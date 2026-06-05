@@ -81,88 +81,38 @@ class MosaicEnv:
     def step(self, action: dict) -> tuple[dict, float, bool, dict]:
         assert self.state is not None, "reset() zuerst aufrufen"
 
+        from agents.shaping import get_player_potential
+
         pi = self.state.current_player
         player = self.state.players[pi]
         
-        # 1. Zustand für Shaping VOR dem Zug
-        # Wir merken uns, wie viele Fliesen in jeder Reihe liegen
-        counts_before = [len(r.tiles) for r in player.pattern_lines] # <-- ANPASSEN, falls dein Attribut anders heißt
-        broken_len_before = len(player.broken_tiles)
+        # 1. Zustand VOR dem Zug merken
         score_before = player.score
+        potential_before = get_player_potential(player)
 
+        # 2. Aktion ausführen
         try:
             self._apply_action(action)
         except Exception as e:
             obs = serialize_state(self.state)
             return obs, -1.0, False, {"error": str(e)}
 
-        # 2. Strategisches Reward-Shaping (Pro Zug)
+        # 3. Zustand NACH dem Zug abfragen
+        score_after = player.score
+        potential_after = get_player_potential(player)
+        
+        done = self.state.phase in ("end", "final")
+
+        # 4. MATHEMATISCH PERFEKTES REWARD SHAPING
         reward = 0.0
         
-        if action["type"] == "stone":
-            ri = action["row"]
-            if 0 <= ri < len(player.pattern_lines):
-                row = player.pattern_lines[ri]
-                
-                # Kapazität der Reihe (Index 0 = Kap. 1, Index 1 = Kap. 2, etc.)
-                capacity = ri + 1 
-                
-                # Wie viele Fliesen lagen vorher drin, wie viele jetzt?
-                count_after = len(row.tiles) # <-- ANPASSEN
-                count_before_action = counts_before[ri]
-                tiles_added = count_after - count_before_action
-                
-                # A: Dein neuer, progressiver Fliesen-Bonus!
-                # Für JEDE neu gelegte Fliese berechnen wir den ansteigenden Wert
-                base_weight = 0.5  # Skalierungsfaktor
-                for k in range(1, tiles_added + 1):
-                    current_position = count_before_action + k
-                    # Formel: (Position / Kapazität) * Gewicht
-                    # Beispiel Reihe 4 (Kap 5): 1. Fliese = 0.1, 2. = 0.2, 5. = 0.5
-                    tile_reward = (current_position / capacity) * base_weight
-                    reward += tile_reward
-
-                # B: Belohnung für passende Farben (Synergie)
-                placed_color = _color(action["color"])
-                if row.color is None or row.color == placed_color:
-                    reward += 0.1
-                else:
-                    reward -= 0.05 # Bestrafung für "falsche" Platzierung
-
-        # C: Extra-Bonus für den Abschluss (Optional, da die letzte Fliese jetzt eh wertvoll ist)
-        # Wir können ihn etwas kleiner machen als vorher, z.B. +0.2 statt +0.5
-        rows_after = [r.is_complete for r in player.pattern_lines]
-        for i in range(len(counts_before)): # Wir iterieren über alle Reihen
-            row_was_complete_before = (counts_before[i] == (i + 1))
-            if rows_after[i] and not row_was_complete_before:
-                reward += 0.2  # Kleiner Bonus als "Zuckerguss" für den Reihen-Abschluss
-
-        # D: Eskalierende Strafe für Bodenfliesen
-        broken_len_after = len(player.broken_tiles)
-        tiles_dropped = broken_len_after - broken_len_before
+        # A: Echte Punkte (oder echte Minuspunkte) aus der Game-Engine
+        reward += float(score_after - score_before)
         
-        if tiles_dropped > 0:
-            # Base-Penalty, der hoch genug ist, um falsche Anreize zu killen
-            base_penalty = 0.4 
-            
-            for k in range(1, tiles_dropped + 1):
-                # An welcher Position in der Strafleiste landet dieser Stein?
-                current_broken_pos = broken_len_before + k
-                
-                # Die Strafe wird pro Platz auf der Leiste immer schlimmer!
-                # 1. Stein: -0.4 | 2. Stein: -0.8 | 3. Stein: -1.2 | 4. Stein: -1.6
-                current_penalty = current_broken_pos * base_penalty
-                reward -= current_penalty
+        # B: Shaping-Delta (Hat sich mein abstraktes Potenzial verbessert?)
+        reward += (potential_after - potential_before)
 
-        # 3. Offizielles Runden/Spielende-Signal (bleibt exakt so, wie wir es repariert haben!)
-        done = self.state.phase in ("end", "final")
-        
-        if done or (self.state.phase == "tiling" and self.state.round_number > 0):
-             round_delta = float(player.score - score_before)
-             if round_delta > 0:
-                 reward += round_delta 
-
-        obs = serialize_state(self.state)
+        # 5. Finale Spielende-Punkte
         info = {
             "phase": self.state.phase,
             "round": self.state.round_number,
@@ -170,14 +120,12 @@ class MosaicEnv:
         }
 
         if done:
-            score_before_end_scoring = player.score
+            score_before_end = player.score
             end_info = self._calculate_end_scoring()
             info.update(end_info)
-            
-            end_delta = float(player.score - score_before_end_scoring)
-            if end_delta > 0:
-                reward += end_delta
+            reward += float(player.score - score_before_end)
 
+        obs = serialize_state(self.state)
         return obs, reward, done, info
 
     def current_player(self) -> int:

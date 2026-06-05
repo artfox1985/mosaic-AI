@@ -109,7 +109,7 @@ if __name__ == "__main__":
     agent_greedy = GreedyAgent()
     agent_mcts_heuristic = HeuristicMCTSAgent(simulations=150, rollout_depth=0)
     agent_alphazero = AlphaZeroAgent(
-        model_path="alphazero_v1.pth",
+        model_version="v1",
         input_size=129, 
         simulations=40
         )
@@ -123,9 +123,9 @@ if __name__ == "__main__":
 
     competitors = {
         "MCTS_Heuristik": (agent_mcts_heuristic, 1000),
-        "AlphaZero_V1": (agent_alphazero, 1000)
+        "Greedy": (agent_greedy, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=10)
+    run_arena(competitors, games_per_matchup=40)

@@ -24,6 +24,7 @@ import pickle
 
 from agents.agent_env import MosaicEnv
 from agents.agents import BaseAgent, RandomAgent
+from agents.shaping import get_player_potential
 
 
 # ── MCTS-Knoten ───────────────────────────────────────────────────────────────
@@ -423,32 +424,14 @@ def evaluate_state(state) -> dict[int, float]:
     for pi in [0, 1]:
         p = state.players[pi]
         
-        # 1. Aktuelle echte Punkte
+        # 1. Echte Punkte + Schätzung
         base_score = p.score
-        
-        # 2. Voraussichtliche Punkte für die aktuelle Runde
         est_score = _estimate_round_score(p)
         
-        # 3. Zukunfts-Potenzial & Strafen (Exakt wie NN Shaping!)
-        potential = 0.0
-        
-        # A: Progressiver Bonus für Fliesen in Reihen
-        for i, row in enumerate(p.pattern_lines):
-            capacity = i + 1
-            if not row.is_complete and len(row.tiles) > 0:
-                base_weight = 0.5
-                # Formel: (Position / Kapazität) * 0.5 für jede liegende Fliese
-                for k in range(1, len(row.tiles) + 1):
-                    potential += (k / capacity) * base_weight
-                    
-        # B: Eskalierende Strafe für den Boden
-        broken_penalty = 0.0
-        base_pen = 0.4
-        for k in range(1, len(p.broken_tiles) + 1):
-            broken_penalty += k * base_pen
+        # 2. Potenzial des Boards laden (Unsere neue Funktion!)
+        potential = get_player_potential(p)
             
-        # Gesamtbewertung dieses Spielers
-        evaluations[pi] = base_score + est_score + potential - broken_penalty
+        evaluations[pi] = base_score + est_score + potential
 
     # --- Tie-Breaker Bonus ---
     if evaluations[0] == evaluations[1]:
