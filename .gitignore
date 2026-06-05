@@ -1,0 +1,40 @@
+# ==========================================
+# Mosaic-AI - Git Ignore File
+# ==========================================
+
+# 1. Projekt-Spezifische Daten (WICHTIG!)
+# Ignoriere Trainingsdaten und trainierte Modelle (zu groß für Git)
+/data/
+/models/
+*.pkl
+*.pth
+*.pt
+
+# 2. Python Cache
+# Diese Dateien generiert Python automatisch, sie gehören nicht ins Repo
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 3. Virtuelle Umgebungen (Virtual Environments)
+# Falls du mal ein lokales Environment anlegst
+venv/
+env/
+.venv/
+.env
+
+# 4. Entwicklungsumgebungen (IDE)
+# Ignoriere deine persönlichen Editor-Einstellungen
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 5. Betriebssystem-Dateien
+# Verhindert, dass unsichtbare Systemdateien hochgeladen werden
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 6. Jupyter Notebook Checkpoints (Falls du später mal welche nutzt)
+.ipynb_checkpoints/
