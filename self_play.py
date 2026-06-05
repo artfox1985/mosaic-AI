@@ -9,6 +9,7 @@ import argparse
 from agents.agent_env import MosaicEnv
 from agents.mcts import MCTSNode
 from agents.alphazero import AlphaZeroAgent
+from config import MODELS_DIR, DATA_DIR
 
 class SelfPlayAgent(AlphaZeroAgent):
     """
@@ -132,14 +133,15 @@ def play_one_game(agent, game_index):
 
 
 def generate_data(num_games=100, simulations=40, version_name="v1"):
-    model_file = f"alphazero_{version_name}.pth"
-    print(f"🚀 Starte Data Generation: {num_games} Spiele (Sims: {simulations} | Gehirn: {model_file})")
+    model_file = MODELS_DIR / f"alphazero_{version_name}.pth"
+    model_path_str = str(model_file) # Sichergehen, dass PyTorch einen String bekommt
+    print(f"🚀 Starte Data Generation: {num_games} Spiele (Sims: {simulations} | Model: {model_file.name})")
     
     os.makedirs("data", exist_ok=True)
     
     # --- Agent lädt das dynamische Modell ---
     agent = SelfPlayAgent(
-        model_path=model_file, 
+        model_version=version_name, 
         input_size=129, 
         simulations=simulations
     )
@@ -160,7 +162,7 @@ def generate_data(num_games=100, simulations=40, version_name="v1"):
         if (i + 1) % 10 == 0 or (i + 1) == num_games:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
             # --- Dynamischer Dateiname für die Trainingsdaten! ---
-            filename = f"data/selfplay_{version_name}_{timestamp}_games_{i+1}.pkl"
+            filename = DATA_DIR / f"selfplay_{version_name}_{timestamp}_games_{i+1}.pkl"
             
             with open(filename, "wb") as f:
                 pickle.dump(all_training_data, f)
@@ -177,7 +179,7 @@ if __name__ == "__main__":
     parser.add_argument("--sims", type=int, default=40, help="MCTS Simulationen pro Zug")
     
     # NEU: Welche Modell-Version soll spielen? (Pflichtfeld)
-    parser.add_argument("--version", type=str, required=True, help="Name des Gehirns, z.B. v1")
+    parser.add_argument("--version", type=str, required=True, help="Name des Models, z.B. v1")
     
     args = parser.parse_args()
     

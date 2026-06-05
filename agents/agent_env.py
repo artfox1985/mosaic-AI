@@ -82,7 +82,12 @@ class MosaicEnv:
         assert self.state is not None, "reset() zuerst aufrufen"
 
         pi = self.state.current_player
-        score_before = self.state.players[pi].score
+        player = self.state.players[pi]
+        
+        # 1. Zustand für Shaping VOR dem Zug
+        rows_before = [r.is_complete for r in player.pattern_lines]
+        broken_len_before = len(player.broken_tiles)
+        score_before = player.score
 
         try:
             self._apply_action(action)
@@ -90,10 +95,43 @@ class MosaicEnv:
             obs = serialize_state(self.state)
             return obs, -1.0, False, {"error": str(e)}
 
-        score_after = self.state.players[pi].score
-        reward = float(score_after - score_before)
+        # 2. Strategisches Reward-Shaping (Pro Zug)
+        # Wir belohnen den Fortschritt, nicht die Punkte, die es noch nicht gibt.
+        reward = 0.0
+        
+        # A: Belohnung für abgeschlossene Reihe
+        rows_after = [r.is_complete for r in player.pattern_lines]
+        for i in range(len(rows_before)):
+            if rows_after[i] and not rows_before[i]:
+                reward += 0.5  # Signifikantes Signal für Fortschritt
+        
+        # B: Belohnung für passende Farben in Reihen
+        if action["type"] == "stone":
+            ri = action["row"]
+            if 0 <= ri < len(player.pattern_lines):
+                row = player.pattern_lines[ri]
+                placed_color = _color(action["color"])
+                if row.color is None or row.color == placed_color:
+                    reward += 0.1 # Kleiner Stupser für "gute" Züge
+                else:
+                    reward -= 0.05 # Bestrafung für "falsche" Platzierung
 
+        # C: Strafe für Bodenfliesen
+        broken_len_after = len(player.broken_tiles)
+        if broken_len_after > broken_len_before:
+            reward -= 0.2 * (broken_len_after - broken_len_before)
+
+        # 3. Offizielles Runden/Spielende-Signal
         done = self.state.phase in ("end", "final")
+        
+        # Wir prüfen, ob die Phase gewechselt hat oder wir im Endstadium sind
+        # Wenn Punkte bei der Abrechnung fallen, addieren wir das Delta zum Reward
+        if done or (self.state.phase == "tiling" and self.state.round_number > 0):
+             # Hier wird das echte Punkte-Delta erst zum Rundenende addiert
+             round_delta = float(player.score - score_before)
+             if round_delta > 0:
+                 reward += round_delta 
+
         obs = serialize_state(self.state)
         info = {
             "phase": self.state.phase,
@@ -104,7 +142,8 @@ class MosaicEnv:
         if done:
             end_info = self._calculate_end_scoring()
             info.update(end_info)
-            reward += float(self.state.players[pi].score - score_after)
+            # Finale Abrechnung
+            reward += float(player.score - score_before)
 
         return obs, reward, done, info
 

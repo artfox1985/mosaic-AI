@@ -98,21 +98,31 @@ class OuterFields(ScoringTile):
 # ── 6. Eckkuppelplatten ──────────────────────────────────────────────────────
 class CornerTiles(ScoringTile):
     """
-    3 Punkte für Eckplatte nicht vollständig gefüllt,
-    8 Punkte für vollständig gefüllte Eckplatte (alle 4 Spaces).
+    3 Punkte für jede vollständig gefüllte obere Eckplatte.
+    8 Punkte für jede vollständig gefüllte untere Eckplatte.
+    Vollständig bedeutet: Alle 4 Felder (Spaces) der Platte sind belegt.
     """
     def score(self, player):
-        corners = [(0,0),(0,2),(2,0),(2,2)]  # Slot-Koordinaten der 4 Ecken
         pts = 0
-        for sr, sc in corners:
+        
+        # --- OBERE ECKEN (Je 3 Punkte) ---
+        top_corners = [(0, 0), (0, 2)]
+        for sr, sc in top_corners:
             slot = player.dome_grid.dome_slots[sr][sc]
-            if slot is None:
-                continue
-            filled = sum(1 for sp in slot.spaces if sp.is_filled)
-            if filled == 4:
-                pts += 8
-            elif filled > 0:
-                pts += 3
+            if slot is not None:
+                filled = sum(1 for sp in slot.spaces if sp.is_filled)
+                if filled == 4:
+                    pts += 3
+                    
+        # --- UNTERE ECKEN (Je 8 Punkte) ---
+        bottom_corners = [(2, 0), (2, 2)]
+        for sr, sc in bottom_corners:
+            slot = player.dome_grid.dome_slots[sr][sc]
+            if slot is not None:
+                filled = sum(1 for sp in slot.spaces if sp.is_filled)
+                if filled == 4:
+                    pts += 8
+                    
         return pts
 
 
@@ -149,7 +159,7 @@ ALL_SCORING_TILES: list[ScoringTile] = [
     DiagonalRows(2,    "Diagonale Reihen",    "10 Pkt je vollständige Diagonale (max. 2×)",           "↗️"),
     WildFields(3,      "Mehrfarbige Felder",  "2 Pkt je Wildcard-Feld wenn ALLE belegt",              "🌈"),
     OuterFields(4,     "Äußere Felder",       "1 Pkt je Fliese auf dem Rand der Kuppel",             "⬜"),
-    CornerTiles(5,     "Eckplatten",          "3/8 Pkt je Eckkuppelplatte (teilw./vollst.)",          "🔲"),
+    CornerTiles(5,     "Eckplatten",          "3/8 Pkt je Eckkuppelplatte (obere/untere)",          "🔲"),
     EmptySpecialFields(6, "Spezialfelder",    "−3 Pkt je leeres Spezialfliesenfeld",                 "⭐"),
     ColorfulRows(7,    "Farbenreiche Reihen", "4 Pkt je Reihe mit ≥5 verschiedenen Farben",          "🎨"),
 ]

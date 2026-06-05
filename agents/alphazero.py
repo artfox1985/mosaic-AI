@@ -3,15 +3,25 @@ import math
 from agents.mcts import MCTSAgent, MCTSNode
 from agents.neural_net import MosaicNet, state_to_tensor, action_to_id
 from engine.serializer import serialize_state
+from config import MODELS_DIR
 
 class AlphaZeroAgent(MCTSAgent):
     """
     Der finale Meister-Agent. Nutzt MCTS (mit der AlphaZero PUCT Formel) und 
     bewertet alle Knotenpunkte blitzschnell mit dem Neuronalen Netz auf der GPU!
     """
-    def __init__(self, model_path="alphazero_v1.pth", input_size=129, simulations=40, **kwargs):
-        # rollout_depth=0: Keine blinden Zufallszüge mehr!
+    def __init__(self, model_version="v1", input_size=129, simulations=40, **kwargs):
+        self.model_version = model_version
+        self.input_size = input_size
+        
+        
         super().__init__(simulations=simulations, rollout_depth=0, **kwargs)
+
+        # Dynamischer Pfad-Aufbau: models/alphazero_v1.pth
+        model_path = MODELS_DIR / f"alphazero_{model_version}.pth"
+
+        if not model_path.exists():
+            raise FileNotFoundError(f"Das Modell '{model_path}' wurde nicht gefunden!")
 
         # --- 1. CUDA & GERÄT SETUP ---
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -80,6 +90,14 @@ class AlphaZeroAgent(MCTSAgent):
             obs = serialize_state(env.state)
             priors = self.node_priors.get(str(obs), None)
 
+            # Policy Normalisierung ---
+            # Wir berechnen die Summe der Wahrscheinlichkeiten ALLER legalen Züge
+            valid_p_sum = 0.0
+            if priors is not None:
+                for child in node.children:
+                    valid_p_sum += priors[action_to_id(child.action)]
+            # ----------------------------------          
+
             for child in node.children:
                 # 1. Q-Value: Was hat die Simulation bisher gezeigt? (Exploitation)
                 q = child.value / child.visits if child.visits > 0 else 0.0
@@ -87,7 +105,7 @@ class AlphaZeroAgent(MCTSAgent):
                 # 2. P-Value: Was sagt das Bauchgefühl des Netzes? (Prior)
                 if priors is not None:
                     a_id = action_to_id(child.action)
-                    p = priors[a_id]
+                    p = priors[a_id] / valid_p_sum
                 else:
                     p = 1.0 / len(node.children)
 

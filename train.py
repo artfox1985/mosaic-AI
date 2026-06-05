@@ -5,14 +5,17 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+# Unsere dynamischen Pfade aus der Config laden
+from config import MODELS_DIR, DATA_DIR
+
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_model_path=None):
-    # 1. Daten laden (Nutzt jetzt die importierte Klasse)
-    dataset = MosaicDataset("data")
+def train(version_name, load_version=None):
+    # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
+    dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
-        print("Fehler: Keine Daten gefunden!")
+        print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
         
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
@@ -25,16 +28,30 @@ def train(version_name, load_model_path=None):
     model = MosaicNet(input_size=dataset.input_size, num_actions=400)
     
     # Warm Start?
-    if load_model_path:
-        print(f"Lade altes Gehirn als Startpunkt: {load_model_path}")
-        model.load_state_dict(torch.load(load_model_path, map_location=device))
+    if load_version:
+        # Baut den Pfad: models/alphazero_v1.pth
+        load_path = MODELS_DIR / f"alphazero_{load_version}.pth"
         
+        if load_path.exists():
+            print(f"📥 Lade altes Model als Startpunkt: {load_path.name}")
+            model.load_state_dict(torch.load(str(load_path), map_location=device))
+        else:
+            print(f"⚠️ Warnung: Start-Modell '{load_path}' nicht gefunden. Trainiere von null!")
+            
     model.to(device)
     
     # 4. Training Parameter
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     mse_loss = nn.MSELoss()
-    epochs = 15  
+    
+    # --- NEU: Dynamische Epochen-Anzahl ---
+    if load_version:
+        epochs = 10
+        print(f"🔄 Warm-Start erkannt: Trainiere für {epochs} Epochen.")
+    else:
+        epochs = 15
+        print(f"🆕 Neues Modell: Trainiere für {epochs} Epochen.")
+    # --------------------------------------
     
     # 5. DIE SCHLEIFE
     for epoch in range(epochs):
@@ -63,14 +80,15 @@ def train(version_name, load_model_path=None):
         
     # 6. Speichern
     model.cpu()
-    save_path = f"alphazero_{version_name}.pth"
-    torch.save(model.state_dict(), save_path)
-    print(f"\n✅ Training beendet! Gespeichert als '{save_path}'.")
+    # Baut den Pfad: models/alphazero_v2.pth
+    save_path = MODELS_DIR / f"alphazero_{version_name}.pth"
+    torch.save(model.state_dict(), str(save_path))
+    print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trainiere das Mosaic-AI Neuronale Netz")
     parser.add_argument("--name", type=str, required=True, help="Name der neuen Version, z.B. v2")
-    parser.add_argument("--load", type=str, default=None, help="Pfad zum alten Modell (Warm Start)")
+    parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     args = parser.parse_args()
     
-    train(version_name=args.name, load_model_path=args.load)
+    train(version_name=args.name, load_version=args.load)
