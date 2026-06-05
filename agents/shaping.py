@@ -35,7 +35,7 @@ def get_player_potential(player) -> float:
             if slot is not None:
                 # Jede liegende Platte ist extrem wertvoll, 
                 # da sie überhaupt erst Punkte ermöglicht!
-                dome_bonus += 2.0 
+                dome_bonus += 0.5 
     potential += dome_bonus   
         
     return potential - broken_penalty

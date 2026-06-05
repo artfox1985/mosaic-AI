@@ -250,11 +250,6 @@ class MCTSAgent(BaseAgent):
     def _rollout(self, env: MosaicEnv) -> dict[int, float]:
         """
         Spiele zufällig bis zum Ende (oder bis rollout_depth Schritte).
-
-        Reward = normalisierte Punktedifferenz:
-          +1.0  wenn der Spieler klar führt
-           0.5  bei Gleichstand
-           0.0  wenn der Spieler klar hinten liegt
         """
         depth = 0
         done = False
@@ -270,12 +265,18 @@ class MCTSAgent(BaseAgent):
             depth += 1
 
         scores = env.scores()
-        diff = scores[0] - scores[1]  # positiv = P0 führt
+        
+        # --- TERMINAL REWARD LOGIK ---
+        # Wenn das Spiel 0:0 endet, bestrafen wir das Ergebnis massiv,
+        # damit der MCTS-Baum diese Züge als schlecht bewertet.
+        if scores[0] == 0 and scores[1] == 0:
+            diff = -15.0  # Künstliche Strafe für "Nichts erreicht"
+        else:
+            diff = scores[0] - scores[1]  # positiv = P0 führt
 
         # Normalisierung: sigmoid-ähnlich auf [0, 1]
-        # diff=0 → 0.5, diff=+10 → ~0.75, diff=-10 → ~0.25
         import math
-        scale = 10.0  # ab ~10 Punkte Vorsprung wird es sehr sicher
+        scale = 10.0  
         p0 = 1.0 / (1.0 + math.exp(-diff / scale))
         p1 = 1.0 - p0
 

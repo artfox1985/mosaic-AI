@@ -413,7 +413,6 @@ class Game:
              raise ValueError(f"Slot ({row}, {col}) ist nicht frei.")
 
         # 2. Kachel finden
-        from engine.game import _find_in_display
         tile = _find_in_display(self.state, tile_id)
         if not tile: raise ValueError("Kachel nicht im Display")
         

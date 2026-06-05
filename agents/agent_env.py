@@ -80,6 +80,13 @@ class MosaicEnv:
         """
         player = self.state.players[player_idx]
         
+        # Falls Display leer, aber noch Kacheln da: Nachfüllen
+        while not self.state.dome_display and self.state.dome_tile_pool:
+            self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
+            
+        if not self.state.dome_display:
+            return # Keine Kacheln mehr für Startplatzierung verfügbar
+        
         # Zufällige Wahl aus dem Display
         tile = random.choice(self.state.dome_display)
         
@@ -171,6 +178,7 @@ class MosaicEnv:
         import pickle
         new_env = MosaicEnv(self.random_scoring_tiles)
         new_env.state = pickle.loads(pickle.dumps(self.state, -1))
+        new_env._game.state = new_env.state   # ← State synchronisieren
         new_env._prev_scores = list(self._prev_scores)
         return new_env
 
@@ -184,10 +192,6 @@ class MosaicEnv:
         actions = []
         state = self.state
         p = state.active_player
-
-        #if p.start_dome_tile is not None:
-        #    self._auto_place_start_tiles()
-        #    return self._drafting_actions()
 
         for m in generate_valid_moves(state):
             actions.append({
@@ -446,7 +450,8 @@ class MosaicEnv:
                 while len(state.dome_display) < 3 and state.dome_tile_pool:
                     state.dome_display.append(state.dome_tile_pool.pop(0))
                 setup_new_round(state)
-                self._auto_place_start_tiles()
+                self._place_initial_dome_tile_ai(1 - state.current_player)
+                self._place_initial_dome_tile_ai(state.current_player)
 
         if state.phase == "drafting":
             self._check_phase_transition()
@@ -494,31 +499,6 @@ class MosaicEnv:
             results[pi] = res
         self.state.phase = "final"
         return {"end_scoring": results}
-
-    def _auto_place_start_tiles(self) -> None:
-        from engine.game import _find_in_display
-        import copy
-
-        state = self.state
-        for player in state.players:
-            if player.start_dome_tile != "Muss_noch_gezogen_werden":
-                continue
-            if not state.dome_display:
-                continue
-            tile = copy.deepcopy(state.dome_display.pop(0))
-            if state.dome_tile_pool:
-                state.dome_display.append(state.dome_tile_pool.pop(0))
-            placed = False
-            for sr in range(3):
-                for sc in range(3):
-                    if player.dome_grid.dome_slots[sr][sc] is None:
-                        player.dome_grid.place_dome_tile(tile, sr, sc)
-                        player.start_dome_tile = None
-                        placed = True
-                        break
-                if placed:
-                    break
-
 
 def _color(v: str):
     from engine.tile import TileColor
