@@ -124,3 +124,4 @@ class AlphaZeroAgent(MCTSAgent):
     def reset_for_new_game(self):
         """Leert alle Caches, um RAM freizugeben."""
         self.node_priors = {}
+        

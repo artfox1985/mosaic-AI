@@ -28,4 +28,15 @@ def get_player_potential(player) -> float:
     for k in range(1, len(player.broken_tiles) + 1):
         broken_penalty += k * base_pen
         
+    # C: Bonus für das Fundament (Kuppelplatten) ---
+    dome_bonus = 0.0
+    for r in player.dome_grid.dome_slots:
+        for slot in r:
+            if slot is not None:
+                # Jede liegende Platte ist extrem wertvoll, 
+                # da sie überhaupt erst Punkte ermöglicht!
+                dome_bonus += 2.0 
+    potential += dome_bonus   
+        
     return potential - broken_penalty
+    

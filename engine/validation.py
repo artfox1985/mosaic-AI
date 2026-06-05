@@ -221,3 +221,30 @@ def generate_valid_moves(state: "GameState") -> list[Move]:
                 moves.append(m)
 
     return moves
+
+def validate_moon_take(state: "GameState", move: "Move") -> Optional[str]:
+    """
+    Validiert die Sonderaktion C (Globaler Mond-Zug).
+    Prüft, ob die Fliesenfarbe auf den Mondbereichen verfügbar ist und 
+    ob sie in die gewählte Musterreihe gelegt werden darf.
+    """
+    color = move.take.color
+    row_index = move.place.row_index
+
+    # 1. Ist die Farbe überhaupt oben auf den Mondbereichen verfügbar?
+    available_moon_colors = set()
+    for f in state.factories:
+        available_moon_colors.update(f.moon_top_colors())
+    available_moon_colors.update(state.large_factory.moon_colors())
+
+    if color not in available_moon_colors:
+        return f"Aktion C ungültig: Keine {color.value}-Fliesen liegen oben auf den Mondbereichen."
+
+    # 2. Darf der Spieler diese Steine legal ablegen?
+    # (Wir nutzen hier deine existierende Platzierungs-Prüfung)
+    err = _validate_place(state, color, row_index)
+    if err:
+        return err
+
+    return None
+    

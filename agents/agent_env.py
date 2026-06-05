@@ -30,7 +30,7 @@ import os
 from engine.setup import GameState, setup_new_game, setup_new_round, NUM_ROUNDS
 from engine.serializer import serialize_state
 from engine.scoring import ALL_SCORING_TILES, calculate_end_scoring
-
+from engine.game import Game
 
 class MosaicEnv:
     """
@@ -47,27 +47,56 @@ class MosaicEnv:
         self.random_scoring_tiles = random_scoring_tiles
         self.state: GameState | None = None
         self._prev_scores: list[int] = [0, 0]
+        self._game = Game()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
     def reset(self, seed: int | None = None) -> tuple[dict, dict]:
-        self.state = setup_new_game(seed=seed)
-
-        if self.random_scoring_tiles:
-            ids = random.sample([t.id for t in ALL_SCORING_TILES], 3)
-        else:
-            ids = [0, 1, 2]
-        self.state.scoring_tile_ids = ids
-
-        self._auto_place_start_tiles()
+        # 1. Spiel starten
+        first_player = random.choice([0, 1])
+        self.state = self._game.start(first_player=first_player, seed=seed, random_scoring=self.random_scoring_tiles)
+        
+        # 2. Regelkonforme Platzierung über die Engine
+        self._place_initial_dome_tile_ai(1 - first_player) # Gegner
+        self._place_initial_dome_tile_ai(first_player)     # Startspieler
+        
+        # 3. Spielphase fixieren
+        self.state.phase = "drafting"
+        self.state.current_player = first_player
         self._prev_scores = [p.score for p in self.state.players]
 
-        obs = serialize_state(self.state)
+        # 4. Info-Objekt für KI
+        ids = self.state.scoring_tile_ids
         info = {
             "scoring_tile_ids": ids,
             "scoring_tile_names": [t.name for t in ALL_SCORING_TILES if t.id in ids],
         }
-        return obs, info
+        return serialize_state(self.state), info
+        
+    def _place_initial_dome_tile_ai(self, player_idx: int):
+        """
+        Nutzt die neue Game-Logik für die Platzierung.
+        Die KI wählt hier (zuerst noch zufällig, kann später durch MCTS erweitert werden).
+        """
+        player = self.state.players[player_idx]
+        
+        # Zufällige Wahl aus dem Display
+        tile = random.choice(self.state.dome_display)
+        
+        # Zufälliger Slot aus den freien Feldern
+        empty_slots = player.dome_grid.empty_slots()
+        row, col = random.choice(empty_slots)
+        rotation = random.choice([0, 90, 180, 270])
+        
+        # Aufruf der zentralen Logik in Game
+        # Wir nutzen _game-Instanz, die in MosaicEnv verfügbar sein sollte
+        self._game.apply_start_placement(
+            player_idx=player_idx,
+            tile_id=tile.tile_id,
+            row=row,
+            col=col,
+            rot=rotation
+        )
 
     def valid_actions(self) -> list[dict]:
         if self.state is None:
@@ -156,9 +185,9 @@ class MosaicEnv:
         state = self.state
         p = state.active_player
 
-        if p.start_dome_tile is not None:
-            self._auto_place_start_tiles()
-            return self._drafting_actions()
+        #if p.start_dome_tile is not None:
+        #    self._auto_place_start_tiles()
+        #    return self._drafting_actions()
 
         for m in generate_valid_moves(state):
             actions.append({

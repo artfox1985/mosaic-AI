@@ -26,10 +26,14 @@ def execute_move(state: "GameState", move: Move) -> None:
     """
     Führt einen validierten Zug aus und aktualisiert den GameState.
     """
-    if "MOON" in move.take.source.name:
+    is_global_moon_take = (
+        move.take.source.name == "SMALL_FACTORY_MOON" and 
+        move.take.factory_id is None
+    )
+    
+    if is_global_moon_take:
         _execute_moon_take(state, move.take.color, move.place.row_index)
         return  # Fertig! Der Rest von execute_move wird übersprungen.
-    
     
     # 1. Steine nehmen
     tiles, got_marker = _execute_take(state, move)

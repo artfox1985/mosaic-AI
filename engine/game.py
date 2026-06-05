@@ -322,18 +322,14 @@ def run_tiling_phase(
                 continue
 
             # Punkte vor der Ausführung berechnen (Stein noch nicht gelegt)
-            # → nach execute wäre der Space schon gefüllt
             execute_tiling_action(state, player_idx, action)
 
-            # Scoring für den gerade platzierten Stein
-            pts = score_placed_tile(
+            # Scoring für den gerade platzierten Stein (sauber entpackt!)
+            pts, _ = score_placed_tile(
                 state.players[player_idx],
                 action.slot_row, action.slot_col, action.space_index,
             )
-            if isinstance(pts, tuple):
-                scores[player_idx] += pts[0]
-            else:
-                scores[player_idx] += pts
+            scores[player_idx] += pts
 
         # Special-Tiles
         if special_decisions:
@@ -389,13 +385,48 @@ class Game:
         self.state: Optional[GameState] = None
 
     def start(
-        self,
-        player_names: list[str] | None = None,
-        first_player: int = 0,
+        self, 
+        player_names: list[str] | None = None, 
+        first_player: int = 0, 
         seed: int | None = None,
+        random_scoring: bool = True
     ) -> GameState:
         self.state = setup_new_game(player_names, first_player, seed)
+        
+        from engine.scoring import ALL_SCORING_TILES
+        import random
+        
+        # Jetzt kennt Python 'random_scoring'
+        if random_scoring:
+            self.state.scoring_tile_ids = random.sample([t.id for t in ALL_SCORING_TILES], 3)
+        else:
+            self.state.scoring_tile_ids = [0, 1, 2]
+            
+        self.state.current_player = first_player
         return self.state
+
+    def apply_start_placement(self, player_idx: int, tile_id: int, row: int, col: int, rot: int):
+        player = self.state.players[player_idx]
+        
+        # 1. Validierung: Ist der Slot wirklich frei? (Schutz gegen fehlerhafte KI-Entscheidungen)
+        if player.dome_grid.dome_slots[row][col] is not None:
+             raise ValueError(f"Slot ({row}, {col}) ist nicht frei.")
+
+        # 2. Kachel finden
+        from engine.game import _find_in_display
+        tile = _find_in_display(self.state, tile_id)
+        if not tile: raise ValueError("Kachel nicht im Display")
+        
+        # 3. Ausführen
+        self.state.dome_display.remove(tile)
+        # Display auffüllen – ACHTUNG: Hier fehlt in deinem Code noch die Auffüll-Regel!
+        # Wenn wir eine Kachel aus Display G nehmen, muss sofort vom Stapel F aufgefüllt werden.
+        if self.state.dome_tile_pool:
+            self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
+            
+        tile.apply_rotation(rot)
+        player.dome_grid.place_dome_tile(tile, row, col)
+        player.start_dome_tile = None
 
     # ------------------------------------------------------------------
     # Drafting-Phase
@@ -436,14 +467,15 @@ class Game:
             execute_take_bonus_chip(self.state, move)
             self.state.switch_player()
         else:
-            # Sobald das Wort "MOON" auftaucht, ist es Aktion C!
-            is_moon_take = "MOON" in move.take.source.name
+            # Eindeutige Erkennung von Aktion C (ohne fuzzy String-Matching)
+            is_global_moon_take = (
+                move.take.source.name == "SMALL_FACTORY_MOON" and 
+                move.take.factory_id is None
+            )
             
-            if is_moon_take:
-                # Da wir die Standard-Validierung überspringen, müssen wir kurz 
-                # prüfen, ob die Ziellinie die Farbe überhaupt akzeptiert.
-                from engine.validation import _validate_place
-                err = _validate_place(self.state, move.take.color, move.place.row_index)
+            if is_global_moon_take:
+                from engine.validation import validate_moon_take
+                err = validate_moon_take(self.state, move)
                 if err:
                     raise ValueError(err)
             else:
