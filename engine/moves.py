@@ -55,12 +55,13 @@ class TakeAction:
     moon_order: list[TileColor]     = field(default_factory=list)
 
     def __post_init__(self):
-        if self.source in (TakeSource.SMALL_FACTORY_SUN, TakeSource.SMALL_FACTORY_MOON):
-            assert self.factory_id is not None, \
-                "factory_id muss gesetzt sein für kleine Fabriken"
-        else:
-            assert self.factory_id is None, \
-                "factory_id muss None sein für die große Fabrik"
+        # Sonne: Braucht zwingend eine factory_id
+        if self.source == TakeSource.SMALL_FACTORY_SUN:
+            assert self.factory_id is not None, "factory_id muss gesetzt sein für kleine Fabriken (Sonne)"
+            
+        # Mond: factory_id darf None sein! (Das ist unser Signal für Aktion C / Globaler Mond)
+        elif self.source == TakeSource.SMALL_FACTORY_MOON:
+            pass # Alles gut, factory_id = None ist erlaubt!
 
 
 @dataclass

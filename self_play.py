@@ -150,6 +150,9 @@ def generate_data(num_games=100, simulations=40, version_name="v1"):
     t_start = time.time()
     
     for i in range(num_games):
+        if hasattr(agent, 'reset_for_new_game'):
+                agent.reset_for_new_game()
+        
         t0 = time.time()
         print(f"Spiele Partie {i+1}/{num_games}... ", end="", flush=True)
         

@@ -26,6 +26,11 @@ def execute_move(state: "GameState", move: Move) -> None:
     """
     Führt einen validierten Zug aus und aktualisiert den GameState.
     """
+    if "MOON" in move.take.source.name:
+        _execute_moon_take(state, move.take.color, move.place.row_index)
+        return  # Fertig! Der Rest von execute_move wird übersprungen.
+    
+    
     # 1. Steine nehmen
     tiles, got_marker = _execute_take(state, move)
 
@@ -54,6 +59,42 @@ def execute_move(state: "GameState", move: Move) -> None:
         f"von {src_str} → {dest} {filled}"
     )
 
+def _execute_moon_take(state, color, row_index: int) -> None:
+    """
+    Sonderaktion (Aktion C): Nimmt alle obersten Fliesen der gewählten Farbe
+    vom Mondbereich ALLER Manufakturen (klein + groß) gleichzeitig.
+    """
+    p = state.active_player
+    taken = []
+
+    # 1. Kleine Fabriken abräumen
+    for f in state.factories:
+        if color in f.moon_top_colors():
+            taken += f.take_from_moon(color)
+            # Bonus-Chip Logik
+            if f.is_fully_empty and f.bonus_chip and not f.bonus_chip_revealed:
+                f.bonus_chip_revealed = True
+                state.log_event(f"Fabrik {f.factory_id}: Bonus-Chip aufgedeckt!")
+
+    # 2. Große Manufaktur (Moon) abräumen
+    got_marker = False
+    if color in state.large_factory.moon_colors():
+        tiles, got_marker = state.large_factory.take_from_moon(color)
+        taken += tiles
+
+    # 3. Sicherheitscheck
+    if not taken:
+        raise ValueError(f"Keine {color.value}-Fliesen oben auf Moon-Seiten gefunden.")
+
+    # 4. Startspieler-Marker vergeben
+    if got_marker:
+        _apply_first_player_marker(state)
+
+    # 5. Steine auf die Musterreihe legen
+    # (Ich nehme an, _execute_place ist ebenfalls in execution.py)
+    _execute_place(state, taken, color, row_index)
+
+    state.log_event(f"🌙 {p.name}: Mond-Aktion — {len(taken)}× {color.value} genommen.")
 
 # ---------------------------------------------------------------------------
 # Take

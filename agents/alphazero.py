@@ -105,7 +105,7 @@ class AlphaZeroAgent(MCTSAgent):
                 # 2. P-Value: Was sagt das Bauchgefühl des Netzes? (Prior)
                 if priors is not None:
                     a_id = action_to_id(child.action)
-                    p = priors[a_id] / valid_p_sum
+                    p = priors[a_id] / (valid_p_sum + 1e-8)
                 else:
                     p = 1.0 / len(node.children)
 
@@ -120,3 +120,7 @@ class AlphaZeroAgent(MCTSAgent):
             env.step(node.action)
 
         return node
+        
+    def reset_for_new_game(self):
+        """Leert alle Caches, um RAM freizugeben."""
+        self.node_priors = {}

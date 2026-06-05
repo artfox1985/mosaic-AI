@@ -415,7 +415,7 @@ def run_episode_mcts(
 def evaluate_state(state) -> dict[int, float]:
     """
     Bewertet den aktuellen Spielstand heuristisch, ohne ihn bis zum Ende zu spielen.
-    Gibt die geschätzten 'wahren' Punkte für {0: punkte_p0, 1: punkte_p1} zurück.
+    Spiegelt exakt das Reward-Shaping des Neuronalen Netzes wider!
     """
     from engine.serializer import _estimate_round_score
     
@@ -426,24 +426,31 @@ def evaluate_state(state) -> dict[int, float]:
         # 1. Aktuelle echte Punkte
         base_score = p.score
         
-        # 2. Voraussichtliche Punkte für die aktuelle Runde (inkl. Strafen)
+        # 2. Voraussichtliche Punkte für die aktuelle Runde
         est_score = _estimate_round_score(p)
         
-        # 3. Zukunfts-Potenzial (Teilweise gefüllte Musterreihen belohnen!)
-        # Ein Stein in einer unfertigen Reihe bringt noch keine Punkte, ist aber wertvoll.
+        # 3. Zukunfts-Potenzial & Strafen (Exakt wie NN Shaping!)
         potential = 0.0
-        for row in p.pattern_lines:
+        
+        # A: Progressiver Bonus für Fliesen in Reihen
+        for i, row in enumerate(p.pattern_lines):
+            capacity = i + 1
             if not row.is_complete and len(row.tiles) > 0:
-                # Je voller die Reihe, desto wertvoller (z.B. 4/5 voll = sehr gut)
-                fill_ratio = len(row.tiles) / row.capacity
-                potential += fill_ratio * 2.0  # Max 2 Punkte Bonus für fast volle Reihen
-                
-        evaluations[pi] = base_score + est_score + potential
+                base_weight = 0.5
+                # Formel: (Position / Kapazität) * 0.5 für jede liegende Fliese
+                for k in range(1, len(row.tiles) + 1):
+                    potential += (k / capacity) * base_weight
+                    
+        # B: Eskalierende Strafe für den Boden
+        broken_penalty = 0.0
+        base_pen = 0.4
+        for k in range(1, len(p.broken_tiles) + 1):
+            broken_penalty += k * base_pen
+            
+        # Gesamtbewertung dieses Spielers
+        evaluations[pi] = base_score + est_score + potential - broken_penalty
 
-        # --- NEU: Tie-Breaker Bonus für das KI-Gehirn ---
-    # Wenn die KI ein extrem knappes Spiel voraussieht, geben wir dem 
-    # Besitzer des Startsteins einen winzigen mathematischen Bonus (+0.1),
-    # damit die KI weiß, dass sie bei Gleichstand gewinnt!
+    # --- Tie-Breaker Bonus ---
     if evaluations[0] == evaluations[1]:
         if state.players[0].holds_first_player_marker:
             evaluations[0] += 0.1
@@ -457,39 +464,54 @@ class HeuristicMCTSAgent(MCTSAgent):
     """
     Ein MCTS-Agent, der NICHT mehr zufällig bis zum Ende spielt,
     sondern das Brett nach wenigen Schritten (oder sofort) intelligent bewertet.
+    Nutzt Greedy-Bias mit Shaping-Rewards für die Rollouts!
     """
     def __init__(self, simulations=200, rollout_depth=3, **kwargs):
-        # rollout_depth=3 bedeutet: Er spielt nur noch 3 Züge voraus und schätzt dann!
         super().__init__(simulations=simulations, rollout_depth=rollout_depth, **kwargs)
 
     def _rollout(self, env):
-        """Überschreibt das Rollout: Nutzt die Heuristik statt Zufall!"""
+        """Überschreibt das Rollout: Nutzt Greedy-Shaping statt Zufall!"""
         depth = 0
         done = False
 
-        # Spiele noch 'rollout_depth' Züge zufällig weiter, um taktische Fehler zu vermeiden
+        # Spiele noch 'rollout_depth' Züge GREEDY weiter, um taktische Fehler zu vermeiden
         while not done and depth < self.rollout_depth:
             actions = env.valid_actions()
             if not actions:
                 break
-            action = self._rollout_agent.choose(actions, {})
-            _, _, done, _ = env.step(action)
+            
+            # --- GREEDY-BIAS ---
+            # Statt random.choice() testen wir ein paar Aktionen kurz an
+            best_action = random.choice(actions) # Fallback
+            best_reward = -float('inf')
+            
+            # Wir testen max 5 Aktionen (Performance-Schutz für MCTS)
+            sample_actions = random.sample(actions, min(5, len(actions)))
+            
+            for a in sample_actions:
+                test_env = env.clone()
+                # Teste den Zug und schau, was das Shaping-System dazu sagt
+                _, r, _, _ = test_env.step(a)
+                if r > best_reward:
+                    best_reward = r
+                    best_action = a
+            
+            # Führe die beste Aktion in der echten Rollout-Umgebung aus
+            _, _, done, _ = env.step(best_action)
             depth += 1
 
         # --- DER MAGISCHE MOMENT: Die Heuristik übernimmt ---
         if done:
-            # Spiel ist wirklich vorbei, nimm die echten Punkte
             scores = env.scores()
             diff = scores[0] - scores[1]
         else:
-            # Spiel läuft noch, nutze unser "Heuristik-Gehirn"
             evals = evaluate_state(env.state)
             diff = evals[0] - evals[1]
 
         # Normalisierung der Punktdifferenz auf 0% bis 100% (Sigmoid)
-        # diff=0 -> 50% Winchance, diff=+10 -> ~73% Winchance
         scale = 10.0 
-        p0_win_prob = 1.0 / (1.0 + math.exp(-diff / scale))
+        safe_diff = max(min(diff, 200.0), -200.0)
+        p0_win_prob = 1.0 / (1.0 + math.exp(-safe_diff / scale))
         p1_win_prob = 1.0 - p0_win_prob
 
         return {0: p0_win_prob, 1: p1_win_prob}

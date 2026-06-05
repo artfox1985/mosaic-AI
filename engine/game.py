@@ -330,7 +330,10 @@ def run_tiling_phase(
                 state.players[player_idx],
                 action.slot_row, action.slot_col, action.space_index,
             )
-            scores[player_idx] += pts
+            if isinstance(pts, tuple):
+                scores[player_idx] += pts[0]
+            else:
+                scores[player_idx] += pts
 
         # Special-Tiles
         if special_decisions:
@@ -353,7 +356,7 @@ class GameResult:
     """Ergebnis einer abgeschlossenen Partie."""
     winner:        Optional[int]        # 0 oder 1, None = Unentschieden
     scores:        list[int]            # [score_p0, score_p1]
-    filled_spaces: list[int]            # [spaces_p0, spaces_p1] — Tiebreaker
+    filled_spaces: list[int]            # [spaces_p0, spaces_p1] — Info-Feld (Kein Tiebreaker!)
     log:           list[str]
 
 
@@ -419,21 +422,35 @@ class Game:
             if err:
                 raise ValueError(err)
             execute_dome_move(self.state, move)
+            self.state.switch_player()
         elif isinstance(move, DrawFromStackMove):
             err = validate_draw_from_stack(self.state, move)
             if err:
                 raise ValueError(err)
             execute_draw_from_stack(self.state, move)
+            self.state.switch_player()
         elif isinstance(move, TakeBonusChipMove):
             err = validate_take_bonus_chip(self.state, move)
             if err:
                 raise ValueError(err)
             execute_take_bonus_chip(self.state, move)
-            # Bonusplättchen nehmen: kein Spielerwechsel, kein Token-Verbrauch
+            self.state.switch_player()
         else:
-            err = validate_move(self.state, move)
-            if err:
-                raise ValueError(err)
+            # Sobald das Wort "MOON" auftaucht, ist es Aktion C!
+            is_moon_take = "MOON" in move.take.source.name
+            
+            if is_moon_take:
+                # Da wir die Standard-Validierung überspringen, müssen wir kurz 
+                # prüfen, ob die Ziellinie die Farbe überhaupt akzeptiert.
+                from engine.validation import _validate_place
+                err = _validate_place(self.state, move.take.color, move.place.row_index)
+                if err:
+                    raise ValueError(err)
+            else:
+                err = validate_move(self.state, move)
+                if err:
+                    raise ValueError(err)
+                    
             execute_move(self.state, move)
             self.state.switch_player()
 
@@ -492,6 +509,16 @@ class Game:
             winner = 1
         else:
             winner = None  # echtes Unentschieden
+            
+        # FIX: Berechne die gefüllten Spaces für das Info-Feld sicher
+        filled = []
+        for p in self.state.players:
+            count = 0
+            for row in p.dome_grid.dome_slots:
+                for slot in row:
+                    if slot is not None:
+                        count += sum(1 for space in slot.spaces if space.is_filled)
+            filled.append(count)
 
         return GameResult(
             winner=winner,
@@ -499,3 +526,12 @@ class Game:
             filled_spaces=filled,
             log=self.state.log,
         )
+        
+    def apply_single_tiling(self, player_idx: int, action: TilingAction):
+        """Führt eine einzelne Tiling-Aktion sofort aus (für Web-Interaktivität)."""
+        err = validate_tiling_action(self.state, player_idx, action)
+        if err:
+            raise ValueError(err)
+            
+        # Nutze die Funktion, die wir vorhin repariert haben!
+        execute_full_tiling(self.state, player_idx, action)
