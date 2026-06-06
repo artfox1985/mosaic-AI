@@ -26,7 +26,25 @@ from agents.agent_env import MosaicEnv
 from agents.agents import BaseAgent, RandomAgent
 from agents.shaping import get_player_potential
 
+def _diff_to_probs(diff: float) -> dict[int, float]:
+    """Normalisiert eine Punktedifferenz auf Win-Wahrscheinlichkeiten via Sigmoid."""
+    scale = 10.0
+    safe_diff = max(min(diff, 200.0), -200.0)
+    p0 = 1.0 / (1.0 + math.exp(-safe_diff / scale))
+    return {0: p0, 1: 1.0 - p0}
 
+def _compute_terminal_reward(scores: list[int], state) -> dict[int, float]:
+    """
+    Berechnet den terminalen Reward aus Spielstand und Startspielerstein.
+    Gibt Win-Wahrscheinlichkeiten {0: p0, 1: p1} zurück.
+    """
+    if scores[0] == 0 and scores[1] == 0:
+        base = -5.0
+        diff = base + (1.0 if state.players[0].holds_first_player_marker else -1.0)
+    else:
+        diff = (scores[0] - scores[1]) * 1.5
+
+    return _diff_to_probs(diff)
 # ── MCTS-Knoten ───────────────────────────────────────────────────────────────
 
 class MCTSNode:
@@ -281,26 +299,7 @@ class MCTSAgent(BaseAgent):
         depth += 1
 
         scores = env.scores()
-        state = env.state
-        
-        # --- TERMINAL REWARD LOGIK ---
-        if scores[0] == 0 and scores[1] == 0:
-            # Tiebreaker-Auflösung über den Startspielerstein
-            diff = 1.0 if state.players[0].holds_first_player_marker else -1.0
-        else:
-            diff = (scores[0] - scores[1]) * 1.5
-
-        # Normalisierung: sigmoid-ähnlich auf [0, 1]
-        scale = 10.0  
-        p0 = 1.0 / (1.0 + math.exp(-diff / scale))
-        p1 = 1.0 - p0
-        
-        duration = time.perf_counter() - start
-        # Nur loggen, wenn die Simulation langsam ist, um das Log nicht zu fluten:
-        if self.verbose and duration > 0.1:
-            print(f"[MCTS] Langsamer Rollout: {duration:.4f}s")
-
-        return {0: p0, 1: p1}
+        return _compute_terminal_reward(scores, env.state)
 
     def _backpropagate(
         self,
@@ -518,21 +517,7 @@ class HeuristicMCTSAgent(MCTSAgent):
         # --- DER MAGISCHE MOMENT: Die Heuristik übernimmt ---
         if done:
             scores = env.scores()
-            state = env.state
-            
-            # HIER MUSS DEINE TIE-BREAKER LOGIK AUCH REIN!
-            if scores[0] == 0 and scores[1] == 0:
-                diff = 1.0 if state.players[0].holds_first_player_marker else -1.0
-            else:
-                diff = (scores[0] - scores[1]) * 1.5
+            return _compute_terminal_reward(scores, env.state)
         else:
             evals = evaluate_state(env.state)
-            diff = evals[0] - evals[1]
-
-        # Normalisierung der Punktdifferenz auf 0% bis 100% (Sigmoid)
-        scale = 10.0 
-        safe_diff = max(min(diff, 200.0), -200.0)
-        p0_win_prob = 1.0 / (1.0 + math.exp(-safe_diff / scale))
-        p1_win_prob = 1.0 - p0_win_prob
-
-        return {0: p0_win_prob, 1: p1_win_prob}
+            return _diff_to_probs(evals[0] - evals[1])

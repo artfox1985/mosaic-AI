@@ -97,7 +97,8 @@ def play_one_game(agent, game_index):
         history.append({
             "state": copy.deepcopy(obs),  # Das genaue Brett
             "player": current_player,     # Wer war dran?
-            "policy": policy              # Was dachte die KI?
+            "policy": policy,              # Was dachte die KI?
+            "valid_actions": actions,
         })
 
         # Zug ausführen
@@ -126,7 +127,8 @@ def play_one_game(agent, game_index):
         training_data.append({
             "state": step["state"],
             "policy": step["policy"],
-            "value": val
+            "value": val,
+            "valid_actions": step["valid_actions"],
         })
 
     return training_data, winner, scores, steps
@@ -165,7 +167,7 @@ def generate_data(num_games=100, simulations=40, version_name="v1"):
         if (i + 1) % 10 == 0 or (i + 1) == num_games:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
             # --- Dynamischer Dateiname für die Trainingsdaten! ---
-            filename = DATA_DIR / f"selfplay_{version_name}_{timestamp}_games_{i+1}.pkl"
+            filename = DATA_DIR / f"selfplay_{version_name}_{timestamp}_g{i+1}.pkl"
             
             with open(filename, "wb") as f:
                 pickle.dump(all_training_data, f)

@@ -36,6 +36,10 @@ def get_player_potential(player) -> float:
                 # Jede liegende Platte ist extrem wertvoll, 
                 # da sie überhaupt erst Punkte ermöglicht!
                 dome_bonus += 0.5 
-    potential += dome_bonus   
+    potential += dome_bonus
+    
+    # D: Bonus für tatsächlich erzielte Punkte (motiviert echte Punktevergabe)
+    score_bonus = player.score * 0.3
+    potential += score_bonus
         
     return potential - broken_penalty

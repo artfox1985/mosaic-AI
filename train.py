@@ -13,7 +13,7 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=15):
+def train(version_name, load_version=None, input_epoch=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trainiere das Mosaic-AI Neuronale Netz")
     parser.add_argument("--name", type=str, required=True, help="Name der neuen Version, z.B. v2")
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
-    parser.add_argument("--epochs", type=int, default=None, help="Wieviele Epochen")
+    parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     
     args = parser.parse_args()
     
