@@ -313,48 +313,10 @@ def tiling_move_to_floor():
 def end_tiling():
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     try:
-        from engine.round_end import score_penalty, process_unplaceable_rows
-        from engine.game import generate_tiling_actions
-
-        for pi, player in enumerate(_game.state.players):
-            for r in player.pattern_lines:
-                if not r.is_complete: continue
-                ri = player.pattern_lines.index(r)
-                actions = generate_tiling_actions(_game.state, pi)
-                placeable = [a for a in actions if a.pattern_row == ri]
-                if placeable:
-                    return jsonify(err(f"{player.name}: Reihe {ri+1} kann noch gelegt werden."))
-
-        for player in _game.state.players:
-            process_unplaceable_rows(player, _game.state.tower, _game.state)
-
-        for player in _game.state.players:
-            pen = score_penalty(player)
-            if pen < 0:
-                player.apply_score(pen)
-                broken = player.clear_broken()
-                _game.state.tower.add(broken)
-                _game.state.log_event(f"{player.name}: Strafe {pen} Pkt → {player.score} Gesamt")
-            else:
-                player.clear_broken()
-
-        if _game.state.round_number >= NUM_ROUNDS:
-            _game.state.phase = "end"
-            _game.state.log_event(
-                f"Spiel beendet! "
-                f"{_game.state.players[0].name}: {_game.state.players[0].score} Pkt | "
-                f"{_game.state.players[1].name}: {_game.state.players[1].score} Pkt"
-            )
-        else:
-            _game.state.phase = "done"
-            _game.next_round()
-            _game.state.log_event(f"Runde {_game.state.round_number} beginnt.")
-
+        _game.apply({"type": "end_tiling"})
         return jsonify(ok())
     except Exception as e:
-        import traceback; traceback.print_exc()
         return jsonify(err(str(e)))
-
 
 @app.route('/api/move/pass', methods=['POST'])
 def move_pass():
@@ -407,33 +369,11 @@ def select_scoring_tiles():
 def end_scoring():
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _game.state.phase != "end": return jsonify(err("Spiel noch nicht beendet"))
-    
-    from engine.scoring import calculate_end_scoring
-    t_ids = getattr(_game.state, "scoring_tile_ids", [0, 1, 2])
-    
-    results = {}
-    for pi, player in enumerate(_game.state.players):
-        res = calculate_end_scoring(player, t_ids)
-        player.apply_score(res["total"])
-        results[pi] = {str(k): v for k, v in res.items()}
-        
-        _game.state.log_event(f"🏆 {player.name}: Endwertung +{res['total']} Pkt → {player.score} Gesamt")
-        for tid, detail in res.items():
-            if tid == "total": continue
-            _game.state.log_event(f"   {detail['emoji']} {detail['name']}: {detail['score']:+d} Pkt")
-            
-    _game.state.phase = "final"
-    
-    # Tie-Breaker Abfrage über game.py !
-    game_res = _game.result()
-    
-    return jsonify({
-        "ok": True, 
-        "state": serialize_state(_game.state), 
-        "winner": game_res.winner, 
-        "results": {str(pi): r for pi, r in results.items()}
-    })
-
+    try:
+        results = _game._calculate_end_scoring()
+        return jsonify({"ok": True, **results})
+    except Exception as e:
+        return jsonify(err(str(e)))
 
 @app.route('/api/stack/peek', methods=['POST'])
 def stack_peek():

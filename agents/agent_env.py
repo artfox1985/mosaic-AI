@@ -14,33 +14,26 @@ Aktionstypen (alle als Dict):
   {"type": "dome_stack", "num_drawn": ..., "chosen_id": ..., "slot_row": ..., "slot_col": ..., "rotation": ...}
   {"type": "bonus_chip", "factory_id": ...}
   {"type": "pass"}
-  {"type": "tiling",     "pi": ..., "pattern_row": ..., "slot_row": ..., "slot_col": ..., "space_index": ...}
-  {"type": "use_chips",  "pi": ..., "pattern_row": ..., "method": ..., "color": ...}
+  {"type": "tiling",     "player": ..., "pattern_row": ..., "slot_row": ..., "slot_col": ..., "space_index": ...}
+  {"type": "use_chips",  "player": ..., "pattern_row": ...}
   {"type": "end_tiling"}
 
-Reward: Punkte-Delta des aktiven Spielers nach jedem Schritt.
+Reward: Punkte-Delta + Potential-Delta des aktiven Spielers nach jedem Schritt.
 """
 from __future__ import annotations
 import random
 import copy
-from typing import Any
-import sys
-import os
 
 from engine.setup import GameState, setup_new_game, setup_new_round, NUM_ROUNDS
 from engine.serializer import serialize_state
-from engine.scoring import ALL_SCORING_TILES, calculate_end_scoring
+from engine.scoring import ALL_SCORING_TILES
 from engine.game import Game
+
 
 class MosaicEnv:
     """
     Trainings-Umgebung für Mosaic-AI KI-Agenten.
-
-    Unterstützt:
-    - Selbstspiel (beide Spieler = KI)
-    - Zufällige Wertungsplatten bei jedem Reset (für Generalisierung)
-    - Vollständige Aktionsauflistung pro Schritt
-    - Reward-Signal als Punkte-Delta
+    Delegiert alle Spiellogik an game.py — Single Source of Truth.
     """
 
     def __init__(self, random_scoring_tiles: bool = True):
@@ -52,34 +45,39 @@ class MosaicEnv:
     # ── Public API ────────────────────────────────────────────────────────────
 
     def reset(self, seed: int | None = None) -> tuple[dict, dict]:
-        # 1. Spiel starten
         first_player = random.choice([0, 1])
-        self.state = self._game.start(first_player=first_player, seed=seed, random_scoring=self.random_scoring_tiles)
-        
-        # 2. Regelkonforme Platzierung über die Engine
-        self._place_initial_dome_tile_ai(1 - first_player) # Gegner
-        self._place_initial_dome_tile_ai(first_player)     # Startspieler
-        
-        # 3. Spielphase fixieren
+        self.state = self._game.start(
+            first_player=first_player,
+            seed=seed,
+            random_scoring=self.random_scoring_tiles
+        )
+
+        # Regelkonforme Platzierung: Nicht-Startspieler zuerst, dann Startspieler
+        self._place_initial_dome_tile_ai(1 - first_player)
+        self._place_initial_dome_tile_ai(first_player)
+
         self.state.phase = "drafting"
         self.state.current_player = first_player
         self._prev_scores = [p.score for p in self.state.players]
 
-        # 4. Info-Objekt für KI
         ids = self.state.scoring_tile_ids
         info = {
             "scoring_tile_ids": ids,
             "scoring_tile_names": [t.name for t in ALL_SCORING_TILES if t.id in ids],
         }
         return serialize_state(self.state), info
-        
+
     def _place_initial_dome_tile_ai(self, player_idx: int):
+        """KI-seitige Startkachel-Platzierung — zufällig. Nur wenn ausstehend."""
         player = self.state.players[player_idx]
+        # Keine ausstehende Startkachel (ab Runde 2 oder bereits gelegt)
+        if player.start_dome_tile is None:
+            return
         if not self.state.dome_display:
             return
-        tile       = random.choice(self.state.dome_display)
-        row, col   = random.choice(player.dome_grid.empty_slots())
-        rotation   = random.choice([0, 90, 180, 270])
+        tile     = random.choice(self.state.dome_display)
+        row, col = random.choice(player.dome_grid.empty_slots())
+        rotation = random.choice([0, 90, 180, 270])
         self._game.apply_start_placement(
             player_idx=player_idx,
             tile_id=tile.tile_id,
@@ -92,50 +90,7 @@ class MosaicEnv:
         if self.state.phase == "drafting":
             return self._drafting_actions()
         if self.state.phase == "tiling":
-            from engine.game import generate_tiling_actions
-            
-            # Wir suchen den ERSTEN Spieler, der noch eine Tiling-Aktion hat
-            for pi in range(2):
-                player = self.state.players[pi]
-                
-                # Finde die oberste fertige Reihe dieses Spielers
-                for ri, row in enumerate(player.pattern_lines):
-                    if not row.is_complete:
-                        continue
-                        
-                    tiling = generate_tiling_actions(self.state, pi)
-                    
-                    # Gibt es GÜLTIGE Aktionen für diese spezielle Reihe?
-                    row_actions = [a for a in tiling if a.pattern_row == ri]
-                    
-                    if len(row_actions) > 0:
-                        # BINGO! Dieser Spieler ist jetzt dran.
-                        # Wir zwingen die Umgebung, auf diesen Spieler zu wechseln!
-                        self.state.active_player_index = pi 
-                        
-                        actions = []
-                        for a in row_actions:
-                            actions.append({
-                                "type":         "tiling",
-                                "player":       pi,  # <-- WICHTIG: "player" statt "pi"
-                                "pattern_row":  a.pattern_row,
-                                "slot_row":     a.slot_row,
-                                "slot_col":     a.slot_col,
-                                "space_index":  a.space_index,
-                                "dome_tile_id": getattr(a, "dome_tile_id", None),
-                                "rotation":     getattr(a, "rotation", 0)
-                            })
-                            
-                        # SOFORT ZURÜCKGEBEN! 
-                        # Wir mischen niemals Züge von Spieler 1 und 2 in derselben Liste!
-                        return actions 
-                        
-                    # Wenn die Reihe zwar voll ist, aber keine Aktionen generiert wurden 
-                    # (z.B. unplatzierbar), brechen wir die Reihen-Suche ab.
-                    break 
-            
-            # Wenn die gesamte Schleife durchläuft und NIEMAND mehr eine Aktion hat:
-            return [{"type": "end_tiling"}]
+            return self._tiling_actions()
         return []
 
     def step(self, action: dict) -> tuple[dict, float, bool, dict]:
@@ -145,43 +100,33 @@ class MosaicEnv:
 
         pi = self.state.current_player
         player = self.state.players[pi]
-        
-        # 1. Zustand VOR dem Zug merken
-        score_before = player.score
+
+        score_before     = player.score
         potential_before = get_player_potential(player)
 
-        # 2. Aktion ausführen
         try:
             self._apply_action(action)
         except Exception as e:
             obs = serialize_state(self.state)
             return obs, -1.0, False, {"error": str(e)}
 
-        # 3. Zustand NACH dem Zug abfragen
-        score_after = player.score
+        score_after     = player.score
         potential_after = get_player_potential(player)
-        
+
         done = self.state.phase in ("end", "final")
 
-        # 4. MATHEMATISCH PERFEKTES REWARD SHAPING
-        reward = 0.0
-        
-        # A: Echte Punkte (oder echte Minuspunkte) aus der Game-Engine
-        reward += float(score_after - score_before)
-        
-        # B: Shaping-Delta (Hat sich mein abstraktes Potenzial verbessert?)
+        reward  = float(score_after - score_before)
         reward += (potential_after - potential_before)
 
-        # 5. Finale Spielende-Punkte
         info = {
-            "phase": self.state.phase,
-            "round": self.state.round_number,
+            "phase":  self.state.phase,
+            "round":  self.state.round_number,
             "scores": [p.score for p in self.state.players],
         }
 
         if done:
             score_before_end = player.score
-            end_info = self._calculate_end_scoring()
+            end_info = self._game._calculate_end_scoring()
             info.update(end_info)
             reward += float(player.score - score_before_end)
 
@@ -189,29 +134,24 @@ class MosaicEnv:
         return obs, reward, done, info
 
     def current_player(self) -> int:
-        if self.state is None:
-            return 0
-        return self.state.current_player
+        return self.state.current_player if self.state else 0
 
     def scores(self) -> list[int]:
-        if self.state is None:
-            return [0, 0]
-        return [p.score for p in self.state.players]
+        return [p.score for p in self.state.players] if self.state else [0, 0]
 
     def clone(self) -> "MosaicEnv":
         import pickle
         new_env = MosaicEnv(self.random_scoring_tiles)
         new_env.state = pickle.loads(pickle.dumps(self.state, -1))
-        new_env._game.state = new_env.state   # ← State synchronisieren
+        new_env._game.state = new_env.state
         new_env._prev_scores = list(self._prev_scores)
         return new_env
 
     # ── Aktions-Generatoren ───────────────────────────────────────────────────
 
     def _drafting_actions(self) -> list[dict]:
-        from engine.validation import generate_valid_moves
+        from engine.validation import generate_valid_moves, _validate_place
         from engine.game import generate_dome_moves, generate_bonus_chip_moves
-        from engine.serializer import _serialize_valid_moves
 
         actions = []
         state = self.state
@@ -227,7 +167,6 @@ class MosaicEnv:
                 "moon_order": [t.value for t in m.take.moon_order],
             })
 
-        from engine.validation import _validate_place
         moon_tops = set()
         for f in state.factories:
             moon_tops |= f.moon_top_colors()
@@ -246,9 +185,7 @@ class MosaicEnv:
                     })
                     break
 
-        # KORREKTUR: Aktion A (Kuppelplatten) nur erlaubt, wenn wir NICHT in Runde 5 sind
         if state.round_number < 5:
-            # Aus der Auslage
             for m in generate_dome_moves(state):
                 actions.append({
                     "type":     "dome",
@@ -258,7 +195,6 @@ class MosaicEnv:
                     "rotation": m.rotation,
                 })
 
-            # Vom Stapel
             if (p.start_dome_tile is None
                     and p.can_place_dome_tile(state.round_number)
                     and state.dome_tile_pool):
@@ -275,7 +211,7 @@ class MosaicEnv:
                                     "slot_col":  slot_col,
                                     "rotation":  rot,
                                 })
-                            break  
+                            break
                     else:
                         continue
                     break
@@ -293,10 +229,10 @@ class MosaicEnv:
 
     def _tiling_actions(self) -> list[dict]:
         from engine.game import generate_tiling_actions
+        from engine.round_end import can_complete_row_with_chips
 
         actions = []
 
-        # 1. Normale Tiling-Aktionen generieren
         for pi in range(2):
             player = self.state.players[pi]
             for ri, row in enumerate(player.pattern_lines):
@@ -308,39 +244,32 @@ class MosaicEnv:
                 )
                 if earlier_open:
                     break
-                
+
                 tiling = generate_tiling_actions(self.state, pi)
                 for a in tiling:
                     if a.pattern_row == ri:
                         actions.append({
-                            "type":        "tiling",
-                            "pi":          pi,
-                            "pattern_row": a.pattern_row,
-                            "slot_row":    a.slot_row,
-                            "slot_col":    a.slot_col,
-                            "space_index": a.space_index,
-                            "dome_tile_id": a.dome_tile_id,   # ← None wenn Slot schon belegt, sonst Kachel-ID
-                            "rotation":    a.rotation,         # ← 0 wenn Slot schon belegt
+                            "type":         "tiling",
+                            "player":       pi,
+                            "pattern_row":  a.pattern_row,
+                            "slot_row":     a.slot_row,
+                            "slot_col":     a.slot_col,
+                            "space_index":  a.space_index,
+                            "dome_tile_id": a.dome_tile_id,
+                            "rotation":     a.rotation,
                         })
-                break 
+                break
 
-         # 2. NEU: Bonus-Chips eintauschen generieren (Nur komplette Reihen-Auffüllung!)
-        from engine.round_end import can_complete_row_with_chips
-        
         for pi in range(2):
             player = self.state.players[pi]
             for ri, row in enumerate(player.pattern_lines):
-                # Die Funktion aus deiner round_end.py prüft alle Regeln:
-                # - Ist mind. 1 Fliese da?
-                # - Sind genug Chips für den GANZEN Rest da (Paare oder Drillinge)?
                 if not row.is_complete and can_complete_row_with_chips(player, ri):
                     actions.append({
-                        "type": "use_chips",
-                        "pi": pi,
-                        "pattern_row": ri
+                        "type":        "use_chips",
+                        "player":      pi,
+                        "pattern_row": ri,
                     })
 
-        # Wenn absolut nichts gemacht werden kann → end_tiling
         if not actions:
             actions.append({"type": "end_tiling"})
 
@@ -349,22 +278,15 @@ class MosaicEnv:
     # ── Aktions-Ausführung ────────────────────────────────────────────────────
 
     def _apply_action(self, action: dict) -> None:
+        """
+        Delegiert alle Aktionen an game.apply() — Single Source of Truth.
+        Nur end_tiling benötigt zusätzliches KI-spezifisches Handling
+        (Startkachel-Platzierung für neue Runde).
+        """
         from engine.tile import TileColor
         from engine.moves import (
             Move, TakeAction, PlaceAction, TakeSource,
             PlaceDomeTileMove, DrawFromStackMove, TakeBonusChipMove,
-        )
-        from engine.validation import validate_move
-        from engine.execution import execute_move
-        from engine.game import (
-            validate_dome_move, execute_dome_move,
-            validate_draw_from_stack, execute_draw_from_stack,
-            validate_take_bonus_chip, execute_take_bonus_chip,
-            check_drafting_complete,
-        )
-        from engine.round_end import (
-            TilingAction, validate_tiling_action, execute_full_tiling,
-            score_placed_tile, process_unplaceable_rows, score_penalty,
         )
 
         t = action["type"]
@@ -372,7 +294,7 @@ class MosaicEnv:
 
         if t == "stone":
             color = _color(action["color"])
-            src = TakeSource[action["source"]]
+            src   = TakeSource[action["source"]]
             if src == TakeSource.SMALL_FACTORY_MOON and action.get("factory_id") is None:
                 self._execute_aktion_c(color, action["row"])
             else:
@@ -386,10 +308,7 @@ class MosaicEnv:
                     ),
                     place=PlaceAction(row_index=action["row"]),
                 )
-                err = validate_move(state, move)
-                if err: raise ValueError(err)
-                execute_move(state, move)
-                state.switch_player()
+                self._game.apply(move)
 
         elif t == "dome":
             move = PlaceDomeTileMove(
@@ -398,10 +317,7 @@ class MosaicEnv:
                 slot_col=action["slot_col"],
                 rotation=action.get("rotation", 0),
             )
-            err = validate_dome_move(state, move)
-            if err: raise ValueError(err)
-            execute_dome_move(state, move)
-            state.switch_player()
+            self._game.apply(move)
 
         elif t == "dome_stack":
             move = DrawFromStackMove(
@@ -411,86 +327,33 @@ class MosaicEnv:
                 slot_col=action["slot_col"],
                 rotation=action.get("rotation", 0),
             )
-            err = validate_draw_from_stack(state, move)
-            if err: raise ValueError(err)
-            execute_draw_from_stack(state, move)
-            state.switch_player()
+            self._game.apply(move)
 
         elif t == "bonus_chip":
-            from engine.moves import TakeBonusChipMove
             move = TakeBonusChipMove(factory_id=action["factory_id"])
-            err = validate_take_bonus_chip(state, move)
-            if err: raise ValueError(err)
-            execute_take_bonus_chip(state, move)
-            state.switch_player()
+            self._game.apply(move)
 
         elif t == "pass":
-            state.switch_player()
+            self._game.apply({"type": "pass"})
 
         elif t == "tiling":
-            pi = action["player"]
-            ta = TilingAction(
-                pattern_row=action["pattern_row"],
-                slot_row=action["slot_row"],
-                slot_col=action["slot_col"],
-                space_index=action["space_index"],
-                dome_tile_id=action.get("dome_tile_id"),  # ← None = Slot bereits belegt
-                rotation=action.get("rotation", 0),
-            )
-            err = validate_tiling_action(state, pi, ta)
-            if err: raise ValueError(err)
-            execute_full_tiling(state, pi, ta)
+            # Delegiere an game.apply() — apply_single_tiling ist dort die Source of Truth
+            self._game.apply(action)
 
-        # NEU: Chips ausgeben und in virtuelle Fliese umwandeln
         elif t == "use_chips":
-            pi = action["player"]
-            ri = action["pattern_row"]
-            player = state.players[pi]
-            
-            from engine.round_end import apply_bonus_chips_to_row
-            
-            # Diese Funktion aus deinem Backend zieht automatisch die richtigen Chips 
-            # ab und füllt die Musterreihe in einem Rutsch komplett auf!
-            success = apply_bonus_chips_to_row(player, ri)
-            
-            if not success:
-                raise ValueError(f"Konnte Reihe {ri+1} nicht mit Chips komplettieren!")
-                
-            state.log_event(
-                f"🎫 {player.name} komplettiert Reihe {ri + 1} vollständig mit Bonus-Chips!"
-            )
-            
-            # WICHTIG: Kein state.switch_player() ! Man darf direkt die nächste Tiling-Aktion machen.
+            # Delegiere an game.apply()
+            self._game.apply(action)
 
         elif t == "end_tiling":
-            for player in state.players:
-                process_unplaceable_rows(player, state.tower, state)
-            for player in state.players:
-                pen = score_penalty(player)
-                if pen < 0:
-                    player.apply_score(pen)
-                    broken = player.clear_broken()
-                    state.tower.add(broken)
-            
-            if state.round_number >= NUM_ROUNDS:
-                state.phase = "end"
-            else:
-                while len(state.dome_display) < 3 and state.dome_tile_pool:
-                    state.dome_display.append(state.dome_tile_pool.pop(0))
-                setup_new_round(state)
+            # game.apply() übernimmt Strafen, Rundenübergang, Logging
+            self._game.apply({"type": "end_tiling"})
+            # KI-spezifisch: Startkacheln für neue Runde legen
+            if state.phase == "drafting":
                 self._place_initial_dome_tile_ai(1 - state.current_player)
                 self._place_initial_dome_tile_ai(state.current_player)
 
-        if state.phase == "drafting":
-            self._check_phase_transition()
-
-    def _check_phase_transition(self) -> None:
-        from engine.round_end import check_drafting_complete
-        if check_drafting_complete(self.state):
-            self.state.phase = "tiling"
-
     def _execute_aktion_c(self, color, row: int) -> None:
-        from engine.tile import TileColor
+        """Globaler Mond-Zug (Aktion C): nimmt Steine aus allen Fabriken."""
         from engine.execution import _execute_place
 
         state = self.state
@@ -517,29 +380,12 @@ class MosaicEnv:
 
         _execute_place(state, taken, color, row)
         state.switch_player()
+        self._game._check_phase_transition()
 
     def _calculate_end_scoring(self) -> dict:
-        from engine.scoring import calculate_end_scoring
-        results = {}
-        for pi, player in enumerate(self.state.players):
-            res = calculate_end_scoring(player, self.state.scoring_tile_ids)
-            player.apply_score(res["total"])
-            results[pi] = res
+        """Delegiert an game._calculate_end_scoring() — Single Source of Truth."""
+        return self._game._calculate_end_scoring()
 
-            # Logging der Wertungsplatten
-            self.state.log_event(
-                f"🏆 {player.name}: Endwertung +{res['total']} Pkt "
-                f"→ Gesamt: {player.score} Pkt"
-            )
-            for tid, detail in res.items():
-                if tid == "total":
-                    continue
-                self.state.log_event(
-                    f"   {detail['emoji']} {detail['name']}: {detail['score']:+d} Pkt"
-                )
-
-        self.state.phase = "final"
-        return {"end_scoring": results}
 
 def _color(v: str):
     from engine.tile import TileColor

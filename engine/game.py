@@ -26,15 +26,16 @@ Ablauf einer kompletten Partie:
   SPIELENDE (nach Runde 5):
     Endwertung: keine weiteren Boni in Mosaic-AI
     Gewinner = höchste Punktzahl
-    Bei Gleichstand: meiste gefüllte Spaces auf der Kuppel
+    Bei Gleichstand: wer Startspielerstein hat
 
 Das Game-Objekt steuert den Ablauf und stellt sicher dass Züge
 nur in der richtigen Phase angenommen werden.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional, Union
+import copy
+from dataclasses import dataclass
+from typing import Optional
 
 from engine.setup import GameState, setup_new_game, setup_new_round, NUM_ROUNDS
 from engine.moves import Move, PlaceDomeTileMove, AnyMove
@@ -46,6 +47,8 @@ from engine.round_end import (
     execute_full_tiling, execute_special_tiling,
     check_drafting_complete, get_pending_tiling_rows,
     apply_round_scoring, score_placed_tile,
+    process_unplaceable_rows, score_penalty,
+    apply_bonus_chips_to_row,
 )
 from engine.dome import ROTATION_MAP
 
@@ -65,21 +68,17 @@ def validate_dome_move(state: GameState, move: PlaceDomeTileMove) -> Optional[st
             return f"{player.name} hat bereits 2 Kacheln diese Runde gelegt."
         return "Das 3×3-Raster ist bereits voll."
 
-    # Startkachel muss zuerst gelegt werden
     if player.has_unplaced_start_tile():
         if move.dome_tile_id != player.start_dome_tile.tile_id:
             return (
                 f"Die Startkachel (ID {player.start_dome_tile.tile_id}) "
                 f"muss als erstes gelegt werden."
             )
-        # Startkachel kommt aus player.start_dome_tile, nicht aus Display
     else:
-        # Kachel muss im offenen Display (G) liegen
         tile = _find_in_display(state, move.dome_tile_id)
         if tile is None:
             return f"Kachel {move.dome_tile_id} liegt nicht im offenen Display (G)."
 
-    # Slot frei?
     slot = player.dome_grid.dome_slots[move.slot_row][move.slot_col]
     if slot is not None:
         return f"Slot ({move.slot_row},{move.slot_col}) ist bereits belegt."
@@ -91,19 +90,17 @@ def execute_dome_move(state: GameState, move: PlaceDomeTileMove) -> None:
     """Führt eine Kachel-Platzierung aus."""
     player = state.active_player
 
-    # Startkachel oder Kachel aus dem Display (G)?
     if player.has_unplaced_start_tile() and move.dome_tile_id == player.start_dome_tile.tile_id:
         tile = player.start_dome_tile
         player.start_dome_tile = None
     else:
         tile = _find_in_display(state, move.dome_tile_id)
         state.dome_display.remove(tile)
-        # [3] Display wird NICHT sofort aufgefüllt — erst in Phase 3
 
     tile.apply_rotation(move.rotation)
     player.dome_grid.place_dome_tile(tile, move.slot_row, move.slot_col)
     player.register_dome_placement()
-    player.use_player_token(state.round_number)   # [2] Spielerplättchen verbrauchen
+    player.use_player_token(state.round_number)
 
     state.log_event(
         f"{player.name}: Kachel {move.dome_tile_id} → "
@@ -185,7 +182,7 @@ def execute_draw_from_stack(state: GameState, move) -> None:
     state.dome_tile_pool = state.dome_tile_pool[move.num_drawn:]
     chosen = next(t for t in drawn if t.tile_id == move.chosen_id)
     rest = [t for t in drawn if t.tile_id != move.chosen_id]
-    state.dome_tile_pool.extend(rest)   # Rest zurück unter Stapel
+    state.dome_tile_pool.extend(rest)
     chosen.apply_rotation(move.rotation)
     player.dome_grid.place_dome_tile(chosen, move.slot_row, move.slot_col)
     player.register_dome_placement()
@@ -205,11 +202,10 @@ def generate_dome_moves(state: GameState) -> list[PlaceDomeTileMove]:
     moves = []
     empty_slots = player.dome_grid.empty_slots()
 
-    # Startkachel muss zuerst gelegt werden
     tiles_to_consider = (
         [player.start_dome_tile]
         if player.has_unplaced_start_tile()
-        else state.dome_display          # nur die 3 offen liegenden Kacheln (G)
+        else state.dome_display
     )
 
     for tile in tiles_to_consider:
@@ -260,9 +256,8 @@ def generate_tiling_actions(
     for row_idx in get_pending_tiling_rows(player):
         color = player.pattern_lines[row_idx].color
 
-        # [8] Musterreihe i → horizontale Kuppelreihe i
-        dome_row = row_idx // 2         # Slot-Zeile: 0,0,1,1,2,2
-        space_row = row_idx % 2         # 0=obere Spaces [0,1], 1=untere [2,3]
+        dome_row = row_idx // 2
+        space_row = row_idx % 2
         valid_si = [space_row * 2, space_row * 2 + 1]
 
         for sc in range(3):
@@ -302,36 +297,25 @@ def run_tiling_phase(
     tiling_decisions: dict[int, list[TilingAction]],
     special_decisions: dict[int, list[SpecialTilingAction]] | None = None,
 ) -> dict[int, int]:
-    """
-    Führt die Tiling-Phase für beide Spieler aus.
-
-    tiling_decisions: {player_idx: [TilingAction, ...]}  — eine pro voller Reihe
-    special_decisions: {player_idx: [SpecialTilingAction, ...]}  — optional
-
-    Gibt {player_idx: tiling_punkte} zurück.
-    """
+    """Führt die Tiling-Phase für beide Spieler aus."""
     scores: dict[int, int] = {0: 0, 1: 0}
 
     for player_idx in range(2):
         actions = tiling_decisions.get(player_idx, [])
         for action in actions:
-            # Re-validieren direkt vor Ausführung (State kann sich geändert haben)
             err = validate_tiling_action(state, player_idx, action)
             if err:
                 state.log_event(f"TilingAction übersprungen: {err}")
                 continue
 
-            # Punkte vor der Ausführung berechnen (Stein noch nicht gelegt)
             execute_tiling_action(state, player_idx, action)
 
-            # Scoring für den gerade platzierten Stein (sauber entpackt!)
             pts, _ = score_placed_tile(
                 state.players[player_idx],
                 action.slot_row, action.slot_col, action.space_index,
             )
             scores[player_idx] += pts
 
-        # Special-Tiles
         if special_decisions:
             for sp_action in special_decisions.get(player_idx, []):
                 err = validate_special_tiling(state, player_idx, sp_action)
@@ -350,62 +334,47 @@ def run_tiling_phase(
 @dataclass
 class GameResult:
     """Ergebnis einer abgeschlossenen Partie."""
-    winner:        Optional[int]        # 0 oder 1, None = Unentschieden
-    scores:        list[int]            # [score_p0, score_p1]
-    filled_spaces: list[int]            # [spaces_p0, spaces_p1] — Info-Feld (Kein Tiebreaker!)
+    winner:        Optional[int]
+    scores:        list[int]
+    filled_spaces: list[int]            # Info-Feld, kein Tiebreaker
     log:           list[str]
 
 
 class Game:
     """
     Steuert den kompletten Spielablauf.
-
-    Verwendung:
-        game = Game()
-        state = game.start(["Alice", "Bob"])
-
-        # Drafting-Phase:
-        while not game.drafting_complete():
-            moves = game.valid_moves()       # Move + PlaceDomeTileMove
-            game.apply(chosen_move)
-
-        # Tiling-Phase:
-        for player_idx in range(2):
-            actions = game.valid_tiling_actions(player_idx)
-            game.apply_tiling(player_idx, chosen_actions)
-
-        # Nächste Runde oder Spielende:
-        if game.is_over():
-            result = game.result()
-        else:
-            game.next_round()
+    Single Source of Truth für alle Spielaktionen.
     """
 
     def __init__(self):
         self.state: Optional[GameState] = None
 
     def start(
-        self, 
-        player_names: list[str] | None = None, 
-        first_player: int = 0, 
+        self,
+        player_names: list[str] | None = None,
+        first_player: int = 0,
         seed: int | None = None,
         random_scoring: bool = True
     ) -> GameState:
         self.state = setup_new_game(player_names, first_player, seed)
-        
+
         from engine.scoring import ALL_SCORING_TILES
         import random
-        
-        # Jetzt kennt Python 'random_scoring'
+
         if random_scoring:
             self.state.scoring_tile_ids = random.sample([t.id for t in ALL_SCORING_TILES], 3)
         else:
             self.state.scoring_tile_ids = [0, 1, 2]
-            
+
         self.state.current_player = first_player
         return self.state
 
     def apply_start_placement(self, player_idx: int, tile_id: int, row: int, col: int, rot: int):
+        """
+        Platziert die Startkuppelkachel eines Spielers.
+        Erzwingt Reihenfolge: Nicht-Startspieler zuerst, dann Startspieler.
+        Single Source of Truth — wird von Server und agent_env aufgerufen.
+        """
         player = self.state.players[player_idx]
         first_player = self.state.current_player
         non_starter  = 1 - first_player
@@ -414,21 +383,17 @@ class Game:
         if player_idx == first_player and self.state.players[non_starter].start_dome_tile is not None:
             raise ValueError("Nicht-Startspieler muss zuerst eine Kuppelplatte wählen.")
 
-        # Bereits gelegt?
+        # start_dome_tile ist None wenn bereits gelegt ODER ab Runde 2 (kein Sentinel mehr)
         if player.start_dome_tile is None:
-            raise ValueError(f"Spieler {player_idx} hat bereits eine Startkachel gelegt.")
+            raise ValueError(f"Spieler {player_idx} hat keine ausstehende Startkachel.")
 
-        # Slot frei?
         if player.dome_grid.dome_slots[row][col] is not None:
             raise ValueError(f"Slot ({row},{col}) ist nicht frei.")
 
-        # Kachel im Display?
         tile = _find_in_display(self.state, tile_id)
         if tile is None:
             raise ValueError(f"Kachel {tile_id} nicht im Display.")
 
-        # Ausführen
-        import copy
         self.state.dome_display.remove(tile)
         if self.state.dome_tile_pool:
             self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
@@ -445,161 +410,146 @@ class Game:
     # ------------------------------------------------------------------
 
     def drafting_complete(self) -> bool:
-        """
-        Das Drafting ist exakt dann beendet, wenn für KEINEN der beiden
-        Spieler noch irgendein gültiger Zug (Steine, Kuppeln, Bonus) generiert werden kann.
-        """
-        from engine.validation import generate_valid_moves
-        from engine.game import generate_dome_moves, generate_bonus_chip_moves
-        
-        assert self.state is not None
-        original_idx = self.state.active_player_index
-        
-        # Wir prüfen für beide Spieler, ob die Engine noch Züge ausspuckt
-        for pi in range(len(self.state.players)):
-            self.state.active_player_index = pi
-            
-            # Hat der Spieler noch Stein-Züge?
-            if len(generate_valid_moves(self.state)) > 0:
-                self.state.active_player_index = original_idx
-                return False
-                
-            # Hat der Spieler noch Kuppel-Züge?
-            if len(generate_dome_moves(self.state)) > 0:
-                self.state.active_player_index = original_idx
-                return False
-                
-            # Hat der Spieler noch Bonus-Züge?
-            if len(generate_bonus_chip_moves(self.state)) > 0:
-                self.state.active_player_index = original_idx
-                return False
-                
-        # Wenn wir hier ankommen, hat kein Spieler mehr einen Zug. Phase beendet!
-        self.state.active_player_index = original_idx
-        return True
+        return check_drafting_complete(self.state)
 
     def valid_moves(self) -> list[dict]:
         """Gibt alle validen Züge für den aktuellen Spieler zurück."""
         if self.state.phase != "drafting":
-            from engine.game import generate_tiling_actions
             return generate_tiling_actions(self.state, self.state.active_player_index)
 
-        from engine.validation import generate_valid_moves
-        from engine.game import generate_dome_moves, generate_bonus_chip_moves
-        
         moves = []
-        
-        # Einfach alle generierbaren Züge sammeln
-        moves.extend(generate_valid_moves(self.state)) 
+        moves.extend(generate_valid_moves(self.state))
         moves.extend(generate_dome_moves(self.state))
         moves.extend(generate_bonus_chip_moves(self.state))
 
-        # --- PASSEN ---
-        # Passen ist NUR erlaubt, wenn der Spieler absolut nichts anderes mehr tun kann.
         if len(moves) == 0:
             moves.append({"type": "pass"})
-            
+
         return moves
 
     def apply(self, move: AnyMove) -> None:
-        """Führt einen Zug aus und wechselt den aktiven Spieler."""
+        """
+        Führt einen Zug aus.
+        Single Source of Truth für alle Spielaktionen —
+        wird von Server, agent_env und self_play aufgerufen.
+        """
         assert self.state is not None
 
-        # ==========================================
-        # PHASE 2: TILING & RUNDENWECHSEL ABFANGEN
-        # ==========================================
         if isinstance(move, dict):
-            if move.get("type") == "tiling":
-                player_idx = move["player"]
-                from engine.round_end import TilingAction
-                
-                # Dictionary in Objekt umwandeln
+            t = move.get("type")
+
+            # ── Tiling-Phase ─────────────────────────────────────────
+            if t == "tiling":
                 action = TilingAction(
                     pattern_row=move["pattern_row"],
                     slot_row=move["slot_row"],
                     slot_col=move["slot_col"],
                     space_index=move["space_index"],
                     dome_tile_id=move.get("dome_tile_id"),
-                    rotation=move.get("rotation", 0)
+                    rotation=move.get("rotation", 0),
                 )
-                
-                # Zug ausführen (Punkte & Logging passieren automatisch in execute_full_tiling!)
-                self.apply_single_tiling(player_idx, action)
-                return  
-
-            elif move.get("type") == "end_tiling":
-                from engine.round_end import apply_round_scoring
-                # Strafpunkte austeilen (z.B. Startspielerstein)
-                apply_round_scoring(self.state, {0: 0, 1: 0})
-                
-                if self.is_over():
-                    self.state.phase = "end"
-                    self.state.log_event("Das Spiel ist beendet!")
-                else:
-                    self.state.phase = "done"
-                    self.next_round() 
+                self.apply_single_tiling(move["player"], action)
                 return
 
-        # ==========================================
-        # PHASE 1: DRAFTING
-        # ==========================================
-        assert self.state.phase == "drafting", f"Zug {move} ist in der Tiling-Phase nicht erlaubt."
+            if t == "use_chips":
+                pi = move["player"]
+                ri = move["pattern_row"]
+                player = self.state.players[pi]
+                success = apply_bonus_chips_to_row(player, ri)
+                if not success:
+                    raise ValueError(f"Reihe {ri+1} nicht mit Chips komplettierbar.")
+                self.state.log_event(
+                    f"🎫 {player.name} komplettiert Reihe {ri+1} vollständig mit Bonus-Chips!"
+                )
+                return
+
+            if t == "end_tiling":
+                self._execute_end_tiling()
+                return
+
+            if t == "pass":
+                self.state.switch_player()
+                self._check_phase_transition()
+                return
+
+        # ── Drafting-Phase ────────────────────────────────────────────
+        assert self.state.phase == "drafting", \
+            f"Zug {move} ist in Phase '{self.state.phase}' nicht erlaubt."
 
         from engine.moves import DrawFromStackMove, TakeBonusChipMove
-        
-        if isinstance(move, dict) and move.get("type") == "pass":
-            self.state.switch_player()
 
-        elif isinstance(move, PlaceDomeTileMove):
-            from engine.validation import validate_dome_move
-            from engine.moves import execute_dome_move
+        if isinstance(move, PlaceDomeTileMove):
             err = validate_dome_move(self.state, move)
             if err: raise ValueError(err)
             execute_dome_move(self.state, move)
             self.state.switch_player()
-            
+
         elif isinstance(move, DrawFromStackMove):
-            from engine.validation import validate_draw_from_stack
-            from engine.moves import execute_draw_from_stack
             err = validate_draw_from_stack(self.state, move)
             if err: raise ValueError(err)
             execute_draw_from_stack(self.state, move)
             self.state.switch_player()
-            
+
         elif isinstance(move, TakeBonusChipMove):
-            from engine.validation import validate_take_bonus_chip
-            from engine.moves import execute_take_bonus_chip
             err = validate_take_bonus_chip(self.state, move)
             if err: raise ValueError(err)
             execute_take_bonus_chip(self.state, move)
             self.state.switch_player()
-            
+
         else:
-            is_global_moon_take = getattr(move, "take", None) is not None and (
-                move.take.source.name == "SMALL_FACTORY_MOON" and 
-                move.take.factory_id is None
+            is_global_moon = (
+                getattr(move, "take", None) is not None
+                and move.take.source.name == "SMALL_FACTORY_MOON"
+                and move.take.factory_id is None
             )
-            if is_global_moon_take:
+            if is_global_moon:
                 from engine.validation import validate_moon_take
                 err = validate_moon_take(self.state, move)
                 if err: raise ValueError(err)
             else:
-                from engine.validation import validate_move
                 err = validate_move(self.state, move)
                 if err: raise ValueError(err)
-                    
-            from engine.moves import execute_move
+
             execute_move(self.state, move)
             self.state.switch_player()
 
-        # --- AUTOMATISCHER PHASENWECHSEL ZU TILING ---
-        if self.state.phase == "drafting" and self.drafting_complete():
+        self._check_phase_transition()
+
+    def _execute_end_tiling(self) -> None:
+        """
+        Schließt die Tiling-Phase ab: Strafen, Rundenübergang oder Spielende.
+        Single Source of Truth — wird von apply() aufgerufen.
+        KI-spezifisches Dome-Placement nach Rundenübergang wird NICHT hier gemacht
+        (das ist Aufgabe von agent_env._place_initial_dome_tile_ai).
+        """
+        for player in self.state.players:
+            process_unplaceable_rows(player, self.state.tower, self.state)
+
+        for player in self.state.players:
+            pen = score_penalty(player)
+            if pen < 0:
+                player.apply_score(pen)
+                broken = player.clear_broken()
+                self.state.tower.add(broken)
+                self.state.log_event(
+                    f"{player.name}: Strafe {pen} Pkt → {player.score} Gesamt"
+                )
+            else:
+                player.clear_broken()
+
+        if self.is_over():
+            self.state.phase = "end"
+            self.state.log_event("Das Spiel ist beendet!")
+        else:
+            self.state.phase = "done"
+            self.next_round()
+
+    def _check_phase_transition(self) -> None:
+        """Wechselt automatisch zu Tiling wenn Drafting abgeschlossen."""
+        if self.state.phase == "drafting" and check_drafting_complete(self.state):
             self.state.phase = "tiling"
-            from engine.round_end import process_unplaceable_rows
-            
             process_unplaceable_rows(self.state.players[0], self.state.tower, self.state)
             process_unplaceable_rows(self.state.players[1], self.state.tower, self.state)
-            
             self.state.log_event("Tiling-Phase beginnt.")
 
     # ------------------------------------------------------------------
@@ -616,13 +566,18 @@ class Game:
     ) -> None:
         """Führt die Tiling-Phase aus und berechnet Punkte."""
         assert self.state.phase == "tiling"
-        # [9] Unplatzierbare Reihen vor Tiling auf Straffeld
-        from engine.round_end import process_unplaceable_rows
         for p in self.state.players:
             process_unplaceable_rows(p, self.state.tower, self.state)
         scores = run_tiling_phase(self.state, tiling_decisions, special_decisions)
         apply_round_scoring(self.state, scores)
         self.state.phase = "end" if self.is_over() else "done"
+
+    def apply_single_tiling(self, player_idx: int, action: TilingAction) -> None:
+        """Führt eine einzelne Tiling-Aktion aus (Single Source of Truth)."""
+        err = validate_tiling_action(self.state, player_idx, action)
+        if err:
+            raise ValueError(err)
+        execute_full_tiling(self.state, player_idx, action)
 
     # ------------------------------------------------------------------
     # Rundenübergang / Spielende
@@ -634,7 +589,6 @@ class Game:
     def next_round(self) -> None:
         assert self.state.phase == "done", "Tiling-Phase muss abgeschlossen sein."
         assert not self.is_over(), "Spiel ist bereits beendet."
-        # Phase 3: Display (G) auf 3 Kacheln auffüllen
         while len(self.state.dome_display) < 3 and self.state.dome_tile_pool:
             self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
         setup_new_round(self.state)
@@ -649,20 +603,19 @@ class Game:
         elif scores[1] > scores[0]:
             winner = 1
         elif self.state.players[0].holds_first_player_marker:
-            winner = 0   # [13] Tiebreaker: wer Startspielerstein hat
+            winner = 0
         elif self.state.players[1].holds_first_player_marker:
             winner = 1
         else:
-            winner = None  # echtes Unentschieden
-            
-        # FIX: Berechne die gefüllten Spaces für das Info-Feld sicher
+            winner = None
+
         filled = []
         for p in self.state.players:
-            count = 0
-            for row in p.dome_grid.dome_slots:
-                for slot in row:
-                    if slot is not None:
-                        count += sum(1 for space in slot.spaces if space.is_filled)
+            count = sum(
+                1 for row in p.dome_grid.dome_slots
+                for slot in row if slot is not None
+                for space in slot.spaces if space.is_filled
+            )
             filled.append(count)
 
         return GameResult(
@@ -671,12 +624,27 @@ class Game:
             filled_spaces=filled,
             log=self.state.log,
         )
-        
-    def apply_single_tiling(self, player_idx: int, action: TilingAction):
-        """Führt eine einzelne Tiling-Aktion sofort aus (für Web-Interaktivität)."""
-        err = validate_tiling_action(self.state, player_idx, action)
-        if err:
-            raise ValueError(err)
-            
-        # Nutze die Funktion, die wir vorhin repariert haben!
-        execute_full_tiling(self.state, player_idx, action)
+
+    def _calculate_end_scoring(self) -> dict:
+        """
+        Führt die Endwertung durch und gibt Ergebnisse zurück.
+        Single Source of Truth — wird von agent_env und Server aufgerufen.
+        """
+        from engine.scoring import calculate_end_scoring
+        results = {}
+        for pi, player in enumerate(self.state.players):
+            res = calculate_end_scoring(player, self.state.scoring_tile_ids)
+            player.apply_score(res["total"])
+            results[pi] = res
+            self.state.log_event(
+                f"🏆 {player.name}: Endwertung +{res['total']} Pkt "
+                f"→ Gesamt: {player.score} Pkt"
+            )
+            for tid, detail in res.items():
+                if tid == "total":
+                    continue
+                self.state.log_event(
+                    f"   {detail['emoji']} {detail['name']}: {detail['score']:+d} Pkt"
+                )
+        self.state.phase = "final"
+        return {"end_scoring": results}
