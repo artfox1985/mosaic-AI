@@ -407,25 +407,38 @@ class Game:
 
     def apply_start_placement(self, player_idx: int, tile_id: int, row: int, col: int, rot: int):
         player = self.state.players[player_idx]
-        
-        # 1. Validierung: Ist der Slot wirklich frei? (Schutz gegen fehlerhafte KI-Entscheidungen)
-        if player.dome_grid.dome_slots[row][col] is not None:
-             raise ValueError(f"Slot ({row}, {col}) ist nicht frei.")
+        first_player = self.state.current_player
+        non_starter  = 1 - first_player
 
-        # 2. Kachel finden
+        # Reihenfolge: Nicht-Startspieler zuerst
+        if player_idx == first_player and self.state.players[non_starter].start_dome_tile is not None:
+            raise ValueError("Nicht-Startspieler muss zuerst eine Kuppelplatte wählen.")
+
+        # Bereits gelegt?
+        if player.start_dome_tile is None:
+            raise ValueError(f"Spieler {player_idx} hat bereits eine Startkachel gelegt.")
+
+        # Slot frei?
+        if player.dome_grid.dome_slots[row][col] is not None:
+            raise ValueError(f"Slot ({row},{col}) ist nicht frei.")
+
+        # Kachel im Display?
         tile = _find_in_display(self.state, tile_id)
-        if not tile: raise ValueError("Kachel nicht im Display")
-        
-        # 3. Ausführen
+        if tile is None:
+            raise ValueError(f"Kachel {tile_id} nicht im Display.")
+
+        # Ausführen
+        import copy
         self.state.dome_display.remove(tile)
-        # Display auffüllen – ACHTUNG: Hier fehlt in deinem Code noch die Auffüll-Regel!
-        # Wenn wir eine Kachel aus Display G nehmen, muss sofort vom Stapel F aufgefüllt werden.
         if self.state.dome_tile_pool:
             self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
-            
+        tile = copy.deepcopy(tile)
         tile.apply_rotation(rot)
         player.dome_grid.place_dome_tile(tile, row, col)
         player.start_dome_tile = None
+        self.state.log_event(
+            f"{player.name}: Startkachel {tile_id} → ({row},{col}) rot={rot}°"
+        )
 
     # ------------------------------------------------------------------
     # Drafting-Phase

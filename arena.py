@@ -4,6 +4,7 @@ from agents.mcts import MCTSAgent, HeuristicMCTSAgent, run_episode_mcts
 from agents.alphazero import AlphaZeroAgent
 from agents.agent_env import MosaicEnv
 import itertools
+from config import INPUT_SIZE
 
 # Falls du den HeuristicMCTSAgent in einer anderen Datei gespeichert hast, importiere ihn entsprechend.
 # from deine_datei import HeuristicMCTSAgent
@@ -114,7 +115,7 @@ if __name__ == "__main__":
     agent_mcts_heuristic = HeuristicMCTSAgent(simulations=150, rollout_depth=0)
     agent_alphazero = AlphaZeroAgent(
         model_version="v1",
-        input_size=129, 
+        input_size=INPUT_SIZE, 
         simulations=40
         )
 
@@ -127,7 +128,7 @@ if __name__ == "__main__":
 
     competitors = {
         "MCTS_Heuristik": (agent_mcts_heuristic, 1000),
-        "Greedy": (agent_greedy, 1000)
+        "AlphaZero_V1": (agent_alphazero, 1000)
     }
 
     # Jeder spielt gegen jeden

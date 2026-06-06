@@ -1,4 +1,9 @@
-# diagnose.py — einmalig ausführen
+# diagnose.py — for sanity check of training data
+
+# zero-mask rows — sollte 0 sein
+# policy leak — sollte < 1e-6 sein
+# p_loss first batch — sollte ln(410) ~6 sein
+
 import sys, torch, glob, pickle
 sys.path.insert(0, '.')
 from agents.neural_net import MosaicDataset, MosaicNet

@@ -74,35 +74,16 @@ class MosaicEnv:
         return serialize_state(self.state), info
         
     def _place_initial_dome_tile_ai(self, player_idx: int):
-        """
-        Nutzt die neue Game-Logik für die Platzierung.
-        Die KI wählt hier (zuerst noch zufällig, kann später durch MCTS erweitert werden).
-        """
         player = self.state.players[player_idx]
-        
-        # Falls Display leer, aber noch Kacheln da: Nachfüllen
-        while not self.state.dome_display and self.state.dome_tile_pool:
-            self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
-            
         if not self.state.dome_display:
-            return # Keine Kacheln mehr für Startplatzierung verfügbar
-        
-        # Zufällige Wahl aus dem Display
-        tile = random.choice(self.state.dome_display)
-        
-        # Zufälliger Slot aus den freien Feldern
-        empty_slots = player.dome_grid.empty_slots()
-        row, col = random.choice(empty_slots)
-        rotation = random.choice([0, 90, 180, 270])
-        
-        # Aufruf der zentralen Logik in Game
-        # Wir nutzen _game-Instanz, die in MosaicEnv verfügbar sein sollte
+            return
+        tile       = random.choice(self.state.dome_display)
+        row, col   = random.choice(player.dome_grid.empty_slots())
+        rotation   = random.choice([0, 90, 180, 270])
         self._game.apply_start_placement(
             player_idx=player_idx,
             tile_id=tile.tile_id,
-            row=row,
-            col=col,
-            rot=rotation
+            row=row, col=col, rot=rotation
         )
 
     def valid_actions(self) -> list[dict]:

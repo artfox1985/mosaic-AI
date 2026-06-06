@@ -14,10 +14,9 @@ class AlphaZeroAgent(MCTSAgent):
         self.model_version = model_version
         self.input_size = input_size
         
-        
         super().__init__(simulations=simulations, rollout_depth=0, **kwargs)
 
-        # Dynamischer Pfad-Aufbau: models/alphazero_v1.pth
+        # Dynamischer Pfad-Aufbau: models/alphazero_vx.pth
         model_path = MODELS_DIR / f"alphazero_{model_version}.pth"
 
         if not model_path.exists():
@@ -26,11 +25,12 @@ class AlphaZeroAgent(MCTSAgent):
         # --- 1. CUDA & GERÄT SETUP ---
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"🧠 AlphaZero Agent initialisiert auf: {self.device.type.upper()}")
-
-        # --- 2. DAS GEHIRN LADEN ---
-        self.model = MosaicNet(input_size=input_size, num_actions=400)
+        ckpt = torch.load(str(model_path), map_location=self.device)
+        # --- 2. DAS Model laden ---
+        self.model = MosaicNet(input_size=input_size, num_actions=NUM_ACTIONS)
         # map_location sorgt dafür, dass es keinen Crash gibt (falls Modell auf CPU gespeichert wurde)
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        
+        self.model.load_state_dict(ckpt["model_state"])
         self.model.to(self.device)
         self.model.eval() 
 

@@ -180,39 +180,14 @@ def move_bonus_chip():
 
 @app.route('/api/move/start_tile', methods=['POST'])
 def move_start_tile():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    d = request.get_json()
     try:
-        pi       = int(d['player'])
-        tile_id  = int(d['tile_id'])
-        slot_row = int(d['slot_row'])
-        slot_col = int(d['slot_col'])
-        rotation = int(d.get('rotation', 0))
-        player   = _game.state.players[pi]
-
-        if player.start_dome_tile is None:
-            return jsonify(err("Startkachel bereits gelegt"))
-            
-        from engine.game import _find_in_display
-        tile = _find_in_display(_game.state, tile_id)
-        if tile is None:
-            return jsonify(err(f"Kachel {tile_id} nicht im Display"))
-            
-        _game.state.dome_display.remove(tile)
-        if _game.state.dome_tile_pool:
-            _game.state.dome_display.append(_game.state.dome_tile_pool.pop(0))
-
-        from engine.dome import ROTATION_MAP
-        import copy
-        tile = copy.deepcopy(tile)
-        tile.apply_rotation(rotation)
-        
-        player.dome_grid.place_dome_tile(tile, slot_row, slot_col)
-        player.start_dome_tile = None
-        
-        _game.state.log_event(
-            f"{player.name}: Startkachel {tile_id} (aus Auslage) → "
-            f"({slot_row},{slot_col}) rot={rotation}°"
+        d = request.json
+        _game.apply_start_placement(
+            player_idx = int(d['player']),
+            tile_id    = int(d['tile_id']),
+            row        = int(d['slot_row']),
+            col        = int(d['slot_col']),
+            rot        = int(d.get('rotation', 0)),
         )
         return jsonify(ok())
     except Exception as e:

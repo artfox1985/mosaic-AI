@@ -99,9 +99,7 @@ def play_one_game(agent, game_index):
             "policy": policy,
             "valid_actions": actions,
         })
-        if not obs.get("valid_moves"):
-            print(f"WARNING: empty valid_moves at step {steps}, phase={env.state.phase}")
-
+        
         obs, reward, done, step_info = env.step(action)
         steps += 1
 
