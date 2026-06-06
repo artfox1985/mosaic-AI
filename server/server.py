@@ -32,7 +32,7 @@ from engine.moves import (
     Move, TakeAction, PlaceAction, TakeSource,
     PlaceDomeTileMove, DrawFromStackMove, TakeBonusChipMove
 )
-from engine.game import Game
+from engine.game import Game, generate_tiling_actions
 from engine.round_end import TilingAction
 
 STATIC_DIR = Path(__file__).resolve().parent / 'static'
@@ -226,13 +226,13 @@ def tiling_bonus_chips():
         pi = int(d['player'])
         row_idx = int(d['pattern_row'])
         chip_uses = d.get('chip_uses', [])
-
         player = _game.state.players[pi]
         row = player.pattern_lines[row_idx]
 
         if not row.tiles: return jsonify(err("Musterreihe hat keine echten Fliesen"))
         if row.is_complete: return jsonify(err("Reihe ist bereits voll"))
 
+        # Chip-IDs validieren
         used_chip_ids = set()
         for use in chip_uses:
             ids = use['chip_ids']
@@ -246,15 +246,32 @@ def tiling_bonus_chips():
         if len(chip_uses) > row.spaces_left:
             return jsonify(err("Mehr Chip-Nutzungen als fehlende Fliesen"))
 
+        # Platzierbarkeit prüfen wenn Reihe nach Chips komplett wäre
+        would_complete = (row.spaces_left - len(chip_uses)) <= 0
+        if would_complete:
+            from engine.game import generate_tiling_actions
+            # Temporär auffüllen und prüfen
+            row.tiles.extend([row.color] * len(chip_uses))
+            actions = generate_tiling_actions(_game.state, pi)
+            placeable = any(a.pattern_row == row_idx for a in actions)
+            del row.tiles[-len(chip_uses):]  # zurückrollen
+
+            if not placeable:
+                return jsonify(err(
+                    f"Reihe {row_idx+1} kann nach Chip-Einsatz nicht auf die Kuppel "
+                    f"gelegt werden — kein passender Slot verfügbar."
+                ))
+
+        # Chips verbrauchen
         for cid in used_chip_ids:
             for i, c in enumerate(player.bonus_chips):
                 if c and c.chip_id == cid:
                     player.bonus_chips[i] = None
                     break
 
-        color = row.color
+        # Fliesen eintragen
         for _ in chip_uses:
-            row.tiles.append(color)
+            row.tiles.append(row.color)
 
         _game.state.log_event(
             f"{player.name}: {len(chip_uses)} Chip-Nutzung(en) → "
@@ -325,7 +342,8 @@ def move_pass():
     if _game.state.phase != "drafting": return jsonify(err("Passen nur in Phase 1 möglich."))
 
     # Validierung: Darf der Spieler passen?
-    if len(_game.valid_moves()) > 0:
+    real_moves = [m for m in _game.valid_moves() if m.get("type") != "pass"]
+    if len(real_moves) > 0:
         return jsonify(err("Passen nicht erlaubt — es gibt noch gültige Aktionen."))
 
     # --- HIER IST DIE MAGIE ---

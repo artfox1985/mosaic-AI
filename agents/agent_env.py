@@ -263,7 +263,7 @@ class MosaicEnv:
         for pi in range(2):
             player = self.state.players[pi]
             for ri, row in enumerate(player.pattern_lines):
-                if not row.is_complete and can_complete_row_with_chips(player, ri):
+                if not row.is_complete and can_complete_row_with_chips(player, ri, self.state):
                     actions.append({
                         "type":        "use_chips",
                         "player":      pi,
@@ -295,20 +295,17 @@ class MosaicEnv:
         if t == "stone":
             color = _color(action["color"])
             src   = TakeSource[action["source"]]
-            if src == TakeSource.SMALL_FACTORY_MOON and action.get("factory_id") is None:
-                self._execute_aktion_c(color, action["row"])
-            else:
-                moon = [_color(c) for c in action.get("moon_order", [])]
-                move = Move(
-                    take=TakeAction(
-                        source=src,
-                        color=color,
-                        factory_id=action.get("factory_id"),
-                        moon_order=moon,
-                    ),
-                    place=PlaceAction(row_index=action["row"]),
-                )
-                self._game.apply(move)
+            moon  = [_color(c) for c in action.get("moon_order", [])]
+            move  = Move(
+                take=TakeAction(
+                    source=src,
+                    color=color,
+                    factory_id=action.get("factory_id"),
+                    moon_order=moon,
+                ),
+                place=PlaceAction(row_index=action["row"]),
+            )
+            self._game.apply(move)
 
         elif t == "dome":
             move = PlaceDomeTileMove(
@@ -351,36 +348,6 @@ class MosaicEnv:
             if state.phase == "drafting":
                 self._place_initial_dome_tile_ai(1 - state.current_player)
                 self._place_initial_dome_tile_ai(state.current_player)
-
-    def _execute_aktion_c(self, color, row: int) -> None:
-        """Globaler Mond-Zug (Aktion C): nimmt Steine aus allen Fabriken."""
-        from engine.execution import _execute_place
-
-        state = self.state
-        p = state.active_player
-        taken = []
-        got_marker = False
-
-        for f in state.factories:
-            if color in f.moon_top_colors():
-                taken += f.take_from_moon(color)
-
-        if color in state.large_factory.moon_colors():
-            tiles, marker = state.large_factory.take_from_moon(color)
-            taken += tiles
-            if marker:
-                got_marker = True
-
-        if not taken:
-            raise ValueError(f"Keine {color.value}-Fliesen im Mondbereich")
-
-        if got_marker:
-            p.holds_first_player_marker = True
-            state.first_player_next_round = state.current_player
-
-        _execute_place(state, taken, color, row)
-        state.switch_player()
-        self._game._check_phase_transition()
 
     def _calculate_end_scoring(self) -> dict:
         """Delegiert an game._calculate_end_scoring() — Single Source of Truth."""

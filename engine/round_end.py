@@ -386,38 +386,53 @@ def score_penalty(player: "PlayerBoard") -> int:
 def can_complete_row_with_chips(
     player: "PlayerBoard",
     row_idx: int,
+    state: "GameState | None" = None,
 ) -> bool:
-    """
-    [10] Kann diese Musterreihe mit Bonusplättchen komplettiert werden?
-    Bedingung: Reihe hat ≥1 Fliese UND Spieler hat genug ungenutzte Chips:
-      - 2 gleichfarbige Chips = 1 fehlende Fliese ODER
-      - 3 beliebige Chips = 1 fehlende Fliese
-    Mehrfach anwendbar solange Chips vorhanden.
-    """
     row = player.pattern_lines[row_idx]
     if not row.tiles or row.color is None:
         return False
     missing = row.spaces_left
     if missing == 0:
         return False
-    # Zähle verfügbare (ungenutzte) Chips
+
+    # Chip-Verfügbarkeit prüfen (bestehende Logik)
     color = row.color
     unused = [c for c in player.bonus_chips if c is not None]
     same_color = [c for c in unused if hasattr(c, 'colors') and color in c.colors]
+    has_chips = False
     if len(same_color) >= missing * 2:
-        return True   # 2 gleichfarbige pro fehlende Fliese
-    if len(unused) >= missing * 3:
-        return True   # 3 beliebige pro fehlende Fliese
-    # Gemischte Nutzung
-    chips_left = list(unused)
-    for _ in range(missing):
-        same = [c for c in chips_left if hasattr(c, 'colors') and color in c.colors]
-        if len(same) >= 2:
-            chips_left.remove(same[0]); chips_left.remove(same[1])
-        elif len(chips_left) >= 3:
-            chips_left = chips_left[3:]
+        has_chips = True
+    elif len(unused) >= missing * 3:
+        has_chips = True
+    else:
+        chips_left = list(unused)
+        for _ in range(missing):
+            same = [c for c in chips_left if hasattr(c, 'colors') and color in c.colors]
+            if len(same) >= 2:
+                chips_left.remove(same[0]); chips_left.remove(same[1])
+            elif len(chips_left) >= 3:
+                chips_left = chips_left[3:]
+            else:
+                break
         else:
+            has_chips = True
+
+    if not has_chips:
+        return False
+
+    # NEU: Platzierbarkeit prüfen wenn State verfügbar
+    if state is not None:
+        from engine.game import generate_tiling_actions
+        # Temporär auffüllen
+        row.tiles.extend([color] * missing)
+        pi = next(i for i, p in enumerate(state.players) if p is player)
+        actions = generate_tiling_actions(state, pi)
+        placeable = any(a.pattern_row == row_idx for a in actions)
+        # Rückrollen
+        del row.tiles[-missing:]
+        if not placeable:
             return False
+
     return True
 
 
