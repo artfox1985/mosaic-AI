@@ -111,8 +111,7 @@ def main():
         has_error = 'error' in info
 
         # Track freeze
-        if (env.state.phase == phase_before and 
-            env.state.round_number == round_before):
+        if reward == -1.0:
             same_state_count += 1
         else:
             same_state_count = 0

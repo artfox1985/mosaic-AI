@@ -447,7 +447,7 @@ class MosaicEnv:
             state.switch_player()
 
         elif t == "tiling":
-            pi = action["pi"]
+            pi = action["player"]
             ta = TilingAction(
                 pattern_row=action["pattern_row"],
                 slot_row=action["slot_row"],
@@ -462,7 +462,7 @@ class MosaicEnv:
 
         # NEU: Chips ausgeben und in virtuelle Fliese umwandeln
         elif t == "use_chips":
-            pi = action["pi"]
+            pi = action["player"]
             ri = action["pattern_row"]
             player = state.players[pi]
             
@@ -544,6 +544,19 @@ class MosaicEnv:
             res = calculate_end_scoring(player, self.state.scoring_tile_ids)
             player.apply_score(res["total"])
             results[pi] = res
+
+            # Logging der Wertungsplatten
+            self.state.log_event(
+                f"🏆 {player.name}: Endwertung +{res['total']} Pkt "
+                f"→ Gesamt: {player.score} Pkt"
+            )
+            for tid, detail in res.items():
+                if tid == "total":
+                    continue
+                self.state.log_event(
+                    f"   {detail['emoji']} {detail['name']}: {detail['score']:+d} Pkt"
+                )
+
         self.state.phase = "final"
         return {"end_scoring": results}
 

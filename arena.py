@@ -61,7 +61,7 @@ def run_arena(agents_dict, games_per_matchup=10):
             result = run_episode_mcts(
                 agents=agent_list, 
                 max_steps=500, 
-                verbose=True  # <--- HIER EINGESCHALTET
+                verbose=False  # <--- HIER EINGESCHALTET
             )
             duration = time.time() - t0
             
@@ -132,4 +132,4 @@ if __name__ == "__main__":
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=1)
+    run_arena(competitors, games_per_matchup=40)

@@ -248,6 +248,7 @@ class MCTSAgent(BaseAgent):
         return child
 
     def _rollout(self, env: MosaicEnv) -> dict[int, float]:
+        start = time.perf_counter()
         """
         Spiele zufällig bis zum Ende (oder bis rollout_depth Schritte).
         """
@@ -255,14 +256,29 @@ class MCTSAgent(BaseAgent):
         done = False
 
         # rollout_depth=-1 → bis Spielende; 0 → sofortige Heuristik (nur für HeuristicMCTSAgent sinnvoll)
-        while not done:
-            if self.rollout_depth >= 0 and depth >= self.rollout_depth:
-                break
+        # Statt env.clone() in der Schleife zu nutzen, 
+        # nutzen wir hier nur die Heuristik:
+        while not done and (self.rollout_depth < 0 or depth < self.rollout_depth):
             actions = env.valid_actions()
-            if not actions:
-                break
-            action = self._rollout_agent.choose(actions, {})
-            _, _, done, _ = env.step(action)
+            if not actions: break
+            
+            # Wähle den besten Zug basierend auf der Heuristik (ohne Klonen!)
+            best_action = None
+            best_val = -float('inf')
+            
+            # Wir nehmen nur eine Stichprobe der Heuristik (sehr schnell)
+            for a in random.sample(actions, min(3, len(actions))):
+                # Wir führen den Schritt in der ECHTEN Rollout-Umgebung aus
+                # und schauen uns den Reward an, den 'step' direkt liefert.
+                # WICHTIG: env.step(a) verändert das env. Wenn du es zurücksetzen 
+                # willst, ist clone() nötig. Aber wenn du es hier in der Simulation 
+                # einfach weiterlaufen lässt, brauchst du kein Klonen!
+                _, r, done, _ = env.step(a)
+                if r > best_val:
+                    best_val = r
+                    best_action = a
+                if done: break
+            
             depth += 1
 
         scores = env.scores()
@@ -279,6 +295,11 @@ class MCTSAgent(BaseAgent):
         scale = 10.0  
         p0 = 1.0 / (1.0 + math.exp(-diff / scale))
         p1 = 1.0 - p0
+        
+        duration = time.perf_counter() - start
+        # Nur loggen, wenn die Simulation langsam ist, um das Log nicht zu fluten:
+        if duration > 0.1: 
+            print(f"DEBUG: Rollout dauerte {duration:.4f}s")
 
         return {0: p0, 1: p1}
 
@@ -474,7 +495,7 @@ class HeuristicMCTSAgent(MCTSAgent):
         done = False
 
         # Spiele noch 'rollout_depth' Züge GREEDY weiter, um taktische Fehler zu vermeiden
-        while not done and depth < self.rollout_depth:
+        while not done and (self.rollout_depth < 0 or depth < self.rollout_depth):
             actions = env.valid_actions()
             if not actions:
                 break
