@@ -96,8 +96,11 @@ def play_one_game(agent, game_index):
         history.append({
             "state":  copy.deepcopy(obs),
             "player": current_player,
-            "policy": policy
+            "policy": policy,
+            "valid_actions": actions,
         })
+        if not obs.get("valid_moves"):
+            print(f"WARNING: empty valid_moves at step {steps}, phase={env.state.phase}")
 
         obs, reward, done, step_info = env.step(action)
         steps += 1
@@ -112,7 +115,7 @@ def play_one_game(agent, game_index):
     training_data = []
     for step in history:
         val = 1.0 if step["player"] == winner else -1.0
-        training_data.append({"state": step["state"], "policy": step["policy"], "value": val})
+        training_data.append({"state": step["state"], "policy": step["policy"], "value": val, "valid_actions": step["valid_actions"],})
 
     return training_data, winner, scores, steps
 

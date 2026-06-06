@@ -173,7 +173,8 @@ class MosaicDataset(Dataset):
                     
                     # Action Mask — 1.0 für legale Aktionen, 0.0 für illegale
                     mask = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
-                    for move in step["state"].get("valid_moves", []):
+                    moves = step.get("valid_actions") or step["state"].get("valid_moves", [])
+                    for move in moves:
                         mask[action_to_id(move)] = 1.0
                     self.masks.append(mask)
                     
