@@ -459,14 +459,6 @@ def apply_bonus_chips_to_row(
 
 
 def check_drafting_complete(state: "GameState") -> bool:
-    """
-    Phase 1 endet wenn:
-    - Alle Manufakturen leer (keine Fliesen UND keine Bonusplättchen)
-    - Beide Spieler haben ihre 2 Spielerplättchen genutzt (außer Runde 5)
-    - Alle aufgedeckten Bonusplättchen wurden genommen
-      (d.h. kein chip_revealed=True mehr auf einer Fabrik)
-    """
-    # Noch aufgedeckte Bonusplättchen vorhanden?
     chips_available = any(
         f.bonus_chip is not None and f.bonus_chip_revealed
         for f in state.factories
@@ -479,10 +471,31 @@ def check_drafting_complete(state: "GameState") -> bool:
             for f in state.factories)
         and state.large_factory.is_empty
     )
+
+    if not factories_empty:
+        return False
+
     if state.round_number >= 5:
-        return factories_empty
+        return True
+
     tokens_done = all(p.has_used_all_tokens(state.round_number) for p in state.players)
-    return factories_empty and tokens_done
+    if tokens_done:
+        return True
+
+    # Fabriken leer aber Tokens noch nicht verbraucht —
+    # Phase endet trotzdem wenn kein Spieler mehr irgendetwas tun kann
+    from engine.game import generate_dome_moves, generate_bonus_chip_moves
+    from engine.validation import generate_valid_moves
+    original = state.current_player
+    for pi in range(2):
+        state.current_player = pi
+        if (generate_valid_moves(state)
+                or generate_dome_moves(state)
+                or generate_bonus_chip_moves(state)):
+            state.current_player = original
+            return False
+    state.current_player = original
+    return True
 
 
 def get_pending_tiling_rows(player: "PlayerBoard") -> list[int]:
@@ -596,8 +609,15 @@ def apply_round_scoring(state: "GameState", tiling_scores: dict[int, int]) -> No
 # ---------------------------------------------------------------------------
 
 def _find_dome_tile(state: "GameState", tile_id: int) -> Optional[DomeTile]:
-    """Sucht eine Dome-Kachel im Pool anhand der ID."""
+    """Sucht eine Dome-Kachel im offenen Display ODER im Pool anhand der ID."""
+    # 1. Zuerst im offenen Display (G) suchen
+    for tile in state.dome_display:
+        if tile.tile_id == tile_id:
+            return tile
+            
+    # 2. Falls nicht da, im verdeckten Stapel (F) suchen
     for tile in state.dome_tile_pool:
         if tile.tile_id == tile_id:
             return tile
+            
     return None

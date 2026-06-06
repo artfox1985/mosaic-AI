@@ -111,7 +111,50 @@ class MosaicEnv:
         if self.state.phase == "drafting":
             return self._drafting_actions()
         if self.state.phase == "tiling":
-            return self._tiling_actions()
+            from engine.game import generate_tiling_actions
+            
+            # Wir suchen den ERSTEN Spieler, der noch eine Tiling-Aktion hat
+            for pi in range(2):
+                player = self.state.players[pi]
+                
+                # Finde die oberste fertige Reihe dieses Spielers
+                for ri, row in enumerate(player.pattern_lines):
+                    if not row.is_complete:
+                        continue
+                        
+                    tiling = generate_tiling_actions(self.state, pi)
+                    
+                    # Gibt es GÜLTIGE Aktionen für diese spezielle Reihe?
+                    row_actions = [a for a in tiling if a.pattern_row == ri]
+                    
+                    if len(row_actions) > 0:
+                        # BINGO! Dieser Spieler ist jetzt dran.
+                        # Wir zwingen die Umgebung, auf diesen Spieler zu wechseln!
+                        self.state.active_player_index = pi 
+                        
+                        actions = []
+                        for a in row_actions:
+                            actions.append({
+                                "type":         "tiling",
+                                "player":       pi,  # <-- WICHTIG: "player" statt "pi"
+                                "pattern_row":  a.pattern_row,
+                                "slot_row":     a.slot_row,
+                                "slot_col":     a.slot_col,
+                                "space_index":  a.space_index,
+                                "dome_tile_id": getattr(a, "dome_tile_id", None),
+                                "rotation":     getattr(a, "rotation", 0)
+                            })
+                            
+                        # SOFORT ZURÜCKGEBEN! 
+                        # Wir mischen niemals Züge von Spieler 1 und 2 in derselben Liste!
+                        return actions 
+                        
+                    # Wenn die Reihe zwar voll ist, aber keine Aktionen generiert wurden 
+                    # (z.B. unplatzierbar), brechen wir die Reihen-Suche ab.
+                    break 
+            
+            # Wenn die gesamte Schleife durchläuft und NIEMAND mehr eine Aktion hat:
+            return [{"type": "end_tiling"}]
         return []
 
     def step(self, action: dict) -> tuple[dict, float, bool, dict]:
@@ -295,8 +338,10 @@ class MosaicEnv:
                             "slot_row":    a.slot_row,
                             "slot_col":    a.slot_col,
                             "space_index": a.space_index,
+                            "dome_tile_id": a.dome_tile_id,   # ← None wenn Slot schon belegt, sonst Kachel-ID
+                            "rotation":    a.rotation,         # ← 0 wenn Slot schon belegt
                         })
-                break  
+                break 
 
          # 2. NEU: Bonus-Chips eintauschen generieren (Nur komplette Reihen-Auffüllung!)
         from engine.round_end import can_complete_row_with_chips
@@ -408,6 +453,8 @@ class MosaicEnv:
                 slot_row=action["slot_row"],
                 slot_col=action["slot_col"],
                 space_index=action["space_index"],
+                dome_tile_id=action.get("dome_tile_id"),  # ← None = Slot bereits belegt
+                rotation=action.get("rotation", 0),
             )
             err = validate_tiling_action(state, pi, ta)
             if err: raise ValueError(err)
