@@ -19,113 +19,90 @@ class SelfPlayAgent(HeuristicMCTSAgent):
         super().__init__(simulations=simulations, rollout_depth=rollout_depth, **kwargs)
 
     def search_and_get_policy(self, env, actions, temp=1.0):
-        # Wir müssen den State klonen, damit der MCTS nicht das echte Spiel manipuliert
-
         pi = env.current_player()
-        print(f"DEBUG: search_and_get_policy gestartet für Spieler {pi}")
         sampled = self._sample_actions(actions)
         
         root = MCTSNode(
-            action=None, 
-            parent=None, 
-            untried_actions=sampled, 
+            action=None,
+            parent=None,
+            untried_actions=sampled,
             player_who_acted=pi
         )
         root.visits = 1
 
         sims_done = 0
         while sims_done < self.simulations:
-            # Zeitmessung für Debugging
-            start_time = time.perf_counter()
-            
-            # Simulation durchführen
-            sim_env = env.clone()
+            sim_env = env.clone()          # ← saubere Isolation durch gepatchtes clone()
             node = self._select(root, sim_env)
             node = self._expand(node, sim_env)
-            result = self._rollout(sim_env)
+            result = self._rollout(sim_env) # ← HeuristicMCTSAgent._rollout macht intern
+                                            #   weitere clone()s — das ist OK, aber teuer
             self._backpropagate(node, result, pi)
-            
             sims_done += 1
-            
+                
             # Debug-Ausgabe nur alle 50 Simulationen
             if sims_done % 50 == 0:
                 duration = (time.perf_counter() - start_time) * 1000
                 print(f"#{sims_done} DEBUG: Letzte Simulation dauerte {duration:.2f}ms")
 
-        # 1. Policy (Wahrscheinlichkeiten)
-        total_visits = sum(child.visits for child in root.children)
-        policy = []
-        for child in root.children:
-            prob = child.visits / total_visits if total_visits > 0 else 0.0
-            policy.append({"action": child.action, "prob": prob})
+            # 1. Policy (Wahrscheinlichkeiten)
+            total_visits = sum(child.visits for child in root.children)
+            policy = []
+            for child in root.children:
+                prob = child.visits / total_visits if total_visits > 0 else 0.0
+                policy.append({"action": child.action, "prob": prob})
 
-        # 2. Zugauswahl
-        if temp > 0:
-            # Temperatur-Sampling
-            r = random.uniform(0, 1)
-            acc = 0.0
-            chosen_action = root.children[-1].action
-            for p in policy:
-                acc += p["prob"]
-                if r <= acc:
-                    chosen_action = p["action"]
-                    break
-        else:
-            best_child = max(root.children, key=lambda c: c.visits)
-            chosen_action = best_child.action
+            # 2. Zugauswahl
+            if temp > 0:
+                # Temperatur-Sampling
+                r = random.uniform(0, 1)
+                acc = 0.0
+                chosen_action = root.children[-1].action
+                for p in policy:
+                    acc += p["prob"]
+                    if r <= acc:
+                        chosen_action = p["action"]
+                        break
+            else:
+                best_child = max(root.children, key=lambda c: c.visits)
+                chosen_action = best_child.action
 
-        return chosen_action, policy
+            return chosen_action, policy
 
 def play_one_game(agent, game_index):
+    """Spielt genau ein Spiel und zeichnet alle Daten auf."""
     env = MosaicEnv()
     obs, info = env.reset()
-    agent.set_env(env)
+    # ENTFERNT: agent.set_env(env)  ← existiert nicht
     
     history = []
     steps = 0
-    temperature_moves = 15 
+    temperature_moves = 15
 
     while True:
         actions = env.valid_actions()
         if not actions:
             break
 
-        # DEBUG: Was denkt das Environment?
-        print(f"DEBUG: Aktuelle Phase: '{getattr(env.state, 'phase', 'N/A')}'")
-        # DEBUG: Warum endet das Drafting nicht?
-        if env.state.phase == "drafting":
-            from engine.round_end import check_drafting_complete
-            is_done = check_drafting_complete(env.state)
-            if not is_done:
-                 # Hier kannst du sehen, was dem Drafting-Ende im Weg steht
-                 # Evtl. printen wir mal, wieviele Tokens oder Steine noch da sind
-                 pass
         current_player = env.current_player()
         temp = 1.0 if steps < temperature_moves else 0.0
 
-        # Der Bypass
-        if getattr(env.state, 'phase', '') == "tiling":
+        if len(actions) == 1:
             action = actions[0]
             policy = [{"action": action, "prob": 1.0}]
-            
-        elif len(actions) == 1:
-            action = actions[0]
-            policy = [{"action": action, "prob": 1.0}]
-            
         else:
-            action, policy = agent.search_and_get_policy(env, actions, temp=temp)
             action, policy = agent.search_and_get_policy(env, actions, temp=temp)
 
         history.append({
-            "state": copy.deepcopy(obs),
+            "state":  copy.deepcopy(obs),
             "player": current_player,
-            "policy": policy 
+            "policy": policy
         })
 
         obs, reward, done, step_info = env.step(action)
         steps += 1
-        
-        if done: 
+
+        if done:
             break
 
     scores = env.scores()

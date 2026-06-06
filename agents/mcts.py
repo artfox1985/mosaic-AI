@@ -248,10 +248,10 @@ class MCTSAgent(BaseAgent):
         return child
 
     def _rollout(self, env: MosaicEnv) -> dict[int, float]:
-        start = time.perf_counter()
         """
         Spiele zufällig bis zum Ende (oder bis rollout_depth Schritte).
         """
+        start = time.perf_counter()
         depth = 0
         done = False
 
@@ -267,19 +267,18 @@ class MCTSAgent(BaseAgent):
             best_val = -float('inf')
             
             # Wir nehmen nur eine Stichprobe der Heuristik (sehr schnell)
-            for a in random.sample(actions, min(3, len(actions))):
-                # Wir führen den Schritt in der ECHTEN Rollout-Umgebung aus
-                # und schauen uns den Reward an, den 'step' direkt liefert.
-                # WICHTIG: env.step(a) verändert das env. Wenn du es zurücksetzen 
-                # willst, ist clone() nötig. Aber wenn du es hier in der Simulation 
-                # einfach weiterlaufen lässt, brauchst du kein Klonen!
-                _, r, done, _ = env.step(a)
-                if r > best_val:
-                    best_val = r
-                    best_action = a
-                if done: break
-            
-            depth += 1
+        best_action = random.choice(actions)  # Fallback
+        best_val = -float('inf')
+
+        for a in random.sample(actions, min(3, len(actions))):
+            test_env = env.clone()
+            _, r, _, _ = test_env.step(a)
+            if r > best_val:
+                best_val = r
+                best_action = a
+
+        _, _, done, _ = env.step(best_action)  # nur einmal ausführen
+        depth += 1
 
         scores = env.scores()
         state = env.state
@@ -298,8 +297,8 @@ class MCTSAgent(BaseAgent):
         
         duration = time.perf_counter() - start
         # Nur loggen, wenn die Simulation langsam ist, um das Log nicht zu fluten:
-        if duration > 0.1: 
-            print(f"DEBUG: Rollout dauerte {duration:.4f}s")
+        if self.verbose and duration > 0.1:
+            print(f"[MCTS] Langsamer Rollout: {duration:.4f}s")
 
         return {0: p0, 1: p1}
 

@@ -188,9 +188,15 @@ def execute_tiling_action(
     # Neue Kachel platzieren falls Slot leer
     if slot is None:
         tile = _find_dome_tile(state, action.dome_tile_id)
+        if tile is None:
+            raise ValueError(f"Dome-Kachel {action.dome_tile_id} nicht gefunden")
         tile.apply_rotation(action.rotation)
         grid.place_dome_tile(tile, action.slot_row, action.slot_col)
-        state.dome_tile_pool.remove(tile)
+        if tile in state.dome_display:
+            state.dome_display.remove(tile)
+        elif tile in state.dome_tile_pool:
+            state.dome_tile_pool.remove(tile)
+        # Falls schon entfernt (doppelte Aktion) → kein Crash
         slot = tile
 
     # Stein auf den gewählten Space legen
