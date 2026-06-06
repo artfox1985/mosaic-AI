@@ -9,7 +9,7 @@ import argparse
 from agents.agent_env import MosaicEnv
 from agents.mcts import MCTSNode
 from agents.alphazero import AlphaZeroAgent
-from config import MODELS_DIR, DATA_DIR
+from config import MODELS_DIR, DATA_DIR, INPUT_SIZE, NUM_ACTIONS
 
 class SelfPlayAgent(AlphaZeroAgent):
     """
@@ -142,7 +142,7 @@ def generate_data(num_games=100, simulations=40, version_name="v1"):
     # --- Agent lädt das dynamische Modell ---
     agent = SelfPlayAgent(
         model_version=version_name, 
-        input_size=129, 
+        input_size=INPUT_SIZE, 
         simulations=simulations
     )
     all_training_data = []

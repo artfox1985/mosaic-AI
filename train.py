@@ -6,7 +6,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS
 
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
@@ -25,7 +25,7 @@ def train(version_name, load_version=None):
     print(f"\n🚀 Starte PyTorch Training auf: {device.type.upper()}")
     
     # 3. Modell Setup
-    model = MosaicNet(input_size=dataset.input_size, num_actions=400)
+    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS)
     
     # Warm Start?
     if load_version:
@@ -57,17 +57,23 @@ def train(version_name, load_version=None):
     for epoch in range(epochs):
         t_loss, t_vloss, t_ploss = 0, 0, 0
         
-        for states, targets_p, targets_v in dataloader:
-            states = states.to(device)
+        for states, targets_p, targets_v, masks in dataloader:
+            states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
-            
+            masks     = masks.to(device)
+
             optimizer.zero_grad()
             pred_p, pred_v = model(states)
-            
+
+            # Policy Loss mit Masking:
+            # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
+            masked_pred_p = pred_p * masks
+            masked_pred_p = masked_pred_p / (masked_pred_p.sum(dim=1, keepdim=True) + 1e-8)
+
             v_loss = mse_loss(pred_v, targets_v)
-            p_loss = -torch.sum(targets_p * torch.log(pred_p + 1e-8)) / states.size(0)
-            
+            p_loss = -torch.sum(targets_p * torch.log(masked_pred_p + 1e-8)) / states.size(0)
+
             loss = v_loss + p_loss
             loss.backward()
             optimizer.step()

@@ -396,10 +396,6 @@ def run_episode_mcts(
         pi = env.current_player()
         agent = agents[pi]
 
-        # Env aktuell halten für MCTS
-        if isinstance(agent, MCTSAgent):
-            agent.set_env(env)
-
         action = agent.choose(actions, obs)
         obs, reward, done, step_info = env.step(action)
         total_rewards[pi] += reward

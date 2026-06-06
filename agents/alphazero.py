@@ -3,14 +3,14 @@ import math
 from agents.mcts import MCTSAgent, MCTSNode
 from agents.neural_net import MosaicNet, state_to_tensor, action_to_id
 from engine.serializer import serialize_state
-from config import MODELS_DIR
+from config import MODELS_DIR, INPUT_SIZE, NUM_ACTIONS
 
 class AlphaZeroAgent(MCTSAgent):
     """
     Der finale Meister-Agent. Nutzt MCTS (mit der AlphaZero PUCT Formel) und 
     bewertet alle Knotenpunkte blitzschnell mit dem Neuronalen Netz auf der GPU!
     """
-    def __init__(self, model_version="v1", input_size=129, simulations=40, **kwargs):
+    def __init__(self, model_version="v1", input_size=INPUT_SIZE, simulations=40, **kwargs):
         self.model_version = model_version
         self.input_size = input_size
         

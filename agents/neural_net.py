@@ -4,6 +4,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+from config import NUM_ACTIONS
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "weiß": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
@@ -78,48 +79,72 @@ def state_to_tensor(data):
             # Straffläche
             features.append(len(p.get("floor", [])) / 7.0)
             
+        # 6. Kuppelzustand (pro Spieler: 9 Slots × 9 Features = 81 Features × 2 = 162)
+        COLOR_ID_MAP = {"blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5}
+
+        for p in [me, enemy]:
+            dome = p.get("dome_grid", [])
+            for sr in range(3):
+                for sc in range(3):
+                    row = dome[sr] if sr < len(dome) else []
+                    slot = row[sc] if sc < len(row) else None
+
+                    if slot is None:
+                        # Slot leer — 9 Nullen
+                        features.extend([0.0] * 9)
+                    else:
+                        features.append(1.0)  # slot existiert
+                        for space in slot.get("spaces", [{}, {}, {}, {}]):
+                            # is_filled
+                            filled = space.get("filled")
+                            features.append(1.0 if filled is not None else 0.0)
+                            # required_color normalisiert (0=kein, 1-5=farbe)
+                            req = space.get("color")
+                            features.append(COLOR_ID_MAP.get(req, 0) / 5.0)
+            
     return torch.tensor(features, dtype=torch.float32)
 
 def action_to_id(action: dict) -> int:
-    """Übersetzt eine Aktion in eine fixe ID zwischen 0 und 399."""
     t = action.get("type", "")
-    if t == "pass": return 0
+    if t == "pass":       return 0
     if t == "end_tiling": return 1
-    
+
     if t == "stone":
-        c_id = COLOR_MAP.get(action.get("color"), -1)
-        r_id = action.get("row", 0) + 1
+        c_id   = max(0, COLOR_MAP.get(action.get("color"), 0))
+        r_id   = action.get("row", 0) + 1          # -1..6 → 0..7
         src_str = action.get("source", "")
-        if "SMALL_FACTORY_MOON" in src_str: src_id = 6
-        elif "LARGE" in src_str: src_id = 7
-        else: src_id = action.get("factory_id", 0)
-        if src_id is None: src_id = 6
-        return min(10 + (max(0, c_id) * 50) + (r_id * 8) + src_id, 399)
-        
+        if "SMALL_FACTORY_MOON" in src_str and action.get("factory_id") is None:
+            src_id = 6                              # globaler Mond-Zug
+        elif "LARGE" in src_str:
+            src_id = 7
+        else:
+            src_id = action.get("factory_id", 0) or 0
+        return min(10 + (c_id * 50) + (r_id * 8) + src_id, 273)
+
     if t == "tiling":
         pr = action.get("pattern_row", 0)
         sr = action.get("slot_row", 0)
         sc = action.get("slot_col", 0)
-        return min(250 + (pr * 9) + (sr * 3) + sc, 399)
-        
-    # NEU: Kuppelplatten (Feld & Rotation -> 36 Kombis)
-    if t == "dome" or t == "dome_stack":
-        sr = action.get("slot_row", 0)
-        sc = action.get("slot_col", 0)
-        rot_idx = action.get("rotation", 0) // 90 
-        return min(300 + (sr * 12) + (sc * 4) + rot_idx, 399)
-        
-    # NEU: Bonuschips (Welche Fabrik?)
+        return 274 + (pr * 9) + (sr * 3) + sc      # 274–327
+
+    if t in ("dome", "dome_stack"):
+        sr      = action.get("slot_row", 0)
+        sc      = action.get("slot_col", 0)
+        rot_idx = action.get("rotation", 0) // 90
+        return 328 + (sr * 12) + (sc * 4) + rot_idx  # 328–363
+
+    if t == "use_chips":
+        return 364 + action.get("pattern_row", 0)  # 364–369
+
     if t == "bonus_chip":
-        f_id = action.get("factory_id", 0)
-        return min(350 + f_id, 399)
-        
-    return 399
+        return 370 + (action.get("factory_id", 1) - 1)  # 370–373
+
+    return 373  # Fallback auf letzte gültige ID
 
 # --- 2. DATENSATZ & NETZWERK ---
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data"):
-        self.states, self.policies, self.values = [], [], []
+        self.states, self.policies, self.values, self.masks = [], [], [], []
         files = glob.glob(os.path.join(data_dir, "*.pkl"))
         print(f"Lade Daten aus {len(files)} Dateien...")
         
@@ -130,7 +155,7 @@ class MosaicDataset(Dataset):
                     self.states.append(state_to_tensor(step["state"]))
                     self.values.append(torch.tensor([step["value"]], dtype=torch.float32))
                     
-                    t_policy = torch.zeros(400, dtype=torch.float32)
+                    t_policy = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
                     for p in step["policy"]:
                         a_id = action_to_id(p["action"])
                         t_policy[a_id] += p["prob"]
@@ -140,11 +165,17 @@ class MosaicDataset(Dataset):
                         t_policy /= t_policy.sum()
                     self.policies.append(t_policy)
                     
+                    # Action Mask — 1.0 für legale Aktionen, 0.0 für illegale
+                    mask = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
+                    for move in step["state"].get("valid_moves", []):
+                        mask[action_to_id(move)] = 1.0
+                    self.masks.append(mask)
+                    
         self.input_size = len(self.states[0]) if self.states else 100
         print(f"Datensatz geladen: {len(self.states)} Züge. (Features pro Zug: {self.input_size})")
 
     def __len__(self): return len(self.states)
-    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx]
+    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx]
 
 
 class MosaicNet(nn.Module):

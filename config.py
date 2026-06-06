@@ -21,3 +21,7 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 MCTS_SIMULATIONS_TRAINING = 40     # Schnellere Simulation für Datengenerierung
 MCTS_SIMULATIONS_ARENA = 150       # Volle Denkkraft für das Titel-Match
 TEMPERATURE_MOVES = 15             # Nach wie vielen Zügen wird Exploitation forciert?
+
+# --- NETZWERK PARAMETER ---
+INPUT_SIZE = 291        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel)
+NUM_ACTIONS = 374       # action_to_id Ausgabebereich
