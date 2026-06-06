@@ -3,6 +3,7 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
@@ -68,11 +69,12 @@ def train(version_name, load_version=None):
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
-            masked_pred_p = pred_p * masks
-            masked_pred_p = masked_pred_p / (masked_pred_p.sum(dim=1, keepdim=True) + 1e-8)
 
+            masked_logits = pred_p + (masks - 1) * 1e9   # illegale Aktionen auf -inf
+            log_probs = F.log_softmax(masked_logits, dim=1)
+            
             v_loss = mse_loss(pred_v, targets_v)
-            p_loss = -torch.sum(targets_p * torch.log(masked_pred_p + 1e-8)) / states.size(0)
+            p_loss = -torch.sum(targets_p * log_probs) / states.size(0)
 
             loss = v_loss + p_loss
             loss.backward()
@@ -86,7 +88,6 @@ def train(version_name, load_version=None):
         
     # 6. Speichern
     model.cpu()
-    # Baut den Pfad: models/alphazero_v2.pth
     save_path = MODELS_DIR / f"alphazero_{version_name}.pth"
     torch.save(model.state_dict(), str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")

@@ -24,4 +24,4 @@ TEMPERATURE_MOVES = 15             # Nach wie vielen Zügen wird Exploitation fo
 
 # --- NETZWERK PARAMETER ---
 INPUT_SIZE = 291        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel)
-NUM_ACTIONS = 374       # action_to_id Ausgabebereich
+NUM_ACTIONS = 410       # action_to_id Ausgabebereich

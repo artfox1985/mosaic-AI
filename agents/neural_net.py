@@ -127,19 +127,25 @@ def action_to_id(action: dict) -> int:
         sc = action.get("slot_col", 0)
         return 274 + (pr * 9) + (sr * 3) + sc      # 274–327
 
-    if t in ("dome", "dome_stack"):
+    if t == "dome":
         sr      = action.get("slot_row", 0)
         sc      = action.get("slot_col", 0)
         rot_idx = action.get("rotation", 0) // 90
-        return 328 + (sr * 12) + (sc * 4) + rot_idx  # 328–363
+        return 328 + (sr * 12) + (sc * 4) + rot_idx   # 328–363 (36 IDs)
+
+    if t == "dome_stack":
+        sr      = action.get("slot_row", 0)
+        sc      = action.get("slot_col", 0)
+        rot_idx = action.get("rotation", 0) // 90
+        return 364 + (sr * 12) + (sc * 4) + rot_idx   # 364–399 (36 IDs)
 
     if t == "use_chips":
-        return 364 + action.get("pattern_row", 0)  # 364–369
+        return 400 + action.get("pattern_row", 0)      # 400–405
 
     if t == "bonus_chip":
-        return 370 + (action.get("factory_id", 1) - 1)  # 370–373
+        return 406 + (action.get("factory_id", 1) - 1) # 406–409
 
-    return 373  # Fallback auf letzte gültige ID
+    return 409  # Fallback auf letzte gültige ID
 
 # --- 2. DATENSATZ & NETZWERK ---
 class MosaicDataset(Dataset):
@@ -188,8 +194,7 @@ class MosaicNet(nn.Module):
             nn.ReLU()
         )
         self.policy_head = nn.Sequential(
-            nn.Linear(128, num_actions),
-            nn.Softmax(dim=1)
+            nn.Linear(128, num_actions)
         )
         self.value_head = nn.Sequential(
             nn.Linear(128, 64),
