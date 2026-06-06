@@ -574,7 +574,7 @@ def apply_round_scoring(state: "GameState", tiling_scores: dict[int, int]) -> No
     for player_idx, player in enumerate(state.players):
         # Tiling-Punkte
         tile_pts = tiling_scores.get(player_idx, 0)
-        #player.apply_score(tile_pts)
+        player.apply_score(tile_pts)
 
         # Strafpunkte
         penalty = score_penalty(player)

@@ -1,9 +1,9 @@
 import time
-from agents.agents import RandomAgent, run_episode, GreedyAgent
-from agents.mcts import MCTSAgent, HeuristicMCTSAgent
+from agents.agents import RandomAgent, GreedyAgent
+from agents.mcts import MCTSAgent, HeuristicMCTSAgent, run_episode_mcts
 from agents.alphazero import AlphaZeroAgent
 from agents.agent_env import MosaicEnv
-import itertools  # <--- WICHTIG: Das hier ganz oben zu den Importen hinzufügen!
+import itertools
 
 # Falls du den HeuristicMCTSAgent in einer anderen Datei gespeichert hast, importiere ihn entsprechend.
 # from deine_datei import HeuristicMCTSAgent
@@ -58,7 +58,11 @@ def run_arena(agents_dict, games_per_matchup=10):
             print(f"  Spiel {i+1}/{games_per_matchup}: {p0:15s} vs {p1:15s}...", end="", flush=True)
             t0 = time.time()
             
-            result = run_episode(env, agent_list, max_steps=500, verbose=False)
+            result = run_episode_mcts(
+                agents=agent_list, 
+                max_steps=500, 
+                verbose=True  # <--- HIER EINGESCHALTET
+            )
             duration = time.time() - t0
             
             # Auswertung
@@ -128,4 +132,4 @@ if __name__ == "__main__":
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=40)
+    run_arena(competitors, games_per_matchup=1)

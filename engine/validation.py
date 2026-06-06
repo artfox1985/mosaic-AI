@@ -161,63 +161,74 @@ def _validate_place(
 
 def generate_valid_moves(state: "GameState") -> list[Move]:
     """
-    Gibt alle regelkonformen Züge für den aktiven Spieler zurück.
-    Nützlich für die KI und für Tests.
+    Optimierte Generierung gültiger Züge. 
+    Vermeidet unnötige Permutationen und nutzt direkt Validatoren.
     """
     from engine.moves import PlaceAction, Move
-    import itertools
-
     moves: list[Move] = []
-    row_indices = list(range(6)) + [-1]  # Musterreihen 0–5 + Strafleiste
+    row_indices = list(range(6)) + [-1]
 
-    # Kleine Fabriken — Sun
+    # --- Kleine Fabriken (Sun & Moon) ---
     for f in state.factories:
+        # Sun: Nur valide Farben, Moon: Nur valide Farben (Top)
+        # Für Sun brauchen wir die moon_order nur einmalig, wenn sie valide ist
         for color in f.sun_colors():
             remaining = [t for t in f.sun_tiles if t != color]
-            # Alle Permutationen der übrigen Steine als moon_order
-            # Bei vielen Steinen explodiert das — wir nehmen alle eindeutigen
-            unique_orders = list({
-                tuple(p) for p in itertools.permutations(remaining)
-            })
-            for order in unique_orders:
-                take = TakeAction(
-                    source=TakeSource.SMALL_FACTORY_SUN,
-                    color=color,
-                    factory_id=f.factory_id,
-                    moon_order=list(order),
-                )
-                for ri in row_indices:
-                    m = Move(take=take, place=PlaceAction(ri))
-                    if validate_move(state, m) is None:
-                        moves.append(m)
-
-    # Kleine Fabriken — Moon
-    for f in state.factories:
-        for color in f.moon_top_colors():
+            # Statt Permutationen: Nur eine eindeutige Reihenfolge der Reststeine nötig
+            # da 'moon_order' nur für die Logik der Verteilung relevant ist
             take = TakeAction(
-                source=TakeSource.SMALL_FACTORY_MOON,
+                source=TakeSource.SMALL_FACTORY_SUN,
                 color=color,
                 factory_id=f.factory_id,
+                moon_order=remaining
             )
             for ri in row_indices:
-                m = Move(take=take, place=PlaceAction(ri))
-                if validate_move(state, m) is None:
-                    moves.append(m)
+                if _validate_place(state, color, ri) is None:
+                    moves.append(Move(take=take, place=PlaceAction(ri)))
 
-    # Große Fabrik — Sun
+        for color in f.moon_top_colors():
+            take = TakeAction(source=TakeSource.SMALL_FACTORY_MOON, color=color, factory_id=f.factory_id)
+            for ri in row_indices:
+                if _validate_place(state, color, ri) is None:
+                    moves.append(Move(take=take, place=PlaceAction(ri)))
+
+    # --- Große Fabrik ---
     for color in state.large_factory.sun_colors():
         take = TakeAction(source=TakeSource.LARGE_FACTORY_SUN, color=color)
         for ri in row_indices:
-            m = Move(take=take, place=PlaceAction(ri))
-            if validate_move(state, m) is None:
-                moves.append(m)
+            if _validate_place(state, color, ri) is None:
+                moves.append(Move(take=take, place=PlaceAction(ri)))
 
-    # Große Fabrik — Moon
     for color in state.large_factory.moon_colors():
         take = TakeAction(source=TakeSource.LARGE_FACTORY_MOON, color=color)
         for ri in row_indices:
+            if _validate_place(state, color, ri) is None:
+                moves.append(Move(take=take, place=PlaceAction(ri)))
+
+    # --- AKTION C: Globaler Mond-Zug (Aktion C) ---
+    # Wir sammeln hier alle Farben, die irgendwo oben auf einem Mondstapel liegen
+    available_moon_colors = set()
+    
+    # Aus den kleinen Fabriken
+    for f in state.factories:
+        available_moon_colors.update(f.moon_top_colors())
+        
+    # Aus der großen Fabrik
+    available_moon_colors.update(state.large_factory.moon_colors())
+
+    # Jetzt fügen wir diese Züge zur Liste hinzu
+    for color in available_moon_colors:
+        for ri in row_indices:
+            # Erstelle den Move für Aktion C (TakeSource.SMALL_FACTORY_MOON mit factory_id=None)
+            take = TakeAction(
+                source=TakeSource.SMALL_FACTORY_MOON,
+                color=color,
+                factory_id=None # Das signalisiert Aktion C
+            )
             m = Move(take=take, place=PlaceAction(ri))
-            if validate_move(state, m) is None:
+            
+            # Prüfe, ob dieser globale Mond-Zug valide ist
+            if validate_moon_take(state, m) is None:
                 moves.append(m)
 
     return moves
@@ -247,4 +258,3 @@ def validate_moon_take(state: "GameState", move: "Move") -> Optional[str]:
         return err
 
     return None
-    

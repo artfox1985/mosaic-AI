@@ -39,4 +39,3 @@ def get_player_potential(player) -> float:
     potential += dome_bonus   
         
     return potential - broken_penalty
-    

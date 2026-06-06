@@ -43,7 +43,7 @@ from engine.execution import execute_move
 from engine.round_end import (
     TilingAction, SpecialTilingAction,
     validate_tiling_action, validate_special_tiling,
-    execute_tiling_action, execute_special_tiling,
+    execute_full_tiling, execute_special_tiling,
     check_drafting_complete, get_pending_tiling_rows,
     apply_round_scoring, score_placed_tile,
 )
@@ -432,14 +432,85 @@ class Game:
     # ------------------------------------------------------------------
 
     def drafting_complete(self) -> bool:
-        return check_drafting_complete(self.state)
+        assert self.state is not None
+        
+        # 1. Sind noch Steine da?
+        stones_left = False
+        for f in self.state.factories:
+            if not f.sun_is_empty or not f.moon_is_empty:
+                stones_left = True
+                break
+        if not self.state.large_factory.sun_is_empty or not self.state.large_factory.moon_is_empty:
+            stones_left = True
+            
+        if stones_left:
+            return False
 
-    def valid_moves(self) -> list[AnyMove]:
-        """Alle gültigen Züge (Stein + Kachel + Bonusplättchen) für aktiven Spieler."""
-        stone_moves = generate_valid_moves(self.state)
-        dome_moves  = generate_dome_moves(self.state)
-        chip_moves  = generate_bonus_chip_moves(self.state)
-        return stone_moves + dome_moves + chip_moves
+        # 2. Spieler-Limits prüfen
+        for player in self.state.players:
+            # Bonus-Chips (alle Runden)
+            chips_taken = len([c for c in player.bonus_chips if c is not None])
+            chips_available = any(len(f.bonus_chips) > 0 for f in self.state.factories)
+            if chips_taken < 2 and chips_available:
+                return False
+
+            # Kuppeln (NUR in Runden 1 bis 4)
+            if self.state.round_number <= 4:
+                domes_placed = len(player.dome_grid.get_all_placed())
+                required_domes = self.state.round_number * 2 + 1
+                
+                if domes_placed < required_domes:
+                    # KANN der Spieler überhaupt noch Kuppeln legen?
+                    has_free_slots = len(player.dome_grid.get_empty_slots()) > 0
+                    has_tiles_available = len(self.state.dome_display) > 0 or len(self.state.dome_tile_pool) > 0
+                    
+                    if has_free_slots and has_tiles_available:
+                        return False # Er MUSS noch Kuppeln legen
+
+        return True
+
+    def valid_moves(self) -> list[dict]:
+        if self.state.phase != "drafting":
+            from engine.game import generate_tiling_actions
+            return generate_tiling_actions(self.state, self.state.active_player_index)
+
+        moves = []
+        player = self.state.active_player
+
+        # 1. Steine
+        from engine.validation import generate_valid_moves
+        moves.extend(generate_valid_moves(self.state)) 
+        
+        # 2. Kuppeln (NUR in Runden 1-4)
+        if self.state.round_number <= 4:
+            domes_placed = len(player.dome_grid.get_all_placed())
+            required_domes = self.state.round_number * 2 + 1
+            if domes_placed < required_domes:
+                from engine.game import generate_dome_moves
+                dome_moves = generate_dome_moves(self.state)
+                moves.extend(dome_moves)
+                
+                # --- WICHTIG: KANN der Spieler überhaupt noch Kuppeln legen? ---
+                # Wenn er das Limit nicht erreicht hat, aber generate_dome_moves() leer ist,
+                # bedeutet das: Er kann physisch keine Kuppeln mehr legen (Board voll oder Stapel leer).
+                can_place_domes = len(dome_moves) > 0
+            else:
+                can_place_domes = False # Limit erreicht
+        else:
+            can_place_domes = False # Runde 5
+
+        # 3. Bonus-Chips
+        chips_taken = len([c for c in player.bonus_chips if c is not None])
+        if chips_taken < 2:
+            from engine.game import generate_bonus_chip_moves
+            moves.extend(generate_bonus_chip_moves(self.state))
+
+        # --- PASSEN ---
+        # Wenn der Spieler keine Steine, keine Kuppeln und keine Bonus-Chips mehr nehmen kann, MUSS er passen.
+        if len(moves) == 0:
+            moves.append({"type": "pass"})
+            
+        return moves
 
     def apply(self, move: AnyMove) -> None:
         """Führt einen Zug aus und wechselt den aktiven Spieler."""
@@ -447,27 +518,36 @@ class Game:
         assert self.state.phase == "drafting", "Nur in der Drafting-Phase möglich."
 
         from engine.moves import DrawFromStackMove, TakeBonusChipMove
-        if isinstance(move, PlaceDomeTileMove):
+        
+        # --- NEU: Explizite Behandlung des "pass" Zugs ---
+        if isinstance(move, dict) and move.get("type") == "pass":
+            # Beim Passen passiert nichts weiter, außer dass der Spieler wechselt
+            self.state.switch_player()
+
+        elif isinstance(move, PlaceDomeTileMove):
             err = validate_dome_move(self.state, move)
             if err:
                 raise ValueError(err)
             execute_dome_move(self.state, move)
             self.state.switch_player()
+            
         elif isinstance(move, DrawFromStackMove):
             err = validate_draw_from_stack(self.state, move)
             if err:
                 raise ValueError(err)
             execute_draw_from_stack(self.state, move)
             self.state.switch_player()
+            
         elif isinstance(move, TakeBonusChipMove):
             err = validate_take_bonus_chip(self.state, move)
             if err:
                 raise ValueError(err)
             execute_take_bonus_chip(self.state, move)
             self.state.switch_player()
+            
         else:
             # Eindeutige Erkennung von Aktion C (ohne fuzzy String-Matching)
-            is_global_moon_take = (
+            is_global_moon_take = getattr(move, "take", None) is not None and (
                 move.take.source.name == "SMALL_FACTORY_MOON" and 
                 move.take.factory_id is None
             )
@@ -485,8 +565,17 @@ class Game:
             execute_move(self.state, move)
             self.state.switch_player()
 
-        if self.drafting_complete():
+        # --- AUTOMATISCHER PHASENWECHSEL ---
+        # Dieser Block prüft nach JEDEM Zug (auch nach dem "pass"), ob das Drafting beendet ist
+        if self.state.phase == "drafting" and self.drafting_complete():
             self.state.phase = "tiling"
+            from engine.round_end import process_unplaceable_rows
+            
+            # Unplatzierbare Fliesen automatisch in den Turm werfen
+            process_unplaceable_rows(self.state.players[0], self.state.tower, self.state)
+            process_unplaceable_rows(self.state.players[1], self.state.tower, self.state)
+            
+            self.state.log_event("Tiling-Phase beginnt.")
 
     # ------------------------------------------------------------------
     # Tiling-Phase

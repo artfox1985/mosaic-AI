@@ -100,15 +100,23 @@ def move_stone():
     
     d = request.get_json()
     try:
+        # --- ROBUSTE HANDHABUNG VON AKTION C ---
+        # Wenn factory_id fehlt oder None ist, ist es ein globaler Mond-Zug.
+        raw_factory_id = d.get('factory_id')
+        factory_id = int(raw_factory_id) if raw_factory_id is not None else None
+        
         move = Move(
             take=TakeAction(
                 source=source(d['source']), 
                 color=color(d['color']),
-                factory_id=d.get('factory_id'), 
+                factory_id=factory_id, 
                 moon_order=[color(c) for c in d.get('moon_order', [])]
             ),
             place=PlaceAction(row_index=int(d['row'])),
         )
+        
+        # apply() in deiner game.py muss jetzt den Fall factory_id=None 
+        # als Aktion C erkennen (hast du ja bereits implementiert)
         _game.apply(move)
         return jsonify(ok())
     except ValueError as e:
@@ -379,22 +387,18 @@ def move_pass():
     if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
     if _game.state.phase != "drafting": return jsonify(err("Passen nur in Phase 1 möglich."))
 
-    # SO SAUBER: Einfach game.py fragen, ob noch Züge möglich sind!
+    # Validierung: Darf der Spieler passen?
     if len(_game.valid_moves()) > 0:
         return jsonify(err("Passen nicht erlaubt — es gibt noch gültige Aktionen."))
 
-    player = _game.state.active_player
-    _game.state.log_event(f"{player.name} passt.")
-    _game.state.switch_player()
-    
-    if _game.drafting_complete():
-        _game.state.phase = "tiling"
-        from engine.round_end import process_unplaceable_rows
-        process_unplaceable_rows(_game.state.players[0], _game.state.tower, _game.state)
-        process_unplaceable_rows(_game.state.players[1], _game.state.tower, _game.state)
-        _game.state.log_event("Tiling-Phase beginnt.")
-        
-    return jsonify(ok())
+    # --- HIER IST DIE MAGIE ---
+    # Wir übergeben das Passen einfach an die Engine. 
+    # game.py kümmert sich jetzt um Spielerwechsel, Log-Eintrag und den Phasenwechsel!
+    try:
+        _game.apply({"type": "pass"})
+        return jsonify(ok())
+    except ValueError as e:
+        return jsonify(err(str(e)))
 
 
 @app.route('/api/scoring_tiles', methods=['GET'])

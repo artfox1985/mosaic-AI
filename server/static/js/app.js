@@ -71,7 +71,7 @@ async function endTiling() {
 }
 
 async function passMove() {
-  const d = await api('/pass', {});
+  const d = await api('/move/pass', {});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
 }

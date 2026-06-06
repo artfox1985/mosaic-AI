@@ -254,6 +254,7 @@ class MCTSAgent(BaseAgent):
         depth = 0
         done = False
 
+        # rollout_depth=-1 → bis Spielende; 0 → sofortige Heuristik (nur für HeuristicMCTSAgent sinnvoll)
         while not done:
             if self.rollout_depth >= 0 and depth >= self.rollout_depth:
                 break
@@ -265,17 +266,16 @@ class MCTSAgent(BaseAgent):
             depth += 1
 
         scores = env.scores()
+        state = env.state
         
         # --- TERMINAL REWARD LOGIK ---
-        # Wenn das Spiel 0:0 endet, bestrafen wir das Ergebnis massiv,
-        # damit der MCTS-Baum diese Züge als schlecht bewertet.
         if scores[0] == 0 and scores[1] == 0:
-            diff = -15.0  # Künstliche Strafe für "Nichts erreicht"
+            # Tiebreaker-Auflösung über den Startspielerstein
+            diff = 1.0 if state.players[0].holds_first_player_marker else -1.0
         else:
-            diff = scores[0] - scores[1]  # positiv = P0 führt
+            diff = (scores[0] - scores[1]) * 1.5
 
         # Normalisierung: sigmoid-ähnlich auf [0, 1]
-        import math
         scale = 10.0  
         p0 = 1.0 / (1.0 + math.exp(-diff / scale))
         p1 = 1.0 - p0
@@ -353,7 +353,7 @@ def run_episode_mcts(
     Wie run_episode, aber übergibt die Umgebung an MCTS-Agenten.
     """
     import time
-    from engine.agents import run_episode
+    from agents.agents import run_episode
 
     env = MosaicEnv(random_scoring_tiles=random_scoring_tiles)
 
@@ -404,6 +404,19 @@ def run_episode_mcts(
         else:
             winner = 1
 
+    # LOG-AUSGABE FÜR DIE ARENA ---
+    if verbose:
+        print("\n" + "="*60)
+        print("📜 ARENA SPIEL-LOG (Rundenende & Punkte)")
+        print("="*60)
+        log_entries = getattr(env.state, 'log', [])
+        if not log_entries:
+            print("Kein Log gefunden.")
+        else:
+            for entry in log_entries:
+                print(entry)
+        print("="*60 + "\n")
+
     result = {
         "scores":           scores,
         "winner":           winner,
@@ -413,6 +426,8 @@ def run_episode_mcts(
         "scoring_names":    info.get("scoring_tile_names", []),
         "duration_s":       round(time.time() - t0, 3),
     }
+    
+    return result
 
 def evaluate_state(state) -> dict[int, float]:
     """
@@ -487,7 +502,13 @@ class HeuristicMCTSAgent(MCTSAgent):
         # --- DER MAGISCHE MOMENT: Die Heuristik übernimmt ---
         if done:
             scores = env.scores()
-            diff = scores[0] - scores[1]
+            state = env.state
+            
+            # HIER MUSS DEINE TIE-BREAKER LOGIK AUCH REIN!
+            if scores[0] == 0 and scores[1] == 0:
+                diff = 1.0 if state.players[0].holds_first_player_marker else -1.0
+            else:
+                diff = (scores[0] - scores[1]) * 1.5
         else:
             evals = evaluate_state(env.state)
             diff = evals[0] - evals[1]
