@@ -266,36 +266,32 @@ class MCTSAgent(BaseAgent):
 
     def _rollout(self, env: MosaicEnv) -> dict[int, float]:
         """
-        Spiele zufällig bis zum Ende (oder bis rollout_depth Schritte).
+        Spiele bis rollout_depth Schritte mit Greedy-Bias.
+        rollout_depth=-1 → bis Spielende
+        rollout_depth=0  → sofortige Heuristik
         """
         start = time.perf_counter()
         depth = 0
         done = False
 
-        # rollout_depth=-1 → bis Spielende; 0 → sofortige Heuristik (nur für HeuristicMCTSAgent sinnvoll)
-        # Statt env.clone() in der Schleife zu nutzen, 
-        # nutzen wir hier nur die Heuristik:
         while not done and (self.rollout_depth < 0 or depth < self.rollout_depth):
             actions = env.valid_actions()
-            if not actions: break
+            if not actions: 
+                break
             
-            # Wähle den besten Zug basierend auf der Heuristik (ohne Klonen!)
-            best_action = None
+            # Greedy-Bias: 3 Aktionen testen, beste ausführen
+            best_action = random.choice(actions)  # Fallback
             best_val = -float('inf')
-            
-            # Wir nehmen nur eine Stichprobe der Heuristik (sehr schnell)
-        best_action = random.choice(actions)  # Fallback
-        best_val = -float('inf')
 
-        for a in random.sample(actions, min(3, len(actions))):
-            test_env = env.clone()
-            _, r, _, _ = test_env.step(a)
-            if r > best_val:
-                best_val = r
-                best_action = a
+            for a in random.sample(actions, min(3, len(actions))):
+                test_env = env.clone()
+                _, r, _, _ = test_env.step(a)
+                if r > best_val:
+                    best_val = r
+                    best_action = a
 
-        _, _, done, _ = env.step(best_action)  # nur einmal ausführen
-        depth += 1
+            _, _, done, _ = env.step(best_action)
+            depth += 1
 
         scores = env.scores()
         return _compute_terminal_reward(scores, env.state)
