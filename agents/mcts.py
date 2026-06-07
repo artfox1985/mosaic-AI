@@ -39,8 +39,7 @@ def _compute_terminal_reward(scores: list[int], state) -> dict[int, float]:
     Gibt Win-Wahrscheinlichkeiten {0: p0, 1: p1} zurück.
     """
     if scores[0] == 0 and scores[1] == 0:
-        base = -5.0
-        diff = base + (1.0 if state.players[0].holds_first_player_marker else -1.0)
+        diff = 1.0 if state.players[0].holds_first_player_marker else -1.0
     else:
         diff = (scores[0] - scores[1]) * 1.5
 

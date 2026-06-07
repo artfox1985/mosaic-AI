@@ -81,23 +81,32 @@ def run_arena(agents_dict, games_per_matchup=10):
                 score_a, score_b = 0.5, 0.5
                 
             wins[winner_name] += 1
-            
+            if scores[0] == 0 and scores[1] == 0:
+                wins["ZeroZero"] += 1
+
             # Elo Update
             old_elo_0 = elo_ratings[p0]
             old_elo_1 = elo_ratings[p1]
             
-            new_elo_0, new_elo_1 = calculate_elo(old_elo_0, old_elo_1, score_a)
+            # Reduzierter K-Faktor bei 0:0
+            k = 16 if (scores[0] == 0 and scores[1] == 0) else 32
+            new_elo_0, new_elo_1 = calculate_elo(old_elo_0, old_elo_1, score_a, k=k)
             
             elo_ratings[p0] = new_elo_0
             elo_ratings[p1] = new_elo_1
             
             print(f" {duration:.1f}s | {scores[0]:3d}:{scores[1]:<3d} -> Sieger: {winner_name}")
 
+    total    = sum(wins[n] for n in names)
+    zerozero = wins["ZeroZero"]
+    pct      = zerozero / total * 100 if total > 0 else 0
+
     print("\n" + "=" * 50)
     print("🏆 ARENA ERGEBNISSE 🏆")
     for name in names:
         print(f"Siege {name}: {wins[name]}")
-    print(f"Unentschieden: {wins['Draw']}")
+    print(f"0:0 Spiele:    {zerozero} / {total} ({pct:.1f}%)")
+
     
     print("\nFINALE ELO RATINGS:")
     # Sortiert die Tabelle absteigend nach Elo

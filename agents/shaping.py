@@ -24,7 +24,7 @@ def get_player_potential(player) -> float:
                 
     # B: Eskalierende Strafe für den Boden
     broken_penalty = 0.0
-    base_pen = 0.4
+    base_pen = 0.8
     for k in range(1, len(player.broken_tiles) + 1):
         broken_penalty += k * base_pen
         
