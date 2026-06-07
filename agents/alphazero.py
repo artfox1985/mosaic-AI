@@ -1,71 +1,77 @@
 import torch
+import torch.nn.functional as F
 import math
 from agents.mcts import MCTSAgent, MCTSNode
 from agents.neural_net import MosaicNet, state_to_tensor, action_to_id
 from engine.serializer import serialize_state
 from config import MODELS_DIR, INPUT_SIZE, NUM_ACTIONS
 
+
 class AlphaZeroAgent(MCTSAgent):
     """
-    Der finale Meister-Agent. Nutzt MCTS (mit der AlphaZero PUCT Formel) und 
-    bewertet alle Knotenpunkte blitzschnell mit dem Neuronalen Netz auf der GPU!
+    Der finale Meister-Agent. Nutzt MCTS (mit der AlphaZero PUCT-Formel) und
+    bewertet alle Knotenpunkte blitzschnell mit dem Neuronalen Netz auf der GPU.
+
+    Die Policy-Priors werden direkt am MCTSNode gespeichert (node.priors),
+    nicht in einem globalen Cache — das vermeidet RAM-Leaks, doppelte
+    Serialisierung und fragile String-Keys.
     """
     def __init__(self, model_version="v1", input_size=INPUT_SIZE, simulations=40, **kwargs):
         self.model_version = model_version
         self.input_size = input_size
-        
+
         super().__init__(simulations=simulations, rollout_depth=0, **kwargs)
 
-        # Dynamischer Pfad-Aufbau: models/alphazero_vx.pth
         model_path = MODELS_DIR / f"alphazero_{model_version}.pth"
-
         if not model_path.exists():
             raise FileNotFoundError(f"Das Modell '{model_path}' wurde nicht gefunden!")
 
-        # --- 1. CUDA & GERÄT SETUP ---
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"🧠 AlphaZero Agent initialisiert auf: {self.device.type.upper()}")
+
         ckpt = torch.load(str(model_path), map_location=self.device)
-        # --- 2. DAS Model laden ---
         self.model = MosaicNet(input_size=input_size, num_actions=NUM_ACTIONS)
-        # map_location sorgt dafür, dass es keinen Crash gibt (falls Modell auf CPU gespeichert wurde)
-        
         self.model.load_state_dict(ckpt["model_state"])
         self.model.to(self.device)
-        self.model.eval() 
+        self.model.eval()
 
-        # Zwischenspeicher für das "halbe" Gehirn: Die Policy!
-        self.node_priors = {}
+        # Knoten der zuletzt expandiert wurde — verbindet _expand → _rollout
+        self._last_expanded: MCTSNode | None = None
+
+    def _expand(self, node: MCTSNode, env) -> MCTSNode:
+        """Wie Basisklasse, merkt sich aber den neuen Knoten für _rollout."""
+        child = super()._expand(node, env)
+        self._last_expanded = child
+        return child
 
     def _rollout(self, env):
         """
-        Fragt das Netz nach der Gewinnwahrscheinlichkeit (Value)
-        UND speichert die Zug-Wahrscheinlichkeiten (Policy) für später.
+        Fragt das Netz nach der Gewinnwahrscheinlichkeit (Value) und speichert
+        die Policy-Priors (Softmax über Logits) direkt am zuletzt expandierten Knoten.
         """
-        # 1. Ist das Spiel vielleicht schon komplett vorbei?
+        # 1. Spiel bereits vorbei?
         if env.state.phase in ("end", "final"):
             scores = env.scores()
-            if scores[0] > scores[1]: return {0: 1.0, 1: 0.0}
-            elif scores[1] > scores[0]: return {0: 0.0, 1: 1.0}
+            if scores[0] > scores[1]:
+                return {0: 1.0, 1: 0.0}
+            elif scores[1] > scores[0]:
+                return {0: 0.0, 1: 1.0}
             else:
-                p0_wins = 1.0 if env.state.players[0].holds_first_player_marker else 0.0
-                return {0: p0_wins, 1: 1.0 - p0_wins}
+                p0 = 1.0 if env.state.players[0].holds_first_player_marker else 0.0
+                return {0: p0, 1: 1.0 - p0}
 
-        # 2. BEREIT FÜR DAS NETZ
+        # 2. Netz-Auswertung
         obs = serialize_state(env.state)
-        # --- TENSOR AUF DIE GRAFIKKARTE SCHIEBEN ---
         tensor_state = state_to_tensor(obs).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            # DAS GANZE GEHIRN: Policy (Welcher Zug?) und Value (Wer gewinnt?)
-            policy_pred, value_pred = self.model(tensor_state)
+            policy_logits, value_pred = self.model(tensor_state)
 
-        # --- NEU: POLICY SPEICHERN ---
-        # Wir merken uns, welche Züge das Netz hier für gut hielt
-        # (Wird sofort danach in der PUCT-Formel in _select genutzt)
-        state_str = str(obs) 
-        self.node_priors[state_str] = policy_pred[0].cpu().numpy()
+        # Policy: Logits → Wahrscheinlichkeiten (Softmax), am Knoten speichern
+        policy_probs = F.softmax(policy_logits[0], dim=0).cpu().numpy()
+        if self._last_expanded is not None:
+            self._last_expanded.priors = policy_probs
 
-        # 3. VALUE UMRECHNEN
+        # 3. Value umrechnen (Tanh-Output [-1,1] → Win-Prob [0,1])
         v = value_pred.item()
         win_prob = (v + 1.0) / 2.0
 
@@ -77,39 +83,32 @@ class AlphaZeroAgent(MCTSAgent):
 
     def _select(self, node: MCTSNode, env) -> MCTSNode:
         """
-        ÜBERSCHREIBT DIE NORMALE MCTS-FORMEL!
-        Nutzt AlphaZero's PUCT: Kombiniert den MCTS-Suchwert (Q) mit der 
-        Intuition des Neuronalen Netzes (P).
+        AlphaZero PUCT: Kombiniert Suchwert Q mit Netz-Prior P.
+        Priors werden vom Knoten gelesen (node.priors), nicht aus globalem Cache.
         """
+        c_puct = 1.5
+
         while node.is_fully_expanded() and node.children:
-            c_puct = 1.5  # AlphaZero Standardwert für Exploration
-            best_score = -float('inf')
-            best_child = None
+            # Priors des AKTUELLEN Knotens (für seine Kinder gültig)
+            priors = node.priors
 
-            # Die Intuition (Policy) für dieses Brett aus dem Speicher holen
-            obs = serialize_state(env.state)
-            priors = self.node_priors.get(str(obs), None)
-
-            # Policy Normalisierung ---
-            # Wir berechnen die Summe der Wahrscheinlichkeiten ALLER legalen Züge
+            # Summe der Prior-Wahrscheinlichkeiten aller legalen Kinder
             valid_p_sum = 0.0
             if priors is not None:
                 for child in node.children:
                     valid_p_sum += priors[action_to_id(child.action)]
-            # ----------------------------------          
+
+            best_score = -float('inf')
+            best_child = None
 
             for child in node.children:
-                # 1. Q-Value: Was hat die Simulation bisher gezeigt? (Exploitation)
                 q = child.value / child.visits if child.visits > 0 else 0.0
 
-                # 2. P-Value: Was sagt das Bauchgefühl des Netzes? (Prior)
                 if priors is not None:
-                    a_id = action_to_id(child.action)
-                    p = priors[a_id] / (valid_p_sum + 1e-8)
+                    p = priors[action_to_id(child.action)] / (valid_p_sum + 1e-8)
                 else:
                     p = 1.0 / len(node.children)
 
-                # 3. DIE MAGISCHE ALPHAZERO PUCT-FORMEL
                 u = q + c_puct * p * math.sqrt(node.visits) / (1 + child.visits)
 
                 if u > best_score:
@@ -120,8 +119,7 @@ class AlphaZeroAgent(MCTSAgent):
             env.step(node.action)
 
         return node
-        
+
     def reset_for_new_game(self):
-        """Leert alle Caches, um RAM freizugeben."""
-        self.node_priors = {}
-        
+        """Kein globaler Cache mehr — Priors leben am Knoten. No-op für Kompatibilität."""
+        self._last_expanded = None

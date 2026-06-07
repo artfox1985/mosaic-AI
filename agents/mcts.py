@@ -57,6 +57,7 @@ class MCTSNode:
         'action', 'parent', 'children',
         'visits', 'value',
         'untried_actions', 'player_who_acted',
+        'priors',
     )
 
     def __init__(
@@ -73,6 +74,7 @@ class MCTSNode:
         self.value:     float = 0.0            # kumulierter Reward aus Sicht von player_who_acted
         self.untried_actions = list(untried_actions)
         self.player_who_acted = player_who_acted
+        self.priors          = None            # NN-Policy-Priors (nur AlphaZero), lazy gesetzt
 
     def ucb1(self, c: float = 1.414) -> float:
         """

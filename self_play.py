@@ -68,6 +68,19 @@ class SelfPlayMixin:
             policy = [p for p in policy if p["prob"] > 0.0]
             return best.action, policy
 
+        for _ in range(self.simulations):
+            sim_env = env.clone()
+            node = self._select(root, sim_env)
+            node = self._expand(node, sim_env)
+            result = self._rollout(sim_env)
+            self._backpropagate(node, result, pi)
+
+        # Cache leeren — Priors gelten nur für diesen Zug
+        if hasattr(self, 'node_priors'):
+            self.node_priors.clear()
+        elif hasattr(self, '_az') and hasattr(self._az, 'node_priors'):
+            self._az.node_priors.clear()
+
         # Temperature-gewichtete Policy: visits^(1/temp)
         total_visits = sum(c.visits for c in root.children)
         if total_visits == 0:
