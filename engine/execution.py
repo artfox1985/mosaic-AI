@@ -1,259 +1,208 @@
 """
-Zugausführung für Mosaic-AI.
+Factory definitions for Mosaic-AI.
 
-Führt einen bereits validierten Move auf dem GameState aus.
-Reihenfolge:
-  1. Steine nehmen (Take) — Fabrik aktualisieren, Marker vergeben
-  2. Steine legen (Place) — Musterreihe befüllen, Überschuss → Strafleiste
-  3. Startspieler-Marker verarbeiten
-  4. Bonus-Chip aufdecken falls Fabrik jetzt leer
+Mosaic-AI hat:
+  - 4 kleine Fabriken (je 4 Steine auf der Sun-Seite)
+  - 1 große Fabrik   (5 Steine auf der Sun-Seite + Moon-Pool für Reste)
 
-WICHTIG: execute_move() geht davon aus dass der Move bereits validiert
-wurde. Ungültige Züge führen zu undefiniertem Verhalten.
+Sun-Mechanik (kleine & große Fabrik):
+  Spieler nimmt ALLE Steine einer Farbe von der Sun-Seite.
+  Die restlichen Steine legt er in gewählter Reihenfolge auf die Moon-Seite.
+
+Moon-Mechanik (nur kleine Fabriken):
+  Spieler nimmt alle TOP-Steine einer Farbe von den Moon-Stapeln.
+
+Moon-Pool (große Fabrik):
+  Flacher Pool für Steine die direkt in der großen Fabrik übrig bleiben
+  (nach Sun-Entnahme). Steine kleiner Fabriken bleiben auf deren eigenen
+  Moon-Stapeln — sie wandern NICHT in den Moon-Pool der großen Fabrik.
+  Spieler nimmt alle Steine einer Farbe aus dem Pool.
+
+Der Startspieler-Marker liegt bei der großen Fabrik.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import Optional
 
-from engine.moves import Move, TakeSource
 from engine.tile import TileColor
-
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from engine.setup import GameState
+    from engine.dome import BonusChip
 
 
-def execute_move(state: "GameState", move: Move) -> None:
-    """
-    Führt einen validierten Zug aus und aktualisiert den GameState.
-    """
-    is_global_moon_take = (
-        move.take.source.name == "SMALL_FACTORY_MOON" and 
-        move.take.factory_id is None
-    )
-    
-    if is_global_moon_take:
-        _execute_moon_take(state, move.take.color, move.place.row_index)
-        return  # Fertig! Der Rest von execute_move wird übersprungen.
-    
-    # 1. Steine nehmen
-    tiles, got_marker = _execute_take(state, move)
+@dataclass
+class Factory:
+    """Eine kleine Fabrik."""
+    factory_id:           int
+    sun_tiles:            list[TileColor]        = field(default_factory=list)
+    moon_stacks:          list[list[TileColor]]  = field(default_factory=list)
+    bonus_chip:           Optional[object]       = None   # BonusChip | None (verdeckt)
+    bonus_chip_revealed:  bool                   = False  # True sobald Fabrik leer
 
-    # 2. Startspieler-Marker
-    if got_marker:
-        _apply_first_player_marker(state)
+    # ------------------------------------------------------------------
+    # Sun-Seite
+    # ------------------------------------------------------------------
 
-    # 3. Steine auf Musterreihe oder Strafleiste legen
-    _execute_place(state, tiles, move.take.color, move.place.row_index)
+    @property
+    def sun_is_empty(self) -> bool:
+        return len(self.sun_tiles) == 0
 
-    # 4. Logging
-    player = state.active_player
-    color = move.take.color
-    dest = f"Reihe {move.place.row_index+1}" if move.place.row_index >= 0 else "Strafleiste"
-    src_map = {
-        "SMALL_FACTORY_SUN":  f"Fabrik {move.take.factory_id} Sonne",
-        "SMALL_FACTORY_MOON": f"Fabrik {move.take.factory_id} Mond",
-        "LARGE_FACTORY_SUN":  "Große Fabrik Sonne",
-        "LARGE_FACTORY_MOON": "Große Fabrik Mond",
-    }
-    src_str = src_map.get(move.take.source.name, str(move.take.source))
-    row = player.pattern_lines[move.place.row_index] if move.place.row_index >= 0 else None
-    filled = f"{len(row.tiles)}/{row.capacity}" if row else ""
-    state.log_event(
-        f"☀️  {player.name}: {len(tiles)}× {color.value} "
-        f"von {src_str} → {dest} {filled}"
-    )
+    def sun_colors(self) -> set[TileColor]:
+        return set(self.sun_tiles)
 
-def _execute_moon_take(state, color, row_index: int) -> None:
-    """
-    Sonderaktion (Aktion C): Nimmt alle obersten Fliesen der gewählten Farbe
-    vom Mondbereich ALLER Manufakturen (klein + groß) gleichzeitig.
-    """
-    p = state.active_player
-    taken = []
+    def take_from_sun(self, color: TileColor) -> tuple[list[TileColor], list[TileColor]]:
+        """
+        Nimmt alle Steine der gewählten Farbe von der Sun-Seite.
+        Gibt (genommene, übrige) zurück — übrige müssen auf Moon gelegt werden.
+        """
+        if color not in self.sun_colors():
+            raise ValueError(
+                f"Farbe {color.value} nicht auf Sun-Seite von Fabrik {self.factory_id}."
+            )
+        taken     = [t for t in self.sun_tiles if t == color]
+        remaining = [t for t in self.sun_tiles if t != color]
+        self.sun_tiles = []
+        return taken, remaining
 
-    # 1. Kleine Fabriken abräumen
-    for f in state.factories:
-        if color in f.moon_top_colors():
-            taken += f.take_from_moon(color)
-            # Bonus-Chip Logik
-            if f.is_fully_empty and f.bonus_chip and not f.bonus_chip_revealed:
-                f.bonus_chip_revealed = True
-                state.log_event(f"Fabrik {f.factory_id}: Bonus-Chip aufgedeckt!")
+    def place_on_moon(self, ordered_tiles: list[TileColor]) -> None:
+        """
+        Legt alle verbleibenden Fliesen als EINEN Stapel auf die Moon-Seite.
+        ordered_tiles: Reihenfolge vom Spieler gewählt — Index 0 = unten, letzter = oben (sichtbar).
+        """
+        if ordered_tiles:
+            self.moon_stacks.append(list(ordered_tiles))
 
-    # 2. Große Manufaktur (Moon) abräumen
-    got_marker = False
-    if color in state.large_factory.moon_colors():
-        tiles, got_marker = state.large_factory.take_from_moon(color)
-        taken += tiles
+    # ------------------------------------------------------------------
+    # Moon-Seite
+    # ------------------------------------------------------------------
 
-    # 3. Sicherheitscheck
-    if not taken:
-        raise ValueError(f"Keine {color.value}-Fliesen oben auf Moon-Seiten gefunden.")
+    @property
+    def moon_is_empty(self) -> bool:
+        return len(self.moon_stacks) == 0
 
-    # 4. Startspieler-Marker vergeben
-    if got_marker:
-        _apply_first_player_marker(state)
+    def moon_top_colors(self) -> set[TileColor]:
+        return {stack[-1] for stack in self.moon_stacks if stack}
 
-    # 5. Steine auf die Musterreihe legen
-    # (Ich nehme an, _execute_place ist ebenfalls in execution.py)
-    _execute_place(state, taken, color, row_index)
+    def take_from_moon(self, color: TileColor) -> list[TileColor]:
+        """
+        Nimmt alle TOP-Steine der gewählten Farbe von den Moon-Stapeln.
+        """
+        if color not in self.moon_top_colors():
+            raise ValueError(
+                f"Farbe {color.value} nicht oben auf Moon-Stapeln von Fabrik {self.factory_id}."
+            )
+        taken = []
+        surviving = []
+        for stack in self.moon_stacks:
+            if stack and stack[-1] == color:
+                taken.append(stack.pop())
+                if stack:
+                    surviving.append(stack)
+            else:
+                surviving.append(stack)
+        self.moon_stacks = surviving
 
-    state.log_event(f"🌙 {p.name}: Mond-Aktion — {len(taken)}× {color.value} genommen.")
+        return taken
 
-# ---------------------------------------------------------------------------
-# Take
-# ---------------------------------------------------------------------------
+    @property
+    def is_fully_empty(self) -> bool:
+        return self.sun_is_empty and self.moon_is_empty
 
-def _execute_take(state: "GameState", move: Move) -> tuple[list[TileColor], bool]:
-    """
-    Führt den Take-Teil aus.
-    Gibt (genommene_steine, hat_marker_bekommen) zurück.
-    """
-    src = move.take.source
-    color = move.take.color
-
-    if src == TakeSource.SMALL_FACTORY_SUN:
-        return _take_small_sun(state, move)
-
-    if src == TakeSource.SMALL_FACTORY_MOON:
-        return _take_small_moon(state, move)
-
-    if src == TakeSource.LARGE_FACTORY_SUN:
-        return _take_large_sun(state, move)
-
-    if src == TakeSource.LARGE_FACTORY_MOON:
-        return _take_large_moon(state, move)
-
-    raise ValueError(f"Unbekannte TakeSource: {src}")
-
-
-def _take_small_sun(state: "GameState", move: Move) -> tuple[list[TileColor], bool]:
-    f = _get_factory(state, move.take.factory_id)
-    taken, remaining = f.take_from_sun(move.take.color)
-
-    # Spieler legt übrige Steine in gewählter Reihenfolge auf Moon
-    if remaining:
-        f.place_on_moon(move.take.moon_order)
-
-    # Bonus-Chip aufdecken wenn Fabrik jetzt komplett leer
-    if f.is_fully_empty and f.bonus_chip and not f.bonus_chip_revealed:
-        f.bonus_chip_revealed = True
-        state.log_event(
-            f"Fabrik {f.factory_id}: Bonus-Chip aufgedeckt → {f.bonus_chip}"
-        )
-
-    return taken, False   # kleine Fabrik hat keinen Startspieler-Marker
-
-
-def _take_small_moon(state: "GameState", move: Move) -> tuple[list[TileColor], bool]:
-    f = _get_factory(state, move.take.factory_id)
-    taken = f.take_from_moon(move.take.color)
-
-    # Bonus-Chip aufdecken wenn Fabrik jetzt komplett leer
-    if f.is_fully_empty and f.bonus_chip and not f.bonus_chip_revealed:
-        f.bonus_chip_revealed = True
-        state.log_event(
-            f"Fabrik {f.factory_id}: Bonus-Chip aufgedeckt → {f.bonus_chip}"
-        )
-
-    return taken, False
-
-
-def _take_large_sun(state: "GameState", move: Move) -> tuple[list[TileColor], bool]:
-    lf = state.large_factory
-    taken, remaining, got_marker = lf.take_from_sun(move.take.color)
-
-    # Übrige Steine landen im Moon-Pool der großen Fabrik
-    if remaining:
-        lf.add_to_moon(remaining)
-
-    return taken, got_marker
-
-
-def _take_large_moon(state: "GameState", move: Move) -> tuple[list[TileColor], bool]:
-    lf = state.large_factory
-    taken, got_marker = lf.take_from_moon(move.take.color)
-    return taken, got_marker
-
-
-# ---------------------------------------------------------------------------
-# Startspieler-Marker
-# ---------------------------------------------------------------------------
-
-def _apply_first_player_marker(state: "GameState") -> None:
-    """
-    Vergibt den Startspieler-Marker an den aktiven Spieler.
-    Laut Regelwerk S.5: dediziertes −2-Feld, NICHT auf der Strafleiste.
-    Die −2 Punkte werden am Rundenende via score_penalty() abgezogen.
-    """
-    player = state.active_player
-    player.holds_first_player_marker = True
-    state.first_player_next_round = state.current_player
-    state.log_event(
-        f"🏁 {player.name}: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell {player.score} Pkt)"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Place
-# ---------------------------------------------------------------------------
-
-def _execute_place(
-    state: "GameState",
-    tiles: list[TileColor],
-    color: TileColor,
-    row_index: int,
-) -> None:
-    """
-    Legt die Steine auf die Musterreihe oder Strafleiste.
-    Überschuss geht auf die Strafleiste, der Rest vom Überschuss in den Turm.
-    """
-    player = state.active_player
-
-    if row_index == -1:
-        # Direkt auf Strafleiste
-        _add_to_penalty(state, tiles)
-        return
-
-    row = player.pattern_lines[row_index]
-    overflow = row.add_tiles(tiles)
-
-    if overflow:
-        _add_to_penalty(state, overflow)
-
-
-def _add_to_penalty(
-    state: "GameState",
-    tiles: list[TileColor],
-) -> None:
-    """
-    Legt Steine auf die Strafleiste des aktiven Spielers.
-    Steine die nicht mehr drauf passen (max 4) gehen in den Turm.
-    """
-    player = state.active_player
-    before = len(player.broken_tiles)
-    to_tower = player.add_broken(tiles)
-    after = len(player.broken_tiles)
-    if after > before:
-        pen_vals = [-1,-2,-3,-4]
-        new_slots = [pen_vals[i] for i in range(before, after)]
-        state.log_event(
-            f"⚠️  {player.name}: {len(tiles)}× auf Strafleiste "
-            f"(Slots {before+1}–{after}, {sum(new_slots)} Pkt Strafe)"
-        )
-    if to_tower:
-        state.tower.add(to_tower)
-        state.log_event(
-            f"⚠️  {player.name}: {len(to_tower)} Stein(e) → Turm (Strafleiste voll)"
+    def __repr__(self) -> str:
+        sun  = [c.value for c in self.sun_tiles]
+        moon = [[c.value for c in s] for s in self.moon_stacks]
+        chip = repr(self.bonus_chip) if self.bonus_chip_revealed and self.bonus_chip else ("[verdeckt]" if self.bonus_chip else "kein")
+        return (
+            f"Factory(id={self.factory_id}, sun={sun}, moon={moon}, "
+            f"bonus={chip})"
         )
 
 
-# ---------------------------------------------------------------------------
-# Hilfsfunktionen
-# ---------------------------------------------------------------------------
+@dataclass
+class LargeFactory:
+    """
+    Die große Fabrik (zentrales Display).
 
-def _get_factory(state: "GameState", factory_id: int):
-    for f in state.factories:
-        if f.factory_id == factory_id:
-            return f
-    raise ValueError(f"Fabrik {factory_id} nicht gefunden.")
+    Sun-Seite:  5 Steine zu Rundenbeginn, offen ausgelegt.
+    Moon-Pool:  flacher Pool, Reste von kleinen Fabriken landen hier.
+
+    Der Startspieler-Marker liegt hier. Wer Steine nimmt während
+    has_first_player_marker=True ist, erhält den Marker.
+    """
+    sun_tiles:               list[TileColor] = field(default_factory=list)
+    moon_pool:               list[TileColor] = field(default_factory=list)
+    has_first_player_marker: bool            = True
+
+    # ------------------------------------------------------------------
+    # Sun-Seite
+    # ------------------------------------------------------------------
+
+    @property
+    def sun_is_empty(self) -> bool:
+        return len(self.sun_tiles) == 0
+
+    def sun_colors(self) -> set[TileColor]:
+        return set(self.sun_tiles)
+
+    def take_from_sun(self, color: TileColor) -> tuple[list[TileColor], list[TileColor], bool]:
+        """
+        Nimmt alle Steine einer Farbe von der Sun-Seite.
+        Gibt (genommene, übrige, hatte_marker) zurück.
+        Übrige wandern in den Moon-Pool (Aufgabe des Aufrufers).
+        """
+        if color not in self.sun_colors():
+            raise ValueError(f"Farbe {color.value} nicht auf Sun-Seite der großen Fabrik.")
+        taken     = [t for t in self.sun_tiles if t == color]
+        remaining = [t for t in self.sun_tiles if t != color]
+        self.sun_tiles = []
+        marker = self.has_first_player_marker
+        self.has_first_player_marker = False
+        return taken, remaining, marker
+
+    # ------------------------------------------------------------------
+    # Moon-Pool
+    # ------------------------------------------------------------------
+
+    @property
+    def moon_is_empty(self) -> bool:
+        return len(self.moon_pool) == 0
+
+    def moon_colors(self) -> set[TileColor]:
+        return set(self.moon_pool)
+
+    def take_from_moon(self, color: TileColor) -> tuple[list[TileColor], bool]:
+        """
+        Nimmt alle Steine einer Farbe aus dem Moon-Pool.
+        Gibt (genommene, hatte_marker) zurück.
+        """
+        if color not in self.moon_colors():
+            raise ValueError(f"Farbe {color.value} nicht im Moon-Pool der großen Fabrik.")
+        taken = [t for t in self.moon_pool if t == color]
+        self.moon_pool = [t for t in self.moon_pool if t != color]
+        marker = self.has_first_player_marker
+        self.has_first_player_marker = False
+        return taken, marker
+
+    def add_to_moon(self, tiles: list[TileColor]) -> None:
+        """Fügt Steine zum Moon-Pool hinzu (Reste von kleinen Fabriken)."""
+        self.moon_pool.extend(tiles)
+
+    # ------------------------------------------------------------------
+    # Allgemein
+    # ------------------------------------------------------------------
+
+    @property
+    def is_empty(self) -> bool:
+        return self.sun_is_empty and self.moon_is_empty and not self.has_first_player_marker
+
+    def reset_for_new_round(self) -> None:
+        self.sun_tiles = []
+        self.moon_pool = []
+        self.has_first_player_marker = True
+
+    def __repr__(self) -> str:
+        sun  = [c.value for c in self.sun_tiles]
+        moon = [c.value for c in self.moon_pool]
+        marker = " ★" if self.has_first_player_marker else ""
+        return f"LargeFactory(sun={sun}, moon={moon}{marker})"

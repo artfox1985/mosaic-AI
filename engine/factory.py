@@ -103,9 +103,6 @@ class Factory:
                 surviving.append(stack)
         self.moon_stacks = surviving
 
-        if self.sun_is_empty and self.moon_is_empty:
-            self.bonus_chip_revealed = True
-
         return taken
 
     @property

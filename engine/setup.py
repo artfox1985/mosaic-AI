@@ -6,7 +6,7 @@ Verantwortlich für:
   2. Fabriken aufbauen und befüllen
   3. Große Fabrik (Tischmitte) initialisieren
   4. Spielerbretter aufbauen
-  5. Dome-Kacheln mischen und verteilen
+  5. Kuppelplatten mischen und verteilen
   6. Bonusplättchen mischen und bereitstellen
   7. Startspieler festlegen
 
@@ -30,7 +30,7 @@ NUM_ROUNDS              = 5
 NUM_SMALL_FACTORIES     = 4   # kleine Fabriken
 TILES_PER_SMALL_FACTORY = 4   # Steine pro kleiner Fabrik (Sun-Seite)
 TILES_PER_LARGE_FACTORY = 5   # Steine in der großen Fabrik zu Rundenbeginn
-DOME_TILES_EACH         = 9   # Dome-Kacheln pro Spieler
+DOME_TILES_EACH         = 9   # Kuppelplatten pro Spieler
 
 
 @dataclass
@@ -53,9 +53,9 @@ class GameState:
     # Spielerbretter
     players:        list[PlayerBoard]  # immer 2 Spieler
 
-    # Dome-Kacheln
+    # Kuppelplatten
     dome_tile_pool:  list[DomeTile]    # verdeckter Stapel (F)
-    dome_display:    list[DomeTile]    # 3 offen ausgelegte Kacheln (G)
+    dome_display:    list[DomeTile]    # 3 offen ausgelegte Kuppelplatten (G)
 
     # Bonusplättchen-Vorrat
     bonus_chip_pool: list[BonusChip]
@@ -173,8 +173,8 @@ def _distribute_dome_tiles(
     dome_pool: list[DomeTile],
 ) -> list[DomeTile]:
     """
-    Mischt den Dome-Kachel-Pool und gibt jedem Spieler seine
-    Starthand. In Mosaic-AI wählen Spieler Dome-Kacheln während
+    Mischt den Kuppelplatten-Pool und gibt jedem Spieler seine
+    Starthand. In Mosaic-AI wählen Spieler Kuppelplatten während
     des Spiels — sie werden hier noch nicht auf das Brett gelegt,
     sondern als verfügbarer Pool gehalten.
     Gibt den verbleibenden Pool zurück.
@@ -230,24 +230,24 @@ def setup_new_game(
 
     # 4. Tischmitte bereits oben erstellt
 
-    # 5. Dome-Kacheln: verdeckter Stapel (F) + 3 offen auslegen (G)
+    # 5. Kuppelplatten: verdeckter Stapel (F) + 3 offen auslegen (G)
     all_dome_tiles = build_dome_tile_pool()
     random.shuffle(all_dome_tiles)
 
     # Wir geben den Spielern ein einfaches Text-Kürzel mit. 
-    # So weiß der Server: "Die Startkachel muss noch aus der Mitte gezogen werden!"
+    # So weiß der Server: "Die Startkuppel muss noch aus der Mitte gezogen werden!"
     for pi in range(NUM_PLAYERS):
         players[pi].start_dome_tile = "Muss_noch_gezogen_werden"
 
-    # Verdeckter Stapel (F) — Rest der Kacheln
+    # Verdeckter Stapel (F) — Rest der Kuppeln
     dome_stack = all_dome_tiles   
 
-    # 3 Kacheln offen auslegen (G)
+    # 3 Kuppeln offen auslegen (G)
     dome_display = []
     for _ in range(3):
         if dome_stack:
             dome_display.append(dome_stack.pop(0))
-    # ---> Ab hier liegen jetzt exakt 15 Kacheln im Stapel!
+    # ---> Ab hier liegen jetzt exakt 15 Kuppeln im Stapel!
 
     # 7. Verbleibende Bonusplättchen als Pool bereithalten
 
@@ -262,7 +262,7 @@ def setup_new_game(
         large_factory=large_factory,
         players=players,
         dome_tile_pool=dome_stack,     # verdeckter Stapel (F)
-        dome_display=dome_display,     # 3 offen ausgelegte Kacheln (G)
+        dome_display=dome_display,     # 3 offen ausgelegte Kuppeln
         bonus_chip_pool=bonus_pool,
         round_number=1,
         current_player=current_player,
@@ -296,7 +296,7 @@ def setup_new_round(state: GameState) -> None:
     _fill_factories(state.factories, state.large_factory, state.bag, state.tower,
                     state.bonus_chip_pool)
 
-    # Dome-Platzierungen zurücksetzen (2 Kacheln pro Runde)
+    # Dome-Platzierungen zurücksetzen (2 Kuppeln pro Runde)
     for p in state.players:
         p.reset_dome_placements()
         p.holds_first_player_marker = False

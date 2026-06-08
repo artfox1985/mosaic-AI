@@ -308,7 +308,7 @@ def _serialize_valid_moves(state: "GameState") -> list[dict]:
                 })
                 break  # nur einen repräsentativen Eintrag pro Farbe
 
-    # Kuppelplatten aus Display
+    # Kuppelplatten aus Ablage
     for m in generate_dome_moves(state):
         moves.append({
             "type":       "dome_display",
@@ -318,9 +318,9 @@ def _serialize_valid_moves(state: "GameState") -> list[dict]:
             "rotation":   m.rotation,
         })
 
-    # NEU: Prüfen, ob verdeckt vom Stapel ziehen möglich ist (Aktion A)
+    #Prüfen, ob verdeckt vom Stapel ziehen möglich ist (Aktion A)
     p = state.active_player
-    # Wenn die Startkachel liegt, man Platz für eine Kuppel hat und der Stapel nicht leer ist:
+    # Wenn die Startkuppel liegt, man Platz für eine Kuppel hat und der Stapel nicht leer ist:
     if p.start_dome_tile is None and p.can_place_dome_tile(state.round_number) and len(state.dome_tile_pool) > 0:
         moves.append({
             "type": "dome_stack"

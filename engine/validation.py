@@ -186,21 +186,9 @@ def generate_valid_moves(state: "GameState") -> list[Move]:
                 if _validate_place(state, color, ri) is None:
                     moves.append(Move(take=take, place=PlaceAction(ri)))
 
-        for color in f.moon_top_colors():
-            take = TakeAction(source=TakeSource.SMALL_FACTORY_MOON, color=color, factory_id=f.factory_id)
-            for ri in row_indices:
-                if _validate_place(state, color, ri) is None:
-                    moves.append(Move(take=take, place=PlaceAction(ri)))
-
     # --- Große Fabrik ---
     for color in state.large_factory.sun_colors():
         take = TakeAction(source=TakeSource.LARGE_FACTORY_SUN, color=color)
-        for ri in row_indices:
-            if _validate_place(state, color, ri) is None:
-                moves.append(Move(take=take, place=PlaceAction(ri)))
-
-    for color in state.large_factory.moon_colors():
-        take = TakeAction(source=TakeSource.LARGE_FACTORY_MOON, color=color)
         for ri in row_indices:
             if _validate_place(state, color, ri) is None:
                 moves.append(Move(take=take, place=PlaceAction(ri)))

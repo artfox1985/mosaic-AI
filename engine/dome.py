@@ -1,18 +1,18 @@
 """
-Dome-Kachel-Definitionen für Mosaic-AI.
+Kuppelplättchen-Definitionen für Mosaic-AI.
 
-Jede DomeTile ist eine 2×2-Platte. Die Spieler legen sie auf ihr 6×6-Raster
-(3×3-Anordnung von Dome-Kacheln).
+Jede Kuppelplatte ist eine 2×2-Platte. Die Spieler legen sie auf ihr 6×6-Raster
+(3×3-Anordnung von Kuppelplättchen).
 
-Space-Typen laut Setup.xlsx:
+Space-Typen laut dome_color.csv:
   - NORMAL(farbe): nur diese Farbe darf hier platziert werden
   - WILD ("bunt"): jede Farbe darf hier platziert werden
   - SPECIAL ("weiß"): wird erst freigeschaltet wenn die anderen 3 Spaces
-                      der Kachel gefüllt sind; nimmt einen weißen Stein
+                      der Kuppel gefüllt sind; nimmt einen weißen Stein
                       aus dem separaten Vorrat auf
 
-Die 18 Kacheln stammen direkt aus dem Sheet "Kacheln" der Setup.xlsx.
-Reihenfolge der 4 Spaces pro Kachel: [oben-links, oben-rechts, unten-links, unten-rechts]
+Die 18 Kuppeln stammen direkt aus dome_color.csv.
+Reihenfolge der 4 Spaces pro Kuppel: [oben-links, oben-rechts, unten-links, unten-rechts]
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ class SpaceType(Enum):
 @dataclass
 class DomeSpace:
     """
-    Einer der 4 Spaces auf einer Dome-Kachel.
+    Einer der 4 Spaces auf einer Kuppelplättchen.
 
     Normal/Wild-Spaces speichern welche TileColor platziert wurde.
     Special-Spaces (weiß) speichern nur ob sie befüllt wurden —
@@ -99,7 +99,7 @@ ROTATION_MAP: dict[int, list[int]] = {
 @dataclass
 class DomeTile:
     """
-    Eine 2×2 Dome-Kachel.
+    Eine 2×2 Kuppelplättchen.
 
     spaces: 4 DomeSpace-Objekte, Index-Layout:
         [0] [1]   →   oben-links   oben-rechts
@@ -107,14 +107,14 @@ class DomeTile:
 
     bonus_points: Zusatzpunkte wenn der SPECIAL-Space befüllt wird
                   (0 wenn kein SPECIAL-Space vorhanden)
-    tile_id: 0-basierter Index in der Kachel-Tabelle (Setup.xlsx Zeile)
+    tile_id: 0-basierter Index in der Kuppel-Tabelle (dome_color.csv)
     """
     tile_id:      int
     spaces:       list[DomeSpace]
     bonus_points: int = 0
 
     def __post_init__(self):
-        assert len(self.spaces) == 4, "Eine Dome-Kachel hat genau 4 Spaces"
+        assert len(self.spaces) == 4, "Eine Kuppelplättchen hat genau 4 Spaces"
 
     @property
     def is_complete(self) -> bool:
@@ -150,7 +150,7 @@ class DomeTile:
         """
         Gibt die 4 Spaces in der gedrehten Reihenfolge zurück.
         degrees muss 0, 90, 180 oder 270 sein.
-        Ändert die Kachel selbst NICHT — nur für Vorschau/Validierung.
+        Ändert die Kuppel selbst NICHT — nur für Vorschau/Validierung.
         """
         if degrees not in ROTATION_MAP:
             raise ValueError(f"Ungültige Rotation: {degrees}. Erlaubt: 0, 90, 180, 270.")
@@ -159,7 +159,7 @@ class DomeTile:
 
     def apply_rotation(self, degrees: int) -> None:
         """
-        Dreht die Kachel dauerhaft um degrees Grad.
+        Dreht die Kuppel dauerhaft um degrees Grad.
         Darf nur VOR dem Platzieren auf dem Brett aufgerufen werden.
         """
         if degrees not in ROTATION_MAP:
@@ -167,7 +167,7 @@ class DomeTile:
         if degrees == 0:
             return
         if any(s.is_filled for s in self.spaces):
-            raise ValueError("Eine bereits befüllte Kachel kann nicht rotiert werden.")
+            raise ValueError("Eine bereits befüllte Kuppel kann nicht rotiert werden.")
         self.spaces = self.rotated_spaces(degrees)
 
     def open_spaces_for(self, color: TileColor) -> list[int]:
@@ -199,15 +199,15 @@ def _s() -> DomeSpace:
 
 
 # ---------------------------------------------------------------------------
-# Die 18 Dome-Kacheln aus Setup.xlsx, Sheet "Kacheln"
+# Die 18 Kuppelplättchen aus dome_colors.csv
 # Reihenfolge der Spalten: oben-links, oben-rechts, unten-links, unten-rechts
 # "weiß" → _s()  |  "bunt" → _w()  |  alles andere → _n(farbe)
 # ---------------------------------------------------------------------------
 
 def build_dome_tile_pool() -> list[DomeTile]:
     """
-    Gibt den vollständigen Pool von 18 Dome-Kacheln zurück.
-    Direkt aus Setup.xlsx, Sheet 'Kacheln' übernommen.
+    Gibt den vollständigen Pool von 18 Kuppelplättchen zurück.
+    Direkt aus dome_colors.csv übernommen.
     """
     B  = TileColor.BLAU
     G  = TileColor.GELB
@@ -264,7 +264,7 @@ def build_dome_tile_pool() -> list[DomeTile]:
 
 
 # ---------------------------------------------------------------------------
-# Die 20 Bonusplättchen aus Setup.xlsx, Sheet "Bonus"
+# Die 20 Bonusplättchen aus bonus_chips_colors.csv
 # Jedes Plättchen hat 1 oder 2 Farbfelder.
 # ---------------------------------------------------------------------------
 
@@ -285,7 +285,7 @@ class BonusChip:
 def build_bonus_chip_pool() -> list[BonusChip]:
     """
     Gibt alle 20 Bonusplättchen zurück.
-    Direkt aus Setup.xlsx, Sheet 'Bonus' übernommen.
+    Direkt aus bonus_chips_colors.csv
     """
     B = TileColor.BLAU
     G = TileColor.GELB

@@ -10,7 +10,7 @@ Ablauf einer kompletten Partie:
     DRAFTING-PHASE (abwechselnd, bis alle Fabriken leer):
       Jeder Spieler wählt einen von zwei Zug-Typen:
         a) Move         — Steine nehmen + auf Musterreihe legen
-        b) PlaceDomeTileMove — neue Kuppelkachel aus Pool legen
+        b) PlaceDomeTileMove — neue Kuppelplatte aus Pool legen
                                (max 2 pro Runde, nicht in Runde 5)
 
     TILING-PHASE (nach Drafting, für jeden Spieler):
@@ -58,26 +58,26 @@ from engine.dome import ROTATION_MAP
 # ---------------------------------------------------------------------------
 
 def validate_dome_move(state: GameState, move: PlaceDomeTileMove) -> Optional[str]:
-    """Prüft ob eine Kachel-Platzierung gültig ist."""
+    """Prüft ob eine Kuppel-Platzierung gültig ist."""
     player = state.active_player
 
     if not player.can_place_dome_tile(state.round_number):
         if state.round_number >= 5:
-            return "In Runde 5 werden keine Kacheln mehr gelegt."
+            return "In Runde 5 werden keine Kuppeln mehr gelegt."
         if player.dome_tiles_placed_this_round >= 2:
-            return f"{player.name} hat bereits 2 Kacheln diese Runde gelegt."
+            return f"{player.name} hat bereits 2 Kuppeln diese Runde gelegt."
         return "Das 3×3-Raster ist bereits voll."
 
     if player.has_unplaced_start_tile():
         if move.dome_tile_id != player.start_dome_tile.tile_id:
             return (
-                f"Die Startkachel (ID {player.start_dome_tile.tile_id}) "
+                f"Die Startkuppel (ID {player.start_dome_tile.tile_id}) "
                 f"muss als erstes gelegt werden."
             )
     else:
         tile = _find_in_display(state, move.dome_tile_id)
         if tile is None:
-            return f"Kachel {move.dome_tile_id} liegt nicht im offenen Display (G)."
+            return f"Kuppel {move.dome_tile_id} liegt nicht in der offenen Ablage."
 
     slot = player.dome_grid.dome_slots[move.slot_row][move.slot_col]
     if slot is not None:
@@ -87,7 +87,7 @@ def validate_dome_move(state: GameState, move: PlaceDomeTileMove) -> Optional[st
 
 
 def execute_dome_move(state: GameState, move: PlaceDomeTileMove) -> None:
-    """Führt eine Kachel-Platzierung aus."""
+    """Führt eine Kuppel-Platzierung aus."""
     player = state.active_player
 
     if player.has_unplaced_start_tile() and move.dome_tile_id == player.start_dome_tile.tile_id:

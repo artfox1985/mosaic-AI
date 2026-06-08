@@ -5,7 +5,7 @@ Endpoints:
   POST /api/new_game          — Neues Spiel starten
   GET  /api/state             — Aktuellen State abrufen
   POST /api/move/stone        — Stein-Zug (Aktion B/C)
-  POST /api/move/dome         — Kuppelplatte aus Display (Aktion A)
+  POST /api/move/dome         — Kuppelplatte aus Ablage (Aktion A)
   POST /api/move/dome_stack   — Kuppelplatte vom Stapel (Aktion A, -1Pkt)
   POST /api/move/bonus_chip   — Bonusplättchen nehmen (Aktion D)
   POST /api/move/start_tile   — Startkachel platzieren (Vorbereitung)

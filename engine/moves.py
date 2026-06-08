@@ -103,14 +103,14 @@ class Move:
 @dataclass
 class PlaceDomeTileMove:
     """
-    Separater Zug: eine neue Kuppelkachel aus dem gemeinsamen Pool
+    Separater Zug: eine neue Kuppelplatte aus dem gemeinsamen Pool
     auf das eigene 3×3-Raster legen.
 
     Kann jederzeit während der Drafting-Phase als eigener Zug gespielt
-    werden (anstelle eines Stein-Zuges). Jeder Spieler legt 2 Kacheln
-    pro Runde (Runde 1: 1 Kachel vorgelegt + 1 weiterer Zug).
+    werden (anstelle eines Stein-Zuges). Jeder Spieler legt 2 Kuppeln
+    pro Runde (Runde 1: 1 Kuppel vorgelegt + 2 weitere Züge).
 
-    dome_tile_id: ID der gewählten Kachel aus dem gemeinsamen Pool
+    dome_tile_id: ID der gewählten Kuppel aus dem gemeinsamen Pool
     slot_row:     Ziel-Slot Zeile im 3×3-Raster (0–2)
     slot_col:     Ziel-Slot Spalte im 3×3-Raster (0–2)
     rotation:     Rotation beim Platzieren (0/90/180/270)

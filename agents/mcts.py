@@ -18,11 +18,12 @@ from __future__ import annotations
 import math
 import time
 import random
+from typing import Any
+
 import pickle
 
-from typing import Any
 from agents.agent_env import MosaicEnv
-from agents.agents import BaseAgent, RandomAgent, run_episode
+from agents.agents import BaseAgent, RandomAgent
 from agents.shaping import get_player_potential
 
 def _diff_to_probs(diff: float) -> dict[int, float]:
@@ -71,7 +72,7 @@ class MCTSNode:
         self.children:  list["MCTSNode"] = []
         self.visits:    int   = 0
         self.value:     float = 0.0            # kumulierter Reward aus Sicht von player_who_acted
-        self.untried_actions = list(untried_actions)
+        self.untried_actions = list(untried_actions) if untried_actions is not None else None
         self.player_who_acted = player_who_acted
         self.priors          = None            # NN-Policy-Priors (nur AlphaZero), lazy gesetzt
 
@@ -92,7 +93,8 @@ class MCTSNode:
         return max(self.children, key=lambda n: n.ucb1(c))
 
     def is_fully_expanded(self) -> bool:
-        return len(self.untried_actions) == 0
+        # None bedeutet "noch nicht initialisiert" → noch nicht expandiert
+        return self.untried_actions is not None and len(self.untried_actions) == 0
 
     def is_terminal(self) -> bool:
         return len(self.children) == 0 and self.is_fully_expanded()
@@ -167,7 +169,7 @@ class MCTSAgent(BaseAgent):
         root = MCTSNode(
             action=None,
             parent=None,
-            untried_actions=sampled,
+            untried_actions=None,   # lazy: wird beim ersten _expand aus env befüllt
             player_who_acted=pi,
         )
         # Dummy-Parent für UCB1-Berechnung
@@ -237,7 +239,16 @@ class MCTSAgent(BaseAgent):
         """
         Wähle eine unerkundete Aktion, führe sie aus und füge
         einen neuen Kindknoten hinzu.
+
+        untried_actions wird lazy befüllt: beim ersten Expand eines Knotens
+        werden die gültigen Aktionen frisch aus dem aktuellen env-Zustand
+        generiert. Das verhindert dass veraltete Aktionen (z.B. Kacheln die
+        bereits platziert wurden) ausgeführt werden.
         """
+        # Lazy Init: frisch aus aktuellem env-Zustand befüllen
+        if node.untried_actions is None:
+            node.untried_actions = self._sample_actions(env.valid_actions())
+
         if not node.untried_actions:
             return node
 
@@ -254,11 +265,10 @@ class MCTSAgent(BaseAgent):
                 player_who_acted=1 - node.player_who_acted,
             )
         else:
-            child_actions = self._sample_actions(env.valid_actions())
             child = MCTSNode(
                 action=action,
                 parent=node,
-                untried_actions=child_actions,
+                untried_actions=None,  # lazy: beim nächsten _expand befüllt
                 player_who_acted=env.current_player(),
             )
 
@@ -367,7 +377,8 @@ def run_episode_mcts(
     """
     Wie run_episode, aber übergibt die Umgebung an MCTS-Agenten.
     """
-
+    import time
+    from agents.agents import run_episode
 
     env = MosaicEnv(random_scoring_tiles=random_scoring_tiles)
 
@@ -381,31 +392,14 @@ def run_episode_mcts(
     total_rewards = [0.0, 0.0]
     steps = 0
     done = False
-    total_valid_actions = 0
-    max_valid_actions = 0  # NEU
-    tracked_steps = 0
+    action_counts = []   # Anzahl valider Züge pro Step
 
     while steps < max_steps and not done:
         actions = env.valid_actions()
         if not actions:
             break
 
-        # NEU: Nur tracken, wenn es wirklich Entscheidungen gibt (>1)
-        # Wenn es nur 1 Zug gibt (wie im Tiling-Bypass), verfälscht das den 
-        # Branching Factor für das MCTS/NN, weil da eh nicht gesucht wird.
-        if len(actions) > 1:
-            total_valid_actions += len(actions)
-            tracked_steps += 1
-            if len(actions) > max_valid_actions:  # NEU
-                max_valid_actions = len(actions)  # NEU
-
-        pi = env.current_player()
-        agent = agents[pi]
-
-        action = agent.choose(actions, obs)
-        obs, reward, done, step_info = env.step(action)
-        total_rewards[pi] += reward
-        steps += 1
+        action_counts.append(len(actions))
 
         pi = env.current_player()
         agent = agents[pi]
@@ -416,7 +410,7 @@ def run_episode_mcts(
         steps += 1
 
         if verbose and steps % 20 == 0:
-            print(f"  Step {steps:3d} | P{pi} {action['type']:12s} von {len(actions):3d} | "
+            print(f"  Step {steps:3d} | P{pi} {action['type']:12s} | "
                   f"reward={reward:+.1f} | scores={env.scores()}")
 
     scores = env.scores()
@@ -447,8 +441,8 @@ def run_episode_mcts(
                 print(entry)
         print("="*60 + "\n")
 
-    # NEU: Durchschnitt berechnen
-    avg_actions = total_valid_actions / tracked_steps if tracked_steps > 0 else 0.0
+    avg_actions = round(sum(action_counts) / len(action_counts), 1) if action_counts else 0.0
+    max_actions = max(action_counts) if action_counts else 0
 
     result = {
         "scores":           scores,
@@ -458,8 +452,8 @@ def run_episode_mcts(
         "scoring_tile_ids": info.get("scoring_tile_ids", []),
         "scoring_names":    info.get("scoring_tile_names", []),
         "duration_s":       round(time.time() - t0, 3),
-        "avg_valid_actions": round(avg_actions, 1),
-        "max_valid_actions": max_valid_actions,
+        "avg_actions":      avg_actions,
+        "max_actions":      max_actions,
     }
     
     return result
