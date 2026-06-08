@@ -218,6 +218,7 @@ def serialize_state(state: "GameState") -> dict:
 
     return {
         "round":          state.round_number,
+        "scoring_confirmed": getattr(state, "scoring_confirmed", False),
         "phase":          state.phase,
         "current_player": state.current_player,
         "scoring_tile_ids": getattr(state, "scoring_tile_ids", [0, 1, 2]),

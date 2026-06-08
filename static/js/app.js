@@ -5,6 +5,10 @@ let domeModal = null;  // {pi, slot_r, slot_c, tile_id, rotation, is_start}
 let tilingPi = null, tilingRow = null;
 
 // ── API ───────────────────────────────────────────────────────────────────────
+// KI-State
+let AI_ENABLED = false;
+let AI_PLAYER  = 1;  // KI ist immer Spieler 2 (Index 1)
+
 async function api(path, body=null) {
   const opts = body
     ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}
@@ -20,8 +24,59 @@ async function api(path, body=null) {
   }
 }
 
-async function newGame() {
-  const d = await api('/new_game', {names:['Spieler 1','Spieler 2']});
+function openNewGameModal() {
+  document.getElementById('newgame-overlay').style.display = 'flex';
+}
+
+function ngToggleAI() {
+  const on = document.getElementById('ng-ai-toggle').checked;
+  document.getElementById('ng-ai-settings').style.display = on ? 'block' : 'none';
+  const track = document.getElementById('ng-toggle-track');
+  const thumb = document.getElementById('ng-toggle-thumb');
+  track.style.background = on ? 'var(--blau, #3b82f6)' : 'var(--border)';
+  thumb.style.transform   = on ? 'translateX(18px)' : 'translateX(0)';
+  ngUpdateStartLabels();
+}
+
+function ngUpdateStartLabels() {
+  const aiOn    = document.getElementById('ng-ai-toggle').checked;
+  const p1name  = document.getElementById('ng-name').value.trim() || 'Spieler 1';
+  const p2label = document.getElementById('ng-start-p2-text');
+  if (p2label) p2label.textContent = aiOn ? 'KI' : 'Spieler 2';
+  const p1label = document.getElementById('ng-start-p1-text');
+  if (p1label) p1label.textContent = p1name;
+}
+
+async function startNewGame() {
+  document.getElementById('newgame-overlay').style.display = 'none';
+
+  const playerName = document.getElementById('ng-name').value.trim() || 'Spieler 1';
+  const aiEnabled  = document.getElementById('ng-ai-toggle').checked;
+  const model      = document.getElementById('ng-model').value.trim() || 'v2';
+  const sims       = parseInt(document.getElementById('ng-sims').value) || 40;
+
+  AI_ENABLED = aiEnabled;
+  AI_PLAYER  = 1;
+
+  // Startspieler aus Radio-Button lesen
+  const startVal = document.querySelector('input[name="ng-start"]:checked')?.value || '0';
+  let firstPlayer;
+  if (startVal === 'random') {
+    firstPlayer = Math.random() < 0.5 ? 0 : 1;
+  } else {
+    firstPlayer = parseInt(startVal);
+  }
+
+  const body = {
+    names:        [playerName, aiEnabled ? 'KI' : 'Spieler 2'],
+    ai_enabled:   aiEnabled,
+    ai_side:      1,
+    model:        model,
+    sims:         sims,
+    first_player: firstPlayer,
+  };
+
+  const d = await api('/new_game', body);
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
   render();
@@ -34,16 +89,43 @@ async function newGame() {
   }
 }
 
+async function newGame() {
+  // Direkt-Start ohne Modal (z.B. nach Spielende)
+  await startNewGame();
+}
+
+async function triggerAIMove() {
+  // Wird nach jedem Menschenzug aufgerufen wenn KI dran ist
+  if (!AI_ENABLED) return;
+  if (!S || S.current_player !== AI_PLAYER) return;
+  if (S.phase === 'end' || S.phase === 'final') return;
+
+  // Kleines Delay damit der Mensch den State sieht
+  await new Promise(r => setTimeout(r, 400));
+
+  const d = await api('/ai/move');
+  if (!d.ok) { showError('KI-Fehler: ' + d.error); return; }
+  S = d.state;
+  render();
+
+  // KI könnte mehrere Züge hintereinander machen (z.B. Tiling-Phase)
+  if (AI_ENABLED && S.current_player === AI_PLAYER) {
+    await triggerAIMove();
+  }
+}
+
 async function stoneMove(source, factory_id, color, row, moon_order=[]) {
   const d = await api('/move/stone', {source, factory_id, color, row, moon_order});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
+  await triggerAIMove();
 }
 
 async function domeMove(tile_id, slot_row, slot_col, rotation) {
   const d = await api('/move/dome', {tile_id, slot_row, slot_col, rotation});
   if(!d.ok){showError(d.error);return;}
   S=d.state; closeDomeModal(); render();
+  await triggerAIMove();
 }
 
 async function startTileMove(player, tile_id, slot_row, slot_col, rotation) {
@@ -56,24 +138,28 @@ async function bonusChipMove(factory_id) {
   const d = await api('/move/bonus_chip', {factory_id});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
+  await triggerAIMove();
 }
 
 async function tilingMove(player, pattern_row, slot_row, slot_col, space_index, dome_tile_id=null, rotation=0) {
   const d = await api('/tiling', {player, pattern_row, slot_row, slot_col, space_index, dome_tile_id, rotation});
   if(!d.ok){showError(d.error);return;}
   S=d.state; tilingRow=null; render();
+  await triggerAIMove();
 }
 
 async function endTiling() {
   const d = await api('/end_tiling', {});
   if(!d.ok){showError(d.error);return;}
   S=d.state; tilingPi=null; tilingRow=null; render();
+  await triggerAIMove();
 }
 
 async function passMove() {
   const d = await api('/move/pass', {});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
+  await triggerAIMove();
 }
 
 async function tilingBonusChips(pi, pattern_row, chip_uses) {
@@ -525,7 +611,10 @@ document.getElementById('factories-area').innerHTML = `
   
   const sdiv = document.getElementById('scoring-display');
   const editBtn = document.getElementById('scoring-edit-btn');
-  const canEditScoring = S && !S.players.every(p=>p.start_placed);
+  // Wertungsplatten nur editierbar solange noch keine Startkacheln gelegt wurden
+  // Nach Bestätigung (beide start_placed=true) nicht mehr änderbar
+  const scoringConfirmed = S && S.scoring_confirmed;
+  const canEditScoring = S && !scoringConfirmed && !S.players.every(p=>p.start_placed);
   if(editBtn) editBtn.innerHTML = canEditScoring
     ? `<button class="btn" onclick="openScoringModal()" style="font-size:9px;padding:2px 6px">✏️</button>`
     : `<span style="font-size:9px;color:var(--text3)">🔒</span>`;
@@ -828,6 +917,8 @@ function openStackPicker() {
 function openDomeModal(pi, sr, sc) {
   const p = S.players[pi];
   const isStart = !p.start_placed;
+  // KI-Board sperren: Mensch darf nicht für KI legen
+  if(AI_ENABLED && pi === AI_PLAYER) return;
   if(!isStart && pi !== S.current_player) return;
   if(!isStart && !p.can_place_dome) return;
 
@@ -1126,6 +1217,22 @@ async function confirmScoringTiles() {
   S = d.state;
   document.getElementById('scoring-overlay').style.display='none';
   render();
+  // KI legt ihre Startkuppelplatte automatisch
+  if (AI_ENABLED) {
+    await aiDoStartTile();
+  }
+}
+
+async function aiDoStartTile() {
+  // start_placed=true → bereits gelegt, nichts tun
+  // start_placed=false → muss noch gelegt werden
+  const aiPlayer = S.players[AI_PLAYER];
+  if (!aiPlayer || aiPlayer.start_placed === true) return;
+  await new Promise(r => setTimeout(r, 600));
+  const d = await api('/ai/start_tile');
+  if (!d.ok) { showError('KI Startkachel Fehler: ' + d.error); return; }
+  S = d.state;
+  render();
 }
 
 async function calculateEndScoring() {
@@ -1295,4 +1402,4 @@ makeDraggable('dome-overlay');
 makeDraggable('moon-overlay');
 makeDraggable('chip-overlay');      // <-- Jetzt alle verschiebbar
 makeDraggable('scoring-overlay');   // <-- Jetzt alle verschiebbar
-newGame();
+openNewGameModal();

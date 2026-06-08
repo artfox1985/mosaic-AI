@@ -70,21 +70,62 @@ class MosaicEnv:
         return serialize_state(self.state), info
 
     def _place_initial_dome_tile_ai(self, player_idx: int):
-        """KI-seitige Startkachel-Platzierung — zufällig. Nur wenn ausstehend."""
+        """
+        KI-seitige Startkachel-Platzierung via evaluate_state.
+        Wird im Self-Play für MCTS und AlphaZero verwendet.
+        Für AlphaZero im Server übernimmt /api/ai/start_tile diese Aufgabe.
+        """
         player = self.state.players[player_idx]
-        # Keine ausstehende Startkachel (ab Runde 2 oder bereits gelegt)
         if player.start_dome_tile is None:
             return
         if not self.state.dome_display:
             return
-        tile     = random.choice(self.state.dome_display)
-        row, col = random.choice(player.dome_grid.empty_slots())
-        rotation = random.choice([0, 90, 180, 270])
-        self._game.apply_start_placement(
-            player_idx=player_idx,
-            tile_id=tile.tile_id,
-            row=row, col=col, rot=rotation
-        )
+
+        empty_slots = player.dome_grid.empty_slots()
+        if not empty_slots:
+            return
+
+        try:
+            import copy
+            from agents.mcts import evaluate_state
+
+            best_score = -float('inf')
+            best_tile  = self.state.dome_display[0]
+            best_row, best_col, best_rot = empty_slots[0][0], empty_slots[0][1], 0
+
+            for tile in self.state.dome_display:
+                for (r, c) in empty_slots:
+                    for rot in [0, 90, 180, 270]:
+                        test_game = copy.deepcopy(self._game)
+                        try:
+                            test_game.apply_start_placement(
+                                player_idx=player_idx,
+                                tile_id=tile.tile_id,
+                                row=r, col=c, rot=rot,
+                            )
+                            score = evaluate_state(test_game.state).get(player_idx, 0.0)
+                            if score > best_score:
+                                best_score = score
+                                best_tile  = tile
+                                best_row, best_col, best_rot = r, c, rot
+                        except Exception:
+                            continue
+
+            self._game.apply_start_placement(
+                player_idx=player_idx,
+                tile_id=best_tile.tile_id,
+                row=best_row, col=best_col, rot=best_rot,
+            )
+        except Exception:
+            # Fallback: zufällig
+            tile     = random.choice(self.state.dome_display)
+            row, col = random.choice(empty_slots)
+            rotation = random.choice([0, 90, 180, 270])
+            self._game.apply_start_placement(
+                player_idx=player_idx,
+                tile_id=tile.tile_id,
+                row=row, col=col, rot=rotation
+            )
 
     def valid_actions(self) -> list[dict]:
         if self.state is None:

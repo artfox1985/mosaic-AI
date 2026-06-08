@@ -12,7 +12,7 @@
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
   <div style="font-size:17px;font-weight:600">Mosaic-AI <span id="round-lbl" style="font-size:12px;font-weight:400;color:var(--text2)"></span></div>
   <div style="display:flex;gap:6px">
-    <button class="btn pri" onclick="newGame()">Neu starten</button>
+    <button class="btn pri" onclick="openNewGameModal()">Neu starten</button>
     <button onclick="showActiveScoringTiles()" class="btn">🎯 Aktive Ziele</button>
   </div>
 </div>
@@ -131,6 +131,98 @@
     <div class="preview" id="dome-preview"></div>
     <button class="confirm" id="dome-confirm" disabled onclick="confirmDome()">Platte legen</button>
     <button class="cancel-btn" onclick="closeDomeModal()">Abbrechen</button>
+  </div>
+</div>
+
+
+<div class="overlay" id="newgame-overlay" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <h3>🧩 Neues Spiel</h3>
+
+    <div class="sep" style="margin:8px 0 12px"></div>
+
+    <!-- Spieler -->
+    <div style="margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:6px">Spieler 1 (Du)</div>
+      <input id="ng-name" type="text" value="Spieler 1"
+        style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+               background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;box-sizing:border-box">
+    </div>
+
+    <div class="sep" style="margin:0 0 12px"></div>
+
+    <!-- KI Toggle -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <div style="font-size:12px;font-weight:600">Gegen KI spielen</div>
+        <div style="font-size:10px;color:var(--text2)">AlphaZero als Gegner</div>
+      </div>
+      <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer">
+        <input type="checkbox" id="ng-ai-toggle" onchange="ngToggleAI()"
+               style="opacity:0;width:0;height:0;position:absolute">
+        <span id="ng-toggle-track" style="position:absolute;inset:0;background:var(--border);
+              border-radius:11px;transition:background .2s"></span>
+        <span id="ng-toggle-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;
+              background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+      </label>
+    </div>
+
+    <!-- KI-Einstellungen (nur sichtbar wenn KI aktiv) -->
+    <div id="ng-ai-settings" style="display:none;margin-bottom:12px;padding:10px;
+         background:var(--bg);border:1px solid var(--border);border-radius:8px">
+      <div class="lbl" style="margin-bottom:8px">KI-Einstellungen</div>
+
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Modell-Version</div>
+          <input id="ng-model" type="text" value="v2" placeholder="z.B. v2"
+            style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;
+                   background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Simulationen</div>
+          <input id="ng-sims" type="number" value="40" min="1" max="500"
+            style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;
+                   background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:var(--text2)">
+        Mehr Simulationen = stärkere KI, aber langsamere Züge.
+      </div>
+    </div>
+
+    <div class="sep" style="margin:0 0 12px"></div>
+
+    <!-- Startspieler -->
+    <div style="margin-bottom:14px">
+      <div class="lbl" style="margin-bottom:6px">Wer beginnt?</div>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;
+               border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px">
+          <input type="radio" name="ng-start" id="ng-start-p1" value="0" checked
+                 onchange="ngUpdateStartLabels()">
+          <span id="ng-start-p1-text">Ich (Spieler 1)</span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;
+               border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px">
+          <input type="radio" name="ng-start" id="ng-start-p2" value="1"
+                 onchange="ngUpdateStartLabels()">
+          <span id="ng-start-p2-text">KI / Spieler 2</span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;
+               border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px">
+          <input type="radio" name="ng-start" id="ng-start-random" value="random"
+                 onchange="ngUpdateStartLabels()">
+          <span>Zufall</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="confirm" style="flex:1" onclick="startNewGame()">Spiel starten</button>
+      <button class="cancel-btn" onclick="document.getElementById('newgame-overlay').style.display='none'">Abbrechen</button>
+    </div>
   </div>
 </div>
 

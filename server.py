@@ -11,6 +11,10 @@ Endpoints:
   POST /api/move/start_tile   — Startkachel platzieren (Vorbereitung)
   POST /api/tiling            — Tiling-Aktion (Phase 2)
   POST /api/end_tiling        — Tiling-Phase abschließen
+  GET  /api/ai/config         — KI-Konfiguration abrufen
+  POST /api/ai/config         — Schwierigkeit setzen (easy/medium/hard/expert)
+  POST /api/ai/move           — KI führt ihren nächsten Zug aus
+  GET  /api/ai/suggest        — Mentor Mode: Top-3 KI-Züge mit Win-Wahrscheinlichkeit
 
 Alle Responses: {"ok": true, "state": {...}} oder {"ok": false, "error": "..."}
 """
@@ -24,6 +28,7 @@ BASE_DIR = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, BASE_DIR)
 
 from flask import Flask, request, jsonify, send_from_directory
+import threading
 
 from engine.setup import GameState, setup_new_game, setup_new_round, NUM_ROUNDS
 from engine.serializer import serialize_state
@@ -45,6 +50,63 @@ except ImportError:
 
 # ── Global game state ────────────────────────────────────────────────────────
 _game = Game()
+
+# ── KI-Konfiguration ─────────────────────────────────────────────────────────
+_ai_agent    = None        # AlphaZeroAgent oder HeuristicMCTSAgent
+_ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
+_ai_lock     = threading.Lock()
+
+# Difficulty Presets — werden befüllt wenn genug Modell-Generationen vorhanden sind.
+# Aktuell: direkt model_version + sims übergeben über /api/ai/config
+# Format: {"model": "<version>", "sims": <int>}
+DIFFICULTY_PRESETS = {
+    "easy":   None,   # TODO: z.B. {"model": "v1", "sims": 10}
+    "medium": None,   # TODO: z.B. {"model": "v2", "sims": 20}
+    "hard":   None,   # TODO: z.B. {"model": "v3", "sims": 50}
+    "expert": None,   # TODO: z.B. {"model": "v5", "sims": 100}
+    # Fallback wenn kein Preset: neuestes verfügbares Modell mit 40 Sims
+    "_default": {"model": "v2", "sims": 40},
+}
+
+def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) -> dict:
+    """
+    Löst Schwierigkeit auf. Priorität:
+    1. Explizite model/sims Parameter
+    2. Preset wenn vorhanden
+    3. _default Preset
+    """
+    if model is not None and sims is not None:
+        return {"model": model, "sims": sims}
+    preset = DIFFICULTY_PRESETS.get(difficulty)
+    if preset is not None:
+        return preset
+    return DIFFICULTY_PRESETS["_default"]
+
+def _init_ai(model_version: str, sims: int) -> None:
+    """Initialisiert den KI-Agenten (lazy — nur wenn Modell vorhanden)."""
+    global _ai_agent
+    try:
+        from agents.alphazero import AlphaZeroAgent
+        from config import INPUT_SIZE
+        _ai_agent = AlphaZeroAgent(
+            model_version=model_version,
+            input_size=INPUT_SIZE,
+            simulations=sims,
+        )
+        _ai_agent.set_env(_wrap_env())
+    except FileNotFoundError:
+        # Modell nicht vorhanden → Fallback auf MCTS
+        from agents.mcts import HeuristicMCTSAgent
+        _ai_agent = HeuristicMCTSAgent(simulations=sims, rollout_depth=1)
+        _ai_agent.set_env(_wrap_env())
+
+def _wrap_env():
+    """Erstellt ein MosaicEnv das den aktuellen _game State spiegelt."""
+    from agents.agent_env import MosaicEnv
+    env = MosaicEnv()
+    env._game = _game
+    env.state  = _game.state
+    return env
 
 def ok() -> dict:
     # Holt sich den State immer frisch aus der Game-Instanz
@@ -76,14 +138,34 @@ def index():
 
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
-    global _game
+    global _game, _ai_agent, _ai_player
     data = request.get_json(silent=True) or {}
-    names = data.get('names', ['Spieler 1', 'Spieler 2'])
-    seed  = data.get('seed', None)
-    
+    names      = data.get('names', ['Spieler 1', 'Spieler 2'])
+    seed       = data.get('seed', None)
+    ai_enabled = data.get('ai_enabled', False)
+    difficulty = data.get('difficulty', 'medium')
+    ai_side    = data.get('ai_side', 1)   # 0 = KI ist P1, 1 = KI ist P2
+
+    import random as _random
+    fp_raw = data.get('first_player', None)
+    first_player = _random.randint(0, 1) if fp_raw is None else int(fp_raw)
     _game = Game()
-    _game.start(player_names=names, seed=seed)
-    return jsonify(ok())
+    _game.start(player_names=names, seed=seed, first_player=first_player)
+
+    if ai_enabled:
+        model_v = data.get('model', None)
+        sims_v  = data.get('sims',  None)
+        preset  = _resolve_difficulty(difficulty, model_v, sims_v)
+        _ai_player = int(ai_side)
+        _init_ai(preset['model'], preset['sims'])
+    else:
+        _ai_agent  = None
+        _ai_player = None
+
+    response = ok()
+    response['ai_enabled'] = ai_enabled
+    response['ai_player']  = _ai_player
+    return jsonify(response)
 
 
 @app.route('/api/state', methods=['GET'])
@@ -379,6 +461,7 @@ def select_scoring_tiles():
     if len(set(ids)) != 3: return jsonify(err("Keine Duplikate erlaubt"))
     
     _game.state.scoring_tile_ids = list(ids)
+    _game.state.scoring_confirmed = True   # nicht mehr editierbar
     _game.state.log_event(f"Wertungsplatten gewählt: {ids}")
     return jsonify(ok())
 
@@ -407,6 +490,202 @@ def stack_peek():
         return jsonify({"ok": True, "tiles": tiles})
     except Exception as e:
         return jsonify(err(str(e)))
+
+
+@app.route('/api/ai/config', methods=['GET'])
+def ai_config():
+    """Gibt aktuelle KI-Konfiguration zurück."""
+    if _ai_agent is None:
+        return jsonify({"ok": True, "ai_enabled": False})
+    sims = getattr(_ai_agent, 'simulations', 0)
+    return jsonify({
+        "ok":         True,
+        "ai_enabled": True,
+        "ai_player":  _ai_player,
+        "sims":       sims,
+    })
+
+
+@app.route('/api/ai/config', methods=['POST'])
+def ai_config_set():
+    """Setzt Schwierigkeit während des Spiels."""
+    global _ai_agent
+    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
+    d = request.get_json(silent=True) or {}
+    difficulty = d.get('difficulty', 'medium')
+    model_v    = d.get('model', None)
+    sims_v     = d.get('sims',  None)
+    preset     = _resolve_difficulty(difficulty, model_v, sims_v)
+    with _ai_lock:
+        _init_ai(preset['model'], preset['sims'])
+    return jsonify({"ok": True, "difficulty": difficulty, **preset})
+
+
+@app.route('/api/ai/move', methods=['POST'])
+def ai_move():
+    """
+    Lässt die KI einen Zug ausführen.
+    Wird vom Frontend nach jedem Menschenzug aufgerufen wenn
+    _game.state.current_player == _ai_player.
+    """
+    if _game.state is None:    return jsonify(err("Kein aktives Spiel"))
+    if _ai_agent is None:      return jsonify(err("Kein KI-Agent aktiv"))
+    if _ai_player is None:     return jsonify(err("KI-Spieler nicht gesetzt"))
+    if _game.state.phase not in ("drafting", "tiling"):
+        return jsonify(err(f"KI kann in Phase '{_game.state.phase}' nicht ziehen"))
+    if _game.state.current_player != _ai_player:
+        return jsonify(err("Nicht der Zug der KI"))
+
+    with _ai_lock:
+        try:
+            from agents.agent_env import MosaicEnv
+            # KI-Env mit aktuellem State synchronisieren
+            env = MosaicEnv()
+            env._game = _game
+            env.state  = _game.state
+            _ai_agent.set_env(env)
+
+            actions = env.valid_actions()
+            if not actions:
+                return jsonify(err("Keine gültigen Aktionen für KI"))
+
+            obs = env._get_obs()
+            action = _ai_agent.choose(actions, obs)
+
+            # Aktion im echten Game ausführen
+            _, reward, done, info = env.step(action)
+
+            if 'error' in info:
+                return jsonify(err(f"KI-Zug ungültig: {info['error']}"))
+
+            response = ok()
+            response['ai_action'] = action
+            response['done']      = done
+            return jsonify(response)
+
+        except Exception as e:
+            return jsonify(err(f"KI-Fehler: {str(e)}"))
+
+
+@app.route('/api/ai/start_tile', methods=['POST'])
+def ai_start_tile():
+    """
+    KI legt ihre Startkuppelplatte strategisch.
+    Bewertet alle Tile×Slot×Rotation Kombinationen mit evaluate_state
+    und wählt die beste aus.
+    """
+    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
+    if _ai_player is None:  return jsonify(err("KI-Spieler nicht gesetzt"))
+
+    state  = _game.state
+    player = state.players[_ai_player]
+
+    # Startkachel bereits gelegt?
+    if player.start_dome_tile is None:
+        return jsonify({"ok": True, "state": serialize_state(state), "skipped": True})
+
+    if not state.dome_display:
+        return jsonify(err("Kein Kuppelplättchen im Display"))
+
+    # Alle freien Slots sammeln
+    empty_slots = []
+    for r in range(3):
+        for c in range(3):
+            if player.dome_grid.dome_slots[r][c] is None:
+                empty_slots.append((r, c))
+
+    if not empty_slots:
+        return jsonify(err("Kein freies Kuppelslot"))
+
+    # Beste Kombination via evaluate_state suchen
+    try:
+        import copy
+        from agents.mcts import evaluate_state
+
+        best_score = -float('inf')
+        best = (state.dome_display[0].tile_id, empty_slots[0][0], empty_slots[0][1], 0)
+
+        for tile in state.dome_display:
+            for (r, c) in empty_slots:
+                for rot in [0, 90, 180, 270]:
+                    # Clone State, Zug anwenden, bewerten
+                    test_game = copy.deepcopy(_game)
+                    try:
+                        test_game.apply_start_placement(
+                            player_idx=_ai_player,
+                            tile_id=tile.tile_id,
+                            row=r, col=c, rot=rot,
+                        )
+                        scores = evaluate_state(test_game.state)
+                        score  = scores.get(_ai_player, 0.0)
+                        if score > best_score:
+                            best_score = score
+                            best = (tile.tile_id, r, c, rot)
+                    except Exception:
+                        continue
+
+        tile_id, row, col, rot = best
+        _game.apply_start_placement(
+            player_idx=_ai_player,
+            tile_id=tile_id,
+            row=row, col=col, rot=rot,
+        )
+        return jsonify(ok())
+
+    except Exception as e:
+        return jsonify(err(str(e)))
+
+
+@app.route('/api/ai/suggest', methods=['GET'])
+def ai_suggest():
+    """
+    Mentor Mode: gibt Top-3 KI-Züge mit Visit-Counts zurück.
+    Nur für AlphaZeroAgent verfügbar.
+    """
+    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
+    if _ai_agent is None:   return jsonify(err("Kein KI-Agent aktiv"))
+
+    try:
+        from agents.agent_env import MosaicEnv
+        from agents.mcts import MCTSNode
+        env = MosaicEnv()
+        env._game = _game
+        env.state  = _game.state
+        _ai_agent.set_env(env)
+
+        actions = env.valid_actions()
+        if not actions:
+            return jsonify({"ok": True, "suggestions": []})
+
+        # MCTS-Baum aufbauen ohne Zug auszuführen
+        pi = env.current_player()
+        root = MCTSNode(action=None, parent=None, untried_actions=None,
+                        player_who_acted=pi)
+        root.visits = 1
+
+        for _ in range(_ai_agent.simulations):
+            sim_env = env.clone()
+            node = _ai_agent._select(root, sim_env)
+            node = _ai_agent._expand(node, sim_env)
+            result = _ai_agent._rollout(sim_env)
+            _ai_agent._backpropagate(node, result, pi)
+
+        # Top-3 nach Visit-Count
+        top = sorted(root.children, key=lambda n: n.visits, reverse=True)[:3]
+        suggestions = []
+        for child in top:
+            q = child.value / child.visits if child.visits > 0 else 0.0
+            win_pct = round((q + 1) / 2 * 100, 1)
+            suggestions.append({
+                "action":   child.action,
+                "visits":   child.visits,
+                "win_pct":  win_pct,
+            })
+
+        return jsonify({"ok": True, "suggestions": suggestions})
+
+    except Exception as e:
+        return jsonify(err(f"Suggest-Fehler: {str(e)}"))
 
 
 if __name__ == '__main__':
