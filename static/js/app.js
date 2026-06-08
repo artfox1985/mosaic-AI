@@ -6,8 +6,16 @@ let tilingPi = null, tilingRow = null;
 
 // ── API ───────────────────────────────────────────────────────────────────────
 // KI-State
-let AI_ENABLED = false;
-let AI_PLAYER  = 1;  // KI ist immer Spieler 2 (Index 1)
+let AI_ENABLED  = false;
+let AI_PLAYER   = 1;   // KI ist immer Spieler 2 (Index 1)
+let AI_THINKING = false;
+
+function setAIThinking(on) {
+  AI_THINKING = on;
+  let overlay = document.getElementById('ai-thinking-overlay');
+  if (!overlay) return;
+  overlay.style.display = on ? 'flex' : 'none';
+}
 
 async function api(path, body=null) {
   const opts = body
@@ -94,27 +102,46 @@ async function newGame() {
   await startNewGame();
 }
 
+function aiIsDue() {
+  // Ist die KI gerade dran?
+  if (!AI_ENABLED || !S) return false;
+  if (S.phase === 'end' || S.phase === 'final') return false;
+  if (S.phase === 'drafting') return S.current_player === AI_PLAYER;
+  if (S.phase === 'tiling') return (S.valid_tiling_rows || []).some(r => r.pi === AI_PLAYER);
+  return false;
+}
+
 async function triggerAIMove() {
-  // Wird nach jedem Menschenzug aufgerufen wenn KI dran ist
-  if (!AI_ENABLED) return;
-  if (!S || S.current_player !== AI_PLAYER) return;
-  if (S.phase === 'end' || S.phase === 'final') return;
+  if (!aiIsDue()) return;
+  if (AI_THINKING) return;
 
-  // Kleines Delay damit der Mensch den State sieht
-  await new Promise(r => setTimeout(r, 400));
+  setAIThinking(true);
+  try {
+    await new Promise(r => setTimeout(r, 600));
 
-  const d = await api('/ai/move');
-  if (!d.ok) { showError('KI-Fehler: ' + d.error); return; }
-  S = d.state;
-  render();
-
-  // KI könnte mehrere Züge hintereinander machen (z.B. Tiling-Phase)
-  if (AI_ENABLED && S.current_player === AI_PLAYER) {
-    await triggerAIMove();
+    // Loop: KI zieht solange sie dran ist (max 20 Züge gegen Endlosloop)
+    let safety = 0;
+    while (aiIsDue() && safety++ < 20) {
+      const d = await api('/ai/move');
+      if (!d.ok) {
+        // Kein Fehler anzeigen wenn KI einfach nicht dran ist
+        if (d.error !== 'Nicht der Zug der KI' && d.error !== 'KI hat keine Tiling-Züge mehr') {
+          showError('KI-Fehler: ' + d.error);
+        }
+        break;
+      }
+      S = d.state;
+      render();
+      if (aiIsDue()) await new Promise(r => setTimeout(r, 350));
+    }
+  } finally {
+    setAIThinking(false);
   }
 }
 
 async function stoneMove(source, factory_id, color, row, moon_order=[]) {
+  if (AI_THINKING) return;
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
   const d = await api('/move/stone', {source, factory_id, color, row, moon_order});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
@@ -135,6 +162,9 @@ async function startTileMove(player, tile_id, slot_row, slot_col, rotation) {
 }
 
 async function bonusChipMove(factory_id) {
+  if (AI_THINKING) return;
+  // Nur wenn Mensch dran ist
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
   const d = await api('/move/bonus_chip', {factory_id});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
@@ -156,6 +186,8 @@ async function endTiling() {
 }
 
 async function passMove() {
+  if (AI_THINKING) return;
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
   const d = await api('/move/pass', {});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
@@ -745,6 +777,9 @@ function onFloorDirect() {
 }
 
 function onTilingRowClick(pi, ri) {
+  if (AI_THINKING) return;
+  // Mensch darf nicht für KI tilen
+  if (AI_ENABLED && pi === AI_PLAYER) return;
   const row = S.players[pi].pattern_lines[ri];
   if(row.tiles.length !== row.capacity) return;
   tilingPi=pi; tilingRow=ri;
@@ -755,6 +790,8 @@ function onTilingRowClick(pi, ri) {
 let chipModal = null;
 
 function openChipModal(pi, ri) {
+  if (AI_THINKING) return;
+  if (AI_ENABLED && pi === AI_PLAYER) return;
   const p = S.players[pi];
   const row = p.pattern_lines[ri];
   const chips = p.bonus_chips.filter(c=>c);
@@ -915,6 +952,7 @@ function openStackPicker() {
 }
 
 function openDomeModal(pi, sr, sc) {
+  if (AI_THINKING) return;  // KI denkt noch
   const p = S.players[pi];
   const isStart = !p.start_placed;
   // KI-Board sperren: Mensch darf nicht für KI legen

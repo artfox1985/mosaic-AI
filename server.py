@@ -521,7 +521,7 @@ def ai_config_set():
     return jsonify({"ok": True, "difficulty": difficulty, **preset})
 
 
-@app.route('/api/ai/move', methods=['POST'])
+@app.route('/api/ai/move', methods=['GET', 'POST'])
 def ai_move():
     """
     Lässt die KI einen Zug ausführen.
@@ -533,8 +533,17 @@ def ai_move():
     if _ai_player is None:     return jsonify(err("KI-Spieler nicht gesetzt"))
     if _game.state.phase not in ("drafting", "tiling"):
         return jsonify(err(f"KI kann in Phase '{_game.state.phase}' nicht ziehen"))
-    if _game.state.current_player != _ai_player:
+
+    # Drafting: current_player muss KI sein
+    if _game.state.phase == "drafting" and _game.state.current_player != _ai_player:
         return jsonify(err("Nicht der Zug der KI"))
+
+    # Tiling: KI muss noch platzierbare Reihen haben
+    if _game.state.phase == "tiling":
+        from engine.game import generate_tiling_actions
+        ai_actions = generate_tiling_actions(_game.state, _ai_player)
+        if not ai_actions:
+            return jsonify(err("KI hat keine Tiling-Züge mehr"))
 
     with _ai_lock:
         try:
@@ -549,7 +558,8 @@ def ai_move():
             if not actions:
                 return jsonify(err("Keine gültigen Aktionen für KI"))
 
-            obs = env._get_obs()
+            from engine.serializer import serialize_state
+            obs = serialize_state(env.state)
             action = _ai_agent.choose(actions, obs)
 
             # Aktion im echten Game ausführen
@@ -567,7 +577,7 @@ def ai_move():
             return jsonify(err(f"KI-Fehler: {str(e)}"))
 
 
-@app.route('/api/ai/start_tile', methods=['POST'])
+@app.route('/api/ai/start_tile', methods=['GET', 'POST'])
 def ai_start_tile():
     """
     KI legt ihre Startkuppelplatte strategisch.
