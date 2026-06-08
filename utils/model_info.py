@@ -20,6 +20,7 @@ LABELS = {
     "epochs":             "Epochen",
     "num_games":          "Züge",
     "input_size":         "Input Size",
+    "hidden_size":        "Hidden Size",
     "num_actions":        "Num Actions",
     "batch_size":         "Batch Size",
     "lr":                 "Learning Rate",

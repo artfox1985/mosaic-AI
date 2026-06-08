@@ -146,7 +146,7 @@ if __name__ == "__main__":
         )
         
     agent_alphazero2 = AlphaZeroAgent(
-        model_version="v2_512",
+        model_version="v2",
         input_size=INPUT_SIZE, 
         simulations=40
         )
@@ -165,4 +165,4 @@ if __name__ == "__main__":
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=40)
+    run_arena(competitors, games_per_matchup=100)
