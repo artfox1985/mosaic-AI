@@ -648,14 +648,16 @@ class Game:
             player.apply_score(res["total"])
             results[pi] = res
             self.state.log_event(
-                f"🏆 {player.name}: Endwertung +{res['total']} Pkt "
+                f"🏆 {player.name}: Endwertung {res['total']} Pkt "
                 f"→ Gesamt: {player.score} Pkt"
             )
             for tid, detail in res.items():
                 if tid == "total":
                     continue
+                if not isinstance(detail, dict):
+                    continue
                 self.state.log_event(
-                    f"   {detail['emoji']} {detail['name']}: {detail['score']:+d} Pkt"
+                    f"   {detail['emoji']} {detail['name']}: {detail['score']} Pkt"
                 )
         self.state.phase = "final"
         return {"end_scoring": results}

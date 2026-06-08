@@ -177,7 +177,7 @@ def calculate_end_scoring(player: "PlayerBoard", tile_ids: list[int]) -> dict:
         if tile is None:
             continue
         pts = tile.score(player)
-        results[tid] = {
+        results[str(tid)] = {       # String-Key für JSON-Kompatibilität
             "name":  tile.name,
             "emoji": tile.emoji,
             "desc":  tile.description,

@@ -157,16 +157,13 @@ def action_to_id(action: dict) -> int:
     if t == "end_tiling": return 1
 
     if t == "stone":
-        c_id   = max(0, COLOR_MAP.get(action.get("color"), 0))
-        r_id   = action.get("row", 0) + 1          # -1..6 → 0..7
-        src_str = action.get("source", "")
-        if "SMALL_FACTORY_MOON" in src_str and action.get("factory_id") is None:
-            src_id = 6                              # globaler Mond-Zug
-        elif "LARGE" in src_str:
-            src_id = 7
-        else:
-            src_id = action.get("factory_id", 0) or 0
-        return min(10 + (c_id * 50) + (r_id * 8) + src_id, 273)
+        # factory_index: 0-3=kleine Fabriken, 4=GF, 5=Mondaktion
+        # color: 0-4, row: -1..6 → 0..7
+        c_id  = max(0, COLOR_MAP.get(action.get("color"), 0))
+        r_id  = action.get("row", 0) + 1           # -1..6 → 0..7
+        f_idx = action.get("factory_index", 0)     # 0-5
+        return min(10 + (c_id * 48) + (r_id * 6) + f_idx, 273)
+        # max: 10 + (4*48) + (7*6) + 5 = 10 + 192 + 42 + 5 = 249 ✅ < 274
 
     if t == "tiling":
         pr = action.get("pattern_row", 0)
@@ -175,24 +172,27 @@ def action_to_id(action: dict) -> int:
         return 274 + (pr * 9) + (sr * 3) + sc      # 274–327
 
     if t == "dome":
+        # display_index: 0-2, slot_row: 0-2, slot_col: 0-2, rotation: 0-3
+        d_idx   = action.get("display_index", 0)   # 0-2
         sr      = action.get("slot_row", 0)
         sc      = action.get("slot_col", 0)
         rot_idx = action.get("rotation", 0) // 90
-        return 328 + (sr * 12) + (sc * 4) + rot_idx   # 328–363 (36 IDs)
+        return 328 + (d_idx * 36) + (sr * 12) + (sc * 4) + rot_idx  # 328–435... clip:
+        # max: 328 + 2*36 + 2*12 + 2*4 + 3 = 328 + 72 + 24 + 8 + 3 = 435 → brauchen mehr Raum
 
     if t == "dome_stack":
         sr      = action.get("slot_row", 0)
         sc      = action.get("slot_col", 0)
         rot_idx = action.get("rotation", 0) // 90
-        return 364 + (sr * 12) + (sc * 4) + rot_idx   # 364–399 (36 IDs)
+        return 436 + (sr * 12) + (sc * 4) + rot_idx  # 436–471 (36 IDs)
 
     if t == "use_chips":
-        return 400 + action.get("pattern_row", 0)      # 400–405
+        return 472 + action.get("pattern_row", 0)  # 472–477
 
     if t == "bonus_chip":
-        return 406 + (action.get("factory_id", 1) - 1) # 406–409
+        return 478 + action.get("factory_index", 0) # 478–481
 
-    return 409  # Fallback auf letzte gültige ID
+    return 481  # Fallback
 
 # --- 2. DATENSATZ & NETZWERK ---
 class MosaicDataset(Dataset):

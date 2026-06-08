@@ -8,11 +8,13 @@ Stellt eine saubere Schnittstelle für KI-Agenten bereit:
   actions = env.valid_actions()       # Liste aller gültigen Aktionen
   state, reward, done, info = env.step(action)  # Aktion ausführen
 
-Aktionstypen (alle als Dict):
-  {"type": "stone",      "source": ..., "factory_id": ..., "color": ..., "row": ..., "moon_order": [...]}
-  {"type": "dome",       "tile_id": ..., "slot_row": ..., "slot_col": ..., "rotation": ...}
-  {"type": "dome_stack", "num_drawn": ..., "chosen_id": ..., "slot_row": ..., "slot_col": ..., "rotation": ...}
-  {"type": "bonus_chip", "factory_id": ...}
+Aktionstypen (alle als Dict — abstrakte Darstellung ohne State-Snapshots):
+  {"type": "stone",      "factory_index": 0-5, "color": ..., "row": ...}
+      factory_index: 0-3=kleine Fabriken F1-F4, 4=Große Fabrik, 5=Mondaktion (Aktion C)
+  {"type": "dome",       "display_index": 0-2, "slot_row": ..., "slot_col": ..., "rotation": ...}
+      display_index: Position im Kuppel-Display (0=links, 1=mitte, 2=rechts)
+  {"type": "dome_stack", "num_drawn": ..., "slot_row": ..., "slot_col": ..., "rotation": ...}
+  {"type": "bonus_chip", "factory_index": 0-3}
   {"type": "pass"}
   {"type": "tiling",     "player": ..., "pattern_row": ..., "slot_row": ..., "slot_col": ..., "space_index": ...}
   {"type": "use_chips",  "player": ..., "pattern_row": ...}
@@ -157,30 +159,42 @@ class MosaicEnv:
         state = self.state
         p = state.active_player
 
+        # factory_index Mapping: 0-3 = kleine Fabriken (F1-F4), 4 = GF, 5 = Mondaktion
+        factory_id_to_index = {f.factory_id: i for i, f in enumerate(state.factories)}
+
         for m in generate_valid_moves(state):
+            src = m.take.source.name
+            if src == "SMALL_FACTORY_MOON" and m.take.factory_id is None:
+                f_idx = 5  # Aktion C: globaler Mondaktion
+            elif src == "LARGE_FACTORY_SUN":
+                f_idx = 4
+            else:
+                f_idx = factory_id_to_index.get(m.take.factory_id, 0)
             actions.append({
-                "type":       "stone",
-                "source":     m.take.source.name,
-                "factory_id": m.take.factory_id,
-                "color":      m.take.color.value,
-                "row":        m.place.row_index,
-                "moon_order": [t.value for t in m.take.moon_order],
+                "type":          "stone",
+                "factory_index": f_idx,
+                "color":         m.take.color.value,
+                "row":           m.place.row_index,
             })
 
         if state.round_number < 5:
             for m in generate_dome_moves(state):
+                # display_index: Position der Kachel im Display
+                display_index = next(
+                    (i for i, t in enumerate(state.dome_display)
+                     if t.tile_id == m.dome_tile_id), 0
+                )
                 actions.append({
-                    "type":     "dome",
-                    "tile_id":  m.dome_tile_id,
-                    "slot_row": m.slot_row,
-                    "slot_col": m.slot_col,
-                    "rotation": m.rotation,
+                    "type":          "dome",
+                    "display_index": display_index,
+                    "slot_row":      m.slot_row,
+                    "slot_col":      m.slot_col,
+                    "rotation":      m.rotation,
                 })
 
             if (p.start_dome_tile is None
                     and p.can_place_dome_tile(state.round_number)
                     and state.dome_tile_pool):
-                top = state.dome_tile_pool[0]
                 for slot_row in range(3):
                     for slot_col in range(3):
                         if state.players[state.current_player].dome_grid.dome_slots[slot_row][slot_col] is None:
@@ -188,7 +202,6 @@ class MosaicEnv:
                                 actions.append({
                                     "type":      "dome_stack",
                                     "num_drawn": 1,
-                                    "chosen_id": top.tile_id,
                                     "slot_row":  slot_row,
                                     "slot_col":  slot_col,
                                     "rotation":  rot,
@@ -199,9 +212,10 @@ class MosaicEnv:
                     break
 
         for m in generate_bonus_chip_moves(state):
+            f_idx = factory_id_to_index.get(m.factory_id, 0)
             actions.append({
-                "type":       "bonus_chip",
-                "factory_id": m.factory_id,
+                "type":          "bonus_chip",
+                "factory_index": f_idx,
             })
 
         if not actions:
@@ -275,46 +289,41 @@ class MosaicEnv:
         state = self.state
 
         if t == "stone":
-            color = _color(action["color"])
-            src   = TakeSource[action["source"]]
-            f_id  = action.get("factory_id")
+            color    = _color(action["color"])
+            f_idx    = action.get("factory_index", 0)
 
-            # moon_order frisch aus aktuellem Fabrik-Zustand berechnen —
-            # die gespeicherte moon_order kann veraltet sein wenn sich der
-            # Fabrik-Zustand seit der Aktionsgenerierung geändert hat
-            if src == TakeSource.SMALL_FACTORY_SUN and f_id is not None:
-                factory = next(
-                    (f for f in state.factories if f.factory_id == f_id), None
-                )
-                if factory is not None:
-                    moon = [t for t in factory.sun_tiles if t != color]
-                else:
-                    moon = [_color(c) for c in action.get("moon_order", [])]
-            elif src == TakeSource.LARGE_FACTORY_SUN:
+            # factory_index → konkrete Fabrik + Source + moon_order aus aktuellem State
+            if f_idx == 5:
+                # Aktion C: globaler Mondaktion
+                src  = TakeSource.SMALL_FACTORY_MOON
+                f_id = None
+                moon = []
+            elif f_idx == 4:
+                # Große Fabrik Sonnenseite
+                src  = TakeSource.LARGE_FACTORY_SUN
+                f_id = None
                 moon = [t for t in state.large_factory.sun_tiles if t != color]
             else:
-                moon = [_color(c) for c in action.get("moon_order", [])]
+                # Kleine Fabrik (Index 0-3 → factory_id 1-4)
+                factories = state.factories
+                factory   = factories[f_idx] if f_idx < len(factories) else factories[0]
+                src  = TakeSource.SMALL_FACTORY_SUN
+                f_id = factory.factory_id
+                moon = [t for t in factory.sun_tiles if t != color]
 
-            move  = Move(
-                take=TakeAction(
-                    source=src,
-                    color=color,
-                    factory_id=f_id,
-                    moon_order=moon,
-                ),
+            move = Move(
+                take=TakeAction(source=src, color=color, factory_id=f_id, moon_order=moon),
                 place=PlaceAction(row_index=action["row"]),
             )
             self._game.apply(move)
 
         elif t == "dome":
-            # tile_id frisch validieren — Kachel muss noch im Display sein
-            tile_id = action["tile_id"]
-            if not any(t.tile_id == tile_id for t in state.dome_display):
-                # Kachel nicht mehr im Display — erste verfügbare nehmen
-                if state.dome_display:
-                    tile_id = state.dome_display[0].tile_id
-                else:
-                    return  # kein Display mehr, Aktion überspringen
+            # display_index → aktuelle Kachel aus Display holen
+            d_idx   = action.get("display_index", 0)
+            display = state.dome_display
+            if not display:
+                return
+            tile_id = display[min(d_idx, len(display) - 1)].tile_id
             move = PlaceDomeTileMove(
                 dome_tile_id=tile_id,
                 slot_row=action["slot_row"],
@@ -324,16 +333,11 @@ class MosaicEnv:
             self._game.apply(move)
 
         elif t == "dome_stack":
-            # chosen_id frisch validieren — Kachel muss noch im Pool sein
-            chosen_id = action["chosen_id"]
-            num_drawn  = action["num_drawn"]
-            if not any(t.tile_id == chosen_id for t in state.dome_tile_pool[:num_drawn]):
-                # Kachel nicht mehr verfügbar — erste verfügbare nehmen
-                if state.dome_tile_pool:
-                    chosen_id = state.dome_tile_pool[0].tile_id
-                    num_drawn  = 1
-                else:
-                    return
+            # Ersten verfügbaren Stapel nehmen
+            if not state.dome_tile_pool:
+                return
+            num_drawn = action.get("num_drawn", 1)
+            chosen_id = state.dome_tile_pool[0].tile_id
             move = DrawFromStackMove(
                 num_drawn=num_drawn,
                 chosen_id=chosen_id,
@@ -344,23 +348,19 @@ class MosaicEnv:
             self._game.apply(move)
 
         elif t == "bonus_chip":
-            # factory_id validieren — Chip muss noch dort liegen
-            f_id = action["factory_id"]
-            factory = next(
-                (f for f in state.factories
-                 if f.factory_id == f_id and f.bonus_chip_revealed and f.bonus_chip),
-                None
-            )
-            if factory is None:
-                # Chip nicht mehr verfügbar — ersten verfügbaren nehmen
+            # factory_index → erste verfügbare Fabrik mit Chip
+            f_idx     = action.get("factory_index", 0)
+            factories = state.factories
+            # Versuche zuerst die gewünschte Fabrik
+            factory   = factories[f_idx] if f_idx < len(factories) else None
+            if factory is None or not factory.bonus_chip_revealed or not factory.bonus_chip:
+                # Fallback: erste Fabrik mit aufgedecktem Chip
                 factory = next(
-                    (f for f in state.factories if f.bonus_chip_revealed and f.bonus_chip),
-                    None
+                    (f for f in factories if f.bonus_chip_revealed and f.bonus_chip), None
                 )
-                if factory is None:
-                    return
-                f_id = factory.factory_id
-            move = TakeBonusChipMove(factory_id=f_id)
+            if factory is None:
+                return
+            move = TakeBonusChipMove(factory_id=factory.factory_id)
             self._game.apply(move)
 
         elif t == "pass":
