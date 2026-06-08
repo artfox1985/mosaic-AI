@@ -102,6 +102,53 @@ def state_to_tensor(data):
                             req = space.get("color")
                             features.append(COLOR_ID_MAP.get(req, 0) / 5.0)
             
+    # 7. Mondseite kleine Fabriken (pro Fabrik: 3 Positionen × 5 Farben = 15 Features)
+    # Position 0 = oben (abholbar), Position 1 = darunter, Position 2 = ganz unten
+    for f in data.get("factories", []):
+        moon_features = [0.0] * 15
+        stacks = f.get("moon", [])
+        if stacks:
+            stack = stacks[0]  # max 1 Stapel pro kleiner Fabrik
+            for pos, stone in enumerate(reversed(stack)):
+                if pos >= 3:
+                    break
+                c_id = COLOR_MAP.get(stone, -1)
+                if c_id >= 0:
+                    moon_features[pos * 5 + c_id] = 1.0
+        features.extend(moon_features)
+
+    # 8. GF Moon-Pool (flach — Farb-Counts, keine Reihenfolge relevant)
+    pool = data.get("large_factory", {}).get("moon", [])
+    pool_counts = [0] * 5
+    for c_str in pool:
+        c_id = COLOR_MAP.get(c_str, -1)
+        if c_id >= 0:
+            pool_counts[c_id] += 1
+    features.extend([c / 10.0 for c in pool_counts])
+
+    # 9. Kuppel-Display (max 3 Platten × 4 Spaces × 2 Features = 24)
+    # Pro Space: is_filled (1) + required_color normalisiert (1)
+    DOME_COLOR_MAP = {"blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5}
+    dome_display = data.get("dome_display", [])
+    for slot_idx in range(3):
+        if slot_idx < len(dome_display):
+            plate = dome_display[slot_idx]
+            spaces = plate.get("spaces", []) if plate else []
+            for space_idx in range(4):
+                if space_idx < len(spaces):
+                    space = spaces[space_idx]
+                    filled = space.get("filled")
+                    features.append(1.0 if filled is not None else 0.0)
+                    req = space.get("color")
+                    features.append(DOME_COLOR_MAP.get(req, 0) / 5.0)
+                else:
+                    features.extend([0.0, 0.0])
+        else:
+            features.extend([0.0] * 8)  # leerer Slot: 4 Spaces × 2 Features
+
+    # 10. Kuppel-Stapel (Anzahl verbleibende Platten)
+    features.append(data.get("dome_stack_count", 0) / 20.0)
+
     return torch.tensor(features, dtype=torch.float32)
 
 def action_to_id(action: dict) -> int:

@@ -510,9 +510,18 @@ def check_drafting_complete(state: "GameState") -> bool:
     original = state.current_player
     for pi in range(2):
         state.current_player = pi
+        p = state.players[pi]
+        # DrawFromStack prüfen: Token verfügbar + Stapel nicht leer + Platz im Grid
+        can_draw_from_stack = (
+            state.round_number < 5
+            and not p.has_used_all_tokens(state.round_number)
+            and bool(state.dome_tile_pool)
+            and p.can_place_dome_tile(state.round_number)
+        )
         if (generate_valid_moves(state)
                 or generate_dome_moves(state)
-                or generate_bonus_chip_moves(state)):
+                or generate_bonus_chip_moves(state)
+                or can_draw_from_stack):
             state.current_player = original
             return False
     state.current_player = original

@@ -37,6 +37,12 @@ def run_arena(agents_dict, games_per_matchup=10):
     wins["ZeroZero"] = 0
     all_avg_actions = []
     all_max_actions = []
+    
+    if games_per_matchup == 1:
+        log = True
+    else:
+        log = False
+            
 
     # Generiert alle Paarungen (z.B. (Random, Greedy), (Random, MCTS), (Greedy, MCTS))
     matchups = list(itertools.combinations(names, 2))
@@ -65,7 +71,7 @@ def run_arena(agents_dict, games_per_matchup=10):
             result = run_episode_mcts(
                 agents=agent_list, 
                 max_steps=500, 
-                verbose=True
+                verbose=log
             )
             duration = time.time() - t0
             

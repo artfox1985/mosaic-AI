@@ -50,7 +50,7 @@ from engine.round_end import (
     process_unplaceable_rows, score_penalty,
     apply_bonus_chips_to_row,
 )
-from engine.dome import ROTATION_MAP
+from engine.dome import ROTATION_MAP, SpaceType
 
 
 # ---------------------------------------------------------------------------
@@ -264,10 +264,17 @@ def generate_tiling_actions(
             slot = player.dome_grid.dome_slots[dome_row][sc]
             if slot is None:
                 continue
-            for si in valid_si:
+            # valid_si für normale Spaces, aber WILD Spaces sind in allen 4 Positionen gültig
+            all_si = list(range(len(slot.spaces)))
+            for si in all_si:
                 space = slot.spaces[si]
                 if space.is_filled or space.is_locked:
                     continue
+                # WILD: immer gültig; NORMAL: nur in valid_si; SPECIAL: nie hier
+                if space.space_type == SpaceType.WILD:
+                    pass  # WILD akzeptiert jede Farbe in jeder Position
+                elif si not in valid_si:
+                    continue  # NORMAL Space außerhalb des erlaubten Bereichs
                 if not space.accepts(color):
                     continue
                 a = TilingAction(pattern_row=row_idx, slot_row=dome_row,
@@ -281,8 +288,12 @@ def generate_tiling_actions(
             for tile in state.dome_display:
                 for rotation in (0, 90, 180, 270):
                     rotated = [tile.spaces[i] for i in ROTATION_MAP[rotation]]
-                    for si in valid_si:
-                        if rotated[si].accepts(color):
+                    for si in range(len(rotated)):
+                        space = rotated[si]
+                        # WILD: immer gültig; NORMAL: nur in valid_si
+                        if space.space_type != SpaceType.WILD and si not in valid_si:
+                            continue
+                        if space.accepts(color):
                             a = TilingAction(pattern_row=row_idx, slot_row=dome_row,
                                              slot_col=sc, space_index=si,
                                              dome_tile_id=tile.tile_id, rotation=rotation)

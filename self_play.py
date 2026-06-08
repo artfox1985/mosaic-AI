@@ -204,7 +204,7 @@ def play_one_game(agent):
 # Datengenerierung
 # ---------------------------------------------------------------------------
 
-def generate_data(mode: str, num_games: int, simulations: int, version_name: str):
+def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0):
     """
     Generiert Self-Play Trainingsdaten.
 
@@ -215,7 +215,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     """
     if mode == "mcts":
         print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations})")
-        agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=5)
+        agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth)
     elif mode == "network":
         model_file = MODELS_DIR / f"alphazero_{version_name}.pth"
         if not model_file.exists():
@@ -265,6 +265,8 @@ if __name__ == "__main__":
                         help="MCTS-Simulationen pro Zug")
     parser.add_argument("--version", type=str, required=True,
                         help="Versionsname, z.B. v0 oder v1")
+    parser.add_argument("--depth",   type=int, required=True,
+                        help="Rollout-Tiefe (0=Heuristik, 1=1 Schritt, 5=5 Schritte)")
     args = parser.parse_args()
 
     generate_data(
@@ -272,4 +274,5 @@ if __name__ == "__main__":
         num_games=args.games,
         simulations=args.sims,
         version_name=args.version,
+        rollout_depth=args.depth,
     )
