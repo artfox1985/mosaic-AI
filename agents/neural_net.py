@@ -186,19 +186,23 @@ class MosaicDataset(Dataset):
 
 
 class MosaicNet(nn.Module):
-    def __init__(self, input_size, num_actions=400):
+    def __init__(self, input_size, num_actions=NUM_ACTIONS):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(input_size, 256),
+            nn.BatchNorm1d(256), # Verhindert, dass das Netz bei extremen Werten kollabiert
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(256, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
             nn.ReLU()
         )
         self.policy_head = nn.Sequential(
-            nn.Linear(128, num_actions)
+            nn.Linear(256, num_actions)
         )
         self.value_head = nn.Sequential(
-            nn.Linear(128, 64),
+            nn.Linear(256, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
             nn.Tanh()

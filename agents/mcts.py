@@ -18,12 +18,11 @@ from __future__ import annotations
 import math
 import time
 import random
-from typing import Any
-
 import pickle
 
+from typing import Any
 from agents.agent_env import MosaicEnv
-from agents.agents import BaseAgent, RandomAgent
+from agents.agents import BaseAgent, RandomAgent, run_episode
 from agents.shaping import get_player_potential
 
 def _diff_to_probs(diff: float) -> dict[int, float]:
@@ -368,8 +367,7 @@ def run_episode_mcts(
     """
     Wie run_episode, aber übergibt die Umgebung an MCTS-Agenten.
     """
-    import time
-    from agents.agents import run_episode
+
 
     env = MosaicEnv(random_scoring_tiles=random_scoring_tiles)
 
@@ -383,11 +381,31 @@ def run_episode_mcts(
     total_rewards = [0.0, 0.0]
     steps = 0
     done = False
+    total_valid_actions = 0
+    max_valid_actions = 0  # NEU
+    tracked_steps = 0
 
     while steps < max_steps and not done:
         actions = env.valid_actions()
         if not actions:
             break
+
+        # NEU: Nur tracken, wenn es wirklich Entscheidungen gibt (>1)
+        # Wenn es nur 1 Zug gibt (wie im Tiling-Bypass), verfälscht das den 
+        # Branching Factor für das MCTS/NN, weil da eh nicht gesucht wird.
+        if len(actions) > 1:
+            total_valid_actions += len(actions)
+            tracked_steps += 1
+            if len(actions) > max_valid_actions:  # NEU
+                max_valid_actions = len(actions)  # NEU
+
+        pi = env.current_player()
+        agent = agents[pi]
+
+        action = agent.choose(actions, obs)
+        obs, reward, done, step_info = env.step(action)
+        total_rewards[pi] += reward
+        steps += 1
 
         pi = env.current_player()
         agent = agents[pi]
@@ -398,7 +416,7 @@ def run_episode_mcts(
         steps += 1
 
         if verbose and steps % 20 == 0:
-            print(f"  Step {steps:3d} | P{pi} {action['type']:12s} | "
+            print(f"  Step {steps:3d} | P{pi} {action['type']:12s} von {len(actions):3d} | "
                   f"reward={reward:+.1f} | scores={env.scores()}")
 
     scores = env.scores()
@@ -429,6 +447,9 @@ def run_episode_mcts(
                 print(entry)
         print("="*60 + "\n")
 
+    # NEU: Durchschnitt berechnen
+    avg_actions = total_valid_actions / tracked_steps if tracked_steps > 0 else 0.0
+
     result = {
         "scores":           scores,
         "winner":           winner,
@@ -437,6 +458,8 @@ def run_episode_mcts(
         "scoring_tile_ids": info.get("scoring_tile_ids", []),
         "scoring_names":    info.get("scoring_tile_names", []),
         "duration_s":       round(time.time() - t0, 3),
+        "avg_valid_actions": round(avg_actions, 1),
+        "max_valid_actions": max_valid_actions,
     }
     
     return result

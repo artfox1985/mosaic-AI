@@ -34,6 +34,10 @@ def run_arena(agents_dict, games_per_matchup=10):
     agent_instances = {name: data[0] for name, data in agents_dict.items()}
     wins = {name: 0 for name in names}
     wins["Draw"] = 0
+    wins["ZeroZero"] = 0
+
+    all_avg_actions = []
+    all_max_actions = []
 
     # Generiert alle Paarungen (z.B. (Random, Greedy), (Random, MCTS), (Greedy, MCTS))
     matchups = list(itertools.combinations(names, 2))
@@ -62,13 +66,16 @@ def run_arena(agents_dict, games_per_matchup=10):
             result = run_episode_mcts(
                 agents=agent_list, 
                 max_steps=500, 
-                verbose=False  # <--- HIER EINGESCHALTET
+                verbose=True
             )
             duration = time.time() - t0
             
             # Auswertung
             scores = result["scores"]
             winner_idx = result["winner"]
+            avg_actions = result.get("avg_valid_actions", 0.0)
+            max_actions = result.get("max_valid_actions", 0)
+            all_avg_actions.append(avg_actions)
             
             if winner_idx == 0:
                 winner_name = p0
@@ -95,18 +102,21 @@ def run_arena(agents_dict, games_per_matchup=10):
             elo_ratings[p0] = new_elo_0
             elo_ratings[p1] = new_elo_1
             
-            print(f" {duration:.1f}s | {scores[0]:3d}:{scores[1]:<3d} -> Sieger: {winner_name}")
+            print(f" {duration:.1f}s | Züge: {result['steps']:3d} | Aktionen (Ø/max): {avg_actions:4.1f}/{max_actions:3d} | {scores[0]:3d}:{scores[1]:<3d} -> Sieger: {winner_name}")
 
     total    = sum(wins[n] for n in names)
     zerozero = wins["ZeroZero"]
     pct      = zerozero / total * 100 if total > 0 else 0
+
+    # NEU: Gesamt-Durchschnitt der Aktionen
+    global_avg_actions = sum(all_avg_actions) / len(all_avg_actions) if all_avg_actions else 0.0
 
     print("\n" + "=" * 50)
     print("🏆 ARENA ERGEBNISSE 🏆")
     for name in names:
         print(f"Siege {name}: {wins[name]}")
     print(f"0:0 Spiele:    {zerozero} / {total} ({pct:.1f}%)")
-
+    print(f"Ø Valide Züge (Branching Factor): {global_avg_actions:.1f}") # NEU
     
     print("\nFINALE ELO RATINGS:")
     # Sortiert die Tabelle absteigend nach Elo
@@ -121,12 +131,12 @@ if __name__ == "__main__":
     
     agent_random = RandomAgent()
     agent_greedy = GreedyAgent()
-    agent_mcts_heuristic = HeuristicMCTSAgent(simulations=150, rollout_depth=0)
-    agent_alphazero = AlphaZeroAgent(
-        model_version="v1",
-        input_size=INPUT_SIZE, 
-        simulations=40
-        )
+    agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=5)
+    #agent_alphazero = AlphaZeroAgent(
+    #    model_version="v1",
+    #    input_size=INPUT_SIZE, 
+    #    simulations=40
+    #    )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -137,9 +147,9 @@ if __name__ == "__main__":
 
     competitors = {
         "MCTS_Heuristik": (agent_mcts_heuristic, 1000),
-        "AlphaZero_V1": (agent_alphazero, 1000)
+        "MCTS_Heuristik2": (agent_mcts_heuristic, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=100)
+    run_arena(competitors, games_per_matchup=1)

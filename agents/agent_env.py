@@ -107,8 +107,11 @@ class MosaicEnv:
         try:
             self._apply_action(action)
         except Exception as e:
-            obs = serialize_state(self.state)
-            return obs, -1.0, False, {"error": str(e)}
+            print(f"FATALER FEHLER in MosaicEnv.step: {e}")
+            print(f"Ungültiger Zug: {action}")
+            #obs = serialize_state(self.state)
+            #return obs, -1.0, False, {"error": str(e)}
+            raise e
 
         score_after     = player.score
         potential_after = get_player_potential(player)

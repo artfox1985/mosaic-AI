@@ -38,23 +38,41 @@ class RandomAgent(BaseAgent):
 
 class GreedyAgent(BaseAgent):
     """
-    Wählt die Aktion die sofort die meisten Punkte bringt.
-    Bei Gleichstand zufällig.
-    Nützlich als Baseline über RandomAgent.
+    Ein echter Greedy-Agent: 
+    Testet alle validen Züge, schaut sich den Reward an und 
+    wählt den Zug mit dem sofort höchsten Reward.
     """
     def choose(self, actions: list[dict], obs: dict) -> dict:
-        # Tiling-Aktionen bevorzugen (bringen garantiert Punkte)
-        tiling = [a for a in actions if a["type"] == "tiling"]
-        if tiling:
-            return random.choice(tiling)
+        # Wir benötigen Zugriff auf das Environment, um die Züge zu testen.
+        # Da BaseAgent kein env standardmäßig hat, holen wir es uns aus 
+        # der Observation (wenn dort wie in Mosaic-AI üblich das env liegt)
+        # oder setzen es über eine set_env Methode.
+        env = obs.get("_env")
+        if env is None:
+            # Fallback falls kein env vorhanden
+            return random.choice(actions)
 
-        # Stone-Züge mit vollständiger Reihe bevorzugen
-        stone = [a for a in actions if a["type"] == "stone"]
-        if stone:
-            # Bevorzuge Züge die eine Reihe füllen (row capacity check nicht möglich ohne state)
-            return random.choice(stone)
-
-        return random.choice(actions)
+        best_action = None
+        best_reward = -float('inf')
+        
+        # Teste alle Züge
+        for action in actions:
+            # Wir klonen das Environment, um den Zustand nicht wirklich zu verändern
+            test_env = env.clone()
+            
+            # Führe die Aktion im geklonten Env aus
+            _, reward, _, _ = test_env.step(action)
+            
+            # Suche das Maximum
+            if reward > best_reward:
+                best_reward = reward
+                best_action = action
+            elif reward == best_reward:
+                # Bei Gleichstand zufällig entscheiden
+                if random.random() < 0.5:
+                    best_action = action
+                    
+        return best_action if best_action is not None else random.choice(actions)
 
 
 # ── Episode ───────────────────────────────────────────────────────────────────
