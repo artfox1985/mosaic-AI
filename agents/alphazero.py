@@ -30,10 +30,16 @@ class AlphaZeroAgent(MCTSAgent):
         print(f"🧠 AlphaZero Agent initialisiert auf: {self.device.type.upper()}")
 
         ckpt = torch.load(str(model_path), map_location=self.device)
-        self.model = MosaicNet(input_size=input_size, num_actions=NUM_ACTIONS)
+        # Architektur aus Checkpoint ableiten — Rückwärtskompatibilität
+        hs = ckpt.get("hidden_size", 256)
+        # value_hidden aus gespeicherten Gewichten lesen
+        vh = ckpt["model_state"]["value_head.0.bias"].shape[0]
+        self.model = MosaicNet(input_size=input_size, num_actions=NUM_ACTIONS,
+                               hidden_size=hs, value_hidden=vh)
         self.model.load_state_dict(ckpt["model_state"])
         self.model.to(self.device)
         self.model.eval()
+        print(f"   Architektur: {input_size}→{hs}→{hs}→{hs} | Value Head: {vh}")
 
         # Knoten der zuletzt expandiert wurde — verbindet _expand → _rollout
         self._last_expanded: MCTSNode | None = None

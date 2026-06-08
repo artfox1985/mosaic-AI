@@ -4,7 +4,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from config import NUM_ACTIONS
+from config import NUM_ACTIONS, HIDDEN_SIZE
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "weiß": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
@@ -29,9 +29,11 @@ def state_to_tensor(data):
                 counts[COLOR_MAP[c_str]] += 1
         features.extend([c / 5.0 for c in counts])
         
-        # NEU: Hat die Fabrik einen Bonus-Chip?
+        # Hat die Fabrik einen Bonus-Chip + ist er bereits aufgedeckt?
         has_chip = 1.0 if f.get("bonus_chip") is not None else 0.0
         features.append(has_chip)
+        chip_revealed = 1.0 if f.get("chip_revealed", False) else 0.0
+        features.append(chip_revealed)
         
     # 4. Große Manufaktur
     lf = data.get("large_factory", {})
@@ -78,6 +80,21 @@ def state_to_tensor(data):
                 
             # Straffläche
             features.append(len(p.get("floor", [])) / 7.0)
+
+            # Spielerplättchen (wie viele bereits genutzt: 0/1/2)
+            features.append(p.get("tokens_used", 0) / 2.0)
+
+            # Bonusplättchen diese Runde bereits genommen (0/1/2)
+            features.append(p.get("chips_taken", 0) / 2.0)
+
+            # Bonus-Chips: welche Farben sind verfügbar (5-dim Count-Vektor)
+            chip_color_counts = [0.0] * 5
+            for chip in p.get("bonus_chips", []):
+                for c_name in chip.get("colors", []):
+                    c_id = COLOR_MAP.get(c_name, -1)
+                    if 0 <= c_id < 5:
+                        chip_color_counts[c_id] += 1.0
+            features.extend([c / 4.0 for c in chip_color_counts])  # max 2 chips × 2 farben = 4
             
         # 6. Kuppelzustand (pro Spieler: 9 Slots × 9 Features = 81 Features × 2 = 162)
         COLOR_ID_MAP = {"blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5}
@@ -197,61 +214,94 @@ def action_to_id(action: dict) -> int:
 # --- 2. DATENSATZ & NETZWERK ---
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data"):
-        self.states, self.policies, self.values, self.masks = [], [], [], []
-        files = glob.glob(os.path.join(data_dir, "*.pkl"))
-        print(f"Lade Daten aus {len(files)} Dateien...")
-        
-        for f in files:
-            with open(f, "rb") as file:
-                game_data = pickle.load(file)
-                for step in game_data:
-                    self.states.append(state_to_tensor(step["state"]))
-                    self.values.append(torch.tensor([step["value"]], dtype=torch.float32))
-                    
-                    t_policy = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
-                    for p in step["policy"]:
-                        a_id = action_to_id(p["action"])
-                        t_policy[a_id] += p["prob"]
-                        
-                    # Sicherheit: Array auf exakt 1.0 (100%) normalisieren
-                    if t_policy.sum() > 0:
-                        t_policy /= t_policy.sum()
-                    self.policies.append(t_policy)
-                    
-                    # Action Mask — 1.0 für legale Aktionen, 0.0 für illegale
-                    mask = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
-                    moves = step.get("valid_actions") or step["state"].get("valid_moves", [])
-                    for move in moves:
-                        mask[action_to_id(move)] = 1.0
-                    self.masks.append(mask)
-                    
+        from config import INPUT_SIZE
+        import hashlib, time
+
+        # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
+        files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+        cache_key = hashlib.md5(
+            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)).encode()
+        ).hexdigest()[:12]
+        cache_path = os.path.join(data_dir, f".cache_{cache_key}.pt")
+
+        if os.path.exists(cache_path):
+            print(f"📦 Lade Cache ({len(files)} Dateien)...")
+            t0 = time.time()
+            bundle = torch.load(cache_path, weights_only=False)
+            self.states   = bundle["states"]
+            self.policies = bundle["policies"]
+            self.values   = bundle["values"]
+            self.masks    = bundle["masks"]
+            print(f"Datensatz geladen: {len(self.states)} Züge. "
+                  f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
+        else:
+            print(f"Lade Daten aus {len(files)} Dateien...")
+            t0 = time.time()
+            states, policies, values, masks = [], [], [], []
+
+            for f in files:
+                with open(f, "rb") as file:
+                    game_data = pickle.load(file)
+                    for step in game_data:
+                        states.append(state_to_tensor(step["state"]))
+                        values.append(torch.tensor([step["value"]], dtype=torch.float32))
+
+                        t_policy = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
+                        for p in step["policy"]:
+                            a_id = action_to_id(p["action"])
+                            t_policy[a_id] += p["prob"]
+                        if t_policy.sum() > 0:
+                            t_policy /= t_policy.sum()
+                        policies.append(t_policy)
+
+                        mask = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
+                        moves = step.get("valid_actions") or step["state"].get("valid_moves", [])
+                        for move in moves:
+                            mask[action_to_id(move)] = 1.0
+                        masks.append(mask)
+
+            self.states   = states
+            self.policies = policies
+            self.values   = values
+            self.masks    = masks
+
+            print(f"Datensatz geladen: {len(self.states)} Züge. "
+                  f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
+            print(f"💾 Speichere Cache...")
+            torch.save({
+                "states":   self.states,
+                "policies": self.policies,
+                "values":   self.values,
+                "masks":    self.masks,
+            }, cache_path)
+            print(f"✅ Cache gespeichert: {cache_path}")
+
         self.input_size = len(self.states[0]) if self.states else 100
-        print(f"Datensatz geladen: {len(self.states)} Züge. (Features pro Zug: {self.input_size})")
 
     def __len__(self): return len(self.states)
     def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx]
 
 
 class MosaicNet(nn.Module):
-    def __init__(self, input_size, num_actions=NUM_ACTIONS):
+    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE, value_hidden=128):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
-            nn.Linear(input_size, 256),
-            nn.BatchNorm1d(256), # Verhindert, dass das Netz bei extremen Werten kollabiert
+            nn.Linear(input_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.BatchNorm1d(256),
+            nn.Linear(hidden_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
-            nn.Linear(256, 256),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU()
         )
         self.policy_head = nn.Sequential(
-            nn.Linear(256, num_actions)
+            nn.Linear(hidden_size, num_actions)
         )
         self.value_head = nn.Sequential(
-            nn.Linear(256, 64),
+            nn.Linear(hidden_size, value_hidden),
             nn.ReLU(),
-            nn.Linear(64, 1),
+            nn.Linear(value_hidden, 1),
             nn.Tanh()
         )
 

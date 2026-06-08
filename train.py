@@ -13,7 +13,7 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None):
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
@@ -27,7 +27,10 @@ def train(version_name, load_version=None, input_epoch=None):
     print(f"\n🚀 Starte PyTorch Training auf: {device.type.upper()}")
     
     # 3. Modell Setup
-    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS)
+    from config import HIDDEN_SIZE as DEFAULT_HIDDEN
+    hs = hidden_size if hidden_size is not None else DEFAULT_HIDDEN
+    print(f"🧠 Netz-Architektur: {dataset.input_size}→{hs}→{hs}→{hs}")
+    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
     
     # Warm Start?
     if load_version:
@@ -137,6 +140,7 @@ def train(version_name, load_version=None, input_epoch=None):
         "num_games":     len(dataset),  # Züge
         "input_size":    dataset.input_size,
         "num_actions":   NUM_ACTIONS,
+        "hidden_size":   hs,
         "batch_size":    BATCH_SIZE,
         "lr":            LEARNING_RATE,
         "value_weight":  VALUE_WEIGHT,
@@ -153,7 +157,8 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, required=True, help="Name der neuen Version, z.B. v2")
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
-    
+    parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
+
     args = parser.parse_args()
-    
-    train(version_name=args.name, load_version=args.load, input_epoch=args.epochs)
+
+    train(version_name=args.name, load_version=args.load, input_epoch=args.epochs, hidden_size=args.hidden)

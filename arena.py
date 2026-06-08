@@ -65,7 +65,7 @@ def run_arena(agents_dict, games_per_matchup=10):
                 if hasattr(agent, 'set_env'):
                     agent.set_env(env)
                     
-            print(f"  Spiel {i+1}/{games_per_matchup}: {p0:15s} vs {p1:15s}...", end="", flush=True)
+            print(f"  #{i+1}/{games_per_matchup}: ", end="", flush=True)
             t0 = time.time()
             
             result = run_episode_mcts(
@@ -139,11 +139,17 @@ if __name__ == "__main__":
     agent_random = RandomAgent()
     agent_greedy = GreedyAgent()
     agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=5)
-    #agent_alphazero = AlphaZeroAgent(
-    #    model_version="v1",
-    #    input_size=INPUT_SIZE, 
-    #    simulations=40
-    #    )
+    agent_alphazero1 = AlphaZeroAgent(
+        model_version="v1",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
+        
+    agent_alphazero2 = AlphaZeroAgent(
+        model_version="v2_512",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -153,10 +159,10 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "MCTS_Heuristik": (agent_mcts_heuristic, 1000),
-        "MCTS_Heuristik 2": (agent_mcts_heuristic, 1000)
+        "AlphaZero_V2": (agent_alphazero2, 1000),
+        "AlphaZero_V1": (agent_alphazero1, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=1)
+    run_arena(competitors, games_per_matchup=40)
