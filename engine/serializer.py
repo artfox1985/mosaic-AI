@@ -235,7 +235,63 @@ def serialize_state(state: "GameState") -> dict:
         "log":            state.log[-30:],
         "valid_moves":    _serialize_valid_moves(state),
         "valid_tiling_rows": _serialize_valid_tiling_rows(state),
+        "chippable_tiling_rows": _serialize_chippable_tiling_rows(state),
     }
+
+
+def _serialize_chippable_tiling_rows(state: "GameState") -> list[dict]:
+    """
+    Reihen die mit Bonuschips vollgemacht werden können UND danach
+    einen validen Kuppelslot haben. Nur die erste solche Reihe pro Spieler
+    (von oben nach unten — Reihenfolge muss eingehalten werden).
+    """
+    if state.phase != "tiling":
+        return []
+    try:
+        from engine.game import generate_tiling_actions
+        from engine.round_end import can_complete_row_with_chips
+        result = []
+        for pi, player in enumerate(state.players):
+            if not player.bonus_chips:
+                continue
+            # Finde platzierbare Reihen (für Reihenfolge-Prüfung)
+            actions = generate_tiling_actions(state, pi)
+            placeable_rows = set(a.pattern_row for a in actions)
+            # Prüfe jede nicht-volle Reihe von oben nach unten
+            for ri, row in enumerate(player.pattern_lines):
+                if row.is_complete or not row.tiles:
+                    continue
+                # Früherer platzierbarer Reihe noch offen?
+                earlier_open = any(
+                    ri2 < ri and player.pattern_lines[ri2].is_complete and ri2 in placeable_rows
+                    for ri2 in range(ri)
+                )
+                if earlier_open:
+                    break  # Reihenfolge erzwingen — keine weiteren Chips möglich
+                # Kann mit Chips vollgemacht werden?
+                if not can_complete_row_with_chips(player, ri):
+                    continue
+                # Wäre nach Vollmachen platzierbar?
+                color = row.color
+                dome_row = ri // 2
+                space_row = ri % 2
+                valid_si = [space_row * 2, space_row * 2 + 1]
+                grid = player.dome_grid
+                has_slot = any(
+                    slot is not None and
+                    any(
+                        not slot.spaces[si].is_filled and
+                        not slot.spaces[si].is_locked and
+                        slot.spaces[si].accepts(color)
+                        for si in valid_si
+                    )
+                    for slot in [grid.dome_slots[dome_row][sc] for sc in range(3)]
+                )
+                if has_slot:
+                    result.append({"pi": pi, "ri": ri})
+        return result
+    except Exception:
+        return []
 
 
 def _serialize_valid_tiling_rows(state: "GameState") -> list[dict]:

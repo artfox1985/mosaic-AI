@@ -299,11 +299,15 @@ function renderBoard(pi) {
     const isPlaceable = validRows.some(vr => vr.pi===pi && vr.ri===ri && vr.placeable === true);
     const earlierPlaceable = validRows.filter(vr => vr.pi===pi && vr.ri<ri && vr.placeable === true);
     const allEarlierDone = earlierPlaceable.length === 0;
-    if(isTiling && tilingRow===null && row.tiles.length===row.capacity)
-      console.log(`P${pi} R${ri+1}: isPlaceable=${isPlaceable}, allEarlierDone=${allEarlierDone}, earlier=`, JSON.stringify(earlierPlaceable), 'validRows=', JSON.stringify(validRows));
     if(isTiling && tilingRow===null && row.tiles.length===row.capacity && isPlaceable && allEarlierDone) cls='drop';
     else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
-    const hasChips = isTiling && p.bonus_chips.some(c=>c) && row.tiles.length>0 && row.tiles.length<row.capacity;
+    // 🎫 Chip-Button: nur wenn Server bestätigt dass Chips hier sinnvoll sind
+    // (Reihenfolge OK + nach Vollmachen platzierbar)
+    const chippableRows = S.chippable_tiling_rows || [];
+    const hasChips = isTiling
+      && row.tiles.length > 0
+      && row.tiles.length < row.capacity
+      && chippableRows.some(cr => cr.pi===pi && cr.ri===ri);
     const onclick = cls==='drop'
       ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
       : '';
@@ -316,9 +320,16 @@ function renderBoard(pi) {
         ? `<div class="tile sm ${normColor(row.color)}"></div>`
         : `<div class="tile sm empty"></div>`;
     }).join('');
+    // Visueller Indikator: nächste fällige Tiling-Reihe
+    const isNextTiling = isTiling && isPlaceable && allEarlierDone && row.tiles.length===row.capacity;
+    const nextDot = isNextTiling
+      ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;
+           background:var(--blau,#3b82f6);margin-left:3px;vertical-align:middle;
+           box-shadow:0 0 4px var(--blau,#3b82f6)" title="Diese Reihe ist als nächstes dran"></span>`
+      : '';
     return `<div class="prow ${cls}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
-      <span class="rowlabel" style="color:var(--text3)">→${domeRow}</span>${chipBtn}
+      <span class="rowlabel" style="color:var(--text3)">→${domeRow}</span>${chipBtn}${nextDot}
     </div>`;
   }).join('');
 
@@ -452,19 +463,16 @@ function renderCenter() {
         return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
       });
 
-    console.log('placeableRows:', JSON.stringify(placeableRows));
-    console.log('placeableOnly:', JSON.stringify(placeableOnly));
-    console.log('pending:', JSON.stringify(pending));
-    console.log('pending:', JSON.stringify(pending));
-    console.log('unplaceable:', JSON.stringify(unplaceable));
-    console.log('placeableOnly:', JSON.stringify(placeableOnly));
     const hasPending = pending.length > 0;
 
-    const chippable = S.players.flatMap((p,pi)=>
-      p.pattern_lines
-        .filter(r=>r.tiles.length>0 && r.tiles.length<r.capacity && p.bonus_chips.some(c=>c))
-        .map(r=>({pi, ri:r.index, color:r.color, need:r.capacity-r.tiles.length, pname:p.name}))
-    );
+    // Nur Reihen die der Server als chippable markiert hat
+    const chippableRows2 = S.chippable_tiling_rows || [];
+    const chippable = chippableRows2.map(cr => {
+      const p = S.players[cr.pi];
+      const row = p.pattern_lines[cr.ri];
+      return {pi: cr.pi, ri: cr.ri, color: row.color,
+              need: row.capacity - row.tiles.length, pname: p.name};
+    });
 
     let infoHTML = '';
     if(tilingRow!==null) {
@@ -1059,6 +1067,10 @@ async function doStackDraw() {
   const stackSec = document.getElementById('dome-stack-section');
   if(stackSec) stackSec.style.display = 'none';
 
+  // Abbrechen nicht mehr möglich — Spieler muss sich entscheiden
+  const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
+  if(cancelBtn) cancelBtn.style.display = 'none';
+
   const notice = document.getElementById('dome-notice');
   notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, der Rest kommt unter den Stapel. (Kosten: −${n} Pkt)<br>
                       <span style="font-size:10px; font-weight:normal;">Wähle danach unten deine Rotation und bestätige.</span>`;
@@ -1092,6 +1104,9 @@ async function doStackDraw() {
 }
 
 function closeDomeModal() {
+  // Abbrechen-Button wieder anzeigen für nächstes Mal
+  const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
+  if(cancelBtn) cancelBtn.style.display = '';
   document.getElementById('dome-overlay').style.display='none';
   domeModal=null;
 }
@@ -1463,4 +1478,13 @@ makeDraggable('dome-overlay');
 makeDraggable('moon-overlay');
 makeDraggable('chip-overlay');      // <-- Jetzt alle verschiebbar
 makeDraggable('scoring-overlay');   // <-- Jetzt alle verschiebbar
-openNewGameModal();
+// Beim Laden: nur Modal öffnen wenn kein aktives Spiel vorhanden
+(async () => {
+  const d = await api('/state');
+  if (d.ok && d.state && d.state.phase && d.state.phase !== 'final') {
+    S = d.state;
+    render();  // bestehendes Spiel wiederherstellen
+  } else {
+    openNewGameModal();
+  }
+})();

@@ -185,8 +185,33 @@ class MosaicEnv:
     def clone(self) -> "MosaicEnv":
         import pickle
         new_env = MosaicEnv(self.random_scoring_tiles)
-        new_env.state = pickle.loads(pickle.dumps(self.state, -1))
-        new_env._game.state = new_env.state
+
+        # Temporär teure/unnötige Felder auslagern:
+        # - log: wird in Simulationen nicht gebraucht
+        # - dome_tile_pool: großes Objekt, wird beim Clone geteilt (read-mostly)
+        #   und bei Bedarf neu gesetzt
+        state = self.state
+        saved_log   = state.log
+        saved_pool  = state.dome_tile_pool
+        saved_chips = state.bonus_chip_pool
+
+        state.log            = []
+        state.dome_tile_pool  = []
+        state.bonus_chip_pool = []
+
+        new_env.state = pickle.loads(pickle.dumps(state, -1))
+
+        # Originale wiederherstellen
+        state.log            = saved_log
+        state.dome_tile_pool  = saved_pool
+        state.bonus_chip_pool = saved_chips
+
+        # Shared references für read-mostly Objekte (Copy-on-Write)
+        new_env.state.dome_tile_pool  = saved_pool
+        new_env.state.bonus_chip_pool = saved_chips
+        new_env.state._pool_shared    = True
+
+        new_env._game.state  = new_env.state
         new_env._prev_scores = list(self._prev_scores)
         return new_env
 
@@ -242,7 +267,6 @@ class MosaicEnv:
                             for rot in [0, 90, 180, 270]:
                                 actions.append({
                                     "type":      "dome_stack",
-                                    "num_drawn": 1,
                                     "slot_row":  slot_row,
                                     "slot_col":  slot_col,
                                     "rotation":  rot,
@@ -299,8 +323,38 @@ class MosaicEnv:
 
         for pi in range(2):
             player = self.state.players[pi]
+            tiling_actions = generate_tiling_actions(self.state, pi)
+            placeable_rows = {a.pattern_row for a in tiling_actions}
             for ri, row in enumerate(player.pattern_lines):
-                if not row.is_complete and can_complete_row_with_chips(player, ri, self.state):
+                if row.is_complete:
+                    continue
+                # Reihenfolge: keine frühere platzierbare Reihe noch offen
+                earlier_open = any(
+                    player.pattern_lines[r].is_complete and r in placeable_rows
+                    for r in range(ri)
+                )
+                if earlier_open:
+                    break
+                # Chips verfügbar und Reihe vollmachbar?
+                if not can_complete_row_with_chips(player, ri, self.state):
+                    continue
+                # Nach Vollmachen platzierbar? Prüfe Kuppelslot
+                color    = row.color
+                dome_row = ri // 2
+                space_row = ri % 2
+                valid_si = [space_row * 2, space_row * 2 + 1]
+                grid = player.dome_grid
+                has_slot = any(
+                    slot is not None and
+                    any(
+                        not slot.spaces[si].is_filled and
+                        not slot.spaces[si].is_locked and
+                        slot.spaces[si].accepts(color)
+                        for si in valid_si
+                    )
+                    for slot in [grid.dome_slots[dome_row][sc] for sc in range(3)]
+                )
+                if has_slot:
                     actions.append({
                         "type":        "use_chips",
                         "player":      pi,
@@ -328,6 +382,16 @@ class MosaicEnv:
 
         t = action["type"]
         state = self.state
+
+        # Copy-on-Write: geteilte Objekte kopieren wenn sie modifiziert werden
+        if getattr(self.state, '_pool_shared', False):
+            if t in ("dome", "dome_stack"):
+                import pickle as _pk
+                self.state.dome_tile_pool = _pk.loads(_pk.dumps(self.state.dome_tile_pool, -1))
+            if t == "bonus_chip":
+                import pickle as _pk
+                self.state.bonus_chip_pool = _pk.loads(_pk.dumps(self.state.bonus_chip_pool, -1))
+            self.state._pool_shared = False
 
         if t == "stone":
             color    = _color(action["color"])
@@ -382,17 +446,59 @@ class MosaicEnv:
             self._game.apply(move)
 
         elif t == "dome_stack":
-            # Ersten verfügbaren Stapel nehmen
             if not state.dome_tile_pool:
                 return
-            num_drawn = action.get("num_drawn", 1)
-            chosen_id = state.dome_tile_pool[0].tile_id
+            import copy
+            from agents.mcts import evaluate_state
+
+            slot_row = action["slot_row"]
+            slot_col = action["slot_col"]
+            rotation = action.get("rotation", 0)
+            pi       = state.current_player
+
+            # Implizite Strategie: ziehe Platten bis keine bessere mehr kommt.
+            # Kosten: -1 Pkt je gezogener Platte (ab der 2. Platte).
+            # Stoppe wenn Kosten > erwarteter Gewinn durch bessere Platte.
+            best_score    = -float('inf')
+            best_tile_id  = state.dome_tile_pool[0].tile_id
+            best_num      = 1
+            prev_score    = -float('inf')
+
+            for num_drawn in range(1, len(state.dome_tile_pool) + 1):
+                tile = state.dome_tile_pool[num_drawn - 1]
+                try:
+                    test_game = copy.deepcopy(self._game)
+                    test_move = DrawFromStackMove(
+                        num_drawn=num_drawn,
+                        chosen_id=tile.tile_id,
+                        slot_row=slot_row,
+                        slot_col=slot_col,
+                        rotation=rotation,
+                    )
+                    test_game.apply(test_move)
+                    score = evaluate_state(test_game.state).get(pi, 0.0)
+
+                    # Kosten der zusätzlichen Platten einrechnen (-1 Pkt ab Platte 2)
+                    cost = (num_drawn - 1) * 0.01  # normalisiert (~1 Pkt)
+                    net_score = score - cost
+
+                    if net_score > best_score:
+                        best_score   = net_score
+                        best_tile_id = tile.tile_id
+                        best_num     = num_drawn
+                        prev_score   = score
+                    elif score < prev_score - 0.05:
+                        # Stapel wird schlechter → aufhören
+                        break
+                except Exception:
+                    break
+
             move = DrawFromStackMove(
-                num_drawn=num_drawn,
-                chosen_id=chosen_id,
-                slot_row=action["slot_row"],
-                slot_col=action["slot_col"],
-                rotation=action.get("rotation", 0),
+                num_drawn=best_num,
+                chosen_id=best_tile_id,
+                slot_row=slot_row,
+                slot_col=slot_col,
+                rotation=rotation,
             )
             self._game.apply(move)
 

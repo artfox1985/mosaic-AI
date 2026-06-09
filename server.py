@@ -314,6 +314,18 @@ def tiling_bonus_chips():
         if not row.tiles: return jsonify(err("Musterreihe hat keine echten Fliesen"))
         if row.is_complete: return jsonify(err("Reihe ist bereits voll"))
 
+        # Reihenfolge prüfen: keine frühere platzierbare Reihe noch offen
+        from engine.game import generate_tiling_actions
+        existing_actions = generate_tiling_actions(_game.state, pi)
+        placeable_rows = {a.pattern_row for a in existing_actions}
+        for earlier_ri in range(row_idx):
+            earlier_row = player.pattern_lines[earlier_ri]
+            if earlier_row.is_complete and earlier_ri in placeable_rows:
+                return jsonify(err(
+                    f"Reihe {earlier_ri+1} muss zuerst gelegt werden "
+                    f"(von oben nach unten)."
+                ))
+
         # Chip-IDs validieren
         used_chip_ids = set()
         for use in chip_uses:

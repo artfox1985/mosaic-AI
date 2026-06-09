@@ -208,13 +208,13 @@ def action_to_id(action: dict) -> int:
         sr      = action.get("slot_row", 0)
         sc      = action.get("slot_col", 0)
         rot_idx = action.get("rotation", 0) // 90
-        return 436 + (sr * 12) + (sc * 4) + rot_idx  # 436–471 (36 IDs)
+        return 436 + (sr * 12) + (sc * 4) + rot_idx  # 436-471
 
     if t == "use_chips":
-        return 472 + action.get("pattern_row", 0)  # 472–477
+        return 472 + action.get("pattern_row", 0)  # 472-477
 
     if t == "bonus_chip":
-        return 478 + action.get("factory_index", 0) # 478–481
+        return 478 + action.get("factory_index", 0)  # 478-481
 
     return 481  # Fallback
 
