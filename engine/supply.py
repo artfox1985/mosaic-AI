@@ -158,5 +158,5 @@ class SpecialSupply:
 
     def clone(self) -> "SpecialSupply":
         new_supply = SpecialSupply()
-        new_supply._count = self._remaining
+        new_supply._remaining = self._remaining
         return new_supply

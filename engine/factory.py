@@ -221,6 +221,7 @@ class LargeFactory:
     # Ähnlich für LargeFactory:
     def clone(self) -> "LargeFactory":
         new_lf = LargeFactory()
-        new_lf.sun_tiles = list(self.sun_tiles)
-        new_lf.moon_pool = list(self.moon_pool)
-        return new_lf    
+        new_lf.sun_tiles               = list(self.sun_tiles)
+        new_lf.moon_pool               = list(self.moon_pool)
+        new_lf.has_first_player_marker = self.has_first_player_marker
+        return new_lf

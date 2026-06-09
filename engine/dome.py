@@ -84,10 +84,13 @@ class DomeSpace:
         return f"Special({state})"
         
     def clone(self) -> "DomeSpace":
-        new_space = self.__class__(self.space_type) # Nimmt den Typ (WILD, NORMAL, SPECIAL)
-        new_space.placed_color = self.placed_color
-        new_space.is_locked = self.is_locked
-        new_space.placed_special = getattr(self, 'placed_special', False)
+        new_space = DomeSpace(
+            space_type=self.space_type,
+            required_color=self.required_color,  # ← war vorher vergessen!
+        )
+        new_space.placed_color   = self.placed_color
+        new_space.is_locked      = self.is_locked
+        new_space.placed_special = self.placed_special
         return new_space    
 
 

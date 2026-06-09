@@ -453,21 +453,26 @@ class PlayerBoard:
 
     def clone(self) -> "PlayerBoard":
         new_p = PlayerBoard(self.player_id, self.name)
-        new_p.score = self.score
-        new_p.holds_first_player_marker = self.holds_first_player_marker
-        new_p.player_tokens_used = self.player_tokens_used
+        new_p.score                       = self.score
+        new_p.holds_first_player_marker   = self.holds_first_player_marker
+        new_p.player_tokens_used          = self.player_tokens_used
         new_p.dome_tiles_placed_this_round = self.dome_tiles_placed_this_round
-        
+        new_p.bonus_chips_used_this_round  = self.bonus_chips_used_this_round
+
         # Flache Listenkopien
         new_p.broken_tiles = list(self.broken_tiles)
-        new_p.bonus_chips = list(self.bonus_chips)
-        
+        new_p.bonus_chips  = list(self.bonus_chips)
+
         # Komplexe Objekte kaskadierend klonen
         new_p.pattern_lines = [line.clone() for line in self.pattern_lines]
-        new_p.dome_grid = self.dome_grid.clone()
-        
-        # Startkuppel kann ein String ("Muss_noch_gezogen...") oder ein DomeTile sein
+        new_p.dome_grid     = self.dome_grid.clone()
+
+        # Startkuppel kann ein String oder ein DomeTile sein
         if self.start_dome_tile is not None:
-            new_p.start_dome_tile = self.start_dome_tile if isinstance(self.start_dome_tile, str) else self.start_dome_tile.clone()
-            
+            new_p.start_dome_tile = (
+                self.start_dome_tile
+                if isinstance(self.start_dome_tile, str)
+                else self.start_dome_tile.clone()
+            )
+
         return new_p
