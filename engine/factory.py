@@ -118,6 +118,17 @@ class Factory:
             f"bonus={chip})"
         )
 
+    def clone(self) -> "Factory":
+        new_f = Factory(self.factory_id)
+        # list() kopiert die Steine in eine neue Liste
+        new_f.sun_tiles = list(self.sun_tiles) 
+        # Listen von Listen müssen per List-Comprehension kopiert werden
+        new_f.moon_stacks = [list(stack) for stack in self.moon_stacks]
+        
+        # Referenz auf den Chip reicht, da der Chip selbst nicht verändert wird
+        new_f.bonus_chip = self.bonus_chip 
+        new_f.bonus_chip_revealed = self.bonus_chip_revealed
+        return new_f
 
 @dataclass
 class LargeFactory:
@@ -206,3 +217,10 @@ class LargeFactory:
         moon = [c.value for c in self.moon_pool]
         marker = " ★" if self.has_first_player_marker else ""
         return f"LargeFactory(sun={sun}, moon={moon}{marker})"
+        
+    # Ähnlich für LargeFactory:
+    def clone(self) -> "LargeFactory":
+        new_lf = LargeFactory()
+        new_lf.sun_tiles = list(self.sun_tiles)
+        new_lf.moon_pool = list(self.moon_pool)
+        return new_lf    

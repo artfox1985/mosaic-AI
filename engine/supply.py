@@ -78,6 +78,11 @@ class Bag:
     def __repr__(self) -> str:
         return f"Bag({self.count} Steine: {self.color_counts()})"
 
+    def clone(self) -> "Bag":
+        new_bag = Bag()
+        # Flache Kopie der internen Liste reicht völlig aus
+        new_bag._tiles = list(self._tiles) 
+        return new_bag
 
 @dataclass
 class Tower:
@@ -113,6 +118,10 @@ class Tower:
     def __repr__(self) -> str:
         return f"Tower({self.count} Steine: {self.color_counts()})"
 
+    def clone(self) -> "Tower":
+        new_tower = Tower()
+        new_tower._tiles = list(self._tiles)
+        return new_tower
 
 @dataclass
 class SpecialSupply:
@@ -146,3 +155,8 @@ class SpecialSupply:
 
     def __repr__(self) -> str:
         return f"SpecialSupply({self._remaining} weiße Steine)"
+
+    def clone(self) -> "SpecialSupply":
+        new_supply = SpecialSupply()
+        new_supply._count = self._remaining
+        return new_supply

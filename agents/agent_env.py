@@ -183,36 +183,15 @@ class MosaicEnv:
         return [p.score for p in self.state.players] if self.state else [0, 0]
 
     def clone(self) -> "MosaicEnv":
-        import pickle
         new_env = MosaicEnv(self.random_scoring_tiles)
-
-        # Temporär teure/unnötige Felder auslagern:
-        # - log: wird in Simulationen nicht gebraucht
-        # - dome_tile_pool: großes Objekt, wird beim Clone geteilt (read-mostly)
-        #   und bei Bedarf neu gesetzt
-        state = self.state
-        saved_log   = state.log
-        saved_pool  = state.dome_tile_pool
-        saved_chips = state.bonus_chip_pool
-
-        state.log            = []
-        state.dome_tile_pool  = []
-        state.bonus_chip_pool = []
-
-        new_env.state = pickle.loads(pickle.dumps(state, -1))
-
-        # Originale wiederherstellen
-        state.log            = saved_log
-        state.dome_tile_pool  = saved_pool
-        state.bonus_chip_pool = saved_chips
-
-        # Shared references für read-mostly Objekte (Copy-on-Write)
-        new_env.state.dome_tile_pool  = saved_pool
-        new_env.state.bonus_chip_pool = saved_chips
-        new_env.state._pool_shared    = True
-
-        new_env._game.state  = new_env.state
+        
+        # Nutze unsere neue, blitzschnelle Custom-Clone Methode
+        new_env.state = self.state.clone()
+        new_env._game.state = new_env.state
+        
+        # Primitives & flache Listen
         new_env._prev_scores = list(self._prev_scores)
+        
         return new_env
 
     # ── Aktions-Generatoren ───────────────────────────────────────────────────

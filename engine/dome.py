@@ -82,6 +82,13 @@ class DomeSpace:
             return f"Wild({filled})"
         state = "gefüllt" if self.placed_special else ("offen" if not self.is_locked else "gesperrt")
         return f"Special({state})"
+        
+    def clone(self) -> "DomeSpace":
+        new_space = self.__class__(self.space_type) # Nimmt den Typ (WILD, NORMAL, SPECIAL)
+        new_space.placed_color = self.placed_color
+        new_space.is_locked = self.is_locked
+        new_space.placed_special = getattr(self, 'placed_special', False)
+        return new_space    
 
 
 # Rotations-Mapping: Rotation → neue Reihenfolge der Space-Indizes
@@ -180,6 +187,17 @@ class DomeTile:
             f"spaces={self.spaces}, bonus={self.bonus_points})"
         )
 
+    def clone(self) -> "DomeTile":
+        # 1. Zuerst die 4 Spaces einzeln klonen
+        cloned_spaces = [space.clone() for space in self.spaces]
+
+        # 2. Das neue Tile direkt mit den geklonten Spaces initialisieren
+        # (Das verhindert, dass __post_init__ sich über fehlende Spaces beschwert)
+        new_tile = DomeTile(
+            tile_id=self.tile_id,
+            spaces=cloned_spaces
+        )
+        return new_tile
 
 # ---------------------------------------------------------------------------
 # Hilfsfunktionen

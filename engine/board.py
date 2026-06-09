@@ -106,6 +106,13 @@ class PatternLine:
             f"PatternLine(row={self.row_index}, "
             f"cap={self.capacity}, tiles={filled}, color={self.color})"
         )
+        
+    def clone(self) -> "PatternLine":
+        # Annahme: Deine PatternLine wird mit der Kapazität initialisiert
+        new_line = PatternLine(row_index=self.row_index)
+        new_line.color = self.color
+        new_line.tiles = list(self.tiles) # Flache Kopie der Steine
+        return new_line    
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +285,15 @@ class DomeGrid:
             rows.append(" ".join(row))
         return "\n".join(rows)
 
-
+    def clone(self) -> "DomeGrid":
+        new_grid = DomeGrid()
+        # Kopiert das 3x3 Raster. Wenn ein Slot None ist, bleibt er None.
+        # Wenn eine Kachel (DomeTile) drin liegt, wird sie geklont.
+        new_grid.dome_slots = [
+            [slot.clone() if slot is not None else None for slot in row]
+            for row in self.dome_slots
+        ]
+        return new_grid
 # ---------------------------------------------------------------------------
 # Player board
 # ---------------------------------------------------------------------------
@@ -435,3 +450,24 @@ class PlayerBoard:
         lines.append(f"Bonus chips: {[t.value for t in self.bonus_chips]}")
         lines.append(f"Tokens left: {self.tokens_left}")
         return "\n".join(lines)
+
+    def clone(self) -> "PlayerBoard":
+        new_p = PlayerBoard(self.player_id, self.name)
+        new_p.score = self.score
+        new_p.holds_first_player_marker = self.holds_first_player_marker
+        new_p.player_tokens_used = self.player_tokens_used
+        new_p.dome_tiles_placed_this_round = self.dome_tiles_placed_this_round
+        
+        # Flache Listenkopien
+        new_p.broken_tiles = list(self.broken_tiles)
+        new_p.bonus_chips = list(self.bonus_chips)
+        
+        # Komplexe Objekte kaskadierend klonen
+        new_p.pattern_lines = [line.clone() for line in self.pattern_lines]
+        new_p.dome_grid = self.dome_grid.clone()
+        
+        # Startkuppel kann ein String ("Muss_noch_gezogen...") oder ein DomeTile sein
+        if self.start_dome_tile is not None:
+            new_p.start_dome_tile = self.start_dome_tile if isinstance(self.start_dome_tile, str) else self.start_dome_tile.clone()
+            
+        return new_p

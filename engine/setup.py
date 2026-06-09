@@ -108,6 +108,30 @@ class GameState:
             lines.append(repr(p))
         return "\n".join(lines)
 
+    def clone(self) -> "GameState":
+        # 1. Den State wie gewohnt erstellen
+        new_state = GameState(
+            bag=self.bag.clone(),
+            tower=self.tower.clone(),
+            special_supply=self.special_supply.clone(),
+            factories=[f.clone() for f in self.factories],
+            large_factory=self.large_factory.clone(),
+            players=[p.clone() for p in self.players],
+            dome_tile_pool=[t.clone() for t in self.dome_tile_pool],
+            dome_display=[t.clone() for t in self.dome_display],
+            bonus_chip_pool=list(self.bonus_chip_pool),
+            round_number=self.round_number,
+            current_player=self.current_player,
+            first_player_next_round=self.first_player_next_round,
+            phase=self.phase,
+            log=[]  # Log für Performance leeren
+        )
+
+        # 2. Dynamisch hinzugefügte Attribute (wie die Wertungsplatten) manuell kopieren!
+        if hasattr(self, 'scoring_tile_ids'):
+            new_state.scoring_tile_ids = list(self.scoring_tile_ids)
+
+        return new_state
 
 # ---------------------------------------------------------------------------
 # Setup-Funktionen
