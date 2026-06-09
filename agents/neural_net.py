@@ -98,6 +98,7 @@ def state_to_tensor(data):
             
         # 6. Kuppelzustand (pro Spieler: 9 Slots × 9 Features = 81 Features × 2 = 162)
         COLOR_ID_MAP = {"blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5}
+        TYPE_MAP     = {"NORMAL": 0.0, "WILD": 0.5, "SPECIAL": 1.0}
 
         for p in [me, enemy]:
             dome = p.get("dome_grid", [])
@@ -107,8 +108,8 @@ def state_to_tensor(data):
                     slot = row[sc] if sc < len(row) else None
 
                     if slot is None:
-                        # Slot leer — 9 Nullen
-                        features.extend([0.0] * 9)
+                        # Slot leer — 17 Nullen
+                        features.extend([0.0] * 17)
                     else:
                         features.append(1.0)  # slot existiert
                         for space in slot.get("spaces", [{}, {}, {}, {}]):
@@ -118,6 +119,12 @@ def state_to_tensor(data):
                             # required_color normalisiert (0=kein, 1-5=farbe)
                             req = space.get("color")
                             features.append(COLOR_ID_MAP.get(req, 0) / 5.0)
+                            # space type: NORMAL=0.0, WILD=0.5, SPECIAL=1.0
+                            sp_type = space.get("type", "NORMAL")
+                            features.append(TYPE_MAP.get(sp_type, 0.0))
+                            # locked: nur relevant für SPECIAL (0=offen, 1=gesperrt)
+                            locked = space.get("locked", False)
+                            features.append(1.0 if locked else 0.0)
             
     # 7. Mondseite kleine Fabriken (pro Fabrik: 3 Positionen × 5 Farben = 15 Features)
     # Position 0 = oben (abholbar), Position 1 = darunter, Position 2 = ganz unten
@@ -228,20 +235,17 @@ class MosaicDataset(Dataset):
             print(f"📦 Lade Cache ({len(files)} Dateien)...")
             t0 = time.time()
             bundle = torch.load(cache_path, weights_only=False)
-            self.states             = bundle["states"]
-            self.policies           = bundle["policies"]
-            self.values             = bundle["values"]
-            self.masks              = bundle["masks"]
-            self.moon_order_targets = bundle.get("moon_order_targets",
-                [torch.full((5,), -1.0) for _ in bundle["states"]])
+            self.states   = bundle["states"]
+            self.policies = bundle["policies"]
+            self.values   = bundle["values"]
+            self.masks    = bundle["masks"]
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
         else:
             print(f"Lade Daten aus {len(files)} Dateien...")
             t0 = time.time()
-            states, policies, values, masks, moon_order_targets = [], [], [], [], []
+            states, policies, values, masks = [], [], [], []
 
-            COLORS_IDX = {c: i for i, c in enumerate(['blau', 'gelb', 'rot', 'schwarz', 'türkis'])}
             for f in files:
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
@@ -263,40 +267,26 @@ class MosaicDataset(Dataset):
                             mask[action_to_id(move)] = 1.0
                         masks.append(mask)
 
-                        # Moon-Order Target: Ranking der Farben (tief=0 bis oben=4)
-                        # -1 wenn kein Sonnenzug (wird beim Training maskiert)
-                        moon_target = torch.full((5,), -1.0, dtype=torch.float32)
-                        moon_order = step.get("moon_order_target", None)
-                        if moon_order:
-                            # moon_order: Liste von Farben, Index 0 = unten (tief)
-                            for rank, color_name in enumerate(moon_order):
-                                c_idx = COLORS_IDX.get(color_name, -1)
-                                if c_idx >= 0:
-                                    moon_target[c_idx] = float(rank)
-                        moon_order_targets.append(moon_target)
-
-            self.states            = states
-            self.policies          = policies
-            self.values            = values
-            self.masks             = masks
-            self.moon_order_targets = moon_order_targets
+            self.states   = states
+            self.policies = policies
+            self.values   = values
+            self.masks    = masks
 
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
             print(f"💾 Speichere Cache...")
             torch.save({
-                "states":            self.states,
-                "policies":          self.policies,
-                "values":            self.values,
-                "masks":             self.masks,
-                "moon_order_targets": self.moon_order_targets,
+                "states":   self.states,
+                "policies": self.policies,
+                "values":   self.values,
+                "masks":    self.masks,
             }, cache_path)
             print(f"✅ Cache gespeichert: {cache_path}")
 
         self.input_size = len(self.states[0]) if self.states else 100
 
     def __len__(self): return len(self.states)
-    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx]
+    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx]
 
 
 class MosaicNet(nn.Module):

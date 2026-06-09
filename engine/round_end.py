@@ -278,18 +278,24 @@ def execute_special_tiling(
 ) -> int:
     """
     Platziert einen weißen Stein auf einen Special-Space.
-    Gibt die Bonus-Punkte zurück.
+    Bonus = Tiling-Reihe (1-6) in der der Space liegt.
     """
     player = state.players[player_idx]
     grid = player.dome_grid
     slot = grid.dome_slots[action.slot_row][action.slot_col]
     space = slot.spaces[action.space_index]
     space.place_special_tile()
-    bonus = slot.bonus_points
     state.special_supply.take(1)
+
+    # Bonus = Tiling-Reihe (1-basiert) in der der Special-Space liegt
+    # pattern_row: 0-basierte Reihe aus Slot-Position + Space-Index
+    pattern_row = action.slot_row * 2 + (action.space_index // 2)
+    bonus = pattern_row + 1  # Reihe 1-6
+
+    player.apply_score(bonus)
     state.log_event(
-        f"{player.name}: weißer Stein auf Special-Space "
-        f"({action.slot_row},{action.slot_col}) +{bonus} Bonus-Punkte"
+        f"⭐ {player.name}: weißer Stein auf Special-Space "
+        f"({action.slot_row},{action.slot_col}) +{bonus} Pkt (Reihe {bonus})"
     )
     return bonus
 

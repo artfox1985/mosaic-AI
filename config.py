@@ -21,7 +21,7 @@ MCTS_SIMULATIONS_ARENA = 150       # Volle Denkkraft für das Titel-Match
 TEMPERATURE_MOVES = 15             # Nach wie vielen Zügen wird Exploitation forciert?
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 399        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel)
+INPUT_SIZE = 543        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel)
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---
@@ -29,4 +29,3 @@ BATCH_SIZE    = 1024
 HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (256 oder 512)
 LEARNING_RATE = 0.0008
 VALUE_WEIGHT  = 0.15
-MOON_WEIGHT   = 0.10   # Gewichtung des Moon-Order Loss

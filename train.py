@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MOON_WEIGHT
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT
 
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
@@ -70,14 +70,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     for epoch in range(epochs):
         t_loss, t_vloss, t_ploss, t_mloss = 0, 0, 0, 0
         
-        for states, targets_p, targets_v, masks, moon_targets in dataloader:
+        for states, targets_p, targets_v, masks in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             masks     = masks.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v, pred_moon = model(states)
+            pred_p, pred_v, _ = model(states)  # Moon-Head Output beim Training ignoriert
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -88,16 +88,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_loss = mse_loss(pred_v, targets_v)
             p_loss = -torch.sum(targets_p * log_probs) / states.size(0)
 
-            # Moon-Order Loss: nur für Sonnenzüge (moon_target[0] != -1)
-            moon_targets = moon_targets.to(device)
-            sun_mask = (moon_targets[:, 0] >= 0)   # True wenn Sonnenzug
-            if sun_mask.any():
-                # MSE zwischen vorhergesagten Logits und Ranking-Target
-                m_loss = mse_loss(pred_moon[sun_mask], moon_targets[sun_mask])
-            else:
-                m_loss = torch.tensor(0.0, device=device)
-
-            loss = v_loss * VALUE_WEIGHT + p_loss + m_loss * MOON_WEIGHT
+            m_loss = torch.tensor(0.0)
+            loss = v_loss * VALUE_WEIGHT + p_loss
             loss.backward()
             optimizer.step()
             
