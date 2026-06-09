@@ -244,13 +244,17 @@ def _serialize_valid_tiling_rows(state: "GameState") -> list[dict]:
         return []
     try:
         from engine.game import generate_tiling_actions
+        from engine.round_end import find_unplaceable_rows
         result = []
         for pi, player in enumerate(state.players):
             actions = generate_tiling_actions(state, pi)
             placeable_rows = set(a.pattern_row for a in actions)
+            unplaceable_rows = set(find_unplaceable_rows(player))
             for ri, row in enumerate(player.pattern_lines):
                 if row.is_complete and ri in placeable_rows:
-                    result.append({"pi": pi, "ri": ri})
+                    result.append({"pi": pi, "ri": ri, "placeable": True})
+                elif ri in unplaceable_rows:
+                    result.append({"pi": pi, "ri": ri, "placeable": False})
         return result
     except Exception:
         return []

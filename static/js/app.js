@@ -294,11 +294,13 @@ function renderBoard(pi) {
       const ok = row.tiles.length < row.capacity && (!row.color || row.color===sel.color);
       cls = ok ? 'drop' : 'nodrop';
     }
-    const allEarlierDone = !isTiling || p.pattern_lines
-      .slice(0, ri)
-      .every(r => r.tiles.length < r.capacity);
-    if(isTiling && tilingRow===null && row.tiles.length===row.capacity && allEarlierDone) cls='drop';
-    else if(isTiling && tilingRow===null && row.tiles.length===row.capacity && !allEarlierDone) cls='nodrop';
+    // Reihe klickbar wenn sie platzierbar ist UND keine frühere platzierbare Reihe noch offen
+    const validRows = (S.valid_tiling_rows || []);
+    const isPlaceable = validRows.some(vr => vr.pi===pi && vr.ri===ri && vr.placeable !== false);
+    const earlierPlaceable = validRows.filter(vr => vr.pi===pi && vr.ri<ri && vr.placeable !== false);
+    const allEarlierDone = earlierPlaceable.length === 0;
+    if(isTiling && tilingRow===null && row.tiles.length===row.capacity && isPlaceable && allEarlierDone) cls='drop';
+    else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
     const hasChips = isTiling && p.bonus_chips.some(c=>c) && row.tiles.length>0 && row.tiles.length<row.capacity;
     const onclick = cls==='drop'
       ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
@@ -425,17 +427,30 @@ function renderCenter() {
         .filter(r=>r.tiles.length===r.capacity)
         .map(r=>({pi, ri:r.index, color:r.color, pname:p.name}))
     );
-    const pending = allComplete.filter(x=>{
-      if(!S.valid_tiling_rows) return true; 
-      return placeableRows.some(pr=>pr.pi===x.pi && pr.ri===x.ri);
-    }).filter(x=>{
-      const p = S.players[x.pi];
-      return !p.pattern_lines.slice(0,x.ri).some(r=>
-        r.tiles.length===r.capacity &&
-        (!S.valid_tiling_rows || placeableRows.some(pr=>pr.pi===x.pi&&pr.ri===p.pattern_lines.indexOf(r)))
-      );
-    });
-    const hasPending = pending.length > 0;
+    // pending: nur Reihen die tatsächlich platzierbar sind (placeable !== false)
+    // und keine frühere platzierbare Reihe noch offen haben
+    const placeableOnly = placeableRows.filter(pr => pr.placeable !== false);
+    const pending = placeableOnly
+      .filter(pr => {
+        // Keine frühere platzierbare Reihe desselben Spielers noch offen
+        return !placeableOnly.some(other => other.pi===pr.pi && other.ri<pr.ri);
+      })
+      .map(pr => {
+        const p = S.players[pr.pi];
+        const row = p.pattern_lines[pr.ri];
+        return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
+      });
+
+    // Unplatzierbare volle Reihen (alle 3 Slots belegt, keine Farbe passend)
+    const unplaceable = placeableRows
+      .filter(pr => pr.placeable === false)
+      .map(pr => {
+        const p = S.players[pr.pi];
+        const row = p.pattern_lines[pr.ri];
+        return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
+      });
+
+    const hasPending = pending.length > 0 || unplaceable.length > 0;
 
     const chippable = S.players.flatMap((p,pi)=>
       p.pattern_lines
@@ -464,6 +479,22 @@ function renderCenter() {
       infoHTML = `<div class="info tiling">
         <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen — anklicken zum Legen:</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">${rows}</div>
+      </div>`;
+    } else if(unplaceable.length > 0) {
+      const uRows = unplaceable.map(x=>
+        `<div style="display:flex;align-items:center;justify-content:space-between;
+          padding:4px 6px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:5px;margin-bottom:3px">
+          <span style="font-size:10px">
+            <span class="tile sm ${normColor(x.color)}">${normColor(x.color)[0].toUpperCase()}</span>
+            <strong>${x.pname}</strong> Reihe ${x.ri+1} — keine passende Kuppelplatte
+          </span>
+          <button class="btn" style="font-size:9px;padding:2px 6px;background:#EF4444;color:#fff;border:none"
+            onclick="tilingMoveToFloor(${x.pi}, ${x.ri})">→ Strafleiste</button>
+        </div>`
+      ).join('');
+      infoHTML = `<div class="info warn">
+        <div style="font-size:10px;font-weight:600;margin-bottom:4px">⚠️ Alle Slots belegt — keine passende Kuppelplatte:</div>
+        ${uRows}
       </div>`;
     } else if(chippable.length>0) {
       infoHTML = `<div class="info warn" style="font-size:10px">
