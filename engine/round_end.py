@@ -92,11 +92,30 @@ def validate_tiling_action(
     if not row.is_complete:
         return f"Musterreihe {action.pattern_row + 1} ist nicht voll."
 
-    # Regelwerk S.7: Reihen von oben nach unten — alle vollständigen Reihen
-    # mit niedrigerem Index müssen zuerst gelegt werden
+    # Regelwerk S.7: Reihen von oben nach unten — aber nur wenn die frühere
+    # Reihe auch tatsächlich platzierbar ist (passende Kuppelplatte vorhanden).
+    # Nicht-platzierbare Reihen dürfen spätere platzierbare Reihen nicht blockieren.
+    grid = player.dome_grid
     for ri in range(action.pattern_row):
         earlier = player.pattern_lines[ri]
-        if earlier.is_complete:
+        if not earlier.is_complete:
+            continue
+        # Prüfe ob diese frühere Reihe einen passenden Space hat
+        e_color = earlier.color
+        e_dome_row = ri // 2
+        e_space_row = ri % 2
+        e_valid_si = [e_space_row * 2, e_space_row * 2 + 1]
+        e_has_action = any(
+            slot is not None and
+            any(
+                not slot.spaces[si].is_filled and
+                not slot.spaces[si].is_locked and
+                slot.spaces[si].accepts(e_color)
+                for si in e_valid_si
+            )
+            for slot in [grid.dome_slots[e_dome_row][sc] for sc in range(3)]
+        )
+        if e_has_action:
             return (
                 f"Reihe {ri + 1} muss zuerst gelegt werden "
                 f"(von oben nach unten, Regelwerk S.7)."
@@ -539,12 +558,14 @@ def get_pending_tiling_rows(player: "PlayerBoard") -> list[int]:
     return [i for i, row in enumerate(player.pattern_lines) if row.is_complete]
 
 
-def find_unplaceable_rows(player: "PlayerBoard") -> list[int]:
+def find_unplaceable_rows(player: "PlayerBoard", state=None) -> list[int]:
     """
-    [9] Ermittelt unplatzierbare Musterreihen:
-    Eine Reihe ist unplatzierbar wenn der Dome-Reihe bereits 3 Kuppelplatten
-    zugeordnet sind (Slot-Zeile voll) UND keine davon ein passendes Farbfeld hat.
-    → Fliesen müssen auf Straffeld.
+    Ermittelt unplatzierbare Musterreihen am Rundenende.
+    Eine Reihe ist unplatzierbar wenn:
+    - Alle 3 Slots der Dome-Reihe belegt sind UND keine davon ein passendes Farbfeld hat
+    → Fliesen gehen automatisch auf Strafleiste beim Rundenende.
+    Reihen mit noch freien Slots bleiben liegen — der Spieler kann noch eine
+    passende Kuppelplatte legen.
     """
     unplaceable = []
     for row_idx, row in enumerate(player.pattern_lines):
@@ -554,11 +575,9 @@ def find_unplaceable_rows(player: "PlayerBoard") -> list[int]:
         dome_row = row_idx // 2
         space_row = row_idx % 2
         valid_si = [space_row * 2, space_row * 2 + 1]
-        # Prüfen ob alle 3 Slots in dieser Dome-Reihe belegt sind
         slots_in_row = [player.dome_grid.dome_slots[dome_row][sc] for sc in range(3)]
         if not all(s is not None for s in slots_in_row):
-            continue  # noch freie Slots → nicht unplatzierbar
-        # Alle 3 belegt — gibt es trotzdem ein passendes Feld?
+            continue  # noch freie Slots → bleibt liegen
         has_match = any(
             slot.spaces[si].accepts(color)
             for slot in slots_in_row
@@ -580,7 +599,7 @@ def process_unplaceable_rows(
     Gibt Anzahl der verschobenen Fliesen zurück.
     """
     total = 0
-    for row_idx in find_unplaceable_rows(player):
+    for row_idx in find_unplaceable_rows(player, state):
         row = player.pattern_lines[row_idx]
         tiles = list(row.tiles)
         row.tiles = []; row.color = None

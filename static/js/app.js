@@ -296,9 +296,11 @@ function renderBoard(pi) {
     }
     // Reihe klickbar wenn sie platzierbar ist UND keine frühere platzierbare Reihe noch offen
     const validRows = (S.valid_tiling_rows || []);
-    const isPlaceable = validRows.some(vr => vr.pi===pi && vr.ri===ri && vr.placeable !== false);
-    const earlierPlaceable = validRows.filter(vr => vr.pi===pi && vr.ri<ri && vr.placeable !== false);
+    const isPlaceable = validRows.some(vr => vr.pi===pi && vr.ri===ri && vr.placeable === true);
+    const earlierPlaceable = validRows.filter(vr => vr.pi===pi && vr.ri<ri && vr.placeable === true);
     const allEarlierDone = earlierPlaceable.length === 0;
+    if(isTiling && tilingRow===null && row.tiles.length===row.capacity)
+      console.log(`P${pi} R${ri+1}: isPlaceable=${isPlaceable}, allEarlierDone=${allEarlierDone}, earlier=`, JSON.stringify(earlierPlaceable), 'validRows=', JSON.stringify(validRows));
     if(isTiling && tilingRow===null && row.tiles.length===row.capacity && isPlaceable && allEarlierDone) cls='drop';
     else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
     const hasChips = isTiling && p.bonus_chips.some(c=>c) && row.tiles.length>0 && row.tiles.length<row.capacity;
@@ -429,7 +431,7 @@ function renderCenter() {
     );
     // pending: nur Reihen die tatsächlich platzierbar sind (placeable !== false)
     // und keine frühere platzierbare Reihe noch offen haben
-    const placeableOnly = placeableRows.filter(pr => pr.placeable !== false);
+    const placeableOnly = placeableRows.filter(pr => pr.placeable === true);
     const pending = placeableOnly
       .filter(pr => {
         // Keine frühere platzierbare Reihe desselben Spielers noch offen
@@ -450,7 +452,13 @@ function renderCenter() {
         return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
       });
 
-    const hasPending = pending.length > 0 || unplaceable.length > 0;
+    console.log('placeableRows:', JSON.stringify(placeableRows));
+    console.log('placeableOnly:', JSON.stringify(placeableOnly));
+    console.log('pending:', JSON.stringify(pending));
+    console.log('pending:', JSON.stringify(pending));
+    console.log('unplaceable:', JSON.stringify(unplaceable));
+    console.log('placeableOnly:', JSON.stringify(placeableOnly));
+    const hasPending = pending.length > 0;
 
     const chippable = S.players.flatMap((p,pi)=>
       p.pattern_lines
@@ -479,22 +487,6 @@ function renderCenter() {
       infoHTML = `<div class="info tiling">
         <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen — anklicken zum Legen:</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">${rows}</div>
-      </div>`;
-    } else if(unplaceable.length > 0) {
-      const uRows = unplaceable.map(x=>
-        `<div style="display:flex;align-items:center;justify-content:space-between;
-          padding:4px 6px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:5px;margin-bottom:3px">
-          <span style="font-size:10px">
-            <span class="tile sm ${normColor(x.color)}">${normColor(x.color)[0].toUpperCase()}</span>
-            <strong>${x.pname}</strong> Reihe ${x.ri+1} — keine passende Kuppelplatte
-          </span>
-          <button class="btn" style="font-size:9px;padding:2px 6px;background:#EF4444;color:#fff;border:none"
-            onclick="tilingMoveToFloor(${x.pi}, ${x.ri})">→ Strafleiste</button>
-        </div>`
-      ).join('');
-      infoHTML = `<div class="info warn">
-        <div style="font-size:10px;font-weight:600;margin-bottom:4px">⚠️ Alle Slots belegt — keine passende Kuppelplatte:</div>
-        ${uRows}
       </div>`;
     } else if(chippable.length>0) {
       infoHTML = `<div class="info warn" style="font-size:10px">

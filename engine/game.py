@@ -270,11 +270,10 @@ def generate_tiling_actions(
                 space = slot.spaces[si]
                 if space.is_filled or space.is_locked:
                     continue
-                # WILD: immer gültig; NORMAL: nur in valid_si; SPECIAL: nie hier
-                if space.space_type == SpaceType.WILD:
-                    pass  # WILD akzeptiert jede Farbe in jeder Position
-                elif si not in valid_si:
-                    continue  # NORMAL Space außerhalb des erlaubten Bereichs
+                # WILD und NORMAL: nur in valid_si (Reihenposition muss stimmen)
+                # SPECIAL: nie hier
+                if si not in valid_si:
+                    continue
                 if not space.accepts(color):
                     continue
                 a = TilingAction(pattern_row=row_idx, slot_row=dome_row,
@@ -290,8 +289,8 @@ def generate_tiling_actions(
                     rotated = [tile.spaces[i] for i in ROTATION_MAP[rotation]]
                     for si in range(len(rotated)):
                         space = rotated[si]
-                        # WILD: immer gültig; NORMAL: nur in valid_si
-                        if space.space_type != SpaceType.WILD and si not in valid_si:
+                        # WILD und NORMAL: nur in valid_si (Reihenposition muss stimmen)
+                        if si not in valid_si:
                             continue
                         if space.accepts(color):
                             a = TilingAction(pattern_row=row_idx, slot_row=dome_row,
