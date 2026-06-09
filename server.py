@@ -21,6 +21,8 @@ Alle Responses: {"ok": true, "state": {...}} oder {"ok": false, "error": "..."}
 
 import sys
 import os
+import json as _json
+import datetime as _dt
 from pathlib import Path
 
 # Stelle sicher dass der Hauptordner im Python-Path ist
@@ -50,6 +52,9 @@ except ImportError:
 
 # ── Global game state ────────────────────────────────────────────────────────
 _game = Game()
+_game_log_path: Path | None = None   # Pfad zur aktuellen Log-Datei
+LOG_DIR = Path(__file__).parent / "static" / "log"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── KI-Konfiguration ─────────────────────────────────────────────────────────
 _ai_agent    = None        # AlphaZeroAgent oder HeuristicMCTSAgent
@@ -112,6 +117,25 @@ def ok() -> dict:
     # Holt sich den State immer frisch aus der Game-Instanz
     return {"ok": True, "state": serialize_state(_game.state)}
 
+
+def _flush_game_log() -> None:
+    """Schreibt neue state.log Einträge in die Log-Datei."""
+    global _game_log_path
+    if _game_log_path is None or _game is None or _game.state is None:
+        return
+    if not hasattr(_game.state, '_logged_count'):
+        _game.state._logged_count = 0
+    new_entries = _game.state.log[_game.state._logged_count:]
+    if new_entries:
+        try:
+            with open(_game_log_path, 'a', encoding='utf-8') as lf:
+                for entry in new_entries:
+                    lf.write(f"{entry}\n")
+            _game.state._logged_count = len(_game.state.log)
+        except Exception:
+            pass
+
+
 def err(msg: str) -> dict:
     return {"ok": False, "error": msg}
 
@@ -149,8 +173,14 @@ def new_game():
     import random as _random
     fp_raw = data.get('first_player', None)
     first_player = _random.randint(0, 1) if fp_raw is None else int(fp_raw)
+    # Seed immer explizit setzen für Reproduzierbarkeit
+    if seed is None:
+        seed = _random.randint(0, 999999)
     _game = Game()
     _game.start(player_names=names, seed=seed, first_player=first_player)
+    # Seed im State speichern
+    _game.state._seed = seed
+    _game.state._first_player = first_player
 
     if ai_enabled:
         model_v = data.get('model', None)
@@ -162,9 +192,31 @@ def new_game():
         _ai_agent  = None
         _ai_player = None
 
+    # Log-Datei für dieses Spiel erstellen
+    global _game_log_path
+    timestamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    actual_seed = getattr(_game.state, '_seed', seed)
+    _game_log_path = LOG_DIR / f"game_{timestamp}_seed{actual_seed}.log"
+    with open(_game_log_path, 'w', encoding='utf-8') as lf:
+        meta = {
+            "timestamp":    timestamp,
+            "seed":         actual_seed,
+            "players":      names,
+            "first_player": first_player,
+            "ai_enabled":   ai_enabled,
+            "ai_player":    _ai_player,
+            "ai_model":     data.get('model', None),
+            "ai_sims":      data.get('sims', None),
+        }
+        lf.write(f"# MOSAIC GAME LOG\n")
+        lf.write(f"# {_json.dumps(meta, ensure_ascii=False)}\n")
+        lf.write(f"# {'='*60}\n")
+
     response = ok()
-    response['ai_enabled'] = ai_enabled
-    response['ai_player']  = _ai_player
+    response['ai_enabled']  = ai_enabled
+    response['ai_player']   = _ai_player
+    response['log_file']    = _game_log_path.name
+    response['seed']        = actual_seed
     return jsonify(response)
 
 
@@ -200,6 +252,7 @@ def move_stone():
         # apply() in deiner game.py muss jetzt den Fall factory_id=None 
         # als Aktion C erkennen (hast du ja bereits implementiert)
         _game.apply(move)
+        _flush_game_log()
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
@@ -219,6 +272,7 @@ def move_dome():
             rotation=int(d.get('rotation', 0)),
         )
         _game.apply(move)
+        _flush_game_log()
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
@@ -241,6 +295,7 @@ def move_dome_stack():
             rotation=int(d.get('rotation', 0)),
         )
         _game.apply(move)
+        _flush_game_log()
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
@@ -255,6 +310,7 @@ def move_bonus_chip():
     try:
         move = TakeBonusChipMove(factory_id=int(d['factory_id']))
         _game.apply(move)
+        _flush_game_log()
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
@@ -425,6 +481,7 @@ def end_tiling():
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     try:
         _game.apply({"type": "end_tiling"})
+        _flush_game_log()
         return jsonify(ok())
     except Exception as e:
         return jsonify(err(str(e)))
@@ -445,6 +502,7 @@ def move_pass():
     # game.py kümmert sich jetzt um Spielerwechsel, Log-Eintrag und den Phasenwechsel!
     try:
         _game.apply({"type": "pass"})
+        _flush_game_log()
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
@@ -484,9 +542,25 @@ def end_scoring():
     if _game.state.phase != "end": return jsonify(err("Spiel noch nicht beendet"))
     try:
         results = _game._calculate_end_scoring()
-        return jsonify({"ok": True, **results})
+        return jsonify({"ok": True, "state": serialize_state(_game.state), **results})
     except Exception as e:
         return jsonify(err(str(e)))
+
+@app.route('/api/end_game_log', methods=['POST'])
+def end_game_log():
+    """Schreibt Spielende-Summary ins Log."""
+    if _game_log_path and _game.state:
+        _flush_game_log()
+        scores = [p.score for p in _game.state.players]
+        try:
+            with open(_game_log_path, 'a', encoding='utf-8') as lf:
+                lf.write(f"# {'='*60}\n")
+                lf.write(f"# SPIELENDE: {scores}\n")
+                lf.write(f"# Seed: {getattr(_game.state, '_seed', '?')}\n")
+        except Exception:
+            pass
+    return jsonify(ok())
+
 
 @app.route('/api/stack/peek', methods=['POST'])
 def stack_peek():

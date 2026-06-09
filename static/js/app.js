@@ -87,6 +87,12 @@ async function startNewGame() {
   const d = await api('/new_game', body);
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
+  window._gameEndLogged = false;
+  if (d.seed !== undefined) {
+    window._gameSeed    = d.seed;
+    window._gameLogFile = d.log_file;
+    console.log(`🎲 Spiel gestartet | Seed: ${d.seed} | Log: ${d.log_file}`);
+  }
   render();
   const dt = await api('/scoring_tiles');
   if(dt.ok) {
@@ -423,6 +429,17 @@ function syncDomeHeight(pi) {
 function renderCenter() {
   const badge = document.getElementById('phase-badge');
   badge.className = 'phase-badge'+(S.phase==='tiling'?' tiling':S.phase==='end'?' end':'');
+  // Seed anzeigen
+  const seedEl = document.getElementById('game-seed-display');
+  if (seedEl && window._gameSeed !== undefined) {
+    seedEl.textContent = `🎲 Seed: ${window._gameSeed}`;
+    seedEl.style.display = '';
+  }
+  // Spielende loggen
+  if ((S.phase === 'end' || S.phase === 'final') && !window._gameEndLogged) {
+    window._gameEndLogged = true;
+    _notifyGameEnd();
+  }
   const tilingStatus = S.phase==='tiling'
     ? (tilingRow!==null ? `TILING — Reihe ${tilingRow+1} legen` : 'PHASE 2: Reihe anklicken')
     : '';
@@ -1286,6 +1303,10 @@ function toggleScoringTile(id) {
   renderScoringGrid();
 }
 
+async function _notifyGameEnd() {
+  try { await api('/end_game_log', {}); } catch(e) {}
+}
+
 async function confirmScoringTiles() {
   const ids = [...selectedScoringIds];
   const d = await api('/scoring_tiles/select', {ids});
@@ -1320,6 +1341,7 @@ async function calculateEndScoring() {
 }
 
 function showEndResults(results) {
+  if (!S || !S.players) return;
   const p0 = S.players[0], p1 = S.players[1];
   const winner = p0.score > p1.score ? p0.name
     : p1.score > p0.score ? p1.name
