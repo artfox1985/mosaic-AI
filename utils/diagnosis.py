@@ -237,17 +237,18 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
         print(f"  Top 10 Stone-IDs (häufig >10% Prob):")
 
         def decode_stone(aid):
-            a = aid - 10
-            f_idx = a % 6
-            a //= 6
-            r_id = a % 8
-            c_id = a // 8
+            # stone = 10 + color_idx*48 + r_id*6 + factory_index
+            # r_id = row + 1: r_id=0 → Strafleiste, r_id=1..6 → Reihe 1-6
+            # factory: 0-3=F1-F4, 4=GF, 5=Mond
+            a       = aid - 10
+            f_idx   = a % 6
+            r_id    = (a // 6) % 8
+            c_id    = a // 48
             colors  = ['blau','gelb','rot','schwarz','türkis']
             sources = ['F1','F2','F3','F4','GF','Mond']
-            color  = colors[c_id]  if c_id  < 5 else '?'
-            source = sources[f_idx] if f_idx < 6 else '?'
-            row = r_id - 1
-            row_str = 'Strafleiste' if row == -1 else f'Reihe {row}'
+            color   = colors[c_id]  if c_id  < 5 else '?'
+            source  = sources[f_idx] if f_idx < 6 else '?'
+            row_str = 'Strafleiste' if r_id == 0 else f'Reihe {r_id}'
             return f"{color} von {source} → {row_str}"
 
         for aid, cnt in stone_id_dist.most_common(10):

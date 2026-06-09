@@ -361,8 +361,62 @@ class MosaicEnv:
                         "pattern_row": ri,
                     })
 
+        # end_tiling nur wenn:
+        # 1. Keine anderen Aktionen mehr verfügbar
+        # 2. Dome-Pflicht erfüllt (2 Platten gelegt) ODER Runde 5 ODER kein Display/Stack
         if not actions:
-            actions.append({"type": "end_tiling"})
+            state = self.state
+            pi_active = state.current_player
+            p_active  = state.players[pi_active]
+
+            # Dome-Pflicht: aktiver Spieler muss noch Platten legen?
+            has_display  = len(state.dome_display) > 0
+            has_pool     = len(state.dome_tile_pool) > 0
+            has_free_slot = any(
+                p_active.dome_grid.dome_slots[sr][sc] is None
+                for sr in range(3) for sc in range(3)
+            )
+            still_must_place = (
+                state.round_number < 5
+                and p_active.dome_tiles_placed_this_round < 2
+                and (has_display or has_pool)
+                and has_free_slot
+                and p_active.can_place_dome_tile(state.round_number)
+            )
+
+            if still_must_place:
+                # Dome-Pflicht erzwingen — nur Dome-Aktionen für aktiven Spieler
+                for m in generate_dome_moves(state):
+                    display_index = next(
+                        (i for i, t in enumerate(state.dome_display)
+                         if t.tile_id == m.dome_tile_id), 0
+                    )
+                    actions.append({
+                        "type":          "dome",
+                        "display_index": display_index,
+                        "slot_row":      m.slot_row,
+                        "slot_col":      m.slot_col,
+                        "rotation":      m.rotation,
+                    })
+                if has_pool and has_free_slot:
+                    for slot_row in range(3):
+                        for slot_col in range(3):
+                            if p_active.dome_grid.dome_slots[slot_row][slot_col] is None:
+                                for rot in [0, 90, 180, 270]:
+                                    actions.append({
+                                        "type":     "dome_stack",
+                                        "slot_row": slot_row,
+                                        "slot_col": slot_col,
+                                        "rotation": rot,
+                                    })
+                                break
+                        else:
+                            continue
+                        break
+                if not actions:
+                    actions.append({"type": "end_tiling"})
+            else:
+                actions.append({"type": "end_tiling"})
 
         return actions
 
@@ -385,11 +439,11 @@ class MosaicEnv:
 
         # Copy-on-Write: geteilte Objekte kopieren wenn sie modifiziert werden
         if getattr(self.state, '_pool_shared', False):
+            import pickle as _pk
             if t in ("dome", "dome_stack"):
-                import pickle as _pk
                 self.state.dome_tile_pool = _pk.loads(_pk.dumps(self.state.dome_tile_pool, -1))
-            if t == "bonus_chip":
-                import pickle as _pk
+            if t in ("bonus_chip", "end_tiling"):
+                # end_tiling → setup_new_round → _fill_factories → .pop() auf bonus_chip_pool
                 self.state.bonus_chip_pool = _pk.loads(_pk.dumps(self.state.bonus_chip_pool, -1))
             self.state._pool_shared = False
 

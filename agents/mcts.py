@@ -57,7 +57,7 @@ class MCTSNode:
         'action', 'parent', 'children',
         'visits', 'value',
         'untried_actions', 'player_who_acted',
-        'priors',
+        'priors', 'remaining_actions',
     )
 
     def __init__(
@@ -72,7 +72,8 @@ class MCTSNode:
         self.children:  list["MCTSNode"] = []
         self.visits:    int   = 0
         self.value:     float = 0.0            # kumulierter Reward aus Sicht von player_who_acted
-        self.untried_actions = list(untried_actions) if untried_actions is not None else None
+        self.untried_actions    = list(untried_actions) if untried_actions is not None else None
+        self.remaining_actions: list = []
         self.player_who_acted = player_who_acted
         self.priors          = None            # NN-Policy-Priors (nur AlphaZero), lazy gesetzt
 
@@ -164,8 +165,6 @@ class MCTSAgent(BaseAgent):
     def _mcts_search(self, env: MosaicEnv, actions: list[dict]) -> dict:
         """Führt MCTS durch und gibt die beste Aktion zurück."""
         pi = env.current_player()
-        # Aktionen priorisiert samplen: Tiling > Stone > Dome > Rest
-        sampled = self._sample_actions(actions)
         root = MCTSNode(
             action=None,
             parent=None,
@@ -254,16 +253,16 @@ class MCTSAgent(BaseAgent):
             node.untried_actions = sampled
             # Restliche Aktionen für spätere Erweiterung aufbewahren
             remaining = [a for a in all_actions if a not in sampled]
-            node._remaining_actions = remaining if remaining else []
+            node.remaining_actions = remaining if remaining else []
         
         # Progressive Widening: neue Aktionen freischalten wenn Knoten oft besucht
-        if hasattr(node, '_remaining_actions') and node._remaining_actions:
+        if node.remaining_actions:
             # Alle k Besuche eine neue Aktion hinzufügen
             k = max(3, self.max_actions // 4)
             extra = max(0, node.visits // k - (self.max_actions - len(node.untried_actions)))
-            if extra > 0 and node._remaining_actions:
-                for _ in range(min(extra, len(node._remaining_actions))):
-                    node.untried_actions.append(node._remaining_actions.pop(0))
+            if extra > 0 and node.remaining_actions:
+                for _ in range(min(extra, len(node.remaining_actions))):
+                    node.untried_actions.append(node.remaining_actions.pop(0))
 
         if not node.untried_actions:
             return node
