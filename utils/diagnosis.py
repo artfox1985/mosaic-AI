@@ -43,7 +43,7 @@ def run_diagnosis(data_dir: str, label: str):
     mask_max    = masks.sum(1).max().item()
 
     model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS)
-    pred_p, _ = model(states)
+    pred_p, *_ = model(states)
     masked_logits = pred_p + (masks - 1) * 1e9
     log_probs = F.log_softmax(masked_logits, dim=1)
     p_loss = (-torch.sum(targets_p * log_probs) / states.size(0)).item()
