@@ -44,8 +44,32 @@ class AlphaZeroAgent(MCTSAgent):
         self._last_expanded: MCTSNode | None = None
 
     def _expand(self, node: MCTSNode, env) -> MCTSNode:
-        """Wie Basisklasse, merkt sich aber den neuen Knoten für _rollout."""
-        child = super()._expand(node, env)
+        """
+        Wie Basisklasse aber ohne Action-Sampling:
+        Alle validen Aktionen werden in den Baum aufgenommen.
+        Policy-Priors (PUCT) übernehmen die Priorisierung.
+        """
+        import random as _rnd
+        # Lazy Init ohne Sampling — alle Aktionen
+        if node.untried_actions is None:
+            node.untried_actions = list(env.valid_actions())
+
+        if not node.untried_actions:
+            self._last_expanded = node
+            return node
+
+        action = node.untried_actions.pop(
+            _rnd.randrange(len(node.untried_actions))
+        )
+        obs, _, done, _ = env.step(action)
+
+        child = MCTSNode(
+            action=action,
+            parent=node,
+            untried_actions=None,
+            player_who_acted=env.current_player(),
+        )
+        node.children.append(child)
         self._last_expanded = child
         return child
 
@@ -128,6 +152,104 @@ class AlphaZeroAgent(MCTSAgent):
             env.step(node.action)
 
         return node
+
+    def _mcts_search(self, env, actions) -> dict:
+        """
+        Batch-Inferenz: Alle Simulationen parallel bis Leaf, dann gebatcht
+        durch das Netz. Ein Forward-Pass statt N einzelner Calls.
+        """
+        import time
+        pi       = env.current_player()
+        root     = MCTSNode(action=None, parent=None, untried_actions=None,
+                            player_who_acted=pi)
+        root.visits = 1
+        # AlphaZero: kein Action-Sampling — Policy-Priors übernehmen die Priorisierung
+        # Alle validen Aktionen in den Baum statt max_actions=20
+        root.untried_actions = list(actions)
+
+        t_start   = time.time()
+        sims_done = 0
+        batch_size = min(self.simulations, 16)  # Batch-Größe
+
+        while True:
+            if self.time_limit_s is not None:
+                if time.time() - t_start >= self.time_limit_s:
+                    break
+            else:
+                if sims_done >= self.simulations:
+                    break
+
+            # ── Phase 1: batch_size Simulations bis Leaf ──────────────────
+            leaves = []  # (node, sim_env, done)
+            for _ in range(min(batch_size, self.simulations - sims_done)):
+                sim_env = env.clone()
+                node    = self._select(root, sim_env)
+                node    = self._expand(node, sim_env)
+
+                # Spiel bereits beendet?
+                if sim_env.state.phase in ("end", "final"):
+                    scores = sim_env.scores()
+                    if scores[0] > scores[1]:
+                        result = {0: 1.0, 1: 0.0}
+                    elif scores[1] > scores[0]:
+                        result = {0: 0.0, 1: 1.0}
+                    else:
+                        p0 = 1.0 if sim_env.state.players[0].holds_first_player_marker else 0.0
+                        result = {0: p0, 1: 1.0 - p0}
+                    self._backpropagate(node, result, pi)
+                    sims_done += 1
+                else:
+                    leaves.append((node, sim_env))
+
+            if not leaves:
+                continue
+
+            # ── Phase 2: Batch-Inferenz ────────────────────────────────────
+            tensors = []
+            for _, sim_env in leaves:
+                obs = serialize_state(sim_env.state)
+                tensors.append(state_to_tensor(obs))
+
+            batch = torch.stack(tensors).to(self.device)
+            with torch.no_grad():
+                policy_logits, value_preds, moon_logits_batch = self.model(batch)
+                policy_probs_batch = F.softmax(policy_logits, dim=1).cpu().numpy()
+                value_preds_np     = value_preds.cpu().numpy()
+                # Moon logits für den aktuellen State (letzter im Batch)
+                self._last_moon_logits = moon_logits_batch[-1].cpu().numpy()
+                if self._env is not None:
+                    self._env._moon_logits = self._last_moon_logits
+
+            # ── Phase 3: Priors setzen + Backprop ─────────────────────────
+            for i, (node, sim_env) in enumerate(leaves):
+                # Policy-Priors am expandierten Knoten speichern
+                if node.priors is None:
+                    node.priors = policy_probs_batch[i]
+
+                # Value → Win-Prob
+                v        = float(value_preds_np[i])
+                win_prob = (v + 1.0) / 2.0
+                curr     = sim_env.current_player()
+                if curr == 0:
+                    result = {0: win_prob, 1: 1.0 - win_prob}
+                else:
+                    result = {0: 1.0 - win_prob, 1: win_prob}
+
+                self._backpropagate(node, result, pi)
+                sims_done += 1
+
+        # Beste Aktion
+        if not root.children:
+            return __import__('random').choice(actions)
+
+        best = max(root.children, key=lambda n: n.visits)
+        self.stats = {
+            "simulations": sims_done,
+            "best_visits": best.visits,
+            "best_q":      best.value / best.visits if best.visits else 0,
+            "tree_size":   sum(1 for _ in self._iter_nodes(root)),
+        }
+        return best.action
 
     def reset_for_new_game(self):
         """Kein globaler Cache mehr — Priors leben am Knoten. No-op für Kompatibilität."""

@@ -246,8 +246,24 @@ class MCTSAgent(BaseAgent):
         bereits platziert wurden) ausgeführt werden.
         """
         # Lazy Init: frisch aus aktuellem env-Zustand befüllen
+        # Progressive Widening: starte mit max_actions, erweitere mit mehr Besuchen
         if node.untried_actions is None:
-            node.untried_actions = self._sample_actions(env.valid_actions())
+            all_actions = env.valid_actions()
+            # Erste Welle: max_actions
+            sampled = self._sample_actions(all_actions)
+            node.untried_actions = sampled
+            # Restliche Aktionen für spätere Erweiterung aufbewahren
+            remaining = [a for a in all_actions if a not in sampled]
+            node._remaining_actions = remaining if remaining else []
+        
+        # Progressive Widening: neue Aktionen freischalten wenn Knoten oft besucht
+        if hasattr(node, '_remaining_actions') and node._remaining_actions:
+            # Alle k Besuche eine neue Aktion hinzufügen
+            k = max(3, self.max_actions // 4)
+            extra = max(0, node.visits // k - (self.max_actions - len(node.untried_actions)))
+            if extra > 0 and node._remaining_actions:
+                for _ in range(min(extra, len(node._remaining_actions))):
+                    node.untried_actions.append(node._remaining_actions.pop(0))
 
         if not node.untried_actions:
             return node
