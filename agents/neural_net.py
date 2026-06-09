@@ -235,16 +235,18 @@ class MosaicDataset(Dataset):
             print(f"📦 Lade Cache ({len(files)} Dateien)...")
             t0 = time.time()
             bundle = torch.load(cache_path, weights_only=False)
-            self.states   = bundle["states"]
-            self.policies = bundle["policies"]
-            self.values   = bundle["values"]
-            self.masks    = bundle["masks"]
+            self.states             = bundle["states"]
+            self.policies           = bundle["policies"]
+            self.values             = bundle["values"]
+            self.masks              = bundle["masks"]
+            self.moon_order_targets = bundle.get("moon_order_targets",
+                [torch.full((5,), -1.0) for _ in bundle["states"]])
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
         else:
             print(f"Lade Daten aus {len(files)} Dateien...")
             t0 = time.time()
-            states, policies, values, masks = [], [], [], []
+            states, policies, values, masks, moon_order_targets = [], [], [], [], []
 
             for f in files:
                 with open(f, "rb") as file:
@@ -267,26 +269,39 @@ class MosaicDataset(Dataset):
                             mask[action_to_id(move)] = 1.0
                         masks.append(mask)
 
-            self.states   = states
-            self.policies = policies
-            self.values   = values
-            self.masks    = masks
+                        # Moon-Order Target: Ranking der Farben (-1 = kein Sonnenzug)
+                        _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
+                        moon_target = torch.full((5,), -1.0, dtype=torch.float32)
+                        moon_order = step.get("moon_order_target", None)
+                        if moon_order:
+                            for rank, color_name in enumerate(moon_order):
+                                c_idx = _CIDX.get(color_name, -1)
+                                if c_idx >= 0:
+                                    moon_target[c_idx] = float(rank)
+                        moon_order_targets.append(moon_target)
+
+            self.states            = states
+            self.policies          = policies
+            self.values            = values
+            self.masks             = masks
+            self.moon_order_targets = moon_order_targets
 
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
             print(f"💾 Speichere Cache...")
             torch.save({
-                "states":   self.states,
-                "policies": self.policies,
-                "values":   self.values,
-                "masks":    self.masks,
+                "states":             self.states,
+                "policies":           self.policies,
+                "values":             self.values,
+                "masks":              self.masks,
+                "moon_order_targets": self.moon_order_targets,
             }, cache_path)
             print(f"✅ Cache gespeichert: {cache_path}")
 
         self.input_size = len(self.states[0]) if self.states else 100
 
     def __len__(self): return len(self.states)
-    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx]
+    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx]
 
 
 class MosaicNet(nn.Module):

@@ -167,11 +167,61 @@ def play_one_game(agent):
         else:
             action, policy = agent.search_and_get_policy(env, actions, temp=temp)
 
+        # Moon-Order Target: nur für kleine Manufakturen (f_idx 0-3)
+        moon_order_target = None
+        f_idx_check = action.get("factory_index", 5)
+        if action.get("type") == "stone" and f_idx_check <= 3:
+            from itertools import permutations as _perms
+            import random as _rand
+            from agents.mcts import evaluate_state as _eval
+            state_now = env.state
+            factories = state_now.factories
+            f_idx = f_idx_check
+            color = action.get("color", "")
+            if f_idx < len(factories):
+                remaining = [t for t in factories[f_idx].sun_tiles
+                             if (t.value if hasattr(t,"value") else str(t)) != color]
+                if remaining:
+                    perms = list(_perms(remaining))
+                    if len(perms) > 6:
+                        perms = _rand.sample(perms, 6)
+                    best_score = -float("inf")
+                    best_order = None
+                    from engine.moves import Move, TakeAction, PlaceAction, TakeSource
+                    for perm in perms:
+                        import copy as _copy
+                        test_game = _copy.deepcopy(env._game)
+                        try:
+                            color_obj = next(
+                                (t for t in factories[f_idx].sun_tiles
+                                 if (t.value if hasattr(t,"value") else str(t)) == color), None)
+                            if color_obj is None: continue
+                            f_id = factories[f_idx].factory_id
+                            move = Move(
+                                take=TakeAction(source=TakeSource.SMALL_FACTORY_SUN,
+                                               color=color_obj, factory_id=f_id,
+                                               moon_order=list(perm)),
+                                place=PlaceAction(row_index=action.get("row", -1)),
+                            )
+                            test_game.apply(move)
+                            score = _eval(test_game.state).get(current_player, 0.0)
+                            if score > best_score:
+                                best_score = score
+                                best_order = perm
+                        except Exception:
+                            continue
+                    if best_order is not None:
+                        moon_order_target = [
+                            t.value if hasattr(t,"value") else str(t)
+                            for t in best_order
+                        ]
+
         history.append({
             "state":              copy.deepcopy(obs),
             "player":             current_player,
             "policy":             policy,
             "valid_actions":      actions,
+            "moon_order_target":  moon_order_target,
         })
 
         obs, reward, done, step_info = env.step(action)
@@ -195,6 +245,7 @@ def play_one_game(agent):
             "policy":            step["policy"],
             "value":             val,
             "valid_actions":     step["valid_actions"],
+            "moon_order_target": step.get("moon_order_target"),
         })
 
     return training_data, winner, scores, steps

@@ -68,16 +68,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     stopped_early = False
 
     for epoch in range(epochs):
-        t_loss, t_vloss, t_ploss, t_mloss = 0, 0, 0, 0
+        t_loss, t_vloss, t_ploss = 0, 0, 0
         
-        for states, targets_p, targets_v, masks in dataloader:
+        for states, targets_p, targets_v, masks, moon_targets in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             masks     = masks.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v, _ = model(states)  # Moon-Head Output beim Training ignoriert
+            pred_p, pred_v, pred_moon = model(states)  # moon für Moon-Loss  # Moon-Head Output beim Training ignoriert
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -88,7 +88,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_loss = mse_loss(pred_v, targets_v)
             p_loss = -torch.sum(targets_p * log_probs) / states.size(0)
 
-            m_loss = torch.tensor(0.0)
+            # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter
+            moon_targets = moon_targets.to(device)
+            sun_mask = (moon_targets[:, 0] >= 0)
+            if sun_mask.any():
+                p_loss = p_loss + mse_loss(pred_moon[sun_mask], moon_targets[sun_mask])
+
             loss = v_loss * VALUE_WEIGHT + p_loss
             loss.backward()
             optimizer.step()
@@ -96,11 +101,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             t_loss  += loss.item()
             t_vloss += v_loss.item()
             t_ploss += p_loss.item()
-            t_mloss += m_loss.item()
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
-        epoch_mloss = t_mloss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
 
@@ -125,7 +128,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
               f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}, "
-              f"Moon: {epoch_mloss:5.3f}){plateau_marker}")
+              f"){plateau_marker}")
 
         # ── Early Stopping ─────────────────────────────────────────────────
         if policy_plateau_since is not None:

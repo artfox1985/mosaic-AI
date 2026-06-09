@@ -227,7 +227,7 @@ class AlphaZeroAgent(MCTSAgent):
                     node.priors = policy_probs_batch[i]
 
                 # Value → Win-Prob
-                v        = float(value_preds_np[i])
+                v        = float(value_preds_np[i].item() if hasattr(value_preds_np[i], "item") else value_preds_np[i].flat[0])
                 win_prob = (v + 1.0) / 2.0
                 curr     = sim_env.current_player()
                 if curr == 0:
