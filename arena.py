@@ -139,11 +139,11 @@ if __name__ == "__main__":
     agent_random = RandomAgent()
     agent_greedy = GreedyAgent()
     agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=5)
-    #agent_alphazero1 = AlphaZeroAgent(
-    #    model_version="v1",
-    #    input_size=INPUT_SIZE, 
-    #    simulations=40
-    #    )
+    agent_alphazero3 = AlphaZeroAgent(
+        model_version="v3",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
         
     agent_alphazero2 = AlphaZeroAgent(
         model_version="v2",
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     competitors = {
         "AlphaZero V2": (agent_alphazero2, 1000),
-        "MCTS Heuristik": (agent_mcts_heuristic, 1000)
+        "AlphaZero V3": (agent_alphazero3, 1000)
     }
 
     # Jeder spielt gegen jeden

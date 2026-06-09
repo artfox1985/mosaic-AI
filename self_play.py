@@ -167,11 +167,77 @@ def play_one_game(agent):
         else:
             action, policy = agent.search_and_get_policy(env, actions, temp=temp)
 
+        # Moon-Order Target: NUR bei kleinen Manufakturen (f_idx 0-3) relevant.
+        # Die große Manufaktur (f_idx 4) legt Reste einzeln in den flachen Moon-Pool —
+        # dort gibt es keine Stapel-Reihenfolge zu entscheiden.
+        moon_order_target = None
+        f_idx_check = action.get("factory_index", 5)
+        if action.get("type") == "stone" and f_idx_check <= 3:
+            f_idx   = f_idx_check
+            color   = action.get("color", "")
+            state   = env.state
+            factories = state.factories
+            if f_idx < len(factories):
+                factory = factories[f_idx]
+                remaining = [t for t in factory.sun_tiles if
+                             (t.value if hasattr(t, "value") else str(t)) != color]
+            else:
+                remaining = []
+
+            if remaining:
+                # Strategische Reihenfolge via evaluate_state
+                from agents.mcts import evaluate_state
+                import copy as _copy
+
+                best_score  = -float("inf")
+                best_order  = None
+
+                from itertools import permutations
+                perms = list(permutations(remaining))
+                # Bei >6 Permutationen nur eine Stichprobe nehmen
+                if len(perms) > 6:
+                    import random as _random
+                    perms = _random.sample(perms, 6)
+
+                for perm in perms:
+                    test_game = _copy.deepcopy(env._game)
+                    try:
+                        from engine.moves import Move, TakeAction, PlaceAction
+                        from engine.tile import TileColor
+                        # Finde die Farbe als TileColor Objekt
+                        color_obj = next(
+                            (t for t in factories[f_idx].sun_tiles if
+                             (t.value if hasattr(t,"value") else str(t)) == color), None)
+                        if color_obj is None:
+                            continue
+                        f_id  = factories[f_idx].factory_id
+                        from engine.moves import TakeSource
+                        src_t = TakeSource.SMALL_FACTORY_SUN
+                        move  = Move(
+                            take=TakeAction(source=src_t, color=color_obj,
+                                           factory_id=f_id, moon_order=list(perm)),
+                            place=PlaceAction(row_index=action.get("row", -1)),
+                        )
+                        test_game.apply(move)
+                        score = evaluate_state(test_game.state).get(current_player, 0.0)
+                        if score > best_score:
+                            best_score = score
+                            best_order = perm
+                    except Exception:
+                        continue
+
+                if best_order is not None:
+                    moon_order_target = [
+                        t.value if hasattr(t, "value") else str(t)
+                        for t in best_order
+                    ]
+
         history.append({
-            "state":         copy.deepcopy(obs),
-            "player":        current_player,
-            "policy":        policy,
-            "valid_actions": actions,
+            "state":              copy.deepcopy(obs),
+            "player":             current_player,
+            "policy":             policy,
+            "valid_actions":      actions,
+            "moon_order_target":  moon_order_target,
         })
 
         obs, reward, done, step_info = env.step(action)
@@ -191,10 +257,11 @@ def play_one_game(agent):
     for step in history:
         val = 1.0 if step["player"] == winner else -1.0
         training_data.append({
-            "state":         step["state"],
-            "policy":        step["policy"],
-            "value":         val,
-            "valid_actions": step["valid_actions"],
+            "state":             step["state"],
+            "policy":            step["policy"],
+            "value":             val,
+            "valid_actions":     step["valid_actions"],
+            "moon_order_target": step.get("moon_order_target"),
         })
 
     return training_data, winner, scores, steps

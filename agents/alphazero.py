@@ -69,7 +69,11 @@ class AlphaZeroAgent(MCTSAgent):
         obs = serialize_state(env.state)
         tensor_state = state_to_tensor(obs).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            policy_logits, value_pred = self.model(tensor_state)
+            policy_logits, value_pred, moon_logits = self.model(tensor_state)
+            self._last_moon_logits = moon_logits[0].cpu().numpy()
+            # Für _apply_action in agent_env.py zugänglich machen
+            if self._env is not None:
+                self._env._moon_logits = self._last_moon_logits
 
         # Policy: Logits → Wahrscheinlichkeiten (Softmax), am Knoten speichern
         policy_probs = F.softmax(policy_logits[0], dim=0).cpu().numpy()

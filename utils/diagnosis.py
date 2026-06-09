@@ -160,6 +160,100 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
         print(f"    ID {aid:4d}: {cnt:5d}×")
     print(f"{'='*55}")
 
+    # ── Stone-only Analyse (strategische Züge ohne Pflichtaktionen) ────────────
+    # Obligatorische Aktionen herausfiltern:
+    # pass(0), end_tiling(1), bonus_chip(478-481), dome(328-435), dome_stack(436-471)
+    OBLIGATORY = set(range(328, 482))  # dome + dome_stack + bonus_chip
+    OBLIGATORY.add(0)   # pass
+    OBLIGATORY.add(1)   # end_tiling
+
+    stone_steps = 0
+    stone_entropy_sum = 0.0
+    stone_max_prob_sum = 0.0
+    stone_concentrated = 0
+    stone_flat = 0
+    stone_id_dist = Counter()
+
+    for f in files:
+        with open(f, 'rb') as fh:
+            data = pickle.load(fh)
+        for step in data:
+            policy = step.get('policy', [])
+            if not policy:
+                continue
+            # Nur Schritte wo die Top-Aktion eine Stone-Aktion ist (10-273)
+            top_action = max(policy, key=lambda p: p['prob'])
+            top_id = action_to_id(top_action['action'])
+            if top_id in OBLIGATORY:
+                continue  # Schritt überspringen wenn Pflichtaktion dominiert
+
+            # Nur Stone-Aktionen in der Policy berücksichtigen
+            stone_policy = [p for p in policy if 10 <= action_to_id(p['action']) <= 273]
+            if not stone_policy:
+                continue
+
+            # Renormalisieren
+            total_p = sum(p['prob'] for p in stone_policy)
+            if total_p < 1e-6:
+                continue
+            stone_probs = [p['prob'] / total_p for p in stone_policy]
+
+            max_p = max(stone_probs)
+            entropy = -sum(p * math.log(p + 1e-9) for p in stone_probs)
+
+            stone_entropy_sum  += entropy
+            stone_max_prob_sum += max_p
+            stone_steps += 1
+
+            if max_p > 0.9: stone_concentrated += 1
+            if max_p < 0.3: stone_flat += 1
+
+            for p, prob in zip(stone_policy, stone_probs):
+                if prob > 0.1:
+                    stone_id_dist[action_to_id(p['action'])] += 1
+
+    if stone_steps > 0:
+        avg_s_ent  = stone_entropy_sum / stone_steps
+        avg_s_maxp = stone_max_prob_sum / stone_steps
+        max_stone_entropy = math.log(240)  # max Stone-Aktionen ~240
+
+        ent_pct_s = avg_s_ent / max_stone_entropy * 100
+        if ent_pct_s < 20:   ent_icon_s = "🟢 Sehr scharf"
+        elif ent_pct_s < 40: ent_icon_s = "🟡 Moderat scharf"
+        elif ent_pct_s < 70: ent_icon_s = "🟠 Eher flach"
+        else:                ent_icon_s = "🔴 Sehr flach"
+
+        print(f"\n{'='*55}")
+        print(f"  STONE-ONLY ANALYSE (strategische Züge)")
+        print(f"  (Pflichtaktionen herausgefiltert: Chips, Kuppel, Pass)")
+        print(f"{'─'*55}")
+        print(f"  Analysierte Schritte: {stone_steps:,} / {total_steps:,} ({stone_steps/total_steps*100:.0f}%)")
+        print(f"{'─'*55}")
+        print(f"  Ø Entropie:     {avg_s_ent:.3f} / {max_stone_entropy:.2f} ({ent_pct_s:.1f}%)  {ent_icon_s}")
+        print(f"  Ø Max-Prob:     {avg_s_maxp:.3f}")
+        print(f"  Konzentriert (>90%): {stone_concentrated/stone_steps*100:.1f}%")
+        print(f"  Sehr flach   (<30%): {stone_flat/stone_steps*100:.1f}%")
+        print(f"{'─'*55}")
+        print(f"  Top 10 Stone-IDs (häufig >10% Prob):")
+
+        def decode_stone(aid):
+            a = aid - 10
+            f_idx = a % 6
+            a //= 6
+            r_id = a % 8
+            c_id = a // 8
+            colors  = ['blau','gelb','rot','schwarz','türkis']
+            sources = ['F1','F2','F3','F4','GF','Mond']
+            color  = colors[c_id]  if c_id  < 5 else '?'
+            source = sources[f_idx] if f_idx < 6 else '?'
+            row = r_id - 1
+            row_str = 'Strafleiste' if row == -1 else f'Reihe {row}'
+            return f"{color} von {source} → {row_str}"
+
+        for aid, cnt in stone_id_dist.most_common(10):
+            print(f"    ID {aid:4d}: {cnt:5d}×  ({decode_stone(aid)})")
+        print(f"{'='*55}")
+
 
 def pick_file() -> str | None:
     """Öffnet einen nativen Datei-Dialog (Windows/Mac/Linux)."""

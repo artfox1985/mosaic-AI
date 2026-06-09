@@ -8,12 +8,12 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MOON_WEIGHT
 
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None, hidden_size=None):
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
@@ -59,17 +59,25 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None):
     
     # 5. DIE SCHLEIFE
     n_batches = len(dataloader)
+    policy_history  = []
+    value_history   = []
+    plateau_window    = 5
+    plateau_threshold = 0.01
+    early_stop_patience = 5 if early_stop else 999999
+    policy_plateau_since = None
+    stopped_early = False
+
     for epoch in range(epochs):
-        t_loss, t_vloss, t_ploss = 0, 0, 0
+        t_loss, t_vloss, t_ploss, t_mloss = 0, 0, 0, 0
         
-        for states, targets_p, targets_v, masks in dataloader:
+        for states, targets_p, targets_v, masks, moon_targets in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             masks     = masks.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v = model(states)
+            pred_p, pred_v, pred_moon = model(states)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -80,20 +88,65 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None):
             v_loss = mse_loss(pred_v, targets_v)
             p_loss = -torch.sum(targets_p * log_probs) / states.size(0)
 
-            loss = v_loss * VALUE_WEIGHT + p_loss
+            # Moon-Order Loss: nur für Sonnenzüge (moon_target[0] != -1)
+            moon_targets = moon_targets.to(device)
+            sun_mask = (moon_targets[:, 0] >= 0)   # True wenn Sonnenzug
+            if sun_mask.any():
+                # MSE zwischen vorhergesagten Logits und Ranking-Target
+                m_loss = mse_loss(pred_moon[sun_mask], moon_targets[sun_mask])
+            else:
+                m_loss = torch.tensor(0.0, device=device)
+
+            loss = v_loss * VALUE_WEIGHT + p_loss + m_loss * MOON_WEIGHT
             loss.backward()
             optimizer.step()
             
-            t_loss += loss.item()
+            t_loss  += loss.item()
             t_vloss += v_loss.item()
             t_ploss += p_loss.item()
-            
-        print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} (Value: {t_vloss/n_batches:5.2f}, Policy: {t_ploss/n_batches:5.2f})")
-                   
-    
+            t_mloss += m_loss.item()
+
+        epoch_ploss = t_ploss / n_batches
+        epoch_vloss = t_vloss / n_batches
+        epoch_mloss = t_mloss / n_batches
+        policy_history.append(epoch_ploss)
+        value_history.append(epoch_vloss)
+
+        # ── Plateau-Erkennung ──────────────────────────────────────────────
+        plateau_marker = ""
+        policy_plateaued = False
+        if len(policy_history) >= plateau_window * 2:
+            recent   = sum(policy_history[-plateau_window:]) / plateau_window
+            previous = sum(policy_history[-plateau_window*2:-plateau_window]) / plateau_window
+            rel = (previous - recent) / previous if previous > 0 else 0
+            if rel < plateau_threshold:
+                policy_plateaued = True
+                if policy_plateau_since is None:
+                    policy_plateau_since = epoch + 1
+                plateau_marker = "  🟡 PLATEAU"
+
+        # Overfitting-Verdacht: Value sinkt, Policy plateaut
+        if policy_plateaued and len(value_history) >= 3:
+            v3 = value_history[-3:]
+            if v3[0] > v3[1] > v3[2]:
+                plateau_marker = "  🔴 PLATEAU + VALUE SINKT (Overfitting-Risiko)"
+
+        print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
+              f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}, "
+              f"Moon: {epoch_mloss:5.3f}){plateau_marker}")
+
+        # ── Early Stopping ─────────────────────────────────────────────────
+        if policy_plateau_since is not None:
+            since = (epoch + 1) - policy_plateau_since
+            if since >= early_stop_patience:
+                print(f"\n⏹️  Early Stopping: Policy plateaut seit Epoche {policy_plateau_since} "
+                      f"({since} Epochen ohne Fortschritt).")
+                stopped_early = True
+                break
+
     max_loss = math.log(NUM_ACTIONS)
-    final_p = t_ploss / n_batches
-    final_v = t_vloss / n_batches
+    final_p = epoch_ploss
+    final_v = epoch_vloss
     pct = final_p / max_loss * 100
 
     if pct < 8:
@@ -127,6 +180,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None):
     print(f"{'─'*55}")
     print(f"  Policy Loss:   {final_p:.4f} / {max_loss:.2f} max  ({pct:.1f}%)  {quality}")
     print(f"  Value Loss:    {final_v:.4f}  {v_quality}")
+    print(f"{'─'*55}")
+    if stopped_early:
+        print(f"  ⏹️  Early Stopping nach Epoche {len(policy_history)}/{epochs}")
+    if policy_plateau_since:
+        print(f"  🟡 Plateau ab Epoche {policy_plateau_since}.")
+        print(f"     → Für nächste Generation: mehr Sims im Self-Play.")
+    else:
+        print(f"  🟢 Kein Plateau — Policy sinkt noch. Mehr Epochen möglich.")
     print(f"{'='*55}")
         
     # 6. Speichern
@@ -158,7 +219,9 @@ if __name__ == "__main__":
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
+    parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
 
     args = parser.parse_args()
 
-    train(version_name=args.name, load_version=args.load, input_epoch=args.epochs, hidden_size=args.hidden)
+    train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
+          hidden_size=args.hidden, early_stop=not args.no_early_stop)

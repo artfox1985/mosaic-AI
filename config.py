@@ -29,3 +29,4 @@ BATCH_SIZE    = 1024
 HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (256 oder 512)
 LEARNING_RATE = 0.0008
 VALUE_WEIGHT  = 0.15
+MOON_WEIGHT   = 0.10   # Gewichtung des Moon-Order Loss

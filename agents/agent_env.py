@@ -343,14 +343,22 @@ class MosaicEnv:
                 # Große Fabrik Sonnenseite
                 src  = TakeSource.LARGE_FACTORY_SUN
                 f_id = None
-                moon = [t for t in state.large_factory.sun_tiles if t != color]
+                moon_logits = getattr(self, '_moon_logits', None)
+                moon = _strategic_moon_order(
+                    [t for t in state.large_factory.sun_tiles if t != color],
+                    state, moon_logits
+                )
             else:
                 # Kleine Fabrik (Index 0-3 → factory_id 1-4)
                 factories = state.factories
                 factory   = factories[f_idx] if f_idx < len(factories) else factories[0]
                 src  = TakeSource.SMALL_FACTORY_SUN
                 f_id = factory.factory_id
-                moon = [t for t in factory.sun_tiles if t != color]
+                moon_logits = getattr(self, '_moon_logits', None)
+                moon = _strategic_moon_order(
+                    [t for t in factory.sun_tiles if t != color],
+                    state, moon_logits
+                )
 
             move = Move(
                 take=TakeAction(source=src, color=color, factory_id=f_id, moon_order=moon),
@@ -426,6 +434,42 @@ class MosaicEnv:
     def _calculate_end_scoring(self) -> dict:
         """Delegiert an game._calculate_end_scoring() — Single Source of Truth."""
         return self._game._calculate_end_scoring()
+
+
+COLORS_ORDER = ['blau', 'gelb', 'rot', 'schwarz', 'türkis']
+
+def _strategic_moon_order(moon_stones, state, moon_logits=None):
+    """
+    Sortiert die Mondsteine strategisch.
+    Wenn moon_logits vorhanden (vom Moon-Order Head des Netzes):
+      → Hoher Logit-Wert = Farbe tief im Stapel (defensiv)
+    Sonst Fallback: seltenste Farben tief.
+    """
+    if len(moon_stones) <= 1:
+        return moon_stones
+
+    if moon_logits is not None:
+        def net_rank(stone):
+            v = stone.value if hasattr(stone, 'value') else str(stone)
+            idx = COLORS_ORDER.index(v) if v in COLORS_ORDER else 0
+            return -moon_logits[idx]
+        return sorted(moon_stones, key=net_rank)
+
+    # Heuristik-Fallback: seltenste Farben nach unten
+    color_counts = {}
+    for factory in state.factories:
+        for stack in factory.moon_stacks:
+            if stack:
+                v = stack[-1].value if hasattr(stack[-1], 'value') else str(stack[-1])
+                color_counts[v] = color_counts.get(v, 0) + 1
+    for stone in getattr(state.large_factory, 'moon_pool', []):
+        v = stone.value if hasattr(stone, 'value') else str(stone)
+        color_counts[v] = color_counts.get(v, 0) + 1
+
+    def rarity(stone):
+        v = stone.value if hasattr(stone, 'value') else str(stone)
+        return color_counts.get(v, 0)
+    return sorted(moon_stones, key=rarity)
 
 
 def _color(v: str):
