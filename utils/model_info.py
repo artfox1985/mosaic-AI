@@ -17,7 +17,10 @@ from config import MODELS_DIR
 LABELS = {
     "version":            "Version",
     "timestamp":          "Erstellt am",
-    "epochs":             "Epochen",
+    "epochs":             "Epochen (tatsächlich)",
+    "epochs_requested":   "Epochen (angefragt)",
+    "early_stopped":      "Early Stop",
+    "early_stop_epoch":   "Early Stop ab Epoche",
     "num_games":          "Züge",
     "input_size":         "Input Size",
     "hidden_size":        "Hidden Size",

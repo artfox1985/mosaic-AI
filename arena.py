@@ -136,20 +136,20 @@ if __name__ == "__main__":
     # Hier kannst du beliebig viele Agenten einfügen, das Skript baut
     # automatisch das perfekte Turnier daraus!
     
-    agent_random = RandomAgent()
-    agent_greedy = GreedyAgent()
-    agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
-    agent_alphazero1 = AlphaZeroAgent(
-        model_version="v1",
+    #agent_random = RandomAgent()
+    #agent_greedy = GreedyAgent()
+    #agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
+    agent_alphazero3a = AlphaZeroAgent(
+        model_version="v3a",
         input_size=INPUT_SIZE, 
         simulations=40
         )
         
-    #agent_alphazero2 = AlphaZeroAgent(
-    #    model_version="v2",
-    #    input_size=INPUT_SIZE, 
-    #    simulations=40
-    #    )
+    agent_alphazero2 = AlphaZeroAgent(
+        model_version="v2",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -159,8 +159,8 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "MTCS 1": (agent_mcts_heuristic, 1000),
-        "AlphaZero V1": (agent_alphazero1, 1000)
+        "AlphaZero V2": (agent_alphazero2, 1000),
+        "AlphaZero V3a": (agent_alphazero3a, 1000)
     }
 
     # Jeder spielt gegen jeden

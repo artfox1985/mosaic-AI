@@ -134,7 +134,7 @@ class NetworkSelfPlayAgent(SelfPlayMixin):
 # Spiel-Loop
 # ---------------------------------------------------------------------------
 
-def play_one_game(agent):
+def play_one_game(agent, score_cap: int = 30):
     """Spielt ein Spiel und gibt Trainingsdaten zurück."""
     env = MosaicEnv()
     obs, info = env.reset()
@@ -239,7 +239,21 @@ def play_one_game(agent):
 
     training_data = []
     for step in history:
-        val = 1.0 if step["player"] == winner else -1.0
+        # Abgestufter Value-Target
+        margin       = abs(scores[0] - scores[1])
+        winner_score = scores[winner]
+        if margin == 0:
+            if winner_score >= 10:
+                win_val  =  0.5
+                lose_val = -0.5
+            else:
+                win_val  =  0.1
+                lose_val = -0.1
+        else:
+            strength = min(1.0, 0.1 + (margin / score_cap) * 0.9)
+            win_val  =  strength
+            lose_val = -strength
+        val = win_val if step["player"] == winner else lose_val
         training_data.append({
             "state":             step["state"],
             "policy":            step["policy"],
@@ -255,7 +269,7 @@ def play_one_game(agent):
 # Datengenerierung
 # ---------------------------------------------------------------------------
 
-def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0):
+def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, score_cap: int = 30):
     """
     Generiert Self-Play Trainingsdaten.
 
@@ -287,7 +301,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         t0 = time.time()
         print(f"Spiele Partie {i+1}/{num_games}... ", end="", flush=True)
 
-        game_data, winner, scores, steps = play_one_game(agent)
+        game_data, winner, scores, steps = play_one_game(agent, score_cap=score_cap)
         all_training_data.extend(game_data)
         duration = time.time() - t0
 
@@ -296,7 +310,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
 
         if (i + 1) % 10 == 0 or (i + 1) == num_games:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            filename = DATA_DIR / f"selfplay_{version_name}_{timestamp}_g{i+1}.pkl"
+            file_tag = f"_{tag}" if tag else ""
+            filename = DATA_DIR / f"selfplay_{version_name}{file_tag}_{timestamp}_g{i+1}.pkl"
             with open(filename, "wb") as f:
                 pickle.dump(all_training_data, f)
             print(f"💾 {len(all_training_data)} Züge gespeichert in '{filename}'")
@@ -316,14 +331,24 @@ if __name__ == "__main__":
                         help="MCTS-Simulationen pro Zug")
     parser.add_argument("--version", type=str, required=True,
                         help="Versionsname, z.B. v0 oder v1")
-    parser.add_argument("--depth",   type=int, required=True,
+    parser.add_argument("--tag",      type=str, default=None,
+                        help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
+    parser.add_argument("--score_cap", type=int, default=30,
+                        help="Punktedifferenz ab der win_val=1.0 (Standard: 30)")
+    parser.add_argument("--depth",   type=int, default=None,
                         help="Rollout-Tiefe (0=Heuristik, 1=1 Schritt, 5=5 Schritte)")
     args = parser.parse_args()
+
+    if args.mode == 'mcts' and args.depth is None:
+        parser.error("--depth ist bei --mode mcts erforderlich")
+    rollout_depth = args.depth if args.depth is not None else 0
 
     generate_data(
         mode=args.mode,
         num_games=args.games,
         simulations=args.sims,
         version_name=args.version,
-        rollout_depth=args.depth,
+        tag=args.tag,
+        rollout_depth=rollout_depth,
+        score_cap=args.score_cap,
     )
