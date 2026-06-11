@@ -145,11 +145,11 @@ if __name__ == "__main__":
         simulations=40
         )
         
-    agent_alphazero2 = AlphaZeroAgent(
-        model_version="v2",
-        input_size=INPUT_SIZE, 
-        simulations=40
-        )
+    #agent_alphazero4 = AlphaZeroAgent(
+    #    model_version="v4",
+    #    input_size=INPUT_SIZE, 
+    #   simulations=40
+    #    )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -159,10 +159,10 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "AlphaZero V2": (agent_alphazero2, 1000),
-        "AlphaZero V3a": (agent_alphazero3a, 1000)
+        "AlphaZero V3a 2": (agent_alphazero3a, 1000),
+        "AlphaZero V3a 1": (agent_alphazero3a, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=100)
+    run_arena(competitors, games_per_matchup=1)

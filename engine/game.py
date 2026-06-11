@@ -302,40 +302,6 @@ def generate_tiling_actions(
     return actions
 
 
-def run_tiling_phase(
-    state: GameState,
-    tiling_decisions: dict[int, list[TilingAction]],
-    special_decisions: dict[int, list[SpecialTilingAction]] | None = None,
-) -> dict[int, int]:
-    """Führt die Tiling-Phase für beide Spieler aus."""
-    scores: dict[int, int] = {0: 0, 1: 0}
-
-    for player_idx in range(2):
-        actions = tiling_decisions.get(player_idx, [])
-        for action in actions:
-            err = validate_tiling_action(state, player_idx, action)
-            if err:
-                state.log_event(f"TilingAction übersprungen: {err}")
-                continue
-
-            execute_tiling_action(state, player_idx, action)
-
-            pts, _ = score_placed_tile(
-                state.players[player_idx],
-                action.slot_row, action.slot_col, action.space_index,
-            )
-            scores[player_idx] += pts
-
-        if special_decisions:
-            for sp_action in special_decisions.get(player_idx, []):
-                err = validate_special_tiling(state, player_idx, sp_action)
-                if err:
-                    raise ValueError(f"Ungültige SpecialTilingAction: {err}")
-                bonus = execute_special_tiling(state, player_idx, sp_action)
-                scores[player_idx] += bonus
-
-    return scores
-
 
 # ---------------------------------------------------------------------------
 # Hauptspiel-Schleife
@@ -568,19 +534,6 @@ class Game:
 
     def valid_tiling_actions(self, player_idx: int) -> list[TilingAction]:
         return generate_tiling_actions(self.state, player_idx)
-
-    def apply_tiling_phase(
-        self,
-        tiling_decisions: dict[int, list[TilingAction]],
-        special_decisions: dict[int, list[SpecialTilingAction]] | None = None,
-    ) -> None:
-        """Führt die Tiling-Phase aus und berechnet Punkte."""
-        assert self.state.phase == "tiling"
-        for p in self.state.players:
-            process_unplaceable_rows(p, self.state.tower, self.state)
-        scores = run_tiling_phase(self.state, tiling_decisions, special_decisions)
-        apply_round_scoring(self.state, scores)
-        self.state.phase = "end" if self.is_over() else "done"
 
     def apply_single_tiling(self, player_idx: int, action: TilingAction) -> None:
         """Führt eine einzelne Tiling-Aktion aus (Single Source of Truth)."""

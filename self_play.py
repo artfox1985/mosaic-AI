@@ -242,15 +242,15 @@ def play_one_game(agent, score_cap: int = 30):
         # Abgestufter Value-Target
         margin       = abs(scores[0] - scores[1])
         winner_score = scores[winner]
-        if margin == 0:
-            if winner_score >= 10:
-                win_val  =  0.5
-                lose_val = -0.5
-            else:
-                win_val  =  0.1
-                lose_val = -0.1
+        if margin == 0 and winner_score < 5:
+            win_val  =  0.1   # 0:0 oder 1:1 — reiner Zufall
+            lose_val = -0.1
         else:
-            strength = min(1.0, 0.1 + (margin / score_cap) * 0.9)
+            # Zwei Komponenten: Margin (Sieghöhe) + Score (Spielqualität)
+            # score_cap steuert die Margin-Komponente
+            margin_part = min(0.45, (margin / score_cap) * 0.45)
+            score_part  = min(0.45, (winner_score / 40) * 0.45)
+            strength    = min(1.0, 0.1 + margin_part + score_part)
             win_val  =  strength
             lose_val = -strength
         val = win_val if step["player"] == winner else lose_val
@@ -333,8 +333,8 @@ if __name__ == "__main__":
                         help="Versionsname, z.B. v0 oder v1")
     parser.add_argument("--tag",      type=str, default=None,
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
-    parser.add_argument("--score_cap", type=int, default=30,
-                        help="Punktedifferenz ab der win_val=1.0 (Standard: 30)")
+    parser.add_argument("--score_cap", type=int, default=15,
+                        help="Punktedifferenz ab der win_val=1.0 (Standard: 15)")
     parser.add_argument("--depth",   type=int, default=None,
                         help="Rollout-Tiefe (0=Heuristik, 1=1 Schritt, 5=5 Schritte)")
     args = parser.parse_args()

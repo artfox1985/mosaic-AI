@@ -448,7 +448,7 @@ class PlayerBoard:
             lines.append(f"  {row}")
         lines.append(f"Broken: {[t.value for t in self.broken_tiles]}")
         lines.append(f"Bonus chips: {[t.value for t in self.bonus_chips]}")
-        lines.append(f"Tokens left: {self.tokens_left}")
+        lines.append(f"Tokens used: {self.player_tokens_used}/{self.TOKENS_PER_ROUND}")
         return "\n".join(lines)
 
     def clone(self) -> "PlayerBoard":
