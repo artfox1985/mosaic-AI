@@ -262,7 +262,7 @@ def play_one_game(agent, score_cap: int = 30):
             "moon_order_target": step.get("moon_order_target"),
         })
 
-    return training_data, winner, scores, steps
+    return training_data, winner, scores, steps, win_val
 
 
 # ---------------------------------------------------------------------------
@@ -301,12 +301,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         t0 = time.time()
         print(f"Spiele Partie {i+1}/{num_games}... ", end="", flush=True)
 
-        game_data, winner, scores, steps = play_one_game(agent, score_cap=score_cap)
+        game_data, winner, scores, steps, win_val = play_one_game(agent, score_cap=score_cap)
         all_training_data.extend(game_data)
         duration = time.time() - t0
 
-        print(f"Fertig in {duration:.1f}s | Sieger: P{winner} | "
-              f"Scores: {scores[0]}:{scores[1]} | Züge: {steps}")
+        print(f"Fertig in {duration:.1f}s | "              f"Scores: {scores[0]}:{scores[1]} | "              f"Strength: {win_val:.3f} | Züge: {steps}")
 
         if (i + 1) % 10 == 0 or (i + 1) == num_games:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")

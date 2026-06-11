@@ -223,82 +223,113 @@ class MosaicDataset(Dataset):
     def __init__(self, data_dir="data"):
         from config import INPUT_SIZE
         import hashlib, time
+        import h5py
+        import numpy as np
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)).encode()
         ).hexdigest()[:12]
-        cache_path = os.path.join(data_dir, f".cache_{cache_key}.pt")
+        cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
+        cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
 
-        if os.path.exists(cache_path):
-            print(f"📦 Lade Cache ({len(files)} Dateien)...")
+        if os.path.exists(cache_path_h5):
+            # HDF5 Cache laden — deutlich schneller als .pt
+            print(f"📦 Lade HDF5-Cache ({len(files)} Dateien)...")
             t0 = time.time()
-            bundle = torch.load(cache_path, weights_only=False)
-            self.states             = bundle["states"]
-            self.policies           = bundle["policies"]
-            self.values             = bundle["values"]
-            self.masks              = bundle["masks"]
-            self.moon_order_targets = bundle.get("moon_order_targets",
-                [torch.full((5,), -1.0) for _ in bundle["states"]])
+            with h5py.File(cache_path_h5, 'r') as hf:
+                self.states             = torch.from_numpy(hf['states'][:])
+                self.policies           = torch.from_numpy(hf['policies'][:])
+                self.values             = torch.from_numpy(hf['values'][:])
+                self.masks              = torch.from_numpy(hf['masks'][:])
+                self.moon_order_targets = torch.from_numpy(hf['moon_order_targets'][:])
             print(f"Datensatz geladen: {len(self.states)} Züge. "
-                  f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
+                  f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
+
+        elif os.path.exists(cache_path_pt):
+            # Alten .pt Cache laden und nach HDF5 migrieren
+            print(f"📦 Migriere .pt → HDF5 Cache...")
+            t0 = time.time()
+            bundle = torch.load(cache_path_pt, weights_only=False)
+            self.states             = bundle["states"] if isinstance(bundle["states"], torch.Tensor) else torch.stack(bundle["states"])
+            self.policies           = bundle["policies"] if isinstance(bundle["policies"], torch.Tensor) else torch.stack(bundle["policies"])
+            self.values             = bundle["values"] if isinstance(bundle["values"], torch.Tensor) else torch.stack(bundle["values"])
+            self.masks              = bundle["masks"] if isinstance(bundle["masks"], torch.Tensor) else torch.stack(bundle["masks"])
+            mot = bundle.get("moon_order_targets")
+            if mot is None:
+                mot = [torch.full((5,), -1.0) for _ in self.states]
+            self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
+            # Als HDF5 speichern
+            with h5py.File(cache_path_h5, 'w') as hf:
+                hf.create_dataset('states',             data=self.states.numpy(),             compression='lzf')
+                hf.create_dataset('policies',           data=self.policies.numpy(),           compression='lzf')
+                hf.create_dataset('values',             data=self.values.numpy(),             compression='lzf')
+                hf.create_dataset('masks',              data=self.masks.numpy(),              compression='lzf')
+                hf.create_dataset('moon_order_targets', data=self.moon_order_targets.numpy(), compression='lzf')
+            os.remove(cache_path_pt)
+            print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
+                  f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
+
         else:
             print(f"Lade Daten aus {len(files)} Dateien...")
             t0 = time.time()
-            states, policies, values, masks, moon_order_targets = [], [], [], [], []
+            _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
+            states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
 
             for f in files:
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
                     for step in game_data:
-                        states.append(state_to_tensor(step["state"]))
-                        values.append(torch.tensor([step["value"]], dtype=torch.float32))
+                        states_l.append(state_to_tensor(step["state"]).numpy())
+                        values_l.append([float(step["value"])])
 
-                        t_policy = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
+                        t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for p in step["policy"]:
-                            a_id = action_to_id(p["action"])
-                            t_policy[a_id] += p["prob"]
-                        if t_policy.sum() > 0:
-                            t_policy /= t_policy.sum()
-                        policies.append(t_policy)
+                            t_policy[action_to_id(p["action"])] += p["prob"]
+                        s = t_policy.sum()
+                        if s > 0: t_policy /= s
+                        policies_l.append(t_policy)
 
-                        mask = torch.zeros(NUM_ACTIONS, dtype=torch.float32)
+                        mask = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         moves = step.get("valid_actions") or step["state"].get("valid_moves", [])
                         for move in moves:
                             mask[action_to_id(move)] = 1.0
-                        masks.append(mask)
+                        masks_l.append(mask)
 
-                        # Moon-Order Target: Ranking der Farben (-1 = kein Sonnenzug)
-                        _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
-                        moon_target = torch.full((5,), -1.0, dtype=torch.float32)
+                        moon_target = np.full(5, -1.0, dtype=np.float32)
                         moon_order = step.get("moon_order_target", None)
                         if moon_order:
                             for rank, color_name in enumerate(moon_order):
                                 c_idx = _CIDX.get(color_name, -1)
                                 if c_idx >= 0:
                                     moon_target[c_idx] = float(rank)
-                        moon_order_targets.append(moon_target)
+                        moon_l.append(moon_target)
 
-            self.states            = states
-            self.policies          = policies
-            self.values            = values
-            self.masks             = masks
-            self.moon_order_targets = moon_order_targets
+            states_np   = np.array(states_l,   dtype=np.float32)
+            policies_np = np.array(policies_l, dtype=np.float32)
+            values_np   = np.array(values_l,   dtype=np.float32)
+            masks_np    = np.array(masks_l,    dtype=np.float32)
+            moon_np     = np.array(moon_l,     dtype=np.float32)
 
-            print(f"Datensatz geladen: {len(self.states)} Züge. "
-                  f"(Features pro Zug: {len(self.states[0])}) — {time.time()-t0:.1f}s")
-            print(f"💾 Speichere Cache...")
-            torch.save({
-                "states":             self.states,
-                "policies":           self.policies,
-                "values":             self.values,
-                "masks":              self.masks,
-                "moon_order_targets": self.moon_order_targets,
-            }, cache_path)
-            print(f"✅ Cache gespeichert: {cache_path}")
+            print(f"Datensatz geladen: {len(states_np)} Züge. "
+                  f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
+            print(f"💾 Speichere HDF5-Cache...")
+            with h5py.File(cache_path_h5, 'w') as hf:
+                hf.create_dataset('states',             data=states_np,   compression='lzf')
+                hf.create_dataset('policies',           data=policies_np, compression='lzf')
+                hf.create_dataset('values',             data=values_np,   compression='lzf')
+                hf.create_dataset('masks',              data=masks_np,    compression='lzf')
+                hf.create_dataset('moon_order_targets', data=moon_np,     compression='lzf')
+            print(f"✅ Cache gespeichert: {cache_path_h5}")
 
-        self.input_size = len(self.states[0]) if self.states else 100
+            self.states             = torch.from_numpy(states_np)
+            self.policies           = torch.from_numpy(policies_np)
+            self.values             = torch.from_numpy(values_np)
+            self.masks              = torch.from_numpy(masks_np)
+            self.moon_order_targets = torch.from_numpy(moon_np)
+
+        self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
 
     def __len__(self): return len(self.states)
     def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx]

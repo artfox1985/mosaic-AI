@@ -106,9 +106,16 @@ def run_arena(agents_dict, games_per_matchup=10):
             elo_ratings[p0] = new_elo_0
             elo_ratings[p1] = new_elo_1
             
-            avg_a = result.get("avg_actions", 0)
-            max_a = result.get("max_actions", 0)
-            print(f" {duration:.1f}s | Züge: {result['steps']} | Aktionen (Ø/max): {avg_a:4.1f}/{max_a:3d} | {scores[0]:3d}:{scores[1]:<3d} -> Sieger: {winner_name}")
+            # Strength berechnen (gleiche Formel wie self_play.py, cap=15)
+            _margin = abs(scores[0] - scores[1])
+            _ws     = max(scores[0], scores[1])
+            if _margin == 0 and _ws < 5:
+                _strength = 0.1
+            else:
+                _mp = min(0.45, (_margin / 15) * 0.45)
+                _sp = min(0.45, (_ws     / 40) * 0.45)
+                _strength = min(1.0, 0.1 + _mp + _sp)
+            print(f" {duration:.1f}s | Züge: {result['steps']} | Strength: {_strength:.3f} | {scores[0]:3d}:{scores[1]:<3d} -> Sieger: {winner_name}")
 
     total    = sum(wins[n] for n in names)
     zerozero = wins["ZeroZero"]
@@ -119,10 +126,10 @@ def run_arena(agents_dict, games_per_matchup=10):
     for name in names:
         print(f"Siege {name}: {wins[name]}")
     print(f"0:0 Spiele:    {zerozero} / {total} ({pct:.1f}%)")
-    if all_avg_actions:
-        global_avg = round(sum(all_avg_actions) / len(all_avg_actions), 1)
-        global_max = max(all_max_actions)
-        print(f"Ø Valide Züge (Branching Factor): {global_avg} (max: {global_max})")
+    # Ø Strength über alle Spiele
+    if all_avg_actions:  # Liste existiert noch (Kompatibilität)
+        pass
+    # Strength wurde pro Spiel ausgegeben
 
     
     print("\nFINALE ELO RATINGS:")
@@ -145,11 +152,17 @@ if __name__ == "__main__":
         simulations=40
         )
         
-    #agent_alphazero4 = AlphaZeroAgent(
-    #    model_version="v4",
-    #    input_size=INPUT_SIZE, 
-    #   simulations=40
-    #    )
+    agent_alphazero3new = AlphaZeroAgent(
+        model_version="v3new",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
+        
+    agent_alphazero2 = AlphaZeroAgent(
+        model_version="v2",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -159,10 +172,11 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "AlphaZero V3a 2": (agent_alphazero3a, 1000),
-        "AlphaZero V3a 1": (agent_alphazero3a, 1000)
+        "AlphaZero V2": (agent_alphazero2, 1000),
+        "AlphaZero V3new": (agent_alphazero3new, 1000),
+        "AlphaZero V3old": (agent_alphazero3a, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=1)
+    run_arena(competitors, games_per_matchup=100)

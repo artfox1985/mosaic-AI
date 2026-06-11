@@ -27,5 +27,5 @@ NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 # --- TRAININGSPARAMETER NN ---
 BATCH_SIZE    = 1024
 HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (256 oder 512)
-LEARNING_RATE = 0.0008
-VALUE_WEIGHT  = 0.25
+LEARNING_RATE = 0.0006
+VALUE_WEIGHT  = 0.1

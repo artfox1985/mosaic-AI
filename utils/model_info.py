@@ -60,20 +60,20 @@ def show_model_info(version: str):
     path = MODELS_DIR / f"alphazero_{version}.pth"
 
     if not path.exists():
-        print(f"❌ Modell nicht gefunden: {path}")
+        print(f"❌ Model nicht gefunden: {path}")
         sys.exit(1)
 
     ckpt = torch.load(str(path), map_location="cpu")
 
     if "model_state" not in ckpt:
-        print(f"⚠️  Modell '{version}' enthält keine Metadaten (altes Format).")
+        print(f"⚠️  Model '{version}' enthält keine Metadaten (altes Format).")
         print(f"   Weights vorhanden: {list(ckpt.keys())[:5]} ...")
         sys.exit(0)
 
     meta = {k: v for k, v in ckpt.items() if k != "model_state"}
 
     print(f"\n{'='*55}")
-    print(f"  MODELL: alphazero_{version}.pth")
+    print(f"  MODEL: alphazero_{version}.pth")
     print(f"{'='*55}")
 
     for key, label in LABELS.items():
@@ -102,7 +102,7 @@ def show_model_info(version: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Zeigt Metadaten eines gespeicherten Modells")
-    parser.add_argument("--version", type=str, required=True, help="Modell-Version, z.B. v1")
+    parser = argparse.ArgumentParser(description="Zeigt Metadaten eines gespeicherten Models")
+    parser.add_argument("--version", type=str, required=True, help="Model-Version, z.B. v1")
     args = parser.parse_args()
     show_model_info(args.version)
