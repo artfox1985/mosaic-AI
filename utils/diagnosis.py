@@ -99,40 +99,9 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     actions_over_10pct = []
     action_id_dist = Counter()
 
-    # Spielergebnis-Statistiken
-    total_games    = 0
-    zerozero_games = 0
-    winner_scores  = []
-    margins        = []
-
     for f in files:
         with open(f, 'rb') as fh:
             data = pickle.load(fh)
-
-        # Spielergebnisse: Wechsel in scores/winner = neues Spiel
-        prev_key = None
-        for step in data:
-            if "scores" in step and "winner" in step:
-                game_key = (tuple(step["scores"]), step["winner"])
-                if game_key != prev_key:
-                    prev_key = game_key
-                    sc  = step["scores"]
-                    w   = step["winner"]
-                    mg  = abs(sc[0] - sc[1])
-                    ws  = sc[w]
-                    total_games += 1
-                    margins.append(mg)
-                    winner_scores.append(ws)
-                    if mg == 0 and ws == 0:
-                        zerozero_games += 1
-            elif "value" in step:
-                # Altes Format: Wechsel in value = neues Spiel
-                game_key = round(step["value"], 3)
-                if game_key != prev_key:
-                    prev_key = game_key
-                    total_games += 1
-                    if abs(step["value"]) <= 0.15:
-                        zerozero_games += 1
 
         for step in data:
             policy = step.get('policy', [])
@@ -191,33 +160,6 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     for aid, cnt in action_id_dist.most_common(10):
         print(f"    ID {aid:4d}: {cnt:5d}×")
 
-    # Spielergebnis-Analyse
-    if total_games > 0:
-        zz_pct = zerozero_games / total_games * 100
-        print(f"\n{'='*55}")
-        print(f"  SPIELERGEBNIS-ANALYSE ({total_games} Spiele)")
-        print(f"{'─'*55}")
-        print(f"  0:0 Spiele:          {zerozero_games:4d} / {total_games} ({zz_pct:.1f}%)")
-        if winner_scores:
-            import statistics as _st
-            print(f"{'─'*55}")
-            print(f"  Winner-Score:")
-            print(f"    Ø:     {_st.mean(winner_scores):.1f}")
-            print(f"    Min:   {min(winner_scores)}")
-            print(f"    Max:   {max(winner_scores)}")
-            print(f"    ≥ 5:   {sum(1 for s in winner_scores if s >= 5):4d} ({sum(1 for s in winner_scores if s >= 5)/len(winner_scores)*100:.1f}%)")
-            print(f"    ≥ 10:  {sum(1 for s in winner_scores if s >= 10):4d} ({sum(1 for s in winner_scores if s >= 10)/len(winner_scores)*100:.1f}%)")
-            print(f"    ≥ 20:  {sum(1 for s in winner_scores if s >= 20):4d} ({sum(1 for s in winner_scores if s >= 20)/len(winner_scores)*100:.1f}%)")
-            print(f"{'─'*55}")
-            print(f"  Margin (Gewinner - Verlierer):")
-            print(f"    Ø:     {_st.mean(margins):.1f}")
-            print(f"    Min:   {min(margins)}")
-            print(f"    Max:   {max(margins)}")
-            print(f"    = 0:   {sum(1 for m in margins if m == 0):4d} ({sum(1 for m in margins if m == 0)/len(margins)*100:.1f}%)")
-            print(f"    1-5:   {sum(1 for m in margins if 1 <= m <= 5):4d} ({sum(1 for m in margins if 1 <= m <= 5)/len(margins)*100:.1f}%)")
-            print(f"    6-15:  {sum(1 for m in margins if 6 <= m <= 15):4d} ({sum(1 for m in margins if 6 <= m <= 15)/len(margins)*100:.1f}%)")
-            print(f"    > 15:  {sum(1 for m in margins if m > 15):4d} ({sum(1 for m in margins if m > 15)/len(margins)*100:.1f}%)")
-        print(f"{'='*55}")
     print(f"{'='*55}")
 
     # ── Stone-only Analyse (strategische Züge ohne Pflichtaktionen) ────────────
@@ -336,6 +278,102 @@ def pick_file() -> str | None:
         return None
 
 
+def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
+    """
+    Berechnet optimale margin_cap und max_winner_score aus den Spielergebnissen.
+    Ziel: maximaler Anteil im mittleren/starken Bereich, wenig gecappt bei 1.0.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agents.neural_net import compute_win_val
+
+    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))[:max_files]
+    if not files:
+        print(f"  ❌ Keine .pkl-Dateien in: {data_dir}")
+        return
+
+    # Rohe Spielergebnisse sammeln
+    results_dict = {}
+    for f in files:
+        with open(f, 'rb') as fh:
+            data = pickle.load(fh)
+
+        for step in data:
+            if "game_id" in step and "scores" in step and "winner" in step:
+                # Da jeder Schritt das Spiel-Ergebnis enthält, überschreiben wir 
+                # es im Dictionary einfach. Am Ende hat jede game_id exakt 1 Eintrag.
+                gid = step["game_id"]
+                results_dict[gid] = (step["scores"], step["winner"])
+
+    # Das Dictionary wieder in eine einfache Liste umwandeln
+    results = list(results_dict.values())
+
+    if not results:
+        print("  ❌ Keine Spielergebnisse mit 'game_id' gefunden (altes Format?)")
+        return
+
+    n = len(results)
+    margins      = [abs(s[0]-s[1]) for s,w in results]
+    winner_scores= [s[w] for s,w in results]
+    zerozero     = sum(1 for m,ws in zip(margins,winner_scores) if m==0 and ws==0)
+
+    import statistics as _st
+    import numpy as np
+
+    print(f"\n{'='*55}")
+    print(f"  VALUE SIMULATION: {label}")
+    print(f"  ({n} Spiele aus {len(files)} Datei(en))")
+    print(f"{'─'*55}")
+    print(f"  0:0 Spiele:        {zerozero:4d} ({zerozero/n*100:.1f}%)")
+    print(f"  Ø Winner-Score:    {_st.mean(winner_scores):.1f}  (Max: {max(winner_scores)})")
+    print(f"  Ø Margin:          {_st.mean(margins):.1f}  (Max: {max(margins)})")
+
+    # Optimale Parameter berechnen
+    # margin_cap: 75. Perzentil der Margins (nicht-null) → cap wo ~75% der Spiele darunter sind
+    non_zero_margins = [m for m in margins if m > 0]
+    non_zero_ws      = [ws for ws,m in zip(winner_scores,margins) if m > 0 or ws > 0]
+
+    if non_zero_margins:
+        margin_cap_opt = max(5, int(np.percentile(non_zero_margins, 75)))
+
+
+    else:
+        margin_cap_opt = 10
+
+    if non_zero_ws:
+        max_ws_opt = max(10, int(np.percentile(non_zero_ws, 80)))
+    else:
+        max_ws_opt = 20
+
+    margin_cap_opt = round(margin_cap_opt / 5) * 5 or 5
+    max_ws_opt     = round(max_ws_opt / 5) * 5 or 10
+
+    print(f"{'─'*55}")
+    print(f"  📊 EMPFOHLENE PARAMETER:")
+    print(f"     --margin_cap       {margin_cap_opt}")
+    print(f"     --max_winner_score {max_ws_opt}")
+    print(f"{'─'*55}")
+
+    from agents.neural_net import compute_win_val
+    for margin_cap, max_ws, desc in [
+        (margin_cap_opt, max_ws_opt, "Empfohlen"),
+        (15, 40, "Standard (15/40)"),
+    ]:
+        values = [compute_win_val(s, w, margin_cap, max_ws) for s, w in results]
+        capped = sum(1 for v in values if v >= 1.0)
+        weak   = sum(1 for v in values if v <= 0.15)
+        medium = sum(1 for v in values if 0.15 < v <= 0.5)
+        strong = sum(1 for v in values if v > 0.5)
+
+        print(f"\n  [{desc}]  margin_cap={margin_cap}, max_winner={max_ws}")
+        print(f"  Ø win_val: {_st.mean(values):.3f}  |  Gecappt (=1.0): {capped} ({capped/n*100:.1f}%)")
+        print(f"  Schwach  (≤0.15): {weak:4d} ({weak/n*100:.1f}%)")
+        print(f"  Mittel (0.15-0.5):{medium:4d} ({medium/n*100:.1f}%)")
+        print(f"  Stark    (> 0.5): {strong:4d} ({strong/n*100:.1f}%)")
+
+    print(f"\n{'='*55}")
+
+
 def main():
     print("\n📋 DIAGNOSIS — Trainingsdaten Analyse")
     print("─" * 55)
@@ -343,12 +381,14 @@ def main():
     print("  [2] Sanity Check  — einzelne Datei auswählen")
     print("  [3] Policy Qualität — alle Daten im data/ Ordner")
     print("  [4] Policy Qualität — einzelne Datei auswählen")
+    print("  [5] Value Simulation — alle Daten im data/ Ordner")
+    print("  [6] Value Simulation — einzelne Datei auswählen")
     print("─" * 55)
 
-    choice = input("  Auswahl (1/2/3/4): ").strip()
+    choice = input("  Auswahl (1/2/3/4/5/6): ").strip()
 
     if choice == "1":
-        run_diagnosis(str(DATA_DIR), f"data/")
+        run_diagnosis(str(DATA_DIR), "data/")
 
     elif choice == "2":
         print("  Öffne Datei-Dialog...")
@@ -372,6 +412,20 @@ def main():
             with tempfile.TemporaryDirectory() as tmp:
                 shutil.copy(path, tmp)
                 run_policy_quality(tmp, Path(path).name, max_files=999)
+        else:
+            print("  ❌ Keine Datei ausgewählt.")
+
+    elif choice == "5":
+        run_value_simulation(str(DATA_DIR), "data/")
+
+    elif choice == "6":
+        print("  Öffne Datei-Dialog...")
+        path = pick_file()
+        if path:
+            import tempfile, shutil
+            with tempfile.TemporaryDirectory() as tmp:
+                shutil.copy(path, tmp)
+                run_value_simulation(tmp, Path(path).name, max_files=999)
         else:
             print("  ❌ Keine Datei ausgewählt.")
 

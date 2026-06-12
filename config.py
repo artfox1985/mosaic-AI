@@ -25,7 +25,7 @@ INPUT_SIZE = 543        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---
-BATCH_SIZE    = 1024
-HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (256 oder 512)
+BATCH_SIZE    = 256
+HIDDEN_SIZE   = 256   # Neuronen pro Hidden Layer (256 oder 512)
 LEARNING_RATE = 0.0006
-VALUE_WEIGHT  = 0.1
+VALUE_WEIGHT  = 1

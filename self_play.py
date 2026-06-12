@@ -134,7 +134,7 @@ class NetworkSelfPlayAgent(SelfPlayMixin):
 # Spiel-Loop
 # ---------------------------------------------------------------------------
 
-def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40):
+def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_id: str = "unknown"):
     """Spielt ein Spiel und gibt Trainingsdaten zurück."""
     env = MosaicEnv()
     obs, info = env.reset()
@@ -240,6 +240,7 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40):
     training_data = []
     for step in history:
         training_data.append({
+            "game_id":          game_id,
             "state":             step["state"],
             "policy":            step["policy"],
             "valid_actions":     step["valid_actions"],
@@ -294,12 +295,19 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     all_training_data = []
     t_start = time.time()
+    
+    # Einmaliger Run-Prefix für diese gesamte Ausführung
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     for i in range(num_games):
         t0 = time.time()
         print(f"Spiele Partie {i+1}/{num_games}... ", end="", flush=True)
 
-        game_data, winner, scores, steps, win_val = play_one_game(agent, margin_cap=margin_cap, max_winner_score=max_winner_score)
+        # Eindeutige ID für dieses spezifische Spiel generieren
+        file_tag = f"_{tag}" if tag else ""
+        current_game_id = f"{version_name}{file_tag}_{run_timestamp}_g{i+1}"
+
+        game_data, winner, scores, steps, win_val = play_one_game(agent, margin_cap=margin_cap, max_winner_score=max_winner_score, game_id=current_game_id)
         all_training_data.extend(game_data)
         duration = time.time() - t0
 

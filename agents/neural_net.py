@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from config import NUM_ACTIONS, HIDDEN_SIZE
 
-COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "weiß": 4, None: -1, "special": 5}
+COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
 
 def state_to_tensor(data):
