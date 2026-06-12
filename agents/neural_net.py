@@ -219,8 +219,21 @@ def action_to_id(action: dict) -> int:
     return 481  # Fallback
 
 # --- 2. DATENSATZ & NETZWERK ---
+def compute_win_val(scores, winner, margin_cap=15, max_winner_score=40):
+    """Berechnet den abgestuften Value-Target aus rohen Scores.
+    Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
+    """
+    margin       = abs(scores[0] - scores[1])
+    winner_score = scores[winner]
+    if margin == 0 and winner_score < 5:
+        return 0.1
+    margin_part = min(0.45, (margin / margin_cap) * 0.45)
+    score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
+    return min(1.0, 0.1 + margin_part + score_part)
+
+
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", margin_cap=15, max_winner_score=40):
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
@@ -228,8 +241,11 @@ class MosaicDataset(Dataset):
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+        self.margin_cap       = margin_cap
+        self.max_winner_score = max_winner_score
         cache_key = hashlib.md5(
-            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)).encode()
+            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)
+             + str(margin_cap) + str(max_winner_score)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -282,7 +298,13 @@ class MosaicDataset(Dataset):
                     game_data = pickle.load(file)
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
-                        values_l.append([float(step["value"])])
+                        if "scores" in step and "winner" in step:
+                            wv  = compute_win_val(step["scores"], step["winner"],
+                                                  margin_cap, max_winner_score)
+                            val = wv if step["player"] == step["winner"] else -wv
+                        else:
+                            val = float(step["value"])
+                        values_l.append([val])
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for p in step["policy"]:

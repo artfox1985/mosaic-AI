@@ -99,9 +99,41 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     actions_over_10pct = []
     action_id_dist = Counter()
 
+    # Spielergebnis-Statistiken
+    total_games    = 0
+    zerozero_games = 0
+    winner_scores  = []
+    margins        = []
+
     for f in files:
         with open(f, 'rb') as fh:
             data = pickle.load(fh)
+
+        # Spielergebnisse: Wechsel in scores/winner = neues Spiel
+        prev_key = None
+        for step in data:
+            if "scores" in step and "winner" in step:
+                game_key = (tuple(step["scores"]), step["winner"])
+                if game_key != prev_key:
+                    prev_key = game_key
+                    sc  = step["scores"]
+                    w   = step["winner"]
+                    mg  = abs(sc[0] - sc[1])
+                    ws  = sc[w]
+                    total_games += 1
+                    margins.append(mg)
+                    winner_scores.append(ws)
+                    if mg == 0 and ws == 0:
+                        zerozero_games += 1
+            elif "value" in step:
+                # Altes Format: Wechsel in value = neues Spiel
+                game_key = round(step["value"], 3)
+                if game_key != prev_key:
+                    prev_key = game_key
+                    total_games += 1
+                    if abs(step["value"]) <= 0.15:
+                        zerozero_games += 1
+
         for step in data:
             policy = step.get('policy', [])
             if not policy:
@@ -158,6 +190,34 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     print(f"  Top 10 Action-IDs (häufig >10% Prob):")
     for aid, cnt in action_id_dist.most_common(10):
         print(f"    ID {aid:4d}: {cnt:5d}×")
+
+    # Spielergebnis-Analyse
+    if total_games > 0:
+        zz_pct = zerozero_games / total_games * 100
+        print(f"\n{'='*55}")
+        print(f"  SPIELERGEBNIS-ANALYSE ({total_games} Spiele)")
+        print(f"{'─'*55}")
+        print(f"  0:0 Spiele:          {zerozero_games:4d} / {total_games} ({zz_pct:.1f}%)")
+        if winner_scores:
+            import statistics as _st
+            print(f"{'─'*55}")
+            print(f"  Winner-Score:")
+            print(f"    Ø:     {_st.mean(winner_scores):.1f}")
+            print(f"    Min:   {min(winner_scores)}")
+            print(f"    Max:   {max(winner_scores)}")
+            print(f"    ≥ 5:   {sum(1 for s in winner_scores if s >= 5):4d} ({sum(1 for s in winner_scores if s >= 5)/len(winner_scores)*100:.1f}%)")
+            print(f"    ≥ 10:  {sum(1 for s in winner_scores if s >= 10):4d} ({sum(1 for s in winner_scores if s >= 10)/len(winner_scores)*100:.1f}%)")
+            print(f"    ≥ 20:  {sum(1 for s in winner_scores if s >= 20):4d} ({sum(1 for s in winner_scores if s >= 20)/len(winner_scores)*100:.1f}%)")
+            print(f"{'─'*55}")
+            print(f"  Margin (Gewinner - Verlierer):")
+            print(f"    Ø:     {_st.mean(margins):.1f}")
+            print(f"    Min:   {min(margins)}")
+            print(f"    Max:   {max(margins)}")
+            print(f"    = 0:   {sum(1 for m in margins if m == 0):4d} ({sum(1 for m in margins if m == 0)/len(margins)*100:.1f}%)")
+            print(f"    1-5:   {sum(1 for m in margins if 1 <= m <= 5):4d} ({sum(1 for m in margins if 1 <= m <= 5)/len(margins)*100:.1f}%)")
+            print(f"    6-15:  {sum(1 for m in margins if 6 <= m <= 15):4d} ({sum(1 for m in margins if 6 <= m <= 15)/len(margins)*100:.1f}%)")
+            print(f"    > 15:  {sum(1 for m in margins if m > 15):4d} ({sum(1 for m in margins if m > 15)/len(margins)*100:.1f}%)")
+        print(f"{'='*55}")
     print(f"{'='*55}")
 
     # ── Stone-only Analyse (strategische Züge ohne Pflichtaktionen) ────────────
