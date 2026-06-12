@@ -19,7 +19,7 @@ Das Rundenende besteht aus zwei Phasen:
    Für jeden platzierten Stein:
      - Orthogonal verbundene Steine zählen mit (horizontal + vertikal getrennt)
      - Steht der Stein allein: 1 Punkt
-   Strafleiste: −1 Punkt pro Stein (max −4)
+   Strafleiste: progressiv [−1, -2, -3, -4]
    Startspieler-Marker: −2 Punkt (zusätzlich zur Strafleiste)
    Punkte können nie unter 0 fallen.
    Special-Space freigeschaltet: Spieler nimmt sofort einen weißen Stein
@@ -63,17 +63,17 @@ class TilingAction:
     rotation:     int           = 0
 
 
-@dataclass
-class SpecialTilingAction:
-    """
-    Platzierung eines weißen Steins auf einen freigeschalteten Special-Space.
+# @dataclass
+# class SpecialTilingAction:
+    # """
+    # Platzierung eines weißen Steins auf einen freigeschalteten Special-Space.
 
-    slot_row, slot_col: der Dome-Slot der den Special-Space enthält
-    space_index:        immer der Index des Special-Spaces auf der Kachel
-    """
-    slot_row:    int
-    slot_col:    int
-    space_index: int
+    # slot_row, slot_col: der Dome-Slot der den Special-Space enthält
+    # space_index:        immer der Index des Special-Spaces auf der Kachel
+    # """
+    # slot_row:    int
+    # slot_col:    int
+    # space_index: int
 
 
 # ---------------------------------------------------------------------------
@@ -157,24 +157,24 @@ def validate_tiling_action(
     return None
 
 
-def validate_special_tiling(
-    state: "GameState",
-    player_idx: int,
-    action: SpecialTilingAction,
-) -> Optional[str]:
-    if state.special_supply.is_empty:
-        return "Kein weißer Stein mehr im Vorrat."
-    player = state.players[player_idx]
-    slot = player.dome_grid.dome_slots[action.slot_row][action.slot_col]
-    if slot is None:
-        return f"Slot ({action.slot_row},{action.slot_col}) ist leer."
-    space = slot.spaces[action.space_index]
-    if not space.accepts_special():
-        return (
-            f"Space {action.space_index} ist kein offener Special-Space "
-            f"(locked={space.is_locked}, filled={space.is_filled})."
-        )
-    return None
+# def validate_special_tiling(
+    # state: "GameState",
+    # player_idx: int,
+    # action: SpecialTilingAction,
+# ) -> Optional[str]:
+    # if state.special_supply.is_empty:
+        # return "Kein weißer Stein mehr im Vorrat."
+    # player = state.players[player_idx]
+    # slot = player.dome_grid.dome_slots[action.slot_row][action.slot_col]
+    # if slot is None:
+        # return f"Slot ({action.slot_row},{action.slot_col}) ist leer."
+    # space = slot.spaces[action.space_index]
+    # if not space.accepts_special():
+        # return (
+            # f"Space {action.space_index} ist kein offener Special-Space "
+            # f"(locked={space.is_locked}, filled={space.is_filled})."
+        # )
+    # return None
 
 
 # ---------------------------------------------------------------------------
@@ -290,33 +290,33 @@ def check_special_trigger(state, player, slot_row: int, slot_col: int) -> int:
                 
     return bonus
     
-def execute_special_tiling(
-    state: "GameState",
-    player_idx: int,
-    action: SpecialTilingAction,
-) -> int:
-    """
-    Platziert einen weißen Stein auf einen Special-Space.
-    Bonus = Tiling-Reihe (1-6) in der der Space liegt.
-    """
-    player = state.players[player_idx]
-    grid = player.dome_grid
-    slot = grid.dome_slots[action.slot_row][action.slot_col]
-    space = slot.spaces[action.space_index]
-    space.place_special_tile()
-    state.special_supply.take(1)
+# def execute_special_tiling(
+    # state: "GameState",
+    # player_idx: int,
+    # action: SpecialTilingAction,
+# ) -> int:
+    # """
+    # Platziert einen weißen Stein auf einen Special-Space.
+    # Bonus = Tiling-Reihe (1-6) in der der Space liegt.
+    # """
+    # player = state.players[player_idx]
+    # grid = player.dome_grid
+    # slot = grid.dome_slots[action.slot_row][action.slot_col]
+    # space = slot.spaces[action.space_index]
+    # space.place_special_tile()
+    # state.special_supply.take(1)
 
-    # Bonus = Tiling-Reihe (1-basiert) in der der Special-Space liegt
-    # pattern_row: 0-basierte Reihe aus Slot-Position + Space-Index
-    pattern_row = action.slot_row * 2 + (action.space_index // 2)
-    bonus = pattern_row + 1  # Reihe 1-6
+    # # Bonus = Tiling-Reihe (1-basiert) in der der Special-Space liegt
+    # # pattern_row: 0-basierte Reihe aus Slot-Position + Space-Index
+    # pattern_row = action.slot_row * 2 + (action.space_index // 2)
+    # bonus = pattern_row + 1  # Reihe 1-6
 
-    player.apply_score(bonus)
-    state.log_event(
-        f"⭐ {player.name}: weißer Stein auf Special-Space "
-        f"({action.slot_row},{action.slot_col}) +{bonus} Pkt (Reihe {bonus})"
-    )
-    return bonus
+    # player.apply_score(bonus)
+    # state.log_event(
+        # f"⭐ {player.name}: weißer Stein auf Special-Space "
+        # f"({action.slot_row},{action.slot_col}) +{bonus} Pkt (Reihe {bonus})"
+    # )
+    # return bonus
 
 
 # ---------------------------------------------------------------------------

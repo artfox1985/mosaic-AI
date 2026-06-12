@@ -24,7 +24,7 @@ def get_player_potential(player) -> float:
                 
     # B: Eskalierende Strafe für den Boden
     broken_penalty = 0.0
-    base_pen = 0.8
+    base_pen = 0.2
     for k in range(1, len(player.broken_tiles) + 1):
         broken_penalty += k * base_pen
         
@@ -35,7 +35,7 @@ def get_player_potential(player) -> float:
             if slot is not None:
                 # Jede liegende Platte ist extrem wertvoll, 
                 # da sie überhaupt erst Punkte ermöglicht!
-                dome_bonus += 0.5 
+                dome_bonus += 1 
     potential += dome_bonus
     
     # D: Bonus für tatsächlich erzielte Punkte (motiviert echte Punktevergabe)

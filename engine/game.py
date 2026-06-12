@@ -42,9 +42,9 @@ from engine.moves import Move, PlaceDomeTileMove, AnyMove
 from engine.validation import validate_move, generate_valid_moves
 from engine.execution import execute_move
 from engine.round_end import (
-    TilingAction, SpecialTilingAction,
-    validate_tiling_action, validate_special_tiling,
-    execute_full_tiling, execute_special_tiling,
+    TilingAction,
+    validate_tiling_action,
+    execute_full_tiling,
     check_drafting_complete, get_pending_tiling_rows,
     apply_round_scoring, score_placed_tile,
     process_unplaceable_rows, score_penalty,
