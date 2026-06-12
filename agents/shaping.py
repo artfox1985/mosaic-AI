@@ -20,11 +20,11 @@ def get_player_potential(player) -> float:
             # Extra 'Zuckerguss'-Bonus, wenn die Reihe fertig ist
             # (Bleibt hoch, bis sie in Phase 2 abgeräumt und in echte Punkte verwandelt wird!)
             if row.is_complete:
-                potential += 0.2
+                potential += 3
                 
     # B: Eskalierende Strafe für den Boden
     broken_penalty = 0.0
-    base_pen = 0.2
+    base_pen = 0.8
     for k in range(1, len(player.broken_tiles) + 1):
         broken_penalty += k * base_pen
         
