@@ -30,6 +30,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     from config import HIDDEN_SIZE as DEFAULT_HIDDEN
     hs = hidden_size if hidden_size is not None else DEFAULT_HIDDEN
     print(f"🧠 Netz-Architektur: {dataset.input_size}→{hs}→{hs}→{hs}")
+    print(f"⚙️  Hyperparameter (config.py):")
+    print(f"   Learning Rate : {LEARNING_RATE}")
+    print(f"   Value Weight  : {VALUE_WEIGHT}")
+    print(f"   Batch Size    : {BATCH_SIZE}")
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
     
     # Warm Start?
@@ -51,6 +55,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     
     # Epochen-Anzahl ---
     epochs = input_epoch
+    print(f"   Epochen       : {epochs}")
     if load_version:
         print(f"🔄 Warm-Start erkannt: Trainiere für {epochs} Epochen.")
     else:
@@ -188,22 +193,26 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # 6. Speichern
     model.cpu()
     save_path = MODELS_DIR / f"alphazero_{version_name}.pth"
+    actual_epochs = len(policy_history)
     checkpoint = {
-        "model_state":   model.state_dict(),
-        "version":       version_name,
-        "timestamp":     __import__("datetime").datetime.now().isoformat(),
-        "epochs":        epochs,
-        "num_games":     len(dataset),  # Züge
-        "input_size":    dataset.input_size,
-        "num_actions":   NUM_ACTIONS,
-        "hidden_size":   hs,
-        "batch_size":    BATCH_SIZE,
-        "lr":            LEARNING_RATE,
-        "value_weight":  VALUE_WEIGHT,
+        "model_state":       model.state_dict(),
+        "version":           version_name,
+        "timestamp":         __import__("datetime").datetime.now().isoformat(),
+        "epochs":            actual_epochs,
+        "epochs_requested":  epochs,
+        "early_stopped":     stopped_early,
+        "early_stop_epoch":  policy_plateau_since if stopped_early else None,
+        "num_games":         len(dataset),  # Züge
+        "input_size":        dataset.input_size,
+        "num_actions":       NUM_ACTIONS,
+        "hidden_size":       hs,
+        "batch_size":        BATCH_SIZE,
+        "lr":                LEARNING_RATE,
+        "value_weight":      VALUE_WEIGHT,
         "final_policy_loss": round(final_p, 4),
         "final_value_loss":  round(final_v, 4),
-        "policy_pct":    round(pct, 1),
-        "load_version":  load_version,
+        "policy_pct":        round(pct, 1),
+        "load_version":      load_version,
     }
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
