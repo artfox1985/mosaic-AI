@@ -191,7 +191,35 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     else:
         print(f"  🟢 Kein Plateau — Policy sinkt noch. Mehr Epochen möglich.")
     print(f"{'='*55}")
-        
+
+    # 5b. Netzauslastung (Dead Neurons + Effective Rank)
+    try:
+        sample_batch = next(iter(dataloader))[0][:512].to(device)
+        if sample_batch.shape[0] >= 2:
+            cap = model.analyze_capacity(sample_batch)
+            print(f"\n{'='*55}")
+            print(f"  NETZAUSLASTUNG (Hidden Size: {hs})")
+            print(f"{'─'*55}")
+            print(f"  {'Schicht':<9} {'Dead':>11} {'Aktiv-Rate':>12} {'Eff.Rank':>15}")
+            print(f"  {'─'*51}")
+            for ln, m in cap.items():
+                dead_str = f"{m['dead']}/{m['n_neurons']} ({m['dead_ratio']*100:.0f}%)"
+                rank_str = f"{m['eff_rank']:.0f}/{m['n_neurons']} ({m['rank_pct']*100:.0f}%)"
+                print(f"  {ln:<9} {dead_str:>11} {m['active_rate']*100:>11.0f}% {rank_str:>15}")
+            print(f"  {'─'*51}")
+            avg_dead = sum(m['dead_ratio'] for m in cap.values()) / len(cap)
+            avg_rank = sum(m['rank_pct'] for m in cap.values()) / len(cap)
+            if avg_dead > 0.4:
+                print(f"  🔴 Viele tote Neuronen ({avg_dead*100:.0f}%) — Netz unterausgelastet.")
+            elif avg_rank > 0.7:
+                print(f"  🟡 Hohe Auslastung (Eff.Rank {avg_rank*100:.0f}%) — bei Plateau mehr Neuronen erwägen.")
+            else:
+                print(f"  🟢 Gesunde Auslastung (Dead {avg_dead*100:.0f}%, Rank {avg_rank*100:.0f}%).")
+            print(f"{'='*55}")
+        model.train()
+    except Exception as e:
+        print(f"  ⚠️  Auslastungsanalyse übersprungen: {e}")
+
     # 6. Speichern
     model.cpu()
     save_path = MODELS_DIR / f"alphazero_{version_name}.pth"

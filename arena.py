@@ -156,11 +156,11 @@ if __name__ == "__main__":
         simulations=40
         )
         
-    # agent_alphazero2 = AlphaZeroAgent(
-        # model_version="v2",
-        # input_size=INPUT_SIZE, 
-        # simulations=40
-        # )
+    agent_alphazero2b = AlphaZeroAgent(
+        model_version="v2b",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -171,6 +171,7 @@ if __name__ == "__main__":
 
     competitors = {
         "AlphaZero V2a": (agent_alphazero2a, 1000),
+        "AlphaZero V2b": (agent_alphazero2b, 1000),
         "AlphaZero V1a": (agent_alphazero1a, 1000)
     }
 

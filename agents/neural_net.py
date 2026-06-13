@@ -446,3 +446,47 @@ class MosaicNet(nn.Module):
     def forward(self, x):
         shared = self.body(x)
         return self.policy_head(shared), self.value_head(shared), self.moon_order_head(shared)
+
+    @torch.no_grad()
+    def analyze_capacity(self, x):
+        """
+        Misst Netzauslastung über einen Batch:
+        - Dead-Neuron-Ratio pro ReLU-Schicht (Neuronen die für ALLE Samples 0 sind)
+        - Effective Rank der Aktivierungen (wie viele Dimensionen real genutzt werden)
+        """
+        self.eval()
+        layer_out = []
+        h = x
+        for layer in self.body:
+            h = layer(h)
+            if isinstance(layer, nn.ReLU):
+                layer_out.append(h.clone())
+
+        results = {}
+        for idx, a in enumerate(layer_out):
+            n_neurons = a.shape[1]
+            active_per_neuron = (a > 1e-6).any(dim=0)
+            dead = (~active_per_neuron).sum().item()
+            dead_ratio = dead / n_neurons
+            active_rate = (a > 1e-6).float().mean().item()
+            a_centered = a - a.mean(dim=0, keepdim=True)
+            try:
+                sv = torch.linalg.svdvals(a_centered)
+                sv = sv[sv > 1e-10]
+                if len(sv) > 0:
+                    p = sv / sv.sum()
+                    entropy = -(p * torch.log(p)).sum()
+                    eff_rank = torch.exp(entropy).item()
+                else:
+                    eff_rank = 0.0
+            except Exception:
+                eff_rank = float('nan')
+            results[f"layer{idx+1}"] = {
+                "n_neurons":   n_neurons,
+                "dead":        dead,
+                "dead_ratio":  dead_ratio,
+                "active_rate": active_rate,
+                "eff_rank":    eff_rank,
+                "rank_pct":    eff_rank / n_neurons if n_neurons else 0,
+            }
+        return results
