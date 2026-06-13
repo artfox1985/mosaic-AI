@@ -145,24 +145,24 @@ if __name__ == "__main__":
     
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
-    #agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
-    agent_alphazero3a = AlphaZeroAgent(
-        model_version="v3a",
+    agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
+    agent_alphazero1a = AlphaZeroAgent(
+        model_version="v1a",
         input_size=INPUT_SIZE, 
         simulations=40
         )
         
-    agent_alphazero3new = AlphaZeroAgent(
-        model_version="v3new",
-        input_size=INPUT_SIZE, 
-        simulations=40
-        )
+    # agent_alphazero3new = AlphaZeroAgent(
+        # model_version="v3new",
+        # input_size=INPUT_SIZE, 
+        # simulations=40
+        # )
         
-    agent_alphazero2 = AlphaZeroAgent(
-        model_version="v2",
-        input_size=INPUT_SIZE, 
-        simulations=40
-        )
+    # agent_alphazero2 = AlphaZeroAgent(
+        # model_version="v2",
+        # input_size=INPUT_SIZE, 
+        # simulations=40
+        # )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -172,10 +172,10 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "AlphaZero V2": (agent_alphazero2, 1000),
-        "AlphaZero V3new": (agent_alphazero3new, 1000)
+        "MTCS": (agent_mcts_heuristic, 1000),
+        "AlphaZero V1": (agent_alphazero1a, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=100)
+    run_arena(competitors, games_per_matchup=40)

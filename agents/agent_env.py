@@ -511,9 +511,8 @@ class MosaicEnv:
                     test_game.apply(test_move)
                     score = evaluate_state(test_game.state).get(pi, 0.0)
 
-                    # Kosten der zusätzlichen Platten einrechnen (-1 Pkt ab Platte 2)
-                    #cost = (num_drawn - 1) * 0.01  # normalisiert (~1 Pkt)
-                    #net_score = score - cost
+                    # Kosten der zusätzlichen Platten einrechnen (-1 Pkt je Platte)
+                    net_score = score - cost
 
                     if net_score > best_score:
                         best_score   = net_score

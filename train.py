@@ -13,9 +13,9 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, margin_cap=15, max_winner_score=40):
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, margin_cap=15, max_winner_score=40, zerozero_ratio=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
-    dataset = MosaicDataset(str(DATA_DIR), margin_cap=margin_cap, max_winner_score=max_winner_score)
+    dataset = MosaicDataset(str(DATA_DIR), margin_cap=margin_cap, max_winner_score=max_winner_score, target_zerozero_ratio=zerozero_ratio)
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
@@ -227,10 +227,13 @@ if __name__ == "__main__":
                         help="Margin ab dem win_val=1.0 (Standard: 15)")
     parser.add_argument("--max_winner_score", type=int, default=40,
                         help="Normalisierung Winner-Score (Standard: 40)")
+    parser.add_argument("--zerozero_ratio", type=float, default=None,
+                        help="Ziel-Anteil 0:0-Spiele (z.B. 0.45). None = keine Reduktion")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
-          margin_cap=args.margin_cap, max_winner_score=args.max_winner_score)
+          margin_cap=args.margin_cap, max_winner_score=args.max_winner_score,
+          zerozero_ratio=args.zerozero_ratio)

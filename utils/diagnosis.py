@@ -10,7 +10,7 @@ Prüft:
 Verwendung:
     python -m utils.diagnosis
 """
-import sys, torch, os, math, glob, pickle
+import sys, torch, os, math, glob, pickle, random
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from pathlib import Path
@@ -84,8 +84,9 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     if not files:
         print(f"  ❌ Keine .pkl-Dateien in: {data_dir}")
         return
+    if len(files) > max_files:
+        files = random.sample(files, max_files)
 
-    files = files[:max_files]
     print(f"\n{'='*55}")
     print(f"  POLICY QUALITÄT: {label}")
     print(f"  (Analyse von {len(files)} Datei(en))")
@@ -287,7 +288,9 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from agents.neural_net import compute_win_val
 
-    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))[:max_files]
+    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    if len(files) > max_files:
+        files = random.sample(files, max_files)
     if not files:
         print(f"  ❌ Keine .pkl-Dateien in: {data_dir}")
         return

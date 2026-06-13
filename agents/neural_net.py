@@ -233,7 +233,7 @@ def compute_win_val(scores, winner, margin_cap=15, max_winner_score=40):
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", margin_cap=15, max_winner_score=40):
+    def __init__(self, data_dir="data", margin_cap=15, max_winner_score=40, target_zerozero_ratio=None):
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
@@ -245,7 +245,8 @@ class MosaicDataset(Dataset):
         self.max_winner_score = max_winner_score
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)
-             + str(margin_cap) + str(max_winner_score)).encode()
+             + str(margin_cap) + str(max_winner_score)
+             + str(target_zerozero_ratio)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -293,10 +294,63 @@ class MosaicDataset(Dataset):
             _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
 
+            import random as _rnd
+            keep_prob = 1.0
+            if target_zerozero_ratio is not None and target_zerozero_ratio < 1.0:
+                # Erst-Scan: 0:0 vs non-0:0 Spiele zählen (Trennung über game_id)
+                n_zz = n_nonzz = 0
+                prev_g = None
+                for f in files:
+                    with open(f, "rb") as file:
+                        gd = pickle.load(file)
+                    for step in gd:
+                        gid = step.get("game_id")
+                        if gid is None:
+                            gid = (tuple(step["scores"]), step["winner"]) if "scores" in step else id(step)
+                        if gid != prev_g:
+                            prev_g = gid
+                            if "scores" in step and "winner" in step:
+                                is_zz = (step["scores"][0] == step["scores"][1] == 0)
+                            elif "value" in step:
+                                is_zz = abs(step["value"]) <= 0.1
+                            else:
+                                is_zz = False
+                            if is_zz: n_zz += 1
+                            else:     n_nonzz += 1
+                if n_nonzz > 0 and n_zz > 0:
+                    target_zz = int((target_zerozero_ratio / (1 - target_zerozero_ratio)) * n_nonzz)
+                    target_zz = min(target_zz, n_zz)
+                    keep_prob = target_zz / n_zz
+                    print(f"  🎯 0:0-Reduktion: {n_zz} 0:0-Spiele (von {n_zz+n_nonzz} total) "
+                          f"→ behalte ~{target_zz} (Ziel {target_zerozero_ratio*100:.0f}%, keep_prob {keep_prob:.2f})")
+
+            prev_g_load = None
+            keep_current = True
+
             for f in files:
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
                     for step in game_data:
+                        # Spielgrenze über game_id
+                        gid = step.get("game_id")
+                        if gid is None:
+                            gid = (tuple(step["scores"]), step["winner"]) if "scores" in step else id(step)
+                        if gid != prev_g_load:
+                            prev_g_load = gid
+                            if keep_prob < 1.0:
+                                if "scores" in step and "winner" in step:
+                                    is_zz = (step["scores"][0] == step["scores"][1] == 0)
+                                elif "value" in step:
+                                    is_zz = abs(step["value"]) <= 0.1
+                                else:
+                                    is_zz = False
+                                keep_current = (not is_zz) or (_rnd.random() < keep_prob)
+                            else:
+                                keep_current = True
+
+                        if not keep_current:
+                            continue
+
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
                             wv  = compute_win_val(step["scores"], step["winner"],

@@ -311,7 +311,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         all_training_data.extend(game_data)
         duration = time.time() - t0
 
-        print(f"Fertig in {duration:.1f}s | "              f"Scores: {scores[0]}:{scores[1]} | "              f"Strength: {win_val:.3f} | Züge: {steps}")
+        print(f"Fertig in {duration:.1f}s | "              f"Scores: {scores[0]}:{scores[1]} | "              f"Züge: {steps}")
 
         if (i + 1) % 10 == 0 or (i + 1) == num_games:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")

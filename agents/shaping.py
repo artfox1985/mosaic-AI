@@ -39,7 +39,7 @@ def get_player_potential(player) -> float:
     potential += dome_bonus
     
     # D: Bonus für tatsächlich erzielte Punkte (motiviert echte Punktevergabe)
-    score_bonus = player.score * 0.15
+    score_bonus = player.score * 0.45
     potential += score_bonus
         
     return potential - broken_penalty
