@@ -15,6 +15,10 @@ Action-ID Schema (siehe agent_env.py):
 """
 
 COLORS  = ['blau', 'gelb', 'rot', 'schwarz', 'türkis']
+# factory_index Bedeutung (siehe agent_env.py _drafting_actions):
+#   0-3 = kleine Fabriken F1-F4 (bzw. GF-Moon-Pool via factory_id, mehrdeutig)
+#   4   = LARGE_FACTORY_SUN  → "GF" (große Fabrik, Sonnenseite)
+#   5   = SMALL_FACTORY_MOON global → Mondaktion C
 SOURCES = ['F1', 'F2', 'F3', 'F4', 'GF', 'Mond']
 
 
@@ -33,28 +37,46 @@ def describe_action_id(aid: int) -> str:
         c_id   = a // 48
         color  = COLORS[c_id]  if c_id  < len(COLORS)  else '?'
         source = SOURCES[f_idx] if f_idx < len(SOURCES) else '?'
+        # r_id wird in action_to_id als (row + 1) kodiert:
+        #   r_id=0 → row=-1 → Strafleiste, r_id=1..6 → Reihe 1..6
         row_str = 'Strafleiste' if r_id == 0 else f'Reihe {r_id}'
         return f"{color} von {source} → {row_str}"
 
-    # Tiling: 274 - 327
+    # Tiling: 274 - 327   (274 + pattern_row*9 + slot_row*3 + slot_col)
     if 274 <= aid <= 327:
-        return f"Tiling-Platzierung (#{aid - 274})"
+        a  = aid - 274
+        pr = a // 9
+        sr = (a % 9) // 3
+        sc = a % 3
+        return f"Tiling: Reihe {pr+1} → Slot ({sr},{sc})"
 
-    # Dome: 328 - 435
+    # Dome: 328 - 435   (328 + display_index*36 + slot_row*12 + slot_col*4 + rot_idx)
     if 328 <= aid <= 435:
-        return f"Kuppel setzen (#{aid - 328})"
+        a       = aid - 328
+        d_idx   = a // 36
+        rest    = a % 36
+        sr      = rest // 12
+        sc      = (rest % 12) // 4
+        rot_idx = rest % 4
+        return f"Kuppel {d_idx} → Slot ({sr},{sc}) {rot_idx*90}°"
 
-    # Dome-Stack: 436 - 471
+    # Dome-Stack: 436 - 471   (436 + slot_row*12 + slot_col*4 + rot_idx)
     if 436 <= aid <= 471:
-        return f"Kuppel vom Stapel (#{aid - 436})"
+        a       = aid - 436
+        sr      = a // 12
+        sc      = (a % 12) // 4
+        rot_idx = a % 4
+        return f"Kuppel vom Stapel → Slot ({sr},{sc}) {rot_idx*90}°"
 
-    # Use-Chips: 472 - 477
+    # Use-Chips: 472 - 477   (472 + pattern_row)
     if 472 <= aid <= 477:
-        return f"Chips einsetzen (#{aid - 472})"
+        return f"Chips einsetzen → Reihe {aid - 472 + 1}"
 
-    # Bonus-Chip: 478 - 481
+    # Bonus-Chip: 478 - 481   (478 + factory_index)
     if 478 <= aid <= 481:
-        return f"Bonus-Chip ({COLORS[aid - 478]})" if (aid - 478) < len(COLORS) else f"Bonus-Chip (#{aid - 478})"
+        f_idx = aid - 478
+        src = SOURCES[f_idx] if f_idx < len(SOURCES) else f"#{f_idx}"
+        return f"Bonus-Chip von {src}"
 
     return f"Unbekannt (ID {aid})"
 

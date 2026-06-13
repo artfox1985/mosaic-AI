@@ -136,6 +136,7 @@ async function triggerAIMove() {
         }
         break;
       }
+      if (d.debug) renderAIDebug(d.debug);
       S = d.state;
       render();
       if (aiIsDue()) await new Promise(r => setTimeout(r, 350));
@@ -1510,3 +1511,75 @@ makeDraggable('scoring-overlay');   // <-- Jetzt alle verschiebbar
     openNewGameModal();
   }
 })();
+
+// ============================================================
+//  KI-ANALYSE (Debug-Panel) — zeigt Netz-Policy vs MCTS pro Zug
+// ============================================================
+function toggleDebugPanel() {
+  const p = document.getElementById('ai-debug-panel');
+  if (!p) return;
+  p.style.display = (p.style.display === 'none') ? 'block' : 'none';
+}
+
+const _DBG_CAT_COLOR = {
+  row: '#3fb950', penalty: '#f85149', tiling: '#58a6ff',
+  dome: '#bc8cff', chip: '#f0a020', pass: '#6e7681', other: '#8a97a5'
+};
+
+function renderAIDebug(dbg) {
+  if (!dbg || dbg.error) return;
+  const panel = document.getElementById('ai-debug-panel');
+  if (!panel) return;
+  // Panel automatisch einblenden sobald Daten kommen
+  if (panel.style.display === 'none') panel.style.display = 'block';
+
+  const moves = dbg.moves || [];
+  const chosen = moves.find(m => m.chosen);
+
+  // Kopfzeile: Value + gewählter Zug
+  const vEl = document.getElementById('dbg-value');
+  const cEl = document.getElementById('dbg-chosen');
+  if (vEl) {
+    const wp = dbg.win_pct ?? 50;
+    const hue = Math.round((wp / 100) * 120);
+    vEl.innerHTML = `Value <span style="color:hsl(${hue},65%,55%)">${(dbg.value>=0?'+':'')}${dbg.value.toFixed(3)}</span> (Win ${wp}%)`;
+  }
+  if (cEl) cEl.textContent = chosen ? ('→ ' + chosen.description + ' ✓') : '';
+
+  if (!moves.length) { document.getElementById('dbg-moves').innerHTML = ''; return; }
+
+  const maxNet  = Math.max(...moves.map(m => m.net_prob_norm), 0.0001);
+  const maxMcts = Math.max(...moves.map(m => m.mcts_share), 0.0001);
+  // Nur Top-12 zeigen, sonst wird's zu lang
+  const top = moves.slice(0, 12);
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead><tr style="color:#8a97a5;text-align:left">' +
+    '<th style="padding:4px 6px">Zug</th>' +
+    '<th style="padding:4px 6px;text-align:right">Netz</th>' +
+    '<th style="padding:4px 6px;text-align:right">MCTS</th>' +
+    '<th style="padding:4px 6px;text-align:right">Win%</th>' +
+    '<th style="padding:4px 6px;text-align:right">Δ</th></tr></thead><tbody>';
+
+  for (const m of top) {
+    const netW  = (m.net_prob_norm / maxNet * 100).toFixed(0);
+    const mctsW = (m.mcts_share / maxMcts * 100).toFixed(0);
+    const div = m.mcts_share - m.net_prob_norm;
+    const divStr = (Math.abs(div) < 0.02) ? '' :
+      `<span style="color:${div>0?'#3fb950':'#f85149'}">${div>0?'▲':'▼'}${Math.abs(div*100).toFixed(0)}</span>`;
+    const dot = _DBG_CAT_COLOR[m.category] || '#8a97a5';
+    const rowBg = m.chosen ? 'background:rgba(63,185,80,0.18);font-weight:600' : '';
+    html += `<tr style="${rowBg};border-bottom:1px solid #232d38">
+      <td style="padding:4px 6px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dot};margin-right:6px"></span>${m.description}${m.chosen?' ✓':''}</td>
+      <td style="padding:4px 6px;text-align:right;position:relative">
+        <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);height:14px;width:${netW}%;max-width:60px;background:#58a6ff;opacity:.25;border-radius:2px"></span>
+        <span style="position:relative">${(m.net_prob_norm*100).toFixed(1)}%</span></td>
+      <td style="padding:4px 6px;text-align:right">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</td>
+      <td style="padding:4px 6px;text-align:right">${m.mcts_win_pct!==null?m.mcts_win_pct+'%':'–'}</td>
+      <td style="padding:4px 6px;text-align:right">${divStr}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  if (moves.length > 12) html += `<div style="color:#8a97a5;font-size:11px;margin-top:4px">… ${moves.length-12} weitere Züge</div>`;
+  document.getElementById('dbg-moves').innerHTML = html;
+}

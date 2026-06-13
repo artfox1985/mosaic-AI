@@ -109,21 +109,20 @@
 <header>
   <h1>🔬 Mosaic-AI KI-Debugger</h1>
   <div class="controls">
-    <label>Modell</label>
-    <input id="model" value="v2a" style="width:90px">
-    <label>Sims</label>
-    <input id="sims" type="number" value="50">
-    <label>KI-Seite</label>
-    <select id="aiside"><option value="1">P2</option><option value="0">P1</option></select>
-    <button id="btnNew">Neues Spiel</button>
+    <button id="btnLoad">⟳ Historie laden</button>
+    <button id="btnFirst" class="secondary">⏮</button>
+    <button id="btnPrev" class="secondary">◀</button>
+    <span id="navInfo" style="min-width:90px;text-align:center;color:var(--muted)">– / –</span>
+    <button id="btnNext" class="secondary">▶</button>
+    <button id="btnLast" class="secondary">⏭</button>
   </div>
   <div class="spacer"></div>
   <div class="controls">
-    <button id="btnAnalyze" class="secondary">🔍 Stellung analysieren</button>
-    <button id="btnAiMove" class="secondary">▶ KI zieht</button>
+    <button id="btnLive" class="secondary">📡 Live (letzter Zug)</button>
+    <label><input type="checkbox" id="autoLive"> Auto-Refresh</label>
   </div>
 </header>
-<div class="status" id="status">Kein Spiel aktiv. Starte ein neues Spiel.</div>
+<div class="status" id="status">Spiele in der Hauptansicht (index.html) gegen die KI, dann „Historie laden".</div>
 
 <main>
   <div class="panel full">
@@ -133,6 +132,8 @@
       <div class="value-num" id="valueNum">–</div>
     </div>
     <div class="meta-row">
+      <span>KI-Zug Nr: <b id="moveIdx">–</b></span>
+      <span>Runde: <b id="roundNum">–</b></span>
       <span>Aktueller Spieler: <b id="curPlayer">–</b></span>
       <span>KI-Spieler: <b id="aiPlayer">–</b></span>
       <span>Gültige Aktionen: <b id="numActions">–</b></span>
@@ -142,7 +143,7 @@
 
   <div class="panel full">
     <h2>Zug-Analyse — Netz-Policy vs. MCTS-Suche</h2>
-    <div id="movesContainer"><div class="empty">Noch keine Analyse. Klicke „Stellung analysieren".</div></div>
+    <div id="movesContainer"><div class="empty">Noch keine Analyse geladen. Klicke „Historie laden".</div></div>
     <div class="legend">
       <span><span class="cat-dot cat-row"></span>Reihe (punkteträchtig)</span>
       <span><span class="cat-dot cat-penalty"></span>Strafleiste (defensiv)</span>
@@ -155,7 +156,7 @@
 </main>
 
 <script>
-const API = '';  // gleicher Origin wie der Server
+const API = '';
 
 async function api(path, method='GET', body=null) {
   const opt = { method, headers: {'Content-Type':'application/json'} };
@@ -163,50 +164,30 @@ async function api(path, method='GET', body=null) {
   const r = await fetch(API + path, opt);
   return r.json();
 }
-
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
-
-async function newGame() {
-  const model = document.getElementById('model').value.trim();
-  const sims  = parseInt(document.getElementById('sims').value) || 50;
-  const aiside= parseInt(document.getElementById('aiside').value);
-  setStatus('Starte neues Spiel...');
-  const res = await api('/api/new_game', 'POST', {
-    ai_enabled: true, difficulty: 'custom', model, sims, ai_side: aiside,
-    names: ['Mensch', 'KI']
-  });
-  if (res.ok === false || res.error) { setStatus('Fehler: ' + (res.error || 'unbekannt')); return; }
-  setStatus(`Spiel gestartet — Modell ${model}, ${sims} Sims, KI ist P${aiside+1} (Seed ${res.seed})`);
-  document.getElementById('movesContainer').innerHTML =
-    '<div class="empty">Spiel läuft. Klicke „Stellung analysieren".</div>';
-}
-
 function catClass(cat) { return 'cat-' + cat; }
 
-async function analyze() {
-  setStatus('Analysiere Stellung...');
-  const d = await api('/api/ai/debug');
-  if (d.ok === false || d.error) { setStatus('Fehler: ' + (d.error || 'unbekannt')); return; }
+let HISTORY = [];
+let IDX = -1;
 
-  // Value-Anzeige
+function renderAnalysis(d) {
   const winPct = d.win_pct ?? 50;
   const fill = document.getElementById('valueFill');
   fill.style.width = winPct + '%';
   fill.textContent = winPct + '%';
-  // Farbe: rot (verlierend) → grün (gewinnend)
-  const hue = Math.round((winPct / 100) * 120); // 0=rot, 120=grün
+  const hue = Math.round((winPct / 100) * 120);
   fill.style.background = `hsl(${hue}, 65%, 55%)`;
   document.getElementById('valueNum').textContent = (d.value >= 0 ? '+' : '') + d.value.toFixed(3);
+  document.getElementById('moveIdx').textContent = d.move_idx ?? '–';
+  document.getElementById('roundNum').textContent = d.round ?? '–';
   document.getElementById('curPlayer').textContent = 'P' + (d.current_player + 1);
-  document.getElementById('aiPlayer').textContent = d.ai_player !== null ? 'P' + (d.ai_player + 1) : '–';
+  document.getElementById('aiPlayer').textContent = (d.ai_player !== null && d.ai_player !== undefined) ? 'P' + (d.ai_player + 1) : '–';
   document.getElementById('numActions').textContent = d.num_actions;
   document.getElementById('numSims').textContent = d.simulations;
 
-  // Zug-Tabelle
   const moves = d.moves || [];
   if (!moves.length) {
     document.getElementById('movesContainer').innerHTML = '<div class="empty">Keine gültigen Züge.</div>';
-    setStatus('Analyse fertig — keine Züge.');
     return;
   }
   const maxNet  = Math.max(...moves.map(m => m.net_prob_norm), 0.0001);
@@ -217,43 +198,94 @@ async function analyze() {
     '<th class="num">Netz-Policy</th>' +
     '<th class="num">MCTS-Visits</th>' +
     '<th class="num">MCTS Win%</th>' +
-    '<th class="num">Δ</th>' +
+    '<th class="num">\u0394</th>' +
     '</tr></thead><tbody>';
 
   for (const m of moves) {
     const netW  = (m.net_prob_norm / maxNet * 100).toFixed(0);
     const mctsW = (m.mcts_share / maxMcts * 100).toFixed(0);
-    // Divergenz: bevorzugt die Suche diesen Zug mehr (+) oder weniger (–) als das Netz?
     const div = m.mcts_share - m.net_prob_norm;
     const divStr = (Math.abs(div) < 0.02) ? '' :
-      `<span class="divergence ${div>0?'div-up':'div-down'}">${div>0?'▲':'▼'}${Math.abs(div*100).toFixed(0)}</span>`;
-    html += `<tr>
-      <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}
+      `<span class="divergence ${div>0?'div-up':'div-down'}">${div>0?'\u25b2':'\u25bc'}${Math.abs(div*100).toFixed(0)}</span>`;
+    const chosen = m.chosen === true;
+    const rowStyle = chosen ? ' style="background:rgba(63,185,80,0.18);font-weight:600"' : '';
+    const chosenMark = chosen ? ' \u2713' : '';
+    html += `<tr${rowStyle}>
+      <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
           <span class="pill">${m.action_id}</span></td>
       <td class="num bar-cell"><div class="bar bar-net" style="width:${netW}%"></div>
           <span class="bar-label">${(m.net_prob_norm*100).toFixed(1)}%</span></td>
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
-      <td class="num">${m.mcts_win_pct !== null ? m.mcts_win_pct + '%' : '–'}</td>
+      <td class="num">${m.mcts_win_pct !== null ? m.mcts_win_pct + '%' : '\u2013'}</td>
       <td class="num">${divStr}</td>
     </tr>`;
   }
   html += '</tbody></table>';
   document.getElementById('movesContainer').innerHTML = html;
-  setStatus(`Analyse fertig — ${moves.length} Züge, Value ${d.value.toFixed(3)} (Win ${winPct}%).`);
 }
 
-async function aiMove() {
-  setStatus('KI zieht...');
-  const r = await api('/api/ai/move', 'POST');
-  if (r.ok === false || r.error) { setStatus('Fehler: ' + (r.error || 'unbekannt')); return; }
-  setStatus('KI hat gezogen (Aktion ' + r.ai_action + '). Analysiere neue Stellung...');
-  await analyze();
+function showIdx(i) {
+  if (!HISTORY.length) return;
+  IDX = Math.max(0, Math.min(i, HISTORY.length - 1));
+  const d = HISTORY[IDX];
+  renderAnalysis(d);
+  document.getElementById('navInfo').textContent = `${IDX+1} / ${HISTORY.length}`;
+  const chosen = (d.moves||[]).find(m => m.chosen);
+  setStatus(`KI-Zug ${d.move_idx} (Runde ${d.round ?? '?'}): ${chosen ? chosen.description : 'Aktion '+d.ai_action} — Value ${d.value.toFixed(3)} (Win ${d.win_pct}%)`);
 }
 
-document.getElementById('btnNew').onclick = newGame;
-document.getElementById('btnAnalyze').onclick = analyze;
-document.getElementById('btnAiMove').onclick = aiMove;
+async function loadHistory(keepIdx=false) {
+  setStatus('Lade Historie...');
+  const r = await api('/api/ai/debug_history');
+  if (r.ok === false || r.error) { setStatus('Fehler: ' + (r.error||'unbekannt')); return; }
+  HISTORY = r.history || [];
+  if (!HISTORY.length) {
+    setStatus('Noch keine KI-Züge aufgezeichnet. Spiele in der Hauptansicht gegen die KI.');
+    document.getElementById('navInfo').textContent = '0 / 0';
+    document.getElementById('movesContainer').innerHTML = '<div class="empty">Keine KI-Züge in der Historie.</div>';
+    return;
+  }
+  const target = keepIdx ? Math.min(IDX, HISTORY.length-1) : HISTORY.length - 1;
+  showIdx(target < 0 ? HISTORY.length - 1 : target);
+}
+
+async function showLive() {
+  // Lädt Historie und springt zum letzten Zug
+  await loadHistory(false);
+}
+
+document.getElementById('btnLoad').onclick  = () => loadHistory(false);
+document.getElementById('btnFirst').onclick = () => showIdx(0);
+document.getElementById('btnPrev').onclick  = () => showIdx(IDX - 1);
+document.getElementById('btnNext').onclick  = () => showIdx(IDX + 1);
+document.getElementById('btnLast').onclick  = () => showIdx(HISTORY.length - 1);
+document.getElementById('btnLive').onclick  = showLive;
+
+// Auto-Refresh: pollt alle 2s die Historie und springt zum neuesten Zug
+let autoTimer = null;
+document.getElementById('autoLive').onchange = (e) => {
+  if (e.target.checked) {
+    autoTimer = setInterval(async () => {
+      const prevLen = HISTORY.length;
+      await loadHistory(false);
+      // bleibt am letzten Zug
+    }, 2000);
+    setStatus('Auto-Refresh aktiv (alle 2s).');
+  } else {
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = null;
+  }
+};
+
+// Tastatur-Navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft')  showIdx(IDX - 1);
+  if (e.key === 'ArrowRight') showIdx(IDX + 1);
+});
+
+// Beim Laden gleich versuchen
+loadHistory(false);
 </script>
 </body>
 </html>

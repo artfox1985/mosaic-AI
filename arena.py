@@ -144,26 +144,26 @@ if __name__ == "__main__":
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
     #agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
-    agent_alphazero1a = AlphaZeroAgent(
-        model_version="v1a",
+    # agent_alphazero1a = AlphaZeroAgent(
+        # model_version="v1a",
+        # input_size=INPUT_SIZE, 
+        # simulations=40
+        # )
+        
+    # agent_alphazero2a = AlphaZeroAgent(
+        # model_version="v2a",
+        # input_size=INPUT_SIZE, 
+        # simulations=40
+        # )
+        
+    agent_alphazero3d = AlphaZeroAgent(
+        model_version="v3d",
         input_size=INPUT_SIZE, 
         simulations=40
         )
         
-    agent_alphazero2a = AlphaZeroAgent(
-        model_version="v2a",
-        input_size=INPUT_SIZE, 
-        simulations=40
-        )
-        
-    agent_alphazero3a = AlphaZeroAgent(
-        model_version="v3a",
-        input_size=INPUT_SIZE, 
-        simulations=40
-        )
-        
-    agent_alphazero3b = AlphaZeroAgent(
-        model_version="v3b",
+    agent_alphazero3c = AlphaZeroAgent(
+        model_version="v3c",
         input_size=INPUT_SIZE, 
         simulations=40
         )
@@ -176,11 +176,11 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "AlphaZero V3-256": (agent_alphazero3a, 1000),
-        "AlphaZero V3-256_v1v2": (agent_alphazero3b, 1000),
+        "AlphaZero V3-512_v1v2": (agent_alphazero3d, 1000),
+        #"AlphaZero V3-256_v1v2": (agent_alphazero3b, 1000),
         #"AlphaZero V2a": (agent_alphazero2a, 1000),
         #"AlphaZero V1a": (agent_alphazero1a, 1000),
-        #"AlphaZero V3-512": (agent_alphazero3b, 1000),
+        "AlphaZero V3-512": (agent_alphazero3c, 1000),
     }
 
     # Jeder spielt gegen jeden
