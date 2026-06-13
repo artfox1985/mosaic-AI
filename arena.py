@@ -156,8 +156,14 @@ if __name__ == "__main__":
         simulations=40
         )
         
-    agent_alphazero2b = AlphaZeroAgent(
-        model_version="v2b",
+    agent_alphazero3a = AlphaZeroAgent(
+        model_version="v3a",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
+        
+    agent_alphazero3b = AlphaZeroAgent(
+        model_version="v3b",
         input_size=INPUT_SIZE, 
         simulations=40
         )
@@ -170,9 +176,10 @@ if __name__ == "__main__":
     #}
 
     competitors = {
+        "AlphaZero V3-256": (agent_alphazero3a, 1000),
         "AlphaZero V2a": (agent_alphazero2a, 1000),
-        "AlphaZero V2b": (agent_alphazero2b, 1000),
-        "AlphaZero V1a": (agent_alphazero1a, 1000)
+        "AlphaZero V1a": (agent_alphazero1a, 1000),
+        "AlphaZero V3-512": (agent_alphazero3b, 1000),
     }
 
     # Jeder spielt gegen jeden

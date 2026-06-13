@@ -15,11 +15,6 @@ MODELS_DIR = BASE_DIR / "models"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-# --- GLOBALE TRAININGSPARAMETER ---
-MCTS_SIMULATIONS_TRAINING = 40     # Schnellere Simulation für Datengenerierung
-MCTS_SIMULATIONS_ARENA = 150       # Volle Denkkraft für das Titel-Match
-TEMPERATURE_MOVES = 15             # Nach wie vielen Zügen wird Exploitation forciert?
-
 # --- NETZWERK PARAMETER ---
 INPUT_SIZE = 543        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel)
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich

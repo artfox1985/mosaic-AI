@@ -344,11 +344,57 @@ if __name__ == "__main__":
                         help="Normalisierung Winner-Score Komponente (Standard: 40)")
     parser.add_argument("--depth",   type=int, default=None,
                         help="Rollout-Tiefe (0=Heuristik, 1=1 Schritt, 5=5 Schritte)")
+    parser.add_argument("--terminals", type=int, default=1,
+                        help="Anzahl paralleler Terminals (teilt --games auf, vergibt Tags a/b/c...)")
     args = parser.parse_args()
 
     if args.mode == 'mcts' and args.depth is None:
         parser.error("--depth ist bei --mode mcts erforderlich")
     rollout_depth = args.depth if args.depth is not None else 0
+
+    # --- Parallele Terminals ---
+    if args.terminals > 1:
+        import subprocess, sys, os, string
+        n = args.terminals
+        base = args.games // n
+        rest = args.games % n
+        tags = list(string.ascii_lowercase)  # a, b, c, ...
+        print(f"🚀 Starte {n} parallele Terminals "
+              f"(je ~{base} Spiele, Tags {tags[0]}–{tags[n-1]})")
+        procs = []
+        for i in range(n):
+            games_i = base + (1 if i < rest else 0)
+            if games_i == 0:
+                continue
+            tag_i = (args.tag or "") + tags[i]
+            cmd = [
+                sys.executable, os.path.abspath(__file__),
+                "--mode", args.mode,
+                "--games", str(games_i),
+                "--sims", str(args.sims),
+                "--version", args.version,
+                "--tag", tag_i,
+                "--margin_cap", str(args.margin_cap),
+                "--max_winner_score", str(args.max_winner_score),
+            ]
+            if args.depth is not None:
+                cmd += ["--depth", str(args.depth)]
+            # Eigenes Konsolenfenster pro Prozess
+            if os.name == "nt":  # Windows
+                CREATE_NEW_CONSOLE = 0x00000010
+                p = subprocess.Popen(cmd, creationflags=CREATE_NEW_CONSOLE)
+            else:  # Linux/Mac: im Hintergrund, Ausgabe in Logdatei
+                logf = open(f"selfplay_terminal_{tag_i}.log", "w")
+                p = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT)
+            procs.append((tag_i, games_i, p))
+            print(f"   ↳ Terminal {i+1}: Tag '{tag_i}', {games_i} Spiele (PID {p.pid})")
+        print(f"\n✅ Alle {len(procs)} Terminals gestartet. "
+              f"Warte auf Abschluss...")
+        for tag_i, games_i, p in procs:
+            p.wait()
+            print(f"   ✓ Terminal Tag '{tag_i}' fertig ({games_i} Spiele)")
+        print("🎉 Alle Terminals abgeschlossen.")
+        sys.exit(0)
 
     generate_data(
         mode=args.mode,
