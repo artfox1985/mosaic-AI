@@ -4,7 +4,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from config import NUM_ACTIONS, HIDDEN_SIZE
+from config import NUM_ACTIONS, HIDDEN_SIZE, MARGIN_CAP, MAX_WINNER_SCORE
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
@@ -219,7 +219,7 @@ def action_to_id(action: dict) -> int:
     return 481  # Fallback
 
 # --- 2. DATENSATZ & NETZWERK ---
-def compute_win_val(scores, winner, margin_cap=15, max_winner_score=40):
+def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
     """Berechnet den abgestuften Value-Target aus rohen Scores.
     Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
     """
@@ -233,7 +233,7 @@ def compute_win_val(scores, winner, margin_cap=15, max_winner_score=40):
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", margin_cap=15, max_winner_score=40, target_zerozero_ratio=None):
+    def __init__(self, data_dir="data", margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE, target_zerozero_ratio=None):
         from config import INPUT_SIZE
         import hashlib, time
         import h5py

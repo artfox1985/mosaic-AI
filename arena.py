@@ -4,7 +4,8 @@ from agents.mcts import MCTSAgent, HeuristicMCTSAgent, run_episode_mcts
 from agents.alphazero import AlphaZeroAgent
 from agents.agent_env import MosaicEnv
 import itertools
-from config import INPUT_SIZE
+from config import INPUT_SIZE, MARGIN_CAP, MAX_WINNER_SCORE
+from agents.neural_net import compute_win_val
 
 # Falls du den HeuristicMCTSAgent in einer anderen Datei gespeichert hast, importiere ihn entsprechend.
 # from deine_datei import HeuristicMCTSAgent
@@ -99,22 +100,19 @@ def run_arena(agents_dict, games_per_matchup=10):
             old_elo_0 = elo_ratings[p0]
             old_elo_1 = elo_ratings[p1]
             
-            # Reduzierter K-Faktor bei 0:0
-            k = 16 if (scores[0] == 0 and scores[1] == 0) else 32
+            # K-Faktor mit Strength skalieren: klare Punktsiege bewegen ELO stärker,
+            # 0:0-Siege (Strength 0.1) nur schwach. Range: ~6 (0:0) bis 32 (klarer Sieg).
+            _winner_idx_elo = 0 if scores[0] >= scores[1] else 1
+            _strength_elo = compute_win_val(scores, _winner_idx_elo, MARGIN_CAP, MAX_WINNER_SCORE)
+            k = 32 * _strength_elo   # Strength 0.1→k≈3.2, 0.5→16, 1.0→32
             new_elo_0, new_elo_1 = calculate_elo(old_elo_0, old_elo_1, score_a, k=k)
             
             elo_ratings[p0] = new_elo_0
             elo_ratings[p1] = new_elo_1
             
-            # Strength berechnen (gleiche Formel wie self_play.py, cap=15)
-            _margin = abs(scores[0] - scores[1])
-            _ws     = max(scores[0], scores[1])
-            if _margin == 0 and _ws < 5:
-                _strength = 0.1
-            else:
-                _mp = min(0.45, (_margin / 15) * 0.45)
-                _sp = min(0.45, (_ws     / 40) * 0.45)
-                _strength = min(1.0, 0.1 + _mp + _sp)
+            # Strength via compute_win_val (config-Parameter)
+            _winner_idx = 0 if scores[0] >= scores[1] else 1
+            _strength = compute_win_val(scores, _winner_idx, MARGIN_CAP, MAX_WINNER_SCORE)
             print(f" {duration:.1f}s | Züge: {result['steps']} | Strength: {_strength:.3f} | {scores[0]:3d}:{scores[1]:<3d} -> Sieger: {winner_name}")
 
     total    = sum(wins[n] for n in names)
@@ -145,18 +143,18 @@ if __name__ == "__main__":
     
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
-    agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
+    #agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
     agent_alphazero1a = AlphaZeroAgent(
         model_version="v1a",
         input_size=INPUT_SIZE, 
         simulations=40
         )
         
-    # agent_alphazero3new = AlphaZeroAgent(
-        # model_version="v3new",
-        # input_size=INPUT_SIZE, 
-        # simulations=40
-        # )
+    agent_alphazero2a = AlphaZeroAgent(
+        model_version="v2a",
+        input_size=INPUT_SIZE, 
+        simulations=40
+        )
         
     # agent_alphazero2 = AlphaZeroAgent(
         # model_version="v2",
@@ -172,10 +170,10 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "MTCS": (agent_mcts_heuristic, 1000),
-        "AlphaZero V1": (agent_alphazero1a, 1000)
+        "AlphaZero V2a": (agent_alphazero2a, 1000),
+        "AlphaZero V1a": (agent_alphazero1a, 1000)
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=40)
+    run_arena(competitors, games_per_matchup=100)

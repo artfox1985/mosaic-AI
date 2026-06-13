@@ -8,12 +8,12 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MARGIN_CAP, MAX_WINNER_SCORE
 
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, margin_cap=15, max_winner_score=40, zerozero_ratio=None):
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE, zerozero_ratio=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR), margin_cap=margin_cap, max_winner_score=max_winner_score, target_zerozero_ratio=zerozero_ratio)
     if len(dataset) == 0:
@@ -34,6 +34,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Learning Rate : {LEARNING_RATE}")
     print(f"   Value Weight  : {VALUE_WEIGHT}")
     print(f"   Batch Size    : {BATCH_SIZE}")
+    print(f"   Margin Cap    : {margin_cap}")
+    print(f"   Max Winner Sc.: {max_winner_score}")
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
     
     # Warm Start?
@@ -223,9 +225,9 @@ if __name__ == "__main__":
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
-    parser.add_argument("--margin_cap",       type=int, default=15,
+    parser.add_argument("--margin_cap",       type=int, default=MARGIN_CAP,
                         help="Margin ab dem win_val=1.0 (Standard: 15)")
-    parser.add_argument("--max_winner_score", type=int, default=40,
+    parser.add_argument("--max_winner_score", type=int, default=MAX_WINNER_SCORE,
                         help="Normalisierung Winner-Score (Standard: 40)")
     parser.add_argument("--zerozero_ratio", type=float, default=None,
                         help="Ziel-Anteil 0:0-Spiele (z.B. 0.45). None = keine Reduktion")
