@@ -655,15 +655,23 @@ def ai_move():
             from engine.serializer import serialize_state
             obs = serialize_state(env.state)
 
-            # Pre-Move-Analyse: was sieht die KI, bevor sie zieht?
-            debug_info = None
+            # Pre-Move-Analyse UND Zugwahl aus DEMSELBEN Baum.
+            # So sind angezeigte Visits und gewählter Zug garantiert konsistent.
+            debug_info  = None
+            best_action = None
             if hasattr(_ai_agent, "evaluate_raw"):
                 try:
-                    debug_info = _compute_debug_analysis(env, actions)
+                    debug_info, best_action = _compute_debug_analysis(
+                        env, actions, mark_best=True)
                 except Exception as _de:
                     debug_info = {"error": str(_de)}
 
-            action = _ai_agent.choose(actions, obs)
+            # Aktion bestimmen: bevorzugt aus der Analyse (gleicher Baum),
+            # sonst Fallback auf separaten choose-Aufruf.
+            if best_action is not None:
+                action = best_action
+            else:
+                action = _ai_agent.choose(actions, obs)
 
             # Aktion im echten Game ausführen
             _, reward, done, info = env.step(action)
@@ -671,13 +679,13 @@ def ai_move():
             if 'error' in info:
                 return jsonify(err(f"KI-Zug ungültig: {info['error']}"))
 
-            # Gewählten Zug in der Analyse markieren + zur Historie hinzufügen
+            # Metadaten + Historie (chosen wurde schon in der Analyse gesetzt)
             if debug_info and "moves" in debug_info:
-                for m in debug_info["moves"]:
-                    m["chosen"] = (m["action_id"] == action)
-                debug_info["round"]    = getattr(_game.state, "round_number", None)
-                debug_info["move_idx"] = len(_ai_debug_history) + 1
-                debug_info["ai_action"] = action
+                from agents.neural_net import action_to_id
+                chosen_id = action_to_id(action) if isinstance(action, dict) else action
+                debug_info["round"]     = getattr(_game.state, "round_number", None)
+                debug_info["move_idx"]  = len(_ai_debug_history) + 1
+                debug_info["ai_action"] = chosen_id
                 _ai_debug_history.append(debug_info)
 
             response = ok()
@@ -759,11 +767,15 @@ def ai_start_tile():
         return jsonify(err(str(e)))
 
 
-def _compute_debug_analysis(env, actions):
+def _compute_debug_analysis(env, actions, mark_best=False):
     """
     Gemeinsame Debug-Analyse für /api/ai/debug und /api/ai/move.
-    Baut einen frischen MCTS-Baum auf (führt KEINEN Zug aus) und kombiniert
+    Baut EINEN MCTS-Baum auf (führt KEINEN Zug aus) und kombiniert
     rohe Netz-Policy + MCTS-Visits + Value pro gültiger Aktion.
+
+    Gibt (analysis_dict, best_action_dict) zurück. Die best_action stammt
+    aus DEMSELBEN Baum (max Visits) — so sind Anzeige und echte Wahl konsistent.
+    Wenn mark_best=True wird der beste Zug direkt als 'chosen' markiert.
     """
     from agents.mcts import MCTSNode
     from agents.neural_net import action_to_id
@@ -774,7 +786,7 @@ def _compute_debug_analysis(env, actions):
     obs = serialize_state(env.state)
     raw = _ai_agent.evaluate_raw(obs, actions=actions)
 
-    # 2. MCTS-Suche aufbauen (Visits), ohne Zug auszuführen
+    # 2. EINEN MCTS-Baum aufbauen (Visits), ohne Zug auszuführen
     pi = env.current_player()
     root = MCTSNode(action=None, parent=None, untried_actions=None,
                     player_who_acted=pi)
@@ -785,6 +797,14 @@ def _compute_debug_analysis(env, actions):
         node = _ai_agent._expand(node, sim_env)
         result = _ai_agent._rollout(sim_env)
         _ai_agent._backpropagate(node, result, pi)
+
+    # Beste Aktion aus DIESEM Baum: höchste Visits (identische Logik wie _mcts_search)
+    best_action = None
+    best_id     = None
+    if root.children:
+        best_child  = max(root.children, key=lambda n: n.visits)
+        best_action = best_child.action
+        best_id     = action_to_id(best_action)
 
     total_visits = sum(c.visits for c in root.children) or 1
     visits_by_id = {}
@@ -809,10 +829,11 @@ def _compute_debug_analysis(env, actions):
             "mcts_share":     round(visits / total_visits, 4),
             "mcts_q":         round(q, 4) if q is not None else None,
             "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
+            "chosen":         (mark_best and aid == best_id),
         })
     moves.sort(key=lambda m: m["mcts_visits"], reverse=True)
 
-    return {
+    analysis = {
         "current_player": pi,
         "ai_player":      _ai_player,
         "value":          round(raw["value"], 4),
@@ -822,6 +843,7 @@ def _compute_debug_analysis(env, actions):
         "num_actions":    len(actions),
         "moves":          moves,
     }
+    return analysis, best_action
 
 
 @app.route('/api/ai/debug', methods=['GET'])
@@ -847,7 +869,7 @@ def ai_debug():
             return jsonify({"ok": True, "value": None, "win_prob": None,
                             "current_player": env.current_player(), "moves": []})
 
-        result = _compute_debug_analysis(env, actions)
+        result, _best = _compute_debug_analysis(env, actions, mark_best=True)
         result["ok"] = True
         return jsonify(result)
 

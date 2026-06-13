@@ -14,7 +14,6 @@
   <div style="display:flex;gap:6px">
     <button class="btn pri" onclick="openNewGameModal()">Neu starten</button>
     <button onclick="showActiveScoringTiles()" class="btn">🎯 Aktive Ziele</button>
-    <button onclick="window.open('/debug','_blank')" class="btn">🔬 KI-Debugger</button>
   </div>
 </div>
 
@@ -218,6 +217,19 @@
                  onchange="ngUpdateStartLabels()">
           <span>Zufall</span>
         </label>
+      </div>
+    </div>
+
+    <div class="sep" style="margin:0 0 12px"></div>
+
+    <!-- Seed für reproduzierbare Spiele -->
+    <div style="margin-bottom:14px">
+      <div class="lbl" style="margin-bottom:6px">Seed <span style="font-weight:400;color:var(--text2);font-size:10px">(optional — leer = zufällig)</span></div>
+      <input id="ng-seed" type="number" placeholder="z.B. 12345 für reproduzierbare Stellung"
+        style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+               background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+      <div style="font-size:10px;color:var(--text2);margin-top:4px">
+        Gleicher Seed = identische Kacheln, Kuppeln &amp; Startaufstellung. Ideal zum Vergleichen von Modellen.
       </div>
     </div>
 

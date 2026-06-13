@@ -208,8 +208,8 @@ function renderAnalysis(d) {
     const divStr = (Math.abs(div) < 0.02) ? '' :
       `<span class="divergence ${div>0?'div-up':'div-down'}">${div>0?'\u25b2':'\u25bc'}${Math.abs(div*100).toFixed(0)}</span>`;
     const chosen = m.chosen === true;
-    const rowStyle = chosen ? ' style="background:rgba(63,185,80,0.18);font-weight:600"' : '';
-    const chosenMark = chosen ? ' \u2713' : '';
+    const rowStyle = chosen ? ' style="background:rgba(63,185,80,0.22);font-weight:600"' : '';
+    const chosenMark = chosen ? ' <span style="color:#3fb950;font-size:11px">✓ GEWÄHLT</span>' : '';
     html += `<tr${rowStyle}>
       <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
           <span class="pill">${m.action_id}</span></td>
