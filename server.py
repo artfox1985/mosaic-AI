@@ -160,6 +160,11 @@ def index():
     return send_from_directory(STATIC_DIR, 'index.html')
 
 
+@app.route('/debug')
+def debug_page():
+    return send_from_directory(STATIC_DIR, 'debug.html')
+
+
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
     global _game, _ai_agent, _ai_player
@@ -730,6 +735,100 @@ def ai_start_tile():
 
     except Exception as e:
         return jsonify(err(str(e)))
+
+
+@app.route('/api/ai/debug', methods=['GET'])
+def ai_debug():
+    """
+    Debugger-Endpunkt: Liefert für die AKTUELLE Stellung
+      - Value-Head Einschätzung (win_prob)
+      - rohe Netz-Policy pro gültiger Aktion (was das Netz INTUITIV will)
+      - MCTS-Visits pro Aktion (was die SUCHE nach Simulationen will)
+    Beide Sichten nebeneinander, mit Klartext + Kategorie pro Aktion.
+    Nur für AlphaZeroAgent.
+    """
+    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
+    if _ai_agent is None:   return jsonify(err("Kein KI-Agent aktiv"))
+
+    if not hasattr(_ai_agent, "evaluate_raw"):
+        return jsonify(err("Debug nur für AlphaZeroAgent verfügbar"))
+
+    try:
+        from agents.agent_env import MosaicEnv
+        from agents.mcts import MCTSNode
+        from agents.neural_net import action_to_id
+        from engine.serializer import serialize_state
+        from utils.action_describe import describe_action_id, action_category
+
+        env = MosaicEnv()
+        env._game = _game
+        env.state  = _game.state
+        _ai_agent.set_env(env)
+
+        actions = env.valid_actions()
+        if not actions:
+            return jsonify({"ok": True, "value": None, "win_prob": None,
+                            "current_player": env.current_player(), "moves": []})
+
+        # 1. Rohe Netz-Auswertung (ohne MCTS)
+        obs = serialize_state(env.state)
+        raw = _ai_agent.evaluate_raw(obs, actions=actions)
+
+        # 2. MCTS-Suche aufbauen (Visits), ohne Zug auszuführen
+        pi = env.current_player()
+        root = MCTSNode(action=None, parent=None, untried_actions=None,
+                        player_who_acted=pi)
+        root.visits = 1
+        for _ in range(_ai_agent.simulations):
+            sim_env = env.clone()
+            node = _ai_agent._select(root, sim_env)
+            node = _ai_agent._expand(node, sim_env)
+            result = _ai_agent._rollout(sim_env)
+            _ai_agent._backpropagate(node, result, pi)
+
+        total_visits = sum(c.visits for c in root.children) or 1
+        visits_by_id = {}
+        q_by_id      = {}
+        for c in root.children:
+            aid = action_to_id(c.action)
+            visits_by_id[aid] = c.visits
+            q_by_id[aid]      = (c.value / c.visits) if c.visits > 0 else 0.0
+
+        # 3. Pro gültiger Aktion beide Sichten zusammenführen
+        moves = []
+        for e in raw["per_action"]:
+            aid = action_to_id(e["action"])
+            visits = visits_by_id.get(aid, 0)
+            q      = q_by_id.get(aid, None)
+            moves.append({
+                "action_id":      aid,
+                "description":    describe_action_id(aid),
+                "category":       action_category(aid),
+                "net_prob":       round(e["prob"], 4),
+                "net_prob_norm":  round(e["prob_renormalized"], 4),
+                "mcts_visits":    visits,
+                "mcts_share":     round(visits / total_visits, 4),
+                "mcts_q":         round(q, 4) if q is not None else None,
+                "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
+            })
+
+        moves.sort(key=lambda m: m["mcts_visits"], reverse=True)
+
+        return jsonify({
+            "ok":             True,
+            "current_player": pi,
+            "ai_player":      _ai_player,
+            "value":          round(raw["value"], 4),
+            "win_prob":       round(raw["win_prob"], 4),
+            "win_pct":        round(raw["win_prob"] * 100, 1),
+            "simulations":    _ai_agent.simulations,
+            "num_actions":    len(actions),
+            "moves":          moves,
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify(err(f"Debug-Fehler: {str(e)}\n{traceback.format_exc()}"))
 
 
 @app.route('/api/ai/suggest', methods=['GET'])

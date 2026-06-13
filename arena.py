@@ -177,9 +177,10 @@ if __name__ == "__main__":
 
     competitors = {
         "AlphaZero V3-256": (agent_alphazero3a, 1000),
-        "AlphaZero V2a": (agent_alphazero2a, 1000),
-        "AlphaZero V1a": (agent_alphazero1a, 1000),
-        "AlphaZero V3-512": (agent_alphazero3b, 1000),
+        "AlphaZero V3-256_v1v2": (agent_alphazero3b, 1000),
+        #"AlphaZero V2a": (agent_alphazero2a, 1000),
+        #"AlphaZero V1a": (agent_alphazero1a, 1000),
+        #"AlphaZero V3-512": (agent_alphazero3b, 1000),
     }
 
     # Jeder spielt gegen jeden

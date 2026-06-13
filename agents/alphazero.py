@@ -254,3 +254,45 @@ class AlphaZeroAgent(MCTSAgent):
     def reset_for_new_game(self):
         """Kein globaler Cache mehr — Priors leben am Knoten. No-op für Kompatibilität."""
         self._last_expanded = None
+
+    @torch.no_grad()
+    def evaluate_raw(self, obs, actions=None):
+        """
+        Reine NETZ-Auswertung OHNE MCTS — für Debugging/Visualisierung.
+
+        Returns dict:
+          - value:     roher Value-Head Output [-1, 1]
+          - win_prob:  (value+1)/2 → [0, 1] aus Sicht des aktuellen Spielers
+          - policy_full: np.array[NUM_ACTIONS] — Softmax über alle Aktionen
+          - per_action: (falls actions übergeben) Liste von
+                        {action, prob, prob_renormalized} nur für gültige Aktionen,
+                        absteigend nach prob sortiert.
+        """
+        import numpy as np
+        self.model.eval()
+        tensor_state = state_to_tensor(obs).unsqueeze(0).to(self.device)
+        policy_logits, value_pred, moon_logits = self.model(tensor_state)
+        policy_probs = F.softmax(policy_logits[0], dim=0).cpu().numpy()
+        v = float(value_pred.item())
+
+        result = {
+            "value":       v,
+            "win_prob":    (v + 1.0) / 2.0,
+            "policy_full": policy_probs,
+        }
+
+        if actions:
+            # Nur gültige Aktionen herausziehen + über diese renormalisieren
+            entries = []
+            valid_sum = 0.0
+            for a in actions:
+                aid = action_to_id(a)
+                p = float(policy_probs[aid]) if 0 <= aid < len(policy_probs) else 0.0
+                entries.append({"action": a, "prob": p})
+                valid_sum += p
+            for e in entries:
+                e["prob_renormalized"] = (e["prob"] / valid_sum) if valid_sum > 1e-12 else 0.0
+            entries.sort(key=lambda e: e["prob"], reverse=True)
+            result["per_action"] = entries
+
+        return result

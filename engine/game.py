@@ -209,6 +209,10 @@ def generate_dome_moves(state: GameState) -> list[PlaceDomeTileMove]:
     )
 
     for tile in tiles_to_consider:
+        # Start-Kachel kann ein String-Platzhalter sein ("Muss_noch_gezogen_werden"),
+        # solange der Spieler sie noch nicht vom Stapel gezogen hat → überspringen.
+        if isinstance(tile, str):
+            continue
         for slot_row, slot_col in empty_slots:
             for rotation in (0, 90, 180, 270):
                 m = PlaceDomeTileMove(
