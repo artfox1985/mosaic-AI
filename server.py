@@ -763,9 +763,10 @@ def ai_move():
 @app.route('/api/ai/start_tile', methods=['GET', 'POST'])
 def ai_start_tile():
     """
-    KI legt ihre Startkuppelplatte strategisch.
-    Bewertet alle Tile×Slot×Rotation Kombinationen mit evaluate_state
-    und wählt die beste aus.
+    KI legt ihre Startkuppelplatte. Nutzt — wie die normalen Züge — den
+    MCTS+Netz-Mechanismus, sodass die KI das gelernte Startkuppel-Wissen
+    aus dem Training anwendet (statt der alten evaluate_state-Heuristik).
+    Fallback auf evaluate_state nur wenn kein KI-Agent aktiv ist.
     """
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _ai_player is None:  return jsonify(err("KI-Spieler nicht gesetzt"))
@@ -780,28 +781,93 @@ def ai_start_tile():
     if not state.dome_display:
         return jsonify(err("Kein Kuppelplättchen im Display"))
 
-    # Alle freien Slots sammeln
-    empty_slots = []
-    for r in range(3):
-        for c in range(3):
-            if player.dome_grid.dome_slots[r][c] is None:
-                empty_slots.append((r, c))
-
+    empty_slots = [(r, c) for r in range(3) for c in range(3)
+                   if player.dome_grid.dome_slots[r][c] is None]
     if not empty_slots:
         return jsonify(err("Kein freies Kuppelslot"))
 
-    # Beste Kombination via evaluate_state suchen
+    # --- Netz-Agent: MCTS+Policy (gelerntes Wissen) ---
+    # Nur für Agenten MIT Netz (evaluate_raw). Der reine Heuristik-Agent
+    # nutzt stattdessen die Farb-Reihen-Heuristik (unten), die ohne Policy
+    # bessere Startkuppeln setzt als die blinde MCTS-Suche.
+    if _ai_agent is not None and hasattr(_ai_agent, "evaluate_raw") and hasattr(_ai_agent, "_select"):
+        prev_phase = state.phase
+        try:
+            from agents.agent_env import MosaicEnv
+            from agents.mcts import MCTSNode
+
+            env = MosaicEnv()
+            env._game = _game
+            env.state = _game.state
+            env._start_first_player = state.current_player
+            state.phase = "start_placement"
+            _ai_agent.set_env(env)
+
+            actions = [a for a in env._start_placement_actions()
+                       if a.get("_placing_player") == _ai_player]
+            if not actions:
+                raise RuntimeError("Keine Startkuppel-Aktionen für KI")
+
+            pi = _ai_player
+            root = MCTSNode(action=None, parent=None, untried_actions=list(actions),
+                            player_who_acted=pi)
+            root.visits = 1
+            if hasattr(_ai_agent, "_compute_dynamic_sims"):
+                sim_count = _ai_agent._compute_dynamic_sims(len(actions))
+            else:
+                sim_count = _ai_agent.simulations
+            for _ in range(sim_count):
+                sim_env = env.clone()
+                node = _ai_agent._select(root, sim_env)
+                node = _ai_agent._expand(node, sim_env)
+                result = _ai_agent._rollout(sim_env)
+                _ai_agent._backpropagate(node, result, pi)
+
+            state.phase = prev_phase  # apply_start_placement macht den echten Übergang
+
+            if root.children:
+                best = max(root.children, key=lambda n: n.visits)
+                a = best.action
+                _game.apply_start_placement(
+                    player_idx=_ai_player,
+                    tile_id=a["tile_id"],
+                    row=a["slot_row"], col=a["slot_col"], rot=a["rotation"],
+                )
+                return jsonify(ok())
+        except Exception:
+            try:
+                state.phase = prev_phase
+            except Exception:
+                pass
+            # weiter zum Heuristik-Fallback
+
+    # --- Heuristik-Agent oder kein Netz: Farb-Reihen-Heuristik ---
+    # Dreht die Kuppel so, dass häufig verfügbare Farben in kurze, leicht
+    # füllbare Reihen zeigen (statt blinder evaluate_state-Bewertung).
     try:
         import copy
-        from agents.mcts import evaluate_state
+        from collections import Counter
+        from agents.agent_env import MosaicEnv
 
+        # Farb-Verfügbarkeit dieser Runde aus den Fabriken
+        color_availability = Counter()
+        for f in state.factories:
+            for t in f.sun_tiles:
+                color_availability[t.name] += 1
+            for t in getattr(f, 'moon_tiles', []):
+                color_availability[t.name] += 1
+        for t in getattr(state.large_factory, 'sun_tiles', []):
+            color_availability[t.name] += 1
+        for t in getattr(state.large_factory, 'moon_tiles', []):
+            color_availability[t.name] += 1
+
+        scorer = MosaicEnv()  # nur für _score_start_placement
         best_score = -float('inf')
         best = (state.dome_display[0].tile_id, empty_slots[0][0], empty_slots[0][1], 0)
 
         for tile in state.dome_display:
             for (r, c) in empty_slots:
                 for rot in [0, 90, 180, 270]:
-                    # Clone State, Zug anwenden, bewerten
                     test_game = copy.deepcopy(_game)
                     try:
                         test_game.apply_start_placement(
@@ -809,8 +875,10 @@ def ai_start_tile():
                             tile_id=tile.tile_id,
                             row=r, col=c, rot=rot,
                         )
-                        scores = evaluate_state(test_game.state)
-                        score  = scores.get(_ai_player, 0.0)
+                        score = scorer._score_start_placement(
+                            test_game.state.players[_ai_player],
+                            color_availability,
+                        )
                         if score > best_score:
                             best_score = score
                             best = (tile.tile_id, r, c, rot)

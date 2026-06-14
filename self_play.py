@@ -169,6 +169,13 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
         else:
             temp = 0.1
 
+        # Startkuppel-Platzierung: nur MILDE Temperature. Genug Variation, damit
+        # das Netz verschiedene (auch suboptimale) Starts sieht und lernt sie
+        # zu kompensieren — aber nicht so viel, dass durchweg schlechte Starts
+        # entstehen, die das Lernsignal verrauschen.
+        if env.state.phase == "start_placement":
+            temp = 0.3
+
         if len(actions) == 1:
             action = actions[0]
             policy = [{"action": action, "prob": 1.0}]

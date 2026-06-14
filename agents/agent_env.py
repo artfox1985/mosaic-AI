@@ -54,12 +54,16 @@ class MosaicEnv:
             random_scoring=self.random_scoring_tiles
         )
 
-        # Regelkonforme Platzierung: Nicht-Startspieler zuerst, dann Startspieler
-        self._place_initial_dome_tile_ai(1 - first_player)
-        self._place_initial_dome_tile_ai(first_player)
-
-        self.state.phase = "drafting"
+        # Startkuppel-Platzierung ist jetzt eine echte Spielphase, in der
+        # Netz/MCTS selbst wählen (statt heuristischer Vorab-Platzierung).
+        # current_player bleibt der echte Startspieler (apply_start_placement
+        # nutzt ihn als Referenz für die Reihenfolge). Wer tatsächlich platziert,
+        # ergibt sich aus "wer hat noch eine ungelegte Startkachel" — und die
+        # Engine erzwingt: Nicht-Startspieler zuerst.
+        self.state.phase = "start_placement"
         self.state.current_player = first_player
+        self._start_first_player = first_player
+
         self._prev_scores = [p.score for p in self.state.players]
 
         ids = self.state.scoring_tile_ids
@@ -69,11 +73,49 @@ class MosaicEnv:
         }
         return serialize_state(self.state), info
 
+    def _score_start_placement(self, player, color_availability) -> float:
+        """
+        Heuristik-Score für eine bereits platzierte Startkuppel.
+        Belohnt Farbflächen die (a) häufig verfügbar sind und (b) in kurze,
+        leicht füllbare Musterreihen zeigen. Wild-Flächen sind flexibel wertvoll.
+
+        Idee: Eine konkrete Farbe in einer kurzen Reihe (Index 0,1) lässt sich
+        früh füllen → startet Nachbar-Boni, die exponentiell Punkte bringen.
+        Dieselbe Farbe in einer langen Reihe (Index 5) ist früh kaum nutzbar.
+        """
+        from engine.tile import TileColor
+        score = 0.0
+        for sr in range(3):
+            for sc in range(3):
+                slot = player.dome_grid.dome_slots[sr][sc]
+                if slot is None:
+                    continue
+                for i, sp in enumerate(slot.spaces):
+                    grid_row = sr * 2 + (0 if i < 2 else 1)  # 0..5
+                    # Reihen-Eignung: kurze Reihen höher gewichten (Reihe 0 = kürzeste)
+                    row_weight = (6 - grid_row) / 6.0  # 1.0 für Reihe 0, ~0.17 für Reihe 5
+                    accepted = [c for c in TileColor if sp.accepts(c)]
+                    is_wild = len(accepted) > 2
+                    if is_wild:
+                        # Wild: flexibel, immer brauchbar — moderater fixer Wert
+                        score += 1.2 * row_weight
+                    elif accepted:
+                        col = accepted[0]
+                        avail = color_availability.get(col.name, 0)
+                        # Verfügbarkeit normalisieren (max ~5-6 Steine pro Farbe)
+                        avail_factor = min(avail / 4.0, 1.5)
+                        score += avail_factor * row_weight
+        return score
+
     def _place_initial_dome_tile_ai(self, player_idx: int):
         """
-        KI-seitige Startkachel-Platzierung via evaluate_state.
+        KI-seitige Startkachel-Platzierung via Farb-Reihen-Heuristik.
         Wird im Self-Play für MCTS und AlphaZero verwendet.
         Für AlphaZero im Server übernimmt /api/ai/start_tile diese Aufgabe.
+
+        Statt evaluate_state (das auf dem leeren Anfangsboard alle Positionen
+        gleich bewertet → immer (0,0)/0°) wird eine Heuristik genutzt, die
+        Kuppelfarben an die früh verfügbaren Steine und kurze Reihen ausrichtet.
         """
         player = self.state.players[player_idx]
         if player.start_dome_tile is None:
@@ -87,7 +129,19 @@ class MosaicEnv:
 
         try:
             import copy
-            from agents.mcts import evaluate_state
+            from collections import Counter
+
+            # Farb-Verfügbarkeit dieser Runde aus den Fabriken zählen
+            color_availability = Counter()
+            for f in self.state.factories:
+                for t in f.sun_tiles:
+                    color_availability[t.name] += 1
+                for t in getattr(f, 'moon_tiles', []):
+                    color_availability[t.name] += 1
+            for t in getattr(self.state.large_factory, 'sun_tiles', []):
+                color_availability[t.name] += 1
+            for t in getattr(self.state.large_factory, 'moon_tiles', []):
+                color_availability[t.name] += 1
 
             best_score = -float('inf')
             best_tile  = self.state.dome_display[0]
@@ -103,7 +157,10 @@ class MosaicEnv:
                                 tile_id=tile.tile_id,
                                 row=r, col=c, rot=rot,
                             )
-                            score = evaluate_state(test_game.state).get(player_idx, 0.0)
+                            score = self._score_start_placement(
+                                test_game.state.players[player_idx],
+                                color_availability,
+                            )
                             if score > best_score:
                                 best_score = score
                                 best_tile  = tile
@@ -130,11 +187,57 @@ class MosaicEnv:
     def valid_actions(self) -> list[dict]:
         if self.state is None:
             return []
+        if self.state.phase == "start_placement":
+            return self._start_placement_actions()
         if self.state.phase == "drafting":
             return self._drafting_actions()
         if self.state.phase == "tiling":
             return self._tiling_actions()
         return []
+
+    def _start_placement_actions(self) -> list[dict]:
+        """
+        Generiert alle möglichen Startkuppel-Platzierungen als 'dome'-Aktionen
+        (gleiche Action-IDs wie normale Kuppelzüge). So kann das Netz die
+        Startkuppel über seine Policy selbst wählen.
+
+        Reihenfolge: Nicht-Startspieler zuerst, dann Startspieler. Der Spieler
+        der platzieren muss, ist der mit noch ungelegter Startkachel — der
+        Nicht-Startspieler hat Vorrang.
+        """
+        actions = []
+        first = getattr(self, "_start_first_player", self.state.current_player)
+        non_starter = 1 - first
+
+        # Wer ist als nächstes dran?
+        if self.state.players[non_starter].start_dome_tile is not None:
+            pi = non_starter
+        elif self.state.players[first].start_dome_tile is not None:
+            pi = first
+        else:
+            return actions  # beide gelegt (sollte nicht passieren in dieser Phase)
+
+        player = self.state.players[pi]
+        if not self.state.dome_display:
+            return actions
+        empty_slots = player.dome_grid.empty_slots()
+        if not empty_slots:
+            return actions
+
+        for d_idx, tile in enumerate(self.state.dome_display):
+            for (r, c) in empty_slots:
+                for rot in [0, 90, 180, 270]:
+                    actions.append({
+                        "type":          "dome",
+                        "display_index": d_idx,
+                        "tile_id":       tile.tile_id,
+                        "slot_row":      r,
+                        "slot_col":      c,
+                        "rotation":      rot,
+                        "is_start":      True,
+                        "_placing_player": pi,   # wer platziert (intern)
+                    })
+        return actions
 
     def step(self, action: dict) -> tuple[dict, float, bool, dict]:
         assert self.state is not None, "reset() zuerst aufrufen"
@@ -427,6 +530,27 @@ class MosaicEnv:
 
         t = action["type"]
         state = self.state
+
+        # Startkuppel-Platzierung (eigene Phase, vor dem Drafting)
+        if action.get("is_start") or state.phase == "start_placement":
+            first = getattr(self, "_start_first_player", state.current_player)
+            pi = action.get("_placing_player", state.current_player)
+            self._game.apply_start_placement(
+                player_idx=pi,
+                tile_id=action["tile_id"],
+                row=action["slot_row"],
+                col=action["slot_col"],
+                rot=action["rotation"],
+            )
+            # Wenn beide platziert haben → Drafting beginnt (Startspieler zuerst)
+            both_placed = (state.players[0].start_dome_tile is None
+                           and state.players[1].start_dome_tile is None)
+            if both_placed:
+                state.phase = "drafting"
+                state.current_player = first
+            # sonst bleibt Phase start_placement; nächster Aufruf von
+            # _start_placement_actions generiert für den Startspieler
+            return True
 
         # Copy-on-Write: geteilte Objekte kopieren wenn sie modifiziert werden
         if getattr(self.state, '_pool_shared', False):
