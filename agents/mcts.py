@@ -517,9 +517,11 @@ def evaluate_state(state) -> dict[int, float]:
     for pi in [0, 1]:
         p = state.players[pi]
         
-        # 1. Echte Punkte + Schätzung
+        # 1. Echte Punkte + Schätzung (NUR Strafen/Marker — die Reihen-Punktwerte
+        #    stecken jetzt im potential über den complete_bonus, also include_rows=False
+        #    um Doppelzählung zu vermeiden)
         base_score = p.score
-        est_score = _estimate_round_score(p)
+        est_score = _estimate_round_score(p, include_rows=False)
         
         # 2. Potenzial des Boards laden (Unsere neue Funktion!)
         potential = get_player_potential(p)

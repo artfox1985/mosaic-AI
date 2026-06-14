@@ -53,70 +53,76 @@ def _serialize_chip(chip) -> dict | None:
         return None
     return {"id": chip.chip_id, "colors": [c.value for c in chip.colors]}
 
-def _estimate_round_score(p) -> int:
-    """Berechnet die voraussichtlichen Punkte für die aktuelle Runde inkl. Nachbarn."""
+def _estimate_row_values(p) -> dict:
+    """
+    Schätzt pro VOLLER Musterreihe die erwartbaren Tiling-Punkte (inkl. Nachbar-Boni).
+    Gibt {row_index: punkte} zurück. Nur für komplette Reihen mit Farbe.
+
+    Wird sowohl von _estimate_round_score (Summe) als auch vom Shaping
+    (complete_bonus pro Reihe) genutzt — eine einzige Quelle für die Geometrie.
+    """
     grid = [[False]*6 for _ in range(6)]
     valid_empty = {i: [] for i in range(6)}
 
-    # 1. Virtuelles 6x6 Raster aufbauen
+    # Virtuelles 6x6 Raster aufbauen
     for sr in range(3):
         for sc in range(3):
             slot = p.dome_grid.dome_slots[sr][sc]
             if slot is not None:
                 spaces = slot.spaces
                 abs_r, abs_c = sr * 2, sc * 2
-                
-                # Oben Links
                 if spaces[0].placed_color or spaces[0].placed_special: grid[abs_r][abs_c] = True
                 elif not spaces[0].is_locked: valid_empty[abs_r].append(abs_c)
-                # Oben Rechts
                 if spaces[1].placed_color or spaces[1].placed_special: grid[abs_r][abs_c+1] = True
                 elif not spaces[1].is_locked: valid_empty[abs_r].append(abs_c+1)
-                # Unten Links
                 if spaces[2].placed_color or spaces[2].placed_special: grid[abs_r+1][abs_c] = True
                 elif not spaces[2].is_locked: valid_empty[abs_r+1].append(abs_c)
-                # Unten Rechts
                 if spaces[3].placed_color or spaces[3].placed_special: grid[abs_r+1][abs_c+1] = True
                 elif not spaces[3].is_locked: valid_empty[abs_r+1].append(abs_c+1)
 
-    est = 0
-    penalties = [-1, -2, -3, -4]
-
-    # 2. Beste Platzierung für volle Musterreihen simulieren
+    row_values = {}
     for ri, row in enumerate(p.pattern_lines):
         if len(row.tiles) == row.capacity and row.color is not None:
             best_score = 1
             for c in valid_empty[ri]:
                 h, v = 1, 1
-                # Horizontale Nachbarn
                 for i in range(c-1, -1, -1):
                     if grid[ri][i]: h += 1
                     else: break
                 for i in range(c+1, 6):
                     if grid[ri][i]: h += 1
                     else: break
-                # Vertikale Nachbarn
                 for i in range(ri-1, -1, -1):
                     if grid[i][c]: v += 1
                     else: break
                 for i in range(ri+1, 6):
                     if grid[i][c]: v += 1
                     else: break
-                    
                 pts = 0
                 if h > 1: pts += h
                 if v > 1: pts += v
                 if pts == 0: pts = 1
-                
                 if pts > best_score:
                     best_score = pts
-            est += best_score
+            row_values[ri] = best_score
+    return row_values
 
-    # 3. Minuspunkte (Boden + Marker) abziehen
+
+def _estimate_round_score(p, include_rows: bool = True) -> int:
+    """Berechnet die voraussichtlichen Punkte für die aktuelle Runde inkl. Nachbarn.
+
+    include_rows=False: nur Boden-/Marker-Strafen, OHNE die vollen Reihen.
+    Das nutzt evaluate_state, weil die Reihen-Punktwerte dort bereits über
+    get_player_potential (complete_bonus) einfließen → keine Doppelzählung.
+    """
+    est = sum(_estimate_row_values(p).values()) if include_rows else 0
+
+    # Minuspunkte (Boden + Marker) abziehen
+    penalties = [-1, -2, -3, -4]
     for i, t in enumerate(p.broken_tiles):
         if i < len(penalties):
             est += penalties[i]
-            
+
     if p.holds_first_player_marker:
         est -= 2
 
