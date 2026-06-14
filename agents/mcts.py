@@ -299,6 +299,10 @@ class MCTSAgent(BaseAgent):
         action = node.untried_actions.pop(
             random.randrange(len(node.untried_actions))
         )
+        # WICHTIG: Spieler VOR dem step auslesen — step() wechselt den Spieler,
+        # danach würde env.current_player() den FOLGE-Spieler liefern und der
+        # Knotenwert würde aus der falschen Perspektive verbucht.
+        mover = env.current_player()
         obs, _, done, _ = env.step(action)
 
         if done:
@@ -306,14 +310,14 @@ class MCTSAgent(BaseAgent):
                 action=action,
                 parent=node,
                 untried_actions=[],
-                player_who_acted=1 - node.player_who_acted,
+                player_who_acted=mover,
             )
         else:
             child = MCTSNode(
                 action=action,
                 parent=node,
                 untried_actions=None,  # lazy: beim nächsten _expand befüllt
-                player_who_acted=env.current_player(),
+                player_who_acted=mover,
             )
 
         node.children.append(child)

@@ -279,85 +279,89 @@ class MosaicEnv:
         from engine.round_end import can_complete_row_with_chips
 
         actions = []
+        
+        # FIX: Nur für den aktuellen Spieler Aktionen generieren
+        pi = self.state.current_player
+        player = self.state.players[pi]
 
-        for pi in range(2):
-            player = self.state.players[pi]
-            for ri, row in enumerate(player.pattern_lines):
-                if not row.is_complete:
-                    continue
-                earlier_open = any(
-                    player.pattern_lines[r].is_complete
-                    for r in range(ri)
-                )
-                if earlier_open:
-                    break
-
-                tiling = generate_tiling_actions(self.state, pi)
-                for a in tiling:
-                    if a.pattern_row == ri:
-                        actions.append({
-                            "type":         "tiling",
-                            "player":       pi,
-                            "pattern_row":  a.pattern_row,
-                            "slot_row":     a.slot_row,
-                            "slot_col":     a.slot_col,
-                            "space_index":  a.space_index,
-                            "dome_tile_id": a.dome_tile_id,
-                            "rotation":     a.rotation,
-                        })
+        # 1. Tiling-Aktionen (Reihen legen)
+        for ri, row in enumerate(player.pattern_lines):
+            if not row.is_complete:
+                continue
+            
+            # Prüfe, ob eine frühere Reihe noch offen ist (Regeltreue)
+            earlier_open = any(
+                player.pattern_lines[r].is_complete
+                for r in range(ri)
+            )
+            if earlier_open:
                 break
 
-        for pi in range(2):
-            player = self.state.players[pi]
-            tiling_actions = generate_tiling_actions(self.state, pi)
-            placeable_rows = {a.pattern_row for a in tiling_actions}
-            for ri, row in enumerate(player.pattern_lines):
-                if row.is_complete:
-                    continue
-                # Reihenfolge: keine frühere platzierbare Reihe noch offen
-                earlier_open = any(
-                    player.pattern_lines[r].is_complete and r in placeable_rows
-                    for r in range(ri)
-                )
-                if earlier_open:
-                    break
-                # Chips verfügbar und Reihe vollmachbar?
-                if not can_complete_row_with_chips(player, ri, self.state):
-                    continue
-                # Nach Vollmachen platzierbar? Prüfe Kuppelslot
-                color    = row.color
-                dome_row = ri // 2
-                space_row = ri % 2
-                valid_si = [space_row * 2, space_row * 2 + 1]
-                grid = player.dome_grid
-                has_slot = any(
-                    slot is not None and
-                    any(
-                        not slot.spaces[si].is_filled and
-                        not slot.spaces[si].is_locked and
-                        slot.spaces[si].accepts(color)
-                        for si in valid_si
-                    )
-                    for slot in [grid.dome_slots[dome_row][sc] for sc in range(3)]
-                )
-                if has_slot:
+            tiling = generate_tiling_actions(self.state, pi)
+            for a in tiling:
+                if a.pattern_row == ri:
                     actions.append({
-                        "type":        "use_chips",
-                        "player":      pi,
-                        "pattern_row": ri,
+                        "type":         "tiling",
+                        "player":       pi,
+                        "pattern_row":  a.pattern_row,
+                        "slot_row":     a.slot_row,
+                        "slot_col":     a.slot_col,
+                        "space_index":  a.space_index,
+                        "dome_tile_id": a.dome_tile_id,
+                        "rotation":     a.rotation,
                     })
+            break # Nur die erste validierte Reihe wird für Tiling betrachtet
 
-        # end_tiling nur wenn:
-        # 1. Keine anderen Aktionen mehr verfügbar
-        # 2. Dome-Pflicht erfüllt (2 Platten gelegt) ODER Runde 5 ODER kein Display/Stack
+        # 2. Chip-Aktionen
+        tiling_actions = generate_tiling_actions(self.state, pi)
+        placeable_rows = {a.pattern_row for a in tiling_actions}
+        
+        for ri, row in enumerate(player.pattern_lines):
+            if row.is_complete:
+                continue
+            
+            # Reihenfolge: keine frühere platzierbare Reihe noch offen
+            earlier_open = any(
+                player.pattern_lines[r].is_complete and r in placeable_rows
+                for r in range(ri)
+            )
+            if earlier_open:
+                break
+                
+            if not can_complete_row_with_chips(player, ri, self.state):
+                continue
+            
+            # Nach Vollmachen platzierbar? Prüfe Kuppelslot
+            color = row.color
+            dome_row = ri // 2
+            space_row = ri % 2
+            valid_si = [space_row * 2, space_row * 2 + 1]
+            grid = player.dome_grid
+            has_slot = any(
+                slot is not None and
+                any(
+                    not slot.spaces[si].is_filled and
+                    not slot.spaces[si].is_locked and
+                    slot.spaces[si].accepts(color)
+                    for si in valid_si
+                )
+                for slot in [grid.dome_slots[dome_row][sc] for sc in range(3)]
+            )
+            if has_slot:
+                actions.append({
+                    "type":        "use_chips",
+                    "player":      pi,
+                    "pattern_row": ri,
+                })
+
+        # 3. end_tiling Logik
         if not actions:
             state = self.state
-            pi_active = state.current_player
-            p_active  = state.players[pi_active]
+            p_active = state.players[pi]
 
-            # Dome-Pflicht: aktiver Spieler muss noch Platten legen?
-            has_display  = len(state.dome_display) > 0
-            has_pool     = len(state.dome_tile_pool) > 0
+            # Dome-Pflicht
+            has_display = len(state.dome_display) > 0
+            has_pool = len(state.dome_tile_pool) > 0
             has_free_slot = any(
                 p_active.dome_grid.dome_slots[sr][sc] is None
                 for sr in range(3) for sc in range(3)
@@ -371,7 +375,7 @@ class MosaicEnv:
             )
 
             if still_must_place:
-                # Dome-Pflicht erzwingen — nur Dome-Aktionen für aktiven Spieler
+                from engine.game import generate_dome_moves
                 for m in generate_dome_moves(state):
                     display_index = next(
                         (i for i, t in enumerate(state.dome_display)
@@ -385,6 +389,7 @@ class MosaicEnv:
                         "rotation":      m.rotation,
                     })
                 if has_pool and has_free_slot:
+                    # Suche ersten freien Slot für Stack-Draw
                     for slot_row in range(3):
                         for slot_col in range(3):
                             if p_active.dome_grid.dome_slots[slot_row][slot_col] is None:
@@ -396,9 +401,9 @@ class MosaicEnv:
                                         "rotation": rot,
                                     })
                                 break
-                        else:
-                            continue
+                        else: continue
                         break
+                
                 if not actions:
                     actions.append({"type": "end_tiling"})
             else:

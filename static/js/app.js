@@ -3,6 +3,7 @@ let S = null;          // server state
 let sel = null;        // {source, factory_id, color}
 let domeModal = null;  // {pi, slot_r, slot_c, tile_id, rotation, is_start}
 let tilingPi = null, tilingRow = null;
+let humanTilingDone = false;
 
 // -- API -----------------------------------------------------------------------
 // KI-State
@@ -119,12 +120,7 @@ function aiIsDue() {
   if (S.phase === 'end' || S.phase === 'final') return false;
   if (S.phase === 'drafting') return S.current_player === AI_PLAYER;
   if (S.phase === 'tiling') {
-    // Regel mit KI: Der Mensch tilt ZUERST komplett, dann die KI.
-    // Die KI ist erst dran wenn der Mensch keine platzierbaren Reihen mehr hat.
-    const rows = S.valid_tiling_rows || [];
-    const humanHasRows = rows.some(r => r.pi !== AI_PLAYER);
-    const aiHasRows    = rows.some(r => r.pi === AI_PLAYER);
-    return aiHasRows && !humanHasRows;
+	return humanTilingDone;
   }
   return false;
 }
@@ -211,6 +207,18 @@ async function endTiling() {
   if(!d.ok){showError(d.error);return;}
   S=d.state; tilingPi=null; tilingRow=null; render();
   if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function finishHumanTiling() {
+  if (!AI_ENABLED) {
+    // Normales Rundenende, wenn zwei Menschen spielen
+    endTiling();
+  } else {
+    // Mensch ist fertig, wir übergeben an die KI!
+    humanTilingDone = true;
+    render();
     await triggerAIMove();
   }
 }
@@ -555,9 +563,10 @@ function renderCenter() {
       infoHTML = `<div class="info tiling">✓ Alle Reihen abgeschlossen</div>`;
     }
 
+	const btnText = AI_ENABLED ? "Mein Tiling abschließen → KI ist dran" : `Runde ${S.round} beenden ✓`;
     info.innerHTML = infoHTML + (!hasPending ? `
-      <button class="btn pri" onclick="endTiling()" style="width:100%;margin-top:6px">
-        Runde ${S.round} beenden ✓
+      <button class="btn pri" onclick="finishHumanTiling()" style="width:100%;margin-top:6px">
+        ${btnText}
       </button>` : '');
   } else if(S.phase==='end' || S.phase==='final') {
     const [p0,p1]=S.players;
@@ -1487,13 +1496,16 @@ document.addEventListener('click', e=>{
 // -- RENDER --------------------------------------------------------------------
 function render() {
   if(!S) return;
+  
+  if (S.phase === 'drafting') humanTilingDone = false;
+  
   document.getElementById('round-lbl').textContent=`Runde ${S.round}/5`;
   renderBoard(0);
   renderBoard(1);
   renderCenter();
   
 // -- UPDATE SYNC DEBUGGER --
-  const dbgPlayer = document.getElementById('dbg-server-player');
+/*   const dbgPlayer = document.getElementById('dbg-server-player');
   if (dbgPlayer && S) {
     dbgPlayer.innerText = `Server Player: ${S.current_player} (KI ist ${AI_PLAYER})`;
     document.getElementById('dbg-server-phase').innerText = `Server Phase: ${S.phase}`;
@@ -1505,7 +1517,7 @@ function render() {
     document.getElementById('dbg-ai-due').style.color = isDue ? "#ff4444" : "#0f0";
     
     document.getElementById('dbg-ai-thinking').innerText = `UI Loop aktiv: ${AI_THINKING}`;
-  }
+  } */
 }  
 
 // -- DRAG & DROP FÜR MODALS --------------------------------------------------

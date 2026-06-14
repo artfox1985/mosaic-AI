@@ -378,8 +378,9 @@ def move_start_tile():
 
 @app.route('/api/tiling', methods=['POST'])
 def tiling():
+    global AI_ENABLED, _ai_player
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    #if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
+    if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
     
     d = request.get_json()
     try:
@@ -387,7 +388,7 @@ def tiling():
         # --- SICHERHEIT: Verhindere KI-Zug durch Mensch ---
         # Wenn KI aktiv ist, darf ein Mensch-Request für Tiling 
         # niemals das KI-Flag oder KI-Züge triggern.
-        if AI_ENABLED and pi == _ai_player:
+        if 'AI_ENABLED' in globals() and AI_ENABLED and pi == _ai_player:
              # Das sollte eigentlich nicht passieren, wenn das Frontend sauber ist
              pass
         action = TilingAction(
@@ -686,9 +687,9 @@ def ai_move():
     # Tiling: KI muss noch platzierbare Reihen haben
     if _game.state.phase == "tiling":
         from engine.game import generate_tiling_actions
-        ai_actions = generate_tiling_actions(_game.state, _ai_player)
-        if not ai_actions:
-            return jsonify(err("KI hat keine Tiling-Züge mehr"))
+        #ai_actions = generate_tiling_actions(_game.state, _ai_player)
+        #if not ai_actions:
+        #    return jsonify(err("KI hat keine Tiling-Züge mehr"))
 
         # Regel mit KI: Der Mensch tilt ZUERST komplett. Solange der Mensch
         # noch platzierbare Reihen hat, darf die KI nicht tilen.
@@ -696,6 +697,8 @@ def ai_move():
         human_actions = generate_tiling_actions(_game.state, human_player)
         if human_actions:
             return jsonify(err("Mensch ist noch am Tilen"))
+            
+        _game.state.current_player = _ai_player
 
     with _ai_lock:
         try:
