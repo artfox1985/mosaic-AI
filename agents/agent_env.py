@@ -148,7 +148,14 @@ class MosaicEnv:
         potential_before = get_player_potential(player)
 
         try:
-            self._apply_action(action)
+            # Wir fangen den Rückgabewert der Methode auf
+            success = self._apply_action(action)
+            
+            # Wenn die Engine den Zug ablehnt (ohne Fehler zu werfen)
+            if success is False:
+                obs = serialize_state(self.state)
+                return obs, -1.0, False, {"error": f"Engine hat Zug abgelehnt: {action}"}
+                
         except Exception as e:
             obs = serialize_state(self.state)
             return obs, -1.0, False, {"error": str(e)}
@@ -213,6 +220,8 @@ class MosaicEnv:
                 f_idx = 5  # Aktion C: globaler Mondaktion
             elif src == "LARGE_FACTORY_SUN":
                 f_idx = 4
+            elif src == "LARGE_FACTORY_MOON":
+                f_idx = 6 
             else:
                 f_idx = factory_id_to_index.get(m.take.factory_id, 0)
             actions.append({
@@ -436,6 +445,11 @@ class MosaicEnv:
                 src  = TakeSource.SMALL_FACTORY_MOON
                 f_id = None
                 moon = []
+            elif f_idx == 6:
+                # Große Fabrik Mondseite
+                src  = TakeSource.LARGE_FACTORY_MOON
+                f_id = None
+                moon = []
             elif f_idx == 4:
                 # Große Fabrik Sonnenseite
                 src  = TakeSource.LARGE_FACTORY_SUN
@@ -535,19 +549,15 @@ class MosaicEnv:
             self._game.apply(move)
 
         elif t == "bonus_chip":
-            # factory_index → erste verfügbare Fabrik mit Chip
-            f_idx     = action.get("factory_index", 0)
-            factories = state.factories
-            # Versuche zuerst die gewünschte Fabrik
-            factory   = factories[f_idx] if f_idx < len(factories) else None
-            if factory is None or not factory.bonus_chip_revealed or not factory.bonus_chip:
-                # Fallback: erste Fabrik mit aufgedecktem Chip
-                factory = next(
-                    (f for f in factories if f.bonus_chip_revealed and f.bonus_chip), None
-                )
-            if factory is None:
-                return
-            move = TakeBonusChipMove(factory_id=factory.factory_id)
+            from engine.moves import TakeBonusChipMove
+            
+            f_idx = action.get("factory_index", 0)
+            if f_idx < len(state.factories):
+                factory_id = state.factories[f_idx].factory_id
+            else:
+                factory_id = state.factories[0].factory_id
+                
+            move = TakeBonusChipMove(factory_id=factory_id)
             self._game.apply(move)
 
         elif t == "pass":

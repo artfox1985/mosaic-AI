@@ -343,11 +343,17 @@ def move_start_tile():
 @app.route('/api/tiling', methods=['POST'])
 def tiling():
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
+    #if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
     
     d = request.get_json()
     try:
         pi = int(d['player'])
+        # --- SICHERHEIT: Verhindere KI-Zug durch Mensch ---
+        # Wenn KI aktiv ist, darf ein Mensch-Request für Tiling 
+        # niemals das KI-Flag oder KI-Züge triggern.
+        if AI_ENABLED and pi == _ai_player:
+             # Das sollte eigentlich nicht passieren, wenn das Frontend sauber ist
+             pass
         action = TilingAction(
             pattern_row=int(d['pattern_row']),
             slot_row=int(d['slot_row']),
@@ -625,6 +631,15 @@ def ai_move():
     if _game.state is None:    return jsonify(err("Kein aktives Spiel"))
     if _ai_agent is None:      return jsonify(err("Kein KI-Agent aktiv"))
     if _ai_player is None:     return jsonify(err("KI-Spieler nicht gesetzt"))
+
+    # --- START SYNC DEBUG LOG ---
+    #print(f"\n[SYNC-DEBUG] Frontend fordert KI-Zug an!")
+    #print(f" -> Engine Phase:   {_game.state.phase}")
+    #print(f" -> Engine Player:  {_game.state.current_player} (Sollte KI={_ai_player} sein)")
+    #print(f" -> Tokens verbraucht (Spieler 0): {_game.state.players[0].tokens_used}")
+    #print(f" -> Tokens verbraucht (Spieler 1): {_game.state.players[1].tokens_used}")
+    # --- END SYNC DEBUG LOG ---
+
     if _game.state.phase not in ("drafting", "tiling"):
         return jsonify(err(f"KI kann in Phase '{_game.state.phase}' nicht ziehen"))
 

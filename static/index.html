@@ -8,12 +8,20 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-
+<!-- <div id="sync-debugger" style="position:fixed; top:10px; right:10px; background:rgba(0,0,0,0.85); color:#0f0; padding:10px; border:1px solid #0f0; border-radius:6px; font-family:monospace; z-index:10000; font-size:12px; pointer-events:none; box-shadow: 0 0 10px #0f0;">
+  <div style="font-weight:bold; border-bottom:1px solid #0f0; margin-bottom:4px;">🕵️‍♂️ SYNC MONITOR</div>
+  <div id="dbg-server-player">Server Player: ?</div>
+  <div id="dbg-server-phase">Server Phase: ?</div>
+  <div id="dbg-ai-enabled">AI Config: ?</div>
+  <div id="dbg-ai-due">UI aiIsDue(): ?</div>
+  <div id="dbg-ai-thinking">UI Loop: ?</div>
+</div> -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
   <div style="font-size:17px;font-weight:600">Mosaic-AI <span id="round-lbl" style="font-size:12px;font-weight:400;color:var(--text2)"></span></div>
   <div style="display:flex;gap:6px">
     <button class="btn pri" onclick="openNewGameModal()">Neu starten</button>
     <button onclick="showActiveScoringTiles()" class="btn">🎯 Aktive Ziele</button>
+	<button onclick="window.open('/debug','_blank')" class="btn">🔬 KI-Debugger</button>
   </div>
 </div>
 

@@ -156,14 +156,18 @@ async function stoneMove(source, factory_id, color, row, moon_order=[]) {
   const d = await api('/move/stone', {source, factory_id, color, row, moon_order});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
-  await triggerAIMove();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
 }
 
 async function domeMove(tile_id, slot_row, slot_col, rotation) {
   const d = await api('/move/dome', {tile_id, slot_row, slot_col, rotation});
   if(!d.ok){showError(d.error);return;}
   S=d.state; closeDomeModal(); render();
-  await triggerAIMove();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
 }
 
 async function startTileMove(player, tile_id, slot_row, slot_col, rotation) {
@@ -179,21 +183,27 @@ async function bonusChipMove(factory_id) {
   const d = await api('/move/bonus_chip', {factory_id});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
-  await triggerAIMove();
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
 }
 
 async function tilingMove(player, pattern_row, slot_row, slot_col, space_index, dome_tile_id=null, rotation=0) {
   const d = await api('/tiling', {player, pattern_row, slot_row, slot_col, space_index, dome_tile_id, rotation});
   if(!d.ok){showError(d.error);return;}
   S=d.state; tilingRow=null; render();
-  await triggerAIMove();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
 }
 
 async function endTiling() {
   const d = await api('/end_tiling', {});
   if(!d.ok){showError(d.error);return;}
   S=d.state; tilingPi=null; tilingRow=null; render();
-  await triggerAIMove();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
 }
 
 async function passMove() {
@@ -202,7 +212,9 @@ async function passMove() {
   const d = await api('/move/pass', {});
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; render();
-  await triggerAIMove();
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
 }
 
 async function tilingBonusChips(pi, pattern_row, chip_uses) {
@@ -1186,6 +1198,10 @@ async function confirmDome() {
     });
     if(!d.ok){showError(d.error);return;}
     S=d.state; closeDomeModal(); render();
+	// Wir erzwingen den Check für die KI, egal in welcher Phase wir sind
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
   } else {
     domeMove(tile_id, slot_r, slot_c, rotation);
   }
@@ -1348,7 +1364,8 @@ async function calculateEndScoring() {
   const d = await api('/end_scoring', {});
   if(!d.ok){showError(d.error);return;}
   S = d.state;
-  showEndResults(d.results);
+  console.log(d)
+  showEndResults(d.end_scoring);
   render();
 }
 
@@ -1465,7 +1482,22 @@ function render() {
   renderBoard(0);
   renderBoard(1);
   renderCenter();
-}
+  
+// -- UPDATE SYNC DEBUGGER --
+  const dbgPlayer = document.getElementById('dbg-server-player');
+  if (dbgPlayer && S) {
+    dbgPlayer.innerText = `Server Player: ${S.current_player} (KI ist ${AI_PLAYER})`;
+    document.getElementById('dbg-server-phase').innerText = `Server Phase: ${S.phase}`;
+    document.getElementById('dbg-ai-enabled').innerText = `AI Enabled: ${AI_ENABLED}`;
+    
+    const isDue = aiIsDue();
+    document.getElementById('dbg-ai-due').innerText = `UI aiIsDue(): ${isDue}`;
+    // Mach es rot, wenn die KI dran ist, damit es auffällt
+    document.getElementById('dbg-ai-due').style.color = isDue ? "#ff4444" : "#0f0";
+    
+    document.getElementById('dbg-ai-thinking').innerText = `UI Loop aktiv: ${AI_THINKING}`;
+  }
+}  
 
 // ── DRAG & DROP FÜR MODALS ──────────────────────────────────────────────────
 function makeDraggable(overlayId) {
@@ -1510,15 +1542,41 @@ function makeDraggable(overlayId) {
 // ── START ─────────────────────────────────────────────────────────────────────
 makeDraggable('dome-overlay');
 makeDraggable('moon-overlay');
-makeDraggable('chip-overlay');      // <-- Jetzt alle verschiebbar
-makeDraggable('scoring-overlay');   // <-- Jetzt alle verschiebbar
-// Beim Laden: nur Modal öffnen wenn kein aktives Spiel vorhanden
+makeDraggable('chip-overlay');
+makeDraggable('scoring-overlay');
+
+// Beim Laden: State synchronisieren und lokales Gedächtnis wiederherstellen
 (async () => {
   const d = await api('/state');
   if (d.ok && d.state && d.state.phase && d.state.phase !== 'final') {
     S = d.state;
-    render();  // bestehendes Spiel wiederherstellen
+    
+    // 1. Wertungsplatten (Metadaten) wieder in den Speicher laden
+    const dt = await api('/scoring_tiles');
+    if(dt.ok) {
+      allScoringTiles = dt.tiles;
+      selectedScoringIds = new Set(S.scoring_tile_ids || [0,1,2]);
+    }
+
+    // 2. KI-Status vom Server abfragen (Gedächtnis auffrischen!)
+    const aiData = await api('/ai/config');
+    if (aiData.ok && aiData.ai_enabled) {
+      AI_ENABLED = true;
+      AI_PLAYER = aiData.ai_player;
+    } else {
+      AI_ENABLED = false;
+    }
+
+    // 3. UI zeichnen
+    render();  
+    
+    // 4. Stupser für die KI: Falls sie vor dem Reload dran war, muss sie jetzt ziehen!
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+    
   } else {
+    // Kein aktives Spiel gefunden
     openNewGameModal();
   }
 })();
