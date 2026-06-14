@@ -130,6 +130,7 @@ class MCTSAgent(BaseAgent):
         time_limit_s: float | None = None,
         max_actions: int = 20,
         verbose: bool = False,
+        dynamic_sims: str | None = None,
     ):
         self.simulations   = simulations
         self.c             = c
@@ -137,10 +138,35 @@ class MCTSAgent(BaseAgent):
         self.time_limit_s  = time_limit_s
         self.max_actions   = max_actions   # max Aktionen pro Knoten (Progressive Widening)
         self.verbose       = verbose
+        self.dynamic_sims  = dynamic_sims  # None | "selfplay" | "play"
         self._rollout_agent = RandomAgent()
 
         # Statistiken
         self.stats: dict = {}
+
+    def _compute_dynamic_sims(self, num_actions: int) -> int:
+        """
+        Passt die Sim-Zahl an die Anzahl gültiger Aktionen an.
+        Die Aktionszahl fällt im Rundenverlauf stark (z.B. 184 → 8),
+        was wir nutzen, statt fix gleich viele Sims pro Zug zu nehmen.
+
+        Modi:
+          "selfplay" → EFFIZIENZ: bei wenig Aktionen Sims sparen
+                       (schnellere Datengenerierung, ~halbe Gesamtzeit).
+                       sims = clamp(actions * 0.35, 15, base)
+          "play"     → STÄRKE: Budget umverteilen, früh (viele Optionen)
+                       mehr Suche. sqrt-Kopplung, moderat.
+                       sims = clamp(sqrt(actions) * 10, 40, base*scale)
+        """
+        import math
+        base = self.simulations
+        if self.dynamic_sims == "selfplay":
+            return max(15, min(base, int(num_actions * 0.35)))
+        if self.dynamic_sims == "play":
+            # base als Untergrenze-Anker, Obergrenze etwas höher für frühe Züge
+            hi = max(base, int(base * 3))
+            return max(base, min(hi, int(math.sqrt(num_actions) * 10)))
+        return base
 
     def choose(self, actions: list[dict], obs: dict) -> dict:
         """
@@ -177,13 +203,16 @@ class MCTSAgent(BaseAgent):
         t_start = time.time()
         sims_done = 0
 
+        # Dynamische Sim-Zahl je nach Aktionsanzahl (falls aktiviert)
+        sim_target = self._compute_dynamic_sims(len(actions))
+
         while True:
             # Abbruchbedingung
             if self.time_limit_s is not None:
                 if time.time() - t_start >= self.time_limit_s:
                     break
             else:
-                if sims_done >= self.simulations:
+                if sims_done >= sim_target:
                     break
 
             # Eine Simulation

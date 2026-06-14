@@ -159,13 +159,15 @@ if __name__ == "__main__":
     agent_alphazero3d = AlphaZeroAgent(
         model_version="v3d",
         input_size=INPUT_SIZE, 
-        simulations=40
+        simulations=40,
+        dynamic_sims="play"
         )
         
     agent_alphazero3c = AlphaZeroAgent(
         model_version="v3c",
         input_size=INPUT_SIZE, 
-        simulations=40
+        simulations=40,
+        dynamic_sims="play"
         )
 
     #competitors = {

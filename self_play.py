@@ -37,9 +37,24 @@ class SelfPlayMixin:
       temp=0.0 → argmax
     """
 
+    def _selfplay_sim_count(self, num_actions: int) -> int:
+        """Dynamische Sim-Zahl für Self-Play (Effizienz-Modus).
+        Greift auf _compute_dynamic_sims zu falls vorhanden (MCTSSelfPlayAgent)
+        oder auf den gewrappten _az (NetworkSelfPlayAgent). Fällt sonst auf
+        self.simulations zurück."""
+        mode = getattr(self, 'dynamic_sims', None)
+        if mode is None and hasattr(self, '_az'):
+            mode = getattr(self._az, 'dynamic_sims', None)
+        if mode != "selfplay":
+            return self.simulations
+        return max(15, min(self.simulations, int(num_actions * 0.35)))
+
     def search_and_get_policy(self, env, actions, temp=1.0):
         pi = env.current_player()
         sampled = self._sample_actions(actions)
+
+        # Dynamische Sim-Zahl je nach Aktionsanzahl (Effizienz)
+        sim_count = self._selfplay_sim_count(len(actions))
 
         root = MCTSNode(
             action=None,
@@ -50,7 +65,7 @@ class SelfPlayMixin:
         root.visits = 1
 
         # Alle Simulationen durchführen
-        for _ in range(self.simulations):
+        for _ in range(sim_count):
             sim_env = env.clone()
             node = self._select(root, sim_env)
             node = self._expand(node, sim_env)
@@ -67,13 +82,6 @@ class SelfPlayMixin:
                       for c in root.children]
             policy = [p for p in policy if p["prob"] > 0.0]
             return best.action, policy
-
-        for _ in range(self.simulations):
-            sim_env = env.clone()
-            node = self._select(root, sim_env)
-            node = self._expand(node, sim_env)
-            result = self._rollout(sim_env)
-            self._backpropagate(node, result, pi)
 
         # Cache leeren — Priors gelten nur für diesen Zug
         if hasattr(self, 'node_priors'):
@@ -279,7 +287,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     """
     if mode == "mcts":
         print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations})")
-        agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth)
+        agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth,
+                                  dynamic_sims="selfplay")
     elif mode == "network":
         model_file = MODELS_DIR / f"alphazero_{version_name}.pth"
         if not model_file.exists():
@@ -287,7 +296,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             return
         print(f"🚀 Starte Network Self-Play: {num_games} Spiele "
               f"(Sims: {simulations} | Model: {model_file.name})")
-        agent = NetworkSelfPlayAgent(model_version=version_name, simulations=simulations)
+        agent = NetworkSelfPlayAgent(model_version=version_name, simulations=simulations,
+                                     dynamic_sims="selfplay")
     else:
         print(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
         return
@@ -333,7 +343,7 @@ if __name__ == "__main__":
     parser.add_argument("--games",   type=int, default=100,
                         help="Anzahl Spiele")
     parser.add_argument("--sims",    type=int, default=50,
-                        help="MCTS-Simulationen pro Zug")
+                        help="MCTS-Simulationen pro Zug (Obergrenze bei dynamischer Anpassung)")
     parser.add_argument("--version", type=str, required=True,
                         help="Versionsname, z.B. v0 oder v1")
     parser.add_argument("--tag",      type=str, default=None,

@@ -220,8 +220,6 @@ class MosaicEnv:
                 f_idx = 5  # Aktion C: globaler Mondaktion
             elif src == "LARGE_FACTORY_SUN":
                 f_idx = 4
-            elif src == "LARGE_FACTORY_MOON":
-                f_idx = 6 
             else:
                 f_idx = factory_id_to_index.get(m.take.factory_id, 0)
             actions.append({
@@ -443,11 +441,6 @@ class MosaicEnv:
             if f_idx == 5:
                 # Aktion C: globaler Mondaktion
                 src  = TakeSource.SMALL_FACTORY_MOON
-                f_id = None
-                moon = []
-            elif f_idx == 6:
-                # Große Fabrik Mondseite
-                src  = TakeSource.LARGE_FACTORY_MOON
                 f_id = None
                 moon = []
             elif f_idx == 4:

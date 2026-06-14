@@ -98,12 +98,14 @@ def _init_ai(model_version: str, sims: int) -> None:
             model_version=model_version,
             input_size=INPUT_SIZE,
             simulations=sims,
+            dynamic_sims="play",   # Stärke: früh (viele Optionen) mehr Suche
         )
         _ai_agent.set_env(_wrap_env())
     except FileNotFoundError:
         # Modell nicht vorhanden → Fallback auf MCTS
         from agents.mcts import HeuristicMCTSAgent
-        _ai_agent = HeuristicMCTSAgent(simulations=sims, rollout_depth=1)
+        _ai_agent = HeuristicMCTSAgent(simulations=sims, rollout_depth=1,
+                                       dynamic_sims="play")
         _ai_agent.set_env(_wrap_env())
 
 def _wrap_env():
@@ -654,6 +656,13 @@ def ai_move():
         if not ai_actions:
             return jsonify(err("KI hat keine Tiling-Züge mehr"))
 
+        # Regel mit KI: Der Mensch tilt ZUERST komplett. Solange der Mensch
+        # noch platzierbare Reihen hat, darf die KI nicht tilen.
+        human_player = 1 - _ai_player
+        human_actions = generate_tiling_actions(_game.state, human_player)
+        if human_actions:
+            return jsonify(err("Mensch ist noch am Tilen"))
+
     with _ai_lock:
         try:
             from agents.agent_env import MosaicEnv
@@ -806,7 +815,13 @@ def _compute_debug_analysis(env, actions, mark_best=False):
     root = MCTSNode(action=None, parent=None, untried_actions=None,
                     player_who_acted=pi)
     root.visits = 1
-    for _ in range(_ai_agent.simulations):
+    # Dieselbe (ggf. dynamische) Sim-Zahl wie die echte Zugwahl verwenden,
+    # damit Anzeige und gewählter Zug konsistent bleiben.
+    if hasattr(_ai_agent, "_compute_dynamic_sims"):
+        sim_count = _ai_agent._compute_dynamic_sims(len(actions))
+    else:
+        sim_count = _ai_agent.simulations
+    for _ in range(sim_count):
         sim_env = env.clone()
         node = _ai_agent._select(root, sim_env)
         node = _ai_agent._expand(node, sim_env)
@@ -854,7 +869,7 @@ def _compute_debug_analysis(env, actions, mark_best=False):
         "value":          round(raw["value"], 4),
         "win_prob":       round(raw["win_prob"], 4),
         "win_pct":        round(raw["win_prob"] * 100, 1),
-        "simulations":    _ai_agent.simulations,
+        "simulations":    sim_count,
         "num_actions":    len(actions),
         "moves":          moves,
     }
@@ -926,7 +941,11 @@ def ai_suggest():
                         player_who_acted=pi)
         root.visits = 1
 
-        for _ in range(_ai_agent.simulations):
+        if hasattr(_ai_agent, "_compute_dynamic_sims"):
+            sug_sims = _ai_agent._compute_dynamic_sims(len(actions))
+        else:
+            sug_sims = _ai_agent.simulations
+        for _ in range(sug_sims):
             sim_env = env.clone()
             node = _ai_agent._select(root, sim_env)
             node = _ai_agent._expand(node, sim_env)
