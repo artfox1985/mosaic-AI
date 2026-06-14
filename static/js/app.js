@@ -1391,6 +1391,11 @@ async function aiDoStartTile() {
   if (!d.ok) { showError('KI Startkachel Fehler: ' + d.error); return; }
   S = d.state;
   render();
+  
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+  
 }
 
 async function calculateEndScoring() {
