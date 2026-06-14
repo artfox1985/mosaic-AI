@@ -561,11 +561,13 @@ def move_pass():
 
 @app.route('/api/scoring_tiles', methods=['GET'])
 def get_scoring_tiles():
-    from engine.scoring import ALL_SCORING_TILES
+    from engine.scoring import ALL_SCORING_TILES, MUTUALLY_EXCLUSIVE_PAIRS, _exclusion_partner
     return jsonify({
         "ok": True,
-        "tiles": [{"id": t.id, "name": t.name, "description": t.description, "emoji": t.emoji}
-                  for t in ALL_SCORING_TILES]
+        "tiles": [{"id": t.id, "name": t.name, "description": t.description,
+                   "emoji": t.emoji, "excludes": _exclusion_partner(t.id)}
+                  for t in ALL_SCORING_TILES],
+        "exclusive_pairs": [list(p) for p in MUTUALLY_EXCLUSIVE_PAIRS],
     })
 
 
@@ -576,10 +578,12 @@ def select_scoring_tiles():
     ids = d.get('ids', [])
     if len(ids) != 3: return jsonify(err("Genau 3 Wertungsplatten wählen"))
     
-    from engine.scoring import ALL_SCORING_TILES
+    from engine.scoring import ALL_SCORING_TILES, has_exclusion_conflict
     valid_ids = {t.id for t in ALL_SCORING_TILES}
     if not all(i in valid_ids for i in ids): return jsonify(err("Ungültige Wertungsplatten-IDs"))
     if len(set(ids)) != 3: return jsonify(err("Keine Duplikate erlaubt"))
+    if has_exclusion_conflict(ids):
+        return jsonify(err("Zwei sich ausschließende Wertungsplatten gewählt"))
     
     _game.state.scoring_tile_ids = list(ids)
     _game.state.scoring_confirmed = True   # nicht mehr editierbar

@@ -1328,13 +1328,22 @@ function renderScoringGrid() {
   if(!grid) return;
   grid.innerHTML = allScoringTiles.map(t => {
     const sel = selectedScoringIds.has(t.id);
+    const locked = !sel && _isScoringLocked(t.id);
+    const partner = _scoringPartnerOf(t.id);
+    const partnerTile = partner !== null ? allScoringTiles.find(x => x.id === partner) : null;
+    const exclNote = partnerTile
+      ? `<div style="font-size:8px;color:var(--text3);margin-top:3px">schließt „${partnerTile.name}" aus</div>`
+      : '';
     return `<div data-stid="${t.id}" onclick="toggleScoringTile(${t.id})"
       style="border:1.5px solid ${sel?'var(--blau)':'var(--border)'};
-             background:${sel?'#EFF6FF':'var(--surface)'};
-             border-radius:8px;padding:8px;cursor:pointer;transition:all .1s">
+             background:${sel?'#EFF6FF':(locked?'#F3F4F6':'var(--surface)')};
+             opacity:${locked?0.45:1};
+             border-radius:8px;padding:8px;
+             cursor:${locked?'not-allowed':'pointer'};transition:all .1s">
       <div style="font-size:16px;margin-bottom:4px">${t.emoji}</div>
       <div style="font-size:11px;font-weight:600">${t.name}</div>
       <div style="font-size:9px;color:var(--text2);margin-top:2px">${t.description}</div>
+      ${exclNote}
     </div>`;
   }).join('');
   const count = selectedScoringIds.size;
@@ -1344,9 +1353,24 @@ function renderScoringGrid() {
   if(btn) btn.disabled = count !== 3;
 }
 
+function _scoringPartnerOf(id) {
+  // Partner aus der vom Server gelieferten 'excludes'-Info
+  const t = allScoringTiles.find(x => x.id === id);
+  return (t && t.excludes !== null && t.excludes !== undefined) ? t.excludes : null;
+}
+
+function _isScoringLocked(id) {
+  // Gesperrt, wenn der Ausschluss-Partner bereits gewählt ist
+  const partner = _scoringPartnerOf(id);
+  return partner !== null && selectedScoringIds.has(partner);
+}
+
 function toggleScoringTile(id) {
   if(selectedScoringIds.has(id)) {
     selectedScoringIds.delete(id);
+  } else if(_isScoringLocked(id)) {
+    // Partner ist gewählt → diese Karte ist gesperrt, nichts tun
+    return;
   } else if(selectedScoringIds.size < 3) {
     selectedScoringIds.add(id);
   }

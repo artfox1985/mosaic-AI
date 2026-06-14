@@ -164,6 +164,51 @@ ALL_SCORING_TILES: list[ScoringTile] = [
     ColorfulRows(7,    "Farbenreiche Reihen", "4 Pkt je Reihe mit ≥5 verschiedenen Farben",          "🎨"),
 ]
 
+# Sich gegenseitig ausschließende Wertungsplatten-Paare (Regel).
+# Aus jedem Paar darf höchstens EINE Platte gewählt werden.
+MUTUALLY_EXCLUSIVE_PAIRS: list[tuple[int, int]] = [
+    (0, 7),   # Horizontale Reihen  ⟷ Farbenreiche Reihen
+    (6, 3),   # Spezialfelder       ⟷ Mehrfarbige Felder
+    (4, 1),   # Äußere Felder       ⟷ Vertikale Reihen
+    (2, 5),   # Diagonale Reihen    ⟷ Eckplatten
+]
+
+def _exclusion_partner(tile_id: int) -> int | None:
+    """Gibt die ID der ausschließenden Partnerplatte zurück, falls vorhanden."""
+    for a, b in MUTUALLY_EXCLUSIVE_PAIRS:
+        if tile_id == a:
+            return b
+        if tile_id == b:
+            return a
+    return None
+
+def has_exclusion_conflict(tile_ids: list[int]) -> bool:
+    """True, wenn zwei IDs aus demselben Ausschluss-Paar gewählt wurden."""
+    s = set(tile_ids)
+    for a, b in MUTUALLY_EXCLUSIVE_PAIRS:
+        if a in s and b in s:
+            return True
+    return False
+
+def sample_valid_scoring_ids(n: int = 3, rng=None) -> list[int]:
+    """
+    Wählt n Wertungsplatten zufällig, ohne zwei aus demselben Ausschluss-Paar.
+    Vorgehen: höchstens eine Platte pro Paar in den Pool nehmen, dann ziehen.
+    """
+    import random as _random
+    r = rng or _random
+    chosen = []
+    # Aus jedem Paar genau eine Seite als Kandidat zulassen
+    pool = []
+    for a, b in MUTUALLY_EXCLUSIVE_PAIRS:
+        pool.append(r.choice([a, b]))
+    # Falls Platten ohne Paar existieren, ebenfalls aufnehmen
+    paired = {x for pair in MUTUALLY_EXCLUSIVE_PAIRS for x in pair}
+    for t in ALL_SCORING_TILES:
+        if t.id not in paired:
+            pool.append(t.id)
+    return r.sample(pool, min(n, len(pool)))
+
 
 def calculate_end_scoring(player: "PlayerBoard", tile_ids: list[int]) -> dict:
     """

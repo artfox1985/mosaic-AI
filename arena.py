@@ -143,7 +143,12 @@ if __name__ == "__main__":
     
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
-    #agent_mcts_heuristic = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
+    agent_mcts_heuristic1 = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
+    agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=50, rollout_depth=5)
+    agent_mcts_heuristic3 = HeuristicMCTSAgent(simulations=100, rollout_depth=0)
+    agent_mcts_heuristic4 = HeuristicMCTSAgent(simulations=100, rollout_depth=1)
+    agent_mcts_heuristic5 = HeuristicMCTSAgent(simulations=200, rollout_depth=0)
+    agent_mcts_heuristic6 = HeuristicMCTSAgent(simulations=200, rollout_depth=1)
     # agent_alphazero1a = AlphaZeroAgent(
         # model_version="v1a",
         # input_size=INPUT_SIZE, 
@@ -156,19 +161,19 @@ if __name__ == "__main__":
         # simulations=40
         # )
         
-    agent_alphazero3d = AlphaZeroAgent(
-        model_version="v3d",
-        input_size=INPUT_SIZE, 
-        simulations=40,
-        dynamic_sims="play"
-        )
+    # agent_alphazero3d = AlphaZeroAgent(
+        # model_version="v3d",
+        # input_size=INPUT_SIZE, 
+        # simulations=40,
+        # dynamic_sims="play"
+        # )
         
-    agent_alphazero3c = AlphaZeroAgent(
-        model_version="v3c",
-        input_size=INPUT_SIZE, 
-        simulations=40,
-        dynamic_sims="play"
-        )
+    # agent_alphazero3c = AlphaZeroAgent(
+        # model_version="v3c",
+        # input_size=INPUT_SIZE, 
+        # simulations=40,
+        # dynamic_sims="play"
+        # )
 
     #competitors = {
     #    "Random": (agent_random, 1000),
@@ -178,11 +183,12 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "AlphaZero V3-512_v1v2": (agent_alphazero3d, 1000),
-        #"AlphaZero V3-256_v1v2": (agent_alphazero3b, 1000),
-        #"AlphaZero V2a": (agent_alphazero2a, 1000),
-        #"AlphaZero V1a": (agent_alphazero1a, 1000),
-        "AlphaZero V3-512": (agent_alphazero3c, 1000),
+        "MTCS 50-0": (agent_mcts_heuristic1, 1000),
+        "MTCS 50-5": (agent_mcts_heuristic2, 1000),
+        "MTCS 100-0": (agent_mcts_heuristic3, 1000),
+        "MTCS 100-1": (agent_mcts_heuristic4, 1000),
+        "MTCS 200-0": (agent_mcts_heuristic5, 1000),
+        "MTCS 200-1": (agent_mcts_heuristic6, 1000),
     }
 
     # Jeder spielt gegen jeden

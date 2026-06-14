@@ -338,11 +338,11 @@ class Game:
     ) -> GameState:
         self.state = setup_new_game(player_names, first_player, seed)
 
-        from engine.scoring import ALL_SCORING_TILES
+        from engine.scoring import ALL_SCORING_TILES, sample_valid_scoring_ids
         import random
 
         if random_scoring:
-            self.state.scoring_tile_ids = random.sample([t.id for t in ALL_SCORING_TILES], 3)
+            self.state.scoring_tile_ids = sample_valid_scoring_ids(3, rng=random)
         else:
             self.state.scoring_tile_ids = [0, 1, 2]
 
