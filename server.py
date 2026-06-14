@@ -50,6 +50,27 @@ try:
 except ImportError:
     pass
 
+# ── MIME-Types fix (besonders Windows) ───────────────────────────────────────
+# Auf Windows liest Pythons mimetypes-Modul die Registry, wo .js oft OHNE
+# charset=utf-8 registriert ist. Dann rät der Browser die Kodierung falsch und
+# Multibyte-Zeichen (z.B. — oder Umlaute) zerbrechen → "unescaped line break".
+# Wir erzwingen die korrekten Typen unabhängig vom OS.
+import mimetypes as _mt
+_mt.add_type('text/javascript', '.js')
+_mt.add_type('text/css', '.css')
+_mt.add_type('application/json', '.json')
+
+@app.after_request
+def _ensure_utf8(resp):
+    ct = resp.headers.get('Content-Type', '')
+    # Bei Text-/JS-/CSS-/JSON-Antworten charset=utf-8 garantieren
+    if ('charset' not in ct.lower()) and any(
+        ct.startswith(p) for p in
+        ('text/', 'application/javascript', 'application/json')
+    ):
+        resp.headers['Content-Type'] = ct + '; charset=utf-8'
+    return resp
+
 # ── Global game state ────────────────────────────────────────────────────────
 _game = Game()
 _game_log_path: Path | None = None   # Pfad zur aktuellen Log-Datei
@@ -89,8 +110,21 @@ def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) ->
     return DIFFICULTY_PRESETS["_default"]
 
 def _init_ai(model_version: str, sims: int) -> None:
-    """Initialisiert den KI-Agenten (lazy — nur wenn Modell vorhanden)."""
+    """Initialisiert den KI-Agenten (lazy — nur wenn Modell vorhanden).
+
+    Spezialfall: model_version == 'heuristic' wählt gezielt den
+    HeuristicMCTSAgent (reines MCTS ohne Netz) — zum Prüfen der Heuristik.
+    """
     global _ai_agent
+
+    # Gezielte Heuristik-Auswahl (kein Netz, nur MCTS + Greedy-Rollouts)
+    if str(model_version).lower() in ("heuristic", "heuristik", "mcts"):
+        from agents.mcts import HeuristicMCTSAgent
+        _ai_agent = HeuristicMCTSAgent(simulations=sims, rollout_depth=1,
+                                       dynamic_sims="play")
+        _ai_agent.set_env(_wrap_env())
+        return
+
     try:
         from agents.alphazero import AlphaZeroAgent
         from config import INPUT_SIZE
@@ -681,9 +715,10 @@ def ai_move():
 
             # Pre-Move-Analyse UND Zugwahl aus DEMSELBEN Baum.
             # So sind angezeigte Visits und gewählter Zug garantiert konsistent.
+            # Gilt für AlphaZero (mit Netz) UND Heuristik (nur MCTS).
             debug_info  = None
             best_action = None
-            if hasattr(_ai_agent, "evaluate_raw"):
+            if hasattr(_ai_agent, "_select"):
                 try:
                     debug_info, best_action = _compute_debug_analysis(
                         env, actions, mark_best=True)
@@ -806,9 +841,11 @@ def _compute_debug_analysis(env, actions, mark_best=False):
     from engine.serializer import serialize_state
     from utils.action_describe import describe_action_id, action_category
 
-    # 1. Rohe Netz-Auswertung (ohne MCTS)
+    has_net = hasattr(_ai_agent, "evaluate_raw")
+
+    # 1. Rohe Netz-Auswertung (nur falls Netz vorhanden)
     obs = serialize_state(env.state)
-    raw = _ai_agent.evaluate_raw(obs, actions=actions)
+    raw = _ai_agent.evaluate_raw(obs, actions=actions) if has_net else None
 
     # 2. EINEN MCTS-Baum aufbauen (Visits), ohne Zug auszuführen
     pi = env.current_player()
@@ -844,31 +881,70 @@ def _compute_debug_analysis(env, actions, mark_best=False):
         visits_by_id[aid] = c.visits
         q_by_id[aid]      = (c.value / c.visits) if c.visits > 0 else 0.0
 
+    # Shaping-Reward pro Aktion: was gibt env.step() für diesen einen Zug?
+    # (Score-Differenz + Potential-Differenz aus shaping.py)
+    # Zeigt direkt, warum die Heuristik/das Shaping einen Zug gut/schlecht findet.
+    shaping_by_id = {}
+    for a in actions:
+        aid = action_to_id(a)
+        if aid in shaping_by_id:
+            continue
+        try:
+            test_env = env.clone()
+            _, r, _, _ = test_env.step(a)
+            shaping_by_id[aid] = round(float(r), 3)
+        except Exception:
+            shaping_by_id[aid] = None
+
     moves = []
-    for e in raw["per_action"]:
-        aid = action_to_id(e["action"])
-        visits = visits_by_id.get(aid, 0)
-        q      = q_by_id.get(aid, None)
-        moves.append({
-            "action_id":      aid,
-            "description":    describe_action_id(aid),
-            "category":       action_category(aid),
-            "net_prob":       round(e["prob"], 4),
-            "net_prob_norm":  round(e["prob_renormalized"], 4),
-            "mcts_visits":    visits,
-            "mcts_share":     round(visits / total_visits, 4),
-            "mcts_q":         round(q, 4) if q is not None else None,
-            "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
-            "chosen":         (mark_best and aid == best_id),
-        })
+    if has_net:
+        # Netz vorhanden: über alle gültigen Aktionen iterieren (mit Policy)
+        for e in raw["per_action"]:
+            aid = action_to_id(e["action"])
+            visits = visits_by_id.get(aid, 0)
+            q      = q_by_id.get(aid, None)
+            moves.append({
+                "action_id":      aid,
+                "description":    describe_action_id(aid),
+                "category":       action_category(aid),
+                "net_prob":       round(e["prob"], 4),
+                "net_prob_norm":  round(e["prob_renormalized"], 4),
+                "mcts_visits":    visits,
+                "mcts_share":     round(visits / total_visits, 4),
+                "mcts_q":         round(q, 4) if q is not None else None,
+                "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
+                "shaping":        shaping_by_id.get(aid),
+                "chosen":         (mark_best and aid == best_id),
+            })
+    else:
+        # Kein Netz (Heuristik): nur die MCTS-besuchten Aktionen anzeigen,
+        # Netz-Felder bleiben None (Frontend blendet sie aus).
+        for c in root.children:
+            aid    = action_to_id(c.action)
+            visits = c.visits
+            q      = q_by_id.get(aid, None)
+            moves.append({
+                "action_id":      aid,
+                "description":    describe_action_id(aid),
+                "category":       action_category(aid),
+                "net_prob":       None,
+                "net_prob_norm":  None,
+                "mcts_visits":    visits,
+                "mcts_share":     round(visits / total_visits, 4),
+                "mcts_q":         round(q, 4) if q is not None else None,
+                "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
+                "shaping":        shaping_by_id.get(aid),
+                "chosen":         (mark_best and aid == best_id),
+            })
     moves.sort(key=lambda m: m["mcts_visits"], reverse=True)
 
     analysis = {
         "current_player": pi,
         "ai_player":      _ai_player,
-        "value":          round(raw["value"], 4),
-        "win_prob":       round(raw["win_prob"], 4),
-        "win_pct":        round(raw["win_prob"] * 100, 1),
+        "value":          round(raw["value"], 4) if has_net else None,
+        "win_prob":       round(raw["win_prob"], 4) if has_net else None,
+        "win_pct":        round(raw["win_prob"] * 100, 1) if has_net else None,
+        "has_net":        has_net,
         "simulations":    sim_count,
         "num_actions":    len(actions),
         "moves":          moves,
@@ -880,12 +956,13 @@ def _compute_debug_analysis(env, actions, mark_best=False):
 def ai_debug():
     """
     Debugger-Endpunkt: Analyse der AKTUELLEN Stellung (ohne Zug auszuführen).
-    Nur für AlphaZeroAgent.
+    Funktioniert für AlphaZeroAgent (mit Netz-Policy) UND HeuristicMCTSAgent
+    (nur MCTS-Visits, ohne Netz-Spalte).
     """
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _ai_agent is None:   return jsonify(err("Kein KI-Agent aktiv"))
-    if not hasattr(_ai_agent, "evaluate_raw"):
-        return jsonify(err("Debug nur für AlphaZeroAgent verfügbar"))
+    if not hasattr(_ai_agent, "_select"):
+        return jsonify(err("Debug nur für MCTS-basierte Agenten verfügbar"))
 
     try:
         from agents.agent_env import MosaicEnv

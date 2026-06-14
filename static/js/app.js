@@ -1,963 +1,1591 @@
-"""
-Mosaic-AI — Flask API Server (Clean Architecture)
+// -- STATE ---------------------------------------------------------------------
+let S = null;          // server state
+let sel = null;        // {source, factory_id, color}
+let domeModal = null;  // {pi, slot_r, slot_c, tile_id, rotation, is_start}
+let tilingPi = null, tilingRow = null;
 
-Endpoints:
-  POST /api/new_game          — Neues Spiel starten
-  GET  /api/state             — Aktuellen State abrufen
-  POST /api/move/stone        — Stein-Zug (Aktion B/C)
-  POST /api/move/dome         — Kuppelplatte aus Ablage (Aktion A)
-  POST /api/move/dome_stack   — Kuppelplatte vom Stapel (Aktion A, -1Pkt)
-  POST /api/move/bonus_chip   — Bonusplättchen nehmen (Aktion D)
-  POST /api/move/start_tile   — Startkachel platzieren (Vorbereitung)
-  POST /api/tiling            — Tiling-Aktion (Phase 2)
-  POST /api/end_tiling        — Tiling-Phase abschließen
-  GET  /api/ai/config         — KI-Konfiguration abrufen
-  POST /api/ai/config         — Schwierigkeit setzen (easy/medium/hard/expert)
-  POST /api/ai/move           — KI führt ihren nächsten Zug aus
-  GET  /api/ai/suggest        — Mentor Mode: Top-3 KI-Züge mit Win-Wahrscheinlichkeit
+// -- API -----------------------------------------------------------------------
+// KI-State
+let AI_ENABLED  = false;
+let AI_PLAYER   = 1;   // KI ist immer Spieler 2 (Index 1)
+let AI_THINKING = false;
 
-Alle Responses: {"ok": true, "state": {...}} oder {"ok": false, "error": "..."}
-"""
-
-import sys
-import os
-import json as _json
-import datetime as _dt
-from pathlib import Path
-
-# Stelle sicher dass der Hauptordner im Python-Path ist
-BASE_DIR = str(Path(__file__).resolve().parent.parent)
-sys.path.insert(0, BASE_DIR)
-
-from flask import Flask, request, jsonify, send_from_directory
-import threading
-
-from engine.setup import GameState, setup_new_game, setup_new_round, NUM_ROUNDS
-from engine.serializer import serialize_state
-from engine.tile import TileColor
-from engine.moves import (
-    Move, TakeAction, PlaceAction, TakeSource,
-    PlaceDomeTileMove, DrawFromStackMove, TakeBonusChipMove
-)
-from engine.game import Game, generate_tiling_actions
-from engine.round_end import TilingAction
-
-STATIC_DIR = Path(__file__).resolve().parent / 'static'
-app = Flask(__name__, static_folder=str(STATIC_DIR))
-try:
-    from flask_cors import CORS
-    CORS(app)
-except ImportError:
-    pass
-
-# ── Global game state ────────────────────────────────────────────────────────
-_game = Game()
-_game_log_path: Path | None = None   # Pfad zur aktuellen Log-Datei
-LOG_DIR = Path(__file__).parent / "static" / "log"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-# ── KI-Konfiguration ─────────────────────────────────────────────────────────
-_ai_agent    = None        # AlphaZeroAgent oder HeuristicMCTSAgent
-_ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
-_ai_lock     = threading.Lock()
-_ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
-
-# Difficulty Presets — werden befüllt wenn genug Modell-Generationen vorhanden sind.
-# Aktuell: direkt model_version + sims übergeben über /api/ai/config
-# Format: {"model": "<version>", "sims": <int>}
-DIFFICULTY_PRESETS = {
-    "easy":   None,   # TODO: z.B. {"model": "v1", "sims": 10}
-    "medium": None,   # TODO: z.B. {"model": "v2", "sims": 20}
-    "hard":   None,   # TODO: z.B. {"model": "v3", "sims": 50}
-    "expert": None,   # TODO: z.B. {"model": "v5", "sims": 100}
-    # Fallback wenn kein Preset: neuestes verfügbares Modell mit 40 Sims
-    "_default": {"model": "v2", "sims": 40},
+function setAIThinking(on) {
+  AI_THINKING = on;
+  let overlay = document.getElementById('ai-thinking-overlay');
+  if (!overlay) return;
+  overlay.style.display = on ? 'flex' : 'none';
 }
 
-def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) -> dict:
-    """
-    Löst Schwierigkeit auf. Priorität:
-    1. Explizite model/sims Parameter
-    2. Preset wenn vorhanden
-    3. _default Preset
-    """
-    if model is not None and sims is not None:
-        return {"model": model, "sims": sims}
-    preset = DIFFICULTY_PRESETS.get(difficulty)
-    if preset is not None:
-        return preset
-    return DIFFICULTY_PRESETS["_default"]
+async function api(path, body=null) {
+  const opts = body
+    ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}
+    : {method:'GET'};
+  
+  const r = await fetch('/api'+path, opts);
+  const text = await r.text();
+  
+  try {
+    return JSON.parse(text);
+  } catch(e) {
+    throw new Error(`Server-Fehler (Code ${r.status}): ${text.substring(0, 150)}...`);
+  }
+}
 
-def _init_ai(model_version: str, sims: int) -> None:
-    """Initialisiert den KI-Agenten (lazy — nur wenn Modell vorhanden)."""
-    global _ai_agent
-    try:
-        from agents.alphazero import AlphaZeroAgent
-        from config import INPUT_SIZE
-        _ai_agent = AlphaZeroAgent(
-            model_version=model_version,
-            input_size=INPUT_SIZE,
-            simulations=sims,
-        )
-        _ai_agent.set_env(_wrap_env())
-    except FileNotFoundError:
-        # Modell nicht vorhanden → Fallback auf MCTS
-        from agents.mcts import HeuristicMCTSAgent
-        _ai_agent = HeuristicMCTSAgent(simulations=sims, rollout_depth=1)
-        _ai_agent.set_env(_wrap_env())
+function openNewGameModal() {
+  document.getElementById('newgame-overlay').style.display = 'flex';
+}
 
-def _wrap_env():
-    """Erstellt ein MosaicEnv das den aktuellen _game State spiegelt."""
-    from agents.agent_env import MosaicEnv
-    env = MosaicEnv()
-    env._game = _game
-    env.state  = _game.state
-    return env
+function ngToggleAI() {
+  const on = document.getElementById('ng-ai-toggle').checked;
+  document.getElementById('ng-ai-settings').style.display = on ? 'block' : 'none';
+  const track = document.getElementById('ng-toggle-track');
+  const thumb = document.getElementById('ng-toggle-thumb');
+  track.style.background = on ? 'var(--blau, #3b82f6)' : 'var(--border)';
+  thumb.style.transform   = on ? 'translateX(18px)' : 'translateX(0)';
+  ngUpdateStartLabels();
+}
 
-def ok() -> dict:
-    # Holt sich den State immer frisch aus der Game-Instanz
-    return {"ok": True, "state": serialize_state(_game.state)}
+function ngUpdateStartLabels() {
+  const aiOn    = document.getElementById('ng-ai-toggle').checked;
+  const p1name  = document.getElementById('ng-name').value.trim() || 'Spieler 1';
+  const p2label = document.getElementById('ng-start-p2-text');
+  if (p2label) p2label.textContent = aiOn ? 'KI' : 'Spieler 2';
+  const p1label = document.getElementById('ng-start-p1-text');
+  if (p1label) p1label.textContent = p1name;
+}
 
+async function startNewGame() {
+  document.getElementById('newgame-overlay').style.display = 'none';
 
-def _flush_game_log() -> None:
-    """Schreibt neue state.log Einträge in die Log-Datei."""
-    global _game_log_path
-    if _game_log_path is None or _game is None or _game.state is None:
-        return
-    if not hasattr(_game.state, '_logged_count'):
-        _game.state._logged_count = 0
-    new_entries = _game.state.log[_game.state._logged_count:]
-    if new_entries:
-        try:
-            with open(_game_log_path, 'a', encoding='utf-8') as lf:
-                for entry in new_entries:
-                    lf.write(f"{entry}\n")
-            _game.state._logged_count = len(_game.state.log)
-        except Exception:
-            pass
+  const playerName = document.getElementById('ng-name').value.trim() || 'Spieler 1';
+  const aiEnabled  = document.getElementById('ng-ai-toggle').checked;
+  const model      = document.getElementById('ng-model').value.trim() || 'v2';
+  const sims       = parseInt(document.getElementById('ng-sims').value) || 40;
+  const seedRaw    = document.getElementById('ng-seed').value.trim();
+  const seed       = seedRaw === '' ? null : parseInt(seedRaw);
 
+  AI_ENABLED = aiEnabled;
+  AI_PLAYER  = 1;
 
-def err(msg: str) -> dict:
-    return {"ok": False, "error": msg}
+  // Startspieler aus Radio-Button lesen
+  const startVal = document.querySelector('input[name="ng-start"]:checked')?.value || '0';
+  let firstPlayer;
+  if (startVal === 'random') {
+    firstPlayer = Math.random() < 0.5 ? 0 : 1;
+  } else {
+    firstPlayer = parseInt(startVal);
+  }
 
-def _both_start_placed() -> bool:
-    if _game.state is None: return False
-    return all(p.start_dome_tile is None for p in _game.state.players)
+  const body = {
+    names:        [playerName, aiEnabled ? 'KI' : 'Spieler 2'],
+    ai_enabled:   aiEnabled,
+    ai_side:      1,
+    model:        model,
+    sims:         sims,
+    first_player: firstPlayer,
+  };
+  if (seed !== null && !Number.isNaN(seed)) {
+    body.seed = seed;
+  }
 
-def color(v: str) -> TileColor:
-    for c in TileColor:
-        if c.value == v:
-            return c
-    raise ValueError(f"Unbekannte Farbe: {v}")
+  const d = await api('/new_game', body);
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
+  window._gameEndLogged = false;
+  if (d.seed !== undefined) {
+    window._gameSeed    = d.seed;
+    window._gameLogFile = d.log_file;
+    console.log(`🎲 Spiel gestartet | Seed: ${d.seed} | Log: ${d.log_file}`);
+  }
+  render();
+  const dt = await api('/scoring_tiles');
+  if(dt.ok) {
+    allScoringTiles = dt.tiles;
+    selectedScoringIds = new Set(S.scoring_tile_ids || [0,1,2]);
+    renderScoringGrid();
+    document.getElementById('scoring-overlay').style.display='flex';
+  }
+}
 
-def source(v: str) -> TakeSource:
-    return TakeSource[v]
+async function newGame() {
+  // Direkt-Start ohne Modal (z.B. nach Spielende)
+  await startNewGame();
+}
 
+function aiIsDue() {
+  // Ist die KI gerade dran?
+  if (!AI_ENABLED || !S) return false;
+  if (S.phase === 'end' || S.phase === 'final') return false;
+  if (S.phase === 'drafting') return S.current_player === AI_PLAYER;
+  if (S.phase === 'tiling') {
+    // Regel mit KI: Der Mensch tilt ZUERST komplett, dann die KI.
+    // Die KI ist erst dran wenn der Mensch keine platzierbaren Reihen mehr hat.
+    const rows = S.valid_tiling_rows || [];
+    const humanHasRows = rows.some(r => r.pi !== AI_PLAYER);
+    const aiHasRows    = rows.some(r => r.pi === AI_PLAYER);
+    return aiHasRows && !humanHasRows;
+  }
+  return false;
+}
 
-# ── Routes ───────────────────────────────────────────────────────────────────
+async function triggerAIMove() {
+  if (!aiIsDue()) return;
+  if (AI_THINKING) return;
 
-@app.route('/')
-def index():
-    return send_from_directory(STATIC_DIR, 'index.html')
+  setAIThinking(true);
+  try {
+    await new Promise(r => setTimeout(r, 600));
 
-
-@app.route('/debug')
-def debug_page():
-    return send_from_directory(STATIC_DIR, 'debug.html')
-
-
-@app.route('/api/new_game', methods=['POST'])
-def new_game():
-    global _game, _ai_agent, _ai_player
-    global _ai_debug_history
-    _ai_debug_history = []   # Historie für neues Spiel zurücksetzen
-    data = request.get_json(silent=True) or {}
-    names      = data.get('names', ['Spieler 1', 'Spieler 2'])
-    seed       = data.get('seed', None)
-    ai_enabled = data.get('ai_enabled', False)
-    difficulty = data.get('difficulty', 'medium')
-    ai_side    = data.get('ai_side', 1)   # 0 = KI ist P1, 1 = KI ist P2
-
-    import random as _random
-    fp_raw = data.get('first_player', None)
-    first_player = _random.randint(0, 1) if fp_raw is None else int(fp_raw)
-    # Seed immer explizit setzen für Reproduzierbarkeit
-    if seed is None:
-        seed = _random.randint(0, 999999)
-    _game = Game()
-    _game.start(player_names=names, seed=seed, first_player=first_player)
-    # Seed im State speichern
-    _game.state._seed = seed
-    _game.state._first_player = first_player
-
-    if ai_enabled:
-        model_v = data.get('model', None)
-        sims_v  = data.get('sims',  None)
-        preset  = _resolve_difficulty(difficulty, model_v, sims_v)
-        _ai_player = int(ai_side)
-        _init_ai(preset['model'], preset['sims'])
-    else:
-        _ai_agent  = None
-        _ai_player = None
-
-    # Log-Datei für dieses Spiel erstellen
-    global _game_log_path
-    timestamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    actual_seed = getattr(_game.state, '_seed', seed)
-    _game_log_path = LOG_DIR / f"game_{timestamp}_seed{actual_seed}.log"
-    with open(_game_log_path, 'w', encoding='utf-8') as lf:
-        meta = {
-            "timestamp":    timestamp,
-            "seed":         actual_seed,
-            "players":      names,
-            "first_player": first_player,
-            "ai_enabled":   ai_enabled,
-            "ai_player":    _ai_player,
-            "ai_model":     data.get('model', None),
-            "ai_sims":      data.get('sims', None),
+    // Loop: KI zieht solange sie dran ist (max 20 Züge gegen Endlosloop)
+    let safety = 0;
+    while (aiIsDue() && safety++ < 20) {
+      const d = await api('/ai/move');
+      if (!d.ok) {
+        // Kein Fehler anzeigen wenn KI einfach nicht dran ist
+        if (d.error !== 'Nicht der Zug der KI'
+            && d.error !== 'KI hat keine Tiling-Züge mehr'
+            && d.error !== 'Mensch ist noch am Tilen') {
+          showError('KI-Fehler: ' + d.error);
         }
-        lf.write(f"# MOSAIC GAME LOG\n")
-        lf.write(f"# {_json.dumps(meta, ensure_ascii=False)}\n")
-        lf.write(f"# {'='*60}\n")
-
-    response = ok()
-    response['ai_enabled']  = ai_enabled
-    response['ai_player']   = _ai_player
-    response['log_file']    = _game_log_path.name
-    response['seed']        = actual_seed
-    return jsonify(response)
-
-
-@app.route('/api/state', methods=['GET'])
-def get_state():
-    if _game.state is None:
-        return jsonify(err("Kein aktives Spiel"))
-    return jsonify(ok())
-
-
-@app.route('/api/move/stone', methods=['POST'])
-def move_stone():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
-    d = request.get_json()
-    try:
-        # --- ROBUSTE HANDHABUNG VON AKTION C ---
-        # Wenn factory_id fehlt oder None ist, ist es ein globaler Mond-Zug.
-        raw_factory_id = d.get('factory_id')
-        factory_id = int(raw_factory_id) if raw_factory_id is not None else None
-        
-        move = Move(
-            take=TakeAction(
-                source=source(d['source']), 
-                color=color(d['color']),
-                factory_id=factory_id, 
-                moon_order=[color(c) for c in d.get('moon_order', [])]
-            ),
-            place=PlaceAction(row_index=int(d['row'])),
-        )
-        
-        # apply() in deiner game.py muss jetzt den Fall factory_id=None 
-        # als Aktion C erkennen (hast du ja bereits implementiert)
-        _game.apply(move)
-        _flush_game_log()
-        return jsonify(ok())
-    except ValueError as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/move/dome', methods=['POST'])
-def move_dome():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
-    d = request.get_json()
-    try:
-        move = PlaceDomeTileMove(
-            dome_tile_id=int(d['tile_id']),
-            slot_row=int(d['slot_row']),
-            slot_col=int(d['slot_col']),
-            rotation=int(d.get('rotation', 0)),
-        )
-        _game.apply(move)
-        _flush_game_log()
-        return jsonify(ok())
-    except ValueError as e:
-        return jsonify(err(str(e)))
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/move/dome_stack', methods=['POST'])
-def move_dome_stack():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
-    d = request.get_json()
-    try:
-        move = DrawFromStackMove(
-            num_drawn=int(d['num_drawn']),
-            chosen_id=int(d['chosen_id']),
-            slot_row=int(d['slot_row']),
-            slot_col=int(d['slot_col']),
-            rotation=int(d.get('rotation', 0)),
-        )
-        _game.apply(move)
-        _flush_game_log()
-        return jsonify(ok())
-    except ValueError as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/move/bonus_chip', methods=['POST'])
-def move_bonus_chip():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
-    d = request.get_json()
-    try:
-        move = TakeBonusChipMove(factory_id=int(d['factory_id']))
-        _game.apply(move)
-        _flush_game_log()
-        return jsonify(ok())
-    except ValueError as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/move/start_tile', methods=['POST'])
-def move_start_tile():
-    try:
-        d = request.json
-        _game.apply_start_placement(
-            player_idx = int(d['player']),
-            tile_id    = int(d['tile_id']),
-            row        = int(d['slot_row']),
-            col        = int(d['slot_col']),
-            rot        = int(d.get('rotation', 0)),
-        )
-        return jsonify(ok())
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/tiling', methods=['POST'])
-def tiling():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    #if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
-    
-    d = request.get_json()
-    try:
-        pi = int(d['player'])
-        # --- SICHERHEIT: Verhindere KI-Zug durch Mensch ---
-        # Wenn KI aktiv ist, darf ein Mensch-Request für Tiling 
-        # niemals das KI-Flag oder KI-Züge triggern.
-        if AI_ENABLED and pi == _ai_player:
-             # Das sollte eigentlich nicht passieren, wenn das Frontend sauber ist
-             pass
-        action = TilingAction(
-            pattern_row=int(d['pattern_row']),
-            slot_row=int(d['slot_row']),
-            slot_col=int(d['slot_col']),
-            space_index=int(d['space_index']),
-            dome_tile_id=d.get('dome_tile_id'),
-            rotation=int(d.get('rotation', 0)),
-        )
-        
-        _game.apply_single_tiling(pi, action)
-        return jsonify(ok())
-    except ValueError as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/tiling/bonus_chips', methods=['POST'])
-def tiling_bonus_chips():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
-    d = request.get_json()
-    try:
-        pi = int(d['player'])
-        row_idx = int(d['pattern_row'])
-        chip_uses = d.get('chip_uses', [])
-        player = _game.state.players[pi]
-        row = player.pattern_lines[row_idx]
-
-        if not row.tiles: return jsonify(err("Musterreihe hat keine echten Fliesen"))
-        if row.is_complete: return jsonify(err("Reihe ist bereits voll"))
-
-        # Reihenfolge prüfen: keine frühere platzierbare Reihe noch offen
-        from engine.game import generate_tiling_actions
-        existing_actions = generate_tiling_actions(_game.state, pi)
-        placeable_rows = {a.pattern_row for a in existing_actions}
-        for earlier_ri in range(row_idx):
-            earlier_row = player.pattern_lines[earlier_ri]
-            if earlier_row.is_complete and earlier_ri in placeable_rows:
-                return jsonify(err(
-                    f"Reihe {earlier_ri+1} muss zuerst gelegt werden "
-                    f"(von oben nach unten)."
-                ))
-
-        # Chip-IDs validieren
-        used_chip_ids = set()
-        for use in chip_uses:
-            ids = use['chip_ids']
-            if len(ids) not in (2, 3): return jsonify(err(f"Ungültige Chip-Anzahl: {len(ids)}"))
-            for cid in ids:
-                if cid in used_chip_ids: return jsonify(err(f"Chip {cid} doppelt verwendet"))
-                chip = next((c for c in player.bonus_chips if c and c.chip_id == cid), None)
-                if chip is None: return jsonify(err(f"Chip {cid} nicht gefunden"))
-                used_chip_ids.add(cid)
-
-        if len(chip_uses) > row.spaces_left:
-            return jsonify(err("Mehr Chip-Nutzungen als fehlende Fliesen"))
-
-        # Platzierbarkeit prüfen wenn Reihe nach Chips komplett wäre
-        would_complete = (row.spaces_left - len(chip_uses)) <= 0
-        if would_complete:
-            from engine.game import generate_tiling_actions
-            # Temporär auffüllen und prüfen
-            row.tiles.extend([row.color] * len(chip_uses))
-            actions = generate_tiling_actions(_game.state, pi)
-            placeable = any(a.pattern_row == row_idx for a in actions)
-            del row.tiles[-len(chip_uses):]  # zurückrollen
-
-            if not placeable:
-                return jsonify(err(
-                    f"Reihe {row_idx+1} kann nach Chip-Einsatz nicht auf die Kuppel "
-                    f"gelegt werden — kein passender Slot verfügbar."
-                ))
-
-        # Chips verbrauchen
-        for cid in used_chip_ids:
-            for i, c in enumerate(player.bonus_chips):
-                if c and c.chip_id == cid:
-                    player.bonus_chips[i] = None
-                    break
-
-        # Fliesen eintragen
-        for _ in chip_uses:
-            row.tiles.append(row.color)
-
-        _game.state.log_event(
-            f"{player.name}: {len(chip_uses)} Chip-Nutzung(en) → "
-            f"Reihe {row_idx+1} {'komplett' if row.is_complete else 'teilweise'} gefüllt"
-        )
-        return jsonify(ok())
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/tiling/unplaceable', methods=['GET'])
-def tiling_unplaceable():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    from engine.round_end import find_unplaceable_rows
-    result = []
-    for pi, player in enumerate(_game.state.players):
-        unplaceable = find_unplaceable_rows(player)
-        for row_idx in unplaceable:
-            row = player.pattern_lines[row_idx]
-            result.append({
-                "player": pi,
-                "pattern_row": row_idx,
-                "color": row.color.value if row.color else None,
-                "count": len(row.tiles),
-            })
-    return jsonify({"ok": True, "unplaceable": result})
-
-
-@app.route('/api/tiling/move_to_floor', methods=['POST'])
-def tiling_move_to_floor():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    d = request.get_json()
-    try:
-        pi = int(d['player'])
-        row_idx = int(d['pattern_row'])
-        player = _game.state.players[pi]
-        row = player.pattern_lines[row_idx]
-
-        if not row.tiles: return jsonify(err("Reihe ist leer"))
-
-        tiles = list(row.tiles)
-        row.tiles = []
-        row.color = None
-        overflow = player.add_broken(tiles)
-        _game.state.tower.add(overflow)
-        _game.state.log_event(
-            f"{player.name}: {len(tiles)} unplatzierbare Fliesen → Strafleiste"
-        )
-        return jsonify(ok())
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/end_tiling', methods=['POST'])
-def end_tiling():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    try:
-        _game.apply({"type": "end_tiling"})
-        _flush_game_log()
-        return jsonify(ok())
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-@app.route('/api/move/pass', methods=['POST'])
-def move_pass():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    if _game.state.phase != "drafting": return jsonify(err("Passen nur in Phase 1 möglich."))
-
-    # Validierung: Darf der Spieler passen?
-    real_moves = [m for m in _game.valid_moves() if m.get("type") != "pass"]
-    if len(real_moves) > 0:
-        return jsonify(err("Passen nicht erlaubt — es gibt noch gültige Aktionen."))
-
-    # --- HIER IST DIE MAGIE ---
-    # Wir übergeben das Passen einfach an die Engine. 
-    # game.py kümmert sich jetzt um Spielerwechsel, Log-Eintrag und den Phasenwechsel!
-    try:
-        _game.apply({"type": "pass"})
-        _flush_game_log()
-        return jsonify(ok())
-    except ValueError as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/scoring_tiles', methods=['GET'])
-def get_scoring_tiles():
-    from engine.scoring import ALL_SCORING_TILES
-    return jsonify({
-        "ok": True,
-        "tiles": [{"id": t.id, "name": t.name, "description": t.description, "emoji": t.emoji}
-                  for t in ALL_SCORING_TILES]
-    })
-
-
-@app.route('/api/scoring_tiles/select', methods=['POST'])
-def select_scoring_tiles():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    d = request.get_json()
-    ids = d.get('ids', [])
-    if len(ids) != 3: return jsonify(err("Genau 3 Wertungsplatten wählen"))
-    
-    from engine.scoring import ALL_SCORING_TILES
-    valid_ids = {t.id for t in ALL_SCORING_TILES}
-    if not all(i in valid_ids for i in ids): return jsonify(err("Ungültige Wertungsplatten-IDs"))
-    if len(set(ids)) != 3: return jsonify(err("Keine Duplikate erlaubt"))
-    
-    _game.state.scoring_tile_ids = list(ids)
-    _game.state.scoring_confirmed = True   # nicht mehr editierbar
-    _game.state.log_event(f"Wertungsplatten gewählt: {ids}")
-    return jsonify(ok())
-
-
-@app.route('/api/end_scoring', methods=['POST'])
-def end_scoring():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if _game.state.phase != "end": return jsonify(err("Spiel noch nicht beendet"))
-    try:
-        results = _game._calculate_end_scoring()
-        return jsonify({"ok": True, "state": serialize_state(_game.state), **results})
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-@app.route('/api/end_game_log', methods=['POST'])
-def end_game_log():
-    """Schreibt Spielende-Summary ins Log."""
-    if _game_log_path and _game.state:
-        _flush_game_log()
-        scores = [p.score for p in _game.state.players]
-        try:
-            with open(_game_log_path, 'a', encoding='utf-8') as lf:
-                lf.write(f"# {'='*60}\n")
-                lf.write(f"# SPIELENDE: {scores}\n")
-                lf.write(f"# Seed: {getattr(_game.state, '_seed', '?')}\n")
-        except Exception:
-            pass
-    return jsonify(ok())
-
-
-@app.route('/api/stack/peek', methods=['POST'])
-def stack_peek():
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    d = request.get_json()
-    try:
-        n = int(d.get('num', 1))
-        n = min(n, len(_game.state.dome_tile_pool))
-        if n < 1: return jsonify(err("Keine Karten auf dem Stapel"))
-        
-        from engine.serializer import serialize_dome_tile
-        tiles = [serialize_dome_tile(t) for t in _game.state.dome_tile_pool[:n]]
-        return jsonify({"ok": True, "tiles": tiles})
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-
-@app.route('/api/ai/config', methods=['GET'])
-def ai_config():
-    """Gibt aktuelle KI-Konfiguration zurück."""
-    if _ai_agent is None:
-        return jsonify({"ok": True, "ai_enabled": False})
-    sims = getattr(_ai_agent, 'simulations', 0)
-    return jsonify({
-        "ok":         True,
-        "ai_enabled": True,
-        "ai_player":  _ai_player,
-        "sims":       sims,
-    })
-
-
-@app.route('/api/ai/config', methods=['POST'])
-def ai_config_set():
-    """Setzt Schwierigkeit während des Spiels."""
-    global _ai_agent
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    d = request.get_json(silent=True) or {}
-    difficulty = d.get('difficulty', 'medium')
-    model_v    = d.get('model', None)
-    sims_v     = d.get('sims',  None)
-    preset     = _resolve_difficulty(difficulty, model_v, sims_v)
-    with _ai_lock:
-        _init_ai(preset['model'], preset['sims'])
-    return jsonify({"ok": True, "difficulty": difficulty, **preset})
-
-
-@app.route('/api/ai/move', methods=['GET', 'POST'])
-def ai_move():
-    """
-    Lässt die KI einen Zug ausführen.
-    Wird vom Frontend nach jedem Menschenzug aufgerufen wenn
-    _game.state.current_player == _ai_player.
-    """
-    if _game.state is None:    return jsonify(err("Kein aktives Spiel"))
-    if _ai_agent is None:      return jsonify(err("Kein KI-Agent aktiv"))
-    if _ai_player is None:     return jsonify(err("KI-Spieler nicht gesetzt"))
-
-    # --- START SYNC DEBUG LOG ---
-    #print(f"\n[SYNC-DEBUG] Frontend fordert KI-Zug an!")
-    #print(f" -> Engine Phase:   {_game.state.phase}")
-    #print(f" -> Engine Player:  {_game.state.current_player} (Sollte KI={_ai_player} sein)")
-    #print(f" -> Tokens verbraucht (Spieler 0): {_game.state.players[0].tokens_used}")
-    #print(f" -> Tokens verbraucht (Spieler 1): {_game.state.players[1].tokens_used}")
-    # --- END SYNC DEBUG LOG ---
-
-    if _game.state.phase not in ("drafting", "tiling"):
-        return jsonify(err(f"KI kann in Phase '{_game.state.phase}' nicht ziehen"))
-
-    # Drafting: current_player muss KI sein
-    if _game.state.phase == "drafting" and _game.state.current_player != _ai_player:
-        return jsonify(err("Nicht der Zug der KI"))
-
-    # Tiling: KI muss noch platzierbare Reihen haben
-    if _game.state.phase == "tiling":
-        from engine.game import generate_tiling_actions
-        ai_actions = generate_tiling_actions(_game.state, _ai_player)
-        if not ai_actions:
-            return jsonify(err("KI hat keine Tiling-Züge mehr"))
-
-        # Regel mit KI: Der Mensch tilt ZUERST komplett. Solange der Mensch
-        # noch platzierbare Reihen hat, darf die KI nicht tilen.
-        human_player = 1 - _ai_player
-        human_actions = generate_tiling_actions(_game.state, human_player)
-        if human_actions:
-            return jsonify(err("Mensch ist noch am Tilen"))
-
-    with _ai_lock:
-        try:
-            from agents.agent_env import MosaicEnv
-            # KI-Env mit aktuellem State synchronisieren
-            env = MosaicEnv()
-            env._game = _game
-            env.state  = _game.state
-            _ai_agent.set_env(env)
-
-            actions = env.valid_actions()
-            if not actions:
-                return jsonify(err("Keine gültigen Aktionen für KI"))
-
-            from engine.serializer import serialize_state
-            obs = serialize_state(env.state)
-
-            # Pre-Move-Analyse UND Zugwahl aus DEMSELBEN Baum.
-            # So sind angezeigte Visits und gewählter Zug garantiert konsistent.
-            debug_info  = None
-            best_action = None
-            if hasattr(_ai_agent, "evaluate_raw"):
-                try:
-                    debug_info, best_action = _compute_debug_analysis(
-                        env, actions, mark_best=True)
-                except Exception as _de:
-                    debug_info = {"error": str(_de)}
-
-            # Aktion bestimmen: bevorzugt aus der Analyse (gleicher Baum),
-            # sonst Fallback auf separaten choose-Aufruf.
-            if best_action is not None:
-                action = best_action
-            else:
-                action = _ai_agent.choose(actions, obs)
-
-            # Aktion im echten Game ausführen
-            _, reward, done, info = env.step(action)
-
-            if 'error' in info:
-                return jsonify(err(f"KI-Zug ungültig: {info['error']}"))
-
-            # Metadaten + Historie (chosen wurde schon in der Analyse gesetzt)
-            if debug_info and "moves" in debug_info:
-                from agents.neural_net import action_to_id
-                chosen_id = action_to_id(action) if isinstance(action, dict) else action
-                debug_info["round"]     = getattr(_game.state, "round_number", None)
-                debug_info["move_idx"]  = len(_ai_debug_history) + 1
-                debug_info["ai_action"] = chosen_id
-                _ai_debug_history.append(debug_info)
-
-            response = ok()
-            response['ai_action'] = action
-            response['done']      = done
-            response['debug']     = debug_info
-            return jsonify(response)
-
-        except Exception as e:
-            return jsonify(err(f"KI-Fehler: {str(e)}"))
-
-
-@app.route('/api/ai/start_tile', methods=['GET', 'POST'])
-def ai_start_tile():
-    """
-    KI legt ihre Startkuppelplatte strategisch.
-    Bewertet alle Tile×Slot×Rotation Kombinationen mit evaluate_state
-    und wählt die beste aus.
-    """
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if _ai_player is None:  return jsonify(err("KI-Spieler nicht gesetzt"))
-
-    state  = _game.state
-    player = state.players[_ai_player]
-
-    # Startkachel bereits gelegt?
-    if player.start_dome_tile is None:
-        return jsonify({"ok": True, "state": serialize_state(state), "skipped": True})
-
-    if not state.dome_display:
-        return jsonify(err("Kein Kuppelplättchen im Display"))
-
-    # Alle freien Slots sammeln
-    empty_slots = []
-    for r in range(3):
-        for c in range(3):
-            if player.dome_grid.dome_slots[r][c] is None:
-                empty_slots.append((r, c))
-
-    if not empty_slots:
-        return jsonify(err("Kein freies Kuppelslot"))
-
-    # Beste Kombination via evaluate_state suchen
-    try:
-        import copy
-        from agents.mcts import evaluate_state
-
-        best_score = -float('inf')
-        best = (state.dome_display[0].tile_id, empty_slots[0][0], empty_slots[0][1], 0)
-
-        for tile in state.dome_display:
-            for (r, c) in empty_slots:
-                for rot in [0, 90, 180, 270]:
-                    # Clone State, Zug anwenden, bewerten
-                    test_game = copy.deepcopy(_game)
-                    try:
-                        test_game.apply_start_placement(
-                            player_idx=_ai_player,
-                            tile_id=tile.tile_id,
-                            row=r, col=c, rot=rot,
-                        )
-                        scores = evaluate_state(test_game.state)
-                        score  = scores.get(_ai_player, 0.0)
-                        if score > best_score:
-                            best_score = score
-                            best = (tile.tile_id, r, c, rot)
-                    except Exception:
-                        continue
-
-        tile_id, row, col, rot = best
-        _game.apply_start_placement(
-            player_idx=_ai_player,
-            tile_id=tile_id,
-            row=row, col=col, rot=rot,
-        )
-        return jsonify(ok())
-
-    except Exception as e:
-        return jsonify(err(str(e)))
-
-
-def _compute_debug_analysis(env, actions, mark_best=False):
-    """
-    Gemeinsame Debug-Analyse für /api/ai/debug und /api/ai/move.
-    Baut EINEN MCTS-Baum auf (führt KEINEN Zug aus) und kombiniert
-    rohe Netz-Policy + MCTS-Visits + Value pro gültiger Aktion.
-
-    Gibt (analysis_dict, best_action_dict) zurück. Die best_action stammt
-    aus DEMSELBEN Baum (max Visits) — so sind Anzeige und echte Wahl konsistent.
-    Wenn mark_best=True wird der beste Zug direkt als 'chosen' markiert.
-    """
-    from agents.mcts import MCTSNode
-    from agents.neural_net import action_to_id
-    from engine.serializer import serialize_state
-    from utils.action_describe import describe_action_id, action_category
-
-    # 1. Rohe Netz-Auswertung (ohne MCTS)
-    obs = serialize_state(env.state)
-    raw = _ai_agent.evaluate_raw(obs, actions=actions)
-
-    # 2. EINEN MCTS-Baum aufbauen (Visits), ohne Zug auszuführen
-    pi = env.current_player()
-    root = MCTSNode(action=None, parent=None, untried_actions=None,
-                    player_who_acted=pi)
-    root.visits = 1
-    for _ in range(_ai_agent.simulations):
-        sim_env = env.clone()
-        node = _ai_agent._select(root, sim_env)
-        node = _ai_agent._expand(node, sim_env)
-        result = _ai_agent._rollout(sim_env)
-        _ai_agent._backpropagate(node, result, pi)
-
-    # Beste Aktion aus DIESEM Baum: höchste Visits (identische Logik wie _mcts_search)
-    best_action = None
-    best_id     = None
-    if root.children:
-        best_child  = max(root.children, key=lambda n: n.visits)
-        best_action = best_child.action
-        best_id     = action_to_id(best_action)
-
-    total_visits = sum(c.visits for c in root.children) or 1
-    visits_by_id = {}
-    q_by_id      = {}
-    for c in root.children:
-        aid = action_to_id(c.action)
-        visits_by_id[aid] = c.visits
-        q_by_id[aid]      = (c.value / c.visits) if c.visits > 0 else 0.0
-
-    moves = []
-    for e in raw["per_action"]:
-        aid = action_to_id(e["action"])
-        visits = visits_by_id.get(aid, 0)
-        q      = q_by_id.get(aid, None)
-        moves.append({
-            "action_id":      aid,
-            "description":    describe_action_id(aid),
-            "category":       action_category(aid),
-            "net_prob":       round(e["prob"], 4),
-            "net_prob_norm":  round(e["prob_renormalized"], 4),
-            "mcts_visits":    visits,
-            "mcts_share":     round(visits / total_visits, 4),
-            "mcts_q":         round(q, 4) if q is not None else None,
-            "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
-            "chosen":         (mark_best and aid == best_id),
-        })
-    moves.sort(key=lambda m: m["mcts_visits"], reverse=True)
-
-    analysis = {
-        "current_player": pi,
-        "ai_player":      _ai_player,
-        "value":          round(raw["value"], 4),
-        "win_prob":       round(raw["win_prob"], 4),
-        "win_pct":        round(raw["win_prob"] * 100, 1),
-        "simulations":    _ai_agent.simulations,
-        "num_actions":    len(actions),
-        "moves":          moves,
+        break;
+      }
+      S = d.state;
+      render();
+      if (aiIsDue()) await new Promise(r => setTimeout(r, 350));
     }
-    return analysis, best_action
+  } finally {
+    setAIThinking(false);
+  }
+}
+
+async function stoneMove(source, factory_id, color, row, moon_order=[]) {
+  if (AI_THINKING) return;
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
+  const d = await api('/move/stone', {source, factory_id, color, row, moon_order});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; sel=null; render();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function domeMove(tile_id, slot_row, slot_col, rotation) {
+  const d = await api('/move/dome', {tile_id, slot_row, slot_col, rotation});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; closeDomeModal(); render();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function startTileMove(player, tile_id, slot_row, slot_col, rotation) {
+  const d = await api('/move/start_tile', {player, tile_id, slot_row, slot_col, rotation});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; closeDomeModal(); render();
+}
+
+async function bonusChipMove(factory_id) {
+  if (AI_THINKING) return;
+  // Nur wenn Mensch dran ist
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
+  const d = await api('/move/bonus_chip', {factory_id});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; sel=null; render();
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function tilingMove(player, pattern_row, slot_row, slot_col, space_index, dome_tile_id=null, rotation=0) {
+  const d = await api('/tiling', {player, pattern_row, slot_row, slot_col, space_index, dome_tile_id, rotation});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; tilingRow=null; render();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function endTiling() {
+  const d = await api('/end_tiling', {});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; tilingPi=null; tilingRow=null; render();
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function passMove() {
+  if (AI_THINKING) return;
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
+  const d = await api('/move/pass', {});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; sel=null; render();
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+}
+
+async function tilingBonusChips(pi, pattern_row, chip_uses) {
+  const d = await api('/tiling/bonus_chips', {player:pi, pattern_row, chip_uses});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; render();
+}
+
+async function tilingMoveToFloor(pi, pattern_row) {
+  const d = await api('/tiling/move_to_floor', {player:pi, pattern_row});
+  if(!d.ok){showError(d.error);return;}
+  S=d.state; render();
+}
+
+function showError(msg) {
+  document.getElementById('info-area').innerHTML = `
+    <div class="info err" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>❌ ${msg}</span>
+      <button class="btn" onclick="render()" style="padding:2px 8px; font-size:10px; flex-shrink:0; border-color:#F87171; color:#991B1B;">OK</button>
+    </div>`;
+}
+
+// -- COLORS --------------------------------------------------------------------
+const COLOR_LABELS = {blau:'B',gelb:'G',rot:'R',schwarz:'S',tuerkis:'T','türkis':'T',bunt:'★',special:'◎'};
+
+function tileDiv(color, extra='', size='') {
+  const nc=normColor(color);
+  return `<div class="tile ${nc} ${size} ${extra}">${COLOR_LABELS[color]||''}</div>`;
+}
+
+function normColor(c) {
+  if (!c) return '';
+  const low = c.toLowerCase();
+  return low === 'türkis' ? 'tuerkis' : low;
+}
 
 
-@app.route('/api/ai/debug', methods=['GET'])
-def ai_debug():
-    """
-    Debugger-Endpunkt: Analyse der AKTUELLEN Stellung (ohne Zug auszuführen).
-    Nur für AlphaZeroAgent.
-    """
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if _ai_agent is None:   return jsonify(err("Kein KI-Agent aktiv"))
-    if not hasattr(_ai_agent, "evaluate_raw"):
-        return jsonify(err("Debug nur für AlphaZeroAgent verfügbar"))
+function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
+  const color = sp.color || sp.req_color || sp.color_id || '';
+  const nc = normColor(color);
+  
+  let bg='', cls='', lbl='', tdata='';
+  
+  if(sp.filled) {
+    bg=''; cls=`ds filled ${normColor(sp.filled)}`; lbl='';
+  } else if(sp.type === 'N' || !sp.type || sp.type === 'NORMAL') {
+    const hexFull={blau:'#2563EB',gelb:'#D97706',rot:'#DC2626',schwarz:'#292524',tuerkis:'#0891B2'};
+    const hex = hexFull[nc] || (nc ? '#FF00FF' : '#999'); 
+    bg = `background:${hex};opacity:.7;`; 
+    cls = 'ds N'; 
+    lbl = nc ? nc[0].toUpperCase() : '?';
+  } else if(sp.type === 'WILD') {
+    bg = 'background:#EDE9FE;'; cls = 'ds W'; lbl = '★';
+  } else {
+    bg = 'background:#E7E5E4;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '🔒' : '◎';
+  }
+  
+  if(tiling && si >= 0) {
+    tdata = ` data-tiling="${pi},${sr},${sc},${si}"`;
+    cls += ' click';
+    bg += 'cursor:pointer;';
+  }
+  
+  return `<div class="${cls}" style="${bg}"${tdata}>${lbl}</div>`;
+}
 
-    try:
-        from agents.agent_env import MosaicEnv
-        env = MosaicEnv()
-        env._game = _game
-        env.state  = _game.state
-        _ai_agent.set_env(env)
+function dome2x2(spaces, pi=-1, sr=-1, sc=-1, tiling=false) {
+  return `<div class="d2x2">${spaces.map((sp,si)=>spaceHTML(sp,si,pi,sr,sc,tiling)).join('')}</div>`;
+}
 
-        actions = env.valid_actions()
-        if not actions:
-            return jsonify({"ok": True, "value": None, "win_prob": None,
-                            "current_player": env.current_player(), "moves": []})
+// -- RENDER BOARD -------------------------------------------------------------
+function estimatedRoundScore(p) {
+  let est = 0;
+  const penalties = [-1,-2,-3,-4];
+  p.pattern_lines.forEach((row,ri)=>{
+    if(!row.color || row.tiles.length < row.capacity) return;
+    const domeRow = Math.floor(ri/2);
+    const filledNeighbors = p.dome_grid[domeRow]
+      .filter(s=>s).flatMap(s=>s.spaces).filter(sp=>sp.filled).length;
+    est += Math.max(1, 1 + Math.floor(filledNeighbors/2));
+  });
+  est += p.floor.reduce((s,_,i)=>s+(penalties[i]||0), 0);
+  if(p.marker) est -= 2;
+  return est;
+}
 
-        result, _best = _compute_debug_analysis(env, actions, mark_best=True)
-        result["ok"] = True
-        return jsonify(result)
+function renderBoard(pi) {
+  const p = S.players[pi];
+  const isActive = S.current_player===pi && S.phase==='drafting';
+  const isTiling = S.phase==='tiling';
 
-    except Exception as e:
-        import traceback
-        return jsonify(err(f"Debug-Fehler: {str(e)}\n{traceback.format_exc()}"))
+  const tokHTML = S.round<5
+    ? `<div class="tokens">${[0,1].map(i=>`<div class="tok ${i<p.tokens_used?'used':''}"></div>`).join('')}<span>${p.tokens_used}/2 Spielerplättchen</span></div>`
+    : '';
 
+  const plHTML = p.pattern_lines.map((row,ri)=>{
+    let cls='';
+    const domeRow = Math.floor(ri/2);
+    if(isActive && sel) {
+      const ok = row.tiles.length < row.capacity && (!row.color || row.color===sel.color);
+      cls = ok ? 'drop' : 'nodrop';
+    }
+    // Reihe klickbar wenn sie platzierbar ist UND keine frühere platzierbare Reihe noch offen
+    const validRows = (S.valid_tiling_rows || []);
+    const isPlaceable = validRows.some(vr => vr.pi===pi && vr.ri===ri && vr.placeable === true);
+    const earlierPlaceable = validRows.filter(vr => vr.pi===pi && vr.ri<ri && vr.placeable === true);
+    const allEarlierDone = earlierPlaceable.length === 0;
+    if(isTiling && tilingRow===null && row.tiles.length===row.capacity && isPlaceable && allEarlierDone) cls='drop';
+    else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
+    // 🎫 Chip-Button: nur wenn Server bestätigt dass Chips hier sinnvoll sind
+    // (Reihenfolge OK + nach Vollmachen platzierbar)
+    const chippableRows = S.chippable_tiling_rows || [];
+    const hasChips = isTiling
+      && row.tiles.length > 0
+      && row.tiles.length < row.capacity
+      && chippableRows.some(cr => cr.pi===pi && cr.ri===ri);
+    const onclick = cls==='drop'
+      ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
+      : '';
+    const chipBtn = hasChips
+      ? `<button onclick="event.stopPropagation();openChipModal(${pi},${ri})" style="font-size:9px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--bg);margin-left:2px" title="Bonusplättchen nutzen">🎫</button>`
+      : '';
+    const cells = Array.from({length:row.capacity},(_,ci)=>{
+      const tileIdx = ci - (row.capacity - row.tiles.length);
+      return tileIdx >= 0
+        ? `<div class="tile sm ${normColor(row.color)}"></div>`
+        : `<div class="tile sm empty"></div>`;
+    }).join('');
+    // Visueller Indikator: nächste fällige Tiling-Reihe
+    const isNextTiling = isTiling && isPlaceable && allEarlierDone && row.tiles.length===row.capacity;
+    const nextDot = isNextTiling
+      ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;
+           background:var(--blau,#3b82f6);margin-left:3px;vertical-align:middle;
+           box-shadow:0 0 4px var(--blau,#3b82f6)" title="Diese Reihe ist als nächstes dran"></span>`
+      : '';
+    return `<div class="prow ${cls}" ${onclick}>
+      <span class="rownum">${ri+1}</span>${cells}
+      <span class="rowlabel" style="color:var(--text3)">→${domeRow}</span>${chipBtn}${nextDot}
+    </div>`;
+  }).join('');
 
-@app.route('/api/ai/debug_history', methods=['GET'])
-def ai_debug_history():
-    """Gibt die komplette KI-Zug-Analyse-Historie des aktuellen Spiels zurück."""
-    return jsonify({"ok": True, "history": _ai_debug_history, "count": len(_ai_debug_history)})
+  const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
+    const needsStart = !p.start_placed;
+    const canNormal  = !slot && p.can_place_dome && isActive;
+    const canStart   = !slot && needsStart;
+    let cls = slot ? 'occ' : (canStart ? 'start' : (canNormal ? 'cando' : ''));
+    let ddata = (canStart||canNormal) ? ` data-dome="${pi},${sr},${sc}"` : '';
+    const isTilingTarget = isTiling && tilingPi===pi && tilingRow!==null;
+    const inner = slot
+      ? dome2x2(slot.spaces, pi, sr, sc, isTilingTarget)
+      : `<div style="font-size:9px;color:var(--text3);text-align:center;width:100%">${canStart?'▼ Start':'+'}</div>`;
+    return `<div class="dslot ${cls}"${ddata}>${inner}</div>`;
+  }).join('')).join('');
 
+  const floorHTML = [...Array(4)].map((_,i)=>{
+    const t = p.floor[i];
+    return `<div class="fslot">${t?`<div class="tile sm ${normColor(t)}"></div>`:`<span>${[-1,-2,-3,-4][i]}</span>`}</div>`;
+  }).join('');
+  const markerHTML = p.marker ? `<div class="tile sm marker">1</div>` : '';
 
-@app.route('/api/ai/suggest', methods=['GET'])
-def ai_suggest():
-    """
-    Mentor Mode: gibt Top-3 KI-Züge mit Visit-Counts zurück.
-    Nur für AlphaZeroAgent verfügbar.
-    """
-    if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    if _ai_agent is None:   return jsonify(err("Kein KI-Agent aktiv"))
+  const est = p.estimated_score || 0;
+  const estStr = (est >= 0 ? '+' : '') + est;
+  const estColor = est > 0 ? '#059669' : est < 0 ? '#DC2626' : 'var(--text3)';
 
-    try:
-        from agents.agent_env import MosaicEnv
-        from agents.mcts import MCTSNode
-        env = MosaicEnv()
-        env._game = _game
-        env.state  = _game.state
-        _ai_agent.set_env(env)
+  document.getElementById(`board${pi}`).className = `panel${isActive?' active':''}`;
+  document.getElementById(`board${pi}`).innerHTML = `
+    <div class="phead">
+      <span class="pname">${isActive?'▶ ':''}${p.name}${p.start_placed?'':' ⚠ Erste Kuppelplatte legen!'}</span>
+      <span style="display:flex;align-items:baseline;gap:5px">
+        <span class="pscore">${p.score}</span>
+        <span style="font-size:11px;color:${estColor}" title="Geschätzte Punkte diese Runde">(${estStr})</span>
+      </span>
+    </div>
+    ${tokHTML}
+    <div class="sep"></div>
+    <div class="board-inner">
+      <div>
+        <div class="lbl">Musterreihen</div>
+        <div id="plines${pi}">${plHTML}</div>
+        <div class="sep"></div>
+        <div class="lbl">Zerbrochene Fliesen ${markerHTML}</div>
+        <div class="floor">${floorHTML}
+          ${sel&&isActive?`<button class="btn danger" style="padding:2px 8px;font-size:10px" onclick="onFloorDirect()">→ Boden</button>`:''}
+        </div>
+        
+        <div style="margin-top:6px;font-size:9px;color:var(--text3)">
+          Chips (${p.chips_taken}/10):
+          <div class="chips-grid">
+            ${Array.from({length: 10}, (_, i) => {
+              const c = p.bonus_chips[i];
+              if (c && c.colors && c.colors.length > 0) {
+                const c1 = normColor(c.colors[0]);
+                const c2 = c.colors.length > 1 ? normColor(c.colors[1]) : 'empty';
+                return `<div class="bchip" title="${c.colors.join('+')}">
+                  <div class="bchip-half ${c1}"></div>
+                  <div class="bchip-half ${c2}"></div>
+                </div>`;
+              } else {
+                return `<div class="bchip placeholder"></div>`;
+              }
+            }).join('')}
+          </div>
+        </div>
+        </div>
+      <div>
+        <div class="lbl" style="display:flex;justify-content:space-between">
+          <span>Kuppel</span><span>${p.dome_grid.flat().filter(Boolean).length}/9</span>
+        </div>
+        <div class="dome-grid" id="dome${pi}">${domeHTML}</div>
+      </div>
+    </div>`;
+  syncDomeHeight(pi);
+}
 
-        actions = env.valid_actions()
-        if not actions:
-            return jsonify({"ok": True, "suggestions": []})
+function syncDomeHeight(pi) {
+  const dgrid = document.getElementById('dome'+pi);
+  if (!dgrid) return;
+  dgrid.querySelectorAll('.dslot').forEach(slot => {
+    slot.style.height = '58px';
+    const d2 = slot.querySelector('.d2x2');
+    if(d2) {
+      d2.style.height = '46px';
+      d2.style.width = '46px';
+    }
+  });
+}
 
-        # MCTS-Baum aufbauen ohne Zug auszuführen
-        pi = env.current_player()
-        root = MCTSNode(action=None, parent=None, untried_actions=None,
-                        player_who_acted=pi)
-        root.visits = 1
+// -- RENDER CENTER -------------------------------------------------------------
+function renderCenter() {
+  const badge = document.getElementById('phase-badge');
+  badge.className = 'phase-badge'+(S.phase==='tiling'?' tiling':S.phase==='end'?' end':'');
+  // Seed anzeigen (klickbar zum Kopieren)
+  const seedEl = document.getElementById('game-seed-display');
+  if (seedEl && window._gameSeed !== undefined) {
+    seedEl.textContent = `🎲 Seed: ${window._gameSeed} (klicken zum Kopieren)`;
+    seedEl.style.display = '';
+    seedEl.style.cursor = 'pointer';
+    seedEl.title = 'Seed in Zwischenablage kopieren';
+    seedEl.onclick = () => {
+      navigator.clipboard?.writeText(String(window._gameSeed));
+      seedEl.textContent = `🎲 Seed: ${window._gameSeed} ✓ kopiert`;
+      setTimeout(() => { seedEl.textContent = `🎲 Seed: ${window._gameSeed} (klicken zum Kopieren)`; }, 1500);
+    };
+  }
+  // Spielende loggen
+  if ((S.phase === 'end' || S.phase === 'final') && !window._gameEndLogged) {
+    window._gameEndLogged = true;
+    _notifyGameEnd();
+  }
+  const tilingStatus = S.phase==='tiling'
+    ? (tilingRow!==null ? `TILING — Reihe ${tilingRow+1} legen` : 'PHASE 2: Reihe anklicken')
+    : '';
+  badge.textContent = S.phase==='drafting'?`Phase 1 — ${S.players[S.current_player].name}`
+    :S.phase==='tiling'? tilingStatus
+    :S.phase==='end'?'SPIELENDE':'—';
 
-        for _ in range(_ai_agent.simulations):
-            sim_env = env.clone()
-            node = _ai_agent._select(root, sim_env)
-            node = _ai_agent._expand(node, sim_env)
-            result = _ai_agent._rollout(sim_env)
-            _ai_agent._backpropagate(node, result, pi)
+  const info = document.getElementById('info-area');
+  if(sel) {
+    info.innerHTML=`<div class="info sel">🎨 <strong>${sel.color}</strong> ausgewählt — Musterreihe wählen oder → Boden</div>`;
+  } else if(S.phase==='tiling') {
+    const placeableRows = (S.valid_tiling_rows||[]); 
+    const allComplete = S.players.flatMap((p,pi)=>
+      p.pattern_lines
+        .filter(r=>r.tiles.length===r.capacity)
+        .map(r=>({pi, ri:r.index, color:r.color, pname:p.name}))
+    );
+    // pending: nur Reihen die tatsächlich platzierbar sind (placeable !== false)
+    // und keine frühere platzierbare Reihe noch offen haben
+    const placeableOnly = placeableRows.filter(pr => pr.placeable === true);
+    const pending = placeableOnly
+      .filter(pr => {
+        // Keine frühere platzierbare Reihe desselben Spielers noch offen
+        return !placeableOnly.some(other => other.pi===pr.pi && other.ri<pr.ri);
+      })
+      .map(pr => {
+        const p = S.players[pr.pi];
+        const row = p.pattern_lines[pr.ri];
+        return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
+      });
 
-        # Top-3 nach Visit-Count
-        top = sorted(root.children, key=lambda n: n.visits, reverse=True)[:3]
-        suggestions = []
-        for child in top:
-            q = child.value / child.visits if child.visits > 0 else 0.0
-            win_pct = round((q + 1) / 2 * 100, 1)
-            suggestions.append({
-                "action":   child.action,
-                "visits":   child.visits,
-                "win_pct":  win_pct,
-            })
+    // Unplatzierbare volle Reihen (alle 3 Slots belegt, keine Farbe passend)
+    const unplaceable = placeableRows
+      .filter(pr => pr.placeable === false)
+      .map(pr => {
+        const p = S.players[pr.pi];
+        const row = p.pattern_lines[pr.ri];
+        return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
+      });
 
-        return jsonify({"ok": True, "suggestions": suggestions})
+    const hasPending = pending.length > 0;
 
-    except Exception as e:
-        return jsonify(err(f"Suggest-Fehler: {str(e)}"))
+    // Nur Reihen die der Server als chippable markiert hat
+    const chippableRows2 = S.chippable_tiling_rows || [];
+    const chippable = chippableRows2.map(cr => {
+      const p = S.players[cr.pi];
+      const row = p.pattern_lines[cr.ri];
+      return {pi: cr.pi, ri: cr.ri, color: row.color,
+              need: row.capacity - row.tiles.length, pname: p.name};
+    });
 
+    let infoHTML = '';
+    if(tilingRow!==null) {
+      const col = S.players[tilingPi].pattern_lines[tilingRow].color;
+      infoHTML = `<div class="info tiling" style="display:flex;align-items:center;justify-content:space-between">
+        <span>→ <strong>${S.players[tilingPi].name}</strong> Reihe ${tilingRow+1}
+          <span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px">${normColor(col)[0].toUpperCase()}</span>
+          — passendes Kuppelfeld anklicken
+        </span>
+        <button class="btn" onclick="tilingPi=null;tilingRow=null;render()" style="font-size:10px;flex-shrink:0">✕</button>
+      </div>`;
+    } else if(hasPending) {
+      const rows = pending.map(x=>
+        `<span style="cursor:pointer;display:inline-flex;align-items:center;gap:2px;padding:1px 4px;border-radius:4px;background:#D1FAE5;border:1px solid #34D399"
+          onclick="tilingPi=${x.pi};tilingRow=${x.ri};render()">
+          <span class="tile sm ${normColor(x.color)}">${normColor(x.color)[0].toUpperCase()}</span>
+          R${x.ri+1} ${x.pname}
+        </span>`
+      ).join(' ');
+      infoHTML = `<div class="info tiling">
+        <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen — anklicken zum Legen:</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">${rows}</div>
+      </div>`;
+    } else if(chippable.length>0) {
+      infoHTML = `<div class="info warn" style="font-size:10px">
+        💡 Reihen mit 🎫-Button können mit Bonusplättchen vervollständigt werden<br>
+        <span style="color:var(--text2)">2 gleichfarbige oder 3 beliebige Chips = 1 fehlende Fliese</span>
+      </div>`;
+    } else {
+      infoHTML = `<div class="info tiling">✓ Alle Reihen abgeschlossen</div>`;
+    }
 
-if __name__ == '__main__':
-    print("Mosaic-AI Server läuft auf http://localhost:5000")
-    app.run(debug=True, port=5000)
+    info.innerHTML = infoHTML + (!hasPending ? `
+      <button class="btn pri" onclick="endTiling()" style="width:100%;margin-top:6px">
+        Runde ${S.round} beenden ✓
+      </button>` : '');
+  } else if(S.phase==='end' || S.phase==='final') {
+    const [p0,p1]=S.players;
+    const w=p0.score>p1.score?p0.name:p1.score>p0.score?p1.name:p0.marker?p0.name:p1.marker?p1.name:'Unentschieden';
+    if(S.phase==='end') {
+      info.innerHTML=`<div class="info tiling" style="text-align:center">
+        🏁 Runde 5 beendet!<br>
+        <button class="btn pri" onclick="calculateEndScoring()" style="margin-top:6px;width:100%">🏆 Endwertung berechnen</button>
+        <button class="btn" onclick="openScoringModal()" style="margin-top:4px;width:100%;font-size:10px">⚙️ Wertungsplatten ändern</button>
+      </div>`;
+    } else {
+      info.innerHTML=`<div class="info tiling">🏁 <strong>${w}</strong> — ${p0.name}: ${p0.score} | ${p1.name}: ${p1.score}</div>`;
+    }
+  } else {
+    const pending = S.players.filter(p=>!p.start_placed);
+    if(pending.length > 0) {
+      const names = pending.map(p=>p.name).join(' und ');
+      info.innerHTML = `<div class="info warn">
+        ⚠ <strong>Vorbereitung:</strong> ${names} ${pending.length>1?'müssen':'muss'} noch die erste Kuppelplatte legen.<br>
+        <span style="font-size:10px;color:var(--text2)">Ein gelbes Feld aus der Kuppel selektieren und Kuppelplatte wählen</span>
+      </div>`;
+    } else {
+      if(S.can_pass) {
+        info.innerHTML = `<div class="info warn" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span>⏸ Keine Aktion möglich</span>
+          <button class="btn danger" onclick="passMove()" style="white-space:nowrap">Passen</button>
+        </div>`;
+      } else {
+        info.innerHTML = '';
+      }
+    }
+  }
+
+  const displayHTML = S.dome_display.map(t=>{
+    const spaces = t.spaces.map(sp=>spaceHTML(sp)).join('');
+    return `<div class="dgtile" data-tile-id="${t.id}" title="Kachel #${t.id}">
+      <div class="d2x2" style="width:46px; height:46px;">${spaces}</div>
+      <div class="dglabel">#${t.id}</div>
+    </div>`;
+  }).join('');
+
+  const facsHTML = S.factories.map(f=>{
+    const sunColors = [...new Set(f.sun)];
+    const moonTops  = [...new Set(f.moon.map(s=>s[s.length-1]).filter(Boolean))];
+    
+    let chipContent = '🔒';
+    if (f.chip_revealed && f.bonus_chip && f.bonus_chip.colors) {
+      const c1 = normColor(f.bonus_chip.colors[0]);
+      const c2 = f.bonus_chip.colors.length > 1 ? normColor(f.bonus_chip.colors[1]) : 'empty';
+      
+      chipContent = `<div class="bchip" style="cursor: pointer;">
+        <div class="bchip-half ${c1}"></div>
+        <div class="bchip-half ${c2}"></div>
+      </div>`;
+    }
+    
+    const chipHTML = f.bonus_chip
+      ? `<span style="cursor:${f.chip_revealed?'pointer':'default'}" onclick="${f.chip_revealed?`bonusChipMove(${f.id})`:''}" title="Bonusplättchen">${chipContent}</span>`
+      : '';
+      
+    const sunTiles = sunColors.map(c=>{
+      const cnt = f.sun.filter(x=>x===c).length;
+      return `<div class="cgroup" data-src="SMALL_FACTORY_SUN" data-fid="${f.id}" data-color="${c}">
+        <div class="tile ${normColor(c)} click ${sel?.color===c&&sel?.factory_id===f.id?'sel':''}"></div>
+        <span class="cnt">×${cnt}</span>
+      </div>`;
+    }).join('');
+    
+    const moonTopTiles = f.moon.map(stack => stack[stack.length-1]).filter(Boolean);
+    const moonTiles = moonTopTiles.length
+      ? `<div style="display:flex;gap:2px;align-items:center;margin-top:3px;flex-wrap:wrap">
+          <span style="font-size:8px;color:var(--text3)">Moon:</span>
+          ${moonTopTiles.map(c=>`<div class="tile sm ${normColor(c)}" title="Oben: ${c}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+         </div>` : '';
+    return `<div class="fcard">
+      <div class="fhead"><span>Kleine Manufaktur ${f.id}</span>${chipHTML}</div>
+      <div class="ftiles">${f.sun.length?sunTiles:'<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
+      ${moonTiles}
+    </div>`;
+  }).join('');
+
+  const lf = S.large_factory;
+  const lSun = [...new Set(lf.sun)].map(c=>{
+    const cnt=lf.sun.filter(x=>x===c).length;
+    return `<div class="cgroup" data-src="LARGE_FACTORY_SUN" data-fid="null" data-color="${c}">
+      <div class="tile ${normColor(c)} click"></div><span class="cnt">×${cnt}</span>
+    </div>`;
+  }).join('');
+  const lMoon = [...new Set(lf.moon)].map(c=>{
+    const cnt=lf.moon.filter(x=>x===c).length;
+    return `<div class="cgroup" data-src="LARGE_FACTORY_MOON" data-fid="null" data-color="${c}">
+      <div class="tile ${normColor(c)} click"></div><span class="cnt">×${cnt}</span>
+    </div>`;
+  }).join('');
+
+  const moonTopCounts = S.moon_top_counts || {};
+  const moonTopEntries = Object.entries(moonTopCounts);
+  
+  const moonActionHTML = moonTopEntries.length
+    ? `<div style="margin-bottom:6px">
+        <div class="lbl">Mondbereich (alle Manufakturen)</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${moonTopEntries.map(([c, count]) => `
+            <div class="cgroup" data-src="SMALL_FACTORY_MOON" data-fid="ALL" data-color="${c}"
+              title="${count} oberste ${c}-Fliesen vom Moon aller Manufakturen">
+              <div class="tile ${normColor(c)} click ${sel?.source==='SMALL_FACTORY_MOON'&&sel?.color===c?'sel':''}"></div>
+              <span class="cnt">×${count}</span>
+            </div>`).join('')}
+        </div>
+       </div>` : '';
+
+document.getElementById('factories-area').innerHTML = `
+    <div class="lbl" style="display:flex;justify-content:space-between">
+      <span>Kuppelplatten (${S.dome_display.length}/3)</span>
+      <span style="color:var(--text3)">Stapel: ${S.dome_stack_count}</span>
+    </div>
+    <div class="display-g">${displayHTML||'<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
+    ${(() => {
+      const cp = S.players[S.current_player];
+      const canStack = S.phase==='drafting'
+        && cp.start_placed
+        && cp.tokens_used < 2
+        && S.round < 5
+        && S.dome_stack_count > 0
+        && cp.dome_grid.flat().filter(Boolean).length < 9;
+      return canStack ? `<button class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
+        📦 Vom Stapel ziehen (−1 Pkt/Karte) · ${S.dome_stack_count} verfügbar
+      </button>` : '';
+    })()}
+    <div class="sep"></div>
+    ${moonActionHTML}
+    <div class="lbl" style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">Sonnenbereich</div>
+    <div style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">
+    ${facsHTML}
+    <div class="fcard">
+      <div class="fhead"><span>Große Manufaktur</span>${lf.marker?'<span style="color:#F59E0B">★</span>':''}</div>
+      <div class="ftiles" style="margin-bottom:2px"><span style="font-size:8px;color:var(--text3)">Sun:</span>${lSun||'—'}</div>
+      <div class="ftiles"><span style="font-size:8px;color:var(--text3)">Moon:</span>${lMoon||'—'}</div>
+    </div>
+    </div>`;
+
+  document.getElementById('log').innerHTML = [...S.log].reverse().map(e=>{
+    let cls='le';
+    let style='';
+    if(e.includes('🟡')||e.includes('+')&&e.includes('Pkt')&&!e.includes('−')){
+      style='color:#D97706;font-weight:600'; 
+    } else if(e.includes('🔴')||e.includes('Strafe')||e.includes('⚠️')){
+      style='color:#DC2626'; 
+    } else if(e.includes('⭐')){
+      style='color:#7C3AED;font-weight:600'; 
+    } else if(e.includes('🏁')){
+      style='color:#F59E0B'; 
+    } else if(e.includes('📦')){
+      style='color:#DC2626'; 
+    } else if(e.includes('✅')){
+      style='color:#059669'; 
+    } else if(e.includes('☀️')||e.includes('🌙')){
+      style='color:var(--text2)';
+    } else if(e.includes('🎫')){
+      style='color:#7C3AED';
+    }
+    return `<div class="le" style="${style}">${e}</div>`;
+  }).join('');
+  
+  const sdiv = document.getElementById('scoring-display');
+  const editBtn = document.getElementById('scoring-edit-btn');
+  // Wertungsplatten nur editierbar solange noch keine Startkacheln gelegt wurden
+  // Nach Bestätigung (beide start_placed=true) nicht mehr änderbar
+  const scoringConfirmed = S && S.scoring_confirmed;
+  const canEditScoring = S && !scoringConfirmed && !S.players.every(p=>p.start_placed);
+  if(editBtn) editBtn.innerHTML = canEditScoring
+    ? `<button class="btn" onclick="openScoringModal()" style="font-size:9px;padding:2px 6px">✏️</button>`
+    : `<span style="font-size:9px;color:var(--text3)">🔒</span>`;
+  if(sdiv && allScoringTiles.length) {
+    sdiv.innerHTML = (S.scoring_tile_ids||[]).map(id=>{
+      const t=allScoringTiles.find(t=>t.id===id);
+      return t?`<span style="margin-right:6px">${t.emoji} ${t.name}</span>`:'';
+    }).join('');
+  }
+
+  const vmDiv = document.getElementById('valid-moves');
+  if(!vmDiv) return;
+
+  if(S.phase === 'tiling') {
+    const rows = (S.valid_tiling_rows||[]);
+    if(rows.length === 0) {
+      vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Alle platzierbaren Reihen gelegt ✓</div>`;
+    } else {
+      vmDiv.innerHTML = rows.map(x=>{
+        const p = S.players[x.pi];
+        const row = p.pattern_lines[x.ri];
+        const nc = normColor(row.color);
+        return `<div class="le" style="display:flex;align-items:center;gap:4px;padding:2px 0">
+          <span style="color:var(--text3)">${p.name}</span>
+          Reihe ${x.ri+1}
+          <div class="tile sm ${nc}" style="flex-shrink:0">${nc[0].toUpperCase()}</div>
+          <span style="color:var(--text3)">→ Kuppelreihe ${Math.floor(x.ri/2)}</span>
+        </div>`;
+      }).join('');
+    }
+    return;
+  }
+
+  if(!S.valid_moves || S.valid_moves.length === 0) {
+    vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Keine Aktionen — Passen möglich</div>`;
+    return;
+  }
+
+  const byType = {};
+  for(const m of S.valid_moves) {
+    if(!byType[m.type]) byType[m.type] = [];
+    byType[m.type].push(m);
+  }
+
+  const lines = [];
+
+  if(byType['start_tile_pending']) {
+    lines.push(`<div class="le" style="color:#F59E0B;font-weight:600">⚠️ Startkachel legen (gelbe Felder anklicken)</div>`);
+  }
+
+  if(byType['stone']) {
+    const sunColors = [...new Set(byType['stone']
+      .filter(m=>m.source==='SMALL_FACTORY_SUN')
+      .map(m=>m.color))];
+    const moonColors = [...new Set(byType['stone']
+      .filter(m=>m.source==='SMALL_FACTORY_MOON')
+      .map(m=>m.color))];
+    const lSunColors = [...new Set(byType['stone']
+      .filter(m=>m.source==='LARGE_FACTORY_SUN')
+      .map(m=>m.color))];
+    const lMoonColors = [...new Set(byType['stone']
+      .filter(m=>m.source==='LARGE_FACTORY_MOON')
+      .map(m=>m.color))];
+
+    if(sunColors.length)
+      lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
+        ☀️ Sonne:
+        ${sunColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+      </div>`);
+    if(moonColors.length)
+      lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
+        🌙 Mond (alle):
+        ${moonColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+      </div>`);
+    if(lSunColors.length)
+      lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
+        ☀️ Gr. Fabrik:
+        ${lSunColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+      </div>`);
+    if(lMoonColors.length)
+      lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
+        🌙 Gr. Fabrik Mond:
+        ${lMoonColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+      </div>`);
+  }
+
+  if(byType['dome_display']) {
+    const ids = [...new Set(byType['dome_display'].map(m=>m.tile_id))];
+    lines.push(`<div class="le" style="padding:2px 0">🧩 Kuppelplatte aus Display: ${ids.map(id=>'#'+id).join(', ')}</div>`);
+  }
+
+  if(byType['dome_stack']) {
+    lines.push(`<div class="le" style="padding:2px 0">📦 Kuppelplatte vom Stapel (−1 Pkt/Karte)</div>`);
+  }
+
+  if(byType['bonus_chip']) {
+    const fids = byType['bonus_chip'].map(m=>'Fabrik '+m.factory_id).join(', ');
+    lines.push(`<div class="le" style="padding:2px 0">🎫 Bonusplättchen: ${fids}</div>`);
+  }
+
+  vmDiv.innerHTML = lines.join('') || `<div class="le" style="color:var(--text3)">—</div>`;
+}
+
+// -- INTERACTION ---------------------------------------------------------------
+function onRowClick(ri) {
+  if(!sel) return;
+  const row = S.players[S.current_player].pattern_lines[ri];
+  if(row.tiles.length >= row.capacity) return;
+  if(row.color && row.color !== sel.color) return;
+  if(sel.source === 'SMALL_FACTORY_SUN' && sel.moon_order && sel.moon_order.length > 0) {
+    openMoonOrderModal(sel.moon_order, (ordered) => {
+      stoneMove(sel.source, sel.factory_id, sel.color, ri, ordered);
+    });
+  } else {
+    stoneMove(sel.source, sel.factory_id, sel.color, ri, sel.moon_order||[]);
+  }
+}
+
+function onFloorDirect() {
+  if(!sel) return;
+  if(sel.source === 'SMALL_FACTORY_SUN' && sel.moon_order && sel.moon_order.length > 0) {
+    openMoonOrderModal(sel.moon_order, (ordered) => {
+      stoneMove(sel.source, sel.factory_id, sel.color, -1, ordered);
+    });
+  } else {
+    stoneMove(sel.source, sel.factory_id, sel.color, -1, sel.moon_order||[]);
+  }
+}
+
+function onTilingRowClick(pi, ri) {
+  if (AI_THINKING) return;
+  // Mensch darf nicht für KI tilen
+  if (AI_ENABLED && pi === AI_PLAYER) return;
+  const row = S.players[pi].pattern_lines[ri];
+  if(row.tiles.length !== row.capacity) return;
+  tilingPi=pi; tilingRow=ri;
+  render();
+}
+
+// -- CHIP MODAL ----------------------------------------------------------------
+let chipModal = null;
+
+function openChipModal(pi, ri) {
+  if (AI_THINKING) return;
+  if (AI_ENABLED && pi === AI_PLAYER) return;
+  const p = S.players[pi];
+  const row = p.pattern_lines[ri];
+  const chips = p.bonus_chips.filter(c=>c);
+  if(!chips.length){showError('Keine Bonusplättchen verfügbar');return;}
+  chipModal = {
+    pi, ri,
+    color: row.color,
+    missing: row.capacity - row.tiles.length,
+    availableChips: chips.map(c=>({...c, colors:[...c.colors]})),
+    selectionIds: [],
+    confirmedGroups: [],
+  };
+  document.getElementById('chip-title').textContent =
+    `Reihe ${ri+1} (${row.color}) — fehlen ${chipModal.missing} Fliese(n)`;
+  document.getElementById('chip-info').textContent =
+    `Wähle je Gruppe: 2 gleichfarbige ODER 3 beliebige Plättchen = 1 Fliese ersetzen`;
+  renderChipModal();
+  document.getElementById('chip-overlay').style.display='flex';
+}
+
+function renderChipModal() {
+  if(!chipModal) return;
+  const {pi,ri,color,missing,availableChips,selectionIds,confirmedGroups} = chipModal;
+  const usedInGroups = confirmedGroups.flatMap(g=>g.chip_ids);
+
+  const pool = document.getElementById('chip-pool');
+  pool.innerHTML='';
+  availableChips.forEach(chip=>{
+    const inGroup = usedInGroups.includes(chip.id);
+    const inSel = selectionIds.includes(chip.id);
+    const div=document.createElement('div');
+    div.className='chip-pill'+(inSel?' in-sel':'');
+    div.style.opacity=inGroup?'0.3':'1';
+    div.style.cursor=inGroup?'not-allowed':'pointer';
+    chip.colors.forEach(c=>{
+      const s=document.createElement('div');
+      s.className=`tile sm ${normColor(c)}`;
+      s.textContent=normColor(c)[0].toUpperCase();
+      div.appendChild(s);
+    });
+    const id=document.createElement('span');
+    id.style.cssText='font-size:8px;color:var(--text3);margin-left:2px';
+    id.textContent='#'+chip.id;
+    div.appendChild(id);
+    if(!inGroup) div.addEventListener('click',()=>{toggleChipInSelection(chip.id);});
+    pool.appendChild(div);
+  });
+
+  const selDiv=document.getElementById('chip-selection');
+  const selEmpty=document.getElementById('chip-sel-empty');
+  selDiv.querySelectorAll('.chip-pill').forEach(e=>e.remove());
+  if(!selectionIds.length){ selEmpty.style.display='inline'; }
+  else {
+    selEmpty.style.display='none';
+    selectionIds.forEach(id=>{
+      const chip=availableChips.find(c=>c.id===id); if(!chip) return;
+      const div=document.createElement('div');
+      div.className='chip-pill in-sel';
+      chip.colors.forEach(c=>{
+        const s=document.createElement('div');
+        s.className=`tile sm ${normColor(c)}`;
+        s.textContent=normColor(c)[0].toUpperCase();
+        div.appendChild(s);
+      });
+      div.addEventListener('click',()=>toggleChipInSelection(id));
+      selDiv.appendChild(div);
+    });
+  }
+
+  const same2 = selectionIds.length===2 &&
+    selectionIds.every(id=>availableChips.find(c=>c.id===id)?.colors.includes(color));
+  const any3 = selectionIds.length===3;
+  const valid = same2||any3;
+  const addBtn=document.getElementById('chip-add-btn');
+  addBtn.disabled=!valid;
+  addBtn.textContent= same2?'→ 2 gleichfarbige = 1 Fliese hinzufügen'
+    :any3?'→ 3 beliebige = 1 Fliese hinzufügen'
+    :`Auswahl (${selectionIds.length}) — 2 gleiche oder 3 beliebige`;
+
+  const gArea=document.getElementById('chip-groups-area');
+  const gDiv=document.getElementById('chip-groups');
+  if(confirmedGroups.length){
+    gArea.style.display='block';
+    gDiv.innerHTML=confirmedGroups.map((g,gi)=>{
+      const cchips=g.chip_ids.map(id=>availableChips.find(c=>c.id===id)).filter(Boolean);
+      return `<div style="display:inline-flex;align-items:center;gap:2px;padding:3px 7px;background:#D1FAE5;border:1px solid #34D399;border-radius:5px;font-size:10px">
+        ${cchips.map(c=>c.colors.map(col=>`<div class="tile sm ${normColor(col)}">${normColor(col)[0].toUpperCase()}</div>`).join('')).join('<span style="color:var(--text3)">+</span>')}
+        <span style="color:#065F46;margin-left:3px">→ 1 Fliese</span>
+        <span onclick="removeChipGroup(${gi})" style="cursor:pointer;color:var(--rot);margin-left:4px">✕</span>
+      </div>`;
+    }).join('');
+  } else { gArea.style.display='none'; }
+
+  const row=S.players[pi].pattern_lines[ri];
+  const have=row.tiles.length+confirmedGroups.length;
+  const cap=row.capacity;
+  const preview=document.getElementById('chip-row-preview');
+  preview.innerHTML=Array.from({length:cap},(_,i)=>
+    i>=cap-have
+      ?`<div class="tile sm ${normColor(color)}">${normColor(color)[0].toUpperCase()}</div>`
+      :`<div class="tile sm empty"></div>`
+  ).join('')+`<span style="font-size:10px;color:var(--text2);margin-left:6px">${have}/${cap}${have===cap?' ✓':''}</span>`;
+
+  document.getElementById('chip-confirm').disabled = confirmedGroups.length!==missing;
+}
+
+function toggleChipInSelection(id) {
+  const idx=chipModal.selectionIds.indexOf(id);
+  if(idx>=0) chipModal.selectionIds.splice(idx,1);
+  else chipModal.selectionIds.push(id);
+  renderChipModal();
+}
+
+function addChipGroup() {
+  const {selectionIds,confirmedGroups,color,availableChips}=chipModal;
+  const same2=selectionIds.length===2&&selectionIds.every(id=>availableChips.find(c=>c.id===id)?.colors.includes(color));
+  const any3=selectionIds.length===3;
+  if(!same2&&!any3) return;
+  confirmedGroups.push({chip_ids:[...selectionIds]});
+  chipModal.selectionIds=[];
+  renderChipModal();
+}
+
+function removeChipGroup(gi) {
+  chipModal.confirmedGroups.splice(gi,1);
+  renderChipModal();
+}
+
+function clearChipSelection() {
+  chipModal.selectionIds=[];
+  renderChipModal();
+}
+
+function confirmChips() {
+  if(!chipModal) return;
+  const {pi,ri,confirmedGroups}=chipModal;
+  closeChipModal();
+  tilingBonusChips(pi,ri,confirmedGroups);
+}
+
+function closeChipModal() {
+  document.getElementById('chip-overlay').style.display='none';
+  chipModal=null;
+}
+
+// -- DOME MODAL ----------------------------------------------------------------
+function openStackPicker() {
+  const pi = S.current_player;
+  const p = S.players[pi];
+  const emptySlot = p.dome_grid.flatMap((row,sr)=>
+    row.map((s,sc)=>s?null:{sr,sc}).filter(Boolean))[0];
+  if(!emptySlot){showError('Keine freien Kuppelfelder!');return;}
+  openDomeModal(pi, emptySlot.sr, emptySlot.sc);
+  setTimeout(()=>{
+    const sec=document.getElementById('dome-stack-section');
+    if(sec) sec.style.display='flex';
+  }, 100);
+}
+
+function openDomeModal(pi, sr, sc) {
+  if (AI_THINKING) return;  // KI denkt noch
+  const p = S.players[pi];
+  const isStart = !p.start_placed;
+  // KI-Board sperren: Mensch darf nicht für KI legen
+  if(AI_ENABLED && pi === AI_PLAYER) return;
+  if(!isStart && pi !== S.current_player) return;
+  if(!isStart && !p.can_place_dome) return;
+
+  domeModal = {pi, slot_r:sr, slot_c:sc, tile_id:null, rotation:0, is_start:isStart};
+  const notice = document.getElementById('dome-notice');
+  if(isStart) {
+    notice.textContent='Eine Kuppelplatte wählen und Rotation setzen';
+    notice.style.display='block';
+  } else notice.style.display='none';
+
+  document.getElementById('dome-title').textContent = isStart ? 'Erste Kuppelplatte legen' : 'Kuppelplatte legen';
+
+  const grid = document.getElementById('dome-pool');
+  grid.innerHTML = '';
+  S.dome_display.forEach(t=>{
+    const div = document.createElement('div');
+    div.className='ptile'; div.dataset.id=t.id;
+    div.innerHTML=`<div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
+      <div class="plabel">#${t.id}</div>`;
+    div.addEventListener('click',()=>{
+      domeModal.tile_id=t.id;
+      grid.querySelectorAll('.ptile').forEach(e=>e.classList.remove('sel'));
+      div.classList.add('sel');
+      document.getElementById('dome-confirm').disabled=false;
+      buildPreview();
+    });
+    grid.appendChild(div);
+  });
+
+  document.getElementById('dome-confirm').disabled=true;
+  document.getElementById('rotbtns').querySelectorAll('.rotbtn').forEach((b,i)=>b.classList.toggle('act',i===0));
+  buildPreview();
+
+  const stackSec = document.getElementById('dome-stack-section');
+  if (!isStart && S.dome_stack_count > 0) {
+    stackSec.style.display = 'flex';
+    document.getElementById('stack-n').max = S.dome_stack_count;
+    document.getElementById('stack-n').value = 1;
+  } else {
+    stackSec.style.display = 'none';
+  }
+
+  document.getElementById('dome-overlay').style.display='flex';
+}
+
+function buildPreview() {
+  const prev = document.getElementById('dome-preview');
+  
+  if (domeModal?.tile_id === null || domeModal?.tile_id === undefined) { 
+    prev.innerHTML = ''; 
+    return; 
+  }
+  
+  let tile = S.dome_display.find(t => t.id === domeModal.tile_id);
+  if (!tile && domeModal.stack_tiles) {
+    tile = domeModal.stack_tiles.find(t => t.id === domeModal.tile_id);
+  }
+  
+  if (!tile) { prev.innerHTML = ''; return; }
+  
+  const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
+  const rotated = ROT[domeModal.rotation||0].map(i => tile.spaces[i]);
+  
+  prev.innerHTML = `<div class="d2x2" style="width:46px; height:46px;">${rotated.map(sp => spaceHTML(sp)).join('')}</div>`;
+}
+
+async function doStackDraw() {
+  const n = +document.getElementById('stack-n').value;
+  if(!n || n < 1) return;
+  const pi = domeModal.pi;
+  
+  const d = await api('/stack/peek', {num: n, player: pi});
+  if(!d.ok){ showError(d.error); return; }
+  
+  domeModal.stack_tiles = d.tiles;
+  
+  const stackSec = document.getElementById('dome-stack-section');
+  if(stackSec) stackSec.style.display = 'none';
+
+  // Abbrechen nicht mehr möglich — Spieler muss sich entscheiden
+  const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
+  if(cancelBtn) cancelBtn.style.display = 'none';
+
+  const notice = document.getElementById('dome-notice');
+  notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, der Rest kommt unter den Stapel. (Kosten: −${n} Pkt)<br>
+                      <span style="font-size:10px; font-weight:normal;">Wähle danach unten deine Rotation und bestätige.</span>`;
+  notice.style.display = 'block';
+
+  const pool = document.getElementById('dome-pool');
+  pool.innerHTML = ''; 
+  
+  d.tiles.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'ptile'; 
+    div.dataset.id = t.id;
+    
+    div.innerHTML = `
+      <div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
+      <div class="plabel">#${t.id}</div>`;
+      
+    div.addEventListener('click', () => {
+      domeModal.tile_id = t.id; 
+      domeModal.stack_draw = {num: n, chosen_id: t.id, player: pi};
+      
+      pool.querySelectorAll('.ptile').forEach(e => e.classList.remove('sel'));
+      div.classList.add('sel');
+      
+      document.getElementById('dome-confirm').disabled = false;
+      buildPreview(); 
+    });
+    
+    pool.appendChild(div);
+  });
+}
+
+function closeDomeModal() {
+  // Abbrechen-Button wieder anzeigen für nächstes Mal
+  const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
+  if(cancelBtn) cancelBtn.style.display = '';
+  document.getElementById('dome-overlay').style.display='none';
+  domeModal=null;
+}
+
+async function showActiveScoringTiles() {
+  if (typeof S === 'undefined' || !S) {
+    alert("Das Spiel hat noch nicht begonnen.");
+    return;
+  }
+
+  try {
+    const res = await api('/scoring_tiles');
+    if (!res.ok) {
+      alert("Fehler beim Laden der Ziele.");
+      return;
+    }
+
+    const activeIds = S.scoring_tile_ids || [0, 1, 2];
+    const activeTiles = res.tiles.filter(t => activeIds.includes(t.id));
+
+    let infoText = "🏆 AKTIVE WERTUNGSPLÄTTCHEN 🏆\n\n";
+    activeTiles.forEach(t => {
+      infoText += `${t.emoji} ${t.name.toUpperCase()}\n    ${t.description}\n\n`;
+    });
+
+    alert(infoText);
+
+  } catch (error) {
+    console.error("Fehler beim Abrufen der Ziele:", error);
+  }
+}
+
+async function confirmDome() {
+  if(!domeModal||domeModal.tile_id===null) return;
+  const {pi,slot_r,slot_c,tile_id,rotation,is_start,stack_draw} = domeModal;
+  if(is_start) { startTileMove(pi, tile_id, slot_r, slot_c, rotation); return; }
+  if(stack_draw) {
+    let sr=slot_r, sc=slot_c;
+    if(sr===-1){
+      const p=S.players[pi];
+      const empty=p.dome_grid.flatMap((row,r)=>row.map((s,c)=>s?null:{r,c}).filter(Boolean));
+      if(!empty.length){showError('Keine freien Slots!');return;}
+      sr=empty[0].r; sc=empty[0].c;
+    }
+    const d = await api('/move/dome_stack', {
+      num_drawn: stack_draw.num, chosen_id: stack_draw.chosen_id,
+      slot_row: sr, slot_col: sc, rotation
+    });
+    if(!d.ok){showError(d.error);return;}
+    S=d.state; closeDomeModal(); render();
+	// Wir erzwingen den Check für die KI, egal in welcher Phase wir sind
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+  } else {
+    domeMove(tile_id, slot_r, slot_c, rotation);
+  }
+}
+
+// -- MOON ORDER MODAL ---------------------------------------------------------
+let moonModal = null; 
+
+function openMoonOrderModal(remaining, callback) {
+  if(remaining.length <= 1) { callback(remaining); return; }
+  const items = remaining.map((color, i) => ({uid: i, color}));
+  moonModal = {items, ordered: [], callback};
+  renderMoonModal();
+  document.getElementById('moon-confirm').disabled = true;
+  document.getElementById('moon-overlay').style.display = 'flex';
+}
+
+function renderMoonModal() {
+  const tilesDiv = document.getElementById('moon-tiles');
+  const stackDiv = document.getElementById('moon-stack');
+  const empty    = document.getElementById('moon-stack-empty');
+
+  tilesDiv.innerHTML = '';
+  moonModal.items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = `tile ${normColor(item.color)} click`;
+    div.style.cursor = 'pointer';
+    div.title = `${item.color} — klicken zum Stapeln`;
+    div.textContent = normColor(item.color)[0].toUpperCase();
+    div.addEventListener('click', () => addToMoonStack(item.uid));
+    tilesDiv.appendChild(div);
+  });
+
+  stackDiv.querySelectorAll('.tile').forEach(e => e.remove());
+  if(moonModal.ordered.length === 0) {
+    empty.style.display = 'inline';
+  } else {
+    empty.style.display = 'none';
+    moonModal.ordered.forEach((item, i) => {
+      const div = document.createElement('div');
+      div.className = `tile ${normColor(item.color)}`;
+      div.textContent = normColor(item.color)[0].toUpperCase();
+      const isTop = i === moonModal.ordered.length - 1;
+      div.style.outline = isTop ? '2.5px solid var(--text)' : '';
+      div.title = isTop ? 'Oben (sichtbar im Mondbereich)' : `${i+1}. von unten`;
+      stackDiv.insertBefore(div, empty);
+    });
+  }
+}
+
+function addToMoonStack(uid) {
+  const idx = moonModal.items.findIndex(item => item.uid === uid);
+  if(idx === -1) return;
+  const item = moonModal.items.splice(idx, 1)[0];
+  moonModal.ordered.push(item);
+  renderMoonModal();
+  if(moonModal.items.length === 0) {
+    document.getElementById('moon-confirm').disabled = false;
+  }
+}
+
+function confirmMoonOrder() {
+  if(!moonModal) return;
+  const cb = moonModal.callback;
+  const ordered = moonModal.ordered.map(item => item.color);
+  closeMoonModal();
+  cb(ordered);
+}
+
+function closeMoonModal() {
+  document.getElementById('moon-overlay').style.display = 'none';
+  moonModal = null;
+}
+
+// -- STACK BUY MODAL ----------------------------------------------------------
+function openStackBuyModal() {
+  const pi = S.current_player;
+  openDomeModal(pi, -1, -1);
+}
+
+// -- SCORING TILES -------------------------------------------------------------
+let allScoringTiles = [];
+let selectedScoringIds = new Set([0,1,2]);
+
+async function openScoringModal() {
+  if(S && S.players.every(p=>p.start_placed)) {
+    showError('Wertungsplatten können nach dem Legen der Startfliesen nicht mehr geändert werden.');
+    return;
+  }
+  if(!allScoringTiles.length) {
+    const d = await api('/scoring_tiles');
+    if(!d.ok) return;
+    allScoringTiles = d.tiles;
+  }
+  selectedScoringIds = new Set(S.scoring_tile_ids || [0,1,2]);
+  renderScoringGrid();
+  document.getElementById('scoring-overlay').style.display='flex';
+}
+
+function renderScoringGrid() {
+  const grid = document.getElementById('scoring-grid');
+  if(!grid) return;
+  grid.innerHTML = allScoringTiles.map(t => {
+    const sel = selectedScoringIds.has(t.id);
+    return `<div data-stid="${t.id}" onclick="toggleScoringTile(${t.id})"
+      style="border:1.5px solid ${sel?'var(--blau)':'var(--border)'};
+             background:${sel?'#EFF6FF':'var(--surface)'};
+             border-radius:8px;padding:8px;cursor:pointer;transition:all .1s">
+      <div style="font-size:16px;margin-bottom:4px">${t.emoji}</div>
+      <div style="font-size:11px;font-weight:600">${t.name}</div>
+      <div style="font-size:9px;color:var(--text2);margin-top:2px">${t.description}</div>
+    </div>`;
+  }).join('');
+  const count = selectedScoringIds.size;
+  const countEl = document.getElementById('scoring-count');
+  if(countEl) countEl.textContent = count;
+  const btn = document.getElementById('scoring-confirm');
+  if(btn) btn.disabled = count !== 3;
+}
+
+function toggleScoringTile(id) {
+  if(selectedScoringIds.has(id)) {
+    selectedScoringIds.delete(id);
+  } else if(selectedScoringIds.size < 3) {
+    selectedScoringIds.add(id);
+  }
+  renderScoringGrid();
+}
+
+async function _notifyGameEnd() {
+  try { await api('/end_game_log', {}); } catch(e) {}
+}
+
+async function confirmScoringTiles() {
+  const ids = [...selectedScoringIds];
+  const d = await api('/scoring_tiles/select', {ids});
+  if(!d.ok){showError(d.error);return;}
+  S = d.state;
+  document.getElementById('scoring-overlay').style.display='none';
+  render();
+  // KI legt ihre Startkuppelplatte automatisch
+  if (AI_ENABLED) {
+    await aiDoStartTile();
+  }
+}
+
+async function aiDoStartTile() {
+  // start_placed=true → bereits gelegt, nichts tun
+  // start_placed=false → muss noch gelegt werden
+  const aiPlayer = S.players[AI_PLAYER];
+  if (!aiPlayer || aiPlayer.start_placed === true) return;
+  await new Promise(r => setTimeout(r, 600));
+  const d = await api('/ai/start_tile');
+  if (!d.ok) { showError('KI Startkachel Fehler: ' + d.error); return; }
+  S = d.state;
+  render();
+}
+
+async function calculateEndScoring() {
+  const d = await api('/end_scoring', {});
+  if(!d.ok){showError(d.error);return;}
+  S = d.state;
+  console.log(d)
+  showEndResults(d.end_scoring);
+  render();
+}
+
+function showEndResults(results) {
+  if (!S || !S.players) return;
+  const p0 = S.players[0], p1 = S.players[1];
+  const winner = p0.score > p1.score ? p0.name
+    : p1.score > p0.score ? p1.name
+    : p0.marker ? p0.name : p1.marker ? p1.name : 'Unentschieden';
+  const tileRows = (S.scoring_tile_ids||[]).map(tid=>{
+    const t = allScoringTiles.find(t=>t.id===tid);
+    const r0 = results['0']?.[tid], r1 = results['1']?.[tid];
+    if(!t) return '';
+    const pts = (r,sign='')=> r?`<span style="font-weight:600;color:${r.score>=0?'#059669':'#DC2626'}">${r.score>=0?'+':''}${r.score}</span>`:'—';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 6px;font-size:10px">${t.emoji} ${t.name}</td>
+      <td style="padding:4px 8px;text-align:right">${pts(r0)}</td>
+      <td style="padding:4px 8px;text-align:right">${pts(r1)}</td>
+    </tr>`;
+  }).join('');
+
+  // HIER WIRD DAS MODAL MIT DER .modal KLASSE ERSTELLT
+  const html = `<div class="modal">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;text-align:center">🏆 Endwertung</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+      <thead><tr style="background:var(--bg)">
+        <th style="padding:4px 6px;text-align:left;font-size:10px;color:var(--text2)">Kriterium</th>
+        <th style="padding:4px 8px;text-align:right;font-size:10px;color:var(--text2)">${p0.name}</th>
+        <th style="padding:4px 8px;text-align:right;font-size:10px;color:var(--text2)">${p1.name}</th>
+      </tr></thead>
+      <tbody>${tileRows}</tbody>
+      <tfoot><tr style="background:var(--bg);font-weight:700">
+        <td style="padding:5px 6px;font-size:11px">Gesamt</td>
+        <td style="padding:5px 8px;text-align:right;font-size:14px">${p0.score}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:14px">${p1.score}</td>
+      </tr></tfoot>
+    </table>
+    <div style="text-align:center;font-size:18px;font-weight:700;color:var(--blau);margin:10px 0">
+      🥇 ${winner} gewinnt!
+    </div>
+    <button style="width:100%;padding:9px;background:var(--text);color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px" onclick="document.getElementById('end-overlay').style.display='none';newGame()">Neues Spiel</button>
+  </div>`;
+
+  let ov = document.getElementById('end-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.id = 'end-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = html; 
+  ov.style.display = 'block'; // block ist hier besser wegen der absoluten Positionierung
+  
+  // WICHTIG: Das Endwertungs-Fenster verschiebbar machen!
+  makeDraggable('end-overlay');
+}
+
+// -- EVENT DELEGATION ----------------------------------------------------------
+document.addEventListener('click', e=>{
+  const cg = e.target.closest('[data-src]');
+  if(cg && S?.phase==='drafting') {
+    const src=cg.dataset.src, fidRaw=cg.dataset.fid, color=cg.dataset.color;
+    const fid = (fidRaw==='null'||fidRaw==='ALL') ? null : +fidRaw;
+    let moon_order=[];
+    if(src==='SMALL_FACTORY_SUN' && fid) {
+      const f=S.factories.find(f=>f.id===fid);
+      if(f) moon_order=f.sun.filter(c=>c!==color);
+    }
+    sel={source:src, factory_id:fid, color, moon_order};
+    render(); return;
+  }
+
+  const dslot = e.target.closest('[data-dome]');
+  if(dslot) {
+    const [pi,sr,sc]=dslot.dataset.dome.split(',').map(Number);
+    openDomeModal(pi,sr,sc); return;
+  }
+
+  const ts = e.target.closest('[data-tiling]');
+  if(ts) {
+    const [pi,sr,sc,si]=ts.dataset.tiling.split(',').map(Number);
+    if(tilingPi===pi && tilingRow!==null) {
+      const expectedDomeRow = Math.floor(tilingRow/2);
+      if(sr !== expectedDomeRow) {
+        showError(`Reihe ${tilingRow+1} gehört zur Kuppelreihe ${expectedDomeRow}, nicht ${sr}`);
+        return;
+      }
+      tilingMove(pi, tilingRow, sr, sc, si);
+    }
+    return;
+  }
+
+  const rb = e.target.closest('.rotbtn');
+  if(rb && domeModal) {
+    domeModal.rotation=+rb.dataset.rot;
+    document.querySelectorAll('.rotbtn').forEach(b=>b.classList.toggle('act',b===rb));
+    buildPreview(); return;
+  }
+
+  const dgt = e.target.closest('[data-tile-id]');
+  if(dgt && domeModal) {
+    const id=+dgt.dataset.tileId;
+    domeModal.tile_id=id;
+    document.querySelectorAll('.dgtile').forEach(e=>e.classList.toggle('sel',+e.dataset.tileId===id));
+    document.getElementById('dome-confirm').disabled=false;
+    buildPreview(); return;
+  }
+});
+
+// -- RENDER --------------------------------------------------------------------
+function render() {
+  if(!S) return;
+  document.getElementById('round-lbl').textContent=`Runde ${S.round}/5`;
+  renderBoard(0);
+  renderBoard(1);
+  renderCenter();
+  
+// -- UPDATE SYNC DEBUGGER --
+  const dbgPlayer = document.getElementById('dbg-server-player');
+  if (dbgPlayer && S) {
+    dbgPlayer.innerText = `Server Player: ${S.current_player} (KI ist ${AI_PLAYER})`;
+    document.getElementById('dbg-server-phase').innerText = `Server Phase: ${S.phase}`;
+    document.getElementById('dbg-ai-enabled').innerText = `AI Enabled: ${AI_ENABLED}`;
+    
+    const isDue = aiIsDue();
+    document.getElementById('dbg-ai-due').innerText = `UI aiIsDue(): ${isDue}`;
+    // Mach es rot, wenn die KI dran ist, damit es auffällt
+    document.getElementById('dbg-ai-due').style.color = isDue ? "#ff4444" : "#0f0";
+    
+    document.getElementById('dbg-ai-thinking').innerText = `UI Loop aktiv: ${AI_THINKING}`;
+  }
+}  
+
+// -- DRAG & DROP FÜR MODALS --------------------------------------------------
+function makeDraggable(overlayId) {
+  const overlay = document.getElementById(overlayId);
+  if (!overlay) return;
+  const modal = overlay.querySelector('.modal');
+  if (!modal) return;
+  const handle = modal.querySelector('h3');
+  if (!handle) return;
+  
+  let isDown = false, startX, startY, startLeft, startTop;
+
+  handle.addEventListener('mousedown', (e) => {
+    isDown = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    
+    const rect = modal.getBoundingClientRect();
+    if (!modal.style.left || modal.style.left.includes('%')) {
+      modal.style.transform = 'none';
+      modal.style.left = rect.left + 'px';
+      modal.style.top = rect.top + 'px';
+    }
+    startLeft = parseFloat(modal.style.left);
+    startTop = parseFloat(modal.style.top);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault(); 
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    modal.style.left = (startLeft + dx) + 'px';
+    modal.style.top = (startTop + dy) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDown = false;
+  });
+}
+
+// -- START ---------------------------------------------------------------------
+makeDraggable('dome-overlay');
+makeDraggable('moon-overlay');
+makeDraggable('chip-overlay');
+makeDraggable('scoring-overlay');
+
+// Beim Laden: State synchronisieren und lokales Gedächtnis wiederherstellen
+(async () => {
+  const d = await api('/state');
+  if (d.ok && d.state && d.state.phase && d.state.phase !== 'final') {
+    S = d.state;
+    
+    // 1. Wertungsplatten (Metadaten) wieder in den Speicher laden
+    const dt = await api('/scoring_tiles');
+    if(dt.ok) {
+      allScoringTiles = dt.tiles;
+      selectedScoringIds = new Set(S.scoring_tile_ids || [0,1,2]);
+    }
+
+    // 2. KI-Status vom Server abfragen (Gedächtnis auffrischen!)
+    const aiData = await api('/ai/config');
+    if (aiData.ok && aiData.ai_enabled) {
+      AI_ENABLED = true;
+      AI_PLAYER = aiData.ai_player;
+    } else {
+      AI_ENABLED = false;
+    }
+
+    // 3. UI zeichnen
+    render();  
+    
+    // 4. Stupser für die KI: Falls sie vor dem Reload dran war, muss sie jetzt ziehen!
+	if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
+  }
+    
+  } else {
+    // Kein aktives Spiel gefunden
+    openNewGameModal();
+  }
+})();

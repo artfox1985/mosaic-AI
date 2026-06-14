@@ -171,13 +171,22 @@ let HISTORY = [];
 let IDX = -1;
 
 function renderAnalysis(d) {
-  const winPct = d.win_pct ?? 50;
+  const hasNet = d.has_net !== false;  // default true für AlphaZero
   const fill = document.getElementById('valueFill');
-  fill.style.width = winPct + '%';
-  fill.textContent = winPct + '%';
-  const hue = Math.round((winPct / 100) * 120);
-  fill.style.background = `hsl(${hue}, 65%, 55%)`;
-  document.getElementById('valueNum').textContent = (d.value >= 0 ? '+' : '') + d.value.toFixed(3);
+  if (hasNet && d.win_pct !== null && d.win_pct !== undefined) {
+    const winPct = d.win_pct;
+    fill.style.width = winPct + '%';
+    fill.textContent = winPct + '%';
+    const hue = Math.round((winPct / 100) * 120);
+    fill.style.background = `hsl(${hue}, 65%, 55%)`;
+    document.getElementById('valueNum').textContent = (d.value >= 0 ? '+' : '') + d.value.toFixed(3);
+  } else {
+    // Heuristik: kein Value-Head
+    fill.style.width = '0%';
+    fill.textContent = '';
+    fill.style.background = 'var(--border)';
+    document.getElementById('valueNum').textContent = 'kein Netz';
+  }
   document.getElementById('moveIdx').textContent = d.move_idx ?? '–';
   document.getElementById('roundNum').textContent = d.round ?? '–';
   document.getElementById('curPlayer').textContent = 'P' + (d.current_player + 1);
@@ -190,35 +199,54 @@ function renderAnalysis(d) {
     document.getElementById('movesContainer').innerHTML = '<div class="empty">Keine gültigen Züge.</div>';
     return;
   }
-  const maxNet  = Math.max(...moves.map(m => m.net_prob_norm), 0.0001);
   const maxMcts = Math.max(...moves.map(m => m.mcts_share), 0.0001);
+  const maxNet  = hasNet ? Math.max(...moves.map(m => m.net_prob_norm || 0), 0.0001) : 1;
 
+  // Spaltenkopf: Netz-Spalte nur wenn Netz vorhanden
   let html = '<table><thead><tr>' +
     '<th>Zug</th>' +
-    '<th class="num">Netz-Policy</th>' +
+    (hasNet ? '<th class="num">Netz-Policy</th>' : '') +
     '<th class="num">MCTS-Visits</th>' +
     '<th class="num">MCTS Win%</th>' +
-    '<th class="num">\u0394</th>' +
+    '<th class="num">Shaping</th>' +
+    (hasNet ? '<th class="num">Δ</th>' : '') +
     '</tr></thead><tbody>';
 
   for (const m of moves) {
-    const netW  = (m.net_prob_norm / maxNet * 100).toFixed(0);
     const mctsW = (m.mcts_share / maxMcts * 100).toFixed(0);
-    const div = m.mcts_share - m.net_prob_norm;
-    const divStr = (Math.abs(div) < 0.02) ? '' :
-      `<span class="divergence ${div>0?'div-up':'div-down'}">${div>0?'\u25b2':'\u25bc'}${Math.abs(div*100).toFixed(0)}</span>`;
     const chosen = m.chosen === true;
     const rowStyle = chosen ? ' style="background:rgba(63,185,80,0.22);font-weight:600"' : '';
     const chosenMark = chosen ? ' <span style="color:#3fb950;font-size:11px">✓ GEWÄHLT</span>' : '';
+
+    let netCell = '';
+    let divCell = '';
+    if (hasNet) {
+      const netW = ((m.net_prob_norm || 0) / maxNet * 100).toFixed(0);
+      netCell = `<td class="num bar-cell"><div class="bar bar-net" style="width:${netW}%"></div>
+          <span class="bar-label">${((m.net_prob_norm || 0)*100).toFixed(1)}%</span></td>`;
+      const div = m.mcts_share - (m.net_prob_norm || 0);
+      const divStr = (Math.abs(div) < 0.02) ? '' :
+        `<span class="divergence ${div>0?'div-up':'div-down'}">${div>0?'▲':'▼'}${Math.abs(div*100).toFixed(0)}</span>`;
+      divCell = `<td class="num">${divStr}</td>`;
+    }
+
+    // Shaping-Reward: grün positiv, rot negativ
+    let shapingCell = '<td class="num">–</td>';
+    if (m.shaping !== null && m.shaping !== undefined) {
+      const sv = m.shaping;
+      const col = sv > 0.05 ? '#3fb950' : (sv < -0.05 ? '#f85149' : 'var(--muted)');
+      shapingCell = `<td class="num" style="color:${col}">${sv >= 0 ? '+' : ''}${sv.toFixed(2)}</td>`;
+    }
+
     html += `<tr${rowStyle}>
       <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
           <span class="pill">${m.action_id}</span></td>
-      <td class="num bar-cell"><div class="bar bar-net" style="width:${netW}%"></div>
-          <span class="bar-label">${(m.net_prob_norm*100).toFixed(1)}%</span></td>
+      ${netCell}
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
-      <td class="num">${m.mcts_win_pct !== null ? m.mcts_win_pct + '%' : '\u2013'}</td>
-      <td class="num">${divStr}</td>
+      <td class="num">${m.mcts_win_pct !== null ? m.mcts_win_pct + '%' : '–'}</td>
+      ${shapingCell}
+      ${divCell}
     </tr>`;
   }
   html += '</tbody></table>';
