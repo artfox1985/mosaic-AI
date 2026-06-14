@@ -374,9 +374,12 @@ class Game:
         if tile is None:
             raise ValueError(f"Kachel {tile_id} nicht im Display.")
 
+        idx = self.state.dome_display.index(tile)
         self.state.dome_display.remove(tile)
         if self.state.dome_tile_pool:
-            self.state.dome_display.append(self.state.dome_tile_pool.pop(0))
+            # Nachgezogene Karte an die Position der gewählten setzen (nicht ans
+            # Ende), damit die verbleibenden Karten ihre Position behalten.
+            self.state.dome_display.insert(idx, self.state.dome_tile_pool.pop(0))
         tile = copy.deepcopy(tile)
         tile.apply_rotation(rot)
         player.dome_grid.place_dome_tile(tile, row, col)

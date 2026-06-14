@@ -179,6 +179,10 @@ async function startTileMove(player, tile_id, slot_row, slot_col, rotation) {
   const d = await api('/move/start_tile', {player, tile_id, slot_row, slot_col, rotation});
   if(!d.ok){showError(d.error);return;}
   S=d.state; closeDomeModal(); render();
+  // Nachdem der Mensch gelegt hat: ist jetzt die KI mit ihrer Startkuppel dran?
+  if (AI_ENABLED) {
+    await aiDoStartTile();
+  }
 }
 
 async function bonusChipMove(factory_id) {
@@ -1368,9 +1372,20 @@ async function confirmScoringTiles() {
 
 async function aiDoStartTile() {
   // start_placed=true → bereits gelegt, nichts tun
-  // start_placed=false → muss noch gelegt werden
   const aiPlayer = S.players[AI_PLAYER];
   if (!aiPlayer || aiPlayer.start_placed === true) return;
+
+  // Reihenfolge: Nicht-Startspieler legt ZUERST. Wenn die KI Startspieler ist,
+  // muss erst der Mensch (Nicht-Startspieler) legen. Sonst lehnt die Engine ab
+  // ("Nicht-Startspieler muss zuerst...") und es entsteht ein Deadlock.
+  const starter = S.current_player;          // Startspieler dieser Runde
+  const human = 1 - AI_PLAYER;
+  const aiIsStarter = (AI_PLAYER === starter);
+  if (aiIsStarter && S.players[human].start_placed !== true) {
+    // KI ist Startspieler, Mensch hat noch nicht gelegt → KI wartet
+    return;
+  }
+
   await new Promise(r => setTimeout(r, 600));
   const d = await api('/ai/start_tile');
   if (!d.ok) { showError('KI Startkachel Fehler: ' + d.error); return; }
