@@ -283,7 +283,7 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
 # Datengenerierung
 # ---------------------------------------------------------------------------
 
-def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40):
+def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40, dynamic_sims: bool = True):
     """
     Generiert Self-Play Trainingsdaten.
 
@@ -291,20 +291,24 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     num_games:    Anzahl zu spielender Partien
     simulations:  MCTS-Simulationen pro Zug
     version_name: Versionsname für Dateinamen und Modell-Laden
+    dynamic_sims: True = Sims an Aktionszahl koppeln (schnell), False = feste Sim-Zahl
     """
+    ds_mode = "selfplay" if dynamic_sims else None
     if mode == "mcts":
-        print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations})")
+        print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations}"
+              f"{' | dynamisch' if dynamic_sims else ' | FIX'})")
         agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth,
-                                  dynamic_sims="selfplay")
+                                  dynamic_sims=ds_mode)
     elif mode == "network":
         model_file = MODELS_DIR / f"alphazero_{version_name}.pth"
         if not model_file.exists():
             print(f"❌ Modell nicht gefunden: {model_file}")
             return
         print(f"🚀 Starte Network Self-Play: {num_games} Spiele "
-              f"(Sims: {simulations} | Model: {model_file.name})")
+              f"(Sims: {simulations} | Model: {model_file.name}"
+              f"{' | dynamisch' if dynamic_sims else ' | FIX'})")
         agent = NetworkSelfPlayAgent(model_version=version_name, simulations=simulations,
-                                     dynamic_sims="selfplay")
+                                     dynamic_sims=ds_mode)
     else:
         print(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
         return
@@ -351,6 +355,9 @@ if __name__ == "__main__":
                         help="Anzahl Spiele")
     parser.add_argument("--sims",    type=int, default=50,
                         help="MCTS-Simulationen pro Zug (Obergrenze bei dynamischer Anpassung)")
+    parser.add_argument("--no_dynamic_sims", action="store_true",
+                        help="Dynamische Sim-Anpassung abschalten — feste Sim-Zahl pro Zug "
+                             "(mehr Suchtiefe, langsamer; sinnvoll für Bootstrap-Daten)")
     parser.add_argument("--version", type=str, required=True,
                         help="Versionsname, z.B. v0 oder v1")
     parser.add_argument("--tag",      type=str, default=None,
@@ -422,4 +429,5 @@ if __name__ == "__main__":
         rollout_depth=rollout_depth,
         margin_cap=args.margin_cap,
         max_winner_score=args.max_winner_score,
+        dynamic_sims=not args.no_dynamic_sims,
     )

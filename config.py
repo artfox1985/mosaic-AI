@@ -16,7 +16,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 543        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel)
+INPUT_SIZE = 553        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel + 10 Chip-Abschließbarkeit)
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---

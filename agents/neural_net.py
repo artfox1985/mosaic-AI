@@ -95,6 +95,21 @@ def state_to_tensor(data):
                     if 0 <= c_id < 5:
                         chip_color_counts[c_id] += 1.0
             features.extend([c / 4.0 for c in chip_color_counts])  # max 2 chips × 2 farben = 4
+
+            # Chip-Abschließbarkeit pro Musterreihe (Reihen 2-6 = Indizes 1-5).
+            # Reihe 1 (Index 0) ausgenommen: sie hat nur 1 Feld, Chip-Mehrfeld-
+            # Logik irrelevant. Ein Flag je Reihe, ob sie sich per Bonuschips
+            # abschließen lässt (2 gleiche ODER 3 beliebige je fehlendem Feld;
+            # deckt auch Mehrfeld-Füllung ab). Quelle: chippable_tiling_rows,
+            # bereits in der Engine via can_complete_row_with_chips berechnet.
+            pi_real = curr_pi if p is me else enemy_pi
+            chippable_rows = {
+                entry.get("ri")
+                for entry in data.get("chippable_tiling_rows", [])
+                if entry.get("pi") == pi_real
+            }
+            for ri in range(1, 6):   # Reihen-Index 1..5 (Reihe 2..6)
+                features.append(1.0 if ri in chippable_rows else 0.0)
             
         # 6. Kuppelzustand (pro Spieler: 9 Slots × 9 Features = 81 Features × 2 = 162)
         COLOR_ID_MAP = {"blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5}
