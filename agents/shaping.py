@@ -1,5 +1,3 @@
-# agents/shaping.py
-
 def get_player_potential(player) -> float:
     """
     Berechnet den heuristischen 'Wert' eines Spieler-Boards.
