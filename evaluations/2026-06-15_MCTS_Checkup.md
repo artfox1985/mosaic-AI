@@ -1,5 +1,5 @@
 date: 15.06.2026  
-status: VALID 🟢  <!-- oder OUTDATED 🔴 -->  
+status: OUTDATED 🔴  <!-- oder VALID 🟢 -->  
 git_commit: d72762b 
 
 ## Goal
