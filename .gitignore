@@ -6,6 +6,7 @@
 # Ignoriere Trainingsdaten und trainierte Modelle (zu groß für Git)
 /data/
 /models/
+/static/log
 *.pkl
 *.pth
 *.pt

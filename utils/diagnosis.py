@@ -279,6 +279,51 @@ def pick_file() -> str | None:
         return None
 
 
+def pick_files() -> list[str]:
+    """Öffnet einen Datei-Dialog mit MEHRFACH-Auswahl (Strg/Shift im Dialog).
+    Gibt eine Liste der gewählten Pfade zurück (leer wenn abgebrochen)."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        paths = filedialog.askopenfilenames(
+            title="Trainingsdatei(en) auswählen — mehrere mit Strg/Shift",
+            initialdir=str(DATA_DIR),
+            filetypes=[("Pickle files", "*.pkl"), ("Alle Dateien", "*.*")]
+        )
+        root.destroy()
+        return list(paths) if paths else []
+    except Exception as e:
+        print(f"  ⚠️  Datei-Dialog nicht verfügbar: {e}")
+        return []
+
+
+def _run_on_selected_files(runner, max_files: int | None = None):
+    """Hilfsfunktion: lässt mehrere Dateien wählen, kopiert sie in ein
+    Temp-Verzeichnis und führt die übergebene Analyse-Funktion darauf aus."""
+    import tempfile, shutil
+    print("  Öffne Datei-Dialog (Mehrfach-Auswahl mit Strg/Shift)...")
+    paths = pick_files()
+    if not paths:
+        print("  ❌ Keine Datei ausgewählt.")
+        return
+    # Label: bei einer Datei der Name, sonst Anzahl
+    if len(paths) == 1:
+        label = Path(paths[0]).name
+    else:
+        label = f"{len(paths)} Dateien"
+    print(f"  ✓ {len(paths)} Datei(en) gewählt.")
+    with tempfile.TemporaryDirectory() as tmp:
+        for p in paths:
+            shutil.copy(p, tmp)
+        if max_files is not None:
+            runner(tmp, label, max_files=max_files)
+        else:
+            runner(tmp, label)
+
+
 def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     """
     Berechnet optimale margin_cap und max_winner_score aus den Spielergebnissen.
@@ -381,11 +426,11 @@ def main():
     print("\n📋 DIAGNOSIS — Trainingsdaten Analyse")
     print("─" * 55)
     print("  [1] Sanity Check  — alle Daten im data/ Ordner")
-    print("  [2] Sanity Check  — einzelne Datei auswählen")
+    print("  [2] Sanity Check  — Datei(en) auswählen (mehrere möglich)")
     print("  [3] Policy Qualität — alle Daten im data/ Ordner")
-    print("  [4] Policy Qualität — einzelne Datei auswählen")
+    print("  [4] Policy Qualität — Datei(en) auswählen (mehrere möglich)")
     print("  [5] Value Simulation — alle Daten im data/ Ordner")
-    print("  [6] Value Simulation — einzelne Datei auswählen")
+    print("  [6] Value Simulation — Datei(en) auswählen (mehrere möglich)")
     print("─" * 55)
 
     choice = input("  Auswahl (1/2/3/4/5/6): ").strip()
@@ -394,43 +439,19 @@ def main():
         run_diagnosis(str(DATA_DIR), "data/")
 
     elif choice == "2":
-        print("  Öffne Datei-Dialog...")
-        path = pick_file()
-        if path:
-            import tempfile, shutil
-            with tempfile.TemporaryDirectory() as tmp:
-                shutil.copy(path, tmp)
-                run_diagnosis(tmp, Path(path).name)
-        else:
-            print("  ❌ Keine Datei ausgewählt.")
+        _run_on_selected_files(run_diagnosis)
 
     elif choice == "3":
         run_policy_quality(str(DATA_DIR), "data/")
 
     elif choice == "4":
-        print("  Öffne Datei-Dialog...")
-        path = pick_file()
-        if path:
-            import tempfile, shutil
-            with tempfile.TemporaryDirectory() as tmp:
-                shutil.copy(path, tmp)
-                run_policy_quality(tmp, Path(path).name, max_files=999)
-        else:
-            print("  ❌ Keine Datei ausgewählt.")
+        _run_on_selected_files(run_policy_quality, max_files=999)
 
     elif choice == "5":
         run_value_simulation(str(DATA_DIR), "data/")
 
     elif choice == "6":
-        print("  Öffne Datei-Dialog...")
-        path = pick_file()
-        if path:
-            import tempfile, shutil
-            with tempfile.TemporaryDirectory() as tmp:
-                shutil.copy(path, tmp)
-                run_value_simulation(tmp, Path(path).name, max_files=999)
-        else:
-            print("  ❌ Keine Datei ausgewählt.")
+        _run_on_selected_files(run_value_simulation, max_files=999)
 
     else:
         print("  ❌ Ungültige Auswahl.")
