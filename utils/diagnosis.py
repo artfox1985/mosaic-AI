@@ -300,6 +300,92 @@ def pick_files() -> list[str]:
         return []
 
 
+def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
+    """
+    Prüft ob die MCTS-Policy Strafleisten-Züge (r_id=0) nur ANBIETET oder
+    tatsächlich BEVORZUGT. Unterscheidet 'harmlos erzwungen' (am Rundenende
+    bleiben unpassende Steine übrig) von 'problematischer Fehlpräferenz'
+    (Strafleiste trotz verfügbarer Reihen-Alternative gewählt).
+
+    Strafleisten-Stone-IDs vom Mond (f_idx=5, alle 5 Farben): 15, 63, 111, 159, 207
+    """
+    from agents.neural_net import action_to_id
+
+    PENALTY_MOON_IDS = {15, 63, 111, 159, 207}
+
+    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    if not files:
+        print(f"  ❌ Keine .pkl-Dateien in: {data_dir}")
+        return
+    if len(files) > max_files:
+        files = random.sample(files, max_files)
+
+    print(f"\n{'='*55}")
+    print(f"  STRAFLEISTEN-BIAS: {label}")
+    print(f"  (Analyse von {len(files)} Datei(en))")
+    print(f"{'='*55}")
+
+    n_steps = 0
+    penalty_offered = 0       # Strafleisten-Zug war in der Policy
+    penalty_prob_sum = 0.0    # Summe seiner Wahrscheinlichkeiten
+    penalty_chosen = 0        # Strafleiste hatte HÖCHSTE prob
+    penalty_when_alt = 0      # Strafleiste TOP obwohl Reihen-Zug verfügbar
+
+    for f in files:
+        with open(f, 'rb') as fh:
+            data = pickle.load(fh)
+        for step in data:
+            policy = step.get('policy', [])
+            if not policy:
+                continue
+            n_steps += 1
+
+            best_prob = -1.0
+            best_is_penalty = False
+            has_row_alt = False
+            for entry in policy:
+                a = entry.get('action', {})
+                p = entry.get('prob', 0.0)
+                try:
+                    aid = action_to_id(a)
+                except Exception:
+                    aid = None
+                is_penalty = aid in PENALTY_MOON_IDS
+                if is_penalty:
+                    penalty_offered += 1
+                    penalty_prob_sum += p
+                elif a.get('type') == 'stone' and a.get('pattern_row') not in (None, -1):
+                    has_row_alt = True
+                if p > best_prob:
+                    best_prob = p
+                    best_is_penalty = is_penalty
+            if best_is_penalty:
+                penalty_chosen += 1
+                if has_row_alt:
+                    penalty_when_alt += 1
+
+    print(f"{'─'*55}")
+    print(f"  Schritte analysiert:             {n_steps:,}")
+    print(f"  Strafleisten-Zug angeboten:      {penalty_offered:,}")
+    if penalty_offered:
+        avg_p = penalty_prob_sum / penalty_offered
+        print(f"  Ø Prob wenn angeboten:           {avg_p:.3f}")
+    else:
+        avg_p = 0.0
+    pct_chosen = 100 * penalty_chosen / max(n_steps, 1)
+    print(f"  Strafleiste war TOP-Wahl:        {penalty_chosen:,} ({pct_chosen:.1f}%)")
+    print(f"    davon mit Reihen-Alternative:  {penalty_when_alt:,}")
+    print(f"{'─'*55}")
+    if penalty_offered and avg_p < 0.15:
+        print("  → ✅ HARMLOS: angeboten, aber kaum bevorzugt (niedrige Prob)")
+    elif penalty_chosen and penalty_when_alt > penalty_chosen * 0.5:
+        print("  → ⚠️ VERDÄCHTIG: Strafleiste oft TROTZ Reihen-Alternative gewählt")
+        print("     (möglicher Rest eines Bewertungs-/Perspektiv-Problems)")
+    else:
+        print("  → 🟡 Strafleiste meist nur wenn keine Alternative (erzwungen, ok)")
+    print(f"{'='*55}")
+
+
 def _run_on_selected_files(runner, max_files: int | None = None):
     """Hilfsfunktion: lässt mehrere Dateien wählen, kopiert sie in ein
     Temp-Verzeichnis und führt die übergebene Analyse-Funktion darauf aus."""
@@ -421,6 +507,10 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
 
     print(f"\n{'='*55}")
 
+    # Strafleisten-Bias direkt mit ausgeben (gehört thematisch zur Ergebnis-/
+    # Entscheidungs-Analyse, daher kein eigener Menüpunkt mehr).
+    run_penalty_bias(data_dir, label, max_files=max_files)
+
 
 def main():
     print("\n📋 DIAGNOSIS — Trainingsdaten Analyse")
@@ -429,8 +519,8 @@ def main():
     print("  [2] Sanity Check  — Datei(en) auswählen (mehrere möglich)")
     print("  [3] Policy Qualität — alle Daten im data/ Ordner")
     print("  [4] Policy Qualität — Datei(en) auswählen (mehrere möglich)")
-    print("  [5] Value Simulation — alle Daten im data/ Ordner")
-    print("  [6] Value Simulation — Datei(en) auswählen (mehrere möglich)")
+    print("  [5] Value Simulation + Strafleisten-Bias — alle Daten")
+    print("  [6] Value Simulation + Strafleisten-Bias — Datei(en) auswählen")
     print("─" * 55)
 
     choice = input("  Auswahl (1/2/3/4/5/6): ").strip()

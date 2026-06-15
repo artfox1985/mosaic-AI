@@ -1,0 +1,1 @@
+cmd /c "set PYTHONIOENCODING=utf-8 && set ARENA_DEBUG=1 && python arena.py > arena_debug.log 2>&1"

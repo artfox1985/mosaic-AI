@@ -26,6 +26,11 @@ from agents.agent_env import MosaicEnv
 from agents.agents import BaseAgent, RandomAgent
 from agents.shaping import get_player_potential
 
+# Watchdog-Timeout für choose(): Hartes Sekunden-Limit pro Zug. Eine normale
+# MCTS-Suche braucht <1s; selbst 200 Sims sind in ~0.2s fertig. 30s ist also
+# eine sehr großzügige Obergrenze die nur bei einem echten Hänger greift.
+_CHOOSE_WATCHDOG_S = 30
+
 def _diff_to_probs(diff: float) -> dict[int, float]:
     """Normalisiert eine Punktedifferenz auf Win-Wahrscheinlichkeiten via Sigmoid."""
     scale = 10.0
@@ -173,6 +178,14 @@ class MCTSAgent(BaseAgent):
         Wählt die beste Aktion via MCTS.
         Benötigt die MosaicEnv-Instanz — wird über obs['_env'] übergeben
         oder muss via set_env() gesetzt werden.
+
+        Signal-Watchdog: Falls die MCTS-Suche aus irgendeinem Grund hängt
+        (seltener, zustandsabhängiger Bug der sich über viele Spiele aufbaut),
+        unterbricht ein SIGALRM nach _CHOOSE_WATCHDOG_S Sekunden HART — egal
+        in welcher inneren Phase (clone/select/expand/rollout/backprop) es
+        klemmt. Dann wird eine zufällige gültige Aktion zurückgegeben, damit
+        das Spiel weiterläuft statt ein ganzes Turnier zu blockieren.
+        Nur im Hauptthread aktiv (signal.alarm-Beschränkung).
         """
         if len(actions) == 1:
             return actions[0]
@@ -181,6 +194,33 @@ class MCTSAgent(BaseAgent):
         if env is None:
             # Fallback: zufällig wenn keine Umgebung verfügbar
             return random.choice(actions)
+
+        # Watchdog nur wenn im Hauptthread (signal.alarm sonst nicht erlaubt)
+        import signal as _signal
+        import threading as _threading
+        _use_watchdog = _threading.current_thread() is _threading.main_thread()
+
+        if _use_watchdog:
+            class _ChooseTimeout(Exception):
+                pass
+
+            def _handler(signum, frame):
+                raise _ChooseTimeout()
+
+            _old = _signal.signal(_signal.SIGALRM, _handler)
+            _signal.alarm(_CHOOSE_WATCHDOG_S)
+            try:
+                result = self._mcts_search(env, actions)
+            except _ChooseTimeout:
+                print(f"⚠️ [MCTS] Watchdog: choose() nach {_CHOOSE_WATCHDOG_S}s "
+                      f"abgebrochen ({len(actions)} Aktionen, phase={env.state.phase}) "
+                      f"— zufällige Aktion gewählt. Bitte melden falls dies auftritt.",
+                      flush=True)
+                result = random.choice(actions)
+            finally:
+                _signal.alarm(0)
+                _signal.signal(_signal.SIGALRM, _old)
+            return result
 
         return self._mcts_search(env, actions)
 
@@ -206,6 +246,18 @@ class MCTSAgent(BaseAgent):
         # Dynamische Sim-Zahl je nach Aktionsanzahl (falls aktiviert)
         sim_target = self._compute_dynamic_sims(len(actions))
 
+        import os as _os
+        _mcts_dbg = _os.environ.get("ARENA_DEBUG", "") not in ("", "0")
+        # Hartes Sicherheitslimit gegen Hänger: selbst wenn eine innere Phase
+        # nie terminiert oder sim_target absurd ist, bricht die Suche nach dem
+        # 100-fachen des Sim-Ziels (mind. 100k) ab. Greift IMMER (nicht nur im
+        # Debug-Modus), damit ein einzelnes Spiel nie ein ganzes Turnier blockiert.
+        _hard_cap = max(100_000, (sim_target or 0) * 100)
+        # Absolute Zeit-Notbremse: Selbst wenn eine EINZELNE Simulation hängt
+        # (dann zählt sims_done nicht hoch und _hard_cap greift nie), bricht
+        # die Suche nach 60s ab. Garantiert dass kein Spiel je ewig hängt.
+        _wall_limit = 60.0
+
         while True:
             # Abbruchbedingung
             if self.time_limit_s is not None:
@@ -214,6 +266,23 @@ class MCTSAgent(BaseAgent):
             else:
                 if sims_done >= sim_target:
                     break
+
+            # Zeit-Notbremse (greift immer, schützt vor hängender Einzelsim)
+            if time.time() - t_start >= _wall_limit:
+                print(f"⚠️ [MCTS] Zeit-Notbremse nach {_wall_limit}s! "
+                      f"sims_done={sims_done}/{sim_target}, actions={len(actions)}, "
+                      f"phase={env.state.phase} — breche Suche ab. "
+                      f"Bitte melden falls dies auftritt.", flush=True)
+                break
+
+            if sims_done >= _hard_cap:
+                # Sollte nie passieren — wenn doch, liegt ein Bug in einer
+                # inneren Phase vor. Warnen (immer) und sauber abbrechen.
+                print(f"⚠️ [MCTS] HARD CAP {_hard_cap} erreicht nach {time.time()-t_start:.1f}s! "
+                      f"sim_target={sim_target}, actions={len(actions)}, "
+                      f"phase={env.state.phase} — breche Suche ab (Hänger-Schutz). "
+                      f"Bitte melden falls dies auftritt.", flush=True)
+                break
 
             # Eine Simulation
             sim_env = env.clone()
@@ -442,18 +511,34 @@ def run_episode_mcts(
     done = False
     action_counts = []   # Anzahl valider Züge pro Step
 
+    # Debug-Logging per Umgebungsvariable ARENA_DEBUG=1 aktivierbar.
+    # Loggt vor jedem kritischen Aufruf mit Flush, sodass bei einem Hänger
+    # die letzte sichtbare Zeile zeigt WO es steckenbleibt.
+    import os
+    _dbg = os.environ.get("ARENA_DEBUG", "") not in ("", "0")
+    def _d(msg):
+        if _dbg:
+            print(f"    [DBG s={steps:3d} t={time.time()-t0:6.1f}s] {msg}", flush=True)
+
     while steps < max_steps and not done:
+        _d(f"phase={env.state.phase} → valid_actions()")
         actions = env.valid_actions()
         if not actions:
+            _d("keine Aktionen → break")
             break
 
         action_counts.append(len(actions))
 
         pi = env.current_player()
         agent = agents[pi]
+        _d(f"P{pi} {type(agent).__name__} choose() aus {len(actions)} Aktionen "
+           f"(sims={getattr(agent,'simulations','?')}, depth={getattr(agent,'rollout_depth','?')})")
 
         action = agent.choose(actions, obs)
+        _d(f"P{pi} gewählt: {action.get('type')} → step()")
         obs, reward, done, step_info = env.step(action)
+        if step_info.get("error"):
+            _d(f"⚠️ step error: {step_info['error']}")
         total_rewards[pi] += reward
         steps += 1
 
