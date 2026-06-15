@@ -29,6 +29,7 @@ from agents.shaping import get_player_potential
 # Watchdog-Timeout für choose(): Hartes Sekunden-Limit pro Zug. Eine normale
 # MCTS-Suche braucht <1s; selbst 200 Sims sind in ~0.2s fertig. 30s ist also
 # eine sehr großzügige Obergrenze die nur bei einem echten Hänger greift.
+# Plattformübergreifend via Thread-Watchdog (Windows hat kein signal.alarm).
 _CHOOSE_WATCHDOG_S = 30
 
 def _diff_to_probs(diff: float) -> dict[int, float]:
@@ -179,13 +180,15 @@ class MCTSAgent(BaseAgent):
         Benötigt die MosaicEnv-Instanz — wird über obs['_env'] übergeben
         oder muss via set_env() gesetzt werden.
 
-        Signal-Watchdog: Falls die MCTS-Suche aus irgendeinem Grund hängt
+        Thread-Watchdog: Falls die MCTS-Suche aus irgendeinem Grund hängt
         (seltener, zustandsabhängiger Bug der sich über viele Spiele aufbaut),
-        unterbricht ein SIGALRM nach _CHOOSE_WATCHDOG_S Sekunden HART — egal
-        in welcher inneren Phase (clone/select/expand/rollout/backprop) es
-        klemmt. Dann wird eine zufällige gültige Aktion zurückgegeben, damit
-        das Spiel weiterläuft statt ein ganzes Turnier zu blockieren.
-        Nur im Hauptthread aktiv (signal.alarm-Beschränkung).
+        läuft sie in einem Worker-Thread. Kommt nach _CHOOSE_WATCHDOG_S
+        Sekunden kein Ergebnis, wird der Thread verworfen (läuft als Daemon
+        im Hintergrund aus) und eine zufällige gültige Aktion zurückgegeben,
+        damit das Spiel weiterläuft statt ein ganzes Turnier zu blockieren.
+
+        Plattformübergreifend (Windows + Linux) — nutzt threading statt
+        signal.alarm, das es unter Windows nicht gibt (kein SIGALRM).
         """
         if len(actions) == 1:
             return actions[0]
@@ -195,34 +198,31 @@ class MCTSAgent(BaseAgent):
             # Fallback: zufällig wenn keine Umgebung verfügbar
             return random.choice(actions)
 
-        # Watchdog nur wenn im Hauptthread (signal.alarm sonst nicht erlaubt)
-        import signal as _signal
         import threading as _threading
-        _use_watchdog = _threading.current_thread() is _threading.main_thread()
 
-        if _use_watchdog:
-            class _ChooseTimeout(Exception):
-                pass
+        result_box = {}
 
-            def _handler(signum, frame):
-                raise _ChooseTimeout()
-
-            _old = _signal.signal(_signal.SIGALRM, _handler)
-            _signal.alarm(_CHOOSE_WATCHDOG_S)
+        def _worker():
             try:
-                result = self._mcts_search(env, actions)
-            except _ChooseTimeout:
-                print(f"⚠️ [MCTS] Watchdog: choose() nach {_CHOOSE_WATCHDOG_S}s "
-                      f"abgebrochen ({len(actions)} Aktionen, phase={env.state.phase}) "
-                      f"— zufällige Aktion gewählt. Bitte melden falls dies auftritt.",
-                      flush=True)
-                result = random.choice(actions)
-            finally:
-                _signal.alarm(0)
-                _signal.signal(_signal.SIGALRM, _old)
-            return result
+                result_box["action"] = self._mcts_search(env, actions)
+            except Exception as e:
+                result_box["error"] = e
 
-        return self._mcts_search(env, actions)
+        t = _threading.Thread(target=_worker, daemon=True)
+        t.start()
+        t.join(_CHOOSE_WATCHDOG_S)
+
+        if t.is_alive():
+            # Watchdog: Suche hängt. Thread läuft als Daemon aus, wir machen weiter.
+            print(f"⚠️ [MCTS] Watchdog: choose() nach {_CHOOSE_WATCHDOG_S}s nicht "
+                  f"fertig ({len(actions)} Aktionen, phase={env.state.phase}) "
+                  f"— zufällige Aktion gewählt. Bitte melden falls dies auftritt.",
+                  flush=True)
+            return random.choice(actions)
+
+        if "error" in result_box:
+            raise result_box["error"]
+        return result_box.get("action", random.choice(actions))
 
     def set_env(self, env: MosaicEnv) -> None:
         """Setzt die aktuelle Spielumgebung für den Agenten."""
