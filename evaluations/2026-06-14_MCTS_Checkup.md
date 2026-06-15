@@ -1,9 +1,9 @@
 date: 14.06.2026  
-status: VALID 🟢  <!-- oder OUTDATED 🔴 -->  
+status: OUTDATED 🔴  <!-- oder VALID 🟢 -->  
 git_commit: baf8e3d 
 
 ## Goal
-Check which combination of MCTS parameters are a good pick for AlphaZero Bootstrap 
+Check which combination of MCTS parameters are a good pick for AlphaZero Bootstrap. Section E was active in the shaping Block.
 
 ## 50 Sims
 ### Rollout Depth = 0, dynamic sims
