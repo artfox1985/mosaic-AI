@@ -40,6 +40,8 @@ def run_arena(agents_dict, games_per_matchup=10):
     wins["ZeroZero"] = 0
     all_avg_actions = []
     all_max_actions = []
+    penalties = {name: 0 for name in names}
+    games_played = {name: 0 for name in names}
     
     if games_per_matchup == 1:
         log = True
@@ -77,6 +79,14 @@ def run_arena(agents_dict, games_per_matchup=10):
             # Auswertung
             scores = result["scores"]
             winner_idx = result["winner"]
+            
+            # Strafpunkte auslesen
+            final_state = result.get("state")
+            if final_state:
+                penalties[p0] += final_state.players[0].total_floor_penalties
+                penalties[p1] += final_state.players[1].total_floor_penalties
+            games_played[p0] += 1
+            games_played[p1] += 1
             
             if winner_idx == 0:
                 winner_name = p0
@@ -122,6 +132,14 @@ def run_arena(agents_dict, games_per_matchup=10):
     for name in names:
         print(f"Siege {name}: {wins[name]}")
     print(f"0:0 Spiele:    {zerozero} / {total} ({pct:.1f}%)")
+    # durchschnittliche Strafpunkte
+    print("\n📉 DURCHSCHNITTLICHE STRAFPUNKTE (BODEN):")
+    for name in names:
+        if games_played[name] > 0:
+            # Gesamte Strafpunkte / Anzahl der Spiele / 5 Runden = Schnitt pro Runde
+            avg_pen_per_round = (penalties[name] / games_played[name]) / 5
+            print(f" - {name:17s}: Ø {avg_pen_per_round:.2f} Pkt pro Runde")
+    
     # Ø Strength über alle Spiele
     if all_avg_actions:  # Liste existiert noch (Kompatibilität)
         pass
@@ -141,22 +159,24 @@ if __name__ == "__main__":
     
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
-    agent_mcts_heuristic1 = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
-    agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=50, rollout_depth=1)
-    agent_mcts_heuristic3 = HeuristicMCTSAgent(simulations=100, rollout_depth=0)
-    agent_mcts_heuristic4 = HeuristicMCTSAgent(simulations=100, rollout_depth=1)
-    agent_mcts_heuristic5 = HeuristicMCTSAgent(simulations=200, rollout_depth=0)
-    agent_mcts_heuristic6 = HeuristicMCTSAgent(simulations=200, rollout_depth=1)
-    # agent_alphazero1a = AlphaZeroAgent(
-        # model_version="v1a",
-        # input_size=INPUT_SIZE, 
-        # simulations=40
-        # )
+    agent_mcts_heuristic1 = HeuristicMCTSAgent(simulations=50, rollout_depth=0, dynamic_sims="play")
+    #agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=50, rollout_depth=1)
+    #agent_mcts_heuristic3 = HeuristicMCTSAgent(simulations=100, rollout_depth=0)
+    #agent_mcts_heuristic4 = HeuristicMCTSAgent(simulations=100, rollout_depth=1)
+    #agent_mcts_heuristic5 = HeuristicMCTSAgent(simulations=200, rollout_depth=0)
+    #agent_mcts_heuristic6 = HeuristicMCTSAgent(simulations=200, rollout_depth=1)
+    agent_alphazero2 = AlphaZeroAgent(
+       model_version="v1c",
+       input_size=INPUT_SIZE, 
+       simulations=50,
+       dynamic_sims="play"
+       )
         
-    # agent_alphazero2a = AlphaZeroAgent(
-        # model_version="v2a",
+    # agent_alphazero1 = AlphaZeroAgent(
+        # model_version="v1_noe_vw05",
         # input_size=INPUT_SIZE, 
-        # simulations=40
+        # simulations=100,
+        # dynamic_sims="play"
         # )
         
     # agent_alphazero3d = AlphaZeroAgent(
@@ -180,15 +200,20 @@ if __name__ == "__main__":
     #    "AlphaZero_V1": (agent_alphazero, 1000)
     #}
 
+    # competitors = {
+        # "MCTS 50-0": (agent_mcts_heuristic1, 1000),
+        # "MCTS 50-1": (agent_mcts_heuristic2, 1000),
+        # "MCTS 100-0": (agent_mcts_heuristic3, 1000),
+        # "MCTS 100-1": (agent_mcts_heuristic4, 1000),
+        # "MCTS 200-0": (agent_mcts_heuristic5, 1000),
+        # "MCTS 200-1": (agent_mcts_heuristic6, 1000),
+    # }
+    
     competitors = {
-        "MCTS 50-0": (agent_mcts_heuristic1, 1000),
-        "MCTS 50-1": (agent_mcts_heuristic2, 1000),
-        "MCTS 100-0": (agent_mcts_heuristic3, 1000),
-        "MCTS 100-1": (agent_mcts_heuristic4, 1000),
-        "MCTS 200-0": (agent_mcts_heuristic5, 1000),
-        "MCTS 200-1": (agent_mcts_heuristic6, 1000),
+       "AlphaZero v1c s50": (agent_alphazero2, 1000),
+       "MCTS s50-d0": (agent_mcts_heuristic1, 1000),
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=100)
+    run_arena(competitors, games_per_matchup=2)

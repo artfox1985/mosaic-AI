@@ -587,6 +587,7 @@ def run_episode_mcts(
         "duration_s":       round(time.time() - t0, 3),
         "avg_actions":      avg_actions,
         "max_actions":      max_actions,
+        "state":            env.state
     }
     
     return result
