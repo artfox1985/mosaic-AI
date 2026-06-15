@@ -401,6 +401,9 @@ if __name__ == "__main__":
                 "--margin_cap", str(args.margin_cap),
                 "--max_winner_score", str(args.max_winner_score),
             ]
+            
+            if args.no_dynamic_sims:
+                cmd.append("--no_dynamic_sims")
             if args.depth is not None:
                 cmd += ["--depth", str(args.depth)]
             # Eigenes Konsolenfenster pro Prozess

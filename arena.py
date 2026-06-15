@@ -6,6 +6,8 @@ from agents.agent_env import MosaicEnv
 import itertools
 from config import INPUT_SIZE, MARGIN_CAP, MAX_WINNER_SCORE
 from agents.neural_net import compute_win_val
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Falls du den HeuristicMCTSAgent in einer anderen Datei gespeichert hast, importiere ihn entsprechend.
 # from deine_datei import HeuristicMCTSAgent
@@ -58,14 +60,10 @@ def run_arena(agents_dict, games_per_matchup=10):
             else:
                 p0, p1 = name_B, name_A
                 
-            env = MosaicEnv()
             agent_list = [agent_instances[p0], agent_instances[p1]]
-            
-            # Für MCTS die Umgebung übergeben
-            for agent in agent_list:
-                if hasattr(agent, 'set_env'):
-                    agent.set_env(env)
-                    
+            # Hinweis: run_episode_mcts erzeugt sein eigenes Env und ruft
+            # set_env selbst — hier kein zusätzliches Env nötig.
+
             print(f"  #{i+1}/{games_per_matchup}: ", end="", flush=True)
             t0 = time.time()
             
