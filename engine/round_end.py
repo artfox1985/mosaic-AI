@@ -399,11 +399,13 @@ def _count_line(
 def score_penalty(player: "PlayerBoard") -> int:
     """
     Strafpunkte am Rundenende:
-    - Strafleiste: −1/−2/−3 für Slot 1/2/3
+    - Strafleiste: −1/−2/−3/-4 für Slot 1/2/3/4
     - Startspielerstein: −2 (dediziertes Feld, getrennt von Strafleiste)
     Gibt den (negativen) Delta zurück.
     """
-    penalty = player.broken_penalty()   # −1/−2/−3 pro Slot
+    penalty = player.broken_penalty()   # −1/−2/−3/-4 pro Slot
+    player.total_floor_penalties += abs(penalty)
+    
     if player.holds_first_player_marker:
         penalty += player.first_player_marker_penalty   # −2
         player.holds_first_player_marker = False
