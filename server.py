@@ -421,17 +421,16 @@ def tiling_bonus_chips():
         if not row.tiles: return jsonify(err("Musterreihe hat keine echten Fliesen"))
         if row.is_complete: return jsonify(err("Reihe ist bereits voll"))
 
-        # Reihenfolge prüfen: keine frühere platzierbare Reihe noch offen
-        from engine.game import generate_tiling_actions
-        existing_actions = generate_tiling_actions(_game.state, pi)
-        placeable_rows = {a.pattern_row for a in existing_actions}
-        for earlier_ri in range(row_idx):
-            earlier_row = player.pattern_lines[earlier_ri]
-            if earlier_row.is_complete and earlier_ri in placeable_rows:
-                return jsonify(err(
-                    f"Reihe {earlier_ri+1} muss zuerst gelegt werden "
-                    f"(von oben nach unten)."
-                ))
+        # Reihenfolge-Regel (top-down): Sobald in dieser Tiling-Phase eine
+        # SPÄTERE Reihe gelegt wurde, sind FRÜHERE Reihen tabu — keine Chips,
+        # keine Abrechnung mehr. tiled_max_row hält die höchste bereits gelegte
+        # Reihe fest (-1 = noch keine gelegt).
+        tiled_max = getattr(player, "tiled_max_row", -1)
+        if row_idx < tiled_max:
+            return jsonify(err(
+                f"Reihe {row_idx+1} ist gesperrt — es wurde bereits eine "
+                f"spätere Reihe gelegt (Tiling läuft von oben nach unten)."
+            ))
 
         # Chip-IDs validieren
         used_chip_ids = set()

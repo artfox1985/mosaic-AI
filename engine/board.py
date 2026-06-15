@@ -322,6 +322,7 @@ class PlayerBoard:
     broken_tiles: list[TileColor]       = field(default_factory=list)
     bonus_chips:  list[TileColor]       = field(default_factory=list)
     dome_tiles_placed_this_round: int   = 0   # max 2 per round
+    tiled_max_row: int                  = -1  # höchste in dieser Tiling-Phase gelegte Reihe (-1=keine)
     player_tokens_used:          int   = 0   # Spielerplättchen genutzt (max 2, außer Runde 5)
     holds_first_player_marker: bool     = False   # Startspielerstein → -2 Pkt am Rundenende
     first_player_marker_penalty: int    = -2      # dediziertes Straffeld laut Regelwerk
@@ -457,6 +458,7 @@ class PlayerBoard:
         new_p.holds_first_player_marker   = self.holds_first_player_marker
         new_p.player_tokens_used          = self.player_tokens_used
         new_p.dome_tiles_placed_this_round = self.dome_tiles_placed_this_round
+        new_p.tiled_max_row                = self.tiled_max_row
         new_p.bonus_chips_used_this_round  = self.bonus_chips_used_this_round
 
         # Flache Listenkopien

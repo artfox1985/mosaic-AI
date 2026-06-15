@@ -531,6 +531,10 @@ class Game:
         """Wechselt automatisch zu Tiling wenn Drafting abgeschlossen."""
         if self.state.phase == "drafting" and check_drafting_complete(self.state):
             self.state.phase = "tiling"
+            # Reihenfolge-Tracking zurücksetzen: zu Beginn jeder Tiling-Phase
+            # wurde noch keine Reihe gelegt.
+            for p in self.state.players:
+                p.tiled_max_row = -1
             process_unplaceable_rows(self.state.players[0], self.state.tower, self.state)
             process_unplaceable_rows(self.state.players[1], self.state.tower, self.state)
             self.state.log_event("Tiling-Phase beginnt.")
