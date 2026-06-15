@@ -15,7 +15,6 @@ from config import MODELS_DIR
 
 
 LABELS = {
-    "version":            "Version",
     "timestamp":          "Erstellt am",
     "epochs":             "Epochen (tatsächlich)",
     "epochs_requested":   "Epochen (angefragt)",

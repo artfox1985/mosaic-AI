@@ -1,4 +1,3 @@
-# config.py
 import os
 from pathlib import Path
 
@@ -21,7 +20,7 @@ NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---
 BATCH_SIZE    = 256
-HIDDEN_SIZE   = 256   # Neuronen pro Hidden Layer (256 oder 512)
+HIDDEN_SIZE   = 256   # Neuronen pro Hidden Layer (2^x)
 LEARNING_RATE = 0.0006
 VALUE_WEIGHT  = 0.5
 
