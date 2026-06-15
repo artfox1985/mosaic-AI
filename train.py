@@ -91,9 +91,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
             masked_logits = pred_p + (masks - 1) * 1e9   # illegale Aktionen auf -inf
             log_probs = F.log_softmax(masked_logits, dim=1)
-            
+
             v_loss = mse_loss(pred_v, targets_v)
-            p_loss = -torch.sum(targets_p * log_probs) / states.size(0)
+
+            # Policy-Loss pro Sample mit der SPIELSTÄRKE gewichten.
+            # |targets_v| = win_val (0.1 für 0:0/schwach … 1.0 für stark).
+            # Dadurch prägen starke Spiele die Policy stark, 0:0-Spiele werden
+            # zu schwachem Hintergrundrauschen — analog zur Value-Abstufung.
+            # Ohne diese Gewichtung lernt die Policy zu 51% aus 0:0-Spielen
+            # (in denen beide Spieler die Strafleiste fluten) mit vollem Gewicht.
+            per_sample_ce = -torch.sum(targets_p * log_probs, dim=1)   # (B,)
+            strength = targets_v.detach().abs().squeeze(-1).clamp(min=1e-3)  # (B,)
+            p_loss = (per_sample_ce * strength).sum() / strength.sum()
 
             # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter
             moon_targets = moon_targets.to(device)
