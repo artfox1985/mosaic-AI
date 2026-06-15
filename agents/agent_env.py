@@ -387,14 +387,22 @@ class MosaicEnv:
         pi = self.state.current_player
         player = self.state.players[pi]
 
-        # 1. Tiling-Aktionen (Reihen legen)
+        # 1. Tiling-Aktionen (Reihen legen) — strikt top-down.
+        # tiled_max_row hält die höchste bereits gelegte Reihe fest; frühere
+        # Reihen sind dann tabu (gleiche Regel wie Server & Serializer).
+        tiled_max = getattr(player, "tiled_max_row", -1)
         for ri, row in enumerate(player.pattern_lines):
             if not row.is_complete:
                 continue
-            
-            # Prüfe, ob eine frühere Reihe noch offen ist (Regeltreue)
+
+            # Tabu: eine spätere Reihe wurde bereits gelegt
+            if ri < tiled_max:
+                continue
+
+            # Top-down: nur die ERSTE noch nicht gelegte vollständige Reihe.
+            # Eine frühere vollständige (noch ungelegte) Reihe blockiert.
             earlier_open = any(
-                player.pattern_lines[r].is_complete
+                player.pattern_lines[r].is_complete and r >= tiled_max
                 for r in range(ri)
             )
             if earlier_open:
@@ -415,17 +423,25 @@ class MosaicEnv:
                     })
             break # Nur die erste validierte Reihe wird für Tiling betrachtet
 
-        # 2. Chip-Aktionen
+        # 2. Chip-Aktionen — gleiche top-down-Regel wie beim Reihen-Legen.
         tiling_actions = generate_tiling_actions(self.state, pi)
         placeable_rows = {a.pattern_row for a in tiling_actions}
-        
+
         for ri, row in enumerate(player.pattern_lines):
             if row.is_complete:
                 continue
+
+            # Tabu: eine spätere Reihe wurde bereits gelegt → keine Chips mehr
+            # für frühere Reihen (tiled_max gilt schon von Block 1).
+            if ri < tiled_max:
+                continue
             
-            # Reihenfolge: keine frühere platzierbare Reihe noch offen
+            # Zusätzlich: eine frühere VOLLSTÄNDIGE (noch nicht gelegte) Reihe
+            # muss zuerst gelegt werden → blockiert Chips für spätere Reihen.
             earlier_open = any(
-                player.pattern_lines[r].is_complete and r in placeable_rows
+                player.pattern_lines[r].is_complete
+                and r in placeable_rows
+                and r >= tiled_max
                 for r in range(ri)
             )
             if earlier_open:

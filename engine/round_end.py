@@ -194,6 +194,12 @@ def execute_tiling_action(
     color = row.color
     capacity = row.capacity
 
+    # Reihenfolge-Tracking: höchste (am weitesten unten gelegene) Reihe merken.
+    # Sobald hier gelegt wird, sind frühere Reihen tabu (Chips/Abrechnung).
+    prev = getattr(player, "tiled_max_row", -1)
+    if action.pattern_row > prev:
+        player.tiled_max_row = action.pattern_row
+
     # Musterreihe leeren: 1 Stein geht auf Kuppel, Rest in Turm
     row.tiles = []
     row.color = None

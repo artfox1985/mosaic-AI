@@ -263,17 +263,17 @@ def _serialize_chippable_tiling_rows(state: "GameState") -> list[dict]:
             # Finde platzierbare Reihen (für Reihenfolge-Prüfung)
             actions = generate_tiling_actions(state, pi)
             placeable_rows = set(a.pattern_row for a in actions)
-            # Prüfe jede nicht-volle Reihe von oben nach unten
+            # Reihenfolge-Regel (top-down): Sobald in dieser Tiling-Phase eine
+            # SPÄTERE Reihe gelegt wurde, sind alle FRÜHEREN Reihen tabu — keine
+            # Chips, keine Abrechnung mehr. tiled_max_row hält die höchste (=am
+            # weitesten unten gelegene) bereits gelegte Reihe fest (-1 = keine).
+            tiled_max = getattr(player, "tiled_max_row", -1)
             for ri, row in enumerate(player.pattern_lines):
-                if row.is_complete or not row.tiles:
+                if not row.tiles or row.is_complete:
                     continue
-                # Früherer platzierbarer Reihe noch offen?
-                earlier_open = any(
-                    ri2 < ri and player.pattern_lines[ri2].is_complete and ri2 in placeable_rows
-                    for ri2 in range(ri)
-                )
-                if earlier_open:
-                    break  # Reihenfolge erzwingen — keine weiteren Chips möglich
+                # Tabu: eine spätere (weiter unten gelegene) Reihe wurde schon gelegt
+                if ri < tiled_max:
+                    continue
                 # Kann mit Chips vollgemacht werden?
                 if not can_complete_row_with_chips(player, ri):
                     continue
