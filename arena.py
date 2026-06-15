@@ -144,7 +144,7 @@ if __name__ == "__main__":
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
     agent_mcts_heuristic1 = HeuristicMCTSAgent(simulations=50, rollout_depth=0)
-    agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=50, rollout_depth=5)
+    agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=50, rollout_depth=1)
     agent_mcts_heuristic3 = HeuristicMCTSAgent(simulations=100, rollout_depth=0)
     agent_mcts_heuristic4 = HeuristicMCTSAgent(simulations=100, rollout_depth=1)
     agent_mcts_heuristic5 = HeuristicMCTSAgent(simulations=200, rollout_depth=0)
@@ -183,12 +183,12 @@ if __name__ == "__main__":
     #}
 
     competitors = {
-        "MTCS 50-0": (agent_mcts_heuristic1, 1000),
-        "MTCS 50-5": (agent_mcts_heuristic2, 1000),
-        "MTCS 100-0": (agent_mcts_heuristic3, 1000),
-        "MTCS 100-1": (agent_mcts_heuristic4, 1000),
-        "MTCS 200-0": (agent_mcts_heuristic5, 1000),
-        "MTCS 200-1": (agent_mcts_heuristic6, 1000),
+        "MCTS 50-0": (agent_mcts_heuristic1, 1000),
+        "MCTS 50-1": (agent_mcts_heuristic2, 1000),
+        "MCTS 100-0": (agent_mcts_heuristic3, 1000),
+        "MCTS 100-1": (agent_mcts_heuristic4, 1000),
+        "MCTS 200-0": (agent_mcts_heuristic5, 1000),
+        "MCTS 200-1": (agent_mcts_heuristic6, 1000),
     }
 
     # Jeder spielt gegen jeden

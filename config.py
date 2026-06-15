@@ -28,5 +28,5 @@ VALUE_WEIGHT  = 0.5
 # --- VALUE-TARGET PARAMETER (abgestuftes Signal) ---
 # Steuern wie scores → win_val umgerechnet werden (compute_win_val).
 # Früh: kleine Werte (mehr Signal aus wenig Punkten), später hochsetzen.
-MARGIN_CAP       = 5   # Punktedifferenz ab der die Margin-Komponente maximal ist
+MARGIN_CAP       = 10   # Punktedifferenz ab der die Margin-Komponente maximal ist
 MAX_WINNER_SCORE = 10   # Winner-Score ab dem die Score-Komponente maximal ist
