@@ -222,8 +222,7 @@ async function finishHumanTiling() {
   } else {
     // Mensch ist fertig, wir übergeben an die KI!
     humanTilingDone = true;
-    render();
-    await triggerAIMove();
+	endTiling();
   }
 }
 
@@ -506,6 +505,7 @@ function renderCenter() {
     // und keine frühere platzierbare Reihe noch offen haben
     const placeableOnly = placeableRows.filter(pr => pr.placeable === true);
     const pending = placeableOnly
+	  .filter(pr => !AI_ENABLED || pr.pi !== AI_PLAYER)
       .filter(pr => {
         // Keine frühere platzierbare Reihe desselben Spielers noch offen
         return !placeableOnly.some(other => other.pi===pr.pi && other.ri<pr.ri);
@@ -529,12 +529,14 @@ function renderCenter() {
 
     // Nur Reihen die der Server als chippable markiert hat
     const chippableRows2 = S.chippable_tiling_rows || [];
-    const chippable = chippableRows2.map(cr => {
-      const p = S.players[cr.pi];
-      const row = p.pattern_lines[cr.ri];
-      return {pi: cr.pi, ri: cr.ri, color: row.color,
-              need: row.capacity - row.tiles.length, pname: p.name};
-    });
+    const chippable = chippableRows2
+      .filter(cr => !AI_ENABLED || cr.pi !== AI_PLAYER)
+		.map(cr => {                                      
+        const p = S.players[cr.pi];
+        const row = p.pattern_lines[cr.ri];
+        return {pi: cr.pi, ri: cr.ri, color: row.color,
+                need: row.capacity - row.tiles.length, pname: p.name};
+      });
 
     let infoHTML = '';
     if(tilingRow!==null) {
@@ -755,9 +757,13 @@ document.getElementById('factories-area').innerHTML = `
   if(!vmDiv) return;
 
   if(S.phase === 'tiling') {
-    const rows = (S.valid_tiling_rows||[]);
+    let rows = (S.valid_tiling_rows||[]);
+	if (AI_ENABLED) {
+        rows = rows.filter(x => x.pi !== AI_PLAYER);
+    }
+	
     if(rows.length === 0) {
-      vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Alle platzierbaren Reihen gelegt ✓</div>`;
+      vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Alle regulären Reihen gelegt ✓ (Nutze Chips oder beende das Tiling)</div>`;
     } else {
       vmDiv.innerHTML = rows.map(x=>{
         const p = S.players[x.pi];
@@ -1437,6 +1443,7 @@ function showEndResults(results) {
   const winner = p0.score > p1.score ? p0.name
     : p1.score > p0.score ? p1.name
     : p0.marker ? p0.name : p1.marker ? p1.name : 'Unentschieden';
+    
   const tileRows = (S.scoring_tile_ids||[]).map(tid=>{
     const t = allScoringTiles.find(t=>t.id===tid);
     const r0 = results['0']?.[tid], r1 = results['1']?.[tid];
@@ -1478,6 +1485,7 @@ function showEndResults(results) {
     ov.id = 'end-overlay';
     document.body.appendChild(ov);
   }
+  
   ov.innerHTML = html; 
   ov.style.display = 'block'; // block ist hier besser wegen der absoluten Positionierung
   
