@@ -326,7 +326,7 @@ class PlayerBoard:
     player_tokens_used:          int   = 0   # Spielerplättchen genutzt (max 2, außer Runde 5)
     holds_first_player_marker: bool     = False   # Startspielerstein → -2 Pkt am Rundenende
     first_player_marker_penalty: int    = -2      # dediziertes Straffeld laut Regelwerk
-    start_dome_tile: object             = None  # DomeTile | None — zu legen in Runde 1
+    start_dome_tile: object             = None  # DomeTile | None — in der Spielvorbereitung (Phase 'start_placement') zu legen, zählt NICHT als Runden-Zug
     bonus_chips_used_this_round: int    = 0     # Aktion D: max 2 pro Runde
     total_floor_penalties: int          = 0 # Zählt alle Boden Strafpunkte für die Arena Auswertung
     floor_penalties_per_round: list      = field(default_factory=list) # Strafpunkte je Runde (Index 0 = Runde 1) für die Arena-Auswertung
@@ -408,7 +408,9 @@ class PlayerBoard:
           - In Runde 5 nie
           - Noch nicht 2 Kacheln diese Runde gelegt
           - Raster noch nicht voll (9 Slots)
-        Startkachel (Runde 1) zählt als einer der 2 Züge.
+        Hinweis: Die Startkuppel wird in der Spielvorbereitung
+        (Phase 'start_placement' via apply_start_placement) gelegt und zählt
+        NICHT zu den 2 Kuppel-Zügen der Runde 1.
         """
         if round_number >= 5:
             return False
