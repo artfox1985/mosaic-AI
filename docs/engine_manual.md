@@ -1,194 +1,88 @@
-# Mosaic — Spielanleitung
+# 🎲 Mosaic — Offizielle Spielanleitung
 
-> Diese Anleitung beschreibt die Spielregeln **so, wie sie im Code (`engine/`) tatsächlich implementiert sind**.
-
----
+Diese Anleitung beschreibt die verbindlichen Spielregeln von Mosaic, basierend auf der tatsächlichen Logik der Engine.
 
 ## 1. Überblick & Spielziel
 
-Mosaic ist ein abstraktes Legespiel für **2 Spieler**. Über **5 Runden** *(`NUM_ROUNDS = 5`)* sammeln die Spieler Fliesen, legen sie auf Musterreihen und übertragen sie von dort auf ihre **Kuppel** (ein Plattenraster). Punkte gibt es beim Legen auf die Kuppel sowie in einer Endwertung über **Wertungsplatten**. Wer am Ende die meisten Punkte hat, gewinnt.
+Mosaic ist ein abstraktes und taktisches Legespiel für zwei Personen. Eine Partie geht über exakt 5 Runden. Die Spieler sammeln farbige Fliesen, ordnen diese in ihren Musterreihen an und übertragen sie anschließend strategisch auf ihr persönliches Kuppel-Raster. Punkte können sowohl während des Spiels beim Platzieren auf der Kuppel als auch bei der großen Endwertung durch spezielle Wertungsplatten gesammelt werden. Wer am Ende die meisten Punkte vorweisen kann, gewinnt das Spiel.
 
----
+## 2. Spielmaterial
 
-## 2. Material
+* **Farbige Fliesen:** Es gibt insgesamt 65 normale Fliesen in 5 verschiedenen Farben (blau, gelb, rot, schwarz, türkis), also exakt 13 Stück pro Farbe. Zusätzlich existiert eine separate Reserve an besonderen Spezialfliesen.
+* **Beutel & Turm:** Zu Beginn befinden sich alle 65 normalen Fliesen gut gemischt im Beutel. Verbrauchte oder abgeräumte Fliesen fallen in den Turm. Ist der Beutel leer, wird er mit den Fliesen aus dem Turm wieder neu befüllt.
+* **Fabriken:** Es gibt 4 kleine Fabriken (diese starten mit je 4 Fliesen auf der Sonnenseite) sowie 1 große Fabrik (diese startet mit 5 Fliesen).
+* **Das Spieler-Tableau:** Jeder Spieler besitzt ein eigenes Brett. Dieses besteht aus 6 Musterreihen, deren Kapazität sich von oben nach unten von 1 bis 6 Fliesen steigert. Es gibt zudem eine Strafleiste (den "Boden") mit 4 Feldern, die am Ende der Runde Minuspunkte von -1 bis -4 bringen. Das Herzstück ist die Kuppel, ein 3x3-Raster, das im Laufe des Spiels mit bis zu 9 Kuppelplatten gefüllt wird. Da jede Platte aus 2x2 Feldern besteht, entsteht nach und nach ein 6x6-Wertungsraster.
+* **Bonusplättchen (Chips):** Pro Runde werden 2 Bonusplättchen verfügbar gemacht. Sie werden sofort aufgedeckt, sobald eine der Fabriken komplett geleert wurde.
 
-### Fliesen (Steine)
+## 3. Vorbereitung & Spielaufbau
 
-- **5 normale Farben:** blau, gelb, rot, schwarz, türkis *(`TileColor`, `NORMAL_COLORS`)*
-- **13 Fliesen pro Farbe** *(`TILES_PER_COLOR = 13`)* → **65 normale Fliesen** insgesamt *(`NORMAL_TILES = 65`)*
-- Dazu eine separate Reserve an **Spezialfliesen** *(`special_supply`, `place_special_tile`)*
+* Zu Beginn jeder neuen Runde werden die kleinen Fabriken mit je 4 Fliesen und die große Fabrik mit 5 Fliesen (inklusive Startspielerstein) frisch aus dem Beutel befüllt.
+* **Sonderregel für die große Fabrik:** Haben zufällig alle 5 gezogenen Fliesen dieselbe Farbe, werden sie zurückgelegt und es wird neu gezogen, bis mindestens zwei verschiedene Farben ausliegen.
+* **Startkuppel (Nur vor der 1. Runde):** Vor dem eigentlichen Spielbeginn muss jeder Spieler eine Startkachel auf seiner Kuppel platzieren. Der Nicht-Startspieler legt seine Platte dabei zuerst, danach folgt der Startspieler. Diese Startplatzierung ist kostenlos, Position sowie Drehung sind frei wählbar und sie zählt nicht zu den regulären Zügen der ersten Runde.
 
-### Beutel & Turm
+## 4. Der Rundenablauf
 
-- Alle 65 normalen Fliesen starten im **Beutel** (`Bag`), gemischt.
-- Verbrauchte/abgeräumte Fliesen wandern in den **Turm** (`Tower`).
-- Läuft der Beutel beim Ziehen leer, wird er aus dem Turm nachgefüllt *(`_draw_with_refill`, `refill_from_tower`)*.
+Jede der 5 Runden ist in zwei aufeinanderfolgende Phasen unterteilt: Drafting (Fliesen nehmen) und Tiling (Auf die Kuppel legen).
 
-### Fabriken
+### Phase 1: Drafting
 
-- **4 kleine Fabriken** *(`NUM_SMALL_FACTORIES = 4`)*, jede zu Rundenbeginn mit **4 Fliesen** auf der Sonnenseite *(`TILES_PER_SMALL_FACTORY = 4`)*.
-- **1 große Fabrik** (`LargeFactory`) mit **5 Fliesen** zu Rundenbeginn *(`TILES_PER_LARGE_FACTORY = 5`)*.
+Die Spieler sind abwechselnd am Zug und führen eine der folgenden vier Aktionen aus:
 
-### Spielerbrett (je Spieler)
+* **A) Kuppelplatte legen:** Der Spieler platziert eine von zwei möglichen Kuppelplatten in dieser Runde. Diese kann entweder kostenlos aus der offenen Ablage genommen oder für -1 Punkt blind vom Nachziehstapel gezogen werden.
+* **B) Fliesen (Sonnenseite):** Der Spieler nimmt alle Fliesen einer gewünschten Farbe von der Sonnenseite einer Fabrik. Diese werden in exakt eine Musterreihe gelegt. Alle restlichen Fliesen dieser Fabrik wandern danach auf die Mondseite (als Mond-Stapel bei der kleinen Fabrik oder in den Moon-Pool bei der großen Fabrik).
+* **C) Fliesen (Mondseite):** Der Spieler sammelt alle oben aufliegenden Fliesen einer bestimmten Farbe aus den Mondbereichen *aller* Fabriken gleichzeitig ein.
+* **D) Bonusplättchen nehmen:** Der Spieler darf sich ein aufgedecktes Bonusplättchen einer leeren Fabrik nehmen (maximal 2 pro Runde).
 
-- **6 Musterreihen** mit Kapazität 1 bis 6 *(`PatternLine`, row 0 hat Kapazität 1, row 5 hat Kapazität 6)*.
-- Eine **Strafleiste** (Boden) mit 4 Slots: **−1 / −2 / −3 / −4** *(`BROKEN_PENALTIES = [-1, -2, -3, -4]`)*.
-- Eine **Kuppel**: ein 3×3-Raster von **Kuppelplatten** *(`DomeGrid`, `dome_slots: 3×3`)*, jede Platte mit 4 Feldern (2×2). Das ergibt das **6×6-Wertungsraster** *(Koordinaten `row6 = slot_row*2 + ...`)*.
-- **9 Kuppelplatten pro Spieler** *(`DOME_TILES_EACH = 9`)*.
+**Wichtige Platzierungsregeln:**
 
-### Bonusplättchen (Chips)
+* Passen aufgenommene Fliesen nicht mehr in die gewählte Musterreihe (oder passt die Farbe nicht), fallen alle überschüssigen Fliesen als Strafe auf die Strafleiste am Boden. Es ist auch erlaubt, Fliesen freiwillig direkt auf die Strafleiste zu legen.
+* Ist die Strafleiste mit ihren 4 Plätzen voll, fallen weitere Fliesen direkt in den Turm.
+* Nimmt ein Spieler den Startspielerstein aus der großen Fabrik, beginnt er die nächste Runde, kassiert dafür am Rundenende aber feste -2 Punkte.
 
-- Pro Runde werden **2 Bonusplättchen** verfügbar *(`BONUS_CHIPS_PER_ROUND = 2`)*, aufgedeckt sobald eine Fabrik leer ist *(„Bonusplättchen aufgedeckt!")*.
+### Phase 2: Tiling
 
----
+Am Ende der Runde werden die vollen Musterreihen ausgewertet.
 
-## 3. Spielaufbau (Spielvorbereitung)
+* Die Reihen werden zwingend von oben nach unten (Reihe 1 bis 6) abgearbeitet. Passt eine Fliesenfarbe zu einer vorhandenen Kuppelplatte, ist diese auch zu legen. Wird eine tiefere Reihe gelegt, sind darüberliegende Reihen für den Rest dieser Phase gesperrt.
+* Von jeder fertigen Reihe wird genau ein Stein auf ein passendes Feld der Kuppel übertragen, die restlichen Steine der abgeräumten Reihe wandern in den Turm.
+* Unplatzierbare volle Reihen (für die es kein freies Feld auf der Kuppel gibt) müssen zwingend geräumt werden; ihre Steine fallen als Strafe auf den Boden in Richtung Turm.
 
-Zu Beginn jeder Runde:
+**Punktevergabe beim Legen:**
 
-1. Jede kleine Fabrik wird mit 4 Fliesen aus dem Beutel gefüllt *(`_fill_small_factory`)*.
-2. Die große Fabrik wird mit 5 Fliesen *(`_fill_large_factory`)* und dem Startspielerstein gefüllt. **Sonderregel:** Sind alle 5 dieselbe Farbe, gehen sie zurück und es wird neu gezogen, bis mindestens 2 Farben dabei sind.
+* Ein Stein ohne orthogonal angrenzende Nachbarn bringt 1 Punkt.
+* Berührt der Stein eine Linie aus gleichfarbigen Steinen, gibt es Punkte in Höhe der Gesamtlänge. Für eine horizontale Linie der Länge *h* (>1) gibt es *h* Punkte, für eine vertikale Linie der Länge *v* (>1) gibt es *v* Punkte. Ist beides der Fall, wird die Summe aus beidem gebildet.
 
-**Startkuppel (Spielvorbereitung, vor Runde 1):**
+**Einsatz von Bonusplättchen (Chips):**
 
-- Jeder Spieler legt **in der Spielvorbereitung** eine **Startkachel** auf seine Kuppel *(Phase `start_placement`, `apply_start_placement`)*.
-- Diese Platzierung gehört zur Vorbereitung und zählt **NICHT** als einer der 2 Kuppel-Züge von Runde 1.
-- **Reihenfolge:** Der **Nicht-Startspieler legt zuerst**, dann der Startspieler *(`apply_start_placement` erzwingt diese Reihenfolge)*.
-- **Position und Drehung sind frei wählbar.**
+* Unvollständige Musterreihen können durch den geschickten Einsatz von Bonusplättchen komplettiert werden.
+* Um ein fehlendes Feld auszugleichen, müssen entweder 2 Chips in der exakt gleichen Farbe oder 3 Chips in beliebiger Farbe ausgegeben werden. Auch hier gilt die Top-down-Regel: Gesperrte Reihen können nicht mehr per Chip befüllt werden.
 
----
+### Rundenende-Abrechnung
 
-## 4. Rundenablauf
-
-Jede Runde besteht aus zwei Phasen: **Drafting** (Fliesen nehmen) und **Tiling** (auf die Kuppel legen).
-
-### 4.1 Drafting-Phase
-
-Spieler wechseln sich ab. Es gibt vier Arten von Zügen:
-
-**A) Kuppelplatten legen**
-
-- Jeder Spieler legt pro Runde **2 Kuppelplatten** *(`DOME_TILES_PER_ROUND = 2`, `TOKENS_PER_ROUND = 2`)*. Entweder aus der offenen Ablage oder aus dem Nachziehstapel. Kuppelkarten aus dem Nachziehstapel kosten -1 Punkt pro Karte.
-
-**B) Fliesen nehmen — Sonnenseite**
-
-- Man nimmt **alle Fliesen einer Farbe** von der Sonnenseite einer Fabrik.
-- Die genommenen Fliesen kommen auf **genau eine Musterreihe** (0–5) *(`moves.py`)*.
-- Die **übrigen** Fliesen der Fabrik werden auf die **Mondseite** gelegt:
-  - Kleine Fabrik: übrige Steine bilden den **Mond-Stapel** derselben Fabrik *(„F2 Mond-Stapel: …")*.
-  - Große Fabrik: übrige Steine landen im **Moon-Pool** der großen Fabrik *(„GF Moon-Pool: …")*.
-
-**C) Fliesen nehmen — Mondseite**
-
-- Man nimmt **alle oben aufliegenden Fliesen einer Farbe** aus dem **Mondbereich aller Manufakturen gleichzeitig** *(`_validate_small_moon`)*. Es werden also über alle Fabriken hinweg alle Stapel berücksichtigt, deren oberste Fliese die gewählte Farbe zeigt.
-
-**D) Bonusplättchen**
-
-- Sobald eine Fabrik leer ist, wird ihr Bonusplättchen aufgedeckt.
-- Spieler nehmen pro Runde genau **2 Bonusplättchen** 
-  *(`BONUS_CHIPS_PER_ROUND = 2`)*.
-
-**Platzierung & Überlauf**
-
-- Passt eine Fliese nicht in die gewählte Reihe (Reihe voll oder Farbe passt nicht zur bereits liegenden Farbe), wandert der **Überschuss auf die Strafleiste** *(`moves.py`)*.
-- Ist die Strafleiste (4 Slots) voll, gehen weitere Steine direkt in den **Turm** *(„Stein(e) → Turm (Strafleiste voll)")*.
-- Man darf Fliesen auch **direkt auf die Strafleiste** legen *(row_index = -1)*.
-
-**Startspielerstein**
-
-- Wer ihn nimmt, beginnt die nächste Runde, erhält aber am Rundenende **−2 Punkte** *(`first_player_marker_penalty = -2`, „Startspielerstein genommen (−2 Pkt am Rundenende)")*.
-
-### 4.2 Tiling-Phase
-
-Am Rundenende werden vollständige Musterreihen auf die Kuppel übertragen.
-
-- Das Tiling läuft **von oben nach unten** (Reihe 1 → 6). Sobald eine spätere Reihe gelegt wurde, sind frühere Reihen **gesperrt** *(`tiled_max_row`, Reihenfolge-Regel in `serializer`/`agent_env`/`server`)*.
-- Von einer abgeschlossenen Musterreihe wird **1 Stein auf die Kuppel** gelegt; die übrigen Steine der Reihe gehen in den **Turm** *(`execute_tiling_action`: `row.tiles = []`)*.
-- **Unplatzierbare Reihen** (vollständig, aber kein passendes Kuppelfeld frei) werden geräumt; ihre Steine gehen über die Strafleiste in den Turm *(„Reihe X unplatzierbar → N Fliesen auf Straffeld")*.
-
-**Punkte beim Legen auf die Kuppel** *(`score_placed_tile`)*
-
-- Ein **alleinstehender** Stein (keine orthogonalen Nachbarn): **1 Punkt**.
-- Ist der Stein Teil einer horizontalen und/oder vertikalen Linie verbundener Steine, zählt er **die Länge der Linie(n)**:
-  - horizontale Linie der Länge *h* (>1): **+h Punkte**
-  - vertikale Linie der Länge *v* (>1): **+v Punkte**
-  - beides möglich → Summe *(„+5 Pkt … 3 horizontal + 2 vertikal")*.
-
-**Bonusplättchen beim Tiling** *(`can_complete_row_with_chips`)*
-
-- Mit Bonusplättchen kann eine **unvollständige** Musterreihe komplettiert werden.
-- Regel pro fehlendem Feld: **2 Chips derselben Farbe** ODER **3 Chips beliebiger Farbe** *(`len(same_color) >= missing*2` bzw. `len(unused) >= missing*3`; Misch-Auflösung pro fehlendem Feld)*.
-- Auch hier gilt die Top-down-Reihenfolge: gesperrte (frühere) Reihen können nicht mehr per Chip abgeschlossen werden.
-
-### 4.3 Rundenende-Strafen
-
-- **Strafleiste:** −1 / −2 / −3 / −4 je belegtem Slot *(`broken_penalty`)*.
-- **Startspielerstein:** zusätzlich −2 *(`first_player_marker_penalty`)*.
-- Der Punktestand fällt **nicht unter 0** *(im Log: „Strafe −12 Pkt → 0 Gesamt")*.
-
----
+* Die Strafleiste wird abgerechnet: -1, -2, -3 und -4 Punkte für die jeweiligen belegten Slots.
+* Der Startspielerstein bringt weitere -2 Punkte.
+* Die Gesamtpunktzahl eines Spielers kann durch Strafen jedoch niemals unter 0 fallen.
 
 ## 5. Spezialfliesen & Spezialfelder
 
-- Manche Kuppelplattenfelder sind **Spezialfelder**, die zunächst **gesperrt** sind (`is_locked`).
-- Ein Spezialfeld wird **freigeschaltet, sobald die anderen 3 Felder derselben Kuppelplatte gefüllt sind** *(`try_unlock_special`)*. Dies ist **nur in der Tiling-Phase** möglich.
-- Auf ein freigeschaltetes Spezialfeld kann eine **Spezialfliese** aus der separaten Reserve gelegt werden *(`place_special_tile`, `accepts_special`)*.
+* Auf den Kuppelplatten befinden sich gesperrte Spezialfelder.
+* Ein solches Feld wird erst dann (und nur in der Tiling-Phase) freigeschaltet, wenn die restlichen drei regulären Felder derselben Platte erfolgreich belegt wurden.
+* Auf ein nun freies Spezialfeld darf eine Spezialfliese aus der separaten Reserve gelegt werden.
+* **Wertung:** Die Spezialfliese bringt sofort Punkte entsprechend der Reihe (1 bis 6), in der sie platziert wird. Sie selbst profitiert nicht von Linien-Boni, wird aber von anderen, angrenzenden Fliesen als Joker-Nachbar mitgewertet.
 
-**Wertung der Spezialfliese:**
+## 6. Spielende & Endwertung
 
-- Eine Spezialfliese erhält beim Legen Punkte **in Höhe der Reihe, in der sie liegt** (Reihennummer).
-- Sie bekommt **keine Nachbar-Boni** (horizontale/vertikale Linien zählen für sie selbst nicht).
-- **Aber:** Sie wird **als Nachbar für andere Steine gewertet** — andere Fliesen können sie also in ihre horizontalen/vertikalen Linien einbeziehen.
+Nach der 5. Runde endet das Spiel. Zu den erspielten Punkten kommt nun die Endwertung hinzu, für die 3 von 8 möglichen Wertungsplatten herangezogen werden. Von 4 festgelegten Paaren darf jeweils nur maximal eine Platte gewählt werden, da sie sich thematisch ausschließen.
 
----
+**Die 8 Wertungsplatten:**
 
-## 6. Endwertung — Wertungsplatten
+1. ↔️ **Horizontale Reihen:** 3 Pkt. je kompletter horizontaler Reihe. *(Schließt Nr. 8 aus)*
+2. ↕️ **Vertikale Reihen:** 7 Pkt. je kompletter vertikaler Reihe. *(Schließt Nr. 5 aus)*
+3. ↗️ **Diagonale Reihen:** 10 Pkt. je kompletter Diagonale (max. 2 Stück möglich). *(Schließt Nr. 6 aus)*
+4. 🌈 **Mehrfarbige Felder:** 2 Pkt. je Wildcard-Feld, vorausgesetzt *alle* sind belegt. *(Schließt Nr. 7 aus)*
+5. ⬜ **Äußere Felder:** 1 Pkt. je Fliese am äußersten Rand der Kuppel. *(Schließt Nr. 2 aus)*
+6. 🔲 **Eckplatten:** 3 Pkt. je kompletter oberer Eckplatte, 8 Pkt. je kompletter unterer Eckplatte (alle 4 Felder belegt). *(Schließt Nr. 3 aus)*
+7. ⭐ **Spezialfelder:** -3 Pkt. je leer gebliebenem Spezialfeld. *(Schließt Nr. 4 aus)*
+8. 🎨 **Farbenreiche Reihen:** 4 Pkt. je horizontaler Reihe, die mindestens 5 verschiedene Farben enthält. *(Schließt Nr. 1 aus)*
 
-Am Spielende *(nach Runde 5)* werden **3 von 8 möglichen Wertungsplatten** gewertet *(`ALL_SCORING_TILES`, Auswahl von 3)*. Die Wertungsplatten gehören zu **4 sich gegenseitig ausschließenden Paaren** — aus jedem Paar darf höchstens eine gewählt werden *(`MUTUALLY_EXCLUSIVE_PAIRS`)*.
-
-### Die 8 Wertungsplatten
-
-| #   | Name                   | Wertung                                                                                                              |
-| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 0   | ↔️ Horizontale Reihen  | **3 Pkt** je vollständige horizontale Reihe (6 Fliesen)                                                              |
-| 1   | ↕️ Vertikale Reihen    | **7 Pkt** je vollständige vertikale Reihe (6 Fliesen)                                                                |
-| 2   | ↗️ Diagonale Reihen    | **10 Pkt** je vollständige Diagonale (6 Fliesen über das gesamte Spielfeld, genau 2 möglich)                         |
-| 3   | 🌈 Mehrfarbige Felder  | **2 Pkt** je Wildcard-Feld, wenn **alle** belegt sind                                                                |
-| 4   | ⬜ Äußere Felder        | **1 Pkt** je Fliese am **Rand** der Kuppel (Zeile 0, Zeile 5, Spalte 0, Spalte 5)                                    |
-| 5   | 🔲 Eckplatten          | **3 Pkt** je vollständige **obere** Eckplatte, **8 Pkt** je vollständige **untere** Eckplatte (alle 4 Felder belegt) |
-| 6   | ⭐ Spezialfelder        | **−3 Pkt** je **leeres** Spezialfliesenfeld                                                                          |
-| 7   | 🎨 Farbenreiche Reihen | **4 Pkt** je horizontale Reihe mit **≥ 5 verschiedenen Farben**                                                      |
-
-### Die 4 Ausschlusspaare *(`MUTUALLY_EXCLUSIVE_PAIRS`)*
-
-- ↔️ Horizontale Reihen ⟷ 🎨 Farbenreiche Reihen *(0 ⟷ 7)*
-- ⭐ Spezialfelder ⟷ 🌈 Mehrfarbige Felder *(6 ⟷ 3)*
-- ⬜ Äußere Felder ⟷ ↕️ Vertikale Reihen *(4 ⟷ 1)*
-- ↗️ Diagonale Reihen ⟷ 🔲 Eckplatten *(2 ⟷ 5)*
-
----
-
-## 7. Spielende & Sieger
-
-- Das Spiel endet nach **Runde 5** *(`round_number >= NUM_ROUNDS`)*.
-- Zu den über die Runden erspielten Punkten kommt die Endwertung der 3 Wertungsplatten hinzu.
-- Der Spieler mit der höheren Gesamtpunktzahl gewinnt. Bei Gleichstand gewinnt der Spieler mit dem Startspielerstein.
-
----
-
-## 8. Punkte-Schnellübersicht
-
-**Während des Spiels (Tiling):**
-
-- Alleinstehender Stein: 1 Pkt
-- Stein in Linie: Länge der horizontalen + vertikalen Linie
-
-**Strafen (Rundenende):**
-
-- Strafleiste: −1/−2/−3/−4 pro Slot
-- Startspielerstein: −2
-- (Punktestand minimal 0)
-
-**Endwertung:** 3 gewählte Wertungsplatten (siehe Tabelle, beachte Ausschlusspaare)
-
----
+Wer nach der Endwertung die höchste Gesamtpunktzahl erreicht hat, ist der Sieger. Bei einem Gleichstand gewinnt der Spieler, der den Startspielerstein besitzt.
