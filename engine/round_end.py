@@ -404,8 +404,15 @@ def score_penalty(player: "PlayerBoard") -> int:
     Gibt den (negativen) Delta zurück.
     """
     penalty = player.broken_penalty()   # −1/−2/−3/-4 pro Slot
-    player.total_floor_penalties += abs(penalty)
-    
+    floor_this_round = abs(penalty)
+    player.total_floor_penalties += floor_this_round
+
+    # Strafpunkte dieser Runde (NUR Strafleiste, konsistent mit
+    # total_floor_penalties) für die Arena-Auswertung festhalten. Der Aufruf
+    # erfolgt einmal pro Spieler und Runde, daher entspricht die Listenlänge
+    # der Rundennummer (Index 0 = Runde 1).
+    player.floor_penalties_per_round.append(floor_this_round)
+
     if player.holds_first_player_marker:
         penalty += player.first_player_marker_penalty   # −2
         player.holds_first_player_marker = False

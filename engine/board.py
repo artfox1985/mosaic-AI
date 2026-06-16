@@ -329,6 +329,7 @@ class PlayerBoard:
     start_dome_tile: object             = None  # DomeTile | None — zu legen in Runde 1
     bonus_chips_used_this_round: int    = 0     # Aktion D: max 2 pro Runde
     total_floor_penalties: int          = 0 # Zählt alle Boden Strafpunkte für die Arena Auswertung
+    floor_penalties_per_round: list      = field(default_factory=list) # Strafpunkte je Runde (Index 0 = Runde 1) für die Arena-Auswertung
 
     def __post_init__(self):
         if not self.pattern_lines:
@@ -463,6 +464,7 @@ class PlayerBoard:
         new_p.bonus_chips_used_this_round  = self.bonus_chips_used_this_round
 
         new_p.total_floor_penalties        = self.total_floor_penalties
+        new_p.floor_penalties_per_round     = list(self.floor_penalties_per_round)
 
         # Flache Listenkopien
         new_p.broken_tiles = list(self.broken_tiles)

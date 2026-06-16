@@ -41,6 +41,9 @@ def run_arena(agents_dict, games_per_matchup=10):
     all_avg_actions = []
     all_max_actions = []
     penalties = {name: 0 for name in names}
+    # Pro-Runde-Strafpunkte: {name: {runde_idx: [summe, anzahl]}} für echten
+    # Durchschnitt je Runde (Runde 1, 2, ...) statt nur Gesamtschnitt.
+    penalties_per_round = {name: {} for name in names}
     games_played = {name: 0 for name in names}
     
     if games_per_matchup == 1:
@@ -85,6 +88,13 @@ def run_arena(agents_dict, games_per_matchup=10):
             if final_state:
                 penalties[p0] += final_state.players[0].total_floor_penalties
                 penalties[p1] += final_state.players[1].total_floor_penalties
+                # Pro-Runde-Aufschlüsselung sammeln
+                for slot, pl_idx in ((p0, 0), (p1, 1)):
+                    per_round = final_state.players[pl_idx].floor_penalties_per_round
+                    for r_idx, pen in enumerate(per_round):
+                        bucket = penalties_per_round[slot].setdefault(r_idx, [0, 0])
+                        bucket[0] += pen   # Summe
+                        bucket[1] += 1     # Anzahl Spiele die diese Runde erreichten
             games_played[p0] += 1
             games_played[p1] += 1
             
@@ -132,13 +142,28 @@ def run_arena(agents_dict, games_per_matchup=10):
     for name in names:
         print(f"Siege {name}: {wins[name]}")
     print(f"0:0 Spiele:    {zerozero} / {total} ({pct:.1f}%)")
-    # durchschnittliche Strafpunkte
-    print("\n📉 DURCHSCHNITTLICHE STRAFPUNKTE (BODEN):")
-    for name in names:
-        if games_played[name] > 0:
-            # Gesamte Strafpunkte / Anzahl der Spiele / 5 Runden = Schnitt pro Runde
-            avg_pen_per_round = (penalties[name] / games_played[name]) / 5
-            print(f" - {name:17s}: Ø {avg_pen_per_round:.2f} Pkt pro Runde")
+    # durchschnittliche Strafpunkte — pro Runde aufgeschlüsselt
+    print("\n📉 DURCHSCHNITTLICHE STRAFPUNKTE (BODEN) pro Runde:")
+    # Spaltenüberschrift: alle vorkommenden Runden ermitteln
+    all_rounds = sorted({
+        r for name in names for r in penalties_per_round[name].keys()
+    })
+    if all_rounds:
+        #header = "   " + " ".join(f"R{r+1:>5}" for r in all_rounds) + "   |  Gesamt"
+        #print(header)
+        for name in names:
+            cells = []
+            for r in all_rounds:
+                bucket = penalties_per_round[name].get(r)
+                if bucket and bucket[1] > 0:
+                    cells.append(f"{bucket[0] / bucket[1]:6.2f}")
+                else:
+                    cells.append(f"{'—':>6}")
+            # Gesamtschnitt pro Runde (über alle Runden gemittelt)
+            total_games = games_played[name]
+            overall = (penalties[name] / total_games / len(all_rounds)) if total_games else 0
+            print(f" - {name:17s}: " + " ".join(cells) + f"   |  {overall:6.2f}")
+        print("   (Werte = Ø Strafpunkte in dieser Runde über alle Spiele)")
     
     # Ø Strength über alle Spiele
     if all_avg_actions:  # Liste existiert noch (Kompatibilität)
@@ -166,7 +191,7 @@ if __name__ == "__main__":
     #agent_mcts_heuristic5 = HeuristicMCTSAgent(simulations=200, rollout_depth=0)
     #agent_mcts_heuristic6 = HeuristicMCTSAgent(simulations=200, rollout_depth=1)
     agent_alphazero2 = AlphaZeroAgent(
-       model_version="v1c",
+       model_version="v1d",
        input_size=INPUT_SIZE, 
        simulations=50,
        dynamic_sims="play"
@@ -210,10 +235,10 @@ if __name__ == "__main__":
     # }
     
     competitors = {
-       "AlphaZero v1c s50": (agent_alphazero2, 1000),
+       "AlphaZero v1d s50": (agent_alphazero2, 1000),
        "MCTS s50-d0": (agent_mcts_heuristic1, 1000),
     }
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=2)
+    run_arena(competitors, games_per_matchup=100)
