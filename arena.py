@@ -241,4 +241,4 @@ if __name__ == "__main__":
 
     # Jeder spielt gegen jeden
     #run_arena(competitors, games_per_matchup=5)
-    run_arena(competitors, games_per_matchup=100)
+    run_arena(competitors, games_per_matchup=5)
