@@ -32,12 +32,36 @@ from agents.shaping import get_player_potential
 # Plattformübergreifend via Thread-Watchdog (Windows hat kein signal.alarm).
 _CHOOSE_WATCHDOG_S = 30
 
-def _diff_to_probs(diff: float) -> dict[int, float]:
-    """Normalisiert eine Punktedifferenz auf Win-Wahrscheinlichkeiten via Sigmoid."""
-    scale = 10.0
+def _diff_to_probs(diff: float, scale: float = 10.0) -> dict[int, float]:
+    """Normalisiert eine Punktedifferenz auf Win-Wahrscheinlichkeiten via Sigmoid.
+
+    scale steuert die Schärfe: kleine scale = scharfe Diskriminierung kleiner
+    Differenzen, große scale = nur große Differenzen werden klar getrennt.
+    Default 10.0 passt für echte Score-Differenzen (Endstand). Für die
+    Potential-Bewertung im Rollout wird eine kleinere, aktionsabhängige scale
+    übergeben (siehe _scale_for_actions), da dort die Differenzen viel kleiner
+    sind und scale=10 sie sonst zu nahe 0.5 stauchen würde.
+    """
     safe_diff = max(min(diff, 200.0), -200.0)
     p0 = 1.0 / (1.0 + math.exp(-safe_diff / scale))
     return {0: p0, 1: 1.0 - p0}
+
+
+def _scale_for_actions(num_actions: int) -> float:
+    """Aktionsabhängige Sigmoid-scale für die Potential-Bewertung im Rollout.
+
+    Kalibriert an den real gemessenen evaluate_state-Differenzen je Spielphase:
+    früh (viele Aktionen) ~1.9, mittel ~4.9, spät ~6.6. Die scale ist so
+    gewählt, dass die typische Differenz der jeweiligen Phase eine klare
+    Win-Prob (~0.72) ergibt — also scharf genug diskriminiert, ohne zu sättigen.
+    Im Frühspiel (viele Optionen) ist die scale klein, damit die feinen
+    Draft-Unterschiede (sauber vs. Strafleiste) nicht plattgedrückt werden.
+    """
+    if num_actions > 50:
+        return 2.0
+    if num_actions > 15:
+        return 5.0
+    return 7.0
 
 def _compute_terminal_reward(scores: list[int], state) -> dict[int, float]:
     """
@@ -633,36 +657,55 @@ class HeuristicMCTSAgent(MCTSAgent):
     def __init__(self, simulations=200, rollout_depth=3, **kwargs):
         super().__init__(simulations=simulations, rollout_depth=rollout_depth, **kwargs)
 
+    # Obergrenze für "gratis" durchlaufene Kuppelzüge im Rollout (Schutz gegen
+    # zu lange/teure Rollouts bei ausgedehnten Kuppelphasen; gemessener Median
+    # einer Kuppelphase ~9, Max ~15).
+    _DOME_PASSTHROUGH_CAP = 10
+
     def _rollout(self, env):
-        """Überschreibt das Rollout: Nutzt Greedy-Shaping statt Zufall!"""
+        """Überschreibt das Rollout: Nutzt Greedy-Shaping statt Zufall!
+
+        Dynamische Tiefe bei Kuppelzügen: Der Wert einer Kuppelplatten-
+        Platzierung zeigt sich erst, wenn das Fundament steht (Steine darauf
+        kommen). Eine Bewertung MITTEN in der Kuppel-Auslegung ist daher wenig
+        aussagekräftig. Deshalb verbrauchen Kuppelzüge (dome/dome_stack) KEIN
+        Tiefenbudget — das Rollout läuft durch sie hindurch, bis das Fundament
+        gelegt ist, und erst Nicht-Kuppelzüge zählen gegen rollout_depth.
+        Eine Obergrenze (_DOME_PASSTHROUGH_CAP) verhindert, dass das Rollout
+        bei langen Kuppelphasen entgleist (Rechenzeit + akkumuliertes
+        Greedy-Rauschen).
+        """
         depth = 0
         done = False
+        dome_passthrough = 0
+        _DOME_TYPES = ("dome", "dome_stack")
 
-        # Spiele noch 'rollout_depth' Züge GREEDY weiter, um taktische Fehler zu vermeiden
+        # Spiele weiter, solange das Tiefenbudget (für Nicht-Kuppelzüge) reicht.
         while not done and (self.rollout_depth < 0 or depth < self.rollout_depth):
             actions = env.valid_actions()
             if not actions:
                 break
-            
+
             # --- GREEDY-BIAS ---
-            # Statt random.choice() testen wir ein paar Aktionen kurz an
             best_action = random.choice(actions) # Fallback
             best_reward = -float('inf')
-            
-            # Wir testen max 5 Aktionen (Performance-Schutz für MCTS)
             sample_actions = random.sample(actions, min(5, len(actions)))
-            
             for a in sample_actions:
                 test_env = env.clone()
-                # Teste den Zug und schau, was das Shaping-System dazu sagt
                 _, r, _, _ = test_env.step(a)
                 if r > best_reward:
                     best_reward = r
                     best_action = a
-            
-            # Führe die beste Aktion in der echten Rollout-Umgebung aus
+
             _, _, done, _ = env.step(best_action)
-            depth += 1
+
+            # Kuppelzüge zählen NICHT gegen die Tiefe (Fundament durchlaufen),
+            # bis zu einer Sicherheitsobergrenze.
+            is_dome = best_action.get("type") in _DOME_TYPES
+            if is_dome and dome_passthrough < self._DOME_PASSTHROUGH_CAP:
+                dome_passthrough += 1
+            else:
+                depth += 1
 
         # --- DER MAGISCHE MOMENT: Die Heuristik übernimmt ---
         if done:
@@ -670,4 +713,8 @@ class HeuristicMCTSAgent(MCTSAgent):
             return _compute_terminal_reward(scores, env.state)
         else:
             evals = evaluate_state(env.state)
-            return _diff_to_probs(evals[0] - evals[1])
+            # Aktionsabhängige scale: im Frühspiel (viele Optionen) klein, damit
+            # die feinen Potential-Unterschiede zwischen Drafts nicht zu nahe 0.5
+            # gestaucht werden (sonst flache Policy-Targets → Strafleisten-Fluten).
+            scale = _scale_for_actions(len(env.valid_actions()))
+            return _diff_to_probs(evals[0] - evals[1], scale=scale)

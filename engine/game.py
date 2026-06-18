@@ -447,6 +447,10 @@ class Game:
                 return
 
             if t == "end_tiling":
+                # Prüfe, ob der aktive Spieler noch offene Tiling-Aktionen hat
+                pi = move.get("player", self.state.current_player) 
+                if self.valid_tiling_actions(pi):
+                    raise ValueError("Du hast noch platzierbare Reihen. Diese müssen zuerst gelegt werden!")
                 self._execute_end_tiling()
                 return
 
