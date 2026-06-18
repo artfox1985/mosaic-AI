@@ -447,10 +447,15 @@ class Game:
                 return
 
             if t == "end_tiling":
-                # Prüfe, ob der aktive Spieler noch offene Tiling-Aktionen hat
-                pi = move.get("player", self.state.current_player) 
-                if self.valid_tiling_actions(pi):
-                    raise ValueError("Du hast noch platzierbare Reihen. Diese müssen zuerst gelegt werden!")
+                # Prüfe ALLE Spieler, ob noch jemand zwingende Züge hat
+                for p_idx, player in enumerate(self.state.players):
+                    pending_actions = self.valid_tiling_actions(p_idx)
+                    if len(pending_actions) > 0:
+                        raise ValueError(
+                            f"Die Tiling-Phase kann nicht beendet werden! "
+                            f"Spieler '{player.name}' muss zuerst noch seine Musterreihen an die Kuppel legen."
+                        )
+                
                 self._execute_end_tiling()
                 return
 
