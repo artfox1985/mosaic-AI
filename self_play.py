@@ -45,9 +45,17 @@ class SelfPlayMixin:
         mode = getattr(self, 'dynamic_sims', None)
         if mode is None and hasattr(self, '_az'):
             mode = getattr(self._az, 'dynamic_sims', None)
-        if mode != "selfplay":
-            return self.simulations
-        return max(15, min(self.simulations, int(num_actions * 0.35)))
+        if mode == "selfplay":
+            # Effizienz: deckelt bei vielen Aktionen. Erzeugt aber im Frühspiel
+            # flache/verrauschte Policy-Targets (zu wenige Sims auf viele Optionen).
+            return max(15, min(self.simulations, int(num_actions * 0.35)))
+        if mode == "play":
+            # Stärke (wie Arena): im Frühspiel MEHR Sims (bis base*3), damit die
+            # Besuchsverteilung scharf genug für ein brauchbares Policy-Target ist.
+            import math
+            return max(self.simulations,
+                       min(self.simulations * 3, int(math.sqrt(num_actions) * 10)))
+        return self.simulations
 
     def search_and_get_policy(self, env, actions, temp=1.0):
         pi = env.current_player()
@@ -89,14 +97,39 @@ class SelfPlayMixin:
         elif hasattr(self, '_az') and hasattr(self._az, 'node_priors'):
             self._az.node_priors.clear()
 
-        # Temperature-gewichtete Policy: visits^(1/temp)
+        # Temperature-gewichtete Policy: visits^(1/temp), zusätzlich mit dem
+        # Q-Wert (Exploitation) gewichtet.
+        #
+        # Hintergrund: Die Suche nutzt UCB1 mit c=1.414 (volle Exploration für
+        # Spielstärke). Dadurch sind die reinen Besuchszahlen im Frühspiel sehr
+        # flach (viele Optionen werden explorativ etwa gleich oft besucht),
+        # selbst wenn die Q-Werte klar zwischen guten und schlechten Drafts
+        # unterscheiden. Würde das Target nur aus Besuchen gebildet, lernte das
+        # Netz diese flache (uninformative) Verteilung — und flutete im Frühspiel.
+        #
+        # Lösung: Das Target zusätzlich mit dem Q-Wert gewichten. So fließt die
+        # diskriminierende Information aus den Q-Werten ins Lernsignal, OHNE die
+        # Suche selbst gieriger zu machen (c bleibt unverändert, Spielstärke
+        # bleibt erhalten). Q wird auf [0,1] genutzt (Win-Prob aus dem Rollout)
+        # und mild verschärft, damit gute Züge klar mehr Gewicht bekommen.
         total_visits = sum(c.visits for c in root.children)
         if total_visits == 0:
             action = random.choice(actions)
             return action, [{"action": action, "prob": 1.0}]
 
-        raw = [(c, c.visits ** (1.0 / temp)) for c in root.children]
+        def _q_weight(c):
+            q = (c.value / c.visits) if c.visits else 0.0
+            # q liegt ~[0,1] (Win-Prob aus Sicht des ziehenden Spielers).
+            # Mild verschärfen: q^2 hebt gute Züge an, ohne schlechte ganz
+            # auszulöschen (Exploration im Target bleibt erhalten).
+            return max(q, 1e-6) ** 2
+
+        raw = [(c, (c.visits ** (1.0 / temp)) * _q_weight(c)) for c in root.children]
         total_raw = sum(r for _, r in raw)
+        if total_raw <= 0:
+            # Fallback: reine Besuche, falls Q-Gewichte degenerieren
+            raw = [(c, c.visits ** (1.0 / temp)) for c in root.children]
+            total_raw = sum(r for _, r in raw)
         policy = [{"action": c.action, "prob": r / total_raw} for c, r in raw]
 
         chosen_action = random.choices(
@@ -152,7 +185,6 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
 
     history = []
     steps = 0
-    temperature_moves = 30
 
     while True:
         actions = env.valid_actions()
@@ -161,13 +193,22 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
 
         current_player = env.current_player()
 
-        # Sanfter Temperature-Übergang
-        if steps < temperature_moves:
-            temp = 1.0
-        elif steps < 60:
-            temp = 0.5
+        # Aktionsbasierte Temperatur (statt zugbasiert):
+        # Mosaic ist rundenbasiert — in JEDER Runde gibt es früh viele offene
+        # Optionen (Fundament legen, auf das man später hinspielt) und spät
+        # wenige, zielgerichtete Züge. Die Temperatur sollte daher an der Zahl
+        # der verfügbaren Aktionen hängen, nicht an der Gesamtzugzahl:
+        #   - VIELE Aktionen  → höhere Temperatur: die frühen Fundament-
+        #     Entscheidungen der Runde explorieren (mehrere Wege sind sinnvoll).
+        #   - WENIGE Aktionen → niedrige Temperatur: späte, scharfe Züge gezielt
+        #     auf das aufgebaute Fundament zuspitzen.
+        n_actions = len(actions)
+        if n_actions > 50:
+            temp = 0.7
+        elif n_actions > 15:
+            temp = 0.4
         else:
-            temp = 0.1
+            temp = 0.15
 
         # Startkuppel-Platzierung: nur MILDE Temperature. Genug Variation, damit
         # das Netz verschiedene (auch suboptimale) Starts sieht und lernt sie
@@ -283,7 +324,7 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
 # Datengenerierung
 # ---------------------------------------------------------------------------
 
-def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40, dynamic_sims: bool = True):
+def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40, dynamic_sims: bool = True, sim_mode: str = None):
     """
     Generiert Self-Play Trainingsdaten.
 
@@ -291,12 +332,20 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     num_games:    Anzahl zu spielender Partien
     simulations:  MCTS-Simulationen pro Zug
     version_name: Versionsname für Dateinamen und Modell-Laden
-    dynamic_sims: True = Sims an Aktionszahl koppeln (schnell), False = feste Sim-Zahl
+    dynamic_sims: (Legacy) True = "selfplay"-Modus, False = fix.
+    sim_mode:     Überschreibt dynamic_sims falls gesetzt. Werte:
+                  "selfplay" (Effizienz-Deckelung), "play" (Stärke wie Arena,
+                  mehr Sims im Frühspiel für scharfe Policy-Targets), None (fix).
     """
-    ds_mode = "selfplay" if dynamic_sims else None
+    # sim_mode hat Vorrang; sonst aus dem Legacy-Bool ableiten.
+    if sim_mode is not None:
+        ds_mode = sim_mode if sim_mode in ("selfplay", "play") else None
+    else:
+        ds_mode = "selfplay" if dynamic_sims else None
+    ds_label = ds_mode if ds_mode else "FIX"
     if mode == "mcts":
         print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations}"
-              f"{' | dynamisch' if dynamic_sims else ' | FIX'})")
+              f" | {ds_label})")
         agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth,
                                   dynamic_sims=ds_mode)
     elif mode == "network":
@@ -306,7 +355,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             return
         print(f"🚀 Starte Network Self-Play: {num_games} Spiele "
               f"(Sims: {simulations} | Model: {model_file.name}"
-              f"{' | dynamisch' if dynamic_sims else ' | FIX'})")
+              f" | {ds_label})")
         agent = NetworkSelfPlayAgent(model_version=version_name, simulations=simulations,
                                      dynamic_sims=ds_mode)
     else:
@@ -358,6 +407,11 @@ if __name__ == "__main__":
     parser.add_argument("--no_dynamic_sims", action="store_true",
                         help="Dynamische Sim-Anpassung abschalten — feste Sim-Zahl pro Zug "
                              "(mehr Suchtiefe, langsamer; sinnvoll für Bootstrap-Daten)")
+    parser.add_argument("--sim_mode", type=str, default=None,
+                        choices=["selfplay", "play"],
+                        help="Dynamik-Modus explizit wählen: 'selfplay' (Effizienz-Deckelung) "
+                             "oder 'play' (Stärke wie Arena — mehr Sims im Frühspiel für "
+                             "scharfe Policy-Targets). Überschreibt --no_dynamic_sims.")
     parser.add_argument("--version", type=str, required=True,
                         help="Versionsname, z.B. v0 oder v1")
     parser.add_argument("--tag",      type=str, default=None,
@@ -404,6 +458,8 @@ if __name__ == "__main__":
             
             if args.no_dynamic_sims:
                 cmd.append("--no_dynamic_sims")
+            if args.sim_mode is not None:
+                cmd += ["--sim_mode", args.sim_mode]
             if args.depth is not None:
                 cmd += ["--depth", str(args.depth)]
             # Eigenes Konsolenfenster pro Prozess
@@ -433,4 +489,5 @@ if __name__ == "__main__":
         margin_cap=args.margin_cap,
         max_winner_score=args.max_winner_score,
         dynamic_sims=not args.no_dynamic_sims,
+        sim_mode=args.sim_mode,
     )
