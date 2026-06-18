@@ -184,18 +184,18 @@ if __name__ == "__main__":
     
     #agent_random = RandomAgent()
     #agent_greedy = GreedyAgent()
-    agent_mcts_heuristic1 = HeuristicMCTSAgent(simulations=50, rollout_depth=0, dynamic_sims="play")
-    #agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=50, rollout_depth=1)
+    agent_mcts_heuristic1 = HeuristicMCTSAgent(simulations=100, rollout_depth=0, dynamic_sims="play")
+    agent_mcts_heuristic2 = HeuristicMCTSAgent(simulations=100, rollout_depth=0, dynamic_sims="play")
     #agent_mcts_heuristic3 = HeuristicMCTSAgent(simulations=100, rollout_depth=0)
     #agent_mcts_heuristic4 = HeuristicMCTSAgent(simulations=100, rollout_depth=1)
     #agent_mcts_heuristic5 = HeuristicMCTSAgent(simulations=200, rollout_depth=0)
     #agent_mcts_heuristic6 = HeuristicMCTSAgent(simulations=200, rollout_depth=1)
-    agent_alphazero2 = AlphaZeroAgent(
-       model_version="v1d",
-       input_size=INPUT_SIZE, 
-       simulations=50,
-       dynamic_sims="play"
-       )
+    #agent_alphazero2 = AlphaZeroAgent(
+    #   model_version="v1d",
+    #   input_size=INPUT_SIZE, 
+    #   simulations=50,
+    #   dynamic_sims="play"
+     #  )
         
     # agent_alphazero1 = AlphaZeroAgent(
         # model_version="v1_noe_vw05",
@@ -235,8 +235,8 @@ if __name__ == "__main__":
     # }
     
     competitors = {
-       "AlphaZero v1d s50": (agent_alphazero2, 1000),
-       "MCTS s50-d0": (agent_mcts_heuristic1, 1000),
+       "MCTS 1 s100-d0": (agent_mcts_heuristic1, 1000),
+       "MCTS 2 s100-d0": (agent_mcts_heuristic2, 1000),
     }
 
     # Jeder spielt gegen jeden

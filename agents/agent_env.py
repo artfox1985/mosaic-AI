@@ -382,35 +382,21 @@ class MosaicEnv:
         from engine.round_end import can_complete_row_with_chips
 
         actions = []
-        
-        # FIX: Nur für den aktuellen Spieler Aktionen generieren
         pi = self.state.current_player
         player = self.state.players[pi]
 
-        # 1. Tiling-Aktionen (Reihen legen) — strikt top-down.
-        # tiled_max_row hält die höchste bereits gelegte Reihe fest; frühere
-        # Reihen sind dann tabu (gleiche Regel wie Server & Serializer).
-        tiled_max = getattr(player, "tiled_max_row", -1)
-        for ri, row in enumerate(player.pattern_lines):
-            if not row.is_complete:
-                continue
+        # 1. ZWINGENDE ZÜGE (Kacheln aus vollen Reihen platzieren)
+        # Die Engine (generate_tiling_actions) kümmert sich bereits perfekt um
+        # alle Regeln (unplatzierbare Reihen blockieren niemanden etc.).
+        tiling_actions = generate_tiling_actions(self.state, pi)
 
-            # Tabu: eine spätere Reihe wurde bereits gelegt
-            if ri < tiled_max:
-                continue
-
-            # Top-down: nur die ERSTE noch nicht gelegte vollständige Reihe.
-            # Eine frühere vollständige (noch ungelegte) Reihe blockiert.
-            earlier_open = any(
-                player.pattern_lines[r].is_complete and r >= tiled_max
-                for r in range(ri)
-            )
-            if earlier_open:
-                break
-
-            tiling = generate_tiling_actions(self.state, pi)
-            for a in tiling:
-                if a.pattern_row == ri:
+        if tiling_actions:
+            # Wir zwingen den Agenten zur Top-Down-Abarbeitung, um den
+            # Branching-Factor klein zu halten. Wir filtern einfach auf die
+            # oberste verfügbare Reihe.
+            first_row = min(a.pattern_row for a in tiling_actions)
+            for a in tiling_actions:
+                if a.pattern_row == first_row:
                     actions.append({
                         "type":         "tiling",
                         "player":       pi,
@@ -421,41 +407,28 @@ class MosaicEnv:
                         "dome_tile_id": a.dome_tile_id,
                         "rotation":     a.rotation,
                     })
-            break # Nur die erste validierte Reihe wird für Tiling betrachtet
 
-        # 2. Chip-Aktionen — gleiche top-down-Regel wie beim Reihen-Legen.
-        tiling_actions = generate_tiling_actions(self.state, pi)
-        placeable_rows = {a.pattern_row for a in tiling_actions}
+            # WICHTIG: Wenn es zwingende Kacheln zu legen gibt,
+            # darf das MCTS absolut nichts anderes (kein end_tiling) sehen!
+            return actions
 
+        # 2. OPTIONALE ZÜGE: Bonus-Chips verwenden
+        tiled_max = getattr(player, "tiled_max_row", -1)
         for ri, row in enumerate(player.pattern_lines):
             if row.is_complete:
                 continue
-
-            # Tabu: eine spätere Reihe wurde bereits gelegt → keine Chips mehr
-            # für frühere Reihen (tiled_max gilt schon von Block 1).
             if ri < tiled_max:
                 continue
-            
-            # Zusätzlich: eine frühere VOLLSTÄNDIGE (noch nicht gelegte) Reihe
-            # muss zuerst gelegt werden → blockiert Chips für spätere Reihen.
-            earlier_open = any(
-                player.pattern_lines[r].is_complete
-                and r in placeable_rows
-                and r >= tiled_max
-                for r in range(ri)
-            )
-            if earlier_open:
-                break
-                
+
             if not can_complete_row_with_chips(player, ri, self.state):
                 continue
-            
-            # Nach Vollmachen platzierbar? Prüfe Kuppelslot
+
             color = row.color
             dome_row = ri // 2
             space_row = ri % 2
             valid_si = [space_row * 2, space_row * 2 + 1]
             grid = player.dome_grid
+
             has_slot = any(
                 slot is not None and
                 any(
@@ -473,60 +446,60 @@ class MosaicEnv:
                     "pattern_row": ri,
                 })
 
-        # 3. end_tiling Logik
-        if not actions:
-            state = self.state
-            p_active = state.players[pi]
+        # 3. KUPPEL-PFLICHT UND BEENDEN
+        state = self.state
+        has_display = len(state.dome_display) > 0
+        has_pool = len(state.dome_tile_pool) > 0
+        has_free_slot = any(
+            player.dome_grid.dome_slots[sr][sc] is None
+            for sr in range(3) for sc in range(3)
+        )
+        still_must_place = (
+            state.round_number < 5
+            and player.dome_tiles_placed_this_round < 2
+            and (has_display or has_pool)
+            and has_free_slot
+            and player.can_place_dome_tile(state.round_number)
+        )
 
-            # Dome-Pflicht
-            has_display = len(state.dome_display) > 0
-            has_pool = len(state.dome_tile_pool) > 0
-            has_free_slot = any(
-                p_active.dome_grid.dome_slots[sr][sc] is None
-                for sr in range(3) for sc in range(3)
-            )
-            still_must_place = (
-                state.round_number < 5
-                and p_active.dome_tiles_placed_this_round < 2
-                and (has_display or has_pool)
-                and has_free_slot
-                and p_active.can_place_dome_tile(state.round_number)
-            )
+        dome_actions_added = False
+        if still_must_place:
+            from engine.game import generate_dome_moves
+            for m in generate_dome_moves(state):
+                display_index = next(
+                    (i for i, t in enumerate(state.dome_display)
+                     if t.tile_id == m.dome_tile_id), 0
+                )
+                actions.append({
+                    "type":          "dome",
+                    "display_index": display_index,
+                    "slot_row":      m.slot_row,
+                    "slot_col":      m.slot_col,
+                    "rotation":      m.rotation,
+                })
+                dome_actions_added = True
 
-            if still_must_place:
-                from engine.game import generate_dome_moves
-                for m in generate_dome_moves(state):
-                    display_index = next(
-                        (i for i, t in enumerate(state.dome_display)
-                         if t.tile_id == m.dome_tile_id), 0
-                    )
-                    actions.append({
-                        "type":          "dome",
-                        "display_index": display_index,
-                        "slot_row":      m.slot_row,
-                        "slot_col":      m.slot_col,
-                        "rotation":      m.rotation,
-                    })
-                if has_pool and has_free_slot:
-                    # Suche ersten freien Slot für Stack-Draw
-                    for slot_row in range(3):
-                        for slot_col in range(3):
-                            if p_active.dome_grid.dome_slots[slot_row][slot_col] is None:
-                                for rot in [0, 90, 180, 270]:
-                                    actions.append({
-                                        "type":     "dome_stack",
-                                        "slot_row": slot_row,
-                                        "slot_col": slot_col,
-                                        "rotation": rot,
-                                    })
-                                break
-                        else: continue
-                        break
-                
-                if not actions:
-                    actions.append({"type": "end_tiling"})
-            else:
-                actions.append({"type": "end_tiling"})
+            if has_pool and has_free_slot:
+                for slot_row in range(3):
+                    for slot_col in range(3):
+                        if player.dome_grid.dome_slots[slot_row][slot_col] is None:
+                            for rot in [0, 90, 180, 270]:
+                                actions.append({
+                                    "type":     "dome_stack",
+                                    "slot_row": slot_row,
+                                    "slot_col": slot_col,
+                                    "rotation": rot,
+                                })
+                                dome_actions_added = True
+                            break
+                    else: continue
+                    break
+
+        # end_tiling wird IMMER als Exit-Strategie angeboten, es sei denn,
+        # die Pflicht-Kuppeln wurden noch nicht platziert.
+        # Wichtig: Optionale Chip-Züge dürfen das Beenden nicht blockieren!
+        if not still_must_place or not dome_actions_added:
+            actions.append({"type": "end_tiling"})
 
         return actions
 
