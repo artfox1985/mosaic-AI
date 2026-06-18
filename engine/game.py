@@ -447,15 +447,26 @@ class Game:
                 return
 
             if t == "end_tiling":
-                # Prüfe ALLE Spieler, ob noch jemand zwingende Züge hat
-                for p_idx, player in enumerate(self.state.players):
-                    pending_actions = self.valid_tiling_actions(p_idx)
-                    if len(pending_actions) > 0:
-                        raise ValueError(
-                            f"Die Tiling-Phase kann nicht beendet werden! "
-                            f"Spieler '{player.name}' muss zuerst noch seine Musterreihen an die Kuppel legen."
-                        )
+                pi = move.get("player", self.state.current_player)
                 
+                # 1. Hat dieser Spieler noch zwingende Züge?
+                if self.valid_tiling_actions(pi):
+                    raise ValueError(f"Du hast noch platzierbare Reihen. Diese müssen zuerst gelegt werden!")
+                
+                # 2. Markiere diesen Spieler als fertig
+                if not hasattr(self.state, "_tiling_done"):
+                    self.state._tiling_done = [False, False]
+                self.state._tiling_done[pi] = True
+                
+                # 3. Ist der ANDERE Spieler auch schon fertig?
+                other = 1 - pi
+                if not self.state._tiling_done[other]:
+                    # Nein? Dann übergeben wir ihm jetzt offiziell den Zug!
+                    self.state.current_player = other
+                    return
+                
+                # 4. BEIDE sind fertig! Wir leiten die nächste Runde ein.
+                self.state._tiling_done = [False, False]
                 self._execute_end_tiling()
                 return
 
@@ -540,6 +551,7 @@ class Game:
         """Wechselt automatisch zu Tiling wenn Drafting abgeschlossen."""
         if self.state.phase == "drafting" and check_drafting_complete(self.state):
             self.state.phase = "tiling"
+            self.state._tiling_done = [False, False]
             # Reihenfolge-Tracking zurücksetzen: zu Beginn jeder Tiling-Phase
             # wurde noch keine Reihe gelegt.
             for p in self.state.players:
