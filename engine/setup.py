@@ -70,6 +70,8 @@ class GameState:
 
     # Spiellog
     log: list[str] = field(default_factory=list)
+    
+    _tiling_done: list[bool] = field(default_factory=lambda: [False, False])
 
     def log_event(self, msg: str) -> None:
         self.log.append(f"[R{self.round_number}] {msg}")
@@ -130,6 +132,7 @@ class GameState:
         # 2. Dynamisch hinzugefügte Attribute (wie die Wertungsplatten) manuell kopieren!
         if hasattr(self, 'scoring_tile_ids'):
             new_state.scoring_tile_ids = list(self.scoring_tile_ids)
+        new_state._tiling_done = list(self._tiling_done)
 
         return new_state
 
