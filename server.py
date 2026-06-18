@@ -371,6 +371,7 @@ def move_start_tile():
             col        = int(d['slot_col']),
             rot        = int(d.get('rotation', 0)),
         )
+        _flush_game_log()
         return jsonify(ok())
     except Exception as e:
         return jsonify(err(str(e)))
@@ -401,6 +402,7 @@ def tiling():
         )
         
         _game.apply_single_tiling(pi, action)
+        _flush_game_log()
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
@@ -477,6 +479,7 @@ def tiling_bonus_chips():
             f"{player.name}: {len(chip_uses)} Chip-Nutzung(en) → "
             f"Reihe {row_idx+1} {'komplett' if row.is_complete else 'teilweise'} gefüllt"
         )
+        _flush_game_log()
         return jsonify(ok())
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -521,6 +524,7 @@ def tiling_move_to_floor():
         _game.state.log_event(
             f"{player.name}: {len(tiles)} unplatzierbare Fliesen → Strafleiste"
         )
+        _flush_game_log()
         return jsonify(ok())
     except Exception as e:
         return jsonify(err(str(e)))
@@ -596,6 +600,7 @@ def end_scoring():
     if _game.state.phase != "end": return jsonify(err("Spiel noch nicht beendet"))
     try:
         results = _game._calculate_end_scoring()
+        _flush_game_log()
         return jsonify({"ok": True, "state": serialize_state(_game.state), **results})
     except Exception as e:
         return jsonify(err(str(e)))

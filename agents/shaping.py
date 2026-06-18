@@ -34,13 +34,35 @@ def get_player_potential(player) -> float:
         broken_penalty += k * base_pen
         
     # C: Bonus für das Fundament (Kuppelplatten) ---
+    # C1: Basis — jede liegende Platte ermöglicht überhaupt erst Punkte.
+    # C2: Positions-Bonus (sanfter E-Term, geometrisch): Die reine ZÄHLUNG der
+    #     Platten (C1) macht alle Platzierungen gleichwertig — die Bewertung kann
+    #     dann nicht zwischen guten und schlechten Plattenpositionen unterscheiden
+    #     (gemessene Spanne 0 → flache dome-Policy → das Netz setzt Platten
+    #     beliebig). Dieser Term bewertet zusätzlich die POSITION: orthogonal
+    #     benachbarte Platten ermöglichen zusammenhängende Linien (horizontal/
+    #     vertikal) und sind damit wertvoller. Bewusst SANFT gewichtet, damit er
+    #     diskriminiert ohne das Lernsignal zu dominieren. Hängt NUR an der
+    #     Plattengeometrie (nicht an Fliesen darauf) → potential-sauber, der Bonus
+    #     bleibt stabil solange die Platte liegt (kein Verschwinden beim Tiling
+    #     wie beim alten, koppelnden E-Term). Wertungsplatten bleiben hier
+    #     bewusst außen vor (vorläufig nur Geometrie).
+    _DOME_POSITION_WEIGHT = 0.3
+    slots = player.dome_grid.dome_slots
+    n_rows = len(slots)
+    n_cols = len(slots[0]) if n_rows else 0
     dome_bonus = 0.0
-    for r in player.dome_grid.dome_slots:
-        for slot in r:
-            if slot is not None:
-                # Jede liegende Platte ist extrem wertvoll, 
-                # da sie überhaupt erst Punkte ermöglicht!
-                dome_bonus += 1 
+    for r in range(n_rows):
+        for c in range(n_cols):
+            if slots[r][c] is not None:
+                dome_bonus += 1  # C1: Basis pro Platte
+                # C2: Positions-Bonus für orthogonale Platten-Nachbarn.
+                # Jede Kante wird von beiden Platten gezählt → Faktor 0.5,
+                # damit ein Nachbarpaar in Summe genau _DOME_POSITION_WEIGHT ergibt.
+                for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < n_rows and 0 <= nc < n_cols and slots[nr][nc] is not None:
+                        dome_bonus += 0.5 * _DOME_POSITION_WEIGHT
     potential += dome_bonus
     
     # D: Bonus für tatsächlich erzielte Punkte (motiviert echte Punktevergabe)
