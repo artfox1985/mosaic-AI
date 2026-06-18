@@ -978,6 +978,13 @@ def _compute_debug_analysis(env, actions, mark_best=False):
         node = _ai_agent._expand(node, sim_env)
         result = _ai_agent._rollout(sim_env)
         _ai_agent._backpropagate(node, result, pi)
+        
+    def get_max_depth(n):
+        if not n.children:
+            return 0
+        return 1 + max(get_max_depth(c) for c in n.children)
+    
+    tree_depth = get_max_depth(root)
 
     # Beste Aktion aus DIESEM Baum: höchste Visits (identische Logik wie _mcts_search)
     best_action = None
@@ -990,10 +997,12 @@ def _compute_debug_analysis(env, actions, mark_best=False):
     total_visits = sum(c.visits for c in root.children) or 1
     visits_by_id = {}
     q_by_id      = {}
+    depth_by_id  = {}
     for c in root.children:
         aid = action_to_id(c.action)
         visits_by_id[aid] = c.visits
         q_by_id[aid]      = (c.value / c.visits) if c.visits > 0 else 0.0
+        depth_by_id[aid]  = get_max_depth(c) + 1
 
     # Shaping-Reward pro Aktion: was gibt env.step() für diesen einen Zug?
     # (Score-Differenz + Potential-Differenz aus shaping.py)
@@ -1017,6 +1026,7 @@ def _compute_debug_analysis(env, actions, mark_best=False):
             aid = action_to_id(e["action"])
             visits = visits_by_id.get(aid, 0)
             q      = q_by_id.get(aid, None)
+            d      = depth_by_id.get(aid, 0)
             moves.append({
                 "action_id":      aid,
                 "description":    describe_action_id(aid),
@@ -1027,6 +1037,7 @@ def _compute_debug_analysis(env, actions, mark_best=False):
                 "mcts_share":     round(visits / total_visits, 4),
                 "mcts_q":         round(q, 4) if q is not None else None,
                 "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
+                "max_depth":      d,
                 "shaping":        shaping_by_id.get(aid),
                 "chosen":         (mark_best and aid == best_id),
             })
@@ -1037,6 +1048,7 @@ def _compute_debug_analysis(env, actions, mark_best=False):
             aid    = action_to_id(c.action)
             visits = c.visits
             q      = q_by_id.get(aid, None)
+            d      = depth_by_id.get(aid, 0)
             moves.append({
                 "action_id":      aid,
                 "description":    describe_action_id(aid),
@@ -1047,6 +1059,7 @@ def _compute_debug_analysis(env, actions, mark_best=False):
                 "mcts_share":     round(visits / total_visits, 4),
                 "mcts_q":         round(q, 4) if q is not None else None,
                 "mcts_win_pct":   round((q + 1) / 2 * 100, 1) if q is not None else None,
+                "max_depth":      d,
                 "shaping":        shaping_by_id.get(aid),
                 "chosen":         (mark_best and aid == best_id),
             })
@@ -1061,6 +1074,7 @@ def _compute_debug_analysis(env, actions, mark_best=False):
         "has_net":        has_net,
         "simulations":    sim_count,
         "num_actions":    len(actions),
+        "max_depth":      tree_depth,
         "moves":          moves,
     }
     return analysis, best_action

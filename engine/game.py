@@ -449,24 +449,31 @@ class Game:
             if t == "end_tiling":
                 pi = move.get("player", self.state.current_player)
                 
-                # 1. Hat dieser Spieler noch zwingende Züge?
+                # 1. Validierung (bestehend)
                 if self.valid_tiling_actions(pi):
-                    raise ValueError(f"Du hast noch platzierbare Reihen. Diese müssen zuerst gelegt werden!")
+                    raise ValueError(f"Noch Züge offen für Spieler {pi}")
                 
-                # 2. Markiere diesen Spieler als fertig
+                # 2. Zwingende Zuweisung auf das State-Objekt!
+                # Wir stellen sicher, dass das Array existiert
                 if not hasattr(self.state, "_tiling_done"):
                     self.state._tiling_done = [False, False]
-                self.state._tiling_done[pi] = True
                 
-                # 3. Ist der ANDERE Spieler auch schon fertig?
+                # Hier der Fix: Wir setzen den Wert explizit im state
+                tmp_done = list(self.state._tiling_done)
+                tmp_done[pi] = True
+                self.state._tiling_done = tmp_done
+                
+                print(f"DEBUG: Flag gesetzt für P{pi}. Neuer Status: {self.state._tiling_done}")
+
+                # 3. Wechsel oder Abschluss (bestehend)
                 other = 1 - pi
                 if not self.state._tiling_done[other]:
-                    # Nein? Dann übergeben wir ihm jetzt offiziell den Zug!
                     self.state.current_player = other
                     return
                 
-                # 4. BEIDE sind fertig! Wir leiten die nächste Runde ein.
+                # 4. Phase beenden
                 self.state._tiling_done = [False, False]
+                self.state.phase = "drafting"
                 self._execute_end_tiling()
                 return
 
@@ -544,8 +551,9 @@ class Game:
             self.state.phase = "end"
             self.state.log_event("Das Spiel ist beendet!")
         else:
-            self.state.phase = "done"
             self.next_round()
+            self.state.phase = "drafting"
+            self.state.log_event(f"Runde {self.state.round_number} beginnt.")
 
     def _check_phase_transition(self) -> None:
         """Wechselt automatisch zu Tiling wenn Drafting abgeschlossen."""

@@ -138,6 +138,7 @@
       <span>KI-Spieler: <b id="aiPlayer">–</b></span>
       <span>Gültige Aktionen: <b id="numActions">–</b></span>
       <span>Simulationen: <b id="numSims">–</b></span>
+	  <span>Max. Suchtiefe: <b id="maxDepth" style="color: var(--accent);">–</b></span>
     </div>
   </div>
 
@@ -193,6 +194,7 @@ function renderAnalysis(d) {
   document.getElementById('aiPlayer').textContent = (d.ai_player !== null && d.ai_player !== undefined) ? 'P' + (d.ai_player + 1) : '–';
   document.getElementById('numActions').textContent = d.num_actions;
   document.getElementById('numSims').textContent = d.simulations;
+  document.getElementById('maxDepth').textContent = d.max_depth !== undefined ? d.max_depth : '–';
 
   const moves = d.moves || [];
   if (!moves.length) {
@@ -208,6 +210,7 @@ function renderAnalysis(d) {
     (hasNet ? '<th class="num">Netz-Policy</th>' : '') +
     '<th class="num">MCTS-Visits</th>' +
     '<th class="num">MCTS Win%</th>' +
+	'<th class="num">Tiefe</th>' +
     '<th class="num">Shaping</th>' +
     (hasNet ? '<th class="num">Δ</th>' : '') +
     '</tr></thead><tbody>';
@@ -238,14 +241,14 @@ function renderAnalysis(d) {
       shapingCell = `<td class="num" style="color:${col}">${sv >= 0 ? '+' : ''}${sv.toFixed(2)}</td>`;
     }
 
-    html += `<tr${rowStyle}>
+	html += `<tr${rowStyle}>
       <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
           <span class="pill">${m.action_id}</span></td>
       ${netCell}
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
       <td class="num">${m.mcts_win_pct !== null ? m.mcts_win_pct + '%' : '–'}</td>
-      ${shapingCell}
+      <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '–'}</td> ${shapingCell}
       ${divCell}
     </tr>`;
   }

@@ -107,7 +107,7 @@ class MCTSNode:
         self.player_who_acted = player_who_acted
         self.priors          = None            # NN-Policy-Priors (nur AlphaZero), lazy gesetzt
 
-    def ucb1(self, c: float = 1.414) -> float:
+    def ucb1(self, c: float = 0.3) -> float:
         """
         UCB1-Score: balance zwischen Exploitation (bekannt gut) und
         Exploration (wenig besucht).
@@ -120,7 +120,7 @@ class MCTSNode:
         explore = c * math.sqrt(math.log(self.parent.visits) / self.visits)
         return exploit + explore
 
-    def best_child(self, c: float = 1.414) -> "MCTSNode":
+    def best_child(self, c: float = 0.3) -> "MCTSNode":
         return max(self.children, key=lambda n: n.ucb1(c))
 
     def is_fully_expanded(self) -> bool:
@@ -155,7 +155,7 @@ class MCTSAgent(BaseAgent):
     def __init__(
         self,
         simulations: int = 200,
-        c: float = 1.414,
+        c: float = 0.3,
         rollout_depth: int = 30,
         time_limit_s: float | None = None,
         max_actions: int = 10,
