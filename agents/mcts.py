@@ -158,7 +158,7 @@ class MCTSAgent(BaseAgent):
         c: float = 1.414,
         rollout_depth: int = 30,
         time_limit_s: float | None = None,
-        max_actions: int = 20,
+        max_actions: int = 10,
         verbose: bool = False,
         dynamic_sims: str | None = None,
     ):
@@ -194,8 +194,10 @@ class MCTSAgent(BaseAgent):
             return max(15, min(base, int(num_actions * 0.35)))
         if self.dynamic_sims == "play":
             # base als Untergrenze-Anker, Obergrenze etwas höher für frühe Züge
-            hi = max(base, int(base * 3))
-            return max(base, min(hi, int(math.sqrt(num_actions) * 10)))
+            hi = max(base, int(base * 5))
+            target = int(base + (math.sqrt(num_actions) * 25))
+            
+            return max(base, min(hi, target))
         return base
 
     def choose(self, actions: list[dict], obs: dict) -> dict:
@@ -216,6 +218,17 @@ class MCTSAgent(BaseAgent):
         """
         if len(actions) == 1:
             return actions[0]
+
+        # Shortcut: Wenn end_tiling verfügbar ist und KEINE anderen Tiling-Züge
+        # mehr offen sind, direkt zurückgeben — kein MCTS nötig und kein Risiko
+        # dass die Suche end_tiling falsch bewertet.
+        # Sind gleichzeitig tiling/use_chips verfügbar, wird end_tiling aus der
+        # MCTS-Suche herausgehalten (in _sample_actions mit -inf bewertet).
+        action_types = set(a.get("type") for a in actions)
+        if "end_tiling" in action_types and not (
+            action_types & {"tiling", "use_chips"}
+        ):
+            return next(a for a in actions if a.get("type") == "end_tiling")
 
         env = getattr(self, '_env', None)
         if env is None:
@@ -317,11 +330,16 @@ class MCTSAgent(BaseAgent):
 
             sims_done += 1
 
-        # Bestes Kind: höchste Besuchsanzahl (robusteste Auswahl)
+        # Bestes Kind: höchste Besuchsanzahl (robusteste Auswahl).
+        # Bei Gleichstand in Besuchen: Q-Wert (value/visits) als Tiebreaker.
+        # Das verhindert dass bei ~gleich oft erkundeten Zügen zufällig der
+        # erste in der Liste gewählt wird statt der qualitativ bessere.
         if not root.children:
             return random.choice(actions)
 
-        best = max(root.children, key=lambda n: n.visits)
+        best = max(root.children,
+                   key=lambda n: (n.visits,
+                                  n.value / n.visits if n.visits else 0.0))
 
         if self.verbose:
             elapsed = time.time() - t_start
@@ -346,77 +364,64 @@ class MCTSAgent(BaseAgent):
 
     def _select(self, node: MCTSNode, env: MosaicEnv) -> MCTSNode:
         """
-        Traversiere den Baum entlang UCB1-maximaler Kinder bis zu einem
-        Knoten der noch unerkundete Aktionen hat.
+        Traversiere den Baum. Integriertes Progressive Widening:
+        Entscheidet, ob wir absteigen, oder auf dieser Ebene eine 
+        neue Aktion aus dem Heuristik-Pool freischalten.
         """
-        while node.is_fully_expanded() and node.children:
+        while node.children:
+            # --- 1. PROGRESSIVE WIDENING CHECK ---
+            if node.remaining_actions is not None and len(node.remaining_actions) > 0:
+                # SUBLINEARES WACHSTUM: Wurzel aus Besuchen.
+                # Wächst anfangs moderat, flacht dann ab, um Deepening zu erzwingen!
+                # Faktor 2.5 bedeutet: Bei 100 Besuchen -> +25 Aktionen, bei 400 Besuchen -> +50 Aktionen
+                allowed_actions = self.max_actions + int(math.sqrt(node.visits) * 2.5)
+                
+                current_actions = len(node.children) + len(node.untried_actions)
+                
+                if current_actions < allowed_actions:
+                    node.untried_actions.append(node.remaining_actions.pop(0))
+                    return node
+
+            # --- 2. SIND NOCH FREIGESCHALTETE ZÜGE UNVERSUCHT? ---
+            if node.untried_actions:
+                return node # _expand kümmert sich um den Test
+                
+            # --- 3. ABSTIEG ZUM KIND ---
+            # Für die aktuelle Anzahl an Besuchen ist dieser Knoten "vollständig".
+            # Wir steigen tiefer in den Baum ab.
             node = node.best_child(self.c)
             obs, _, done, _ = env.step(node.action)
             if done:
                 return node
+                
         return node
 
     def _expand(self, node: MCTSNode, env: MosaicEnv) -> MCTSNode:
-        """
-        Wähle eine unerkundete Aktion, führe sie aus und füge
-        einen neuen Kindknoten hinzu.
-
-        untried_actions wird lazy befüllt: beim ersten Expand eines Knotens
-        werden die gültigen Aktionen frisch aus dem aktuellen env-Zustand
-        generiert. Das verhindert dass veraltete Aktionen (z.B. Kacheln die
-        bereits platziert wurden) ausgeführt werden.
-        """
-        # Lazy Init: frisch aus aktuellem env-Zustand befüllen
-        # Progressive Widening: starte mit max_actions, erweitere mit mehr Besuchen
+        # Lazy Init: Beim allerersten Aufruf befüllen
         if node.untried_actions is None:
             all_actions = env.valid_actions()
-            # Reward-basierte Sortierung (clone+step pro Aktion) ist teuer und
-            # lohnt nur an der WURZEL: dort wird der echte Zug gewählt und das
-            # Policy-Target aus den Besuchen gebildet, also müssen dort die besten
-            # Züge in den Baum. Tiefere Knoten (reiner Lookahead) nutzen die
-            # schnelle typ-priorisierte Zufallsauswahl — sonst vervielfacht sich
-            # die Vorbewertung über alle Baumknoten (gemessen ~11×) und bremst
-            # die Suche drastisch aus.
             is_root = node.parent is None
             ranked = self._sample_actions(all_actions, env if is_root else None)
             node.untried_actions = ranked[:self.max_actions]
             node.remaining_actions = ranked[self.max_actions:]
-        
-        # Progressive Widening: neue Aktionen freischalten wenn Knoten oft besucht
-        if node.remaining_actions:
-            # Alle k Besuche eine neue Aktion hinzufügen
-            k = max(3, self.max_actions // 4)
-            extra = max(0, node.visits // k - (self.max_actions - len(node.untried_actions)))
-            if extra > 0 and node.remaining_actions:
-                for _ in range(min(extra, len(node.remaining_actions))):
-                    node.untried_actions.append(node.remaining_actions.pop(0))
-
+            
         if not node.untried_actions:
             return node
 
+        # Ziehe eine freigeschaltete Aktion
         action = node.untried_actions.pop(
             random.randrange(len(node.untried_actions))
         )
-        # WICHTIG: Spieler VOR dem step auslesen — step() wechselt den Spieler,
-        # danach würde env.current_player() den FOLGE-Spieler liefern und der
-        # Knotenwert würde aus der falschen Perspektive verbucht.
+        
         mover = env.current_player()
         obs, _, done, _ = env.step(action)
 
-        if done:
-            child = MCTSNode(
-                action=action,
-                parent=node,
-                untried_actions=[],
-                player_who_acted=mover,
-            )
-        else:
-            child = MCTSNode(
-                action=action,
-                parent=node,
-                untried_actions=None,  # lazy: beim nächsten _expand befüllt
-                player_who_acted=mover,
-            )
+        child = MCTSNode(
+            action=action,
+            parent=node,
+            untried_actions=[] if done else None,
+            player_who_acted=mover,
+        )
 
         node.children.append(child)
         return child
@@ -492,22 +497,91 @@ class MCTSAgent(BaseAgent):
             return list(actions)
 
         if env is not None:
-            # Nach Shaping-Reward sortieren (beste zuerst). Ein clone()+step()
-            # pro Aktion — derselbe Mechanismus wie im Greedy-Rollout.
-            scored = []
+            # Aktionen nach Güte sortieren.
+            # Dome-Aktionen: score_dome_action() nutzen (Shaping-Reward ist
+            # bei dome ~0 weil der Wert zukunftsbezogen ist).
+            # Stone/andere: normaler Shaping-Reward via clone+step.
+            #
+            # SKALIERUNGS-PROBLEM: score_dome_action() gibt Werte ~1-8 zurück
+            # (Summe über 4 Spaces × Reihen-Wahrscheinlichkeit × Reihen-Punkte),
+            # während Stone-Shaping-Rewards typisch ~-2 bis +2 liegen.
+            # Ohne Normalisierung verdrängen Dome-Aktionen alle Stone-Züge aus
+            # den Top-max_actions → KI sieht nur Kuppelplatten und ignoriert
+            # komplett das Stein-Drafting.
+            #
+            # Lösung: Separate Quoten. Die Top-max_actions werden aufgeteilt:
+            # - dome_quota Plätze für die besten Kuppelzüge
+            # - der Rest für die besten Stone/anderen Züge
+            # So landet immer ein Mix beider Typen in der Suche.
+            #
+            # end_tiling: -inf wenn andere Tiling-Züge offen (500-Züge-Bug-Fix).
+            from agents.shaping import score_dome_action
+            has_other_tiling = any(
+                a.get("type") in ("tiling", "use_chips")
+                for a in actions
+            )
+            state = env.state
+            pi = env.current_player()
+            player = state.players[pi]
+
+            dome_scored = []
+            other_scored = []
+
             for a in actions:
                 try:
-                    te = env.clone()
-                    _, r, _, _ = te.step(a)
+                    t = a.get("type")
+                    if t == "end_tiling" and has_other_tiling:
+                        r = -float("inf")
+                        other_scored.append((r, a))
+                    elif t in ("dome", "dome_stack"):
+                        r = score_dome_action(a, player, state)
+                        dome_scored.append((r, a))
+                    else:
+                        te = env.clone()
+                        _, r, _, _ = te.step(a)
+                        other_scored.append((r, a))
                 except Exception:
-                    r = -float("inf")
-                scored.append((r, a))
-            # Stabil nach Reward absteigend; Reihenfolge gleichwertiger bleibt erhalten
-            scored.sort(key=lambda x: x[0], reverse=True)
-            return [a for _, a in scored]
+                    other_scored.append((-float("inf"), a))
 
-        # Fallback ohne env: typ-priorisierte Zufallsauswahl (wie zuvor)
-        priority = {"tiling":8,"end_tiling":7,"bonus_chip":6,"stone":4,"dome":3,"dome_stack":2,"pass":1}
+            dome_scored.sort(key=lambda x: x[0], reverse=True)
+            other_scored.sort(key=lambda x: x[0], reverse=True)
+            # wenn nur einer vorhanden, bekommt er alle Plätze.
+            if dome_scored and other_scored:
+                dome_quota  = max(1, self.max_actions // 2)
+                other_quota = max(1, self.max_actions - dome_quota)
+            elif dome_scored:
+                dome_quota  = self.max_actions
+                other_quota = 0
+            else:
+                dome_quota  = 0
+                other_quota = self.max_actions
+
+            top = ([a for _, a in dome_scored[:dome_quota]] +
+                   [a for _, a in other_scored[:other_quota]])
+            remaining = ([a for _, a in dome_scored[dome_quota:]] +
+                         [a for _, a in other_scored[other_quota:]])
+            # remaining ebenfalls nach Score sortiert für Progressive Widening
+            remaining.sort(key=lambda a: next(
+                (s for s, x in dome_scored + other_scored if x is a), -float("inf")
+            ), reverse=True)
+            return top + remaining
+
+        # Fallback ohne env: typ-priorisierte Zufallsauswahl.
+        # end_tiling bekommt NIEDRIGSTE Priorität wenn andere Tiling-Züge offen sind,
+        # damit es nie ausgewählt wird solange platzierbare Reihen vorhanden sind.
+        has_other_tiling_fb = any(
+            a.get("type") in ("tiling", "use_chips") for a in actions
+        )
+        priority = {
+            "tiling":     8,
+            "use_chips":  7,
+            "end_tiling": 0 if has_other_tiling_fb else 6,  # last resort wenn andere offen
+            "bonus_chip": 6,
+            "stone":      4,
+            "dome":       3,
+            "dome_stack": 2,
+            "pass":       1,
+        }
         by_type: dict[str, list] = {}
         for a in actions:
             by_type.setdefault(a["type"], []).append(a)
@@ -659,30 +733,37 @@ def evaluate_state(state) -> dict[int, float]:
     Spiegelt exakt das Reward-Shaping des Neuronalen Netzes wider!
     """
     from engine.serializer import _estimate_round_score
-    
+
+    round_number = getattr(state, "round_number", 1)
+    scoring_tile_ids = getattr(state, "scoring_tile_ids", [])
+
     evaluations = {}
     for pi in [0, 1]:
         p = state.players[pi]
-        
-        # 1. Echte Punkte + Schätzung (NUR Strafen/Marker — die Reihen-Punktwerte
-        #    stecken jetzt im potential über den complete_bonus, also include_rows=False
-        #    um Doppelzählung zu vermeiden)
+
+        # Echte Punkte + Schätzung (Reihen-Punkte stecken im potential via
+        # complete_bonus → include_rows=False verhindert Doppelzählung)
         base_score = p.score
         est_score = _estimate_round_score(p, include_rows=False)
-        
-        # 2. Potenzial des Boards laden (Unsere neue Funktion!)
-        potential = get_player_potential(p)
-            
+
+        # Potenzial mit Runde + aktiven Wertungsplatten
+        potential = get_player_potential(
+            p,
+            round_number=round_number,
+            scoring_tile_ids=scoring_tile_ids,
+        )
+
         evaluations[pi] = base_score + est_score + potential
 
-    # --- Tie-Breaker Bonus ---
+    # Tie-Breaker
     if evaluations[0] == evaluations[1]:
         if state.players[0].holds_first_player_marker:
             evaluations[0] += 0.1
         else:
             evaluations[1] += 0.1
-        
+
     return evaluations
+
 
 
 class HeuristicMCTSAgent(MCTSAgent):

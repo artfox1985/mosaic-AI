@@ -38,36 +38,28 @@ class SelfPlayMixin:
     """
 
     def _selfplay_sim_count(self, num_actions: int) -> int:
-        """Dynamische Sim-Zahl für Self-Play (Effizienz-Modus).
-        Greift auf _compute_dynamic_sims zu falls vorhanden (MCTSSelfPlayAgent)
-        oder auf den gewrappten _az (NetworkSelfPlayAgent). Fällt sonst auf
-        self.simulations zurück."""
-        mode = getattr(self, 'dynamic_sims', None)
-        if mode is None and hasattr(self, '_az'):
-            mode = getattr(self._az, 'dynamic_sims', None)
-        if mode == "selfplay":
-            # Effizienz: deckelt bei vielen Aktionen. Erzeugt aber im Frühspiel
-            # flache/verrauschte Policy-Targets (zu wenige Sims auf viele Optionen).
-            return max(15, min(self.simulations, int(num_actions * 0.35)))
-        if mode == "play":
-            # Stärke (wie Arena): im Frühspiel MEHR Sims (bis base*3), damit die
-            # Besuchsverteilung scharf genug für ein brauchbares Policy-Target ist.
-            import math
-            return max(self.simulations,
-                       min(self.simulations * 3, int(math.sqrt(num_actions) * 10)))
-        return self.simulations
+        """Dynamische Sim-Zahl für Self-Play — immer play-Modus.
+        Gibt im Frühspiel (viele Aktionen) mehr Sims für schärfere Policy-Targets,
+        skaliert mit sqrt(num_actions) * 10, begrenzt auf [base, base*3]."""
+        import math
+        return max(self.simulations,
+                   min(self.simulations * 3, int(math.sqrt(num_actions) * 10)))
 
     def search_and_get_policy(self, env, actions, temp=1.0):
         pi = env.current_player()
-        sampled = self._sample_actions(actions)
 
-        # Dynamische Sim-Zahl je nach Aktionsanzahl (Effizienz)
+        # Dynamische Sim-Zahl je nach Aktionsanzahl
         sim_count = self._selfplay_sim_count(len(actions))
 
+        # Root-Knoten mit untried_actions=None initialisieren, damit _expand
+        # beim ersten Besuch die reward-basierte Sortierung (beste Züge zuerst)
+        # durchführt. Wenn hier mit vorbefüllten untried_actions gearbeitet wird,
+        # überspringt _expand die Initialisierung komplett → alle Aktionen landen
+        # ungefiltert im Baum, die Reward-Sortierung greift nie.
         root = MCTSNode(
             action=None,
             parent=None,
-            untried_actions=sampled,
+            untried_actions=None,
             player_who_acted=pi
         )
         root.visits = 1
@@ -324,40 +316,28 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
 # Datengenerierung
 # ---------------------------------------------------------------------------
 
-def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40, dynamic_sims: bool = True, sim_mode: str = None):
+def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40):
     """
     Generiert Self-Play Trainingsdaten.
 
     mode:         'mcts' oder 'network'
     num_games:    Anzahl zu spielender Partien
-    simulations:  MCTS-Simulationen pro Zug
+    simulations:  MCTS-Simulationen pro Zug (Basis; play-Modus skaliert im
+                  Frühspiel auf bis zu 3× für schärfere Policy-Targets)
     version_name: Versionsname für Dateinamen und Modell-Laden
-    dynamic_sims: (Legacy) True = "selfplay"-Modus, False = fix.
-    sim_mode:     Überschreibt dynamic_sims falls gesetzt. Werte:
-                  "selfplay" (Effizienz-Deckelung), "play" (Stärke wie Arena,
-                  mehr Sims im Frühspiel für scharfe Policy-Targets), None (fix).
     """
-    # sim_mode hat Vorrang; sonst aus dem Legacy-Bool ableiten.
-    if sim_mode is not None:
-        ds_mode = sim_mode if sim_mode in ("selfplay", "play") else None
-    else:
-        ds_mode = "selfplay" if dynamic_sims else None
-    ds_label = ds_mode if ds_mode else "FIX"
     if mode == "mcts":
         print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations}"
-              f" | depth={rollout_depth} | {ds_label})")
-        agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth,
-                                  dynamic_sims=ds_mode)
+              f" | depth={rollout_depth} | play)")
+        agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth)
     elif mode == "network":
         model_file = MODELS_DIR / f"alphazero_{version_name}.pth"
         if not model_file.exists():
             print(f"❌ Modell nicht gefunden: {model_file}")
             return
         print(f"🚀 Starte Network Self-Play: {num_games} Spiele "
-              f"(Sims: {simulations} | Model: {model_file.name}"
-              f" | {ds_label})")
-        agent = NetworkSelfPlayAgent(model_version=version_name, simulations=simulations,
-                                     dynamic_sims=ds_mode)
+              f"(Sims: {simulations} | Model: {model_file.name} | play)")
+        agent = NetworkSelfPlayAgent(model_version=version_name, simulations=simulations)
     else:
         print(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
         return
@@ -402,16 +382,9 @@ if __name__ == "__main__":
                         help="'mcts' für MCTS-only, 'network' für AlphaZero-Netz")
     parser.add_argument("--games",   type=int, default=100,
                         help="Anzahl Spiele")
-    parser.add_argument("--sims",    type=int, default=50,
-                        help="MCTS-Simulationen pro Zug (Obergrenze bei dynamischer Anpassung)")
-    parser.add_argument("--no_dynamic_sims", action="store_true",
-                        help="Dynamische Sim-Anpassung abschalten — feste Sim-Zahl pro Zug "
-                             "(mehr Suchtiefe, langsamer; sinnvoll für Bootstrap-Daten)")
-    parser.add_argument("--sim_mode", type=str, default=None,
-                        choices=["selfplay", "play"],
-                        help="Dynamik-Modus explizit wählen: 'selfplay' (Effizienz-Deckelung) "
-                             "oder 'play' (Stärke wie Arena — mehr Sims im Frühspiel für "
-                             "scharfe Policy-Targets). Überschreibt --no_dynamic_sims.")
+    parser.add_argument("--sims",    type=int, default=100,
+                        help="MCTS-Simulationen pro Zug (Basis; play-Modus skaliert "
+                             "im Frühspiel auf bis zu 3×)")
     parser.add_argument("--version", type=str, required=True,
                         help="Versionsname, z.B. v0 oder v1")
     parser.add_argument("--tag",      type=str, default=None,
@@ -436,7 +409,7 @@ if __name__ == "__main__":
         n = args.terminals
         base = args.games // n
         rest = args.games % n
-        tags = list(string.ascii_lowercase)  # a, b, c, ...
+        tags = list(string.ascii_lowercase)
         print(f"🚀 Starte {n} parallele Terminals "
               f"(je ~{base} Spiele, Tags {tags[0]}–{tags[n-1]})")
         procs = []
@@ -455,24 +428,17 @@ if __name__ == "__main__":
                 "--margin_cap", str(args.margin_cap),
                 "--max_winner_score", str(args.max_winner_score),
             ]
-            
-            if args.no_dynamic_sims:
-                cmd.append("--no_dynamic_sims")
-            if args.sim_mode is not None:
-                cmd += ["--sim_mode", args.sim_mode]
             if args.depth is not None:
                 cmd += ["--depth", str(args.depth)]
-            # Eigenes Konsolenfenster pro Prozess
-            if os.name == "nt":  # Windows
+            if os.name == "nt":
                 CREATE_NEW_CONSOLE = 0x00000010
                 p = subprocess.Popen(cmd, creationflags=CREATE_NEW_CONSOLE)
-            else:  # Linux/Mac: im Hintergrund, Ausgabe in Logdatei
+            else:
                 logf = open(f"selfplay_terminal_{tag_i}.log", "w")
                 p = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT)
             procs.append((tag_i, games_i, p))
             print(f"   ↳ Terminal {i+1}: Tag '{tag_i}', {games_i} Spiele (PID {p.pid})")
-        print(f"\n✅ Alle {len(procs)} Terminals gestartet. "
-              f"Warte auf Abschluss...")
+        print(f"\n✅ Alle {len(procs)} Terminals gestartet. Warte auf Abschluss...")
         for tag_i, games_i, p in procs:
             p.wait()
             print(f"   ✓ Terminal Tag '{tag_i}' fertig ({games_i} Spiele)")
@@ -488,6 +454,4 @@ if __name__ == "__main__":
         rollout_depth=rollout_depth,
         margin_cap=args.margin_cap,
         max_winner_score=args.max_winner_score,
-        dynamic_sims=not args.no_dynamic_sims,
-        sim_mode=args.sim_mode,
     )
