@@ -533,10 +533,45 @@ def tiling_move_to_floor():
 @app.route('/api/end_tiling', methods=['POST'])
 def end_tiling():
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
+    
+    # 1. Sicherheits-Check: Hat der Mensch wirklich alles gelegt?
+    human_player = 1 - _ai_player if _ai_player is not None else _game.state.current_player
+    if _game.valid_tiling_actions(human_player):
+        return jsonify(err("Du hast noch platzierbare Reihen. Bitte lege sie zuerst an die Kuppel!"))
+
     try:
+        # 2. KI-Turbo: Falls die KI aktiv ist, darf sie jetzt vollautomatisch zu Ende tilen!
+        if _ai_agent is not None and _ai_player is not None:
+            _game.state.current_player = _ai_player
+            from agents.agent_env import MosaicEnv
+            from engine.serializer import serialize_state
+            
+            env = MosaicEnv()
+            env._game = _game
+            env.state = _game.state
+            _ai_agent.set_env(env)
+            
+            while True:
+                actions = env.valid_actions()
+                if not actions:
+                    break
+                # Sobald nur noch der "end_tiling" Exit übrig ist, stoppt die Schleife
+                if len(actions) == 1 and actions[0].get("type") == "end_tiling":
+                    break
+                
+                # KI wählt ihren nächsten Tiling-Zug und führt ihn aus
+                action = _ai_agent.choose(actions, serialize_state(env.state))
+                _, _, done, info = env.step(action)
+                
+                if 'error' in info:
+                    print(f"KI Tiling Fehler (Auto-Loop): {info['error']}")
+                    break
+        
+        # 3. Beide Spieler sind restlos fertig -> Die Phase wird ganz offiziell beendet
         _game.apply({"type": "end_tiling"})
         _flush_game_log()
         return jsonify(ok())
+        
     except Exception as e:
         return jsonify(err(str(e)))
 
