@@ -345,7 +345,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     ds_label = ds_mode if ds_mode else "FIX"
     if mode == "mcts":
         print(f"🚀 Starte MCTS Self-Play: {num_games} Spiele (Sims: {simulations}"
-              f" | {ds_label})")
+              f" | depth={rollout_depth} | {ds_label})")
         agent = MCTSSelfPlayAgent(simulations=simulations, rollout_depth=rollout_depth,
                                   dynamic_sims=ds_mode)
     elif mode == "network":

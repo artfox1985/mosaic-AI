@@ -370,12 +370,17 @@ class MCTSAgent(BaseAgent):
         # Progressive Widening: starte mit max_actions, erweitere mit mehr Besuchen
         if node.untried_actions is None:
             all_actions = env.valid_actions()
-            # Erste Welle: max_actions
-            sampled = self._sample_actions(all_actions)
-            node.untried_actions = sampled
-            # Restliche Aktionen für spätere Erweiterung aufbewahren
-            remaining = [a for a in all_actions if a not in sampled]
-            node.remaining_actions = remaining if remaining else []
+            # Reward-basierte Sortierung (clone+step pro Aktion) ist teuer und
+            # lohnt nur an der WURZEL: dort wird der echte Zug gewählt und das
+            # Policy-Target aus den Besuchen gebildet, also müssen dort die besten
+            # Züge in den Baum. Tiefere Knoten (reiner Lookahead) nutzen die
+            # schnelle typ-priorisierte Zufallsauswahl — sonst vervielfacht sich
+            # die Vorbewertung über alle Baumknoten (gemessen ~11×) und bremst
+            # die Suche drastisch aus.
+            is_root = node.parent is None
+            ranked = self._sample_actions(all_actions, env if is_root else None)
+            node.untried_actions = ranked[:self.max_actions]
+            node.remaining_actions = ranked[self.max_actions:]
         
         # Progressive Widening: neue Aktionen freischalten wenn Knoten oft besucht
         if node.remaining_actions:
@@ -466,15 +471,42 @@ class MCTSAgent(BaseAgent):
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
-    def _sample_actions(self, actions: list[dict]) -> list[dict]:
+    def _sample_actions(self, actions: list[dict], env: "MosaicEnv" = None) -> list[dict]:
         """
-        Samplet max_actions Aktionen mit Typ-Priorisierung:
-        tiling > end_tiling > bonus_chip > stone > dome > dome_stack > pass
-        Innerhalb jedes Typs wird zufällig gemischt.
+        Wählt die besten max_actions Aktionen aus.
+
+        Wenn env übergeben wird, werden die Aktionen nach ihrem Shaping-Reward
+        (dieselbe Größe, die der Greedy-Rollout als "gut" bewertet) sortiert und
+        die besten zuerst genommen. So landen die vielversprechendsten Züge im
+        Suchbaum, statt zufällig ausgewählter — wichtig, weil bei vielen Optionen
+        (z.B. ~100 Kuppelplatzierungen) sonst der beste Zug fast nie in den Baum
+        kommt und die Suche ihn nie finden kann.
+
+        Ohne env (Fallback) wird die alte typ-priorisierte Zufallsauswahl genutzt.
+
+        Gibt die VOLLSTÄNDIGE Aktionsliste sortiert zurück (beste zuerst), damit
+        der Aufrufer die ersten max_actions als erste Welle nimmt und den Rest
+        (ebenfalls nach Güte sortiert) für Progressive Widening aufhebt.
         """
         if len(actions) <= self.max_actions:
             return list(actions)
 
+        if env is not None:
+            # Nach Shaping-Reward sortieren (beste zuerst). Ein clone()+step()
+            # pro Aktion — derselbe Mechanismus wie im Greedy-Rollout.
+            scored = []
+            for a in actions:
+                try:
+                    te = env.clone()
+                    _, r, _, _ = te.step(a)
+                except Exception:
+                    r = -float("inf")
+                scored.append((r, a))
+            # Stabil nach Reward absteigend; Reihenfolge gleichwertiger bleibt erhalten
+            scored.sort(key=lambda x: x[0], reverse=True)
+            return [a for _, a in scored]
+
+        # Fallback ohne env: typ-priorisierte Zufallsauswahl (wie zuvor)
         priority = {"tiling":8,"end_tiling":7,"bonus_chip":6,"stone":4,"dome":3,"dome_stack":2,"pass":1}
         by_type: dict[str, list] = {}
         for a in actions:
@@ -494,11 +526,16 @@ class MCTSAgent(BaseAgent):
 
         # Falls noch Platz: fülle mit weiteren zufälligen Aktionen auf
         remaining = [a for a in actions if a not in result]
+        random.shuffle(remaining)
         if len(result) < self.max_actions and remaining:
-            random.shuffle(remaining)
-            result.extend(remaining[:self.max_actions - len(result)])
+            take = self.max_actions - len(result)
+            result.extend(remaining[:take])
+            remaining = remaining[take:]
 
-        return result[:self.max_actions]
+        # Vollständige Liste zurückgeben: erst die ausgewählten (erste Welle),
+        # dann der Rest (für Progressive Widening) — konsistent mit dem env-Pfad,
+        # damit _expand korrekt in [:max_actions] und [max_actions:] aufteilen kann.
+        return result + remaining
 
     def _iter_nodes(self, node: MCTSNode):
         yield node
