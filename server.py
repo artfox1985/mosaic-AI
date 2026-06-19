@@ -320,8 +320,10 @@ def move_dome():
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
+    except AssertionError:
+        return jsonify(err("Ungültige Slot-Position für die Kuppelplatte."))
     except Exception as e:
-        return jsonify(err(str(e)))
+        return jsonify(err(str(e) or "Zug abgelehnt."))
 
 
 @app.route('/api/move/dome_stack', methods=['POST'])
@@ -343,6 +345,10 @@ def move_dome_stack():
         return jsonify(ok())
     except ValueError as e:
         return jsonify(err(str(e)))
+    except AssertionError:
+        # DrawFromStackMove.__post_init__ asserted ohne Message (z.B. slot_row
+        # außerhalb 0..2). Klare Meldung statt leerem String ans Frontend.
+        return jsonify(err("Ungültige Slot-Position für die Kuppelplatte."))
 
 
 @app.route('/api/move/bonus_chip', methods=['POST'])
@@ -373,8 +379,10 @@ def move_start_tile():
         )
         _flush_game_log()
         return jsonify(ok())
+    except AssertionError:
+        return jsonify(err("Ungültige Slot-Position für die Startkuppelplatte."))
     except Exception as e:
-        return jsonify(err(str(e)))
+        return jsonify(err(str(e) or "Zug abgelehnt."))
 
 
 @app.route('/api/tiling', methods=['POST'])
