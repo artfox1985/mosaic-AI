@@ -167,7 +167,7 @@ class NetworkSelfPlayAgent(SelfPlayMixin):
 # Spiel-Loop
 # ---------------------------------------------------------------------------
 
-def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_id: str = "unknown"):
+def play_one_game(agent, game_id: str = "unknown"):
     """Spielt ein Spiel und gibt Trainingsdaten zurück."""
     env = MosaicEnv()
     obs, info = env.reset()
@@ -299,24 +299,14 @@ def play_one_game(agent, margin_cap: int = 15, max_winner_score: int = 40, game_
             "player":            step["player"],
         })
 
-    # win_val nur für Konsolenausgabe
-    margin       = abs(scores[0] - scores[1])
-    winner_score = scores[winner]
-    if margin == 0 and winner_score < 5:
-        win_val = 0.1
-    else:
-        margin_part = min(0.45, (margin / margin_cap) * 0.45)
-        score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
-        win_val     = min(1.0, 0.1 + margin_part + score_part)
-
-    return training_data, winner, scores, steps, win_val
+    return training_data, winner, scores, steps
 
 
 # ---------------------------------------------------------------------------
 # Datengenerierung
 # ---------------------------------------------------------------------------
 
-def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None, margin_cap: int = 15, max_winner_score: int = 40):
+def generate_data(mode: str, num_games: int, simulations: int, version_name: str, rollout_depth: int = 0, tag: str = None):
     """
     Generiert Self-Play Trainingsdaten.
 
@@ -357,7 +347,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         file_tag = f"_{tag}" if tag else ""
         current_game_id = f"{version_name}{file_tag}_{run_timestamp}_g{i+1}"
 
-        game_data, winner, scores, steps, win_val = play_one_game(agent, margin_cap=margin_cap, max_winner_score=max_winner_score, game_id=current_game_id)
+        game_data, winner, scores, steps = play_one_game(agent, game_id=current_game_id)
         all_training_data.extend(game_data)
         duration = time.time() - t0
 
@@ -389,11 +379,7 @@ if __name__ == "__main__":
                         help="Versionsname, z.B. v0 oder v1")
     parser.add_argument("--tag",      type=str, default=None,
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
-    parser.add_argument("--margin_cap",       type=int, default=15,
-                        help="Margin ab dem win_val=1.0 (Standard: 15)")
-    parser.add_argument("--max_winner_score", type=int, default=40,
-                        help="Normalisierung Winner-Score Komponente (Standard: 40)")
-    parser.add_argument("--depth",   type=int, default=None,
+    parser.add_argument("--depth",   type=int, default=0,
                         help="Rollout-Tiefe (0=Heuristik, 1=1 Schritt, 5=5 Schritte)")
     parser.add_argument("--terminals", type=int, default=1,
                         help="Anzahl paralleler Terminals (teilt --games auf, vergibt Tags a/b/c...)")
@@ -425,8 +411,6 @@ if __name__ == "__main__":
                 "--sims", str(args.sims),
                 "--version", args.version,
                 "--tag", tag_i,
-                "--margin_cap", str(args.margin_cap),
-                "--max_winner_score", str(args.max_winner_score),
             ]
             if args.depth is not None:
                 cmd += ["--depth", str(args.depth)]
@@ -452,6 +436,4 @@ if __name__ == "__main__":
         version_name=args.version,
         tag=args.tag,
         rollout_depth=rollout_depth,
-        margin_cap=args.margin_cap,
-        max_winner_score=args.max_winner_score,
     )

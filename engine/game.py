@@ -463,7 +463,7 @@ class Game:
                 tmp_done[pi] = True
                 self.state._tiling_done = tmp_done
                 
-                print(f"DEBUG: Flag gesetzt für P{pi}. Neuer Status: {self.state._tiling_done}")
+                #print(f"DEBUG: Flag gesetzt für P{pi}. Neuer Status: {self.state._tiling_done}")
 
                 # 3. Wechsel oder Abschluss (bestehend)
                 other = 1 - pi
@@ -472,8 +472,14 @@ class Game:
                     return
                 
                 # 4. Phase beenden
+                # WICHTIG: phase = "done" setzen, NICHT "drafting".
+                # _execute_end_tiling() ruft next_round() auf, das phase=="done"
+                # per assert erwartet und danach selbst auf "drafting" setzt.
+                # Würde hier schon "drafting" gesetzt, schlägt der assert in
+                # next_round() fehl → Exception wird im Server verschluckt →
+                # Runde wechselt nie → Endlosschleife.
                 self.state._tiling_done = [False, False]
-                self.state.phase = "drafting"
+                self.state.phase = "done"
                 self._execute_end_tiling()
                 return
 
