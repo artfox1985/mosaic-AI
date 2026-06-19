@@ -2,6 +2,11 @@
 let S = null;          // server state
 let sel = null;        // {source, factory_id, color}
 let domeModal = null;  // {pi, slot_r, slot_c, tile_id, rotation, is_start}
+// Schwebende Kuppelplatzierung: Karte ist gewählt (Display ODER Stapel),
+// der Slot folgt per Board-Klick. source: 'display' | 'stack'.
+// display: {source:'display', pi, tile_id, rotation, tile}
+// stack:   {source:'stack',   pi, tile_id, rotation, tile, num, chosen_id}
+let pendingStackPlacement = null;
 let tilingPi = null, tilingRow = null;
 let humanTilingDone = false;
 
@@ -592,7 +597,7 @@ function renderCenter() {
       const names = pending.map(p=>p.name).join(' und ');
       info.innerHTML = `<div class="info warn">
         ⚠ <strong>Vorbereitung:</strong> ${names} ${pending.length>1?'müssen':'muss'} noch die erste Kuppelplatte legen.<br>
-        <span style="font-size:10px;color:var(--text2)">Ein gelbes Feld aus der Kuppel selektieren und Kuppelplatte wählen</span>
+        <span style="font-size:10px;color:var(--text2)">Eine Kuppelplatte unten anklicken, Rotation wählen, dann ein gelbes Kuppelfeld.</span>
       </div>`;
     } else {
       if(S.can_pass) {
@@ -608,7 +613,7 @@ function renderCenter() {
 
   const displayHTML = S.dome_display.map(t=>{
     const spaces = t.spaces.map(sp=>spaceHTML(sp)).join('');
-    return `<div class="dgtile" data-tile-id="${t.id}" title="Kachel #${t.id}">
+    return `<div class="dgtile" data-tile-id="${t.id}" title="Kachel #${t.id} – anklicken zum Legen" onclick="openDisplayPicker(${t.id})" style="cursor:pointer">
       <div class="d2x2" style="width:46px; height:46px;">${spaces}</div>
       <div class="dglabel">#${t.id}</div>
     </div>`;
@@ -694,10 +699,8 @@ document.getElementById('factories-area').innerHTML = `
       const cp = S.players[S.current_player];
       const canStack = S.phase==='drafting'
         && cp.start_placed
-        && cp.tokens_used < 2
-        && S.round < 5
-        && S.dome_stack_count > 0
-        && cp.dome_grid.flat().filter(Boolean).length < 9;
+        && cp.can_place_dome
+        && S.dome_stack_count > 0;
       return canStack ? `<button class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
         📦 Vom Stapel ziehen (−1 Pkt/Karte) · ${S.dome_stack_count} verfügbar
       </button>` : '';
@@ -1038,20 +1041,59 @@ function closeChipModal() {
 }
 
 // -- DOME MODAL ----------------------------------------------------------------
-function openStackPicker() {
+function openDisplayPicker(tileId) {
+  if (AI_THINKING) return;
   const pi = S.current_player;
   const p = S.players[pi];
-  const emptySlot = p.dome_grid.flatMap((row,sr)=>
-    row.map((s,sc)=>s?null:{sr,sc}).filter(Boolean))[0];
-  if(!emptySlot){showError('Keine freien Kuppelfelder!');return;}
-  openDomeModal(pi, emptySlot.sr, emptySlot.sc);
-  setTimeout(()=>{
-    const sec=document.getElementById('dome-stack-section');
-    if(sec) sec.style.display='flex';
-  }, 100);
+
+  if(AI_ENABLED && pi === AI_PLAYER){ showError('Die KI ist am Zug.'); return; }
+  // Normale Runde braucht can_place_dome; Startkuppel (noch nicht gelegt) nicht.
+  if(p.start_placed && !p.can_place_dome){
+    showError('Du kannst diese Runde keine Kuppelplatte mehr legen (max. 2 pro Runde, in Runde 5 keine, oder Raster voll).');
+    return;
+  }
+  const hasEmpty = p.dome_grid.flat().some(s => !s);
+  if(!hasEmpty){ showError('Keine freien Kuppelfelder!'); return; }
+
+  // Modal ohne Slot öffnen, die angeklickte Display-Karte direkt vorwählen.
+  openDomeModal(pi, -1, -1);
+  // Vorauswahl setzen + im Pool markieren.
+  domeModal.tile_id = tileId;
+  const pool = document.getElementById('dome-pool');
+  pool.querySelectorAll('.ptile').forEach(e=>{
+    e.classList.toggle('sel', Number(e.dataset.id) === tileId);
+  });
+  document.getElementById('dome-confirm').disabled = false;
+  buildPreview();
 }
 
-function openDomeModal(pi, sr, sc) {
+function openStackPicker() {
+  if (AI_THINKING) return;
+  const pi = S.current_player;
+  const p = S.players[pi];
+
+  // Klare Fehlermeldungen statt stillem Abbruch in openDomeModal.
+  if(AI_ENABLED && pi === AI_PLAYER){ showError('Die KI ist am Zug.'); return; }
+  if(!p.start_placed){ showError('Erst die Startkuppelplatte legen.'); return; }
+  if(!p.can_place_dome){
+    showError('Du kannst diese Runde keine Kuppelplatte mehr legen (max. 2 pro Runde, in Runde 5 keine, oder Raster voll).');
+    return;
+  }
+  const hasEmpty = p.dome_grid.flat().some(s => !s);
+  if(!hasEmpty){ showError('Keine freien Kuppelfelder!'); return; }
+  if(!(S.dome_stack_count > 0)){ showError('Der Kuppelstapel ist leer.'); return; }
+
+  // Slot wird NICHT vorab gewählt (-1,-1). Modal im reinen Stapel-Modus öffnen
+  // (ohne Display-Auswahl) und den Ziehvorgang sofort starten — der Spieler hat
+  // ja bereits "vom Stapel ziehen" gewählt, soll also nicht erst die Display-
+  // Auswahl sehen oder nochmal einen Ziehen-Button drücken müssen.
+  openDomeModal(pi, -1, -1, /*stackOnly=*/true);
+  // Default-Anzahl 1 ziehen; bei Bedarf kann der Spieler im Modal die Anzahl
+  // erhöhen und erneut ziehen (Stapel-Sektion bleibt sichtbar bis zur Wahl).
+  setTimeout(()=>{ doStackDraw(); }, 50);
+}
+
+function openDomeModal(pi, sr, sc, stackOnly=false) {
   if (AI_THINKING) return;  // KI denkt noch
   const p = S.players[pi];
   const isStart = !p.start_placed;
@@ -1060,31 +1102,46 @@ function openDomeModal(pi, sr, sc) {
   if(!isStart && pi !== S.current_player) return;
   if(!isStart && !p.can_place_dome) return;
 
-  domeModal = {pi, slot_r:sr, slot_c:sc, tile_id:null, rotation:0, is_start:isStart};
+  // Falls ein vorheriger Stapelzug noch auf einen Slot wartete, verwerfen:
+  // ein bewusst geöffnetes Dome-Modal mit echtem Slot ersetzt ihn. (Beim
+  // Stapelziehen-Start ist sr/sc = -1, da gibt es noch nichts zu verwerfen.)
+  if(pendingStackPlacement && sr !== -1) {
+    pendingStackPlacement = null;
+  }
+
+  domeModal = {pi, slot_r:sr, slot_c:sc, tile_id:null, rotation:0, is_start:isStart, stack_only:stackOnly};
   const notice = document.getElementById('dome-notice');
   if(isStart) {
-    notice.textContent='Eine Kuppelplatte wählen und Rotation setzen';
+    notice.textContent='Rotation für die Kuppelplatte wählen, dann ein gelbes Kuppelfeld anklicken.';
     notice.style.display='block';
   } else notice.style.display='none';
 
-  document.getElementById('dome-title').textContent = isStart ? 'Erste Kuppelplatte legen' : 'Kuppelplatte legen';
+  document.getElementById('dome-title').textContent =
+    isStart ? 'Erste Kuppelplatte legen'
+    : stackOnly ? 'Kuppelplatte vom Stapel ziehen'
+    : 'Kuppelplatte legen';
 
   const grid = document.getElementById('dome-pool');
   grid.innerHTML = '';
-  S.dome_display.forEach(t=>{
-    const div = document.createElement('div');
-    div.className='ptile'; div.dataset.id=t.id;
-    div.innerHTML=`<div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
-      <div class="plabel">#${t.id}</div>`;
-    div.addEventListener('click',()=>{
-      domeModal.tile_id=t.id;
-      grid.querySelectorAll('.ptile').forEach(e=>e.classList.remove('sel'));
-      div.classList.add('sel');
-      document.getElementById('dome-confirm').disabled=false;
-      buildPreview();
+  // Im reinen Stapel-Modus KEINE Display-Auswahl zeigen — der Spieler hat sich
+  // bewusst fürs Ziehen entschieden. Die gezogenen Karten füllt doStackDraw ein.
+  // Start UND normale Runde wählen aus dem Display.
+  if(!stackOnly) {
+    S.dome_display.forEach(t=>{
+      const div = document.createElement('div');
+      div.className='ptile'; div.dataset.id=t.id;
+      div.innerHTML=`<div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
+        <div class="plabel">#${t.id}</div>`;
+      div.addEventListener('click',()=>{
+        domeModal.tile_id=t.id;
+        grid.querySelectorAll('.ptile').forEach(e=>e.classList.remove('sel'));
+        div.classList.add('sel');
+        document.getElementById('dome-confirm').disabled=false;
+        buildPreview();
+      });
+      grid.appendChild(div);
     });
-    grid.appendChild(div);
-  });
+  }
 
   document.getElementById('dome-confirm').disabled=true;
   document.getElementById('rotbtns').querySelectorAll('.rotbtn').forEach((b,i)=>b.classList.toggle('act',i===0));
@@ -1132,6 +1189,11 @@ async function doStackDraw() {
   if(!d.ok){ showError(d.error); return; }
   
   domeModal.stack_tiles = d.tiles;
+  // Slot zurücksetzen: beim Stapelziehen wird die Position IMMER danach per
+  // Board-Klick gewählt (man hat die Karte ja blind gezogen). Ein evtl. vorher
+  // angeklickter Slot (Modal über Board-Slot geöffnet) wäre hier sinnlos.
+  domeModal.slot_r = -1;
+  domeModal.slot_c = -1;
   
   const stackSec = document.getElementById('dome-stack-section');
   if(stackSec) stackSec.style.display = 'none';
@@ -1141,8 +1203,8 @@ async function doStackDraw() {
   if(cancelBtn) cancelBtn.style.display = 'none';
 
   const notice = document.getElementById('dome-notice');
-  notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, der Rest kommt unter den Stapel. (Kosten: −${n} Pkt)<br>
-                      <span style="font-size:10px; font-weight:normal;">Wähle danach unten deine Rotation und bestätige.</span>`;
+  notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, dann Rotation wählen. Der Rest kommt unter den Stapel. (Kosten: −${n} Pkt)<br>
+                      <span style="font-size:10px; font-weight:normal;">Nach dem Bestätigen klickst du das Ziel-Kuppelfeld auf deinem Board an.</span>`;
   notice.style.display = 'block';
 
   const pool = document.getElementById('dome-pool');
@@ -1211,27 +1273,79 @@ async function showActiveScoringTiles() {
 async function confirmDome() {
   if(!domeModal||domeModal.tile_id===null) return;
   const {pi,slot_r,slot_c,tile_id,rotation,is_start,stack_draw} = domeModal;
-  if(is_start) { startTileMove(pi, tile_id, slot_r, slot_c, rotation); return; }
-  if(stack_draw) {
-    let sr=slot_r, sc=slot_c;
-    if(sr===-1){
-      const p=S.players[pi];
-      const empty=p.dome_grid.flatMap((row,r)=>row.map((s,c)=>s?null:{r,c}).filter(Boolean));
-      if(!empty.length){showError('Keine freien Slots!');return;}
-      sr=empty[0].r; sc=empty[0].c;
-    }
-    const d = await api('/move/dome_stack', {
-      num_drawn: stack_draw.num, chosen_id: stack_draw.chosen_id,
-      slot_row: sr, slot_col: sc, rotation
-    });
-    if(!d.ok){showError(d.error);return;}
-    S=d.state; closeDomeModal(); render();
-	// Wir erzwingen den Check für die KI, egal in welcher Phase wir sind
-	if (AI_ENABLED && aiIsDue()) {
+
+  // Einheitlicher Flow für Start, Display UND Stapel: Karte ist gewählt → Modal
+  // schließen, Slot per Board-Klick wählen lassen. Kein sofortiger Server-Call.
+  if(is_start) {
+    const chosenTile = (S.dome_display || []).find(t => t.id === tile_id);
+    pendingStackPlacement = { source: 'start', pi, tile_id, rotation, tile: chosenTile };
+  } else if(stack_draw) {
+    const chosenTile = (domeModal.stack_tiles || []).find(t => t.id === stack_draw.chosen_id);
+    pendingStackPlacement = {
+      source: 'stack', pi, tile_id: stack_draw.chosen_id, rotation,
+      tile: chosenTile, num: stack_draw.num, chosen_id: stack_draw.chosen_id
+    };
+  } else {
+    const chosenTile = (S.dome_display || []).find(t => t.id === tile_id);
+    pendingStackPlacement = {
+      source: 'display', pi, tile_id, rotation, tile: chosenTile
+    };
+  }
+  closeDomeModal();
+  render();  // Board neu zeichnen (markiert freie Slots, zeigt Hinweis)
+}
+
+async function submitDomePlacement(sr, sc) {
+  // Legt die schwebende Karte (Start, Display oder Stapel) auf den Slot.
+  const pend = pendingStackPlacement;
+  if(!pend) return;
+  if(sr < 0 || sr > 2 || sc < 0 || sc > 2) {
+    showError('Bitte ein freies Kuppelfeld auf deinem Board anklicken.');
+    return;
+  }
+  if(pend.source === 'stack') {
+    await submitStackDraw(pend.pi, pend.num, pend.chosen_id, sr, sc, pend.rotation);
+  } else if(pend.source === 'start') {
+    await submitStartTile(pend.pi, pend.tile_id, sr, sc, pend.rotation);
+  } else {
+    await submitDisplayDome(pend.tile_id, sr, sc, pend.rotation);
+  }
+}
+
+async function submitStartTile(pi, tile_id, sr, sc, rotation) {
+  const d = await api('/move/start_tile', {player: pi, tile_id, slot_row: sr, slot_col: sc, rotation});
+  if(!d.ok){ showError(d.error || 'Zug abgelehnt (unbekannter Fehler).'); return; }
+  S=d.state; pendingStackPlacement=null; closeDomeModal(); render();
+  // Nachdem der Mensch gelegt hat: ist jetzt die KI mit ihrer Startkuppel dran?
+  if (AI_ENABLED) {
+    await aiDoStartTile();
+  }
+}
+
+async function submitDisplayDome(tile_id, sr, sc, rotation) {
+  const d = await api('/move/dome', {tile_id, slot_row: sr, slot_col: sc, rotation});
+  if(!d.ok){ showError(d.error || 'Zug abgelehnt (unbekannter Fehler).'); return; }
+  S=d.state; pendingStackPlacement=null; closeDomeModal(); render();
+  if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
-  } else {
-    domeMove(tile_id, slot_r, slot_c, rotation);
+}
+
+async function submitStackDraw(pi, num, chosen_id, sr, sc, rotation) {
+  // Schutz: ein ungültiger Slot (-1) würde serverseitig eine leere
+  // AssertionError auslösen → leere Fehlermeldung. Hier klar abfangen.
+  if(sr < 0 || sr > 2 || sc < 0 || sc > 2) {
+    showError('Bitte zuerst ein freies Kuppelfeld auf deinem Board anklicken.');
+    return;
+  }
+  const d = await api('/move/dome_stack', {
+    num_drawn: num, chosen_id, slot_row: sr, slot_col: sc, rotation
+  });
+  if(!d.ok){showError(d.error || 'Zug abgelehnt (unbekannter Fehler).');return;}
+  S=d.state; pendingStackPlacement=null; closeDomeModal(); render();
+  // KI-Check erzwingen, egal in welcher Phase
+  if (AI_ENABLED && aiIsDue()) {
+    await triggerAIMove();
   }
 }
 
@@ -1511,7 +1625,19 @@ document.addEventListener('click', e=>{
   const dslot = e.target.closest('[data-dome]');
   if(dslot) {
     const [pi,sr,sc]=dslot.dataset.dome.split(',').map(Number);
-    openDomeModal(pi,sr,sc); return;
+    // Wartet eine gewählte Karte (Start, Display oder Stapel) auf ihren Slot?
+    if(pendingStackPlacement && pendingStackPlacement.pi===pi) {
+      submitDomePlacement(sr, sc);
+      return;
+    }
+    // Keine Karte gewählt: Hinweis je nach Phase.
+    const p = S.players[pi];
+    if(p && !p.start_placed) {
+      showError('Wähle zuerst eine Kuppelplatte unten im Display, dann Rotation.');
+    } else {
+      showError('Wähle zuerst eine Kuppelplatte (Display anklicken oder „Vom Stapel ziehen").');
+    }
+    return;
   }
 
   const ts = e.target.closest('[data-tiling]');
@@ -1555,22 +1681,35 @@ function render() {
   renderBoard(0);
   renderBoard(1);
   renderCenter();
-  
-// -- UPDATE SYNC DEBUGGER --
-/*   const dbgPlayer = document.getElementById('dbg-server-player');
-  if (dbgPlayer && S) {
-    dbgPlayer.innerText = `Server Player: ${S.current_player} (KI ist ${AI_PLAYER})`;
-    document.getElementById('dbg-server-phase').innerText = `Server Phase: ${S.phase}`;
-    document.getElementById('dbg-ai-enabled').innerText = `AI Enabled: ${AI_ENABLED}`;
-    
-    const isDue = aiIsDue();
-    document.getElementById('dbg-ai-due').innerText = `UI aiIsDue(): ${isDue}`;
-    // Mach es rot, wenn die KI dran ist, damit es auffällt
-    document.getElementById('dbg-ai-due').style.color = isDue ? "#ff4444" : "#0f0";
-    
-    document.getElementById('dbg-ai-thinking').innerText = `UI Loop aktiv: ${AI_THINKING}`;
-  } */
-}  
+
+  // Platzierungs-Modus: gewählte Karte (Display oder Stapel) wartet auf Slot-Klick.
+  if(pendingStackPlacement) {
+    const {tile_id, rotation, tile, source, num} = pendingStackPlacement;
+    const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
+    const previewHTML = tile
+      ? `<div class="d2x2" style="width:38px;height:38px;flex-shrink:0;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
+      : '';
+    const msg = source === 'stack'
+      ? `📦 Platte #${tile_id} gezogen — klick auf ein freies Kuppelfeld zum Legen (−${num} Pkt)`
+      : source === 'start'
+      ? `🏁 Startplatte #${tile_id} gewählt — klick auf ein freies Kuppelfeld zum Legen`
+      : `🧩 Platte #${tile_id} gewählt — klick auf ein freies Kuppelfeld zum Legen`;
+    document.getElementById('info-area').innerHTML = `
+      <div class="info warn" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span style="display:flex; align-items:center; gap:8px;">
+          ${previewHTML}
+          <span>${msg}</span>
+        </span>
+        <button class="btn" onclick="cancelStackPlacement()" style="padding:2px 8px; font-size:10px; flex-shrink:0;">Abbrechen</button>
+      </div>`;
+  }
+}
+
+function cancelStackPlacement() {
+  pendingStackPlacement = null;
+  document.getElementById('info-area').innerHTML = '';
+  render();
+}
 
 // -- DRAG & DROP FÜR MODALS --------------------------------------------------
 function makeDraggable(overlayId) {
