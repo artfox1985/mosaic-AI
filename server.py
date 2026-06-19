@@ -567,8 +567,21 @@ def end_tiling():
                     print(f"KI Tiling Fehler (Auto-Loop): {info['error']}")
                     break
         
-        # 3. Beide Spieler sind restlos fertig -> Die Phase wird ganz offiziell beendet
-        _game.apply({"type": "end_tiling"})
+        # 3. Phase offiziell beenden — für BEIDE Spieler.
+        # game.apply({"type":"end_tiling"}) setzt nur das Flag für EINEN
+        # Spieler (current_player). Wird nur einmal gerufen, bleibt das Flag
+        # des anderen Spielers False → game.py wechselt zurück zu ihm und die
+        # Phase endet nie → Endlosschleife. Beide haben hier nachweislich
+        # keine platzierbaren Reihen mehr (Mensch via Check oben, KI via
+        # Auto-Loop), daher ist end_tiling für beide regelkonform.
+        if _ai_player is not None:
+            # Erst Mensch, dann KI: der zweite Aufruf erreicht [True, True]
+            # und löst _execute_end_tiling() in game.py aus.
+            for p in (human_player, _ai_player):
+                if not _game.valid_tiling_actions(p):
+                    _game.apply({"type": "end_tiling", "player": p})
+        else:
+            _game.apply({"type": "end_tiling"})
         _flush_game_log()
         return jsonify(ok())
         
