@@ -76,6 +76,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     for epoch in range(epochs):
         t_loss, t_vloss, t_ploss = 0, 0, 0
+        v_preds_epoch = [] 
         
         for states, targets_p, targets_v, masks, moon_targets in dataloader:
             states    = states.to(device)
@@ -117,11 +118,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             t_loss  += loss.item()
             t_vloss += v_loss.item()
             t_ploss += p_loss.item()
+            v_preds_epoch.append(pred_v.detach().flatten().cpu())
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
+        
+        import torch as _t
+        v_all   = _t.cat(v_preds_epoch)
+        v_std   = v_all.std().item()
+        v_mean  = v_all.mean().item()
 
         # ── Plateau-Erkennung ──────────────────────────────────────────────
         plateau_marker = ""
@@ -143,8 +150,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plateau_marker = "  🔴 PLATEAU + VALUE SINKT (Overfitting-Risiko)"
 
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
-              f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}, "
-              f"){plateau_marker}")
+              f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}) "
+              f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
         # ── Early Stopping ─────────────────────────────────────────────────
         if policy_plateau_since is not None:
