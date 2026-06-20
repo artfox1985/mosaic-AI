@@ -250,10 +250,11 @@ def get_player_potential(player, round_number: int = 1,
     # Ab 4 offenen Reihen steigt die Wahrscheinlichkeit stark, dass zukünftige
     # Züge auf die Strafleiste gehen (kein Platz mehr für neue Farben).
     # Jede offene Reihe über dem Schwellenwert kostet zunehmend.
-    _OPEN_ROW_THRESHOLD = 3   # bis 3 offene Reihen: kein Penalty
-    _OPEN_ROW_PEN       = 1.2 # Penalty pro Reihe über dem Schwellenwert
+    _OPEN_ROW_THRESHOLD = 2   # bis 3 offene Reihen: kein Penalty
+    _OPEN_ROW_PEN       = 1 # Penalty pro Reihe über dem Schwellenwert
     if open_rows > _OPEN_ROW_THRESHOLD:
-        saturation_penalty = (open_rows - _OPEN_ROW_THRESHOLD) * _OPEN_ROW_PEN
+        over = open_rows - _OPEN_ROW_THRESHOLD
+        saturation_penalty = over * over * _OPEN_ROW_PEN
         potential -= saturation_penalty
 
     # ── B: Strafleiste (eskalierend) ─────────────────────────────────────────

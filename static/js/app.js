@@ -377,22 +377,26 @@ function renderBoard(pi) {
       : '';
     return `<div class="prow ${cls}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
-      <span class="rowlabel" style="color:var(--text3)">→${domeRow}</span>${chipBtn}${nextDot}
+      <span class="rowlabel" style="color:var(--text3)">→ </span>${chipBtn}${nextDot}
     </div>`;
   }).join('');
 
-  const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
-    const needsStart = !p.start_placed;
-    const canNormal  = !slot && p.can_place_dome && isActive;
-    const canStart   = !slot && needsStart;
-    let cls = slot ? 'occ' : (canStart ? 'start' : (canNormal ? 'cando' : ''));
-    let ddata = (canStart||canNormal) ? ` data-dome="${pi},${sr},${sc}"` : '';
+const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
+    // Prüfe: Gibt es einen aktiven Platzierungsprozess (Start, Display oder Stapel) für diesen Spieler?
+    const isPending = pendingStackPlacement && pendingStackPlacement.pi === pi;
+    
+    // Hervorhebung (cando) nur, wenn eine Karte zum Legen bereit liegt.
+    // In der Vorbereitungsphase bleibt isPending hier false, solange keine Karte gewählt ist.
+    let cls = slot ? 'occ' : (isPending ? 'cando' : '');
+    let ddata = isPending ? ` data-dome="${pi},${sr},${sc}"` : '';
+    
     const isTilingTarget = isTiling && tilingPi===pi && tilingRow!==null;
     const inner = slot
       ? dome2x2(slot.spaces, pi, sr, sc, isTilingTarget)
-      : `<div style="font-size:9px;color:var(--text3);text-align:center;width:100%">${canStart?'▼ Start':'+'}</div>`;
+      : `<div style="font-size:9px;color:var(--text3);text-align:center;width:100%">+</div>`;
+      
     return `<div class="dslot ${cls}"${ddata}>${inner}</div>`;
-  }).join('')).join('');
+}).join('')).join('');
 
   const floorHTML = [...Array(4)].map((_,i)=>{
     const t = p.floor[i];
@@ -510,7 +514,7 @@ function renderCenter() {
     // und keine frühere platzierbare Reihe noch offen haben
     const placeableOnly = placeableRows.filter(pr => pr.placeable === true);
     const pending = placeableOnly
-	  .filter(pr => !AI_ENABLED || pr.pi !== AI_PLAYER)
+      .filter(pr => !AI_ENABLED || pr.pi !== AI_PLAYER)
       .filter(pr => {
         // Keine frühere platzierbare Reihe desselben Spielers noch offen
         return !placeableOnly.some(other => other.pi===pr.pi && other.ri<pr.ri);
@@ -536,7 +540,7 @@ function renderCenter() {
     const chippableRows2 = S.chippable_tiling_rows || [];
     const chippable = chippableRows2
       .filter(cr => !AI_ENABLED || cr.pi !== AI_PLAYER)
-		.map(cr => {                                      
+        .map(cr => {                                      
         const p = S.players[cr.pi];
         const row = p.pattern_lines[cr.ri];
         return {pi: cr.pi, ri: cr.ri, color: row.color,
@@ -574,7 +578,7 @@ function renderCenter() {
       infoHTML = `<div class="info tiling">✓ Alle Reihen abgeschlossen</div>`;
     }
 
-	const btnText = AI_ENABLED ? "Mein Tiling abschließen → KI ist dran" : `Runde ${S.round} beenden ✓`;
+    const btnText = AI_ENABLED ? "Mein Tiling abschließen → KI ist dran" : `Runde ${S.round} beenden ✓`;
     info.innerHTML = infoHTML + (!hasPending ? `
       <button class="btn pri" onclick="finishHumanTiling()" style="width:100%;margin-top:6px">
         ${btnText}
@@ -649,11 +653,11 @@ function renderCenter() {
     const moonTopTiles = f.moon.map(stack => stack[stack.length-1]).filter(Boolean);
     const moonTiles = moonTopTiles.length
       ? `<div style="display:flex;gap:2px;align-items:center;margin-top:3px;flex-wrap:wrap">
-          <span style="font-size:8px;color:var(--text3)">Moon:</span>
+          <span style="font-size:8px;color:var(--text3)">Stapel:</span>
           ${moonTopTiles.map(c=>`<div class="tile sm ${normColor(c)}" title="Oben: ${c}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
          </div>` : '';
     return `<div class="fcard">
-      <div class="fhead"><span>Kleine Manufaktur ${f.id}</span>${chipHTML}</div>
+      <div class="fhead"><span>F${f.id}</span>${chipHTML}</div>
       <div class="ftiles">${f.sun.length?sunTiles:'<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
       ${moonTiles}
     </div>`;
@@ -694,7 +698,7 @@ document.getElementById('factories-area').innerHTML = `
       <span>Kuppelplatten (${S.dome_display.length}/3)</span>
       <span style="color:var(--text3)">Stapel: ${S.dome_stack_count}</span>
     </div>
-    <div class="display-g">${displayHTML||'<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
+    <div class="display-g">${displayHTML || '<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
     ${(() => {
       const cp = S.players[S.current_player];
       const canStack = S.phase==='drafting'
@@ -711,7 +715,7 @@ document.getElementById('factories-area').innerHTML = `
     <div style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">
     ${facsHTML}
     <div class="fcard">
-      <div class="fhead"><span>Große Manufaktur</span>${lf.marker?'<span style="color:#F59E0B">★</span>':''}</div>
+      <div class="fhead"><span>GF</span>${lf.marker?'<span style="color:#F59E0B">★</span>':''}</div>
       <div class="ftiles" style="margin-bottom:2px"><span style="font-size:8px;color:var(--text3)">Sun:</span>${lSun||'—'}</div>
       <div class="ftiles"><span style="font-size:8px;color:var(--text3)">Moon:</span>${lMoon||'—'}</div>
     </div>
@@ -740,7 +744,7 @@ document.getElementById('factories-area').innerHTML = `
     return `<div class="le" style="${style}">${e}</div>`;
   }).join('');
   
-  const sdiv = document.getElementById('scoring-display');
+const sdiv = document.getElementById('scoring-display');
   const editBtn = document.getElementById('scoring-edit-btn');
   // Wertungsplatten nur editierbar solange noch keine Startkacheln gelegt wurden
   // Nach Bestätigung (beide start_placed=true) nicht mehr änderbar
@@ -761,10 +765,10 @@ document.getElementById('factories-area').innerHTML = `
 
   if(S.phase === 'tiling') {
     let rows = (S.valid_tiling_rows||[]);
-	if (AI_ENABLED) {
+    if (AI_ENABLED) {
         rows = rows.filter(x => x.pi !== AI_PLAYER);
     }
-	
+    
     if(rows.length === 0) {
       vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Alle regulären Reihen gelegt ✓ (Nutze Chips oder beende das Tiling)</div>`;
     } else {
@@ -1687,20 +1691,21 @@ function render() {
     const {tile_id, rotation, tile, source, num} = pendingStackPlacement;
     const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
     const previewHTML = tile
-      ? `<div class="d2x2" style="width:38px;height:38px;flex-shrink:0;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
+      ? `<div class="d2x2" style="width:38px;height:38px;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
       : '';
     const msg = source === 'stack'
       ? `📦 Platte #${tile_id} gezogen — klick auf ein freies Kuppelfeld zum Legen (−${num} Pkt)`
       : source === 'start'
       ? `🏁 Startplatte #${tile_id} gewählt — klick auf ein freies Kuppelfeld zum Legen`
       : `🧩 Platte #${tile_id} gewählt — klick auf ein freies Kuppelfeld zum Legen`;
+      
     document.getElementById('info-area').innerHTML = `
-      <div class="info warn" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <span style="display:flex; align-items:center; gap:8px;">
-          ${previewHTML}
+      <div class="info warn" style="display:flex; flex-direction:column; gap:8px;">
+        <div style="align-self:center">${previewHTML}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
           <span>${msg}</span>
-        </span>
-        <button class="btn" onclick="cancelStackPlacement()" style="padding:2px 8px; font-size:10px; flex-shrink:0;">Abbrechen</button>
+          <button class="btn" onclick="cancelStackPlacement()" style="padding:2px 8px; font-size:10px; flex-shrink:0;">Abbrechen</button>
+        </div>
       </div>`;
   }
 }
