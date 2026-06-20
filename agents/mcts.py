@@ -373,7 +373,6 @@ class MCTSAgent(BaseAgent):
             if node.remaining_actions is not None and len(node.remaining_actions) > 0:
                 # SUBLINEARES WACHSTUM: Wurzel aus Besuchen.
                 # Wächst anfangs moderat, flacht dann ab, um Deepening zu erzwingen!
-                # Faktor 2.5 bedeutet: Bei 100 Besuchen -> +25 Aktionen, bei 400 Besuchen -> +50 Aktionen
                 allowed_actions = self.max_actions + int(math.sqrt(node.visits) * 2.5)
                 
                 current_actions = len(node.children) + len(node.untried_actions)

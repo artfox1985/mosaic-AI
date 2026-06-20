@@ -487,6 +487,16 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     print(f"     --margin_cap       {margin_cap_opt}")
     print(f"     --max_winner_score {max_ws_opt}")
     print(f"{'─'*55}")
+    print(f"  ℹ️  Die Empfehlung kalibriert die Skala auf den NORMALBEREICH:")
+    print(f"     margin_cap = 75. Perzentil der Margins, max_winner = 80.")
+    print(f"     Perzentil der Sieger-Scores. Der obere Score-Schwanz (klare,")
+    print(f"     hohe Siege) wird damit bewusst auf win_val=1.0 gestaucht.")
+    print(f"     → Für FRÜHE Trainingsgenerationen (Bootstrap/Iteration 0) ist")
+    print(f"       das oft suboptimal: gerade die hohen Siege liefern die")
+    print(f"       Abstufung 'solide vs. vernichtend gewonnen'. Dort lieber ein")
+    print(f"       großzügigeres max_winner_score (z.B. 40) wählen, das fast")
+    print(f"       nichts cappt (volle Auflösung). Faustregel: Gecappt-Anteil")
+    print(f"       unten im Vergleich beachten — für Iteration 0 möglichst < 2%.")
 
     from agents.neural_net import compute_win_val
     for margin_cap, max_ws, desc in [
