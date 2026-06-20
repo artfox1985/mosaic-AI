@@ -88,6 +88,7 @@ class MCTSNode:
         'visits', 'value',
         'untried_actions', 'player_who_acted',
         'priors', 'remaining_actions',
+        'virtual_loss',
     )
 
     def __init__(
@@ -106,6 +107,16 @@ class MCTSNode:
         self.remaining_actions: list = []
         self.player_who_acted = player_who_acted
         self.priors          = None            # NN-Policy-Priors (nur AlphaZero), lazy gesetzt
+        self.virtual_loss    = 0                # temporäre Strafe für Leaf-Batching
+
+    def _eff_visits(self) -> int:
+        """Besuche inkl. Virtual Loss (für Leaf-Batching)."""
+        return self.visits + self.virtual_loss
+
+    def _eff_value(self) -> float:
+        """Wert inkl. Virtual Loss: jede virtuelle Strafe zieht den Mittelwert
+        Richtung Niederlage (−1 pro virtuellem Besuch)."""
+        return self.value - self.virtual_loss
 
     def ucb1(self, c: float = 0.3) -> float:
         """
@@ -114,11 +125,23 @@ class MCTSNode:
 
         UCB1 = Q/N + c * sqrt(ln(N_parent) / N)
         """
-        if self.visits == 0:
+        n = self._eff_visits()
+        if n == 0:
             return float('inf')
-        exploit = self.value / self.visits
-        explore = c * math.sqrt(math.log(self.parent.visits) / self.visits)
+        parent_n = self.parent._eff_visits() if self.parent else 1
+        exploit = self._eff_value() / n
+        explore = c * math.sqrt(math.log(max(parent_n, 1)) / n)
         return exploit + explore
+
+    def puct(self, c_puct: float, prior: float, parent_visits: int) -> float:
+        """
+        PUCT-Score (AlphaZero): Q + c_puct * P * sqrt(N_parent) / (1 + N_child).
+        Nutzt effektive (virtual-loss-bereinigte) Statistiken.
+        """
+        n = self._eff_visits()
+        q = (self._eff_value() / n) if n > 0 else 0.0
+        u = c_puct * prior * math.sqrt(max(parent_visits, 1)) / (1 + n)
+        return q + u
 
     def best_child(self, c: float = 0.3) -> "MCTSNode":
         return max(self.children, key=lambda n: n.ucb1(c))
@@ -170,6 +193,19 @@ class MCTSAgent(BaseAgent):
         self.verbose       = verbose
         self.dynamic_sims  = dynamic_sims  # None | "selfplay" | "play"
         self._rollout_agent = RandomAgent()
+
+        # ── Vereinheitlichte Suchmaschine: Strategie-Hooks ───────────────────
+        # Heuristik- und Netz-Agent teilen dieselbe Suche (Widening, Sim-Scaling,
+        # Q-Tiebreaker, Limits). Sie unterscheiden sich NUR über diese Hooks:
+        #   _batch_size       : 1 = sequentiell (Heuristik), >1 = Leaf-Batch (Netz)
+        #   _uses_priors      : False = UCB1-Selection, True = PUCT mit node.priors
+        #   _evaluate_leaves  : wie ein Blatt bewertet wird (Rollout vs. Netz-Value)
+        #   _provide_priors   : setzt node.priors (No-Op bei Heuristik)
+        # Default = Heuristik-Verhalten (batch_size 1, kein Prior) → die Basis-
+        # klasse spielt exakt wie bisher.
+        self._batch_size   = 1
+        self._uses_priors  = False
+        self._c_puct       = 1.5      # nur relevant wenn _uses_priors
 
         # Statistiken
         self.stats: dict = {}
@@ -277,6 +313,18 @@ class MCTSAgent(BaseAgent):
         # Dummy-Parent für UCB1-Berechnung
         root.visits = 1
 
+        # Wurzel-Aktionen sofort befüllen (sonst wäre root.priors nutzlos, weil
+        # PUCT erst greift wenn Kinder da sind). Ranking via _sample_actions wie
+        # in _expand.
+        ranked = self._sample_actions(list(actions), env)
+        root.untried_actions   = ranked[:self.max_actions]
+        root.remaining_actions = ranked[self.max_actions:]
+
+        # Netz-Agent: Wurzel-Priors setzen (Heuristik: No-Op). Ohne das würde
+        # PUCT an der Wurzel auf uniform zurückfallen → die gelernte Policy würde
+        # an der wichtigsten Stelle ignoriert.
+        self._provide_priors(root, env)
+
         t_start = time.time()
         sims_done = 0
 
@@ -321,14 +369,55 @@ class MCTSAgent(BaseAgent):
                       f"Bitte melden falls dies auftritt.", flush=True)
                 break
 
-            # Eine Simulation
-            sim_env = env.clone()
-            node = self._select(root, sim_env)
-            node = self._expand(node, sim_env)
-            result = self._rollout(sim_env)
-            self._backpropagate(node, result, pi)
+            # ── Leaf-Sammlung (Batch) ────────────────────────────────────────
+            # batch_size=1 → exakt sequentiell (Heuristik). batch_size>1 → mehrere
+            # Leaves gleichzeitig sammeln (Netz-Batch-Inferenz). Virtual Loss
+            # verhindert, dass alle Sims im Batch denselben Pfad wählen.
+            n_collect = min(self._batch_size, sim_target - sims_done) if self.time_limit_s is None else self._batch_size
+            n_collect = max(1, n_collect)
 
-            sims_done += 1
+            collected = []  # (leaf_node, sim_env, path)
+            terminal_done = []  # (leaf_node, result) — Spielende, sofort bewertbar
+
+            for _ in range(n_collect):
+                sim_env = env.clone()
+                leaf = self._select(root, sim_env)
+                leaf = self._expand(leaf, sim_env)
+
+                # Pfad Wurzel→Leaf für Virtual-Loss-Rücknahme + Backprop merken
+                path = []
+                n = leaf
+                while n is not None:
+                    path.append(n)
+                    n = n.parent
+
+                # Terminal? → echtes Ergebnis, kein Netz/Rollout nötig
+                if sim_env.state.phase in ("end", "final"):
+                    result = self._terminal_result(sim_env)
+                    terminal_done.append((leaf, path, result))
+                else:
+                    # Virtual Loss auf den ganzen Pfad legen (nur bei Batching >1)
+                    if self._batch_size > 1:
+                        for nd in path:
+                            nd.virtual_loss += 1
+                    collected.append((leaf, sim_env, path))
+
+            # ── Terminal-Leaves sofort backpropagieren ───────────────────────
+            for leaf, path, result in terminal_done:
+                self._backpropagate(leaf, result, pi)
+                sims_done += 1
+
+            # ── Nicht-terminale Leaves bewerten (Hook: Rollout ODER Netz-Batch)
+            if collected:
+                leaf_envs = [(c[0], c[1]) for c in collected]  # (node, env)
+                results = self._evaluate_leaves(leaf_envs)  # Liste von result-Dicts
+                for (leaf, sim_env, path), result in zip(collected, results):
+                    # Virtual Loss zurücknehmen
+                    if self._batch_size > 1:
+                        for nd in path:
+                            nd.virtual_loss -= 1
+                    self._backpropagate(leaf, result, pi)
+                    sims_done += 1
 
         # Bestes Kind: höchste Besuchsanzahl (robusteste Auswahl).
         # Bei Gleichstand in Besuchen: Q-Wert (value/visits) als Tiebreaker.
@@ -366,17 +455,20 @@ class MCTSAgent(BaseAgent):
         """
         Traversiere den Baum. Integriertes Progressive Widening:
         Entscheidet, ob wir absteigen, oder auf dieser Ebene eine 
-        neue Aktion aus dem Heuristik-Pool freischalten.
+        neue Aktion aus dem Pool freischalten.
+
+        Selection-Kriterium: UCB1 (Heuristik) oder PUCT mit node.priors (Netz).
+        Beide nutzen virtual-loss-bereinigte Statistiken (Leaf-Batching).
         """
         while node.children:
             # --- 1. PROGRESSIVE WIDENING CHECK ---
             if node.remaining_actions is not None and len(node.remaining_actions) > 0:
                 # SUBLINEARES WACHSTUM: Wurzel aus Besuchen.
                 # Wächst anfangs moderat, flacht dann ab, um Deepening zu erzwingen!
-                allowed_actions = self.max_actions + int(math.sqrt(node.visits) * 2.5)
-                
+                allowed_actions = self.max_actions + int(math.sqrt(node._eff_visits()) * 2.5)
+
                 current_actions = len(node.children) + len(node.untried_actions)
-                
+
                 if current_actions < allowed_actions:
                     node.untried_actions.append(node.remaining_actions.pop(0))
                     return node
@@ -384,16 +476,34 @@ class MCTSAgent(BaseAgent):
             # --- 2. SIND NOCH FREIGESCHALTETE ZÜGE UNVERSUCHT? ---
             if node.untried_actions:
                 return node # _expand kümmert sich um den Test
-                
+
             # --- 3. ABSTIEG ZUM KIND ---
             # Für die aktuelle Anzahl an Besuchen ist dieser Knoten "vollständig".
             # Wir steigen tiefer in den Baum ab.
-            node = node.best_child(self.c)
+            node = self._best_child(node)
             obs, _, done, _ = env.step(node.action)
             if done:
                 return node
-                
+
         return node
+
+    def _best_child(self, node: MCTSNode) -> MCTSNode:
+        """Wählt das beste Kind: PUCT wenn Priors aktiv, sonst UCB1."""
+        if self._uses_priors and node.priors is not None:
+            from agents.neural_net import action_to_id
+            parent_visits = node._eff_visits()
+            # Prior-Normalisierung über die legalen Kinder
+            valid_p_sum = 0.0
+            for ch in node.children:
+                valid_p_sum += node.priors[action_to_id(ch.action)]
+            valid_p_sum = valid_p_sum or 1.0
+
+            def _score(ch):
+                p = node.priors[action_to_id(ch.action)] / valid_p_sum
+                return ch.puct(self._c_puct, p, parent_visits)
+            return max(node.children, key=_score)
+        # Default: UCB1
+        return node.best_child(self.c)
 
     def _expand(self, node: MCTSNode, env: MosaicEnv) -> MCTSNode:
         # Lazy Init: Beim allerersten Aufruf befüllen
@@ -472,6 +582,31 @@ class MCTSAgent(BaseAgent):
             # Wert aus Sicht des Spielers der zu diesem Knoten geführt hat
             node.value += result.get(node.player_who_acted, 0.0)
             node = node.parent
+
+    # ── Strategie-Hooks (von Subklassen überschrieben) ────────────────────────
+
+    def _terminal_result(self, sim_env: MosaicEnv) -> dict[int, float]:
+        """Ergebnis eines beendeten Spiels (Win/Loss/Tie über Score)."""
+        scores = sim_env.scores()
+        if scores[0] > scores[1]:
+            return {0: 1.0, 1: 0.0}
+        elif scores[1] > scores[0]:
+            return {0: 0.0, 1: 1.0}
+        p0 = 1.0 if sim_env.state.players[0].holds_first_player_marker else 0.0
+        return {0: p0, 1: 1.0 - p0}
+
+    def _evaluate_leaves(self, leaves: list) -> list[dict[int, float]]:
+        """
+        Bewertet eine Liste nicht-terminaler Leaves. Eingabe: Liste von
+        (node, env)-Paaren. Basis (Heuristik): pro Leaf ein Greedy-Rollout.
+        Subklassen (Netz) überschreiben dies mit einem Batch-Forward-Pass und
+        setzen dabei node.priors.
+        """
+        return [self._rollout(env) for (_node, env) in leaves]
+
+    def _provide_priors(self, node: MCTSNode, env: MosaicEnv) -> None:
+        """Setzt node.priors (No-Op bei Heuristik; Netz überschreibt)."""
+        pass
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
