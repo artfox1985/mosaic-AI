@@ -247,11 +247,12 @@ def get_player_potential(player, round_number: int = 1,
                 open_rows += 1
 
     # A2: Sättigungs-Penalty für zu viele gleichzeitig offene Reihen.
-    # Ab 4 offenen Reihen steigt die Wahrscheinlichkeit stark, dass zukünftige
+    # Ab einer definierten Anzahl an offenen Reihen steigt die 
+    # Wahrscheinlichkeit stark, dass zukünftige
     # Züge auf die Strafleiste gehen (kein Platz mehr für neue Farben).
     # Jede offene Reihe über dem Schwellenwert kostet zunehmend.
-    _OPEN_ROW_THRESHOLD = 2   # bis 3 offene Reihen: kein Penalty
-    _OPEN_ROW_PEN       = 1 # Penalty pro Reihe über dem Schwellenwert
+    _OPEN_ROW_THRESHOLD = 2   # bis _OPEN_ROW_THRESHOLD offene Reihen: kein Penalty
+    _OPEN_ROW_PEN       = 1 # Basisfaktor, quadratisch skaliert: over² * Faktor
     if open_rows > _OPEN_ROW_THRESHOLD:
         over = open_rows - _OPEN_ROW_THRESHOLD
         saturation_penalty = over * over * _OPEN_ROW_PEN

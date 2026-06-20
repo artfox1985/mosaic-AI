@@ -1,5 +1,5 @@
 date: 19.06.2026  
-status: VALID 🟢<!-- oder VALID 🟢 -->  
+status: OUTDATED 🔴<!-- oder VALID 🟢 -->  
 git_commit: 2aa5b85
 
 ## Goal
