@@ -48,31 +48,13 @@ class SelfPlayMixin:
     def search_and_get_policy(self, env, actions, temp=1.0):
         pi = env.current_player()
 
-        # Dynamische Sim-Zahl je nach Aktionsanzahl
-        sim_count = self._selfplay_sim_count(len(actions))
+        # Vereinheitlichte Suche nutzen (statt eigener Schleife): erbt Wurzel-
+        # Priors, Dirichlet-Noise, Batching, Progressive Widening und Sim-Scaling.
+        # Vorher lief hier eine eigene, primitive Schleife, die den Wurzel-Prior-
+        # Fix und das Batching umging — sie erzeugte verrauschte Policy-Targets.
+        _best, root = self._mcts_search(env, list(actions), return_root=True)
 
-        # Root-Knoten mit untried_actions=None initialisieren, damit _expand
-        # beim ersten Besuch die reward-basierte Sortierung (beste Züge zuerst)
-        # durchführt. Wenn hier mit vorbefüllten untried_actions gearbeitet wird,
-        # überspringt _expand die Initialisierung komplett → alle Aktionen landen
-        # ungefiltert im Baum, die Reward-Sortierung greift nie.
-        root = MCTSNode(
-            action=None,
-            parent=None,
-            untried_actions=None,
-            player_who_acted=pi
-        )
-        root.visits = 1
-
-        # Alle Simulationen durchführen
-        for _ in range(sim_count):
-            sim_env = env.clone()
-            node = self._select(root, sim_env)
-            node = self._expand(node, sim_env)
-            result = self._rollout(sim_env)
-            self._backpropagate(node, result, pi)
-
-        if not root.children:
+        if root is None or not root.children:
             action = random.choice(actions)
             return action, [{"action": action, "prob": 1.0}]
 
@@ -143,21 +125,22 @@ class NetworkSelfPlayAgent(SelfPlayMixin):
     """AlphaZero-basierter Self-Play Agent (mit trainiertem Netz)."""
     def __init__(self, model_version: str, simulations=40, **kwargs):
         from agents.alphazero import AlphaZeroAgent
-        # Wir erben nicht von AlphaZeroAgent sondern wrappen ihn
-        # damit SelfPlayMixin._sample_actions etc. verfügbar sind
+        # Wir wrappen den AlphaZeroAgent und nutzen seine vereinheitlichte Suche.
         self._az = AlphaZeroAgent(
             model_version=model_version,
             input_size=INPUT_SIZE,
             simulations=simulations,
             **kwargs
         )
-        # Delegiere alle MCTS-Methoden an den AlphaZero-Agent
+        # Self-Play: Dirichlet-Wurzel-Noise aktivieren (Exploration, bricht die
+        # 0:0-Blockade zweier identischer Netze, diversifiziert die Daten).
+        self._az._add_root_noise = True
+
         self.simulations = simulations
-        self._select = self._az._select
-        self._expand = self._az._expand
-        self._rollout = self._az._rollout
-        self._backpropagate = self._az._backpropagate
+        # Gesamte Suche an den AlphaZero-Agent delegieren (eine Suchmaschine).
+        self._mcts_search    = self._az._mcts_search
         self._sample_actions = self._az._sample_actions
+        self._backpropagate  = self._az._backpropagate
 
     def set_env(self, env):
         self._az.set_env(env)

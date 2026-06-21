@@ -27,6 +27,8 @@ LABELS = {
     "batch_size":         "Batch Size",
     "lr":                 "Learning Rate",
     "value_weight":       "Value Weight",
+    "margin_cap":         "Margin Cap",
+    "max_winner_score":   "Max Winner Score",
     "final_policy_loss":  "Policy Loss (final)",
     "policy_pct":         "Policy Loss %",
     "final_value_loss":   "Value Loss (final)",

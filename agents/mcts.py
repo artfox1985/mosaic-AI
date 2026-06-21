@@ -207,6 +207,16 @@ class MCTSAgent(BaseAgent):
         self._uses_priors  = False
         self._c_puct       = 1.5      # nur relevant wenn _uses_priors
 
+        # Dirichlet-Wurzel-Noise (AlphaZero-Standard): zwingt die Suche, an der
+        # Wurzel auch nicht-favorisierte Züge zu probieren. Bricht die gegen-
+        # seitige Blockade zweier identischer Netze im Self-Play (0:0-Rate) und
+        # diversifiziert die Trainingsdaten. NUR im Self-Play aktivieren — in
+        # Arena/echtem Spiel will man die unverrauschte Netzstärke. Wirkt nur
+        # wenn _uses_priors (Netz-Agent); beim Heuristik-Agent ohne Priors No-Op.
+        self._add_root_noise = False
+        self._dirichlet_eps  = 0.25   # Noise-Anteil ε
+        self._dirichlet_alpha = 0.3   # Streuung α
+
         # Statistiken
         self.stats: dict = {}
 
@@ -301,8 +311,9 @@ class MCTSAgent(BaseAgent):
         """Setzt die aktuelle Spielumgebung für den Agenten."""
         self._env = env
 
-    def _mcts_search(self, env: MosaicEnv, actions: list[dict]) -> dict:
-        """Führt MCTS durch und gibt die beste Aktion zurück."""
+    def _mcts_search(self, env: MosaicEnv, actions: list[dict], return_root: bool = False):
+        """Führt MCTS durch und gibt die beste Aktion zurück.
+        Mit return_root=True zusätzlich die Wurzel (für Self-Play-Policy-Target)."""
         pi = env.current_player()
         root = MCTSNode(
             action=None,
@@ -324,6 +335,10 @@ class MCTSAgent(BaseAgent):
         # PUCT an der Wurzel auf uniform zurückfallen → die gelernte Policy würde
         # an der wichtigsten Stelle ignoriert.
         self._provide_priors(root, env)
+
+        # Dirichlet-Wurzel-Noise (nur Self-Play, nur Netz-Agent mit Priors).
+        if self._add_root_noise and self._uses_priors and root.priors is not None:
+            self._apply_root_noise(root, list(actions))
 
         t_start = time.time()
         sims_done = 0
@@ -424,7 +439,7 @@ class MCTSAgent(BaseAgent):
         # Das verhindert dass bei ~gleich oft erkundeten Zügen zufällig der
         # erste in der Liste gewählt wird statt der qualitativ bessere.
         if not root.children:
-            return random.choice(actions)
+            return (random.choice(actions), None) if return_root else random.choice(actions)
 
         best = max(root.children,
                    key=lambda n: (n.visits,
@@ -447,7 +462,7 @@ class MCTSAgent(BaseAgent):
             "tree_size": sum(1 for _ in self._iter_nodes(root)),
         }
 
-        return best.action
+        return (best.action, root) if return_root else best.action
 
     # ── MCTS-Phasen ───────────────────────────────────────────────────────────
 
@@ -607,6 +622,27 @@ class MCTSAgent(BaseAgent):
     def _provide_priors(self, node: MCTSNode, env: MosaicEnv) -> None:
         """Setzt node.priors (No-Op bei Heuristik; Netz überschreibt)."""
         pass
+
+    def _apply_root_noise(self, root: MCTSNode, actions: list[dict]) -> None:
+        """
+        Mischt Dirichlet-Noise auf die Wurzel-Priors der legalen Aktionen:
+            P(a) = (1-ε)·P_netz(a) + ε·noise(a)
+        Nur die Action-IDs der legalen Züge werden verrauscht — der Rest des
+        Prior-Vektors bleibt unangetastet (irrelevant, da nie expandiert).
+        """
+        try:
+            from agents.neural_net import action_to_id
+            import numpy as _np
+            ids = [action_to_id(a) for a in actions]
+            ids = [i for i in ids if 0 <= i < len(root.priors)]
+            if len(ids) < 2:
+                return
+            noise = _np.random.dirichlet([self._dirichlet_alpha] * len(ids))
+            eps = self._dirichlet_eps
+            for idx, aid in enumerate(ids):
+                root.priors[aid] = (1.0 - eps) * root.priors[aid] + eps * noise[idx]
+        except Exception:
+            pass  # Noise ist optional — bei Fehler einfach ohne weiter
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
