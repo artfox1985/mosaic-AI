@@ -44,7 +44,10 @@ class AlphaZeroAgent(MCTSAgent):
         vh = ckpt["model_state"]["value_head.0.bias"].shape[0]
         self.model = MosaicNet(input_size=input_size, num_actions=NUM_ACTIONS,
                                hidden_size=hs, value_hidden=vh)
-        self.model.load_state_dict(ckpt["model_state"])
+        # strict=False: alte Modelle (vor dem Floor-Head) haben floor_head-Gewichte
+        # nicht gespeichert. Der Head wird dann zufällig initialisiert — unkritisch,
+        # da er bei der Inferenz (Suche) ignoriert wird.
+        self.model.load_state_dict(ckpt["model_state"], strict=False)
         self.model.to(self.device)
         self.model.eval()
         print(f"   Architektur: {input_size}→{hs}→{hs}→{hs} | Value Head: {vh}")
@@ -57,7 +60,7 @@ class AlphaZeroAgent(MCTSAgent):
         """states: Liste von serialisierten obs → (policy_probs[B,A], values[B])."""
         tensors = [state_to_tensor(s) for s in states]
         batch = torch.stack(tensors).to(self.device)
-        policy_logits, value_pred, moon_logits = self.model(batch)
+        policy_logits, value_pred, moon_logits, _floor = self.model(batch)
         policy_probs = F.softmax(policy_logits, dim=1).cpu().numpy()
         values = value_pred.cpu().numpy().reshape(-1)
         # Moon-Logits des letzten States für agent_env zugänglich machen
@@ -109,7 +112,7 @@ class AlphaZeroAgent(MCTSAgent):
         import numpy as np
         self.model.eval()
         tensor_state = state_to_tensor(obs).unsqueeze(0).to(self.device)
-        policy_logits, value_pred, moon_logits = self.model(tensor_state)
+        policy_logits, value_pred, moon_logits, _floor = self.model(tensor_state)
         policy_probs = F.softmax(policy_logits[0], dim=0).cpu().numpy()
         v = float(value_pred.item())
         result = {

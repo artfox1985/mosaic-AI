@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MARGIN_CAP, MAX_WINNER_SCORE
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MARGIN_CAP, MAX_WINNER_SCORE, AUX_FLOOR_WEIGHT
 
 # WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
 from agents.neural_net import MosaicNet, MosaicDataset
@@ -45,7 +45,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if load_path.exists():
             print(f"📥 Lade altes Model als Startpunkt: {load_path.name}")
             ckpt = torch.load(str(load_path), map_location=device)
-            model.load_state_dict(ckpt["model_state"])
+            # strict=False: floor_head fehlt in alten Checkpoints → frisch
+            # initialisiert, lernt von null, während die übrigen Heads warm starten.
+            model.load_state_dict(ckpt["model_state"], strict=False)
         else:
             print(f"⚠️ Warnung: Start-Modell '{load_path}' nicht gefunden. Trainiere von null!")
             
@@ -75,17 +77,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     stopped_early = False
 
     for epoch in range(epochs):
-        t_loss, t_vloss, t_ploss = 0, 0, 0
+        t_loss, t_vloss, t_ploss, t_floss = 0, 0, 0, 0
         v_preds_epoch = [] 
         
-        for states, targets_p, targets_v, masks, moon_targets in dataloader:
+        for states, targets_p, targets_v, masks, moon_targets, floor_targets in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             masks     = masks.to(device)
+            floor_targets = floor_targets.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v, pred_moon = model(states)  # moon für Moon-Loss  # Moon-Head Output beim Training ignoriert
+            pred_p, pred_v, pred_moon, pred_floor = model(states)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -111,13 +114,20 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if sun_mask.any():
                 p_loss = p_loss + mse_loss(pred_moon[sun_mask], moon_targets[sun_mask])
 
-            loss = v_loss * VALUE_WEIGHT + p_loss
+            # Auxiliary Floor-Loss: dichtes Hilfssignal für floor-bewusste
+            # Repräsentationen im geteilten Rumpf. Konservativ gewichtet (0.3),
+            # damit Policy/Value dominieren. Ziel: Value-Head soll Floor-
+            # Stellungen früh erkennen (was der Anreiz-Hebel allein nicht schaffte).
+            floor_loss = mse_loss(pred_floor, floor_targets)
+
+            loss = v_loss * VALUE_WEIGHT + p_loss + AUX_FLOOR_WEIGHT * floor_loss
             loss.backward()
             optimizer.step()
             
             t_loss  += loss.item()
             t_vloss += v_loss.item()
             t_ploss += p_loss.item()
+            t_floss += floor_loss.item()
             v_preds_epoch.append(pred_v.detach().flatten().cpu())
 
         epoch_ploss = t_ploss / n_batches
@@ -150,7 +160,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plateau_marker = "  🔴 PLATEAU + VALUE SINKT (Overfitting-Risiko)"
 
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
-              f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}) "
+              f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}, Floor: {t_floss/n_batches:5.3f}) "
               f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
         # ── Early Stopping ─────────────────────────────────────────────────
