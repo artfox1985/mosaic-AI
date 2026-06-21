@@ -237,6 +237,15 @@ def action_to_id(action: dict) -> int:
 def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
     """Berechnet den abgestuften Value-Target aus rohen Scores.
     Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
+
+    Rückgabe ist der Wert AUS SIEGER-SICHT. Die Trainings-Aufrufstelle spiegelt:
+    +wv für den Sieger, -wv für den Verlierer.
+
+    Sonderfall 0:0 (margin==0, winner_score<5): kein echter Sieg, sondern ein
+    vermiedenswertes Ergebnis (geflutete Strafleisten — kein Mensch spielt so).
+    Gibt 0.1 zurück; die Trainings-Aufrufstelle erkennt diesen Fall separat über
+    is_zerozero() und bestraft BEIDE Spieler symmetrisch (statt zu spiegeln).
+    Für Diagnose-Zwecke bleibt die Float-Rückgabe unverändert.
     """
     margin       = abs(scores[0] - scores[1])
     winner_score = scores[winner]
@@ -245,6 +254,17 @@ def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_
     margin_part = min(0.45, (margin / margin_cap) * 0.45)
     score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
     return min(1.0, 0.1 + margin_part + score_part)
+
+
+# 0:0-Strafe (milde Variante): geflutete Strafleisten sind ein vermiedenswertes
+# Ergebnis. BEIDE Spieler erhalten dieses negative Target (symmetrisch, nicht
+# gespiegelt), damit das Netz lernt, 0:0 aktiv zu vermeiden statt sich über den
+# Startspieler-Marker in einen "sicheren" +0.1-Hafen zu mauern.
+ZEROZERO_PENALTY = -0.15
+
+def is_zerozero(scores, winner) -> bool:
+    """True, wenn der Ausgang ein 0:0-Tiebreak-Spiel ist (kein echtes Punkten)."""
+    return abs(scores[0] - scores[1]) == 0 and scores[winner] < 5
 
 
 class MosaicDataset(Dataset):
@@ -368,9 +388,15 @@ class MosaicDataset(Dataset):
 
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
-                            wv  = compute_win_val(step["scores"], step["winner"],
-                                                  margin_cap, max_winner_score)
-                            val = wv if step["player"] == step["winner"] else -wv
+                            if is_zerozero(step["scores"], step["winner"]):
+                                # 0:0 → beide Spieler bestraft (symmetrisch, KEINE
+                                # Spiegelung). Nimmt dem Marker-Halter den sicheren
+                                # +0.1-Hafen und gibt einen Gradienten gegen 0:0.
+                                val = ZEROZERO_PENALTY
+                            else:
+                                wv  = compute_win_val(step["scores"], step["winner"],
+                                                      margin_cap, max_winner_score)
+                                val = wv if step["player"] == step["winner"] else -wv
                         else:
                             val = float(step["value"])
                         values_l.append([val])

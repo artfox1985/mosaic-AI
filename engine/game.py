@@ -320,6 +320,21 @@ class GameResult:
     log:           list[str]
 
 
+def determine_winner(state) -> int:
+    """Bestimmt den Sieger einer Partie — die EINZIGE Quelle dieser Regel.
+
+    Regel: höhere Punktzahl gewinnt; bei Gleichstand der Besitzer des
+    Startspieler-Markers (einer der beiden Spieler hält ihn zwingend).
+    Gibt immer 0 oder 1 zurück.
+    """
+    scores = [p.score for p in state.players]
+    if scores[0] > scores[1]:
+        return 0
+    if scores[1] > scores[0]:
+        return 1
+    return 0 if state.players[0].holds_first_player_marker else 1
+
+
 class Game:
     """
     Steuert den kompletten Spielablauf.
@@ -606,17 +621,7 @@ class Game:
     def result(self) -> GameResult:
         assert self.is_over()
         scores = [p.score for p in self.state.players]
-
-        if scores[0] > scores[1]:
-            winner = 0
-        elif scores[1] > scores[0]:
-            winner = 1
-        elif self.state.players[0].holds_first_player_marker:
-            winner = 0
-        elif self.state.players[1].holds_first_player_marker:
-            winner = 1
-        else:
-            winner = None
+        winner = determine_winner(self.state)
 
         filled = []
         for p in self.state.players:

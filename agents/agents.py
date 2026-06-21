@@ -8,7 +8,7 @@ Beide Agenten implementieren dasselbe Interface:
     agent.choose(actions, observation) -> dict
 
 Training:
-    results = run_episode(env, agent0, agent1)
+    results = run_episode(env, [agent0, agent1])
     stats = run_training(n_episodes=1000)
 """
 from __future__ import annotations
@@ -85,29 +85,52 @@ def run_episode(
     verbose: bool = False,
 ) -> dict:
     """
-    Führt eine vollständige Episode durch.
+    Führt eine vollständige Episode durch. Einheitlicher Spiel-Loop für alle
+    Agenten (inkl. MCTS — set_env wird automatisch aufgerufen, falls vorhanden).
 
     Returns:
         {
           "scores": [int, int],
-          "winner": 0 | 1 | -1 (Unentschieden),
+          "winner": 0 | 1,
           "steps": int,
           "rewards": [float, float],
           "scoring_tile_ids": [...],
+          "avg_actions": float,
+          "max_actions": int,
+          "state": GameState,
           "duration_s": float,
         }
     """
+    import os
     t0 = time.time()
+
+    # MCTS-Agenten brauchen Zugriff auf die Umgebung (set_env). Schadet anderen
+    # Agenten nicht — wird nur aufgerufen, wenn die Methode existiert.
+    for agent in agents:
+        if hasattr(agent, "set_env"):
+            agent.set_env(env)
+
     obs, info = env.reset(seed=seed)
     total_rewards = [0.0, 0.0]
     steps = 0
+    action_counts = []   # Anzahl valider Züge pro Step (für Diagnose)
+
+    # Optionales Hänger-Debug per ARENA_DEBUG=1.
+    _dbg = os.environ.get("ARENA_DEBUG", "") not in ("", "0")
+    def _d(msg):
+        if _dbg:
+            print(f"    [DBG s={steps:3d} t={time.time()-t0:6.1f}s] {msg}", flush=True)
 
     while steps < max_steps:
+        _d(f"phase={env.state.phase} → valid_actions()")
         actions = env.valid_actions()
         if not actions:
+            _d("keine Aktionen → break")
             break
 
+        action_counts.append(len(actions))
         pi = env.current_player()
+        _d(f"P{pi} {type(agents[pi]).__name__} choose() aus {len(actions)} Aktionen")
         action = agents[pi].choose(actions, obs)
 
         obs, reward, done, step_info = env.step(action)
@@ -115,27 +138,33 @@ def run_episode(
         steps += 1
 
         if verbose and steps % 20 == 0:
-            scores = env.scores()
             print(f"  Step {steps:3d} | P{pi} {action['type']:12s} | "
-                  f"reward={reward:+.1f} | scores={scores}")
+                  f"reward={reward:+.1f} | scores={env.scores()}")
 
         if done:
             break
 
     scores = env.scores()
-    
-    # 1. Sieger nach Punkten
-    if scores[0] > scores[1]:
-        winner = 0
-    elif scores[1] > scores[0]:
-        winner = 1
-    else:
-        # 2. TIE-BREAKER: Bei Gleichstand gewinnt der Besitzer des Startspieler-Markers!
-        # Einer der beiden Spieler muss ihn zwingend haben.
-        if env.state.players[0].holds_first_player_marker:
-            winner = 0
+
+    # Sieger via zentrale Regel (engine.game.determine_winner).
+    from engine.game import determine_winner
+    winner = determine_winner(env.state)
+
+    # Arena-Spiel-Log (Rundenende & Punkte), nur bei verbose.
+    if verbose:
+        print("\n" + "="*60)
+        print("📜 ARENA SPIEL-LOG (Rundenende & Punkte)")
+        print("="*60)
+        log_entries = getattr(env.state, 'log', [])
+        if not log_entries:
+            print("Kein Log gefunden.")
         else:
-            winner = 1
+            for entry in log_entries:
+                print(entry)
+        print("="*60 + "\n")
+
+    avg_actions = round(sum(action_counts) / len(action_counts), 1) if action_counts else 0.0
+    max_act = max(action_counts) if action_counts else 0
 
     result = {
         "scores":           scores,
@@ -145,6 +174,9 @@ def run_episode(
         "scoring_tile_ids": info.get("scoring_tile_ids", []),
         "scoring_names":    info.get("scoring_tile_names", []),
         "duration_s":       round(time.time() - t0, 3),
+        "avg_actions":      avg_actions,
+        "max_actions":      max_act,
+        "state":            env.state,
     }
 
     for agent in agents:
