@@ -255,6 +255,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "batch_size":        BATCH_SIZE,
         "lr":                LEARNING_RATE,
         "value_weight":      VALUE_WEIGHT,
+        "margin_cap":        margin_cap,
+        "max_winner_score":  max_winner_score,
         "final_policy_loss": round(final_p, 4),
         "final_value_loss":  round(final_v, 4),
         "policy_pct":        round(pct, 1),
