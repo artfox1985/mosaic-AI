@@ -1,5 +1,5 @@
 """
-self_play.py — Self-Play Datengenerierung für Mosaic-AI
+Self-Play Datengenerierung für Mosaic-AI
 
 Unterstützt zwei Modi:
   --mode mcts      Verwendet HeuristicMCTSAgent (kein Netz, für erste Generation)
@@ -36,14 +36,6 @@ class SelfPlayMixin:
       temp=0.1 → fast deterministisch
       temp=0.0 → argmax
     """
-
-    def _selfplay_sim_count(self, num_actions: int) -> int:
-        """Dynamische Sim-Zahl für Self-Play — immer play-Modus.
-        Gibt im Frühspiel (viele Aktionen) mehr Sims für schärfere Policy-Targets,
-        skaliert mit sqrt(num_actions) * 10, begrenzt auf [base, base*3]."""
-        import math
-        return max(self.simulations,
-                   min(self.simulations * 3, int(math.sqrt(num_actions) * 10)))
 
     def search_and_get_policy(self, env, actions, temp=1.0):
         pi = env.current_player()
@@ -262,11 +254,8 @@ def play_one_game(agent, game_id: str = "unknown"):
             break
 
     scores = env.scores()
-    winner = (
-        0 if scores[0] > scores[1] else
-        1 if scores[1] > scores[0] else
-        0 if env.state.players[0].holds_first_player_marker else 1
-    )
+    from engine.game import determine_winner
+    winner = determine_winner(env.state)
 
     training_data = []
     for step in history:

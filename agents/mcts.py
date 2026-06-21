@@ -552,33 +552,10 @@ class MCTSAgent(BaseAgent):
 
     def _rollout(self, env: MosaicEnv) -> dict[int, float]:
         """
-        Spiele bis rollout_depth Schritte mit Greedy-Bias.
-        rollout_depth=-1 → bis Spielende
-        rollout_depth=0  → sofortige Heuristik
+        Blattbewertung. rollout_depth ist projektweit 0 → keine Ausspiel-Schleife,
+        sofortige terminale Bewertung des aktuellen Zustands. (Die Heuristik-
+        Subklasse überschreibt dies mit Greedy-Shaping.)
         """
-        start = time.perf_counter()
-        depth = 0
-        done = False
-
-        while not done and (self.rollout_depth < 0 or depth < self.rollout_depth):
-            actions = env.valid_actions()
-            if not actions: 
-                break
-            
-            # Greedy-Bias: 3 Aktionen testen, beste ausführen
-            best_action = random.choice(actions)  # Fallback
-            best_val = -float('inf')
-
-            for a in random.sample(actions, min(3, len(actions))):
-                test_env = env.clone()
-                _, r, _, _ = test_env.step(a)
-                if r > best_val:
-                    best_val = r
-                    best_action = a
-
-            _, _, done, _ = env.step(best_action)
-            depth += 1
-
         scores = env.scores()
         return _compute_terminal_reward(scores, env.state)
 
@@ -602,13 +579,9 @@ class MCTSAgent(BaseAgent):
 
     def _terminal_result(self, sim_env: MosaicEnv) -> dict[int, float]:
         """Ergebnis eines beendeten Spiels (Win/Loss/Tie über Score)."""
-        scores = sim_env.scores()
-        if scores[0] > scores[1]:
-            return {0: 1.0, 1: 0.0}
-        elif scores[1] > scores[0]:
-            return {0: 0.0, 1: 1.0}
-        p0 = 1.0 if sim_env.state.players[0].holds_first_player_marker else 0.0
-        return {0: p0, 1: 1.0 - p0}
+        from engine.game import determine_winner
+        w = determine_winner(sim_env.state)
+        return {w: 1.0, 1 - w: 0.0}
 
     def _evaluate_leaves(self, leaves: list) -> list[dict[int, float]]:
         """
@@ -796,106 +769,16 @@ def run_episode_mcts(
     max_steps: int = 500,
     verbose: bool = False,
 ) -> dict:
+    """Dünner Wrapper um run_episode: erzeugt das Env (mit random_scoring_tiles)
+    und delegiert an den einheitlichen Spiel-Loop. set_env für MCTS-Agenten
+    übernimmt run_episode selbst (hasattr-Guard).
+
+    Beibehalten für Rückwärtskompatibilität (arena.py ruft diese Signatur).
     """
-    Wie run_episode, aber übergibt die Umgebung an MCTS-Agenten.
-    """
-    import time
     from agents.agents import run_episode
-
     env = MosaicEnv(random_scoring_tiles=random_scoring_tiles)
+    return run_episode(env, agents, seed=seed, max_steps=max_steps, verbose=verbose)
 
-    # Env an MCTS-Agenten übergeben
-    for agent in agents:
-        if isinstance(agent, MCTSAgent):
-            agent.set_env(env)
-
-    t0 = time.time()
-    obs, info = env.reset(seed=seed)
-    total_rewards = [0.0, 0.0]
-    steps = 0
-    done = False
-    action_counts = []   # Anzahl valider Züge pro Step
-
-    # Debug-Logging per Umgebungsvariable ARENA_DEBUG=1 aktivierbar.
-    # Loggt vor jedem kritischen Aufruf mit Flush, sodass bei einem Hänger
-    # die letzte sichtbare Zeile zeigt WO es steckenbleibt.
-    import os
-    _dbg = os.environ.get("ARENA_DEBUG", "") not in ("", "0")
-    def _d(msg):
-        if _dbg:
-            print(f"    [DBG s={steps:3d} t={time.time()-t0:6.1f}s] {msg}", flush=True)
-
-    while steps < max_steps and not done:
-        _d(f"phase={env.state.phase} → valid_actions()")
-        actions = env.valid_actions()
-        if not actions:
-            _d("keine Aktionen → break")
-            break
-
-        action_counts.append(len(actions))
-
-        pi = env.current_player()
-        agent = agents[pi]
-        _d(f"P{pi} {type(agent).__name__} choose() aus {len(actions)} Aktionen "
-           f"(sims={getattr(agent,'simulations','?')}, depth={getattr(agent,'rollout_depth','?')})")
-
-        action = agent.choose(actions, obs)
-        _d(f"P{pi} gewählt: {action.get('type')} → step()")
-        obs, reward, done, step_info = env.step(action)
-        if step_info.get("error"):
-            _d(f"⚠️ step error: {step_info['error']}")
-        total_rewards[pi] += reward
-        steps += 1
-
-        if verbose and steps % 20 == 0:
-            print(f"  Step {steps:3d} | P{pi} {action['type']:12s} | "
-                  f"reward={reward:+.1f} | scores={env.scores()}")
-
-    scores = env.scores()
-    
-    # 1. Sieger nach Punkten
-    if scores[0] > scores[1]:
-        winner = 0
-    elif scores[1] > scores[0]:
-        winner = 1
-    else:
-        # 2. TIE-BREAKER: Bei Gleichstand gewinnt der Besitzer des Startspieler-Markers!
-        # Einer der beiden Spieler muss ihn zwingend haben.
-        if env.state.players[0].holds_first_player_marker:
-            winner = 0
-        else:
-            winner = 1
-
-    # LOG-AUSGABE FÜR DIE ARENA ---
-    if verbose:
-        print("\n" + "="*60)
-        print("📜 ARENA SPIEL-LOG (Rundenende & Punkte)")
-        print("="*60)
-        log_entries = getattr(env.state, 'log', [])
-        if not log_entries:
-            print("Kein Log gefunden.")
-        else:
-            for entry in log_entries:
-                print(entry)
-        print("="*60 + "\n")
-
-    avg_actions = round(sum(action_counts) / len(action_counts), 1) if action_counts else 0.0
-    max_actions = max(action_counts) if action_counts else 0
-
-    result = {
-        "scores":           scores,
-        "winner":           winner,
-        "steps":            steps,
-        "rewards":          total_rewards,
-        "scoring_tile_ids": info.get("scoring_tile_ids", []),
-        "scoring_names":    info.get("scoring_tile_names", []),
-        "duration_s":       round(time.time() - t0, 3),
-        "avg_actions":      avg_actions,
-        "max_actions":      max_actions,
-        "state":            env.state
-    }
-    
-    return result
 
 def evaluate_state(state) -> dict[int, float]:
     """
@@ -948,61 +831,20 @@ class HeuristicMCTSAgent(MCTSAgent):
     # Obergrenze für "gratis" durchlaufene Kuppelzüge im Rollout (Schutz gegen
     # zu lange/teure Rollouts bei ausgedehnten Kuppelphasen; gemessener Median
     # einer Kuppelphase ~9, Max ~15).
-    _DOME_PASSTHROUGH_CAP = 10
-
     def _rollout(self, env):
-        """Überschreibt das Rollout: Nutzt Greedy-Shaping statt Zufall!
+        """Blattbewertung des Heuristik-Agents: Greedy-Shaping über evaluate_state.
 
-        Dynamische Tiefe bei Kuppelzügen: Der Wert einer Kuppelplatten-
-        Platzierung zeigt sich erst, wenn das Fundament steht (Steine darauf
-        kommen). Eine Bewertung MITTEN in der Kuppel-Auslegung ist daher wenig
-        aussagekräftig. Deshalb verbrauchen Kuppelzüge (dome/dome_stack) KEIN
-        Tiefenbudget — das Rollout läuft durch sie hindurch, bis das Fundament
-        gelegt ist, und erst Nicht-Kuppelzüge zählen gegen rollout_depth.
-        Eine Obergrenze (_DOME_PASSTHROUGH_CAP) verhindert, dass das Rollout
-        bei langen Kuppelphasen entgleist (Rechenzeit + akkumuliertes
-        Greedy-Rauschen).
+        rollout_depth ist projektweit 0 → kein Ausspielen, sofortige Bewertung
+        des aktuellen Zustands. Die Potential-Differenz beider Spieler wird über
+        eine aktionsabhängige Skala in Win-Wahrscheinlichkeiten übersetzt.
+
+        (Früher lief hier optional ein tiefenbegrenztes Greedy-Rollout mit
+        Kuppel-Passthrough. Da rollout_depth nie > 0 genutzt wird, ist diese
+        Schleife entfallen — sie wäre toter Code gewesen.)
         """
-        depth = 0
-        done = False
-        dome_passthrough = 0
-        _DOME_TYPES = ("dome", "dome_stack")
-
-        # Spiele weiter, solange das Tiefenbudget (für Nicht-Kuppelzüge) reicht.
-        while not done and (self.rollout_depth < 0 or depth < self.rollout_depth):
-            actions = env.valid_actions()
-            if not actions:
-                break
-
-            # --- GREEDY-BIAS ---
-            best_action = random.choice(actions) # Fallback
-            best_reward = -float('inf')
-            sample_actions = random.sample(actions, min(5, len(actions)))
-            for a in sample_actions:
-                test_env = env.clone()
-                _, r, _, _ = test_env.step(a)
-                if r > best_reward:
-                    best_reward = r
-                    best_action = a
-
-            _, _, done, _ = env.step(best_action)
-
-            # Kuppelzüge zählen NICHT gegen die Tiefe (Fundament durchlaufen),
-            # bis zu einer Sicherheitsobergrenze.
-            is_dome = best_action.get("type") in _DOME_TYPES
-            if is_dome and dome_passthrough < self._DOME_PASSTHROUGH_CAP:
-                dome_passthrough += 1
-            else:
-                depth += 1
-
-        # --- DER MAGISCHE MOMENT: Die Heuristik übernimmt ---
-        if done:
-            scores = env.scores()
-            return _compute_terminal_reward(scores, env.state)
-        else:
-            evals = evaluate_state(env.state)
-            # Aktionsabhängige scale: im Frühspiel (viele Optionen) klein, damit
-            # die feinen Potential-Unterschiede zwischen Drafts nicht zu nahe 0.5
-            # gestaucht werden (sonst flache Policy-Targets → Strafleisten-Fluten).
-            scale = _scale_for_actions(len(env.valid_actions()))
-            return _diff_to_probs(evals[0] - evals[1], scale=scale)
+        evals = evaluate_state(env.state)
+        # Aktionsabhängige scale: im Frühspiel (viele Optionen) klein, damit
+        # die feinen Potential-Unterschiede zwischen Drafts nicht zu nahe 0.5
+        # gestaucht werden (sonst flache Policy-Targets → Strafleisten-Fluten).
+        scale = _scale_for_actions(len(env.valid_actions()))
+        return _diff_to_probs(evals[0] - evals[1], scale=scale)
