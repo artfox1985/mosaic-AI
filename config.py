@@ -23,6 +23,10 @@ BATCH_SIZE    = 256
 HIDDEN_SIZE   = 256   # Neuronen pro Hidden Layer (2^x)
 LEARNING_RATE = 0.0006
 VALUE_WEIGHT  = 0.5
+# Gewicht des Auxiliary-Floor-Heads im Gesamt-Loss. Konservativ (0.3): groß
+# genug für Effekt auf den geteilten Rumpf, klein genug dass Policy/Value
+# dominieren. Der einzige echte Tuning-Parameter des Floor-Heads.
+AUX_FLOOR_WEIGHT = 0.3
 
 # --- VALUE-TARGET PARAMETER (abgestuftes Signal) ---
 # Steuern wie scores → win_val umgerechnet werden (compute_win_val).
