@@ -45,3 +45,11 @@ FINALE ELO RATINGS:
     ID  159:    38×
 =======================================================
 ```
+
+### v1f 0cdb9df
+
+penalty im value head für 0:0 spiele von -0.15 für beide spieler
+
+v1g 
+
+penalty im value head für 0:0 spiele von -0.3 für beide spieler

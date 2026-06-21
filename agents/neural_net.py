@@ -234,37 +234,41 @@ def action_to_id(action: dict) -> int:
     return 481  # Fallback
 
 # --- 2. DATENSATZ & NETZWERK ---
-def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
-    """Berechnet den abgestuften Value-Target aus rohen Scores.
-    Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
 
-    Rückgabe ist der Wert AUS SIEGER-SICHT. Die Trainings-Aufrufstelle spiegelt:
-    +wv für den Sieger, -wv für den Verlierer.
-
-    Sonderfall 0:0 (margin==0, winner_score<5): kein echter Sieg, sondern ein
-    vermiedenswertes Ergebnis (geflutete Strafleisten — kein Mensch spielt so).
-    Gibt 0.1 zurück; die Trainings-Aufrufstelle erkennt diesen Fall separat über
-    is_zerozero() und bestraft BEIDE Spieler symmetrisch (statt zu spiegeln).
-    Für Diagnose-Zwecke bleibt die Float-Rückgabe unverändert.
-    """
-    margin       = abs(scores[0] - scores[1])
-    winner_score = scores[winner]
-    if margin == 0 and winner_score < 5:
-        return 0.1
-    margin_part = min(0.45, (margin / margin_cap) * 0.45)
-    score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
-    return min(1.0, 0.1 + margin_part + score_part)
-
-
-# 0:0-Strafe (milde Variante): geflutete Strafleisten sind ein vermiedenswertes
-# Ergebnis. BEIDE Spieler erhalten dieses negative Target (symmetrisch, nicht
-# gespiegelt), damit das Netz lernt, 0:0 aktiv zu vermeiden statt sich über den
-# Startspieler-Marker in einen "sicheren" +0.1-Hafen zu mauern.
+# 0:0-Strafe: geflutete Strafleisten sind ein vermiedenswertes Ergebnis. BEIDE
+# Spieler erhalten dieses negative Target (symmetrisch, nicht gespiegelt), damit
+# das Netz lernt, 0:0 aktiv zu vermeiden statt sich über den Startspieler-Marker
+# in einen "sicheren" Hafen zu mauern.
+#   v1f: -0.15 (mild) → senkte Self-Play-0:0 von 58.7% auf ~47%.
+#   v1g: -0.30 (stärker) → Test, ob der stärkere Anreiz die Rate weiter drückt,
+#        bevor der teurere Auxiliary-Floor-Head nötig wird.
 ZEROZERO_PENALTY = -0.15
 
 def is_zerozero(scores, winner) -> bool:
     """True, wenn der Ausgang ein 0:0-Tiebreak-Spiel ist (kein echtes Punkten)."""
     return abs(scores[0] - scores[1]) == 0 and scores[winner] < 5
+
+def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
+    """Berechnet den abgestuften Value-Target aus rohen Scores.
+    Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
+
+    Rückgabe ist der Wert AUS SIEGER-SICHT (für echte Siege). Die Trainings-
+    Aufrufstelle spiegelt: +wv für den Sieger, -wv für den Verlierer.
+
+    Sonderfall 0:0 (margin==0, winner_score<5): kein echter Sieg, sondern ein
+    vermiedenswertes Ergebnis (geflutete Strafleisten — kein Mensch spielt so).
+    Gibt direkt ZEROZERO_PENALTY (negativ) zurück — konsistent mit dem
+    Trainings-Target. Die Trainings-Aufrufstelle erkennt den Fall zusätzlich über
+    is_zerozero() und setzt den Wert für BEIDE Spieler symmetrisch (ohne
+    Spiegelung), sodass nicht ein Spieler durch die Spiegelung +0.3 bekäme.
+    """
+    margin       = abs(scores[0] - scores[1])
+    winner_score = scores[winner]
+    if margin == 0 and winner_score < 5:
+        return ZEROZERO_PENALTY
+    margin_part = min(0.45, (margin / margin_cap) * 0.45)
+    score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
+    return min(1.0, 0.1 + margin_part + score_part)
 
 
 class MosaicDataset(Dataset):
