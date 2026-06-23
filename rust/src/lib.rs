@@ -8,10 +8,13 @@ use pyo3::prelude::*;
 // Reiner Rust-Kern (PyO3-frei, mit `cargo test` testbar).
 pub mod board;
 pub mod dome;
+pub mod execution;
 pub mod factory;
+pub mod moves;
 pub mod state;
 pub mod supply;
 pub mod tile;
+pub mod validation;
 
 /// Version des Rust-Kerns (CARGO_PKG_VERSION) — für den Import-Smoke-Test.
 #[pyfunction]
