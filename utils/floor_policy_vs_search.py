@@ -49,16 +49,120 @@ def top_action_of_policy(policy: list) -> dict:
     return best or {}
 
 
+def count_open_rows(state: dict, player_idx: int) -> int:
+    """
+    Zählt die OFFENEN Musterreihen eines Spielers (begonnen, aber nicht voll) —
+    exakt das A2-Maß der Heuristik (shaping.py): 0 < len(tiles) < capacity.
+    Die Heuristik bestraft >2 offene Reihen, weil zu viele gleichzeitig offene
+    Reihen am Rundenende zwangsläufig zu Strafleisten-Würfen führen (eingehende
+    Steine passen nirgends mehr).
+    """
+    try:
+        pl = state["players"][player_idx]
+    except (KeyError, IndexError, TypeError):
+        return 0
+    n = 0
+    for row in pl.get("pattern_lines", []):
+        tiles = row.get("tiles", [])
+        cap = row.get("capacity", row.get("index", 0) + 1)
+        if 0 < len(tiles) < cap:
+            n += 1
+    return n
+
+
+def analyze_buildup(files, max_steps=200000):
+    """
+    Modellfreie Buildup-Analyse: Wie viele Musterreihen hält der ziehende Spieler
+    gleichzeitig offen? Vergleicht man Netz- vs. Heuristik-Daten, zeigt sich, ob
+    das Netz sich durch Über-Öffnen von Reihen in die Floor-Sackgasse manövriert
+    (ein Aufbau-/Policy-Problem, das kein Value-Head beheben kann).
+    """
+    import collections
+    dist = collections.Counter()         # open_rows → Häufigkeit (alle Stellungen)
+    by_round = collections.defaultdict(list)
+    floor_open_rows = []                 # offene Reihen an Floor-Stellungen
+    total = 0
+    over_threshold = 0                   # Stellungen mit >2 offenen Reihen
+
+    for f in files:
+        with open(f, "rb") as fh:
+            data = pickle.load(fh)
+        for step in data:
+            state = step.get("state")
+            pl = step.get("player")
+            if state is None or pl is None or not isinstance(state, dict):
+                continue
+            opn = count_open_rows(state, pl)
+            dist[opn] += 1
+            rnd = state.get("round", 0)
+            by_round[rnd].append(opn)
+            total += 1
+            if opn > 2:
+                over_threshold += 1
+
+            # Floor-Stellung? (Suche wählte Floor, keine Reihen-Alternative)
+            top = top_action_of_policy(step.get("policy", []))
+            valid = step.get("valid_actions", [])
+            if is_floor_action(top) and not any(is_row_action(a) for a in valid):
+                floor_open_rows.append(opn)
+
+            if total >= max_steps:
+                break
+        if total >= max_steps:
+            break
+
+    return dist, by_round, floor_open_rows, total, over_threshold
+
+
+def print_buildup(files, label=""):
+    dist, by_round, floor_open_rows, total, over_threshold = analyze_buildup(files)
+    if total == 0:
+        print("  Keine auswertbaren Stellungen.")
+        return
+    avg = sum(k * v for k, v in dist.items()) / total
+    print(f"\n{'='*60}")
+    print(f"  BUILDUP-ANALYSE — offene Reihen (A2-Maß){'  ' + label if label else ''}")
+    print(f"  {len(files)} Dateien, {total} Stellungen")
+    print(f"{'='*60}")
+    print(f"  Ø offene Reihen (alle Stellungen): {avg:.2f}")
+    print(f"  Anteil >2 offene Reihen (A2-Schwelle): "
+          f"{100*over_threshold/total:.1f}%")
+    print(f"{'-'*60}")
+    print(f"  Verteilung offene Reihen:")
+    for k in sorted(dist):
+        bar = "█" * int(40 * dist[k] / total)
+        print(f"    {k}: {dist[k]:6d} ({100*dist[k]/total:4.1f}%) {bar}")
+    print(f"{'-'*60}")
+    print(f"  Ø offene Reihen pro Runde (Aufbau wächst, Reset am Rundenende):")
+    for r in sorted(by_round):
+        vals = by_round[r]
+        if vals:
+            print(f"    Runde {r}: Ø {sum(vals)/len(vals):.2f} (n={len(vals)})")
+    if floor_open_rows:
+        fo = sum(floor_open_rows) / len(floor_open_rows)
+        print(f"{'-'*60}")
+        print(f"  An Floor-Stellungen (Suche→Floor, keine Reihen-Alt):")
+        print(f"    Ø offene Reihen: {fo:.2f}  (n={len(floor_open_rows)})")
+        print(f"    → Hoch (>2) = Brett verstopft durch Über-Öffnen → Aufbau-Problem")
+        print(f"      Niedrig (≤2) = Floor eher strukturell (Steine passen nie)")
+    print(f"{'='*60}")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Diagnose: flutet die rohe Policy oder erst die Suche? "
+                    "Plus Buildup-Analyse (offene Reihen / A2-Maß). "
                     "Ordner mit den .pkl-Dateien als Argument angeben.")
-    ap.add_argument("--version", required=True, help="Netz-Version, z.B. v1e")
+    ap.add_argument("--version", default=None,
+                    help="Netz-Version, z.B. v1e (nur für Policy-vs-Suche nötig)")
     ap.add_argument("data", nargs="?", default="data",
                     help="Ordner mit Self-Play .pkl (Unterordner-Name oder voller "
                          "Pfad). Default: data")
     ap.add_argument("--max", type=int, default=300,
                     help="max. Floor-Stellungen, die geprüft werden (Rechenzeit)")
+    ap.add_argument("--buildup-only", action="store_true",
+                    help="NUR Buildup-Analyse (offene Reihen), ohne Netz zu laden. "
+                         "Für Heuristik-/Bootstrap-Daten ohne Versions-Modell.")
     args = ap.parse_args()
 
     # Ordner robust auflösen: nimm den Pfad wie angegeben, sonst relativ zum cwd.
@@ -76,17 +180,34 @@ def main():
                 print(f"     {c}")
         return
 
+    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    if not files:
+        print(f"Keine .pkl in {data_dir}")
+        return
+
+    # Buildup-Modus: rein datenbasiert, kein Netz nötig (läuft auf Heuristik-Daten).
+    if args.buildup_only:
+        print_buildup(files, label=f"({data_dir})")
+        return
+
+    # Policy-vs-Suche braucht das Netz.
+    if not args.version:
+        print("❌ Für die Policy-vs-Suche-Analyse wird --version benötigt.")
+        print("   (Oder --buildup-only für die reine Buildup-Analyse ohne Netz.)")
+        return
+
     # Netz laden (lazy, damit das Skript ohne torch zumindest importierbar ist)
     from agents.alphazero import AlphaZeroAgent
     from config import INPUT_SIZE
     agent = AlphaZeroAgent(model_version=args.version, input_size=INPUT_SIZE,
                            simulations=1)  # sims egal, wir nutzen nur evaluate_raw
 
-    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
-    if not files:
-        print(f"Keine .pkl in {data_dir}")
-        return
+    _run_policy_vs_search(agent, files, data_dir, args)
+    # Buildup-Analyse hängt sich an die Policy-vs-Suche-Analyse an (gleicher Datensatz).
+    print_buildup(files, label=f"({data_dir})")
 
+
+def _run_policy_vs_search(agent, files, data_dir, args):
     # Zähler
     checked = 0            # geprüfte Floor-Stellungen (Suche wählte Floor trotz Reihen-Alt)
     raw_also_floor = 0     # rohe Policy wählt AUCH Floor
