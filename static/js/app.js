@@ -801,7 +801,10 @@ const sdiv = document.getElementById('scoring-display');
   const lines = [];
 
   if(byType['start_tile_pending']) {
-    lines.push(`<div class="le" style="color:#F59E0B;font-weight:600">⚠️ Startkachel legen (gelbe Felder anklicken)</div>`);
+    const sp = byType['start_tile_pending'][0];
+    const who = (sp && sp.player != null && S.players[sp.player])
+      ? S.players[sp.player].name + ': ' : '';
+    lines.push(`<div class="le" style="color:#F59E0B;font-weight:600">⚠️ ${who}Startkachel legen (gelbe Felder anklicken)</div>`);
   }
 
   if(byType['stone']) {
@@ -1045,9 +1048,21 @@ function closeChipModal() {
 }
 
 // -- DOME MODAL ----------------------------------------------------------------
+
+// Bestimmt den Spieler, der gerade legen/auswählen darf.
+// In der Startplatzierungs-Phase (noch nicht beide gelegt) gilt die Engine-Regel:
+// Nicht-Startspieler ZUERST, dann Startspieler. Sonst der normale current_player.
+function activePlacingPlayer() {
+  const first = S.current_player;          // Startspieler
+  const nonStarter = 1 - first;
+  if (!S.players[nonStarter].start_placed) return nonStarter;  // muss zuerst
+  if (!S.players[first].start_placed)      return first;        // dann Startspieler
+  return S.current_player;                  // beide gelegt → normaler Zug
+}
+
 function openDisplayPicker(tileId) {
   if (AI_THINKING) return;
-  const pi = S.current_player;
+  const pi = activePlacingPlayer();
   const p = S.players[pi];
 
   if(AI_ENABLED && pi === AI_PLAYER){ showError('Die KI ist am Zug.'); return; }
@@ -1424,7 +1439,7 @@ function closeMoonModal() {
 
 // -- STACK BUY MODAL ----------------------------------------------------------
 function openStackBuyModal() {
-  const pi = S.current_player;
+  const pi = activePlacingPlayer();
   openDomeModal(pi, -1, -1);
 }
 

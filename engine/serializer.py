@@ -331,11 +331,16 @@ def _serialize_valid_moves(state: "GameState") -> list[dict]:
         return []
 
     p = state.active_player
-    
+
     # NEU: Wenn die Startkachel noch nicht liegt, ist DAS der einzig mögliche Zug!
-    # Der Server bricht hier ab und berechnet gar nicht erst andere Züge.
-    if p.start_dome_tile is not None:
-        return [{"type": "start_tile_pending"}]
+    # Reihenfolge folgt der Engine-Regel (apply_start_placement): Nicht-Startspieler
+    # ZUERST, dann Startspieler. Den als nächstes legepflichtigen Spieler explizit
+    # mitgeben, damit das Frontend den richtigen Spieler anzeigt (nicht active_player).
+    first_player = state.current_player
+    non_starter  = 1 - first_player
+    for pi in (non_starter, first_player):
+        if state.players[pi].start_dome_tile is not None:
+            return [{"type": "start_tile_pending", "player": pi}]
 
     moves = []
 
