@@ -257,25 +257,6 @@ def play_one_game(agent, game_id: str = "unknown"):
     from engine.game import determine_winner
     winner = determine_winner(env.state)
 
-    # Floor-Target pro Step: wie viel Strafleisten-Schaden erleidet der ziehende
-    # Spieler am Ende DER Runde, in der dieser Step stattfand. Quelle ist
-    # floor_penalties_per_round (Index 0 = Runde 1), am Spielende vollständig.
-    # Dichtes Signal für den Auxiliary-Floor-Head — der Value-Head soll lernen,
-    # Floor-Stellungen früh zu erkennen (was die Heuristik via A2/B-Term tut).
-    floor_per_round = [
-        list(getattr(p, "floor_penalties_per_round", [])) for p in env.state.players
-    ]
-
-    def _floor_target_for(step):
-        st = step.get("state", {})
-        rnd = st.get("round", 1) if isinstance(st, dict) else 1
-        pl = step["player"]
-        fpr = floor_per_round[pl] if 0 <= pl < len(floor_per_round) else []
-        idx = rnd - 1
-        if 0 <= idx < len(fpr):
-            return float(fpr[idx])
-        return 0.0
-
     training_data = []
     for step in history:
         training_data.append({
@@ -284,7 +265,6 @@ def play_one_game(agent, game_id: str = "unknown"):
             "policy":            step["policy"],
             "valid_actions":     step["valid_actions"],
             "moon_order_target": step.get("moon_order_target"),
-            "floor_target":      _floor_target_for(step),
             # Rohe Spielergebnis-Daten — value wird im Dataset on-the-fly berechnet
             "scores":            list(scores),
             "winner":            winner,
