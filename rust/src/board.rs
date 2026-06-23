@@ -316,6 +316,41 @@ impl PlayerBoard {
         self.bonus_chips_used_this_round < BONUS_CHIPS_PER_ROUND
     }
 
+    pub fn register_dome_placement(&mut self) -> Result<(), String> {
+        if self.dome_tiles_placed_this_round >= DOME_TILES_PER_ROUND {
+            return Err(format!("{} hat bereits 2 Kacheln diese Runde gelegt.", self.name));
+        }
+        self.dome_tiles_placed_this_round += 1;
+        Ok(())
+    }
+
+    pub fn use_player_token(&mut self, round_number: u32) -> Result<(), String> {
+        if round_number >= 5 {
+            return Err("In Runde 5 werden keine Spielerplättchen genutzt.".into());
+        }
+        if self.player_tokens_used >= TOKENS_PER_ROUND {
+            return Err(format!("{} hat bereits beide Spielerplättchen genutzt.", self.name));
+        }
+        self.player_tokens_used += 1;
+        Ok(())
+    }
+
+    pub fn take_bonus_chip(&mut self, chip: crate::dome::BonusChip) -> Result<(), String> {
+        if !self.can_take_bonus_chip() {
+            return Err(format!(
+                "{} hat bereits 2 Bonusplättchen diese Runde genommen.",
+                self.name
+            ));
+        }
+        self.bonus_chips.push(chip);
+        self.bonus_chips_used_this_round += 1;
+        Ok(())
+    }
+
+    pub fn has_unplaced_start_tile(&self) -> bool {
+        self.start_tile_pending
+    }
+
     pub fn reset_dome_placements(&mut self) {
         self.dome_tiles_placed_this_round = 0;
         self.player_tokens_used = 0;
