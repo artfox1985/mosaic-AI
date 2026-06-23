@@ -39,3 +39,39 @@ impl Move {
         self.take.source == TakeSource::SmallFactoryMoon && self.take.factory_id.is_none()
     }
 }
+
+/// Neue Kuppelplatte aus dem offenen Display auf das 3×3-Raster legen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlaceDomeTileMove {
+    pub dome_tile_id: usize,
+    pub slot_row: usize,
+    pub slot_col: usize,
+    pub rotation: u32, // 0/90/180/270
+}
+
+/// Aktion A (Stapel-Variante): num_drawn Karten verdeckt ziehen (je −1 Pkt),
+/// eine wählen, Rest zurück unter den Stapel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DrawFromStackMove {
+    pub num_drawn: usize,
+    pub chosen_id: usize,
+    pub slot_row: usize,
+    pub slot_col: usize,
+    pub rotation: u32,
+}
+
+/// Aktion D: ein aufgedecktes Bonusplättchen von einer Fabrik nehmen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TakeBonusChipMove {
+    pub factory_id: usize,
+}
+
+/// Vereinheitlichter Drafting-Zug (ersetzt das Python-isinstance-Dispatch).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Action {
+    Stone(Move),
+    Dome(PlaceDomeTileMove),
+    DrawStack(DrawFromStackMove),
+    BonusChip(TakeBonusChipMove),
+    Pass,
+}
