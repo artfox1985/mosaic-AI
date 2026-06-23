@@ -239,6 +239,9 @@ pub struct PlayerBoard {
     pub holds_first_player_marker: bool,
     /// In der Vorbereitung (Phase start_placement) zu legen; zählt nicht als Runden-Zug.
     pub start_dome_tile: Option<DomeTile>,
+    /// True, wenn die Startkachel noch aus der Mitte gezogen werden muss
+    /// (ersetzt den Python-String-Platzhalter "Muss_noch_gezogen_werden").
+    pub start_tile_pending: bool,
     pub bonus_chips_used_this_round: u32,
     pub total_floor_penalties: i32,
     pub floor_penalties_per_round: Vec<i32>,
@@ -259,6 +262,7 @@ impl PlayerBoard {
             player_tokens_used: 0,
             holds_first_player_marker: false,
             start_dome_tile: None,
+            start_tile_pending: false,
             bonus_chips_used_this_round: 0,
             total_floor_penalties: 0,
             floor_penalties_per_round: Vec::new(),
