@@ -244,9 +244,6 @@ def action_to_id(action: dict) -> int:
 #        bevor der teurere Auxiliary-Floor-Head nötig wird.
 ZEROZERO_PENALTY = -0.15
 
-# Normierungs-Obergrenze für das Floor-Target des Auxiliary-Heads.
-# Floor-Schaden pro Runde lag empirisch bei ~5-10; 10 normiert auf [0,1].
-_FLOOR_NORM = 10.0
 
 def is_zerozero(scores, winner) -> bool:
     """True, wenn der Ausgang ein 0:0-Tiebreak-Spiel ist (kein echtes Punkten)."""
@@ -304,11 +301,6 @@ class MosaicDataset(Dataset):
                 self.values             = torch.from_numpy(hf['values'][:])
                 self.masks              = torch.from_numpy(hf['masks'][:])
                 self.moon_order_targets = torch.from_numpy(hf['moon_order_targets'][:])
-                # Floor-Targets: Fallback für alte Caches ohne dieses Dataset.
-                if 'floor_targets' in hf:
-                    self.floor_targets = torch.from_numpy(hf['floor_targets'][:])
-                else:
-                    self.floor_targets = torch.zeros((len(self.states), 1), dtype=torch.float32)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -325,8 +317,6 @@ class MosaicDataset(Dataset):
             if mot is None:
                 mot = [torch.full((5,), -1.0) for _ in self.states]
             self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
-            # Floor-Targets: alte .pt-Bundles haben keine → Nullen.
-            self.floor_targets = torch.zeros((len(self.states), 1), dtype=torch.float32)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',             data=self.states.numpy(),             compression='lzf')
@@ -334,7 +324,6 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('values',             data=self.values.numpy(),             compression='lzf')
                 hf.create_dataset('masks',              data=self.masks.numpy(),              compression='lzf')
                 hf.create_dataset('moon_order_targets', data=self.moon_order_targets.numpy(), compression='lzf')
-                hf.create_dataset('floor_targets',      data=self.floor_targets.numpy(),      compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -344,7 +333,6 @@ class MosaicDataset(Dataset):
             t0 = time.time()
             _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
-            floor_l = []   # Auxiliary Floor-Targets (normiert [0,1])
 
             import random as _rnd
             keep_prob = 1.0
@@ -440,18 +428,11 @@ class MosaicDataset(Dataset):
                                     moon_target[c_idx] = float(rank)
                         moon_l.append(moon_target)
 
-                        # Floor-Target: normierter Strafleisten-Schaden [0,1] des
-                        # ziehenden Spielers bis Rundenende. _FLOOR_NORM=10 als
-                        # grobe Obergrenze (Floor-Werte lagen bei ~5-10/Runde).
-                        ft = float(step.get("floor_target", 0.0))
-                        floor_l.append([min(ft / _FLOOR_NORM, 1.0)])
-
             states_np   = np.array(states_l,   dtype=np.float32)
             policies_np = np.array(policies_l, dtype=np.float32)
             values_np   = np.array(values_l,   dtype=np.float32)
             masks_np    = np.array(masks_l,    dtype=np.float32)
             moon_np     = np.array(moon_l,     dtype=np.float32)
-            floor_np    = np.array(floor_l,    dtype=np.float32)
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -462,7 +443,6 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('values',             data=values_np,   compression='lzf')
                 hf.create_dataset('masks',              data=masks_np,    compression='lzf')
                 hf.create_dataset('moon_order_targets', data=moon_np,     compression='lzf')
-                hf.create_dataset('floor_targets',      data=floor_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -470,12 +450,11 @@ class MosaicDataset(Dataset):
             self.values             = torch.from_numpy(values_np)
             self.masks              = torch.from_numpy(masks_np)
             self.moon_order_targets = torch.from_numpy(moon_np)
-            self.floor_targets      = torch.from_numpy(floor_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
 
     def __len__(self): return len(self.states)
-    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx], self.floor_targets[idx]
+    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx]
 
 
 class MosaicNet(nn.Module):
@@ -509,21 +488,11 @@ class MosaicNet(nn.Module):
             nn.ReLU(),
             nn.Linear(32, 5)   # 5 Farben: blau, gelb, rot, schwarz, türkis
         )
-        # Auxiliary Floor-Head: sagt den normierten Floor-Schaden [0,1] des
-        # ziehenden Spielers bis zum Rundenende voraus. Dichtes Hilfssignal,
-        # damit der gemeinsame Rumpf floor-bewusste Repräsentationen lernt
-        # (was der Value-Head allein aus dem fernen Spielausgang kaum schafft).
-        self.floor_head = nn.Sequential(
-            nn.Linear(hidden_size, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid()
-        )
 
     def forward(self, x):
         shared = self.body(x)
         return (self.policy_head(shared), self.value_head(shared),
-                self.moon_order_head(shared), self.floor_head(shared))
+                self.moon_order_head(shared))
 
     @torch.no_grad()
     def analyze_capacity(self, x):
