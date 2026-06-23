@@ -63,6 +63,21 @@ _E_WEIGHT       = 0.8   # Dämpfungsfaktor (war 0.5 → zu klein um Plattenentsc
 _F_START_ROUND  = 3     # Greift ab R3 (war R4 → zu spät)
 _F_MULTI = {3: 1.0, 4: 2.5, 5: 5.0}  # Multiplikatoren je Runde
 
+# G: Offene Reihe braucht ein farblich passendes Zuhause auf der Kuppel.
+# Greift find_unplaceable_rows (round_end.py) VORAUSSCHAUEND auf: eine offene Reihe,
+# deren Dome-Reihe komplett belegt ist und keinen passenden freien Space mehr hat,
+# geht am Rundenende garantiert auf die Strafleiste.
+_HOME_DOOMED_PEN = 1.2   # Penalty je bereits gelegtem Stein in einer Sackgassen-Reihe
+_HOME_OK_BONUS   = 0.25  # kleiner Bonus wenn (bei vollen Slots) ein passender Space frei ist
+
+# H: Schnell schließen — konvexer Sog (filled/capacity)² zum Reihenabschluss.
+# Macht fast-fertige Reihen überproportional wertvoll → abschließen statt liegen lassen.
+_CLOSE_WEIGHT    = 1.5
+
+# I: Kuppel nach Reihenfarbe (score_dome_action) — Bonus wenn ein Dome-Space eine
+# eigene offene Reihe farblich aufnehmen kann (ermöglicht das Schließen).
+_DOME_ROWMATCH   = 1.2
+
 
 def _row_probs(round_number: int) -> list[float]:
     """Reihen-Wahrscheinlichkeiten je nach Spielphase."""
@@ -109,6 +124,40 @@ def _estimate_cluster_value(player, slot_row: int, slot_col: int,
                     v_neighbors += 1
 
     return float(h_neighbors + v_neighbors)
+
+
+# ── Offene-Reihe-„Zuhause"-Check (Floor-Vorausschau) ─────────────────────────
+
+def _open_row_home_status(player, row_idx: int, color) -> str:
+    """
+    Klassifiziert vorausschauend, ob eine offene Musterreihe am Rundenende ein
+    farblich passendes Zuhause auf der Kuppel hat. Spiegelt find_unplaceable_rows
+    (engine/round_end.py), aber als 3-Wert-Status für die Heuristik:
+
+      "free_slot" → mind. ein Slot der Dome-Reihe ist noch leer (None): es kann
+                    später eine passende Kuppel gelegt werden → kein Floor-Risiko.
+                    Stellt damit eine lange Auffangbecken-Reihe automatisch frei.
+      "has_match" → alle Slots belegt, aber ein freier nicht-locked Space
+                    akzeptiert die Farbe → Reihe kann gelegt werden.
+      "doomed"    → alle Slots belegt, KEIN passender Space → Reihe geht am
+                    Rundenende garantiert auf die Strafleiste.
+    """
+    if color is None:
+        return "free_slot"
+    dome_row  = row_idx // 2
+    space_row = row_idx % 2
+    valid_si  = (space_row * 2, space_row * 2 + 1)
+    slots = [player.dome_grid.dome_slots[dome_row][sc] for sc in range(3)]
+
+    if any(s is None for s in slots):
+        return "free_slot"
+
+    for slot in slots:
+        for si in valid_si:
+            sp = slot.spaces[si]
+            if not sp.is_filled and not sp.is_locked and sp.accepts(color):
+                return "has_match"
+    return "doomed"
 
 
 # ── Dome-Platzierungs-Heuristik (Action-Ranking) ────────────────────────────
@@ -199,6 +248,23 @@ def score_dome_action(action: dict, player, state) -> float:
         elif density <= 0.10 and not lower_half:  # Snipe → kurze Reihen
             score += 0.3
 
+    # I: Kuppel nach Reihenfarbe — Bonus wenn ein Space eine EIGENE offene Reihe
+    # farblich aufnehmen kann (gibt ihr ein Zuhause → ermöglicht das Schließen).
+    # Am wertvollsten für fast-fertige Reihen. (Rotation wird im Quick-Scan wie beim
+    # Capacity-Matching nicht angewandt — Konsistenz mit obigem game_row.)
+    pattern_lines = getattr(player, "pattern_lines", [])
+    for space_idx, space in enumerate(dome_tile.spaces):
+        if space.is_locked:
+            continue
+        game_row = slot_row * 2 + (0 if space_idx < 2 else 1)
+        if not (0 <= game_row < len(pattern_lines)):
+            continue
+        prow = pattern_lines[game_row]
+        if (len(prow.tiles) > 0 and not prow.is_complete
+                and prow.color is not None and space.accepts(prow.color)):
+            frac = len(prow.tiles) / (game_row + 1)
+            score += _DOME_ROWMATCH * (0.4 + 0.6 * frac)
+
     # Lategame: obere Slots dringend prioritisieren
     if lategame and slot_row == 0:
         score += 1.5
@@ -245,6 +311,20 @@ def get_player_potential(player, round_number: int = 1,
                 potential += row_values.get(i, 1)
             else:
                 open_rows += 1
+
+                # H: Schnell schließen — konvexer Sog (filled/capacity)² zum Abschluss.
+                # row_hint = erwarteter Reihenwert (Reihen-Index als Punkte-Proxy,
+                # gedeckelt auf 6). Quadrat macht fast-fertige Reihen überproportional.
+                frac     = len(row.tiles) / capacity
+                row_hint = min(i + 1, 6)
+                potential += (frac * frac) * _CLOSE_WEIGHT * (row_hint / 6.0)
+
+                # G: Hat die offene Reihe ein farblich passendes Zuhause auf der Kuppel?
+                status = _open_row_home_status(player, i, row.color)
+                if status == "doomed":
+                    potential -= _HOME_DOOMED_PEN * len(row.tiles)
+                elif status == "has_match":
+                    potential += _HOME_OK_BONUS
 
     # A2: Sättigungs-Penalty für zu viele gleichzeitig offene Reihen.
     # Ab einer definierten Anzahl an offenen Reihen steigt die 
