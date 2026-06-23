@@ -5,6 +5,11 @@
 
 use pyo3::prelude::*;
 
+// Reiner Rust-Kern (PyO3-frei, mit `cargo test` testbar).
+pub mod board;
+pub mod dome;
+pub mod tile;
+
 /// Version des Rust-Kerns (CARGO_PKG_VERSION) — für den Import-Smoke-Test.
 #[pyfunction]
 fn version() -> &'static str {
