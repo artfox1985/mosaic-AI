@@ -1,8 +1,8 @@
 //! Spielsteuerung (Orchestrierung) — Port von engine/game.py.
 //!
-//! Schritt 4: Dome-/Chip-/Stapel-Züge + Drafting-Orchestrierung bis zum
-//! Phasenübergang Drafting→Tiling. Tiling-Ausführung, Scoring, Rundenwechsel
-//! und Endwertung folgen in Schritt 5.
+//! Schritt 5: Tiling-Phase (Aktionen, Validierung, Ausführung, Scoring),
+//! Rundenende-Strafen und Rundenwechsel. Die scoring-tile-Endwertung
+//! (engine/scoring.py) folgt als eigenes Modul in Schritt 6.
 
 use rand::Rng;
 
@@ -10,9 +10,23 @@ use crate::execution::execute_move;
 use crate::moves::{
     Action, DrawFromStackMove, PlaceDomeTileMove, TakeBonusChipMove,
 };
-use crate::round_end::process_unplaceable_rows;
-use crate::state::{setup_new_game, GameState, Phase, NUM_PLAYERS, NUM_ROUNDS};
+use crate::round_end::{
+    apply_bonus_chips_to_row, execute_full_tiling, generate_tiling_actions,
+    process_unplaceable_rows, score_penalty, validate_tiling_action, TilingAction,
+};
+use crate::state::{setup_new_game, setup_new_round, GameState, Phase, NUM_PLAYERS, NUM_ROUNDS};
 use crate::validation::{generate_valid_moves, validate_move, validate_moon_take};
+
+/// Zug der Tiling-Phase — Port der dict-Move-Typen aus engine/game.py.apply().
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TilingMove {
+    /// Einen Stein aus einer vollen Musterreihe auf die Kuppel legen.
+    Place(TilingAction),
+    /// Eine Reihe mit Bonusplättchen komplettieren (`use_chips`).
+    UseChips { player: usize, pattern_row: usize },
+    /// Tiling für einen Spieler beenden (`end_tiling`).
+    EndTiling { player: usize },
+}
 
 // ── Dome-Zug ────────────────────────────────────────────────────────────────
 
@@ -426,6 +440,116 @@ impl Game {
             }
         }
     }
+
+    // ── Tiling-Phase ──────────────────────────────────────────────────────────
+
+    /// Alle gültigen Tiling-Aktionen des Spielers (leer → Spieler kann `EndTiling`).
+    pub fn valid_tiling_actions(&self, player_idx: usize) -> Vec<TilingAction> {
+        generate_tiling_actions(&self.state, player_idx)
+    }
+
+    /// Führt eine einzelne, validierte Tiling-Aktion aus und gibt die Punkte zurück.
+    pub fn apply_single_tiling(
+        &mut self,
+        player_idx: usize,
+        action: &TilingAction,
+    ) -> Result<i32, String> {
+        if let Some(e) = validate_tiling_action(&self.state, player_idx, action) {
+            return Err(e);
+        }
+        execute_full_tiling(&mut self.state, player_idx, action)
+    }
+
+    /// Wendet einen Tiling-Phasen-Zug an (Stein legen / Chips nutzen / beenden).
+    /// `EndTiling` kann den Rundenwechsel auslösen und braucht daher den RNG.
+    pub fn apply_tiling<R: Rng + ?Sized>(
+        &mut self,
+        mv: &TilingMove,
+        rng: &mut R,
+    ) -> Result<(), String> {
+        if self.state.phase != Phase::Tiling {
+            return Err(format!(
+                "Tiling-Zug in Phase '{}' nicht erlaubt.",
+                self.state.phase.as_str()
+            ));
+        }
+        match mv {
+            TilingMove::Place(action) => {
+                let pi = self.state.current_player;
+                self.apply_single_tiling(pi, action)?;
+                Ok(())
+            }
+            TilingMove::UseChips { player, pattern_row } => {
+                if !apply_bonus_chips_to_row(&mut self.state.players[*player], *pattern_row) {
+                    return Err(format!("Reihe {} nicht mit Chips komplettierbar.", pattern_row + 1));
+                }
+                let name = self.state.players[*player].name.clone();
+                self.state.log_event(format!(
+                    "🎫 {name} komplettiert Reihe {} vollständig mit Bonus-Chips!",
+                    pattern_row + 1
+                ));
+                Ok(())
+            }
+            TilingMove::EndTiling { player } => self.end_tiling(*player, rng),
+        }
+    }
+
+    /// Beendet das Tiling für einen Spieler; wechselt zum anderen oder schließt
+    /// die Phase ab (Strafen + Rundenwechsel/Spielende).
+    fn end_tiling<R: Rng + ?Sized>(&mut self, player: usize, rng: &mut R) -> Result<(), String> {
+        if !self.valid_tiling_actions(player).is_empty() {
+            return Err(format!("Noch Tiling-Züge offen für Spieler {player}."));
+        }
+        self.state.tiling_done[player] = true;
+        let other = 1 - player;
+        if !self.state.tiling_done[other] {
+            self.state.current_player = other;
+            return Ok(());
+        }
+        self.state.tiling_done = [false, false];
+        self.execute_end_tiling(rng);
+        Ok(())
+    }
+
+    /// Rundenende-Abschluss: unplatzierbare Reihen, Strafen, dann Rundenwechsel
+    /// oder Spielende. Port von engine/game.py `_execute_end_tiling`.
+    fn execute_end_tiling<R: Rng + ?Sized>(&mut self, rng: &mut R) {
+        for pi in 0..NUM_PLAYERS {
+            let (players, tower) = (&mut self.state.players, &mut self.state.tower);
+            process_unplaceable_rows(&mut players[pi], tower);
+        }
+
+        for pi in 0..NUM_PLAYERS {
+            let pen = score_penalty(&mut self.state.players[pi]);
+            let broken = self.state.players[pi].clear_broken();
+            self.state.tower.add(&broken);
+            if pen < 0 {
+                self.state.players[pi].apply_score(pen);
+                let (name, score) = {
+                    let p = &self.state.players[pi];
+                    (p.name.clone(), p.score)
+                };
+                self.state.log_event(format!("{name}: Strafe {pen} Pkt → {score} Gesamt"));
+            }
+        }
+
+        if self.is_over() {
+            self.state.phase = Phase::End;
+            self.state.log_event("Das Spiel ist beendet!");
+        } else {
+            self.next_round(rng);
+        }
+    }
+
+    /// Bereitet die nächste Runde vor: Display auf 3 auffüllen, dann setup_new_round.
+    fn next_round<R: Rng + ?Sized>(&mut self, rng: &mut R) {
+        while self.state.dome_display.len() < 3 && !self.state.dome_tile_pool.is_empty() {
+            let t = self.state.dome_tile_pool.remove(0);
+            self.state.dome_display.push(t);
+        }
+        setup_new_round(&mut self.state, rng);
+        self.state.phase = Phase::Drafting;
+    }
 }
 
 #[cfg(test)]
@@ -455,6 +579,44 @@ mod tests {
         }
         assert_eq!(game.state.phase, Phase::Tiling, "Drafting endet in Tiling (steps={steps})");
         assert!(steps < 500, "Drafting terminiert");
+    }
+
+    #[test]
+    fn full_round_drafting_through_tiling_to_next_round() {
+        let mut rng = StdRng::seed_from_u64(2024);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+
+        // Drafting bis Tiling.
+        let mut steps = 0;
+        while game.state.phase == Phase::Drafting && steps < 500 {
+            let actions = game.valid_drafting_actions();
+            game.apply_drafting(&actions[0]).expect("valider Drafting-Zug");
+            steps += 1;
+        }
+        assert_eq!(game.state.phase, Phase::Tiling);
+
+        // Tiling: jeder Spieler legt alle möglichen Steine, dann EndTiling.
+        let round_before = game.state.round_number;
+        let mut tsteps = 0;
+        while game.state.phase == Phase::Tiling && tsteps < 200 {
+            let pi = game.state.current_player;
+            let actions = game.valid_tiling_actions(pi);
+            let mv = match actions.first() {
+                Some(a) => TilingMove::Place(*a),
+                None => TilingMove::EndTiling { player: pi },
+            };
+            game.apply_tiling(&mv, &mut rng).expect("valider Tiling-Zug");
+            tsteps += 1;
+        }
+        assert!(tsteps < 200, "Tiling terminiert");
+        // Runde 1 ist nicht das Spielende → neue Runde, Phase wieder Drafting.
+        assert_eq!(game.state.phase, Phase::Drafting);
+        assert_eq!(game.state.round_number, round_before + 1);
+        // Tiling-Flags zurückgesetzt; volle Reihen abgeräumt.
+        assert_eq!(game.state.tiling_done, [false, false]);
     }
 
     #[test]
