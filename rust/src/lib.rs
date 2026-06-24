@@ -12,8 +12,10 @@ pub mod execution;
 pub mod factory;
 pub mod game;
 pub mod moves;
+pub mod py;
 pub mod round_end;
 pub mod scoring;
+pub mod serialize;
 pub mod state;
 pub mod supply;
 pub mod tile;
@@ -36,5 +38,6 @@ fn ping(x: i64) -> i64 {
 fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(ping, m)?)?;
+    m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
