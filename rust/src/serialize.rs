@@ -7,9 +7,10 @@ use crate::board::PlayerBoard;
 use crate::dome::{BonusChip, DomeSpace, DomeTile, SpaceType};
 use crate::evaluate::estimate_round_score;
 use crate::factory::{Factory, LargeFactory};
+use crate::moves::Action;
 use crate::round_end::{
     can_complete_row_with_chips, generate_tiling_actions, get_pending_tiling_rows,
-    row_has_open_matching_slot,
+    row_has_open_matching_slot, TilingAction,
 };
 use crate::state::{GameState, Phase};
 use crate::validation::generate_valid_moves;
@@ -193,6 +194,52 @@ fn source_name(src: crate::moves::TakeSource) -> &'static str {
         LargeFactorySun => "LARGE_FACTORY_SUN",
         LargeFactoryMoon => "LARGE_FACTORY_MOON",
     }
+}
+
+/// Drafting-Aktion → Anzeige-Move-Dict (für KI-Zug-Rückgabe und Baum-Labels).
+/// Bewusst informativ/vollständig (anders als die UI-`valid_moves`-Variante,
+/// die z.B. `dome_stack` ohne Slot-Felder liefert).
+pub fn action_to_dict(a: &Action) -> Value {
+    match a {
+        Action::Stone(m) => json!({
+            "type": "stone",
+            "source": source_name(m.take.source),
+            "factory_id": m.take.factory_id,
+            "color": m.take.color.value(),
+            "row": m.place.row_index,
+            "moon_order": m.take.moon_order.iter().map(|t| t.value()).collect::<Vec<_>>(),
+        }),
+        Action::Dome(m) => json!({
+            "type": "dome_display",
+            "tile_id": m.dome_tile_id,
+            "slot_row": m.slot_row,
+            "slot_col": m.slot_col,
+            "rotation": m.rotation,
+        }),
+        Action::DrawStack(m) => json!({
+            "type": "dome_stack",
+            "num_drawn": m.num_drawn,
+            "chosen_id": m.chosen_id,
+            "slot_row": m.slot_row,
+            "slot_col": m.slot_col,
+            "rotation": m.rotation,
+        }),
+        Action::BonusChip(m) => json!({ "type": "bonus_chip", "factory_id": m.factory_id }),
+        Action::Pass => json!({ "type": "pass" }),
+    }
+}
+
+/// Tiling-Aktion → Anzeige-Move-Dict.
+pub fn tiling_action_to_dict(ta: &TilingAction) -> Value {
+    json!({
+        "type": "tiling",
+        "pattern_row": ta.pattern_row,
+        "slot_row": ta.slot_row,
+        "slot_col": ta.slot_col,
+        "space_index": ta.space_index,
+        "dome_tile_id": ta.dome_tile_id,
+        "rotation": ta.rotation,
+    })
 }
 
 fn serialize_valid_moves(state: &GameState) -> Value {

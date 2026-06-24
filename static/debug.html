@@ -103,6 +103,19 @@
   .full { grid-column: 1 / -1; }
   .status { font-size: 12px; color: var(--muted); padding: 0 20px 10px; }
   .pill { padding: 2px 8px; border-radius: 10px; background: var(--panel2); font-size: 11px; }
+
+  /* MCTS-Baum */
+  .tree-node, .tree-leaf { margin: 2px 0; }
+  .tree-children { margin-left: 16px; border-left: 1px solid var(--border); padding-left: 12px; }
+  details.tree-node > summary {
+    cursor: pointer; padding: 3px 4px; border-radius: 5px; user-select: none;
+  }
+  details.tree-node > summary:hover { background: var(--panel2); }
+  details.tree-node > summary::marker { color: var(--accent); }
+  .tree-leaf { padding: 3px 4px 3px 20px; }
+  .tree-desc { font-weight: 500; }
+  .tree-meta { color: var(--muted); font-size: 11px; margin-left: 8px; font-variant-numeric: tabular-nums; }
+  .tree-chosen { color: var(--row); font-size: 11px; font-weight: 700; margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -152,6 +165,14 @@
       <span><span class="cat-dot cat-dome"></span>Kuppel</span>
       <span><span class="cat-dot cat-chip"></span>Chip</span>
       <span><span class="cat-dot cat-pass"></span>Pass</span>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <h2>MCTS-Suchbaum (Wurzel → Kinder, aufklappbar)</h2>
+    <div id="treeContainer"><div class="empty">Noch kein Baum geladen.</div></div>
+    <div class="legend">
+      <span>N = Besuche · Q = Win% (Sicht KI) · d = Teilbaumtiefe</span>
     </div>
   </div>
 </main>
@@ -247,7 +268,7 @@ function renderAnalysis(d) {
       ${netCell}
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
-      <td class="num">${m.mcts_win_pct !== null ? m.mcts_win_pct + '%' : '–'}</td>
+      <td class="num">${m.mcts_win_pct != null ? m.mcts_win_pct.toFixed(1) + '%' : '–'}</td>
       <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '–'}</td> ${shapingCell}
       ${divCell}
     </tr>`;
@@ -256,14 +277,49 @@ function renderAnalysis(d) {
   document.getElementById('movesContainer').innerHTML = html;
 }
 
+// ── MCTS-Baum (Wurzel + Kinder, rekursiv via <details>) ──────────────────────
+function nodeLabel(n, chosen=false) {
+  const dot = `<span class="cat-dot ${catClass(n.category || 'other')}"></span>`;
+  const win = (n.win_pct != null) ? n.win_pct.toFixed(0) + '%' : '–';
+  const mark = chosen ? ' <span class="tree-chosen">✓ GEWÄHLT</span>' : '';
+  return `${dot}<span class="tree-desc">${n.description ?? n.type}</span>${mark}` +
+         `<span class="tree-meta">N=${n.visits} · Q ${win} · d${n.depth} · ${n.n_children} Kinder</span>`;
+}
+// `markBestChild` nur auf der Wurzelebene true → genau EIN „✓ GEWÄHLT" (der real
+// gespielte Zug). Tiefere Ebenen werden nicht als gewählt markiert.
+function renderTreeNode(n, open, chosen, markBestChild) {
+  const kids = n.children || [];
+  if (!kids.length) {
+    return `<div class="tree-leaf">${nodeLabel(n, chosen)}</div>`;
+  }
+  let bestIdx = -1;
+  if (markBestChild) {
+    bestIdx = 0;
+    for (let i = 1; i < kids.length; i++) if (kids[i].visits > kids[bestIdx].visits) bestIdx = i;
+  }
+  const childHtml = kids.map((c, i) => renderTreeNode(c, false, i === bestIdx, false)).join('');
+  return `<details class="tree-node"${open ? ' open' : ''}>` +
+         `<summary>${nodeLabel(n, chosen)}</summary>` +
+         `<div class="tree-children">${childHtml}</div></details>`;
+}
+function renderTree(d) {
+  const c = document.getElementById('treeContainer');
+  if (!d || !d.tree) { c.innerHTML = '<div class="empty">Kein Baum für diesen Zug.</div>'; return; }
+  c.innerHTML = renderTreeNode(d.tree, true, false, true);
+}
+
 function showIdx(i) {
   if (!HISTORY.length) return;
   IDX = Math.max(0, Math.min(i, HISTORY.length - 1));
   const d = HISTORY[IDX];
   renderAnalysis(d);
+  renderTree(d);
   document.getElementById('navInfo').textContent = `${IDX+1} / ${HISTORY.length}`;
   const chosen = (d.moves||[]).find(m => m.chosen);
-  setStatus(`KI-Zug ${d.move_idx} (Runde ${d.round ?? '?'}): ${chosen ? chosen.description : 'Aktion '+d.ai_action} — Value ${d.value.toFixed(3)} (Win ${d.win_pct}%)`);
+  const valStr = (d.value != null)
+    ? `Value ${d.value.toFixed(3)} (Win ${d.win_pct}%)`
+    : (chosen && chosen.mcts_win_pct != null ? `Win ${chosen.mcts_win_pct.toFixed(0)}%` : 'Heuristik');
+  setStatus(`KI-Zug ${d.move_idx} (Runde ${d.round ?? '?'}): ${chosen ? chosen.description : 'Aktion '+d.ai_action} — ${valStr}`);
 }
 
 async function loadHistory(keepIdx=false) {
