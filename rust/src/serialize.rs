@@ -7,7 +7,10 @@ use crate::board::PlayerBoard;
 use crate::dome::{BonusChip, DomeSpace, DomeTile, SpaceType};
 use crate::evaluate::estimate_round_score;
 use crate::factory::{Factory, LargeFactory};
-use crate::round_end::{can_complete_row_with_chips, generate_tiling_actions, get_pending_tiling_rows};
+use crate::round_end::{
+    can_complete_row_with_chips, generate_tiling_actions, get_pending_tiling_rows,
+    row_has_open_matching_slot,
+};
 use crate::state::{GameState, Phase};
 use crate::validation::generate_valid_moves;
 
@@ -291,18 +294,7 @@ fn serialize_chippable_tiling_rows(state: &GameState) -> Value {
                 Some(c) => c,
                 None => continue,
             };
-            let dome_row = ri / 2;
-            let space_row = ri % 2;
-            let valid_si = [space_row * 2, space_row * 2 + 1];
-            let has_slot = (0..3).any(|sc| {
-                player.dome_grid.dome_slots[dome_row][sc].as_ref().map_or(false, |slot| {
-                    valid_si.iter().any(|&si| {
-                        let sp = &slot.spaces[si];
-                        !sp.is_filled() && !sp.is_locked && sp.accepts(color)
-                    })
-                })
-            });
-            if has_slot {
+            if row_has_open_matching_slot(player, ri, color) {
                 result.push(json!({ "pi": pi, "ri": ri }));
             }
         }

@@ -9,6 +9,28 @@ use crate::board::PlayerBoard;
 use crate::dome::{DomeTile, SpaceType};
 use crate::state::GameState;
 use crate::supply::Tower;
+use crate::tile::TileColor;
+
+/// True, wenn die Dome-Reihe der Musterreihe `row_idx` mindestens einen gelegten
+/// Slot mit offenem, passendem Space an gültiger Position hat. Single Source of
+/// Truth für die Tiling-Platzierbarkeit einer Reihe — genutzt von Validierung
+/// (Reihenfolge-Regel), Rundenende (unplatzierbare Reihen) und Serializer
+/// (chippable rows); später auch vom MCTS.
+pub fn row_has_open_matching_slot(player: &PlayerBoard, row_idx: usize, color: TileColor) -> bool {
+    let dome_row = row_idx / 2;
+    let space_row = row_idx % 2;
+    let valid_si = [space_row * 2, space_row * 2 + 1];
+    (0..3).any(|sc| {
+        player.dome_grid.dome_slots[dome_row][sc]
+            .as_ref()
+            .map_or(false, |slot| {
+                valid_si.iter().any(|&si| {
+                    let sp = &slot.spaces[si];
+                    !sp.is_filled() && !sp.is_locked && sp.accepts(color)
+                })
+            })
+    })
+}
 
 // ── Tiling-Aktion ──────────────────────────────────────────────────────────────
 
@@ -47,22 +69,12 @@ pub fn find_unplaceable_rows(player: &PlayerBoard) -> Vec<usize> {
             _ => continue,
         };
         let dome_row = row_idx / 2;
-        let space_row = row_idx % 2;
-        let valid_si = [space_row * 2, space_row * 2 + 1];
         let slots = &player.dome_grid.dome_slots[dome_row];
         // Noch freie Slots in der Dome-Reihe → Reihe bleibt liegen.
         if slots.iter().any(|s| s.is_none()) {
             continue;
         }
-        let has_match = slots.iter().any(|slot| {
-            slot.as_ref().map_or(false, |d| {
-                valid_si.iter().any(|&si| {
-                    let sp = &d.spaces[si];
-                    !sp.is_filled() && !sp.is_locked && sp.accepts(color)
-                })
-            })
-        });
-        if !has_match {
+        if !row_has_open_matching_slot(player, row_idx, color) {
             unplaceable.push(row_idx);
         }
     }
@@ -114,18 +126,7 @@ pub fn validate_tiling_action(
             Some(c) => c,
             None => continue,
         };
-        let e_dome_row = ri / 2;
-        let e_space_row = ri % 2;
-        let e_valid_si = [e_space_row * 2, e_space_row * 2 + 1];
-        let e_has_action = (0..3).any(|sc| {
-            grid.dome_slots[e_dome_row][sc].as_ref().map_or(false, |slot| {
-                e_valid_si.iter().any(|&si| {
-                    let sp = &slot.spaces[si];
-                    !sp.is_filled() && !sp.is_locked && sp.accepts(e_color)
-                })
-            })
-        });
-        if e_has_action {
+        if row_has_open_matching_slot(player, ri, e_color) {
             return Some(format!(
                 "Reihe {} muss zuerst gelegt werden (von oben nach unten, Regelwerk S.7).",
                 ri + 1
