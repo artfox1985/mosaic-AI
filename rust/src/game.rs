@@ -71,6 +71,14 @@ pub fn execute_dome_move(state: &mut GameState, m: &PlaceDomeTileMove) -> Result
         .place_dome_tile(tile, m.slot_row, m.slot_col)?;
     state.players[pi].register_dome_placement()?;
     state.players[pi].use_player_token(state.round_number)?;
+    let (name, tokens) = {
+        let p = &state.players[pi];
+        (p.name.clone(), p.player_tokens_used)
+    };
+    state.log_event(format!(
+        "{name}: Kachel {} → Slot ({},{}) rot={}° [Plättchen {tokens}/2]",
+        m.dome_tile_id, m.slot_row, m.slot_col, m.rotation
+    ));
     Ok(())
 }
 
@@ -133,6 +141,14 @@ pub fn validate_draw_from_stack(state: &GameState, m: &DrawFromStackMove) -> Opt
 pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> Result<(), String> {
     let pi = state.current_player;
     state.players[pi].apply_score(-(m.num_drawn as i32));
+    let (name, score) = {
+        let p = &state.players[pi];
+        (p.name.clone(), p.score)
+    };
+    state.log_event(format!(
+        "📦 {name}: {}× vom Stapel gezogen −{} Pkt → {score} Gesamt",
+        m.num_drawn, m.num_drawn
+    ));
     let drawn: Vec<_> = state.dome_tile_pool.drain(..m.num_drawn).collect();
     let mut chosen = None;
     for t in drawn {
@@ -149,6 +165,14 @@ pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> 
         .place_dome_tile(chosen, m.slot_row, m.slot_col)?;
     state.players[pi].register_dome_placement()?;
     state.players[pi].use_player_token(state.round_number)?;
+    let (name, tokens) = {
+        let p = &state.players[pi];
+        (p.name.clone(), p.player_tokens_used)
+    };
+    state.log_event(format!(
+        "{name}: Kachel {} → Slot ({},{}) rot={}° [Plättchen {tokens}/2]",
+        m.chosen_id, m.slot_row, m.slot_col, m.rotation
+    ));
     Ok(())
 }
 
@@ -178,6 +202,14 @@ pub fn execute_take_bonus_chip(state: &mut GameState, m: &TakeBonusChipMove) -> 
     state.factories[fidx].bonus_chip_revealed = false;
     let pi = state.current_player;
     state.players[pi].take_bonus_chip(chip)?;
+    let (name, used) = {
+        let p = &state.players[pi];
+        (p.name.clone(), p.bonus_chips_used_this_round)
+    };
+    state.log_event(format!(
+        "{name}: Bonusplättchen von Fabrik {} genommen [{used}/2 diese Runde]",
+        m.factory_id
+    ));
     Ok(())
 }
 
@@ -315,6 +347,8 @@ pub fn apply_start_placement(
         .dome_grid
         .place_dome_tile(tile, row, col)?;
     state.players[player_idx].start_tile_pending = false;
+    let name = state.players[player_idx].name.clone();
+    state.log_event(format!("{name}: Startkachel {tile_id} → ({row},{col}) rot={rot}°"));
     Ok(())
 }
 
@@ -434,6 +468,7 @@ impl Game {
             for p in self.state.players.iter_mut() {
                 p.tiled_max_row = -1;
             }
+            self.state.log_event("Tiling-Phase beginnt.");
             // Unplatzierbare Reihen → Strafleiste (für beide Spieler).
             for pi in 0..NUM_PLAYERS {
                 let (players, tower) = (&mut self.state.players, &mut self.state.tower);
