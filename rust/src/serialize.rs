@@ -5,6 +5,7 @@ use serde_json::{json, Map, Value};
 
 use crate::board::PlayerBoard;
 use crate::dome::{BonusChip, DomeSpace, DomeTile, SpaceType};
+use crate::evaluate::estimate_round_score;
 use crate::factory::{Factory, LargeFactory};
 use crate::round_end::{can_complete_row_with_chips, generate_tiling_actions, get_pending_tiling_rows};
 use crate::state::{GameState, Phase};
@@ -75,77 +76,6 @@ fn serialize_large_factory(lf: &LargeFactory) -> Value {
     })
 }
 
-/// Schätzt pro voller Musterreihe die erwartbaren Tiling-Punkte (inkl. Nachbarn).
-fn estimate_row_values(p: &PlayerBoard) -> Vec<(usize, i32)> {
-    let mut grid = [[false; 6]; 6];
-    let mut valid_empty: [Vec<usize>; 6] = Default::default();
-
-    for sr in 0..3 {
-        for sc in 0..3 {
-            if let Some(slot) = &p.dome_grid.dome_slots[sr][sc] {
-                let (abs_r, abs_c) = (sr * 2, sc * 2);
-                for (si, sp) in slot.spaces.iter().enumerate() {
-                    let r = abs_r + si / 2;
-                    let c = abs_c + si % 2;
-                    if sp.placed_color.is_some() || sp.placed_special {
-                        grid[r][c] = true;
-                    } else if !sp.is_locked {
-                        valid_empty[r].push(c);
-                    }
-                }
-            }
-        }
-    }
-
-    let mut out = Vec::new();
-    for (ri, row) in p.pattern_lines.iter().enumerate() {
-        if row.is_complete() && row.color.is_some() {
-            let mut best = 1;
-            for &c in &valid_empty[ri] {
-                let mut h = 1;
-                let mut v = 1;
-                let mut i = c as i32 - 1;
-                while i >= 0 && grid[ri][i as usize] {
-                    h += 1;
-                    i -= 1;
-                }
-                for i in (c + 1)..6 {
-                    if grid[ri][i] { h += 1; } else { break; }
-                }
-                let mut i = ri as i32 - 1;
-                while i >= 0 && grid[i as usize][c] {
-                    v += 1;
-                    i -= 1;
-                }
-                for i in (ri + 1)..6 {
-                    if grid[i][c] { v += 1; } else { break; }
-                }
-                let mut pts = 0;
-                if h > 1 { pts += h; }
-                if v > 1 { pts += v; }
-                if pts == 0 { pts = 1; }
-                if pts > best { best = pts; }
-            }
-            out.push((ri, best));
-        }
-    }
-    out
-}
-
-fn estimate_round_score(p: &PlayerBoard) -> i32 {
-    let mut est: i32 = estimate_row_values(p).iter().map(|(_, v)| v).sum();
-    let penalties = [-1, -2, -3, -4];
-    for (i, _) in p.broken_tiles.iter().enumerate() {
-        if i < penalties.len() {
-            est += penalties[i];
-        }
-    }
-    if p.holds_first_player_marker {
-        est -= 2;
-    }
-    est
-}
-
 fn serialize_player(p: &PlayerBoard, round_number: u32) -> Value {
     let unused: Vec<&BonusChip> = p.bonus_chips.iter().collect();
     let unused_colors: Vec<&'static str> =
@@ -172,7 +102,7 @@ fn serialize_player(p: &PlayerBoard, round_number: u32) -> Value {
         "start_placed": !p.start_tile_pending,
         "start_tile": Value::Null,
         "can_place_dome": p.can_place_dome_tile(round_number),
-        "estimated_score": estimate_round_score(p),
+        "estimated_score": estimate_round_score(p, true),
         "unused_chip_count": unused.len(),
         "unused_chip_colors": unused_colors,
     })

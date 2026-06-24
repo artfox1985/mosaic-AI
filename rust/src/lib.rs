@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 // Reiner Rust-Kern (PyO3-frei, mit `cargo test` testbar).
 pub mod board;
 pub mod dome;
+pub mod evaluate;
 pub mod execution;
 pub mod factory;
 pub mod game;
