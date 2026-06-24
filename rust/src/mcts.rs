@@ -19,12 +19,9 @@ use serde_json::{json, Value};
 use crate::evaluate::estimate_round_score;
 use crate::game::{drafting_actions, Game};
 use crate::moves::Action;
-use crate::round_end::{
-    apply_bonus_chips_to_row, can_complete_row_with_chips, execute_full_tiling,
-    generate_tiling_actions, row_has_open_matching_slot, TilingAction,
-};
-use crate::serialize::{action_to_dict, tiling_action_to_dict};
+use crate::serialize::action_to_dict;
 use crate::state::{GameState, Phase};
+use crate::tiling_solver::solve_round_final_score;
 
 /// Initialwelle an Aktionen pro Knoten (Progressive Widening).
 pub const MAX_ACTIONS: usize = 10;
@@ -33,13 +30,11 @@ pub const WIDEN_FACTOR: f64 = 2.5;
 /// Standard-Explorationskonstante (wie agents/mcts.py).
 pub const DEFAULT_C: f64 = 0.3;
 
-/// Vereinheitlichter Such-Zug über Drafting- und Tiling-Phase.
+/// Such-Zug des Drafting-MCTS. Tiling wird NICHT mehr im Baum gesucht — die
+/// Tiling-Phase löst der exakte DFS (`crate::tiling_solver`) als Pseudo-Terminal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SearchMove {
     Draft(Action),
-    TilePlace(TilingAction),
-    TileChips { player: usize, row: usize },
-    TileEnd { player: usize },
 }
 
 struct Node {
@@ -83,102 +78,43 @@ fn diff_to_probs(diff: f64, scale: f64) -> [f64; 2] {
     [p0, 1.0 - p0]
 }
 
+/// Sigmoid-scale für das exakte DFS-Terminal (kalibriert auf echte Score-Diffs).
+const TERMINAL_SCALE: f64 = 10.0;
+
 /// Blattbewertung als Per-Spieler-Win-Prob (absolut, nicht perspektivisch).
+/// Am Drafting→Tiling-Übergang (Phase ≠ Drafting) wird der exakte Runden-Score
+/// per DFS-Solver bestimmt (Pseudo-Terminal); mitten im Drafting die Heuristik.
 fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
+    if state.phase != Phase::Drafting {
+        let f0 = solve_round_final_score(state, 0) as f64;
+        let f1 = solve_round_final_score(state, 1) as f64;
+        return diff_to_probs(f0 - f1, TERMINAL_SCALE);
+    }
     let diff = player_total(state, 0) - player_total(state, 1);
     diff_to_probs(diff, scale_for_actions(n_actions))
 }
 
-// ── Zuggenerierung & -ausführung über beide Phasen ───────────────────────────
+// ── Zuggenerierung & -ausführung (nur Drafting) ──────────────────────────────
 
-/// Chippbare Reihen eines Spielers (komplettierbar UND danach platzierbar,
-/// Reihenfolge oben→unten respektiert) — analog serialize_chippable_tiling_rows.
-fn chippable_rows(state: &GameState, pi: usize) -> Vec<usize> {
-    let player = &state.players[pi];
-    if player.bonus_chips.is_empty() {
-        return Vec::new();
-    }
-    let tiled_max = player.tiled_max_row;
-    let mut out = Vec::new();
-    for (ri, row) in player.pattern_lines.iter().enumerate() {
-        if row.tiles.is_empty() || row.is_complete() {
-            continue;
-        }
-        if (ri as i32) < tiled_max {
-            continue;
-        }
-        if !can_complete_row_with_chips(player, ri) {
-            continue;
-        }
-        let color = match row.color {
-            Some(c) => c,
-            None => continue,
-        };
-        if row_has_open_matching_slot(player, ri, color) {
-            out.push(ri);
-        }
-    }
-    out
-}
-
+/// Legale Such-Züge: nur Drafting (Tiling löst der DFS-Solver). Außerhalb der
+/// Drafting-Phase leer → der Knoten ist (Pseudo-)Terminal.
 fn valid_search_moves(state: &GameState) -> Vec<SearchMove> {
     match state.phase {
         Phase::Drafting => drafting_actions(state).into_iter().map(SearchMove::Draft).collect(),
-        Phase::Tiling => {
-            let cp = state.current_player;
-            let places = generate_tiling_actions(state, cp);
-            let mut moves: Vec<SearchMove> =
-                places.iter().map(|ta| SearchMove::TilePlace(*ta)).collect();
-            for ri in chippable_rows(state, cp) {
-                moves.push(SearchMove::TileChips { player: cp, row: ri });
-            }
-            // EndTiling nur, wenn keine Reihe mehr platzierbar ist (Server-Regel).
-            if places.is_empty() {
-                moves.push(SearchMove::TileEnd { player: cp });
-            }
-            moves
-        }
         _ => Vec::new(),
     }
 }
 
-/// Wendet einen Such-Zug auf einen Klon an. Gibt (neuer Zustand, round_over)
-/// zurück; `round_over == true` markiert das Rundenende (Knoten wird terminal,
-/// KEIN Rundenwechsel). None bei (unerwartet) ungültigem Zug.
-fn apply_search_move(state: &GameState, mv: &SearchMove) -> Option<(GameState, bool)> {
+/// Wendet einen Drafting-Zug auf einen Klon an. None bei (unerwartet)
+/// ungültigem Zug.
+fn apply_search_move(state: &GameState, mv: &SearchMove) -> Option<GameState> {
     match mv {
         SearchMove::Draft(a) => {
             let mut g = Game { state: state.clone() };
             g.apply_drafting(a).ok()?;
             let mut s = g.state;
             s.log.clear();
-            Some((s, false))
-        }
-        SearchMove::TilePlace(ta) => {
-            let mut s = state.clone();
-            let cp = s.current_player;
-            execute_full_tiling(&mut s, cp, ta).ok()?;
-            s.log.clear();
-            Some((s, false))
-        }
-        SearchMove::TileChips { player, row } => {
-            let mut s = state.clone();
-            if !apply_bonus_chips_to_row(&mut s.players[*player], *row) {
-                return None;
-            }
-            s.log.clear();
-            Some((s, false))
-        }
-        SearchMove::TileEnd { player } => {
-            let mut s = state.clone();
-            s.tiling_done[*player] = true;
-            let other = 1 - *player;
-            let round_over = s.tiling_done[other];
-            if !round_over {
-                s.current_player = other;
-            }
-            s.log.clear();
-            Some((s, round_over))
+            Some(s)
         }
     }
 }
@@ -194,7 +130,7 @@ fn rank_actions_root(state: &GameState, moves: Vec<SearchMove>) -> Vec<SearchMov
         .into_iter()
         .map(|m| {
             let score = match apply_search_move(state, &m) {
-                Some((child, _)) => player_total(&child, acting) - player_total(&child, other),
+                Some(child) => player_total(&child, acting) - player_total(&child, other),
                 None => f64::NEG_INFINITY,
             };
             (score, m)
@@ -206,9 +142,6 @@ fn rank_actions_root(state: &GameState, moves: Vec<SearchMove>) -> Vec<SearchMov
 
 fn move_priority(m: &SearchMove) -> i32 {
     match m {
-        SearchMove::TilePlace(_) => 8,
-        SearchMove::TileChips { .. } => 7,
-        SearchMove::TileEnd { .. } => 0,
         SearchMove::Draft(a) => match a {
             Action::BonusChip(_) => 6,
             Action::Stone(_) => 4,
@@ -291,19 +224,15 @@ fn best_uct_child(nodes: &[Node], nid: usize, c: f64) -> usize {
     best
 }
 
-fn is_terminal_phase(state: &GameState) -> bool {
-    matches!(state.phase, Phase::End | Phase::Final)
-}
-
-/// Baut den Suchbaum (Wurzel = Index 0). None, wenn `state` weder in der
-/// Drafting- noch in der Tiling-Phase ist (KI sucht in beiden Phasen).
+/// Baut den Drafting-Suchbaum (Wurzel = Index 0). None, wenn `state` nicht in
+/// der Drafting-Phase ist (Tiling löst der DFS-Solver separat).
 fn build_tree<R: Rng + ?Sized>(
     state: &GameState,
     simulations: u32,
     c: f64,
     rng: &mut R,
 ) -> Option<Vec<Node>> {
-    if !matches!(state.phase, Phase::Drafting | Phase::Tiling) {
+    if state.phase != Phase::Drafting {
         return None;
     }
 
@@ -344,8 +273,9 @@ fn build_tree<R: Rng + ?Sized>(
             let idx = rng.random_range(0..nodes[nid].untried.len());
             let mv = nodes[nid].untried.swap_remove(idx);
             let mover = nodes[nid].state.current_player;
-            if let Some((child_state, round_over)) = apply_search_move(&nodes[nid].state, &mv) {
-                let terminal = round_over || is_terminal_phase(&child_state);
+            if let Some(child_state) = apply_search_move(&nodes[nid].state, &mv) {
+                // Terminal sobald die Drafting-Phase verlassen ist (→ DFS-Eval).
+                let terminal = child_state.phase != Phase::Drafting;
                 let child = make_node(child_state, Some(nid), Some(mv), mover, terminal, false, rng);
                 let cid = nodes.len();
                 nodes.push(child);
@@ -429,21 +359,6 @@ fn label_search_move(sm: &SearchMove) -> (&'static str, String, &'static str, Va
             ),
             Action::Pass => ("pass", "Pass".to_string(), "pass", action_to_dict(a)),
         },
-        SearchMove::TilePlace(ta) => (
-            "tiling",
-            format!("Tiling R{} → Slot({},{}) Sp{}", ta.pattern_row + 1, ta.slot_row, ta.slot_col, ta.space_index),
-            "tiling",
-            tiling_action_to_dict(ta),
-        ),
-        SearchMove::TileChips { row, .. } => (
-            "use_chips",
-            format!("Chips R{}", row + 1),
-            "chip",
-            json!({ "type": "use_chips", "pattern_row": row }),
-        ),
-        SearchMove::TileEnd { .. } => {
-            ("end_tiling", "Tiling beenden".to_string(), "pass", json!({ "type": "end_tiling" }))
-        }
     }
 }
 
@@ -485,8 +400,7 @@ pub fn search_move_json(sm: &SearchMove) -> Value {
     json!({ "type": typ, "description": desc, "category": cat, "move": mv })
 }
 
-/// Beste Aktion (Drafting ODER Tiling) für `state`. None, wenn `state` weder
-/// Drafting noch Tiling ist.
+/// Beste Drafting-Aktion für `state` (als SearchMove). None außerhalb Drafting.
 pub fn search_action<R: Rng + ?Sized>(
     state: &GameState,
     simulations: u32,
@@ -579,16 +493,13 @@ pub fn search_drafting_action<R: Rng + ?Sized>(
 ) -> Option<Action> {
     match search_action(state, simulations, c, rng)? {
         SearchMove::Draft(a) => Some(a),
-        _ => None,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dome::build_dome_tile_pool;
     use crate::state::setup_new_game;
-    use crate::tile::TileColor::*;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -633,58 +544,6 @@ mod tests {
     }
 
     #[test]
-    fn tiling_state_yields_place_moves() {
-        // Reihe 0 (cap 1) mit Rot voll; Slot (0,0) = pool[2] hat si1 = Rot.
-        let mut s = drafting_state(7);
-        s.phase = Phase::Tiling;
-        let tile = build_dome_tile_pool()[2].clone();
-        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
-        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
-        let moves = valid_search_moves(&s);
-        assert!(moves.iter().any(|m| matches!(m, SearchMove::TilePlace(_))));
-        // Solange platzierbar, KEIN TileEnd.
-        assert!(!moves.iter().any(|m| matches!(m, SearchMove::TileEnd { .. })));
-    }
-
-    #[test]
-    fn tile_end_marks_round_over_when_both_done() {
-        // Tiling-Zustand ohne platzierbare Reihen → TileEnd verfügbar.
-        let mut s = drafting_state(7);
-        s.phase = Phase::Tiling;
-        s.tiling_done = [false, true]; // Gegner schon fertig
-        let cp = s.current_player; // 0
-        s.tiling_done[1 - cp] = true;
-        let moves = valid_search_moves(&s);
-        let end = moves
-            .iter()
-            .find(|m| matches!(m, SearchMove::TileEnd { .. }))
-            .expect("TileEnd verfügbar");
-        let (_st, round_over) = apply_search_move(&s, end).unwrap();
-        assert!(round_over, "beide fertig → Rundenende");
-    }
-
-    #[test]
-    fn chippable_row_yields_chips_move() {
-        use crate::dome::BonusChip;
-        let mut s = drafting_state(7);
-        s.phase = Phase::Tiling;
-        // Reihe 2 (cap 3): 1 Rot gelegt → 2 fehlen; 4 Rot-Chips → komplettierbar.
-        s.players[0].pattern_lines[2].add_tiles(&[Rot]);
-        for i in 0..4 {
-            s.players[0].bonus_chips.push(BonusChip { chip_id: i, colors: vec![Rot] });
-        }
-        // Dome-Reihe 1 (Reihe 2 → dome_row 1) braucht einen Slot mit offenem
-        // Rot-Space an valid_si [0,1]. pool[2] = [Tuerkis, Rot, Blau, Wild]: si1 = Rot.
-        let tile = build_dome_tile_pool()[2].clone();
-        s.players[0].dome_grid.place_dome_tile(tile, 1, 0).unwrap();
-        let moves = valid_search_moves(&s);
-        assert!(
-            moves.iter().any(|m| matches!(m, SearchMove::TileChips { row: 2, .. })),
-            "chippbare Reihe 2 sollte ein TileChips erzeugen"
-        );
-    }
-
-    #[test]
     fn does_not_dump_to_floor_early() {
         let s = drafting_state(11);
         let mut rng = StdRng::seed_from_u64(4);
@@ -705,16 +564,12 @@ mod tests {
     }
 
     #[test]
-    fn search_action_works_for_tiling_root() {
-        // Tiling-Wurzel mit platzierbarer Reihe → search_action liefert TilePlace.
+    fn search_action_none_for_tiling_root() {
+        // Tiling wird NICHT mehr im MCTS gesucht (löst der DFS-Solver).
         let mut s = drafting_state(7);
         s.phase = Phase::Tiling;
-        let tile = build_dome_tile_pool()[2].clone(); // si1 = Rot
-        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
-        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
         let mut rng = StdRng::seed_from_u64(5);
-        let mv = search_action(&s, 150, DEFAULT_C, &mut rng).expect("Tiling-Aktion");
-        assert!(matches!(mv, SearchMove::TilePlace(_) | SearchMove::TileEnd { .. }));
+        assert!(search_action(&s, 150, DEFAULT_C, &mut rng).is_none());
     }
 
     #[test]
