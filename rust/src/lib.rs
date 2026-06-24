@@ -20,6 +20,7 @@ pub mod scoring;
 pub mod serialize;
 pub mod state;
 pub mod supply;
+pub mod tiling_solver;
 pub mod tile;
 pub mod validation;
 

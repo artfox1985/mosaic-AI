@@ -17,7 +17,8 @@ use crate::mcts::{search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
 use crate::round_end::{apply_bonus_chips_to_row, find_unplaceable_rows, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
-use crate::serialize::{serialize_stack_peek, state_to_json};
+use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
+use crate::tiling_solver::{best_first_step, solve_round_final_score, TilingStep};
 use crate::state::Phase;
 use crate::tile::TileColor;
 
@@ -288,58 +289,22 @@ impl PyGame {
 
     // ── KI (MCTS) ─────────────────────────────────────────────────────────────
 
-    /// Führt EINEN KI-Zug für den aktuellen Spieler aus (Drafting oder Tiling)
-    /// und gibt `{applied, phase, action, done, debug}` als JSON zurück.
-    /// `debug` ist debug.html-kompatibel (moves[] + tree). Server ruft dies nur,
-    /// wenn die KI am Zug ist.
+    /// Führt EINEN KI-Zug für den aktuellen Spieler aus und gibt
+    /// `{applied, phase, action, done, debug}` als JSON zurück. Drafting → MCTS
+    /// (mit Debug-Baum); Tiling → exakter DFS-Solver (schlankes Debug, kein Baum).
+    /// Server ruft dies nur, wenn die KI am Zug ist.
     #[pyo3(signature = (simulations=300))]
     fn ai_step_json(&mut self, simulations: u32) -> PyResult<String> {
-        let (chosen, analysis) = search_with_tree(
-            &self.game.state,
-            simulations,
-            AI_C,
-            &mut self.rng,
-            AI_TREE_DEPTH,
-            AI_TREE_TOPK,
-        );
-        let mv = match chosen {
-            Some(m) => m,
-            None => {
-                return Ok(json!({
-                    "applied": false,
-                    "phase": self.game.state.phase.as_str(),
-                    "reason": "keine KI-Aktion (terminale Phase?)",
-                })
-                .to_string())
-            }
-        };
-
-        let action_json = search_move_json(&mv);
-        match &mv {
-            SearchMove::Draft(a) => map_err(self.game.apply_drafting(a))?,
-            SearchMove::TilePlace(ta) => {
-                let pi = self.game.state.current_player;
-                map_err(self.game.apply_single_tiling(pi, ta))?;
-            }
-            SearchMove::TileChips { player, row } => {
-                if !apply_bonus_chips_to_row(&mut self.game.state.players[*player], *row) {
-                    return Err(PyValueError::new_err("KI: Chip-Komplettierung fehlgeschlagen."));
-                }
-            }
-            SearchMove::TileEnd { player } => {
-                let m = TilingMove::EndTiling { player: *player };
-                map_err(self.game.apply_tiling(&m, &mut self.rng))?;
-            }
+        match self.game.state.phase {
+            Phase::Tiling => self.ai_tiling_step(),
+            Phase::Drafting => self.ai_drafting_step(simulations),
+            other => Ok(json!({
+                "applied": false,
+                "phase": other.as_str(),
+                "reason": "keine KI-Aktion (terminale Phase?)",
+            })
+            .to_string()),
         }
-
-        Ok(json!({
-            "applied": true,
-            "phase": self.game.state.phase.as_str(),
-            "action": action_json,
-            "done": self.game.is_over(),
-            "debug": analysis,
-        })
-        .to_string())
     }
 
     /// Analysiert die aktuelle Stellung per MCTS OHNE Zug auszuführen
@@ -405,6 +370,113 @@ impl PyGame {
             "rotation": rot,
             "is_start": true,
             "description": format!("Startkachel #{tile_id} → ({r},{c}) {rot}°"),
+        })
+        .to_string())
+    }
+}
+
+// Interne KI-Schritt-Helfer (kein PyO3-Export).
+impl PyGame {
+    /// Drafting-Zug per MCTS (mit Debug-Baum).
+    fn ai_drafting_step(&mut self, simulations: u32) -> PyResult<String> {
+        let (chosen, analysis) = search_with_tree(
+            &self.game.state,
+            simulations,
+            AI_C,
+            &mut self.rng,
+            AI_TREE_DEPTH,
+            AI_TREE_TOPK,
+        );
+        let mv = match chosen {
+            Some(m) => m,
+            None => {
+                return Ok(json!({
+                    "applied": false,
+                    "phase": self.game.state.phase.as_str(),
+                    "reason": "keine Drafting-Aktion",
+                })
+                .to_string())
+            }
+        };
+        let action_json = search_move_json(&mv);
+        let SearchMove::Draft(a) = &mv;
+        map_err(self.game.apply_drafting(a))?;
+        Ok(json!({
+            "applied": true,
+            "phase": self.game.state.phase.as_str(),
+            "action": action_json,
+            "done": self.game.is_over(),
+            "debug": analysis,
+        })
+        .to_string())
+    }
+
+    /// Tiling-Zug per exaktem DFS-Solver. Wendet den optimalen nächsten Schritt
+    /// an; liefert ein schlankes Debug-Dict (kein MCTS-Baum).
+    fn ai_tiling_step(&mut self) -> PyResult<String> {
+        let pi = self.game.state.current_player;
+        let optimal = solve_round_final_score(&self.game.state, pi);
+        let step = best_first_step(&self.game.state, pi);
+
+        let (typ, desc, cat, mv): (&str, String, &str, Value) = match step {
+            TilingStep::Place(ta) => {
+                map_err(self.game.apply_single_tiling(pi, &ta))?;
+                (
+                    "tiling",
+                    format!("Tiling R{} → Slot({},{}) Sp{}", ta.pattern_row + 1, ta.slot_row, ta.slot_col, ta.space_index),
+                    "tiling",
+                    tiling_action_to_dict(&ta),
+                )
+            }
+            TilingStep::Chips { row } => {
+                if !apply_bonus_chips_to_row(&mut self.game.state.players[pi], row) {
+                    return Err(PyValueError::new_err("KI: Chip-Komplettierung fehlgeschlagen."));
+                }
+                ("use_chips", format!("Chips R{}", row + 1), "chip", json!({ "type": "use_chips", "pattern_row": row }))
+            }
+            TilingStep::End => {
+                map_err(self.game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut self.rng))?;
+                ("end_tiling", "Tiling beenden".to_string(), "pass", json!({ "type": "end_tiling" }))
+            }
+        };
+
+        // Schlankes, debug.html-kompatibles Debug-Dict (kein Baum).
+        let debug = json!({
+            "current_player": pi,
+            "ai_player": pi,
+            "value": Value::Null,
+            "win_pct": Value::Null,
+            "has_net": false,
+            "simulations": 0,
+            "num_actions": 1,
+            "max_depth": 0,
+            "ai_action": 0,
+            "solver": "dfs",
+            "dfs_optimal_score": optimal,
+            "moves": [json!({
+                "action_id": 0,
+                "type": typ,
+                "description": desc.clone(),
+                "category": cat,
+                "net_prob": Value::Null,
+                "net_prob_norm": Value::Null,
+                "mcts_visits": 0,
+                "mcts_share": 1.0,
+                "mcts_q": Value::Null,
+                "mcts_win_pct": Value::Null,
+                "max_depth": 0,
+                "shaping": optimal as f64,
+                "chosen": true,
+            })],
+            "tree": Value::Null,
+        });
+
+        Ok(json!({
+            "applied": true,
+            "phase": self.game.state.phase.as_str(),
+            "action": json!({ "type": typ, "description": desc, "category": cat, "move": mv }),
+            "done": self.game.is_over(),
+            "debug": debug,
         })
         .to_string())
     }
