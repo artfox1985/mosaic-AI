@@ -13,6 +13,7 @@ pub mod factory;
 pub mod game;
 pub mod moves;
 pub mod round_end;
+pub mod scoring;
 pub mod state;
 pub mod supply;
 pub mod tile;

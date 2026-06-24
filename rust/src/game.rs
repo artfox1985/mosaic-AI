@@ -14,6 +14,7 @@ use crate::round_end::{
     apply_bonus_chips_to_row, execute_full_tiling, generate_tiling_actions,
     process_unplaceable_rows, score_penalty, validate_tiling_action, TilingAction,
 };
+use crate::scoring::{calculate_end_scoring, EndScoring};
 use crate::state::{setup_new_game, setup_new_round, GameState, Phase, NUM_PLAYERS, NUM_ROUNDS};
 use crate::validation::{generate_valid_moves, validate_move, validate_moon_take};
 
@@ -549,6 +550,33 @@ impl Game {
         }
         setup_new_round(&mut self.state, rng);
         self.state.phase = Phase::Drafting;
+    }
+
+    // ── Endwertung ────────────────────────────────────────────────────────────
+
+    /// Wendet die Wertungsplatten-Endwertung an (nach dem Spielende), schreibt
+    /// die Punkte gut und setzt die Phase auf `Final`. Gibt die Detailergebnisse
+    /// je Spieler zurück. Port von engine/game.py `_calculate_end_scoring`.
+    pub fn apply_end_scoring(&mut self) -> Vec<EndScoring> {
+        let ids = self.state.scoring_tile_ids.clone();
+        let mut results = Vec::with_capacity(NUM_PLAYERS);
+        for pi in 0..NUM_PLAYERS {
+            let res = calculate_end_scoring(&self.state.players[pi], &ids);
+            self.state.players[pi].apply_score(res.total);
+            let (name, score) = {
+                let p = &self.state.players[pi];
+                (p.name.clone(), p.score)
+            };
+            self.state
+                .log_event(format!("🏆 {name}: Endwertung {} Pkt → Gesamt: {score} Pkt", res.total));
+            for d in &res.details {
+                self.state
+                    .log_event(format!("   {} {}: {} Pkt", d.emoji, d.name, d.score));
+            }
+            results.push(res);
+        }
+        self.state.phase = Phase::Final;
+        results
     }
 }
 
