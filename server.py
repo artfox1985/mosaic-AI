@@ -151,6 +151,9 @@ def _wrap_env():
     return env
 
 def ok() -> dict:
+    # Rust-Engine aktiv? Dann State aus der PyGame-Instanz.
+    if _rust is not None:
+        return {"ok": True, "state": _json.loads(_rust.state_json())}
     # Holt sich den State immer frisch aus der Game-Instanz
     return {"ok": True, "state": serialize_state(_game.state)}
 
@@ -158,6 +161,9 @@ def ok() -> dict:
 def _flush_game_log() -> None:
     """Schreibt neue state.log Einträge in die Log-Datei."""
     global _game_log_path
+    if _rust is not None:
+        _rust_flush_log()
+        return
     if _game_log_path is None or _game is None or _game.state is None:
         return
     if not hasattr(_game.state, '_logged_count'):
@@ -177,6 +183,8 @@ def err(msg: str) -> dict:
     return {"ok": False, "error": msg}
 
 def _both_start_placed() -> bool:
+    if _rust is not None:
+        return _rust.both_start_placed()
     if _game.state is None: return False
     return all(p.start_dome_tile is None for p in _game.state.players)
 
@@ -188,6 +196,45 @@ def color(v: str) -> TileColor:
 
 def source(v: str) -> TakeSource:
     return TakeSource[v]
+
+
+# ── Rust-Engine-Pfad (Mensch-vs-Mensch, Branch rust-engine) ──────────────────
+# Wenn ein Spiel mit engine="rust" gestartet wird, hält _rust eine
+# mosaic_rust.PyGame-Instanz und die Routen verzweigen darauf. Der bestehende
+# Python-Flow (_game) bleibt unverändert.
+try:
+    import mosaic_rust as _mr
+except ImportError:
+    _mr = None
+
+_rust = None        # mosaic_rust.PyGame oder None
+_rust_logged = 0    # bereits in die Logdatei geschriebene Log-Zeilen
+
+def _rust_active() -> bool:
+    return _rust is not None
+
+def _rust_state() -> dict:
+    return _json.loads(_rust.state_json())
+
+def _rust_ok(extra: dict | None = None):
+    r = {"ok": True, "state": _rust_state()}
+    if extra:
+        r.update(extra)
+    return jsonify(r)
+
+def _rust_flush_log() -> None:
+    global _rust_logged
+    if _game_log_path is None or _rust is None:
+        return
+    new = _rust.log_since(_rust_logged)
+    if new:
+        try:
+            with open(_game_log_path, 'a', encoding='utf-8') as lf:
+                for e in new:
+                    lf.write(f"{e}\n")
+            _rust_logged = _rust.log_len()
+        except Exception:
+            pass
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -220,21 +267,24 @@ def new_game():
     # Seed immer explizit setzen für Reproduzierbarkeit
     if seed is None:
         seed = _random.randint(0, 999999)
-    _game = Game()
-    _game.start(player_names=names, seed=seed, first_player=first_player)
-    # Seed im State speichern
-    _game.state._seed = seed
-    _game.state._first_player = first_player
 
+    global _rust, _rust_logged
+
+    # In diesem Branch ist Rust die einzige Engine (Mensch-gegen-Mensch).
+    # KI-Spiele werden noch nicht unterstützt → Spiel startet nicht.
     if ai_enabled:
-        model_v = data.get('model', None)
-        sims_v  = data.get('sims',  None)
-        preset  = _resolve_difficulty(difficulty, model_v, sims_v)
-        _ai_player = int(ai_side)
-        _init_ai(preset['model'], preset['sims'])
-    else:
-        _ai_agent  = None
-        _ai_player = None
+        return jsonify(err("Spiele gegen die KI sind in diesem Branch (Rust-Engine) "
+                           "noch nicht verfügbar."))
+
+    if _mr is None:
+        return jsonify(err("Rust-Engine (mosaic_rust) ist nicht installiert. "
+                           "Bitte im rust/-Verzeichnis `pip install .` ausführen."))
+    _rust = _mr.PyGame((names[0], names[1]), first_player=first_player, seed=seed)
+    _rust_logged = 0
+    _game = Game()        # Platzhalter; ungenutzt
+    _ai_agent  = None
+    _ai_player = None
+    seed = _rust.seed()
 
     # Log-Datei für dieses Spiel erstellen
     global _game_log_path
@@ -266,6 +316,8 @@ def new_game():
 
 @app.route('/api/state', methods=['GET'])
 def get_state():
+    if _rust_active():
+        return jsonify(ok())
     if _game.state is None:
         return jsonify(err("Kein aktives Spiel"))
     return jsonify(ok())
@@ -273,9 +325,21 @@ def get_state():
 
 @app.route('/api/move/stone', methods=['POST'])
 def move_stone():
+    if _rust_active():
+        if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
+        d = request.get_json()
+        try:
+            raw = d.get('factory_id')
+            fid = int(raw) if raw is not None else None
+            _rust.apply_stone(d['source'], d['color'], int(d['row']),
+                              fid, list(d.get('moon_order', [])))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
+
     d = request.get_json()
     try:
         # --- ROBUSTE HANDHABUNG VON AKTION C ---
@@ -304,9 +368,19 @@ def move_stone():
 
 @app.route('/api/move/dome', methods=['POST'])
 def move_dome():
+    if _rust_active():
+        if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
+        d = request.get_json()
+        try:
+            _rust.apply_dome(int(d['tile_id']), int(d['slot_row']),
+                             int(d['slot_col']), int(d.get('rotation', 0)))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e) or "Zug abgelehnt."))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
+
     d = request.get_json()
     try:
         move = PlaceDomeTileMove(
@@ -328,9 +402,20 @@ def move_dome():
 
 @app.route('/api/move/dome_stack', methods=['POST'])
 def move_dome_stack():
+    if _rust_active():
+        if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
+        d = request.get_json()
+        try:
+            _rust.apply_dome_stack(int(d['num_drawn']), int(d['chosen_id']),
+                                   int(d['slot_row']), int(d['slot_col']),
+                                   int(d.get('rotation', 0)))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e) or "Zug abgelehnt."))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
+
     d = request.get_json()
     try:
         move = DrawFromStackMove(
@@ -353,9 +438,18 @@ def move_dome_stack():
 
 @app.route('/api/move/bonus_chip', methods=['POST'])
 def move_bonus_chip():
+    if _rust_active():
+        if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
+        d = request.get_json()
+        try:
+            _rust.apply_bonus_chip(int(d['factory_id']))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
-    
+
     d = request.get_json()
     try:
         move = TakeBonusChipMove(factory_id=int(d['factory_id']))
@@ -368,6 +462,16 @@ def move_bonus_chip():
 
 @app.route('/api/move/start_tile', methods=['POST'])
 def move_start_tile():
+    if _rust_active():
+        d = request.json
+        try:
+            _rust.apply_start_tile(int(d['player']), int(d['tile_id']),
+                                   int(d['slot_row']), int(d['slot_col']),
+                                   int(d.get('rotation', 0)))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e) or "Zug abgelehnt."))
     try:
         d = request.json
         _game.apply_start_placement(
@@ -388,9 +492,22 @@ def move_start_tile():
 @app.route('/api/tiling', methods=['POST'])
 def tiling():
     global AI_ENABLED, _ai_player
+    if _rust_active():
+        if _rust.phase() != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
+        d = request.get_json()
+        try:
+            raw_tid = d.get('dome_tile_id')
+            tid = int(raw_tid) if raw_tid is not None else None
+            _rust.apply_tiling(int(d['player']), int(d['pattern_row']),
+                               int(d['slot_row']), int(d['slot_col']),
+                               int(d['space_index']), tid, int(d.get('rotation', 0)))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
-    
+
     d = request.get_json()
     try:
         pi = int(d['player'])
@@ -418,6 +535,15 @@ def tiling():
 
 @app.route('/api/tiling/bonus_chips', methods=['POST'])
 def tiling_bonus_chips():
+    if _rust_active():
+        if _rust.phase() != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
+        d = request.get_json()
+        try:
+            _rust.apply_tiling_chips(int(d['player']), int(d['pattern_row']))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _game.state.phase != "tiling": return jsonify(err("Nicht in der Tiling-Phase"))
     d = request.get_json()
@@ -496,6 +622,8 @@ def tiling_bonus_chips():
 
 @app.route('/api/tiling/unplaceable', methods=['GET'])
 def tiling_unplaceable():
+    if _rust_active():
+        return jsonify({"ok": True, "unplaceable": _json.loads(_rust.unplaceable_json())})
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     from engine.round_end import find_unplaceable_rows
     result = []
@@ -514,6 +642,14 @@ def tiling_unplaceable():
 
 @app.route('/api/tiling/move_to_floor', methods=['POST'])
 def tiling_move_to_floor():
+    if _rust_active():
+        d = request.get_json()
+        try:
+            _rust.move_row_to_floor(int(d['player']), int(d['pattern_row']))
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     d = request.get_json()
     try:
@@ -540,8 +676,18 @@ def tiling_move_to_floor():
 
 @app.route('/api/end_tiling', methods=['POST'])
 def end_tiling():
+    if _rust_active():
+        pi = _rust.current_player()
+        if _rust.pending_tiling_count(pi):
+            return jsonify(err("Du hast noch platzierbare Reihen. Bitte lege sie zuerst an die Kuppel!"))
+        try:
+            _rust.end_tiling(pi)
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
-    
+
     # 1. Sicherheits-Check: Hat der Mensch wirklich alles gelegt?
     human_player = 1 - _ai_player if _ai_player is not None else _game.state.current_player
     if _game.valid_tiling_actions(human_player):
@@ -598,6 +744,18 @@ def end_tiling():
 
 @app.route('/api/move/pass', methods=['POST'])
 def move_pass():
+    if _rust_active():
+        if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
+        if _rust.phase() != "drafting": return jsonify(err("Passen nur in Phase 1 möglich."))
+        real_moves = [m for m in _rust_state().get("valid_moves", []) if m.get("type") != "pass"]
+        if real_moves:
+            return jsonify(err("Passen nicht erlaubt — es gibt noch gültige Aktionen."))
+        try:
+            _rust.apply_pass()
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if not _both_start_placed(): return jsonify(err("Startkacheln fehlen."))
     if _game.state.phase != "drafting": return jsonify(err("Passen nur in Phase 1 möglich."))
@@ -632,6 +790,14 @@ def get_scoring_tiles():
 
 @app.route('/api/scoring_tiles/select', methods=['POST'])
 def select_scoring_tiles():
+    if _rust_active():
+        d = request.get_json()
+        try:
+            _rust.select_scoring([int(i) for i in d.get('ids', [])])
+            _flush_game_log()
+            return jsonify(ok())
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     d = request.get_json()
     ids = d.get('ids', [])
@@ -652,6 +818,14 @@ def select_scoring_tiles():
 
 @app.route('/api/end_scoring', methods=['POST'])
 def end_scoring():
+    if _rust_active():
+        if _rust.phase() != "end": return jsonify(err("Spiel noch nicht beendet"))
+        try:
+            results = _json.loads(_rust.end_scoring_json())
+            _flush_game_log()
+            return jsonify({"ok": True, "state": _rust_state(), **results})
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _game.state.phase != "end": return jsonify(err("Spiel noch nicht beendet"))
     try:
@@ -664,6 +838,18 @@ def end_scoring():
 @app.route('/api/end_game_log', methods=['POST'])
 def end_game_log():
     """Schreibt Spielende-Summary ins Log."""
+    if _rust_active():
+        if _game_log_path:
+            _flush_game_log()
+            scores = list(_rust.scores())
+            try:
+                with open(_game_log_path, 'a', encoding='utf-8') as lf:
+                    lf.write(f"# {'='*60}\n")
+                    lf.write(f"# SPIELENDE: {scores}\n")
+                    lf.write(f"# Seed: {_rust.seed()}\n")
+            except Exception:
+                pass
+        return jsonify(ok())
     if _game_log_path and _game.state:
         _flush_game_log()
         scores = [p.score for p in _game.state.players]
@@ -679,6 +865,16 @@ def end_game_log():
 
 @app.route('/api/stack/peek', methods=['POST'])
 def stack_peek():
+    if _rust_active():
+        d = request.get_json()
+        try:
+            n = int(d.get('num', 1))
+            tiles = _json.loads(_rust.peek_stack_json(n))
+            if not tiles:
+                return jsonify(err("Keine Karten auf dem Stapel"))
+            return jsonify({"ok": True, "tiles": tiles})
+        except Exception as e:
+            return jsonify(err(str(e)))
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     d = request.get_json()
     try:
