@@ -80,6 +80,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # ── KI-Konfiguration ─────────────────────────────────────────────────────────
 _ai_agent    = None        # AlphaZeroAgent oder HeuristicMCTSAgent
 _ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
+_ai_sims     = 300         # MCTS-Simulationen der Rust-KI (rust-Pfad)
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
 
@@ -268,23 +269,25 @@ def new_game():
     if seed is None:
         seed = _random.randint(0, 999999)
 
-    global _rust, _rust_logged
+    global _rust, _rust_logged, _ai_sims
 
-    # In diesem Branch ist Rust die einzige Engine (Mensch-gegen-Mensch).
-    # KI-Spiele werden noch nicht unterstützt → Spiel startet nicht.
-    if ai_enabled:
-        return jsonify(err("Spiele gegen die KI sind in diesem Branch (Rust-Engine) "
-                           "noch nicht verfügbar."))
-
+    # In diesem Branch ist Rust die einzige Engine. KI (optional) läuft als
+    # Rust-MCTS direkt auf der PyGame-Instanz — kein Python-Agent.
     if _mr is None:
         return jsonify(err("Rust-Engine (mosaic_rust) ist nicht installiert. "
                            "Bitte im rust/-Verzeichnis `pip install .` ausführen."))
     _rust = _mr.PyGame((names[0], names[1]), first_player=first_player, seed=seed)
     _rust_logged = 0
     _game = Game()        # Platzhalter; ungenutzt
-    _ai_agent  = None
-    _ai_player = None
+    _ai_agent  = None     # rust-Pfad nutzt keinen Python-Agenten
     seed = _rust.seed()
+
+    if ai_enabled:
+        preset = _resolve_difficulty(difficulty, data.get('model'), data.get('sims'))
+        _ai_player = int(ai_side)
+        _ai_sims   = int(preset.get('sims') or 300)
+    else:
+        _ai_player = None
 
     # Log-Datei für dieses Spiel erstellen
     global _game_log_path
@@ -677,7 +680,9 @@ def tiling_move_to_floor():
 @app.route('/api/end_tiling', methods=['POST'])
 def end_tiling():
     if _rust_active():
-        pi = _rust.current_player()
+        # Mit KI beendet der Mensch (= 1-_ai_player) sein Tiling; danach übernimmt
+        # die KI via /api/ai/move. Ohne KI: der aktuelle Spieler.
+        pi = (1 - _ai_player) if _ai_player is not None else _rust.current_player()
         if _rust.pending_tiling_count(pi):
             return jsonify(err("Du hast noch platzierbare Reihen. Bitte lege sie zuerst an die Kuppel!"))
         try:
@@ -892,6 +897,13 @@ def stack_peek():
 @app.route('/api/ai/config', methods=['GET'])
 def ai_config():
     """Gibt aktuelle KI-Konfiguration zurück."""
+    if _rust_active():
+        return jsonify({
+            "ok": True,
+            "ai_enabled": _ai_player is not None,
+            "ai_player": _ai_player,
+            "sims": _ai_sims,
+        })
     if _ai_agent is None:
         return jsonify({"ok": True, "ai_enabled": False})
     sims = getattr(_ai_agent, 'simulations', 0)
@@ -906,7 +918,12 @@ def ai_config():
 @app.route('/api/ai/config', methods=['POST'])
 def ai_config_set():
     """Setzt Schwierigkeit während des Spiels."""
-    global _ai_agent
+    global _ai_agent, _ai_sims
+    if _rust_active():
+        d = request.get_json(silent=True) or {}
+        preset = _resolve_difficulty(d.get('difficulty', 'medium'), d.get('model'), d.get('sims'))
+        _ai_sims = int(preset.get('sims') or 300)
+        return jsonify({"ok": True, "sims": _ai_sims})
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     d = request.get_json(silent=True) or {}
     difficulty = d.get('difficulty', 'medium')
@@ -925,6 +942,32 @@ def ai_move():
     Wird vom Frontend nach jedem Menschenzug aufgerufen wenn
     _game.state.current_player == _ai_player.
     """
+    if _rust_active():
+        if _ai_player is None: return jsonify(err("KI-Spieler nicht gesetzt"))
+        phase = _rust.phase()
+        if phase not in ("drafting", "tiling"):
+            return jsonify(err(f"KI kann in Phase '{phase}' nicht ziehen"))
+        if _rust.current_player() != _ai_player:
+            return jsonify(err("Nicht der Zug der KI" if phase == "drafting"
+                               else "Mensch ist noch am Tilen"))
+        try:
+            res = _json.loads(_rust.ai_step_json(_ai_sims))
+        except Exception as e:
+            return jsonify(err(f"KI-Fehler: {e}"))
+        if not res.get("applied"):
+            return jsonify(err(res.get("reason", "KI konnte nicht ziehen")))
+        dbg = res.get("debug")
+        if isinstance(dbg, dict) and "moves" in dbg:
+            dbg["round"]    = _rust.round_number()
+            dbg["move_idx"] = len(_ai_debug_history) + 1
+            _ai_debug_history.append(dbg)
+        _flush_game_log()
+        response = ok()
+        response["ai_action"] = res.get("action")
+        response["done"]      = res.get("done", False)
+        response["debug"]     = dbg
+        return jsonify(response)
+
     if _game.state is None:    return jsonify(err("Kein aktives Spiel"))
     if _ai_agent is None:      return jsonify(err("Kein KI-Agent aktiv"))
     if _ai_player is None:     return jsonify(err("KI-Spieler nicht gesetzt"))
@@ -1028,6 +1071,24 @@ def ai_start_tile():
     aus dem Training anwendet (statt der alten evaluate_state-Heuristik).
     Fallback auf evaluate_state nur wenn kein KI-Agent aktiv ist.
     """
+    if _rust_active():
+        if _ai_player is None: return jsonify(err("KI-Spieler nicht gesetzt"))
+        if _rust.both_start_placed():
+            return jsonify({"ok": True, "state": _rust_state(), "skipped": True})
+        vm = _rust_state().get("valid_moves", [])
+        pending = vm[0].get("player") if vm and vm[0].get("type") == "start_tile_pending" else None
+        if pending != _ai_player:
+            # Noch nicht die KI dran (Nicht-Startspieler zuerst) → warten.
+            return jsonify({"ok": True, "state": _rust_state(), "skipped": True})
+        try:
+            res = _json.loads(_rust.ai_start_tile_json(_ai_player))
+        except Exception as e:
+            return jsonify(err(str(e)))
+        _flush_game_log()
+        response = ok()
+        response["ai_action"] = res
+        return jsonify(response)
+
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _ai_player is None:  return jsonify(err("KI-Spieler nicht gesetzt"))
 
@@ -1304,6 +1365,12 @@ def ai_debug():
     Funktioniert für AlphaZeroAgent (mit Netz-Policy) UND HeuristicMCTSAgent
     (nur MCTS-Visits, ohne Netz-Spalte).
     """
+    if _rust_active():
+        analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
+        if not isinstance(analysis, dict):
+            return jsonify({"ok": True, "moves": [], "current_player": _rust.current_player()})
+        analysis["ok"] = True
+        return jsonify(analysis)
     if _game.state is None: return jsonify(err("Kein aktives Spiel"))
     if _ai_agent is None:   return jsonify(err("Kein KI-Agent aktiv"))
     if not hasattr(_ai_agent, "_select"):

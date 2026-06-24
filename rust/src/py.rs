@@ -1,9 +1,9 @@
 //! PyO3-Bindings: exportiert eine spielbare Engine-Instanz `PyGame` nach Python.
 //!
-//! Ziel: server.py kann eine komplette Mensch-gegen-Mensch-Partie direkt auf der
-//! Rust-Engine fahren. `state_json()` liefert exakt das Frontend-JSON
-//! (Port von engine/serializer.py), die `apply_*`-Methoden spiegeln die
-//! server.py-Routen. KI-Anbindung folgt später.
+//! Ziel: server.py kann eine komplette Partie direkt auf der Rust-Engine fahren.
+//! `state_json()` liefert exakt das Frontend-JSON (Port von engine/serializer.py),
+//! die `apply_*`-Methoden spiegeln die server.py-Routen, und die `ai_*`-Methoden
+//! treiben die MCTS-KI (Drafting + Tiling + Startkachel, inkl. Debug-Baum).
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -11,13 +11,21 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 
+use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, Game, TilingMove};
+use crate::mcts::{search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
 use crate::round_end::{apply_bonus_chips_to_row, find_unplaceable_rows, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json};
 use crate::state::Phase;
 use crate::tile::TileColor;
+
+/// Tiefe/Breite des Debug-Baum-Exports (siehe debug.html-Panel).
+const AI_TREE_DEPTH: u32 = 3;
+const AI_TREE_TOPK: usize = 8;
+/// Standard-UCT-Konstante der KI (= mcts::DEFAULT_C).
+const AI_C: f64 = 0.3;
 
 fn parse_color(s: &str) -> PyResult<TileColor> {
     TileColor::from_value(s).ok_or_else(|| PyValueError::new_err(format!("Unbekannte Farbe: {s}")))
@@ -277,4 +285,151 @@ impl PyGame {
     fn peek_stack_json(&self, n: usize) -> String {
         serialize_stack_peek(&self.game.state, n).to_string()
     }
+
+    // ── KI (MCTS) ─────────────────────────────────────────────────────────────
+
+    /// Führt EINEN KI-Zug für den aktuellen Spieler aus (Drafting oder Tiling)
+    /// und gibt `{applied, phase, action, done, debug}` als JSON zurück.
+    /// `debug` ist debug.html-kompatibel (moves[] + tree). Server ruft dies nur,
+    /// wenn die KI am Zug ist.
+    #[pyo3(signature = (simulations=300))]
+    fn ai_step_json(&mut self, simulations: u32) -> PyResult<String> {
+        let (chosen, analysis) = search_with_tree(
+            &self.game.state,
+            simulations,
+            AI_C,
+            &mut self.rng,
+            AI_TREE_DEPTH,
+            AI_TREE_TOPK,
+        );
+        let mv = match chosen {
+            Some(m) => m,
+            None => {
+                return Ok(json!({
+                    "applied": false,
+                    "phase": self.game.state.phase.as_str(),
+                    "reason": "keine KI-Aktion (terminale Phase?)",
+                })
+                .to_string())
+            }
+        };
+
+        let action_json = search_move_json(&mv);
+        match &mv {
+            SearchMove::Draft(a) => map_err(self.game.apply_drafting(a))?,
+            SearchMove::TilePlace(ta) => {
+                let pi = self.game.state.current_player;
+                map_err(self.game.apply_single_tiling(pi, ta))?;
+            }
+            SearchMove::TileChips { player, row } => {
+                if !apply_bonus_chips_to_row(&mut self.game.state.players[*player], *row) {
+                    return Err(PyValueError::new_err("KI: Chip-Komplettierung fehlgeschlagen."));
+                }
+            }
+            SearchMove::TileEnd { player } => {
+                let m = TilingMove::EndTiling { player: *player };
+                map_err(self.game.apply_tiling(&m, &mut self.rng))?;
+            }
+        }
+
+        Ok(json!({
+            "applied": true,
+            "phase": self.game.state.phase.as_str(),
+            "action": action_json,
+            "done": self.game.is_over(),
+            "debug": analysis,
+        })
+        .to_string())
+    }
+
+    /// Analysiert die aktuelle Stellung per MCTS OHNE Zug auszuführen
+    /// (für /api/ai/debug). Gibt das debug.html-Analyse-Dict zurück.
+    #[pyo3(signature = (simulations=300))]
+    fn ai_debug_json(&mut self, simulations: u32) -> String {
+        let (_chosen, analysis) = search_with_tree(
+            &self.game.state,
+            simulations,
+            AI_C,
+            &mut self.rng,
+            AI_TREE_DEPTH,
+            AI_TREE_TOPK,
+        );
+        analysis.to_string()
+    }
+
+    /// Platziert die Startkachel der KI per einfacher Farb-Häufigkeits-Heuristik.
+    /// Gibt das gewählte Move-Dict zurück.
+    fn ai_start_tile_json(&mut self, player: usize) -> PyResult<String> {
+        let counts = sun_color_counts(&self.game.state);
+        let empties = self.game.state.players[player].dome_grid.empty_slots();
+        if empties.is_empty() {
+            return Err(PyValueError::new_err("Kein freier Slot für die Startkachel."));
+        }
+
+        let mut best: Option<(f64, usize, usize, usize, u32)> = None; // (score, tile_id, r, c, rot)
+        for tile in &self.game.state.dome_display {
+            for &(r, c) in &empties {
+                let corner_bonus = if (r == 0 || r == 2) && (c == 0 || c == 2) { 0.5 } else { 0.0 };
+                for &rot in &[0u32, 90, 180, 270] {
+                    let spaces = match tile.rotated_spaces(rot) {
+                        Ok(s) => s,
+                        Err(_) => continue,
+                    };
+                    let mut score = corner_bonus;
+                    for sp in &spaces {
+                        score += match sp.space_type {
+                            SpaceType::Normal => sp
+                                .required_color
+                                .and_then(color_index)
+                                .map(|i| counts[i] as f64)
+                                .unwrap_or(0.0),
+                            SpaceType::Wild => *counts.iter().max().unwrap_or(&0) as f64,
+                            SpaceType::Special => 0.0,
+                        };
+                    }
+                    if best.map_or(true, |(b, ..)| score > b) {
+                        best = Some((score, tile.tile_id, r, c, rot));
+                    }
+                }
+            }
+        }
+
+        let (_score, tile_id, r, c, rot) =
+            best.ok_or_else(|| PyValueError::new_err("Keine Startkachel platzierbar."))?;
+        map_err(apply_start_placement(&mut self.game.state, player, tile_id, r, c, rot))?;
+        Ok(json!({
+            "type": "dome",
+            "tile_id": tile_id,
+            "slot_row": r,
+            "slot_col": c,
+            "rotation": rot,
+            "is_start": true,
+            "description": format!("Startkachel #{tile_id} → ({r},{c}) {rot}°"),
+        })
+        .to_string())
+    }
+}
+
+/// Index einer Normalfarbe in `TileColor::NORMAL` (None für Wild).
+fn color_index(c: TileColor) -> Option<usize> {
+    TileColor::NORMAL.iter().position(|&x| x == c)
+}
+
+/// Zählt die Sun-Steine je Normalfarbe über alle Fabriken + Tischmitte.
+fn sun_color_counts(state: &crate::state::GameState) -> [usize; 5] {
+    let mut counts = [0usize; 5];
+    let mut bump = |c: TileColor| {
+        if let Some(i) = color_index(c) {
+            counts[i] += 1;
+        }
+    };
+    for f in &state.factories {
+        for &t in &f.sun_tiles {
+            bump(t);
+        }
+    }
+    for &t in &state.large_factory.sun_tiles {
+        bump(t);
+    }
+    counts
 }

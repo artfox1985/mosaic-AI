@@ -14,6 +14,7 @@
 
 use rand::seq::SliceRandom;
 use rand::{Rng, RngExt};
+use serde_json::{json, Value};
 
 use crate::evaluate::estimate_round_score;
 use crate::game::{drafting_actions, Game};
@@ -22,6 +23,7 @@ use crate::round_end::{
     apply_bonus_chips_to_row, can_complete_row_with_chips, execute_full_tiling,
     generate_tiling_actions, row_has_open_matching_slot, TilingAction,
 };
+use crate::serialize::{action_to_dict, tiling_action_to_dict};
 use crate::state::{GameState, Phase};
 
 /// Initialwelle an Aktionen pro Knoten (Progressive Widening).
@@ -33,7 +35,7 @@ pub const DEFAULT_C: f64 = 0.3;
 
 /// Vereinheitlichter Such-Zug über Drafting- und Tiling-Phase.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum SearchMove {
+pub enum SearchMove {
     Draft(Action),
     TilePlace(TilingAction),
     TileChips { player: usize, row: usize },
@@ -293,15 +295,15 @@ fn is_terminal_phase(state: &GameState) -> bool {
     matches!(state.phase, Phase::End | Phase::Final)
 }
 
-/// Baut den Suchbaum (Wurzel = Index 0). None, wenn `state` nicht in der
-/// Drafting-Phase ist.
+/// Baut den Suchbaum (Wurzel = Index 0). None, wenn `state` weder in der
+/// Drafting- noch in der Tiling-Phase ist (KI sucht in beiden Phasen).
 fn build_tree<R: Rng + ?Sized>(
     state: &GameState,
     simulations: u32,
     c: f64,
     rng: &mut R,
 ) -> Option<Vec<Node>> {
-    if state.phase != Phase::Drafting {
+    if !matches!(state.phase, Phase::Drafting | Phase::Tiling) {
         return None;
     }
 
@@ -367,26 +369,216 @@ fn build_tree<R: Rng + ?Sized>(
     Some(nodes)
 }
 
-/// Führt `simulations` MCTS-Iterationen ab `state` aus und gibt die beste
-/// Drafting-Aktion (meistbesuchtes Wurzelkind, Tiebreak Mittelwert) zurück.
-/// None, wenn der Zustand nicht in der Drafting-Phase ist.
-pub fn search_drafting_action<R: Rng + ?Sized>(
-    state: &GameState,
-    simulations: u32,
-    c: f64,
-    rng: &mut R,
-) -> Option<Action> {
-    let nodes = build_tree(state, simulations, c, rng)?;
-    let best = nodes[0].children.iter().copied().max_by(|&a, &b| {
+/// Meistbesuchtes Wurzelkind (Tiebreak: Mittelwert Q).
+fn best_root_child(nodes: &[Node]) -> Option<usize> {
+    nodes[0].children.iter().copied().max_by(|&a, &b| {
         let qa = nodes[a].value / nodes[a].visits.max(1) as f64;
         let qb = nodes[b].value / nodes[b].visits.max(1) as f64;
         nodes[a]
             .visits
             .cmp(&nodes[b].visits)
             .then(qa.partial_cmp(&qb).unwrap_or(std::cmp::Ordering::Equal))
-    })?;
-    match &nodes[best].action {
-        Some(SearchMove::Draft(a)) => Some(a.clone()),
+    })
+}
+
+/// Tiefe des Teilbaums unter `nid` (0 = Blatt).
+fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
+    let children = &nodes[nid].children;
+    if children.is_empty() {
+        0
+    } else {
+        1 + children.iter().map(|&c| subtree_depth(nodes, c)).max().unwrap()
+    }
+}
+
+/// Typ, Beschreibung, Kategorie (für `.cat-*` in debug.html) und Move-Dict.
+fn label_search_move(sm: &SearchMove) -> (&'static str, String, &'static str, Value) {
+    match sm {
+        SearchMove::Draft(a) => match a {
+            Action::Stone(m) => {
+                let cat = if m.place.row_index < 0 { "penalty" } else { "row" };
+                let dest = if m.place.row_index < 0 {
+                    "Strafleiste".to_string()
+                } else {
+                    format!("Reihe {}", m.place.row_index + 1)
+                };
+                let src = match m.take.factory_id {
+                    Some(id) => format!("F{id}"),
+                    None => "GF".to_string(),
+                };
+                let desc = format!("Stein {} von {src} → {dest}", m.take.color.value());
+                ("stone", desc, cat, action_to_dict(a))
+            }
+            Action::Dome(m) => (
+                "dome",
+                format!("Kuppel #{} → ({},{}) {}°", m.dome_tile_id, m.slot_row, m.slot_col, m.rotation),
+                "dome",
+                action_to_dict(a),
+            ),
+            Action::DrawStack(m) => (
+                "dome_stack",
+                format!("Stapel → ({},{}) {}°", m.slot_row, m.slot_col, m.rotation),
+                "dome",
+                action_to_dict(a),
+            ),
+            Action::BonusChip(m) => (
+                "bonus_chip",
+                format!("Bonuschip F{}", m.factory_id),
+                "chip",
+                action_to_dict(a),
+            ),
+            Action::Pass => ("pass", "Pass".to_string(), "pass", action_to_dict(a)),
+        },
+        SearchMove::TilePlace(ta) => (
+            "tiling",
+            format!("Tiling R{} → Slot({},{}) Sp{}", ta.pattern_row + 1, ta.slot_row, ta.slot_col, ta.space_index),
+            "tiling",
+            tiling_action_to_dict(ta),
+        ),
+        SearchMove::TileChips { row, .. } => (
+            "use_chips",
+            format!("Chips R{}", row + 1),
+            "chip",
+            json!({ "type": "use_chips", "pattern_row": row }),
+        ),
+        SearchMove::TileEnd { .. } => {
+            ("end_tiling", "Tiling beenden".to_string(), "pass", json!({ "type": "end_tiling" }))
+        }
+    }
+}
+
+/// Serialisiert einen Knoten rekursiv (bis `depth_left`, je Knoten `top_k`
+/// meistbesuchte Kinder) für das Debug-Baum-Panel.
+fn serialize_node(nodes: &[Node], nid: usize, depth_left: u32, top_k: usize) -> Value {
+    let node = &nodes[nid];
+    let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+    let (typ, desc, cat, mv) = match &node.action {
+        None => ("root", "Wurzel".to_string(), "pass", Value::Null),
+        Some(sm) => label_search_move(sm),
+    };
+    let children = if depth_left > 0 && !node.children.is_empty() {
+        let mut ch = node.children.clone();
+        ch.sort_by(|a, b| nodes[*b].visits.cmp(&nodes[*a].visits));
+        ch.truncate(top_k);
+        ch.iter().map(|&c| serialize_node(nodes, c, depth_left - 1, top_k)).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    json!({
+        "type": typ,
+        "description": desc,
+        "category": cat,
+        "move": mv,
+        "visits": node.visits,
+        "q": q,
+        "win_pct": q * 100.0,
+        "depth": subtree_depth(nodes, nid),
+        "player_who_acted": node.player_who_acted,
+        "n_children": node.children.len(),
+        "children": children,
+    })
+}
+
+/// Anzeige-JSON einer Suchaktion (`{type, description, category, move}`).
+pub fn search_move_json(sm: &SearchMove) -> Value {
+    let (typ, desc, cat, mv) = label_search_move(sm);
+    json!({ "type": typ, "description": desc, "category": cat, "move": mv })
+}
+
+/// Beste Aktion (Drafting ODER Tiling) für `state`. None, wenn `state` weder
+/// Drafting noch Tiling ist.
+pub fn search_action<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> Option<SearchMove> {
+    let nodes = build_tree(state, simulations, c, rng)?;
+    let best = best_root_child(&nodes)?;
+    nodes[best].action.clone()
+}
+
+/// Wie [`search_action`], liefert zusätzlich ein debug.html-kompatibles
+/// Analyse-Dict (Per-Zug-Statistik `moves[]` + serialisierter `tree`).
+pub fn search_with_tree<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    max_depth: u32,
+    top_k: usize,
+) -> (Option<SearchMove>, Value) {
+    let nodes = match build_tree(state, simulations, c, rng) {
+        Some(n) => n,
+        None => return (None, Value::Null),
+    };
+    let best = best_root_child(&nodes);
+    let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
+
+    let mut child_ids = nodes[0].children.clone();
+    child_ids.sort_by(|a, b| nodes[*b].visits.cmp(&nodes[*a].visits));
+
+    let mut chosen_id: Option<usize> = None;
+    let moves: Vec<Value> = child_ids
+        .iter()
+        .enumerate()
+        .map(|(i, &cid)| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            let (typ, desc, cat, _mv) = match &node.action {
+                Some(sm) => label_search_move(sm),
+                None => ("?", "?".to_string(), "pass", Value::Null),
+            };
+            let is_chosen = best == Some(cid);
+            if is_chosen {
+                chosen_id = Some(i);
+            }
+            json!({
+                "action_id": i,
+                "type": typ,
+                "description": desc,
+                "category": cat,
+                "net_prob": Value::Null,
+                "net_prob_norm": Value::Null,
+                "mcts_visits": node.visits,
+                "mcts_share": if total_visits > 0 { node.visits as f64 / total_visits as f64 } else { 0.0 },
+                "mcts_q": q,
+                "mcts_win_pct": q * 100.0,
+                "max_depth": subtree_depth(&nodes, cid),
+                "shaping": Value::Null,
+                "chosen": is_chosen,
+            })
+        })
+        .collect();
+
+    let analysis = json!({
+        "current_player": nodes[0].player_who_acted,
+        "ai_player": nodes[0].player_who_acted,
+        "value": Value::Null,
+        "win_pct": Value::Null,
+        "has_net": false,
+        "simulations": simulations,
+        "num_actions": nodes[0].n_actions,
+        "max_depth": subtree_depth(&nodes, 0),
+        "ai_action": chosen_id,
+        "moves": moves,
+        "tree": serialize_node(&nodes, 0, max_depth, top_k),
+    });
+
+    let chosen = best.and_then(|cid| nodes[cid].action.clone());
+    (chosen, analysis)
+}
+
+/// Beste Drafting-Aktion (dünner Wrapper; None außerhalb Drafting bzw. wenn die
+/// beste Wurzelaktion kein Drafting-Zug ist).
+pub fn search_drafting_action<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> Option<Action> {
+    match search_action(state, simulations, c, rng)? {
+        SearchMove::Draft(a) => Some(a),
         _ => None,
     }
 }
@@ -510,5 +702,35 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(9);
         let _ = search_drafting_action(&s, 300, DEFAULT_C, &mut rng);
         assert_eq!(s.round_number, round_before);
+    }
+
+    #[test]
+    fn search_action_works_for_tiling_root() {
+        // Tiling-Wurzel mit platzierbarer Reihe → search_action liefert TilePlace.
+        let mut s = drafting_state(7);
+        s.phase = Phase::Tiling;
+        let tile = build_dome_tile_pool()[2].clone(); // si1 = Rot
+        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+        let mut rng = StdRng::seed_from_u64(5);
+        let mv = search_action(&s, 150, DEFAULT_C, &mut rng).expect("Tiling-Aktion");
+        assert!(matches!(mv, SearchMove::TilePlace(_) | SearchMove::TileEnd { .. }));
+    }
+
+    #[test]
+    fn search_with_tree_produces_valid_tree() {
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(6);
+        let (chosen, analysis) = search_with_tree(&s, 300, DEFAULT_C, &mut rng, 3, 8);
+        assert!(chosen.is_some());
+        let tree = &analysis["tree"];
+        assert!(tree["children"].as_array().unwrap().len() > 0);
+        // Wurzelkinder ≤ top_k im Baum.
+        assert!(tree["children"].as_array().unwrap().len() <= 8);
+        // moves[] vorhanden, Summe der Visits ≈ Simulationen (jede Sim besucht Wurzel).
+        let moves = analysis["moves"].as_array().unwrap();
+        assert!(!moves.is_empty());
+        let sum: u64 = moves.iter().map(|m| m["mcts_visits"].as_u64().unwrap()).sum();
+        assert!(sum >= 290 && sum <= 300, "Visit-Summe {sum} ~ 300");
     }
 }
