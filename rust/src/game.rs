@@ -370,6 +370,28 @@ pub fn determine_winner(state: &GameState) -> usize {
 
 // ── Game-Loop ─────────────────────────────────────────────────────────────────
 
+/// Alle gültigen Drafting-Aktionen für den aktiven Spieler eines Zustands.
+/// Leer → [Pass]. Single Source of Truth für Game-Loop und MCTS.
+pub fn drafting_actions(state: &GameState) -> Vec<Action> {
+    let mut actions: Vec<Action> = Vec::new();
+    for m in generate_valid_moves(state) {
+        actions.push(Action::Stone(m));
+    }
+    for m in generate_dome_moves(state) {
+        actions.push(Action::Dome(m));
+    }
+    for m in generate_bonus_chip_moves(state) {
+        actions.push(Action::BonusChip(m));
+    }
+    for m in generate_draw_stack_moves(state) {
+        actions.push(Action::DrawStack(m));
+    }
+    if actions.is_empty() {
+        actions.push(Action::Pass);
+    }
+    actions
+}
+
 pub struct Game {
     pub state: GameState,
 }
@@ -442,23 +464,7 @@ impl Game {
     /// Alle gültigen Drafting-Aktionen des aktiven Spielers (ohne Stapel-Zug,
     /// dessen Auswahl agentenseitig erfolgt). Leer → [Pass].
     pub fn valid_drafting_actions(&self) -> Vec<Action> {
-        let mut actions: Vec<Action> = Vec::new();
-        for m in generate_valid_moves(&self.state) {
-            actions.push(Action::Stone(m));
-        }
-        for m in generate_dome_moves(&self.state) {
-            actions.push(Action::Dome(m));
-        }
-        for m in generate_bonus_chip_moves(&self.state) {
-            actions.push(Action::BonusChip(m));
-        }
-        for m in generate_draw_stack_moves(&self.state) {
-            actions.push(Action::DrawStack(m));
-        }
-        if actions.is_empty() {
-            actions.push(Action::Pass);
-        }
-        actions
+        drafting_actions(&self.state)
     }
 
     fn check_phase_transition(&mut self) {

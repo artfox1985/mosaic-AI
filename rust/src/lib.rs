@@ -12,6 +12,7 @@ pub mod evaluate;
 pub mod execution;
 pub mod factory;
 pub mod game;
+pub mod mcts;
 pub mod moves;
 pub mod py;
 pub mod round_end;
