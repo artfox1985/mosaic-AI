@@ -3,9 +3,7 @@
 
 use serde_json::{json, Map, Value};
 
-use crate::board::PlayerBoard;
 use crate::dome::{BonusChip, DomeSpace, DomeTile, SpaceType};
-use crate::evaluate::estimate_round_score;
 use crate::factory::{Factory, LargeFactory};
 use crate::moves::Action;
 use crate::round_end::{
@@ -13,6 +11,7 @@ use crate::round_end::{
     row_has_open_matching_slot, TilingAction,
 };
 use crate::state::{GameState, Phase};
+use crate::tiling_solver::solve_round_final_score;
 use crate::validation::generate_valid_moves;
 
 fn space_type_name(t: SpaceType) -> &'static str {
@@ -80,10 +79,15 @@ fn serialize_large_factory(lf: &LargeFactory) -> Value {
     })
 }
 
-fn serialize_player(p: &PlayerBoard, round_number: u32) -> Value {
+fn serialize_player(state: &GameState, pi: usize) -> Value {
+    let p = &state.players[pi];
+    let round_number = state.round_number;
     let unused: Vec<&BonusChip> = p.bonus_chips.iter().collect();
     let unused_colors: Vec<&'static str> =
         unused.iter().flat_map(|c| c.colors.iter().map(|c| c.value())).collect();
+    // Erwartete Rundenpunkte EXAKT per Tiling-Solver (optimale Platzierung der
+    // vollen Reihen inkl. Linien über mehrere Reihen) − fixe Strafen.
+    let estimated_score = solve_round_final_score(state, pi) - p.score;
 
     json!({
         "id": p.player_id,
@@ -106,7 +110,7 @@ fn serialize_player(p: &PlayerBoard, round_number: u32) -> Value {
         "start_placed": !p.start_tile_pending,
         "start_tile": Value::Null,
         "can_place_dome": p.can_place_dome_tile(round_number),
-        "estimated_score": estimate_round_score(p, true),
+        "estimated_score": estimated_score,
         "unused_chip_count": unused.len(),
         "unused_chip_colors": unused_colors,
     })
@@ -114,10 +118,8 @@ fn serialize_player(p: &PlayerBoard, round_number: u32) -> Value {
 
 /// Vollständiges State-Dict für das Frontend.
 pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
-    let players: Vec<Value> = state
-        .players
-        .iter()
-        .map(|p| serialize_player(p, state.round_number))
+    let players: Vec<Value> = (0..state.players.len())
+        .map(|pi| serialize_player(state, pi))
         .collect();
 
     // Moon-Top-Zählung (Aktion C).

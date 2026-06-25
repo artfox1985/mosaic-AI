@@ -1,22 +1,20 @@
-//! MCTS bis zum Rundenende — Port der Kern-Features aus agents/mcts.py
+//! MCTS für die Drafting-Phase — Port der Kern-Features aus agents/mcts.py
 //! (HeuristicMCTSAgent): Progressive Widening, UCB c = 0.3, sublineares
 //! Wachstum, `player_who_acted`-Backprop und Win-Prob-Bewertung.
 //!
-//! Bewusst einfaches „Shaping": der Wert eines Zustands ist allein
-//! `(eigene Punkte + Schätzung) − (gegnerische Punkte + Schätzung)` (siehe
-//! [`crate::evaluate`]), per Sigmoid (`diff_to_probs`) in (0, 1) abgebildet.
+//! Wert eines Zustands = `total(0) − total(1)`, per Sigmoid (`diff_to_probs`)
+//! in (0, 1) abgebildet. `total(pi)` ist der EXAKTE erwartete Rundenscore aus
+//! dem Tiling-Solver ([`crate::tiling_solver::solve_round_final_score`]) — keine
+//! per-Reihe-Heuristik mehr (erfasst auch reihenübergreifende Linien).
 //!
-//! Phasen-Umfang: Der Suchbaum läuft über Drafting UND die Tiling-Phase der
-//! laufenden Runde (strikt Reihe für Reihe, inkl. Bonus-Chips), stoppt aber am
-//! Rundenende — der Rundenwechsel (RNG/Neubefüllen) wird NICHT betreten.
-//! Strafpunkte werden am Rundenende-Blatt nicht angewandt; `estimate_round_score`
-//! enthält Boden-/Marker-Strafen bereits.
+//! Phasen-Umfang: Der Suchbaum läuft NUR über Drafting; am Übergang
+//! Drafting→Tiling ist der Knoten Pseudo-Terminal und wird per DFS-Solver
+//! bewertet (kein Tiling im Baum, kein Rundenwechsel/RNG-Neubefüllen).
 
 use rand::seq::SliceRandom;
 use rand::{Rng, RngExt};
 use serde_json::{json, Value};
 
-use crate::evaluate::estimate_round_score;
 use crate::game::{drafting_actions, Game};
 use crate::moves::Action;
 use crate::serialize::action_to_dict;
@@ -56,8 +54,11 @@ struct Node {
 
 // ── Bewertung ────────────────────────────────────────────────────────────────
 
+/// Erwarteter finaler Rundenscore eines Spielers — EXAKT per Tiling-Solver
+/// (optimale Platzierung der vollen Reihen inkl. Linien über mehrere Reihen),
+/// statt der per-Reihe-Heuristik. Konsistent mit dem `estimated_score` der UI.
 fn player_total(state: &GameState, pi: usize) -> f64 {
-    state.players[pi].score as f64 + estimate_round_score(&state.players[pi], true) as f64
+    solve_round_final_score(state, pi) as f64
 }
 
 /// Aktionsabhängige Sigmoid-scale (Port von agents/mcts.py `_scale_for_actions`).

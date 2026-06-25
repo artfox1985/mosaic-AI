@@ -221,6 +221,21 @@ mod tests {
     }
 
     #[test]
+    fn counts_cross_row_vertical_line() {
+        // Reihenübergreifende Linie: Reihe 1 (Schwarz) → 6x6 (0,1), Reihe 2
+        // (Schwarz) → 6x6 (1,1, Wild). Zusammen vertikale Linie → 1 + 2 = 3
+        // (NICHT 1 + 1 = 2, wie die per-Reihe-Heuristik schätzen würde).
+        let mut s = tiling_state(7);
+        let tile = build_dome_tile_pool()[11].clone(); // [Tuerkis, Schwarz, Rot, Wild]
+        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        s.players[0].pattern_lines[0].add_tiles(&[Schwarz]);
+        s.players[0].pattern_lines[1].add_tiles(&[Schwarz, Schwarz]);
+        assert_eq!(solve_max_tiling_points(&s, 0), 3);
+        // Erwartete Rundenpunkte (estimated_score) = Solver-Score − aktueller Score.
+        assert_eq!(solve_round_final_score(&s, 0) - s.players[0].score, 3);
+    }
+
+    #[test]
     fn uses_chips_to_complete_and_place() {
         use crate::dome::BonusChip;
         let mut s = tiling_state(7);
