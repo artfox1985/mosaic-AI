@@ -103,7 +103,7 @@ while state()["phase"] not in ("end", "final") and guard < 4000:
             r = post('/api/ai/move')
             assert r["ok"], ("ai draft", r)
             ai_moves += 1
-            if r.get("debug") and r["debug"].get("tree", {}).get("children"):
+            if r.get("debug") and r["debug"].get("moves"):
                 debug_seen += 1
         else:
             r = human_draft(st)

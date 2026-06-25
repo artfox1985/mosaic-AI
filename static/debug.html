@@ -104,18 +104,12 @@
   .status { font-size: 12px; color: var(--muted); padding: 0 20px 10px; }
   .pill { padding: 2px 8px; border-radius: 10px; background: var(--panel2); font-size: 11px; }
 
-  /* MCTS-Baum */
-  .tree-node, .tree-leaf { margin: 2px 0; }
-  .tree-children { margin-left: 16px; border-left: 1px solid var(--border); padding-left: 12px; }
-  details.tree-node > summary {
-    cursor: pointer; padding: 3px 4px; border-radius: 5px; user-select: none;
+  /* MCTS-Wurzel-Zusammenfassung */
+  .root-summary {
+    padding: 8px 10px; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 6px; font-variant-numeric: tabular-nums;
   }
-  details.tree-node > summary:hover { background: var(--panel2); }
-  details.tree-node > summary::marker { color: var(--accent); }
-  .tree-leaf { padding: 3px 4px 3px 20px; }
-  .tree-desc { font-weight: 500; }
-  .tree-meta { color: var(--muted); font-size: 11px; margin-left: 8px; font-variant-numeric: tabular-nums; }
-  .tree-chosen { color: var(--row); font-size: 11px; font-weight: 700; margin-left: 6px; }
+  #mctsLogResult a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -169,10 +163,14 @@
   </div>
 
   <div class="panel full">
-    <h2>MCTS-Suchbaum (Wurzel → Kinder, aufklappbar)</h2>
-    <div id="treeContainer"><div class="empty">Noch kein Baum geladen.</div></div>
-    <div class="legend">
-      <span>N = Besuche · Q = Win% (Sicht KI) · d = Teilbaumtiefe</span>
+    <h2>MCTS-Wurzel &amp; Debug-Log</h2>
+    <div id="treeContainer"><div class="empty">Noch keine Analyse geladen.</div></div>
+    <div class="legend" style="margin-bottom:10px">
+      <span>N = Besuche · Q = Win% (Sicht KI) · max. Tiefe = erreichte Suchtiefe</span>
+    </div>
+    <div class="controls">
+      <button id="btnMctsLog">📝 MCTS-Log der AKTUELLEN Stellung erzeugen</button>
+      <span id="mctsLogResult" style="color:var(--muted);font-size:12px"></span>
     </div>
   </div>
 </main>
@@ -232,7 +230,6 @@ function renderAnalysis(d) {
     '<th class="num">MCTS-Visits</th>' +
     '<th class="num">MCTS Win%</th>' +
 	'<th class="num">Tiefe</th>' +
-    '<th class="num">Shaping</th>' +
     (hasNet ? '<th class="num">Δ</th>' : '') +
     '</tr></thead><tbody>';
 
@@ -254,14 +251,6 @@ function renderAnalysis(d) {
       divCell = `<td class="num">${divStr}</td>`;
     }
 
-    // Shaping-Reward: grün positiv, rot negativ
-    let shapingCell = '<td class="num">–</td>';
-    if (m.shaping !== null && m.shaping !== undefined) {
-      const sv = m.shaping;
-      const col = sv > 0.05 ? '#3fb950' : (sv < -0.05 ? '#f85149' : 'var(--muted)');
-      shapingCell = `<td class="num" style="color:${col}">${sv >= 0 ? '+' : ''}${sv.toFixed(2)}</td>`;
-    }
-
 	html += `<tr${rowStyle}>
       <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
           <span class="pill">${m.action_id}</span></td>
@@ -269,7 +258,7 @@ function renderAnalysis(d) {
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
       <td class="num">${m.mcts_win_pct != null ? m.mcts_win_pct.toFixed(1) + '%' : '–'}</td>
-      <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '–'}</td> ${shapingCell}
+      <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '–'}</td>
       ${divCell}
     </tr>`;
   }
@@ -277,35 +266,16 @@ function renderAnalysis(d) {
   document.getElementById('movesContainer').innerHTML = html;
 }
 
-// ── MCTS-Baum (Wurzel + Kinder, rekursiv via <details>) ──────────────────────
-function nodeLabel(n, chosen=false) {
-  const dot = `<span class="cat-dot ${catClass(n.category || 'other')}"></span>`;
-  const win = (n.win_pct != null) ? n.win_pct.toFixed(0) + '%' : '–';
-  const mark = chosen ? ' <span class="tree-chosen">✓ GEWÄHLT</span>' : '';
-  return `${dot}<span class="tree-desc">${n.description ?? n.type}</span>${mark}` +
-         `<span class="tree-meta">N=${n.visits} · Q ${win} · d${n.depth} · ${n.n_children} Kinder</span>`;
-}
-// `markBestChild` nur auf der Wurzelebene true → genau EIN „✓ GEWÄHLT" (der real
-// gespielte Zug). Tiefere Ebenen werden nicht als gewählt markiert.
-function renderTreeNode(n, open, chosen, markBestChild) {
-  const kids = n.children || [];
-  if (!kids.length) {
-    return `<div class="tree-leaf">${nodeLabel(n, chosen)}</div>`;
-  }
-  let bestIdx = -1;
-  if (markBestChild) {
-    bestIdx = 0;
-    for (let i = 1; i < kids.length; i++) if (kids[i].visits > kids[bestIdx].visits) bestIdx = i;
-  }
-  const childHtml = kids.map((c, i) => renderTreeNode(c, false, i === bestIdx, false)).join('');
-  return `<details class="tree-node"${open ? ' open' : ''}>` +
-         `<summary>${nodeLabel(n, chosen)}</summary>` +
-         `<div class="tree-children">${childHtml}</div></details>`;
-}
+// ── MCTS-Wurzel-Zusammenfassung (keine Kind-Ansicht mehr) ────────────────────
 function renderTree(d) {
   const c = document.getElementById('treeContainer');
-  if (!d || !d.tree) { c.innerHTML = '<div class="empty">Kein Baum für diesen Zug.</div>'; return; }
-  c.innerHTML = renderTreeNode(d.tree, true, false, true);
+  const t = d && d.tree;
+  if (!t) { c.innerHTML = '<div class="empty">Kein Baum für diesen Zug (z.B. Tiling/DFS).</div>'; return; }
+  const win = (t.win_pct != null) ? t.win_pct.toFixed(1) + '%' : '–';
+  c.innerHTML =
+    `<div class="root-summary">` +
+    `<b>Wurzel</b> · N=${t.visits} · Q ${win} · max. Tiefe ${t.depth} · ${t.n_children} Kinder` +
+    `</div>`;
 }
 
 function showIdx(i) {
@@ -348,6 +318,14 @@ document.getElementById('btnPrev').onclick  = () => showIdx(IDX - 1);
 document.getElementById('btnNext').onclick  = () => showIdx(IDX + 1);
 document.getElementById('btnLast').onclick  = () => showIdx(HISTORY.length - 1);
 document.getElementById('btnLive').onclick  = showLive;
+
+document.getElementById('btnMctsLog').onclick = async () => {
+  const res = document.getElementById('mctsLogResult');
+  res.textContent = 'Erzeuge MCTS-Log…';
+  const r = await api('/api/ai/debug_log');
+  if (r.ok === false || r.error) { res.textContent = 'Fehler: ' + (r.error || 'unbekannt'); return; }
+  res.innerHTML = `geschrieben: <a href="${r.url}" target="_blank">${r.file}</a> (${r.lines} Zeilen, Basis-Sims ${r.sims_base})`;
+};
 
 // Auto-Refresh: pollt alle 2s die Historie und springt zum neuesten Zug
 let autoTimer = null;

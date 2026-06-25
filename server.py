@@ -285,7 +285,8 @@ def new_game():
     if ai_enabled:
         preset = _resolve_difficulty(difficulty, data.get('model'), data.get('sims'))
         _ai_player = int(ai_side)
-        _ai_sims   = int(preset.get('sims') or 300)
+        # Basis-Sims kommt aus dem Start-Modal; dynamic_sims skaliert davon hoch.
+        _ai_sims   = int(preset.get('sims') or 100)
     else:
         _ai_player = None
 
@@ -1401,6 +1402,31 @@ def ai_debug():
 def ai_debug_history():
     """Gibt die komplette KI-Zug-Analyse-Historie des aktuellen Spiels zurück."""
     return jsonify({"ok": True, "history": _ai_debug_history, "count": len(_ai_debug_history)})
+
+
+@app.route('/api/ai/debug_log', methods=['GET', 'POST'])
+def ai_debug_log():
+    """Schreibt einen detaillierten MCTS-Schleifen-Trace (Selection/Expansion/
+    Bewertung/Backprop je Simulation) der AKTUELLEN Stellung als Textdatei."""
+    if not _rust_active():
+        return jsonify(err("MCTS-Log nur mit der Rust-KI verfügbar."))
+    if _rust.phase() != "drafting":
+        return jsonify(err("MCTS-Log nur in der Drafting-Phase verfügbar."))
+    try:
+        text = _rust.ai_debug_log(_ai_sims)
+        ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"mcts_debug_{ts}.txt"
+        with open(LOG_DIR / fname, 'w', encoding='utf-8') as f:
+            f.write(text)
+        return jsonify({
+            "ok": True,
+            "file": fname,
+            "url": f"/static/log/{fname}",
+            "lines": text.count("\n") + 1,
+            "sims_base": _ai_sims,
+        })
+    except Exception as e:
+        return jsonify(err(f"MCTS-Log-Fehler: {e}"))
 
 
 @app.route('/api/ai/suggest', methods=['GET'])
