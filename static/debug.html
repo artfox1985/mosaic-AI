@@ -127,7 +127,6 @@
   <div class="controls">
     <button id="btnLive" class="secondary">📡 Live (letzter Zug)</button>
     <label><input type="checkbox" id="autoLive"> Auto-Refresh</label>
-    <label title="Schneidet pro KI-Drafting-Zug den vollständigen Sim-Trace als Datei mit"><input type="checkbox" id="aiLogToggle"> KI-Zug-Logs aufzeichnen</label>
   </div>
 </header>
 <div class="status" id="status">Spiele in der Hauptansicht (index.html) gegen die KI, dann „Historie laden".</div>
@@ -147,7 +146,6 @@
       <span>Gültige Aktionen: <b id="numActions">–</b></span>
       <span>Simulationen: <b id="numSims">–</b></span>
 	  <span>Max. Suchtiefe: <b id="maxDepth" style="color: var(--accent);">–</b></span>
-	  <span id="moveLogLink"></span>
     </div>
   </div>
 
@@ -171,7 +169,7 @@
       <span>N = Besuche · Q = Win% (Sicht KI) · max. Tiefe = erreichte Suchtiefe</span>
     </div>
     <div class="controls">
-      <button id="btnMctsLog">📝 MCTS-Log der AKTUELLEN Stellung erzeugen</button>
+      <button id="btnLastLog">🔎 Letzter KI-Zug: MCTS-Log</button>
       <span id="mctsLogResult" style="color:var(--muted);font-size:12px"></span>
     </div>
   </div>
@@ -286,10 +284,6 @@ function showIdx(i) {
   const d = HISTORY[IDX];
   renderAnalysis(d);
   renderTree(d);
-  const ll = document.getElementById('moveLogLink');
-  ll.innerHTML = d.log_file
-    ? ` · <a href="/static/log/${d.log_file}" target="_blank" style="color:var(--accent)">🔎 Sim-Log öffnen</a>`
-    : '';
   document.getElementById('navInfo').textContent = `${IDX+1} / ${HISTORY.length}`;
   const chosen = (d.moves||[]).find(m => m.chosen);
   const valStr = (d.value != null)
@@ -325,18 +319,12 @@ document.getElementById('btnNext').onclick  = () => showIdx(IDX + 1);
 document.getElementById('btnLast').onclick  = () => showIdx(HISTORY.length - 1);
 document.getElementById('btnLive').onclick  = showLive;
 
-document.getElementById('aiLogToggle').onchange = async (e) => {
-  const r = await api('/api/ai/log_toggle', 'POST', { enabled: e.target.checked });
-  setStatus(r && r.enabled ? 'KI-Zug-Logs werden aufgezeichnet (pro KI-Drafting-Zug eine Datei).'
-                           : 'KI-Zug-Logs aus.');
-};
-
-document.getElementById('btnMctsLog').onclick = async () => {
+document.getElementById('btnLastLog').onclick = async () => {
   const res = document.getElementById('mctsLogResult');
-  res.textContent = 'Erzeuge MCTS-Log…';
-  const r = await api('/api/ai/debug_log');
+  res.textContent = 'Erzeuge MCTS-Log des letzten KI-Zugs…';
+  const r = await api('/api/ai/last_log');
   if (r.ok === false || r.error) { res.textContent = 'Fehler: ' + (r.error || 'unbekannt'); return; }
-  res.innerHTML = `geschrieben: <a href="${r.url}" target="_blank">${r.file}</a> (${r.lines} Zeilen, Basis-Sims ${r.sims_base})`;
+  res.innerHTML = `geschrieben: <a href="${r.url}" target="_blank">${r.file}</a> (${r.lines} Zeilen)`;
 };
 
 // Auto-Refresh: pollt alle 2s die Historie und springt zum neuesten Zug
