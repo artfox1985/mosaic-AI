@@ -81,6 +81,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 _ai_agent    = None        # AlphaZeroAgent oder HeuristicMCTSAgent
 _ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
 _ai_sims     = 300         # MCTS-Simulationen der Rust-KI (rust-Pfad)
+_ai_log      = False       # KI-Drafting-Zug als Sim-Trace-Datei mitschneiden
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
 
@@ -952,7 +953,8 @@ def ai_move():
             return jsonify(err("Nicht der Zug der KI" if phase == "drafting"
                                else "Mensch ist noch am Tilen"))
         try:
-            res = _json.loads(_rust.ai_step_json(_ai_sims))
+            # _ai_log: bei Drafting den exakten Such-Trace mitschneiden.
+            res = _json.loads(_rust.ai_step_json(_ai_sims, bool(_ai_log)))
         except Exception as e:
             return jsonify(err(f"KI-Fehler: {e}"))
         if not res.get("applied"):
@@ -961,6 +963,17 @@ def ai_move():
         if isinstance(dbg, dict) and "moves" in dbg:
             dbg["round"]    = _rust.round_number()
             dbg["move_idx"] = len(_ai_debug_history) + 1
+            # KI-Zug-Log (falls aktiviert) als Datei ablegen + im Eintrag verlinken.
+            log_text = res.get("log_text")
+            if log_text:
+                ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+                fname = f"mcts_move{dbg['move_idx']}_{ts}.txt"
+                try:
+                    with open(LOG_DIR / fname, 'w', encoding='utf-8') as f:
+                        f.write(log_text)
+                    dbg["log_file"] = fname
+                except Exception:
+                    pass
             _ai_debug_history.append(dbg)
         _flush_game_log()
         response = ok()
@@ -1402,6 +1415,15 @@ def ai_debug():
 def ai_debug_history():
     """Gibt die komplette KI-Zug-Analyse-Historie des aktuellen Spiels zurück."""
     return jsonify({"ok": True, "history": _ai_debug_history, "count": len(_ai_debug_history)})
+
+
+@app.route('/api/ai/log_toggle', methods=['POST'])
+def ai_log_toggle():
+    """Schaltet den Mitschnitt des KI-Drafting-Such-Logs (pro KI-Zug) an/aus."""
+    global _ai_log
+    d = request.get_json(silent=True) or {}
+    _ai_log = bool(d.get('enabled', not _ai_log))
+    return jsonify({"ok": True, "enabled": _ai_log})
 
 
 @app.route('/api/ai/debug_log', methods=['GET', 'POST'])
