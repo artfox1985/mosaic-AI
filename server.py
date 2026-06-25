@@ -81,7 +81,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 _ai_agent    = None        # AlphaZeroAgent oder HeuristicMCTSAgent
 _ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
 _ai_sims     = 300         # MCTS-Simulationen der Rust-KI (rust-Pfad)
-_ai_log      = False       # KI-Drafting-Zug als Sim-Trace-Datei mitschneiden
+_last_ai_log = None        # voller Such-Trace des zuletzt gespielten KI-Drafting-Zugs
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
 
@@ -953,27 +953,20 @@ def ai_move():
             return jsonify(err("Nicht der Zug der KI" if phase == "drafting"
                                else "Mensch ist noch am Tilen"))
         try:
-            # _ai_log: bei Drafting den exakten Such-Trace mitschneiden.
-            res = _json.loads(_rust.ai_step_json(_ai_sims, bool(_ai_log)))
+            # KI-Drafting-Zug immer geloggt ausführen (gleicher Zug; nur Trace
+            # zusätzlich) → letzter Trace für den Debugger-Button vorhalten.
+            global _last_ai_log
+            res = _json.loads(_rust.ai_step_json(_ai_sims, True))
         except Exception as e:
             return jsonify(err(f"KI-Fehler: {e}"))
         if not res.get("applied"):
             return jsonify(err(res.get("reason", "KI konnte nicht ziehen")))
+        if res.get("log_text"):
+            _last_ai_log = res["log_text"]
         dbg = res.get("debug")
         if isinstance(dbg, dict) and "moves" in dbg:
             dbg["round"]    = _rust.round_number()
             dbg["move_idx"] = len(_ai_debug_history) + 1
-            # KI-Zug-Log (falls aktiviert) als Datei ablegen + im Eintrag verlinken.
-            log_text = res.get("log_text")
-            if log_text:
-                ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-                fname = f"mcts_move{dbg['move_idx']}_{ts}.txt"
-                try:
-                    with open(LOG_DIR / fname, 'w', encoding='utf-8') as f:
-                        f.write(log_text)
-                    dbg["log_file"] = fname
-                except Exception:
-                    pass
             _ai_debug_history.append(dbg)
         _flush_game_log()
         response = ok()
@@ -1417,38 +1410,27 @@ def ai_debug_history():
     return jsonify({"ok": True, "history": _ai_debug_history, "count": len(_ai_debug_history)})
 
 
-@app.route('/api/ai/log_toggle', methods=['POST'])
-def ai_log_toggle():
-    """Schaltet den Mitschnitt des KI-Drafting-Such-Logs (pro KI-Zug) an/aus."""
-    global _ai_log
-    d = request.get_json(silent=True) or {}
-    _ai_log = bool(d.get('enabled', not _ai_log))
-    return jsonify({"ok": True, "enabled": _ai_log})
-
-
-@app.route('/api/ai/debug_log', methods=['GET', 'POST'])
-def ai_debug_log():
-    """Schreibt einen detaillierten MCTS-Schleifen-Trace (Selection/Expansion/
-    Bewertung/Backprop je Simulation) der AKTUELLEN Stellung als Textdatei."""
-    if not _rust_active():
-        return jsonify(err("MCTS-Log nur mit der Rust-KI verfügbar."))
-    if _rust.phase() != "drafting":
-        return jsonify(err("MCTS-Log nur in der Drafting-Phase verfügbar."))
+@app.route('/api/ai/last_log', methods=['GET', 'POST'])
+def ai_last_log():
+    """Schreibt den vollständigen MCTS-Trace des ZULETZT gespielten KI-Drafting-
+    Zugs als Textdatei (Wurzelspieler = KI)."""
+    if not _last_ai_log:
+        return jsonify(err("Noch kein KI-Zug protokolliert."))
     try:
-        text = _rust.ai_debug_log(_ai_sims)
         ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname = f"mcts_debug_{ts}.txt"
+        fname = f"mcts_lastmove_{ts}.txt"
         with open(LOG_DIR / fname, 'w', encoding='utf-8') as f:
-            f.write(text)
+            f.write(_last_ai_log)
         return jsonify({
             "ok": True,
             "file": fname,
             "url": f"/static/log/{fname}",
-            "lines": text.count("\n") + 1,
-            "sims_base": _ai_sims,
+            "lines": _last_ai_log.count("\n") + 1,
         })
     except Exception as e:
-        return jsonify(err(f"MCTS-Log-Fehler: {e}"))
+        return jsonify(err(f"Log-Fehler: {e}"))
+
+
 
 
 @app.route('/api/ai/suggest', methods=['GET'])
