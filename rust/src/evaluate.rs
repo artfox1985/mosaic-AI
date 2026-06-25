@@ -37,33 +37,46 @@ pub fn estimate_row_values(p: &PlayerBoard) -> Vec<(usize, i32)> {
 
     let mut out = Vec::new();
     for (ri, row) in p.pattern_lines.iter().enumerate() {
-        if row.is_complete() && row.color.is_some() {
-            let mut best = 1;
-            for &c in &valid_empty[ri] {
-                let mut h = 1;
-                let mut v = 1;
-                let mut i = c as i32 - 1;
-                while i >= 0 && grid[ri][i as usize] {
-                    h += 1;
-                    i -= 1;
-                }
-                for i in (c + 1)..6 {
-                    if grid[ri][i] { h += 1; } else { break; }
-                }
-                let mut i = ri as i32 - 1;
-                while i >= 0 && grid[i as usize][c] {
-                    v += 1;
-                    i -= 1;
-                }
-                for i in (ri + 1)..6 {
-                    if grid[i][c] { v += 1; } else { break; }
-                }
-                let mut pts = 0;
-                if h > 1 { pts += h; }
-                if v > 1 { pts += v; }
-                if pts == 0 { pts = 1; }
-                if pts > best { best = pts; }
+        let color = match (row.is_complete(), row.color) {
+            (true, Some(c)) => c,
+            _ => continue,
+        };
+        // Nur Spaces zählen, die die Reihenfarbe akzeptieren (Wild = jede Farbe).
+        // Ohne passenden, platzierbaren Space ist die Reihe NICHT legbar → 0 Punkte
+        // (Reihe gar nicht aufnehmen), statt fälschlich Baseline 1.
+        let mut best = 0;
+        let mut placeable = false;
+        for &c in &valid_empty[ri] {
+            let accepts = p.dome_grid.get_space(ri, c).map_or(false, |sp| sp.accepts(color));
+            if !accepts {
+                continue;
             }
+            placeable = true;
+            let mut h = 1;
+            let mut v = 1;
+            let mut i = c as i32 - 1;
+            while i >= 0 && grid[ri][i as usize] {
+                h += 1;
+                i -= 1;
+            }
+            for i in (c + 1)..6 {
+                if grid[ri][i] { h += 1; } else { break; }
+            }
+            let mut i = ri as i32 - 1;
+            while i >= 0 && grid[i as usize][c] {
+                v += 1;
+                i -= 1;
+            }
+            for i in (ri + 1)..6 {
+                if grid[i][c] { v += 1; } else { break; }
+            }
+            let mut pts = 0;
+            if h > 1 { pts += h; }
+            if v > 1 { pts += v; }
+            if pts == 0 { pts = 1; } // alleinstehend = 1
+            if pts > best { best = pts; }
+        }
+        if placeable {
             out.push((ri, best));
         }
     }
@@ -104,6 +117,31 @@ mod tests {
         p.pattern_lines[0].add_tiles(&[Rot]);
         let rv = estimate_row_values(&p);
         assert_eq!(rv, vec![(0, 1)]);
+    }
+
+    #[test]
+    fn full_row_without_matching_space_scores_zero() {
+        // Volle blaue Reihe 0, aber der einzige Slot bietet keinen blauen/Wild-
+        // Space → Reihe nicht platzierbar → 0 erwartete Punkte (nicht 1).
+        let mut p = PlayerBoard::new(0, "P");
+        let tile = build_dome_tile_pool()[2].clone(); // [Tuerkis, Rot, Blau, Wild]
+        // 6x6 Reihe 0 = obere Spaces si0=Tuerkis, si1=Rot → kein Blau/Wild.
+        p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        p.pattern_lines[0].add_tiles(&[Blau]);
+        assert!(estimate_row_values(&p).is_empty());
+        assert_eq!(estimate_round_score(&p, true), 0);
+    }
+
+    #[test]
+    fn full_row_with_wild_space_is_placeable() {
+        // Wild-Space akzeptiert jede Farbe → blaue Reihe wird platzierbar (≥1).
+        let mut p = PlayerBoard::new(0, "P");
+        let tile = build_dome_tile_pool()[2].clone(); // si3 = Wild bei 6x6 (1,1)
+        p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        // Reihe 1 (cap 2) → 6x6 Reihe 1 (untere Spaces si2=Blau, si3=Wild).
+        p.pattern_lines[1].add_tiles(&[Gelb, Gelb]); // Gelb passt nur auf Wild
+        let rv = estimate_row_values(&p);
+        assert_eq!(rv, vec![(1, 1)]);
     }
 
     #[test]

@@ -85,17 +85,26 @@ const TERMINAL_SCALE: f64 = 10.0;
 /// Am Drafting→Tiling-Übergang (Phase ≠ Drafting) wird der exakte Runden-Score
 /// per DFS-Solver bestimmt (Pseudo-Terminal); mitten im Drafting die Heuristik.
 fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
-    evaluate_explain(state, n_actions).0
+    if state.phase != Phase::Drafting {
+        let f0 = solve_round_final_score(state, 0) as f64;
+        let f1 = solve_round_final_score(state, 1) as f64;
+        return diff_to_probs(f0 - f1, TERMINAL_SCALE);
+    }
+    let diff = player_total(state, 0) - player_total(state, 1);
+    diff_to_probs(diff, scale_for_actions(n_actions))
 }
 
-/// Wie [`evaluate`], zusätzlich mit einer Klartext-Erklärung (für das MCTS-Log).
+/// Wie [`evaluate`], zusätzlich mit einer Klartext-Erklärung (nur fürs Log).
+/// Verwendet die Spielernamen statt P0/P1.
 fn evaluate_explain(state: &GameState, n_actions: usize) -> ([f64; 2], String) {
+    let n0 = state.players[0].name.as_str();
+    let n1 = state.players[1].name.as_str();
     if state.phase != Phase::Drafting {
         let f0 = solve_round_final_score(state, 0);
         let f1 = solve_round_final_score(state, 1);
         let v = diff_to_probs((f0 - f1) as f64, TERMINAL_SCALE);
         let why = format!(
-            "DFS-Terminal (phase={}) P0={f0} P1={f1} diff={:+}",
+            "DFS-Terminal (phase={}) {n0}={f0} {n1}={f1} diff={:+}",
             state.phase.as_str(),
             f0 - f1
         );
@@ -106,7 +115,7 @@ fn evaluate_explain(state: &GameState, n_actions: usize) -> ([f64; 2], String) {
     let scale = scale_for_actions(n_actions);
     let v = diff_to_probs(t0 - t1, scale);
     let why = format!(
-        "Heuristik total[P0]={t0:.1} total[P1]={t1:.1} diff={:+.1} scale={scale}",
+        "Heuristik total[{n0}]={t0:.1} total[{n1}]={t1:.1} diff={:+.1} scale={scale}",
         t0 - t1
     );
     (v, why)
@@ -273,6 +282,7 @@ fn build_tree<R: Rng + ?Sized>(
         return None;
     }
 
+    let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
     root_state.log.clear();
     let root_player = root_state.current_player;
@@ -317,8 +327,9 @@ fn build_tree<R: Rng + ?Sized>(
                 let exploit = nodes[cid].value / n;
                 let explore = c * ((nodes[nid].visits.max(1) as f64).ln() / n).sqrt();
                 logln!(
-                    "  SELECT #{nid} → #{cid} [{}] N={} Q={:.3} U={:.3} → {:.3}",
-                    log_label(&nodes, cid), nodes[cid].visits, exploit, explore, exploit + explore
+                    "  SELECT #{nid} → #{cid} [{}] (Zug: {}) N={} Q={:.3} U={:.3} → {:.3}",
+                    log_label(&nodes, cid), names[nodes[cid].player_who_acted],
+                    nodes[cid].visits, exploit, explore, exploit + explore
                 );
             }
             nid = cid;
@@ -337,8 +348,9 @@ fn build_tree<R: Rng + ?Sized>(
                 nodes.push(child);
                 nodes[nid].children.push(cid);
                 logln!(
-                    "  EXPAND #{nid} +[{}] → #{cid} (mover P{mover}{})",
+                    "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}{})",
                     label_search_move(&mv).1,
+                    names[mover],
                     if terminal { ", terminal/DFS" } else { "" }
                 );
                 nid = cid;
@@ -348,7 +360,7 @@ fn build_tree<R: Rng + ?Sized>(
         // 3. Blattbewertung (Per-Spieler-Win-Prob).
         let value = if log.is_some() {
             let (v, why) = evaluate_explain(&nodes[nid].state, nodes[nid].n_actions);
-            logln!("  EVAL   #{nid} {why} → win[P0]={:.3} win[P1]={:.3}", v[0], v[1]);
+            logln!("  EVAL   #{nid} {why} → win[{}]={:.3} win[{}]={:.3}", names[0], v[0], names[1], v[1]);
             v
         } else {
             evaluate(&nodes[nid].state, nodes[nid].n_actions)
@@ -362,7 +374,7 @@ fn build_tree<R: Rng + ?Sized>(
             let delta = value[nodes[i].player_who_acted];
             nodes[i].value += delta;
             if log.is_some() {
-                bp.push_str(&format!(" #{i}+={delta:.3}(P{})", nodes[i].player_who_acted));
+                bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
             }
             cur = nodes[i].parent;
         }
@@ -386,9 +398,10 @@ pub fn search_log_text<R: Rng + ?Sized>(
     let n_actions = drafting_actions(state).len();
     out.push_str("MCTS-Debug-Log\n");
     out.push_str(&format!(
-        "Simulationen={simulations}  #Aktionen={n_actions}  Wurzelspieler=P{}  c={c}\n",
-        state.current_player
+        "Simulationen={simulations}  #Aktionen={n_actions}  Wurzelspieler={}  c={c}\n",
+        state.players[state.current_player].name
     ));
+    out.push_str(&format!("Spieler: P0={}  P1={}\n", state.players[0].name, state.players[1].name));
     match &nodes {
         Some(nodes) => {
             if let Some(best) = best_root_child(nodes) {
@@ -536,8 +549,9 @@ pub fn search_with_tree<R: Rng + ?Sized>(
     rng: &mut R,
     max_depth: u32,
     top_k: usize,
+    log: Option<&mut Vec<String>>,
 ) -> (Option<SearchMove>, Value) {
-    let nodes = match build_tree(state, simulations, c, rng, None) {
+    let nodes = match build_tree(state, simulations, c, rng, log) {
         Some(n) => n,
         None => return (None, Value::Null),
     };
@@ -596,6 +610,23 @@ pub fn search_with_tree<R: Rng + ?Sized>(
 
     let chosen = best.and_then(|cid| nodes[cid].action.clone());
     (chosen, analysis)
+}
+
+/// Kopfzeilen für ein MCTS-Log aus state + Analyse (für den geloggten KI-Zug).
+pub fn search_log_header(state: &GameState, analysis: &Value) -> String {
+    let sims = analysis["simulations"].as_u64().unwrap_or(0);
+    let na = analysis["num_actions"].as_u64().unwrap_or(0);
+    let chosen = analysis["moves"]
+        .as_array()
+        .and_then(|ms| ms.iter().find(|m| m["chosen"] == json!(true)))
+        .and_then(|m| m["description"].as_str())
+        .unwrap_or("?");
+    format!(
+        "MCTS-Debug-Log (KI-Zug)\nSimulationen={sims}  #Aktionen={na}  Wurzelspieler={}\nSpieler: P0={}  P1={}\nGewaehlter Zug: {chosen}\n==================================================\n",
+        state.players[state.current_player].name,
+        state.players[0].name,
+        state.players[1].name
+    )
 }
 
 /// Beste Drafting-Aktion (dünner Wrapper; None außerhalb Drafting bzw. wenn die
@@ -691,7 +722,7 @@ mod tests {
     fn search_with_tree_produces_valid_tree() {
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(6);
-        let (chosen, analysis) = search_with_tree(&s, 300, DEFAULT_C, &mut rng, 3, 8);
+        let (chosen, analysis) = search_with_tree(&s, 300, DEFAULT_C, &mut rng, 3, 8, None);
         assert!(chosen.is_some());
         let tree = &analysis["tree"];
         assert!(tree["children"].as_array().unwrap().len() > 0);

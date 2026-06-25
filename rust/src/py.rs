@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
-use crate::mcts::{dynamic_sims, search_log_text, search_move_json, search_with_tree, SearchMove};
+use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
 use crate::round_end::{apply_bonus_chips_to_row, find_unplaceable_rows, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
@@ -293,11 +293,11 @@ impl PyGame {
     /// `{applied, phase, action, done, debug}` als JSON zurück. Drafting → MCTS
     /// (mit Debug-Baum); Tiling → exakter DFS-Solver (schlankes Debug, kein Baum).
     /// Server ruft dies nur, wenn die KI am Zug ist.
-    #[pyo3(signature = (simulations=300))]
-    fn ai_step_json(&mut self, simulations: u32) -> PyResult<String> {
+    #[pyo3(signature = (simulations=300, log=false))]
+    fn ai_step_json(&mut self, simulations: u32, log: bool) -> PyResult<String> {
         match self.game.state.phase {
             Phase::Tiling => self.ai_tiling_step(),
-            Phase::Drafting => self.ai_drafting_step(simulations),
+            Phase::Drafting => self.ai_drafting_step(simulations, log),
             other => Ok(json!({
                 "applied": false,
                 "phase": other.as_str(),
@@ -320,6 +320,7 @@ impl PyGame {
             &mut self.rng,
             AI_TREE_DEPTH,
             AI_TREE_TOPK,
+            None,
         );
         analysis.to_string()
     }
@@ -392,10 +393,13 @@ impl PyGame {
 
 // Interne KI-Schritt-Helfer (kein PyO3-Export).
 impl PyGame {
-    /// Drafting-Zug per MCTS (mit Debug-Baum).
-    fn ai_drafting_step(&mut self, simulations: u32) -> PyResult<String> {
+    /// Drafting-Zug per MCTS (mit Debug-Baum). `log=true` schneidet den exakten
+    /// Such-Trace mit und hängt ihn als `log_text` an.
+    fn ai_drafting_step(&mut self, simulations: u32, log: bool) -> PyResult<String> {
         let n = drafting_actions(&self.game.state).len();
         let sims = dynamic_sims(simulations, n);
+        let mut lines: Vec<String> = Vec::new();
+        let logger = if log { Some(&mut lines) } else { None };
         let (chosen, analysis) = search_with_tree(
             &self.game.state,
             sims,
@@ -403,6 +407,7 @@ impl PyGame {
             &mut self.rng,
             AI_TREE_DEPTH,
             AI_TREE_TOPK,
+            logger,
         );
         let mv = match chosen {
             Some(m) => m,
@@ -415,17 +420,32 @@ impl PyGame {
                 .to_string())
             }
         };
+        // Log-Text VOR dem Anwenden bauen (Kopf nutzt den Pre-Move-Zustand).
+        let log_text = if log {
+            let mut t = search_log_header(&self.game.state, &analysis);
+            for l in &lines {
+                t.push_str(l);
+                t.push('\n');
+            }
+            Some(t)
+        } else {
+            None
+        };
+
         let action_json = search_move_json(&mv);
         let SearchMove::Draft(a) = &mv;
         map_err(self.game.apply_drafting(a))?;
-        Ok(json!({
-            "applied": true,
-            "phase": self.game.state.phase.as_str(),
-            "action": action_json,
-            "done": self.game.is_over(),
-            "debug": analysis,
-        })
-        .to_string())
+
+        let mut obj = serde_json::Map::new();
+        obj.insert("applied".into(), json!(true));
+        obj.insert("phase".into(), json!(self.game.state.phase.as_str()));
+        obj.insert("action".into(), action_json);
+        obj.insert("done".into(), json!(self.game.is_over()));
+        obj.insert("debug".into(), analysis);
+        if let Some(t) = log_text {
+            obj.insert("log_text".into(), json!(t));
+        }
+        Ok(Value::Object(obj).to_string())
     }
 
     /// Tiling-Zug per exaktem DFS-Solver. Wendet den optimalen nächsten Schritt
