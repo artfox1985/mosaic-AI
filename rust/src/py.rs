@@ -12,8 +12,8 @@ use rand::SeedableRng;
 use serde_json::{json, Value};
 
 use crate::dome::SpaceType;
-use crate::game::{apply_start_placement, Game, TilingMove};
-use crate::mcts::{search_move_json, search_with_tree, SearchMove};
+use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
+use crate::mcts::{dynamic_sims, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
 use crate::round_end::{apply_bonus_chips_to_row, find_unplaceable_rows, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
@@ -22,8 +22,8 @@ use crate::tiling_solver::{best_first_step, solve_round_final_score, TilingStep}
 use crate::state::Phase;
 use crate::tile::TileColor;
 
-/// Tiefe/Breite des Debug-Baum-Exports (siehe debug.html-Panel).
-const AI_TREE_DEPTH: u32 = 3;
+/// Debug-Baum-Export: nur die Wurzel (debug.html zeigt keine Kind-Dropdowns mehr).
+const AI_TREE_DEPTH: u32 = 0;
 const AI_TREE_TOPK: usize = 8;
 /// Standard-UCT-Konstante der KI (= mcts::DEFAULT_C).
 const AI_C: f64 = 0.3;
@@ -311,15 +311,30 @@ impl PyGame {
     /// (für /api/ai/debug). Gibt das debug.html-Analyse-Dict zurück.
     #[pyo3(signature = (simulations=300))]
     fn ai_debug_json(&mut self, simulations: u32) -> String {
+        let n = drafting_actions(&self.game.state).len();
+        let sims = dynamic_sims(simulations, n);
         let (_chosen, analysis) = search_with_tree(
             &self.game.state,
-            simulations,
+            sims,
             AI_C,
             &mut self.rng,
             AI_TREE_DEPTH,
             AI_TREE_TOPK,
         );
         analysis.to_string()
+    }
+
+    /// Vollständiger MCTS-Schleifen-Trace (Selection/Expansion/Bewertung/Backprop
+    /// je Simulation) als Text — für /api/ai/debug_log. Volle dynamische Sim-Zahl
+    /// (`simulations` = Basis). Wendet KEINEN Zug an; nur in der Drafting-Phase.
+    #[pyo3(signature = (simulations=300))]
+    fn ai_debug_log(&mut self, simulations: u32) -> String {
+        if self.game.state.phase != Phase::Drafting {
+            return "(Zustand nicht in der Drafting-Phase — kein MCTS-Log)".to_string();
+        }
+        let n = drafting_actions(&self.game.state).len();
+        let sims = dynamic_sims(simulations, n);
+        search_log_text(&self.game.state, sims, AI_C, &mut self.rng)
     }
 
     /// Platziert die Startkachel der KI per einfacher Farb-Häufigkeits-Heuristik.
@@ -379,9 +394,11 @@ impl PyGame {
 impl PyGame {
     /// Drafting-Zug per MCTS (mit Debug-Baum).
     fn ai_drafting_step(&mut self, simulations: u32) -> PyResult<String> {
+        let n = drafting_actions(&self.game.state).len();
+        let sims = dynamic_sims(simulations, n);
         let (chosen, analysis) = search_with_tree(
             &self.game.state,
-            simulations,
+            sims,
             AI_C,
             &mut self.rng,
             AI_TREE_DEPTH,
