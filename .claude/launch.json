@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mosaic",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-c", "import server; server.app.run(port=5058, use_reloader=False)"],
+      "port": 5058
+    }
+  ]
+}

@@ -197,12 +197,12 @@ if __name__ == "__main__":
     #   dynamic_sims="play"
      #  )
         
-    agent_alphazero1 = AlphaZeroAgent(
-        model_version="v1e",
-        input_size=INPUT_SIZE, 
-        simulations=100,
-        dynamic_sims="play"
-        )
+    # agent_alphazero1 = AlphaZeroAgent(
+        # model_version="v1e",
+        # input_size=INPUT_SIZE, 
+        # simulations=100,
+        # dynamic_sims="play"
+        # )
         
     # agent_alphazero3d = AlphaZeroAgent(
         # model_version="v3d",
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     
     competitors = {
        "MCTS s100-d0": (agent_mcts_heuristic1, 1000),
-       "AlphaZero V1e s100": (agent_alphazero1, 1000),
+       "MCTS s100-d0": (agent_alphazero1, 1000),
     }
 
     # Jeder spielt gegen jeden
