@@ -56,9 +56,11 @@ def calculate_elo(rating_a, rating_b, actual_score_a, k=32):
     return round(new_rating_a), round(new_rating_b)
 
 
-def run_arena(competitors, games_per_matchup=100, threads=0, seed=None):
+def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10):
     """Round-Robin: jeder Wettkämpfer gegen jeden. `competitors` =
-    {name: {"sims": int, "elo": int}}."""
+    {name: {"sims": int, "elo": int}}. `chunk` = Spiele pro Rust-Aufruf
+    (kleiner = häufigere Live-Ausgabe, aber etwas mehr Overhead)."""
+    chunk = max(1, chunk)
     print("🏟️ WILLKOMMEN IN DER Mosaic-AI ARENA (Rust) 🏟️")
     names = list(competitors.keys())
     print(f"Kämpfer: {names}")
@@ -77,49 +79,66 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None):
     base_seed = seed if seed is not None else random.randint(0, 10**9)
 
     for mi, (A, B) in enumerate(matchups):
-        print(f"\n⚔️ NEUES MATCHUP: {A} vs {B} ({games_per_matchup} Spiele)")
+        print(f"\n⚔️ NEUES MATCHUP: {A} (Brett 0) vs {B} (Brett 1) "
+              f"— {games_per_matchup} Spiele", flush=True)
         t0 = time.time()
-        raw = _mr.arena_match(sims[A], sims[B], games_per_matchup,
-                              seed=base_seed + mi * 100_000, num_threads=threads)
-        results = json.loads(raw)
+        done = 0
+        chunk_idx = 0
+        a_wins = b_wins = 0   # laufender Matchup-Stand
+        # In Chunks spielen, damit die Einzelergebnisse LIVE erscheinen (statt
+        # alle erst nach dem kompletten Matchup-Aufruf). Rust spielt jeden Chunk
+        # parallel über alle Threads; Elo wird sequentiell über die Reihenfolge
+        # gerechnet.
+        while done < games_per_matchup:
+            n = min(chunk, games_per_matchup - done)
+            raw = _mr.arena_match(sims[A], sims[B], n,
+                                  seed=base_seed + mi * 1_000_000 + chunk_idx,
+                                  num_threads=threads)
+            results = json.loads(raw)
+            chunk_idx += 1
+
+            for g in results:
+                done += 1
+                scores = g["scores"]      # [Brett0=A, Brett1=B]
+                winner = g["winner"]      # 0 oder 1 (Brett-Index)
+                steps  = g["steps"]
+
+                penalties[A] += g["total_floor"][0]
+                penalties[B] += g["total_floor"][1]
+                for slot, idx in ((A, 0), (B, 1)):
+                    for r_idx, pen in enumerate(g["floor_per_round"][idx]):
+                        bucket = penalties_per_round[slot].setdefault(r_idx, [0, 0])
+                        bucket[0] += pen
+                        bucket[1] += 1
+                games_played[A] += 1
+                games_played[B] += 1
+
+                if winner == 0:
+                    winner_name, score_a = A, 1.0
+                    a_wins += 1
+                elif winner == 1:
+                    winner_name, score_a = B, 0.0
+                    b_wins += 1
+                else:
+                    winner_name, score_a = "Draw", 0.5
+                wins[winner_name] += 1
+                if scores[0] == 0 and scores[1] == 0:
+                    wins["ZeroZero"] += 1
+
+                # Elo mit Siegstärke-skaliertem K (0:0 bewegt kaum, klarer Sieg voll)
+                widx = 0 if scores[0] >= scores[1] else 1
+                strength = compute_win_val(scores, widx)
+                k = 32 * strength
+                elo[A], elo[B] = calculate_elo(elo[A], elo[B], score_a, k=k)
+
+                print(f"  #{done:>3}/{games_per_matchup}: {scores[0]:3d}:{scores[1]:<3d} "
+                      f"-> {winner_name:<14} | Züge {steps:3d} | Strength {strength:.3f} "
+                      f"| Stand {A} {a_wins}:{b_wins} {B} | Elo {elo[A]}/{elo[B]}",
+                      flush=True)
+
         dur = time.time() - t0
-        print(f"  (Rust: {len(results)} Spiele in {dur:.1f}s, "
-              f"{len(results)/dur:.1f} Spiele/s)")
-
-        for i, g in enumerate(results):
-            scores = g["scores"]      # [Brett0=A, Brett1=B]
-            winner = g["winner"]      # 0 oder 1 (Brett-Index)
-            steps  = g["steps"]
-
-            penalties[A] += g["total_floor"][0]
-            penalties[B] += g["total_floor"][1]
-            for slot, idx in ((A, 0), (B, 1)):
-                for r_idx, pen in enumerate(g["floor_per_round"][idx]):
-                    bucket = penalties_per_round[slot].setdefault(r_idx, [0, 0])
-                    bucket[0] += pen
-                    bucket[1] += 1
-            games_played[A] += 1
-            games_played[B] += 1
-
-            if winner == 0:
-                winner_name, score_a = A, 1.0
-            elif winner == 1:
-                winner_name, score_a = B, 0.0
-            else:
-                winner_name, score_a = "Draw", 0.5
-            wins[winner_name] += 1
-            if scores[0] == 0 and scores[1] == 0:
-                wins["ZeroZero"] += 1
-
-            # Elo mit Siegstärke skaliertem K (0:0 bewegt kaum, klarer Sieg voll)
-            widx = 0 if scores[0] >= scores[1] else 1
-            strength = compute_win_val(scores, widx)
-            k = 32 * strength
-            elo[A], elo[B] = calculate_elo(elo[A], elo[B], score_a, k=k)
-
-            print(f"  #{i+1}/{games_per_matchup}: Züge {steps:3d} | "
-                  f"Strength {strength:.3f} | {scores[0]:3d}:{scores[1]:<3d} "
-                  f"-> Sieger: {winner_name}")
+        print(f"  ↳ Matchup fertig: {a_wins}:{b_wins} in {dur:.1f}s "
+              f"({games_per_matchup/dur:.1f} Spiele/s)", flush=True)
 
     # ── Ergebnisse ────────────────────────────────────────────────────────────
     total    = sum(wins[n] for n in names)
