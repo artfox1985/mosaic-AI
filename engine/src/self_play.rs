@@ -37,6 +37,11 @@ use crate::tiling_solver::{best_first_step_exact, solve_round_final_score, Tilin
 /// Standard-UCT-Konstante der Self-Play-Suche (= `py.rs::AI_C`).
 pub const SELF_PLAY_C: f64 = 0.3;
 
+/// Temperatur für die AUFGEZEICHNETE Policy-Target (scharf → Destillation der
+/// Heuristik-Wahl). Entkoppelt von der Play-Temperatur (die fürs Sampeln der
+/// gespielten Aktion sorgt und die Zustandsvielfalt erhält). Niedriger = schärfer.
+pub const TARGET_TEMP: f64 = 0.15;
+
 // ── agent_env-Action-Serializer ──────────────────────────────────────────────
 
 /// `factory_index` einer Stein-Aktion (Port der Logik aus
@@ -113,7 +118,7 @@ fn drafting_policy<R: Rng + ?Sized>(
     actions: &[Action],
     base_sims: u32,
     c: f64,
-    temp: f64,
+    play_temp: f64,
     rng: &mut R,
 ) -> (Action, Vec<Value>) {
     let sims = dynamic_sims(base_sims, actions.len());
@@ -125,43 +130,37 @@ fn drafting_policy<R: Rng + ?Sized>(
         return (a, vec![entry]);
     }
 
-    // temp == 0 → argmax (deterministisch); sonst gewichtete Verteilung.
-    if temp <= 0.0 {
-        let best = stats
+    // Gewichte für eine Temperatur: visits^(1/temp)·q², mit reinem-Visits-Fallback.
+    let weights_for = |t: f64| -> (Vec<f64>, f64) {
+        let inv = 1.0 / t.max(1e-6);
+        let mut w: Vec<f64> = stats
             .iter()
-            .enumerate()
-            .max_by_key(|(_, (_, v, _))| *v)
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        let a = stats[best].0.clone();
-        let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-        return (a, vec![entry]);
-    }
+            .map(|(_, v, q)| (*v as f64).powf(inv) * q.max(1e-6).powi(2))
+            .collect();
+        let mut s: f64 = w.iter().sum();
+        if !(s > 0.0) {
+            w = stats.iter().map(|(_, v, _)| (*v as f64).powf(inv)).collect();
+            s = w.iter().sum();
+        }
+        (w, s)
+    };
 
-    let inv_t = 1.0 / temp;
-    let mut raw: Vec<f64> = stats
-        .iter()
-        .map(|(_, v, q)| (*v as f64).powf(inv_t) * q.max(1e-6).powi(2))
-        .collect();
-    let mut total: f64 = raw.iter().sum();
-    if !(total > 0.0) {
-        // Fallback: reine Besuche, falls die Q-Gewichte degenerieren.
-        raw = stats.iter().map(|(_, v, _)| (*v as f64).powf(inv_t)).collect();
-        total = raw.iter().sum();
-    }
-    if !(total > 0.0) {
-        let a = stats[0].0.clone();
-        let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-        return (a, vec![entry]);
-    }
+    // TARGET (aufgezeichnet): scharf via TARGET_TEMP → Destillation der besten
+    // Heuristik-Züge, damit das Netz eine lernbar-scharfe Policy bekommt.
+    let (tw, ts) = weights_for(TARGET_TEMP);
+    let policy: Vec<Value> = if ts > 0.0 {
+        stats
+            .iter()
+            .zip(tw.iter())
+            .map(|((a, _, _), w)| json!({ "action": action_to_env_dict(state, a), "prob": w / ts }))
+            .collect()
+    } else {
+        vec![json!({ "action": action_to_env_dict(state, &stats[0].0), "prob": 1.0 })]
+    };
 
-    let policy: Vec<Value> = stats
-        .iter()
-        .zip(raw.iter())
-        .map(|((a, _, _), w)| json!({ "action": action_to_env_dict(state, a), "prob": w / total }))
-        .collect();
-
-    let idx = weighted_index(&raw, total, rng);
+    // PLAY: moderate Temperatur → gespielte Aktion sampeln (Zustandsvielfalt).
+    let (pw, ps) = weights_for(play_temp);
+    let idx = if ps > 0.0 { weighted_index(&pw, ps, rng) } else { 0 };
     (stats[idx].0.clone(), policy)
 }
 
