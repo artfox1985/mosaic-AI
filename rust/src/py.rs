@@ -15,10 +15,10 @@ use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
-use crate::round_end::{apply_bonus_chips_to_row, find_unplaceable_rows, TilingAction};
+use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
-use crate::tiling_solver::{best_first_step, solve_round_final_score, TilingStep};
+use crate::tiling_solver::{best_first_step_exact, solve_round_final_score, TilingStep};
 use crate::state::Phase;
 use crate::tile::TileColor;
 
@@ -396,30 +396,70 @@ impl PyGame {
     /// Drafting-Zug per MCTS (mit Debug-Baum). `log=true` schneidet den exakten
     /// Such-Trace mit und hängt ihn als `log_text` an.
     fn ai_drafting_step(&mut self, simulations: u32, log: bool) -> PyResult<String> {
-        let n = drafting_actions(&self.game.state).len();
-        let sims = dynamic_sims(simulations, n);
+        let actions = drafting_actions(&self.game.state);
+        if actions.is_empty() {
+            return Ok(json!({
+                "applied": false,
+                "phase": self.game.state.phase.as_str(),
+                "reason": "keine Drafting-Aktion",
+            })
+            .to_string());
+        }
+
         let mut lines: Vec<String> = Vec::new();
-        let logger = if log { Some(&mut lines) } else { None };
-        let (chosen, analysis) = search_with_tree(
-            &self.game.state,
-            sims,
-            AI_C,
-            &mut self.rng,
-            AI_TREE_DEPTH,
-            AI_TREE_TOPK,
-            logger,
-        );
-        let mv = match chosen {
-            Some(m) => m,
-            None => {
-                return Ok(json!({
-                    "applied": false,
-                    "phase": self.game.state.phase.as_str(),
-                    "reason": "keine Drafting-Aktion",
-                })
-                .to_string())
+        let mv: SearchMove;
+        let analysis: Value;
+        if actions.len() == 1 {
+            // Nur eine legale Aktion → direkt wählen, keine Simulationen
+            // (eine erzwungene Wahl muss nicht durchgerechnet werden).
+            mv = SearchMove::Draft(actions.into_iter().next().unwrap());
+            let mj = search_move_json(&mv); // { type, description, category, move }
+            if log {
+                lines.push("Nur eine legale Drafting-Aktion — direkt gewaehlt (0 Simulationen).".to_string());
             }
-        };
+            analysis = json!({
+                "simulations": 0,
+                "num_actions": 1,
+                "max_depth": 0,
+                "single_action": true,
+                "moves": [ {
+                    "description": mj["description"],
+                    "category": mj["category"],
+                    "action_id": mj["type"],
+                    "mcts_share": 1.0,
+                    "mcts_visits": 0,
+                    "mcts_win_pct": null,
+                    "max_depth": 0,
+                    "chosen": true,
+                } ],
+            });
+        } else {
+            let sims = dynamic_sims(simulations, actions.len());
+            let logger = if log { Some(&mut lines) } else { None };
+            let (chosen, a) = search_with_tree(
+                &self.game.state,
+                sims,
+                AI_C,
+                &mut self.rng,
+                AI_TREE_DEPTH,
+                AI_TREE_TOPK,
+                logger,
+            );
+            match chosen {
+                Some(m) => {
+                    mv = m;
+                    analysis = a;
+                }
+                None => {
+                    return Ok(json!({
+                        "applied": false,
+                        "phase": self.game.state.phase.as_str(),
+                        "reason": "keine Drafting-Aktion",
+                    })
+                    .to_string());
+                }
+            }
+        }
         // Log-Text VOR dem Anwenden bauen (Kopf nutzt den Pre-Move-Zustand).
         let log_text = if log {
             let mut t = search_log_header(&self.game.state, &analysis);
@@ -453,7 +493,8 @@ impl PyGame {
     fn ai_tiling_step(&mut self) -> PyResult<String> {
         let pi = self.game.state.current_player;
         let optimal = solve_round_final_score(&self.game.state, pi);
-        let step = best_first_step(&self.game.state, pi);
+        // Exakte Chip-Allokationssuche für den ECHTEN Zug (einmal pro Schritt).
+        let step = best_first_step_exact(&self.game.state, pi);
 
         let (typ, desc, cat, mv): (&str, String, &str, Value) = match step {
             TilingStep::Place(ta) => {
@@ -465,8 +506,9 @@ impl PyGame {
                     tiling_action_to_dict(&ta),
                 )
             }
-            TilingStep::Chips { row } => {
-                if !apply_bonus_chips_to_row(&mut self.game.state.players[pi], row) {
+            TilingStep::Chips { row, chips } => {
+                // Exakt die vom Solver gewählte Plättchen-Allokation anwenden.
+                if !apply_bonus_chips_with(&mut self.game.state.players[pi], row, &chips) {
                     return Err(PyValueError::new_err("KI: Chip-Komplettierung fehlgeschlagen."));
                 }
                 ("use_chips", format!("Chips R{}", row + 1), "chip", json!({ "type": "use_chips", "pattern_row": row }))

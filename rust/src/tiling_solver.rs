@@ -14,19 +14,20 @@
 
 use crate::board::FIRST_PLAYER_MARKER_PENALTY;
 use crate::round_end::{
-    apply_bonus_chips_to_row, can_complete_row_with_chips, execute_full_tiling,
-    generate_tiling_actions, row_has_open_matching_slot, TilingAction,
+    apply_bonus_chips_with, can_complete_row_with_chips, chip_allocations, execute_full_tiling,
+    generate_tiling_actions, greedy_chip_alloc, row_has_open_matching_slot, TilingAction,
 };
 use crate::state::GameState;
 
 /// Defensive Rekursionsgrenze (Branching ist klein; nur als Sicherung).
 const MAX_DEPTH: u32 = 30;
 
-/// Ein Tiling-Schritt im Solver.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
+/// (Indizes in `bonus_chips`), damit der reale KI-Zug exakt dem Solver-Plan folgt.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TilingStep {
     Place(TilingAction),
-    Chips { row: usize },
+    Chips { row: usize, chips: Vec<usize> },
     End,
 }
 
@@ -61,14 +62,26 @@ fn chippable_rows(state: &GameState, pi: usize) -> Vec<usize> {
 }
 
 /// Legale Solver-Schritte: Steine auf bestehende Platten (kein Display) + Chips.
-fn legal_steps(state: &GameState, pi: usize) -> Vec<TilingStep> {
+///
+/// `exact` steuert die Plättchen-Allokation:
+/// - `false` (Hot-Path, MCTS-Blätter): EINE Greedy-Allokation pro Reihe. Das
+///   Verzweigen über ALLE 2^n-Allokationen wäre hier unbezahlbar (E2E 8 s→75 s+).
+/// - `true` (nur der echte KI-Zug, einmal pro Tiling-Schritt): alle distinkten
+///   Allokationen → exakt optimale Chip-Nutzung im tatsächlich gespielten Zug.
+fn legal_steps(state: &GameState, pi: usize, exact: bool) -> Vec<TilingStep> {
     let mut steps: Vec<TilingStep> = generate_tiling_actions(state, pi)
         .into_iter()
         .filter(|ta| ta.dome_tile_id.is_none())
         .map(TilingStep::Place)
         .collect();
     for row in chippable_rows(state, pi) {
-        steps.push(TilingStep::Chips { row });
+        if exact {
+            for chips in chip_allocations(&state.players[pi], row) {
+                steps.push(TilingStep::Chips { row, chips });
+            }
+        } else if let Some(chips) = greedy_chip_alloc(&state.players[pi], row) {
+            steps.push(TilingStep::Chips { row, chips });
+        }
     }
     steps
 }
@@ -82,9 +95,9 @@ fn apply_step(state: &GameState, pi: usize, step: &TilingStep) -> Option<(GameSt
             let pts = execute_full_tiling(&mut s, pi, ta).ok()?;
             Some((s, pts))
         }
-        TilingStep::Chips { row } => {
+        TilingStep::Chips { row, chips } => {
             let mut s = state.clone();
-            if !apply_bonus_chips_to_row(&mut s.players[pi], *row) {
+            if !apply_bonus_chips_with(&mut s.players[pi], *row, chips) {
                 return None;
             }
             Some((s, 0))
@@ -93,11 +106,11 @@ fn apply_step(state: &GameState, pi: usize, step: &TilingStep) -> Option<(GameSt
     }
 }
 
-fn solve_rec(state: &GameState, pi: usize, depth: u32) -> i32 {
+fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool) -> i32 {
     if depth >= MAX_DEPTH {
         return 0;
     }
-    let steps = legal_steps(state, pi);
+    let steps = legal_steps(state, pi, exact);
     if steps.is_empty() {
         return 0;
     }
@@ -106,7 +119,7 @@ fn solve_rec(state: &GameState, pi: usize, depth: u32) -> i32 {
     let mut best = 0;
     for step in &steps {
         if let Some((next, pts)) = apply_step(state, pi, step) {
-            let total = pts + solve_rec(&next, pi, depth + 1);
+            let total = pts + solve_rec(&next, pi, depth + 1, exact);
             if total > best {
                 best = total;
             }
@@ -116,9 +129,15 @@ fn solve_rec(state: &GameState, pi: usize, depth: u32) -> i32 {
 }
 
 /// Maximal erreichbare Tiling-Punkte (Linien + Spezial-Boni) für Spieler `pi`,
-/// ausgehend vom aktuellen Brett (Drafting-Ende).
+/// ausgehend vom aktuellen Brett (Drafting-Ende). GREEDY-Chips (Hot-Path).
 pub fn solve_max_tiling_points(state: &GameState, pi: usize) -> i32 {
-    solve_rec(state, pi, 0)
+    solve_rec(state, pi, 0, false)
+}
+
+/// Wie `solve_max_tiling_points`, aber mit exakter Chip-Allokationssuche.
+/// Nur für den echten KI-Zug (einmalig) gedacht — NICHT für MCTS-Blätter.
+pub fn solve_max_tiling_points_exact(state: &GameState, pi: usize) -> i32 {
+    solve_rec(state, pi, 0, true)
 }
 
 /// Optimaler finaler Runden-Score für Spieler `pi`: aktueller Score +
@@ -130,10 +149,11 @@ pub fn solve_round_final_score(state: &GameState, pi: usize) -> i32 {
     p.score + penalty + solve_max_tiling_points(state, pi)
 }
 
-/// Optimaler nächster Tiling-Schritt für Spieler `pi` (für den echten KI-Zug).
-/// `End`, wenn nichts mehr platzierbar/komplettierbar ist.
-pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
-    let steps = legal_steps(state, pi);
+/// Optimaler nächster Tiling-Schritt für Spieler `pi`. `End`, wenn nichts mehr
+/// platzierbar/komplettierbar ist. `exact` → exakte Chip-Allokationssuche
+/// (nur für den echten Zug verwenden, NICHT pro MCTS-Blatt).
+fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingStep {
+    let steps = legal_steps(state, pi, exact);
     if steps.is_empty() {
         return TilingStep::End;
     }
@@ -141,7 +161,7 @@ pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
     let mut best_val = i32::MIN;
     for step in steps {
         if let Some((next, pts)) = apply_step(state, pi, &step) {
-            let val = pts + solve_max_tiling_points(&next, pi);
+            let val = pts + solve_rec(&next, pi, 1, exact);
             if val > best_val {
                 best_val = val;
                 best_step = step;
@@ -149,6 +169,18 @@ pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
         }
     }
     best_step
+}
+
+/// Greedy-Variante (Hot-Path / Tests).
+pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
+    best_first_step_inner(state, pi, false)
+}
+
+/// Exakte Variante für den tatsächlich gespielten KI-Tiling-Zug: durchsucht die
+/// Chip-Allokationen, damit mehrfarbige Plättchen im Engpass optimal verteilt
+/// werden. Wird nur einmal pro Zug aufgerufen → bezahlbar.
+pub fn best_first_step_exact(state: &GameState, pi: usize) -> TilingStep {
+    best_first_step_inner(state, pi, true)
 }
 
 #[cfg(test)]
@@ -208,8 +240,8 @@ mod tests {
                 TilingStep::Place(ta) => {
                     execute_full_tiling(&mut s, pi, &ta).unwrap();
                 }
-                TilingStep::Chips { row } => {
-                    apply_bonus_chips_to_row(&mut s.players[pi], row);
+                TilingStep::Chips { row, chips } => {
+                    apply_bonus_chips_with(&mut s.players[pi], row, &chips);
                 }
                 TilingStep::End => break,
             }
@@ -252,7 +284,96 @@ mod tests {
         // platzieren → ≥1 Punkt. Solver muss die Chip-Option nutzen.
         assert!(solve_max_tiling_points(&s, 0) >= 1);
         let first = best_first_step(&s, 0);
-        assert!(matches!(first, TilingStep::Chips { row: 2 } | TilingStep::Place(_)));
+        assert!(matches!(first, TilingStep::Chips { row: 2, .. } | TilingStep::Place(_)));
+    }
+
+    #[test]
+    fn greedy_chip_alloc_tradeoff_in_contention() {
+        use crate::dome::BonusChip;
+        // Engpass: 2 Doppel-Chips [blau,rot] + [blau] + [rot]. Reihe 3 (Rot,
+        // fehlt 1) und Reihe 4 (Blau, fehlt 1) je per 2 farbgleichen Chips
+        // komplettierbar. Der DFS nutzt im Hot-Path die GREEDY-Allokation: sie
+        // verbrennt beide Doppel-Chips auf die erste Reihe → nur 1 Reihe legbar.
+        // (Die exakte Allokationssuche käme auf 3, ist aber an jedem MCTS-Blatt
+        // zu teuer — bewusster Tradeoff; `chip_allocations` bleibt dafür da.)
+        let mut s = tiling_state(7);
+        // Slot (1,0) = pool[2] [Tuerkis, Rot, Blau, Wild]:
+        //   si1 = Rot @ 6x6 (2,1) → Reihe 3 (idx 2, valid_si [0,1]).
+        //   si2 = Blau @ 6x6 (3,0) → Reihe 4 (idx 3, valid_si [2,3]).
+        let tile = build_dome_tile_pool()[2].clone();
+        s.players[0].dome_grid.place_dome_tile(tile, 1, 0).unwrap();
+        s.players[0].pattern_lines[2].add_tiles(&[Rot, Rot]); // cap 3 → 1 fehlt
+        s.players[0].pattern_lines[3].add_tiles(&[Blau, Blau, Blau]); // cap 4 → 1 fehlt
+        s.players[0].bonus_chips = vec![
+            BonusChip { chip_id: 0, colors: vec![Blau, Rot] },
+            BonusChip { chip_id: 1, colors: vec![Blau, Rot] },
+            BonusChip { chip_id: 2, colors: vec![Blau] },
+            BonusChip { chip_id: 3, colors: vec![Rot] },
+        ];
+        // Greedy-DFS (Hot-Path): verbrennt beide Doppel-Chips → nur 1 Reihe = 1.
+        assert_eq!(solve_max_tiling_points(&s, 0), 1);
+        // EXAKT (echter Zug): beide Reihen legbar; Blau aufs Wild-Feld (3,1)
+        // bildet mit Rot auf (2,1) eine vertikale Linie → 1 + 2 = 3.
+        assert_eq!(solve_max_tiling_points_exact(&s, 0), 3);
+        // Der erste exakte Schritt ist ein kontentionsschonender Chip-Schritt.
+        assert!(matches!(best_first_step_exact(&s, 0), TilingStep::Chips { .. }));
+    }
+
+    #[test]
+    fn chip_allocations_offers_distinct_choices() {
+        use crate::dome::BonusChip;
+        use crate::round_end::chip_allocations;
+        let mut p = PlayerBoard::new(0, "P");
+        p.pattern_lines[2].add_tiles(&[Rot, Rot]); // Reihe 3, 1 fehlt
+        p.bonus_chips = vec![
+            BonusChip { chip_id: 0, colors: vec![Blau, Rot] },
+            BonusChip { chip_id: 1, colors: vec![Rot] },
+            BonusChip { chip_id: 2, colors: vec![Rot] },
+        ];
+        // 1 fehlend → 2 rot-tragende ODER 3 beliebige. Mehrere distinkte
+        // Allokationen (z.B. {0,1}, {1,2}); deduppliziert nach Farb-Signatur.
+        let allocs = chip_allocations(&p, 2);
+        assert!(allocs.len() >= 2, "mehrere distinkte Allokationen erwartet: {allocs:?}");
+        // Jede Allokation komplettiert die Reihe.
+        for a in &allocs {
+            let mut q = p.clone();
+            assert!(apply_bonus_chips_with(&mut q, 2, a));
+            assert!(q.pattern_lines[2].is_complete());
+        }
+    }
+
+    #[test]
+    fn solver_counts_special_bonus_and_neighbor() {
+        // Verifikation: (1) Special-Bonus = Reihennummer wird vom Solver gezählt,
+        // (2) der ausgelöste Special zählt als Nachbar für eine spätere Fliese.
+        //
+        // Slot A (0,0) = pool[8] [Tuerkis(si0,(0,0)), Rot(si1,(0,1)),
+        //   Blau(si2,(1,0)), Special(si3,(1,1))]. si0/si1 aus "Vorrunden" gefüllt.
+        // Slot B (1,0) = pool[2] [Tuerkis(si0), Rot(si1,(2,1)), Blau, Wild].
+        let mut s = tiling_state(7);
+        s.dome_display.clear(); // nur bestehende Slots nutzbar (deterministisch)
+
+        let mut a = build_dome_tile_pool()[8].clone();
+        a.spaces[0].placed_color = Some(Tuerkis); // (0,0)
+        a.spaces[1].placed_color = Some(Rot); // (0,1)
+        s.players[0].dome_grid.place_dome_tile(a, 0, 0).unwrap();
+
+        let mut b = build_dome_tile_pool()[2].clone();
+        b.tile_id = 200;
+        s.players[0].dome_grid.place_dome_tile(b, 1, 0).unwrap();
+
+        // Reihe 2 (idx 1, cap 2) → Blau auf Slot A si2 (1,0): füllt das 3. Feld
+        //   → Special si3 (1,1) löst aus. Reihe 3 (idx 2, cap 3) → Rot auf (2,1).
+        s.players[0].pattern_lines[1].add_tiles(&[Blau, Blau]);
+        s.players[0].pattern_lines[2].add_tiles(&[Rot, Rot, Rot]);
+
+        // Erwartung:
+        //  - Blau@(1,0): vertikale Linie (0,0)+(1,0) = 2. Special-Bonus: Reihe von
+        //    si3 = slot_row*2 + 3/2 = 1 → +2. = 4.
+        //  - Rot@(2,1): vertikale Linie (0,1)Rot + (1,1)Special + (2,1)Rot = 3
+        //    (Special zählt als gefüllter Nachbar). = 3.
+        //  Summe = 7. (Ohne Special-Bonus: 5; ohne Nachbar-Effekt: 5.)
+        assert_eq!(solve_max_tiling_points(&s, 0), 7);
     }
 
     #[test]
