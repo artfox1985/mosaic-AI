@@ -63,7 +63,7 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
 
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
-                  tag: str = None, threads: int = 0):
+                  tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None):
     if mode == "network":
         raise SystemExit(
             "ℹ️  --mode network läuft über die ONNX-Inferenz in Rust (Phase B) und ist "
@@ -73,38 +73,46 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     if mode != "mcts":
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
 
+    import random as _random
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_tag = f"_{tag}" if tag else ""
-    prefix = f"{version_name}{file_tag}_{run_timestamp}"
+    prefix = f"{version_name}{('_' + tag) if tag else ''}_{run_timestamp}"
+    base_seed = seed if seed is not None else _random.randint(0, 2**31 - 1)
+    chunk = max(1, chunk)
 
     print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
-          f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'})")
+          f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | Chunk: {chunk})")
+    print(f"   (Fortschritt erscheint nach jedem Chunk von {chunk} Spielen.)")
 
+    # WICHTIG: In Chunks generieren statt in EINEM riesigen Rust-Aufruf. Das gibt
+    # laufenden Fortschritt + ETA, schreibt Dateien inkrementell und hält den
+    # Speicher klein (sonst lägen bei z.B. 3000 Spielen mehrere GB JSON im RAM).
     t_start = time.time()
-    raw = _mr.self_play_games(
-        n_games=num_games,
-        base_sims=simulations,
-        num_threads=threads,
-        prefix=prefix,
-    )
-    steps = json.loads(raw)
-    gen_dur = time.time() - t_start
-    print(f"✅ Rust fertig: {len(steps)} Züge in {gen_dur:.1f}s "
-          f"({num_games / gen_dur:.1f} Spiele/s)")
+    done = 0
+    total_steps = 0
+    chunk_idx = 0
+    while done < num_games:
+        n = min(chunk, num_games - done)
+        raw = _mr.self_play_games(
+            n_games=n,
+            base_sims=simulations,
+            seed=base_seed + chunk_idx,
+            num_threads=threads,
+            prefix=f"{prefix}_c{chunk_idx}",
+        )
+        steps = json.loads(raw)
+        total_steps += len(steps)
+        done += n
+        chunk_idx += 1
+        _flush(steps, version_name, tag, done)   # diesen Chunk sofort pickeln
 
-    # Nach Spielen gruppieren und in 10er-Blöcken pickeln (wie bisher).
-    games = _group_by_game(steps)
-    buffer: list[dict] = []
-    written_games = 0
-    for gi, game_steps in enumerate(games, start=1):
-        buffer.extend(game_steps)
-        written_games = gi
-        if gi % 10 == 0 or gi == len(games):
-            _flush(buffer, version_name, tag, written_games)
-            buffer = []
+        elapsed = time.time() - t_start
+        rate = done / elapsed if elapsed > 0 else 0.0
+        eta_min = (num_games - done) / rate / 60 if rate > 0 else 0.0
+        print(f"  ⏳ {done}/{num_games} Spiele | {rate:.2f} Spiele/s | "
+              f"{total_steps} Züge | ETA {eta_min:.1f} min")
 
-    print(f"\n✅ Fertig: {len(games)} Spiele, {len(steps)} Züge nach {time.time() - t_start:.1f}s")
+    print(f"\n✅ Fertig: {num_games} Spiele, {total_steps} Züge nach {time.time() - t_start:.1f}s")
 
 
 if __name__ == "__main__":
@@ -119,6 +127,10 @@ if __name__ == "__main__":
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
     parser.add_argument("--threads", type=int, default=0,
                         help="Rust-Worker-Threads (0 = alle Kerne). Ersetzt das alte --terminals.")
+    parser.add_argument("--chunk", type=int, default=50,
+                        help="Spiele pro Rust-Aufruf (Fortschritts-Granularität + Speicherlimit)")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Basis-Seed (für reproduzierbare Läufe). Standard: zufällig.")
     parser.add_argument("--depth", type=int, default=0,
                         help="(Kompatibilität; ignoriert — Rust bewertet Blätter exakt per Tiling-Solver)")
     args = parser.parse_args()
@@ -130,4 +142,6 @@ if __name__ == "__main__":
         version_name=args.version,
         tag=args.tag,
         threads=args.threads,
+        chunk=args.chunk,
+        seed=args.seed,
     )
