@@ -15,7 +15,7 @@ use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
-use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, TilingAction};
+use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, generate_tiling_actions, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
 use crate::tiling_solver::{best_first_step_exact, solve_round_final_score, TilingStep};
@@ -494,7 +494,17 @@ impl PyGame {
         let pi = self.game.state.current_player;
         let optimal = solve_round_final_score(&self.game.state, pi);
         // Exakte Chip-Allokationssuche für den ECHTEN Zug (einmal pro Schritt).
-        let step = best_first_step_exact(&self.game.state, pi);
+        let step = match best_first_step_exact(&self.game.state, pi) {
+            // Solver sagt `End` — aber die Engine erlaubt das nur bei leerem
+            // valid_tiling_actions. Bleiben Aktionen offen (volle Reihe nur per
+            // neuer Kuppelplatte legbar), die beste davon platzieren statt zu
+            // deadlocken (siehe self_play::best_pending_placement).
+            TilingStep::End => match best_pending_placement(&self.game.state, pi) {
+                Some(ta) => TilingStep::Place(ta),
+                None => TilingStep::End,
+            },
+            other => other,
+        };
 
         let (typ, desc, cat, mv): (&str, String, &str, Value) = match step {
             TilingStep::Place(ta) => {
@@ -561,6 +571,26 @@ impl PyGame {
     }
 }
 
+/// Beste noch ausstehende Tiling-Platzierung (inkl. Platzierung einer NEUEN
+/// Kuppelplatte für eine volle Reihe — die der DFS-Solver bewusst ausblendet).
+/// Wahl nach maximalem finalem Runden-Score. Verhindert den Deadlock, wenn der
+/// Solver `End` liefert, die Engine das Beenden aber wegen offener Aktionen
+/// (`valid_tiling_actions` ≠ ∅) verweigert.
+fn best_pending_placement(state: &crate::state::GameState, pi: usize) -> Option<TilingAction> {
+    let actions = generate_tiling_actions(state, pi);
+    let mut best: Option<(i32, TilingAction)> = None;
+    for ta in actions {
+        let mut g = Game { state: state.clone() };
+        if g.apply_single_tiling(pi, &ta).is_ok() {
+            let score = solve_round_final_score(&g.state, pi);
+            if best.as_ref().map_or(true, |(b, _)| score > *b) {
+                best = Some((score, ta));
+            }
+        }
+    }
+    best.map(|(_, ta)| ta)
+}
+
 /// Index einer Normalfarbe in `TileColor::NORMAL` (None für Wild).
 fn color_index(c: TileColor) -> Option<usize> {
     TileColor::NORMAL.iter().position(|&x| x == c)
@@ -583,4 +613,48 @@ fn sun_color_counts(state: &crate::state::GameState) -> [usize; 5] {
         bump(t);
     }
     counts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dome::build_dome_tile_pool;
+    use crate::state::setup_new_game;
+    use crate::tile::TileColor::Rot;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    /// Deadlock-Szenario des Servers: eine volle Pattern-Reihe lässt sich NUR per
+    /// neuer Kuppelplatte (leerer Slot) komplettieren. Der DFS-Solver blendet
+    /// solche `dome_tile_id: Some(..)`-Platzierungen aus und liefert `End`, doch
+    /// `generate_tiling_actions` ist nicht-leer → die Engine verweigert `EndTiling`.
+    /// `best_pending_placement` muss die ausstehende Platzierung liefern, statt zu
+    /// deadlocken (= harter Server-Fehler).
+    #[test]
+    fn best_pending_placement_resolves_solver_end_deadlock() {
+        let mut rng = StdRng::seed_from_u64(99);
+        let mut s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        for p in s.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        // Display-Kachel akzeptiert Rot (pool[2] = [Tuerkis, Rot, Blau, Wild]).
+        let tile = build_dome_tile_pool()[2].clone();
+        s.dome_display.clear();
+        s.dome_display.push(tile);
+        // Reihe 0 (cap 1) voll mit Rot, Kuppel-Grid leer → nur per neuer Platte legbar.
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+
+        // Solver kapituliert (keine Platzierung auf bereits gefülltem Slot)...
+        assert!(matches!(best_first_step_exact(&s, 0), TilingStep::End));
+        // ...aber es gibt offene Aktionen (neue Kuppelplatte).
+        assert!(!generate_tiling_actions(&s, 0).is_empty());
+
+        // best_pending_placement liefert die Platzierung und sie ist anwendbar.
+        let ta = best_pending_placement(&s, 0).expect("ausstehende Platzierung erwartet");
+        assert_eq!(ta.pattern_row, 0);
+        assert!(ta.dome_tile_id.is_some(), "muss eine NEUE Kuppelplatte legen");
+        let mut g = Game { state: s };
+        assert!(g.apply_single_tiling(0, &ta).is_ok());
+        assert!(g.state.players[0].pattern_lines[0].is_empty(), "Reihe geleert");
+    }
 }
