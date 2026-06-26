@@ -384,6 +384,120 @@ pub fn player_scoring_features(player: &PlayerBoard) -> ScoringFeatures {
     }
 }
 
+// ── Linien-Geometrie-Features (offensives Linien-Bauen) ─────────────────────────
+
+/// Räumliche Linien-Information, damit das flache MLP offensives Cluster-/Linien-
+/// Bauen lernen kann (statt zur Strafleiste zu degenerieren). Punkte entstehen aus
+/// zusammenhängenden orthogonalen Läufen ([`crate::round_end::score_placed_tile`]);
+/// diese Features machen genau diese Struktur explizit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineFeatures {
+    /// Anzahl horizontaler maximaler Läufe der Länge 2,3,4,5,6.
+    pub h_hist: [u32; 5],
+    /// Anzahl vertikaler maximaler Läufe der Länge 2,3,4,5,6.
+    pub v_hist: [u32; 5],
+    /// Σ Lauflänge² über alle h+v-Läufe (Länge ≥ 2) — belohnt lange Linien.
+    pub cluster_sq: u32,
+    /// Je Reihe: maximaler Linien-Zuwachs, den ein füllbares Feld dort brächte
+    /// (= `score_placed_tile`-Wert, wenn dort ein Stein läge).
+    pub row_potential: [u32; 6],
+    /// Je Spalte: dito.
+    pub col_potential: [u32; 6],
+}
+
+fn bucket_run(run: u32, hist: &mut [u32; 5], cluster_sq: &mut u32) {
+    if run >= 2 {
+        hist[(run.min(6) - 2) as usize] += 1;
+        *cluster_sq += run * run;
+    }
+}
+
+/// Länge des zusammenhängenden gefüllten Laufs durch `(r,c)` in Richtung
+/// `(dr,dc)` (beide Seiten), inkl. des hypothetisch gefüllten Felds selbst.
+fn run_through(filled: &[[bool; 6]; 6], r: usize, c: usize, dr: i32, dc: i32) -> u32 {
+    let mut n = 1u32;
+    for &sign in &[1i32, -1] {
+        let (mut rr, mut cc) = (r as i32 + sign * dr, c as i32 + sign * dc);
+        while (0..6).contains(&rr) && (0..6).contains(&cc) && filled[rr as usize][cc as usize] {
+            n += 1;
+            rr += sign * dr;
+            cc += sign * dc;
+        }
+    }
+    n
+}
+
+/// Berechnet die [`LineFeatures`] eines Bretts.
+pub fn player_line_features(player: &PlayerBoard) -> LineFeatures {
+    // 6×6-Raster: gefüllt bzw. füllbar (Slot vorhanden, leer, nicht gesperrt).
+    let mut filled = [[false; 6]; 6];
+    let mut placeable = [[false; 6]; 6];
+    for sr in 0..3 {
+        for sc in 0..3 {
+            if let Some(slot) = &player.dome_grid.dome_slots[sr][sc] {
+                for (si, sp) in slot.spaces.iter().enumerate() {
+                    let (r, c) = (sr * 2 + si / 2, sc * 2 + si % 2);
+                    if sp.is_filled() {
+                        filled[r][c] = true;
+                    } else if !sp.is_locked {
+                        placeable[r][c] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut h_hist = [0u32; 5];
+    let mut v_hist = [0u32; 5];
+    let mut cluster_sq = 0u32;
+    for r in 0..6 {
+        let mut run = 0u32;
+        for c in 0..6 {
+            if filled[r][c] {
+                run += 1;
+            } else {
+                bucket_run(run, &mut h_hist, &mut cluster_sq);
+                run = 0;
+            }
+        }
+        bucket_run(run, &mut h_hist, &mut cluster_sq);
+    }
+    for c in 0..6 {
+        let mut run = 0u32;
+        for r in 0..6 {
+            if filled[r][c] {
+                run += 1;
+            } else {
+                bucket_run(run, &mut v_hist, &mut cluster_sq);
+                run = 0;
+            }
+        }
+        bucket_run(run, &mut v_hist, &mut cluster_sq);
+    }
+
+    let mut row_potential = [0u32; 6];
+    let mut col_potential = [0u32; 6];
+    for r in 0..6 {
+        for c in 0..6 {
+            if !placeable[r][c] {
+                continue;
+            }
+            let h = run_through(&filled, r, c, 0, 1);
+            let v = run_through(&filled, r, c, 1, 0);
+            // Wie score_placed_tile: alleinstehend = 1, sonst Summe der Läufe > 1.
+            let gain = if h <= 1 && v <= 1 {
+                1
+            } else {
+                (if h > 1 { h } else { 0 }) + (if v > 1 { v } else { 0 })
+            };
+            row_potential[r] = row_potential[r].max(gain);
+            col_potential[c] = col_potential[c].max(gain);
+        }
+    }
+
+    LineFeatures { h_hist, v_hist, cluster_sq, row_potential, col_potential }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -459,6 +573,31 @@ mod tests {
         // Special-Felder sind alle belegt (placed_special) → keine leeren.
         assert_eq!(sf.special_empty, 0);
         assert!(sf.special_total >= 1);
+    }
+
+    #[test]
+    fn line_features_full_board() {
+        let p = fully_filled_board();
+        let lf = player_line_features(&p);
+        // Volles Brett: 6 horizontale + 6 vertikale Läufe der Länge 6.
+        assert_eq!(lf.h_hist, [0, 0, 0, 0, 6]); // alle len 6
+        assert_eq!(lf.v_hist, [0, 0, 0, 0, 6]);
+        // Cluster: 12 Läufe × 6² = 432.
+        assert_eq!(lf.cluster_sq, 12 * 36);
+        // Kein füllbares Feld mehr → Potential 0.
+        assert_eq!(lf.row_potential, [0; 6]);
+        assert_eq!(lf.col_potential, [0; 6]);
+    }
+
+    #[test]
+    fn line_features_empty_board() {
+        let p = PlayerBoard::new(0, "P");
+        let lf = player_line_features(&p);
+        assert_eq!(lf.h_hist, [0; 5]);
+        assert_eq!(lf.v_hist, [0; 5]);
+        assert_eq!(lf.cluster_sq, 0);
+        // Kein Slot gelegt → keine füllbaren Felder → Potential 0.
+        assert_eq!(lf.row_potential, [0; 6]);
     }
 
     #[test]
