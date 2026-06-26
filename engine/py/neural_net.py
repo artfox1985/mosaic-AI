@@ -9,6 +9,17 @@ from config import NUM_ACTIONS, HIDDEN_SIZE, MARGIN_CAP, MAX_WINNER_SCORE
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
 
+# Platzierte-Farbe-ID je Dome-Feld: 0=leer, 1-5=Farbe, 6=Special.
+FILLED_ID_MAP = {None: 0, "blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5, "special": 6}
+# Normalisierung der aktuellen Punkte je der 8 Wertungsplatten (grobe Skalen).
+SCORE_NORM = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0]
+
+
+def _padn(lst, n):
+    """Liste auf genau n Einträge bringen (0-gepolstert) — robust gegen alte Daten."""
+    lst = list(lst or [])
+    return (lst + [0] * n)[:n]
+
 def state_to_tensor(data):
     """Macht aus deinem Serializer-Dict ein flaches Zahlen-Array für PyTorch."""
     features = []
@@ -128,9 +139,10 @@ def state_to_tensor(data):
                     else:
                         features.append(1.0)  # slot existiert
                         for space in slot.get("spaces", [{}, {}, {}, {}]):
-                            # is_filled
+                            # placed-color id: 0=leer, 1-5=Farbe, 6=special
+                            # (behält belegt/leer UND die platzierte Farbe)
                             filled = space.get("filled")
-                            features.append(1.0 if filled is not None else 0.0)
+                            features.append(FILLED_ID_MAP.get(filled, 0) / 6.0)
                             # required_color normalisiert (0=kein, 1-5=farbe)
                             req = space.get("color")
                             features.append(COLOR_ID_MAP.get(req, 0) / 5.0)
@@ -140,7 +152,27 @@ def state_to_tensor(data):
                             # locked: nur relevant für SPECIAL (0=offen, 1=gesperrt)
                             locked = space.get("locked", False)
                             features.append(1.0 if locked else 0.0)
-            
+
+        # 6b. Berechnete Endwertungs-/Geometrie-Features (pro Spieler, 37 je Spieler)
+        # Damit das Netz lernt, WIE Endpunkte entstehen (Quelle: Rust
+        # scoring::player_scoring_features). Endkriterien sind harte geometrische
+        # Prädikate, die ein flaches MLP aus der Roh-Kodierung kaum lernt.
+        for p in [me, enemy]:
+            pts = _padn(p.get("scoring_tile_points"), 8)
+            for i in range(8):
+                features.append(pts[i] / SCORE_NORM[i])
+            geo = p.get("score_geo", {})
+            features.extend(v / 6.0 for v in _padn(geo.get("row_fill"), 6))
+            features.extend(v / 6.0 for v in _padn(geo.get("col_fill"), 6))
+            features.extend(v / 6.0 for v in _padn(geo.get("diag_fill"), 2))
+            features.extend(v / 5.0 for v in _padn(geo.get("row_colors"), 6))
+            features.append(geo.get("border_fill", 0) / 20.0)
+            features.extend(v / 4.0 for v in _padn(geo.get("corner_fill"), 4))
+            features.append(geo.get("wild_filled", 0) / 8.0)
+            features.append(geo.get("wild_total", 0) / 8.0)
+            features.append(geo.get("special_empty", 0) / 8.0)
+            features.append(geo.get("special_total", 0) / 8.0)
+
     # 7. Mondseite kleine Fabriken (pro Fabrik: 3 Positionen × 5 Farben = 15 Features)
     # Position 0 = oben (abholbar), Position 1 = darunter, Position 2 = ganz unten
     for f in data.get("factories", []):
