@@ -284,6 +284,106 @@ fn row_unique_colors(player: &PlayerBoard, row6: usize) -> usize {
     seen.len()
 }
 
+// ── Berechnete Features fürs Netz ───────────────────────────────────────────────
+
+/// Endwertungs- und Geometrie-Features eines Spielerbretts — damit das Netz lernt,
+/// WIE (End-)Punkte entstehen, statt sie aus der flachen Brett-Kodierung raten zu
+/// müssen. Wird über `serialize_player` ins State-Dict gespiegelt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScoringFeatures {
+    /// Aktuelle Punkte je der 8 Wertungsplatten (ID == Index).
+    pub tile_points: [i32; 8],
+    /// Gefüllte Felder je horizontaler 6er-Reihe.
+    pub row_fill: [u32; 6],
+    /// Gefüllte Felder je vertikaler 6er-Spalte.
+    pub col_fill: [u32; 6],
+    /// Gefüllte Felder je Diagonale (Haupt-, Nebendiagonale).
+    pub diag_fill: [u32; 2],
+    /// Verschiedene platzierte Farben je horizontaler Reihe (→ farbenreiche Reihen).
+    pub row_colors: [u32; 6],
+    /// Gefüllte Felder auf dem 6×6-Rand.
+    pub border_fill: u32,
+    /// Gefüllte Felder je Eckplatte: (0,0),(0,2),(2,0),(2,2).
+    pub corner_fill: [u32; 4],
+    pub wild_filled: u32,
+    pub wild_total: u32,
+    pub special_empty: u32,
+    pub special_total: u32,
+}
+
+/// Berechnet die [`ScoringFeatures`] eines Bretts (reuse der Wertungs-Helfer).
+pub fn player_scoring_features(player: &PlayerBoard) -> ScoringFeatures {
+    let grid = build_grid(player);
+
+    let mut tile_points = [0i32; 8];
+    for (i, slot) in tile_points.iter_mut().enumerate() {
+        *slot = ALL_SCORING_TILES[i].score(player);
+    }
+
+    let mut row_fill = [0u32; 6];
+    let mut col_fill = [0u32; 6];
+    for r in 0..6 {
+        for c in 0..6 {
+            if grid[r][c] {
+                row_fill[r] += 1;
+                col_fill[c] += 1;
+            }
+        }
+    }
+
+    let mut diag_fill = [0u32; 2];
+    for i in 0..6 {
+        if grid[i][i] {
+            diag_fill[0] += 1;
+        }
+        if grid[i][5 - i] {
+            diag_fill[1] += 1;
+        }
+    }
+
+    let mut row_colors = [0u32; 6];
+    for (r, slot) in row_colors.iter_mut().enumerate() {
+        *slot = row_unique_colors(player, r) as u32;
+    }
+
+    let mut border_fill = 0;
+    for r in 0..6 {
+        for c in 0..6 {
+            if (r == 0 || r == 5 || c == 0 || c == 5) && grid[r][c] {
+                border_fill += 1;
+            }
+        }
+    }
+
+    let mut corner_fill = [0u32; 4];
+    for (k, &(sr, sc)) in [(0usize, 0usize), (0, 2), (2, 0), (2, 2)].iter().enumerate() {
+        corner_fill[k] = player.dome_grid.dome_slots[sr][sc]
+            .as_ref()
+            .map_or(0, |slot| slot.spaces.iter().filter(|sp| sp.is_filled()).count() as u32);
+    }
+
+    let wild = collect_spaces(player, SpaceType::Wild);
+    let wild_total = wild.len() as u32;
+    let wild_filled = wild.iter().filter(|sp| sp.is_filled()).count() as u32;
+    let special = collect_spaces(player, SpaceType::Special);
+    let special_total = special.len() as u32;
+    let special_empty = special.iter().filter(|sp| !sp.is_filled()).count() as u32;
+
+    ScoringFeatures {
+        tile_points,
+        row_fill,
+        col_fill,
+        diag_fill,
+        row_colors,
+        border_fill,
+        corner_fill,
+        wild_filled,
+        wild_total,
+        special_empty,
+        special_total,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,6 +440,36 @@ mod tests {
         let p = fully_filled_board();
         // 2 obere Ecken × 3 + 2 untere Ecken × 8 = 6 + 16 = 22.
         assert_eq!(score_corner_tiles(&p), 22);
+    }
+
+    #[test]
+    fn scoring_features_match_tile_scores_full_board() {
+        let p = fully_filled_board();
+        let sf = player_scoring_features(&p);
+        // tile_points müssen exakt den Einzelwertungen entsprechen.
+        for i in 0..8 {
+            assert_eq!(sf.tile_points[i], ALL_SCORING_TILES[i].score(&p), "tile {i}");
+        }
+        // Volles Brett: jede Reihe/Spalte/Diagonale komplett gefüllt.
+        assert_eq!(sf.row_fill, [6; 6]);
+        assert_eq!(sf.col_fill, [6; 6]);
+        assert_eq!(sf.diag_fill, [6, 6]);
+        assert_eq!(sf.border_fill, 20);
+        assert_eq!(sf.corner_fill, [4, 4, 4, 4]);
+        // Special-Felder sind alle belegt (placed_special) → keine leeren.
+        assert_eq!(sf.special_empty, 0);
+        assert!(sf.special_total >= 1);
+    }
+
+    #[test]
+    fn scoring_features_empty_board_is_zero() {
+        let p = PlayerBoard::new(0, "P");
+        let sf = player_scoring_features(&p);
+        assert_eq!(sf.row_fill, [0; 6]);
+        assert_eq!(sf.border_fill, 0);
+        assert_eq!(sf.corner_fill, [0; 4]);
+        // Kein Brett gelegt → keine Wertungspunkte (auch keine Special-Strafe).
+        assert_eq!(sf.tile_points, [0; 8]);
     }
 
     #[test]
