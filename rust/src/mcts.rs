@@ -494,11 +494,23 @@ fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (&'static st
                     Some(id) => format!("F{id}"),
                     None => "GF".to_string(),
                 };
-                let amount = match state.map(|s| tiles_taken(s, &m.take)) {
-                    Some(n) => format!("{n}× "),
-                    None => String::new(),
+                // Mit Zustand: Steinanzahl voranstellen und Füllstand der Zielreihe
+                // NACH dem Zug anhängen ([gefüllt/Kapazität], wie im Game-Log).
+                let (amount, fill) = match state {
+                    Some(s) => {
+                        let n = tiles_taken(s, &m.take);
+                        let fill = if m.place.row_index >= 0 {
+                            let row = &s.players[s.current_player].pattern_lines[m.place.row_index as usize];
+                            let filled = (row.tiles.len() + n).min(row.capacity());
+                            format!(" [{}/{}]", filled, row.capacity())
+                        } else {
+                            String::new()
+                        };
+                        (format!("{n}× "), fill)
+                    }
+                    None => (String::new(), String::new()),
                 };
-                let desc = format!("{amount}Stein {} von {src} → {dest}", m.take.color.value());
+                let desc = format!("{amount}Stein {} von {src} → {dest}{fill}", m.take.color.value());
                 ("stone", desc, cat, action_to_dict(a))
             }
             Action::Dome(m) => (
