@@ -16,6 +16,7 @@ pub mod game;
 pub mod mcts;
 pub mod moves;
 pub mod net;
+pub mod net_mcts;
 pub mod py;
 pub mod round_end;
 pub mod scoring;
@@ -82,6 +83,31 @@ fn arena_match(
     py.detach(move || crate::self_play::run_arena_match(sims_a, sims_b, n_games, seed, num_threads, c))
 }
 
+/// Arena-Match Netz vs. Heuristik-MCTS (Netz auf Brett 0). Lädt das ONNX-Netz
+/// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
+/// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
+#[pyfunction]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5))]
+fn net_arena_match(
+    py: Python<'_>,
+    model_path: String,
+    net_sims: u32,
+    heur_sims: u32,
+    n_games: usize,
+    seed: Option<u64>,
+    num_threads: usize,
+    c: f64,
+    c_puct: f64,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_net_arena_match(
+            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
 /// Feature-Vektor aus und gibt `(value, policy_logits)` zurück.
 #[pyfunction]
@@ -125,6 +151,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
+    m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
