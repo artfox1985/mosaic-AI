@@ -413,7 +413,7 @@ impl PyGame {
             // Nur eine legale Aktion → direkt wählen, keine Simulationen
             // (eine erzwungene Wahl muss nicht durchgerechnet werden).
             mv = SearchMove::Draft(actions.into_iter().next().unwrap());
-            let mj = search_move_json(&mv); // { type, description, category, move }
+            let mj = search_move_json(&mv, Some(&self.game.state)); // { type, description, category, move }
             if log {
                 lines.push("Nur eine legale Drafting-Aktion — direkt gewaehlt (0 Simulationen).".to_string());
             }
@@ -472,7 +472,7 @@ impl PyGame {
             None
         };
 
-        let action_json = search_move_json(&mv);
+        let action_json = search_move_json(&mv, Some(&self.game.state));
         let SearchMove::Draft(a) = &mv;
         map_err(self.game.apply_drafting(a))?;
 
