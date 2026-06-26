@@ -84,11 +84,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         t_loss, t_vloss, t_ploss = 0, 0, 0
         v_preds_epoch = [] 
         
-        for states, targets_p, targets_v, masks, moon_targets in dataloader:
+        for states, targets_p, targets_v, masks, moon_targets, pol_w in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             masks     = masks.to(device)
+            pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
             pred_p, pred_v, pred_moon = model(states)
@@ -109,7 +110,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # (in denen beide Spieler die Strafleiste fluten) mit vollem Gewicht.
             per_sample_ce = -torch.sum(targets_p * log_probs, dim=1)   # (B,)
             strength = targets_v.detach().abs().squeeze(-1).clamp(min=1e-3)  # (B,)
-            p_loss = (per_sample_ce * strength).sum() / strength.sum()
+            # Policy-Loss NUR auf echten Drafting-Schritten (pol_w=1); Tiling/Start-
+            # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
+            # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
+            w = strength * pol_w
+            p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 
             # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter
             moon_targets = moon_targets.to(device)

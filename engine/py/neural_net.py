@@ -345,6 +345,10 @@ class MosaicDataset(Dataset):
                 self.values             = torch.from_numpy(hf['values'][:])
                 self.masks              = torch.from_numpy(hf['masks'][:])
                 self.moon_order_targets = torch.from_numpy(hf['moon_order_targets'][:])
+                if 'policy_weights' in hf:
+                    self.policy_weights = torch.from_numpy(hf['policy_weights'][:])
+                else:  # alter Cache ohne Gewicht → alle 1.0
+                    self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -361,6 +365,7 @@ class MosaicDataset(Dataset):
             if mot is None:
                 mot = [torch.full((5,), -1.0) for _ in self.states]
             self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
+            self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',             data=self.states.numpy(),             compression='lzf')
@@ -368,6 +373,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('values',             data=self.values.numpy(),             compression='lzf')
                 hf.create_dataset('masks',              data=self.masks.numpy(),              compression='lzf')
                 hf.create_dataset('moon_order_targets', data=self.moon_order_targets.numpy(), compression='lzf')
+                hf.create_dataset('policy_weights',     data=self.policy_weights.numpy(),     compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -377,6 +383,7 @@ class MosaicDataset(Dataset):
             t0 = time.time()
             _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
+            polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
 
             import random as _rnd
             keep_prob = 1.0
@@ -478,11 +485,23 @@ class MosaicDataset(Dataset):
                                     moon_target[c_idx] = float(rank)
                         moon_l.append(moon_target)
 
+                        # Policy-Loss nur für ECHTE Drafting-Schritte: Tiling/Start-
+                        # Steps sind one-hot Solver-/Heuristik-Züge, die das Netz nie
+                        # vorhersagen muss (Tiling macht der DFS-Solver). Sie fluten
+                        # sonst den Policy-Head mit Tiling-Aktionen → das Netz legt
+                        # auch in der Drafting-Phase Masse auf (illegale) Tiling-IDs
+                        # und die Drafting-Priors verkommen zu Rauschen.
+                        phase = step["state"].get("phase")
+                        is_start = any(pe["action"].get("is_start") for pe in step["policy"])
+                        pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
+                        polw_l.append(np.float32(pol_w))
+
             states_np   = np.array(states_l,   dtype=np.float32)
             policies_np = np.array(policies_l, dtype=np.float32)
             values_np   = np.array(values_l,   dtype=np.float32)
             masks_np    = np.array(masks_l,    dtype=np.float32)
             moon_np     = np.array(moon_l,     dtype=np.float32)
+            polw_np     = np.array(polw_l,     dtype=np.float32)
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -493,6 +512,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('values',             data=values_np,   compression='lzf')
                 hf.create_dataset('masks',              data=masks_np,    compression='lzf')
                 hf.create_dataset('moon_order_targets', data=moon_np,     compression='lzf')
+                hf.create_dataset('policy_weights',     data=polw_np,     compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -500,11 +520,14 @@ class MosaicDataset(Dataset):
             self.values             = torch.from_numpy(values_np)
             self.masks              = torch.from_numpy(masks_np)
             self.moon_order_targets = torch.from_numpy(moon_np)
+            self.policy_weights     = torch.from_numpy(polw_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
 
     def __len__(self): return len(self.states)
-    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx]
+    def __getitem__(self, idx):
+        return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
+                self.moon_order_targets[idx], self.policy_weights[idx])
 
 
 class MosaicNet(nn.Module):
