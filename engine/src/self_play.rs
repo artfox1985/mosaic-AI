@@ -21,6 +21,8 @@ use serde_json::{json, Map, Value};
 use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, determine_winner, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, root_child_stats, search_drafting_action};
+use crate::net::Net;
+use crate::net_mcts::net_search_drafting_action;
 use crate::moves::{Action, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
@@ -65,7 +67,7 @@ fn factory_pos(state: &GameState, fid: usize) -> i64 {
 
 /// Mappt eine Engine-`Action` auf das agent_env-Dict (Schlüssel, die
 /// `action_to_id` liest).
-fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
+pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
     match a {
         Action::Stone(m) => json!({
             "type": "stone",
@@ -780,6 +782,139 @@ pub fn run_arena_match(
         }
     };
     serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string())
+}
+
+// ── Netz vs. Heuristik (Arena-Messung) ───────────────────────────────────────
+
+/// Spielt EIN Spiel: Brett `net_board` zieht per Netz-PUCT, das andere per
+/// Heuristik-MCTS. Tiling/Start für BEIDE per Solver/Heuristik (wie Arena).
+#[allow(clippy::too_many_arguments)]
+fn play_net_game<R: Rng + ?Sized>(
+    net: &Net,
+    net_board: usize,
+    net_sims: u32,
+    heur_sims: u32,
+    c: f64,
+    c_puct: f64,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+) -> Value {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut steps = 0u32;
+    let mut guard = 0u32;
+    loop {
+        guard += 1;
+        if guard > 100_000 {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    let first = game.state.current_player;
+                    let non_starter = 1 - first;
+                    let pi = if game.state.players[non_starter].start_tile_pending {
+                        non_starter
+                    } else if game.state.players[first].start_tile_pending {
+                        first
+                    } else {
+                        break;
+                    };
+                    match choose_start_placement(&game.state, pi) {
+                        Some((tid, r, c2, rot)) => {
+                            let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                        }
+                        None => break,
+                    }
+                    steps += 1;
+                } else if game.state.phase == Phase::Drafting {
+                    let pi = game.state.current_player;
+                    let actions = drafting_actions(&game.state);
+                    let chosen = if actions.len() == 1 {
+                        actions[0].clone()
+                    } else if pi == net_board {
+                        let s = dynamic_sims(net_sims, actions.len());
+                        net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
+                            .unwrap_or_else(|| actions[0].clone())
+                    } else {
+                        let s = dynamic_sims(heur_sims, actions.len());
+                        search_drafting_action(&game.state, s, c, rng)
+                            .unwrap_or_else(|| actions[0].clone())
+                    };
+                    let _ = game.apply_drafting(&chosen);
+                    steps += 1;
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => {
+                let pi = game.state.current_player;
+                match resolve_tiling_step(&game.state, pi) {
+                    TilingStep::Place(ta) => {
+                        let _ = game.apply_single_tiling(pi, &ta);
+                    }
+                    TilingStep::Chips { row, chips } => {
+                        apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                    }
+                    TilingStep::End => {
+                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
+                    }
+                }
+                steps += 1;
+            }
+            _ => break,
+        }
+    }
+    if game.state.phase == Phase::End {
+        let _ = game.apply_end_scoring();
+    }
+    let p0 = &game.state.players[0];
+    let p1 = &game.state.players[1];
+    json!({
+        "scores": [p0.score, p1.score],
+        "winner": determine_winner(&game.state),
+        "steps": steps,
+        "net_board": net_board,
+        "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
+        "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+    })
+}
+
+/// `n_games` Spiele Netz vs. Heuristik (Netz auf Brett 0, Startspieler alternierend).
+/// Lädt das ONNX-Netz einmal. Gibt JSON-Array `[{scores:[netz,heur], winner, …}]`.
+#[allow(clippy::too_many_arguments)]
+pub fn run_net_arena_match(
+    model_path: &str,
+    net_sims: u32,
+    heur_sims: u32,
+    n_games: usize,
+    seed: u64,
+    num_threads: usize,
+    c: f64,
+    c_puct: f64,
+) -> Result<String, String> {
+    let net = Net::load(model_path, 673).map_err(|e| e.to_string())?;
+    let net = std::sync::Arc::new(net);
+
+    let play = |i: usize| -> Value {
+        let mut rng =
+            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = i % 2;
+        let names = ["Netz".to_string(), "Heuristik".to_string()];
+        play_net_game(&net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng)
+    };
+
+    let all: Vec<Value> = if num_threads <= 1 {
+        (0..n_games).map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
 
 #[cfg(test)]
