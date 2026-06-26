@@ -34,15 +34,15 @@ except ImportError as e:  # pragma: no cover
 
 # 0:0-Strafe (vermiedenswerte Strafleisten-Flut) — Kopie aus agents/neural_net.py,
 # damit die Arena unabhängig von agents/ ist.
-ZEROZERO_PENALTY = -0.15
 
 
 def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
-    """Abgestufte Siegstärke aus den Endscores (0.1 schwach … 1.0 klar)."""
+    """Abgestufte Siegstärke aus den Endscores (0.1 schwach … 1.0 klar).
+    KEINE 0:0-Strafe: in der Arena gibt es kein Unentschieden — bei Punkte-
+    gleichstand gewinnt der Startstein-Halter (determine_winner). Ein Marker-Sieg
+    ohne Punkte ist ein schwacher Sieg (~0.1), kein bestrafter."""
     margin = abs(scores[0] - scores[1])
     winner_score = scores[winner]
-    if margin == 0 and winner_score < 5:
-        return ZEROZERO_PENALTY
     margin_part = min(0.45, (margin / margin_cap) * 0.45)
     score_part = min(0.45, (winner_score / max_winner_score) * 0.45)
     return min(1.0, 0.1 + margin_part + score_part)
@@ -69,8 +69,7 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
     elo = {n: competitors[n].get("elo", 1000) for n in names}
     sims = {n: int(competitors[n]["sims"]) for n in names}
     wins = {n: 0 for n in names}
-    wins["Draw"] = 0
-    wins["ZeroZero"] = 0
+    wins["ZeroZero"] = 0  # Punktegleichstand (Sieg per Startstein) — nur als Info
     penalties = {n: 0 for n in names}
     penalties_per_round = {n: {} for n in names}
     games_played = {n: 0 for n in names}
@@ -113,21 +112,21 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
                 games_played[A] += 1
                 games_played[B] += 1
 
+                # Kein Unentschieden: determine_winner liefert 0/1 (Punkte­gleich-
+                # stand → Startstein-Halter gewinnt).
                 if winner == 0:
                     winner_name, score_a = A, 1.0
                     a_wins += 1
-                elif winner == 1:
+                else:
                     winner_name, score_a = B, 0.0
                     b_wins += 1
-                else:
-                    winner_name, score_a = "Draw", 0.5
                 wins[winner_name] += 1
-                if scores[0] == 0 and scores[1] == 0:
-                    wins["ZeroZero"] += 1
+                if scores[0] == scores[1]:
+                    wins["ZeroZero"] += 1   # Punktegleichstand (per Startstein entschieden)
 
-                # Elo mit Siegstärke-skaliertem K (0:0 bewegt kaum, klarer Sieg voll)
-                widx = 0 if scores[0] >= scores[1] else 1
-                strength = compute_win_val(scores, widx)
+                # Elo mit Siegstärke-skaliertem K. Strength aus Sicht des echten
+                # Siegers (inkl. Startstein-Tiebreak bei Gleichstand).
+                strength = compute_win_val(scores, winner)
                 k = 32 * strength
                 elo[A], elo[B] = calculate_elo(elo[A], elo[B], score_a, k=k)
 
