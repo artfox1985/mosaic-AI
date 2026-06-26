@@ -92,6 +92,8 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
     // Berechnete Endwertungs-/Geometrie-Features (damit das Netz lernt, wie
     // Endpunkte entstehen — siehe scoring::player_scoring_features).
     let sf = crate::scoring::player_scoring_features(p);
+    // Linien-Geometrie (offensives Linien-Bauen — scoring::player_line_features).
+    let lf = crate::scoring::player_line_features(p);
 
     json!({
         "id": p.player_id,
@@ -130,6 +132,14 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
             "wild_total": sf.wild_total,
             "special_empty": sf.special_empty,
             "special_total": sf.special_total,
+        },
+        // Linien-Geometrie fürs offensive Linien-Bauen.
+        "line_geo": {
+            "h_hist": lf.h_hist,
+            "v_hist": lf.v_hist,
+            "cluster_sq": lf.cluster_sq,
+            "row_potential": lf.row_potential,
+            "col_potential": lf.col_potential,
         },
     })
 }
