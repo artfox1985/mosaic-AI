@@ -438,31 +438,29 @@ fn drafting_step<R: Rng + ?Sized>(
     m
 }
 
-/// Legale Tiling-Aktionen im agent_env-Schema (Port von `_tiling_actions`):
-/// gibt es zwingende Steine, NUR die oberste Reihe; sonst optionale `use_chips`
-/// plus `end_tiling`.
+/// Legale Tiling-Aktionen im agent_env-Schema (für `valid_actions` = Trainings-
+/// maske): ALLE platzierbaren Steine (jede pending Reihe) + optionale `use_chips`
+/// + `end_tiling`. WICHTIG: NICHT auf die oberste Reihe filtern — der DFS-Solver
+/// darf jede pending Reihe wählen (Engine erlaubt freie Reihenfolge, bis eine
+/// spätere gelegt wird). Ein Top-Reihen-Filter ließe eine vom Solver gewählte
+/// Aktion einer anderen Reihe außerhalb der Maske liegen → Policy-Leak →
+/// explodierender Policy-Loss im Training.
 fn tiling_env_actions(state: &GameState, pi: usize) -> Vec<Value> {
     let mut actions = Vec::new();
     let tiling_actions = generate_tiling_actions(state, pi);
     let has_placements = !tiling_actions.is_empty();
 
-    if has_placements {
-        // Top-Down: nur die oberste platzierbare Reihe (Engine erzwingt das).
-        let first_row = tiling_actions.iter().map(|a| a.pattern_row).min().unwrap();
-        for a in &tiling_actions {
-            if a.pattern_row == first_row {
-                actions.push(json!({
-                    "type": "tiling",
-                    "player": pi,
-                    "pattern_row": a.pattern_row,
-                    "slot_row": a.slot_row,
-                    "slot_col": a.slot_col,
-                    "space_index": a.space_index,
-                    "dome_tile_id": a.dome_tile_id,
-                    "rotation": a.rotation,
-                }));
-            }
-        }
+    for a in &tiling_actions {
+        actions.push(json!({
+            "type": "tiling",
+            "player": pi,
+            "pattern_row": a.pattern_row,
+            "slot_row": a.slot_row,
+            "slot_col": a.slot_col,
+            "space_index": a.space_index,
+            "dome_tile_id": a.dome_tile_id,
+            "rotation": a.rotation,
+        }));
     }
 
     // Chip-Komplettierung: der DFS-Solver kann Chips auch bei noch offenen
@@ -887,6 +885,20 @@ mod tests {
                 "Seed {seed}: {} Steps — Deadlock-Verdacht (Tiling-End-Schleife)",
                 recs.len()
             );
+            // Regression Policy-Leak: jede Policy-Aktion MUSS in valid_actions
+            // liegen (sonst Target-Masse auf maskierter Aktion → Policy-Loss-
+            // Explosion im Training). Traf früher seltene Tiling-Nicht-Top-Reihen.
+            for r in &recs {
+                let o = r.as_object().unwrap();
+                let valid = o["valid_actions"].as_array().unwrap();
+                for p in o["policy"].as_array().unwrap() {
+                    let pa = &p["action"];
+                    assert!(
+                        valid.iter().any(|v| env_action_eq(v, pa)),
+                        "Seed {seed}: Policy-Aktion {pa} nicht in valid_actions (Leak)"
+                    );
+                }
+            }
         }
     }
 }

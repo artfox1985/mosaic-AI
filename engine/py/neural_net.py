@@ -461,6 +461,12 @@ class MosaicDataset(Dataset):
                         moves = step.get("valid_actions") or step["state"].get("valid_moves", [])
                         for move in moves:
                             mask[action_to_id(move)] = 1.0
+                        # Selbstkonsistenz: die tatsächlich gespielten Policy-Aktionen
+                        # sind per Definition legal — immer in die Maske aufnehmen.
+                        # Verhindert Policy-Leaks (Target-Masse auf maskierter Aktion →
+                        # explodierender Policy-Loss), falls valid_actions unvollständig ist.
+                        for p in step["policy"]:
+                            mask[action_to_id(p["action"])] = 1.0
                         masks_l.append(mask)
 
                         moon_target = np.full(5, -1.0, dtype=np.float32)
