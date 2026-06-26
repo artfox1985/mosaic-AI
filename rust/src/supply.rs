@@ -6,7 +6,7 @@
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::tile::{TileColor, TILES_PER_COLOR, SPECIAL_TILES};
+use crate::tile::{TileColor, TILES_PER_COLOR};
 
 #[derive(Debug, Clone, Default)]
 pub struct Bag {
@@ -73,39 +73,6 @@ impl Tower {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SpecialSupply {
-    pub remaining: usize,
-}
-
-impl Default for SpecialSupply {
-    fn default() -> Self {
-        SpecialSupply {
-            remaining: SPECIAL_TILES,
-        }
-    }
-}
-
-impl SpecialSupply {
-    pub fn count(&self) -> usize {
-        self.remaining
-    }
-    pub fn is_empty(&self) -> bool {
-        self.remaining == 0
-    }
-    /// Entnimmt n weiße Steine; Fehler wenn nicht genug vorhanden.
-    pub fn take(&mut self, n: usize) -> Result<usize, String> {
-        if n > self.remaining {
-            return Err(format!(
-                "Nicht genug weiße Steine: {n} angefordert, nur {} verfügbar.",
-                self.remaining
-            ));
-        }
-        self.remaining -= n;
-        Ok(n)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,12 +100,4 @@ mod tests {
         assert!(tower.is_empty());
     }
 
-    #[test]
-    fn special_supply_take_and_exhaust() {
-        let mut s = SpecialSupply::default();
-        assert_eq!(s.count(), 9);
-        assert!(s.take(9).is_ok());
-        assert!(s.is_empty());
-        assert!(s.take(1).is_err());
-    }
 }

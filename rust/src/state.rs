@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::board::PlayerBoard;
 use crate::dome::{build_bonus_chip_pool, build_dome_tile_pool, BonusChip, DomeTile};
 use crate::factory::{Factory, LargeFactory};
-use crate::supply::{Bag, SpecialSupply, Tower};
+use crate::supply::{Bag, Tower};
 use crate::tile::TileColor;
 
 // Spielkonstanten
@@ -45,7 +45,6 @@ impl Phase {
 pub struct GameState {
     pub bag: Bag,
     pub tower: Tower,
-    pub special_supply: SpecialSupply,
 
     pub factories: Vec<Factory>,
     pub large_factory: LargeFactory,
@@ -156,7 +155,6 @@ pub fn setup_new_game<R: Rng + ?Sized>(
 ) -> GameState {
     let mut bag = Bag::full(rng);
     let mut tower = Tower::default();
-    let special_supply = SpecialSupply::default();
 
     let mut players: Vec<PlayerBoard> = player_names
         .into_iter()
@@ -189,7 +187,6 @@ pub fn setup_new_game<R: Rng + ?Sized>(
     let mut state = GameState {
         bag,
         tower,
-        special_supply,
         factories,
         large_factory,
         players,

@@ -156,7 +156,6 @@ pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
         "moon_top_colors": moon_colors,
         "dome_display": state.dome_display.iter().map(|t| serialize_dome_tile(Some(t))).collect::<Vec<_>>(),
         "dome_stack_count": state.dome_tile_pool.len(),
-        "special_supply": state.special_supply.count(),
         "bag_count": state.bag.count(),
         "players": players,
         "log": state.log.iter().rev().take(30).rev().cloned().collect::<Vec<_>>(),
