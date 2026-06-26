@@ -316,12 +316,8 @@ pub fn check_special_trigger(
         return 0;
     }
 
-    if state.special_supply.is_empty() {
-        state.log_event("Kein Spezialfliesen-Vorrat mehr! (Kein Bonus)");
-        return 0;
-    }
-    let _ = state.special_supply.take(1);
-
+    // Kein Vorrats-Check nötig: exakt 9 Kuppelplatten tragen einen Special-Slot
+    // und es gibt exakt 9 Special-Fliesen → der Vorrat kann nie leerlaufen.
     {
         let slot = state.players[player_idx].dome_grid.dome_slots[slot_row][slot_col]
             .as_mut()
@@ -469,6 +465,142 @@ pub fn apply_bonus_chips_to_row(player: &mut PlayerBoard, row_idx: usize) -> boo
         } else {
             break;
         }
+    }
+    player.pattern_lines[row_idx].is_complete()
+}
+
+/// Sicherheits-Cap für die Allokations-Enumeration (2^n Bitmasken).
+const CHIP_ALLOC_CAP: usize = 14;
+
+/// Kanonische Signatur eines Chips (sortierte Farben) — Chips mit gleicher
+/// Signatur sind austauschbar (gleiche Restmenge nach Verbrauch).
+fn chip_sig(chip: &crate::dome::BonusChip) -> String {
+    let mut cs: Vec<&str> = chip.colors.iter().map(|c| c.value()).collect();
+    cs.sort_unstable();
+    cs.join(",")
+}
+
+/// Greedy-Verbrauch (2 farbgleiche bevorzugt, sonst 3 beliebige) als
+/// ORIGINAL-Indizes — Fallback für den Cap.
+fn greedy_chip_indices(player: &PlayerBoard, color: TileColor, missing: usize) -> Option<Vec<usize>> {
+    let mut pool: Vec<usize> = (0..player.bonus_chips.len()).collect();
+    let mut consumed = Vec::new();
+    for _ in 0..missing {
+        let same: Vec<usize> = pool
+            .iter()
+            .copied()
+            .filter(|&i| player.bonus_chips[i].colors.contains(&color))
+            .collect();
+        if same.len() >= 2 {
+            let (a, b) = (same[0], same[1]);
+            consumed.push(a);
+            consumed.push(b);
+            pool.retain(|&i| i != a && i != b);
+        } else if pool.len() >= 3 {
+            let three: Vec<usize> = pool.iter().take(3).copied().collect();
+            consumed.extend(&three);
+            pool.retain(|&i| !three.contains(&i));
+        } else {
+            return None;
+        }
+    }
+    Some(consumed)
+}
+
+/// Gültig (O(1)): `s` Chips, davon `cb` mit der Reihenfarbe, komplettieren
+/// `missing` Slots gdw. `2·missing ≤ s ≤ 3·missing` und `cb ≥ 2·(3·missing − s)`.
+fn chips_complete(s: usize, cb: usize, missing: usize) -> bool {
+    if missing == 0 || s < 2 * missing || s > 3 * missing {
+        return false;
+    }
+    let a = 3 * missing - s; // Anzahl 2-farbgleich-Gruppen
+    cb >= 2 * a
+}
+
+/// Greedy-Allokation (Engine-Regel) als ORIGINAL-Index-Set. EINE Allokation,
+/// O(missing·chips) — für den Hot-Path (DFS an jedem MCTS-Blatt) statt der
+/// teuren 2^n-Enumeration von `chip_allocations`.
+pub fn greedy_chip_alloc(player: &PlayerBoard, row_idx: usize) -> Option<Vec<usize>> {
+    let row = &player.pattern_lines[row_idx];
+    let color = match row.color {
+        Some(c) if !row.tiles.is_empty() => c,
+        _ => return None,
+    };
+    let missing = row.spaces_left();
+    if missing == 0 {
+        return None;
+    }
+    greedy_chip_indices(player, color, missing)
+}
+
+/// Distinkte Chip-Index-Mengen, die Reihe `row_idx` komplettieren (dedupliziert
+/// nach Farb-Set-Signatur der verbrauchten Chips → gleiche Restmenge = ein
+/// Zweig). Bei sehr vielen Chips nur die Greedy-Allokation (Cap-Fallback).
+pub fn chip_allocations(player: &PlayerBoard, row_idx: usize) -> Vec<Vec<usize>> {
+    let row = &player.pattern_lines[row_idx];
+    let color = match row.color {
+        Some(c) if !row.tiles.is_empty() => c,
+        _ => return Vec::new(),
+    };
+    let missing = row.spaces_left();
+    if missing == 0 {
+        return Vec::new();
+    }
+    let n = player.bonus_chips.len();
+    if n > CHIP_ALLOC_CAP {
+        return greedy_chip_indices(player, color, missing).into_iter().collect();
+    }
+
+    let mut seen: std::collections::HashSet<Vec<String>> = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for mask in 1u32..(1u32 << n) {
+        let subset: Vec<usize> = (0..n).filter(|&i| mask & (1 << i) != 0).collect();
+        let s = subset.len();
+        if s < 2 * missing || s > 3 * missing {
+            continue;
+        }
+        let cb = subset
+            .iter()
+            .filter(|&&i| player.bonus_chips[i].colors.contains(&color))
+            .count();
+        if !chips_complete(s, cb, missing) {
+            continue;
+        }
+        let mut sig: Vec<String> = subset.iter().map(|&i| chip_sig(&player.bonus_chips[i])).collect();
+        sig.sort_unstable();
+        if seen.insert(sig) {
+            out.push(subset);
+        }
+    }
+    out
+}
+
+/// Komplettiert Reihe `row_idx` mit GENAU den angegebenen Chips (Indizes in
+/// `player.bonus_chips`). Gibt false, wenn die Auswahl ungültig ist.
+pub fn apply_bonus_chips_with(player: &mut PlayerBoard, row_idx: usize, chip_indices: &[usize]) -> bool {
+    let color = match player.pattern_lines[row_idx].color {
+        Some(c) if !player.pattern_lines[row_idx].tiles.is_empty() => c,
+        _ => return false,
+    };
+    let missing = player.pattern_lines[row_idx].spaces_left();
+    let n = player.bonus_chips.len();
+    let mut idx: Vec<usize> = chip_indices.to_vec();
+    idx.sort_unstable();
+    idx.dedup();
+    if idx.len() != chip_indices.len() || idx.iter().any(|&i| i >= n) {
+        return false;
+    }
+    let s = idx.len();
+    let cb = idx.iter().filter(|&&i| player.bonus_chips[i].colors.contains(&color)).count();
+    if !chips_complete(s, cb, missing) {
+        return false;
+    }
+    // Absteigend entfernen, damit Indizes stabil bleiben.
+    for &i in idx.iter().rev() {
+        player.bonus_chips.remove(i);
+    }
+    for _ in 0..missing {
+        player.pattern_lines[row_idx].tiles.push(color);
     }
     player.pattern_lines[row_idx].is_complete()
 }
