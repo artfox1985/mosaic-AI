@@ -15,7 +15,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 627        # state_to_tensor Ausgabegröße (553 Basis + 74 Endwertungs-/Geometrie-Features, 37 je Spieler)
+INPUT_SIZE = 673        # state_to_tensor (553 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler)
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---

@@ -173,6 +173,18 @@ def state_to_tensor(data):
             features.append(geo.get("special_empty", 0) / 8.0)
             features.append(geo.get("special_total", 0) / 8.0)
 
+        # 6c. Linien-Geometrie (offensives Linien-Bauen, 23 je Spieler).
+        # Punkte = zusammenhängende orthogonale Läufe → diese Struktur explizit
+        # machen, damit das flache MLP Linien-Strategie repräsentieren kann
+        # (Quelle: Rust scoring::player_line_features).
+        for p in [me, enemy]:
+            lg = p.get("line_geo", {})
+            features.extend(v / 6.0 for v in _padn(lg.get("h_hist"), 5))   # Läufe len 2-6
+            features.extend(v / 6.0 for v in _padn(lg.get("v_hist"), 5))
+            features.append(lg.get("cluster_sq", 0) / 150.0)               # Σ länge²
+            features.extend(v / 12.0 for v in _padn(lg.get("row_potential"), 6))
+            features.extend(v / 12.0 for v in _padn(lg.get("col_potential"), 6))
+
     # 7. Mondseite kleine Fabriken (pro Fabrik: 3 Positionen × 5 Farben = 15 Features)
     # Position 0 = oben (abholbar), Position 1 = darunter, Position 2 = ganz unten
     for f in data.get("factories", []):
