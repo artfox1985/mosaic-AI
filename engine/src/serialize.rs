@@ -89,6 +89,10 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
     // vollen Reihen inkl. Linien über mehrere Reihen) − fixe Strafen.
     let estimated_score = solve_round_final_score(state, pi) - p.score;
 
+    // Berechnete Endwertungs-/Geometrie-Features (damit das Netz lernt, wie
+    // Endpunkte entstehen — siehe scoring::player_scoring_features).
+    let sf = crate::scoring::player_scoring_features(p);
+
     json!({
         "id": p.player_id,
         "name": p.name,
@@ -113,6 +117,20 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
         "estimated_score": estimated_score,
         "unused_chip_count": unused.len(),
         "unused_chip_colors": unused_colors,
+        // Berechnete Punkte-Features fürs Netz (Endwertung + Geometrie-Fortschritt).
+        "scoring_tile_points": sf.tile_points,
+        "score_geo": {
+            "row_fill": sf.row_fill,
+            "col_fill": sf.col_fill,
+            "diag_fill": sf.diag_fill,
+            "row_colors": sf.row_colors,
+            "border_fill": sf.border_fill,
+            "corner_fill": sf.corner_fill,
+            "wild_filled": sf.wild_filled,
+            "wild_total": sf.wild_total,
+            "special_empty": sf.special_empty,
+            "special_total": sf.special_total,
+        },
     })
 }
 
