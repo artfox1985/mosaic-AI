@@ -80,6 +80,12 @@ impl PyGame {
         state_to_json(&self.game.state, self.scoring_confirmed).to_string()
     }
 
+    /// 673-dim NN-Feature-Vektor (Port von `state_to_tensor`) — für die
+    /// Phase-B-Paritätsprüfung gegen Python.
+    fn features(&self) -> Vec<f32> {
+        crate::features::state_to_features(&state_to_json(&self.game.state, self.scoring_confirmed))
+    }
+
     fn phase(&self) -> &'static str {
         self.game.state.phase.as_str()
     }
