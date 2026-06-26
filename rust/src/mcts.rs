@@ -17,6 +17,7 @@ use serde_json::{json, Value};
 
 use crate::game::{drafting_actions, Game};
 use crate::moves::Action;
+use crate::tile::TileColor;
 use crate::serialize::action_to_dict;
 use crate::state::{GameState, Phase};
 use crate::tiling_solver::solve_round_final_score;
@@ -264,7 +265,7 @@ fn best_uct_child(nodes: &[Node], nid: usize, c: f64) -> usize {
 fn log_label(nodes: &[Node], nid: usize) -> String {
     match &nodes[nid].action {
         None => "Wurzel".to_string(),
-        Some(sm) => label_search_move(sm).1,
+        Some(sm) => label_search_move(sm, None).1,
     }
 }
 
@@ -350,7 +351,7 @@ fn build_tree<R: Rng + ?Sized>(
                 nodes[nid].children.push(cid);
                 logln!(
                     "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}{})",
-                    label_search_move(&mv).1,
+                    label_search_move(&mv, None).1,
                     names[mover],
                     if terminal { ", terminal/DFS" } else { "" }
                 );
@@ -409,7 +410,7 @@ pub fn search_log_text<R: Rng + ?Sized>(
                 let label = nodes[best]
                     .action
                     .as_ref()
-                    .map(|sm| label_search_move(sm).1)
+                    .map(|sm| label_search_move(sm, Some(state)).1)
                     .unwrap_or_default();
                 out.push_str(&format!(
                     "Gewaehlter Zug: {label}  (Wurzel-N={}, Knoten={})\n",
@@ -451,7 +452,35 @@ fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
 }
 
 /// Typ, Beschreibung, Kategorie (für `.cat-*` in debug.html) und Move-Dict.
-fn label_search_move(sm: &SearchMove) -> (&'static str, String, &'static str, Value) {
+/// Wie viele Steine ein Take-Zug aus `state` entnimmt: alle der Farbe in der
+/// Sonnen-Sektion bzw. (Mond) je Stapel mit passender Oberseite. Der globale
+/// Mond-Zug (factory_id=None) summiert alle kleinen Fabriken + große Fabrik.
+fn tiles_taken(state: &GameState, t: &crate::moves::TakeAction) -> usize {
+    use crate::moves::TakeSource::*;
+    let by_id = |fid: usize| state.factories.iter().find(|f| f.factory_id == fid);
+    let moon_top = |f: &crate::factory::Factory, c: TileColor| {
+        f.moon_stacks.iter().filter(|s| s.last() == Some(&c)).count()
+    };
+    match t.source {
+        SmallFactorySun => t
+            .factory_id
+            .and_then(by_id)
+            .map_or(0, |f| f.sun_tiles.iter().filter(|&&c| c == t.color).count()),
+        LargeFactorySun => state.large_factory.sun_tiles.iter().filter(|&&c| c == t.color).count(),
+        LargeFactoryMoon => state.large_factory.moon_pool.iter().filter(|&&c| c == t.color).count(),
+        SmallFactoryMoon => match t.factory_id {
+            Some(fid) => by_id(fid).map_or(0, |f| moon_top(f, t.color)),
+            None => {
+                let small: usize = state.factories.iter().map(|f| moon_top(f, t.color)).sum();
+                let large = state.large_factory.moon_pool.iter().filter(|&&c| c == t.color).count();
+                small + large
+            }
+        },
+    }
+}
+
+/// `state=Some` blendet die Steinanzahl in die Stein-Beschreibung ein.
+fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (&'static str, String, &'static str, Value) {
     match sm {
         SearchMove::Draft(a) => match a {
             Action::Stone(m) => {
@@ -465,7 +494,11 @@ fn label_search_move(sm: &SearchMove) -> (&'static str, String, &'static str, Va
                     Some(id) => format!("F{id}"),
                     None => "GF".to_string(),
                 };
-                let desc = format!("Stein {} von {src} → {dest}", m.take.color.value());
+                let amount = match state.map(|s| tiles_taken(s, &m.take)) {
+                    Some(n) => format!("{n}× "),
+                    None => String::new(),
+                };
+                let desc = format!("{amount}Stein {} von {src} → {dest}", m.take.color.value());
                 ("stone", desc, cat, action_to_dict(a))
             }
             Action::Dome(m) => (
@@ -498,7 +531,7 @@ fn serialize_node(nodes: &[Node], nid: usize, depth_left: u32, top_k: usize) -> 
     let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
     let (typ, desc, cat, mv) = match &node.action {
         None => ("root", "Wurzel".to_string(), "pass", Value::Null),
-        Some(sm) => label_search_move(sm),
+        Some(sm) => label_search_move(sm, None),
     };
     let children = if depth_left > 0 && !node.children.is_empty() {
         let mut ch = node.children.clone();
@@ -524,8 +557,8 @@ fn serialize_node(nodes: &[Node], nid: usize, depth_left: u32, top_k: usize) -> 
 }
 
 /// Anzeige-JSON einer Suchaktion (`{type, description, category, move}`).
-pub fn search_move_json(sm: &SearchMove) -> Value {
-    let (typ, desc, cat, mv) = label_search_move(sm);
+pub fn search_move_json(sm: &SearchMove, state: Option<&GameState>) -> Value {
+    let (typ, desc, cat, mv) = label_search_move(sm, state);
     json!({ "type": typ, "description": desc, "category": cat, "move": mv })
 }
 
@@ -570,7 +603,7 @@ pub fn search_with_tree<R: Rng + ?Sized>(
             let node = &nodes[cid];
             let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
             let (typ, desc, cat, _mv) = match &node.action {
-                Some(sm) => label_search_move(sm),
+                Some(sm) => label_search_move(sm, Some(state)),
                 None => ("?", "?".to_string(), "pass", Value::Null),
             };
             let is_chosen = best == Some(cid);
