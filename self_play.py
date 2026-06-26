@@ -63,7 +63,8 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
 
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
-                  tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None):
+                  tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None,
+                  per_file: int = 10):
     if mode == "network":
         raise SystemExit(
             "ℹ️  --mode network läuft über die ONNX-Inferenz in Rust (Phase B) und ist "
@@ -80,17 +81,21 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     base_seed = seed if seed is not None else _random.randint(0, 2**31 - 1)
     chunk = max(1, chunk)
 
+    per_file = max(1, per_file)
     print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
-          f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | Chunk: {chunk})")
-    print(f"   (Fortschritt erscheint nach jedem Chunk von {chunk} Spielen.)")
+          f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | "
+          f"Chunk: {chunk} | {per_file} Spiele/Datei)")
 
     # WICHTIG: In Chunks generieren statt in EINEM riesigen Rust-Aufruf. Das gibt
-    # laufenden Fortschritt + ETA, schreibt Dateien inkrementell und hält den
-    # Speicher klein (sonst lägen bei z.B. 3000 Spielen mehrere GB JSON im RAM).
+    # laufenden Fortschritt + ETA und hält den Speicher klein (sonst lägen bei
+    # z.B. 3000 Spielen mehrere GB JSON im RAM). Die .pkl-Granularität (per_file,
+    # Standard 10 Spiele/Datei) ist davon ENTKOPPELT.
     t_start = time.time()
     done = 0
     total_steps = 0
     chunk_idx = 0
+    buffer: list[dict] = []      # akkumulierte Steps für die nächste .pkl
+    buffer_games = 0             # Anzahl Spiele im Buffer
     while done < num_games:
         n = min(chunk, num_games - done)
         raw = _mr.self_play_games(
@@ -102,15 +107,25 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         )
         steps = json.loads(raw)
         total_steps += len(steps)
-        done += n
         chunk_idx += 1
-        _flush(steps, version_name, tag, done)   # diesen Chunk sofort pickeln
+
+        # Chunk in Spiele aufteilen und je `per_file` Spiele eine .pkl schreiben.
+        for game_steps in _group_by_game(steps):
+            buffer.extend(game_steps)
+            buffer_games += 1
+            done += 1
+            if buffer_games >= per_file:
+                _flush(buffer, version_name, tag, done)
+                buffer, buffer_games = [], 0
 
         elapsed = time.time() - t_start
         rate = done / elapsed if elapsed > 0 else 0.0
         eta_min = (num_games - done) / rate / 60 if rate > 0 else 0.0
         print(f"  ⏳ {done}/{num_games} Spiele | {rate:.2f} Spiele/s | "
               f"{total_steps} Züge | ETA {eta_min:.1f} min")
+
+    if buffer:   # Rest (< per_file Spiele) sichern
+        _flush(buffer, version_name, tag, done)
 
     print(f"\n✅ Fertig: {num_games} Spiele, {total_steps} Züge nach {time.time() - t_start:.1f}s")
 
@@ -129,6 +144,8 @@ if __name__ == "__main__":
                         help="Rust-Worker-Threads (0 = alle Kerne). Ersetzt das alte --terminals.")
     parser.add_argument("--chunk", type=int, default=50,
                         help="Spiele pro Rust-Aufruf (Fortschritts-Granularität + Speicherlimit)")
+    parser.add_argument("--per-file", dest="per_file", type=int, default=10,
+                        help="Spiele pro .pkl-Datei (Standard 10, entkoppelt von --chunk)")
     parser.add_argument("--seed", type=int, default=None,
                         help="Basis-Seed (für reproduzierbare Läufe). Standard: zufällig.")
     parser.add_argument("--depth", type=int, default=0,
@@ -144,4 +161,5 @@ if __name__ == "__main__":
         threads=args.threads,
         chunk=args.chunk,
         seed=args.seed,
+        per_file=args.per_file,
     )
