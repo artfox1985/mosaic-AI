@@ -574,6 +574,33 @@ pub fn search_move_json(sm: &SearchMove, state: Option<&GameState>) -> Value {
     json!({ "type": typ, "description": desc, "category": cat, "move": mv })
 }
 
+/// Wurzelkind-Statistik nach einer Suche: `(Drafting-Action, Besuche, Q)` je
+/// Kind. Basis für die Self-Play-Policy-Targets (`crate::self_play`). Leer
+/// außerhalb der Drafting-Phase.
+pub fn root_child_stats<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> Vec<(Action, u32, f64)> {
+    let nodes = match build_tree(state, simulations, c, rng, None) {
+        Some(n) => n,
+        None => return Vec::new(),
+    };
+    nodes[0]
+        .children
+        .iter()
+        .filter_map(|&cid| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            match &node.action {
+                Some(SearchMove::Draft(a)) => Some((a.clone(), node.visits, q)),
+                None => None,
+            }
+        })
+        .collect()
+}
+
 /// Beste Drafting-Aktion für `state` (als SearchMove). None außerhalb Drafting.
 pub fn search_action<R: Rng + ?Sized>(
     state: &GameState,
