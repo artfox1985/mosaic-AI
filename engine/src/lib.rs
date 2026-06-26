@@ -11,9 +11,11 @@ pub mod board;
 pub mod dome;
 pub mod execution;
 pub mod factory;
+pub mod features;
 pub mod game;
 pub mod mcts;
 pub mod moves;
+pub mod net;
 pub mod py;
 pub mod round_end;
 pub mod scoring;
@@ -80,6 +82,18 @@ fn arena_match(
     py.detach(move || crate::self_play::run_arena_match(sims_a, sims_b, n_games, seed, num_threads, c))
 }
 
+/// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
+/// Feature-Vektor aus und gibt `(value, policy_logits)` zurück.
+#[pyfunction]
+fn onnx_eval(path: String, features: Vec<f32>) -> PyResult<(f32, Vec<f32>)> {
+    let net = crate::net::Net::load(&path, features.len())
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    let (policy, value, _moon) = net
+        .eval(&features)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    Ok((value, policy))
+}
+
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
@@ -110,6 +124,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(self_play_games, m)?)?;
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
+    m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
