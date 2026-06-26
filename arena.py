@@ -69,7 +69,7 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
     elo = {n: competitors[n].get("elo", 1000) for n in names}
     sims = {n: int(competitors[n]["sims"]) for n in names}
     wins = {n: 0 for n in names}
-    wins["ZeroZero"] = 0  # Punktegleichstand (Sieg per Startstein) — nur als Info
+    wins["ZeroZero"] = 0  # echte 0:0-Spiele (beide ~nichts gescort) = Sauberkeits-Indikator
     penalties = {n: 0 for n in names}
     penalties_per_round = {n: {} for n in names}
     games_played = {n: 0 for n in names}
@@ -121,8 +121,8 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
                     winner_name, score_a = B, 0.0
                     b_wins += 1
                 wins[winner_name] += 1
-                if scores[0] == scores[1]:
-                    wins["ZeroZero"] += 1   # Punktegleichstand (per Startstein entschieden)
+                if scores[0] == 0 and scores[1] == 0:
+                    wins["ZeroZero"] += 1   # beide 0 → degeneriertes Spiel (Floor-Flut)
 
                 # Elo mit Siegstärke-skaliertem K. Strength aus Sicht des echten
                 # Siegers (inkl. Startstein-Tiebreak bei Gleichstand).
