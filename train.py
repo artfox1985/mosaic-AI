@@ -1,17 +1,20 @@
 # train.py
+import sys
 import argparse
 import torch
 import math
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from pathlib import Path
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
 from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MARGIN_CAP, MAX_WINNER_SCORE
 
-# WICHTIG: Wir importieren das Dataset UND das Netz aus unserer neuen Datei
-from agents.neural_net import MosaicNet, MosaicDataset
+# Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
+from neural_net import MosaicNet, MosaicDataset
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE, zerozero_ratio=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
