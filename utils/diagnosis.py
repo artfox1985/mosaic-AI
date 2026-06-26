@@ -17,7 +17,9 @@ from pathlib import Path
 from collections import Counter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from agents.neural_net import MosaicDataset, MosaicNet, action_to_id
+# Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
+from neural_net import MosaicDataset, MosaicNet, action_to_id
 from config import DATA_DIR, INPUT_SIZE, NUM_ACTIONS
 
 
@@ -309,7 +311,7 @@ def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
 
     Strafleisten-Stone-IDs vom Mond (f_idx=5, alle 5 Farben): 15, 63, 111, 159, 207
     """
-    from agents.neural_net import action_to_id
+    from neural_net import action_to_id
 
     PENALTY_MOON_IDS = {15, 63, 111, 159, 207}
 
@@ -417,7 +419,7 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     """
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from agents.neural_net import compute_win_val
+    from neural_net import compute_win_val
 
     files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
     if len(files) > max_files:
@@ -498,7 +500,7 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     print(f"       nichts cappt (volle Auflösung). Faustregel: Gecappt-Anteil")
     print(f"       unten im Vergleich beachten — für Iteration 0 möglichst < 2%.")
 
-    from agents.neural_net import compute_win_val
+    from neural_net import compute_win_val
     for margin_cap, max_ws, desc in [
         (margin_cap_opt, max_ws_opt, "Empfohlen"),
         (15, 40, "Standard (15/40)"),
