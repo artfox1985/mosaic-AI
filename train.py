@@ -16,9 +16,9 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, zerozero_ratio=None):
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
-    dataset = MosaicDataset(str(DATA_DIR), target_zerozero_ratio=zerozero_ratio)
+    dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
@@ -288,12 +288,9 @@ if __name__ == "__main__":
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
-    parser.add_argument("--zerozero_ratio", type=float, default=None,
-                        help="Ziel-Anteil 0:0-Spiele (z.B. 0.45). None = keine Reduktion")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
-          hidden_size=args.hidden, early_stop=not args.no_early_stop,
-          zerozero_ratio=args.zerozero_ratio)
+          hidden_size=args.hidden, early_stop=not args.no_early_stop)
