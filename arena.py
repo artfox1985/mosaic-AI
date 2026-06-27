@@ -250,11 +250,11 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
 if __name__ == "__main__":
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_gen1.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL = "models/alphazero_v1.onnx"   # Pfad zum ONNX-Netz
     NET_SIMS  = 200                            # Basis-Sims des Netzes
     STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
-    HEUR_SIMS = 60                             # Basis-Sims der Heuristik
-    GAMES     = 40
+    HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
+    GAMES     = 100
     run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS,
                   games=GAMES, stage=STAGE, threads=0)
 
