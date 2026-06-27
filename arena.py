@@ -171,11 +171,97 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
         print(f" - {name:15s}: {elo[name]} Elo")
 
 
+def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=0,
+                  seed=None, chunk=10, c=0.3, c_puct=1.5,
+                  net_name=None, heur_name=None):
+    """AlphaZero-Netz (ONNX) vs Heuristik-MCTS. Das Netz spielt Brett 0, die
+    Heuristik Brett 1; der Startspieler-Vorteil wird über alternierende Start-
+    spieler je Spiel (i % 2) ausgeglichen. `stage` 1 = DFS-Blatt (Stufe 1),
+    2 = Netz-Value-Blatt (Stufe 2). Spielt in Chunks für LIVE-Ausgabe."""
+    import os
+    import statistics as _st
+    chunk = max(1, chunk)
+    dfs_leaf = (stage == 1)
+    net_name  = net_name  or f"AlphaZero({os.path.basename(model)})"
+    heur_name = heur_name or f"Heuristik(s{heur_sims})"
+    leaf = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
+
+    print("🏟️ Mosaic-AI ARENA — Netz vs Heuristik (Rust) 🏟️")
+    print(f"  {net_name} (Brett 0, {net_sims} Sims, Stufe {stage}/{leaf}) "
+          f"vs {heur_name} (Brett 1, {heur_sims} Sims) — {games} Spiele")
+    print("-" * 50)
+
+    elo  = {net_name: 1000, heur_name: 1000}
+    wins = {net_name: 0, heur_name: 0, "ZeroZero": 0}
+    floor = {net_name: 0, heur_name: 0}
+    net_scores, heur_scores = [], []
+    base_seed = seed if seed is not None else random.randint(0, 10**9)
+
+    done = chunk_idx = 0
+    n_wins = h_wins = 0
+    t0 = time.time()
+    while done < games:
+        n = min(chunk, games - done)
+        raw = _mr.net_arena_match(model, net_sims=net_sims, heur_sims=heur_sims,
+                                  n_games=n, seed=base_seed + chunk_idx,
+                                  num_threads=threads, c=c, c_puct=c_puct, dfs_leaf=dfs_leaf)
+        results = json.loads(raw)
+        chunk_idx += 1
+
+        for g in results:
+            done += 1
+            scores = g["scores"]      # [Netz=Brett0, Heuristik=Brett1]
+            winner = g["winner"]      # 0 = Netz, 1 = Heuristik
+            steps  = g["steps"]
+            net_scores.append(scores[0]); heur_scores.append(scores[1])
+            floor[net_name]  += g["total_floor"][0]
+            floor[heur_name] += g["total_floor"][1]
+
+            if winner == 0:
+                winner_name, score_a = net_name, 1.0
+                n_wins += 1
+            else:
+                winner_name, score_a = heur_name, 0.0
+                h_wins += 1
+            wins[winner_name] += 1
+            if scores[0] == 0 and scores[1] == 0:
+                wins["ZeroZero"] += 1
+
+            strength = compute_win_val(scores, winner)
+            k = 32 * strength
+            elo[net_name], elo[heur_name] = calculate_elo(elo[net_name], elo[heur_name], score_a, k=k)
+
+            print(f"  #{done:>3}/{games}: {scores[0]:3d}:{scores[1]:<3d} -> {winner_name:<24} "
+                  f"| Züge {steps:3d} | Strength {strength:.3f} "
+                  f"| Stand Netz {n_wins}:{h_wins} Heur | Elo {elo[net_name]}/{elo[heur_name]}",
+                  flush=True)
+
+    dur = time.time() - t0
+    print("-" * 50)
+    print(f"🏆 ERGEBNIS: {net_name} {n_wins}:{h_wins} {heur_name} "
+          f"({n_wins/games*100:.0f}% Netz-Siege) in {dur:.1f}s ({games/dur:.1f} Spiele/s)")
+    print(f"   Ø Score: {net_name} {_st.mean(net_scores):.1f} | {heur_name} {_st.mean(heur_scores):.1f}")
+    print(f"   0:0-Spiele: {wins['ZeroZero']}/{games} ({wins['ZeroZero']/games*100:.1f}%)  "
+          f"(Sauberkeits-Indikator)")
+    print(f"   Ø Floor-Strafe: {net_name} {floor[net_name]/games:.1f} | {heur_name} {floor[heur_name]/games:.1f}")
+    print(f"   Elo: {net_name} {elo[net_name]} | {heur_name} {elo[heur_name]}")
+
+
 if __name__ == "__main__":
-    # Wettkämpfer = Heuristik-MCTS-Konfigurationen (durch Basis-Sims definiert).
-    competitors = {
-        "MCTS s50":  {"sims": 50,  "elo": 1000},
-        "MCTS s100": {"sims": 100, "elo": 1000},
-        "MCTS s200": {"sims": 200, "elo": 1000},
-    }
-    run_arena(competitors, games_per_matchup=100, threads=0)
+    # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
+    # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
+    NET_MODEL = "models/alphazero_gen1.onnx"   # Pfad zum ONNX-Netz
+    NET_SIMS  = 200                            # Basis-Sims des Netzes
+    STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
+    HEUR_SIMS = 60                             # Basis-Sims der Heuristik
+    GAMES     = 40
+    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS,
+                  games=GAMES, stage=STAGE, threads=0)
+
+    # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
+    # competitors = {
+    #     "MCTS s50":  {"sims": 50,  "elo": 1000},
+    #     "MCTS s100": {"sims": 100, "elo": 1000},
+    #     "MCTS s200": {"sims": 200, "elo": 1000},
+    # }
+    # run_arena(competitors, games_per_matchup=100, threads=0)
