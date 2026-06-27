@@ -87,7 +87,8 @@ fn arena_match(
 /// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
 #[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5))]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, dfs_leaf=true))]
+#[allow(clippy::too_many_arguments)]
 fn net_arena_match(
     py: Python<'_>,
     model_path: String,
@@ -98,11 +99,38 @@ fn net_arena_match(
     num_threads: usize,
     c: f64,
     c_puct: f64,
+    dfs_leaf: bool,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_arena_match(
-            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct,
+            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, dfs_leaf,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
+/// Netzgeführtes Self-Play (AlphaZero-Loop). `dfs_leaf=True` = Stufe 1 (DFS-Blatt,
+/// saubere Visit-Targets), `False` = Stufe 2 (Netz-Value). Gibt alle Step-Records
+/// als JSON-Array zurück (Format wie self_play_games). `num_threads=0` = alle Kerne.
+#[pyfunction]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, dfs_leaf=true, prefix="netgen".to_string()))]
+#[allow(clippy::too_many_arguments)]
+fn net_self_play_games(
+    py: Python<'_>,
+    model_path: String,
+    n_games: usize,
+    base_sims: u32,
+    c_puct: f64,
+    seed: Option<u64>,
+    num_threads: usize,
+    dfs_leaf: bool,
+    prefix: String,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_net_self_play(
+            &model_path, n_games, base_sims, c_puct, seed, num_threads, dfs_leaf, &prefix,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -152,6 +180,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }

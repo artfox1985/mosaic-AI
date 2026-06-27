@@ -22,7 +22,7 @@ use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, determine_winner, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, root_child_stats, search_drafting_action};
 use crate::net::Net;
-use crate::net_mcts::net_search_drafting_action;
+use crate::net_mcts::{net_root_child_stats, net_search_drafting_action, LeafEval};
 use crate::moves::{Action, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
@@ -795,6 +795,7 @@ fn play_net_game<R: Rng + ?Sized>(
     heur_sims: u32,
     c: f64,
     c_puct: f64,
+    leaf: LeafEval,
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
@@ -834,7 +835,7 @@ fn play_net_game<R: Rng + ?Sized>(
                         actions[0].clone()
                     } else if pi == net_board {
                         let s = dynamic_sims(net_sims, actions.len());
-                        net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
+                        net_search_drafting_action(net, &game.state, s, c_puct, false, leaf, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = dynamic_sims(heur_sims, actions.len());
@@ -892,9 +893,11 @@ pub fn run_net_arena_match(
     num_threads: usize,
     c: f64,
     c_puct: f64,
+    dfs_leaf: bool,
 ) -> Result<String, String> {
     let net = Net::load(model_path, 673).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
+    let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Value {
         let mut rng =
@@ -902,7 +905,7 @@ pub fn run_net_arena_match(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["Netz".to_string(), "Heuristik".to_string()];
-        play_net_game(&net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng)
+        play_net_game(&net, 0, net_sims, heur_sims, c, c_puct, leaf, ids, names, first, &mut rng)
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -914,6 +917,155 @@ pub fn run_net_arena_match(
         }
     };
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
+}
+
+// ── Netzgeführtes Self-Play (AlphaZero-Loop, Stufe 1/2) ──────────────────────
+
+/// Drafting-Policy aus der Netz-PUCT: Target = ROHE Visit-Verteilung N/ΣN
+/// (kein q²/Schärfen — die Schärfe kommt aus der Suchtiefe). Gespielte Aktion ~
+/// Visits (τ=1, Exploration; plus Dirichlet-Wurzel-Noise in der Suche).
+fn net_drafting_policy<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    base_sims: u32,
+    c_puct: f64,
+    leaf: LeafEval,
+    rng: &mut R,
+) -> (Action, Vec<Value>) {
+    let sims = dynamic_sims(base_sims, actions.len());
+    let stats = net_root_child_stats(net, state, sims, c_puct, true, leaf, rng); // (Action, visits, q)
+    let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
+    if stats.is_empty() || !(total > 0.0) {
+        let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
+        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
+    }
+    let policy: Vec<Value> = stats
+        .iter()
+        .map(|(a, v, _)| {
+            json!({ "action": action_to_env_dict(state, a), "prob": (*v as f64) / total })
+        })
+        .collect();
+    let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
+    let idx = weighted_index(&weights, total, rng);
+    (stats[idx].0.clone(), policy)
+}
+
+/// Ein netzgeführtes Self-Play-Spiel. Wie `play_one_game`, aber Drafting per
+/// Netz-PUCT (Priors vom Netz, Blatt per `leaf`) mit rohen Visit-Targets.
+#[allow(clippy::too_many_arguments)]
+fn play_net_self_play_game<R: Rng + ?Sized>(
+    net: &Net,
+    base_sims: u32,
+    c_puct: f64,
+    leaf: LeafEval,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    game_id: &str,
+    rng: &mut R,
+) -> Vec<Value> {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut records: Vec<Map<String, Value>> = Vec::new();
+    let mut guard = 0u32;
+    loop {
+        guard += 1;
+        if guard > 100_000 {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    match start_placement_step(&mut game, rng) {
+                        Some(rec) => records.push(rec),
+                        None => break,
+                    }
+                } else if game.state.phase == Phase::Drafting {
+                    let player = game.state.current_player;
+                    let actions = drafting_actions(&game.state);
+                    let valid_actions: Vec<Value> =
+                        actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
+                    let (chosen, policy) = if actions.len() == 1 {
+                        let a = actions[0].clone();
+                        let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
+                        (a, vec![e])
+                    } else {
+                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, leaf, rng)
+                    };
+                    let moon_t = moon_order_target(&game.state, &chosen, player, rng);
+                    let state_json = state_to_json(&game.state, true);
+                    let _ = game.apply_drafting(&chosen);
+                    let mut m = Map::new();
+                    m.insert("state".into(), state_json);
+                    m.insert("policy".into(), Value::Array(policy));
+                    m.insert("valid_actions".into(), Value::Array(valid_actions));
+                    m.insert(
+                        "moon_order_target".into(),
+                        moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
+                    );
+                    m.insert("player".into(), json!(player));
+                    records.push(m);
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => records.push(tiling_step(&mut game, rng)),
+            _ => break,
+        }
+    }
+    if game.state.phase == Phase::End {
+        let _ = game.apply_end_scoring();
+    }
+    let scores = [game.state.players[0].score, game.state.players[1].score];
+    let winner = determine_winner(&game.state);
+    records
+        .into_iter()
+        .map(|mut m| {
+            m.insert("game_id".into(), json!(game_id));
+            m.insert("scores".into(), json!(scores));
+            m.insert("winner".into(), json!(winner));
+            Value::Object(m)
+        })
+        .collect()
+}
+
+/// Netzgeführtes Self-Play: `n_games` Partien (rayon-parallel), Netz vs. sich
+/// selbst, rohe Visit-Targets. `dfs_leaf` = Stufe 1 (DFS-Blatt) vs. Stufe 2
+/// (Netz-Value). Gibt alle Step-Records flach als JSON-Array zurück.
+#[allow(clippy::too_many_arguments)]
+pub fn run_net_self_play(
+    model_path: &str,
+    n_games: usize,
+    base_sims: u32,
+    c_puct: f64,
+    seed: u64,
+    num_threads: usize,
+    dfs_leaf: bool,
+    prefix: &str,
+) -> Result<String, String> {
+    let net = std::sync::Arc::new(Net::load(model_path, 673).map_err(|e| e.to_string())?);
+    let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
+
+    let play = |i: usize| -> Vec<Value> {
+        let mut rng =
+            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = rng.random_range(0..2usize);
+        let names = ["Netz".to_string(), "Netz".to_string()];
+        let gid = format!("{prefix}_g{}", i + 1);
+        play_net_self_play_game(&net, base_sims, c_puct, leaf, ids, names, first, &gid, &mut rng)
+    };
+
+    let all: Vec<Vec<Value>> = if num_threads == 0 {
+        (0..n_games).into_par_iter().map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    let flat: Vec<Value> = all.into_iter().flatten().collect();
+    Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
 #[cfg(test)]

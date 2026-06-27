@@ -25,6 +25,18 @@ pub const DEFAULT_C_PUCT: f64 = 1.5;
 pub const DIRICHLET_EPS: f64 = 0.25;
 pub const DIRICHLET_ALPHA: f64 = 0.3;
 
+/// Blattbewertung der Netz-Suche. Priors kommen IMMER vom Netz; nur das Blatt
+/// unterscheidet sich:
+///   - `Dfs`: exakter DFS-Solver (Stufe 1 — saubere, scharfe Visit-Targets,
+///     unabhängig vom noch schwachen Netz-Value).
+///   - `Net`: Netz-Value (Stufe 2 — sobald das Netz die Heuristik schlägt, um
+///     deren Ein-Runden-Kurzsichtigkeit per Mehrrunden-Value zu überwinden).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LeafEval {
+    Dfs,
+    Net,
+}
+
 struct Node {
     parent: Option<usize>,
     children: Vec<usize>,
@@ -42,7 +54,8 @@ struct Node {
     leaf_value: [f64; 2],
 }
 
-/// Erzeugt einen Knoten: Netz-Forward → Value (Blattwert) + Child-Priors (untried).
+/// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
+/// (per `leaf`: DFS-Solver oder Netz-Value).
 fn make_node(
     net: &Net,
     state: GameState,
@@ -50,6 +63,7 @@ fn make_node(
     action: Option<Action>,
     prior: f32,
     player_who_acted: usize,
+    leaf: LeafEval,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
     let feats = state_to_features(&state_to_json(&state, true));
@@ -57,19 +71,13 @@ fn make_node(
         .eval(&feats)
         .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], 0.0, Vec::new()));
 
-    // Value (Tanh, [-1,1]) → Win-Prob aus Sicht des Spielers am Zug.
-    let win = ((value + 1.0) / 2.0) as f64;
-    let cp = state.current_player;
-    let leaf_value = if cp == 0 { [win, 1.0 - win] } else { [1.0 - win, win] };
-
-    let untried = if terminal {
-        Vec::new()
+    let (untried, n_actions) = if terminal {
+        (Vec::new(), 0)
     } else {
         // WICHTIG: Maskierte Softmax NUR über die legalen Aktions-Logits — exakt
         // wie das Training (masked log_softmax). Eine Softmax über alle 482 würde
-        // die durch den Policy-Weight-Fix unbeschränkten illegalen (Tiling-)Logits
-        // einrechnen, die dann die legalen Priors flach drücken (≈uniform → die
-        // Suche wird ungeführt).
+        // die unbeschränkten illegalen (Tiling-)Logits einrechnen und die legalen
+        // Priors flach drücken (≈uniform → ungeführte Suche).
         let acts0: Vec<(Action, usize)> = drafting_actions(&state)
             .into_iter()
             .map(|a| {
@@ -77,6 +85,7 @@ fn make_node(
                 (a, id)
             })
             .collect();
+        let n = acts0.len();
         let legal_logits: Vec<f32> = acts0
             .iter()
             .map(|(_, id)| logits.get(*id).copied().unwrap_or(f32::NEG_INFINITY))
@@ -85,7 +94,17 @@ fn make_node(
         let mut acts: Vec<(Action, f32)> =
             acts0.into_iter().zip(probs).map(|((a, _), p)| (a, p)).collect();
         acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        acts
+        (acts, n)
+    };
+
+    // Blattwert: absolute Per-Spieler-Win-Prob.
+    let leaf_value = match leaf {
+        LeafEval::Net => {
+            let win = ((value + 1.0) / 2.0) as f64; // Sicht des Spielers am Zug
+            let cp = state.current_player;
+            if cp == 0 { [win, 1.0 - win] } else { [1.0 - win, win] }
+        }
+        LeafEval::Dfs => crate::mcts::evaluate(&state, n_actions),
     };
 
     Node {
@@ -135,12 +154,13 @@ fn build_net_tree<R: Rng + ?Sized>(
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
+    leaf: LeafEval,
     rng: &mut R,
 ) -> Vec<Node> {
     let mut root_state = state.clone();
     root_state.log.clear();
     let root_player = root_state.current_player;
-    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player)];
+    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, leaf)];
 
     // Dirichlet-Noise auf die Wurzel-Priors mischen (Self-Play-Exploration).
     if add_root_noise && !nodes[0].untried.is_empty() {
@@ -168,7 +188,7 @@ fn build_net_tree<R: Rng + ?Sized>(
                 if g.apply_drafting(&act).is_ok() {
                     let mut child_state = g.state;
                     child_state.log.clear();
-                    let child = make_node(net, child_state, Some(nid), Some(act), prior, mover);
+                    let child = make_node(net, child_state, Some(nid), Some(act), prior, mover, leaf);
                     let cid = nodes.len();
                     nodes.push(child);
                     nodes[nid].children.push(cid);
@@ -202,12 +222,13 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
+    leaf: LeafEval,
     rng: &mut R,
 ) -> Option<Action> {
     if state.phase != Phase::Drafting {
         return None;
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits)?;
     nodes[best].action.clone()
 }
@@ -219,12 +240,13 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
+    leaf: LeafEval,
     rng: &mut R,
 ) -> Vec<(Action, u32, f64)> {
     if state.phase != Phase::Drafting {
         return Vec::new();
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng);
     nodes[0]
         .children
         .iter()
