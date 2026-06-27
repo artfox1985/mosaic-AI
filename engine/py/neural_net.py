@@ -4,7 +4,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from config import NUM_ACTIONS, HIDDEN_SIZE, MARGIN_CAP, MAX_WINNER_SCORE
+from config import NUM_ACTIONS, HIDDEN_SIZE
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
@@ -279,45 +279,14 @@ def action_to_id(action: dict) -> int:
 
 # --- 2. DATENSATZ & NETZWERK ---
 
-# 0:0-Strafe: geflutete Strafleisten sind ein vermiedenswertes Ergebnis. BEIDE
-# Spieler erhalten dieses negative Target (symmetrisch, nicht gespiegelt), damit
-# das Netz lernt, 0:0 aktiv zu vermeiden statt sich über den Startspieler-Marker
-# in einen "sicheren" Hafen zu mauern.
-#   v1f: -0.15 (mild) → senkte Self-Play-0:0 von 58.7% auf ~47%.
-#   v1g: -0.30 (stärker) → Test, ob der stärkere Anreiz die Rate weiter drückt,
-#        bevor der teurere Auxiliary-Floor-Head nötig wird.
-ZEROZERO_PENALTY = -0.15
-
-
-def is_zerozero(scores, winner) -> bool:
-    """True, wenn der Ausgang ein 0:0-Tiebreak-Spiel ist (kein echtes Punkten)."""
-    return abs(scores[0] - scores[1]) == 0 and scores[winner] < 5
-
-def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
-    """Berechnet den abgestuften Value-Target aus rohen Scores.
-    Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
-
-    Rückgabe ist der Wert AUS SIEGER-SICHT (für echte Siege). Die Trainings-
-    Aufrufstelle spiegelt: +wv für den Sieger, -wv für den Verlierer.
-
-    Sonderfall 0:0 (margin==0, winner_score<5): kein echter Sieg, sondern ein
-    vermiedenswertes Ergebnis (geflutete Strafleisten — kein Mensch spielt so).
-    Gibt direkt ZEROZERO_PENALTY (negativ) zurück — konsistent mit dem
-    Trainings-Target. Die Trainings-Aufrufstelle erkennt den Fall zusätzlich über
-    is_zerozero() und setzt den Wert für BEIDE Spieler symmetrisch (ohne
-    Spiegelung), sodass nicht ein Spieler durch die Spiegelung +0.3 bekäme.
-    """
-    margin       = abs(scores[0] - scores[1])
-    winner_score = scores[winner]
-    if margin == 0 and winner_score < 5:
-        return ZEROZERO_PENALTY
-    margin_part = min(0.45, (margin / margin_cap) * 0.45)
-    score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
-    return min(1.0, 0.1 + margin_part + score_part)
+# Value-Target = reines Spielergebnis ±1 (Sieger +1 / Verlierer −1). Keine
+# abgestufte win_val/Margin-Skala mehr im Training — die lebt nur noch in der
+# Arena (Elo-K-Skalierung, arena.py). ±1 ist konsistent mit der Win-Prob, die die
+# Suche zurückbackt (Stufe-1-DFS-Blatt bzw. Stufe-2-Netz-Value).
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE, target_zerozero_ratio=None):
+    def __init__(self, data_dir="data", target_zerozero_ratio=None):
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
@@ -325,11 +294,8 @@ class MosaicDataset(Dataset):
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
-        self.margin_cap       = margin_cap
-        self.max_winner_score = max_winner_score
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)
-             + str(margin_cap) + str(max_winner_score)
              + str(target_zerozero_ratio)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
@@ -444,15 +410,8 @@ class MosaicDataset(Dataset):
 
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
-                            if is_zerozero(step["scores"], step["winner"]):
-                                # 0:0 → beide Spieler bestraft (symmetrisch, KEINE
-                                # Spiegelung). Nimmt dem Marker-Halter den sicheren
-                                # +0.1-Hafen und gibt einen Gradienten gegen 0:0.
-                                val = ZEROZERO_PENALTY
-                            else:
-                                wv  = compute_win_val(step["scores"], step["winner"],
-                                                      margin_cap, max_winner_score)
-                                val = wv if step["player"] == step["winner"] else -wv
+                            # Reines Ergebnis: +1 aus Sicht des Siegers, -1 sonst.
+                            val = 1.0 if step["player"] == step["winner"] else -1.0
                         else:
                             val = float(step["value"])
                         values_l.append([val])

@@ -10,15 +10,15 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, MARGIN_CAP, MAX_WINNER_SCORE
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE, zerozero_ratio=None):
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True, zerozero_ratio=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
-    dataset = MosaicDataset(str(DATA_DIR), margin_cap=margin_cap, max_winner_score=max_winner_score, target_zerozero_ratio=zerozero_ratio)
+    dataset = MosaicDataset(str(DATA_DIR), target_zerozero_ratio=zerozero_ratio)
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
@@ -37,8 +37,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Learning Rate : {LEARNING_RATE}")
     print(f"   Value Weight  : {VALUE_WEIGHT}")
     print(f"   Batch Size    : {BATCH_SIZE}")
-    print(f"   Margin Cap    : {margin_cap}")
-    print(f"   Max Winner Sc.: {max_winner_score}")
+    print(f"   Value-Target  : ±1 (reines Ergebnis)")
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
     
     # Warm Start?
@@ -109,11 +108,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # Ohne diese Gewichtung lernt die Policy zu 51% aus 0:0-Spielen
             # (in denen beide Spieler die Strafleiste fluten) mit vollem Gewicht.
             per_sample_ce = -torch.sum(targets_p * log_probs, dim=1)   # (B,)
-            strength = targets_v.detach().abs().squeeze(-1).clamp(min=1e-3)  # (B,)
             # Policy-Loss NUR auf echten Drafting-Schritten (pol_w=1); Tiling/Start-
             # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
             # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
-            w = strength * pol_w
+            # Keine win_val-Stärke-Gewichtung mehr (Value-Target ist ±1, und die
+            # Visit-Targets sind unabhängig vom Ausgang valide Policy-Ziele).
+            w = pol_w
             p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 
             # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter
@@ -282,10 +282,6 @@ if __name__ == "__main__":
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
-    parser.add_argument("--margin_cap",       type=int, default=MARGIN_CAP,
-                        help="Margin ab dem win_val=1.0 (Standard: 15)")
-    parser.add_argument("--max_winner_score", type=int, default=MAX_WINNER_SCORE,
-                        help="Normalisierung Winner-Score (Standard: 40)")
     parser.add_argument("--zerozero_ratio", type=float, default=None,
                         help="Ziel-Anteil 0:0-Spiele (z.B. 0.45). None = keine Reduktion")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
@@ -294,5 +290,4 @@ if __name__ == "__main__":
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
-          margin_cap=args.margin_cap, max_winner_score=args.max_winner_score,
           zerozero_ratio=args.zerozero_ratio)
