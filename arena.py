@@ -247,6 +247,67 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
     print(f"   Elo: {net_name} {elo[net_name]} | {heur_name} {elo[heur_name]}")
 
 
+def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
+                   threads=0, seed=None, chunk=10, c_puct=1.5, name_a=None, name_b=None):
+    """Netz A (Brett 0) vs. Netz B (Brett 1) — Generationen-Vergleich. Start-
+    spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt."""
+    import os
+    import statistics as _st
+    chunk = max(1, chunk)
+    dfs_leaf = (stage == 1)
+    name_a = name_a or f"A({os.path.basename(model_a)})"
+    name_b = name_b or f"B({os.path.basename(model_b)})"
+    leaf = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
+
+    print("🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️")
+    print(f"  {name_a} (Brett 0, {sims_a} Sims) vs {name_b} (Brett 1, {sims_b} Sims) "
+          f"— Stufe {stage}/{leaf} — {games} Spiele")
+    print("-" * 50)
+
+    elo  = {name_a: 1000, name_b: 1000}
+    wins = {name_a: 0, name_b: 0, "ZeroZero": 0}
+    a_scores, b_scores = [], []
+    base_seed = seed if seed is not None else random.randint(0, 10**9)
+
+    done = chunk_idx = 0
+    a_wins = b_wins = 0
+    t0 = time.time()
+    while done < games:
+        n = min(chunk, games - done)
+        raw = _mr.net_vs_net_arena_match(model_a, model_b, sims_a=sims_a, sims_b=sims_b,
+                                         n_games=n, seed=base_seed + chunk_idx,
+                                         num_threads=threads, c_puct=c_puct, dfs_leaf=dfs_leaf)
+        results = json.loads(raw)
+        chunk_idx += 1
+        for g in results:
+            done += 1
+            scores = g["scores"]      # [A=Brett0, B=Brett1]
+            winner = g["winner"]      # 0 = A, 1 = B
+            steps  = g["steps"]
+            a_scores.append(scores[0]); b_scores.append(scores[1])
+            if winner == 0:
+                winner_name, score_a = name_a, 1.0; a_wins += 1
+            else:
+                winner_name, score_a = name_b, 0.0; b_wins += 1
+            wins[winner_name] += 1
+            if scores[0] == 0 and scores[1] == 0:
+                wins["ZeroZero"] += 1
+            strength = compute_win_val(scores, winner)
+            elo[name_a], elo[name_b] = calculate_elo(elo[name_a], elo[name_b], score_a, k=32 * strength)
+            print(f"  #{done:>3}/{games}: {scores[0]:3d}:{scores[1]:<3d} -> {winner_name:<22} "
+                  f"| Züge {steps:3d} | Strength {strength:.3f} "
+                  f"| Stand {name_a} {a_wins}:{b_wins} {name_b} | Elo {elo[name_a]}/{elo[name_b]}",
+                  flush=True)
+
+    dur = time.time() - t0
+    print("-" * 50)
+    print(f"🏆 ERGEBNIS: {name_a} {a_wins}:{b_wins} {name_b} "
+          f"({a_wins/games*100:.0f}% A-Siege) in {dur:.1f}s ({games/dur:.1f} Spiele/s)")
+    print(f"   Ø Score: {name_a} {_st.mean(a_scores):.1f} | {name_b} {_st.mean(b_scores):.1f}")
+    print(f"   0:0-Spiele: {wins['ZeroZero']}/{games} ({wins['ZeroZero']/games*100:.1f}%)")
+    print(f"   Elo: {name_a} {elo[name_a]} | {name_b} {elo[name_b]}")
+
+
 if __name__ == "__main__":
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.

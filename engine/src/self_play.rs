@@ -919,6 +919,138 @@ pub fn run_net_arena_match(
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
 
+// ── Netz vs. Netz (Generationen-Vergleich) ───────────────────────────────────
+
+/// Spielt EIN Spiel Netz A (Brett 0) vs. Netz B (Brett 1). Beide ziehen per
+/// Netz-PUCT mit eigenem Netz/Sims; Tiling/Start für beide per Solver.
+#[allow(clippy::too_many_arguments)]
+fn play_net_vs_net_game<R: Rng + ?Sized>(
+    net_a: &Net,
+    net_b: &Net,
+    sims_a: u32,
+    sims_b: u32,
+    c_puct: f64,
+    leaf: LeafEval,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+) -> Value {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut steps = 0u32;
+    let mut guard = 0u32;
+    loop {
+        guard += 1;
+        if guard > 100_000 {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    let first = game.state.current_player;
+                    let non_starter = 1 - first;
+                    let pi = if game.state.players[non_starter].start_tile_pending {
+                        non_starter
+                    } else if game.state.players[first].start_tile_pending {
+                        first
+                    } else {
+                        break;
+                    };
+                    match choose_start_placement(&game.state, pi) {
+                        Some((tid, r, c2, rot)) => {
+                            let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                        }
+                        None => break,
+                    }
+                    steps += 1;
+                } else if game.state.phase == Phase::Drafting {
+                    let pi = game.state.current_player;
+                    let actions = drafting_actions(&game.state);
+                    let chosen = if actions.len() == 1 {
+                        actions[0].clone()
+                    } else {
+                        let (net, base) = if pi == 0 { (net_a, sims_a) } else { (net_b, sims_b) };
+                        let s = dynamic_sims(base, actions.len());
+                        net_search_drafting_action(net, &game.state, s, c_puct, false, leaf, rng)
+                            .unwrap_or_else(|| actions[0].clone())
+                    };
+                    let _ = game.apply_drafting(&chosen);
+                    steps += 1;
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => {
+                let pi = game.state.current_player;
+                match resolve_tiling_step(&game.state, pi) {
+                    TilingStep::Place(ta) => {
+                        let _ = game.apply_single_tiling(pi, &ta);
+                    }
+                    TilingStep::Chips { row, chips } => {
+                        apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                    }
+                    TilingStep::End => {
+                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
+                    }
+                }
+                steps += 1;
+            }
+            _ => break,
+        }
+    }
+    if game.state.phase == Phase::End {
+        let _ = game.apply_end_scoring();
+    }
+    let p0 = &game.state.players[0];
+    let p1 = &game.state.players[1];
+    json!({
+        "scores": [p0.score, p1.score],
+        "winner": determine_winner(&game.state),
+        "steps": steps,
+        "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
+        "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+    })
+}
+
+/// `n_games` Spiele Netz A (Brett 0) vs. Netz B (Brett 1), Startspieler
+/// alternierend. Lädt beide ONNX-Netze einmal. Gibt JSON-Array
+/// `[{scores:[A,B], winner, …}]`. `dfs_leaf` wie sonst (Stufe 1/2).
+#[allow(clippy::too_many_arguments)]
+pub fn run_net_vs_net_arena(
+    model_a: &str,
+    model_b: &str,
+    sims_a: u32,
+    sims_b: u32,
+    n_games: usize,
+    seed: u64,
+    num_threads: usize,
+    c_puct: f64,
+    dfs_leaf: bool,
+) -> Result<String, String> {
+    let net_a = std::sync::Arc::new(Net::load(model_a, 673).map_err(|e| e.to_string())?);
+    let net_b = std::sync::Arc::new(Net::load(model_b, 673).map_err(|e| e.to_string())?);
+    let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
+
+    let play = |i: usize| -> Value {
+        let mut rng =
+            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = i % 2;
+        let names = ["NetzA".to_string(), "NetzB".to_string()];
+        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct, leaf, ids, names, first, &mut rng)
+    };
+
+    let all: Vec<Value> = if num_threads <= 1 {
+        (0..n_games).map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
+}
+
 // ── Netzgeführtes Self-Play (AlphaZero-Loop, Stufe 1/2) ──────────────────────
 
 /// Drafting-Policy aus der Netz-PUCT: Target = ROHE Visit-Verteilung N/ΣN
