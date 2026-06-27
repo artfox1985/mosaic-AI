@@ -65,14 +65,25 @@ fn make_node(
     let untried = if terminal {
         Vec::new()
     } else {
-        let policy = softmax(&logits);
-        let mut acts: Vec<(Action, f32)> = drafting_actions(&state)
+        // WICHTIG: Maskierte Softmax NUR über die legalen Aktions-Logits — exakt
+        // wie das Training (masked log_softmax). Eine Softmax über alle 482 würde
+        // die durch den Policy-Weight-Fix unbeschränkten illegalen (Tiling-)Logits
+        // einrechnen, die dann die legalen Priors flach drücken (≈uniform → die
+        // Suche wird ungeführt).
+        let acts0: Vec<(Action, usize)> = drafting_actions(&state)
             .into_iter()
             .map(|a| {
                 let id = action_to_id(&action_to_env_dict(&state, &a));
-                (a, policy.get(id).copied().unwrap_or(0.0))
+                (a, id)
             })
             .collect();
+        let legal_logits: Vec<f32> = acts0
+            .iter()
+            .map(|(_, id)| logits.get(*id).copied().unwrap_or(f32::NEG_INFINITY))
+            .collect();
+        let probs = softmax(&legal_logits);
+        let mut acts: Vec<(Action, f32)> =
+            acts0.into_iter().zip(probs).map(|((a, _), p)| (a, p)).collect();
         acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         acts
     };
