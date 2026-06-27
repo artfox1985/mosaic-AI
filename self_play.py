@@ -27,7 +27,7 @@ try:
 except Exception:
     pass
 
-from config import DATA_DIR
+from config import DATA_DIR, MODELS_DIR
 
 try:
     import mosaic_rust as _mr
@@ -69,9 +69,19 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
         raise SystemExit(
-            "❌ --mode network benötigt --model PATH (z.B. models/alphazero_s100.onnx). "
-            "Vorher 'export_onnx.py <version>' ausführen."
+            "❌ --mode network benötigt --model (z.B. alphazero_s100.onnx). "
+            "Vorher 'export_onnx.py <version>' bzw. train.py ausführen."
         )
+    if mode == "network":
+        # --model gegen den models/-Ordner auflösen: der bloße Dateiname genügt
+        # (z.B. "alphazero_s100.onnx"). Ein existierender expliziter Pfad bleibt.
+        from pathlib import Path
+        mp = Path(model)
+        if not mp.exists():
+            mp = MODELS_DIR / model
+        if not mp.exists():
+            raise SystemExit(f"❌ Modell nicht gefunden: '{model}' (auch nicht in {MODELS_DIR}/)")
+        model = str(mp)
 
     import random as _random
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -150,7 +160,8 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, required=True, choices=["mcts", "network"],
                         help="'mcts' für Heuristik-MCTS, 'network' für AlphaZero-Netz-PUCT")
     parser.add_argument("--model", type=str, default=None,
-                        help="ONNX-Modellpfad (Pflicht bei --mode network), z.B. models/alphazero_s100.onnx")
+                        help="ONNX-Modell (Pflicht bei --mode network). Dateiname genügt — wird "
+                             "im models/-Ordner gesucht, z.B. alphazero_s100.onnx (oder ein voller Pfad)")
     parser.add_argument("--stage", type=int, default=1, choices=[1, 2],
                         help="Netz-Self-Play-Stufe: 1 = DFS-Blatt (saubere Targets), 2 = Netz-Value-Blatt")
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
