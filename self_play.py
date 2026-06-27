@@ -64,15 +64,14 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
                   tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None,
-                  per_file: int = 10):
-    if mode == "network":
-        raise SystemExit(
-            "ℹ️  --mode network läuft über die ONNX-Inferenz in Rust (Phase B) und ist "
-            "noch nicht aktiv. Zuerst 'export_onnx.py' ausführen und den Network-Pfad in "
-            "mosaic_rust.self_play_games aktivieren."
-        )
-    if mode != "mcts":
+                  per_file: int = 10, model: str = None, stage: int = 1, c_puct: float = 1.5):
+    if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
+    if mode == "network" and not model:
+        raise SystemExit(
+            "❌ --mode network benötigt --model PATH (z.B. models/alphazero_s100.onnx). "
+            "Vorher 'export_onnx.py <version>' ausführen."
+        )
 
     import random as _random
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -80,11 +79,33 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     prefix = f"{version_name}{('_' + tag) if tag else ''}_{run_timestamp}"
     base_seed = seed if seed is not None else _random.randint(0, 2**31 - 1)
     chunk = max(1, chunk)
-
     per_file = max(1, per_file)
-    print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
-          f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | "
-          f"Chunk: {chunk} | {per_file} Spiele/Datei)")
+
+    # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
+    # Pickle teilen sich beide Pfade. MCTS = Heuristik-Suche; network = Netz-PUCT
+    # (Priors vom Netz, Blatt per DFS [stage 1] oder Netz-Value [stage 2]),
+    # Policy-Target = rohe Visit-Verteilung N/ΣN.
+    dfs_leaf = (stage == 1)
+    if mode == "network":
+        def make_chunk(n, chunk_idx):
+            return _mr.net_self_play_games(
+                model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
+                seed=base_seed + chunk_idx, num_threads=threads, dfs_leaf=dfs_leaf,
+                prefix=f"{prefix}_c{chunk_idx}",
+            )
+        leaf_name = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
+        print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
+              f"Stufe {stage} ({leaf_name}) | base_sims {simulations} | c_puct {c_puct} | "
+              f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei")
+    else:
+        def make_chunk(n, chunk_idx):
+            return _mr.self_play_games(
+                n_games=n, base_sims=simulations, seed=base_seed + chunk_idx,
+                num_threads=threads, prefix=f"{prefix}_c{chunk_idx}",
+            )
+        print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
+              f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | "
+              f"Chunk: {chunk} | {per_file} Spiele/Datei)")
 
     # WICHTIG: In Chunks generieren statt in EINEM riesigen Rust-Aufruf. Das gibt
     # laufenden Fortschritt + ETA und hält den Speicher klein (sonst lägen bei
@@ -98,13 +119,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     buffer_games = 0             # Anzahl Spiele im Buffer
     while done < num_games:
         n = min(chunk, num_games - done)
-        raw = _mr.self_play_games(
-            n_games=n,
-            base_sims=simulations,
-            seed=base_seed + chunk_idx,
-            num_threads=threads,
-            prefix=f"{prefix}_c{chunk_idx}",
-        )
+        raw = make_chunk(n, chunk_idx)
         steps = json.loads(raw)
         total_steps += len(steps)
         chunk_idx += 1
@@ -133,10 +148,16 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Mosaic-AI Self-Play (Rust-Hybrid)")
     parser.add_argument("--mode", type=str, required=True, choices=["mcts", "network"],
-                        help="'mcts' für Heuristik-MCTS, 'network' für AlphaZero-Netz (Phase B)")
+                        help="'mcts' für Heuristik-MCTS, 'network' für AlphaZero-Netz-PUCT")
+    parser.add_argument("--model", type=str, default=None,
+                        help="ONNX-Modellpfad (Pflicht bei --mode network), z.B. models/alphazero_s100.onnx")
+    parser.add_argument("--stage", type=int, default=1, choices=[1, 2],
+                        help="Netz-Self-Play-Stufe: 1 = DFS-Blatt (saubere Targets), 2 = Netz-Value-Blatt")
+    parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
+                        help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--games", type=int, default=100, help="Anzahl Spiele")
     parser.add_argument("--sims", type=int, default=100,
-                        help="MCTS-Basis-Simulationen pro Zug (Rust skaliert im Frühspiel dynamisch)")
+                        help="Basis-Simulationen pro Zug (Rust skaliert im Frühspiel dynamisch)")
     parser.add_argument("--version", type=str, required=True, help="Versionsname, z.B. v0")
     parser.add_argument("--tag", type=str, default=None,
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
@@ -162,4 +183,7 @@ if __name__ == "__main__":
         chunk=args.chunk,
         seed=args.seed,
         per_file=args.per_file,
+        model=args.model,
+        stage=args.stage,
+        c_puct=args.c_puct,
     )
