@@ -110,6 +110,33 @@ fn net_arena_match(
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+/// Arena-Match Netz A (Brett 0) vs. Netz B (Brett 1). Lädt beide ONNX-Netze,
+/// spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
+/// `[{scores:[A,B], winner, steps, total_floor, floor_per_round}]` zurück.
+#[pyfunction]
+#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct=1.5, dfs_leaf=true))]
+#[allow(clippy::too_many_arguments)]
+fn net_vs_net_arena_match(
+    py: Python<'_>,
+    model_a: String,
+    model_b: String,
+    sims_a: u32,
+    sims_b: u32,
+    n_games: usize,
+    seed: Option<u64>,
+    num_threads: usize,
+    c_puct: f64,
+    dfs_leaf: bool,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_net_vs_net_arena(
+            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct, dfs_leaf,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Netzgeführtes Self-Play (AlphaZero-Loop). `dfs_leaf=True` = Stufe 1 (DFS-Blatt,
 /// saubere Visit-Targets), `False` = Stufe 2 (Netz-Value). Gibt alle Step-Records
 /// als JSON-Array zurück (Format wie self_play_games). `num_threads=0` = alle Kerne.
@@ -180,6 +207,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(net_vs_net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
