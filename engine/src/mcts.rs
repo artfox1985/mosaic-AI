@@ -86,7 +86,8 @@ const TERMINAL_SCALE: f64 = 10.0;
 /// Blattbewertung als Per-Spieler-Win-Prob (absolut, nicht perspektivisch).
 /// Am Drafting→Tiling-Übergang (Phase ≠ Drafting) wird der exakte Runden-Score
 /// per DFS-Solver bestimmt (Pseudo-Terminal); mitten im Drafting die Heuristik.
-fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
+/// Öffentlich für den Netz-MCTS-Stufe-1-Modus (DFS-Blattbewertung + Netz-Priors).
+pub fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
     if state.phase != Phase::Drafting {
         let f0 = solve_round_final_score(state, 0) as f64;
         let f1 = solve_round_final_score(state, 1) as f64;
