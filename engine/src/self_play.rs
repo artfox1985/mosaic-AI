@@ -586,6 +586,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     let mut records: Vec<Map<String, Value>> = Vec::new();
 
     let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
     loop {
         guard += 1;
         if guard > 100_000 {
@@ -679,9 +680,13 @@ fn play_arena_game<R: Rng + ?Sized>(
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
     let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
     loop {
         guard += 1;
-        if guard > 100_000 {
+        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
+        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
+        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
             break;
         }
         match game.state.phase {
@@ -804,9 +809,13 @@ fn play_net_game<R: Rng + ?Sized>(
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
     let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
     loop {
         guard += 1;
-        if guard > 100_000 {
+        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
+        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
+        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
             break;
         }
         match game.state.phase {
@@ -939,9 +948,13 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
     let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
     loop {
         guard += 1;
-        if guard > 100_000 {
+        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
+        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
+        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
             break;
         }
         match game.state.phase {
@@ -1100,9 +1113,13 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
     let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
     loop {
         guard += 1;
-        if guard > 100_000 {
+        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
+        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
+        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
             break;
         }
         match game.state.phase {
