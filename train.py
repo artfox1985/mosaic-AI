@@ -1,6 +1,13 @@
 # train.py
 import sys
 import argparse
+
+# Windows-Konsolen (cp1252) können die Emoji-Ausgaben sonst nicht kodieren.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 import torch
 import math
 import torch.nn as nn
