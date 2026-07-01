@@ -5,6 +5,11 @@
 
 use serde_json::Value;
 
+/// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
+/// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
+/// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
+pub const INPUT_SIZE: usize = 684;
+
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
 
@@ -71,7 +76,7 @@ fn num(obj: &Value, k: &str) -> f64 {
 
 /// Vollständiger Feature-Vektor aus dem State-Dict (`state_to_json`).
 pub fn state_to_features(v: &Value) -> Vec<f32> {
-    let mut f: Vec<f32> = Vec::with_capacity(664);
+    let mut f: Vec<f32> = Vec::with_capacity(INPUT_SIZE);
 
     // 1. Globale Infos
     f.push((num(v, "round") / 6.0) as f32);
