@@ -72,7 +72,7 @@ def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345)
         print(f"  ⚠️  Sonde übersprungen (mosaic_rust nicht importierbar): {e}")
         return
 
-    def zero_zero_rate(raw):
+    def zero_zero_stats(raw):
         # net_self_play_games liefert eine FLACHE Liste von Zug-Records (jeder
         # Schritt trägt scores/winner des fertigen Spiels) — pro game_id
         # deduplizieren, sonst gewichten längere Spiele die Rate fälschlich stärker.
@@ -83,11 +83,9 @@ def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345)
             if gid is not None and "scores" in s:
                 games[gid] = tuple(s["scores"])
         n = len(games)
-        if n == 0:
-            return 0.0, 0.0
         zz = sum(1 for sc in games.values() if sc[0] == 0 and sc[1] == 0)
-        winner_scores = [max(sc) for sc in games.values()]
-        return zz / n, st.mean(winner_scores)
+        ws = st.mean(max(sc) for sc in games.values()) if n > 0 else 0.0
+        return zz, n, ws
 
     print(f"\n{'='*55}")
     print(f"  STAGE-2-REIFEGRAD-SONDE ({games} Spiele je Stufe, {sims} Sims)")
@@ -95,16 +93,25 @@ def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345)
     raw_s1 = _mr.net_self_play_games(model_path=str(onnx_path), n_games=games, base_sims=sims,
                                      seed=seed, num_threads=threads, dfs_leaf=True,
                                      prefix=f"{version_name}_probe_s1")
-    zz1, ws1 = zero_zero_rate(raw_s1)
+    zz1, n1, ws1 = zero_zero_stats(raw_s1)
     raw_s2 = _mr.net_self_play_games(model_path=str(onnx_path), n_games=games, base_sims=sims,
                                      seed=seed, num_threads=threads, dfs_leaf=False,
                                      prefix=f"{version_name}_probe_s2")
-    zz2, ws2 = zero_zero_rate(raw_s2)
+    zz2, n2, ws2 = zero_zero_stats(raw_s2)
 
-    if zz1 > 0:
-        ratio = zz2 / zz1
-    else:
-        ratio = 1.0 if zz2 == 0 else float("inf")
+    if n1 == 0 or n2 == 0:
+        print(f"  ⚠️  Sonde ergebnislos: Stufe 1 lieferte {n1}, Stufe 2 {n2} Spiele "
+              f"(erwartet {games} je Stufe) — Self-Play evtl. abgebrochen.")
+        print(f"{'='*55}")
+        return
+
+    rate1 = zz1 / n1
+    rate2 = zz2 / n2
+    # Laplace-Glättung (+1 auf beide Zähler/Nenner) statt Sonderfall-Verzweigung:
+    # bleibt auch bei 0 beobachteten 0:0-Spielen (in beiden oder einer Stufe)
+    # wohldefiniert und dämpft Ausreißer durch kleine Stichproben (z.B. 1 vs.
+    # 3 Vorkommen bei wenigen Spielen), statt sofort auf ∞/1.0 zu springen.
+    ratio = (zz2 + 1) / (n2 + 1) / ((zz1 + 1) / (n1 + 1))
 
     if ratio <= 1.5:
         ampel = "🟢 GRÜN — Value-Head trägt, voller Stufe-2-Zyklus lohnt sich"
@@ -113,16 +120,15 @@ def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345)
     else:
         ampel = "🔴 ROT — klar noch nicht reif, in Stufe 1 bleiben"
 
-    print(f"  Stufe 1 (DFS-Blatt):   0:0 {zz1*100:5.1f}% | Ø Sieger-Score {ws1:5.1f}")
-    print(f"  Stufe 2 (Netz-Value):  0:0 {zz2*100:5.1f}% | Ø Sieger-Score {ws2:5.1f}")
-    ratio_str = "∞" if ratio == float("inf") else f"{ratio:.2f}x"
-    print(f"  Verhältnis 0:0(Stufe2/Stufe1): {ratio_str}")
+    print(f"  Stufe 1 (DFS-Blatt):   0:0 {rate1*100:5.1f}% ({zz1}/{n1}) | Ø Sieger-Score {ws1:5.1f}")
+    print(f"  Stufe 2 (Netz-Value):  0:0 {rate2*100:5.1f}% ({zz2}/{n2}) | Ø Sieger-Score {ws2:5.1f}")
+    print(f"  Verhältnis 0:0(Stufe2/Stufe1, geglättet): {ratio:.2f}x")
     print(f"  {ampel}")
     print(f"{'='*55}")
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          probe_games=40, probe_sims=400, skip_probe=False):
+          probe_games=40, probe_sims=400, skip_probe=False, show_plot=True):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
@@ -193,6 +199,36 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     early_stop_patience = 5 if early_stop else 999999
     policy_plateau_since = None
     stopped_early = False
+    total_history = []
+
+    # ── Live-Plot (zusätzlich zur Textausgabe): Total/Policy oben, Value unten.
+    # Getrennte Panels, weil Value-Loss (~0.05–0.5) sonst neben Policy-Loss
+    # (~2–4) im Diagramm verschwindet. Bei fehlendem Display (headless) sauber
+    # überspringen statt das Training abzubrechen.
+    plot = None
+    if show_plot:
+        try:
+            import matplotlib
+            import matplotlib.pyplot as plt
+            plt.ion()
+            fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+            fig.suptitle(f"Training {version_name}")
+            ax_top.set_ylabel("Total / Policy Loss")
+            ax_bot.set_ylabel("Value Loss")
+            ax_bot.set_xlabel("Epoche")
+            (line_total,) = ax_top.plot([], [], label="Total", color="tab:blue")
+            (line_policy,) = ax_top.plot([], [], label="Policy", color="tab:orange")
+            (line_value,) = ax_bot.plot([], [], label="Value", color="tab:green")
+            ax_top.legend(loc="upper right")
+            ax_bot.legend(loc="upper right")
+            plot = {
+                "fig": fig, "ax_top": ax_top, "ax_bot": ax_bot,
+                "line_total": line_total, "line_policy": line_policy, "line_value": line_value,
+                "plateau_line": None,
+            }
+        except Exception as e:
+            print(f"⚠️  Live-Plot deaktiviert (kein Display?): {e}")
+            plot = None
 
     for epoch in range(epochs):
         t_loss, t_vloss, t_ploss = 0, 0, 0
@@ -250,9 +286,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
+        epoch_tloss = t_loss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
-        
+        total_history.append(epoch_tloss)
+
         import torch as _t
         v_all   = _t.cat(v_preds_epoch)
         v_std   = v_all.std().item()
@@ -276,6 +314,27 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v3 = value_history[-3:]
             if v3[0] > v3[1] > v3[2]:
                 plateau_marker = "  🔴 PLATEAU + VALUE SINKT (Overfitting-Risiko)"
+
+        # ── Live-Plot aktualisieren (zusätzlich zur Textzeile unten) ────────
+        if plot is not None:
+            try:
+                xs = list(range(1, len(total_history) + 1))
+                plot["line_total"].set_data(xs, total_history)
+                plot["line_policy"].set_data(xs, policy_history)
+                plot["line_value"].set_data(xs, value_history)
+                if policy_plateau_since is not None and plot["plateau_line"] is None:
+                    plot["plateau_line"] = plot["ax_top"].axvline(
+                        policy_plateau_since, color="red", linestyle="--", alpha=0.5, label="Plateau")
+                    plot["ax_top"].legend(loc="upper right")
+                for ax in (plot["ax_top"], plot["ax_bot"]):
+                    ax.relim()
+                    ax.autoscale_view()
+                plot["fig"].canvas.draw()
+                plot["fig"].canvas.flush_events()
+                import matplotlib.pyplot as _plt
+                _plt.pause(0.001)
+            except Exception:
+                plot = None  # Fenster evtl. geschlossen o.ä. — Rest ohne Plot weiterlaufen
 
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
               f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}) "
@@ -391,6 +450,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
 
+    if plot is not None:
+        try:
+            plot_path = MODELS_DIR / f"alphazero_{version_name}_loss.png"
+            plot["fig"].savefig(str(plot_path))
+            print(f"📈 Loss-Verlauf gespeichert unter:\n📂 {plot_path}")
+        except Exception as e:
+            print(f"⚠️  Loss-Plot konnte nicht gespeichert werden: {e}")
+
     # 7. ONNX direkt mitexportieren (Rust-Inferenz für Self-Play/Arena), damit
     #    kein manueller export_onnx.py-Schritt nötig ist.
     try:
@@ -422,9 +489,12 @@ if __name__ == "__main__":
                         help="Sims/Zug für die Reifegrad-Sonde (Standard: 400)")
     parser.add_argument("--skip-probe", action="store_true",
                         help="Reifegrad-Sonde nach dem Training überspringen")
+    parser.add_argument("--no-plot", action="store_true",
+                        help="Live-Loss-Plot deaktivieren (z.B. ohne Display)")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
-          probe_games=args.probe_games, probe_sims=args.probe_sims, skip_probe=args.skip_probe)
+          probe_games=args.probe_games, probe_sims=args.probe_sims, skip_probe=args.skip_probe,
+          show_plot=not args.no_plot)
