@@ -86,7 +86,115 @@ Epoche 26/100 | Total Loss:   2.29 (Value:  0.06, Policy:  2.26) | v_pred μ=+0.
 **Arena vs v5**
 
 ```
-
+PS D:\Archiv\Documents\Projekte\mosaic-AI> python arena.py
+🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️
+  v7 (Brett 0, 200 Sims) vs v5 (Brett 1, 200 Sims) — Stufe 1/DFS-Blatt — 100 Spiele
+--------------------------------------------------
+  #  1/100:   2:17  -> v5                     | Züge 150 | Strength 0.741 | Stand v7 0:1 v5 | Elo 988/1012
+  #  2/100:   0:0   -> v5                     | Züge 159 | Strength 0.100 | Stand v7 0:2 v5 | Elo 987/1013
+  #  3/100:   9:12  -> v5                     | Züge 155 | Strength 0.325 | Stand v7 0:3 v5 | Elo 982/1018
+  #  4/100:   7:0   -> v7                     | Züge 162 | Strength 0.389 | Stand v7 1:3 v5 | Elo 989/1011
+  #  5/100:  30:34  -> v5                     | Züge 161 | Strength 0.603 | Stand v7 1:4 v5 | Elo 980/1020
+  #  6/100:  44:27  -> v7                     | Züge 154 | Strength 1.000 | Stand v7 2:4 v5 | Elo 998/1002
+  #  7/100:   0:26  -> v5                     | Züge 153 | Strength 0.843 | Stand v7 2:5 v5 | Elo 985/1015
+  #  8/100:   0:14  -> v5                     | Züge 147 | Strength 0.677 | Stand v7 2:6 v5 | Elo 975/1025
+  #  9/100:  45:14  -> v7                     | Züge 162 | Strength 1.000 | Stand v7 3:6 v5 | Elo 993/1007
+  # 10/100:  11:16  -> v5                     | Züge 161 | Strength 0.430 | Stand v7 3:7 v5 | Elo 986/1014
+  # 11/100:  19:20  -> v5                     | Züge 158 | Strength 0.355 | Stand v7 3:8 v5 | Elo 981/1019
+  # 12/100:   2:18  -> v5                     | Züge 151 | Strength 0.753 | Stand v7 3:9 v5 | Elo 970/1030
+  # 13/100:  12:11  -> v7                     | Züge 150 | Strength 0.265 | Stand v7 4:9 v5 | Elo 975/1025
+  # 14/100:  17:3   -> v7                     | Züge 148 | Strength 0.711 | Stand v7 5:9 v5 | Elo 988/1012
+  # 15/100:  29:26  -> v7                     | Züge 152 | Strength 0.516 | Stand v7 6:9 v5 | Elo 997/1003
+  # 16/100:   3:36  -> v5                     | Züge 155 | Strength 0.955 | Stand v7 6:10 v5 | Elo 982/1018
+  # 17/100:  14:39  -> v5                     | Züge 158 | Strength 0.989 | Stand v7 6:11 v5 | Elo 968/1032
+  # 18/100:   0:27  -> v5                     | Züge 158 | Strength 0.854 | Stand v7 6:12 v5 | Elo 957/1043
+  # 19/100:  40:12  -> v7                     | Züge 155 | Strength 1.000 | Stand v7 7:12 v5 | Elo 977/1023
+  # 20/100:  24:20  -> v7                     | Züge 156 | Strength 0.490 | Stand v7 8:12 v5 | Elo 986/1014
+  # 21/100:   8:0   -> v7                     | Züge 159 | Strength 0.430 | Stand v7 9:12 v5 | Elo 993/1007
+  # 22/100:  11:49  -> v5                     | Züge 158 | Strength 1.000 | Stand v7 9:13 v5 | Elo 978/1022
+  # 23/100:   7:24  -> v5                     | Züge 157 | Strength 0.820 | Stand v7 9:14 v5 | Elo 967/1033
+  # 24/100:  21:30  -> v5                     | Züge 164 | Strength 0.708 | Stand v7 9:15 v5 | Elo 958/1042
+  # 25/100:   0:6   -> v5                     | Züge 148 | Strength 0.348 | Stand v7 9:16 v5 | Elo 954/1046
+  # 26/100:  32:12  -> v7                     | Züge 154 | Strength 0.910 | Stand v7 10:16 v5 | Elo 972/1028
+  # 27/100:  33:12  -> v7                     | Züge 158 | Strength 0.921 | Stand v7 11:16 v5 | Elo 989/1011
+  # 28/100:  28:0   -> v7                     | Züge 157 | Strength 0.865 | Stand v7 12:16 v5 | Elo 1004/996
+  # 29/100:  30:45  -> v5                     | Züge 152 | Strength 1.000 | Stand v7 12:17 v5 | Elo 988/1012
+  # 30/100:  32:27  -> v7                     | Züge 157 | Strength 0.610 | Stand v7 13:17 v5 | Elo 998/1002
+  # 31/100:  27:38  -> v5                     | Züge 159 | Strength 0.857 | Stand v7 13:18 v5 | Elo 984/1016
+  # 32/100:  10:20  -> v5                     | Züge 157 | Strength 0.625 | Stand v7 13:19 v5 | Elo 975/1025
+  # 33/100:  57:18  -> v7                     | Züge 163 | Strength 1.000 | Stand v7 14:19 v5 | Elo 993/1007
+  # 34/100:  28:24  -> v7                     | Züge 157 | Strength 0.535 | Stand v7 15:19 v5 | Elo 1002/998
+  # 35/100:   7:26  -> v5                     | Züge 150 | Strength 0.843 | Stand v7 15:20 v5 | Elo 988/1012
+  # 36/100:  14:11  -> v7                     | Züge 155 | Strength 0.348 | Stand v7 16:20 v5 | Elo 994/1006
+  # 37/100:   7:18  -> v5                     | Züge 150 | Strength 0.632 | Stand v7 16:21 v5 | Elo 984/1016
+  # 38/100:  29:10  -> v7                     | Züge 165 | Strength 0.876 | Stand v7 17:21 v5 | Elo 999/1001
+  # 39/100:   3:23  -> v5                     | Züge 159 | Strength 0.809 | Stand v7 17:22 v5 | Elo 986/1014
+  # 40/100:  68:26  -> v7                     | Züge 155 | Strength 1.000 | Stand v7 18:22 v5 | Elo 1003/997
+  # 41/100:   5:0   -> v7                     | Züge 156 | Strength 0.306 | Stand v7 19:22 v5 | Elo 1008/992
+  # 42/100:  22:19  -> v7                     | Züge 153 | Strength 0.438 | Stand v7 20:22 v5 | Elo 1015/985
+  # 43/100:  34:3   -> v7                     | Züge 157 | Strength 0.933 | Stand v7 21:22 v5 | Elo 1029/971
+  # 44/100:   0:19  -> v5                     | Züge 158 | Strength 0.764 | Stand v7 21:23 v5 | Elo 1015/985
+  # 45/100:   7:15  -> v5                     | Züge 155 | Strength 0.509 | Stand v7 21:24 v5 | Elo 1006/994
+  # 46/100:   3:30  -> v5                     | Züge 148 | Strength 0.888 | Stand v7 21:25 v5 | Elo 991/1009
+  # 47/100:  31:13  -> v7                     | Züge 153 | Strength 0.899 | Stand v7 22:25 v5 | Elo 1006/994
+  # 48/100:  21:35  -> v5                     | Züge 153 | Strength 0.914 | Stand v7 22:26 v5 | Elo 991/1009
+  # 49/100:  27:3   -> v7                     | Züge 151 | Strength 0.854 | Stand v7 23:26 v5 | Elo 1005/995
+  # 50/100:  38:52  -> v5                     | Züge 152 | Strength 0.970 | Stand v7 23:27 v5 | Elo 989/1011
+  # 51/100:  19:32  -> v5                     | Züge 151 | Strength 0.850 | Stand v7 23:28 v5 | Elo 976/1024
+  # 52/100:  55:4   -> v7                     | Züge 155 | Strength 1.000 | Stand v7 24:28 v5 | Elo 994/1006
+  # 53/100:  26:9   -> v7                     | Züge 151 | Strength 0.843 | Stand v7 25:28 v5 | Elo 1008/992
+  # 54/100:  34:30  -> v7                     | Züge 161 | Strength 0.603 | Stand v7 26:28 v5 | Elo 1017/983
+  # 55/100:  16:19  -> v5                     | Züge 160 | Strength 0.404 | Stand v7 26:29 v5 | Elo 1010/990
+  # 56/100:  30:25  -> v7                     | Züge 159 | Strength 0.588 | Stand v7 27:29 v5 | Elo 1019/981
+  # 57/100:  30:12  -> v7                     | Züge 152 | Strength 0.888 | Stand v7 28:29 v5 | Elo 1032/968
+  # 58/100:  18:64  -> v5                     | Züge 152 | Strength 1.000 | Stand v7 28:30 v5 | Elo 1013/987
+  # 59/100:  36:40  -> v5                     | Züge 159 | Strength 0.670 | Stand v7 28:31 v5 | Elo 1001/999
+  # 60/100:  38:45  -> v5                     | Züge 155 | Strength 0.760 | Stand v7 28:32 v5 | Elo 989/1011
+  # 61/100:  15:2   -> v7                     | Züge 156 | Strength 0.659 | Stand v7 29:32 v5 | Elo 1000/1000
+  # 62/100:  40:33  -> v7                     | Züge 152 | Strength 0.760 | Stand v7 30:32 v5 | Elo 1012/988
+  # 63/100:  10:0   -> v7                     | Züge 149 | Strength 0.513 | Stand v7 31:32 v5 | Elo 1020/980
+  # 64/100:   9:22  -> v5                     | Züge 155 | Strength 0.738 | Stand v7 31:33 v5 | Elo 1007/993
+  # 65/100:  65:33  -> v7                     | Züge 158 | Strength 1.000 | Stand v7 32:33 v5 | Elo 1022/978
+  # 66/100:  21:3   -> v7                     | Züge 154 | Strength 0.786 | Stand v7 33:33 v5 | Elo 1033/967
+  # 67/100:  35:41  -> v5                     | Züge 158 | Strength 0.730 | Stand v7 33:34 v5 | Elo 1019/981
+  # 68/100:  12:2   -> v7                     | Züge 153 | Strength 0.535 | Stand v7 34:34 v5 | Elo 1027/973
+  # 69/100:  83:38  -> v7                     | Züge 159 | Strength 1.000 | Stand v7 35:34 v5 | Elo 1041/959
+  # 70/100:  41:21  -> v7                     | Züge 157 | Strength 1.000 | Stand v7 36:34 v5 | Elo 1053/947
+  # 71/100:  30:23  -> v7                     | Züge 152 | Strength 0.648 | Stand v7 37:34 v5 | Elo 1060/940
+  # 72/100:  40:7   -> v7                     | Züge 154 | Strength 1.000 | Stand v7 38:34 v5 | Elo 1071/929
+  # 73/100:  31:22  -> v7                     | Züge 158 | Strength 0.719 | Stand v7 39:34 v5 | Elo 1078/922
+  # 74/100:   4:33  -> v5                     | Züge 152 | Strength 0.921 | Stand v7 39:35 v5 | Elo 1057/943
+  # 75/100:  16:49  -> v5                     | Züge 164 | Strength 1.000 | Stand v7 39:36 v5 | Elo 1036/964
+  # 76/100:  60:6   -> v7                     | Züge 160 | Strength 1.000 | Stand v7 40:36 v5 | Elo 1049/951
+  # 77/100:   0:2   -> v5                     | Züge 150 | Strength 0.182 | Stand v7 40:37 v5 | Elo 1045/955
+  # 78/100:  35:9   -> v7                     | Züge 159 | Strength 0.944 | Stand v7 41:37 v5 | Elo 1056/944
+  # 79/100:  15:10  -> v7                     | Züge 158 | Strength 0.419 | Stand v7 42:37 v5 | Elo 1061/939
+  # 80/100:  47:0   -> v7                     | Züge 159 | Strength 1.000 | Stand v7 43:37 v5 | Elo 1072/928
+  # 81/100:   9:36  -> v5                     | Züge 157 | Strength 0.955 | Stand v7 43:38 v5 | Elo 1051/949
+  # 82/100:  19:26  -> v5                     | Züge 156 | Strength 0.603 | Stand v7 43:39 v5 | Elo 1039/961
+  # 83/100:  43:32  -> v7                     | Züge 160 | Strength 0.880 | Stand v7 44:39 v5 | Elo 1050/950
+  # 84/100:  10:28  -> v5                     | Züge 150 | Strength 0.865 | Stand v7 44:40 v5 | Elo 1032/968
+  # 85/100:  27:29  -> v5                     | Züge 153 | Strength 0.486 | Stand v7 44:41 v5 | Elo 1023/977
+  # 86/100:   0:34  -> v5                     | Züge 156 | Strength 0.933 | Stand v7 44:42 v5 | Elo 1006/994
+  # 87/100:   6:26  -> v5                     | Züge 158 | Strength 0.843 | Stand v7 44:43 v5 | Elo 992/1008
+  # 88/100:  27:26  -> v7                     | Züge 158 | Strength 0.434 | Stand v7 45:43 v5 | Elo 999/1001
+  # 89/100:   0:30  -> v5                     | Züge 161 | Strength 0.888 | Stand v7 45:44 v5 | Elo 985/1015
+  # 90/100:  43:8   -> v7                     | Züge 150 | Strength 1.000 | Stand v7 46:44 v5 | Elo 1002/998
+  # 91/100:   9:14  -> v5                     | Züge 159 | Strength 0.407 | Stand v7 46:45 v5 | Elo 995/1005
+  # 92/100:  11:17  -> v5                     | Züge 154 | Strength 0.471 | Stand v7 46:46 v5 | Elo 988/1012
+  # 93/100:   4:29  -> v5                     | Züge 157 | Strength 0.876 | Stand v7 46:47 v5 | Elo 975/1025
+  # 94/100:  27:28  -> v5                     | Züge 156 | Strength 0.445 | Stand v7 46:48 v5 | Elo 969/1031
+  # 95/100:  13:21  -> v5                     | Züge 151 | Strength 0.576 | Stand v7 46:49 v5 | Elo 961/1039
+  # 96/100:  18:0   -> v7                     | Züge 154 | Strength 0.753 | Stand v7 47:49 v5 | Elo 976/1024
+  # 97/100:   6:40  -> v5                     | Züge 161 | Strength 1.000 | Stand v7 47:50 v5 | Elo 962/1038
+  # 98/100:  24:25  -> v5                     | Züge 155 | Strength 0.411 | Stand v7 47:51 v5 | Elo 957/1043
+  # 99/100:  28:24  -> v7                     | Züge 158 | Strength 0.535 | Stand v7 48:51 v5 | Elo 968/1032
+  #100/100:  32:16  -> v7                     | Züge 159 | Strength 0.910 | Stand v7 49:51 v5 | Elo 985/1015
+--------------------------------------------------
+🏆 ERGEBNIS: v7 49:51 v5 (49% A-Siege) in 1860.5s (0.1 Spiele/s)
+   Ø Score: v7 22.1 | v5 21.1
+   0:0-Spiele: 1/100 (1.0%)
+   Elo: v7 985 | v5 1015
 ```
 
 **Arena vs. heuristik**
