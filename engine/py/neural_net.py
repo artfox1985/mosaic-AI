@@ -67,21 +67,7 @@ def state_to_tensor(data):
             features.append(p.get("score", 0) / 100.0)
             features.append(p.get("estimated_score", 0) / 100.0)
             features.append(1.0 if p.get("marker", False) else 0.0)
-            
-            # NEU: Chip-Farben als numerische Features (5-dim Vektor)
-            # Mapping der Farben auf 0-4 (deine COLOR_MAP)
-            chip_features = [0.0] * 5
-    
-            # Zugriff auf die Liste aus deinem Serializer
-            chip_colors = p.get("unused_chip_colors", [])
-            for c_name in chip_colors:
-                c_id = COLOR_MAP.get(c_name, -1)
-                if 0 <= c_id < 5:
-                    chip_features[c_id] += 1.0
-            
-            # Normalisierung (z.B. durch 5.0, damit das Netz Werte in [0, 1] bekommt)
-            features.extend([c / 5.0 for c in chip_features])
-            
+
             # Musterreihen
             for row in p.get("pattern_lines", []):
                 capacity = row.get("capacity", 1)
