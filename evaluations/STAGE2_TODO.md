@@ -83,10 +83,10 @@
      `train.py`. Trainings-Target: weiterhin `moon_order_target`
      (`self_play.rs`) als Referenz-Reihenfolge, aber als Permutations-Likelihood
      statt Rang-Regression codiert.
-   - **Kosten/Risiko:** bis zu 6× Branching an genau den (≤4/Spiel)
-     `SmallFactorySun`-Entscheidungen — durch Progressive Widening
-     (`MAX_ACTIONS`/`WIDEN_FACTOR`) gedämpft, aber nicht null. Sauber testen
-     (cargo test: Aktionszahl an SmallFactorySun-Knoten, Prior-Summe=1 nach
+   - **Kosten:** bis zu 6× Branching, aber nur an den (≤4/Spiel)
+     `SmallFactorySun`-Entscheidungen — **akzeptiert**, da so selten (durch
+     Progressive Widening zusätzlich gedämpft). Sauber testen (cargo test:
+     Aktionszahl an SmallFactorySun-Knoten, Prior-Summe=1 nach
      Kombination) und per Arena-Gating wie jede andere Generation validieren.
 
 ## C) Daten/Fenster (Begleitthema)
