@@ -6,16 +6,19 @@
 //!   - **Dirichlet-Wurzel-Noise** (Self-Play-Exploration).
 //! Lazy Expansion nach Prior (höchster zuerst) + Progressive Widening.
 
+use std::collections::HashMap;
+
 use rand::{Rng, RngExt};
 
 use crate::features::{action_to_id, state_to_features};
 use crate::game::{drafting_actions, Game};
 use crate::mcts::{MAX_ACTIONS, WIDEN_FACTOR};
-use crate::moves::Action;
+use crate::moves::{Action, TakeSource};
 use crate::net::{softmax, Net};
 use crate::self_play::action_to_env_dict;
 use crate::serialize::state_to_json;
 use crate::state::{GameState, Phase};
+use crate::tile::TileColor;
 
 /// Aktionsraum-Größe (= `config.NUM_ACTIONS`).
 const NUM_ACTIONS: usize = 482;
@@ -37,6 +40,77 @@ pub enum LeafEval {
     Net,
 }
 
+// ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
+//
+// Die Aktions-ID (`action_to_id`) kodiert `moon_order` NICHT — Farbe/Reihe/
+// Fabrik bestimmen die ID, alle Reihenfolge-Varianten eines SmallFactorySun-
+// Zugs fallen also auf dieselbe ID. Statt NUM_ACTIONS aufzublähen (würde alle
+// bestehenden Checkpoints invalidieren), bleibt der 482-dim Policy-Head auf
+// Farbe+Reihe beschränkt; die Permutations-Priors kommen SEPARAT aus dem
+// moon_order_head (Plackett-Luce über die rohen 5 Farb-Scores) und werden erst
+// beim Expandieren eines SmallFactorySun-Knotens mit dem Basis-Prior
+// multipliziert: P(Zug) = P(Basis) × P(Order | Plackett-Luce).
+
+/// TileColor → Index in COLOR_MAP-Reihenfolge (blau=0…türkis=4), sonst None.
+fn color_idx5(c: TileColor) -> Option<usize> {
+    TileColor::NORMAL.iter().position(|&x| x == c)
+}
+
+/// Alle EINDEUTIGEN Permutationen einer Farb-Multimenge (Tiles derselben Farbe
+/// sind ununterscheidbar — Duplikate durch wiederholte Farben werden dedupliziert).
+fn unique_moon_orders(remaining: &[TileColor]) -> Vec<Vec<TileColor>> {
+    fn permute(items: &mut Vec<TileColor>, k: usize, out: &mut Vec<Vec<TileColor>>) {
+        if k == items.len() {
+            out.push(items.clone());
+            return;
+        }
+        for i in k..items.len() {
+            items.swap(k, i);
+            permute(items, k + 1, out);
+            items.swap(k, i);
+        }
+    }
+    if remaining.is_empty() {
+        return vec![Vec::new()];
+    }
+    let mut items = remaining.to_vec();
+    let mut out = Vec::new();
+    permute(&mut items, 0, &mut out);
+    out.sort_by(|a, b| {
+        let av: Vec<&str> = a.iter().map(|c| c.value()).collect();
+        let bv: Vec<&str> = b.iter().map(|c| c.value()).collect();
+        av.cmp(&bv)
+    });
+    out.dedup();
+    out
+}
+
+/// Plackett-Luce-Wahrscheinlichkeit einer konkreten Farbfolge unter den 5 rohen
+/// Moon-Head-Scores (unnormalisiert, Reihenfolge wie `TileColor::NORMAL`):
+/// sequenzieller Softmax über die jeweils noch verbleibenden Farben.
+fn plackett_luce_prob(scores: &[f32; 5], seq: &[TileColor]) -> f64 {
+    let mut counts = [0i32; 5];
+    for &c in seq {
+        if let Some(i) = color_idx5(c) {
+            counts[i] += 1;
+        }
+    }
+    let mut p = 1.0f64;
+    for &c in seq {
+        let Some(cid) = color_idx5(c) else { continue };
+        let avail: Vec<usize> = (0..5).filter(|&i| counts[i] > 0).collect();
+        if avail.len() > 1 {
+            let max_s = avail.iter().map(|&i| scores[i]).fold(f32::NEG_INFINITY, f32::max);
+            let exps: Vec<f64> = avail.iter().map(|&i| ((scores[i] - max_s) as f64).exp()).collect();
+            let sum: f64 = exps.iter().sum::<f64>().max(1e-12);
+            let pos = avail.iter().position(|&i| i == cid).unwrap();
+            p *= exps[pos] / sum;
+        } // avail.len() <= 1: einziger Rest-Kandidat -> P=1, kein Beitrag
+        counts[cid] -= 1;
+    }
+    p
+}
+
 struct Node {
     parent: Option<usize>,
     children: Vec<usize>,
@@ -54,6 +128,61 @@ struct Node {
     leaf_value: [f64; 2],
 }
 
+/// Baut die priorisierte Kandidatenliste (Kind-Aktionen + Priors) für einen
+/// Nicht-Terminal-Knoten aus den rohen Netz-Logits + Moon-Head-Scores. Reine
+/// Funktion (kein `Net`-Aufruf) — direkt mit synthetischen Logits testbar.
+/// Gibt `(sortierte Kandidaten, Basis-Aktionszahl VOR Moon-Order-Expansion)`
+/// zurück; letzteres bleibt für `LeafEval::Dfs`s Skalierung unverändert.
+fn build_untried_actions(
+    state: &GameState,
+    logits: &[f32],
+    moon_scores: &[f32; 5],
+) -> (Vec<(Action, f32)>, usize) {
+    let base_actions = drafting_actions(state);
+    let n = base_actions.len();
+    let ids: Vec<usize> =
+        base_actions.iter().map(|a| action_to_id(&action_to_env_dict(state, a))).collect();
+
+    // WICHTIG: Maskierte Softmax NUR über die EINDEUTIGEN legalen Aktions-IDs —
+    // exakt wie das Training (masked log_softmax). Mehrere Moon-Order-Varianten
+    // derselben Basis-Aktion teilen sich eine ID; würden sie hier dupliziert
+    // eingehen, bekäme diese ID fälschlich mehrfaches Gewicht.
+    let mut unique_ids: Vec<usize> = ids.clone();
+    unique_ids.sort_unstable();
+    unique_ids.dedup();
+    let legal_logits: Vec<f32> = unique_ids
+        .iter()
+        .map(|&id| logits.get(id).copied().unwrap_or(f32::NEG_INFINITY))
+        .collect();
+    let base_probs = softmax(&legal_logits);
+    let p_base: HashMap<usize, f32> = unique_ids.into_iter().zip(base_probs).collect();
+
+    // Kandidaten: SmallFactorySun mit ≥2 Restfliesen → alle eindeutigen Moon-
+    // Order-Permutationen, Prior = P(Basis) × P(Order | Plackett-Luce). Alle
+    // anderen Aktionen unverändert 1:1.
+    let mut acts: Vec<(Action, f32)> = Vec::with_capacity(base_actions.len());
+    for (act, id) in base_actions.into_iter().zip(ids.into_iter()) {
+        let base_p = *p_base.get(&id).unwrap_or(&0.0);
+        if let Action::Stone(m) = &act {
+            if m.take.source == TakeSource::SmallFactorySun && m.take.moon_order.len() >= 2 {
+                let variants = unique_moon_orders(&m.take.moon_order);
+                let pl: Vec<f64> =
+                    variants.iter().map(|seq| plackett_luce_prob(moon_scores, seq)).collect();
+                let pl_sum: f64 = pl.iter().sum::<f64>().max(1e-12);
+                for (seq, p) in variants.into_iter().zip(pl.into_iter()) {
+                    let mut mm = m.clone();
+                    mm.take.moon_order = seq;
+                    acts.push((Action::Stone(mm), base_p * (p / pl_sum) as f32));
+                }
+                continue;
+            }
+        }
+        acts.push((act, base_p));
+    }
+    acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    (acts, n)
+}
+
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
 /// (per `leaf`: DFS-Solver oder Netz-Value).
 fn make_node(
@@ -67,35 +196,16 @@ fn make_node(
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
     let feats = state_to_features(&state_to_json(&state, true));
-    let (logits, value, _moon) = net
+    let (logits, value, moon) = net
         .eval(&feats)
         .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], 0.0, Vec::new()));
 
-    let (untried, n_actions) = if terminal {
-        (Vec::new(), 0)
-    } else {
-        // WICHTIG: Maskierte Softmax NUR über die legalen Aktions-Logits — exakt
-        // wie das Training (masked log_softmax). Eine Softmax über alle 482 würde
-        // die unbeschränkten illegalen (Tiling-)Logits einrechnen und die legalen
-        // Priors flach drücken (≈uniform → ungeführte Suche).
-        let acts0: Vec<(Action, usize)> = drafting_actions(&state)
-            .into_iter()
-            .map(|a| {
-                let id = action_to_id(&action_to_env_dict(&state, &a));
-                (a, id)
-            })
-            .collect();
-        let n = acts0.len();
-        let legal_logits: Vec<f32> = acts0
-            .iter()
-            .map(|(_, id)| logits.get(*id).copied().unwrap_or(f32::NEG_INFINITY))
-            .collect();
-        let probs = softmax(&legal_logits);
-        let mut acts: Vec<(Action, f32)> =
-            acts0.into_iter().zip(probs).map(|((a, _), p)| (a, p)).collect();
-        acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        (acts, n)
-    };
+    let mut moon_scores = [0f32; 5];
+    for (i, s) in moon.iter().take(5).enumerate() {
+        moon_scores[i] = *s;
+    }
+    let (untried, n_actions) =
+        if terminal { (Vec::new(), 0) } else { build_untried_actions(&state, &logits, &moon_scores) };
 
     // Blattwert: absolute Per-Spieler-Win-Prob.
     let leaf_value = match leaf {
@@ -291,4 +401,126 @@ fn dirichlet<R: Rng + ?Sized>(n: usize, alpha: f64, rng: &mut R) -> Vec<f64> {
     let g: Vec<f64> = (0..n).map(|_| gamma(alpha, rng)).collect();
     let s: f64 = g.iter().sum::<f64>().max(1e-12);
     g.iter().map(|&x| x / s).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::setup_new_game;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn names() -> [String; 2] {
+        ["P1".into(), "P2".into()]
+    }
+
+    #[test]
+    fn unique_moon_orders_dedups_repeated_colors() {
+        // 3 verschiedene Farben -> alle 6 Permutationen eindeutig.
+        let all_diff = [TileColor::Blau, TileColor::Gelb, TileColor::Rot];
+        assert_eq!(unique_moon_orders(&all_diff).len(), 6);
+
+        // 2x dieselbe Farbe + 1 andere -> nur 3 unterscheidbare Reihenfolgen
+        // (die beiden Rot-Fliesen sind ununterscheidbar).
+        let two_same = [TileColor::Rot, TileColor::Rot, TileColor::Blau];
+        let orders = unique_moon_orders(&two_same);
+        assert_eq!(orders.len(), 3);
+        for o in &orders {
+            let mut sorted = o.clone();
+            sorted.sort_by_key(|c| c.value());
+            let mut expected = two_same.to_vec();
+            expected.sort_by_key(|c| c.value());
+            assert_eq!(sorted, expected);
+        }
+
+        // Alle 3 gleich -> nur 1 mögliche Reihenfolge.
+        let all_same = [TileColor::Schwarz, TileColor::Schwarz, TileColor::Schwarz];
+        assert_eq!(unique_moon_orders(&all_same).len(), 1);
+
+        // 1 Restfliese -> genau 1 Reihenfolge.
+        assert_eq!(unique_moon_orders(&[TileColor::Tuerkis]).len(), 1);
+
+        // 0 Restfliesen -> 1 leere Reihenfolge (kein Stapel nötig).
+        assert_eq!(unique_moon_orders(&[]), vec![Vec::<TileColor>::new()]);
+    }
+
+    #[test]
+    fn plackett_luce_probs_sum_to_one_over_all_unique_orders() {
+        let remaining = [TileColor::Blau, TileColor::Gelb, TileColor::Rot];
+        let orders = unique_moon_orders(&remaining);
+        // Beliebige, nicht-uniforme Scores.
+        let scores = [2.0f32, -1.0, 0.5, 3.0, -2.0];
+        let total: f64 = orders.iter().map(|o| plackett_luce_prob(&scores, o)).sum();
+        assert!((total - 1.0).abs() < 1e-9, "Summe war {total}, erwartet 1.0");
+
+        // Auch mit Farbwiederholung (3 Order statt 6) muss die Summe 1 bleiben.
+        let remaining2 = [TileColor::Rot, TileColor::Rot, TileColor::Blau];
+        let orders2 = unique_moon_orders(&remaining2);
+        let total2: f64 = orders2.iter().map(|o| plackett_luce_prob(&scores, o)).sum();
+        assert!((total2 - 1.0).abs() < 1e-9, "Summe war {total2}, erwartet 1.0");
+    }
+
+    #[test]
+    fn plackett_luce_prefers_higher_scored_color_first() {
+        // Score für Rot (Index 2) klar am höchsten -> P(Rot zuerst) muss die
+        // größte Einzelwahrscheinlichkeit unter den Permutationen sein, die
+        // mit Rot beginnen, gegenüber denen, die mit Blau beginnen.
+        let scores = [0.0f32, 0.0, 5.0, 0.0, 0.0]; // Rot dominiert klar
+        let p_rot_first = plackett_luce_prob(&scores, &[TileColor::Rot, TileColor::Blau]);
+        let p_blau_first = plackett_luce_prob(&scores, &[TileColor::Blau, TileColor::Rot]);
+        assert!(p_rot_first > p_blau_first, "{p_rot_first} sollte > {p_blau_first} sein");
+        assert!(p_rot_first > 0.9, "bei Score-Differenz 5.0 sollte P(Rot zuerst) dominieren");
+    }
+
+    #[test]
+    fn build_untried_actions_priors_sum_to_one_and_expand_moon_orders() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let state = setup_new_game(names(), 0, &mut rng);
+        let logits = vec![0.1f32; NUM_ACTIONS];
+        let moon_scores = [1.0f32, 0.5, -0.5, 2.0, 0.0];
+
+        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores);
+        assert!(!acts.is_empty());
+
+        // Gesamtsumme aller Priors muss (bis auf Rundung) 1 ergeben — die
+        // Moon-Order-Aufteilung darf keine Masse erzeugen oder verlieren.
+        let total: f64 = acts.iter().map(|(_, p)| *p as f64).sum();
+        assert!((total - 1.0).abs() < 1e-4, "Summe der Priors war {total}, erwartet 1.0");
+
+        // Mindestens eine SmallFactorySun-Basis-Aktion mit ≥2 Restfliesen sollte
+        // beim Spielstart existieren (4 Fabriken × 4 Fliesen) -> Expansion
+        // muss stattgefunden haben (mehr Kandidaten als Basis-Aktionen).
+        let has_multi_order = state.factories.iter().any(|f| {
+            f.sun_colors().iter().any(|&c| {
+                f.sun_tiles.iter().filter(|&&t| t != c).count() >= 2
+            })
+        });
+        if has_multi_order {
+            assert!(
+                acts.len() > n_base,
+                "Erwartete Moon-Order-Expansion (mehr Kandidaten als Basis-Aktionen): {} vs {}",
+                acts.len(),
+                n_base
+            );
+        }
+
+        // Für jede expandierte SmallFactorySun-Gruppe: die Prior-Summe der
+        // Varianten muss der Basis-ID-Wahrscheinlichkeit entsprechen (Prüfung
+        // über Gruppierung nach (color,row,factory), da die ID selbst nicht
+        // direkt zugänglich ist -> stattdessen Gesamtsumme je Gruppe > 0).
+        use std::collections::HashMap as Map;
+        let mut groups: Map<(String, i32, Option<usize>), f64> = Map::new();
+        for (act, p) in &acts {
+            if let Action::Stone(m) = act {
+                if m.take.source == TakeSource::SmallFactorySun {
+                    let key = (m.take.color.value().to_string(), m.place.row_index, m.take.factory_id);
+                    *groups.entry(key).or_insert(0.0) += *p as f64;
+                }
+            }
+        }
+        assert!(!groups.is_empty(), "keine SmallFactorySun-Gruppen gefunden");
+        for (_, sum) in &groups {
+            assert!(*sum > 0.0);
+        }
+    }
 }

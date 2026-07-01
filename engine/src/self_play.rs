@@ -79,6 +79,10 @@ pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
             "factory_index": factory_index(state, &m.take),
             "color": m.take.color.value(),
             "row": m.place.row_index,
+            // Nur Debug-/Introspektions-Info — action_to_id liest dieses Feld
+            // NICHT (Moon-Order-Varianten teilen sich bewusst dieselbe ID; die
+            // Suche kombiniert ihre Priors separat, siehe net_mcts.rs).
+            "moon_order": m.take.moon_order.iter().map(|c| c.value()).collect::<Vec<_>>(),
         }),
         Action::Dome(m) => {
             let d_idx = state
@@ -589,7 +593,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     let t_start = std::time::Instant::now();
     loop {
         guard += 1;
-        if guard > 100_000 {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
             break; // defensive Endlosschleifen-Sicherung
         }
         match game.state.phase {
@@ -904,7 +908,7 @@ pub fn run_net_arena_match(
     c_puct: f64,
     dfs_leaf: bool,
 ) -> Result<String, String> {
-    let net = Net::load(model_path, 673).map_err(|e| e.to_string())?;
+    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
     let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
 
@@ -1040,8 +1044,8 @@ pub fn run_net_vs_net_arena(
     c_puct: f64,
     dfs_leaf: bool,
 ) -> Result<String, String> {
-    let net_a = std::sync::Arc::new(Net::load(model_a, 673).map_err(|e| e.to_string())?);
-    let net_b = std::sync::Arc::new(Net::load(model_b, 673).map_err(|e| e.to_string())?);
+    let net_a = std::sync::Arc::new(Net::load(model_a, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+    let net_b = std::sync::Arc::new(Net::load(model_b, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
     let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Value {
@@ -1192,7 +1196,7 @@ pub fn run_net_self_play(
     dfs_leaf: bool,
     prefix: &str,
 ) -> Result<String, String> {
-    let net = std::sync::Arc::new(Net::load(model_path, 673).map_err(|e| e.to_string())?);
+    let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
     let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Vec<Value> {
