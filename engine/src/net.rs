@@ -15,7 +15,8 @@ pub struct Net {
 }
 
 impl Net {
-    /// Lädt ein ONNX-Netz; `input_size` muss zur Feature-Länge passen (673).
+    /// Lädt ein ONNX-Netz; `input_size` muss zur Feature-Länge passen
+    /// (siehe `features::INPUT_SIZE` — dort übergeben, nicht hier hardcoden).
     pub fn load(path: &str, input_size: usize) -> TractResult<Net> {
         let model = tract_onnx::onnx()
             .model_for_path(path)?
