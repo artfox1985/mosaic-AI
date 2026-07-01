@@ -107,7 +107,23 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
             f.push(c / 5.0);
         }
         f.push(if fac.get("bonus_chip").map_or(false, |x| !x.is_null()) { 1.0 } else { 0.0 });
-        f.push(if fac.get("chip_revealed").and_then(|x| x.as_bool()).unwrap_or(false) { 1.0 } else { 0.0 });
+        let revealed = fac.get("chip_revealed").and_then(|x| x.as_bool()).unwrap_or(false);
+        f.push(if revealed { 1.0 } else { 0.0 });
+
+        // Farben des Bonus-Chips (5-dim Maske) — NUR wenn aufgedeckt (sonst
+        // versteckte Information, die kein Spieler kennt).
+        let mut chip_mask = [0f32; 5];
+        if revealed {
+            if let Some(cols) = fac.get("bonus_chip").and_then(|x| x.get("colors")).and_then(|x| x.as_array()) {
+                for c in cols {
+                    let id = color_idx(c.as_str());
+                    if (0..5).contains(&id) {
+                        chip_mask[id as usize] = 1.0;
+                    }
+                }
+            }
+        }
+        f.extend_from_slice(&chip_mask);
     }
 
     // 4. Große Manufaktur: 5 Sun-Counts /10

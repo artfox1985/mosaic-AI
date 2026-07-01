@@ -48,7 +48,19 @@ def state_to_tensor(data):
         features.append(has_chip)
         chip_revealed = 1.0 if f.get("chip_revealed", False) else 0.0
         features.append(chip_revealed)
-        
+
+        # Farben des Bonus-Chips (5-dim Maske) — NUR wenn aufgedeckt (sonst
+        # wäre das versteckte Information, die kein Spieler kennt). Zeigt dem
+        # Netz, ob der Chip 1- oder 2-farbig (= flexibler einsetzbar) ist.
+        chip_colors_mask = [0.0] * 5
+        if chip_revealed:
+            bc = f.get("bonus_chip") or {}
+            for c_name in bc.get("colors", []):
+                c_id = COLOR_MAP.get(c_name, -1)
+                if 0 <= c_id < 5:
+                    chip_colors_mask[c_id] = 1.0
+        features.extend(chip_colors_mask)
+
     # 4. Große Manufaktur
     lf = data.get("large_factory", {})
     lf_sun = [0] * 5
