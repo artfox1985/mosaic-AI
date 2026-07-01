@@ -4,16 +4,26 @@
 
 **Stufe 1 ist zufriedenstellend: v7 schlägt die Heuristik klar.**
 
-| Netz | hidden | vs. Heuristik | Ø Score (Netz:Heur) |
-|---|---|---|---|
-| v4 | 256 | 51 % | 23.4 : 25.0 |
-| v5 | 256 (warm v4) | 49 % | 23.8 : 28.4 |
-| v6 | 512 (**cold**) | 45 % | 21.6 : 27.4 |
-| **v7** | **512 (warm v6, ~790k Züge)** | **61 %** | **27.3 : 26.1** |
+| Netz | hidden | vs. Heuristik | Ø Score (Netz:Heur) | 0:0 |
+|---|---|---|---|---|
+| v4 | 256 | 51 % | 23.4 : 25.0 | — |
+| v5 | 256 (warm v4) | 49 % | 23.8 : 28.4 | — |
+| v6 | 512 (**cold**) | 45 % | 21.6 : 27.4 | — |
+| v7 | 512 (warm v6, ~790k Züge) | 61 % | 27.3 : 26.1 | ~1 % |
+| **v8** | **512 (warm v7, +Chip-/Moon-Order-Features, gleiches Datenfenster wie v7)** | **60 %** | **24.7 : 23.9** | **0 %** |
 
 - v7 übertrifft die Heuristik **erstmals auch im Ø-Score** (27.3 > 26.1), Elo 1049:951,
   0:0 ~1 %. v7 ≈ v5 im Direktduell (Nicht-Transitivität, ok) — Benchmark ist die
-  Heuristik, dort ist v7 klar vorn. **Weiter mit v7.**
+  Heuristik, dort ist v7 klar vorn.
+- **v8 liegt praktisch gleichauf mit v7** (60 % vs. 61 %, Marge +0.8 vs. +1.2) —
+  kein klarer Sprung, aber auch kein Rückschritt. Nachvollziehbar: die neue
+  Eingangsschicht (Chip-/Moon-Order-Features) startet bei `INPUT_SIZE`-Änderungen
+  frisch (s. Learnings) und muss sich erst wieder einspielen. **Vorsicht bei der
+  finalen Elo-Zeile** (v8 992 : Heuristik 1008, wirkt wie eine Niederlage): bei
+  Spiel #92 stand es noch 1080:920 für v8, eine kurze Pechsträhne mit mehreren
+  Strength-1.0-Niederlagen am Ende hat die pfadabhängige Elo verzerrt — Sieganteil
+  (60:40) und Ø-Score (24.7 > 23.9) sind hier die robusteren Kennzahlen.
+  **Weiter mit v8** als Ausgangspunkt für v9.
 
 ## Learnings (validiert)
 - **Größeres Netz hilft — aber nur WARM.** 256 gedeckelt (~49–51 %); 512 **cold**
@@ -34,14 +44,32 @@
   solche Keys jetzt vorher raus — Rest (Bias, tiefere Schichten, alle Heads)
   bleibt warm-startbar. Bei jeder künftigen `INPUT_SIZE`-Änderung gilt das
   weiterhin (committet, mit State-Dict-Vergleich verifiziert).
+- **Alte `.onnx`-Modelle sind nach einer `INPUT_SIZE`-Änderung endgültig tot fürs
+  Self-Play/Netz-vs-Netz** (feste Graph-Shape, kein Toleranzmechanismus wie
+  `strict=False`) — betrifft nur das Spielen, nicht das `.pth` (Warm-Start bleibt
+  möglich) und nicht bereits erzeugte Self-Play-`.pkl`-Daten (rohe States, werden
+  frisch kodiert). v7.onnx kann seitdem weder Self-Play generieren noch gegen v8
+  antreten — kein Bug, erwartete Konsequenz.
+- **Reifegrad-Sonde kann sich zwischen Generationen verschlechtern, auch wenn
+  die Spielstärke gleich bleibt.** v8s Faktor lag bei 9.33× (v7: ~3×) — die
+  frisch initialisierte Eingangsschicht muss die wertrelevanten Signale nach
+  einer `INPUT_SIZE`-Änderung erst neu extrahieren lernen. Kein Alarmsignal,
+  aber: nach einem Repräsentationsumbruch (neue Features, Netzvergrößerung)
+  eher MEHR Stufe-1-Generationen einplanen, bevor man erneut auf Grün hofft.
+- **Die finale Elo-Zeile kann täuschen** (pfadabhängig, von einer kurzen
+  Pechsträhne am Ende verzerrbar — bei v8 sichtbar: Peak 1080:920 bei Spiel
+  #92, Endstand 992:1008 trotz 60:40-Sieganteil). Sieganteil + Ø-Score sind
+  die robusteren Kennzahlen für den Generationen-Vergleich.
 
 ## A) Stufe 2 — Netz-Value-Blatt (nächster Hauptschritt, jetzt mit Reifegrad-Sonde)
 
-**Status:** v8 trainiert gerade (512, warm von v7, Daten v2+v3+4000×v4, PLUS die
-Features aus Abschnitt B — Chip-Farben + Moon-Order, s.u.). Sobald v8 fertig ist
-und das übliche Arena-Gate (vs. v7 + vs. Heuristik) besteht, gilt der folgende
-Ablauf für den Stufe-2-Umstieg — **nicht mehr blind versuchen** (der v7-Versuch
-kostete einen vollen Self-Play-Zyklus, bevor der Kollaps auffiel).
+**Status: v8 fertig, Gate bestanden (knapp gleichauf mit v7, s. Status-Tabelle),
+Reifegrad-Sonde ROT (9.33× — v7 lag bei ~3×).** Entscheidung: **in Stufe 1
+bleiben.** v8 erzeugt jetzt 2000 Stufe-1-Self-Play-Spiele; v9 trainiert darauf
+(Fenster **v3+2000×v4+2000×v8**, v2 komplett raus, v4 halbiert) und wiederholt
+die Sonde. Der folgende Ablauf gilt weiterhin für den Umstieg, sobald die Sonde
+grün ausschlägt — **nicht mehr blind versuchen** (der v7-Versuch kostete einen
+vollen Self-Play-Zyklus, bevor der Kollaps auffiel).
 
 ### Reifegrad-Sonde (nach jeder Stufe-1-Generation, die das Heuristik-Gate besteht)
 Billiger, isolierender Vergleich mit **demselben Netz**, einmal Stufe 1 und
@@ -61,8 +89,9 @@ Stufe-1-Grundrauschen der Generation):
 - **≤ ~1.5×** → Value-Head trägt, voller Stufe-2-Zyklus lohnt sich.
 - **1.5×–3×** → noch nicht reif, Trend über Generationen beobachten, Stufe 1
   weiter iterieren.
-- **> 3×** (v7: 3.7×/2.96× — 51.8 % vs. 17.5 %) → klar nicht reif, keinen
-  Stufe-2-Zyklus starten, Probe bei der nächsten Gen wiederholen.
+- **> 3×** (v7: 3.7×/2.96× — 51.8 % vs. 17.5 %; **v8: 9.33× — 28.0 % vs. 3.0 %**)
+  → klar nicht reif, keinen Stufe-2-Zyklus starten, Probe bei der nächsten Gen
+  wiederholen.
 
 ### Bei Grün: voller Stufe-2-Zyklus
 - Self-Play groß mit `--stage 2` (`dfs_leaf=False`), z. B. 1500–2000 Spiele.
@@ -106,8 +135,15 @@ die Reifegrad-Sonde oben — kein separater Feature-Rollout mehr nötig.
 
 ## C) Daten/Fenster (Begleitthema)
 - DFS-verankerte Daten → altes bleibt brauchbar, breites Fenster günstig.
-- Ab ~Gen 5 die **älteste** Generation rausrollen; fürs 512er Richtung
-  **3000–5000 Spiele** im Fenster (v7 lief auf ~790k Züge / ~5000 Spiele).
+- **Korrektur:** Das Fenster wurde von v4 bis v8 tatsächlich NIE fortbewegt —
+  v5/v6/v7/v8 trainierten alle auf demselben v2+v3+4000×v4-Fenster (der geplante
+  v7-Self-Play-Beitrag scheiterte an der `INPUT_SIZE`-Inkompatibilität, s.
+  Learnings, und wurde nie Teil des Fensters). **v9 ist der erste echte
+  Fenster-Fortschritt**: v2 komplett raus, v4 halbiert (4000→2000), dazu
+  2000×v8 — verhindert, dass die neuen v8-Daten von der alten v4-Masse
+  erschlagen werden.
+- Ab ~Gen 5 (jetzt erreicht) die **älteste** Generation rausrollen; fürs 512er
+  Richtung **3000–5000 Spiele** im Fenster (v7 lief auf ~790k Züge / ~5000 Spiele).
 
 ## Gating / Verifikation
 - Je Generation: `run_net_arena(v_neu vs Heuristik, 200/200, 100)` +
