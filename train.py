@@ -16,6 +16,33 @@ import torch.nn.functional as F
 from pathlib import Path
 from torch.utils.data import DataLoader
 
+
+def plackett_luce_moon_loss(pred_moon, moon_targets):
+    """Negative Log-Likelihood der DFS-Referenz-Reihenfolge unter einem
+    Plackett-Luce-Modell über die 5 rohen Moon-Head-Scores (sequenzieller
+    Softmax über die jeweils noch nicht platzierten, ursprünglich vorhandenen
+    Farben — Rust-Pendant: net_mcts.rs::plackett_luce_prob, hier differenzierbar
+    fürs Training). `moon_targets`: je Farbe der Rang (0=zuerst…4=zuletzt) oder
+    -1 (Farbe nicht in der Restmenge dieses Samples). Gibt (B,) NLL zurück —
+    Zeilen ohne jede gültige Farbe (kein Sonnenzug) liefern 0.
+    Nutzt -1e9 statt -inf als Masken-Wert: nach der Max-Subtraktion in
+    log_softmax bleibt eine vollständig maskierte Zeile ein wohldefiniertes
+    Gleichverteilungs-Softmax (kein NaN), unabhängig davon ob ihr Beitrag
+    später über `has_rank_t` verworfen wird."""
+    present = moon_targets >= 0                      # (B,5) bool
+    placed = torch.zeros_like(present)
+    total_nll = torch.zeros(moon_targets.shape[0], device=moon_targets.device)
+    for t in range(5):
+        is_rank_t = present & (moon_targets == t)     # (B,5): genau 1 True je Zeile, falls Rang t existiert
+        has_rank_t = is_rank_t.any(dim=1)
+        avail = present & (~placed)
+        masked_logits = pred_moon.masked_fill(~avail, -1e9)
+        log_probs = F.log_softmax(masked_logits, dim=1)
+        step_nll = -(log_probs * is_rank_t.float()).sum(dim=1)
+        total_nll = total_nll + torch.where(has_rank_t, step_nll, torch.zeros_like(step_nll))
+        placed = placed | is_rank_t
+    return total_nll
+
 # Unsere dynamischen Pfade aus der Config laden
 from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT
 
@@ -117,11 +144,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             w = pol_w
             p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 
-            # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter
+            # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter.
+            # Plackett-Luce-NLL statt MSE-auf-Rängen: der moon_order_head liefert
+            # jetzt echte Präferenz-SCORES, die net_mcts.rs zur Suchzeit direkt als
+            # P(Order)-Verteilung nutzt (statt einer bloßen Rang-Regression).
             moon_targets = moon_targets.to(device)
-            sun_mask = (moon_targets[:, 0] >= 0)
+            # BUGFIX: sun_mask prüfte zuvor nur Spalte 0 (blau) auf >=0 — das
+            # schloss gültige Sonnenzug-Samples aus, deren Restfarben blau nicht
+            # enthielten (z.B. remaining=[gelb,rot]), und verzerrte den Loss
+            # systematisch zugunsten blau-haltiger Samples. Jetzt: irgendeine Spalte.
+            sun_mask = (moon_targets >= 0).any(dim=1)
             if sun_mask.any():
-                p_loss = p_loss + mse_loss(pred_moon[sun_mask], moon_targets[sun_mask])
+                moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
+                p_loss = p_loss + moon_nll[sun_mask].mean()
 
             loss = v_loss * VALUE_WEIGHT + p_loss
             loss.backward()
