@@ -51,12 +51,43 @@
    Farben (1- vs. 2-Farb-Flexibilität). **Kein Regen nötig** — Farben stehen schon
    in den States (`serialize_chip`), pkl werden neu kodiert. `INPUT_SIZE`-Änderung →
    erste Body-Schicht frisch, tiefere warm-startbar (`strict=False`).
-2. **Moon-Order aktiv wählen** (liegt brach): gespielt wird immer Default-`remaining`
-   (`validation.rs:175`); `moon_order_head` wird zur Spielzeit verworfen
-   (`net_mcts.rs` ignoriert `_moon`). Das Netz *sieht* die Order (state_to_tensor
-   Sektion 7), *setzt* sie nicht. Pro Spiel nur **4×** → Rechenzeit lohnt. Billigster
-   Fix: `self_play.rs::moon_order_target`-DFS-Logik zur Spielzeit die `moon_order`
-   des gewählten Zuges setzen. Besseres Target würde den *Gegnerzugriff* mitbewerten.
+2. **Moon-Order aktiv wählen, suche-getrieben (Geminis Ansatz)** (liegt brach):
+   gespielt wird immer Default-`remaining` (`validation.rs:175`); `moon_order_head`
+   wird zur Spielzeit verworfen (`net_mcts.rs` ignoriert `_moon`). Das Netz *sieht*
+   die Order (state_to_tensor Sektion 7), *setzt* sie nicht. Pro Spiel nur **4×**
+   → volle MCTS-Behandlung lohnt sich; die Value-Backups (bei Stufe 2 implizit
+   inkl. Mehrrunden-/Gegner-Effekte) sollen die Order-Wahl validieren, statt eine
+   handgestrickte Heuristik zu raten.
+   - **Zugerzeugung** (`validation.rs:175`, nur `TakeSource::SmallFactorySun`):
+     statt einem Move mit `moon_order=remaining` alle Permutationen der Restfliesen
+     als separate Moves erzeugen (≤ 3 Restfliesen → ≤ 6 Permutationen, wie in
+     `moon_order_target` bereits gededupelt/begrenzt). Nur diese eine Quelle
+     betroffen — `LargeFactorySun`/Mond-Pool sind ungeordnet, keine Änderung nötig.
+   - **KRITISCH — Aktions-ID-Konflikt:** `action_to_id` kodiert `moon_order`
+     **nicht** (Stone-ID hängt nur an `color/row/factory_index`,
+     [engine/py/neural_net.py:248](../engine/py/neural_net.py),
+     [engine/src/features.rs:354](../engine/src/features.rs)). Alle Permutationen
+     desselben Base-Zugs fallen also auf dieselbe ID → der 482-dim Policy-Head kann
+     ihnen keine unterschiedlichen Priors geben. **`NUM_ACTIONS` NICHT aufblähen**
+     (würde alle bisherigen Checkpoints v1–v7 invalidieren). Stattdessen
+     hierarchisch bleiben: der 482-dim Head bestimmt weiter nur Farbe+Reihe; die
+     Permutations-Priors kommen **separat** aus dem `moon_order_head` und werden
+     nur beim Expandieren eines `SmallFactorySun`-Knotens mit dem Base-Prior
+     multipliziert (`P(Zug) = P(Base) × P(Order)`), in `net_mcts.rs::make_node`.
+   - **Head-Redesign nötig:** `moon_order_head` liefert aktuell 5 MSE-Rang-Werte
+     (kein Softmax, keine Verteilung). Für `P(Order)` braucht es eine echte
+     Verteilung über Permutationen — z. B. **Plackett-Luce**: sequenzieller Softmax
+     über die Restfarben (erst wahrscheinlichste Farbe oben wählen, dann aus dem
+     Rest die nächste, usw.). Loss entsprechend von MSE auf Ranking-Likelihood
+     umstellen; betrifft `MosaicNet.moon_order_head` + den Trainings-Loss in
+     `train.py`. Trainings-Target: weiterhin `moon_order_target`
+     (`self_play.rs`) als Referenz-Reihenfolge, aber als Permutations-Likelihood
+     statt Rang-Regression codiert.
+   - **Kosten/Risiko:** bis zu 6× Branching an genau den (≤4/Spiel)
+     `SmallFactorySun`-Entscheidungen — durch Progressive Widening
+     (`MAX_ACTIONS`/`WIDEN_FACTOR`) gedämpft, aber nicht null. Sauber testen
+     (cargo test: Aktionszahl an SmallFactorySun-Knoten, Prior-Summe=1 nach
+     Kombination) und per Arena-Gating wie jede andere Generation validieren.
 
 ## C) Daten/Fenster (Begleitthema)
 - DFS-verankerte Daten → altes bleibt brauchbar, breites Fenster günstig.
