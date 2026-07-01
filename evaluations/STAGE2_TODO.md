@@ -30,11 +30,19 @@
   (Stage-2-Sims sind billiger: Netz-Forward statt Netz-Forward+DFS pro Sim.)
 - Training **warm von v7**: `train.py --name v8 --load v7 --hidden 512` → gleiche
   Architektur, voller Gewichts-Transfer (Priors + Value bleiben).
-- **Arena-Gating**: v8 nur übernehmen, wenn es v7 schlägt; sonst in Stufe 1 bleiben.
-  Erste Stufe-2-Generation eng beobachten (kann anfangs abfallen, da die Visit-
-  Targets nun vom Netz-Value statt DFS kommen). Value-Head trägt (v7 Value-Loss 0.057).
+- Erste Generation: Mix aus altem Stufe-1 (v3 + reduziertes v4) + neuem Stufe-2
+  (v7-generiert) — verhindert, dass die DFS-myopischen Alt-Targets die neuen
+  Mehrrunden-Targets zahlenmäßig erschlagen. Über folgende Gens Stufe-1-Anteil
+  schrittweise rausrollen.
+- **Arena-Gating**: v8 (und jede weitere Stufe-2-Gen) nur übernehmen, wenn sie den
+  Vorgänger schlägt; sonst in Stufe 1 bleiben. Rückschlag in der ersten Gen ist
+  normal (Visit-Targets kommen jetzt vom Netz-Value statt DFS).
+- **Gate für Schritt B (Feature-Upgrades): erst wenn sich die Stufe-2-Generationen
+  auf v7-Niveau eingependelt haben** (über mehrere Gens stabil ≥ v7 in der Arena,
+  nicht nur ein einzelner guter Lauf). Verhindert, dass ein Abfall nicht zuordenbar
+  ist (Netz-Value-Blatt vs. neue Features als Ursache).
 
-## B) Feature-Upgrades (Repräsentation) — parallel/danach
+## B) Feature-Upgrades (Repräsentation) — erst NACH eingependelter Stufe 2 (Gate oben)
 Ändern `INPUT_SIZE` bzw. Spielzeit-Logik, nicht den Kern-Loop:
 1. **Bonuschip-Farben pro Fabrik** in `state_to_tensor`
    ([engine/py/neural_net.py](../engine/py/neural_net.py)) **+ Rust-Parität**
