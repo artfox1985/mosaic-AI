@@ -81,10 +81,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if load_path.exists():
             print(f"📥 Lade altes Model als Startpunkt: {load_path.name}")
             ckpt = torch.load(str(load_path), map_location=device)
-            # strict=False: tolerant gegenüber Head-Änderungen zwischen Versionen
-            # (z.B. der entfernte Floor-Head in alten Checkpoints) — unerwartete/
-            # fehlende Keys werden ignoriert, der Rest startet warm.
-            model.load_state_dict(ckpt["model_state"], strict=False)
+            old_state = ckpt["model_state"]
+            new_state = model.state_dict()
+            # strict=False allein reicht NICHT bei INPUT_SIZE-Änderungen: es
+            # toleriert fehlende/zusätzliche Keys, aber KEINE Shape-Mismatches
+            # bei gleichnamigen Keys (z.B. body.0.weight bei geändertem
+            # INPUT_SIZE) — das würde crashen. Shape-inkompatible Keys daher
+            # vorher explizit rausfiltern; der Rest (tiefere Body-Schichten,
+            # alle Heads) startet weiterhin warm.
+            skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
+            if skipped:
+                print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")
+                old_state = {k: v for k, v in old_state.items() if k not in skipped}
+            model.load_state_dict(old_state, strict=False)
         else:
             print(f"⚠️ Warnung: Start-Modell '{load_path}' nicht gefunden. Trainiere von null!")
             
