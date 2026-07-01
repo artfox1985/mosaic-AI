@@ -56,6 +56,19 @@
   einer `INPUT_SIZE`-Änderung erst neu extrahieren lernen. Kein Alarmsignal,
   aber: nach einem Repräsentationsumbruch (neue Features, Netzvergrößerung)
   eher MEHR Stufe-1-Generationen einplanen, bevor man erneut auf Grün hofft.
+  **Korrektur/Einschränkung:** ein Großteil des scheinbaren Rückschritts ist
+  Messrauschen, kein echter Effekt — v8s Stufe-1-Basisrate war mit 3 % (3/100)
+  viel niedriger als v7s ~17.5–14 % (7/40 bzw. eine frühere Messung), und bei so
+  wenigen 0:0-Ereignissen ist die Ratio extrem instabil: ±1 Spiel Unterschied in
+  der Stufe-1-Stichprobe verschiebt sie (Laplace-geglättet) zwischen 4.8× und
+  14.5×. Mit Glättung: v8 ≈ 7.25× statt roh 9.33×, v7 ≈ 2.68× statt 2.96× — die
+  Richtung (v8 schlechter) bleibt, das Ausmaß ist aber deutlich unsicherer als
+  die Rohzahlen suggerieren. **Folge für die Sonde selbst:** je sauberer die
+  Netze spielen (niedrigere 0:0-Basisrate), desto MEHR Spiele braucht die Sonde
+  für ein verlässliches Signal — 40 (train.py-Default) oder auch 100 reichen bei
+  einstelliger Prozent-Basisrate nicht mehr für ein präzises Verhältnis, auch
+  wenn die Entscheidung „noch nicht reif" davon in diesem Fall nicht berührt war
+  (alle plausiblen Werte lagen klar über der 3×-Schwelle).
 - **Die finale Elo-Zeile kann täuschen** (pfadabhängig, von einer kurzen
   Pechsträhne am Ende verzerrbar — bei v8 sichtbar: Peak 1080:920 bei Spiel
   #92, Endstand 992:1008 trotz 60:40-Sieganteil). Sieganteil + Ø-Score sind
@@ -64,8 +77,11 @@
 ## A) Stufe 2 — Netz-Value-Blatt (nächster Hauptschritt, jetzt mit Reifegrad-Sonde)
 
 **Status: v8 fertig, Gate bestanden (knapp gleichauf mit v7, s. Status-Tabelle),
-Reifegrad-Sonde ROT (9.33× — v7 lag bei ~3×).** Entscheidung: **in Stufe 1
-bleiben.** v8 erzeugt jetzt 2000 Stufe-1-Self-Play-Spiele; v9 trainiert darauf
+Reifegrad-Sonde ROT (9.33× roh / ~7.25× geglättet — v7 lag bei ~2.7–3×; die
+genaue Größe der Verschlechterung ist wegen v8s niedriger Stufe-1-Basisrate
+[3 %] unsicher, die Richtung — noch nicht reif — aber robust, s. Learnings).**
+Entscheidung: **in Stufe 1 bleiben.** v8 erzeugt jetzt 2000 Stufe-1-Self-Play-
+Spiele; v9 trainiert darauf
 (Fenster **v3+2000×v4+2000×v8**, v2 komplett raus, v4 halbiert) und wiederholt
 die Sonde. Der folgende Ablauf gilt weiterhin für den Umstieg, sobald die Sonde
 grün ausschlägt — **nicht mehr blind versuchen** (der v7-Versuch kostete einen
@@ -89,9 +105,12 @@ Stufe-1-Grundrauschen der Generation):
 - **≤ ~1.5×** → Value-Head trägt, voller Stufe-2-Zyklus lohnt sich.
 - **1.5×–3×** → noch nicht reif, Trend über Generationen beobachten, Stufe 1
   weiter iterieren.
-- **> 3×** (v7: 3.7×/2.96× — 51.8 % vs. 17.5 %; **v8: 9.33× — 28.0 % vs. 3.0 %**)
+- **> 3×** (v7: 3.7×/2.96× — 51.8 % vs. 17.5 %; **v8: 9.33× roh / ~7.25×
+  geglättet — 28.0 % vs. 3.0 %, Basisrate niedrig → Zahl unsicher, s. Learnings**)
   → klar nicht reif, keinen Stufe-2-Zyklus starten, Probe bei der nächsten Gen
-  wiederholen.
+  wiederholen. **Bei niedriger Stufe-1-Basisrate (einstellige %) die Ratio per
+  Laplace-Glättung berechnen und die Sonde mit mehr Spielen laufen lassen** —
+  sonst kann ±1 Spiel das Ergebnis um mehrere hundert Prozent verschieben.
 
 ### Bei Grün: voller Stufe-2-Zyklus
 - Self-Play groß mit `--stage 2` (`dfs_leaf=False`), z. B. 1500–2000 Spiele.
