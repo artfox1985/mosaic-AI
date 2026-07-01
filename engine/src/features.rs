@@ -137,19 +137,6 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
             f.push((num(p, "estimated_score") / 100.0) as f32);
             f.push(if p.get("marker").and_then(|x| x.as_bool()).unwrap_or(false) { 1.0 } else { 0.0 });
 
-            let mut chip_feat = [0f32; 5];
-            if let Some(cc) = p.get("unused_chip_colors").and_then(|x| x.as_array()) {
-                for c in cc {
-                    let id = color_idx(c.as_str());
-                    if (0..5).contains(&id) {
-                        chip_feat[id as usize] += 1.0;
-                    }
-                }
-            }
-            for c in chip_feat {
-                f.push(c / 5.0);
-            }
-
             if let Some(rows) = p.get("pattern_lines").and_then(|x| x.as_array()) {
                 for row in rows {
                     let cap = row.get("capacity").and_then(|x| x.as_f64()).unwrap_or(1.0);
