@@ -50,7 +50,79 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import MosaicNet, MosaicDataset
 
-def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True):
+def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345):
+    """Stage-2-Reifegrad-Sonde (siehe evaluations/STAGE2_TODO.md, Abschnitt A):
+    vergleicht die 0:0-Rate DESSELBEN frisch exportierten Netzes einmal mit
+    DFS-Blatt (Stufe 1) und einmal mit Netz-Value-Blatt (Stufe 2), isoliert per
+    kurzem Self-Play (kein Regen-Zyklus — keine pkl-Dateien, nur In-Memory-
+    Auswertung). Dient als Netz-Gesundheitscheck bei JEDER Generation — auch
+    nach einem Umstieg auf Stufe 2, als Sanity-Check gegen einen erneuten
+    Kollaps (wie beim ersten v7-Stufe-2-Versuch: 51.8% vs. 17.5% 0:0).
+    Ampel: Verhältnis 0:0(Stufe2)/0:0(Stufe1) — ≤1.5x grün, 1.5–3x gelb, >3x rot."""
+    import json
+    import statistics as st
+
+    onnx_path = MODELS_DIR / f"alphazero_{version_name}.onnx"
+    if not onnx_path.exists():
+        print(f"  ⚠️  Sonde übersprungen: {onnx_path.name} nicht gefunden.")
+        return
+    try:
+        import mosaic_rust as _mr
+    except ImportError as e:
+        print(f"  ⚠️  Sonde übersprungen (mosaic_rust nicht importierbar): {e}")
+        return
+
+    def zero_zero_rate(raw):
+        # net_self_play_games liefert eine FLACHE Liste von Zug-Records (jeder
+        # Schritt trägt scores/winner des fertigen Spiels) — pro game_id
+        # deduplizieren, sonst gewichten längere Spiele die Rate fälschlich stärker.
+        steps = json.loads(raw)
+        games = {}
+        for s in steps:
+            gid = s.get("game_id")
+            if gid is not None and "scores" in s:
+                games[gid] = tuple(s["scores"])
+        n = len(games)
+        if n == 0:
+            return 0.0, 0.0
+        zz = sum(1 for sc in games.values() if sc[0] == 0 and sc[1] == 0)
+        winner_scores = [max(sc) for sc in games.values()]
+        return zz / n, st.mean(winner_scores)
+
+    print(f"\n{'='*55}")
+    print(f"  STAGE-2-REIFEGRAD-SONDE ({games} Spiele je Stufe, {sims} Sims)")
+    print(f"{'─'*55}")
+    raw_s1 = _mr.net_self_play_games(model_path=str(onnx_path), n_games=games, base_sims=sims,
+                                     seed=seed, num_threads=threads, dfs_leaf=True,
+                                     prefix=f"{version_name}_probe_s1")
+    zz1, ws1 = zero_zero_rate(raw_s1)
+    raw_s2 = _mr.net_self_play_games(model_path=str(onnx_path), n_games=games, base_sims=sims,
+                                     seed=seed, num_threads=threads, dfs_leaf=False,
+                                     prefix=f"{version_name}_probe_s2")
+    zz2, ws2 = zero_zero_rate(raw_s2)
+
+    if zz1 > 0:
+        ratio = zz2 / zz1
+    else:
+        ratio = 1.0 if zz2 == 0 else float("inf")
+
+    if ratio <= 1.5:
+        ampel = "🟢 GRÜN — Value-Head trägt, voller Stufe-2-Zyklus lohnt sich"
+    elif ratio <= 3.0:
+        ampel = "🟡 GELB — noch nicht reif, Trend über Generationen beobachten"
+    else:
+        ampel = "🔴 ROT — klar noch nicht reif, in Stufe 1 bleiben"
+
+    print(f"  Stufe 1 (DFS-Blatt):   0:0 {zz1*100:5.1f}% | Ø Sieger-Score {ws1:5.1f}")
+    print(f"  Stufe 2 (Netz-Value):  0:0 {zz2*100:5.1f}% | Ø Sieger-Score {ws2:5.1f}")
+    ratio_str = "∞" if ratio == float("inf") else f"{ratio:.2f}x"
+    print(f"  Verhältnis 0:0(Stufe2/Stufe1): {ratio_str}")
+    print(f"  {ampel}")
+    print(f"{'='*55}")
+
+
+def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
+          probe_games=40, probe_sims=400, skip_probe=False):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
@@ -326,6 +398,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         export(version_name)
     except Exception as e:
         print(f"⚠️  ONNX-Export übersprungen (manuell nachholbar: python export_onnx.py --version {version_name}): {e}")
+        return
+
+    # 8. Stage-2-Reifegrad-Sonde (Netz-Gesundheitscheck jeder Generation, s.
+    #    evaluations/STAGE2_TODO.md Abschnitt A) — auch nach dem Umstieg auf
+    #    Stufe 2 als laufender Sanity-Check gegen einen erneuten Kollaps.
+    if not skip_probe:
+        try:
+            run_readiness_probe(version_name, games=probe_games, sims=probe_sims)
+        except Exception as e:
+            print(f"⚠️  Reifegrad-Sonde übersprungen: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trainiere das Mosaic-AI Neuronale Netz")
@@ -334,8 +416,15 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
+    parser.add_argument("--probe-games", type=int, default=40,
+                        help="Spiele je Stufe für die Stage-2-Reifegrad-Sonde (Standard: 40)")
+    parser.add_argument("--probe-sims", type=int, default=400,
+                        help="Sims/Zug für die Reifegrad-Sonde (Standard: 400)")
+    parser.add_argument("--skip-probe", action="store_true",
+                        help="Reifegrad-Sonde nach dem Training überspringen")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
-          hidden_size=args.hidden, early_stop=not args.no_early_stop)
+          hidden_size=args.hidden, early_stop=not args.no_early_stop,
+          probe_games=args.probe_games, probe_sims=args.probe_sims, skip_probe=args.skip_probe)
