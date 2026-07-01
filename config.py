@@ -15,8 +15,9 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 663        # state_to_tensor (543 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler)
-                        # (redundantes unused_chip_colors-Feature entfernt: 673 → 663, -5 je Spieler × 2)
+INPUT_SIZE = 664        # state_to_tensor (544 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler)
+                        # (redundantes unused_chip_colors-Feature entfernt: -10; bag_count-Feature ergänzt: +1;
+                        #  floor-Normierung /7.0 -> /4.0 korrigiert (kein Dim-Effekt); 673 -> 664)
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---

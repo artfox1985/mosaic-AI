@@ -69,14 +69,16 @@ fn num(obj: &Value, k: &str) -> f64 {
     obj.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0)
 }
 
-/// Vollständiger 673-dim Feature-Vektor aus dem State-Dict (`state_to_json`).
+/// Vollständiger Feature-Vektor aus dem State-Dict (`state_to_json`).
 pub fn state_to_features(v: &Value) -> Vec<f32> {
-    let mut f: Vec<f32> = Vec::with_capacity(673);
+    let mut f: Vec<f32> = Vec::with_capacity(664);
 
     // 1. Globale Infos
     f.push((num(v, "round") / 6.0) as f32);
     let phase = v.get("phase").and_then(|x| x.as_str()).unwrap_or("drafting");
     f.push(phase_id(phase) / 3.0);
+    // Beutel-Restbestand (max. 65 Fliesen zu Spielbeginn).
+    f.push((num(v, "bag_count") / 65.0) as f32);
 
     // 2. Wertungsplatten one-hot (8)
     let sids: Vec<i64> = v
@@ -151,7 +153,7 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
             }
 
             let floor_n = p.get("floor").and_then(|x| x.as_array()).map_or(0, |a| a.len()) as f32;
-            f.push(floor_n / 7.0);
+            f.push(floor_n / 4.0); // MAX_BROKEN=4 (nicht 7)
             f.push((num(p, "tokens_used") / 2.0) as f32);
             f.push((num(p, "chips_taken") / 2.0) as f32);
 

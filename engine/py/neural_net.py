@@ -27,7 +27,10 @@ def state_to_tensor(data):
     # 1. Globale Infos
     features.append(data.get("round", 0) / 6.0)
     features.append(PHASE_MAP.get(data.get("phase", "drafting"), 0) / 3.0)
-    
+    # Beutel-Restbestand (max. 65 Fliesen zu Spielbeginn) — Signal, wie knapp
+    # Farben werden könnten (bislang serialisiert, aber ungenutzt).
+    features.append(data.get("bag_count", 0) / 65.0)
+
     # 2. Wertungsplatten (Welche 3 von 8 sind aktiv?)
     scoring_ids = data.get("scoring_tile_ids", [])
     features.extend([1.0 if i in scoring_ids else 0.0 for i in range(8)])
@@ -76,7 +79,7 @@ def state_to_tensor(data):
                 features.extend([1.0 if i == color_id else 0.0 for i in range(5)])
                 
             # Straffläche
-            features.append(len(p.get("floor", [])) / 7.0)
+            features.append(len(p.get("floor", [])) / 4.0)   # MAX_BROKEN=4 (nicht 7)
 
             # Spielerplättchen (wie viele bereits genutzt: 0/1/2)
             features.append(p.get("tokens_used", 0) / 2.0)
