@@ -149,7 +149,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Learning Rate : {LEARNING_RATE}")
     print(f"   Value Weight  : {VALUE_WEIGHT}")
     print(f"   Batch Size    : {BATCH_SIZE}")
-    print(f"   Value-Target  : tanh(Punktediff/20) (Marge statt reinem Win/Loss)")
+    from neural_net import VALUE_SCALE, VALUE_OPP_WEIGHT
+    print(f"   Value-Target  : tanh((eigen-{VALUE_OPP_WEIGHT}*gegner)/{VALUE_SCALE:.0f}) (Endergebnis statt Win/Loss)")
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
     
     # Warm Start?
@@ -257,8 +258,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
             # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
             # Keine separate win_val-Stärke-Gewichtung mehr nötig — die Marge steckt
-            # bereits im Value-Target selbst (tanh(Punktediff/20)); die Visit-Targets
-            # sind unabhängig vom Ausgang valide Policy-Ziele.
+            # bereits im Value-Target selbst (siehe neural_net.py, tanh-Endergebnis-Target);
+            # die Visit-Targets sind unabhängig vom Ausgang valide Policy-Ziele.
             w = pol_w
             p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 

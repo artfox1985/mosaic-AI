@@ -248,11 +248,11 @@ Fehlentscheidung im Moment; das Problem entsteht früher im Draft).
    nirgends ein Signal "größerer Vorsprung ist besser" bzw. "knapp verlieren
    ist besser als kollabieren". Widerspricht direkt dem Ziel ("schlussendlich
    gewinnt, wer die meisten Punkte macht").
-   Fix in `engine/py/neural_net.py` (`VALUE_SCHEMA_VERSION = 7`):
+   Fix in `engine/py/neural_net.py` (`VALUE_SCHEMA_VERSION = 8`):
    ```
    own_total = step["scores"][eigener Spieler]   # inkl. Wertungsplatten
    opp_total = step["scores"][Gegner]
-   value = tanh((own_total − 0.5 · opp_total) / 25)
+   value = tanh((own_total − 0.5 · opp_total) / 50)
    ```
    als Ziel für JEDEN Schritt der Partie — klassisches AlphaZero-Prinzip
    (delayed reward): der Zielwert für einen Runde-1-Zustand ist derselbe wie
@@ -286,8 +286,16 @@ Fehlentscheidung im Moment; das Problem entsteht früher im Draft).
    Auswirkung: keine Self-Play-Regeneration nötig (Rohdaten enthalten
    `scores`/`winner` bereits pro Schritt), nur ein HDF5-Cache-Rebuild beim
    nächsten Training (`VALUE_SCHEMA_VERSION` im Cache-Key). Gewicht (0.5)
-   und Skala (25) sind ein erster Ansatz, ggf. nach weiteren Messungen
-   nachjustieren.
+   und Skala sind erste Ansätze, ggf. nach weiteren Messungen nachjustieren.
+   **Skala nachträglich auf 50 korrigiert** (ursprünglich 25, aus der
+   Streuung damaliger Spieldaten abgeleitet): Heuristik und Netz spielen
+   beide noch schwach, jede aus AKTUELLEN Spieldaten abgeleitete Skala hätte
+   nur diese Schwäche festgeschrieben statt das echte Punktepotenzial
+   abzubilden. Neu kalibriert an einem groben menschlichen Referenzwert
+   (ab ~100 Punkten gilt ein Ergebnis als sehr gut): bei own≈100 gegen einen
+   soliden Gegner (opp≈40) ergibt own−0.5·opp≈80, Skala 50 legt den
+   tanh-Arg an diesem Punkt auf ~1.6 (tanh≈0.92) — informativ, nicht schon
+   voll gesättigt.
    **Verifiziert an v11 (warm-start v10, gleiches Fenster) — gemischtes
    Ergebnis:** vs. Heuristik deutlich verbessert (55 % Siege, bester Wert
    seit v8, vs. v10s 47 %; Ø-Score 24.6 vs. v10s 23.6). Kollaps-Raten
