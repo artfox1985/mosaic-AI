@@ -61,6 +61,18 @@ korrumpierten Daten und ist mit Vorsicht zu genießen** — v1-Self-Play wird mi
 dem Fix neu generiert, v2 wird auf den sauberen Daten neu trainiert und die
 Gate-Arena wiederholt.
 
+**Rückblick auf die alte Zählung (v4-v11, vor dem Neustart):** derselbe Bug
+betraf mit hoher Wahrscheinlichkeit ALLE Netz-Self-Play-Generationen davor,
+nicht nur v1 — jede `--mode network`-Self-Play-Generation lief durch dieselbe
+`play_net_self_play_game`-Funktion mit demselben 30s-Guard. Das relativiert
+Teile der alten Diagnose in Abschnitt D (einseitige Kollaps-Rate, Value-Loss-
+Trends, nicht-transitives Vorgänger-Duell-Verhalten v9→v10→v11): möglicherweise
+war das teils Rauschen aus abgebrochenen Partien mit Fake-Endständen statt
+echtem Modellverhalten. Die Value-Target-Umstellung und der saubere Neustart
+bleiben trotzdem berechtigt, aber die Datengrundlage der alten Analyse war
+vermutlich von Anfang an angeknackst — nicht mehr rekonstruierbar, da die alten
+Daten bereits gelöscht sind.
+
 **v11 (nach Value-Target-Umstellung, Details Abschnitt D Punkt 0): gegen Heuristik
 wieder über 50 % (55 %, bester Wert seit v8) und Ø-Score steigt (24.6 vs. v10s
 23.6) — ABER gegen den direkten Vorgänger v10 verliert v11 45:55 (Ø-Score 21.4 vs.
