@@ -47,6 +47,20 @@ v2 hat v1 im direkten Duell NICHT signifikant geschlagen (51:49, weit unter der
 60:40-Schwelle) — trotz leicht besserem Ø-Score. v1 bleibt Champion, generiert
 eine zweite Self-Play-Runde (2000 weitere Spiele, kumulativer Netz-Pool → 4000).
 
+**⚠️ Kritischer Bug gefunden und gefixt:** der 30s-Wallclock-Hänger-Schutz in
+`self_play.rs` war auf reine Heuristik-Suche kalibriert — netzgeführte Suche
+(ONNX-Inferenz pro Simulation) ist deutlich langsamer, wodurch Self-Play-
+Partien bei 400 Sims systematisch VOR Rundenende abgeschnitten wurden. Prüfung
+ergab: nur **35 von 2000 v1-Self-Play-Partien (1.8%) erreichten Runde 5**. Da
+`apply_end_scoring()` nur bei echtem Spielende läuft, waren die aufgezeichneten
+`scores`/`winner` dieser Partien kein echtes Ergebnis, sondern Zufalls-
+Schnappschüsse — das untergrub das komplette Punkte-Marge-Value-Target. Fix:
+separate Timeouts, `NET_GAME_TIMEOUT_SECS=180` für alle netzbeteiligten
+Partien (vorher 30s für alle). **Die obige v2-Zeile beruht auf den
+korrumpierten Daten und ist mit Vorsicht zu genießen** — v1-Self-Play wird mit
+dem Fix neu generiert, v2 wird auf den sauberen Daten neu trainiert und die
+Gate-Arena wiederholt.
+
 **v11 (nach Value-Target-Umstellung, Details Abschnitt D Punkt 0): gegen Heuristik
 wieder über 50 % (55 %, bester Wert seit v8) und Ø-Score steigt (24.6 vs. v10s
 23.6) — ABER gegen den direkten Vorgänger v10 verliert v11 45:55 (Ø-Score 21.4 vs.
