@@ -232,7 +232,57 @@ Fehlentscheidung im Moment; das Problem entsteht früher im Draft).
 
 ### Lösungskonzept
 
-1. **Sofort — Diversität ins Self-Play zurückbringen:** einen Anteil der
+0. **Kernfix — Value-Target von Win/Loss auf Partie-Endergebnis-Punkte
+   umgestellt (bereits umgesetzt):** Punkte 1–4 unten sind alles Diagnose-/
+   Diversitäts-Maßnahmen, greifen aber nicht den eigentlichen Grund an, warum
+   das Netz Marge nicht lernt: das Value-Target war `±1` (Sieger/Verlierer),
+   also sind ein 30:29- und ein 60:0-Sieg für den Trainings-Loss IDENTISCH —
+   nirgends ein Signal "größerer Vorsprung ist besser" bzw. "knapp verlieren
+   ist besser als kollabieren". Widerspricht direkt dem Ziel ("schlussendlich
+   gewinnt, wer die meisten Punkte macht").
+   Fix in `engine/py/neural_net.py` (`VALUE_SCHEMA_VERSION = 7`):
+   ```
+   own_total = step["scores"][eigener Spieler]   # inkl. Wertungsplatten
+   opp_total = step["scores"][Gegner]
+   value = tanh((own_total − 0.5 · opp_total) / 25)
+   ```
+   als Ziel für JEDEN Schritt der Partie — klassisches AlphaZero-Prinzip
+   (delayed reward): der Zielwert für einen Runde-1-Zustand ist derselbe wie
+   für den letzten Zug, nämlich wie das Spiel am Ende wirklich ausging.
+   `step["scores"]` enthält die Wertungsplatten-Endwertung bereits
+   (`apply_end_scoring()` in Rust rechnet sie vor dem Serialisieren ein).
+   **Zwischenstände verworfen (Nutzer-Korrektur):** ursprünglich war hier ein
+   dichtes Zwischensignal geplant (`own.score + own.estimated_score`, exakte
+   DFS-Projektion NUR der laufenden Runde). Das wurde bewusst wieder
+   entfernt: die Heuristik maximiert bereits gierig die Rundenpunkte, hat
+   aber keine Weitsicht (kein strategischer Board-Aufbau, keine
+   Wertungsplatten-Berücksichtigung). Ein Rundenprojektions-Ziel hätte dem
+   Netz genau diesen gierigen Rundenoptimum-Bias beigebracht — Runde 1/2
+   bewusst suboptimal spielen, um durch strategischen Aufbau in Runde 3/4
+   viel mehr zu holen, wäre damit NICHT belohnt worden, weil der Zielwert
+   für Runde-1-Zustände Runde 3/4 gar nicht kennt. Das reine
+   Partie-Endergebnis als Ziel lernt automatisch, dass ein scheinbar
+   suboptimaler früher Zustand gut ist, WENN er zuverlässig zu einem
+   starken Endergebnis führt — das ist genau die Weitsicht, die der
+   Heuristik fehlt.
+   Gewichtung (0.5) auf die gegnerische Seite statt reiner Differenz: ein
+   10:5 und ein 65:60 (beide Marge 5) wären bei reiner Differenz identisch
+   bewertet, obwohl 65:60 absolut deutlich mehr erreichte Punkte sind
+   (own−0.5·opp: 10−2.5=7.5 vs. 65−30=35 — klar unterschieden).
+   **Kompromiss:** die Gewichtung macht das Target nicht mehr exakt
+   antisymmetrisch (`value(p0) ≠ -value(p1)`), was der Zero-Sum-Annahme der
+   Suche (`net_mcts.rs`: 1 Netzquery aus Sicht des Ziehenden, Gegnerwert wird
+   als `1 - win` angenommen) nur noch näherungsweise entspricht. Akzeptiert,
+   weil das eigentliche Ziel (hohe absolute Punktzahl statt nur "irgendwie
+   gewinnen") das explizit verlangt.
+   Auswirkung: keine Self-Play-Regeneration nötig (Rohdaten enthalten
+   `scores`/`winner` bereits pro Schritt), nur ein HDF5-Cache-Rebuild beim
+   nächsten Training (`VALUE_SCHEMA_VERSION` im Cache-Key). **Noch nicht
+   durch Training/Arena verifiziert** — nächste Generation muss zeigen, ob
+   Ø-Score UND Ø-Score-Marge steigen und die Kollaps-Rate sinkt. Gewicht
+   (0.5) und Skala (25) sind ein erster Ansatz, ggf. nach erster Messung
+   nachjustieren.
+1. **Diversität ins Self-Play zurückbringen (ergänzend, nicht Ersatz für 0):** einen Anteil der
    Self-Play-Partien als **Netz-vs-Heuristik** generieren (analog `play_net_game`
    in `self_play.rs`, Aufzeichnung für die Netz-Seite), NICHT um "Heuristik
    schlagen" zum Ziel zu machen, sondern als Mittel gegen die Selbstähnlichkeits-
