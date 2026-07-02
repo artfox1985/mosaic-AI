@@ -1,94 +1,92 @@
 # Offensiv-Spiel: Repräsentation/Architektur statt Heuristik-Terme
 
+## Status (aktualisiert nach Rust-Migration)
+
+- ✅ **Stufe 1 (Linien-/Endwertungs-Features) ist umgesetzt — in Rust.**
+- ⏳ Offen: Gen-0 mit den neuen Features neu trainieren + in der Arena messen
+  (Punkte/Stein, Ø Siegerscore, Floor-Rate). Daten wurden bereits geleert.
+- ⏳ Stufe 2 (räumlicher CNN-Zweig) nur, falls Stufe 1 nicht reicht.
+
+Wichtige Korrektur zur ursprünglichen Deutung: Das „Mondsteine auf die Strafleiste
+werfen" war **Netz-Degeneration nach dem Training**, nicht der Datengenerator — die
+Heuristik-MCTS (Python *und* Rust) wirft freiwillig nicht. Das **flache MLP konnte
+die Linien-Strategie nicht repräsentieren** und ist in den „sicheren" Strafleisten-
+Hafen degeneriert. Genau diese Repräsentationslücke schließen die neuen Features.
+
 ## Context
 
-Die Heuristik-Erweiterung (Terme G/H/I in `agents/shaping.py`) ist umgesetzt und **hat ihr
-Ziel erreicht**, aber ein tieferes Problem freigelegt:
+Punkte entstehen aus **zusammenhängenden orthogonalen Linien** auf dem 6×6-Dome
+([round_end.rs `score_placed_tile`/`count_line`](engine/src/round_end.rs:341)) plus
+**Endwertung** (8 Kriterien, [scoring.rs](engine/src/scoring.rs)). Das ursprüngliche
+Problem: Der Agent baute keine Linien (Punkte/Stein ~0,82, Ø Siegerscore ~9,8), weil
+das eine mehrstufige Farb-Geometrie-Planung erfordert, die ein **flaches MLP**
+([neural_net.py `MosaicNet`](engine/py/neural_net.py)) aus der **flachen** Dome-
+Kodierung ohne Linien-Features nicht ausdrücken kann. Das Value-Target ist bereits
+outcome-basiert — das Problem war Repräsentation, nicht die Belohnung.
 
-**Was die G/H/I-Terme gebracht haben** (gemessen an frischen s100-Self-Play-Daten):
+## Was die Rust-Migration bereits geändert hat (Ausgangslage besser als 2024)
 
-- Ø offene Reihen **2,83 → 1,96**, an Floor-Stellungen **3,41 → 2,09** (Buildup-Drift behoben,
-  Floor jetzt „strukturell" statt Über-Öffnen).
-- 0:0-Rate **58% → 30%**.
+1. **`estimated_score` ist jetzt EXAKT statt Heuristik.** Früher Python
+   `_estimate_round_score` (grobe per-Reihe-Schätzung); jetzt
+   `estimated_score = solve_round_final_score − score`
+   ([tiling_solver.rs](engine/src/tiling_solver.rs)), d.h. der **optimal erreichbare
+   Tiling-Score** als Skalar — das Netz bekommt den Linien-Wert direkt.
+2. **MCTS-Blätter werden mit dem exakten DFS-Solver bewertet** → die generierten
+   Policy-Targets bevorzugen Linien-Bauen (Floor-Bias gemessen HARMLOS: 0 Strafleisten-
+   Würfe, wenn eine Reihen-Alternative existiert; 0:0-Rate ~9 %).
 
-**Das verbleibende, eigentliche Problem — Offensive (datenbelegt):**
-| Messung | Wert | Deutung |
-|---|---|---|
-| Platten belegt / Nachbarpaare | 9/9, 12/12 (Maximum) | Dome-Struktur komplett & verbunden — *nicht* das Problem |
-| Gefüllte Spaces | ~12/36 | Agent legt Steine |
-| **Punkte pro gelegtem Stein** | **0,82** | Steine stehen ISOLIERT → ~1 Pkt, Floor frisst den Rest |
-| Ø Siegerscore | 9,8 (sollte 40–70+) | — |
+## Stufe 1 — UMGESETZT (Linien- + Endwertungs-Features)
 
-Punkte entstehen nur aus **orthogonalen Linien** auf dem 6×6-Dome
-([round_end.py `score_placed_tile`](engine/round_end.py:332)). Der Agent baut keine Linien,
-weil das eine **mehrstufige Farb-Geometrie-Planung** über Drafting (Plattenwahl/-rotation +
-welche Reihen) und Tiling (wohin der Stein) erfordert.
+Berechnet in **Rust** ([scoring.rs](engine/src/scoring.rs)), ins State-Dict gespiegelt
+([serialize.rs `serialize_player`](engine/src/serialize.rs)), gelesen in
+[state_to_tensor](engine/py/neural_net.py). `INPUT_SIZE` 553 → **673**
+([config.py](config.py)); +120 Features (60 je Spieler). Netz wird **von Null**
+trainiert (Input-Schicht geändert).
 
-**Entscheidung des Users:** Keine weiteren Heuristik-Terme („nicht weiter forcieren"). Ein
-anderer Ansatz.
+**Linien-Geometrie** (`scoring::player_line_features` → `line_geo`):
+- `h_hist`/`v_hist` — Linienlängen-Histogramm der zusammenhängenden Läufe (Länge 2–6).
+- `cluster_sq` — Σ Lauflänge² (belohnt lange Linien indirekt über echte Outcomes).
+- `row_potential`/`col_potential` — je Reihe/Spalte der **maximale Linien-Zuwachs eines
+  füllbaren Felds** (= `score_placed_tile`-Wert) → direktes „welcher Zug baut eine
+  Linie"-Signal für die Policy.
 
-**Die eigentliche Decke (aus Code-Analyse):** Das Netz ist ein **flaches MLP**
-([neural_net.py `MosaicNet`](agents/neural_net.py:481), input→hidden×3). Der Dome wird als
-**162 flache Features** ohne Nachbarschafts-Induktion und **ohne Linien-Features** eingespeist
-([state_to_tensor Abschnitt 6](agents/neural_net.py:114)). Ein flaches MLP kann „diesen Space
-füllen verlängert eine Linie auf Länge 4 → +4" praktisch nicht repräsentieren. Das
-Value-Target ist bereits outcome-basiert ([compute_win_val](agents/neural_net.py:255)) — aber
-die Funktionsklasse kann die Linien-Strategie nicht ausdrücken. **Darum half kein
-Bewertungs-Hebel: das Problem ist Repräsentation/Architektur, nicht die Belohnung.**
+**Endwertung** (`scoring::player_scoring_features` → `scoring_tile_points` + `score_geo`):
+- aktuelle Punkte aller 8 Wertungsplatten + Geometrie-Fortschritt (Reihen-/Spalten-/
+  Diagonalen-Füllung, Farben/Reihe, Rand, Ecken, Wild, Spezial).
 
-**Ziel:** Dem Lerner die räumliche Linien-Information geben, sodass das (bereits
-outcome-basierte) Lernen offensives Cluster-Bauen selbst entdecken kann.
+**placed-color-Fix:** Das `dome_grid`-Feld trägt jetzt die **platzierte Farbe**
+(0=leer, 1-5=Farbe, 6=special) statt nur belegt/leer.
 
-## Ansatz — zweistufig, billig zuerst
+## Stufe 2 (nur falls Stufe 1 hilft, aber nicht reicht): räumlicher CNN-Zweig
 
-### Stufe 1 (empfohlen zuerst — billige Falsifikation): Linien-Geometrie als Features
-
-Erweitere `state_to_tensor` ([neural_net.py:12](agents/neural_net.py:12)) um explizite
-räumliche Features pro Spieler (me + enemy), abgeleitet aus dem 6×6-Belegungsraster (das
-`_estimate_row_values` in [serializer.py:64](engine/serializer.py:64) bereits aufbaut — Logik
-wiederverwenden):
-
-- **Linienlängen-Histogramm:** Anzahl horizontaler/vertikaler Linien der Länge 2/3/4/5/6
-  (gefüllte zusammenhängende Spaces).
-- **Linien-Potential:** je leerem, farblich noch bedienbarem Space — um wie viel würde Füllen
-  eine Linie verlängern (max h+v), aggregiert pro Reihe/Spalte.
-- **Cluster-Kennzahl:** Σ Linienlänge² (belohnt das Netz indirekt für lange Linien, sobald es
-  den Zusammenhang Score↔Feature über echte Outcomes lernt).
-
-Konsequenzen: `INPUT_SIZE` ([config.py:18](config.py:18)) wächst → Netz muss **von Null** neu
-trainiert werden (kein Warm-Start über die Schichtgrenze). `state_to_tensor` ist die einzige
-Pflicht-Änderung; `MosaicNet` bleibt unverändert. Damit testen wir mit minimalem Aufwand, ob
-Repräsentation die Decke ist.
-
-### Stufe 2 (nur falls Stufe 1 hilft, aber nicht reicht): räumlicher CNN-Zweig
-
-Den Dome als `6×6×C`-Planes (belegt, required_color one-hot, type/locked) aufbereiten und einen
-kleinen Conv-Zweig in `MosaicNet.body` einführen, dessen Output mit den flachen Features
-konkateniert wird. Größerer Eingriff (Architektur + Tensor-Reshape), echte räumliche
-Induktion. Erst nach Messung von Stufe 1 entscheiden.
+Den Dome als `6×6×C`-Planes (belegt, required_color one-hot, type/locked) aufbereiten
+und einen kleinen Conv-Zweig in `MosaicNet.body` einführen, dessen Output mit den
+flachen Features konkateniert wird. Größerer Eingriff (Architektur + Reshape), echte
+räumliche Induktion. Erst nach Messung von Stufe 1 entscheiden.
 
 ## Kritische Dateien
 
-- `agents/neural_net.py` — `state_to_tensor` (Stufe 1), ggf. `MosaicNet` (Stufe 2).
-- `config.py` — `INPUT_SIZE` anpassen.
-- Wiederverwenden: 6×6-Raster-Aufbau aus `engine/serializer.py:_estimate_row_values`,
-  Linien-Zählung analog `engine/round_end.py:_count_line`.
+- `engine/src/scoring.rs` — `player_line_features`, `player_scoring_features`.
+- `engine/src/serialize.rs` — `serialize_player` (Dict-Keys `line_geo`, `score_geo`,
+  `scoring_tile_points`).
+- `engine/py/neural_net.py` — `state_to_tensor` (Features), ggf. `MosaicNet` (Stufe 2).
+- `config.py` — `INPUT_SIZE` (673).
+- Referenz: `engine/src/round_end.rs` (`score_placed_tile`/`count_line`),
+  `engine/src/tiling_solver.rs` (`solve_round_final_score`).
 
 ## Verifikation
 
-1. **Feature-Sanity:** `state_to_tensor` auf ein paar gespeicherte States anwenden, neue
-   Feature-Länge == neuer `INPUT_SIZE`, Linien-Features auf einem Board mit bekannter Linie
-   manuell gegenprüfen.
-2. **Frische Daten + Training:** s100-MCTS-Self-Play (Heuristik mit G/H/I) → `train.py --name vX`
-   von Null. Value-Loss soll konvergieren.
-3. **Arena/Score-Messung (Hauptmetrik):** `arena.py` AlphaZero vX vs. HeuristicMCTS. Vergleich
-   gegen heute: **Punkte pro gelegtem Stein** (>1,0 = Linien entstehen), **Ø Siegerscore**
-   (Ziel deutlich >9,8), **0:0-Rate**. Mess-Skript dafür existiert sinngemäß bereits (die
-   read-only pkl-Analyse aus dieser Session — Platten-/Stein-/Punkte-pro-Stein-Auswertung).
+1. **Feature-Sanity:** `len(state_to_tensor(state)) == INPUT_SIZE`; Linien-Features
+   gegen ein Board mit bekannter Linie prüfen (Rust-Unit-Tests `line_features_*`,
+   `scoring_features_*` decken das ab). ✅
+2. **Frische Daten + Training:** `python self_play.py --mode mcts --games 3000
+   --version s100 --sims 100 --threads 0` → `python train.py --name s100` von Null.
+3. **Arena/Score-Messung (Hauptmetrik):** `python arena.py` (Netz vs. Heuristik-MCTS
+   — Netz-Arena kommt mit Phase B / Network-Modus). Vergleich gegen Baseline:
+   **Punkte/Stein** (>1,0 = Linien entstehen), **Ø Siegerscore** (Ziel ≫9,8),
+   **0:0/Floor-Rate**. Datenseitige Sanity: `python -m utils.diagnosis`.
 
-## Offener Punkt (separat)
+## Hinweis
 
-Die G/H/I-Heuristik-Änderung ist lokal committet (HEAD, 2 Commits vor `origin/main`), aber
-**noch nicht gepusht**; ein PR war angefragt, wurde aber durch diese Analyse unterbrochen.
-`gh` ist auf diesem Rechner nicht installiert → PR-Erstellung braucht entweder `gh`-Installation
-oder manuelles Pushen + PR über die GitHub-Weboberfläche.
+Der Network-Modus (AlphaZero-Inferenz in Rust, Phase B) muss `state_to_tensor`
+inkl. dieser Features im Rust-Port (`engine/src/features.rs`) identisch spiegeln.
