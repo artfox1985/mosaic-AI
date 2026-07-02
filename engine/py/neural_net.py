@@ -313,10 +313,21 @@ def action_to_id(action: dict) -> int:
 # 1 Netzquery aus Sicht des Ziehenden, Gegner = 1-win) nur noch näherungsweise
 # entspricht — akzeptiert, weil das eigentliche Ziel (hohe absolute Punktzahl,
 # nicht nur "irgendwie gewinnen") das explizit verlangt.
+# VALUE_SCALE-Kalibrierung: NICHT aus aktuellen Spieldaten abgeleitet (Heuristik
+# und Netz spielen beide noch schwach — jede aus dieser Verteilung abgeleitete
+# Skala würde nur die aktuelle Schwäche festschreiben, nicht das echte
+# Punktepotenzial des Spiels). Stattdessen an einem groben menschlichen
+# Referenzwert kalibriert: ab ~100 Punkten gilt ein Ergebnis als sehr gut.
+# own_total = own − 0.5·opp; bei own≈100 gegen einen soliden Gegner (opp≈40)
+# ergibt das own_total≈80. VALUE_SCALE=50 legt den tanh-Arg bei diesem
+# "sehr gut"-Referenzpunkt auf ~1.6 (tanh(1.6)≈0.92) — informativ, aber noch
+# nicht voll gesättigt, sodass auch darüber hinaus noch Differenzierung
+# möglich bleibt. Deutlich gröber als eine "saubere" Herleitung, aber
+# begründeter als eine an aktueller Schwäche kalibrierte Zahl.
 # VALUE_SCHEMA_VERSION erzwingt einen Cache-Rebuild bei Änderungen an dieser Formel.
-VALUE_SCHEMA_VERSION = 7
+VALUE_SCHEMA_VERSION = 8
 VALUE_OPP_WEIGHT = 0.5
-VALUE_SCALE = 25.0
+VALUE_SCALE = 50.0
 
 
 class MosaicDataset(Dataset):
