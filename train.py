@@ -149,7 +149,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Learning Rate : {LEARNING_RATE}")
     print(f"   Value Weight  : {VALUE_WEIGHT}")
     print(f"   Batch Size    : {BATCH_SIZE}")
-    print(f"   Value-Target  : ±1 (reines Ergebnis)")
+    print(f"   Value-Target  : tanh(Punktediff/20) (Marge statt reinem Win/Loss)")
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
     
     # Warm Start?
@@ -256,8 +256,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # Policy-Loss NUR auf echten Drafting-Schritten (pol_w=1); Tiling/Start-
             # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
             # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
-            # Keine win_val-Stärke-Gewichtung mehr (Value-Target ist ±1, und die
-            # Visit-Targets sind unabhängig vom Ausgang valide Policy-Ziele).
+            # Keine separate win_val-Stärke-Gewichtung mehr nötig — die Marge steckt
+            # bereits im Value-Target selbst (tanh(Punktediff/20)); die Visit-Targets
+            # sind unabhängig vom Ausgang valide Policy-Ziele.
             w = pol_w
             p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 

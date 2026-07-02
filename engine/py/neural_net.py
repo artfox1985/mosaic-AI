@@ -1,5 +1,6 @@
 import os
 import glob
+import math
 import pickle
 import torch
 import torch.nn as nn
@@ -280,10 +281,42 @@ def action_to_id(action: dict) -> int:
 
 # --- 2. DATENSATZ & NETZWERK ---
 
-# Value-Target = reines Spielergebnis ±1 (Sieger +1 / Verlierer −1). Keine
-# abgestufte win_val/Margin-Skala mehr im Training — die lebt nur noch in der
-# Arena (Elo-K-Skalierung, arena.py). ±1 ist konsistent mit der Win-Prob, die die
-# Suche zurückbackt (Stufe-1-DFS-Blatt bzw. Stufe-2-Netz-Value).
+# Value-Target = das TATSÄCHLICHE ENDERGEBNIS der ganzen Partie (inkl.
+# Wertungsplatten), als Ziel für JEDEN Schritt der Partie — klassisches
+# AlphaZero-Prinzip (delayed reward): der Zielwert für einen Runde-1-Zustand
+# ist derselbe wie für den letzten Zug, nämlich wie das Spiel am Ende wirklich
+# ausging.
+#
+# Bewusst NICHT die pro-Runde projizierte Größe (own.score + estimated_score)
+# als dichtes Zwischensignal — das wurde probiert und verworfen: die
+# Heuristik maximiert bereits gierig die Rundenpunkte, hat aber keine
+# Weitsicht (kein strategischer Board-Aufbau, keine Wertungsplatten). Ein
+# Rundenprojektions-Ziel hätte dem Netz denselben gierigen Rundenoptimum-Bias
+# beigebracht — Runde 1/2 bewusst suboptimal spielen, um in Runde 3/4 durch
+# strategischen Aufbau viel mehr zu holen, wäre dann NICHT belohnt worden
+# (der Zielwert für Runde-1-Zustände hätte Runde 3/4 gar nicht gesehen).
+# Das reine Partie-Endergebnis als Ziel lernt automatisch, dass ein
+# scheinbar suboptimaler früher Zustand gut ist, WENN er zuverlässig zu einem
+# starken Endergebnis führt.
+#
+# own_total = step["scores"][eigener Spieler]  (bereits inkl. Wertungsplatten,
+#             von apply_end_scoring() in Rust eingerechnet)
+# opp_total = step["scores"][Gegner]
+# value = tanh((own_total − VALUE_OPP_WEIGHT · opp_total) / VALUE_SCALE)
+#
+# Gewichtung < 1 auf die gegnerische Seite statt reiner Differenz: ein 10:5
+# und ein 65:60 (beide Marge 5) wären bei reiner Differenz identisch bewertet,
+# obwohl 65:60 absolut deutlich mehr erreichte Punkte sind (own-0.5·opp:
+# 10-2.5=7.5 vs. 65-30=35 — klar unterschieden).
+# Kompromiss: das macht das Target nicht mehr exakt antisymmetrisch
+# (value(p0) != -value(p1)), was der Zero-Sum-Annahme der Suche (net_mcts.rs:
+# 1 Netzquery aus Sicht des Ziehenden, Gegner = 1-win) nur noch näherungsweise
+# entspricht — akzeptiert, weil das eigentliche Ziel (hohe absolute Punktzahl,
+# nicht nur "irgendwie gewinnen") das explizit verlangt.
+# VALUE_SCHEMA_VERSION erzwingt einen Cache-Rebuild bei Änderungen an dieser Formel.
+VALUE_SCHEMA_VERSION = 7
+VALUE_OPP_WEIGHT = 0.5
+VALUE_SCALE = 25.0
 
 
 class MosaicDataset(Dataset):
@@ -296,7 +329,7 @@ class MosaicDataset(Dataset):
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
         cache_key = hashlib.md5(
-            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)).encode()
+            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -357,8 +390,12 @@ class MosaicDataset(Dataset):
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
-                            # Reines Ergebnis: +1 aus Sicht des Siegers, -1 sonst.
-                            val = 1.0 if step["player"] == step["winner"] else -1.0
+                            # Partie-Endergebnis als Ziel für JEDEN Schritt (siehe
+                            # VALUE_SCHEMA_VERSION oben) — bereits inkl. Wertungsplatten.
+                            p = step["player"]
+                            own_total = float(step["scores"][p])
+                            opp_total = float(step["scores"][1 - p])
+                            val = math.tanh((own_total - VALUE_OPP_WEIGHT * opp_total) / VALUE_SCALE)
                         else:
                             val = float(step["value"])
                         values_l.append([val])
