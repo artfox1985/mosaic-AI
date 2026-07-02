@@ -20,6 +20,33 @@ begleitet von steigendem Value-Loss (0.057→0.098→0.110→0.120). Arena-Gate 
 v9 nur knapp bestanden (51:49, im Rauschbereich). Siehe Abschnitt D für Diagnose
 und Lösungskonzept (Value-Target-Umstellung).
 
+### ⟲ Sauberer Neustart (2026-07-02)
+
+Rückblickend hat kein Netz nach v8 seinen direkten Vorgänger statistisch
+signifikant geschlagen (v9 vs. v8: 54:46 z=0.8; v10 vs. v9: 51:49 z=0.2; v11 vs.
+v10: 45:55 z=-1.0 — alle im Rauschbereich bei n=100). Neuer Gate-Maßstab:
+**≥60:40 (z≈2.0, ~95%-Niveau)** für einen echten Champion-Wechsel. Alle
+Self-Play-Daten und Checkpoints (v1-v11 der alten Zählung) gelöscht, Neustart
+mit nur den reinen Heuristik-Bootstrap-Daten (`data/archive/selfplay_s100_*.pkl`,
+300 Dateien / 3000 Spiele, 100 Sims). Die Tabelle unten zählt ab hier neu bei v1.
+Details zum Value-Target-Fix (Partie-Endergebnis statt Win/Loss) weiterhin in
+Abschnitt D.
+
+**Champion/Kandidat-Protokoll:** Self-Play wird immer vom aktuellen Champion
+generiert, nicht vom zuletzt trainierten Netz. Ein Kandidat wird nur dann neuer
+Champion, wenn er den bisherigen Champion mit ≥60:40 schlägt — sonst bleibt der
+Champion bestehen und generiert weitere Self-Play-Runden, wodurch sein Anteil im
+Trainingsfenster mit jedem gescheiterten Kandidaten wächst.
+
+| Netz | hidden | Champion? | vs. Heuristik | Ø Score (Netz:Heur) | vs. Vorgänger | Ø Score (vs. Vorgänger) |
+|---|---|---|---|---|---|---|
+| v1 | 512 (cold, 3000 Bootstrap-Spiele) | ja (einzige Option) | 43 % | 19.5 : 25.4 | — | — |
+| v2 | 512 (warm v1, Bootstrap+2000×v1) | **nein — v1 bleibt** | 43 % | 22.2 : 27.9 | 51:49 (v2, z=0.2) | 19.6 : 16.9 |
+
+v2 hat v1 im direkten Duell NICHT signifikant geschlagen (51:49, weit unter der
+60:40-Schwelle) — trotz leicht besserem Ø-Score. v1 bleibt Champion, generiert
+eine zweite Self-Play-Runde (2000 weitere Spiele, kumulativer Netz-Pool → 4000).
+
 **v11 (nach Value-Target-Umstellung, Details Abschnitt D Punkt 0): gegen Heuristik
 wieder über 50 % (55 %, bester Wert seit v8) und Ø-Score steigt (24.6 vs. v10s
 23.6) — ABER gegen den direkten Vorgänger v10 verliert v11 45:55 (Ø-Score 21.4 vs.
