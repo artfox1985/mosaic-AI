@@ -50,7 +50,7 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import MosaicNet, MosaicDataset
 
-def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345):
+def run_readiness_probe(version_name, games=100, sims=400, threads=0, seed=12345):
     """Stage-2-Reifegrad-Sonde (siehe evaluations/STAGE2_TODO.md, Abschnitt A):
     vergleicht die 0:0-Rate DESSELBEN frisch exportierten Netzes einmal mit
     DFS-Blatt (Stufe 1) und einmal mit Netz-Value-Blatt (Stufe 2), isoliert per
@@ -128,7 +128,7 @@ def run_readiness_probe(version_name, games=40, sims=400, threads=0, seed=12345)
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          probe_games=40, probe_sims=400, skip_probe=False, show_plot=True):
+          probe_games=100, probe_sims=400, skip_probe=False, show_plot=True):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     dataset = MosaicDataset(str(DATA_DIR))
     if len(dataset) == 0:
@@ -483,8 +483,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
-    parser.add_argument("--probe-games", type=int, default=40,
-                        help="Spiele je Stufe für die Stage-2-Reifegrad-Sonde (Standard: 40)")
+    parser.add_argument("--probe-games", type=int, default=100,
+                        help="Spiele je Stufe für die Stage-2-Reifegrad-Sonde (Standard: 100)")
     parser.add_argument("--probe-sims", type=int, default=400,
                         help="Sims/Zug für die Reifegrad-Sonde (Standard: 400)")
     parser.add_argument("--skip-probe", action="store_true",
