@@ -69,6 +69,15 @@
   einstelliger Prozent-Basisrate nicht mehr für ein präzises Verhältnis, auch
   wenn die Entscheidung „noch nicht reif" davon in diesem Fall nicht berührt war
   (alle plausiblen Werte lagen klar über der 3×-Schwelle).
+- **Die Ratio allein kann in die Irre führen — die ABSOLUTE Stufe-2-0:0-Rate
+  gehört immer danebengestellt.** Verlauf über die Generationen: v7 51.8 %
+  (110 Spiele) → v8 28.0 % (100 Spiele) → **v9 75.0 %** (40 Spiele, 95%-CI
+  ~62–88 %) — kein monotoner Trend, v9 ist in absoluten Zahlen das bisher am
+  stärksten degenerierte Stufe-2-Self-Play, obwohl seine Ratio (4.43×) besser
+  aussah als v8s (~7.25×). Grund: die Ratio normiert nur gegen die jeweilige
+  Stufe-1-Basisrate, die selbst stark schwankt (v7 ~17.5 %, v8 3 %, v9 15 %) —
+  „Ratio verbessert sich" ist NICHT dasselbe wie „Stufe-2-Qualität verbessert
+  sich". Beide Kennzahlen künftig gemeinsam berichten, nicht nur die Ratio.
 - **Die finale Elo-Zeile kann täuschen** (pfadabhängig, von einer kurzen
   Pechsträhne am Ende verzerrbar — bei v8 sichtbar: Peak 1080:920 bei Spiel
   #92, Endstand 992:1008 trotz 60:40-Sieganteil). Sieganteil + Ø-Score sind
