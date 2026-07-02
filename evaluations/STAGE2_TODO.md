@@ -12,12 +12,20 @@
 | v7 | 512 (warm v6, ~790k Züge) | 61 % | 27.3 : 26.1 | ~1 % |
 | v8 | 512 (warm v7, +Chip-/Moon-Order-Features, gleiches Datenfenster wie v7) | 60 % | 24.7 : 23.9 | 0 % |
 | v9 | 512 (warm v8, Fenster v3+2000×v4+2000×v8) | 57 % | 25.5 : 25.2 | 0 % |
-| **v10** | **512 (warm v9, Fenster 2000×v4+v8+v9, v3 raus)** | **47 % ⚠️** | **23.6 : 26.4** | **0 %** |
+| v10 | 512 (warm v9, Fenster 2000×v4+v8+v9, v3 raus) | 47 % ⚠️ | 23.6 : 26.4 | 0 % |
+| **v11** | **512 (warm v10, gleiches Fenster, Value-Target auf Punkte-Marge umgestellt)** | **55 %** | **24.6 : 26.1** | **0 %** |
 
-**v10 fällt erstmals unter 50 % — monotoner Abwärtstrend v7→v10 (61→60→57→47 %),
+v10 fiel erstmals unter 50 % — monotoner Abwärtstrend v7→v10 (61→60→57→47 %),
 begleitet von steigendem Value-Loss (0.057→0.098→0.110→0.120). Arena-Gate gegen
 v9 nur knapp bestanden (51:49, im Rauschbereich). Siehe Abschnitt D für Diagnose
-+ Lösungskonzept.**
+und Lösungskonzept (Value-Target-Umstellung).
+
+**v11 (nach Value-Target-Umstellung, Details Abschnitt D Punkt 0): gegen Heuristik
+wieder über 50 % (55 %, bester Wert seit v8) und Ø-Score steigt (24.6 vs. v10s
+23.6) — ABER gegen den direkten Vorgänger v10 verliert v11 45:55 (Ø-Score 21.4 vs.
+23.4), das klassische Arena-Gate ("schlägt den Vorgänger") ist damit NICHT
+bestanden. Kollaps-Raten bleiben stabil bis leicht verbessert. Gemischtes
+Ergebnis — Details und Interpretation in v11_eval.md und Abschnitt D.**
 
 - v7 übertrifft die Heuristik **erstmals auch im Ø-Score** (27.3 > 26.1), Elo 1049:951,
   0:0 ~1 %. v7 ≈ v5 im Direktduell (Nicht-Transitivität, ok) — Benchmark ist die
@@ -277,11 +285,43 @@ Fehlentscheidung im Moment; das Problem entsteht früher im Draft).
    gewinnen") das explizit verlangt.
    Auswirkung: keine Self-Play-Regeneration nötig (Rohdaten enthalten
    `scores`/`winner` bereits pro Schritt), nur ein HDF5-Cache-Rebuild beim
-   nächsten Training (`VALUE_SCHEMA_VERSION` im Cache-Key). **Noch nicht
-   durch Training/Arena verifiziert** — nächste Generation muss zeigen, ob
-   Ø-Score UND Ø-Score-Marge steigen und die Kollaps-Rate sinkt. Gewicht
-   (0.5) und Skala (25) sind ein erster Ansatz, ggf. nach erster Messung
+   nächsten Training (`VALUE_SCHEMA_VERSION` im Cache-Key). Gewicht (0.5)
+   und Skala (25) sind ein erster Ansatz, ggf. nach weiteren Messungen
    nachjustieren.
+   **Verifiziert an v11 (warm-start v10, gleiches Fenster) — gemischtes
+   Ergebnis:** vs. Heuristik deutlich verbessert (55 % Siege, bester Wert
+   seit v8, vs. v10s 47 %; Ø-Score 24.6 vs. v10s 23.6). Kollaps-Raten
+   stabil/leicht verbessert (one-sided 15 % vs. v10s 18 %). ABER: das
+   klassische Arena-Gate ("schlägt den direkten Vorgänger") ist NICHT
+   bestanden — v11 verliert 45:55 gegen v10, auch im Ø-Score (21.4 vs. 23.4).
+   Einordnung: v10 selbst hatte im Vorgänger-Duell (v9) nur hauchdünn
+   gewonnen (51:49) und war schon damals als instabiles Signal markiert
+   (siehe v10-Zeile oben) — direkte Netz-vs-Netz-Duelle scheinen generell
+   nicht-transitiv/verrauscht zu sein. Nach den erweiterten Kriterien aus
+   Punkt 3 (Ø-Score, Kollaps-Rate statt nur Win/Loss) spricht mehr für v11
+   als dagegen, aber das reine Win/Loss-Gate widerspricht dem. Details in
+   `v11_eval.md`. **Ob v11 die neue Baseline wird, ist ein Nutzer-Call.**
+   Nebenbefund: `VALUE_WEIGHT` musste ebenfalls auf 2.5 hochskaliert werden
+   (0.5 vorher), weil das neue Target eine ~4.6x kleinere Streuung hat als
+   das alte ±1-Ziel (an ~27k echten Schritten gemessen: std≈0.22 vs. 1.0) —
+   sonst hätte der Value-Head unter dem neuen Target kaum noch trainiert.
+   Zusätzlich musste Early-Stopping in `train.py` entkoppelt werden (stoppt
+   jetzt erst, wenn Policy UND Value plateauen, nicht nur Policy) — der erste
+   v11-Trainingsversuch brach ab, während der Value-Head noch mitten in der
+   Konvergenz war (v_pred σ 0.154→0.174 wachsend), was zu einer sichtbar
+   schlechteren Stage-2-Sonde führte (56 % statt 39 % 0:0-Rate). Nach dem Fix
+   lief das Training alle 100 Epochen durch, σ wuchs weiter auf 0.190, und
+   die Stage-2-Sonde normalisierte sich wieder auf v10-Niveau (40 %).
+   **Nachtrag — `VALUE_WEIGHT` mit hochskaliert (config.py, 0.5 → 2.5):** das
+   neue Target hat eine deutlich kleinere charakteristische Streuung als das
+   alte ±1-Ziel (Stichprobe über ~27k reale Self-Play-Schritte: std≈0.22 vs.
+   1.0 vorher, Faktor ~4.6). Ohne Anpassung von `VALUE_WEIGHT`
+   (`loss = v_loss·VALUE_WEIGHT + p_loss`) wäre der Value-Loss-Beitrag zum
+   Gesamtloss weiter geschrumpft und der Value-Head faktisch kaum noch
+   trainiert worden — das genaue Gegenteil vom Zweck dieser Änderung. 2.5
+   ist ebenfalls ein erster Ansatz (grob am Streuungs-Verhältnis kalibriert,
+   nicht exakt hergeleitet), an den frühen v11-Epochen (Value:Policy-Anteil
+   im Log) zu verifizieren/nachjustieren.
 1. **Diversität ins Self-Play zurückbringen (ergänzend, nicht Ersatz für 0):** einen Anteil der
    Self-Play-Partien als **Netz-vs-Heuristik** generieren (analog `play_net_game`
    in `self_play.rs`, Aufzeichnung für die Netz-Seite), NICHT um "Heuristik

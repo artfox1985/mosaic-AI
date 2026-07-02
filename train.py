@@ -306,15 +306,29 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             rel = (previous - recent) / previous if previous > 0 else 0
             if rel < plateau_threshold:
                 policy_plateaued = True
-                if policy_plateau_since is None:
-                    policy_plateau_since = epoch + 1
-                plateau_marker = "  🟡 PLATEAU"
+                plateau_marker = "  🟡 POLICY-PLATEAU"
 
-        # Overfitting-Verdacht: Value sinkt, Policy plateaut
-        if policy_plateaued and len(value_history) >= 3:
+        # Value plateaut separat prüfen (gleiche Fenster-Logik) — seit dem
+        # Punkte-Marge-Target (VALUE_SCHEMA_VERSION, deutlich geringere
+        # Zielstreuung als das alte ±1-Ziel) konvergiert Value oft langsamer
+        # als Policy. Früher wurde NUR auf Policy-Plateau early-gestoppt, was
+        # den Value-Head mitten in der Konvergenz abschneiden konnte.
+        value_plateaued = False
+        if len(value_history) >= plateau_window * 2:
+            v_recent   = sum(value_history[-plateau_window:]) / plateau_window
+            v_previous = sum(value_history[-plateau_window*2:-plateau_window]) / plateau_window
+            v_rel = (v_previous - v_recent) / v_previous if v_previous > 0 else 0
+            if v_rel < plateau_threshold:
+                value_plateaued = True
+
+        if policy_plateaued and value_plateaued:
+            if policy_plateau_since is None:
+                policy_plateau_since = epoch + 1
+            plateau_marker = "  🟡 PLATEAU (Policy+Value)"
+        elif policy_plateaued and len(value_history) >= 3:
             v3 = value_history[-3:]
             if v3[0] > v3[1] > v3[2]:
-                plateau_marker = "  🔴 PLATEAU + VALUE SINKT (Overfitting-Risiko)"
+                plateau_marker = "  🔵 POLICY-PLATEAU, VALUE LERNT NOCH (kein Stopp)"
 
         # ── Live-Plot aktualisieren (zusätzlich zur Textzeile unten) ────────
         if plot is not None:
@@ -345,7 +359,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if policy_plateau_since is not None:
             since = (epoch + 1) - policy_plateau_since
             if since >= early_stop_patience:
-                print(f"\n⏹️  Early Stopping: Policy plateaut seit Epoche {policy_plateau_since} "
+                print(f"\n⏹️  Early Stopping: Policy+Value plateaut seit Epoche {policy_plateau_since} "
                       f"({since} Epochen ohne Fortschritt).")
                 stopped_early = True
                 break
