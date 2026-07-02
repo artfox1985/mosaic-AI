@@ -630,7 +630,8 @@ pub fn play_one_game<R: Rng + ?Sized>(
     }
 
     // Endwertung anwenden, damit Scores die Wertungsplatten enthalten.
-    if game.state.phase == Phase::End {
+    let completed = game.state.phase == Phase::End;
+    if completed {
         let _ = game.apply_end_scoring();
     }
     let scores = [game.state.players[0].score, game.state.players[1].score];
@@ -642,6 +643,10 @@ pub fn play_one_game<R: Rng + ?Sized>(
             m.insert("game_id".into(), json!(game_id));
             m.insert("scores".into(), json!(scores));
             m.insert("winner".into(), json!(winner));
+            // Erreicht die Partie regulär Phase::End (nicht durch Haenger-Schutz
+            // abgebrochen)? Nur dann sind scores/winner ein echtes Endergebnis
+            // (inkl. Wertungsplatten). Downstream (self_play.py) prüft das je Datei.
+            m.insert("completed".into(), json!(completed));
             Value::Object(m)
         })
         .collect()
@@ -1181,7 +1186,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
             _ => break,
         }
     }
-    if game.state.phase == Phase::End {
+    let completed = game.state.phase == Phase::End;
+    if completed {
         let _ = game.apply_end_scoring();
     }
     let scores = [game.state.players[0].score, game.state.players[1].score];
@@ -1192,6 +1198,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
             m.insert("game_id".into(), json!(game_id));
             m.insert("scores".into(), json!(scores));
             m.insert("winner".into(), json!(winner));
+            m.insert("completed".into(), json!(completed));
             Value::Object(m)
         })
         .collect()
