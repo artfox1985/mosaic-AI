@@ -10,7 +10,14 @@
 | v5 | 256 (warm v4) | 49 % | 23.8 : 28.4 | — |
 | v6 | 512 (**cold**) | 45 % | 21.6 : 27.4 | — |
 | v7 | 512 (warm v6, ~790k Züge) | 61 % | 27.3 : 26.1 | ~1 % |
-| **v8** | **512 (warm v7, +Chip-/Moon-Order-Features, gleiches Datenfenster wie v7)** | **60 %** | **24.7 : 23.9** | **0 %** |
+| v8 | 512 (warm v7, +Chip-/Moon-Order-Features, gleiches Datenfenster wie v7) | 60 % | 24.7 : 23.9 | 0 % |
+| v9 | 512 (warm v8, Fenster v3+2000×v4+2000×v8) | 57 % | 25.5 : 25.2 | 0 % |
+| **v10** | **512 (warm v9, Fenster 2000×v4+v8+v9, v3 raus)** | **47 % ⚠️** | **23.6 : 26.4** | **0 %** |
+
+**v10 fällt erstmals unter 50 % — monotoner Abwärtstrend v7→v10 (61→60→57→47 %),
+begleitet von steigendem Value-Loss (0.057→0.098→0.110→0.120). Arena-Gate gegen
+v9 nur knapp bestanden (51:49, im Rauschbereich). Siehe Abschnitt D für Diagnose
++ Lösungskonzept.**
 
 - v7 übertrifft die Heuristik **erstmals auch im Ø-Score** (27.3 > 26.1), Elo 1049:951,
   0:0 ~1 %. v7 ≈ v5 im Direktduell (Nicht-Transitivität, ok) — Benchmark ist die
@@ -174,6 +181,76 @@ die Reifegrad-Sonde oben — kein separater Feature-Rollout mehr nötig.
   erschlagen werden.
 - Ab ~Gen 5 (jetzt erreicht) die **älteste** Generation rausrollen; fürs 512er
   Richtung **3000–5000 Spiele** im Fenster (v7 lief auf ~790k Züge / ~5000 Spiele).
+
+## D) Einseitige Kollapse — Diagnose & Lösungskonzept
+
+**Klarstellung des eigentlichen Ziels** (wichtig für alles Folgende): Heuristik
+schlagen war nie das Ziel selbst, sondern ein Proxy/Nebeneffekt. Das eigentliche
+Ziel: **hohe absolute Punktzahl, menschen-kompetitiv (gute Menschen erreichen
+60+).** Ein Spiel, in dem eine Seite nahe 0 Punkte macht, ist fragwürdig für
+diese Seite — unabhängig davon, wer "gewonnen" hat. Bisher gab es dafür nur den
+beidseitigen 0:0-Indikator; einseitige Blowouts (eine Seite ≤5, andere ≥15)
+wurden nie erfasst.
+
+### Diagnose (an allen vollständigen Arena-Logs v7–v10 gemessen, je 100 Spiele)
+
+**vs. Heuristik:**
+| Gen | Ø Score | Max | Einseitig (eine ≤5, andere ≥15) | davon: Netz kollabiert | Heuristik kollabiert |
+|---|---|---|---|---|---|
+| v7 | 27.3:26.1 | 74 | 20 % | 10 % | 10 % |
+| v8 | 24.7:23.9 | 70 | 11 % | 6 % | 5 % |
+| v9 | 25.5:25.2 | 62 | 22 % | **15 %** | 7 % |
+| v10 | 23.6:26.4 | 65 | 18 % | **11 %** | 7 % |
+
+**Netz-vs-Netz (zum Vergleich):**
+| Matchup | Ø Score | Einseitig | Irgendeine Seite ≤5 |
+|---|---|---|---|
+| v9 vs. v8 | 14.9:16.1 | 17 % | 35 % |
+| v10 vs. v9 | 13.1:12.4 | 20 % | **46 %** |
+
+**Drei Kernbefunde:**
+1. **Die einseitige Kollaps-Rate (11–22 %) ist über alle Generationen persistent
+   vorhanden — kein neues v10-Problem, aber bisher nie gemessen.**
+2. **Netz-vs-Netz-Spiele kollabieren strukturell viel häufiger** (Ø-Score fast
+   halbiert, "irgendeine Seite ≤5" fast verdoppelt ggü. Netz-vs-Heuristik).
+   Self-Play-artige Matchups sind ein deutlich instabileres Umfeld als das Spiel
+   gegen einen strukturell andersartigen Gegner.
+3. **Ab v9 kippt die Balance beim Netz-vs-Heuristik-Kollaps klar zulasten des
+   Netzes** (15 %/11 % vs. Heuristiks 7 %/7 % — bei v7/v8 noch ausgeglichen
+   ~10/10, 6/5). Timt exakt mit dem Sieganteil-Einbruch — es ist also nicht
+   "die Heuristik wird relativ stärker", sondern **das Netz selbst wird
+   kollaps-anfälliger.**
+
+**Ursachen-Kette (Arbeitshypothese, gut gestützt):** Das Trainingsfenster besteht
+ausschließlich aus Netz-Self-Play (nie echten Heuristik-Spieldaten, s. Learnings).
+Je mehr das Fenster sich zu reinem, jüngerem Self-Play verengt (v2/v3 raus, v4
+könnte folgen), desto mehr übernimmt die trainierte Policy die kollaps-anfällige
+Dynamik aus Netz-vs-Netz-Spielen — sichtbar als **erzwungenes Floor-Dumping**
+(Strafleisten-Bias-Check zeigt konsistent 0 Fälle mit legaler Reihen-Alternative
+bei Floor-Top-Wahl — das ist also situativ erzwungen, nicht vermeidbare
+Fehlentscheidung im Moment; das Problem entsteht früher im Draft).
+
+### Lösungskonzept
+
+1. **Sofort — Diversität ins Self-Play zurückbringen:** einen Anteil der
+   Self-Play-Partien als **Netz-vs-Heuristik** generieren (analog `play_net_game`
+   in `self_play.rs`, Aufzeichnung für die Netz-Seite), NICHT um "Heuristik
+   schlagen" zum Ziel zu machen, sondern als Mittel gegen die Selbstähnlichkeits-
+   Kollaps-Dynamik — ein strukturell andersartiger Sparringspartner bricht die
+   "beide Seiten teilen dieselben blinden Flecken"-Dynamik auf.
+2. **Neue Standard-Kennzahl: einseitige Kollaps-Rate** (eine Seite ≤5, andere
+   ≥15) in die reguläre Arena-/Sonden-Auswertung aufnehmen, neben 0:0-Rate und
+   Sieganteil — hätte den v9-Knick schon 1 Generation früher sichtbar gemacht,
+   statt erst nachträglich per Log-Analyse.
+3. **Arena-Gate erweitern:** "Sieg gegen Vorgänger" (Win/Loss) allein hat den
+   v10-Rückschritt nicht verhindert (51:49 "bestanden", aber Robustheit sank).
+   Gate um Ø-Score-Marge UND Kollaps-Rate ergänzen — bei „schlussendlich gewinnt,
+   wer die meisten Punkte macht" sollte die Punktzahl/Robustheit stärker
+   gewichtet werden als reines Win/Loss.
+4. **Optional/später — Root-Cause im Draft:** untersuchen, WANN im Spiel sich
+   die erzwungenen Floor-Situationen anbahnen (z. B. Farb-Hortung früh im Draft,
+   die später Musterreihen-Konflikte erzwingt) — würde eine gezieltere Korrektur
+   als reine Datendiversität ermöglichen.
 
 ## Gating / Verifikation
 - Je Generation: `run_net_arena(v_neu vs Heuristik, 200/200, 100)` +
