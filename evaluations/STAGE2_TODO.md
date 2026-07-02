@@ -97,14 +97,16 @@ grün ausschlägt — **nicht mehr blind versuchen** (der v7-Versuch kostete ein
 vollen Self-Play-Zyklus, bevor der Kollaps auffiel).
 
 ### Reifegrad-Sonde (nach jeder Stufe-1-Generation, die das Heuristik-Gate besteht)
-Billiger, isolierender Vergleich mit **demselben Netz**, einmal Stufe 1 und
-einmal Stufe 2 (~40 Spiele reichen — das war die Stichprobe, die v7s Kollaps zeigte):
+Läuft automatisch nach jedem `train.py`-Lauf (`run_readiness_probe`, Default
+**100 Spiele je Stufe**, 400 Sims — auf 100 angehoben, da 40 Spiele bei niedrigen
+0:0-Basisraten [v9: 15 %/75 %] eine zu schwache Absicherung waren, s. Learnings).
+Manuell (falls nötig) äquivalent:
 
 ```
 python self_play.py --mode network --model alphazero_<gen>.onnx --stage 1 \
-    --games 40 --sims 400 --version <gen>_probe_s1 --threads 0
+    --games 100 --sims 400 --version <gen>_probe_s1 --threads 0
 python self_play.py --mode network --model alphazero_<gen>.onnx --stage 2 \
-    --games 40 --sims 400 --version <gen>_probe_s2 --threads 0
+    --games 100 --sims 400 --version <gen>_probe_s2 --threads 0
 # 0:0-Rate + Ø Sieger-Score je Lauf vergleichen; Probe-Daten danach löschen
 # (kein Regen-Zyklus, reine Messung).
 ```
