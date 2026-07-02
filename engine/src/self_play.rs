@@ -42,6 +42,21 @@ pub const SELF_PLAY_C: f64 = 0.3;
 /// gespielten Aktion sorgt und die Zustandsvielfalt erhält). Niedriger = schärfer.
 pub const TARGET_TEMP: f64 = 0.15;
 
+/// Hänger-Schutz-Wallclock für reine Heuristik-Partien (`play_one_game`,
+/// `play_arena_game`) — normal 1-4s, 30s ist hier großzügig genug.
+pub const HEURISTIC_GAME_TIMEOUT_SECS: u64 = 30;
+
+/// Hänger-Schutz-Wallclock für netzbeteiligte Partien (`play_net_game`,
+/// `play_net_vs_net_game`, `play_net_self_play_game`) — jede Simulation
+/// braucht eine ONNX-Inferenz, das ist deutlich langsamer als reine
+/// Heuristik-Suche. Bei 30s wurden Self-Play-Partien bei 400 Sims systematisch
+/// vor Rundenende (Runde 3-4 von 5) abgeschnitten, statt regulär zu terminieren
+/// — die aufgezeichneten scores/winner solcher Partien sind dann KEIN echtes
+/// Endergebnis (Wertungsplatten werden nur bei Phase::End angewendet), was das
+/// gesamte Punkte-Marge-Value-Target korrumpiert. 180s gibt genug Puffer auch
+/// bei hoher Simulationszahl/dynamischer Sims-Skalierung.
+pub const NET_GAME_TIMEOUT_SECS: u64 = 180;
+
 // ── agent_env-Action-Serializer ──────────────────────────────────────────────
 
 /// `factory_index` einer Stein-Aktion (Port der Logik aus
@@ -593,7 +608,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     let t_start = std::time::Instant::now();
     loop {
         guard += 1;
-        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= HEURISTIC_GAME_TIMEOUT_SECS {
             break; // defensive Endlosschleifen-Sicherung
         }
         match game.state.phase {
@@ -690,7 +705,7 @@ fn play_arena_game<R: Rng + ?Sized>(
         // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= HEURISTIC_GAME_TIMEOUT_SECS {
             break;
         }
         match game.state.phase {
@@ -819,7 +834,7 @@ fn play_net_game<R: Rng + ?Sized>(
         // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= NET_GAME_TIMEOUT_SECS {
             break;
         }
         match game.state.phase {
@@ -958,7 +973,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= NET_GAME_TIMEOUT_SECS {
             break;
         }
         match game.state.phase {
@@ -1123,7 +1138,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= 30 {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= NET_GAME_TIMEOUT_SECS {
             break;
         }
         match game.state.phase {
