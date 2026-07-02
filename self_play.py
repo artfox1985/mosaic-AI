@@ -52,6 +52,22 @@ def _group_by_game(steps: list[dict]) -> list[list[dict]]:
     return games
 
 
+def _check_completion(steps: list[dict], filename) -> None:
+    """Prüft je Datei, wie viele Partien wirklich Phase::End erreicht haben
+    (Rust-Feld 'completed', siehe self_play.rs). Abgebrochene Partien (Hänger-
+    Schutz-Timeout) haben KEIN echtes Endergebnis in scores/winner — wurde als
+    echter Bug beobachtet (30s-Timeout bei netzgeführter Suche zu knapp, siehe
+    STAGE2_TODO.md), deshalb hier ein Sanity-Check bei jeder generierten Datei."""
+    games = _group_by_game(steps)
+    if not games:
+        return
+    n = len(games)
+    n_complete = sum(1 for g in games if g and g[-1].get("completed", True))
+    if n_complete < n:
+        print(f"  ⚠️  {filename.name}: nur {n_complete}/{n} Partien komplett "
+              f"(Rest durch Hänger-Schutz abgebrochen — scores/winner unzuverlässig!)")
+
+
 def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> None:
     """Schreibt die akkumulierten Steps in eine .pkl (Dateinamens-Schema wie bisher)."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -59,6 +75,7 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
     filename = DATA_DIR / f"selfplay_{version_name}{file_tag}_{timestamp}_g{game_count}.pkl"
     with open(filename, "wb") as f:
         pickle.dump(steps, f)
+    _check_completion(steps, filename)
     print(f"💾 {len(steps)} Züge gespeichert in '{filename}'")
 
 
