@@ -1,0 +1,833 @@
+//! MCTS für die Drafting-Phase — Port der Kern-Features aus agents/mcts.py
+//! (HeuristicMCTSAgent): Progressive Widening, UCB c = 0.3, sublineares
+//! Wachstum, `player_who_acted`-Backprop und Win-Prob-Bewertung.
+//!
+//! Wert eines Zustands = `total(0) − total(1)`, per Sigmoid (`diff_to_probs`)
+//! in (0, 1) abgebildet. `total(pi)` ist der EXAKTE erwartete Rundenscore aus
+//! dem Tiling-Solver ([`crate::tiling_solver::solve_round_final_score`]) — keine
+//! per-Reihe-Heuristik mehr (erfasst auch reihenübergreifende Linien).
+//!
+//! Phasen-Umfang: Der Suchbaum läuft NUR über Drafting; am Übergang
+//! Drafting→Tiling ist der Knoten Pseudo-Terminal und wird per DFS-Solver
+//! bewertet (kein Tiling im Baum, kein Rundenwechsel/RNG-Neubefüllen).
+
+use rand::seq::SliceRandom;
+use rand::{Rng, RngExt};
+use serde_json::{json, Value};
+
+use crate::game::{drafting_actions, Game};
+use crate::moves::Action;
+use crate::tile::TileColor;
+use crate::serialize::action_to_dict;
+use crate::state::{GameState, Phase};
+use crate::tiling_solver::solve_round_final_score;
+
+/// Initialwelle an Aktionen pro Knoten (Progressive Widening).
+pub const MAX_ACTIONS: usize = 10;
+/// Faktor des sublinearen Wachstums: `allowed = MAX_ACTIONS + WIDEN_FACTOR·√N`.
+pub const WIDEN_FACTOR: f64 = 2.5;
+/// Standard-Explorationskonstante (wie agents/mcts.py).
+pub const DEFAULT_C: f64 = 0.3;
+
+/// Such-Zug des Drafting-MCTS. Tiling wird NICHT mehr im Baum gesucht — die
+/// Tiling-Phase löst der exakte DFS (`crate::tiling_solver`) als Pseudo-Terminal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SearchMove {
+    Draft(Action),
+}
+
+struct Node {
+    parent: Option<usize>,
+    children: Vec<usize>,
+    untried: Vec<SearchMove>,
+    /// Für Progressive Widening zurückgehaltene, nach Güte sortierte Aktionen.
+    remaining: Vec<SearchMove>,
+    action: Option<SearchMove>,
+    /// Spieler, der den Zug zu diesem Knoten gemacht hat (Backprop-Perspektive).
+    player_who_acted: usize,
+    visits: u32,
+    value: f64,
+    state: GameState,
+    terminal: bool,
+    /// Anzahl legaler Züge in diesem Zustand (für die aktionsabhängige Sigmoid-scale).
+    n_actions: usize,
+}
+
+// ── Bewertung ────────────────────────────────────────────────────────────────
+
+/// Erwarteter finaler Rundenscore eines Spielers — EXAKT per Tiling-Solver
+/// (optimale Platzierung der vollen Reihen inkl. Linien über mehrere Reihen),
+/// statt der per-Reihe-Heuristik. Konsistent mit dem `estimated_score` der UI.
+fn player_total(state: &GameState, pi: usize) -> f64 {
+    solve_round_final_score(state, pi) as f64
+}
+
+/// Aktionsabhängige Sigmoid-scale (Port von agents/mcts.py `_scale_for_actions`).
+fn scale_for_actions(n: usize) -> f64 {
+    if n > 50 {
+        2.0
+    } else if n > 15 {
+        5.0
+    } else {
+        7.0
+    }
+}
+
+/// Punktedifferenz → Win-Wahrscheinlichkeiten [p0, p1] (Port von `_diff_to_probs`).
+fn diff_to_probs(diff: f64, scale: f64) -> [f64; 2] {
+    let safe = diff.clamp(-200.0, 200.0);
+    let p0 = 1.0 / (1.0 + (-safe / scale).exp());
+    [p0, 1.0 - p0]
+}
+
+/// Sigmoid-scale für das exakte DFS-Terminal (kalibriert auf echte Score-Diffs).
+const TERMINAL_SCALE: f64 = 10.0;
+
+/// Blattbewertung als Per-Spieler-Win-Prob (absolut, nicht perspektivisch).
+/// Am Drafting→Tiling-Übergang (Phase ≠ Drafting) wird der exakte Runden-Score
+/// per DFS-Solver bestimmt (Pseudo-Terminal); mitten im Drafting die Heuristik.
+/// Öffentlich für den Netz-MCTS-Stufe-1-Modus (DFS-Blattbewertung + Netz-Priors).
+pub fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
+    if state.phase != Phase::Drafting {
+        let f0 = solve_round_final_score(state, 0) as f64;
+        let f1 = solve_round_final_score(state, 1) as f64;
+        return diff_to_probs(f0 - f1, TERMINAL_SCALE);
+    }
+    let diff = player_total(state, 0) - player_total(state, 1);
+    diff_to_probs(diff, scale_for_actions(n_actions))
+}
+
+/// Wie [`evaluate`], zusätzlich mit einer Klartext-Erklärung (nur fürs Log).
+/// Verwendet die Spielernamen statt P0/P1.
+fn evaluate_explain(state: &GameState, n_actions: usize) -> ([f64; 2], String) {
+    let n0 = state.players[0].name.as_str();
+    let n1 = state.players[1].name.as_str();
+    if state.phase != Phase::Drafting {
+        let f0 = solve_round_final_score(state, 0);
+        let f1 = solve_round_final_score(state, 1);
+        let v = diff_to_probs((f0 - f1) as f64, TERMINAL_SCALE);
+        let why = format!(
+            "DFS-Terminal (phase={}) {n0}={f0} {n1}={f1} diff={:+}",
+            state.phase.as_str(),
+            f0 - f1
+        );
+        return (v, why);
+    }
+    let t0 = player_total(state, 0);
+    let t1 = player_total(state, 1);
+    let scale = scale_for_actions(n_actions);
+    let v = diff_to_probs(t0 - t1, scale);
+    let why = format!(
+        "Heuristik total[{n0}]={t0:.1} total[{n1}]={t1:.1} diff={:+.1} scale={scale}",
+        t0 - t1
+    );
+    (v, why)
+}
+
+/// Simulationszahl je Zug (Port von agents/mcts.py `_compute_dynamic_sims`,
+/// Modus „play"): mehr Optionen → mehr Sims. `clamp(base + √n·25, base, base·5)`.
+pub fn dynamic_sims(base: u32, num_actions: usize) -> u32 {
+    let hi = base.saturating_mul(5);
+    let target = base + ((num_actions as f64).sqrt() * 25.0) as u32;
+    target.clamp(base, hi)
+}
+
+// ── Zuggenerierung & -ausführung (nur Drafting) ──────────────────────────────
+
+/// Legale Such-Züge: nur Drafting (Tiling löst der DFS-Solver). Außerhalb der
+/// Drafting-Phase leer → der Knoten ist (Pseudo-)Terminal.
+fn valid_search_moves(state: &GameState) -> Vec<SearchMove> {
+    match state.phase {
+        Phase::Drafting => drafting_actions(state).into_iter().map(SearchMove::Draft).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Wendet einen Drafting-Zug auf einen Klon an. None bei (unerwartet)
+/// ungültigem Zug.
+fn apply_search_move(state: &GameState, mv: &SearchMove) -> Option<GameState> {
+    match mv {
+        SearchMove::Draft(a) => {
+            let mut g = Game { state: state.clone() };
+            g.apply_drafting(a).ok()?;
+            let mut s = g.state;
+            s.log.clear();
+            Some(s)
+        }
+    }
+}
+
+// ── Aktions-Ranking für Widening ─────────────────────────────────────────────
+
+/// Teures 1-Ply-Heuristik-Ranking (nur an der Wurzel): jede Aktion ausführen und
+/// nach `total(acting) − total(other)` absteigend sortieren.
+fn rank_actions_root(state: &GameState, moves: Vec<SearchMove>) -> Vec<SearchMove> {
+    let acting = state.current_player;
+    let other = 1 - acting;
+    let mut scored: Vec<(f64, SearchMove)> = moves
+        .into_iter()
+        .map(|m| {
+            let score = match apply_search_move(state, &m) {
+                Some(child) => player_total(&child, acting) - player_total(&child, other),
+                None => f64::NEG_INFINITY,
+            };
+            (score, m)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    scored.into_iter().map(|(_, m)| m).collect()
+}
+
+fn move_priority(m: &SearchMove) -> i32 {
+    match m {
+        SearchMove::Draft(a) => match a {
+            Action::BonusChip(_) => 6,
+            Action::Stone(_) => 4,
+            Action::Dome(_) => 3,
+            Action::DrawStack(_) => 2,
+            Action::Pass => 1,
+        },
+    }
+}
+
+/// Billiges Ranking für tiefe Knoten: nach Typ-Priorität (innerhalb gleich:
+/// zufällig).
+fn rank_actions_cheap<R: Rng + ?Sized>(mut moves: Vec<SearchMove>, rng: &mut R) -> Vec<SearchMove> {
+    moves.shuffle(rng);
+    moves.sort_by(|a, b| move_priority(b).cmp(&move_priority(a)));
+    moves
+}
+
+// ── Knoten ───────────────────────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+fn make_node<R: Rng + ?Sized>(
+    state: GameState,
+    parent: Option<usize>,
+    action: Option<SearchMove>,
+    player_who_acted: usize,
+    terminal: bool,
+    is_root: bool,
+    rng: &mut R,
+) -> Node {
+    let (untried, remaining, n_actions) = if terminal {
+        (Vec::new(), Vec::new(), 0)
+    } else {
+        let moves = valid_search_moves(&state);
+        let n = moves.len();
+        let mut ordered = if is_root {
+            rank_actions_root(&state, moves)
+        } else {
+            rank_actions_cheap(moves, rng)
+        };
+        let remaining = if ordered.len() > MAX_ACTIONS {
+            ordered.split_off(MAX_ACTIONS)
+        } else {
+            Vec::new()
+        };
+        (ordered, remaining, n)
+    };
+    Node {
+        parent,
+        children: Vec::new(),
+        untried,
+        remaining,
+        action,
+        player_who_acted,
+        visits: 0,
+        value: 0.0,
+        state,
+        terminal,
+        n_actions,
+    }
+}
+
+/// UCB1 (c = 0.3): bestes Kind aus Sicht des Knoten-Spielers. Da alle Kinder
+/// vom selben Spieler (current_player des Knotens) erzeugt werden und ihr Wert
+/// aus `player_who_acted`-Sicht gespeichert ist, wird NICHT negiert.
+fn best_uct_child(nodes: &[Node], nid: usize, c: f64) -> usize {
+    let ln_parent = (nodes[nid].visits.max(1) as f64).ln();
+    let mut best = nodes[nid].children[0];
+    let mut best_score = f64::NEG_INFINITY;
+    for &cid in &nodes[nid].children {
+        let n = nodes[cid].visits as f64;
+        let exploit = nodes[cid].value / n;
+        let explore = c * (ln_parent / n).sqrt();
+        let score = exploit + explore;
+        if score > best_score {
+            best_score = score;
+            best = cid;
+        }
+    }
+    best
+}
+
+/// Knoten-Kurzlabel fürs Log (Aktionsbeschreibung bzw. „Wurzel").
+fn log_label(nodes: &[Node], nid: usize) -> String {
+    match &nodes[nid].action {
+        None => "Wurzel".to_string(),
+        Some(sm) => label_search_move(sm, None).1,
+    }
+}
+
+/// Baut den Drafting-Suchbaum (Wurzel = Index 0). None, wenn `state` nicht in
+/// der Drafting-Phase ist (Tiling löst der DFS-Solver separat). Mit
+/// `log = Some(..)` wird die Schleife je Simulation (Selection/Expansion/
+/// Bewertung/Backprop) protokolliert; `None` = kein Overhead.
+fn build_tree<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    mut log: Option<&mut Vec<String>>,
+) -> Option<Vec<Node>> {
+    if state.phase != Phase::Drafting {
+        return None;
+    }
+
+    let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
+    let mut root_state = state.clone();
+    root_state.log.clear();
+    let root_player = root_state.current_player;
+    let mut nodes: Vec<Node> =
+        vec![make_node(root_state, None, None, root_player, false, true, rng)];
+
+    macro_rules! logln {
+        ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
+    }
+
+    for sim in 0..simulations {
+        logln!("=== Sim {}/{} ===", sim + 1, simulations);
+
+        // 1. Selection (mit Progressive Widening).
+        let mut nid = 0;
+        loop {
+            if nodes[nid].terminal {
+                logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
+                break;
+            }
+            // Widening: eine reservierte Aktion freischalten, sobald untried leer
+            // ist und das sublineare Budget noch Platz lässt.
+            if nodes[nid].untried.is_empty() && !nodes[nid].remaining.is_empty() {
+                let allowed =
+                    MAX_ACTIONS + (WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
+                if nodes[nid].children.len() < allowed {
+                    let mv = nodes[nid].remaining.remove(0);
+                    logln!("  WIDEN  #{nid} schaltet Aktion frei (allowed={allowed}, Kinder={})",
+                        nodes[nid].children.len());
+                    nodes[nid].untried.push(mv);
+                }
+            }
+            if !nodes[nid].untried.is_empty() {
+                break; // hier expandieren
+            }
+            if nodes[nid].children.is_empty() {
+                break; // (sollte bei nicht-terminal nicht auftreten)
+            }
+            let cid = best_uct_child(&nodes, nid, c);
+            if log.is_some() {
+                let n = nodes[cid].visits.max(1) as f64;
+                let exploit = nodes[cid].value / n;
+                let explore = c * ((nodes[nid].visits.max(1) as f64).ln() / n).sqrt();
+                logln!(
+                    "  SELECT #{nid} → #{cid} [{}] (Zug: {}) N={} Q={:.3} U={:.3} → {:.3}",
+                    log_label(&nodes, cid), names[nodes[cid].player_who_acted],
+                    nodes[cid].visits, exploit, explore, exploit + explore
+                );
+            }
+            nid = cid;
+        }
+
+        // 2. Expansion (eine zufällige unversuchte Aktion).
+        if !nodes[nid].terminal && !nodes[nid].untried.is_empty() {
+            let idx = rng.random_range(0..nodes[nid].untried.len());
+            let mv = nodes[nid].untried.swap_remove(idx);
+            let mover = nodes[nid].state.current_player;
+            if let Some(child_state) = apply_search_move(&nodes[nid].state, &mv) {
+                // Terminal sobald die Drafting-Phase verlassen ist (→ DFS-Eval).
+                let terminal = child_state.phase != Phase::Drafting;
+                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, false, rng);
+                let cid = nodes.len();
+                nodes.push(child);
+                nodes[nid].children.push(cid);
+                logln!(
+                    "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}{})",
+                    label_search_move(&mv, None).1,
+                    names[mover],
+                    if terminal { ", terminal/DFS" } else { "" }
+                );
+                nid = cid;
+            }
+        }
+
+        // 3. Blattbewertung (Per-Spieler-Win-Prob).
+        let value = if log.is_some() {
+            let (v, why) = evaluate_explain(&nodes[nid].state, nodes[nid].n_actions);
+            logln!("  EVAL   #{nid} {why} → win[{}]={:.3} win[{}]={:.3}", names[0], v[0], names[1], v[1]);
+            v
+        } else {
+            evaluate(&nodes[nid].state, nodes[nid].n_actions)
+        };
+
+        // 4. Backprop (player_who_acted, ohne Vorzeichenwechsel).
+        let mut bp = String::from("  BACKPROP");
+        let mut cur = Some(nid);
+        while let Some(i) = cur {
+            nodes[i].visits += 1;
+            let delta = value[nodes[i].player_who_acted];
+            nodes[i].value += delta;
+            if log.is_some() {
+                bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
+            }
+            cur = nodes[i].parent;
+        }
+        logln!("{bp}");
+    }
+
+    Some(nodes)
+}
+
+/// Vollständiger Texttrace einer geloggten MCTS-Suche (für die Debug-Logdatei).
+pub fn search_log_text<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    let nodes = build_tree(state, simulations, c, rng, Some(&mut lines));
+
+    let mut out = String::new();
+    let n_actions = drafting_actions(state).len();
+    out.push_str("MCTS-Debug-Log\n");
+    out.push_str(&format!(
+        "Simulationen={simulations}  #Aktionen={n_actions}  Wurzelspieler={}  c={c}\n",
+        state.players[state.current_player].name
+    ));
+    out.push_str(&format!("Spieler: P0={}  P1={}\n", state.players[0].name, state.players[1].name));
+    match &nodes {
+        Some(nodes) => {
+            if let Some(best) = best_root_child(nodes) {
+                let label = nodes[best]
+                    .action
+                    .as_ref()
+                    .map(|sm| label_search_move(sm, Some(state)).1)
+                    .unwrap_or_default();
+                out.push_str(&format!(
+                    "Gewaehlter Zug: {label}  (Wurzel-N={}, Knoten={})\n",
+                    nodes[0].visits,
+                    nodes.len()
+                ));
+            }
+        }
+        None => out.push_str("(Zustand nicht in der Drafting-Phase — kein MCTS)\n"),
+    }
+    out.push_str("==================================================\n");
+    for l in lines {
+        out.push_str(&l);
+        out.push('\n');
+    }
+    out
+}
+
+/// Meistbesuchtes Wurzelkind (Tiebreak: Mittelwert Q).
+fn best_root_child(nodes: &[Node]) -> Option<usize> {
+    nodes[0].children.iter().copied().max_by(|&a, &b| {
+        let qa = nodes[a].value / nodes[a].visits.max(1) as f64;
+        let qb = nodes[b].value / nodes[b].visits.max(1) as f64;
+        nodes[a]
+            .visits
+            .cmp(&nodes[b].visits)
+            .then(qa.partial_cmp(&qb).unwrap_or(std::cmp::Ordering::Equal))
+    })
+}
+
+/// Tiefe des Teilbaums unter `nid` (0 = Blatt).
+fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
+    let children = &nodes[nid].children;
+    if children.is_empty() {
+        0
+    } else {
+        1 + children.iter().map(|&c| subtree_depth(nodes, c)).max().unwrap()
+    }
+}
+
+/// Typ, Beschreibung, Kategorie (für `.cat-*` in debug.html) und Move-Dict.
+/// Wie viele Steine ein Take-Zug aus `state` entnimmt: alle der Farbe in der
+/// Sonnen-Sektion bzw. (Mond) je Stapel mit passender Oberseite. Der globale
+/// Mond-Zug (factory_id=None) summiert alle kleinen Fabriken + große Fabrik.
+fn tiles_taken(state: &GameState, t: &crate::moves::TakeAction) -> usize {
+    use crate::moves::TakeSource::*;
+    let by_id = |fid: usize| state.factories.iter().find(|f| f.factory_id == fid);
+    let moon_top = |f: &crate::factory::Factory, c: TileColor| {
+        f.moon_stacks.iter().filter(|s| s.last() == Some(&c)).count()
+    };
+    match t.source {
+        SmallFactorySun => t
+            .factory_id
+            .and_then(by_id)
+            .map_or(0, |f| f.sun_tiles.iter().filter(|&&c| c == t.color).count()),
+        LargeFactorySun => state.large_factory.sun_tiles.iter().filter(|&&c| c == t.color).count(),
+        LargeFactoryMoon => state.large_factory.moon_pool.iter().filter(|&&c| c == t.color).count(),
+        SmallFactoryMoon => match t.factory_id {
+            Some(fid) => by_id(fid).map_or(0, |f| moon_top(f, t.color)),
+            None => {
+                let small: usize = state.factories.iter().map(|f| moon_top(f, t.color)).sum();
+                let large = state.large_factory.moon_pool.iter().filter(|&&c| c == t.color).count();
+                small + large
+            }
+        },
+    }
+}
+
+/// `state=Some` blendet die Steinanzahl in die Stein-Beschreibung ein.
+fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (&'static str, String, &'static str, Value) {
+    match sm {
+        SearchMove::Draft(a) => match a {
+            Action::Stone(m) => {
+                let cat = if m.place.row_index < 0 { "penalty" } else { "row" };
+                let dest = if m.place.row_index < 0 {
+                    "Strafleiste".to_string()
+                } else {
+                    format!("Reihe {}", m.place.row_index + 1)
+                };
+                let src = match m.take.factory_id {
+                    Some(id) => format!("F{id}"),
+                    None => "GF".to_string(),
+                };
+                // Mit Zustand: Steinanzahl voranstellen und Füllstand der Zielreihe
+                // NACH dem Zug anhängen ([gefüllt/Kapazität], wie im Game-Log).
+                let (amount, fill) = match state {
+                    Some(s) => {
+                        let n = tiles_taken(s, &m.take);
+                        let fill = if m.place.row_index >= 0 {
+                            let row = &s.players[s.current_player].pattern_lines[m.place.row_index as usize];
+                            let filled = (row.tiles.len() + n).min(row.capacity());
+                            format!(" [{}/{}]", filled, row.capacity())
+                        } else {
+                            String::new()
+                        };
+                        (format!("{n}× "), fill)
+                    }
+                    None => (String::new(), String::new()),
+                };
+                let desc = format!("{amount}Stein {} von {src} → {dest}{fill}", m.take.color.value());
+                ("stone", desc, cat, action_to_dict(a))
+            }
+            Action::Dome(m) => (
+                "dome",
+                format!("Kuppel #{} → ({},{}) {}°", m.dome_tile_id, m.slot_row, m.slot_col, m.rotation),
+                "dome",
+                action_to_dict(a),
+            ),
+            Action::DrawStack(m) => (
+                "dome_stack",
+                format!("Stapel → ({},{}) {}°", m.slot_row, m.slot_col, m.rotation),
+                "dome",
+                action_to_dict(a),
+            ),
+            Action::BonusChip(m) => (
+                "bonus_chip",
+                format!("Bonuschip F{}", m.factory_id),
+                "chip",
+                action_to_dict(a),
+            ),
+            Action::Pass => ("pass", "Pass".to_string(), "pass", action_to_dict(a)),
+        },
+    }
+}
+
+/// Serialisiert einen Knoten rekursiv (bis `depth_left`, je Knoten `top_k`
+/// meistbesuchte Kinder) für das Debug-Baum-Panel.
+fn serialize_node(nodes: &[Node], nid: usize, depth_left: u32, top_k: usize) -> Value {
+    let node = &nodes[nid];
+    let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+    let (typ, desc, cat, mv) = match &node.action {
+        None => ("root", "Wurzel".to_string(), "pass", Value::Null),
+        Some(sm) => label_search_move(sm, None),
+    };
+    let children = if depth_left > 0 && !node.children.is_empty() {
+        let mut ch = node.children.clone();
+        ch.sort_by(|a, b| nodes[*b].visits.cmp(&nodes[*a].visits));
+        ch.truncate(top_k);
+        ch.iter().map(|&c| serialize_node(nodes, c, depth_left - 1, top_k)).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    json!({
+        "type": typ,
+        "description": desc,
+        "category": cat,
+        "move": mv,
+        "visits": node.visits,
+        "q": q,
+        "win_pct": q * 100.0,
+        "depth": subtree_depth(nodes, nid),
+        "player_who_acted": node.player_who_acted,
+        "n_children": node.children.len(),
+        "children": children,
+    })
+}
+
+/// Anzeige-JSON einer Suchaktion (`{type, description, category, move}`).
+pub fn search_move_json(sm: &SearchMove, state: Option<&GameState>) -> Value {
+    let (typ, desc, cat, mv) = label_search_move(sm, state);
+    json!({ "type": typ, "description": desc, "category": cat, "move": mv })
+}
+
+/// Wurzelkind-Statistik nach einer Suche: `(Drafting-Action, Besuche, Q)` je
+/// Kind. Basis für die Self-Play-Policy-Targets (`crate::self_play`). Leer
+/// außerhalb der Drafting-Phase.
+pub fn root_child_stats<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> Vec<(Action, u32, f64)> {
+    let nodes = match build_tree(state, simulations, c, rng, None) {
+        Some(n) => n,
+        None => return Vec::new(),
+    };
+    nodes[0]
+        .children
+        .iter()
+        .filter_map(|&cid| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            match &node.action {
+                Some(SearchMove::Draft(a)) => Some((a.clone(), node.visits, q)),
+                None => None,
+            }
+        })
+        .collect()
+}
+
+/// Beste Drafting-Aktion für `state` (als SearchMove). None außerhalb Drafting.
+pub fn search_action<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> Option<SearchMove> {
+    let nodes = build_tree(state, simulations, c, rng, None)?;
+    let best = best_root_child(&nodes)?;
+    nodes[best].action.clone()
+}
+
+/// Wie [`search_action`], liefert zusätzlich ein debug.html-kompatibles
+/// Analyse-Dict (Per-Zug-Statistik `moves[]` + serialisierter `tree`).
+pub fn search_with_tree<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    max_depth: u32,
+    top_k: usize,
+    log: Option<&mut Vec<String>>,
+) -> (Option<SearchMove>, Value) {
+    let nodes = match build_tree(state, simulations, c, rng, log) {
+        Some(n) => n,
+        None => return (None, Value::Null),
+    };
+    let best = best_root_child(&nodes);
+    let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
+
+    let mut child_ids = nodes[0].children.clone();
+    child_ids.sort_by(|a, b| nodes[*b].visits.cmp(&nodes[*a].visits));
+
+    let mut chosen_id: Option<usize> = None;
+    let moves: Vec<Value> = child_ids
+        .iter()
+        .enumerate()
+        .map(|(i, &cid)| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            let (typ, desc, cat, _mv) = match &node.action {
+                Some(sm) => label_search_move(sm, Some(state)),
+                None => ("?", "?".to_string(), "pass", Value::Null),
+            };
+            let is_chosen = best == Some(cid);
+            if is_chosen {
+                chosen_id = Some(i);
+            }
+            json!({
+                "action_id": i,
+                "type": typ,
+                "description": desc,
+                "category": cat,
+                "net_prob": Value::Null,
+                "net_prob_norm": Value::Null,
+                "mcts_visits": node.visits,
+                "mcts_share": if total_visits > 0 { node.visits as f64 / total_visits as f64 } else { 0.0 },
+                "mcts_q": q,
+                "mcts_win_pct": q * 100.0,
+                "max_depth": subtree_depth(&nodes, cid),
+                "shaping": Value::Null,
+                "chosen": is_chosen,
+            })
+        })
+        .collect();
+
+    let analysis = json!({
+        "current_player": nodes[0].player_who_acted,
+        "ai_player": nodes[0].player_who_acted,
+        "value": Value::Null,
+        "win_pct": Value::Null,
+        "has_net": false,
+        "simulations": simulations,
+        "num_actions": nodes[0].n_actions,
+        "max_depth": subtree_depth(&nodes, 0),
+        "ai_action": chosen_id,
+        "moves": moves,
+        "tree": serialize_node(&nodes, 0, max_depth, top_k),
+    });
+
+    let chosen = best.and_then(|cid| nodes[cid].action.clone());
+    (chosen, analysis)
+}
+
+/// Kopfzeilen für ein MCTS-Log aus state + Analyse (für den geloggten KI-Zug).
+pub fn search_log_header(state: &GameState, analysis: &Value) -> String {
+    let sims = analysis["simulations"].as_u64().unwrap_or(0);
+    let na = analysis["num_actions"].as_u64().unwrap_or(0);
+    let chosen = analysis["moves"]
+        .as_array()
+        .and_then(|ms| ms.iter().find(|m| m["chosen"] == json!(true)))
+        .and_then(|m| m["description"].as_str())
+        .unwrap_or("?");
+    format!(
+        "MCTS-Debug-Log (KI-Zug)\nSimulationen={sims}  #Aktionen={na}  Wurzelspieler={}\nSpieler: P0={}  P1={}\nGewaehlter Zug: {chosen}\n==================================================\n",
+        state.players[state.current_player].name,
+        state.players[0].name,
+        state.players[1].name
+    )
+}
+
+/// Beste Drafting-Aktion (dünner Wrapper; None außerhalb Drafting bzw. wenn die
+/// beste Wurzelaktion kein Drafting-Zug ist).
+pub fn search_drafting_action<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+) -> Option<Action> {
+    match search_action(state, simulations, c, rng)? {
+        SearchMove::Draft(a) => Some(a),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::setup_new_game;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn drafting_state(seed: u64) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        for p in s.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        s
+    }
+
+    #[test]
+    fn returns_a_legal_drafting_action() {
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(1);
+        let action = search_drafting_action(&s, 200, DEFAULT_C, &mut rng).expect("Aktion");
+        assert!(drafting_actions(&s).contains(&action), "MCTS-Aktion muss legal sein");
+    }
+
+    #[test]
+    fn none_outside_drafting() {
+        let mut s = drafting_state(7);
+        s.phase = Phase::Tiling;
+        let mut rng = StdRng::seed_from_u64(3);
+        assert!(search_drafting_action(&s, 10, DEFAULT_C, &mut rng).is_none());
+    }
+
+    #[test]
+    fn progressive_widening_grows_children_beyond_initial_wave() {
+        // Frühes Drafting hat weit mehr als MAX_ACTIONS legale Züge.
+        let s = drafting_state(7);
+        assert!(valid_search_moves(&s).len() > MAX_ACTIONS);
+        let mut rng = StdRng::seed_from_u64(2);
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
+        // allowed = 10 + 2.5*sqrt(300) ≈ 53 → Wurzel muss > MAX_ACTIONS Kinder haben.
+        assert!(
+            nodes[0].children.len() > MAX_ACTIONS,
+            "Widening sollte mehr als {MAX_ACTIONS} Kinder erzeugen, hat {}",
+            nodes[0].children.len()
+        );
+    }
+
+    #[test]
+    fn does_not_dump_to_floor_early() {
+        let s = drafting_state(11);
+        let mut rng = StdRng::seed_from_u64(4);
+        let action = search_drafting_action(&s, 400, DEFAULT_C, &mut rng).expect("Aktion");
+        if let Action::Stone(m) = &action {
+            assert_ne!(m.place.row_index, -1, "MCTS sollte nicht auf die Strafleiste werfen");
+        }
+    }
+
+    #[test]
+    fn search_does_not_advance_round() {
+        // Die Suche darf den Rundenwechsel nie betreten (Rundennummer bleibt).
+        let s = drafting_state(7);
+        let round_before = s.round_number;
+        let mut rng = StdRng::seed_from_u64(9);
+        let _ = search_drafting_action(&s, 300, DEFAULT_C, &mut rng);
+        assert_eq!(s.round_number, round_before);
+    }
+
+    #[test]
+    fn search_action_none_for_tiling_root() {
+        // Tiling wird NICHT mehr im MCTS gesucht (löst der DFS-Solver).
+        let mut s = drafting_state(7);
+        s.phase = Phase::Tiling;
+        let mut rng = StdRng::seed_from_u64(5);
+        assert!(search_action(&s, 150, DEFAULT_C, &mut rng).is_none());
+    }
+
+    #[test]
+    fn search_with_tree_produces_valid_tree() {
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(6);
+        let (chosen, analysis) = search_with_tree(&s, 300, DEFAULT_C, &mut rng, 3, 8, None);
+        assert!(chosen.is_some());
+        let tree = &analysis["tree"];
+        assert!(tree["children"].as_array().unwrap().len() > 0);
+        // Wurzelkinder ≤ top_k im Baum.
+        assert!(tree["children"].as_array().unwrap().len() <= 8);
+        // moves[] vorhanden, Summe der Visits ≈ Simulationen (jede Sim besucht Wurzel).
+        let moves = analysis["moves"].as_array().unwrap();
+        assert!(!moves.is_empty());
+        let sum: u64 = moves.iter().map(|m| m["mcts_visits"].as_u64().unwrap()).sum();
+        assert!(sum >= 290 && sum <= 300, "Visit-Summe {sum} ~ 300");
+    }
+
+    #[test]
+    fn dynamic_sims_scales_with_actions() {
+        // Mehr Aktionen → mehr Sims; Grenzen [base, base*5] eingehalten.
+        assert_eq!(dynamic_sims(300, 0), 300);
+        assert!(dynamic_sims(300, 64) > 300); // 300 + 8*25 = 500
+        assert_eq!(dynamic_sims(300, 64), 500);
+        assert!(dynamic_sims(100, 100_000) <= 500); // clamp auf base*5
+    }
+
+    #[test]
+    fn search_log_text_contains_all_phases() {
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(8);
+        let log = search_log_text(&s, 50, DEFAULT_C, &mut rng);
+        assert!(log.contains("=== Sim 1/50 ==="));
+        assert!(log.contains("EXPAND"));
+        assert!(log.contains("EVAL"));
+        assert!(log.contains("BACKPROP"));
+        // Bei genug Sims wird auch selektiert (Abstieg).
+        assert!(log.contains("SELECT"));
+    }
+}

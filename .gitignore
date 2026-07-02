@@ -39,3 +39,8 @@ Desktop.ini
 
 # 6. Jupyter Notebook Checkpoints (Falls du später mal welche nutzt)
 .ipynb_checkpoints/
+# 6. Rust (PyO3-Crate unter engine/)
+# Build-Artefakte nicht versionieren; Cargo.lock bleibt drin (reproduzierbare Builds).
+/engine/target/
+*.whl
+*.pyd

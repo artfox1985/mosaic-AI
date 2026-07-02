@@ -15,21 +15,22 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 553        # state_to_tensor Ausgabegröße (129 Basis + 162 Kuppel + 10 Chip-Abschließbarkeit)
+INPUT_SIZE = 684        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler)
+                        # (redundantes unused_chip_colors-Feature entfernt: -10; bag_count ergänzt: +1;
+                        #  floor-Normierung /7.0 -> /4.0 korrigiert (kein Dim-Effekt);
+                        #  Bonuschip-Farbmaske je Fabrik ergänzt: +5*4=+20; 673 -> 664 -> 684)
 NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 
 # --- TRAININGSPARAMETER NN ---
 BATCH_SIZE    = 256
-HIDDEN_SIZE   = 256   # Neuronen pro Hidden Layer (2^x)
+HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (2^x)
 LEARNING_RATE = 0.0006
-VALUE_WEIGHT  = 0.5
-# Gewicht des Auxiliary-Floor-Heads im Gesamt-Loss. Konservativ (0.3): groß
-# genug für Effekt auf den geteilten Rumpf, klein genug dass Policy/Value
-# dominieren. Der einzige echte Tuning-Parameter des Floor-Heads.
-AUX_FLOOR_WEIGHT = 0.3
-
-# --- VALUE-TARGET PARAMETER (abgestuftes Signal) ---
-# Steuern wie scores → win_val umgerechnet werden (compute_win_val).
-# Früh: kleine Werte (mehr Signal aus wenig Punkten), später hochsetzen.
-MARGIN_CAP       = 15   # Punktedifferenz ab der die Margin-Komponente maximal ist
-MAX_WINNER_SCORE = 40   # Winner-Score ab dem die Score-Komponente maximal ist
+VALUE_WEIGHT  = 2.5  # war 0.5 — hochskaliert, weil das neue Punkte-Marge-Value-Target
+                      # (siehe engine/py/neural_net.py, VALUE_SCHEMA_VERSION) eine deutlich
+                      # kleinere charakteristische Streuung hat als das alte ±1-Target:
+                      # Stichprobe über ~27k reale Self-Play-Schritte ergab std(target)≈0.22
+                      # (vs. std=1.0 beim alten ±1-Ziel) → Faktor ~4.6. Ohne Anpassung würde
+                      # der Value-Loss-Beitrag zum Gesamtloss weiter schrumpfen und der
+                      # Value-Head faktisch kaum noch trainiert — genau das Gegenteil vom
+                      # Ziel dieser Änderung. Erster Ansatz, an frühen Epochen (Value:Policy-
+                      # Verhältnis im Log) nachjustieren.

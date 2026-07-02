@@ -1,13 +1,25 @@
 import os
 import glob
+import math
 import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from config import NUM_ACTIONS, HIDDEN_SIZE, MARGIN_CAP, MAX_WINNER_SCORE
+from config import NUM_ACTIONS, HIDDEN_SIZE
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
+
+# Platzierte-Farbe-ID je Dome-Feld: 0=leer, 1-5=Farbe, 6=Special.
+FILLED_ID_MAP = {None: 0, "blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5, "special": 6}
+# Normalisierung der aktuellen Punkte je der 8 Wertungsplatten (grobe Skalen).
+SCORE_NORM = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0]
+
+
+def _padn(lst, n):
+    """Liste auf genau n Einträge bringen (0-gepolstert) — robust gegen alte Daten."""
+    lst = list(lst or [])
+    return (lst + [0] * n)[:n]
 
 def state_to_tensor(data):
     """Macht aus deinem Serializer-Dict ein flaches Zahlen-Array für PyTorch."""
@@ -16,7 +28,10 @@ def state_to_tensor(data):
     # 1. Globale Infos
     features.append(data.get("round", 0) / 6.0)
     features.append(PHASE_MAP.get(data.get("phase", "drafting"), 0) / 3.0)
-    
+    # Beutel-Restbestand (max. 65 Fliesen zu Spielbeginn) — Signal, wie knapp
+    # Farben werden könnten (bislang serialisiert, aber ungenutzt).
+    features.append(data.get("bag_count", 0) / 65.0)
+
     # 2. Wertungsplatten (Welche 3 von 8 sind aktiv?)
     scoring_ids = data.get("scoring_tile_ids", [])
     features.extend([1.0 if i in scoring_ids else 0.0 for i in range(8)])
@@ -34,7 +49,19 @@ def state_to_tensor(data):
         features.append(has_chip)
         chip_revealed = 1.0 if f.get("chip_revealed", False) else 0.0
         features.append(chip_revealed)
-        
+
+        # Farben des Bonus-Chips (5-dim Maske) — NUR wenn aufgedeckt (sonst
+        # wäre das versteckte Information, die kein Spieler kennt). Zeigt dem
+        # Netz, ob der Chip 1- oder 2-farbig (= flexibler einsetzbar) ist.
+        chip_colors_mask = [0.0] * 5
+        if chip_revealed:
+            bc = f.get("bonus_chip") or {}
+            for c_name in bc.get("colors", []):
+                c_id = COLOR_MAP.get(c_name, -1)
+                if 0 <= c_id < 5:
+                    chip_colors_mask[c_id] = 1.0
+        features.extend(chip_colors_mask)
+
     # 4. Große Manufaktur
     lf = data.get("large_factory", {})
     lf_sun = [0] * 5
@@ -56,21 +83,7 @@ def state_to_tensor(data):
             features.append(p.get("score", 0) / 100.0)
             features.append(p.get("estimated_score", 0) / 100.0)
             features.append(1.0 if p.get("marker", False) else 0.0)
-            
-            # NEU: Chip-Farben als numerische Features (5-dim Vektor)
-            # Mapping der Farben auf 0-4 (deine COLOR_MAP)
-            chip_features = [0.0] * 5
-    
-            # Zugriff auf die Liste aus deinem Serializer
-            chip_colors = p.get("unused_chip_colors", [])
-            for c_name in chip_colors:
-                c_id = COLOR_MAP.get(c_name, -1)
-                if 0 <= c_id < 5:
-                    chip_features[c_id] += 1.0
-            
-            # Normalisierung (z.B. durch 5.0, damit das Netz Werte in [0, 1] bekommt)
-            features.extend([c / 5.0 for c in chip_features])
-            
+
             # Musterreihen
             for row in p.get("pattern_lines", []):
                 capacity = row.get("capacity", 1)
@@ -79,7 +92,7 @@ def state_to_tensor(data):
                 features.extend([1.0 if i == color_id else 0.0 for i in range(5)])
                 
             # Straffläche
-            features.append(len(p.get("floor", [])) / 7.0)
+            features.append(len(p.get("floor", [])) / 4.0)   # MAX_BROKEN=4 (nicht 7)
 
             # Spielerplättchen (wie viele bereits genutzt: 0/1/2)
             features.append(p.get("tokens_used", 0) / 2.0)
@@ -128,9 +141,10 @@ def state_to_tensor(data):
                     else:
                         features.append(1.0)  # slot existiert
                         for space in slot.get("spaces", [{}, {}, {}, {}]):
-                            # is_filled
+                            # placed-color id: 0=leer, 1-5=Farbe, 6=special
+                            # (behält belegt/leer UND die platzierte Farbe)
                             filled = space.get("filled")
-                            features.append(1.0 if filled is not None else 0.0)
+                            features.append(FILLED_ID_MAP.get(filled, 0) / 6.0)
                             # required_color normalisiert (0=kein, 1-5=farbe)
                             req = space.get("color")
                             features.append(COLOR_ID_MAP.get(req, 0) / 5.0)
@@ -140,7 +154,39 @@ def state_to_tensor(data):
                             # locked: nur relevant für SPECIAL (0=offen, 1=gesperrt)
                             locked = space.get("locked", False)
                             features.append(1.0 if locked else 0.0)
-            
+
+        # 6b. Berechnete Endwertungs-/Geometrie-Features (pro Spieler, 37 je Spieler)
+        # Damit das Netz lernt, WIE Endpunkte entstehen (Quelle: Rust
+        # scoring::player_scoring_features). Endkriterien sind harte geometrische
+        # Prädikate, die ein flaches MLP aus der Roh-Kodierung kaum lernt.
+        for p in [me, enemy]:
+            pts = _padn(p.get("scoring_tile_points"), 8)
+            for i in range(8):
+                features.append(pts[i] / SCORE_NORM[i])
+            geo = p.get("score_geo", {})
+            features.extend(v / 6.0 for v in _padn(geo.get("row_fill"), 6))
+            features.extend(v / 6.0 for v in _padn(geo.get("col_fill"), 6))
+            features.extend(v / 6.0 for v in _padn(geo.get("diag_fill"), 2))
+            features.extend(v / 5.0 for v in _padn(geo.get("row_colors"), 6))
+            features.append(geo.get("border_fill", 0) / 20.0)
+            features.extend(v / 4.0 for v in _padn(geo.get("corner_fill"), 4))
+            features.append(geo.get("wild_filled", 0) / 8.0)
+            features.append(geo.get("wild_total", 0) / 8.0)
+            features.append(geo.get("special_empty", 0) / 8.0)
+            features.append(geo.get("special_total", 0) / 8.0)
+
+        # 6c. Linien-Geometrie (offensives Linien-Bauen, 23 je Spieler).
+        # Punkte = zusammenhängende orthogonale Läufe → diese Struktur explizit
+        # machen, damit das flache MLP Linien-Strategie repräsentieren kann
+        # (Quelle: Rust scoring::player_line_features).
+        for p in [me, enemy]:
+            lg = p.get("line_geo", {})
+            features.extend(v / 6.0 for v in _padn(lg.get("h_hist"), 5))   # Läufe len 2-6
+            features.extend(v / 6.0 for v in _padn(lg.get("v_hist"), 5))
+            features.append(lg.get("cluster_sq", 0) / 150.0)               # Σ länge²
+            features.extend(v / 12.0 for v in _padn(lg.get("row_potential"), 6))
+            features.extend(v / 12.0 for v in _padn(lg.get("col_potential"), 6))
+
     # 7. Mondseite kleine Fabriken (pro Fabrik: 3 Positionen × 5 Farben = 15 Features)
     # Position 0 = oben (abholbar), Position 1 = darunter, Position 2 = ganz unten
     for f in data.get("factories", []):
@@ -235,48 +281,57 @@ def action_to_id(action: dict) -> int:
 
 # --- 2. DATENSATZ & NETZWERK ---
 
-# 0:0-Strafe: geflutete Strafleisten sind ein vermiedenswertes Ergebnis. BEIDE
-# Spieler erhalten dieses negative Target (symmetrisch, nicht gespiegelt), damit
-# das Netz lernt, 0:0 aktiv zu vermeiden statt sich über den Startspieler-Marker
-# in einen "sicheren" Hafen zu mauern.
-#   v1f: -0.15 (mild) → senkte Self-Play-0:0 von 58.7% auf ~47%.
-#   v1g: -0.30 (stärker) → Test, ob der stärkere Anreiz die Rate weiter drückt,
-#        bevor der teurere Auxiliary-Floor-Head nötig wird.
-ZEROZERO_PENALTY = -0.15
-
-# Normierungs-Obergrenze für das Floor-Target des Auxiliary-Heads.
-# Floor-Schaden pro Runde lag empirisch bei ~5-10; 10 normiert auf [0,1].
-_FLOOR_NORM = 10.0
-
-def is_zerozero(scores, winner) -> bool:
-    """True, wenn der Ausgang ein 0:0-Tiebreak-Spiel ist (kein echtes Punkten)."""
-    return abs(scores[0] - scores[1]) == 0 and scores[winner] < 5
-
-def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
-    """Berechnet den abgestuften Value-Target aus rohen Scores.
-    Entkoppelt — kann beim Training mit anderen Parametern neu berechnet werden.
-
-    Rückgabe ist der Wert AUS SIEGER-SICHT (für echte Siege). Die Trainings-
-    Aufrufstelle spiegelt: +wv für den Sieger, -wv für den Verlierer.
-
-    Sonderfall 0:0 (margin==0, winner_score<5): kein echter Sieg, sondern ein
-    vermiedenswertes Ergebnis (geflutete Strafleisten — kein Mensch spielt so).
-    Gibt direkt ZEROZERO_PENALTY (negativ) zurück — konsistent mit dem
-    Trainings-Target. Die Trainings-Aufrufstelle erkennt den Fall zusätzlich über
-    is_zerozero() und setzt den Wert für BEIDE Spieler symmetrisch (ohne
-    Spiegelung), sodass nicht ein Spieler durch die Spiegelung +0.3 bekäme.
-    """
-    margin       = abs(scores[0] - scores[1])
-    winner_score = scores[winner]
-    if margin == 0 and winner_score < 5:
-        return ZEROZERO_PENALTY
-    margin_part = min(0.45, (margin / margin_cap) * 0.45)
-    score_part  = min(0.45, (winner_score / max_winner_score) * 0.45)
-    return min(1.0, 0.1 + margin_part + score_part)
+# Value-Target = das TATSÄCHLICHE ENDERGEBNIS der ganzen Partie (inkl.
+# Wertungsplatten), als Ziel für JEDEN Schritt der Partie — klassisches
+# AlphaZero-Prinzip (delayed reward): der Zielwert für einen Runde-1-Zustand
+# ist derselbe wie für den letzten Zug, nämlich wie das Spiel am Ende wirklich
+# ausging.
+#
+# Bewusst NICHT die pro-Runde projizierte Größe (own.score + estimated_score)
+# als dichtes Zwischensignal — das wurde probiert und verworfen: die
+# Heuristik maximiert bereits gierig die Rundenpunkte, hat aber keine
+# Weitsicht (kein strategischer Board-Aufbau, keine Wertungsplatten). Ein
+# Rundenprojektions-Ziel hätte dem Netz denselben gierigen Rundenoptimum-Bias
+# beigebracht — Runde 1/2 bewusst suboptimal spielen, um in Runde 3/4 durch
+# strategischen Aufbau viel mehr zu holen, wäre dann NICHT belohnt worden
+# (der Zielwert für Runde-1-Zustände hätte Runde 3/4 gar nicht gesehen).
+# Das reine Partie-Endergebnis als Ziel lernt automatisch, dass ein
+# scheinbar suboptimaler früher Zustand gut ist, WENN er zuverlässig zu einem
+# starken Endergebnis führt.
+#
+# own_total = step["scores"][eigener Spieler]  (bereits inkl. Wertungsplatten,
+#             von apply_end_scoring() in Rust eingerechnet)
+# opp_total = step["scores"][Gegner]
+# value = tanh((own_total − VALUE_OPP_WEIGHT · opp_total) / VALUE_SCALE)
+#
+# Gewichtung < 1 auf die gegnerische Seite statt reiner Differenz: ein 10:5
+# und ein 65:60 (beide Marge 5) wären bei reiner Differenz identisch bewertet,
+# obwohl 65:60 absolut deutlich mehr erreichte Punkte sind (own-0.5·opp:
+# 10-2.5=7.5 vs. 65-30=35 — klar unterschieden).
+# Kompromiss: das macht das Target nicht mehr exakt antisymmetrisch
+# (value(p0) != -value(p1)), was der Zero-Sum-Annahme der Suche (net_mcts.rs:
+# 1 Netzquery aus Sicht des Ziehenden, Gegner = 1-win) nur noch näherungsweise
+# entspricht — akzeptiert, weil das eigentliche Ziel (hohe absolute Punktzahl,
+# nicht nur "irgendwie gewinnen") das explizit verlangt.
+# VALUE_SCALE-Kalibrierung: NICHT aus aktuellen Spieldaten abgeleitet (Heuristik
+# und Netz spielen beide noch schwach — jede aus dieser Verteilung abgeleitete
+# Skala würde nur die aktuelle Schwäche festschreiben, nicht das echte
+# Punktepotenzial des Spiels). Stattdessen an einem groben menschlichen
+# Referenzwert kalibriert: ab ~100 Punkten gilt ein Ergebnis als sehr gut.
+# own_total = own − 0.5·opp; bei own≈100 gegen einen soliden Gegner (opp≈40)
+# ergibt das own_total≈80. VALUE_SCALE=50 legt den tanh-Arg bei diesem
+# "sehr gut"-Referenzpunkt auf ~1.6 (tanh(1.6)≈0.92) — informativ, aber noch
+# nicht voll gesättigt, sodass auch darüber hinaus noch Differenzierung
+# möglich bleibt. Deutlich gröber als eine "saubere" Herleitung, aber
+# begründeter als eine an aktueller Schwäche kalibrierte Zahl.
+# VALUE_SCHEMA_VERSION erzwingt einen Cache-Rebuild bei Änderungen an dieser Formel.
+VALUE_SCHEMA_VERSION = 8
+VALUE_OPP_WEIGHT = 0.5
+VALUE_SCALE = 50.0
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE, target_zerozero_ratio=None):
+    def __init__(self, data_dir="data"):
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
@@ -284,12 +339,8 @@ class MosaicDataset(Dataset):
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
-        self.margin_cap       = margin_cap
-        self.max_winner_score = max_winner_score
         cache_key = hashlib.md5(
-            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS)
-             + str(margin_cap) + str(max_winner_score)
-             + str(target_zerozero_ratio)).encode()
+            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -304,11 +355,10 @@ class MosaicDataset(Dataset):
                 self.values             = torch.from_numpy(hf['values'][:])
                 self.masks              = torch.from_numpy(hf['masks'][:])
                 self.moon_order_targets = torch.from_numpy(hf['moon_order_targets'][:])
-                # Floor-Targets: Fallback für alte Caches ohne dieses Dataset.
-                if 'floor_targets' in hf:
-                    self.floor_targets = torch.from_numpy(hf['floor_targets'][:])
-                else:
-                    self.floor_targets = torch.zeros((len(self.states), 1), dtype=torch.float32)
+                if 'policy_weights' in hf:
+                    self.policy_weights = torch.from_numpy(hf['policy_weights'][:])
+                else:  # alter Cache ohne Gewicht → alle 1.0
+                    self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -325,8 +375,7 @@ class MosaicDataset(Dataset):
             if mot is None:
                 mot = [torch.full((5,), -1.0) for _ in self.states]
             self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
-            # Floor-Targets: alte .pt-Bundles haben keine → Nullen.
-            self.floor_targets = torch.zeros((len(self.states), 1), dtype=torch.float32)
+            self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',             data=self.states.numpy(),             compression='lzf')
@@ -334,7 +383,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('values',             data=self.values.numpy(),             compression='lzf')
                 hf.create_dataset('masks',              data=self.masks.numpy(),              compression='lzf')
                 hf.create_dataset('moon_order_targets', data=self.moon_order_targets.numpy(), compression='lzf')
-                hf.create_dataset('floor_targets',      data=self.floor_targets.numpy(),      compression='lzf')
+                hf.create_dataset('policy_weights',     data=self.policy_weights.numpy(),     compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -344,76 +393,20 @@ class MosaicDataset(Dataset):
             t0 = time.time()
             _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
-            floor_l = []   # Auxiliary Floor-Targets (normiert [0,1])
-
-            import random as _rnd
-            keep_prob = 1.0
-            if target_zerozero_ratio is not None and target_zerozero_ratio < 1.0:
-                # Erst-Scan: 0:0 vs non-0:0 Spiele zählen (Trennung über game_id)
-                n_zz = n_nonzz = 0
-                prev_g = None
-                for f in files:
-                    with open(f, "rb") as file:
-                        gd = pickle.load(file)
-                    for step in gd:
-                        gid = step.get("game_id")
-                        if gid is None:
-                            gid = (tuple(step["scores"]), step["winner"]) if "scores" in step else id(step)
-                        if gid != prev_g:
-                            prev_g = gid
-                            if "scores" in step and "winner" in step:
-                                is_zz = (step["scores"][0] == step["scores"][1] == 0)
-                            elif "value" in step:
-                                is_zz = abs(step["value"]) <= 0.1
-                            else:
-                                is_zz = False
-                            if is_zz: n_zz += 1
-                            else:     n_nonzz += 1
-                if n_nonzz > 0 and n_zz > 0:
-                    target_zz = int((target_zerozero_ratio / (1 - target_zerozero_ratio)) * n_nonzz)
-                    target_zz = min(target_zz, n_zz)
-                    keep_prob = target_zz / n_zz
-                    print(f"  🎯 0:0-Reduktion: {n_zz} 0:0-Spiele (von {n_zz+n_nonzz} total) "
-                          f"→ behalte ~{target_zz} (Ziel {target_zerozero_ratio*100:.0f}%, keep_prob {keep_prob:.2f})")
-
-            prev_g_load = None
-            keep_current = True
+            polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
 
             for f in files:
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
                     for step in game_data:
-                        # Spielgrenze über game_id
-                        gid = step.get("game_id")
-                        if gid is None:
-                            gid = (tuple(step["scores"]), step["winner"]) if "scores" in step else id(step)
-                        if gid != prev_g_load:
-                            prev_g_load = gid
-                            if keep_prob < 1.0:
-                                if "scores" in step and "winner" in step:
-                                    is_zz = (step["scores"][0] == step["scores"][1] == 0)
-                                elif "value" in step:
-                                    is_zz = abs(step["value"]) <= 0.1
-                                else:
-                                    is_zz = False
-                                keep_current = (not is_zz) or (_rnd.random() < keep_prob)
-                            else:
-                                keep_current = True
-
-                        if not keep_current:
-                            continue
-
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
-                            if is_zerozero(step["scores"], step["winner"]):
-                                # 0:0 → beide Spieler bestraft (symmetrisch, KEINE
-                                # Spiegelung). Nimmt dem Marker-Halter den sicheren
-                                # +0.1-Hafen und gibt einen Gradienten gegen 0:0.
-                                val = ZEROZERO_PENALTY
-                            else:
-                                wv  = compute_win_val(step["scores"], step["winner"],
-                                                      margin_cap, max_winner_score)
-                                val = wv if step["player"] == step["winner"] else -wv
+                            # Partie-Endergebnis als Ziel für JEDEN Schritt (siehe
+                            # VALUE_SCHEMA_VERSION oben) — bereits inkl. Wertungsplatten.
+                            p = step["player"]
+                            own_total = float(step["scores"][p])
+                            opp_total = float(step["scores"][1 - p])
+                            val = math.tanh((own_total - VALUE_OPP_WEIGHT * opp_total) / VALUE_SCALE)
                         else:
                             val = float(step["value"])
                         values_l.append([val])
@@ -429,6 +422,12 @@ class MosaicDataset(Dataset):
                         moves = step.get("valid_actions") or step["state"].get("valid_moves", [])
                         for move in moves:
                             mask[action_to_id(move)] = 1.0
+                        # Selbstkonsistenz: die tatsächlich gespielten Policy-Aktionen
+                        # sind per Definition legal — immer in die Maske aufnehmen.
+                        # Verhindert Policy-Leaks (Target-Masse auf maskierter Aktion →
+                        # explodierender Policy-Loss), falls valid_actions unvollständig ist.
+                        for p in step["policy"]:
+                            mask[action_to_id(p["action"])] = 1.0
                         masks_l.append(mask)
 
                         moon_target = np.full(5, -1.0, dtype=np.float32)
@@ -440,18 +439,23 @@ class MosaicDataset(Dataset):
                                     moon_target[c_idx] = float(rank)
                         moon_l.append(moon_target)
 
-                        # Floor-Target: normierter Strafleisten-Schaden [0,1] des
-                        # ziehenden Spielers bis Rundenende. _FLOOR_NORM=10 als
-                        # grobe Obergrenze (Floor-Werte lagen bei ~5-10/Runde).
-                        ft = float(step.get("floor_target", 0.0))
-                        floor_l.append([min(ft / _FLOOR_NORM, 1.0)])
+                        # Policy-Loss nur für ECHTE Drafting-Schritte: Tiling/Start-
+                        # Steps sind one-hot Solver-/Heuristik-Züge, die das Netz nie
+                        # vorhersagen muss (Tiling macht der DFS-Solver). Sie fluten
+                        # sonst den Policy-Head mit Tiling-Aktionen → das Netz legt
+                        # auch in der Drafting-Phase Masse auf (illegale) Tiling-IDs
+                        # und die Drafting-Priors verkommen zu Rauschen.
+                        phase = step["state"].get("phase")
+                        is_start = any(pe["action"].get("is_start") for pe in step["policy"])
+                        pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
+                        polw_l.append(np.float32(pol_w))
 
             states_np   = np.array(states_l,   dtype=np.float32)
             policies_np = np.array(policies_l, dtype=np.float32)
             values_np   = np.array(values_l,   dtype=np.float32)
             masks_np    = np.array(masks_l,    dtype=np.float32)
             moon_np     = np.array(moon_l,     dtype=np.float32)
-            floor_np    = np.array(floor_l,    dtype=np.float32)
+            polw_np     = np.array(polw_l,     dtype=np.float32)
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -462,7 +466,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('values',             data=values_np,   compression='lzf')
                 hf.create_dataset('masks',              data=masks_np,    compression='lzf')
                 hf.create_dataset('moon_order_targets', data=moon_np,     compression='lzf')
-                hf.create_dataset('floor_targets',      data=floor_np,    compression='lzf')
+                hf.create_dataset('policy_weights',     data=polw_np,     compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -470,12 +474,14 @@ class MosaicDataset(Dataset):
             self.values             = torch.from_numpy(values_np)
             self.masks              = torch.from_numpy(masks_np)
             self.moon_order_targets = torch.from_numpy(moon_np)
-            self.floor_targets      = torch.from_numpy(floor_np)
+            self.policy_weights     = torch.from_numpy(polw_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
 
     def __len__(self): return len(self.states)
-    def __getitem__(self, idx): return self.states[idx], self.policies[idx], self.values[idx], self.masks[idx], self.moon_order_targets[idx], self.floor_targets[idx]
+    def __getitem__(self, idx):
+        return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
+                self.moon_order_targets[idx], self.policy_weights[idx])
 
 
 class MosaicNet(nn.Module):
@@ -509,21 +515,11 @@ class MosaicNet(nn.Module):
             nn.ReLU(),
             nn.Linear(32, 5)   # 5 Farben: blau, gelb, rot, schwarz, türkis
         )
-        # Auxiliary Floor-Head: sagt den normierten Floor-Schaden [0,1] des
-        # ziehenden Spielers bis zum Rundenende voraus. Dichtes Hilfssignal,
-        # damit der gemeinsame Rumpf floor-bewusste Repräsentationen lernt
-        # (was der Value-Head allein aus dem fernen Spielausgang kaum schafft).
-        self.floor_head = nn.Sequential(
-            nn.Linear(hidden_size, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid()
-        )
 
     def forward(self, x):
         shared = self.body(x)
         return (self.policy_head(shared), self.value_head(shared),
-                self.moon_order_head(shared), self.floor_head(shared))
+                self.moon_order_head(shared))
 
     @torch.no_grad()
     def analyze_capacity(self, x):

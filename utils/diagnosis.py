@@ -17,7 +17,9 @@ from pathlib import Path
 from collections import Counter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from agents.neural_net import MosaicDataset, MosaicNet, action_to_id
+# Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
+from neural_net import MosaicDataset, MosaicNet, action_to_id
 from config import DATA_DIR, INPUT_SIZE, NUM_ACTIONS
 
 
@@ -309,7 +311,7 @@ def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
 
     Strafleisten-Stone-IDs vom Mond (f_idx=5, alle 5 Farben): 15, 63, 111, 159, 207
     """
-    from agents.neural_net import action_to_id
+    from neural_net import action_to_id
 
     PENALTY_MOON_IDS = {15, 63, 111, 159, 207}
 
@@ -412,13 +414,10 @@ def _run_on_selected_files(runner, max_files: int | None = None):
 
 def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     """
-    Berechnet optimale margin_cap und max_winner_score aus den Spielergebnissen.
-    Ziel: maximaler Anteil im mittleren/starken Bereich, wenig gecappt bei 1.0.
+    Ergebnis-Übersicht der Spiele (0:0-Anteil, Ø Sieger-Score, Ø Margin) +
+    Strafleisten-Bias. margin_cap/max_winner_score werden hier NICHT mehr
+    kalibriert — die leben nur noch in der Arena (Elo-Skalierung).
     """
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from agents.neural_net import compute_win_val
-
     files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
     if len(files) > max_files:
         files = random.sample(files, max_files)
@@ -452,69 +451,14 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     zerozero     = sum(1 for m,ws in zip(margins,winner_scores) if m==0 and ws==0)
 
     import statistics as _st
-    import numpy as np
 
     print(f"\n{'='*55}")
-    print(f"  VALUE SIMULATION: {label}")
+    print(f"  ERGEBNIS-ÜBERSICHT: {label}")
     print(f"  ({n} Spiele aus {len(files)} Datei(en))")
     print(f"{'─'*55}")
     print(f"  0:0 Spiele:        {zerozero:4d} ({zerozero/n*100:.1f}%)")
     print(f"  Ø Winner-Score:    {_st.mean(winner_scores):.1f}  (Max: {max(winner_scores)})")
     print(f"  Ø Margin:          {_st.mean(margins):.1f}  (Max: {max(margins)})")
-
-    # Optimale Parameter berechnen
-    # margin_cap: 75. Perzentil der Margins (nicht-null) → cap wo ~75% der Spiele darunter sind
-    non_zero_margins = [m for m in margins if m > 0]
-    non_zero_ws      = [ws for ws,m in zip(winner_scores,margins) if m > 0 or ws > 0]
-
-    if non_zero_margins:
-        margin_cap_opt = max(5, int(np.percentile(non_zero_margins, 75)))
-
-
-    else:
-        margin_cap_opt = 10
-
-    if non_zero_ws:
-        max_ws_opt = max(10, int(np.percentile(non_zero_ws, 80)))
-    else:
-        max_ws_opt = 20
-
-    margin_cap_opt = round(margin_cap_opt / 5) * 5 or 5
-    max_ws_opt     = round(max_ws_opt / 5) * 5 or 10
-
-    print(f"{'─'*55}")
-    print(f"  📊 EMPFOHLENE PARAMETER:")
-    print(f"     --margin_cap       {margin_cap_opt}")
-    print(f"     --max_winner_score {max_ws_opt}")
-    print(f"{'─'*55}")
-    print(f"  ℹ️  Die Empfehlung kalibriert die Skala auf den NORMALBEREICH:")
-    print(f"     margin_cap = 75. Perzentil der Margins, max_winner = 80.")
-    print(f"     Perzentil der Sieger-Scores. Der obere Score-Schwanz (klare,")
-    print(f"     hohe Siege) wird damit bewusst auf win_val=1.0 gestaucht.")
-    print(f"     → Für FRÜHE Trainingsgenerationen (Bootstrap/Iteration 0) ist")
-    print(f"       das oft suboptimal: gerade die hohen Siege liefern die")
-    print(f"       Abstufung 'solide vs. vernichtend gewonnen'. Dort lieber ein")
-    print(f"       großzügigeres max_winner_score (z.B. 40) wählen, das fast")
-    print(f"       nichts cappt (volle Auflösung). Faustregel: Gecappt-Anteil")
-    print(f"       unten im Vergleich beachten — für Iteration 0 möglichst < 2%.")
-
-    from agents.neural_net import compute_win_val
-    for margin_cap, max_ws, desc in [
-        (margin_cap_opt, max_ws_opt, "Empfohlen"),
-        (15, 40, "Standard (15/40)"),
-    ]:
-        values = [compute_win_val(s, w, margin_cap, max_ws) for s, w in results]
-        capped = sum(1 for v in values if v >= 1.0)
-        weak   = sum(1 for v in values if v <= 0.15)
-        medium = sum(1 for v in values if 0.15 < v <= 0.5)
-        strong = sum(1 for v in values if v > 0.5)
-
-        print(f"\n  [{desc}]  margin_cap={margin_cap}, max_winner={max_ws}")
-        print(f"  Ø win_val: {_st.mean(values):.3f}  |  Gecappt (=1.0): {capped} ({capped/n*100:.1f}%)")
-        print(f"  Schwach  (≤0.15): {weak:4d} ({weak/n*100:.1f}%)")
-        print(f"  Mittel (0.15-0.5):{medium:4d} ({medium/n*100:.1f}%)")
-        print(f"  Stark    (> 0.5): {strong:4d} ({strong/n*100:.1f}%)")
-
     print(f"\n{'='*55}")
 
     # Strafleisten-Bias direkt mit ausgeben (gehört thematisch zur Ergebnis-/
@@ -529,8 +473,8 @@ def main():
     print("  [2] Sanity Check  — Datei(en) auswählen (mehrere möglich)")
     print("  [3] Policy Qualität — alle Daten im data/ Ordner")
     print("  [4] Policy Qualität — Datei(en) auswählen (mehrere möglich)")
-    print("  [5] Value Simulation + Strafleisten-Bias — alle Daten")
-    print("  [6] Value Simulation + Strafleisten-Bias — Datei(en) auswählen")
+    print("  [5] Ergebnis-Übersicht + Strafleisten-Bias — alle Daten")
+    print("  [6] Ergebnis-Übersicht + Strafleisten-Bias — Datei(en) auswählen")
     print("─" * 55)
 
     choice = input("  Auswahl (1/2/3/4/5/6): ").strip()
