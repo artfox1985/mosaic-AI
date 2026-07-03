@@ -31,7 +31,17 @@ const MAX_DEPTH: u32 = 30;
 /// in self_play.rs, der nur ZWISCHEN Zügen prüft). Bei Erschöpfung bricht die
 /// Suche ab und liefert das bisher beste Ergebnis — degradiert graceful zu
 /// suboptimal statt zu hängen.
-const NODE_BUDGET: u32 = 200_000;
+///
+/// WICHTIG: ein „Knoten" ist hier NICHT billig — `chip_allocations` (Aufruf in
+/// `legal_steps`, einmal PRO chippable Reihe PRO Knoten) kann bis zu 2^14
+/// Teilmengen prüfen (`CHIP_ALLOC_CAP=14`), inkl. Set-/String-Allokationen je
+/// Teilmenge. Ein erster Versuch mit 200_000 war deshalb immer noch viel zu
+/// hoch (200_000 Knoten × mehrere teure Chip-Allokations-Aufrufe ≈
+/// Milliarden Operationen, erneut >30min gehangen). 2_000 hält den
+/// Worst-Case auf niedrige zweistellige Sekunden begrenzt und liegt weit über
+/// dem, was normale Partien tatsächlich brauchen (Branching ist laut
+/// Doc-Kommentar oben klein).
+const NODE_BUDGET: u32 = 2_000;
 
 /// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
 /// (Indizes in `bonus_chips`), damit der reale KI-Zug exakt dem Solver-Plan folgt.
