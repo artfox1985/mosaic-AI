@@ -472,12 +472,13 @@ pub fn apply_bonus_chips_to_row(player: &mut PlayerBoard, row_idx: usize) -> boo
 /// Sicherheits-Cap für die Allokations-Enumeration (2^n Bitmasken).
 const CHIP_ALLOC_CAP: usize = 14;
 
-/// Kanonische Signatur eines Chips (sortierte Farben) — Chips mit gleicher
-/// Signatur sind austauschbar (gleiche Restmenge nach Verbrauch).
-fn chip_sig(chip: &crate::dome::BonusChip) -> String {
-    let mut cs: Vec<&str> = chip.colors.iter().map(|c| c.value()).collect();
-    cs.sort_unstable();
-    cs.join(",")
+/// Kanonische Signatur eines Chips (Farb-Bitmaske) — Chips mit gleicher
+/// Signatur sind austauschbar (gleiche Restmenge nach Verbrauch). `u8` statt
+/// String: TileColor hat nur 6 Varianten, passt locker in ein Byte — spart
+/// Allokation/Formatierung im heißen Pfad (`chip_allocations`, rekursiv oft
+/// aufgerufen, siehe tiling_solver.rs NODE_BUDGET-Kommentar).
+fn chip_sig(chip: &crate::dome::BonusChip) -> u8 {
+    chip.colors.iter().fold(0u8, |acc, c| acc | (1 << (*c as u8)))
 }
 
 /// Greedy-Verbrauch (2 farbgleiche bevorzugt, sonst 3 beliebige) als
@@ -551,14 +552,22 @@ pub fn chip_allocations(player: &PlayerBoard, row_idx: usize) -> Vec<Vec<usize>>
         return greedy_chip_indices(player, color, missing).into_iter().collect();
     }
 
-    let mut seen: std::collections::HashSet<Vec<String>> = std::collections::HashSet::new();
+    // Perf: Größe erst aus der Bitmaske prüfen (billige count_ones()), BEVOR der
+    // Subset-Vec gebaut wird — spart die Allokation für die meisten der bis zu
+    // 2^14 Masken, da nur eine schmale Größen-Spanne (2·missing..=3·missing)
+    // überhaupt infrage kommt. Dedup-Signatur als u8-Bitmaske (6 Farben passen
+    // locker in ein Byte) statt String — keine Allokation/Formatierung/String-
+    // Hashing mehr. Beides verhaltensgleich zur Vorversion, nur schneller
+    // (relevant: dieser Pfad wird rekursiv sehr oft aufgerufen, siehe
+    // tiling_solver.rs NODE_BUDGET-Kommentar).
+    let mut seen: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
     let mut out = Vec::new();
     for mask in 1u32..(1u32 << n) {
-        let subset: Vec<usize> = (0..n).filter(|&i| mask & (1 << i) != 0).collect();
-        let s = subset.len();
+        let s = mask.count_ones() as usize;
         if s < 2 * missing || s > 3 * missing {
             continue;
         }
+        let subset: Vec<usize> = (0..n).filter(|&i| mask & (1 << i) != 0).collect();
         let cb = subset
             .iter()
             .filter(|&&i| player.bonus_chips[i].colors.contains(&color))
@@ -566,7 +575,7 @@ pub fn chip_allocations(player: &PlayerBoard, row_idx: usize) -> Vec<Vec<usize>>
         if !chips_complete(s, cb, missing) {
             continue;
         }
-        let mut sig: Vec<String> = subset.iter().map(|&i| chip_sig(&player.bonus_chips[i])).collect();
+        let mut sig: Vec<u8> = subset.iter().map(|&i| chip_sig(&player.bonus_chips[i])).collect();
         sig.sort_unstable();
         if seen.insert(sig) {
             out.push(subset);
