@@ -22,6 +22,17 @@ use crate::state::GameState;
 /// Defensive Rekursionsgrenze (Branching ist klein; nur als Sicherung).
 const MAX_DEPTH: u32 = 30;
 
+/// Globales Knoten-Budget für EINEN Solver-Aufruf. `MAX_DEPTH` begrenzt nur die
+/// Tiefe, nicht die Breite — bei `exact=true` verzweigt `legal_steps` bei JEDEM
+/// Rekursionsschritt über ALLE Chip-Allokationen (2^n), nicht nur einmal. Bei
+/// mehreren gleichzeitig „chippable" Reihen mit vielen Farboptionen kann das
+/// kombinatorisch explodieren (beobachtet: Self-Play hing >30min in einem
+/// einzelnen `best_first_step_exact`-Aufruf, unerreichbar für den Hänger-Schutz
+/// in self_play.rs, der nur ZWISCHEN Zügen prüft). Bei Erschöpfung bricht die
+/// Suche ab und liefert das bisher beste Ergebnis — degradiert graceful zu
+/// suboptimal statt zu hängen.
+const NODE_BUDGET: u32 = 200_000;
+
 /// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
 /// (Indizes in `bonus_chips`), damit der reale KI-Zug exakt dem Solver-Plan folgt.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,10 +117,11 @@ fn apply_step(state: &GameState, pi: usize, step: &TilingStep) -> Option<(GameSt
     }
 }
 
-fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool) -> i32 {
-    if depth >= MAX_DEPTH {
+fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool, budget: &mut u32) -> i32 {
+    if depth >= MAX_DEPTH || *budget == 0 {
         return 0;
     }
+    *budget -= 1;
     let steps = legal_steps(state, pi, exact);
     if steps.is_empty() {
         return 0;
@@ -118,8 +130,11 @@ fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool) -> i32 {
     // (schalten aber Platzierungen frei) — der maximierende Pfad gewinnt.
     let mut best = 0;
     for step in &steps {
+        if *budget == 0 {
+            break; // Budget erschöpft: bisher bestes Ergebnis liefern statt hängen.
+        }
         if let Some((next, pts)) = apply_step(state, pi, step) {
-            let total = pts + solve_rec(&next, pi, depth + 1, exact);
+            let total = pts + solve_rec(&next, pi, depth + 1, exact, budget);
             if total > best {
                 best = total;
             }
@@ -131,13 +146,15 @@ fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool) -> i32 {
 /// Maximal erreichbare Tiling-Punkte (Linien + Spezial-Boni) für Spieler `pi`,
 /// ausgehend vom aktuellen Brett (Drafting-Ende). GREEDY-Chips (Hot-Path).
 pub fn solve_max_tiling_points(state: &GameState, pi: usize) -> i32 {
-    solve_rec(state, pi, 0, false)
+    let mut budget = NODE_BUDGET;
+    solve_rec(state, pi, 0, false, &mut budget)
 }
 
 /// Wie `solve_max_tiling_points`, aber mit exakter Chip-Allokationssuche.
 /// Nur für den echten KI-Zug (einmalig) gedacht — NICHT für MCTS-Blätter.
 pub fn solve_max_tiling_points_exact(state: &GameState, pi: usize) -> i32 {
-    solve_rec(state, pi, 0, true)
+    let mut budget = NODE_BUDGET;
+    solve_rec(state, pi, 0, true, &mut budget)
 }
 
 /// Optimaler finaler Runden-Score für Spieler `pi`: aktueller Score +
@@ -157,11 +174,15 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
     if steps.is_empty() {
         return TilingStep::End;
     }
+    let mut budget = NODE_BUDGET;
     let mut best_step = TilingStep::End;
     let mut best_val = i32::MIN;
     for step in steps {
+        if budget == 0 {
+            break; // Budget erschöpft: bisher besten Schritt liefern statt hängen.
+        }
         if let Some((next, pts)) = apply_step(state, pi, &step) {
-            let val = pts + solve_rec(&next, pi, 1, exact);
+            let val = pts + solve_rec(&next, pi, 1, exact, &mut budget);
             if val > best_val {
                 best_val = val;
                 best_step = step;
