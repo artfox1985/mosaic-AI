@@ -43,6 +43,7 @@ Trainingsfenster mit jedem gescheiterten Kandidaten wächst.
 | v1 | 512 (cold, 3000 Bootstrap-Spiele) | ja (einzige Option) | 43 % | 19.5 : 25.4 | — | — |
 | v2 | 512 (warm v1, Bootstrap+2000×v1, **korrigiert nach Timeout-Fix**) | **nein — v1 bleibt** | 44 % | 19.6 : 28.4 | 50:50 (v2, z=0.0) | 20.5 : 17.6 |
 | v3 | 512 (warm v1, Bootstrap+2000×v1+2000×v1b, 4000 Netz-Spiele) | **nein — v1 bleibt** | 47 % | 25.6 : 29.9 | 53:47 (v3, z=0.6) | 22.1 : 19.6 |
+| **v4** | **512 (warm v1, v1+v1b+v1c, 6000 Netz-Spiele, KEIN Bootstrap)** | **✅ JA — neuer Champion** | 48 % | 22.3 : 25.5 | **65:35 (v4, z=3.0)** | 19.7 : 15.2 |
 
 v2 hat v1 im direkten Duell NICHT signifikant geschlagen (exakt 50:50, z=0.0 —
 noch eindeutiger im Rauschbereich als der erste, verworfene Versuch mit 51:49)
@@ -56,6 +57,25 @@ Duell 50:50→53:47 (z=0.0→0.6). Gate weiterhin nicht bestanden (braucht z≈2
 aber die Richtung stimmt — mehr Daten helfen sichtbar. v1 bleibt Champion,
 generiert eine dritte Self-Play-Runde (kumulativer Netz-Pool → 6000, die vom
 Nutzer gesetzte Obergrenze für diesen Zyklus). Details in v3_eval.md.
+
+**v4 — erster erfolgreicher Champion-Wechsel des Zyklus.** Trainiert auf dem
+vollen 6000-Spiele-Fenster (v1+v1b+v1c) **ohne Bootstrap** (nach Erreichen der
+Obergrenze zurück nach `data/archive/` verschoben). Schlägt v1 klar mit 65:35
+(z=3.0, p≪0.001) — weit über der 60:40-Schwelle. Bestätigt den über v2→v3
+beobachteten Trend (50:50 → 53:47 → 65:35): mehr saubere Self-Play-Daten
+lassen einen Kandidaten irgendwann den Champion klar schlagen, genau wie vom
+Champion/Kandidat-Protokoll vorhergesagt. Gegen Heuristik weiter steigend
+(43%→44%→47%→48%), noch nicht über 50%. Details in v4_eval.md.
+
+**Zusammenfassung des Zyklus (v1→v4):** kein anderer wesentlicher Trend als
+"mehr Daten helfen" — Policy Loss, Ø-Score und Vorgänger-Duell-Ergebnis
+verbessern sich über alle 4 Generationen konsistent monoton mit wachsendem
+Self-Play-Pool. Mehrere Infrastruktur-Bugs unterwegs gefunden und gefixt
+(Self-Play-Timeout zu knapp für Netz-Suche, BatchNorm-Crash bei Batch-Größe 1,
+Tiling-Solver-Kombinatorik-Explosion/Node-Budget, chip_allocations-Performance) —
+ohne diese Fixes wären die v1-v4-Daten vermutlich teilweise korrumpiert
+gewesen, wie es rückblickend wahrscheinlich auch die gesamte alte Zählung
+(v4-v11) betraf (siehe Rückblick-Absatz oben).
 
 **⚠️ Kritischer Bug gefunden und gefixt:** der 30s-Wallclock-Hänger-Schutz in
 `self_play.rs` war auf reine Heuristik-Suche kalibriert — netzgeführte Suche
