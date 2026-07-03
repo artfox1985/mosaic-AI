@@ -41,11 +41,13 @@ Trainingsfenster mit jedem gescheiterten Kandidaten wächst.
 | Netz | hidden | Champion? | vs. Heuristik | Ø Score (Netz:Heur) | vs. Vorgänger | Ø Score (vs. Vorgänger) |
 |---|---|---|---|---|---|---|
 | v1 | 512 (cold, 3000 Bootstrap-Spiele) | ja (einzige Option) | 43 % | 19.5 : 25.4 | — | — |
-| v2 | 512 (warm v1, Bootstrap+2000×v1) | **nein — v1 bleibt** | 43 % | 22.2 : 27.9 | 51:49 (v2, z=0.2) | 19.6 : 16.9 |
+| v2 | 512 (warm v1, Bootstrap+2000×v1, **korrigiert nach Timeout-Fix**) | **nein — v1 bleibt** | 44 % | 19.6 : 28.4 | 50:50 (v2, z=0.0) | 20.5 : 17.6 |
 
-v2 hat v1 im direkten Duell NICHT signifikant geschlagen (51:49, weit unter der
-60:40-Schwelle) — trotz leicht besserem Ø-Score. v1 bleibt Champion, generiert
-eine zweite Self-Play-Runde (2000 weitere Spiele, kumulativer Netz-Pool → 4000).
+v2 hat v1 im direkten Duell NICHT signifikant geschlagen (exakt 50:50, z=0.0 —
+noch eindeutiger im Rauschbereich als der erste, verworfene Versuch mit 51:49)
+— trotz besserem Ø-Score (20.5 vs. 17.6). v1 bleibt Champion, generiert eine
+zweite Self-Play-Runde (2000 weitere Spiele, kumulativer sauberer Netz-Pool →
+4000). Details inkl. des ursprünglichen (verworfenen) Versuchs in v2_eval.md.
 
 **⚠️ Kritischer Bug gefunden und gefixt:** der 30s-Wallclock-Hänger-Schutz in
 `self_play.rs` war auf reine Heuristik-Suche kalibriert — netzgeführte Suche
@@ -100,7 +102,11 @@ Ergebnis — Details und Interpretation in v11_eval.md und Abschnitt D.**
   → Punkt „größeres Netz" damit **erledigt** (v7 ist das 512er).
 - ±1-Value-Target, rohe Visit-Targets (N/ΣN), DFS-Blatt (Stufe 1), breites
   DFS-verankertes Fenster, v4/v7 als starke Daten-Generatoren.
-- Hänger-Schutz: 30s-Wall-Clock je Partie in allen `play_*`-Schleifen (committet).
+- Hänger-Schutz: Wall-Clock je Partie in allen `play_*`-Schleifen — **getrennte
+  Timeouts** seit dem Timeout-Bug-Fix: `HEURISTIC_GAME_TIMEOUT_SECS=30` (reine
+  Heuristik-Suche, unverändert) vs. `NET_GAME_TIMEOUT_SECS=180` (netzbeteiligte
+  Suche, war vorher ebenfalls 30s und zu knapp — führte zu systematisch
+  abgebrochenen Self-Play-Partien, siehe v1/v2-Historie oben).
 - **Erster Stufe-2-Versuch (v7, `--stage 2`) ist kollabiert: 51.8 % 0:0-Spiele
   vs. 17.5 % mit demselben Netz + DFS-Blatt** (isolierender Diagnose-Lauf, kein
   Bug — v7s Value-Head ist als Endergebnis-Klassifikator brauchbar, Loss 0.057,
