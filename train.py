@@ -135,7 +135,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
         
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    # drop_last=True: ohne das kann die letzte Batch einer Epoche zufällig auf
+    # Größe 1 fallen (Datensatzgröße mod BATCH_SIZE == 1) — BatchNorm im Netz
+    # verlangt >1 Sample pro Kanal im Training und crasht sonst hart.
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     
     # 2. Hardware Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
