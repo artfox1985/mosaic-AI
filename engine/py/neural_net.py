@@ -456,6 +456,12 @@ class MosaicDataset(Dataset):
             masks_np    = np.array(masks_l,    dtype=np.float32)
             moon_np     = np.array(moon_l,     dtype=np.float32)
             polw_np     = np.array(polw_l,     dtype=np.float32)
+            # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
+            # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
+            # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
+            # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
+            # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
+            del states_l, policies_l, values_l, masks_l, moon_l, polw_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
