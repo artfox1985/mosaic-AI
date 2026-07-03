@@ -42,12 +42,20 @@ Trainingsfenster mit jedem gescheiterten Kandidaten wächst.
 |---|---|---|---|---|---|---|
 | v1 | 512 (cold, 3000 Bootstrap-Spiele) | ja (einzige Option) | 43 % | 19.5 : 25.4 | — | — |
 | v2 | 512 (warm v1, Bootstrap+2000×v1, **korrigiert nach Timeout-Fix**) | **nein — v1 bleibt** | 44 % | 19.6 : 28.4 | 50:50 (v2, z=0.0) | 20.5 : 17.6 |
+| v3 | 512 (warm v1, Bootstrap+2000×v1+2000×v1b, 4000 Netz-Spiele) | **nein — v1 bleibt** | 47 % | 25.6 : 29.9 | 53:47 (v3, z=0.6) | 22.1 : 19.6 |
 
 v2 hat v1 im direkten Duell NICHT signifikant geschlagen (exakt 50:50, z=0.0 —
 noch eindeutiger im Rauschbereich als der erste, verworfene Versuch mit 51:49)
 — trotz besserem Ø-Score (20.5 vs. 17.6). v1 bleibt Champion, generiert eine
 zweite Self-Play-Runde (2000 weitere Spiele, kumulativer sauberer Netz-Pool →
 4000). Details inkl. des ursprünglichen (verworfenen) Versuchs in v2_eval.md.
+
+v3 (mit doppelt so vielen sauberen Self-Play-Daten wie v2) zeigt einen klaren
+Aufwärtstrend: Sieganteil vs. Heuristik 44%→47%, Ø-Score 19.6→25.6, Vorgänger-
+Duell 50:50→53:47 (z=0.0→0.6). Gate weiterhin nicht bestanden (braucht z≈2.0),
+aber die Richtung stimmt — mehr Daten helfen sichtbar. v1 bleibt Champion,
+generiert eine dritte Self-Play-Runde (kumulativer Netz-Pool → 6000, die vom
+Nutzer gesetzte Obergrenze für diesen Zyklus). Details in v3_eval.md.
 
 **⚠️ Kritischer Bug gefunden und gefixt:** der 30s-Wallclock-Hänger-Schutz in
 `self_play.rs` war auf reine Heuristik-Suche kalibriert — netzgeführte Suche
