@@ -44,6 +44,7 @@ Trainingsfenster mit jedem gescheiterten Kandidaten wächst.
 | v2 | 512 (warm v1, Bootstrap+2000×v1, **korrigiert nach Timeout-Fix**) | **nein — v1 bleibt** | 44 % | 19.6 : 28.4 | 50:50 (v2, z=0.0) | 20.5 : 17.6 |
 | v3 | 512 (warm v1, Bootstrap+2000×v1+2000×v1b, 4000 Netz-Spiele) | **nein — v1 bleibt** | 47 % | 25.6 : 29.9 | 53:47 (v3, z=0.6) | 22.1 : 19.6 |
 | **v4** | **512 (warm v1, v1+v1b+v1c, 6000 Netz-Spiele, KEIN Bootstrap)** | **✅ JA — neuer Champion** | 48 % | 22.3 : 25.5 | **65:35 (v4, z=3.0)** | 19.7 : 15.2 |
+| v5 | 512 (warm v4, gleitendes Fenster v1b+v1c+v4, 6000 Netz-Spiele) | **nein — v4 bleibt** | 47 % | 22.9 : 25.7 | 45:55 (v5, z=-1.0) | 20.0 : 24.0 |
 
 v2 hat v1 im direkten Duell NICHT signifikant geschlagen (exakt 50:50, z=0.0 —
 noch eindeutiger im Rauschbereich als der erste, verworfene Versuch mit 51:49)
@@ -76,6 +77,14 @@ Tiling-Solver-Kombinatorik-Explosion/Node-Budget, chip_allocations-Performance) 
 ohne diese Fixes wären die v1-v4-Daten vermutlich teilweise korrumpiert
 gewesen, wie es rückblickend wahrscheinlich auch die gesamte alte Zählung
 (v4-v11) betraf (siehe Rückblick-Absatz oben).
+
+**v5 — erste Generation ohne Fortschritt.** Warm-start v4, gleitendes Fenster
+(v1b+v1c+v4, v1 rausgenommen, damit die 6000-Spiele-Größe erhalten bleibt statt
+zu wachsen). Verliert gegen v4 sogar numerisch (45:55, z=-1.0) — anders als
+v2/v3, die wenigstens knapp vorne lagen. Kein Anlass zur Sorge: das
+Champion/Kandidat-Protokoll erwartet genau das (nicht jeder Kandidat gewinnt) —
+v4 bleibt Champion, generiert eine weitere Runde (v4b, läuft bereits). Details
+in v5_eval.md.
 
 **⚠️ Kritischer Bug gefunden und gefixt:** der 30s-Wallclock-Hänger-Schutz in
 `self_play.rs` war auf reine Heuristik-Suche kalibriert — netzgeführte Suche
