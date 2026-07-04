@@ -139,7 +139,25 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Größe 1 fallen (Datensatzgröße mod BATCH_SIZE == 1) — BatchNorm im Netz
     # verlangt >1 Sample pro Kanal im Training und crasht sonst hart.
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
-    
+
+    # Ziel-Varianz einmalig vorab bestimmen: die rohe Value-MSE ist wegen der
+    # tanh(.../VALUE_SCALE)-Stauchung auf absoluter Skala kaum aussagekräftig
+    # (aktuell std≈0.19 — das ist aber kein Spielziel-Merkmal, im Gegenteil:
+    # Ziel ist eine MÖGLICHST GROSSE Punktedifferenz, u.a. durch gezieltes
+    # Stören des Gegners. Die geringe Streuung spiegelt nur den aktuellen,
+    # noch schwachen Spielstand von Heuristik/frühen Netz-Generationen wider,
+    # nicht eine inhärente Eigenschaft des Spiels) und ändert sich über
+    # Epochen hinweg sichtbar zu wenig, um Fortschritt zu erkennen (weder im
+    # Log noch im Plot). Ein R² = 1 − MSE/Var(Ziel) (Varianzaufklärung ggü.
+    # der trivialen Mittelwert-Baseline) ist skalenunabhängig und bewegt sich
+    # sichtbar zwischen 0 (nicht besser als Mittelwert-Vorhersage) und 1
+    # (perfekt) — unabhängig davon, ob die Ziel-Streuung mit stärkerem Spiel
+    # künftig noch wächst.
+    target_var = dataset.values.var().item()
+    target_std = target_var ** 0.5
+    print(f"   Value-Ziel-Streuung: σ={target_std:.3f} (Varianz={target_var:.4f}, "
+          f"zum Vergleich mit v_pred σ unten; Varianz ist die Baseline-MSE bei reiner Mittelwert-Vorhersage)")
+
     # 2. Hardware Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n🚀 Starte PyTorch Training auf: {device.type.upper()}")
@@ -198,6 +216,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     n_batches = len(dataloader)
     policy_history  = []
     value_history   = []
+    value_r2_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -218,11 +237,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
             fig.suptitle(f"Training {version_name}")
             ax_top.set_ylabel("Total / Policy Loss")
-            ax_bot.set_ylabel("Value Loss")
+            ax_bot.set_ylabel("Value R² (ggü. Mittelwert-Baseline)")
             ax_bot.set_xlabel("Epoche")
             (line_total,) = ax_top.plot([], [], label="Total", color="tab:blue")
             (line_policy,) = ax_top.plot([], [], label="Policy", color="tab:orange")
-            (line_value,) = ax_bot.plot([], [], label="Value", color="tab:green")
+            (line_value,) = ax_bot.plot([], [], label="Value R²", color="tab:green")
             ax_top.legend(loc="upper right")
             ax_bot.legend(loc="upper right")
             plot = {
@@ -294,6 +313,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_tloss = t_loss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
+        epoch_r2 = 1 - epoch_vloss / target_var if target_var > 0 else 0.0
+        value_r2_history.append(epoch_r2)
         total_history.append(epoch_tloss)
 
         import torch as _t
@@ -340,7 +361,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 xs = list(range(1, len(total_history) + 1))
                 plot["line_total"].set_data(xs, total_history)
                 plot["line_policy"].set_data(xs, policy_history)
-                plot["line_value"].set_data(xs, value_history)
+                plot["line_value"].set_data(xs, value_r2_history)
                 if policy_plateau_since is not None and plot["plateau_line"] is None:
                     plot["plateau_line"] = plot["ax_top"].axvline(
                         policy_plateau_since, color="red", linestyle="--", alpha=0.5, label="Plateau")
@@ -356,7 +377,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plot = None  # Fenster evtl. geschlossen o.ä. — Rest ohne Plot weiterlaufen
 
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
-              f"(Value: {epoch_vloss:5.2f}, Policy: {epoch_ploss:5.2f}) "
+              f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}) "
               f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
         # ── Early Stopping ─────────────────────────────────────────────────
@@ -384,16 +405,20 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     else:
         quality = "🔴 Nichts gelernt"
 
-    if final_v > 0.3:
-        v_quality = "🔴 Nichts gelernt"
-    elif final_v > 0.1:
-        v_quality = "🟠 Schwaches Signal"
-    elif final_v > 0.05:
-        v_quality = "🟡 Gut"
-    elif final_v > 0.01:
-        v_quality = "🟢 Sehr gut"
-    else:
+    # R² statt absoluter MSE-Schwellen: die Value-MSE allein ist wegen der
+    # tanh-Stauchung der Zielskala (siehe target_var oben) nicht
+    # generationsübergreifend vergleichbar — R² = 1 - MSE/Var(Ziel) schon.
+    final_r2 = 1 - final_v / target_var if target_var > 0 else 0.0
+    if final_r2 > 0.97:
         v_quality = "⚠️  Overfitting-Verdacht"
+    elif final_r2 > 0.7:
+        v_quality = "🟢 Sehr gut"
+    elif final_r2 > 0.4:
+        v_quality = "🟡 Gut"
+    elif final_r2 > 0.15:
+        v_quality = "🟠 Schwaches Signal"
+    else:
+        v_quality = "🔴 Nichts gelernt"
 
     print(f"\n{'='*55}")
     print(f"  TRAINING SUMMARY")
@@ -403,7 +428,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"  Batches/Epoche:{n_batches}")
     print(f"{'─'*55}")
     print(f"  Policy Loss:   {final_p:.4f} / {max_loss:.2f} max  ({pct:.1f}%)  {quality}")
-    print(f"  Value Loss:    {final_v:.4f}  {v_quality}")
+    print(f"  Value Loss:    {final_v:.4f}  (R²={final_r2:.2f} ggü. Mittelwert-Baseline)  {v_quality}")
     print(f"{'─'*55}")
     if stopped_early:
         print(f"  ⏹️  Early Stopping nach Epoche {len(policy_history)}/{epochs}")
@@ -463,6 +488,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_weight":      VALUE_WEIGHT,
         "final_policy_loss": round(final_p, 4),
         "final_value_loss":  round(final_v, 4),
+        "final_value_r2":    round(final_r2, 4),
+        "value_target_var":  round(target_var, 4),
         "policy_pct":        round(pct, 1),
         "load_version":      load_version,
     }

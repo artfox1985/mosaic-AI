@@ -31,7 +31,22 @@ def export(version: str, opset: int = 13) -> Path:
     if in_size != INPUT_SIZE:
         print(f"⚠️  Modell-Input {in_size} ≠ config.INPUT_SIZE {INPUT_SIZE} — nutze Modellwert.")
 
-    model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, value_hidden=vh)
+    # policy_head.2 existiert nur bei der neuen 2-lagigen Head-Struktur (ab
+    # v7). Bei älteren Checkpoints (v1-v6, 1-lagiger Head) policy_hidden=0
+    # setzen — das lässt MosaicNet die ALTE, einlagige Architektur exakt
+    # nachbauen, damit die echten trainierten Policy-Gewichte passen und
+    # geladen werden (NICHT den neuen Head mit Zufallsgewichten auffüllen —
+    # das hätte den Policy-Head beim Re-Export stillschweigend kaputt gemacht,
+    # siehe Vorfall bei v6).
+    ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
+
+    model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, value_hidden=vh,
+                       policy_hidden=ph)
+    new_state = model.state_dict()
+    skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
+    if skipped:
+        print(f"⚠️  Shape-Mismatch (alte Head-Architektur?), startet zufällig: {', '.join(skipped)}")
+        state = {k: v for k, v in state.items() if k not in skipped}
     model.load_state_dict(state, strict=False)
     model.eval()
 
