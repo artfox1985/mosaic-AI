@@ -37,12 +37,18 @@ Protokoll erwartet, kein Alarmsignal.
   sobald eine neue dazukommt (gilt sowohl zwischen Champions als auch innerhalb
   der Runden des aktuellen Champions).
 - **Wenn ein Kandidat mit vollen 10.000 Spielen den Champion immer noch nicht
-  schlägt:** die 3 Champion-Runden nicht mehr 1:1 durch gleich-starke neue
-  Runden ersetzen (das wäre nur eine neue Stichprobe derselben Verteilung,
-  kein Qualitätsgewinn) — stattdessen **Sims für die Ersatzrunde erhöhen**
-  (z. B. 800 statt 400), sequenziell älteste zuerst austauschen. Grund: mehr
-  Sims verbessert die Suche selbst (schärfere, genauere Zielverteilung), reine
-  Wiederholung bei gleicher Sim-Zahl reduziert nur Stichprobenrauschen, hebt
+  schlägt**, zwei Eskalationsstufen, günstigste zuerst:
+  1. **Fenster ausdünnen** (billig, kein neues Self-Play nötig): die 4000
+     Spiele der alten Champions reduzieren (z. B. auf 2000 oder weniger),
+     sodass der aktuelle Champion relativ mehr Gewicht im Fenster bekommt, und
+     mit dieser Zusammensetzung neu trainieren — nur ein Trainingslauf, keine
+     neue Self-Play-Generation.
+  2. **Erst wenn das auch nicht reicht: Sims für die Champion-Runden erhöhen**
+  (z. B. 800 statt 400), sequenziell älteste zuerst austauschen — teuer
+  (braucht eine neue, mehrstündige Self-Play-Runde), aber ein echter
+  Qualitätsgewinn: mehr Sims verbessert die Suche selbst (schärfere, genauere
+  Zielverteilung), reine Wiederholung bei gleicher Sim-Zahl reduziert nur
+  Stichprobenrauschen, hebt
   aber nicht die Qualitätsdecke an.
 
 ## Value-Target (aktuelle Formel, `engine/py/neural_net.py`)
