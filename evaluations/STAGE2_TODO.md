@@ -37,19 +37,21 @@ Protokoll erwartet, kein Alarmsignal.
   sobald eine neue dazukommt (gilt sowohl zwischen Champions als auch innerhalb
   der Runden des aktuellen Champions).
 - **Wenn ein Kandidat mit vollen 10.000 Spielen den Champion immer noch nicht
-  schlägt**, zwei Eskalationsstufen, günstigste zuerst:
-  1. **Fenster ausdünnen** (billig, kein neues Self-Play nötig): die 4000
-     Spiele der alten Champions reduzieren (z. B. auf 2000 oder weniger),
-     sodass der aktuelle Champion relativ mehr Gewicht im Fenster bekommt, und
-     mit dieser Zusammensetzung neu trainieren — nur ein Trainingslauf, keine
-     neue Self-Play-Generation.
-  2. **Erst wenn das auch nicht reicht: Sims für die Champion-Runden erhöhen**
-  (z. B. 800 statt 400), sequenziell älteste zuerst austauschen — teuer
-  (braucht eine neue, mehrstündige Self-Play-Runde), aber ein echter
-  Qualitätsgewinn: mehr Sims verbessert die Suche selbst (schärfere, genauere
-  Zielverteilung), reine Wiederholung bei gleicher Sim-Zahl reduziert nur
-  Stichprobenrauschen, hebt
-  aber nicht die Qualitätsdecke an.
+  schlägt**, drei Eskalationsstufen, günstigste zuerst:
+  1. **Fenster ausdünnen** (billigste Stufe, kein neues Self-Play nötig): die
+     4000 Spiele der alten Champions reduzieren (z. B. auf 2000 oder weniger)
+     und mit dieser Zusammensetzung neu trainieren — nur ein Trainingslauf.
+  2. **Reicht das nicht: eine weitere Runde vom aktuellen Champion bei
+     GLEICHER Sim-Zahl** generieren (kostet ein Self-Play, aber noch zu den
+     bisherigen, günstigeren Sims) — z. B. 2000 (alte Champions) + 8000
+     (aktueller Champion, 4 Runden) statt der üblichen 4000/6000-Aufteilung.
+  3. **Erst wenn auch das nicht reicht: Sims für neue Champion-Runden
+     erhöhen** (z. B. 800 statt 400), sequenziell älteste zuerst austauschen —
+     teuerste Stufe (mehrstündige Self-Play-Runde), aber ein echter
+     Qualitätsgewinn: mehr Sims verbessert die Suche selbst (schärfere,
+     genauere Zielverteilung), während Stufe 1/2 nur Stichprobenrauschen
+     reduzieren bzw. das Mischverhältnis verschieben, ohne die Qualitätsdecke
+     der Suche selbst anzuheben.
 
 ## Value-Target (aktuelle Formel, `engine/py/neural_net.py`)
 
