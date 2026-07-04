@@ -491,7 +491,8 @@ class MosaicDataset(Dataset):
 
 
 class MosaicNet(nn.Module):
-    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE, value_hidden=128):
+    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE, value_hidden=128,
+                 policy_hidden=256):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
             nn.Linear(input_size, hidden_size),
@@ -503,9 +504,31 @@ class MosaicNet(nn.Module):
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU()
         )
-        self.policy_head = nn.Sequential(
-            nn.Linear(hidden_size, num_actions)
-        )
+        # Eigene Zwischenschicht für den Policy-Head (vorher: 1 nackter Linear-
+        # Layer direkt auf den geteilten Trunk — im Gegensatz zu Value-/Moon-
+        # Order-Head, die beide schon eine ReLU-Zwischenschicht hatten. Bei v5
+        # blieb der Policy-Loss bei 33% des Max-Werts stehen, während der
+        # Value-Loss exzellent konvergierte (siehe evaluations/v5_eval.md) —
+        # die Kapazitätsanalyse zeigte einen gesunden, nicht gesättigten Trunk
+        # (Dead-Ratio 4%, Eff.Rank ~41%), also lag die Asymmetrie näher am Head
+        # selbst als am Trunk. Ab v7 relevant (v6 lief bereits mit dem alten,
+        # einlagigen Head).
+        # policy_hidden=0 rekonstruiert bewusst die ALTE, einlagige Architektur
+        # (kein Linear→ReLU→Linear, sondern nackter Linear-Layer) — nötig, damit
+        # export_onnx.py ältere Checkpoints (v1-v6) exakt mit ihren echten
+        # trainierten Gewichten neu exportieren kann, statt den neuen Head mit
+        # Zufallsgewichten aufzufüllen (das würde den Policy-Head stillschweigend
+        # kaputt machen, siehe Vorfall bei v6).
+        if policy_hidden and policy_hidden > 0:
+            self.policy_head = nn.Sequential(
+                nn.Linear(hidden_size, policy_hidden),
+                nn.ReLU(),
+                nn.Linear(policy_hidden, num_actions)
+            )
+        else:
+            self.policy_head = nn.Sequential(
+                nn.Linear(hidden_size, num_actions)
+            )
         self.value_head = nn.Sequential(
             nn.Linear(hidden_size, value_hidden),
             nn.ReLU(),
