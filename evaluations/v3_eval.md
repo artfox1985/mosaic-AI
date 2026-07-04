@@ -2,13 +2,12 @@ trainiert mit
 
 - --games 3000 --mode mcts --sims 100
 - --games 2000 --mode network --version v1 --sims 400 --stage 1
-- --games 2000 --mode network --version v1 --sims 400 --stage 1
+- --games 2000 --mode network --version v1b --sims 400 --stage 1
 - -- load v1
 
 512 neuronen pro hidden layer
 
-warm-start v1 (v1 ist weiterhin Champion), Fenster = Bootstrap (300) + v1 (200) +
-v1b (200) = 700 Dateien, 4000 saubere Netz-Self-Play-Spiele
+
 
 **Netzdaten**
 

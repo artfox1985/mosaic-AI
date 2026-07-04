@@ -7,9 +7,7 @@ trainiert mit
 
 512 neuronen pro hidden layer
 
-warm-start v1 (letzte Generation dieses Zyklus), Fenster = v1+v1b+v1c (600
-Dateien, 6000 saubere Netz-Self-Play-Spiele) — **ohne Bootstrap**, der wurde
-nach Erreichen der 6000er-Schwelle nach `data/archive/` zurückverschoben.
+
 
 **Netzdaten**
 
