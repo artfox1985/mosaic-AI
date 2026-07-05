@@ -15,6 +15,8 @@ use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
+use crate::net::Net;
+use crate::net_mcts::{self, net_search_with_tree, LeafEval};
 use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, generate_tiling_actions, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
@@ -53,6 +55,11 @@ pub struct PyGame {
     seed: u64,
     first_player: usize,
     scoring_confirmed: bool,
+    /// Geladenes Netz für den Netz-KI-Modus (Server "Gegen KI spielen" mit
+    /// Modell-Version statt "heuristic"). `None` = Heuristik-Modus (Standard).
+    net: Option<Net>,
+    /// Pfad des zuletzt geladenen Netzes — verhindert Neu-Laden bei jedem Zug.
+    net_path: Option<String>,
 }
 
 #[pymethods]
@@ -70,7 +77,31 @@ impl PyGame {
         let mut rng = StdRng::seed_from_u64(seed);
         let ids = scoring_ids.unwrap_or_else(|| sample_valid_scoring_ids(3, &mut rng));
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
-        PyGame { game, rng, seed, first_player, scoring_confirmed: false }
+        PyGame {
+            game, rng, seed, first_player, scoring_confirmed: false,
+            net: None, net_path: None,
+        }
+    }
+
+    /// Lädt ein ONNX-Netz für den Netz-KI-Modus (einmalig pro Modellpfad — wird
+    /// bei gleichem Pfad übersprungen). Server ruft dies bei `/api/new_game`,
+    /// wenn ein Modell (statt "heuristic") gewählt wurde.
+    fn load_net(&mut self, model_path: String) -> PyResult<()> {
+        if self.net_path.as_deref() == Some(model_path.as_str()) {
+            return Ok(()); // schon geladen
+        }
+        let net = Net::load(&model_path, crate::features::INPUT_SIZE)
+            .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+        self.net = Some(net);
+        self.net_path = Some(model_path);
+        Ok(())
+    }
+
+    /// Deaktiviert den Netz-Modus (zurück auf Heuristik), ohne das geladene
+    /// Netz zu verwerfen (erneutes `load_net` mit demselben Pfad bleibt billig).
+    fn clear_net(&mut self) {
+        self.net = None;
+        self.net_path = None;
     }
 
     // ── Zustand ───────────────────────────────────────────────────────────────
@@ -313,6 +344,39 @@ impl PyGame {
         }
     }
 
+    /// Wie `ai_step_json`, aber mit dem geladenen Netz (`load_net` zuvor
+    /// aufrufen) statt der Heuristik. Tiling bleibt der exakte DFS-Solver
+    /// (netzunabhängig, wie im Self-Play/Arena). `stage=1` = DFS-Blatt,
+    /// `stage=2` = Netz-Value-Blatt. Fehler, falls kein Netz geladen ist.
+    #[pyo3(signature = (simulations=200, c_puct=1.5, stage=1, log=false))]
+    fn ai_step_net_json(&mut self, simulations: u32, c_puct: f64, stage: u32, log: bool) -> PyResult<String> {
+        match self.game.state.phase {
+            Phase::Tiling => self.ai_tiling_step(),
+            Phase::Drafting => self.ai_drafting_net_step(simulations, c_puct, stage, log),
+            other => Ok(json!({
+                "applied": false,
+                "phase": other.as_str(),
+                "reason": "keine KI-Aktion (terminale Phase?)",
+            })
+            .to_string()),
+        }
+    }
+
+    /// Wie `ai_debug_json`, aber mit dem geladenen Netz: Analyse-Dict mit
+    /// echten Netz-Priors (`net_prob`/`net_prob_norm`) UND PUCT-Such-Stats
+    /// je Wurzelkind, ohne einen Zug auszuführen.
+    #[pyo3(signature = (simulations=200, c_puct=1.5, stage=1))]
+    fn ai_debug_net_json(&mut self, simulations: u32, c_puct: f64, stage: u32) -> PyResult<String> {
+        let net = self.net.as_ref().ok_or_else(|| {
+            PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
+        })?;
+        let leaf = if stage == 2 { LeafEval::Net } else { LeafEval::Dfs };
+        let sims = dynamic_sims(simulations, drafting_actions(&self.game.state).len());
+        let (_chosen, analysis) =
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng);
+        Ok(analysis.to_string())
+    }
+
     /// Analysiert die aktuelle Stellung per MCTS OHNE Zug auszuführen
     /// (für /api/ai/debug). Gibt das debug.html-Analyse-Dict zurück.
     #[pyo3(signature = (simulations=300))]
@@ -481,6 +545,59 @@ impl PyGame {
         let action_json = search_move_json(&mv, Some(&self.game.state));
         let SearchMove::Draft(a) = &mv;
         map_err(self.game.apply_drafting(a))?;
+
+        let mut obj = serde_json::Map::new();
+        obj.insert("applied".into(), json!(true));
+        obj.insert("phase".into(), json!(self.game.state.phase.as_str()));
+        obj.insert("action".into(), action_json);
+        obj.insert("done".into(), json!(self.game.is_over()));
+        obj.insert("debug".into(), analysis);
+        if let Some(t) = log_text {
+            obj.insert("log_text".into(), json!(t));
+        }
+        Ok(Value::Object(obj).to_string())
+    }
+
+    /// Drafting-Zug per Netz-PUCT (mit Priors+Such-Stats-Analyse). Erfordert
+    /// zuvor `load_net()`. `log=true` hängt einen Text-Log an (Kopf + Zug-
+    /// Ranking-Tabelle — kein Sim-für-Sim-Trace wie bei der Heuristik, da
+    /// `build_net_tree` aktuell nicht sim-genau protokolliert).
+    fn ai_drafting_net_step(&mut self, simulations: u32, c_puct: f64, stage: u32, log: bool) -> PyResult<String> {
+        let net = self.net.as_ref().ok_or_else(|| {
+            PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
+        })?;
+        let actions = drafting_actions(&self.game.state);
+        if actions.is_empty() {
+            return Ok(json!({
+                "applied": false,
+                "phase": self.game.state.phase.as_str(),
+                "reason": "keine Drafting-Aktion",
+            })
+            .to_string());
+        }
+
+        let leaf = if stage == 2 { LeafEval::Net } else { LeafEval::Dfs };
+        let sims = dynamic_sims(simulations, actions.len());
+        let (chosen, analysis) =
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng);
+        let a = match chosen {
+            Some(a) => a,
+            None => {
+                return Ok(json!({
+                    "applied": false,
+                    "phase": self.game.state.phase.as_str(),
+                    "reason": "keine Drafting-Aktion",
+                })
+                .to_string());
+            }
+        };
+
+        // Log-Text VOR dem Anwenden bauen (Kopf nutzt den Pre-Move-Zustand).
+        let log_text =
+            if log { Some(net_mcts::net_analysis_log_text(&self.game.state, &analysis)) } else { None };
+
+        let action_json = search_move_json(&SearchMove::Draft(a.clone()), Some(&self.game.state));
+        map_err(self.game.apply_drafting(&a))?;
 
         let mut obj = serde_json::Map::new();
         obj.insert("applied".into(), json!(true));

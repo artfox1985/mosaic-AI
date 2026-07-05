@@ -9,10 +9,11 @@
 use std::collections::HashMap;
 
 use rand::{Rng, RngExt};
+use serde_json::{json, Value};
 
 use crate::features::{action_to_id, state_to_features};
 use crate::game::{drafting_actions, Game};
-use crate::mcts::{MAX_ACTIONS, WIDEN_FACTOR};
+use crate::mcts::{label_search_move, SearchMove, MAX_ACTIONS, WIDEN_FACTOR};
 use crate::moves::{Action, TakeSource};
 use crate::net::{softmax, Net};
 use crate::self_play::action_to_env_dict;
@@ -126,6 +127,10 @@ struct Node {
     terminal: bool,
     /// Netz-Value am Knotenzustand (absolute Win-Prob je Spieler) — Backprop-Blattwert.
     leaf_value: [f64; 2],
+    /// Gesamtzahl legaler Züge VOR Moon-Order-Expansion (= Basis-Aktionen) —
+    /// für die "Gültige Aktionen"-Anzeige (Server-Debug-UI), unabhängig davon,
+    /// wie viele davon durchs Widening tatsächlich zu Kindern wurden.
+    n_actions: usize,
 }
 
 /// Baut die priorisierte Kandidatenliste (Kind-Aktionen + Priors) für einen
@@ -229,6 +234,7 @@ fn make_node(
         state,
         terminal,
         leaf_value,
+        n_actions,
     }
 }
 
@@ -366,6 +372,143 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
             node.action.clone().map(|a| (a, node.visits, q))
         })
         .collect()
+}
+
+/// Wie [`net_search_drafting_action`], liefert zusätzlich ein debug.html-kompatibles
+/// Analyse-Dict je Wurzelkind: rohen Netz-Prior (`net_prob`/`net_prob_norm`, VOR jeder
+/// Suche — das eigentliche Policy-Head-Signal) zusammen mit den PUCT-Such-Stats
+/// (`mcts_visits`/`mcts_share`/`mcts_q`). Für den Server (Mensch-vs-Netz) und Debug-UI;
+/// `add_root_noise` hier i.d.R. `false` (Dirichlet-Noise ist nur ein Self-Play-Kniff).
+pub fn net_search_with_tree<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    leaf: LeafEval,
+    rng: &mut R,
+) -> (Option<Action>, Value) {
+    if state.phase != Phase::Drafting {
+        return (None, Value::Null);
+    }
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng);
+    let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits);
+    let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
+    let prior_sum: f64 = nodes[0]
+        .children
+        .iter()
+        .map(|&c| nodes[c].prior as f64)
+        .sum::<f64>()
+        .max(1e-8);
+
+    let mut child_ids = nodes[0].children.clone();
+    child_ids.sort_by(|a, b| nodes[*b].visits.cmp(&nodes[*a].visits));
+
+    let mut chosen_id: Option<usize> = None;
+    let moves: Vec<Value> = child_ids
+        .iter()
+        .enumerate()
+        .map(|(i, &cid)| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            let (typ, desc, cat, _mv) = match &node.action {
+                Some(a) => label_search_move(&SearchMove::Draft(a.clone()), Some(state)),
+                None => ("?", "?".to_string(), "pass", Value::Null),
+            };
+            let is_chosen = best == Some(cid);
+            if is_chosen {
+                chosen_id = Some(i);
+            }
+            json!({
+                "action_id": i,
+                "type": typ,
+                "description": desc,
+                "category": cat,
+                "net_prob": node.prior,
+                "net_prob_norm": node.prior as f64 / prior_sum,
+                "mcts_visits": node.visits,
+                "mcts_share": if total_visits > 0 { node.visits as f64 / total_visits as f64 } else { 0.0 },
+                "mcts_q": q,
+                "mcts_win_pct": q * 100.0,
+                "max_depth": subtree_depth(&nodes, cid),
+                "chosen": is_chosen,
+            })
+        })
+        .collect();
+
+    let root_visits = nodes[0].visits.max(1) as f64;
+    let root_q = nodes[0].value / root_visits;
+
+    let analysis = json!({
+        "current_player": nodes[0].player_who_acted,
+        "ai_player": state.current_player,
+        "value": Value::Null,
+        "win_pct": Value::Null,
+        "has_net": true,
+        "simulations": sims,
+        // Gesamtzahl legaler Züge (unabhängig vom Widening) vs. tatsächlich
+        // durchsuchte Wurzelkinder — Server-Debug-UI zeigt "considered/total".
+        "num_actions": nodes[0].n_actions,
+        "num_actions_considered": nodes[0].children.len(),
+        "max_depth": subtree_depth(&nodes, 0),
+        "ai_action": chosen_id,
+        "moves": moves,
+        "tree": json!({
+            "visits": nodes[0].visits,
+            "win_pct": root_q * 100.0,
+            "depth": subtree_depth(&nodes, 0),
+            "n_children": nodes[0].children.len(),
+        }),
+    });
+
+    let chosen = best.and_then(|cid| nodes[cid].action.clone());
+    (chosen, analysis)
+}
+
+/// Tiefe des Teilbaums unter `nid` (0 = Blatt) — Pendant zu `mcts::subtree_depth`.
+fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
+    let children = &nodes[nid].children;
+    if children.is_empty() {
+        0
+    } else {
+        1 + children.iter().map(|&c| subtree_depth(nodes, c)).max().unwrap()
+    }
+}
+
+/// Textzusammenfassung einer `net_search_with_tree`-Analyse fürs Server-Debug-Log
+/// (kein Sim-für-Sim-Trace wie bei der Heuristik — `build_net_tree` protokolliert
+/// aktuell nicht jede Simulation einzeln — sondern Kopfzeilen + Zug-Ranking-Tabelle).
+pub fn net_analysis_log_text(state: &GameState, analysis: &Value) -> String {
+    let sims = analysis["simulations"].as_u64().unwrap_or(0);
+    let na = analysis["num_actions"].as_u64().unwrap_or(0);
+    let considered = analysis["num_actions_considered"].as_u64().unwrap_or(0);
+    let mut out = String::new();
+    out.push_str("Netz-PUCT-Debug-Log (KI-Zug)\n");
+    out.push_str(&format!(
+        "Simulationen={sims}  Aktionen={considered}/{na} durchsucht  Wurzelspieler={}\n",
+        state.players[state.current_player].name
+    ));
+    out.push_str(&format!("Spieler: P0={}  P1={}\n", state.players[0].name, state.players[1].name));
+    out.push_str(&format!("{}\n", "=".repeat(60)));
+    out.push_str(&format!(
+        "{:<5} {:<45} {:>8} {:>8} {:>8} {:>7}\n",
+        "#", "Zug", "Prior", "Visits", "Share%", "Q%"
+    ));
+    if let Some(moves) = analysis["moves"].as_array() {
+        for m in moves {
+            let mark = if m["chosen"].as_bool().unwrap_or(false) { "*" } else { " " };
+            out.push_str(&format!(
+                "{mark}{:<4} {:<45} {:>7.1}% {:>8} {:>7.1}% {:>6.1}%\n",
+                m["action_id"].as_i64().unwrap_or(-1),
+                m["description"].as_str().unwrap_or("?"),
+                m["net_prob_norm"].as_f64().unwrap_or(0.0) * 100.0,
+                m["mcts_visits"].as_u64().unwrap_or(0),
+                m["mcts_share"].as_f64().unwrap_or(0.0) * 100.0,
+                m["mcts_q"].as_f64().unwrap_or(0.0) * 100.0,
+            ));
+        }
+    }
+    out
 }
 
 // ── Dirichlet/Gamma-Sampling (ohne rand_distr) ──────────────────────────────────
