@@ -146,6 +146,43 @@ pub fn calculate_end_scoring(player: &PlayerBoard, tile_ids: &[usize]) -> EndSco
     result
 }
 
+/// Stetiger Ersatz für [`calculate_end_scoring`], gedacht für die MCTS-Blatt-
+/// bewertung (NICHT für die echte Endwertung!): die "Alles-oder-nichts"-Platten
+/// (0 Horizontale/1 Vertikale/2 Diagonale Reihen, 3 Mehrfarbige Felder,
+/// 5 Eckplatten, 7 Farbenreiche Reihen) geben bei Teilfüllung einen quadratisch
+/// skalierten Teil-Bonus statt hartem 0 — bei voller Füllung fällt die Formel
+/// exakt auf den echten Punktwert von `calculate_end_scoring` zurück (ersetzt
+/// diese Funktion also, statt sie zu ergänzen — keine Doppelzählung möglich).
+/// Additive Platten (4 Äußere Felder, 6 Spezialfelder) bleiben unverändert
+/// linear, die brauchen keinen Fortschritts-Ersatz. Der Exponent 2 bevorzugt
+/// EINE fast fertige Linie/Ecke gegenüber vielen halbfertigen (verhindert
+/// Verzetteln der Suche über zu viele Baustellen).
+pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
+    let sf = player_scoring_features(player);
+    let mut total = 0.0;
+    for &id in tile_ids {
+        total += match id {
+            0 => sf.row_fill.iter().map(|&f| (f as f64 / 6.0).powi(2)).sum::<f64>() * 3.0,
+            1 => sf.col_fill.iter().map(|&f| (f as f64 / 6.0).powi(2)).sum::<f64>() * 7.0,
+            2 => sf.diag_fill.iter().map(|&f| (f as f64 / 6.0).powi(2)).sum::<f64>() * 10.0,
+            3 => (sf.wild_filled as f64 / sf.wild_total.max(1) as f64).powi(2)
+                * 2.0
+                * sf.wild_total as f64,
+            4 => sf.border_fill as f64,
+            5 => {
+                (sf.corner_fill[0] as f64 / 4.0).powi(2) * 3.0
+                    + (sf.corner_fill[1] as f64 / 4.0).powi(2) * 3.0
+                    + (sf.corner_fill[2] as f64 / 4.0).powi(2) * 8.0
+                    + (sf.corner_fill[3] as f64 / 4.0).powi(2) * 8.0
+            }
+            6 => -3.0 * sf.special_empty as f64,
+            7 => sf.row_colors.iter().map(|&c| (c as f64 / 5.0).powi(2)).sum::<f64>() * 4.0,
+            _ => 0.0,
+        };
+    }
+    total
+}
+
 // ── Einzelne Wertungen ──────────────────────────────────────────────────────────
 
 fn score_horizontal_rows(player: &PlayerBoard) -> i32 {
@@ -617,6 +654,54 @@ mod tests {
         let res = calculate_end_scoring(&p, &[0, 1, 2]);
         assert_eq!(res.details.len(), 3);
         assert_eq!(res.total, 18 + 42 + 20);
+    }
+
+    #[test]
+    fn wertung_progress_matches_end_scoring_on_full_board() {
+        // Bei voller Fuellung muss die stetige Fortschritts-Formel exakt auf
+        // den echten (diskreten) Wertungsplatten-Punktwert zurueckfallen --
+        // sonst waere sie keine gueltige Ersatzformel fuer die Suche.
+        let p = fully_filled_board();
+        for id in [0usize, 1, 2, 3, 4, 5, 6] {
+            let exact = calculate_end_scoring(&p, &[id]).total as f64;
+            let progress = wertung_progress(&p, &[id]);
+            assert!(
+                (exact - progress).abs() < 1e-9,
+                "Platte {id}: exakt={exact} vs fortschritt={progress}"
+            );
+        }
+    }
+
+    #[test]
+    fn wertung_progress_is_zero_on_empty_board() {
+        let p = PlayerBoard::new(0, "P");
+        assert_eq!(wertung_progress(&p, &[0, 1, 2, 3, 5, 7]), 0.0);
+    }
+
+    #[test]
+    fn wertung_progress_gives_partial_credit_before_completion() {
+        // Kuppelplatte (0,0) ist eine obere Eckplatte (3 Pkt bei voller
+        // Fuellung aller 4 Spaces). Hier nur 2 von 4 Spaces gefuellt -- die
+        // diskrete Wertung (`calculate_end_scoring`) sieht das noch als 0,
+        // der Fortschritts-Term soll aber schon einen Teil-Bonus zwischen
+        // 0 und dem vollen Wert liefern.
+        let mut p = PlayerBoard::new(0, "P");
+        let mut tile = build_dome_tile_pool()[0].clone();
+        for sp in tile.spaces.iter_mut().take(2) {
+            match sp.space_type {
+                SpaceType::Special => sp.placed_special = true,
+                SpaceType::Wild => sp.placed_color = Some(Rot),
+                SpaceType::Normal => sp.placed_color = sp.required_color,
+            }
+        }
+        p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+
+        let exact = calculate_end_scoring(&p, &[5]).total as f64;
+        let progress = wertung_progress(&p, &[5]);
+        assert_eq!(exact, 0.0, "Eckplatte noch nicht komplett -> diskret 0");
+        assert!(progress > 0.0 && progress < 3.0, "Teil-Bonus erwartet, war {progress}");
+        // (2/4)^2 * 3 = 0.75
+        assert!((progress - 0.75).abs() < 1e-9, "war {progress}");
     }
 
     #[test]

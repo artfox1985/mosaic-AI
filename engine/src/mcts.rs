@@ -17,6 +17,7 @@ use serde_json::{json, Value};
 
 use crate::game::{drafting_actions, Game};
 use crate::moves::Action;
+use crate::scoring::wertung_progress;
 use crate::tile::TileColor;
 use crate::serialize::action_to_dict;
 use crate::state::{GameState, Phase};
@@ -59,10 +60,16 @@ struct Node {
 // ── Bewertung ────────────────────────────────────────────────────────────────
 
 /// Erwarteter finaler Rundenscore eines Spielers — EXAKT per Tiling-Solver
-/// (optimale Platzierung der vollen Reihen inkl. Linien über mehrere Reihen),
-/// statt der per-Reihe-Heuristik. Konsistent mit dem `estimated_score` der UI.
+/// (optimale Platzierung der vollen Reihen inkl. Linien über mehrere Reihen)
+/// PLUS ein stetiger Wertungsplatten-Fortschritts-Term ([`wertung_progress`]),
+/// damit die Suche Baustellen an aktiven Wertungsplatten (volle Reihen/Spalten/
+/// Diagonalen, Ecken, Mehrfarbige Felder) schon vor Fertigstellung goutiert,
+/// statt sie erst beim letzten fehlenden Feld zu bemerken. NICHT identisch mit
+/// dem `estimated_score` der UI (`serialize.rs`) — der bleibt bewusst rein am
+/// real erreichbaren Rundenscore, ohne diesen Suche-only-Fortschrittsbonus.
 fn player_total(state: &GameState, pi: usize) -> f64 {
     solve_round_final_score(state, pi) as f64
+        + wertung_progress(&state.players[pi], &state.scoring_tile_ids)
 }
 
 /// Skala für die Score→Wert-Normalisierung — identisch zum Netz-Value-Target
@@ -84,16 +91,13 @@ fn normalize_score(score: f64) -> f64 {
     ((score / VALUE_SCALE).tanh() + 1.0) / 2.0
 }
 
-/// Blattbewertung als Per-Spieler-Wert (absolut, nicht perspektivisch).
-/// Am Drafting→Tiling-Übergang (Phase ≠ Drafting) wird der exakte Runden-Score
-/// per DFS-Solver bestimmt (Pseudo-Terminal); mitten im Drafting die Heuristik.
-/// Öffentlich für den Netz-MCTS-Stufe-1-Modus (DFS-Blattbewertung + Netz-Priors).
+/// Blattbewertung als Per-Spieler-Wert (absolut, nicht perspektivisch) —
+/// [`player_total`] (exakter Rundenscore + Wertungsplatten-Fortschritt),
+/// unabhängig davon ob `state` mitten im Drafting oder am Drafting→Tiling-
+/// Übergang (Pseudo-Terminal) steht, `solve_round_final_score` behandelt
+/// beide Fälle identisch. Öffentlich für den Netz-MCTS-Stufe-1-Modus
+/// (DFS-Blattbewertung + Netz-Priors).
 pub fn evaluate(state: &GameState, _n_actions: usize) -> [f64; 2] {
-    if state.phase != Phase::Drafting {
-        let f0 = solve_round_final_score(state, 0) as f64;
-        let f1 = solve_round_final_score(state, 1) as f64;
-        return [normalize_score(f0), normalize_score(f1)];
-    }
     [normalize_score(player_total(state, 0)), normalize_score(player_total(state, 1))]
 }
 
@@ -102,19 +106,16 @@ pub fn evaluate(state: &GameState, _n_actions: usize) -> [f64; 2] {
 fn evaluate_explain(state: &GameState, _n_actions: usize) -> ([f64; 2], String) {
     let n0 = state.players[0].name.as_str();
     let n1 = state.players[1].name.as_str();
+    let t0 = player_total(state, 0);
+    let t1 = player_total(state, 1);
+    let v = [normalize_score(t0), normalize_score(t1)];
     if state.phase != Phase::Drafting {
-        let f0 = solve_round_final_score(state, 0);
-        let f1 = solve_round_final_score(state, 1);
-        let v = [normalize_score(f0 as f64), normalize_score(f1 as f64)];
         let why = format!(
-            "DFS-Terminal (phase={}) {n0}={f0} {n1}={f1}",
+            "DFS-Terminal (phase={}) {n0}={t0:.1} {n1}={t1:.1} (inkl. Wertungsplatten-Fortschritt)",
             state.phase.as_str(),
         );
         return (v, why);
     }
-    let t0 = player_total(state, 0);
-    let t1 = player_total(state, 1);
-    let v = [normalize_score(t0), normalize_score(t1)];
     let why = format!("Heuristik total[{n0}]={t0:.1} total[{n1}]={t1:.1} (absolut, scale={VALUE_SCALE})");
     (v, why)
 }
