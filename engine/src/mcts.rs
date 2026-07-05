@@ -49,8 +49,11 @@ struct Node {
     value: f64,
     state: GameState,
     terminal: bool,
-    /// Anzahl legaler Züge in diesem Zustand (für die aktionsabhängige Sigmoid-scale).
+    /// Anzahl legaler Züge in diesem Zustand (Debug-/Analyse-Anzeige).
     n_actions: usize,
+    /// Tiefe im Suchbaum (Wurzel = 0). Steuert die Ranking-Qualität beim
+    /// Erzeugen (`make_node`) — Tiefe 0/1 teuer, ab Tiefe 2 billig.
+    depth: u32,
 }
 
 // ── Bewertung ────────────────────────────────────────────────────────────────
@@ -199,7 +202,7 @@ fn make_node<R: Rng + ?Sized>(
     action: Option<SearchMove>,
     player_who_acted: usize,
     terminal: bool,
-    is_root: bool,
+    depth: u32,
     rng: &mut R,
 ) -> Node {
     let (untried, remaining, n_actions) = if terminal {
@@ -207,7 +210,12 @@ fn make_node<R: Rng + ?Sized>(
     } else {
         let moves = valid_search_moves(&state);
         let n = moves.len();
-        let mut ordered = if is_root {
+        // Teures 1-Ply-Ranking für Wurzel UND den ersten Gegnerzug (Tiefe 0/1) —
+        // die Suche erzwingt (s. build_tree) für jeden Wurzelkandidaten
+        // mindestens diesen einen Gegenzug, bevor die Wurzel weiterbreitert;
+        // der sollte dann auch plausibel sein, nicht zufällig. Ab Tiefe 2
+        // (Enkel) wieder das billige Typ-Ranking wie bisher.
+        let mut ordered = if depth <= 1 {
             rank_actions_root(&state, moves)
         } else {
             rank_actions_cheap(moves, rng)
@@ -231,6 +239,7 @@ fn make_node<R: Rng + ?Sized>(
         state,
         terminal,
         n_actions,
+        depth,
     }
 }
 
@@ -282,7 +291,7 @@ fn build_tree<R: Rng + ?Sized>(
     root_state.log.clear();
     let root_player = root_state.current_player;
     let mut nodes: Vec<Node> =
-        vec![make_node(root_state, None, None, root_player, false, true, rng)];
+        vec![make_node(root_state, None, None, root_player, false, 0, rng)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -294,6 +303,22 @@ fn build_tree<R: Rng + ?Sized>(
         // 1. Selection (mit Progressive Widening).
         let mut nid = 0;
         loop {
+            // Erzwungener Gegnerzug: die Wurzel breitert erst weiter (neuer
+            // Kandidat), wenn ihr zuletzt erzeugtes Kind selbst mindestens
+            // einen eigenen Kindknoten hat (= Gegner-Antwort simuliert). Ohne
+            // das verschlingt reine Breite an der Wurzel das Sim-Budget, bevor
+            // irgendein Kandidat auch nur EINEN Gegenzug gesehen hat — kein
+            // sauberer Vergleich zwischen den Wurzelkandidaten. Nur an der
+            // Wurzel selbst (nid==0), nicht rekursiv tiefer.
+            if nid == 0 {
+                if let Some(&last_child) = nodes[0].children.last() {
+                    if nodes[last_child].children.is_empty() && !nodes[last_child].terminal {
+                        logln!("  FORCE-REPLY #0 → #{last_child}: Gegnerzug erzwungen vor weiterem Breitern");
+                        nid = last_child;
+                        continue;
+                    }
+                }
+            }
             if nodes[nid].terminal {
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
                 break;
@@ -338,7 +363,8 @@ fn build_tree<R: Rng + ?Sized>(
             if let Some(child_state) = apply_search_move(&nodes[nid].state, &mv) {
                 // Terminal sobald die Drafting-Phase verlassen ist (→ DFS-Eval).
                 let terminal = child_state.phase != Phase::Drafting;
-                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, false, rng);
+                let child_depth = nodes[nid].depth + 1;
+                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng);
                 let cid = nodes.len();
                 nodes.push(child);
                 nodes[nid].children.push(cid);
@@ -757,6 +783,29 @@ mod tests {
     }
 
     #[test]
+    fn root_children_all_get_at_least_one_forced_reply() {
+        // Jeder (nicht-terminale) Wurzelkandidat muss mindestens einen eigenen
+        // Kindknoten haben (simulierter Gegenzug), bevor die Wurzel einen NEUEN
+        // Kandidaten anlegt -- sonst wäre der Vergleich zwischen Wurzelkindern
+        // nicht "sauber" (nur der rohe Zustand direkt nach dem eigenen Zug,
+        // ohne jede Gegner-Reaktion). Der zuletzt erzeugte Kandidat ist davon
+        // ausgenommen -- der könnte genau am Ende des Sim-Budgets entstanden
+        // sein, bevor seine eigene erzwungene Antwort noch simuliert wurde.
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(21);
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
+        assert!(nodes[0].children.len() > 1, "Test braucht mehrere Wurzelkinder");
+        for &cid in &nodes[0].children[..nodes[0].children.len() - 1] {
+            if !nodes[cid].terminal {
+                assert!(
+                    !nodes[cid].children.is_empty(),
+                    "Wurzelkind #{cid} hat keinen eigenen Kindknoten (Gegenzug nicht simuliert)"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn normalize_score_stays_distinguishable_over_typical_score_range() {
         // Anders als die alte Differenz-Sigmoid (scale=2.0 bei >50 Aktionen,
         // sättigte schon bei Diffs von ~20-30 Punkten für BEIDE Spieler
@@ -832,11 +881,16 @@ mod tests {
     fn search_log_text_contains_all_phases() {
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(8);
-        let log = search_log_text(&s, 50, DEFAULT_C, &mut rng);
-        assert!(log.contains("=== Sim 1/50 ==="));
+        // Mit dem erzwungenen Gegnerzug "kostet" jeder Wurzelkandidat jetzt
+        // effektiv 2 statt 1 Sim (eigener Zug + erzwungene Antwort), bevor die
+        // Wurzel weiterbreitert oder selektiert -- 300 statt 50 Sims, damit
+        // die Wurzel ihr Widening-Budget innerhalb des Tests sicher ausschöpft.
+        let log = search_log_text(&s, 300, DEFAULT_C, &mut rng);
+        assert!(log.contains("=== Sim 1/300 ==="));
         assert!(log.contains("EXPAND"));
         assert!(log.contains("EVAL"));
         assert!(log.contains("BACKPROP"));
+        assert!(log.contains("FORCE-REPLY"), "erzwungener Gegnerzug sollte im Log auftauchen");
         // Bei genug Sims wird auch selektiert (Abstieg).
         assert!(log.contains("SELECT"));
     }

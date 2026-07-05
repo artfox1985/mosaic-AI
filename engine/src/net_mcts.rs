@@ -234,12 +234,24 @@ fn make_node(
     let (untried, n_actions) =
         if terminal { (Vec::new(), 0) } else { build_untried_actions(&state, &logits, &moon_scores) };
 
-    // Blattwert: absolute Per-Spieler-Win-Prob.
+    // Blattwert: unabhängige Pro-Spieler-Werte (analog zu Stage 1s
+    // `crate::mcts::evaluate` — keine erzwungene Komplementär-Konstruktion
+    // [win, 1-win] mehr). Das Netz liefert einen EGO-perspektivischen Wert
+    // (die Input-Features hängen von `state.current_player` ab, siehe
+    // `features.rs`/`state_to_tensor`s "me"/"enemy"-Aufteilung) — für den
+    // jeweils ANDEREN Spieler braucht es deshalb einen zweiten Forward-Pass
+    // mit geflipptem `current_player`, nicht einfach `1.0 - value`.
     let leaf_value = match leaf {
         LeafEval::Net => {
-            let win = ((value + 1.0) / 2.0) as f64; // Sicht des Spielers am Zug
-            let cp = state.current_player;
-            if cp == 0 { [win, 1.0 - win] } else { [1.0 - win, win] }
+            let mover_val = ((value + 1.0) / 2.0) as f64;
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = state_to_features(&state_to_json(&flipped, true));
+            let other_val = net
+                .eval(&other_feats)
+                .map(|(_, v, _)| ((v + 1.0) / 2.0) as f64)
+                .unwrap_or(0.5);
+            if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
         }
         LeafEval::Dfs => crate::mcts::evaluate(&state, n_actions),
     };
@@ -335,6 +347,21 @@ fn build_net_tree<R: Rng + ?Sized>(
         // Selection + (eine) Expansion.
         let mut nid = 0;
         loop {
+            // Erzwungener Gegnerzug: die Wurzel breitert erst weiter (neuer
+            // Kandidat), wenn ihr zuletzt erzeugtes Kind selbst mindestens
+            // einen eigenen Kindknoten hat (= Gegner-Antwort simuliert) —
+            // sonst vergleicht man Wurzelkandidaten nur anhand des rohen
+            // Zustands direkt nach dem eigenen Zug, ohne jede Gegnerreaktion.
+            // Nur an der Wurzel selbst (nid==0), nicht rekursiv tiefer.
+            if nid == 0 {
+                if let Some(&last_child) = nodes[0].children.last() {
+                    if nodes[last_child].children.is_empty() && !nodes[last_child].terminal {
+                        logln!("  FORCE-REPLY #0 → #{last_child}: Gegnerzug erzwungen vor weiterem Breitern");
+                        nid = last_child;
+                        continue;
+                    }
+                }
+            }
             if nodes[nid].terminal {
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
                 break;
