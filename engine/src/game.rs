@@ -477,8 +477,18 @@ impl Game {
             self.state.log_event("Tiling-Phase beginnt.");
             // Unplatzierbare Reihen → Strafleiste (für beide Spieler).
             for pi in 0..NUM_PLAYERS {
-                let (players, tower) = (&mut self.state.players, &mut self.state.tower);
-                process_unplaceable_rows(&mut players[pi], tower);
+                let moved = {
+                    let (players, tower) = (&mut self.state.players, &mut self.state.tower);
+                    process_unplaceable_rows(&mut players[pi], tower)
+                };
+                for (row_idx, color, n) in moved {
+                    let name = self.state.players[pi].name.clone();
+                    self.state.log_event(format!(
+                        "⚠️  {name}: Musterreihe {} ({}) nicht platzierbar → {n}× Strafleiste",
+                        row_idx + 1,
+                        color.value()
+                    ));
+                }
             }
         }
     }
@@ -557,8 +567,18 @@ impl Game {
     /// oder Spielende. Port von engine/game.py `_execute_end_tiling`.
     fn execute_end_tiling<R: Rng + ?Sized>(&mut self, rng: &mut R) {
         for pi in 0..NUM_PLAYERS {
-            let (players, tower) = (&mut self.state.players, &mut self.state.tower);
-            process_unplaceable_rows(&mut players[pi], tower);
+            let moved = {
+                let (players, tower) = (&mut self.state.players, &mut self.state.tower);
+                process_unplaceable_rows(&mut players[pi], tower)
+            };
+            for (row_idx, color, n) in moved {
+                let name = self.state.players[pi].name.clone();
+                self.state.log_event(format!(
+                    "⚠️  {name}: Musterreihe {} ({}) nicht platzierbar → {n}× Strafleiste",
+                    row_idx + 1,
+                    color.value()
+                ));
+            }
         }
 
         for pi in 0..NUM_PLAYERS {
@@ -648,6 +668,58 @@ mod tests {
         }
         assert_eq!(game.state.phase, Phase::Tiling, "Drafting endet in Tiling (steps={steps})");
         assert!(steps < 500, "Drafting terminiert");
+    }
+
+    #[test]
+    fn unplaceable_row_logs_row_and_color_at_tiling_start() {
+        use crate::dome::build_dome_tile_pool;
+        use crate::tile::TileColor::Rot;
+
+        let mut rng = StdRng::seed_from_u64(9);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+
+        // Musterreihe 0 (Kapazität 1) mit Rot voll, Dome-Reihe 0 komplett mit
+        // Platten ohne offenen Rot-/Wild-Space belegt -- exakt das Fixture aus
+        // round_end::tests::unplaceable_when_domerow_full_no_match.
+        let p0 = &mut game.state.players[0];
+        p0.pattern_lines[0].add_tiles(&[Rot]);
+        let pool = build_dome_tile_pool();
+        for sc in 0..3 {
+            let mut t = pool[11].clone(); // [Tuerkis, Schwarz, Rot, Wild]
+            t.tile_id = 200 + sc;
+            p0.dome_grid.place_dome_tile(t, 0, sc).unwrap();
+        }
+
+        // Alles leeren, was check_drafting_complete() sonst noch als
+        // "es gibt noch einen Zug" werten wuerde (Fabriken, Kuppel-Stapel,
+        // Kuppel-Display, Startspieler-Marker auf der grossen Fabrik).
+        for f in game.state.factories.iter_mut() {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+            // Wie beim echten Leerwerden: Bonusplaettchen gilt als bereits
+            // aufgedeckt/genommen, sonst haengt check_drafting_complete() an
+            // "chips_available"/"factories_empty" fest.
+            f.bonus_chip_revealed = true;
+            f.bonus_chip = None;
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
+        game.state.large_factory.has_first_player_marker = false;
+        game.state.dome_tile_pool.clear();
+        game.state.dome_display.clear();
+
+        game.check_phase_transition();
+
+        assert_eq!(game.state.phase, Phase::Tiling);
+        assert!(
+            game.state.log.iter().any(|l| l.contains("Musterreihe 1 (rot) nicht platzierbar")),
+            "Log fehlt Reihe+Farbe-Hinweis: {:?}",
+            game.state.log
+        );
+        assert!(game.state.players[0].pattern_lines[0].tiles.is_empty());
     }
 
     #[test]

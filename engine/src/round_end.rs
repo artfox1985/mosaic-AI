@@ -82,18 +82,21 @@ pub fn find_unplaceable_rows(player: &PlayerBoard) -> Vec<usize> {
 }
 
 /// Verschiebt unplatzierbare Fliesen auf die Strafleiste (Überlauf → Turm).
-/// Gibt die Anzahl verschobener Fliesen zurück.
-pub fn process_unplaceable_rows(player: &mut PlayerBoard, tower: &mut Tower) -> usize {
-    let mut total = 0;
+/// Gibt je betroffener Reihe `(row_idx, Farbe, Anzahl Fliesen)` zurück --
+/// Aufrufer nutzen das für die Logausgabe (Reihe+Farbe sichtbar machen,
+/// sonst passiert dieser Strafleisten-Übergang komplett stumm).
+pub fn process_unplaceable_rows(player: &mut PlayerBoard, tower: &mut Tower) -> Vec<(usize, TileColor, usize)> {
+    let mut moved = Vec::new();
     for row_idx in find_unplaceable_rows(player) {
+        let color = player.pattern_lines[row_idx].color.expect("unplatzierbare Reihe hat Farbe");
         let tiles: Vec<_> = std::mem::take(&mut player.pattern_lines[row_idx].tiles);
         player.pattern_lines[row_idx].color = None;
         let n = tiles.len();
         let to_tower = player.add_broken(&tiles);
         tower.add(&to_tower);
-        total += n;
+        moved.push((row_idx, color, n));
     }
-    total
+    moved
 }
 
 // ── Validierung der Tiling-Aktion ───────────────────────────────────────────────
@@ -717,7 +720,7 @@ mod tests {
 
         let mut tower = Tower::default();
         let moved = process_unplaceable_rows(&mut p, &mut tower);
-        assert_eq!(moved, 1);
+        assert_eq!(moved, vec![(0, Rot, 1)]);
         assert_eq!(p.broken_tiles.len(), 1);
         assert!(p.pattern_lines[0].tiles.is_empty());
     }
