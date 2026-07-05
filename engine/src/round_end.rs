@@ -190,8 +190,9 @@ pub fn validate_tiling_action(
 // ── Ausführung der Tiling-Phase ─────────────────────────────────────────────────
 
 /// Führt eine (bereits validierte) TilingAction aus: Reihe leeren, ggf. Kachel
-/// platzieren, Stein auf den Space legen und Special freischalten.
-pub fn execute_tiling_action(
+/// platzieren, Stein auf den Space legen und Special freischalten. Nur intern
+/// genutzt (von `execute_full_tiling`) -- kein externer Aufrufer.
+fn execute_tiling_action(
     state: &mut GameState,
     player_idx: usize,
     action: &TilingAction,
@@ -287,8 +288,9 @@ pub fn execute_full_tiling(
 
 /// Prüft, ob der platzierte Stein einen freigeschalteten Special-Space abrechnet,
 /// entnimmt dafür einen weißen Stein und vergibt den Kuppel-Bonus. Gibt die
-/// Bonus-Punkte zurück.
-pub fn check_special_trigger(
+/// Bonus-Punkte zurück. Nur intern genutzt (von `execute_full_tiling`) -- kein
+/// externer Aufrufer.
+fn check_special_trigger(
     state: &mut GameState,
     player_idx: usize,
     slot_row: usize,
@@ -406,67 +408,27 @@ pub fn score_penalty(player: &mut PlayerBoard) -> i32 {
 
 /// Kann die (unvollständige) Reihe mit Bonusplättchen komplettiert werden?
 /// Regel: pro fehlendem Slot 2 farbgleiche ODER 3 beliebige Chips.
+///
+/// WICHTIG: [`chips_complete`] ist hier NICHT anwendbar -- die Formel prüft
+/// eine bereits konkret gewählte Teilmenge (`s` = deren Größe), nicht "gibt es
+/// irgendeine passende Teilmenge im ganzen Pool". Mit überzähligen, für diese
+/// Reihe irrelevanten Chips im Pool (`s` = `player.bonus_chips.len()`) würde
+/// die Formel fälschlich "nicht komplettierbar" melden, sobald der Pool größer
+/// als `3·missing` ist. Delegiert stattdessen an [`greedy_chip_alloc`], das
+/// dieselbe Greedy-Regel korrekt über eine Index-Kopie simuliert.
 pub fn can_complete_row_with_chips(player: &PlayerBoard, row_idx: usize) -> bool {
-    let row = &player.pattern_lines[row_idx];
-    let color = match row.color {
-        Some(c) if !row.tiles.is_empty() => c,
-        _ => return false,
-    };
-    let missing = row.spaces_left();
-    if missing == 0 {
-        return false;
-    }
-    // Greedy auf einer Kopie der Chip-Indizes (entfernte Chips = verbraucht).
-    let mut pool: Vec<&crate::dome::BonusChip> = player.bonus_chips.iter().collect();
-    for _ in 0..missing {
-        let same: Vec<usize> = pool
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| c.colors.contains(&color))
-            .map(|(i, _)| i)
-            .collect();
-        if same.len() >= 2 {
-            let (a, b) = (same[0], same[1]);
-            pool.remove(a.max(b));
-            pool.remove(a.min(b));
-        } else if pool.len() >= 3 {
-            pool.drain(0..3);
-        } else {
-            return false;
-        }
-    }
-    true
+    greedy_chip_alloc(player, row_idx).is_some()
 }
 
 /// Komplettiert eine Musterreihe mit Bonusplättchen, falls möglich. Verbraucht
 /// die genutzten Chips (entfernt sie). Gibt true zurück, wenn die Reihe voll wurde.
+/// Greedy-Auswahl + Ausführung über [`greedy_chip_alloc`]/[`apply_bonus_chips_with`]
+/// (dieselbe Regel, keine eigene zweite Simulation mehr).
 pub fn apply_bonus_chips_to_row(player: &mut PlayerBoard, row_idx: usize) -> bool {
-    if !can_complete_row_with_chips(player, row_idx) {
-        return false;
+    match greedy_chip_alloc(player, row_idx) {
+        Some(indices) => apply_bonus_chips_with(player, row_idx, &indices),
+        None => false,
     }
-    let color = player.pattern_lines[row_idx].color.expect("Reihe hat Farbe");
-    let missing = player.pattern_lines[row_idx].spaces_left();
-    for _ in 0..missing {
-        let same: Vec<usize> = player
-            .bonus_chips
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| c.colors.contains(&color))
-            .map(|(i, _)| i)
-            .collect();
-        if same.len() >= 2 {
-            let (a, b) = (same[0], same[1]);
-            player.bonus_chips.remove(a.max(b));
-            player.bonus_chips.remove(a.min(b));
-            player.pattern_lines[row_idx].tiles.push(color);
-        } else if player.bonus_chips.len() >= 3 {
-            player.bonus_chips.drain(0..3);
-            player.pattern_lines[row_idx].tiles.push(color);
-        } else {
-            break;
-        }
-    }
-    player.pattern_lines[row_idx].is_complete()
 }
 
 /// Sicherheits-Cap für die Allokations-Enumeration (2^n Bitmasken).
