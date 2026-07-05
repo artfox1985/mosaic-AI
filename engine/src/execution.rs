@@ -35,12 +35,15 @@ pub fn execute_move(state: &mut GameState, m: &Move) {
     ));
     let idx = state.log.len() - 1;
 
-    execute_place(state, &taken, m.place.row_index);
+    let overflow = execute_place(state, &taken, m.place.row_index);
 
     if m.place.row_index >= 0 {
         let row = &state.players[pi].pattern_lines[m.place.row_index as usize];
         let fill = format!(" [{}/{}]", row.tiles.len(), row.capacity());
         state.log[idx].push_str(&fill);
+        if overflow > 0 {
+            state.log[idx].push_str(&format!(" (+{overflow} Strafleiste)"));
+        }
     }
 
     for line in pending {
@@ -229,11 +232,14 @@ fn execute_moon_take(state: &mut GameState, color: TileColor, row_index: i32) {
     ));
     let idx = state.log.len() - 1;
 
-    execute_place(state, &taken, row_index);
+    let overflow = execute_place(state, &taken, row_index);
 
     if row_index >= 0 {
         let row = &state.players[pi].pattern_lines[row_index as usize];
         state.log[idx].push_str(&format!(" [{}/{}]", row.tiles.len(), row.capacity()));
+        if overflow > 0 {
+            state.log[idx].push_str(&format!(" (+{overflow} Strafleiste)"));
+        }
     }
 
     for line in pending {
@@ -254,16 +260,24 @@ fn apply_first_player_marker(state: &mut GameState) {
     ));
 }
 
-fn execute_place(state: &mut GameState, tiles: &[TileColor], row_index: i32) {
+/// Platziert `tiles` in Reihe `row_index` (oder direkt auf der Strafleiste bei
+/// `-1`). Gibt die Anzahl der Fliesen zurück, die NICHT mehr in die Reihe
+/// passten und automatisch auf die Strafleiste übergelaufen sind (0 beim
+/// direkten Strafleisten-Zug, da dort schon alles dorthin geht) — Aufrufer
+/// nutzen das, um den Überlauf direkt in die Aktions-Logzeile zu patchen
+/// (zusätzlich zur separaten `⚠️`-Zeile aus `add_to_penalty`).
+fn execute_place(state: &mut GameState, tiles: &[TileColor], row_index: i32) -> usize {
     let pi = state.current_player;
     if row_index == -1 {
         add_to_penalty(state, tiles);
-        return;
+        return 0;
     }
     let overflow = state.players[pi].pattern_lines[row_index as usize].add_tiles(tiles);
+    let n_overflow = overflow.len();
     if !overflow.is_empty() {
         add_to_penalty(state, &overflow);
     }
+    n_overflow
 }
 
 fn add_to_penalty(state: &mut GameState, tiles: &[TileColor]) {
@@ -345,6 +359,49 @@ mod tests {
         // Aktions-Log wurde geschrieben (mind. 1 neuer Eintrag, mit Füllstand).
         assert!(s.log.len() > log_before);
         assert!(s.log.iter().any(|l| l.contains("☀️") && l.contains("F1")));
+    }
+
+    #[test]
+    fn overflow_to_penalty_is_noted_in_the_same_log_line() {
+        // Reihe 0 hat Kapazität 1 -- jede Fabrik mit >=2 Fliesen derselben Farbe
+        // im Sonnenbereich erzwingt einen Überlauf auf die Strafleiste.
+        let mut rng = StdRng::seed_from_u64(1);
+        let mut s = setup_new_game(names(), 0, &mut rng);
+        let (fidx, color, count) = s
+            .factories
+            .iter()
+            .enumerate()
+            .find_map(|(i, f)| {
+                f.sun_colors().into_iter().find_map(|c| {
+                    let n = f.sun_tiles.iter().filter(|&&t| t == c).count();
+                    (n >= 2).then_some((i, c, n))
+                })
+            })
+            .expect("Testfixtur braucht eine Fabrik mit >=2 gleichfarbigen Sonnensteinen");
+        let f = &s.factories[fidx];
+        let remaining: Vec<TileColor> = f.sun_tiles.iter().copied().filter(|&t| t != color).collect();
+        let factory_id = f.factory_id;
+        let m = Move {
+            take: TakeAction {
+                source: TakeSource::SmallFactorySun,
+                color,
+                factory_id: Some(factory_id),
+                moon_order: remaining,
+            },
+            place: PlaceAction { row_index: 0 },
+        };
+        assert!(validate_move(&s, &m).is_none());
+        let log_before = s.log.len();
+        execute_move(&mut s, &m);
+
+        let overflow = count - 1; // Reihe 0 hat Kapazität 1.
+        let action_line = &s.log[log_before];
+        assert!(
+            action_line.contains(&format!("(+{overflow} Strafleiste)")),
+            "Überlauf-Hinweis fehlt in der Aktionszeile: {action_line}"
+        );
+        // Separate ⚠️-Zeile bleibt zusätzlich bestehen (Rückwärtskompatibilität).
+        assert!(s.log.iter().any(|l| l.contains("⚠️") && l.contains("Strafleiste")));
     }
 
     #[test]

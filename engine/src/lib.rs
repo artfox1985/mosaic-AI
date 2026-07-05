@@ -17,6 +17,7 @@ pub mod mcts;
 pub mod moves;
 pub mod net;
 pub mod net_mcts;
+pub mod profiling;
 pub mod py;
 pub mod round_end;
 pub mod scoring;
