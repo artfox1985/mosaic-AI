@@ -11,13 +11,12 @@ use std::collections::HashMap;
 use rand::{Rng, RngExt};
 use serde_json::{json, Value};
 
-use crate::features::{action_to_id, state_to_features};
+use crate::features::{action_to_id, state_to_features_direct};
 use crate::game::{drafting_actions, Game};
 use crate::mcts::{label_search_move, SearchMove};
 use crate::moves::{Action, TakeSource};
 use crate::net::{softmax, Net};
 use crate::self_play::action_to_env_dict;
-use crate::serialize::state_to_json;
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
 
@@ -222,9 +221,8 @@ fn make_node(
     leaf: LeafEval,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
-    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
-        state_to_features(&state_to_json(&state, true))
-    });
+    let feats =
+        crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
     let (logits, value, moon) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
         net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], 0.0, Vec::new()))
     });
@@ -249,7 +247,7 @@ fn make_node(
             crate::profiling::note_gamestate_clone();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
-            let other_feats = state_to_features(&state_to_json(&flipped, true));
+            let other_feats = state_to_features_direct(&flipped);
             let other_val = net
                 .eval(&other_feats)
                 .map(|(_, v, _)| ((v + 1.0) / 2.0) as f64)
