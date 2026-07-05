@@ -271,6 +271,77 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
     }
 }
 
+/// Expandiert ein zufälliges unversuchtes Kind von `nid` (widened bei Bedarf
+/// zuerst eine Aktion aus `remaining` frei) und backpropagiert dessen
+/// Blattwert bis zur Wurzel — exakt der Expansion/Bewertung/Backprop-Schritt
+/// einer normalen Simulation, nur außerhalb der Sim-Zählschleife aufrufbar.
+/// Für die Nachlauf-Schließung offener Enden (siehe unten): kein Effekt,
+/// falls `nid` bereits terminal ist oder keine Aktionen mehr übrig hat.
+fn expand_and_backprop<R: Rng + ?Sized>(
+    nodes: &mut Vec<Node>,
+    nid: usize,
+    names: &[&str; 2],
+    rng: &mut R,
+    log: &mut Option<&mut Vec<String>>,
+) {
+    if nodes[nid].untried.is_empty() && !nodes[nid].remaining.is_empty() {
+        let allowed = MAX_ACTIONS + (WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
+        if nodes[nid].children.len() < allowed {
+            let mv = nodes[nid].remaining.remove(0);
+            nodes[nid].untried.push(mv);
+        }
+    }
+    if nodes[nid].untried.is_empty() {
+        return;
+    }
+    let idx = rng.random_range(0..nodes[nid].untried.len());
+    let mv = nodes[nid].untried.swap_remove(idx);
+    let mover = nodes[nid].state.current_player;
+    let Some(child_state) = apply_search_move(&nodes[nid].state, &mv) else { return };
+    let terminal = child_state.phase != Phase::Drafting;
+    let child_depth = nodes[nid].depth + 1;
+    let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng);
+    let cid = nodes.len();
+    nodes.push(child);
+    nodes[nid].children.push(cid);
+    if let Some(l) = log.as_deref_mut() {
+        l.push(format!(
+            "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}{})",
+            label_search_move(&mv, None).1,
+            names[mover],
+            if terminal { ", terminal/DFS" } else { "" }
+        ));
+    }
+
+    let value = if log.is_some() {
+        let (v, why) = evaluate_explain(&nodes[cid].state, nodes[cid].n_actions);
+        if let Some(l) = log.as_deref_mut() {
+            l.push(format!(
+                "  EVAL   #{cid} {why} → win[{}]={:.3} win[{}]={:.3}",
+                names[0], v[0], names[1], v[1]
+            ));
+        }
+        v
+    } else {
+        evaluate(&nodes[cid].state, nodes[cid].n_actions)
+    };
+
+    let mut bp = String::from("  BACKPROP");
+    let mut cur = Some(cid);
+    while let Some(i) = cur {
+        nodes[i].visits += 1;
+        let delta = value[nodes[i].player_who_acted];
+        nodes[i].value += delta;
+        if log.is_some() {
+            bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
+        }
+        cur = nodes[i].parent;
+    }
+    if let Some(l) = log.as_deref_mut() {
+        l.push(bp);
+    }
+}
+
 /// Baut den Drafting-Suchbaum (Wurzel = Index 0). None, wenn `state` nicht in
 /// der Drafting-Phase ist (Tiling löst der DFS-Solver separat). Mit
 /// `log = Some(..)` wird die Schleife je Simulation (Selection/Expansion/
@@ -403,6 +474,32 @@ fn build_tree<R: Rng + ?Sized>(
             cur = nodes[i].parent;
         }
         logln!("{bp}");
+    }
+
+    // Nachlauf: Force-Reply oben (Tiefe 0/1) greift nur, wenn UCB den Knoten
+    // je wieder besucht — Wurzelkinder mit sehr niedrigem Score werden nie
+    // erneut selektiert und ihr einziges erzwungenes Kind (Tiefe 2) bleibt
+    // dauerhaft ohne eigene Antwort. Hier wird EINMAL über die bereits
+    // gebauten Wurzel- und Tiefe-1-Knoten gegangen und jeder mit Kindern,
+    // dessen zuletzt hinzugefügtes Kind selbst noch keins hat, nachträglich
+    // um genau eine Antwort ergänzt — auch wenn das über `simulations`
+    // hinausgeht. Bewusst NICHT auf tiefere Knoten ausgeweitet: dort ist ein
+    // kinderloses letztes Kind die normale, gewollte MCTS-Baumgrenze, kein
+    // offenes Ende (siehe Kommentar bei FORCE-REPLY oben).
+    let built = nodes.len();
+    for i in 0..built {
+        if i != 0 && nodes[i].parent != Some(0) {
+            continue;
+        }
+        if nodes[i].terminal {
+            continue;
+        }
+        let Some(&last_child) = nodes[i].children.last() else { continue };
+        if nodes[last_child].terminal || !nodes[last_child].children.is_empty() {
+            continue;
+        }
+        logln!("  NACHLAUF #{i} → #{last_child}: offenes Ende nachträglich geschlossen");
+        expand_and_backprop(&mut nodes, last_child, &names, rng, &mut log);
     }
 
     Some(nodes)
@@ -791,14 +888,15 @@ mod tests {
         // Kindknoten haben (simulierter Gegenzug), bevor die Wurzel einen NEUEN
         // Kandidaten anlegt -- sonst wäre der Vergleich zwischen Wurzelkindern
         // nicht "sauber" (nur der rohe Zustand direkt nach dem eigenen Zug,
-        // ohne jede Gegner-Reaktion). Der zuletzt erzeugte Kandidat ist davon
-        // ausgenommen -- der könnte genau am Ende des Sim-Budgets entstanden
-        // sein, bevor seine eigene erzwungene Antwort noch simuliert wurde.
+        // ohne jede Gegner-Reaktion). Der Nachlauf am Ende von `build_tree`
+        // schließt auch den zuletzt erzeugten Kandidaten nach, selbst wenn der
+        // genau am Ende des Sim-Budgets entstand und nie erneut selektiert
+        // wurde -- daher gilt die Garantie jetzt für ALLE Wurzelkinder.
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(21);
         let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
         assert!(nodes[0].children.len() > 1, "Test braucht mehrere Wurzelkinder");
-        for &cid in &nodes[0].children[..nodes[0].children.len() - 1] {
+        for &cid in &nodes[0].children {
             if !nodes[cid].terminal {
                 assert!(
                     !nodes[cid].children.is_empty(),
@@ -814,18 +912,22 @@ mod tests {
         // (Kind = 1. Gegnerzug): deren Kinder (Enkel, Tiefe 2) sollten
         // ebenfalls je einen eigenen Kindknoten (Urenkel) haben, bevor das
         // Tiefe-1-Kind weiterbreitert — sonst wären Enkel-Kandidaten anders
-        // behandelt als Wurzelkandidaten (unsymmetrisch).
+        // behandelt als Wurzelkandidaten (unsymmetrisch). Der Nachlauf schließt
+        // auch hier den zuletzt erzeugten Enkel nach (selbst wenn das
+        // Tiefe-1-Kind selbst nie wieder von UCB selektiert wurde, z.B. bei
+        // niedrigem Score) — daher gilt die Garantie für ALLE Enkel, nicht nur
+        // "alle außer dem letzten".
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(33);
         let nodes = build_tree(&s, 600, DEFAULT_C, &mut rng, None).unwrap();
         let mut checked_any = false;
         for &root_child in &nodes[0].children {
             let grandkids = &nodes[root_child].children;
-            if nodes[root_child].terminal || grandkids.len() < 2 {
-                continue; // braucht mind. 2 Enkel, um "alle außer dem letzten" zu prüfen
+            if nodes[root_child].terminal || grandkids.is_empty() {
+                continue;
             }
             checked_any = true;
-            for &gc in &grandkids[..grandkids.len() - 1] {
+            for &gc in grandkids {
                 if !nodes[gc].terminal {
                     assert!(
                         !nodes[gc].children.is_empty(),
@@ -834,7 +936,43 @@ mod tests {
                 }
             }
         }
-        assert!(checked_any, "Test braucht mind. ein Wurzelkind mit >=2 Enkeln");
+        assert!(checked_any, "Test braucht mind. ein Wurzelkind mit Enkeln");
+    }
+
+    #[test]
+    fn nachlauf_closed_nodes_have_even_visit_counts() {
+        // Für jeden nicht-terminalen Knoten X gilt strukturell f(X) = 1
+        // (eigene Erstellung/Eval) + f(letztes Kind) + ... -- ein Knoten, der
+        // GENAU einmal per Nachlauf geschlossen wurde (ein einzelnes,
+        // unerforschtes Antwort-Kind angehängt bekam), landet also bei
+        // f(Antwort-Kind) = 1 (eigene Erstellung) + 1 (Nachlauf-Antwort) = 2.
+        // Einfacher Sichtcheck im Debug-Log: jeder per NACHLAUF geschlossene
+        // Knoten muss eine GERADE Visit-Zahl zeigen.
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(21);
+        let mut lines = Vec::new();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, Some(&mut lines)).unwrap();
+        let mut checked_any = false;
+        for line in &lines {
+            if !line.contains("NACHLAUF") {
+                continue;
+            }
+            let after_arrow = line.split("→ #").nth(1).expect("NACHLAUF-Zeile ohne '→ #'");
+            let closed_id: usize = after_arrow
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse()
+                .expect("NACHLAUF-Zeile ohne Knoten-ID nach '→ #'");
+            checked_any = true;
+            assert_eq!(
+                nodes[closed_id].visits % 2,
+                0,
+                "per NACHLAUF geschlossener Knoten #{closed_id} hat ungerade Visits ({})",
+                nodes[closed_id].visits
+            );
+        }
+        assert!(checked_any, "Test braucht mind. einen NACHLAUF-Fund (ggf. Seed anpassen)");
     }
 
     #[test]
@@ -893,11 +1031,16 @@ mod tests {
         assert!(tree["children"].as_array().unwrap().len() > 0);
         // Wurzelkinder ≤ top_k im Baum.
         assert!(tree["children"].as_array().unwrap().len() <= 8);
-        // moves[] vorhanden, Summe der Visits ≈ Simulationen (jede Sim besucht Wurzel).
+        // moves[] vorhanden, Summe der Visits ≈ Simulationen (jede Sim besucht
+        // Wurzel) PLUS der Nachlauf-Sims, die offene Wurzel-/Tiefe-1-Enden
+        // nachträglich schließen (siehe FORCE-REPLY-Nachlauf in build_tree) —
+        // daher keine scharfe Obergrenze bei genau 300 mehr, nur eine
+        // großzügige, um echte Regressionen (z.B. unbeschränkte Kaskaden)
+        // trotzdem zu erkennen.
         let moves = analysis["moves"].as_array().unwrap();
         assert!(!moves.is_empty());
         let sum: u64 = moves.iter().map(|m| m["mcts_visits"].as_u64().unwrap()).sum();
-        assert!(sum >= 290 && sum <= 300, "Visit-Summe {sum} ~ 300");
+        assert!(sum >= 300 && sum <= 450, "Visit-Summe {sum} ~ 300 (+ Nachlauf)");
     }
 
     #[test]
