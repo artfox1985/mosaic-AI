@@ -5,7 +5,7 @@
 //! Rundenende-Strafen. Die scoring-tile-Endwertung (engine/scoring.py) folgt
 //! als eigenes Modul in Schritt 6.
 
-use crate::board::PlayerBoard;
+use crate::board::{PlayerBoard, BROKEN_PENALTIES, MAX_BROKEN};
 use crate::dome::{DomeTile, SpaceType};
 use crate::state::GameState;
 use crate::supply::Tower;
@@ -97,6 +97,25 @@ pub fn process_unplaceable_rows(player: &mut PlayerBoard, tower: &mut Tower) -> 
         moved.push((row_idx, color, n));
     }
     moved
+}
+
+/// Wie stark würde [`process_unplaceable_rows`] die Strafleiste bei diesem
+/// Spieler treffen, wenn es JETZT ausgeführt würde? Rein lesend (keine
+/// Mutation, keine Fliesen bewegt) -- für die Suche (`mcts.rs::player_total`),
+/// die diese deterministische Konsequenz schon VOR dem tatsächlichen
+/// Drafting→Tiling-Übergang einpreisen soll: der DFS-Solver
+/// (`solve_max_tiling_points`) erkennt zwar bereits, dass eine unplatzierbare
+/// Reihe 0 Punkte beiträgt, zieht aber nicht die Strafpunkte ab, die sie beim
+/// tatsächlichen Rundenende verursachen wird.
+pub fn projected_unplaceable_penalty(player: &PlayerBoard) -> i32 {
+    let unplaceable = find_unplaceable_rows(player);
+    if unplaceable.is_empty() {
+        return 0;
+    }
+    let n_tiles: usize = unplaceable.iter().map(|&ri| player.pattern_lines[ri].tiles.len()).sum();
+    let before = player.broken_tiles.len();
+    let after = (before + n_tiles).min(MAX_BROKEN);
+    (before..after).map(|i| BROKEN_PENALTIES[i]).sum()
 }
 
 // ── Validierung der Tiling-Aktion ───────────────────────────────────────────────
@@ -723,6 +742,54 @@ mod tests {
         assert_eq!(moved, vec![(0, Rot, 1)]);
         assert_eq!(p.broken_tiles.len(), 1);
         assert!(p.pattern_lines[0].tiles.is_empty());
+    }
+
+    #[test]
+    fn projected_unplaceable_penalty_matches_actual_outcome() {
+        // Gleiches Fixture wie unplaceable_when_domerow_full_no_match: die
+        // projizierte Strafe (VOR jeder Mutation berechnet) muss exakt der
+        // Strafe entsprechen, die process_unplaceable_rows danach wirklich
+        // verursacht (broken_penalty-Differenz).
+        let mut p = PlayerBoard::new(0, "P");
+        p.pattern_lines[0].add_tiles(&[Rot]);
+        let pool = build_dome_tile_pool();
+        for sc in 0..3 {
+            let mut t = pool[11].clone();
+            t.tile_id = 300 + sc;
+            p.dome_grid.place_dome_tile(t, 0, sc).unwrap();
+        }
+        assert_eq!(projected_unplaceable_penalty(&p), -1);
+
+        let penalty_before = p.broken_penalty();
+        let mut tower = Tower::default();
+        process_unplaceable_rows(&mut p, &mut tower);
+        let penalty_after = p.broken_penalty();
+        assert_eq!(penalty_after - penalty_before, -1);
+    }
+
+    #[test]
+    fn projected_unplaceable_penalty_escalates_with_existing_floor_tiles() {
+        // Strafleiste hat schon 2 Fliesen (-1,-2 bereits verbraucht) -- die
+        // naechste unplatzierbare Reihe muss mit -3 bewertet werden, nicht
+        // wieder mit -1.
+        use crate::tile::TileColor::{Blau, Schwarz};
+        let mut p = PlayerBoard::new(0, "P");
+        p.broken_tiles = vec![Blau, Schwarz];
+        p.pattern_lines[0].add_tiles(&[Rot]);
+        let pool = build_dome_tile_pool();
+        for sc in 0..3 {
+            let mut t = pool[11].clone();
+            t.tile_id = 400 + sc;
+            p.dome_grid.place_dome_tile(t, 0, sc).unwrap();
+        }
+        assert_eq!(projected_unplaceable_penalty(&p), -3);
+    }
+
+    #[test]
+    fn projected_unplaceable_penalty_is_zero_when_row_still_placeable() {
+        let mut p = PlayerBoard::new(0, "P");
+        p.pattern_lines[0].add_tiles(&[Rot]);
+        assert_eq!(projected_unplaceable_penalty(&p), 0);
     }
 
     #[test]

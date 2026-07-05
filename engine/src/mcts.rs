@@ -64,12 +64,17 @@ struct Node {
 /// PLUS ein stetiger Wertungsplatten-Fortschritts-Term ([`wertung_progress`]),
 /// damit die Suche Baustellen an aktiven Wertungsplatten (volle Reihen/Spalten/
 /// Diagonalen, Ecken, Mehrfarbige Felder) schon vor Fertigstellung goutiert,
-/// statt sie erst beim letzten fehlenden Feld zu bemerken. NICHT identisch mit
-/// dem `estimated_score` der UI (`serialize.rs`) — der bleibt bewusst rein am
-/// real erreichbaren Rundenscore, ohne diesen Suche-only-Fortschrittsbonus.
+/// statt sie erst beim letzten fehlenden Feld zu bemerken, MINUS die Strafe,
+/// die bereits unplatzierbare Musterreihen ([`projected_unplaceable_penalty`])
+/// beim tatsächlichen Rundenende verursachen werden -- der DFS-Solver sieht
+/// selbst nur "0 Punkte von dieser Reihe", nicht die Buße, die sie auf der
+/// Strafleiste noch anrichtet. NICHT identisch mit dem `estimated_score` der
+/// UI (`serialize.rs`) — der bleibt bewusst rein am real erreichbaren
+/// Rundenscore, ohne diese beiden Suche-only-Korrekturterme.
 fn player_total(state: &GameState, pi: usize) -> f64 {
     solve_round_final_score(state, pi) as f64
         + wertung_progress(&state.players[pi], &state.scoring_tile_ids)
+        + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64
 }
 
 /// Skala für die Score→Wert-Normalisierung — identisch zum Netz-Value-Target
