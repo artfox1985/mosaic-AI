@@ -373,7 +373,7 @@ impl PyGame {
         let leaf = if stage == 2 { LeafEval::Net } else { LeafEval::Dfs };
         let sims = dynamic_sims(simulations, drafting_actions(&self.game.state).len());
         let (_chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng, None);
         Ok(analysis.to_string())
     }
 
@@ -559,9 +559,8 @@ impl PyGame {
     }
 
     /// Drafting-Zug per Netz-PUCT (mit Priors+Such-Stats-Analyse). Erfordert
-    /// zuvor `load_net()`. `log=true` hängt einen Text-Log an (Kopf + Zug-
-    /// Ranking-Tabelle — kein Sim-für-Sim-Trace wie bei der Heuristik, da
-    /// `build_net_tree` aktuell nicht sim-genau protokolliert).
+    /// zuvor `load_net()`. `log=true` hängt einen vollen Sim-für-Sim-Trace an
+    /// (Selection/Expansion/Eval/Backprop je Simulation, analog zur Heuristik).
     fn ai_drafting_net_step(&mut self, simulations: u32, c_puct: f64, stage: u32, log: bool) -> PyResult<String> {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
@@ -578,8 +577,10 @@ impl PyGame {
 
         let leaf = if stage == 2 { LeafEval::Net } else { LeafEval::Dfs };
         let sims = dynamic_sims(simulations, actions.len());
+        let mut lines: Vec<String> = Vec::new();
+        let logger = if log { Some(&mut lines) } else { None };
         let (chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng, logger);
         let a = match chosen {
             Some(a) => a,
             None => {
@@ -593,8 +594,16 @@ impl PyGame {
         };
 
         // Log-Text VOR dem Anwenden bauen (Kopf nutzt den Pre-Move-Zustand).
-        let log_text =
-            if log { Some(net_mcts::net_analysis_log_text(&self.game.state, &analysis)) } else { None };
+        let log_text = if log {
+            let mut t = net_mcts::net_search_log_header(&self.game.state, &analysis);
+            for l in &lines {
+                t.push_str(l);
+                t.push('\n');
+            }
+            Some(t)
+        } else {
+            None
+        };
 
         let action_json = search_move_json(&SearchMove::Draft(a.clone()), Some(&self.game.state));
         map_err(self.game.apply_drafting(&a))?;
