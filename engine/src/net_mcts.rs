@@ -347,16 +347,19 @@ fn build_net_tree<R: Rng + ?Sized>(
         // Selection + (eine) Expansion.
         let mut nid = 0;
         loop {
-            // Erzwungener Gegnerzug: die Wurzel breitert erst weiter (neuer
-            // Kandidat), wenn ihr zuletzt erzeugtes Kind selbst mindestens
-            // einen eigenen Kindknoten hat (= Gegner-Antwort simuliert) —
-            // sonst vergleicht man Wurzelkandidaten nur anhand des rohen
-            // Zustands direkt nach dem eigenen Zug, ohne jede Gegnerreaktion.
-            // Nur an der Wurzel selbst (nid==0), nicht rekursiv tiefer.
-            if nid == 0 {
-                if let Some(&last_child) = nodes[0].children.last() {
+            // Erzwungener Gegnerzug: ein Knoten breitert erst weiter (neuer
+            // Kandidat), wenn sein zuletzt erzeugtes Kind selbst mindestens
+            // einen eigenen Kindknoten hat (= Antwort simuliert) — sonst
+            // vergleicht man Kandidaten nur anhand des rohen Zustands direkt
+            // nach dem Zug, ohne jede Reaktion. Gilt für Wurzel (Tiefe 0) UND
+            // ihre direkten Kinder (Tiefe 1, "1. Gegnerzug") symmetrisch —
+            // sonst bekämen Enkel-Kandidaten (Tiefe 2, Antworten auf den
+            // Gegnerzug) nicht dieselbe Garantie wie die Wurzelkandidaten
+            // selbst. Ab Tiefe 2 nicht mehr rekursiv (normales Widening/PUCT).
+            if nid == 0 || nodes[nid].parent == Some(0) {
+                if let Some(&last_child) = nodes[nid].children.last() {
                     if nodes[last_child].children.is_empty() && !nodes[last_child].terminal {
-                        logln!("  FORCE-REPLY #0 → #{last_child}: Gegnerzug erzwungen vor weiterem Breitern");
+                        logln!("  FORCE-REPLY #{nid} → #{last_child}: Antwort erzwungen vor weiterem Breitern");
                         nid = last_child;
                         continue;
                     }
