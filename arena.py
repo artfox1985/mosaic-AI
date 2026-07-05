@@ -312,16 +312,16 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
 if __name__ == "__main__":
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v6b.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL = "models/alphazero_v7.onnx"   # Pfad zum ONNX-Netz
     NET_MODEL_PRE = "models/alphazero_v4.onnx"
     NET_SIMS  = 200                            # Basis-Sims des Netzes
     STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
     GAMES     = 100
-    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = "v6b",
+    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = "v7",
                   games=GAMES, stage=STAGE, threads=0)
     #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
-    #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v6b", name_b="v4")
+    #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v7", name_b="v4")
 
     # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
     # competitors = {

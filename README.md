@@ -1,6 +1,6 @@
 # 🧩 Mosaic-AI: Tile-Drafting AlphaZero Environment
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Rust](https://img.shields.io/badge/engine-Rust-orange.svg)](https://www.rust-lang.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -12,182 +12,171 @@
 
 ## 🧠 Core Features
 
-- **Custom Game Engine** — Full headless Python engine with multi-phase gameplay: tile drafting (sun/moon sides), dome placement, bonus chips, pattern rows, floor penalty, and end scoring
-- **MCTS** — Monte Carlo Tree Search with heuristic rollouts, greedy-bias exploration, and lazy action expansion
-- **AlphaZero Agent** — PUCT-based search with neural network priors stored directly on tree nodes (no global cache, no RAM leak)
-- **Self-Play Pipeline** — MCTS bootstrap → Network self-play loop with temperature scheduling and policy caching
-- **The Arena** — Automated tournament with ELO ratings, branching factor tracking, and detailed game logs
-- **Web Interface** — Flask server with browser UI for playing against the AI and replaying games
+- **Rust Game Engine** (`engine/`, PyO3/maturin) — full headless engine covering the whole multi-phase gameplay (sun/moon drafting, dome placement, bonus chips, pattern rows, floor penalty, exact end scoring). GIL-free, rayon-parallel self-play/arena.
+- **Heuristic MCTS** (`engine/src/mcts.rs`) — Progressive Widening with a depth-dependent cap (full breadth at the root, capped breadth + UCB-driven depth from depth 1 onward), leaf evaluation via an exact tiling solver (no rollouts).
+- **AlphaZero Agent** (`engine/src/net_mcts.rs`) — PUCT search with network priors (including Plackett-Luce moon-order priors), Stage 1 (DFS leaf) and Stage 2 (network-value leaf, gated behind a readiness probe).
+- **Self-Play Pipeline** (`self_play.py`) — thin Python driver over the Rust self-play loop; MCTS and network modes, chunked for live progress reporting.
+- **Champion/Candidate Training** (`train.py`) — warm-start with shape-mismatch filtering (architecture can change between generations, e.g. the policy head), plateau-based early stopping, R² tracking for the value head, automatic network-utilization analysis (dead neurons / effective rank), and a Stage-2 readiness probe after every run.
+- **The Arena** (`arena.py`) — network-vs-network, network-vs-heuristic, and pure-heuristic round robins with Elo ratings and a significance gate for the champion protocol.
+- **Web Interface** (`server.py` + `static/`) — Flask API on top of the Rust engine, browser UI for playing against the AI and a replay viewer.
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-📦 mosaic-AI/  (Hauptordner)
-├── 📂 agents/
-│   ├── 📜 __init__.py
-│   ├── 📜 agent_env.py       # MosaicEnv: OpenAI Gym-style wrapper, abstract action representation
-│   ├── 📜 agents.py          # RandomAgent, GreedyAgent
-│   ├── 📜 alphazero.py       # AlphaZeroAgent: PUCT search with node-based priors
-│   ├── 📜 mcts.py            # MCTSAgent, HeuristicMCTSAgent, MCTSNode, run_episode_mcts
-│   ├── 📜 neural_net.py      # MosaicNet (399→512→512→512), state_to_tensor, action_to_id, MosaicDataset
-│   └── 📜 shaping.py         # Reward shaping: pattern rows, floor penalty, dome bonus
-├── 📂 archive/
-│   └── 📜 self_play_v0.py    # Legacy self-play script
-├── 📂 docs/
-│   ├── 📜 bonus_chips_colors.csv
-│   └── 📜 dome_colors.csv
-├── 📂 engine/
-│   ├── 📜 __init__.py
-│   ├── 📜 board.py           # PlayerBoard, DomeGrid
-│   ├── 📜 dome.py            # DomeTile, DomeSlot, SpaceType (NORMAL/WILD/SPECIAL)
-│   ├── 📜 execution.py       # execute_move, _execute_moon_take, bonus chip reveal, log formatting
-│   ├── 📜 factory.py         # SmallFactory, LargeFactory, moon stacks, bonus chips
-│   ├── 📜 game.py            # Game class: apply(), valid_moves(), phase transitions
-│   ├── 📜 moves.py           # Move, TakeAction, PlaceAction, PlaceDomeTileMove, DrawFromStackMove
-│   ├── 📜 round_end.py       # check_drafting_complete, can_complete_row_with_chips, process_unplaceable_rows
-│   ├── 📜 scoring.py         # ScoringTile subclasses, calculate_end_scoring
-│   ├── 📜 serializer.py      # serialize_state → obs dict for neural net
-│   ├── 📜 setup.py           # GameState dataclass, new_game()
-│   ├── 📜 supply.py          # Tile bag, tower
-│   ├── 📜 tile.py            # TileColor enum
-│   └── 📜 validation.py      # generate_valid_moves, validate_tiling_action
-├── 📂 models/                # Trained model checkpoints (.pth)
-├── 📂 static/
-│   ├── 📂 css/
-│   │   └── 📜 style.css
-│   ├── 📂 js/
-│   │   └── 📜 app.js
-│   ├── 📜 index.html         # Main game UI
-│   └── 📜 replay.html        # Game replay viewer
-├── 📂 utils/
-│   ├── 📜 __init__.py
-│   ├── 📜 debug_data.py      # Training data inspector
-│   ├── 📜 debug_game.py      # Game state debugger
-│   ├── 📜 diagnosis.py       # Policy quality analysis, sanity checks (options 1-4)
-│   ├── 📜 git_tree.py        # Project tree printer
-│   ├── 📜 model_info.py      # Model metadata viewer
-│   └── 📜 replay_server.py   # Replay file server
-├── 📜 .gitignore
-├── 📜 README.md
-├── 📜 arena.py               # ▶️ Tournament runner with ELO ratings
-├── 📜 config.py              # Hyperparameters: INPUT_SIZE=399, NUM_ACTIONS=482, HIDDEN_SIZE=512
-├── 📜 self_play.py           # ▶️ Generate training data (MCTS or Network self-play)
-├── 📜 server.py              # ▶️ Flask web server for browser UI
-└── 📜 train.py               # ▶️ Train neural network (PyTorch, CUDA)
+📦 mosaic-AI/  (project root)
+├── 📂 engine/                 # Rust crate (mosaic_rust) — all game/search/self-play logic
+│   ├── 📂 src/
+│   │   ├── 📜 state.rs, board.rs, dome.rs, factory.rs, supply.rs, tile.rs   # Game state
+│   │   ├── 📜 game.rs, moves.rs, execution.rs, round_end.rs, validation.rs # Rules/move execution
+│   │   ├── 📜 scoring.rs, tiling_solver.rs   # Exact round/end scoring (DFS solver)
+│   │   ├── 📜 mcts.rs          # Heuristic MCTS (depth-dependent Progressive Widening)
+│   │   ├── 📜 net_mcts.rs      # AlphaZero PUCT search (network priors + Plackett-Luce moon order)
+│   │   ├── 📜 net.rs           # ONNX inference (tract-onnx)
+│   │   ├── 📜 features.rs      # State → feature vector (Rust mirror of engine/py/neural_net.py)
+│   │   ├── 📜 self_play.rs     # Rayon-parallel self-play/arena loops
+│   │   ├── 📜 serialize.rs     # State → JSON (UI/Python)
+│   │   └── 📜 py.rs            # PyO3 bindings (`mosaic_rust` module)
+│   ├── 📂 py/
+│   │   └── 📜 neural_net.py    # MosaicNet (PyTorch), MosaicDataset, state_to_tensor, action_to_id
+│   ├── 📜 Cargo.toml
+│   └── 📜 pyproject.toml       # maturin build config
+├── 📂 evaluations/            # Per-generation eval reports (v*_eval.md) + STAGE2_TODO.md (champion protocol, roadmap)
+├── 📂 data/                   # Self-play output (.pkl) + HDF5 training cache
+├── 📂 models/                 # Trained checkpoints (.pth), ONNX exports (.onnx), loss plots
+├── 📂 static/                 # Web UI (index.html, debug.html, replay viewer, css/js)
+├── 📂 utils/                  # diagnosis.py, model_info.py, git_tree.py
+├── 📂 docs/                   # engine_manual.md, reference CSVs (bonus chip/dome colors)
+├── 📂 archive/                # Legacy: old pure-Python engine/agents (python_engine/, python_agents/), history notes
+├── 📜 config.py               # Hyperparameters (INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, VALUE_WEIGHT, ...)
+├── 📜 self_play.py            # ▶️ Self-play driver (calls into Rust, groups/pickles step records)
+├── 📜 train.py                # ▶️ Training (PyTorch/CUDA) + auto ONNX export + readiness probe
+├── 📜 export_onnx.py          # ▶️ .pth → .onnx (also run automatically at the end of train.py)
+├── 📜 arena.py                # ▶️ Tournaments/comparisons with Elo rating
+└── 📜 server.py               # ▶️ Flask web server (browser UI)
 ```
 
 ---
 
 ## 🚀 Quickstart
 
-### 1. Generate Training Data (MCTS Bootstrap)
+### 0. Build the Rust engine (once, then again whenever Rust code changes)
 ```bash
-python self_play.py --mode mcts --games 500 --sims 50 --version v0a --depth 0
+cd engine
+python -m maturin build --release
+python -m pip install --force-reinstall target/wheels/mosaic_rust-*.whl
 ```
 
-### 2. Train Neural Network
+### 1. Generate self-play data
 ```bash
-python train.py --name v1 --epochs 30
-# Warm-start from previous version (same architecture required):
-python train.py --name v2 --load v1 --epochs 30
+# Heuristic MCTS (e.g. bootstrap, no network dependency)
+python self_play.py --mode mcts --games 1500 --sims 100 --version v0
+
+# AlphaZero network self-play (Stage 1 = DFS leaf, Stage 2 = network-value leaf)
+python self_play.py --mode network --model alphazero_v4.onnx --stage 1 --games 2000 --sims 400 --version v4b
 ```
 
-### 3. Network Self-Play
+### 2. Train the neural network
 ```bash
-python self_play.py --mode network --games 500 --sims 40 --version v1 --depth 0
+python train.py --name v1 --epochs 100
+# Warm-start from a previous generation (shape mismatches, e.g. from architecture
+# changes, are filtered automatically and only those layers start fresh):
+python train.py --name v2 --load v1 --epochs 100
 ```
+Automatically exports to `.onnx` at the end and runs the Stage-2 readiness probe right after.
 
-### 4. Arena
+### 3. Arena (Elo, champion gate)
+Participants are configured in the `if __name__ == "__main__"` block of `arena.py` (no CLI flags):
 ```bash
 python arena.py
 ```
 
-### 5. Web Interface
+### 4. Web interface
 ```bash
 python server.py
-# Open http://localhost:5000
+# http://localhost:5000
 ```
 
 ---
 
 ## 🏗️ Architecture
 
-### Neural Network (`MosaicNet`)
+### Neural Network (`MosaicNet`, `engine/py/neural_net.py`)
 ```
-Input (399) → Linear(512) → BN → ReLU
+Input (684) → Linear(512) → BN → ReLU
            → Linear(512) → BN → ReLU
            → Linear(512) → ReLU
-           ┌→ Policy Head: Linear(482) — action logits
-           └→ Value Head:  Linear(128) → ReLU → Linear(1) → Tanh
+           ┌→ Policy Head: Linear(256) → ReLU → Linear(482)   — action logits
+           ├→ Value Head:  Linear(128) → ReLU → Linear(1) → Tanh
+           └→ Moon-Order Head: Linear(32) → ReLU → Linear(5)   — Plackett-Luce scores
 ```
+`policy_hidden=0` reconstructs the old, single-layer policy head (for older checkpoints,
+auto-detected by `export_onnx.py`).
 
-### State Tensor (399 features)
-| Block | Features | Description |
-|---|---|---|
-| Global | 2 | round/6, phase/3 |
-| Scoring Tiles | 8 | active scoring tile IDs (one-hot) |
-| Small Factories ×4 | 28 | sun colors(5) + has_chip(1) + chip_revealed(1) = 7 each |
-| Large Factory | 5 | sun color counts/10 |
-| Players ×2 | 114 | score, estimated_score, marker, chip colors, pattern lines ×6, floor, tokens_used, chips_taken, bonus_chip colors |
-| Dome Grid ×2 | 162 | 9 slots × 9 features each |
-| Moon Stacks ×4 | 60 | 3 positions × 5 colors per factory |
-| GF Moon Pool | 5 | color counts/10 |
-| Dome Display | 24 | 3 plates × 4 spaces × (filled + required_color) |
-| Dome Stack | 1 | remaining plates/20 |
+### State Tensor (684 features)
+| Block | Description |
+|---|---|
+| Global | Round, phase, bag count |
+| Scoring tiles | 8-dim one-hot of active tiles |
+| Small factories ×4 | Sun colors, bonus-chip status + color mask |
+| Large factory | Sun color counts |
+| Players ×2 (ego perspective) | Score, estimated_score, pattern lines, floor, bonus chips, per-row chip-completability |
+| Dome grid ×2 | 9 slots × 9 features (filled/color/type/locked) |
+| End-scoring/geometry features ×2 | Scoring-tile points, row/column/diagonal fill, corners, wild/special state |
+| Line geometry ×2 | Contiguous row/column runs, cluster score, growth potential |
+| Small-factory moon side ×4 | Stack order per position |
+| Large-factory moon pool | Color counts |
+| Dome display + stack | Scoring slots, remaining plates |
 
 ### Action Space (482 actions)
 | Type | IDs | Description |
 |---|---|---|
-| pass | 0 | No valid moves |
-| end_tiling | 1 | End tiling phase |
-| stone | 10–249 | Take stones: factory_index(0-5) × color(5) × row(-1..6) |
-| tiling | 274–327 | Place tile: pattern_row × slot_row × slot_col |
-| dome | 328–435 | Place dome from display: display_index × slot × rotation |
-| dome_stack | 436–471 | Draw from stack: slot × rotation |
-| use_chips | 472–477 | Use bonus chips for pattern row |
-| bonus_chip | 478–481 | Take bonus chip from factory |
+| pass | 0 | No legal move |
+| end_tiling | 1 | End the tiling phase |
+| stone | 10–249 | Take a tile: factory index × color × target row |
+| tiling | 274–327 | Place a tile: pattern row × slot |
+| dome | 328–435 | Place a dome plate from the display: display index × slot × rotation |
+| dome_stack | 436–471 | Draw a dome plate from the stack: slot × rotation |
+| use_chips | 472–477 | Use bonus chips to complete a pattern row |
+| bonus_chip | 478–481 | Take a bonus chip from a factory |
 
 ---
 
-## 🔄 Training Pipeline
+## 🔄 Training Pipeline: Champion/Candidate Protocol
+
+Full details in [`evaluations/STAGE2_TODO.md`](evaluations/STAGE2_TODO.md) — short version:
 
 ```
-MCTS Bootstrap (depth=0, 50 sims)
+Self-play (current champion, Stage 1 / DFS leaf)
         ↓
-   ~1000 games → train V1
+Training window: max. 2 retired champions (2000 games each) + current champion (up to 3×2000)
         ↓
-Network Self-Play V1 (40 sims)
+Train candidate (warm-start from the champion)
         ↓
-   ~500 games → train V2 (warm-start)
+Arena gate: candidate vs. champion, 100 games — needs ≥60:40 (z≈2.0), otherwise champion stays
         ↓
-Network Self-Play V2 (40 sims)
-        ↓
-   ~500 games → train V3 (warm-start)
-        ↓
-        ...
+Champion generates another self-play round → next candidate
 ```
 
-### Current Results
+If the champion stays unbeaten with the full 10,000-game window: thin the window first
+(cheapest step), then generate another round from the champion at the same sim count, and
+only as a last resort raise the sim count for new rounds. Stage 2 (network value as the
+search leaf) is only unlocked once the Stage-2 readiness probe (0:0 ratio Stage2/Stage1
+≤1.5×) turns green — currently still 🔴/🟡 across all generations.
 
-| Model | Architecture | Policy Loss | Value Loss | vs MCTS(50,d=5) |
-|---|---|---|---|---|
-| V1 | 399→256→256→256 | 31.6% | 0.025 | **60%** (40 games) |
-| V2 | 399→512→512→512 | 27.1% | 0.020 | **60%** (40 games) |
-
-> `AlphaZeroAgent(sims=40)` vs `HeuristicMCTSAgent(sims=50, rollout_depth=d)`
+Current champion, generation history, and arena results: see `evaluations/*.md`.
 
 ---
 
-## 🛠️ Diagnosis & Tools
+## 🛠️ Diagnostics & Tools
 
 ```bash
 # Policy quality analysis
 python -m utils.diagnosis
 
 # Model metadata
-python -m utils.model_info --version v2
+python -m utils.model_info --version v4
 
 # Project file tree
 python utils/git_tree.py
@@ -197,11 +186,14 @@ python utils/git_tree.py
 
 ## ⚙️ Configuration (`config.py`)
 
-| Parameter | Value | Description |
+| Parameter | Current value | Description |
 |---|---|---|
-| `INPUT_SIZE` | 399 | State tensor size |
+| `INPUT_SIZE` | 684 | State tensor size |
 | `NUM_ACTIONS` | 482 | Action space size |
-| `HIDDEN_SIZE` | 512 | Hidden layer neurons |
+| `HIDDEN_SIZE` | 512 | Neurons per hidden layer |
 | `BATCH_SIZE` | 256 | Training batch size |
-| `LEARNING_RATE` | 0.001 | Adam optimizer LR |
-| `VALUE_WEIGHT` | 0.15 | Value loss weight in total loss |
+| `LEARNING_RATE` | 0.0004 | Adam learning rate |
+| `VALUE_WEIGHT` | 15 | Weight of the value loss in the combined loss (compensates for the narrow spread of the score-margin target vs. the old ±1 target) |
+
+`LEARNING_RATE` and `VALUE_WEIGHT` are currently under active parameter sweeps
+(see `evaluations/v6*_eval.md`) — values may change between generations.
