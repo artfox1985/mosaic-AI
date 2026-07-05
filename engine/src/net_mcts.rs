@@ -305,6 +305,72 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
     }
 }
 
+/// Expandiert das höchstpriorisierte unversuchte Kind von `nid` (falls
+/// vorhanden) und backpropagiert dessen Blattwert bis zur Wurzel — exakt der
+/// EXPAND/EVAL/BACKPROP-Schritt einer normalen Simulation, nur außerhalb der
+/// Sim-Zählschleife aufrufbar. Für die Nachlauf-Schließung offener Enden
+/// (siehe unten): kein Effekt, falls `nid` bereits terminal ist oder keine
+/// unversuchten Aktionen mehr hat.
+#[allow(clippy::too_many_arguments)]
+fn expand_and_backprop(
+    nodes: &mut Vec<Node>,
+    net: &Net,
+    nid: usize,
+    leaf: LeafEval,
+    names: &[&str; 2],
+    log: &mut Option<&mut Vec<String>>,
+) {
+    if nodes[nid].untried.is_empty() {
+        return;
+    }
+    let (act, prior) = nodes[nid].untried.remove(0);
+    let mover = nodes[nid].state.current_player;
+    let mut g = Game { state: nodes[nid].state.clone() };
+    if g.apply_drafting(&act).is_err() {
+        return;
+    }
+    let mut child_state = g.state;
+    child_state.log.clear();
+    let terminal = child_state.phase != Phase::Drafting;
+    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, leaf);
+    let cid = nodes.len();
+    nodes.push(child);
+    nodes[nid].children.push(cid);
+    if let Some(l) = log.as_deref_mut() {
+        l.push(format!(
+            "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}, prior={:.1}%{})",
+            label_search_move(&SearchMove::Draft(act), None).1,
+            names[mover],
+            prior * 100.0,
+            if terminal { ", terminal" } else { "" }
+        ));
+    }
+
+    let value = nodes[cid].leaf_value;
+    if let Some(l) = log.as_deref_mut() {
+        l.push(format!(
+            "  EVAL   #{cid} ({}) win[{}]={:.3} win[{}]={:.3}",
+            if leaf == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
+            names[0], value[0], names[1], value[1]
+        ));
+    }
+
+    let mut bp = String::from("  BACKPROP");
+    let mut cur = Some(cid);
+    while let Some(i) = cur {
+        nodes[i].visits += 1;
+        let delta = value[nodes[i].player_who_acted];
+        nodes[i].value += delta;
+        if log.is_some() {
+            bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
+        }
+        cur = nodes[i].parent;
+    }
+    if let Some(l) = log.as_deref_mut() {
+        l.push(bp);
+    }
+}
+
 /// Baut den PUCT-Suchbaum. `add_root_noise` aktiviert Dirichlet-Wurzel-Noise.
 /// Mit `log = Some(..)` wird jede Simulation (Selection/Expansion/Eval/Backprop)
 /// als Text protokolliert (für den Server-Debug-Log, analog `mcts::build_tree`).
@@ -443,6 +509,34 @@ fn build_net_tree<R: Rng + ?Sized>(
         }
         logln!("{bp}");
     }
+
+    // Nachlauf: Force-Reply oben (Tiefe 0/1) greift nur, wenn PUCT den Knoten
+    // je wieder besucht — Wurzelkinder mit sehr niedrigem Prior (z.B. #45 im
+    // Log vom 2026-07-05) werden von PUCT nie erneut selektiert und ihr
+    // einziges erzwungenes Kind (Tiefe 2) bleibt dauerhaft ohne eigene
+    // Antwort. Hier wird EINMAL über die bereits gebauten Wurzel- und
+    // Tiefe-1-Knoten gegangen und jeder mit Kindern, dessen zuletzt
+    // hinzugefügtes Kind selbst noch keins hat, nachträglich um genau eine
+    // Antwort ergänzt — auch wenn das über `sims` hinausgeht. Bewusst NICHT
+    // auf tiefere Knoten ausgeweitet: dort ist ein kinderloses letztes Kind
+    // die normale, gewollte MCTS-Baumgrenze, kein offenes Ende (siehe
+    // Kommentar bei FORCE-REPLY oben).
+    let built = nodes.len();
+    for i in 0..built {
+        if i != 0 && nodes[i].parent != Some(0) {
+            continue;
+        }
+        if nodes[i].terminal {
+            continue;
+        }
+        let Some(&last_child) = nodes[i].children.last() else { continue };
+        if nodes[last_child].terminal || !nodes[last_child].children.is_empty() {
+            continue;
+        }
+        logln!("  NACHLAUF #{i} → #{last_child}: offenes Ende nachträglich geschlossen");
+        expand_and_backprop(&mut nodes, net, last_child, leaf, &names, &mut log);
+    }
+
     nodes
 }
 
