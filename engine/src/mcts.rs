@@ -481,7 +481,7 @@ fn tiles_taken(state: &GameState, t: &crate::moves::TakeAction) -> usize {
 }
 
 /// `state=Some` blendet die Steinanzahl in die Stein-Beschreibung ein.
-fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (&'static str, String, &'static str, Value) {
+pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (&'static str, String, &'static str, Value) {
     match sm {
         SearchMove::Draft(a) => match a {
             Action::Stone(m) => {
@@ -676,6 +676,7 @@ pub fn search_with_tree<R: Rng + ?Sized>(
         "has_net": false,
         "simulations": simulations,
         "num_actions": nodes[0].n_actions,
+        "num_actions_considered": nodes[0].children.len(),
         "max_depth": subtree_depth(&nodes, 0),
         "ai_action": chosen_id,
         "moves": moves,

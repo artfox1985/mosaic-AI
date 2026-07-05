@@ -211,7 +211,9 @@ function renderAnalysis(d) {
   document.getElementById('roundNum').textContent = d.round ?? '–';
   document.getElementById('curPlayer').textContent = 'P' + (d.current_player + 1);
   document.getElementById('aiPlayer').textContent = (d.ai_player !== null && d.ai_player !== undefined) ? 'P' + (d.ai_player + 1) : '–';
-  document.getElementById('numActions').textContent = d.num_actions;
+  document.getElementById('numActions').textContent = (d.num_actions_considered !== undefined && d.num_actions_considered !== null)
+    ? `${d.num_actions_considered}/${d.num_actions}`
+    : d.num_actions;
   document.getElementById('numSims').textContent = d.simulations;
   document.getElementById('maxDepth').textContent = d.max_depth !== undefined ? d.max_depth : '–';
 

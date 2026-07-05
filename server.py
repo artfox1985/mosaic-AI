@@ -33,6 +33,7 @@ sys.path.insert(0, BASE_DIR)
 
 from flask import Flask, request, jsonify, send_from_directory
 import threading
+from config import MODELS_DIR
 
 # Rust-Engine — einzige Engine. Ohne sie kann kein Spiel laufen.
 try:
@@ -77,6 +78,9 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # ── KI-Konfiguration ─────────────────────────────────────────────────────────
 _ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
 _ai_sims     = 300         # MCTS-Basis-Simulationen der Rust-KI
+_ai_model    = None        # None = Heuristik; sonst Versionsname (z.B. "v8") -> Netz-Modus
+_ai_c_puct   = 1.5         # PUCT-Konstante im Netz-Modus (Standard wie net_mcts.rs)
+_ai_stage    = 1           # 1 = DFS-Blatt, 2 = Netz-Value-Blatt (Netz-Modus)
 _last_ai_log = None        # voller Such-Trace des zuletzt gespielten KI-Drafting-Zugs
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
@@ -98,6 +102,19 @@ def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) ->
     if preset is not None:
         return preset
     return DIFFICULTY_PRESETS["_default"]
+
+
+def _resolve_model_path(model: str | None) -> Path | None:
+    """`model` ("v8", "heuristic", None, ...) -> ONNX-Pfad oder None (= Heuristik).
+    Akzeptiert auch einen bereits vollständigen Pfad/Dateinamen."""
+    if not model or model.strip().lower() in ("", "heuristic", "heuristik"):
+        return None
+    m = model.strip()
+    candidates = [Path(m), MODELS_DIR / m, MODELS_DIR / f"alphazero_{m}.onnx"]
+    for c in candidates:
+        if c.exists() and c.suffix == ".onnx":
+            return c
+    return None
 
 
 # ── Rust-Helfer ──────────────────────────────────────────────────────────────
@@ -154,7 +171,7 @@ def debug_page():
 
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
-    global _rust, _rust_logged, _ai_sims, _ai_player, _ai_debug_history, _game_log_path
+    global _rust, _rust_logged, _ai_sims, _ai_player, _ai_model, _ai_debug_history, _game_log_path
     _ai_debug_history = []
     data = request.get_json(silent=True) or {}
     names      = data.get('names', ['Spieler 1', 'Spieler 2'])
@@ -177,12 +194,27 @@ def new_game():
     _rust_logged = 0
     seed = _rust.seed()
 
+    model_warning = None
     if ai_enabled:
         preset = _resolve_difficulty(difficulty, data.get('model'), data.get('sims'))
         _ai_player = int(ai_side)
         _ai_sims   = int(preset.get('sims') or 100)
+        requested_model = preset.get('model')
+        model_path = _resolve_model_path(requested_model)
+        if model_path is not None:
+            try:
+                _rust.load_net(str(model_path))
+                _ai_model = requested_model
+            except Exception as e:
+                model_warning = f"Netz '{requested_model}' konnte nicht geladen werden ({e}) — spiele gegen Heuristik."
+                _ai_model = None
+        else:
+            if requested_model and requested_model.strip().lower() not in ("", "heuristic", "heuristik"):
+                model_warning = f"Modell '{requested_model}' nicht gefunden (models/alphazero_{requested_model}.onnx) — spiele gegen Heuristik."
+            _ai_model = None
     else:
         _ai_player = None
+        _ai_model = None
 
     # Log-Datei für dieses Spiel erstellen
     timestamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -195,8 +227,8 @@ def new_game():
             "first_player": first_player,
             "ai_enabled":   ai_enabled,
             "ai_player":    _ai_player,
-            "ai_model":     data.get('model', None),
-            "ai_sims":      data.get('sims', None),
+            "ai_model":     _ai_model or "heuristic",
+            "ai_sims":      _ai_sims if ai_enabled else None,
         }
         lf.write("# MOSAIC GAME LOG\n")
         lf.write(f"# {_json.dumps(meta, ensure_ascii=False)}\n")
@@ -205,6 +237,9 @@ def new_game():
     response = ok()
     response['ai_enabled']  = ai_enabled
     response['ai_player']   = _ai_player
+    response['ai_model']    = _ai_model or "heuristic"
+    if model_warning:
+        response['warning'] = model_warning
     response['log_file']    = _game_log_path.name
     response['seed']        = seed
     return jsonify(response)
@@ -468,17 +503,29 @@ def ai_config():
         "ai_enabled": _ai_player is not None,
         "ai_player": _ai_player,
         "sims": _ai_sims,
+        "model": _ai_model or "heuristic",
     })
 
 
 @app.route('/api/ai/config', methods=['POST'])
 def ai_config_set():
-    """Setzt Schwierigkeit (Basis-Sims) während des Spiels."""
-    global _ai_sims
+    """Setzt Schwierigkeit (Basis-Sims, Modell) während des Spiels."""
+    global _ai_sims, _ai_model
     d = request.get_json(silent=True) or {}
     preset = _resolve_difficulty(d.get('difficulty', 'medium'), d.get('model'), d.get('sims'))
     _ai_sims = int(preset.get('sims') or 300)
-    return jsonify({"ok": True, "sims": _ai_sims})
+    if 'model' in d or 'difficulty' in d:
+        requested_model = preset.get('model')
+        model_path = _resolve_model_path(requested_model)
+        if model_path is not None and _rust is not None:
+            try:
+                _rust.load_net(str(model_path))
+                _ai_model = requested_model
+            except Exception as e:
+                return jsonify(err(f"Netz '{requested_model}' konnte nicht geladen werden: {e}"))
+        else:
+            _ai_model = None
+    return jsonify({"ok": True, "sims": _ai_sims, "model": _ai_model or "heuristic"})
 
 
 @app.route('/api/ai/move', methods=['GET', 'POST'])
@@ -496,8 +543,12 @@ def ai_move():
         return jsonify(err("Nicht der Zug der KI" if phase == "drafting"
                            else "Mensch ist noch am Tilen"))
     try:
-        # KI-Drafting-Zug immer geloggt ausführen → Trace für den Debugger-Button.
-        res = _json.loads(_rust.ai_step_json(_ai_sims, True))
+        if _ai_model is not None:
+            # Netz-Modus: kein Text-Trace (anders als Heuristik), dafür Priors+PUCT-Stats im debug-Dict.
+            res = _json.loads(_rust.ai_step_net_json(_ai_sims, _ai_c_puct, _ai_stage, True))
+        else:
+            # KI-Drafting-Zug immer geloggt ausführen → Trace für den Debugger-Button.
+            res = _json.loads(_rust.ai_step_json(_ai_sims, True))
     except Exception as e:
         return jsonify(err(f"KI-Fehler: {e}"))
     if not res.get("applied"):
@@ -546,7 +597,10 @@ def ai_debug():
     """Analyse der AKTUELLEN Stellung (ohne Zug auszuführen), aus der Rust-KI."""
     if (e := _require_game()) is not None:
         return e
-    analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
+    if _ai_model is not None:
+        analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct, _ai_stage))
+    else:
+        analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
     if not isinstance(analysis, dict):
         return jsonify({"ok": True, "moves": [], "current_player": _rust.current_player()})
     analysis["ok"] = True
@@ -585,7 +639,10 @@ def ai_suggest():
     if (e := _require_game()) is not None:
         return e
     try:
-        analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
+        if _ai_model is not None:
+            analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct, _ai_stage))
+        else:
+            analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
         moves = analysis.get("moves", []) if isinstance(analysis, dict) else []
         top = sorted(moves, key=lambda m: m.get("mcts_visits", 0), reverse=True)[:3]
         suggestions = [{

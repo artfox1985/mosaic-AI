@@ -6,20 +6,26 @@ hier nur der aktuelle Stand und die aktiven Regeln.
 
 ## Aktueller Stand
 
-**Champion: v4.** v5 konnte v4 nicht schlagen (45:55). v4 generiert aktuell
-eine weitere Self-Play-Runde (v4b); v6 wird als nächster Kandidat trainiert.
+**Champion: v8.** Nach v5/v6/v6c/v6d/v7 (alle gegen v4 gescheitert) hat v8 das Gate
+mit 60:40 (z≈2.0) genommen — erster Champion-Wechsel seit v4. v8 generiert jetzt
+eine neue Self-Play-Runde (`v8`, 6000 Spiele).
 
-| Netz   | Fenster                           | Champion?            | vs. Heuristik | Ø Score (Netz:Heur) | vs. Champion      | Ø Score   |
-| ------ | --------------------------------- | -------------------- | ------------- | ------------------- | ----------------- | --------- |
-| v1     | 3000 Bootstrap-Spiele (cold)      | ja (einzige Option)  | 43 %          | 19.5:25.4           | —                 | —         |
-| v2     | Bootstrap+2000×v1                 | nein — v1 bleibt     | 44 %          | 19.6:28.4           | 50:50 (z=0.0)     | 20.5:17.6 |
-| v3     | Bootstrap+2000×v1+2000×v1b        | nein — v1 bleibt     | 47 %          | 25.6:29.9           | 53:47 (z=0.6)     | 22.1:19.6 |
-| **v4** | v1+v1b+v1c (6000, kein Bootstrap) | **✅ neuer Champion** | 48 %          | 22.3:25.5           | **65:35 (z=3.0)** | 19.7:15.2 |
-| v5     | v1b+v1c+v4 (gleitend)             | nein — v4 bleibt     | 47 %          | 22.9:25.7           | 45:55 (z=-1.0)    | 20.0:24.0 |
+| Netz   | Fenster                                | Champion?            | vs. Heuristik | Ø Score (Netz:Heur) | vs. Champion      | Ø Score   |
+| ------ | --------------------------------------- | -------------------- | ------------- | ------------------- | ----------------- | --------- |
+| v1     | 3000 Bootstrap-Spiele (cold)            | ja (einzige Option)  | 43 %          | 19.5:25.4           | —                 | —         |
+| v2     | Bootstrap+2000×v1                       | nein — v1 bleibt     | 44 %          | 19.6:28.4           | 50:50 (z=0.0)     | 20.5:17.6 |
+| v3     | Bootstrap+2000×v1+2000×v1b              | nein — v1 bleibt     | 47 %          | 25.6:29.9           | 53:47 (z=0.6)     | 22.1:19.6 |
+| **v4** | v1+v1b+v1c (6000, kein Bootstrap)       | **✅ neuer Champion** | 48 %          | 22.3:25.5           | **65:35 (z=3.0)** | 19.7:15.2 |
+| v5     | v1b+v1c+v4 (gleitend)                    | nein — v4 bleibt     | 47 %          | 22.9:25.7           | 45:55 (z=-1.0)    | 20.0:24.0 |
+| v6b    | v1b+v1c+v4+v4b (8000)                    | nein — v4 bleibt     | 58 %          | 27.0:26.6           | 53:47 (z=0.6)     | 21.6:21.7 |
+| v7     | v1b+v1c+v4+v4b+v4c (10000, voll)         | nein — v4 bleibt     | 59 %          | 27.2:25.5           | 43:57 (z=-1.4)     | 21.2:21.2 |
+| **v8** | v1c+v4+v4b+v4c+v4d (10000, ausgedünnt)  | **✅ neuer Champion** | 55 %          | 25.7:26.6           | **60:40 (z=2.0)** | 26.8:22.4 |
 
 Trend: durchgehender Fortschritt v1→v4 (mehr Daten half sichtbar auf jeder
-Achse), v5 der erste Ausreißer ohne Fortschritt — vom Champion/Kandidat-
-Protokoll erwartet, kein Alarmsignal.
+Achse), v5/v6b/v7 Ausreißer ohne Gate-Erfolg gegen v4 (vom Protokoll erwartet,
+kein Alarmsignal) — v8 (erstes Fenster mit Ausdünnung statt reinem Wachstum,
+plus 2-lagiger Policy-Head + höheres `VALUE_WEIGHT=15`) durchbricht die Serie.
+v8 vs. v1 zum Vergleich: 68:32 (z≈3.6), deutlich über v4s 65:35 gegen v1.
 
 **Stage 2 (Netz-Value als Suchblatt): weiterhin 🔴 ROT** bei allen Generationen
 (Ratio 3.4×–5.1×, siehe Reifegrad-Sonde unten). Bleibt in Stufe 1 (DFS-Blatt).
@@ -105,3 +111,10 @@ Neustart (v4-v11) — nicht mehr rekonstruierbar, da die Daten gelöscht sind.
 
 - Stage 2 weiterhin rot — keine Prognose, wann sich das ändert.
 - Learning Rate kann noch optimiert werden
+- **Für später (nur falls v4 nach v8 Champion bleibt):** testweise ein `v4b`
+  (Name kollidiert mit der bestehenden Self-Play-Runde `v4b` — bei Umsetzung
+  neu benennen) mit dem neuen 2-lagigen Policy-Head trainieren, aber auf den
+  ALTEN, frühen Trainingsdaten (`v1+v1b+v1c`) statt dem aktuellen Fenster.
+  Gegen `v1` in der Arena testen — schlägt es weiterhin `v1`, daraus einen
+  Herausforderer mit vollständigem Warm-Start (kompletter aktueller
+  Datenstand) generieren.
