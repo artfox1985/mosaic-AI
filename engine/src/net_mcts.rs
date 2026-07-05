@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 use crate::features::{action_to_id, state_to_features};
 use crate::game::{drafting_actions, Game};
-use crate::mcts::{label_search_move, SearchMove, MAX_ACTIONS, WIDEN_FACTOR};
+use crate::mcts::{label_search_move, SearchMove};
 use crate::moves::{Action, TakeSource};
 use crate::net::{softmax, Net};
 use crate::self_play::action_to_env_dict;
@@ -28,6 +28,13 @@ pub const DEFAULT_C_PUCT: f64 = 1.5;
 /// Dirichlet-Wurzel-Noise (AlphaZero-Standard).
 pub const DIRICHLET_EPS: f64 = 0.25;
 pub const DIRICHLET_ALPHA: f64 = 0.3;
+/// Kumulative Policy-Masse, ab der das Widening stoppt: nur die (nach Prior
+/// absteigend sortierten) Kandidaten bis zu dieser Schwelle werden je
+/// überhaupt zu Kindknoten — der "Long Tail" niedrig priorisierter Züge wird
+/// nie besucht (spart Simulationsschritte, ersetzt die alte, rein
+/// besuchszahl-gesteuerte Progressive-Widening-Formel `MAX_ACTIONS +
+/// WIDEN_FACTOR·√N`).
+pub const POLICY_MASS_CUTOFF: f64 = 0.95;
 
 /// Blattbewertung der Netz-Suche. Priors kommen IMMER vom Netz; nur das Blatt
 /// unterscheidet sich:
@@ -185,6 +192,21 @@ fn build_untried_actions(
         acts.push((act, base_p));
     }
     acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Policy-Masse-Cutoff: nur den minimalen Präfix behalten, dessen kumulierte
+    // Priors POLICY_MASS_CUTOFF erreichen — der Rest (Long Tail) wird verworfen,
+    // BEVOR er je ein Kandidat für Widening werden kann. Mindestens 1 Aktion
+    // bleibt immer erhalten (auch wenn ihr eigener Prior schon >= Cutoff ist).
+    let mut cum = 0.0f64;
+    let mut keep = acts.len();
+    for (i, (_, p)) in acts.iter().enumerate() {
+        cum += *p as f64;
+        if cum >= POLICY_MASS_CUTOFF {
+            keep = i + 1;
+            break;
+        }
+    }
+    acts.truncate(keep.max(1));
     (acts, n)
 }
 
@@ -296,8 +318,11 @@ fn build_net_tree<R: Rng + ?Sized>(
             if nodes[nid].terminal {
                 break;
             }
-            let allowed = MAX_ACTIONS + (WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
-            if !nodes[nid].untried.is_empty() && nodes[nid].children.len() < allowed {
+            // Kein besuchszahl-abhängiges Wachstum mehr: `untried` ist bereits beim
+            // Erzeugen des Knotens auf den POLICY_MASS_CUTOFF-Präfix gekappt (siehe
+            // `build_untried_actions`) — jeder verbleibende Kandidat darf irgendwann
+            // Kind werden, der Long Tail wurde schon vorher verworfen.
+            if !nodes[nid].untried.is_empty() {
                 let (act, prior) = nodes[nid].untried.remove(0); // höchster Prior zuerst
                 let mover = nodes[nid].state.current_player;
                 let mut g = Game { state: nodes[nid].state.clone() };
@@ -616,7 +641,35 @@ mod tests {
     }
 
     #[test]
-    fn build_untried_actions_priors_sum_to_one_and_expand_moon_orders() {
+    fn build_untried_actions_truncates_long_tail_for_peaked_policy() {
+        // Genau EINE legale Aktions-ID stark bevorzugen -> praktisch die gesamte
+        // Masse liegt auf ihr (+ ggf. ihren Moon-Order-Varianten), der Rest ist
+        // Long Tail und sollte komplett verworfen werden.
+        let mut rng = StdRng::seed_from_u64(11);
+        let state = setup_new_game(names(), 0, &mut rng);
+        let base_actions = drafting_actions(&state);
+        assert!(base_actions.len() > 5, "Testvoraussetzung: früher Zustand mit vielen legalen Zügen");
+        let spike_id = action_to_id(&action_to_env_dict(&state, &base_actions[0]));
+
+        let mut logits = vec![-10.0f32; NUM_ACTIONS];
+        logits[spike_id] = 10.0;
+        let moon_scores = [0.0f32; 5];
+
+        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores);
+        assert!(!acts.is_empty());
+        assert!(
+            acts.len() < n_base,
+            "Kappung sollte bei stark geneigter Verteilung deutlich weniger Kandidaten \
+             behalten als Basis-Aktionen: {} Kandidaten vs. {} Basis-Aktionen",
+            acts.len(),
+            n_base
+        );
+        let total: f64 = acts.iter().map(|(_, p)| *p as f64).sum();
+        assert!(total >= POLICY_MASS_CUTOFF && total <= 1.0 + 1e-4);
+    }
+
+    #[test]
+    fn build_untried_actions_priors_reach_cutoff_and_expand_moon_orders() {
         let mut rng = StdRng::seed_from_u64(42);
         let state = setup_new_game(names(), 0, &mut rng);
         let logits = vec![0.1f32; NUM_ACTIONS];
@@ -625,10 +678,15 @@ mod tests {
         let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores);
         assert!(!acts.is_empty());
 
-        // Gesamtsumme aller Priors muss (bis auf Rundung) 1 ergeben — die
-        // Moon-Order-Aufteilung darf keine Masse erzeugen oder verlieren.
+        // Kandidaten sind auf den POLICY_MASS_CUTOFF-Präfix gekappt (Long Tail
+        // verworfen) — die Summe muss also mindestens den Cutoff erreichen
+        // (der Schritt, der ihn überschreitet, wird noch mitgenommen), aber
+        // nie mehr als 1.0 (Moon-Order-Aufteilung erzeugt/verliert keine Masse).
         let total: f64 = acts.iter().map(|(_, p)| *p as f64).sum();
-        assert!((total - 1.0).abs() < 1e-4, "Summe der Priors war {total}, erwartet 1.0");
+        assert!(
+            total >= POLICY_MASS_CUTOFF && total <= 1.0 + 1e-4,
+            "Summe der (gekappten) Priors war {total}, erwartet in [{POLICY_MASS_CUTOFF}, 1.0]"
+        );
 
         // Mindestens eine SmallFactorySun-Basis-Aktion mit ≥2 Restfliesen sollte
         // beim Spielstart existieren (4 Fabriken × 4 Fliesen) -> Expansion
