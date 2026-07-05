@@ -62,65 +62,57 @@ fn player_total(state: &GameState, pi: usize) -> f64 {
     solve_round_final_score(state, pi) as f64
 }
 
-/// Aktionsabhängige Sigmoid-scale (Port von agents/mcts.py `_scale_for_actions`).
-fn scale_for_actions(n: usize) -> f64 {
-    if n > 50 {
-        2.0
-    } else if n > 15 {
-        5.0
-    } else {
-        7.0
-    }
+/// Skala für die Score→Wert-Normalisierung — identisch zum Netz-Value-Target
+/// (`config.py` `VALUE_SCALE=50`), damit Heuristik- und Netzbewertung auf
+/// derselben Punkte-Kalibrierung beruhen: gutes Signal bei ~50 Punkten,
+/// deutlich sichtbare Sättigung erst deutlich über ~90 Punkten.
+pub const VALUE_SCALE: f64 = 50.0;
+
+/// Absoluter Rundenscore eines Spielers → normalisierter Wert in (0, 1).
+/// BEWUSST unabhängig vom Score des Gegners (keine Differenzbildung mehr):
+/// eine Differenz-Sigmoid sättigt bei großem Punkteabstand für BEIDE Spieler
+/// gegen 0/1 — die Suche verliert dann jede Fähigkeit, zwischen "schlecht"
+/// und "noch schlechter" (bzw. "gut" und "noch besser") zu unterscheiden,
+/// obwohl das Ziel (maximale eigene Punkte, wo möglich auch Abstand
+/// minimieren) in jeder Stellung weiterhin gilt. "Wissen" über den Gegner
+/// kommt strukturell aus dem Suchbaum (eigene Zweige je Spieler), nicht aus
+/// dieser Formel.
+fn normalize_score(score: f64) -> f64 {
+    ((score / VALUE_SCALE).tanh() + 1.0) / 2.0
 }
 
-/// Punktedifferenz → Win-Wahrscheinlichkeiten [p0, p1] (Port von `_diff_to_probs`).
-fn diff_to_probs(diff: f64, scale: f64) -> [f64; 2] {
-    let safe = diff.clamp(-200.0, 200.0);
-    let p0 = 1.0 / (1.0 + (-safe / scale).exp());
-    [p0, 1.0 - p0]
-}
-
-/// Sigmoid-scale für das exakte DFS-Terminal (kalibriert auf echte Score-Diffs).
-const TERMINAL_SCALE: f64 = 10.0;
-
-/// Blattbewertung als Per-Spieler-Win-Prob (absolut, nicht perspektivisch).
+/// Blattbewertung als Per-Spieler-Wert (absolut, nicht perspektivisch).
 /// Am Drafting→Tiling-Übergang (Phase ≠ Drafting) wird der exakte Runden-Score
 /// per DFS-Solver bestimmt (Pseudo-Terminal); mitten im Drafting die Heuristik.
 /// Öffentlich für den Netz-MCTS-Stufe-1-Modus (DFS-Blattbewertung + Netz-Priors).
-pub fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
+pub fn evaluate(state: &GameState, _n_actions: usize) -> [f64; 2] {
     if state.phase != Phase::Drafting {
         let f0 = solve_round_final_score(state, 0) as f64;
         let f1 = solve_round_final_score(state, 1) as f64;
-        return diff_to_probs(f0 - f1, TERMINAL_SCALE);
+        return [normalize_score(f0), normalize_score(f1)];
     }
-    let diff = player_total(state, 0) - player_total(state, 1);
-    diff_to_probs(diff, scale_for_actions(n_actions))
+    [normalize_score(player_total(state, 0)), normalize_score(player_total(state, 1))]
 }
 
 /// Wie [`evaluate`], zusätzlich mit einer Klartext-Erklärung (nur fürs Log).
 /// Verwendet die Spielernamen statt P0/P1.
-fn evaluate_explain(state: &GameState, n_actions: usize) -> ([f64; 2], String) {
+fn evaluate_explain(state: &GameState, _n_actions: usize) -> ([f64; 2], String) {
     let n0 = state.players[0].name.as_str();
     let n1 = state.players[1].name.as_str();
     if state.phase != Phase::Drafting {
         let f0 = solve_round_final_score(state, 0);
         let f1 = solve_round_final_score(state, 1);
-        let v = diff_to_probs((f0 - f1) as f64, TERMINAL_SCALE);
+        let v = [normalize_score(f0 as f64), normalize_score(f1 as f64)];
         let why = format!(
-            "DFS-Terminal (phase={}) {n0}={f0} {n1}={f1} diff={:+}",
+            "DFS-Terminal (phase={}) {n0}={f0} {n1}={f1}",
             state.phase.as_str(),
-            f0 - f1
         );
         return (v, why);
     }
     let t0 = player_total(state, 0);
     let t1 = player_total(state, 1);
-    let scale = scale_for_actions(n_actions);
-    let v = diff_to_probs(t0 - t1, scale);
-    let why = format!(
-        "Heuristik total[{n0}]={t0:.1} total[{n1}]={t1:.1} diff={:+.1} scale={scale}",
-        t0 - t1
-    );
+    let v = [normalize_score(t0), normalize_score(t1)];
+    let why = format!("Heuristik total[{n0}]={t0:.1} total[{n1}]={t1:.1} (absolut, scale={VALUE_SCALE})");
     (v, why)
 }
 
@@ -762,6 +754,23 @@ mod tests {
             "Widening sollte mehr als {MAX_ACTIONS} Kinder erzeugen, hat {}",
             nodes[0].children.len()
         );
+    }
+
+    #[test]
+    fn normalize_score_stays_distinguishable_over_typical_score_range() {
+        // Anders als die alte Differenz-Sigmoid (scale=2.0 bei >50 Aktionen,
+        // sättigte schon bei Diffs von ~20-30 Punkten für BEIDE Spieler
+        // gleichzeitig) bleibt die absolute Score-Normalisierung über den
+        // gesamten typischen Punktebereich (0–90+) klar unterscheidbar und
+        // monoton — auch bei bereits großem Abstand zum Gegner (den diese
+        // Funktion gar nicht mehr kennt) bleibt "mehr eigene Punkte" ein
+        // Signal.
+        let v0 = normalize_score(0.0);
+        let v45 = normalize_score(45.0);
+        let v90 = normalize_score(90.0);
+        assert!(v0 < v45 && v45 < v90, "muss streng monoton steigend sein");
+        assert!(v45 > v0 + 0.1, "45 Punkte sollten sich deutlich von 0 abheben");
+        assert!(v90 > v45 + 0.02, "90 Punkte sollten noch messbar über 45 liegen (nicht schon gesättigt)");
     }
 
     #[test]
