@@ -285,7 +285,18 @@ fn best_puct(nodes: &[Node], nid: usize, c_puct: f64) -> usize {
     best
 }
 
+/// Kurzlabel eines Knotens fürs Log (Aktionsbeschreibung bzw. „Wurzel").
+fn log_label(nodes: &[Node], nid: usize) -> String {
+    match &nodes[nid].action {
+        None => "Wurzel".to_string(),
+        Some(a) => label_search_move(&SearchMove::Draft(a.clone()), None).1,
+    }
+}
+
 /// Baut den PUCT-Suchbaum. `add_root_noise` aktiviert Dirichlet-Wurzel-Noise.
+/// Mit `log = Some(..)` wird jede Simulation (Selection/Expansion/Eval/Backprop)
+/// als Text protokolliert (für den Server-Debug-Log, analog `mcts::build_tree`).
+#[allow(clippy::too_many_arguments)]
 fn build_net_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -294,11 +305,17 @@ fn build_net_tree<R: Rng + ?Sized>(
     add_root_noise: bool,
     leaf: LeafEval,
     rng: &mut R,
+    mut log: Option<&mut Vec<String>>,
 ) -> Vec<Node> {
+    let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
     root_state.log.clear();
     let root_player = root_state.current_player;
     let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, leaf)];
+
+    macro_rules! logln {
+        ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
+    }
 
     // Dirichlet-Noise auf die Wurzel-Priors mischen (Self-Play-Exploration).
     if add_root_noise && !nodes[0].untried.is_empty() {
@@ -309,13 +326,17 @@ fn build_net_tree<R: Rng + ?Sized>(
         nodes[0]
             .untried
             .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        logln!("  ROOT-NOISE gemischt (Dirichlet alpha={DIRICHLET_ALPHA}, eps={DIRICHLET_EPS})");
     }
 
-    for _ in 0..sims {
+    for sim in 0..sims {
+        logln!("=== Sim {}/{} ===", sim + 1, sims);
+
         // Selection + (eine) Expansion.
         let mut nid = 0;
         loop {
             if nodes[nid].terminal {
+                logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
                 break;
             }
             // Kein besuchszahl-abhängiges Wachstum mehr: `untried` ist bereits beim
@@ -329,10 +350,18 @@ fn build_net_tree<R: Rng + ?Sized>(
                 if g.apply_drafting(&act).is_ok() {
                     let mut child_state = g.state;
                     child_state.log.clear();
-                    let child = make_node(net, child_state, Some(nid), Some(act), prior, mover, leaf);
+                    let terminal = child_state.phase != Phase::Drafting;
+                    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, leaf);
                     let cid = nodes.len();
                     nodes.push(child);
                     nodes[nid].children.push(cid);
+                    logln!(
+                        "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}, prior={:.1}%{})",
+                        label_search_move(&SearchMove::Draft(act), None).1,
+                        names[mover],
+                        prior * 100.0,
+                        if terminal { ", terminal" } else { "" }
+                    );
                     nid = cid;
                 }
                 break;
@@ -340,17 +369,49 @@ fn build_net_tree<R: Rng + ?Sized>(
             if nodes[nid].children.is_empty() {
                 break;
             }
-            nid = best_puct(&nodes, nid, c_puct);
+            let cid = best_puct(&nodes, nid, c_puct);
+            if log.is_some() {
+                let sqrt_pv = (nodes[nid].visits.max(1) as f64).sqrt();
+                let psum: f64 = nodes[nid]
+                    .children
+                    .iter()
+                    .map(|&c| nodes[c].prior as f64)
+                    .sum::<f64>()
+                    .max(1e-8);
+                let n = nodes[cid].visits as f64;
+                let q = if n > 0.0 { nodes[cid].value / n } else { 0.0 };
+                let p = nodes[cid].prior as f64 / psum;
+                let u = c_puct * p * sqrt_pv / (1.0 + n);
+                logln!(
+                    "  SELECT #{nid} → #{cid} [{}] (Zug: {}) N={} P={:.3} Q={:.3} U={:.3} → {:.3}",
+                    log_label(&nodes, cid), names[nodes[cid].player_who_acted],
+                    nodes[cid].visits, p, q, u, q + u
+                );
+            }
+            nid = cid;
         }
 
-        // Backprop (Netz-Blattwert, player_who_acted-Sicht).
+        // Eval: Blattwert wurde schon bei Knoten-Erzeugung berechnet (make_node).
         let value = nodes[nid].leaf_value;
+        logln!(
+            "  EVAL   #{nid} ({}) win[{}]={:.3} win[{}]={:.3}",
+            if leaf == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
+            names[0], value[0], names[1], value[1]
+        );
+
+        // Backprop (Netz-Blattwert, player_who_acted-Sicht).
+        let mut bp = String::from("  BACKPROP");
         let mut cur = Some(nid);
         while let Some(i) = cur {
             nodes[i].visits += 1;
-            nodes[i].value += value[nodes[i].player_who_acted];
+            let delta = value[nodes[i].player_who_acted];
+            nodes[i].value += delta;
+            if log.is_some() {
+                bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
+            }
             cur = nodes[i].parent;
         }
+        logln!("{bp}");
     }
     nodes
 }
@@ -369,7 +430,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return None;
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng, None);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits)?;
     nodes[best].action.clone()
 }
@@ -387,7 +448,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return Vec::new();
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng, None);
     nodes[0]
         .children
         .iter()
@@ -404,6 +465,9 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
 /// Suche — das eigentliche Policy-Head-Signal) zusammen mit den PUCT-Such-Stats
 /// (`mcts_visits`/`mcts_share`/`mcts_q`). Für den Server (Mensch-vs-Netz) und Debug-UI;
 /// `add_root_noise` hier i.d.R. `false` (Dirichlet-Noise ist nur ein Self-Play-Kniff).
+/// Mit `log = Some(..)` wird zusätzlich ein Sim-für-Sim-Trace protokolliert
+/// (für den Server-Debug-Log-Button, analog zur Heuristik).
+#[allow(clippy::too_many_arguments)]
 pub fn net_search_with_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -412,11 +476,12 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     add_root_noise: bool,
     leaf: LeafEval,
     rng: &mut R,
+    log: Option<&mut Vec<String>>,
 ) -> (Option<Action>, Value) {
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng, log);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits);
     let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
     let prior_sum: f64 = nodes[0]
@@ -500,40 +565,25 @@ fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
     }
 }
 
-/// Textzusammenfassung einer `net_search_with_tree`-Analyse fürs Server-Debug-Log
-/// (kein Sim-für-Sim-Trace wie bei der Heuristik — `build_net_tree` protokolliert
-/// aktuell nicht jede Simulation einzeln — sondern Kopfzeilen + Zug-Ranking-Tabelle).
-pub fn net_analysis_log_text(state: &GameState, analysis: &Value) -> String {
+/// Kopfzeilen für ein Netz-PUCT-Log aus State + Analyse (für den geloggten
+/// KI-Zug) — Pendant zu `mcts::search_log_header`. Der eigentliche Sim-für-
+/// Sim-Trace kommt separat aus `build_net_tree`s `log`-Parameter.
+pub fn net_search_log_header(state: &GameState, analysis: &Value) -> String {
     let sims = analysis["simulations"].as_u64().unwrap_or(0);
     let na = analysis["num_actions"].as_u64().unwrap_or(0);
     let considered = analysis["num_actions_considered"].as_u64().unwrap_or(0);
-    let mut out = String::new();
-    out.push_str("Netz-PUCT-Debug-Log (KI-Zug)\n");
-    out.push_str(&format!(
-        "Simulationen={sims}  Aktionen={considered}/{na} durchsucht  Wurzelspieler={}\n",
-        state.players[state.current_player].name
-    ));
-    out.push_str(&format!("Spieler: P0={}  P1={}\n", state.players[0].name, state.players[1].name));
-    out.push_str(&format!("{}\n", "=".repeat(60)));
-    out.push_str(&format!(
-        "{:<5} {:<45} {:>8} {:>8} {:>8} {:>7}\n",
-        "#", "Zug", "Prior", "Visits", "Share%", "Q%"
-    ));
-    if let Some(moves) = analysis["moves"].as_array() {
-        for m in moves {
-            let mark = if m["chosen"].as_bool().unwrap_or(false) { "*" } else { " " };
-            out.push_str(&format!(
-                "{mark}{:<4} {:<45} {:>7.1}% {:>8} {:>7.1}% {:>6.1}%\n",
-                m["action_id"].as_i64().unwrap_or(-1),
-                m["description"].as_str().unwrap_or("?"),
-                m["net_prob_norm"].as_f64().unwrap_or(0.0) * 100.0,
-                m["mcts_visits"].as_u64().unwrap_or(0),
-                m["mcts_share"].as_f64().unwrap_or(0.0) * 100.0,
-                m["mcts_q"].as_f64().unwrap_or(0.0) * 100.0,
-            ));
-        }
-    }
-    out
+    let chosen = analysis["moves"]
+        .as_array()
+        .and_then(|ms| ms.iter().find(|m| m["chosen"] == json!(true)))
+        .and_then(|m| m["description"].as_str())
+        .unwrap_or("?");
+    format!(
+        "Netz-PUCT-Debug-Log (KI-Zug)\nSimulationen={sims}  Aktionen={considered}/{na} durchsucht (Policy-Masse-Cutoff)  Wurzelspieler={}\nSpieler: P0={}  P1={}\nGewaehlter Zug: {chosen}\n{}\n",
+        state.players[state.current_player].name,
+        state.players[0].name,
+        state.players[1].name,
+        "=".repeat(60),
+    )
 }
 
 // ── Dirichlet/Gamma-Sampling (ohne rand_distr) ──────────────────────────────────
