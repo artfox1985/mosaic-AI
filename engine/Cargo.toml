@@ -17,3 +17,15 @@ serde_json = "1"
 # Reines Rust ONNX-Inferenz (Network-Modus, Phase B) — kein libtorch/onnxruntime nötig.
 tract-onnx = "0.21"
 # pyo3-Version wird via `cargo add` auf die neueste 3.14-kompatible gesetzt.
+
+[features]
+# Zaehlt GameState-Klone im Such-Hot-Path (mcts.rs/net_mcts.rs) via AtomicUsize.
+# Nur fuers Profiling gedacht -- im Normalbetrieb aus (Zero-Cost, da wegkompiliert).
+clone_profiling = []
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "clone_cost"
+harness = false

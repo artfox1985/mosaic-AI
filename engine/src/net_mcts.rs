@@ -222,10 +222,12 @@ fn make_node(
     leaf: LeafEval,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
-    let feats = state_to_features(&state_to_json(&state, true));
-    let (logits, value, moon) = net
-        .eval(&feats)
-        .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], 0.0, Vec::new()));
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+        state_to_features(&state_to_json(&state, true))
+    });
+    let (logits, value, moon) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], 0.0, Vec::new()))
+    });
 
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
@@ -244,6 +246,7 @@ fn make_node(
     let leaf_value = match leaf {
         LeafEval::Net => {
             let mover_val = ((value + 1.0) / 2.0) as f64;
+            crate::profiling::note_gamestate_clone();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let other_feats = state_to_features(&state_to_json(&flipped, true));
@@ -253,7 +256,9 @@ fn make_node(
                 .unwrap_or(0.5);
             if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
         }
-        LeafEval::Dfs => crate::mcts::evaluate(&state, n_actions),
+        LeafEval::Dfs => crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
+            crate::mcts::evaluate(&state, n_actions)
+        }),
     };
 
     Node {
@@ -297,11 +302,15 @@ fn best_puct(nodes: &[Node], nid: usize, c_puct: f64) -> usize {
     best
 }
 
-/// Kurzlabel eines Knotens fürs Log (Aktionsbeschreibung bzw. „Wurzel").
+/// Kurzlabel eines Knotens fürs Log (Aktionsbeschreibung bzw. „Wurzel"). Mit
+/// Eltern-Zustand (VOR dem Zug) für Steinanzahl/Füllstand/Strafleisten-Hinweis.
 fn log_label(nodes: &[Node], nid: usize) -> String {
     match &nodes[nid].action {
         None => "Wurzel".to_string(),
-        Some(a) => label_search_move(&SearchMove::Draft(a.clone()), None).1,
+        Some(a) => {
+            let parent_state = nodes[nid].parent.map(|p| &nodes[p].state);
+            label_search_move(&SearchMove::Draft(a.clone()), parent_state).1
+        }
     }
 }
 
@@ -325,6 +334,7 @@ fn expand_and_backprop(
     }
     let (act, prior) = nodes[nid].untried.remove(0);
     let mover = nodes[nid].state.current_player;
+    crate::profiling::note_gamestate_clone();
     let mut g = Game { state: nodes[nid].state.clone() };
     if g.apply_drafting(&act).is_err() {
         return;
@@ -339,7 +349,7 @@ fn expand_and_backprop(
     if let Some(l) = log.as_deref_mut() {
         l.push(format!(
             "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}, prior={:.1}%{})",
-            label_search_move(&SearchMove::Draft(act), None).1,
+            label_search_move(&SearchMove::Draft(act), Some(&nodes[nid].state)).1,
             names[mover],
             prior * 100.0,
             if terminal { ", terminal" } else { "" }
@@ -442,6 +452,7 @@ fn build_net_tree<R: Rng + ?Sized>(
             if !nodes[nid].untried.is_empty() {
                 let (act, prior) = nodes[nid].untried.remove(0); // höchster Prior zuerst
                 let mover = nodes[nid].state.current_player;
+                crate::profiling::note_gamestate_clone();
                 let mut g = Game { state: nodes[nid].state.clone() };
                 if g.apply_drafting(&act).is_ok() {
                     let mut child_state = g.state;
@@ -453,7 +464,7 @@ fn build_net_tree<R: Rng + ?Sized>(
                     nodes[nid].children.push(cid);
                     logln!(
                         "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}, prior={:.1}%{})",
-                        label_search_move(&SearchMove::Draft(act), None).1,
+                        label_search_move(&SearchMove::Draft(act), Some(&nodes[nid].state)).1,
                         names[mover],
                         prior * 100.0,
                         if terminal { ", terminal" } else { "" }

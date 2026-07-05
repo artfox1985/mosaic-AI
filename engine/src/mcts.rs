@@ -144,6 +144,7 @@ fn valid_search_moves(state: &GameState) -> Vec<SearchMove> {
 fn apply_search_move(state: &GameState, mv: &SearchMove) -> Option<GameState> {
     match mv {
         SearchMove::Draft(a) => {
+            crate::profiling::note_gamestate_clone();
             let mut g = Game { state: state.clone() };
             g.apply_drafting(a).ok()?;
             let mut s = g.state;
@@ -264,11 +265,15 @@ fn best_uct_child(nodes: &[Node], nid: usize, c: f64) -> usize {
     best
 }
 
-/// Knoten-Kurzlabel fürs Log (Aktionsbeschreibung bzw. „Wurzel").
+/// Knoten-Kurzlabel fürs Log (Aktionsbeschreibung bzw. „Wurzel"). Mit
+/// Eltern-Zustand (VOR dem Zug) für Steinanzahl/Füllstand/Strafleisten-Hinweis.
 fn log_label(nodes: &[Node], nid: usize) -> String {
     match &nodes[nid].action {
         None => "Wurzel".to_string(),
-        Some(sm) => label_search_move(sm, None).1,
+        Some(sm) => {
+            let parent_state = nodes[nid].parent.map(|p| &nodes[p].state);
+            label_search_move(sm, parent_state).1
+        }
     }
 }
 
@@ -308,7 +313,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
     if let Some(l) = log.as_deref_mut() {
         l.push(format!(
             "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}{})",
-            label_search_move(&mv, None).1,
+            label_search_move(&mv, Some(&nodes[nid].state)).1,
             names[mover],
             if terminal { ", terminal/DFS" } else { "" }
         ));
@@ -445,7 +450,7 @@ fn build_tree<R: Rng + ?Sized>(
                 nodes[nid].children.push(cid);
                 logln!(
                     "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}{})",
-                    label_search_move(&mv, None).1,
+                    label_search_move(&mv, Some(&nodes[nid].state)).1,
                     names[mover],
                     if terminal { ", terminal/DFS" } else { "" }
                 );
@@ -615,14 +620,22 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                     None => "GF".to_string(),
                 };
                 // Mit Zustand: Steinanzahl voranstellen und Füllstand der Zielreihe
-                // NACH dem Zug anhängen ([gefüllt/Kapazität], wie im Game-Log).
+                // NACH dem Zug anhängen ([gefüllt/Kapazität], wie im Game-Log) --
+                // plus Überlauf-Hinweis, falls mehr Steine genommen werden, als in
+                // die Reihe passen (Rest landet automatisch auf der Strafleiste,
+                // siehe `execution::execute_place`/`add_to_penalty`).
                 let (amount, fill) = match state {
                     Some(s) => {
                         let n = tiles_taken(s, &m.take);
                         let fill = if m.place.row_index >= 0 {
                             let row = &s.players[s.current_player].pattern_lines[m.place.row_index as usize];
-                            let filled = (row.tiles.len() + n).min(row.capacity());
-                            format!(" [{}/{}]", filled, row.capacity())
+                            let remaining = row.capacity().saturating_sub(row.tiles.len());
+                            let placed = n.min(remaining);
+                            let overflow = n.saturating_sub(remaining);
+                            let filled = row.tiles.len() + placed;
+                            let overflow_note =
+                                if overflow > 0 { format!(" (+{overflow} Strafleiste)") } else { String::new() };
+                            format!(" [{}/{}]{overflow_note}", filled, row.capacity())
                         } else {
                             String::new()
                         };
@@ -663,7 +676,10 @@ fn serialize_node(nodes: &[Node], nid: usize, depth_left: u32, top_k: usize) -> 
     let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
     let (typ, desc, cat, mv) = match &node.action {
         None => ("root", "Wurzel".to_string(), "pass", Value::Null),
-        Some(sm) => label_search_move(sm, None),
+        Some(sm) => {
+            let parent_state = node.parent.map(|p| &nodes[p].state);
+            label_search_move(sm, parent_state)
+        }
     };
     let children = if depth_left > 0 && !node.children.is_empty() {
         let mut ch = node.children.clone();
@@ -850,6 +866,43 @@ mod tests {
             p.start_tile_pending = false;
         }
         s
+    }
+
+    #[test]
+    fn label_search_move_notes_penalty_overflow() {
+        // Reihe 0 hat Kapazität 1 -- eine Fabrik mit >=2 gleichfarbigen
+        // Sonnensteinen erzwingt einen Überlauf auf die Strafleiste, den das
+        // Label jetzt direkt mitausweisen soll (Debug-Log-Anreicherung).
+        use crate::moves::{Move, PlaceAction, TakeAction, TakeSource};
+        let s = drafting_state(7);
+        let (fidx, color, count) = s
+            .factories
+            .iter()
+            .enumerate()
+            .find_map(|(i, f)| {
+                f.sun_colors().into_iter().find_map(|c| {
+                    let n = f.sun_tiles.iter().filter(|&&t| t == c).count();
+                    (n >= 2).then_some((i, c, n))
+                })
+            })
+            .expect("Testfixtur braucht eine Fabrik mit >=2 gleichfarbigen Sonnensteinen");
+        let f = &s.factories[fidx];
+        let remaining: Vec<TileColor> = f.sun_tiles.iter().copied().filter(|&t| t != color).collect();
+        let sm = SearchMove::Draft(Action::Stone(Move {
+            take: TakeAction {
+                source: TakeSource::SmallFactorySun,
+                color,
+                factory_id: Some(f.factory_id),
+                moon_order: remaining,
+            },
+            place: PlaceAction { row_index: 0 },
+        }));
+        let (_, desc, _, _) = label_search_move(&sm, Some(&s));
+        let overflow = count - 1;
+        assert!(
+            desc.contains(&format!("(+{overflow} Strafleiste)")),
+            "Überlauf-Hinweis fehlt im Label: {desc}"
+        );
     }
 
     #[test]
