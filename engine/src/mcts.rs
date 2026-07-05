@@ -303,17 +303,20 @@ fn build_tree<R: Rng + ?Sized>(
         // 1. Selection (mit Progressive Widening).
         let mut nid = 0;
         loop {
-            // Erzwungener Gegnerzug: die Wurzel breitert erst weiter (neuer
-            // Kandidat), wenn ihr zuletzt erzeugtes Kind selbst mindestens
-            // einen eigenen Kindknoten hat (= Gegner-Antwort simuliert). Ohne
-            // das verschlingt reine Breite an der Wurzel das Sim-Budget, bevor
-            // irgendein Kandidat auch nur EINEN Gegenzug gesehen hat — kein
-            // sauberer Vergleich zwischen den Wurzelkandidaten. Nur an der
-            // Wurzel selbst (nid==0), nicht rekursiv tiefer.
-            if nid == 0 {
-                if let Some(&last_child) = nodes[0].children.last() {
+            // Erzwungener Gegnerzug: ein Knoten breitert erst weiter (neuer
+            // Kandidat), wenn sein zuletzt erzeugtes Kind selbst mindestens
+            // einen eigenen Kindknoten hat (= Antwort simuliert). Ohne das
+            // verschlingt reine Breite das Sim-Budget, bevor auch nur EIN
+            // Kandidat eine Antwort gesehen hat — kein sauberer Vergleich.
+            // Gilt für Wurzel (Tiefe 0) UND ihre direkten Kinder (Tiefe 1,
+            // "1. Gegnerzug") symmetrisch — sonst bekämen Enkel-Kandidaten
+            // (Tiefe 2, die Antworten AUF den Gegnerzug) nicht dieselbe
+            // Garantie wie die Wurzelkandidaten selbst. Ab Tiefe 2 (Enkel)
+            // nicht mehr rekursiv (dort gilt wieder normales Widening/PUCT).
+            if nid == 0 || nodes[nid].parent == Some(0) {
+                if let Some(&last_child) = nodes[nid].children.last() {
                     if nodes[last_child].children.is_empty() && !nodes[last_child].terminal {
-                        logln!("  FORCE-REPLY #0 → #{last_child}: Gegnerzug erzwungen vor weiterem Breitern");
+                        logln!("  FORCE-REPLY #{nid} → #{last_child}: Antwort erzwungen vor weiterem Breitern");
                         nid = last_child;
                         continue;
                     }
@@ -803,6 +806,35 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn depth1_children_also_get_at_least_one_forced_reply() {
+        // Die Force-Reply-Garantie gilt symmetrisch auch für Tiefe-1-Knoten
+        // (Kind = 1. Gegnerzug): deren Kinder (Enkel, Tiefe 2) sollten
+        // ebenfalls je einen eigenen Kindknoten (Urenkel) haben, bevor das
+        // Tiefe-1-Kind weiterbreitert — sonst wären Enkel-Kandidaten anders
+        // behandelt als Wurzelkandidaten (unsymmetrisch).
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(33);
+        let nodes = build_tree(&s, 600, DEFAULT_C, &mut rng, None).unwrap();
+        let mut checked_any = false;
+        for &root_child in &nodes[0].children {
+            let grandkids = &nodes[root_child].children;
+            if nodes[root_child].terminal || grandkids.len() < 2 {
+                continue; // braucht mind. 2 Enkel, um "alle außer dem letzten" zu prüfen
+            }
+            checked_any = true;
+            for &gc in &grandkids[..grandkids.len() - 1] {
+                if !nodes[gc].terminal {
+                    assert!(
+                        !nodes[gc].children.is_empty(),
+                        "Enkel #{gc} (unter Kind #{root_child}) hat keinen eigenen Kindknoten"
+                    );
+                }
+            }
+        }
+        assert!(checked_any, "Test braucht mind. ein Wurzelkind mit >=2 Enkeln");
     }
 
     #[test]
