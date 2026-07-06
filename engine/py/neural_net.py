@@ -302,31 +302,35 @@ def action_to_id(action: dict) -> int:
 # own_total = step["scores"][eigener Spieler]  (bereits inkl. Wertungsplatten,
 #             von apply_end_scoring() in Rust eingerechnet)
 # opp_total = step["scores"][Gegner]
-# value = tanh((own_total − VALUE_OPP_WEIGHT · opp_total) / VALUE_SCALE)
+# value = tanh(own_total/VALUE_SCALE) − VALUE_OPP_EPSILON · tanh(opp_total/VALUE_SCALE)
 #
-# Gewichtung < 1 auf die gegnerische Seite statt reiner Differenz: ein 10:5
-# und ein 65:60 (beide Marge 5) wären bei reiner Differenz identisch bewertet,
-# obwohl 65:60 absolut deutlich mehr erreichte Punkte sind (own-0.5·opp:
-# 10-2.5=7.5 vs. 65-30=35 — klar unterschieden).
-# Kompromiss: das macht das Target nicht mehr exakt antisymmetrisch
-# (value(p0) != -value(p1)), was der Zero-Sum-Annahme der Suche (net_mcts.rs:
-# 1 Netzquery aus Sicht des Ziehenden, Gegner = 1-win) nur noch näherungsweise
-# entspricht — akzeptiert, weil das eigentliche Ziel (hohe absolute Punktzahl,
-# nicht nur "irgendwie gewinnen") das explizit verlangt.
+# Getrennt gesättigt statt Differenzbildung VOR dem tanh (wie zuvor
+# `own − 0.5·opp`, dann erst tanh): eine Differenz sättigt bei großem Abstand
+# für BEIDE Terme gemeinsam — das Netz verliert dann jede Fähigkeit, zwischen
+# "gut" und "noch besser" bzw. "schlecht" und "noch schlechter" zu
+# unterscheiden, obwohl Priorität 1 (maximale eigene Punktzahl) in jeder
+# Stellung weiterhin gilt. Genau das Problem, das `mcts.rs::evaluate()` schon
+# durch rein absolute Pro-Spieler-Bewertung behoben hat — konsistent dazu
+# bekommt jetzt auch das Value-Head-Ziel einen eigenen, unabhängig sättigenden
+# own-Term (volle Differenzierung über den ganzen Bereich).
+# Der Gegner-Term bildet Priorität 2 ("wenn möglich dem Gegner schaden") ab,
+# aber additiv NACH der Sättigung statt als Abzug davor: er kann den
+# Gesamtwert nur um max. ±VALUE_OPP_EPSILON verschieben, niemals das
+# Eigenpunkte-Signal überstimmen — ein Zug, der dem Gegner schadet OHNE die
+# eigene Punktzahl zu beeinflussen, bekommt einen kleinen Bonus, kann aber nie
+# eine eigene Einbuße aufwiegen.
 # VALUE_SCALE-Kalibrierung: NICHT aus aktuellen Spieldaten abgeleitet (Heuristik
 # und Netz spielen beide noch schwach — jede aus dieser Verteilung abgeleitete
 # Skala würde nur die aktuelle Schwäche festschreiben, nicht das echte
 # Punktepotenzial des Spiels). Stattdessen an einem groben menschlichen
 # Referenzwert kalibriert: ab ~100 Punkten gilt ein Ergebnis als sehr gut.
-# own_total = own − 0.5·opp; bei own≈100 gegen einen soliden Gegner (opp≈40)
-# ergibt das own_total≈80. VALUE_SCALE=50 legt den tanh-Arg bei diesem
-# "sehr gut"-Referenzpunkt auf ~1.6 (tanh(1.6)≈0.92) — informativ, aber noch
-# nicht voll gesättigt, sodass auch darüber hinaus noch Differenzierung
-# möglich bleibt. Deutlich gröber als eine "saubere" Herleitung, aber
-# begründeter als eine an aktueller Schwäche kalibrierte Zahl.
+# VALUE_SCALE=50 legt den tanh-Arg bei own_total=100 auf 2.0 (tanh(2.0)≈0.96)
+# — informativ, aber noch nicht voll gesättigt, sodass auch darüber hinaus
+# noch Differenzierung möglich bleibt. Deutlich gröber als eine "saubere"
+# Herleitung, aber begründeter als eine an aktueller Schwäche kalibrierte Zahl.
 # VALUE_SCHEMA_VERSION erzwingt einen Cache-Rebuild bei Änderungen an dieser Formel.
-VALUE_SCHEMA_VERSION = 8
-VALUE_OPP_WEIGHT = 0.5
+VALUE_SCHEMA_VERSION = 9
+VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
 
@@ -406,7 +410,8 @@ class MosaicDataset(Dataset):
                             p = step["player"]
                             own_total = float(step["scores"][p])
                             opp_total = float(step["scores"][1 - p])
-                            val = math.tanh((own_total - VALUE_OPP_WEIGHT * opp_total) / VALUE_SCALE)
+                            val = (math.tanh(own_total / VALUE_SCALE)
+                                   - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
                         else:
                             val = float(step["value"])
                         values_l.append([val])
