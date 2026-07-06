@@ -42,20 +42,38 @@ pub const SELF_PLAY_C: f64 = 0.3;
 /// gespielten Aktion sorgt und die Zustandsvielfalt erhält). Niedriger = schärfer.
 pub const TARGET_TEMP: f64 = 0.15;
 
+/// Boden-Wallclock für den Hänger-Schutz, unabhängig von der Sim-Zahl — sehr
+/// niedrige Sims (Tests, kleine Debug-Läufe) sollen trotzdem nie unter dieses
+/// Minimum fallen.
+const MIN_GAME_TIMEOUT_SECS: u64 = 30;
+
 /// Hänger-Schutz-Wallclock für reine Heuristik-Partien (`play_one_game`,
-/// `play_arena_game`) — normal 1-4s, 30s ist hier großzügig genug.
-pub const HEURISTIC_GAME_TIMEOUT_SECS: u64 = 30;
+/// `play_arena_game`), SKALIERT mit der tatsächlich verwendeten Sim-Zahl statt
+/// eines fixen Werts — ein fixer Wert (früher 30s, kalibriert auf niedrige
+/// Sim-Zahlen, "normal 1-4s") reißt bei jeder künftigen Erhöhung der Sims
+/// wieder: bei 400 Sims plus den seit diesem Zyklus zusätzlichen
+/// Blattbewertungskosten (Wertungsplatten-/Unplaceable-Penalty-Projektion pro
+/// Knoten) wurden Partien vereinzelt vor Rundenende abgebrochen, scores/winner
+/// sind dann kein echtes Endergebnis. Faktor 0.3s/Sim kalibriert so, dass bei
+/// 400 Sims wie zuletzt 120s Puffer herauskommen.
+fn heuristic_game_timeout_secs(sims: u32) -> u64 {
+    ((sims as u64 * 3) / 10).max(MIN_GAME_TIMEOUT_SECS)
+}
 
 /// Hänger-Schutz-Wallclock für netzbeteiligte Partien (`play_net_game`,
 /// `play_net_vs_net_game`, `play_net_self_play_game`) — jede Simulation
 /// braucht eine ONNX-Inferenz, das ist deutlich langsamer als reine
-/// Heuristik-Suche. Bei 30s wurden Self-Play-Partien bei 400 Sims systematisch
-/// vor Rundenende (Runde 3-4 von 5) abgeschnitten, statt regulär zu terminieren
-/// — die aufgezeichneten scores/winner solcher Partien sind dann KEIN echtes
-/// Endergebnis (Wertungsplatten werden nur bei Phase::End angewendet), was das
-/// gesamte Punkte-Marge-Value-Target korrumpiert. 180s gibt genug Puffer auch
-/// bei hoher Simulationszahl/dynamischer Sims-Skalierung.
-pub const NET_GAME_TIMEOUT_SECS: u64 = 180;
+/// Heuristik-Suche, daher ein höherer Faktor pro Sim als bei
+/// `heuristic_game_timeout_secs`. SKALIERT mit der Sim-Zahl aus demselben
+/// Grund: bei 30s fix wurden Self-Play-Partien bei 400 Sims systematisch vor
+/// Rundenende (Runde 3-4 von 5) abgeschnitten — die aufgezeichneten
+/// scores/winner solcher Partien sind dann KEIN echtes Endergebnis
+/// (Wertungsplatten werden nur bei Phase::End angewendet), was das gesamte
+/// Punkte-Marge-Value-Target korrumpiert. Faktor 0.45s/Sim kalibriert so, dass
+/// bei 400 Sims wie zuletzt 180s Puffer herauskommen.
+fn net_game_timeout_secs(sims: u32) -> u64 {
+    ((sims as u64 * 9) / 20).max(MIN_GAME_TIMEOUT_SECS)
+}
 
 // ── agent_env-Action-Serializer ──────────────────────────────────────────────
 
@@ -606,9 +624,10 @@ pub fn play_one_game<R: Rng + ?Sized>(
 
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
+    let timeout_secs = heuristic_game_timeout_secs(base_sims);
     loop {
         guard += 1;
-        if guard > 100_000 || t_start.elapsed().as_secs() >= HEURISTIC_GAME_TIMEOUT_SECS {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
             break; // defensive Endlosschleifen-Sicherung
         }
         match game.state.phase {
@@ -705,12 +724,13 @@ fn play_arena_game<R: Rng + ?Sized>(
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
+    let timeout_secs = heuristic_game_timeout_secs(sims[0].max(sims[1]));
     loop {
         guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= HEURISTIC_GAME_TIMEOUT_SECS {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
             break;
         }
         match game.state.phase {
@@ -834,12 +854,13 @@ fn play_net_game<R: Rng + ?Sized>(
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
+    let timeout_secs = net_game_timeout_secs(net_sims.max(heur_sims));
     loop {
         guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= NET_GAME_TIMEOUT_SECS {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
             break;
         }
         match game.state.phase {
@@ -974,12 +995,13 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
+    let timeout_secs = net_game_timeout_secs(sims_a.max(sims_b));
     loop {
         guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= NET_GAME_TIMEOUT_SECS {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
             break;
         }
         match game.state.phase {
@@ -1144,12 +1166,13 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     let mut records: Vec<Map<String, Value>> = Vec::new();
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
+    let timeout_secs = net_game_timeout_secs(base_sims);
     loop {
         guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER 30s Wall-Clock je Partie (normal 1–4s).
+        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= NET_GAME_TIMEOUT_SECS {
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
             break;
         }
         match game.state.phase {
