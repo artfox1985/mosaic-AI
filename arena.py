@@ -249,19 +249,25 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
 
 
 def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
-                   threads=0, seed=None, chunk=10, c_puct=1.5, name_a=None, name_b=None):
+                   threads=0, seed=None, chunk=10, c_puct=1.5, c_puct_a=None, c_puct_b=None,
+                   name_a=None, name_b=None):
     """Netz A (Brett 0) vs. Netz B (Brett 1) — Generationen-Vergleich. Start-
-    spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt."""
+    spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt.
+    `c_puct_a`/`c_puct_b` überschreiben `c_puct` je Brett (z.B. um denselben
+    Modell-Stand mit unterschiedlichem c_puct gegeneinander antreten zu lassen)."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
     dfs_leaf = (stage == 1)
+    cp_a = c_puct_a if c_puct_a is not None else c_puct
+    cp_b = c_puct_b if c_puct_b is not None else c_puct
     name_a = name_a or f"A({os.path.basename(model_a)})"
     name_b = name_b or f"B({os.path.basename(model_b)})"
     leaf = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
 
     print("🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️")
-    print(f"  {name_a} (Brett 0, {sims_a} Sims) vs {name_b} (Brett 1, {sims_b} Sims) "
+    print(f"  {name_a} (Brett 0, {sims_a} Sims, c_puct={cp_a}) vs "
+          f"{name_b} (Brett 1, {sims_b} Sims, c_puct={cp_b}) "
           f"— Stufe {stage}/{leaf} — {games} Spiele")
     print("-" * 50)
 
@@ -277,7 +283,7 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
         n = min(chunk, games - done)
         raw = _mr.net_vs_net_arena_match(model_a, model_b, sims_a=sims_a, sims_b=sims_b,
                                          n_games=n, seed=base_seed + chunk_idx,
-                                         num_threads=threads, c_puct=c_puct, dfs_leaf=dfs_leaf)
+                                         num_threads=threads, c_puct_a=cp_a, c_puct_b=cp_b, dfs_leaf=dfs_leaf)
         results = json.loads(raw)
         chunk_idx += 1
         for g in results:
@@ -313,7 +319,7 @@ if __name__ == "__main__":
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
     NET_MODEL = "models/alphazero_v8.onnx"   # Pfad zum ONNX-Netz
-    NET_MODEL_PRE = "models/alphazero_v1.onnx"
+    NET_MODEL_PRE = "models/alphazero_v4.onnx"
     NET_SIMS  = 200                            # Basis-Sims des Netzes
     STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
@@ -321,7 +327,7 @@ if __name__ == "__main__":
     #run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = "v8",
     #              games=GAMES, stage=STAGE, threads=0)
     run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
-                   threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v8", name_b="v1")
+                   threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v8", name_b="v4")
 
     # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
     # competitors = {

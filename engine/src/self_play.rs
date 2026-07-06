@@ -962,7 +962,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     net_b: &Net,
     sims_a: u32,
     sims_b: u32,
-    c_puct: f64,
+    c_puct_a: f64,
+    c_puct_b: f64,
     leaf: LeafEval,
     scoring_ids: Vec<usize>,
     names: [String; 2],
@@ -1006,9 +1007,13 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else {
-                        let (net, base) = if pi == 0 { (net_a, sims_a) } else { (net_b, sims_b) };
+                        let (net, base, cp) = if pi == 0 {
+                            (net_a, sims_a, c_puct_a)
+                        } else {
+                            (net_b, sims_b, c_puct_b)
+                        };
                         let s = dynamic_sims(base, actions.len());
-                        net_search_drafting_action(net, &game.state, s, c_puct, false, leaf, rng)
+                        net_search_drafting_action(net, &game.state, s, cp, false, leaf, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     let _ = game.apply_drafting(&chosen);
@@ -1061,7 +1066,8 @@ pub fn run_net_vs_net_arena(
     n_games: usize,
     seed: u64,
     num_threads: usize,
-    c_puct: f64,
+    c_puct_a: f64,
+    c_puct_b: f64,
     dfs_leaf: bool,
 ) -> Result<String, String> {
     let net_a = std::sync::Arc::new(Net::load(model_a, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
@@ -1074,7 +1080,7 @@ pub fn run_net_vs_net_arena(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
-        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct, leaf, ids, names, first, &mut rng)
+        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, leaf, ids, names, first, &mut rng)
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
