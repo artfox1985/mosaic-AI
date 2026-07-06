@@ -82,18 +82,4 @@ gelb aus reihe 3 ist zwar dann alleinstehend, aber zumindest keine strafpunkte
 
 hol ich mir primär die chips mit den doppelfarben von der fabrik
 
-
-
-### Spiel 2
-
-P1 vs P2
-
-Ausgangssituation
-
-P1 Startspieler
-
-seed 561600
-
-Wertungsplatten: Eckplatten, Äußere Felder, Horizontale Reihen
-
-Kuppelplatten im Display: #10, #8, #16
+# 
