@@ -302,18 +302,107 @@ def pick_files() -> list[str]:
         return []
 
 
+def _tiles_taken_from_state(state: dict, action: dict) -> int:
+    """Wie viele Steine `action` (type='stone') aus `state` tatsächlich nimmt --
+    Python-Pendant zu `mcts.rs::tiles_taken`. factory_index: 0-3=kleine
+    Fabrik-Sonne, 4=Große-Fabrik-Sonne, 5=globaler Mond-Zug (oberste Stapel-
+    Fliese je kleiner Fabrik + ALLE passenden aus dem GF-Mond-Pool)."""
+    color = action.get('color')
+    f_idx = action.get('factory_index', 0)
+    factories = state.get('factories', [])
+    large = state.get('large_factory', {}) or {}
+    if f_idx <= 3:
+        if f_idx < len(factories):
+            return sum(1 for c in factories[f_idx].get('sun', []) if c == color)
+        return 0
+    if f_idx == 4:
+        return sum(1 for c in large.get('sun', []) if c == color)
+    if f_idx == 5:
+        n = sum(
+            1
+            for f in factories
+            for stack in f.get('moon', [])
+            if stack and stack[-1] == color
+        )
+        n += sum(1 for c in large.get('moon', []) if c == color)
+        return n
+    return 0
+
+
+def _row_remaining_capacity(state: dict, row_idx: int) -> int | None:
+    """Freie Slots der Musterreihe `row_idx` des aktuell ziehenden Spielers,
+    None wenn nicht ermittelbar (fehlendes Feld/Index)."""
+    pi = state.get('current_player')
+    players = state.get('players', [])
+    if pi is None or not (0 <= pi < len(players)):
+        return None
+    rows = players[pi].get('pattern_lines', [])
+    if not (0 <= row_idx < len(rows)):
+        return None
+    row = rows[row_idx]
+    cap = row.get('capacity')
+    tiles = row.get('tiles', [])
+    if cap is None:
+        return None
+    return max(0, cap - len(tiles))
+
+
+def _dome_row_has_open_matching_slot(state: dict, pi: int, row_idx: int, color: str) -> bool | None:
+    """Python-Pendant zu `round_end::row_has_open_matching_slot`. None wenn
+    nicht ermittelbar (fehlende Felder)."""
+    players = state.get('players', [])
+    if not (0 <= pi < len(players)):
+        return None
+    dome_grid = players[pi].get('dome_grid')
+    if dome_grid is None:
+        return None
+    dome_row_idx = row_idx // 2
+    if not (0 <= dome_row_idx < len(dome_grid)):
+        return None
+    valid_si = [(row_idx % 2) * 2, (row_idx % 2) * 2 + 1]
+    for slot in dome_grid[dome_row_idx]:
+        if not slot:
+            continue
+        spaces = slot.get('spaces', [])
+        for si in valid_si:
+            if si >= len(spaces):
+                continue
+            sp = spaces[si]
+            if sp.get('filled') is not None or sp.get('locked'):
+                continue
+            typ = sp.get('type', 'NORMAL')
+            if typ == 'WILD' or (typ == 'NORMAL' and sp.get('color') == color):
+                return True
+    return False
+
+
+def _dome_row_fully_built(state: dict, pi: int, row_idx: int) -> bool | None:
+    """True, wenn alle 3 Kuppelplatten der zu `row_idx` gehörigen Dome-Reihe
+    bereits gelegt sind (kein leerer Slot mehr, an dem eine neue Platte mit
+    passendem Space auftauchen könnte). None wenn nicht ermittelbar."""
+    players = state.get('players', [])
+    if not (0 <= pi < len(players)):
+        return None
+    dome_grid = players[pi].get('dome_grid')
+    dome_row_idx = row_idx // 2
+    if dome_grid is None or not (0 <= dome_row_idx < len(dome_grid)):
+        return None
+    return all(slot is not None for slot in dome_grid[dome_row_idx])
+
+
 def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
     """
-    Prüft ob die MCTS-Policy Strafleisten-Züge (r_id=0) nur ANBIETET oder
-    tatsächlich BEVORZUGT. Unterscheidet 'harmlos erzwungen' (am Rundenende
-    bleiben unpassende Steine übrig) von 'problematischer Fehlpräferenz'
-    (Strafleiste trotz verfügbarer Reihen-Alternative gewählt).
-
-    Strafleisten-Stone-IDs vom Mond (f_idx=5, alle 5 Farben): 15, 63, 111, 159, 207
+    Prüft, WARUM Steine auf der Strafleiste landen -- drei Kategorien:
+    1. Explizit gewählt, KEINE Reihen-Alternative vorhanden (erzwungen, harmlos).
+    2. Explizit gewählt, OBWOHL eine Reihen-Alternative existierte (verdächtig --
+       möglicher Rest eines Bewertungs-/Perspektiv-Problems).
+    3. Überlauf: eine Reihe wurde gewählt, aber mehr Steine genommen als noch
+       Platz war (z.B. 3× türkis auf ein Feld mit nur 2 freien Slots) -- der
+       Rest landet automatisch auf der Strafleiste, unabhängig von der Wahl.
+    Alle drei nur anhand der TOP-Policy-Aktion je Schritt (nicht des real
+    gespielten Zugs, der wird hier nicht mitgeführt).
     """
     from neural_net import action_to_id
-
-    PENALTY_MOON_IDS = {15, 63, 111, 159, 207}
 
     files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
     if not files:
@@ -328,10 +417,14 @@ def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
     print(f"{'='*55}")
 
     n_steps = 0
-    penalty_offered = 0       # Strafleisten-Zug war in der Policy
-    penalty_prob_sum = 0.0    # Summe seiner Wahrscheinlichkeiten
-    penalty_chosen = 0        # Strafleiste hatte HÖCHSTE prob
-    penalty_when_alt = 0      # Strafleiste TOP obwohl Reihen-Zug verfügbar
+    penalty_offered = 0       # Strafleisten-Zug (row=-1) war in der Policy
+    penalty_prob_sum = 0.0
+    penalty_chosen = 0        # Strafleiste (row=-1) hatte HÖCHSTE prob
+    penalty_when_alt = 0      # ... obwohl ein Reihen-Zug verfügbar war
+    overflow_chosen = 0       # TOP-Aktion zielt auf eine Reihe, überläuft aber
+    overflow_tiles_sum = 0    # Summe der übergelaufenen Steine (TOP-Aktion)
+    missing_state = 0
+    kat2_cases = []           # Details je Kategorie-2-Fall (für Aufschlüsselung)
 
     for f in files:
         with open(f, 'rb') as fh:
@@ -341,33 +434,67 @@ def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
             if not policy:
                 continue
             n_steps += 1
+            state = step.get('state')
 
             best_prob = -1.0
-            best_is_penalty = False
+            best_action = None
             has_row_alt = False
+            best_alt_prob = -1.0
+            best_alt_action = None
             for entry in policy:
                 a = entry.get('action', {})
                 p = entry.get('prob', 0.0)
-                try:
-                    aid = action_to_id(a)
-                except Exception:
-                    aid = None
-                is_penalty = aid in PENALTY_MOON_IDS
+                is_penalty = a.get('type') == 'stone' and a.get('row', 0) == -1
                 if is_penalty:
                     penalty_offered += 1
                     penalty_prob_sum += p
-                elif a.get('type') == 'stone' and a.get('pattern_row') not in (None, -1):
+                elif a.get('type') == 'stone' and a.get('row') not in (None, -1):
                     has_row_alt = True
+                    if p > best_alt_prob:
+                        best_alt_prob = p
+                        best_alt_action = a
                 if p > best_prob:
                     best_prob = p
-                    best_is_penalty = is_penalty
-            if best_is_penalty:
+                    best_action = a
+
+            if best_action is None:
+                continue
+            if best_action.get('type') == 'stone' and best_action.get('row', 0) == -1:
                 penalty_chosen += 1
                 if has_row_alt:
                     penalty_when_alt += 1
+                    pi = state.get('current_player') if state else None
+                    alt_row = best_alt_action.get('row') if best_alt_action else None
+                    alt_color = best_alt_action.get('color') if best_alt_action else None
+                    doomed_alt = None
+                    if state is not None and pi is not None and alt_row is not None:
+                        fully_built = _dome_row_fully_built(state, pi, alt_row)
+                        has_slot = _dome_row_has_open_matching_slot(state, pi, alt_row, alt_color)
+                        if fully_built is not None and has_slot is not None:
+                            doomed_alt = fully_built and not has_slot
+                    kat2_cases.append({
+                        'round': state.get('round') if state else None,
+                        'scoring_tile_ids': tuple(sorted(state.get('scoring_tile_ids', []))) if state else None,
+                        'color': best_action.get('color'),
+                        'penalty_prob': best_prob,
+                        'alt_prob': best_alt_prob,
+                        'margin': best_prob - best_alt_prob,
+                        'doomed_alt': doomed_alt,
+                    })
+            elif best_action.get('type') == 'stone' and best_action.get('row', -1) >= 0:
+                if state is None:
+                    missing_state += 1
+                    continue
+                n_taken = _tiles_taken_from_state(state, best_action)
+                remaining = _row_remaining_capacity(state, best_action['row'])
+                if remaining is not None and n_taken > remaining:
+                    overflow_chosen += 1
+                    overflow_tiles_sum += n_taken - remaining
 
     print(f"{'─'*55}")
     print(f"  Schritte analysiert:             {n_steps:,}")
+    if missing_state:
+        print(f"  (⚠️ {missing_state} Schritte ohne 'state' -- Überlauf dort nicht prüfbar)")
     print(f"  Strafleisten-Zug angeboten:      {penalty_offered:,}")
     if penalty_offered:
         avg_p = penalty_prob_sum / penalty_offered
@@ -375,16 +502,199 @@ def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
     else:
         avg_p = 0.0
     pct_chosen = 100 * penalty_chosen / max(n_steps, 1)
-    print(f"  Strafleiste war TOP-Wahl:        {penalty_chosen:,} ({pct_chosen:.1f}%)")
-    print(f"    davon mit Reihen-Alternative:  {penalty_when_alt:,}")
+    print(f"  1) Explizit TOP-Wahl:            {penalty_chosen:,} ({pct_chosen:.1f}%)")
+    print(f"     davon mit Reihen-Alternative:  {penalty_when_alt:,}  ← Kategorie 2 (verdächtig)")
+    pct_overflow = 100 * overflow_chosen / max(n_steps, 1)
+    print(f"  3) Überlauf bei Reihen-TOP-Wahl: {overflow_chosen:,} ({pct_overflow:.1f}%)"
+          f"  Ø {overflow_tiles_sum/max(overflow_chosen,1):.1f} Steine übergelaufen" if overflow_chosen else
+          f"  3) Überlauf bei Reihen-TOP-Wahl: 0")
     print(f"{'─'*55}")
-    if penalty_offered and avg_p < 0.15:
+
+    if kat2_cases:
+        print(f"  KATEGORIE-2-AUFSCHLÜSSELUNG ({len(kat2_cases):,} Fälle):")
+        n = len(kat2_cases)
+
+        doomed = sum(1 for c in kat2_cases if c['doomed_alt'] is True)
+        not_doomed = sum(1 for c in kat2_cases if c['doomed_alt'] is False)
+        unknown_doomed = n - doomed - not_doomed
+        print(f"    Alternative-Reihe selbst schon aussichtslos: {doomed:,} ({100*doomed/n:.1f}%)")
+        print(f"    Alternative-Reihe noch offen (echter Fehlgriff-Verdacht): {not_doomed:,} ({100*not_doomed/n:.1f}%)")
+        if unknown_doomed:
+            print(f"    (nicht ermittelbar: {unknown_doomed:,})")
+
+        rounds = Counter(c['round'] for c in kat2_cases if c['round'] is not None)
+        print(f"    Nach Runde: " + ", ".join(f"R{r}={cnt}" for r, cnt in sorted(rounds.items())))
+
+        colors = Counter(c['color'] for c in kat2_cases)
+        print(f"    Nach Farbe: " + ", ".join(f"{c}={cnt}" for c, cnt in colors.most_common()))
+
+        tiles = Counter(c['scoring_tile_ids'] for c in kat2_cases if c['scoring_tile_ids'] is not None)
+        print(f"    Top-5 Wertungsplatten-Kombis:")
+        for ids, cnt in tiles.most_common(5):
+            print(f"      {ids}: {cnt}")
+
+        margins = [c['margin'] for c in kat2_cases]
+        confident = sum(1 for m in margins if m > 0.2)
+        close = sum(1 for m in margins if abs(m) <= 0.2)
+        print(f"    Prob-Marge (Strafleiste - beste Reihen-Alt.): "
+              f"deutlich ({'>'}0.2)={confident} ({100*confident/n:.1f}%), knapp={close} ({100*close/n:.1f}%)")
+        print(f"{'─'*55}")
+
+    if penalty_offered and avg_p < 0.15 and not overflow_chosen:
         print("  → ✅ HARMLOS: angeboten, aber kaum bevorzugt (niedrige Prob)")
     elif penalty_chosen and penalty_when_alt > penalty_chosen * 0.5:
-        print("  → ⚠️ VERDÄCHTIG: Strafleiste oft TROTZ Reihen-Alternative gewählt")
+        print("  → ⚠️ VERDÄCHTIG: Strafleiste oft TROTZ Reihen-Alternative gewählt (Kategorie 2)")
         print("     (möglicher Rest eines Bewertungs-/Perspektiv-Problems)")
+    elif overflow_chosen > n_steps * 0.02:
+        print("  → 🟠 Nennenswerter Anteil Überlauf-Züge (Kategorie 3) -- Policy nimmt")
+        print("     bewusst mehr Steine als eine Reihe fasst (kann bei mehreren")
+        print("     gleichzeitig fertigstellbaren Reihen trotzdem korrekt sein).")
     else:
         print("  → 🟡 Strafleiste meist nur wenn keine Alternative (erzwungen, ok)")
+    print(f"{'='*55}")
+
+
+def run_policy_cutoff_exclusion(data_dir: str, label: str, max_files: int = 100):
+    """
+    Praeziseres, schaerferes Problem als die Kategorie-2-Analyse: der
+    POLICY_MASS_CUTOFF (95%) in net_mcts.rs::build_untried_actions kappt den
+    Kandidaten-Long-Tail, BEVOR ueberhaupt ein Kindknoten entsteht -- c_puct
+    kann nur unter bereits existierenden Kindern gewichten, nicht bei einer
+    Aktion, die nie zum Kandidaten wurde. Diese Funktion prueft direkt: wurde
+    beim TOP-Strafleisten-Zug eine farbgleiche Reihen-Alternative, die laut
+    `valid_actions` (alle legalen Zuege) existierte, ueberhaupt NIRGENDS in
+    der durchsuchten `policy` (den ueberlebenden Cutoff-Kandidaten) sichtbar?
+    Falls ja: die Suche hatte NIE eine Chance, diese Alternative zu entdecken
+    -- unabhaengig von c_puct/Sims.
+    """
+    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    if not files:
+        print(f"  ❌ Keine .pkl-Dateien in: {data_dir}")
+        return
+    if len(files) > max_files:
+        files = random.sample(files, max_files)
+
+    print(f"\n{'='*55}")
+    print(f"  POLICY-CUTOFF-AUSSCHLUSS: {label}")
+    print(f"  (Analyse von {len(files)} Datei(en))")
+    print(f"{'='*55}")
+
+    n_penalty_top = 0     # Schritte, bei denen Strafleiste die TOP-Policy-Wahl war
+    n_excluded = 0         # ... davon: farbgleiche Reihen-Alt. existierte, aber NICHT in policy
+
+    for f in files:
+        with open(f, 'rb') as fh:
+            data = pickle.load(fh)
+        for step in data:
+            policy = step.get('policy', [])
+            valid_actions = step.get('valid_actions')
+            if not policy or valid_actions is None:
+                continue
+
+            best_prob, best_action = -1.0, None
+            for entry in policy:
+                p = entry.get('prob', 0.0)
+                if p > best_prob:
+                    best_prob, best_action = p, entry.get('action', {})
+            if best_action is None:
+                continue
+            if not (best_action.get('type') == 'stone' and best_action.get('row', 0) == -1):
+                continue
+            n_penalty_top += 1
+            color = best_action.get('color')
+
+            # Farbgleiche Reihen-Alternative laut Regelwerk (nicht nur Suche)?
+            has_valid_alt = any(
+                a.get('type') == 'stone' and a.get('color') == color and a.get('row', -1) >= 0
+                for a in valid_actions
+            )
+            if not has_valid_alt:
+                continue
+
+            # Erscheint SO EINE Alternative irgendwo in der durchsuchten policy?
+            in_policy = any(
+                entry.get('action', {}).get('type') == 'stone'
+                and entry.get('action', {}).get('color') == color
+                and entry.get('action', {}).get('row', -1) >= 0
+                for entry in policy
+            )
+            if not in_policy:
+                n_excluded += 1
+
+    print(f"{'─'*55}")
+    print(f"  Strafleiste als TOP-Policy-Wahl:                {n_penalty_top:,}")
+    if n_penalty_top:
+        pct = 100 * n_excluded / n_penalty_top
+        print(f"  ... davon: farbgleiche Reihen-Alt. existierte,")
+        print(f"      erschien aber NIRGENDS in der policy:    {n_excluded:,} ({pct:.1f}%)")
+    print(f"{'─'*55}")
+    if n_penalty_top and n_excluded / n_penalty_top > 0.15:
+        print("  → 🔴 Nennenswerter Anteil: der Cutoff schliesst die Alternative aus,")
+        print("     BEVOR die Suche sie je anschauen kann -- c_puct/mehr Sims helfen hier nicht.")
+    else:
+        print("  → 🟢 Meist wird die Alternative wenigstens als Kandidat betrachtet")
+        print("     (auch wenn sie dann evtl. zu wenig Besuche bekommt, siehe Kategorie 2).")
+    print(f"{'='*55}")
+
+
+def run_penalty_score_by_round(data_dir: str, label: str, max_files: int = 100):
+    """
+    Durchschnittlicher Strafleisten-Punktabzug pro Runde (1-5), gemittelt über
+    alle Spiele und beide Spieler. Die Trainingsdaten enthalten den Abzug
+    selbst nicht direkt -- ermittelt aus dem MAXIMALEN 'floor'-Füllstand je
+    (Spiel, Spieler, Runde) über alle Zustands-Schnappschüsse dieser Runde
+    (die Strafleiste wird erst am Rundenende abgerechnet und geleert, der
+    Peak innerhalb der Runde ist daher die beste verfügbare Näherung).
+    """
+    files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    if not files:
+        print(f"  ❌ Keine .pkl-Dateien in: {data_dir}")
+        return
+    if len(files) > max_files:
+        files = random.sample(files, max_files)
+
+    BROKEN_PENALTIES = [-1, -2, -3, -4]
+
+    peak = {}  # (game_id, player_idx, round) -> maximaler floor-Füllstand
+    for f in files:
+        with open(f, 'rb') as fh:
+            data = pickle.load(fh)
+        for step in data:
+            state = step.get('state')
+            gid = step.get('game_id')
+            if state is None or gid is None:
+                continue
+            rnd = state.get('round')
+            if rnd is None:
+                continue
+            for pi, player in enumerate(state.get('players', [])):
+                key = (gid, pi, rnd)
+                n = len(player.get('floor', []))
+                if n > peak.get(key, 0):
+                    peak[key] = n
+
+    print(f"\n{'='*55}")
+    print(f"  STRAFLEISTEN-SCORE PRO RUNDE: {label}")
+    print(f"{'='*55}")
+    if not peak:
+        print("  ❌ Keine auswertbaren Zustände gefunden (fehlt 'state'/'game_id'?).")
+        print(f"{'='*55}")
+        return
+
+    by_round = {}
+    for (_gid, _pi, rnd), n in peak.items():
+        n = min(n, len(BROKEN_PENALTIES))
+        penalty = sum(BROKEN_PENALTIES[:n])
+        by_round.setdefault(rnd, []).append(penalty)
+
+    for rnd in sorted(by_round):
+        vals = by_round[rnd]
+        avg = sum(vals) / len(vals)
+        hit = sum(1 for v in vals if v < 0)
+        print(f"  Runde {rnd}: Ø {avg:+.2f} Pkt  (n={len(vals):,}, davon {hit:,} mit Strafe > 0)")
+    all_vals = [v for vs in by_round.values() for v in vs]
+    print(f"{'─'*55}")
+    print(f"  Gesamt (alle Runden): Ø {sum(all_vals)/len(all_vals):+.2f} Pkt  (n={len(all_vals):,})")
     print(f"{'='*55}")
 
 
@@ -461,9 +771,11 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     print(f"  Ø Margin:          {_st.mean(margins):.1f}  (Max: {max(margins)})")
     print(f"\n{'='*55}")
 
-    # Strafleisten-Bias direkt mit ausgeben (gehört thematisch zur Ergebnis-/
-    # Entscheidungs-Analyse, daher kein eigener Menüpunkt mehr).
+    # Strafleisten-Bias + Score-pro-Runde direkt mit ausgeben (gehört
+    # thematisch zur Ergebnis-/Entscheidungs-Analyse, daher kein eigener
+    # Menüpunkt mehr).
     run_penalty_bias(data_dir, label, max_files=max_files)
+    run_penalty_score_by_round(data_dir, label, max_files=max_files)
 
 
 def main():
