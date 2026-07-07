@@ -335,14 +335,19 @@ VALUE_SCALE = 50.0
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", files=None):
+        """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
+        Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
+        `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
+        uebergebenen Liste ab, Train- und Val-Split bekommen also automatisch
+        getrennte HDF5-Caches im selben Ordner."""
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
         import numpy as np
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
-        files = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+        files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)).encode()
         ).hexdigest()[:12]
