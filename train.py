@@ -10,6 +10,8 @@ except Exception:
 
 import torch
 import math
+import glob
+import random
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -128,17 +130,42 @@ def run_readiness_probe(version_name, games=100, sims=400, threads=0, seed=12345
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          probe_games=100, probe_sims=400, skip_probe=False, show_plot=True):
+          probe_games=100, probe_sims=400, skip_probe=False, show_plot=True, val_frac=0.1):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
-    dataset = MosaicDataset(str(DATA_DIR))
+    # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
+    # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
+    # Training UND Validierung streuen und ein zu gutes Val-R² vortaeuschen.
+    # Bewusst PRO TRAININGSLAUF neu gezogen (kein ueber Generationen fixer
+    # Val-Satz) -- das Val-R² soll nur beantworten "ueberfittet DIESES Modell
+    # auf sein eigenes aktuelles Fenster", nicht als generationsuebergreifendes
+    # Benchmark dienen (das leistet schon die Arena vs. Champion/Heuristik).
+    all_files = sorted(glob.glob(str(DATA_DIR / "*.pkl")))
+    val_files = []
+    train_files = None  # None == MosaicDataset laedt wie bisher den ganzen Ordner
+    if val_frac > 0 and len(all_files) >= 10:
+        shuffled = all_files[:]
+        random.Random(20260707).shuffle(shuffled)
+        n_val = max(1, round(len(shuffled) * val_frac))
+        val_files = sorted(shuffled[:n_val])
+        train_files = sorted(shuffled[n_val:])
+
+    dataset = MosaicDataset(str(DATA_DIR), files=train_files)
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
-        
+
+    val_dataset = None
+    if val_files:
+        val_dataset = MosaicDataset(str(DATA_DIR), files=val_files)
+        print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
+              f"({len(dataset):,} / {len(val_dataset):,} Züge)")
+
     # drop_last=True: ohne das kann die letzte Batch einer Epoche zufällig auf
     # Größe 1 fallen (Datensatzgröße mod BATCH_SIZE == 1) — BatchNorm im Netz
     # verlangt >1 Sample pro Kanal im Training und crasht sonst hart.
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+    val_dataloader = (DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+                      if val_dataset is not None else None)
 
     # Ziel-Varianz einmalig vorab bestimmen: die rohe Value-MSE ist wegen der
     # tanh(.../VALUE_SCALE)-Stauchung auf absoluter Skala kaum aussagekräftig
@@ -217,6 +244,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     policy_history  = []
     value_history   = []
     value_r2_history = []
+    val_r2_history  = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -241,12 +269,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             ax_bot.set_xlabel("Epoche")
             (line_total,) = ax_top.plot([], [], label="Total", color="tab:blue")
             (line_policy,) = ax_top.plot([], [], label="Policy", color="tab:orange")
-            (line_value,) = ax_bot.plot([], [], label="Value R²", color="tab:green")
+            (line_value,) = ax_bot.plot([], [], label="Value R² (Train)", color="tab:green")
+            (line_val,) = ax_bot.plot([], [], label="Value R² (Val)", color="tab:red", linestyle="--")
             ax_top.legend(loc="upper right")
             ax_bot.legend(loc="upper right")
             plot = {
                 "fig": fig, "ax_top": ax_top, "ax_bot": ax_bot,
                 "line_total": line_total, "line_policy": line_policy, "line_value": line_value,
+                "line_val": line_val,
                 "plateau_line": None,
             }
         except Exception as e:
@@ -317,6 +347,27 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         value_r2_history.append(epoch_r2)
         total_history.append(epoch_tloss)
 
+        # ── Validierung (Value-Head) auf dem NIE trainierten Datei-Split ────
+        # Reiner Forward-Pass ohne Gradient -- kostet nur einen Bruchteil einer
+        # Trainings-Epoche (val_frac der Datenmenge, kein backward()). Nutzt
+        # dieselbe target_var (Trainings-Baseline) fuer einen vergleichbaren
+        # Maßstab statt einer je Epoche neu berechneten Val-eigenen Varianz.
+        epoch_val_r2 = None
+        if val_dataloader is not None:
+            model.eval()
+            val_vloss_sum, val_batches = 0.0, 0
+            with torch.no_grad():
+                for v_states, _vp, v_targets_v, _vm, _vmoon, _vpw in val_dataloader:
+                    v_states = v_states.to(device)
+                    v_targets_v = v_targets_v.to(device)
+                    _, v_pred_v, _ = model(v_states)
+                    val_vloss_sum += mse_loss(v_pred_v, v_targets_v).item()
+                    val_batches += 1
+            model.train()
+            epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
+            epoch_val_r2 = 1 - epoch_val_vloss / target_var if target_var > 0 else 0.0
+        val_r2_history.append(epoch_val_r2)
+
         import torch as _t
         v_all   = _t.cat(v_preds_epoch)
         v_std   = v_all.std().item()
@@ -362,6 +413,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plot["line_total"].set_data(xs, total_history)
                 plot["line_policy"].set_data(xs, policy_history)
                 plot["line_value"].set_data(xs, value_r2_history)
+                if val_dataloader is not None:
+                    plot["line_val"].set_data(xs, val_r2_history)
                 if policy_plateau_since is not None and plot["plateau_line"] is None:
                     plot["plateau_line"] = plot["ax_top"].axvline(
                         policy_plateau_since, color="red", linestyle="--", alpha=0.5, label="Plateau")
@@ -376,8 +429,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             except Exception:
                 plot = None  # Fenster evtl. geschlossen o.ä. — Rest ohne Plot weiterlaufen
 
+        val_str = f" | Val-R²={epoch_val_r2:+.2f}" if epoch_val_r2 is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
-              f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}) "
+              f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}){val_str} "
               f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
         # ── Early Stopping ─────────────────────────────────────────────────
@@ -420,15 +474,33 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     else:
         v_quality = "🔴 Nichts gelernt"
 
+    # Val-R² (auf nie trainierten Dateien) -- die eigentliche Antwort auf die
+    # Overfitting-Frage, die final_r2 (Trainingsdaten selbst) nicht geben kann.
+    final_val_r2 = None
+    for v in reversed(val_r2_history):
+        if v is not None:
+            final_val_r2 = v
+            break
+    val_gap = (final_r2 - final_val_r2) if final_val_r2 is not None else None
+
     print(f"\n{'='*55}")
     print(f"  TRAINING SUMMARY")
     print(f"{'='*55}")
     print(f"  Epochen:       {epochs}")
-    print(f"  Züge:          {len(dataset):,}")
+    print(f"  Züge:          {len(dataset):,}"
+          + (f"  (+{len(val_dataset):,} Val, nie trainiert)" if val_dataset is not None else ""))
     print(f"  Batches/Epoche:{n_batches}")
     print(f"{'─'*55}")
     print(f"  Policy Loss:   {final_p:.4f} / {max_loss:.2f} max  ({pct:.1f}%)  {quality}")
     print(f"  Value Loss:    {final_v:.4f}  (R²={final_r2:.2f} ggü. Mittelwert-Baseline)  {v_quality}")
+    if final_val_r2 is not None:
+        if val_gap > 0.3:
+            gap_marker = "⚠️  großer Train/Val-Abstand — Overfitting wahrscheinlich"
+        elif val_gap > 0.15:
+            gap_marker = "🟡 spürbarer Train/Val-Abstand — im Auge behalten"
+        else:
+            gap_marker = "🟢 Train/Val nah beieinander"
+        print(f"  Value Val-R²:  {final_val_r2:.2f}  (Gap ggü. Train: {val_gap:+.2f})  {gap_marker}")
     print(f"{'─'*55}")
     if stopped_early:
         print(f"  ⏹️  Early Stopping nach Epoche {len(policy_history)}/{epochs}")
@@ -489,6 +561,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "final_policy_loss": round(final_p, 4),
         "final_value_loss":  round(final_v, 4),
         "final_value_r2":    round(final_r2, 4),
+        "final_val_r2":      round(final_val_r2, 4) if final_val_r2 is not None else None,
+        "val_frac":          val_frac,
+        "num_val_games":     len(val_dataset) if val_dataset is not None else 0,
         "value_target_var":  round(target_var, 4),
         "policy_pct":        round(pct, 1),
         "load_version":      load_version,
@@ -537,10 +612,13 @@ if __name__ == "__main__":
                         help="Reifegrad-Sonde nach dem Training überspringen")
     parser.add_argument("--no-plot", action="store_true",
                         help="Live-Loss-Plot deaktivieren (z.B. ohne Display)")
+    parser.add_argument("--val-frac", type=float, default=0.1,
+                        help="Anteil der Spiele-DATEIEN (nicht Züge), der als Val-Split nie "
+                             "trainiert wird (Standard: 0.1). 0 deaktiviert den Split.")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           probe_games=args.probe_games, probe_sims=args.probe_sims, skip_probe=args.skip_probe,
-          show_plot=not args.no_plot)
+          show_plot=not args.no_plot, val_frac=args.val_frac)
