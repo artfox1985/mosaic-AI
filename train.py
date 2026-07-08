@@ -53,80 +53,34 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import MosaicNet, MosaicDataset
 
-def run_readiness_probe(version_name, games=100, sims=400, threads=0, seed=12345):
-    """Stage-2-Reifegrad-Sonde (siehe evaluations/STAGE2_TODO.md, Abschnitt A):
-    vergleicht die 0:0-Rate DESSELBEN frisch exportierten Netzes einmal mit
-    DFS-Blatt (Stufe 1) und einmal mit Netz-Value-Blatt (Stufe 2), isoliert per
-    kurzem Self-Play (kein Regen-Zyklus — keine pkl-Dateien, nur In-Memory-
-    Auswertung). Dient als Netz-Gesundheitscheck bei JEDER Generation — auch
-    nach einem Umstieg auf Stufe 2, als Sanity-Check gegen einen erneuten
-    Kollaps (wie beim ersten v7-Stufe-2-Versuch: 51.8% vs. 17.5% 0:0).
-    Ampel: Verhältnis 0:0(Stufe2)/0:0(Stufe1) — ≤1.5x grün, 1.5–3x gelb, >3x rot."""
-    import json
-    import statistics as st
-
+def run_readiness_probe(version_name, games=50, sims=200, threads=0, seed=12345):
+    """Stage-2-Reifegrad-Test (siehe evaluations/STAGE2_TODO.md, Abschnitt A):
+    dasselbe frisch trainierte Netz tritt DIREKT gegeneinander an — Stufe 1
+    (DFS-Blatt) vs. Stufe 2 (Netz-Value-Blatt), max. `games` Partien, mit
+    Early-Stop (siehe arena.py::early_stop_wins_needed). Ersetzt den alten
+    0:0-Raten-Vergleich aus zwei GETRENNTEN Self-Play-Läufen: der maß nur
+    "kollabiert Stufe 2 nicht mehr in Nichtangriffs-Partien", nicht "gewinnt
+    Stufe 2 tatsächlich" — v2b hatte dort ein grünes 1.45x-Verhältnis, verlor
+    aber 2:98 in einer echten Stufe-1-vs-Stufe-2-Partie. Diese direkte Arena
+    ist aussagekräftiger UND (dank Early-Stop) meist schneller als die alten
+    2×100 Self-Play-Spiele."""
     onnx_path = MODELS_DIR / f"alphazero_{version_name}.onnx"
     if not onnx_path.exists():
-        print(f"  ⚠️  Sonde übersprungen: {onnx_path.name} nicht gefunden.")
+        print(f"  ⚠️  Stufen-Vergleich übersprungen: {onnx_path.name} nicht gefunden.")
         return
     try:
-        import mosaic_rust as _mr
+        from arena import run_net_vs_net
     except ImportError as e:
-        print(f"  ⚠️  Sonde übersprungen (mosaic_rust nicht importierbar): {e}")
+        print(f"  ⚠️  Stufen-Vergleich übersprungen (arena.py nicht importierbar): {e}")
         return
-
-    def zero_zero_stats(raw):
-        # net_self_play_games liefert eine FLACHE Liste von Zug-Records (jeder
-        # Schritt trägt scores/winner des fertigen Spiels) — pro game_id
-        # deduplizieren, sonst gewichten längere Spiele die Rate fälschlich stärker.
-        steps = json.loads(raw)
-        games = {}
-        for s in steps:
-            gid = s.get("game_id")
-            if gid is not None and "scores" in s:
-                games[gid] = tuple(s["scores"])
-        n = len(games)
-        zz = sum(1 for sc in games.values() if sc[0] == 0 and sc[1] == 0)
-        ws = st.mean(max(sc) for sc in games.values()) if n > 0 else 0.0
-        return zz, n, ws
 
     print(f"\n{'='*55}")
-    print(f"  STAGE-2-REIFEGRAD-SONDE ({games} Spiele je Stufe, {sims} Sims)")
+    print(f"  STUFE 1 vs. STUFE 2 (max. {games} Spiele, {sims} Sims, Early-Stop)")
     print(f"{'─'*55}")
-    raw_s1 = _mr.net_self_play_games(model_path=str(onnx_path), n_games=games, base_sims=sims,
-                                     seed=seed, num_threads=threads, dfs_leaf=True,
-                                     prefix=f"{version_name}_probe_s1")
-    zz1, n1, ws1 = zero_zero_stats(raw_s1)
-    raw_s2 = _mr.net_self_play_games(model_path=str(onnx_path), n_games=games, base_sims=sims,
-                                     seed=seed, num_threads=threads, dfs_leaf=False,
-                                     prefix=f"{version_name}_probe_s2")
-    zz2, n2, ws2 = zero_zero_stats(raw_s2)
-
-    if n1 == 0 or n2 == 0:
-        print(f"  ⚠️  Sonde ergebnislos: Stufe 1 lieferte {n1}, Stufe 2 {n2} Spiele "
-              f"(erwartet {games} je Stufe) — Self-Play evtl. abgebrochen.")
-        print(f"{'='*55}")
-        return
-
-    rate1 = zz1 / n1
-    rate2 = zz2 / n2
-    # Laplace-Glättung (+1 auf beide Zähler/Nenner) statt Sonderfall-Verzweigung:
-    # bleibt auch bei 0 beobachteten 0:0-Spielen (in beiden oder einer Stufe)
-    # wohldefiniert und dämpft Ausreißer durch kleine Stichproben (z.B. 1 vs.
-    # 3 Vorkommen bei wenigen Spielen), statt sofort auf ∞/1.0 zu springen.
-    ratio = (zz2 + 1) / (n2 + 1) / ((zz1 + 1) / (n1 + 1))
-
-    if ratio <= 1.5:
-        ampel = "🟢 GRÜN — Value-Head trägt, voller Stufe-2-Zyklus lohnt sich"
-    elif ratio <= 3.0:
-        ampel = "🟡 GELB — noch nicht reif, Trend über Generationen beobachten"
-    else:
-        ampel = "🔴 ROT — klar noch nicht reif, in Stufe 1 bleiben"
-
-    print(f"  Stufe 1 (DFS-Blatt):   0:0 {rate1*100:5.1f}% ({zz1}/{n1}) | Ø Sieger-Score {ws1:5.1f}")
-    print(f"  Stufe 2 (Netz-Value):  0:0 {rate2*100:5.1f}% ({zz2}/{n2}) | Ø Sieger-Score {ws2:5.1f}")
-    print(f"  Verhältnis 0:0(Stufe2/Stufe1, geglättet): {ratio:.2f}x")
-    print(f"  {ampel}")
+    model = str(onnx_path)
+    run_net_vs_net(model, model, sims_a=sims, sims_b=sims, stage_a=1, stage_b=2,
+                   games=games, threads=threads, seed=seed,
+                   name_a=f"{version_name}(Stufe1)", name_b=f"{version_name}(Stufe2)")
     print(f"{'='*55}")
 
 
@@ -680,12 +634,13 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
-    parser.add_argument("--probe-games", type=int, default=100,
-                        help="Spiele je Stufe für die Stage-2-Reifegrad-Sonde (Standard: 100)")
-    parser.add_argument("--probe-sims", type=int, default=400,
-                        help="Sims/Zug für die Reifegrad-Sonde (Standard: 400)")
+    parser.add_argument("--probe-games", type=int, default=50,
+                        help="Max. Spiele für den direkten Stufe-1-vs-Stufe-2-Vergleich, "
+                             "mit Early-Stop meist weniger (Standard: 50)")
+    parser.add_argument("--probe-sims", type=int, default=200,
+                        help="Sims/Zug für den Stufenvergleich (Standard: 200)")
     parser.add_argument("--skip-probe", action="store_true",
-                        help="Reifegrad-Sonde nach dem Training überspringen")
+                        help="Stufe-1-vs-Stufe-2-Vergleich nach dem Training überspringen")
     parser.add_argument("--no-plot", action="store_true",
                         help="Live-Loss-Plot deaktivieren (z.B. ohne Display)")
     parser.add_argument("--val-frac", type=float, default=0.1,
