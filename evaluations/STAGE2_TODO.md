@@ -81,11 +81,15 @@ zufällig gewählt, keine echte Herleitung — der einzige Datenpunkt-Vergleich
   Macht standardmäßig **10.000 Spiele** gesamt.
 - **Wenn ein Kandidat mit vollen 10.000 Spielen den Champion nicht
   schlägt**, drei Eskalationsstufen, günstigste zuerst:
-  1. **Fenster ausdünnen** (billigste Stufe): die 4000 Spiele der alten
-     Champions reduzieren (z. B. auf 2000 oder weniger) und mit aktuellen
-     Champion-Self-Plays auf 10.000 Spiele auffüllen, mit dieser
-     Zusammensetzung neu trainieren — nur ein Trainingslauf.
-  2. **Erst wenn auch das nicht reicht: Sims für neue Champion-Runden
+  1. **+2000 Spiele** (billigste Stufe): das Fenster um 2000 weitere aktuelle
+     Champion-Self-Plays auf 12.000 Spiele erweitern (kein Ausdünnen, reines
+     Wachstum), mit dieser Zusammensetzung neu trainieren — nur ein
+     zusätzlicher Self-Play-Lauf + ein Trainingslauf.
+  2. **Erst wenn auch das nicht reicht: Fenster ausdünnen** — die Spiele der
+     alten Champions reduzieren (z. B. auf 2000 oder weniger) und mit
+     aktuellen Champion-Self-Plays auf die Zielgröße auffüllen, mit dieser
+     Zusammensetzung neu trainieren.
+  3. **Erst wenn auch das nicht reicht: Sims für neue Champion-Runden
      erhöhen** (z. B. 800 statt 400) — teuerste Stufe (mehrstündige
      Self-Play-Runde), aber ein echter Qualitätsgewinn: mehr Sims verbessert
      die Suche selbst, während Fenster-Anpassungen nur Stichprobenrauschen
