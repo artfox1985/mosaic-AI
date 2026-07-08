@@ -13,6 +13,7 @@ Fairness: Brett 0 = Agent A, Brett 1 = Agent B; der Startspieler-Vorteil wird
 import sys
 import time
 import json
+import math
 import random
 import itertools
 
@@ -47,6 +48,18 @@ def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_
     margin_part = min(0.45, (margin / margin_cap) * 0.45)
     score_part = min(0.45, (winner_score / max_winner_score) * 0.45)
     return min(1.0, 0.1 + margin_part + score_part)
+
+
+def early_stop_wins_needed(n, z=1.96):
+    """Ab wie vielen Siegen bei `n` gespielten Partien ist eine Seite bereits
+    signifikant (einseitiger Binomialtest gegen p=0.5, Standard z=1.96 ~ 95%)
+    im Vorteil — d.h. hochgerechnet mit >50% Gewinnchance? Geschlossene Form:
+    Sieg-Anteil w/n braucht (w/n - 0.5) / sqrt(0.25/n) >= z, aufgelöst nach w
+    ergibt w >= 0.5*(n + z*sqrt(n)). Reproduziert exakt die Tabelle
+    10->9(90%), 20->15(75%), 30->21(70%), ..., 100->60(60%) bei z=1.96.
+    Erlaubt einen Spielsatz VORZEITIG abzubrechen, sobald eine Seite diese
+    Schwelle erreicht — spart Zeit ggü. immer alle `games` durchzuspielen."""
+    return math.ceil(0.5 * (n + z * math.sqrt(n)))
 
 
 def calculate_elo(rating_a, rating_b, actual_score_a, k=32):
@@ -174,11 +187,14 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
 
 def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=0,
                   seed=None, chunk=10, c=0.3, c_puct=1.5,
-                  net_name=None, heur_name=None):
+                  net_name=None, heur_name=None, early_stop=True):
     """AlphaZero-Netz (ONNX) vs Heuristik-MCTS. Das Netz spielt Brett 0, die
     Heuristik Brett 1; der Startspieler-Vorteil wird über alternierende Start-
     spieler je Spiel (i % 2) ausgeglichen. `stage` 1 = DFS-Blatt (Stufe 1),
-    2 = Netz-Value-Blatt (Stufe 2). Spielt in Chunks für LIVE-Ausgabe."""
+    2 = Netz-Value-Blatt (Stufe 2). Spielt in Chunks für LIVE-Ausgabe.
+    `early_stop`: bricht ab, sobald eine Seite den 95%-Signifikanz-Schwellwert
+    für >50% Gewinnchance erreicht hat (siehe early_stop_wins_needed) — spart
+    Zeit ggü. immer allen `games` Partien."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
@@ -200,6 +216,7 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
 
     done = chunk_idx = 0
     n_wins = h_wins = 0
+    stopped_early = None
     t0 = time.time()
     while done < games:
         n = min(chunk, games - done)
@@ -237,27 +254,43 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
                   f"| Stand Netz {n_wins}:{h_wins} Heur | Elo {elo[net_name]}/{elo[heur_name]}",
                   flush=True)
 
+            if early_stop and done >= 10:
+                needed = early_stop_wins_needed(done)
+                if n_wins >= needed:
+                    stopped_early = net_name
+                elif h_wins >= needed:
+                    stopped_early = heur_name
+                if stopped_early:
+                    print(f"  ⏹️  Vorzeitig entschieden: {stopped_early} hat nach {done} Spielen "
+                          f"bereits {needed} Siege (95%-Signifikanz für >50% Gewinnchance).")
+                    break
+        if stopped_early:
+            break
+
     dur = time.time() - t0
     print("-" * 50)
     print(f"🏆 ERGEBNIS: {net_name} {n_wins}:{h_wins} {heur_name} "
-          f"({n_wins/games*100:.0f}% Netz-Siege) in {dur:.1f}s ({games/dur:.1f} Spiele/s)")
+          f"({n_wins/done*100:.0f}% Netz-Siege) in {dur:.1f}s ({done/dur:.1f} Spiele/s)"
+          + (f"  [vorzeitig nach {done}/{games} Spielen]" if stopped_early else ""))
     print(f"   Ø Score: {net_name} {_st.mean(net_scores):.1f} | {heur_name} {_st.mean(heur_scores):.1f}")
-    print(f"   0:0-Spiele: {wins['ZeroZero']}/{games} ({wins['ZeroZero']/games*100:.1f}%)  "
+    print(f"   0:0-Spiele: {wins['ZeroZero']}/{done} ({wins['ZeroZero']/done*100:.1f}%)  "
           f"(Sauberkeits-Indikator)")
-    print(f"   Ø Floor-Strafe: {net_name} {floor[net_name]/games:.1f} | {heur_name} {floor[heur_name]/games:.1f}")
+    print(f"   Ø Floor-Strafe: {net_name} {floor[net_name]/done:.1f} | {heur_name} {floor[heur_name]/done:.1f}")
     print(f"   Elo: {net_name} {elo[net_name]} | {heur_name} {elo[heur_name]}")
 
 
 def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
                    threads=0, seed=None, chunk=10, c_puct=1.5, c_puct_a=None, c_puct_b=None,
-                   stage_a=None, stage_b=None, name_a=None, name_b=None):
+                   stage_a=None, stage_b=None, name_a=None, name_b=None, early_stop=True):
     """Netz A (Brett 0) vs. Netz B (Brett 1) — Generationen-Vergleich. Start-
     spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt.
     `c_puct_a`/`c_puct_b` überschreiben `c_puct` je Brett (z.B. um denselben
     Modell-Stand mit unterschiedlichem c_puct gegeneinander antreten zu lassen).
     `stage_a`/`stage_b` überschreiben `stage` je Brett (z.B. um Netz A auf
     Stufe 2 gegen Netz B auf Stufe 1 antreten zu lassen — Reifegrad-Vergleich
-    in einer echten Partie statt nur der internen Sonde)."""
+    in einer echten Partie statt nur der internen Sonde).
+    `early_stop`: bricht ab, sobald eine Seite den 95%-Signifikanz-Schwellwert
+    für >50% Gewinnchance erreicht hat (siehe early_stop_wins_needed)."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
@@ -285,6 +318,7 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
 
     done = chunk_idx = 0
     a_wins = b_wins = 0
+    stopped_early = None
     t0 = time.time()
     while done < games:
         n = min(chunk, games - done)
@@ -314,12 +348,26 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
                   f"| Stand {name_a} {a_wins}:{b_wins} {name_b} | Elo {elo[name_a]}/{elo[name_b]}",
                   flush=True)
 
+            if early_stop and done >= 10:
+                needed = early_stop_wins_needed(done)
+                if a_wins >= needed:
+                    stopped_early = name_a
+                elif b_wins >= needed:
+                    stopped_early = name_b
+                if stopped_early:
+                    print(f"  ⏹️  Vorzeitig entschieden: {stopped_early} hat nach {done} Spielen "
+                          f"bereits {needed} Siege (95%-Signifikanz für >50% Gewinnchance).")
+                    break
+        if stopped_early:
+            break
+
     dur = time.time() - t0
     print("-" * 50)
     print(f"🏆 ERGEBNIS: {name_a} {a_wins}:{b_wins} {name_b} "
-          f"({a_wins/games*100:.0f}% A-Siege) in {dur:.1f}s ({games/dur:.1f} Spiele/s)")
+          f"({a_wins/done*100:.0f}% A-Siege) in {dur:.1f}s ({done/dur:.1f} Spiele/s)"
+          + (f"  [vorzeitig nach {done}/{games} Spielen]" if stopped_early else ""))
     print(f"   Ø Score: {name_a} {_st.mean(a_scores):.1f} | {name_b} {_st.mean(b_scores):.1f}")
-    print(f"   0:0-Spiele: {wins['ZeroZero']}/{games} ({wins['ZeroZero']/games*100:.1f}%)")
+    print(f"   0:0-Spiele: {wins['ZeroZero']}/{done} ({wins['ZeroZero']/done*100:.1f}%)")
     print(f"   Elo: {name_a} {elo[name_a]} | {name_b} {elo[name_b]}")
 
 
