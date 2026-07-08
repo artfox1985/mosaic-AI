@@ -57,6 +57,12 @@ struct Node {
     depth: u32,
 }
 
+impl crate::search_common::SearchNode for Node {
+    fn parent(&self) -> Option<usize> { self.parent }
+    fn children(&self) -> &[usize] { &self.children }
+    fn terminal(&self) -> bool { self.terminal }
+}
+
 // ── Bewertung ────────────────────────────────────────────────────────────────
 
 /// Erwarteter finaler Rundenscore eines Spielers — EXAKT per Tiling-Solver
@@ -385,24 +391,13 @@ fn build_tree<R: Rng + ?Sized>(
         // 1. Selection (mit Progressive Widening).
         let mut nid = 0;
         loop {
-            // Erzwungener Gegnerzug: ein Knoten breitert erst weiter (neuer
-            // Kandidat), wenn sein zuletzt erzeugtes Kind selbst mindestens
-            // einen eigenen Kindknoten hat (= Antwort simuliert). Ohne das
-            // verschlingt reine Breite das Sim-Budget, bevor auch nur EIN
-            // Kandidat eine Antwort gesehen hat — kein sauberer Vergleich.
-            // Gilt für Wurzel (Tiefe 0) UND ihre direkten Kinder (Tiefe 1,
-            // "1. Gegnerzug") symmetrisch — sonst bekämen Enkel-Kandidaten
-            // (Tiefe 2, die Antworten AUF den Gegnerzug) nicht dieselbe
-            // Garantie wie die Wurzelkandidaten selbst. Ab Tiefe 2 (Enkel)
-            // nicht mehr rekursiv (dort gilt wieder normales Widening/PUCT).
-            if nid == 0 || nodes[nid].parent == Some(0) {
-                if let Some(&last_child) = nodes[nid].children.last() {
-                    if nodes[last_child].children.is_empty() && !nodes[last_child].terminal {
-                        logln!("  FORCE-REPLY #{nid} → #{last_child}: Antwort erzwungen vor weiterem Breitern");
-                        nid = last_child;
-                        continue;
-                    }
-                }
+            // Erzwungener Gegnerzug (Tiefe 0/1, siehe search_common::force_reply_target):
+            // ein Knoten breitert erst weiter, wenn sein zuletzt erzeugtes Kind
+            // selbst mindestens einen eigenen Kindknoten hat (= Antwort simuliert).
+            if let Some(target) = crate::search_common::force_reply_target(&nodes, nid) {
+                logln!("  FORCE-REPLY #{nid} → #{target}: Antwort erzwungen vor weiterem Breitern");
+                nid = target;
+                continue;
             }
             if nodes[nid].terminal {
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
@@ -490,27 +485,10 @@ fn build_tree<R: Rng + ?Sized>(
     // Nachlauf: Force-Reply oben (Tiefe 0/1) greift nur, wenn UCB den Knoten
     // je wieder besucht — Wurzelkinder mit sehr niedrigem Score werden nie
     // erneut selektiert und ihr einziges erzwungenes Kind (Tiefe 2) bleibt
-    // dauerhaft ohne eigene Antwort. Hier wird EINMAL über die bereits
-    // gebauten Wurzel- und Tiefe-1-Knoten gegangen und jeder mit Kindern,
-    // dessen zuletzt hinzugefügtes Kind selbst noch keins hat, nachträglich
-    // um genau eine Antwort ergänzt — auch wenn das über `simulations`
-    // hinausgeht. Bewusst NICHT auf tiefere Knoten ausgeweitet: dort ist ein
-    // kinderloses letztes Kind die normale, gewollte MCTS-Baumgrenze, kein
-    // offenes Ende (siehe Kommentar bei FORCE-REPLY oben).
-    let built = nodes.len();
-    for i in 0..built {
-        if i != 0 && nodes[i].parent != Some(0) {
-            continue;
-        }
-        if nodes[i].terminal {
-            continue;
-        }
-        let Some(&last_child) = nodes[i].children.last() else { continue };
-        if nodes[last_child].terminal || !nodes[last_child].children.is_empty() {
-            continue;
-        }
-        logln!("  NACHLAUF #{i} → #{last_child}: offenes Ende nachträglich geschlossen");
-        expand_and_backprop(&mut nodes, last_child, &names, rng, &mut log);
+    // dauerhaft ohne eigene Antwort (siehe search_common::nachlauf_targets).
+    for target in crate::search_common::nachlauf_targets(&nodes) {
+        logln!("  NACHLAUF → #{target}: offenes Ende nachträglich geschlossen");
+        expand_and_backprop(&mut nodes, target, &names, rng, &mut log);
     }
 
     Some(nodes)
@@ -571,14 +549,10 @@ fn best_root_child(nodes: &[Node]) -> Option<usize> {
     })
 }
 
-/// Tiefe des Teilbaums unter `nid` (0 = Blatt).
+/// Tiefe des Teilbaums unter `nid` (0 = Blatt) — Pendant zu `net_mcts::subtree_depth`,
+/// beide delegieren an `search_common::subtree_depth`.
 fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
-    let children = &nodes[nid].children;
-    if children.is_empty() {
-        0
-    } else {
-        1 + children.iter().map(|&c| subtree_depth(nodes, c)).max().unwrap()
-    }
+    crate::search_common::subtree_depth(nodes, nid)
 }
 
 /// Typ, Beschreibung, Kategorie (für `.cat-*` in debug.html) und Move-Dict.
