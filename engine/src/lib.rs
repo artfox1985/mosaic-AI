@@ -21,6 +21,7 @@ pub mod profiling;
 pub mod py;
 pub mod round_end;
 pub mod scoring;
+pub mod search_common;
 pub mod self_play;
 pub mod serialize;
 pub mod state;
