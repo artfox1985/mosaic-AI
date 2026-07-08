@@ -44,3 +44,4 @@ Desktop.ini
 /engine/target/
 *.whl
 *.pyd
+*.xlsx
