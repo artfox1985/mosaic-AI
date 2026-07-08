@@ -250,25 +250,32 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
 
 def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
                    threads=0, seed=None, chunk=10, c_puct=1.5, c_puct_a=None, c_puct_b=None,
-                   name_a=None, name_b=None):
+                   stage_a=None, stage_b=None, name_a=None, name_b=None):
     """Netz A (Brett 0) vs. Netz B (Brett 1) — Generationen-Vergleich. Start-
     spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt.
     `c_puct_a`/`c_puct_b` überschreiben `c_puct` je Brett (z.B. um denselben
-    Modell-Stand mit unterschiedlichem c_puct gegeneinander antreten zu lassen)."""
+    Modell-Stand mit unterschiedlichem c_puct gegeneinander antreten zu lassen).
+    `stage_a`/`stage_b` überschreiben `stage` je Brett (z.B. um Netz A auf
+    Stufe 2 gegen Netz B auf Stufe 1 antreten zu lassen — Reifegrad-Vergleich
+    in einer echten Partie statt nur der internen Sonde)."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
-    dfs_leaf = (stage == 1)
+    st_a = stage_a if stage_a is not None else stage
+    st_b = stage_b if stage_b is not None else stage
+    dfs_leaf_a = (st_a == 1)
+    dfs_leaf_b = (st_b == 1)
     cp_a = c_puct_a if c_puct_a is not None else c_puct
     cp_b = c_puct_b if c_puct_b is not None else c_puct
     name_a = name_a or f"A({os.path.basename(model_a)})"
     name_b = name_b or f"B({os.path.basename(model_b)})"
-    leaf = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
+    leaf_a = "DFS-Blatt" if dfs_leaf_a else "Netz-Value-Blatt"
+    leaf_b = "DFS-Blatt" if dfs_leaf_b else "Netz-Value-Blatt"
 
     print("🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️")
-    print(f"  {name_a} (Brett 0, {sims_a} Sims, c_puct={cp_a}) vs "
-          f"{name_b} (Brett 1, {sims_b} Sims, c_puct={cp_b}) "
-          f"— Stufe {stage}/{leaf} — {games} Spiele")
+    print(f"  {name_a} (Brett 0, {sims_a} Sims, c_puct={cp_a}, Stufe {st_a}/{leaf_a}) vs "
+          f"{name_b} (Brett 1, {sims_b} Sims, c_puct={cp_b}, Stufe {st_b}/{leaf_b}) "
+          f"— {games} Spiele")
     print("-" * 50)
 
     elo  = {name_a: 1000, name_b: 1000}
@@ -283,7 +290,8 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
         n = min(chunk, games - done)
         raw = _mr.net_vs_net_arena_match(model_a, model_b, sims_a=sims_a, sims_b=sims_b,
                                          n_games=n, seed=base_seed + chunk_idx,
-                                         num_threads=threads, c_puct_a=cp_a, c_puct_b=cp_b, dfs_leaf=dfs_leaf)
+                                         num_threads=threads, c_puct_a=cp_a, c_puct_b=cp_b,
+                                         dfs_leaf_a=dfs_leaf_a, dfs_leaf_b=dfs_leaf_b)
         results = json.loads(raw)
         chunk_idx += 1
         for g in results:
@@ -318,16 +326,16 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
 if __name__ == "__main__":
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v1b.onnx"   # Pfad zum ONNX-Netz
-    NET_MODEL_PRE = "models/alphazero_v4.onnx"
+    NET_MODEL = "models/alphazero_v2b.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL_PRE = "models/alphazero_v1.onnx"
     NET_SIMS  = 200                            # Basis-Sims des Netzes
-    STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
+    STAGE     = 2                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
     GAMES     = 100
-    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = "v1b",
+    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = "v2b",
                   games=GAMES, stage=STAGE, threads=0)
     #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
-    #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v8", name_b="v4")
+    #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v2b", name_b="v1")
 
     # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
     # competitors = {
