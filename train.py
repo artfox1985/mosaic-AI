@@ -12,6 +12,7 @@ import torch
 import math
 import glob
 import random
+import copy
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -130,7 +131,8 @@ def run_readiness_probe(version_name, games=100, sims=400, threads=0, seed=12345
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          probe_games=100, probe_sims=400, skip_probe=False, show_plot=True, val_frac=0.1):
+          probe_games=100, probe_sims=400, skip_probe=False, show_plot=True, val_frac=0.1,
+          val_overfit_patience=8):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -250,7 +252,29 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     early_stop_patience = 5 if early_stop else 999999
     policy_plateau_since = None
     stopped_early = False
+    stop_reason = None
     total_history = []
+
+    # ── Value-Freeze (chirurgisch statt Full-Stop): der Value-Head soll
+    # generalistisch bleiben (nicht von Anfang an auf die Eigenheiten DIESES
+    # Fensters/Champions einlernen), OHNE dafuer das Policy-Training zu
+    # kappen -- Policy plateaut in der Praxis regelmaessig SPAETER als Value
+    # ueberfittet, und in Stufe 1 (DFS-Blatt) treibt allein die Policy die
+    # Spielstaerke, der Value-Head wird beim Spielen gar nicht befragt (siehe
+    # v2 vs. v2b: schlechteres Val-R² bei v2, aber staerker in der Arena).
+    # Ein Full-Stop wegen Value-Overfitting wuerde also Policy-Potential
+    # verschenken. Stattdessen: sobald Val-R² `val_overfit_patience` Epochen
+    # lang sein Maximum nicht mehr ueberschritten hat, wird NUR der
+    # Value-Head auf seinen bislang besten Stand zurueckgesetzt und
+    # eingefroren (requires_grad=False + Value-Loss-Anteil auf 0) -- Trunk
+    # und Policy-Head trainieren unveraendert weiter.
+    val_overfit_tolerance = 0.005   # Rauschtoleranz, bevor eine "Verbesserung" zaehlt
+    val_overfit_patience_eff = val_overfit_patience if (early_stop and val_dataloader is not None) else 999999
+    best_val_r2 = float("-inf")
+    best_val_epoch = None
+    best_value_head_state = None
+    value_frozen = False
+    value_frozen_since = None
 
     # ── Live-Plot (zusätzlich zur Textausgabe): Total/Policy oben, Value unten.
     # Getrennte Panels, weil Value-Loss (~0.05–0.5) sonst neben Policy-Loss
@@ -329,7 +353,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
                 p_loss = p_loss + moon_nll[sun_mask].mean()
 
-            loss = v_loss * VALUE_WEIGHT + p_loss
+            # Eingefroren: Value-Loss-Anteil auf 0 (kein Gradient mehr Richtung
+            # Value-Head ODER Trunk ueber diesen Term) -- Policy trainiert
+            # unbeeinflusst weiter. v_loss selbst bleibt fuer die Anzeige/das
+            # Monitoring unten trotzdem berechnet.
+            eff_value_weight = 0.0 if value_frozen else VALUE_WEIGHT
+            loss = v_loss * eff_value_weight + p_loss
             loss.backward()
             optimizer.step()
 
@@ -367,6 +396,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
             epoch_val_r2 = 1 - epoch_val_vloss / target_var if target_var > 0 else 0.0
         val_r2_history.append(epoch_val_r2)
+
+        # ── Val-Overfitting-Tracking: nur relevant, solange der Value-Head noch
+        # nicht eingefroren ist -- danach aendern sich seine Gewichte ohnehin
+        # nicht mehr, weiteres Tracking waere sinnlos.
+        val_overfit_triggered = False
+        if not value_frozen and epoch_val_r2 is not None:
+            if epoch_val_r2 > best_val_r2 + val_overfit_tolerance:
+                best_val_r2 = epoch_val_r2
+                best_val_epoch = epoch + 1
+                # Snapshot NUR des Value-Heads -- beim Einfrieren wird darauf
+                # zurueckgesetzt, waehrend Trunk/Policy-Head unangetastet
+                # (auf ihrem aktuellen, weiter trainierten Stand) bleiben.
+                best_value_head_state = copy.deepcopy(model.value_head.state_dict())
+            elif best_val_epoch is not None and (epoch + 1) - best_val_epoch >= val_overfit_patience_eff:
+                val_overfit_triggered = True
 
         import torch as _t
         v_all   = _t.cat(v_preds_epoch)
@@ -434,16 +478,36 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
               f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}){val_str} "
               f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
-        # ── Early Stopping ─────────────────────────────────────────────────
+        # ── Value-Freeze (chirurgisch, kein Stop) ───────────────────────────
+        # Value-Head soll generalistisch bleiben statt auf dieses Fenster zu
+        # overfitten -- aber statt das GANZE Training zu stoppen, wird NUR der
+        # Value-Head auf seinen besten Stand zurueckgesetzt und eingefroren.
+        # Policy/Trunk trainieren ab hier unveraendert mit VALUE_WEIGHT=0 weiter.
+        if val_overfit_triggered and not value_frozen:
+            if best_value_head_state is not None:
+                model.value_head.load_state_dict(best_value_head_state)
+                for p in model.value_head.parameters():
+                    p.requires_grad = False
+            value_frozen = True
+            value_frozen_since = epoch + 1
+            print(f"\n🧊 Value-Head eingefroren: Val-R² seit Epoche {best_val_epoch} nicht mehr "
+                  f"verbessert (Bestwert {best_val_r2:.2f}, jetzt {epoch_val_r2:.2f}) — Gewichte auf "
+                  f"Epoche {best_val_epoch} zurückgesetzt, Policy trainiert unbeeinflusst weiter.")
+
+        # ── Early Stopping (unveraendert: nur bei Policy+Value-Plateau) ─────
         if policy_plateau_since is not None:
             since = (epoch + 1) - policy_plateau_since
             if since >= early_stop_patience:
                 print(f"\n⏹️  Early Stopping: Policy+Value plateaut seit Epoche {policy_plateau_since} "
                       f"({since} Epochen ohne Fortschritt).")
                 stopped_early = True
+                stop_reason = "plateau"
                 break
 
     max_loss = math.log(NUM_ACTIONS)
+    # Kein Rollback mehr noetig: bei Value-Freeze trainieren Trunk/Policy bis
+    # zur echten letzten Epoche weiter, epoch_ploss/epoch_vloss beschreiben
+    # also weiterhin korrekt den tatsaechlich gespeicherten Endstand.
     final_p = epoch_ploss
     final_v = epoch_vloss
     pct = final_p / max_loss * 100
@@ -476,6 +540,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     # Val-R² (auf nie trainierten Dateien) -- die eigentliche Antwort auf die
     # Overfitting-Frage, die final_r2 (Trainingsdaten selbst) nicht geben kann.
+    # Wird JEDE Epoche weiterberechnet, auch nach einem Freeze (der Value-Head
+    # selbst aendert sich dann nicht mehr, aber sein Output kann durch den
+    # weiter trainierten, gemeinsamen Trunk trotzdem leicht driften) -- zeigt
+    # also ob der Freeze tatsaechlich haelt.
     final_val_r2 = None
     for v in reversed(val_r2_history):
         if v is not None:
@@ -502,8 +570,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             gap_marker = "🟢 Train/Val nah beieinander"
         print(f"  Value Val-R²:  {final_val_r2:.2f}  (Gap ggü. Train: {val_gap:+.2f})  {gap_marker}")
     print(f"{'─'*55}")
+    if value_frozen:
+        print(f"  🧊 Value-Head eingefroren seit Epoche {value_frozen_since}/{epochs} "
+              f"(Gewichte von Epoche {best_val_epoch}, bestes Val-R²={best_val_r2:.2f}) — "
+              f"Policy trainierte darüber hinaus unbeeinflusst weiter.")
     if stopped_early:
-        print(f"  ⏹️  Early Stopping nach Epoche {len(policy_history)}/{epochs}")
+        print(f"  ⏹️  Early Stopping (Policy+Value-Plateau) nach Epoche {len(policy_history)}/{epochs}")
     if policy_plateau_since:
         print(f"  🟡 Plateau ab Epoche {policy_plateau_since}.")
         print(f"     → Für nächste Generation: mehr Sims im Self-Play.")
@@ -550,7 +622,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "epochs":            actual_epochs,
         "epochs_requested":  epochs,
         "early_stopped":     stopped_early,
+        "stop_reason":       stop_reason,
         "early_stop_epoch":  policy_plateau_since if stopped_early else None,
+        "value_frozen":      value_frozen,
+        "value_frozen_epoch": value_frozen_since,
+        "best_val_r2":       round(best_val_r2, 4) if best_val_r2 > float("-inf") else None,
         "num_games":         len(dataset),  # Züge
         "input_size":        dataset.input_size,
         "num_actions":       NUM_ACTIONS,
@@ -615,10 +691,15 @@ if __name__ == "__main__":
     parser.add_argument("--val-frac", type=float, default=0.1,
                         help="Anteil der Spiele-DATEIEN (nicht Züge), der als Val-Split nie "
                              "trainiert wird (Standard: 0.1). 0 deaktiviert den Split.")
+    parser.add_argument("--val-patience", type=int, default=8,
+                        help="Epochen ohne Val-R²-Verbesserung, bevor der Value-Head eingefroren "
+                             "wird (Gewichte auf beste Val-Epoche zurückgesetzt, Standard: 8). "
+                             "Policy/Trunk trainieren unverändert weiter -- kein Stop des gesamten "
+                             "Trainings. Nur aktiv mit Val-Split und ohne --no-early-stop.")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           probe_games=args.probe_games, probe_sims=args.probe_sims, skip_probe=args.skip_probe,
-          show_plot=not args.no_plot, val_frac=args.val_frac)
+          show_plot=not args.no_plot, val_frac=args.val_frac, val_overfit_patience=args.val_patience)
