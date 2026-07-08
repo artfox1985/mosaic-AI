@@ -985,7 +985,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     sims_b: u32,
     c_puct_a: f64,
     c_puct_b: f64,
-    leaf: LeafEval,
+    leaf_a: LeafEval,
+    leaf_b: LeafEval,
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
@@ -1029,10 +1030,10 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else {
-                        let (net, base, cp) = if pi == 0 {
-                            (net_a, sims_a, c_puct_a)
+                        let (net, base, cp, leaf) = if pi == 0 {
+                            (net_a, sims_a, c_puct_a, leaf_a)
                         } else {
-                            (net_b, sims_b, c_puct_b)
+                            (net_b, sims_b, c_puct_b, leaf_b)
                         };
                         let s = dynamic_sims(base, actions.len());
                         net_search_drafting_action(net, &game.state, s, cp, false, leaf, rng)
@@ -1090,11 +1091,13 @@ pub fn run_net_vs_net_arena(
     num_threads: usize,
     c_puct_a: f64,
     c_puct_b: f64,
-    dfs_leaf: bool,
+    dfs_leaf_a: bool,
+    dfs_leaf_b: bool,
 ) -> Result<String, String> {
     let net_a = std::sync::Arc::new(Net::load(model_a, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
     let net_b = std::sync::Arc::new(Net::load(model_b, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
-    let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
+    let leaf_a = if dfs_leaf_a { LeafEval::Dfs } else { LeafEval::Net };
+    let leaf_b = if dfs_leaf_b { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Value {
         let mut rng =
@@ -1102,7 +1105,7 @@ pub fn run_net_vs_net_arena(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
-        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, leaf, ids, names, first, &mut rng)
+        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, leaf_a, leaf_b, ids, names, first, &mut rng)
     };
 
     let all: Vec<Value> = if num_threads <= 1 {

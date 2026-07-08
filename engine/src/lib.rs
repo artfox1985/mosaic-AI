@@ -115,7 +115,7 @@ fn net_arena_match(
 /// spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[A,B], winner, steps, total_floor, floor_per_round}]` zurück.
 #[pyfunction]
-#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, dfs_leaf=true))]
+#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, dfs_leaf=true, dfs_leaf_a=None, dfs_leaf_b=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_vs_net_arena_match(
     py: Python<'_>,
@@ -129,11 +129,18 @@ fn net_vs_net_arena_match(
     c_puct_a: f64,
     c_puct_b: f64,
     dfs_leaf: bool,
+    dfs_leaf_a: Option<bool>,
+    dfs_leaf_b: Option<bool>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
+    // dfs_leaf_a/dfs_leaf_b ueberschreiben das gemeinsame dfs_leaf je Brett (z.B.
+    // um Stufe 2 vs. Stufe 1 gegeneinander antreten zu lassen) -- ohne Angabe
+    // gilt fuer beide weiterhin das gemeinsame dfs_leaf (Standard: Stufe 1).
+    let leaf_a = dfs_leaf_a.unwrap_or(dfs_leaf);
+    let leaf_b = dfs_leaf_b.unwrap_or(dfs_leaf);
     py.detach(move || {
         crate::self_play::run_net_vs_net_arena(
-            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, dfs_leaf,
+            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, leaf_a, leaf_b,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
