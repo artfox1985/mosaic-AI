@@ -501,7 +501,7 @@ class MosaicDataset(Dataset):
 
 
 class MosaicNet(nn.Module):
-    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE, value_hidden=128,
+    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE, value_hidden=64,
                  policy_hidden=256):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
