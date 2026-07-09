@@ -59,5 +59,11 @@ STUFE 1 vs. STUFE 2 (max. 50 Spiele, 200 Sims, Early-Stop)
 **Arena vs. Heuristik**
 
 ```
-
+v1w8 (Brett 0, 200 Sims, Stufe 1/DFS-Blatt) vs Heuristik(s200) (Brett 1, 200 Sims) — 100 Spiele
+⏹️  Vorzeitig entschieden: Heuristik(s200) hat nach 10 Spielen bereits 9 Siege (95%-Signifikanz für >50% Gewinnchance).
+🏆 ERGEBNIS: v1w8 1:9 Heuristik(s200) (10% Netz-Siege) in 150.7s  [vorzeitig nach 10/100 Spielen]
+   Ø Score: v1w8 26.5 | Heuristik(s200) 47.0
+   0:0-Spiele: 0/10 (0.0%)
+   Ø Floor-Strafe: v1w8 16.4 | Heuristik(s200) 8.7
+   Elo: v1w8 913 | Heuristik(s200) 1087
 ```
