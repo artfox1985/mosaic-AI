@@ -1,0 +1,110 @@
+🏟️ Mosaic-AI ARENA — Netz vs Heuristik (Rust) 🏟️
+  v1b_w2 (Brett 0, 200 Sims, Stufe 1/DFS-Blatt) vs Heuristik(s200) (Brett 1, 200 Sims) — 100 Spiele
+--------------------------------------------------
+  #  1/100:   9:65  -> Heuristik(s200)          | Züge 159 | Strength 1.000 | Stand Netz 0:1 Heur | Elo 984/1016
+  #  2/100:  46:49  -> Heuristik(s200)          | Züge 162 | Strength 0.640 | Stand Netz 0:2 Heur | Elo 975/1025
+  #  3/100:  31:34  -> Heuristik(s200)          | Züge 168 | Strength 0.573 | Stand Netz 0:3 Heur | Elo 967/1033
+  #  4/100:  36:51  -> Heuristik(s200)          | Züge 166 | Strength 1.000 | Stand Netz 0:4 Heur | Elo 954/1046
+  #  5/100:  37:67  -> Heuristik(s200)          | Züge 164 | Strength 1.000 | Stand Netz 0:5 Heur | Elo 942/1058
+  #  6/100:  46:41  -> v1b_w2                   | Züge 162 | Strength 0.700 | Stand Netz 1:5 Heur | Elo 957/1043
+  #  7/100:  51:37  -> v1b_w2                   | Züge 167 | Strength 0.970 | Stand Netz 2:5 Heur | Elo 976/1024
+  #  8/100:  36:52  -> Heuristik(s200)          | Züge 155 | Strength 1.000 | Stand Netz 2:6 Heur | Elo 962/1038
+  #  9/100:  38:42  -> Heuristik(s200)          | Züge 160 | Strength 0.670 | Stand Netz 2:7 Heur | Elo 954/1046
+  # 10/100:  36:50  -> Heuristik(s200)          | Züge 155 | Strength 0.970 | Stand Netz 2:8 Heur | Elo 942/1058
+  # 11/100:  40:72  -> Heuristik(s200)          | Züge 162 | Strength 1.000 | Stand Netz 2:9 Heur | Elo 931/1069
+  # 12/100:  58:61  -> Heuristik(s200)          | Züge 160 | Strength 0.640 | Stand Netz 2:10 Heur | Elo 925/1075
+  # 13/100:  34:24  -> v1b_w2                   | Züge 163 | Strength 0.782 | Stand Netz 3:10 Heur | Elo 943/1057
+  # 14/100:  34:65  -> Heuristik(s200)          | Züge 160 | Strength 1.000 | Stand Netz 3:11 Heur | Elo 932/1068
+  # 15/100:  26:53  -> Heuristik(s200)          | Züge 163 | Strength 1.000 | Stand Netz 3:12 Heur | Elo 922/1078
+  # 16/100:  34:63  -> Heuristik(s200)          | Züge 158 | Strength 1.000 | Stand Netz 3:13 Heur | Elo 913/1087
+  # 17/100:  27:55  -> Heuristik(s200)          | Züge 163 | Strength 1.000 | Stand Netz 3:14 Heur | Elo 904/1096
+  # 18/100:  26:80  -> Heuristik(s200)          | Züge 166 | Strength 1.000 | Stand Netz 3:15 Heur | Elo 896/1104
+  # 19/100:  37:58  -> Heuristik(s200)          | Züge 157 | Strength 1.000 | Stand Netz 3:16 Heur | Elo 889/1111
+  # 20/100:  54:52  -> v1b_w2                   | Züge 168 | Strength 0.610 | Stand Netz 4:16 Heur | Elo 904/1096
+  # 21/100:  33:51  -> Heuristik(s200)          | Züge 156 | Strength 1.000 | Stand Netz 4:17 Heur | Elo 896/1104
+  # 22/100:  18:17  -> v1b_w2                   | Züge 159 | Strength 0.333 | Stand Netz 5:17 Heur | Elo 904/1096
+  # 23/100:  40:51  -> Heuristik(s200)          | Züge 154 | Strength 0.880 | Stand Netz 5:18 Heur | Elo 897/1103
+  # 24/100:  65:65  -> Heuristik(s200)          | Züge 165 | Strength 0.550 | Stand Netz 5:19 Heur | Elo 893/1107
+  # 25/100:   0:50  -> Heuristik(s200)          | Züge 161 | Strength 1.000 | Stand Netz 5:20 Heur | Elo 886/1114
+  # 26/100:  21:49  -> Heuristik(s200)          | Züge 168 | Strength 1.000 | Stand Netz 5:21 Heur | Elo 879/1121
+  # 27/100:  30:33  -> Heuristik(s200)          | Züge 166 | Strength 0.561 | Stand Netz 5:22 Heur | Elo 875/1125
+  # 28/100:  36:56  -> Heuristik(s200)          | Züge 161 | Strength 1.000 | Stand Netz 5:23 Heur | Elo 869/1131
+  # 29/100:  22:64  -> Heuristik(s200)          | Züge 165 | Strength 1.000 | Stand Netz 5:24 Heur | Elo 863/1137
+  # 30/100:  49:46  -> v1b_w2                   | Züge 166 | Strength 0.640 | Stand Netz 6:24 Heur | Elo 880/1120
+  # 31/100:  52:49  -> v1b_w2                   | Züge 158 | Strength 0.640 | Stand Netz 7:24 Heur | Elo 896/1104
+  # 32/100:   7:33  -> Heuristik(s200)          | Züge 162 | Strength 0.921 | Stand Netz 7:25 Heur | Elo 889/1111
+  # 33/100:  34:50  -> Heuristik(s200)          | Züge 156 | Strength 1.000 | Stand Netz 7:26 Heur | Elo 882/1118
+  # 34/100:  50:51  -> Heuristik(s200)          | Züge 159 | Strength 0.580 | Stand Netz 7:27 Heur | Elo 878/1122
+  # 35/100:  36:35  -> v1b_w2                   | Züge 151 | Strength 0.535 | Stand Netz 8:27 Heur | Elo 892/1108
+  # 36/100:  36:32  -> v1b_w2                   | Züge 161 | Strength 0.625 | Stand Netz 9:27 Heur | Elo 908/1092
+  # 37/100:  62:27  -> v1b_w2                   | Züge 156 | Strength 1.000 | Stand Netz 10:27 Heur | Elo 932/1068
+  # 38/100:  30:62  -> Heuristik(s200)          | Züge 164 | Strength 1.000 | Stand Netz 10:28 Heur | Elo 922/1078
+  # 39/100:  44:70  -> Heuristik(s200)          | Züge 157 | Strength 1.000 | Stand Netz 10:29 Heur | Elo 913/1087
+  # 40/100:  68:26  -> v1b_w2                   | Züge 163 | Strength 1.000 | Stand Netz 11:29 Heur | Elo 936/1064
+  # 41/100:  34:59  -> Heuristik(s200)          | Züge 162 | Strength 1.000 | Stand Netz 11:30 Heur | Elo 926/1074
+  # 42/100:  48:58  -> Heuristik(s200)          | Züge 165 | Strength 0.850 | Stand Netz 11:31 Heur | Elo 918/1082
+  # 43/100:  20:79  -> Heuristik(s200)          | Züge 163 | Strength 1.000 | Stand Netz 11:32 Heur | Elo 909/1091
+  # 44/100:  30:40  -> Heuristik(s200)          | Züge 158 | Strength 0.850 | Stand Netz 11:33 Heur | Elo 902/1098
+  # 45/100:   4:57  -> Heuristik(s200)          | Züge 166 | Strength 1.000 | Stand Netz 11:34 Heur | Elo 894/1106
+  # 46/100:  32:61  -> Heuristik(s200)          | Züge 160 | Strength 1.000 | Stand Netz 11:35 Heur | Elo 887/1113
+  # 47/100:  55:60  -> Heuristik(s200)          | Züge 163 | Strength 0.700 | Stand Netz 11:36 Heur | Elo 882/1118
+  # 48/100:  57:47  -> v1b_w2                   | Züge 167 | Strength 0.850 | Stand Netz 12:36 Heur | Elo 904/1096
+  # 49/100:   7:38  -> Heuristik(s200)          | Züge 159 | Strength 0.978 | Stand Netz 12:37 Heur | Elo 896/1104
+  # 50/100:  26:37  -> Heuristik(s200)          | Züge 159 | Strength 0.846 | Stand Netz 12:38 Heur | Elo 890/1110
+  # 51/100:  33:46  -> Heuristik(s200)          | Züge 164 | Strength 0.940 | Stand Netz 12:39 Heur | Elo 883/1117
+  # 52/100:  43:49  -> Heuristik(s200)          | Züge 167 | Strength 0.730 | Stand Netz 12:40 Heur | Elo 878/1122
+  # 53/100:  29:37  -> Heuristik(s200)          | Züge 160 | Strength 0.756 | Stand Netz 12:41 Heur | Elo 873/1127
+  # 54/100:  35:54  -> Heuristik(s200)          | Züge 159 | Strength 1.000 | Stand Netz 12:42 Heur | Elo 867/1133
+  # 55/100:  39:48  -> Heuristik(s200)          | Züge 162 | Strength 0.820 | Stand Netz 12:43 Heur | Elo 862/1138
+  # 56/100:  21:22  -> Heuristik(s200)          | Züge 159 | Strength 0.378 | Stand Netz 12:44 Heur | Elo 860/1140
+  # 57/100:   0:53  -> Heuristik(s200)          | Züge 166 | Strength 1.000 | Stand Netz 12:45 Heur | Elo 855/1145
+  # 58/100:  10:70  -> Heuristik(s200)          | Züge 157 | Strength 1.000 | Stand Netz 12:46 Heur | Elo 850/1150
+  # 59/100:  30:62  -> Heuristik(s200)          | Züge 154 | Strength 1.000 | Stand Netz 12:47 Heur | Elo 845/1155
+  # 60/100:  26:31  -> Heuristik(s200)          | Züge 160 | Strength 0.599 | Stand Netz 12:48 Heur | Elo 842/1158
+  # 61/100:  32:59  -> Heuristik(s200)          | Züge 161 | Strength 1.000 | Stand Netz 12:49 Heur | Elo 838/1162
+  # 62/100:  20:40  -> Heuristik(s200)          | Züge 160 | Strength 1.000 | Stand Netz 12:50 Heur | Elo 834/1166
+  # 63/100:  31:67  -> Heuristik(s200)          | Züge 161 | Strength 1.000 | Stand Netz 12:51 Heur | Elo 830/1170
+  # 64/100:  35:47  -> Heuristik(s200)          | Züge 166 | Strength 0.910 | Stand Netz 12:52 Heur | Elo 826/1174
+  # 65/100:  54:52  -> v1b_w2                   | Züge 158 | Strength 0.610 | Stand Netz 13:52 Heur | Elo 843/1157
+  # 66/100:  56:45  -> v1b_w2                   | Züge 167 | Strength 0.880 | Stand Netz 14:52 Heur | Elo 867/1133
+  # 67/100:   0:63  -> Heuristik(s200)          | Züge 169 | Strength 1.000 | Stand Netz 14:53 Heur | Elo 861/1139
+  # 68/100:  43:71  -> Heuristik(s200)          | Züge 160 | Strength 1.000 | Stand Netz 14:54 Heur | Elo 856/1144
+  # 69/100:  50:60  -> Heuristik(s200)          | Züge 162 | Strength 0.850 | Stand Netz 14:55 Heur | Elo 852/1148
+  # 70/100:  12:62  -> Heuristik(s200)          | Züge 165 | Strength 1.000 | Stand Netz 14:56 Heur | Elo 847/1153
+  # 71/100:  27:51  -> Heuristik(s200)          | Züge 165 | Strength 1.000 | Stand Netz 14:57 Heur | Elo 842/1158
+  # 72/100:  22:29  -> Heuristik(s200)          | Züge 152 | Strength 0.636 | Stand Netz 14:58 Heur | Elo 839/1161
+  # 73/100:  54:48  -> v1b_w2                   | Züge 165 | Strength 0.730 | Stand Netz 15:58 Heur | Elo 859/1141
+  # 74/100:  60:38  -> v1b_w2                   | Züge 166 | Strength 1.000 | Stand Netz 16:58 Heur | Elo 886/1114
+  # 75/100:   2:45  -> Heuristik(s200)          | Züge 168 | Strength 1.000 | Stand Netz 16:59 Heur | Elo 879/1121
+  # 76/100:  50:58  -> Heuristik(s200)          | Züge 166 | Strength 0.790 | Stand Netz 16:60 Heur | Elo 874/1126
+  # 77/100:  15:56  -> Heuristik(s200)          | Züge 162 | Strength 1.000 | Stand Netz 16:61 Heur | Elo 868/1132
+  # 78/100:  22:65  -> Heuristik(s200)          | Züge 163 | Strength 1.000 | Stand Netz 16:62 Heur | Elo 862/1138
+  # 79/100:  47:68  -> Heuristik(s200)          | Züge 159 | Strength 1.000 | Stand Netz 16:63 Heur | Elo 857/1143
+  # 80/100:  27:14  -> v1b_w2                   | Züge 162 | Strength 0.794 | Stand Netz 17:63 Heur | Elo 878/1122
+  # 81/100:   0:31  -> Heuristik(s200)          | Züge 152 | Strength 0.899 | Stand Netz 17:64 Heur | Elo 872/1128
+  # 82/100:  18:53  -> Heuristik(s200)          | Züge 169 | Strength 1.000 | Stand Netz 17:65 Heur | Elo 866/1134
+  # 83/100:  25:67  -> Heuristik(s200)          | Züge 157 | Strength 1.000 | Stand Netz 17:66 Heur | Elo 860/1140
+  # 84/100:  25:60  -> Heuristik(s200)          | Züge 164 | Strength 1.000 | Stand Netz 17:67 Heur | Elo 855/1145
+  # 85/100:  30:50  -> Heuristik(s200)          | Züge 163 | Strength 1.000 | Stand Netz 17:68 Heur | Elo 850/1150
+  # 86/100:  20:34  -> Heuristik(s200)          | Züge 161 | Strength 0.903 | Stand Netz 17:69 Heur | Elo 846/1154
+  # 87/100:  23:41  -> Heuristik(s200)          | Züge 154 | Strength 1.000 | Stand Netz 17:70 Heur | Elo 841/1159
+  # 88/100:  41:38  -> v1b_w2                   | Züge 161 | Strength 0.640 | Stand Netz 18:70 Heur | Elo 859/1141
+  # 89/100:  16:28  -> Heuristik(s200)          | Züge 161 | Strength 0.775 | Stand Netz 18:71 Heur | Elo 855/1145
+  # 90/100:  40:37  -> v1b_w2                   | Züge 164 | Strength 0.640 | Stand Netz 19:71 Heur | Elo 872/1128
+  # 91/100:   6:55  -> Heuristik(s200)          | Züge 168 | Strength 1.000 | Stand Netz 19:72 Heur | Elo 866/1134
+  # 92/100:  47:47  -> Heuristik(s200)          | Züge 158 | Strength 0.550 | Stand Netz 19:73 Heur | Elo 863/1137
+  # 93/100:  41:56  -> Heuristik(s200)          | Züge 163 | Strength 1.000 | Stand Netz 19:74 Heur | Elo 858/1142
+  # 94/100:  25:85  -> Heuristik(s200)          | Züge 156 | Strength 1.000 | Stand Netz 19:75 Heur | Elo 853/1147
+  # 95/100:  25:24  -> v1b_w2                   | Züge 167 | Strength 0.411 | Stand Netz 20:75 Heur | Elo 864/1136
+  # 96/100:  37:45  -> Heuristik(s200)          | Züge 160 | Strength 0.790 | Stand Netz 20:76 Heur | Elo 860/1140
+  # 97/100:  36:34  -> v1b_w2                   | Züge 160 | Strength 0.565 | Stand Netz 21:76 Heur | Elo 875/1125
+  # 98/100:   0:47  -> Heuristik(s200)          | Züge 164 | Strength 1.000 | Stand Netz 21:77 Heur | Elo 869/1131
+  # 99/100:  64:54  -> v1b_w2                   | Züge 167 | Strength 0.850 | Stand Netz 22:77 Heur | Elo 891/1109
+  #100/100:   0:46  -> Heuristik(s200)          | Züge 157 | Strength 1.000 | Stand Netz 22:78 Heur | Elo 884/1116
+--------------------------------------------------
+🏆 ERGEBNIS: v1b_w2 22:78 Heuristik(s200) (22% Netz-Siege) in 1372.3s (0.1 Spiele/s)
+   Ø Score: v1b_w2 32.3 | Heuristik(s200) 49.7
+   0:0-Spiele: 0/100 (0.0%)  (Sauberkeits-Indikator)
+   Ø Floor-Strafe: v1b_w2 16.3 | Heuristik(s200) 10.0
+   Elo: v1b_w2 884 | Heuristik(s200) 1116
+

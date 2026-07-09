@@ -25,12 +25,4 @@ NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 BATCH_SIZE    = 256
 HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (2^x)
 LEARNING_RATE = 0.0004
-VALUE_WEIGHT  = 5  # war 0.5 — hochskaliert, weil das neue Punkte-Marge-Value-Target
-                      # (siehe engine/py/neural_net.py, VALUE_SCHEMA_VERSION) eine deutlich
-                      # kleinere charakteristische Streuung hat als das alte ±1-Target:
-                      # Stichprobe über ~27k reale Self-Play-Schritte ergab std(target)≈0.22
-                      # (vs. std=1.0 beim alten ±1-Ziel) → Faktor ~4.6. Ohne Anpassung würde
-                      # der Value-Loss-Beitrag zum Gesamtloss weiter schrumpfen und der
-                      # Value-Head faktisch kaum noch trainiert — genau das Gegenteil vom
-                      # Ziel dieser Änderung. Erster Ansatz, an frühen Epochen (Value:Policy-
-                      # Verhältnis im Log) nachjustieren.
+VALUE_WEIGHT  = 1

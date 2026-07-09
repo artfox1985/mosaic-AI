@@ -1,0 +1,110 @@
+📦 Lade HDF5-Cache (990 Dateien)...
+Datensatz geladen: 1501066 Züge. (Features pro Zug: 684) — 29.9s
+📦 Lade HDF5-Cache (110 Dateien)...
+Datensatz geladen: 167036 Züge. (Features pro Zug: 684) — 3.0s
+   Val-Split: 990 Trainings-Dateien / 110 Val-Dateien (1,501,066 / 167,036 Züge)
+   Value-Ziel-Streuung: σ=0.183 (Varianz=0.0334, zum Vergleich mit v_pred σ unten; Varianz ist die Baseline-MSE bei reiner Mittelwert-Vorhersage)
+
+🚀 Starte PyTorch Training auf: CUDA
+🧠 Netz-Architektur: 684→512→512→512
+⚙️  Hyperparameter (config.py):
+   Learning Rate : 0.0004
+   Value Weight  : 15
+   Batch Size    : 256
+   Value-Target  : tanh(eigen/50) - 0.1*tanh(gegner/50) (Endergebnis statt Win/Loss)
+   Epochen       : 15
+🆕 Neues Modell: Trainiere für 15 Epochen.
+Epoche  1/15 | Total Loss:   3.21 (R²=+0.68, Policy:  3.05) | Val-R²=+0.26 | Policy-Val= 2.26 | v_pred μ=+0.19 σ=0.151
+Epoche  2/15 | Total Loss:   3.08 (R²=+0.86, Policy:  3.01) | Val-R²=+0.25 | Policy-Val= 2.24 | v_pred μ=+0.19 σ=0.170
+Epoche  3/15 | Total Loss:   3.04 (R²=+0.89, Policy:  2.99) | Val-R²=+0.25 | Policy-Val= 2.24 | v_pred μ=+0.19 σ=0.172
+Epoche  4/15 | Total Loss:   3.02 (R²=+0.89, Policy:  2.96) | Val-R²=+0.23 | Policy-Val= 2.24 | v_pred μ=+0.19 σ=0.173
+Epoche  5/15 | Total Loss:   3.00 (R²=+0.89, Policy:  2.94) | Val-R²=+0.23 | Policy-Val= 2.24 | v_pred μ=+0.19 σ=0.173
+Epoche  6/15 | Total Loss:   2.97 (R²=+0.89, Policy:  2.91) | Val-R²=+0.22 | Policy-Val= 2.24 | v_pred μ=+0.19 σ=0.172
+Epoche  7/15 | Total Loss:   2.93 (R²=+0.88, Policy:  2.87) | Val-R²=+0.22 | Policy-Val= 2.24 | v_pred μ=+0.19 σ=0.171
+Epoche  8/15 | Total Loss:   2.89 (R²=+0.87, Policy:  2.82) | Val-R²=+0.22 | Policy-Val= 2.25 | v_pred μ=+0.19 σ=0.171
+Epoche  9/15 | Total Loss:   2.84 (R²=+0.87, Policy:  2.78) | Val-R²=+0.23 | Policy-Val= 2.25 | v_pred μ=+0.19 σ=0.170
+Epoche 10/15 | Total Loss:   2.80 (R²=+0.86, Policy:  2.73) | Val-R²=+0.21 | Policy-Val= 2.25 | v_pred μ=+0.19 σ=0.170
+Epoche 11/15 | Total Loss:   2.76 (R²=+0.86, Policy:  2.69) | Val-R²=+0.22 | Policy-Val= 2.25 | v_pred μ=+0.19 σ=0.170
+Epoche 12/15 | Total Loss:   2.72 (R²=+0.86, Policy:  2.65) | Val-R²=+0.22 | Policy-Val= 2.25 | v_pred μ=+0.19 σ=0.169
+Epoche 13/15 | Total Loss:   2.69 (R²=+0.85, Policy:  2.61) | Val-R²=+0.21 | Policy-Val= 2.26 | v_pred μ=+0.19 σ=0.169
+Epoche 14/15 | Total Loss:   2.66 (R²=+0.85, Policy:  2.58) | Val-R²=+0.22 | Policy-Val= 2.26 | v_pred μ=+0.19 σ=0.169
+Epoche 15/15 | Total Loss:   2.63 (R²=+0.85, Policy:  2.56) | Val-R²=+0.22 | Policy-Val= 2.26 | v_pred μ=+0.19 σ=0.169
+
+=======================================================
+  PHASE 2: VALUE-KALIBRIERUNG (Trunk/Policy eingefroren)
+───────────────────────────────────────────────────────
+  Kalibrierung  1/50 | Val-R²=+0.211  (bislang bester: Epoche 1)
+  Kalibrierung  2/50 | Val-R²=+0.218  (bislang bester: Epoche 2)
+  Kalibrierung  3/50 | Val-R²=+0.221  (bislang bester: Epoche 2)
+  Kalibrierung  4/50 | Val-R²=+0.218  (bislang bester: Epoche 2)
+  Kalibrierung  5/50 | Val-R²=+0.216  (bislang bester: Epoche 2)
+  Kalibrierung  6/50 | Val-R²=+0.220  (bislang bester: Epoche 2)
+  Kalibrierung  7/50 | Val-R²=+0.213  (bislang bester: Epoche 2)
+  Kalibrierung  8/50 | Val-R²=+0.216  (bislang bester: Epoche 2)
+  Kalibrierung  9/50 | Val-R²=+0.203  (bislang bester: Epoche 2)
+  Kalibrierung 10/50 | Val-R²=+0.210  (bislang bester: Epoche 2)
+  ⏹️  Kalibrierung gestoppt: Val-R² seit Epoche 2 nicht mehr verbessert (Bestwert 0.218).
+  ✅ Value-Head auf besten Kalibrierungs-Stand zurückgesetzt (Epoche 2, Val-R²=0.218).
+=======================================================
+
+=======================================================
+  TRAINING SUMMARY
+=======================================================
+  Epochen:       15
+  Züge:          1,501,066  (+167,036 Val, nie trainiert)
+  Batches/Epoche:5863
+───────────────────────────────────────────────────────
+  Policy Loss:   2.5571 / 6.18 max  (41.4%)  🟠 Schwaches Signal
+  Policy Val-Loss: 2.2560  (Gap ggü. Train: -0.3012)
+  Value Loss:    0.0047  (R²=0.86 ggü. Mittelwert-Baseline)  🟢 Sehr gut
+  Value Val-R²:  0.22  (Gap ggü. Train: +0.64)  ⚠️  großer Train/Val-Abstand — Overfitting wahrscheinlich
+───────────────────────────────────────────────────────
+  ℹ️  Phase 1 Val-R² war in Epoche 1 am besten (0.26), danach Überfitten (normal — Value trainiert bewusst bis zum Ende mit).
+  🎯 Phase 2 (Value-Kalibrierung): bester Stand nach Epoche 2, Val-R²=0.22 — Wert oben spiegelt diesen kalibrierten Value-Head wider.
+  🟢 Kein Plateau — Policy sinkt noch. Mehr Epochen möglich.
+=======================================================
+
+=======================================================
+  NETZAUSLASTUNG (Hidden Size: 512)
+───────────────────────────────────────────────────────
+  Schicht          Dead   Aktiv-Rate        Eff.Rank
+  ───────────────────────────────────────────────────
+  layer1     0/512 (0%)          41%   219/512 (43%)
+  layer2     0/512 (0%)          39%   216/512 (42%)
+  layer3    44/512 (9%)          13%   201/512 (39%)
+  ───────────────────────────────────────────────────
+  🟢 Gesunde Auslastung (Dead 3%, Rank 41%).
+=======================================================
+
+✅ Training beendet! Neues Model gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v1b_w15.pth
+📈 Loss-Verlauf gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v1b_w15_loss.png
+✅ Exportiert: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v1b_w15.onnx  (input=684, hidden=512, value_hidden=64, opset=13)
+📎 Referenz für Rust-Parität: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v1b_w15.onnx.ref.txt
+
+=======================================================
+  STUFE 1 vs. STUFE 2 (max. 50 Spiele, 200 Sims, Early-Stop)
+───────────────────────────────────────────────────────
+🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️
+  v1b_w15(Stufe1) (Brett 0, 200 Sims, c_puct=1.5, Stufe 1/DFS-Blatt) vs v1b_w15(Stufe2) (Brett 1, 200 Sims, c_puct=1.5, Stufe 2/Netz-Value-Blatt) — 50 Spiele
+--------------------------------------------------
+  #  1/50:  14:0   -> v1b_w15(Stufe1)        | Züge 150 | Strength 0.677 | Stand v1b_w15(Stufe1) 1:0 v1b_w15(Stufe2) | Elo 1011/989
+  #  2/50:  50:2   -> v1b_w15(Stufe1)        | Züge 160 | Strength 1.000 | Stand v1b_w15(Stufe1) 2:0 v1b_w15(Stufe2) | Elo 1026/974
+  #  3/50:  26:13  -> v1b_w15(Stufe1)        | Züge 158 | Strength 0.782 | Stand v1b_w15(Stufe1) 3:0 v1b_w15(Stufe2) | Elo 1037/963
+  #  4/50:   8:10  -> v1b_w15(Stufe2)        | Züge 158 | Strength 0.273 | Stand v1b_w15(Stufe1) 3:1 v1b_w15(Stufe2) | Elo 1032/968
+  #  5/50:  29:17  -> v1b_w15(Stufe1)        | Züge 160 | Strength 0.786 | Stand v1b_w15(Stufe1) 4:1 v1b_w15(Stufe2) | Elo 1042/958
+  #  6/50:  24:0   -> v1b_w15(Stufe1)        | Züge 155 | Strength 0.820 | Stand v1b_w15(Stufe1) 5:1 v1b_w15(Stufe2) | Elo 1052/948
+  #  7/50:  17:0   -> v1b_w15(Stufe1)        | Züge 162 | Strength 0.741 | Stand v1b_w15(Stufe1) 6:1 v1b_w15(Stufe2) | Elo 1060/940
+  #  8/50:  46:15  -> v1b_w15(Stufe1)        | Züge 156 | Strength 1.000 | Stand v1b_w15(Stufe1) 7:1 v1b_w15(Stufe2) | Elo 1071/929
+  #  9/50:   1:0   -> v1b_w15(Stufe1)        | Züge 157 | Strength 0.141 | Stand v1b_w15(Stufe1) 8:1 v1b_w15(Stufe2) | Elo 1072/928
+  # 10/50:  26:9   -> v1b_w15(Stufe1)        | Züge 159 | Strength 0.843 | Stand v1b_w15(Stufe1) 9:1 v1b_w15(Stufe2) | Elo 1080/920
+  ⏹️  Vorzeitig entschieden: v1b_w15(Stufe1) hat nach 10 Spielen bereits 9 Siege (95%-Signifikanz für >50% Gewinnchance).
+--------------------------------------------------
+🏆 ERGEBNIS: v1b_w15(Stufe1) 9:1 v1b_w15(Stufe2) (90% A-Siege) in 189.9s (0.1 Spiele/s)  [vorzeitig nach 10/50 Spielen]
+   Ø Score: v1b_w15(Stufe1) 24.1 | v1b_w15(Stufe2) 6.6
+   0:0-Spiele: 0/10 (0.0%)
+   Elo: v1b_w15(Stufe1) 1080 | v1b_w15(Stufe2) 920
+=======================================================
+ufe2) 922
+=======================================================
