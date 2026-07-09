@@ -372,18 +372,21 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
 
 
 if __name__ == "__main__":
+    import os
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v2b.onnx"   # Pfad zum ONNX-Netz
-    NET_MODEL_PRE = "models/alphazero_v1.onnx"
+    NET_MODEL = "models/alphazero_v1w15_e50.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL_PRE = "models/alphazero_v1w0_e50.onnx"
+    NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
+    NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
     NET_SIMS  = 200                            # Basis-Sims des Netzes
-    STAGE     = 2                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
+    STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
     GAMES     = 100
-    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = "v2b",
-                  games=GAMES, stage=STAGE, threads=0)
-    #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
-    #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a="v2b", name_b="v1")
+    #run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
+    #              games=GAMES, stage=STAGE, threads=0)
+    run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
+                   threads=0, seed=None, chunk=10, c_puct=1.5, name_a=NET_NAME, name_b=NET_NAME_PRE)
 
     # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
     # competitors = {

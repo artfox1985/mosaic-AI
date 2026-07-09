@@ -201,6 +201,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     value_history   = []
     value_r2_history = []
     val_r2_history  = []
+    val_ploss_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -323,20 +324,33 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # dieselbe target_var (Trainings-Baseline) fuer einen vergleichbaren
         # Maßstab statt einer je Epoche neu berechneten Val-eigenen Varianz.
         epoch_val_r2 = None
+        epoch_val_ploss = None
         if val_dataloader is not None:
             model.eval()
-            val_vloss_sum, val_batches = 0.0, 0
+            val_vloss_sum, val_ploss_sum, val_batches = 0.0, 0.0, 0
             with torch.no_grad():
-                for v_states, _vp, v_targets_v, _vm, _vmoon, _vpw in val_dataloader:
+                for v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w in val_dataloader:
                     v_states = v_states.to(device)
+                    v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
-                    _, v_pred_v, _ = model(v_states)
+                    v_masks = v_masks.to(device)
+                    v_pol_w = v_pol_w.to(device)
+                    v_pred_p, v_pred_v, _ = model(v_states)
                     val_vloss_sum += mse_loss(v_pred_v, v_targets_v).item()
+                    # Gleiche Masking/Gewichtung wie im Training (siehe oben) --
+                    # sonst waere der Val-Policy-Loss nicht vergleichbar.
+                    v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
+                    v_log_probs = F.log_softmax(v_masked_logits, dim=1)
+                    v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
+                    v_p_loss = (v_per_sample_ce * v_pol_w).sum() / v_pol_w.sum().clamp(min=1e-6)
+                    val_ploss_sum += v_p_loss.item()
                     val_batches += 1
             model.train()
             epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
             epoch_val_r2 = 1 - epoch_val_vloss / target_var if target_var > 0 else 0.0
+            epoch_val_ploss = val_ploss_sum / max(val_batches, 1)
         val_r2_history.append(epoch_val_r2)
+        val_ploss_history.append(epoch_val_ploss)
 
         # Nur zur Beobachtung/Zusammenfassung: ab wann startet der Val-R²-
         # Verfall? (Kein Trigger mehr -- Value trainiert bewusst bis zum Ende
@@ -407,8 +421,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plot = None  # Fenster evtl. geschlossen o.ä. — Rest ohne Plot weiterlaufen
 
         val_str = f" | Val-R²={epoch_val_r2:+.2f}" if epoch_val_r2 is not None else ""
+        val_p_str = f" | Policy-Val={epoch_val_ploss:5.2f}" if epoch_val_ploss is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Total Loss: {t_loss/n_batches:6.2f} "
-              f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}){val_str} "
+              f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}){val_str}{val_p_str} "
               f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
         # ── Early Stopping (nur bei Policy+Value-Plateau) ───────────────────
@@ -579,6 +594,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"  Batches/Epoche:{n_batches}")
     print(f"{'─'*55}")
     print(f"  Policy Loss:   {final_p:.4f} / {max_loss:.2f} max  ({pct:.1f}%)  {quality}")
+    final_val_ploss = None
+    for v in reversed(val_ploss_history):
+        if v is not None:
+            final_val_ploss = v
+            break
+    if final_val_ploss is not None:
+        policy_val_gap = final_val_ploss - final_p
+        print(f"  Policy Val-Loss: {final_val_ploss:.4f}  (Gap ggü. Train: {policy_val_gap:+.4f})")
     print(f"  Value Loss:    {final_v:.4f}  (R²={final_r2:.2f} ggü. Mittelwert-Baseline)  {v_quality}")
     if final_val_r2 is not None:
         if val_gap > 0.3:
@@ -659,6 +682,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "final_value_loss":  round(final_v, 4),
         "final_value_r2":    round(final_r2, 4),
         "final_val_r2":      round(final_val_r2, 4) if final_val_r2 is not None else None,
+        "final_policy_val_loss": round(final_val_ploss, 4) if final_val_ploss is not None else None,
         "val_frac":          val_frac,
         "num_val_games":     len(val_dataset) if val_dataset is not None else 0,
         "value_target_var":  round(target_var, 4),

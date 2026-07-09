@@ -4,12 +4,18 @@ Historische Details (alte v1-v9-Zählung vor dem Reset, Bug-Diagnosen,
 verworfene Ansätze) stehen in der Git-Historie dieser Datei und in den alten
 `v*_eval.md`s — hier nur der aktuelle Stand und die aktiven Regeln.
 
-## Aktueller Stand (nach vollem Reset 2026-07-07)
+## Aktueller Stand (nach zweitem, kompletten Fenster-Reset)
 
-Die alte v1→v9-Linie (Tabelle mit Champion-Verlauf, v8-Policy-Bias-Analyse
-etc.) wurde verworfen — neue Basis ist reine, mit den Suche-Fixes dieses
-Zyklus generierte Heuristik-Self-Play statt Fortsetzung der alten Kette.
-Zählung beginnt bei v1 neu.
+Der erste Reset (2026-07-07, v1/v1b/v2/v2b/v2c) ist selbst überholt — das
+Datenfenster wurde seitdem komplett neu aufgesetzt (~11.000 frische
+Heuristik-Spiele), Zählung beginnt wieder bei v1. **Aktuell existiert daher
+noch KEIN v2** — VALUE_WEIGHT ist jetzt final auf **1** gesetzt (siehe
+Confounder-Ergebnis unten: das Gewicht ist für Stufe 1 UND Stufe 2 irrelevant,
+kein weiterer Sweep nötig), die nächsten Generationen (Self-Play mit dem
+aktuellen Champion) folgen als nächster Schritt.
+
+<details>
+<summary>Historie: erster Reset-Zyklus (v1/v1b/v2/v2b, überholt)</summary>
 
 | Netz  | Fenster                              | Warm-Start | vs. Vorgänger      | vs. Heuristik | Val-R² |
 | ----- | ------------------------------------- | ---------- | ------------------- | ------------- | ------ |
@@ -18,29 +24,86 @@ Zählung beginnt bei v1 neu.
 | v2    | 4000 Heuristik + 6000×v1              | nein       | **63:37 vs. v1** ✅  | 31:69         | 0.16   |
 | v2b   | 4000 Heuristik + 6000×v1              | ja (v1)    | 58:42 vs. v1 (Gate ✗)| —             | 0.41   |
 
-Kernbefunde:
-- **v2 schlägt v1 63:37** (reißt das 60:40-Gate) — trotz massivem
+Kernbefunde (aus dieser überholten Runde, aber weiterhin lehrreich):
+- v2 schlug v1 63:37 (reißt das 60:40-Gate) — trotz massivem
   Train/Val-Overfitting (Train-R²=0.90, Val-R²=0.16). Mehr Daten halfen der
   reinen Spielstärke, auch wenn der Value-Head sie kaum generalisiert hat.
-- **v2b (Warm-Start) generalisiert deutlich besser** (Val-R²=0.41), spielt
-  aber SCHWÄCHER (58:42 statt 63:37) — Val-R² sagt nur etwas über den
-  Value-Head aus, der in Stufe 1 beim Spielen gar nicht befragt wird. Was für
-  Stufe-1-Stärke zählt, ist der Policy-Head, und der scheint unter
-  Warm-Start eher an v1s eigene (noch unausgereifte) Präferenzen anzuknüpfen,
-  statt unabhängig auf dem größeren Fenster neu zu lernen.
-- **Stufe 2 weiterhin nicht praxistauglich** — v2b hatte mit der ALTEN
-  0:0-Raten-Sonde ein grünes 1.45x-Verhältnis (bester Wert der Historie),
-  verlor aber **2:98** in einer echten Stufe-1-vs-Stufe-2-Partie. Die alte
-  Sonde maß nur "kollabiert nicht mehr in Nichtangriffs-Partien", nicht
+- v2b (Warm-Start) generalisierte deutlich besser (Val-R²=0.41), spielte aber
+  SCHWÄCHER (58:42 statt 63:37) — Val-R² sagt nur etwas über den Value-Head
+  aus, der in Stufe 1 beim Spielen gar nicht befragt wird. Was für
+  Stufe-1-Stärke zählt, ist der Policy-Head, und der schien unter Warm-Start
+  eher an v1s eigene (noch unausgereifte) Präferenzen anzuknüpfen, statt
+  unabhängig auf dem größeren Fenster neu zu lernen.
+- Stufe 2 weiterhin nicht praxistauglich — v2b hatte mit der ALTEN
+  0:0-Raten-Sonde ein grünes 1.45x-Verhältnis (bester Wert der damaligen
+  Historie), verlor aber 2:98 in einer echten Stufe-1-vs-Stufe-2-Partie. Die
+  alte Sonde maß nur "kollabiert nicht mehr in Nichtangriffs-Partien", nicht
   "gewinnt wirklich" — seitdem durch einen direkten Arena-Test ersetzt (siehe
   Werkzeuge unten).
 
-**Laufend:** kompletter Reset des Datenfensters — v1 wird mit ~11.000
-frischen Heuristik-Spielen neu von null trainiert, diesmal als
-**systematischer VALUE_WEIGHT-Sweep (15/8/4/2)**: `v1w15`, `v1w8`, `v1w4`,
-`v1w2`, jeweils Arena vs. Heuristik. Grund: der bisherige Wert 15 war
-zufällig gewählt, keine echte Herleitung — der einzige Datenpunkt-Vergleich
-(15 vs. 2.5) zeigte 15 im Vorteil, das reicht nicht für eine fundierte Wahl.
+</details>
+
+**Abgeschlossen (aktueller Reset-Zyklus):** VALUE_WEIGHT-Sweep (15/8/4/2) auf frischem 11.000-Spiele-
+Heuristik-Fenster, je Arena vs. Heuristik (200 Sims, Early-Stop):
+
+| Variante | vs. Heuristik   | Value Val-R² (Peak→nach Freeze) |
+| -------- | --------------- | -------------------------------- |
+| v1w15    | 29% (6:15, n=21)| 0.27 → -0.87                     |
+| v1w8     | 10% (1:9, n=10) | 0.28 → -0.46                     |
+| v1w4     | 31% (9:20, n=29)| 0.30 → -0.06                     |
+| v1w2     | 10% (1:9, n=10) | 0.35 → +0.07                     |
+
+Jedes einzelne Ergebnis ist für sich statistisch abgesichert (Early-Stop
+garantiert ≥95%-Konfidenz, dass Heuristik pro Match >50% Gewinnchance hat).
+Die RANGFOLGE zwischen den vier Gewichten ist damit aber nicht automatisch
+mitgesichert: Zweistichproben-z-Test v1w4 (9/29=31%) vs. v1w8 (1/10=10%)
+ergibt z≈1.31 — unter der 95%-Schwelle (z≥1.96), also (noch) nicht
+signifikant unterscheidbar trotz des deutlich wirkenden Punkteabstands.
+v1w15 (6/21=29%) vs. v1w4 (9/29=31%) sind ohnehin praktisch identisch. Sweep
+zeigt also verlässlich "alle vier Gewichte verlieren gegen Heuristik", aber
+NICHT verlässlich, welches der vier Gewichte am besten ist — dafür bräuchte
+es größere Stichproben pro Variante oder direkte Kandidat-vs-Kandidat-Arenen.
+Wichtigster Nebenbefund: **in ALLEN vier Varianten kollabiert der (per
+chirurgischem Freeze fixierte) Value-Head trotzdem** (siehe Tabelle) — der
+Freeze schützt nur die Head-Gewichte selbst, nicht vor dem weiterhin
+driftenden gemeinsamen Trunk, der nach dem Freeze noch dutzende Epochen rein
+auf Policy trainiert. **Fix:** Zwei-Phasen-Training ersetzt den Freeze (siehe
+Werkzeuge unten) — Sweep-Wiederholung mit dem neuen Mechanismus steht noch
+aus, `VALUE_WEIGHT` in `config.py` bleibt bis dahin unentschieden.
+
+**Abgeschlossen:** Confounder-Check zum Sweep-Befund "v1 (Weight 15) schlägt
+v1b (Weight 2.5)": weil das Stop-Kriterium erst greift, wenn Policy UND Value
+plateauen, trainiert ein hoher VALUE_WEIGHT-Lauf schlicht länger (Value
+plateaut später als Policy) — der scheinbare Vorteil könnte reine
+Trainingsdauer sein, nicht der Value-Gradient selbst. Test: zwei epochen-
+gematchte Läufe auf demselben Fenster, je exakt 50 Epochen
+(`--epochs 50 --no-early-stop`), `v1b_w15_e50` (VALUE_WEIGHT=15) vs.
+`v1b_w0_e50` (VALUE_WEIGHT=0, reines Policy-Training) — Details in
+`evaluations/v1b_w15_e50_eval.md` / `v1b_w0_e50_eval.md`.
+
+Ergebnisse:
+- **Stufe 1 (A vs. B, 100 Spiele, kein Early-Stop): exaktes 50:50.** Kein
+  messbarer Vorteil von VALUE_WEIGHT=15 gegenüber 0 bei gleicher
+  Trainingsdauer — der frühere Sweep-Befund war der Confounder, nicht der
+  Value-Gradient.
+- Selbst der Value-Head-Kalibrierungswert (Phase 2, gegen den jeweils fixen
+  Trunk) ist fast identisch: 0.24 (w15) vs. 0.22 (w0) — der rein
+  policy-trainierte Trunk liefert also fast gleich gute Repräsentationen für
+  die Value-Vorhersage.
+- **Stufe 2 (A vs. B, 100 Spiele, kein Early-Stop): 40:60 — w0 gewinnt sogar
+  leicht** (z≈2.0, knapp signifikant), trotz des minimal schlechteren
+  Kalibrierungswerts. VALUE_WEIGHT ist also auch für Stufe 2 kein Hebel; wenn
+  überhaupt, ist "kein Value-Gradient in Phase 1" leicht im Vorteil. 0:0-Rate
+  bei Stufe 2 mit 7% weiterhin auffällig höher als bei Stufe 1 (0%) — Stufe 2
+  bleibt insgesamt die schwächere Spielweise, unabhängig vom Gewicht.
+
+**Entscheidung:** `VALUE_WEIGHT` in `config.py` auf **1** gesetzt (statt dem
+zufällig gewählten alten Standard 15) — der Sweep mit dem korrigierten
+Zwei-Phasen-Training (der wegen eines Skript-Bugs nur mit 15 statt ~100
+Epochen lief, siehe Git-Historie) wird NICHT wiederholt, da der Confounder-
+Test die eigentliche Frage bereits klar beantwortet hat: das Gewicht ist für
+Stufe 1 und Stufe 2 gleichermaßen irrelevant. Nächste Generationen laufen mit
+diesem Wert.
 
 ## Werkzeug-Verbesserungen dieser Session
 
@@ -48,11 +111,20 @@ zufällig gewählt, keine echte Herleitung — der einzige Datenpunkt-Vergleich
   Zug-Ebene): deckt Overfitting auf, das Train-R² allein verdeckt hätte
   (siehe v2 oben). Pro Trainingslauf neu gezogen, kein generationsübergreifend
   fixer Val-Satz (das leistet die Arena vs. Champion/Heuristik).
-- **Chirurgisches Value-Head-Freeze**: sobald Val-R² `--val-patience`
-  (Standard 8) Epochen nicht mehr verbessert, wird NUR der Value-Head auf
-  seinen besten Val-Stand zurückgesetzt und eingefroren
-  (`requires_grad=False` + Loss-Anteil 0) — Trunk/Policy trainieren
-  unbeeinflusst weiter, kein verschenktes Policy-Potential.
+- **Zwei-Phasen-Training** (ersetzt das frühere chirurgische Value-Head-
+  Freeze, das den Val-R²-Kollaps im Sweep NICHT verhindert hat — der Trunk
+  driftete nach dem Freeze unter dem fixen Head weiter weg): Phase 1
+  trainiert Value+Policy bis zum bestehenden Policy+Value-Plateau komplett
+  gemeinsam (voller `VALUE_WEIGHT`, kein Freeze mehr — der Trunk profitiert
+  nachweislich vom Value-Signal, siehe v1 vs. v1b). Danach Phase 2:
+  Trunk/Policy/Moon-Head einfrieren, Value-Head NEU initialisieren und
+  ausschließlich gegen den jetzt fixen Trunk kalibrieren (bis zu 50 Epochen,
+  `--val-patience`-Patience als Stop). Kann nicht mehr kollabieren, weil sich
+  der Trunk während der Kalibrierung nicht mehr bewegt.
+- **Policy-Val-Loss** (`train.py`, `val_ploss_history`): zusätzlich zum
+  Value-Val-R² jetzt auch Policy-Verlust auf dem nie trainierten Val-Split
+  gemessen (gleiche Masking/Gewichtung wie Training) — bislang nur ein
+  Nice-to-have-Signal, die Arena bleibt der eigentliche Entscheider.
 - **`value_hidden` 128→64**: die Value-Regression ist eigentlich einfach,
   weniger Kapazität dürfte dem Overfitting zusätzlich entgegenwirken.
 - **Direkter Stufe-1-vs-Stufe-2-Arena-Test** (`train.py::run_readiness_probe`)
@@ -111,8 +183,12 @@ gesättigt und verschiebt den Gesamtwert nur um max. ±0.1 (Priorität 2 "wenn
 möglich dem Gegner schaden", begrenzter Bonus, kann nie eine eigene Einbuße
 aufwiegen).
 
-`VALUE_WEIGHT` balanciert Value- gegen Policy-Loss — **aktuell im Sweep**
-(siehe oben), nicht mehr fix auf 15 gesetzt.
+`VALUE_WEIGHT` balanciert Value- gegen Policy-Loss — der ursprüngliche Sweep
+(15/8/4/2) war durch den alten Freeze-Mechanismus verfälscht; der Confounder-
+Test (siehe oben, epochengematcht mit Zwei-Phasen-Training) zeigt aber klar,
+dass das Gewicht weder für Stufe 1 (50:50) noch für Stufe 2 (40:60, tendenziell
+sogar zugunsten Weight=0) einen Unterschied macht. Final auf **1** gesetzt,
+kein weiterer Sweep nötig.
 
 ## Bekannte Bugs (in früheren Zyklen gefunden und gefixt, Referenz)
 
@@ -136,7 +212,6 @@ aufwiegen).
 
 ## Offene Punkte
 
-- VALUE_WEIGHT-Sweep (v1w15/v1w8/v1w4/v1w2) noch nicht abgeschlossen.
 - Stage 2 weiterhin nicht praxistauglich — jetzt mit dem direkten Arena-Test
   (statt der alten Sonde) belastbarer messbar, aber noch keine Generation hat
   ihn bestanden.
