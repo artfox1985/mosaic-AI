@@ -53,11 +53,11 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import MosaicNet, MosaicDataset
 
-def run_readiness_probe(version_name, games=50, sims=200, threads=0, seed=12345):
+def run_readiness_probe(version_name, games=100, sims=200, threads=0, seed=12345):
     """Stage-2-Reifegrad-Test (siehe evaluations/STAGE2_TODO.md, Abschnitt A):
     dasselbe frisch trainierte Netz tritt DIREKT gegeneinander an — Stufe 1
     (DFS-Blatt) vs. Stufe 2 (Netz-Value-Blatt), max. `games` Partien, mit
-    Early-Stop (siehe arena.py::early_stop_wins_needed). Ersetzt den alten
+    Early-Stop (truncated SPRT, siehe arena.py::sprt_bounds). Ersetzt den alten
     0:0-Raten-Vergleich aus zwei GETRENNTEN Self-Play-Läufen: der maß nur
     "kollabiert Stufe 2 nicht mehr in Nichtangriffs-Partien", nicht "gewinnt
     Stufe 2 tatsächlich" — v2b hatte dort ein grünes 1.45x-Verhältnis, verlor
@@ -375,27 +375,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 policy_plateaued = True
                 plateau_marker = "  🟡 POLICY-PLATEAU"
 
-        # Value plateaut separat prüfen (gleiche Fenster-Logik) — seit dem
-        # Punkte-Marge-Target (VALUE_SCHEMA_VERSION, deutlich geringere
-        # Zielstreuung als das alte ±1-Ziel) konvergiert Value oft langsamer
-        # als Policy. Früher wurde NUR auf Policy-Plateau early-gestoppt, was
-        # den Value-Head mitten in der Konvergenz abschneiden konnte.
-        value_plateaued = False
-        if len(value_history) >= plateau_window * 2:
-            v_recent   = sum(value_history[-plateau_window:]) / plateau_window
-            v_previous = sum(value_history[-plateau_window*2:-plateau_window]) / plateau_window
-            v_rel = (v_previous - v_recent) / v_previous if v_previous > 0 else 0
-            if v_rel < plateau_threshold:
-                value_plateaued = True
-
-        if policy_plateaued and value_plateaued:
+        # Frueher musste zusaetzlich auch Value plateauen (Value konvergiert
+        # oft langsamer als Policy) -- seit dem Zwei-Phasen-Training deckt
+        # Phase 2 die Value-Kalibrierung ohnehin separat ab, daher reicht das
+        # Policy-Plateau allein als Stop-Kriterium fuer Phase 1.
+        if policy_plateaued:
             if policy_plateau_since is None:
                 policy_plateau_since = epoch + 1
-            plateau_marker = "  🟡 PLATEAU (Policy+Value)"
-        elif policy_plateaued and len(value_history) >= 3:
-            v3 = value_history[-3:]
-            if v3[0] > v3[1] > v3[2]:
-                plateau_marker = "  🔵 POLICY-PLATEAU, VALUE LERNT NOCH (kein Stopp)"
+            plateau_marker = "  🟡 POLICY-PLATEAU"
 
         # ── Live-Plot aktualisieren (zusätzlich zur Textzeile unten) ────────
         if plot is not None:
@@ -426,11 +413,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
               f"(R²={epoch_r2:+.2f}, Policy: {epoch_ploss:5.2f}){val_str}{val_p_str} "
               f"| v_pred μ={v_mean:+.2f} σ={v_std:.3f}{plateau_marker}")
 
-        # ── Early Stopping (nur bei Policy+Value-Plateau) ───────────────────
+        # ── Early Stopping (nur bei Policy-Plateau) ──────────────────────────
         if policy_plateau_since is not None:
             since = (epoch + 1) - policy_plateau_since
             if since >= early_stop_patience:
-                print(f"\n⏹️  Early Stopping: Policy+Value plateaut seit Epoche {policy_plateau_since} "
+                print(f"\n⏹️  Early Stopping: Policy plateaut seit Epoche {policy_plateau_since} "
                       f"({since} Epochen ohne Fortschritt).")
                 stopped_early = True
                 stop_reason = "plateau"
@@ -619,7 +606,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"  🎯 Phase 2 (Value-Kalibrierung): bester Stand nach Epoche {calib_best_epoch}, "
               f"Val-R²={calib_best_val_r2:.2f} — Wert oben spiegelt diesen kalibrierten Value-Head wider.")
     if stopped_early:
-        print(f"  ⏹️  Early Stopping (Policy+Value-Plateau) nach Epoche {len(policy_history)}/{epochs}")
+        print(f"  ⏹️  Early Stopping (Policy-Plateau) nach Epoche {len(policy_history)}/{epochs}")
     if policy_plateau_since:
         print(f"  🟡 Plateau ab Epoche {policy_plateau_since}.")
         print(f"     → Für nächste Generation: mehr Sims im Self-Play.")
@@ -725,9 +712,9 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
-    parser.add_argument("--probe-games", type=int, default=50,
+    parser.add_argument("--probe-games", type=int, default=100,
                         help="Max. Spiele für den direkten Stufe-1-vs-Stufe-2-Vergleich, "
-                             "mit Early-Stop meist weniger (Standard: 50)")
+                             "mit Early-Stop meist weniger (Standard: 100)")
     parser.add_argument("--probe-sims", type=int, default=200,
                         help="Sims/Zug für den Stufenvergleich (Standard: 200)")
     parser.add_argument("--skip-probe", action="store_true",
@@ -742,7 +729,7 @@ if __name__ == "__main__":
                              "bevor diese abgebrochen wird und der Value-Head auf den besten "
                              "Kalibrierungs-Stand zurückgesetzt wird (Standard: 8). Phase 1 "
                              "(Policy+Value gemeinsam) ist davon unberuehrt und stoppt nur ueber "
-                             "das Policy+Value-Plateau-Kriterium.")
+                             "das Policy-Plateau-Kriterium.")
 
     args = parser.parse_args()
 

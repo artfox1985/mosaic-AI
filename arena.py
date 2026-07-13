@@ -22,9 +22,6 @@ try:
 except Exception:
     pass
 
-MARGIN_CAP       = 15   # Punktedifferenz ab der die Margin-Komponente maximal ist
-MAX_WINNER_SCORE = 40   # Winner-Score ab dem die Score-Komponente maximal ist
-
 try:
     import mosaic_rust as _mr
 except ImportError as e:  # pragma: no cover
@@ -34,36 +31,47 @@ except ImportError as e:  # pragma: no cover
         f"(Import-Fehler: {e})"
     )
 
-# 0:0-Strafe (vermiedenswerte Strafleisten-Flut) — Kopie aus agents/neural_net.py,
-# damit die Arena unabhängig von agents/ ist.
+
+def sprt_bounds(alpha=0.05, beta=0.10):
+    """Abbruchschranken fuer den truncated SPRT (Wald 1945). H0: Agenten
+    gleich stark (Δelo<=0), H1: A signifikant staerker (Δelo>=100, das
+    entspricht p1=0.64 Gewinnchance, siehe sprt_llr_delta). `alpha` = Risiko
+    fuer ein Falsch-Positiv (H1 angenommen obwohl H0 wahr), `beta` = Risiko,
+    einen echten Fortschritt zu uebersehen (H0 angenommen obwohl H1 wahr).
+    Untere Schranke A = ln(beta/(1-alpha)), obere Schranke B = ln((1-beta)/alpha)."""
+    A = math.log(beta / (1 - alpha))
+    B = math.log((1 - beta) / alpha)
+    return A, B
 
 
-def compute_win_val(scores, winner, margin_cap=MARGIN_CAP, max_winner_score=MAX_WINNER_SCORE):
-    """Abgestufte Siegstärke aus den Endscores (0.1 schwach … 1.0 klar).
-    KEINE 0:0-Strafe: in der Arena gibt es kein Unentschieden — bei Punkte-
-    gleichstand gewinnt der Startstein-Halter (determine_winner). Ein Marker-Sieg
-    ohne Punkte ist ein schwacher Sieg (~0.1), kein bestrafter."""
-    margin = abs(scores[0] - scores[1])
-    winner_score = scores[winner]
-    margin_part = min(0.45, (margin / margin_cap) * 0.45)
-    score_part = min(0.45, (winner_score / max_winner_score) * 0.45)
-    return min(1.0, 0.1 + margin_part + score_part)
+def sprt_llr_delta(a_won, p0=0.5, p1=0.64):
+    """LLR-Zuwachs fuer EIN Spiel (Log-Likelihood-Ratio H1 vs. H0). p0 =
+    Gewinnwahrscheinlichkeit von A unter H0 (gleich stark), p1 = unter H1
+    (A signifikant staerker). Aufsummiert ueber alle Spiele ergibt das die
+    laufende SPRT-Teststatistik, die nach jedem Spiel gegen die Schranken aus
+    sprt_bounds() geprueft wird."""
+    if a_won:
+        return math.log(p1 / p0)
+    return math.log((1 - p1) / (1 - p0))
 
 
-def early_stop_wins_needed(n, z=1.96):
-    """Ab wie vielen Siegen bei `n` gespielten Partien ist eine Seite bereits
-    signifikant (einseitiger Binomialtest gegen p=0.5, Standard z=1.96 ~ 95%)
-    im Vorteil — d.h. hochgerechnet mit >50% Gewinnchance? Geschlossene Form:
-    Sieg-Anteil w/n braucht (w/n - 0.5) / sqrt(0.25/n) >= z, aufgelöst nach w
-    ergibt w >= 0.5*(n + z*sqrt(n)). Reproduziert exakt die Tabelle
-    10->9(90%), 20->15(75%), 30->21(70%), ..., 100->60(60%) bei z=1.96.
-    Erlaubt einen Spielsatz VORZEITIG abzubrechen, sobald eine Seite diese
-    Schwelle erreicht — spart Zeit ggü. immer alle `games` durchzuspielen."""
-    return math.ceil(0.5 * (n + z * math.sqrt(n)))
+def smoothed_win_prob_and_elo(wins_a, n, p1=0.64):
+    """NUR fuers Live-Monitoring/Logging (nicht fuer die SPRT-Abbruch-
+    entscheidung selbst, die exakt auf den Rohdaten operieren muss):
+    Laplace-geglaettete Gewinnwahrscheinlichkeit (ein fiktiver Sieg + eine
+    fiktive Niederlage dazugerechnet), damit die ersten 5-10 Spiele nicht zu
+    extremen Elo-Ausschlaegen fuehren, plus die daraus abgeleitete
+    Elo-Differenz (klassische Elo-Umkehrformel)."""
+    p_smooth = (wins_a + 1) / (n + 2)
+    delta_elo = -400 * math.log10(1 / p_smooth - 1)
+    return p_smooth, delta_elo
 
 
 def calculate_elo(rating_a, rating_b, actual_score_a, k=32):
-    """Neue Elo-Ratings nach einer Partie."""
+    """Neue Elo-Ratings nach einer Partie -- rein sieg-/niederlage-basiert
+    (actual_score_a ist 1.0 oder 0.0), kein Siegstärke-Multiplikator mehr:
+    das laesst den Elo-Wert direkt mit der Gewinnwahrscheinlichkeit
+    korrelieren, statt zusaetzlich von der Punktemarge beeinflusst zu sein."""
     expected_a = 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
     new_rating_a = rating_a + k * (actual_score_a - expected_a)
     new_rating_b = rating_b + k * ((1 - actual_score_a) - (1 - expected_a))
@@ -138,14 +146,10 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
                 if scores[0] == 0 and scores[1] == 0:
                     wins["ZeroZero"] += 1   # beide 0 → degeneriertes Spiel (Floor-Flut)
 
-                # Elo mit Siegstärke-skaliertem K. Strength aus Sicht des echten
-                # Siegers (inkl. Startstein-Tiebreak bei Gleichstand).
-                strength = compute_win_val(scores, winner)
-                k = 32 * strength
-                elo[A], elo[B] = calculate_elo(elo[A], elo[B], score_a, k=k)
+                elo[A], elo[B] = calculate_elo(elo[A], elo[B], score_a)
 
                 print(f"  #{done:>3}/{games_per_matchup}: {scores[0]:3d}:{scores[1]:<3d} "
-                      f"-> {winner_name:<14} | Züge {steps:3d} | Strength {strength:.3f} "
+                      f"-> {winner_name:<14} | Züge {steps:3d} "
                       f"| Stand {A} {a_wins}:{b_wins} {B} | Elo {elo[A]}/{elo[B]}",
                       flush=True)
 
@@ -185,16 +189,21 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
         print(f" - {name:15s}: {elo[name]} Elo")
 
 
-def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=0,
+def run_net_arena(model, net_sims=200, heur_sims=60, games=100, stage=1, threads=0,
                   seed=None, chunk=10, c=0.3, c_puct=1.5,
-                  net_name=None, heur_name=None, early_stop=True):
+                  net_name=None, heur_name=None, early_stop=True,
+                  sprt_alpha=0.05, sprt_beta=0.10, sprt_p1=0.64):
     """AlphaZero-Netz (ONNX) vs Heuristik-MCTS. Das Netz spielt Brett 0, die
     Heuristik Brett 1; der Startspieler-Vorteil wird über alternierende Start-
     spieler je Spiel (i % 2) ausgeglichen. `stage` 1 = DFS-Blatt (Stufe 1),
     2 = Netz-Value-Blatt (Stufe 2). Spielt in Chunks für LIVE-Ausgabe.
-    `early_stop`: bricht ab, sobald eine Seite den 95%-Signifikanz-Schwellwert
-    für >50% Gewinnchance erreicht hat (siehe early_stop_wins_needed) — spart
-    Zeit ggü. immer allen `games` Partien."""
+    `early_stop`: zwei parallele truncated SPRTs (Wald) -- einer testet
+    "Netz signifikant staerker" (H1a), einer "Heuristik signifikant staerker"
+    (H1b), je p1=0.64 (~+100 Elo). Bricht ab, sobald EINER seine obere
+    Schranke reisst (dieser gewinnt); "Gleich stark" gilt erst, wenn BEIDE
+    ihre H1 verwerfen (untere Schranke) oder Spiel `games` ohne Entscheidung
+    erreicht wird -- ein einzelner verworfener Test heisst nur "diese Seite
+    nicht bewiesen besser", NICHT automatisch Parität (siehe sprt_bounds)."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
@@ -202,10 +211,12 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
     net_name  = net_name  or f"AlphaZero({os.path.basename(model)})"
     heur_name = heur_name or f"Heuristik(s{heur_sims})"
     leaf = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
+    sprt_lower, sprt_upper = sprt_bounds(sprt_alpha, sprt_beta)
 
     print("🏟️ Mosaic-AI ARENA — Netz vs Heuristik (Rust) 🏟️")
     print(f"  {net_name} (Brett 0, {net_sims} Sims, Stufe {stage}/{leaf}) "
-          f"vs {heur_name} (Brett 1, {heur_sims} Sims) — {games} Spiele")
+          f"vs {heur_name} (Brett 1, {heur_sims} Sims) — {games} Spiele"
+          + (f"  [SPRT p1={sprt_p1}, α={sprt_alpha}, β={sprt_beta}]" if early_stop else ""))
     print("-" * 50)
 
     elo  = {net_name: 1000, heur_name: 1000}
@@ -216,7 +227,9 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
 
     done = chunk_idx = 0
     n_wins = h_wins = 0
-    stopped_early = None
+    llr_net = llr_heur = 0.0
+    net_out = heur_out = False   # True = diese Seite hat ihre H1 (signifikant staerker) verworfen
+    verdict = None   # None=laeuft noch, net_name/heur_name=Sieger, "PARITY"=Gleich stark
     t0 = time.time()
     while done < games:
         n = min(chunk, games - done)
@@ -235,7 +248,8 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
             floor[net_name]  += g["total_floor"][0]
             floor[heur_name] += g["total_floor"][1]
 
-            if winner == 0:
+            net_won = (winner == 0)
+            if net_won:
                 winner_name, score_a = net_name, 1.0
                 n_wins += 1
             else:
@@ -245,33 +259,50 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
             if scores[0] == 0 and scores[1] == 0:
                 wins["ZeroZero"] += 1
 
-            strength = compute_win_val(scores, winner)
-            k = 32 * strength
-            elo[net_name], elo[heur_name] = calculate_elo(elo[net_name], elo[heur_name], score_a, k=k)
+            elo[net_name], elo[heur_name] = calculate_elo(elo[net_name], elo[heur_name], score_a)
+            _, delta_elo_smooth = smoothed_win_prob_and_elo(n_wins, done, p1=sprt_p1)
+
+            if early_stop:
+                if not net_out:
+                    llr_net += sprt_llr_delta(net_won, p1=sprt_p1)
+                    if llr_net >= sprt_upper:
+                        verdict = net_name
+                    elif llr_net <= sprt_lower:
+                        net_out = True
+                if verdict is None and not heur_out:
+                    llr_heur += sprt_llr_delta(not net_won, p1=sprt_p1)
+                    if llr_heur >= sprt_upper:
+                        verdict = heur_name
+                    elif llr_heur <= sprt_lower:
+                        heur_out = True
+                if verdict is None and net_out and heur_out:
+                    verdict = "PARITY"
 
             print(f"  #{done:>3}/{games}: {scores[0]:3d}:{scores[1]:<3d} -> {winner_name:<24} "
-                  f"| Züge {steps:3d} | Strength {strength:.3f} "
-                  f"| Stand Netz {n_wins}:{h_wins} Heur | Elo {elo[net_name]}/{elo[heur_name]}",
+                  f"| Züge {steps:3d} | LLR_Netz {llr_net:+.2f} | LLR_Heur {llr_heur:+.2f} "
+                  f"| ΔElo~{delta_elo_smooth:+.0f} | Stand Netz {n_wins}:{h_wins} Heur "
+                  f"| Elo {elo[net_name]}/{elo[heur_name]}",
                   flush=True)
 
-            if early_stop and done >= 10:
-                needed = early_stop_wins_needed(done)
-                if n_wins >= needed:
-                    stopped_early = net_name
-                elif h_wins >= needed:
-                    stopped_early = heur_name
-                if stopped_early:
-                    print(f"  ⏹️  Vorzeitig entschieden: {stopped_early} hat nach {done} Spielen "
-                          f"bereits {needed} Siege (95%-Signifikanz für >50% Gewinnchance).")
-                    break
-        if stopped_early:
+            if verdict:
+                label = (f"{verdict} signifikant staerker" if verdict != "PARITY"
+                         else "Gleich stark (beide Seiten nicht signifikant staerker)")
+                print(f"  ⏹️  SPRT-Entscheid nach {done} Spielen: {label} "
+                      f"(LLR_Netz={llr_net:+.2f}, LLR_Heur={llr_heur:+.2f}).")
+                break
+        if verdict:
             break
+
+    if early_stop and verdict is None:
+        verdict = "PARITY"
+        print(f"  ⏹️  Ressourcenlimit erreicht (Spiel {games}) ohne SPRT-Entscheidung -> Gleich stark "
+              f"(LLR_Netz={llr_net:+.2f}, LLR_Heur={llr_heur:+.2f}).")
 
     dur = time.time() - t0
     print("-" * 50)
     print(f"🏆 ERGEBNIS: {net_name} {n_wins}:{h_wins} {heur_name} "
           f"({n_wins/done*100:.0f}% Netz-Siege) in {dur:.1f}s ({done/dur:.1f} Spiele/s)"
-          + (f"  [vorzeitig nach {done}/{games} Spielen]" if stopped_early else ""))
+          + (f"  [vorzeitig nach {done}/{games} Spielen]" if early_stop and done < games else ""))
     print(f"   Ø Score: {net_name} {_st.mean(net_scores):.1f} | {heur_name} {_st.mean(heur_scores):.1f}")
     print(f"   0:0-Spiele: {wins['ZeroZero']}/{done} ({wins['ZeroZero']/done*100:.1f}%)  "
           f"(Sauberkeits-Indikator)")
@@ -279,9 +310,10 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=40, stage=1, threads=
     print(f"   Elo: {net_name} {elo[net_name]} | {heur_name} {elo[heur_name]}")
 
 
-def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
+def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=100,
                    threads=0, seed=None, chunk=10, c_puct=1.5, c_puct_a=None, c_puct_b=None,
-                   stage_a=None, stage_b=None, name_a=None, name_b=None, early_stop=True):
+                   stage_a=None, stage_b=None, name_a=None, name_b=None, early_stop=True,
+                   sprt_alpha=0.05, sprt_beta=0.10, sprt_p1=0.64):
     """Netz A (Brett 0) vs. Netz B (Brett 1) — Generationen-Vergleich. Start-
     spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt.
     `c_puct_a`/`c_puct_b` überschreiben `c_puct` je Brett (z.B. um denselben
@@ -289,8 +321,13 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
     `stage_a`/`stage_b` überschreiben `stage` je Brett (z.B. um Netz A auf
     Stufe 2 gegen Netz B auf Stufe 1 antreten zu lassen — Reifegrad-Vergleich
     in einer echten Partie statt nur der internen Sonde).
-    `early_stop`: bricht ab, sobald eine Seite den 95%-Signifikanz-Schwellwert
-    für >50% Gewinnchance erreicht hat (siehe early_stop_wins_needed)."""
+    `early_stop`: zwei parallele truncated SPRTs (Wald) -- einer testet
+    "A signifikant staerker" (H1a), einer "B signifikant staerker" (H1b),
+    je p1=0.64 (~+100 Elo). Bricht ab, sobald EINER seine obere Schranke
+    reisst (dieser gewinnt); "Gleich stark" gilt erst, wenn BEIDE ihre H1
+    verwerfen (untere Schranke) oder Spiel `games` ohne Entscheidung
+    erreicht wird -- ein einzelner verworfener Test heisst nur "diese Seite
+    nicht bewiesen besser", NICHT automatisch Parität (siehe sprt_bounds)."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
@@ -304,11 +341,13 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
     name_b = name_b or f"B({os.path.basename(model_b)})"
     leaf_a = "DFS-Blatt" if dfs_leaf_a else "Netz-Value-Blatt"
     leaf_b = "DFS-Blatt" if dfs_leaf_b else "Netz-Value-Blatt"
+    sprt_lower, sprt_upper = sprt_bounds(sprt_alpha, sprt_beta)
 
     print("🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️")
     print(f"  {name_a} (Brett 0, {sims_a} Sims, c_puct={cp_a}, Stufe {st_a}/{leaf_a}) vs "
           f"{name_b} (Brett 1, {sims_b} Sims, c_puct={cp_b}, Stufe {st_b}/{leaf_b}) "
-          f"— {games} Spiele")
+          f"— {games} Spiele"
+          + (f"  [SPRT p1={sprt_p1}, α={sprt_alpha}, β={sprt_beta}]" if early_stop else ""))
     print("-" * 50)
 
     elo  = {name_a: 1000, name_b: 1000}
@@ -318,7 +357,9 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
 
     done = chunk_idx = 0
     a_wins = b_wins = 0
-    stopped_early = None
+    llr_a = llr_b = 0.0
+    a_out = b_out = False   # True = diese Seite hat ihre H1 (signifikant staerker) verworfen
+    verdict = None   # None=laeuft noch, name_a/name_b=Sieger, "PARITY"=Gleich stark
     t0 = time.time()
     while done < games:
         n = min(chunk, games - done)
@@ -334,38 +375,58 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=40,
             winner = g["winner"]      # 0 = A, 1 = B
             steps  = g["steps"]
             a_scores.append(scores[0]); b_scores.append(scores[1])
-            if winner == 0:
+            a_won = (winner == 0)
+            if a_won:
                 winner_name, score_a = name_a, 1.0; a_wins += 1
             else:
                 winner_name, score_a = name_b, 0.0; b_wins += 1
             wins[winner_name] += 1
             if scores[0] == 0 and scores[1] == 0:
                 wins["ZeroZero"] += 1
-            strength = compute_win_val(scores, winner)
-            elo[name_a], elo[name_b] = calculate_elo(elo[name_a], elo[name_b], score_a, k=32 * strength)
+            elo[name_a], elo[name_b] = calculate_elo(elo[name_a], elo[name_b], score_a)
+            _, delta_elo_smooth = smoothed_win_prob_and_elo(a_wins, done, p1=sprt_p1)
+
+            if early_stop:
+                if not a_out:
+                    llr_a += sprt_llr_delta(a_won, p1=sprt_p1)
+                    if llr_a >= sprt_upper:
+                        verdict = name_a
+                    elif llr_a <= sprt_lower:
+                        a_out = True
+                if verdict is None and not b_out:
+                    llr_b += sprt_llr_delta(not a_won, p1=sprt_p1)
+                    if llr_b >= sprt_upper:
+                        verdict = name_b
+                    elif llr_b <= sprt_lower:
+                        b_out = True
+                if verdict is None and a_out and b_out:
+                    verdict = "PARITY"
+
             print(f"  #{done:>3}/{games}: {scores[0]:3d}:{scores[1]:<3d} -> {winner_name:<22} "
-                  f"| Züge {steps:3d} | Strength {strength:.3f} "
-                  f"| Stand {name_a} {a_wins}:{b_wins} {name_b} | Elo {elo[name_a]}/{elo[name_b]}",
+                  f"| Züge {steps:3d} | LLR_A {llr_a:+.2f} | LLR_B {llr_b:+.2f} "
+                  f"| ΔElo~{delta_elo_smooth:+.0f} | Stand {name_a} {a_wins}:{b_wins} {name_b} "
+                  f"| Elo {elo[name_a]}/{elo[name_b]}",
                   flush=True)
 
-            if early_stop and done >= 10:
-                needed = early_stop_wins_needed(done)
-                if a_wins >= needed:
-                    stopped_early = name_a
-                elif b_wins >= needed:
-                    stopped_early = name_b
-                if stopped_early:
-                    print(f"  ⏹️  Vorzeitig entschieden: {stopped_early} hat nach {done} Spielen "
-                          f"bereits {needed} Siege (95%-Signifikanz für >50% Gewinnchance).")
-                    break
-        if stopped_early:
+            if verdict:
+                label = (f"{verdict} signifikant staerker" if verdict != "PARITY"
+                         else "Gleich stark (beide Seiten nicht signifikant staerker)")
+                print(f"  ⏹️  SPRT-Entscheid nach {done} Spielen: {label} "
+                      f"(LLR_A={llr_a:+.2f}, LLR_B={llr_b:+.2f}).")
+                break
+        if verdict:
             break
+
+    if early_stop and verdict is None:
+        verdict = "PARITY"
+        print(f"  ⏹️  Ressourcenlimit erreicht (Spiel {games}) ohne SPRT-Entscheidung -> Gleich stark "
+              f"(LLR_A={llr_a:+.2f}, LLR_B={llr_b:+.2f}).")
 
     dur = time.time() - t0
     print("-" * 50)
     print(f"🏆 ERGEBNIS: {name_a} {a_wins}:{b_wins} {name_b} "
           f"({a_wins/done*100:.0f}% A-Siege) in {dur:.1f}s ({done/dur:.1f} Spiele/s)"
-          + (f"  [vorzeitig nach {done}/{games} Spielen]" if stopped_early else ""))
+          + (f"  [vorzeitig nach {done}/{games} Spielen]" if early_stop and done < games else ""))
     print(f"   Ø Score: {name_a} {_st.mean(a_scores):.1f} | {name_b} {_st.mean(b_scores):.1f}")
     print(f"   0:0-Spiele: {wins['ZeroZero']}/{done} ({wins['ZeroZero']/done*100:.1f}%)")
     print(f"   Elo: {name_a} {elo[name_a]} | {name_b} {elo[name_b]}")
@@ -375,18 +436,18 @@ if __name__ == "__main__":
     import os
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v1w15_e50.onnx"   # Pfad zum ONNX-Netz
-    NET_MODEL_PRE = "models/alphazero_v1w0_e50.onnx"
+    NET_MODEL = "models/alphazero_v2.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL_PRE = "models/alphazero_v1c.onnx"
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
     NET_SIMS  = 200                            # Basis-Sims des Netzes
     STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
     GAMES     = 100
-    #run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
-    #              games=GAMES, stage=STAGE, threads=0)
-    run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
-                   threads=0, seed=None, chunk=10, c_puct=1.5, name_a=NET_NAME, name_b=NET_NAME_PRE)
+    run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
+                  games=GAMES, stage=STAGE, threads=0)
+    #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
+    #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a=NET_NAME, name_b=NET_NAME_PRE)
 
     # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
     # competitors = {
