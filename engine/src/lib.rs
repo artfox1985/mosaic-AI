@@ -151,7 +151,7 @@ fn net_vs_net_arena_match(
 /// saubere Visit-Targets), `False` = Stufe 2 (Netz-Value). Gibt alle Step-Records
 /// als JSON-Array zurück (Format wie self_play_games). `num_threads=0` = alle Kerne.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, dfs_leaf=true, prefix="netgen".to_string()))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, dfs_leaf=true, prefix="netgen".to_string(), add_root_noise=true))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -163,11 +163,12 @@ fn net_self_play_games(
     num_threads: usize,
     dfs_leaf: bool,
     prefix: String,
+    add_root_noise: bool,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_self_play(
-            &model_path, n_games, base_sims, c_puct, seed, num_threads, dfs_leaf, &prefix,
+            &model_path, n_games, base_sims, c_puct, seed, num_threads, dfs_leaf, &prefix, add_root_noise,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)

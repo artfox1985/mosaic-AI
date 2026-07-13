@@ -81,7 +81,8 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
                   tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None,
-                  per_file: int = 10, model: str = None, stage: int = 1, c_puct: float = 1.5):
+                  per_file: int = 10, model: str = None, stage: int = 1, c_puct: float = 1.5,
+                  add_root_noise: bool = True):
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -118,11 +119,12 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             return _mr.net_self_play_games(
                 model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
                 seed=base_seed + chunk_idx, num_threads=threads, dfs_leaf=dfs_leaf,
-                prefix=f"{prefix}_c{chunk_idx}",
+                prefix=f"{prefix}_c{chunk_idx}", add_root_noise=add_root_noise,
             )
         leaf_name = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"Stufe {stage} ({leaf_name}) | base_sims {simulations} | c_puct {c_puct} | "
+              f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei")
     else:
         def make_chunk(n, chunk_idx):
@@ -199,6 +201,9 @@ if __name__ == "__main__":
                         help="Basis-Seed (für reproduzierbare Läufe). Standard: zufällig.")
     parser.add_argument("--depth", type=int, default=0,
                         help="(Kompatibilität; ignoriert — Rust bewertet Blätter exakt per Tiling-Solver)")
+    parser.add_argument("--no-root-noise", action="store_true",
+                        help="Dirichlet-Wurzel-Rauschen abschalten (nur --mode network; Standard: an). "
+                             "Diagnose-Flag fuer den Stufe-2-0:0-Test, siehe evaluations/stage2_investigation.md")
     args = parser.parse_args()
 
     generate_data(
@@ -214,4 +219,5 @@ if __name__ == "__main__":
         model=args.model,
         stage=args.stage,
         c_puct=args.c_puct,
+        add_root_noise=not args.no_root_noise,
     )

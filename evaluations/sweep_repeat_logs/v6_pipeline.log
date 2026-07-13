@@ -1,0 +1,656 @@
+Mon Jul 13 09:20:27     2026 Starte 4000 Stufe-2-Self-Plays mit v2 (La🚀 Starte N🚀 Starte Netz-Self-Play (Rust): 4000 Spiele | Modell D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v2.onnx | Stufe 2 (Netz-Value-Blatt) | base_sims 400 | c_puct 1.5 | Threads alle Kerne | Chunk 50 | 10 Spiele/Datei
+💾 1505 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0928_g10.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0928_g20.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0928_g30.pkl'
+💾 1462 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0928_g40.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0928_g50.pkl'
+  ⏳ 50/4000 Spiele | 0.11 Spiele/s | 7385 Züge | ETA 609.1 min
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0932_g60.pkl'
+💾 1479 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0932_g70.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0932_g80.pkl'
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0932_g90.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0932_g100.pkl'
+  ⏳ 100/4000 Spiele | 0.13 Spiele/s | 14726 Züge | ETA 486.1 min
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0937_g110.pkl'
+💾 1449 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0937_g120.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0937_g130.pkl'
+💾 1488 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0937_g140.pkl'
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0937_g150.pkl'
+  ⏳ 150/4000 Spiele | 0.15 Spiele/s | 22097 Züge | ETA 434.3 min
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0941_g160.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0941_g170.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0941_g180.pkl'
+💾 1502 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0941_g190.pkl'
+💾 1482 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0941_g200.pkl'
+  ⏳ 200/4000 Spiele | 0.16 Spiele/s | 29465 Züge | ETA 407.0 min
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0946_g210.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0946_g220.pkl'
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0946_g230.pkl'
+💾 1488 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0946_g240.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0946_g250.pkl'
+  ⏳ 250/4000 Spiele | 0.16 Spiele/s | 36855 Züge | ETA 390.2 min
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0951_g260.pkl'
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0951_g270.pkl'
+💾 1447 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0951_g280.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0951_g290.pkl'
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0951_g300.pkl'
+  ⏳ 300/4000 Spiele | 0.16 Spiele/s | 44205 Züge | ETA 378.8 min
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0955_g310.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0955_g320.pkl'
+💾 1510 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0955_g330.pkl'
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0955_g340.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_0955_g350.pkl'
+  ⏳ 350/4000 Spiele | 0.17 Spiele/s | 51598 Züge | ETA 367.3 min
+💾 1462 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1000_g360.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1000_g370.pkl'
+💾 1506 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1000_g380.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1000_g390.pkl'
+💾 1441 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1000_g400.pkl'
+  ⏳ 400/4000 Spiele | 0.17 Spiele/s | 58967 Züge | ETA 359.2 min
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1004_g410.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1004_g420.pkl'
+💾 1482 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1004_g430.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1004_g440.pkl'
+💾 1459 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1004_g450.pkl'
+  ⏳ 450/4000 Spiele | 0.17 Spiele/s | 66337 Züge | ETA 350.5 min
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1009_g460.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1009_g470.pkl'
+💾 1505 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1009_g480.pkl'
+💾 1444 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1009_g490.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1009_g500.pkl'
+  ⏳ 500/4000 Spiele | 0.17 Spiele/s | 73722 Züge | ETA 342.7 min
+💾 1483 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1014_g510.pkl'
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1014_g520.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1014_g530.pkl'
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1014_g540.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1014_g550.pkl'
+  ⏳ 550/4000 Spiele | 0.17 Spiele/s | 81110 Züge | ETA 336.6 min
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1018_g560.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1018_g570.pkl'
+💾 1483 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1018_g580.pkl'
+💾 1441 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1018_g590.pkl'
+💾 1432 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1018_g600.pkl'
+  ⏳ 600/4000 Spiele | 0.17 Spiele/s | 88438 Züge | ETA 330.5 min
+💾 1496 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1023_g610.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1023_g620.pkl'
+💾 1506 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1023_g630.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1023_g640.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1023_g650.pkl'
+  ⏳ 650/4000 Spiele | 0.17 Spiele/s | 95898 Züge | ETA 325.3 min
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1027_g660.pkl'
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1027_g670.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1027_g680.pkl'
+💾 1459 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1027_g690.pkl'
+💾 1490 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1027_g700.pkl'
+  ⏳ 700/4000 Spiele | 0.17 Spiele/s | 103244 Züge | ETA 318.4 min
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1032_g710.pkl'
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1032_g720.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1032_g730.pkl'
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1032_g740.pkl'
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1032_g750.pkl'
+  ⏳ 750/4000 Spiele | 0.17 Spiele/s | 110595 Züge | ETA 311.4 min
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1036_g760.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1036_g770.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1036_g780.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1036_g790.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1036_g800.pkl'
+  ⏳ 800/4000 Spiele | 0.17 Spiele/s | 117936 Züge | ETA 305.2 min
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1041_g810.pkl'
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1041_g820.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1041_g830.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1041_g840.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1041_g850.pkl'
+  ⏳ 850/4000 Spiele | 0.18 Spiele/s | 125320 Züge | ETA 299.3 min
+💾 1453 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1045_g860.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1045_g870.pkl'
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1045_g880.pkl'
+💾 1512 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1045_g890.pkl'
+💾 1451 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1045_g900.pkl'
+  ⏳ 900/4000 Spiele | 0.18 Spiele/s | 132678 Züge | ETA 293.1 min
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1049_g910.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1049_g920.pkl'
+💾 1506 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1049_g930.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1049_g940.pkl'
+💾 1507 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1049_g950.pkl'
+  ⏳ 950/4000 Spiele | 0.18 Spiele/s | 140131 Züge | ETA 287.2 min
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1054_g960.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1054_g970.pkl'
+💾 1460 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1054_g980.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1054_g990.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1054_g1000.pkl'
+  ⏳ 1000/4000 Spiele | 0.18 Spiele/s | 147490 Züge | ETA 281.8 min
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1058_g1010.pkl'
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1058_g1020.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1058_g1030.pkl'
+💾 1507 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1058_g1040.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1058_g1050.pkl'
+  ⏳ 1050/4000 Spiele | 0.18 Spiele/s | 154900 Züge | ETA 276.4 min
+💾 1449 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1103_g1060.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1103_g1070.pkl'
+💾 1493 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1103_g1080.pkl'
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1103_g1090.pkl'
+💾 1455 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1103_g1100.pkl'
+  ⏳ 1100/4000 Spiele | 0.18 Spiele/s | 162224 Züge | ETA 270.7 min
+💾 1510 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1107_g1110.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1107_g1120.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1107_g1130.pkl'
+💾 1495 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1107_g1140.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1107_g1150.pkl'
+  ⏳ 1150/4000 Spiele | 0.18 Spiele/s | 169657 Züge | ETA 265.3 min
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1111_g1160.pkl'
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1111_g1170.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1111_g1180.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1112_g1190.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1112_g1200.pkl'
+  ⏳ 1200/4000 Spiele | 0.18 Spiele/s | 177017 Züge | ETA 260.3 min
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1116_g1210.pkl'
+💾 1500 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1116_g1220.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1116_g1230.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1116_g1240.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1116_g1250.pkl'
+  ⏳ 1250/4000 Spiele | 0.18 Spiele/s | 184392 Züge | ETA 255.0 min
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1120_g1260.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1120_g1270.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1120_g1280.pkl'
+💾 1445 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1120_g1290.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1120_g1300.pkl'
+  ⏳ 1300/4000 Spiele | 0.18 Spiele/s | 191732 Züge | ETA 250.1 min
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1125_g1310.pkl'
+💾 1507 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1125_g1320.pkl'
+💾 1508 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1125_g1330.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1125_g1340.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1125_g1350.pkl'
+  ⏳ 1350/4000 Spiele | 0.18 Spiele/s | 199161 Züge | ETA 245.8 min
+💾 1454 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1130_g1360.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1130_g1370.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1130_g1380.pkl'
+💾 1498 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1130_g1390.pkl'
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1130_g1400.pkl'
+  ⏳ 1400/4000 Spiele | 0.18 Spiele/s | 206541 Züge | ETA 241.1 min
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1134_g1410.pkl'
+💾 1450 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1134_g1420.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1134_g1430.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1134_g1440.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1134_g1450.pkl'
+  ⏳ 1450/4000 Spiele | 0.18 Spiele/s | 213863 Züge | ETA 235.6 min
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1138_g1460.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1138_g1470.pkl'
+💾 1490 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1138_g1480.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1138_g1490.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1138_g1500.pkl'
+  ⏳ 1500/4000 Spiele | 0.18 Spiele/s | 221251 Züge | ETA 230.5 min
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1143_g1510.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1143_g1520.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1143_g1530.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1143_g1540.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1143_g1550.pkl'
+  ⏳ 1550/4000 Spiele | 0.18 Spiele/s | 228645 Züge | ETA 225.6 min
+💾 1497 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1147_g1560.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1147_g1570.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1147_g1580.pkl'
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1147_g1590.pkl'
+💾 1497 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1147_g1600.pkl'
+  ⏳ 1600/4000 Spiele | 0.18 Spiele/s | 236078 Züge | ETA 221.1 min
+💾 1491 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1151_g1610.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1151_g1620.pkl'
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1151_g1630.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1151_g1640.pkl'
+💾 1465 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1151_g1650.pkl'
+  ⏳ 1650/4000 Spiele | 0.18 Spiele/s | 243429 Züge | ETA 215.7 min
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1156_g1660.pkl'
+💾 1448 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1156_g1670.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1156_g1680.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1156_g1690.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1156_g1700.pkl'
+  ⏳ 1700/4000 Spiele | 0.18 Spiele/s | 250798 Züge | ETA 210.7 min
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1200_g1710.pkl'
+💾 1488 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1200_g1720.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1200_g1730.pkl'
+💾 1465 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1200_g1740.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1200_g1750.pkl'
+  ⏳ 1750/4000 Spiele | 0.18 Spiele/s | 258201 Züge | ETA 205.9 min
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1204_g1760.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1204_g1770.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1204_g1780.pkl'
+💾 1449 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1204_g1790.pkl'
+💾 1453 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1204_g1800.pkl'
+  ⏳ 1800/4000 Spiele | 0.18 Spiele/s | 265523 Züge | ETA 200.9 min
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1208_g1810.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1208_g1820.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1208_g1830.pkl'
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1208_g1840.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1208_g1850.pkl'
+  ⏳ 1850/4000 Spiele | 0.18 Spiele/s | 272873 Züge | ETA 195.8 min
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1213_g1860.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1213_g1870.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1213_g1880.pkl'
+💾 1479 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1213_g1890.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1213_g1900.pkl'
+  ⏳ 1900/4000 Spiele | 0.18 Spiele/s | 280212 Züge | ETA 191.1 min
+💾 1441 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1217_g1910.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1217_g1920.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1217_g1930.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1217_g1940.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1217_g1950.pkl'
+  ⏳ 1950/4000 Spiele | 0.18 Spiele/s | 287571 Züge | ETA 186.3 min
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1221_g1960.pkl'
+💾 1462 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1221_g1970.pkl'
+💾 1483 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1221_g1980.pkl'
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1221_g1990.pkl'
+💾 1460 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1221_g2000.pkl'
+  ⏳ 2000/4000 Spiele | 0.18 Spiele/s | 294941 Züge | ETA 181.5 min
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1225_g2010.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1225_g2020.pkl'
+💾 1495 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1225_g2030.pkl'
+💾 1493 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1225_g2040.pkl'
+💾 1479 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1225_g2050.pkl'
+  ⏳ 2050/4000 Spiele | 0.18 Spiele/s | 302331 Züge | ETA 176.2 min
+💾 1479 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1229_g2060.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1229_g2070.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1229_g2080.pkl'
+💾 1497 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1229_g2090.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1229_g2100.pkl'
+  ⏳ 2100/4000 Spiele | 0.18 Spiele/s | 309706 Züge | ETA 171.3 min
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1233_g2110.pkl'
+💾 1497 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1233_g2120.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1233_g2130.pkl'
+💾 1446 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1233_g2140.pkl'
+💾 1490 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1233_g2150.pkl'
+  ⏳ 2150/4000 Spiele | 0.19 Spiele/s | 317095 Züge | ETA 166.5 min
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1238_g2160.pkl'
+💾 1483 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1238_g2170.pkl'
+💾 1502 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1238_g2180.pkl'
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1238_g2190.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1238_g2200.pkl'
+  ⏳ 2200/4000 Spiele | 0.19 Spiele/s | 324517 Züge | ETA 161.7 min
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1242_g2210.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1242_g2220.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1242_g2230.pkl'
+💾 1482 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1242_g2240.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1242_g2250.pkl'
+  ⏳ 2250/4000 Spiele | 0.19 Spiele/s | 331858 Züge | ETA 157.0 min
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1246_g2260.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1246_g2270.pkl'
+💾 1482 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1246_g2280.pkl'
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1246_g2290.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1246_g2300.pkl'
+  ⏳ 2300/4000 Spiele | 0.19 Spiele/s | 339213 Züge | ETA 152.4 min
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1250_g2310.pkl'
+💾 1502 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1250_g2320.pkl'
+💾 1445 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1250_g2330.pkl'
+💾 1482 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1250_g2340.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1250_g2350.pkl'
+  ⏳ 2350/4000 Spiele | 0.19 Spiele/s | 346586 Züge | ETA 147.7 min
+💾 1444 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1254_g2360.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1254_g2370.pkl'
+💾 1440 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1254_g2380.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1254_g2390.pkl'
+💾 1493 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1254_g2400.pkl'
+  ⏳ 2400/4000 Spiele | 0.19 Spiele/s | 353909 Züge | ETA 142.8 min
+💾 1499 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1258_g2410.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1258_g2420.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1258_g2430.pkl'
+💾 1491 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1258_g2440.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1258_g2450.pkl'
+  ⏳ 2450/4000 Spiele | 0.19 Spiele/s | 361325 Züge | ETA 138.3 min
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1303_g2460.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1303_g2470.pkl'
+💾 1440 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1303_g2480.pkl'
+💾 1449 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1303_g2490.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1303_g2500.pkl'
+  ⏳ 2500/4000 Spiele | 0.19 Spiele/s | 368632 Züge | ETA 133.7 min
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1307_g2510.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1307_g2520.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1307_g2530.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1307_g2540.pkl'
+💾 1446 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1307_g2550.pkl'
+  ⏳ 2550/4000 Spiele | 0.19 Spiele/s | 375975 Züge | ETA 129.2 min
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1311_g2560.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1311_g2570.pkl'
+💾 1457 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1311_g2580.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1311_g2590.pkl'
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1311_g2600.pkl'
+  ⏳ 2600/4000 Spiele | 0.19 Spiele/s | 383321 Züge | ETA 124.6 min
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1315_g2610.pkl'
+💾 1446 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1315_g2620.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1315_g2630.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1315_g2640.pkl'
+💾 1482 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1315_g2650.pkl'
+  ⏳ 2650/4000 Spiele | 0.19 Spiele/s | 390649 Züge | ETA 119.9 min
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1319_g2660.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1319_g2670.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1319_g2680.pkl'
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1319_g2690.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1319_g2700.pkl'
+  ⏳ 2700/4000 Spiele | 0.19 Spiele/s | 398021 Züge | ETA 115.3 min
+💾 1459 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1324_g2710.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1324_g2720.pkl'
+💾 1491 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1324_g2730.pkl'
+💾 1479 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1324_g2740.pkl'
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1324_g2750.pkl'
+  ⏳ 2750/4000 Spiele | 0.19 Spiele/s | 405391 Züge | ETA 110.8 min
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1328_g2760.pkl'
+💾 1452 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1328_g2770.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1328_g2780.pkl'
+💾 1494 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1328_g2790.pkl'
+💾 1495 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1328_g2800.pkl'
+  ⏳ 2800/4000 Spiele | 0.19 Spiele/s | 412773 Züge | ETA 106.5 min
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1333_g2810.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1333_g2820.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1333_g2830.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1333_g2840.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1333_g2850.pkl'
+  ⏳ 2850/4000 Spiele | 0.19 Spiele/s | 420160 Züge | ETA 102.0 min
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1337_g2860.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1337_g2870.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1337_g2880.pkl'
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1337_g2890.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1337_g2900.pkl'
+  ⏳ 2900/4000 Spiele | 0.19 Spiele/s | 427546 Züge | ETA 97.5 min
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1341_g2910.pkl'
+💾 1462 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1341_g2920.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1341_g2930.pkl'
+💾 1488 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1341_g2940.pkl'
+💾 1488 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1341_g2950.pkl'
+  ⏳ 2950/4000 Spiele | 0.19 Spiele/s | 434935 Züge | ETA 93.0 min
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1346_g2960.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1346_g2970.pkl'
+💾 1479 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1346_g2980.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1346_g2990.pkl'
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1346_g3000.pkl'
+  ⏳ 3000/4000 Spiele | 0.19 Spiele/s | 442306 Züge | ETA 88.6 min
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1350_g3010.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1350_g3020.pkl'
+💾 1492 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1350_g3030.pkl'
+💾 1460 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1350_g3040.pkl'
+💾 1454 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1350_g3050.pkl'
+  ⏳ 3050/4000 Spiele | 0.19 Spiele/s | 449664 Züge | ETA 84.1 min
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1354_g3060.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1354_g3070.pkl'
+💾 1493 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1354_g3080.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1354_g3090.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1354_g3100.pkl'
+  ⏳ 3100/4000 Spiele | 0.19 Spiele/s | 457068 Züge | ETA 79.7 min
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1358_g3110.pkl'
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1358_g3120.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1358_g3130.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1358_g3140.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1358_g3150.pkl'
+  ⏳ 3150/4000 Spiele | 0.19 Spiele/s | 464402 Züge | ETA 75.1 min
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1403_g3160.pkl'
+💾 1455 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1403_g3170.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1403_g3180.pkl'
+💾 1453 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1403_g3190.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1403_g3200.pkl'
+  ⏳ 3200/4000 Spiele | 0.19 Spiele/s | 471715 Züge | ETA 70.7 min
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1407_g3210.pkl'
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1407_g3220.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1407_g3230.pkl'
+💾 1465 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1407_g3240.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1407_g3250.pkl'
+  ⏳ 3250/4000 Spiele | 0.19 Spiele/s | 479106 Züge | ETA 66.2 min
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1411_g3260.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1411_g3270.pkl'
+💾 1460 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1411_g3280.pkl'
+💾 1454 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1411_g3290.pkl'
+💾 1454 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1411_g3300.pkl'
+  ⏳ 3300/4000 Spiele | 0.19 Spiele/s | 486409 Züge | ETA 61.7 min
+💾 1474 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1415_g3310.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1415_g3320.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1415_g3330.pkl'
+💾 1466 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1415_g3340.pkl'
+💾 1499 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1415_g3350.pkl'
+  ⏳ 3350/4000 Spiele | 0.19 Spiele/s | 493785 Züge | ETA 57.2 min
+💾 1491 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1419_g3360.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1419_g3370.pkl'
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1419_g3380.pkl'
+💾 1491 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1419_g3390.pkl'
+💾 1488 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1419_g3400.pkl'
+  ⏳ 3400/4000 Spiele | 0.19 Spiele/s | 501202 Züge | ETA 52.8 min
+💾 1461 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1423_g3410.pkl'
+💾 1484 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1423_g3420.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1423_g3430.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1423_g3440.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1423_g3450.pkl'
+  ⏳ 3450/4000 Spiele | 0.19 Spiele/s | 508558 Züge | ETA 48.3 min
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1427_g3460.pkl'
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1427_g3470.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1427_g3480.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1427_g3490.pkl'
+💾 1507 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1427_g3500.pkl'
+  ⏳ 3500/4000 Spiele | 0.19 Spiele/s | 515955 Züge | ETA 43.9 min
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1431_g3510.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1431_g3520.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1431_g3530.pkl'
+💾 1487 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1431_g3540.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1431_g3550.pkl'
+  ⏳ 3550/4000 Spiele | 0.19 Spiele/s | 523365 Züge | ETA 39.5 min
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1435_g3560.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1435_g3570.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1435_g3580.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1435_g3590.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1435_g3600.pkl'
+  ⏳ 3600/4000 Spiele | 0.19 Spiele/s | 530743 Züge | ETA 35.1 min
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1440_g3610.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1440_g3620.pkl'
+💾 1456 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1440_g3630.pkl'
+💾 1459 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1440_g3640.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1440_g3650.pkl'
+  ⏳ 3650/4000 Spiele | 0.19 Spiele/s | 538092 Züge | ETA 30.7 min
+💾 1470 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1444_g3660.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1444_g3670.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1444_g3680.pkl'
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1444_g3690.pkl'
+💾 1458 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1444_g3700.pkl'
+  ⏳ 3700/4000 Spiele | 0.19 Spiele/s | 545431 Züge | ETA 26.3 min
+💾 1459 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1449_g3710.pkl'
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1449_g3720.pkl'
+💾 1489 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1449_g3730.pkl'
+💾 1480 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1449_g3740.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1449_g3750.pkl'
+  ⏳ 3750/4000 Spiele | 0.19 Spiele/s | 552809 Züge | ETA 21.9 min
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1453_g3760.pkl'
+💾 1481 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1453_g3770.pkl'
+💾 1468 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1453_g3780.pkl'
+💾 1486 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1453_g3790.pkl'
+💾 1476 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1453_g3800.pkl'
+  ⏳ 3800/4000 Spiele | 0.19 Spiele/s | 560197 Züge | ETA 17.5 min
+💾 1454 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1457_g3810.pkl'
+💾 1471 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1457_g3820.pkl'
+💾 1463 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1457_g3830.pkl'
+💾 1500 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1457_g3840.pkl'
+💾 1434 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1457_g3850.pkl'
+  ⏳ 3850/4000 Spiele | 0.19 Spiele/s | 567519 Züge | ETA 13.1 min
+💾 1483 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1502_g3860.pkl'
+💾 1498 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1502_g3870.pkl'
+💾 1472 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1502_g3880.pkl'
+💾 1448 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1502_g3890.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1502_g3900.pkl'
+  ⏳ 3900/4000 Spiele | 0.19 Spiele/s | 574897 Züge | ETA 8.8 min
+💾 1464 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1506_g3910.pkl'
+💾 1473 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1506_g3920.pkl'
+💾 1469 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1506_g3930.pkl'
+💾 1475 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1506_g3940.pkl'
+💾 1490 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1506_g3950.pkl'
+  ⏳ 3950/4000 Spiele | 0.19 Spiele/s | 582268 Züge | ETA 4.4 min
+💾 1485 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1510_g3960.pkl'
+💾 1478 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1510_g3970.pkl'
+💾 1467 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1510_g3980.pkl'
+💾 1477 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1510_g3990.pkl'
+💾 1455 Züge gespeichert in 'D:\Archiv\Documents\Projekte\mosaic-AI\data\selfplay_v2s2_20260713_1510_g4000.pkl'
+  ⏳ 4000/4000 Spiele | 0.19 Spiele/s | 589630 Züge | ETA 0.0 min
+
+✅ Fertig: 4000 Spiele, 589630 Züge nach 20998.0s
+Mon Jul 13 15:10:25     2026 Self-Play fertig. Starte Training v6 (Warm-Start v2)...
+Lade Daten aus 1561 Dateien...
+Datensatz geladen: 2323860 Züge. (Features pro Zug: 684) — 985.4s
+💾 Speichere HDF5-Cache...
+✅ Cache gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\data\.cache_41684f3d5171.h5
+Lade Daten aus 174 Dateien...
+Datensatz geladen: 258887 Züge. (Features pro Zug: 684) — 112.0s
+💾 Speichere HDF5-Cache...
+✅ Cache gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\data\.cache_d83fda8b658d.h5
+   Val-Split: 1561 Trainings-Dateien / 174 Val-Dateien (2,323,860 / 258,887 Züge)
+   Value-Ziel-Streuung: σ=0.149 (Varianz=0.0222, zum Vergleich mit v_pred σ unten; Varianz ist die Baseline-MSE bei reiner Mittelwert-Vorhersage)
+
+🚀 Starte PyTorch Training auf: CUDA
+🧠 Netz-Architektur: 684→512→512→512
+⚙️  Hyperparameter (config.py):
+   Learning Rate : 0.0004
+   Value Weight  : 1
+   Batch Size    : 256
+   Value-Target  : tanh(eigen/50) - 0.1*tanh(gegner/50) (Endergebnis statt Win/Loss)
+📥 Lade altes Model als Startpunkt: alphazero_v2.pth
+   Epochen       : 100
+🔄 Warm-Start erkannt: Trainiere für 100 Epochen.
+Epoche  1/100 | Total Loss:   3.00 (R²=+0.37, Policy:  2.99) | Val-R²=+0.33 | Policy-Val= 2.19 | v_pred μ=+0.12 σ=0.091
+Epoche  2/100 | Total Loss:   2.97 (R²=+0.39, Policy:  2.96) | Val-R²=+0.34 | Policy-Val= 2.19 | v_pred μ=+0.12 σ=0.094
+Epoche  3/100 | Total Loss:   2.97 (R²=+0.40, Policy:  2.96) | Val-R²=+0.33 | Policy-Val= 2.19 | v_pred μ=+0.12 σ=0.095
+Epoche  4/100 | Total Loss:   2.97 (R²=+0.41, Policy:  2.95) | Val-R²=+0.34 | Policy-Val= 2.19 | v_pred μ=+0.12 σ=0.096
+Epoche  5/100 | Total Loss:   2.96 (R²=+0.42, Policy:  2.95) | Val-R²=+0.33 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.097
+Epoche  6/100 | Total Loss:   2.95 (R²=+0.42, Policy:  2.94) | Val-R²=+0.34 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.097
+Epoche  7/100 | Total Loss:   2.95 (R²=+0.42, Policy:  2.93) | Val-R²=+0.33 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.097
+Epoche  8/100 | Total Loss:   2.94 (R²=+0.42, Policy:  2.93) | Val-R²=+0.34 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche  9/100 | Total Loss:   2.93 (R²=+0.43, Policy:  2.92) | Val-R²=+0.34 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 10/100 | Total Loss:   2.92 (R²=+0.43, Policy:  2.91) | Val-R²=+0.34 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 11/100 | Total Loss:   2.92 (R²=+0.43, Policy:  2.90) | Val-R²=+0.33 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 12/100 | Total Loss:   2.91 (R²=+0.43, Policy:  2.89) | Val-R²=+0.33 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 13/100 | Total Loss:   2.90 (R²=+0.43, Policy:  2.88) | Val-R²=+0.34 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 14/100 | Total Loss:   2.89 (R²=+0.43, Policy:  2.87) | Val-R²=+0.33 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 15/100 | Total Loss:   2.88 (R²=+0.43, Policy:  2.87) | Val-R²=+0.33 | Policy-Val= 2.20 | v_pred μ=+0.12 σ=0.098
+Epoche 16/100 | Total Loss:   2.87 (R²=+0.43, Policy:  2.86) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 17/100 | Total Loss:   2.86 (R²=+0.43, Policy:  2.84) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 18/100 | Total Loss:   2.85 (R²=+0.43, Policy:  2.83) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 19/100 | Total Loss:   2.84 (R²=+0.43, Policy:  2.83) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 20/100 | Total Loss:   2.83 (R²=+0.43, Policy:  2.82) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 21/100 | Total Loss:   2.82 (R²=+0.43, Policy:  2.81) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 22/100 | Total Loss:   2.81 (R²=+0.43, Policy:  2.80) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 23/100 | Total Loss:   2.80 (R²=+0.43, Policy:  2.79) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 24/100 | Total Loss:   2.79 (R²=+0.43, Policy:  2.78) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 25/100 | Total Loss:   2.78 (R²=+0.43, Policy:  2.77) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 26/100 | Total Loss:   2.77 (R²=+0.43, Policy:  2.76) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 27/100 | Total Loss:   2.76 (R²=+0.44, Policy:  2.75) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 28/100 | Total Loss:   2.75 (R²=+0.44, Policy:  2.74) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 29/100 | Total Loss:   2.75 (R²=+0.44, Policy:  2.73) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 30/100 | Total Loss:   2.74 (R²=+0.43, Policy:  2.72) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 31/100 | Total Loss:   2.73 (R²=+0.44, Policy:  2.72) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 32/100 | Total Loss:   2.72 (R²=+0.44, Policy:  2.71) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 33/100 | Total Loss:   2.71 (R²=+0.44, Policy:  2.70) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 34/100 | Total Loss:   2.70 (R²=+0.44, Policy:  2.69) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 35/100 | Total Loss:   2.70 (R²=+0.44, Policy:  2.68) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 36/100 | Total Loss:   2.69 (R²=+0.44, Policy:  2.68) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 37/100 | Total Loss:   2.68 (R²=+0.44, Policy:  2.67) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 38/100 | Total Loss:   2.67 (R²=+0.44, Policy:  2.66) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 39/100 | Total Loss:   2.67 (R²=+0.44, Policy:  2.66) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 40/100 | Total Loss:   2.66 (R²=+0.44, Policy:  2.65) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 41/100 | Total Loss:   2.66 (R²=+0.44, Policy:  2.64) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 42/100 | Total Loss:   2.65 (R²=+0.44, Policy:  2.64) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 43/100 | Total Loss:   2.64 (R²=+0.44, Policy:  2.63) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 44/100 | Total Loss:   2.64 (R²=+0.44, Policy:  2.62) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 45/100 | Total Loss:   2.63 (R²=+0.44, Policy:  2.62) | Val-R²=+0.31 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 46/100 | Total Loss:   2.62 (R²=+0.44, Policy:  2.61) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 47/100 | Total Loss:   2.62 (R²=+0.44, Policy:  2.61) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 48/100 | Total Loss:   2.61 (R²=+0.44, Policy:  2.60) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 49/100 | Total Loss:   2.61 (R²=+0.44, Policy:  2.59) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 50/100 | Total Loss:   2.60 (R²=+0.44, Policy:  2.59) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 51/100 | Total Loss:   2.60 (R²=+0.44, Policy:  2.59) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 52/100 | Total Loss:   2.59 (R²=+0.44, Policy:  2.58) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 53/100 | Total Loss:   2.59 (R²=+0.44, Policy:  2.57) | Val-R²=+0.31 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 54/100 | Total Loss:   2.58 (R²=+0.44, Policy:  2.57) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099
+Epoche 55/100 | Total Loss:   2.58 (R²=+0.44, Policy:  2.56) | Val-R²=+0.32 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099  🟡 POLICY-PLATEAU
+Epoche 56/100 | Total Loss:   2.57 (R²=+0.44, Policy:  2.56) | Val-R²=+0.31 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.099  🟡 POLICY-PLATEAU
+Epoche 57/100 | Total Loss:   2.57 (R²=+0.44, Policy:  2.56) | Val-R²=+0.31 | Policy-Val= 2.22 | v_pred μ=+0.12 σ=0.100  🟡 POLICY-PLATEAU
+Epoche 58/100 | Total Loss:   2.56 (R²=+0.44, Policy:  2.55) | Val-R²=+0.31 | Policy-Val= 2.21 | v_pred μ=+0.12 σ=0.100  🟡 POLICY-PLATEAU
+Epoche 59/100 | Total Loss:   2.56 (R²=+0.44, Policy:  2.55) | Val-R²=+0.32 | Policy-Val= 2.22 | v_pred μ=+0.12 σ=0.100  🟡 POLICY-PLATEAU
+Epoche 60/100 | Total Loss:   2.56 (R²=+0.44, Policy:  2.54) | Val-R²=+0.31 | Policy-Val= 2.22 | v_pred μ=+0.12 σ=0.100  🟡 POLICY-PLATEAU
+
+⏹️  Early Stopping: Policy plateaut seit Epoche 55 (5 Epochen ohne Fortschritt).
+
+=======================================================
+  PHASE 2: VALUE-KALIBRIERUNG (Trunk/Policy eingefroren)
+───────────────────────────────────────────────────────
+  Kalibrierung  1/50 | Val-R²=+0.285  (bislang bester: Epoche 1)
+  Kalibrierung  2/50 | Val-R²=+0.330  (bislang bester: Epoche 2)
+  Kalibrierung  3/50 | Val-R²=+0.329  (bislang bester: Epoche 2)
+  Kalibrierung  4/50 | Val-R²=+0.326  (bislang bester: Epoche 2)
+  Kalibrierung  5/50 | Val-R²=+0.322  (bislang bester: Epoche 2)
+  Kalibrierung  6/50 | Val-R²=+0.321  (bislang bester: Epoche 2)
+  Kalibrierung  7/50 | Val-R²=+0.322  (bislang bester: Epoche 2)
+  Kalibrierung  8/50 | Val-R²=+0.323  (bislang bester: Epoche 2)
+  Kalibrierung  9/50 | Val-R²=+0.320  (bislang bester: Epoche 2)
+  Kalibrierung 10/50 | Val-R²=+0.319  (bislang bester: Epoche 2)
+  ⏹️  Kalibrierung gestoppt: Val-R² seit Epoche 2 nicht mehr verbessert (Bestwert 0.330).
+  ✅ Value-Head auf besten Kalibrierungs-Stand zurückgesetzt (Epoche 2, Val-R²=0.330).
+=======================================================
+
+=======================================================
+  TRAINING SUMMARY
+=======================================================
+  Epochen:       100
+  Züge:          2,323,860  (+258,887 Val, nie trainiert)
+  Batches/Epoche:9077
+───────────────────────────────────────────────────────
+  Policy Loss:   2.5430 / 6.18 max  (41.2%)  🟠 Schwaches Signal
+  Policy Val-Loss: 2.2150  (Gap ggü. Train: -0.3279)
+  Value Loss:    0.0131  (R²=0.41 ggü. Mittelwert-Baseline)  🟡 Gut
+  Value Val-R²:  0.33  (Gap ggü. Train: +0.08)  🟢 Train/Val nah beieinander
+───────────────────────────────────────────────────────
+  ℹ️  Phase 1 Val-R² war in Epoche 2 am besten (0.34), danach Überfitten (normal — Value trainiert bewusst bis zum Ende mit).
+  🎯 Phase 2 (Value-Kalibrierung): bester Stand nach Epoche 2, Val-R²=0.33 — Wert oben spiegelt diesen kalibrierten Value-Head wider.
+  ⏹️  Early Stopping (Policy-Plateau) nach Epoche 60/100
+  🟡 Plateau ab Epoche 55.
+     → Für nächste Generation: mehr Sims im Self-Play.
+=======================================================
+
+=======================================================
+  NETZAUSLASTUNG (Hidden Size: 512)
+───────────────────────────────────────────────────────
+  Schicht          Dead   Aktiv-Rate        Eff.Rank
+  ───────────────────────────────────────────────────
+  layer1     0/512 (0%)          40%   219/512 (43%)
+  layer2     0/512 (0%)          40%   202/512 (39%)
+  layer3    67/512 (13%)          18%   147/512 (29%)
+  ───────────────────────────────────────────────────
+  🟢 Gesunde Auslastung (Dead 4%, Rank 37%).
+=======================================================
+
+✅ Training beendet! Neues Model gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v6.pth
+📈 Loss-Verlauf gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v6_loss.png
+✅ Exportiert: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v6.onnx  (input=684, hidden=512, value_hidden=64, opset=13)
+📎 Referenz für Rust-Parität: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v6.onnx.ref.txt
+
+=======================================================
+  STUFE 1 vs. STUFE 2 (max. 100 Spiele, 200 Sims, Early-Stop)
+───────────────────────────────────────────────────────
+🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️
+  v6(Stufe1) (Brett 0, 200 Sims, c_puct=1.5, Stufe 1/DFS-Blatt) vs v6(Stufe2) (Brett 1, 200 Sims, c_puct=1.5, Stufe 2/Netz-Value-Blatt) — 100 Spiele  [SPRT p1=0.64, α=0.05, β=0.1]
+--------------------------------------------------
+  #  1/100:  26:0   -> v6(Stufe1)             | Züge 161 | LLR_A +0.25 | LLR_B -0.33 | ΔElo~+120 | Stand v6(Stufe1) 1:0 v6(Stufe2) | Elo 1016/984
+  #  2/100:  47:31  -> v6(Stufe1)             | Züge 158 | LLR_A +0.49 | LLR_B -0.66 | ΔElo~+191 | Stand v6(Stufe1) 2:0 v6(Stufe2) | Elo 1031/969
+  #  3/100:  28:0   -> v6(Stufe1)             | Züge 155 | LLR_A +0.74 | LLR_B -0.99 | ΔElo~+241 | Stand v6(Stufe1) 3:0 v6(Stufe2) | Elo 1044/956
+  #  4/100:  30:21  -> v6(Stufe1)             | Züge 163 | LLR_A +0.99 | LLR_B -1.31 | ΔElo~+280 | Stand v6(Stufe1) 4:0 v6(Stufe2) | Elo 1056/944
+  #  5/100:  36:37  -> v6(Stufe2)             | Züge 156 | LLR_A +0.66 | LLR_B -1.07 | ΔElo~+159 | Stand v6(Stufe1) 4:1 v6(Stufe2) | Elo 1035/965
+  #  6/100:  37:4   -> v6(Stufe1)             | Züge 161 | LLR_A +0.91 | LLR_B -1.40 | ΔElo~+191 | Stand v6(Stufe1) 5:1 v6(Stufe2) | Elo 1048/952
+  #  7/100:  23:0   -> v6(Stufe1)             | Züge 165 | LLR_A +1.15 | LLR_B -1.72 | ΔElo~+218 | Stand v6(Stufe1) 6:1 v6(Stufe2) | Elo 1060/940
+  #  8/100:  37:51  -> v6(Stufe2)             | Züge 165 | LLR_A +0.82 | LLR_B -1.48 | ΔElo~+147 | Stand v6(Stufe1) 6:2 v6(Stufe2) | Elo 1039/961
+  #  9/100:  28:6   -> v6(Stufe1)             | Züge 170 | LLR_A +1.07 | LLR_B -1.81 | ΔElo~+170 | Stand v6(Stufe1) 7:2 v6(Stufe2) | Elo 1051/949
+  # 10/100:  53:7   -> v6(Stufe1)             | Züge 156 | LLR_A +1.32 | LLR_B -2.13 | ΔElo~+191 | Stand v6(Stufe1) 8:2 v6(Stufe2) | Elo 1062/938
+  # 11/100:  23:41  -> v6(Stufe2)             | Züge 166 | LLR_A +0.99 | LLR_B -1.89 | ΔElo~+141 | Stand v6(Stufe1) 8:3 v6(Stufe2) | Elo 1041/959
+  # 12/100:  43:19  -> v6(Stufe1)             | Züge 154 | LLR_A +1.24 | LLR_B -2.22 | ΔElo~+159 | Stand v6(Stufe1) 9:3 v6(Stufe2) | Elo 1053/947
+  # 13/100:  60:17  -> v6(Stufe1)             | Züge 156 | LLR_A +1.48 | LLR_B -2.54 | ΔElo~+176 | Stand v6(Stufe1) 10:3 v6(Stufe2) | Elo 1064/936
+  # 14/100:  75:35  -> v6(Stufe1)             | Züge 158 | LLR_A +1.73 | LLR_B -2.54 | ΔElo~+191 | Stand v6(Stufe1) 11:3 v6(Stufe2) | Elo 1074/926
+  # 15/100:  17:11  -> v6(Stufe1)             | Züge 159 | LLR_A +1.98 | LLR_B -2.54 | ΔElo~+205 | Stand v6(Stufe1) 12:3 v6(Stufe2) | Elo 1084/916
+  # 16/100:  43:0   -> v6(Stufe1)             | Züge 160 | LLR_A +2.22 | LLR_B -2.54 | ΔElo~+218 | Stand v6(Stufe1) 13:3 v6(Stufe2) | Elo 1093/907
+  # 17/100:  39:6   -> v6(Stufe1)             | Züge 160 | LLR_A +2.47 | LLR_B -2.54 | ΔElo~+230 | Stand v6(Stufe1) 14:3 v6(Stufe2) | Elo 1101/899
+  # 18/100:  55:0   -> v6(Stufe1)             | Züge 164 | LLR_A +2.72 | LLR_B -2.54 | ΔElo~+241 | Stand v6(Stufe1) 15:3 v6(Stufe2) | Elo 1109/891
+  # 19/100:  36:8   -> v6(Stufe1)             | Züge 156 | LLR_A +2.96 | LLR_B -2.54 | ΔElo~+251 | Stand v6(Stufe1) 16:3 v6(Stufe2) | Elo 1116/884
+  ⏹️  SPRT-Entscheid nach 19 Spielen: v6(Stufe1) signifikant staerker (LLR_A=+2.96, LLR_B=-2.54).
+--------------------------------------------------
+🏆 ERGEBNIS: v6(Stufe1) 16:3 v6(Stufe2) (84% A-Siege) in 374.8s (0.1 Spiele/s)  [vorzeitig nach 19/100 Spielen]
+   Ø Score: v6(Stufe1) 38.7 | v6(Stufe2) 15.5
+   0:0-Spiele: 0/19 (0.0%)
+   Elo: v6(Stufe1) 1116 | v6(Stufe2) 884
+=======================================================
+Mon Jul 13 18:03:23     2026 FERTIG.
