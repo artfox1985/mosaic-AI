@@ -131,9 +131,10 @@ diesem Wert.
   ersetzt die alte 0:0-Raten-Sonde: dasselbe Netz tritt in einer echten Partie
   gegen sich selbst an (Stufe 1 vs. Stufe 2), max. 50 Spiele, mit Early-Stop.
 - **Arena-Early-Stop** (`arena.py::early_stop_wins_needed`): bricht ab,
-  sobald eine Seite ab Spiel 10 mit 95%-Signifikanz (z=1.96,
-  `ceil(0.5·(n+1.96·√n))` Siege) vorne liegt — spart Zeit bei eindeutigen
-  Matchups, ohne bei knappen Ergebnissen zu früh abzubrechen.
+  sobald eine Seite ab Spiel 40 (Mindestanzahl angehoben, da das 95%-Quartil
+  bei weniger Spielen nicht vertrauenswürdig genug ist) mit 95%-Signifikanz
+  (z=1.96, `ceil(0.5·(n+1.96·√n))` Siege) vorne liegt — spart Zeit bei
+  eindeutigen Matchups, ohne bei knappen Ergebnissen zu früh abzubrechen.
 - **`net_vs_net_arena_match`**: `dfs_leaf_a`/`dfs_leaf_b` getrennt wählbar
   (z.B. Stufe 1 vs. Stufe 2 in derselben Partie, nicht nur global pro Match).
 - **`mcts.rs`/`net_mcts.rs`**: strukturell identische Teile (Force-Reply-
