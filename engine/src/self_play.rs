@@ -1132,9 +1132,10 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     c_puct: f64,
     leaf: LeafEval,
     rng: &mut R,
+    add_root_noise: bool,
 ) -> (Action, Vec<Value>) {
     let sims = dynamic_sims(base_sims, actions.len());
-    let stats = net_root_child_stats(net, state, sims, c_puct, true, leaf, rng); // (Action, visits, q)
+    let stats = net_root_child_stats(net, state, sims, c_puct, add_root_noise, leaf, rng); // (Action, visits, q)
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
@@ -1164,6 +1165,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     first_player: usize,
     game_id: &str,
     rng: &mut R,
+    add_root_noise: bool,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
@@ -1195,7 +1197,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
                         (a, vec![e])
                     } else {
-                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, leaf, rng)
+                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, leaf, rng, add_root_noise)
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
@@ -1249,6 +1251,7 @@ pub fn run_net_self_play(
     num_threads: usize,
     dfs_leaf: bool,
     prefix: &str,
+    add_root_noise: bool,
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
     let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
@@ -1260,7 +1263,7 @@ pub fn run_net_self_play(
         let first = rng.random_range(0..2usize);
         let names = ["Netz".to_string(), "Netz".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_net_self_play_game(&net, base_sims, c_puct, leaf, ids, names, first, &gid, &mut rng)
+        play_net_self_play_game(&net, base_sims, c_puct, leaf, ids, names, first, &gid, &mut rng, add_root_noise)
     };
 
     let all: Vec<Vec<Value>> = if num_threads == 0 {
