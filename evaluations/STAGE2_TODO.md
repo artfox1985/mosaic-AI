@@ -51,51 +51,51 @@ Zwei parallele Spuren — Spur A treibt die eigentliche Spielstärke voran
 ### Spur A: v7 — Champion v2 endlich herausfordern
 
 Stufe 1 ("+2000 Spiele") ist nach vier Fehlversuchen (v3-v6) empirisch
-ausgereizt (siehe oben) — **v7 kombiniert Stufe 2 (Ausdünnen) UND Stufe 3
-(mehr Sims) direkt**, statt sie einzeln nacheinander zu probieren (spart
-eine ganze Iteration, falls "nur ausdünnen" allein auch nicht gereicht
-hätte):
+ausgereizt (siehe oben). **Sims-Erhöhung wurde verworfen** (siehe unten,
+"Verworfene Idee") — v7 testet stattdessen ISOLIERT nur eine einzige neue
+Variable: ein bewusst kontrolliertes, unverwässertes Fenster, ohne
+Sims-Änderung. Kein neues Self-Play nötig — genug `v2`-Spiele liegen
+bereits vor, es muss nur kuratiert werden:
 
-1. **Fenster ausdünnen — konkret in `data/` (nicht nur konzeptionell):**
+1. **Fenster kuratieren — konkret in `data/` (nicht nur konzeptionell):**
    `train.py` lädt beim Training ALLE `.pkl`-Dateien aus `data/` ohne
-   Filterung (siehe Nebenbefund oben) — Ausdünnen heißt hier also: Dateien
-   PHYSISCH aus `data/` entfernen (z.B. in einen Archiv-Ordner verschieben,
-   nicht loeschen), nicht nur eine Zahl in der Doku anpassen.
-   - Die anfängliche Heuristik-/`v1c`-Beimischung raus (`selfplay_s400_*`,
-     `selfplay_v1c_*`, je ~100 Dateien).
-   - Den `v2`-Selfplay-Berg (aktuell 1135 Dateien, ~11.350 Spiele) auf ein
-     handhabbares Maß kürzen — z.B. die 600 neuesten (per Timestamp im
-     Dateinamen) behalten, den Rest archivieren.
-   - `selfplay_v2s2_*` (die 4000 Stufe-2-Bootstrapping-Spiele aus v6):
-     behalten oder raus — offene Entscheidung, da v6 damit nicht gewonnen
-     hat; default: raus, da Spur A jetzt bewusst bei Stufe 1 bleibt.
-   - **Vor dem v7-Training außerdem prüfen**: keine Diagnose-Daten aus Spur B
-     (`selfplay_v2s2det_*`) mehr in `data/`, sobald deren Auswertung
-     abgeschlossen ist — sonst fließen sie unbeabsichtigt mit ein.
-   - Direkt danach `ls data/*.pkl | wc -l` gegenchecken, BEVOR `train.py`
-     läuft — die Anzahl muss zur beabsichtigten Fenstergröße passen.
-2. **Neue Champion-Runde mit erhöhten Sims**: 2000 frische Self-Play-Spiele
-   von `v2`, Stufe 1, **`--sims 800`** (statt 400) —
-   `python self_play.py --mode network --model alphazero_v2.onnx --stage 1 --games 2000 --sims 800 --version v2`.
-3. Zielfenster: ~8000-10.000 Spiele, jetzt mit höherem Anteil an
-   800-Sims-Qualität statt immer mehr 400-Sims-Volumen.
-4. Training: `python train.py --name v7 --epochs 100 --load v2` (wie
-   bisher, Warm-Start vom Champion).
-5. Gate: `run_net_vs_net(v7, v2, stage=1, games=100)` — SPRT-Entscheid.
-6. **Trigger-Regel für danach** (damit nicht wieder 4x dasselbe Rezept ohne
-   Kurskorrektur läuft):
-   - **v7 gewinnt** (H1a): v7 wird neuer Champion, Zyklus geht normal weiter
-     (v8 mit v7 als Basis, zurück zu Stufe 1 "+2000 Spiele" für die naechste
-     Runde).
-   - **v7 "Gleich stark"**: Sims nochmal erhöhen (1600) für v8 UND
-     ernsthaft prüfen, ob v2 schlicht ein sehr stabiles lokales Optimum ist,
-     das mit diesem Rezept (Warm-Start, gleiche Architektur) nicht mehr zu
-     verbessern ist — dann Kurswechsel erwägen (z.B. Cold-Start statt
-     Warm-Start für einen Kandidaten, oder größeres Netz).
-   - **v7 verliert klar** (H1b, v2 gewinnt signifikant): würde bedeuten,
-     mehr Sims UND Ausdünnen haben geschadet (z.B. zu aggressiv ausgedünnt,
-     zu wenig Spiele) — dann Fenstergröße für v8 wieder anheben, aber Sims
-     auf 800 belassen.
+   Filterung (siehe Nebenbefund oben) — kuratieren heißt hier also: Dateien
+   PHYSISCH aus `data/` entfernen (Archiv-Ordner, nicht löschen).
+   - Raus: `selfplay_v1c_*`, `selfplay_s400_*` (alt, vor `v2`),
+     `selfplay_v2s2_*` (Stufe-2-Bootstrapping, half v6 nicht, nicht Teil
+     von Spur A), `selfplay_v2s2det_*` (Spur-B-Diagnosedaten).
+   - `v2`-Pile (aktuell 1135 Dateien) auf ~800 Dateien (8000 Spiele)
+     eindampfen — beliebige Teilmenge, da `v2` als Policy unveraendert ist,
+     alle Spiele gleichwertig.
+   - **Nutzer bereitet `data/` vor** (Stand: läuft).
+   - Danach `ls data/*.pkl | wc -l` gegenchecken, BEVOR `train.py` läuft.
+2. Training: `python train.py --name v7 --epochs 100 --load v2` (wie
+   bisher, Warm-Start vom Champion) — **keine neuen Self-Play-Spiele, keine
+   Sims-Änderung**, ausschließlich das kuratierte ~8000-Spiele-Fenster.
+3. Gate: `run_net_vs_net(v7, v2, stage=1, games=100)` — SPRT-Entscheid.
+4. **Trigger-Regel für danach:**
+   - **v7 gewinnt** (H1a): v7 wird neuer Champion, Zyklus geht normal weiter.
+   - **v7 "Gleich stark"**: zeigt, dass reine Fenster-Kontrolle (ohne
+     Kontamination) allein nicht reicht — dann ernsthaft Kurswechsel
+     erwägen (z.B. Cold-Start statt Warm-Start testen, um zu prüfen, ob der
+     Warm-Start selbst der limitierende Faktor ist), bevor überhaupt an
+     Sims gedacht wird.
+   - **v7 verliert klar** (H1b): würde bedeuten, das ausgedünnte Fenster war
+     zu klein/einseitig — Fenstergröße vorsichtig wieder anheben.
+
+**Verworfene Idee: Sims auf 800-3200 erhöhen.** `dynamic_sims(base,
+num_actions) = clamp(base + √actions·25, base, base·5)` addiert nur einen
+von der Aktionszahl abhängigen Zuschlag zur `base` — sie skaliert NICHT
+relativ zur Basis. Eine höhere `base` verteuert JEDEN Zug gleichermaßen
+(nicht nur komplexe Situationen), und die ohnehin schon teuren frühen
+Runden (mehr Optionen) würden zusätzlich noch den vollen höheren Sockel
+obendrauf bekommen — überproportionale Laufzeit-Explosion ausgerechnet
+dort, wo die Stufe-2-Untersuchung gar kein Problem gefunden hat (die
+Schwäche zeigt sich eher bei bodenlastigen/späten Entscheidungen). Ohne
+jede Evidenz, dass eine Sims-Erhöhung das eigentliche Plateau (vier
+Kandidaten, vier verschiedene Fenster, immer "Gleich stark") überhaupt
+adressiert, ist das kein guter erster Test — Fenster-Kontrolle isoliert zu
+testen ist billiger und aussagekräftiger.
 
 ### Spur B: Stufe-2-Ursachenforschung — inhaltlich abgeschlossen
 
@@ -288,15 +288,19 @@ diesem Wert.
 - **Eskalationsstufen bei erfolglosem Kandidaten, ab jetzt in dieser
   Reihenfolge (Stufe 1 gilt als verbraucht):**
   1. ~~+2000 Spiele~~ — **4x versucht (v3-v6), 4x erfolglos. Nicht mehr
-     wiederholen, bevor nicht Stufe 2 oder 3 probiert wurde.**
-  2. **Fenster ausdünnen**: alte, vorreset-fremde Spiele (die anfängliche
-     Heuristik-/v1c-Beimischung, die seit dem Reset in jedem Fenster
-     mitgeschleppt wird) rauswerfen, nur noch aktuelle Champion-Qualität +
-     eine begrenzte, frische Champion-Runde behalten. Ziel: zurück auf
-     ~10.000-12.000 Spiele, aber mit höherem Anteil aktueller Qualität statt
-     immer mehr Gesamtvolumen.
-  3. **Sims für neue Champion-Runden erhöhen** (z. B. 800 statt 400) — ein
-     echter Qualitätsgewinn (verbessert die Suche selbst), teuerste Stufe.
+     wiederholen, bevor nicht Stufe 2 probiert wurde.**
+  2. **Fenster kuratieren** (v7, laufend): alte, vorreset-fremde Spiele
+     sowie die Stufe-2-Bootstrapping-Beimischung rauswerfen, nur noch
+     kuratierte `v2`-Champion-Qualität behalten (~8000 Spiele) — kein neues
+     Self-Play nötig, genug liegt bereits vor.
+  3. **Sims erhöhen — zurückgestellt, keine Evidenz dafür**: `dynamic_sims`
+     skaliert nicht relativ zur Basis (siehe Masterplan Spur A, "Verworfene
+     Idee") — eine höhere Basis würde JEDEN Zug (nicht nur komplexe
+     Situationen) verteuern und die ohnehin teuren frühen Runden
+     überproportional treffen, ohne dass wir Evidenz haben, dass das
+     eigentliche Plateau (v3-v6 alle "Gleich stark") daran liegt. Nur
+     erwägen, falls Stufe 2 (kuratiertes Fenster) ebenfalls scheitert, UND
+     dann mit klarer Kosten-Nutzen-Abwägung, nicht blind.
 
 ## Value-Target-Formel (`engine/py/neural_net.py`, `VALUE_SCHEMA_VERSION=9`)
 
@@ -343,8 +347,10 @@ kein weiterer Sweep nötig.
 
 ## Offene Punkte
 
-- **v7 (Spur A des Masterplans) noch nicht gestartet** — Fenster ausdünnen +
-  Sims auf 800 erhöhen, dann trainieren und gegen v2 testen.
+- **v7 (Spur A des Masterplans):** Nutzer kuratiert gerade `data/` (altes/
+  Stufe-2-Material raus, `v2`-Pile auf ~8000 Spiele eindampfen). Sobald
+  fertig: `train.py --name v7 --epochs 100 --load v2`, kein neues Self-Play,
+  keine Sims-Änderung, dann Gate gegen v2.
 - **Stufe-2-Ursachenforschung (Spur B) inhaltlich abgeschlossen** (siehe
   `evaluations/stage2_investigation.md`): 0:0-Rate ist ein Score-Klemm-
   Mechanik-Effekt; Stufe 2 hat real ~7% davon (rauschfrei, zweifach
