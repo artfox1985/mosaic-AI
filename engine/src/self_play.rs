@@ -1123,7 +1123,11 @@ pub fn run_net_vs_net_arena(
 
 /// Drafting-Policy aus der Netz-PUCT: Target = ROHE Visit-Verteilung N/ΣN
 /// (kein q²/Schärfen — die Schärfe kommt aus der Suchtiefe). Gespielte Aktion ~
-/// Visits (τ=1, Exploration; plus Dirichlet-Wurzel-Noise in der Suche).
+/// Visits (τ=1, Exploration; plus Dirichlet-Wurzel-Noise in der Suche) --
+/// AUSSER `deterministic=true`: dann wird wie in der Arena immer der
+/// meistbesuchte Zug gespielt (kein Sampling). Nur fuer Diagnose-Zwecke
+/// (siehe evaluations/stage2_investigation.md) -- normales Self-Play nutzt
+/// weiterhin Sampling fuer Trainingsdaten-Vielfalt.
 fn net_drafting_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -1133,6 +1137,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     leaf: LeafEval,
     rng: &mut R,
     add_root_noise: bool,
+    deterministic: bool,
 ) -> (Action, Vec<Value>) {
     let sims = dynamic_sims(base_sims, actions.len());
     let stats = net_root_child_stats(net, state, sims, c_puct, add_root_noise, leaf, rng); // (Action, visits, q)
@@ -1147,8 +1152,17 @@ fn net_drafting_policy<R: Rng + ?Sized>(
             json!({ "action": action_to_env_dict(state, a), "prob": (*v as f64) / total })
         })
         .collect();
-    let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
-    let idx = weighted_index(&weights, total, rng);
+    let idx = if deterministic {
+        stats
+            .iter()
+            .enumerate()
+            .max_by(|(_, (_, v1, _)), (_, (_, v2, _))| v1.cmp(v2))
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    } else {
+        let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
+        weighted_index(&weights, total, rng)
+    };
     (stats[idx].0.clone(), policy)
 }
 
@@ -1166,6 +1180,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     game_id: &str,
     rng: &mut R,
     add_root_noise: bool,
+    deterministic: bool,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
@@ -1197,7 +1212,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
                         (a, vec![e])
                     } else {
-                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, leaf, rng, add_root_noise)
+                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, leaf, rng, add_root_noise, deterministic)
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
@@ -1252,6 +1267,7 @@ pub fn run_net_self_play(
     dfs_leaf: bool,
     prefix: &str,
     add_root_noise: bool,
+    deterministic: bool,
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
     let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
@@ -1263,7 +1279,7 @@ pub fn run_net_self_play(
         let first = rng.random_range(0..2usize);
         let names = ["Netz".to_string(), "Netz".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_net_self_play_game(&net, base_sims, c_puct, leaf, ids, names, first, &gid, &mut rng, add_root_noise)
+        play_net_self_play_game(&net, base_sims, c_puct, leaf, ids, names, first, &gid, &mut rng, add_root_noise, deterministic)
     };
 
     let all: Vec<Vec<Value>> = if num_threads == 0 {

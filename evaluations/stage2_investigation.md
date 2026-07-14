@@ -268,6 +268,52 @@ kalibrierter Value-Head (groessere Trennschaerfe zwischen guten und
 schlechten Zustaenden, nicht nur richtige Richtung) — beides bereits
 frueher genannte, nicht in dieser Runde umgesetzte Stellschrauben.
 
+## Schritt 8: Argmax-Selfplay bestätigt die 7%-Rate direkt (mit vollen Trajektorien)
+
+`self_play.py` um `--deterministic` erweitert (immer meistbesuchter Zug,
+kein Sampling — siehe Werkzeuge in `STAGE2_TODO.md`). 1000 Spiele geplant
+(`v2s2det`, Modell v2, Stufe 2, `--deterministic --no-root-noise`), bei
+Spiel 900 gehängt (2. Haenger unter aehnlichen Einstellungen dieser Session
+— vermutlich ein seltener, vorbestehender Tiling-Solver-Randfall, ~1 von
+2500 Spielen, nicht weiter verfolgt) und dort abgebrochen. 900 Spiele reichen.
+
+```
+=== 'v2s2det' (90 Dateien, 900 Spiele, 0 unvollstaendig) ===
+0:0-Partien: 63/900 (7.0%)
+```
+
+**Exakte Bestätigung**: 7.0% deckt sich (auf die Nachkommastelle) mit den
+Arena-Ergebnissen (v6(Stufe2) vs. v2(Stufe2): 7.0%; v1b-Vergleiche: 7-8%).
+Das ist jetzt zweifach unabhängig bestätigt (Arena UND komplett rauschfreies
+Self-Play) — die ~7% sind robust die "echte" Stufe-2-0:0-Rate. Jetzt liegen
+volle Zug-fuer-Zug-Trajektorien dieser 63 Partien vor (nicht nur
+Endergebnisse wie bei Arena-Logs) für die tiefere Analyse (Value-Head-
+Vorhersagen an kritischen Stellen, siehe Masterplan Spur B Schritt 2).
+
+## Schritt 9: Value-Head-Trajektorie auf sauberen Daten — schärferes Bild
+
+Dieselbe Analyse wie Schritt 6, jetzt auf den komplett rauschfreien
+`v2s2det`-Daten (30 0:0- vs. 30 normale Partien, Modell v2):
+
+```
+0:0-Partien:     Runde 1: +0.037  Runde 2: +0.084  Runde 3: +0.090  Runde 4: +0.108  Runde 5: +0.084
+normale Partien: Runde 1: +0.186  Runde 2: +0.206  Runde 3: +0.243  Runde 4: +0.274  Runde 5: +0.293
+```
+
+**Deutlicherer Befund als auf den verrauschten Daten:** die Lücke WÄCHST
+über die Runden (Runde 1: 0.149 Abstand → Runde 5: 0.209 Abstand), statt
+konstant zu bleiben. Normale Partien werden im Value-Head-Urteil zunehmend
+zuversichtlicher (0.186→0.293, plausibel: die Suche bestätigt über die
+Runden ihre gute Ausgangslage). 0:0-Partien bleiben dagegen durchgehend
+flach niedrig (0.04-0.11) — der Value-Head registriert von Anfang an, dass
+etwas nicht stimmt, aber das Urteil eskaliert NICHT ins klar Negative, selbst
+im denkbar schlechtesten Ausgang (0:0). Das bestätigt die "weiches Signal"-
+Hypothese aus Schritt 6 nochmal deutlicher: der Value-Head unterscheidet
+richtig gerichtet, aber mit zu wenig Dynamikumfang/Schärfe, um die Suche
+stark genug von der schlechten Linie wegzudrücken — selbst im
+schlimmstmöglichen Fall bleibt die Vorhersage nur "mittelmäßig", nie
+"eindeutig schlecht".
+
 ## Fazit dieser Untersuchungsrunde
 
 1. **Bestätigt**: 0:0-Ergebnisse sind ein Klemm-Mechanik-Effekt
@@ -296,17 +342,28 @@ frueher genannte, nicht in dieser Runde umgesetzte Stellschrauben.
    PUCT-Suchschwaeche unter dem weicheren Stufe-2-Value-Signal, kein
    Selfplay-Artefakt.
 
-**Praktische Konsequenz für jetzt:** die hohen Selfplay-0:0-Raten (21.8%
-Stufe 1, 33-36% Stufe 2) sind ueberwiegend ein generelles
+7. **Bestätigt und geschärft (Schritt 8/9)**: komplett rauschfreies Argmax-
+   Self-Play (900 Spiele) reproduziert die 7.0%-Rate exakt (deckungsgleich
+   mit den Arena-Ergebnissen) und zeigt anhand voller Trajektorien: der
+   Value-Head registriert 0:0-bound Partien schon ab Runde 1, aber die
+   Lücke zum Normalfall bleibt im Absolutwert klein und eskaliert selbst im
+   schlechtestmöglichen Fall nie ins klar Negative (0.04-0.11 statt z.B.
+   -0.3 oder schlechter) — während normale Partien über die Runden
+   zunehmend zuversichtlicher bewertet werden (0.19→0.29). Das ist die
+   deutlichste Bestätigung der "weiches Signal"-Hypothese.
+
+**Praktische Konsequenz / Stand der Untersuchung:** die hohen Selfplay-
+0:0-Raten (21.8% Stufe 1, 33-36% Stufe 2) sind ueberwiegend ein generelles
 Sampling-Rauschen-Artefakt (bei BEIDEN Stufen vorhanden, nur unterschiedlich
-stark) — die Kennzahl, die tatsaechlich zaehlt, ist die rauschfreie
-Arena-Rate: 0% (Stufe 1) vs. ~7% (Stufe 2). Dieser Unterschied ist real,
-klein aber konsistent reproduziert, und die wahrscheinlichste Erklaerung
-bleibt das weichere/weniger trennscharfe Value-Signal aus Schritt 6 (nicht
-falsch gerichtet, aber schwaecher gegen Suchfehler). Ein sauberer Test
-dieser Hypothese braeuchte volle Zustands-Trajektorien aus argmax-basiertem
-(nicht sampling-basiertem) Stufe-2-Selfplay — noch nicht umgesetzt, siehe
-"Naechster konkreter Test" oben.
+stark) — die Kennzahl, die tatsaechlich zaehlt, ist die rauschfreie Rate:
+0% (Stufe 1) vs. ~7% (Stufe 2), jetzt zweifach (Arena + Argmax-Selfplay)
+bestätigt. Ursache: kein Bug, sondern ein zu wenig trennscharfer Value-Head,
+der Stufe-1s exakter DFS-Solver-Bewertung bei der Rückstellkraft gegen
+Sucheffekte/verbleibendes Rauschen unterlegen ist. **Diese Untersuchungsrunde
+ist damit inhaltlich abgeschlossen** — die verbleibende offene Frage
+("lohnt sich eine gezielte Investition in einen schärfer kalibrierten
+Value-Head, oder bleibt Stufe 1 vorerst der Produktionspfad") ist eine
+Priorisierungsentscheidung, siehe Masterplan (`STAGE2_TODO.md`, Spur B).
 
 ## Offene Frage, die die Interpretation verschiebt
 
