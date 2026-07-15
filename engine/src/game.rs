@@ -268,6 +268,57 @@ fn current_player_can_move(state: &GameState) -> bool {
         || !generate_bonus_chip_moves(state).is_empty()
 }
 
+/// Schreibt den kompletten Event-Log plus Diagnose-Kopf nach
+/// `static/log/CRASH_dome_deadlock_<unix_ts>.log` und bricht den Prozess ab.
+/// Wird nur aufgerufen, wenn die Invariante "beide Spieler nutzen pro Runde
+/// (ausser Runde 5) exakt 2 Kuppel-Tokens" verletzt wird -- siehe
+/// `check_drafting_complete`. Das darf laut Spielregel nie vorkommen; ein
+/// stiller Rundenabschluss würde Trainingsdaten/Self-Play mit einem
+/// regelwidrigen Zustand verseuchen, deshalb harter Abbruch statt Fallback.
+fn panic_on_dome_deadlock(state: &GameState) -> ! {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let dir = std::path::Path::new("static/log");
+    let _ = std::fs::create_dir_all(dir);
+    let path = dir.join(format!("CRASH_dome_deadlock_{ts}.log"));
+
+    let mut body = String::new();
+    body.push_str("# MOSAIC CRASH DUMP: Kuppel-Deadlock (Invariante verletzt)\n");
+    body.push_str(&format!(
+        "# Runde {}: kein Spieler kann mehr handeln, obwohl nicht beide Spieler ihre \
+         2 Kuppel-Tokens verbraucht haben (ausserhalb Runde 5 sollte das nie passieren).\n",
+        state.round_number
+    ));
+    for (i, p) in state.players.iter().enumerate() {
+        body.push_str(&format!(
+            "# Spieler {i} ({}): tokens_used={}, dome_tiles_placed_this_round={}, freie Slots={}\n",
+            p.name,
+            p.player_tokens_used,
+            p.dome_tiles_placed_this_round,
+            p.dome_grid.empty_slots().len()
+        ));
+    }
+    body.push_str(&format!(
+        "# Display: {} Kacheln, Stapel: {} Kacheln\n",
+        state.dome_display.len(),
+        state.dome_tile_pool.len()
+    ));
+    body.push_str("# ============================================================\n");
+    body.push_str(&state.log.join("\n"));
+    body.push('\n');
+    let _ = std::fs::write(&path, &body);
+
+    panic!(
+        "Kuppel-Deadlock in Runde {}: kein Spieler kann mehr ziehen, obwohl noch Kuppel-Tokens \
+         offen sind (ausser Runde 5 darf das nie passieren). Log gespeichert unter: {}",
+        state.round_number,
+        path.display()
+    );
+}
+
 /// Port von round_end.check_drafting_complete. Braucht &mut, um current_player
 /// temporär für die Pro-Spieler-Prüfung zu setzen (danach wiederhergestellt).
 pub fn check_drafting_complete(state: &mut GameState) -> bool {
@@ -307,7 +358,10 @@ pub fn check_drafting_complete(state: &mut GameState) -> bool {
         }
     }
     state.current_player = orig;
-    !anyone
+    if !anyone {
+        panic_on_dome_deadlock(state);
+    }
+    false
 }
 
 // ── Startkuppel-Platzierung ───────────────────────────────────────────────────
@@ -710,6 +764,14 @@ mod tests {
         game.state.large_factory.has_first_player_marker = false;
         game.state.dome_tile_pool.clear();
         game.state.dome_display.clear();
+        // Fixture simuliert "beide Spieler haben ihre 2 Kuppel-Tokens diese
+        // Runde schon anderweitig verbraucht" -- sonst wuerde
+        // check_drafting_complete() jetzt (korrekt) einen Kuppel-Deadlock
+        // erkennen und abbrechen, statt die Runde zu beenden.
+        for p in game.state.players.iter_mut() {
+            p.player_tokens_used = 2;
+            p.dome_tiles_placed_this_round = 2;
+        }
 
         game.check_phase_transition();
 

@@ -77,7 +77,7 @@ impl crate::search_common::SearchNode for Node {
 /// Strafleiste noch anrichtet. NICHT identisch mit dem `estimated_score` der
 /// UI (`serialize.rs`) — der bleibt bewusst rein am real erreichbaren
 /// Rundenscore, ohne diese beiden Suche-only-Korrekturterme.
-fn player_total(state: &GameState, pi: usize) -> f64 {
+pub(crate) fn player_total(state: &GameState, pi: usize) -> f64 {
     solve_round_final_score(state, pi) as f64
         + wertung_progress(&state.players[pi], &state.scoring_tile_ids)
         + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64

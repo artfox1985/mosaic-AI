@@ -16,7 +16,7 @@ use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
 use crate::net::Net;
-use crate::net_mcts::{self, net_search_with_tree, LeafEval};
+use crate::net_mcts::{self, net_search_with_tree};
 use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, generate_tiling_actions, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
@@ -209,7 +209,6 @@ impl PyGame {
 
     // ── Tiling-Phase ──────────────────────────────────────────────────────────
 
-    #[pyo3(signature = (player, pattern_row, slot_row, slot_col, space_index, dome_tile_id=None, rotation=0))]
     fn apply_tiling(
         &mut self,
         player: usize,
@@ -217,13 +216,11 @@ impl PyGame {
         slot_row: usize,
         slot_col: usize,
         space_index: usize,
-        dome_tile_id: Option<usize>,
-        rotation: u32,
     ) -> PyResult<i32> {
         if self.game.state.phase != Phase::Tiling {
             return Err(PyValueError::new_err("Nicht in der Tiling-Phase."));
         }
-        let action = TilingAction { pattern_row, slot_row, slot_col, space_index, dome_tile_id, rotation };
+        let action = TilingAction { pattern_row, slot_row, slot_col, space_index };
         map_err(self.game.apply_single_tiling(player, &action))
     }
 
@@ -346,13 +343,14 @@ impl PyGame {
 
     /// Wie `ai_step_json`, aber mit dem geladenen Netz (`load_net` zuvor
     /// aufrufen) statt der Heuristik. Tiling bleibt der exakte DFS-Solver
-    /// (netzunabhängig, wie im Self-Play/Arena). `stage=1` = DFS-Blatt,
-    /// `stage=2` = Netz-Value-Blatt. Fehler, falls kein Netz geladen ist.
-    #[pyo3(signature = (simulations=200, c_puct=1.5, stage=1, log=false))]
-    fn ai_step_net_json(&mut self, simulations: u32, c_puct: f64, stage: u32, log: bool) -> PyResult<String> {
+    /// (netzunabhängig, wie im Self-Play/Arena). Blattbewertung ist immer der
+    /// exakte DFS-Solver (kein Value-Head mehr). Fehler, falls kein Netz
+    /// geladen ist.
+    #[pyo3(signature = (simulations=200, c_puct=1.5, log=false))]
+    fn ai_step_net_json(&mut self, simulations: u32, c_puct: f64, log: bool) -> PyResult<String> {
         match self.game.state.phase {
             Phase::Tiling => self.ai_tiling_step(),
-            Phase::Drafting => self.ai_drafting_net_step(simulations, c_puct, stage, log),
+            Phase::Drafting => self.ai_drafting_net_step(simulations, c_puct, log),
             other => Ok(json!({
                 "applied": false,
                 "phase": other.as_str(),
@@ -365,15 +363,14 @@ impl PyGame {
     /// Wie `ai_debug_json`, aber mit dem geladenen Netz: Analyse-Dict mit
     /// echten Netz-Priors (`net_prob`/`net_prob_norm`) UND PUCT-Such-Stats
     /// je Wurzelkind, ohne einen Zug auszuführen.
-    #[pyo3(signature = (simulations=200, c_puct=1.5, stage=1))]
-    fn ai_debug_net_json(&mut self, simulations: u32, c_puct: f64, stage: u32) -> PyResult<String> {
+    #[pyo3(signature = (simulations=200, c_puct=1.5))]
+    fn ai_debug_net_json(&mut self, simulations: u32, c_puct: f64) -> PyResult<String> {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
         })?;
-        let leaf = if stage == 2 { LeafEval::Net } else { LeafEval::Dfs };
         let sims = dynamic_sims(simulations, drafting_actions(&self.game.state).len());
         let (_chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng, None);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, None);
         Ok(analysis.to_string())
     }
 
@@ -561,7 +558,7 @@ impl PyGame {
     /// Drafting-Zug per Netz-PUCT (mit Priors+Such-Stats-Analyse). Erfordert
     /// zuvor `load_net()`. `log=true` hängt einen vollen Sim-für-Sim-Trace an
     /// (Selection/Expansion/Eval/Backprop je Simulation, analog zur Heuristik).
-    fn ai_drafting_net_step(&mut self, simulations: u32, c_puct: f64, stage: u32, log: bool) -> PyResult<String> {
+    fn ai_drafting_net_step(&mut self, simulations: u32, c_puct: f64, log: bool) -> PyResult<String> {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
         })?;
@@ -575,12 +572,11 @@ impl PyGame {
             .to_string());
         }
 
-        let leaf = if stage == 2 { LeafEval::Net } else { LeafEval::Dfs };
         let sims = dynamic_sims(simulations, actions.len());
         let mut lines: Vec<String> = Vec::new();
         let logger = if log { Some(&mut lines) } else { None };
         let (chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, leaf, &mut self.rng, logger);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, logger);
         let a = match chosen {
             Some(a) => a,
             None => {
@@ -626,17 +622,10 @@ impl PyGame {
         let pi = self.game.state.current_player;
         let optimal = solve_round_final_score(&self.game.state, pi);
         // Exakte Chip-Allokationssuche für den ECHTEN Zug (einmal pro Schritt).
-        let step = match best_first_step_exact(&self.game.state, pi) {
-            // Solver sagt `End` — aber die Engine erlaubt das nur bei leerem
-            // valid_tiling_actions. Bleiben Aktionen offen (volle Reihe nur per
-            // neuer Kuppelplatte legbar), die beste davon platzieren statt zu
-            // deadlocken (siehe self_play::best_pending_placement).
-            TilingStep::End => match best_pending_placement(&self.game.state, pi) {
-                Some(ta) => TilingStep::Place(ta),
-                None => TilingStep::End,
-            },
-            other => other,
-        };
+        // Waehrend des Tilings werden keine neuen Kuppelplatten gelegt (Regel) --
+        // liefert der Solver `End`, ist die Tiling-Phase fuer diesen Spieler
+        // wirklich zu Ende (offene volle Reihen ohne Slot bleiben liegen).
+        let step = best_first_step_exact(&self.game.state, pi);
 
         let (typ, desc, cat, mv): (&str, String, &str, Value) = match step {
             TilingStep::Place(ta) => {
@@ -703,26 +692,6 @@ impl PyGame {
     }
 }
 
-/// Beste noch ausstehende Tiling-Platzierung (inkl. Platzierung einer NEUEN
-/// Kuppelplatte für eine volle Reihe — die der DFS-Solver bewusst ausblendet).
-/// Wahl nach maximalem finalem Runden-Score. Verhindert den Deadlock, wenn der
-/// Solver `End` liefert, die Engine das Beenden aber wegen offener Aktionen
-/// (`valid_tiling_actions` ≠ ∅) verweigert.
-fn best_pending_placement(state: &crate::state::GameState, pi: usize) -> Option<TilingAction> {
-    let actions = generate_tiling_actions(state, pi);
-    let mut best: Option<(i32, TilingAction)> = None;
-    for ta in actions {
-        let mut g = Game { state: state.clone() };
-        if g.apply_single_tiling(pi, &ta).is_ok() {
-            let score = solve_round_final_score(&g.state, pi);
-            if best.as_ref().map_or(true, |(b, _)| score > *b) {
-                best = Some((score, ta));
-            }
-        }
-    }
-    best.map(|(_, ta)| ta)
-}
-
 /// Index einer Normalfarbe in `TileColor::NORMAL` (None für Wild).
 fn color_index(c: TileColor) -> Option<usize> {
     TileColor::NORMAL.iter().position(|&x| x == c)
@@ -750,43 +719,28 @@ fn sun_color_counts(state: &crate::state::GameState) -> [usize; 5] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dome::build_dome_tile_pool;
     use crate::state::setup_new_game;
     use crate::tile::TileColor::Rot;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
-    /// Deadlock-Szenario des Servers: eine volle Pattern-Reihe lässt sich NUR per
-    /// neuer Kuppelplatte (leerer Slot) komplettieren. Der DFS-Solver blendet
-    /// solche `dome_tile_id: Some(..)`-Platzierungen aus und liefert `End`, doch
-    /// `generate_tiling_actions` ist nicht-leer → die Engine verweigert `EndTiling`.
-    /// `best_pending_placement` muss die ausstehende Platzierung liefern, statt zu
-    /// deadlocken (= harter Server-Fehler).
+    /// Während des Tilings werden keine neuen Kuppelplatten gelegt (Regel): eine
+    /// volle Pattern-Reihe ohne bereits belegten passenden Slot bleibt liegen --
+    /// weder der Solver noch `generate_tiling_actions` bieten dafür eine Aktion
+    /// an. Das ist kein Deadlock (die Reihe wartet auf eine künftige
+    /// Drafting-Platzierung oder landet irgendwann auf der Strafleiste), kein
+    /// künstliches Nachziehen einer neuen Platte mehr nötig.
     #[test]
-    fn best_pending_placement_resolves_solver_end_deadlock() {
+    fn no_tiling_action_for_row_without_templated_slot() {
         let mut rng = StdRng::seed_from_u64(99);
         let mut s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
         for p in s.players.iter_mut() {
             p.start_tile_pending = false;
         }
-        // Display-Kachel akzeptiert Rot (pool[2] = [Tuerkis, Rot, Blau, Wild]).
-        let tile = build_dome_tile_pool()[2].clone();
-        s.dome_display.clear();
-        s.dome_display.push(tile);
-        // Reihe 0 (cap 1) voll mit Rot, Kuppel-Grid leer → nur per neuer Platte legbar.
+        // Reihe 0 (cap 1) voll mit Rot, Kuppel-Grid leer → keine Aktion möglich.
         s.players[0].pattern_lines[0].add_tiles(&[Rot]);
 
-        // Solver kapituliert (keine Platzierung auf bereits gefülltem Slot)...
         assert!(matches!(best_first_step_exact(&s, 0), TilingStep::End));
-        // ...aber es gibt offene Aktionen (neue Kuppelplatte).
-        assert!(!generate_tiling_actions(&s, 0).is_empty());
-
-        // best_pending_placement liefert die Platzierung und sie ist anwendbar.
-        let ta = best_pending_placement(&s, 0).expect("ausstehende Platzierung erwartet");
-        assert_eq!(ta.pattern_row, 0);
-        assert!(ta.dome_tile_id.is_some(), "muss eine NEUE Kuppelplatte legen");
-        let mut g = Game { state: s };
-        assert!(g.apply_single_tiling(0, &ta).is_ok());
-        assert!(g.state.players[0].pattern_lines[0].is_empty(), "Reihe geleert");
+        assert!(generate_tiling_actions(&s, 0).is_empty());
     }
 }

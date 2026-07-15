@@ -6,7 +6,7 @@
 //! als eigenes Modul in Schritt 6.
 
 use crate::board::{PlayerBoard, BROKEN_PENALTIES, MAX_BROKEN};
-use crate::dome::{DomeTile, SpaceType};
+use crate::dome::SpaceType;
 use crate::state::GameState;
 use crate::supply::Tower;
 use crate::tile::TileColor;
@@ -35,15 +35,14 @@ pub fn row_has_open_matching_slot(player: &PlayerBoard, row_idx: usize, color: T
 // ── Tiling-Aktion ──────────────────────────────────────────────────────────────
 
 /// Beschreibt, wie ein Spieler einen Stein aus einer vollen Musterreihe auf die
-/// Kuppel legt. `dome_tile_id`/`rotation` nur relevant, wenn der Slot noch leer ist.
+/// Kuppel legt. Während des Tilings werden KEINE Kuppelplatten gelegt (Regel) --
+/// der Ziel-Slot muss also immer bereits eine Platte tragen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TilingAction {
     pub pattern_row: usize,
     pub slot_row: usize,
     pub slot_col: usize,
     pub space_index: usize,
-    pub dome_tile_id: Option<usize>,
-    pub rotation: u32,
 }
 
 // ── Pending/Unplatzierbare Reihen ───────────────────────────────────────────────
@@ -160,50 +159,28 @@ pub fn validate_tiling_action(
         Some(c) => c,
         None => return Some("Volle Reihe ohne Farbe.".into()),
     };
-    let slot = &grid.dome_slots[action.slot_row][action.slot_col];
-
-    match slot {
+    let slot = match &grid.dome_slots[action.slot_row][action.slot_col] {
+        Some(slot) => slot,
         None => {
-            // Slot leer → Kachel muss neu platziert werden.
-            let tile_id = match action.dome_tile_id {
-                Some(id) => id,
-                None => return Some("Slot ist leer — dome_tile_id muss angegeben werden.".into()),
-            };
-            let tile = match find_dome_tile(state, tile_id) {
-                Some(t) => t,
-                None => return Some(format!("Dome-Kachel {tile_id} nicht im Pool.")),
-            };
-            let rotated = match tile.rotated_spaces(action.rotation) {
-                Ok(r) => r,
-                Err(_) => return Some(format!("Ungültige Rotation: {}.", action.rotation)),
-            };
-            if action.space_index >= rotated.len() {
-                return Some("Space-Index außerhalb der Kachel.".into());
-            }
-            if !rotated[action.space_index].accepts(color) {
-                return Some(format!(
-                    "Space {} nach Rotation {}° akzeptiert {} nicht.",
-                    action.space_index,
-                    action.rotation,
-                    color.value()
-                ));
-            }
+            return Some(format!(
+                "Slot ({},{}) hat noch keine Kuppelplatte — während des Tilings werden keine \
+                 neuen Platten gelegt (nur via Aktion A in der Drafting-Phase).",
+                action.slot_row, action.slot_col
+            ))
         }
-        Some(slot) => {
-            if action.space_index >= slot.spaces.len() {
-                return Some("Space-Index außerhalb der Kachel.".into());
-            }
-            let space = &slot.spaces[action.space_index];
-            if !space.accepts(color) {
-                return Some(format!(
-                    "Space {} in Slot ({},{}) akzeptiert {} nicht.",
-                    action.space_index,
-                    action.slot_row,
-                    action.slot_col,
-                    color.value()
-                ));
-            }
-        }
+    };
+    if action.space_index >= slot.spaces.len() {
+        return Some("Space-Index außerhalb der Kachel.".into());
+    }
+    let space = &slot.spaces[action.space_index];
+    if !space.accepts(color) {
+        return Some(format!(
+            "Space {} in Slot ({},{}) akzeptiert {} nicht.",
+            action.space_index,
+            action.slot_row,
+            action.slot_col,
+            color.value()
+        ));
     }
 
     None
@@ -240,22 +217,9 @@ fn execute_tiling_action(
         state.tower.add(&to_tower);
     }
 
-    // Neue Kachel platzieren, falls der Slot leer ist.
-    let slot_empty =
-        state.players[player_idx].dome_grid.dome_slots[action.slot_row][action.slot_col].is_none();
-    if slot_empty {
-        let tile_id = action
-            .dome_tile_id
-            .ok_or("Slot ist leer — dome_tile_id muss angegeben werden.")?;
-        let mut tile = take_dome_tile(state, tile_id)
-            .ok_or_else(|| format!("Dome-Kachel {tile_id} nicht gefunden"))?;
-        tile.apply_rotation(action.rotation)?;
-        state.players[player_idx]
-            .dome_grid
-            .place_dome_tile(tile, action.slot_row, action.slot_col)?;
-    }
-
-    // Stein auf den gewählten Space legen + Special ggf. freischalten.
+    // Stein auf den gewählten Space legen + Special ggf. freischalten. Der Slot
+    // muss bereits eine Kuppelplatte tragen -- `validate_tiling_action` lehnt
+    // leere Ziel-Slots ab, während des Tilings werden keine neuen Platten gelegt.
     let slot = state.players[player_idx].dome_grid.dome_slots[action.slot_row][action.slot_col]
         .as_mut()
         .ok_or("Slot nach Platzierung unerwartet leer")?;
@@ -631,8 +595,6 @@ pub fn generate_tiling_actions(state: &GameState, player_idx: usize) -> Vec<Tili
                         slot_row: dome_row,
                         slot_col: sc,
                         space_index: si,
-                        dome_tile_id: None,
-                        rotation: 0,
                     };
                     if validate_tiling_action(state, player_idx, &a).is_none() {
                         actions.push(a);
@@ -640,63 +602,8 @@ pub fn generate_tiling_actions(state: &GameState, player_idx: usize) -> Vec<Tili
                 }
             }
         }
-
-        // Leere Slots: neue Kachel aus dem offenen Display, alle Rotationen.
-        for sc in 0..3 {
-            if player.dome_grid.dome_slots[dome_row][sc].is_some() {
-                continue;
-            }
-            for tile in &state.dome_display {
-                for &rotation in &[0u32, 90, 180, 270] {
-                    let rotated = match tile.rotated_spaces(rotation) {
-                        Ok(r) => r,
-                        Err(_) => continue,
-                    };
-                    for si in 0..rotated.len() {
-                        if !valid_si.contains(&si) {
-                            continue;
-                        }
-                        if rotated[si].accepts(color) {
-                            let a = TilingAction {
-                                pattern_row: row_idx,
-                                slot_row: dome_row,
-                                slot_col: sc,
-                                space_index: si,
-                                dome_tile_id: Some(tile.tile_id),
-                                rotation,
-                            };
-                            if validate_tiling_action(state, player_idx, &a).is_none() {
-                                actions.push(a);
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
     actions
-}
-
-// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
-
-/// Sucht eine Dome-Kachel im offenen Display oder im verdeckten Stapel (read-only).
-fn find_dome_tile(state: &GameState, tile_id: usize) -> Option<&DomeTile> {
-    state
-        .dome_display
-        .iter()
-        .find(|t| t.tile_id == tile_id)
-        .or_else(|| state.dome_tile_pool.iter().find(|t| t.tile_id == tile_id))
-}
-
-/// Entnimmt eine Dome-Kachel aus Display oder Stapel (für die Platzierung).
-fn take_dome_tile(state: &mut GameState, tile_id: usize) -> Option<DomeTile> {
-    if let Some(i) = state.dome_display.iter().position(|t| t.tile_id == tile_id) {
-        return Some(state.dome_display.remove(i));
-    }
-    if let Some(i) = state.dome_tile_pool.iter().position(|t| t.tile_id == tile_id) {
-        return Some(state.dome_tile_pool.remove(i));
-    }
-    None
 }
 
 #[cfg(test)]
@@ -796,11 +703,11 @@ mod tests {
     fn tiling_places_stone_and_scores_solo() {
         let mut s = game();
         // Slot (0,0) mit einer Kachel belegen, die oben (si 0/1) Rot akzeptiert.
-        // Pool[2] = [Tuerkis, Rot, Blau, Wild] → si1 = Rot.
+        // Pool[2] = [Tuerkis, Rot, Blau, Wild] → si1 = Rot. Waehrend des Tilings
+        // werden KEINE neuen Kuppelplatten gelegt -- die Platte muss also schon
+        // im Grid liegen (so, als waere sie zuvor per Aktion A gelegt worden).
         let tile = build_dome_tile_pool()[2].clone();
-        let tid = tile.tile_id;
-        s.dome_display.clear();
-        s.dome_display.push(tile);
+        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
         // Reihe 0 (cap 1) mit Rot füllen.
         s.players[0].pattern_lines[0].add_tiles(&[Rot]);
 
@@ -809,8 +716,6 @@ mod tests {
             slot_row: 0,
             slot_col: 0,
             space_index: 1, // si 1 = Rot in pool[2]
-            dome_tile_id: Some(tid),
-            rotation: 0,
         };
         assert!(validate_tiling_action(&s, 0, &action).is_none());
         let before = s.players[0].score;
@@ -869,11 +774,23 @@ mod tests {
     #[test]
     fn generate_tiling_actions_nonempty_for_full_row() {
         let mut s = game();
+        // Slot muss schon eine Platte tragen (Tiling installiert keine neuen).
         let tile = build_dome_tile_pool()[2].clone(); // si1 = Rot
-        s.dome_display.clear();
-        s.dome_display.push(tile);
+        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
         s.players[0].pattern_lines[0].add_tiles(&[Rot]);
         let actions = generate_tiling_actions(&s, 0);
         assert!(actions.iter().any(|a| a.pattern_row == 0));
+    }
+
+    #[test]
+    fn generate_tiling_actions_empty_for_row_with_no_templated_slot() {
+        // Kein Slot in der passenden Dome-Reihe hat eine Platte -- waehrend des
+        // Tilings duerfen KEINE neuen Kuppelplatten gelegt werden, also gibt es
+        // fuer diese Reihe keine gueltige Tiling-Aktion (landet stattdessen auf
+        // der Strafleiste via process_unplaceable_rows).
+        let mut s = game();
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+        let actions = generate_tiling_actions(&s, 0);
+        assert!(!actions.iter().any(|a| a.pattern_row == 0));
     }
 }

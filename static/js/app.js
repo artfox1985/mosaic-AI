@@ -202,8 +202,8 @@ async function bonusChipMove(factory_id) {
   }
 }
 
-async function tilingMove(player, pattern_row, slot_row, slot_col, space_index, dome_tile_id=null, rotation=0) {
-  const d = await api('/tiling', {player, pattern_row, slot_row, slot_col, space_index, dome_tile_id, rotation});
+async function tilingMove(player, pattern_row, slot_row, slot_col, space_index) {
+  const d = await api('/tiling', {player, pattern_row, slot_row, slot_col, space_index});
   if(!d.ok){showError(d.error);return;}
   S=d.state; tilingRow=null; render();
   if (AI_ENABLED && aiIsDue()) {

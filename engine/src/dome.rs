@@ -182,6 +182,11 @@ impl DomeTile {
     }
 }
 
+/// Gesamtkatalog-Größe (tile_id 0..18 fortlaufend) — Grundlage für die
+/// Kuppelstapel-Masken-Features (siehe features.rs: "welche Designs sind
+/// noch im verdeckten Stapel").
+pub const NUM_DOME_TILE_DESIGNS: usize = 18;
+
 /// Vollständiger Pool von 18 Kuppelplättchen (engine/dome.py, dome_colors.csv).
 pub fn build_dome_tile_pool() -> Vec<DomeTile> {
     use TileColor::*;

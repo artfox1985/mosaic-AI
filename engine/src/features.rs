@@ -15,7 +15,7 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 684;
+pub const INPUT_SIZE: usize = 707;
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -91,6 +91,26 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
     f.push(phase_id(phase) / 3.0);
     // Beutel-Restbestand (max. 65 Fliesen zu Spielbeginn).
     f.push((num(v, "bag_count") / 65.0) as f32);
+    // Beutel+Turm je Farbe (was insgesamt noch "im Umlauf" ist, bevor es
+    // wieder auf ein Spielerbrett/Fabrik kommt) -- Nutzer-Anstoss: der Beutel
+    // ist fuer die KI nicht direkt sichtbar, seine Zusammensetzung ist aber
+    // deterministisch aus dem Rest rueckrechenbar (feste Gesamtzahl je Farbe
+    // minus alles sichtbar Platzierte), direktes Auslesen liefert also
+    // dieselbe Zahl, nur guenstiger. /13.0 = TILES_PER_COLOR (Bag+Turm einer
+    // Farbe kann nie mehr als die Gesamtzahl je Farbe sein).
+    let bag_colors = arr_n(Some(v), "bag_colors", 5);
+    let tower_colors = arr_n(Some(v), "tower_colors", 5);
+    for i in 0..5 {
+        f.push(((bag_colors.get(i).copied().unwrap_or(0.0) + tower_colors.get(i).copied().unwrap_or(0.0)) / 13.0) as f32);
+    }
+    // Kuppelstapel-Maske (18, tile_id-Reihenfolge): 1, falls das Design noch
+    // verdeckt im Stapel liegt -- welche Designs schon verbraucht/ausgelegt
+    // sind, verraet dem Netz, was noch "lauert" (Nutzer-Anstoss, siehe
+    // stage2_investigation.md).
+    let dome_mask = arr_n(Some(v), "dome_pool_mask", 18);
+    for i in 0..18 {
+        f.push(dome_mask.get(i).copied().unwrap_or(0.0) as f32);
+    }
 
     // 2. Wertungsplatten one-hot (8)
     let sids: Vec<i64> = v
@@ -456,6 +476,32 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     f.push(state.round_number as f32 / 6.0);
     f.push(phase_id_direct(state.phase) / 3.0);
     f.push(state.bag.count() as f32 / 65.0);
+    // Beutel+Turm je Farbe -- siehe state_to_features (JSON-Pfad) fuer die
+    // ausfuehrliche Begruendung. MUSS mit dort identisch bleiben (Paritaetstest).
+    {
+        let mut supply = [0f32; 5];
+        for &c in state.bag.tiles.iter().chain(state.tower.tiles.iter()) {
+            let id = color_idx_direct(c);
+            if (0..5).contains(&id) {
+                supply[id as usize] += 1.0;
+            }
+        }
+        for x in supply {
+            f.push(x / 13.0);
+        }
+    }
+    // Kuppelstapel-Maske -- siehe state_to_features (JSON-Pfad).
+    {
+        let mut mask = [0f32; 18];
+        for t in &state.dome_tile_pool {
+            if t.tile_id < mask.len() {
+                mask[t.tile_id] = 1.0;
+            }
+        }
+        for x in mask {
+            f.push(x);
+        }
+    }
 
     // 2. Wertungsplatten one-hot (8)
     for i in 0..8usize {

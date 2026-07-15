@@ -19,10 +19,11 @@ use rayon::prelude::*;
 use serde_json::{json, Map, Value};
 
 use crate::dome::SpaceType;
+use crate::features::{action_to_id, state_to_features_direct};
 use crate::game::{apply_start_placement, determine_winner, drafting_actions, Game, TilingMove};
-use crate::mcts::{dynamic_sims, root_child_stats, search_drafting_action};
+use crate::mcts::{dynamic_sims, player_total, root_child_stats, search_drafting_action};
 use crate::net::Net;
-use crate::net_mcts::{net_root_child_stats, net_search_drafting_action, LeafEval};
+use crate::net_mcts::{net_root_child_stats, net_search_drafting_action};
 use crate::moves::{Action, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
@@ -496,8 +497,6 @@ fn tiling_env_actions(state: &GameState, pi: usize) -> Vec<Value> {
             "slot_row": a.slot_row,
             "slot_col": a.slot_col,
             "space_index": a.space_index,
-            "dome_tile_id": a.dome_tile_id,
-            "rotation": a.rotation,
         }));
     }
 
@@ -528,38 +527,14 @@ fn tiling_env_actions(state: &GameState, pi: usize) -> Vec<Value> {
     actions
 }
 
-/// Beste noch ausstehende Tiling-Platzierung (inkl. Platzierung einer NEUEN
-/// Kuppelplatte für eine volle Reihe — die der DFS-Solver bewusst ausblendet).
-/// Wahl nach maximalem finalem Runden-Score. Verhindert den Deadlock, wenn der
-/// Solver `End` liefert, die Engine das Beenden aber wegen offener Aktionen
-/// (`valid_tiling_actions` ≠ ∅) verweigert.
-fn best_pending_placement(state: &GameState, pi: usize) -> Option<crate::round_end::TilingAction> {
-    let actions = generate_tiling_actions(state, pi);
-    let mut best: Option<(i32, crate::round_end::TilingAction)> = None;
-    for ta in actions {
-        let mut g = Game { state: state.clone() };
-        if g.apply_single_tiling(pi, &ta).is_ok() {
-            let score = solve_round_final_score(&g.state, pi);
-            if best.as_ref().map_or(true, |(b, _)| score > *b) {
-                best = Some((score, ta));
-            }
-        }
-    }
-    best.map(|(_, ta)| ta)
-}
-
-/// Optimaler Tiling-Schritt: DFS-Solver, aber wenn der `End` liefert während die
-/// Engine noch offene Tiling-Aktionen sieht (volle Reihe nur per neuer
-/// Kuppelplatte legbar), stattdessen die beste solche Platzierung — verhindert
-/// den end_tiling-Deadlock. Gemeinsam genutzt von Self-Play und Arena.
+/// Optimaler Tiling-Schritt: reiner exakter DFS-Solver. Während des Tilings
+/// werden keine neuen Kuppelplatten gelegt (Regel) -- eine volle Musterreihe
+/// ohne bereits belegten passenden Slot bleibt liegen (ggf. später per
+/// Strafleiste abgerechnet, siehe `process_unplaceable_rows`), statt am
+/// Tiling-Ende künstlich eine neue Platte zu installieren. Gemeinsam genutzt
+/// von Self-Play und Arena.
 fn resolve_tiling_step(state: &GameState, pi: usize) -> TilingStep {
-    match best_first_step_exact(state, pi) {
-        TilingStep::End => match best_pending_placement(state, pi) {
-            Some(ta) => TilingStep::Place(ta),
-            None => TilingStep::End,
-        },
-        other => other,
-    }
+    best_first_step_exact(state, pi)
 }
 
 /// Tiling-Zug per exaktem DFS-Solver (one-hot Policy auf den optimalen Schritt).
@@ -577,8 +552,6 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, rng: &mut R) -> Map<String, Val
             "slot_row": ta.slot_row,
             "slot_col": ta.slot_col,
             "space_index": ta.space_index,
-            "dome_tile_id": ta.dome_tile_id,
-            "rotation": ta.rotation,
         }),
         TilingStep::Chips { row, .. } => {
             json!({ "type": "use_chips", "player": pi, "pattern_row": row })
@@ -844,7 +817,6 @@ fn play_net_game<R: Rng + ?Sized>(
     heur_sims: u32,
     c: f64,
     c_puct: f64,
-    leaf: LeafEval,
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
@@ -889,7 +861,7 @@ fn play_net_game<R: Rng + ?Sized>(
                         actions[0].clone()
                     } else if pi == net_board {
                         let s = dynamic_sims(net_sims, actions.len());
-                        net_search_drafting_action(net, &game.state, s, c_puct, false, leaf, rng)
+                        net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = dynamic_sims(heur_sims, actions.len());
@@ -947,11 +919,9 @@ pub fn run_net_arena_match(
     num_threads: usize,
     c: f64,
     c_puct: f64,
-    dfs_leaf: bool,
 ) -> Result<String, String> {
     let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
-    let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Value {
         let mut rng =
@@ -959,7 +929,7 @@ pub fn run_net_arena_match(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["Netz".to_string(), "Heuristik".to_string()];
-        play_net_game(&net, 0, net_sims, heur_sims, c, c_puct, leaf, ids, names, first, &mut rng)
+        play_net_game(&net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng)
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -985,8 +955,6 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     sims_b: u32,
     c_puct_a: f64,
     c_puct_b: f64,
-    leaf_a: LeafEval,
-    leaf_b: LeafEval,
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
@@ -1030,13 +998,13 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else {
-                        let (net, base, cp, leaf) = if pi == 0 {
-                            (net_a, sims_a, c_puct_a, leaf_a)
+                        let (net, base, cp) = if pi == 0 {
+                            (net_a, sims_a, c_puct_a)
                         } else {
-                            (net_b, sims_b, c_puct_b, leaf_b)
+                            (net_b, sims_b, c_puct_b)
                         };
                         let s = dynamic_sims(base, actions.len());
-                        net_search_drafting_action(net, &game.state, s, cp, false, leaf, rng)
+                        net_search_drafting_action(net, &game.state, s, cp, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     let _ = game.apply_drafting(&chosen);
@@ -1079,8 +1047,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
 
 /// `n_games` Spiele Netz A (Brett 0) vs. Netz B (Brett 1), Startspieler
 /// alternierend. Lädt beide ONNX-Netze einmal. Gibt JSON-Array
-/// `[{scores:[A,B], winner, …}]`. `dfs_leaf` wie sonst (Stufe 1/2).
-#[allow(clippy::too_many_arguments)]
+/// `[{scores:[A,B], winner, …}]`.
 pub fn run_net_vs_net_arena(
     model_a: &str,
     model_b: &str,
@@ -1091,13 +1058,9 @@ pub fn run_net_vs_net_arena(
     num_threads: usize,
     c_puct_a: f64,
     c_puct_b: f64,
-    dfs_leaf_a: bool,
-    dfs_leaf_b: bool,
 ) -> Result<String, String> {
     let net_a = std::sync::Arc::new(Net::load(model_a, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
     let net_b = std::sync::Arc::new(Net::load(model_b, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
-    let leaf_a = if dfs_leaf_a { LeafEval::Dfs } else { LeafEval::Net };
-    let leaf_b = if dfs_leaf_b { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Value {
         let mut rng =
@@ -1105,7 +1068,7 @@ pub fn run_net_vs_net_arena(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
-        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, leaf_a, leaf_b, ids, names, first, &mut rng)
+        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng)
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -1134,13 +1097,12 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     actions: &[Action],
     base_sims: u32,
     c_puct: f64,
-    leaf: LeafEval,
     rng: &mut R,
     add_root_noise: bool,
     deterministic: bool,
 ) -> (Action, Vec<Value>) {
     let sims = dynamic_sims(base_sims, actions.len());
-    let stats = net_root_child_stats(net, state, sims, c_puct, add_root_noise, leaf, rng); // (Action, visits, q)
+    let stats = net_root_child_stats(net, state, sims, c_puct, add_root_noise, rng); // (Action, visits, q)
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
@@ -1173,7 +1135,6 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     net: &Net,
     base_sims: u32,
     c_puct: f64,
-    leaf: LeafEval,
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
@@ -1212,7 +1173,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
                         (a, vec![e])
                     } else {
-                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, leaf, rng, add_root_noise, deterministic)
+                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
@@ -1254,8 +1215,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
 }
 
 /// Netzgeführtes Self-Play: `n_games` Partien (rayon-parallel), Netz vs. sich
-/// selbst, rohe Visit-Targets. `dfs_leaf` = Stufe 1 (DFS-Blatt) vs. Stufe 2
-/// (Netz-Value). Gibt alle Step-Records flach als JSON-Array zurück.
+/// selbst, rohe Visit-Targets. Gibt alle Step-Records flach als JSON-Array
+/// zurück.
 #[allow(clippy::too_many_arguments)]
 pub fn run_net_self_play(
     model_path: &str,
@@ -1264,13 +1225,11 @@ pub fn run_net_self_play(
     c_puct: f64,
     seed: u64,
     num_threads: usize,
-    dfs_leaf: bool,
     prefix: &str,
     add_root_noise: bool,
     deterministic: bool,
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
-    let leaf = if dfs_leaf { LeafEval::Dfs } else { LeafEval::Net };
 
     let play = |i: usize| -> Vec<Value> {
         let mut rng =
@@ -1279,7 +1238,7 @@ pub fn run_net_self_play(
         let first = rng.random_range(0..2usize);
         let names = ["Netz".to_string(), "Netz".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_net_self_play_game(&net, base_sims, c_puct, leaf, ids, names, first, &gid, &mut rng, add_root_noise, deterministic)
+        play_net_self_play_game(&net, base_sims, c_puct, ids, names, first, &gid, &mut rng, add_root_noise, deterministic)
     };
 
     let all: Vec<Vec<Value>> = if num_threads == 0 {
@@ -1294,164 +1253,166 @@ pub fn run_net_self_play(
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
-/// Argmax-Aktion nach Besuchen (deterministische Wahl) aus Wurzelkind-Stats.
-fn argmax_action(stats: &[(Action, u32, f64)]) -> Option<Action> {
-    stats.iter().max_by_key(|(_, v, _)| *v).map(|(a, _, _)| a.clone())
-}
+// ── Alpha-Beta-Minimax als guenstige Rollout-Fortsetzungspolitik ────────────
+// Hintergrund (siehe evaluations/stage2_investigation.md, Stufe-3-Kalibrierung):
+// Profiling zeigte 1,8 Mio. Blattauswertungen fuer nur 2 Spiele -- Feature-
+// Extraktion, Netz-Forward-Pass und DFS-Solver je etwa gleich teuer (~31-35%),
+// keiner davon dominant. Der PUCT-Sims-Ansatz braucht so viele Auswertungen,
+// weil er fuer VERRAUSCHTE Blattwerte gebaut ist (viele Simulationen, um
+// Rauschen wegzumitteln) -- unser DFS-Blatt ist aber EXAKT. Referenz
+// (domwil.co.uk/posts/azul-ai): ein echtes Azul-KI-Projekt nutzt gar keine
+// MCTS, sondern Alpha-Beta-Minimax mit Zugsortierung + einer guenstigen
+// statischen "Score, wenn die Runde JETZT endet"-Bewertung (identisch zu
+// unserem `player_total`/DFS-Solver) -- 42-54x weniger besuchte Knoten als
+// reines Minimax. Hier als guenstigere Fortsetzungspolitik NUR fuer Stufe-3-
+// Rollouts prototypisiert (NICHT fuer Stufe 1 selbst, das bleibt PUCT).
 
-/// Ein gefundener Stufe1/Stufe2-Meinungsverschiedenheits-Kandidat: Zustand VOR
-/// der Entscheidung (für die spätere Verzweigung) + beide argmax-Aktionen.
-struct Candidate {
-    round: u32,
-    player: usize,
-    state: GameState,
-    a1: Action,
-    a2: Action,
-}
-
-/// Spielt EIN Spiel per Stufe-1 (DFS-Blatt, deterministisch) durch — genau wie
-/// die Champion-Politik in der Arena — und sammelt dabei GÜNSTIG (nur 2x
-/// Wurzelkind-Stats je Entscheidung, KEINE Rollouts) alle Punkte, an denen
-/// Stufe 2 (Netz-Value-Blatt) argmax abweichend gewählt hätte. Das Sammeln
-/// läuft mit normalem Self-Play-Timeout durch bis Spielende (alle 5 Runden) —
-/// die teure Rollout-Auswertung passiert ERST DANACH in
-/// `evaluate_sampled_candidates`, damit sie das Erreichen späterer Runden
-/// nicht mehr verdrängen kann (frühere Version: Rollouts liefen inline in
-/// derselben Zeitschranke wie das Hauptspiel und brachen es schon nach den
-/// ersten Runde-1-Fällen ab, bevor Runde 2-5 je gesehen wurden).
-fn collect_disagreement_candidates<R: Rng + ?Sized>(
-    net: &Net,
-    base_sims: u32,
-    c_puct: f64,
-    scoring_ids: Vec<usize>,
-    names: [String; 2],
-    first_player: usize,
-    rng: &mut R,
-) -> Vec<Candidate> {
-    let mut game = Game::start(names, first_player, scoring_ids, rng);
-    let mut out: Vec<Candidate> = Vec::new();
-    let mut guard = 0u32;
-    let t_start = std::time::Instant::now();
-    let timeout_secs = net_game_timeout_secs(base_sims) * 3; // 2x Suchaufwand je Entscheidung
-    loop {
-        guard += 1;
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
-            break;
-        }
-        match game.state.phase {
-            Phase::StartPlacement | Phase::Drafting => {
-                if game.state.players.iter().any(|p| p.start_tile_pending) {
-                    if start_placement_step(&mut game, rng).is_none() {
-                        break;
-                    }
-                } else if game.state.phase == Phase::Drafting {
-                    let player = game.state.current_player;
-                    let round = game.state.round_number;
-                    let actions = drafting_actions(&game.state);
-                    let chosen = if actions.len() == 1 {
-                        actions[0].clone()
-                    } else {
-                        let sims = dynamic_sims(base_sims, actions.len());
-                        let stats1 =
-                            net_root_child_stats(net, &game.state, sims, c_puct, false, LeafEval::Dfs, rng);
-                        let stats2 =
-                            net_root_child_stats(net, &game.state, sims, c_puct, false, LeafEval::Net, rng);
-                        let a1 = argmax_action(&stats1);
-                        let a2 = argmax_action(&stats2);
-                        if let (Some(ref a1v), Some(ref a2v)) = (&a1, &a2) {
-                            if a1v != a2v {
-                                out.push(Candidate {
-                                    round,
-                                    player,
-                                    state: game.state.clone(),
-                                    a1: a1v.clone(),
-                                    a2: a2v.clone(),
-                                });
-                            }
-                        }
-                        a1.unwrap_or_else(|| actions.choose(rng).cloned().unwrap_or(Action::Pass))
-                    };
-                    let _ = game.apply_drafting(&chosen);
-                } else {
-                    break;
-                }
-            }
-            Phase::Tiling => {
-                tiling_step(&mut game, rng);
-            }
-            _ => break,
-        }
-    }
-    out
-}
-
-/// Gruppiert `candidates` nach Runde und wertet höchstens `max_per_round`
-/// zufällig gezogene Kandidaten je Runde per Rollout aus (siehe
-/// `evaluate_disagreement`) — begrenzt die teure Rollout-Arbeit pro Spiel und
-/// sorgt für eine über alle Runden ausgeglichene Stichprobe (Runde 1 hat sonst
-/// weit mehr Kandidaten als spätere Runden und würde die Stichprobe dominieren).
+/// Bewertet `state` aus Sicht von `perspective` (dessen Score minus Gegner-
+/// Score) per Alpha-Beta-Minimax mit Netz-Policy-Zugsortierung (ein
+/// Forward-Pass je Knoten fuer die Reihenfolge, kein Sims-Budget). Bricht ab
+/// bei Rundenende (Phase != Drafting), erschoepfter `depth_remaining` ODER
+/// erschoepftem `node_budget` -- an all diesen Punkten liefert `player_total`
+/// (derselbe DFS-Solver-Score wie Stufe 1s Blattwert, nur ggf. VOR dem
+/// echten Rundenende ausgewertet: "wieviele Punkte, wenn die Runde jetzt
+/// endet") die Bewertung.
 #[allow(clippy::too_many_arguments)]
-fn evaluate_sampled_candidates<R: Rng + ?Sized>(
-    net: &Net,
-    candidates: Vec<Candidate>,
-    base_sims: u32,
-    c_puct: f64,
-    n_reps: usize,
-    max_per_round: usize,
-    rng: &mut R,
-) -> Vec<Value> {
-    use std::collections::HashMap;
-    let mut by_round: HashMap<u32, Vec<Candidate>> = HashMap::new();
-    for c in candidates {
-        by_round.entry(c.round).or_default().push(c);
-    }
-    let mut out = Vec::new();
-    for (_, mut group) in by_round {
-        group.shuffle(rng);
-        for c in group.into_iter().take(max_per_round) {
-            let rec = evaluate_disagreement(
-                net, &c.state, &c.a1, &c.a2, base_sims, c_puct, n_reps, c.player, c.round, rng,
-            );
-            out.push(rec);
-        }
-    }
-    out
-}
-
-/// Verzweigt `state` bei einer Stufe1/Stufe2-Meinungsverschiedenheit: wendet
-/// `a1` (Stufe 1) bzw. `a2` (Stufe 2) an und spielt beide Zweige `n_reps`-mal
-/// per Stufe-1-Politik bis Spielende fort. Gibt ein Vergleichs-Dict zurück.
-#[allow(clippy::too_many_arguments)]
-fn evaluate_disagreement<R: Rng + ?Sized>(
+fn negamax_value(
     net: &Net,
     state: &GameState,
-    a1: &Action,
-    a2: &Action,
-    base_sims: u32,
-    c_puct: f64,
-    n_reps: usize,
-    player: usize,
-    round: u32,
-    rng: &mut R,
-) -> Value {
-    let mean_a = mean_rollout_diff(net, state, a1, base_sims, c_puct, n_reps, player, None, rng);
-    let mean_b = mean_rollout_diff(net, state, a2, base_sims, c_puct, n_reps, player, None, rng);
-    json!({
-        "round": round,
-        "player": player,
-        "stage1_action": crate::mcts::label_search_move(&crate::mcts::SearchMove::Draft(a1.clone()), Some(state)).1,
-        "stage2_action": crate::mcts::label_search_move(&crate::mcts::SearchMove::Draft(a2.clone()), Some(state)).1,
-        "stage1_mean_diff": mean_a,
-        "stage2_mean_diff": mean_b,
-        "n_reps": n_reps,
-    })
+    depth_remaining: u32,
+    alpha_in: f64,
+    beta_in: f64,
+    perspective: usize,
+    node_count: &mut u32,
+    node_budget: u32,
+) -> f64 {
+    *node_count += 1;
+    ALPHABETA_NODE_VISITS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if state.phase != Phase::Drafting || depth_remaining == 0 || *node_count >= node_budget {
+        return crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
+            player_total(state, perspective) - player_total(state, 1 - perspective)
+        });
+    }
+    let actions = drafting_actions(state);
+    if actions.is_empty() {
+        return crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
+            player_total(state, perspective) - player_total(state, 1 - perspective)
+        });
+    }
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let (logits, _m) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new()))
+    });
+    let mut scored: Vec<(f32, Action)> = actions
+        .into_iter()
+        .map(|a| {
+            let id = action_to_id(&action_to_env_dict(state, &a));
+            (logits.get(id).copied().unwrap_or(f32::NEG_INFINITY), a)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let maximizing = state.current_player == perspective;
+    let mut alpha = alpha_in;
+    let mut beta = beta_in;
+    let mut best = if maximizing { f64::NEG_INFINITY } else { f64::INFINITY };
+    for (_, a) in scored {
+        if *node_count >= node_budget {
+            break;
+        }
+        let mut g = Game { state: state.clone() };
+        if g.apply_drafting(&a).is_err() {
+            continue;
+        }
+        let val = negamax_value(
+            net, &g.state, depth_remaining - 1, alpha, beta, perspective, node_count, node_budget,
+        );
+        if maximizing {
+            if val > best {
+                best = val;
+            }
+            if best > alpha {
+                alpha = best;
+            }
+        } else {
+            if val < best {
+                best = val;
+            }
+            if best < beta {
+                beta = best;
+            }
+        }
+        if alpha >= beta {
+            break; // Beta-/Alpha-Cutoff
+        }
+    }
+    if best.is_finite() {
+        best
+    } else {
+        player_total(state, perspective) - player_total(state, 1 - perspective)
+    }
+}
+
+/// Waehlt EINE Drafting-Aktion per Alpha-Beta-Minimax (siehe `negamax_value`)
+/// -- guenstige Ersatz-Fortsetzungspolitik fuer Stufe-3-Rollouts statt der
+/// vollen PUCT-Suche. `depth` begrenzt die Suchtiefe (Plies), `node_budget`
+/// ist ein zusaetzliches Sicherheitsnetz gegen pathologische Explosion.
+fn alphabeta_choose_action(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    depth: u32,
+    node_budget: u32,
+) -> Action {
+    if actions.len() <= 1 {
+        return actions.first().cloned().unwrap_or(Action::Pass);
+    }
+    ALPHABETA_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let perspective = state.current_player;
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let (logits, _m) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new()))
+    });
+    let mut scored: Vec<(f32, Action)> = actions
+        .iter()
+        .map(|a| {
+            let id = action_to_id(&action_to_env_dict(state, a));
+            (logits.get(id).copied().unwrap_or(f32::NEG_INFINITY), a.clone())
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut node_count = 0u32;
+    let mut best_action = scored[0].1.clone();
+    let mut best_val = f64::NEG_INFINITY;
+    let mut alpha = f64::NEG_INFINITY;
+    let beta = f64::INFINITY;
+    for (_, a) in scored {
+        if node_count >= node_budget {
+            break;
+        }
+        let mut g = Game { state: state.clone() };
+        if g.apply_drafting(&a).is_err() {
+            continue;
+        }
+        let val = negamax_value(
+            net, &g.state, depth.saturating_sub(1), alpha, beta, perspective, &mut node_count, node_budget,
+        );
+        if val > best_val {
+            best_val = val;
+            best_action = a;
+        }
+        if val > alpha {
+            alpha = val;
+        }
+    }
+    best_action
 }
 
 /// Wendet `first_action` auf eine Kopie von `state` an und spielt danach
 /// `n_reps`-mal (je frischer RNG-Ziehung ab diesem Punkt) per Stufe-1-Politik
 /// (DFS-Blatt, deterministisch — Champion-Spielstil) bis Spielende fort.
 /// Gibt den mittleren Score-Vorsprung (`player` minus Gegner) zurück.
-#[allow(clippy::too_many_arguments)]
 /// `horizon_rounds`: `None` = wie bisher bis Spielende (Disagreement-Studie).
 /// `Some(h)` bricht ab, sobald `h` Runden ab der aktuellen gespielt wurden,
 /// und wertet den bis dahin ECHT erzielten Score-Vorsprung aus (keine
@@ -1461,6 +1422,10 @@ fn evaluate_disagreement<R: Rng + ?Sized>(
 /// Runde 1 muessten sonst im Schnitt alle ~109 restlichen Zuege des GANZEN
 /// Spiels durchgespielt werden, mit horizon_rounds=2 nur noch die aktuelle
 /// plus eine weitere Runde).
+/// `alphabeta`: `None` = Fortsetzung per Stufe-1-PUCT (`net_drafting_policy`,
+/// wie bisher). `Some((depth, node_budget))` nutzt stattdessen die guenstigere
+/// Alpha-Beta-Minimax-Fortsetzung (`alphabeta_choose_action`) -- Prototyp fuer
+/// Stufe-3-Rollouts, siehe Kommentar vor `negamax_value`.
 #[allow(clippy::too_many_arguments)]
 fn mean_rollout_diff<R: Rng + ?Sized>(
     net: &Net,
@@ -1471,12 +1436,27 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
     n_reps: usize,
     player: usize,
     horizon_rounds: Option<u32>,
+    alphabeta: Option<(u32, u32)>,
     rng: &mut R,
 ) -> f64 {
     let start_round = state.round_number;
     let mut total = 0.0;
     for _ in 0..n_reps {
         let mut g = Game { state: state.clone() };
+        // Determinisierung (Weg 1, siehe evaluations/stage2_investigation.md,
+        // Nutzer-Anstoss): das noch UNBEKANNTE -- Beutel-Restbestand und
+        // verdeckter Kuppelstapel -- wird je Wiederholung frisch ausgewuerfelt.
+        // OHNE das wuerden ALLE Wiederholungen exakt dieselbe, schon
+        // feststehende Reihenfolge durchspielen (`draw_with_refill` mischt den
+        // Beutel nur bei Unterversorgung neu, der Kuppelstapel wird nur EINMAL
+        // beim Spielstart gemischt) -- verifiziert per Test
+        // `rollout_repetitions_actually_diverge_in_bag_and_dome_order`, der
+        // ohne diesen Fix fehlschlaegt (identischer Beutel/Stapel ueber alle
+        // Wiederholungen). Die sichtbare Information (Fabriken, Spielerbretter,
+        // Kuppel-Auslage) bleibt unveraendert -- nur das wirklich Verdeckte
+        // wird neu resampelt.
+        g.state.bag.tiles.shuffle(rng);
+        g.state.dome_tile_pool.shuffle(rng);
         let _ = g.apply_drafting(first_action);
         let mut guard = 0u32;
         loop {
@@ -1502,9 +1482,11 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                         }
                         let a = if actions.len() == 1 {
                             actions[0].clone()
+                        } else if let Some((depth, node_budget)) = alphabeta {
+                            alphabeta_choose_action(net, &g.state, &actions, depth, node_budget)
                         } else {
                             let (a, _) = net_drafting_policy(
-                                net, &g.state, &actions, base_sims, c_puct, LeafEval::Dfs, rng, false, true,
+                                net, &g.state, &actions, base_sims, c_puct, rng, false, true,
                             );
                             a
                         };
@@ -1528,68 +1510,31 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
     total / n_reps.max(1) as f64
 }
 
-/// Sucht in `n_games` Stufe-1-geführten Partien nach Stufe1/Stufe2-
-/// Meinungsverschiedenheiten (Phase 1, günstig, siehe
-/// `collect_disagreement_candidates`), wertet je Runde höchstens
-/// `max_per_round` davon per Rollout aus (Phase 2, siehe
-/// `evaluate_sampled_candidates`) und gibt alle Vergleichs-Dicts flach als
-/// JSON-Array zurück.
-#[allow(clippy::too_many_arguments)]
-pub fn run_stage_disagreement_study(
-    model_path: &str,
-    n_games: usize,
-    base_sims: u32,
-    c_puct: f64,
-    n_reps: usize,
-    max_per_round: usize,
-    seed: u64,
-    num_threads: usize,
-) -> Result<String, String> {
-    let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
-
-    let play = |i: usize| -> Vec<Value> {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
-        let ids = sample_valid_scoring_ids(3, &mut rng);
-        let first = rng.random_range(0..2usize);
-        let names = ["Netz".to_string(), "Netz".to_string()];
-        let candidates =
-            collect_disagreement_candidates(&net, base_sims, c_puct, ids, names, first, &mut rng);
-        evaluate_sampled_candidates(&net, candidates, base_sims, c_puct, n_reps, max_per_round, &mut rng)
-    };
-
-    let all: Vec<Vec<Value>> = if num_threads == 0 {
-        (0..n_games).into_par_iter().map(play).collect()
-    } else {
-        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
-            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
-            Err(_) => (0..n_games).map(play).collect(),
-        }
-    };
-    let flat: Vec<Value> = all.into_iter().flatten().collect();
-    Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
-}
-
 // ── Stufe 3: explizite Zufallsmittelung über Rundengrenzen (Rollouts) ───────
 // Begründung siehe `evaluations/stage2_investigation.md`: AlphaZero (Schach/
 // Go) hat keine Zufallsknoten im Suchbaum, weil dort kein Zufall zwischen
 // Zügen liegt. Backgammon/Scrabble-Programme lösen das nicht durch ein
 // größeres Wertenetz, sondern durch explizite Mittelung über den Zufall
-// (Rollouts). Stufe 1/2 haben BEIDE null Zufallsknoten -- der Suchbaum endet
-// exakt an der Rundengrenze (`terminal = phase != Drafting`) und überlässt
-// den kompletten Rest (Beutel-Nachschub künftiger Runden) dem Wertenetz.
-// Stufe 3 ersetzt diese Schätzung durch echte Simulation: die
-// vielversprechendsten Kandidatenzüge (Top-K nach Netz-Suche) werden je
-// `n_reps`-mal mit unabhängigem Zufall (Beutel-Nachschub) bis Spielende
-// fortgesetzt (Stufe-1-Politik als Fortsetzung), der beste mittlere
-// Score-Vorsprung gewinnt. Braucht den Value-Head NICHT (reine
-// Policy+DFS-Simulation), ist aber pro Zug deutlich teurer.
+// (Rollouts). Stufe 1 hatte (wie Stufe 2, mittlerweile entfernt) null
+// Zufallsknoten -- der Suchbaum endet exakt an der Rundengrenze
+// (`terminal = phase != Drafting`) und überließ den kompletten Rest
+// (Beutel-Nachschub künftiger Runden) frueher dem Wertenetz. Stufe 3 ersetzt
+// diese Schätzung durch echte Simulation: die vielversprechendsten
+// Kandidatenzüge (Top-K nach Netz-Suche) werden je `n_reps`-mal mit
+// unabhängigem Zufall (Beutel-Nachschub) bis Spielende fortgesetzt
+// (Stufe-1-Politik als Fortsetzung), der beste mittlere Score-Vorsprung
+// gewinnt. Braucht keinen Value-Head (reine Policy+DFS-Simulation), ist aber
+// pro Zug deutlich teurer.
 
 /// Diagnose-Zaehler (Trigger-Rate des Rollout-Tiebreaks) fuer die
 /// Stufe-3-Kalibrierung -- siehe `run_stage3_vs_stage1_arena`, das sie vor
 /// jedem Lauf zuruecksetzt und am Ende ausliest/loggt.
 static STAGE3_DECISIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 static STAGE3_ROLLOUTS_TRIGGERED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Zaehlt besuchte Knoten (`negamax_value`-Aufrufe) bzw. Top-Level-Aufrufe
+/// von `alphabeta_choose_action` -- Kalibrierungshilfe fuer depth/node_budget.
+pub(crate) static ALPHABETA_NODE_VISITS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(crate) static ALPHABETA_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Wählt EINE Drafting-Aktion per Stufe 3: Top-K-Kandidaten (nach Besuchen
 /// einer günstigen Vorab-Suche, DFS-Blatt) werden je `n_reps`-mal per
@@ -1616,6 +1561,8 @@ fn stage3_choose_action<R: Rng + ?Sized>(
     top_k: usize,
     n_reps: usize,
     horizon_rounds: u32,
+    alphabeta_depth: u32,
+    alphabeta_node_budget: u32,
     rng: &mut R,
 ) -> Action {
     if actions.len() <= 1 {
@@ -1624,7 +1571,7 @@ fn stage3_choose_action<R: Rng + ?Sized>(
     // Kandidaten-Vorauswahl: guenstige Suche (wie Stufe 1), Top-K nach Besuchen
     // -- nicht ALLE Legalzuege ausrollen, das waere zu teuer.
     let sims = dynamic_sims(shortlist_sims, actions.len());
-    let mut stats = net_root_child_stats(net, state, sims, c_puct, false, LeafEval::Dfs, rng);
+    let mut stats = net_root_child_stats(net, state, sims, c_puct, false, rng);
     stats.sort_by(|a, b| b.1.cmp(&a.1)); // absteigend nach Besuchen
     if stats.is_empty() {
         return actions[0].clone();
@@ -1634,9 +1581,10 @@ fn stage3_choose_action<R: Rng + ?Sized>(
     let player = state.current_player;
     let mut best_action = stats[0].0.clone();
     let mut best_score = f64::NEG_INFINITY;
+    let alphabeta = Some((alphabeta_depth, alphabeta_node_budget));
     for (a, _visits, _q) in stats.into_iter().take(top_k.max(1)) {
         let mean_diff = mean_rollout_diff(
-            net, state, &a, rollout_sims, c_puct, n_reps, player, Some(horizon_rounds), rng,
+            net, state, &a, rollout_sims, c_puct, n_reps, player, Some(horizon_rounds), alphabeta, rng,
         );
         if mean_diff > best_score {
             best_score = mean_diff;
@@ -1661,6 +1609,8 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
     n_reps: usize,
     horizon_rounds: u32,
     stage3_max_round: u32,
+    alphabeta_depth: u32,
+    alphabeta_node_budget: u32,
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
@@ -1706,11 +1656,11 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                     } else if pi == 0 && game.state.round_number <= stage3_max_round {
                         stage3_choose_action(
                             net, &game.state, &actions, stage3_shortlist_sims, stage3_rollout_sims,
-                            c_puct, top_k, n_reps, horizon_rounds, rng,
+                            c_puct, top_k, n_reps, horizon_rounds, alphabeta_depth, alphabeta_node_budget, rng,
                         )
                     } else {
                         let s = dynamic_sims(sims1, actions.len());
-                        net_search_drafting_action(net, &game.state, s, c_puct, false, LeafEval::Dfs, rng)
+                        net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     let _ = game.apply_drafting(&chosen);
@@ -1767,6 +1717,8 @@ pub fn run_stage3_vs_stage1_arena(
     n_reps: usize,
     horizon_rounds: u32,
     stage3_max_round: u32,
+    alphabeta_depth: u32,
+    alphabeta_node_budget: u32,
     seed: u64,
     num_threads: usize,
 ) -> Result<String, String> {
@@ -1783,7 +1735,7 @@ pub fn run_stage3_vs_stage1_arena(
         let names = ["Stufe3".to_string(), "Stufe1".to_string()];
         play_stage3_vs_stage1_game(
             &net, sims1, stage3_shortlist_sims, stage3_rollout_sims, c_puct, top_k, n_reps,
-            horizon_rounds, stage3_max_round, ids, names, first, &mut rng,
+            horizon_rounds, stage3_max_round, alphabeta_depth, alphabeta_node_budget, ids, names, first, &mut rng,
         )
     };
 
@@ -1812,6 +1764,199 @@ pub fn run_stage3_vs_stage1_arena(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Zaehlt alle Vorkommen von `color` im GESAMTEN Spielzustand: Beutel,
+    /// Turm, alle Fabriken (Sun+Mond), Spielerreihen, Strafleiste, verlegte
+    /// Kuppel-Spaces. Grundlage fuer den Bilanz-Sanity-Check unten (Basis fuer
+    /// das geplante Beutel-Farbanteil-Feature, siehe stage2_investigation.md).
+    fn count_color(state: &GameState, color: crate::tile::TileColor) -> usize {
+        let mut n = 0;
+        n += state.bag.tiles.iter().filter(|&&c| c == color).count();
+        n += state.tower.tiles.iter().filter(|&&c| c == color).count();
+        for f in &state.factories {
+            n += f.sun_tiles.iter().filter(|&&c| c == color).count();
+            for stack in &f.moon_stacks {
+                n += stack.iter().filter(|&&c| c == color).count();
+            }
+        }
+        n += state.large_factory.sun_tiles.iter().filter(|&&c| c == color).count();
+        n += state.large_factory.moon_pool.iter().filter(|&&c| c == color).count();
+        for p in &state.players {
+            for pl in &p.pattern_lines {
+                n += pl.tiles.iter().filter(|&&c| c == color).count();
+            }
+            n += p.broken_tiles.iter().filter(|&&c| c == color).count();
+            for row in &p.dome_grid.dome_slots {
+                for slot in row.iter().flatten() {
+                    for sp in &slot.spaces {
+                        if sp.placed_color == Some(color) {
+                            n += 1;
+                        }
+                    }
+                }
+            }
+        }
+        n
+    }
+
+    /// Sanity-Check (Nutzer-Anstoss, siehe stage2_investigation.md): Beutel +
+    /// Turm + alles sichtbar auf dem Spielfeld darf je Farbe NIE UNTER der
+    /// festen Gesamtzahl (`TILES_PER_COLOR`=13) liegen -- keine Fliese darf
+    /// "verschwinden". Bewusst KEINE strikte Gleichheit: Bonus-Chip-
+    /// Komplettierung (`apply_bonus_chips_with`, round_end.rs) schiebt
+    /// zusaetzliche "Phantom"-Fliesen direkt in `pattern_lines[row].tiles`,
+    /// OHNE sie aus Beutel/Turm zu ziehen (Chips ERSETZEN echte gezogene
+    /// Fliesen) -- das ist beabsichtigtes Spieldesign, kein Bug, wurde aber
+    /// live vom ersten (strikten) Testlauf aufgedeckt (Spiel 0, Schritt 47,
+    /// Farbe Rot: 14 statt 13). WICHTIG fuer das geplante Beutel-
+    /// Farbanteil-Feature: der Mechanismus fasst NUR `pattern_lines` an,
+    /// NIE `bag`/`tower` -- direktes Auslesen von `state.bag.tiles` bleibt
+    /// exakt korrekt als "was noch wirklich zu ziehen ist".
+    #[test]
+    fn tile_color_accounting_invariant_holds_throughout_random_games() {
+        use crate::tile::TILES_PER_COLOR;
+        let mut rng = StdRng::seed_from_u64(777);
+        for gi in 0..5u64 {
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let mut game = Game::start([format!("A{gi}"), format!("B{gi}")], (gi % 2) as usize, ids, &mut rng);
+            let mut guard = 0u32;
+            loop {
+                guard += 1;
+                if guard > 3000 {
+                    break;
+                }
+                match game.state.phase {
+                    Phase::StartPlacement | Phase::Drafting => {
+                        if game.state.players.iter().any(|p| p.start_tile_pending) {
+                            if start_placement_step(&mut game, &mut rng).is_none() {
+                                break;
+                            }
+                        } else if game.state.phase == Phase::Drafting {
+                            let actions = drafting_actions(&game.state);
+                            if actions.is_empty() {
+                                break;
+                            }
+                            let a = actions.choose(&mut rng).cloned().unwrap_or(Action::Pass);
+                            let _ = game.apply_drafting(&a);
+                        } else {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        tiling_step(&mut game, &mut rng);
+                    }
+                    _ => break,
+                }
+                for &color in &crate::tile::TileColor::NORMAL {
+                    let n = count_color(&game.state, color);
+                    if n < TILES_PER_COLOR {
+                        let bag = game.state.bag.tiles.iter().filter(|&&c| c == color).count();
+                        let tower = game.state.tower.tiles.iter().filter(|&&c| c == color).count();
+                        let fac_sun: usize = game.state.factories.iter().map(|f| f.sun_tiles.iter().filter(|&&c| c == color).count()).sum();
+                        let fac_moon: usize = game.state.factories.iter().map(|f| f.moon_stacks.iter().flatten().filter(|&&c| c == color).count()).sum();
+                        let lf_sun = game.state.large_factory.sun_tiles.iter().filter(|&&c| c == color).count();
+                        let lf_moon = game.state.large_factory.moon_pool.iter().filter(|&&c| c == color).count();
+                        for (pi, p) in game.state.players.iter().enumerate() {
+                            let pl: usize = p.pattern_lines.iter().map(|l| l.tiles.iter().filter(|&&c| c == color).count()).sum();
+                            let broken = p.broken_tiles.iter().filter(|&&c| c == color).count();
+                            let dome: usize = p.dome_grid.dome_slots.iter().flatten().flatten()
+                                .map(|t| t.spaces.iter().filter(|sp| sp.placed_color == Some(color)).count()).sum();
+                            eprintln!("  Spieler {pi}: pattern_lines={pl} broken={broken} dome={dome}");
+                        }
+                        eprintln!(
+                            "  bag={bag} tower={tower} fac_sun={fac_sun} fac_moon={fac_moon} lf_sun={lf_sun} lf_moon={lf_moon}"
+                        );
+                    }
+                    assert!(
+                        n >= TILES_PER_COLOR,
+                        "Spiel {gi}, Schritt {guard}, Phase {:?}: Farbe {color:?} zaehlt nur {n}, erwartet mindestens {TILES_PER_COLOR}",
+                        game.state.phase,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Diagnose (Nutzer-Anstoss): koennen zwei Rollout-Wiederholungen ab
+    /// DEMSELBEN geklonten Zustand ueberhaupt unterschiedliche Beutel-/
+    /// Kuppelstapel-Ziehungen erleben, wenn sie nur mit unabhaengigem RNG
+    /// weiterspielen? `draw_with_refill` mischt den Beutel NUR neu, wenn er
+    /// nicht genug Fliesen fuer die Anfrage hat (state.rs) -- der
+    /// Kuppelstapel wird NUR EINMAL beim Spielstart gemischt (setup_new_game),
+    /// nie wieder. Reicht der Vorrat innerhalb des Rollout-Horizonts, wuerden
+    /// ALLE Wiederholungen dieselbe schon feststehende Reihenfolge
+    /// durchspielen -- keine echte Zufallsmittelung (Weg-1-Determinisierung
+    /// waere dann ein No-Op fuer diese beiden Zufallsquellen).
+    #[test]
+    fn rollout_repetitions_actually_diverge_in_bag_and_dome_order() {
+        let mut base_rng = StdRng::seed_from_u64(555);
+        let ids = sample_valid_scoring_ids(3, &mut base_rng);
+        let names = ["A".to_string(), "B".to_string()];
+        let mut base = Game::start(names, 0, ids, &mut base_rng);
+        // Bis zum Start von Runde 1 (Startkacheln legen), damit wir eine
+        // echte fruehe Runde-1-Drafting-Entscheidung als Ausgangspunkt haben.
+        while base.state.players.iter().any(|p| p.start_tile_pending) {
+            if start_placement_step(&mut base, &mut base_rng).is_none() {
+                break;
+            }
+        }
+        let snapshot = base.state.clone();
+
+        let mut results: Vec<(Vec<crate::tile::TileColor>, Vec<usize>)> = Vec::new();
+        for rep_seed in [1001u64, 2002, 3003] {
+            let mut rng = StdRng::seed_from_u64(rep_seed);
+            let mut g = Game { state: snapshot.clone() };
+            // Derselbe Fix wie in mean_rollout_diff: unbekanntes neu auswuerfeln.
+            g.state.bag.tiles.shuffle(&mut rng);
+            g.state.dome_tile_pool.shuffle(&mut rng);
+            let mut guard = 0u32;
+            // Bis mindestens EINE Runde weiter (next_round() also mind. 1x
+            // durchlaufen) -- entspricht ungefaehr horizon_rounds=2.
+            let start_round = g.state.round_number;
+            loop {
+                guard += 1;
+                if guard > 5000 || g.state.round_number > start_round + 1 {
+                    break;
+                }
+                match g.state.phase {
+                    Phase::StartPlacement | Phase::Drafting => {
+                        if g.state.players.iter().any(|p| p.start_tile_pending) {
+                            if start_placement_step(&mut g, &mut rng).is_none() {
+                                break;
+                            }
+                        } else if g.state.phase == Phase::Drafting {
+                            let actions = drafting_actions(&g.state);
+                            if actions.is_empty() {
+                                break;
+                            }
+                            let a = actions.choose(&mut rng).cloned().unwrap_or(Action::Pass);
+                            let _ = g.apply_drafting(&a);
+                        } else {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        tiling_step(&mut g, &mut rng);
+                    }
+                    _ => break,
+                }
+            }
+            let dome_ids: Vec<usize> = g.state.dome_tile_pool.iter().map(|t| t.tile_id).collect();
+            results.push((g.state.bag.tiles.clone(), dome_ids));
+        }
+
+        let all_bag_identical = results.windows(2).all(|w| w[0].0 == w[1].0);
+        let all_dome_identical = results.windows(2).all(|w| w[0].1 == w[1].1);
+        for (i, (bag, dome)) in results.iter().enumerate() {
+            eprintln!("  Rep {i}: bag_len={} dome_pool_ids={:?}", bag.len(), dome);
+        }
+        // Mit dem Determinisierungs-Fix (shuffle vor Rollout-Fortsetzung)
+        // MUESSEN unabhaengige Wiederholungen unterschiedliche Beutel-/
+        // Kuppelstapel-Reihenfolgen sehen -- sonst ist Weg 1 (Mittelung ueber
+        // ausgewuerfelte Welten) fuer diese beiden Zufallsquellen ein No-Op.
+        assert!(!all_bag_identical, "Beutel-Reihenfolge identisch ueber alle Wiederholungen -- Determinisierung wirkungslos");
+        assert!(!all_dome_identical, "Kuppelstapel-Reihenfolge identisch ueber alle Wiederholungen -- Determinisierung wirkungslos");
+    }
 
     #[test]
     fn play_one_game_terminates_with_records() {
