@@ -1,0 +1,149 @@
+Lade Daten aus 792 Dateien...
+Datensatz geladen: 1184315 Züge. (Features pro Zug: 684) — 744.7s
+💾 Speichere HDF5-Cache...
+✅ Cache gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\data\.cache_91f750af0a3a.h5
+Lade Daten aus 88 Dateien...
+Datensatz geladen: 131345 Züge. (Features pro Zug: 684) — 83.9s
+💾 Speichere HDF5-Cache...
+✅ Cache gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\data\.cache_01b5a161d484.h5
+   Val-Split: 792 Trainings-Dateien / 88 Val-Dateien (1,184,315 / 131,345 Züge)
+   Value-Ziel-Streuung: σ=0.153 (Varianz=0.0234, zum Vergleich mit v_pred σ unten; Varianz ist die Baseline-MSE bei reiner Mittelwert-Vorhersage)
+
+🚀 Starte PyTorch Training auf: CUDA
+🧠 Netz-Architektur: 684→512→512→512
+⚙️  Hyperparameter (config.py):
+   Learning Rate : 0.0004
+   Value Weight  : 1
+   Batch Size    : 256
+   Value-Target  : tanh(eigen/50) - 0.1*tanh(gegner/50) (Endergebnis statt Win/Loss)
+   Epochen       : 100
+🆕 Neues Modell: Trainiere für 100 Epochen.
+Epoche  1/100 | Total Loss:   3.02 (R²=+0.47, Policy:  3.01) | Val-R²=+0.33 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.105
+Epoche  2/100 | Total Loss:   2.99 (R²=+0.62, Policy:  2.98) | Val-R²=+0.24 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.121
+Epoche  3/100 | Total Loss:   2.98 (R²=+0.67, Policy:  2.97) | Val-R²=+0.23 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.126
+Epoche  4/100 | Total Loss:   2.97 (R²=+0.68, Policy:  2.97) | Val-R²=+0.23 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.126
+Epoche  5/100 | Total Loss:   2.96 (R²=+0.65, Policy:  2.96) | Val-R²=+0.25 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.123
+Epoche  6/100 | Total Loss:   2.94 (R²=+0.61, Policy:  2.93) | Val-R²=+0.26 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.120
+Epoche  7/100 | Total Loss:   2.91 (R²=+0.58, Policy:  2.90) | Val-R²=+0.26 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.117
+Epoche  8/100 | Total Loss:   2.86 (R²=+0.56, Policy:  2.85) | Val-R²=+0.23 | Policy-Val= 2.20 | v_pred μ=+0.13 σ=0.115
+Epoche  9/100 | Total Loss:   2.82 (R²=+0.55, Policy:  2.81) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.114
+Epoche 10/100 | Total Loss:   2.78 (R²=+0.54, Policy:  2.77) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.113
+Epoche 11/100 | Total Loss:   2.74 (R²=+0.53, Policy:  2.73) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.112
+Epoche 12/100 | Total Loss:   2.70 (R²=+0.53, Policy:  2.69) | Val-R²=+0.29 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.111
+Epoche 13/100 | Total Loss:   2.67 (R²=+0.52, Policy:  2.66) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.111
+Epoche 14/100 | Total Loss:   2.64 (R²=+0.52, Policy:  2.63) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.110
+Epoche 15/100 | Total Loss:   2.62 (R²=+0.51, Policy:  2.61) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.110
+Epoche 16/100 | Total Loss:   2.59 (R²=+0.51, Policy:  2.58) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 17/100 | Total Loss:   2.57 (R²=+0.51, Policy:  2.56) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 18/100 | Total Loss:   2.54 (R²=+0.51, Policy:  2.53) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 19/100 | Total Loss:   2.53 (R²=+0.50, Policy:  2.51) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 20/100 | Total Loss:   2.51 (R²=+0.50, Policy:  2.49) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 21/100 | Total Loss:   2.49 (R²=+0.50, Policy:  2.48) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 22/100 | Total Loss:   2.48 (R²=+0.50, Policy:  2.47) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 23/100 | Total Loss:   2.47 (R²=+0.50, Policy:  2.45) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 24/100 | Total Loss:   2.45 (R²=+0.50, Policy:  2.44) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 25/100 | Total Loss:   2.44 (R²=+0.50, Policy:  2.43) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 26/100 | Total Loss:   2.44 (R²=+0.50, Policy:  2.42) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 27/100 | Total Loss:   2.43 (R²=+0.50, Policy:  2.41) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 28/100 | Total Loss:   2.42 (R²=+0.50, Policy:  2.41) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 29/100 | Total Loss:   2.41 (R²=+0.50, Policy:  2.40) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 30/100 | Total Loss:   2.41 (R²=+0.50, Policy:  2.40) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 31/100 | Total Loss:   2.40 (R²=+0.50, Policy:  2.39) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.108
+Epoche 32/100 | Total Loss:   2.40 (R²=+0.50, Policy:  2.39) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 33/100 | Total Loss:   2.39 (R²=+0.50, Policy:  2.38) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 34/100 | Total Loss:   2.39 (R²=+0.50, Policy:  2.38) | Val-R²=+0.28 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 35/100 | Total Loss:   2.38 (R²=+0.50, Policy:  2.37) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 36/100 | Total Loss:   2.38 (R²=+0.50, Policy:  2.37) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 37/100 | Total Loss:   2.37 (R²=+0.50, Policy:  2.36) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 38/100 | Total Loss:   2.37 (R²=+0.50, Policy:  2.36) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109
+Epoche 39/100 | Total Loss:   2.37 (R²=+0.51, Policy:  2.35) | Val-R²=+0.27 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109  🟡 POLICY-PLATEAU
+Epoche 40/100 | Total Loss:   2.36 (R²=+0.51, Policy:  2.35) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109  🟡 POLICY-PLATEAU
+Epoche 41/100 | Total Loss:   2.36 (R²=+0.51, Policy:  2.35) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109  🟡 POLICY-PLATEAU
+Epoche 42/100 | Total Loss:   2.36 (R²=+0.51, Policy:  2.35) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109  🟡 POLICY-PLATEAU
+Epoche 43/100 | Total Loss:   2.35 (R²=+0.51, Policy:  2.34) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109  🟡 POLICY-PLATEAU
+Epoche 44/100 | Total Loss:   2.35 (R²=+0.51, Policy:  2.34) | Val-R²=+0.26 | Policy-Val= 2.21 | v_pred μ=+0.13 σ=0.109  🟡 POLICY-PLATEAU
+
+⏹️  Early Stopping: Policy plateaut seit Epoche 39 (5 Epochen ohne Fortschritt).
+
+=======================================================
+  PHASE 2: VALUE-KALIBRIERUNG (Trunk/Policy eingefroren)
+───────────────────────────────────────────────────────
+  Kalibrierung  1/50 | Val-R²=+0.273  (bislang bester: Epoche 1)
+  Kalibrierung  2/50 | Val-R²=+0.264  (bislang bester: Epoche 1)
+  Kalibrierung  3/50 | Val-R²=+0.271  (bislang bester: Epoche 1)
+  Kalibrierung  4/50 | Val-R²=+0.266  (bislang bester: Epoche 1)
+  Kalibrierung  5/50 | Val-R²=+0.268  (bislang bester: Epoche 1)
+  Kalibrierung  6/50 | Val-R²=+0.267  (bislang bester: Epoche 1)
+  Kalibrierung  7/50 | Val-R²=+0.264  (bislang bester: Epoche 1)
+  Kalibrierung  8/50 | Val-R²=+0.264  (bislang bester: Epoche 1)
+  Kalibrierung  9/50 | Val-R²=+0.258  (bislang bester: Epoche 1)
+  ⏹️  Kalibrierung gestoppt: Val-R² seit Epoche 1 nicht mehr verbessert (Bestwert 0.273).
+  ✅ Value-Head auf besten Kalibrierungs-Stand zurückgesetzt (Epoche 1, Val-R²=0.273).
+=======================================================
+
+=======================================================
+  TRAINING SUMMARY
+=======================================================
+  Epochen:       100
+  Züge:          1,184,315  (+131,345 Val, nie trainiert)
+  Batches/Epoche:4626
+───────────────────────────────────────────────────────
+  Policy Loss:   2.3380 / 6.18 max  (37.8%)  🟡 Gut
+  Policy Val-Loss: 2.2134  (Gap ggü. Train: -0.1246)
+  Value Loss:    0.0118  (R²=0.50 ggü. Mittelwert-Baseline)  🟡 Gut
+  Value Val-R²:  0.27  (Gap ggü. Train: +0.22)  🟡 spürbarer Train/Val-Abstand — im Auge behalten
+───────────────────────────────────────────────────────
+  ℹ️  Phase 1 Val-R² war in Epoche 1 am besten (0.33), danach Überfitten (normal — Value trainiert bewusst bis zum Ende mit).
+  🎯 Phase 2 (Value-Kalibrierung): bester Stand nach Epoche 1, Val-R²=0.27 — Wert oben spiegelt diesen kalibrierten Value-Head wider.
+  ⏹️  Early Stopping (Policy-Plateau) nach Epoche 44/100
+  🟡 Plateau ab Epoche 39.
+     → Für nächste Generation: mehr Sims im Self-Play.
+=======================================================
+
+=======================================================
+  NETZAUSLASTUNG (Hidden Size: 512)
+───────────────────────────────────────────────────────
+  Schicht          Dead   Aktiv-Rate        Eff.Rank
+  ───────────────────────────────────────────────────
+  layer1     0/512 (0%)          39%   220/512 (43%)
+  layer2     0/512 (0%)          41%   202/512 (39%)
+  layer3    59/512 (12%)          11%   177/512 (35%)
+  ───────────────────────────────────────────────────
+  🟢 Gesunde Auslastung (Dead 4%, Rank 39%).
+=======================================================
+
+✅ Training beendet! Neues Model gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v7cold.pth
+📈 Loss-Verlauf gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v7cold_loss.png
+✅ Exportiert: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v7cold.onnx  (input=684, hidden=512, value_hidden=64, opset=13)
+📎 Referenz für Rust-Parität: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v7cold.onnx.ref.txt
+
+=======================================================
+  STUFE 1 vs. STUFE 2 (max. 100 Spiele, 200 Sims, Early-Stop)
+───────────────────────────────────────────────────────
+🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️
+  v7cold(Stufe1) (Brett 0, 200 Sims, c_puct=1.5, Stufe 1/DFS-Blatt) vs v7cold(Stufe2) (Brett 1, 200 Sims, c_puct=1.5, Stufe 2/Netz-Value-Blatt) — 100 Spiele  [SPRT p1=0.64, α=0.05, β=0.1]
+--------------------------------------------------
+  #  1/100:  40:0   -> v7cold(Stufe1)         | Züge 158 | LLR_A +0.25 | LLR_B -0.33 | ΔElo~+120 | Stand v7cold(Stufe1) 1:0 v7cold(Stufe2) | Elo 1016/984
+  #  2/100:  26:0   -> v7cold(Stufe1)         | Züge 155 | LLR_A +0.49 | LLR_B -0.66 | ΔElo~+191 | Stand v7cold(Stufe1) 2:0 v7cold(Stufe2) | Elo 1031/969
+  #  3/100:  44:6   -> v7cold(Stufe1)         | Züge 162 | LLR_A +0.74 | LLR_B -0.99 | ΔElo~+241 | Stand v7cold(Stufe1) 3:0 v7cold(Stufe2) | Elo 1044/956
+  #  4/100:  33:26  -> v7cold(Stufe1)         | Züge 160 | LLR_A +0.99 | LLR_B -1.31 | ΔElo~+280 | Stand v7cold(Stufe1) 4:0 v7cold(Stufe2) | Elo 1056/944
+  #  5/100:  31:34  -> v7cold(Stufe2)         | Züge 161 | LLR_A +0.66 | LLR_B -1.07 | ΔElo~+159 | Stand v7cold(Stufe1) 4:1 v7cold(Stufe2) | Elo 1035/965
+  #  6/100:  51:20  -> v7cold(Stufe1)         | Züge 155 | LLR_A +0.91 | LLR_B -1.40 | ΔElo~+191 | Stand v7cold(Stufe1) 5:1 v7cold(Stufe2) | Elo 1048/952
+  #  7/100:  34:0   -> v7cold(Stufe1)         | Züge 156 | LLR_A +1.15 | LLR_B -1.72 | ΔElo~+218 | Stand v7cold(Stufe1) 6:1 v7cold(Stufe2) | Elo 1060/940
+  #  8/100:  71:24  -> v7cold(Stufe1)         | Züge 161 | LLR_A +1.40 | LLR_B -2.05 | ΔElo~+241 | Stand v7cold(Stufe1) 7:1 v7cold(Stufe2) | Elo 1071/929
+  #  9/100:  13:0   -> v7cold(Stufe1)         | Züge 157 | LLR_A +1.65 | LLR_B -2.38 | ΔElo~+261 | Stand v7cold(Stufe1) 8:1 v7cold(Stufe2) | Elo 1081/919
+  # 10/100:  52:8   -> v7cold(Stufe1)         | Züge 162 | LLR_A +1.89 | LLR_B -2.38 | ΔElo~+280 | Stand v7cold(Stufe1) 9:1 v7cold(Stufe2) | Elo 1090/910
+  # 11/100:  53:20  -> v7cold(Stufe1)         | Züge 167 | LLR_A +2.14 | LLR_B -2.38 | ΔElo~+296 | Stand v7cold(Stufe1) 10:1 v7cold(Stufe2) | Elo 1098/902
+  # 12/100:  32:24  -> v7cold(Stufe1)         | Züge 158 | LLR_A +2.39 | LLR_B -2.38 | ΔElo~+311 | Stand v7cold(Stufe1) 11:1 v7cold(Stufe2) | Elo 1106/894
+  # 13/100:  49:21  -> v7cold(Stufe1)         | Züge 161 | LLR_A +2.63 | LLR_B -2.38 | ΔElo~+325 | Stand v7cold(Stufe1) 12:1 v7cold(Stufe2) | Elo 1113/887
+  # 14/100:  62:21  -> v7cold(Stufe1)         | Züge 160 | LLR_A +2.88 | LLR_B -2.38 | ΔElo~+338 | Stand v7cold(Stufe1) 13:1 v7cold(Stufe2) | Elo 1120/880
+  # 15/100:  34:0   -> v7cold(Stufe1)         | Züge 154 | LLR_A +3.13 | LLR_B -2.38 | ΔElo~+350 | Stand v7cold(Stufe1) 14:1 v7cold(Stufe2) | Elo 1126/874
+  ⏹️  SPRT-Entscheid nach 15 Spielen: v7cold(Stufe1) signifikant staerker (LLR_A=+3.13, LLR_B=-2.38).
+--------------------------------------------------
+🏆 ERGEBNIS: v7cold(Stufe1) 14:1 v7cold(Stufe2) (93% A-Siege) in 280.1s (0.1 Spiele/s)  [vorzeitig nach 15/100 Spielen]
+   Ø Score: v7cold(Stufe1) 41.7 | v7cold(Stufe2) 13.6
+   0:0-Spiele: 0/15 (0.0%)
+   Elo: v7cold(Stufe1) 1126 | v7cold(Stufe2) 874
+=======================================================

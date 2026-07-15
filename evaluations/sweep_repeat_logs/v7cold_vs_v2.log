@@ -1,0 +1,53 @@
+🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️
+  v7cold (Brett 0, 200 Sims, c_puct=1.5, Stufe 1/DFS-Blatt) vs v2 (Brett 1, 200 Sims, c_puct=1.5, Stufe 1/DFS-Blatt) — 100 Spiele  [SPRT p1=0.64, α=0.05, β=0.1]
+--------------------------------------------------
+  #  1/100:  25:57  -> v2                     | Züge 162 | LLR_A -0.33 | LLR_B +0.25 | ΔElo~-120 | Stand v7cold 0:1 v2 | Elo 984/1016
+  #  2/100:  28:28  -> v2                     | Züge 155 | LLR_A -0.66 | LLR_B +0.49 | ΔElo~-191 | Stand v7cold 0:2 v2 | Elo 969/1031
+  #  3/100:  39:41  -> v2                     | Züge 155 | LLR_A -0.99 | LLR_B +0.74 | ΔElo~-241 | Stand v7cold 0:3 v2 | Elo 956/1044
+  #  4/100:  30:30  -> v2                     | Züge 163 | LLR_A -1.31 | LLR_B +0.99 | ΔElo~-280 | Stand v7cold 0:4 v2 | Elo 944/1056
+  #  5/100:  39:64  -> v2                     | Züge 160 | LLR_A -1.64 | LLR_B +1.23 | ΔElo~-311 | Stand v7cold 0:5 v2 | Elo 933/1067
+  #  6/100:  37:23  -> v7cold                 | Züge 160 | LLR_A -1.40 | LLR_B +0.91 | ΔElo~-191 | Stand v7cold 1:5 v2 | Elo 955/1045
+  #  7/100:  28:44  -> v2                     | Züge 163 | LLR_A -1.72 | LLR_B +1.15 | ΔElo~-218 | Stand v7cold 1:6 v2 | Elo 943/1057
+  #  8/100:  20:49  -> v2                     | Züge 165 | LLR_A -2.05 | LLR_B +1.40 | ΔElo~-241 | Stand v7cold 1:7 v2 | Elo 932/1068
+  #  9/100:  64:35  -> v7cold                 | Züge 159 | LLR_A -1.81 | LLR_B +1.07 | ΔElo~-170 | Stand v7cold 2:7 v2 | Elo 954/1046
+  # 10/100:   6:9   -> v2                     | Züge 155 | LLR_A -2.13 | LLR_B +1.32 | ΔElo~-191 | Stand v7cold 2:8 v2 | Elo 942/1058
+  # 11/100:  36:49  -> v2                     | Züge 154 | LLR_A -2.46 | LLR_B +1.56 | ΔElo~-209 | Stand v7cold 2:9 v2 | Elo 931/1069
+  # 12/100:  21:40  -> v2                     | Züge 164 | LLR_A -2.46 | LLR_B +1.81 | ΔElo~-226 | Stand v7cold 2:10 v2 | Elo 921/1079
+  # 13/100:  12:11  -> v7cold                 | Züge 157 | LLR_A -2.46 | LLR_B +1.48 | ΔElo~-176 | Stand v7cold 3:10 v2 | Elo 944/1056
+  # 14/100:  51:58  -> v2                     | Züge 155 | LLR_A -2.46 | LLR_B +1.73 | ΔElo~-191 | Stand v7cold 3:11 v2 | Elo 933/1067
+  # 15/100:  47:47  -> v2                     | Züge 155 | LLR_A -2.46 | LLR_B +1.98 | ΔElo~-205 | Stand v7cold 3:12 v2 | Elo 923/1077
+  # 16/100:  34:29  -> v7cold                 | Züge 162 | LLR_A -2.46 | LLR_B +1.65 | ΔElo~-166 | Stand v7cold 4:12 v2 | Elo 946/1054
+  # 17/100:  53:43  -> v7cold                 | Züge 166 | LLR_A -2.46 | LLR_B +1.32 | ΔElo~-134 | Stand v7cold 5:12 v2 | Elo 967/1033
+  # 18/100:  26:33  -> v2                     | Züge 165 | LLR_A -2.46 | LLR_B +1.57 | ΔElo~-147 | Stand v7cold 5:13 v2 | Elo 954/1046
+  # 19/100:  49:45  -> v7cold                 | Züge 161 | LLR_A -2.46 | LLR_B +1.24 | ΔElo~-120 | Stand v7cold 6:13 v2 | Elo 974/1026
+  # 20/100:  57:39  -> v7cold                 | Züge 166 | LLR_A -2.46 | LLR_B +0.91 | ΔElo~-97 | Stand v7cold 7:13 v2 | Elo 992/1008
+  # 21/100:  43:29  -> v7cold                 | Züge 162 | LLR_A -2.46 | LLR_B +0.58 | ΔElo~-77 | Stand v7cold 8:13 v2 | Elo 1009/991
+  # 22/100:  37:42  -> v2                     | Züge 164 | LLR_A -2.46 | LLR_B +0.83 | ΔElo~-89 | Stand v7cold 8:14 v2 | Elo 992/1008
+  # 23/100:  30:27  -> v7cold                 | Züge 165 | LLR_A -2.46 | LLR_B +0.50 | ΔElo~-70 | Stand v7cold 9:14 v2 | Elo 1009/991
+  # 24/100:  44:42  -> v7cold                 | Züge 166 | LLR_A -2.46 | LLR_B +0.17 | ΔElo~-54 | Stand v7cold 10:14 v2 | Elo 1024/976
+  # 25/100:  25:42  -> v2                     | Züge 155 | LLR_A -2.46 | LLR_B +0.42 | ΔElo~-65 | Stand v7cold 10:15 v2 | Elo 1006/994
+  # 26/100:  48:45  -> v7cold                 | Züge 157 | LLR_A -2.46 | LLR_B +0.09 | ΔElo~-50 | Stand v7cold 11:15 v2 | Elo 1021/979
+  # 27/100:  34:47  -> v2                     | Züge 161 | LLR_A -2.46 | LLR_B +0.34 | ΔElo~-61 | Stand v7cold 11:16 v2 | Elo 1003/997
+  # 28/100:  53:27  -> v7cold                 | Züge 157 | LLR_A -2.46 | LLR_B +0.01 | ΔElo~-47 | Stand v7cold 12:16 v2 | Elo 1019/981
+  # 29/100:  31:36  -> v2                     | Züge 161 | LLR_A -2.46 | LLR_B +0.25 | ΔElo~-57 | Stand v7cold 12:17 v2 | Elo 1001/999
+  # 30/100:  40:46  -> v2                     | Züge 161 | LLR_A -2.46 | LLR_B +0.50 | ΔElo~-66 | Stand v7cold 12:18 v2 | Elo 985/1015
+  # 31/100:  39:52  -> v2                     | Züge 156 | LLR_A -2.46 | LLR_B +0.75 | ΔElo~-75 | Stand v7cold 12:19 v2 | Elo 970/1030
+  # 32/100:  58:22  -> v7cold                 | Züge 161 | LLR_A -2.46 | LLR_B +0.42 | ΔElo~-62 | Stand v7cold 13:19 v2 | Elo 989/1011
+  # 33/100:  56:38  -> v7cold                 | Züge 157 | LLR_A -2.46 | LLR_B +0.09 | ΔElo~-50 | Stand v7cold 14:19 v2 | Elo 1006/994
+  # 34/100:  31:8   -> v7cold                 | Züge 162 | LLR_A -2.46 | LLR_B -0.24 | ΔElo~-39 | Stand v7cold 15:19 v2 | Elo 1021/979
+  # 35/100:  32:48  -> v2                     | Züge 161 | LLR_A -2.46 | LLR_B +0.01 | ΔElo~-47 | Stand v7cold 15:20 v2 | Elo 1003/997
+  # 36/100:  41:14  -> v7cold                 | Züge 164 | LLR_A -2.46 | LLR_B -0.32 | ΔElo~-37 | Stand v7cold 16:20 v2 | Elo 1019/981
+  # 37/100:  36:31  -> v7cold                 | Züge 166 | LLR_A -2.46 | LLR_B -0.65 | ΔElo~-27 | Stand v7cold 17:20 v2 | Elo 1033/967
+  # 38/100:  55:34  -> v7cold                 | Züge 160 | LLR_A -2.46 | LLR_B -0.98 | ΔElo~-17 | Stand v7cold 18:20 v2 | Elo 1046/954
+  # 39/100:  50:43  -> v7cold                 | Züge 164 | LLR_A -2.46 | LLR_B -1.30 | ΔElo~-8 | Stand v7cold 19:20 v2 | Elo 1058/942
+  # 40/100:  49:48  -> v7cold                 | Züge 164 | LLR_A -2.46 | LLR_B -1.63 | ΔElo~-0 | Stand v7cold 20:20 v2 | Elo 1069/931
+  # 41/100:  43:39  -> v7cold                 | Züge 161 | LLR_A -2.46 | LLR_B -1.96 | ΔElo~+8 | Stand v7cold 21:20 v2 | Elo 1079/921
+  # 42/100:  26:39  -> v2                     | Züge 157 | LLR_A -2.46 | LLR_B -1.71 | ΔElo~-0 | Stand v7cold 21:21 v2 | Elo 1056/944
+  # 43/100:  47:10  -> v7cold                 | Züge 159 | LLR_A -2.46 | LLR_B -2.04 | ΔElo~+8 | Stand v7cold 22:21 v2 | Elo 1067/933
+  # 44/100:  48:41  -> v7cold                 | Züge 155 | LLR_A -2.46 | LLR_B -2.37 | ΔElo~+15 | Stand v7cold 23:21 v2 | Elo 1077/923
+  ⏹️  SPRT-Entscheid nach 44 Spielen: Gleich stark (beide Seiten nicht signifikant staerker) (LLR_A=-2.46, LLR_B=-2.37).
+--------------------------------------------------
+🏆 ERGEBNIS: v7cold 23:21 v2 (52% A-Siege) in 592.4s (0.1 Spiele/s)  [vorzeitig nach 44/100 Spielen]
+   Ø Score: v7cold 38.6 | v2 36.9
+   0:0-Spiele: 0/44 (0.0%)
+   Elo: v7cold 1077 | v2 923
