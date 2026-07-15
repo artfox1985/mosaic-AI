@@ -432,6 +432,129 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=100,
     print(f"   Elo: {name_a} {elo[name_a]} | {name_b} {elo[name_b]}")
 
 
+def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50,
+                         top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2, games=50,
+                         threads=0, seed=None, chunk=5, c_puct=1.5, name_a="Stufe3", name_b="Stufe1",
+                         early_stop=True, sprt_alpha=0.05, sprt_beta=0.10, sprt_p1=0.64):
+    """Stufe 3 (Brett 0: bis einschliesslich Runde `stage3_max_round` per
+    Top-K-Kandidaten + gemittelten Rollouts über den Beutel-Zufall
+    entschieden, begrenzt auf `horizon_rounds` Runden statt Spielende; danach
+    faellt es auf reine Stufe 1 zurueck -- ein Besuchsanteil-/Q-Wert-
+    basiertes "nur bei knappen Entscheidungen"-Kriterium wurde gemessen und
+    verworfen, siehe evaluations/stage2_investigation.md, Stufe-3-
+    Kalibrierung) vs. Stufe 1 (Brett 1: reine Netz-PUCT + DFS-Blatt),
+    dasselbe Netz. Startspieler alternieren je Spiel. `early_stop`: dieselbe
+    duale SPRT wie `run_net_vs_net` (siehe dort für die genaue Logik)."""
+    import os
+    import statistics as _st
+    chunk = max(1, chunk)
+    name_a = name_a or f"Stufe3({os.path.basename(model)})"
+    name_b = name_b or f"Stufe1({os.path.basename(model)})"
+    sprt_lower, sprt_upper = sprt_bounds(sprt_alpha, sprt_beta)
+
+    print("🏟️ Mosaic-AI ARENA — Stufe 3 (Rollouts) vs Stufe 1 (Rust) 🏟️")
+    print(f"  {name_a} (Brett 0, nur Runde 1-{stage3_max_round}, Top-{top_k}, {n_reps} Rollouts, "
+          f"Horizont {horizon_rounds} Runden, Shortlist-Sims {stage3_shortlist_sims}, "
+          f"Rollout-Sims {stage3_rollout_sims}) vs "
+          f"{name_b} (Brett 1, {sims1} Sims, DFS-Blatt) — {games} Spiele"
+          + (f"  [SPRT p1={sprt_p1}, α={sprt_alpha}, β={sprt_beta}]" if early_stop else ""))
+    print("-" * 50)
+
+    elo  = {name_a: 1000, name_b: 1000}
+    wins = {name_a: 0, name_b: 0, "ZeroZero": 0}
+    a_scores, b_scores = [], []
+    base_seed = seed if seed is not None else random.randint(0, 10**9)
+
+    done = chunk_idx = 0
+    a_wins = b_wins = 0
+    llr_a = llr_b = 0.0
+    a_out = b_out = False
+    verdict = None
+    total_decisions = total_triggered = 0
+    t0 = time.time()
+    while done < games:
+        n = min(chunk, games - done)
+        raw = _mr.stage3_vs_stage1_arena_match(
+            model_path=model, n_games=n, sims1=sims1,
+            stage3_shortlist_sims=stage3_shortlist_sims, stage3_rollout_sims=stage3_rollout_sims,
+            c_puct=c_puct, top_k=top_k, n_reps=n_reps, horizon_rounds=horizon_rounds,
+            stage3_max_round=stage3_max_round, seed=base_seed + chunk_idx, num_threads=threads,
+        )
+        results = json.loads(raw)
+        chunk_idx += 1
+        diag = None
+        for g in results:
+            if g.get("stage3_diagnostics"):
+                diag = g
+                continue
+            done += 1
+            scores = g["scores"]      # [Stufe3=Brett0, Stufe1=Brett1]
+            winner = g["winner"]      # 0 = Stufe3, 1 = Stufe1
+            steps  = g["steps"]
+            a_scores.append(scores[0]); b_scores.append(scores[1])
+            a_won = (winner == 0)
+            if a_won:
+                winner_name, score_a = name_a, 1.0; a_wins += 1
+            else:
+                winner_name, score_a = name_b, 0.0; b_wins += 1
+            wins[winner_name] += 1
+            if scores[0] == 0 and scores[1] == 0:
+                wins["ZeroZero"] += 1
+            elo[name_a], elo[name_b] = calculate_elo(elo[name_a], elo[name_b], score_a)
+            _, delta_elo_smooth = smoothed_win_prob_and_elo(a_wins, done, p1=sprt_p1)
+
+            if early_stop:
+                if not a_out:
+                    llr_a += sprt_llr_delta(a_won, p1=sprt_p1)
+                    if llr_a >= sprt_upper:
+                        verdict = name_a
+                    elif llr_a <= sprt_lower:
+                        a_out = True
+                if verdict is None and not b_out:
+                    llr_b += sprt_llr_delta(not a_won, p1=sprt_p1)
+                    if llr_b >= sprt_upper:
+                        verdict = name_b
+                    elif llr_b <= sprt_lower:
+                        b_out = True
+                if verdict is None and a_out and b_out:
+                    verdict = "PARITY"
+
+            print(f"  #{done:>3}/{games}: {scores[0]:3d}:{scores[1]:<3d} -> {winner_name:<22} "
+                  f"| Züge {steps:3d} | LLR_A {llr_a:+.2f} | LLR_B {llr_b:+.2f} "
+                  f"| ΔElo~{delta_elo_smooth:+.0f} | Stand {name_a} {a_wins}:{b_wins} {name_b} "
+                  f"| Elo {elo[name_a]}/{elo[name_b]}",
+                  flush=True)
+
+            if verdict:
+                label = (f"{verdict} signifikant staerker" if verdict != "PARITY"
+                         else "Gleich stark (beide Seiten nicht signifikant staerker)")
+                print(f"  ⏹️  SPRT-Entscheid nach {done} Spielen: {label} "
+                      f"(LLR_A={llr_a:+.2f}, LLR_B={llr_b:+.2f}).")
+                break
+        if diag is not None:
+            total_decisions += diag["decisions"]
+            total_triggered += diag["rollouts_triggered"]
+        if verdict:
+            break
+
+    if early_stop and verdict is None:
+        verdict = "PARITY"
+        print(f"  ⏹️  Ressourcenlimit erreicht (Spiel {games}) ohne SPRT-Entscheidung -> Gleich stark "
+              f"(LLR_A={llr_a:+.2f}, LLR_B={llr_b:+.2f}).")
+
+    dur = time.time() - t0
+    print("-" * 50)
+    print(f"🏆 ERGEBNIS: {name_a} {a_wins}:{b_wins} {name_b} "
+          f"({a_wins/done*100:.0f}% A-Siege) in {dur:.1f}s ({done/dur:.1f} Spiele/s)"
+          + (f"  [vorzeitig nach {done}/{games} Spielen]" if early_stop and done < games else ""))
+    print(f"   Ø Score: {name_a} {_st.mean(a_scores):.1f} | {name_b} {_st.mean(b_scores):.1f}")
+    print(f"   0:0-Spiele: {wins['ZeroZero']}/{done} ({wins['ZeroZero']/done*100:.1f}%)")
+    print(f"   Elo: {name_a} {elo[name_a]} | {name_b} {elo[name_b]}")
+    if total_decisions > 0:
+        print(f"   Stufe-3-Entscheidungen (Runde 1-{stage3_max_round}): {total_decisions}, "
+              f"davon per Rollout bewertet: {total_triggered}")
+
+
 if __name__ == "__main__":
     import os
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────

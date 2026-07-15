@@ -175,6 +175,76 @@ fn net_self_play_games(
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+/// Sucht in `n_games` Stufe-1-geführten Partien nach Stufe1/Stufe2-
+/// Meinungsverschiedenheiten (argmax-Zug unterschiedlich) und bewertet jede
+/// per `n_reps` unabhängigen Rollouts (Stufe-1-Fortsetzung), ob Stufe 2s Wahl
+/// im Mittel zu einem besseren Score-Vorsprung führt. Siehe
+/// `evaluations/stage2_investigation.md` (Mehrrunden-Vorsicht-Hypothese).
+#[pyfunction]
+#[pyo3(signature = (model_path, n_games=100, base_sims=400, c_puct=1.5, n_reps=8, max_per_round=2, seed=None, num_threads=0))]
+#[allow(clippy::too_many_arguments)]
+fn stage_disagreement_study(
+    py: Python<'_>,
+    model_path: String,
+    n_games: usize,
+    base_sims: u32,
+    c_puct: f64,
+    n_reps: usize,
+    max_per_round: usize,
+    seed: Option<u64>,
+    num_threads: usize,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_stage_disagreement_study(
+            &model_path, n_games, base_sims, c_puct, n_reps, max_per_round, seed, num_threads,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
+/// Arena-Match Stufe 3 (Brett 0, Top-K-Kandidaten + gemittelte Rollouts über
+/// den Beutel-Zufall) vs. Stufe 1 (Brett 1, reine Netz-PUCT + DFS-Blatt),
+/// dasselbe Netz. Siehe `evaluations/stage2_investigation.md`: Stufe 3
+/// braucht keinen Value-Head, mittelt stattdessen explizit über künftige
+/// Runden statt sie zu schätzen.
+/// Defaults kalibriert aus gemessener Verzweigungsbreite/Zugzahl (siehe
+/// evaluations/stage2_investigation.md, Stufe-3-Kalibrierung): top_k=2,
+/// n_reps=3, horizon_rounds=2 (statt bis Spielende) haelt die Rollout-Kosten
+/// gerade fuer teure Runde-1/2-Entscheidungen in einem praktikablen Rahmen.
+/// `stage3_max_round=2`: Stufe 3 nur in Runde 1-2 einsetzen (dort zaehlt die
+/// Mehrrunden-Frage am meisten), danach auf reine Stufe 1 zurueckfallen --
+/// ein Besuchsanteil-/Q-Wert-basiertes "nur bei knappen Entscheidungen"-
+/// Kriterium wurde gemessen und verworfen (bei 20-43 Kandidaten je Runde zu
+/// verrauscht, siehe stage3_choose_action).
+#[pyfunction]
+#[pyo3(signature = (model_path, n_games=50, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50, c_puct=1.5, top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2, seed=None, num_threads=0))]
+#[allow(clippy::too_many_arguments)]
+fn stage3_vs_stage1_arena_match(
+    py: Python<'_>,
+    model_path: String,
+    n_games: usize,
+    sims1: u32,
+    stage3_shortlist_sims: u32,
+    stage3_rollout_sims: u32,
+    c_puct: f64,
+    top_k: usize,
+    n_reps: usize,
+    horizon_rounds: u32,
+    stage3_max_round: u32,
+    seed: Option<u64>,
+    num_threads: usize,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_stage3_vs_stage1_arena(
+            &model_path, n_games, sims1, stage3_shortlist_sims, stage3_rollout_sims, c_puct, top_k,
+            n_reps, horizon_rounds, stage3_max_round, seed, num_threads,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
 /// Feature-Vektor aus und gibt `(value, policy_logits)` zurück.
 #[pyfunction]
@@ -221,6 +291,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_vs_net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
+    m.add_function(wrap_pyfunction!(stage_disagreement_study, m)?)?;
+    m.add_function(wrap_pyfunction!(stage3_vs_stage1_arena_match, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }

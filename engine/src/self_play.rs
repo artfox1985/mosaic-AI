@@ -1294,6 +1294,521 @@ pub fn run_net_self_play(
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
+/// Argmax-Aktion nach Besuchen (deterministische Wahl) aus Wurzelkind-Stats.
+fn argmax_action(stats: &[(Action, u32, f64)]) -> Option<Action> {
+    stats.iter().max_by_key(|(_, v, _)| *v).map(|(a, _, _)| a.clone())
+}
+
+/// Ein gefundener Stufe1/Stufe2-Meinungsverschiedenheits-Kandidat: Zustand VOR
+/// der Entscheidung (für die spätere Verzweigung) + beide argmax-Aktionen.
+struct Candidate {
+    round: u32,
+    player: usize,
+    state: GameState,
+    a1: Action,
+    a2: Action,
+}
+
+/// Spielt EIN Spiel per Stufe-1 (DFS-Blatt, deterministisch) durch — genau wie
+/// die Champion-Politik in der Arena — und sammelt dabei GÜNSTIG (nur 2x
+/// Wurzelkind-Stats je Entscheidung, KEINE Rollouts) alle Punkte, an denen
+/// Stufe 2 (Netz-Value-Blatt) argmax abweichend gewählt hätte. Das Sammeln
+/// läuft mit normalem Self-Play-Timeout durch bis Spielende (alle 5 Runden) —
+/// die teure Rollout-Auswertung passiert ERST DANACH in
+/// `evaluate_sampled_candidates`, damit sie das Erreichen späterer Runden
+/// nicht mehr verdrängen kann (frühere Version: Rollouts liefen inline in
+/// derselben Zeitschranke wie das Hauptspiel und brachen es schon nach den
+/// ersten Runde-1-Fällen ab, bevor Runde 2-5 je gesehen wurden).
+fn collect_disagreement_candidates<R: Rng + ?Sized>(
+    net: &Net,
+    base_sims: u32,
+    c_puct: f64,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+) -> Vec<Candidate> {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut out: Vec<Candidate> = Vec::new();
+    let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
+    let timeout_secs = net_game_timeout_secs(base_sims) * 3; // 2x Suchaufwand je Entscheidung
+    loop {
+        guard += 1;
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    if start_placement_step(&mut game, rng).is_none() {
+                        break;
+                    }
+                } else if game.state.phase == Phase::Drafting {
+                    let player = game.state.current_player;
+                    let round = game.state.round_number;
+                    let actions = drafting_actions(&game.state);
+                    let chosen = if actions.len() == 1 {
+                        actions[0].clone()
+                    } else {
+                        let sims = dynamic_sims(base_sims, actions.len());
+                        let stats1 =
+                            net_root_child_stats(net, &game.state, sims, c_puct, false, LeafEval::Dfs, rng);
+                        let stats2 =
+                            net_root_child_stats(net, &game.state, sims, c_puct, false, LeafEval::Net, rng);
+                        let a1 = argmax_action(&stats1);
+                        let a2 = argmax_action(&stats2);
+                        if let (Some(ref a1v), Some(ref a2v)) = (&a1, &a2) {
+                            if a1v != a2v {
+                                out.push(Candidate {
+                                    round,
+                                    player,
+                                    state: game.state.clone(),
+                                    a1: a1v.clone(),
+                                    a2: a2v.clone(),
+                                });
+                            }
+                        }
+                        a1.unwrap_or_else(|| actions.choose(rng).cloned().unwrap_or(Action::Pass))
+                    };
+                    let _ = game.apply_drafting(&chosen);
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => {
+                tiling_step(&mut game, rng);
+            }
+            _ => break,
+        }
+    }
+    out
+}
+
+/// Gruppiert `candidates` nach Runde und wertet höchstens `max_per_round`
+/// zufällig gezogene Kandidaten je Runde per Rollout aus (siehe
+/// `evaluate_disagreement`) — begrenzt die teure Rollout-Arbeit pro Spiel und
+/// sorgt für eine über alle Runden ausgeglichene Stichprobe (Runde 1 hat sonst
+/// weit mehr Kandidaten als spätere Runden und würde die Stichprobe dominieren).
+#[allow(clippy::too_many_arguments)]
+fn evaluate_sampled_candidates<R: Rng + ?Sized>(
+    net: &Net,
+    candidates: Vec<Candidate>,
+    base_sims: u32,
+    c_puct: f64,
+    n_reps: usize,
+    max_per_round: usize,
+    rng: &mut R,
+) -> Vec<Value> {
+    use std::collections::HashMap;
+    let mut by_round: HashMap<u32, Vec<Candidate>> = HashMap::new();
+    for c in candidates {
+        by_round.entry(c.round).or_default().push(c);
+    }
+    let mut out = Vec::new();
+    for (_, mut group) in by_round {
+        group.shuffle(rng);
+        for c in group.into_iter().take(max_per_round) {
+            let rec = evaluate_disagreement(
+                net, &c.state, &c.a1, &c.a2, base_sims, c_puct, n_reps, c.player, c.round, rng,
+            );
+            out.push(rec);
+        }
+    }
+    out
+}
+
+/// Verzweigt `state` bei einer Stufe1/Stufe2-Meinungsverschiedenheit: wendet
+/// `a1` (Stufe 1) bzw. `a2` (Stufe 2) an und spielt beide Zweige `n_reps`-mal
+/// per Stufe-1-Politik bis Spielende fort. Gibt ein Vergleichs-Dict zurück.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_disagreement<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    a1: &Action,
+    a2: &Action,
+    base_sims: u32,
+    c_puct: f64,
+    n_reps: usize,
+    player: usize,
+    round: u32,
+    rng: &mut R,
+) -> Value {
+    let mean_a = mean_rollout_diff(net, state, a1, base_sims, c_puct, n_reps, player, None, rng);
+    let mean_b = mean_rollout_diff(net, state, a2, base_sims, c_puct, n_reps, player, None, rng);
+    json!({
+        "round": round,
+        "player": player,
+        "stage1_action": crate::mcts::label_search_move(&crate::mcts::SearchMove::Draft(a1.clone()), Some(state)).1,
+        "stage2_action": crate::mcts::label_search_move(&crate::mcts::SearchMove::Draft(a2.clone()), Some(state)).1,
+        "stage1_mean_diff": mean_a,
+        "stage2_mean_diff": mean_b,
+        "n_reps": n_reps,
+    })
+}
+
+/// Wendet `first_action` auf eine Kopie von `state` an und spielt danach
+/// `n_reps`-mal (je frischer RNG-Ziehung ab diesem Punkt) per Stufe-1-Politik
+/// (DFS-Blatt, deterministisch — Champion-Spielstil) bis Spielende fort.
+/// Gibt den mittleren Score-Vorsprung (`player` minus Gegner) zurück.
+#[allow(clippy::too_many_arguments)]
+/// `horizon_rounds`: `None` = wie bisher bis Spielende (Disagreement-Studie).
+/// `Some(h)` bricht ab, sobald `h` Runden ab der aktuellen gespielt wurden,
+/// und wertet den bis dahin ECHT erzielten Score-Vorsprung aus (keine
+/// Schätzung -- nur ohne die Wertungsplatten-Endbonuspunkte, die erst am
+/// echten Spielende dazukommen). Kappt die Rollout-Kosten drastisch fuer
+/// fruehe Runden (siehe stage2_investigation.md, Stufe-3-Kalibrierung: ab
+/// Runde 1 muessten sonst im Schnitt alle ~109 restlichen Zuege des GANZEN
+/// Spiels durchgespielt werden, mit horizon_rounds=2 nur noch die aktuelle
+/// plus eine weitere Runde).
+#[allow(clippy::too_many_arguments)]
+fn mean_rollout_diff<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    first_action: &Action,
+    base_sims: u32,
+    c_puct: f64,
+    n_reps: usize,
+    player: usize,
+    horizon_rounds: Option<u32>,
+    rng: &mut R,
+) -> f64 {
+    let start_round = state.round_number;
+    let mut total = 0.0;
+    for _ in 0..n_reps {
+        let mut g = Game { state: state.clone() };
+        let _ = g.apply_drafting(first_action);
+        let mut guard = 0u32;
+        loop {
+            guard += 1;
+            if guard > 2000 {
+                break;
+            }
+            if let Some(h) = horizon_rounds {
+                if g.state.phase == Phase::Drafting && g.state.round_number >= start_round + h {
+                    break;
+                }
+            }
+            match g.state.phase {
+                Phase::StartPlacement | Phase::Drafting => {
+                    if g.state.players.iter().any(|p| p.start_tile_pending) {
+                        if start_placement_step(&mut g, rng).is_none() {
+                            break;
+                        }
+                    } else if g.state.phase == Phase::Drafting {
+                        let actions = drafting_actions(&g.state);
+                        if actions.is_empty() {
+                            break;
+                        }
+                        let a = if actions.len() == 1 {
+                            actions[0].clone()
+                        } else {
+                            let (a, _) = net_drafting_policy(
+                                net, &g.state, &actions, base_sims, c_puct, LeafEval::Dfs, rng, false, true,
+                            );
+                            a
+                        };
+                        let _ = g.apply_drafting(&a);
+                    } else {
+                        break;
+                    }
+                }
+                Phase::Tiling => {
+                    tiling_step(&mut g, rng);
+                }
+                _ => break,
+            }
+        }
+        if g.state.phase == Phase::End {
+            let _ = g.apply_end_scoring();
+        }
+        let opp = 1 - player;
+        total += (g.state.players[player].score - g.state.players[opp].score) as f64;
+    }
+    total / n_reps.max(1) as f64
+}
+
+/// Sucht in `n_games` Stufe-1-geführten Partien nach Stufe1/Stufe2-
+/// Meinungsverschiedenheiten (Phase 1, günstig, siehe
+/// `collect_disagreement_candidates`), wertet je Runde höchstens
+/// `max_per_round` davon per Rollout aus (Phase 2, siehe
+/// `evaluate_sampled_candidates`) und gibt alle Vergleichs-Dicts flach als
+/// JSON-Array zurück.
+#[allow(clippy::too_many_arguments)]
+pub fn run_stage_disagreement_study(
+    model_path: &str,
+    n_games: usize,
+    base_sims: u32,
+    c_puct: f64,
+    n_reps: usize,
+    max_per_round: usize,
+    seed: u64,
+    num_threads: usize,
+) -> Result<String, String> {
+    let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+
+    let play = |i: usize| -> Vec<Value> {
+        let mut rng =
+            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = rng.random_range(0..2usize);
+        let names = ["Netz".to_string(), "Netz".to_string()];
+        let candidates =
+            collect_disagreement_candidates(&net, base_sims, c_puct, ids, names, first, &mut rng);
+        evaluate_sampled_candidates(&net, candidates, base_sims, c_puct, n_reps, max_per_round, &mut rng)
+    };
+
+    let all: Vec<Vec<Value>> = if num_threads == 0 {
+        (0..n_games).into_par_iter().map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    let flat: Vec<Value> = all.into_iter().flatten().collect();
+    Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
+}
+
+// ── Stufe 3: explizite Zufallsmittelung über Rundengrenzen (Rollouts) ───────
+// Begründung siehe `evaluations/stage2_investigation.md`: AlphaZero (Schach/
+// Go) hat keine Zufallsknoten im Suchbaum, weil dort kein Zufall zwischen
+// Zügen liegt. Backgammon/Scrabble-Programme lösen das nicht durch ein
+// größeres Wertenetz, sondern durch explizite Mittelung über den Zufall
+// (Rollouts). Stufe 1/2 haben BEIDE null Zufallsknoten -- der Suchbaum endet
+// exakt an der Rundengrenze (`terminal = phase != Drafting`) und überlässt
+// den kompletten Rest (Beutel-Nachschub künftiger Runden) dem Wertenetz.
+// Stufe 3 ersetzt diese Schätzung durch echte Simulation: die
+// vielversprechendsten Kandidatenzüge (Top-K nach Netz-Suche) werden je
+// `n_reps`-mal mit unabhängigem Zufall (Beutel-Nachschub) bis Spielende
+// fortgesetzt (Stufe-1-Politik als Fortsetzung), der beste mittlere
+// Score-Vorsprung gewinnt. Braucht den Value-Head NICHT (reine
+// Policy+DFS-Simulation), ist aber pro Zug deutlich teurer.
+
+/// Diagnose-Zaehler (Trigger-Rate des Rollout-Tiebreaks) fuer die
+/// Stufe-3-Kalibrierung -- siehe `run_stage3_vs_stage1_arena`, das sie vor
+/// jedem Lauf zuruecksetzt und am Ende ausliest/loggt.
+static STAGE3_DECISIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static STAGE3_ROLLOUTS_TRIGGERED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Wählt EINE Drafting-Aktion per Stufe 3: Top-K-Kandidaten (nach Besuchen
+/// einer günstigen Vorab-Suche, DFS-Blatt) werden je `n_reps`-mal per
+/// Rollout (begrenzt auf `horizon_rounds` Runden statt Spielende) bewertet,
+/// bester mittlerer Score-Vorsprung gewinnt. NUR fuer Runde-1/2-Entscheidungen
+/// aufgerufen (siehe `play_stage3_vs_stage1_game`) -- ein Besuchsanteil-/
+/// Q-Wert-basiertes "nur bei knappen Entscheidungen"-Kriterium (das
+/// TD-Gammon/Maven-Muster) wurde gemessen und verworfen: bei ~20-43
+/// Kandidaten je Runde verteilt die guenstige Suche Besuche zu duenn, um
+/// "knapp" verlaesslich von "eindeutig" zu unterscheiden (94% aller
+/// Entscheidungen lagen selbst unter margin=0.30 noch "knapp" -- kein
+/// brauchbares Signal). Die Rundenbegrenzung ist der robustere Kosten-Hebel:
+/// billig UND genau dort, wo die Mehrrunden-Frage zaehlt (siehe
+/// evaluations/stage2_investigation.md, Stufe-3-Kalibrierung). Fällt auf die
+/// einzige Aktion zurück, falls nur eine legal ist.
+#[allow(clippy::too_many_arguments)]
+fn stage3_choose_action<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    shortlist_sims: u32,
+    rollout_sims: u32,
+    c_puct: f64,
+    top_k: usize,
+    n_reps: usize,
+    horizon_rounds: u32,
+    rng: &mut R,
+) -> Action {
+    if actions.len() <= 1 {
+        return actions.first().cloned().unwrap_or(Action::Pass);
+    }
+    // Kandidaten-Vorauswahl: guenstige Suche (wie Stufe 1), Top-K nach Besuchen
+    // -- nicht ALLE Legalzuege ausrollen, das waere zu teuer.
+    let sims = dynamic_sims(shortlist_sims, actions.len());
+    let mut stats = net_root_child_stats(net, state, sims, c_puct, false, LeafEval::Dfs, rng);
+    stats.sort_by(|a, b| b.1.cmp(&a.1)); // absteigend nach Besuchen
+    if stats.is_empty() {
+        return actions[0].clone();
+    }
+    STAGE3_DECISIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    STAGE3_ROLLOUTS_TRIGGERED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let player = state.current_player;
+    let mut best_action = stats[0].0.clone();
+    let mut best_score = f64::NEG_INFINITY;
+    for (a, _visits, _q) in stats.into_iter().take(top_k.max(1)) {
+        let mean_diff = mean_rollout_diff(
+            net, state, &a, rollout_sims, c_puct, n_reps, player, Some(horizon_rounds), rng,
+        );
+        if mean_diff > best_score {
+            best_score = mean_diff;
+            best_action = a;
+        }
+    }
+    best_action
+}
+
+/// Ein Spiel Stufe 3 (Brett 0) vs. Stufe 1 (Brett 1), dasselbe Netz. Analog zu
+/// `play_net_vs_net_game`, nur dass Brett 0 bis einschliesslich Runde
+/// `stage3_max_round` `stage3_choose_action` nutzt (danach faellt es auf
+/// reine Stufe 1 zurueck -- Kosten-Hebel, siehe stage3_choose_action).
+#[allow(clippy::too_many_arguments)]
+fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
+    net: &Net,
+    sims1: u32,
+    stage3_shortlist_sims: u32,
+    stage3_rollout_sims: u32,
+    c_puct: f64,
+    top_k: usize,
+    n_reps: usize,
+    horizon_rounds: u32,
+    stage3_max_round: u32,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+) -> Value {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut steps = 0u32;
+    let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
+    // Grosszuegiger fester Timeout statt `net_game_timeout_secs`: Stufe 3
+    // macht pro Zug deutlich mehr Arbeit (Top-K x n_reps Rollouts bis
+    // Spielende) -- dieselbe Falle wie beim Disagreement-Study-Timeout-Bug.
+    let timeout_secs: u64 = 3600;
+    loop {
+        guard += 1;
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    let first = game.state.current_player;
+                    let non_starter = 1 - first;
+                    let pi = if game.state.players[non_starter].start_tile_pending {
+                        non_starter
+                    } else if game.state.players[first].start_tile_pending {
+                        first
+                    } else {
+                        break;
+                    };
+                    match choose_start_placement(&game.state, pi) {
+                        Some((tid, r, c2, rot)) => {
+                            let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                        }
+                        None => break,
+                    }
+                    steps += 1;
+                } else if game.state.phase == Phase::Drafting {
+                    let pi = game.state.current_player;
+                    let actions = drafting_actions(&game.state);
+                    let chosen = if actions.len() == 1 {
+                        actions[0].clone()
+                    } else if pi == 0 && game.state.round_number <= stage3_max_round {
+                        stage3_choose_action(
+                            net, &game.state, &actions, stage3_shortlist_sims, stage3_rollout_sims,
+                            c_puct, top_k, n_reps, horizon_rounds, rng,
+                        )
+                    } else {
+                        let s = dynamic_sims(sims1, actions.len());
+                        net_search_drafting_action(net, &game.state, s, c_puct, false, LeafEval::Dfs, rng)
+                            .unwrap_or_else(|| actions[0].clone())
+                    };
+                    let _ = game.apply_drafting(&chosen);
+                    steps += 1;
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => {
+                let pi = game.state.current_player;
+                match resolve_tiling_step(&game.state, pi) {
+                    TilingStep::Place(ta) => {
+                        let _ = game.apply_single_tiling(pi, &ta);
+                    }
+                    TilingStep::Chips { row, chips } => {
+                        apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                    }
+                    TilingStep::End => {
+                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
+                    }
+                }
+                steps += 1;
+            }
+            _ => break,
+        }
+    }
+    if game.state.phase == Phase::End {
+        let _ = game.apply_end_scoring();
+    }
+    let p0 = &game.state.players[0];
+    let p1 = &game.state.players[1];
+    json!({
+        "scores": [p0.score, p1.score],
+        "winner": determine_winner(&game.state),
+        "steps": steps,
+        "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
+        "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+    })
+}
+
+/// `n_games` Spiele Stufe 3 (Brett 0) vs. Stufe 1 (Brett 1), dasselbe Netz,
+/// Startspieler alternierend. Gibt JSON-Array `[{scores:[Stufe3,Stufe1],
+/// winner, …}]` (Format wie `run_net_vs_net_arena`, Elo/SPRT rechnet
+/// `arena.py`).
+#[allow(clippy::too_many_arguments)]
+pub fn run_stage3_vs_stage1_arena(
+    model_path: &str,
+    n_games: usize,
+    sims1: u32,
+    stage3_shortlist_sims: u32,
+    stage3_rollout_sims: u32,
+    c_puct: f64,
+    top_k: usize,
+    n_reps: usize,
+    horizon_rounds: u32,
+    stage3_max_round: u32,
+    seed: u64,
+    num_threads: usize,
+) -> Result<String, String> {
+    let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+    use std::sync::atomic::Ordering;
+    STAGE3_DECISIONS.store(0, Ordering::Relaxed);
+    STAGE3_ROLLOUTS_TRIGGERED.store(0, Ordering::Relaxed);
+
+    let play = |i: usize| -> Value {
+        let mut rng =
+            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = i % 2;
+        let names = ["Stufe3".to_string(), "Stufe1".to_string()];
+        play_stage3_vs_stage1_game(
+            &net, sims1, stage3_shortlist_sims, stage3_rollout_sims, c_puct, top_k, n_reps,
+            horizon_rounds, stage3_max_round, ids, names, first, &mut rng,
+        )
+    };
+
+    let mut all: Vec<Value> = if num_threads <= 1 {
+        (0..n_games).map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    // Trigger-Rate des Rollout-Tiebreaks als eigenes Diagnose-Objekt anhaengen
+    // (Kalibrierungs-Hilfe, siehe evaluations/stage2_investigation.md) --
+    // arena.py liest es separat aus, kein Einfluss auf die Spiel-Auswertung.
+    let decisions = STAGE3_DECISIONS.load(Ordering::Relaxed);
+    let triggered = STAGE3_ROLLOUTS_TRIGGERED.load(Ordering::Relaxed);
+    all.push(json!({
+        "stage3_diagnostics": true,
+        "decisions": decisions,
+        "rollouts_triggered": triggered,
+        "trigger_rate": if decisions > 0 { triggered as f64 / decisions as f64 } else { 0.0 },
+    }));
+    Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
