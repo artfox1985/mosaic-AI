@@ -81,7 +81,7 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
                   tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None,
-                  per_file: int = 10, model: str = None, stage: int = 1, c_puct: float = 1.5,
+                  per_file: int = 10, model: str = None, c_puct: float = 1.5,
                   add_root_noise: bool = True, deterministic: bool = False):
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
@@ -111,20 +111,18 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
     # Pickle teilen sich beide Pfade. MCTS = Heuristik-Suche; network = Netz-PUCT
-    # (Priors vom Netz, Blatt per DFS [stage 1] oder Netz-Value [stage 2]),
-    # Policy-Target = rohe Visit-Verteilung N/ΣN.
-    dfs_leaf = (stage == 1)
+    # (Priors vom Netz, Blatt immer per exaktem DFS-Solver), Policy-Target =
+    # rohe Visit-Verteilung N/ΣN.
     if mode == "network":
         def make_chunk(n, chunk_idx):
             return _mr.net_self_play_games(
                 model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
-                seed=base_seed + chunk_idx, num_threads=threads, dfs_leaf=dfs_leaf,
+                seed=base_seed + chunk_idx, num_threads=threads,
                 prefix=f"{prefix}_c{chunk_idx}", add_root_noise=add_root_noise,
                 deterministic=deterministic,
             )
-        leaf_name = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
-              f"Stufe {stage} ({leaf_name}) | base_sims {simulations} | c_puct {c_puct} | "
+              f"base_sims {simulations} | c_puct {c_puct} | "
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei")
@@ -183,8 +181,6 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default=None,
                         help="ONNX-Modell (Pflicht bei --mode network). Dateiname genügt — wird "
                              "im models/-Ordner gesucht, z.B. alphazero_s100.onnx (oder ein voller Pfad)")
-    parser.add_argument("--stage", type=int, default=1, choices=[1, 2],
-                        help="Netz-Self-Play-Stufe: 1 = DFS-Blatt (saubere Targets), 2 = Netz-Value-Blatt")
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--games", type=int, default=100, help="Anzahl Spiele")
@@ -225,7 +221,6 @@ if __name__ == "__main__":
         seed=args.seed,
         per_file=args.per_file,
         model=args.model,
-        stage=args.stage,
         c_puct=args.c_puct,
         add_root_noise=not args.no_root_noise,
         deterministic=args.deterministic,

@@ -11,8 +11,38 @@ use crate::round_end::{
     row_has_open_matching_slot, TilingAction,
 };
 use crate::state::{GameState, Phase};
+use crate::tile::TileColor;
 use crate::tiling_solver::solve_round_final_score;
 use crate::validation::generate_valid_moves;
+
+/// Zaehlt Vorkommen je Normalfarbe (Reihenfolge `TileColor::NORMAL`) in
+/// einem Fliesen-Stapel -- Grundlage fuer die Beutel-/Turm-Farbanteil-
+/// Features (siehe features.rs, "was noch zu ziehen ist").
+fn color_counts(tiles: &[TileColor]) -> [usize; 5] {
+    let mut counts = [0usize; 5];
+    for &t in tiles {
+        if let Some(i) = TileColor::NORMAL.iter().position(|&c| c == t) {
+            counts[i] += 1;
+        }
+    }
+    counts
+}
+
+/// Maske je Kuppelplatten-Design (tile_id 0..18): 1, falls das Design noch
+/// im verdeckten Stapel liegt -- Nutzer-Anstoss: "dem Netz mitgeben, welche
+/// Platten schon aus dem Spiel sind, damit es weiß, was noch im Stapel
+/// lauert" (Gemini-Chat-Hinweis, siehe stage2_investigation.md). Die
+/// Auslage (`dome_display`) ist bereits an anderer Stelle im JSON codiert
+/// (sichtbar), diese Maske betrifft NUR den verdeckten Rest.
+fn dome_pool_mask(state: &GameState) -> [u8; crate::dome::NUM_DOME_TILE_DESIGNS] {
+    let mut mask = [0u8; crate::dome::NUM_DOME_TILE_DESIGNS];
+    for t in &state.dome_tile_pool {
+        if t.tile_id < mask.len() {
+            mask[t.tile_id] = 1;
+        }
+    }
+    mask
+}
 
 fn space_type_name(t: SpaceType) -> &'static str {
     match t {
@@ -185,6 +215,9 @@ pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
         "dome_display": state.dome_display.iter().map(|t| serialize_dome_tile(Some(t))).collect::<Vec<_>>(),
         "dome_stack_count": state.dome_tile_pool.len(),
         "bag_count": state.bag.count(),
+        "bag_colors": color_counts(&state.bag.tiles),
+        "tower_colors": color_counts(&state.tower.tiles),
+        "dome_pool_mask": dome_pool_mask(state),
         "players": players,
         "log": state.log.iter().rev().take(30).rev().cloned().collect::<Vec<_>>(),
         "valid_moves": serialize_valid_moves(state),
@@ -266,8 +299,6 @@ pub fn tiling_action_to_dict(ta: &TilingAction) -> Value {
         "slot_row": ta.slot_row,
         "slot_col": ta.slot_col,
         "space_index": ta.space_index,
-        "dome_tile_id": ta.dome_tile_id,
-        "rotation": ta.rotation,
     })
 }
 

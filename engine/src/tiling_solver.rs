@@ -7,10 +7,10 @@
 //! maximiert. Genutzt (a) als Pseudo-Terminal-Bewertung am Drafting→Tiling-
 //! Übergang im MCTS und (b) für den echten Tiling-Zug der KI.
 //!
-//! Zugmenge: nur Steine auf BEREITS gelegte Kuppel-Spaces (Filter
-//! `dome_tile_id.is_none()` auf `generate_tiling_actions`) + Bonus-Chip-
-//! Komplettierung passender Reihen. Reihenfolge oben→unten (Regelwerk S.7)
-//! steckt bereits in `validate_tiling_action`/`generate_tiling_actions`.
+//! Zugmenge: nur Steine auf BEREITS gelegte Kuppel-Spaces (`generate_tiling_actions`
+//! erzeugt von sich aus nur solche -- kein separater Filter mehr nötig) +
+//! Bonus-Chip-Komplettierung passender Reihen. Reihenfolge oben→unten
+//! (Regelwerk S.7) steckt bereits in `validate_tiling_action`/`generate_tiling_actions`.
 
 use crate::board::FIRST_PLAYER_MARKER_PENALTY;
 use crate::round_end::{
@@ -92,7 +92,6 @@ fn chippable_rows(state: &GameState, pi: usize) -> Vec<usize> {
 fn legal_steps(state: &GameState, pi: usize, exact: bool) -> Vec<TilingStep> {
     let mut steps: Vec<TilingStep> = generate_tiling_actions(state, pi)
         .into_iter()
-        .filter(|ta| ta.dome_tile_id.is_none())
         .map(TilingStep::Place)
         .collect();
     for row in chippable_rows(state, pi) {

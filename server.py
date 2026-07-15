@@ -80,7 +80,6 @@ _ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
 _ai_sims     = 300         # MCTS-Basis-Simulationen der Rust-KI
 _ai_model    = None        # None = Heuristik; sonst Versionsname (z.B. "v8") -> Netz-Modus
 _ai_c_puct   = 1.5         # PUCT-Konstante im Netz-Modus (Standard wie net_mcts.rs)
-_ai_stage    = 1           # 1 = DFS-Blatt, 2 = Netz-Value-Blatt (Netz-Modus)
 _last_ai_log = None        # voller Such-Trace des zuletzt gespielten KI-Drafting-Zugs
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
@@ -360,11 +359,9 @@ def tiling():
         return jsonify(err("Nicht in der Tiling-Phase"))
     d = request.get_json()
     try:
-        raw_tid = d.get('dome_tile_id')
-        tid = int(raw_tid) if raw_tid is not None else None
         _rust.apply_tiling(int(d['player']), int(d['pattern_row']),
                            int(d['slot_row']), int(d['slot_col']),
-                           int(d['space_index']), tid, int(d.get('rotation', 0)))
+                           int(d['space_index']))
         _flush_game_log()
         return jsonify(ok())
     except Exception as e:
@@ -545,7 +542,7 @@ def ai_move():
     try:
         if _ai_model is not None:
             # Netz-Modus: kein Text-Trace (anders als Heuristik), dafür Priors+PUCT-Stats im debug-Dict.
-            res = _json.loads(_rust.ai_step_net_json(_ai_sims, _ai_c_puct, _ai_stage, True))
+            res = _json.loads(_rust.ai_step_net_json(_ai_sims, _ai_c_puct, True))
         else:
             # KI-Drafting-Zug immer geloggt ausführen → Trace für den Debugger-Button.
             res = _json.loads(_rust.ai_step_json(_ai_sims, True))
@@ -598,7 +595,7 @@ def ai_debug():
     if (e := _require_game()) is not None:
         return e
     if _ai_model is not None:
-        analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct, _ai_stage))
+        analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct))
     else:
         analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
     if not isinstance(analysis, dict):
@@ -640,7 +637,7 @@ def ai_suggest():
         return e
     try:
         if _ai_model is not None:
-            analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct, _ai_stage))
+            analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct))
         else:
             analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
         moves = analysis.get("moves", []) if isinstance(analysis, dict) else []

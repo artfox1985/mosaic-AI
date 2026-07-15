@@ -506,3 +506,95 @@ trennscharfer Value-Head, nicht verborgene Mehrrunden-Weisheit, die Stufe 1
 fehlt. Stufe 2 bleibt vorerst kein Kandidat für den Produktionspfad; sollte
 künftig ein deutlich besser kalibrierter Value-Head trainiert werden (Val-R²
 spürbar über 0.3-0.5), lohnt sich eine Wiederholung dieses Tests.
+
+## Schritt 11: Stufe 3 (Rollout-Determinisierung) — Aufbau, Kalibrierung, kritischer Korrektheits-Fix
+
+Nutzer-Anstoß: AlphaZero (Schach/Go) hat keine Zufallsknoten, weil dort kein
+Zufall zwischen Zügen liegt — unser Beutel-/Kuppelstapel-Nachschub pro Runde
+schon. Stufe 1/2 haben beide null Zufallsknoten (Suchbaum endet exakt an der
+Rundengrenze). Externe Recherche (domwil.co.uk/posts/azul-ai, ein reales
+Azul-KI-Projekt) UND ein Gemini-Chat des Nutzers bestätigen unabhängig
+voneinander: die etablierte Lösung für stochastische Brettspiele ist nicht
+ein größeres Wertenetz, sondern explizite Zufallsmittelung — entweder echte
+Zufallsknoten im Baum ("Stochastic/Gumbel AlphaZero") oder Determinisierung
+("Information-Set-MCTS", der Maven-Weg: mehrere plausible Welten
+auswürfeln, je einmal durchspielen, mitteln).
+
+**Stufe 3 gebaut** (`stage3_choose_action`, `mean_rollout_diff` mit
+`horizon_rounds`): Top-K-Kandidaten (Shortlist-Suche wie Stufe 1) werden
+`n_reps`-mal per Rollout (Fortsetzungspolitik, begrenzt auf `horizon_rounds`
+Runden statt Spielende) bewertet, bester mittlerer Score-Vorsprung gewinnt.
+Das ist Weg 1 (Determinisierung), nur abgespeckt: statt 20 volle MCTS-Bäume
+auf 20 ausgewürfelten Welten (unbezahlbar) läuft pro Welt nur eine günstige
+Fortsetzung.
+
+**Kalibrierung aus gemessener Verzweigungsbreite** (`measure_branching.py`,
+20 Spiele): Runde 1 ⌀43 Aktionen (Kuppel-Platzierung: bis zu 3 Anzeige-Platten
+× bis zu 9 freie Slots × 4 Rotationen dominiert den Aktionsraum, siehe
+`generate_dome_moves`), Runden 2-5 ⌀20-24. Voller Rollout bis Spielende wäre
+15-25 Min/Spiel gewesen — unpraktikabel. Ein Besuchsanteil-/Q-Wert-basiertes
+"nur bei knappen Entscheidungen den teuren Rollout auslösen"-Kriterium
+(TD-Gammon/Maven-Muster) wurde gemessen (`measure_margin_gaps.py`) und
+verworfen: bei 20-43 Kandidaten je Runde verteilt die Suche Besuche zu dünn,
+selbst nach Korrektur eines Q-Wert-Skalenfehlers (`normalize_score` staucht
+auf [0,1]) lösten 58-95%+ aller Entscheidungen bei JEDER sinnvollen Schwelle
+noch aus — kein brauchbares Signal. Stattdessen: Stufe 3 nur in Runde 1-2
+einsetzen (`stage3_max_round=2`, dort zählt die Mehrrunden-Frage am meisten),
+danach reine Stufe 1.
+
+**Alpha-Beta-Minimax als günstigere Rollout-Fortsetzung**: Profiling
+(`clone_profiling`-Feature, neu: `profiling_reset`/`profiling_snapshot`)
+zeigte 1,8 Mio. Blattauswertungen für nur 2 Spiele — Feature-Extraktion,
+Netz-Forward-Pass und DFS-Solver je etwa gleich teuer (~31-35%), keiner
+dominant (widerlegt "DFS ist der Flaschenhals", deckt sich mit der früheren
+Stufe1-vs-Stufe2-Zeitmessung). Da unser DFS-Blatt EXAKT ist (nicht verrauscht
+wie ein Value-Netz), braucht Alpha-Beta mit Netz-Policy-Zugsortierung dafür
+deutlich weniger Blattauswertungen als PUCT mit Sims-Budget (Referenz:
+42-54x weniger Knoten als reines Minimax). Erster Kalibrierungsversuch
+(`depth=4`, `node_budget=3000`) massiv überkalibriert — 3433s für 2 Spiele,
+SCHLECHTER als PUCT, weil die Fortsetzung bei JEDEM simulierten Zug im
+Rollout neu aufgerufen wird (nicht nur einmal pro echter Entscheidung).
+Korrigiert auf `depth=2`/`node_budget=100` (⌀57 besuchte Knoten/Aufruf, klar
+unter dem Budget-Deckel — Pruning greift): 53s/Spiel einzeln, 190,5s für 8
+Spiele parallel (8 Threads) — praktikabel.
+
+**Kritischer Korrektheits-Fix** (Nutzer-Anstoß zu Kuppelplatten-Anzahl: 15
+Platten im verdeckten Stapel zu Spielbeginn, nach Startkachel-Ziehung +
+Auslage-Auffüllung 13 unbekannt): direkt geprüft, ob `mean_rollout_diff`s
+`n_reps`-Wiederholungen überhaupt unterschiedliche Beutel-/Kuppelstapel-
+Ziehungen erleben (neuer Test
+`rollout_repetitions_actually_diverge_in_bag_and_dome_order`). Ergebnis:
+**nein** — `draw_with_refill` (state.rs) mischt den Beutel nur bei
+Unterversorgung neu, der Kuppelstapel wird nur EINMAL beim Spielstart
+gemischt (`setup_new_game`), nie wieder. Drei Wiederholungen mit komplett
+unterschiedlichem RNG-Seed lieferten VOR dem Fix identischen Beutel UND
+identische Kuppelstapel-Reihenfolge — die ganze "Weg 1"-Determinisierung war
+für genau diese beiden Zufallsquellen ein No-Op, mit der jetzt deterministischen
+Alpha-Beta-Fortsetzung vermutlich sogar bitgleiche Wiederholungen (n_reps
+wirkungslos, nur Rechenzeit verschwendet). **Fix**: vor jeder Rollout-
+Wiederholung wird `g.state.bag.tiles`/`g.state.dome_tile_pool` mit dem
+eigenen RNG dieser Wiederholung neu gemischt (sichtbare Information bleibt
+unverändert, nur das wirklich Verdeckte wird pro "Welt" neu ausgewürfelt) —
+danach divergieren alle drei Wiederholungen nachweislich (Test grün, volle
+Suite 86/86 grün).
+
+**Konsequenz: alle bisherigen Stufe-3-Arena-Ergebnisse (2:6, 3:1, 0:2 etc.)
+sind ungültig** — sie liefen ohne echte Determinisierung. Ein neuer, echter
+Testlauf mit dem Fix steht noch aus. Der Fix betrifft rückwirkend auch die
+Disagreement-Studie (Schritt 10): deren Rollouts liefen meist bis zum
+echten Spielende (mehrere Runden), der Beutel wurde dabei wahrscheinlich
+mindestens einmal neu gemischt (Bag-Problem entschärft), aber der
+Kuppelstapel nie — der Effekt auf die dortige Schlussfolgerung (Mehrrunden-
+Hypothese widerlegt) ist vermutlich klein (n=597, durchgängiges Bild über
+alle Runden inkl. der als Sanity-Check erwartbaren Runde-5-Überlegenheit),
+aber nicht neu verifiziert.
+
+**Nebenfund (Sanity-Check, Nutzer-Anstoß):** neuer Test
+`tile_color_accounting_invariant_holds_throughout_random_games` verifiziert,
+dass Beutel + Turm + alles sichtbar auf dem Feld nie unter der festen
+Gesamtzahl (13/Farbe) liegt. Erste (zu strikte) Version schlug fehl: Bonus-
+Chip-Komplettierung (`apply_bonus_chips_with`, round_end.rs) erzeugt
+absichtlich "Phantom"-Fliesen direkt in `pattern_lines`, ohne Beutel/Turm zu
+berühren (Chips ERSETZEN echte gezogene Fliesen — Spieldesign, kein Bug).
+Wichtig fürs geplante Beutel-Farbanteil-Feature: der Beutel selbst bleibt
+davon unberührt, `state.bag.tiles` bleibt exakt korrekt als Grundlage.

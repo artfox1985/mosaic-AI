@@ -189,14 +189,14 @@ def run_arena(competitors, games_per_matchup=100, threads=0, seed=None, chunk=10
         print(f" - {name:15s}: {elo[name]} Elo")
 
 
-def run_net_arena(model, net_sims=200, heur_sims=60, games=100, stage=1, threads=0,
+def run_net_arena(model, net_sims=200, heur_sims=60, games=100, threads=0,
                   seed=None, chunk=10, c=0.3, c_puct=1.5,
                   net_name=None, heur_name=None, early_stop=True,
                   sprt_alpha=0.05, sprt_beta=0.10, sprt_p1=0.64):
     """AlphaZero-Netz (ONNX) vs Heuristik-MCTS. Das Netz spielt Brett 0, die
     Heuristik Brett 1; der Startspieler-Vorteil wird über alternierende Start-
-    spieler je Spiel (i % 2) ausgeglichen. `stage` 1 = DFS-Blatt (Stufe 1),
-    2 = Netz-Value-Blatt (Stufe 2). Spielt in Chunks für LIVE-Ausgabe.
+    spieler je Spiel (i % 2) ausgeglichen. Blattbewertung ist immer der exakte
+    DFS-Solver (kein Value-Head mehr). Spielt in Chunks für LIVE-Ausgabe.
     `early_stop`: zwei parallele truncated SPRTs (Wald) -- einer testet
     "Netz signifikant staerker" (H1a), einer "Heuristik signifikant staerker"
     (H1b), je p1=0.64 (~+100 Elo). Bricht ab, sobald EINER seine obere
@@ -207,14 +207,12 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=100, stage=1, threads
     import os
     import statistics as _st
     chunk = max(1, chunk)
-    dfs_leaf = (stage == 1)
     net_name  = net_name  or f"AlphaZero({os.path.basename(model)})"
     heur_name = heur_name or f"Heuristik(s{heur_sims})"
-    leaf = "DFS-Blatt" if dfs_leaf else "Netz-Value-Blatt"
     sprt_lower, sprt_upper = sprt_bounds(sprt_alpha, sprt_beta)
 
     print("🏟️ Mosaic-AI ARENA — Netz vs Heuristik (Rust) 🏟️")
-    print(f"  {net_name} (Brett 0, {net_sims} Sims, Stufe {stage}/{leaf}) "
+    print(f"  {net_name} (Brett 0, {net_sims} Sims) "
           f"vs {heur_name} (Brett 1, {heur_sims} Sims) — {games} Spiele"
           + (f"  [SPRT p1={sprt_p1}, α={sprt_alpha}, β={sprt_beta}]" if early_stop else ""))
     print("-" * 50)
@@ -235,7 +233,7 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=100, stage=1, threads
         n = min(chunk, games - done)
         raw = _mr.net_arena_match(model, net_sims=net_sims, heur_sims=heur_sims,
                                   n_games=n, seed=base_seed + chunk_idx,
-                                  num_threads=threads, c=c, c_puct=c_puct, dfs_leaf=dfs_leaf)
+                                  num_threads=threads, c=c, c_puct=c_puct)
         results = json.loads(raw)
         chunk_idx += 1
 
@@ -310,17 +308,15 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=100, stage=1, threads
     print(f"   Elo: {net_name} {elo[net_name]} | {heur_name} {elo[heur_name]}")
 
 
-def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=100,
+def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, games=100,
                    threads=0, seed=None, chunk=10, c_puct=1.5, c_puct_a=None, c_puct_b=None,
-                   stage_a=None, stage_b=None, name_a=None, name_b=None, early_stop=True,
+                   name_a=None, name_b=None, early_stop=True,
                    sprt_alpha=0.05, sprt_beta=0.10, sprt_p1=0.64):
     """Netz A (Brett 0) vs. Netz B (Brett 1) — Generationen-Vergleich. Start-
-    spieler alternieren je Spiel. `stage` 1 = DFS-Blatt, 2 = Netz-Value-Blatt.
-    `c_puct_a`/`c_puct_b` überschreiben `c_puct` je Brett (z.B. um denselben
-    Modell-Stand mit unterschiedlichem c_puct gegeneinander antreten zu lassen).
-    `stage_a`/`stage_b` überschreiben `stage` je Brett (z.B. um Netz A auf
-    Stufe 2 gegen Netz B auf Stufe 1 antreten zu lassen — Reifegrad-Vergleich
-    in einer echten Partie statt nur der internen Sonde).
+    spieler alternieren je Spiel. Blattbewertung ist immer der exakte
+    DFS-Solver (kein Value-Head mehr). `c_puct_a`/`c_puct_b` überschreiben
+    `c_puct` je Brett (z.B. um denselben Modell-Stand mit unterschiedlichem
+    c_puct gegeneinander antreten zu lassen).
     `early_stop`: zwei parallele truncated SPRTs (Wald) -- einer testet
     "A signifikant staerker" (H1a), einer "B signifikant staerker" (H1b),
     je p1=0.64 (~+100 Elo). Bricht ab, sobald EINER seine obere Schranke
@@ -331,21 +327,15 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=100,
     import os
     import statistics as _st
     chunk = max(1, chunk)
-    st_a = stage_a if stage_a is not None else stage
-    st_b = stage_b if stage_b is not None else stage
-    dfs_leaf_a = (st_a == 1)
-    dfs_leaf_b = (st_b == 1)
     cp_a = c_puct_a if c_puct_a is not None else c_puct
     cp_b = c_puct_b if c_puct_b is not None else c_puct
     name_a = name_a or f"A({os.path.basename(model_a)})"
     name_b = name_b or f"B({os.path.basename(model_b)})"
-    leaf_a = "DFS-Blatt" if dfs_leaf_a else "Netz-Value-Blatt"
-    leaf_b = "DFS-Blatt" if dfs_leaf_b else "Netz-Value-Blatt"
     sprt_lower, sprt_upper = sprt_bounds(sprt_alpha, sprt_beta)
 
     print("🏟️ Mosaic-AI ARENA — Netz vs Netz (Rust) 🏟️")
-    print(f"  {name_a} (Brett 0, {sims_a} Sims, c_puct={cp_a}, Stufe {st_a}/{leaf_a}) vs "
-          f"{name_b} (Brett 1, {sims_b} Sims, c_puct={cp_b}, Stufe {st_b}/{leaf_b}) "
+    print(f"  {name_a} (Brett 0, {sims_a} Sims, c_puct={cp_a}) vs "
+          f"{name_b} (Brett 1, {sims_b} Sims, c_puct={cp_b}) "
           f"— {games} Spiele"
           + (f"  [SPRT p1={sprt_p1}, α={sprt_alpha}, β={sprt_beta}]" if early_stop else ""))
     print("-" * 50)
@@ -365,8 +355,7 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=100,
         n = min(chunk, games - done)
         raw = _mr.net_vs_net_arena_match(model_a, model_b, sims_a=sims_a, sims_b=sims_b,
                                          n_games=n, seed=base_seed + chunk_idx,
-                                         num_threads=threads, c_puct_a=cp_a, c_puct_b=cp_b,
-                                         dfs_leaf_a=dfs_leaf_a, dfs_leaf_b=dfs_leaf_b)
+                                         num_threads=threads, c_puct_a=cp_a, c_puct_b=cp_b)
         results = json.loads(raw)
         chunk_idx += 1
         for g in results:
@@ -433,7 +422,8 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, stage=1, games=100,
 
 
 def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50,
-                         top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2, games=50,
+                         top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2,
+                         alphabeta_depth=2, alphabeta_node_budget=100, games=50,
                          threads=0, seed=None, chunk=5, c_puct=1.5, name_a="Stufe3", name_b="Stufe1",
                          early_stop=True, sprt_alpha=0.05, sprt_beta=0.10, sprt_p1=0.64):
     """Stufe 3 (Brett 0: bis einschliesslich Runde `stage3_max_round` per
@@ -442,9 +432,14 @@ def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rol
     faellt es auf reine Stufe 1 zurueck -- ein Besuchsanteil-/Q-Wert-
     basiertes "nur bei knappen Entscheidungen"-Kriterium wurde gemessen und
     verworfen, siehe evaluations/stage2_investigation.md, Stufe-3-
-    Kalibrierung) vs. Stufe 1 (Brett 1: reine Netz-PUCT + DFS-Blatt),
-    dasselbe Netz. Startspieler alternieren je Spiel. `early_stop`: dieselbe
-    duale SPRT wie `run_net_vs_net` (siehe dort für die genaue Logik)."""
+    Kalibrierung). Die Rollout-Fortsetzung selbst laeuft jetzt per Alpha-Beta-
+    Minimax (Netz-Policy-Zugsortierung, `alphabeta_depth` Plies,
+    `alphabeta_node_budget` Sicherheitsnetz) statt der vollen PUCT-Suche --
+    guenstiger, weil unser DFS-Blatt exakt ist (siehe Referenz
+    domwil.co.uk/posts/azul-ai). Vs. Stufe 1 (Brett 1: reine Netz-PUCT +
+    DFS-Blatt), dasselbe Netz. Startspieler alternieren je Spiel.
+    `early_stop`: dieselbe duale SPRT wie `run_net_vs_net` (siehe dort für
+    die genaue Logik)."""
     import os
     import statistics as _st
     chunk = max(1, chunk)
@@ -478,7 +473,8 @@ def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rol
             model_path=model, n_games=n, sims1=sims1,
             stage3_shortlist_sims=stage3_shortlist_sims, stage3_rollout_sims=stage3_rollout_sims,
             c_puct=c_puct, top_k=top_k, n_reps=n_reps, horizon_rounds=horizon_rounds,
-            stage3_max_round=stage3_max_round, seed=base_seed + chunk_idx, num_threads=threads,
+            stage3_max_round=stage3_max_round, alphabeta_depth=alphabeta_depth,
+            alphabeta_node_budget=alphabeta_node_budget, seed=base_seed + chunk_idx, num_threads=threads,
         )
         results = json.loads(raw)
         chunk_idx += 1
@@ -564,12 +560,11 @@ if __name__ == "__main__":
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
     NET_SIMS  = 200                            # Basis-Sims des Netzes
-    STAGE     = 1                              # 1 = DFS-Blatt, 2 = Netz-Value-Blatt
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
     GAMES     = 100
     run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
-                  games=GAMES, stage=STAGE, threads=0)
-    #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, stage=STAGE, games=GAMES,
+                  games=GAMES, threads=0)
+    #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, games=GAMES,
     #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a=NET_NAME, name_b=NET_NAME_PRE)
 
     # ── Alternativ: reines Heuristik-Round-Robin (auskommentiert) ────────────
