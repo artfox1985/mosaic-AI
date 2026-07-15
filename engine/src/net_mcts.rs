@@ -2,7 +2,8 @@
 //!
 //! Gleiche Baumstruktur wie der Heuristik-MCTS (`crate::mcts`), aber:
 //!   - Selektion per **PUCT** mit Netz-Priors statt UCB1,
-//!   - Blattbewertung = **Netz-Value** (Tanh → Win-Prob) statt DFS-Solver,
+//!   - Blattbewertung = exakter DFS-Solver (kein Value-Head mehr, siehe
+//!     evaluations/stage2_investigation.md),
 //!   - **Dirichlet-Wurzel-Noise** (Self-Play-Exploration).
 //! Lazy Expansion nach Prior (höchster zuerst) + Progressive Widening.
 
@@ -21,7 +22,7 @@ use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
 
 /// Aktionsraum-Größe (= `config.NUM_ACTIONS`).
-const NUM_ACTIONS: usize = 482;
+pub(crate) const NUM_ACTIONS: usize = 482;
 /// Standard-PUCT-Konstante (= agents/mcts.py `_c_puct`).
 pub const DEFAULT_C_PUCT: f64 = 1.5;
 /// Dirichlet-Wurzel-Noise (AlphaZero-Standard).
@@ -35,17 +36,10 @@ pub const DIRICHLET_ALPHA: f64 = 0.3;
 /// WIDEN_FACTOR·√N`).
 pub const POLICY_MASS_CUTOFF: f64 = 0.95;
 
-/// Blattbewertung der Netz-Suche. Priors kommen IMMER vom Netz; nur das Blatt
-/// unterscheidet sich:
-///   - `Dfs`: exakter DFS-Solver (Stufe 1 — saubere, scharfe Visit-Targets,
-///     unabhängig vom noch schwachen Netz-Value).
-///   - `Net`: Netz-Value (Stufe 2 — sobald das Netz die Heuristik schlägt, um
-///     deren Ein-Runden-Kurzsichtigkeit per Mehrrunden-Value zu überwinden).
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum LeafEval {
-    Dfs,
-    Net,
-}
+// Blattbewertung: exakter DFS-Solver (siehe crate::mcts::evaluate). Frueher
+// gab es hier eine Wahl (Stufe 2 = Netz-Value als Blatt) -- der Value-Head
+// wurde entfernt (siehe evaluations/stage2_investigation.md: Stufe 2 wird
+// nicht mehr verfolgt, Stufe 1/3 brauchten ihn nie), also bleibt nur DFS.
 
 // ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
 //
@@ -131,7 +125,7 @@ struct Node {
     prior: f32,
     state: GameState,
     terminal: bool,
-    /// Netz-Value am Knotenzustand (absolute Win-Prob je Spieler) — Backprop-Blattwert.
+    /// DFS-Solver-Blattwert am Knotenzustand (je Spieler) — Backprop-Blattwert.
     leaf_value: [f64; 2],
     /// Gesamtzahl legaler Züge VOR Moon-Order-Expansion (= Basis-Aktionen) —
     /// für die "Gültige Aktionen"-Anzeige (Server-Debug-UI), unabhängig davon,
@@ -149,7 +143,7 @@ impl crate::search_common::SearchNode for Node {
 /// Nicht-Terminal-Knoten aus den rohen Netz-Logits + Moon-Head-Scores. Reine
 /// Funktion (kein `Net`-Aufruf) — direkt mit synthetischen Logits testbar.
 /// Gibt `(sortierte Kandidaten, Basis-Aktionszahl VOR Moon-Order-Expansion)`
-/// zurück; letzteres bleibt für `LeafEval::Dfs`s Skalierung unverändert.
+/// zurück; letzteres bleibt für den DFS-Solver-Blattwert unverändert.
 fn build_untried_actions(
     state: &GameState,
     logits: &[f32],
@@ -216,7 +210,7 @@ fn build_untried_actions(
 }
 
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
-/// (per `leaf`: DFS-Solver oder Netz-Value).
+/// (exakter DFS-Solver, siehe crate::mcts::evaluate).
 fn make_node(
     net: &Net,
     state: GameState,
@@ -224,13 +218,12 @@ fn make_node(
     action: Option<Action>,
     prior: f32,
     player_who_acted: usize,
-    leaf: LeafEval,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
-    let (logits, value, moon) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], 0.0, Vec::new()))
+    let (logits, moon) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new()))
     });
 
     let mut moon_scores = [0f32; 5];
@@ -240,30 +233,9 @@ fn make_node(
     let (untried, n_actions) =
         if terminal { (Vec::new(), 0) } else { build_untried_actions(&state, &logits, &moon_scores) };
 
-    // Blattwert: unabhängige Pro-Spieler-Werte (analog zu Stage 1s
-    // `crate::mcts::evaluate` — keine erzwungene Komplementär-Konstruktion
-    // [win, 1-win] mehr). Das Netz liefert einen EGO-perspektivischen Wert
-    // (die Input-Features hängen von `state.current_player` ab, siehe
-    // `features.rs`/`state_to_tensor`s "me"/"enemy"-Aufteilung) — für den
-    // jeweils ANDEREN Spieler braucht es deshalb einen zweiten Forward-Pass
-    // mit geflipptem `current_player`, nicht einfach `1.0 - value`.
-    let leaf_value = match leaf {
-        LeafEval::Net => {
-            let mover_val = ((value + 1.0) / 2.0) as f64;
-            crate::profiling::note_gamestate_clone();
-            let mut flipped = state.clone();
-            flipped.current_player = 1 - state.current_player;
-            let other_feats = state_to_features_direct(&flipped);
-            let other_val = net
-                .eval(&other_feats)
-                .map(|(_, v, _)| ((v + 1.0) / 2.0) as f64)
-                .unwrap_or(0.5);
-            if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
-        }
-        LeafEval::Dfs => crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
-            crate::mcts::evaluate(&state, n_actions)
-        }),
-    };
+    let leaf_value = crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
+        crate::mcts::evaluate(&state, n_actions)
+    });
 
     Node {
         parent,
@@ -324,12 +296,10 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// Sim-Zählschleife aufrufbar. Für die Nachlauf-Schließung offener Enden
 /// (siehe unten): kein Effekt, falls `nid` bereits terminal ist oder keine
 /// unversuchten Aktionen mehr hat.
-#[allow(clippy::too_many_arguments)]
 fn expand_and_backprop(
     nodes: &mut Vec<Node>,
     net: &Net,
     nid: usize,
-    leaf: LeafEval,
     names: &[&str; 2],
     log: &mut Option<&mut Vec<String>>,
 ) {
@@ -346,7 +316,7 @@ fn expand_and_backprop(
     let mut child_state = g.state;
     child_state.log.clear();
     let terminal = child_state.phase != Phase::Drafting;
-    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, leaf);
+    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover);
     let cid = nodes.len();
     nodes.push(child);
     nodes[nid].children.push(cid);
@@ -363,8 +333,7 @@ fn expand_and_backprop(
     let value = nodes[cid].leaf_value;
     if let Some(l) = log.as_deref_mut() {
         l.push(format!(
-            "  EVAL   #{cid} ({}) win[{}]={:.3} win[{}]={:.3}",
-            if leaf == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
+            "  EVAL   #{cid} (DFS-Solver) win[{}]={:.3} win[{}]={:.3}",
             names[0], value[0], names[1], value[1]
         ));
     }
@@ -388,14 +357,12 @@ fn expand_and_backprop(
 /// Baut den PUCT-Suchbaum. `add_root_noise` aktiviert Dirichlet-Wurzel-Noise.
 /// Mit `log = Some(..)` wird jede Simulation (Selection/Expansion/Eval/Backprop)
 /// als Text protokolliert (für den Server-Debug-Log, analog `mcts::build_tree`).
-#[allow(clippy::too_many_arguments)]
 fn build_net_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
-    leaf: LeafEval,
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
 ) -> Vec<Node> {
@@ -403,7 +370,7 @@ fn build_net_tree<R: Rng + ?Sized>(
     let mut root_state = state.clone();
     root_state.log.clear();
     let root_player = root_state.current_player;
-    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, leaf)];
+    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -452,7 +419,7 @@ fn build_net_tree<R: Rng + ?Sized>(
                     let mut child_state = g.state;
                     child_state.log.clear();
                     let terminal = child_state.phase != Phase::Drafting;
-                    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, leaf);
+                    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover);
                     let cid = nodes.len();
                     nodes.push(child);
                     nodes[nid].children.push(cid);
@@ -495,8 +462,7 @@ fn build_net_tree<R: Rng + ?Sized>(
         // Eval: Blattwert wurde schon bei Knoten-Erzeugung berechnet (make_node).
         let value = nodes[nid].leaf_value;
         logln!(
-            "  EVAL   #{nid} ({}) win[{}]={:.3} win[{}]={:.3}",
-            if leaf == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
+            "  EVAL   #{nid} (DFS-Solver) win[{}]={:.3} win[{}]={:.3}",
             names[0], value[0], names[1], value[1]
         );
 
@@ -521,7 +487,7 @@ fn build_net_tree<R: Rng + ?Sized>(
     // bleibt dauerhaft ohne eigene Antwort (siehe search_common::nachlauf_targets).
     for target in crate::search_common::nachlauf_targets(&nodes) {
         logln!("  NACHLAUF → #{target}: offenes Ende nachträglich geschlossen");
-        expand_and_backprop(&mut nodes, net, target, leaf, &names, &mut log);
+        expand_and_backprop(&mut nodes, net, target, &names, &mut log);
     }
 
     nodes
@@ -535,13 +501,12 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
-    leaf: LeafEval,
     rng: &mut R,
 ) -> Option<Action> {
     if state.phase != Phase::Drafting {
         return None;
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng, None);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits)?;
     nodes[best].action.clone()
 }
@@ -553,13 +518,12 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
-    leaf: LeafEval,
     rng: &mut R,
 ) -> Vec<(Action, u32, f64)> {
     if state.phase != Phase::Drafting {
         return Vec::new();
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng, None);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
     nodes[0]
         .children
         .iter()
@@ -578,21 +542,19 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
 /// `add_root_noise` hier i.d.R. `false` (Dirichlet-Noise ist nur ein Self-Play-Kniff).
 /// Mit `log = Some(..)` wird zusätzlich ein Sim-für-Sim-Trace protokolliert
 /// (für den Server-Debug-Log-Button, analog zur Heuristik).
-#[allow(clippy::too_many_arguments)]
 pub fn net_search_with_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
     sims: u32,
     c_puct: f64,
     add_root_noise: bool,
-    leaf: LeafEval,
     rng: &mut R,
     log: Option<&mut Vec<String>>,
 ) -> (Option<Action>, Value) {
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, leaf, rng, log);
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits);
     let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
     let prior_sum: f64 = nodes[0]

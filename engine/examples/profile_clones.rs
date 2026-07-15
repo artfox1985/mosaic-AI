@@ -8,7 +8,7 @@
 
 use mosaic_rust::dome::build_dome_tile_pool;
 use mosaic_rust::net::Net;
-use mosaic_rust::net_mcts::{net_search_drafting_action, LeafEval};
+use mosaic_rust::net_mcts::net_search_drafting_action;
 use mosaic_rust::state::setup_new_game;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -39,7 +39,7 @@ fn main() {
     mosaic_rust::profiling::reset_all();
 
     let start = Instant::now();
-    let _ = net_search_drafting_action(&net, &state, sims, 1.5, false, LeafEval::Dfs, &mut rng);
+    let _ = net_search_drafting_action(&net, &state, sims, 1.5, false, &mut rng);
     let elapsed = start.elapsed();
     let total_ns = elapsed.as_nanos() as f64;
 

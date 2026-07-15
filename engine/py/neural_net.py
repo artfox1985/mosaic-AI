@@ -29,8 +29,26 @@ def state_to_tensor(data):
     features.append(data.get("round", 0) / 6.0)
     features.append(PHASE_MAP.get(data.get("phase", "drafting"), 0) / 3.0)
     # Beutel-Restbestand (max. 65 Fliesen zu Spielbeginn) — Signal, wie knapp
-    # Farben werden könnten (bislang serialisiert, aber ungenutzt).
+    # Farben werden könnten.
     features.append(data.get("bag_count", 0) / 65.0)
+    # Beutel+Turm je Farbe (was insgesamt noch "im Umlauf" ist) -- ergänzt das
+    # bisher ungenutzte Gesamt-bag_count um eine Farbaufschlüsselung. Der
+    # Beutel ist für die KI nicht direkt sichtbar, seine Zusammensetzung ist
+    # aber deterministisch aus dem Rest rückrechenbar (feste Gesamtzahl je
+    # Farbe minus alles sichtbar Platzierte) -- direktes Auslesen liefert
+    # dieselbe Zahl, nur günstiger. /13 = TILES_PER_COLOR.
+    bag_colors = data.get("bag_colors", [0] * 5)
+    tower_colors = data.get("tower_colors", [0] * 5)
+    for i in range(5):
+        bc = bag_colors[i] if i < len(bag_colors) else 0
+        tc = tower_colors[i] if i < len(tower_colors) else 0
+        features.append((bc + tc) / 13.0)
+    # Kuppelstapel-Maske (18, tile_id-Reihenfolge): 1, falls das Design noch
+    # verdeckt im Stapel liegt -- welche Designs schon verbraucht/ausgelegt
+    # sind, verrät dem Netz, was noch "lauert".
+    dome_mask = data.get("dome_pool_mask", [0] * 18)
+    for i in range(18):
+        features.append(float(dome_mask[i]) if i < len(dome_mask) else 0.0)
 
     # 2. Wertungsplatten (Welche 3 von 8 sind aktiv?)
     scoring_ids = data.get("scoring_tile_ids", [])
@@ -501,7 +519,7 @@ class MosaicDataset(Dataset):
 
 
 class MosaicNet(nn.Module):
-    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE, value_hidden=64,
+    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
@@ -539,12 +557,6 @@ class MosaicNet(nn.Module):
             self.policy_head = nn.Sequential(
                 nn.Linear(hidden_size, num_actions)
             )
-        self.value_head = nn.Sequential(
-            nn.Linear(hidden_size, value_hidden),
-            nn.ReLU(),
-            nn.Linear(value_hidden, 1),
-            nn.Tanh()
-        )
         # Moon-Order Head: 5 Logits (eine pro Farbe)
         # Hoher Wert = Farbe tief im Stapel (defensiv versteckt)
         # Niedriger Wert = Farbe oben (weniger strategisch wichtig)
@@ -557,8 +569,7 @@ class MosaicNet(nn.Module):
 
     def forward(self, x):
         shared = self.body(x)
-        return (self.policy_head(shared), self.value_head(shared),
-                self.moon_order_head(shared))
+        return (self.policy_head(shared), self.moon_order_head(shared))
 
     @torch.no_grad()
     def analyze_capacity(self, x):

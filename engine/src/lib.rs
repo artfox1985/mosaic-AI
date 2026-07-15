@@ -89,7 +89,7 @@ fn arena_match(
 /// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
 #[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, dfs_leaf=true))]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5))]
 #[allow(clippy::too_many_arguments)]
 fn net_arena_match(
     py: Python<'_>,
@@ -101,12 +101,11 @@ fn net_arena_match(
     num_threads: usize,
     c: f64,
     c_puct: f64,
-    dfs_leaf: bool,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_arena_match(
-            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, dfs_leaf,
+            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -116,7 +115,7 @@ fn net_arena_match(
 /// spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[A,B], winner, steps, total_floor, floor_per_round}]` zurück.
 #[pyfunction]
-#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, dfs_leaf=true, dfs_leaf_a=None, dfs_leaf_b=None))]
+#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5))]
 #[allow(clippy::too_many_arguments)]
 fn net_vs_net_arena_match(
     py: Python<'_>,
@@ -129,29 +128,21 @@ fn net_vs_net_arena_match(
     num_threads: usize,
     c_puct_a: f64,
     c_puct_b: f64,
-    dfs_leaf: bool,
-    dfs_leaf_a: Option<bool>,
-    dfs_leaf_b: Option<bool>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
-    // dfs_leaf_a/dfs_leaf_b ueberschreiben das gemeinsame dfs_leaf je Brett (z.B.
-    // um Stufe 2 vs. Stufe 1 gegeneinander antreten zu lassen) -- ohne Angabe
-    // gilt fuer beide weiterhin das gemeinsame dfs_leaf (Standard: Stufe 1).
-    let leaf_a = dfs_leaf_a.unwrap_or(dfs_leaf);
-    let leaf_b = dfs_leaf_b.unwrap_or(dfs_leaf);
     py.detach(move || {
         crate::self_play::run_net_vs_net_arena(
-            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, leaf_a, leaf_b,
+            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
-/// Netzgeführtes Self-Play (AlphaZero-Loop). `dfs_leaf=True` = Stufe 1 (DFS-Blatt,
-/// saubere Visit-Targets), `False` = Stufe 2 (Netz-Value). Gibt alle Step-Records
-/// als JSON-Array zurück (Format wie self_play_games). `num_threads=0` = alle Kerne.
+/// Netzgeführtes Self-Play (AlphaZero-Loop, Stufe 1: DFS-Blatt, saubere
+/// Visit-Targets). Gibt alle Step-Records als JSON-Array zurück (Format wie
+/// self_play_games). `num_threads=0` = alle Kerne.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, dfs_leaf=true, prefix="netgen".to_string(), add_root_noise=true, deterministic=false))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -161,7 +152,6 @@ fn net_self_play_games(
     c_puct: f64,
     seed: Option<u64>,
     num_threads: usize,
-    dfs_leaf: bool,
     prefix: String,
     add_root_noise: bool,
     deterministic: bool,
@@ -169,35 +159,7 @@ fn net_self_play_games(
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_self_play(
-            &model_path, n_games, base_sims, c_puct, seed, num_threads, dfs_leaf, &prefix, add_root_noise, deterministic,
-        )
-    })
-    .map_err(pyo3::exceptions::PyValueError::new_err)
-}
-
-/// Sucht in `n_games` Stufe-1-geführten Partien nach Stufe1/Stufe2-
-/// Meinungsverschiedenheiten (argmax-Zug unterschiedlich) und bewertet jede
-/// per `n_reps` unabhängigen Rollouts (Stufe-1-Fortsetzung), ob Stufe 2s Wahl
-/// im Mittel zu einem besseren Score-Vorsprung führt. Siehe
-/// `evaluations/stage2_investigation.md` (Mehrrunden-Vorsicht-Hypothese).
-#[pyfunction]
-#[pyo3(signature = (model_path, n_games=100, base_sims=400, c_puct=1.5, n_reps=8, max_per_round=2, seed=None, num_threads=0))]
-#[allow(clippy::too_many_arguments)]
-fn stage_disagreement_study(
-    py: Python<'_>,
-    model_path: String,
-    n_games: usize,
-    base_sims: u32,
-    c_puct: f64,
-    n_reps: usize,
-    max_per_round: usize,
-    seed: Option<u64>,
-    num_threads: usize,
-) -> PyResult<String> {
-    let seed = seed.unwrap_or_else(rand::random);
-    py.detach(move || {
-        crate::self_play::run_stage_disagreement_study(
-            &model_path, n_games, base_sims, c_puct, n_reps, max_per_round, seed, num_threads,
+            &model_path, n_games, base_sims, c_puct, seed, num_threads, &prefix, add_root_noise, deterministic,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -216,9 +178,15 @@ fn stage_disagreement_study(
 /// Mehrrunden-Frage am meisten), danach auf reine Stufe 1 zurueckfallen --
 /// ein Besuchsanteil-/Q-Wert-basiertes "nur bei knappen Entscheidungen"-
 /// Kriterium wurde gemessen und verworfen (bei 20-43 Kandidaten je Runde zu
-/// verrauscht, siehe stage3_choose_action).
+/// verrauscht, siehe stage3_choose_action). `alphabeta_depth`/
+/// `alphabeta_node_budget`: die Rollout-Fortsetzung nutzt jetzt Alpha-Beta-
+/// Minimax mit Netz-Policy-Zugsortierung statt der vollen PUCT-Suche (Profiling
+/// zeigte 1,8 Mio. Blattauswertungen fuer 2 Spiele, DFS-Solver/Netz/Features
+/// je ~1/3 der Zeit -- Referenz domwil.co.uk/posts/azul-ai: Alpha-Beta mit
+/// Zugsortierung braucht 42-54x weniger Knoten als reines Minimax, weil
+/// unser DFS-Blatt EXAKT ist, nicht verrauscht wie ein Value-Netz).
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games=50, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50, c_puct=1.5, top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2, seed=None, num_threads=0))]
+#[pyo3(signature = (model_path, n_games=50, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50, c_puct=1.5, top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2, alphabeta_depth=2, alphabeta_node_budget=100, seed=None, num_threads=0))]
 #[allow(clippy::too_many_arguments)]
 fn stage3_vs_stage1_arena_match(
     py: Python<'_>,
@@ -232,6 +200,8 @@ fn stage3_vs_stage1_arena_match(
     n_reps: usize,
     horizon_rounds: u32,
     stage3_max_round: u32,
+    alphabeta_depth: u32,
+    alphabeta_node_budget: u32,
     seed: Option<u64>,
     num_threads: usize,
 ) -> PyResult<String> {
@@ -239,22 +209,52 @@ fn stage3_vs_stage1_arena_match(
     py.detach(move || {
         crate::self_play::run_stage3_vs_stage1_arena(
             &model_path, n_games, sims1, stage3_shortlist_sims, stage3_rollout_sims, c_puct, top_k,
-            n_reps, horizon_rounds, stage3_max_round, seed, num_threads,
+            n_reps, horizon_rounds, stage3_max_round, alphabeta_depth, alphabeta_node_budget, seed, num_threads,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
-/// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
-/// Feature-Vektor aus und gibt `(value, policy_logits)` zurück.
+/// Diagnose (nur mit `--features clone_profiling` aussagekräftig, sonst
+/// immer 0): setzt die Zeit-/Zaehler-Statistik aus `profiling.rs` zurueck --
+/// vor einem zu profilierenden Testlauf aufrufen (siehe stage2_investigation.md).
 #[pyfunction]
-fn onnx_eval(path: String, features: Vec<f32>) -> PyResult<(f32, Vec<f32>)> {
+fn profiling_reset() {
+    crate::profiling::reset_all();
+    crate::self_play::ALPHABETA_CALLS.store(0, std::sync::atomic::Ordering::Relaxed);
+    crate::self_play::ALPHABETA_NODE_VISITS.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Liest die aktuelle Zeit-/Zaehler-Statistik aus `profiling.rs`: wie viel
+/// Zeit ging in Feature-Extraktion, Netz-Forward-Pass, DFS-Solver-Aufrufe
+/// (jeweils Aufrufe + Gesamt-Nanosekunden), plus GameState-Klon-Zaehler.
+/// Nur mit `--features clone_profiling` aussagekraeftig.
+#[pyfunction]
+fn profiling_snapshot() -> String {
+    json!({
+        "features_count": crate::profiling::features_count(),
+        "features_ns": crate::profiling::features_ns(),
+        "net_eval_count": crate::profiling::net_eval_count(),
+        "net_eval_ns": crate::profiling::net_eval_ns(),
+        "dfs_eval_count": crate::profiling::dfs_eval_count(),
+        "dfs_eval_ns": crate::profiling::dfs_eval_ns(),
+        "gamestate_clone_count": crate::profiling::gamestate_clone_count(),
+        "alphabeta_calls": crate::self_play::ALPHABETA_CALLS.load(std::sync::atomic::Ordering::Relaxed),
+        "alphabeta_node_visits": crate::self_play::ALPHABETA_NODE_VISITS.load(std::sync::atomic::Ordering::Relaxed),
+    })
+    .to_string()
+}
+
+/// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
+/// Feature-Vektor aus und gibt die Policy-Logits zurück (kein Value-Head mehr).
+#[pyfunction]
+fn onnx_eval(path: String, features: Vec<f32>) -> PyResult<Vec<f32>> {
     let net = crate::net::Net::load(&path, features.len())
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-    let (policy, value, _moon) = net
+    let (policy, _moon) = net
         .eval(&features)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-    Ok((value, policy))
+    Ok(policy)
 }
 
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
@@ -291,8 +291,9 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_vs_net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
-    m.add_function(wrap_pyfunction!(stage_disagreement_study, m)?)?;
     m.add_function(wrap_pyfunction!(stage3_vs_stage1_arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(profiling_reset, m)?)?;
+    m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
