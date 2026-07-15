@@ -3,7 +3,7 @@ Exportiert ein trainiertes MosaicNet (.pth) nach ONNX für die Rust-Inferenz (Ph
 
   python export_onnx.py --version s100
 
-Erzeugt models/alphazero_<version>.onnx mit 3 Outputs (policy, value, moon) und
+Erzeugt models/alphazero_<version>.onnx mit 2 Outputs (policy, moon) und
 dynamischer Batch-Achse. Die Rust-Engine (tract-onnx) lädt diese Datei für den
 Network-Modus (Self-Play / Arena).
 """
@@ -26,7 +26,6 @@ def export(version: str, opset: int = 13) -> Path:
     ckpt = torch.load(str(pth), map_location="cpu")
     state = ckpt["model_state"]
     hs = state["body.0.weight"].shape[0]
-    vh = state["value_head.0.bias"].shape[0]
     in_size = state["body.0.weight"].shape[1]
     if in_size != INPUT_SIZE:
         print(f"⚠️  Modell-Input {in_size} ≠ config.INPUT_SIZE {INPUT_SIZE} — nutze Modellwert.")
@@ -40,9 +39,13 @@ def export(version: str, opset: int = 13) -> Path:
     # siehe Vorfall bei v6).
     ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
 
-    model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, value_hidden=vh,
-                       policy_hidden=ph)
+    model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph)
     new_state = model.state_dict()
+    # Alte Checkpoints (vor der Value-Head-Entfernung) haben zusaetzlich
+    # value_head.*-Keys -- strict=False ignoriert die einfach (kein Ziel
+    # dafuer mehr im Modell). Shape-Mismatches bei den verbleibenden,
+    # gemeinsamen Keys (z.B. body.0.weight bei geaendertem INPUT_SIZE) werden
+    # weiterhin explizit rausgefiltert, sonst wuerde load_state_dict crashen.
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
     if skipped:
         print(f"⚠️  Shape-Mismatch (alte Head-Architektur?), startet zufällig: {', '.join(skipped)}")
@@ -55,28 +58,26 @@ def export(version: str, opset: int = 13) -> Path:
     torch.onnx.export(
         model, dummy, str(out),
         input_names=["state"],
-        output_names=["policy", "value", "moon"],
+        output_names=["policy", "moon"],
         dynamic_axes={
             "state":  {0: "batch"},
             "policy": {0: "batch"},
-            "value":  {0: "batch"},
             "moon":   {0: "batch"},
         },
         opset_version=opset,
         dynamo=False,
     )
-    print(f"✅ Exportiert: {out}  (input={in_size}, hidden={hs}, value_hidden={vh}, opset={opset})")
+    print(f"✅ Exportiert: {out}  (input={in_size}, hidden={hs}, opset={opset})")
 
     # Referenz-Ein/Ausgabe für die Rust-Paritätsprüfung schreiben (deterministisch).
     torch.manual_seed(0)
     x = torch.rand(1, in_size, dtype=torch.float32)
     with torch.no_grad():
-        p, v, m = model(x)
+        p, m = model(x)
     ref = MODELS_DIR / f"alphazero_{version}.onnx.ref.txt"
     with open(ref, "w") as f:
         f.write("# input\n" + " ".join(f"{z:.6f}" for z in x[0].tolist()) + "\n")
         f.write("# policy\n" + " ".join(f"{z:.6f}" for z in p[0].tolist()) + "\n")
-        f.write("# value\n" + f"{float(v[0,0]):.6f}" + "\n")
         f.write("# moon\n" + " ".join(f"{z:.6f}" for z in m[0].tolist()) + "\n")
     print(f"📎 Referenz für Rust-Parität: {ref}")
     return out

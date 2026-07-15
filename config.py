@@ -15,7 +15,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 684        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler)
+INPUT_SIZE = 707        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske)
                         # (redundantes unused_chip_colors-Feature entfernt: -10; bag_count ergänzt: +1;
                         #  floor-Normierung /7.0 -> /4.0 korrigiert (kein Dim-Effekt);
                         #  Bonuschip-Farbmaske je Fabrik ergänzt: +5*4=+20; 673 -> 664 -> 684)
@@ -25,4 +25,3 @@ NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 BATCH_SIZE    = 256
 HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (2^x)
 LEARNING_RATE = 0.0004
-VALUE_WEIGHT  = 1
