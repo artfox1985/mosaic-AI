@@ -1,5 +1,46 @@
 # Ursachensuche: 0:0-Partien bei Stufe 2
 
+## Wichtige Korrektur zum eigentlichen Zweck von Stufe 2 (Nutzer-Hinweis)
+
+Diese Untersuchung ist unter der Annahme gestartet, Stufe 2s Daseinszweck sei
+"billigere Blattauswertung statt teurem DFS-Solve". Direkt gemessen (10
+Spiele v2 vs. sich selbst, gleiche Sims, gleiche Bedingungen): **Stufe 1
+14.86s/Spiel, Stufe 2 16.21s/Spiel — praktisch gleich schnell, Stufe 2 sogar
+minimal langsamer.** Kein Geschwindigkeitsvorteil. Der DFS-Solve ist (dank
+Node-Budget) offenbar nicht der Flaschenhals der Suche — Baum-Traversierung/
+Feature-Extraktion fallen für beide Stufen gleich an.
+
+**Der eigentliche Zweck ist ein anderer**: `solve_round_final_score`
+("Optimaler finaler RUNDEN-Score", `tiling_solver.rs`) löst nur die
+AKTUELLE Runde exakt — null Sicht auf Runde 2-5. Und die Suchbaeume beider
+Stufen behandeln das Rundenende strukturell als "terminal"
+(`terminal = state.phase != Phase::Drafting`, identisch in `mcts.rs` und
+`net_mcts.rs`) — die Suche simuliert NIE über Rundengrenzen hinweg, in
+KEINER Stufe. Stufe 1 ist damit strukturell blind für rundenübergreifende
+Strategie (z.B. bewusst eine schwächere Runde-1-Platzierung fuer eine
+bessere Ausgangslage in Runde 2+ in Kauf nehmen) — das kann nur indirekt
+über die Policy hereinkommen, nie über die Suche selbst. Der Value-Head
+ist dagegen auf das TATSAECHLICHE Fuenf-Runden-Endergebnis trainiert und
+damit der einzige Baustein im System, der prinzipiell mehrrundenbewusste
+Bewertung leisten könnte.
+
+**Konsequenz für die Einordnung der bisherigen Befunde:** die ~7%-0:0-Rate
+zeigt, dass der Value-Head dieses Potenzial noch nicht gut nutzt — nicht,
+dass der Ansatz falsch ist. Ein direkter Vergleich, ob Stufe 2 in
+Situationen mit erkennbarem Rundenkonflikt (schlechter Rundenzug für
+bessere Gesamtstrategie) qualitativ andere/plausiblere Entscheidungen
+trifft als Stufe 1, wurde bisher NICHT untersucht — die gesamte bisherige
+Untersuchung schaute nur auf Symptome (Boden, Klemm-Effekt, 0:0-Rate), nicht
+auf tatsächliche Mehrrunden-Entscheidungsqualität. Offener, potenziell
+lohnender nächster Schritt, falls weiterverfolgt.
+
+**Nebenbefund (v7/v7cold, Stufe 2):** waehrend Cold-Start bei Stufe 1 klar
+signifikant staerker war als Warm-Start (siehe `STAGE2_TODO.md`), zeigt
+derselbe Vergleich bei Stufe 2 keinen Unterschied (25:24, 51%, echte
+Paritaet) — der Policy-Vorteil von Cold-Start scheint sich nicht auf Stufe
+2 zu uebertragen, konsistent damit, dass die Stufe-2-Schwaeche am Value-Head
+selbst liegt, nicht an der allgemeinen Politik-Qualitaet.
+
 Auftrag: bei den laufenden 4000 Stufe-2-Self-Play-Spielen (Label `v2s2`,
 Modell v2, siehe `evaluations/sweep_repeat_logs/v6_pipeline.sh`) nach den
 ersten ~500 Spielen in die 0:0-Partien reinschauen und der Ursache
@@ -376,3 +417,92 @@ Spielstärke-/Bewertungsschwäche der Stufe-2-Suche hin, unabhängig vom
 Trainingsdaten-Noise-Artefakt. Die Selfplay-0:0-Rate (mit Noise) und die
 Arena-0:0-Rate (ohne Noise) sind zwei GETRENNTE Phänomene, die nicht
 miteinander vermischt werden sollten.
+
+## Schritt 10: Direkter Test — trifft Stufe 2 in Meinungsverschiedenheiten die bessere Mehrrunden-Entscheidung?
+
+Direkte Folgeuntersuchung der Mehrrunden-Vorsicht-Hypothese (siehe Korrektur
+oben): statt indirekt über Value-Head-Trajektorien zu schließen, wird JEDE
+Drafting-Entscheidung in einem Stufe-1-geführten Champion-Spiel (v2) darauf
+geprüft, ob Stufe 2 (Netz-Value-Blatt) argmax eine ANDERE Aktion gewählt
+hätte. Bei Abweichung: Zustand verzweigen, je einmal Stufe-1s und Stufe-2s
+Wahl anwenden, beide Zweige mehrfach (unabhängiger RNG) per Stufe-1-Politik
+bis Spielende fortsetzen, Score-Vorsprung des entscheidenden Spielers
+vergleichen. Neue Rust-Funktion `stage_disagreement_study`
+(`engine/src/self_play.rs`: `collect_disagreement_candidates` +
+`evaluate_sampled_candidates`, PyO3-Export in `lib.rs`), Treiber-Skript
+`evaluations/scripts/stage_disagreement_study.py`.
+
+**Bug beim ersten Anlauf (gefunden + gefixt):** die erste Version wertete
+Meinungsverschiedenheiten INLINE im selben zeitgesteuerten Spiel-Loop aus
+(Rollouts liefen auf derselben Uhr wie das Hauptspiel) — Ergebnis:
+ausschließlich Runde-1-Fälle (20/20 bzw. 123/136 in Pilot 1/2), weil die
+teuren Rollouts das Zeitbudget des Hauptspiels aufbrauchten, bevor Runde 2-5
+je erreicht wurden. Fix: zweiphasiges Design — Phase 1 spielt das GANZE
+Spiel günstig durch und sammelt nur die Zustände+Aktionen (kein Rollout),
+Phase 2 wertet danach je Runde höchstens `max_per_round` zufällig gezogene
+Kandidaten per Rollout aus (verhindert außerdem, dass Runde 1 mit weit mehr
+Kandidaten die Stichprobe dominiert).
+
+**Pilot (nach Fix, v2, 8 Spiele, sims=100, reps=4, max/Runde=2, n=16/Runde):**
+
+```
+Gesamt — Stufe 2 im Rollout besser: 34/80 | Stufe 1 besser: 42/80 | gleich: 4/80 | Diff -1.49
+Runde 1: n=16 | Stufe2 besser 6 | Stufe1 besser 9 | Diff -1.72
+Runde 2: n=16 | Stufe2 besser 7 | Stufe1 besser 9 | Diff -1.16
+Runde 3: n=16 | Stufe2 besser 7 | Stufe1 besser 9 | Diff -0.19
+Runde 4: n=16 | Stufe2 besser 10 | Stufe1 besser 6 | Diff -0.08
+Runde 5: n=16 | Stufe2 besser 4 | Stufe1 besser 9 | Diff -4.31
+```
+
+Design-Sanity-Check bestanden: Runde 5 IST die letzte Spielrunde, dort ist
+Stufe 1s DFS-Blatt gar nicht myopisch (es löst exakt bis Spielende) — folglich
+sollte Stufe 1 dort klar überlegen sein, und genau das zeigt sich (Diff
+-4.31, deutlichster Wert aller Runden). Für Runde 1-4 ist die
+Einzelvarianz je Vergleich hoch (σ≈20 Score-Punkte Differenz), bei n=16/Runde
+ist nichts davon statistisch belastbar (Standardfehler ≈5) — reiner Pilot,
+keine Schlussfolgerung zulässig. Voller Lauf (60 Spiele, ~n=120/Runde)
+gestartet, Ergebnis folgt.
+
+**Voller Lauf (v2, 60 Spiele, sims=100, reps=4, max/Runde=2, n=597 gesamt):**
+
+```
+GESAMT: n=597 mean=-1.72 sd=15.38 se=0.63 t=-2.73   (signifikant, p<0.01)
+Runde 1: n=120 mean=+0.18 sd=17.94 se=1.64 t=+0.11  (nicht signifikant)
+Runde 2: n=120 mean=+0.39 sd=18.67 se=1.70 t=+0.23  (nicht signifikant)
+Runde 3: n=120 mean=-4.67 sd=11.70 se=1.07 t=-4.37  (hoch signifikant, Stufe 1 besser)
+Runde 4: n=120 mean=-2.00 sd=15.47 se=1.41 t=-1.42  (nicht signifikant, Trend Stufe 1)
+Runde 5: n=117 mean=-2.52 sd=11.10 se=1.03 t=-2.46  (signifikant, Stufe 1 besser)
+```
+(mean = mittlere Differenz Stufe2-Rollout minus Stufe1-Rollout im
+Score-Vorsprung des entscheidenden Spielers; negativ = Stufe 1s Wahl war im
+Mittel besser.)
+
+**Ergebnis: die Mehrrunden-Vorsicht-Hypothese wird durch diesen direkten Test
+NICHT gestützt.** Gerade in Runde 1-2 — dort, wo Stufe 2s angebliches
+5-Runden-Weitblick-Argument am stärksten greifen müsste (die meisten
+zukünftigen Runden liegen noch vor einem) — ist der Unterschied statistisch
+nicht von Null zu unterscheiden (t=+0.11 bzw. +0.23). In Runde 3 und 5 ist
+Stufe 1 signifikant besser; Runde 5 ist dabei erwartbar (letzte Runde: Stufe
+1s DFS-Blatt löst dort exakt bis Spielende, ist also gar nicht myopisch —
+das bestätigt erneut, dass die Methode etwas Echtes misst). Runde 3 ist der
+eigentlich bemerkenswerte Befund: hier verliert Stufe 2s abweichende Wahl
+klar, obwohl noch zwei Runden Restspiel folgen — das Gegenteil dessen, was
+die Weitblick-Hypothese vorhersagen würde.
+
+**Wichtiger methodischer Vorbehalt:** beide Zweige werden nach der
+abweichenden ersten Aktion IMMER per Stufe-1-Politik zu Ende gespielt (nicht
+per Stufe 2). Der Test beantwortet also präzise die praktisch relevante
+Frage "hilft es, an dieser Stelle einmalig Stufe 2s Zug zu übernehmen, wenn
+der Champion (Stufe 1) den Rest spielt" — nicht die Frage "wäre eine
+durchgehend mit Stufe 2 gespielte Partie stärker". Letzteres ist bereits
+mehrfach direkt getestet (v6/v7/v7cold Stufe1-vs-Stufe2-Arena, 73-93%
+Stufe-1-Siege) und zeigt dasselbe Bild.
+
+**Fazit:** die beiden unabhängigen Testarten (durchgehende Stufe1-vs-Stufe2-
+Arena UND dieser punktuelle Entscheidungs-Rollout-Test) konvergieren jetzt
+auf dieselbe Schlussfolgerung. Die "weicher/komprimierter Value-Head-Signal"-
+Beobachtung aus Schritt 5-9 ist wahrscheinlich genau das: ein zu wenig
+trennscharfer Value-Head, nicht verborgene Mehrrunden-Weisheit, die Stufe 1
+fehlt. Stufe 2 bleibt vorerst kein Kandidat für den Produktionspfad; sollte
+künftig ein deutlich besser kalibrierter Value-Head trainiert werden (Val-R²
+spürbar über 0.3-0.5), lohnt sich eine Wiederholung dieses Tests.

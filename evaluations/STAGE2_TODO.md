@@ -22,8 +22,23 @@ abgewehrt** — alle vier kamen per SPRT-Arena (siehe Werkzeuge unten) als
 | v4   | +2300 Champion-Self-Play (Warm-Start v2)     | Gleich stark     | —                   |
 | v5   | +Champion-Self-Play (Warm-Start v2)          | 39:37, 51% (Gleich stark) | —          |
 | v6   | +4000 Stufe-2-Bootstrapping-Spiele (v2, Warm-Start v2) | 35:37, 49% (Gleich stark) | 45:41, 52% (Gleich stark) |
+| v7   | Kuratiertes ~8800-Spiele-`v2`-Fenster (Warm-Start v2) | 42:58, 42% (Gleich stark) | — |
+| v7cold | GLEICHES Fenster wie v7, Cold-Start (kein `--load`) | 23:21, 52% (Gleich stark, echte Paritaet) | — |
 
-Details je Generation in `v3_eval.md` bis `v6_eval.md`. **Wichtiger
+**Wichtiger Fund: v7 vs. v7cold direkt (Stufe 1) — 22:41, 35%, v7cold
+SIGNIFIKANT stärker** (SPRT-Entscheid, kein Ressourcenlimit). Auf
+IDENTISCHEM Fenster ist Cold-Start klar stärker als Warm-Start — erster
+eindeutiger (nicht "Gleich stark") Ausgang in der ganzen Serie. Erklärt
+plausibel, warum v3-v7 (alle Warm-Start) durchgehend bei "Gleich stark"
+gegen v2 hängen blieben: Warm-Start scheint das Training in der Nähe von
+v2s Gewichten festzuhalten, statt einen echt neuen, besseren Punkt zu
+finden. Bei Stufe 2 zeigt sich derselbe Vorteil NICHT (v7(Stufe2) vs.
+v7cold(Stufe2): 25:24, 51%, echte Paritaet) — konsistent damit, dass die
+Stufe-2-Schwäche am Value-Head selbst liegt, nicht an der Policy-Qualität.
+**Konsequenz: Cold-Start wird die neue Standard-Strategie für Kandidaten.**
+
+Details je Generation in `v3_eval.md` bis `v7_eval.md` (v7cold: eigene
+Eval-Datei, da kein regulärer Kandidat im bisherigen Sinn). **Wichtiger
 Nebenbefund (Datenfenster-Kontrolle):** `train.py` lädt beim Training IMMER
 alle `.pkl`-Dateien aus `data/` (`glob.glob(*.pkl)`, keine Filterung nach
 Version/Herkunft) — es gibt keinen Mechanismus, der sicherstellt, dass nur
@@ -97,11 +112,11 @@ Kandidaten, vier verschiedene Fenster, immer "Gleich stark") überhaupt
 adressiert, ist das kein guter erster Test — Fenster-Kontrolle isoliert zu
 testen ist billiger und aussagekräftiger.
 
-### Spur B: Stufe-2-Ursachenforschung — inhaltlich abgeschlossen
+### Spur B: Stufe-2-Ursachenforschung — abgeschlossen (Mehrrunden-Hypothese widerlegt)
 
 Deterministisches (`--deterministic --no-root-noise`) Stufe-2-Self-Play mit
 `v2` (900 Spiele, `v2s2det`, siehe `evaluations/stage2_investigation.md`
-Schritt 8/9) lieferte ein klares Ergebnis:
+Schritt 8/9) klärte die Symptomatik:
 
 - [x] 0:0-Rate auf komplett rauschfreien Daten: **7.0%** — deckungsgleich
       mit den Arena-Ergebnissen (v6(Stufe2) vs. v2(Stufe2): 7.0%). Zweifach
@@ -111,17 +126,103 @@ Schritt 8/9) lieferte ein klares Ergebnis:
       selbst im schlechtesten Fall nie ins klar Negative (bleibt bei
       0.04-0.11, während normale Partien auf 0.19→0.29 steigen) — bestätigt
       die "weiches/wenig trennscharfes Value-Signal"-Hypothese deutlich.
-- [ ] NICHT umgesetzt (optional, nur bei Bedarf): direkter Vergleich der
-      Value-Head-Vorhersagen an denselben Zuständen gegen die exakte
-      Stufe-1-DFS-Solver-Bewertung — waere der naechste Verfeinerungsschritt,
-      ist aber fuer die Priorisierungsentscheidung unten nicht mehr
-      zwingend noetig, da die Kernursache bereits klar identifiziert ist.
 
-**Entscheidung:** Stufe 1 bleibt der Produktions-Pfad. Eine gezielte
-Investition in einen schärfer kalibrierten Stufe-2-Value-Head (größerer
-`value_hidden`, mehr Sims nur für Stufe-2-Blattauswertung) ist eine
-zurückgestellte Option, keine aktuelle Prioritaet — Spur A (Champion-
-Spielstärke) hat Vorrang.
+**Wichtige Korrektur des Gesamtbilds** (siehe
+`evaluations/stage2_investigation.md`, Abschnitt oben): Stufe 2s eigentlicher
+Zweck ist NICHT billigere Blattauswertung — direkt gemessen sind Stufe 1
+und Stufe 2 praktisch gleich schnell (14.86s vs. 16.21s/Spiel, 10 Spiele
+v2 vs. sich selbst). Der eigentliche Grund: `solve_round_final_score` löst
+nur die AKTUELLE Runde exakt (null Sicht auf Runde 2-5), und die Suchbaeume
+beider Stufen behandeln das Rundenende strukturell als "terminal" — die
+Suche simuliert NIE über Rundengrenzen. Stufe 1 ist damit **strukturell
+blind für rundenübergreifende Strategie**, unabhängig davon wie gut sie
+wird. Der Value-Head (trainiert auf das tatsächliche 5-Runden-Endergebnis)
+ist der einzige Baustein, der das prinzipiell könnte.
+
+- [x] **Direkter Test durchgeführt** (`evaluations/stage2_investigation.md`
+      Schritt 10, neue Rust-Funktion `stage_disagreement_study`): an jeder
+      Drafting-Entscheidung eines Stufe-1-geführten Champion-Spiels (v2)
+      geprüft, ob Stufe 2 argmax anders gewählt hätte; bei Abweichung
+      verzweigt und beide Zweige per Rollout (Stufe-1-Fortsetzung) verglichen.
+      597 Meinungsverschiedenheiten (60 Spiele, ~120/Runde):
+      ```
+      Runde 1: n=120  t=+0.11  (nicht signifikant)
+      Runde 2: n=120  t=+0.23  (nicht signifikant)
+      Runde 3: n=120  t=-4.37  (Stufe 1 signifikant besser)
+      Runde 4: n=120  t=-1.42  (nicht signifikant, Trend Stufe 1)
+      Runde 5: n=117  t=-2.46  (Stufe 1 signifikant besser — erwartbar: letzte
+                                Runde, Stufe 1s DFS-Blatt ist dort exakt)
+      ```
+      **Ergebnis: Mehrrunden-Vorsicht-Hypothese widerlegt.** Gerade in Runde
+      1-2, wo Weitblick am meisten zählen müsste, ist der Unterschied
+      statistisch nicht von Null zu unterscheiden. In Runde 3 verliert
+      Stufe 2s abweichende Wahl sogar signifikant — das Gegenteil der
+      Hypothese. (Methodischer Vorbehalt: beide Zweige spielen nach der
+      abweichenden Aktion mit Stufe-1-Politik weiter — testet also "hilft
+      Stufe 2s Zug einmalig, wenn der Champion den Rest spielt", nicht
+      "wäre eine durchgehende Stufe-2-Partie stärker"; Letzteres zeigt die
+      Stufe1-vs-Stufe2-Arena ohnehin schon eindeutig, 73-93% Stufe-1-Siege.)
+
+**Entscheidung:** Stufe 1 bleibt der Produktions-Pfad — nicht nur vorläufig
+mangels Alternative, sondern weil die Mehrrunden-Foresight-Hypothese, die
+Stufe 2s einzige denkbare Existenzberechtigung war, jetzt direkt getestet
+und widerlegt ist. Die Value-Head-Beobachtungen aus Schritt 5-9 (weiches,
+wenig trennscharfes Signal) erklären die Stufe-2-Schwäche vollständig; es
+gibt kein verborgenes Mehrrunden-Können, das Stufe 1 fehlt. Spur B ist damit
+inhaltlich abgeschlossen. Sollte künftig ein deutlich besser kalibrierter
+Value-Head trainiert werden (Val-R² spürbar über 0.3-0.5), lohnt sich eine
+Wiederholung dieses Tests — bis dahin kein weiterer Aufwand hier. Spur A
+(Champion-Spielstärke) hat alleinige Priorität.
+
+**Nachtrag (2026-07-15): Kapazitätstest durchgeführt, Ergebnis negativ.**
+Nutzer-Anstoß: "dann müssen wir den Value-Head so modifizieren dass er
+strategisch denkt, sonst hat das alles wenig Sinn." Neue `train.py`-Flags
+`--value-hidden N` + `--skip-phase1` (erzwingt 0 Phase-1-Epochen: geladener
+Trunk/Policy/Moon-Head bleiben exakt unverändert, nur Phase 2 läuft) erlauben
+einen schnellen, günstigen Test ohne neues Self-Play: Value-Head von 64 auf
+256 Hidden-Neuronen (4x) verbreitert, gegen denselben eingefrorenen
+v7cold-Trunk neu kalibriert.
+
+```
+v7cold        (value_hidden= 64): Val-R²=0.273, bester Stand nach Epoche 1/50
+v7cold_vh256  (value_hidden=256): Val-R²=0.272, bester Stand nach Epoche 1/50
+```
+
+Praktisch identisch — 4x mehr Kopf-Kapazität ändert NICHTS an der Decke, und
+das Muster (bester Wert bereits nach Epoche 1, danach nur noch Verschlechterung)
+bleibt exakt gleich. **Kopf-Kapazität ist damit als Ursache ausgeschlossen.**
+
+**Zweiter Test (direkt im Anschluss, Nutzer-Anstoß "was müssen wir machen,
+damit der Value-Head endlich greift"): Trunk-Hypothese direkt geprüft.**
+Neuer `train.py`-Modus `--value-only` (Phase 1 trainiert den Trunk NUR mit
+Value-Loss, kein Policy-/Moon-Loss fließt in den Trunk-Gradienten) — testet,
+ob ein nicht vom (dominanten) Policy-Loss geformter Trunk eine höhere
+Val-R²-Decke erreicht. Frischer Trunk, 60 Epochen, dasselbe Datenfenster:
+
+```
+Gemeinsam trainierter Trunk (v7cold, Policy+Value): Val-R²=0.27-0.34
+Value-only-Trunk (kein Policy-Signal):              Val-R²=0.19 (Phase-1-Peak
+                                                      bereits 0.25 in Epoche 1)
+```
+
+**Schlechter, nicht besser.** Auch die Trunk-Hypothese ist damit widerlegt —
+den Trunk vom Policy-Signal zu befreien hilft dem Value-Fit nicht, es schadet
+ihm sogar leicht (deckt sich mit der älteren Beobachtung "der Trunk profitiert
+nachweislich vom Value-Signal, siehe v1 vs. v1b" — es scheint umgekehrt
+genauso zu gelten: Policy hilft dem Trunk auch fürs Value-Fitting).
+
+**Damit sind beide plausiblen Architektur-Fixes (Kopf-Kapazität, Trunk-
+Dedikation) sauber ausgeschlossen.** Die verbleibende Erklärung ist
+wahrscheinlicher: irreduzibles Rauschen im Trainings-Target selbst — der
+finale Score hängt stark von künftigen Zufalls-Fliesenzügen ab, die zum
+Entscheidungszeitpunkt prinzipiell unbekannt sind, und Val-R²≈0.2-0.3 könnte
+schlicht nahe der Decke liegen, die die Zustandsfeatures + das Spielzufalls-
+element überhaupt zulassen. Einzig verbleibender Hebel: das Trainings-TARGET
+selbst weniger verrauscht machen (z.B. über mehrere Rollouts gemittelte
+Werte statt des rohen Einzelspiel-Ergebnisses, analog zum `n_reps`-Ansatz aus
+der Disagreement-Studie) — deutlich teurer, da es Self-Play-Rechenzeit
+vervielfacht, und mit unsicherem Ertrag. Nächster Schritt nur auf explizite
+Anfrage, da Spur A (Champion-Herausforderung) weiterhin alleinige Priorität hat.
 
 <details>
 <summary>Historie: erster Reset-Zyklus (v1/v1b/v2/v2b, überholt)</summary>
@@ -234,8 +335,11 @@ diesem Wert.
   Value-Val-R² jetzt auch Policy-Verlust auf dem nie trainierten Val-Split
   gemessen (gleiche Masking/Gewichtung wie Training) — bislang nur ein
   Nice-to-have-Signal, die Arena bleibt der eigentliche Entscheider.
-- **`value_hidden` 128→64**: die Value-Regression ist eigentlich einfach,
-  weniger Kapazität dürfte dem Overfitting zusätzlich entgegenwirken.
+- ~~`value_hidden` 128→64: die Value-Regression ist eigentlich einfach,
+  weniger Kapazität dürfte dem Overfitting zusätzlich entgegenwirken.~~
+  **Widerlegt** (siehe Test unten, 2026-07-15): 64→256 (4x) auf demselben
+  eingefrorenen Trunk ändert die Val-R²-Decke praktisch nicht (0.273→0.272).
+  Kopf-Kapazität war nicht die Ursache.
 - **Direkter Stufe-1-vs-Stufe-2-Arena-Test** (`train.py::run_readiness_probe`)
   ersetzt die alte 0:0-Raten-Sonde: dasselbe Netz tritt in einer echten Partie
   gegen sich selbst an (Stufe 1 vs. Stufe 2), max. 50 Spiele, mit Early-Stop.
@@ -347,10 +451,12 @@ kein weiterer Sweep nötig.
 
 ## Offene Punkte
 
-- **v7 (Spur A des Masterplans):** Nutzer kuratiert gerade `data/` (altes/
-  Stufe-2-Material raus, `v2`-Pile auf ~8000 Spiele eindampfen). Sobald
-  fertig: `train.py --name v7 --epochs 100 --load v2`, kein neues Self-Play,
-  keine Sims-Änderung, dann Gate gegen v2.
+- **v7 (Spur A des Masterplans):** `data/` kuratiert (880 Dateien, nur `v2`,
+  ~8800 Spiele). Läuft: `v7` (Warm-Start `--load v2`) UND `v7cold`
+  (Cold-Start, gleiches Fenster, kein `--load`) PARALLEL — testet zusätzlich
+  zur Fenster-Kontrolle, ob Warm-Start selbst der limitierende Faktor beim
+  Plateau ist. Danach Gates: `v7` vs. `v2`, `v7cold` vs. `v2`, ggf. `v7` vs.
+  `v7cold` direkt.
 - **Stufe-2-Ursachenforschung (Spur B) inhaltlich abgeschlossen** (siehe
   `evaluations/stage2_investigation.md`): 0:0-Rate ist ein Score-Klemm-
   Mechanik-Effekt; Stufe 2 hat real ~7% davon (rauschfrei, zweifach

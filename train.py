@@ -86,7 +86,16 @@ def run_readiness_probe(version_name, games=100, sims=200, threads=0, seed=12345
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           probe_games=100, probe_sims=400, skip_probe=False, show_plot=True, val_frac=0.1,
-          val_overfit_patience=8):
+          val_overfit_patience=8, value_hidden=None, skip_phase1=False, value_only=False):
+    if value_only:
+        # Policy-Plateau ist als Stop-Kriterium hier sinnlos (Policy-Head wird
+        # gar nicht trainiert, sein Loss bewegt sich nie) -- liefe sonst nach
+        # ~10 Epochen (Plateau-Fenster+Patience) faelschlich in den Early-Stop,
+        # lange bevor der Value-Only-Trunk seine eigene Decke erreicht hat.
+        early_stop = False
+        print("⚠️  Value-Only-Modus: Policy-/Moon-Head werden NICHT trainiert "
+              "(Zufallsgewichte, ihre Zahlen im Report sind irrelevant). "
+              "Early-Stop deaktiviert -- volle --epochs-Anzahl läuft durch.")
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -155,23 +164,33 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Batch Size    : {BATCH_SIZE}")
     from neural_net import VALUE_SCALE, VALUE_OPP_EPSILON
     print(f"   Value-Target  : tanh(eigen/{VALUE_SCALE:.0f}) - {VALUE_OPP_EPSILON}*tanh(gegner/{VALUE_SCALE:.0f}) (Endergebnis statt Win/Loss)")
-    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
-    
+    # value_hidden nur als Kwarg reichen, wenn explizit gesetzt -- sonst bleibt
+    # der Klassendefault (64) unveraendert fuer alle bisherigen Trainingslaeufe.
+    net_kwargs = {"value_hidden": value_hidden} if value_hidden is not None else {}
+    if value_hidden is not None:
+        print(f"   Value-Hidden  : {value_hidden} (Standard: 64 — Kapazitaetstest, siehe STAGE2_TODO.md)")
+    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs, **net_kwargs)
+
     # Warm Start?
+    ckpt = None
     if load_version:
         load_path = MODELS_DIR / f"alphazero_{load_version}.pth"
-        
+
         if load_path.exists():
             print(f"📥 Lade altes Model als Startpunkt: {load_path.name}")
             ckpt = torch.load(str(load_path), map_location=device)
             old_state = ckpt["model_state"]
             new_state = model.state_dict()
-            # strict=False allein reicht NICHT bei INPUT_SIZE-Änderungen: es
-            # toleriert fehlende/zusätzliche Keys, aber KEINE Shape-Mismatches
-            # bei gleichnamigen Keys (z.B. body.0.weight bei geändertem
-            # INPUT_SIZE) — das würde crashen. Shape-inkompatible Keys daher
-            # vorher explizit rausfiltern; der Rest (tiefere Body-Schichten,
-            # alle Heads) startet weiterhin warm.
+            # strict=False allein reicht NICHT bei INPUT_SIZE-/value_hidden-
+            # Aenderungen: es toleriert fehlende/zusaetzliche Keys, aber KEINE
+            # Shape-Mismatches bei gleichnamigen Keys (z.B. body.0.weight bei
+            # geaendertem INPUT_SIZE, oder value_head.* bei geaendertem
+            # value_hidden) — das wuerde crashen. Shape-inkompatible Keys daher
+            # vorher explizit rausfiltern; der Rest (Trunk, Policy/Moon-Head,
+            # ggf. Value-Head bei gleicher Groesse) startet weiterhin warm.
+            # Bei --skip-phase1 + neuem --value-hidden ist genau das gewollt:
+            # Trunk/Policy/Moon warm, Value-Head bewusst frisch (Phase 2 baut
+            # ihn ohnehin neu auf, siehe unten).
             skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
             if skipped:
                 print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")
@@ -179,7 +198,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             model.load_state_dict(old_state, strict=False)
         else:
             print(f"⚠️ Warnung: Start-Modell '{load_path}' nicht gefunden. Trainiere von null!")
-            
+
     model.to(device)
     
     # 4. Training Parameter
@@ -187,7 +206,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     mse_loss = nn.MSELoss()
     
     # Epochen-Anzahl ---
-    epochs = input_epoch
+    # --skip-phase1 erzwingt 0 Phase-1-Epochen: der geladene Trunk/Policy/Moon-
+    # Head bleibt dann UNVERAENDERT (kein optimizer.step() bewegt ihn), nur
+    # Phase 2 (Value-Kalibrierung) laeuft danach noch -- fuer schnelle
+    # Value-Head-Kapazitaetstests auf einem bereits fertig trainierten Trunk
+    # (siehe STAGE2_TODO.md, value_hidden-Test).
+    epochs = 0 if skip_phase1 else input_epoch
+    if skip_phase1:
+        print(f"   ⏭️  Phase 1 übersprungen (--skip-phase1): Trunk/Policy/Moon bleiben exakt "
+              f"wie in '{load_version}' geladen, nur Phase 2 läuft.")
     print(f"   Epochen       : {epochs}")
     if load_version:
         print(f"🔄 Warm-Start erkannt: Trainiere für {epochs} Epochen.")
@@ -300,7 +327,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
                 p_loss = p_loss + moon_nll[sun_mask].mean()
 
-            loss = v_loss * VALUE_WEIGHT + p_loss
+            # Value-Only-Diagnosemodus (siehe STAGE2_TODO.md, Kopf-Kapazitaetstest
+            # widerlegt): Policy-/Moon-Loss werden zwar oben mitberechnet (fuer die
+            # Report-Zahlen, koennen aber ignoriert werden -- Policy-/Moon-Head
+            # bekommen dann keine Gradienten und bleiben zufaellig), gehen aber
+            # NICHT in den Trunk-Gradienten ein. Testet, ob ein Trunk, der NICHT
+            # vom (dominanten) Policy-Loss mitgeformt wird, eine hoehere
+            # Value-Val-R²-Decke erreicht als der bisherige gemeinsame Trunk.
+            loss = v_loss if value_only else (v_loss * VALUE_WEIGHT + p_loss)
             loss.backward()
             optimizer.step()
 
@@ -423,6 +457,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 stop_reason = "plateau"
                 break
 
+    # Bei --skip-phase1 (epochs=0) lief die Schleife oben nie -- epoch_ploss/
+    # epoch_vloss/epoch_tloss (unten fuer Report+Checkpoint gebraucht) sind
+    # dann aus dem geladenen Checkpoint zu uebernehmen (Trunk/Policy bleiben
+    # ja exakt so, der alte Policy-/Value-Stand ist weiterhin korrekt).
+    if skip_phase1:
+        epoch_ploss = ckpt.get("final_policy_loss", 0.0) if ckpt else 0.0
+        epoch_vloss = ckpt.get("final_value_loss", 0.0) if ckpt else 0.0
+        epoch_tloss = epoch_ploss + epoch_vloss * VALUE_WEIGHT
+
     # ── Phase 2: Value-Kalibrierung auf dem fertigen, unbeweglichen Trunk ──
     # Trunk/Policy-Head haben sich in Phase 1 GEMEINSAM mit dem Value-Loss
     # entwickelt (das hilft der Policy ueber den geteilten Trunk, siehe v1 vs.
@@ -449,7 +492,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Value-Head NEU initialisieren -- der Phase-1-Stand ist ein
         # Kompromiss ueber einen sich bewegenden Trunk, kein sauberer Fit auf
         # den jetzt finalen, fixen Trunk.
-        fresh = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
+        fresh = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs, **net_kwargs)
         model.value_head.load_state_dict(fresh.value_head.state_dict())
         model.value_head.to(device)
 
@@ -730,10 +773,30 @@ if __name__ == "__main__":
                              "Kalibrierungs-Stand zurückgesetzt wird (Standard: 8). Phase 1 "
                              "(Policy+Value gemeinsam) ist davon unberuehrt und stoppt nur ueber "
                              "das Policy-Plateau-Kriterium.")
+    parser.add_argument("--value-hidden", dest="value_hidden", type=int, default=None,
+                        help="Value-Head Hidden-Groesse (Standard: 64, siehe neural_net.MosaicNet). "
+                             "Kapazitaetstest: bei --load + --skip-phase1 wird der Value-Head neu "
+                             "in dieser Groesse angelegt und in Phase 2 gegen den unveraenderten "
+                             "geladenen Trunk kalibriert (siehe STAGE2_TODO.md).")
+    parser.add_argument("--skip-phase1", action="store_true",
+                        help="Ueberspringt Phase 1 komplett (erzwingt Epochen=0): Trunk/Policy/"
+                             "Moon-Head bleiben exakt wie mit --load geladen, nur Phase 2 "
+                             "(Value-Kalibrierung) laeuft. Fuer schnelle Value-Head-Architektur-"
+                             "Tests ohne neues Self-Play/Phase-1-Training. Ergibt nur mit --load "
+                             "Sinn.")
+    parser.add_argument("--value-only", dest="value_only", action="store_true",
+                        help="Diagnose-Modus: Phase 1 trainiert den Trunk NUR mit Value-Loss "
+                             "(kein Policy-/Moon-Loss, diese Heads bleiben zufaellig). Testet, ob "
+                             "ein nicht vom Policy-Loss dominierter Trunk eine hoehere "
+                             "Value-Val-R²-Decke erreicht (siehe STAGE2_TODO.md). Sinnvoll nur "
+                             "OHNE --load (frischer Trunk, sonst bleibt die alte Policy-Praegung "
+                             "als Startpunkt erhalten) und mit grosszuegigem --epochs (kein "
+                             "sinnvolles Early-Stop-Kriterium in diesem Modus).")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           probe_games=args.probe_games, probe_sims=args.probe_sims, skip_probe=args.skip_probe,
-          show_plot=not args.no_plot, val_frac=args.val_frac, val_overfit_patience=args.val_patience)
+          show_plot=not args.no_plot, val_frac=args.val_frac, val_overfit_patience=args.val_patience,
+          value_hidden=args.value_hidden, skip_phase1=args.skip_phase1, value_only=args.value_only)
