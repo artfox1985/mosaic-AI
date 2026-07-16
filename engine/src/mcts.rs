@@ -108,6 +108,17 @@ fn normalize_score(score: f64) -> f64 {
 /// Übergang (Pseudo-Terminal) steht, `solve_round_final_score` behandelt
 /// beide Fälle identisch. Öffentlich für den Netz-MCTS-Stufe-1-Modus
 /// (DFS-Blattbewertung + Netz-Priors).
+///
+/// Bewusst NICHT mit `round_transition.rs`s Chance-Node-Sampling verdrahtet
+/// (im Unterschied zu `net_mcts.rs`s `LeafEval::Net`-Pfad, siehe dort
+/// `ROUND_TRANSITION_SAMPLING`): `player_total` liest `state.factories`
+/// nirgends, direkt nach einem Rundenübergang sind die Musterreihen frisch
+/// leer -- eine Stichprobe über verschiedene Fabrik-Neubefüllungen würde
+/// hier für praktisch jedes Sample denselben Wert liefern (reiner
+/// Mehraufwand ohne Nutzen). Außerdem cacht diese Suche den Blattwert nicht
+/// pro Knoten (jeder Besuch ruft `evaluate` neu auf) -- ein N-faches
+/// Sampling würde die Kosten mit *(Besuche × N)* multiplizieren, nicht nur
+/// N, ein leicht zu übersehender Performance-Fallstrick.
 pub fn evaluate(state: &GameState, _n_actions: usize) -> [f64; 2] {
     [normalize_score(player_total(state, 0)), normalize_score(player_total(state, 1))]
 }

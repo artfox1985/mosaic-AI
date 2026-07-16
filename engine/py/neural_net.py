@@ -367,7 +367,14 @@ def action_to_id(action: dict) -> int:
 #                    (tanh(eigen/SCALE) - EPSILON*tanh(gegner/SCALE)) -- liefert
 #                    dem Trunk ein feineres, kontinuierliches Zusatzsignal
 #                    ohne dass die SUCHE (Stage 1/3) je darauf zugreift.
-VALUE_SCHEMA_VERSION = 10
+#                    Ab Version 11: wo vorhanden, nutzt `points_forecast`
+#                    das gemittelte Rundenübergangs-Sampling
+#                    (`round_transition_value`) statt der einzelnen,
+#                    verrauschten Partie-Endpunktzahl (siehe
+#                    round_transition.rs -- Versuch, das dokumentierte
+#                    Val-R²-Plateau ueber ein rauschaermeres Ziel
+#                    anzugehen).
+VALUE_SCHEMA_VERSION = 11
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
@@ -466,6 +473,24 @@ class MosaicDataset(Dataset):
                             opp_total = float(step["scores"][1 - p])
                             points_val = (math.tanh(own_total / VALUE_SCALE)
                                           - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
+                            # Rundenübergangs-Ziel (siehe round_transition.rs/
+                            # self_play.rs::play_net_self_play_game): über
+                            # mehrere Chance-Node-Samples (verschiedene mögliche
+                            # Fabrik-Neubefüllungen) gemittelte NETZ-
+                            # Gewinnwahrscheinlichkeit ([0,1], nicht Punkte --
+                            # daher NICHT in die own_total/opp_total-Formel
+                            # oben eingesetzt, sondern direkt auf den
+                            # tanh-Wertebereich [-1,1] reskaliert und als
+                            # rauschärmerer Ersatz für points_val verwendet).
+                            # Nur vorhanden, wenn dieser Schritt tatsächlich
+                            # einen Rundenübergang erreicht hat (nicht Runde 5,
+                            # keine abgebrochenen Partien) -- sonst Fallback
+                            # auf die obige Punktestand-Formel.
+                            rtv = step.get("round_transition_value")
+                            if rtv is not None:
+                                own_rtv = float(rtv[p]) * 2.0 - 1.0
+                                opp_rtv = float(rtv[1 - p]) * 2.0 - 1.0
+                                points_val = own_rtv - VALUE_OPP_EPSILON * opp_rtv
                         else:
                             val = float(step["value"])
                             points_val = val
