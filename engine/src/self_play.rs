@@ -135,6 +135,7 @@ pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
                 "rotation": m.rotation,
             })
         }
+        Action::DrawStackPeek => json!({ "type": "dome_stack_peek" }),
         Action::DrawStack(m) => json!({
             "type": "dome_stack",
             "slot_row": m.slot_row,
@@ -168,8 +169,7 @@ fn drafting_policy<R: Rng + ?Sized>(
     if stats.is_empty() {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
         let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-        let chosen = resolve_chosen_action(state, a, rng);
-        return (chosen, vec![entry]);
+        return (a, vec![entry]);
     }
 
     // Gewichte für eine Temperatur: visits^(1/temp)·q², mit reinem-Visits-Fallback.
@@ -203,8 +203,7 @@ fn drafting_policy<R: Rng + ?Sized>(
     // PLAY: moderate Temperatur → gespielte Aktion sampeln (Zustandsvielfalt).
     let (pw, ps) = weights_for(play_temp);
     let idx = if ps > 0.0 { weighted_index(&pw, ps, rng) } else { 0 };
-    let chosen = resolve_chosen_action(state, stats[idx].0.clone(), rng);
-    (chosen, policy)
+    (stats[idx].0.clone(), policy)
 }
 
 /// Sampelt einen Index proportional zu `weights` (Summe = `total`).
@@ -219,114 +218,159 @@ fn weighted_index<R: Rng + ?Sized>(weights: &[f64], total: f64, rng: &mut R) -> 
     weights.len().saturating_sub(1)
 }
 
-// ── Stapel-Zieh-Aufloesung (Aktion A: wie viele Kacheln ziehen?) ────────────
+// ── Stapel-Zieh-Aufloesung (Aktion A: weiterziehen oder aufhoeren?) ─────────
 //
-// `generate_draw_stack_moves` liefert nur repraesentative Zuege (num_drawn=1)
-// je Slot×Rotation -- `action_to_id` kodiert num_drawn/chosen_id ohnehin
-// nicht (wie moon_order bei Sonnenzuegen). Die eigentliche "wie viele
-// ziehen"-Entscheidung faellt HIER, per Rollout-Mittelung ueber die
-// verdeckte Stapel-Reihenfolge (Menge bekannt via dome_pool_mask-Feature,
-// Reihenfolge nicht) -- das Netz muss dafuer keinen eigenen Policy-
-// Freiheitsgrad lernen (Nutzer-Entscheidung).
+// Regelwerk (Nutzer-Fund): beim Ziehen zeigt die RUECKSEITE nur den TYP der
+// Platte (Special vs. Wild, siehe DomeTile::is_special_type) -- die
+// Vorderseite (Farbanordnung) sieht man erst, wenn man beschliesst
+// aufzuhoeren. Das ist ein echter sequenzieller Stopp-Prozess: Platte
+// ziehen (−1 Pkt), Typ pruefen, weiterziehen-oder-aufhoeren entscheiden,
+// wiederholen. Erst beim Aufhoeren werden alle gezogenen Platten
+// aufgedeckt und eine gewaehlt.
+//
+// Deshalb ist `Action::DrawStackPeek` jetzt eine ECHTE Engine-Aktion (siehe
+// game.rs) statt eines vorab berechneten `num_drawn` -- diese Funktion
+// fuehrt den kompletten Vorgang aus (mehrere echte apply_drafting-Aufrufe),
+// per Ein-Schritt-Erwartungswert-Vergleich: "aufhoeren" nutzt die exakte
+// Bewertung der bereits gezogenen (Front bekannt), "weiterziehen" nur den
+// TYP-Durchschnitt ueber den echten Rest-Stapel (Menge bekannt via
+// dome_pool_mask-Feature, Reihenfolge nicht -- kein Vorgriff auf konkrete
+// Farben ungezogener Karten, sonst waere das kein fairer Spielzug mehr).
+// Kein Rollout/Resampling noetig: die Restbestands-TYP-Verteilung ist exakt
+// bekannt, nur die Reihenfolge nicht -- der Durchschnitt ueber den echten
+// Rest-Pool IST bereits der korrekte Erwartungswert.
+//
+// Fuer die Heuristik-MCTS (Stufe 1) wird das bewusst NICHT nachgebaut (siehe
+// mcts.rs::move_priority) -- nur der Netz-Pfad nutzt diese Funktion.
 
-/// Rollout-Wiederholungen je `num_drawn`-Kandidat. Fest, kein Progressive
-/// Widening: ein Margin-/Knappheits-Trigger hatte sich schon bei der
-/// Stage-3-Kandidatenauswahl als unbrauchbar erwiesen (94% aller
-/// Entscheidungen wirkten selbst bei margin=0.30 noch "knapp", siehe
-/// evaluations/stage2_investigation.md).
-const STACK_DRAW_N_REPS: usize = 6;
-
-/// Loest `num_drawn`/`chosen_id` eines Stapel-Zugs auf (Slot+Rotation stehen
-/// schon aus der Zugwahl fest). Bewertet NUR die unmittelbare Platzierung
-/// (Wertungsplatten-Fortschritt minus Punktkosten) -- kein Mehrrunden-
-/// Rollout, da diese Entscheidung selten ist (max. 2 Tokens/Runde) und
-/// keinen tiefen Folgebaum braucht.
-fn resolve_stack_draw<R: Rng + ?Sized>(
-    state: &GameState,
-    slot_row: usize,
-    slot_col: usize,
-    rotation: u32,
-    rng: &mut R,
-) -> DrawFromStackMove {
+/// Beste erreichbare Bewertung einer (schon gezogenen) Platte über alle
+/// freien Slots × Rotationen: Wertungsplatten-Fortschritt + eigene
+/// Bonuspunkte (werden später beim Füllen des Spezialfelds real ausgezahlt)
+/// + Wild-Spaces (akzeptieren jede Farbe → Flexibilität, unabhängig davon
+/// welche Farbe der Spieler noch braucht). OHNE Punktkosten -- die werden
+/// separat als Gesamtzahl gezogener Karten geführt, nicht pro Kandidat.
+/// Gibt (Score, slot_row, slot_col, rotation) zurück.
+fn best_eval_for_tile(state: &GameState, tile: &crate::dome::DomeTile) -> (f64, usize, usize, u32) {
     let pi = state.current_player;
-    let pool_len = state.dome_tile_pool.len();
-
-    // Direkt nach dem Legen sind alle Spaces der neuen Platte noch leer --
-    // `wertung_progress` allein (misst nur GEFUELLTE Felder) wuerde also fast
-    // immer 0 Unterschied zwischen verschiedenen Kachel-Designs zeigen (bis
-    // auf den -3/leeres-Spezialfeld-Abzug, falls "Spezialfelder" aktive
-    // Wertungsplatte ist). Deshalb zusaetzlich die PLATTE selbst bewerten:
-    // eigene Bonuspunkte (werden spaeter beim Fuellen des Spezialfelds real
-    // ausgezahlt) + Wild-Spaces (akzeptieren jede Farbe -> Flexibilitaet für
-    // kuenftiges Tiling, unabhaengig davon welche Farbe der Spieler noch
-    // braucht).
-    let eval = |pool: &[crate::dome::DomeTile], n: usize, tile_id: usize| -> f64 {
-        let mut g = Game { state: state.clone() };
-        g.state.dome_tile_pool = pool.to_vec();
-        let mv = DrawFromStackMove { num_drawn: n, chosen_id: tile_id, slot_row, slot_col, rotation };
-        if execute_draw_from_stack(&mut g.state, &mv).is_ok() {
-            let progress = wertung_progress(&g.state.players[pi], &g.state.scoring_tile_ids);
-            let placed = g.state.players[pi].dome_grid.dome_slots[slot_row][slot_col].as_ref();
-            let bonus = placed.map_or(0, |t| t.bonus_points) as f64;
-            let wild_count = placed.map_or(0, |t| {
-                t.spaces.iter().filter(|s| s.space_type == SpaceType::Wild).count()
-            }) as f64;
-            progress + bonus + wild_count - n as f64
-        } else {
-            f64::NEG_INFINITY
-        }
-    };
-
-    let mut best_n = 1usize;
-    let mut best_mean = f64::NEG_INFINITY;
-    for n in 1..=pool_len {
-        let mut total = 0.0;
-        let mut valid_reps = 0usize;
-        for _ in 0..STACK_DRAW_N_REPS {
-            let mut pool = state.dome_tile_pool.clone();
-            pool.shuffle(rng);
-            let best_of_n = pool[..n]
-                .iter()
-                .map(|t| eval(&pool, n, t.tile_id))
-                .fold(f64::NEG_INFINITY, f64::max);
-            if best_of_n > f64::NEG_INFINITY {
-                total += best_of_n;
-                valid_reps += 1;
+    let mut best = (f64::NEG_INFINITY, 0usize, 0usize, 0u32);
+    for (sr, sc) in state.players[pi].dome_grid.empty_slots() {
+        for &rotation in &[0u32, 90, 180, 270] {
+            let mut g = Game { state: state.clone() };
+            g.state.pending_stack_draw = vec![tile.clone()];
+            // Nur diese eine Platte ist "gezogen" -- kein Rest, return_order
+            // bleibt leer (triviale einzige gueltige Reihenfolge).
+            let mv = DrawFromStackMove {
+                chosen_id: tile.tile_id,
+                slot_row: sr,
+                slot_col: sc,
+                rotation,
+                return_order: Vec::new(),
+            };
+            if execute_draw_from_stack(&mut g.state, &mv).is_ok() {
+                let progress = wertung_progress(&g.state.players[pi], &g.state.scoring_tile_ids);
+                let placed = g.state.players[pi].dome_grid.dome_slots[sr][sc].as_ref();
+                let bonus = placed.map_or(0, |t| t.bonus_points) as f64;
+                let wild_count = placed.map_or(0, |t| {
+                    t.spaces.iter().filter(|s| s.space_type == SpaceType::Wild).count()
+                }) as f64;
+                let score = progress + bonus + wild_count;
+                if score > best.0 {
+                    best = (score, sr, sc, rotation);
+                }
             }
         }
-        if valid_reps == 0 {
-            continue;
-        }
-        let mean = total / valid_reps as f64;
-        if mean > best_mean {
-            best_mean = mean;
-            best_n = n;
-        }
     }
-
-    // Fuer den ECHTEN Zug: unter den tatsaechlich obersten `best_n` Kacheln
-    // (im echten, nicht resampleten Pool) die beste nach Wertungsfortschritt
-    // waehlen.
-    let real_pool = state.dome_tile_pool.clone();
-    let chosen_id = real_pool[..best_n]
-        .iter()
-        .map(|t| (t.tile_id, eval(&real_pool, best_n, t.tile_id)))
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(id, _)| id)
-        .unwrap_or(state.dome_tile_pool[0].tile_id);
-
-    DrawFromStackMove { num_drawn: best_n, chosen_id, slot_row, slot_col, rotation }
+    best
 }
 
-/// Loest `Action::DrawStack` per `resolve_stack_draw` auf, alle anderen
-/// Aktionen unveraendert durchgereicht. Zentraler Einhaengepunkt fuer jede
-/// Stelle, die eine gewaehlte Drafting-Aktion tatsaechlich ausfuehrt.
-pub(crate) fn resolve_chosen_action<R: Rng + ?Sized>(state: &GameState, a: Action, rng: &mut R) -> Action {
-    match a {
-        Action::DrawStack(m) => {
-            Action::DrawStack(resolve_stack_draw(state, m.slot_row, m.slot_col, m.rotation, rng))
+/// Durchschnittlicher TYP-Basiswert (Bonus + Wild-Anzahl) über den echten
+/// Rest-Stapel -- das ist alles, was die Rückseite vor dem nächsten Zug
+/// verrät (keine Farbanordnung).
+fn avg_remaining_type_value(state: &GameState) -> f64 {
+    if state.dome_tile_pool.is_empty() {
+        return f64::NEG_INFINITY;
+    }
+    let sum: f64 = state
+        .dome_tile_pool
+        .iter()
+        .map(|t| {
+            t.bonus_points as f64
+                + t.spaces.iter().filter(|s| s.space_type == SpaceType::Wild).count() as f64
+        })
+        .sum();
+    sum / state.dome_tile_pool.len() as f64
+}
+
+/// Führt einen kompletten Stapel-Zug (Aktion A) aus: mind. 1 Pflichtzug,
+/// danach per Ein-Schritt-Erwartungswert-Vergleich weiterziehen oder
+/// aufhören, abschließend die beste gezogene Platte in den besten Slot legen.
+/// Mehrere echte `apply_drafting`-Aufrufe -- der Zug ist erst danach beendet
+/// (switch_player passiert im letzten `DrawStack`-Aufruf).
+fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
+    let _ = game.apply_drafting(&Action::DrawStackPeek);
+    loop {
+        let cost_so_far = game.state.pending_stack_draw.len() as f64;
+        let stop_value = game
+            .state
+            .pending_stack_draw
+            .iter()
+            .map(|t| best_eval_for_tile(&game.state, t).0)
+            .fold(f64::NEG_INFINITY, f64::max)
+            - cost_so_far;
+        if !crate::game::can_draw_stack_peek(&game.state) {
+            break;
         }
-        other => other,
+        let continue_estimate = avg_remaining_type_value(&game.state) - (cost_so_far + 1.0);
+        if continue_estimate <= stop_value {
+            break;
+        }
+        let _ = game.apply_drafting(&Action::DrawStackPeek);
+    }
+
+    let (chosen_id, sr, sc, rotation) = game
+        .state
+        .pending_stack_draw
+        .iter()
+        .map(|t| {
+            let (score, sr, sc, rot) = best_eval_for_tile(&game.state, t);
+            (score, t.tile_id, sr, sc, rot)
+        })
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(_, id, sr, sc, rot)| (id, sr, sc, rot))
+        .expect("pending_stack_draw darf hier nicht leer sein (mind. 1 Pflichtzug oben)");
+    // Reihenfolge der Restplatten ist fuer die KI keine gelernte Policy-
+    // Dimension (wie moon_order/num_drawn) -- kanonisch die Ziehreihenfolge,
+    // wie beim Suchbaum-Pfad (game.rs::generate_draw_stack_moves).
+    let return_order: Vec<usize> = game
+        .state
+        .pending_stack_draw
+        .iter()
+        .filter(|t| t.tile_id != chosen_id)
+        .map(|t| t.tile_id)
+        .collect();
+    let mv = DrawFromStackMove { chosen_id, slot_row: sr, slot_col: sc, rotation, return_order };
+    let final_action = Action::DrawStack(mv);
+    let _ = game.apply_drafting(&final_action);
+    final_action
+}
+
+/// Wendet eine gewählte Drafting-Aktion an. Bei `Action::DrawStackPeek`
+/// (Start eines Stapel-Zugs) übernimmt `resolve_and_apply_stack_draw` das
+/// komplette Peek-Entscheiden-Wählen-Prozedere (mehrere echte
+/// `apply_drafting`-Aufrufe) -- der Aufrufer sieht danach den fertig
+/// abgeschlossenen Zustand (Zug beendet). Alle anderen Aktionen einmalig
+/// normal angewendet. Gibt die TATSÄCHLICH final ausgeführte Aktion zurück
+/// (bei DrawStackPeek also das konkrete `DrawStack`, nicht den Peek selbst)
+/// -- für Aufrufer, die den echten Zug anzeigen/loggen müssen. Zentraler
+/// Einhängepunkt für jede Stelle, die eine gewählte Drafting-Aktion
+/// tatsächlich ausführt.
+pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Action {
+    match a {
+        Action::DrawStackPeek => resolve_and_apply_stack_draw(game),
+        other => {
+            let _ = game.apply_drafting(&other);
+            other
+        }
     }
 }
 
@@ -438,7 +482,7 @@ fn sun_color_counts(state: &GameState) -> [usize; 5] {
 /// Heuristik-Wahl der Startkuppel für Spieler `pi` (Farb-Häufigkeit + Eckbonus):
 /// liefert `(tile_id, slot_row, slot_col, rotation)`. `None`, wenn kein Display
 /// oder kein freier Slot. Gemeinsam genutzt von Self-Play und Arena.
-fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
+pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
     if state.dome_display.is_empty() {
         return None;
     }
@@ -851,7 +895,6 @@ fn play_arena_game<R: Rng + ?Sized>(
                         search_drafting_action(&game.state, s, c, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
                     let _ = game.apply_drafting(&chosen);
                     steps += 1;
                 } else {
@@ -985,8 +1028,16 @@ fn play_net_game<R: Rng + ?Sized>(
                         search_drafting_action(&game.state, s, c, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
-                    let _ = game.apply_drafting(&chosen);
+                    // Sequenzielle Stapel-Zieh-Aufloesung nur fuer den Netz-Spieler
+                    // (siehe apply_chosen_action) -- die Heuristik-Seite braucht das
+                    // laut Nutzer-Vorgabe nicht, dort reicht die normale Einzelaktion,
+                    // Folge-Entscheidungen (weiterziehen/waehlen) kommen automatisch
+                    // ueber den naechsten Schleifendurchlauf.
+                    if pi == net_board {
+                        apply_chosen_action(&mut game, chosen);
+                    } else {
+                        let _ = game.apply_drafting(&chosen);
+                    }
                     steps += 1;
                 } else {
                     break;
@@ -1125,8 +1176,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                         net_search_drafting_action(net, &game.state, s, cp, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
-                    let _ = game.apply_drafting(&chosen);
+                    apply_chosen_action(&mut game, chosen);
                     steps += 1;
                 } else {
                     break;
@@ -1225,8 +1275,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
-        let chosen = resolve_chosen_action(state, a.clone(), rng);
-        return (chosen, vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
+        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
     }
     let policy: Vec<Value> = stats
         .iter()
@@ -1245,8 +1294,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
         weighted_index(&weights, total, rng)
     };
-    let chosen = resolve_chosen_action(state, stats[idx].0.clone(), rng);
-    (chosen, policy)
+    (stats[idx].0.clone(), policy)
 }
 
 /// Ein netzgeführtes Self-Play-Spiel. Wie `play_one_game`, aber Drafting per
@@ -1298,7 +1346,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
-                    let _ = game.apply_drafting(&chosen);
+                    apply_chosen_action(&mut game, chosen);
                     let mut m = Map::new();
                     m.insert("state".into(), state_json);
                     m.insert("policy".into(), Value::Array(policy));
@@ -1615,8 +1663,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                             );
                             a
                         };
-                        let a = resolve_chosen_action(&g.state, a, rng);
-                        let _ = g.apply_drafting(&a);
+                        apply_chosen_action(&mut g, a);
                     } else {
                         break;
                     }
@@ -1789,8 +1836,7 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
-                    let _ = game.apply_drafting(&chosen);
+                    apply_chosen_action(&mut game, chosen);
                     steps += 1;
                 } else {
                     break;
@@ -1891,7 +1937,6 @@ pub fn run_stage3_vs_stage1_arena(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::validate_draw_from_stack;
 
     /// Zaehlt alle Vorkommen von `color` im GESAMTEN Spielzustand: Beutel,
     /// Turm, alle Fabriken (Sun+Mond), Spielerreihen, Strafleiste, verlegte
@@ -2099,12 +2144,11 @@ mod tests {
         assert!(!all_dome_identical, "Kuppelstapel-Reihenfolge identisch ueber alle Wiederholungen -- Determinisierung wirkungslos");
     }
 
-    /// `resolve_stack_draw` muss immer ein gueltiges, ausfuehrbares Ergebnis
-    /// liefern: num_drawn im erlaubten Bereich, chosen_id tatsaechlich unter
-    /// den obersten num_drawn Kacheln des ECHTEN (nicht resampleten) Pools --
-    /// unabhaengig davon, welches n am Ende gewaehlt wird.
+    /// `resolve_and_apply_stack_draw` muss immer zu einer gueltig platzierten
+    /// Kachel fuehren: mindestens 1 Pflichtzug, `pending_stack_draw` danach
+    /// wieder leer, Zug beendet (Token verbraucht, Spieler gewechselt).
     #[test]
-    fn resolve_stack_draw_returns_valid_move() {
+    fn resolve_and_apply_stack_draw_produces_valid_placement() {
         let mut rng = StdRng::seed_from_u64(42);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
@@ -2112,28 +2156,32 @@ mod tests {
         for p in state.players.iter_mut() {
             p.start_tile_pending = false;
         }
-        let pool_len = state.dome_tile_pool.len();
-        assert!(pool_len > 1, "Test braucht einen Pool mit mehreren Kacheln");
+        assert!(state.dome_tile_pool.len() > 1, "Test braucht einen Pool mit mehreren Kacheln");
+        let mut game = Game { state };
 
-        let mv = resolve_stack_draw(&state, 0, 0, 0, &mut rng);
-        assert!(mv.num_drawn >= 1 && mv.num_drawn <= pool_len);
-        assert!(
-            state.dome_tile_pool[..mv.num_drawn].iter().any(|t| t.tile_id == mv.chosen_id),
-            "chosen_id {} nicht unter den obersten {} echten Stapelkacheln",
-            mv.chosen_id,
-            mv.num_drawn
-        );
-        assert!(validate_draw_from_stack(&state, &mv).is_none(), "Aufgeloester Zug muss gueltig sein");
+        let final_action = resolve_and_apply_stack_draw(&mut game);
+        match final_action {
+            Action::DrawStack(m) => {
+                assert!(
+                    game.state.players[0].dome_grid.dome_slots[m.slot_row][m.slot_col].is_some(),
+                    "gewaehlte Kachel muss im Raster liegen"
+                );
+            }
+            other => panic!("erwartet Action::DrawStack, bekommen {other:?}"),
+        }
+        assert!(game.state.pending_stack_draw.is_empty(), "Zieh-Vorgang muss abgeschlossen sein");
+        assert_eq!(game.state.players[0].player_tokens_used, 1, "genau 1 Token verbraucht");
+        assert_eq!(game.state.current_player, 1, "Zug muss beendet sein (Spielerwechsel)");
     }
 
     /// Wenn eine Kachel um ein Vielfaches wertvoller ist als alle anderen im
     /// Pool (hier kuenstlich uebertrieben: 4 Wild-Spaces + Bonus, real
     /// erreichen Katalog-Kacheln das nie -- reine Mechanismus-Pruefung), muss
-    /// die Rollout-Mittelung das durch hoeheres `num_drawn` tendenziell
-    /// finden, statt immer bei n=1 (und damit stur der real fixen
-    /// Stapel-Reihenfolge) zu bleiben.
+    /// die sequenzielle Aufloesung sie zuverlaessig finden (deterministisch,
+    /// kein Zufall mehr -- der Erwartungswert-Vergleich nutzt die exakte
+    /// Rest-Pool-Zusammensetzung, kein Resampling noetig).
     #[test]
-    fn resolve_stack_draw_tends_to_find_high_value_tile_when_worthwhile() {
+    fn resolve_and_apply_stack_draw_finds_high_value_tile_when_worthwhile() {
         use crate::dome::{DomeSpace, DomeTile};
         let junk = || DomeTile::new(
             0,
@@ -2151,29 +2199,25 @@ mod tests {
             3,
         );
 
-        let mut hits = 0u32;
-        let trials = 30u64;
-        for seed in 0..trials {
-            let mut rng = StdRng::seed_from_u64(9000 + seed);
-            let ids = sample_valid_scoring_ids(3, &mut rng);
-            let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
-            state.scoring_tile_ids = ids;
-            for p in state.players.iter_mut() {
-                p.start_tile_pending = false;
-            }
-            // Jackpot ganz unten im Stapel -- nur per hoeherem num_drawn erreichbar.
-            state.dome_tile_pool = vec![junk(), junk(), junk(), jackpot.clone()];
-            let mv = resolve_stack_draw(&state, 0, 0, 0, &mut rng);
-            if mv.chosen_id == jackpot.tile_id {
-                hits += 1;
-            }
+        let mut rng = StdRng::seed_from_u64(9000);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = ids;
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
         }
-        // Reines n=1 mit Zufallsreihenfolge traefe die wertvolle Kachel nur zu
-        // 25% (1 von 4 Positionen) -- die Mittelung soll das deutlich schlagen.
-        assert!(
-            hits as f64 / trials as f64 > 0.5,
-            "wertvolle Kachel nur in {hits}/{trials} Laeufen gewaehlt -- Rollout-Mittelung findet sie nicht zuverlaessig, obwohl es sich klar lohnt"
-        );
+        // Jackpot ganz unten im Stapel -- nur per Weiterziehen erreichbar.
+        state.dome_tile_pool = vec![junk(), junk(), junk(), jackpot.clone()];
+        let mut game = Game { state };
+
+        let final_action = resolve_and_apply_stack_draw(&mut game);
+        match final_action {
+            Action::DrawStack(m) => assert_eq!(
+                m.chosen_id, jackpot.tile_id,
+                "haette die wertvolle Kachel waehlen sollen, es lohnt sich klar weiterzuziehen"
+            ),
+            other => panic!("erwartet Action::DrawStack, bekommen {other:?}"),
+        }
     }
 
     #[test]

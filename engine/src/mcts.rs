@@ -192,7 +192,7 @@ fn move_priority(m: &SearchMove) -> i32 {
             Action::BonusChip(_) => 6,
             Action::Stone(_) => 4,
             Action::Dome(_) => 3,
-            Action::DrawStack(_) => 2,
+            Action::DrawStack(_) | Action::DrawStackPeek => 2,
             Action::Pass => 1,
         },
     }
@@ -631,6 +631,12 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                 "dome",
                 action_to_dict(a),
             ),
+            Action::DrawStackPeek => (
+                "dome_stack_peek",
+                "Stapel: verdeckt ziehen".to_string(),
+                "dome",
+                action_to_dict(a),
+            ),
             Action::DrawStack(m) => (
                 "dome_stack",
                 format!("Stapel → ({},{}) {}°", m.slot_row, m.slot_col, m.rotation),
@@ -698,6 +704,16 @@ pub fn root_child_stats<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Vec<(Action, u32, f64)> {
+    // Runde 5: informationsfreies Endspiel, siehe round5.rs -- exakte
+    // Alpha-Beta-Wahl statt PUCT-Baum. Einzelner Eintrag mit Gewicht 1.0
+    // (statt leer) macht `drafting_policy`s Zufalls-Fallback (bei leerer
+    // Stats-Liste) nicht faelschlich fuer die Aktionswahl zustaendig.
+    if crate::round5::applies(state) {
+        return crate::round5::choose_action(state)
+            .into_iter()
+            .map(|a| (a, 1, 1.0))
+            .collect();
+    }
     let nodes = match build_tree(state, simulations, c, rng, None) {
         Some(n) => n,
         None => return Vec::new(),
@@ -723,6 +739,9 @@ pub fn search_action<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Option<SearchMove> {
+    if crate::round5::applies(state) {
+        return crate::round5::choose_action(state).map(SearchMove::Draft);
+    }
     let nodes = build_tree(state, simulations, c, rng, None)?;
     let best = best_root_child(&nodes)?;
     nodes[best].action.clone()
@@ -739,6 +758,10 @@ pub fn search_with_tree<R: Rng + ?Sized>(
     top_k: usize,
     log: Option<&mut Vec<String>>,
 ) -> (Option<SearchMove>, Value) {
+    if crate::round5::applies(state) {
+        let (a, analysis) = crate::round5::choose_action_with_analysis(state);
+        return (a.map(SearchMove::Draft), analysis);
+    }
     let nodes = match build_tree(state, simulations, c, rng, log) {
         Some(n) => n,
         None => return (None, Value::Null),

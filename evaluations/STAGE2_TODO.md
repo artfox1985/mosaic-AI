@@ -4,6 +4,92 @@ Historische Details (alte v1-v9-Zählung vor dem Reset, Bug-Diagnosen,
 verworfene Ansätze) stehen in der Git-Historie dieser Datei und in den alten
 `v*_eval.md`s — hier nur der aktuelle Stand und die aktiven Regeln.
 
+## Update (Phase 8): Kurswechsel — Stufe 2 ist jetzt der Produktions-Pfad
+
+**Die weiter unten dokumentierte Spur-B-Schlussfolgerung ("Stufe 1 bleibt der
+Produktions-Pfad") ist überholt.** Nutzer-Entscheidung, keine neue
+SPRT-widerlegte Messung: "Stufe 2 ist nicht tot. Wir werden Stufe 1 sterben
+lassen und Stufe 2 entsprechend anpassen. Stufe 1 ist für mich sinnlos, da
+spiel ich gleich gegen die Heuristik." Stufe 1 (DFS-Solver-Blattwert) bleibt
+im Code liegen (dormant, `LeafEval::Dfs` weiterhin wählbar), wird aber nicht
+mehr aktiv verwendet oder weiterentwickelt. `net_mcts::ACTIVE_LEAF =
+LeafEval::Net` ist jetzt der Standard (modulweite Konstante statt
+durchgereichtem Parameter).
+
+Zusammen mit dem Kurswechsel wurde die Value-Head-Architektur zurückgesetzt:
+**`MosaicNet` hat wieder einen `value_head` (±1 Win/Loss, Tanh) PLUS einen
+separaten `points_head`** (der alte score-Regressions-Wert, jetzt nur noch
+Hilfsziel). Das unten dokumentierte "Value-Target-Formel"-Kapitel
+(`tanh(own/50) − 0.1·tanh(opp/50)`, `VALUE_SCHEMA_VERSION=9`) beschreibt die
+VORHERIGE Architektur und ist damit ebenfalls überholt — alle Val-R²-Zahlen
+und Sweep-Ergebnisse in diesem Dokument (VALUE_WEIGHT-Sweep, Kapazitätstests,
+Confounder-Check) beziehen sich auf das alte Zielformat und sind für die
+neue ±1-Architektur nicht direkt übertragbar. `VALUE_WEIGHT=1.0`,
+`POINTS_WEIGHT=0.5` in `config.py`.
+
+**Neu: exakte Alpha-Beta-Suche für Runde 5** (`engine/src/round5.rs`). Ab
+Runde 5 wird keine Kuppelplatte mehr gelegt und die gesamte Zufälligkeit der
+Runde (Fabrik-Befüllung) ist bereits vor Rundenbeginn aufgelöst — Runde 5 ist
+damit ein Full-Information-Endspiel, für das PUCT/Netz-Approximation (Stufe
+1/2) durch exakte Minimax-Suche mit Alpha-Beta-Pruning ersetzt wird
+(`round5::choose_action`, in allen 6 heuristik-/netzseitigen
+Entry-Points von `mcts.rs`/`net_mcts.rs` verdrahtet). Blattbewertung nutzt
+die EXAKTE Wertungsplatten-Endwertung (`calculate_end_scoring`) statt der
+Fortschritts-Heuristik `wertung_progress`, da das Kuppelraster ab Runde 5
+eingefroren ist — kein Näherungsfehler mehr in der letzten, oft
+entscheidenden Runde. Zeitbudget-basiert (150ms/Entscheidung, empirisch
+kalibriert, siehe Modul-Kommentar) statt eines reinen Knotenbudgets, weil die
+Kosten pro Suchknoten je nach Brettkomplexität stark schwanken. Das
+adressiert strukturell einen Teil der unten dokumentierten Spur-B-Beobachtung
+("Stufe 1/2 strukturell blind für Rundenübergänge") — nicht durch besseres
+Mehrrunden-Lernen, sondern durch exaktes Lösen der letzten, isoliert
+lösbaren Runde.
+
+**Neu: Kuppelstapel-Zieh-Mechanik regelwerkstreu nachgebaut.** Beim Ziehen
+vom verdeckten Kuppelstapel zeigt die Rückseite nur den TYP (Wild/Special),
+nicht die Farbanordnung — die sieht man erst, wenn man aufhört
+(`Action::DrawStackPeek`/`Action::DrawStack`, sequentielles Ziehen statt
+vorab festgelegtem `num_drawn`). Nicht gewählte gezogene Platten legt der
+Spieler in selbst gewählter Reihenfolge zurück unter den Stapel
+(`DrawFromStackMove::return_order`, Multiset-validiert wie `moon_order`).
+Neues Feature `dome_wild_remaining_frac` (Wild-Anteil der noch verdeckten
+Restplatten) ergänzt die bereits bestehende `dome_pool_mask` um ein
+explizites Aggregat — `INPUT_SIZE` 707→708. Für die Heuristik-MCTS bewusst
+NICHT nachgebaut (kein Netz nötig, Peek/Choose wird dort per einfacher
+Wiederverwendung des normalen Suchloops aufgelöst, siehe
+`self_play.rs::apply_chosen_action`).
+
+**Bugfixes aus dem Server-Spiel (2026-07-16):**
+- Phantom-Fliesen (per Bonuschip virtuell ergänzt) rendern jetzt korrekt am
+  linken Ende der Musterreihe (zuletzt hinzugefügt, analog zur echten
+  Azul-Füllrichtung rechts→links) statt am rechten Ende (`static/js/app.js`,
+  Index-Mapping in der Musterreihen-Zellberechnung war invertiert).
+- Kuppelstapel-Ziehungen sind jetzt durch die verfügbaren Punkte gedeckelt
+  (max. so viele Ziehungen wie Punkte vorhanden, je 1 Pkt/Ziehung) —
+  Ausnahme: bei 0 Punkten ist der ERSTE/Pflichtzug eines Vorgangs trotzdem
+  erlaubt (Deadlock-Vermeidung, Punkte fallen nie unter 0,
+  `game::validate_draw_stack_peek`).
+- Rückseite (Typ) der OBERSTEN Stapelplatte ist jetzt jederzeit sichtbar
+  (neues Feld `dome_stack_top_type`), nicht erst nach dem Ziehen — entspricht
+  einem physischen Tisch, an dem die Rückseite immer offen liegt. Beim
+  Mehrfach-Ziehen werden jetzt ALLE bisher gezogenen Rückseiten angezeigt
+  (nicht nur die zuletzt gezogene), und da beide Spieler denselben
+  gemeinsamen Zustand sehen (Hotseat, kein separates Per-Spieler-View), ist
+  diese Information automatisch auch für den Gegenspieler sichtbar.
+- Start-Kuppel-Platzierungsheuristik war in `self_play.rs` UND `py.rs`
+  unabhängig dupliziert (identische Farb-Häufigkeits-Formel) — `py.rs` ruft
+  jetzt `self_play::choose_start_placement` direkt auf.
+
+98 Rust-Tests grün (inkl. neuer Tests für Runde-5-Alpha-Beta,
+`return_order`-Validierung, Punkte-Deckel). Browser-verifiziert (Server-Play
+End-to-End: sequentielles Ziehen, Rückseiten-Sichtbarkeit, Punkte-Deckel,
+Phantom-Fliesen-Rendering).
+
+**Offen:** Stufe 2 unter der neuen ±1-Architektur ist noch NICHT gegen einen
+Champion oder gegen Heuristik gemessen worden (alle Arena-Zahlen unten
+beziehen sich auf die alte Architektur). Das ist der logische nächste
+Schritt, sobald wieder trainiert wird.
+
 ## Aktueller Stand (Stand: v6, siehe Masterplan unten für die nächsten Schritte)
 
 Der erste Reset (2026-07-07, v1/v1b/v2/v2b/v2c) ist selbst überholt — das

@@ -2,8 +2,16 @@
 //!
 //! Gleiche Baumstruktur wie der Heuristik-MCTS (`crate::mcts`), aber:
 //!   - Selektion per **PUCT** mit Netz-Priors statt UCB1,
-//!   - Blattbewertung = exakter DFS-Solver (kein Value-Head mehr, siehe
-//!     evaluations/stage2_investigation.md),
+//!   - Blattbewertung = `ACTIVE_LEAF` (siehe unten) -- aktuell Stufe 2
+//!     (Netz-Value, mit dem neuen ±1-Sieg/Niederlage-Ziel statt der alten
+//!     verrauschten Punktestand-Regression), Stufe 1 (DFS-Solver) bleibt als
+//!     abschaltbarer Pfad im Code, wird aber nicht mehr aktiv genutzt (siehe
+//!     evaluations/stage2_investigation.md fuer die Historie: die
+//!     Disagreement-Studie widerlegte Stufe 2 mit dem ALTEN Value-Ziel,
+//!     Stufe 1 ist mit dem exakten DFS-Solver aber strukturell auf
+//!     Ein-Runden-Sicht begrenzt -- "spielt man gegen Stufe 1, spielt man
+//!     letztlich gegen die Heuristik". Stufe 2 mit einem sauber trainierten
+//!     Value-Head ist der einzige Weg zu echter Mehrrunden-Strategie).
 //!   - **Dirichlet-Wurzel-Noise** (Self-Play-Exploration).
 //! Lazy Expansion nach Prior (höchster zuerst) + Progressive Widening.
 
@@ -22,7 +30,7 @@ use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
 
 /// Aktionsraum-Größe (= `config.NUM_ACTIONS`).
-pub(crate) const NUM_ACTIONS: usize = 482;
+pub(crate) const NUM_ACTIONS: usize = 483;
 /// Standard-PUCT-Konstante (= agents/mcts.py `_c_puct`).
 pub const DEFAULT_C_PUCT: f64 = 1.5;
 /// Dirichlet-Wurzel-Noise (AlphaZero-Standard).
@@ -36,10 +44,24 @@ pub const DIRICHLET_ALPHA: f64 = 0.3;
 /// WIDEN_FACTOR·√N`).
 pub const POLICY_MASS_CUTOFF: f64 = 0.95;
 
-// Blattbewertung: exakter DFS-Solver (siehe crate::mcts::evaluate). Frueher
-// gab es hier eine Wahl (Stufe 2 = Netz-Value als Blatt) -- der Value-Head
-// wurde entfernt (siehe evaluations/stage2_investigation.md: Stufe 2 wird
-// nicht mehr verfolgt, Stufe 1/3 brauchten ihn nie), also bleibt nur DFS.
+/// Blattbewertung der Netz-Suche. Priors kommen IMMER vom Netz; nur das Blatt
+/// unterscheidet sich:
+///   - `Dfs`: exakter DFS-Solver (Stufe 1 — saubere, scharfe Visit-Targets,
+///     aber strukturell auf Ein-Runden-Sicht begrenzt).
+///   - `Net`: Netz-Value (Stufe 2 — Mehrrunden-Value-Ziel, jetzt ±1
+///     Sieg/Niederlage statt der alten Punktestand-Regression).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LeafEval {
+    Dfs,
+    Net,
+}
+
+/// Aktiv genutzte Blattbewertung fuer Self-Play/Arena/Stufe 3 (siehe
+/// Modul-Kommentar oben). Stufe 1 (`Dfs`) bleibt als Pfad im Code, wird aber
+/// bewusst nicht mehr default-mäßig verwendet -- eine Zeile hier zurück auf
+/// `Dfs` reaktiviert sie bei Bedarf wieder, ohne Funktionssignaturen
+/// anzufassen.
+pub const ACTIVE_LEAF: LeafEval = LeafEval::Net;
 
 // ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
 //
@@ -209,8 +231,16 @@ fn build_untried_actions(
     (acts, n)
 }
 
+/// Netz-Value (Tanh, ±1) → Win-Prob [0,1] fuer die perspektivische Blattwert-
+/// Skala von `leaf_value` (muss zu `crate::mcts::evaluate`s [0,1]-Skala passen,
+/// damit PUCTs Q-Mittelung konsistent bleibt).
+fn value_to_win_prob(value: &[f32]) -> f64 {
+    let v = value.first().copied().unwrap_or(0.0) as f64;
+    (v + 1.0) / 2.0
+}
+
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
-/// (exakter DFS-Solver, siehe crate::mcts::evaluate).
+/// (per `ACTIVE_LEAF`: DFS-Solver oder Netz-Value).
 fn make_node(
     net: &Net,
     state: GameState,
@@ -222,9 +252,9 @@ fn make_node(
     let terminal = state.phase != Phase::Drafting;
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
-    // value/points sind reine Trainings-Zusatzsignale (siehe net.rs) -- die
-    // Suche liest hier nur logits/moon, genau wie vor der Value-Head-Rueckkehr.
-    let (logits, _value, moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+    // `points` ist reines Trainings-Zusatzsignal (siehe net.rs), hier nie
+    // gebraucht. `value` wird nur bei ACTIVE_LEAF=Net gelesen.
+    let (logits, value, moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
         net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
     });
 
@@ -235,9 +265,28 @@ fn make_node(
     let (untried, n_actions) =
         if terminal { (Vec::new(), 0) } else { build_untried_actions(&state, &logits, &moon_scores) };
 
-    let leaf_value = crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
-        crate::mcts::evaluate(&state, n_actions)
-    });
+    // Blattwert: unabhängige Pro-Spieler-Werte. Das Netz liefert einen
+    // EGO-perspektivischen Wert (die Input-Features hängen von
+    // `state.current_player` ab, siehe features.rs/state_to_tensor) — für
+    // den jeweils ANDEREN Spieler braucht es deshalb einen zweiten
+    // Forward-Pass mit geflipptem `current_player`, nicht einfach `1-wert`.
+    let leaf_value = match ACTIVE_LEAF {
+        LeafEval::Net => {
+            let mover_val = value_to_win_prob(&value);
+            crate::profiling::note_gamestate_clone();
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = state_to_features_direct(&flipped);
+            let other_val = net
+                .eval(&other_feats)
+                .map(|(_, v, _, _)| value_to_win_prob(&v))
+                .unwrap_or(0.5);
+            if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
+        }
+        LeafEval::Dfs => crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
+            crate::mcts::evaluate(&state, n_actions)
+        }),
+    };
 
     Node {
         parent,
@@ -335,7 +384,8 @@ fn expand_and_backprop(
     let value = nodes[cid].leaf_value;
     if let Some(l) = log.as_deref_mut() {
         l.push(format!(
-            "  EVAL   #{cid} (DFS-Solver) win[{}]={:.3} win[{}]={:.3}",
+            "  EVAL   #{cid} ({}) win[{}]={:.3} win[{}]={:.3}",
+            if ACTIVE_LEAF == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
             names[0], value[0], names[1], value[1]
         ));
     }
@@ -464,7 +514,8 @@ fn build_net_tree<R: Rng + ?Sized>(
         // Eval: Blattwert wurde schon bei Knoten-Erzeugung berechnet (make_node).
         let value = nodes[nid].leaf_value;
         logln!(
-            "  EVAL   #{nid} (DFS-Solver) win[{}]={:.3} win[{}]={:.3}",
+            "  EVAL   #{nid} ({}) win[{}]={:.3} win[{}]={:.3}",
+            if ACTIVE_LEAF == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
             names[0], value[0], names[1], value[1]
         );
 
@@ -508,6 +559,12 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return None;
     }
+    // Runde 5: informationsfreies Endspiel, siehe round5.rs -- exakte
+    // Alpha-Beta-Wahl statt Netz-PUCT (kein Netz noetig, kein
+    // Naeherungsfehler in der Wertungsplatten-Endwertung).
+    if crate::round5::applies(state) {
+        return crate::round5::choose_action(state);
+    }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits)?;
     nodes[best].action.clone()
@@ -524,6 +581,16 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
 ) -> Vec<(Action, u32, f64)> {
     if state.phase != Phase::Drafting {
         return Vec::new();
+    }
+    // Runde 5: siehe net_search_drafting_action. Einzelner Eintrag mit
+    // Gewicht 1.0 (statt leer) macht `net_drafting_policy`s Zufalls-
+    // Fallback (bei leerer Stats-Liste) nicht faelschlich fuer die
+    // Aktionswahl zustaendig.
+    if crate::round5::applies(state) {
+        return crate::round5::choose_action(state)
+            .into_iter()
+            .map(|a| (a, 1, 1.0))
+            .collect();
     }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
     nodes[0]
@@ -555,6 +622,9 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
 ) -> (Option<Action>, Value) {
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
+    }
+    if crate::round5::applies(state) {
+        return crate::round5::choose_action_with_analysis(state);
     }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
     let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits);

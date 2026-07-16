@@ -108,54 +108,118 @@ pub fn generate_dome_moves(state: &GameState) -> Vec<PlaceDomeTileMove> {
 }
 
 // ── Stapel-Zug (Aktion A) ─────────────────────────────────────────────────────
+//
+// Zwei Schritte, wie im Regelwerk: (1) `DrawStackPeek` -- eine weitere
+// verdeckte Platte ziehen (−1 Pkt), Rückseite zeigt nur den TYP (Wild/
+// Special, siehe DomeTile::is_special_type), nicht die Farbanordnung. Beendet
+// den Zug NICHT, beliebig oft wiederholbar. (2) `DrawStack` -- aufhören,
+// eine der bisher gezogenen Platten (state.pending_stack_draw) wählen und
+// platzieren, Rest zurück unter den Stapel. Solange ein Zieh-Vorgang läuft
+// (pending_stack_draw nicht leer), sind KEINE anderen Drafting-Aktionen
+// erlaubt (siehe drafting_actions) -- Aktion A ist ein durchgängiger Zug.
 
-pub fn validate_draw_from_stack(state: &GameState, m: &DrawFromStackMove) -> Option<String> {
+/// Schritt 1: darf gerade (noch) verdeckt gezogen werden?
+pub fn validate_draw_stack_peek(state: &GameState) -> Option<String> {
     let player = &state.players[state.current_player];
     if state.round_number >= 5 {
         return Some("In Runde 5 werden keine Kuppelplatten mehr gelegt.".into());
     }
-    if player.has_used_all_tokens(state.round_number) {
-        return Some(format!("{} hat bereits beide Spielerplättchen genutzt.", player.name));
-    }
-    if !player.can_place_dome_tile(state.round_number) {
-        return Some("Das 3×3-Raster ist bereits voll.".into());
+    // Token-/Platz-Check nur vor dem ERSTEN Zug eines Vorgangs -- danach ist
+    // der Vorgang schon "im Gange" und muss zu Ende geführt werden (Slots
+    // können sich währenddessen nicht ändern, da keine andere Aktion erlaubt ist).
+    if state.pending_stack_draw.is_empty() {
+        if player.has_used_all_tokens(state.round_number) {
+            return Some(format!("{} hat bereits beide Spielerplättchen genutzt.", player.name));
+        }
+        if !player.can_place_dome_tile(state.round_number) {
+            return Some("Das 3×3-Raster ist bereits voll.".into());
+        }
+    } else if player.score == 0 {
+        // Nutzer-Anstoss: man darf nur so viele Platten ziehen, wie man sich
+        // leisten kann (je Ziehung -1 Pkt, siehe execute_draw_stack_peek).
+        // Der ERSTE Zug eines Vorgangs (pending_stack_draw leer) ist davon
+        // ausgenommen -- sonst könnte ein Spieler mit 0 Punkten gar keine
+        // Kuppelplatte mehr ziehen und damit (falls das sein einziger noch
+        // offener Zug ist) in einen Deadlock laufen. Punkte fallen nie unter
+        // 0 (apply_score floort), daher ist "score == 0" hier gleichbedeutend
+        // mit "die bisherigen Ziehungen dieser Runde haben das Budget exakt
+        // aufgebraucht" -- ab der 2. Ziehung greift das Budget wieder normal.
+        return Some(format!(
+            "{} hat nicht genug Punkte für eine weitere Kachel vom Stapel.",
+            player.name
+        ));
     }
     if state.dome_tile_pool.is_empty() {
         return Some("Kein Stapel mehr vorhanden.".into());
     }
-    if m.num_drawn < 1 || m.num_drawn > state.dome_tile_pool.len() {
-        return Some(format!("num_drawn muss zwischen 1 und {} liegen.", state.dome_tile_pool.len()));
+    None
+}
+
+pub fn execute_draw_stack_peek(state: &mut GameState) -> Result<(), String> {
+    if let Some(e) = validate_draw_stack_peek(state) {
+        return Err(e);
     }
-    let available = state.dome_tile_pool[..m.num_drawn]
-        .iter()
-        .any(|t| t.tile_id == m.chosen_id);
-    if !available {
-        return Some(format!("Kachel {} nicht unter den {} gezogenen.", m.chosen_id, m.num_drawn));
+    let pi = state.current_player;
+    state.players[pi].apply_score(-1);
+    let tile = state.dome_tile_pool.remove(0);
+    let typ = if tile.is_special_type() { "Special" } else { "Wild" };
+    state.pending_stack_draw.push(tile);
+    let (name, score, n) = {
+        let p = &state.players[pi];
+        (p.name.clone(), p.score, state.pending_stack_draw.len())
+    };
+    state.log_event(format!(
+        "📦 {name}: {n}. Kachel vom Stapel gezogen (Rückseite: {typ}) −1 Pkt → {score} Gesamt"
+    ));
+    Ok(())
+}
+
+/// Schritt 2: eine der gezogenen Platten wählen und platzieren.
+pub fn validate_draw_from_stack(state: &GameState, m: &DrawFromStackMove) -> Option<String> {
+    if state.pending_stack_draw.is_empty() {
+        return Some("Kein laufender Stapel-Zug -- zuerst ziehen.".into());
     }
+    if !state.pending_stack_draw.iter().any(|t| t.tile_id == m.chosen_id) {
+        return Some(format!("Kachel {} nicht unter den gezogenen.", m.chosen_id));
+    }
+    let player = &state.players[state.current_player];
     if player.dome_grid.dome_slots[m.slot_row][m.slot_col].is_some() {
         return Some(format!("Slot ({},{}) ist bereits belegt.", m.slot_row, m.slot_col));
+    }
+    // return_order muss exakt die tile_ids der NICHT gewählten gezogenen
+    // Platten als Multiset treffen (wie moon_order bei Sonnenzügen).
+    let mut expected: Vec<usize> = state
+        .pending_stack_draw
+        .iter()
+        .filter(|t| t.tile_id != m.chosen_id)
+        .map(|t| t.tile_id)
+        .collect();
+    let mut got = m.return_order.clone();
+    expected.sort_unstable();
+    got.sort_unstable();
+    if got != expected {
+        return Some("return_order stimmt nicht mit den übrigen gezogenen Platten überein.".into());
     }
     None
 }
 
 pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> Result<(), String> {
     let pi = state.current_player;
-    state.players[pi].apply_score(-(m.num_drawn as i32));
-    let (name, score) = {
-        let p = &state.players[pi];
-        (p.name.clone(), p.score)
-    };
-    state.log_event(format!(
-        "📦 {name}: {}× vom Stapel gezogen −{} Pkt → {score} Gesamt",
-        m.num_drawn, m.num_drawn
-    ));
-    let drawn: Vec<_> = state.dome_tile_pool.drain(..m.num_drawn).collect();
+    let drawn = std::mem::take(&mut state.pending_stack_draw);
     let mut chosen = None;
+    let mut rest: std::collections::HashMap<usize, crate::dome::DomeTile> = std::collections::HashMap::new();
     for t in drawn {
         if t.tile_id == m.chosen_id && chosen.is_none() {
             chosen = Some(t);
         } else {
-            state.dome_tile_pool.push(t); // Rest zurück unter den Stapel
+            rest.insert(t.tile_id, t);
+        }
+    }
+    // Rest in der vom Spieler gewählten Reihenfolge zurück unter den Stapel
+    // (Regelwerk: "in beliebiger Reihenfolge zurücklegen", siehe DrawFromStackMove).
+    for id in &m.return_order {
+        if let Some(t) = rest.remove(id) {
+            state.dome_tile_pool.push(t);
         }
     }
     let mut chosen = chosen.ok_or("gewählte Kachel nicht gezogen")?;
@@ -213,34 +277,49 @@ pub fn execute_take_bonus_chip(state: &mut GameState, m: &TakeBonusChipMove) -> 
     Ok(())
 }
 
-/// Repräsentative Stapel-Züge (Aktion A): günstigste Variante (num_drawn=1,
-/// oberste Stapelkachel) in jeden freien Slot × jede Rotation. `action_to_id`
-/// kodiert nur (Slot, Rotation) für `dome_stack` -- `num_drawn`/`chosen_id`
-/// fließen NICHT in die Policy-ID ein (wie `moon_order` bei Sonnenzügen) und
-/// werden erst nach der Zugwahl separat aufgelöst (siehe
-/// `self_play::resolve_stack_draw`, Rollout-Mittelung über die verdeckte
-/// Stapel-Reihenfolge -- die Menge ist bekannt via `dome_pool_mask`, nur die
-/// Reihenfolge nicht).
+/// Darf gerade eine weitere verdeckte Platte gezogen werden (Aktion A,
+/// Schritt 1)? Reine Verfügbarkeits-Frage, `Action::DrawStackPeek` hat keine
+/// Felder.
+pub fn can_draw_stack_peek(state: &GameState) -> bool {
+    validate_draw_stack_peek(state).is_none()
+}
+
+/// Wahl-Züge (Aktion A, Schritt 2): je bereits gezogener Kachel (in
+/// `pending_stack_draw`) × freiem Slot × Rotation. Leer, solange kein
+/// Zieh-Vorgang läuft. `action_to_id` kodiert nur (Slot, Rotation) für
+/// `dome_stack` -- `chosen_id` fließt NICHT in die Policy-ID ein (wie
+/// `moon_order` bei Sonnenzügen).
 pub fn generate_draw_stack_moves(state: &GameState) -> Vec<DrawFromStackMove> {
-    let player = &state.players[state.current_player];
-    if state.round_number >= 5
-        || player.has_used_all_tokens(state.round_number)
-        || !player.can_place_dome_tile(state.round_number)
-        || state.dome_tile_pool.is_empty()
-    {
+    if state.pending_stack_draw.is_empty() {
         return Vec::new();
     }
-    let chosen_id = state.dome_tile_pool[0].tile_id;
+    let player = &state.players[state.current_player];
+    let mut ids: Vec<usize> = state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+    ids.sort_unstable();
+    ids.dedup();
     let mut moves = Vec::new();
-    for (sr, sc) in player.dome_grid.empty_slots() {
-        for &rotation in &[0u32, 90, 180, 270] {
-            moves.push(DrawFromStackMove {
-                num_drawn: 1,
-                chosen_id,
-                slot_row: sr,
-                slot_col: sc,
-                rotation,
-            });
+    for chosen_id in ids {
+        // return_order wird -- wie moon_order bei Sonnenzuegen -- NICHT
+        // kombinatorisch aufgefaechert (keine eigene Policy-Dimension,
+        // s. DrawFromStackMove-Kommentar): ein Kandidat je (chosen_id, Slot,
+        // Rotation), Reihenfolge der uebrigen Platten kanonisch = die
+        // Ziehreihenfolge aus `pending_stack_draw`.
+        let return_order: Vec<usize> = state
+            .pending_stack_draw
+            .iter()
+            .filter(|t| t.tile_id != chosen_id)
+            .map(|t| t.tile_id)
+            .collect();
+        for (sr, sc) in player.dome_grid.empty_slots() {
+            for &rotation in &[0u32, 90, 180, 270] {
+                moves.push(DrawFromStackMove {
+                    chosen_id,
+                    slot_row: sr,
+                    slot_col: sc,
+                    rotation,
+                    return_order: return_order.clone(),
+                });
+            }
         }
     }
     moves
@@ -263,12 +342,8 @@ pub fn generate_bonus_chip_moves(state: &GameState) -> Vec<TakeBonusChipMove> {
 
 /// Kann der aktive Spieler (so wie state.current_player gesetzt ist) noch ziehen?
 fn current_player_can_move(state: &GameState) -> bool {
-    let p = &state.players[state.current_player];
-    let can_draw = state.round_number < 5
-        && !p.has_used_all_tokens(state.round_number)
-        && !state.dome_tile_pool.is_empty()
-        && p.can_place_dome_tile(state.round_number);
-    can_draw
+    can_draw_stack_peek(state)
+        || !generate_draw_stack_moves(state).is_empty()
         || !generate_valid_moves(state).is_empty()
         || !generate_dome_moves(state).is_empty()
         || !generate_bonus_chip_moves(state).is_empty()
@@ -434,6 +509,22 @@ pub fn determine_winner(state: &GameState) -> usize {
 /// Leer → [Pass]. Single Source of Truth für Game-Loop und MCTS.
 pub fn drafting_actions(state: &GameState) -> Vec<Action> {
     let mut actions: Vec<Action> = Vec::new();
+    // Mitten in einem Stapel-Zug (Aktion A): NUR weiterziehen oder wählen
+    // erlaubt, keine andere Aktion -- das Regelwerk behandelt Aktion A als
+    // EINEN durchgängigen Zug, der nicht mit anderen Aktionen verschachtelt
+    // werden darf.
+    if !state.pending_stack_draw.is_empty() {
+        if can_draw_stack_peek(state) {
+            actions.push(Action::DrawStackPeek);
+        }
+        for m in generate_draw_stack_moves(state) {
+            actions.push(Action::DrawStack(m));
+        }
+        if actions.is_empty() {
+            actions.push(Action::Pass);
+        }
+        return actions;
+    }
     for m in generate_valid_moves(state) {
         actions.push(Action::Stone(m));
     }
@@ -443,8 +534,8 @@ pub fn drafting_actions(state: &GameState) -> Vec<Action> {
     for m in generate_bonus_chip_moves(state) {
         actions.push(Action::BonusChip(m));
     }
-    for m in generate_draw_stack_moves(state) {
-        actions.push(Action::DrawStack(m));
+    if can_draw_stack_peek(state) {
+        actions.push(Action::DrawStackPeek);
     }
     if actions.is_empty() {
         actions.push(Action::Pass);
@@ -498,6 +589,11 @@ impl Game {
                 }
                 execute_dome_move(&mut self.state, m)?;
                 self.state.switch_player();
+            }
+            Action::DrawStackPeek => {
+                execute_draw_stack_peek(&mut self.state)?;
+                // Beendet den Zug NICHT -- derselbe Spieler entscheidet als
+                // naechstes erneut (weiterziehen oder waehlen).
             }
             Action::DrawStack(m) => {
                 if let Some(e) = validate_draw_from_stack(&self.state, m) {
@@ -709,6 +805,113 @@ mod tests {
 
     fn names() -> [String; 2] {
         ["P1".into(), "P2".into()]
+    }
+
+    #[test]
+    fn stack_peek_capped_by_affordable_points() {
+        // Nutzer-Anstoss: hoechstens so viele Ziehungen wie Punkte vorhanden
+        // (je Ziehung -1 Pkt). Bei 2 Punkten sind also genau 2 Ziehungen
+        // erlaubt, die dritte muss abgelehnt werden.
+        let mut rng = StdRng::seed_from_u64(11);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game.state.players[game.state.current_player].score = 2;
+
+        assert!(execute_draw_stack_peek(&mut game.state).is_ok(), "1. Ziehung (2 Pkt uebrig davor)");
+        assert_eq!(game.state.players[0].score, 1);
+        assert!(execute_draw_stack_peek(&mut game.state).is_ok(), "2. Ziehung (1 Pkt uebrig davor)");
+        assert_eq!(game.state.players[0].score, 0);
+        assert!(
+            validate_draw_stack_peek(&game.state).is_some(),
+            "3. Ziehung muss abgelehnt werden (0 Pkt, kein Pflichtzug mehr)"
+        );
+    }
+
+    #[test]
+    fn stack_peek_at_zero_score_allows_exactly_one_mandatory_draw() {
+        // Deadlock-Vermeidung: bei 0 Punkten ist der ERSTE Zug eines
+        // Vorgangs trotzdem erlaubt (score floort bei 0, kostet also
+        // effektiv nichts), die Fortsetzung danach aber nicht mehr.
+        let mut rng = StdRng::seed_from_u64(12);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game.state.players[game.state.current_player].score = 0;
+
+        assert!(validate_draw_stack_peek(&game.state).is_none(), "Pflichtzug bei 0 Punkten muss erlaubt sein");
+        execute_draw_stack_peek(&mut game.state).expect("Pflichtzug");
+        assert_eq!(game.state.players[0].score, 0, "Punkte duerfen nie unter 0 fallen");
+        assert!(
+            validate_draw_stack_peek(&game.state).is_some(),
+            "Weiterziehen bei weiterhin 0 Punkten muss abgelehnt werden"
+        );
+    }
+
+    #[test]
+    fn draw_from_stack_returns_rest_in_chosen_order() {
+        use crate::dome::build_dome_tile_pool;
+
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let pool = build_dome_tile_pool();
+        game.state.pending_stack_draw = vec![pool[0].clone(), pool[1].clone(), pool[2].clone()];
+        game.state.dome_tile_pool.clear();
+
+        let (sr, sc) = game.state.players[game.state.current_player]
+            .dome_grid
+            .empty_slots()[0];
+        // Regelwerk-Zitat des Users: die zwei nicht gewaehlten Platten in
+        // "beliebiger Reihenfolge" zurueck -- hier bewusst NICHT die
+        // Ziehreihenfolge (waere [pool[1].tile_id, pool[2].tile_id]),
+        // sondern umgekehrt.
+        let mv = DrawFromStackMove {
+            chosen_id: pool[0].tile_id,
+            slot_row: sr,
+            slot_col: sc,
+            rotation: 0,
+            return_order: vec![pool[2].tile_id, pool[1].tile_id],
+        };
+        assert!(validate_draw_from_stack(&game.state, &mv).is_none());
+        execute_draw_from_stack(&mut game.state, &mv).expect("gueltiger Zug");
+
+        assert_eq!(
+            game.state.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+            vec![pool[2].tile_id, pool[1].tile_id],
+            "Restplatten muessen exakt in der gewaehlten Reihenfolge unter dem Stapel liegen"
+        );
+    }
+
+    #[test]
+    fn draw_from_stack_rejects_incomplete_return_order() {
+        use crate::dome::build_dome_tile_pool;
+
+        let mut rng = StdRng::seed_from_u64(6);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let pool = build_dome_tile_pool();
+        game.state.pending_stack_draw = vec![pool[0].clone(), pool[1].clone(), pool[2].clone()];
+        game.state.dome_tile_pool.clear();
+
+        let (sr, sc) = game.state.players[game.state.current_player]
+            .dome_grid
+            .empty_slots()[0];
+        // return_order fehlt eine der beiden Restplatten -- muss abgelehnt werden.
+        let mv = DrawFromStackMove {
+            chosen_id: pool[0].tile_id,
+            slot_row: sr,
+            slot_col: sc,
+            rotation: 0,
+            return_order: vec![pool[1].tile_id],
+        };
+        assert!(validate_draw_from_stack(&game.state, &mv).is_some());
     }
 
     #[test]
