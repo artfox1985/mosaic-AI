@@ -539,9 +539,15 @@ impl PyGame {
             None
         };
 
-        let action_json = search_move_json(&mv, Some(&self.game.state));
         let SearchMove::Draft(a) = &mv;
-        map_err(self.game.apply_drafting(a))?;
+        // Stapel-Zieh-Menge/-Kachel sind nicht Teil der Policy-ID (siehe
+        // resolve_chosen_action) -- erst hier, direkt vor dem Anwenden,
+        // aufloesen, und Anzeige-JSON/Log NACH der Aufloesung bauen, damit sie
+        // zum tatsaechlich ausgefuehrten Zug passen.
+        let resolved = crate::self_play::resolve_chosen_action(&self.game.state, a.clone(), &mut self.rng);
+        let resolved_mv = SearchMove::Draft(resolved.clone());
+        let action_json = search_move_json(&resolved_mv, Some(&self.game.state));
+        map_err(self.game.apply_drafting(&resolved))?;
 
         let mut obj = serde_json::Map::new();
         obj.insert("applied".into(), json!(true));
@@ -601,8 +607,9 @@ impl PyGame {
             None
         };
 
-        let action_json = search_move_json(&SearchMove::Draft(a.clone()), Some(&self.game.state));
-        map_err(self.game.apply_drafting(&a))?;
+        let resolved = crate::self_play::resolve_chosen_action(&self.game.state, a, &mut self.rng);
+        let action_json = search_move_json(&SearchMove::Draft(resolved.clone()), Some(&self.game.state));
+        map_err(self.game.apply_drafting(&resolved))?;
 
         let mut obj = serde_json::Map::new();
         obj.insert("applied".into(), json!(true));

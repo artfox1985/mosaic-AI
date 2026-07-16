@@ -3,9 +3,10 @@ Exportiert ein trainiertes MosaicNet (.pth) nach ONNX für die Rust-Inferenz (Ph
 
   python export_onnx.py --version s100
 
-Erzeugt models/alphazero_<version>.onnx mit 2 Outputs (policy, moon) und
-dynamischer Batch-Achse. Die Rust-Engine (tract-onnx) lädt diese Datei für den
-Network-Modus (Self-Play / Arena).
+Erzeugt models/alphazero_<version>.onnx mit 4 Outputs (policy, value, moon,
+points) und dynamischer Batch-Achse. Die Rust-Engine (tract-onnx) lädt diese
+Datei für den Network-Modus (Self-Play / Arena). `value`/`points` sind reine
+Trainings-Zusatzsignale -- die Suche (Stage 1/3) liest nur `policy`/`moon`.
 """
 import sys
 import argparse
@@ -41,11 +42,12 @@ def export(version: str, opset: int = 13) -> Path:
 
     model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph)
     new_state = model.state_dict()
-    # Alte Checkpoints (vor der Value-Head-Entfernung) haben zusaetzlich
-    # value_head.*-Keys -- strict=False ignoriert die einfach (kein Ziel
-    # dafuer mehr im Modell). Shape-Mismatches bei den verbleibenden,
-    # gemeinsamen Keys (z.B. body.0.weight bei geaendertem INPUT_SIZE) werden
-    # weiterhin explizit rausgefiltert, sonst wuerde load_state_dict crashen.
+    # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
+    # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads
+    # dann einfach zufallsinitialisiert (kein Ziel dafuer im alten Checkpoint).
+    # Shape-Mismatches bei den verbleibenden, gemeinsamen Keys (z.B.
+    # body.0.weight bei geaendertem INPUT_SIZE) werden weiterhin explizit
+    # rausgefiltert, sonst wuerde load_state_dict crashen.
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
     if skipped:
         print(f"⚠️  Shape-Mismatch (alte Head-Architektur?), startet zufällig: {', '.join(skipped)}")
@@ -58,11 +60,13 @@ def export(version: str, opset: int = 13) -> Path:
     torch.onnx.export(
         model, dummy, str(out),
         input_names=["state"],
-        output_names=["policy", "moon"],
+        output_names=["policy", "value", "moon", "points"],
         dynamic_axes={
             "state":  {0: "batch"},
             "policy": {0: "batch"},
+            "value":  {0: "batch"},
             "moon":   {0: "batch"},
+            "points": {0: "batch"},
         },
         opset_version=opset,
         dynamo=False,
@@ -73,12 +77,14 @@ def export(version: str, opset: int = 13) -> Path:
     torch.manual_seed(0)
     x = torch.rand(1, in_size, dtype=torch.float32)
     with torch.no_grad():
-        p, m = model(x)
+        p, v, m, pts = model(x)
     ref = MODELS_DIR / f"alphazero_{version}.onnx.ref.txt"
     with open(ref, "w") as f:
         f.write("# input\n" + " ".join(f"{z:.6f}" for z in x[0].tolist()) + "\n")
         f.write("# policy\n" + " ".join(f"{z:.6f}" for z in p[0].tolist()) + "\n")
+        f.write("# value\n" + " ".join(f"{z:.6f}" for z in v[0].tolist()) + "\n")
         f.write("# moon\n" + " ".join(f"{z:.6f}" for z in m[0].tolist()) + "\n")
+        f.write("# points\n" + " ".join(f"{z:.6f}" for z in pts[0].tolist()) + "\n")
     print(f"📎 Referenz für Rust-Parität: {ref}")
     return out
 

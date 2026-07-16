@@ -36,6 +36,14 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .blau{background:var(--blau)}.gelb{background:var(--gelb)}.rot{background:var(--rot)}
 .schwarz{background:var(--schwarz)}.tuerkis{background:var(--tuerkis)}
 .marker{background:#F59E0B}
+/* Phantom-Fliesen (per Bonuschip virtuell ergänzt, nie real gezogen):
+   weiß gefüllt mit farbigem Rand statt voll gefüllt. */
+.tile.phantom{background:#fff;border-width:2.5px}
+.tile.phantom.blau{border-color:var(--blau)}
+.tile.phantom.gelb{border-color:var(--gelb)}
+.tile.phantom.rot{border-color:var(--rot)}
+.tile.phantom.schwarz{border-color:var(--schwarz)}
+.tile.phantom.tuerkis{border-color:var(--tuerkis)}
 
 /* Buttons */
 .btn{cursor:pointer;font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);transition:all .1s}

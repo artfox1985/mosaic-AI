@@ -25,3 +25,9 @@ NUM_ACTIONS = 482       # action_to_id Ausgabebereich
 BATCH_SIZE    = 256
 HIDDEN_SIZE   = 512   # Neuronen pro Hidden Layer (2^x)
 LEARNING_RATE = 0.0004
+# Value-Head (Sieg/Niederlage) zurueckgeholt + neuer Punktestand-Aux-Head
+# (siehe neural_net.py::VALUE_SCHEMA_VERSION). Beide Gewichte bewusst klein
+# ggue. dem Policy-Loss (der bleibt das Trainingsziel, das die Suche/Self-Play
+# tatsaechlich nutzt) -- reine Trunk-Zusatzsignale, kein Ersatz fuer Stufe 1/3.
+VALUE_WEIGHT  = 1.0
+POINTS_WEIGHT = 0.5

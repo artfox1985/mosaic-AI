@@ -10,6 +10,12 @@ pub struct PatternLine {
     pub row_index: usize,
     pub tiles: Vec<TileColor>,
     pub color: Option<TileColor>,
+    /// Anzahl der Fliesen in `tiles`, die per Bonuschip virtuell ergänzt
+    /// wurden (nie aus Beutel/Turm gezogen, siehe
+    /// round_end::apply_bonus_chips_with). Beim Leeren der Reihe muss das
+    /// berücksichtigt werden, sonst würden Phantom-Fliesen beim Tiling als
+    /// "echte" in den Turm wandern und die feste Gesamtzahl je Farbe aufblähen.
+    pub phantom_count: usize,
 }
 
 impl PatternLine {
@@ -18,6 +24,7 @@ impl PatternLine {
             row_index,
             tiles: Vec::new(),
             color: None,
+            phantom_count: 0,
         }
     }
 
@@ -65,6 +72,7 @@ impl PatternLine {
         let color = self.color.expect("complete line has a color");
         self.tiles.clear();
         self.color = None;
+        self.phantom_count = 0;
         color
     }
 }

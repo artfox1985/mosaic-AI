@@ -20,16 +20,19 @@ use serde_json::{json, Map, Value};
 
 use crate::dome::SpaceType;
 use crate::features::{action_to_id, state_to_features_direct};
-use crate::game::{apply_start_placement, determine_winner, drafting_actions, Game, TilingMove};
+use crate::game::{
+    apply_start_placement, determine_winner, drafting_actions, execute_draw_from_stack, Game,
+    TilingMove,
+};
 use crate::mcts::{dynamic_sims, player_total, root_child_stats, search_drafting_action};
 use crate::net::Net;
 use crate::net_mcts::{net_root_child_stats, net_search_drafting_action};
-use crate::moves::{Action, Move, PlaceAction, TakeAction, TakeSource};
+use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
     row_has_open_matching_slot,
 };
-use crate::scoring::sample_valid_scoring_ids;
+use crate::scoring::{sample_valid_scoring_ids, wertung_progress};
 use crate::serialize::state_to_json;
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
@@ -165,7 +168,8 @@ fn drafting_policy<R: Rng + ?Sized>(
     if stats.is_empty() {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
         let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-        return (a, vec![entry]);
+        let chosen = resolve_chosen_action(state, a, rng);
+        return (chosen, vec![entry]);
     }
 
     // Gewichte für eine Temperatur: visits^(1/temp)·q², mit reinem-Visits-Fallback.
@@ -199,7 +203,8 @@ fn drafting_policy<R: Rng + ?Sized>(
     // PLAY: moderate Temperatur → gespielte Aktion sampeln (Zustandsvielfalt).
     let (pw, ps) = weights_for(play_temp);
     let idx = if ps > 0.0 { weighted_index(&pw, ps, rng) } else { 0 };
-    (stats[idx].0.clone(), policy)
+    let chosen = resolve_chosen_action(state, stats[idx].0.clone(), rng);
+    (chosen, policy)
 }
 
 /// Sampelt einen Index proportional zu `weights` (Summe = `total`).
@@ -212,6 +217,117 @@ fn weighted_index<R: Rng + ?Sized>(weights: &[f64], total: f64, rng: &mut R) -> 
         }
     }
     weights.len().saturating_sub(1)
+}
+
+// ── Stapel-Zieh-Aufloesung (Aktion A: wie viele Kacheln ziehen?) ────────────
+//
+// `generate_draw_stack_moves` liefert nur repraesentative Zuege (num_drawn=1)
+// je Slot×Rotation -- `action_to_id` kodiert num_drawn/chosen_id ohnehin
+// nicht (wie moon_order bei Sonnenzuegen). Die eigentliche "wie viele
+// ziehen"-Entscheidung faellt HIER, per Rollout-Mittelung ueber die
+// verdeckte Stapel-Reihenfolge (Menge bekannt via dome_pool_mask-Feature,
+// Reihenfolge nicht) -- das Netz muss dafuer keinen eigenen Policy-
+// Freiheitsgrad lernen (Nutzer-Entscheidung).
+
+/// Rollout-Wiederholungen je `num_drawn`-Kandidat. Fest, kein Progressive
+/// Widening: ein Margin-/Knappheits-Trigger hatte sich schon bei der
+/// Stage-3-Kandidatenauswahl als unbrauchbar erwiesen (94% aller
+/// Entscheidungen wirkten selbst bei margin=0.30 noch "knapp", siehe
+/// evaluations/stage2_investigation.md).
+const STACK_DRAW_N_REPS: usize = 6;
+
+/// Loest `num_drawn`/`chosen_id` eines Stapel-Zugs auf (Slot+Rotation stehen
+/// schon aus der Zugwahl fest). Bewertet NUR die unmittelbare Platzierung
+/// (Wertungsplatten-Fortschritt minus Punktkosten) -- kein Mehrrunden-
+/// Rollout, da diese Entscheidung selten ist (max. 2 Tokens/Runde) und
+/// keinen tiefen Folgebaum braucht.
+fn resolve_stack_draw<R: Rng + ?Sized>(
+    state: &GameState,
+    slot_row: usize,
+    slot_col: usize,
+    rotation: u32,
+    rng: &mut R,
+) -> DrawFromStackMove {
+    let pi = state.current_player;
+    let pool_len = state.dome_tile_pool.len();
+
+    // Direkt nach dem Legen sind alle Spaces der neuen Platte noch leer --
+    // `wertung_progress` allein (misst nur GEFUELLTE Felder) wuerde also fast
+    // immer 0 Unterschied zwischen verschiedenen Kachel-Designs zeigen (bis
+    // auf den -3/leeres-Spezialfeld-Abzug, falls "Spezialfelder" aktive
+    // Wertungsplatte ist). Deshalb zusaetzlich die PLATTE selbst bewerten:
+    // eigene Bonuspunkte (werden spaeter beim Fuellen des Spezialfelds real
+    // ausgezahlt) + Wild-Spaces (akzeptieren jede Farbe -> Flexibilitaet für
+    // kuenftiges Tiling, unabhaengig davon welche Farbe der Spieler noch
+    // braucht).
+    let eval = |pool: &[crate::dome::DomeTile], n: usize, tile_id: usize| -> f64 {
+        let mut g = Game { state: state.clone() };
+        g.state.dome_tile_pool = pool.to_vec();
+        let mv = DrawFromStackMove { num_drawn: n, chosen_id: tile_id, slot_row, slot_col, rotation };
+        if execute_draw_from_stack(&mut g.state, &mv).is_ok() {
+            let progress = wertung_progress(&g.state.players[pi], &g.state.scoring_tile_ids);
+            let placed = g.state.players[pi].dome_grid.dome_slots[slot_row][slot_col].as_ref();
+            let bonus = placed.map_or(0, |t| t.bonus_points) as f64;
+            let wild_count = placed.map_or(0, |t| {
+                t.spaces.iter().filter(|s| s.space_type == SpaceType::Wild).count()
+            }) as f64;
+            progress + bonus + wild_count - n as f64
+        } else {
+            f64::NEG_INFINITY
+        }
+    };
+
+    let mut best_n = 1usize;
+    let mut best_mean = f64::NEG_INFINITY;
+    for n in 1..=pool_len {
+        let mut total = 0.0;
+        let mut valid_reps = 0usize;
+        for _ in 0..STACK_DRAW_N_REPS {
+            let mut pool = state.dome_tile_pool.clone();
+            pool.shuffle(rng);
+            let best_of_n = pool[..n]
+                .iter()
+                .map(|t| eval(&pool, n, t.tile_id))
+                .fold(f64::NEG_INFINITY, f64::max);
+            if best_of_n > f64::NEG_INFINITY {
+                total += best_of_n;
+                valid_reps += 1;
+            }
+        }
+        if valid_reps == 0 {
+            continue;
+        }
+        let mean = total / valid_reps as f64;
+        if mean > best_mean {
+            best_mean = mean;
+            best_n = n;
+        }
+    }
+
+    // Fuer den ECHTEN Zug: unter den tatsaechlich obersten `best_n` Kacheln
+    // (im echten, nicht resampleten Pool) die beste nach Wertungsfortschritt
+    // waehlen.
+    let real_pool = state.dome_tile_pool.clone();
+    let chosen_id = real_pool[..best_n]
+        .iter()
+        .map(|t| (t.tile_id, eval(&real_pool, best_n, t.tile_id)))
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(id, _)| id)
+        .unwrap_or(state.dome_tile_pool[0].tile_id);
+
+    DrawFromStackMove { num_drawn: best_n, chosen_id, slot_row, slot_col, rotation }
+}
+
+/// Loest `Action::DrawStack` per `resolve_stack_draw` auf, alle anderen
+/// Aktionen unveraendert durchgereicht. Zentraler Einhaengepunkt fuer jede
+/// Stelle, die eine gewaehlte Drafting-Aktion tatsaechlich ausfuehrt.
+pub(crate) fn resolve_chosen_action<R: Rng + ?Sized>(state: &GameState, a: Action, rng: &mut R) -> Action {
+    match a {
+        Action::DrawStack(m) => {
+            Action::DrawStack(resolve_stack_draw(state, m.slot_row, m.slot_col, m.rotation, rng))
+        }
+        other => other,
+    }
 }
 
 // ── Moon-Order-Target (Port von self_play.py:194-240) ─────────────────────────
@@ -735,6 +851,7 @@ fn play_arena_game<R: Rng + ?Sized>(
                         search_drafting_action(&game.state, s, c, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
+                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
                     let _ = game.apply_drafting(&chosen);
                     steps += 1;
                 } else {
@@ -868,6 +985,7 @@ fn play_net_game<R: Rng + ?Sized>(
                         search_drafting_action(&game.state, s, c, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
+                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
                     let _ = game.apply_drafting(&chosen);
                     steps += 1;
                 } else {
@@ -1007,6 +1125,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                         net_search_drafting_action(net, &game.state, s, cp, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
+                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
                     let _ = game.apply_drafting(&chosen);
                     steps += 1;
                 } else {
@@ -1106,7 +1225,8 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
-        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
+        let chosen = resolve_chosen_action(state, a.clone(), rng);
+        return (chosen, vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
     }
     let policy: Vec<Value> = stats
         .iter()
@@ -1125,7 +1245,8 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
         weighted_index(&weights, total, rng)
     };
-    (stats[idx].0.clone(), policy)
+    let chosen = resolve_chosen_action(state, stats[idx].0.clone(), rng);
+    (chosen, policy)
 }
 
 /// Ein netzgeführtes Self-Play-Spiel. Wie `play_one_game`, aber Drafting per
@@ -1300,8 +1421,10 @@ fn negamax_value(
         });
     }
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _m) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new()))
+    let (logits, _value, _m, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| {
+            (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+        })
     });
     let mut scored: Vec<(f32, Action)> = actions
         .into_iter()
@@ -1370,8 +1493,10 @@ fn alphabeta_choose_action(
     ALPHABETA_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let perspective = state.current_player;
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _m) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new()))
+    let (logits, _value, _m, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| {
+            (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+        })
     });
     let mut scored: Vec<(f32, Action)> = actions
         .iter()
@@ -1490,6 +1615,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                             );
                             a
                         };
+                        let a = resolve_chosen_action(&g.state, a, rng);
                         let _ = g.apply_drafting(&a);
                     } else {
                         break;
@@ -1663,6 +1789,7 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
+                    let chosen = resolve_chosen_action(&game.state, chosen, rng);
                     let _ = game.apply_drafting(&chosen);
                     steps += 1;
                 } else {
@@ -1764,6 +1891,7 @@ pub fn run_stage3_vs_stage1_arena(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::validate_draw_from_stack;
 
     /// Zaehlt alle Vorkommen von `color` im GESAMTEN Spielzustand: Beutel,
     /// Turm, alle Fabriken (Sun+Mond), Spielerreihen, Strafleiste, verlegte
@@ -1783,7 +1911,13 @@ mod tests {
         n += state.large_factory.moon_pool.iter().filter(|&&c| c == color).count();
         for p in &state.players {
             for pl in &p.pattern_lines {
-                n += pl.tiles.iter().filter(|&&c| c == color).count();
+                // Phantom-Fliesen (per Bonuschip virtuell ergaenzt, siehe
+                // PatternLine::phantom_count) sind nie real gezogen worden --
+                // ausklammern, sonst waere die Zahl kurzzeitig aufgeblaeht,
+                // solange die Reihe noch nicht getilt ist.
+                let raw = pl.tiles.iter().filter(|&&c| c == color).count();
+                let phantom_here = if pl.color == Some(color) { pl.phantom_count.min(raw) } else { 0 };
+                n += raw - phantom_here;
             }
             n += p.broken_tiles.iter().filter(|&&c| c == color).count();
             for row in &p.dome_grid.dome_slots {
@@ -1800,23 +1934,26 @@ mod tests {
     }
 
     /// Sanity-Check (Nutzer-Anstoss, siehe stage2_investigation.md): Beutel +
-    /// Turm + alles sichtbar auf dem Spielfeld darf je Farbe NIE UNTER der
-    /// festen Gesamtzahl (`TILES_PER_COLOR`=13) liegen -- keine Fliese darf
-    /// "verschwinden". Bewusst KEINE strikte Gleichheit: Bonus-Chip-
-    /// Komplettierung (`apply_bonus_chips_with`, round_end.rs) schiebt
-    /// zusaetzliche "Phantom"-Fliesen direkt in `pattern_lines[row].tiles`,
-    /// OHNE sie aus Beutel/Turm zu ziehen (Chips ERSETZEN echte gezogene
-    /// Fliesen) -- das ist beabsichtigtes Spieldesign, kein Bug, wurde aber
-    /// live vom ersten (strikten) Testlauf aufgedeckt (Spiel 0, Schritt 47,
-    /// Farbe Rot: 14 statt 13). WICHTIG fuer das geplante Beutel-
-    /// Farbanteil-Feature: der Mechanismus fasst NUR `pattern_lines` an,
-    /// NIE `bag`/`tower` -- direktes Auslesen von `state.bag.tiles` bleibt
-    /// exakt korrekt als "was noch wirklich zu ziehen ist".
+    /// Turm + alles sichtbar auf dem Spielfeld muss je Farbe IMMER EXAKT der
+    /// festen Gesamtzahl (`TILES_PER_COLOR`=13) entsprechen -- die
+    /// Gesamtanzahl je Farbe im Spiel aendert sich nie (Nutzer-Bestaetigung).
+    /// Frueher nur `>=` geprueft: Bonus-Chip-Komplettierung
+    /// (`apply_bonus_chips_with`, round_end.rs) schiebt "Phantom"-Fliesen
+    /// direkt in `pattern_lines[row].tiles`, OHNE sie aus Beutel/Turm zu
+    /// ziehen -- das ist beabsichtigtes Spieldesign (Chips geben rein
+    /// virtuelle Fliesen). Frueher wanderten diese Phantome beim Tiling/bei
+    /// unplatzierbaren Reihen faelschlich als "echte" Fliesen in Turm/
+    /// Strafleiste (`PatternLine::phantom_count` in `execute_tiling_action`
+    /// bzw. `process_unplaceable_rows` beruecksichtigt das jetzt). WICHTIG
+    /// fuer das Beutel-Farbanteil-Feature: der Mechanismus fasst NUR
+    /// `pattern_lines` an, NIE `bag`/`tower` direkt -- direktes Auslesen von
+    /// `state.bag.tiles` bleibt exakt korrekt als "was noch wirklich zu
+    /// ziehen ist".
     #[test]
     fn tile_color_accounting_invariant_holds_throughout_random_games() {
         use crate::tile::TILES_PER_COLOR;
         let mut rng = StdRng::seed_from_u64(777);
-        for gi in 0..5u64 {
+        for gi in 0..25u64 {
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let mut game = Game::start([format!("A{gi}"), format!("B{gi}")], (gi % 2) as usize, ids, &mut rng);
             let mut guard = 0u32;
@@ -1849,7 +1986,7 @@ mod tests {
                 }
                 for &color in &crate::tile::TileColor::NORMAL {
                     let n = count_color(&game.state, color);
-                    if n < TILES_PER_COLOR {
+                    if n != TILES_PER_COLOR {
                         let bag = game.state.bag.tiles.iter().filter(|&&c| c == color).count();
                         let tower = game.state.tower.tiles.iter().filter(|&&c| c == color).count();
                         let fac_sun: usize = game.state.factories.iter().map(|f| f.sun_tiles.iter().filter(|&&c| c == color).count()).sum();
@@ -1861,15 +1998,19 @@ mod tests {
                             let broken = p.broken_tiles.iter().filter(|&&c| c == color).count();
                             let dome: usize = p.dome_grid.dome_slots.iter().flatten().flatten()
                                 .map(|t| t.spaces.iter().filter(|sp| sp.placed_color == Some(color)).count()).sum();
-                            eprintln!("  Spieler {pi}: pattern_lines={pl} broken={broken} dome={dome}");
+                            let phantoms: Vec<(usize, usize, usize)> = p.pattern_lines.iter()
+                                .filter(|l| l.phantom_count > 0)
+                                .map(|l| (l.row_index, l.phantom_count, l.tiles.len()))
+                                .collect();
+                            eprintln!("  Spieler {pi}: pattern_lines={pl} broken={broken} dome={dome} phantom(row,cnt,tiles_len)={phantoms:?}");
                         }
                         eprintln!(
                             "  bag={bag} tower={tower} fac_sun={fac_sun} fac_moon={fac_moon} lf_sun={lf_sun} lf_moon={lf_moon}"
                         );
                     }
                     assert!(
-                        n >= TILES_PER_COLOR,
-                        "Spiel {gi}, Schritt {guard}, Phase {:?}: Farbe {color:?} zaehlt nur {n}, erwartet mindestens {TILES_PER_COLOR}",
+                        n == TILES_PER_COLOR,
+                        "Spiel {gi}, Schritt {guard}, Phase {:?}: Farbe {color:?} zaehlt {n}, erwartet genau {TILES_PER_COLOR}",
                         game.state.phase,
                     );
                 }
@@ -1956,6 +2097,83 @@ mod tests {
         // ausgewuerfelte Welten) fuer diese beiden Zufallsquellen ein No-Op.
         assert!(!all_bag_identical, "Beutel-Reihenfolge identisch ueber alle Wiederholungen -- Determinisierung wirkungslos");
         assert!(!all_dome_identical, "Kuppelstapel-Reihenfolge identisch ueber alle Wiederholungen -- Determinisierung wirkungslos");
+    }
+
+    /// `resolve_stack_draw` muss immer ein gueltiges, ausfuehrbares Ergebnis
+    /// liefern: num_drawn im erlaubten Bereich, chosen_id tatsaechlich unter
+    /// den obersten num_drawn Kacheln des ECHTEN (nicht resampleten) Pools --
+    /// unabhaengig davon, welches n am Ende gewaehlt wird.
+    #[test]
+    fn resolve_stack_draw_returns_valid_move() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = ids;
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let pool_len = state.dome_tile_pool.len();
+        assert!(pool_len > 1, "Test braucht einen Pool mit mehreren Kacheln");
+
+        let mv = resolve_stack_draw(&state, 0, 0, 0, &mut rng);
+        assert!(mv.num_drawn >= 1 && mv.num_drawn <= pool_len);
+        assert!(
+            state.dome_tile_pool[..mv.num_drawn].iter().any(|t| t.tile_id == mv.chosen_id),
+            "chosen_id {} nicht unter den obersten {} echten Stapelkacheln",
+            mv.chosen_id,
+            mv.num_drawn
+        );
+        assert!(validate_draw_from_stack(&state, &mv).is_none(), "Aufgeloester Zug muss gueltig sein");
+    }
+
+    /// Wenn eine Kachel um ein Vielfaches wertvoller ist als alle anderen im
+    /// Pool (hier kuenstlich uebertrieben: 4 Wild-Spaces + Bonus, real
+    /// erreichen Katalog-Kacheln das nie -- reine Mechanismus-Pruefung), muss
+    /// die Rollout-Mittelung das durch hoeheres `num_drawn` tendenziell
+    /// finden, statt immer bei n=1 (und damit stur der real fixen
+    /// Stapel-Reihenfolge) zu bleiben.
+    #[test]
+    fn resolve_stack_draw_tends_to_find_high_value_tile_when_worthwhile() {
+        use crate::dome::{DomeSpace, DomeTile};
+        let junk = || DomeTile::new(
+            0,
+            vec![
+                DomeSpace::normal(TileColor::Rot),
+                DomeSpace::normal(TileColor::Blau),
+                DomeSpace::normal(TileColor::Gelb),
+                DomeSpace::normal(TileColor::Schwarz),
+            ],
+            0,
+        );
+        let jackpot = DomeTile::new(
+            1,
+            vec![DomeSpace::wild(), DomeSpace::wild(), DomeSpace::wild(), DomeSpace::wild()],
+            3,
+        );
+
+        let mut hits = 0u32;
+        let trials = 30u64;
+        for seed in 0..trials {
+            let mut rng = StdRng::seed_from_u64(9000 + seed);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+            state.scoring_tile_ids = ids;
+            for p in state.players.iter_mut() {
+                p.start_tile_pending = false;
+            }
+            // Jackpot ganz unten im Stapel -- nur per hoeherem num_drawn erreichbar.
+            state.dome_tile_pool = vec![junk(), junk(), junk(), jackpot.clone()];
+            let mv = resolve_stack_draw(&state, 0, 0, 0, &mut rng);
+            if mv.chosen_id == jackpot.tile_id {
+                hits += 1;
+            }
+        }
+        // Reines n=1 mit Zufallsreihenfolge traefe die wertvolle Kachel nur zu
+        // 25% (1 von 4 Positionen) -- die Mittelung soll das deutlich schlagen.
+        assert!(
+            hits as f64 / trials as f64 > 0.5,
+            "wertvolle Kachel nur in {hits}/{trials} Laeufen gewaehlt -- Rollout-Mittelung findet sie nicht zuverlaessig, obwohl es sich klar lohnt"
+        );
     }
 
     #[test]

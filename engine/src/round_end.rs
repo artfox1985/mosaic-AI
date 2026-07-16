@@ -89,11 +89,17 @@ pub fn process_unplaceable_rows(player: &mut PlayerBoard, tower: &mut Tower) -> 
     for row_idx in find_unplaceable_rows(player) {
         let color = player.pattern_lines[row_idx].color.expect("unplatzierbare Reihe hat Farbe");
         let tiles: Vec<_> = std::mem::take(&mut player.pattern_lines[row_idx].tiles);
+        let phantom = player.pattern_lines[row_idx].phantom_count;
         player.pattern_lines[row_idx].color = None;
-        let n = tiles.len();
-        let to_tower = player.add_broken(&tiles);
+        player.pattern_lines[row_idx].phantom_count = 0;
+        // Nur ECHTE Fliesen zaehlen fuer Strafleiste/Turm -- Bonuschips geben
+        // rein virtuelle Fliesen (nie real gezogen), die Gesamtanzahl je
+        // Farbe im Spiel aendert sich dadurch nie (Nutzer-Bestaetigung).
+        let real_n = tiles.len().saturating_sub(phantom);
+        let real_tiles = vec![color; real_n];
+        let to_tower = player.add_broken(&real_tiles);
         tower.add(&to_tower);
-        moved.push((row_idx, color, n));
+        moved.push((row_idx, color, real_n));
     }
     moved
 }
@@ -196,10 +202,10 @@ fn execute_tiling_action(
     player_idx: usize,
     action: &TilingAction,
 ) -> Result<(), String> {
-    let (color, capacity) = {
+    let (color, capacity, phantom_count) = {
         let row = &state.players[player_idx].pattern_lines[action.pattern_row];
         let color = row.color.ok_or("Reihe hat keine Farbe")?;
-        (color, row.capacity())
+        (color, row.capacity(), row.phantom_count)
     };
 
     // Reihenfolge-Tracking + Musterreihe leeren (1 Stein auf Kuppel, Rest in Turm).
@@ -211,9 +217,14 @@ fn execute_tiling_action(
         let row = &mut p.pattern_lines[action.pattern_row];
         row.tiles.clear();
         row.color = None;
+        row.phantom_count = 0;
     }
-    if capacity > 1 {
-        let to_tower = vec![color; capacity - 1];
+    // Nur ECHTE Fliesen (nie per Bonuschip virtuell ergänzt) wandern in den
+    // Turm -- Phantom-Fliesen verschwinden einfach (waren nie real gezogen),
+    // sonst blähen sie über den Turm die feste Gesamtzahl je Farbe auf.
+    let real_remainder = (capacity - 1).saturating_sub(phantom_count);
+    if real_remainder > 0 {
+        let to_tower = vec![color; real_remainder];
         state.tower.add(&to_tower);
     }
 
@@ -559,6 +570,7 @@ pub fn apply_bonus_chips_with(player: &mut PlayerBoard, row_idx: usize, chip_ind
     for _ in 0..missing {
         player.pattern_lines[row_idx].tiles.push(color);
     }
+    player.pattern_lines[row_idx].phantom_count += missing;
     player.pattern_lines[row_idx].is_complete()
 }
 
