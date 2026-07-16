@@ -134,6 +134,10 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
             "capacity": row.capacity(),
             "tiles": row.tiles.iter().map(|t| t.value()).collect::<Vec<_>>(),
             "color": row.color.map(|c| c.value()),
+            // Anzahl der zuletzt hinzugefügten Fliesen (rechtes Ende von
+            // `tiles`), die per Bonuschip virtuell ergänzt wurden --
+            // Frontend zeigt sie weiß mit farbigem Rand statt voll gefüllt.
+            "phantom_count": row.phantom_count,
         })).collect::<Vec<_>>(),
         "dome_grid": p.dome_grid.dome_slots.iter().map(|row| {
             row.iter().map(|slot| serialize_dome_tile(slot.as_ref())).collect::<Vec<_>>()

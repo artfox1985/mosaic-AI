@@ -362,11 +362,14 @@ function renderBoard(pi) {
     const chipBtn = hasChips
       ? `<button onclick="event.stopPropagation();openChipModal(${pi},${ri})" style="font-size:9px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--bg);margin-left:2px" title="Bonusplättchen nutzen">🎫</button>`
       : '';
+    const phantomCount = row.phantom_count || 0;
     const cells = Array.from({length:row.capacity},(_,ci)=>{
       const tileIdx = ci - (row.capacity - row.tiles.length);
-      return tileIdx >= 0
-        ? `<div class="tile sm ${normColor(row.color)}"></div>`
-        : `<div class="tile sm empty"></div>`;
+      if (tileIdx < 0) return `<div class="tile sm empty"></div>`;
+      // Phantom-Fliesen (per Bonuschip ergänzt) sitzen am Ende von `tiles`
+      // (zuletzt gepusht) -- weiß mit farbigem Rand statt voll gefüllt.
+      const isPhantom = tileIdx >= row.tiles.length - phantomCount;
+      return `<div class="tile sm ${normColor(row.color)}${isPhantom ? ' phantom' : ''}"></div>`;
     }).join('');
     // Visueller Indikator: nächste fällige Tiling-Reihe
     const isNextTiling = isTiling && isPlaceable && allEarlierDone && row.tiles.length===row.capacity;

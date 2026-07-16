@@ -214,8 +214,13 @@ pub fn execute_take_bonus_chip(state: &mut GameState, m: &TakeBonusChipMove) -> 
 }
 
 /// Repräsentative Stapel-Züge (Aktion A): günstigste Variante (num_drawn=1,
-/// oberste Stapelkachel) in jeden freien Slot, Rotation 0. Die vollständige
-/// num_drawn/Rotations-Auswahl trifft später der Agent.
+/// oberste Stapelkachel) in jeden freien Slot × jede Rotation. `action_to_id`
+/// kodiert nur (Slot, Rotation) für `dome_stack` -- `num_drawn`/`chosen_id`
+/// fließen NICHT in die Policy-ID ein (wie `moon_order` bei Sonnenzügen) und
+/// werden erst nach der Zugwahl separat aufgelöst (siehe
+/// `self_play::resolve_stack_draw`, Rollout-Mittelung über die verdeckte
+/// Stapel-Reihenfolge -- die Menge ist bekannt via `dome_pool_mask`, nur die
+/// Reihenfolge nicht).
 pub fn generate_draw_stack_moves(state: &GameState) -> Vec<DrawFromStackMove> {
     let player = &state.players[state.current_player];
     if state.round_number >= 5
@@ -226,18 +231,19 @@ pub fn generate_draw_stack_moves(state: &GameState) -> Vec<DrawFromStackMove> {
         return Vec::new();
     }
     let chosen_id = state.dome_tile_pool[0].tile_id;
-    player
-        .dome_grid
-        .empty_slots()
-        .into_iter()
-        .map(|(sr, sc)| DrawFromStackMove {
-            num_drawn: 1,
-            chosen_id,
-            slot_row: sr,
-            slot_col: sc,
-            rotation: 0,
-        })
-        .collect()
+    let mut moves = Vec::new();
+    for (sr, sc) in player.dome_grid.empty_slots() {
+        for &rotation in &[0u32, 90, 180, 270] {
+            moves.push(DrawFromStackMove {
+                num_drawn: 1,
+                chosen_id,
+                slot_row: sr,
+                slot_col: sc,
+                rotation,
+            });
+        }
+    }
+    moves
 }
 
 pub fn generate_bonus_chip_moves(state: &GameState) -> Vec<TakeBonusChipMove> {

@@ -347,7 +347,22 @@ def action_to_id(action: dict) -> int:
 # noch Differenzierung möglich bleibt. Deutlich gröber als eine "saubere"
 # Herleitung, aber begründeter als eine an aktueller Schwäche kalibrierte Zahl.
 # VALUE_SCHEMA_VERSION erzwingt einen Cache-Rebuild bei Änderungen an dieser Formel.
-VALUE_SCHEMA_VERSION = 9
+#
+# Zwei getrennte Ziele, zwei Köpfe (Value-Head zurückgeholt, siehe
+# evaluations/stage2_investigation.md fuer die Historie -- Stufe 2/Netz-Value-
+# Blatt in der SUCHE bleibt weiterhin tot, das hier ist reines Trainings-
+# Zusatzsignal fuer den gemeinsamen Trunk):
+#   - `values`     : reines Sieg/Niederlage-Ziel (+1/-1, wer hat GEWONNEN),
+#                    der klassische AlphaZero-Value-Head. Einfacher/robuster
+#                    als ein Punktestand-Regressionsziel (siehe
+#                    feedback_value_head_capacity.md: die alte reine
+#                    Punktestand-Variante blieb bei Val-R² 0.27-0.34 haengen,
+#                    vermutlich irreduzibles Ziel-Rauschen).
+#   - `points_forecast`: die alte Punktestand-Formel als separater Aux-Head
+#                    (tanh(eigen/SCALE) - EPSILON*tanh(gegner/SCALE)) -- liefert
+#                    dem Trunk ein feineres, kontinuierliches Zusatzsignal
+#                    ohne dass die SUCHE (Stage 1/3) je darauf zugreift.
+VALUE_SCHEMA_VERSION = 10
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
@@ -386,6 +401,10 @@ class MosaicDataset(Dataset):
                     self.policy_weights = torch.from_numpy(hf['policy_weights'][:])
                 else:  # alter Cache ohne Gewicht → alle 1.0
                     self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)
+                if 'points_forecast' in hf:
+                    self.points_forecast = torch.from_numpy(hf['points_forecast'][:])
+                else:  # alter Cache ohne Aux-Ziel → 0.0 (wird durch VALUE_SCHEMA_VERSION eh selten erreicht)
+                    self.points_forecast = torch.zeros_like(self.values)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -403,6 +422,7 @@ class MosaicDataset(Dataset):
                 mot = [torch.full((5,), -1.0) for _ in self.states]
             self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
             self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
+            self.points_forecast = torch.zeros_like(self.values)  # Legacy .pt kennt kein Aux-Ziel
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',             data=self.states.numpy(),             compression='lzf')
@@ -411,6 +431,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('masks',              data=self.masks.numpy(),              compression='lzf')
                 hf.create_dataset('moon_order_targets', data=self.moon_order_targets.numpy(), compression='lzf')
                 hf.create_dataset('policy_weights',     data=self.policy_weights.numpy(),     compression='lzf')
+                hf.create_dataset('points_forecast',    data=self.points_forecast.numpy(),    compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -421,6 +442,7 @@ class MosaicDataset(Dataset):
             _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
             polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
+            points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
 
             for f in files:
                 with open(f, "rb") as file:
@@ -428,16 +450,22 @@ class MosaicDataset(Dataset):
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
-                            # Partie-Endergebnis als Ziel für JEDEN Schritt (siehe
-                            # VALUE_SCHEMA_VERSION oben) — bereits inkl. Wertungsplatten.
+                            # Sieg/Niederlage als Hauptziel (klassischer AlphaZero-
+                            # Value-Head) -- einfacher/robuster als eine
+                            # Punktestand-Regression (siehe VALUE_SCHEMA_VERSION).
                             p = step["player"]
+                            val = 1.0 if step["winner"] == p else -1.0
+                            # Punktestand-Formel bleibt als separates Aux-Ziel
+                            # erhalten (bereits inkl. Wertungsplatten).
                             own_total = float(step["scores"][p])
                             opp_total = float(step["scores"][1 - p])
-                            val = (math.tanh(own_total / VALUE_SCALE)
-                                   - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
+                            points_val = (math.tanh(own_total / VALUE_SCALE)
+                                          - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
                         else:
                             val = float(step["value"])
+                            points_val = val
                         values_l.append([val])
+                        points_l.append([points_val])
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for p in step["policy"]:
@@ -484,12 +512,13 @@ class MosaicDataset(Dataset):
             masks_np    = np.array(masks_l,    dtype=np.float32)
             moon_np     = np.array(moon_l,     dtype=np.float32)
             polw_np     = np.array(polw_l,     dtype=np.float32)
+            points_np   = np.array(points_l,   dtype=np.float32)
             # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
             # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
             # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
             # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
             # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
-            del states_l, policies_l, values_l, masks_l, moon_l, polw_l
+            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -501,6 +530,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('masks',              data=masks_np,    compression='lzf')
                 hf.create_dataset('moon_order_targets', data=moon_np,     compression='lzf')
                 hf.create_dataset('policy_weights',     data=polw_np,     compression='lzf')
+                hf.create_dataset('points_forecast',    data=points_np,   compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -509,18 +539,19 @@ class MosaicDataset(Dataset):
             self.masks              = torch.from_numpy(masks_np)
             self.moon_order_targets = torch.from_numpy(moon_np)
             self.policy_weights     = torch.from_numpy(polw_np)
+            self.points_forecast    = torch.from_numpy(points_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
 
     def __len__(self): return len(self.states)
     def __getitem__(self, idx):
         return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
-                self.moon_order_targets[idx], self.policy_weights[idx])
+                self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx])
 
 
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
-                 policy_hidden=256):
+                 policy_hidden=256, value_hidden=64):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
             nn.Linear(input_size, hidden_size),
@@ -566,10 +597,35 @@ class MosaicNet(nn.Module):
             nn.ReLU(),
             nn.Linear(32, 5)   # 5 Farben: blau, gelb, rot, schwarz, türkis
         )
+        # Value-Head: Sieg/Niederlage (+1/-1), klassisches AlphaZero-Ziel --
+        # zurueckgeholt, aber NICHT mehr fuer die Suche gedacht (Stufe 2 bleibt
+        # tot, siehe evaluations/stage2_investigation.md), sondern als
+        # Trainings-Zusatzsignal fuer den gemeinsamen Trunk.
+        self.value_head = nn.Sequential(
+            nn.Linear(hidden_size, value_hidden),
+            nn.ReLU(),
+            nn.Linear(value_hidden, 1),
+            nn.Tanh()
+        )
+        # Punktestand-Prognose-Head (Aux-Ziel): dieselbe tanh-gestauchte
+        # Punktedifferenz-Formel, die frueher der einzige Value-Head war --
+        # jetzt als separater, feinerer Regressions-Kopf NEBEN dem robusteren
+        # Sieg/Niederlage-Ziel (siehe VALUE_SCHEMA_VERSION in neural_net.py).
+        self.points_head = nn.Sequential(
+            nn.Linear(hidden_size, value_hidden),
+            nn.ReLU(),
+            nn.Linear(value_hidden, 1),
+            nn.Tanh()
+        )
 
     def forward(self, x):
         shared = self.body(x)
-        return (self.policy_head(shared), self.moon_order_head(shared))
+        return (
+            self.policy_head(shared),
+            self.value_head(shared),
+            self.moon_order_head(shared),
+            self.points_head(shared),
+        )
 
     @torch.no_grad()
     def analyze_capacity(self, x):

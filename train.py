@@ -46,7 +46,7 @@ def plackett_luce_moon_loss(pred_moon, moon_targets):
     return total_nll
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE
+from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, POINTS_WEIGHT
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
@@ -103,6 +103,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"⚙️  Hyperparameter (config.py):")
     print(f"   Learning Rate : {LEARNING_RATE}")
     print(f"   Batch Size    : {BATCH_SIZE}")
+    print(f"   Value Weight  : {VALUE_WEIGHT}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)")
+    print(f"   Points Weight : {POINTS_WEIGHT}  (Punktestand-Prognose, Aux-Signal)")
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
 
     # Warm Start?
@@ -145,8 +147,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # --------------------------------------
 
     # 5. DIE SCHLEIFE
+    mse_loss = nn.MSELoss()
     n_batches = len(dataloader)
     policy_history  = []
+    value_history   = []
+    points_history  = []
     val_ploss_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
@@ -163,28 +168,38 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             import matplotlib
             import matplotlib.pyplot as plt
             plt.ion()
-            fig, ax = plt.subplots(figsize=(8, 5))
+            fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
             fig.suptitle(f"Training {version_name}")
-            ax.set_ylabel("Policy Loss")
-            ax.set_xlabel("Epoche")
-            (line_policy,) = ax.plot([], [], label="Policy", color="tab:orange")
-            ax.legend(loc="upper right")
-            plot = {"fig": fig, "ax": ax, "line_policy": line_policy, "plateau_line": None}
+            ax_top.set_ylabel("Policy Loss")
+            ax_bot.set_ylabel("Value / Points Loss (Aux)")
+            ax_bot.set_xlabel("Epoche")
+            (line_policy,) = ax_top.plot([], [], label="Policy", color="tab:orange")
+            (line_value,) = ax_bot.plot([], [], label="Value", color="tab:green")
+            (line_points,) = ax_bot.plot([], [], label="Points", color="tab:purple")
+            ax_top.legend(loc="upper right")
+            ax_bot.legend(loc="upper right")
+            plot = {
+                "fig": fig, "ax": ax_top, "ax_bot": ax_bot,
+                "line_policy": line_policy, "line_value": line_value, "line_points": line_points,
+                "plateau_line": None,
+            }
         except Exception as e:
             print(f"⚠️  Live-Plot deaktiviert (kein Display?): {e}")
             plot = None
 
     for epoch in range(epochs):
-        t_loss, t_ploss = 0, 0
+        t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
 
-        for states, targets_p, _targets_v, masks, moon_targets, pol_w in dataloader:
+        for states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
+            targets_v = targets_v.to(device)
+            targets_points = targets_points.to(device)
             masks     = masks.to(device)
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_moon = model(states)
+            pred_p, pred_v, pred_moon, pred_points = model(states)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -212,16 +227,29 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
                 p_loss = p_loss + moon_nll[sun_mask].mean()
 
-            loss = p_loss
+            # Value-/Punkte-Aux-Losses: reines Trainings-Zusatzsignal fuer den
+            # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
+            # evaluations/stage2_investigation.md) -- klein gewichtet, damit
+            # sie den Policy-Loss nicht dominieren.
+            v_loss = mse_loss(pred_v, targets_v)
+            points_loss = mse_loss(pred_points, targets_points)
+
+            loss = p_loss + VALUE_WEIGHT * v_loss + POINTS_WEIGHT * points_loss
             loss.backward()
             optimizer.step()
 
-            t_loss  += loss.item()
-            t_ploss += p_loss.item()
+            t_loss       += loss.item()
+            t_ploss      += p_loss.item()
+            t_vloss      += v_loss.item()
+            t_pointsloss += points_loss.item()
 
         epoch_ploss = t_ploss / n_batches
+        epoch_vloss = t_vloss / n_batches
+        epoch_pointsloss = t_pointsloss / n_batches
         epoch_tloss = t_loss / n_batches
         policy_history.append(epoch_ploss)
+        value_history.append(epoch_vloss)
+        points_history.append(epoch_pointsloss)
         total_history.append(epoch_tloss)
 
         # ── Validierung (Policy) auf dem NIE trainierten Datei-Split ────────
@@ -230,12 +258,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             model.eval()
             val_ploss_sum, val_batches = 0.0, 0
             with torch.no_grad():
-                for v_states, v_targets_p, _v_targets_v, v_masks, _vmoon, v_pol_w in val_dataloader:
+                for v_states, v_targets_p, _v_targets_v, v_masks, _vmoon, v_pol_w, _v_targets_points in val_dataloader:
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
-                    v_pred_p, _ = model(v_states)
+                    v_pred_p, _v_pred_v, _v_pred_moon, _v_pred_points = model(v_states)
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
@@ -267,12 +295,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             try:
                 xs = list(range(1, len(total_history) + 1))
                 plot["line_policy"].set_data(xs, policy_history)
+                plot["line_value"].set_data(xs, value_history)
+                plot["line_points"].set_data(xs, points_history)
                 if policy_plateau_since is not None and plot["plateau_line"] is None:
                     plot["plateau_line"] = plot["ax"].axvline(
                         policy_plateau_since, color="red", linestyle="--", alpha=0.5, label="Plateau")
                     plot["ax"].legend(loc="upper right")
                 plot["ax"].relim()
                 plot["ax"].autoscale_view()
+                plot["ax_bot"].relim()
+                plot["ax_bot"].autoscale_view()
                 plot["fig"].canvas.draw()
                 plot["fig"].canvas.flush_events()
                 import matplotlib.pyplot as _plt
@@ -281,7 +313,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plot = None  # Fenster evtl. geschlossen o.ä. — Rest ohne Plot weiterlaufen
 
         val_p_str = f" | Policy-Val={epoch_val_ploss:5.2f}" if epoch_val_ploss is not None else ""
-        print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str}{plateau_marker}")
+        print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{plateau_marker}")
 
         # ── Early Stopping (nur bei Policy-Plateau) ──────────────────────────
         if policy_plateau_since is not None:
@@ -317,6 +350,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"  Batches/Epoche:{n_batches}")
     print(f"{'─'*55}")
     print(f"  Policy Loss:   {final_p:.4f} / {max_loss:.2f} max  ({pct:.1f}%)  {quality}")
+    print(f"  Value Loss:    {value_history[-1]:.4f}  (Aux, Sieg/Niederlage +1/-1)")
+    print(f"  Points Loss:   {points_history[-1]:.4f}  (Aux, Punktestand-Prognose)")
     final_val_ploss = None
     for v in reversed(val_ploss_history):
         if v is not None:
@@ -384,6 +419,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "lr":                LEARNING_RATE,
         "final_policy_loss": round(final_p, 4),
         "final_policy_val_loss": round(final_val_ploss, 4) if final_val_ploss is not None else None,
+        "final_value_loss":  round(value_history[-1], 4),
+        "final_points_loss": round(points_history[-1], 4),
+        "value_weight":      VALUE_WEIGHT,
+        "points_weight":     POINTS_WEIGHT,
         "val_frac":          val_frac,
         "num_val_games":     len(val_dataset) if val_dataset is not None else 0,
         "policy_pct":        round(pct, 1),

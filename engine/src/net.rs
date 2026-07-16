@@ -1,11 +1,13 @@
 //! ONNX-Netz-Inferenz via tract-onnx (Network-Modus, Phase B).
 //!
 //! Lädt ein nach ONNX exportiertes MosaicNet (`export_onnx.py`) und liefert
-//! `(policy_logits[NUM_ACTIONS], moon_logits[5])`. Kein Value-Head mehr (siehe
-//! stage2_investigation.md: Stufe 2 brauchte ihn, wird nicht mehr verfolgt;
-//! Stufe 1/3 nutzen ohnehin nur die Policy + den exakten DFS-Solver). Reines
-//! Rust — keine libtorch/onnxruntime-Abhängigkeit. Batch fix = 1 (eine
-//! Stellung pro Forward).
+//! `(policy_logits[NUM_ACTIONS], value[1], moon_logits[5], points[1])`.
+//! `value`/`points` sind reine Trainings-Zusatzsignale (siehe
+//! stage2_investigation.md: Stufe 2/Netz-Value-Blatt in der SUCHE bleibt
+//! tot) -- Stufe 1/3 nutzen weiterhin nur Policy + den exakten DFS-Solver,
+//! lesen die beiden Werte also nirgends aus. Reines Rust — keine
+//! libtorch/onnxruntime-Abhängigkeit. Batch fix = 1 (eine Stellung pro
+//! Forward).
 
 use tract_onnx::prelude::*;
 
@@ -29,14 +31,17 @@ impl Net {
         Ok(Net { model, input_size })
     }
 
-    /// Forward-Pass für eine Stellung. Gibt (policy_logits, moon_logits).
-    pub fn eval(&self, feats: &[f32]) -> TractResult<(Vec<f32>, Vec<f32>)> {
+    /// Forward-Pass für eine Stellung. Gibt (policy_logits, value, moon_logits,
+    /// points) -- ONNX-Ausgabereihenfolge aus `export_onnx.py`.
+    pub fn eval(&self, feats: &[f32]) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
         let input: Tensor =
             tract_ndarray::Array2::from_shape_vec((1, self.input_size), feats.to_vec())?.into();
         let out = self.model.run(tvec!(input.into()))?;
         let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        Ok((policy, moon))
+        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+        Ok((policy, value, moon, points))
     }
 }
 

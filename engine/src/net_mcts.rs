@@ -222,8 +222,10 @@ fn make_node(
     let terminal = state.phase != Phase::Drafting;
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
-    let (logits, moon) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new()))
+    // value/points sind reine Trainings-Zusatzsignale (siehe net.rs) -- die
+    // Suche liest hier nur logits/moon, genau wie vor der Value-Head-Rueckkehr.
+    let (logits, _value, moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
     });
 
     let mut moon_scores = [0f32; 5];
