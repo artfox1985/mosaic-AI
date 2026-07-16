@@ -44,6 +44,22 @@ fn dome_pool_mask(state: &GameState) -> [u8; crate::dome::NUM_DOME_TILE_DESIGNS]
     mask
 }
 
+/// Wild-Anteil der noch verdeckten Stapelplatten (0.5 = neutral, wenn leer)
+/// -- explizites Aggregat ergaenzend zu `dome_pool_mask`: die Rueckseite
+/// verraet beim Ziehen nur den Typ (Special/Wild, `DomeTile::is_special_type`),
+/// nicht die Vorderseite. Relevant z.B. bei der "-3 je offenes Spezialfeld"-
+/// Wertungsplatte, um abzuschaetzen ob die naechste gezogene Platte eher
+/// Wild oder Special ist (Nutzer-Anstoss). Direkt aus der Maske ableitbar,
+/// aber als eigenes Feld spart es Netz/Python-Seite die 18er-Summation.
+fn dome_wild_remaining_frac(state: &GameState) -> f64 {
+    let total = state.dome_tile_pool.len();
+    if total == 0 {
+        return 0.5;
+    }
+    let wild = state.dome_tile_pool.iter().filter(|t| !t.is_special_type()).count();
+    wild as f64 / total as f64
+}
+
 fn space_type_name(t: SpaceType) -> &'static str {
     match t {
         SpaceType::Normal => "NORMAL",
@@ -218,10 +234,23 @@ pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
         "moon_top_colors": moon_colors,
         "dome_display": state.dome_display.iter().map(|t| serialize_dome_tile(Some(t))).collect::<Vec<_>>(),
         "dome_stack_count": state.dome_tile_pool.len(),
+        // Rückseite der OBERSTEN Stapelplatte -- am physischen Tisch für
+        // beide Spieler jederzeit sichtbar (Nutzer-Anstoss), nicht erst beim
+        // Ziehen. Nur die Vorderseite (Farbanordnung) bleibt bis zum
+        // tatsächlichen Ziehen verdeckt.
+        "dome_stack_top_type": state.dome_tile_pool.first().map(|t| {
+            if t.is_special_type() { "special" } else { "wild" }
+        }),
+        // Bereits gezogene, aber noch nicht gewählte Platten des laufenden
+        // Stapel-Zugs (Aktion A) -- Rückseite zeigt beim Ziehen nur den Typ,
+        // hier vereinfacht schon mit voller Vorderseite serialisiert (wie
+        // dome_display), sobald mind. 1 gezogen ist.
+        "pending_stack_draw": state.pending_stack_draw.iter().map(|t| serialize_dome_tile(Some(t))).collect::<Vec<_>>(),
         "bag_count": state.bag.count(),
         "bag_colors": color_counts(&state.bag.tiles),
         "tower_colors": color_counts(&state.tower.tiles),
         "dome_pool_mask": dome_pool_mask(state),
+        "dome_wild_remaining_frac": dome_wild_remaining_frac(state),
         "players": players,
         "log": state.log.iter().rev().take(30).rev().cloned().collect::<Vec<_>>(),
         "valid_moves": serialize_valid_moves(state),
@@ -282,13 +311,14 @@ pub fn action_to_dict(a: &Action) -> Value {
             "slot_col": m.slot_col,
             "rotation": m.rotation,
         }),
+        Action::DrawStackPeek => json!({ "type": "dome_stack_peek" }),
         Action::DrawStack(m) => json!({
             "type": "dome_stack",
-            "num_drawn": m.num_drawn,
             "chosen_id": m.chosen_id,
             "slot_row": m.slot_row,
             "slot_col": m.slot_col,
             "rotation": m.rotation,
+            "return_order": m.return_order,
         }),
         Action::BonusChip(m) => json!({ "type": "bonus_chip", "factory_id": m.factory_id }),
         Action::Pass => json!({ "type": "pass" }),
@@ -322,6 +352,25 @@ fn serialize_valid_moves(state: &GameState) -> Value {
 
     let mut moves: Vec<Value> = Vec::new();
 
+    // Mitten in einem Stapel-Zug (Aktion A): NUR weiterziehen oder eine der
+    // gezogenen Platten wählen -- keine andere Aktion (siehe game::drafting_actions).
+    if !state.pending_stack_draw.is_empty() {
+        if crate::game::can_draw_stack_peek(state) {
+            moves.push(json!({ "type": "dome_stack_peek" }));
+        }
+        for m in crate::game::generate_draw_stack_moves(state) {
+            moves.push(json!({
+                "type": "dome_stack_choose",
+                "chosen_id": m.chosen_id,
+                "slot_row": m.slot_row,
+                "slot_col": m.slot_col,
+                "rotation": m.rotation,
+                "return_order": m.return_order,
+            }));
+        }
+        return Value::Array(moves);
+    }
+
     // Stein-Züge (Aktion B + globaler Mond-Zug aus generate_valid_moves).
     for m in generate_valid_moves(state) {
         moves.push(json!({
@@ -345,15 +394,9 @@ fn serialize_valid_moves(state: &GameState) -> Value {
         }));
     }
 
-    // Aktion A: verdeckt vom Stapel ziehen.
-    let p = &state.players[state.current_player];
-    if !p.start_tile_pending
-        && p.can_place_dome_tile(state.round_number)
-        && !state.dome_tile_pool.is_empty()
-        && state.round_number < 5
-        && !p.has_used_all_tokens(state.round_number)
-    {
-        moves.push(json!({ "type": "dome_stack" }));
+    // Aktion A: verdeckt vom Stapel ziehen (Schritt 1, startet einen neuen Zieh-Vorgang).
+    if crate::game::can_draw_stack_peek(state) {
+        moves.push(json!({ "type": "dome_stack_peek" }));
     }
 
     // Bonusplättchen.

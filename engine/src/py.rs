@@ -11,7 +11,6 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 
-use crate::dome::SpaceType;
 use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
 use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_json, search_with_tree, SearchMove};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
@@ -188,9 +187,43 @@ impl PyGame {
         map_err(self.game.apply_drafting(&Action::Dome(m)))
     }
 
-    #[pyo3(signature = (num_drawn, chosen_id, slot_row, slot_col, rotation=0))]
-    fn apply_dome_stack(&mut self, num_drawn: usize, chosen_id: usize, slot_row: usize, slot_col: usize, rotation: u32) -> PyResult<()> {
-        let m = DrawFromStackMove { num_drawn, chosen_id, slot_row, slot_col, rotation };
+    /// Aktion A, Schritt 1: eine weitere verdeckte Kuppelplatte ziehen (−1
+    /// Pkt). Gibt den Typ zurück (Rückseite: "special"/"wild"), NICHT die
+    /// Vorderseite -- der Zug endet nicht, `apply_dome_stack_choose` oder ein
+    /// weiterer `apply_dome_stack_peek` folgt.
+    fn apply_dome_stack_peek(&mut self) -> PyResult<String> {
+        map_err(self.game.apply_drafting(&Action::DrawStackPeek))?;
+        let last = self.game.state.pending_stack_draw.last().ok_or_else(|| {
+            PyValueError::new_err("Keine Kachel gezogen (interner Fehler).")
+        })?;
+        Ok(if last.is_special_type() { "special".into() } else { "wild".into() })
+    }
+
+    /// `return_order`: Reihenfolge, in der die NICHT gewählten gezogenen
+    /// Platten zurück unter den Stapel gelegt werden (Regelwerk: "in
+    /// beliebiger Reihenfolge") -- tile_ids, erstes Element zuerst
+    /// zurückgelegt. `None`/weggelassen füllt die Ziehreihenfolge (kanonisch,
+    /// wie bei der KI) -- bei ≤1 übriger Platte ohnehin die einzig mögliche
+    /// Reihenfolge, das Frontend fragt den Menschen nur bei 2+ übrigen.
+    #[pyo3(signature = (chosen_id, slot_row, slot_col, rotation=0, return_order=None))]
+    fn apply_dome_stack_choose(
+        &mut self,
+        chosen_id: usize,
+        slot_row: usize,
+        slot_col: usize,
+        rotation: u32,
+        return_order: Option<Vec<usize>>,
+    ) -> PyResult<()> {
+        let return_order = return_order.unwrap_or_else(|| {
+            self.game
+                .state
+                .pending_stack_draw
+                .iter()
+                .filter(|t| t.tile_id != chosen_id)
+                .map(|t| t.tile_id)
+                .collect()
+        });
+        let m = DrawFromStackMove { chosen_id, slot_row, slot_col, rotation, return_order };
         map_err(self.game.apply_drafting(&Action::DrawStack(m)))
     }
 
@@ -405,45 +438,12 @@ impl PyGame {
         search_log_text(&self.game.state, sims, AI_C, &mut self.rng)
     }
 
-    /// Platziert die Startkachel der KI per einfacher Farb-Häufigkeits-Heuristik.
+    /// Platziert die Startkachel der KI per einfacher Farb-Häufigkeits-Heuristik
+    /// (gemeinsamer Helfer mit Self-Play/Arena, siehe `self_play::choose_start_placement`).
     /// Gibt das gewählte Move-Dict zurück.
     fn ai_start_tile_json(&mut self, player: usize) -> PyResult<String> {
-        let counts = sun_color_counts(&self.game.state);
-        let empties = self.game.state.players[player].dome_grid.empty_slots();
-        if empties.is_empty() {
-            return Err(PyValueError::new_err("Kein freier Slot für die Startkachel."));
-        }
-
-        let mut best: Option<(f64, usize, usize, usize, u32)> = None; // (score, tile_id, r, c, rot)
-        for tile in &self.game.state.dome_display {
-            for &(r, c) in &empties {
-                let corner_bonus = if (r == 0 || r == 2) && (c == 0 || c == 2) { 0.5 } else { 0.0 };
-                for &rot in &[0u32, 90, 180, 270] {
-                    let spaces = match tile.rotated_spaces(rot) {
-                        Ok(s) => s,
-                        Err(_) => continue,
-                    };
-                    let mut score = corner_bonus;
-                    for sp in &spaces {
-                        score += match sp.space_type {
-                            SpaceType::Normal => sp
-                                .required_color
-                                .and_then(color_index)
-                                .map(|i| counts[i] as f64)
-                                .unwrap_or(0.0),
-                            SpaceType::Wild => *counts.iter().max().unwrap_or(&0) as f64,
-                            SpaceType::Special => 0.0,
-                        };
-                    }
-                    if best.map_or(true, |(b, ..)| score > b) {
-                        best = Some((score, tile.tile_id, r, c, rot));
-                    }
-                }
-            }
-        }
-
-        let (_score, tile_id, r, c, rot) =
-            best.ok_or_else(|| PyValueError::new_err("Keine Startkachel platzierbar."))?;
+        let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&self.game.state, player)
+            .ok_or_else(|| PyValueError::new_err("Keine Startkachel platzierbar."))?;
         map_err(apply_start_placement(&mut self.game.state, player, tile_id, r, c, rot))?;
         Ok(json!({
             "type": "dome",
@@ -539,15 +539,14 @@ impl PyGame {
             None
         };
 
+        // Heuristik (Stufe 1) braucht die sequenzielle Stapel-Zieh-Aufloesung
+        // nicht (Nutzer-Vorgabe) -- einfach die gewaehlte Aktion einmalig
+        // anwenden. Bei DrawStackPeek endet der Zug nicht; ein Folgeaufruf
+        // dieser Methode (naechster KI-Zug) entscheidet dann ganz normal
+        // ueber weiterziehen/waehlen, wie der Rest der Heuristik-Suche auch.
+        let action_json = search_move_json(&mv, Some(&self.game.state));
         let SearchMove::Draft(a) = &mv;
-        // Stapel-Zieh-Menge/-Kachel sind nicht Teil der Policy-ID (siehe
-        // resolve_chosen_action) -- erst hier, direkt vor dem Anwenden,
-        // aufloesen, und Anzeige-JSON/Log NACH der Aufloesung bauen, damit sie
-        // zum tatsaechlich ausgefuehrten Zug passen.
-        let resolved = crate::self_play::resolve_chosen_action(&self.game.state, a.clone(), &mut self.rng);
-        let resolved_mv = SearchMove::Draft(resolved.clone());
-        let action_json = search_move_json(&resolved_mv, Some(&self.game.state));
-        map_err(self.game.apply_drafting(&resolved))?;
+        map_err(self.game.apply_drafting(a))?;
 
         let mut obj = serde_json::Map::new();
         obj.insert("applied".into(), json!(true));
@@ -607,9 +606,12 @@ impl PyGame {
             None
         };
 
-        let resolved = crate::self_play::resolve_chosen_action(&self.game.state, a, &mut self.rng);
-        let action_json = search_move_json(&SearchMove::Draft(resolved.clone()), Some(&self.game.state));
-        map_err(self.game.apply_drafting(&resolved))?;
+        // Stufe 2 (Netz): DrawStackPeek wird ueber apply_chosen_action komplett
+        // aufgeloest (mehrere echte Zuege bis Wahl+Platzierung) -- die
+        // zurueckgegebene Aktion ist die tatsaechlich final ausgefuehrte
+        // (bei DrawStackPeek also das konkrete DrawStack, nicht der Peek).
+        let resolved = crate::self_play::apply_chosen_action(&mut self.game, a);
+        let action_json = search_move_json(&SearchMove::Draft(resolved), Some(&self.game.state));
 
         let mut obj = serde_json::Map::new();
         obj.insert("applied".into(), json!(true));
@@ -697,30 +699,6 @@ impl PyGame {
         })
         .to_string())
     }
-}
-
-/// Index einer Normalfarbe in `TileColor::NORMAL` (None für Wild).
-fn color_index(c: TileColor) -> Option<usize> {
-    TileColor::NORMAL.iter().position(|&x| x == c)
-}
-
-/// Zählt die Sun-Steine je Normalfarbe über alle Fabriken + Tischmitte.
-fn sun_color_counts(state: &crate::state::GameState) -> [usize; 5] {
-    let mut counts = [0usize; 5];
-    let mut bump = |c: TileColor| {
-        if let Some(i) = color_index(c) {
-            counts[i] += 1;
-        }
-    };
-    for f in &state.factories {
-        for &t in &f.sun_tiles {
-            bump(t);
-        }
-    }
-    for &t in &state.large_factory.sun_tiles {
-        bump(t);
-    }
-    counts
 }
 
 #[cfg(test)]

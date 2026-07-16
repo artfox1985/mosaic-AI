@@ -276,6 +276,21 @@ function normColor(c) {
   return low === 'türkis' ? 'tuerkis' : low;
 }
 
+// Rückseite der obersten Kuppelstapel-Platte -- an einem physischen Tisch
+// für ALLE Spieler jederzeit sichtbar (Nutzer-Anstoss), nicht erst beim
+// Ziehen. `S.dome_stack_top_type` kommt direkt vom Server (state.dome_tile_pool[0]),
+// ist also fuer beide Spieler gleichermassen Teil des gemeinsamen Zustands.
+function stackTopTypeIcon() {
+  if (S.dome_stack_top_type === 'special') return '⭐';
+  if (S.dome_stack_top_type === 'wild') return '🃏';
+  return '📦';
+}
+function stackTopTypeLabel() {
+  if (S.dome_stack_top_type === 'special') return ' (⭐ Special oben)';
+  if (S.dome_stack_top_type === 'wild') return ' (🃏 Wild oben)';
+  return '';
+}
+
 
 function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
   const color = sp.color || sp.req_color || sp.color_id || '';
@@ -364,10 +379,15 @@ function renderBoard(pi) {
       : '';
     const phantomCount = row.phantom_count || 0;
     const cells = Array.from({length:row.capacity},(_,ci)=>{
-      const tileIdx = ci - (row.capacity - row.tiles.length);
-      if (tileIdx < 0) return `<div class="tile sm empty"></div>`;
-      // Phantom-Fliesen (per Bonuschip ergänzt) sitzen am Ende von `tiles`
-      // (zuletzt gepusht) -- weiß mit farbigem Rand statt voll gefüllt.
+      const emptyCount = row.capacity - row.tiles.length;
+      if (ci < emptyCount) return `<div class="tile sm empty"></div>`;
+      // Musterreihen füllen sich von rechts (an der Kuppel/Wand) nach links --
+      // die zuerst gezogene Fliese liegt also ganz rechts, die zuletzt
+      // hinzugefügte ganz links. Phantom-Fliesen (per Bonuschip ergänzt)
+      // sitzen am Ende von `tiles` (zuletzt gepusht) und damit visuell GANZ
+      // LINKS -- weiß mit farbigem Rand statt voll gefüllt. tileIdx zählt
+      // daher von rechts nach links (ci=capacity-1 → tileIdx=0).
+      const tileIdx = row.capacity - 1 - ci;
       const isPhantom = tileIdx >= row.tiles.length - phantomCount;
       return `<div class="tile sm ${normColor(row.color)}${isPhantom ? ' phantom' : ''}"></div>`;
     }).join('');
@@ -699,7 +719,7 @@ function renderCenter() {
 document.getElementById('factories-area').innerHTML = `
     <div class="lbl" style="display:flex;justify-content:space-between">
       <span>Kuppelplatten (${S.dome_display.length}/3)</span>
-      <span style="color:var(--text3)">Stapel: ${S.dome_stack_count}</span>
+      <span style="color:var(--text3)">Stapel: ${S.dome_stack_count}${stackTopTypeLabel()}</span>
     </div>
     <div class="display-g">${displayHTML || '<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
     ${(() => {
@@ -709,7 +729,7 @@ document.getElementById('factories-area').innerHTML = `
         && cp.can_place_dome
         && S.dome_stack_count > 0;
       return canStack ? `<button class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
-        📦 Vom Stapel ziehen (−1 Pkt/Karte) · ${S.dome_stack_count} verfügbar
+        ${stackTopTypeIcon()} Vom Stapel ziehen (−1 Pkt/Karte) · ${S.dome_stack_count} verfügbar
       </button>` : '';
     })()}
     <div class="sep"></div>
@@ -851,8 +871,12 @@ const sdiv = document.getElementById('scoring-display');
     lines.push(`<div class="le" style="padding:2px 0">🧩 Kuppelplatte aus Display: ${ids.map(id=>'#'+id).join(', ')}</div>`);
   }
 
+  if(byType['dome_stack_peek']) {
+    lines.push(`<div class="le" style="padding:2px 0">📦 Verdeckt vom Stapel ziehen (−1 Pkt)</div>`);
+  }
+
   if(byType['dome_stack']) {
-    lines.push(`<div class="le" style="padding:2px 0">📦 Kuppelplatte vom Stapel (−1 Pkt/Karte)</div>`);
+    lines.push(`<div class="le" style="padding:2px 0">📦 Kuppelplatte vom Stapel wählen</div>`);
   }
 
   if(byType['bonus_chip']) {
@@ -1106,13 +1130,11 @@ function openStackPicker() {
   if(!(S.dome_stack_count > 0)){ showError('Der Kuppelstapel ist leer.'); return; }
 
   // Slot wird NICHT vorab gewählt (-1,-1). Modal im reinen Stapel-Modus öffnen
-  // (ohne Display-Auswahl) und den Ziehvorgang sofort starten — der Spieler hat
-  // ja bereits "vom Stapel ziehen" gewählt, soll also nicht erst die Display-
-  // Auswahl sehen oder nochmal einen Ziehen-Button drücken müssen.
+  // (ohne Display-Auswahl) und den ersten (Pflicht-)Zug sofort ziehen -- laut
+  // Regelwerk muss mind. 1x gezogen werden, sobald man sich fürs Ziehen
+  // entschieden hat.
   openDomeModal(pi, -1, -1, /*stackOnly=*/true);
-  // Default-Anzahl 1 ziehen; bei Bedarf kann der Spieler im Modal die Anzahl
-  // erhöhen und erneut ziehen (Stapel-Sektion bleibt sichtbar bis zur Wahl).
-  setTimeout(()=>{ doStackDraw(); }, 50);
+  setTimeout(()=>{ stackPeekMore(); }, 50);
 }
 
 function openDomeModal(pi, sr, sc, stackOnly=false) {
@@ -1146,7 +1168,7 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   const grid = document.getElementById('dome-pool');
   grid.innerHTML = '';
   // Im reinen Stapel-Modus KEINE Display-Auswahl zeigen — der Spieler hat sich
-  // bewusst fürs Ziehen entschieden. Die gezogenen Karten füllt doStackDraw ein.
+  // bewusst fürs Ziehen entschieden. Die gezogenen Karten füllt stackStopAndChoose ein.
   // Start UND normale Runde wählen aus dem Display.
   if(!stackOnly) {
     S.dome_display.forEach(t=>{
@@ -1170,10 +1192,19 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   buildPreview();
 
   const stackSec = document.getElementById('dome-stack-section');
-  if (!isStart && S.dome_stack_count > 0) {
+  const pendingN = (S.pending_stack_draw || []).length;
+  if (!isStart && (S.dome_stack_count > 0 || pendingN > 0)) {
     stackSec.style.display = 'flex';
-    document.getElementById('stack-n').max = S.dome_stack_count;
-    document.getElementById('stack-n').value = 1;
+    if(pendingN > 0) {
+      renderStackPeekState();
+    } else {
+      const statusEl = document.getElementById('stack-peek-status');
+      if(statusEl) statusEl.textContent = '';
+      const moreBtn = document.getElementById('stack-peek-more-btn');
+      if(moreBtn) moreBtn.style.display = '';
+      const stopBtn = document.getElementById('stack-stop-btn');
+      if(stopBtn) stopBtn.disabled = true;
+    }
   } else {
     stackSec.style.display = 'none';
   }
@@ -1190,8 +1221,8 @@ function buildPreview() {
   }
   
   let tile = S.dome_display.find(t => t.id === domeModal.tile_id);
-  if (!tile && domeModal.stack_tiles) {
-    tile = domeModal.stack_tiles.find(t => t.id === domeModal.tile_id);
+  if (!tile && S.pending_stack_draw) {
+    tile = S.pending_stack_draw.find(t => t.id === domeModal.tile_id);
   }
   
   if (!tile) { prev.innerHTML = ''; return; }
@@ -1202,56 +1233,138 @@ function buildPreview() {
   prev.innerHTML = `<div class="d2x2" style="width:46px; height:46px;">${rotated.map(sp => spaceHTML(sp)).join('')}</div>`;
 }
 
-async function doStackDraw() {
-  const n = +document.getElementById('stack-n').value;
-  if(!n || n < 1) return;
-  const pi = domeModal.pi;
-  
-  const d = await api('/stack/peek', {num: n, player: pi});
+// Aktion A (Stapel-Variante), Schritt 1: eine weitere verdeckte Platte ziehen
+// (−1 Pkt). Rückseite zeigt nur den TYP (Special/Wild), nicht die
+// Farbanordnung -- die sieht man laut Regelwerk erst beim Aufhören
+// (stackStopAndChoose). Beliebig oft wiederholbar, solange der Stapel reicht.
+async function stackPeekMore() {
+  if(!domeModal) return;
+  const d = await api('/move/dome_stack_peek', {});
   if(!d.ok){ showError(d.error); return; }
-  
-  domeModal.stack_tiles = d.tiles;
-  // Slot zurücksetzen: beim Stapelziehen wird die Position IMMER danach per
-  // Board-Klick gewählt (man hat die Karte ja blind gezogen). Ein evtl. vorher
-  // angeklickter Slot (Modal über Board-Slot geöffnet) wäre hier sinnlos.
+  S = d.state;
+  renderStackPeekState();
+}
+
+function renderStackPeekState() {
+  const pending = S.pending_stack_draw || [];
+  const n = pending.length;
+  // Alle bisher gezogenen Rückseiten zeigen, nicht nur die zuletzt gezogene
+  // (Nutzer-Anstoss) -- Teil des gemeinsamen `S`-Zustands, also gleichermassen
+  // für den Gegenspieler sichtbar, sobald der bzw. die Modal/Anzeige offen ist.
+  const typeIcons = pending.map(t => t.bonus > 0 ? '⭐' : '🃏').join(' ');
+  const statusEl = document.getElementById('stack-peek-status');
+  if(statusEl) {
+    statusEl.innerHTML = `${n}. Platte gezogen. Rückseiten bisher: ${typeIcons} — bisher −${n} Pkt.<br>
+      <span style="font-size:9px">Vorderseiten siehst du erst, wenn du aufhörst.</span>`;
+  }
+  const moreBtn = document.getElementById('stack-peek-more-btn');
+  const stopBtn = document.getElementById('stack-stop-btn');
+  // Weiterziehen nur, solange der Stapel reicht UND es sich der Spieler
+  // leisten kann (Nutzer-Anstoss: max. so viele Platten wie Punkte
+  // vorhanden -- der erste/Pflichtzug ist server-seitig auch bei 0 Punkten
+  // erlaubt, siehe validate_draw_stack_peek).
+  const canAfford = S.players[S.current_player].score > 0;
+  if(moreBtn) moreBtn.style.display = (S.dome_stack_count > 0 && canAfford) ? '' : 'none';
+  if(stopBtn) stopBtn.disabled = n === 0;
+  // Sobald mind. 1 Punkt bezahlt wurde, ist der Zug nicht mehr abbrechbar
+  // (das Regelwerk kennt kein Zurück, sobald gezogen wurde).
+  const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
+  if(cancelBtn) cancelBtn.style.display = n > 0 ? 'none' : '';
+}
+
+// Aktion A, Schritt 2: aufhören -- alle bisher gezogenen Platten (bereits in
+// S.pending_stack_draw enthalten) werden jetzt sichtbar, 1 wählen + Rotation,
+// dann Ziel-Kuppelfeld anklicken (submitDomePlacement).
+function stackStopAndChoose() {
+  if(!domeModal) return;
+  const n = (S.pending_stack_draw || []).length;
+  if(n === 0) return;
   domeModal.slot_r = -1;
   domeModal.slot_c = -1;
-  
+
   const stackSec = document.getElementById('dome-stack-section');
   if(stackSec) stackSec.style.display = 'none';
 
-  // Abbrechen nicht mehr möglich — Spieler muss sich entscheiden
-  const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
-  if(cancelBtn) cancelBtn.style.display = 'none';
-
   const notice = document.getElementById('dome-notice');
-  notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, dann Rotation wählen. Der Rest kommt unter den Stapel. (Kosten: −${n} Pkt)<br>
+  notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, dann Rotation wählen. Der Rest kommt unter den Stapel. (Kosten bereits bezahlt: −${n} Pkt)<br>
                       <span style="font-size:10px; font-weight:normal;">Nach dem Bestätigen klickst du das Ziel-Kuppelfeld auf deinem Board an.</span>`;
   notice.style.display = 'block';
 
   const pool = document.getElementById('dome-pool');
-  pool.innerHTML = ''; 
-  
-  d.tiles.forEach(t => {
+  pool.innerHTML = '';
+
+  (S.pending_stack_draw || []).forEach(t => {
     const div = document.createElement('div');
-    div.className = 'ptile'; 
+    div.className = 'ptile';
     div.dataset.id = t.id;
-    
+
     div.innerHTML = `
       <div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
       <div class="plabel">#${t.id}</div>`;
-      
+
     div.addEventListener('click', () => {
-      domeModal.tile_id = t.id; 
-      domeModal.stack_draw = {num: n, chosen_id: t.id, player: pi};
-      
+      domeModal.tile_id = t.id;
+      domeModal.stack_draw = {chosen_id: t.id};
+
       pool.querySelectorAll('.ptile').forEach(e => e.classList.remove('sel'));
       div.classList.add('sel');
-      
-      document.getElementById('dome-confirm').disabled = false;
-      buildPreview(); 
+      buildPreview();
+
+      // Regelwerk-Zitat: die NICHT gewählten Platten legst du "in beliebiger
+      // Reihenfolge zurück unter den Stapel" -- bei 2+ Restplatten ist das
+      // eine echte Wahl, bei ≤1 gibt es nur eine mögliche (leere/einwertige)
+      // Reihenfolge, kein extra Schritt nötig.
+      const rest = (S.pending_stack_draw || []).filter(x => x.id !== t.id);
+      if(rest.length >= 2) {
+        openReturnOrderPicker(rest);
+      } else {
+        domeModal.stack_draw.return_order = rest.map(x => x.id);
+        document.getElementById('dome-confirm').disabled = false;
+      }
     });
-    
+
+    pool.appendChild(div);
+  });
+}
+
+// Zwischenschritt von stackStopAndChoose, nur bei 2+ Restplatten: Reihenfolge
+// per Klick festlegen, zuerst geklickt = zuerst zurückgelegt = liegt näher
+// an der Ziehseite (wird tendenziell früher wieder gezogen, siehe
+// DrawFromStackMove-Kommentar im Rust-Code).
+function openReturnOrderPicker(rest) {
+  document.getElementById('dome-confirm').disabled = true;
+  domeModal.stack_draw.return_order = [];
+
+  const notice = document.getElementById('dome-notice');
+  notice.innerHTML = `<strong>Reihenfolge der übrigen Platten:</strong> Klicke sie in der Reihenfolge an, in der sie zurück unter den Stapel gelegt werden sollen (zuerst geklickt = zuerst zurückgelegt).<br>
+                      <span id="return-order-status" style="font-size:10px; font-weight:normal;">0/${rest.length} platziert</span>`;
+  notice.style.display = 'block';
+
+  const pool = document.getElementById('dome-pool');
+  pool.innerHTML = '';
+
+  rest.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'ptile';
+    div.dataset.id = t.id;
+    div.innerHTML = `
+      <div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
+      <div class="plabel">#${t.id}</div>
+      <div class="order-badge" style="font-size:10px; font-weight:bold;"></div>`;
+
+    div.addEventListener('click', () => {
+      const order = domeModal.stack_draw.return_order;
+      if(order.includes(t.id)) return; // schon plaziert, ignorieren
+      order.push(t.id);
+      div.classList.add('sel');
+      div.querySelector('.order-badge').textContent = `#${order.length}`;
+      const statusEl = document.getElementById('return-order-status');
+      if(statusEl) statusEl.textContent = `${order.length}/${rest.length} platziert`;
+      if(order.length === rest.length) {
+        document.getElementById('dome-confirm').disabled = false;
+      }
+    });
+
     pool.appendChild(div);
   });
 }
@@ -1302,10 +1415,11 @@ async function confirmDome() {
     const chosenTile = (S.dome_display || []).find(t => t.id === tile_id);
     pendingStackPlacement = { source: 'start', pi, tile_id, rotation, tile: chosenTile };
   } else if(stack_draw) {
-    const chosenTile = (domeModal.stack_tiles || []).find(t => t.id === stack_draw.chosen_id);
+    const chosenTile = (S.pending_stack_draw || []).find(t => t.id === stack_draw.chosen_id);
     pendingStackPlacement = {
       source: 'stack', pi, tile_id: stack_draw.chosen_id, rotation,
-      tile: chosenTile, num: stack_draw.num, chosen_id: stack_draw.chosen_id
+      tile: chosenTile, chosen_id: stack_draw.chosen_id,
+      return_order: stack_draw.return_order || []
     };
   } else {
     const chosenTile = (S.dome_display || []).find(t => t.id === tile_id);
@@ -1326,7 +1440,7 @@ async function submitDomePlacement(sr, sc) {
     return;
   }
   if(pend.source === 'stack') {
-    await submitStackDraw(pend.pi, pend.num, pend.chosen_id, sr, sc, pend.rotation);
+    await submitStackDraw(pend.chosen_id, sr, sc, pend.rotation, pend.return_order);
   } else if(pend.source === 'start') {
     await submitStartTile(pend.pi, pend.tile_id, sr, sc, pend.rotation);
   } else {
@@ -1353,15 +1467,15 @@ async function submitDisplayDome(tile_id, sr, sc, rotation) {
   }
 }
 
-async function submitStackDraw(pi, num, chosen_id, sr, sc, rotation) {
+async function submitStackDraw(chosen_id, sr, sc, rotation, return_order) {
   // Schutz: ein ungültiger Slot (-1) würde serverseitig eine leere
   // AssertionError auslösen → leere Fehlermeldung. Hier klar abfangen.
   if(sr < 0 || sr > 2 || sc < 0 || sc > 2) {
     showError('Bitte zuerst ein freies Kuppelfeld auf deinem Board anklicken.');
     return;
   }
-  const d = await api('/move/dome_stack', {
-    num_drawn: num, chosen_id, slot_row: sr, slot_col: sc, rotation
+  const d = await api('/move/dome_stack_choose', {
+    chosen_id, slot_row: sr, slot_col: sc, rotation, return_order
   });
   if(!d.ok){showError(d.error || 'Zug abgelehnt (unbekannter Fehler).');return;}
   S=d.state; pendingStackPlacement=null; closeDomeModal(); render();

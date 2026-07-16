@@ -15,7 +15,7 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 707;
+pub const INPUT_SIZE: usize = 708;
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -111,6 +111,15 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
     for i in 0..18 {
         f.push(dome_mask.get(i).copied().unwrap_or(0.0) as f32);
     }
+    // Wild-Anteil der noch verdeckten Stapelplatten -- explizites Aggregat
+    // ergaenzend zur rohen Maske oben, siehe `serialize::dome_wild_remaining_frac`
+    // fuer die Begruendung. 0.5 als Fallback nur falls das Feld fehlt (alte
+    // JSON-Snapshots ohne dieses Feld).
+    f.push(
+        v.get("dome_wild_remaining_frac")
+            .and_then(|x| x.as_f64())
+            .unwrap_or(0.5) as f32,
+    );
 
     // 2. Wertungsplatten one-hot (8)
     let sids: Vec<i64> = v
@@ -502,6 +511,13 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
             f.push(x);
         }
     }
+    // Wild-Anteil -- siehe state_to_features (JSON-Pfad). Hier direkt über
+    // die echten DomeTile-Werte statt der Maske+ID-Lookup.
+    {
+        let total = state.dome_tile_pool.len() as f32;
+        let wild = state.dome_tile_pool.iter().filter(|t| !t.is_special_type()).count() as f32;
+        f.push(if total > 0.0 { wild / total } else { 0.5 });
+    }
 
     // 2. Wertungsplatten one-hot (8)
     for i in 0..8usize {
@@ -752,6 +768,8 @@ pub fn action_to_id(a: &Value) -> usize {
         }
         "use_chips" => (472 + geti("pattern_row")) as usize,
         "bonus_chip" => (478 + geti("factory_index")) as usize,
+        // Aktion A, Schritt 1 (verdeckt ziehen) -- parameterlos, eigene feste ID.
+        "dome_stack_peek" => 482,
         _ => 481,
     }
 }

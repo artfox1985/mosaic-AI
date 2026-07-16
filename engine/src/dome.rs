@@ -118,6 +118,16 @@ impl DomeTile {
         self.spaces.iter().all(|s| s.is_filled())
     }
 
+    /// Typ der Platte, wie er auf der RÜCKSEITE sichtbar ist (Regelwerk: man
+    /// erkennt beim Ziehen den Typ, bevor man die Vorderseite/Farbanordnung
+    /// sieht). Jede der 18 Platten hat genau 3 Normal-Spaces + 1 Sonder-Space,
+    /// der entweder Special (bonus_points=3) oder Wild (bonus_points=0) ist —
+    /// nie beides/keins (siehe build_dome_tile_pool) — daher reicht
+    /// `bonus_points` als eindeutiges Unterscheidungsmerkmal.
+    pub fn is_special_type(&self) -> bool {
+        self.bonus_points > 0
+    }
+
     /// Index des SPECIAL-Space, falls vorhanden.
     pub fn special_space_idx(&self) -> Option<usize> {
         self.spaces

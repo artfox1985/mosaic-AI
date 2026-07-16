@@ -19,6 +19,7 @@ pub mod net;
 pub mod net_mcts;
 pub mod profiling;
 pub mod py;
+pub mod round5;
 pub mod round_end;
 pub mod scoring;
 pub mod search_common;

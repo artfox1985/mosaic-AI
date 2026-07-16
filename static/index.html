@@ -120,14 +120,12 @@
     <h3 id="dome-title">Kuppelplatte legen</h3>
     <div id="dome-notice" class="info warn" style="display:none"></div>
     <div class="pool-grid" id="dome-pool"></div>
-    <div id="dome-stack-section" style="display:none; align-items:center; justify-content:space-between; margin-bottom:10px; padding:8px; background:var(--bg); border:1px dashed var(--border); border-radius:6px;">
-      <div>
-        <div style="font-size:11px; font-weight:600;">📦 Vom verdeckten Stapel ziehen</div>
-        <div style="font-size:9px; color:var(--rot);">−1 Pkt pro gezogener Platte</div>
-      </div>
+    <div id="dome-stack-section" style="display:none; flex-direction:column; gap:6px; margin-bottom:10px; padding:8px; background:var(--bg); border:1px dashed var(--border); border-radius:6px;">
+      <div style="font-size:11px; font-weight:600;">📦 Vom verdeckten Stapel ziehen</div>
+      <div id="stack-peek-status" style="font-size:10px; color:var(--text2);"></div>
       <div style="display:flex; gap:4px;">
-        <input type="number" id="stack-n" min="1" value="1" style="width:40px; border:1px solid var(--border); border-radius:4px; text-align:center; font-size:11px;">
-        <button class="btn" onclick="doStackDraw()">Ziehen</button>
+        <button class="btn" id="stack-peek-more-btn" onclick="stackPeekMore()">Ziehen (−1 Pkt)</button>
+        <button class="btn" id="stack-stop-btn" onclick="stackStopAndChoose()" disabled>Aufhören &amp; wählen</button>
       </div>
     </div>
     

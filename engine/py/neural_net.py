@@ -49,6 +49,11 @@ def state_to_tensor(data):
     dome_mask = data.get("dome_pool_mask", [0] * 18)
     for i in range(18):
         features.append(float(dome_mask[i]) if i < len(dome_mask) else 0.0)
+    # Wild-Anteil der noch verdeckten Stapelplatten -- explizites Aggregat
+    # ergänzend zur rohen Maske oben (siehe Rust serialize.rs
+    # `dome_wild_remaining_frac` für die Begründung). 0.5 = neutral, falls
+    # das Feld fehlt (alte JSON-Snapshots ohne dieses Feld).
+    features.append(float(data.get("dome_wild_remaining_frac", 0.5)))
 
     # 2. Wertungsplatten (Welche 3 von 8 sind aktiv?)
     scoring_ids = data.get("scoring_tile_ids", [])

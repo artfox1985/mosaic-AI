@@ -9,8 +9,9 @@ Endpoints:
   POST /api/new_game          — Neues Spiel starten
   GET  /api/state             — Aktuellen State abrufen
   POST /api/move/stone        — Stein-Zug (Aktion B/C)
-  POST /api/move/dome         — Kuppelplatte aus Ablage (Aktion A)
-  POST /api/move/dome_stack   — Kuppelplatte vom Stapel (Aktion A, -1Pkt)
+  POST /api/move/dome                — Kuppelplatte aus Ablage (Aktion A)
+  POST /api/move/dome_stack_peek     — Aktion A Schritt 1: verdeckt ziehen (-1Pkt, endet Zug nicht)
+  POST /api/move/dome_stack_choose   — Aktion A Schritt 2: aufhören + Platte wählen (beendet Zug)
   POST /api/move/bonus_chip   — Bonusplättchen nehmen (Aktion D)
   POST /api/move/start_tile   — Startkachel platzieren (Vorbereitung)
   POST /api/tiling            — Tiling-Aktion (Phase 2)
@@ -285,17 +286,43 @@ def move_dome():
         return jsonify(err(str(e) or "Zug abgelehnt."))
 
 
-@app.route('/api/move/dome_stack', methods=['POST'])
-def move_dome_stack():
+@app.route('/api/move/dome_stack_peek', methods=['POST'])
+def move_dome_stack_peek():
+    """Aktion A, Schritt 1: eine weitere verdeckte Kuppelplatte ziehen (-1 Pkt).
+    Beendet den Zug NICHT -- Rückseite zeigt nur den Typ (special/wild), die
+    Vorderseite kommt erst mit move_dome_stack_choose. Gibt den gezogenen Typ
+    zurück, damit das Frontend "Special!"/"Wild." anzeigen kann."""
+    if (e := _require_game()) is not None:
+        return e
+    if not _both_start_placed():
+        return jsonify(err("Startkacheln fehlen."))
+    try:
+        typ = _rust.apply_dome_stack_peek()
+        _flush_game_log()
+        res = ok()
+        res['type'] = typ
+        return jsonify(res)
+    except Exception as e:
+        return jsonify(err(str(e) or "Zug abgelehnt."))
+
+
+@app.route('/api/move/dome_stack_choose', methods=['POST'])
+def move_dome_stack_choose():
+    """Aktion A, Schritt 2: das Ziehen beenden -- eine der bisher gezogenen
+    Platten (state.pending_stack_draw) wählen und platzieren, Rest zurück
+    unter den Stapel. Beendet den Zug."""
     if (e := _require_game()) is not None:
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
     d = request.get_json()
     try:
-        _rust.apply_dome_stack(int(d['num_drawn']), int(d['chosen_id']),
-                               int(d['slot_row']), int(d['slot_col']),
-                               int(d.get('rotation', 0)))
+        return_order = d.get('return_order')
+        if return_order is not None:
+            return_order = [int(x) for x in return_order]
+        _rust.apply_dome_stack_choose(int(d['chosen_id']),
+                                      int(d['slot_row']), int(d['slot_col']),
+                                      int(d.get('rotation', 0)), return_order)
         _flush_game_log()
         return jsonify(ok())
     except Exception as e:

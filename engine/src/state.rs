@@ -54,6 +54,12 @@ pub struct GameState {
     pub dome_tile_pool: Vec<DomeTile>, // verdeckter Stapel (F)
     pub dome_display: Vec<DomeTile>,   // 3 offen ausgelegte Kuppeln (G)
     pub bonus_chip_pool: Vec<BonusChip>,
+    /// Aktion A (Stapel-Variante), laufender Zieh-Vorgang von `current_player`:
+    /// bereits gezogene, aber noch nicht gewählte Platten (Rückseite zeigt
+    /// beim Ziehen nur den Typ, siehe DomeTile::is_special_type). Leer, wenn
+    /// gerade kein Stapel-Zug läuft. Reset bei `Action::DrawStack` (Wahl
+    /// getroffen) und beim Rundenwechsel.
+    pub pending_stack_draw: Vec<DomeTile>,
 
     pub scoring_tile_ids: Vec<usize>,
 
@@ -193,6 +199,7 @@ pub fn setup_new_game<R: Rng + ?Sized>(
         dome_tile_pool,
         dome_display,
         bonus_chip_pool: bonus_pool,
+        pending_stack_draw: Vec::new(),
         scoring_tile_ids: Vec::new(),
         round_number: 1,
         current_player: first_player,
