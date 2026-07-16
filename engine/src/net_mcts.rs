@@ -63,6 +63,16 @@ pub enum LeafEval {
 /// anzufassen.
 pub const ACTIVE_LEAF: LeafEval = LeafEval::Net;
 
+/// Rundenübergang per Chance-Node-Sampling bewerten (`round_transition.rs`)
+/// statt eines einzelnen Netz-Blattwerts, nur wirksam bei `ACTIVE_LEAF=Net`.
+/// Standardmäßig AUS -- siehe `round_transition.rs`-Modul-Kommentar (Phase 2
+/// im Fahrplan, erst nach einer belegten Val-R²-Verbesserung über den
+/// Trainingsziel-Pfad aktivieren, siehe `evaluations/STAGE2_TODO.md`). Eine
+/// Zeile hier auf `true` aktiviert die Live-Suche-Integration jederzeit
+/// wieder, ohne Funktionssignaturen anzufassen (gleiches Muster wie
+/// `ACTIVE_LEAF`).
+pub const ROUND_TRANSITION_SAMPLING: bool = false;
+
 // ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
 //
 // Die Aktions-ID (`action_to_id`) kodiert `moon_order` NICHT — Farbe/Reihe/
@@ -239,15 +249,40 @@ fn value_to_win_prob(value: &[f32]) -> f64 {
     (v + 1.0) / 2.0
 }
 
+/// Netz-Blattwert für `state`: unabhängige Pro-Spieler-Werte. Das Netz liefert
+/// einen EGO-perspektivischen Wert (die Input-Features hängen von
+/// `state.current_player` ab, siehe features.rs/state_to_tensor) — für den
+/// jeweils ANDEREN Spieler braucht es deshalb einen zweiten Forward-Pass mit
+/// geflipptem `current_player`, nicht einfach `1-wert`. Extrahiert aus
+/// `make_node` (dort weiterhin für den `terminal==false`-Pfad genutzt,
+/// unverändert), zusätzlich von `round_transition`-Aufrufstellen (Sampling
+/// über Runden-Neubefüllungen, siehe `round_transition.rs`) wiederverwendet,
+/// da beide denselben Netz-Blattwert brauchen.
+pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
+    let feats =
+        crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let (_logits, value, _moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
+    });
+    let mover_val = value_to_win_prob(&value);
+    crate::profiling::note_gamestate_clone();
+    let mut flipped = state.clone();
+    flipped.current_player = 1 - state.current_player;
+    let other_feats = state_to_features_direct(&flipped);
+    let other_val = net.eval(&other_feats).map(|(_, v, _, _)| value_to_win_prob(&v)).unwrap_or(0.5);
+    if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
+}
+
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
 /// (per `ACTIVE_LEAF`: DFS-Solver oder Netz-Value).
-fn make_node(
+fn make_node<R: Rng + ?Sized>(
     net: &Net,
     state: GameState,
     parent: Option<usize>,
     action: Option<Action>,
     prior: f32,
     player_who_acted: usize,
+    rng: &mut R,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
     let feats =
@@ -281,7 +316,30 @@ fn make_node(
                 .eval(&other_feats)
                 .map(|(_, v, _, _)| value_to_win_prob(&v))
                 .unwrap_or(0.5);
-            if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
+            let today_value =
+                if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+
+            // Rundenübergang (Phase wechselt von Drafting weg) per Chance-Node-
+            // Sampling statt Einzelwert bewerten -- siehe round_transition.rs
+            // fuer die Begruendung (verrauschtes Trainingsziel/Blattwert, da die
+            // Fabrik-Neubefuellung sonst nirgends als echter Zufallsknoten
+            // repraesentiert ist). Standardmaessig AUS (siehe Konstante unten) --
+            // erst nach einer Val-R²-Verbesserung im Trainingsziel-Pfad
+            // (self_play.rs::play_net_self_play_game) aktivieren.
+            if terminal && ROUND_TRANSITION_SAMPLING {
+                match crate::round_transition::resolve_to_pre_chance(&state) {
+                    Some(pre) => crate::round_transition::sample_round_transition_value(
+                        &pre,
+                        crate::round_transition::N_SAMPLES_SEARCH,
+                        |s| net_leaf_eval(net, s),
+                        rng,
+                        std::time::Instant::now() + crate::round_transition::TIME_BUDGET,
+                    ),
+                    None => today_value, // defensiv, sollte durch das `terminal`-Gating nie vorkommen
+                }
+            } else {
+                today_value
+            }
         }
         LeafEval::Dfs => crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
             crate::mcts::evaluate(&state, n_actions)
@@ -347,11 +405,12 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// Sim-Zählschleife aufrufbar. Für die Nachlauf-Schließung offener Enden
 /// (siehe unten): kein Effekt, falls `nid` bereits terminal ist oder keine
 /// unversuchten Aktionen mehr hat.
-fn expand_and_backprop(
+fn expand_and_backprop<R: Rng + ?Sized>(
     nodes: &mut Vec<Node>,
     net: &Net,
     nid: usize,
     names: &[&str; 2],
+    rng: &mut R,
     log: &mut Option<&mut Vec<String>>,
 ) {
     if nodes[nid].untried.is_empty() {
@@ -367,7 +426,7 @@ fn expand_and_backprop(
     let mut child_state = g.state;
     child_state.log.clear();
     let terminal = child_state.phase != Phase::Drafting;
-    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover);
+    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, rng);
     let cid = nodes.len();
     nodes.push(child);
     nodes[nid].children.push(cid);
@@ -422,7 +481,7 @@ fn build_net_tree<R: Rng + ?Sized>(
     let mut root_state = state.clone();
     root_state.log.clear();
     let root_player = root_state.current_player;
-    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player)];
+    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, rng)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -471,7 +530,7 @@ fn build_net_tree<R: Rng + ?Sized>(
                     let mut child_state = g.state;
                     child_state.log.clear();
                     let terminal = child_state.phase != Phase::Drafting;
-                    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover);
+                    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, rng);
                     let cid = nodes.len();
                     nodes.push(child);
                     nodes[nid].children.push(cid);
@@ -540,7 +599,7 @@ fn build_net_tree<R: Rng + ?Sized>(
     // bleibt dauerhaft ohne eigene Antwort (siehe search_common::nachlauf_targets).
     for target in crate::search_common::nachlauf_targets(&nodes) {
         logln!("  NACHLAUF → #{target}: offenes Ende nachträglich geschlossen");
-        expand_and_backprop(&mut nodes, net, target, &names, &mut log);
+        expand_and_backprop(&mut nodes, net, target, &names, rng, &mut log);
     }
 
     nodes

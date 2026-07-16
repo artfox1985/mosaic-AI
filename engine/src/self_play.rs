@@ -1314,6 +1314,12 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
+    // Rundenübergangs-Trainingsziel (siehe round_transition.rs): je Runde N
+    // ein per Chance-Node-Sampling gemitteltes Blattwert-Paar, gespeichert
+    // unter der Rundennummer VOR dem Übergang (state.round zu dem Zeitpunkt,
+    // wenn die Drafting-Phase endet). Ergänzt `scores`/`winner` additiv, siehe
+    // Stamping-Schleife unten -- KEIN Ersatz dafür.
+    let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
     let timeout_secs = net_game_timeout_secs(base_sims);
@@ -1346,7 +1352,31 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
+                    let round_before = game.state.round_number;
                     apply_chosen_action(&mut game, chosen);
+                    if game.state.phase == Phase::Tiling {
+                        // Rundenübergang gerade erreicht -- Chance-Node-
+                        // Sampling für ein rauschärmeres Trainingsziel (siehe
+                        // round_transition.rs). Läuft nur ~4x je Partie
+                        // (einmal je echtem Rundenwechsel), Budget daher
+                        // grosszügiger als in der (noch inaktiven)
+                        // Live-Suche. Defensiv best-effort: schlägt der
+                        // Sampling-Versuch fehl (sollte durch die
+                        // Phase-Prüfung nicht vorkommen), bleibt einfach
+                        // kein Eintrag für diese Runde -- Python-Seite fällt
+                        // dann auf die literalen `scores` zurück.
+                        if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
+                            let deadline = std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN;
+                            let v = crate::round_transition::sample_round_transition_value(
+                                &pre,
+                                crate::round_transition::N_SAMPLES_TRAIN,
+                                |s| crate::net_mcts::net_leaf_eval(net, s),
+                                rng,
+                                deadline,
+                            );
+                            round_transition_values.insert(round_before, v);
+                        }
+                    }
                     let mut m = Map::new();
                     m.insert("state".into(), state_json);
                     m.insert("policy".into(), Value::Array(policy));
@@ -1378,6 +1408,15 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
             m.insert("scores".into(), json!(scores));
             m.insert("winner".into(), json!(winner));
             m.insert("completed".into(), json!(completed));
+            // Zusätzliches, rauschärmeres Trainingsziel für den Rundenübergang
+            // (siehe round_transition.rs) -- additiv, ERSETZT `scores`/`winner`
+            // NICHT. Nur vorhanden für Runden, die tatsächlich einen
+            // Übergang erreicht haben (nicht Runde 5, keine abgebrochenen
+            // Partien) -- Python-Seite muss das Fehlen tolerieren.
+            let round = m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
+            if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
+                m.insert("round_transition_value".into(), json!(v));
+            }
             Value::Object(m)
         })
         .collect()
