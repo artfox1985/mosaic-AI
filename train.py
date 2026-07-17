@@ -153,6 +153,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     value_history   = []
     points_history  = []
     val_ploss_history = []
+    # Value/Points hatten bisher KEINEN Val-Split-Loss/R² -- nur der rohe
+    # Trainings-Loss wurde reported (siehe TRAINING SUMMARY unten). Für den
+    # Runden-Übergangs-Sampling-Vergleich (evaluations/STATUS.md, Phase-1-
+    # Gate: points_forecast-Val-R² gegen die archivierte 0.2-0.3-Baseline)
+    # braucht es einen echten Held-out-Wert -- Trainings-Loss allein sagt
+    # nichts über Generalisierung aus.
+    val_vloss_history = []
+    val_pointsloss_history = []
+    val_value_r2_history = []
+    val_points_r2_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -173,14 +183,23 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             ax_top.set_ylabel("Policy Loss")
             ax_bot.set_ylabel("Value / Points Loss (Aux)")
             ax_bot.set_xlabel("Epoche")
-            (line_policy,) = ax_top.plot([], [], label="Policy", color="tab:orange")
-            (line_value,) = ax_bot.plot([], [], label="Value", color="tab:green")
-            (line_points,) = ax_bot.plot([], [], label="Points", color="tab:purple")
+            (line_policy,) = ax_top.plot([], [], label="Policy (Train)", color="tab:orange")
+            (line_value,) = ax_bot.plot([], [], label="Value (Train)", color="tab:green")
+            (line_points,) = ax_bot.plot([], [], label="Points (Train)", color="tab:purple")
+            # Val-Kurven (gestrichelt, gleiche Farbe) -- der ganze Grund fuer
+            # diese Ergaenzung: das v8-Overfitting (Value Train/Val-Verhaeltnis
+            # 48.6x) war an der finalen Zahl allein erkennbar, aber NICHT, AB
+            # WELCHER Epoche die Schere aufgeht -- nur sichtbar, wenn Train-
+            # und Val-Kurve gemeinsam im Verlauf geplottet werden.
+            (line_policy_val,) = ax_top.plot([], [], label="Policy (Val)", color="tab:orange", linestyle="--")
+            (line_value_val,) = ax_bot.plot([], [], label="Value (Val)", color="tab:green", linestyle="--")
+            (line_points_val,) = ax_bot.plot([], [], label="Points (Val)", color="tab:purple", linestyle="--")
             ax_top.legend(loc="upper right")
             ax_bot.legend(loc="upper right")
             plot = {
                 "fig": fig, "ax": ax_top, "ax_bot": ax_bot,
                 "line_policy": line_policy, "line_value": line_value, "line_points": line_points,
+                "line_policy_val": line_policy_val, "line_value_val": line_value_val, "line_points_val": line_points_val,
                 "plateau_line": None,
             }
         except Exception as e:
@@ -252,27 +271,72 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         points_history.append(epoch_pointsloss)
         total_history.append(epoch_tloss)
 
-        # ── Validierung (Policy) auf dem NIE trainierten Datei-Split ────────
+        # ── Validierung (Policy + Value + Points) auf dem NIE trainierten
+        # Datei-Split. R² (nicht bloß MSE) je Kopf: 1 - SS_res/SS_tot über
+        # den GESAMTEN Val-Split (nicht Mittel über Batch-R²s -- R² ist eine
+        # globale Kennzahl, die von der Gesamtvarianz des Val-Sets abhängt,
+        # ein Batch-Mittel würde das verzerren). SS_tot/SS_res daher als
+        # laufende Summen über alle Batches akkumuliert, R² erst danach
+        # einmalig berechnet.
         epoch_val_ploss = None
+        epoch_val_vloss = None
+        epoch_val_pointsloss = None
+        epoch_val_value_r2 = None
+        epoch_val_points_r2 = None
         if val_dataloader is not None:
             model.eval()
-            val_ploss_sum, val_batches = 0.0, 0
+            val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
+            v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
+            pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             with torch.no_grad():
-                for v_states, v_targets_p, _v_targets_v, v_masks, _vmoon, v_pol_w, _v_targets_points in val_dataloader:
+                for v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points in val_dataloader:
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
+                    v_targets_v = v_targets_v.to(device)
+                    v_targets_points = v_targets_points.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
-                    v_pred_p, _v_pred_v, _v_pred_moon, _v_pred_points = model(v_states)
+                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points = model(v_states)
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
                     v_p_loss = (v_per_sample_ce * v_pol_w).sum() / v_pol_w.sum().clamp(min=1e-6)
+                    v_v_loss = mse_loss(v_pred_v, v_targets_v)
+                    v_points_loss = mse_loss(v_pred_points, v_targets_points)
                     val_ploss_sum += v_p_loss.item()
+                    val_vloss_sum += v_v_loss.item()
+                    val_pointsloss_sum += v_points_loss.item()
                     val_batches += 1
+
+                    v_sum += v_targets_v.sum().item()
+                    v_sumsq += (v_targets_v ** 2).sum().item()
+                    v_sqerr_sum += ((v_targets_v - v_pred_v) ** 2).sum().item()
+                    n_v += v_targets_v.numel()
+
+                    pts_sum += v_targets_points.sum().item()
+                    pts_sumsq += (v_targets_points ** 2).sum().item()
+                    pts_sqerr_sum += ((v_targets_points - v_pred_points) ** 2).sum().item()
+                    n_pts += v_targets_points.numel()
             model.train()
             epoch_val_ploss = val_ploss_sum / max(val_batches, 1)
+            epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
+            epoch_val_pointsloss = val_pointsloss_sum / max(val_batches, 1)
+
+            def _r2(sum_y, sumsq_y, sqerr, n):
+                if n == 0:
+                    return None
+                ss_tot = sumsq_y - (sum_y ** 2) / n
+                if ss_tot <= 1e-9:  # entartet: Val-Targets praktisch konstant
+                    return None
+                return 1.0 - sqerr / ss_tot
+
+            epoch_val_value_r2 = _r2(v_sum, v_sumsq, v_sqerr_sum, n_v)
+            epoch_val_points_r2 = _r2(pts_sum, pts_sumsq, pts_sqerr_sum, n_pts)
         val_ploss_history.append(epoch_val_ploss)
+        val_vloss_history.append(epoch_val_vloss)
+        val_pointsloss_history.append(epoch_val_pointsloss)
+        val_value_r2_history.append(epoch_val_value_r2)
+        val_points_r2_history.append(epoch_val_points_r2)
 
         # ── Plateau-Erkennung ──────────────────────────────────────────────
         plateau_marker = ""
@@ -297,6 +361,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plot["line_policy"].set_data(xs, policy_history)
                 plot["line_value"].set_data(xs, value_history)
                 plot["line_points"].set_data(xs, points_history)
+                nan = float("nan")
+                plot["line_policy_val"].set_data(xs, [v if v is not None else nan for v in val_ploss_history])
+                plot["line_value_val"].set_data(xs, [v if v is not None else nan for v in val_vloss_history])
+                plot["line_points_val"].set_data(xs, [v if v is not None else nan for v in val_pointsloss_history])
                 if policy_plateau_since is not None and plot["plateau_line"] is None:
                     plot["plateau_line"] = plot["ax"].axvline(
                         policy_plateau_since, color="red", linestyle="--", alpha=0.5, label="Plateau")
@@ -313,8 +381,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 plot = None  # Fenster evtl. geschlossen o.ä. — Rest ohne Plot weiterlaufen
 
         val_p_str = f" | Policy-Val={epoch_val_ploss:5.2f}" if epoch_val_ploss is not None else ""
+        val_r2_str = ""
+        if epoch_val_value_r2 is not None or epoch_val_points_r2 is not None:
+            v_r2_s = f"{epoch_val_value_r2:.3f}" if epoch_val_value_r2 is not None else "n/a"
+            p_r2_s = f"{epoch_val_points_r2:.3f}" if epoch_val_points_r2 is not None else "n/a"
+            val_r2_str = f" | Val-R² Value={v_r2_s} Points={p_r2_s}"
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{plateau_marker}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{plateau_marker}")
 
         # ── Early Stopping (nur bei Policy-Plateau) ──────────────────────────
         if policy_plateau_since is not None:
@@ -349,17 +422,32 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           + (f"  (+{len(val_dataset):,} Val, nie trainiert)" if val_dataset is not None else ""))
     print(f"  Batches/Epoche:{n_batches}")
     print(f"{'─'*55}")
+    def _last_valid(history):
+        for v in reversed(history):
+            if v is not None:
+                return v
+        return None
+
     print(f"  Policy Loss:   {final_p:.4f} / {max_loss:.2f} max  ({pct:.1f}%)  {quality}")
-    print(f"  Value Loss:    {value_history[-1]:.4f}  (Aux, Sieg/Niederlage +1/-1)")
-    print(f"  Points Loss:   {points_history[-1]:.4f}  (Aux, Punktestand-Prognose)")
-    final_val_ploss = None
-    for v in reversed(val_ploss_history):
-        if v is not None:
-            final_val_ploss = v
-            break
+    print(f"  Value Loss:    {value_history[-1]:.4f}  (Aux, Sieg/Niederlage +1/-1, Training)")
+    print(f"  Points Loss:   {points_history[-1]:.4f}  (Aux, Punktestand-Prognose, Training)")
+    final_val_ploss = _last_valid(val_ploss_history)
+    final_val_vloss = _last_valid(val_vloss_history)
+    final_val_pointsloss = _last_valid(val_pointsloss_history)
+    final_value_r2 = _last_valid(val_value_r2_history)
+    final_points_r2 = _last_valid(val_points_r2_history)
     if final_val_ploss is not None:
         policy_val_gap = final_val_ploss - final_p
         print(f"  Policy Val-Loss: {final_val_ploss:.4f}  (Gap ggü. Train: {policy_val_gap:+.4f})")
+    # Val-R² (nicht bloß Val-Loss) ist die Kennzahl, gegen die die archivierte
+    # 0.2-0.3-Plateau-Baseline (evaluations/STATUS.md) vergleichbar ist --
+    # Loss allein sagt ohne Referenz-Skala wenig aus.
+    if final_val_vloss is not None:
+        r2_s = f"{final_value_r2:.4f}" if final_value_r2 is not None else "n/a"
+        print(f"  Value Val-Loss:  {final_val_vloss:.4f}  (Val-R²: {r2_s})")
+    if final_val_pointsloss is not None:
+        r2_s = f"{final_points_r2:.4f}" if final_points_r2 is not None else "n/a"
+        print(f"  Points Val-Loss: {final_val_pointsloss:.4f}  (Val-R²: {r2_s})")
     print(f"{'─'*55}")
     if stopped_early:
         print(f"  ⏹️  Early Stopping (Policy-Plateau) nach Epoche {len(policy_history)}/{epochs}")
@@ -421,6 +509,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "final_policy_val_loss": round(final_val_ploss, 4) if final_val_ploss is not None else None,
         "final_value_loss":  round(value_history[-1], 4),
         "final_points_loss": round(points_history[-1], 4),
+        "final_value_val_loss": round(final_val_vloss, 4) if final_val_vloss is not None else None,
+        "final_points_val_loss": round(final_val_pointsloss, 4) if final_val_pointsloss is not None else None,
+        "final_value_val_r2": round(final_value_r2, 4) if final_value_r2 is not None else None,
+        "final_points_val_r2": round(final_points_r2, 4) if final_points_r2 is not None else None,
         "value_weight":      VALUE_WEIGHT,
         "points_weight":     POINTS_WEIGHT,
         "val_frac":          val_frac,
