@@ -8,8 +8,9 @@
 //! echter Zufallsknoten repräsentiert -- der Blattwert muss implizit über
 //! die gesamte Verteilung möglicher künftiger Steinzüge mitteln, was ein
 //! sehr hochvarianzes Ziel für den Value-Head ist (siehe
-//! `evaluations/STAGE2_TODO.md`: "irreduzibles Rauschen im Trainings-
-//! Target" als Erklärung für den Val-R²-Plateau bei 0.2-0.3).
+//! `archive/STAGE2_TODO_ARCHIVED.md`: "irreduzibles Rauschen im Trainings-
+//! Target" als Erklärung für den Val-R²-Plateau bei 0.2-0.3, aktueller
+//! Stand in `evaluations/STATUS.md`).
 //!
 //! Dieses Modul macht die Fabrik-Neubefüllung explizit: `resolve_to_pre_chance`
 //! spult einen Runden-End-Zustand deterministisch (kein RNG-Verbrauch,
