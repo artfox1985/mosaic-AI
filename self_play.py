@@ -57,7 +57,8 @@ def _check_completion(steps: list[dict], filename) -> None:
     (Rust-Feld 'completed', siehe self_play.rs). Abgebrochene Partien (Hänger-
     Schutz-Timeout) haben KEIN echtes Endergebnis in scores/winner — wurde als
     echter Bug beobachtet (30s-Timeout bei netzgeführter Suche zu knapp, siehe
-    STAGE2_TODO.md), deshalb hier ein Sanity-Check bei jeder generierten Datei."""
+    archive/STAGE2_TODO_ARCHIVED.md), deshalb hier ein Sanity-Check bei jeder
+    generierten Datei."""
     games = _group_by_game(steps)
     if not games:
         return

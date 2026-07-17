@@ -42,13 +42,13 @@
 │   │   └── 📜 neural_net.py    # MosaicNet (PyTorch), MosaicDataset, state_to_tensor, action_to_id
 │   ├── 📜 Cargo.toml
 │   └── 📜 pyproject.toml       # maturin build config
-├── 📂 evaluations/            # Per-generation eval reports (v*_eval.md) + STAGE2_TODO.md (champion protocol, roadmap)
+├── 📂 evaluations/            # Per-generation eval reports (v*_eval.md) + STATUS.md (current status/roadmap)
 ├── 📂 data/                   # Self-play output (.pkl) + HDF5 training cache
 ├── 📂 models/                 # Trained checkpoints (.pth), ONNX exports (.onnx), loss plots
 ├── 📂 static/                 # Web UI (index.html, debug.html, replay viewer, css/js)
 ├── 📂 utils/                  # diagnosis.py, model_info.py, git_tree.py
 ├── 📂 docs/                   # engine_manual.md, reference CSVs (bonus chip/dome colors)
-├── 📂 archive/                # Legacy: old pure-Python engine/agents (python_engine/, python_agents/), history notes
+├── 📂 archive/                # Legacy: old pure-Python engine/agents, superseded eval reports/models/logs (pre-v1-v7cold lineage, see evaluations/STATUS.md)
 ├── 📜 config.py               # Hyperparameters (INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, VALUE_WEIGHT, ...)
 ├── 📜 self_play.py            # ▶️ Self-play driver (calls into Rust, groups/pickles step records)
 ├── 📜 train.py                # ▶️ Training (PyTorch/CUDA) + auto ONNX export + readiness probe
@@ -145,7 +145,7 @@ auto-detected by `export_onnx.py`).
 
 ## 🔄 Training Pipeline: Champion/Candidate Protocol
 
-Full details in [`evaluations/STAGE2_TODO.md`](evaluations/STAGE2_TODO.md) — short version:
+Full details in [`evaluations/STATUS.md`](evaluations/STATUS.md) — short version:
 
 ```
 Self-play (current champion, Stage 1 / DFS leaf)
