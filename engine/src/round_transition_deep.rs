@@ -29,22 +29,28 @@
 //! um vor der (teureren) 1-Zug-Vorschau bereits die Kandidatenzahl klein zu
 //! halten.
 //!
-//! **Wichtige Scoping-Entscheidung, beim Implementieren erkannt (nicht
-//! Teil des ursprünglichen Plans in dieser Form)**: die "Gamma-Pruning für
-//! Geschwister-Kandidaten"-Idee aus der Plan-Datei (mehrere rundenendende
-//! Kandidaten je über eine kleine Rundenübergangs-Stichprobe vergleichen,
-//! per optimistischem Punkte-Deckel früh abbrechen) würde bedeuten, dass
-//! `choose_drafting_action_pruned` bei JEDEM rundenendenden Kandidaten
-//! erneut durch `sample_round_transition_value` müsste -- das reintroduziert
-//! genau die kombinatorische Verzweigung, die die "1 Kontinuation je
-//! äußerem Sample"-Architektur oben bewusst vermeidet. Diese erste Version
-//! nutzt deshalb für ALLE Kandidaten (rundenendend oder nicht) denselben
-//! günstigen, deterministischen `leaf_value_progress`-Wert -- exakt wie
-//! `mcts.rs`s bestehende Stufe-1-Suche es an ihrer eigenen Rundengrenze
-//! bereits tut. Eine Chance-Knoten-bewusste Gamma-Pruning-Erweiterung
-//! (mehrere rundenendende Kandidaten aktiv gegeneinander per Stichprobe
-//! abwägen) ist als expliziter Folge-Schritt zu behandeln, nicht Teil
-//! dieser ersten, funktionierenden Version.
+//! **Gamma-Pruning für rundenendende Geschwister-Kandidaten** (*-Minimax/
+//! Star1-Star2-Familie, Ballard 1983): NUR an der WURZEL von
+//! `choose_drafting_action_pruned` (nicht rekursiv in `negamax_progress`s
+//! tieferer Vorschau -- das würde die vermiedene Kombinatorik doch
+//! wieder einführen). Ein Kandidat, der die Runde beendet, wird NICHT mehr
+//! per billiger (faktoren-blinder) `leaf_value_progress` bewertet, sondern
+//! per echtem, aber knapp gehaltenem Rundenübergangs-Sampling: erst ein
+//! kleines Startsample (`N_MIN_ROUND_END`), dann ein Vergleich gegen den
+//! bisher besten Kandidaten -- liegt der Kandidat mehr als `GAMMA_MARGIN`
+//! Punkte dahinter, wird er verworfen (kein volles Sample verschwendet),
+//! sonst mit `N_FULL_ROUND_END` Samples verfeinert. Kosten bleiben dadurch
+//! auf die WENIGEN Entscheidungen begrenzt, die tatsächlich rundenendende
+//! Kandidaten haben (typischerweise die letzten 1-3 Züge einer simulierten
+//! Runde), nicht auf jede der ~15-20 Entscheidungen/Runde.
+//!
+//! Skalen-Hinweis: `round_end_eval` liefert eine Gewinnwahrscheinlichkeit
+//! ([0,1], wie `net_leaf_eval`/`continue_through_roundX`), `negamax_progress`
+//! arbeitet auf der Punkte-Differenz-Skala (wie `round5::negamax`) --
+//! `denormalize_score` (Inverse von `mcts::normalize_score`) bringt beide
+//! auf dieselbe Skala, damit `best_val`/`alpha` in der Wurzel-Schleife
+//! konsistent bleiben, OHNE `negamax_progress`s eigene (unveränderte)
+//! Alpha-Beta-Rekursion anzufassen.
 //!
 //! **Information-Set-Determinisierung für den Kuppelstapel**: kein neuer
 //! Mechanismus -- Wiederverwendung des bereits vorhandenen, geprüften
@@ -90,17 +96,19 @@ pub const N_SAMPLES_TRAIN_ROUND3: u32 = 16;
 /// ganze Simulationskette). Grosszügig, aber begrenzt -- degradiert
 /// graceful auf weniger Samples, falls überschritten (siehe
 /// `round_transition.rs::sample_round_transition_value`).
-pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(15);
-pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(15);
-pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(15);
-// Einmalig gegen v8c auf je EINEM echten Runde-2/3/4-Start-Zustand gemessen
-// (ein Sample je Tiefe, nicht über mehrere Zustände gemittelt -- also noch
-// kein belastbarer Durchschnitt, siehe Modul-Kommentar):
-// continue_through_round2 (Runde-1-Evaluator) ~1,13s/Sample,
-// continue_through_round3 (Runde-2-Evaluator) ~0,63s/Sample,
-// continue_through_round4 (Runde-3-Evaluator) ~0,69s/Sample.
-// Ergibt bei den obigen N grob ~4,5s/5,0s/11s je Rundentiefe (~20s/Partie
-// zusätzlich) -- deutlich unter den 15s-Budgets, Luft nach oben vorhanden.
+pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(30);
+pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(30);
+pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(30);
+// Vorherige Messung (~20s/Partie gesamt) galt VOR dem Gamma-Pruning oben --
+// jetzt kostet JEDE simulierte Zwischenrunde potenziell mehrere echte
+// Rundenübergangs-Stichproben (an ihren letzten 1-3 Zügen), nicht mehr nur
+// die eine äußere pro Kette. NEU GEMESSEN (Heuristik-Self-Play + v8c-Labels,
+// end-zu-Ende über self_play_games_with_net_labels, 1 Partie, base_sims=40):
+// ~105s/Partie gesamt (vorher ~35s ohne Gamma-Pruning) -- Partie lief
+// vollständig durch (completed=true, Runde 1-4 komplett gelabelt, Runde 5
+// korrekt nicht). Deutlich teurer als erwartet, aber INNERHALB der Budgets
+// hier -- kein Timeout-Abbruch. Bei einem Self-Play-Batch entsprechend
+// einplanen (~100s/Partie x Batch-Größe).
 
 /// Zusätzliches Zeitbudget, das `self_play.rs::play_net_self_play_game`s
 /// eigener Hänger-Schutz-Timeout (`net_game_timeout_secs`) einrechnen MUSS.
@@ -114,23 +122,58 @@ pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(15);
 /// Kalibrierung beschreibt ("scores/winner sind dann kein echtes
 /// Endergebnis"), jetzt durch dieses Moduls zusätzliche synchrone
 /// Sampling-Zeit reproduziert.
-pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 5 + 15 + 15 + 15; // Runde4+3+2+1, Worst-Case-Summe
+pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 5 + 30 + 30 + 30; // Runde4+3+2+1, Worst-Case-Summe
 
 /// Suchtiefe/-budget der Zwischenrunden-Zugwahl (`choose_drafting_action_pruned`)
 /// je Einzelentscheidung -- bewusst deutlich billiger als `round5::TIME_BUDGET`
-/// (150ms): das hier ist eine Fortschritts-Heuristik-Suche für eine
-/// SIMULIERTE Zwischenrunde, kein Vollsolve.
+/// (150ms) für NICHT-rundenendende Kandidaten (Fortschritts-Heuristik-Suche,
+/// kein Vollsolve). WICHTIG, per Testlauf gefunden: `POLICY_NODE_BUDGET`
+/// (20.000) ist bei diesem `player_total`-Blattwert (ruft selbst einen
+/// DFS-Solver auf) real teuer genug, dass die Suche fast IMMER das
+/// Zeitbudget statt das Knotenbudget ausschöpft -- ein einfaches
+/// Hochsetzen DIESES Budgets (versucht, dann verworfen) ließ dadurch JEDE
+/// (nicht nur rundenendende) Entscheidung ballonieren, nicht nur die
+/// Gamma-Pruning-Kandidaten. Deshalb ZWEI getrennte Budgets: dieses hier
+/// bleibt klein (nur `negamax_progress`s Fortschritts-Heuristik-Rekursion),
+/// `POLICY_OVERALL_TIME_BUDGET_PER_DECISION` unten deckt zusätzlich die
+/// Gamma-Pruning-Samples ab.
 pub const POLICY_DEPTH: u32 = 4;
 pub const POLICY_NODE_BUDGET: u64 = 20_000;
 pub const POLICY_TIME_BUDGET_PER_DECISION: Duration = Duration::from_millis(15);
+/// Gesamt-Zeitbudget für EINEN `choose_drafting_action_pruned`-Aufruf
+/// (alle Geschwister-Kandidaten inkl. Gamma-Pruning-Samples für
+/// rundenendende) -- deutlich grosszügiger als `POLICY_TIME_BUDGET_PER_DECISION`
+/// allein, aber greift nur bei Entscheidungen mit tatsächlich rundenendenden
+/// Kandidaten (typischerweise die letzten 1-3 Züge einer simulierten Runde).
+pub const POLICY_OVERALL_TIME_BUDGET_PER_DECISION: Duration = Duration::from_secs(3);
 
 /// Gesamt-Wall-Clock-Sicherheitsnetz für EINE simulierte Runde
-/// (~15-20 Entscheidungen).
-pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_millis(600);
+/// (~15-20 Entscheidungen, davon typischerweise nur die letzten 1-3 mit
+/// rundenendenden -- also Gamma-Pruning-kostenpflichtigen -- Kandidaten).
+pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_secs(10);
 
 /// Zeitbudget für den EINEN verschachtelten Chance-Node-Sample-Aufruf
 /// (`n_samples = 1`) nach einer simulierten Zwischenrunde.
 pub const INNER_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(300);
+
+// ── Gamma-Pruning für rundenendende Geschwister-Kandidaten ──────────────────
+
+/// Kleines Startsample für einen rundenendenden Kandidaten -- billig genug,
+/// um es für JEDEN solchen Kandidaten zu zahlen, bevor überhaupt entschieden
+/// wird, ob sich ein volles Sample lohnt.
+pub const N_MIN_ROUND_END: u32 = 2;
+/// Volles Sample für einen rundenendenden Kandidaten, der laut Startsample
+/// noch konkurrenzfähig ist (siehe `GAMMA_MARGIN`).
+pub const N_FULL_ROUND_END: u32 = 6;
+/// Marge auf der Punkte-Differenz-Skala (wie `round5.rs`s `player_total`-
+/// Werte, NICHT die [0,1]-Gewinnwahrscheinlichkeit) -- ein Kandidat, dessen
+/// Startsample-Wert mehr als `GAMMA_MARGIN` unter dem bisher besten liegt,
+/// wird ohne volles Sample verworfen.
+pub const GAMMA_MARGIN: f64 = 10.0;
+/// Zeitbudget für EIN Gamma-Pruning-Sample (Start- oder Vollsample) --
+/// deutlich teurer als der Rest der Zwischenrunden-Zugwahl, da hier ein
+/// echter (rekursiver) Rundenübergang samplet statt der billigen Heuristik.
+pub const GAMMA_SAMPLE_TIME_BUDGET: Duration = Duration::from_secs(2);
 
 // ── Zwischenrunden-Zugwahl ───────────────────────────────────────────────────
 
@@ -139,6 +182,18 @@ pub const INNER_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(300);
 /// laufende Runde (Kuppelraster nicht eingefroren), nicht nur Runde 5.
 fn leaf_value_progress(state: &GameState, perspective: usize) -> f64 {
     crate::mcts::player_total(state, perspective) - crate::mcts::player_total(state, 1 - perspective)
+}
+
+/// Inverse von `mcts::normalize_score` -- wandelt eine Gewinnwahrscheinlichkeit
+/// ([0,1], wie sie `round_end_eval`/`net_leaf_eval`/`exact_round5_outcome`
+/// liefern) zurück auf die Punkte-Differenz-Skala von `leaf_value_progress`/
+/// `negamax_progress`, damit Gamma-Pruning-Werte und Fortschritts-Heuristik-
+/// Werte in derselben Wurzel-Schleife (`choose_drafting_action_pruned`)
+/// vergleichbar bleiben, OHNE `negamax_progress`s eigene Alpha-Beta-Skala
+/// anzufassen. `clamp` vermeidet `atanh`-Singularitäten bei p=0/1.
+fn denormalize_score(p: f64) -> f64 {
+    let clamped = p.clamp(1e-6, 1.0 - 1e-6);
+    crate::mcts::VALUE_SCALE * (2.0 * clamped - 1.0).atanh()
 }
 
 /// Wie `round5.rs::ordered_children`, aber die Kandidatenliste kommt aus
@@ -233,16 +288,29 @@ fn negamax_progress(
 }
 
 /// Wählt EINE Drafting-Aktion für `state` per Fortschritts-Heuristik +
-/// Alpha-Beta (siehe Modul-Kommentar für die Gamma-Pruning-Scoping-
-/// Entscheidung). `None` außerhalb der Drafting-Phase oder ohne Legalzüge.
-/// Eigenständiges Zeitbudget (wie `round5::choose_action`), nicht von
-/// einem entfernten Aufrufer durchgereicht.
-pub(crate) fn choose_drafting_action_pruned(
+/// Alpha-Beta, mit Gamma-Pruning für rundenendende Kandidaten (siehe
+/// Modul-Kommentar). `round_end_eval(state, n_samples, rng)` bewertet einen
+/// rundenendenden Kandidatenzustand per `n_samples`-fachem Rundenübergangs-
+/// Sampling (Gewinnwahrscheinlichkeits-Skala) -- von `simulate_one_round`s
+/// Aufrufern (`continue_through_round{2,3,4}`) über `make_round_end_eval`
+/// gebaut; Tests, denen das egal ist, übergeben eine triviale Closure.
+/// `None` außerhalb der Drafting-Phase oder ohne Legalzüge.
+///
+/// ZWEI Zeitbudgets, nicht eines (per Testlauf gefunden, siehe
+/// `POLICY_TIME_BUDGET_PER_DECISION`-Kommentar): `heuristic_time_budget`
+/// gilt NUR für `negamax_progress`s Fortschritts-Heuristik-Rekursion
+/// (nicht-rundenendende Kandidaten) und bleibt klein, `overall_time_budget`
+/// deckt den GESAMTEN Aufruf inkl. Gamma-Pruning-Samples ab.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn choose_drafting_action_pruned<R: Rng + ?Sized>(
     priors: impl Fn(&GameState) -> Vec<(Action, f32)> + Copy,
     state: &GameState,
     depth: u32,
     node_budget: u64,
-    time_budget: Duration,
+    heuristic_time_budget: Duration,
+    overall_time_budget: Duration,
+    round_end_eval: impl Fn(&GameState, u32, &mut R) -> [f64; 2] + Copy,
+    rng: &mut R,
 ) -> Option<Action> {
     let perspective = state.current_player;
     let children = ordered_children_pruned(priors, state, perspective);
@@ -252,20 +320,42 @@ pub(crate) fn choose_drafting_action_pruned(
     if children.len() == 1 {
         return Some(children[0].1.clone());
     }
-    let deadline = Instant::now() + time_budget;
+    let overall_deadline = Instant::now() + overall_time_budget;
+    // EINMAL berechnet, nicht pro Kandidat (sonst bekäme jeder nicht-
+    // rundenendende Kandidat sein EIGENES frisches `heuristic_time_budget`-
+    // Fenster statt eines gemeinsam geteilten -- hätte die Gesamtlaufzeit
+    // mit der Kandidatenzahl multipliziert statt sie zu deckeln, exakt der
+    // Bug, der beim ersten Testlauf auffiel).
+    let heuristic_deadline = std::cmp::min(Instant::now() + heuristic_time_budget, overall_deadline);
     let mut node_count: u64 = 0;
     let mut best_action = children[0].1.clone();
     let mut best_val = f64::NEG_INFINITY;
     let mut alpha = f64::NEG_INFINITY;
     let beta = f64::INFINITY;
     for (_, a, next_state) in children {
-        if node_count >= node_budget || Instant::now() >= deadline {
+        if node_count >= node_budget || Instant::now() >= overall_deadline {
             break;
         }
-        let val = negamax_progress(
-            priors, &next_state, depth.saturating_sub(1), alpha, beta, perspective, &mut node_count, node_budget,
-            deadline,
-        );
+        let val = if next_state.phase != Phase::Drafting {
+            // Gamma-Pruning: echtes (aber knapp gehaltenes) Rundenübergangs-
+            // Sampling statt der billigen, faktoren-blinden Heuristik --
+            // siehe Modul-Kommentar. Eigenes Zeitbudget je Sample
+            // (`GAMMA_SAMPLE_TIME_BUDGET`, siehe `make_round_end_eval`),
+            // zusätzlich durch `overall_deadline` gedeckelt.
+            let quick_p = round_end_eval(&next_state, N_MIN_ROUND_END, rng)[perspective];
+            let quick = denormalize_score(quick_p);
+            if quick < best_val - GAMMA_MARGIN || Instant::now() >= overall_deadline {
+                quick
+            } else {
+                let full_p = round_end_eval(&next_state, N_FULL_ROUND_END, rng)[perspective];
+                denormalize_score(full_p)
+            }
+        } else {
+            negamax_progress(
+                priors, &next_state, depth.saturating_sub(1), alpha, beta, perspective, &mut node_count,
+                node_budget, heuristic_deadline,
+            )
+        };
         if val > best_val {
             best_val = val;
             best_action = a;
@@ -279,6 +369,26 @@ pub(crate) fn choose_drafting_action_pruned(
 
 // ── "Simuliere eine Runde" ───────────────────────────────────────────────────
 
+/// Baut den `round_end_eval`-Callback für `choose_drafting_action_pruned`s
+/// Gamma-Pruning: löst den Rundenübergang ab einem rundenendenden
+/// Kandidatenzustand deterministisch bis zum Chance-Knoten vor
+/// (`resolve_to_pre_chance`, wiederverwendet), sampelt ihn `n`-fach und
+/// bewertet jedes Sample über `continuation` (z.B. `exact_round5_outcome`
+/// oder ein weiteres `continue_through_roundX`). `[0.5, 0.5]`-Fallback,
+/// falls der Zustand wider Erwarten nicht auflösbar ist (sollte durch die
+/// `phase != Drafting`-Prüfung des Aufrufers nie vorkommen).
+fn make_round_end_eval<R: Rng + ?Sized>(
+    continuation: impl Fn(&GameState, &mut R) -> [f64; 2] + Copy,
+) -> impl Fn(&GameState, u32, &mut R) -> [f64; 2] + Copy {
+    move |s: &GameState, n: u32, rng: &mut R| match round_transition::resolve_to_pre_chance(s) {
+        Some(pre) => {
+            let deadline = Instant::now() + GAMMA_SAMPLE_TIME_BUDGET;
+            round_transition::sample_round_transition_value(&pre, n, |s2, rng2| continuation(s2, rng2), rng, deadline)
+        }
+        None => [0.5, 0.5],
+    }
+}
+
 /// Spielt EINE volle Runde durch (Drafting -- `drafting_actions`/
 /// `apply_drafting` decken Kuppelstapel-Züge `DrawStackPeek`/`DrawStack`
 /// bereits mit ab, kein Sonderfall nötig -- bis Tiling), ausgehend von
@@ -291,6 +401,7 @@ pub(crate) fn choose_drafting_action_pruned(
 pub(crate) fn simulate_one_round<R: Rng + ?Sized>(
     priors: impl Fn(&GameState) -> Vec<(Action, f32)> + Copy,
     round_start_state: &GameState,
+    round_end_eval: impl Fn(&GameState, u32, &mut R) -> [f64; 2] + Copy,
     overall_deadline: Instant,
     rng: &mut R,
 ) -> Option<PreChanceState> {
@@ -311,6 +422,9 @@ pub(crate) fn simulate_one_round<R: Rng + ?Sized>(
             POLICY_DEPTH,
             POLICY_NODE_BUDGET,
             POLICY_TIME_BUDGET_PER_DECISION,
+            POLICY_OVERALL_TIME_BUDGET_PER_DECISION,
+            round_end_eval,
+            rng,
         )?;
         game.apply_drafting(&action).ok()?;
     }
@@ -331,6 +445,7 @@ pub(crate) fn continue_through_round4<R: Rng + ?Sized>(
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
         round4_start,
+        make_round_end_eval(|s, _rng| crate::round5::exact_round5_outcome(s)),
         overall,
         rng,
     ) {
@@ -361,6 +476,7 @@ pub(crate) fn continue_through_round3<R: Rng + ?Sized>(
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
         round3_start,
+        make_round_end_eval(|s, rng| continue_through_round4(net, s, rng)),
         overall,
         rng,
     ) {
@@ -389,6 +505,7 @@ pub(crate) fn continue_through_round2<R: Rng + ?Sized>(
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
         round2_start,
+        make_round_end_eval(|s, rng| continue_through_round3(net, s, rng)),
         overall,
         rng,
     ) {
@@ -413,6 +530,22 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
+    /// `denormalize_score` muss exakt die Inverse von `mcts::normalize_score`
+    /// sein -- sonst wären Gamma-Pruning-Werte (Gewinnwahrscheinlichkeits-
+    /// Skala) und Fortschritts-Heuristik-Werte (Punkte-Differenz-Skala) in
+    /// derselben Wurzel-Schleife nicht mehr vergleichbar.
+    #[test]
+    fn denormalize_score_is_the_inverse_of_normalize_score() {
+        for raw in [-80.0, -12.5, -1.0, 0.0, 1.0, 12.5, 80.0] {
+            let p = crate::mcts::normalize_score(raw);
+            let back = denormalize_score(p);
+            assert!(
+                (back - raw).abs() < 1e-6,
+                "denormalize_score(normalize_score({raw})) = {back}, erwartet ~{raw}"
+            );
+        }
+    }
+
     /// Synthetische, uniforme Prior-Closure -- kein Netz nötig. Netzabhängige
     /// Teile (`net_mcts::drafting_action_priors`, `continue_through_round{2,3,4}`
     /// mit echtem `&Net`) haben KEINEN Rust-Unit-Test-Präzedenzfall in diesem
@@ -425,12 +558,23 @@ mod tests {
         actions.into_iter().map(|a| (a, 1.0 / n)).collect()
     }
 
+    /// Triviale `round_end_eval`-Closure für Tests, denen die Qualität der
+    /// Gamma-Pruning-Bewertung egal ist (nur `choose_drafting_action_pruned`s/
+    /// `simulate_one_round`s Kontrollfluss wird geprüft, nicht die Netz-
+    /// Rundenübergangs-Bewertung selbst -- die hat ohnehin keinen Rust-Test-
+    /// Präzedenzfall, siehe `uniform_priors`-Kommentar).
+    fn trivial_round_end_eval(_s: &GameState, _n: u32, _rng: &mut StdRng) -> [f64; 2] {
+        [0.5, 0.5]
+    }
+
     #[test]
     fn choose_drafting_action_pruned_picks_a_legal_move() {
         let state = drive_to_round_start(31, 2);
         let actions = crate::game::drafting_actions(&state);
+        let mut rng = StdRng::seed_from_u64(1);
         let chosen = choose_drafting_action_pruned(
             uniform_priors, &state, POLICY_DEPTH, POLICY_NODE_BUDGET, POLICY_TIME_BUDGET_PER_DECISION,
+            POLICY_OVERALL_TIME_BUDGET_PER_DECISION, trivial_round_end_eval, &mut rng,
         )
         .expect("Aktion");
         assert!(actions.contains(&chosen));
@@ -441,9 +585,11 @@ mod tests {
     #[test]
     fn choose_drafting_action_pruned_stays_within_time_budget() {
         let state = drive_to_round_start(32, 2);
+        let mut rng = StdRng::seed_from_u64(2);
         let t0 = Instant::now();
         let _ = choose_drafting_action_pruned(
             uniform_priors, &state, POLICY_DEPTH, POLICY_NODE_BUDGET, POLICY_TIME_BUDGET_PER_DECISION,
+            POLICY_OVERALL_TIME_BUDGET_PER_DECISION, trivial_round_end_eval, &mut rng,
         );
         let elapsed = t0.elapsed();
         assert!(
@@ -457,7 +603,7 @@ mod tests {
         let state = drive_to_round_start(33, 2);
         let mut rng = StdRng::seed_from_u64(1);
         let deadline = Instant::now() + Duration::from_secs(5);
-        let pre = simulate_one_round(uniform_priors, &state, deadline, &mut rng)
+        let pre = simulate_one_round(uniform_priors, &state, trivial_round_end_eval, deadline, &mut rng)
             .expect("sollte eine PreChanceState liefern");
         // PreChanceState ist opak (private Felder, andere Datei) -- über die
         // öffentliche API prüfen: ein Sample muss anwendbar sein und Runde 3
@@ -494,7 +640,8 @@ mod tests {
         for seed in 0..8u64 {
             let mut rng = StdRng::seed_from_u64(seed);
             let deadline = Instant::now() + Duration::from_secs(5);
-            let Some(pre) = simulate_one_round(uniform_priors, &state, deadline, &mut rng) else {
+            let Some(pre) = simulate_one_round(uniform_priors, &state, trivial_round_end_eval, deadline, &mut rng)
+            else {
                 continue;
             };
             let mut rng2 = StdRng::seed_from_u64(seed + 1000);
@@ -527,7 +674,7 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(9);
         let t0 = Instant::now();
         let deadline = t0 + ROUND_SIM_TIME_BUDGET;
-        let _ = simulate_one_round(uniform_priors, &state, deadline, &mut rng);
+        let _ = simulate_one_round(uniform_priors, &state, trivial_round_end_eval, deadline, &mut rng);
         let elapsed = t0.elapsed();
         assert!(
             elapsed < ROUND_SIM_TIME_BUDGET * 3,
