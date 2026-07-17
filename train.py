@@ -338,21 +338,32 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_value_r2_history.append(epoch_val_value_r2)
         val_points_r2_history.append(epoch_val_points_r2)
 
-        # ── Plateau-Erkennung ──────────────────────────────────────────────
+        # ── Plateau-Erkennung (auf Val-Policy-Loss wenn vorhanden, sonst
+        # Fallback auf Train-Loss) ───────────────────────────────────────────
+        # WARUM Val statt Train: v8b zeigte, dass die Train-Policy-Loss noch
+        # bis Epoche 56 weiter sank, waehrend die Val-Policy-Loss bereits ab
+        # ~Epoche 15-18 ihr Minimum hatte und danach durchgehend STIEG (2.2 ->
+        # 2.67) -- Train-Loss-Plateau-Erkennung haette das nie bemerkt, weil
+        # sie ja gar nicht plateaut, sondern normal weiter faellt. `rel < 0`
+        # (Val-Loss steigt) unterschreitet plateau_threshold automatisch und
+        # loest Early Stopping korrekt aus, auch wenn "PLATEAU" fuer einen
+        # tatsaechlich divergierenden Verlauf untertrieben ist.
+        has_val_ploss = val_dataloader is not None
+        plateau_series = val_ploss_history if has_val_ploss else policy_history
         plateau_marker = ""
         policy_plateaued = False
-        if len(policy_history) >= plateau_window * 2:
-            recent   = sum(policy_history[-plateau_window:]) / plateau_window
-            previous = sum(policy_history[-plateau_window*2:-plateau_window]) / plateau_window
+        if len(plateau_series) >= plateau_window * 2:
+            recent   = sum(plateau_series[-plateau_window:]) / plateau_window
+            previous = sum(plateau_series[-plateau_window*2:-plateau_window]) / plateau_window
             rel = (previous - recent) / previous if previous > 0 else 0
             if rel < plateau_threshold:
                 policy_plateaued = True
-                plateau_marker = "  🟡 POLICY-PLATEAU"
 
+        plateau_label = "VAL-POLICY-PLATEAU" if has_val_ploss else "POLICY-PLATEAU"
         if policy_plateaued:
             if policy_plateau_since is None:
                 policy_plateau_since = epoch + 1
-            plateau_marker = "  🟡 POLICY-PLATEAU"
+            plateau_marker = f"  🟡 {plateau_label}"
 
         # ── Live-Plot aktualisieren (zusätzlich zur Textzeile unten) ────────
         if plot is not None:
@@ -393,7 +404,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if policy_plateau_since is not None:
             since = (epoch + 1) - policy_plateau_since
             if since >= early_stop_patience:
-                print(f"\n⏹️  Early Stopping: Policy plateaut seit Epoche {policy_plateau_since} "
+                print(f"\n⏹️  Early Stopping: {plateau_label} seit Epoche {policy_plateau_since} "
                       f"({since} Epochen ohne Fortschritt).")
                 stopped_early = True
                 stop_reason = "plateau"
