@@ -19,3 +19,4 @@
 - Bevor du große Refactorings durchführst, skizziere kurz den Plan (1-2 Sätze).
 - Führe Änderungen schrittweise durch (Atomic CommitsEdits).
 - Wenn Unklarheiten bei den Spielregeln bestehen, frage kurz nach, anstatt Annahmen zu treffen.
+- Schau in vorhandene scripts ob dort bereits relevante funktionen vorhanden sind bevor du was neues baust (zb arena.py war schon da, aber du hast dir selbst noch eine gebaut)
