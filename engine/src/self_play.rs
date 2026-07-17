@@ -743,6 +743,16 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, rng: &mut R) -> Map<String, Val
 // ── Spiel-Loop ────────────────────────────────────────────────────────────────
 
 /// Spielt EINE komplette Partie und gibt die Trainings-Records zurück.
+/// `net`: `None` = ursprüngliches Verhalten (rein heuristische Partie, keine
+/// `round_transition_value`-Labels -- alle bestehenden Aufrufstellen
+/// unverändert). `Some(net)`: die Partie wird WEITERHIN komplett von der
+/// Heuristik entschieden (`drafting_step`/`tiling_step` unverändert), aber
+/// zusätzlich werden die Rundenübergänge per `sample_round_transition_for_round`
+/// (Netz-Chance-Node-Sampling, siehe `round_transition.rs`/
+/// `round_transition_deep.rs`) gelabelt -- lässt den Value-Head über die
+/// GESAMTE bestehende Heuristik-Self-Play-Menge hinweg vom rauschärmeren
+/// Ziel profitieren, ohne dass das Netz je eine Spielentscheidung trifft
+/// (kein Vertrauen in dessen aktuelle Suchqualität nötig).
 pub fn play_one_game<R: Rng + ?Sized>(
     base_sims: u32,
     c: f64,
@@ -751,13 +761,20 @@ pub fn play_one_game<R: Rng + ?Sized>(
     first_player: usize,
     game_id: &str,
     rng: &mut R,
+    net: Option<&Net>,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
+    let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
 
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
-    let timeout_secs = heuristic_game_timeout_secs(base_sims);
+    // `+ EXTRA_GAME_TIMEOUT_SECS` nur wenn `net` aktiv ist -- dieselbe
+    // Bugfix-Logik wie in `play_net_self_play_game` (siehe dortiger
+    // Kommentar): ohne den Zuschlag schneidet der Hänger-Schutz Partien vor
+    // Rundenende ab, sobald das zusätzliche Sampling nennenswert Zeit kostet.
+    let timeout_secs = heuristic_game_timeout_secs(base_sims)
+        + if net.is_some() { crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS } else { 0 };
     loop {
         guard += 1;
         if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
@@ -771,7 +788,20 @@ pub fn play_one_game<R: Rng + ?Sized>(
                         None => break,
                     }
                 } else if game.state.phase == Phase::Drafting {
+                    let round_before = game.state.round_number;
                     records.push(drafting_step(&mut game, base_sims, c, rng));
+                    if let Some(net) = net {
+                        if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
+                            // Gleiche Rundenende-vs-Spielende-Unterscheidung wie
+                            // in `play_net_self_play_game` (siehe dortiger
+                            // Kommentar) -- `round_before < NUM_ROUNDS` filtert
+                            // den bedeutungslosen Runde-5-Fall.
+                            if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
+                                let v = sample_round_transition_for_round(round_before, &pre, net, rng);
+                                round_transition_values.insert(round_before, v);
+                            }
+                        }
+                    }
                 } else {
                     break;
                 }
@@ -799,6 +829,13 @@ pub fn play_one_game<R: Rng + ?Sized>(
             // abgebrochen)? Nur dann sind scores/winner ein echtes Endergebnis
             // (inkl. Wertungsplatten). Downstream (self_play.py) prüft das je Datei.
             m.insert("completed".into(), json!(completed));
+            // Nur vorhanden, wenn `net` übergeben wurde UND dieser Schritts
+            // Runde tatsächlich einen Übergang erreicht hat -- siehe
+            // `play_net_self_play_game`s identisches Stempel-Muster.
+            let round = m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
+            if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
+                m.insert("round_transition_value".into(), json!(v));
+            }
             Value::Object(m)
         })
         .collect()
@@ -821,7 +858,7 @@ pub fn run_self_play(
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_one_game(base_sims, c, ids, names, first, &gid, &mut rng)
+        play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None)
     };
 
     // num_threads == 0 → globaler rayon-Pool (alle Kerne); sonst dedizierter Pool.
@@ -836,6 +873,46 @@ pub fn run_self_play(
 
     let flat: Vec<Value> = all.into_iter().flatten().collect();
     serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Wie `run_self_play`, aber zusätzlich mit `round_transition_value`-Labels
+/// aus einem geladenen Netz (siehe `play_one_game`s `net`-Parameter) --
+/// Spielentscheidungen bleiben VOLLSTÄNDIG heuristisch, nur die
+/// Rundenübergänge werden zusätzlich per Netz-Chance-Node-Sampling bewertet.
+/// Lädt das Netz EINMAL (wie `run_net_arena_match`), `Arc`-geteilt über alle
+/// Rayon-Threads.
+pub fn run_self_play_with_net_labels(
+    model_path: &str,
+    n_games: usize,
+    base_sims: u32,
+    c: f64,
+    seed: u64,
+    num_threads: usize,
+    prefix: &str,
+) -> Result<String, String> {
+    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let net = std::sync::Arc::new(net);
+
+    let play = |i: usize| -> Vec<Value> {
+        let mut rng = StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = rng.random_range(0..2usize);
+        let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
+        let gid = format!("{prefix}_g{}", i + 1);
+        play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, Some(&net))
+    };
+
+    let all: Vec<Vec<Value>> = if num_threads == 0 {
+        (0..n_games).into_par_iter().map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+
+    let flat: Vec<Value> = all.into_iter().flatten().collect();
+    Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
 // ── Arena (Agent-vs-Agent-Turnier) ───────────────────────────────────────────
@@ -1297,6 +1374,77 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     (stats[idx].0.clone(), policy)
 }
 
+/// Bewertet den Rundenübergang `round_before -> round_before+1` per
+/// mehrstufigem Chance-Node-Sampling (siehe `round_transition.rs`/
+/// `round_transition_deep.rs`) -- gemeinsame Logik für `play_net_self_play_game`
+/// (Netz entscheidet UND bewertet) und `play_one_game` (Heuristik entscheidet,
+/// Netz bewertet NUR die Übergänge zusätzlich, siehe dortiger Aufruf).
+/// Runde 4->5: exakter Freebie (`round5::exact_round5_outcome`, kein Netz-
+/// Rauschen). Runde 1-3: rekursive `continue_through_round{2,3,4}`-Ketten aus
+/// `round_transition_deep.rs`, additive (nicht kombinatorische) Kosten.
+fn sample_round_transition_for_round<R: Rng + ?Sized>(
+    round_before: u32,
+    pre: &crate::round_transition::PreChanceState,
+    net: &Net,
+    rng: &mut R,
+) -> [f64; 2] {
+    use crate::round_transition_deep as rtd;
+    match round_before {
+        r if r == crate::state::NUM_ROUNDS - 1 => {
+            let deadline = std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN_ROUND4;
+            crate::round_transition::sample_round_transition_value(
+                pre,
+                crate::round_transition::N_SAMPLES_TRAIN,
+                |s, _rng| crate::round5::exact_round5_outcome(s),
+                rng,
+                deadline,
+            )
+        }
+        3 => {
+            let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND3;
+            crate::round_transition::sample_round_transition_value(
+                pre,
+                rtd::N_SAMPLES_TRAIN_ROUND3,
+                |s, rng| rtd::continue_through_round4(net, s, rng),
+                rng,
+                deadline,
+            )
+        }
+        2 => {
+            let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND2;
+            crate::round_transition::sample_round_transition_value(
+                pre,
+                rtd::N_SAMPLES_TRAIN_ROUND2,
+                |s, rng| rtd::continue_through_round3(net, s, rng),
+                rng,
+                deadline,
+            )
+        }
+        1 => {
+            let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND1;
+            crate::round_transition::sample_round_transition_value(
+                pre,
+                rtd::N_SAMPLES_TRAIN_ROUND1,
+                |s, rng| rtd::continue_through_round2(net, s, rng),
+                rng,
+                deadline,
+            )
+        }
+        _ => {
+            // Verteidigung: sollte durch `round_before < NUM_ROUNDS` (Aufrufer-
+            // Bedingung) nie erreicht werden.
+            let deadline = std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN;
+            crate::round_transition::sample_round_transition_value(
+                pre,
+                crate::round_transition::N_SAMPLES_TRAIN,
+                |s, _rng| crate::net_mcts::net_leaf_eval(net, s),
+                rng,
+                deadline,
+            )
+        }
+    }
+}
+
 /// Ein netzgeführtes Self-Play-Spiel. Wie `play_one_game`, aber Drafting per
 /// Netz-PUCT (Priors vom Netz, Blatt per `leaf`) mit rohen Visit-Targets.
 #[allow(clippy::too_many_arguments)]
@@ -1387,72 +1535,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // Samples. Live gefunden: `round_transition_value`
                         // tauchte faelschlich auch in Runde-5-Records auf.
                         if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
-                            // Mehrstufiges Sampling (siehe round_transition_deep.rs):
-                            // Runde 4->5 ist der letzte Übergang vor dem exakt lösbaren
-                            // Runde-5-Start (kein weiterer Zufall, festes Kuppelraster)
-                            // -- Basisfall, `exact_round5_outcome`. Runde 1-3 rekursieren
-                            // je EINE Zwischenrunde simuliert + EIN verschachteltes
-                            // Sample tiefer, bis Runde 4 erreicht ist -- additive, nicht
-                            // kombinatorische Kosten (siehe Modul-Kommentar dort). Jede
-                            // Tiefe hat ihr eigenes Sample-/Zeitbudget (teurer pro Sample,
-                            // je tiefer die Kette).
-                            use crate::round_transition_deep as rtd;
-                            let v = match round_before {
-                                r if r == crate::state::NUM_ROUNDS - 1 => {
-                                    let deadline = std::time::Instant::now()
-                                        + crate::round_transition::TIME_BUDGET_TRAIN_ROUND4;
-                                    crate::round_transition::sample_round_transition_value(
-                                        &pre,
-                                        crate::round_transition::N_SAMPLES_TRAIN,
-                                        |s, _rng| crate::round5::exact_round5_outcome(s),
-                                        rng,
-                                        deadline,
-                                    )
-                                }
-                                3 => {
-                                    let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND3;
-                                    crate::round_transition::sample_round_transition_value(
-                                        &pre,
-                                        rtd::N_SAMPLES_TRAIN_ROUND3,
-                                        |s, rng| rtd::continue_through_round4(net, s, rng),
-                                        rng,
-                                        deadline,
-                                    )
-                                }
-                                2 => {
-                                    let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND2;
-                                    crate::round_transition::sample_round_transition_value(
-                                        &pre,
-                                        rtd::N_SAMPLES_TRAIN_ROUND2,
-                                        |s, rng| rtd::continue_through_round3(net, s, rng),
-                                        rng,
-                                        deadline,
-                                    )
-                                }
-                                1 => {
-                                    let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND1;
-                                    crate::round_transition::sample_round_transition_value(
-                                        &pre,
-                                        rtd::N_SAMPLES_TRAIN_ROUND1,
-                                        |s, rng| rtd::continue_through_round2(net, s, rng),
-                                        rng,
-                                        deadline,
-                                    )
-                                }
-                                _ => {
-                                    // Verteidigung: sollte durch `round_before < NUM_ROUNDS`
-                                    // (Aufrufer-Bedingung) nie erreicht werden.
-                                    let deadline =
-                                        std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN;
-                                    crate::round_transition::sample_round_transition_value(
-                                        &pre,
-                                        crate::round_transition::N_SAMPLES_TRAIN,
-                                        |s, _rng| crate::net_mcts::net_leaf_eval(net, s),
-                                        rng,
-                                        deadline,
-                                    )
-                                }
-                            };
+                            let v = sample_round_transition_for_round(round_before, &pre, net, rng);
                             round_transition_values.insert(round_before, v);
                         }
                     }
@@ -2350,6 +2433,7 @@ mod tests {
             0,
             "test_g1",
             &mut rng,
+            None,
         );
         assert!(!recs.is_empty(), "Spiel muss Records erzeugen");
         for r in &recs {
@@ -2431,6 +2515,7 @@ mod tests {
                 (seed % 2) as usize,
                 "seedcheck",
                 &mut rng,
+                None,
             );
             assert!(
                 recs.len() < 3000,
