@@ -171,6 +171,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     stop_reason = None
     total_history = []
 
+    # Best-Checkpoint-Tracking: bisher wurde NUR der letzte Epochenstand
+    # gespeichert, auch wenn Early Stopping (Patience-Fenster) erst einige
+    # Epochen nach dem eigentlichen Val-Policy-Loss-Optimum greift (siehe
+    # v8c: Minimum bei Epoche 5, Stop typischerweise erst bei Epoche
+    # plateau_since+patience). Bestes Modell nach Val-Policy-Loss (Fallback
+    # Train-Loss ohne Val-Split -- dieselbe Kennzahl wie die Plateau-
+    # Erkennung oben) zusätzlich als *_best.pth/.onnx sichern.
+    best_val_ploss = float("inf")
+    best_epoch = None
+    best_state_dict = None
+
     # ── Live-Plot (zusätzlich zur Textausgabe) ──────────────────────────────
     plot = None
     if show_plot:
@@ -337,6 +348,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_pointsloss_history.append(epoch_val_pointsloss)
         val_value_r2_history.append(epoch_val_value_r2)
         val_points_r2_history.append(epoch_val_points_r2)
+
+        current_metric = epoch_val_ploss if epoch_val_ploss is not None else epoch_ploss
+        if current_metric < best_val_ploss:
+            best_val_ploss = current_metric
+            best_epoch = epoch + 1
+            best_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
         # ── Plateau-Erkennung (auf Val-Policy-Loss wenn vorhanden, sonst
         # Fallback auf Train-Loss) ───────────────────────────────────────────
@@ -534,6 +551,35 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
 
+    best_version_name = None
+    if best_state_dict is not None and best_epoch != actual_epochs:
+        best_idx = best_epoch - 1
+        best_checkpoint = dict(checkpoint)
+        best_checkpoint["model_state"]      = best_state_dict
+        best_checkpoint["epochs"]           = best_epoch
+        best_checkpoint["is_best_checkpoint"] = True
+        best_checkpoint["selected_by"]      = "val_policy_loss" if val_dataloader is not None else "train_policy_loss"
+        best_checkpoint["final_policy_loss"] = round(policy_history[best_idx], 4)
+        best_checkpoint["final_policy_val_loss"] = (
+            round(val_ploss_history[best_idx], 4) if val_ploss_history[best_idx] is not None else None)
+        best_checkpoint["final_value_loss"]  = round(value_history[best_idx], 4)
+        best_checkpoint["final_points_loss"] = round(points_history[best_idx], 4)
+        best_checkpoint["final_value_val_loss"] = (
+            round(val_vloss_history[best_idx], 4) if val_vloss_history[best_idx] is not None else None)
+        best_checkpoint["final_points_val_loss"] = (
+            round(val_pointsloss_history[best_idx], 4) if val_pointsloss_history[best_idx] is not None else None)
+        best_checkpoint["final_value_val_r2"] = (
+            round(val_value_r2_history[best_idx], 4) if val_value_r2_history[best_idx] is not None else None)
+        best_checkpoint["final_points_val_r2"] = (
+            round(val_points_r2_history[best_idx], 4) if val_points_r2_history[best_idx] is not None else None)
+        best_version_name = f"{version_name}_best"
+        best_save_path = MODELS_DIR / f"alphazero_{best_version_name}.pth"
+        torch.save(best_checkpoint, str(best_save_path))
+        print(f"⭐ Bestes Modell (Epoche {best_epoch}, {best_checkpoint['selected_by']}="
+              f"{best_val_ploss:.4f}) zusätzlich gespeichert unter:\n📂 {best_save_path}")
+    elif best_state_dict is not None:
+        print(f"ℹ️  Letzte Epoche ({actual_epochs}) war bereits die beste — kein separater Best-Checkpoint nötig.")
+
     if plot is not None:
         try:
             plot_path = MODELS_DIR / f"alphazero_{version_name}_loss.png"
@@ -549,6 +595,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         export(version_name)
     except Exception as e:
         print(f"⚠️  ONNX-Export übersprungen (manuell nachholbar: python export_onnx.py --version {version_name}): {e}")
+    if best_version_name is not None:
+        try:
+            from export_onnx import export
+            export(best_version_name)
+        except Exception as e:
+            print(f"⚠️  ONNX-Export (Best) übersprungen "
+                  f"(manuell nachholbar: python export_onnx.py --version {best_version_name}): {e}")
 
 
 if __name__ == "__main__":
