@@ -278,6 +278,31 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
 }
 
+/// Netz-Policy-Priors für `state`: EIN Forward-Pass, wiederverwendet
+/// `build_untried_actions`s bestehende Prior-Sortierung/POLICY_MASS_CUTOFF-
+/// Kappung/Moon-Order-Expansion unverändert (dieselbe Logik, die `make_node`
+/// für die PUCT-Baumexpansion nutzt). Für `round_transition_deep.rs`s
+/// Zwischenrunden-Zugwahl (`choose_drafting_action_pruned`) gedacht — dort
+/// wird `priors` als generische Closure erwartet (kein `&Net` direkt), damit
+/// Tests eine synthetische Closure ohne ONNX-Fixture übergeben können; dies
+/// ist der dünne Produktions-Wrapper dafür. Liefert eine leere Liste bei
+/// `terminal`-Zuständen (kein Policy-Kopf-Bedarf außerhalb Drafting).
+pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Action, f32)> {
+    if state.phase != Phase::Drafting {
+        return Vec::new();
+    }
+    let feats =
+        crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let (logits, _value, moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
+    });
+    let mut moon_scores = [0f32; 5];
+    for (i, s) in moon.iter().take(5).enumerate() {
+        moon_scores[i] = *s;
+    }
+    build_untried_actions(state, &logits, &moon_scores).0
+}
+
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
 /// (per `ACTIVE_LEAF`: DFS-Solver oder Netz-Value).
 fn make_node<R: Rng + ?Sized>(
@@ -336,7 +361,7 @@ fn make_node<R: Rng + ?Sized>(
                     Some(pre) => crate::round_transition::sample_round_transition_value(
                         &pre,
                         crate::round_transition::N_SAMPLES_SEARCH,
-                        |s| net_leaf_eval(net, s),
+                        |s, _rng| net_leaf_eval(net, s),
                         rng,
                         std::time::Instant::now() + crate::round_transition::TIME_BUDGET,
                     ),
