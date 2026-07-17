@@ -71,6 +71,16 @@ pub const N_SAMPLES_TRAIN: u32 = 24;
 /// `TIME_BUDGET`-Kommentar) -- vor breitem Einsatz gegen echte Partien prüfen.
 pub const TIME_BUDGET_TRAIN: Duration = Duration::from_millis(800);
 
+/// Zeitbudget speziell für die Runde-4→5-Transition (siehe
+/// `round5::exact_round5_outcome`, self_play.rs-Aufrufstelle): dort kostet
+/// JEDER Sample-Aufruf selbst bis zu `round5::TIME_BUDGET` (150ms, ein
+/// voller Alpha-Beta-Solve statt eines ~0,2ms-Netz-Forward-Passes) --
+/// `TIME_BUDGET_TRAIN` (800ms) würde die Sample-Zahl auf ~5 statt der vollen
+/// `N_SAMPLES_TRAIN`=24 zusammenstutzen. Grosszügig auf 24×150ms+Puffer
+/// bemessen -- läuft nur 1x je Partie (nur dieser eine Übergang), daher
+/// vertretbar teurer als die anderen drei.
+pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(5);
+
 /// Ein Runden-End-Zustand, deterministisch bis unmittelbar vor den EINEN
 /// tatsächlich zufälligen Schritt vorgespult (den `EndTiling`-Aufruf des
 /// Spielers, der als zweiter fertig wird -- der DAVOR liegende erste
@@ -134,10 +144,21 @@ pub fn resolve_to_pre_chance(leaf_state: &GameState) -> Option<PreChanceState> {
 /// `deadline` ab und mittelt über die bis dahin erfolgreich gezogenen
 /// Samples; liefert `evaluator(&pre.state)` als Fallback, falls kein
 /// einziges Sample vor der Deadline fertig wurde.
+///
+/// `evaluator` bekommt `rng` als expliziten Parameter (statt es selbst per
+/// Closure zu capturen) -- `round_transition_deep.rs`s rekursive Evaluatoren
+/// (Runde 1-3, mehrstufiges Sampling) brauchen mutablen Zugriff auf
+/// DASSELBE `rng` für ihre eigenen verschachtelten
+/// `simulate_one_round`/`sample_round_transition_value`-Aufrufe -- ein
+/// Closure, das `rng` per Capture hielte, würde sich mit dem `rng: &mut R`-
+/// Parameter dieser Funktion selbst überlappend ausleihen (Borrow-Checker-
+/// Konflikt). Bestehende, rng-unabhängige Evaluatoren (`net_leaf_eval`,
+/// `round5::exact_round5_outcome`) ignorieren den zweiten Parameter einfach
+/// (`|s, _rng| ...`).
 pub fn sample_round_transition_value<R: Rng + ?Sized>(
     pre: &PreChanceState,
     n_samples: u32,
-    evaluator: impl Fn(&GameState) -> [f64; 2],
+    mut evaluator: impl FnMut(&GameState, &mut R) -> [f64; 2],
     rng: &mut R,
     deadline: Instant,
 ) -> [f64; 2] {
@@ -173,15 +194,97 @@ pub fn sample_round_transition_value<R: Rng + ?Sized>(
         if !applied {
             continue;
         }
-        let v = evaluator(&game.state);
+        let v = evaluator(&game.state, rng);
         sum[0] += v[0];
         sum[1] += v[1];
         n += 1;
     }
     if n == 0 {
-        return evaluator(&pre.state);
+        return evaluator(&pre.state, rng);
     }
     [sum[0] / n as f64, sum[1] / n as f64]
+}
+
+/// Treibt Drafting per naiver `actions[0]`-Politik bis zum nächsten
+/// Tiling-Leaf (oder Spielende). Ausgelagert aus `drive_to_first_round_end`,
+/// damit `drive_to_round_start` (unten) dieselbe Politik auch für
+/// Zwischenrunden wiederverwenden kann.
+#[cfg(test)]
+fn drive_drafting_to_leaf_naive(mut state: GameState) -> GameState {
+    let mut guard = 0u32;
+    while state.phase == Phase::Drafting {
+        guard += 1;
+        assert!(guard < 2000, "Drafting endet nicht");
+        let actions = crate::game::drafting_actions(&state);
+        if actions.is_empty() {
+            break;
+        }
+        let mut game = Game { state };
+        game.apply_drafting(&actions[0]).expect("valider Zug");
+        state = game.state;
+    }
+    state
+}
+
+/// Baut eine Partie direkt über die Engine nach (bewusst KEIN synthetisches
+/// leeres Testbrett, siehe Modul-Kommentar/`round5.rs`-Lehre: ein auf einem
+/// künstlichen Brett kalibrierter Test sagt nichts über echte
+/// Spielkomplexität aus) und stoppt beim ersten echten Rundenende, damit
+/// wir einen typisierten `GameState` bekommen. `pub(crate)` (nicht in
+/// `mod tests` verschachtelt), damit `round_transition_deep.rs`s Tests
+/// (andere Modul, braucht echte Zustände statt synthetischer Bretter,
+/// siehe dortiger Modul-Kommentar) das wiederverwenden können.
+#[cfg(test)]
+pub(crate) fn drive_to_first_round_end(seed: u64) -> GameState {
+    use crate::scoring::sample_valid_scoring_ids;
+    use crate::state::setup_new_game;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    let ids = sample_valid_scoring_ids(3, &mut rng);
+    let mut state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+    state.scoring_tile_ids = ids;
+    for p in state.players.iter_mut() {
+        p.start_tile_pending = false;
+    }
+    drive_drafting_to_leaf_naive(state)
+}
+
+/// Treibt eine Partie über `drive_to_first_round_end` hinaus bis zum
+/// Drafting-START von `target_round` (>= 2) -- wiederverwendet
+/// `resolve_to_pre_chance` für den deterministischen Vorlauf UND (mit einem
+/// ECHTEN, verbrauchenden `rng`, nicht dem verbrauchsfreien Trick aus
+/// `resolve_to_pre_chance` selbst) den tatsächlichen `EndTiling`-
+/// Zufallsschritt, um wirklich in der nächsten Runde anzukommen. Für
+/// `round_transition_deep.rs`s Tests (`simulate_one_round`/
+/// `continue_through_round{2,3,4}` brauchen echte Runde-2/3/4-Start-
+/// Zustände, kein synthetisches Brett).
+#[cfg(test)]
+pub(crate) fn drive_to_round_start(seed: u64, target_round: u32) -> GameState {
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed.wrapping_add(0xD00D));
+    let mut state = drive_to_first_round_end(seed);
+    let mut guard = 0u32;
+    while !(state.round_number == target_round && state.phase == Phase::Drafting) {
+        guard += 1;
+        assert!(guard < 10, "drive_to_round_start: zu viele Runden ohne Ziel");
+        assert_eq!(state.phase, Phase::Tiling, "erwarteter Tiling-Leaf vor Rundenübergang");
+        let pre = resolve_to_pre_chance(&state).expect("aufloesbar");
+        let mut game = Game { state: pre.state.clone() };
+        game.state.bag.tiles.shuffle(&mut rng);
+        game.state.bonus_chip_pool.shuffle(&mut rng);
+        game.apply_tiling(&TilingMove::EndTiling { player: pre.pending_end_tiling_player }, &mut rng)
+            .expect("EndTiling sollte gelingen");
+        state = game.state;
+        if !(state.round_number == target_round && state.phase == Phase::Drafting) {
+            state = drive_drafting_to_leaf_naive(state);
+        }
+    }
+    state
 }
 
 #[cfg(test)]
@@ -190,38 +293,6 @@ mod tests {
     use crate::state::Phase;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
-
-    /// Baut eine Partie direkt über die Engine nach (bewusst KEIN
-    /// synthetisches leeres Testbrett, siehe Modul-Kommentar/`round5.rs`-
-    /// Lehre: ein auf einem künstlichen Brett kalibrierter Test sagt nichts
-    /// über echte Spielkomplexität aus) und stoppt beim ersten echten
-    /// JSON-Records) und stoppt beim ersten echten Rundenende, damit wir
-    /// einen typisierten `GameState` bekommen.
-    fn drive_to_first_round_end(seed: u64) -> GameState {
-        use crate::game::Game;
-        use crate::scoring::sample_valid_scoring_ids;
-        use crate::state::setup_new_game;
-
-        let mut rng = StdRng::seed_from_u64(seed);
-        let ids = sample_valid_scoring_ids(3, &mut rng);
-        let mut state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
-        state.scoring_tile_ids = ids;
-        let mut game = Game { state };
-        for p in game.state.players.iter_mut() {
-            p.start_tile_pending = false;
-        }
-        let mut guard = 0u32;
-        while game.state.phase == Phase::Drafting {
-            guard += 1;
-            assert!(guard < 2000, "Drafting endet nicht");
-            let actions = crate::game::drafting_actions(&game.state);
-            if actions.is_empty() {
-                break;
-            }
-            game.apply_drafting(&actions[0]).expect("valider Zug");
-        }
-        game.state
-    }
 
     #[test]
     fn resolve_to_pre_chance_stops_before_final_end_tiling() {
@@ -255,7 +326,7 @@ mod tests {
         sample_round_transition_value(
             &pre,
             10,
-            |s| {
+            |s, _rng| {
                 let sig: Vec<String> = s
                     .factories
                     .iter()
@@ -290,7 +361,7 @@ mod tests {
         sample_round_transition_value(
             &pre,
             10,
-            |s| {
+            |s, _rng| {
                 let sig: Vec<String> = s
                     .factories
                     .iter()
@@ -322,7 +393,7 @@ mod tests {
         let val = sample_round_transition_value(
             &pre,
             4,
-            |_s| {
+            |_s, _rng| {
                 let v = counter.get();
                 counter.set(v + 1.0);
                 [v, v * 2.0]
@@ -346,7 +417,7 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(1);
         let t0 = Instant::now();
         let deadline = t0 + TIME_BUDGET;
-        let _ = sample_round_transition_value(&pre, N_SAMPLES_SEARCH, |s| crate::mcts::evaluate(s, 0), &mut rng, deadline);
+        let _ = sample_round_transition_value(&pre, N_SAMPLES_SEARCH, |s, _rng| crate::mcts::evaluate(s, 0), &mut rng, deadline);
         let elapsed = t0.elapsed();
         assert!(
             elapsed < TIME_BUDGET * 3,
