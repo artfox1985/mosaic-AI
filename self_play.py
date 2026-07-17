@@ -7,11 +7,16 @@ ruft Rust auf, gruppiert die zurückgelieferten Step-Records nach Spiel und
 pickled sie im UNVERÄNDERTEN Format (das `train.py` / `MosaicDataset` liest).
 
 Modi:
-  --mode mcts      Heuristik-MCTS in Rust (kein Netz, erste Generation)
-  --mode network   AlphaZero-Netz in Rust (Phase B: benötigt ONNX-Export)
+  --mode mcts             Heuristik-MCTS in Rust (kein Netz)
+  --mode mcts --model X   Heuristik-MCTS, ZUSÄTZLICH mit round_transition_value-
+                          Labels aus Modell X (Netz-Chance-Node-Sampling an den
+                          vier Rundenübergängen, siehe round_transition_deep.rs)
+                          -- Zugentscheidungen bleiben komplett heuristisch
+  --mode network          AlphaZero-Netz in Rust (Phase B: benötigt ONNX-Export)
 
 Verwendung:
   python self_play.py --mode mcts --games 1500 --sims 50 --version v0 --threads 8
+  python self_play.py --mode mcts --model alphazero_v8c.onnx --games 500 --sims 50 --version v0
 """
 import os
 import sys
@@ -91,9 +96,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             "❌ --mode network benötigt --model (z.B. alphazero_s100.onnx). "
             "Vorher 'export_onnx.py <version>' bzw. train.py ausführen."
         )
-    if mode == "network":
+    if model:
         # --model gegen den models/-Ordner auflösen: der bloße Dateiname genügt
         # (z.B. "alphazero_s100.onnx"). Ein existierender expliziter Pfad bleibt.
+        # Gilt jetzt auch für --mode mcts (siehe unten, Netz-Rundenübergangs-
+        # Labels) -- nicht mehr nur für --mode network.
         from pathlib import Path
         mp = Path(model)
         if not mp.exists():
@@ -127,6 +134,21 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei")
+    elif mode == "mcts" and model:
+        # Heuristik entscheidet WEITERHIN ausschließlich über Züge -- zusätzlich
+        # werden die vier Rundenübergänge per Netz-Chance-Node-Sampling
+        # gelabelt (round_transition_value, siehe round_transition_deep.rs).
+        # Kein Vertrauen in die Netz-Suchqualität nötig, nur in dessen
+        # Blattbewertung an den Übergängen. ~20s/Partie zusätzlich (Stand
+        # dieser Kalibrierung, siehe round_transition_deep.rs-Kommentar).
+        def make_chunk(n, chunk_idx):
+            return _mr.self_play_games_with_net_labels(
+                model_path=model, n_games=n, base_sims=simulations,
+                seed=base_seed + chunk_idx, num_threads=threads, prefix=f"{prefix}_c{chunk_idx}",
+            )
+        print(f"🚀 Starte MCTS Self-Play (Rust) MIT Netz-Rundenübergangs-Labels: {num_games} Spiele | "
+              f"Modell {model} | Sims {simulations} | Threads {threads or 'alle Kerne'} | "
+              f"Chunk {chunk} | {per_file} Spiele/Datei | ~20s/Partie zusätzlich fürs Sampling")
     else:
         def make_chunk(n, chunk_idx):
             return _mr.self_play_games(
@@ -180,8 +202,10 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, required=True, choices=["mcts", "network"],
                         help="'mcts' für Heuristik-MCTS, 'network' für AlphaZero-Netz-PUCT")
     parser.add_argument("--model", type=str, default=None,
-                        help="ONNX-Modell (Pflicht bei --mode network). Dateiname genügt — wird "
-                             "im models/-Ordner gesucht, z.B. alphazero_s100.onnx (oder ein voller Pfad)")
+                        help="ONNX-Modell (Pflicht bei --mode network; bei --mode mcts optional -- "
+                             "aktiviert dann Netz-Rundenübergangs-Labels, Zugentscheidungen bleiben "
+                             "heuristisch). Dateiname genügt — wird im models/-Ordner gesucht, "
+                             "z.B. alphazero_s100.onnx (oder ein voller Pfad)")
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--games", type=int, default=100, help="Anzahl Spiele")
