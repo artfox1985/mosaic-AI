@@ -86,7 +86,7 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
 
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
-                  tag: str = None, threads: int = 0, chunk: int = 50, seed: int = None,
+                  tag: str = None, threads: int = 0, chunk: int = 10, seed: int = None,
                   per_file: int = 10, model: str = None, c_puct: float = 1.5,
                   add_root_noise: bool = True, deterministic: bool = False):
     if mode not in ("mcts", "network"):
@@ -216,8 +216,12 @@ if __name__ == "__main__":
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
     parser.add_argument("--threads", type=int, default=0,
                         help="Rust-Worker-Threads (0 = alle Kerne). Ersetzt das alte --terminals.")
-    parser.add_argument("--chunk", type=int, default=50,
-                        help="Spiele pro Rust-Aufruf (Fortschritts-Granularität + Speicherlimit)")
+    parser.add_argument("--chunk", type=int, default=10,
+                        help="Spiele pro Rust-Aufruf (Fortschritts-Granularität + Speicherlimit). "
+                             "Bewusst klein (Standard 10, vorher 50) seit round_transition_deep.rs: "
+                             "Gamma-Pruning macht einzelne Partien teuer/variabel (~100s+ im Schnitt, "
+                             "live beobachtete Nachzügler deutlich länger) -- ein 50er-Chunk lieferte "
+                             "keinerlei Fortschrittsanzeige, bis ALLE 50 Partien durch waren.")
     parser.add_argument("--per-file", dest="per_file", type=int, default=10,
                         help="Spiele pro .pkl-Datei (Standard 10, entkoppelt von --chunk)")
     parser.add_argument("--seed", type=int, default=None,
