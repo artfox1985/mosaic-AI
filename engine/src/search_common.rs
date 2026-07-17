@@ -2,15 +2,12 @@
 //! Heuristik-MCTS (`mcts.rs`, UCB1 + progressive Widening) und die
 //! Netz-PUCT-Suche (`net_mcts.rs`, PUCT + Policy-Masse-Cutoff).
 //!
-//! Beide Bäume teilen dieselbe STRUKTUR (Force-Reply-Garantie an Tiefe 0/1,
-//! Nachlauf-Schließung offener Enden, Tiefenberechnung) — nur Selektions-
-//! formel, Blattbewertung und Kandidaten-Verwaltung unterscheiden sich
-//! fundamental (UCB1 ohne Prior + besuchszahl-getriebenes Widening vs. PUCT
-//! mit Netz-Prior + Policy-Masse-Cutoff bei Knoten-Erzeugung). Diese Datei
-//! fasst NUR die strukturell identischen Teile zusammen, damit ein Fix daran
-//! (wie die Force-Reply-Nachlauf-Ergänzung dieser Session) künftig nur noch
-//! EINMAL geschrieben werden muss, statt von Hand in beide Dateien übertragen
-//! zu werden — die eigentlichen Suchalgorithmen bleiben bewusst getrennt.
+//! `subtree_depth` wird von beiden genutzt. `force_reply_target`/
+//! `nachlauf_targets` (Force-Reply-Garantie an Tiefe 0/1 + Nachlauf-
+//! Schließung offener Enden) nutzt seit einer Vereinfachung des Netz-Pfads
+//! (Nutzer-Entscheidung: unnötige Komplexität für Stufe 2) nur noch
+//! `mcts.rs` (Stufe 1) -- bewusst hier belassen statt nach `mcts.rs`
+//! verschoben, falls Stufe 2 das je wieder braucht.
 
 /// Minimale Knoten-Schnittstelle, die beide `Node`-Typen (`mcts::Node`,
 /// `net_mcts::Node`) erfüllen — genug, um Baumstruktur (nicht Bewertung)
