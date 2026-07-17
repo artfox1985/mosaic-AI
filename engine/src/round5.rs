@@ -156,6 +156,34 @@ fn negamax(
     }
 }
 
+/// Exakter Endwert nach optimalem Runde-5-Spiel ab `state` (muss
+/// `round_number>=5` und `Phase::Drafting` sein) -- für
+/// `round_transition.rs`s Runde-4-"Freebie": nach dem 4→5-Übergangs-Sample
+/// braucht es KEINE Netz-Bewertung mehr, weil Runde 5 vollständig exakt
+/// gelöst werden kann (kein weiterer Zufall, Kuppelraster fix, siehe
+/// Modul-Kommentar oben). EIN `negamax`-Aufruf mit `perspective=0` löst dabei
+/// die GESAMTE restliche Runde 5 in einem Rutsch (nicht nur den nächsten
+/// Zug) -- `MAX_DEPTH`/`NODE_BUDGET`/`TIME_BUDGET` sind dieselben, mit denen
+/// `choose_action` ohnehin bei JEDER echten Runde-5-Entscheidung im
+/// Self-Play arbeitet (siehe dortiger Kommentar: "150ms/Entscheidung ...
+/// bleibt auch bei vielen tausend Self-Play-Partien tragbar"), ein Aufruf
+/// vom Runde-5-START ist also strukturell dieselbe Art Suche, nur an einem
+/// frühen Punkt im Baum. `perspective=0` ist eine willkürliche, aber
+/// widerspruchsfreie Referenz -- `leaf_value` ist antisymmetrisch
+/// (`leaf_value(s,p) = -leaf_value(s,1-p)`), das Ergebnis gilt unabhängig
+/// davon, wer gerade am Zug ist. Rückgabe im selben Format wie
+/// `net_mcts::net_leaf_eval` (Pro-Spieler-"Gewinnwahrscheinlichkeits"-Paar
+/// über dieselbe Sigmoid-Normalisierung wie `mcts::normalize_score`), NICHT
+/// die rohe Punkte-Differenz -- damit `round_transition_value`s
+/// Downstream-Verbraucher (self_play.rs-Stempelung, neural_net.py-Rescaling)
+/// unverändert bleiben können.
+pub(crate) fn exact_round5_outcome(state: &GameState) -> [f64; 2] {
+    let deadline = Instant::now() + TIME_BUDGET;
+    let mut node_count: u64 = 0;
+    let diff = negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, NODE_BUDGET, deadline);
+    [crate::mcts::normalize_score(diff), crate::mcts::normalize_score(-diff)]
+}
+
 /// Wählt EINE Drafting-Aktion für `state` per exakter Alpha-Beta-Suche.
 /// `None` außerhalb der Drafting-Phase oder ohne Legalzüge.
 pub fn choose_action(state: &GameState) -> Option<Action> {
@@ -354,6 +382,31 @@ mod tests {
             elapsed,
             TIME_BUDGET
         );
+    }
+
+    #[test]
+    fn exact_round5_outcome_returns_complementary_probability_pair() {
+        // normalize_score(x) + normalize_score(-x) == 1 exakt (tanh ist
+        // ungerade) -- Regressionsschutz gegen eine falsch verdrahtete
+        // Perspektive oder eine kaputte Normalisierung.
+        let s = round5_state(21);
+        let [p0, p1] = exact_round5_outcome(&s);
+        assert!((0.0..=1.0).contains(&p0), "p0 ausserhalb [0,1]: {p0}");
+        assert!((0.0..=1.0).contains(&p1), "p1 ausserhalb [0,1]: {p1}");
+        assert!((p0 + p1 - 1.0).abs() < 1e-9, "p0+p1 sollte exakt 1 sein: {p0}+{p1}");
+    }
+
+    #[test]
+    fn exact_round5_outcome_favors_the_leading_player() {
+        // Kuenstlich groszer Punktevorsprung fuer Spieler 0 (direkt am
+        // Score-Feld, nicht ueber echtes Spiel -- reicht hier, weil
+        // `leaf_value` den aktuellen `player.score` einliest).
+        let mut s = round5_state(22);
+        s.players[0].score = 80;
+        s.players[1].score = 5;
+        let [p0, p1] = exact_round5_outcome(&s);
+        assert!(p0 > p1, "fuehrender Spieler sollte hoeheren Wert bekommen: p0={p0} p1={p1}");
+        assert!(p0 > 0.5, "p0 sollte deutlich ueber 0.5 liegen: {p0}");
     }
 
     #[test]

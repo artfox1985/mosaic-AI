@@ -2,12 +2,14 @@
 //!
 //! Lädt ein nach ONNX exportiertes MosaicNet (`export_onnx.py`) und liefert
 //! `(policy_logits[NUM_ACTIONS], value[1], moon_logits[5], points[1])`.
-//! `value`/`points` sind reine Trainings-Zusatzsignale (siehe
-//! stage2_investigation.md: Stufe 2/Netz-Value-Blatt in der SUCHE bleibt
-//! tot) -- Stufe 1/3 nutzen weiterhin nur Policy + den exakten DFS-Solver,
-//! lesen die beiden Werte also nirgends aus. Reines Rust — keine
-//! libtorch/onnxruntime-Abhängigkeit. Batch fix = 1 (eine Stellung pro
-//! Forward).
+//! `value` treibt bei `ACTIVE_LEAF=Net` (Stufe 2, Standard) tatsächlich die
+//! PUCT-Suche (`net_mcts.rs::make_node`, `value_to_win_prob`) -- KORRIGIERT
+//! ggü. frühem Kommentarstand hier, der noch von der Vor-Value-Head-
+//! Rückholung stammte (siehe stage2_investigation.md für die Historie).
+//! `points` bleibt reines Trainings-Zusatzsignal, wird in der Suche nirgends
+//! gelesen. Stufe 1/3 nutzen weiterhin nur Policy + den exakten DFS-Solver.
+//! Reines Rust — keine libtorch/onnxruntime-Abhängigkeit. Batch fix = 1
+//! (eine Stellung pro Forward, kein Batching über mehrere Positionen).
 
 use tract_onnx::prelude::*;
 
