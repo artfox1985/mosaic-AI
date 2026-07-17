@@ -354,9 +354,14 @@ def action_to_id(action: dict) -> int:
 # VALUE_SCHEMA_VERSION erzwingt einen Cache-Rebuild bei Änderungen an dieser Formel.
 #
 # Zwei getrennte Ziele, zwei Köpfe (Value-Head zurückgeholt, siehe
-# evaluations/stage2_investigation.md fuer die Historie -- Stufe 2/Netz-Value-
-# Blatt in der SUCHE bleibt weiterhin tot, das hier ist reines Trainings-
-# Zusatzsignal fuer den gemeinsamen Trunk):
+# evaluations/stage2_investigation.md fuer die Historie). KORREKTUR ggue.
+# frueheren Kommentarstand hier: `values` ist NICHT tot in der Suche --
+# net_mcts.rs::make_node liest bei ACTIVE_LEAF=Net (aktueller Standard)
+# ausschliesslich `value_to_win_prob(value)` fuer den PUCT-Blattwert, `points`
+# wird dort explizit verworfen (Kommentar "reines Trainings-Zusatzsignal, hier
+# nie gebraucht"). D.h. `values` treibt die Suche, `points_forecast` ist reines
+# Trunk-Zusatzsignal ohne Sucheinfluss -- umgekehrt zu dem, was man aus dem
+# Namen "Aux-Head" vermuten wuerde.
 #   - `values`     : reines Sieg/Niederlage-Ziel (+1/-1, wer hat GEWONNEN),
 #                    der klassische AlphaZero-Value-Head. Einfacher/robuster
 #                    als ein Punktestand-Regressionsziel (siehe
@@ -366,15 +371,26 @@ def action_to_id(action: dict) -> int:
 #   - `points_forecast`: die alte Punktestand-Formel als separater Aux-Head
 #                    (tanh(eigen/SCALE) - EPSILON*tanh(gegner/SCALE)) -- liefert
 #                    dem Trunk ein feineres, kontinuierliches Zusatzsignal
-#                    ohne dass die SUCHE (Stage 1/3) je darauf zugreift.
+#                    ohne dass die SUCHE je darauf zugreift.
 #                    Ab Version 11: wo vorhanden, nutzt `points_forecast`
 #                    das gemittelte Rundenübergangs-Sampling
 #                    (`round_transition_value`) statt der einzelnen,
 #                    verrauschten Partie-Endpunktzahl (siehe
 #                    round_transition.rs -- Versuch, das dokumentierte
 #                    Val-R²-Plateau ueber ein rauschaermeres Ziel
-#                    anzugehen).
-VALUE_SCHEMA_VERSION = 11
+#                    anzugehen). Half beim points_forecast-Head (Val-R²
+#                    0.27->0.34, v8->v8b).
+#                    Ab Version 12: `round_transition_value` (wo vorhanden)
+#                    ersetzt jetzt AUCH `values` selbst, nicht nur
+#                    `points_forecast` -- v8/v8b zeigten trotz gesenktem
+#                    VALUE_WEIGHT weiterhin Val-R²<0 fuer `values` (den Head,
+#                    der tatsaechlich die Suche treibt), waehrend
+#                    `points_forecast` mit derselben Rauschreduktion bereits
+#                    auf Val-R²=0.34 kam. Gleiche Ursache: das reine
+#                    Partie-Endergebnis haengt fuer fruehe Zustaende von noch
+#                    ungezogenen Fabrik-Neubefuellungen ab (siehe oben), das
+#                    trifft `values` genauso wie `points_forecast`.
+VALUE_SCHEMA_VERSION = 12
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
@@ -480,16 +496,23 @@ class MosaicDataset(Dataset):
                             # Gewinnwahrscheinlichkeit ([0,1], nicht Punkte --
                             # daher NICHT in die own_total/opp_total-Formel
                             # oben eingesetzt, sondern direkt auf den
-                            # tanh-Wertebereich [-1,1] reskaliert und als
-                            # rauschärmerer Ersatz für points_val verwendet).
-                            # Nur vorhanden, wenn dieser Schritt tatsächlich
-                            # einen Rundenübergang erreicht hat (nicht Runde 5,
-                            # keine abgebrochenen Partien) -- sonst Fallback
-                            # auf die obige Punktestand-Formel.
+                            # tanh-Wertebereich [-1,1] reskaliert). Nur
+                            # vorhanden, wenn dieser Schritt tatsächlich einen
+                            # Rundenübergang erreicht hat (nicht Runde 5, keine
+                            # abgebrochenen Partien) -- sonst Fallback auf die
+                            # obigen Formeln (hartes ±1 bzw. Punktestand).
+                            #
+                            # Ab Version 12 ersetzt own_rtv sowohl `val` (das
+                            # Hauptziel, das net_mcts.rs tatsächlich für PUCT
+                            # liest) als auch `points_val` -- own_rtv ist
+                            # bereits exakt auf `val`s Skala (2*win_prob-1),
+                            # daher direkt übernommen statt über die
+                            # own_total/opp_total-Punkteformel geschickt.
                             rtv = step.get("round_transition_value")
                             if rtv is not None:
                                 own_rtv = float(rtv[p]) * 2.0 - 1.0
                                 opp_rtv = float(rtv[1 - p]) * 2.0 - 1.0
+                                val = own_rtv
                                 points_val = own_rtv - VALUE_OPP_EPSILON * opp_rtv
                         else:
                             val = float(step["value"])
