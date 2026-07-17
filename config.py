@@ -30,5 +30,12 @@ LEARNING_RATE = 0.0004
 # (siehe neural_net.py::VALUE_SCHEMA_VERSION). Beide Gewichte bewusst klein
 # ggue. dem Policy-Loss (der bleibt das Trainingsziel, das die Suche/Self-Play
 # tatsaechlich nutzt) -- reine Trunk-Zusatzsignale, kein Ersatz fuer Stufe 1/3.
-VALUE_WEIGHT  = 1.0
+# VALUE_WEIGHT 1.0 -> 0.2 (2026-07-17): v8-Sanity-Check zeigte massives
+# Value-Head-Overfitting (Val-R²=-0.43, Train/Val-Loss-Verhaeltnis 48.6x,
+# waehrend der Punktestand-Aux-Head mit demselben Trunk nur 2.7x zeigte,
+# Val-R²=0.27 -- im historischen 0.2-0.3-Plateau). Early Stopping beobachtet
+# nur das Policy-Plateau, nichts bremste das Value-Overfitting waehrend der
+# 55 Epochen. Kleineres Gewicht soll den Trunk weniger stark aufs leicht
+# auswendig lernbare ±1-Ziel ausrichten.
+VALUE_WEIGHT  = 0.2
 POINTS_WEIGHT = 0.5
