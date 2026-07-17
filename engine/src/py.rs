@@ -96,6 +96,18 @@ impl PyGame {
         Ok(())
     }
 
+    /// Roher Netz-Forward-Pass für einen beliebigen Feature-Vektor (Länge
+    /// muss `INPUT_SIZE` treffen) -- KEIN Spielzustand-Bezug, nur fürs
+    /// Rust-Paritätstesten gegen `export_onnx.py`s `.onnx.ref.txt`
+    /// (deterministischer Zufalls-Input+Referenz-Output je Modell-Export).
+    /// Gibt `(policy, value, moon, points)` zurück.
+    fn net_eval_raw(&self, feats: Vec<f32>) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+        let net = self.net.as_ref().ok_or_else(|| {
+            PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
+        })?;
+        net.eval(&feats).map_err(|e| PyValueError::new_err(format!("Netz-Fehler: {e}")))
+    }
+
     /// Deaktiviert den Netz-Modus (zurück auf Heuristik), ohne das geladene
     /// Netz zu verwerfen (erneutes `load_net` mit demselben Pfad bleibt billig).
     fn clear_net(&mut self) {
