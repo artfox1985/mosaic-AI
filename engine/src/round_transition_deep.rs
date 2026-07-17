@@ -99,16 +99,19 @@ pub const N_SAMPLES_TRAIN_ROUND3: u32 = 16;
 pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(30);
 pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(30);
 pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(30);
-// Vorherige Messung (~20s/Partie gesamt) galt VOR dem Gamma-Pruning oben --
-// jetzt kostet JEDE simulierte Zwischenrunde potenziell mehrere echte
-// Rundenübergangs-Stichproben (an ihren letzten 1-3 Zügen), nicht mehr nur
-// die eine äußere pro Kette. NEU GEMESSEN (Heuristik-Self-Play + v8c-Labels,
-// end-zu-Ende über self_play_games_with_net_labels, 1 Partie, base_sims=40):
-// ~105s/Partie gesamt (vorher ~35s ohne Gamma-Pruning) -- Partie lief
-// vollständig durch (completed=true, Runde 1-4 komplett gelabelt, Runde 5
-// korrekt nicht). Deutlich teurer als erwartet, aber INNERHALB der Budgets
-// hier -- kein Timeout-Abbruch. Bei einem Self-Play-Batch entsprechend
-// einplanen (~100s/Partie x Batch-Größe).
+// GESCHICHTE (Lehre, nicht mehr aktueller Stand): eine erste Gamma-Pruning-
+// Version bewertete rundenendende Kandidaten per VOLLER
+// continue_through_roundX-Rekursion statt eines einzelnen Netz-Forward-
+// Passes (siehe make_round_end_eval-Kommentar) -- ein Live-Batch lief >2h
+// ohne eine einzige Partie fertigzustellen (kombinatorische Explosion durch
+// verschachteltes Gamma-Pruning auf jeder Rekursionsebene), musste
+// abgebrochen werden. Nach dem Fix (make_round_end_eval nutzt
+// net_leaf_eval, EIN Forward-Pass, kein rekursiver Aufruf) NEU GEMESSEN
+// (Heuristik-Self-Play + v8c-Labels, end-zu-Ende über
+// self_play_games_with_net_labels, 1 Partie, base_sims=40): ~47s/Partie --
+// wieder im erwarteten Bereich (vorher ~35s ganz ohne Gamma-Pruning),
+// Partie lief vollständig durch (completed=true, Runde 1-4 komplett
+// gelabelt, Runde 5 korrekt nicht).
 
 /// Zusätzliches Zeitbudget, das `self_play.rs::play_net_self_play_game`s
 /// eigener Hänger-Schutz-Timeout (`net_game_timeout_secs`) einrechnen MUSS.
@@ -373,17 +376,41 @@ pub(crate) fn choose_drafting_action_pruned<R: Rng + ?Sized>(
 /// Gamma-Pruning: löst den Rundenübergang ab einem rundenendenden
 /// Kandidatenzustand deterministisch bis zum Chance-Knoten vor
 /// (`resolve_to_pre_chance`, wiederverwendet), sampelt ihn `n`-fach und
-/// bewertet jedes Sample über `continuation` (z.B. `exact_round5_outcome`
-/// oder ein weiteres `continue_through_roundX`). `[0.5, 0.5]`-Fallback,
-/// falls der Zustand wider Erwarten nicht auflösbar ist (sollte durch die
-/// `phase != Drafting`-Prüfung des Aufrufers nie vorkommen).
-fn make_round_end_eval<R: Rng + ?Sized>(
-    continuation: impl Fn(&GameState, &mut R) -> [f64; 2] + Copy,
-) -> impl Fn(&GameState, u32, &mut R) -> [f64; 2] + Copy {
+/// bewertet jedes Sample per EINEM Netz-Forward-Pass (`net_leaf_eval`,
+/// ~0,2ms) -- bewusst NICHT über eine rekursive `continue_through_roundX`-
+/// Kontinuation.
+///
+/// BUGFIX, live beobachtet (2+ Stunden ohne fertigzuwerden, Prozess
+/// letztlich abgebrochen): eine frühere Version bewertete hier per voller
+/// `continue_through_roundX`-Rekursion -- jeder rundenendende Kandidat, den
+/// Gamma-Pruning antrifft, hätte damit eine KOMPLETTE verschachtelte
+/// `simulate_one_round` (mit ihrem EIGENEN Gamma-Pruning, bis zu 8
+/// Auswertungen je Kandidat) ausgelöst, rekursiv bis Runde 5 -- genau die
+/// kombinatorische Explosion, die das "1 Sample je äußerer Ebene"-Design
+/// eigentlich vermeiden sollte. Jede Ebene berechnete zudem ihr eigenes
+/// Zeitbudget frisch ab `Instant::now()`, unabhängig davon, wie viel vom
+/// Budget der aufrufenden Ebene bereits verbraucht war -- nichts deckelte
+/// die Gesamtzeit wirklich. Die tiefe, korrekt additive Rekursion bleibt
+/// unverändert in `continue_through_round{2,3,4}` selbst (dort EIN Sample,
+/// EINE Rekursionsebene tiefer) -- Gamma-Pruning innerhalb einer
+/// SIMULIERTEN Runde ist ein separates, bewusst BILLIG gehaltenes Anliegen:
+/// eine brauchbare, aber begrenzte Zugwahl treffen, nicht das finale
+/// Trainingsziel konstruieren.
+///
+/// `[0.5, 0.5]`-Fallback, falls der Zustand wider Erwarten nicht auflösbar
+/// ist (sollte durch die `phase != Drafting`-Prüfung des Aufrufers nie
+/// vorkommen).
+fn make_round_end_eval<R: Rng + ?Sized>(net: &Net) -> impl Fn(&GameState, u32, &mut R) -> [f64; 2] + Copy + '_ {
     move |s: &GameState, n: u32, rng: &mut R| match round_transition::resolve_to_pre_chance(s) {
         Some(pre) => {
             let deadline = Instant::now() + GAMMA_SAMPLE_TIME_BUDGET;
-            round_transition::sample_round_transition_value(&pre, n, |s2, rng2| continuation(s2, rng2), rng, deadline)
+            round_transition::sample_round_transition_value(
+                &pre,
+                n,
+                |s2, _rng| crate::net_mcts::net_leaf_eval(net, s2),
+                rng,
+                deadline,
+            )
         }
         None => [0.5, 0.5],
     }
@@ -445,7 +472,7 @@ pub(crate) fn continue_through_round4<R: Rng + ?Sized>(
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
         round4_start,
-        make_round_end_eval(|s, _rng| crate::round5::exact_round5_outcome(s)),
+        make_round_end_eval(net),
         overall,
         rng,
     ) {
@@ -476,7 +503,7 @@ pub(crate) fn continue_through_round3<R: Rng + ?Sized>(
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
         round3_start,
-        make_round_end_eval(|s, rng| continue_through_round4(net, s, rng)),
+        make_round_end_eval(net),
         overall,
         rng,
     ) {
@@ -505,7 +532,7 @@ pub(crate) fn continue_through_round2<R: Rng + ?Sized>(
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
         round2_start,
-        make_round_end_eval(|s, rng| continue_through_round3(net, s, rng)),
+        make_round_end_eval(net),
         overall,
         rng,
     ) {
