@@ -1354,7 +1354,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     let state_json = state_to_json(&game.state, true);
                     let round_before = game.state.round_number;
                     apply_chosen_action(&mut game, chosen);
-                    if game.state.phase == Phase::Tiling {
+                    if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
                         // Rundenübergang gerade erreicht -- Chance-Node-
                         // Sampling für ein rauschärmeres Trainingsziel (siehe
                         // round_transition.rs). Läuft nur ~4x je Partie
@@ -1365,6 +1365,20 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // Phase-Prüfung nicht vorkommen), bleibt einfach
                         // kein Eintrag für diese Runde -- Python-Seite fällt
                         // dann auf die literalen `scores` zurück.
+                        //
+                        // `round_before < NUM_ROUNDS` (nicht Runde 5) ist
+                        // BUGFIX, nicht nur Optimierung: nach Runde 5s
+                        // Tiling endet `execute_end_tiling` in `Phase::End`
+                        // statt `next_round` aufzurufen (`is_over()` greift)
+                        // -- ohne diese Prüfung sampelte
+                        // `resolve_to_pre_chance`/`sample_round_transition_value`
+                        // hier trotzdem "etwas" (den EndTiling-Übergang ins
+                        // Spielende), aber ohne jede echte Zufallskomponente
+                        // (kein Refill, `apply_tiling` liefert deterministisch
+                        // denselben Endzustand) -- ein bedeutungsloser,
+                        // irreführender Wert statt eines Rundenübergangs-
+                        // Samples. Live gefunden: `round_transition_value`
+                        // tauchte faelschlich auch in Runde-5-Records auf.
                         if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
                             let deadline = std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN;
                             let v = crate::round_transition::sample_round_transition_value(
