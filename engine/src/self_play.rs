@@ -1322,7 +1322,14 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
-    let timeout_secs = net_game_timeout_secs(base_sims);
+    // `+ EXTRA_GAME_TIMEOUT_SECS`: BUGFIX, live gefunden. `net_game_timeout_secs`
+    // wurde kalibriert, bevor `round_transition_deep` existierte -- ohne diesen
+    // Zuschlag schnitt ein erster Smoke-Test (60 Sims, Timeout 30s) die Partie
+    // VOR Rundenende 5 ab (0 Runde-5-Schritte trotz vollständigem Runde-1-4-
+    // Sampling), exakt der corrupted-scores-Fehlermodus, den
+    // `net_game_timeout_secs`s eigener Kommentar beschreibt -- siehe
+    // round_transition_deep.rs::EXTRA_GAME_TIMEOUT_SECS.
+    let timeout_secs = net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS;
     loop {
         guard += 1;
         // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
@@ -1380,14 +1387,72 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // Samples. Live gefunden: `round_transition_value`
                         // tauchte faelschlich auch in Runde-5-Records auf.
                         if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
-                            let deadline = std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN;
-                            let v = crate::round_transition::sample_round_transition_value(
-                                &pre,
-                                crate::round_transition::N_SAMPLES_TRAIN,
-                                |s| crate::net_mcts::net_leaf_eval(net, s),
-                                rng,
-                                deadline,
-                            );
+                            // Mehrstufiges Sampling (siehe round_transition_deep.rs):
+                            // Runde 4->5 ist der letzte Übergang vor dem exakt lösbaren
+                            // Runde-5-Start (kein weiterer Zufall, festes Kuppelraster)
+                            // -- Basisfall, `exact_round5_outcome`. Runde 1-3 rekursieren
+                            // je EINE Zwischenrunde simuliert + EIN verschachteltes
+                            // Sample tiefer, bis Runde 4 erreicht ist -- additive, nicht
+                            // kombinatorische Kosten (siehe Modul-Kommentar dort). Jede
+                            // Tiefe hat ihr eigenes Sample-/Zeitbudget (teurer pro Sample,
+                            // je tiefer die Kette).
+                            use crate::round_transition_deep as rtd;
+                            let v = match round_before {
+                                r if r == crate::state::NUM_ROUNDS - 1 => {
+                                    let deadline = std::time::Instant::now()
+                                        + crate::round_transition::TIME_BUDGET_TRAIN_ROUND4;
+                                    crate::round_transition::sample_round_transition_value(
+                                        &pre,
+                                        crate::round_transition::N_SAMPLES_TRAIN,
+                                        |s, _rng| crate::round5::exact_round5_outcome(s),
+                                        rng,
+                                        deadline,
+                                    )
+                                }
+                                3 => {
+                                    let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND3;
+                                    crate::round_transition::sample_round_transition_value(
+                                        &pre,
+                                        rtd::N_SAMPLES_TRAIN_ROUND3,
+                                        |s, rng| rtd::continue_through_round4(net, s, rng),
+                                        rng,
+                                        deadline,
+                                    )
+                                }
+                                2 => {
+                                    let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND2;
+                                    crate::round_transition::sample_round_transition_value(
+                                        &pre,
+                                        rtd::N_SAMPLES_TRAIN_ROUND2,
+                                        |s, rng| rtd::continue_through_round3(net, s, rng),
+                                        rng,
+                                        deadline,
+                                    )
+                                }
+                                1 => {
+                                    let deadline = std::time::Instant::now() + rtd::TIME_BUDGET_TRAIN_ROUND1;
+                                    crate::round_transition::sample_round_transition_value(
+                                        &pre,
+                                        rtd::N_SAMPLES_TRAIN_ROUND1,
+                                        |s, rng| rtd::continue_through_round2(net, s, rng),
+                                        rng,
+                                        deadline,
+                                    )
+                                }
+                                _ => {
+                                    // Verteidigung: sollte durch `round_before < NUM_ROUNDS`
+                                    // (Aufrufer-Bedingung) nie erreicht werden.
+                                    let deadline =
+                                        std::time::Instant::now() + crate::round_transition::TIME_BUDGET_TRAIN;
+                                    crate::round_transition::sample_round_transition_value(
+                                        &pre,
+                                        crate::round_transition::N_SAMPLES_TRAIN,
+                                        |s, _rng| crate::net_mcts::net_leaf_eval(net, s),
+                                        rng,
+                                        deadline,
+                                    )
+                                }
+                            };
                             round_transition_values.insert(round_before, v);
                         }
                     }
