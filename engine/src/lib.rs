@@ -67,6 +67,35 @@ fn self_play_games(
     })
 }
 
+/// Wie `self_play_games`, aber zusätzlich mit `round_transition_value`-
+/// Labels aus einem geladenen Netz (siehe `self_play::play_one_game`s
+/// `net`-Parameter): Spielentscheidungen bleiben VOLLSTÄNDIG heuristisch,
+/// nur die vier Rundenübergänge werden zusätzlich per Netz-Chance-Node-
+/// Sampling (`round_transition.rs`/`round_transition_deep.rs`) bewertet --
+/// lässt den Value-Head vom rauschärmeren Ziel profitieren, ohne dass das
+/// Netz je eine Spielentscheidung trifft.
+#[pyfunction]
+#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string()))]
+#[allow(clippy::too_many_arguments)]
+fn self_play_games_with_net_labels(
+    py: Python<'_>,
+    model_path: String,
+    n_games: usize,
+    base_sims: u32,
+    c: f64,
+    seed: Option<u64>,
+    num_threads: usize,
+    prefix: String,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_self_play_with_net_labels(
+            &model_path, n_games, base_sims, c, seed, num_threads, &prefix,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Arena-Match (Heuristik-MCTS vs. Heuristik-MCTS) komplett in Rust.
 ///
 /// Spielt `n_games` Partien rayon-parallel (GIL freigegeben): Brett 0 nutzt
@@ -287,6 +316,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(ping, m)?)?;
     m.add_function(wrap_pyfunction!(self_play_games, m)?)?;
+    m.add_function(wrap_pyfunction!(self_play_games_with_net_labels, m)?)?;
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
