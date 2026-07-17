@@ -98,7 +98,7 @@ pub const VALUE_SCALE: f64 = 50.0;
 /// minimieren) in jeder Stellung weiterhin gilt. "Wissen" über den Gegner
 /// kommt strukturell aus dem Suchbaum (eigene Zweige je Spieler), nicht aus
 /// dieser Formel.
-fn normalize_score(score: f64) -> f64 {
+pub(crate) fn normalize_score(score: f64) -> f64 {
     ((score / VALUE_SCALE).tanh() + 1.0) / 2.0
 }
 
