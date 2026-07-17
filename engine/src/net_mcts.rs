@@ -1,6 +1,11 @@
 //! AlphaZero-PUCT-Suche über die Drafting-Phase (Network-Modus, Phase B).
 //!
-//! Gleiche Baumstruktur wie der Heuristik-MCTS (`crate::mcts`), aber:
+//! Ähnliche Grundstruktur wie die Heuristik-MCTS (`crate::mcts`), aber
+//! bewusst OHNE deren Force-Reply-Garantie/Nachlauf-Schließung (Tiefe 0/1
+//! erzwang früher eine simulierte Gegner-Antwort vor weiterem Breitern,
+//! plus ein Nachlauf-Pass für Fälle, die PUCT nie erneut besucht hätte) --
+//! entfernt als unnötige Komplexität für den Netz-Pfad (Nutzer-Entscheidung).
+//! `crate::mcts` behält beides (Stufe 1 bleibt unverändert). Sonst:
 //!   - Selektion per **PUCT** mit Netz-Priors statt UCB1,
 //!   - Blattbewertung = `ACTIVE_LEAF` (siehe unten) -- aktuell Stufe 2
 //!     (Netz-Value, mit dem neuen ±1-Sieg/Niederlage-Ziel statt der alten
@@ -67,7 +72,7 @@ pub const ACTIVE_LEAF: LeafEval = LeafEval::Net;
 /// statt eines einzelnen Netz-Blattwerts, nur wirksam bei `ACTIVE_LEAF=Net`.
 /// Standardmäßig AUS -- siehe `round_transition.rs`-Modul-Kommentar (Phase 2
 /// im Fahrplan, erst nach einer belegten Val-R²-Verbesserung über den
-/// Trainingsziel-Pfad aktivieren, siehe `evaluations/STAGE2_TODO.md`). Eine
+/// Trainingsziel-Pfad aktivieren, siehe `evaluations/STATUS.md`). Eine
 /// Zeile hier auf `true` aktiviert die Live-Suche-Integration jederzeit
 /// wieder, ohne Funktionssignaturen anzufassen (gleiches Muster wie
 /// `ACTIVE_LEAF`).
@@ -399,72 +404,6 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
     }
 }
 
-/// Expandiert das höchstpriorisierte unversuchte Kind von `nid` (falls
-/// vorhanden) und backpropagiert dessen Blattwert bis zur Wurzel — exakt der
-/// EXPAND/EVAL/BACKPROP-Schritt einer normalen Simulation, nur außerhalb der
-/// Sim-Zählschleife aufrufbar. Für die Nachlauf-Schließung offener Enden
-/// (siehe unten): kein Effekt, falls `nid` bereits terminal ist oder keine
-/// unversuchten Aktionen mehr hat.
-fn expand_and_backprop<R: Rng + ?Sized>(
-    nodes: &mut Vec<Node>,
-    net: &Net,
-    nid: usize,
-    names: &[&str; 2],
-    rng: &mut R,
-    log: &mut Option<&mut Vec<String>>,
-) {
-    if nodes[nid].untried.is_empty() {
-        return;
-    }
-    let (act, prior) = nodes[nid].untried.remove(0);
-    let mover = nodes[nid].state.current_player;
-    crate::profiling::note_gamestate_clone();
-    let mut g = Game { state: nodes[nid].state.clone() };
-    if g.apply_drafting(&act).is_err() {
-        return;
-    }
-    let mut child_state = g.state;
-    child_state.log.clear();
-    let terminal = child_state.phase != Phase::Drafting;
-    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, rng);
-    let cid = nodes.len();
-    nodes.push(child);
-    nodes[nid].children.push(cid);
-    if let Some(l) = log.as_deref_mut() {
-        l.push(format!(
-            "  EXPAND #{nid} +[{}] → #{cid} (Zug: {}, prior={:.1}%{})",
-            label_search_move(&SearchMove::Draft(act), Some(&nodes[nid].state)).1,
-            names[mover],
-            prior * 100.0,
-            if terminal { ", terminal" } else { "" }
-        ));
-    }
-
-    let value = nodes[cid].leaf_value;
-    if let Some(l) = log.as_deref_mut() {
-        l.push(format!(
-            "  EVAL   #{cid} ({}) win[{}]={:.3} win[{}]={:.3}",
-            if ACTIVE_LEAF == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
-            names[0], value[0], names[1], value[1]
-        ));
-    }
-
-    let mut bp = String::from("  BACKPROP");
-    let mut cur = Some(cid);
-    while let Some(i) = cur {
-        nodes[i].visits += 1;
-        let delta = value[nodes[i].player_who_acted];
-        nodes[i].value += delta;
-        if log.is_some() {
-            bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
-        }
-        cur = nodes[i].parent;
-    }
-    if let Some(l) = log.as_deref_mut() {
-        l.push(bp);
-    }
-}
-
 /// Baut den PUCT-Suchbaum. `add_root_noise` aktiviert Dirichlet-Wurzel-Noise.
 /// Mit `log = Some(..)` wird jede Simulation (Selection/Expansion/Eval/Backprop)
 /// als Text protokolliert (für den Server-Debug-Log, analog `mcts::build_tree`).
@@ -505,14 +444,6 @@ fn build_net_tree<R: Rng + ?Sized>(
         // Selection + (eine) Expansion.
         let mut nid = 0;
         loop {
-            // Erzwungener Gegnerzug (Tiefe 0/1, siehe search_common::force_reply_target):
-            // ein Knoten breitert erst weiter, wenn sein zuletzt erzeugtes Kind
-            // selbst mindestens einen eigenen Kindknoten hat (= Antwort simuliert).
-            if let Some(target) = crate::search_common::force_reply_target(&nodes, nid) {
-                logln!("  FORCE-REPLY #{nid} → #{target}: Antwort erzwungen vor weiterem Breitern");
-                nid = target;
-                continue;
-            }
             if nodes[nid].terminal {
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
                 break;
@@ -591,15 +522,6 @@ fn build_net_tree<R: Rng + ?Sized>(
             cur = nodes[i].parent;
         }
         logln!("{bp}");
-    }
-
-    // Nachlauf: Force-Reply oben (Tiefe 0/1) greift nur, wenn PUCT den Knoten
-    // je wieder besucht — Wurzelkinder mit sehr niedrigem Prior werden von
-    // PUCT nie erneut selektiert und ihr einziges erzwungenes Kind (Tiefe 2)
-    // bleibt dauerhaft ohne eigene Antwort (siehe search_common::nachlauf_targets).
-    for target in crate::search_common::nachlauf_targets(&nodes) {
-        logln!("  NACHLAUF → #{target}: offenes Ende nachträglich geschlossen");
-        expand_and_backprop(&mut nodes, net, target, &names, rng, &mut log);
     }
 
     nodes
