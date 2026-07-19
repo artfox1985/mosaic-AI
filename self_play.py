@@ -24,6 +24,8 @@ import json
 import time
 import pickle
 import argparse
+import multiprocessing as mp
+import queue as _queue_mod
 from datetime import datetime
 
 # Windows-Konsolen (cp1252) können die Emoji-Ausgaben sonst nicht kodieren.
@@ -42,6 +44,103 @@ except ImportError as e:  # pragma: no cover
         "   cd engine && maturin build --release  (dann das Wheel installieren)\n"
         f"(Import-Fehler: {e})"
     )
+
+# ── Hänger-Schutz auf Prozessebene ───────────────────────────────────────────
+# Fund (round_transition_deep.rs-Debugging, siehe dortige Kommentare zu
+# Gamma-Pruning): die internen Rust-Timeouts (heuristic_game_timeout_secs /
+# EXTRA_GAME_TIMEOUT_SECS) greifen unter realer Last nicht immer zuverlässig
+# -- eine isolierte Wiederholung des exakten Seeds einer 40+ Minuten
+# gehängten Partie lief sauber in 77s durch. Ursache: Gamma-Prunings
+# Sample-Zahl hängt von Wall-Clock-Deadlines ab, wodurch derselbe Seed unter
+# unterschiedlicher Systemlast unterschiedlich viel RNG verbraucht --
+# "Seed -> deterministische Partie" gilt nicht mehr uneingeschränkt. Da das
+# nicht auf eine einzelne behebbare Zeile zurückgeführt werden konnte, hier
+# stattdessen ein externes Sicherheitsnetz: jeder Chunk läuft in einem
+# eigenen Subprozess mit Wall-Clock-Timeout; hängt er, wird er hart beendet
+# und (mit neuem Seed, da chunk_idx den Seed mitbestimmt) automatisch neu
+# versucht, statt den ganzen Lauf zu blockieren.
+GAME_HANG_SAFETY_FACTOR = 5  # externe Grenze = Vielfaches des internen Timeouts
+MIN_CHUNK_TIMEOUT_SECS = 120
+MAX_CONSECUTIVE_CHUNK_FAILURES = 3
+
+
+def _internal_game_timeout_secs(sims: int, has_model: bool) -> int:
+    """Spiegelt self_play.rs::heuristic_game_timeout_secs/EXTRA_GAME_TIMEOUT_SECS,
+    um die externe Supervisor-Grenze proportional dazu zu skalieren."""
+    base = max(30, (sims * 3) // 10)
+    if has_model:
+        base += 5 + 30 + 30 + 30  # EXTRA_GAME_TIMEOUT_SECS (Runde 4..1)
+    return base
+
+
+def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) -> int:
+    workers = threads if threads and threads > 0 else (os.cpu_count() or 1)
+    waves = -(-n_games // max(1, workers))  # ceil
+    per_game = _internal_game_timeout_secs(sims, has_model)
+    return max(MIN_CHUNK_TIMEOUT_SECS, waves * per_game * GAME_HANG_SAFETY_FACTOR)
+
+
+def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
+                      add_root_noise, deterministic, queue):
+    """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
+    Weiterleitung, damit sie per multiprocessing.Process spawnbar ist."""
+    try:
+        import mosaic_rust as mr
+        if mode == "network":
+            raw = mr.net_self_play_games(
+                model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
+                seed=seed, num_threads=threads, prefix=prefix,
+                add_root_noise=add_root_noise, deterministic=deterministic,
+            )
+        elif mode == "mcts" and model:
+            raw = mr.self_play_games_with_net_labels(
+                model_path=model, n_games=n, base_sims=simulations,
+                seed=seed, num_threads=threads, prefix=prefix,
+            )
+        else:
+            raw = mr.self_play_games(
+                n_games=n, base_sims=simulations, seed=seed,
+                num_threads=threads, prefix=prefix,
+            )
+        queue.put(("ok", raw))
+    except Exception as e:  # pragma: no cover
+        queue.put(("error", repr(e)))
+
+
+def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
+                          add_root_noise, deterministic, timeout_secs) -> str | None:
+    """Führt einen Chunk in einem Subprozess mit Wall-Clock-Timeout aus.
+    Gibt das rohe JSON zurück, oder None bei Hänger/Timeout (Aufrufer
+    entscheidet über Retry -- siehe MAX_CONSECUTIVE_CHUNK_FAILURES)."""
+    queue: mp.Queue = mp.Queue()
+    proc = mp.Process(
+        target=_worker_run_chunk,
+        args=(mode, model, n, simulations, c_puct, seed, threads, prefix,
+              add_root_noise, deterministic, queue),
+    )
+    proc.start()
+    # WICHTIG: das Ergebnis MUSS aus der Queue gelesen werden, während wir
+    # warten, nicht erst nach proc.join() -- der Payload (JSON mehrerer
+    # Partien) kann den OS-Pipe-Puffer überschreiten; der Feeder-Thread des
+    # Kindprozesses blockiert dann beim Schreiben, und der Prozess bleibt
+    # "am Leben", bis jemand aus der Queue liest. Ein join() VOR dem get()
+    # würde also bei jedem größeren Chunk fälschlich als Hänger erkannt
+    # (klassische multiprocessing-Falle, siehe Queue-Doku).
+    try:
+        status, payload = queue.get(timeout=timeout_secs)
+    except _queue_mod.Empty:
+        print(f"  ⚠️  Chunk-Hänger erkannt (Seed {seed}, > {timeout_secs}s) -- "
+              f"beende Subprozess und versuche mit neuem Seed erneut.")
+        proc.terminate()
+        proc.join(10)
+        if proc.is_alive():  # pragma: no cover
+            proc.kill()
+            proc.join()
+        return None
+    proc.join()
+    if status == "error":
+        raise RuntimeError(f"Rust-Self-Play-Fehler im Subprozess: {payload}")
+    return payload
 
 
 def _group_by_game(steps: list[dict]) -> list[list[dict]]:
@@ -102,12 +201,12 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # Gilt jetzt auch für --mode mcts (siehe unten, Netz-Rundenübergangs-
         # Labels) -- nicht mehr nur für --mode network.
         from pathlib import Path
-        mp = Path(model)
-        if not mp.exists():
-            mp = MODELS_DIR / model
-        if not mp.exists():
+        model_path = Path(model)
+        if not model_path.exists():
+            model_path = MODELS_DIR / model
+        if not model_path.exists():
             raise SystemExit(f"❌ Modell nicht gefunden: '{model}' (auch nicht in {MODELS_DIR}/)")
-        model = str(mp)
+        model = str(model_path)
 
     import random as _random
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,19 +220,15 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # Pickle teilen sich beide Pfade. MCTS = Heuristik-Suche; network = Netz-PUCT
     # (Priors vom Netz, Blatt immer per exaktem DFS-Solver), Policy-Target =
     # rohe Visit-Verteilung N/ΣN.
+    has_model = bool(model)
+    timeout_secs = _chunk_timeout_secs(chunk, threads, simulations, has_model and mode == "mcts")
     if mode == "network":
-        def make_chunk(n, chunk_idx):
-            return _mr.net_self_play_games(
-                model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
-                seed=base_seed + chunk_idx, num_threads=threads,
-                prefix=f"{prefix}_c{chunk_idx}", add_root_noise=add_root_noise,
-                deterministic=deterministic,
-            )
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
-              f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei")
+              f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
+              f"Chunk-Hänger-Timeout {timeout_secs}s")
     elif mode == "mcts" and model:
         # Heuristik entscheidet WEITERHIN ausschließlich über Züge -- zusätzlich
         # werden die vier Rundenübergänge per Netz-Chance-Node-Sampling
@@ -141,23 +236,20 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # Kein Vertrauen in die Netz-Suchqualität nötig, nur in dessen
         # Blattbewertung an den Übergängen. ~20s/Partie zusätzlich (Stand
         # dieser Kalibrierung, siehe round_transition_deep.rs-Kommentar).
-        def make_chunk(n, chunk_idx):
-            return _mr.self_play_games_with_net_labels(
-                model_path=model, n_games=n, base_sims=simulations,
-                seed=base_seed + chunk_idx, num_threads=threads, prefix=f"{prefix}_c{chunk_idx}",
-            )
         print(f"🚀 Starte MCTS Self-Play (Rust) MIT Netz-Rundenübergangs-Labels: {num_games} Spiele | "
               f"Modell {model} | Sims {simulations} | Threads {threads or 'alle Kerne'} | "
-              f"Chunk {chunk} | {per_file} Spiele/Datei | ~20s/Partie zusätzlich fürs Sampling")
+              f"Chunk {chunk} | {per_file} Spiele/Datei | ~20s/Partie zusätzlich fürs Sampling | "
+              f"Chunk-Hänger-Timeout {timeout_secs}s")
     else:
-        def make_chunk(n, chunk_idx):
-            return _mr.self_play_games(
-                n_games=n, base_sims=simulations, seed=base_seed + chunk_idx,
-                num_threads=threads, prefix=f"{prefix}_c{chunk_idx}",
-            )
         print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
               f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | "
-              f"Chunk: {chunk} | {per_file} Spiele/Datei)")
+              f"Chunk: {chunk} | {per_file} Spiele/Datei | Chunk-Hänger-Timeout {timeout_secs}s)")
+
+    def make_chunk(n, chunk_idx):
+        return _run_chunk_supervised(
+            mode, model, n, simulations, c_puct, base_seed + chunk_idx, threads,
+            f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, timeout_secs,
+        )
 
     # WICHTIG: In Chunks generieren statt in EINEM riesigen Rust-Aufruf. Das gibt
     # laufenden Fortschritt + ETA und hält den Speicher klein (sonst lägen bei
@@ -167,14 +259,24 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     done = 0
     total_steps = 0
     chunk_idx = 0
+    consecutive_failures = 0
     buffer: list[dict] = []      # akkumulierte Steps für die nächste .pkl
     buffer_games = 0             # Anzahl Spiele im Buffer
     while done < num_games:
         n = min(chunk, num_games - done)
         raw = make_chunk(n, chunk_idx)
+        chunk_idx += 1  # Seed für den nächsten Versuch (auch bei Retry) ändert sich immer.
+        if raw is None:
+            consecutive_failures += 1
+            if consecutive_failures > MAX_CONSECUTIVE_CHUNK_FAILURES:
+                raise SystemExit(
+                    f"❌ {MAX_CONSECUTIVE_CHUNK_FAILURES} Chunks in Folge gehängt/abgebrochen -- "
+                    "wahrscheinlich ein systematisches Problem (Modell, Threads), kein Einzelfall-Hänger. Abbruch."
+                )
+            continue  # gleiche Ziel-Spielezahl `n`, aber neuer Seed durch bumped chunk_idx
+        consecutive_failures = 0
         steps = json.loads(raw)
         total_steps += len(steps)
-        chunk_idx += 1
 
         # Chunk in Spiele aufteilen und je `per_file` Spiele eine .pkl schreiben.
         for game_steps in _group_by_game(steps):
@@ -214,8 +316,10 @@ if __name__ == "__main__":
     parser.add_argument("--version", type=str, required=True, help="Versionsname, z.B. v0")
     parser.add_argument("--tag", type=str, default=None,
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
-    parser.add_argument("--threads", type=int, default=0,
-                        help="Rust-Worker-Threads (0 = alle Kerne). Ersetzt das alte --terminals.")
+    parser.add_argument("--threads", type=int, default=8,
+                        help="Rust-Worker-Threads (0 = alle Kerne, Standard jetzt 8 statt alle Kerne -- "
+                             "reduziert die Wahrscheinlichkeit lastabhängiger Gamma-Pruning-Hänger, "
+                             "siehe round_transition_deep.rs-Fund). Ersetzt das alte --terminals.")
     parser.add_argument("--chunk", type=int, default=10,
                         help="Spiele pro Rust-Aufruf (Fortschritts-Granularität + Speicherlimit). "
                              "Bewusst klein (Standard 10, vorher 50) seit round_transition_deep.rs: "
