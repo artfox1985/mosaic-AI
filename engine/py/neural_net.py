@@ -397,7 +397,27 @@ def action_to_id(action: dict) -> int:
 #                    Partie-Endergebnis haengt fuer fruehe Zustaende von noch
 #                    ungezogenen Fabrik-Neubefuellungen ab (siehe oben), das
 #                    trifft `values` genauso wie `points_forecast`.
-VALUE_SCHEMA_VERSION = 12
+#                    Ab Version 13 (2026-07-19): Kalibrierungs-Diagnose auf
+#                    v8e zeigte corr(val_true, pts_true) nur 0.49 (die beiden
+#                    ZIELE selbst stimmen nur maessig ueberein -- points_forecast
+#                    gewichtet own_total stark, values ist reines Sieg/
+#                    Niederlage), UND beide Koepfe fitten die (ueberwiegend
+#                    gesehenen) Trainingsdaten aehnlich gut (corr(pred,true)
+#                    ~0.68-0.69) -- das Problem ist also eine echte
+#                    Generalisierungsluecke, kein grundsaetzlich ungelernbares
+#                    Ziel. Hypothese: das HARTE ±1-Ziel (Fallback ohne rtv)
+#                    ist "schaerfer" als das weiche, kontinuierliche
+#                    points_forecast-Ziel und treibt den gemeinsamen Trunk
+#                    staerker Richtung Overfitting (v8e: Val-R² startet bei
+#                    Epoche 1 positiv (+0.135), zerfaellt danach monoton --
+#                    klassisches Overfitting-Muster). Fallback (ohne rtv)
+#                    daher von hartem sign(own_total-opp_total) auf ein
+#                    weiches, SYMMETRISCHES Margin-Ziel umgestellt:
+#                    tanh((own_total-opp_total)/VALUE_SCALE) -- selbe
+#                    zugrundeliegende Information wie zuvor, nur nicht mehr
+#                    an den Raendern gesaettigt/binarisiert. `rtv` bleibt
+#                    unveraendert bevorzugt, wo vorhanden.
+VALUE_SCHEMA_VERSION = 13
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
@@ -496,15 +516,17 @@ class MosaicDataset(Dataset):
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
-                            # Sieg/Niederlage als Hauptziel (klassischer AlphaZero-
-                            # Value-Head) -- einfacher/robuster als eine
-                            # Punktestand-Regression (siehe VALUE_SCHEMA_VERSION).
                             p = step["player"]
-                            val = 1.0 if step["winner"] == p else -1.0
-                            # Punktestand-Formel bleibt als separates Aux-Ziel
-                            # erhalten (bereits inkl. Wertungsplatten).
                             own_total = float(step["scores"][p])
                             opp_total = float(step["scores"][1 - p])
+                            # Weiches, symmetrisches Margin-Ziel statt hartem
+                            # ±1 (siehe VALUE_SCHEMA_VERSION=13-Kommentar oben)
+                            # -- dieselbe own_total/opp_total-Information wie
+                            # bisher, nur nicht mehr an den Raendern
+                            # gesaettigt/binarisiert.
+                            val = math.tanh((own_total - opp_total) / VALUE_SCALE)
+                            # Punktestand-Formel bleibt als separates Aux-Ziel
+                            # erhalten (bereits inkl. Wertungsplatten).
                             points_val = (math.tanh(own_total / VALUE_SCALE)
                                           - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
                             # Rundenübergangs-Ziel (siehe round_transition.rs/
