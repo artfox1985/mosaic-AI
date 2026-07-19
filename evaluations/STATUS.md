@@ -252,40 +252,100 @@ volle Kombination selbst lernen.
   Verzweigungsfaktor-Problem, das B adressieren soll. Beide Baustellen
   bewusst nacheinander, nicht gleichzeitig offen halten.
 
-## Nächste Schritte (in Reihenfolge)
+## Drei-Diagnosen-Runde abgeschlossen (2026-07-19)
 
-**Beide Teilfragen aus der vorherigen Fassung dieses Abschnitts sind jetzt
-beantwortet**: (a) Korpus-Alter/hs200 WAR ein echter Confound, domefact-only
-behebt ihn (DFS-Leaf 30%, besser als v8d). (b) Ein gesundes Val-R² reicht
-NICHT aus — v9b_domeonly kombiniert beide Fixes und zeigt trotzdem den
-schlechtesten Score-Abstand der Session unter Produktions-Konfiguration.
-Das ist jetzt eine strukturelle Frage, keine Trainings-/Datenfrage mehr.
+Alle drei parallel beauftragten Diagnosen sind durch, plus eine Recherche
+nach vergleichbaren Befunden in der AlphaZero/MCTS-Literatur.
 
-1. **Entscheidung nötig, nicht mehr nur Experimentieren** — drei nicht
-   gegenseitig ausschließende Kandidaten-Erklärungen (siehe oben,
-   v9b_domeonly-Eintrag): ungleichmäßige Fehlerverteilung über
-   Spielphasen, zu wenige Sims (150) um PUCT von Value-Rauschen zu
-   erholen, oder DFS-Leaf ist als exakter (wenn auch beschränkter)
-   Schätzer grundsätzlich verlässlicher als jede NN-Approximation hier.
-   Konkrete nächste Diagnosen (noch nicht durchgeführt):
-   a) Value-Head-Fehler NACH RUNDE aufschlüsseln (Runde 1 vs. Runde 4/5) —
-      falls der Fehler in frühen Runden konzentriert ist, würde das die
-      "ungleichmäßige Fehlerverteilung"-Hypothese stützen.
-   b) Arena bei deutlich höheren Sims (z.B. 400-800 statt 150) wiederholen
-      — falls sich die Lücke schließt, ist es ein reines Sims-Budget-
-      Problem, keine Value-Head-Qualitätsfrage.
-   c) hs200 endgültig als Trainingsquelle zurückziehen (bestätigter
-      Confound), domefact-artige Self-Play-Daten als alleinige Basis
-      etablieren, unabhängig vom Value-Head-Thema.
-2. `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
-   bis (1) einen klaren Fortschritt zeigt.
-3. **Baustein B (zweistufiger Slot→Rotation-Suchknoten) weiterhin NACH
-   der Value-Head-Klärung** (Nutzer-Entscheidung 2026-07-19) — nicht
-   parallel angehen.
-4. round_transition_value-Daten-Skalierung (2000-3000 Spiele) bleibt
-   hinten angestellt — mit dem neuen Befund (gesundes R² ≠ Spielstärke)
-   ist unklar, ob mehr solcher Daten überhaupt noch die richtige Stellschraube
-   sind.
+**(a) Value-Head-Fehler NACH RUNDE aufgeschlüsselt — entscheidender Befund.**
+R² steigt MONOTON mit der Rundenzahl (v9b_domeonly, ganzer Korpus, n=860k
+Schritte):
+
+| Runde | n | R² | MAE |
+|---|---|---|---|
+| 1 | 166.880 | **+0.032** (praktisch Rauschen) | 0.203 |
+| 2 | 175.100 | +0.146 | 0.191 |
+| 3 | 183.193 | +0.262 | 0.178 |
+| 4 | 182.517 | +0.426 | 0.155 |
+| 5 | 152.734 | **+0.621** (brauchbar) | 0.126 |
+
+Das aggregierte R² (0.22-0.29) verdeckte diese massive Ungleichverteilung
+komplett. Der Value-Head ist in Runde 1 — wo die Suche die meiste Führung
+am nötigsten hätte (größter Verzweigungsfaktor, meiste verbleibende
+Entscheidungen) — kaum besser als der Mittelwert, wird aber an JEDEM
+PUCT-Blattknoten gleich stark vertraut wie in Runde 5, wo er tatsächlich gut
+ist. Das ist die direkteste, am besten belegte Erklärung der drei
+Kandidaten.
+
+**(b) Sims-Budget hochgesetzt (150→400) — Hypothese verworfen.** Arena bleibt
+bei 0:12 (0% Siege), Score 18.2 vs. 44.4 — praktisch identisch zu 150 Sims
+(13.7 vs. 46.8). Mehr Sims schließen die Lücke NICHT — kein reines
+Explorations-/Budget-Problem.
+
+**(c) hs200 zurückgezogen** — siehe Abschnitt oben, erledigt.
+
+**Recherche-Befund** (Internet-Agent, Quellen siehe unten): das exakte
+Phänomen "Value-Head mit gutem Offline-R² schadet der Suche trotzdem" ist
+nirgends als benanntes Problem dokumentiert, aber drei eng verwandte
+Präzedenzfälle:
+- Leela Chess Zero hatte einen Stärke-Rückgang, der auf `value_loss_weight`
+  zurückgeführt wurde (github.com/leela-zero/leela-zero#1480).
+- Grupen et al., "Policy-Value Alignment and Robustness in Search-based
+  Multi-Agent Learning" (arXiv:2301.11857): Policy und Value widersprechen
+  sich am selben Zustand systematisch, Value-Funktion ist intern
+  inkonsistent — passt strukturell zu unserem Runden-Befund.
+- **KataGo blendet eine Winrate MIT einem kontinuierlichen
+  Punktestand-Vorhersage-Kopf zu einer "Utility", die tatsächlich die Suche
+  treibt** (nicht nur Trainings-Zusatzsignal) — dokumentierter Erfolgsfall
+  für genau die Idee, die `points_forecast` bei uns schon existiert, aber
+  bisher nur als Aux-Loss genutzt wird.
+
+## Empfohlener nächster Schritt
+
+Zwei sich ergänzende, beide gut begründete Optionen — keine davon braucht
+neue Self-Play-Daten, beide sind Such-Code-Änderungen auf Basis des
+bestehenden `v9b_domeonly`-Modells:
+
+1. **Rundenabhängige Blattbewertung** (direkt durch Befund (a) motiviert):
+   Value-Head nur ab einer bestimmten Runde (z.B. 3+) fürs PUCT-Blatt
+   nutzen, davor auf die Heuristik/den exakten DFS-Ansatz zurückfallen —
+   analog zu dem, was `round5.rs` für Runde 5 bereits tut, nur die Grenze
+   nach vorne verschoben.
+2. **KataGo-Stil Blended Utility** (durch Recherche gestützt): `points_forecast`
+   (generalisiert historisch immer besser als `values`) statt oder zusammen
+   mit `value` für den PUCT-Blattwert nutzen.
+
+**Explizit nicht mehr nötig für diese beiden Optionen**: kein neues
+Self-Play. Beide nutzen das bestehende `v9b_domeonly`-Modell (hat schon
+`points_forecast` UND `value` trainiert) und den bestehenden Korpus.
+
+**Offener, teurerer Verdacht für später** (nur falls beide Optionen nicht
+reichen): der gesamte domefact-Korpus stammt aus HEURISTIK-geführtem
+Self-Play (nur die Rundenübergangs-Labels kommen vom Netz) — der Value-Head
+lernt also auf Zuständen, die die Heuristik besucht, muss aber zur
+Inferenzzeit Zustände bewerten, die die NETZ-eigene PUCT-Suche besucht.
+Eine Trainings-/Inferenz-Verteilungsverschiebung wäre ein weiterer,
+unabhängiger Erklärungskandidat — würde aber echtes netz-geführtes
+Self-Play brauchen (teurer als das aktuelle heuristik-geführte), daher erst
+verfolgen, wenn (1)/(2) nicht reichen.
+
+## Weitere zurückgestellte Punkte
+
+- `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
+  bis der Value-Head-Fix einen klaren Fortschritt zeigt.
+- **Baustein B (zweistufiger Slot→Rotation-Suchknoten) weiterhin NACH
+  der Value-Head-Reparatur** (Nutzer-Entscheidung 2026-07-19).
+- round_transition_value-Daten-Skalierung (2000-3000 Spiele) bleibt
+  hinten angestellt.
+
+## Quellen (Recherche 2026-07-19)
+
+- [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
+- [Grupen et al., Policy-Value Alignment and Robustness (arXiv:2301.11857)](https://arxiv.org/abs/2301.11857)
+- [KataGo Methods docs (Score/Utility-Blending)](https://github.com/lightvector/KataGo/blob/master/docs/KataGoMethods.md)
+- [Wu, Accelerating Self-Play Learning in Go (arXiv:1902.10565)](https://arxiv.org/pdf/1902.10565)
+- [Multi-Labelled Value Networks for Computer Go (arXiv:1705.10701)](https://arxiv.org/abs/1705.10701)
+- [MCTS mit Uncertainty Propagation via Optimal Transport (arXiv:2309.10737)](https://arxiv.org/pdf/2309.10737)
 
 ## Referenz
 
