@@ -416,6 +416,67 @@ Sucherauschen hat verglichen mit einer exakten Bewertung — was auch erklärt,
 warum Floor-Shaping (ein exaktes Teilsignal statt eines weiteren gelernten)
 die einzige Variante ist, die überhaupt in Bewegung kam.
 
+## Größere Testläufe + externe Zweitmeinung (2026-07-20)
+
+Nutzer-Auftrag: größere Arena-Tests (je 100 Spiele, kein Early-Stop) für die
+vielversprechendsten Kandidaten, plus Diagnose-Vorschläge von einem externen
+Kollegen (Repo-Review).
+
+**Floor-Shaping W=0.3, n=100, kein Early-Stop — bestätigt sich als echter,
+wenn auch kleiner Effekt:**
+
+| Konfiguration | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| Floor-Shaping W=0.3 (Quelle 1+2) | 11:89 (11%) | 24.5 vs. 44.2 | **16.9 vs. 12.3** |
+
+Deutlich engerer Floor-Abstand als jede Baseline/Blend-Variante (~20-27 vs.
+~8-10) und die bisher beste Netz-Performance der Session — bei n=100 kein
+Stichproben-Artefakt mehr. Bleibt aktiv (Standard-Konfiguration).
+
+**Externe Zweitmeinung (Kollege, Repo-Review) — Kernthese: `net_leaf_eval`/
+`make_node`s zweiter Forward-Pass für `other_val` (künstlich geflipptes
+`current_player`) ist Out-of-Distribution, da Trainingsdaten nur die echte
+Zugspieler-Perspektive kennen — potenzieller Erklärer für "gesundes R², aber
+schadet der Suche" UND "Value/Points/Blend versagen identisch" (gleiche
+Plumbing).** Cheap Interventionstest direkt umgesetzt: `MIRROR_OTHER_VAL`
+erzwingt `other_val = 1 - mover_val` (ein Forward-Pass, kein OOD-Risiko).
+
+| Konfiguration | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| Mirror-Fix, ISOLIERT (kein Floor-Shaping), n=100 | 3:97 (3%) | 15.7 vs. 43.4 | 21.3 vs. 11.1 |
+
+**Ergebnis: KEINE Verbesserung** — eher schwächer als Baseline, klar
+schwächer als Floor-Shaping. Die Perspektiven-/OOD-Hypothese ist damit als
+ALLEINIGE/dominante Erklärung widerlegt (der zweite Forward-Pass mag
+suboptimal sein, ist aber nicht der Haupttäter). Zurückgesetzt auf
+`false` (Original-Zwei-Forward-Pass-Verhalten). Die übrigen Diagnose-
+Vorschläge des Kollegen (Noise-Floor-Test für Runde-1-R²-Deckel,
+Geschwister-Kendall-τ statt globalem R², FPU/Unvisited-Q-Audit,
+Kalibrierungs-Shrinkage-Intervention, TD-Bootstrap-Ziele) sind NICHT
+umgesetzt/getestet — bleiben als hochwertige, noch offene Kandidaten für
+die Fortsetzung dieser Untersuchung.
+
+**Policy-Ziel-Schärfung (Exponent 2.0 auf MCTS-Visit-Anteile, kein neues
+Self-Play nötig)**: `v9c_sharpen` warm-gestartet von `v9b_domeonly`, 15
+Epochen (Early-Stop bei Policy-Val-Plateau ab Epoche 10). Ergebnis: Top-1
+61.5% (vorher 61.8%), Top-3 86.6% (vorher 87.1%), Ø Wahrscheinlichkeitsmasse
+auf Ziel-Argmax 53.6% (vorher 49.1%, mechanisch erwartbar da Exponent die
+Reihenfolge/den Argmax NICHT ändert, nur die Schärfe der Verteilung um ihn
+herum). **Top-1-Accuracy bewegt sich NICHT** — bestätigt, dass die
+~60-65%-Decke wahrscheinlich der Ziel-eigenen Mehrdeutigkeit (viele
+Drafting-Entscheidungen sind echte Fast-Gleichstände) entspringt, nicht
+einem Trainings-/Kapazitätsdefizit. Kein Arena-Test nötig, da die
+Accuracy-Messung schon keinen Hebel zeigte.
+
+**Stand jetzt**: Floor-Shaping (W=0.3) bleibt die einzige Konfiguration mit
+einem echten, größenordnungsmäßig bestätigten (n=100) Fortschritt — von
+0% auf 11% Netz-Siege, Floor-Lücke deutlich verkleinert. Alle anderen
+getesteten Hebel (KataGo-Blend, Perspektiven-Mirror-Fix, Policy-Schärfung)
+zeigen kein Signal. Der Kollegen-Vorschlag Nr. 1 (Noise-Floor-Test: wie viel
+R² ist in Runde 1 überhaupt erreichbar, per Varianzzerlegung über K
+unabhängige Heuristik-Fortsetzungen) ist der nächste, noch nicht
+durchgeführte Test mit dem höchsten Erkenntnisgewinn-pro-Aufwand-Verhältnis.
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
