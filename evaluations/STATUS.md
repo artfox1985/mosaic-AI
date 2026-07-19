@@ -108,8 +108,10 @@ Zwei Dinge ausdrücklich NICHT auf dem Tisch:
   sind. Naechster Schritt: domefact-only-Training (nur frische, konsistente
   sims=200-Partien, kein hs200) isoliert diese Frage.
 - **v9b_domeonly -- Korpus-Confound BESTAETIGT, Value-Head-Frage NEU
-  GERAHMT (2026-07-19)**: Training exklusiv auf 550 frischen domefact-
-  Partien (kein hs200) mit demselben weichen Value-Ziel. Zwei Ergebnisse:
+  GERAHMT (2026-07-19)**: Training exklusiv auf 5500 frischen domefact-
+  Partien (550 Dateien à 10 Spiele -- 500 aus dem ersten Testlauf + volle
+  5000 aus dem zweiten Batch, kein hs200) mit demselben weichen Value-Ziel.
+  Zwei Ergebnisse:
   1) **DFS-Leaf-Diagnose: 30% Siegquote (13:30, n=43) -- BESSER als v8d
      (26%), mit groesserer Stichprobe.** Bestaetigt zweifelsfrei: das alte
      hs200 (Partien von vor den Gamma-Pruning-Bugfixes dieser Session)
