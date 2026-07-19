@@ -7,12 +7,19 @@ Reward-Value-Ziel, "Stufe 1 bleibt Produktionspfad", VALUE_WEIGHT-Sweep,
 v1-v7cold) siehe das archivierte File (`../archive/STAGE2_TODO_ARCHIVED.md`,
 mit dem restlichen alten Auswertungsmaterial zusammengelegt).
 
-## Aktuelles Ziel (2026-07-19)
+## Aktuelles Ziel (2026-07-19, AKTUALISIERT nach v9b_domeonly)
 
 **Den Value-Head geradeziehen** — das ist gerade die Priorität vor allem
 anderen. Grund: ein Net-vs-Heuristik-A/B (siehe unten) zeigt, dass der
 aktuell trainierte Value-Head die Live-Suche AKTIV verschlechtert, nicht nur
-neutral bleibt. Zwei Dinge ausdrücklich NICHT auf dem Tisch:
+neutral bleibt. **WICHTIGE KORREKTUR nach v9b_domeonly**: das Problem ist
+NICHT (nur) mehr "Val-R² ist negativ" — ein Value-Head mit gesundem,
+stabilem, positivem R² (+0.22-0.24) zeigt in Arena WEITERHIN das
+schlechteste Ergebnis der Session (0:12, Score 13.7 vs. 46.8). Die
+"Zielformel reparieren"-Hypothese ist damit als VOLLSTÄNDIGE Erklärung
+widerlegt (auch wenn sie die Val-R²-Metrik selbst nachweislich repariert
+hat) — es braucht eine STRUKTURELLE Entscheidung, siehe "Nächste Schritte".
+Zwei Dinge ausdrücklich NICHT auf dem Tisch:
 
 - **Zurück auf Stufe 1 (DFS-Solver-Blatt) als Produktions-Default** — bewusst
   verworfen, obwohl es im A/B klar besser abschnitt (siehe unten). Das Ziel
@@ -100,6 +107,36 @@ neutral bleibt. Zwei Dinge ausdrücklich NICHT auf dem Tisch:
   Value-Head-Experimente auf dem wachsenden Mischkorpus sauber interpretierbar
   sind. Naechster Schritt: domefact-only-Training (nur frische, konsistente
   sims=200-Partien, kein hs200) isoliert diese Frage.
+- **v9b_domeonly -- Korpus-Confound BESTAETIGT, Value-Head-Frage NEU
+  GERAHMT (2026-07-19)**: Training exklusiv auf 550 frischen domefact-
+  Partien (kein hs200) mit demselben weichen Value-Ziel. Zwei Ergebnisse:
+  1) **DFS-Leaf-Diagnose: 30% Siegquote (13:30, n=43) -- BESSER als v8d
+     (26%), mit groesserer Stichprobe.** Bestaetigt zweifelsfrei: das alte
+     hs200 (Partien von vor den Gamma-Pruning-Bugfixes dieser Session)
+     verschlechterte die Policy-Generalisierung, unabhaengig vom Value-
+     Thema. Konsequenz: hs200 sollte als Trainingsquelle zurueckgezogen
+     werden, frische domefact-artige Selfplay-Daten sind die bessere Basis
+     ab jetzt.
+  2) **ABER: Arena unter Produktions-Konfiguration (ACTIVE_LEAF=Net) bleibt
+     bei 0:12 (0% Siege), Ø Score 13.7 vs. 46.8 -- SCHLECHTESTER Score-
+     Abstand der gesamten Session**, trotz gesundem, stabilem Value-R²
+     (+0.22 bis +0.24, bislang bester Wert) UND wiederhergestellter
+     Policy-Qualitaet (30% DFS-Leaf).
+  **Das aendert die Diagnose grundlegend**: es ist NICHT (nur) eine Frage
+  von "wie hoch muss R² sein" -- selbst ein nachweislich gesunder,
+  generalisierender Value-Head scheint die PUCT-Suche bei diesem Sim-
+  Budget (150) genauso zu schaden wie der urspruenglich kaputte. Moegliche
+  Erklaerungen (noch nicht getestet): (a) aggregiertes Val-R² verdeckt eine
+  ungleichmaessige Fehlerverteilung ueber Spielphasen (z.B. gut in
+  Spaetphasen, irrefuehrend in Fruehphasen, wo die Suche den Wert am
+  noetigsten braucht); (b) 150 Sims reichen nicht, um PUCT durch
+  UCB-Exploration von Value-Rauschen erholen zu lassen (mehr Sims koennten
+  ein anderes Bild zeigen); (c) DFS-Leaf ist als beschraenkter, aber
+  EXAKTER Rundenrest-Schaetzer grundsaetzlich zuverlaessiger als jede
+  NN-Approximation ueber das GANZE Spiel, unabhaengig von deren Val-R².
+  **Dies ist ein struktureller Befund, keine Parameter-Frage mehr** --
+  naechster Schritt braucht eine Entscheidung (siehe "Naechste Schritte"),
+  nicht noch einen Trainingslauf.
 - **Runde 5: exakte Alpha-Beta-Suche** (`engine/src/round5.rs`). Fertig,
   getestet, aktiv.
 - **Kuppelstapel-Mechanik regelwerkstreu**: sequentielles Ziehen, gedeckelte
@@ -202,36 +239,38 @@ volle Kombination selbst lernen.
 
 ## Nächste Schritte (in Reihenfolge)
 
-1. **Value-Head-Reparatur ist Priorität #1** (s.o. "Aktuelles Ziel").
-   Kalibrierungsdiagnose erledigt (siehe oben): echte Generalisierungslücke,
-   kein ungelernbares Ziel. Weiches Margin-Ziel (VALUE_SCHEMA_VERSION=13)
-   löst das Val-R²-Problem auf Metrik-Ebene (v9a: stabil +0.19-0.21), aber
-   NICHT die Arena-Schwäche (v9a bleibt bei 7%, sogar schlechterer
-   Score-Abstand als v8d/v8e). Zwei offene Fragen jetzt:
-   a) Warum übersetzt sich gesundes Val-R² nicht in Spielstärke? Reicht
-      R²=0.19 als Signal nicht aus, um PUCT wirksam zu leiten?
-   b) **Neu, wichtiger, zuerst klären**: Policy-Qualität selbst driftet über
-      die Generationen ab (DFS-Leaf: v8d 26% → v8e 18% → v9a 7%,
-      UNABHÄNGIG vom Value-Ziel, da DFS-Leaf den Value-Output ignoriert).
-      Verdacht: wachsender/gemischter Korpus (altes hs200 von vor den
-      Gamma-Pruning-Bugfixes dieser Session, gemischt mit neuem
-      sims=200-domefact) verschlechtert die Policy-Generalisierung.
-2. **Domefact-only-Training** (nur frische, konsistente sims=200-Partien,
-   OHNE hs200) ist jetzt der Schlüsseltest für beide offenen Fragen: isoliert
-   Korpus-Alter/-Mischung als Variable UND liefert gleichzeitig die
-   eigentlich geplante Kuppel-Faktorisierungs-Auswertung (Baustein A).
-   5000-Spiele-Batch läuft (self-play), Training + DFS-Leaf-Diagnose +
-   Arena-Test direkt danach.
-3. Falls domefact-only weiterhin schlecht abschneidet (DFS-Leaf-Siegquote
-   nicht wieder bei ~26%): Korpus-Alter ist NICHT die Ursache, dann tiefer
-   in Policy-Head/Trunk-Kapazität oder Self-Play-Politik-Qualität selbst
-   schauen.
-4. Erst NACH 1: erwägen, ob mehr round_transition_value-Daten (2000-3000
-   Spiele) oder eine andere Zielkonstruktion sinnvoller ist.
-5. `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
-   bis Punkt 1 einen klaren Fortschritt zeigt.
-6. **Baustein B (zweistufiger Slot→Rotation-Suchknoten) explizit NACH
-   Punkt 1** (Nutzer-Entscheidung 2026-07-19) — nicht parallel angehen.
+**Beide Teilfragen aus der vorherigen Fassung dieses Abschnitts sind jetzt
+beantwortet**: (a) Korpus-Alter/hs200 WAR ein echter Confound, domefact-only
+behebt ihn (DFS-Leaf 30%, besser als v8d). (b) Ein gesundes Val-R² reicht
+NICHT aus — v9b_domeonly kombiniert beide Fixes und zeigt trotzdem den
+schlechtesten Score-Abstand der Session unter Produktions-Konfiguration.
+Das ist jetzt eine strukturelle Frage, keine Trainings-/Datenfrage mehr.
+
+1. **Entscheidung nötig, nicht mehr nur Experimentieren** — drei nicht
+   gegenseitig ausschließende Kandidaten-Erklärungen (siehe oben,
+   v9b_domeonly-Eintrag): ungleichmäßige Fehlerverteilung über
+   Spielphasen, zu wenige Sims (150) um PUCT von Value-Rauschen zu
+   erholen, oder DFS-Leaf ist als exakter (wenn auch beschränkter)
+   Schätzer grundsätzlich verlässlicher als jede NN-Approximation hier.
+   Konkrete nächste Diagnosen (noch nicht durchgeführt):
+   a) Value-Head-Fehler NACH RUNDE aufschlüsseln (Runde 1 vs. Runde 4/5) —
+      falls der Fehler in frühen Runden konzentriert ist, würde das die
+      "ungleichmäßige Fehlerverteilung"-Hypothese stützen.
+   b) Arena bei deutlich höheren Sims (z.B. 400-800 statt 150) wiederholen
+      — falls sich die Lücke schließt, ist es ein reines Sims-Budget-
+      Problem, keine Value-Head-Qualitätsfrage.
+   c) hs200 endgültig als Trainingsquelle zurückziehen (bestätigter
+      Confound), domefact-artige Self-Play-Daten als alleinige Basis
+      etablieren, unabhängig vom Value-Head-Thema.
+2. `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
+   bis (1) einen klaren Fortschritt zeigt.
+3. **Baustein B (zweistufiger Slot→Rotation-Suchknoten) weiterhin NACH
+   der Value-Head-Klärung** (Nutzer-Entscheidung 2026-07-19) — nicht
+   parallel angehen.
+4. round_transition_value-Daten-Skalierung (2000-3000 Spiele) bleibt
+   hinten angestellt — mit dem neuen Befund (gesundes R² ≠ Spielstärke)
+   ist unklar, ob mehr solcher Daten überhaupt noch die richtige Stellschraube
+   sind.
 
 ## Referenz
 
