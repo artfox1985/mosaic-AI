@@ -421,6 +421,17 @@ VALUE_SCHEMA_VERSION = 13
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
+# Policy-Ziel-Schärfung (Experiment, 2026-07-19): die rohen MCTS-Visit-Anteile
+# (`step["policy"]`s `prob`-Werte, Heuristik-Selfplay) sind selbst oft recht
+# flach (Stone-only-Diagnose: Ø Max-Prob nur 0.503, 41.7% "sehr flach") --
+# das gemessene Policy-Top-1 des trainierten Netzes (61.8%) liegt nah an
+# dieser Ziel-eigenen Unschärfe, nicht klar darunter (siehe
+# project_v8d_value_head_root_cause-Memory). Exponent >1 schärft die
+# Ziel-Verteilung vor dem Training nach (p → p^k, renormiert), OHNE neues
+# Self-Play zu brauchen -- reiner Trainings-Loss-Hebel auf dem bestehenden
+# Korpus. 1.0 = unveraendert (bisheriges Verhalten).
+POLICY_TARGET_SHARPEN_EXPONENT = 2.0
+
 
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data", files=None):
@@ -437,7 +448,8 @@ class MosaicDataset(Dataset):
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
         cache_key = hashlib.md5(
-            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)).encode()
+            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
+             + str(POLICY_TARGET_SHARPEN_EXPONENT)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -565,6 +577,10 @@ class MosaicDataset(Dataset):
                             t_policy[action_to_id(p["action"])] += p["prob"]
                         s = t_policy.sum()
                         if s > 0: t_policy /= s
+                        if POLICY_TARGET_SHARPEN_EXPONENT != 1.0:
+                            t_policy = np.power(t_policy, POLICY_TARGET_SHARPEN_EXPONENT, dtype=np.float32)
+                            s2 = t_policy.sum()
+                            if s2 > 0: t_policy /= s2
                         policies_l.append(t_policy)
 
                         mask = np.zeros(NUM_ACTIONS, dtype=np.float32)

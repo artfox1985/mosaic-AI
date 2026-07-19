@@ -111,7 +111,37 @@ const FLOOR_SHAPING_SCALE: f64 = 50.0;
 /// Gewicht der Floor-Straf-Korrektur relativ zum Netz-Blattwert. Bewusst
 /// klein gewählt (Nudge, kein Ersatz für den Value-Head) — erster Test, mit
 /// echten Arena-Ergebnissen kalibrieren.
+///
+/// GETESTET (2026-07-19/20, v9b_domeonly, 150 Sims, n=100, KEIN Early-Stop):
+/// 11:89 (11% Siege), Score 24.5 vs. 44.2, Floor 16.9 vs. 11.2 — spürbar
+/// engerer Floor-Abstand als Baseline (~20-27 vs. ~8-10) und die bisher
+/// beste Netz-Performance der gesamten Session. Bleibt vorerst aktiv.
 pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
+
+/// Perspektiven-/OOD-Interventionstest (externer Hinweis, 2026-07-19): der
+/// zweite Forward-Pass für `other_val` (künstlich geflipptes
+/// `state.current_player`) bewertet einen Zustand, den das Netz im Training
+/// NIE sieht — Trainingsdaten (`self_play.rs`) zeichnen Zustände IMMER nur
+/// aus der Perspektive des TATSÄCHLICHEN Zugspielers auf, nie eine fremde
+/// Ego-Sicht mitten in einem fremden Zug (inkl. pending-Phasen wie
+/// Kuppelplatzierung). Dieser zweite Forward-Pass ist also potenziell
+/// Out-of-Distribution und könnte inkohärente, nicht nullsummen-konsistente
+/// Q-Backups in beide PUCT-Bäume einspeisen — eine Hypothese, die sowohl
+/// "gesundes R², aber schadet der Suche" ALS AUCH "Value/Points/Blend
+/// versagen alle identisch" erklären würde (gleiche Plumbing in allen drei
+/// Fällen). `true` erzwingt stattdessen die günstige, garantiert
+/// nullsummen-konsistente Näherung `other_val = 1 - mover_val` (EIN
+/// Forward-Pass statt zwei, kein OOD-Risiko, halbiert nebenbei die
+/// Inferenzkosten) — direkter, kostenloser Interventionstest.
+///
+/// GETESTET (2026-07-20, v9b_domeonly, 150 Sims, n=100, KEIN Early-Stop,
+/// ISOLIERT ohne Floor-Shaping): 3:97 (3% Siege), Score 15.7 vs. 43.4,
+/// Floor 21.3 vs. 11.1 — KEINE Verbesserung, eher schlechter als der
+/// 0.0-Baseline-Bereich und deutlich schwächer als Floor-Shaping (11%).
+/// Die Perspektiven-/OOD-Hypothese ist damit als ALLEINIGE Erklärung
+/// widerlegt (der zweite Forward-Pass ist zumindest nicht der dominante
+/// Schadensfaktor) -- auf `false` zurückgesetzt (Original-Verhalten).
+pub const MIRROR_OTHER_VAL: bool = false;
 
 /// Exakte, JETZT SCHON feststehende Floor-Straf-Differenz (Spieler0 minus
 /// Spieler1) dieser Runde, roh (unskaliert). KEINE Vorhersage — reine
@@ -438,14 +468,17 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
             })
         });
     let mover_val = blended_leaf_win_prob(&value, &points);
-    crate::profiling::note_gamestate_clone();
-    let mut flipped = state.clone();
-    flipped.current_player = 1 - state.current_player;
-    let other_feats = state_to_features_direct(&flipped);
-    let other_val = net
-        .eval(&other_feats)
-        .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
-        .unwrap_or(0.5);
+    let other_val = if MIRROR_OTHER_VAL {
+        1.0 - mover_val
+    } else {
+        crate::profiling::note_gamestate_clone();
+        let mut flipped = state.clone();
+        flipped.current_player = 1 - state.current_player;
+        let other_feats = state_to_features_direct(&flipped);
+        net.eval(&other_feats)
+            .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
+            .unwrap_or(0.5)
+    };
     if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
 }
 
@@ -534,14 +567,17 @@ fn make_node<R: Rng + ?Sized>(
     let leaf_value = match ACTIVE_LEAF {
         LeafEval::Net => {
             let mover_val = blended_leaf_win_prob(&value, &points);
-            crate::profiling::note_gamestate_clone();
-            let mut flipped = state.clone();
-            flipped.current_player = 1 - state.current_player;
-            let other_feats = state_to_features_direct(&flipped);
-            let other_val = net
-                .eval(&other_feats)
-                .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
-                .unwrap_or(0.5);
+            let other_val = if MIRROR_OTHER_VAL {
+                1.0 - mover_val
+            } else {
+                crate::profiling::note_gamestate_clone();
+                let mut flipped = state.clone();
+                flipped.current_player = 1 - state.current_player;
+                let other_feats = state_to_features_direct(&flipped);
+                net.eval(&other_feats)
+                    .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
+                    .unwrap_or(0.5)
+            };
             let mut today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
 
