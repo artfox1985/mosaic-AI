@@ -78,6 +78,30 @@ pub const ACTIVE_LEAF: LeafEval = LeafEval::Net;
 /// `ACTIVE_LEAF`).
 pub const ROUND_TRANSITION_SAMPLING: bool = false;
 
+/// KataGo-Stil geblendete Utility (siehe `project_v8d_value_head_root_cause`-
+/// Memory / `evaluations/STATUS.md`): `value_head`s R² ist stark rundenabhängig
+/// (~0.03 in Runde 1, ~0.62 in Runde 5) — die Suche vertraut ihm aber an jedem
+/// Blatt gleichermaßen. `points_head`/`points_forecast` (kontinuierliches
+/// Punktestand-Ziel, siehe `neural_net.py::VALUE_SCALE`/`VALUE_OPP_EPSILON`)
+/// generalisiert historisch durchgehend besser (R²≈0.33-0.44) als `value`.
+/// KataGo blendet genau so einen Score-basierten Utility-Term MIT der
+/// Sieg-Wahrscheinlichkeit in die tatsächliche, such-treibende Utility (nicht
+/// nur als Trainings-Nebenverlust) — siehe
+/// github.com/lightvector/KataGo/blob/master/docs/KataGoMethods.md. Gewicht
+/// hier bewusst ohne Vorab-Tuning auf 0.5 (gleichgewichtete Mischung) gesetzt;
+/// erster Test, mit echten Arena-Ergebnissen gegenkalibrieren (0.0 = alter
+/// reiner Value-Leaf-Zustand, 1.0 = reiner Points-Leaf).
+///
+/// GETESTET (2026-07-19, v9b_domeonly, 150 Sims, SPRT): weder 0.5 (1:14,
+/// Score 19.5 vs 49.7, Floor 27.0 vs 10.5) noch 1.0 (0:12, Score 14.2 vs
+/// 55.0, Floor 25.4 vs 10.1) schließen die Lücke zum 0.0-Baseline (0:12,
+/// Score 13.7-18.2 vs 44.4-46.8, Floor ~20-25) — Floor-Strafe bleibt bei
+/// ALLEN drei Werten im selben erhöhten Bereich, unabhängig von der
+/// Blattwert-Formel. Auf 0.0 zurückgesetzt (= vorheriger, besser abgesicherter
+/// Zustand); Code bleibt verfügbar für spätere Rekalibrierung, siehe
+/// `project_v8d_value_head_root_cause`-Memory für die volle Diskussion.
+pub const POINTS_UTILITY_WEIGHT: f64 = 0.0;
+
 // ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
 //
 // Die Aktions-ID (`action_to_id`) kodiert `moon_order` NICHT — Farbe/Reihe/
@@ -333,6 +357,21 @@ fn value_to_win_prob(value: &[f32]) -> f64 {
     (v + 1.0) / 2.0
 }
 
+/// KataGo-Stil geblendete Blattbewertung: mischt `value_head`s Sieg-Wahr-
+/// scheinlichkeit mit `points_head`s Punktestand-Prognose (`POINTS_UTILITY_
+/// WEIGHT`, siehe dortiger Kommentar für die Begründung). `points` nutzt
+/// dieselbe Tanh→[0,1]-Skalierung wie `value` (andere Zielformel, gleiche
+/// Skala) — bei fehlendem `points`-Kopf (z.B. ältere ONNX-Checkpoints ohne
+/// den Kopf) fällt dies auf reines `value` zurück, kein Panik/Skip nötig.
+fn blended_leaf_win_prob(value: &[f32], points: &[f32]) -> f64 {
+    let wr = value_to_win_prob(value);
+    if points.is_empty() {
+        return wr;
+    }
+    let pts = value_to_win_prob(points);
+    (1.0 - POINTS_UTILITY_WEIGHT) * wr + POINTS_UTILITY_WEIGHT * pts
+}
+
 /// Netz-Blattwert für `state`: unabhängige Pro-Spieler-Werte. Das Netz liefert
 /// einen EGO-perspektivischen Wert (die Input-Features hängen von
 /// `state.current_player` ab, siehe features.rs/state_to_tensor) — für den
@@ -345,18 +384,21 @@ fn value_to_win_prob(value: &[f32]) -> f64 {
 pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (_logits, value, _moon, _points, _dslot, _drot) =
+    let (_logits, value, _moon, points, _dslot, _drot) =
         crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
             net.eval(&feats).unwrap_or_else(|_| {
                 (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
             })
         });
-    let mover_val = value_to_win_prob(&value);
+    let mover_val = blended_leaf_win_prob(&value, &points);
     crate::profiling::note_gamestate_clone();
     let mut flipped = state.clone();
     flipped.current_player = 1 - state.current_player;
     let other_feats = state_to_features_direct(&flipped);
-    let other_val = net.eval(&other_feats).map(|(_, v, _, _, _, _)| value_to_win_prob(&v)).unwrap_or(0.5);
+    let other_val = net
+        .eval(&other_feats)
+        .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
+        .unwrap_or(0.5);
     if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
 }
 
@@ -410,9 +452,9 @@ fn make_node<R: Rng + ?Sized>(
     let terminal = state.phase != Phase::Drafting;
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
-    // `points` ist reines Trainings-Zusatzsignal (siehe net.rs), hier nie
-    // gebraucht. `value` wird nur bei ACTIVE_LEAF=Net gelesen.
-    let (logits, value, moon, _points, dslot, drot) =
+    // `points` fließt bei ACTIVE_LEAF=Net jetzt in `blended_leaf_win_prob` mit
+    // ein (KataGo-Stil Score-Utility, siehe `POINTS_UTILITY_WEIGHT`-Kommentar).
+    let (logits, value, moon, points, dslot, drot) =
         crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
             net.eval(&feats).unwrap_or_else(|_| {
                 (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
@@ -444,14 +486,14 @@ fn make_node<R: Rng + ?Sized>(
     // Forward-Pass mit geflipptem `current_player`, nicht einfach `1-wert`.
     let leaf_value = match ACTIVE_LEAF {
         LeafEval::Net => {
-            let mover_val = value_to_win_prob(&value);
+            let mover_val = blended_leaf_win_prob(&value, &points);
             crate::profiling::note_gamestate_clone();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let other_feats = state_to_features_direct(&flipped);
             let other_val = net
                 .eval(&other_feats)
-                .map(|(_, v, _, _, _, _)| value_to_win_prob(&v))
+                .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
                 .unwrap_or(0.5);
             let today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };

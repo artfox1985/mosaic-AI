@@ -302,32 +302,50 @@ Präzedenzfälle:
 
 ## Empfohlener nächster Schritt
 
-Zwei sich ergänzende, beide gut begründete Optionen — keine davon braucht
-neue Self-Play-Daten, beide sind Such-Code-Änderungen auf Basis des
-bestehenden `v9b_domeonly`-Modells:
+**Nutzer-Entscheidung (2026-07-19): Option 1 (rundenabhängige Blattbewertung)
+explizit ABGELEHNT** — würde ausgerechnet in Runde 1-2 (wo die meisten Runden
+noch bevorstehen und Rundenweitsicht am wichtigsten wäre) auf DFS/Heuristik
+zurückfallen, das widerspricht direkt dem eigentlichen Ziel von Stufe 2.
 
-1. **Rundenabhängige Blattbewertung** (direkt durch Befund (a) motiviert):
-   Value-Head nur ab einer bestimmten Runde (z.B. 3+) fürs PUCT-Blatt
-   nutzen, davor auf die Heuristik/den exakten DFS-Ansatz zurückfallen —
-   analog zu dem, was `round5.rs` für Runde 5 bereits tut, nur die Grenze
-   nach vorne verschoben.
-2. **KataGo-Stil Blended Utility** (durch Recherche gestützt): `points_forecast`
-   (generalisiert historisch immer besser als `values`) statt oder zusammen
-   mit `value` für den PUCT-Blattwert nutzen.
+**Option 2 (KataGo-Stil Blended Utility) implementiert und GETESTET — schließt
+die Lücke NICHT.** `net_mcts.rs`: neue Konstante `POINTS_UTILITY_WEIGHT`
+mischt `value_head`s Sieg-Wahrscheinlichkeit mit `points_head`s
+Punktestand-Prognose (`blended_leaf_win_prob`, gleiche Tanh→[0,1]-Skala für
+beide). Arena v9b_domeonly vs. Heuristik, 150 Sims, SPRT, drei Gewichte:
 
-**Explizit nicht mehr nötig für diese beiden Optionen**: kein neues
-Self-Play. Beide nutzen das bestehende `v9b_domeonly`-Modell (hat schon
-`points_forecast` UND `value` trainiert) und den bestehenden Korpus.
+| Gewicht | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| 0.0 (nur `value`, Baseline) | 0:12 (0%) | 13.7-18.2 vs. 44.4-46.8 | ~20-25 vs. ~8-10 |
+| 0.5 (hälftiger Blend) | 1:14 (7%) | 19.5 vs. 49.7 | 27.0 vs. 10.5 |
+| 1.0 (nur `points_forecast`) | 0:12 (0%) | 14.2 vs. 55.0 | 25.4 vs. 10.1 |
 
-**Offener, teurerer Verdacht für später** (nur falls beide Optionen nicht
-reichen): der gesamte domefact-Korpus stammt aus HEURISTIK-geführtem
-Self-Play (nur die Rundenübergangs-Labels kommen vom Netz) — der Value-Head
-lernt also auf Zuständen, die die Heuristik besucht, muss aber zur
-Inferenzzeit Zustände bewerten, die die NETZ-eigene PUCT-Suche besucht.
-Eine Trainings-/Inferenz-Verteilungsverschiebung wäre ein weiterer,
-unabhängiger Erklärungskandidat — würde aber echtes netz-geführtes
-Self-Play brauchen (teurer als das aktuelle heuristik-geführte), daher erst
-verfolgen, wenn (1)/(2) nicht reichen.
+Keines der drei Gewichte kommt in die Nähe einer echten Verbesserung — alle
+verlieren 93-100% gegen die Heuristik. **Bemerkenswert**: die Floor-Strafe
+bleibt bei ALLEN drei Werten im selben erhöhten Bereich, unabhängig davon,
+welches Signal den Blattwert bestimmt. Das spricht dagegen, dass die
+Blattwert-Formel (egal ob `value`, `points_forecast` oder eine Mischung) der
+eigentliche Flaschenhals ist — der Fehler sitzt wahrscheinlich woanders
+(Policy-Kopf-Qualität oder wie Priors/Blattwert in der PUCT-Formel
+zusammenwirken). Code bleibt als Konstante verfügbar (aktuell auf 0.0
+zurückgesetzt = alter, besser abgesicherter Zustand), aber "Blend-Gewicht
+tunen" ist als eigenständiger nächster Schritt damit erledigt/verworfen.
+
+**Damit ist die Vorbedingung für Baustein B ("nach der Value-Head-
+Reparatur") noch NICHT erfüllt** — beide vorgeschlagenen Optionen sind jetzt
+durch (eine abgelehnt, eine getestet und widerlegt), ohne dass die Suche
+tatsächlich repariert wurde. Nächster Schritt braucht eine neue Idee oder
+eine explizite Nutzer-Entscheidung, wie weiter vorgegangen wird.
+
+**Offener, teurerer Verdacht, weiterhin zurückgestellt**: der gesamte
+domefact-Korpus stammt aus HEURISTIK-geführtem Self-Play (nur die
+Rundenübergangs-Labels kommen vom Netz) — der Value-Head lernt also auf
+Zuständen, die die Heuristik besucht, muss aber zur Inferenzzeit Zustände
+bewerten, die die NETZ-eigene PUCT-Suche besucht. Eine Trainings-/Inferenz-
+Verteilungsverschiebung wäre ein weiterer, unabhängiger Erklärungskandidat.
+**Nutzer-Präzisierung (2026-07-19)**: das lässt sich sinnvoll erst testen,
+wenn bereits ein brauchbarer netz-geführter Agent existiert, der überhaupt
+sinnvolles Self-Play erzeugen kann — Henne-Ei-Problem, kann also nicht VOR
+einer Lösung geprüft werden, nur zur Bestätigung danach.
 
 ## Weitere zurückgestellte Punkte
 
