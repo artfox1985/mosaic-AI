@@ -347,6 +347,75 @@ wenn bereits ein brauchbarer netz-geführter Agent existiert, der überhaupt
 sinnvolles Self-Play erzeugen kann — Henne-Ei-Problem, kann also nicht VOR
 einer Lösung geprüft werden, nur zur Bestätigung danach.
 
+## Floor-Straf-Ursachenforschung (2026-07-19, Anschluss an KataGo-Blend)
+
+Nutzer-Fragen nach dem Blend-Fehlschlag: Policy-Kopf-Qualität separat prüfen,
+PUCT-Prior/Blattwert-Gewichtung prüfen, und woher die erhöhte Floor-Strafe
+kommt (Heuristik zeigt das nicht) — inkl. Idee "eigener Mini-Head für
+Floor-Strafen?".
+
+**Policy-Kopf-Qualität, erstmals gemessen** (v9b_domeonly, echter Val-Split,
+n=87.498 Züge, gleicher Seed wie beim Training): **Top-1-Accuracy 61.8%,
+Top-3 87.1%**, Ø Wahrscheinlichkeitsmasse auf dem Trainings-Target-Argmax
+49.1%. Moderat, nicht katastrophal, aber ein echter, bisher unbeachteter
+Faktor — bei 346 Aktionen weicht die Netz-eigene Top-Wahl in ~38% der Fälle
+vom Trainings-Label ab.
+
+**PUCT-Gewichtung geprüft** (`best_puct`, net_mcts.rs): Standard-AlphaZero-
+PUCT-Formel (Q + c·P·√N/(1+n)), `c_puct=1.5`, meistbesuchtes Wurzelkind
+gewinnt — beim Code-Review keine offensichtliche Fehlfunktion gefunden.
+
+**Floor-Strafe-Mechanismus geklärt** (`execution.rs`, `round_end.rs`): Boden-
+Strafe ist eine **100% deterministische Konsequenz** zweier Aktionen — (1)
+Drafting-Überlauf (`execute_place`/`add_to_penalty`, sofort beim Zug), UND
+(2, Nutzer-Korrektur) beim Drafting→Tiling-Übergang selbst, wenn Musterreihen
+wegen belegter Dome-Reihe unplatzierbar werden (`process_unplaceable_rows`).
+Beides ist beim PUCT-Knoten schon exakt bekannt — braucht keine Netz-
+Vorhersage. `round_end::projected_unplaceable_penalty` existierte für Quelle
+(2) bereits (dort dokumentiert: selbst der DFS-Solver preist das NICHT ein).
+
+**Idee statt Mini-Head**: kein Training nötig — Reward-Shaping mit der
+EXAKTEN, bereits bekannten Strafe direkt in den PUCT-Blattwert einspeisen
+(`floor_shaping_delta`, `FLOOR_SHAPING_WEIGHT`), auf dem bestehenden
+`v9b_domeonly`-Modell getestet:
+
+| Konfiguration | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| Baseline (kein Shaping) | 0:12 (0%) | 13.7-18.2 vs. 44.4-46.8 | ~20-25 vs. ~8-10 |
+| Shaping W=0.3 (nur Quelle 1, VOR Fix) | 2:15 (12%) | 12.9 vs. 44.8 | 21.4 vs. 10.8 |
+| Shaping W=0.6 (nur Quelle 1, VOR Fix) | 0:12 (0%) | 17.2 vs. 53.6 | 18.8 vs. 11.5 |
+| Shaping W=0.3 (Quelle 1+2, NACH Fix) | 0:12 (0%) | 19.3 vs. 43.9 | 19.3 vs. 11.2 |
+
+**Ehrliche Einordnung**: bei n=12-17 Spielen/Konfiguration (SPRT-Abbruch) sind
+diese Ergebnisse NICHT sauber voneinander unterscheidbar — die 12%-Rate bei
+W=0.3 war wahrscheinlich Stichproben-Glück, kein belastbarer Effekt. Alle
+vier Konfigurationen verlieren weiterhin signifikant gegen die Heuristik.
+Floor-Strafe selbst bewegt sich leicht (bis ~19 statt ~20-25), aber nicht
+genug, um als Durchbruch zu gelten. Aktuell auf W=0.3 (Quelle 1+2) belassen,
+Code bleibt verfügbar. Für ein belastbares Urteil bräuchte es einen
+größeren, nicht früh abgebrochenen Testlauf (z.B. `early_stop=False`,
+feste 100+ Spiele).
+
+**Wichtiger Fund: passt zu einer bereits archivierten, unabhängigen
+Untersuchung** (`archive/stage2_investigation.md`, altes v2-Modell, VOR
+allen Architekturänderungen dieser Session). Dort wurde bereits einmal
+komplett rauschfrei (Argmax-Arena + deterministisches Self-Play, doppelt
+bestätigt) gezeigt: Stufe 1 (DFS-Blatt) = 0% "0:0-Rate" (beide Spieler
+Richtung Boden gedrückt), Stufe 2 (Netz-Value-Blatt) = ~7%. Der Value-Head
+zeigte dabei die RICHTIGE Richtung schon ab Runde 1, aber mit zu wenig
+Trennschärfe (~0.05-0.08 vs. ~0.17-0.19 — ein schmales Band statt einer
+scharfen Bewertung wie beim exakten DFS-Solver). Die
+Mehrrunden-Weitsicht-Hypothese wurde dort direkt getestet (Meinungsverschie-
+denheits-Rollout-Studie, n=597) und WIDERLEGT — Stufe 2s abweichende Züge
+schlugen sich in Runde 1-2 nicht besser, in Runde 3 sogar signifikant
+schlechter. **Konsistentes Gesamtbild über zwei Untersuchungsrunden und
+komplett verschiedene Architekturen hinweg**: es geht nicht darum, WELCHES
+gelernte Signal (value/points/Blend) die Suche treibt, sondern dass ein
+weiches, gelerntes Signal grundsätzlich zu wenig "Rückstellkraft" gegen
+Sucherauschen hat verglichen mit einer exakten Bewertung — was auch erklärt,
+warum Floor-Shaping (ein exaktes Teilsignal statt eines weiteren gelernten)
+die einzige Variante ist, die überhaupt in Bewegung kam.
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
