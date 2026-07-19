@@ -7,6 +7,19 @@ Reward-Value-Ziel, "Stufe 1 bleibt Produktionspfad", VALUE_WEIGHT-Sweep,
 v1-v7cold) siehe das archivierte File (`../archive/STAGE2_TODO_ARCHIVED.md`,
 mit dem restlichen alten Auswertungsmaterial zusammengelegt).
 
+## hs200 zurückgezogen (2026-07-19)
+
+`data/selfplay_hs200_*.pkl` (600 Dateien, 6000 Spiele, ~7.7GB) nach
+`data/archive_hs200/` verschoben (nicht gelöscht — `train.py`s Standard-Glob
+`data/*.pkl` ist nicht rekursiv, greift also nicht mehr darauf zu). Grund:
+bestätigter Korpus-Alter-Confound (siehe v9b_domeonly unten) — diese Partien
+stammen von vor den Gamma-Pruning-Bugfixes dieser Session und verschlechterten
+nachweislich die Policy-Generalisierung. Domefact-artige Selfplay-Daten
+(sims=200, nach den Bugfixes) sind ab jetzt die alleinige Trainingsbasis.
+Alte, jetzt permanent verwaiste HDF5-Caches (`data/.cache_*.h5`, ~2.1GB,
+schlossen hs200 mit ein) können gefahrlos gelöscht werden — kein zukünftiger
+Standard-Trainingslauf kann sie je wieder treffen.
+
 ## Aktuelles Ziel (2026-07-19, AKTUALISIERT nach v9b_domeonly)
 
 **Den Value-Head geradeziehen** — das ist gerade die Priorität vor allem
