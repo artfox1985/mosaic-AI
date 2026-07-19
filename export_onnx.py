@@ -3,10 +3,11 @@ Exportiert ein trainiertes MosaicNet (.pth) nach ONNX für die Rust-Inferenz (Ph
 
   python export_onnx.py --version s100
 
-Erzeugt models/alphazero_<version>.onnx mit 4 Outputs (policy, value, moon,
-points) und dynamischer Batch-Achse. Die Rust-Engine (tract-onnx) lädt diese
-Datei für den Network-Modus (Self-Play / Arena). `value`/`points` sind reine
-Trainings-Zusatzsignale -- die Suche (Stage 1/3) liest nur `policy`/`moon`.
+Erzeugt models/alphazero_<version>.onnx mit 6 Outputs (policy, value, moon,
+points, dome_slot, dome_rotation) und dynamischer Batch-Achse. Die Rust-Engine
+(tract-onnx) lädt diese Datei für den Network-Modus (Self-Play / Arena).
+`value`/`points` sind reine Trainings-Zusatzsignale -- die Suche (Stage 1/3)
+liest nur `policy`/`moon`/`dome_slot`/`dome_rotation`.
 """
 import sys
 import argparse
@@ -60,13 +61,15 @@ def export(version: str, opset: int = 13) -> Path:
     torch.onnx.export(
         model, dummy, str(out),
         input_names=["state"],
-        output_names=["policy", "value", "moon", "points"],
+        output_names=["policy", "value", "moon", "points", "dome_slot", "dome_rotation"],
         dynamic_axes={
-            "state":  {0: "batch"},
-            "policy": {0: "batch"},
-            "value":  {0: "batch"},
-            "moon":   {0: "batch"},
-            "points": {0: "batch"},
+            "state":         {0: "batch"},
+            "policy":        {0: "batch"},
+            "value":         {0: "batch"},
+            "moon":          {0: "batch"},
+            "points":        {0: "batch"},
+            "dome_slot":     {0: "batch"},
+            "dome_rotation": {0: "batch"},
         },
         opset_version=opset,
         dynamo=False,
@@ -77,7 +80,7 @@ def export(version: str, opset: int = 13) -> Path:
     torch.manual_seed(0)
     x = torch.rand(1, in_size, dtype=torch.float32)
     with torch.no_grad():
-        p, v, m, pts = model(x)
+        p, v, m, pts, dslot, drot = model(x)
     ref = MODELS_DIR / f"alphazero_{version}.onnx.ref.txt"
     with open(ref, "w") as f:
         f.write("# input\n" + " ".join(f"{z:.6f}" for z in x[0].tolist()) + "\n")
@@ -85,6 +88,8 @@ def export(version: str, opset: int = 13) -> Path:
         f.write("# value\n" + " ".join(f"{z:.6f}" for z in v[0].tolist()) + "\n")
         f.write("# moon\n" + " ".join(f"{z:.6f}" for z in m[0].tolist()) + "\n")
         f.write("# points\n" + " ".join(f"{z:.6f}" for z in pts[0].tolist()) + "\n")
+        f.write("# dome_slot\n" + " ".join(f"{z:.6f}" for z in dslot[0].tolist()) + "\n")
+        f.write("# dome_rotation\n" + " ".join(f"{z:.6f}" for z in drot[0].tolist()) + "\n")
     print(f"📎 Referenz für Rust-Parität: {ref}")
     return out
 

@@ -35,7 +35,7 @@ use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
 
 /// Aktionsraum-Größe (= `config.NUM_ACTIONS`).
-pub(crate) const NUM_ACTIONS: usize = 483;
+pub(crate) const NUM_ACTIONS: usize = 346;
 /// Standard-PUCT-Konstante (= agents/mcts.py `_c_puct`).
 pub const DEFAULT_C_PUCT: f64 = 1.5;
 /// Dirichlet-Wurzel-Noise (AlphaZero-Standard).
@@ -149,6 +149,46 @@ fn plackett_luce_prob(scores: &[f32; 5], seq: &[TileColor]) -> f64 {
     p
 }
 
+// ── Kuppelplatten-Faktorisierung (Slot × Rotation, analog Moon-Order) ────────
+//
+// `action_to_id` kollabiert "dome"/"dome_stack" auf wenige IDs (Auslage-Index
+// bzw. gedeckelter Pending-Index, siehe features.rs) -- alle Slot×Rotation-
+// Varianten derselben Gruppe teilen sich eine ID. Die faktorisierte
+// Sub-Verteilung kommt separat aus `dome_slot_head`/`dome_rotation_head` und
+// wird beim Expandieren mit dem Basis-Prior multipliziert:
+// P(Zug) = P(Basis) × P(Slot) × P(Rotation) -- jeweils NUR über die in diesem
+// Zustand tatsächlich legalen Slot-/Rotationswerte dieser Gruppe maskiert.
+
+/// Maskierte Softmax: nur Indizes mit `allowed[i]==true` tragen bei, Rest
+/// bleibt 0. Kein Permutationsproblem wie bei `plackett_luce_prob` -- einfache
+/// feste kategoriale Wahl (Slot bzw. Rotation).
+fn masked_softmax(scores: &[f32], allowed: &[bool]) -> Vec<f64> {
+    let max_s = scores
+        .iter()
+        .zip(allowed)
+        .filter(|(_, &a)| a)
+        .map(|(&s, _)| s)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let mut out = vec![0.0f64; scores.len()];
+    if !max_s.is_finite() {
+        return out; // kein erlaubter Index -- sollte der Aufrufer nie liefern
+    }
+    let mut sum = 0.0f64;
+    for (i, (&s, &a)) in scores.iter().zip(allowed).enumerate() {
+        if a {
+            let e = ((s - max_s) as f64).exp();
+            out[i] = e;
+            sum += e;
+        }
+    }
+    if sum > 1e-12 {
+        for v in out.iter_mut() {
+            *v /= sum;
+        }
+    }
+    out
+}
+
 struct Node {
     parent: Option<usize>,
     children: Vec<usize>,
@@ -185,6 +225,8 @@ fn build_untried_actions(
     state: &GameState,
     logits: &[f32],
     moon_scores: &[f32; 5],
+    dome_slot_scores: &[f32; 9],
+    dome_rotation_scores: &[f32; 4],
 ) -> (Vec<(Action, f32)>, usize) {
     let base_actions = drafting_actions(state);
     let n = base_actions.len();
@@ -205,9 +247,34 @@ fn build_untried_actions(
     let base_probs = softmax(&legal_logits);
     let p_base: HashMap<usize, f32> = unique_ids.into_iter().zip(base_probs).collect();
 
+    // Kuppelplatten-Gruppen (siehe Modul-Kommentar oben): pro kollabierter ID
+    // die tatsächlich legalen Slot-/Rotationswerte sammeln, EINMAL je Gruppe
+    // maskiert softmaxen (nicht pro Kandidat einzeln -- alle Kandidaten
+    // derselben Gruppe teilen sich dieselbe Verteilung).
+    let mut dome_slot_allowed: HashMap<usize, [bool; 9]> = HashMap::new();
+    let mut dome_rot_allowed: HashMap<usize, [bool; 4]> = HashMap::new();
+    for (act, &id) in base_actions.iter().zip(ids.iter()) {
+        let (slot_idx, rot_idx) = match act {
+            Action::Dome(m) => (m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize),
+            Action::DrawStack(m) => (m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize),
+            _ => continue,
+        };
+        dome_slot_allowed.entry(id).or_insert([false; 9])[slot_idx] = true;
+        dome_rot_allowed.entry(id).or_insert([false; 4])[rot_idx] = true;
+    }
+    let dome_slot_dist: HashMap<usize, Vec<f64>> = dome_slot_allowed
+        .iter()
+        .map(|(&id, allowed)| (id, masked_softmax(dome_slot_scores, allowed)))
+        .collect();
+    let dome_rot_dist: HashMap<usize, Vec<f64>> = dome_rot_allowed
+        .iter()
+        .map(|(&id, allowed)| (id, masked_softmax(dome_rotation_scores, allowed)))
+        .collect();
+
     // Kandidaten: SmallFactorySun mit ≥2 Restfliesen → alle eindeutigen Moon-
-    // Order-Permutationen, Prior = P(Basis) × P(Order | Plackett-Luce). Alle
-    // anderen Aktionen unverändert 1:1.
+    // Order-Permutationen, Prior = P(Basis) × P(Order | Plackett-Luce).
+    // Dome/DrawStack → Prior = P(Basis) × P(Slot) × P(Rotation). Alle anderen
+    // Aktionen unverändert 1:1.
     let mut acts: Vec<(Action, f32)> = Vec::with_capacity(base_actions.len());
     for (act, id) in base_actions.into_iter().zip(ids.into_iter()) {
         let base_p = *p_base.get(&id).unwrap_or(&0.0);
@@ -225,7 +292,19 @@ fn build_untried_actions(
                 continue;
             }
         }
-        acts.push((act, base_p));
+        let dome_slot_rot = match &act {
+            Action::Dome(m) => Some((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize)),
+            Action::DrawStack(m) => Some((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize)),
+            _ => None,
+        };
+        match dome_slot_rot {
+            Some((slot_idx, rot_idx)) => {
+                let p_slot = dome_slot_dist.get(&id).map(|d| d[slot_idx]).unwrap_or(0.0);
+                let p_rot = dome_rot_dist.get(&id).map(|d| d[rot_idx]).unwrap_or(0.0);
+                acts.push((act, (base_p as f64 * p_slot * p_rot) as f32));
+            }
+            None => acts.push((act, base_p)),
+        }
     }
     acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -266,15 +345,18 @@ fn value_to_win_prob(value: &[f32]) -> f64 {
 pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (_logits, value, _moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
-    });
+    let (_logits, value, _moon, _points, _dslot, _drot) =
+        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            net.eval(&feats).unwrap_or_else(|_| {
+                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            })
+        });
     let mover_val = value_to_win_prob(&value);
     crate::profiling::note_gamestate_clone();
     let mut flipped = state.clone();
     flipped.current_player = 1 - state.current_player;
     let other_feats = state_to_features_direct(&flipped);
-    let other_val = net.eval(&other_feats).map(|(_, v, _, _)| value_to_win_prob(&v)).unwrap_or(0.5);
+    let other_val = net.eval(&other_feats).map(|(_, v, _, _, _, _)| value_to_win_prob(&v)).unwrap_or(0.5);
     if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
 }
 
@@ -293,14 +375,25 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     }
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _value, moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
-    });
+    let (logits, _value, moon, _points, dslot, drot) =
+        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            net.eval(&feats).unwrap_or_else(|_| {
+                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            })
+        });
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
         moon_scores[i] = *s;
     }
-    build_untried_actions(state, &logits, &moon_scores).0
+    let mut dome_slot_scores = [0f32; 9];
+    for (i, s) in dslot.iter().take(9).enumerate() {
+        dome_slot_scores[i] = *s;
+    }
+    let mut dome_rotation_scores = [0f32; 4];
+    for (i, s) in drot.iter().take(4).enumerate() {
+        dome_rotation_scores[i] = *s;
+    }
+    build_untried_actions(state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores).0
 }
 
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
@@ -319,16 +412,30 @@ fn make_node<R: Rng + ?Sized>(
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
     // `points` ist reines Trainings-Zusatzsignal (siehe net.rs), hier nie
     // gebraucht. `value` wird nur bei ACTIVE_LEAF=Net gelesen.
-    let (logits, value, moon, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
-    });
+    let (logits, value, moon, _points, dslot, drot) =
+        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            net.eval(&feats).unwrap_or_else(|_| {
+                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            })
+        });
 
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
         moon_scores[i] = *s;
     }
-    let (untried, n_actions) =
-        if terminal { (Vec::new(), 0) } else { build_untried_actions(&state, &logits, &moon_scores) };
+    let mut dome_slot_scores = [0f32; 9];
+    for (i, s) in dslot.iter().take(9).enumerate() {
+        dome_slot_scores[i] = *s;
+    }
+    let mut dome_rotation_scores = [0f32; 4];
+    for (i, s) in drot.iter().take(4).enumerate() {
+        dome_rotation_scores[i] = *s;
+    }
+    let (untried, n_actions) = if terminal {
+        (Vec::new(), 0)
+    } else {
+        build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores)
+    };
 
     // Blattwert: unabhängige Pro-Spieler-Werte. Das Netz liefert einen
     // EGO-perspektivischen Wert (die Input-Features hängen von
@@ -344,7 +451,7 @@ fn make_node<R: Rng + ?Sized>(
             let other_feats = state_to_features_direct(&flipped);
             let other_val = net
                 .eval(&other_feats)
-                .map(|(_, v, _, _)| value_to_win_prob(&v))
+                .map(|(_, v, _, _, _, _)| value_to_win_prob(&v))
                 .unwrap_or(0.5);
             let today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
@@ -851,8 +958,11 @@ mod tests {
         let mut logits = vec![-10.0f32; NUM_ACTIONS];
         logits[spike_id] = 10.0;
         let moon_scores = [0.0f32; 5];
+        let dome_slot_scores = [0.0f32; 9];
+        let dome_rotation_scores = [0.0f32; 4];
 
-        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores);
+        let (acts, n_base) =
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
         assert!(!acts.is_empty());
         assert!(
             acts.len() < n_base,
@@ -871,8 +981,11 @@ mod tests {
         let state = setup_new_game(names(), 0, &mut rng);
         let logits = vec![0.1f32; NUM_ACTIONS];
         let moon_scores = [1.0f32, 0.5, -0.5, 2.0, 0.0];
+        let dome_slot_scores = [0.0f32; 9];
+        let dome_rotation_scores = [0.0f32; 4];
 
-        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores);
+        let (acts, n_base) =
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
         assert!(!acts.is_empty());
 
         // Kandidaten sind auf den POLICY_MASS_CUTOFF-Präfix gekappt (Long Tail
@@ -920,5 +1033,154 @@ mod tests {
         for (_, sum) in &groups {
             assert!(*sum > 0.0);
         }
+    }
+
+    // ── Kuppelplatten-Faktorisierung (Slot × Rotation) ──────────────────────
+
+    #[test]
+    fn masked_softmax_prefers_higher_scored_allowed_index() {
+        let scores = [0.0f32, 5.0, 0.0, 0.0];
+        let allowed = [true, true, true, false];
+        let dist = masked_softmax(&scores, &allowed);
+        assert!(dist[1] > dist[0] && dist[1] > dist[2], "{dist:?}");
+        assert_eq!(dist[3], 0.0, "nicht erlaubter Index darf keine Masse bekommen");
+        let sum: f64 = dist.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9, "Summe über erlaubte Indizes sollte 1.0 sein: {sum}");
+    }
+
+    #[test]
+    fn masked_softmax_ignores_disallowed_indices_entirely() {
+        // Der hoechste rohe Score liegt auf einem NICHT erlaubten Index --
+        // die Verteilung darf sich davon nicht beeinflussen lassen (reine
+        // Renormierung ueber die erlaubte Teilmenge, kein globaler Softmax).
+        let scores = [10.0f32, 1.0, 0.0, 0.0];
+        let allowed = [false, true, true, false];
+        let dist = masked_softmax(&scores, &allowed);
+        assert_eq!(dist[0], 0.0);
+        assert_eq!(dist[3], 0.0);
+        assert!(dist[1] > dist[2], "{dist:?}");
+        let sum: f64 = dist.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn masked_softmax_single_allowed_index_gets_all_mass() {
+        let scores = [1.0f32, 2.0, 3.0];
+        let allowed = [false, true, false];
+        let dist = masked_softmax(&scores, &allowed);
+        assert_eq!(dist, vec![0.0, 1.0, 0.0]);
+    }
+
+    /// Baut einen frischen Zustand OHNE offene Startplatten-Pflicht (sonst
+    /// blockiert `validate_dome_move`/`has_unplaced_start_tile` jede
+    /// `Action::Dome`-Kandidatengenerierung -- siehe game.rs).
+    fn state_with_dome_moves_available(seed: u64) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        state
+    }
+
+    #[test]
+    fn build_untried_actions_dome_factorization_prefers_boosted_slot_and_rotation() {
+        let state = state_with_dome_moves_available(7);
+        let base_actions = drafting_actions(&state);
+
+        // Nach kollabierter Gruppen-ID (328 + display_index) gruppieren, um
+        // eine Gruppe mit >1 Slot/Rotations-Variante zu finden.
+        let mut groups: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
+        for a in &base_actions {
+            if let Action::Dome(m) = a {
+                let d_idx = state
+                    .dome_display
+                    .iter()
+                    .position(|t| t.tile_id == m.dome_tile_id)
+                    .unwrap_or(0);
+                groups
+                    .entry(328 + d_idx)
+                    .or_default()
+                    .push((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize));
+            }
+        }
+        let (&group_id, variants) = groups
+            .iter()
+            .find(|(_, v)| v.len() > 1)
+            .expect("Testvoraussetzung: mind. eine Dome-Gruppe mit >1 Slot/Rotations-Variante");
+        let (target_slot, target_rot) = variants[0];
+
+        let logits = vec![0.1f32; NUM_ACTIONS];
+        let moon_scores = [0f32; 5];
+        let mut dome_slot_scores = [0f32; 9];
+        dome_slot_scores[target_slot] = 3.0;
+        let mut dome_rotation_scores = [0f32; 4];
+        dome_rotation_scores[target_rot] = 3.0;
+
+        let (acts, _n) =
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
+
+        let mut target_p = None;
+        let mut sibling_ps = Vec::new();
+        for (a, p) in &acts {
+            if let Action::Dome(m) = a {
+                let d_idx = state
+                    .dome_display
+                    .iter()
+                    .position(|t| t.tile_id == m.dome_tile_id)
+                    .unwrap_or(0);
+                if 328 + d_idx != group_id {
+                    continue;
+                }
+                let slot_idx = m.slot_row * 3 + m.slot_col;
+                let rot_idx = (m.rotation / 90) as usize;
+                if (slot_idx, rot_idx) == (target_slot, target_rot) {
+                    target_p = Some(*p);
+                } else {
+                    sibling_ps.push(*p);
+                }
+            }
+        }
+        let target_p = target_p.expect(
+            "die geboostete Slot/Rotation-Kombination sollte im Kandidatenergebnis auftauchen \
+             (hoechste Prior ihrer Gruppe, sollte nie vom Cutoff betroffen sein)",
+        );
+        for p in sibling_ps {
+            assert!(
+                target_p >= p,
+                "geboostete Kombination ({target_slot},{target_rot}) sollte >= jede \
+                 Geschwister-Kombination derselben Gruppe sein: {target_p} vs {p}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_untried_actions_draw_stack_factorization_stays_within_group_mass() {
+        // DrawStack-Kandidaten existieren nur waehrend eines laufenden
+        // Stapel-Zugs (`pending_stack_draw` nichtleer) -- direkt konstruieren
+        // statt durch echtes Ziehen zu spielen (kein bestehender Test-
+        // Helfer dafuer, siehe game.rs::generate_draw_stack_moves-Doc).
+        let mut state = state_with_dome_moves_available(3);
+        let pending: Vec<_> = state.dome_tile_pool.iter().take(2).cloned().collect();
+        assert!(pending.len() >= 2, "Testvoraussetzung: genug Platten im verdeckten Stapel");
+        state.pending_stack_draw = pending;
+
+        let base_actions = drafting_actions(&state);
+        let draw_stack_count = base_actions.iter().filter(|a| matches!(a, Action::DrawStack(_))).count();
+        assert!(draw_stack_count > 1, "Testvoraussetzung: mehrere DrawStack-Kandidaten");
+
+        let logits = vec![0.1f32; NUM_ACTIONS];
+        let moon_scores = [0f32; 5];
+        let dome_slot_scores = [0f32; 9];
+        let dome_rotation_scores = [0f32; 4];
+        let (acts, _n) =
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
+
+        let draw_stack_sum: f64 = acts
+            .iter()
+            .filter(|(a, _)| matches!(a, Action::DrawStack(_)))
+            .map(|(_, p)| *p as f64)
+            .sum();
+        assert!(draw_stack_sum > 0.0, "DrawStack-Kandidaten sollten positive Prior-Masse tragen");
     }
 }

@@ -278,10 +278,14 @@ fn profiling_snapshot() -> String {
 }
 
 /// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
-/// Feature-Vektor aus und gibt (policy_logits, value, moon_logits, points)
-/// zurück -- passend zur Referenzdatei aus `export_onnx.py`.
+/// Feature-Vektor aus und gibt (policy_logits, value, moon_logits, points,
+/// dome_slot_logits, dome_rotation_logits) zurück -- passend zur
+/// Referenzdatei aus `export_onnx.py`.
 #[pyfunction]
-fn onnx_eval(path: String, features: Vec<f32>) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+fn onnx_eval(
+    path: String,
+    features: Vec<f32>,
+) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
     let net = crate::net::Net::load(&path, features.len())
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     net.eval(&features)

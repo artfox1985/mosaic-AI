@@ -20,7 +20,11 @@ INPUT_SIZE = 708        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie
                         #  floor-Normierung /7.0 -> /4.0 korrigiert (kein Dim-Effekt);
                         #  Bonuschip-Farbmaske je Fabrik ergänzt: +5*4=+20; 673 -> 664 -> 684;
                         #  wild_remaining_frac ergänzt (Wild-Anteil der verdeckten Kuppelstapel-Restplatten): 707 -> 708)
-NUM_ACTIONS = 483       # action_to_id Ausgabebereich (482 = dome_stack_peek: Aktion A Schritt 1, parameterlos)
+NUM_ACTIONS = 346       # action_to_id Ausgabebereich (345 = dome_stack_peek: Aktion A Schritt 1, parameterlos)
+                        # (war 483: dome/dome_stack kodierten Slot+Rotation noch selbst, 108+36 IDs;
+                        #  jetzt kollabiert auf 3 (display_index) + 4 (pending_index) IDs, analog
+                        #  moon_order -- Slot/Rotation faktorisiert ueber dome_slot_head/
+                        #  dome_rotation_head, siehe net_mcts.rs::build_untried_actions)
 
 # --- TRAININGSPARAMETER NN ---
 BATCH_SIZE    = 256
