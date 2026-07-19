@@ -67,6 +67,39 @@ neutral bleibt. Zwei Dinge ausdrücklich NICHT auf dem Tisch:
   ohne neuen Befund.
 - **`INPUT_SIZE=708`**, **`NUM_ACTIONS=346`** (war 483 bis 2026-07-19, siehe
   Kuppelplatten-Faktorisierung unten).
+- **VALUE_SCHEMA_VERSION=13 (2026-07-19)**: Kalibrierungs-Diagnose (v8e,
+  über den gesamten -- ueberwiegend gesehenen -- Datensatz) zeigte
+  `corr(val_true, pts_true)` nur 0.49 (die beiden Ziele selbst stimmen nur
+  maessig ueberein) UND beide Koepfe fitten gesehene Daten aehnlich gut
+  (`corr(pred,true)` ~0.68-0.69) -- die negative Val-R² ist also eine echte
+  Generalisierungsluecke, kein grundsaetzlich ungelernbares Ziel. Fallback
+  (ohne `round_transition_value`) von hartem `sign(own-opp)` auf weiches
+  `tanh((own-opp)/VALUE_SCALE)` umgestellt. **Ergebnis (v9a): Val-R² steigt
+  von +0.142 (Epoche 1) auf +0.208 (Epoche 4) und bleibt stabil bei
+  ~0.19-0.21 bis Epoche 15 -- KEIN Zerfall in den Negativbereich, erstmals
+  in der Session-Historie.** Bestaetigt die Hypothese auf Metrik-Ebene.
+  **ABER: Arena v9a vs. Heuristik (s150) bleibt bei 1:14 (7% Siege, Ø Score
+  15.4 vs. 56.0) -- SCHLECHTER im Score-Abstand als v8d/v8e trotz gesundem
+  Val-R².** Die Metrik-Reparatur hat NICHT automatisch zu besserer
+  Spielstaerke gefuehrt -- R²=0.19 ist offenbar nicht per se "gut genug",
+  um PUCT wirksam zu leiten. Noch nicht geklaert.
+- **NEUER NEBENBEFUND -- Policy-Qualitaet driftet ueber die Generationen
+  (2026-07-19)**: DFS-Leaf-Diagnose (ACTIVE_LEAF=Dfs, macht den Value-Head
+  irrelevant) ueber drei Generationen: v8d 26% (8:23), v8e 18% (4:18), v9a
+  7% (1:14) gegen dieselbe Heuristik. v8e und v9a teilen sich denselben
+  Aktionsraum (346) und einen wachsenden, gemeinsamen Korpus -- nur v9a hat
+  zusaetzlich das neue Value-Ziel. Da DFS-Leaf den Value-Output gar nicht
+  liest, kann das neue Value-Ziel diesen Abwaertstrend NICHT direkt
+  erklaeren -- der gemeinsame Trunk koennte indirekt betroffen sein
+  (gleiche Gradientenquelle), ODER der wachsende/gemischte Korpus selbst
+  (hs200 enthaelt aeltere Partien von VOR den Gamma-Pruning-Bugfixes dieser
+  Session, gemischt mit neueren domefact-Partien bei durchgehend sims=200)
+  verschlechtert die Policy-Generalisierung unabhaengig vom Value-Thema.
+  **Stichprobengroessen klein (15-22 Spiele je SPRT-Abbruch), Trend aber
+  konsistent ueber drei Punkte.** Muss geklaert werden, bevor weitere
+  Value-Head-Experimente auf dem wachsenden Mischkorpus sauber interpretierbar
+  sind. Naechster Schritt: domefact-only-Training (nur frische, konsistente
+  sims=200-Partien, kein hs200) isoliert diese Frage.
 - **Runde 5: exakte Alpha-Beta-Suche** (`engine/src/round5.rs`). Fertig,
   getestet, aktiv.
 - **Kuppelstapel-Mechanik regelwerkstreu**: sequentielles Ziehen, gedeckelte
@@ -169,21 +202,35 @@ volle Kombination selbst lernen.
 
 ## Nächste Schritte (in Reihenfolge)
 
-1. **Value-Head-Reparatur ist Priorität #1** (s.o. "Aktuelles Ziel") — bevor
-   weitere Daten-Skalierung (round_transition_value oder Kuppel-Faktorisierung)
-   als Lösung angenommen wird, klären: liegt das Problem an Datenmenge oder
-   an der Zielkonstruktion selbst (binäres ±1 bei knappen Ergebnissen)? Ein
-   möglicher nächster Test: Kalibrierung/Korrelation von `values`-Vorhersage
-   gegen `points_forecast`-Vorhersage auf denselben Val-Zuständen, um zu
-   sehen, ob das Problem tatsächlich am Ziel selbst liegt oder am Trunk/Head.
-2. **5000-Spiele-Kuppel-Faktorisierungs-Auswertung** abschließen (self-play
-   läuft/geplant), Ergebnis hier nachtragen: hat A einen messbaren
-   Policy-Qualitäts-Effekt (nicht nur "kein Crash")?
-3. Erst NACH 1: erwägen, ob mehr round_transition_value-Daten (2000-3000
+1. **Value-Head-Reparatur ist Priorität #1** (s.o. "Aktuelles Ziel").
+   Kalibrierungsdiagnose erledigt (siehe oben): echte Generalisierungslücke,
+   kein ungelernbares Ziel. Weiches Margin-Ziel (VALUE_SCHEMA_VERSION=13)
+   löst das Val-R²-Problem auf Metrik-Ebene (v9a: stabil +0.19-0.21), aber
+   NICHT die Arena-Schwäche (v9a bleibt bei 7%, sogar schlechterer
+   Score-Abstand als v8d/v8e). Zwei offene Fragen jetzt:
+   a) Warum übersetzt sich gesundes Val-R² nicht in Spielstärke? Reicht
+      R²=0.19 als Signal nicht aus, um PUCT wirksam zu leiten?
+   b) **Neu, wichtiger, zuerst klären**: Policy-Qualität selbst driftet über
+      die Generationen ab (DFS-Leaf: v8d 26% → v8e 18% → v9a 7%,
+      UNABHÄNGIG vom Value-Ziel, da DFS-Leaf den Value-Output ignoriert).
+      Verdacht: wachsender/gemischter Korpus (altes hs200 von vor den
+      Gamma-Pruning-Bugfixes dieser Session, gemischt mit neuem
+      sims=200-domefact) verschlechtert die Policy-Generalisierung.
+2. **Domefact-only-Training** (nur frische, konsistente sims=200-Partien,
+   OHNE hs200) ist jetzt der Schlüsseltest für beide offenen Fragen: isoliert
+   Korpus-Alter/-Mischung als Variable UND liefert gleichzeitig die
+   eigentlich geplante Kuppel-Faktorisierungs-Auswertung (Baustein A).
+   5000-Spiele-Batch läuft (self-play), Training + DFS-Leaf-Diagnose +
+   Arena-Test direkt danach.
+3. Falls domefact-only weiterhin schlecht abschneidet (DFS-Leaf-Siegquote
+   nicht wieder bei ~26%): Korpus-Alter ist NICHT die Ursache, dann tiefer
+   in Policy-Head/Trunk-Kapazität oder Self-Play-Politik-Qualität selbst
+   schauen.
+4. Erst NACH 1: erwägen, ob mehr round_transition_value-Daten (2000-3000
    Spiele) oder eine andere Zielkonstruktion sinnvoller ist.
-4. `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
+5. `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
    bis Punkt 1 einen klaren Fortschritt zeigt.
-5. **Baustein B (zweistufiger Slot→Rotation-Suchknoten) explizit NACH
+6. **Baustein B (zweistufiger Slot→Rotation-Suchknoten) explizit NACH
    Punkt 1** (Nutzer-Entscheidung 2026-07-19) — nicht parallel angehen.
 
 ## Referenz
