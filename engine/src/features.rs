@@ -744,8 +744,25 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     f
 }
 
+/// Obergrenze für die `pending_index`-ID-Dimension bei `dome_stack`
+/// (Position der gewählten Platte in der deduplizierten
+/// `pending_stack_draw`-Liste, siehe `self_play.rs::action_to_env_dict`) --
+/// gedeckelt, damit die ID-Dimension klein/fest bleibt, statt mit der
+/// (theoretisch unbeschränkten) Anzahl gleichzeitig gezogener Platten zu
+/// wachsen. Ungeprüfter erster Wert -- gegen echte Spielverläufe absichern.
+const MAX_PENDING_STACK_TILES: i64 = 4;
+
 /// Port von `action_to_id` (für Masken/Prior-Zuordnung). Erwartet ein
 /// env-Action-Dict (agent_env-Schema).
+///
+/// `dome`/`dome_stack`: Slot UND Rotation fliessen NICHT mehr in die ID ein
+/// (vorher 108 bzw. 36 einzelne IDs) -- wie bei `moon_order` (siehe
+/// net_mcts.rs) teilen sich alle Slot×Rotation-Varianten derselben Gruppe
+/// (Auslage-Platte bzw. `pending_index`) eine ID; die Suche faktorisiert den
+/// Prior separat über `dome_slot_head`/`dome_rotation_head`
+/// (`build_untried_actions`, net_mcts.rs). Das entlastet den 483->kleiner
+/// gewordenen Policy-Head, der sonst die volle Kombination selbst lernen
+/// müsste.
 pub fn action_to_id(a: &Value) -> usize {
     let t = a.get("type").and_then(|x| x.as_str()).unwrap_or("");
     let geti = |k: &str| a.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
@@ -759,18 +776,13 @@ pub fn action_to_id(a: &Value) -> usize {
             (10 + c_id * 48 + r_id * 6 + f_idx).min(273) as usize
         }
         "tiling" => (274 + geti("pattern_row") * 9 + geti("slot_row") * 3 + geti("slot_col")) as usize,
-        "dome" => {
-            (328 + geti("display_index") * 36 + geti("slot_row") * 12 + geti("slot_col") * 4
-                + geti("rotation") / 90) as usize
-        }
-        "dome_stack" => {
-            (436 + geti("slot_row") * 12 + geti("slot_col") * 4 + geti("rotation") / 90) as usize
-        }
-        "use_chips" => (472 + geti("pattern_row")) as usize,
-        "bonus_chip" => (478 + geti("factory_index")) as usize,
+        "dome" => (328 + geti("display_index")) as usize,
+        "dome_stack" => (331 + geti("pending_index").min(MAX_PENDING_STACK_TILES - 1)) as usize,
+        "use_chips" => (335 + geti("pattern_row")) as usize,
+        "bonus_chip" => (341 + geti("factory_index")) as usize,
         // Aktion A, Schritt 1 (verdeckt ziehen) -- parameterlos, eigene feste ID.
-        "dome_stack_peek" => 482,
-        _ => 481,
+        "dome_stack_peek" => 345,
+        _ => 344,
     }
 }
 
@@ -853,5 +865,119 @@ mod tests {
         let mut s = states.last().expect("mind. ein Zustand").clone();
         s.phase = crate::state::Phase::Tiling;
         assert_feature_parity(&s, "Tiling-Phase (manuell umgeschaltet)");
+    }
+
+    /// `action_to_id`-Rundtrip: verschiedene Aktions-TYP-Familien duerfen sich
+    /// niemals ueberlappende ID-Bereiche teilen (waere ein stiller Policy-
+    /// Leak), waehrend INNERHALB einer Familie bewusstes Kollabieren erlaubt
+    /// ist (Kuppelplatten-Slot/Rotation, Sonnenzug-Farbreihenfolge -- siehe
+    /// net_mcts.rs::build_untried_actions). `NUM_ACTIONS` muss exakt
+    /// `max_id + 1` sein, sonst wird entweder ein Teil des Policy-Kopfs nie
+    /// trainiert (zu gross) oder eine echte ID faellt aus dem Head-Bereich
+    /// (zu klein, harter Crash beim Training).
+    #[test]
+    fn action_to_id_ranges_stay_within_num_actions_and_dont_collide() {
+        use serde_json::json;
+
+        let mut ranges: Vec<(&str, usize, usize)> = Vec::new();
+        let mut record = |label: &'static str, ids: Vec<usize>| {
+            let lo = *ids.iter().min().expect("nichtleere ID-Liste");
+            let hi = *ids.iter().max().expect("nichtleere ID-Liste");
+            ranges.push((label, lo, hi));
+        };
+
+        record("pass", vec![action_to_id(&json!({"type": "pass"}))]);
+        record("end_tiling", vec![action_to_id(&json!({"type": "end_tiling"}))]);
+
+        let mut stone_ids = Vec::new();
+        for color in ["blau", "gelb", "rot", "schwarz", "türkis"] {
+            for row in -1..=5i64 {
+                for f in 0..6 {
+                    stone_ids.push(action_to_id(
+                        &json!({"type": "stone", "color": color, "row": row, "factory_index": f}),
+                    ));
+                }
+            }
+        }
+        record("stone", stone_ids);
+
+        let mut tiling_ids = Vec::new();
+        for pr in 0..6 {
+            for sr in 0..3 {
+                for sc in 0..3 {
+                    tiling_ids.push(action_to_id(
+                        &json!({"type": "tiling", "pattern_row": pr, "slot_row": sr, "slot_col": sc}),
+                    ));
+                }
+            }
+        }
+        record("tiling", tiling_ids);
+
+        // 3 Auslage-Platten, 3x3 Kuppelraster, 4 Rotationen (game.rs::generate_dome_moves).
+        let mut dome_ids = Vec::new();
+        for d in 0..3 {
+            for sr in 0..3 {
+                for sc in 0..3 {
+                    for rot in [0, 90, 180, 270] {
+                        dome_ids.push(action_to_id(&json!({
+                            "type": "dome", "display_index": d, "slot_row": sr,
+                            "slot_col": sc, "rotation": rot
+                        })));
+                    }
+                }
+            }
+        }
+        record("dome", dome_ids);
+
+        // pending_index grosszuegig ueber MAX_PENDING_STACK_TILES hinaus getestet
+        // (muss gedeckelt werden, nicht crashen).
+        let mut dome_stack_ids = Vec::new();
+        for p in 0..8 {
+            for sr in 0..3 {
+                for sc in 0..3 {
+                    for rot in [0, 90, 180, 270] {
+                        dome_stack_ids.push(action_to_id(&json!({
+                            "type": "dome_stack", "pending_index": p, "slot_row": sr,
+                            "slot_col": sc, "rotation": rot
+                        })));
+                    }
+                }
+            }
+        }
+        record("dome_stack", dome_stack_ids);
+
+        let mut use_chips_ids = Vec::new();
+        for pr in 0..6 {
+            use_chips_ids.push(action_to_id(&json!({"type": "use_chips", "pattern_row": pr})));
+        }
+        record("use_chips", use_chips_ids);
+
+        let mut bonus_chip_ids = Vec::new();
+        for f in 0..4 {
+            bonus_chip_ids.push(action_to_id(&json!({"type": "bonus_chip", "factory_index": f})));
+        }
+        record("bonus_chip", bonus_chip_ids);
+
+        record("dome_stack_peek", vec![action_to_id(&json!({"type": "dome_stack_peek"}))]);
+
+        for i in 0..ranges.len() {
+            for j in (i + 1)..ranges.len() {
+                let (name_a, lo_a, hi_a) = ranges[i];
+                let (name_b, lo_b, hi_b) = ranges[j];
+                assert!(
+                    hi_a < lo_b || hi_b < lo_a,
+                    "ID-Bereiche ueberlappen: {name_a}=[{lo_a},{hi_a}] vs {name_b}=[{lo_b},{hi_b}]"
+                );
+            }
+        }
+
+        let global_max = ranges.iter().map(|&(_, _, hi)| hi).max().expect("mind. eine Familie");
+        assert_eq!(
+            crate::net_mcts::NUM_ACTIONS,
+            global_max + 1,
+            "NUM_ACTIONS ({}) sollte genau max_id+1 ({}) sein",
+            crate::net_mcts::NUM_ACTIONS,
+            global_max + 1
+        );
     }
 }

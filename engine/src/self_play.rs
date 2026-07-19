@@ -136,12 +136,26 @@ pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
             })
         }
         Action::DrawStackPeek => json!({ "type": "dome_stack_peek" }),
-        Action::DrawStack(m) => json!({
-            "type": "dome_stack",
-            "slot_row": m.slot_row,
-            "slot_col": m.slot_col,
-            "rotation": m.rotation,
-        }),
+        Action::DrawStack(m) => {
+            // Position von `chosen_id` in der deduplizierten Pending-Liste --
+            // exakt dieselbe Dedup-Reihenfolge wie `generate_draw_stack_moves`
+            // (game.rs), damit `pending_index` konsistent zur Kandidaten-
+            // generierung ist. `chosen_id` selbst fliesst NICHT in die ID ein
+            // (wie bisher) -- `pending_index` ist nur eine grobe, beschraenkte
+            // Ersatzdimension dafuer (siehe action_to_id/dome_stack).
+            let mut ids: Vec<usize> =
+                state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+            ids.sort_unstable();
+            ids.dedup();
+            let pending_index = ids.iter().position(|&id| id == m.chosen_id).unwrap_or(0);
+            json!({
+                "type": "dome_stack",
+                "slot_row": m.slot_row,
+                "slot_col": m.slot_col,
+                "rotation": m.rotation,
+                "pending_index": pending_index,
+            })
+        }
         Action::BonusChip(m) => json!({
             "type": "bonus_chip",
             "factory_index": factory_pos(state, m.factory_id),
@@ -454,6 +468,21 @@ fn permutations<T: Clone>(items: &[T]) -> Vec<Vec<T>> {
     out
 }
 
+// ── Kuppelplatten-Slot/Rotation-Target (analog Moon-Order, aber ohne Suche) ──
+
+/// Slot- (0-8, row-major) und Rotations-Index (0-3) des TATSÄCHLICH gewählten
+/// Kuppelzugs -- im Gegensatz zu `moon_order_target` keine Suche nach der
+/// "besten" Alternative, nur ein einfaches Klassifikations-Label für
+/// `dome_slot_head`/`dome_rotation_head` (net_mcts.rs::build_untried_actions).
+/// `None` außerhalb von `Action::Dome`/`Action::DrawStack`.
+fn dome_slot_rotation_target(a: &Action) -> Option<(usize, usize)> {
+    match a {
+        Action::Dome(m) => Some((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize)),
+        Action::DrawStack(m) => Some((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize)),
+        _ => None,
+    }
+}
+
 // ── Startkachel-Heuristik (Port von py.rs::ai_start_tile_json) ────────────────
 
 fn color_index(c: TileColor) -> Option<usize> {
@@ -590,6 +619,8 @@ fn start_placement_step<R: Rng + ?Sized>(game: &mut Game, _rng: &mut R) -> Optio
     m.insert("policy".into(), json!([{ "action": chosen_env, "prob": 1.0 }]));
     m.insert("valid_actions".into(), Value::Array(valid_actions));
     m.insert("moon_order_target".into(), Value::Null);
+    m.insert("dome_slot_target".into(), Value::Null);
+    m.insert("dome_rotation_target".into(), Value::Null);
     m.insert("player".into(), json!(recorded_player));
     Some(m)
 }
@@ -620,6 +651,7 @@ fn drafting_step<R: Rng + ?Sized>(
     };
 
     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
+    let dome_t = dome_slot_rotation_target(&chosen);
     let state_json = state_to_json(&game.state, true);
 
     // Zug anwenden (sollte stets gültig sein — aus drafting_actions stammend).
@@ -632,6 +664,14 @@ fn drafting_step<R: Rng + ?Sized>(
     m.insert(
         "moon_order_target".into(),
         moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
+    );
+    m.insert(
+        "dome_slot_target".into(),
+        dome_t.map(|(s, _)| json!(s)).unwrap_or(Value::Null),
+    );
+    m.insert(
+        "dome_rotation_target".into(),
+        dome_t.map(|(_, r)| json!(r)).unwrap_or(Value::Null),
     );
     m.insert("player".into(), json!(player));
     m
@@ -736,6 +776,8 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, rng: &mut R) -> Map<String, Val
     m.insert("policy".into(), json!([{ "action": chosen_env, "prob": 1.0 }]));
     m.insert("valid_actions".into(), Value::Array(valid_actions));
     m.insert("moon_order_target".into(), Value::Null);
+    m.insert("dome_slot_target".into(), Value::Null);
+    m.insert("dome_rotation_target".into(), Value::Null);
     m.insert("player".into(), json!(pi));
     m
 }
@@ -1506,6 +1548,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
+                    let dome_t = dome_slot_rotation_target(&chosen);
                     let state_json = state_to_json(&game.state, true);
                     let round_before = game.state.round_number;
                     apply_chosen_action(&mut game, chosen);
@@ -1546,6 +1589,14 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     m.insert(
                         "moon_order_target".into(),
                         moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
+                    );
+                    m.insert(
+                        "dome_slot_target".into(),
+                        dome_t.map(|(s, _)| json!(s)).unwrap_or(Value::Null),
+                    );
+                    m.insert(
+                        "dome_rotation_target".into(),
+                        dome_t.map(|(_, r)| json!(r)).unwrap_or(Value::Null),
                     );
                     m.insert("player".into(), json!(player));
                     records.push(m);
@@ -1670,11 +1721,12 @@ fn negamax_value(
         });
     }
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _value, _m, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| {
-            (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
-        })
-    });
+    let (logits, _value, _m, _points, _dslot, _drot) =
+        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            net.eval(&feats).unwrap_or_else(|_| {
+                (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            })
+        });
     let mut scored: Vec<(f32, Action)> = actions
         .into_iter()
         .map(|a| {
@@ -1742,11 +1794,12 @@ fn alphabeta_choose_action(
     ALPHABETA_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let perspective = state.current_player;
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _value, _m, _points) = crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-        net.eval(&feats).unwrap_or_else(|_| {
-            (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
-        })
-    });
+    let (logits, _value, _m, _points, _dslot, _drot) =
+        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            net.eval(&feats).unwrap_or_else(|_| {
+                (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            })
+        });
     let mut scored: Vec<(f32, Action)> = actions
         .iter()
         .map(|a| {

@@ -36,7 +36,7 @@ def run_diagnosis(data_dir: str, label: str):
     print(f"  Input Size:   {dataset.input_size}")
 
     loader = DataLoader(dataset, batch_size=32, shuffle=False)
-    states, targets_p, targets_v, masks = next(iter(loader))
+    states, targets_p, targets_v, masks, *_ = next(iter(loader))
 
     zero_mask   = (masks.sum(1) == 0).sum().item()
     leak        = (targets_p * (1 - masks)).sum(1).max().item()
@@ -167,8 +167,10 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
 
     # ── Stone-only Analyse (strategische Züge ohne Pflichtaktionen) ────────────
     # Obligatorische Aktionen herausfiltern:
-    # pass(0), end_tiling(1), bonus_chip(478-481), dome(328-435), dome_stack(436-471)
-    OBLIGATORY = set(range(328, 482))  # dome + dome_stack + bonus_chip
+    # pass(0), end_tiling(1), dome(328-330), dome_stack(331-334),
+    # use_chips(335-340), bonus_chip(341-344) -- Slot/Rotation kollabiert seit
+    # der Kuppelplatten-Faktorisierung (siehe neural_net.py::action_to_id).
+    OBLIGATORY = set(range(328, 345))  # dome + dome_stack + use_chips + bonus_chip
     OBLIGATORY.add(0)   # pass
     OBLIGATORY.add(1)   # end_tiling
 
