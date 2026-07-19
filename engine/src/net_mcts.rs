@@ -102,6 +102,53 @@ pub const ROUND_TRANSITION_SAMPLING: bool = false;
 /// `project_v8d_value_head_root_cause`-Memory für die volle Diskussion.
 pub const POINTS_UTILITY_WEIGHT: f64 = 0.0;
 
+/// Skala für die Floor-Straf-Korrektur (siehe `floor_shaping_delta`), gleiche
+/// Größenordnung wie `VALUE_SCALE` in `neural_net.py` (dort 50.0) — macht die
+/// Korrektur direkt vergleichbar mit dem own-minus-opp-Score-Margin, den
+/// `value`/`points_forecast` schon als Trainingsziel verwenden.
+const FLOOR_SHAPING_SCALE: f64 = 50.0;
+
+/// Gewicht der Floor-Straf-Korrektur relativ zum Netz-Blattwert. Bewusst
+/// klein gewählt (Nudge, kein Ersatz für den Value-Head) — erster Test, mit
+/// echten Arena-Ergebnissen kalibrieren.
+pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
+
+/// Exakte, JETZT SCHON feststehende Floor-Straf-Differenz (Spieler0 minus
+/// Spieler1) dieser Runde, roh (unskaliert). KEINE Vorhersage — reine
+/// State-Funktion (`PlayerBoard::broken_penalty`, board.rs), verfügbar ohne
+/// jeden Netz-Forward-Pass. Motivation: `execute_place`/`add_to_penalty`
+/// (execution.rs) legen Überlauf-Fliesen zu 100% deterministisch beim
+/// Anwenden eines Zugs fest — die resultierende Strafe ist beim Expandieren
+/// eines PUCT-Knotens (`apply_drafting` ist da schon gelaufen) bereits exakt
+/// bekannt, lange bevor irgendeine Runde endet und offiziell verrechnet wird.
+/// Der Value-Head bekommt die rohe Fliesenanzahl zwar als Input-Feature
+/// (`features.rs`, `floor_n/4`), muss die NICHTLINEARE, eskalierende
+/// Strafskala (`BROKEN_PENALTIES` = -1,-2,-3,-4) aber selbst lernen UND
+/// korrekt gegen den unsicheren Rest der Partie abwägen — genau dort ist der
+/// Value-Head laut Rundenabhängigkeits-Befund (siehe
+/// `project_v8d_value_head_root_cause`-Memory) am schwächsten. Diese
+/// Korrektur reicht die exakt bekannte Teilinformation direkt durch, statt
+/// darauf zu vertrauen, dass das Netz sie selbst wiederentdeckt.
+///
+/// Zwei Quellen, BEIDE exakt/deterministisch, BEIDE nötig (Nutzer-Hinweis --
+/// Boden entsteht nicht nur beim Drafting-Überlauf): `broken_penalty()`
+/// zählt bereits MATERIALISIERTE Strafleisten-Fliesen (Drafting-Überlauf,
+/// `execution.rs::add_to_penalty`); `round_end::projected_unplaceable_penalty`
+/// preist zusätzlich die beim NÄCHSTEN Drafting→Tiling-Übergang fällige
+/// Strafe für schon jetzt erkennbar unplatzierbare Reihen ein
+/// (`round_end.rs::process_unplaceable_rows`) — komponiert korrekt mit dem
+/// MAX_BROKEN-Deckel der ersten Quelle (siehe dortiger Kommentar: selbst der
+/// exakte DFS-Solver preist das NICHT ein). Ohne diese zweite Quelle sieht
+/// die Korrektur an einem Rundenende-Knoten oft noch 0 Boden, obwohl er beim
+/// tatsächlichen Übergang unausweichlich feststeht.
+fn floor_shaping_delta(state: &GameState) -> f64 {
+    let mine = (state.players[0].broken_penalty()
+        + crate::round_end::projected_unplaceable_penalty(&state.players[0])) as f64;
+    let theirs = (state.players[1].broken_penalty()
+        + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
+    (mine - theirs) / FLOOR_SHAPING_SCALE
+}
+
 // ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
 //
 // Die Aktions-ID (`action_to_id`) kodiert `moon_order` NICHT — Farbe/Reihe/
@@ -495,8 +542,15 @@ fn make_node<R: Rng + ?Sized>(
                 .eval(&other_feats)
                 .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
                 .unwrap_or(0.5);
-            let today_value =
+            let mut today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+
+            // Exakte Floor-Straf-Korrektur (siehe `floor_shaping_delta`-Kommentar) --
+            // reine State-Funktion, kein Netz-Forward-Pass, direkt additiv auf
+            // beide Perspektiven (Nullsummen-Charakter wie beim own-opp-Value-Ziel).
+            let floor_shift = FLOOR_SHAPING_WEIGHT * floor_shaping_delta(&state).tanh();
+            today_value[0] = (today_value[0] + floor_shift).clamp(0.0, 1.0);
+            today_value[1] = (today_value[1] - floor_shift).clamp(0.0, 1.0);
 
             // Rundenübergang (Phase wechselt von Drafting weg) per Chance-Node-
             // Sampling statt Einzelwert bewerten -- siehe round_transition.rs
