@@ -844,7 +844,7 @@ pub const GUMBEL_TOP_M: usize = 16;
 /// Softmax statt Besuchsanteil). Standardmaessig AUS, bis Phase 3 (Arena-
 /// Validierung ohne Neu-Training) ein Ergebnis liefert -- gleiches Muster
 /// wie `ACTIVE_LEAF`/`MIRROR_OTHER_VAL`.
-pub const USE_GUMBEL_SEARCH: bool = false;
+pub const USE_GUMBEL_SEARCH: bool = true;
 
 /// Gumbel(0,1)-Ziehung: `-ln(-ln(U))`, `U ~ Uniform(0,1)` (offenes Intervall,
 /// `U=0` waere `ln(0)=-inf`).
@@ -989,6 +989,273 @@ fn best_root_child(nodes: &[Node], children: &[usize]) -> Option<usize> {
     })
 }
 
+/// Tiefe-≥1-Auswahl unter bereits existierenden Kindern von `nid` (Gumbel-
+/// Pendant zu `best_puct`, §6 des Plans): `argmax[π'_node(a) − N(a)/(1+ΣN)]`,
+/// NUR über `nodes[nid].children` -- WELCHE Kandidaten überhaupt als Kind
+/// entstehen dürfen, entscheidet weiterhin derselbe Progressive-Widening-
+/// Cap wie im PUCT-Pfad (siehe `build_gumbel_tree`s `descend_and_backprop`).
+/// `improved_policy`s erste `children.len()` Einträge entsprechen 1:1
+/// `nodes[nid].children` (Reihenfolge von `completed_q_per_candidate`).
+fn gumbel_select_child(nodes: &[Node], nid: usize) -> usize {
+    let policy = improved_policy(nodes, nid);
+    let sum_n: f64 = nodes[nid].children.iter().map(|&c| nodes[c].visits as f64).sum();
+    let mut best = nodes[nid].children[0];
+    let mut best_adv = f64::NEG_INFINITY;
+    for (i, &cid) in nodes[nid].children.iter().enumerate() {
+        let n_a = nodes[cid].visits as f64;
+        let adv = policy[i] - n_a / (1.0 + sum_n);
+        if adv > best_adv {
+            best_adv = adv;
+            best = cid;
+        }
+    }
+    best
+}
+
+/// Finale Wurzel-Zugwahl im Gumbel-Modus (§7 des Plans, `gumbel_scale=0` für
+/// Arena/Produktion -- keine Ziehung): unter den Wurzelkindern mit
+/// `N(a) == max_a N(a)` (den Sequential-Halving-Überlebenden), `argmax[
+/// ln(prior(a)) + σ(completedQ(a))]`. Für besuchte Überlebende ist
+/// `completedQ` immer das eigene Q (nie `v_mix`, siehe `completed_q`-
+/// Kommentar), daher direkt `value/visits` statt der vollen
+/// `completed_q_per_candidate`-Maschinerie.
+fn gumbel_final_root_action(nodes: &[Node]) -> Option<usize> {
+    let children = &nodes[0].children;
+    if children.is_empty() {
+        return None;
+    }
+    let max_n = children.iter().map(|&c| nodes[c].visits).max().unwrap_or(0);
+    children
+        .iter()
+        .copied()
+        .filter(|&c| nodes[c].visits == max_n)
+        .max_by(|&a, &b| {
+            let score = |cid: usize| -> f64 {
+                let prior = (nodes[cid].prior as f64).max(1e-9);
+                let q = if nodes[cid].visits > 0 { nodes[cid].value / nodes[cid].visits as f64 } else { 0.0 };
+                prior.ln() + gumbel_sigma(q, max_n)
+            };
+            score(a).partial_cmp(&score(b)).unwrap_or(std::cmp::Ordering::Equal)
+        })
+}
+
+/// Dispatcht die finale Wurzel-Zugwahl auf `gumbel_final_root_action`
+/// (Gumbel-Modus) oder `best_root_child` (PUCT), je nach `USE_GUMBEL_SEARCH`.
+fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
+    if USE_GUMBEL_SEARCH {
+        gumbel_final_root_action(nodes)
+    } else {
+        best_root_child(nodes, &nodes[0].children)
+    }
+}
+
+/// Gumbel-AlphaZero-Baumaufbau (siehe Modul-Kommentar "Gumbel AlphaZero" für
+/// die volle Herleitung) -- Ersatz für `build_net_tree`, wenn
+/// `USE_GUMBEL_SEARCH=true`. Wurzel: Gumbel-Top-m + Sequential Halving statt
+/// Dirichlet-Noise + PUCT über den vollen Kandidatensatz. Tiefe≥1:
+/// `gumbel_select_child` statt `best_puct` (Progressive-Widening-Cap bleibt
+/// unverändert maßgeblich dafür, WELCHE Kandidaten überhaupt als Kind
+/// entstehen -- identisch zum PUCT-Pfad, siehe `descend_and_backprop`).
+fn build_gumbel_tree<R: Rng + ?Sized>(net: &Net, state: &GameState, sims: u32, rng: &mut R) -> Vec<Node> {
+    let mut root_state = state.clone();
+    root_state.log.clear();
+    if DETERMINIZE_ROOT_HIDDEN_INFO {
+        determinize_hidden_information(&mut root_state, rng);
+    }
+    let root_player = root_state.current_player;
+    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, rng)];
+
+    // Eine einzelne Tiefe-≥1-Deszension + Backprop, beginnend bei einem
+    // bereits existierenden Knoten (typischerweise ein Wurzelkind) --
+    // identisches Muster zur inneren Selection-Schleife im PUCT-Pfad, nur
+    // mit `gumbel_select_child` statt `best_puct`. Kein granularer Sim-
+    // Trace (siehe `build_net_tree`-Dispatch-Kommentar).
+    fn descend_and_backprop<R: Rng + ?Sized>(net: &Net, nodes: &mut Vec<Node>, start_nid: usize, rng: &mut R) {
+        let mut nid = start_nid;
+        let mut expansion_failed = false;
+        loop {
+            if nodes[nid].terminal {
+                break;
+            }
+            let widen_allowed = crate::mcts::MAX_ACTIONS
+                + (crate::mcts::WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
+            if !nodes[nid].untried.is_empty() && nodes[nid].children.len() < widen_allowed {
+                let (act, prior) = nodes[nid].untried.remove(0);
+                let mover = nodes[nid].state.current_player;
+                crate::profiling::note_gamestate_clone();
+                let mut g = Game { state: nodes[nid].state.clone() };
+                if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
+                    g.state.dome_tile_pool.shuffle(rng);
+                }
+                if g.apply_drafting(&act).is_ok() {
+                    let mut child_state = g.state;
+                    child_state.log.clear();
+                    let child = make_node(net, child_state, Some(nid), Some(act), prior, mover, rng);
+                    let cid = nodes.len();
+                    nodes.push(child);
+                    nodes[nid].children.push(cid);
+                    nid = cid;
+                } else {
+                    expansion_failed = true;
+                }
+                break;
+            }
+            if nodes[nid].children.is_empty() {
+                break;
+            }
+            nid = gumbel_select_child(nodes, nid);
+        }
+        if expansion_failed {
+            return;
+        }
+        let value = nodes[nid].leaf_value;
+        let mut cur = Some(nid);
+        while let Some(i) = cur {
+            nodes[i].visits += 1;
+            nodes[i].value += value[nodes[i].player_who_acted];
+            cur = nodes[i].parent;
+        }
+    }
+
+    let n_root = nodes[0].untried.len();
+    if n_root == 0 {
+        return nodes; // Wurzel terminal/keine legalen Züge -- nichts zu tun.
+    }
+
+    // Gumbel-Top-m an der Wurzel (§1 des Plans): je Kandidat einen Gumbel-
+    // Wert ziehen, Score = g(a) + ln(prior(a)), Top m' behalten. `g(a)`
+    // wird für die spätere Halbierungs-Rangfolge (§2) aufbewahrt (NICHT neu
+    // gezogen).
+    let m_prime = GUMBEL_TOP_M.min(n_root);
+    let mut scored: Vec<(f64, f64, usize)> = nodes[0]
+        .untried
+        .iter()
+        .enumerate()
+        .map(|(i, &(_, p))| {
+            let g = sample_gumbel(rng);
+            (g + (p as f64).max(1e-9).ln(), g, i)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let mut chosen: Vec<(usize, f64)> = scored.iter().take(m_prime).map(|&(_, g, i)| (i, g)).collect();
+    // Absteigend nach urspruenglichem Untried-Index entfernen, damit sich
+    // die Indizes der VERBLEIBENDEN (nicht gezogenen) Einträge beim
+    // Herausnehmen nicht verschieben.
+    chosen.sort_by(|a, b| b.0.cmp(&a.0));
+    let candidates: Vec<(Action, f32, f64)> = chosen
+        .into_iter()
+        .map(|(i, g)| {
+            let (act, prior) = nodes[0].untried.remove(i);
+            (act, prior, g)
+        })
+        .collect();
+    // `nodes[0].untried` enthält jetzt nur noch die NICHT gezogenen
+    // Kandidaten -- bleibt für `improved_policy`/das spätere Policy-Ziel
+    // (§5, Phase 4) korrekt als "N(a)=0"-Menge erhalten.
+
+    let mut candidate_node: Vec<Option<usize>> = vec![None; candidates.len()];
+    let mut current: Vec<usize> = (0..candidates.len()).collect();
+
+    // Expandiert (falls nötig) und simuliert EINEN weiteren Besuch für
+    // Kandidat `ci` (Index in `candidates`/`candidate_node`).
+    macro_rules! visit_candidate {
+        ($ci:expr) => {{
+            let ci = $ci;
+            match candidate_node[ci] {
+                Some(cid) => descend_and_backprop(net, &mut nodes, cid, rng),
+                None => {
+                    let (act, prior, _g) = candidates[ci].clone();
+                    let mover = nodes[0].state.current_player;
+                    crate::profiling::note_gamestate_clone();
+                    let mut g = Game { state: nodes[0].state.clone() };
+                    if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
+                        g.state.dome_tile_pool.shuffle(rng);
+                    }
+                    if g.apply_drafting(&act).is_ok() {
+                        let mut child_state = g.state;
+                        child_state.log.clear();
+                        let child = make_node(net, child_state, Some(0), Some(act), prior, mover, rng);
+                        let cid = nodes.len();
+                        nodes.push(child);
+                        nodes[0].children.push(cid);
+                        candidate_node[ci] = Some(cid);
+                        let value = nodes[cid].leaf_value;
+                        let mut cur = Some(cid);
+                        while let Some(i) = cur {
+                            nodes[i].visits += 1;
+                            nodes[i].value += value[nodes[i].player_who_acted];
+                            cur = nodes[i].parent;
+                        }
+                    }
+                    // Fehlgeschlagenes apply_drafting: `candidate_node[ci]`
+                    // bleibt `None` -- der Kandidat faellt bei der naechsten
+                    // Rangfolge automatisch raus (Q=0-Fallback unten trifft
+                    // nie einen ECHTEN Kandidaten, da jeder in `current`
+                    // vor der ersten Rangfolge mind. 1 Sim bekommen hat --
+                    // ausser bei wiederholtem Fehlschlag, dann bleibt er
+                    // einfach auf Q=0 stehen, kein Panik/Sonderfall noetig).
+                }
+            }
+        }};
+    }
+
+    if candidates.len() <= 1 {
+        for _ in 0..sims {
+            visit_candidate!(0);
+        }
+    } else {
+        let m_actual = candidates.len();
+        let num_phases = (m_actual as f64).log2().ceil().max(1.0) as u32;
+        let mut budget_used: u32 = 0;
+        while current.len() > 1 && budget_used < sims {
+            let remaining_slots = (num_phases as usize) * current.len();
+            let extra = (((sims - budget_used) as usize / remaining_slots.max(1)).max(1)) as u32;
+            for &ci in &current.clone() {
+                for _ in 0..extra {
+                    if budget_used >= sims {
+                        break;
+                    }
+                    visit_candidate!(ci);
+                    budget_used += 1;
+                }
+            }
+            // Rangfolge: g(a) + ln(prior(a)) + σ(Q̂(a)) -- Q̂ ist der
+            // empirische Mittelwert des zugehörigen Wurzelkindes (inzwischen
+            // mind. 1x besucht, siehe `extra = max(1, ...)` oben).
+            let max_n = current
+                .iter()
+                .filter_map(|&ci| candidate_node[ci].map(|cid| nodes[cid].visits))
+                .max()
+                .unwrap_or(0);
+            current.sort_by(|&a, &b| {
+                let score = |ci: usize| -> f64 {
+                    let (_, prior, g) = candidates[ci];
+                    let q = match candidate_node[ci] {
+                        Some(cid) if nodes[cid].visits > 0 => nodes[cid].value / nodes[cid].visits as f64,
+                        _ => 0.0,
+                    };
+                    g + (prior as f64).max(1e-9).ln() + gumbel_sigma(q, max_n)
+                };
+                score(b).partial_cmp(&score(a)).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let keep = (current.len() / 2).max(2);
+            current.truncate(keep);
+        }
+        // Restbudget (Rundungsreste) auf die verbliebenen Kandidaten verteilen.
+        while budget_used < sims {
+            for &ci in &current.clone() {
+                if budget_used >= sims {
+                    break;
+                }
+                visit_candidate!(ci);
+                budget_used += 1;
+            }
+        }
+    }
+
+    nodes
+}
+
 /// Kurzlabel eines Knotens fürs Log (Aktionsbeschreibung bzw. „Wurzel"). Mit
 /// Eltern-Zustand (VOR dem Zug) für Steinanzahl/Füllstand/Strafleisten-Hinweis.
 fn log_label(nodes: &[Node], nid: usize) -> String {
@@ -1004,6 +1271,9 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// Baut den PUCT-Suchbaum. `add_root_noise` aktiviert Dirichlet-Wurzel-Noise.
 /// Mit `log = Some(..)` wird jede Simulation (Selection/Expansion/Eval/Backprop)
 /// als Text protokolliert (für den Server-Debug-Log, analog `mcts::build_tree`).
+/// Dispatcht komplett auf `build_gumbel_tree`, wenn `USE_GUMBEL_SEARCH` --
+/// Gumbel hat (noch) keinen granularen Sim-fuer-Sim-Trace (nur ein
+/// Platzhalter-Log-Eintrag), `log` wird in diesem Fall ignoriert.
 fn build_net_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -1013,6 +1283,12 @@ fn build_net_tree<R: Rng + ?Sized>(
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
 ) -> Vec<Node> {
+    if USE_GUMBEL_SEARCH {
+        if let Some(l) = log.as_deref_mut() {
+            l.push("  GUMBEL-SUCHE (kein granularer Sim-Trace)".to_string());
+        }
+        return build_gumbel_tree(net, state, sims, rng);
+    }
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
     root_state.log.clear();
@@ -1189,7 +1465,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
         return crate::round5::choose_action(state);
     }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
-    let best = best_root_child(&nodes, &nodes[0].children)?;
+    let best = select_final_root_child(&nodes)?;
     nodes[best].action.clone()
 }
 
@@ -1250,7 +1526,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
         return crate::round5::choose_action_with_analysis(state);
     }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
-    let best = best_root_child(&nodes, &nodes[0].children);
+    let best = select_final_root_child(&nodes);
     let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
     let prior_sum: f64 = nodes[0]
         .children
