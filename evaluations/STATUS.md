@@ -760,14 +760,89 @@ Rauschband → mit dem Nutzer besprechen, ob trotzdem zu Phase 4
 (frisches Self-Play + Retrain, deutlich teurer) weitergegangen wird oder
 pausiert wird. Stand: offen, noch nicht entschieden.
 
+## Baustein B (zweistufiger Kuppel-Suchknoten) + Fund 7 (Schattenpunkte) implementiert (2026-07-20)
+
+Plan-Dokument `elegant-wandering-mist.md` (Nutzer-genehmigt) umgesetzt --
+Nutzer-Entscheidung, Baustein B jetzt doch VOR statt nach dem
+Value-Head-Entscheidungspunkt umzusetzen, da Gumbel ohnehin einen frischen
+Self-Play-Zyklus verlangt (completed-Q-Ziele), und Baustein B (NUM_ACTIONS
+ändert sich) diesen Zyklus ohnehin erzwingt -- Effizienzgewinn, beides in
+EINEM teuren Batch zu bündeln.
+
+**Baustein B**: der Kuppelplatten-Zug (Kachel/Stapel × Slot × Rotation) ist
+jetzt ein ECHTER zweistufiger Suchknoten statt eines kollabierten Einzelzugs
+mit Prior-Faktorisierung (Baustein A). Neue `Action`-Varianten
+`ChooseDomeSlot`/`ChooseDrawStackSlot` (Stufe 1: Kachel+Slot, ~24-27
+Kandidaten) und `ChooseDomeRotation` (Stufe 2: nur Rotation, ≤4 Kandidaten,
+gemeinsam für beide Pfade), neues `GameState`-Feld `pending_dome_choice`.
+`execute_dome_move`/`execute_draw_from_stack`/`validate_*` (game.rs) bleiben
+komplett unverändert -- nur wann/wie die volle Move-Struktur zusammengesetzt
+wird, ändert sich (zwei Spielerentscheidungen statt einer, ohne
+`switch_player()` zwischen Stufe 1 und 2, exakt wie beim bereits bestehenden
+Stapel-Zieh-Muster DrawStackPeek/ChooseDrawStackSlot). Dead-End-Analyse
+ergab: Rotation ist in dieser Regelbasis NIE gültigkeitsrelevant
+(`validate_dome_move`/`validate_draw_from_stack` prüfen `rotation` gar
+nicht, `apply_rotation` schlägt nur bei einer bereits befüllten Kachel fehl,
+was für frisch gezogene Kacheln nie zutrifft) -- Stufe 2 hat also strukturell
+IMMER ≥1 Fortsetzung, per Test abgesichert
+(`dome_slot_candidates_never_yield_a_dead_end_stage_two`).
+
+Frontend/menschliche Spieler-API (`server.py` über `PyGame::apply_dome`/
+`apply_dome_stack_choose`, `serialize_valid_moves`) bleibt NACH AUSSEN
+byte-identisch -- Tile+Slot+Rotation weiterhin EIN atomarer Aufruf bzw. eine
+volle Enumeration in der UI-Zugliste, intern jetzt zwei `apply_drafting`-
+Aufrufe bzw. eine lokale Rotations-Auffächerung. Nur die KI-Suche
+(net_mcts.rs/mcts.rs, über `drafting_actions()`) sieht die kleinere
+Verzweigung.
+
+Die alte `dome_slot_head`/`dome_rotation_head`-Prior-Faktorisierung
+(Baustein A, net_mcts.rs + neural_net.py) ist komplett entfernt -- jede
+Kachel×Slot- bzw. Rotations-Kombination hat jetzt eine EIGENE, nicht
+kollabierte Policy-ID (`action_to_id`: 328-354 choose_dome_slot, 355-390
+choose_draw_stack_slot, 391-394 choose_dome_rotation; `NUM_ACTIONS`
+346→406), keine Faktorisierung mehr nötig. ONNX-Modellausgabe von 6 auf 4
+Tensoren reduziert (policy/value/moon/points).
+
+**Fund 7 (Schattenpunkte, externe Bugfix-Review Abschnitt C)**: `apply_score`
+klemmt den sichtbaren Punktestand regelkonform bei 0 -- das verwischte
+bisher im Value-/Points-Trainingsziel "schlecht" (0) und "desaströs"
+(eigentlich weit im Minus) zum selben Label. Neues `PlayerBoard`-Feld
+`score_unclamped` läuft NIE geklemmt parallel mit (Start 5, wie `score`),
+wird in `self_play.rs` an allen 6 Backfill-Stellen als `scores_unclamped`
+aufgezeichnet (2 Post-hoc-Backfill-Funktionen + 4 Einzelrecord-Stellen --
+alle 6 gebraucht, initial wurden nur die 4 Einzelrecord-Stellen gepatcht,
+die tatsächlich von `self_play_games` genutzten Backfill-Stellen fehlten
+zunächst und wurden erst durch einen End-to-End-Smoke-Test über die echte
+Python-Bindung entdeckt). `neural_net.py::VALUE_SCHEMA_VERSION` 13→14,
+Zielformel nutzt `scores_unclamped` statt `scores` (Fallback bei fehlendem
+Feld für alte Daten). Verifiziert an echtem Self-Play: ein Spiel endete mit
+sichtbar `[5, 10]` aber ungeklemmt `[-19, -8]` -- zeigt genau den Fall, den
+Fund 7 beheben soll (mehrfach auf 0 geklemmt, dann wieder erholt, sichtbarer
+Endstand verschleiert den tatsächlich viel schlechteren Verlauf).
+
+Volle Testsuite 122/122 grün (124 alt − 3 jetzt gegenstandslose
+`masked_softmax`-Tests − 2 durch Baustein-B-Umbau ersetzte Faktorisierungs-
+Tests + 2 neue Baustein-B-Tests + 1 neuer Dead-End-Test). Wheel neu gebaut
+und per End-to-End-Smoke-Test über die echte Python-Bindung verifiziert
+(nicht nur `cargo test`).
+
+**Nächster Schritt** (noch NICHT gestartet, braucht Nutzer-Freigabe wegen
+Laufzeit/Kosten): frischer Self-Play-Batch (Baustein B + Fund 7 + Gumbel
+kombiniert) + Retrain + volle Diagnose-Kette gegen die Session-Baselines
+(17% Struktur-Fixes, 10% Gumbel-ohne-Retrain). NUM_ACTIONS-Änderung macht
+bestehende Checkpoints für Live-Inferenz endgültig unbrauchbar (erzwingt
+ohnehin Policy-Head-Neustart).
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
   bis der Value-Head-Fix einen klaren Fortschritt zeigt.
-- **Baustein B (zweistufiger Slot→Rotation-Suchknoten) weiterhin NACH
-  der Value-Head-Reparatur** (Nutzer-Entscheidung 2026-07-19).
 - round_transition_value-Daten-Skalierung (2000-3000 Spiele) bleibt
   hinten angestellt.
+- Gumbels eigentliches completed-Q-Policy-Ziel (`net_drafting_policy` müsste
+  `π'(a) = softmax(ln(prior)+σ(completedQ))` statt Besuchsanteil
+  aufzeichnen) ist bewusst NICHT Teil des kommenden Self-Play-Zyklus --
+  separater Folgeversuch, je nach Ergebnis von B+Fund-7.
 
 ## Quellen (Recherche 2026-07-19)
 

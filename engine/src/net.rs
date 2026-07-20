@@ -1,17 +1,16 @@
 //! ONNX-Netz-Inferenz via tract-onnx (Network-Modus, Phase B).
 //!
 //! Lädt ein nach ONNX exportiertes MosaicNet (`export_onnx.py`) und liefert
-//! `(policy_logits[NUM_ACTIONS], value[1], moon_logits[5], points[1],
-//! dome_slot_logits[9], dome_rotation_logits[4])`.
+//! `(policy_logits[NUM_ACTIONS], value[1], moon_logits[5], points[1])`.
 //! `value` treibt bei `ACTIVE_LEAF=Net` (Stufe 2, Standard) tatsächlich die
 //! PUCT-Suche (`net_mcts.rs::make_node`, `value_to_win_prob`) -- KORRIGIERT
 //! ggü. frühem Kommentarstand hier, der noch von der Vor-Value-Head-
 //! Rückholung stammte (siehe stage2_investigation.md für die Historie).
 //! `points` bleibt reines Trainings-Zusatzsignal, wird in der Suche nirgends
-//! gelesen. `dome_slot`/`dome_rotation` faktorisieren die (in `action_to_id`
-//! kollabierte) Kuppelplatten-Slot/Rotation-Wahl analog zu `moon_logits`,
-//! siehe `net_mcts.rs::build_untried_actions`. Stufe 1/3 nutzen weiterhin nur
-//! Policy(+Moon+Dome-Faktorisierung) + den exakten DFS-Solver fürs Blatt.
+//! gelesen. Frühere `dome_slot`/`dome_rotation`-Faktorisierungsköpfe (Baustein
+//! A) sind mit Baustein B (zweistufiger Kuppel-Suchknoten, `game.rs`
+//! `ChooseDomeSlot`/`ChooseDomeRotation`) entfallen -- die Slot/Rotations-Wahl
+//! bekommt jetzt jeweils eigene Policy-IDs statt einer Prior-Faktorisierung.
 //! Reines Rust — keine libtorch/onnxruntime-Abhängigkeit. Batch fix = 1
 //! (eine Stellung pro Forward, kein Batching über mehrere Positionen).
 
@@ -38,13 +37,11 @@ impl Net {
     }
 
     /// Forward-Pass für eine Stellung. Gibt (policy_logits, value, moon_logits,
-    /// points, dome_slot_logits, dome_rotation_logits) -- ONNX-Ausgabereihenfolge
-    /// aus `export_onnx.py`.
-    #[allow(clippy::type_complexity)]
+    /// points) -- ONNX-Ausgabereihenfolge aus `export_onnx.py`.
     pub fn eval(
         &self,
         feats: &[f32],
-    ) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+    ) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
         let input: Tensor =
             tract_ndarray::Array2::from_shape_vec((1, self.input_size), feats.to_vec())?.into();
         let out = self.model.run(tvec!(input.into()))?;
@@ -52,9 +49,7 @@ impl Net {
         let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
         let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
         let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        let dome_slot: Vec<f32> = out[4].to_array_view::<f32>()?.iter().copied().collect();
-        let dome_rotation: Vec<f32> = out[5].to_array_view::<f32>()?.iter().copied().collect();
-        Ok((policy, value, moon, points, dome_slot, dome_rotation))
+        Ok((policy, value, moon, points))
     }
 }
 

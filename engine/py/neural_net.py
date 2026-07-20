@@ -285,29 +285,39 @@ def action_to_id(action: dict) -> int:
         sc = action.get("slot_col", 0)
         return 274 + (pr * 9) + (sr * 3) + sc      # 274–327
 
-    if t == "dome":
-        # Slot/Rotation fliessen NICHT mehr in die ID ein (analog Moon-Order) --
-        # nur der Auslage-Index (0-2). Faktorisierung uebernehmen
-        # dome_slot_head/dome_rotation_head (net_mcts.rs::build_untried_actions).
-        return 328 + action.get("display_index", 0)  # 328-330
+    if t == "choose_dome_slot":
+        # Baustein B: Kachel (Auslage-Index 0-2) + Slot ZUSAMMEN, Rotation ist
+        # eine separate Stufe-2-Aktion (choose_dome_rotation) -- ersetzt das
+        # frühere kollabierte "dome"-Schema (dome_slot_head/dome_rotation_head).
+        d_idx = action.get("display_index", 0)
+        sr = action.get("slot_row", 0)
+        sc = action.get("slot_col", 0)
+        return 328 + (d_idx * 9) + (sr * 3) + sc  # 328-354
 
-    if t == "dome_stack":
+    if t == "choose_draw_stack_slot":
         # `pending_index`: Position der gewaehlten Platte in der deduplizierten
         # Pending-Liste (self_play.rs::action_to_env_dict), gedeckelt statt
-        # Slot/Rotation-kodiert.
+        # Kachel-kodiert. + Slot zusammen, Rotation separat (siehe oben).
         p_idx = min(action.get("pending_index", 0), MAX_PENDING_STACK_TILES - 1)
-        return 331 + p_idx  # 331-334
+        sr = action.get("slot_row", 0)
+        sc = action.get("slot_col", 0)
+        return 355 + (p_idx * 9) + (sr * 3) + sc  # 355-390
+
+    if t == "choose_dome_rotation":
+        # EINE gemeinsame ID-Familie fuer beide Pfade (Display/Stapel).
+        rot_idx = max(0, min(3, action.get("rotation", 0) // 90))
+        return 391 + rot_idx  # 391-394
 
     if t == "use_chips":
-        return 335 + action.get("pattern_row", 0)  # 335-340
+        return 395 + action.get("pattern_row", 0)  # 395-400
 
     if t == "bonus_chip":
-        return 341 + action.get("factory_index", 0)  # 341-344
+        return 401 + action.get("factory_index", 0)  # 401-404
 
     if t == "dome_stack_peek":
-        return 345
+        return 405
 
-    return 344  # Fallback
+    return 405  # Fallback
 
 # --- 2. DATENSATZ & NETZWERK ---
 
@@ -417,7 +427,17 @@ def action_to_id(action: dict) -> int:
 #                    zugrundeliegende Information wie zuvor, nur nicht mehr
 #                    an den Raendern gesaettigt/binarisiert. `rtv` bleibt
 #                    unveraendert bevorzugt, wo vorhanden.
-VALUE_SCHEMA_VERSION = 13
+# Ab Version 14 (Fund 7, externe Bugfix-Review Bugfixes.txt Abschnitt C):
+#                    `scores` klemmt regelkonform bei 0 (PlayerBoard::apply_score)
+#                    -- das verwischt im Fallback-Zweig (kein rtv) "schlecht"
+#                    (0) und "desastroes" (eigentlich weit im Minus) zum
+#                    selben Label. own_total/opp_total nutzen daher jetzt
+#                    `scores_unclamped` (nie geklemmt, self_play.rs), mit
+#                    Fallback auf `scores` falls das Feld in aelteren Daten
+#                    fehlt (gleiches Graceful-Degradation-Muster wie
+#                    policy_weights/points_forecast oben). `rtv`-Zweig bleibt
+#                    unveraendert (eigene, bereits ungeklemmte Quelle).
+VALUE_SCHEMA_VERSION = 14
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 
@@ -472,12 +492,6 @@ class MosaicDataset(Dataset):
                     self.points_forecast = torch.from_numpy(hf['points_forecast'][:])
                 else:  # alter Cache ohne Aux-Ziel → 0.0 (wird durch VALUE_SCHEMA_VERSION eh selten erreicht)
                     self.points_forecast = torch.zeros_like(self.values)
-                if 'dome_slot_targets' in hf:
-                    self.dome_slot_targets = torch.from_numpy(hf['dome_slot_targets'][:])
-                    self.dome_rotation_targets = torch.from_numpy(hf['dome_rotation_targets'][:])
-                else:  # alter Cache ohne Kuppel-Faktorisierungs-Ziel → -1 (ueberall "nicht anwendbar")
-                    self.dome_slot_targets = torch.full((len(self.states),), -1.0)
-                    self.dome_rotation_targets = torch.full((len(self.states),), -1.0)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -496,8 +510,6 @@ class MosaicDataset(Dataset):
             self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
             self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
             self.points_forecast = torch.zeros_like(self.values)  # Legacy .pt kennt kein Aux-Ziel
-            self.dome_slot_targets = torch.full((len(self.states),), -1.0)      # Legacy .pt kennt kein Ziel
-            self.dome_rotation_targets = torch.full((len(self.states),), -1.0)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -507,8 +519,6 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('moon_order_targets',  data=self.moon_order_targets.numpy(),  compression='lzf')
                 hf.create_dataset('policy_weights',      data=self.policy_weights.numpy(),      compression='lzf')
                 hf.create_dataset('points_forecast',     data=self.points_forecast.numpy(),     compression='lzf')
-                hf.create_dataset('dome_slot_targets',   data=self.dome_slot_targets.numpy(),    compression='lzf')
-                hf.create_dataset('dome_rotation_targets', data=self.dome_rotation_targets.numpy(), compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -520,7 +530,6 @@ class MosaicDataset(Dataset):
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
             polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
-            dome_slot_l, dome_rot_l = [], []  # Kuppelplatten-Faktorisierungs-Ziele (analog moon_l)
 
             for f in files:
                 with open(f, "rb") as file:
@@ -529,8 +538,9 @@ class MosaicDataset(Dataset):
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
                             p = step["player"]
-                            own_total = float(step["scores"][p])
-                            opp_total = float(step["scores"][1 - p])
+                            scores_src = step.get("scores_unclamped", step["scores"])
+                            own_total = float(scores_src[p])
+                            opp_total = float(scores_src[1 - p])
                             # Weiches, symmetrisches Margin-Ziel statt hartem
                             # ±1 (siehe VALUE_SCHEMA_VERSION=13-Kommentar oben)
                             # -- dieselbe own_total/opp_total-Information wie
@@ -604,11 +614,6 @@ class MosaicDataset(Dataset):
                                     moon_target[c_idx] = float(rank)
                         moon_l.append(moon_target)
 
-                        dome_slot_t = step.get("dome_slot_target")
-                        dome_rot_t = step.get("dome_rotation_target")
-                        dome_slot_l.append(float(dome_slot_t) if dome_slot_t is not None else -1.0)
-                        dome_rot_l.append(float(dome_rot_t) if dome_rot_t is not None else -1.0)
-
                         # Policy-Loss nur für ECHTE Drafting-Schritte: Tiling/Start-
                         # Steps sind one-hot Solver-/Heuristik-Züge, die das Netz nie
                         # vorhersagen muss (Tiling macht der DFS-Solver). Sie fluten
@@ -627,14 +632,12 @@ class MosaicDataset(Dataset):
             moon_np      = np.array(moon_l,      dtype=np.float32)
             polw_np      = np.array(polw_l,      dtype=np.float32)
             points_np    = np.array(points_l,    dtype=np.float32)
-            dome_slot_np = np.array(dome_slot_l, dtype=np.float32)
-            dome_rot_np  = np.array(dome_rot_l,  dtype=np.float32)
             # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
             # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
             # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
             # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
             # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
-            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l, dome_slot_l, dome_rot_l
+            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -647,8 +650,6 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('moon_order_targets',   data=moon_np,      compression='lzf')
                 hf.create_dataset('policy_weights',       data=polw_np,      compression='lzf')
                 hf.create_dataset('points_forecast',      data=points_np,    compression='lzf')
-                hf.create_dataset('dome_slot_targets',    data=dome_slot_np, compression='lzf')
-                hf.create_dataset('dome_rotation_targets', data=dome_rot_np, compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -658,16 +659,13 @@ class MosaicDataset(Dataset):
             self.moon_order_targets = torch.from_numpy(moon_np)
             self.policy_weights     = torch.from_numpy(polw_np)
             self.points_forecast    = torch.from_numpy(points_np)
-            self.dome_slot_targets     = torch.from_numpy(dome_slot_np)
-            self.dome_rotation_targets = torch.from_numpy(dome_rot_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
 
     def __len__(self): return len(self.states)
     def __getitem__(self, idx):
         return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
-                self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx],
-                self.dome_slot_targets[idx], self.dome_rotation_targets[idx])
+                self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx])
 
 
 class MosaicNet(nn.Module):
@@ -718,23 +716,6 @@ class MosaicNet(nn.Module):
             nn.ReLU(),
             nn.Linear(32, 5)   # 5 Farben: blau, gelb, rot, schwarz, türkis
         )
-        # Kuppelplatten-Faktorisierung (analog Moon-Order): `action_to_id`
-        # kollabiert Slot/Rotation fuer "dome"/"dome_stack" auf wenige IDs
-        # (features.rs), diese beiden kleinen Koepfe liefern die faktorisierte
-        # Sub-Verteilung P(Slot) x P(Rotation) dafuer (net_mcts.rs::
-        # build_untried_actions). Erste Version UNKONDITIONIERT (Rotation
-        # haengt nicht vom gewaehlten Slot ab) -- bewusst einfach gehalten wie
-        # moon_order_head, Slot-Konditionierung erst bei belegtem Bedarf.
-        self.dome_slot_head = nn.Sequential(
-            nn.Linear(hidden_size, 16),
-            nn.ReLU(),
-            nn.Linear(16, 9)   # 3x3 Kuppelraster, row-major (slot_row*3+slot_col)
-        )
-        self.dome_rotation_head = nn.Sequential(
-            nn.Linear(hidden_size, 16),
-            nn.ReLU(),
-            nn.Linear(16, 4)   # 0/90/180/270 Grad
-        )
         # Value-Head: Sieg/Niederlage (+1/-1), klassisches AlphaZero-Ziel --
         # zurueckgeholt, aber NICHT mehr fuer die Suche gedacht (Stufe 2 bleibt
         # tot, siehe evaluations/stage2_investigation.md), sondern als
@@ -763,8 +744,6 @@ class MosaicNet(nn.Module):
             self.value_head(shared),
             self.moon_order_head(shared),
             self.points_head(shared),
-            self.dome_slot_head(shared),
-            self.dome_rotation_head(shared),
         )
 
     @torch.no_grad()

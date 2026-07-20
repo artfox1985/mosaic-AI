@@ -100,11 +100,11 @@ impl PyGame {
     /// muss `INPUT_SIZE` treffen) -- KEIN Spielzustand-Bezug, nur fürs
     /// Rust-Paritätstesten gegen `export_onnx.py`s `.onnx.ref.txt`
     /// (deterministischer Zufalls-Input+Referenz-Output je Modell-Export).
-    /// Gibt `(policy, value, moon, points, dome_slot, dome_rotation)` zurück.
+    /// Gibt `(policy, value, moon, points)` zurück.
     fn net_eval_raw(
         &self,
         feats: Vec<f32>,
-    ) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+    ) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
         })?;
@@ -196,10 +196,16 @@ impl PyGame {
         map_err(self.game.apply_drafting(&Action::Stone(m)))
     }
 
+    /// Bleibt nach aussen ein ATOMARER Zug (Tile+Slot+Rotation in einem Aufruf,
+    /// wie server.py es erwartet) -- intern seit Baustein B zwei aufeinander-
+    /// folgende `apply_drafting`-Aufrufe (Stufe 1: Slot waehlen, Stufe 2:
+    /// Rotation), da die KI-Suche (net_mcts.rs/mcts.rs) diese Zerlegung fuer
+    /// den kleineren Verzweigungsfaktor braucht.
     #[pyo3(signature = (tile_id, slot_row, slot_col, rotation=0))]
     fn apply_dome(&mut self, tile_id: usize, slot_row: usize, slot_col: usize, rotation: u32) -> PyResult<()> {
-        let m = PlaceDomeTileMove { dome_tile_id: tile_id, slot_row, slot_col, rotation };
-        map_err(self.game.apply_drafting(&Action::Dome(m)))
+        let m = PlaceDomeTileMove { dome_tile_id: tile_id, slot_row, slot_col, rotation: 0 };
+        map_err(self.game.apply_drafting(&Action::ChooseDomeSlot(m)))?;
+        map_err(self.game.apply_drafting(&Action::ChooseDomeRotation(rotation)))
     }
 
     /// Aktion A, Schritt 1: eine weitere verdeckte Kuppelplatte ziehen (−1
@@ -238,8 +244,10 @@ impl PyGame {
                 .map(|t| t.tile_id)
                 .collect()
         });
-        let m = DrawFromStackMove { chosen_id, slot_row, slot_col, rotation, return_order };
-        map_err(self.game.apply_drafting(&Action::DrawStack(m)))
+        // Bleibt nach aussen atomar -- siehe `apply_dome`-Kommentar.
+        let m = DrawFromStackMove { chosen_id, slot_row, slot_col, rotation: 0, return_order };
+        map_err(self.game.apply_drafting(&Action::ChooseDrawStackSlot(m)))?;
+        map_err(self.game.apply_drafting(&Action::ChooseDomeRotation(rotation)))
     }
 
     fn apply_bonus_chip(&mut self, factory_id: usize) -> PyResult<()> {

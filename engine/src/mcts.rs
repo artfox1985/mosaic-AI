@@ -202,8 +202,8 @@ fn move_priority(m: &SearchMove) -> i32 {
         SearchMove::Draft(a) => match a {
             Action::BonusChip(_) => 6,
             Action::Stone(_) => 4,
-            Action::Dome(_) => 3,
-            Action::DrawStack(_) | Action::DrawStackPeek => 2,
+            Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => 3,
+            Action::ChooseDrawStackSlot(_) | Action::DrawStackPeek => 2,
             Action::Pass => 1,
         },
     }
@@ -636,9 +636,9 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                 let desc = format!("{amount}Stein {} von {src} → {dest}{fill}", m.take.color.value());
                 ("stone", desc, cat, action_to_dict(a))
             }
-            Action::Dome(m) => (
-                "dome",
-                format!("Kuppel #{} → ({},{}) {}°", m.dome_tile_id, m.slot_row, m.slot_col, m.rotation),
+            Action::ChooseDomeSlot(m) => (
+                "choose_dome_slot",
+                format!("Kuppel #{} → ({},{})", m.dome_tile_id, m.slot_row, m.slot_col),
                 "dome",
                 action_to_dict(a),
             ),
@@ -648,9 +648,15 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                 "dome",
                 action_to_dict(a),
             ),
-            Action::DrawStack(m) => (
-                "dome_stack",
-                format!("Stapel → ({},{}) {}°", m.slot_row, m.slot_col, m.rotation),
+            Action::ChooseDrawStackSlot(m) => (
+                "choose_draw_stack_slot",
+                format!("Stapel → ({},{})", m.slot_row, m.slot_col),
+                "dome",
+                action_to_dict(a),
+            ),
+            Action::ChooseDomeRotation(rot) => (
+                "choose_dome_rotation",
+                format!("Rotation {rot}°"),
                 "dome",
                 action_to_dict(a),
             ),

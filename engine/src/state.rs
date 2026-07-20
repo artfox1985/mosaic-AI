@@ -6,6 +6,7 @@ use rand::Rng;
 use crate::board::PlayerBoard;
 use crate::dome::{build_bonus_chip_pool, build_dome_tile_pool, BonusChip, DomeTile};
 use crate::factory::{Factory, LargeFactory};
+use crate::moves::PendingDomeChoice;
 use crate::supply::{Bag, Tower};
 use crate::tile::TileColor;
 
@@ -60,6 +61,12 @@ pub struct GameState {
     /// gerade kein Stapel-Zug läuft. Reset bei `Action::DrawStack` (Wahl
     /// getroffen) und beim Rundenwechsel.
     pub pending_stack_draw: Vec<DomeTile>,
+
+    /// Baustein B (zweistufiger Kuppel-Suchknoten): Stufe-1-Wahl (Kachel+Slot),
+    /// die noch auf ihre Stufe-2-Rotation wartet. `None`, solange kein
+    /// Kuppel-Zug im Gange ist. Reset bei `Action::ChooseDomeRotation`
+    /// (Wahl abgeschlossen) und beim Rundenwechsel.
+    pub pending_dome_choice: Option<PendingDomeChoice>,
 
     pub scoring_tile_ids: Vec<usize>,
 
@@ -200,6 +207,7 @@ pub fn setup_new_game<R: Rng + ?Sized>(
         dome_display,
         bonus_chip_pool: bonus_pool,
         pending_stack_draw: Vec::new(),
+        pending_dome_choice: None,
         scoring_tile_ids: Vec::new(),
         round_number: 1,
         current_player: first_player,

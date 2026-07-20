@@ -1,0 +1,36 @@
+# ==spielablauf==
+digraph Spielablauf {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.15,0.1"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    R1 [label="Runde 1 — Drafting\nAlphaZero: Netz-Policy-Priors + PUCT-MCTS-Suche\n(Tiling danach: exakter DFS-Solver)", fillcolor="#cfe2ff"];
+    U1 [label="Rundenübergang r→r+1\nChance-Node: mehrere Fabrik-/Bonuschip-\nNeubefüllungen gesampelt, je Sample die\nRestrunde simuliert (Gamma-Pruning für\nrundenendende Geschwister-Kandidaten)\n→ gemittelt zu round_transition_value", fillcolor="#ffe5b4", shape=diamond];
+    R2 [label="Runde 2, 3, 4 — Drafting\n(gleicher Ablauf wie Runde 1, x3 wiederholt)", fillcolor="#cfe2ff"];
+    U4 [label="Übergang 4→5 (Sonderfall)\nKein Sampling nötig — Runde 5 hat keine\nKuppelplatzierung mehr, exact_round5_outcome\nlöst sie direkt exakt (Freebie)", fillcolor="#ffe5b4", shape=diamond];
+    R5 [label="Runde 5\nExakte Alpha-Beta-Suche\n(volle Information, kein Zufall mehr)", fillcolor="#cfe2ff"];
+
+    R1 -> U1 -> R2 -> U4 -> R5;
+    R2 -> U1 [label="wiederholt für 2→3, 3→4", style=dashed, constraint=false];
+}
+
+# ==puct_suche==
+digraph PUCTSuche {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.15,0.1"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    N1 [label="Netz-Forward-Pass\nstate → policy_logits[346], value,\nmoon_scores[5], dome_slot_scores[9],\ndome_rotation_scores[4]", fillcolor="#cfe2ff"];
+    N2 [label="Prior-Berechnung\nAktionen → action_to_id (mehrere Aktionen\nteilen sich eine ID: Moon-Order-, Dome-\nSlot×Rotation-Varianten) → maskierte\nSoftmax NUR über eindeutige legale IDs\n→ Basis-Prior, dann Moon-/Dome-\nFaktorisierung multipliziert drauf", fillcolor="#cfe2ff"];
+    N3 [label="95%-Cutoff (POLICY_MASS_CUTOFF)\nSortiert nach Prior absteigend,\nminimaler Präfix mit kumulierter\nMasse >= 0.95 behalten (Rest verworfen,\nmind. 1 Aktion bleibt immer)", fillcolor="#cfe2ff"];
+    N4 [label="PUCT-Selektion\nUCB = Q + c_puct*P*sqrt(N_eltern)/(1+N_kind)\ndynamic_sims(base,n) = clamp(base+sqrt(n)*25,\nbase, base*5) — mehr Optionen -> mehr Sims", fillcolor="#ffe5b4"];
+    N5 [label="Expansion + Blattbewertung\nNeuer Knoten (zurück zu Netz-Forward-Pass);\nACTIVE_LEAF=Net: value_to_win_prob\n(2 Forward-Pässe, Ego-Perspektive)\nACTIVE_LEAF=Dfs: exakter Tiling-Solver", fillcolor="#ffe5b4"];
+    N6 [label="Backpropagation\nWert + Besuchszähler N entlang\ndes Pfads zur Wurzel zurückführen", fillcolor="#ffe5b4"];
+    N7 [label="Zugwahl\nSelf-Play: temperaturbasiertes Sampling\nArena/Produktion: meistbesuchtes Kind", fillcolor="#cfe2ff"];
+
+    N1 -> N2 -> N3 -> N4 -> N5 -> N6;
+    N6 -> N4 [label="wiederholt bis Sims-Budget erreicht", style=dashed, constraint=false];
+    N6 -> N7 [label="Budget erreicht"];
+}
