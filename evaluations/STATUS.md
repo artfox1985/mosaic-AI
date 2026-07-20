@@ -570,6 +570,80 @@ danach erneut der Kollegen-Vorschlag Nr. 1 aus der vorherigen Runde
 (Noise-Floor-Test für Runde-1-R²-Deckel) zur Einordnung, wie viel
 Kopfraum nach den Struktur-Fixes noch bleibt.
 
+## Fund 6, Fund 4/5, Geschwister-Ranking-Diagnose (2026-07-20, Fortsetzung)
+
+**Fund 6 (verdeckte Information/Orakel-Wissen) implementiert und GETESTET —
+schließt die Lücke NICHT, eher schlechter.** `SHUFFLE_STACK_PEEK_IN_SEARCH`:
+mischt `dome_tile_pool` bei jedem simulierten `DrawStackPeek` im Suchbaum neu
+(analog `round_transition_deep::simulate_one_round`s Determinisierungs-
+Muster), statt die echte, im realen Spiel verdeckte oberste Platte zu lesen.
+Arena (n=100, kein Early-Stop, Struktur-Fixes + Floor-Shaping W=0.3 als
+Basis): **9:91 (9%), Score 21.9 vs. 43.9, Floor 18.8 vs. 12.1 — schlechter
+als ohne (17%)**. Theoretisch gut begründet, aber die Neumischung erhöht
+offenbar die Such-Varianz (jeder simulierte Ast sieht eine andere Ziehung)
+mehr, als sie echte Verzerrung beseitigt — bei 150 Sims/Zug zu teuer.
+Zurückgesetzt auf `false` (Original-Verhalten), Code bleibt verfügbar.
+
+**Fund 4 (Dirichlet-Noise nach Cutoff) behoben.** `build_untried_actions`
+bekommt jetzt einen `skip_cutoff`-Parameter, an der WURZEL (`make_node`s
+`parent.is_none()`) ausgesetzt — Dirichlet-Root-Noise (Self-Play) wirkt
+jetzt auf den VOLLEN Kandidatensatz, nicht mehr nur auf den bereits auf
+POLICY_MASS_CUTOFF gekappten Präfix. Jede legale Wurzelaktion hat damit
+wieder eine echte Explorations-Chance (AlphaZero-Standardverhalten). Der
+Progressive-Widening-Cap verhindert weiterhin, dass der Long Tail in der
+Arena tatsächlich durchgehend expandiert wird.
+
+**Fund 5 (stille Sim-Verschwendung) behoben.** Ein fehlgeschlagenes
+`apply_drafting` ließ die Simulation fälschlich den PARENT-eigenen
+Blattwert ein zweites Mal backpropagieren (verzerrte Besuchszahlen ohne
+echten Informationsgewinn). Jetzt wird eine solche Sim sauber übersprungen
+(kein Backprop). Der `q=0.0`-Fallback in `best_puct` bleibt bewusst
+unverändert — er ist nur bei einem FPU-basierten Fix für Fund 1 relevant
+(hier stattdessen per Widening gelöst), also weiterhin totes, harmloses Code.
+
+**Perspektiven-/OOD-Audit dauerhaft ins Self-Play integriert** (Nutzer-
+Auftrag): `|v_mover + v_other − 1|` wird bei JEDER Netz-Blattbewertung
+(sofern `MIRROR_OTHER_VAL=false`) unconditional mitgeloggt (kein Feature-
+Flag, im Gegensatz zu `profiling.rs`), aggregiert nach Runde. `run_net_self_play`
+hängt das Ergebnis als `perspective_divergence_diagnostics`-Objekt ans
+JSON an (gleiches Muster wie `stage3_diagnostics`) — kein Einfluss auf die
+Suche selbst (der Mirror-Fix-Test war negativ, siehe oben), reine
+Sichtbarkeit für künftige Selbstplay-Läufe.
+
+**Neue Standard-Metrik: Geschwister-Ranking-Kendall-Tau statt globalem R²**
+(Nutzer-Auftrag, Kollegen-Vorschlag Punkt 3). Neue Funktion
+`self_play::sibling_ranking_diagnostic` (pyo3: `sibling_ranking_diagnostic`):
+läuft die Netz-eigene Suche ein Stück weit (realistische Zustands-
+verteilung), sammelt Runde-1/2-Entscheidungspunkte, wertet für jeden alle
+Geschwister-Nachfolgezustände per Netz UND per exaktem DFS-Solver (Ground
+Truth) aus, berichtet Kendall-Tau zwischen beiden Rangfolgen.
+
+Ergebnis (v9b_domeonly, n=100 Zustände/Runde, Ø 17.6/15.1 Geschwister):
+
+| Runde | Kendall-Tau | Ø Geschwister |
+|---|---|---|
+| 1 | **0.318** | 17.6 |
+| 2 | 0.164 | 15.1 |
+
+**Wichtige Einordnung**: das ist ein ANDERES Bild als die frühere globale
+Val-R²-Tabelle (Runde 1 = 0.032, Runde 2 = 0.146) — R² ist empfindlich
+gegenüber absoluter Kalibrierungs-Verzerrung, Kendall-Tau nur gegenüber der
+RELATIVEN Reihenfolge. Ein Tau von 0.32 in Runde 1 zeigt, dass der Value-Head
+dort eine echte, wenn auch bescheidene, lokale Unterscheidungsfähigkeit hat
+-- die frühere "praktisch nutzlos"-Einordnung (aus dem R²=0.03) war insofern
+zu pessimistisch. Die Umkehrung (Runde 2 < Runde 1) ist unerwartet und noch
+nicht erklärt -- könnte an mehr echten Fast-Gleichständen in Runde 2 liegen
+(siehe `run_penalty_bias`-Diagnose) oder an der Stichprobengröße (n=100)
+liegen. Kein Perfekt-Wert (1.0) in keiner Runde -- es bleibt Verbesserungs-
+potenzial, aber "praktisch Zufall" ist nach diesem Befund nicht mehr die
+richtige Beschreibung für Runde 1.
+
+**Aktueller Stand der Konstanten** (`net_mcts.rs`): `ACTIVE_LEAF=Net`,
+`POINTS_UTILITY_WEIGHT=0.0`, `FLOOR_SHAPING_WEIGHT=0.3`,
+`MIRROR_OTHER_VAL=false`, `SHUFFLE_STACK_PEEK_IN_SEARCH=false` -- die
+beiden Struktur-Fixes (Widening, Tiebreak) sind fest im Code (kein Toggle,
+echte Bugfixes). Bestätigter bester Stand bleibt **17% Netz-Siege** (n=100).
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,

@@ -117,6 +117,27 @@ fn arena_match(
     py.detach(move || crate::self_play::run_arena_match(sims_a, sims_b, n_games, seed, num_threads, c))
 }
 
+/// Geschwister-Ranking-Diagnose (siehe `self_play::sibling_ranking_diagnostic`
+/// fuer die volle Begruendung): Kendall-Tau zwischen trainiertem Netz-Value
+/// und exaktem DFS-Solver ueber Geschwister-Nachfolgezustaende, aggregiert
+/// nach Runde 1/2. Gibt JSON `{"round_1": {...}, "round_2": {...}}` zurueck.
+#[pyfunction]
+#[pyo3(signature = (model_path, n_states_per_round=100, max_children=20, walk_sims=80, seed=None))]
+fn sibling_ranking_diagnostic(
+    py: Python<'_>,
+    model_path: String,
+    n_states_per_round: usize,
+    max_children: usize,
+    walk_sims: u32,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::sibling_ranking_diagnostic(&model_path, n_states_per_round, max_children, walk_sims, seed)
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Arena-Match Netz vs. Heuristik-MCTS (Netz auf Brett 0). Lädt das ONNX-Netz
 /// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
@@ -325,6 +346,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(sibling_ranking_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(net_vs_net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
     m.add_function(wrap_pyfunction!(stage3_vs_stage1_arena_match, m)?)?;
