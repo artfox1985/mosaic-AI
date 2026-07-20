@@ -160,6 +160,77 @@ pub const MIRROR_OTHER_VAL: bool = false;
 /// Verhalten); Code bleibt verfügbar.
 pub const SHUFFLE_STACK_PEEK_IN_SEARCH: bool = false;
 
+/// Wurzel-Determinisierung (Nutzer-Vorschlag, 2026-07-20 -- Ersatz für
+/// `SHUFFLE_STACK_PEEK_IN_SEARCH`s In-Tree-Neumischung): statt bei JEDEM
+/// simulierten Peek/Chip-Reveal neu zu mischen (nachweislich MEHR
+/// Such-Varianz als Bias-Korrektur, siehe dortiger Kommentar -- und für den
+/// Kuppelstapel-Fall ohnehin irrelevant, siehe Bindungs-Check: der
+/// Value-Head sieht `pending_stack_draw` architektonisch nie), wird hier
+/// EINMAL pro Zugsuche (`build_net_tree`s Wurzel-Erzeugung) eine plausible,
+/// fixierte "Stichwelt" gezogen -- `dome_tile_pool` UND die noch
+/// unaufgedeckten Bonuschips (`bonus_chip_pool` + noch nicht enthüllte
+/// Fabrik-Chips) werden einmalig neu gemischt, danach läuft die GESAMTE
+/// Suche deterministisch auf dieser einen Welt. Kein zusätzliches
+/// In-Tree-Rauschen (jeder Knoten bleibt intern konsistent) -- nur der
+/// klassische, weit mildere Determinisierungs-Fehler (die Suche vertraut
+/// EINER plausiblen Stichprobe statt der echten, aber unbekannten Welt).
+/// Anders als beim Kuppelstapel (bewiesen irrelevant) sieht der Value-Head
+/// aufgedeckte Bonuschip-Werte tatsächlich als Feature (`features.rs`,
+/// `bonus_chip_revealed`) -- hier könnte Orakel-Wissen also durchaus
+/// greifen.
+///
+/// GETESTET (2026-07-20, v9b_domeonly + Struktur-Fixes + Floor-Shaping
+/// W=0.3, 150 Sims, n=100, KEIN Early-Stop): 12:88 (12% Siege), Score 19.2
+/// vs. 40.5, Floor 19.2 vs. 13.7 -- KEINE Verbesserung ggü. der Baseline
+/// ohne Determinisierung (17%), tendenziell sogar leicht schlechter (wenn
+/// auch deutlich milder als der In-Tree-Fix, der von 17%→9% stürzte). Da
+/// der Kuppelstapel-Anteil bewiesen irrelevant ist, kann die Ursache nur im
+/// Bonuschip-Anteil liegen oder schlicht Stichproben-Rauschen sein (n=100,
+/// ~5 Prozentpunkte liegen im selben Band wie andere Wiederholungen dieser
+/// Session) -- kein separater Bonuschip-Bindungs-Check bisher gefahren.
+///
+/// NUTZER-ENTSCHEIDUNG (2026-07-20): TROTZDEM aktiv gelassen. Anders als
+/// der In-Tree-Fix (klarer, großer Rückschritt 17%→9%, dort zu Recht
+/// verworfen) ist der Effekt hier klein und im Rauschband dieser Session --
+/// es geht nicht nur um gemessenen Vorteil, sondern auch um KORREKTHEIT:
+/// die Suche soll kein Wissen nutzen, das ein echter Spieler nicht hat.
+/// Dies ist der Minimalfix für das Orakel-Wissen-Problem (Fund 6), bewusst
+/// als Standardverhalten beibehalten, unabhängig vom (unklaren) Arena-Delta.
+pub const DETERMINIZE_ROOT_HIDDEN_INFO: bool = true;
+
+/// Mischt `dome_tile_pool` und alle noch unaufgedeckten Bonuschip-Werte
+/// (Fabrik-Chips mit `!bonus_chip_revealed` + `bonus_chip_pool`) einmalig
+/// neu -- siehe `DETERMINIZE_ROOT_HIDDEN_INFO`-Kommentar. Bereits
+/// AUFGEDECKTE Fabrik-Chips sind öffentliches Wissen und bleiben
+/// unangetastet. Gleiches Muster wie `round_transition_deep::
+/// simulate_one_round`s Kuppelstapel-Determinisierung, hier auf beide
+/// verdeckten Informationsquellen erweitert und auf Wurzel-Ebene (einmal
+/// pro Suche) statt pro Runde angewendet.
+fn determinize_hidden_information<R: Rng + ?Sized>(state: &mut GameState, rng: &mut R) {
+    state.dome_tile_pool.shuffle(rng);
+
+    let orig_pool_len = state.bonus_chip_pool.len();
+    let mut hidden_chips: Vec<crate::dome::BonusChip> = state.bonus_chip_pool.drain(..).collect();
+    let unrevealed_idxs: Vec<usize> = state
+        .factories
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.bonus_chip.is_some() && !f.bonus_chip_revealed)
+        .map(|(i, _)| i)
+        .collect();
+    for &idx in &unrevealed_idxs {
+        if let Some(chip) = state.factories[idx].bonus_chip.take() {
+            hidden_chips.push(chip);
+        }
+    }
+    hidden_chips.shuffle(rng);
+    let remaining = hidden_chips.split_off(orig_pool_len.min(hidden_chips.len()));
+    state.bonus_chip_pool = hidden_chips;
+    for (idx, chip) in unrevealed_idxs.into_iter().zip(remaining.into_iter()) {
+        state.factories[idx].bonus_chip = Some(chip);
+    }
+}
+
 /// Exakte, JETZT SCHON feststehende Floor-Straf-Differenz (Spieler0 minus
 /// Spieler1) dieser Runde, roh (unskaliert). KEINE Vorhersage — reine
 /// State-Funktion (`PlayerBoard::broken_penalty`, board.rs), verfügbar ohne
@@ -403,8 +474,11 @@ fn build_untried_actions(
 ) -> (Vec<(Action, f32)>, usize) {
     let base_actions = drafting_actions(state);
     let n = base_actions.len();
-    let ids: Vec<usize> =
-        base_actions.iter().map(|a| action_to_id(&action_to_env_dict(state, a))).collect();
+    // Direkter Action→ID-Match statt JSON-Umweg (Performance, externer
+    // Hinweis Abschnitt D, 2026-07-20) -- heißester Aufruf in
+    // `build_untried_actions` (pro legaler Aktion pro Knoten), siehe
+    // `self_play::action_to_id_direct`-Kommentar für die Parität-Absicherung.
+    let ids: Vec<usize> = base_actions.iter().map(|a| crate::self_play::action_to_id_direct(state, a)).collect();
 
     // WICHTIG: Maskierte Softmax NUR über die EINDEUTIGEN legalen Aktions-IDs —
     // exakt wie das Training (masked log_softmax). Mehrere Moon-Order-Varianten
@@ -813,6 +887,9 @@ fn build_net_tree<R: Rng + ?Sized>(
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
     root_state.log.clear();
+    if DETERMINIZE_ROOT_HIDDEN_INFO {
+        determinize_hidden_information(&mut root_state, rng);
+    }
     let root_player = root_state.current_player;
     let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, rng)];
 

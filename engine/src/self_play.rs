@@ -164,6 +164,50 @@ pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
     }
 }
 
+/// Direkter `Action → ID`-Match ohne JSON-Umweg (Performance, externer
+/// Hinweis Abschnitt D, 2026-07-20) -- identische Logik zu
+/// `features::action_to_id(&action_to_env_dict(state, a))`, nur ohne den
+/// serde_json-Objektbau + String-Matching im heißesten Suchpfad
+/// (`net_mcts::build_untried_actions`, pro legaler Aktion pro Knoten
+/// aufgerufen). NUR für Drafting-Phase-Aktionen (alle `Action`-Varianten
+/// decken das ab) -- Tiling-Phase-IDs (`end_tiling`/`tiling`/`use_chips` in
+/// `action_to_id`) werden hier nicht gebraucht, `build_untried_actions`
+/// läuft nur auf Drafting-Knoten. Parität mit dem JSON-Pfad wird per Test
+/// abgesichert (`action_to_id_direct_matches_json_path_across_random_games`).
+pub(crate) fn action_to_id_direct(state: &GameState, a: &Action) -> usize {
+    match a {
+        Action::Pass => 0,
+        Action::Stone(m) => {
+            let c_id: i64 = match m.take.color {
+                TileColor::Blau => 0,
+                TileColor::Gelb => 1,
+                TileColor::Rot => 2,
+                TileColor::Schwarz => 3,
+                TileColor::Tuerkis => 4,
+                TileColor::Wild => -1,
+            }
+            .max(0);
+            let r_id = m.place.row_index as i64 + 1;
+            let f_idx = factory_index(state, &m.take);
+            (10 + c_id * 48 + r_id * 6 + f_idx).clamp(0, 273) as usize
+        }
+        Action::Dome(m) => {
+            let d_idx =
+                state.dome_display.iter().position(|t| t.tile_id == m.dome_tile_id).unwrap_or(0);
+            328 + d_idx
+        }
+        Action::DrawStack(m) => {
+            let mut ids: Vec<usize> = state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+            ids.sort_unstable();
+            ids.dedup();
+            let pending_index = ids.iter().position(|&id| id == m.chosen_id).unwrap_or(0);
+            331 + pending_index.min((crate::features::MAX_PENDING_STACK_TILES - 1) as usize)
+        }
+        Action::BonusChip(m) => (341 + factory_pos(state, m.factory_id)) as usize,
+        Action::DrawStackPeek => 345,
+    }
+}
+
 // ── Policy-Extraktion (Port von SelfPlayMixin.search_and_get_policy) ──────────
 
 /// Gewichtete Policy aus der Wurzelkind-Statistik:
@@ -2934,6 +2978,46 @@ mod tests {
                         valid.iter().any(|v| env_action_eq(v, pa)),
                         "Seed {seed}: Policy-Aktion {pa} nicht in valid_actions (Leak)"
                     );
+                }
+            }
+        }
+    }
+
+    /// `action_to_id_direct` (Performance-Fix, Abschnitt D) muss für JEDE
+    /// gesammelte Drafting-Aktion exakt dieselbe ID liefern wie der
+    /// bisherige JSON-Umweg (`action_to_id(&action_to_env_dict(...))`) --
+    /// sonst würde der direkte Pfad die Policy-Zielzuordnung stillschweigend
+    /// verfälschen (Wiederverwendung des `state_to_features_direct`-
+    /// Paritätstest-Musters aus features.rs).
+    #[test]
+    fn action_to_id_direct_matches_json_path_across_random_games() {
+        for seed in 0..8u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut game = Game {
+                state: crate::state::setup_new_game(["P1".into(), "P2".into()], 0, &mut rng),
+            };
+            for p in game.state.players.iter_mut() {
+                p.start_tile_pending = false;
+            }
+            for step in 0..60 {
+                if game.state.phase != Phase::Drafting {
+                    break;
+                }
+                let actions = drafting_actions(&game.state);
+                if actions.is_empty() {
+                    break;
+                }
+                for a in &actions {
+                    let via_json = crate::features::action_to_id(&action_to_env_dict(&game.state, a));
+                    let direct = action_to_id_direct(&game.state, a);
+                    assert_eq!(
+                        direct, via_json,
+                        "seed={seed} step={step}: ID weicht ab fuer {a:?} (direct={direct} json={via_json})"
+                    );
+                }
+                let action = actions.choose(&mut rng).unwrap().clone();
+                if game.apply_drafting(&action).is_err() {
+                    break;
                 }
             }
         }

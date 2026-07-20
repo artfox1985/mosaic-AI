@@ -573,8 +573,8 @@ class MosaicDataset(Dataset):
                         points_l.append([points_val])
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
-                        for p in step["policy"]:
-                            t_policy[action_to_id(p["action"])] += p["prob"]
+                        for pe in step["policy"]:
+                            t_policy[action_to_id(pe["action"])] += pe["prob"]
                         s = t_policy.sum()
                         if s > 0: t_policy /= s
                         if POLICY_TARGET_SHARPEN_EXPONENT != 1.0:
@@ -591,8 +591,8 @@ class MosaicDataset(Dataset):
                         # sind per Definition legal — immer in die Maske aufnehmen.
                         # Verhindert Policy-Leaks (Target-Masse auf maskierter Aktion →
                         # explodierender Policy-Loss), falls valid_actions unvollständig ist.
-                        for p in step["policy"]:
-                            mask[action_to_id(p["action"])] = 1.0
+                        for pe in step["policy"]:
+                            mask[action_to_id(pe["action"])] = 1.0
                         masks_l.append(mask)
 
                         moon_target = np.full(5, -1.0, dtype=np.float32)
