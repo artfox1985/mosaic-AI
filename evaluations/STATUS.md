@@ -468,14 +468,107 @@ Drafting-Entscheidungen sind echte Fast-Gleichstände) entspringt, nicht
 einem Trainings-/Kapazitätsdefizit. Kein Arena-Test nötig, da die
 Accuracy-Messung schon keinen Hebel zeigte.
 
-**Stand jetzt**: Floor-Shaping (W=0.3) bleibt die einzige Konfiguration mit
-einem echten, größenordnungsmäßig bestätigten (n=100) Fortschritt — von
-0% auf 11% Netz-Siege, Floor-Lücke deutlich verkleinert. Alle anderen
-getesteten Hebel (KataGo-Blend, Perspektiven-Mirror-Fix, Policy-Schärfung)
-zeigen kein Signal. Der Kollegen-Vorschlag Nr. 1 (Noise-Floor-Test: wie viel
-R² ist in Runde 1 überhaupt erreichbar, per Varianzzerlegung über K
-unabhängige Heuristik-Fortsetzungen) ist der nächste, noch nicht
-durchgeführte Test mit dem höchsten Erkenntnisgewinn-pro-Aufwand-Verhältnis.
+## Struktureller Durchbruch: zwei echte Such-Bugs gefunden (2026-07-20)
+
+Zweiter externer Kollege ging die Engine durch (Schwerpunkt `net_mcts.rs`,
+`mcts.rs`, `features.rs`, `game.rs`/`execution.rs`, `self_play.rs`,
+`neural_net.py`, `train.py`, siehe `evaluations/Bugfixes.txt` +
+`evaluations/Gumbal Alphazero.txt`) und fand mehrere konkrete, spielstärke-
+relevante Implementierungsfehler — zwei davon direkt verifiziert und
+gefixt, mit dem bislang größten Fortschritt der gesamten Session:
+
+**Bug 1 — erzwungene Voll-Expansion vor jeder Suchtiefe.** `build_net_tree`s
+Selection-Loop expandierte den KOMPLETTEN POLICY_MASS_CUTOFF-Präfix eines
+Knotens (in Runde 1 oft Dutzende Kandidaten, gegeben ~49% Policy-Top-1-
+Masse), bevor überhaupt einmal PUCT zwischen ihnen differenzieren konnte —
+bei 150 Sims faktisch Breitensuche mit Tiefe ~1-2 statt echter Suche. Aus
+der Historie (`git log`, Commit `068bb62`) bestätigt: eine FRÜHERE Version
+hatte echtes besuchszahl-gesteuertes Progressive Widening
+(`MAX_ACTIONS + WIDEN_FACTOR·√N`, identisch zu `mcts.rs`), das bewusst
+entfernt wurde, um den Long Tail dauerhaft auszuschließen (guter, separater
+Zweck) — dabei aber versehentlich auch die Drosselung ÜBER dem
+verbleibenden Präfix mit entfernt. **Fix**: denselben Widening-Cap wie
+`mcts.rs` wieder eingeführt, aber nur auf den bereits gekappten Präfix
+angewendet (Long-Tail-Ausschluss bleibt vollständig erhalten).
+
+**Bug 2 — Tie-Breaking wählt bei Besuchsgleichstand den SCHLECHTESTEN
+Kandidaten.** `net_search_drafting_action`/`net_search_with_tree` nutzten
+`max_by_key(|c| nodes[c].visits)` — Rusts `max_by_key`/`max_by` liefern bei
+Gleichstand dokumentiert das LETZTE Maximum. Kinder werden aber in
+ABSTEIGENDER Prior-Reihenfolge expandiert, das letzte gleichstehende Kind
+ist also das mit dem NIEDRIGSTEN Prior im Set. Wegen Bug 1 ist Besuchs-
+gleichstand in frühen, hochverzweigten Runden der Normalfall — die Suche
+spielte also systematisch einen der am schlechtesten bewerteten Kandidaten.
+`mcts.rs`s eigene `best_root_child` hat bereits den korrekten Tiebreak
+(`visits.cmp(...).then(Q-Vergleich)`) — `net_mcts.rs` hatte ihn nicht.
+**Fix**: neue `best_root_child`-Hilfsfunktion (Pendant zu `mcts.rs`),
+Tiebreak über `(visits, Q, prior)`, an beiden Aufrufstellen eingesetzt.
+
+**Wichtige Erkenntnis, warum das die ganze Session lang verdeckt blieb**:
+BEIDE Bugs betreffen `build_net_tree`/`net_search_drafting_action` UNABHÄNGIG
+von `ACTIVE_LEAF` — Stufe 1 (DFS-Blatt) UND Stufe 2 (Netz-Value) laufen durch
+denselben Code, nur der Blattwert unterscheidet sich. Das erklärt, warum DFS-
+Blatt trotz identischer Bugs immer noch klar besser abschnitt (26-30% vs.
+0-12%): DFS' exakte, scharfe Q-Werte brechen Besuchsgleichstände schnell
+durch echte Differenzierung auf, während Netz-Values weiches/verrauschtes
+Signal liefern, das Gleichstände viel länger bestehen lässt — Bug 2 trifft
+also gerade das schwache Signal viel härter. Das verbindet die gesamte
+bisherige "weiches Signal hat zu wenig Rückstellkraft"-Erkenntnis
+(`stage2_investigation.md`) mit einem konkreten, jetzt behobenen Mechanismus.
+
+**Arena-Ergebnis (n=100, kein Early-Stop, v9b_domeonly, 150 Sims,
+Struktur-Fixes + Floor-Shaping W=0.3 kombiniert)**:
+
+| Konfiguration | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| Floor-Shaping allein (vorher) | 11:89 (11%) | 24.5 vs. 44.2 | 16.9 vs. 12.3 |
+| **+ Struktur-Fixes (Bug 1+2)** | **17:83 (17%)** | 22.7 vs. 42.2 | 18.1 vs. 12.5 |
+
+Deutlichster Sprung der gesamten Session (11% → 17%, +55% relativ) bei
+gleicher Stichprobengröße — kein Zufallsrauschen. Attributions-Test
+(Struktur-Fixes ISOLIERT ohne Floor-Shaping) noch nicht gefahren.
+
+**Weitere, noch nicht umgesetzte Funde aus derselben Kollegen-Review**
+(Details in `evaluations/Bugfixes.txt`), nach Priorität:
+- **Fund 6 (verdeckte Information)**: `execute_draw_stack_peek`/Kuppelstapel-
+  Refill nutzen `dome_tile_pool.remove(0)` — im Suchbaum liegt die ECHTE
+  oberste Platte offen, obwohl Features sie korrekt maskieren. Erzeugt
+  prinzipiell unlernbares Zielrauschen, am stärksten in frühen Runden.
+  `round_transition.rs` hat für Rundenübergänge bereits das richtige Muster
+  (Chance-Node-Sampling) — fehlt noch für Peek-Ziehungen/Chip-Aufdeckungen
+  innerhalb des Baums.
+- **Fund 7 (Score-Clamp verzerrt Value-Ziel)**: `apply_score` clampt bei 0;
+  das Value-Ziel nutzt diesen geclampten Endstand — ein Spieler bei
+  "eigentlich" -25 bekommt dasselbe Label wie einer bei 0. Genau die
+  Floor-Spiralen, die bekämpft werden sollen, kollabieren im Label auf
+  denselben Wert.
+- **Fund 8**: Checkpoint-Auswahl in `train.py` ignoriert den Value-Head
+  (wählt nur nach Policy-Val-Loss).
+- **Fund 3/4/5**: Self-Play-Policy-Targets werden bei breiten Knoten
+  near-uniform (Folge von Bug 1, jetzt gemildert); Dirichlet-Noise wird erst
+  NACH dem Policy-Cutoff gemischt (Root-Aktionen jenseits der 95%-Masse
+  können im Self-Play nie exploriert werden); fehlgeschlagenes
+  `apply_drafting` verbraucht eine Sim ohne Backprop.
+- **Performance**: `action_to_id`-Aufruf im heißesten Suchpfad geht über
+  JSON-Umweg (`action_to_env_dict` + String-Matching) statt direktem
+  `Action → id`-Match.
+
+**Gumbel AlphaZero** (`evaluations/Gumbal Alphazero.txt`): größerer,
+eigenständiger Umbauvorschlag (Sequential Halving + completed-Q-Policy-
+Targets statt PUCT+Dirichlet-Noise an der Wurzel) — würde Bug 2 strukturell
+eliminieren und Bug 3/4 mit auflösen, aber KEIN Ersatz für einen besseren
+Value-Head (Halving-Ranking hängt selbst am Q-Schätzer) und kein Ersatz für
+Baustein B. Eigenständiges, größeres Vorhaben, noch nicht begonnen.
+
+**Stand jetzt**: die beiden Struktur-Fixes plus Floor-Shaping sind
+zusammen der stärkste bestätigte Fortschritt der Session (0% → 17%
+Netz-Siege). Noch keine Parität, aber ein klar anderes Bild als der
+gesamte bisherige Session-Verlauf (der ausschließlich an der Blattwert-
+Formel drehte, ohne die Suchmechanik selbst zu hinterfragen). Nächste
+Schritte: Fund 6/7 (beide zahlen direkt auf Runde-1-Zielrauschen ein),
+danach erneut der Kollegen-Vorschlag Nr. 1 aus der vorherigen Runde
+(Noise-Floor-Test für Runde-1-R²-Deckel) zur Einordnung, wie viel
+Kopfraum nach den Struktur-Fixes noch bleibt.
 
 ## Weitere zurückgestellte Punkte
 
