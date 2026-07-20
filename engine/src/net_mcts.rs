@@ -812,6 +812,135 @@ fn make_node<R: Rng + ?Sized>(
     }
 }
 
+// ── Gumbel AlphaZero (Danihelka/Guez/Schrittwieser/Silver, ICLR 2022) ───────
+//
+// Motivation (siehe evaluations/STATUS.md, "Struktureller Durchbruch"-
+// Abschnitt): selbst nach den Widening-/Tiebreak-Fixes verteilt PUCT sein
+// Sim-Budget bei ~150-195 Kandidaten in Runde 1 extrem duenn. Gumbel-Top-m +
+// Sequential Halving konzentriert das Budget gezielt auf wenige Kandidaten
+// statt "1 Besuch auf 150". Alle Formeln unten exakt aus der DeepMind-mctx-
+// Referenzimplementierung (github.com/google-deepmind/mctx: seq_halving.py,
+// qtransforms.py, action_selection.py, policies.py) uebernommen, NICHT nur
+// aus der Paper-Prosa rekonstruiert -- siehe Plan-Dokument fuer die volle
+// Herleitung/Quellenlage.
+
+/// Gewicht der Q-Komponente relativ zum Log-Prior in Gumbel-Scores (§3 des
+/// Plans): `σ(q) = (c_visit + max_N) · c_scale · q`. Paper-Werte (NICHT
+/// mctx-Bibliotheks-Default 0.1 fuer c_scale) -- unsere Q sind schon
+/// [0,1]-Win-Wahrscheinlichkeiten, keine zusaetzliche Min-Max-Rescale wie
+/// bei mctx' unbeschraenkten Atari-Rewards noetig.
+const GUMBEL_C_VISIT: f64 = 50.0;
+const GUMBEL_C_SCALE: f64 = 1.0;
+
+/// Anzahl der per Gumbel-Top-m an der Wurzel gezogenen Kandidaten (vor
+/// Sequential Halving). Paper-/mctx-Standardwert, aus Go/Schach-Experimenten
+/// mit aehnlichem/groesserem Verzweigungsfaktor -- fuer dieses Spiel noch
+/// nicht eigens kalibriert (siehe Plan-Dokument, "Offene Risiken").
+pub const GUMBEL_TOP_M: usize = 16;
+
+/// Schaltet die Suche komplett auf Gumbel-AlphaZero um (Wurzel: Gumbel-Top-m
+/// + Sequential Halving statt Dirichlet-Noise + PUCT; Tiefe≥1: neue
+/// deterministische Auswahlregel statt `best_puct`; Policy-Ziel: completed-Q-
+/// Softmax statt Besuchsanteil). Standardmaessig AUS, bis Phase 3 (Arena-
+/// Validierung ohne Neu-Training) ein Ergebnis liefert -- gleiches Muster
+/// wie `ACTIVE_LEAF`/`MIRROR_OTHER_VAL`.
+pub const USE_GUMBEL_SEARCH: bool = false;
+
+/// Gumbel(0,1)-Ziehung: `-ln(-ln(U))`, `U ~ Uniform(0,1)` (offenes Intervall,
+/// `U=0` waere `ln(0)=-inf`).
+fn sample_gumbel<R: Rng + ?Sized>(rng: &mut R) -> f64 {
+    let u: f64 = rng.random_range(f64::MIN_POSITIVE..1.0);
+    -(-u.ln()).ln()
+}
+
+/// `σ(q) = (c_visit + max_N) · c_scale · q` -- siehe Modul-Kommentar.
+fn gumbel_sigma(q: f64, max_n: u32) -> f64 {
+    (GUMBEL_C_VISIT + max_n as f64) * GUMBEL_C_SCALE * q
+}
+
+/// Eigener Netz-/DFS-Blattwert von `nid`, aus der Sicht des an DIESEM Knoten
+/// ziehenden Spielers (`state.current_player`) -- NICHT `nodes[nid].value`
+/// (das akkumuliert aus der Sicht des Spielers, der in `nid` HINEIN gezogen
+/// ist, i.d.R. der GEGNER von `state.current_player`). Für `v_mix` brauchen
+/// wir explizit die Perspektive des Spielers, dessen Kinder gerade bewertet
+/// werden -- exakt dieselbe Perspektive, in der `nodes[cid].value/visits`
+/// für Kinder von `nid` bereits akkumuliert (deren `player_who_acted` ist
+/// der Zieher AN `nid`, siehe `make_node`-Aufruf beim Expandieren).
+fn node_own_value(nodes: &[Node], nid: usize) -> f64 {
+    nodes[nid].leaf_value[nodes[nid].state.current_player]
+}
+
+/// `v_mix` (§4 des Plans) -- PRIOR-gewichtet über besuchte Kinder von `nid`
+/// (NICHT visit-gewichtet, ein leicht zu verwechselnder Punkt):
+/// `v_mix = (v(nid) + N_total · Σ_besucht[π(a)·Q(a)] / Σ_besucht[π(a)]) / (1 + N_total)`.
+/// Fällt bei `N_total=0` (noch kein Kind besucht) exakt auf `v(nid)` zurück.
+fn v_mix(nodes: &[Node], nid: usize) -> f64 {
+    let v_node = node_own_value(nodes, nid);
+    let n_total: f64 = nodes[nid].children.iter().map(|&c| nodes[c].visits as f64).sum();
+    if n_total <= 0.0 {
+        return v_node;
+    }
+    let mut prior_sum = 0.0f64;
+    let mut weighted_q_sum = 0.0f64;
+    for &c in &nodes[nid].children {
+        if nodes[c].visits == 0 {
+            continue;
+        }
+        let p = (nodes[c].prior as f64).max(1e-9);
+        let q = nodes[c].value / nodes[c].visits as f64;
+        prior_sum += p;
+        weighted_q_sum += p * q;
+    }
+    if prior_sum <= 0.0 {
+        return v_node;
+    }
+    (v_node + n_total * (weighted_q_sum / prior_sum)) / (1.0 + n_total)
+}
+
+/// `(Prior, completed Q)` je Kandidat von `nid`, Reihenfolge: erst
+/// `children` (besucht → eigenes Q), dann `untried` (unbesucht → `v_mix`,
+/// derselbe Wert für alle unbesuchten Kandidaten desselben Knotens).
+fn completed_q_per_candidate(nodes: &[Node], nid: usize) -> Vec<(f64, f64)> {
+    let vmix = v_mix(nodes, nid);
+    let mut out: Vec<(f64, f64)> =
+        Vec::with_capacity(nodes[nid].children.len() + nodes[nid].untried.len());
+    for &c in &nodes[nid].children {
+        let prior = nodes[c].prior as f64;
+        let q = if nodes[c].visits > 0 { nodes[c].value / nodes[c].visits as f64 } else { vmix };
+        out.push((prior, q));
+    }
+    for (_, prior) in &nodes[nid].untried {
+        out.push((*prior as f64, vmix));
+    }
+    out
+}
+
+/// Softmax über `f64`-Scores (eigene Kopie statt `net::softmax`, das auf
+/// `f32` arbeitet -- Gumbel-Score-Summen (Log-Prior + σ(Q)) profitieren von
+/// der zusätzlichen Präzision).
+fn softmax_f64(scores: &[f64]) -> Vec<f64> {
+    let m = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let exps: Vec<f64> = scores.iter().map(|&x| (x - m).exp()).collect();
+    let sum: f64 = exps.iter().sum();
+    if sum > 0.0 {
+        exps.iter().map(|&e| e / sum).collect()
+    } else {
+        vec![1.0 / scores.len().max(1) as f64; scores.len()]
+    }
+}
+
+/// `π'_node(a) = softmax(ln(prior(a)) + σ(completedQ(a)))` über
+/// `children ∪ untried` von `nid`, gleiche Reihenfolge wie
+/// `completed_q_per_candidate`. `max_N` (für σ) = größte Besuchszahl unter
+/// `nid`s Kindern JETZT (wächst über die Suche).
+fn improved_policy(nodes: &[Node], nid: usize) -> Vec<f64> {
+    let max_n = nodes[nid].children.iter().map(|&c| nodes[c].visits).max().unwrap_or(0);
+    let cq = completed_q_per_candidate(nodes, nid);
+    let scores: Vec<f64> =
+        cq.iter().map(|&(p, q)| p.max(1e-9).ln() + gumbel_sigma(q, max_n)).collect();
+    softmax_f64(&scores)
+}
+
 /// PUCT: bestes Kind = argmax Q + c·P·√N_parent/(1+N_child). Priors über die
 /// Kinder normalisiert (wie agents/mcts.py `_best_child`).
 fn best_puct(nodes: &[Node], nid: usize, c_puct: f64) -> usize {
@@ -1563,5 +1692,131 @@ mod tests {
             .map(|(_, p)| *p as f64)
             .sum();
         assert!(draw_stack_sum > 0.0, "DrawStack-Kandidaten sollten positive Prior-Masse tragen");
+    }
+
+    // ── Gumbel AlphaZero: Kern-Mathematik (Phase 1) ─────────────────────────
+
+    fn gumbel_test_state(current_player: usize) -> GameState {
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut s = setup_new_game(names(), 0, &mut rng);
+        s.current_player = current_player;
+        s
+    }
+
+    /// Minimaler Testknoten -- nur die für Gumbel-Mathematik relevanten
+    /// Felder (`prior`/`visits`/`value`/`leaf_value`/`state.current_player`)
+    /// sind aussagekräftig, der Rest ist Fuellwerk.
+    fn gumbel_test_node(prior: f32, visits: u32, value: f64, current_player: usize) -> Node {
+        Node {
+            parent: None,
+            children: Vec::new(),
+            untried: Vec::new(),
+            action: None,
+            player_who_acted: 0,
+            visits,
+            value,
+            prior,
+            state: gumbel_test_state(current_player),
+            terminal: false,
+            leaf_value: [0.0, 0.0],
+            n_actions: 0,
+        }
+    }
+
+    #[test]
+    fn sample_gumbel_is_reproducible_with_fixed_seed() {
+        let mut rng_a = StdRng::seed_from_u64(42);
+        let mut rng_b = StdRng::seed_from_u64(42);
+        let a: Vec<f64> = (0..20).map(|_| sample_gumbel(&mut rng_a)).collect();
+        let b: Vec<f64> = (0..20).map(|_| sample_gumbel(&mut rng_b)).collect();
+        assert_eq!(a, b, "gleicher Seed muss dieselbe Gumbel-Folge liefern");
+        // Sanity: nicht alle Werte identisch (echte Ziehung, keine Konstante).
+        assert!(a.iter().any(|&x| (x - a[0]).abs() > 1e-6));
+    }
+
+    #[test]
+    fn gumbel_sigma_matches_formula_directly() {
+        let q = 0.7;
+        let max_n = 30u32;
+        let expected = (GUMBEL_C_VISIT + max_n as f64) * GUMBEL_C_SCALE * q;
+        assert!((gumbel_sigma(q, max_n) - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn v_mix_falls_back_to_node_own_value_when_no_child_visited() {
+        // Wurzel mit eigenem Blattwert 0.42 (Mover-Perspektive, current_player=0),
+        // ein Kind, aber NIE besucht (visits=0) -- v_mix muss exakt auf den
+        // eigenen Blattwert zurueckfallen (kein NaN, keine Division durch 0).
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.42, 0.58];
+        let child = gumbel_test_node(0.5, 0, 0.0, 1);
+        let nodes = vec![root, child];
+        let mut nodes = nodes;
+        nodes[0].children.push(1);
+        assert!((v_mix(&nodes, 0) - 0.42).abs() < 1e-12);
+    }
+
+    #[test]
+    fn v_mix_matches_hand_computed_example_with_two_visited_children() {
+        // Wurzel: eigener Blattwert 0.5 (current_player=0). Zwei Kinder:
+        // Kind A prior=0.6 visits=4 value_sum=2.4 (Q=0.6), Kind B prior=0.2
+        // visits=2 value_sum=1.6 (Q=0.8). N_total = 4+2 = 6.
+        // weighted_Q = (0.6*0.6 + 0.2*0.8) / (0.6+0.2) = (0.36+0.16)/0.8 = 0.65
+        // v_mix = (0.5 + 6*0.65) / (1+6) = (0.5 + 3.9) / 7 = 0.62857142857...
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.5, 0.5];
+        let child_a = gumbel_test_node(0.6, 4, 2.4, 1);
+        let child_b = gumbel_test_node(0.2, 2, 1.6, 1);
+        let mut nodes = vec![root, child_a, child_b];
+        nodes[0].children.push(1);
+        nodes[0].children.push(2);
+        let expected = (0.5 + 6.0 * 0.65) / 7.0;
+        assert!((v_mix(&nodes, 0) - expected).abs() < 1e-9, "v_mix={} expected={}", v_mix(&nodes, 0), expected);
+    }
+
+    #[test]
+    fn completed_q_uses_own_q_for_visited_and_v_mix_for_unvisited() {
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.5, 0.5];
+        let child_a = gumbel_test_node(0.6, 4, 2.4, 1); // Q=0.6, besucht
+        let mut nodes = vec![root, child_a];
+        nodes[0].children.push(1);
+        nodes[0].untried.push((Action::Pass, 0.1));
+        nodes[0].untried.push((Action::Pass, 0.05));
+        let cq = completed_q_per_candidate(&nodes, 0);
+        assert_eq!(cq.len(), 3, "1 Kind + 2 untried");
+        assert!((cq[0].1 - 0.6).abs() < 1e-9, "besuchtes Kind behaelt eigenes Q");
+        let vmix = v_mix(&nodes, 0);
+        assert!((cq[1].1 - vmix).abs() < 1e-12, "unbesucht #1 bekommt v_mix");
+        assert!((cq[2].1 - vmix).abs() < 1e-12, "unbesucht #2 bekommt v_mix");
+        assert!((cq[1].1 - cq[2].1).abs() < 1e-12, "alle unbesuchten Kandidaten teilen denselben v_mix");
+    }
+
+    #[test]
+    fn improved_policy_sums_to_one_and_matches_hand_example() {
+        // Wurzel mit einem besuchten Kind (prior=0.5, Q=0.6, visits=3) und
+        // zwei unbesuchten Kandidaten (prior=0.3, prior=0.2). max_N=3.
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.4, 0.6];
+        let child = gumbel_test_node(0.5, 3, 1.8, 1); // Q = 1.8/3 = 0.6
+        let mut nodes = vec![root, child];
+        nodes[0].children.push(1);
+        nodes[0].untried.push((Action::Pass, 0.3));
+        nodes[0].untried.push((Action::Pass, 0.2));
+
+        let policy = improved_policy(&nodes, 0);
+        assert_eq!(policy.len(), 3);
+        let total: f64 = policy.iter().sum();
+        assert!((total - 1.0).abs() < 1e-9, "Policy muss zu 1.0 summieren, ist {total}");
+
+        // Von Hand nachrechnen: max_N=3, vmix = (0.4 + 3*0.6)/(1+3) = 2.2/4 = 0.55
+        let vmix_expected = (0.4 + 3.0 * 0.6) / 4.0;
+        let score_child = 0.5f64.ln() + gumbel_sigma(0.6, 3);
+        let score_u1 = 0.3f64.ln() + gumbel_sigma(vmix_expected, 3);
+        let score_u2 = 0.2f64.ln() + gumbel_sigma(vmix_expected, 3);
+        let expected = softmax_f64(&[score_child, score_u1, score_u2]);
+        for (a, b) in policy.iter().zip(expected.iter()) {
+            assert!((a - b).abs() < 1e-6, "policy={policy:?} expected={expected:?}");
+        }
     }
 }
