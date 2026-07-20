@@ -10,11 +10,11 @@ Format der Eingabedatei (siehe diagrams.txt):
     digraph AndererName { ... }
 
 Verwendung:
-    python render_diagrams.py                    # rendert alle Diagramme als PNG
+    python render_diagrams.py                    # rendert alle Diagramme als SVG
     python render_diagrams.py spielablauf         # nur dieses eine Diagramm
-    python render_diagrams.py --format svg        # als SVG statt PNG
+    python render_diagrams.py --format png        # als PNG statt SVG
     python render_diagrams.py --input pfad.txt    # andere Eingabedatei
-    python render_diagrams.py --no-open           # nicht automatisch oeffnen
+    python render_diagrams.py --open              # zusaetzlich automatisch oeffnen
 
 Voraussetzung: Graphviz-Software installiert (nicht nur `pip install graphviz`
 -- das ist nur der Python-Wrapper). Falls `dot` nicht gefunden wird: Terminal
@@ -64,8 +64,8 @@ def main():
         default=str(Path(__file__).parent / "diagrams.txt"),
         help="Eingabedatei mit DOT-Quellen (Standard: diagrams.txt neben diesem Skript)",
     )
-    ap.add_argument("--format", default="png", choices=["png", "svg", "pdf"], help="Ausgabeformat (Standard: png)")
-    ap.add_argument("--no-open", action="store_true", help="Nicht automatisch oeffnen")
+    ap.add_argument("--format", default="svg", choices=["png", "svg", "pdf"], help="Ausgabeformat (Standard: svg)")
+    ap.add_argument("--open", action="store_true", help="Nach dem Rendern automatisch oeffnen (Standard: nicht oeffnen)")
     args = ap.parse_args()
 
     input_path = Path(args.input)
@@ -86,7 +86,7 @@ def main():
                 "Terminal neu starten (PATH wird erst in einer neuen Shell-Sitzung aktiv)."
             )
         print(f"Erzeugt: {name} -> {out_path}")
-        if not args.no_open:
+        if args.open:
             open_file(out_path)
 
 
