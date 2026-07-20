@@ -656,6 +656,29 @@ fn best_puct(nodes: &[Node], nid: usize, c_puct: f64) -> usize {
     best
 }
 
+/// Meistbesuchtes Wurzelkind (Tiebreak: Mittelwert Q, dann Prior) — Pendant
+/// zu `mcts::best_root_child`. Externer Bugfix-Hinweis (2026-07-20): ein
+/// reines `max_by_key(|c| nodes[c].visits)` ist hier ein echter Bug --
+/// Rusts `max_by_key`/`max_by` liefern bei Gleichstand das LETZTE Maximum,
+/// Kinder werden aber in ABSTEIGENDER Prior-Reihenfolge expandiert (siehe
+/// `build_net_tree`s `untried.remove(0)`), das letzte (gleichstehende) Kind
+/// ist also das mit dem NIEDRIGSTEN Prior im behaltenen Set. Besuchsgleich-
+/// stand ist in frühen, hochverzweigten Runden wegen der (jetzt engeren,
+/// aber nicht eliminierten) Voll-Expansions-Neigung der Normalfall --
+/// ohne Tiebreak würde dort systematisch der am schlechtesten bewertete
+/// Kandidat gespielt.
+fn best_root_child(nodes: &[Node], children: &[usize]) -> Option<usize> {
+    children.iter().copied().max_by(|&a, &b| {
+        let qa = if nodes[a].visits > 0 { nodes[a].value / nodes[a].visits as f64 } else { 0.0 };
+        let qb = if nodes[b].visits > 0 { nodes[b].value / nodes[b].visits as f64 } else { 0.0 };
+        nodes[a]
+            .visits
+            .cmp(&nodes[b].visits)
+            .then(qa.partial_cmp(&qb).unwrap_or(std::cmp::Ordering::Equal))
+            .then(nodes[a].prior.partial_cmp(&nodes[b].prior).unwrap_or(std::cmp::Ordering::Equal))
+    })
+}
+
 /// Kurzlabel eines Knotens fürs Log (Aktionsbeschreibung bzw. „Wurzel"). Mit
 /// Eltern-Zustand (VOR dem Zug) für Steinanzahl/Füllstand/Strafleisten-Hinweis.
 fn log_label(nodes: &[Node], nid: usize) -> String {
@@ -712,11 +735,22 @@ fn build_net_tree<R: Rng + ?Sized>(
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
                 break;
             }
-            // Kein besuchszahl-abhängiges Wachstum mehr: `untried` ist bereits beim
-            // Erzeugen des Knotens auf den POLICY_MASS_CUTOFF-Präfix gekappt (siehe
-            // `build_untried_actions`) — jeder verbleibende Kandidat darf irgendwann
-            // Kind werden, der Long Tail wurde schon vorher verworfen.
-            if !nodes[nid].untried.is_empty() {
+            // Progressive Widening ÜBER dem POLICY_MASS_CUTOFF-Präfix (externer
+            // Bugfix-Hinweis, 2026-07-20): `untried` ist bereits beim Erzeugen des
+            // Knotens auf den Cutoff-Präfix gekappt (siehe `build_untried_actions`,
+            // schließt den Long Tail dauerhaft aus -- das bleibt), ABER ohne
+            // zusätzliche Bremse hier würde ein Knoten mit dutzenden Kandidaten
+            // (Runde 1, ~49% Top-1-Masse) seinen KOMPLETTEN Präfix erst voll
+            // ausrollen (ein Kind pro Sim), bevor PUCT überhaupt einmal zwischen
+            // ihnen differenzieren kann -- bei 150 Sims faktisch Breitensuche mit
+            // Tiefe ~1-2 statt echter Suche. Derselbe `MAX_ACTIONS + WIDEN_FACTOR·
+            // √N`-Wachstumscap wie `crate::mcts` (Heuristik-Suche) angewendet,
+            // NUR auf den bereits gekappten Präfix -- der Long Tail bleibt
+            // dauerhaft ausgeschlossen, aber selbst die guten Kandidaten kommen
+            // erst nach und nach ins Spiel, sodass PUCT früh differenzieren kann.
+            let widen_allowed = crate::mcts::MAX_ACTIONS
+                + (crate::mcts::WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
+            if !nodes[nid].untried.is_empty() && nodes[nid].children.len() < widen_allowed {
                 let (act, prior) = nodes[nid].untried.remove(0); // höchster Prior zuerst
                 let mover = nodes[nid].state.current_player;
                 crate::profiling::note_gamestate_clone();
@@ -811,7 +845,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
         return crate::round5::choose_action(state);
     }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
-    let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits)?;
+    let best = best_root_child(&nodes, &nodes[0].children)?;
     nodes[best].action.clone()
 }
 
@@ -872,7 +906,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
         return crate::round5::choose_action_with_analysis(state);
     }
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
-    let best = nodes[0].children.iter().copied().max_by_key(|&c| nodes[c].visits);
+    let best = best_root_child(&nodes, &nodes[0].children);
     let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
     let prior_sum: f64 = nodes[0]
         .children
