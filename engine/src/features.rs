@@ -750,7 +750,7 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
 /// gedeckelt, damit die ID-Dimension klein/fest bleibt, statt mit der
 /// (theoretisch unbeschränkten) Anzahl gleichzeitig gezogener Platten zu
 /// wachsen. Ungeprüfter erster Wert -- gegen echte Spielverläufe absichern.
-const MAX_PENDING_STACK_TILES: i64 = 4;
+pub(crate) const MAX_PENDING_STACK_TILES: i64 = 4;
 
 /// Port von `action_to_id` (für Masken/Prior-Zuordnung). Erwartet ein
 /// env-Action-Dict (agent_env-Schema).

@@ -186,12 +186,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     # Best-Checkpoint-Tracking: bisher wurde NUR der letzte Epochenstand
     # gespeichert, auch wenn Early Stopping (Patience-Fenster) erst einige
-    # Epochen nach dem eigentlichen Val-Policy-Loss-Optimum greift (siehe
-    # v8c: Minimum bei Epoche 5, Stop typischerweise erst bei Epoche
-    # plateau_since+patience). Bestes Modell nach Val-Policy-Loss (Fallback
-    # Train-Loss ohne Val-Split -- dieselbe Kennzahl wie die Plateau-
-    # Erkennung oben) zusätzlich als *_best.pth/.onnx sichern.
-    best_val_ploss = float("inf")
+    # Epochen nach dem eigentlichen Optimum greift (siehe v8c: Minimum bei
+    # Epoche 5, Stop typischerweise erst bei Epoche plateau_since+patience).
+    # Bestes Modell nach GEWICHTETER Kombination aus Policy-/Value-/Points-
+    # Val-Loss (Fallback Train-Loss ohne Val-Split), dieselbe Gewichtung wie
+    # der Trainings-Loss selbst -- siehe Kommentar an der Vergleichsstelle
+    # unten (Fund 8, Bugfixes.txt: reine Policy-Val-Loss-Auswahl ignorierte
+    # den Value-Head, den erklärten Engpass dieser Session) -- zusätzlich als
+    # *_best.pth/.onnx sichern.
+    best_combined_metric = float("inf")
     best_epoch = None
     best_state_dict = None
 
@@ -377,9 +380,23 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_value_r2_history.append(epoch_val_value_r2)
         val_points_r2_history.append(epoch_val_points_r2)
 
-        current_metric = epoch_val_ploss if epoch_val_ploss is not None else epoch_ploss
-        if current_metric < best_val_ploss:
-            best_val_ploss = current_metric
+        # Fund 8 (externer Hinweis, Bugfixes.txt Abschnitt C): "bestes Modell"
+        # wurde bisher NUR nach Policy-Val-Loss gewählt -- der Value-Head
+        # (dieser Session zentraler Engpass) lief dabei unbeachtet mit, ein
+        # Checkpoint konnte also als "best" markiert werden, waehrend der
+        # Value-Head an genau diesem Punkt bereits schlechter war als an
+        # einem anderen Epochenstand. Fix: dieselbe gewichtete Kombination
+        # wie der Trainings-Loss selbst (`p_loss + VALUE_WEIGHT*v_loss +
+        # POINTS_WEIGHT*points_loss`), nur auf den Val-Metriken -- "best"
+        # bedeutet jetzt "bestes GESAMTZIEL", nicht mehr "bestes Policy-Val
+        # allein". Fallback (kein Val-Split) nutzt dieselbe Formel auf den
+        # Trainings-Losses, konsistent mit dem bisherigen Fallback-Muster.
+        if epoch_val_ploss is not None:
+            current_metric = epoch_val_ploss + VALUE_WEIGHT * epoch_val_vloss + POINTS_WEIGHT * epoch_val_pointsloss
+        else:
+            current_metric = epoch_ploss + VALUE_WEIGHT * epoch_vloss + POINTS_WEIGHT * epoch_pointsloss
+        if current_metric < best_combined_metric:
+            best_combined_metric = current_metric
             best_epoch = epoch + 1
             best_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
@@ -586,7 +603,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         best_checkpoint["model_state"]      = best_state_dict
         best_checkpoint["epochs"]           = best_epoch
         best_checkpoint["is_best_checkpoint"] = True
-        best_checkpoint["selected_by"]      = "val_policy_loss" if val_dataloader is not None else "train_policy_loss"
+        best_checkpoint["selected_by"]      = ("val_combined(p+v*value_w+pts*points_w)" if val_dataloader is not None
+                                                else "train_combined(p+v*value_w+pts*points_w)")
         best_checkpoint["final_policy_loss"] = round(policy_history[best_idx], 4)
         best_checkpoint["final_policy_val_loss"] = (
             round(val_ploss_history[best_idx], 4) if val_ploss_history[best_idx] is not None else None)
@@ -604,7 +622,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         best_save_path = MODELS_DIR / f"alphazero_{best_version_name}.pth"
         torch.save(best_checkpoint, str(best_save_path))
         print(f"⭐ Bestes Modell (Epoche {best_epoch}, {best_checkpoint['selected_by']}="
-              f"{best_val_ploss:.4f}) zusätzlich gespeichert unter:\n📂 {best_save_path}")
+              f"{best_combined_metric:.4f}) zusätzlich gespeichert unter:\n📂 {best_save_path}")
     elif best_state_dict is not None:
         print(f"ℹ️  Letzte Epoche ({actual_epochs}) war bereits die beste — kein separater Best-Checkpoint nötig.")
 

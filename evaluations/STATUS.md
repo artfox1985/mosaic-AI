@@ -686,6 +686,53 @@ untersuchte Frage (Peek-Wahlrate von nur ~4-5% könnte darauf hindeuten,
 dass das Netz das Nachziehen generell selten für lohnend hält — unabhängig
 von Fund 6).
 
+## Wurzel-Determinisierung, C8-Fix, D-Performance (2026-07-20, Fortsetzung)
+
+**Wurzel-Determinisierung: getestet, gemischtes Ergebnis, TROTZDEM aktiv
+belassen (Nutzer-Entscheidung).** Sauberer Ersatz für den In-Tree-Fix: statt
+bei jedem simulierten Peek/Chip-Reveal neu zu mischen, EINMAL pro Zugsuche
+(`build_net_tree`s Wurzel) `dome_tile_pool` UND unaufgedeckte Bonuschips
+(`bonus_chip_pool` + verdeckte Fabrik-Chips) neu mischen, dann die gesamte
+Suche deterministisch auf dieser einen Welt laufen lassen — kein
+In-Tree-Rauschen. Arena (n=100, kein Early-Stop): **12:88 (12%), Score 19.2
+vs. 40.5, Floor 19.2 vs. 13.7** gegen die 17%-Baseline. Ein direkter
+Wiederholungslauf DERSELBEN Baseline-Konfiguration (kein Determinisieren,
+nur der D-Performance-Fix zusätzlich) ergab bei n=100 aber **11%** statt
+17% — d.h. eine Schwankung von 6 Prozentpunkten bei IDENTISCHER
+Konfiguration. Das Rauschband dieser Session ist also mindestens so breit
+wie der 12%-vs-17%-Unterschied selbst, der Wurzel-Determinisierungs-Befund
+ist damit statistisch nicht von "kein Effekt" zu unterscheiden.
+
+**Nutzer-Entscheidung**: trotzdem aktiv lassen (`DETERMINIZE_ROOT_HIDDEN_INFO
+= true`) — es geht nicht nur um gemessenen Vorteil, sondern auch um
+KORREKTHEIT: die Suche soll kein Wissen nutzen, das ein echter Spieler nicht
+hat. Anders als der In-Tree-Fix (klarer, großer, NICHT im Rauschen
+erklärbarer Rückschritt 17%→9%, zu Recht verworfen) ist dieser Minimalfix
+für das Orakel-Wissen-Problem (Fund 6) bewusst Standardverhalten, unabhängig
+vom unklaren Arena-Delta.
+
+**C8 (Checkpoint-Auswahl ignoriert Value-Head) behoben.** `train.py`:
+"bestes Modell" wurde bisher NUR nach Policy-Val-Loss gewählt. Jetzt
+dieselbe gewichtete Kombination wie der Trainings-Loss selbst
+(`p_loss + VALUE_WEIGHT·v_loss + POINTS_WEIGHT·points_loss`), auf den
+Val-Metriken (Fallback Train-Loss ohne Val-Split). Wirkt sich erst beim
+nächsten Trainingslauf aus.
+
+**D (Performance) — JSON-Umweg im heißesten Suchpfad eliminiert.**
+`build_untried_actions` rief pro legaler Aktion pro Knoten
+`action_to_id(&action_to_env_dict(...))` auf (serde_json-Objektbau +
+String-Matching). Neue Funktion `self_play::action_to_id_direct` matcht
+direkt auf `&Action`/`&GameState`, ohne JSON-Umweg — Parität mit dem
+JSON-Pfad per neuem Test abgesichert
+(`action_to_id_direct_matches_json_path_across_random_games`, 8 Seeds ×
+60 Züge, alle legalen Aktionen pro Schritt). Restliche "Kleinkram"-Funde
+(D: `feats.to_vec()`-Kopie, `unique_moon_orders`-String-Sortierung) bewusst
+NICHT angefasst — beide vom externen Kollegen selbst als minor eingestuft,
+Kosten gegenüber dem ONNX-Forward-Pass vernachlässigbar. Python-`p`-
+Variablen-Kollision (Spielerindex → Schleifenvariable, `neural_net.py`)
+umbenannt (`pe`) — reine Sicherheits-/Klarheits-Änderung, kein
+Verhaltensunterschied.
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
