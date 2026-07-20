@@ -26,7 +26,7 @@ use crate::game::{
 };
 use crate::mcts::{dynamic_sims, player_total, root_child_stats, search_drafting_action};
 use crate::net::Net;
-use crate::net_mcts::{net_root_child_stats, net_search_drafting_action};
+use crate::net_mcts::{net_effective_sims, net_root_child_stats, net_search_drafting_action};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
@@ -1176,7 +1176,7 @@ fn play_net_game<R: Rng + ?Sized>(
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else if pi == net_board {
-                        let s = dynamic_sims(net_sims, actions.len());
+                        let s = net_effective_sims(net_sims, actions.len());
                         net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
@@ -1329,7 +1329,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                         } else {
                             (net_b, sims_b, c_puct_b)
                         };
-                        let s = dynamic_sims(base, actions.len());
+                        let s = net_effective_sims(base, actions.len());
                         net_search_drafting_action(net, &game.state, s, cp, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -1411,13 +1411,17 @@ pub fn run_net_vs_net_arena(
 
 // ── Netzgeführtes Self-Play (AlphaZero-Loop, Stufe 1/2) ──────────────────────
 
-/// Drafting-Policy aus der Netz-PUCT: Target = ROHE Visit-Verteilung N/ΣN
-/// (kein q²/Schärfen — die Schärfe kommt aus der Suchtiefe). Gespielte Aktion ~
-/// Visits (τ=1, Exploration; plus Dirichlet-Wurzel-Noise in der Suche) --
-/// AUSSER `deterministic=true`: dann wird wie in der Arena immer der
-/// meistbesuchte Zug gespielt (kein Sampling). Nur fuer Diagnose-Zwecke
-/// (siehe evaluations/stage2_investigation.md) -- normales Self-Play nutzt
-/// weiterhin Sampling fuer Trainingsdaten-Vielfalt.
+/// Drafting-Policy aus der Netz-Suche: Trainingsziel = Gumbels completed-Q-
+/// Softmax `π'(a) = softmax(ln(prior(a)) + σ(completedQ(a)))` über ALLE
+/// Wurzelkandidaten (`net_mcts::net_root_child_stats_and_policy`, ersetzt
+/// die vorherige rohe Visit-Verteilung N/ΣN, siehe STATUS.md "Gumbel
+/// AlphaZero", Punkt 4 -- unbesuchte Kandidaten tragen jetzt via `v_mix`
+/// echte Wahrscheinlichkeitsmasse statt Null). Die tatsächlich GESPIELTE
+/// Aktion bleibt bewusst UNVERÄNDERT besuchsbasiert (τ=1, Sampling; plus
+/// Dirichlet-Wurzel-Noise im PUCT-Legacy-Pfad) -- AUSSER
+/// `deterministic=true`: dann wird wie in der Arena immer der meistbesuchte
+/// Zug gespielt. Nur das aufgezeichnete Policy-Ziel ändert sich, nicht die
+/// Selbstspiel-Trajektorie/Explorationsvielfalt.
 fn net_drafting_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -1428,18 +1432,17 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     add_root_noise: bool,
     deterministic: bool,
 ) -> (Action, Vec<Value>) {
-    let sims = dynamic_sims(base_sims, actions.len());
-    let stats = net_root_child_stats(net, state, sims, c_puct, add_root_noise, rng); // (Action, visits, q)
+    let sims = net_effective_sims(base_sims, actions.len());
+    let (stats, completed_q_policy) =
+        crate::net_mcts::net_root_child_stats_and_policy(net, state, sims, c_puct, add_root_noise, rng);
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
         return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
     }
-    let policy: Vec<Value> = stats
+    let policy: Vec<Value> = completed_q_policy
         .iter()
-        .map(|(a, v, _)| {
-            json!({ "action": action_to_env_dict(state, a), "prob": (*v as f64) / total })
-        })
+        .map(|(a, p)| json!({ "action": action_to_env_dict(state, a), "prob": p }))
         .collect();
     let idx = if deterministic {
         stats
@@ -2039,7 +2042,7 @@ fn stage3_choose_action<R: Rng + ?Sized>(
     }
     // Kandidaten-Vorauswahl: guenstige Suche (wie Stufe 1), Top-K nach Besuchen
     // -- nicht ALLE Legalzuege ausrollen, das waere zu teuer.
-    let sims = dynamic_sims(shortlist_sims, actions.len());
+    let sims = net_effective_sims(shortlist_sims, actions.len());
     let mut stats = net_root_child_stats(net, state, sims, c_puct, false, rng);
     stats.sort_by(|a, b| b.1.cmp(&a.1)); // absteigend nach Besuchen
     if stats.is_empty() {
@@ -2128,7 +2131,7 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                             c_puct, top_k, n_reps, horizon_rounds, alphabeta_depth, alphabeta_node_budget, rng,
                         )
                     } else {
-                        let s = dynamic_sims(sims1, actions.len());
+                        let s = net_effective_sims(sims1, actions.len());
                         net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -2377,7 +2380,7 @@ pub fn sibling_ranking_diagnostic(
                         if actions.is_empty() {
                             break;
                         }
-                        let s = dynamic_sims(walk_sims, actions.len());
+                        let s = net_effective_sims(walk_sims, actions.len());
                         match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game) {
                             Some(act) => {
                                 apply_chosen_action(&mut game, act);
@@ -2489,7 +2492,7 @@ pub fn draw_stack_peek_impact_diagnostic(
                         if offers_peek {
                             *peek_offered.entry(round).or_insert(0) += 1;
                         }
-                        let s = dynamic_sims(walk_sims, actions.len());
+                        let s = net_effective_sims(walk_sims, actions.len());
                         let chosen = match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game)
                         {
                             Some(act) => act,
@@ -2564,6 +2567,200 @@ pub fn draw_stack_peek_impact_diagnostic(
         );
     }
     Ok(serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| "{}".to_string()))
+}
+
+/// Noise-Floor-Test für Runde 1 (`evaluations/value head tests.txt`, Punkt 1
+/// -- externer Kollegen-Vorschlag, "wichtigster Test, weil er den
+/// Lösungsraum halbiert"): wie viel Value-R² ist in Runde 1 ÜBERHAUPT
+/// erreichbar, selbst wenn ein Head das Ziel perfekt lernen würde? Sampelt
+/// `n_states` realistische Runde-1-Entscheidungspunkte per Heuristik-Walk
+/// (KEINE Netz-Abhängigkeit -- das Ziel ist eine Eigenschaft des LABELS,
+/// nicht eines bestimmten Modells) und spielt je Zustand `k_rollouts`
+/// unabhängige Heuristik-Fortsetzungen bis Spielende (Beutel/Kuppelstapel
+/// je Wiederholung neu gemischt, gleiches Determinisierungs-Muster wie
+/// `mean_rollout_diff`, verifiziert per
+/// `rollout_repetitions_actually_diverge_in_bag_and_dome_order`).
+///
+/// Label = aktuelle Value-Zielformel (VALUE_SCHEMA_VERSION=14, Fund 7):
+/// `tanh((own_unclamped - opp_unclamped) / VALUE_SCALE)`, aus der Sicht des
+/// Spielers, der am gesampelten Zustand am Zug ist.
+///
+/// Varianzzerlegung (Gesetz der totalen Varianz):
+/// `Var(y) = Var(E[y|s]) + E[Var(y|s)]` -- `Var(E[y|s])` (Varianz der
+/// Rollout-MITTELWERTE über die Zustände) ist der ERKLÄRBARE Anteil,
+/// `E[Var(y|s)]` (mittlere Rollout-Varianz INNERHALB je Zustand) ist
+/// irreduzibles Rauschen (spätere Zufallszüge/Neubefüllungen). Maximal
+/// erreichbares R² = `Var(E[y|s]) / Var(y)`. Deckel ~0.05-0.1: Runde-1-
+/// Rauschen ist eine Eigenschaft des Ziels selbst (kein Lern-/Feature-
+/// Problem lösbar) -- das Ziel müsste geändert werden (z.B. TD-/
+/// Rundenübergangs-Bootstrap-Labels). Deckel 0.3+: echtes, noch nicht
+/// ausgeschöpftes Lernpotenzial.
+pub fn value_noise_floor_diagnostic(
+    n_states: usize,
+    k_rollouts: usize,
+    walk_sims: u32,
+    rollout_sims: u32,
+    seed: u64,
+) -> Result<String, String> {
+    // Phase 1 (billig, sequenziell): `n_states` Runde-1-Entscheidungspunkte
+    // per Heuristik-Walk sammeln -- höchstens 1 je Partie (Diversität über
+    // verschiedene Trajektorien statt mehrfach aus derselben, analog
+    // `sibling_ranking_diagnostic`).
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut sampled_states: Vec<GameState> = Vec::with_capacity(n_states);
+    let mut game_idx = 0u64;
+    while sampled_states.len() < n_states && game_idx < (n_states as u64) * 6 + 20 {
+        game_idx += 1;
+        let names = ["A".to_string(), "B".to_string()];
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut rng_game =
+            StdRng::seed_from_u64(seed.wrapping_add(game_idx.wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let mut game = Game::start(names, 0, ids, &mut rng_game);
+        let t_start = std::time::Instant::now();
+        let mut guard = 0u32;
+        let mut collected_this_game = false;
+        while guard < 500 && t_start.elapsed().as_secs() < 60 {
+            guard += 1;
+            match game.state.phase {
+                Phase::StartPlacement | Phase::Drafting => {
+                    if game.state.players.iter().any(|p| p.start_tile_pending) {
+                        let first = game.state.current_player;
+                        let non_starter = 1 - first;
+                        let pi = if game.state.players[non_starter].start_tile_pending {
+                            non_starter
+                        } else if game.state.players[first].start_tile_pending {
+                            first
+                        } else {
+                            break;
+                        };
+                        match choose_start_placement(&game.state, pi) {
+                            Some((tid, r, c2, rot)) => {
+                                let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                            }
+                            None => break,
+                        }
+                    } else if game.state.phase == Phase::Drafting {
+                        let actions = drafting_actions(&game.state);
+                        if actions.is_empty() {
+                            break;
+                        }
+                        if !collected_this_game && game.state.round_number == 1 && actions.len() > 1 {
+                            collected_this_game = true;
+                            sampled_states.push(game.state.clone());
+                            if sampled_states.len() >= n_states {
+                                break;
+                            }
+                        }
+                        // Hauptspiel per Heuristik weiterführen (Walk zum
+                        // nächsten realistischen Zustand), unabhängig davon
+                        // ob dieser Schritt gesampelt wurde.
+                        let s = dynamic_sims(walk_sims, actions.len());
+                        let a = search_drafting_action(&game.state, s, 1.5, &mut rng)
+                            .unwrap_or_else(|| actions[0].clone());
+                        let _ = game.apply_drafting(&a);
+                    } else {
+                        break;
+                    }
+                }
+                Phase::Tiling => {
+                    tiling_step(&mut game, &mut rng);
+                }
+                _ => break,
+            }
+        }
+    }
+
+    // Phase 2 (teuer, RAYON-PARALLEL über die Zustände): je Zustand
+    // `k_rollouts` unabhängige Heuristik-Fortsetzungen bis Spielende
+    // (Beutel/Kuppelstapel je Wiederholung neu gemischt, gleiches
+    // Determinisierungs-Muster wie `mean_rollout_diff`, verifiziert per
+    // `rollout_repetitions_actually_diverge_in_bag_and_dome_order`).
+    // Deterministisch trotz Parallelität: jeder Zustands-Index bekommt
+    // seinen EIGENEN, vom Index abgeleiteten RNG-Strom.
+    let results: Vec<(f64, f64)> = sampled_states
+        .par_iter()
+        .enumerate()
+        .filter_map(|(idx, sample_state)| {
+            let mut rng = StdRng::seed_from_u64(seed.wrapping_add((idx as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)));
+            let player = sample_state.current_player;
+            let opp = 1 - player;
+            let mut ys: Vec<f64> = Vec::with_capacity(k_rollouts);
+            for _ in 0..k_rollouts {
+                let mut g2 = Game { state: sample_state.clone() };
+                g2.state.bag.tiles.shuffle(&mut rng);
+                g2.state.dome_tile_pool.shuffle(&mut rng);
+                let mut rguard = 0u32;
+                loop {
+                    rguard += 1;
+                    if rguard > 4000 {
+                        break;
+                    }
+                    match g2.state.phase {
+                        Phase::StartPlacement | Phase::Drafting => {
+                            if g2.state.players.iter().any(|p| p.start_tile_pending) {
+                                if start_placement_step(&mut g2, &mut rng).is_none() {
+                                    break;
+                                }
+                            } else if g2.state.phase == Phase::Drafting {
+                                let acts = drafting_actions(&g2.state);
+                                if acts.is_empty() {
+                                    break;
+                                }
+                                let a = if acts.len() == 1 {
+                                    acts[0].clone()
+                                } else {
+                                    let s = dynamic_sims(rollout_sims, acts.len());
+                                    search_drafting_action(&g2.state, s, 1.5, &mut rng)
+                                        .unwrap_or_else(|| acts[0].clone())
+                                };
+                                let _ = g2.apply_drafting(&a);
+                            } else {
+                                break;
+                            }
+                        }
+                        Phase::Tiling => {
+                            tiling_step(&mut g2, &mut rng);
+                        }
+                        _ => break,
+                    }
+                }
+                if g2.state.phase == Phase::End {
+                    let _ = g2.apply_end_scoring();
+                }
+                let own = g2.state.players[player].score_unclamped as f64;
+                let opp_s = g2.state.players[opp].score_unclamped as f64;
+                ys.push(((own - opp_s) / crate::mcts::VALUE_SCALE).tanh());
+            }
+            if ys.len() < 2 {
+                return None;
+            }
+            let n = ys.len() as f64;
+            let mean = ys.iter().sum::<f64>() / n;
+            let var = ys.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
+            Some((mean, var))
+        })
+        .collect();
+    let (state_means, state_vars): (Vec<f64>, Vec<f64>) = results.into_iter().unzip();
+
+    let n = state_means.len();
+    if n < 2 {
+        return Err(format!("Zu wenige auswertbare Runde-1-Zustände gesammelt ({n}/{n_states})"));
+    }
+    let grand_mean = state_means.iter().sum::<f64>() / n as f64;
+    let var_between = state_means.iter().map(|m| (m - grand_mean).powi(2)).sum::<f64>() / n as f64;
+    let var_within_mean = state_vars.iter().sum::<f64>() / n as f64;
+    let var_total = var_between + var_within_mean;
+    let max_r2 = if var_total > 1e-12 { var_between / var_total } else { f64::NAN };
+
+    Ok(json!({
+        "n_states": n,
+        "k_rollouts": k_rollouts,
+        "var_between_states": var_between,
+        "var_within_state_mean": var_within_mean,
+        "var_total": var_total,
+        "max_achievable_r2": max_r2,
+    })
+    .to_string())
 }
 
 #[cfg(test)]

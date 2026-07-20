@@ -932,13 +932,143 @@ Rauschband lag bei identischer Konfiguration schon einmal bei 6 Prozent-
 punkten (11% vs. 17%) — ein Wiederholungslauf vor endgültiger Einordnung
 als neue Baseline wäre angebracht, ist aber (noch) nicht gelaufen.
 
+**Wiederholungslauf (2026-07-20, gleiche Konfiguration, frischer Seed):
+26:74 (26%), Ø Score 31.1 vs. 38.9, Floor 16.1 vs. 15.0.** Zusammen mit dem
+ersten Lauf (22%) macht das 48:152 (24%) über 200 Spiele — deutlich über der
+alten 17%-Bestmarke in BEIDEN Einzelläufen, kein Zufallsartefakt. Der
+Score-/Floor-Abstand ist im zweiten Lauf sogar noch enger. **22-26% gilt
+damit als bestätigte neue Bestmarke der Session.**
+
+**Gumbels completed-Q-Policy-Ziel implementiert (2026-07-20)**:
+`net_mcts::net_root_child_stats_and_policy` baut den Suchbaum einmal und
+liefert zusätzlich zu den rohen Stats (weiterhin für die Zugwahl genutzt)
+das completed-Q-Policy-Ziel (`improved_policy` an der Wurzel) für ALLE
+Wurzelkandidaten. `self_play::net_drafting_policy` zeichnet dieses Ziel
+jetzt als Trainings-Policy auf, statt der rohen Besuchsverteilung — die
+tatsächlich gespielte Aktion bleibt bewusst besuchsbasiert (keine Änderung
+an der Self-Play-Trajektorie/Explorationsvielfalt). Neuer Unit-Test
+(`root_completed_q_policy_pairs_each_action_with_its_own_probability`),
+123/123 Tests grün. **Wichtige Einschränkung**: `net_drafting_policy` wird
+nur von netzgeführtem Self-Play (`--mode network`) genutzt — der
+tatsächliche Trainingskorpus dieser Session (domefactB, wie alle Korpora
+zuvor) läuft über Heuristik-Self-Play (`--mode mcts`) und ist von dieser
+Änderung NICHT betroffen. Um den Effekt zu messen, bräuchte es einen
+eigenen netzgeführten Self-Play-Zyklus (Strategiewechsel der Datenquelle,
+noch nicht mit dem Nutzer abgestimmt) — Umsetzung bewusst getrennt von
+dieser Entscheidung.
+
+**`dynamic_sims`-Entkopplung getestet, als Toggle belassen (2026-07-20).**
+`net_mcts::net_effective_sims` kann bei `USE_GUMBEL_SEARCH=true` `base_sims`
+unverändert zurückgeben (kein Skalieren mit der Aktionszahl mehr) statt
+`dynamic_sims(base,n)`, gated über neues `DECOUPLE_NET_SIMS_FROM_ACTIONS`
+(Standard `false`). Ablation (n=100, kein Early-Stop): Netz fest auf 330
+Sims (≈ altes `dynamic_sims(150,n)`-Mittel, siehe
+`evaluations/actions_per_round.md`) vs. Heuristik unverändert bei 150 —
+**20:80 (20%), Ø Score 27.2 vs. 40.9, Floor 16.3 vs. 15.0** — liegt im
+Rauschband der 22-26%-Bestmarke, kein klarer Effekt in diesem einzelnen
+Test. Bewusst als Toggle (Standard AUS) statt unconditional umgesetzt: eine
+unconditional Änderung hätte still überall, wo netzgeführte Suche mit
+einem `base_sims`-Wert aufgerufen wird (Server-Mensch-vs-KI,
+`self_play.py --mode network`, künftige Arena-Standardwerte), dessen
+Bedeutung geändert (vorher automatisch auf ~185-499 hochskaliert, jetzt
+exakt der übergebene Wert) — ohne bestätigten Nutzen ein unnötiges stilles
+Regressionsrisiko. Code bleibt verfügbar für einen saubereren
+Wiederholungstest.
+
 **Offen für die Fortsetzung** (siehe auch Task-Liste dieser Session):
-- Wiederholungslauf der 22%-Konfiguration zur Rauschband-Einordnung.
-- Gumbels completed-Q-Policy-Ziel (weiterhin nicht umgesetzt, `net_drafting_policy`
-  nutzt noch Besuchsanteil) — jetzt auf einem Korpus mit echter
-  Baustein-B-Verzweigung vermutlich wirksamer zu testen als vorher.
-- `dynamic_sims`-Entkopplung vom Aktions-Count im Gumbel-Netzpfad (externer
-  Befund, 2026-07-20) — noch nicht umgesetzt, siehe Sessions-Task-Liste.
+- Ob/wann auf netzgeführtes Self-Play als primäre Datenquelle umgestellt
+  wird, um das completed-Q-Ziel tatsächlich zu nutzen — offene
+  Nutzer-Entscheidung, kein automatischer Folgeschritt.
+- `dynamic_sims`-Entkopplung: nur ein Einzeltest, kein klares Ergebnis —
+  bei Bedarf mit mehr Wiederholungen oder anderem `GUMBEL_TOP_M` erneut
+  prüfen.
+
+## Zweiter Kollegen-Diagnosevorschlag: günstige Punkte abgearbeitet (2026-07-20)
+
+`evaluations/value head tests.txt` (zweiter externer Kollege) schlägt 7
+Diagnosen vor, grob nach Aufwand/Erkenntnisgewinn priorisiert. Punkt 2
+(Perspektiven-/OOD-Audit) und 3 (Geschwister-Ranking) waren bereits
+größtenteils erledigt (Divergenz-Logging, `MIRROR_OTHER_VAL`-Test,
+`sibling_ranking_diagnostic`) — die beiden verbleibenden günstigen Punkte
+sind jetzt nachgezogen:
+
+**Punkt 2, Rest (klassische Vorzeichen-/Mirror-Unit-Tests) — implementiert,
+KEIN Perspektivfehler gefunden.** Zwei neue Rust-Tests
+(`net_mcts::tests`, gegen `alphazero_v10_best.onnx`):
+- `net_leaf_eval_is_invariant_to_which_player_is_flagged_current`: flippt
+  NUR `state.current_player` an sonst identischen Zuständen — `net_leaf_eval`
+  muss (da es intern ohnehin beide Perspektiven separat auswertet und fest
+  auf [Spieler0, Spieler1] einsortiert) exakt dasselbe Ergebnis liefern.
+  **Hält exakt** (Toleranz 1e-9, 10 Stichproben) — kein Plumbing-Bug in der
+  Index-Zuordnung.
+- `net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth`: Netz-
+  Vorzeichen (wer liegt vorne) gegen `mcts::evaluate` (exaktes DFS-Urteil)
+  über 40 zufällige Drafting-Zustände. **76.9% Übereinstimmung (30/39
+  auswertbare Stichproben)** — deutlich über Zufall (50%), passt zum
+  positiven (wenn auch schwachen) Geschwister-Tau. Ein systematischer
+  Perspektivfehler würde die Rate weit UNTER 50% drücken, nicht nur
+  dämpfen — beide Tests zusammen schließen einen groben Perspektiv-/
+  Plumbing-Bug als Erklärung für "gesundes R², aber schadet der Suche"
+  aus (konsistent mit dem bereits negativen `MIRROR_OTHER_VAL`-Befund).
+  125/125 Tests grün.
+
+**Punkt 5 (FPU-/Unvisited-Q-Audit) — Code-Audit, KEIN Fix nötig.**
+Nachvollzogen für beide Suchpfade (`build_net_tree`/PUCT-Legacy UND
+`build_gumbel_tree`, beide mit identischem Expansions-/Backprop-Muster):
+ein Kandidat wird NUR dann in `nodes[nid].children` aufgenommen, wenn
+`apply_drafting` erfolgreich war — und genau dieselbe Simulation backprop't
+danach sofort entlang des Pfads bis zur Wurzel (inkl. des gerade erzeugten
+Kindes). Jedes Element in `.children` hat also strukturell IMMER ≥1 Besuch,
+bevor `best_puct`/`gumbel_select_child` es je zu Gesicht bekommen — der
+`q=0.0`-Fallback in `best_puct` (auf der [0,1]-Skala eigentlich "sicherer
+Verlust", nicht neutral) ist damit bestätigt toter Code, keine Regression
+durch Baustein B. Der tatsächlich relevante "unbesucht"-Fall (Kandidaten,
+die noch gar nicht expandiert sind) tritt nur im Gumbel-Pfad auf
+(`completed_q_per_candidate`) und bekommt dort bereits `v_mix` — einen
+plausiblen, prior-gewichteten Elternwert-Schätzer, keine naive Konstante
+(0/0.5). **Keine FPU-Reduction-Variante nötig, Punkt 5 damit geschlossen.**
+
+**Punkt 1 (Noise-Floor-Test) gelaufen — Ergebnis: niedriger Deckel, Ziel
+selbst ist das Problem.** Neue pyo3-Funktion
+`self_play::value_noise_floor_diagnostic` (rayon-parallel über die
+Zustände): sampelt Runde-1-Entscheidungspunkte per Heuristik-Walk (KEINE
+Netz-Abhängigkeit), spielt je Zustand K unabhängige Heuristik-
+Fortsetzungen bis Spielende (Beutel/Kuppelstapel je Wiederholung neu
+gemischt), Varianzzerlegung `Var(y)=Var(E[y|s])+E[Var(y|s)]` auf dem
+AKTUELLEN Value-Ziel (VALUE_SCHEMA_VERSION=14, `score_unclamped`-Margin).
+
+Lauf (n_states=100, k_rollouts=8, walk_sims=80, rollout_sims=60,
+1612s/~27 Min dank Parallelisierung):
+
+| Metrik | Wert |
+|---|---|
+| Var(E[y\|s]) (erklärbar, zwischen Zuständen) | 0.0150 |
+| E[Var(y\|s)] (irreduzibel, innerhalb eines Zustands) | 0.1128 |
+| Var(y) gesamt | 0.1278 |
+| **max. erreichbares R²** | **0.117** |
+
+**Einordnung**: liegt naeher an der "~0.05-0.1"-Zone (Ziel selbst ist die
+Grenze) als an "0.3+" (Lern-/Feature-Problem) — selbst ein PERFEKTER
+Value-Head könnte auf dem aktuellen Ziel (finaler Spielausgang) in Runde 1
+nur ~12% der Varianz erklären, der Rest ist irreduzibles Rauschen aus den
+verbleibenden 4 Runden Zufall. Erklärt zwanglos, warum trotz Baustein B,
+Fund 7 und alter Struktur-Fixes das Runde-1-R² dieser Session nie über
+~0.03-0.06 hinauskam — kein Trainingsansatz auf dem AKTUELLEN Ziel hätte
+das je können. **Methodischer Vorbehalt**: `rollout_sims=60` (Heuristik-
+Suche für die K Wiederholungen) fügt selbst etwas Eigenrauschen hinzu
+(unterschiedliche Zugentscheidungen zwischen Wiederholungen, nicht nur
+echte Spielzufälligkeit) — der wahre Deckel könnte also etwas HÖHER als
+0.117 liegen, aber vermutlich nicht qualitativ anders (kein Sprung
+Richtung 0.3+).
+
+**Implikation (Punkt 6 aus derselben Datei jetzt gut motiviert)**: der
+Ceiling-Befund spricht dafür, dass der nächste produktive Schritt nicht
+"mehr/besser auf demselben Ziel trainieren" ist, sondern das ZIEL selbst
+zu ändern — TD-/Bootstrap-Labels (Runde-r-Zustände mit dem nachweislich
+besseren Netz-Wert am Rundenübergang r+1/r+2 labeln, gemischt mit dem
+Endergebnis, gleiche rtv-Maschinerie bereits vorhanden). Noch NICHT
+umgesetzt — eigene Nutzer-Entscheidung, ob/wann dieser Schritt als
+nächstes angegangen wird.
 
 ## Quellen (Recherche 2026-07-19)
 

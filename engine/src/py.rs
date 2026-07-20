@@ -424,7 +424,7 @@ impl PyGame {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
         })?;
-        let sims = dynamic_sims(simulations, drafting_actions(&self.game.state).len());
+        let sims = net_mcts::net_effective_sims(simulations, drafting_actions(&self.game.state).len());
         let (_chosen, analysis) =
             net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, None);
         Ok(analysis.to_string())
@@ -600,7 +600,7 @@ impl PyGame {
             .to_string());
         }
 
-        let sims = dynamic_sims(simulations, actions.len());
+        let sims = net_mcts::net_effective_sims(simulations, actions.len());
         let mut lines: Vec<String> = Vec::new();
         let logger = if log { Some(&mut lines) } else { None };
         let (chosen, analysis) =
