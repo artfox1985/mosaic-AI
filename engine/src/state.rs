@@ -119,6 +119,32 @@ fn fill_large_factory<R: Rng + ?Sized>(
     tower: &mut Tower,
     rng: &mut R,
 ) {
+    // R3 (Regelbuch S.10): können Beutel+Turm zusammen keine 2 verschiedenen
+    // Farben mehr liefern, würde der Redraw-Loop unten endlos laufen. Dann
+    // wird die monochrome Befüllung akzeptiert und markiert -- die Sonnen-
+    // Nahme vergibt in diesem Fall die Startspielerfliese (siehe
+    // `LargeFactory::take_from_sun`), weil der Mondbereich leer bleibt.
+    let mut available: Vec<TileColor> = Vec::new();
+    for &t in bag.tiles.iter().chain(tower.tiles.iter()) {
+        if !available.contains(&t) {
+            available.push(t);
+            if available.len() >= 2 {
+                break;
+            }
+        }
+    }
+    if available.len() < 2 {
+        large_factory.sun_tiles = draw_with_refill(TILES_PER_LARGE_FACTORY, bag, tower, rng);
+        large_factory.monochrome_fallback = true;
+        if large_factory.sun_tiles.is_empty() {
+            // Gar keine Fliesen mehr im Spiel-Vorrat: der Marker wäre über
+            // keinen Zug mehr nehmbar (weder Sonne noch Mond) und würde
+            // `is_empty()` dauerhaft blockieren -- defensiv entfernen,
+            // `first_player_next_round` bleibt beim bisherigen Halter.
+            large_factory.has_first_player_marker = false;
+        }
+        return;
+    }
     loop {
         let tiles = draw_with_refill(TILES_PER_LARGE_FACTORY, bag, tower, rng);
         // mindestens 2 verschiedene Farben?
@@ -153,6 +179,14 @@ fn fill_factories<R: Rng + ?Sized>(
         factory.sun_tiles = draw_with_refill(TILES_PER_SMALL_FACTORY, bag, tower, rng);
         if let Some(pool) = bonus_pool.as_deref_mut() {
             factory.bonus_chip = pool.pop();
+        }
+        // R4 (Regelbuch S.10): bleibt eine kleine Manufaktur bei der
+        // Rundenvorbereitung ohne Fliesen (Beutel+Turm erschöpft), wird ihr
+        // Bonusplättchen sofort aufgedeckt -- sonst würde
+        // `reveal_chip_if_empty` nie feuern und die Fabrik gälte nie als
+        // abgeräumt (Deadlock in check_drafting_complete).
+        if factory.is_fully_empty() {
+            factory.bonus_chip_revealed = true;
         }
     }
     fill_large_factory(large_factory, bag, tower, rng);
@@ -303,5 +337,50 @@ mod tests {
         }
         assert_eq!(s.large_factory.sun_tiles.len(), 5);
         assert!(s.large_factory.has_first_player_marker);
+    }
+
+    #[test]
+    fn fill_large_factory_monochrome_fallback_terminates() {
+        // R3 (Vollaudit 2026-07-21): liefern Beutel+Turm keine 2 Farben
+        // mehr, wird die monochrome Befüllung akzeptiert (kein Endlos-Loop)
+        // und `monochrome_fallback` gesetzt -- die Sonnen-Nahme vergibt
+        // dann den Marker.
+        let mut rng = StdRng::seed_from_u64(3);
+        let mut bag = Bag { tiles: vec![TileColor::Rot; 6] };
+        let mut tower = Tower::default();
+        let mut lf = LargeFactory::default();
+        fill_large_factory(&mut lf, &mut bag, &mut tower, &mut rng);
+        assert_eq!(lf.sun_tiles.len(), 5);
+        assert!(lf.sun_tiles.iter().all(|&t| t == TileColor::Rot));
+        assert!(lf.monochrome_fallback);
+        assert!(lf.has_first_player_marker);
+        let (taken, rest, marker) = lf.take_from_sun(TileColor::Rot).unwrap();
+        assert_eq!(taken.len(), 5);
+        assert!(rest.is_empty());
+        assert!(marker, "monochromer Fallback: Sonnen-Nahme vergibt den Marker");
+        assert!(lf.is_empty());
+    }
+
+    #[test]
+    fn fill_factories_reveals_chip_on_empty_factory() {
+        // R4 (Vollaudit 2026-07-21): bleibt eine kleine Fabrik bei der
+        // Rundenvorbereitung ohne Fliesen, wird ihr Chip sofort aufgedeckt.
+        let mut rng = StdRng::seed_from_u64(4);
+        let mut s = setup_new_game(names(), 0, &mut rng);
+        // Beutel+Turm komplett leeren → Neubefüllung bleibt fliesenlos.
+        s.bag.tiles.clear();
+        s.tower.tiles.clear();
+        setup_new_round(&mut s, &mut rng);
+        for f in &s.factories {
+            assert!(f.is_fully_empty());
+            assert!(
+                f.bonus_chip_revealed,
+                "Chip einer leer gebliebenen Fabrik muss sofort aufgedeckt sein"
+            );
+        }
+        // Große Fabrik: gar keine Fliesen mehr → Fallback greift, Marker
+        // wird defensiv entfernt, damit is_empty() erreichbar bleibt.
+        assert!(s.large_factory.monochrome_fallback);
+        assert!(s.large_factory.is_empty());
     }
 }

@@ -1121,6 +1121,70 @@ angepasst** — Sims-Werte werden künftig über Leicht/Mittel/Schwer-Presets
 gepflegt, der Standard-KI-Gegner bleibt bis auf Weiteres die Heuristik
 (kein aktueller Netz-Checkpoint gilt als "reif genug" für den Standard-Slot).
 
+## Vollaudit Regelbuch + Kollegen-Docs (2026-07-21)
+
+Systematischer Abgleich: offizielles Regelbuch vs. Engine (33 Regeln
+geprüft, 29 direkt VERIFIED — alle 8 Wertungsplatten, Punkteformeln,
+Strafleiste, Musterreihen-Mechanik, Aktionen B/C/D und Chip-Formeln exakt
+korrekt) plus Kontrolle der externen Review-Dokumente (`Bugfixes.txt`,
+`Gumbal Alphazero.txt`, `value head tests.txt`). Zwei Agenten-Meldungen
+stellten sich als Fehlalarme heraus und bleiben unverändert:
+
+- **T2** (unvollständige Reihen bei vollem Kuppel-Row geräumt): Regelbuch
+  S.7 Punkt 3 hat keinen Vollständigkeits-Vorbehalt — Engine korrekt.
+- **T5** (genutzte Chips entfernt statt umgedreht): Umdrehen ist laut
+  Regelbuch nur Gedächtnisstütze, kein Regel-Effekt hängt an behaltenen
+  genutzten Chips — funktional äquivalent.
+
+**Gefixt (alle in einem Commit, volle Testsuite 130/130 grün, Wheel neu
+gebaut, End-to-End-Smoke bestanden):**
+
+- **R1 — Sieger-Tie-Break**: `determine_winner` las
+  `holds_first_player_marker`, das `score_penalty` bei der Runde-5-Wertung
+  aber immer schon gelöscht hatte — jedes Unentschieden ging an Spieler 1.
+  Jetzt entscheidet `first_player_next_round` (überlebt die Wertung).
+- **R2 — Startspielerfliese nur bei Mond-Nahme**: Regelbuch S.5 vergibt den
+  Marker NUR bei der ersten Nahme vom Mondbereich der großen Fabrik; die
+  Engine gab ihn bisher schon bei der Sonnen-Nahme ab.
+  `LargeFactory::take_from_sun` lässt den Marker jetzt liegen.
+- **R3 — Monochrom-Fallback** (gehört zu R2): `fill_large_factory` konnte
+  endlos loopen, wenn Beutel+Turm keine 2 Farben mehr liefern. Jetzt wird
+  die monochrome Befüllung akzeptiert (`LargeFactory::monochrome_fallback`),
+  und nur in diesem Fall vergibt die Sonnen-Nahme den Marker (Regelbuch
+  S.10). Ganz ohne Restfliesen wird der Marker defensiv entfernt.
+- **R4 — Chip-Reveal auf leer bleibenden Fabriken**: bleibt eine kleine
+  Manufaktur bei der Rundenvorbereitung fliesenlos (Vorrat erschöpft), wird
+  ihr Bonusplättchen sofort aufgedeckt (Regelbuch S.10, Deadlock-Schutz).
+- **R5 — Phasen-Gate**: `apply_drafting` lehnt defensiv jede Aktion ab,
+  solange eine Startkuppel-Platzierung aussteht.
+- **R6 — Stack-Zieh-Hausregel entfernt** (Nutzer-Entscheidung): die
+  Budget-Deckelung "weiterziehen nur mit Punkten" fällt zugunsten der
+  Regelbuch-Variante — beliebig oft wiederholen, je −1 Punkt, Score klemmt
+  bei 0 (bei 0 Punkten effektiv gratis bis Stapel leer). `score_unclamped`
+  zählt die echten Kosten weiter.
+- **B1 — `scores_unclamped` im netzgeführten Self-Play**: der Post-hoc-
+  Backfill von `play_net_self_play_game` schrieb nur `scores`; jetzt beide
+  (Fund-7-Restlücke geschlossen, per Smoke verifiziert).
+- **B2 — Tie-Break in `net_drafting_policy`**: deterministischer Zweig
+  wählte per nacktem `max_by(visits)` (letzter gewinnt = niedrigster
+  Prior); jetzt Tie-Break visits→Q wie `net_mcts::best_root_child`.
+- **B3 — Stale Kommentar**: `VALUE_SCHEMA_VERSION=14` → 15 (self_play.rs).
+- **G1 — Deterministisches Gumbel für Arena**: `build_gumbel_tree` bekommt
+  `add_root_noise` durchgereicht; bei `false` (Arena/Produktion) sind alle
+  g(a)=0 — Top-m und Halving ranken rein nach ln(prior)+σ(Q), äquivalent zu
+  mctx `gumbel_scale=0`. Self-Play behält echte Gumbel-Exploration.
+- **G2 — SH-Budget-Verteilung**: das Restbudget wird jetzt wie in mctx
+  durch die VERBLEIBENDE Phasenzahl geteilt (statt der festen
+  Anfangs-Phasenzahl), frühe Phasen sind nicht mehr unterbudgetiert.
+
+**Einordnung**: der domefactB-Korpus (5500 Spiele) und v10 sind unter der
+alten Marker-Regel + kaputtem Tie-Break entstanden. Keine sofortige
+Neugenerierung nötig — der ohnehin anstehende frische Self-Play-Zyklus
+(TD-Bootstrap, VALUE_SCHEMA_VERSION=15) nimmt die korrigierten Regeln
+automatisch mit. **Nach G1 muss die Arena-Baseline neu gemessen werden**
+(deterministisches Gumbel ändert das Arena-Verhalten ggü. den
+22-26%-Referenzen) — ein n=100-Lauf als neue Referenz steht aus.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)

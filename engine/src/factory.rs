@@ -118,6 +118,11 @@ pub struct LargeFactory {
     pub sun_tiles: Vec<TileColor>,
     pub moon_pool: Vec<TileColor>,
     pub has_first_player_marker: bool,
+    /// Regelbuch S.10: konnten Beutel+Turm keine 2 verschiedenen Farben mehr
+    /// liefern, wird die monochrome Befüllung akzeptiert -- dann (und NUR
+    /// dann) vergibt bereits die Sonnen-Nahme die Startspielerfliese, weil
+    /// der Mondbereich sonst leer bliebe und der Marker unnehmbar wäre.
+    pub monochrome_fallback: bool,
 }
 
 impl Default for LargeFactory {
@@ -126,6 +131,7 @@ impl Default for LargeFactory {
             sun_tiles: Vec::new(),
             moon_pool: Vec::new(),
             has_first_player_marker: true,
+            monochrome_fallback: false,
         }
     }
 }
@@ -161,8 +167,14 @@ impl LargeFactory {
         let remaining: Vec<TileColor> =
             self.sun_tiles.iter().copied().filter(|&t| t != color).collect();
         self.sun_tiles.clear();
-        let marker = self.has_first_player_marker;
-        self.has_first_player_marker = false;
+        // Regelbuch S.5: NUR die erste Nahme vom MONDbereich vergibt die
+        // Startspielerfliese -- die Sonnen-Nahme lässt den Marker liegen.
+        // Einzige Ausnahme (Regelbuch S.10): monochrome Notbefüllung, dann
+        // bleibt der Mond leer und der Marker geht mit den 5 gleichfarbigen.
+        let marker = self.monochrome_fallback && self.has_first_player_marker;
+        if marker {
+            self.has_first_player_marker = false;
+        }
         Ok((taken, remaining, marker))
     }
 
@@ -207,6 +219,7 @@ impl LargeFactory {
         self.sun_tiles.clear();
         self.moon_pool.clear();
         self.has_first_player_marker = true;
+        self.monochrome_fallback = false;
     }
 }
 
@@ -240,12 +253,50 @@ mod tests {
 
     #[test]
     fn large_factory_marker_taken_once() {
+        // R2 (Vollaudit 2026-07-21): der Marker geht mit der ERSTEN
+        // Mond-Nahme, nicht mit der Sonnen-Nahme.
+        let mut lf = LargeFactory::default();
+        lf.moon_pool = vec![Rot, Blau, Blau];
+        let (taken, marker) = lf.take_from_moon(Blau).unwrap();
+        assert_eq!(taken.len(), 2);
+        assert!(marker);
+        assert!(!lf.has_first_player_marker);
+        // Zweite Mond-Nahme: Marker ist weg.
+        let (taken2, marker2) = lf.take_from_moon(Rot).unwrap();
+        assert_eq!(taken2.len(), 1);
+        assert!(!marker2);
+    }
+
+    #[test]
+    fn large_factory_sun_take_leaves_marker() {
+        // R2: die Sonnen-Nahme lässt den Marker liegen -- erst die
+        // anschließende erste Mond-Nahme holt ihn.
         let mut lf = LargeFactory::default();
         lf.sun_tiles = vec![Rot, Blau, Blau];
         let (taken, rest, marker) = lf.take_from_sun(Blau).unwrap();
         assert_eq!(taken.len(), 2);
         assert_eq!(rest, vec![Rot]);
-        assert!(marker);
+        assert!(!marker, "Sonnen-Nahme darf den Marker nicht vergeben");
+        assert!(lf.has_first_player_marker);
+        lf.add_to_moon(&rest);
+        let (_, moon_marker) = lf.take_from_moon(Rot).unwrap();
+        assert!(moon_marker, "erste Mond-Nahme holt den Marker");
         assert!(!lf.has_first_player_marker);
+        assert!(lf.is_empty());
+    }
+
+    #[test]
+    fn large_factory_monochrome_fallback_gives_marker_on_sun_take() {
+        // R3: bei monochromer Notbefüllung (Regelbuch S.10) vergibt
+        // ausnahmsweise die Sonnen-Nahme den Marker.
+        let mut lf = LargeFactory::default();
+        lf.sun_tiles = vec![Rot, Rot, Rot, Rot, Rot];
+        lf.monochrome_fallback = true;
+        let (taken, rest, marker) = lf.take_from_sun(Rot).unwrap();
+        assert_eq!(taken.len(), 5);
+        assert!(rest.is_empty());
+        assert!(marker, "monochromer Fallback: Sonnen-Nahme vergibt den Marker");
+        assert!(!lf.has_first_player_marker);
+        assert!(lf.is_empty());
     }
 }

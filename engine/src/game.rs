@@ -156,21 +156,14 @@ pub fn validate_draw_stack_peek(state: &GameState) -> Option<String> {
         if !player.can_place_dome_tile(state.round_number) {
             return Some("Das 3×3-Raster ist bereits voll.".into());
         }
-    } else if player.score == 0 {
-        // Nutzer-Anstoss: man darf nur so viele Platten ziehen, wie man sich
-        // leisten kann (je Ziehung -1 Pkt, siehe execute_draw_stack_peek).
-        // Der ERSTE Zug eines Vorgangs (pending_stack_draw leer) ist davon
-        // ausgenommen -- sonst könnte ein Spieler mit 0 Punkten gar keine
-        // Kuppelplatte mehr ziehen und damit (falls das sein einziger noch
-        // offener Zug ist) in einen Deadlock laufen. Punkte fallen nie unter
-        // 0 (apply_score floort), daher ist "score == 0" hier gleichbedeutend
-        // mit "die bisherigen Ziehungen dieser Runde haben das Budget exakt
-        // aufgebraucht" -- ab der 2. Ziehung greift das Budget wieder normal.
-        return Some(format!(
-            "{} hat nicht genug Punkte für eine weitere Kachel vom Stapel.",
-            player.name
-        ));
     }
+    // Regelbuch: Weiterziehen darf beliebig oft wiederholt werden (je Ziehung
+    // -1 Pkt, Score klemmt bei 0 -- apply_score floort). Bei 0 Punkten ist
+    // Weiterziehen also effektiv gratis, bis der Stapel leer ist. Die frühere
+    // Hausregel "nur so viele Ziehungen wie Punkte" wurde per Nutzer-
+    // Entscheidung (Vollaudit 2026-07-21) entfernt. `score_unclamped` wird
+    // durch apply_score(-1) weiterhin ehrlich belastet -- das Trainingslabel
+    // sieht die echten Kosten.
     if state.dome_tile_pool.is_empty() {
         return Some("Kein Stapel mehr vorhanden.".into());
     }
@@ -549,10 +542,14 @@ pub fn determine_winner(state: &GameState) -> usize {
         0
     } else if s1 > s0 {
         1
-    } else if state.players[0].holds_first_player_marker {
-        0
     } else {
-        1
+        // Gleichstand: es gewinnt, wer die Startspielerfliese hält. ACHTUNG:
+        // `holds_first_player_marker` taugt hier NICHT -- `score_penalty`
+        // (round_end.rs) löscht das Flag bei JEDER Rundenwertung (auch
+        // Runde 5), es ist zum Zeitpunkt der Siegerermittlung also immer
+        // false. `first_player_next_round` wird bei der Marker-Nahme gesetzt
+        // (execution.rs::apply_first_player_marker) und überlebt die Wertung.
+        state.first_player_next_round
     }
 }
 
@@ -647,6 +644,13 @@ impl Game {
     pub fn apply_drafting(&mut self, action: &Action) -> Result<(), String> {
         if self.state.phase != Phase::Drafting {
             return Err(format!("Zug in Phase '{}' nicht erlaubt.", self.state.phase.as_str()));
+        }
+        // Defensive: solange die Startkuppel-Platzierung (vor Runde 1) noch
+        // aussteht, ist KEINE Drafting-Aktion erlaubt -- der Harness ruft
+        // korrekt erst apply_start_placement auf, aber direkte Aufrufer
+        // (z.B. Suche/Server) sollen hier hart abprallen.
+        if self.state.players.iter().any(|p| p.start_tile_pending) {
+            return Err("Startkuppel-Platzierung noch ausstehend -- keine Drafting-Aktion erlaubt.".into());
         }
         match action {
             Action::Stone(m) => {
@@ -920,46 +924,62 @@ mod tests {
     }
 
     #[test]
-    fn stack_peek_capped_by_affordable_points() {
-        // Nutzer-Anstoss: hoechstens so viele Ziehungen wie Punkte vorhanden
-        // (je Ziehung -1 Pkt). Bei 2 Punkten sind also genau 2 Ziehungen
-        // erlaubt, die dritte muss abgelehnt werden.
-        let mut rng = StdRng::seed_from_u64(11);
-        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
-        for p in game.state.players.iter_mut() {
-            p.start_tile_pending = false;
-        }
-        game.state.players[game.state.current_player].score = 2;
-
-        assert!(execute_draw_stack_peek(&mut game.state).is_ok(), "1. Ziehung (2 Pkt uebrig davor)");
-        assert_eq!(game.state.players[0].score, 1);
-        assert!(execute_draw_stack_peek(&mut game.state).is_ok(), "2. Ziehung (1 Pkt uebrig davor)");
-        assert_eq!(game.state.players[0].score, 0);
-        assert!(
-            validate_draw_stack_peek(&game.state).is_some(),
-            "3. Ziehung muss abgelehnt werden (0 Pkt, kein Pflichtzug mehr)"
-        );
-    }
-
-    #[test]
-    fn stack_peek_at_zero_score_allows_exactly_one_mandatory_draw() {
-        // Deadlock-Vermeidung: bei 0 Punkten ist der ERSTE Zug eines
-        // Vorgangs trotzdem erlaubt (score floort bei 0, kostet also
-        // effektiv nichts), die Fortsetzung danach aber nicht mehr.
+    fn stack_peek_at_zero_score_allows_unlimited_draws() {
+        // Regelbuch-Variante (Vollaudit 2026-07-21): Weiterziehen darf
+        // beliebig oft wiederholt werden, je Ziehung -1 Pkt, Score klemmt
+        // bei 0 -- bei 0 Punkten also effektiv gratis, bis der Stapel leer
+        // ist. `score_unclamped` sinkt dabei ehrlich weiter.
         let mut rng = StdRng::seed_from_u64(12);
         let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
         for p in game.state.players.iter_mut() {
             p.start_tile_pending = false;
         }
         game.state.players[game.state.current_player].score = 0;
+        let unclamped_before = game.state.players[0].score_unclamped;
 
-        assert!(validate_draw_stack_peek(&game.state).is_none(), "Pflichtzug bei 0 Punkten muss erlaubt sein");
-        execute_draw_stack_peek(&mut game.state).expect("Pflichtzug");
-        assert_eq!(game.state.players[0].score, 0, "Punkte duerfen nie unter 0 fallen");
-        assert!(
-            validate_draw_stack_peek(&game.state).is_some(),
-            "Weiterziehen bei weiterhin 0 Punkten muss abgelehnt werden"
-        );
+        for i in 1..=4 {
+            assert!(
+                validate_draw_stack_peek(&game.state).is_none(),
+                "{i}. Ziehung bei 0 Punkten muss erlaubt sein"
+            );
+            execute_draw_stack_peek(&mut game.state).expect("Ziehung");
+            assert_eq!(game.state.players[0].score, 0, "Punkte duerfen nie unter 0 fallen");
+            assert_eq!(
+                game.state.players[0].score_unclamped,
+                unclamped_before - i,
+                "score_unclamped muss die echten Kosten weiter zaehlen"
+            );
+        }
+    }
+
+    #[test]
+    fn tie_break_uses_first_player_next_round() {
+        // R1 (Vollaudit 2026-07-21): bei Gleichstand gewinnt, wer die
+        // Startspielerfliese genommen hat. `holds_first_player_marker` ist
+        // nach der Runde-5-Wertung immer false (score_penalty räumt es),
+        // daher entscheidet `first_player_next_round`.
+        let mut rng = StdRng::seed_from_u64(7);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        game.state.players[0].score = 30;
+        game.state.players[1].score = 30;
+        // score_penalty hat die Flags bereits geräumt (wie nach Runde 5).
+        game.state.players[0].holds_first_player_marker = false;
+        game.state.players[1].holds_first_player_marker = false;
+
+        game.state.first_player_next_round = 0;
+        assert_eq!(determine_winner(&game.state), 0);
+        game.state.first_player_next_round = 1;
+        assert_eq!(determine_winner(&game.state), 1);
+    }
+
+    #[test]
+    fn apply_drafting_blocked_while_start_tile_pending() {
+        // R5 (Vollaudit 2026-07-21): solange die Startkuppel-Platzierung
+        // aussteht, darf apply_drafting KEINE Aktion durchlassen.
+        let mut rng = StdRng::seed_from_u64(9);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        assert!(game.state.players.iter().any(|p| p.start_tile_pending));
+        assert!(game.apply_drafting(&Action::Pass).is_err());
     }
 
     #[test]

@@ -17,7 +17,7 @@ Mosaic ist ein abstraktes und taktisches Legespiel für zwei Personen. Eine Part
 ## 3. Vorbereitung & Spielaufbau
 
 * Zu Beginn jeder neuen Runde werden die kleinen Fabriken mit je 4 Fliesen und die große Fabrik mit 5 Fliesen (inklusive Startspielerstein) frisch aus dem Beutel befüllt.
-* **Sonderregel für die große Fabrik:** Haben zufällig alle 5 gezogenen Fliesen dieselbe Farbe, werden sie zurückgelegt und es wird neu gezogen, bis mindestens zwei verschiedene Farben ausliegen.
+* **Sonderregel für die große Fabrik:** Haben zufällig alle 5 gezogenen Fliesen dieselbe Farbe, werden sie zurückgelegt und es wird neu gezogen, bis mindestens zwei verschiedene Farben ausliegen. Können Beutel und Turm zusammen keine zwei verschiedenen Farben mehr liefern, wird die monochrome Befüllung akzeptiert — wer diese 5 gleichfarbigen Fliesen nimmt, erhält den Startspielerstein.
 * **Startkuppel (Nur vor der 1. Runde):** Vor dem eigentlichen Spielbeginn muss jeder Spieler eine Startkachel auf seiner Kuppel platzieren. Der Nicht-Startspieler legt seine Platte dabei zuerst, danach folgt der Startspieler. Diese Startplatzierung ist kostenlos, Position sowie Drehung sind frei wählbar und sie zählt nicht zu den regulären Zügen der ersten Runde.
 
 ## 4. Der Rundenablauf
@@ -37,7 +37,7 @@ Die Spieler sind abwechselnd am Zug und führen eine der folgenden vier Aktionen
 
 * Passen aufgenommene Fliesen nicht mehr in die gewählte Musterreihe (oder passt die Farbe nicht), fallen alle überschüssigen Fliesen als Strafe auf die Strafleiste am Boden. Es ist auch erlaubt, Fliesen freiwillig direkt auf die Strafleiste zu legen.
 * Ist die Strafleiste mit ihren 4 Plätzen voll, fallen weitere Fliesen direkt in den Turm.
-* Nimmt ein Spieler den Startspielerstein aus der großen Fabrik, beginnt er die nächste Runde, kassiert dafür am Rundenende aber feste -2 Punkte.
+* Der Startspielerstein wird NUR bei der ersten Nahme vom **Mondbereich** der großen Fabrik vergeben — eine Sonnen-Nahme lässt ihn liegen. Wer ihn nimmt, beginnt die nächste Runde, kassiert dafür am Rundenende aber feste -2 Punkte. (Einzige Ausnahme: musste die große Fabrik mangels zwei verfügbarer Farben monochrom befüllt werden, geht der Stein bereits mit der Sonnen-Nahme der 5 gleichfarbigen Fliesen.)
 
 ### Phase 2: Tiling
 

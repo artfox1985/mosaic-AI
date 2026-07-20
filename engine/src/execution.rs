@@ -406,6 +406,8 @@ mod tests {
 
     #[test]
     fn floor_placement_and_marker_from_large() {
+        // R2 (Vollaudit 2026-07-21): die Sonnen-Nahme von der großen Fabrik
+        // lässt den Marker liegen -- erst die erste MOND-Nahme vergibt ihn.
         let mut rng = StdRng::seed_from_u64(11);
         let mut s = setup_new_game(names(), 0, &mut rng);
         let color = s.large_factory.sun_colors()[0];
@@ -419,12 +421,32 @@ mod tests {
             place: PlaceAction { row_index: -1 },
         };
         execute_move(&mut s, &m);
-        assert!(s.players[0].holds_first_player_marker);
-        assert_eq!(s.first_player_next_round, 0);
+        assert!(
+            !s.players[0].holds_first_player_marker,
+            "Sonnen-Nahme darf den Marker nicht vergeben"
+        );
+        assert!(s.large_factory.has_first_player_marker);
         assert!(!s.players[0].broken_tiles.is_empty());
         assert!(s.large_factory.sun_is_empty());
-        // Marker- und Strafleisten-Log vorhanden.
-        assert!(s.log.iter().any(|l| l.contains("🏁")));
         assert!(s.log.iter().any(|l| l.contains("Strafleiste")));
+
+        // Erste Mond-Nahme (Restfliesen der Sonnen-Nahme liegen im Moon-Pool)
+        // holt den Marker.
+        s.switch_player();
+        let moon_color = s.large_factory.moon_colors()[0];
+        let m2 = Move {
+            take: TakeAction {
+                source: TakeSource::LargeFactoryMoon,
+                color: moon_color,
+                factory_id: None,
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: -1 },
+        };
+        execute_move(&mut s, &m2);
+        assert!(s.players[1].holds_first_player_marker);
+        assert_eq!(s.first_player_next_round, 1);
+        assert!(!s.large_factory.has_first_player_marker);
+        assert!(s.log.iter().any(|l| l.contains("🏁")));
     }
 }
