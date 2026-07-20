@@ -1028,47 +1028,98 @@ die noch gar nicht expandiert sind) tritt nur im Gumbel-Pfad auf
 plausiblen, prior-gewichteten Elternwert-Schätzer, keine naive Konstante
 (0/0.5). **Keine FPU-Reduction-Variante nötig, Punkt 5 damit geschlossen.**
 
-**Punkt 1 (Noise-Floor-Test) gelaufen — Ergebnis: niedriger Deckel, Ziel
-selbst ist das Problem.** Neue pyo3-Funktion
+**Punkt 1 (Noise-Floor-Test) gelaufen, dann BIAS-KORRIGIERT (2026-07-21,
+Nutzer-Anstoß) — Ergebnis: Deckel praktisch bei Null, Ziel selbst ist das
+Problem, noch deutlicher als zunächst gemessen.** Neue pyo3-Funktion
 `self_play::value_noise_floor_diagnostic` (rayon-parallel über die
-Zustände): sampelt Runde-1-Entscheidungspunkte per Heuristik-Walk (KEINE
-Netz-Abhängigkeit), spielt je Zustand K unabhängige Heuristik-
-Fortsetzungen bis Spielende (Beutel/Kuppelstapel je Wiederholung neu
-gemischt), Varianzzerlegung `Var(y)=Var(E[y|s])+E[Var(y|s)]` auf dem
-AKTUELLEN Value-Ziel (VALUE_SCHEMA_VERSION=14, `score_unclamped`-Margin).
+Zustände, jetzt auf beliebige `target_round` verallgemeinert): sampelt
+Entscheidungspunkte einer Runde per Heuristik-Walk (KEINE Netz-
+Abhängigkeit), spielt je Zustand K unabhängige Heuristik-Fortsetzungen bis
+Spielende (Beutel/Kuppelstapel je Wiederholung neu gemischt),
+Varianzzerlegung auf dem AKTUELLEN Value-Ziel (VALUE_SCHEMA_VERSION=15,
+`score_unclamped`-Margin).
 
-Lauf (n_states=100, k_rollouts=8, walk_sims=80, rollout_sims=60,
-1612s/~27 Min dank Parallelisierung):
+**Bias-Fix**: der erste Lauf berechnete `Var(E[y|s])` naiv als Varianz der
+K-Rollout-MITTELWERTE über die Zustände — das schätzt aber
+`Var(E[y|s]) + E[Var(y|s)]/K`, nicht `Var(E[y|s])` allein (jeder Mittelwert
+ist selbst nur aus K Stichproben geschätzt, der Standardfehler dieser
+Schätzung ging fälschlich als erklärbare Signal-Varianz durch). Korrigiert:
+`Var(E[y|s])_korrigiert = Var(Mittelwerte)_beobachtet − E[Var(y|s)]/K`. Der
+Korrekturterm skaliert mit `1/K`, NICHT mit der Zustandszahl — deshalb K
+von 8 auf 16 erhöht (nicht mehr Zustände) für den korrigierten Lauf.
 
-| Metrik | Wert |
-|---|---|
-| Var(E[y\|s]) (erklärbar, zwischen Zuständen) | 0.0150 |
-| E[Var(y\|s)] (irreduzibel, innerhalb eines Zustands) | 0.1128 |
-| Var(y) gesamt | 0.1278 |
-| **max. erreichbares R²** | **0.117** |
+Runde 1 (n_states=120, k_rollouts=16, walk_sims=80, rollout_sims=60,
+3070s/~51 Min):
 
-**Einordnung**: liegt naeher an der "~0.05-0.1"-Zone (Ziel selbst ist die
-Grenze) als an "0.3+" (Lern-/Feature-Problem) — selbst ein PERFEKTER
-Value-Head könnte auf dem aktuellen Ziel (finaler Spielausgang) in Runde 1
-nur ~12% der Varianz erklären, der Rest ist irreduzibles Rauschen aus den
-verbleibenden 4 Runden Zufall. Erklärt zwanglos, warum trotz Baustein B,
-Fund 7 und alter Struktur-Fixes das Runde-1-R² dieser Session nie über
-~0.03-0.06 hinauskam — kein Trainingsansatz auf dem AKTUELLEN Ziel hätte
-das je können. **Methodischer Vorbehalt**: `rollout_sims=60` (Heuristik-
-Suche für die K Wiederholungen) fügt selbst etwas Eigenrauschen hinzu
-(unterschiedliche Zugentscheidungen zwischen Wiederholungen, nicht nur
-echte Spielzufälligkeit) — der wahre Deckel könnte also etwas HÖHER als
-0.117 liegen, aber vermutlich nicht qualitativ anders (kein Sprung
-Richtung 0.3+).
+| Metrik | Naiv (K=8, erster Lauf) | Naiv (K=16) | **Korrigiert (K=16)** |
+|---|---|---|---|
+| max. erreichbares R² | 0.117 | 0.065 | **0.0068** |
 
-**Implikation (Punkt 6 aus derselben Datei jetzt gut motiviert)**: der
-Ceiling-Befund spricht dafür, dass der nächste produktive Schritt nicht
-"mehr/besser auf demselben Ziel trainieren" ist, sondern das ZIEL selbst
-zu ändern — TD-/Bootstrap-Labels (Runde-r-Zustände mit dem nachweislich
-besseren Netz-Wert am Rundenübergang r+1/r+2 labeln, gemischt mit dem
-Endergebnis, gleiche rtv-Maschinerie bereits vorhanden). Noch NICHT
-umgesetzt — eigene Nutzer-Entscheidung, ob/wann dieser Schritt als
-nächstes angegangen wird.
+Die naive Schätzung sinkt bereits allein durch die K-Erhöhung (0.117→0.065,
+wie von der `1/K`-Korrekturformel vorhergesagt) — der korrigierte Wert
+landet bei **0.68%**, praktisch nicht von Null unterscheidbar. **Runde-1-
+Zustände sagen den finalen Spielausgang so gut wie gar nicht voraus**,
+solange beide Seiten danach vernünftig (heuristisch) weiterspielen — noch
+entschiedener als die erste (unkorrigierte) Messung nahelegte. Erklärt
+zwanglos, warum trotz Baustein B, Fund 7 und alter Struktur-Fixes das
+Runde-1-R² dieser Session nie über ~0.03-0.06 hinauskam — kein
+Trainingsansatz auf dem AKTUELLEN Ziel (finaler Spielausgang) hätte das je
+können. **Wichtige Einordnung (Nutzer-Diskussion)**: das ist eine Aussage
+über die VORHERSAGBARKEIT eines Runde-1-Zustands unter WEITERHIN
+vernünftigem Spiel, keine direkte Aussage darüber, ob Runde-1-
+Entscheidungen selbst kausal irrelevant wären (bei schwächerer Fortsetzung
+könnten frühe Unterschiede stärker durchschlagen).
+
+**Runde 2 (gleiche Parameter, 2452s/~41 Min) — ÜBERRASCHUNG: Deckel schon
+deutlich höher als Runde 1, NICHT nah bei Null wie zunächst vermutet:**
+
+**Runde 3 (gleiche Parameter, 2142s/~36 Min) — klar in der "echtes
+Lernpotenzial"-Zone, bestätigt den monotonen Anstieg:**
+
+| Runde | max. erreichbares R² (korrigiert) | zum Vergleich: trainiertes Modell (v10_best) |
+|---|---|---|
+| 1 | **0.0068** | -0.063 |
+| 2 | **0.166** | 0.017 |
+| 3 | **0.437** | 0.195 |
+
+**Gesamtbild (alle drei Runden, gleiche Methode/Parameter,
+n_states=120/k_rollouts=16 je Runde)**: der Deckel steigt klar monoton
+(0.007 → 0.17 → 0.44) — konsistent mit dem allgemeinen Muster "weniger
+verbleibende Runden Zufall = höhere Vorhersagbarkeit". Runde 1 ist
+tatsächlich ein Sonderfall (Ziel selbst praktisch unlernbar), Runde 2 hat
+bereits einen soliden, vom trainierten Modell bei Weitem nicht ausgeschöpften
+Deckel (0.166 möglich vs. 0.017 erreicht — reines Lern-/Trainingsdefizit,
+kein Ziel-Problem), Runde 3 zeigt kaum noch Lücke zwischen Deckel und
+Modell-R² (0.437 vs. 0.195 — hier ist eher unklar ob die Lücke Trainings-
+oder Rauschen-in-der-Deckel-Schätzung selbst ist). **Praktische Konsequenz
+für Punkt 6/TD-Bootstrap**: `BOOTSTRAP_HORIZON_ROUNDS=2` (Runde r → r+2)
+zielt für Runde-1-Zustände auf einen Zwischenpunkt mit ECHTEM Deckel
+(Runde 2/3s Bereich) statt auf Runde 1s eigenen Nahe-Null-Deckel — die
+Design-Entscheidung ist durch diese Drei-Runden-Messung nachträglich gut
+gestützt. Für Runde-2-Zustände selbst wäre eher ein reines Trainings-
+/Kapazitäts-Hebel (mehr Daten, mehr Epochen, evtl. größerer Head) der
+naheliegendere nächste Schritt als eine Zieländerung.
+
+**Punkt 6 (TD-/Bootstrap-Value-Ziele) UMGESETZT** (direkt durch diesen
+Befund motiviert): `round_transition_deep::bootstrap_value_after_rounds`
+bewertet Zustände NUR `BOOTSTRAP_HORIZON_ROUNDS=2` Runden voraus (statt bis
+zum echten Spielende wie die bestehende `continue_through_roundN`-Kette,
+die dieselbe niedrige Decke wie das Endergebnis hat), dann direkte
+`net_leaf_eval`. In beiden Self-Play-Pfaden als neues Feld
+`bootstrap_value` aufgezeichnet, in `neural_net.py` (VALUE_SCHEMA_VERSION
+14→15) per `TD_LAMBDA=0.5` ins bisherige Ziel gemischt (nicht komplett
+ersetzt wie `rtv`). Erster, noch UNGETESTETER Startwert — noch kein
+frischer Self-Play-Batch/Retrain damit gefahren, siehe "Nächste Schritte".
+
+**`dynamic_sims`-Entkopplung jetzt Standard** (Nutzer-Entscheidung,
+2026-07-21, unabhängig vom uneindeutigen 20%-Ablationsergebnis oben):
+`DECOUPLE_NET_SIMS_FROM_ACTIONS=true`. `arena.py`: `NET_SIMS=400` (flaches
+Budget, Nutzer-Vorgabe), `HEUR_SIMS` bewusst von `NET_SIMS` entkoppelt und
+bei 150 belassen (weiterhin `dynamic_sims`-skaliert, Vergleichbarkeit mit
+den 17-26%-Baselines bleibt erhalten). **Server (`server.py`) bewusst NICHT
+angepasst** — Sims-Werte werden künftig über Leicht/Mittel/Schwer-Presets
+gepflegt, der Standard-KI-Gegner bleibt bis auf Weiteres die Heuristik
+(kein aktueller Netz-Checkpoint gilt als "reif genug" für den Standard-Slot).
 
 ## Quellen (Recherche 2026-07-19)
 
