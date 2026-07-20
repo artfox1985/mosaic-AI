@@ -844,6 +844,102 @@ ohnehin Policy-Head-Neustart).
   aufzeichnen) ist bewusst NICHT Teil des kommenden Self-Play-Zyklus --
   separater Folgeversuch, je nach Ergebnis von B+Fund-7.
 
+## Teil 3: frischer Self-Play-Zyklus + Retrain (Baustein B + Fund 7), v10 (2026-07-20)
+
+Umsetzung des in `elegant-wandering-mist.md` als "braucht Nutzer-Freigabe"
+markierten letzten Schritts: da Baustein B (NUM_ACTIONS 346→406, zweistufiger
+Kuppel-Suchknoten) und Fund 7 (`score_unclamped`) sowohl alle bestehenden
+Checkpoints als auch den kompletten domefact-Korpus strukturell unbrauchbar
+machen (gleicher Präzedenzfall wie hs200), war ein frischer, konsistenter
+Korpus + Neu-Training nötig.
+
+**Daten-Hygiene**: alle 561 alten `.pkl`-Dateien (550 domefact + 11 ältere
+v8d-rtv-Dateien, beide altes 346er-Einstufen-Schema) nach
+`data/archive_domefact_preBausteinB/` verschoben (nicht gelöscht, gleiches
+Muster wie hs200).
+
+**Self-Play**: 5500 Spiele, Heuristik-MCTS (`--mode mcts`, kein Modell —
+kein kompatibler Checkpoint verfügbar), sims=200, 953.832 Züge, 8452s
+(~2h21, schneller als domefact trotz gleicher Spielezahl — plausibel durch
+Baustein Bs kleineren echten Verzweigungsfaktor). Keine Hänger-Warnungen,
+550/550 Dateien vollständig.
+
+**Training (`v10`)**: kein Warm-Start (Nutzer-Entscheidung — Action-Raum UND
+Value-Zielformel ändern sich gleichzeitig), `--epochs 100` als reiner
+Deckel, Early Stopping (Val-Policy-Plateau) griff bei Epoche 15 (Plateau
+seit Epoche 10). Bestes Modell nach gewichteter Val-Metrik (Fund 8):
+**Epoche 4** (`alphazero_v10_best`). Netzauslastung gesund (Dead 6%,
+Eff.Rank 39%).
+
+**Diagnose-Kette** (`v10_best`, echter Val-Split 55/550 Dateien, n=95.339
+Val-Züge):
+
+| Metrik | v10_best | v9b_domeonly (Referenz) |
+|---|---|---|
+| Policy Top-1 (nur Drafting) | 44.0% | 61.8% |
+| Policy Top-3 | 74.3% | 87.1% |
+| Value Val-R² (global) | 0.221 | 0.22-0.24 |
+| Points Val-R² (global) | 0.377 | 0.27-0.34 |
+| Geschwister-Tau Runde 1 | 0.264 (Ø 13.6 Geschw.) | 0.318 (Ø 17.6 Geschw.) |
+| Geschwister-Tau Runde 2 | 0.339 (Ø 12.9 Geschw.) | 0.164 (Ø 15.1 Geschw.) |
+
+Value-R² nach Runde (monoton steigend, gleiches Muster wie zuvor):
+
+| Runde | n | R² | MAE |
+|---|---|---|---|
+| 1 | 18.971 | -0.063 | 0.310 |
+| 2 | 19.876 | 0.017 | 0.294 |
+| 3 | 20.623 | 0.195 | 0.266 |
+| 4 | 20.586 | 0.406 | 0.225 |
+| 5 | 15.283 | 0.623 | 0.180 |
+
+**Auffällig, NICHT glattgezogen**: Policy-Top-1/Top-3 und Runde-1/2-Value-R²
+sind gegenüber der v9b_domeonly-Referenz sogar leicht SCHLECHTER, obwohl das
+Arena-Ergebnis (unten) klar besser ausfällt. Wahrscheinlichste Erklärung:
+Baustein B macht aus einem kollabierten Kuppel-Zug zwei echte
+Policy-Entscheidungen (mehr, feinere Drafting-Schritte je Spiel, dadurch
+strengerer Top-1-Maßstab) UND der Geschwister-Tau sinkt in der
+Stichprobengröße (Ø-Geschwister 13.6/12.9 statt 17.6/15.1 — Baustein B
+reduziert den ECHTEN Verzweigungsfaktor, weniger Geschwister zum Ranken).
+Nicht direkt vergleichbar mit der alten Messung, da sich die zugrunde
+liegende Aktionsstruktur geändert hat — als Vorsicht vermerkt, nicht als
+Regression gewertet, weil die Suchstärke selbst (Arena) das Gegenteil zeigt.
+
+**Arena (n=100, kein Early-Stop, 150 Sims — Session-Standard für die
+17%/10%-Baselines) — neue Bestmarke der Session:**
+
+| Konfiguration | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| Struktur-Fixes (vorherige Bestmarke, v9b_domeonly) | 17:83 (17%) | 22.7 vs. 42.2 | 18.1 vs. 12.5 |
+| Gumbel ohne Retrain (v9b_domeonly, gleiche Gewichte) | 10:90 (10%) | 22.8 vs. 47.2 | 17.3 vs. 14.0 |
+| **v10_best (Baustein B + Fund 7 + frisches Self-Play), Floor-Shaping W=0.3** | **22:78 (22%)** | **26.1 vs. 39.4** | 16.1 vs. 14.1 |
+| v10_best, Floor-Shaping W=0.0 (Ablation, gleiches Modell) | 17:83 (17%) | 22.6 vs. 41.1 | 20.7 vs. 13.3 |
+
+**Floor-Shaping-Ablation beantwortet die offene Frage aus dieser Runde
+("macht Fund 7 Floor-Shaping überflüssig?") klar mit NEIN**: ohne Shaping
+fällt dasselbe Modell von 22% auf 17% zurück, UND die Floor-Strafe
+verschlechtert sich sichtbar (20.7 vs. 13.3, gegenüber 16.1 vs. 14.1 mit
+Shaping) — Fund 7 (Trainings-Label-Rauschen behoben) und Floor-Shaping
+(Such-Zeit-Korrektur) lösen unterschiedliche Probleme, keine Redundanz.
+`FLOOR_SHAPING_WEIGHT` bleibt auf 0.3, Wheel zurückgebaut, 122/122 Tests
+grün.
+
+**Einordnung**: 22% ist das beste Einzelergebnis der gesamten Session
+(vorher 17%), mit engerem Score- UND Floor-Abstand — nach den beiden
+Struktur-Bugfixes vom vorigen Zyklus der zweite klare Fortschritt. **Aber**:
+nur ein einzelner n=100-Lauf je Konfiguration, das Session-eigene
+Rauschband lag bei identischer Konfiguration schon einmal bei 6 Prozent-
+punkten (11% vs. 17%) — ein Wiederholungslauf vor endgültiger Einordnung
+als neue Baseline wäre angebracht, ist aber (noch) nicht gelaufen.
+
+**Offen für die Fortsetzung** (siehe auch Task-Liste dieser Session):
+- Wiederholungslauf der 22%-Konfiguration zur Rauschband-Einordnung.
+- Gumbels completed-Q-Policy-Ziel (weiterhin nicht umgesetzt, `net_drafting_policy`
+  nutzt noch Besuchsanteil) — jetzt auf einem Korpus mit echter
+  Baustein-B-Verzweigung vermutlich wirksamer zu testen als vorher.
+- `dynamic_sims`-Entkopplung vom Aktions-Count im Gumbel-Netzpfad (externer
+  Befund, 2026-07-20) — noch nicht umgesetzt, siehe Sessions-Task-Liste.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
