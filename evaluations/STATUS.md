@@ -733,6 +733,33 @@ Variablen-Kollision (Spielerindex → Schleifenvariable, `neural_net.py`)
 umbenannt (`pe`) — reine Sicherheits-/Klarheits-Änderung, kein
 Verhaltensunterschied.
 
+## Gumbel AlphaZero implementiert + arena-validiert (2026-07-20)
+
+Plan-Dokument `elegant-wandering-mist.md` (Nutzer-genehmigt) umgesetzt:
+Gumbel-Top-m (m=16) + Sequential Halving an der Wurzel statt Dirichlet-
+Noise + PUCT über den vollen Kandidatensatz; neue deterministische
+Tiefe-≥1-Auswahlregel (`argmax[π'_node(a) − N(a)/(1+ΣN)]`, `π'_node` =
+completed-Q-Softmax) statt `best_puct`; finale Zugwahl unter den
+Sequential-Halving-Überlebenden. Formeln exakt aus der DeepMind-mctx-
+Referenzimplementierung (nicht nur Paper-Prosa). `USE_GUMBEL_SEARCH`-Toggle,
+124/124 Tests grün (reine Erweiterung, alter PUCT-Pfad unverändert).
+
+**Arena-Ergebnis (n=100, kein Early-Stop, GLEICHE Gewichte v9b_domeonly.onnx,
+nur andere Suche): 10:90 (10%), Score 22.8 vs. 47.2, Floor 17.3 vs. 14.0 —
+liegt im selben Rauschband wie die PUCT-Wiederholungen dieser Session
+(11-17%), keine klare Verbesserung.** Nachvollziehbar: Sequential Halvings
+Rangfolge UND completed-Q hängen weiter am selben, in Runde 1 schwachen
+Value-Head; und die eingesetzten Priors wurden unter PUCT-Besuchszahl-
+Zielen trainiert, nicht Gumbels completed-Q-Ziel — der im Plan als
+"eigentlicher Gewinn" erwartete Effekt (Phase 4: frisches Self-Play mit
+completed-Q-Policy-Zielen + Retrain) ist damit noch nicht getestet, nur die
+reine Such-Mechanik (ohne Neu-Training).
+
+**Entscheidungspunkt gemäß Plan**: Ergebnis liegt NICHT klar über dem
+Rauschband → mit dem Nutzer besprechen, ob trotzdem zu Phase 4
+(frisches Self-Play + Retrain, deutlich teurer) weitergegangen wird oder
+pausiert wird. Stand: offen, noch nicht entschieden.
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,
