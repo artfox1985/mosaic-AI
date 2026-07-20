@@ -750,6 +750,48 @@ pub const GUMBEL_TOP_M: usize = 16;
 /// wie `ACTIVE_LEAF`/`MIRROR_OTHER_VAL`.
 pub const USE_GUMBEL_SEARCH: bool = true;
 
+/// Schaltet die dynamic_sims-Entkopplung im Gumbel-Netzpfad frei (externer
+/// Befund, 2026-07-20, siehe `net_effective_sims`). Standardmäßig AUS:
+/// Arena-Ablation (n=100, Netz fest auf 330 Sims -- entspricht dem alten
+/// `dynamic_sims(150,n)`-Durchschnitt -- vs. Heuristik unverändert bei 150)
+/// ergab 20:80 (20%), innerhalb des Rauschbands der 22-26%-Bestmarke, KEIN
+/// klarer Effekt in diesem einzelnen Test. Bewusst als Toggle statt
+/// unconditional belassen: eine unconditional Umstellung würde still
+/// ÜBERALL, wo netzgeführte Suche mit einem `base_sims`-Wert aufgerufen
+/// wird (Server-Mensch-vs-KI, `self_play.py --mode network`, künftige
+/// Arena-Standardwerte), die Bedeutung dieses Werts ändern (vorher
+/// automatisch auf ~185-499 hochskaliert, siehe
+/// `evaluations/actions_per_round.md`, jetzt exakt der übergebene Wert) --
+/// ohne bestätigten Nutzen ein unnötiges stilles Regressionsrisiko.
+pub const DECOUPLE_NET_SIMS_FROM_ACTIONS: bool = false;
+
+/// Sims-Skalierung für NETZGEFÜHRTE Suche (Gumbel oder PUCT-Legacy) --
+/// externer Befund (2026-07-20): `mcts::dynamic_sims`s Kopplung an die
+/// Aktionszahl war für die alte PUCT-Zwangs-Expansion begründet (mehr
+/// Kandidaten -> mehr Sims nötig, sonst Breitensuche ohne Differenzierung).
+/// Mit Gumbel-Top-m + Sequential Halving ist die Wurzelbreite FIX
+/// (`GUMBEL_TOP_M`) -- 195 legale Aktionen kosten nicht mehr Suchaufwand
+/// als 44, dieselben Sims werden unabhängig von der Aktionszahl sinnvoll
+/// auf `GUMBEL_TOP_M` Kandidaten verteilt. Die Kopplung ist im Gumbel-Pfad
+/// daher THEORETISCH eine Fehlallokation (Zusatzbudget an breiten Wurzeln,
+/// wo es am wenigsten bringt; Einsparung an engen Stellungen, wo es am
+/// meisten hilft) -- EMPIRISCH aber noch nicht bestätigt (siehe
+/// `DECOUPLE_NET_SIMS_FROM_ACTIONS`-Kommentar), daher Toggle statt Standard.
+/// Bei `USE_GUMBEL_SEARCH=true UND DECOUPLE_NET_SIMS_FROM_ACTIONS=true`:
+/// `base_sims` unverändert zurückgeben. Sonst (inkl. PUCT-Legacy-Pfad, wo
+/// `dynamic_sims` weiterhin seine ursprüngliche Begründung hat): normales
+/// `dynamic_sims`-Verhalten. Betrifft NUR netzgeführte Suche -- die
+/// Heuristik-MCTS (`mcts.rs`) behält `dynamic_sims` an ihren eigenen
+/// Aufrufstellen unverändert (braucht die Skalierung weiterhin, da sie
+/// klassisches PUCT+Widening ohne Gumbel nutzt).
+pub fn net_effective_sims(base_sims: u32, num_actions: usize) -> u32 {
+    if USE_GUMBEL_SEARCH && DECOUPLE_NET_SIMS_FROM_ACTIONS {
+        base_sims
+    } else {
+        crate::mcts::dynamic_sims(base_sims, num_actions)
+    }
+}
+
 /// Gumbel(0,1)-Ziehung: `-ln(-ln(U))`, `U ~ Uniform(0,1)` (offenes Intervall,
 /// `U=0` waere `ln(0)=-inf`).
 fn sample_gumbel<R: Rng + ?Sized>(rng: &mut R) -> f64 {
@@ -1407,6 +1449,69 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
         .collect()
 }
 
+/// Wie [`net_root_child_stats`], liefert ZUSÄTZLICH Gumbels completed-Q-
+/// Policy-Ziel (`improved_policy` an der Wurzel, §4 des Gumbel-Plans) für
+/// die Self-Play-Aufzeichnung — EIN Baum-Aufbau statt zwei getrennte
+/// (`build_net_tree` ist die teure Suche, hier nicht doppelt bezahlt).
+/// Rückgabe: (rohe Stats für Zugwahl/Shortlisting, unverändert), (Aktion,
+/// completed-Q-Wahrscheinlichkeit) je Kandidat für den Trainings-Policy-
+/// Vektor — deckt `children ∪ untried` ab, d.h. ALLE Wurzelaktionen, nicht
+/// nur die tatsächlich durchsuchten (unbesuchte bekommen `v_mix` statt
+/// Null-Besuch, siehe `completed_q_per_candidate`). Die tatsächlich
+/// GESPIELTE Aktion bleibt weiterhin besuchsbasiert (Sequential-Halving-
+/// Ergebnis) — nur das aufgezeichnete Trainingsziel ändert sich, siehe
+/// `self_play::net_drafting_policy`.
+pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>) {
+    if state.phase != Phase::Drafting {
+        return (Vec::new(), Vec::new());
+    }
+    if crate::round5::applies(state) {
+        let stats: Vec<(Action, u32, f64)> =
+            crate::round5::choose_action(state).into_iter().map(|a| (a, 1, 1.0)).collect();
+        let n = stats.len().max(1);
+        let policy: Vec<(Action, f64)> = stats.iter().map(|(a, _, _)| (a.clone(), 1.0 / n as f64)).collect();
+        return (stats, policy);
+    }
+    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
+    let stats: Vec<(Action, u32, f64)> = nodes[0]
+        .children
+        .iter()
+        .filter_map(|&cid| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            node.action.clone().map(|a| (a, node.visits, q))
+        })
+        .collect();
+    (stats, root_completed_q_policy(&nodes))
+}
+
+/// Zippt `improved_policy(nodes, 0)` (reine Zahlen, Reihenfolge
+/// `children ∪ untried`, siehe `completed_q_per_candidate`) mit den
+/// zugehörigen Aktionen der Wurzel — extrahiert aus
+/// [`net_root_child_stats_and_policy`] für einen Unit-Test ohne echtes
+/// Netz/Suche (siehe Testmodul, hand-gebauter `Node`-Vektor).
+fn root_completed_q_policy(nodes: &[Node]) -> Vec<(Action, f64)> {
+    let improved = improved_policy(nodes, 0);
+    let mut policy: Vec<(Action, f64)> = Vec::with_capacity(improved.len());
+    for (i, &cid) in nodes[0].children.iter().enumerate() {
+        if let Some(a) = nodes[cid].action.clone() {
+            policy.push((a, improved[i]));
+        }
+    }
+    let n_children = nodes[0].children.len();
+    for (i, (act, _prior)) in nodes[0].untried.iter().enumerate() {
+        policy.push((act.clone(), improved[n_children + i]));
+    }
+    policy
+}
+
 /// Wie [`net_search_drafting_action`], liefert zusätzlich ein debug.html-kompatibles
 /// Analyse-Dict je Wurzelkind: rohen Netz-Prior (`net_prob`/`net_prob_norm`, VOR jeder
 /// Suche — das eigentliche Policy-Head-Signal) zusammen mit den PUCT-Such-Stats
@@ -1570,6 +1675,7 @@ mod tests {
     use super::*;
     use crate::state::setup_new_game;
     use rand::rngs::StdRng;
+    use rand::seq::IndexedRandom;
     use rand::SeedableRng;
 
     fn names() -> [String; 2] {
@@ -1919,5 +2025,146 @@ mod tests {
         for (a, b) in policy.iter().zip(expected.iter()) {
             assert!((a - b).abs() < 1e-6, "policy={policy:?} expected={expected:?}");
         }
+    }
+
+    #[test]
+    fn root_completed_q_policy_pairs_each_action_with_its_own_probability() {
+        // Wurzel mit einem besuchten Kind (Action::Pass) und zwei unbesuchten
+        // Kandidaten (Action::DrawStackPeek, Action::ChooseDomeRotation(1)) --
+        // prueft, dass `root_completed_q_policy` dieselben Zahlen wie
+        // `improved_policy` liefert UND korrekt der jeweils richtigen Aktion
+        // zuordnet (children zuerst, dann untried, wie `completed_q_per_candidate`).
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.4, 0.6];
+        let mut child = gumbel_test_node(0.5, 3, 1.8, 1); // Q = 0.6
+        child.action = Some(Action::Pass);
+        let mut nodes = vec![root, child];
+        nodes[0].children.push(1);
+        nodes[0].untried.push((Action::DrawStackPeek, 0.3));
+        nodes[0].untried.push((Action::ChooseDomeRotation(1), 0.2));
+
+        let numeric = improved_policy(&nodes, 0);
+        let paired = root_completed_q_policy(&nodes);
+        assert_eq!(paired.len(), 3);
+
+        let total: f64 = paired.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-9, "Policy muss zu 1.0 summieren, ist {total}");
+
+        assert_eq!(paired[0].0, Action::Pass);
+        assert!((paired[0].1 - numeric[0]).abs() < 1e-12);
+        assert_eq!(paired[1].0, Action::DrawStackPeek);
+        assert!((paired[1].1 - numeric[1]).abs() < 1e-12);
+        assert_eq!(paired[2].0, Action::ChooseDomeRotation(1));
+        assert!((paired[2].1 - numeric[2]).abs() < 1e-12);
+    }
+
+    /// Laedt das aktuelle Produktions-Modell fuer die beiden folgenden
+    /// Perspektiven-/Vorzeichen-Tests (`evaluations/value head tests.txt`,
+    /// Punkt 2, "klassische Vorzeichen-Unit-Tests"). Ueberspringt sich
+    /// selbst (statt zu failen), falls die Datei lokal fehlt -- `models/`
+    /// ist per `.gitignore` nicht Teil des Checkouts, ein frischer Klon
+    /// haette also sonst einen harten Testfehler ohne jeden eigenen Fehler.
+    fn load_test_net() -> Option<Net> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
+        match Net::load(path.to_str().unwrap(), crate::features::INPUT_SIZE) {
+            Ok(n) => Some(n),
+            Err(e) => {
+                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");
+                None
+            }
+        }
+    }
+
+    /// Spielt ein paar zufaellige Drafting-Zuege aus `Game::start` heraus
+    /// (kein Tiling -- reicht fuer die Value-Head-Perspektiventests unten,
+    /// die nur reale, unterschiedliche Drafting-Stellungen brauchen).
+    /// Gibt `None`, falls die Drafting-Phase vor Ablauf der Schritte endet.
+    fn random_drafting_state<R: Rng + ?Sized>(seed_tag: u64, steps: u32, rng: &mut R) -> Option<GameState> {
+        let ids = crate::scoring::sample_valid_scoring_ids(3, rng);
+        let mut game = Game::start(
+            [format!("A{seed_tag}"), format!("B{seed_tag}")],
+            (seed_tag % 2) as usize,
+            ids,
+            rng,
+        );
+        for _ in 0..steps {
+            if game.state.phase != Phase::Drafting {
+                return None;
+            }
+            let actions = drafting_actions(&game.state);
+            if actions.is_empty() {
+                return None;
+            }
+            let a = actions.choose(rng).unwrap().clone();
+            let _ = game.apply_drafting(&a);
+        }
+        (game.state.phase == Phase::Drafting).then_some(game.state)
+    }
+
+    #[test]
+    fn net_leaf_eval_is_invariant_to_which_player_is_flagged_current() {
+        // Kernbehauptung des Kollegen-Verdachts (Perspektivfehler): flippt man
+        // NUR `current_player` an einem ansonsten identischen Zustand, MUSS
+        // `net_leaf_eval` (das intern ohnehin beide Perspektiven per zwei
+        // Forward-Pässen auswertet und fest auf [Spieler0, Spieler1] einsortiert)
+        // exakt dasselbe Ergebnis liefern -- unabhaengig davon, wer gerade
+        // "current_player" ist. Ein Perspektiv-/Plumbing-Bug wuerde diese
+        // Invariante brechen.
+        let Some(net) = load_test_net() else { return };
+        let mut rng = StdRng::seed_from_u64(2026);
+        let mut checked = 0;
+        for gi in 0..10u64 {
+            let Some(state) = random_drafting_state(gi, 15, &mut rng) else { continue };
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - flipped.current_player;
+            let a = net_leaf_eval(&net, &state);
+            let b = net_leaf_eval(&net, &flipped);
+            assert!(
+                (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9,
+                "Spiel {gi}: net_leaf_eval haengt faelschlich von state.current_player ab -- a={a:?} b={b:?}"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 5, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth() {
+        // "Terminalnahe Zustaende mit bekanntem Sieger" (Kollegen-Vorschlag)
+        // verallgemeinert: `mcts::evaluate` ist an JEDEM Drafting-Zustand ein
+        // exaktes Ground-Truth-Urteil (Rundenscore + Wertungsplatten-
+        // Fortschritt, dieselbe Grundlage wie das Runde-5-Alpha-Beta). Prueft
+        // NICHT Genauigkeit (die ist bekanntermassen schwach, siehe Runde-1-R²
+        // in STATUS.md) -- nur, ob das Netz MEHRHEITLICH auf der richtigen
+        // Seite der 50%-Linie liegt. Ein echter Perspektivfehler wuerde die
+        // Uebereinstimmungsrate weit unter 50% druecken (systematische
+        // Umkehrung), reines Value-Rauschen bleibt darueber.
+        let Some(net) = load_test_net() else { return };
+        let mut rng = StdRng::seed_from_u64(4242);
+        let (mut agree, mut total) = (0usize, 0usize);
+        for gi in 0..40u64 {
+            let Some(state) = random_drafting_state(gi, 25, &mut rng) else { continue };
+            let net_vals = net_leaf_eval(&net, &state);
+            let dfs_vals = crate::mcts::evaluate(&state, 0);
+            // Nur werten, wenn beide Seiten ueberhaupt eine Praeferenz zeigen --
+            // bei einem Gleichstand ist "Vorzeichen" nicht definiert.
+            if (net_vals[0] - net_vals[1]).abs() < 1e-6 || (dfs_vals[0] - dfs_vals[1]).abs() < 1e-6 {
+                continue;
+            }
+            total += 1;
+            if (net_vals[0] > net_vals[1]) == (dfs_vals[0] > dfs_vals[1]) {
+                agree += 1;
+            }
+        }
+        assert!(total >= 10, "zu wenige auswertbare Stichproben ({total}) -- Testaufbau pruefen");
+        let rate = agree as f64 / total as f64;
+        eprintln!("  ℹ️  Vorzeichen-Uebereinstimmung Netz vs. DFS: {:.1}% ({agree}/{total})", rate * 100.0);
+        assert!(
+            rate > 0.5,
+            "Vorzeichen-Uebereinstimmung Netz vs. exaktem DFS nur {:.0}% ({agree}/{total}) -- \
+             das ist nicht besser als Zufall und deutet auf einen Perspektivfehler hin, nicht nur \
+             auf gewöhnliches Value-Rauschen",
+            rate * 100.0
+        );
     }
 }

@@ -559,7 +559,7 @@ if __name__ == "__main__":
     NET_MODEL_PRE = "models/alphazero_v1c.onnx"
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
-    NET_SIMS  = 150                            # Basis-Sims des Netzes (Session-Standard fuer 17%/10%-Baselines)
+    NET_SIMS  = 150                            # Basis-Sims des Netzes (Session-Standard fuer 17-26%-Baselines)
     HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
     GAMES     = 100
     run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
