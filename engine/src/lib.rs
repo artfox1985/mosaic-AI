@@ -155,22 +155,33 @@ fn draw_stack_peek_impact_diagnostic(
         .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
-/// Noise-Floor-Test Runde 1 (siehe `self_play::value_noise_floor_diagnostic`,
-/// `evaluations/value head tests.txt` Punkt 1): braucht KEIN Netz -- reine
-/// Heuristik-Rollout-Varianzzerlegung des Value-Ziels selbst.
+/// Noise-Floor-Test für eine beliebige Runde (siehe
+/// `self_play::value_noise_floor_diagnostic`, `evaluations/value head
+/// tests.txt` Punkt 1): braucht KEIN Netz -- reine Heuristik-Rollout-
+/// Varianzzerlegung des Value-Ziels selbst. `target_round` wählt die Runde
+/// (Standard 1, auch 2/3 für die Runde-für-Runde-Einordnung sinnvoll).
 #[pyfunction]
-#[pyo3(signature = (n_states=300, k_rollouts=10, walk_sims=80, rollout_sims=60, seed=None))]
+#[pyo3(signature = (n_states=300, k_rollouts=10, walk_sims=80, rollout_sims=60, target_round=1, seed=None))]
+#[allow(clippy::too_many_arguments)]
 fn value_noise_floor_diagnostic(
     py: Python<'_>,
     n_states: usize,
     k_rollouts: usize,
     walk_sims: u32,
     rollout_sims: u32,
+    target_round: u32,
     seed: Option<u64>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
-        crate::self_play::value_noise_floor_diagnostic(n_states, k_rollouts, walk_sims, rollout_sims, seed)
+        crate::self_play::value_noise_floor_diagnostic(
+            n_states,
+            k_rollouts,
+            walk_sims,
+            rollout_sims,
+            target_round,
+            seed,
+        )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }

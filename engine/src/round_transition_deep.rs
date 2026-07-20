@@ -99,6 +99,14 @@ pub const N_SAMPLES_TRAIN_ROUND3: u32 = 16;
 pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(30);
 pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(30);
 pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(30);
+
+/// Horizont (in Runden) für `bootstrap_value_after_rounds` (Punkt 6,
+/// `evaluations/value head tests.txt`) -- wie viele Runden vorausgeschaut
+/// wird, bevor per `net_leaf_eval` direkt bewertet wird, statt bis zum
+/// echten Spielende zu rekursieren. 2 als erster, ungetesteter Startwert
+/// (Kollegen-Vorschlag: "r+1/r+2") -- noch keine Arena-/R²-Validierung,
+/// bei Bedarf anpassen.
+pub const BOOTSTRAP_HORIZON_ROUNDS: u32 = 2;
 // GESCHICHTE (Lehre, nicht mehr aktueller Stand): eine erste Gamma-Pruning-
 // Version bewertete rundenendende Kandidaten per VOLLER
 // continue_through_roundX-Rekursion statt eines einzelnen Netz-Forward-
@@ -548,6 +556,83 @@ pub(crate) fn continue_through_round2<R: Rng + ?Sized>(
         }
         None => crate::net_mcts::net_leaf_eval(net, round2_start),
     }
+}
+
+/// TD-Bootstrap-Ziel (`evaluations/value head tests.txt`, Punkt 6): anders
+/// als `continue_through_round{2,3,4}` (die bis zum ECHTEN Spielende
+/// rekursieren -- dasselbe Ziel wie das Endergebnis selbst, nur an jedem
+/// Uebergang variance-reduziert gemittelt) bewertet diese Funktion NUR
+/// `horizon_rounds` Runden voraus, dann DIREKT per `net_leaf_eval`.
+/// Begruendung: der Noise-Floor-Test (STATUS.md, 2026-07-20/21) zeigt fuer
+/// Runde 1 einen praktisch nicht von Null unterscheidbaren Deckel fuers
+/// EndergebnisZiel -- das ist eine Eigenschaft der Zielgroesse selbst
+/// ("wer gewinnt das GANZE Spiel"), keine Frage der Mittelungstechnik.
+/// Die Runde-fuer-Runde-R²-Tabelle zeigt aber einen deutlich hoeheren
+/// Deckel fuer NAHE Runden (Runde 4: 0.42, Runde 5: 0.62) -- ein kurzer
+/// Bootstrap-Horizont zielt auf genau diese hoehere Decke statt auf die
+/// niedrige des vollen Spielausgangs. EIN Sample je Rundenuebergang
+/// (keine Mittelung ueber mehrere Neubefuellungen wie bei den
+/// `continue_through_roundN`-Funktionen) -- das Ziel ist ein kurzer,
+/// billiger Horizont, keine variance-reduzierte Vollsimulation.
+/// `horizon_rounds=1`: bewertet direkt den Rundenuebergangs-Zustand
+/// (EINE Neubefuellung gezogen, noch kein Zug in der neuen Runde).
+/// `horizon_rounds=2`: simuliert zusaetzlich die neue Runde komplett
+/// (netzgefuehrt) und bewertet erst am UEBERNAECHSTEN Uebergang. `[0.5,
+/// 0.5]`-Fallback, falls die anfaengliche Neubefuellungs-Stichprobe wider
+/// Erwarten fehlschlaegt (Zeitbudget/Deadline).
+pub(crate) fn bootstrap_value_after_rounds<R: Rng + ?Sized>(
+    pre: &PreChanceState,
+    net: &Net,
+    horizon_rounds: u32,
+    rng: &mut R,
+) -> [f64; 2] {
+    let mut captured: Option<GameState> = None;
+    let deadline0 = Instant::now() + INNER_SAMPLE_TIME_BUDGET;
+    round_transition::sample_round_transition_value(
+        pre,
+        1,
+        |s, _rng| {
+            captured = Some(s.clone());
+            [0.0, 0.0] // Rueckgabewert irrelevant -- nur der Seiteneffekt (captured) zaehlt.
+        },
+        rng,
+        deadline0,
+    );
+    let Some(mut state) = captured else {
+        return [0.5, 0.5];
+    };
+    for _ in 1..horizon_rounds {
+        if state.phase != Phase::Drafting {
+            break;
+        }
+        let overall = Instant::now() + ROUND_SIM_TIME_BUDGET;
+        let Some(next_pre) = simulate_one_round(
+            |s| crate::net_mcts::drafting_action_priors(net, s),
+            &state,
+            make_round_end_eval(net),
+            overall,
+            rng,
+        ) else {
+            break;
+        };
+        let mut next_captured: Option<GameState> = None;
+        let deadline = Instant::now() + INNER_SAMPLE_TIME_BUDGET;
+        round_transition::sample_round_transition_value(
+            &next_pre,
+            1,
+            |s, _rng| {
+                next_captured = Some(s.clone());
+                [0.0, 0.0]
+            },
+            rng,
+            deadline,
+        );
+        match next_captured {
+            Some(s) => state = s,
+            None => break,
+        }
+    }
+    crate::net_mcts::net_leaf_eval(net, &state)
 }
 
 #[cfg(test)]

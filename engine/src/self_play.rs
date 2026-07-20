@@ -839,6 +839,11 @@ pub fn play_one_game<R: Rng + ?Sized>(
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
     let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
+    // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
+    // zusätzlich zum vollen `round_transition_value` (das bis zum echten
+    // Spielende rekursiert und damit dieselbe niedrige Runde-1-Decke hat
+    // wie das Endergebnis, siehe Noise-Floor-Befund).
+    let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
 
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
@@ -872,6 +877,13 @@ pub fn play_one_game<R: Rng + ?Sized>(
                             if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
                                 let v = sample_round_transition_for_round(round_before, &pre, net, rng);
                                 round_transition_values.insert(round_before, v);
+                                let bv = crate::round_transition_deep::bootstrap_value_after_rounds(
+                                    &pre,
+                                    net,
+                                    crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                                    rng,
+                                );
+                                bootstrap_values.insert(round_before, bv);
                             }
                         }
                     }
@@ -913,6 +925,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
             let round = m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
             if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
                 m.insert("round_transition_value".into(), json!(v));
+            }
+            if let Some(v) = round.and_then(|r| bootstrap_values.get(&(r as u32))) {
+                m.insert("bootstrap_value".into(), json!(v));
             }
             Value::Object(m)
         })
@@ -1552,6 +1567,10 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // wenn die Drafting-Phase endet). Ergänzt `scores`/`winner` additiv, siehe
     // Stamping-Schleife unten -- KEIN Ersatz dafür.
     let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
+    // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
+    // zusätzlich zum vollen `round_transition_value`, siehe
+    // `bootstrap_value_after_rounds`-Doku (round_transition_deep.rs).
+    let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
     // `+ EXTRA_GAME_TIMEOUT_SECS`: BUGFIX, live gefunden. `net_game_timeout_secs`
@@ -1621,6 +1640,13 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
                             let v = sample_round_transition_for_round(round_before, &pre, net, rng);
                             round_transition_values.insert(round_before, v);
+                            let bv = crate::round_transition_deep::bootstrap_value_after_rounds(
+                                &pre,
+                                net,
+                                crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                                rng,
+                            );
+                            bootstrap_values.insert(round_before, bv);
                         }
                     }
                     let mut m = Map::new();
@@ -1662,6 +1688,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
             let round = m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
             if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
                 m.insert("round_transition_value".into(), json!(v));
+            }
+            if let Some(v) = round.and_then(|r| bootstrap_values.get(&(r as u32))) {
+                m.insert("bootstrap_value".into(), json!(v));
             }
             Value::Object(m)
         })
@@ -2569,13 +2598,16 @@ pub fn draw_stack_peek_impact_diagnostic(
     Ok(serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| "{}".to_string()))
 }
 
-/// Noise-Floor-Test für Runde 1 (`evaluations/value head tests.txt`, Punkt 1
-/// -- externer Kollegen-Vorschlag, "wichtigster Test, weil er den
-/// Lösungsraum halbiert"): wie viel Value-R² ist in Runde 1 ÜBERHAUPT
-/// erreichbar, selbst wenn ein Head das Ziel perfekt lernen würde? Sampelt
-/// `n_states` realistische Runde-1-Entscheidungspunkte per Heuristik-Walk
-/// (KEINE Netz-Abhängigkeit -- das Ziel ist eine Eigenschaft des LABELS,
-/// nicht eines bestimmten Modells) und spielt je Zustand `k_rollouts`
+/// Noise-Floor-Test für eine beliebige Runde (`evaluations/value head
+/// tests.txt`, Punkt 1 -- externer Kollegen-Vorschlag, "wichtigster Test,
+/// weil er den Lösungsraum halbiert"; ursprünglich nur für Runde 1, auf
+/// Nutzer-Wunsch 2026-07-21 auf `target_round` verallgemeinert, um
+/// Runde 2/3 vergleichbar zu prüfen): wie viel Value-R² ist in
+/// `target_round` ÜBERHAUPT erreichbar, selbst wenn ein Head das Ziel
+/// perfekt lernen würde? Sampelt `n_states` realistische
+/// `target_round`-Entscheidungspunkte per Heuristik-Walk (KEINE Netz-
+/// Abhängigkeit -- das Ziel ist eine Eigenschaft des LABELS, nicht eines
+/// bestimmten Modells) und spielt je Zustand `k_rollouts`
 /// unabhängige Heuristik-Fortsetzungen bis Spielende (Beutel/Kuppelstapel
 /// je Wiederholung neu gemischt, gleiches Determinisierungs-Muster wie
 /// `mean_rollout_diff`, verifiziert per
@@ -2585,27 +2617,36 @@ pub fn draw_stack_peek_impact_diagnostic(
 /// `tanh((own_unclamped - opp_unclamped) / VALUE_SCALE)`, aus der Sicht des
 /// Spielers, der am gesampelten Zustand am Zug ist.
 ///
-/// Varianzzerlegung (Gesetz der totalen Varianz):
-/// `Var(y) = Var(E[y|s]) + E[Var(y|s)]` -- `Var(E[y|s])` (Varianz der
-/// Rollout-MITTELWERTE über die Zustände) ist der ERKLÄRBARE Anteil,
-/// `E[Var(y|s)]` (mittlere Rollout-Varianz INNERHALB je Zustand) ist
-/// irreduzibles Rauschen (spätere Zufallszüge/Neubefüllungen). Maximal
-/// erreichbares R² = `Var(E[y|s]) / Var(y)`. Deckel ~0.05-0.1: Runde-1-
+/// Varianzzerlegung (Einweg-Zufallseffekte-Modell/ANOVA, NICHT die naive
+/// Varianz der Rollout-Mittelwerte -- Bias-Fix, 2026-07-20, Nutzer-Anstoss
+/// nach dem ersten Lauf dieser Diagnose): die beobachtete Varianz der
+/// Rollout-MITTELWERTE über die Zustände schätzt `Var(E[y|s]) +
+/// E[Var(y|s)]/k_rollouts`, NICHT `Var(E[y|s])` allein -- jeder Mittelwert
+/// ist selbst nur aus `k_rollouts` Stichproben geschätzt, der
+/// Standardfehler dieser Schätzung geht sonst fälschlich als erklärbare
+/// Signal-Varianz durch. Korrektur: `Var(E[y|s])_korrigiert =
+/// Var(Mittelwerte)_beobachtet - E[Var(y|s)]/k_rollouts` (kann durch
+/// Stichprobenrauschen leicht negativ ausfallen, wenn der wahre Wert nahe
+/// 0 liegt -- für die R²-Berechnung bei 0 gekappt). Maximal erreichbares
+/// R² = `Var(E[y|s])_korrigiert / Var(y)`. Deckel ~0.05-0.1: Runde-1-
 /// Rauschen ist eine Eigenschaft des Ziels selbst (kein Lern-/Feature-
 /// Problem lösbar) -- das Ziel müsste geändert werden (z.B. TD-/
 /// Rundenübergangs-Bootstrap-Labels). Deckel 0.3+: echtes, noch nicht
-/// ausgeschöpftes Lernpotenzial.
+/// ausgeschöpftes Lernpotenzial. Der Korrekturterm skaliert mit
+/// `1/k_rollouts` -- NICHT mit `n_states` -- ein größeres `k_rollouts`
+/// (statt mehr Zustände) macht die Schätzung präziser.
 pub fn value_noise_floor_diagnostic(
     n_states: usize,
     k_rollouts: usize,
     walk_sims: u32,
     rollout_sims: u32,
+    target_round: u32,
     seed: u64,
 ) -> Result<String, String> {
-    // Phase 1 (billig, sequenziell): `n_states` Runde-1-Entscheidungspunkte
-    // per Heuristik-Walk sammeln -- höchstens 1 je Partie (Diversität über
-    // verschiedene Trajektorien statt mehrfach aus derselben, analog
-    // `sibling_ranking_diagnostic`).
+    // Phase 1 (billig, sequenziell): `n_states` `target_round`-
+    // Entscheidungspunkte per Heuristik-Walk sammeln -- höchstens 1 je
+    // Partie (Diversität über verschiedene Trajektorien statt mehrfach aus
+    // derselben, analog `sibling_ranking_diagnostic`).
     let mut rng = StdRng::seed_from_u64(seed);
     let mut sampled_states: Vec<GameState> = Vec::with_capacity(n_states);
     let mut game_idx = 0u64;
@@ -2644,7 +2685,7 @@ pub fn value_noise_floor_diagnostic(
                         if actions.is_empty() {
                             break;
                         }
-                        if !collected_this_game && game.state.round_number == 1 && actions.len() > 1 {
+                        if !collected_this_game && game.state.round_number == target_round && actions.len() > 1 {
                             collected_this_game = true;
                             sampled_states.push(game.state.clone());
                             if sampled_states.len() >= n_states {
@@ -2736,7 +2777,11 @@ pub fn value_noise_floor_diagnostic(
             }
             let n = ys.len() as f64;
             let mean = ys.iter().sum::<f64>() / n;
-            let var = ys.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
+            // UNVERZERRTE Stichprobenvarianz (÷(k-1), Bessel-Korrektur) --
+            // wird unten fuer die Between-States-Bias-Korrektur gebraucht
+            // (siehe Kommentar dort). Mit ÷k allein waere dieser Schaetzer
+            // selbst schon leicht nach unten verzerrt.
+            let var = ys.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (n - 1.0);
             Some((mean, var))
         })
         .collect();
@@ -2747,16 +2792,41 @@ pub fn value_noise_floor_diagnostic(
         return Err(format!("Zu wenige auswertbare Runde-1-Zustände gesammelt ({n}/{n_states})"));
     }
     let grand_mean = state_means.iter().sum::<f64>() / n as f64;
-    let var_between = state_means.iter().map(|m| (m - grand_mean).powi(2)).sum::<f64>() / n as f64;
+    // Beobachtete Varianz der ROLLOUT-MITTELWERTE ueber die Zustaende --
+    // schaetzt NICHT direkt Var(E[y|s]) (den erklaerbaren Anteil), sondern
+    // Var(E[y|s]) + E[Var(y|s)]/k, weil jeder Mittelwert selbst nur aus
+    // k_rollouts Stichproben geschaetzt ist (Standardfehler der
+    // Mittelwertbildung geht mit rein). Ohne Korrektur wuerde dieser
+    // "Rausch-Aufschlag" faelschlich als erklaerbare Signal-Varianz
+    // gezaehlt -- Bug im ersten Lauf dieser Diagnose (2026-07-20, vom
+    // Nutzer angestossen), hier behoben.
+    let var_between_raw = state_means.iter().map(|m| (m - grand_mean).powi(2)).sum::<f64>() / (n as f64 - 1.0);
     let var_within_mean = state_vars.iter().sum::<f64>() / n as f64;
-    let var_total = var_between + var_within_mean;
-    let max_r2 = if var_total > 1e-12 { var_between / var_total } else { f64::NAN };
+    // Bias-Korrektur (Einweg-Zufallseffekte-Modell, analog ANOVA):
+    // Var(E[y|s])_korrigiert = Var(Mittelwerte)_beobachtet - E[Var(y|s)]/k.
+    // Kann durch Stichprobenrauschen leicht negativ ausfallen, wenn der
+    // wahre Wert nahe 0 liegt -- fuer die R²-Berechnung bei 0 gekappt
+    // (eine Varianz kann nicht negativ sein), der ungekappte Wert bleibt
+    // im JSON sichtbar (wichtig fuer die Einordnung "nahe Null" vs.
+    // "eindeutig positiv").
+    let var_between_corrected = var_between_raw - var_within_mean / k_rollouts as f64;
+    let var_between_corrected_clamped = var_between_corrected.max(0.0);
+    let var_total = var_between_corrected_clamped + var_within_mean;
+    let max_r2 = if var_total > 1e-12 { var_between_corrected_clamped / var_total } else { f64::NAN };
+    // Unkorrigierter Wert (Bug des ersten Laufs) bleibt zum Vergleich im
+    // JSON -- NICHT als max_achievable_r2 verwenden, siehe Kommentar oben.
+    let var_total_naive = var_between_raw + var_within_mean;
+    let max_r2_naive_biased =
+        if var_total_naive > 1e-12 { var_between_raw / var_total_naive } else { f64::NAN };
 
     Ok(json!({
+        "target_round": target_round,
         "n_states": n,
         "k_rollouts": k_rollouts,
-        "var_between_states": var_between,
+        "var_between_states_raw_biased": var_between_raw,
+        "var_between_states_corrected": var_between_corrected,
         "var_within_state_mean": var_within_mean,
+        "max_achievable_r2_naive_biased": max_r2_naive_biased,
         "var_total": var_total,
         "max_achievable_r2": max_r2,
     })

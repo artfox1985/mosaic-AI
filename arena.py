@@ -559,8 +559,14 @@ if __name__ == "__main__":
     NET_MODEL_PRE = "models/alphazero_v1c.onnx"
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
-    NET_SIMS  = 150                            # Basis-Sims des Netzes (Session-Standard fuer 17-26%-Baselines)
-    HEUR_SIMS = NET_SIMS #60                             # Basis-Sims der Heuristik
+    # NET_SIMS: seit DECOUPLE_NET_SIMS_FROM_ACTIONS=true (2026-07-21, Nutzer-
+    # Entscheidung) ist dies die TATSAECHLICHE Sims-Zahl fuer die Netzsuche
+    # (kein dynamic_sims-Hochskalieren mehr) -- 400 als Budget (Nutzer-Vorgabe),
+    # bewusst NICHT mehr an HEUR_SIMS gekoppelt: die Heuristik-Seite bleibt bei
+    # 150 (weiterhin dynamic_sims-skaliert, Ø ~330 tatsaechliche Sims) fuer
+    # Vergleichbarkeit mit den bisherigen 17-26%-Session-Baselines.
+    NET_SIMS  = 400
+    HEUR_SIMS = 150
     GAMES     = 100
     run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
                   games=GAMES, threads=0, early_stop=False)

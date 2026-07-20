@@ -312,7 +312,12 @@ if __name__ == "__main__":
                         help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--games", type=int, default=100, help="Anzahl Spiele")
     parser.add_argument("--sims", type=int, default=100,
-                        help="Basis-Simulationen pro Zug (Rust skaliert im Frühspiel dynamisch)")
+                        help="Basis-Simulationen pro Zug. Bei --mode mcts weiterhin dynamisch "
+                             "skaliert (mehr Optionen -> mehr Sims). Bei --mode network seit "
+                             "DECOUPLE_NET_SIMS_FROM_ACTIONS=true (2026-07-21) die TATSAECHLICHE, "
+                             "unskalierte Sims-Zahl -- dort explizit --sims 400 verwenden (Nutzer-"
+                             "Budget-Vorgabe, ersetzt das alte dynamic_sims-Hochskalieren eines "
+                             "kleineren Basiswerts).")
     parser.add_argument("--version", type=str, required=True, help="Versionsname, z.B. v0")
     parser.add_argument("--tag", type=str, default=None,
                         help="Optionaler Tag für parallele Läufe (z.B. 'a', 'b')")
