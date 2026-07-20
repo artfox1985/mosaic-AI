@@ -437,9 +437,28 @@ def action_to_id(action: dict) -> int:
 #                    fehlt (gleiches Graceful-Degradation-Muster wie
 #                    policy_weights/points_forecast oben). `rtv`-Zweig bleibt
 #                    unveraendert (eigene, bereits ungeklemmte Quelle).
-VALUE_SCHEMA_VERSION = 14
+# Ab Version 15 (Punkt 6, evaluations/value head tests.txt): TD-Bootstrap-
+#                    Blend. Der Noise-Floor-Test (STATUS.md, 2026-07-20/21,
+#                    bias-korrigiert) zeigt fuer Runde 1 einen praktisch
+#                    nicht von Null unterscheidbaren Deckel fuers
+#                    Endergebnis-Ziel (auch `rtv` zielt darauf, nur variance-
+#                    reduziert -- gleiche niedrige Decke). `bootstrap_value`
+#                    (self_play.rs::bootstrap_value_after_rounds, NUR
+#                    BOOTSTRAP_HORIZON_ROUNDS Runden vorausgeschaut statt bis
+#                    zum echten Spielende) zielt auf eine NAEHERE, laut der
+#                    Runde-fuer-Runde-R²-Tabelle deutlich hoehere Decke.
+#                    Wo vorhanden, wird es TD(lambda)-artig mit dem
+#                    bisherigen Ziel gemischt (TD_LAMBDA, siehe unten) --
+#                    ERSETZT `val`/`points_val` NICHT vollstaendig wie `rtv`,
+#                    sondern mischt hinein. Erster, ungetesteter Wert.
+VALUE_SCHEMA_VERSION = 15
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
+# Mischgewicht fuer `bootstrap_value` (Punkt 6) -- 0.0 = nur bisheriges Ziel
+# (Endergebnis bzw. rtv-Override), 1.0 = nur der kurze Bootstrap-Horizont.
+# 0.5 als erster, ungetesteter Startwert (gleichgewichtiger Blend) -- noch
+# keine Arena-/R²-Validierung, bei Bedarf anpassen.
+TD_LAMBDA = 0.5
 
 # Policy-Ziel-Schärfung (Experiment, 2026-07-19): die rohen MCTS-Visit-Anteile
 # (`step["policy"]`s `prob`-Werte, Heuristik-Selfplay) sind selbst oft recht
@@ -576,6 +595,18 @@ class MosaicDataset(Dataset):
                                 opp_rtv = float(rtv[1 - p]) * 2.0 - 1.0
                                 val = own_rtv
                                 points_val = own_rtv - VALUE_OPP_EPSILON * opp_rtv
+                            # Punkt 6 (VALUE_SCHEMA_VERSION=15): TD-Bootstrap-
+                            # Blend, siehe Kommentar oben -- mischt HINEIN
+                            # (ersetzt `val`/`points_val` nicht komplett wie
+                            # `rtv`), da der kurze Horizont eine andere,
+                            # naehere Groesse schaetzt als das bisherige Ziel.
+                            bv = step.get("bootstrap_value")
+                            if bv is not None:
+                                own_bootstrap = float(bv[p]) * 2.0 - 1.0
+                                opp_bootstrap = float(bv[1 - p]) * 2.0 - 1.0
+                                points_bootstrap = own_bootstrap - VALUE_OPP_EPSILON * opp_bootstrap
+                                val = TD_LAMBDA * own_bootstrap + (1.0 - TD_LAMBDA) * val
+                                points_val = TD_LAMBDA * points_bootstrap + (1.0 - TD_LAMBDA) * points_val
                         else:
                             val = float(step["value"])
                             points_val = val

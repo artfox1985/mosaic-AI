@@ -751,19 +751,23 @@ pub const GUMBEL_TOP_M: usize = 16;
 pub const USE_GUMBEL_SEARCH: bool = true;
 
 /// Schaltet die dynamic_sims-Entkopplung im Gumbel-Netzpfad frei (externer
-/// Befund, 2026-07-20, siehe `net_effective_sims`). Standardmäßig AUS:
-/// Arena-Ablation (n=100, Netz fest auf 330 Sims -- entspricht dem alten
-/// `dynamic_sims(150,n)`-Durchschnitt -- vs. Heuristik unverändert bei 150)
-/// ergab 20:80 (20%), innerhalb des Rauschbands der 22-26%-Bestmarke, KEIN
-/// klarer Effekt in diesem einzelnen Test. Bewusst als Toggle statt
-/// unconditional belassen: eine unconditional Umstellung würde still
-/// ÜBERALL, wo netzgeführte Suche mit einem `base_sims`-Wert aufgerufen
-/// wird (Server-Mensch-vs-KI, `self_play.py --mode network`, künftige
-/// Arena-Standardwerte), die Bedeutung dieses Werts ändern (vorher
-/// automatisch auf ~185-499 hochskaliert, siehe
-/// `evaluations/actions_per_round.md`, jetzt exakt der übergebene Wert) --
-/// ohne bestätigten Nutzen ein unnötiges stilles Regressionsrisiko.
-pub const DECOUPLE_NET_SIMS_FROM_ACTIONS: bool = false;
+/// Befund, 2026-07-20, siehe `net_effective_sims`). Standardmäßig AN
+/// (Nutzer-Entscheidung, 2026-07-21) -- Arena-Ablation davor (n=100, Netz
+/// fest auf 330 Sims vs. Heuristik unverändert bei 150) ergab 20:80 (20%),
+/// innerhalb des Rauschbands der 22-26%-Bestmarke, kein klarer Effekt in
+/// diesem einzelnen Test, aber auch keine Verschlechterung -- die
+/// theoretische Begründung (Gumbel-Wurzelbreite ist fix, dynamic_sims'
+/// Kopplung an die Aktionszahl hat dort keine Grundlage mehr) bleibt
+/// unabhängig vom uneindeutigen Arena-Ergebnis gültig.
+/// **WICHTIG für alle Aufrufstellen mit `base_sims`** (Server-Mensch-vs-KI,
+/// `self_play.py --mode network`, Arena-Konstanten): `dynamic_sims` skalierte
+/// einen Wert wie 150 bisher automatisch auf ~185-499 hoch (siehe
+/// `evaluations/actions_per_round.md`) -- mit dieser Umstellung ist der
+/// übergebene Wert jetzt die TATSÄCHLICHE Sims-Zahl, keine Basis mehr.
+/// Bestehende `base_sims`-Werte ggf. entsprechend nach oben anpassen, um
+/// dieselbe effektive Suchtiefe zu behalten (z.B. `arena.py`s bisheriges
+/// `NET_SIMS=150` ⇒ vergleichbar wäre eher ~300-330 flach).
+pub const DECOUPLE_NET_SIMS_FROM_ACTIONS: bool = true;
 
 /// Sims-Skalierung für NETZGEFÜHRTE Suche (Gumbel oder PUCT-Legacy) --
 /// externer Befund (2026-07-20): `mcts::dynamic_sims`s Kopplung an die
