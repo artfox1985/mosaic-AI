@@ -1006,7 +1006,18 @@ fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
 /// `gumbel_select_child` statt `best_puct` (Progressive-Widening-Cap bleibt
 /// unverändert maßgeblich dafür, WELCHE Kandidaten überhaupt als Kind
 /// entstehen -- identisch zum PUCT-Pfad, siehe `descend_and_backprop`).
-fn build_gumbel_tree<R: Rng + ?Sized>(net: &Net, state: &GameState, sims: u32, rng: &mut R) -> Vec<Node> {
+/// `add_root_noise = false` (Arena/Produktion) schaltet die Gumbel-Samples ab
+/// (alle g(a) = 0.0): Top-m und Halving ranken dann rein nach
+/// `ln(prior) + σ(Q̂)` -- deterministisch, äquivalent zu mctx
+/// `gumbel_scale=0`. Self-Play ruft mit `true` und behält die echte
+/// Gumbel-Exploration (G1, Vollaudit 2026-07-21).
+fn build_gumbel_tree<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    add_root_noise: bool,
+    rng: &mut R,
+) -> Vec<Node> {
     let mut root_state = state.clone();
     root_state.log.clear();
     if DETERMINIZE_ROOT_HIDDEN_INFO {
@@ -1082,7 +1093,8 @@ fn build_gumbel_tree<R: Rng + ?Sized>(net: &Net, state: &GameState, sims: u32, r
         .iter()
         .enumerate()
         .map(|(i, &(_, p))| {
-            let g = sample_gumbel(rng);
+            // g(a) = 0 im deterministischen Modus (siehe Funktionskommentar).
+            let g = if add_root_noise { sample_gumbel(rng) } else { 0.0 };
             (g + (p as f64).max(1e-9).ln(), g, i)
         })
         .collect();
@@ -1156,9 +1168,19 @@ fn build_gumbel_tree<R: Rng + ?Sized>(net: &Net, state: &GameState, sims: u32, r
     } else {
         let m_actual = candidates.len();
         let num_phases = (m_actual as f64).log2().ceil().max(1.0) as u32;
+        // G2 (Vollaudit 2026-07-21): das Restbudget wird wie in mctx durch
+        // die VERBLEIBENDE Phasenzahl geteilt (Laufvariable, pro Halbierung
+        // dekrementiert) -- die frühere Division durch die feste Anfangs-
+        // Phasenzahl unterbudgetierte die frühen Phasen und kippte den Rest
+        // per Tail-Loop nur auf die Finalisten.
+        let mut remaining_phases = num_phases;
         let mut budget_used: u32 = 0;
         while current.len() > 1 && budget_used < sims {
-            let remaining_slots = (num_phases as usize) * current.len();
+            let remaining_slots = (remaining_phases as usize) * current.len();
+            // Invariante "jeder in current bekommt mind. 1 Sim je Phase"
+            // (extra >= 1) gilt nur für sims >= m -- bei kleinerem Budget
+            // bricht `budget_used >= sims` die Phase vorzeitig ab und
+            // unbesuchte Kandidaten bleiben auf dem Q=0-Fallback.
             let extra = (((sims - budget_used) as usize / remaining_slots.max(1)).max(1)) as u32;
             for &ci in &current.clone() {
                 for _ in 0..extra {
@@ -1190,6 +1212,7 @@ fn build_gumbel_tree<R: Rng + ?Sized>(net: &Net, state: &GameState, sims: u32, r
             });
             let keep = (current.len() / 2).max(2);
             current.truncate(keep);
+            remaining_phases = remaining_phases.saturating_sub(1).max(1);
         }
         // Restbudget (Rundungsreste) auf die verbliebenen Kandidaten verteilen.
         while budget_used < sims {
@@ -1237,7 +1260,7 @@ fn build_net_tree<R: Rng + ?Sized>(
         if let Some(l) = log.as_deref_mut() {
             l.push("  GUMBEL-SUCHE (kein granularer Sim-Trace)".to_string());
         }
-        return build_gumbel_tree(net, state, sims, rng);
+        return build_gumbel_tree(net, state, sims, add_root_noise, rng);
     }
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
@@ -2091,6 +2114,11 @@ mod tests {
             ids,
             rng,
         );
+        // Startkuppel-Platzierung überspringen -- seit dem R5-Gate
+        // (Vollaudit 2026-07-21) lehnt apply_drafting sonst alles ab.
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
         for _ in 0..steps {
             if game.state.phase != Phase::Drafting {
                 return None;

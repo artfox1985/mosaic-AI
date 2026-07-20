@@ -1460,10 +1460,16 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         .map(|(a, p)| json!({ "action": action_to_env_dict(state, a), "prob": p }))
         .collect();
     let idx = if deterministic {
+        // Fund 2 (B2, Vollaudit 2026-07-21): Tie-Break visits, dann Q --
+        // gleiches Muster wie net_mcts::best_root_child. Nacktes
+        // max_by(visits) ließe bei Gleichstand den LETZTEN Eintrag
+        // (= niedrigster Prior) gewinnen.
         stats
             .iter()
             .enumerate()
-            .max_by(|(_, (_, v1, _)), (_, (_, v2, _))| v1.cmp(v2))
+            .max_by(|(_, (_, v1, q1)), (_, (_, v2, q2))| {
+                v1.cmp(v2).then(q1.partial_cmp(q2).unwrap_or(std::cmp::Ordering::Equal))
+            })
             .map(|(i, _)| i)
             .unwrap_or(0)
     } else {
@@ -1672,12 +1678,19 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         let _ = game.apply_end_scoring();
     }
     let scores = [game.state.players[0].score, game.state.players[1].score];
+    // Fund 7 (B1, Vollaudit 2026-07-21): auch der netzgeführte Pfad muss die
+    // ungeklemmten Scores backfillen -- gleiches Muster wie in play_one_game.
+    let scores_unclamped = [
+        game.state.players[0].score_unclamped,
+        game.state.players[1].score_unclamped,
+    ];
     let winner = determine_winner(&game.state);
     records
         .into_iter()
         .map(|mut m| {
             m.insert("game_id".into(), json!(game_id));
             m.insert("scores".into(), json!(scores));
+            m.insert("scores_unclamped".into(), json!(scores_unclamped));
             m.insert("winner".into(), json!(winner));
             m.insert("completed".into(), json!(completed));
             // Zusätzliches, rauschärmeres Trainingsziel für den Rundenübergang
@@ -2613,7 +2626,7 @@ pub fn draw_stack_peek_impact_diagnostic(
 /// `mean_rollout_diff`, verifiziert per
 /// `rollout_repetitions_actually_diverge_in_bag_and_dome_order`).
 ///
-/// Label = aktuelle Value-Zielformel (VALUE_SCHEMA_VERSION=14, Fund 7):
+/// Label = aktuelle Value-Zielformel (VALUE_SCHEMA_VERSION=15, Fund 7):
 /// `tanh((own_unclamped - opp_unclamped) / VALUE_SCALE)`, aus der Sicht des
 /// Spielers, der am gesampelten Zustand am Zug ist.
 ///
