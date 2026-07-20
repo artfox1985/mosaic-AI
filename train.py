@@ -46,18 +46,6 @@ def plackett_luce_moon_loss(pred_moon, moon_targets):
     return total_nll
 
 
-def masked_categorical_nll(pred_logits, targets):
-    """NLL je Sample gegen einen Kategorie-Index (`targets`, -1 = nicht
-    anwendbar -> 0 Beitrag). Fuer `dome_slot_head`/`dome_rotation_head`:
-    im Gegensatz zu Moon-Order kein Permutations-/Pool-Problem (Reihenfolge
-    aus einer schrumpfenden Restmenge), sondern eine feste kategoriale Wahl
-    (9 Slots bzw. 4 Rotationen) -- einfache maskierte Kreuzentropie reicht."""
-    valid = targets >= 0
-    safe_targets = targets.clamp(min=0).long()
-    log_probs = F.log_softmax(pred_logits, dim=1)
-    nll = -log_probs.gather(1, safe_targets.unsqueeze(1)).squeeze(1)
-    return torch.where(valid, nll, torch.zeros_like(nll))
-
 # Unsere dynamischen Pfade aus der Config laden
 from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, POINTS_WEIGHT
 
@@ -236,8 +224,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
 
-        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
-             dome_slot_targets, dome_rot_targets) in dataloader:
+        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points) in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
@@ -246,7 +233,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v, pred_moon, pred_points, pred_dome_slot, pred_dome_rotation = model(states)
+            pred_p, pred_v, pred_moon, pred_points = model(states)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -273,19 +260,6 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if sun_mask.any():
                 moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
                 p_loss = p_loss + moon_nll[sun_mask].mean()
-
-            # Kuppelplatten-Faktorisierung (Slot/Rotation) -- gleiches Muster wie
-            # Moon-Order: direkt in p_loss, kein extra Hyperparameter. Slot und
-            # Rotation teilen sich dieselbe Maske (`dome_slot_target`/
-            # `dome_rotation_target` werden immer gemeinsam gesetzt/null, siehe
-            # self_play.rs::dome_slot_rotation_target).
-            dome_slot_targets = dome_slot_targets.to(device)
-            dome_rot_targets = dome_rot_targets.to(device)
-            dome_mask = dome_slot_targets >= 0
-            if dome_mask.any():
-                slot_nll = masked_categorical_nll(pred_dome_slot, dome_slot_targets)
-                rot_nll = masked_categorical_nll(pred_dome_rotation, dome_rot_targets)
-                p_loss = p_loss + slot_nll[dome_mask].mean() + rot_nll[dome_mask].mean()
 
             # Value-/Punkte-Aux-Losses: reines Trainings-Zusatzsignal fuer den
             # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
@@ -330,15 +304,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             with torch.no_grad():
-                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points,
-                     _v_dslot_t, _v_drot_t) in val_dataloader:
+                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points) in val_dataloader:
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
                     v_targets_points = v_targets_points.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
-                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, _v_pred_dslot, _v_pred_drot = model(v_states)
+                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points = model(v_states)
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)

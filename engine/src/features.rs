@@ -755,14 +755,14 @@ pub(crate) const MAX_PENDING_STACK_TILES: i64 = 4;
 /// Port von `action_to_id` (für Masken/Prior-Zuordnung). Erwartet ein
 /// env-Action-Dict (agent_env-Schema).
 ///
-/// `dome`/`dome_stack`: Slot UND Rotation fliessen NICHT mehr in die ID ein
-/// (vorher 108 bzw. 36 einzelne IDs) -- wie bei `moon_order` (siehe
-/// net_mcts.rs) teilen sich alle Slot×Rotation-Varianten derselben Gruppe
-/// (Auslage-Platte bzw. `pending_index`) eine ID; die Suche faktorisiert den
-/// Prior separat über `dome_slot_head`/`dome_rotation_head`
-/// (`build_untried_actions`, net_mcts.rs). Das entlastet den 483->kleiner
-/// gewordenen Policy-Head, der sonst die volle Kombination selbst lernen
-/// müsste.
+/// `choose_dome_slot`/`choose_draw_stack_slot` (Baustein B, ersetzt das
+/// vorherige `dome`/`dome_stack`-Schema): Kachel/Pending-Index UND Slot
+/// fliessen JEWEILS in eine eigene, nicht kollabierte ID ein (27 bzw. 36 IDs)
+/// -- die Rotation ist seit Baustein B eine eigenständige Stufe-2-Such-
+/// knotenentscheidung (`choose_dome_rotation`, 4 IDs, geteilt von beiden
+/// Pfaden), keine Prior-Faktorisierung mehr nötig (ersetzt die frühere
+/// `dome_slot_head`/`dome_rotation_head`-Multiplikation, siehe
+/// net_mcts.rs::build_untried_actions).
 pub fn action_to_id(a: &Value) -> usize {
     let t = a.get("type").and_then(|x| x.as_str()).unwrap_or("");
     let geti = |k: &str| a.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
@@ -776,13 +776,19 @@ pub fn action_to_id(a: &Value) -> usize {
             (10 + c_id * 48 + r_id * 6 + f_idx).min(273) as usize
         }
         "tiling" => (274 + geti("pattern_row") * 9 + geti("slot_row") * 3 + geti("slot_col")) as usize,
-        "dome" => (328 + geti("display_index")) as usize,
-        "dome_stack" => (331 + geti("pending_index").min(MAX_PENDING_STACK_TILES - 1)) as usize,
-        "use_chips" => (335 + geti("pattern_row")) as usize,
-        "bonus_chip" => (341 + geti("factory_index")) as usize,
+        "choose_dome_slot" => {
+            (328 + geti("display_index") * 9 + geti("slot_row") * 3 + geti("slot_col")) as usize
+        }
+        "choose_draw_stack_slot" => {
+            let p_idx = geti("pending_index").min(MAX_PENDING_STACK_TILES - 1);
+            (355 + p_idx * 9 + geti("slot_row") * 3 + geti("slot_col")) as usize
+        }
+        "choose_dome_rotation" => (391 + (geti("rotation") / 90).clamp(0, 3)) as usize,
+        "use_chips" => (395 + geti("pattern_row")) as usize,
+        "bonus_chip" => (401 + geti("factory_index")) as usize,
         // Aktion A, Schritt 1 (verdeckt ziehen) -- parameterlos, eigene feste ID.
-        "dome_stack_peek" => 345,
-        _ => 344,
+        "dome_stack_peek" => 405,
+        _ => 405,
     }
 }
 
@@ -870,8 +876,9 @@ mod tests {
     /// `action_to_id`-Rundtrip: verschiedene Aktions-TYP-Familien duerfen sich
     /// niemals ueberlappende ID-Bereiche teilen (waere ein stiller Policy-
     /// Leak), waehrend INNERHALB einer Familie bewusstes Kollabieren erlaubt
-    /// ist (Kuppelplatten-Slot/Rotation, Sonnenzug-Farbreihenfolge -- siehe
-    /// net_mcts.rs::build_untried_actions). `NUM_ACTIONS` muss exakt
+    /// ist (Sonnenzug-Farbreihenfolge -- siehe net_mcts.rs::build_untried_actions;
+    /// Kuppelplatten-Slot/Rotation kollabieren seit Baustein B NICHT mehr,
+    /// jede Kombination hat eine eigene ID). `NUM_ACTIONS` muss exakt
     /// `max_id + 1` sein, sonst wird entweder ein Teil des Policy-Kopfs nie
     /// trainiert (zu gross) oder eine echte ID faellt aus dem Head-Bereich
     /// (zu klein, harter Crash beim Training).
@@ -913,38 +920,41 @@ mod tests {
         }
         record("tiling", tiling_ids);
 
-        // 3 Auslage-Platten, 3x3 Kuppelraster, 4 Rotationen (game.rs::generate_dome_moves).
-        let mut dome_ids = Vec::new();
+        // Baustein B: 3 Auslage-Platten x 3x3 Kuppelraster, Kachel+Slot ZUSAMMEN
+        // (Rotation ist eine separate Stufe-2-Suchknotenentscheidung, siehe
+        // game.rs::generate_dome_moves / Action::ChooseDomeRotation).
+        let mut dome_slot_ids = Vec::new();
         for d in 0..3 {
             for sr in 0..3 {
                 for sc in 0..3 {
-                    for rot in [0, 90, 180, 270] {
-                        dome_ids.push(action_to_id(&json!({
-                            "type": "dome", "display_index": d, "slot_row": sr,
-                            "slot_col": sc, "rotation": rot
-                        })));
-                    }
+                    dome_slot_ids.push(action_to_id(&json!({
+                        "type": "choose_dome_slot", "display_index": d, "slot_row": sr, "slot_col": sc
+                    })));
                 }
             }
         }
-        record("dome", dome_ids);
+        record("choose_dome_slot", dome_slot_ids);
 
         // pending_index grosszuegig ueber MAX_PENDING_STACK_TILES hinaus getestet
         // (muss gedeckelt werden, nicht crashen).
-        let mut dome_stack_ids = Vec::new();
+        let mut draw_stack_slot_ids = Vec::new();
         for p in 0..8 {
             for sr in 0..3 {
                 for sc in 0..3 {
-                    for rot in [0, 90, 180, 270] {
-                        dome_stack_ids.push(action_to_id(&json!({
-                            "type": "dome_stack", "pending_index": p, "slot_row": sr,
-                            "slot_col": sc, "rotation": rot
-                        })));
-                    }
+                    draw_stack_slot_ids.push(action_to_id(&json!({
+                        "type": "choose_draw_stack_slot", "pending_index": p, "slot_row": sr, "slot_col": sc
+                    })));
                 }
             }
         }
-        record("dome_stack", dome_stack_ids);
+        record("choose_draw_stack_slot", draw_stack_slot_ids);
+
+        // Stufe 2: EINE gemeinsame Rotation-ID-Familie fuer beide Pfade.
+        let mut dome_rotation_ids = Vec::new();
+        for rot in [0, 90, 180, 270] {
+            dome_rotation_ids.push(action_to_id(&json!({ "type": "choose_dome_rotation", "rotation": rot })));
+        }
+        record("choose_dome_rotation", dome_rotation_ids);
 
         let mut use_chips_ids = Vec::new();
         for pr in 0..6 {

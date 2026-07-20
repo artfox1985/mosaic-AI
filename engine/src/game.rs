@@ -8,7 +8,7 @@ use rand::Rng;
 
 use crate::execution::execute_move;
 use crate::moves::{
-    Action, DrawFromStackMove, PlaceDomeTileMove, TakeBonusChipMove,
+    Action, DrawFromStackMove, PendingDomeChoice, PlaceDomeTileMove, TakeBonusChipMove,
 };
 use crate::round_end::{
     apply_bonus_chips_to_row, execute_full_tiling, generate_tiling_actions,
@@ -82,6 +82,31 @@ pub fn execute_dome_move(state: &mut GameState, m: &PlaceDomeTileMove) -> Result
     Ok(())
 }
 
+/// Rotationen, die für diese (Kachel, Slot)-Kombination tatsächlich legal
+/// sind (`validate_dome_move` selbst prüft `rotation` nicht -- die einzige
+/// Fehlerquelle wäre `DomeTile::apply_rotation` auf einer bereits befüllten
+/// Kachel, was für eine frisch gezogene, unplatzierte Kachel nie zutrifft --
+/// daher aktuell immer alle 4, aber als echter Filter geschrieben statt
+/// hartkodiert, falls künftige Regeln Rotation doch einschränken).
+fn dome_slot_rotation_candidates(
+    state: &GameState,
+    dome_tile_id: usize,
+    slot_row: usize,
+    slot_col: usize,
+) -> Vec<u32> {
+    [0u32, 90, 180, 270]
+        .into_iter()
+        .filter(|&rotation| {
+            let m = PlaceDomeTileMove { dome_tile_id, slot_row, slot_col, rotation };
+            validate_dome_move(state, &m).is_none()
+        })
+        .collect()
+}
+
+/// Baustein B Stufe 1: eine Kachel aus dem offenen Display + Slot wählen.
+/// Ein Kandidat je (Kachel, Slot)-Paar, das mindestens eine legale Rotation
+/// hat (verhindert Sackgassen in Stufe 2) -- `rotation` im zurückgegebenen
+/// Move ist Platzhalter (siehe `Action::ChooseDomeSlot`).
 pub fn generate_dome_moves(state: &GameState) -> Vec<PlaceDomeTileMove> {
     let player = &state.players[state.current_player];
     if !player.can_place_dome_tile(state.round_number) || player.has_unplaced_start_tile() {
@@ -91,16 +116,13 @@ pub fn generate_dome_moves(state: &GameState) -> Vec<PlaceDomeTileMove> {
     let mut moves = Vec::new();
     for tile in &state.dome_display {
         for &(sr, sc) in &empty_slots {
-            for &rot in &[0u32, 90, 180, 270] {
-                let m = PlaceDomeTileMove {
+            if !dome_slot_rotation_candidates(state, tile.tile_id, sr, sc).is_empty() {
+                moves.push(PlaceDomeTileMove {
                     dome_tile_id: tile.tile_id,
                     slot_row: sr,
                     slot_col: sc,
-                    rotation: rot,
-                };
-                if validate_dome_move(state, &m).is_none() {
-                    moves.push(m);
-                }
+                    rotation: 0,
+                });
             }
         }
     }
@@ -284,11 +306,37 @@ pub fn can_draw_stack_peek(state: &GameState) -> bool {
     validate_draw_stack_peek(state).is_none()
 }
 
-/// Wahl-Züge (Aktion A, Schritt 2): je bereits gezogener Kachel (in
-/// `pending_stack_draw`) × freiem Slot × Rotation. Leer, solange kein
-/// Zieh-Vorgang läuft. `action_to_id` kodiert nur (Slot, Rotation) für
-/// `dome_stack` -- `chosen_id` fließt NICHT in die Policy-ID ein (wie
-/// `moon_order` bei Sonnenzügen).
+/// Rotationen, die für diese (gewählte Stapel-Kachel, Slot)-Kombination
+/// tatsächlich legal sind -- siehe `dome_slot_rotation_candidates`-Kommentar,
+/// gleiche Begründung (aktuell immer alle 4, echter Filter für Zukunftssicherheit).
+fn draw_stack_slot_rotation_candidates(
+    state: &GameState,
+    chosen_id: usize,
+    slot_row: usize,
+    slot_col: usize,
+    return_order: &[usize],
+) -> Vec<u32> {
+    [0u32, 90, 180, 270]
+        .into_iter()
+        .filter(|&rotation| {
+            let m = DrawFromStackMove {
+                chosen_id,
+                slot_row,
+                slot_col,
+                rotation,
+                return_order: return_order.to_vec(),
+            };
+            validate_draw_from_stack(state, &m).is_none()
+        })
+        .collect()
+}
+
+/// Wahl-Züge (Aktion A, Schritt 2, Baustein B Stufe 1): je bereits gezogener
+/// Kachel (in `pending_stack_draw`) × freiem Slot, gefiltert auf ≥1 legale
+/// Rotation (verhindert Sackgassen in Stufe 2). Leer, solange kein
+/// Zieh-Vorgang läuft. `chosen_id` fließt NICHT in die Policy-ID ein (wie
+/// `moon_order` bei Sonnenzügen) -- `rotation` im zurückgegebenen Move ist
+/// Platzhalter (siehe `Action::ChooseDrawStackSlot`).
 pub fn generate_draw_stack_moves(state: &GameState) -> Vec<DrawFromStackMove> {
     if state.pending_stack_draw.is_empty() {
         return Vec::new();
@@ -301,9 +349,9 @@ pub fn generate_draw_stack_moves(state: &GameState) -> Vec<DrawFromStackMove> {
     for chosen_id in ids {
         // return_order wird -- wie moon_order bei Sonnenzuegen -- NICHT
         // kombinatorisch aufgefaechert (keine eigene Policy-Dimension,
-        // s. DrawFromStackMove-Kommentar): ein Kandidat je (chosen_id, Slot,
-        // Rotation), Reihenfolge der uebrigen Platten kanonisch = die
-        // Ziehreihenfolge aus `pending_stack_draw`.
+        // s. DrawFromStackMove-Kommentar): ein Kandidat je (chosen_id, Slot),
+        // Reihenfolge der uebrigen Platten kanonisch = die Ziehreihenfolge
+        // aus `pending_stack_draw`.
         let return_order: Vec<usize> = state
             .pending_stack_draw
             .iter()
@@ -311,12 +359,12 @@ pub fn generate_draw_stack_moves(state: &GameState) -> Vec<DrawFromStackMove> {
             .map(|t| t.tile_id)
             .collect();
         for (sr, sc) in player.dome_grid.empty_slots() {
-            for &rotation in &[0u32, 90, 180, 270] {
+            if !draw_stack_slot_rotation_candidates(state, chosen_id, sr, sc, &return_order).is_empty() {
                 moves.push(DrawFromStackMove {
                     chosen_id,
                     slot_row: sr,
                     slot_col: sc,
-                    rotation,
+                    rotation: 0,
                     return_order: return_order.clone(),
                 });
             }
@@ -342,6 +390,11 @@ pub fn generate_bonus_chip_moves(state: &GameState) -> Vec<TakeBonusChipMove> {
 
 /// Kann der aktive Spieler (so wie state.current_player gesetzt ist) noch ziehen?
 fn current_player_can_move(state: &GameState) -> bool {
+    // Baustein B: eine offene Rotation-Wahl (Stufe 2) MUSS abgeschlossen
+    // werden -- das zaehlt immer als "kann noch ziehen".
+    if state.pending_dome_choice.is_some() {
+        return true;
+    }
     can_draw_stack_peek(state)
         || !generate_draw_stack_moves(state).is_empty()
         || !generate_valid_moves(state).is_empty()
@@ -509,6 +562,31 @@ pub fn determine_winner(state: &GameState) -> usize {
 /// Leer → [Pass]. Single Source of Truth für Game-Loop und MCTS.
 pub fn drafting_actions(state: &GameState) -> Vec<Action> {
     let mut actions: Vec<Action> = Vec::new();
+
+    // Baustein B Stufe 2: eine Kuppel-Slot-Wahl ist bereits getroffen, nur
+    // noch die Rotation fehlt -- NICHTS anderes ist erlaubt (gilt für BEIDE
+    // Pfade gleich, geprüft VOR dem pending_stack_draw-Check, da bei der
+    // Stapel-Variante beide Felder gleichzeitig gesetzt sein können).
+    if let Some(choice) = &state.pending_dome_choice {
+        let rotations = match choice {
+            PendingDomeChoice::FromDisplay { dome_tile_id, slot_row, slot_col } => {
+                dome_slot_rotation_candidates(state, *dome_tile_id, *slot_row, *slot_col)
+            }
+            PendingDomeChoice::FromDrawStack { chosen_id, slot_row, slot_col, return_order } => {
+                draw_stack_slot_rotation_candidates(state, *chosen_id, *slot_row, *slot_col, return_order)
+            }
+        };
+        for rot in rotations {
+            actions.push(Action::ChooseDomeRotation(rot));
+        }
+        // Sollte laut Stufe-1-Sackgassen-Check nie leer sein -- Pass nur als
+        // letzte Absicherung, kein regulärer Spielzustand.
+        if actions.is_empty() {
+            actions.push(Action::Pass);
+        }
+        return actions;
+    }
+
     // Mitten in einem Stapel-Zug (Aktion A): NUR weiterziehen oder wählen
     // erlaubt, keine andere Aktion -- das Regelwerk behandelt Aktion A als
     // EINEN durchgängigen Zug, der nicht mit anderen Aktionen verschachtelt
@@ -518,7 +596,7 @@ pub fn drafting_actions(state: &GameState) -> Vec<Action> {
             actions.push(Action::DrawStackPeek);
         }
         for m in generate_draw_stack_moves(state) {
-            actions.push(Action::DrawStack(m));
+            actions.push(Action::ChooseDrawStackSlot(m));
         }
         if actions.is_empty() {
             actions.push(Action::Pass);
@@ -529,7 +607,7 @@ pub fn drafting_actions(state: &GameState) -> Vec<Action> {
         actions.push(Action::Stone(m));
     }
     for m in generate_dome_moves(state) {
-        actions.push(Action::Dome(m));
+        actions.push(Action::ChooseDomeSlot(m));
     }
     for m in generate_bonus_chip_moves(state) {
         actions.push(Action::BonusChip(m));
@@ -583,23 +661,57 @@ impl Game {
                 execute_move(&mut self.state, m);
                 self.state.switch_player();
             }
-            Action::Dome(m) => {
+            Action::ChooseDomeSlot(m) => {
                 if let Some(e) = validate_dome_move(&self.state, m) {
                     return Err(e);
                 }
-                execute_dome_move(&mut self.state, m)?;
-                self.state.switch_player();
+                self.state.pending_dome_choice = Some(PendingDomeChoice::FromDisplay {
+                    dome_tile_id: m.dome_tile_id,
+                    slot_row: m.slot_row,
+                    slot_col: m.slot_col,
+                });
+                // Beendet den Zug NICHT -- Stufe 2 (Rotation) folgt direkt,
+                // derselbe Spieler ist weiter am Zug.
             }
             Action::DrawStackPeek => {
                 execute_draw_stack_peek(&mut self.state)?;
                 // Beendet den Zug NICHT -- derselbe Spieler entscheidet als
                 // naechstes erneut (weiterziehen oder waehlen).
             }
-            Action::DrawStack(m) => {
+            Action::ChooseDrawStackSlot(m) => {
                 if let Some(e) = validate_draw_from_stack(&self.state, m) {
                     return Err(e);
                 }
-                execute_draw_from_stack(&mut self.state, m)?;
+                self.state.pending_dome_choice = Some(PendingDomeChoice::FromDrawStack {
+                    chosen_id: m.chosen_id,
+                    slot_row: m.slot_row,
+                    slot_col: m.slot_col,
+                    return_order: m.return_order.clone(),
+                });
+                // Beendet den Zug NICHT -- Stufe 2 (Rotation) folgt direkt.
+            }
+            Action::ChooseDomeRotation(rot) => {
+                let choice = match &self.state.pending_dome_choice {
+                    Some(c) => c.clone(),
+                    None => return Err("Keine offene Kuppel-Wahl fuer Rotation.".into()),
+                };
+                match choice {
+                    PendingDomeChoice::FromDisplay { dome_tile_id, slot_row, slot_col } => {
+                        let m = PlaceDomeTileMove { dome_tile_id, slot_row, slot_col, rotation: *rot };
+                        if let Some(e) = validate_dome_move(&self.state, &m) {
+                            return Err(e);
+                        }
+                        execute_dome_move(&mut self.state, &m)?;
+                    }
+                    PendingDomeChoice::FromDrawStack { chosen_id, slot_row, slot_col, return_order } => {
+                        let m = DrawFromStackMove { chosen_id, slot_row, slot_col, rotation: *rot, return_order };
+                        if let Some(e) = validate_draw_from_stack(&self.state, &m) {
+                            return Err(e);
+                        }
+                        execute_draw_from_stack(&mut self.state, &m)?;
+                    }
+                }
+                self.state.pending_dome_choice = None;
                 self.state.switch_player();
             }
             Action::BonusChip(m) => {
@@ -1049,5 +1161,57 @@ mod tests {
         let tid2 = game.state.dome_display[0].tile_id;
         apply_start_placement(&mut game.state, 0, tid2, 0, 0, 0).unwrap();
         assert!(!game.state.players[0].start_tile_pending);
+    }
+
+    /// Baustein B (zweistufiger Kuppel-Suchknoten): jeder Stufe-1-Kandidat
+    /// (`generate_dome_moves`/`generate_draw_stack_moves`) MUSS mindestens
+    /// eine legale Stufe-2-Rotation haben -- sonst würde Stufe 2 auf den
+    /// Pass-Nothilfszweig zurückfallen und `pending_dome_choice` bliebe
+    /// falsch hängen (siehe `drafting_actions`-Kommentar). Nicht optional:
+    /// ohne diesen Test könnte eine künftige Regeländerung (z.B. eine
+    /// rotationsabhängige Platzierungsregel) stillschweigend Sackgassen
+    /// erzeugen.
+    #[test]
+    fn dome_slot_candidates_never_yield_a_dead_end_stage_two() {
+        use rand::seq::IndexedRandom;
+
+        let mut rng = StdRng::seed_from_u64(77);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let mut checked_dome = 0;
+        let mut checked_draw_stack = 0;
+        let mut steps = 0;
+        // Zufällig statt immer `actions[0]` waehlen -- sonst wuerde die
+        // Auswahl (Stein-Zuege stehen zuerst in `drafting_actions`) einen
+        // Stapel-Zug so gut wie nie tatsaechlich auslösen.
+        while game.state.phase == Phase::Drafting && steps < 500 {
+            for m in generate_dome_moves(&game.state) {
+                assert!(
+                    !dome_slot_rotation_candidates(&game.state, m.dome_tile_id, m.slot_row, m.slot_col)
+                        .is_empty(),
+                    "Kachel {} Slot ({},{}) hat keine legale Rotation",
+                    m.dome_tile_id, m.slot_row, m.slot_col
+                );
+                checked_dome += 1;
+            }
+            for m in generate_draw_stack_moves(&game.state) {
+                assert!(
+                    !draw_stack_slot_rotation_candidates(
+                        &game.state, m.chosen_id, m.slot_row, m.slot_col, &m.return_order
+                    ).is_empty(),
+                    "Kachel {} Slot ({},{}) hat keine legale Rotation",
+                    m.chosen_id, m.slot_row, m.slot_col
+                );
+                checked_draw_stack += 1;
+            }
+            let actions = game.valid_drafting_actions();
+            let action = actions.choose(&mut rng).unwrap().clone();
+            game.apply_drafting(&action).expect("valider Zug");
+            steps += 1;
+        }
+        assert!(checked_dome > 0, "Testvoraussetzung: mind. ein ChooseDomeSlot-Kandidat gesehen");
+        assert!(checked_draw_stack > 0, "Testvoraussetzung: mind. ein ChooseDrawStackSlot-Kandidat gesehen");
     }
 }

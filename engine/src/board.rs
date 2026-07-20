@@ -237,6 +237,13 @@ pub struct PlayerBoard {
     pub player_id: usize,
     pub name: String,
     pub score: i32,
+    /// Fund 7 (externe Bugfix-Review, Bugfixes.txt Abschnitt C): `score`
+    /// klemmt regelkonform bei 0 (`apply_score`) -- fürs Value-/Points-
+    /// Trainingsziel verwischt das aber "schlecht" (0) und "desaströs"
+    /// (eigentlich weit im Minus). `score_unclamped` läuft NIE geklemmt
+    /// parallel mit, nur fürs Trainingsziel gedacht (self_play.rs
+    /// `scores_unclamped`), niemals fürs sichtbare Spiel/Regelwerk gelesen.
+    pub score_unclamped: i32,
     pub pattern_lines: Vec<PatternLine>,
     pub dome_grid: DomeGrid,
     pub broken_tiles: Vec<TileColor>,
@@ -261,6 +268,7 @@ impl PlayerBoard {
             player_id,
             name: name.into(),
             score: 5,
+            score_unclamped: 5,
             pattern_lines: (0..6).map(PatternLine::new).collect(),
             dome_grid: DomeGrid::default(),
             broken_tiles: Vec::new(),
@@ -301,6 +309,7 @@ impl PlayerBoard {
     /// Punkte addieren, nie unter 0.
     pub fn apply_score(&mut self, delta: i32) {
         self.score = (self.score + delta).max(0);
+        self.score_unclamped += delta;
     }
 
     pub fn has_used_all_tokens(&self, round_number: u32) -> bool {

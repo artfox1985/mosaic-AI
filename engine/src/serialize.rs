@@ -304,22 +304,21 @@ pub fn action_to_dict(a: &Action) -> Value {
             "row": m.place.row_index,
             "moon_order": m.take.moon_order.iter().map(|t| t.value()).collect::<Vec<_>>(),
         }),
-        Action::Dome(m) => json!({
+        Action::ChooseDomeSlot(m) => json!({
             "type": "dome_display",
             "tile_id": m.dome_tile_id,
             "slot_row": m.slot_row,
             "slot_col": m.slot_col,
-            "rotation": m.rotation,
         }),
         Action::DrawStackPeek => json!({ "type": "dome_stack_peek" }),
-        Action::DrawStack(m) => json!({
+        Action::ChooseDrawStackSlot(m) => json!({
             "type": "dome_stack",
             "chosen_id": m.chosen_id,
             "slot_row": m.slot_row,
             "slot_col": m.slot_col,
-            "rotation": m.rotation,
             "return_order": m.return_order,
         }),
+        Action::ChooseDomeRotation(rot) => json!({ "type": "dome_rotation", "rotation": rot }),
         Action::BonusChip(m) => json!({ "type": "bonus_chip", "factory_id": m.factory_id }),
         Action::Pass => json!({ "type": "pass" }),
     }
@@ -358,15 +357,24 @@ fn serialize_valid_moves(state: &GameState) -> Value {
         if crate::game::can_draw_stack_peek(state) {
             moves.push(json!({ "type": "dome_stack_peek" }));
         }
+        // Baustein B: `generate_draw_stack_moves` liefert nur noch Kachel×Slot
+        // (Rotation ist eine separate Stufe-2-Suchknoten-Entscheidung, siehe
+        // game.rs) -- die UI erwartet weiterhin die volle Kachel×Slot×Rotation-
+        // Enumeration in EINEM Zug, daher hier lokal wieder aufgefächert.
         for m in crate::game::generate_draw_stack_moves(state) {
-            moves.push(json!({
-                "type": "dome_stack_choose",
-                "chosen_id": m.chosen_id,
-                "slot_row": m.slot_row,
-                "slot_col": m.slot_col,
-                "rotation": m.rotation,
-                "return_order": m.return_order,
-            }));
+            for &rotation in &[0u32, 90, 180, 270] {
+                let full = crate::moves::DrawFromStackMove { rotation, ..m.clone() };
+                if crate::game::validate_draw_from_stack(state, &full).is_none() {
+                    moves.push(json!({
+                        "type": "dome_stack_choose",
+                        "chosen_id": full.chosen_id,
+                        "slot_row": full.slot_row,
+                        "slot_col": full.slot_col,
+                        "rotation": full.rotation,
+                        "return_order": full.return_order,
+                    }));
+                }
+            }
         }
         return Value::Array(moves);
     }
@@ -383,15 +391,24 @@ fn serialize_valid_moves(state: &GameState) -> Value {
         }));
     }
 
-    // Kuppelplatten aus offener Ablage.
+    // Kuppelplatten aus offener Ablage. Baustein B: `generate_dome_moves`
+    // liefert nur noch Kachel×Slot (Rotation ist eine separate Stufe-2-
+    // Suchknoten-Entscheidung, siehe game.rs) -- die UI erwartet weiterhin
+    // die volle Kachel×Slot×Rotation-Enumeration in EINEM Zug, daher hier
+    // lokal wieder aufgefächert.
     for m in crate::game::generate_dome_moves(state) {
-        moves.push(json!({
-            "type": "dome_display",
-            "tile_id": m.dome_tile_id,
-            "slot_row": m.slot_row,
-            "slot_col": m.slot_col,
-            "rotation": m.rotation,
-        }));
+        for &rotation in &[0u32, 90, 180, 270] {
+            let full = crate::moves::PlaceDomeTileMove { rotation, ..m };
+            if crate::game::validate_dome_move(state, &full).is_none() {
+                moves.push(json!({
+                    "type": "dome_display",
+                    "tile_id": full.dome_tile_id,
+                    "slot_row": full.slot_row,
+                    "slot_col": full.slot_col,
+                    "rotation": full.rotation,
+                }));
+            }
+        }
     }
 
     // Aktion A: verdeckt vom Stapel ziehen (Schritt 1, startet einen neuen Zieh-Vorgang).

@@ -121,41 +121,40 @@ pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
             // Suche kombiniert ihre Priors separat, siehe net_mcts.rs).
             "moon_order": m.take.moon_order.iter().map(|c| c.value()).collect::<Vec<_>>(),
         }),
-        Action::Dome(m) => {
+        Action::ChooseDomeSlot(m) => {
             let d_idx = state
                 .dome_display
                 .iter()
                 .position(|t| t.tile_id == m.dome_tile_id)
                 .unwrap_or(0);
             json!({
-                "type": "dome",
+                "type": "choose_dome_slot",
                 "display_index": d_idx,
                 "slot_row": m.slot_row,
                 "slot_col": m.slot_col,
-                "rotation": m.rotation,
             })
         }
         Action::DrawStackPeek => json!({ "type": "dome_stack_peek" }),
-        Action::DrawStack(m) => {
+        Action::ChooseDrawStackSlot(m) => {
             // Position von `chosen_id` in der deduplizierten Pending-Liste --
             // exakt dieselbe Dedup-Reihenfolge wie `generate_draw_stack_moves`
             // (game.rs), damit `pending_index` konsistent zur Kandidaten-
             // generierung ist. `chosen_id` selbst fliesst NICHT in die ID ein
             // (wie bisher) -- `pending_index` ist nur eine grobe, beschraenkte
-            // Ersatzdimension dafuer (siehe action_to_id/dome_stack).
+            // Ersatzdimension dafuer (siehe action_to_id/choose_draw_stack_slot).
             let mut ids: Vec<usize> =
                 state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
             ids.sort_unstable();
             ids.dedup();
             let pending_index = ids.iter().position(|&id| id == m.chosen_id).unwrap_or(0);
             json!({
-                "type": "dome_stack",
+                "type": "choose_draw_stack_slot",
                 "slot_row": m.slot_row,
                 "slot_col": m.slot_col,
-                "rotation": m.rotation,
                 "pending_index": pending_index,
             })
         }
+        Action::ChooseDomeRotation(rot) => json!({ "type": "choose_dome_rotation", "rotation": rot }),
         Action::BonusChip(m) => json!({
             "type": "bonus_chip",
             "factory_index": factory_pos(state, m.factory_id),
@@ -191,20 +190,22 @@ pub(crate) fn action_to_id_direct(state: &GameState, a: &Action) -> usize {
             let f_idx = factory_index(state, &m.take);
             (10 + c_id * 48 + r_id * 6 + f_idx).clamp(0, 273) as usize
         }
-        Action::Dome(m) => {
+        Action::ChooseDomeSlot(m) => {
             let d_idx =
                 state.dome_display.iter().position(|t| t.tile_id == m.dome_tile_id).unwrap_or(0);
-            328 + d_idx
+            328 + d_idx * 9 + m.slot_row * 3 + m.slot_col
         }
-        Action::DrawStack(m) => {
+        Action::ChooseDrawStackSlot(m) => {
             let mut ids: Vec<usize> = state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
             ids.sort_unstable();
             ids.dedup();
             let pending_index = ids.iter().position(|&id| id == m.chosen_id).unwrap_or(0);
-            331 + pending_index.min((crate::features::MAX_PENDING_STACK_TILES - 1) as usize)
+            let p_idx = pending_index.min((crate::features::MAX_PENDING_STACK_TILES - 1) as usize);
+            355 + p_idx * 9 + m.slot_row * 3 + m.slot_col
         }
-        Action::BonusChip(m) => (341 + factory_pos(state, m.factory_id)) as usize,
-        Action::DrawStackPeek => 345,
+        Action::ChooseDomeRotation(rot) => 391 + ((*rot / 90) as usize).min(3),
+        Action::BonusChip(m) => (401 + factory_pos(state, m.factory_id)) as usize,
+        Action::DrawStackPeek => 405,
     }
 }
 
@@ -406,9 +407,15 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
         .filter(|t| t.tile_id != chosen_id)
         .map(|t| t.tile_id)
         .collect();
-    let mv = DrawFromStackMove { chosen_id, slot_row: sr, slot_col: sc, rotation, return_order };
-    let final_action = Action::DrawStack(mv);
+    // Baustein B: zwei echte `apply_drafting`-Aufrufe (Stufe 1 Slot, Stufe 2
+    // Rotation) statt eines einzelnen `DrawStack` -- die zurückgegebene
+    // Aktion ist die Stufe-1-Wahl (traegt chosen_id/slot_row/slot_col, wie
+    // von den Aufrufern/Tests unten gelesen), die Rotation ist zu diesem
+    // Zeitpunkt bereits angewendet.
+    let mv = DrawFromStackMove { chosen_id, slot_row: sr, slot_col: sc, rotation: 0, return_order };
+    let final_action = Action::ChooseDrawStackSlot(mv);
     let _ = game.apply_drafting(&final_action);
+    let _ = game.apply_drafting(&Action::ChooseDomeRotation(rotation));
     final_action
 }
 
@@ -512,20 +519,13 @@ fn permutations<T: Clone>(items: &[T]) -> Vec<Vec<T>> {
     out
 }
 
-// ── Kuppelplatten-Slot/Rotation-Target (analog Moon-Order, aber ohne Suche) ──
-
-/// Slot- (0-8, row-major) und Rotations-Index (0-3) des TATSÄCHLICH gewählten
-/// Kuppelzugs -- im Gegensatz zu `moon_order_target` keine Suche nach der
-/// "besten" Alternative, nur ein einfaches Klassifikations-Label für
-/// `dome_slot_head`/`dome_rotation_head` (net_mcts.rs::build_untried_actions).
-/// `None` außerhalb von `Action::Dome`/`Action::DrawStack`.
-fn dome_slot_rotation_target(a: &Action) -> Option<(usize, usize)> {
-    match a {
-        Action::Dome(m) => Some((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize)),
-        Action::DrawStack(m) => Some((m.slot_row * 3 + m.slot_col, (m.rotation / 90) as usize)),
-        _ => None,
-    }
-}
+// Baustein B (zweistufiger Kuppel-Suchknoten): das frühere
+// `dome_slot_rotation_target` (Klassifikations-Label für `dome_slot_head`/
+// `dome_rotation_head`, Baustein A) ist entfallen -- Kachel+Slot (Stufe 1)
+// und Rotation (Stufe 2) sind jetzt eigenständige `drafting_step`-Aufrufe
+// (siehe `game.rs::PendingDomeChoice`) und bekommen dadurch automatisch je
+// einen EIGENEN Policy-Record aus dem normalen Selfplay-Loop, ohne
+// Sonderbehandlung.
 
 // ── Startkachel-Heuristik (Port von py.rs::ai_start_tile_json) ────────────────
 
@@ -663,8 +663,6 @@ fn start_placement_step<R: Rng + ?Sized>(game: &mut Game, _rng: &mut R) -> Optio
     m.insert("policy".into(), json!([{ "action": chosen_env, "prob": 1.0 }]));
     m.insert("valid_actions".into(), Value::Array(valid_actions));
     m.insert("moon_order_target".into(), Value::Null);
-    m.insert("dome_slot_target".into(), Value::Null);
-    m.insert("dome_rotation_target".into(), Value::Null);
     m.insert("player".into(), json!(recorded_player));
     Some(m)
 }
@@ -695,7 +693,6 @@ fn drafting_step<R: Rng + ?Sized>(
     };
 
     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
-    let dome_t = dome_slot_rotation_target(&chosen);
     let state_json = state_to_json(&game.state, true);
 
     // Zug anwenden (sollte stets gültig sein — aus drafting_actions stammend).
@@ -708,14 +705,6 @@ fn drafting_step<R: Rng + ?Sized>(
     m.insert(
         "moon_order_target".into(),
         moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
-    );
-    m.insert(
-        "dome_slot_target".into(),
-        dome_t.map(|(s, _)| json!(s)).unwrap_or(Value::Null),
-    );
-    m.insert(
-        "dome_rotation_target".into(),
-        dome_t.map(|(_, r)| json!(r)).unwrap_or(Value::Null),
     );
     m.insert("player".into(), json!(player));
     m
@@ -820,8 +809,6 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, rng: &mut R) -> Map<String, Val
     m.insert("policy".into(), json!([{ "action": chosen_env, "prob": 1.0 }]));
     m.insert("valid_actions".into(), Value::Array(valid_actions));
     m.insert("moon_order_target".into(), Value::Null);
-    m.insert("dome_slot_target".into(), Value::Null);
-    m.insert("dome_rotation_target".into(), Value::Null);
     m.insert("player".into(), json!(pi));
     m
 }
@@ -903,6 +890,10 @@ pub fn play_one_game<R: Rng + ?Sized>(
         let _ = game.apply_end_scoring();
     }
     let scores = [game.state.players[0].score, game.state.players[1].score];
+    let scores_unclamped = [
+        game.state.players[0].score_unclamped,
+        game.state.players[1].score_unclamped,
+    ];
     let winner = determine_winner(&game.state);
 
     records
@@ -910,6 +901,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         .map(|mut m| {
             m.insert("game_id".into(), json!(game_id));
             m.insert("scores".into(), json!(scores));
+            m.insert("scores_unclamped".into(), json!(scores_unclamped));
             m.insert("winner".into(), json!(winner));
             // Erreicht die Partie regulär Phase::End (nicht durch Haenger-Schutz
             // abgebrochen)? Nur dann sind scores/winner ein echtes Endergebnis
@@ -1089,6 +1081,7 @@ fn play_arena_game<R: Rng + ?Sized>(
     let p1 = &game.state.players[1];
     json!({
         "scores": [p0.score, p1.score],
+        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
@@ -1231,6 +1224,7 @@ fn play_net_game<R: Rng + ?Sized>(
     let p1 = &game.state.players[1];
     json!({
         "scores": [p0.score, p1.score],
+        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
         "steps": steps,
         "net_board": net_board,
@@ -1370,6 +1364,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     let p1 = &game.state.players[1];
     json!({
         "scores": [p0.score, p1.score],
+        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
@@ -1592,7 +1587,6 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
-                    let dome_t = dome_slot_rotation_target(&chosen);
                     let state_json = state_to_json(&game.state, true);
                     let round_before = game.state.round_number;
                     apply_chosen_action(&mut game, chosen);
@@ -1633,14 +1627,6 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     m.insert(
                         "moon_order_target".into(),
                         moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
-                    );
-                    m.insert(
-                        "dome_slot_target".into(),
-                        dome_t.map(|(s, _)| json!(s)).unwrap_or(Value::Null),
-                    );
-                    m.insert(
-                        "dome_rotation_target".into(),
-                        dome_t.map(|(_, r)| json!(r)).unwrap_or(Value::Null),
                     );
                     m.insert("player".into(), json!(player));
                     records.push(m);
@@ -1777,10 +1763,10 @@ fn negamax_value(
         });
     }
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _value, _m, _points, _dslot, _drot) =
+    let (logits, _value, _m, _points) =
         crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
             net.eval(&feats).unwrap_or_else(|_| {
-                (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
         });
     let mut scored: Vec<(f32, Action)> = actions
@@ -1850,10 +1836,10 @@ fn alphabeta_choose_action(
     ALPHABETA_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let perspective = state.current_player;
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (logits, _value, _m, _points, _dslot, _drot) =
+    let (logits, _value, _m, _points) =
         crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
             net.eval(&feats).unwrap_or_else(|_| {
-                (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
         });
     let mut scored: Vec<(f32, Action)> = actions
@@ -2177,6 +2163,7 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
     let p1 = &game.state.players[1];
     json!({
         "scores": [p0.score, p1.score],
+        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
@@ -2373,7 +2360,7 @@ pub fn sibling_ranking_diagnostic(
                                     let feats = state_to_features_direct(&g2.state);
                                     let net_mover_val = net
                                         .eval(&feats)
-                                        .map(|(_, v, _, _, _, _)| {
+                                        .map(|(_, v, _, _)| {
                                             1.0 - (v.first().copied().unwrap_or(0.0) as f64 + 1.0) / 2.0
                                         })
                                         .unwrap_or(0.5);
@@ -2519,7 +2506,7 @@ pub fn draw_stack_peek_impact_diagnostic(
                                     hypo.players[mover].apply_score(-1);
                                     hypo.pending_stack_draw.push(tile.clone());
                                     let feats = state_to_features_direct(&hypo);
-                                    if let Ok((_, v, _, _, _, _)) = net.eval(&feats) {
+                                    if let Ok((_, v, _, _)) = net.eval(&feats) {
                                         vals.push((v.first().copied().unwrap_or(0.0) as f64 + 1.0) / 2.0);
                                     }
                                 }
@@ -2806,13 +2793,13 @@ mod tests {
 
         let final_action = resolve_and_apply_stack_draw(&mut game);
         match final_action {
-            Action::DrawStack(m) => {
+            Action::ChooseDrawStackSlot(m) => {
                 assert!(
                     game.state.players[0].dome_grid.dome_slots[m.slot_row][m.slot_col].is_some(),
                     "gewaehlte Kachel muss im Raster liegen"
                 );
             }
-            other => panic!("erwartet Action::DrawStack, bekommen {other:?}"),
+            other => panic!("erwartet Action::ChooseDrawStackSlot, bekommen {other:?}"),
         }
         assert!(game.state.pending_stack_draw.is_empty(), "Zieh-Vorgang muss abgeschlossen sein");
         assert_eq!(game.state.players[0].player_tokens_used, 1, "genau 1 Token verbraucht");
@@ -2857,11 +2844,11 @@ mod tests {
 
         let final_action = resolve_and_apply_stack_draw(&mut game);
         match final_action {
-            Action::DrawStack(m) => assert_eq!(
+            Action::ChooseDrawStackSlot(m) => assert_eq!(
                 m.chosen_id, jackpot.tile_id,
                 "haette die wertvolle Kachel waehlen sollen, es lohnt sich klar weiterzuziehen"
             ),
-            other => panic!("erwartet Action::DrawStack, bekommen {other:?}"),
+            other => panic!("erwartet Action::ChooseDrawStackSlot, bekommen {other:?}"),
         }
     }
 

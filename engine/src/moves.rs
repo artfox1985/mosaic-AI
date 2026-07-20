@@ -79,17 +79,49 @@ pub struct TakeBonusChipMove {
     pub factory_id: usize,
 }
 
+/// Baustein B (zweistufiger Kuppel-Suchknoten, externe Bugfix-Review):
+/// speichert die Stufe-1-Wahl (Kachel+Slot), bis die Stufe-2-Wahl (Rotation)
+/// eintrifft. `execute_dome_move`/`execute_draw_from_stack` (game.rs) bleiben
+/// unveraendert -- nur WANN die volle Move-Struktur zusammengesetzt wird
+/// (ueber zwei Spielerentscheidungen statt einer, ohne `switch_player()`
+/// zwischen Stufe 1 und 2), aendert sich.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingDomeChoice {
+    FromDisplay {
+        dome_tile_id: usize,
+        slot_row: usize,
+        slot_col: usize,
+    },
+    FromDrawStack {
+        chosen_id: usize,
+        slot_row: usize,
+        slot_col: usize,
+        return_order: Vec<usize>,
+    },
+}
+
 /// Vereinheitlichter Drafting-Zug (ersetzt das Python-isinstance-Dispatch).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     Stone(Move),
-    Dome(PlaceDomeTileMove),
+    /// Baustein B Stufe 1: Kachel aus dem offenen Display + Slot waehlen.
+    /// `rotation` im enthaltenen Move ist Platzhalter (immer 0, siehe
+    /// `PendingDomeChoice`) -- die tatsaechliche Rotation folgt als
+    /// eigenstaendige Stufe-2-Entscheidung (`ChooseDomeRotation`).
+    ChooseDomeSlot(PlaceDomeTileMove),
     /// Aktion A (Stapel-Variante), Schritt 1: eine weitere verdeckte Platte
     /// ziehen (−1 Pkt), Rückseite zeigt nur den Typ (Wild/Special), nicht
     /// Farben/Anordnung. Beendet den Zug NICHT -- danach muss der Spieler
-    /// erneut entscheiden (weiterziehen oder `DrawStack` zum Aufhören).
+    /// erneut entscheiden (weiterziehen oder `ChooseDrawStackSlot` zum
+    /// Aufhören).
     DrawStackPeek,
-    DrawStack(DrawFromStackMove),
+    /// Baustein B Stufe 1 (Stapel-Variante): gezogene Kachel + Slot waehlen.
+    /// `rotation` Platzhalter (immer 0), analog `ChooseDomeSlot`.
+    ChooseDrawStackSlot(DrawFromStackMove),
+    /// Baustein B Stufe 2: Rotation fuer die in `GameState::pending_dome_choice`
+    /// gespeicherte Stufe-1-Wahl -- EINE gemeinsame Aktion fuer beide Pfade
+    /// (Display/Stapel), `pending_dome_choice` sagt welcher gemeint ist.
+    ChooseDomeRotation(u32),
     BonusChip(TakeBonusChipMove),
     Pass,
 }
