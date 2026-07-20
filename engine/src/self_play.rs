@@ -1652,6 +1652,11 @@ pub fn run_net_self_play(
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
 
+    // Perspektiven-/OOD-Audit (siehe net_mcts.rs-Modulkommentar zu
+    // `PERSPECTIVE_DIVERGENCE_STATS`) -- vor diesem Self-Play-Lauf
+    // zuruecksetzen, damit der angehaengte Snapshot NUR diesen Lauf abbildet.
+    crate::net_mcts::perspective_divergence_reset();
+
     let play = |i: usize| -> Vec<Value> {
         let mut rng =
             StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
@@ -1670,7 +1675,14 @@ pub fn run_net_self_play(
             Err(_) => (0..n_games).map(play).collect(),
         }
     };
-    let flat: Vec<Value> = all.into_iter().flatten().collect();
+    let mut flat: Vec<Value> = all.into_iter().flatten().collect();
+    // Audit-Objekt anhaengen -- gleiches Muster wie `stage3_diagnostics`
+    // weiter unten (arena.py/self_play.py lesen es separat aus, kein
+    // Einfluss auf die Trainingsdaten-Auswertung).
+    flat.push(json!({
+        "perspective_divergence_diagnostics": true,
+        "by_round": crate::net_mcts::perspective_divergence_snapshot(),
+    }));
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
@@ -2186,6 +2198,199 @@ pub fn run_stage3_vs_stage1_arena(
         "trigger_rate": if decisions > 0 { triggered as f64 / decisions as f64 } else { 0.0 },
     }));
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
+}
+
+/// Kendall-Tau (unnormalisiert, Tau-a) zwischen zwei parallelen Werte-Listen
+/// -- Anteil konkordanter minus diskordanter Paare, [-1,1]. Bei `n<2` (kein
+/// Paar möglich) `0.0` (neutral, nicht "perfekt übereinstimmend").
+fn kendall_tau(pairs: &[(f64, f64)]) -> f64 {
+    let n = pairs.len();
+    if n < 2 {
+        return 0.0;
+    }
+    let mut concordant = 0i64;
+    let mut discordant = 0i64;
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let (xa, ya) = pairs[i];
+            let (xb, yb) = pairs[j];
+            let dx = xa - xb;
+            let dy = ya - yb;
+            let sign = dx * dy;
+            if sign > 0.0 {
+                concordant += 1;
+            } else if sign < 0.0 {
+                discordant += 1;
+            }
+        }
+    }
+    let total = (concordant + discordant) as f64;
+    if total <= 0.0 {
+        0.0
+    } else {
+        (concordant - discordant) as f64 / total
+    }
+}
+
+/// Geschwister-Ranking-Diagnose (Nutzer-Auftrag nach externem Kollegen-
+/// Vorschlag, 2026-07-20, siehe `evaluations/Bugfixes.txt` Punkt 3): PUCT
+/// braucht keine absolute Kalibrierung des Value-Heads, sondern die
+/// richtige RANGFOLGE unter den Kindern eines Knotens ("Geschwister") --
+/// das ist eine andere, praxisnähere Frage als das bisher gemessene globale
+/// Val-R². Läuft die Netz-eigene Suche (`net_search_drafting_action`,
+/// dieselbe Zustandsverteilung wie die echte Live-Suche, kein künstlicher
+/// Random-Walk) ein Spiel weit, sammelt dabei bis zu `n_states_per_round`
+/// Runde-1/2-Drafting-Entscheidungspunkte ein. Für jeden gesammelten
+/// Zustand: alle (bzw. bis zu `max_children`, zufällig gezogen falls mehr)
+/// legalen Nachfolgezustände sowohl per trainiertem Netz-Value als auch per
+/// exaktem DFS-Solver (Ground Truth, `crate::mcts::evaluate` -- absolute
+/// Pro-Spieler-Werte, unabhängig davon wer gerade am Zug ist, funktioniert
+/// daher unverändert für JEDEN Nachfolgezustand) auswerten, Kendall-Tau
+/// zwischen beiden Rangfolgen berechnen. Aggregiert nach Runde als JSON
+/// zurückgegeben.
+///
+/// Netz-Ranking bewusst NICHT über den (im Live-Suche-Blattwert genutzten,
+/// separat als nicht hilfreich getesteten, siehe `MIRROR_OTHER_VAL`-
+/// Kommentar) Flip-Klon für die Gegner-Perspektive -- stattdessen der
+/// native, garantiert In-Distribution Ein-Forward-Pass auf dem tatsächlichen
+/// Nachfolgezustand (dessen `current_player` nach dem Zug auf den GEGNER
+/// zeigt): Ranking nach `1 - value_to_win_prob(...)` (höher = besser für
+/// den ziehenden Spieler) ist ordnungsäquivalent zur Gegner-Sicht, keine
+/// zusätzliche Annahme nötig.
+pub fn sibling_ranking_diagnostic(
+    model_path: &str,
+    n_states_per_round: usize,
+    max_children: usize,
+    walk_sims: u32,
+    seed: u64,
+) -> Result<String, String> {
+    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let mut rng = StdRng::seed_from_u64(seed);
+    let target_rounds = [1u32, 2u32];
+    let mut taus: std::collections::HashMap<u32, Vec<f64>> = std::collections::HashMap::new();
+    let mut sib_counts: std::collections::HashMap<u32, Vec<usize>> = std::collections::HashMap::new();
+
+    let mut game_idx = 0u64;
+    loop {
+        let need_more = target_rounds
+            .iter()
+            .any(|r| taus.get(r).map(|v| v.len()).unwrap_or(0) < n_states_per_round);
+        if !need_more || game_idx > 300 {
+            break;
+        }
+        game_idx += 1;
+
+        let names = ["A".to_string(), "B".to_string()];
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut rng_game =
+            StdRng::seed_from_u64(seed.wrapping_add(game_idx.wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let mut game = Game::start(names, 0, ids, &mut rng_game);
+        let t_start = std::time::Instant::now();
+        let mut guard = 0u32;
+        while guard < 2000 && t_start.elapsed().as_secs() < 120 {
+            guard += 1;
+            match game.state.phase {
+                Phase::StartPlacement | Phase::Drafting => {
+                    if game.state.players.iter().any(|p| p.start_tile_pending) {
+                        let first = game.state.current_player;
+                        let non_starter = 1 - first;
+                        let pi = if game.state.players[non_starter].start_tile_pending {
+                            non_starter
+                        } else if game.state.players[first].start_tile_pending {
+                            first
+                        } else {
+                            break;
+                        };
+                        match choose_start_placement(&game.state, pi) {
+                            Some((tid, r, c2, rot)) => {
+                                let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                            }
+                            None => break,
+                        }
+                    } else if game.state.phase == Phase::Drafting {
+                        let round = game.state.round_number;
+                        let need_this_round = target_rounds.contains(&round)
+                            && taus.get(&round).map(|v| v.len()).unwrap_or(0) < n_states_per_round;
+                        let actions = drafting_actions(&game.state);
+                        if need_this_round && actions.len() > 1 {
+                            let mover = game.state.current_player;
+                            let sampled: Vec<_> = if actions.len() > max_children {
+                                let mut idxs: Vec<usize> = (0..actions.len()).collect();
+                                idxs.shuffle(&mut rng);
+                                idxs.truncate(max_children);
+                                idxs.into_iter().map(|i| actions[i].clone()).collect()
+                            } else {
+                                actions.clone()
+                            };
+                            let mut pairs: Vec<(f64, f64)> = Vec::new();
+                            for act in &sampled {
+                                let mut g2 = Game { state: game.state.clone() };
+                                if g2.apply_drafting(act).is_ok() {
+                                    let feats = state_to_features_direct(&g2.state);
+                                    let net_mover_val = net
+                                        .eval(&feats)
+                                        .map(|(_, v, _, _, _, _)| {
+                                            1.0 - (v.first().copied().unwrap_or(0.0) as f64 + 1.0) / 2.0
+                                        })
+                                        .unwrap_or(0.5);
+                                    let dfs_mover_val = crate::mcts::evaluate(&g2.state, 0)[mover];
+                                    pairs.push((net_mover_val, dfs_mover_val));
+                                }
+                            }
+                            if pairs.len() >= 2 {
+                                let tau = kendall_tau(&pairs);
+                                taus.entry(round).or_default().push(tau);
+                                sib_counts.entry(round).or_default().push(pairs.len());
+                            }
+                        }
+                        if actions.is_empty() {
+                            break;
+                        }
+                        let s = dynamic_sims(walk_sims, actions.len());
+                        match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game) {
+                            Some(act) => {
+                                apply_chosen_action(&mut game, act);
+                            }
+                            None => break,
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                Phase::Tiling => {
+                    let pi = game.state.current_player;
+                    match resolve_tiling_step(&game.state, pi) {
+                        TilingStep::Place(ta) => {
+                            let _ = game.apply_single_tiling(pi, &ta);
+                        }
+                        TilingStep::Chips { row, chips } => {
+                            apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                        }
+                        TilingStep::End => {
+                            let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng_game);
+                        }
+                    }
+                }
+                _ => break,
+            }
+        }
+    }
+
+    let mut result = serde_json::Map::new();
+    for &round in &target_rounds {
+        let round_taus = taus.get(&round).cloned().unwrap_or_default();
+        let n = round_taus.len();
+        let mean = if n > 0 { round_taus.iter().sum::<f64>() / n as f64 } else { 0.0 };
+        let avg_sib = sib_counts
+            .get(&round)
+            .map(|v| v.iter().sum::<usize>() as f64 / v.len().max(1) as f64)
+            .unwrap_or(0.0);
+        result.insert(
+            format!("round_{round}"),
+            json!({ "n_states": n, "mean_kendall_tau": mean, "avg_siblings": avg_sib }),
+        );
+    }
+    Ok(serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| "{}".to_string()))
 }
 
 #[cfg(test)]

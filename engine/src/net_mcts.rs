@@ -22,6 +22,7 @@
 
 use std::collections::HashMap;
 
+use rand::seq::SliceRandom;
 use rand::{Rng, RngExt};
 use serde_json::{json, Value};
 
@@ -143,6 +144,22 @@ pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
 /// Schadensfaktor) -- auf `false` zurückgesetzt (Original-Verhalten).
 pub const MIRROR_OTHER_VAL: bool = false;
 
+/// Kuppelstapel-Determinisierung im Suchbaum (Fund 6, externer Hinweis,
+/// 2026-07-20) -- mischt `dome_tile_pool` bei jedem simulierten
+/// `DrawStackPeek` neu (siehe Kommentar an der Aufrufstelle in
+/// `build_net_tree`), statt die ECHTE, im realen Spiel verdeckte oberste
+/// Platte zu lesen.
+///
+/// GETESTET (2026-07-20, v9b_domeonly + Struktur-Fixes + Floor-Shaping
+/// W=0.3, 150 Sims, n=100, KEIN Early-Stop): 9:91 (9% Siege), Score 21.9
+/// vs. 43.9, Floor 18.8 vs. 12.1 -- SCHLECHTER als ohne diesen Fix (17%
+/// Siege). Theoretisch gut begründet (entfernt Orakel-Wissen), aber die
+/// Neumischung erhöht offenbar eher die Varianz der Suche (jeder simulierte
+/// Ast sieht eine andere Ziehung) als dass sie echte Verzerrung beseitigt --
+/// bei nur 150 Sims/Zug zu teuer. Auf `false` zurückgesetzt (Original-
+/// Verhalten); Code bleibt verfügbar.
+pub const SHUFFLE_STACK_PEEK_IN_SEARCH: bool = false;
+
 /// Exakte, JETZT SCHON feststehende Floor-Straf-Differenz (Spieler0 minus
 /// Spieler1) dieser Runde, roh (unskaliert). KEINE Vorhersage — reine
 /// State-Funktion (`PlayerBoard::broken_penalty`, board.rs), verfügbar ohne
@@ -177,6 +194,60 @@ fn floor_shaping_delta(state: &GameState) -> f64 {
     let theirs = (state.players[1].broken_penalty()
         + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
     (mine - theirs) / FLOOR_SHAPING_SCALE
+}
+
+// ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
+//
+// Der Perspektiven-Mirror-Fix (`MIRROR_OTHER_VAL`) wurde arena-getestet und
+// hat die Suchstärke NICHT verbessert (siehe dortiger Kommentar) -- die
+// Hypothese "zweiter Forward-Pass ist der dominante Schadensfaktor" ist damit
+// als ALLEINIGE Erklärung widerlegt. Der zugrunde liegende Verdacht (mover_val
+// + other_val nicht nullsummen-konsistent, da `other_val` einen im Training
+// nie gesehenen Zustand auswertet) bleibt aber eine berechtigte, noch nicht
+// endgültig ausgeschlossene Teilursache -- daher NICHT die Suche selbst
+// ändern (das Ergebnis war negativ), sondern permanent als Audit/Sanity-Check
+// mitloggen: `|v_mover + v_other - 1|` pro Runde, unconditional (kein
+// Feature-Flag, immer aktiv, im Gegensatz zu `profiling.rs`s
+// `clone_profiling`-gated Tooling) -- Nutzer-Auftrag, im Self-Play als
+// zusätzliche Ausgabewerte sichtbar bleiben. Gleiches Muster wie
+// `self_play.rs`s `STAGE3_DECISIONS`-Zähler (Mutex statt Atomics, da hier
+// auch Summen/Mittelwerte gebraucht werden, nicht nur Zählungen).
+static PERSPECTIVE_DIVERGENCE_STATS: std::sync::OnceLock<std::sync::Mutex<[(u64, f64); 6]>> =
+    std::sync::OnceLock::new();
+
+fn perspective_divergence_stats() -> &'static std::sync::Mutex<[(u64, f64); 6]> {
+    PERSPECTIVE_DIVERGENCE_STATS.get_or_init(|| std::sync::Mutex::new([(0u64, 0.0f64); 6]))
+}
+
+/// `mover_val`/`other_val` sind VOR der Floor-Shaping-Korrektur genau die
+/// beiden unabhängigen Netz-Forward-Pass-Ergebnisse -- exakt die Größen, die
+/// laut Hinweis nicht nullsummen-konsistent sein könnten. `round` wird auf
+/// 1..=5 gekappt (Index 0 bleibt ungenutzt).
+fn record_perspective_divergence(round: u32, mover_val: f64, other_val: f64) {
+    let idx = (round as usize).clamp(1, 5);
+    let div = (mover_val + other_val - 1.0).abs();
+    let mut g = perspective_divergence_stats().lock().unwrap();
+    g[idx].0 += 1;
+    g[idx].1 += div;
+}
+
+pub(crate) fn perspective_divergence_reset() {
+    let mut g = perspective_divergence_stats().lock().unwrap();
+    *g = [(0u64, 0.0f64); 6];
+}
+
+/// JSON `{"round_1": {"n": .., "mean_abs_divergence": ..}, ...}` -- ans
+/// Self-Play-Ergebnis angehängt, analog `self_play.rs`s
+/// `stage3_diagnostics`-Objekt.
+pub(crate) fn perspective_divergence_snapshot() -> Value {
+    let g = perspective_divergence_stats().lock().unwrap();
+    let mut out = serde_json::Map::new();
+    for round in 1..=5usize {
+        let (n, sum) = g[round];
+        let mean = if n > 0 { sum / n as f64 } else { 0.0 };
+        out.insert(format!("round_{round}"), json!({ "n": n, "mean_abs_divergence": mean }));
+    }
+    Value::Object(out)
 }
 
 // ── Suche-getriebene Moon-Order-Wahl ─────────────────────────────────────────
@@ -328,6 +399,7 @@ fn build_untried_actions(
     moon_scores: &[f32; 5],
     dome_slot_scores: &[f32; 9],
     dome_rotation_scores: &[f32; 4],
+    skip_cutoff: bool,
 ) -> (Vec<(Action, f32)>, usize) {
     let base_actions = drafting_actions(state);
     let n = base_actions.len();
@@ -413,6 +485,20 @@ fn build_untried_actions(
     // Priors POLICY_MASS_CUTOFF erreichen — der Rest (Long Tail) wird verworfen,
     // BEVOR er je ein Kandidat für Widening werden kann. Mindestens 1 Aktion
     // bleibt immer erhalten (auch wenn ihr eigener Prior schon >= Cutoff ist).
+    //
+    // `skip_cutoff` (externer Bugfix-Hinweis, Fund 4, 2026-07-20): an der
+    // WURZEL ausgesetzt (siehe `make_node`s `parent.is_none()`-Aufruf) --
+    // Dirichlet-Root-Noise (`build_net_tree`) wird sonst erst NACH diesem
+    // Cutoff auf den bereits verkleinerten Präfix gemischt, wodurch Aktionen
+    // jenseits der 95%-Masse im Self-Play NIE exploriert werden können (kein
+    // AlphaZero-Standardverhalten: Root-Noise soll JEDER legalen Aktion eine
+    // Explorations-Chance geben). Nur an der Wurzel relevant -- der
+    // Progressive-Widening-Cap (`MAX_ACTIONS + WIDEN_FACTOR·√N`, siehe
+    // `build_net_tree`) verhindert weiterhin, dass der Long Tail tatsächlich
+    // durchgehend expandiert wird, auch ohne den harten Cutoff hier.
+    if skip_cutoff {
+        return (acts, n);
+    }
     let mut cum = 0.0f64;
     let mut keep = acts.len();
     for (i, (_, p)) in acts.iter().enumerate() {
@@ -479,6 +565,9 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
             .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
             .unwrap_or(0.5)
     };
+    if !MIRROR_OTHER_VAL {
+        record_perspective_divergence(state.round_number, mover_val, other_val);
+    }
     if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
 }
 
@@ -515,7 +604,7 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     for (i, s) in drot.iter().take(4).enumerate() {
         dome_rotation_scores[i] = *s;
     }
-    build_untried_actions(state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores).0
+    build_untried_actions(state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores, false).0
 }
 
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
@@ -556,7 +645,18 @@ fn make_node<R: Rng + ?Sized>(
     let (untried, n_actions) = if terminal {
         (Vec::new(), 0)
     } else {
-        build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores)
+        // Cutoff an der Wurzel ausgesetzt (siehe `build_untried_actions`-
+        // Kommentar zu `skip_cutoff`, Fund 4) -- `parent.is_none()` erkennt
+        // die Wurzel unabhängig davon, ob Root-Noise gerade aktiv ist
+        // (Arena-Suche bleibt durch den Widening-Cap trotzdem sicher).
+        build_untried_actions(
+            &state,
+            &logits,
+            &moon_scores,
+            &dome_slot_scores,
+            &dome_rotation_scores,
+            parent.is_none(),
+        )
     };
 
     // Blattwert: unabhängige Pro-Spieler-Werte. Das Netz liefert einen
@@ -578,6 +678,13 @@ fn make_node<R: Rng + ?Sized>(
                     .map(|(_, v, _, p, _, _)| blended_leaf_win_prob(&v, &p))
                     .unwrap_or(0.5)
             };
+            // Perspektiven-/OOD-Audit (siehe Modul-Kommentar oben) -- nur
+            // aussagekräftig, wenn `other_val` ein ECHTER zweiter Forward-Pass
+            // ist (bei `MIRROR_OTHER_VAL=true` wäre die Divergenz trivial 0,
+            // per Konstruktion, keine echte Information).
+            if !MIRROR_OTHER_VAL {
+                record_perspective_divergence(state.round_number, mover_val, other_val);
+            }
             let mut today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
 
@@ -730,6 +837,14 @@ fn build_net_tree<R: Rng + ?Sized>(
 
         // Selection + (eine) Expansion.
         let mut nid = 0;
+        // Fund 5 (externer Hinweis, 2026-07-20): ein fehlgeschlagenes
+        // `apply_drafting` verwarf den Kandidaten still und liess `nid` auf
+        // dem PARENT stehen -- die anschliessende Eval/Backprop-Sektion
+        // backprop'te dann fälschlich noch einmal den Parent-eigenen,
+        // bereits bekannten Blattwert (verzerrte Besuchszahlen ohne echten
+        // Informationsgewinn). Fix: diese Sim sauber überspringen (kein
+        // Eval/Backprop), statt den Parent nochmal zu zählen.
+        let mut expansion_failed = false;
         loop {
             if nodes[nid].terminal {
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
@@ -755,6 +870,22 @@ fn build_net_tree<R: Rng + ?Sized>(
                 let mover = nodes[nid].state.current_player;
                 crate::profiling::note_gamestate_clone();
                 let mut g = Game { state: nodes[nid].state.clone() };
+                // Verdeckte-Information-Fix (externer Hinweis, Fund 6,
+                // 2026-07-20): `execute_draw_stack_peek` (aufgerufen via
+                // `apply_drafting` bei `DrawStackPeek`) liest sonst
+                // `dome_tile_pool.remove(0)` -- die ECHTE, im realen Spiel
+                // eigentlich verdeckte oberste Platte. Dieselbe
+                // Determinisierung wie `round_transition_deep::
+                // simulate_one_round` (mischt den Restpool einmalig beim
+                // Runden-Eintritt): hier einmalig VOR jedem simulierten Peek,
+                // da genau in diesem Moment eine neue verdeckte Information
+                // aufgedeckt würde. `dome_tile_pool` enthält an dieser Stelle
+                // ohnehin nur noch die ungezogenen (= wirklich verdeckten)
+                // Platten -- volles Mischen ist daher exakt richtig, keine
+                // Sonderbehandlung für bereits aufgedeckte Platten nötig.
+                if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
+                    g.state.dome_tile_pool.shuffle(rng);
+                }
                 if g.apply_drafting(&act).is_ok() {
                     let mut child_state = g.state;
                     child_state.log.clear();
@@ -771,6 +902,8 @@ fn build_net_tree<R: Rng + ?Sized>(
                         if terminal { ", terminal" } else { "" }
                     );
                     nid = cid;
+                } else {
+                    expansion_failed = true;
                 }
                 break;
             }
@@ -797,6 +930,11 @@ fn build_net_tree<R: Rng + ?Sized>(
                 );
             }
             nid = cid;
+        }
+
+        if expansion_failed {
+            logln!("  SKIP   Sim {} (apply_drafting fehlgeschlagen, kein Backprop)", sim + 1);
+            continue;
         }
 
         // Eval: Blattwert wurde schon bei Knoten-Erzeugung berechnet (make_node).
@@ -1128,7 +1266,7 @@ mod tests {
         let dome_rotation_scores = [0.0f32; 4];
 
         let (acts, n_base) =
-            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores, false);
         assert!(!acts.is_empty());
         assert!(
             acts.len() < n_base,
@@ -1151,7 +1289,7 @@ mod tests {
         let dome_rotation_scores = [0.0f32; 4];
 
         let (acts, n_base) =
-            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores, false);
         assert!(!acts.is_empty());
 
         // Kandidaten sind auf den POLICY_MASS_CUTOFF-Präfix gekappt (Long Tail
@@ -1284,7 +1422,7 @@ mod tests {
         dome_rotation_scores[target_rot] = 3.0;
 
         let (acts, _n) =
-            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores, false);
 
         let mut target_p = None;
         let mut sibling_ps = Vec::new();
@@ -1340,7 +1478,7 @@ mod tests {
         let dome_slot_scores = [0f32; 9];
         let dome_rotation_scores = [0f32; 4];
         let (acts, _n) =
-            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores);
+            build_untried_actions(&state, &logits, &moon_scores, &dome_slot_scores, &dome_rotation_scores, false);
 
         let draw_stack_sum: f64 = acts
             .iter()
