@@ -138,6 +138,23 @@ fn sibling_ranking_diagnostic(
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+/// Bindungs-Check fuer Fund 6 (siehe `self_play::draw_stack_peek_impact_
+/// diagnostic`): Peek-Haeufigkeit + Netz-Wertspanne ueber alle moeglichen
+/// Plattenidentitaeten, aggregiert nach Runde.
+#[pyfunction]
+#[pyo3(signature = (model_path, n_games=30, walk_sims=80, seed=None))]
+fn draw_stack_peek_impact_diagnostic(
+    py: Python<'_>,
+    model_path: String,
+    n_games: usize,
+    walk_sims: u32,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || crate::self_play::draw_stack_peek_impact_diagnostic(&model_path, n_games, walk_sims, seed))
+        .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Arena-Match Netz vs. Heuristik-MCTS (Netz auf Brett 0). Lädt das ONNX-Netz
 /// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
@@ -347,6 +364,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(sibling_ranking_diagnostic, m)?)?;
+    m.add_function(wrap_pyfunction!(draw_stack_peek_impact_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(net_vs_net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
     m.add_function(wrap_pyfunction!(stage3_vs_stage1_arena_match, m)?)?;

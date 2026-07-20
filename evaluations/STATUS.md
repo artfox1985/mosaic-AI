@@ -644,6 +644,48 @@ richtige Beschreibung für Runde 1.
 beiden Struktur-Fixes (Widening, Tiebreak) sind fest im Code (kein Toggle,
 echte Bugfixes). Bestätigter bester Stand bleibt **17% Netz-Siege** (n=100).
 
+## Fund 6: Bindungs-Check — abgeschlossen, KEIN echtes Problem (2026-07-20)
+
+Nutzer-Auftrag vor weiterer Arbeit an Fund 6: erst messen, ob der Orakel-Bias
+überhaupt bindend ist, statt blind mehr Aufwand reinzustecken. Neue
+Diagnose `self_play::draw_stack_peek_impact_diagnostic` (pyo3:
+`draw_stack_peek_impact_diagnostic`): loggt pro Runde, wie oft
+`DrawStackPeek` unter den legalen Aktionen ist bzw. von der Netz-Suche
+tatsächlich gespielt wird, UND an tatsächlich gespielten Peek-Entscheidungen
+die Wertspanne (max−min) des Netz-Blattwerts über ALLE aktuell im
+`dome_tile_pool` verbleibenden Plattenidentitäten (statt der einen echten).
+
+Ergebnis (v9b_domeonly, 30 Spiele, Netz-eigene Suche):
+
+| Runde | Peek angeboten | Peek gewählt | Wahlrate | Ø Wertspanne | Max Wertspanne |
+|---|---|---|---|---|---|
+| 1 | 397/767 | 36 | 4.7% | **0.0** | **0.0** |
+| 2 | 262/737 | 33 | 4.5% | **0.0** | **0.0** |
+| 3 | 330/737 | 37 | 5.0% | **0.0** | **0.0** |
+| 4 | 472/744 | 30 | 4.0% | **0.0** | **0.0** |
+| 5 | 0/531 | 0 | 0% | — | — |
+
+**Eindeutiges Ergebnis, kein Diagnose-Artefakt**: Peeks werden selten
+gewählt (~4-5%, obwohl oft angeboten), UND die Wertspanne ist in JEDER
+einzelnen Stichprobe EXAKT 0.0 — nicht nur klein. Verifiziert per Code-Grep:
+`pending_stack_draw` kommt in `features.rs` NUR in einem Kommentar vor,
+nirgends im tatsächlichen Feature-Vektor. Der Value-Head ist also
+architektonisch BLIND dafür, welche Platte gerade verdeckt gezogen wurde —
+es gibt keinen Bias zu korrigieren, weil die Information den Value-Head nie
+erreicht. Das erklärt auch sauber den 17%→9%-Regressions-Befund von vorhin:
+die Neumischung (`SHUFFLE_STACK_PEEK_IN_SEARCH`) korrigierte keinen echten
+Bias (es gab keinen), sondern führte reines Rauschen ein (welche Platte am
+Ende tatsächlich platziert wird, ändert sich zufällig zwischen simulierten
+Ästen, ohne dass der Value-Head das je hätte nutzen können).
+
+**Fund 6 damit abgeschlossen** (nicht nur zurückgestellt) — kein weiterer
+Aufwand hier gerechtfertigt, zumindest nicht für den Value-Head-Pfad. Ob die
+fehlende Kodierung von `pending_stack_draw` die POLICY-Entscheidung
+"nochmal ziehen oder aufhören" schwächt, ist eine separate, nicht
+untersuchte Frage (Peek-Wahlrate von nur ~4-5% könnte darauf hindeuten,
+dass das Netz das Nachziehen generell selten für lohnend hält — unabhängig
+von Fund 6).
+
 ## Weitere zurückgestellte Punkte
 
 - `ROUND_TRANSITION_SAMPLING` in der Live-Suche bleibt hinten angestellt,

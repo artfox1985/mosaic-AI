@@ -2393,6 +2393,148 @@ pub fn sibling_ranking_diagnostic(
     Ok(serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| "{}".to_string()))
 }
 
+/// Bindungs-Check für Fund 6 (Nutzer-Auftrag, 2026-07-20): BEVOR mehr Arbeit
+/// in die Kuppelstapel-Determinisierung fließt -- der `SHUFFLE_STACK_PEEK_
+/// IN_SEARCH`-Test (17%→9% Siege, siehe net_mcts.rs) deutet schon darauf
+/// hin, dass die durch Neumischen eingeführte Varianz größer war als der
+/// eigentliche Orakel-Bias. Misst direkt: (a) wie oft `DrawStackPeek` unter
+/// den legalen Aktionen ist bzw. von der Netz-Suche tatsächlich GESPIELT
+/// wird, (b) an tatsächlich gespielten Peek-Entscheidungen die Wertspanne
+/// (max-min) des Netz-Blattwerts über ALLE aktuell im `dome_tile_pool`
+/// verbleibenden Platten-Identitäten (statt der einen echten) -- kleine
+/// Spanne/seltene Peeks == der Orakel-Bias ist marginal, Fund 6 gehört ans
+/// Ende der Liste. Läuft die Netz-eigene Suche ein Spiel weit (realistische
+/// Zustandsverteilung, `walk_sims` moderat), aggregiert nach Runde.
+pub fn draw_stack_peek_impact_diagnostic(
+    model_path: &str,
+    n_games: usize,
+    walk_sims: u32,
+    seed: u64,
+) -> Result<String, String> {
+    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut total_decisions: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
+    let mut peek_offered: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
+    let mut peek_chosen: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
+    let mut value_spreads: std::collections::HashMap<u32, Vec<f64>> = std::collections::HashMap::new();
+
+    for game_idx in 0..n_games {
+        let names = ["A".to_string(), "B".to_string()];
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut rng_game = StdRng::seed_from_u64(
+            seed.wrapping_add((game_idx as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+        );
+        let mut game = Game::start(names, 0, ids, &mut rng_game);
+        let t_start = std::time::Instant::now();
+        let mut guard = 0u32;
+        while guard < 2000 && t_start.elapsed().as_secs() < 120 {
+            guard += 1;
+            match game.state.phase {
+                Phase::StartPlacement | Phase::Drafting => {
+                    if game.state.players.iter().any(|p| p.start_tile_pending) {
+                        let first = game.state.current_player;
+                        let non_starter = 1 - first;
+                        let pi = if game.state.players[non_starter].start_tile_pending {
+                            non_starter
+                        } else if game.state.players[first].start_tile_pending {
+                            first
+                        } else {
+                            break;
+                        };
+                        match choose_start_placement(&game.state, pi) {
+                            Some((tid, r, c2, rot)) => {
+                                let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                            }
+                            None => break,
+                        }
+                    } else if game.state.phase == Phase::Drafting {
+                        let round = game.state.round_number;
+                        let actions = drafting_actions(&game.state);
+                        if actions.is_empty() {
+                            break;
+                        }
+                        *total_decisions.entry(round).or_insert(0) += 1;
+                        let offers_peek = actions.contains(&Action::DrawStackPeek);
+                        if offers_peek {
+                            *peek_offered.entry(round).or_insert(0) += 1;
+                        }
+                        let s = dynamic_sims(walk_sims, actions.len());
+                        let chosen = match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game)
+                        {
+                            Some(act) => act,
+                            None => break,
+                        };
+                        if chosen == Action::DrawStackPeek {
+                            *peek_chosen.entry(round).or_insert(0) += 1;
+                            let pool = game.state.dome_tile_pool.clone();
+                            let mover = game.state.current_player;
+                            if pool.len() >= 2 {
+                                let mut vals: Vec<f64> = Vec::new();
+                                for tile in &pool {
+                                    let mut hypo = game.state.clone();
+                                    hypo.players[mover].apply_score(-1);
+                                    hypo.pending_stack_draw.push(tile.clone());
+                                    let feats = state_to_features_direct(&hypo);
+                                    if let Ok((_, v, _, _, _, _)) = net.eval(&feats) {
+                                        vals.push((v.first().copied().unwrap_or(0.0) as f64 + 1.0) / 2.0);
+                                    }
+                                }
+                                if vals.len() >= 2 {
+                                    let lo = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+                                    let hi = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                                    value_spreads.entry(round).or_default().push(hi - lo);
+                                }
+                            }
+                        }
+                        apply_chosen_action(&mut game, chosen);
+                    } else {
+                        break;
+                    }
+                }
+                Phase::Tiling => {
+                    let pi = game.state.current_player;
+                    match resolve_tiling_step(&game.state, pi) {
+                        TilingStep::Place(ta) => {
+                            let _ = game.apply_single_tiling(pi, &ta);
+                        }
+                        TilingStep::Chips { row, chips } => {
+                            apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                        }
+                        TilingStep::End => {
+                            let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng_game);
+                        }
+                    }
+                }
+                _ => break,
+            }
+        }
+    }
+
+    let mut result = serde_json::Map::new();
+    for round in 1..=5u32 {
+        let total = *total_decisions.get(&round).unwrap_or(&0);
+        let offered = *peek_offered.get(&round).unwrap_or(&0);
+        let chosen = *peek_chosen.get(&round).unwrap_or(&0);
+        let spreads = value_spreads.get(&round).cloned().unwrap_or_default();
+        let n_spread = spreads.len();
+        let mean_spread = if n_spread > 0 { spreads.iter().sum::<f64>() / n_spread as f64 } else { 0.0 };
+        let max_spread = spreads.iter().cloned().fold(0.0f64, f64::max);
+        result.insert(
+            format!("round_{round}"),
+            json!({
+                "total_decisions": total,
+                "peek_offered": offered,
+                "peek_chosen": chosen,
+                "peek_chosen_rate": if total > 0 { chosen as f64 / total as f64 } else { 0.0 },
+                "n_value_spread_samples": n_spread,
+                "mean_value_spread": mean_spread,
+                "max_value_spread": max_spread,
+            }),
+        );
+    }
+    Ok(serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| "{}".to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
