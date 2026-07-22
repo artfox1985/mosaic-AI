@@ -1185,6 +1185,219 @@ automatisch mit. **Nach G1 muss die Arena-Baseline neu gemessen werden**
 (deterministisches Gumbel ändert das Arena-Verhalten ggü. den
 22-26%-Referenzen) — ein n=100-Lauf als neue Referenz steht aus.
 
+## Arena-Re-Baseline nach den Audit-Fixes (2026-07-21)
+
+Zwei unabhängige n=100-Läufe (v10_best, NET_SIMS=400 flach, deterministisches
+Gumbel, neue Regeln, kein Early-Stop) — versehentlich zeitgleich gestartet
+(CPU-Doppellast), daher als zwei Stichproben gewertet:
+
+| Lauf | Ergebnis | Ø Score | Floor-Strafe |
+|---|---|---|---|
+| A | ~36-39% (36:61 nach 97 erfassten Spielen) | 33.6 vs. 39.1 | n/a |
+| B | **49:51 (49%)** | 35.3 vs. 34.8 | **14.6 vs. 17.4** |
+
+Gepoolt ≈ **43%** (85/197) — massiv über der alten 22-26%-Referenz, und in
+Lauf B erstmals Netz-Floor-Strafe BESSER als die der Heuristik. Der Sprung
+ist konfundiert aus drei gleichzeitigen Änderungen (NET_SIMS 400 flach statt
+150, deterministisches Arena-Gumbel/G1, Regelfixes R1/R2/R6) und nicht
+auftrennbar. Die A/B-Differenz liegt über dem üblichen ±6pp-Band, plausibel
+durch die parallele Doppellast. **22-26% ist als Referenz obsolet; neue
+Arbeitsreferenz ~43-49% unter den neuen Standardbedingungen.**
+
+## Floor-Shaping-Signifikanzanalyse W=0.3 vs. W=0.0 (2026-07-21)
+
+Nutzer-Auftrag: ist `FLOOR_SHAPING_WEIGHT=0.3` wirklich signifikant besser
+als 0.0? Vorab-Erkenntnis: die ALTEN Daten (48/200 vs. 17/100, alte
+Bedingungen) sind mit Fisher exakt **p=0.183**, CI [−3.1, +15.8] pp,
+Power ~27% schlicht unterpowert — die frühere "bestätigt bei n=100"-
+Einordnung oben war statistisch nicht haltbar.
+
+Neues Design: **gepaarte Arena** (identische Spiel-Seeds in beiden Armen —
+`net_arena_match` seedet deterministisch je Spielindex), Arm A = W=0.3
+(Haupt-Wheel), Arm B = W=0.0 (isolierter Git-Worktree
+`../mosaic-floorablation` + eigenes venv, Einzeilen-Diff), beide v10_best,
+NET_SIMS=400/HEUR_SIMS=150; Blöcke à 25 Paare, kumulativer exakter McNemar,
+Early-Stop-Regime.
+
+**Endergebnis (fixed n=150 Paare)**:
+
+| | W=0.3 | W=0.0 |
+|---|---|---|
+| Netz-Siege | **52/150 (34.7%)** | 31/150 (20.7%) |
+| Ø Floor-Strafe Netz | **15.9** | 20.1 |
+| Ø Score-Margin (Netz−Heur.) | **−7.8** | −14.6 |
+
+Diskordante Paare 39:18, **exakter McNemar p=0.0075**, gepaarte
+Winrate-Differenz **+14.0 pp, 95%-CI [+4.4, +23.6]**. Sekundärendpunkte
+alle gleichgerichtet und hochsignifikant (Floor-Differenz −4.25, p<0.0001 —
+der Mechanismus tut nachweislich genau das, wofür er gebaut wurde).
+Sequenzielle Ehrlichkeit: der Interim-Stopp bei n=100 (nominal p=0.047)
+wäre wegen 4 Zwischenblicken allein KEIN sauberer Nachweis gewesen
+(Verfahrens-α≈0.07-0.10); die 50 unabhängigen Zusatzpaare verstärkten den
+Effekt aber (Diskordanz 14:6 in Blöcken 5-6 allein), selbst konservativ
+verdoppeltes p bleibt <0.02. **Fazit: W=0.3 ist signifikant besser —
+FLOOR_SHAPING_WEIGHT=0.3 bleibt.** (Rohdaten/Skripte im Session-Scratchpad,
+W=0.0-Worktree `../mosaic-floorablation` steht noch, nichts committet.)
+
+## Netz-Self-Play-Zyklus v11 — Zwischenstand (2026-07-21; Endergebnisse siehe eigener Abschnitt unten)
+
+Erster netzgeführter Zyklus (Nutzer-Freigabe: 2000 Spiele): completed-Q-
+Policy-Ziele + TD-Bootstrap (Schema 15) + korrigierte Regeln in einem
+Korpus (`selfplay_netcq_*`).
+
+- **Benchmark**: 10 Spiele, 1618 Züge, 146.7s (0.068 Spiele/s) →
+  Hochrechnung 2000 Spiele ≈ 8.2h solo.
+- **Record-Stichprobe bestanden**: `policy` = echte completed-Q-Verteilung
+  (keine One-Hots), `bootstrap_value` in 923/923 Drafting-Steps,
+  `scores_unclamped` konsistent.
+- **Bugfix nebenbei**: `run_net_self_play` hängt einen
+  `perspective_divergence_diagnostics`-Record ans JSON, den self_play.py
+  als 11. "Spiel" in die .pkl schrieb — hätte das Training mit KeyError
+  gecrasht. Filter in self_play.py ergänzt (arena.py-Muster).
+- **Unterbrechungen**: tagsüber Nutzer-Abbruch (Rechner gebraucht, 50
+  Spiele gesichert); abends Neustart kollidierte mit der parallelen
+  Floor-Shaping-Ablation (lastabhängiger Gamma-Pruning-Chunk-Hänger, vom
+  self_play.py-Supervisor korrekt abgefangen) → **Nutzer-Entscheidung:
+  serialisieren** — erst Ablation solo fertig, dann Batch solo (~8h,
+  Rest 1950 Spiele, frischer Seed).
+- **Trainingsplan** (nach Batch): v11 UND v11_sharp1 auf demselben Korpus —
+  `POLICY_TARGET_SHARPEN_EXPONENT` 2.0 vs. 1.0, weil das ^2-Schärfen für
+  flache Heuristik-Besuchsanteile gedacht war und Gumbels π′ (bereits die
+  theoretisch korrekte Zielverteilung) verzerren dürfte. Warm-Start v10,
+  gleiche Diagnose-Kette für beide.
+
+## Projekt-Entscheidungen aus der Hyperparameter-/Backlog-Review (2026-07-21)
+
+- **Replay-Fenster (Nutzer-Entscheidung)**: Trainingskorpus je Generation =
+  ~5000 Spiele vom aktuellen Champion + je ~1000 der letzten 2
+  Vorgänger-Champions (Datei-Subsampling). Impliziert Champion-Gating
+  (neues Modell muss den amtierenden in der Arena schlagen). Gilt ab den
+  Netz-Generationen; Alt-Regel-Korpora (domefactB und früher) kommen nie
+  zurück in den Mix. Datenbedarf je Generation wird per
+  Skalierungs-Ablation auf dem netcq-Korpus kalibriert (500/1000/2000-
+  Subsets, Potenzgesetz-Fit).
+- **`VALUE_SCALE=50` bleibt bewusst fix** (Nutzer: 50 Punkte = gutes Spiel,
+  semantischer Anker). Schattenpunkte verlängern nur den negativen Rand der
+  Margin-Skala (z.B. −75 → tanh −0.91 statt geklemmt −0.76) — gewollte
+  Differenzierung, keine Sättigungsgefahr; Label-Histogramm wird bei der
+  v11-Diagnose geprüft.
+- **Tote Knöpfe seit Gumbel** (nicht mehr tunen): `DEFAULT_C_PUCT`,
+  `DIRICHLET_EPS/ALPHA` (nur Legacy-PUCT-Pfad), `TARGET_TEMP`/
+  Temperaturleiter (nur Heuristik-Pfad).
+- **Statt Tuning: Entfernen** — `MAX_ACTIONS`/`WIDEN_FACTOR`/
+  `POLICY_MASS_CUTOFF` sind im Gumbel-Pfad ab Tiefe ≥1 noch PUCT-Erbe
+  (Wurzel ist bereits frei davon); mctx braucht beides nicht, weil die
+  Auswahlregel über ALLE Kandidaten läuft und sich selbst begrenzt. Umbau
+  als eigenes Arbeitspaket geplant (gebündelt mit Inferenz-Batching).
+- **Runde-5-Alpha-Beta**: Prüfauftrag ergab — bereits vollständig
+  implementiert und in BEIDEN Suchpfaden verdrahtet (`round5::applies` an
+  allen vier Netz-Einstiegspunkten); kein offener Punkt.
+- **Nächste Arbeitspakete** (nach v11): Elo-Tracking mit festem
+  Benchmark-Kader (beendet Baseline-Drift), Inferenz-Batching Batch=2 je
+  Blatt (+ `MIRROR_OTHER_VAL`-Neubewertung anhand der perspective_divergence-
+  Daten aus dem netcq-Batch), Run-Manifeste je Lauf, ISMCTS-Mehrfach-
+  Determinisierung, Diversitäts-Monitoring auf dem netcq-Korpus.
+
+## Netzgeführter Self-Play-Zyklus v11 — Endergebnisse (completed-Q + TD-Bootstrap + Regelfixes) (2026-07-22)
+
+Abschluss des oben als Zwischenstand dokumentierten ersten NETZGEFÜHRTEN
+Zyklus: 2000 Spiele `selfplay_netcq_*` (v10_best als Generator, base_sims=400,
+Gumbel-Self-Play mit Root-Noise, completed-Q-Policy-Ziele via
+`net_drafting_policy`, `bootstrap_value`/`scores_unclamped` nach Schema 15,
+korrigierte Regeln).
+
+**Batch-Historie / Hänger-Bewährung.** Der Batch lief über mehrere
+Unterbrechungen (Nutzer-Abbrüche tagsüber, Serialisierung gegen die
+Floor-Shaping-Ablation): 300 Spiele stammen aus Läufen VOR dem
+Root-Cause-Fix `1a683d3`, die restlichen 1700 aus dem Nutzer-Lauf danach.
+Entscheidender Befund auf dem Weg: die Chunk-Hänger sind INTRINSISCH
+(seltener Spielzustand — 1 Rust-Thread spinnt auf 100%, alle übrigen
+rayon-Worker idle; auch solo ohne Parallellast, ~1 Hänger je ~7 Chunks;
+py-spy sieht nur rayons WaitOnAddress im Hauptthread, Dump
+`hang_dump_15024.txt` im Session-Scratchpad), NICHT lastbedingt — die
+Lasthypothese vom Vorabend war damit widerlegt. Mitigation:
+`MAX_CHUNK_TIMEOUT_SECS=450` in self_play.py (Hänger-Steuer 7,5 statt
+20 Min). **Bewährungsprobe bestanden: der 1700-Spiele-Nutzer-Lauf nach dem
+Root-Cause-Fix lief KOMPLETT ohne einen einzigen Hänger durch** (~0.07
+Spiele/s durchgehend). Record-Stichprobe über frühe/mittlere/späte Dateien:
+0 Pseudo-Records (Diagnostics-Filter wirkt), ~98-99% echte
+completed-Q-Verteilungen, `bootstrap_value` 100% der Drafting-Steps,
+`scores_unclamped` 100%, keine unvollständigen Partien. domefactB (550
+Dateien, alte Regeln + Besuchsanteil-Ziele) nach
+`data/archive_domefactB_preRuleFix/` verschoben — kommt nie zurück in den
+Mix (Replay-Fenster-Regel).
+
+**Training: v11 (Exponent 2.0) und v11_sharp1 (Exponent 1.0)** — beide
+Warm-Start von v10, 290.702 Train- / 32.370 Val-Züge (Val-Split 20/200
+Dateien). Hintergrund sharp1: `POLICY_TARGET_SHARPEN_EXPONENT=2.0` war für
+flache Heuristik-Besuchsanteile eingeführt worden; auf Gumbels π′
+(theoretisch bereits korrekte Zielverteilung) ist das Schärfen mutmaßlich
+eine Verzerrung. Beide Läufe nahezu deckungsgleich: Early Stop Epoche
+15/100 (Val-Policy-Plateau ab 10), **bester Checkpoint jeweils EPOCHE 2**
+(val_combined 1.8738 bzw. 1.9096), Value-Val-R² peakt bei Epoche 1-2
+(~0.13-0.15) und zerfällt danach monoton. Netzauslastung gesund (Dead 5%,
+Eff.Rank 41%/40%). Die Epoche-2-Auswahl bestätigt den C8-Fix als wirksam —
+der reine Policy-Val-Loss hätte einen späteren, valueseitig schlechteren
+Stand gewählt.
+
+**Offline-Diagnose (Val-Split, identischer Seed wie Training):**
+
+| Metrik | v11_best | v11_sharp1_best | v10_best (Referenz)* |
+|---|---|---|---|
+| Policy Top-1 (nur Drafting, n=23.667) | 38.2% | 38.3% | 44.0% |
+| Policy Top-3 | 66.8% | 66.5% | 74.3% |
+| Value Val-R² global | +0.139 | +0.134 | 0.221 |
+| R² Runde 1 | **+0.029** | +0.020 | **−0.063** |
+| R² Runde 2 | **+0.101** | +0.098 | **+0.017** |
+| R² Runde 3 | +0.138 | +0.109 | 0.195 |
+| R² Runde 4 | +0.084 | +0.080 | 0.406 |
+| R² Runde 5 | +0.290 | +0.305 | 0.623 |
+| Geschwister-Tau R1 (n=100) | 0.207 (Ø 16.2) | 0.175 (Ø 15.1) | 0.264 |
+| Geschwister-Tau R2 | 0.179 (Ø 13.4) | 0.193 (Ø 12.6) | 0.339 |
+
+*v10-Spalte NICHT direkt vergleichbar: anderer Korpus (domefactB) UND
+anderes Value-Ziel (der TD-Bootstrap-Blend ändert die Zieldefinition
+selbst — die niedrigeren R4/R5-Werte messen ein anderes Ziel, nicht
+zwingend schlechteres Lernen). Kernbefund im Sinne der Design-Absicht von
+Punkt 6: **Runde-1/2-R² erstmals positiv bzw. deutlich verbessert**
+(+0.029/+0.101 statt −0.063/+0.017). Exponent 2.0 vs. 1.0: praktisch kein
+Unterschied (v11 hauchdünn vorn bei Top-3, globalem R², R1-R², R1-Tau) —
+Arena nur für v11_best gefahren, sharp1 nicht (Bild ist "kein messbarer
+Unterschied", nicht "unklar"; Nutzer-/Koordinator-Entscheid).
+
+**Label-Histogramm (VALUE_SCALE-Check, Val-Split n=32.370):**
+|Ziel|>0.9: **0.00%** (auch >0.99: 0.00%); 66.2% unter 0.3, 32.4% in
+[0.3,0.6), 1.4% in [0.6,0.9). Keinerlei Sättigung — falls überhaupt, ist
+`VALUE_SCALE=50` eher zu groß (Ziele in ein schmales Band gestaucht), die
+Schattenpunkte-Sättigungssorge ist damit empirisch vom Tisch.
+
+**Arena + Champion-Gating:**
+
+| Match | Ergebnis | Ø Score | Floor |
+|---|---|---|---|
+| v11_best vs. Heuristik (n=100, 400/150, kein Early-Stop) | **37:63 (37%)** | 30.2 vs. 39.8 | 15.0 vs. 16.3 |
+| v11_best vs. v10_best (Gating, n=100, je 400 Sims) | **43:57 (43%)** | 26.9 vs. 29.4 | — |
+
+37% liegt am unteren Rand der v10-Re-Baseline (37%/49%, gepoolt ~43%) —
+kein Beleg für Verbesserung, aber im ±6pp-Band auch kein klarer
+Rückschritt. Das Gating-Match ist statistisch nicht von Parität zu
+unterscheiden (z≈−1.41, p≈0.16), aber sicher KEIN Sieg für v11.
+**Gating-Entscheid: v10_best bleibt Champion und Self-Play-Generator für
+v12.**
+
+**Ehrliche Einordnung — dreifach konfundiert, nicht auftrennbar:** der
+Vergleich v11 vs. v10 vermischt (1) completed-Q- statt Besuchsanteil-
+Policy-Ziele, (2) TD-Bootstrap-Value-Ziel (Schema 15), (3) die Regelfixes
+aus dem Audit — und zusätzlich (4) die HALBIERTE Datenmenge (2000 netcq-
+vs. 5500 domefactB-Spiele) sowie (5) den Generatorwechsel (netzgeführtes
+statt heuristisches Self-Play, andere Zustandsverteilung). Dass v11 bei
+halber Datenmenge nahe an v10 herankommt und die Runde-1/2-Value-Metriken
+verbessert, ist kein Misserfolg des Ansatzes — aber ein Nachweis der
+Überlegenheit ist es ebenso wenig. Naheliegendster nächster Hebel gemäß
+Replay-Fenster-Regel: Korpus auf ~5000 Spiele des Champions (v10_best)
+auffüllen und v12 auf voller Datenmenge trainieren, bevor am Zielformat
+weitergedreht wird.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
