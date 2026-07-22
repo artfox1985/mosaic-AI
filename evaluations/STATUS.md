@@ -1554,6 +1554,57 @@ seed-exakt reproduzierbar). Nebenbefund als Folge-Task: ~1e-4
 Prozessgrenzen-Nichtdeterminismus in tract-onnx (vorbestehend,
 vernachlässigbar).
 
+## Task #65: ISMCTS-Mehrfach-Determinisierung implementiert + arena-widerlegt (2026-07-22)
+
+`net_mcts.rs`: neue Konstante `NUM_DETERMINIZATIONS` -- klassisches ISMCTS
+(mehrere unabhängige Welten statt der bisherigen EINEN Stichprobe pro
+Zugsuche, siehe `DETERMINIZE_ROOT_HIDDEN_INFO`). Bei `>1` wird das
+Sims-Budget gleichmäßig auf `N` Welten gesplittet (Rest an die erste Welt),
+je Welt ein eigener Baum gebaut, die completed-Q-Politik an der Wurzel über
+die Welten gemittelt (Standard-ISMCTS-Aggregation). Umgesetzt an allen drei
+Such-Einstiegen (`net_search_drafting_action`, `net_root_child_stats_and_policy`,
+`net_search_with_tree`); der `<=1`-Codepfad bleibt an allen drei Stellen
+unverändert (kein Routing durch die neue Aggregations-Maschinerie), damit
+`NUM_DETERMINIZATIONS=1` byte-identisch zum Alt-Verhalten bleibt.
+
+**Befund zur Wurzel-Kandidatenliste** (Aufgabenstellung fragte explizit
+danach): weltunabhängig -- `drafting_actions(state)` hängt nur von
+öffentlichem Zustand ab (Fabrik-Existenz/-Farbe, Dome-Auslage,
+Pending-Struktur), NIE von `dome_tile_pool`-Reihenfolge oder der Identität
+unaufgedeckter Bonuschips (nur deren Existenz zählt). Die Aggregation über
+den direkten Aktions-Schlüssel ist damit exakt, keine Näherung. 143/143
+Tests grün (138 Baseline + 5 neu: Sims-Split-Arithmetik, synthetische
+Aggregations-Mathematik, n=1-Äquivalenz zum Alt-Pfad, n=3 zieht
+nachweislich 3 verschiedene `dome_tile_pool`-Ordnungen).
+
+**Gepaarter A/B** (`evaluations/paired_arena_ismcts.py`, Muster wie beim
+Speed-Bündel-A/B): ALT (n=1, Worktree `../mosaic-ismcts-n1`) vs. NEU (n=3,
+Haupt-Wheel), v10_best @ NET_SIMS=400 vs. Heuristik @ HEUR_SIMS=200, Blöcke
+à 25, kumulativer exakter McNemar, Stopp bei p<0.05 oder 150 Paaren.
+**Ergebnis: STOPP nach 75 Paaren, p=0.00088 -- n=1 gewinnt signifikant
+gegen n=3** (nicht wie erhofft umgekehrt):
+
+| Arm | Siege vs. Heuristik | 95%-KI |
+|---|---|---|
+| ALT (n=1) | 38/75 = 50.7% | 39.6-61.7% |
+| NEU (n=3) | 19/75 = 25.3% | 16.9-36.2% |
+
+Diskordant b=6 (n=3 gewinnt, n=1 nicht), c=25 (umgekehrt) -- deutlich, nicht
+im Rauschband. Wahrscheinlichste Erklärung: das 400er-Sims-Budget auf 3
+Welten gesplittet (~133/Welt) unterbudgetiert `GUMBEL_TOP_M=16` + Sequential
+Halving pro Welt stark genug, dass der Suchtiefenverlust den
+ISMCTS-Aggregationsgewinn bei diesem Sims-Niveau klar überwiegt.
+
+**Entscheid**: reiner Performance-Hebel (kein Korrektheits-Fix, anders als
+`DETERMINIZE_ROOT_HIDDEN_INFO` selbst) -- Nachweis-Regel greift, nicht die
+Floor-Shaping-Präzedenz (die gilt nur für Korrektheits-Fixes bei flachem
+Ergebnis). `NUM_DETERMINIZATIONS` auf `1` zurückgesetzt (Standard bleibt
+Einzeldeterminisierung), Haupt-Wheel entsprechend neu gebaut/installiert.
+Der komplette Mehrwelten-/Aggregations-Code bleibt als Toggle im Code
+verfügbar (z.B. für einen künftigen Test bei höherem Sims-Budget). Kein
+neuer `elo_history.csv`-Eintrag (v10_best@400 vs. Heuristik@200 existiert
+bereits als Paarung, siehe oben) -- nur hier dokumentiert.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)

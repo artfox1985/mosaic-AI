@@ -233,6 +233,184 @@ fn determinize_hidden_information<R: Rng + ?Sized>(state: &mut GameState, rng: &
     }
 }
 
+/// Klassisches ISMCTS (Task #65, 2026-07-22): `DETERMINIZE_ROOT_HIDDEN_INFO`
+/// zieht bisher EINE Stichweltentscheidung pro Zugsuche -- die Suche
+/// optimiert dann gegen genau diese eine mögliche Welt. Mit `> 1` werden
+/// stattdessen `NUM_DETERMINIZATIONS` unabhängige Welten gezogen (je ein
+/// eigener `build_net_tree`-Aufruf, das Sims-Budget gleichmäßig gesplittet,
+/// Rest an die erste Welt, siehe `split_sims_across_worlds`), je Welt ein
+/// eigener Baum gebaut, und die completed-Q-Politik an der Wurzel über die
+/// Welten GEMITTELT (siehe `average_completed_q_policy`) -- Standard-ISMCTS-
+/// Aggregation, statt sich auf eine einzelne Stichprobe zu verlassen.
+///
+/// `1` = EXAKT das bisherige Verhalten -- an allen drei Suche-Einstiegen
+/// (`net_search_drafting_action`/`net_root_child_stats_and_policy`/
+/// `net_search_with_tree`) bleibt der `<= 1`-Codepfad unverändert ein
+/// einzelner `build_net_tree`-Aufruf + die alte Auswahl-/Extraktionslogik --
+/// bewusst NICHT durch die neue Aggregations-Maschinerie geroutet, damit
+/// `NUM_DETERMINIZATIONS=1` byte-identisch zum Alt-Verhalten bleibt (siehe
+/// Testmodul).
+///
+/// **Befund zur Wurzel-Kandidatenliste (Aufgabenstellung fragte explizit
+/// danach)**: `drafting_actions(state)` (game.rs) hängt an der Wurzel nur
+/// von `state.factories` (Existenz/Farbe der Auslage-Fliesen, `bonus_chip.
+/// is_some()` -- NICHT von dessen Identität/`bonus_chip_revealed`),
+/// `state.dome_display`, `state.pending_dome_choice`/`pending_stack_draw`
+/// (Struktur, nicht Inhalt) ab. `determinize_hidden_information` verändert
+/// AUSSCHLIESSLICH die REIHENFOLGE von `dome_tile_pool` und die IDENTITÄT
+/// (nicht Existenz) unaufgedeckter Bonus-Chips -- keines dieser Felder
+/// beeinflusst, welche `Action`-Varianten legal sind. Die Wurzel-
+/// Kandidatenliste (und mit ihr `build_untried_actions`s POLICY_MASS_CUTOFF-
+/// Präfix, da die Netz-Priors auf denselben, für unaufgedeckte Information
+/// maskierten Features beruhen) ist damit weltUNabhängig -- die Aggregation
+/// per direktem Aktions-Schlüsselvergleich (`Action: PartialEq`) ist
+/// folglich korrekt und braucht keinen Kandidatenlisten-Abgleich über
+/// Indizes. Trotzdem defensiv robust implementiert (fehlende Aktion in
+/// einer Welt wird einfach übersprungen, kein Panik), falls diese Invariante
+/// künftig durch eine Regeländerung verletzt würde.
+///
+/// **Perspektiven-Divergenz-Logging/Diagnose-Pfade geprüft (kein n-faches
+/// Zählen)**: `record_perspective_divergence` akkumuliert pro `make_node`-
+/// Aufruf, also pro TATSÄCHLICH bewertetem Baumknoten -- bei N Welten gibt
+/// es zwar N separate Bäume, aber JEDER Knoten in JEDEM Baum ist eine echte,
+/// eigenständige Netz-Auswertung (kein Knoten wird mehrfach für dieselbe
+/// Sim gezählt). Das Gesamt-Sims-Budget bleibt unverändert (nur gesplittet,
+/// siehe `split_sims_across_worlds`) -- die Diagnose sammelt also über
+/// denselben Gesamt-Simulationsaufwand wie zuvor, nur jetzt über mehrere
+/// kleinere Bäume statt einem großen. Kein Fix nötig.
+///
+/// **GETESTET (2026-07-22, gepaarter A/B, `evaluations/paired_arena_ismcts.py`,
+/// v10_best@NET_SIMS=400 vs. Heuristik@HEUR_SIMS=200, Blöcke à 25, kumulativer
+/// exakter McNemar): n=3 verliert SIGNIFIKANT gegen n=1 -- Stopp nach 75
+/// Paaren bei p=0.00088 (diskordant b=6 [n=3 gewinnt, n=1 nicht] vs. c=25
+/// [umgekehrt]). Sieg-Anteil gegen Heuristik: n=3 19/75=25.3% (95%-KI
+/// 16.9-36.2%), n=1 38/75=50.7% (95%-KI 39.6-61.7%) -- deutlich, nicht im
+/// Rauschband. Wahrscheinlichste Erklärung: das 400er-Sims-Budget auf 3
+/// Welten gesplittet (~133/Welt) unterbudgetiert `GUMBEL_TOP_M=16` +
+/// Sequential Halving pro Welt stark genug, dass der Suchtiefen-/
+/// Differenzierungsverlust den ISMCTS-Aggregationsgewinn (Robustheit gegen
+/// EINE ungünstige Determinisierung) bei diesem Sims-Niveau klar überwiegt.
+/// Reiner Performance-Hebel (kein Korrektheits-Fix, siehe
+/// `DETERMINIZE_ROOT_HIDDEN_INFO`-Präzedenz für den Unterschied) -- hier
+/// zählt der Nachweis, nicht die theoretische Eleganz (Floor-Shaping-
+/// Präzedenz). Auf `1` zurückgesetzt (= Standard-Einzeldeterminisierung,
+/// unverändert seit vor Task #65); der komplette Mehrwelten-/Aggregations-
+/// Code bleibt als Toggle verfügbar (z.B. für einen künftigen Test bei
+/// höherem Sims-Budget, wo der Unterbudgetierungs-Nachteil kleiner sein
+/// könnte).
+pub const NUM_DETERMINIZATIONS: usize = 1;
+
+/// Teilt `sims` gleichmäßig auf `n` Welten auf (Rest an die ERSTE Welt).
+/// `n` wird an den Aufrufstellen immer `NUM_DETERMINIZATIONS` sein.
+fn split_sims_across_worlds(sims: u32, n: usize) -> Vec<u32> {
+    let n = (n.max(1)) as u32;
+    let base = sims / n;
+    let rem = sims % n;
+    (0..n).map(|i| if i == 0 { base + rem } else { base }).collect()
+}
+
+/// Baut `n` unabhängige Suchbäume ("Wald", ein Baum je Welt) -- `n` nimmt
+/// alle Produktions-Aufrufstellen als `NUM_DETERMINIZATIONS` entgegen
+/// (NUR für den `> 1`-Pfad gedacht, siehe Konstantenkommentar), als
+/// Parameter statt hartkodierter Konstante gehalten, damit das Testmodul
+/// direkt verschiedene `n` prüfen kann, ohne die Konstante selbst umbauen
+/// zu müssen. `build_net_tree` zieht bei `DETERMINIZE_ROOT_HIDDEN_INFO=true`
+/// selbst bei JEDEM Aufruf eine frische Determinisierung (RNG-Strom wird
+/// zwischen den Welten einfach weitergereicht) -- kein separates Reseeding
+/// nötig, um unterschiedliche Welten zu bekommen.
+fn build_determinized_forest<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    n: usize,
+    rng: &mut R,
+) -> Vec<Vec<Node>> {
+    split_sims_across_worlds(sims, n)
+        .into_iter()
+        .map(|world_sims| build_net_tree(net, state, world_sims, c_puct, add_root_noise, rng, None))
+        .collect()
+}
+
+/// Rohe `(Action, Besuche, Q)`-Statistik der Wurzelkinder EINES Baums --
+/// extrahiert aus `net_root_child_stats`/`net_root_child_stats_and_policy`s
+/// altem `NUM_DETERMINIZATIONS<=1`-Pfad, zusätzlich von
+/// `aggregate_root_child_stats` (Mehrwelten-Summierung) je Welt genutzt.
+fn root_child_stats_from_nodes(nodes: &[Node]) -> Vec<(Action, u32, f64)> {
+    nodes[0]
+        .children
+        .iter()
+        .filter_map(|&cid| {
+            let node = &nodes[cid];
+            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
+            node.action.clone().map(|a| (a, node.visits, q))
+        })
+        .collect()
+}
+
+/// Aggregiert `(Action, Besuche, Q)` über den Determinisierungs-Wald:
+/// Besuche werden SUMMIERT (treibt `self_play::net_drafting_policy`s
+/// besuchsbasierte Stichprobe unverändert weiter, jetzt über die
+/// Welten-SUMME statt einer einzelnen Welt), `Q = Σ(Value)/Σ(Besuche)` über
+/// alle Welten, in denen die Aktion tatsächlich zu einem Wurzelkind wurde
+/// (kleineres Pro-Welt-Sims-Budget kann dazu führen, dass eine Aktion nicht
+/// in JEDER Welt besucht wird -- trägt dann einfach 0 bei). Aktions-
+/// Gleichheit als Schlüssel ist korrekt, siehe `NUM_DETERMINIZATIONS`-
+/// Kommentar (weltunabhängige Wurzel-Kandidaten).
+fn aggregate_root_child_stats(forest: &[Vec<Node>]) -> Vec<(Action, u32, f64)> {
+    let mut acc: Vec<(Action, u32, f64)> = Vec::new(); // (action, visits_sum, value_sum)
+    for nodes in forest {
+        for &cid in &nodes[0].children {
+            let node = &nodes[cid];
+            let Some(a) = node.action.clone() else { continue };
+            match acc.iter_mut().find(|(act, _, _)| *act == a) {
+                Some(entry) => {
+                    entry.1 += node.visits;
+                    entry.2 += node.value;
+                }
+                None => acc.push((a, node.visits, node.value)),
+            }
+        }
+    }
+    acc.into_iter()
+        .map(|(a, v, val_sum)| (a, v, if v > 0 { val_sum / v as f64 } else { 0.0 }))
+        .collect()
+}
+
+/// Mittelt `root_completed_q_policy` (completed-Q-Softmax an der Wurzel, je
+/// Welt über `improved_policy(nodes, 0)`) über den Determinisierungs-Wald,
+/// Aktions-Schlüssel = die Aktion selbst (siehe `NUM_DETERMINIZATIONS`-
+/// Kommentar: Wurzel-Kandidaten sind weltunabhängig, jede Aktion sollte
+/// daher in JEDER Welt genau einmal auftauchen). Defensiv trotzdem robust
+/// gegen eine in einzelnen Welten fehlende Aktion (Mittelwert nur über die
+/// Welten, in denen sie auftaucht, plus Renormalisierung am Ende, falls die
+/// Summe dadurch von 1.0 abweicht).
+fn average_completed_q_policy(forest: &[Vec<Node>]) -> Vec<(Action, f64)> {
+    let per_world: Vec<Vec<(Action, f64)>> =
+        forest.iter().map(|nodes| root_completed_q_policy(nodes)).collect();
+    let Some(reference) = per_world.first() else { return Vec::new() };
+    let mut out: Vec<(Action, f64)> = Vec::with_capacity(reference.len());
+    for (act, _) in reference {
+        let mut sum = 0.0f64;
+        let mut count = 0usize;
+        for world in &per_world {
+            if let Some(&(_, p)) = world.iter().find(|(a, _)| a == act) {
+                sum += p;
+                count += 1;
+            }
+        }
+        out.push((act.clone(), if count > 0 { sum / count as f64 } else { 0.0 }));
+    }
+    let total: f64 = out.iter().map(|(_, p)| p).sum();
+    if total > 0.0 {
+        for entry in out.iter_mut() {
+            entry.1 /= total;
+        }
+    }
+    out
+}
+
 /// Exakte, JETZT SCHON feststehende Floor-Straf-Differenz (Spieler0 minus
 /// Spieler1) dieser Runde, roh (unskaliert). KEINE Vorhersage — reine
 /// State-Funktion (`PlayerBoard::broken_penalty`, board.rs), verfügbar ohne
@@ -1504,9 +1682,21 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     if crate::round5::applies(state) {
         return crate::round5::choose_action(state);
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
-    let best = select_final_root_child(&nodes)?;
-    nodes[best].action.clone()
+    if NUM_DETERMINIZATIONS <= 1 {
+        let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
+        let best = select_final_root_child(&nodes)?;
+        return nodes[best].action.clone();
+    }
+    // ISMCTS-Mehrfach-Determinisierung (Task #65): finale Zugwahl = argmax
+    // der über die Welten GEMITTELTEN completed-Q-Politik (siehe
+    // `average_completed_q_policy`-Kommentar), nicht mehr
+    // `select_final_root_child` auf einem Einzelbaum -- letzteres hätte
+    // keinen sinnvollen "einen" Baum mehr, über den es entscheiden könnte.
+    let forest = build_determinized_forest(net, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    average_completed_q_policy(&forest)
+        .into_iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(a, _)| a)
 }
 
 /// Wurzelkind-Statistik `(Action, Besuche, Q)` — für Self-Play-Policy-Targets.
@@ -1531,16 +1721,13 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
             .map(|a| (a, 1, 1.0))
             .collect();
     }
+    // Bewusst NICHT auf NUM_DETERMINIZATIONS umgestellt -- diese Funktion
+    // dient nur der günstigen Stufe-3-Rollout-Kandidaten-Vorauswahl
+    // (`self_play::alphabeta_choose_action`s Shortlisting), nicht einer der
+    // drei in Task #65 benannten Haupt-Sucheinstiege (Arena/Self-Play-Ziel/
+    // Debug-UI) -- bleibt unverändert Einzelwelt.
     let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
-    nodes[0]
-        .children
-        .iter()
-        .filter_map(|&cid| {
-            let node = &nodes[cid];
-            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
-            node.action.clone().map(|a| (a, node.visits, q))
-        })
-        .collect()
+    root_child_stats_from_nodes(&nodes)
 }
 
 /// Wie [`net_root_child_stats`], liefert ZUSÄTZLICH Gumbels completed-Q-
@@ -1573,17 +1760,16 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         let policy: Vec<(Action, f64)> = stats.iter().map(|(a, _, _)| (a.clone(), 1.0 / n as f64)).collect();
         return (stats, policy);
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
-    let stats: Vec<(Action, u32, f64)> = nodes[0]
-        .children
-        .iter()
-        .filter_map(|&cid| {
-            let node = &nodes[cid];
-            let q = if node.visits > 0 { node.value / node.visits as f64 } else { 0.0 };
-            node.action.clone().map(|a| (a, node.visits, q))
-        })
-        .collect();
-    (stats, root_completed_q_policy(&nodes))
+    if NUM_DETERMINIZATIONS <= 1 {
+        let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
+        return (root_child_stats_from_nodes(&nodes), root_completed_q_policy(&nodes));
+    }
+    // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
+    // Besuche (treibt Self-Plays besuchsbasierte Sampling-Auswahl
+    // unverändert weiter, jetzt über den Wald statt einer Welt), Policy-
+    // Ziel = über die Welten gemittelte completed-Q-Politik.
+    let forest = build_determinized_forest(net, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    (aggregate_root_child_stats(&forest), average_completed_q_policy(&forest))
 }
 
 /// Zippt `improved_policy(nodes, 0)` (reine Zahlen, Reihenfolge
@@ -1620,7 +1806,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
-    log: Option<&mut Vec<String>>,
+    mut log: Option<&mut Vec<String>>,
 ) -> (Option<Action>, Value) {
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
@@ -1628,8 +1814,27 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     if crate::round5::applies(state) {
         return crate::round5::choose_action_with_analysis(state);
     }
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
-    let best = select_final_root_child(&nodes);
+    if NUM_DETERMINIZATIONS <= 1 {
+        let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
+        return net_search_with_tree_from_nodes(state, sims, &nodes);
+    }
+    // ISMCTS-Mehrfach-Determinisierung: kein granularer Sim-für-Sim-Trace je
+    // Welt (würde N verschachtelte "=== Sim x/y ==="-Folgen ergeben, kaum
+    // lesbar) -- ein einzelner Hinweis genügt, gleiches Muster wie
+    // `build_net_tree`s Gumbel-Dispatch-Log.
+    if let Some(l) = log.as_deref_mut() {
+        l.push(format!(
+            "  ISMCTS: {NUM_DETERMINIZATIONS} Determinisierungen (kein granularer Sim-Trace je Welt)"
+        ));
+    }
+    let forest = build_determinized_forest(net, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    net_search_with_tree_from_forest(state, sims, &forest)
+}
+
+/// `net_search_with_tree`s Debug-Analyse-Dict aus einem EINZELNEN Baum
+/// (`NUM_DETERMINIZATIONS <= 1`-Pfad, unverändert gegenüber vor Task #65).
+fn net_search_with_tree_from_nodes(state: &GameState, sims: u32, nodes: &[Node]) -> (Option<Action>, Value) {
+    let best = select_final_root_child(nodes);
     let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
     let prior_sum: f64 = nodes[0]
         .children
@@ -1667,7 +1872,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
                 "mcts_share": if total_visits > 0 { node.visits as f64 / total_visits as f64 } else { 0.0 },
                 "mcts_q": q,
                 "mcts_win_pct": q * 100.0,
-                "max_depth": subtree_depth(&nodes, cid),
+                "max_depth": subtree_depth(nodes, cid),
                 "chosen": is_chosen,
             })
         })
@@ -1687,18 +1892,114 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
         // durchsuchte Wurzelkinder — Server-Debug-UI zeigt "considered/total".
         "num_actions": nodes[0].n_actions,
         "num_actions_considered": nodes[0].children.len(),
-        "max_depth": subtree_depth(&nodes, 0),
+        "max_depth": subtree_depth(nodes, 0),
         "ai_action": chosen_id,
         "moves": moves,
         "tree": json!({
             "visits": nodes[0].visits,
             "win_pct": root_q * 100.0,
-            "depth": subtree_depth(&nodes, 0),
+            "depth": subtree_depth(nodes, 0),
             "n_children": nodes[0].children.len(),
         }),
     });
 
     let chosen = best.and_then(|cid| nodes[cid].action.clone());
+    (chosen, analysis)
+}
+
+/// `net_search_with_tree`s Debug-Analyse-Dict aus dem Determinisierungs-Wald
+/// (`NUM_DETERMINIZATIONS > 1`). Baut dieselben Felder wie
+/// `net_search_with_tree_from_nodes`, aber aus den über die Welten
+/// AGGREGIERTEN Größen (`aggregate_root_child_stats`/
+/// `average_completed_q_policy`, siehe dortige Kommentare) statt einem
+/// Einzelbaum -- "gewählter Zug" folgt derselben Regel wie
+/// `net_search_drafting_action` (argmax gemittelte completed-Q-Politik).
+/// Strukturelle Felder ohne sinnvolles Mehrwelten-Äquivalent (rohe
+/// Netz-Priors VOR jeder Suche, `n_actions`) kommen repräsentativ aus der
+/// ERSTEN Welt -- laut Befund im `NUM_DETERMINIZATIONS`-Kommentar sind
+/// Wurzel-Kandidaten UND deren Priors (maskierte Features) weltunabhängig,
+/// eine einzelne Welt ist hier also keine Näherung, sondern exakt.
+fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<Node>]) -> (Option<Action>, Value) {
+    let stats = aggregate_root_child_stats(forest); // (Action, Σ Besuche, Q)
+    let policy = average_completed_q_policy(forest); // (Action, gemittelte completed-Q-Wahrscheinlichkeit)
+    let chosen: Option<Action> = policy
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(a, _)| a.clone());
+
+    let total_visits: u32 = stats.iter().map(|(_, v, _)| *v).sum();
+    let nodes0: &[Node] = &forest[0];
+    let prior_sum: f64 = nodes0[0].children.iter().map(|&c| nodes0[c].prior as f64).sum::<f64>()
+        + nodes0[0].untried.iter().map(|(_, p)| *p as f64).sum::<f64>();
+    let prior_sum = prior_sum.max(1e-8);
+    let prior_of = |a: &Action| -> f32 {
+        nodes0[0]
+            .children
+            .iter()
+            .find(|&&c| nodes0[c].action.as_ref() == Some(a))
+            .map(|&c| nodes0[c].prior)
+            .or_else(|| nodes0[0].untried.iter().find(|(act, _)| act == a).map(|(_, p)| *p))
+            .unwrap_or(0.0)
+    };
+
+    let mut ordered = stats.clone();
+    ordered.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let mut chosen_id: Option<usize> = None;
+    let moves: Vec<Value> = ordered
+        .iter()
+        .enumerate()
+        .map(|(i, (act, visits, q))| {
+            let (typ, desc, cat, _mv) = label_search_move(&SearchMove::Draft(act.clone()), Some(state));
+            let is_chosen = chosen.as_ref() == Some(act);
+            if is_chosen {
+                chosen_id = Some(i);
+            }
+            let prior = prior_of(act);
+            json!({
+                "action_id": i,
+                "type": typ,
+                "description": desc,
+                "category": cat,
+                "net_prob": prior,
+                "net_prob_norm": prior as f64 / prior_sum,
+                "mcts_visits": *visits,
+                "mcts_share": if total_visits > 0 { *visits as f64 / total_visits as f64 } else { 0.0 },
+                "mcts_q": *q,
+                "mcts_win_pct": *q * 100.0,
+                "max_depth": Value::Null,
+                "chosen": is_chosen,
+            })
+        })
+        .collect();
+
+    let (visits_sum, value_sum): (u32, f64) = stats
+        .iter()
+        .fold((0u32, 0.0f64), |(vs, vl), (_, v, q)| (vs + v, vl + q * (*v as f64)));
+    let root_q = if visits_sum > 0 { value_sum / visits_sum as f64 } else { 0.0 };
+    let max_depth = forest.iter().map(|nodes| subtree_depth(nodes, 0)).max().unwrap_or(0);
+
+    let analysis = json!({
+        "current_player": nodes0[0].player_who_acted,
+        "ai_player": state.current_player,
+        "value": Value::Null,
+        "win_pct": Value::Null,
+        "has_net": true,
+        "simulations": sims,
+        "determinizations": NUM_DETERMINIZATIONS,
+        "num_actions": nodes0[0].n_actions,
+        "num_actions_considered": stats.len(),
+        "max_depth": max_depth,
+        "ai_action": chosen_id,
+        "moves": moves,
+        "tree": json!({
+            "visits": visits_sum,
+            "win_pct": root_q * 100.0,
+            "depth": max_depth,
+            "n_children": stats.len(),
+        }),
+    });
+
     (chosen, analysis)
 }
 
@@ -2176,6 +2477,93 @@ mod tests {
         assert!((paired[2].1 - numeric[2]).abs() < 1e-12);
     }
 
+    // ── ISMCTS-Mehrfach-Determinisierung (Task #65) ─────────────────────────
+
+    #[test]
+    fn average_completed_q_policy_averages_matching_actions_across_worlds() {
+        // Zwei synthetische "Welten" mit identischem Kandidatensatz (Pass
+        // besucht, DrawStackPeek/ChooseDomeRotation(1) unbesucht), aber
+        // unterschiedlichen Besuchs-/Wertstatistiken -- prueft, dass
+        // `average_completed_q_policy` exakt das arithmetische Mittel der
+        // Pro-Welt-`root_completed_q_policy`-Ausgaben liefert (Aktions-
+        // Schluessel, siehe `NUM_DETERMINIZATIONS`-Kommentar).
+        fn make_world(child_visits: u32, child_value: f64, root_leaf: [f64; 2]) -> Vec<Node> {
+            let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+            root.leaf_value = root_leaf;
+            let mut child = gumbel_test_node(0.5, child_visits, child_value, 1);
+            child.action = Some(Action::Pass);
+            let mut nodes = vec![root, child];
+            nodes[0].children.push(1);
+            nodes[0].untried.push((Action::DrawStackPeek, 0.3));
+            nodes[0].untried.push((Action::ChooseDomeRotation(1), 0.2));
+            nodes
+        }
+
+        let world1 = make_world(3, 1.8, [0.4, 0.6]); // Q_pass = 0.6
+        let world2 = make_world(5, 2.0, [0.5, 0.5]); // Q_pass = 0.4
+        let p1 = root_completed_q_policy(&world1);
+        let p2 = root_completed_q_policy(&world2);
+        let forest = vec![world1, world2];
+
+        let averaged = average_completed_q_policy(&forest);
+        assert_eq!(averaged.len(), 3);
+        let total: f64 = averaged.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-9, "gemittelte Politik muss zu 1.0 summieren, ist {total}");
+
+        for i in 0..3 {
+            assert_eq!(averaged[i].0, p1[i].0, "Aktions-Reihenfolge sollte der ersten Welt folgen");
+            assert_eq!(averaged[i].0, p2[i].0, "beide Welten sollten denselben Kandidatensatz haben");
+            let expected = (p1[i].1 + p2[i].1) / 2.0;
+            assert!(
+                (averaged[i].1 - expected).abs() < 1e-9,
+                "Aktion {:?}: gemittelt={} erwartet={}",
+                averaged[i].0,
+                averaged[i].1,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn aggregate_root_child_stats_sums_visits_and_weighted_averages_q_across_worlds() {
+        // Zwei Welten, beide besuchen Action::Pass als Wurzelkind mit
+        // unterschiedlichen Besuchs-/Wertsummen -- Erwartung: Besuche werden
+        // SUMMIERT (treibt Self-Plays besuchsbasierte Stichprobe ueber die
+        // Welten-SUMME), Q = Sigma(Value)/Sigma(Besuche) -- NICHT das
+        // einfache arithmetische Mittel der Pro-Welt-Q-Werte.
+        fn make_world(child_visits: u32, child_value: f64) -> Vec<Node> {
+            let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+            root.leaf_value = [0.5, 0.5];
+            let mut child = gumbel_test_node(0.5, child_visits, child_value, 1);
+            child.action = Some(Action::Pass);
+            let mut nodes = vec![root, child];
+            nodes[0].children.push(1);
+            nodes
+        }
+        let world1 = make_world(3, 1.8); // Q=0.6
+        let world2 = make_world(5, 2.0); // Q=0.4
+        let forest = vec![world1, world2];
+
+        let stats = aggregate_root_child_stats(&forest);
+        assert_eq!(stats.len(), 1);
+        let (act, visits, q) = &stats[0];
+        assert_eq!(*act, Action::Pass);
+        assert_eq!(*visits, 8, "Besuche muessen SUMMIERT werden (3+5)");
+        let expected_q = (1.8 + 2.0) / 8.0;
+        assert!(
+            (q - expected_q).abs() < 1e-9,
+            "Q={q} erwartet={expected_q} (gewichteter Mittelwert, nicht einfacher Mittelwert der Pro-Welt-Qs)"
+        );
+    }
+
+    #[test]
+    fn split_sims_across_worlds_puts_remainder_on_first_world() {
+        assert_eq!(split_sims_across_worlds(150, 3), vec![50, 50, 50]);
+        assert_eq!(split_sims_across_worlds(151, 3), vec![51, 50, 50]);
+        assert_eq!(split_sims_across_worlds(8, 1), vec![8]);
+        assert_eq!(split_sims_across_worlds(7, 5), vec![3, 1, 1, 1, 1]);
+    }
+
     /// Laedt das aktuelle Produktions-Modell fuer die beiden folgenden
     /// Perspektiven-/Vorzeichen-Tests (`evaluations/value head tests.txt`,
     /// Punkt 2, "klassische Vorzeichen-Unit-Tests"). Ueberspringt sich
@@ -2222,6 +2610,73 @@ mod tests {
             let _ = game.apply_drafting(&a);
         }
         (game.state.phase == Phase::Drafting).then_some(game.state)
+    }
+
+    #[test]
+    fn build_determinized_forest_with_n_equals_1_matches_single_tree_stats_and_policy() {
+        // (a) NUM_DETERMINIZATIONS<=1 ist byte-identisch zum Alt-Verhalten --
+        // die drei Produktions-Einstiege routen bei <=1 zwar NICHT durch die
+        // Forest-/Aggregations-Maschinerie (siehe deren Code, bewusst
+        // unveraendert), aber selbst WENN man `build_determinized_forest`
+        // mit n=1 aufruft, muss das aggregierte Ergebnis exakt dem direkten
+        // `build_net_tree`-Aufruf mit identischem RNG-Seed entsprechen --
+        // Sicherheitsnetz, falls ein zukuenftiges Refactoring den
+        // <=1-Sonderfall an den Aufrufstellen versehentlich entfernt.
+        let Some(net) = load_test_net() else { return };
+        let mut rng_state = StdRng::seed_from_u64(777);
+        let state = random_drafting_state(1, 10, &mut rng_state).expect("Testzustand sollte auswertbar sein");
+
+        let mut rng_a = StdRng::seed_from_u64(999);
+        let nodes = build_net_tree(&net, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None);
+        let direct_stats = root_child_stats_from_nodes(&nodes);
+        let direct_policy = root_completed_q_policy(&nodes);
+
+        let mut rng_b = StdRng::seed_from_u64(999);
+        let forest = build_determinized_forest(&net, &state, 8, DEFAULT_C_PUCT, false, 1, &mut rng_b);
+        assert_eq!(forest.len(), 1, "n=1 sollte genau einen Baum liefern");
+        let forest_stats = aggregate_root_child_stats(&forest);
+        let forest_policy = average_completed_q_policy(&forest);
+
+        assert_eq!(direct_stats.len(), forest_stats.len());
+        for ((a1, v1, q1), (a2, v2, q2)) in direct_stats.iter().zip(forest_stats.iter()) {
+            assert_eq!(a1, a2, "Aktionsreihenfolge muss uebereinstimmen");
+            assert_eq!(v1, v2, "Besuche muessen bei n=1 identisch sein");
+            assert!((q1 - q2).abs() < 1e-12, "Q muss bei n=1 identisch sein: {q1} vs {q2}");
+        }
+        assert_eq!(direct_policy.len(), forest_policy.len());
+        for ((a1, p1), (a2, p2)) in direct_policy.iter().zip(forest_policy.iter()) {
+            assert_eq!(a1, a2, "Aktionsreihenfolge muss uebereinstimmen");
+            assert!((p1 - p2).abs() < 1e-9, "completed-Q-Politik muss bei n=1 identisch sein: {p1} vs {p2}");
+        }
+    }
+
+    #[test]
+    fn build_determinized_forest_draws_three_different_determinizations_at_n_equals_3() {
+        // (b) Kernanforderung Task #65: bei n=3 muessen drei GENUIN
+        // unterschiedliche Determinisierungen gezogen werden (nicht dieselbe
+        // Welt dreimal) -- `dome_tile_pool`-Reihenfolge NACH der Wurzel-
+        // Determinisierung ist der direkteste Zeuge dafuer (siehe
+        // `determinize_hidden_information`, `DETERMINIZE_ROOT_HIDDEN_INFO`
+        // ist Standard `true`). Gleicher RNG-Strom (ein einziges `rng`,
+        // wie `build_determinized_forest` es an `build_net_tree` weiterreicht)
+        // muss trotzdem drei verschiedene Ziehungen liefern.
+        let Some(net) = load_test_net() else { return };
+        let mut rng = StdRng::seed_from_u64(2468);
+        let state = random_drafting_state(2, 10, &mut rng).expect("Testzustand sollte auswertbar sein");
+        assert!(
+            state.dome_tile_pool.len() >= 3,
+            "Testvoraussetzung: genug Platten im verdeckten Stapel fuer eine aussagekraeftige Mischung"
+        );
+
+        let forest = build_determinized_forest(&net, &state, 6, DEFAULT_C_PUCT, false, 3, &mut rng);
+        assert_eq!(forest.len(), 3);
+        let pools: Vec<Vec<usize>> = forest
+            .iter()
+            .map(|nodes| nodes[0].state.dome_tile_pool.iter().map(|t| t.tile_id).collect())
+            .collect();
+        assert_ne!(pools[0], pools[1], "Welt 1 und 2 sollten unterschiedliche dome_tile_pool-Reihenfolgen ziehen");
+        assert_ne!(pools[1], pools[2], "Welt 2 und 3 sollten unterschiedliche dome_tile_pool-Reihenfolgen ziehen");
+        assert_ne!(pools[0], pools[2], "Welt 1 und 3 sollten unterschiedliche dome_tile_pool-Reihenfolgen ziehen");
     }
 
     #[test]
