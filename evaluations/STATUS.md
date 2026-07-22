@@ -1398,6 +1398,110 @@ Replay-Fenster-Regel: Korpus auf ~5000 Spiele des Champions (v10_best)
 auffüllen und v12 auf voller Datenmenge trainieren, bevor am Zielformat
 weitergedreht wird.
 
+## Nach-v11-Arbeitspakete: Stand + Tuning-Konsolidierung (2026-07-22, laufend)
+
+Drei Agenten-Arbeitspakete parallel (Nutzer-Direktive: Koordinator plant,
+Sonnet-Agenten führen aus):
+
+**Speed-Bündel Phase 1 — FERTIG (135/135 Tests, noch uncommitted, Commit
+kommt mit Phase 2 als Paket):**
+- **Inferenz-Batching (#63a)**: `Net::eval_pair` — beide Blatt-Perspektiven
+  (Mover + geflippt) in EINEM Batch=2-ONNX-Aufruf statt zwei sequenziellen.
+  Eigener fest auf Batch=2 optimierter tract-Plan, Paritätstest (1e-5) grün.
+  Gemessen: 190µs → 98µs je Blatt-Doppelauswertung = **~1.94× Suchspeedup**.
+- **Gumbel Tiefe ≥1 mctx-treu (#68)**: `gumbel_select_child` wählt jetzt
+  über children ∪ untried (unbesuchte mit N=0, completed-Q=v_mix),
+  Expansion on demand — Widening-Cap UND 95%-Cutoff im Gumbel-Pfad
+  vollständig entfernt (Legacy-PUCT-Pfad unangetastet). Echte
+  Suchverhaltens-Änderung → gepaarter Alt-vs-Neu-Arena-A/B in Phase 2
+  zwingend, bevor es Standard wird.
+- **R6-Nachtrag Peek-Kosten (#70)**: neue `PlayerBoard::apply_paid_cost` —
+  Stapel-Ziehungen ziehen nur den tatsächlich BEZAHLTEN Betrag von beiden
+  Scores ab (Gratis-Ziehung bei 0 Punkten lässt `score_unclamped` konstant);
+  Strafen laufen weiter ungeklemmt (Fund-7-Kern unberührt). Nutzer-
+  Klarstellung: freiwilliger Kauf ≠ Strafe.
+
+**Phase 2 (wartet auf Trainings-Ende):** Run-Manifeste + Trainings-Korpus-
+Log (#64, Nutzer-Wunsch: je Trainingsstart die Zusammensetzung nach
+Versions-Präfix loggen, z.B. "3000× v10, 2000× v11" — das Replay-Fenster
+stellt der Nutzer MANUELL zusammen, die frühere Implementierungs-Aufgabe
+ist gestrichen), Wheel-Rebuild, gepaarte Arena-Validierung des Bündels.
+
+**Daten-Skalierungs-Ablation (#69) — FERTIG, differenziertes Ergebnis**
+(fixer Val-Split identisch zu v11, Cache-Key-Bug vorab gefixt+committiert
+`475d9c8`: TD_LAMBDA fehlte im HDF5-Cache-Key — ein Lambda-Sweep hätte
+sonst still die 0.5-Targets recycelt):
+
+| Spiele | Epoche | val_combined | Val-Ploss | R² global |
+|---|---|---|---|---|
+| 500 | 2 | 1.9148 | 1.8609 | 0.113 |
+| 1000 | 2 | 1.8993 | 1.8461 | 0.121 |
+| 2000 (=v11) | 2 | 1.8738 | 1.8222 | 0.139 |
+
+**Policy-Seite ab 500 Spielen praktisch flach** (Potenzgesetz-Exponent
+val_combined ≈ −0.016) — die Datenmengen-Halbierung erklärt den v11-
+Stärke-Rückstand also NICHT über die Policy. **Value-Seite steigt monoton
+ohne Sättigung**, aber mit kleiner Effektgröße (Fit: 5000 Spiele ≈ +0.02
+R² global). Konsequenz: mehr Daten sind fürs Value-Ziel vertretbar, aber
+kein Zwang; die Datenmangel-These ist als Haupterklärung geschwächt.
+
+**TD_LAMBDA-Sweep (#72) — FERTIG, klare Empfehlung λ=0.7:**
+
+| λ | Val-Ploss | R²-Struktur | Label-Band <0.3 |
+|---|---|---|---|
+| 0.3 | 1.8262 | Signal fast nur R5 (R1-R4 schwach) | 52.7% |
+| 0.5 (=v11) | 1.8222 | R1/R2 positiv, R3/R4 mittel | 66.2% |
+| 0.7 | 1.8269 | gleichmäßig über ALLE Runden inkl. R1 0.059 | 73.3% |
+
+Alle λ: beste Epoche 2 (Overfitting-Tempo unverändert), Val-Ploss
+praktisch identisch (Spanne 0.005 — policy-neutral). R² über λ hinweg
+NICHT höhenvergleichbar (Zieldefinition ändert sich) — bewertet wurde nur
+die Struktur. **v11_td07 (λ=0.7) verdient einen Arena-Test** (gleichmäßige
+Rundenabdeckung = genau die Punkt-6-Absicht); λ=0.3 verworfen.
+
+**Diversität (#67) + Elo-Infra (#62):** siehe oben — beide fertig.
+
+**Danach eingeplant:** ISMCTS-Mehrfach-Determinisierung (#65, eigener
+gepaarter A/B nach Phase 2 — Suchänderungen werden nie gebündelt getestet),
+Knoten-Budgets/Einzelspiel-Flush/Heartbeat (#71, vor dem v12-Batch:
+Zeitbudgets machen rtv/bootstrap-Labels lastabhängig, Knoten-Budgets machen
+sie deterministisch).
+
+**Diversitäts-Monitoring (#67) — FERTIG, Urteil: GESUND, kein Kollaps.**
+`evaluations/selfplay_diversity_report.py` (wiederverwendbar als
+Regressions-Check), alle 200 netcq-Dateien vs. 30 domefactB-Referenzdateien,
+Eröffnungen exakt aus den state-log-Diffs rekonstruiert: **1996/2000
+einzigartige 3-Zug-Eröffnungen** (normierte Entropie 1.00, häufigste
+Eröffnung 0.1%), Brett-/Startspieler-Siegraten ~50/50 (Fairness ok),
+Spiellängen 161.5±4.3 (etwas kürzer als Heuristik 173.7±4.3 — plausibler
+Stilunterschied, kein Befund). **Keine Eröffnungs-Temperatur für v12 nötig.**
+
+**Elo-Tracker (#62) — Infrastruktur FERTIG, erste Kader-Matches ausstehend.**
+`evaluations/elo_tracker.py` + `elo_history.csv`: Bradley-Terry-MLE
+(MM-Algorithmus) je Zusammenhangskomponente des Match-Graphen,
+Heuristik@200 als fixer 1000-Anker, 95%-CI per Bootstrap, CLI add/report.
+Initial nur das kader-valide Gating-Match (v11 43:57 v10) eingetragen; alte
+@150/Alt-Regel-Matches bewusst nicht backfilled (im Docstring begründet).
+Die ersten echten Kader-Matches (v10_best/v11_best je vs. Heuristik@200)
+sind als Kommandos vorbereitet und laufen, sobald die Maschine frei ist.
+
+**Tuning-Parameter-Konsolidierung (Stand 2026-07-22):**
+
+| Parameter | Status |
+|---|---|
+| POLICY_TARGET_SHARPEN_EXPONENT | ERLEDIGT: toter Knopf auf completed-Q (v11 vs. sharp1 identisch), bleibt 2.0 |
+| FLOOR_SHAPING_WEIGHT=0.3 | VALIDIERT (gepaart, +14pp, p=0.0075); 0.15/0.6-Sweep optional |
+| VALUE_SCALE=50 | FIX (Nutzer-Anker); Histogramm: 0% Sättigung, eher gestaucht |
+| MAX_ACTIONS/WIDEN_FACTOR/POLICY_MASS_CUTOFF | ENTFERNT statt getunt (#68), Validierung Phase 2 |
+| c_puct / Dirichlet / TARGET_TEMP | tote Knöpfe (Legacy-/Heuristik-Pfad) |
+| TD_LAMBDA | Sweep LÄUFT (0.3/0.7 vs. 0.5) |
+| Datenmenge/Generation | Ablation LÄUFT (500/1000/2000) |
+| NET_SIMS 400 vs. 800 | offen, nach Phase 2 (Batching halbiert die Kosten) |
+| GUMBEL_TOP_M 16 vs. 32 | offen, nach Phase 2 (#68 ändert vorher die Tiefe-≥1-Breite) |
+| VALUE_WEIGHT/POINTS_WEIGHT | offen, nach TD-Ergebnis (billiger Retrain-Sweep) |
+| GUMBEL_C_SCALE/C_VISIT | offen, niedrige Priorität |
+| BOOTSTRAP_HORIZON_ROUNDS | geparkt bis nach v12 (teuer, Noise-Floor stützt 2) |
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)

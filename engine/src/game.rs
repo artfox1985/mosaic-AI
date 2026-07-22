@@ -158,12 +158,13 @@ pub fn validate_draw_stack_peek(state: &GameState) -> Option<String> {
         }
     }
     // Regelbuch: Weiterziehen darf beliebig oft wiederholt werden (je Ziehung
-    // -1 Pkt, Score klemmt bei 0 -- apply_score floort). Bei 0 Punkten ist
-    // Weiterziehen also effektiv gratis, bis der Stapel leer ist. Die frühere
-    // Hausregel "nur so viele Ziehungen wie Punkte" wurde per Nutzer-
-    // Entscheidung (Vollaudit 2026-07-21) entfernt. `score_unclamped` wird
-    // durch apply_score(-1) weiterhin ehrlich belastet -- das Trainingslabel
-    // sieht die echten Kosten.
+    // -1 Pkt, Score klemmt bei 0). Bei 0 Punkten ist Weiterziehen also WIRKLICH
+    // gratis, bis der Stapel leer ist. Die frühere Hausregel "nur so viele
+    // Ziehungen wie Punkte" wurde per Nutzer-Entscheidung (Vollaudit
+    // 2026-07-21) entfernt. R6-Nachtrag (Paket 3, 2026-07-22): `execute_draw_
+    // stack_peek` nutzt `apply_paid_cost` statt `apply_score` -- anders als
+    // bei STRAFEN (Fund 7) bleibt `score_unclamped` bei diesem Kauf nie
+    // negativ, die Gratis-Ziehung kostet auch im Trainingslabel wirklich 0.
     if state.dome_tile_pool.is_empty() {
         return Some("Kein Stapel mehr vorhanden.".into());
     }
@@ -175,7 +176,10 @@ pub fn execute_draw_stack_peek(state: &mut GameState) -> Result<(), String> {
         return Err(e);
     }
     let pi = state.current_player;
-    state.players[pi].apply_score(-1);
+    // R6-Nachtrag (Paket 3, 2026-07-22): eine weitere Stapel-Ziehung ist ein
+    // KAUF (−1 Pkt), keine Strafe -- bei 0 Punkten laut Regelbuch wirklich
+    // gratis, siehe `apply_paid_cost`-Kommentar (Abgrenzung zu Fund 7).
+    state.players[pi].apply_paid_cost(-1);
     let tile = state.dome_tile_pool.remove(0);
     let typ = if tile.is_special_type() { "Special" } else { "Wild" };
     state.pending_stack_draw.push(tile);
@@ -928,7 +932,11 @@ mod tests {
         // Regelbuch-Variante (Vollaudit 2026-07-21): Weiterziehen darf
         // beliebig oft wiederholt werden, je Ziehung -1 Pkt, Score klemmt
         // bei 0 -- bei 0 Punkten also effektiv gratis, bis der Stapel leer
-        // ist. `score_unclamped` sinkt dabei ehrlich weiter.
+        // ist. R6-Nachtrag (Paket 3, 2026-07-22): "gratis" heisst jetzt
+        // WIRKLICH kostenlos -- `apply_paid_cost` zieht nur den tatsaechlich
+        // bezahlten Betrag ab (0, wenn score schon 0 ist), `score_unclamped`
+        // bleibt bei diesen Gratis-Ziehungen daher KONSTANT (anders als bei
+        // STRAFEN, Fund 7, deren ungeklemmte Zaehlung weiter ins Minus laeuft).
         let mut rng = StdRng::seed_from_u64(12);
         let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
         for p in game.state.players.iter_mut() {
@@ -945,11 +953,29 @@ mod tests {
             execute_draw_stack_peek(&mut game.state).expect("Ziehung");
             assert_eq!(game.state.players[0].score, 0, "Punkte duerfen nie unter 0 fallen");
             assert_eq!(
-                game.state.players[0].score_unclamped,
-                unclamped_before - i,
-                "score_unclamped muss die echten Kosten weiter zaehlen"
+                game.state.players[0].score_unclamped, unclamped_before,
+                "score_unclamped muss bei GRATIS-Ziehungen (score=0) konstant bleiben, kein realer Kosten-Betrag"
             );
         }
+    }
+
+    #[test]
+    fn stack_peek_with_positive_score_pays_real_cost() {
+        // Mini-Test (Paket 3): bei score>0 ist die Ziehung ein echter Kauf --
+        // score UND score_unclamped sinken beide um genau 1 (voll bezahlt,
+        // kein Gratis-Fall).
+        let mut rng = StdRng::seed_from_u64(99);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let pi = game.state.current_player;
+        game.state.players[pi].score = 5;
+        game.state.players[pi].score_unclamped = 5;
+
+        execute_draw_stack_peek(&mut game.state).expect("Ziehung");
+        assert_eq!(game.state.players[pi].score, 4, "voller Kaufpreis -1 bei ausreichendem Punktestand");
+        assert_eq!(game.state.players[pi].score_unclamped, 4, "score_unclamped zieht denselben tatsaechlich bezahlten Betrag ab");
     }
 
     #[test]

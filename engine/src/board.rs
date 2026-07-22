@@ -312,6 +312,23 @@ impl PlayerBoard {
         self.score_unclamped += delta;
     }
 
+    /// "Bezahlte" Kosten abziehen (R6-Nachtrag, Paket 3, 2026-07-22) --
+    /// abzugrenzen von `apply_score`: dort ist die ungeklemmte Zählung von
+    /// STRAFEN der Kern von Fund 7 (`score_unclamped` läuft absichtlich ins
+    /// Minus, um "schlecht" von "desaströs" fürs Trainingsziel zu
+    /// unterscheiden). Ein KAUF wie die Stapel-Ziehung (Regel: −1 Pkt je
+    /// weiterer verdeckter Platte) ist dagegen laut Regelbuch bei 0 Punkten
+    /// wirklich gratis -- man kann nicht mehr bezahlen, als man hat. Zieht
+    /// deshalb von `score` UND `score_unclamped` nur den TATSÄCHLICH
+    /// bezahlten Betrag ab (`max(delta, -score)`, für die üblichen negativen
+    /// `delta`-Kosten also nie mehr als der aktuelle Punktestand) -- anders
+    /// als bei Strafen bleibt `score_unclamped` hier nie negativ.
+    pub fn apply_paid_cost(&mut self, delta: i32) {
+        let paid = delta.max(-self.score);
+        self.score += paid;
+        self.score_unclamped += paid;
+    }
+
     pub fn has_used_all_tokens(&self, round_number: u32) -> bool {
         if round_number >= 5 {
             return true;

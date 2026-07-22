@@ -548,23 +548,36 @@ fn blended_leaf_win_prob(value: &[f32], points: &[f32]) -> f64 {
 pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
-    let (_logits, value, _moon, points) =
-        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-            net.eval(&feats).unwrap_or_else(|_| {
-                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
-            })
-        });
-    let mover_val = blended_leaf_win_prob(&value, &points);
-    let other_val = if MIRROR_OTHER_VAL {
-        1.0 - mover_val
+    // Paket 1 (Inferenz-Batching, 2026-07-22): bei `MIRROR_OTHER_VAL=false`
+    // braucht dieser Aufruf ohnehin ZWEI Forward-Pässe (Mover-/geflippte
+    // Perspektive) -- `Net::eval_pair` fasst sie zu einem Batch=2-Aufruf
+    // zusammen statt zwei sequenzieller Batch=1-Aufrufe zu bezahlen (Parität
+    // siehe `net.rs::eval_pair_matches_two_single_evals`). Bei `true` entfällt
+    // der zweite Pass ohnehin (reines `eval`, unverändert).
+    let (mover_val, other_val) = if MIRROR_OTHER_VAL {
+        let (_logits, value, _moon, points) =
+            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+                net.eval(&feats).unwrap_or_else(|_| {
+                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+                })
+            });
+        let mv = blended_leaf_win_prob(&value, &points);
+        (mv, 1.0 - mv)
     } else {
         crate::profiling::note_gamestate_clone();
         let mut flipped = state.clone();
         flipped.current_player = 1 - state.current_player;
         let other_feats = state_to_features_direct(&flipped);
-        net.eval(&other_feats)
-            .map(|(_, v, _, p)| blended_leaf_win_prob(&v, &p))
-            .unwrap_or(0.5)
+        let ((_logits, value, _moon, points), (_o_logits, o_value, _o_moon, o_points)) =
+            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+                net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
+                    (
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                    )
+                })
+            });
+        (blended_leaf_win_prob(&value, &points), blended_leaf_win_prob(&o_value, &o_points))
     };
     if !MIRROR_OTHER_VAL {
         record_perspective_divergence(state.round_number, mover_val, other_val);
@@ -616,25 +629,59 @@ fn make_node<R: Rng + ?Sized>(
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
     // `points` fließt bei ACTIVE_LEAF=Net jetzt in `blended_leaf_win_prob` mit
     // ein (KataGo-Stil Score-Utility, siehe `POINTS_UTILITY_WEIGHT`-Kommentar).
-    let (logits, value, moon, points) =
-        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
-            net.eval(&feats).unwrap_or_else(|_| {
-                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
-            })
-        });
+    //
+    // Paket 1 (Inferenz-Batching, 2026-07-22): bei ACTIVE_LEAF=Net UND
+    // MIRROR_OTHER_VAL=false braucht dieser Knoten ohnehin einen zweiten
+    // Forward-Pass für `other_val` (geflippte Perspektive, siehe weiter unten)
+    // -- `Net::eval_pair` fasst Mover- und Gegner-Pass zu EINEM Batch=2-
+    // ONNX-Aufruf zusammen statt zwei sequenzieller Batch=1-Aufrufe (Parität
+    // siehe `net.rs::eval_pair_matches_two_single_evals`). Policy-Logits/
+    // Moon-Scores werden nur aus dem Mover-Pass gebraucht -- die geflippte
+    // Perspektive dient ausschließlich `other_val`, siehe `other_pass` unten.
+    let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
+    let (logits, value, moon, points, other_pass) = if need_other_pass {
+        crate::profiling::note_gamestate_clone();
+        let mut flipped = state.clone();
+        flipped.current_player = 1 - state.current_player;
+        let other_feats = state_to_features_direct(&flipped);
+        let ((logits, value, moon, points), (_o_logits, o_value, _o_moon, o_points)) =
+            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+                net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
+                    (
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                    )
+                })
+            });
+        (logits, value, moon, points, Some((o_value, o_points)))
+    } else {
+        let (logits, value, moon, points) =
+            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+                net.eval(&feats).unwrap_or_else(|_| {
+                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+                })
+            });
+        (logits, value, moon, points, None)
+    };
 
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
         moon_scores[i] = *s;
     }
+    // Cutoff ausgesetzt (siehe `build_untried_actions`-Kommentar zu
+    // `skip_cutoff`, Fund 4) an der Wurzel (`parent.is_none()`, unabhängig
+    // davon, ob Root-Noise gerade aktiv ist) -- UND (Paket 2, mctx-Treue
+    // Tiefe-≥1-Auswahl, 2026-07-22) an JEDEM Knoten, wenn `USE_GUMBEL_SEARCH`
+    // aktiv ist: die neue `gumbel_select_child`-Auswahlregel entscheidet
+    // selbst über children ∪ untried, ohne einen vorab gekappten Long Tail zu
+    // brauchen -- der PUCT-Legacy-Pfad (`USE_GUMBEL_SEARCH=false`) bleibt
+    // unverändert nur an der Wurzel ausgesetzt (sein eigener Widening-Cap in
+    // `build_net_tree` bremst dort weiterhin, wie bisher).
+    let skip_cutoff = parent.is_none() || USE_GUMBEL_SEARCH;
     let (untried, n_actions) = if terminal {
         (Vec::new(), 0)
     } else {
-        // Cutoff an der Wurzel ausgesetzt (siehe `build_untried_actions`-
-        // Kommentar zu `skip_cutoff`, Fund 4) -- `parent.is_none()` erkennt
-        // die Wurzel unabhängig davon, ob Root-Noise gerade aktiv ist
-        // (Arena-Suche bleibt durch den Widening-Cap trotzdem sicher).
-        build_untried_actions(&state, &logits, &moon_scores, parent.is_none())
+        build_untried_actions(&state, &logits, &moon_scores, skip_cutoff)
     };
 
     // Blattwert: unabhängige Pro-Spieler-Werte. Das Netz liefert einen
@@ -648,13 +695,12 @@ fn make_node<R: Rng + ?Sized>(
             let other_val = if MIRROR_OTHER_VAL {
                 1.0 - mover_val
             } else {
-                crate::profiling::note_gamestate_clone();
-                let mut flipped = state.clone();
-                flipped.current_player = 1 - state.current_player;
-                let other_feats = state_to_features_direct(&flipped);
-                net.eval(&other_feats)
-                    .map(|(_, v, _, p)| blended_leaf_win_prob(&v, &p))
-                    .unwrap_or(0.5)
+                // `other_pass` wurde oben bereits per `eval_pair` MIT dem
+                // Mover-Pass zusammen berechnet (Paket 1) -- hier nur noch
+                // auslesen, kein zweiter Forward-Pass mehr nötig.
+                let (o_value, o_points) =
+                    other_pass.expect("need_other_pass deckt genau diesen Zweig ab");
+                blended_leaf_win_prob(&o_value, &o_points)
             };
             // Perspektiven-/OOD-Audit (siehe Modul-Kommentar oben) -- nur
             // aussagekräftig, wenn `other_val` ein ECHTER zweiter Forward-Pass
@@ -939,24 +985,33 @@ fn best_root_child(nodes: &[Node], children: &[usize]) -> Option<usize> {
     })
 }
 
-/// Tiefe-≥1-Auswahl unter bereits existierenden Kindern von `nid` (Gumbel-
-/// Pendant zu `best_puct`, §6 des Plans): `argmax[π'_node(a) − N(a)/(1+ΣN)]`,
-/// NUR über `nodes[nid].children` -- WELCHE Kandidaten überhaupt als Kind
-/// entstehen dürfen, entscheidet weiterhin derselbe Progressive-Widening-
-/// Cap wie im PUCT-Pfad (siehe `build_gumbel_tree`s `descend_and_backprop`).
-/// `improved_policy`s erste `children.len()` Einträge entsprechen 1:1
-/// `nodes[nid].children` (Reihenfolge von `completed_q_per_candidate`).
+/// Tiefe-≥1-Auswahl über `children ∪ untried` von `nid` (Gumbel-Pendant zu
+/// `best_puct`, §6 des Plans, JETZT mctx-treu ohne PUCT-geerbte Forced-
+/// Expansion/Widening-Cap-Sonderbehandlung -- Paket 2 des Speed-Bündels,
+/// 2026-07-22): `argmax[π'_node(a) − N(a)/(1+ΣN)]` über ALLE Kandidaten,
+/// unbesuchte (untried) zählen mit `N(a)=0`, exakt wie mctx' `action_selection.py`
+/// (vorher: nur über `nodes[nid].children`, WELCHE Kandidaten überhaupt als
+/// Kind entstehen durften, entschied ein separater Progressive-Widening-Cap
+/// -- beides jetzt entfernt, siehe `descend_and_backprop`).
+///
+/// Rückgabe: Index INNERHALB des Kombi-Vektors (`completed_q_per_candidate`-
+/// Reihenfolge: erst `children`, dann `untried`). `< children.len()` heißt
+/// bestehendes Kind (`nodes[nid].children[idx]`), sonst unbesuchter Kandidat
+/// bei Offset `idx - children.len()` in `nodes[nid].untried` -- der Aufrufer
+/// entscheidet anhand dieses Index, ob deszendiert oder on-demand expandiert
+/// wird.
 fn gumbel_select_child(nodes: &[Node], nid: usize) -> usize {
     let policy = improved_policy(nodes, nid);
+    let n_children = nodes[nid].children.len();
     let sum_n: f64 = nodes[nid].children.iter().map(|&c| nodes[c].visits as f64).sum();
-    let mut best = nodes[nid].children[0];
+    let mut best = 0usize;
     let mut best_adv = f64::NEG_INFINITY;
-    for (i, &cid) in nodes[nid].children.iter().enumerate() {
-        let n_a = nodes[cid].visits as f64;
-        let adv = policy[i] - n_a / (1.0 + sum_n);
+    for (i, &p) in policy.iter().enumerate() {
+        let n_a = if i < n_children { nodes[nodes[nid].children[i]].visits as f64 } else { 0.0 };
+        let adv = p - n_a / (1.0 + sum_n);
         if adv > best_adv {
             best_adv = adv;
-            best = cid;
+            best = i;
         }
     }
     best
@@ -1002,10 +1057,12 @@ fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
 /// Gumbel-AlphaZero-Baumaufbau (siehe Modul-Kommentar "Gumbel AlphaZero" für
 /// die volle Herleitung) -- Ersatz für `build_net_tree`, wenn
 /// `USE_GUMBEL_SEARCH=true`. Wurzel: Gumbel-Top-m + Sequential Halving statt
-/// Dirichlet-Noise + PUCT über den vollen Kandidatensatz. Tiefe≥1:
-/// `gumbel_select_child` statt `best_puct` (Progressive-Widening-Cap bleibt
-/// unverändert maßgeblich dafür, WELCHE Kandidaten überhaupt als Kind
-/// entstehen -- identisch zum PUCT-Pfad, siehe `descend_and_backprop`).
+/// Dirichlet-Noise + PUCT über den vollen Kandidatensatz. Tiefe≥1 (Paket 2
+/// des Speed-Bündels, 2026-07-22): `gumbel_select_child` über
+/// `children ∪ untried` OHNE Progressive-Widening-Cap -- die mctx-Auswahlregel
+/// selbst entscheidet, ob deszendiert oder ein neuer Kandidat expandiert wird
+/// (vorher PUCT-Erbe: fester Widening-Cap erzwang Expansion, bevor überhaupt
+/// zwischen Kindern gewählt wurde, siehe `descend_and_backprop`).
 /// `add_root_noise = false` (Arena/Produktion) schaltet die Gumbel-Samples ab
 /// (alle g(a) = 0.0): Top-m und Halving ranken dann rein nach
 /// `ln(prior) + σ(Q̂)` -- deterministisch, äquivalent zu mctx
@@ -1027,10 +1084,16 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, rng)];
 
     // Eine einzelne Tiefe-≥1-Deszension + Backprop, beginnend bei einem
-    // bereits existierenden Knoten (typischerweise ein Wurzelkind) --
-    // identisches Muster zur inneren Selection-Schleife im PUCT-Pfad, nur
-    // mit `gumbel_select_child` statt `best_puct`. Kein granularer Sim-
-    // Trace (siehe `build_net_tree`-Dispatch-Kommentar).
+    // bereits existierenden Knoten (typischerweise ein Wurzelkind). Paket 2
+    // (2026-07-22): KEIN Progressive-Widening-Cap/Forced-Expansion mehr (PUCT-
+    // Erbe, entfernt) -- `gumbel_select_child` wählt bei jedem Schritt über
+    // `children ∪ untried`; fällt die Wahl auf einen unbesuchten Kandidaten,
+    // wird GENAU DIESER on demand expandiert (statt immer `untried[0]`), sonst
+    // wird zum gewählten bestehenden Kind weiter deszendiert. Der PUCT-Legacy-
+    // Pfad (`build_net_tree`s eigene Sim-Schleife, `USE_GUMBEL_SEARCH=false`)
+    // behält seinen eigenen Widening-Cap unverändert -- diese Funktion wird
+    // von dort nie aufgerufen. Kein granularer Sim-Trace (siehe
+    // `build_net_tree`-Dispatch-Kommentar).
     fn descend_and_backprop<R: Rng + ?Sized>(net: &Net, nodes: &mut Vec<Node>, start_nid: usize, rng: &mut R) {
         let mut nid = start_nid;
         let mut expansion_failed = false;
@@ -1038,33 +1101,37 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
             if nodes[nid].terminal {
                 break;
             }
-            let widen_allowed = crate::mcts::MAX_ACTIONS
-                + (crate::mcts::WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
-            if !nodes[nid].untried.is_empty() && nodes[nid].children.len() < widen_allowed {
-                let (act, prior) = nodes[nid].untried.remove(0);
-                let mover = nodes[nid].state.current_player;
-                crate::profiling::note_gamestate_clone();
-                let mut g = Game { state: nodes[nid].state.clone() };
-                if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
-                    g.state.dome_tile_pool.shuffle(rng);
-                }
-                if g.apply_drafting(&act).is_ok() {
-                    let mut child_state = g.state;
-                    child_state.log.clear();
-                    let child = make_node(net, child_state, Some(nid), Some(act), prior, mover, rng);
-                    let cid = nodes.len();
-                    nodes.push(child);
-                    nodes[nid].children.push(cid);
-                    nid = cid;
-                } else {
-                    expansion_failed = true;
-                }
-                break;
+            if nodes[nid].children.is_empty() && nodes[nid].untried.is_empty() {
+                break; // defensiv: sollte an einem Nicht-Terminal-Knoten nie vorkommen
             }
-            if nodes[nid].children.is_empty() {
-                break;
+            let n_children = nodes[nid].children.len();
+            let idx = gumbel_select_child(nodes, nid);
+            if idx < n_children {
+                nid = nodes[nid].children[idx];
+                continue;
             }
-            nid = gumbel_select_child(nodes, nid);
+            // Auswahl faellt auf einen unbesuchten Kandidaten -- GENAU DIESEN
+            // on demand expandieren (kein Zwang mehr auf `untried[0]`).
+            let untried_idx = idx - n_children;
+            let (act, prior) = nodes[nid].untried.remove(untried_idx);
+            let mover = nodes[nid].state.current_player;
+            crate::profiling::note_gamestate_clone();
+            let mut g = Game { state: nodes[nid].state.clone() };
+            if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
+                g.state.dome_tile_pool.shuffle(rng);
+            }
+            if g.apply_drafting(&act).is_ok() {
+                let mut child_state = g.state;
+                child_state.log.clear();
+                let child = make_node(net, child_state, Some(nid), Some(act), prior, mover, rng);
+                let cid = nodes.len();
+                nodes.push(child);
+                nodes[nid].children.push(cid);
+                nid = cid;
+            } else {
+                expansion_failed = true;
+            }
+            break;
         }
         if expansion_failed {
             return;
@@ -2052,6 +2119,30 @@ mod tests {
         for (a, b) in policy.iter().zip(expected.iter()) {
             assert!((a - b).abs() < 1e-6, "policy={policy:?} expected={expected:?}");
         }
+    }
+
+    #[test]
+    fn gumbel_select_child_can_pick_a_strongly_preferred_unvisited_candidate_over_existing_children() {
+        // Paket 2 (mctx-treue Tiefe-≥1-Auswahl, 2026-07-22): anders als die
+        // alte Auswahl (nur ueber `nodes[nid].children`, ein separater
+        // Widening-Cap entschied, WANN neue Kandidaten ueberhaupt entstehen
+        // duerfen) muss die Auswahl jetzt auch einen bislang UNBESUCHTEN
+        // Kandidaten (hoher Prior, N=0) waehlen koennen, selbst wenn ein Kind
+        // schon 200 Besuche hat -- `N(a)/(1+ΣN)` bestraft den vielbesuchten
+        // Kandidaten irgendwann so stark, dass ein hochpriorisierter, nie
+        // besuchter Kandidat gewinnt.
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.5, 0.5];
+        let child = gumbel_test_node(0.3, 200, 100.0, 1); // Q = 100/200 = 0.5, stark besucht
+        let mut nodes = vec![root, child];
+        nodes[0].children.push(1);
+        nodes[0].untried.push((Action::Pass, 0.65)); // deutlich hoeherer Prior, N=0
+
+        let idx = gumbel_select_child(&nodes, 0);
+        assert_eq!(
+            idx, 1,
+            "Kombi-Index 1 (= der einzige untried-Kandidat, nach 1 Kind) haette gewaehlt werden muessen, war {idx}"
+        );
     }
 
     #[test]

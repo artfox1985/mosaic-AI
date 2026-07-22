@@ -11,11 +11,15 @@ except Exception:
 import torch
 import math
 import glob
+import json
+import re
+import subprocess
 import random
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from pathlib import Path
+from datetime import datetime
 from torch.utils.data import DataLoader
 
 
@@ -51,11 +55,138 @@ from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE,
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
-from neural_net import MosaicNet, MosaicDataset
+from neural_net import (
+    MosaicNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT, VALUE_SCHEMA_VERSION,
+)
+
+
+# ── Lauf-Manifest + Korpus-Log (#64 Teil 2, Phase 2b, 2026-07-22) ───────────
+# Additiv neben dem bestehenden `--train-file-limit`-Flag (Daten-Skalierungs-
+# Ablation, Task #69, unveraendert -- siehe dessen Kommentar unten). Ein
+# Trainingslauf soll rueckwirkend rekonstruierbar sein: welche CLI-Args,
+# welcher Rust/Python-Konstanten-Stand, welche Korpus-Zusammensetzung gingen
+# ein. Nutzer-Wunsch: die Korpus-Zusammensetzung wird NUR geloggt (Konsole +
+# Manifest) -- das Replay-Fenster selbst stellt der Nutzer weiterhin manuell
+# zusammen (kein automatisches Filtern hier). Alles best-effort (git/
+# engine_config_json koennen fehlen) -- ein Manifest-Fehler darf das
+# eigentliche Training nie verhindern.
+
+_SELFPLAY_FILENAME_RE = re.compile(
+    r"^selfplay_(?P<prefix>.+)_(?P<date>\d{8})_(?P<time>\d{4})_g(?P<games>\d+)\.pkl$"
+)
+
+
+def _git_commit_hash() -> str | None:
+    """Best-effort HEAD-Commit-Hash. None, wenn nicht ermittelbar."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(Path(__file__).resolve().parent),
+            capture_output=True, text=True, timeout=5, check=True,
+        )
+        return out.stdout.strip()
+    except Exception:
+        return None
+
+
+def _git_is_dirty() -> bool | None:
+    """Best-effort: gibt es uncommittete Änderungen im Arbeitsbaum? None,
+    wenn nicht ermittelbar."""
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=str(Path(__file__).resolve().parent),
+            capture_output=True, text=True, timeout=5, check=True,
+        )
+        return bool(out.stdout.strip())
+    except Exception:
+        return None
+
+
+def _engine_config() -> dict:
+    """Aktive Rust-Suchkonstanten, siehe `mosaic_rust.engine_config_json`
+    (lib.rs, Phase 2a). Best-effort: `train.py` braucht `mosaic_rust`
+    ansonsten nicht -- ein fehlendes/altes Wheel darf das Training nicht
+    verhindern, nur diesen Manifest-Teil leer/fehlerhaft lassen."""
+    try:
+        import mosaic_rust as _mr
+        return json.loads(_mr.engine_config_json())
+    except Exception as e:
+        return {"_error": f"engine_config_json nicht verfügbar: {e!r}"}
+
+
+def _corpus_composition(all_files: list[str]) -> list[dict]:
+    """Gruppiert die Trainingskorpus-Dateien nach Versions-Präfix (alles vor
+    dem eingebetteten Zeitstempel `_<date>_<time>_g<N>.pkl`, siehe
+    `self_play.py::_flush`) -- rein aus den DATEINAMEN, kein Pickle-Laden
+    nötig. `games`-Schätzung: die kumulative `_g<N>`-Ziffer resettet bei
+    JEDEM neuen Self-Play-Lauf auf klein (self_play.py's `done` startet pro
+    Aufruf bei 0) -- Dateien je Präfix nach (Zeitstempel, dann g) sortiert,
+    ein Sprung `g_i <= g_{i-1}` gilt als Start eines neuen Laufs (eigener
+    Beitrag = g_i selbst statt g_i - g_{i-1}). Reduziert sich für den
+    Normalfall (ein durchgehender Lauf je Präfix) exakt auf `max(g)`
+    (z.B. "180 Dateien netcq (1800 Spiele)" bei per_file=10)."""
+    groups: dict[str, list[tuple[str, int]]] = {}
+    unmatched = 0
+    for f in all_files:
+        name = Path(f).name
+        m = _SELFPLAY_FILENAME_RE.match(name)
+        if not m:
+            unmatched += 1
+            continue
+        prefix = m.group("prefix")
+        dt_key = m.group("date") + m.group("time")
+        games = int(m.group("games"))
+        groups.setdefault(prefix, []).append((dt_key, games))
+
+    composition = []
+    for prefix, entries in groups.items():
+        entries.sort(key=lambda e: (e[0], e[1]))  # (Zeitstempel, dann g) aufsteigend
+        total_games = 0
+        prev_g = 0
+        for _dt_key, g in entries:
+            total_games += g if g <= prev_g else g - prev_g
+            prev_g = g
+        composition.append({"prefix": prefix, "files": len(entries), "games": total_games})
+    composition.sort(key=lambda c: -c["files"])
+    if unmatched:
+        composition.append({"prefix": "_unmatched", "files": unmatched, "games": None})
+    return composition
+
+
+def _write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp) -> None:
+    """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
+    Korpus-Zusammensetzung auf Konsole."""
+    manifest = {
+        "version": version_name,
+        "run_timestamp": run_timestamp,
+        "cli_args": cli_args,
+        "git_commit": _git_commit_hash(),
+        "git_dirty": _git_is_dirty(),
+        "engine_config": _engine_config(),
+        "python_constants": {
+            "TD_LAMBDA": TD_LAMBDA,
+            "POLICY_TARGET_SHARPEN_EXPONENT": POLICY_TARGET_SHARPEN_EXPONENT,
+            "VALUE_WEIGHT": VALUE_WEIGHT,
+            "POINTS_WEIGHT": POINTS_WEIGHT,
+            "VALUE_SCHEMA_VERSION": VALUE_SCHEMA_VERSION,
+        },
+        "corpus_composition": corpus_composition,
+    }
+    path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+        print(f"📝 Trainings-Manifest geschrieben: '{path}'")
+    except Exception as e:
+        print(f"  ⚠️  Manifest konnte nicht geschrieben werden ({e!r}) -- Training läuft trotzdem weiter.")
+
+    print("📦 Trainingskorpus-Zusammensetzung (nach Versions-Präfix, aus Dateinamen):")
+    for c in corpus_composition:
+        games_s = f"{c['games']} Spiele" if c["games"] is not None else "Spiele-Zahl unklar"
+        print(f"   {c['files']:>4} Dateien {c['prefix']:<28} ({games_s})")
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          show_plot=True, val_frac=0.1):
+          show_plot=True, val_frac=0.1, train_file_limit=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -66,6 +197,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # uebergreifendes Benchmark dienen (das leistet schon die Arena vs.
     # Champion/Heuristik).
     all_files = sorted(glob.glob(str(DATA_DIR / "*.pkl")))
+
+    # Lauf-Manifest + Korpus-Log (#64 Teil 2) -- siehe Funktionskommentare
+    # oben. Additiv, rührt die train_file_limit-Logik unten nicht an.
+    _run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    _cli_args = {
+        "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
+        "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
+        "train_file_limit": train_file_limit,
+    }
+    _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
+
     val_files = []
     train_files = None  # None == MosaicDataset laedt wie bisher den ganzen Ordner
     if val_frac > 0 and len(all_files) >= 10:
@@ -74,6 +216,20 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         n_val = max(1, round(len(shuffled) * val_frac))
         val_files = sorted(shuffled[:n_val])
         train_files = sorted(shuffled[n_val:])
+
+    # Daten-Skalierungs-Ablation (Task #69): Trainings-Dateien NACH dem
+    # Val-Split auf train_file_limit kappen -- der Val-Split oben ist davon
+    # unberuehrt (bleibt identisch zu v11/vollem Korpus), nur die Trainings-
+    # menge schrumpft. Eigener, vom Val-Split-Seed getrennter Seed (+1), damit
+    # die Auswahl nicht zufaellig mit dem Val-Split-Shuffle korreliert.
+    if train_file_limit is not None and train_files is not None and len(train_files) > train_file_limit:
+        subsample_rng = random.Random(20260707 + 1)
+        pool = train_files[:]
+        subsample_rng.shuffle(pool)
+        orig_n = len(train_files)
+        train_files = sorted(pool[:train_file_limit])
+        print(f"   Subsampling (Task #69): {len(train_files)} von {orig_n} Trainings-Dateien "
+              f"(Seed 20260708, Val-Split unveraendert)")
 
     dataset = MosaicDataset(str(DATA_DIR), files=train_files)
     if len(dataset) == 0:
@@ -635,9 +791,14 @@ if __name__ == "__main__":
     parser.add_argument("--val-frac", type=float, default=0.1,
                         help="Anteil der Spiele-DATEIEN (nicht Züge), der als Val-Split nie "
                              "trainiert wird (Standard: 0.1). 0 deaktiviert den Split.")
+    parser.add_argument("--train-file-limit", type=int, default=None,
+                        help="Begrenzt die TRAININGS-Dateien (nach Abzug des Val-Splits) auf N "
+                             "(Daten-Skalierungs-Ablation, Task #69). Val-Split bleibt unveraendert "
+                             "identisch zu einem Lauf ohne dieses Flag.")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
-          show_plot=not args.no_plot, val_frac=args.val_frac)
+          show_plot=not args.no_plot, val_frac=args.val_frac,
+          train_file_limit=args.train_file_limit)
