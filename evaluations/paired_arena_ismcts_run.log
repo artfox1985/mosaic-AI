@@ -1,0 +1,26 @@
+Gepaarter A/B ALT(NUM_DETERMINIZATIONS=1) vs NEU(NUM_DETERMINIZATIONS=3) -- v10_best @ NET_SIMS=400 vs. Heuristik @ HEUR_SIMS=200, Basis-Seed=970389981
+  ALT-Python (n=1): D:\Archiv\Documents\Projekte\mosaic-ismcts-n1\.venv-n1\Scripts\python.exe
+  NEU-Python (n=3): C:\Users\Patrick\AppData\Local\Python\pythoncore-3.14-64\python.exe
+  [NEU(n=3)] Block Seed=970389981 n=25 fertig in 88.0s (0.28 Spiele/s)
+  [ALT(n=1)] Block Seed=970389981 n=25 fertig in 56.3s (0.44 Spiele/s)
+  Kumulativ nach 25 Paaren: NEU(n=3) 7:11 ALT(n=1) | diskordant b=3 c=7 | McNemar p=0.3438
+  [NEU(n=3)] Block Seed=971389981 n=25 fertig in 66.1s (0.38 Spiele/s)
+  [ALT(n=1)] Block Seed=971389981 n=25 fertig in 56.9s (0.44 Spiele/s)
+  Kumulativ nach 50 Paaren: NEU(n=3) 11:21 ALT(n=1) | diskordant b=6 c=16 | McNemar p=0.0525
+  [NEU(n=3)] Block Seed=972389981 n=25 fertig in 74.6s (0.34 Spiele/s)
+  [ALT(n=1)] Block Seed=972389981 n=25 fertig in 61.0s (0.41 Spiele/s)
+  Kumulativ nach 75 Paaren: NEU(n=3) 19:38 ALT(n=1) | diskordant b=6 c=25 | McNemar p=0.0009
+  Signifikant bei p<0.05 nach 75 Paaren.
+{
+  "done": 75,
+  "new_wins": 19,
+  "old_wins": 38,
+  "b_new_only": 6,
+  "c_old_only": 25,
+  "p": 0.0008779102936387062,
+  "base_seed": 970389981,
+  "net_sims": 400,
+  "heur_sims": 200,
+  "model": "D:\\Archiv\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v10_best.onnx"
+}
+Ergebnis gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\evaluations\paired_arena_ismcts_result.json
