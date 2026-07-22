@@ -1535,6 +1535,25 @@ sind als Kommandos vorbereitet und laufen, sobald die Maschine frei ist.
 | GUMBEL_C_SCALE/C_VISIT | offen, niedrige Priorität |
 | BOOTSTRAP_HORIZON_ROUNDS | geparkt bis nach v12 (teuer, Noise-Floor stützt 2) |
 
+## Task #71: Knoten-Budgets, Einzelspiel-Flush, Heartbeat (2026-07-22, Commit 753f749)
+
+Label-Determinismus + Robustheit vor v12. Kalibrierung deckte auf, dass die
+alten Zeitbudgets REALE Cutoffs waren: Runde-2-Sampling überschritt seine
+30s regelmäßig schon unbelastet (Median 23.9s, Max 32.1s), und
+`choose_drafting_action_pruned` wurde faktisch von der 15ms-Deadline
+beschnitten (Median nur 13 Knoten!) statt vom 20.000er-Knotenbudget —
+**die rtv-/bootstrap-Labels aller bisherigen Korpora waren also
+lastsensitiv.** Jetzt: `POLICY_NODE_BUDGET=40` als primärer,
+deterministischer Cutoff; alle Zeitbudgets zu großzügigen Not-Deckeln
+umgewidmet (Werte siehe Code-Kommentare mit Kalibrier-Basis).
+Einzelspiel-Flush (.jsonl je Spiel, Chunk-Kill kostet ≤1 Spiel, Retry
+fordert nur Fehlendes nach — im Smoke real bewährt: 18/20 gerettet) +
+Heartbeat-Erkennung (180s ohne Herzschlag = tot, langsam ≠ tot).
+138/138 Tests inkl. Determinismus-Test (`bootstrap_value_after_rounds`
+seed-exakt reproduzierbar). Nebenbefund als Folge-Task: ~1e-4
+Prozessgrenzen-Nichtdeterminismus in tract-onnx (vorbestehend,
+vernachlässigbar).
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
