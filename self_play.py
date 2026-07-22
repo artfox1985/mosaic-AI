@@ -61,16 +61,28 @@ except ImportError as e:  # pragma: no cover
 # versucht, statt den ganzen Lauf zu blockieren.
 GAME_HANG_SAFETY_FACTOR = 5  # externe Grenze = Vielfaches des internen Timeouts
 MIN_CHUNK_TIMEOUT_SECS = 120
-# Harte Obergrenze (2026-07-21, netcq-Batch): die Hänger sind INTRINSISCH
-# (seltener Spielzustand -> 1 Rust-Thread spinnt auf 100%, alle anderen
-# rayon-Worker idle; auch SOLO ohne Parallellast beobachtet, py-spy-Dump:
-# Python-Hauptthread parkt in rayons WaitOnAddress). Beobachtete Rate
-# ~1 Hänger je ~7 Chunks; mit der alten Formelgrenze (1200s bei sims=400)
-# kostete jeder Hänger 20 Min Leerlauf. 450s ~= 3x normale Chunk-Dauer
-# (~150s solo, 10 Spiele/8 Threads) -- reicht für legitime Nachzügler,
-# begrenzt die Hänger-Steuer auf ~7,5 Min. Ursachenanalyse (procdump/
-# Minidump des spinnenden Native-Threads) ist separat geplant (Task #71).
+# Harte AUSSEN-Obergrenze (2026-07-21, netcq-Batch), NICHT mehr der primäre
+# Kill-Trigger seit Task #71 (siehe HEARTBEAT_TIMEOUT_SECS unten) -- reiner
+# Not-Deckel gegen den Fall, dass der Herzschlag selbst aus irgendeinem Grund
+# dauerhaft weiterläuft, ohne dass der Chunk je fertig wird. Die Hänger sind
+# INTRINSISCH (seltener Spielzustand -> 1 Rust-Thread spinnt auf 100%, alle
+# anderen rayon-Worker idle; auch SOLO ohne Parallellast beobachtet, py-spy-
+# Dump: Python-Hauptthread parkt in rayons WaitOnAddress).
 MAX_CHUNK_TIMEOUT_SECS = 450
+# Task #71: primärer Kill-Trigger -- der Supervisor beendet einen Chunk NICHT
+# mehr, sobald er insgesamt "zu lange" braucht (das verwechselt "langsam
+# unter Last" mit "tot"), sondern nur noch, wenn der Fortschritts-Herzschlag
+# (Rust schreibt ihn per Zug, siehe self_play.rs::start_heartbeat_reporter)
+# für HEARTBEAT_TIMEOUT_SECS ausbleibt. WICHTIG: der Zug-Zähler tickt NICHT
+# während eines laufenden Rundenübergangs-Samplings (das passiert innerhalb
+# EINES Zugs, bevor der nächste Zähler-Tick kommt) -- der theoretische
+# Worst-Case-Abstand zweier Ticks (falls ALLE Not-Deckel gleichzeitig voll
+# ausgeschöpft würden, was die Kalibrierung nie beobachtet hat) liegt bei
+# Runde 2/3 bei bis zu ~130s (75s Rundenübergang + 55s Bootstrap-Fortsetzung,
+# siehe round_transition_deep.rs-Konstanten). 180s Toleranz lässt dafür
+# komfortabel Luft, bleibt aber weit unter dem alten starren 450s-Deckel.
+HEARTBEAT_TIMEOUT_SECS = 180
+HEARTBEAT_POLL_INTERVAL_SECS = 5
 MAX_CONSECUTIVE_CHUNK_FAILURES = 3
 
 
@@ -110,10 +122,13 @@ def _allow_system_sleep() -> None:
 
 def _internal_game_timeout_secs(sims: int, has_model: bool) -> int:
     """Spiegelt self_play.rs::heuristic_game_timeout_secs/EXTRA_GAME_TIMEOUT_SECS,
-    um die externe Supervisor-Grenze proportional dazu zu skalieren."""
+    um die externe Supervisor-Grenze proportional dazu zu skalieren.
+    Task #71: EXTRA_GAME_TIMEOUT_SECS neu kalibriert (12+75+75+45=207 statt
+    5+30+30+30=95, siehe round_transition_deep.rs -- die alten Zeitbudgets
+    waren als primärer Cutoff zu knapp bemessen, jetzt nur noch Not-Deckel)."""
     base = max(30, (sims * 3) // 10)
     if has_model:
-        base += 5 + 30 + 30 + 30  # EXTRA_GAME_TIMEOUT_SECS (Runde 4..1)
+        base += 12 + 75 + 75 + 45  # EXTRA_GAME_TIMEOUT_SECS (Runde 4..1)
     return base
 
 
@@ -126,9 +141,12 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
 
 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
-                      add_root_noise, deterministic, queue):
+                      add_root_noise, deterministic, queue, progress_path, heartbeat_path):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
-    Weiterleitung, damit sie per multiprocessing.Process spawnbar ist."""
+    Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
+    `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
+    durchgereicht -- Einzelspiel-Flush (JSONL) + periodischer Herzschlag,
+    siehe self_play.rs::run_net_self_play & Geschwister."""
     try:
         import mosaic_rust as mr
         if mode == "network":
@@ -136,56 +154,126 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
                 seed=seed, num_threads=threads, prefix=prefix,
                 add_root_noise=add_root_noise, deterministic=deterministic,
+                progress_path=progress_path, heartbeat_path=heartbeat_path,
             )
         elif mode == "mcts" and model:
             raw = mr.self_play_games_with_net_labels(
                 model_path=model, n_games=n, base_sims=simulations,
                 seed=seed, num_threads=threads, prefix=prefix,
+                progress_path=progress_path, heartbeat_path=heartbeat_path,
             )
         else:
             raw = mr.self_play_games(
                 n_games=n, base_sims=simulations, seed=seed,
                 num_threads=threads, prefix=prefix,
+                progress_path=progress_path, heartbeat_path=heartbeat_path,
             )
         queue.put(("ok", raw))
     except Exception as e:  # pragma: no cover
         queue.put(("error", repr(e)))
 
 
+def _recover_partial_progress(progress_path) -> list[list[dict]]:
+    """Liest eine (möglicherweise durch einen harten Kill mitten im Schreiben
+    abgebrochene) JSONL-Fortschrittsdatei -- eine Zeile je fertigem Spiel
+    (siehe self_play.rs::append_game_progress). Toleriert eine unvollständige
+    LETZTE Zeile (Kill mitten im Schreibvorgang, trotz Flush ein theoretisch
+    möglicher Rest-Fall bei OS-Puffergrenzen) -- überspringt sie stumm statt
+    abzustürzen. Gibt eine Liste bereits vollständiger Spiele zurück (je eine
+    Step-Liste, direkt kompatibel mit `_group_by_game`s Rückgabeformat)."""
+    games: list[list[dict]] = []
+    if progress_path is None or not progress_path.exists():
+        return games
+    with open(progress_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                game_steps = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # unvollständige/kaputte letzte Zeile -- verwerfen, nicht crashen
+            if isinstance(game_steps, list) and game_steps:
+                games.append(game_steps)
+    return games
+
+
+def _cleanup_progress_files(progress_path, heartbeat_path) -> None:
+    """Räumt die Zwischendateien eines Chunk-Versuchs auf (best-effort) --
+    weder auf Erfolg (Inhalt bereits im `raw`-JSON enthalten) noch auf
+    Wiederherstellung (Inhalt bereits ins `buffer` übernommen) wird die
+    JSONL/Heartbeat-Datei noch gebraucht."""
+    for p in (progress_path, heartbeat_path):
+        if p is not None:
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
-                          add_root_noise, deterministic, timeout_secs) -> str | None:
-    """Führt einen Chunk in einem Subprozess mit Wall-Clock-Timeout aus.
-    Gibt das rohe JSON zurück, oder None bei Hänger/Timeout (Aufrufer
-    entscheidet über Retry -- siehe MAX_CONSECUTIVE_CHUNK_FAILURES)."""
+                          add_root_noise, deterministic, timeout_secs,
+                          progress_path, heartbeat_path) -> str | None:
+    """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
+    Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
+    mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
+    noch, nur langsam unter Last" von "hängt/ist tot". `timeout_secs` bleibt
+    als äußerer Not-Deckel (MAX_CHUNK_TIMEOUT_SECS-basiert) zusätzlich aktiv.
+    Gibt das rohe JSON zurück, oder None bei Hänger/Timeout (Aufrufer liest
+    dann `progress_path` für die bereits geflushten Spiele und retried nur
+    den fehlenden Rest -- siehe `generate_data`)."""
     queue: mp.Queue = mp.Queue()
     proc = mp.Process(
         target=_worker_run_chunk,
         args=(mode, model, n, simulations, c_puct, seed, threads, prefix,
-              add_root_noise, deterministic, queue),
+              add_root_noise, deterministic, queue,
+              str(progress_path), str(heartbeat_path)),
     )
     proc.start()
-    # WICHTIG: das Ergebnis MUSS aus der Queue gelesen werden, während wir
-    # warten, nicht erst nach proc.join() -- der Payload (JSON mehrerer
-    # Partien) kann den OS-Pipe-Puffer überschreiten; der Feeder-Thread des
-    # Kindprozesses blockiert dann beim Schreiben, und der Prozess bleibt
-    # "am Leben", bis jemand aus der Queue liest. Ein join() VOR dem get()
-    # würde also bei jedem größeren Chunk fälschlich als Hänger erkannt
-    # (klassische multiprocessing-Falle, siehe Queue-Doku).
-    try:
-        status, payload = queue.get(timeout=timeout_secs)
-    except _queue_mod.Empty:
-        print(f"  ⚠️  Chunk-Hänger erkannt (Seed {seed}, > {timeout_secs}s) -- "
-              f"beende Subprozess und versuche mit neuem Seed erneut.")
+    t_start = time.time()
+    last_heartbeat_seen = t_start  # Prozessstart zaehlt als initialer Herzschlag
+    while True:
+        # WICHTIG: das Ergebnis MUSS aus der Queue gelesen werden, während wir
+        # warten, nicht erst nach proc.join() -- der Payload (JSON mehrerer
+        # Partien) kann den OS-Pipe-Puffer überschreiten; der Feeder-Thread des
+        # Kindprozesses blockiert dann beim Schreiben, und der Prozess bleibt
+        # "am Leben", bis jemand aus der Queue liest. Ein join() VOR dem get()
+        # würde also bei jedem größeren Chunk fälschlich als Hänger erkannt
+        # (klassische multiprocessing-Falle, siehe Queue-Doku). Kurzes Poll-
+        # Intervall statt eines einzigen langen `get(timeout=...)`, damit wir
+        # zwischendurch den Herzschlag prüfen können.
+        try:
+            status, payload = queue.get(timeout=HEARTBEAT_POLL_INTERVAL_SECS)
+            proc.join()
+            if status == "error":
+                raise RuntimeError(f"Rust-Self-Play-Fehler im Subprozess: {payload}")
+            return payload
+        except _queue_mod.Empty:
+            pass
+
+        try:
+            hb_mtime = heartbeat_path.stat().st_mtime
+            if hb_mtime > last_heartbeat_seen:
+                last_heartbeat_seen = hb_mtime
+        except FileNotFoundError:
+            pass  # Noch kein Herzschlag geschrieben -- Prozessstart bleibt Referenz.
+
+        stale_secs = time.time() - last_heartbeat_seen
+        elapsed_secs = time.time() - t_start
+        if stale_secs > HEARTBEAT_TIMEOUT_SECS:
+            print(f"  ⚠️  Herzschlag ausgeblieben (Seed {seed}, {stale_secs:.0f}s ohne Fortschritt) -- "
+                  f"beende Subprozess und versuche mit neuem Seed erneut.")
+        elif elapsed_secs > timeout_secs:
+            print(f"  ⚠️  Chunk-Notdeckel erreicht (Seed {seed}, > {timeout_secs}s trotz Herzschlag) -- "
+                  f"beende Subprozess und versuche mit neuem Seed erneut.")
+        else:
+            continue
         proc.terminate()
         proc.join(10)
         if proc.is_alive():  # pragma: no cover
             proc.kill()
             proc.join()
         return None
-    proc.join()
-    if status == "error":
-        raise RuntimeError(f"Rust-Self-Play-Fehler im Subprozess: {payload}")
-    return payload
 
 
 def _group_by_game(steps: list[dict]) -> list[list[dict]]:
@@ -365,10 +453,18 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"Chunk: {chunk} | {per_file} Spiele/Datei | Chunk-Hänger-Timeout {timeout_secs}s)")
 
     def make_chunk(n, chunk_idx):
-        return _run_chunk_supervised(
+        # Task #71: je Chunk-VERSUCH eigene Zwischendateien (chunk_idx macht
+        # den Pfad pro Versuch eindeutig) -- Rust schreibt hier den
+        # Einzelspiel-Flush (JSONL) + Herzschlag hinein, der Supervisor kann
+        # sie bei einem Kill zur Wiederherstellung lesen (siehe unten).
+        progress_path = DATA_DIR / f".progress_{prefix}_c{chunk_idx}.jsonl"
+        heartbeat_path = DATA_DIR / f".heartbeat_{prefix}_c{chunk_idx}.json"
+        raw = _run_chunk_supervised(
             mode, model, n, simulations, c_puct, base_seed + chunk_idx, threads,
             f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, timeout_secs,
+            progress_path, heartbeat_path,
         )
+        return raw, progress_path, heartbeat_path
 
     # WICHTIG: In Chunks generieren statt in EINEM riesigen Rust-Aufruf. Das gibt
     # laufenden Fortschritt + ETA und hält den Speicher klein (sonst lägen bei
@@ -387,11 +483,41 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         consecutive_failures = 0
         buffer: list[dict] = []      # akkumulierte Steps für die nächste .pkl
         buffer_games = 0             # Anzahl Spiele im Buffer
+
+        def _absorb_games(games: list[list[dict]]) -> None:
+            """Übernimmt bereits gruppierte Spiele (aus `raw` ODER aus einer
+            geretteten JSONL) ins gemeinsame `buffer`/`done`/`total_steps`-
+            Tracking und flusht bei Bedarf -- EIN Pfad für beide Quellen
+            (Task #71), damit sich Erfolgs- und Recovery-Fall nicht
+            auseinanderentwickeln."""
+            nonlocal done, total_steps, buffer, buffer_games
+            for game_steps in games:
+                buffer.extend(game_steps)
+                buffer_games += 1
+                done += 1
+                total_steps += len(game_steps)
+                if buffer_games >= per_file:
+                    _flush(buffer, version_name, tag, done)
+                    buffer, buffer_games = [], 0
+
         while done < num_games:
             n = min(chunk, num_games - done)
-            raw = make_chunk(n, chunk_idx)
+            raw, progress_path, heartbeat_path = make_chunk(n, chunk_idx)
             chunk_idx += 1  # Seed für den nächsten Versuch (auch bei Retry) ändert sich immer.
             if raw is None:
+                # Chunk gehängt/getötet -- Task #71: statt den GESAMTEN Chunk zu
+                # verwerfen, die bereits per Einzelspiel-Flush geschriebenen
+                # Partien aus der JSONL retten und nur noch den fehlenden Rest
+                # neu anfordern (nächste Schleifen-Iteration verkleinert `n`
+                # automatisch über `num_games - done`).
+                recovered = _recover_partial_progress(progress_path)
+                _cleanup_progress_files(progress_path, heartbeat_path)
+                if recovered:
+                    print(f"  ♻️  {len(recovered)}/{n} Spiele aus dem unterbrochenen Chunk "
+                          f"gerettet -- fordere nur den Rest neu an.")
+                    _absorb_games(recovered)
+                    consecutive_failures = 0  # echter Fortschritt zählt nicht als Fehlschlag
+                    continue
                 consecutive_failures += 1
                 if consecutive_failures > MAX_CONSECUTIVE_CHUNK_FAILURES:
                     raise SystemExit(
@@ -400,6 +526,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                     )
                 continue  # gleiche Ziel-Spielezahl `n`, aber neuer Seed durch bumped chunk_idx
             consecutive_failures = 0
+            # Erfolgreicher Chunk: `raw` enthält bereits ALLES -- die parallel
+            # geschriebene JSONL wird nicht mehr gebraucht.
+            _cleanup_progress_files(progress_path, heartbeat_path)
             steps = json.loads(raw)
             # run_net_self_play hängt ans JSON einen reinen Diagnose-Record an
             # (perspective_divergence_diagnostics, gleiches Muster wie
@@ -409,16 +538,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             # gezählt (verfälscht `done` und das per_file-Chunking). Hier
             # rausfiltern, bevor gruppiert/gepickelt wird.
             steps = [s for s in steps if "perspective_divergence_diagnostics" not in s]
-            total_steps += len(steps)
 
             # Chunk in Spiele aufteilen und je `per_file` Spiele eine .pkl schreiben.
-            for game_steps in _group_by_game(steps):
-                buffer.extend(game_steps)
-                buffer_games += 1
-                done += 1
-                if buffer_games >= per_file:
-                    _flush(buffer, version_name, tag, done)
-                    buffer, buffer_games = [], 0
+            _absorb_games(_group_by_game(steps))
 
             elapsed = time.time() - t_start
             rate = done / elapsed if elapsed > 0 else 0.0

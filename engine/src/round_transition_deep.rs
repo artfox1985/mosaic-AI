@@ -61,10 +61,47 @@
 //! gemischt -- das übernimmt bereits `sample_round_transition_value` beim
 //! Übergang IN die simulierte Runde hinein.
 //!
-//! **Alle Zeit-/Sample-Konstanten unten sind NICHT empirisch kalibriert**
-//! (gleiche Lehre wie `round5.rs`s erste, ~75x zu optimistische
-//! Kalibrierung auf einem synthetischen Brett statt echten Self-Play-
-//! Zuständen) -- vor breitem Einsatz gegen echte Zustände nachmessen.
+//! **Kalibrierung (Task #71, 2026-07-22)**: alle Zeit-/Sample-Konstanten
+//! unten waren ursprünglich NICHT empirisch kalibriert und dienten als
+//! PRIMÄRER Cutoff -- dadurch hing die tatsächlich geleistete Sucharbeit
+//! (und damit die Label-Qualität von `bootstrap_value_after_rounds`/
+//! `round_transition_value`) von der CPU-Last während der Self-Play-
+//! Generierung ab: derselbe Seed konnte je nach Systemlast unterschiedlich
+//! viel RNG verbrauchen und einen anderen Wert liefern (Determinismus-Bug).
+//! Kalibrierlauf: 8 netzgeführte Partien (`v10_best.onnx`, sims=400) auf
+//! einer freien lokalen Maschine, instrumentiert mit temporären
+//! `eprintln!`-Zählern in `sample_round_transition_value`,
+//! `choose_drafting_action_pruned` und `simulate_one_round`. Befund: der
+//! Sample-COUNT (`N_SAMPLES_TRAIN_ROUND{1,2,3}`, `N_MIN_ROUND_END`,
+//! `N_FULL_ROUND_END`) und der `guard`-Iterationsdeckel in
+//! `simulate_one_round` wurden in ALLEN Messungen vollständig erreicht (nie
+//! durch die alte Deadline degradiert) -- diese Counts SIND bereits der
+//! deterministische Knoten-Deckel, keine Änderung nötig. EINZIGE Ausnahme:
+//! `POLICY_NODE_BUDGET` (20.000) war so großzügig bemessen, dass in der
+//! Praxis fast immer `POLICY_TIME_BUDGET_PER_DECISION` (15ms) zuerst griff
+//! (gemessener `node_count` bei Rückkehr aus `choose_drafting_action_pruned`:
+//! Median 13, p90 91, Maximum 336, n=9189 Aufrufe) -- DAS war die tatsächlich
+//! lastabhängige Stelle. Jetzt umgedreht: `POLICY_NODE_BUDGET` (klein, vom
+//! MEDIAN abgeleitet, nicht vom Maximum) ist der primäre, deterministische
+//! Cutoff; alle Zeitbudgets unten sind auf das 3-5-fache des gemessenen
+//! Medians/Maximums aufgerundete Not-Deckel, die unter normaler Last nicht
+//! mehr greifen sollen. `EXTRA_GAME_TIMEOUT_SECS` entsprechend nachgezogen.
+//!
+//! **Restbefund, NICHT durch diesen Fix behoben** (End-zu-Ende-Vergleich
+//! zweier separater `self_play.py`-Prozesse, gleicher Seed, `--threads 1`):
+//! `bootstrap_value_after_rounds`/`sample_round_transition_for_round`
+//! liefern INNERHALB EINES Prozesses (siehe Determinismus-Test unten) exakt
+//! reproduzierbare Werte, aber ÜBER ZWEI SEPARATE Prozessstarts hinweg eine
+//! winzige Restabweichung (~1e-4..1e-3, selbst mit auf 1h aufgeblähten
+//! Zeitbudgets zur Kontrolle -- also NICHT wall-clock-bedingt). Ursache
+//! vermutlich `tract-onnx`s Forward-Pass selbst (SIMD-/Speicherlayout-
+//! abhängige Gleitkomma-Summationsreihenfolge, z.B. durch ASLR), nicht
+//! dieses Modul -- eine bereits VOR Task #71 bestehende Eigenschaft, die
+//! erst durch den Wegfall des viel größeren wall-clock-Effekts sichtbar
+//! wurde. Größenordnung vernachlässigbar gegenüber dem behobenen Effekt
+//! (der bis zu ganze Prozentpunkte verschob), aber eine ECHTE Cross-Prozess-
+//! Bit-Exaktheit ist damit NICHT erreicht -- separates Thema, nicht Teil
+//! dieses Fixes.
 //!
 //! Nur für den Trainingsziel-Pfad gedacht (`self_play.rs`), NICHT für die
 //! Live-Suche (`net_mcts.rs`) -- selbst Runde 3s günstigste Kette wäre dort
@@ -93,12 +130,19 @@ pub const N_SAMPLES_TRAIN_ROUND3: u32 = 16;
 
 /// Gesamt-Zeitbudget je äußerem `sample_round_transition_value`-Aufruf
 /// (deckt bis zu `N_SAMPLES_TRAIN_ROUNDx` Samples ab, jedes selbst eine
-/// ganze Simulationskette). Grosszügig, aber begrenzt -- degradiert
-/// graceful auf weniger Samples, falls überschritten (siehe
-/// `round_transition.rs::sample_round_transition_value`).
-pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(30);
-pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(30);
-pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(30);
+/// ganze Simulationskette) -- NUR NOCH äußerer Not-Deckel (Task #71, siehe
+/// Modul-Kommentar), der Sample-COUNT selbst ist der primäre, deterministische
+/// Cutoff. Kalibrierung (2026-07-22, 8 Partien, siehe Modul-Kommentar):
+/// gemessene Gesamtlaufzeit je vollständigem Sample-Satz -- Runde 1 (4
+/// Samples, je 3 verschachtelte Zwischenrunden): Median 15,04s, Maximum
+/// 16,88s; Runde 2 (8 Samples): Median 23,88s, Maximum 32,12s -- ÜBER dem
+/// alten 30s-Budget, d.h. der alte Wert wurde in dieser Messung bereits
+/// vereinzelt real ausgeschöpft; Runde 3 (16 Samples): Median 24,71s,
+/// Maximum 29,44s -- ebenfalls dicht am alten 30s-Budget (kaum Marge). Neu:
+/// grosszügig auf ca. das 3-fache des jeweiligen Medians aufgerundet.
+pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(45);
+pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(75);
+pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(75);
 
 /// Horizont (in Runden) für `bootstrap_value_after_rounds` (Punkt 6,
 /// `evaluations/value head tests.txt`) -- wie viele Runden vorausgeschaut
@@ -133,39 +177,62 @@ pub const BOOTSTRAP_HORIZON_ROUNDS: u32 = 2;
 /// Kalibrierung beschreibt ("scores/winner sind dann kein echtes
 /// Endergebnis"), jetzt durch dieses Moduls zusätzliche synchrone
 /// Sampling-Zeit reproduziert.
-pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 5 + 30 + 30 + 30; // Runde4+3+2+1, Worst-Case-Summe
+pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 12 + 75 + 75 + 45; // Runde4+3+2+1, Worst-Case-Summe (Task #71 neukalibriert)
 
 /// Suchtiefe/-budget der Zwischenrunden-Zugwahl (`choose_drafting_action_pruned`)
 /// je Einzelentscheidung -- bewusst deutlich billiger als `round5::TIME_BUDGET`
 /// (150ms) für NICHT-rundenendende Kandidaten (Fortschritts-Heuristik-Suche,
-/// kein Vollsolve). WICHTIG, per Testlauf gefunden: `POLICY_NODE_BUDGET`
-/// (20.000) ist bei diesem `player_total`-Blattwert (ruft selbst einen
-/// DFS-Solver auf) real teuer genug, dass die Suche fast IMMER das
-/// Zeitbudget statt das Knotenbudget ausschöpft -- ein einfaches
-/// Hochsetzen DIESES Budgets (versucht, dann verworfen) ließ dadurch JEDE
-/// (nicht nur rundenendende) Entscheidung ballonieren, nicht nur die
-/// Gamma-Pruning-Kandidaten. Deshalb ZWEI getrennte Budgets: dieses hier
-/// bleibt klein (nur `negamax_progress`s Fortschritts-Heuristik-Rekursion),
+/// kein Vollsolve).
+///
+/// Task #71, Determinismus-Fix: `POLICY_NODE_BUDGET` ist jetzt der PRIMÄRE,
+/// deterministische Cutoff (vorher 20.000 -- so großzügig, dass laut
+/// Kalibrierung fast immer `POLICY_TIME_BUDGET_PER_DECISION` zuerst griff,
+/// siehe Modul-Kommentar). Kalibrierung (2026-07-22, 8 Partien, n=9189
+/// `choose_drafting_action_pruned`-Aufrufe): `node_count` bei Rückkehr --
+/// Median 13, p90 91, Maximum 336. Neu auf ca. 3x Median (nicht Maximum,
+/// siehe Nutzer-Vorgabe) gesetzt: 40 -- deckt die typische Entscheidung
+/// komfortabel ab, bleibt aber unter dem beobachteten p90/Maximum.
+/// `POLICY_TIME_BUDGET_PER_DECISION` ist jetzt NUR NOCH Not-Deckel --
+/// grosszügig auf das ~13-fache des alten Werts (15ms) angehoben, damit er
+/// unter normaler Last nicht mehr vor dem Knoten-Deckel greift.
 /// `POLICY_OVERALL_TIME_BUDGET_PER_DECISION` unten deckt zusätzlich die
 /// Gamma-Pruning-Samples ab.
 pub const POLICY_DEPTH: u32 = 4;
-pub const POLICY_NODE_BUDGET: u64 = 20_000;
-pub const POLICY_TIME_BUDGET_PER_DECISION: Duration = Duration::from_millis(15);
+pub const POLICY_NODE_BUDGET: u64 = 40;
+pub const POLICY_TIME_BUDGET_PER_DECISION: Duration = Duration::from_millis(200);
 /// Gesamt-Zeitbudget für EINEN `choose_drafting_action_pruned`-Aufruf
 /// (alle Geschwister-Kandidaten inkl. Gamma-Pruning-Samples für
-/// rundenendende) -- deutlich grosszügiger als `POLICY_TIME_BUDGET_PER_DECISION`
-/// allein, aber greift nur bei Entscheidungen mit tatsächlich rundenendenden
-/// Kandidaten (typischerweise die letzten 1-3 Züge einer simulierten Runde).
-pub const POLICY_OVERALL_TIME_BUDGET_PER_DECISION: Duration = Duration::from_secs(3);
+/// rundenendende) -- NUR NOCH Not-Deckel (Task #71). Kalibrierung
+/// (2026-07-22, dieselben 9189 Aufrufe): Gesamt-Laufzeit je Aufruf --
+/// Median 25,9ms, p90 54,3ms, Maximum 2,46s (Ausreißer mit aktivem
+/// Gamma-Pruning-Zweig). Neu: grosszügig auf ca. 6x Maximum aufgerundet.
+pub const POLICY_OVERALL_TIME_BUDGET_PER_DECISION: Duration = Duration::from_secs(15);
 
 /// Gesamt-Wall-Clock-Sicherheitsnetz für EINE simulierte Runde
 /// (~15-20 Entscheidungen, davon typischerweise nur die letzten 1-3 mit
 /// rundenendenden -- also Gamma-Pruning-kostenpflichtigen -- Kandidaten).
-pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_secs(10);
+/// NUR NOCH Not-Deckel (Task #71) -- der primäre, deterministische Cutoff
+/// ist der `guard`-Iterationsdeckel (300) in `simulate_one_round` selbst,
+/// der laut Kalibrierung (2026-07-22, n=384 simulierte Runden) NIE auch nur
+/// annähernd erreicht wurde (gemessen: Median 27, p90 31, Maximum 38
+/// Entscheidungen je simulierter Runde -- eine normale Runde hat naturgemäß
+/// ~15-40 Halbzüge). Gemessene Gesamtlaufzeit je simulierter Runde: Median
+/// 977ms, p90 2,21s, Maximum 4,41s. Neu: ca. 3x Maximum aufgerundet.
+pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_secs(15);
 
 /// Zeitbudget für den EINEN verschachtelten Chance-Node-Sample-Aufruf
-/// (`n_samples = 1`) nach einer simulierten Zwischenrunde.
-pub const INNER_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(300);
+/// (`n_samples = 1`) nach einer simulierten Zwischenrunde. Task #71-Befund:
+/// bei `n_samples = 1` prüft `sample_round_transition_value`s Schleife die
+/// Deadline nur VOR der (einzigen) Iteration, nie währenddessen -- dieses
+/// Budget hatte in der Kalibrierung (2026-07-22, n=416 Aufrufe) daher NIE
+/// eine Wirkung (Sample-Count immer exakt 1), obwohl die gemessene
+/// tatsächliche Laufzeit der einen (rekursiven) Sample-Auswertung bei
+/// Median 160ms, p90 2,19s, Maximum 5,08s lag -- weit über dem alten
+/// 300ms-Wert. Der alte Wert war also faktisch wirkungslos, nicht falsch
+/// kalibriert. Neu: ehrlicher Not-Deckel, ca. 4x Maximum aufgerundet (rein
+/// defensiv -- die eigentliche Begrenzung kommt jetzt aus den
+/// Knoten-Deckeln der rekursiven Evaluatoren selbst, s.o.).
+pub const INNER_SAMPLE_TIME_BUDGET: Duration = Duration::from_secs(20);
 
 // ── Gamma-Pruning für rundenendende Geschwister-Kandidaten ──────────────────
 
@@ -184,7 +251,17 @@ pub const GAMMA_MARGIN: f64 = 10.0;
 /// Zeitbudget für EIN Gamma-Pruning-Sample (Start- oder Vollsample) --
 /// deutlich teurer als der Rest der Zwischenrunden-Zugwahl, da hier ein
 /// echter (rekursiver) Rundenübergang samplet statt der billigen Heuristik.
-pub const GAMMA_SAMPLE_TIME_BUDGET: Duration = Duration::from_secs(2);
+/// NUR NOCH Not-Deckel (Task #71) -- der Bewerter hier ist `net_leaf_eval`
+/// (EIN Forward-Pass je Sample), der Sample-COUNT (`N_MIN_ROUND_END`/
+/// `N_FULL_ROUND_END`) ist bereits der primäre, deterministische Cutoff.
+/// Kalibrierung (2026-07-22, n=390 bzw. n=371 Aufrufe): gemessene
+/// Laufzeit -- `N_MIN_ROUND_END`=2: Median 0,87ms, Maximum 2,66ms;
+/// `N_FULL_ROUND_END`=6: Median 1,96ms, Maximum 4,98ms -- der alte
+/// 2s-Wert war bereits ~400x großzügiger als nötig, blieb aber als
+/// unbegründet gewählte Zahl stehen. Neu: 500ms (immer noch >100x
+/// gemessenes Maximum, aber jetzt als bewusster, dokumentierter Not-Deckel
+/// statt einer Zufallszahl).
+pub const GAMMA_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(500);
 
 // ── Zwischenrunden-Zugwahl ───────────────────────────────────────────────────
 
@@ -791,6 +868,69 @@ mod tests {
         assert!(
             elapsed < ROUND_SIM_TIME_BUDGET * 3,
             "simulate_one_round zu langsam: {elapsed:?} (Budget: {ROUND_SIM_TIME_BUDGET:?})"
+        );
+    }
+
+    /// Task #71, Kern-Regressionsschutz: `POLICY_NODE_BUDGET` muss der
+    /// tatsächlich bindende (deterministische) Cutoff sein, nicht mehr die
+    /// Zeit -- sonst wäre der ganze Determinismus-Fix wirkungslos. Prüft das
+    /// INDIREKT (der Knoten-Zähler selbst ist privat): dieselbe Entscheidung
+    /// mit dem regulären `POLICY_TIME_BUDGET_PER_DECISION`/
+    /// `POLICY_OVERALL_TIME_BUDGET_PER_DECISION` UND mit künstlich stark
+    /// vergrößerten Zeitbudgets (10x) muss exakt dieselbe Aktion liefern --
+    /// wenn die Zeit noch der bindende Faktor wäre, dürfte das großzügigere
+    /// Budget potenziell tiefer suchen und eine andere Aktion wählen.
+    #[test]
+    fn choose_drafting_action_pruned_result_is_unaffected_by_extra_time_budget() {
+        let state = drive_to_round_start(41, 2);
+        let mut rng_a = StdRng::seed_from_u64(4);
+        let chosen_normal = choose_drafting_action_pruned(
+            uniform_priors, &state, POLICY_DEPTH, POLICY_NODE_BUDGET, POLICY_TIME_BUDGET_PER_DECISION,
+            POLICY_OVERALL_TIME_BUDGET_PER_DECISION, trivial_round_end_eval, &mut rng_a,
+        );
+        let mut rng_b = StdRng::seed_from_u64(4);
+        let chosen_generous = choose_drafting_action_pruned(
+            uniform_priors, &state, POLICY_DEPTH, POLICY_NODE_BUDGET, POLICY_TIME_BUDGET_PER_DECISION * 10,
+            POLICY_OVERALL_TIME_BUDGET_PER_DECISION * 10, trivial_round_end_eval, &mut rng_b,
+        );
+        assert_eq!(
+            chosen_normal, chosen_generous,
+            "Ergebnis haengt noch vom Zeitbudget ab -- POLICY_NODE_BUDGET ist nicht der bindende Cutoff"
+        );
+    }
+
+    /// Task #71, Kern-Regressionsschutz (Determinismus): `bootstrap_value_after_rounds`
+    /// muss bei GLEICHEM Seed und GLEICHEM Ausgangszustand zweimal EXAKT
+    /// denselben Wert liefern -- vorher (wall-clock-basierte Deadlines als
+    /// primärer Cutoff) war das nicht garantiert, weil unter Systemlast
+    /// weniger Sucharbeit stattfinden konnte. Braucht ein echtes Netz --
+    /// überspringt sich selbst (kein Fehlschlag), falls das Kalibrier-Modell
+    /// lokal fehlt (z.B. frischer Checkout ohne `models/`, siehe .gitignore).
+    #[test]
+    fn bootstrap_value_after_rounds_is_deterministic_for_same_seed() {
+        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v10_best.onnx");
+        let net = match Net::load(model_path, crate::features::INPUT_SIZE) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!(
+                    "bootstrap_value_after_rounds_is_deterministic_for_same_seed uebersprungen \
+                     (Modell nicht geladen: {e})"
+                );
+                return;
+            }
+        };
+        let leaf = crate::round_transition::drive_to_first_round_end(51);
+        let pre = round_transition::resolve_to_pre_chance(&leaf).expect("aufloesbar");
+
+        let mut rng_a = StdRng::seed_from_u64(777);
+        let val_a = bootstrap_value_after_rounds(&pre, &net, BOOTSTRAP_HORIZON_ROUNDS, &mut rng_a);
+        let mut rng_b = StdRng::seed_from_u64(777);
+        let val_b = bootstrap_value_after_rounds(&pre, &net, BOOTSTRAP_HORIZON_ROUNDS, &mut rng_b);
+
+        assert_eq!(
+            val_a, val_b,
+            "gleicher Seed + gleiche Stellung lieferten unterschiedliche bootstrap_value_after_rounds-Werte \
+             ({val_a:?} vs {val_b:?}) -- Determinismus-Fix (Task #71) nicht wirksam"
         );
     }
 }
