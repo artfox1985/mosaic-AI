@@ -12,12 +12,15 @@
 
 ## 🧠 Core Features
 
-- **Rust Game Engine** (`engine/`, PyO3/maturin) — full headless engine covering the whole multi-phase gameplay (sun/moon drafting, dome placement, bonus chips, pattern rows, floor penalty, exact end scoring). GIL-free, rayon-parallel self-play/arena.
-- **Heuristic MCTS** (`engine/src/mcts.rs`) — Progressive Widening with a depth-dependent cap (full breadth at the root, capped breadth + UCB-driven depth from depth 1 onward), leaf evaluation via an exact tiling solver (no rollouts).
-- **AlphaZero Agent** (`engine/src/net_mcts.rs`) — PUCT search with network priors (including Plackett-Luce moon-order priors), Stage 1 (DFS leaf) and Stage 2 (network-value leaf, gated behind a readiness probe).
-- **Self-Play Pipeline** (`self_play.py`) — thin Python driver over the Rust self-play loop; MCTS and network modes, chunked for live progress reporting.
-- **Champion/Candidate Training** (`train.py`) — warm-start with shape-mismatch filtering (architecture can change between generations, e.g. the policy head), plateau-based early stopping, R² tracking for the value head, automatic network-utilization analysis (dead neurons / effective rank), and a Stage-2 readiness probe after every run.
-- **The Arena** (`arena.py`) — network-vs-network, network-vs-heuristic, and pure-heuristic round robins with Elo ratings and a significance gate for the champion protocol.
+- **Rust Game Engine** (`engine/`, PyO3/maturin) — full headless engine covering the whole multi-phase gameplay (sun/moon drafting, two-stage dome placement, hidden-stack draws, bonus chips, pattern rows, floor penalty, exact end scoring). Rulebook-audited (33 rules verified). GIL-free, rayon-parallel self-play/arena.
+- **Gumbel AlphaZero Search** (`engine/src/net_mcts.rs`) — Gumbel-Top-m (m=16) + Sequential Halving at the root, mctx-faithful deterministic selection at depth ≥1 (completed-Q over *all* candidates, expansion on demand — no widening caps, no policy-mass cutoff), Plackett-Luce moon-order priors, network-value leaf with exact floor-penalty shaping (paired-test validated: +14 pp, p=0.0075). Deterministic in arena/production (`gumbel_scale=0` equivalent), Gumbel exploration in self-play. Legacy PUCT path kept behind a toggle.
+- **Imperfect information handled honestly** — hidden dome stack + unrevealed bonus chips are determinized once per move at the search root (no in-tree oracle knowledge); round transitions are evaluated as sampled chance nodes.
+- **Exact endgame** (`engine/src/round5.rs`) — round 5 (no more hidden info) is solved by alpha-beta with an exact tiling/end-scoring evaluator, wired into both search paths.
+- **Batched inference** (`engine/src/net.rs`) — both leaf perspectives (mover + flipped) run as one batch=2 ONNX call (tract-onnx, ~1.9× search speedup).
+- **Self-Play Pipeline** (`self_play.py`) — network or heuristic mode; per-game flush (a crash costs ≤1 game), heartbeat supervision, preemptive per-game watchdog, Windows keep-awake, and a JSON run manifest (CLI args, git commit, full engine-constant snapshot) per run. Value labels (`round_transition_value`, TD-bootstrap `bootstrap_value`) are node-budgeted → deterministic and load-independent.
+- **Training** (`train.py`) — warm-start with shape-mismatch filtering, plateau-based early stopping, combined-metric checkpoint selection (policy+value+points), per-run corpus-composition log (games per version prefix), automatic ONNX export, network-utilization analysis (dead neurons / effective rank).
+- **Elo tracking & champion gating** (`evaluations/elo_tracker.py`) — Bradley-Terry Elo over the full match graph, anchored at Heuristik@200 = 1000; roster: current champion@400 + previous champion@400. A new model becomes champion (= next self-play generator) only by beating the incumbent.
+- **Diagnostics suite** — sibling-ranking Kendall-tau vs. exact solver, per-round value R², noise-floor variance decomposition (bias-corrected), self-play diversity report, paired-seed arena A/B harness (McNemar).
 - **Web Interface** (`server.py` + `static/`) — Flask API on top of the Rust engine, browser UI for playing against the AI and a replay viewer.
 
 ---
@@ -31,29 +34,33 @@
 │   │   ├── 📜 state.rs, board.rs, dome.rs, factory.rs, supply.rs, tile.rs   # Game state
 │   │   ├── 📜 game.rs, moves.rs, execution.rs, round_end.rs, validation.rs # Rules/move execution
 │   │   ├── 📜 scoring.rs, tiling_solver.rs   # Exact round/end scoring (DFS solver)
-│   │   ├── 📜 mcts.rs          # Heuristic MCTS (depth-dependent Progressive Widening)
-│   │   ├── 📜 net_mcts.rs      # AlphaZero PUCT search (network priors + Plackett-Luce moon order)
-│   │   ├── 📜 net.rs           # ONNX inference (tract-onnx)
+│   │   ├── 📜 mcts.rs          # Heuristic MCTS (baseline opponent; Progressive Widening)
+│   │   ├── 📜 net_mcts.rs      # Gumbel AlphaZero search (+ legacy PUCT toggle)
+│   │   ├── 📜 round5.rs        # Exact alpha-beta endgame (round 5)
+│   │   ├── 📜 round_transition*.rs # Chance-node sampling + TD-bootstrap labels (node-budgeted)
+│   │   ├── 📜 net.rs           # ONNX inference incl. batch=2 eval_pair (tract-onnx)
 │   │   ├── 📜 features.rs      # State → feature vector (Rust mirror of engine/py/neural_net.py)
-│   │   ├── 📜 self_play.rs     # Rayon-parallel self-play/arena loops
+│   │   ├── 📜 self_play.rs     # Rayon-parallel self-play/arena loops + diagnostics
 │   │   ├── 📜 serialize.rs     # State → JSON (UI/Python)
-│   │   └── 📜 py.rs            # PyO3 bindings (`mosaic_rust` module)
+│   │   └── 📜 py.rs / lib.rs   # PyO3 bindings (`mosaic_rust` module, engine_config_json, ...)
 │   ├── 📂 py/
 │   │   └── 📜 neural_net.py    # MosaicNet (PyTorch), MosaicDataset, state_to_tensor, action_to_id
 │   ├── 📜 Cargo.toml
 │   └── 📜 pyproject.toml       # maturin build config
-├── 📂 evaluations/            # Per-generation eval reports (v*_eval.md) + STATUS.md (current status/roadmap)
-├── 📂 data/                   # Self-play output (.pkl) + HDF5 training cache
-├── 📂 models/                 # Trained checkpoints (.pth), ONNX exports (.onnx), loss plots
+├── 📂 evaluations/            # STATUS.md (living status/roadmap), elo_tracker.py + elo_history.csv,
+│   │                          #   diversity report, paired-arena harnesses, diagrams.txt, eval reports
+├── 📂 data/                   # Self-play output (.pkl) + run manifests + HDF5 training cache
+│   └── 📂 archive_*/          # Retired corpora (never mixed back in — regime consistency)
+├── 📂 models/                 # Checkpoints (.pth), ONNX exports (.onnx), training manifests, loss plots
 ├── 📂 static/                 # Web UI (index.html, debug.html, replay viewer, css/js)
 ├── 📂 utils/                  # diagnosis.py, model_info.py, git_tree.py
 ├── 📂 docs/                   # engine_manual.md, reference CSVs (bonus chip/dome colors)
-├── 📂 archive/                # Legacy: old pure-Python engine/agents, superseded eval reports/models/logs (pre-v1-v7cold lineage, see evaluations/STATUS.md)
-├── 📜 config.py               # Hyperparameters (INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, VALUE_WEIGHT, ...)
-├── 📜 self_play.py            # ▶️ Self-play driver (calls into Rust, groups/pickles step records)
-├── 📜 train.py                # ▶️ Training (PyTorch/CUDA) + auto ONNX export + readiness probe
+├── 📂 archive/                # Legacy: old pure-Python engine/agents, superseded eval reports
+├── 📜 config.py               # Hyperparameters (INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, ...)
+├── 📜 self_play.py            # ▶️ Self-play driver (calls into Rust, per-game flush, manifests)
+├── 📜 train.py                # ▶️ Training (PyTorch/CUDA) + corpus log + auto ONNX export
 ├── 📜 export_onnx.py          # ▶️ .pth → .onnx (also run automatically at the end of train.py)
-├── 📜 arena.py                # ▶️ Tournaments/comparisons with Elo rating
+├── 📜 arena.py                # ▶️ Net-vs-heuristic / net-vs-net matches
 └── 📜 server.py               # ▶️ Flask web server (browser UI)
 ```
 
@@ -64,33 +71,34 @@
 ### 0. Build the Rust engine (once, then again whenever Rust code changes)
 ```bash
 cd engine
-python -m maturin build --release
-python -m pip install --force-reinstall target/wheels/mosaic_rust-*.whl
+pip install . --force-reinstall --no-deps
 ```
 
 ### 1. Generate self-play data
 ```bash
-# Heuristic MCTS (e.g. bootstrap, no network dependency)
-python self_play.py --mode mcts --games 1500 --sims 100 --version v0
+# Network self-play (production path: Gumbel search, completed-Q policy targets,
+# TD-bootstrap value labels, per-game flush, run manifest):
+python self_play.py --mode network --model alphazero_v10_best.onnx --games 2000 --sims 400 --version netcq2 --threads 8
 
-# AlphaZero network self-play (Stage 1 = DFS leaf, Stage 2 = network-value leaf)
-python self_play.py --mode network --model alphazero_v4.onnx --stage 1 --games 2000 --sims 400 --version v4b
+# Heuristic MCTS (bootstrap / no network dependency):
+python self_play.py --mode mcts --games 1500 --sims 200 --version v0
 ```
 
 ### 2. Train the neural network
 ```bash
-python train.py --name v1 --epochs 100
-# Warm-start from a previous generation (shape mismatches, e.g. from architecture
-# changes, are filtered automatically and only those layers start fresh):
-python train.py --name v2 --load v1 --epochs 100
+# Warm-start from the current champion (shape mismatches are filtered automatically);
+# logs the corpus composition per version prefix and writes a training manifest:
+python train.py --name v12 --load v10 --epochs 100
 ```
-Automatically exports to `.onnx` at the end and runs the Stage-2 readiness probe right after.
+Automatically exports to `.onnx` at the end.
 
-### 3. Arena (Elo, champion gate)
-Participants are configured in the `if __name__ == "__main__"` block of `arena.py` (no CLI flags):
+### 3. Elo / champion gate
 ```bash
-python arena.py
+# Roster matches (see evaluations/elo_tracker.py header for the workflow), then:
+python evaluations/elo_tracker.py report
 ```
+Participants for raw matches are configured in `arena.py`'s `__main__` block. Set
+`threads=` explicitly (the Rust default is single-threaded).
 
 ### 4. Web interface
 ```bash
@@ -104,96 +112,108 @@ python server.py
 
 ### Neural Network (`MosaicNet`, `engine/py/neural_net.py`)
 ```
-Input (684) → Linear(512) → BN → ReLU
+Input (708) → Linear(512) → BN → ReLU
            → Linear(512) → BN → ReLU
            → Linear(512) → ReLU
-           ┌→ Policy Head: Linear(256) → ReLU → Linear(482)   — action logits
-           ├→ Value Head:  Linear(128) → ReLU → Linear(1) → Tanh
-           └→ Moon-Order Head: Linear(32) → ReLU → Linear(5)   — Plackett-Luce scores
+           ┌→ Policy Head:     Linear(256) → ReLU → Linear(406)   — action logits
+           ├→ Value Head:      Linear(64)  → ReLU → Linear(1) → Tanh
+           ├→ Moon-Order Head: Linear(32)  → ReLU → Linear(5)     — Plackett-Luce scores
+           └→ Points Head:     Linear(64)  → ReLU → Linear(1) → Tanh  — score forecast (aux)
 ```
-`policy_hidden=0` reconstructs the old, single-layer policy head (for older checkpoints,
-auto-detected by `export_onnx.py`).
+ONNX export carries exactly these 4 output tensors (policy/value/moon/points).
 
-### State Tensor (684 features)
-| Block | Description |
-|---|---|
-| Global | Round, phase, bag count |
-| Scoring tiles | 8-dim one-hot of active tiles |
-| Small factories ×4 | Sun colors, bonus-chip status + color mask |
-| Large factory | Sun color counts |
-| Players ×2 (ego perspective) | Score, estimated_score, pattern lines, floor, bonus chips, per-row chip-completability |
-| Dome grid ×2 | 9 slots × 9 features (filled/color/type/locked) |
-| End-scoring/geometry features ×2 | Scoring-tile points, row/column/diagonal fill, corners, wild/special state |
-| Line geometry ×2 | Contiguous row/column runs, cluster score, growth potential |
-| Small-factory moon side ×4 | Stack order per position |
-| Large-factory moon pool | Color counts |
-| Dome display + stack | Scoring slots, remaining plates |
+**Value target** (`VALUE_SCHEMA_VERSION = 15`): soft symmetric margin
+`tanh((own − opp)/50)` on *unclamped* shadow scores (the visible score floors at 0,
+the training label keeps counting penalties below it), overridden by the sampled
+round-transition value where available, then blended with a 2-round-ahead
+TD-bootstrap value (`TD_LAMBDA = 0.5`).
 
-### Action Space (482 actions)
+### State Tensor (708 features)
+Coarse layout (exact source of truth: `engine/src/features.rs` ↔ `state_to_tensor`):
+global state (round/phase/bag), active scoring tiles, small factories (sun colors +
+bonus-chip state), large factory, both player boards in ego perspective (score,
+pattern rows, floor, chips, chip-completability), both 3×3 dome grids incl.
+end-scoring/geometry/line features, moon-side stacks, dome display, hidden-stack
+composition mask + wild fraction, bag/tower color fractions.
+
+### Action Space (406 actions)
 | Type | IDs | Description |
 |---|---|---|
 | pass | 0 | No legal move |
 | end_tiling | 1 | End the tiling phase |
-| stone | 10–249 | Take a tile: factory index × color × target row |
+| stone | 10–273 | Take tiles: factory × color × target row |
 | tiling | 274–327 | Place a tile: pattern row × slot |
-| dome | 328–435 | Place a dome plate from the display: display index × slot × rotation |
-| dome_stack | 436–471 | Draw a dome plate from the stack: slot × rotation |
-| use_chips | 472–477 | Use bonus chips to complete a pattern row |
-| bonus_chip | 478–481 | Take a bonus chip from a factory |
+| choose_dome_slot | 328–354 | Dome placement **stage 1**: display tile × slot |
+| choose_draw_stack_slot | 355–390 | Stack-draw placement **stage 1**: drawn tile × slot |
+| choose_dome_rotation | 391–394 | Dome placement **stage 2**: rotation (shared by both paths) |
+| use_chips | 395–400 | Complete a pattern row with bonus chips |
+| bonus_chip | 401–404 | Take a revealed bonus chip |
+| dome_stack_peek | 405 | Pay 1 point, draw one hidden plate (repeatable) |
+
+Dome placement is a genuine **two-stage search node** (tile+slot, then rotation) —
+this replaced an earlier prior-factorization approach and shrinks the effective
+branching factor inside the tree.
 
 ---
 
-## 🔄 Training Pipeline: Champion/Candidate Protocol
+## 🔄 Training Pipeline: Champion Protocol
 
-Full details in [`evaluations/STATUS.md`](evaluations/STATUS.md) — short version:
+Full history and current numbers in [`evaluations/STATUS.md`](evaluations/STATUS.md) — short version:
 
 ```
-Self-play (current champion, Stage 1 / DFS leaf)
+Self-play: ~2000 games generated by the CURRENT champion (network mode)
         ↓
-Training window: max. 2 retired champions (2000 games each) + current champion (up to 3×2000)
+Training corpus: fresh champion games (+ ~1000 each from the last 2 retired
+champions, assembled manually — old-rule/old-label corpora never re-enter)
         ↓
-Train candidate (warm-start from the champion)
+Train candidate (warm-start from the champion, TD_LAMBDA=0.5)
         ↓
-Arena gate: candidate vs. champion, 100 games — needs ≥60:40 (z≈2.0), otherwise champion stays
+Offline diagnostics: per-round value R², sibling Kendall-tau, label histogram
         ↓
-Champion generates another self-play round → next candidate
+Elo roster: candidate vs. Heuristik@200 (anchor=1000) and GATING match vs. the
+champion @400 sims — champion only changes on a proven win
+        ↓
+Champion generates the next round → next candidate
 ```
 
-If the champion stays unbeaten with the full 10,000-game window: thin the window first
-(cheapest step), then generate another round from the champion at the same sim count, and
-only as a last resort raise the sim count for new rounds. Stage 2 (network value as the
-search leaf) is only unlocked once the Stage-2 readiness probe (0:0 ratio Stage2/Stage1
-≤1.5×) turns green — currently still 🔴/🟡 across all generations.
-
-Current champion, generation history, and arena results: see `evaluations/*.md`.
+Current state: champion **v10_best** (Elo 858 vs. anchor 1000); v11 (first
+completed-Q + TD-bootstrap generation) did not gate (43:57). Statistical
+ground rules learned the hard way: n=100 arena margins carry a ±6–10 pp noise
+band — paired-seed McNemar A/Bs are the standard for tuning decisions, and
+single sub-n=100 arms never overwrite reference numbers.
 
 ---
 
 ## 🛠️ Diagnostics & Tools
 
 ```bash
-# Policy quality analysis
-python -m utils.diagnosis
-
-# Model metadata
-python -m utils.model_info --version v4
-
-# Project file tree
-python utils/git_tree.py
+python evaluations/elo_tracker.py report        # Elo table (Bradley-Terry, anchored)
+python evaluations/selfplay_diversity_report.py # opening entropy / collapse check
+python -m utils.diagnosis                       # policy quality analysis
+python -m utils.model_info --version v10        # model metadata
 ```
+Rust-side diagnostics exposed via `mosaic_rust`: `sibling_ranking_diagnostic`,
+`value_noise_floor_diagnostic`, `draw_stack_peek_impact_diagnostic`,
+`engine_config_json`, profiling counters.
 
 ---
 
-## ⚙️ Configuration (`config.py`)
+## ⚙️ Configuration
 
-| Parameter | Current value | Description |
-|---|---|---|
-| `INPUT_SIZE` | 684 | State tensor size |
-| `NUM_ACTIONS` | 482 | Action space size |
-| `HIDDEN_SIZE` | 512 | Neurons per hidden layer |
-| `BATCH_SIZE` | 256 | Training batch size |
-| `LEARNING_RATE` | 0.0004 | Adam learning rate |
-| `VALUE_WEIGHT` | 15 | Weight of the value loss in the combined loss (compensates for the narrow spread of the score-margin target vs. the old ±1 target) |
+| Parameter | Value | Where | Description |
+|---|---|---|---|
+| `INPUT_SIZE` | 708 | config.py | State tensor size |
+| `NUM_ACTIONS` | 406 | config.py | Action space size |
+| `HIDDEN_SIZE` | 512 | config.py | Neurons per hidden layer |
+| `LEARNING_RATE` | 0.0004 | config.py | Adam learning rate |
+| `VALUE_WEIGHT` / `POINTS_WEIGHT` | 0.2 / 0.5 | config.py | Aux-loss weights (policy loss dominates) |
+| `TD_LAMBDA` | 0.5 | engine/py/neural_net.py | TD-bootstrap blend in the value target |
+| `USE_GUMBEL_SEARCH` | true | engine/src/net_mcts.rs | Gumbel search (false = legacy PUCT) |
+| `GUMBEL_TOP_M` | 16 | engine/src/net_mcts.rs | Root candidates for Sequential Halving |
+| `FLOOR_SHAPING_WEIGHT` | 0.3 | engine/src/net_mcts.rs | Exact floor-penalty leaf shaping (validated) |
+| `DETERMINIZE_ROOT_HIDDEN_INFO` | true | engine/src/net_mcts.rs | One-world root determinization |
+| `NUM_DETERMINIZATIONS` | 1 | engine/src/net_mcts.rs | ISMCTS multi-world toggle (tested: 1 is best) |
 
-`LEARNING_RATE` and `VALUE_WEIGHT` are currently under active parameter sweeps
-(see `evaluations/v6*_eval.md`) — values may change between generations.
+Search/training constants live as documented Rust/Python constants with their
+calibration history in code comments; every self-play and training run snapshots
+the active configuration into a JSON manifest next to its output.
