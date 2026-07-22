@@ -119,13 +119,35 @@ fn fill_large_factory<R: Rng + ?Sized>(
     tower: &mut Tower,
     rng: &mut R,
 ) {
-    // R3 (Regelbuch S.10): können Beutel+Turm zusammen keine 2 verschiedenen
-    // Farben mehr liefern, würde der Redraw-Loop unten endlos laufen. Dann
-    // wird die monochrome Befüllung akzeptiert und markiert -- die Sonnen-
-    // Nahme vergibt in diesem Fall die Startspielerfliese (siehe
-    // `LargeFactory::take_from_sun`), weil der Mondbereich leer bleibt.
+    // R3 (Regelbuch S.10), NACHAUDIT 2026-07-22 (Root-Cause eines
+    // intermittierenden Self-Play-Hängers, siehe hang_dump_15024.txt --
+    // Python-Hauptthread parkt in rayons WaitOnAddress, 1 nativer Thread
+    // spinnt auf 100%): die ALTE Vorprüfung sammelte Farben aus Beutel UND
+    // Turm zusammen ("available >= 2 -> normale Redraw-Schleife"). Das war
+    // ein Loch, weil `draw_with_refill` den Turm NUR anzapft, wenn der
+    // Beutel ALLEIN nicht mehr die vollen `n` Fliesen liefern kann
+    // (`drawn.len() < n`). Enthält der Beutel also >= n Fliesen einer
+    // EINZIGEN Farbe (zweite Farbe existiert nur im Turm), liefert
+    // `bag.draw(n)` immer `n` Fliesen -- der Turm wird nie erreicht, egal
+    // wie oft der monochrome Redraw unten fehlschlägt (die Fliesen gehen per
+    // `extend`+`shuffle` in DENSELBEN Beutel zurück, dessen Farbmenge sich
+    // dadurch nicht ändert) -> Endlos-Schleife ohne jeden Deadline-Check.
+    // Die Vorprüfung muss daher die für DIESEN Ziehmodus tatsächlich
+    // ERREICHBARE Farbmenge prüfen, nicht bloß Beutel+Turm zusammen:
+    //  - Beutel hat bereits >= n Fliesen: nur der Beutel wird je angezapft,
+    //    der Turm bleibt für diesen gesamten Redraw-Vorgang unerreichbar.
+    //  - Beutel hat < n Fliesen: der erste Redraw-Versuch triggert bereits
+    //    `refill_from_tower` (Turm -> Beutel gemischt), danach ist der Beutel
+    //    (>= n Fliesen für sehr lange) wieder im ersten Fall -- die
+    //    kombinierte Farbmenge von Beutel+Turm ist also die richtige Basis.
+    let n = TILES_PER_LARGE_FACTORY;
+    let reachable_colors: Vec<TileColor> = if bag.tiles.len() >= n {
+        bag.tiles.clone()
+    } else {
+        bag.tiles.iter().chain(tower.tiles.iter()).copied().collect()
+    };
     let mut available: Vec<TileColor> = Vec::new();
-    for &t in bag.tiles.iter().chain(tower.tiles.iter()) {
+    for t in reachable_colors {
         if !available.contains(&t) {
             available.push(t);
             if available.len() >= 2 {
@@ -134,7 +156,7 @@ fn fill_large_factory<R: Rng + ?Sized>(
         }
     }
     if available.len() < 2 {
-        large_factory.sun_tiles = draw_with_refill(TILES_PER_LARGE_FACTORY, bag, tower, rng);
+        large_factory.sun_tiles = draw_with_refill(n, bag, tower, rng);
         large_factory.monochrome_fallback = true;
         if large_factory.sun_tiles.is_empty() {
             // Gar keine Fliesen mehr im Spiel-Vorrat: der Marker wäre über
@@ -145,8 +167,16 @@ fn fill_large_factory<R: Rng + ?Sized>(
         }
         return;
     }
+    // Gürtel+Hosenträger: die Vorprüfung oben sollte den Redraw-Loop jetzt
+    // immer terminieren lassen, aber eine Schleife ohne HARTEN
+    // Fortschritts-/Iterations-Deckel darf es nach diesem Hänger nicht mehr
+    // geben -- falls doch ein unvorhergesehener Randfall (z.B. Beutel+Turm
+    // werden durch den Refill-Mischvorgang beide einfarbig) durchrutscht,
+    // hier hart abbrechen statt endlos weiterzuziehen.
+    const MAX_REDRAW_ATTEMPTS: u32 = 20;
+    let mut attempts: u32 = 0;
     loop {
-        let tiles = draw_with_refill(TILES_PER_LARGE_FACTORY, bag, tower, rng);
+        let tiles = draw_with_refill(n, bag, tower, rng);
         // mindestens 2 verschiedene Farben?
         let mut distinct: Vec<_> = Vec::new();
         for &t in &tiles {
@@ -156,6 +186,12 @@ fn fill_large_factory<R: Rng + ?Sized>(
         }
         if distinct.len() >= 2 {
             large_factory.sun_tiles = tiles;
+            return;
+        }
+        attempts += 1;
+        if attempts >= MAX_REDRAW_ATTEMPTS {
+            large_factory.sun_tiles = tiles;
+            large_factory.monochrome_fallback = true;
             return;
         }
         // Alle gleiche Farbe → zurück in den Beutel, neu mischen.
@@ -359,6 +395,54 @@ mod tests {
         assert!(rest.is_empty());
         assert!(marker, "monochromer Fallback: Sonnen-Nahme vergibt den Marker");
         assert!(lf.is_empty());
+    }
+
+    #[test]
+    fn fill_large_factory_terminates_when_second_color_is_tower_only() {
+        // Regressionstest für den Nacht-Hänger (2026-07-22, hang_dump_15024.txt):
+        // Beutel enthält >= TILES_PER_LARGE_FACTORY (5) Fliesen EINER Farbe,
+        // die zweite Farbe existiert NUR im Turm. Die alte Vorprüfung sah
+        // Beutel+Turm zusammen als "2 Farben verfügbar" an und ließ die
+        // normale Redraw-Schleife laufen -- die zieht aber ausschließlich aus
+        // `bag.draw(n)` (Turm wird nur angezapft, wenn der Beutel ALLEIN < n
+        // Fliesen hat), landet also für immer bei 5x Rot, legt sie per
+        // extend+shuffle zurück in denselben (weiterhin >= n, weiterhin rein
+        // roten) Beutel und läuft endlos ohne jeden Deadline-Check. Mit dem
+        // Fix muss die Funktion sofort (kein Blockieren) den monochromen
+        // Fallback greifen, weil der Turm für diesen Redraw-Vorgang gar
+        // nicht erreichbar ist.
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut bag = Bag { tiles: vec![TileColor::Rot; 8] };
+        let mut tower = Tower { tiles: vec![TileColor::Blau; 3] };
+        let mut lf = LargeFactory::default();
+        fill_large_factory(&mut lf, &mut bag, &mut tower, &mut rng);
+        assert_eq!(lf.sun_tiles.len(), 5);
+        assert!(lf.sun_tiles.iter().all(|&t| t == TileColor::Rot));
+        assert!(lf.monochrome_fallback, "Turm-Farbe ist für diesen Redraw-Vorgang unerreichbar -- muss als monochrom gelten");
+        // Turm bleibt unangetastet -- kein Refill, weil der Beutel allein
+        // genug Fliesen hatte.
+        assert_eq!(tower.tiles.len(), 3);
+    }
+
+    #[test]
+    fn fill_large_factory_terminates_when_bag_underflows_and_tower_saves_diversity() {
+        // Gegenprobe: Beutel hat WENIGER als n Fliesen -> der Refill-Pfad
+        // zapft den Turm tatsächlich an, die zweite Farbe wird real gezogen,
+        // kein Fallback nötig.
+        let mut rng = StdRng::seed_from_u64(6);
+        let mut bag = Bag { tiles: vec![TileColor::Rot; 2] };
+        let mut tower = Tower { tiles: vec![TileColor::Blau; 6] };
+        let mut lf = LargeFactory::default();
+        fill_large_factory(&mut lf, &mut bag, &mut tower, &mut rng);
+        assert_eq!(lf.sun_tiles.len(), 5);
+        assert!(!lf.monochrome_fallback, "Turm-Refill macht 2 Farben real erreichbar -- kein Fallback nötig");
+        let mut distinct: Vec<_> = Vec::new();
+        for &t in &lf.sun_tiles {
+            if !distinct.contains(&t) {
+                distinct.push(t);
+            }
+        }
+        assert!(distinct.len() >= 2);
     }
 
     #[test]

@@ -61,7 +61,51 @@ except ImportError as e:  # pragma: no cover
 # versucht, statt den ganzen Lauf zu blockieren.
 GAME_HANG_SAFETY_FACTOR = 5  # externe Grenze = Vielfaches des internen Timeouts
 MIN_CHUNK_TIMEOUT_SECS = 120
+# Harte Obergrenze (2026-07-21, netcq-Batch): die Hänger sind INTRINSISCH
+# (seltener Spielzustand -> 1 Rust-Thread spinnt auf 100%, alle anderen
+# rayon-Worker idle; auch SOLO ohne Parallellast beobachtet, py-spy-Dump:
+# Python-Hauptthread parkt in rayons WaitOnAddress). Beobachtete Rate
+# ~1 Hänger je ~7 Chunks; mit der alten Formelgrenze (1200s bei sims=400)
+# kostete jeder Hänger 20 Min Leerlauf. 450s ~= 3x normale Chunk-Dauer
+# (~150s solo, 10 Spiele/8 Threads) -- reicht für legitime Nachzügler,
+# begrenzt die Hänger-Steuer auf ~7,5 Min. Ursachenanalyse (procdump/
+# Minidump des spinnenden Native-Threads) ist separat geplant (Task #71).
+MAX_CHUNK_TIMEOUT_SECS = 450
 MAX_CONSECUTIVE_CHUNK_FAILURES = 3
+
+
+# ── Windows Keep-Awake (verhindert System-Standby während eines Laufs) ──────
+# Fund (2026-07-22): der Nacht-Batch (--mode network, 2000 Spiele) brach nach
+# 300/2000 Spielen mitten im Fortschritt ab -- Log endet fehlerlos (kein
+# Chunk-Hänger, kein Traceback), Harness meldet den Prozess um ~00:30 Uhr als
+# "killed". Ursache: Windows-Standby, nicht der Chunk-Supervisor. Diese
+# Prozess-lokale API haelt das System wach, SOLANGE dieser Python-Prozess
+# lebt (ES_SYSTEM_REQUIRED) -- bewusst OHNE ES_DISPLAY_REQUIRED, der Monitor
+# darf ausgehen. Kein Eingriff in Systemeinstellungen/Registry, wirkt nur für
+# diesen Prozess und wird beim Lauf-Ende (auch bei Fehlern, via `finally`)
+# wieder auf ES_CONTINUOUS zurückgesetzt.
+_ES_CONTINUOUS = 0x80000000
+_ES_SYSTEM_REQUIRED = 0x00000001
+
+
+def _keep_system_awake() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(_ES_CONTINUOUS | _ES_SYSTEM_REQUIRED)
+    except Exception:
+        pass  # Best-effort -- ein fehlender Keep-Awake darf den Lauf nicht verhindern.
+
+
+def _allow_system_sleep() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(_ES_CONTINUOUS)
+    except Exception:
+        pass
 
 
 def _internal_game_timeout_secs(sims: int, has_model: bool) -> int:
@@ -77,7 +121,8 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
     workers = threads if threads and threads > 0 else (os.cpu_count() or 1)
     waves = -(-n_games // max(1, workers))  # ceil
     per_game = _internal_game_timeout_secs(sims, has_model)
-    return max(MIN_CHUNK_TIMEOUT_SECS, waves * per_game * GAME_HANG_SAFETY_FACTOR)
+    return min(MAX_CHUNK_TIMEOUT_SECS,
+               max(MIN_CHUNK_TIMEOUT_SECS, waves * per_game * GAME_HANG_SAFETY_FACTOR))
 
 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
@@ -255,48 +300,64 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # laufenden Fortschritt + ETA und hält den Speicher klein (sonst lägen bei
     # z.B. 3000 Spielen mehrere GB JSON im RAM). Die .pkl-Granularität (per_file,
     # Standard 10 Spiele/Datei) ist davon ENTKOPPELT.
-    t_start = time.time()
-    done = 0
-    total_steps = 0
-    chunk_idx = 0
-    consecutive_failures = 0
-    buffer: list[dict] = []      # akkumulierte Steps für die nächste .pkl
-    buffer_games = 0             # Anzahl Spiele im Buffer
-    while done < num_games:
-        n = min(chunk, num_games - done)
-        raw = make_chunk(n, chunk_idx)
-        chunk_idx += 1  # Seed für den nächsten Versuch (auch bei Retry) ändert sich immer.
-        if raw is None:
-            consecutive_failures += 1
-            if consecutive_failures > MAX_CONSECUTIVE_CHUNK_FAILURES:
-                raise SystemExit(
-                    f"❌ {MAX_CONSECUTIVE_CHUNK_FAILURES} Chunks in Folge gehängt/abgebrochen -- "
-                    "wahrscheinlich ein systematisches Problem (Modell, Threads), kein Einzelfall-Hänger. Abbruch."
-                )
-            continue  # gleiche Ziel-Spielezahl `n`, aber neuer Seed durch bumped chunk_idx
+    #
+    # Keep-Awake (siehe Modul-Kommentar oben) umspannt GENAU den lang laufenden
+    # Teil -- ab hier bis zum Lauf-Ende, auch bei Fehlern/Abbruch (`finally`),
+    # damit Windows-Standby diesen mehrstündigen Batch nicht mehr killt.
+    _keep_system_awake()
+    try:
+        t_start = time.time()
+        done = 0
+        total_steps = 0
+        chunk_idx = 0
         consecutive_failures = 0
-        steps = json.loads(raw)
-        total_steps += len(steps)
+        buffer: list[dict] = []      # akkumulierte Steps für die nächste .pkl
+        buffer_games = 0             # Anzahl Spiele im Buffer
+        while done < num_games:
+            n = min(chunk, num_games - done)
+            raw = make_chunk(n, chunk_idx)
+            chunk_idx += 1  # Seed für den nächsten Versuch (auch bei Retry) ändert sich immer.
+            if raw is None:
+                consecutive_failures += 1
+                if consecutive_failures > MAX_CONSECUTIVE_CHUNK_FAILURES:
+                    raise SystemExit(
+                        f"❌ {MAX_CONSECUTIVE_CHUNK_FAILURES} Chunks in Folge gehängt/abgebrochen -- "
+                        "wahrscheinlich ein systematisches Problem (Modell, Threads), kein Einzelfall-Hänger. Abbruch."
+                    )
+                continue  # gleiche Ziel-Spielezahl `n`, aber neuer Seed durch bumped chunk_idx
+            consecutive_failures = 0
+            steps = json.loads(raw)
+            # run_net_self_play hängt ans JSON einen reinen Diagnose-Record an
+            # (perspective_divergence_diagnostics, gleiches Muster wie
+            # stage3_diagnostics in arena.py) -- der ist KEIN Spielschritt: er hat
+            # kein "state"-Feld (MosaicDataset würde beim Training mit KeyError
+            # crashen) und würde von _group_by_game als eigenes Pseudo-Spiel
+            # gezählt (verfälscht `done` und das per_file-Chunking). Hier
+            # rausfiltern, bevor gruppiert/gepickelt wird.
+            steps = [s for s in steps if "perspective_divergence_diagnostics" not in s]
+            total_steps += len(steps)
 
-        # Chunk in Spiele aufteilen und je `per_file` Spiele eine .pkl schreiben.
-        for game_steps in _group_by_game(steps):
-            buffer.extend(game_steps)
-            buffer_games += 1
-            done += 1
-            if buffer_games >= per_file:
-                _flush(buffer, version_name, tag, done)
-                buffer, buffer_games = [], 0
+            # Chunk in Spiele aufteilen und je `per_file` Spiele eine .pkl schreiben.
+            for game_steps in _group_by_game(steps):
+                buffer.extend(game_steps)
+                buffer_games += 1
+                done += 1
+                if buffer_games >= per_file:
+                    _flush(buffer, version_name, tag, done)
+                    buffer, buffer_games = [], 0
 
-        elapsed = time.time() - t_start
-        rate = done / elapsed if elapsed > 0 else 0.0
-        eta_min = (num_games - done) / rate / 60 if rate > 0 else 0.0
-        print(f"  ⏳ {done}/{num_games} Spiele | {rate:.2f} Spiele/s | "
-              f"{total_steps} Züge | ETA {eta_min:.1f} min")
+            elapsed = time.time() - t_start
+            rate = done / elapsed if elapsed > 0 else 0.0
+            eta_min = (num_games - done) / rate / 60 if rate > 0 else 0.0
+            print(f"  ⏳ {done}/{num_games} Spiele | {rate:.2f} Spiele/s | "
+                  f"{total_steps} Züge | ETA {eta_min:.1f} min")
 
-    if buffer:   # Rest (< per_file Spiele) sichern
-        _flush(buffer, version_name, tag, done)
+        if buffer:   # Rest (< per_file Spiele) sichern
+            _flush(buffer, version_name, tag, done)
 
-    print(f"\n✅ Fertig: {num_games} Spiele, {total_steps} Züge nach {time.time() - t_start:.1f}s")
+        print(f"\n✅ Fertig: {num_games} Spiele, {total_steps} Züge nach {time.time() - t_start:.1f}s")
+    finally:
+        _allow_system_sleep()
 
 
 if __name__ == "__main__":

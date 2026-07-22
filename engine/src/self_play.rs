@@ -367,6 +367,20 @@ fn avg_remaining_type_value(state: &GameState) -> f64 {
 /// (switch_player passiert im letzten `DrawStack`-Aufruf).
 fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
     let _ = game.apply_drafting(&Action::DrawStackPeek);
+    // Terminierung: `can_draw_stack_peek` wird false, sobald
+    // `state.dome_tile_pool` leer ist (`validate_draw_stack_peek`,
+    // game.rs) -- jeder Redraw entnimmt per `dome_tile_pool.remove(0)`
+    // GENAU eine Platte (execute_draw_stack_peek), der Pool schrumpft also
+    // strikt monoton und ist von Haus aus endlich (<= 18 Platten). Die
+    // Schleife terminiert daher beweisbar von selbst, auch seit R6 die
+    // punktbasierte Budget-Schranke entfernt hat (Regelbuch-Audit
+    // 2026-07-21: Weiterziehen darf jetzt beliebig oft wiederholt werden).
+    // Deckel unten ist reine Gürtel+Hosenträger-Absicherung (Nacht-Hänger
+    // 2026-07-22 hat gezeigt, dass "beweisbar endlich" allein keine
+    // ausreichende Grundlage mehr ist, siehe fill_large_factory-Fix in
+    // state.rs) -- sollte in der Praxis nie greifen.
+    const MAX_STACK_PEEKS: u32 = 20;
+    let mut peeks: u32 = 0;
     loop {
         let cost_so_far = game.state.pending_stack_draw.len() as f64;
         let stop_value = game
@@ -376,7 +390,7 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
             .map(|t| best_eval_for_tile(&game.state, t).0)
             .fold(f64::NEG_INFINITY, f64::max)
             - cost_so_far;
-        if !crate::game::can_draw_stack_peek(&game.state) {
+        if !crate::game::can_draw_stack_peek(&game.state) || peeks >= MAX_STACK_PEEKS {
             break;
         }
         let continue_estimate = avg_remaining_type_value(&game.state) - (cost_so_far + 1.0);
@@ -384,6 +398,7 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
             break;
         }
         let _ = game.apply_drafting(&Action::DrawStackPeek);
+        peeks += 1;
     }
 
     let (chosen_id, sr, sc, rotation) = game
@@ -1710,6 +1725,54 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         .collect()
 }
 
+/// Zusätzliche Sicherheitsmarge (über `net_game_timeout_secs +
+/// EXTRA_GAME_TIMEOUT_SECS` hinaus) für den präemptiven Thread-Watchdog
+/// unten -- gibt dem KOOPERATIVEN Timeout in `play_net_self_play_game`
+/// (dessen eigener `guard`/`t_start.elapsed()`-Check) immer zuerst die
+/// Chance, sauber mit einem `completed: false`-Teilresultat zurückzukehren
+/// (besser als ein komplett leeres Ergebnis).
+const WATCHDOG_MARGIN_SECS: u64 = 60;
+
+/// Führt `f` mit einer HARTEN Wallclock-Deadline aus, präemptiv statt
+/// kooperativ: `f` läuft in einem eigenen OS-Thread; überschreitet es
+/// `deadline`, wartet der Aufrufer NICHT weiter -- er bekommt `None` und
+/// macht sofort mit dem nächsten Spiel weiter.
+///
+/// Hintergrund (Root-Cause-Fix 2026-07-22, siehe `fill_large_factory` in
+/// state.rs): `play_net_self_play_game`s eigener Hänger-Schutz
+/// (`guard`/`t_start.elapsed()` in dessen Zug-Schleife) ist rein
+/// KOOPERATIV -- er wird nur ZWISCHEN zwei Zügen geprüft. Hängt ein
+/// EINZELNER Zug in einer tiefer liegenden, unbegrenzten Schleife (wie es
+/// bei `fill_large_factory` der Fall war, aufgerufen aus
+/// `setup_new_round`/`next_round` beim Rundenübergang, oder ebenso aus
+/// `round_transition_deep::bootstrap_value_after_rounds`s Sampling), kommt
+/// die Zug-Schleife nie wieder zu ihrer eigenen Deadline-Prüfung zurück --
+/// der kooperative Timeout greift dann nicht, exakt der beobachtete Hänger
+/// (1 nativer Thread spinnt auf 100%, alle anderen rayon-Worker idle,
+/// Python-Hauptthread parkt in `WaitOnAddress` auf das `.collect()` der
+/// gesamten Partie-Menge). Dieser Watchdog ist die einzige WIRKLICH
+/// präemptive Absicherung: er schützt auch gegen künftige, heute noch
+/// unbekannte unbegrenzte Schleifen tief im Aufrufbaum, ohne dass jede
+/// einzelne Funktion selbst einen Deadline-Parameter durchreichen muss.
+///
+/// Trade-off: der gespawnte Thread wird NICHT abgebrochen (Rust/OS-Threads
+/// sind nicht sicher von außen killbar) -- er läuft verwaist weiter, bis er
+/// selbst terminiert oder der Prozess endet, und bindet bis dahin einen
+/// CPU-Kern. Das ist bewusst hingenommen: besser 1 verwaister Kern als der
+/// gesamte Chunk/Batch, der laut Beobachtung sonst komplett blockiert.
+fn run_with_watchdog<F, T>(deadline: std::time::Duration, f: F) -> Option<T>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = f();
+        let _ = tx.send(result);
+    });
+    rx.recv_timeout(deadline).ok()
+}
+
 /// Netzgeführtes Self-Play: `n_games` Partien (rayon-parallel), Netz vs. sich
 /// selbst, rohe Visit-Targets. Gibt alle Step-Records flach als JSON-Array
 /// zurück.
@@ -1732,6 +1795,14 @@ pub fn run_net_self_play(
     // zuruecksetzen, damit der angehaengte Snapshot NUR diesen Lauf abbildet.
     crate::net_mcts::perspective_divergence_reset();
 
+    // Präemptiver Per-Spiel-Watchdog (siehe `run_with_watchdog`-Doku): der
+    // interne kooperative Timeout von `play_net_self_play_game` bekommt per
+    // `WATCHDOG_MARGIN_SECS` immer zuerst die Chance, sauber abzubrechen --
+    // erst wenn das nicht einmal das schafft (Hänger tief in einem
+    // EINZELNEN Zug, siehe Kommentar oben), greift dieser harte Deckel.
+    let watchdog_deadline = std::time::Duration::from_secs(
+        net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS + WATCHDOG_MARGIN_SECS,
+    );
     let play = |i: usize| -> Vec<Value> {
         let mut rng =
             StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
@@ -1739,7 +1810,21 @@ pub fn run_net_self_play(
         let first = rng.random_range(0..2usize);
         let names = ["Netz".to_string(), "Netz".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_net_self_play_game(&net, base_sims, c_puct, ids, names, first, &gid, &mut rng, add_root_noise, deterministic)
+        let net = std::sync::Arc::clone(&net);
+        let gid_thread = gid.clone();
+        let result = run_with_watchdog(watchdog_deadline, move || {
+            play_net_self_play_game(&net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise, deterministic)
+        });
+        match result {
+            Some(v) => v,
+            None => {
+                eprintln!(
+                    "⚠️  [Watchdog] Spiel {gid} ueberschritt die harte {watchdog_deadline:?}-Deadline -- \
+                     als unvollstaendig verworfen (verwaister Thread laeuft im Hintergrund weiter)."
+                );
+                Vec::new()
+            }
+        }
     };
 
     let all: Vec<Vec<Value>> = if num_threads == 0 {
