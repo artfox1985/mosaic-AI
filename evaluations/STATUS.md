@@ -1552,7 +1552,9 @@ Heartbeat-Erkennung (180s ohne Herzschlag = tot, langsam ≠ tot).
 138/138 Tests inkl. Determinismus-Test (`bootstrap_value_after_rounds`
 seed-exakt reproduzierbar). Nebenbefund als Folge-Task: ~1e-4
 Prozessgrenzen-Nichtdeterminismus in tract-onnx (vorbestehend,
-vernachlässigbar).
+vernachlässigbar). **[KORRIGIERT: tract-onnx ist bit-exakt; die wahre
+Quelle ist round5.rs' 150ms-Wall-Clock-Deadline — siehe eigener
+Abschnitt unten (2026-07-22).]**
 
 ## Task #65: ISMCTS-Mehrfach-Determinisierung implementiert + arena-widerlegt (2026-07-22)
 
@@ -1634,6 +1636,65 @@ des Worktrees persistieren — der ISMCTS-ALT-Worktree war bereits gelöscht,
 die Konstanten-Verifikation nur noch indirekt möglich (interne Konsistenz
 des gepaarten Splits widerlegte die Wheel-Verwechslung, aber ein Beleg wäre
 besser gewesen).
+
+## Prozessgrenzen-Nichtdeterminismus geklärt: tract-onnx entlastet, round5.rs überführt (2026-07-22)
+
+Untersuchung des Task-#71-Nebenbefunds (bootstrap_value/rtv weichen über
+separate Prozessstarts ~1e-4..1e-3 ab, trotz Knoten-Budgets und identischer
+Live-Züge). Ergebnis in zwei Teilen:
+
+**Teil 1 — tract-onnx ist BIT-EXAKT reproduzierbar** (Hypothese
+"Fließkomma-Nichtdeterminismus über Prozessgrenzen" widerlegt). Isolierte
+Probe `engine/examples/net_determinism.rs` (bleibt im Repo): 8 seeded
+Zufalls-Feature-Vektoren durch `Net::eval` UND `Net::eval_pair`
+(v10_best.onnx), alle vier Köpfe als f32-Bitmuster in Datei. 12 separate
+Prozessstarts → alle Dateien bitweise identisch; zusätzlich zwei
+`Net::load`-Instanzen im selben Prozess bitgleich (auch die
+Graph-OPTIMIERUNG ist deterministisch, keine HashMap-Order-Effekte) und
+Wiederholungs-Aufrufe bitgleich. tract-linalg läuft default
+single-threaded (`Executor::SingleThread`, `multithread-mm`-Feature aus,
+kein rayon in der Dep-Kette) — es gibt dort nichts zu konfigurieren.
+
+**Teil 2 — die wahre Quelle: `round5::TIME_BUDGET` (150ms) ist weiterhin
+ein PRIMÄRER Wall-Clock-Cutoff.** Task #71 hat nur
+round_transition/round_transition_deep auf Knoten-primär umgestellt;
+`round5::negamax` prüft `Instant::now() >= deadline` an JEDEM Knoten, und
+das `NODE_BUDGET=200_000` ist dort de facto unerreichbar: temporäre
+Diagnose-Probe (6 realistische Runde-5-Stellungen via
+`drive_to_round_start(seed, 5)`, Release-Build, danach wieder entfernt):
+
+- 200k Knoten brauchen **45-393 SEKUNDEN** (nicht ms) — bei 150ms schafft
+  die Suche nur ~0,04-0,7% des Knotenbudgets, der Umfang hängt allein von
+  der momentanen Maschinenlast ab.
+- **4 von 6 Stellungen liefern schon IN-PROZESS bei 3 direkt
+  aufeinanderfolgenden `exact_round5_outcome`-Aufrufen verschiedene
+  Werte**, Spanne bis **0,065 Gewinnwahrscheinlichkeit** (z.B. 0,739 vs.
+  0,681). Das ist kein Prozessgrenzen-Effekt, sondern Run-zu-Run-Rauschen
+  bei jedem einzelnen Aufruf.
+
+Damit vollständig konsistent mit dem E2E-Bild: `mcts.rs` ist komplett
+wanduhrfrei (Live-Züge exakt reproduzierbar; Ausnahme Runde-5-Züge via
+`round5::choose_action` — gleiche Deadline, Argmax war im E2E-Test nur
+zufällig robust), und die ~1e-4..1e-3 im Label sind das ±0,065-Rauschen
+des Runde-4→5-Evaluators, verdünnt durch 24-Sample-Mittelung und die
+Bootstrap-Kette. Die Restgröße nach der 1h-Budget-Probe in
+round_transition_deep.rs erklärt sich exakt dadurch, dass round5.rs (und
+die Not-Deckel `TIME_BUDGET_TRAIN`/`_ROUND4` in round_transition.rs) von
+dieser Probe nicht erfasst waren.
+
+**Einordnung/Handlungsbedarf**: Kein net.rs-Problem, nichts zu fixen an
+tract. Aber die Task-#71-Aussage "Labels sind jetzt deterministisch" gilt
+NUR bis Runde 3 — das Runde-4-Label (und jede Bootstrap-Kette, die Runde 5
+erreicht) trägt weiterhin lastabhängiges Rauschen von ±einigen Prozent
+Gewinnwahrscheinlichkeit pro Evaluator-Aufruf. Möglicher Folge-Task (nicht
+umgesetzt, Entscheidung offen): round5.rs analog Task #71 auf
+Knoten-primär umstellen — dazu müsste das Knotenbudget auf das real in
+150ms Erreichbare kalibriert werden (~500-4000 Knoten laut Messung, statt
+200k), Zeit-Deadline nur noch als Not-Deckel; betrifft neben dem Label
+auch die Live-Runde-5-Zugwahl (`choose_action`), also per Arena
+gegenprüfen. Bis dahin: Größenordnung im Label nach Verdünnung ~1e-3,
+für Arena-/Replays-Vergleiche vernachlässigbar, für exakte
+Reproduzierbarkeits-Tests (Prozess A == Prozess B) NICHT.
 
 ## Quellen (Recherche 2026-07-19)
 
