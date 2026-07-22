@@ -1605,6 +1605,36 @@ verfügbar (z.B. für einen künftigen Test bei höherem Sims-Budget). Kein
 neuer `elo_history.csv`-Eintrag (v10_best@400 vs. Heuristik@200 existiert
 bereits als Paarung, siehe oben) -- nur hier dokumentiert.
 
+## Task #65 (ISMCTS) + Mess-Diskrepanz-Klärung (2026-07-22)
+
+**ISMCTS-Mehrfach-Determinisierung getestet und VERWORFEN** (Commit 61fce82):
+n=3 Welten mit gesplittetem Budget (~133 Sims/Welt) verlor den gepaarten
+A/B klar (25.3% vs. 50.7%, McNemar p=0.0009, Stopp nach 75 Paaren) — der
+Budget-Split hungert Sequential Halving stärker aus, als die Welten-
+Mittelung bringt. `NUM_DETERMINIZATIONS` zurück auf 1, Code bleibt als
+Toggle (143/143 Tests). Sauberer Implementierungs-Befund nebenbei:
+Wurzel-Kandidaten sind beweisbar weltenunabhängig (Aggregation exakt).
+
+**Diskrepanz-Klärung**: der ALT-Arm des ISMCTS-A/B (50.7% vs. Heuristik@200)
+widersprach dem Elo-Referenzwert (30.7%, 46/150) um +3.7σ. Frische
+Replikation auf dem aktuellen Wheel (n=150, neuer Seed): **34.7%** —
+kompatibel mit 30.7% (p=0.46), NICHT kompatibel mit 50.7% (p=0.02).
+Chi²-Heterogenität über alle drei Messungen (p=0.012) geht vollständig auf
+den 75er-Ausreißer zurück. Arena-Pfad zwischen den Wheel-Ständen per
+git-diff als funktional identisch verifiziert. **Elo-Eintrag v10=858
+bleibt; die 50.7% werden als Kleinstichproben-Ausreißer verworfen.**
+Einordnung fürs n=3-Urteil: gegen die replizierte 31-35%-Basis ist NEUs
+25.3% allein nicht mehr signifikant schlechter (p≈0.15) — die Rückbau-
+Entscheidung bleibt trotzdem richtig (Nachweis-Regel: n=3 müsste einen
+VORTEIL zeigen, und davon ist nichts zu sehen).
+
+**Prozess-Lernpunkt** (aus der Bohrung): bei Worktree-A/B-Tests den
+tatsächlich gebauten Diff (inkl. uncommitted lokaler Edits) VOR dem Löschen
+des Worktrees persistieren — der ISMCTS-ALT-Worktree war bereits gelöscht,
+die Konstanten-Verifikation nur noch indirekt möglich (interne Konsistenz
+des gepaarten Splits widerlegte die Wheel-Verwechslung, aber ein Beleg wäre
+besser gewesen).
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
