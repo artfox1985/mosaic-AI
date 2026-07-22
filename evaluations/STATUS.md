@@ -1461,6 +1461,39 @@ Rundenabdeckung = genau die Punkt-6-Absicht); λ=0.3 verworfen.
 
 **Diversität (#67) + Elo-Infra (#62):** siehe oben — beide fertig.
 
+**Speed-Bündel Phase 2b — FERTIG (Commit ad13044):** train.py-Manifest +
+Korpus-Log live (corpus_composition nach Versions-Präfix). Gepaarter
+A/B ALT-vs-NEU (150 Paare, v10_best@400 vs. Heuristik@200): NEU 46:56 ALT,
+McNemar p=0.28, CI [−17.3, +4.0] pp — **kein Nachweis in irgendeine
+Richtung**, Bündel bleibt (1.94× Speed + mctx-Treue; #68 als Merkposten,
+falls v12 enttäuscht). Perspektiven-Divergenz-Readout: 7-15% je Runde
+(sinkend R1→R5), MIRROR-Retest bewusst nicht priorisiert (alter klarer
+Negativ-Befund, Mechanik von keinem Umbau berührt).
+
+**Erste vollständige Elo-Kader-Tabelle (Heuristik@200 = 1000, Anker):**
+
+| Modell | Elo | 95%-CI | Spiele |
+|---|---|---|---|
+| v10_best@400 (Champion) | 858 | [793, 915] | 250 |
+| v11_td07_best@400 | 853 | [770, 922] | 100 |
+| v11_best@400 | 809 | [708, 895] | 100 |
+
+Kader-Realität: der Champion liegt bei ~31% gegen Heuristik@200 (die
+200-Sims-Heuristik ist stärker als die alte 150er-Referenz — Messlatte
+verschoben, aber ab jetzt fix).
+
+**td07-Arena-Test (#73) — λ=0.7 NICHT übernommen:** v11_td07 30:70 gegen
+Heuristik@200 — statistisch identisch mit v10s 30.7%-Referenz (p≈0.91),
+Gating-Match daher übersprungen, v10_best bleibt Champion. Die im Sweep
+gesehene gleichmäßigere Value-Struktur übersetzt sich (wie schon bei v11)
+nicht in Spielstärke. **v12 trainiert mit TD_LAMBDA=0.5 (Status quo).**
+Wiederkehrendes Muster der Projektgeschichte bestätigt sich: Value-Ziel-
+Verbesserungen bewegen Offline-Metriken, aber die Stärke-Hebel waren bisher
+ausnahmslos Such-Mechanik (Struktur-Fixes, Sims-Budget, Floor-Shaping).
+Nebenbefund für künftige Läufe: run_net_arena mit threads=0 läuft
+single-threaded (Rust-Default 1) — threads explizit setzen (4× Speedup
+gemessen).
+
 **Danach eingeplant:** ISMCTS-Mehrfach-Determinisierung (#65, eigener
 gepaarter A/B nach Phase 2 — Suchänderungen werden nie gebündelt getestet),
 Knoten-Budgets/Einzelspiel-Flush/Heartbeat (#71, vor dem v12-Batch:
