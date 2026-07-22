@@ -485,10 +485,16 @@ class MosaicDataset(Dataset):
         import numpy as np
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
+        # TD_LAMBDA fehlte hier bisher im Hash (Retrain-Sweep-Audit,
+        # 2026-07-22): der TD-Bootstrap-Blend wird in `val`/`points_val`
+        # VOR dem Caching eingerechnet (siehe unten), ein Lambda-Sweep haette
+        # also stillschweigend den Cache der ersten je Dateiliste gebauten
+        # Lambda-Variante wiederverwendet und NICHTS gemessen. Jetzt Teil des
+        # Keys, gleiche Stelle wie POLICY_TARGET_SHARPEN_EXPONENT.
         files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
-             + str(POLICY_TARGET_SHARPEN_EXPONENT)).encode()
+             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
