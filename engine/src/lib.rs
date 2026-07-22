@@ -360,6 +360,46 @@ fn onnx_eval(
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
+/// Snapshot der aktiv wirksamen Rust-Suchkonstanten als JSON -- für
+/// `self_play.py`s Lauf-Manifest (#64 Teil 1, Phase 2a, 2026-07-22): ein
+/// Self-Play-Lauf soll rückwirkend rekonstruierbar sein (welche Engine-
+/// Konfiguration hat DIESE Daten erzeugt), ohne den Rust-Quellcode zum
+/// jeweiligen Commit-Stand extra auschecken zu müssen. Reines Auslesen
+/// bestehender `pub`/`pub(crate)`-Konstanten aus `net_mcts.rs`/
+/// `round_transition.rs`/`round_transition_deep.rs` -- kein Spielzustand
+/// nötig, keine neue Suchlogik.
+#[pyfunction]
+fn engine_config_json() -> String {
+    use crate::net_mcts::{
+        ACTIVE_LEAF, DECOUPLE_NET_SIMS_FROM_ACTIONS, DETERMINIZE_ROOT_HIDDEN_INFO,
+        FLOOR_SHAPING_WEIGHT, GUMBEL_TOP_M, LeafEval, MIRROR_OTHER_VAL, NUM_ACTIONS,
+        POINTS_UTILITY_WEIGHT, POLICY_MASS_CUTOFF, ROUND_TRANSITION_SAMPLING,
+        SHUFFLE_STACK_PEEK_IN_SEARCH, USE_GUMBEL_SEARCH,
+    };
+    let active_leaf = match ACTIVE_LEAF {
+        LeafEval::Net => "Net",
+        LeafEval::Dfs => "Dfs",
+    };
+    json!({
+        "engine_version": env!("CARGO_PKG_VERSION"),
+        "num_actions": NUM_ACTIONS,
+        "active_leaf": active_leaf,
+        "use_gumbel_search": USE_GUMBEL_SEARCH,
+        "gumbel_top_m": GUMBEL_TOP_M,
+        "decouple_net_sims_from_actions": DECOUPLE_NET_SIMS_FROM_ACTIONS,
+        "floor_shaping_weight": FLOOR_SHAPING_WEIGHT,
+        "points_utility_weight": POINTS_UTILITY_WEIGHT,
+        "mirror_other_val": MIRROR_OTHER_VAL,
+        "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
+        "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,
+        "round_transition_sampling": ROUND_TRANSITION_SAMPLING,
+        "policy_mass_cutoff": POLICY_MASS_CUTOFF,
+        "round_transition_n_samples_search": crate::round_transition::N_SAMPLES_SEARCH,
+        "bootstrap_horizon_rounds": crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+    })
+    .to_string()
+}
+
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
@@ -401,6 +441,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(stage3_vs_stage1_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(profiling_reset, m)?)?;
     m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
+    m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
