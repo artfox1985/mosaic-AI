@@ -64,22 +64,35 @@ pub const N_SAMPLES_SEARCH: u32 = 8;
 /// Anzahl Samples für die Trainingsziel-Konstruktion (Self-Play,
 /// `self_play.rs::play_net_self_play_game`). Läuft nur ~4x je Partie (einmal
 /// je echtem Rundenübergang), daher deutlich großzügigeres Budget möglich.
+/// Dieser Sample-COUNT ist bereits der eigentliche (deterministische)
+/// Knoten-Deckel -- siehe `TIME_BUDGET_TRAIN`-Kommentar (Task #71).
 pub const N_SAMPLES_TRAIN: u32 = 24;
-/// Zeitbudget für die Trainingsziel-Konstruktion -- großzügiger als
-/// `TIME_BUDGET` (Live-Suche), da dieser Pfad nur ~4x je Partie läuft statt
-/// potenziell tausendfach je Suche. NICHT empirisch kalibriert (siehe
-/// `TIME_BUDGET`-Kommentar) -- vor breitem Einsatz gegen echte Partien prüfen.
-pub const TIME_BUDGET_TRAIN: Duration = Duration::from_millis(800);
+/// Task #71, Determinismus-Fix: NUR NOCH äußerer Not-Deckel, nicht mehr der
+/// primäre Cutoff. Kalibrierung (2026-07-22, freie lokale Maschine, 8
+/// netzgeführte v10_best-Spiele, sims=400, `CALIB_RTV`-Instrumentierung in
+/// `sample_round_transition_value`): der Sample-COUNT (`N_SAMPLES_TRAIN`/
+/// `N_SAMPLES_TRAIN_ROUND{1,2,3}` in `round_transition_deep.rs`) wurde in
+/// ALLEN 8 Spielen IMMER vollständig erreicht (n==cap, nie degradiert) --
+/// die Schleife in `sample_round_transition_value` prüft die Deadline nur
+/// VOR jeder Sample-Iteration, nicht währenddessen, daher ist der Sample-
+/// Count selbst schon der eigentliche (deterministische) Knoten-Deckel.
+/// Dieser Pfad (`round_before` außerhalb 1-4, sollte laut Aufrufer nie
+/// erreicht werden) nutzt den billigen `net_leaf_eval`-Bewerter (ein
+/// Forward-Pass) -- 5s deckt 24 Samples komfortabel ab, selbst unter Last.
+pub const TIME_BUDGET_TRAIN: Duration = Duration::from_secs(5);
 
 /// Zeitbudget speziell für die Runde-4→5-Transition (siehe
 /// `round5::exact_round5_outcome`, self_play.rs-Aufrufstelle): dort kostet
 /// JEDER Sample-Aufruf selbst bis zu `round5::TIME_BUDGET` (150ms, ein
-/// voller Alpha-Beta-Solve statt eines ~0,2ms-Netz-Forward-Passes) --
-/// `TIME_BUDGET_TRAIN` (800ms) würde die Sample-Zahl auf ~5 statt der vollen
-/// `N_SAMPLES_TRAIN`=24 zusammenstutzen. Grosszügig auf 24×150ms+Puffer
-/// bemessen -- läuft nur 1x je Partie (nur dieser eine Übergang), daher
-/// vertretbar teurer als die anderen drei.
-pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(5);
+/// voller Alpha-Beta-Solve statt eines ~0,2ms-Netz-Forward-Passes).
+/// Task #71, Determinismus-Fix: NUR NOCH äußerer Not-Deckel (der Sample-
+/// COUNT `N_SAMPLES_TRAIN`=24 ist der primäre, deterministische Cutoff --
+/// siehe `TIME_BUDGET_TRAIN`-Kommentar). Kalibrierung (2026-07-22, freie
+/// lokale Maschine, 8 netzgeführte v10_best-Spiele, sims=400): gemessene
+/// Laufzeit für die volle 24-Sample-Runde-4→5-Kette lag bei Median 3,83s
+/// (n=8, engster Bereich 3,8-3,93s) -- der alte Wert (5s) hatte damit real
+/// nur ~1,3x Marge, keine 3x. Neu: 3x Median aufgerundet.
+pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(12);
 
 /// Ein Runden-End-Zustand, deterministisch bis unmittelbar vor den EINEN
 /// tatsächlich zufälligen Schritt vorgespult (den `EndTiling`-Aufruf des

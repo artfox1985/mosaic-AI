@@ -12,6 +12,11 @@
 //! `agents/neural_net.py::action_to_id` genau diese Keys liest — NICHT dem
 //! `serialize::action_to_dict`-Schema (`factory_id`, `tile_id`).
 
+use std::fs::{File, OpenOptions};
+use std::io::{BufWriter, Write};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+
 use rand::rngs::StdRng;
 use rand::seq::{IndexedRandom, SliceRandom};
 use rand::{Rng, RngExt, SeedableRng};
@@ -77,6 +82,107 @@ fn heuristic_game_timeout_secs(sims: u32) -> u64 {
 /// bei 400 Sims wie zuletzt 180s Puffer herauskommen.
 fn net_game_timeout_secs(sims: u32) -> u64 {
     ((sims as u64 * 9) / 20).max(MIN_GAME_TIMEOUT_SECS)
+}
+
+// ── Fortschritts-Tracking: Einzelspiel-Flush + Heartbeat (Task #71) ─────────
+// Wurzel-Problem (siehe self_play.py-Modulkommentar zum Chunk-Hänger-
+// Supervisor): ein Chunk lief bisher komplett in EINEM Rust-Aufruf, der ALLE
+// `n_games` Partien rayon-parallel spielt und erst am Ende (`.collect()`)
+// irgendetwas zurückgibt -- ein harter Kill (Timeout) verwirft deshalb bis zu
+// `chunk`-1 bereits fertige Partien, und der Supervisor kann "langsam unter
+// Last" nicht von "tot" unterscheiden (beides sieht von außen gleich aus:
+// keine Rückgabe). Fix, minimal-invasiv (Dateiformat der finalen .pkl bleibt
+// UNVERÄNDERT): optional (beide Pfade `None` = Verhalten exakt wie vorher)
+// schreibt JEDES fertige Spiel sofort eine Zeile in eine JSONL-Zwischendatei
+// (`progress_path`), UND ein Hintergrund-Thread aktualisiert periodisch eine
+// kleine Herzschlag-Datei (`heartbeat_path`) mit Zug-/Spielzählern -- der
+// Python-Supervisor beobachtet deren mtime statt eines starren
+// Chunk-Gesamttimeouts.
+
+/// Öffnet (falls `progress_path` gesetzt) die JSONL-Zwischendatei im
+/// Append-Modus. `None` (kein Pfad) hält das Verhalten identisch zu vorher
+/// (kein Fortschritts-Tracking, z.B. Diagnose-/Arena-Aufrufe).
+fn open_progress_file(progress_path: Option<&str>) -> Option<Arc<Mutex<BufWriter<File>>>> {
+    progress_path.map(|p| {
+        let f = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(p)
+            .unwrap_or_else(|e| panic!("Fortschritts-Datei '{p}' konnte nicht geoeffnet werden: {e}"));
+        Arc::new(Mutex::new(BufWriter::new(f)))
+    })
+}
+
+/// Schreibt EIN fertiges Spiel (dessen Step-Records) als eine JSONL-Zeile --
+/// Thread-sicher (Mutex, mehrere rayon-Worker schreiben gleichzeitig
+/// unterschiedliche Spiele fertig) und geflusht (minimiert das Zeitfenster
+/// für eine unvollständige Zeile bei einem harten Kill mitten im Schreiben).
+/// Best-effort: ein Schreibfehler (volle Platte etc.) darf den Self-Play-Lauf
+/// selbst nicht abbrechen, nur diesen einen Fortschritts-Eintrag verlieren.
+fn append_game_progress(file: &Option<Arc<Mutex<BufWriter<File>>>>, steps: &[Value]) {
+    if let Some(f) = file {
+        if let Ok(line) = serde_json::to_string(steps) {
+            if let Ok(mut guard) = f.lock() {
+                let _ = writeln!(guard, "{line}");
+                let _ = guard.flush();
+            }
+        }
+    }
+}
+
+/// Startet (falls `heartbeat_path` gesetzt) einen Hintergrund-Thread, der
+/// alle 2s den aktuellen Zug-/Spielzähler in eine kleine JSON-Datei schreibt
+/// -- der Supervisor (self_play.py) killt einen Chunk nur noch, wenn deren
+/// mtime für eine Weile stillsteht (unterscheidet "läuft noch, nur langsam
+/// unter Last" von "hängt/ist tot"), statt bei jedem trägen, aber lebenden
+/// Chunk vorschnell abzubrechen. `move_counter` wird aus den per-Zug-Schleifen
+/// in `play_one_game`/`play_net_self_play_game` inkrementiert (feinere
+/// Granularität als nur "Spiel fertig" -- ein einzelnes Spiel kann bei hohen
+/// Sim-Zahlen selbst deutlich länger als die 120s-Herzschlag-Toleranz
+/// brauchen). Rückgabe: Stop-Flag + Thread-Handle, MUSS nach dem parallelen
+/// Batch über `stop_heartbeat_reporter` aufgeräumt werden.
+fn start_heartbeat_reporter(
+    heartbeat_path: Option<String>,
+    move_counter: Arc<AtomicU64>,
+    games_counter: Arc<AtomicU64>,
+) -> (Arc<AtomicBool>, Option<std::thread::JoinHandle<()>>) {
+    let stop = Arc::new(AtomicBool::new(false));
+    let handle = heartbeat_path.map(|hp| {
+        let stop2 = Arc::clone(&stop);
+        std::thread::spawn(move || {
+            let write_once = |last: &mut (u64, u64)| {
+                let cur = (move_counter.load(Ordering::Relaxed), games_counter.load(Ordering::Relaxed));
+                if cur != *last {
+                    let body = format!("{{\"moves_done\":{},\"games_done\":{}}}", cur.0, cur.1);
+                    let _ = std::fs::write(&hp, body);
+                    *last = cur;
+                }
+            };
+            let mut last = (u64::MAX, u64::MAX); // erzwingt einen initialen Schreibvorgang
+            loop {
+                write_once(&mut last);
+                if stop2.load(Ordering::Relaxed) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
+            // Letzter Schreibvorgang nach dem Stop-Signal -- der finale Stand
+            // (z.B. "alle Spiele fertig") muss sichtbar sein, auch wenn der
+            // Supervisor genau in diesem Moment liest.
+            write_once(&mut last);
+        })
+    });
+    (stop, handle)
+}
+
+/// Signalisiert dem Heartbeat-Thread das Ende des Batches und wartet auf
+/// dessen (kurzen) letzten Schreibvorgang -- verhindert einen verwaisten
+/// Thread, wenn derselbe Prozess mehrere Self-Play-Aufrufe nacheinander macht.
+fn stop_heartbeat_reporter(stop: Arc<AtomicBool>, handle: Option<std::thread::JoinHandle<()>>) {
+    stop.store(true, Ordering::Relaxed);
+    if let Some(h) = handle {
+        let _ = h.join();
+    }
 }
 
 // ── agent_env-Action-Serializer ──────────────────────────────────────────────
@@ -850,6 +956,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     game_id: &str,
     rng: &mut R,
     net: Option<&Net>,
+    move_heartbeat: Option<&AtomicU64>,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
@@ -870,6 +977,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
         + if net.is_some() { crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS } else { 0 };
     loop {
         guard += 1;
+        if let Some(hb) = move_heartbeat {
+            hb.fetch_add(1, Ordering::Relaxed);
+        }
         if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
             break; // defensive Endlosschleifen-Sicherung
         }
@@ -952,6 +1062,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
 /// Spielt `n_games` Partien (rayon-parallel) und gibt ALLE Step-Records flach als
 /// JSON-Array-String zurück. Je Spiel ein deterministisch aus `seed` abgeleiteter
 /// RNG, zufälliger Startspieler und konfliktfreie Wertungsplatten.
+/// `progress_path`/`heartbeat_path` (Task #71, Einzelspiel-Flush + Heartbeat,
+/// siehe Modul-Kommentar dort): beide optional, `None` = Verhalten exakt wie
+/// vorher (kein Fortschritts-Tracking).
 pub fn run_self_play(
     n_games: usize,
     base_sims: u32,
@@ -959,14 +1072,30 @@ pub fn run_self_play(
     seed: u64,
     num_threads: usize,
     prefix: &str,
+    progress_path: Option<&str>,
+    heartbeat_path: Option<&str>,
 ) -> String {
+    let progress_file = open_progress_file(progress_path);
+    let move_counter = Arc::new(AtomicU64::new(0));
+    let games_counter = Arc::new(AtomicU64::new(0));
+    let (hb_stop, hb_handle) = start_heartbeat_reporter(
+        heartbeat_path.map(String::from),
+        Arc::clone(&move_counter),
+        Arc::clone(&games_counter),
+    );
+
     let play = |i: usize| -> Vec<Value> {
         let mut rng = StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None)
+        let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None, Some(&move_counter));
+        if !steps.is_empty() {
+            games_counter.fetch_add(1, Ordering::Relaxed);
+            append_game_progress(&progress_file, &steps);
+        }
+        steps
     };
 
     // num_threads == 0 → globaler rayon-Pool (alle Kerne); sonst dedizierter Pool.
@@ -978,6 +1107,7 @@ pub fn run_self_play(
             Err(_) => (0..n_games).map(play).collect(), // Fallback: seriell
         }
     };
+    stop_heartbeat_reporter(hb_stop, hb_handle);
 
     let flat: Vec<Value> = all.into_iter().flatten().collect();
     serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string())
@@ -989,6 +1119,8 @@ pub fn run_self_play(
 /// Rundenübergänge werden zusätzlich per Netz-Chance-Node-Sampling bewertet.
 /// Lädt das Netz EINMAL (wie `run_net_arena_match`), `Arc`-geteilt über alle
 /// Rayon-Threads.
+/// `progress_path`/`heartbeat_path`: siehe `run_self_play`-Dokumentation (Task #71).
+#[allow(clippy::too_many_arguments)]
 pub fn run_self_play_with_net_labels(
     model_path: &str,
     n_games: usize,
@@ -997,9 +1129,19 @@ pub fn run_self_play_with_net_labels(
     seed: u64,
     num_threads: usize,
     prefix: &str,
+    progress_path: Option<&str>,
+    heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
     let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
+    let progress_file = open_progress_file(progress_path);
+    let move_counter = Arc::new(AtomicU64::new(0));
+    let games_counter = Arc::new(AtomicU64::new(0));
+    let (hb_stop, hb_handle) = start_heartbeat_reporter(
+        heartbeat_path.map(String::from),
+        Arc::clone(&move_counter),
+        Arc::clone(&games_counter),
+    );
 
     let play = |i: usize| -> Vec<Value> {
         let mut rng = StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
@@ -1007,7 +1149,12 @@ pub fn run_self_play_with_net_labels(
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, Some(&net))
+        let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, Some(&net), Some(&move_counter));
+        if !steps.is_empty() {
+            games_counter.fetch_add(1, Ordering::Relaxed);
+            append_game_progress(&progress_file, &steps);
+        }
+        steps
     };
 
     let all: Vec<Vec<Value>> = if num_threads == 0 {
@@ -1018,6 +1165,7 @@ pub fn run_self_play_with_net_labels(
             Err(_) => (0..n_games).map(play).collect(),
         }
     };
+    stop_heartbeat_reporter(hb_stop, hb_handle);
 
     let flat: Vec<Value> = all.into_iter().flatten().collect();
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
@@ -1579,6 +1727,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     rng: &mut R,
     add_root_noise: bool,
     deterministic: bool,
+    move_heartbeat: Option<&AtomicU64>,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
@@ -1604,6 +1753,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     let timeout_secs = net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS;
     loop {
         guard += 1;
+        if let Some(hb) = move_heartbeat {
+            hb.fetch_add(1, Ordering::Relaxed);
+        }
         // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
         // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
         // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
@@ -1775,7 +1927,9 @@ where
 
 /// Netzgeführtes Self-Play: `n_games` Partien (rayon-parallel), Netz vs. sich
 /// selbst, rohe Visit-Targets. Gibt alle Step-Records flach als JSON-Array
-/// zurück.
+/// zurück. `progress_path`/`heartbeat_path`: siehe `run_self_play`-
+/// Dokumentation (Task #71) -- dies ist der Pfad des v12-Batches
+/// (`--mode network`), daher hier die primäre Zielfunktion für den Fix.
 #[allow(clippy::too_many_arguments)]
 pub fn run_net_self_play(
     model_path: &str,
@@ -1787,8 +1941,18 @@ pub fn run_net_self_play(
     prefix: &str,
     add_root_noise: bool,
     deterministic: bool,
+    progress_path: Option<&str>,
+    heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+    let progress_file = open_progress_file(progress_path);
+    let move_counter = Arc::new(AtomicU64::new(0));
+    let games_counter = Arc::new(AtomicU64::new(0));
+    let (hb_stop, hb_handle) = start_heartbeat_reporter(
+        heartbeat_path.map(String::from),
+        Arc::clone(&move_counter),
+        Arc::clone(&games_counter),
+    );
 
     // Perspektiven-/OOD-Audit (siehe net_mcts.rs-Modulkommentar zu
     // `PERSPECTIVE_DIVERGENCE_STATS`) -- vor diesem Self-Play-Lauf
@@ -1812,10 +1976,14 @@ pub fn run_net_self_play(
         let gid = format!("{prefix}_g{}", i + 1);
         let net = std::sync::Arc::clone(&net);
         let gid_thread = gid.clone();
+        let move_counter_thread = Arc::clone(&move_counter);
         let result = run_with_watchdog(watchdog_deadline, move || {
-            play_net_self_play_game(&net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise, deterministic)
+            play_net_self_play_game(
+                &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise, deterministic,
+                Some(&move_counter_thread),
+            )
         });
-        match result {
+        let steps = match result {
             Some(v) => v,
             None => {
                 eprintln!(
@@ -1824,7 +1992,16 @@ pub fn run_net_self_play(
                 );
                 Vec::new()
             }
+        };
+        // Nur GENUTZTE Spiele (nicht der leere Watchdog-Abbruch-Fall) zaehlen
+        // fuers Fortschritts-Tracking -- ein leeres Ergebnis traegt nichts
+        // zur Ziel-Spielezahl bei (`_group_by_game` in self_play.py ueberspringt
+        // es ohnehin, siehe dortige Gruppierung anhand von `game_id`-Steps).
+        if !steps.is_empty() {
+            games_counter.fetch_add(1, Ordering::Relaxed);
+            append_game_progress(&progress_file, &steps);
         }
+        steps
     };
 
     let all: Vec<Vec<Value>> = if num_threads == 0 {
@@ -1835,6 +2012,7 @@ pub fn run_net_self_play(
             Err(_) => (0..n_games).map(play).collect(),
         }
     };
+    stop_heartbeat_reporter(hb_stop, hb_handle);
     let mut flat: Vec<Value> = all.into_iter().flatten().collect();
     // Audit-Objekt anhaengen -- gleiches Muster wie `stage3_diagnostics`
     // weiter unten (arena.py/self_play.py lesen es separat aus, kein
@@ -3230,6 +3408,7 @@ mod tests {
             "test_g1",
             &mut rng,
             None,
+            None,
         );
         assert!(!recs.is_empty(), "Spiel muss Records erzeugen");
         for r in &recs {
@@ -3275,9 +3454,52 @@ mod tests {
 
     #[test]
     fn run_self_play_returns_valid_json() {
-        let out = run_self_play(2, 30, SELF_PLAY_C, 7, 2, "vtest");
+        let out = run_self_play(2, 30, SELF_PLAY_C, 7, 2, "vtest", None, None);
         let parsed: Value = serde_json::from_str(&out).unwrap();
         assert!(parsed.as_array().unwrap().len() > 0);
+    }
+
+    /// Task #71, Kern-Regressionsschutz Einzelspiel-Flush + Heartbeat: mit
+    /// gesetzten `progress_path`/`heartbeat_path` muss (a) die JSONL-Datei
+    /// GENAU eine Zeile je Spiel enthalten (nicht eine Zeile je Chunk), jede
+    /// Zeile ein valides JSON-Array mit `game_id`, und (b) die Heartbeat-Datei
+    /// existieren und einen positiven `moves_done`-Zähler enthalten.
+    #[test]
+    fn run_self_play_writes_per_game_progress_and_heartbeat() {
+        let dir = std::env::temp_dir().join(format!("mosaic_progress_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("Temp-Verzeichnis anlegen");
+        let progress_path = dir.join("progress.jsonl");
+        let heartbeat_path = dir.join("heartbeat.json");
+        let _ = std::fs::remove_file(&progress_path);
+        let _ = std::fs::remove_file(&heartbeat_path);
+
+        let out = run_self_play(
+            3, 30, SELF_PLAY_C, 123, 2, "vtest_progress",
+            Some(progress_path.to_str().unwrap()),
+            Some(heartbeat_path.to_str().unwrap()),
+        );
+        let parsed: Value = serde_json::from_str(&out).unwrap();
+        assert!(parsed.as_array().unwrap().len() > 0);
+
+        let jsonl = std::fs::read_to_string(&progress_path).expect("Fortschrittsdatei sollte existieren");
+        let lines: Vec<&str> = jsonl.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(lines.len(), 3, "erwartet genau eine JSONL-Zeile je Spiel (3 Spiele)");
+        for line in &lines {
+            let game: Value = serde_json::from_str(line).expect("jede Zeile muss valides JSON sein");
+            let steps = game.as_array().expect("jede Zeile ist ein Array von Step-Records");
+            assert!(!steps.is_empty(), "ein Spiel-Eintrag sollte nicht leer sein");
+            assert!(steps[0].get("game_id").is_some(), "Step-Records sollten game_id tragen");
+        }
+
+        let hb = std::fs::read_to_string(&heartbeat_path).expect("Heartbeat-Datei sollte existieren");
+        let hb_json: Value = serde_json::from_str(&hb).expect("Heartbeat-Datei muss valides JSON sein");
+        assert!(
+            hb_json["moves_done"].as_u64().unwrap_or(0) > 0,
+            "Heartbeat sollte einen positiven Zug-Zaehler zeigen: {hb_json}"
+        );
+        assert_eq!(hb_json["games_done"].as_u64(), Some(3));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -3311,6 +3533,7 @@ mod tests {
                 (seed % 2) as usize,
                 "seedcheck",
                 &mut rng,
+                None,
                 None,
             );
             assert!(

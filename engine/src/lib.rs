@@ -50,8 +50,13 @@ fn ping(x: i64) -> i64 {
 /// Spielt `n_games` Partien rayon-parallel (GIL freigegeben) und liefert ALLE
 /// Step-Records flach als JSON-Array-String zurück (Python: `json.loads`).
 /// `num_threads=0` nutzt alle Kerne. Jeder Step folgt dem `self_play.py`-Format.
+/// `progress_path`/`heartbeat_path` (Task #71, optional): siehe
+/// `self_play::run_self_play`-Dokumentation -- Einzelspiel-Flush (JSONL, eine
+/// Zeile je fertigem Spiel) + periodischer Zug-/Spiel-Herzschlag für den
+/// Chunk-Supervisor in `self_play.py`.
 #[pyfunction]
-#[pyo3(signature = (n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust".to_string()))]
+#[pyo3(signature = (n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust".to_string(), progress_path=None, heartbeat_path=None))]
+#[allow(clippy::too_many_arguments)]
 fn self_play_games(
     py: Python<'_>,
     n_games: usize,
@@ -60,10 +65,15 @@ fn self_play_games(
     seed: Option<u64>,
     num_threads: usize,
     prefix: String,
+    progress_path: Option<String>,
+    heartbeat_path: Option<String>,
 ) -> String {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
-        crate::self_play::run_self_play(n_games, base_sims, c, seed, num_threads, &prefix)
+        crate::self_play::run_self_play(
+            n_games, base_sims, c, seed, num_threads, &prefix,
+            progress_path.as_deref(), heartbeat_path.as_deref(),
+        )
     })
 }
 
@@ -73,9 +83,10 @@ fn self_play_games(
 /// nur die vier Rundenübergänge werden zusätzlich per Netz-Chance-Node-
 /// Sampling (`round_transition.rs`/`round_transition_deep.rs`) bewertet --
 /// lässt den Value-Head vom rauschärmeren Ziel profitieren, ohne dass das
-/// Netz je eine Spielentscheidung trifft.
+/// Netz je eine Spielentscheidung trifft. `progress_path`/`heartbeat_path`:
+/// siehe `self_play_games` (Task #71).
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string()))]
+#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), progress_path=None, heartbeat_path=None))]
 #[allow(clippy::too_many_arguments)]
 fn self_play_games_with_net_labels(
     py: Python<'_>,
@@ -86,11 +97,14 @@ fn self_play_games_with_net_labels(
     seed: Option<u64>,
     num_threads: usize,
     prefix: String,
+    progress_path: Option<String>,
+    heartbeat_path: Option<String>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_self_play_with_net_labels(
             &model_path, n_games, base_sims, c, seed, num_threads, &prefix,
+            progress_path.as_deref(), heartbeat_path.as_deref(),
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -241,9 +255,11 @@ fn net_vs_net_arena_match(
 
 /// Netzgeführtes Self-Play (AlphaZero-Loop, Stufe 1: DFS-Blatt, saubere
 /// Visit-Targets). Gibt alle Step-Records als JSON-Array zurück (Format wie
-/// self_play_games). `num_threads=0` = alle Kerne.
+/// self_play_games). `num_threads=0` = alle Kerne. `progress_path`/
+/// `heartbeat_path`: siehe `self_play_games` (Task #71) -- dies ist der Pfad
+/// des `--mode network`-v12-Batches, daher die primäre Zielfunktion.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, progress_path=None, heartbeat_path=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -256,11 +272,14 @@ fn net_self_play_games(
     prefix: String,
     add_root_noise: bool,
     deterministic: bool,
+    progress_path: Option<String>,
+    heartbeat_path: Option<String>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_self_play(
             &model_path, n_games, base_sims, c_puct, seed, num_threads, &prefix, add_root_noise, deterministic,
+            progress_path.as_deref(), heartbeat_path.as_deref(),
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
