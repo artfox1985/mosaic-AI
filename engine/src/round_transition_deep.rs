@@ -177,12 +177,13 @@ pub const BOOTSTRAP_HORIZON_ROUNDS: u32 = 2;
 /// Kalibrierung beschreibt ("scores/winner sind dann kein echtes
 /// Endergebnis"), jetzt durch dieses Moduls zusätzliche synchrone
 /// Sampling-Zeit reproduziert.
-pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 12 + 75 + 75 + 45; // Runde4+3+2+1, Worst-Case-Summe (Task #71 neukalibriert)
+pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 60 + 75 + 75 + 45; // Runde4+3+2+1, Worst-Case-Summe (Runde-4-Anteil mit round5-Knoten-primär-Umstellung nachgezogen, siehe TIME_BUDGET_TRAIN_ROUND4)
 
 /// Suchtiefe/-budget der Zwischenrunden-Zugwahl (`choose_drafting_action_pruned`)
-/// je Einzelentscheidung -- bewusst deutlich billiger als `round5::TIME_BUDGET`
-/// (150ms) für NICHT-rundenendende Kandidaten (Fortschritts-Heuristik-Suche,
-/// kein Vollsolve).
+/// je Einzelentscheidung -- bewusst deutlich billiger als ein voller
+/// Runde-5-Solve (`round5::NODE_BUDGET`=200 Knoten mit teurem Tiling-Solver
+/// je Knoten) für NICHT-rundenendende Kandidaten
+/// (Fortschritts-Heuristik-Suche, kein Vollsolve).
 ///
 /// Task #71, Determinismus-Fix: `POLICY_NODE_BUDGET` ist jetzt der PRIMÄRE,
 /// deterministische Cutoff (vorher 20.000 -- so großzügig, dass laut

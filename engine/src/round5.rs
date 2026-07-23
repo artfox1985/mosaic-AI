@@ -31,25 +31,40 @@ use crate::scoring::calculate_end_scoring;
 use crate::state::{GameState, Phase};
 use crate::tiling_solver::solve_round_final_score;
 
-/// Primäres Zeitbudget je Entscheidung -- robuster als ein reines
-/// Knotenbudget, weil die Kosten pro Knoten (exakter Tiling-DFS-Solver
-/// `solve_round_final_score` + `calculate_end_scoring`) je nach
-/// Brettkomplexität stark schwanken: ein leeres Testbrett (siehe
-/// `round5_state` in den Tests unten) ist deutlich billiger zu lösen als
-/// ein nach 4 echten Runden weit entwickeltes Brett -- ein Knotenbudget
-/// allein kalibriert auf den billigen Fall lief in echten Self-Play-Spielen
-/// (`no_tiling_deadlock_across_seeds`, 12 volle Partien) trotzdem >60s pro
-/// Testfall. 150ms/Entscheidung x ~15-20 Halbzüge/Runde bleibt auch bei
-/// vielen tausend Self-Play-Partien tragbar. Für einzelne Mensch-vs-KI-
-/// Partien (Server) kann dieser Wert bei Bedarf erhöht werden (aktuell
-/// keine Laufzeitparametrisierung wie bei der Stufe-3-
-/// `alphabeta_node_budget`, siehe lib.rs -- bewusst nicht threading, um den
-/// Änderungsradius klein zu halten).
-pub const TIME_BUDGET: Duration = Duration::from_millis(150);
-/// Zusätzlicher Deckel für den (unwahrscheinlichen) Fall extrem billiger
-/// Knoten, die das Zeitbudget kaum ausschöpfen würden -- verhindert
-/// unbegrenztes Baumwachstum bei pathologisch günstiger Bewertung.
-pub const NODE_BUDGET: u64 = 200_000;
+/// PRIMÄRER, deterministischer Cutoff je Entscheidung (analog Task #71 in
+/// round_transition/round_transition_deep -- dieselbe Umstellung, hier für
+/// die Runde-5-Alpha-Beta). GESCHICHTE: bis zur Determinismus-Untersuchung
+/// (2026-07-22, STATUS.md "Prozessgrenzen-Nichtdeterminismus geklärt") war
+/// das alte `TIME_BUDGET` (150ms, an JEDEM Knoten geprüft) der de-facto-
+/// Cutoff und das alte `NODE_BUDGET` (200.000) unerreichbar (200k Knoten
+/// brauchen 45-393s) -- Folge: `exact_round5_outcome` streute in-Prozess
+/// bis 0,065 Gewinnwahrscheinlichkeit zwischen direkt aufeinanderfolgenden
+/// Aufrufen, das Runde-4→5-Label und jede Runde-5-Bootstrap-Kette waren
+/// lastabhängig verrauscht.
+///
+/// Kalibrierung (2026-07-23, freie lokale Maschine, Release-Build,
+/// `round5_node_calibration_probe` unten: 8 realistische Runde-5-Partien
+/// via `drive_to_round_start(seed, 5)`, je Entscheidung ein Negamax mit
+/// unbegrenztem Knotenbudget und 150ms-Deadline): deadline-gebundene
+/// Entscheidungen (n=92) erreichten min 34, p25 88, Median 155, p75 203,
+/// p90 292, max 473 Knoten; vor der Deadline vollständig gelöste Teilbäume
+/// (n=24, Rundenende) blieben <=144 Knoten. 200 ~ p75 hält die typische
+/// Suchtiefe auf dem Niveau des alten 150ms-Cutoffs (Arena-Gegenprobe:
+/// siehe STATUS.md) und deckt alle beobachteten natürlich terminierenden
+/// Teilbäume ab. Kosten pro Knoten schwanken stellungsabhängig um >10x
+/// (0,3-4,4ms) -- deshalb ist das Budget bewusst klein und auf REALISTISCHE
+/// Stellungen kalibriert, nicht auf das billige leere Testbrett (siehe
+/// Lehre im alten `TIME_BUDGET`-Kommentar: ein auf dem billigen Fall
+/// kalibriertes 200k-Budget lief >60s pro Testfall).
+pub const NODE_BUDGET: u64 = 200;
+/// NUR NOCH Not-Deckel gegen pathologisch teure Stellungen (Task-#71-
+/// Muster), NICHT mehr der primäre Cutoff -- greift er, ist das Ergebnis
+/// wieder lastabhängig, darum großzügig: Worst-Case der Kalibrierung oben
+/// (200 Knoten x 4,4ms/Knoten ~ 0,9s) x ~5. Unter normaler Last entscheidet
+/// allein `NODE_BUDGET`; 5s x ~15-20 Halbzüge/Runde bleibt als reiner
+/// Ausfallschutz auch im Self-Play tragbar (typische Entscheidung:
+/// ~60-900ms, siehe Kalibrierung).
+pub const TIME_BUDGET: Duration = Duration::from_secs(5);
 /// Größer als die längstmögliche Runde-5-Drafting-Phase -- der eigentliche
 /// Deckel ist `NODE_BUDGET`.
 pub const MAX_DEPTH: u32 = 60;
@@ -165,10 +180,12 @@ fn negamax(
 /// die GESAMTE restliche Runde 5 in einem Rutsch (nicht nur den nächsten
 /// Zug) -- `MAX_DEPTH`/`NODE_BUDGET`/`TIME_BUDGET` sind dieselben, mit denen
 /// `choose_action` ohnehin bei JEDER echten Runde-5-Entscheidung im
-/// Self-Play arbeitet (siehe dortiger Kommentar: "150ms/Entscheidung ...
-/// bleibt auch bei vielen tausend Self-Play-Partien tragbar"), ein Aufruf
+/// Self-Play arbeitet (siehe `NODE_BUDGET`-Kommentar zur Kalibrierung auf
+/// Self-Play-Tragbarkeit), ein Aufruf
 /// vom Runde-5-START ist also strukturell dieselbe Art Suche, nur an einem
-/// frühen Punkt im Baum. `perspective=0` ist eine willkürliche, aber
+/// frühen Punkt im Baum (Budget-Semantik seit der Knoten-primär-Umstellung:
+/// `NODE_BUDGET`-Knoten je Aufruf, `TIME_BUDGET` nur Not-Deckel -- siehe
+/// Konstanten-Kommentare oben). `perspective=0` ist eine willkürliche, aber
 /// widerspruchsfreie Referenz -- `leaf_value` ist antisymmetrisch
 /// (`leaf_value(s,p) = -leaf_value(s,1-p)`), das Ergebnis gilt unabhängig
 /// davon, wer gerade am Zug ist. Rückgabe im selben Format wie
@@ -178,10 +195,17 @@ fn negamax(
 /// Downstream-Verbraucher (self_play.rs-Stempelung, neural_net.py-Rescaling)
 /// unverändert bleiben können.
 pub(crate) fn exact_round5_outcome(state: &GameState) -> [f64; 2] {
-    let deadline = Instant::now() + TIME_BUDGET;
-    let mut node_count: u64 = 0;
-    let diff = negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, NODE_BUDGET, deadline);
+    let diff = outcome_diff(state, Instant::now() + TIME_BUDGET);
     [crate::mcts::normalize_score(diff), crate::mcts::normalize_score(-diff)]
+}
+
+/// Kern von [`exact_round5_outcome`] mit injizierbarer Not-Deckel-Deadline --
+/// ausgelagert, damit der Determinismus-Test unten (Task-#71-Muster) belegen
+/// kann, dass das Ergebnis NICHT von der Deadline abhängt, solange sie nicht
+/// greift (`NODE_BUDGET` ist der bindende Cutoff).
+fn outcome_diff(state: &GameState, deadline: Instant) -> f64 {
+    let mut node_count: u64 = 0;
+    negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, NODE_BUDGET, deadline)
 }
 
 /// Wählt EINE Drafting-Aktion für `state` per exakter Alpha-Beta-Suche.
@@ -363,13 +387,14 @@ mod tests {
         assert!(naive_best.is_finite());
     }
 
-    /// Performance-Regressionswächter: `choose_action` darf `TIME_BUDGET`
-    /// (das eigentliche Limit je Entscheidung) nur um eine großzügige
-    /// Toleranz für den letzten, schon laufenden Negamax-Aufruf
-    /// überschreiten -- ein früherer, rein knotenbudget-basierter Versuch
-    /// ließ komplette Self-Play-Spiele (mehrere Runde-5-Halbzüge) über 60s
-    /// pro Testfall hängen, weil das Knotenbudget auf einem leeren
-    /// Testbrett kalibriert war, echte Bretter aber pro Knoten teurer sind.
+    /// Performance-Regressionswächter: `choose_action` darf den Not-Deckel
+    /// `TIME_BUDGET` nur um eine großzügige Toleranz für den letzten, schon
+    /// laufenden Negamax-Aufruf überschreiten. Historische Lehre (alter,
+    /// zeit-primärer Stand): ein auf dem leeren Testbrett kalibriertes
+    /// 200k-Knotenbudget ließ komplette Self-Play-Spiele >60s pro Testfall
+    /// hängen -- deshalb ist `NODE_BUDGET` heute auf REALISTISCHE
+    /// Stellungen kalibriert (siehe Konstanten-Kommentar), und dieser Test
+    /// bleibt als Wächter gegen eine erneute Fehlkalibrierung bestehen.
     #[test]
     fn choose_action_stays_within_time_budget() {
         let s = round5_state(9);
@@ -381,6 +406,48 @@ mod tests {
             "choose_action zu langsam: {:?} (Budget: {:?})",
             elapsed,
             TIME_BUDGET
+        );
+    }
+
+    /// Determinismus-Kern (Ziel der Knoten-primär-Umstellung): direkt
+    /// aufeinanderfolgende Aufrufe auf DERSELBEN realistischen Stellung
+    /// müssen bit-identisch sein -- exakt das Szenario, in dem der alte
+    /// zeit-primäre Cutoff in-Prozess bis zu 0,065 Gewinnwahrscheinlichkeit
+    /// streute (STATUS.md 2026-07-22). Realistische Stellung statt
+    /// `round5_state`-Leerbrett, weil das Leerbrett vor jedem Budget
+    /// natürlich terminieren kann und damit trivial deterministisch wäre.
+    #[test]
+    fn exact_round5_outcome_is_bit_identical_across_repeats() {
+        use crate::round_transition::drive_to_round_start;
+        let s = drive_to_round_start(51, 5);
+        let a = exact_round5_outcome(&s);
+        let b = exact_round5_outcome(&s);
+        let c = exact_round5_outcome(&s);
+        assert_eq!(a[0].to_bits(), b[0].to_bits(), "Aufruf 1 vs 2: {} vs {}", a[0], b[0]);
+        assert_eq!(a[1].to_bits(), b[1].to_bits(), "Aufruf 1 vs 2: {} vs {}", a[1], b[1]);
+        assert_eq!(a[0].to_bits(), c[0].to_bits(), "Aufruf 1 vs 3: {} vs {}", a[0], c[0]);
+        assert_eq!(a[1].to_bits(), c[1].to_bits(), "Aufruf 1 vs 3: {} vs {}", a[1], c[1]);
+        // Live-Zugwahl haengt am selben Suchkern -- auch sie muss stabil sein.
+        let m1 = choose_action(&s).expect("Aktion");
+        let m2 = choose_action(&s).expect("Aktion");
+        assert_eq!(m1, m2, "choose_action nicht reproduzierbar");
+    }
+
+    /// Task-#71-Kernmuster (vgl. `round_transition_deep.rs`,
+    /// `pruned_action_is_deterministic_under_time_pressure`): das Ergebnis
+    /// darf NICHT vom Zeit-Not-Deckel abhängen -- `NODE_BUDGET` muss der
+    /// bindende Cutoff sein. Eine 10x aufgeblähte Deadline muss dasselbe
+    /// Bitmuster liefern.
+    #[test]
+    fn outcome_is_independent_of_time_budget() {
+        use crate::round_transition::drive_to_round_start;
+        let s = drive_to_round_start(52, 5);
+        let normal = outcome_diff(&s, Instant::now() + TIME_BUDGET);
+        let inflated = outcome_diff(&s, Instant::now() + TIME_BUDGET * 10);
+        assert_eq!(
+            normal.to_bits(),
+            inflated.to_bits(),
+            "Ergebnis haengt noch vom Zeitbudget ab -- NODE_BUDGET ist nicht der bindende Cutoff: {normal} vs {inflated}"
         );
     }
 
@@ -407,6 +474,78 @@ mod tests {
         let [p0, p1] = exact_round5_outcome(&s);
         assert!(p0 > p1, "fuehrender Spieler sollte hoeheren Wert bekommen: p0={p0} p1={p1}");
         assert!(p0 > 0.5, "p0 sollte deutlich ueber 0.5 liegen: {p0}");
+    }
+
+    /// Kalibrierungs-Probe (manuell, nicht Teil der Suite):
+    /// `cargo test --release round5_node_calibration -- --ignored --nocapture`
+    /// Misst je Runde-5-Entscheidung auf REALISTISCHEN Stellungen
+    /// (`drive_to_round_start(seed, 5)`, siehe round_transition.rs-Lehre:
+    /// kein synthetisches Leerbrett), wie viele Negamax-Knoten in 150ms
+    /// (dem alten `TIME_BUDGET`) erreichbar sind -- Grundlage für die Wahl
+    /// von `NODE_BUDGET` als primärem, deterministischem Cutoff.
+    /// Auf möglichst freier Maschine laufen lassen.
+    #[test]
+    #[ignore]
+    fn round5_node_calibration_probe() {
+        use crate::round_transition::drive_to_round_start;
+        let probe_budget = Duration::from_millis(150);
+        let mut bound: Vec<u64> = Vec::new(); // Deadline hat gegriffen
+        let mut complete: Vec<u64> = Vec::new(); // Teilbaum fertig vor Deadline
+        for seed in [101u64, 202, 303, 404, 505, 606, 707, 808] {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut step = 0u32;
+            while state.phase == Phase::Drafting {
+                let children = ordered_children(&state, state.current_player);
+                if children.is_empty() {
+                    break;
+                }
+                if children.len() > 1 {
+                    let deadline = Instant::now() + probe_budget;
+                    let t0 = Instant::now();
+                    let mut nodes: u64 = 0;
+                    let _ = negamax(
+                        &state,
+                        MAX_DEPTH.saturating_sub(1),
+                        f64::NEG_INFINITY,
+                        f64::INFINITY,
+                        state.current_player,
+                        &mut nodes,
+                        u64::MAX,
+                        deadline,
+                    );
+                    let elapsed = t0.elapsed();
+                    let deadline_hit = elapsed >= probe_budget;
+                    eprintln!(
+                        "seed={seed} step={step} kandidaten={} nodes={nodes} elapsed={elapsed:?} deadline_hit={deadline_hit}",
+                        children.len()
+                    );
+                    if deadline_hit {
+                        bound.push(nodes);
+                    } else {
+                        complete.push(nodes);
+                    }
+                }
+                let chosen = choose_action(&state).expect("Aktion");
+                let mut g = Game { state };
+                g.apply_drafting(&chosen).expect("legal");
+                state = g.state;
+                step += 1;
+            }
+        }
+        let stats = |label: &str, v: &mut Vec<u64>| {
+            if v.is_empty() {
+                eprintln!("{label}: keine Messpunkte");
+                return;
+            }
+            v.sort_unstable();
+            let p = |q: f64| v[((v.len() - 1) as f64 * q) as usize];
+            eprintln!(
+                "{label}: n={} min={} p25={} median={} p75={} p90={} max={}",
+                v.len(), v[0], p(0.25), p(0.5), p(0.75), p(0.9), v[v.len() - 1]
+            );
+        };
+        stats("DEADLINE-GEBUNDEN (relevant fuer NODE_BUDGET)", &mut bound);
+        stats("VOR DEADLINE FERTIG (natuerlich beschraenkt)", &mut complete);
     }
 
     #[test]
