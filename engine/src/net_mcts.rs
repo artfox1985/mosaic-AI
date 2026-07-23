@@ -121,21 +121,27 @@ const FLOOR_SHAPING_SCALE: f64 = 50.0;
 /// beste Netz-Performance der gesamten Session. Bleibt vorerst aktiv.
 pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
 
-/// Task #78 (v12c, Phase A -- NUR Code, KEIN Nachweis-Lauf): rundenabhängige
-/// Value-Shrinkage Richtung 0.5. Motivation: der Value-Head ist in frühen
-/// Runden nachweislich kaum besser als der Mittelwert (Runde-1-Noise-Floor-
-/// Deckel ≈0.007, siehe `evaluations/STATUS.md` "Noise-Floor-Test"), wird an
-/// JEDEM PUCT-Blattknoten aber gleich stark vertraut wie in Runde 5 (Deckel
-/// ≈0.44, klar informativ). Shrinkage dämpft die Blattwert-AUSSCHLÄGE (nicht
-/// den Mittelwert) proportional zur erwarteten Zuverlässigkeit je Runde,
-/// analog zu einem James-Stein-artigen Schrumpfen des Schätzers Richtung des
+/// Task #78 (v12c): rundenabhängige Value-Shrinkage Richtung 0.5. Motivation:
+/// der Value-Head ist in frühen Runden nachweislich kaum besser als der
+/// Mittelwert (Runde-1-Noise-Floor-Deckel ≈0.007, siehe
+/// `evaluations/STATUS.md` "Noise-Floor-Test"), wird an JEDEM PUCT-
+/// Blattknoten aber gleich stark vertraut wie in Runde 5 (Deckel ≈0.44, klar
+/// informativ). Shrinkage dämpft die Blattwert-AUSSCHLÄGE (nicht den
+/// Mittelwert) proportional zur erwarteten Zuverlässigkeit je Runde, analog
+/// zu einem James-Stein-artigen Schrumpfen des Schätzers Richtung des
 /// uninformativen Priors 0.5.
 ///
-/// Standard AUS -- Aktivierung erst nach einem gepaarten Arena-Nachweis in
-/// Phase B (Nachweis-Regel, siehe MEMORY.md/STATUS.md-Präzedenzfälle: reine
-/// Performance-Hebel ohne Korrektheits-Charakter brauchen einen Beleg, bevor
-/// sie standardmäßig aktiv geschaltet werden, siehe z.B. das ISMCTS-
-/// Mehrfach-Determinisierungs-Verwerfungsmuster).
+/// GEPAARTER A/B-NACHWEIS GEFAHREN (2026-07-23, `tools/paired_arena_shrink_ab.py`,
+/// v12b_lr_best@400 vs. v12_best@400, 100 seed-gepaarte Spiele je Arm, gleiche
+/// Seeds in beiden Armen): Arm OFF 61:39, Arm ON 50:50 -- ON ist NICHT nur
+/// unsignifikant, sondern tendenziell sogar schwächer (Diskordanz b=15 vs.
+/// c=26, exakter McNemar p=0.117). Evidenzregel (siehe MEMORY.md/STATUS.md-
+/// Präzedenzfälle: reine Performance-Hebel ohne Korrektheits-Charakter
+/// brauchen einen signifikanten Beleg, bevor sie standardmäßig aktiv
+/// geschaltet werden, siehe z.B. das ISMCTS-Mehrfach-Determinisierungs-
+/// Verwerfungsmuster) verlangt p<0.05 UND Vorteil für ON -- keins von beiden
+/// erfüllt. Bleibt daher AUS. Details: `evaluations/STATUS.md` Abschnitt
+/// "v12c: Value-Shrinkage-Rekalibrierung + A/B (2026-07-23)".
 pub const VALUE_SHRINK_ENABLED: bool = false;
 
 /// Rekalibrierung (Task #78, 2026-07-23) `w_r` je Runde (Index 0 = Runde 1
@@ -2876,7 +2882,11 @@ mod tests {
         let v = [0.9, 0.05];
         if VALUE_SHRINK_ENABLED {
             assert_ne!(apply_value_shrink(v, 1), v, "bei AN muss Runde 1 sichtbar geschrumpft werden");
-            assert_eq!(apply_value_shrink(v, 5), v, "Runde 5 bleibt Identitaet (w_5=1.0)");
+            let r5 = apply_value_shrink(v, 5);
+            assert!(
+                (r5[0] - v[0]).abs() < 1e-9 && (r5[1] - v[1]).abs() < 1e-9,
+                "Runde 5 bleibt (bis auf Gleitkomma-Rauschen) Identitaet (w_5=1.0): {r5:?} vs {v:?}"
+            );
         } else {
             assert_eq!(apply_value_shrink(v, 1), v);
             assert_eq!(apply_value_shrink(v, 5), v);
