@@ -1,0 +1,82 @@
+{
+  "name_a": "v12d_pw05_best",
+  "name_b": "v12b_lr_best",
+  "model_a": "models/alphazero_v12d_pw05_best.onnx",
+  "model_b": "models/alphazero_v12b_lr_best.onnx",
+  "sims_a": 400,
+  "sims_b": 400,
+  "c_puct_a": 1.5,
+  "c_puct_b": 1.5,
+  "done_pairs": 50,
+  "n_games_total": 100,
+  "a_wins_total": 42,
+  "b_wins_total": 58,
+  "pair_a_sweeps_b": 7,
+  "pair_b_sweeps_c": 15,
+  "pair_splits": 28,
+  "sprt_verdict": "H0",
+  "sprt_llr": -3.5135743078085495,
+  "sprt_bounds": [
+    -2.9444389791664403,
+    2.9444389791664403
+  ],
+  "sprt_p0": 0.5,
+  "sprt_p1": 0.65,
+  "sprt_alpha": 0.05,
+  "sprt_beta": 0.05,
+  "report_mcnemar_p": 0.13380050659179688,
+  "mean_pair_diff": -0.32,
+  "ci95": [
+    -0.6804938834432561,
+    0.04049388344325616
+  ],
+  "base_seed": 330370838,
+  "blocks": [
+    {
+      "block": 1,
+      "seed": 330370838,
+      "n_pairs_block": 25,
+      "done_pairs": 25,
+      "a_wins_total": 21,
+      "b_wins_total": 29,
+      "pair_a_sweeps_b": 4,
+      "pair_b_sweeps_c": 8,
+      "pair_splits": 13,
+      "llr": -1.8039424936398953,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.3876953125,
+      "mean_pair_diff": -0.32,
+      "ci95": [
+        -0.8593859224463811,
+        0.21938592244638105
+      ],
+      "duration_s": 152.0073115825653
+    },
+    {
+      "block": 2,
+      "seed": 331370838,
+      "n_pairs_block": 25,
+      "done_pairs": 50,
+      "a_wins_total": 42,
+      "b_wins_total": 58,
+      "pair_a_sweeps_b": 7,
+      "pair_b_sweeps_c": 15,
+      "pair_splits": 28,
+      "llr": -3.5135743078085495,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.13380050659179688,
+      "mean_pair_diff": -0.32,
+      "ci95": [
+        -0.6804938834432561,
+        0.04049388344325616
+      ],
+      "duration_s": 162.28428864479065
+    }
+  ]
+}

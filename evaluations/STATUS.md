@@ -2124,6 +2124,124 @@ bereits so gehandhabt.
 sich höchstens die Engine-Konfiguration (hier: bleibt unverändert), nicht der
 Champion oder Self-Play-Generator.
 
+## v12d: VALUE_WEIGHT/POINTS_WEIGHT-Sweep (2026-07-23)
+
+**Ist-Zustand vor dem Sweep** (`config.py`): `VALUE_WEIGHT = 0.2`,
+`POINTS_WEIGHT = 0.5`. `train.py` verrechnet sie im Gesamt-Loss als
+`loss = p_loss + VALUE_WEIGHT*v_loss + POINTS_WEIGHT*points_loss` (Policy-CE +
+gewichteter Value-Aux-MSE + gewichteter Punktestand-Aux-MSE); dieselbe
+gewichtete Formel entscheidet auch die "bestes Modell"-Checkpoint-Auswahl
+(kombinierte Val-Metrik, nicht mehr nur Policy-Val-Loss allein, siehe Fund 8).
+Beide Gewichte wirken NUR im Loss/der Checkpoint-Auswahl, nicht in den
+Targets selbst -- der HDF5-Cache-Key hängt an `VALUE_SCHEMA_VERSION`
+(Zieldefinition), nicht an den Gewichten, war also für diesen Sweep korrekt
+wiederverwendbar (keine Neuberechnung nötig).
+
+**CLI-Ergänzung** (`train.py`, Commit `3049d25`): `--value-weight`/
+`--points-weight`, additiv analog zu `--lr` -- Default `None` lässt
+`VALUE_WEIGHT`/`POINTS_WEIGHT` aus `config.py` unverändert wirken
+(Bestandsverhalten), kein Antasten der Config-Datei zwischen Sweep-Läufen
+nötig.
+
+### Sweep (one-factor-at-a-time, 4 Läufe)
+
+Alle mit dem v12b_lr-Standardrezept: Warm-Start `alphazero_v10_best`,
+`--lr 0.00005 --lr-schedule cosine --epochs 100`, v10b-Korpus (200 Dateien,
+2000 Spiele, unverändert). Alle 4 Läufe stoppten per Val-Policy-Plateau nach
+Epoche 15, bestes Modell (kombinierte Val-Metrik) jeweils Epoche 4 --
+identisches Muster wie beim v12b_lr-Referenzlauf.
+
+| Lauf | Gewicht | Wert (Faktor) |
+|---|---|---|
+| v12d_vw2   | VALUE_WEIGHT  | 0.4  (2×) |
+| v12d_vw05  | VALUE_WEIGHT  | 0.1  (0.5×) |
+| v12d_pw2   | POINTS_WEIGHT | 1.0  (2×) |
+| v12d_pw05  | POINTS_WEIGHT | 0.25 (0.5×) |
+
+### Offline-Diagnose (`tools/offline_diagnose.py`, `evaluations/offline_diagnose_v12d_sweep.json`)
+
+| Metrik | v12b_lr (Ref.) | v12d_vw2 | v12d_vw05 | v12d_pw2 | v12d_pw05 |
+|---|---|---|---|---|---|
+| Policy Top-1 | 40.0% | 40.1% | 40.0% | 39.9% | **40.3%** |
+| Policy Top-3 | 68.7% | 68.6% | 68.8% | 68.7% | 68.7% |
+| Value R² gesamt | 0.2289 | 0.2254 | 0.2260 | 0.2119 | **0.2323** |
+| R² Runde 1 | 0.0368 | 0.0286 | 0.0361 | 0.0145 | **0.0434** |
+| R² Runde 2 | 0.1106 | 0.0970 | 0.1060 | 0.0769 | **0.1167** |
+| R² Runde 3 | 0.1717 | 0.1682 | 0.1705 | 0.1591 | **0.1719** |
+| R² Runde 4 | 0.2298 | 0.2253 | 0.2272 | 0.2201 | **0.2301** |
+| R² Runde 5 | 0.5145 | **0.5237** | 0.5093 | 0.5042 | 0.5186 |
+
+Kein sauberer mechanischer Trade-off wie erwartet (höheres VW zulasten der
+Policy, höheres PW zulasten des Value-Ziels o.ä.): `v12d_pw2` (PW verdoppelt)
+ist auf praktisch JEDER Metrik schlechter als die Referenz -- das
+Punktestand-Aux-Signal stärker zu gewichten schadet dem gemeinsamen Trunk,
+statt zu helfen. `v12d_vw2`/`v12d_vw05` sind gemischt/neutral (R5 bei vw2
+etwas besser, sonst eher leicht schlechter). Einzig `v12d_pw05` (PW halbiert)
+verbessert Policy Top-1 UND Value-R² in allen 5 Runden gegenüber der
+Referenz -- kein Metrik-Ausreißer, sondern durchgehend (schwach) besser.
+Einziger Kandidat, der die Bar "klar UND breit besser, nicht nur die
+mechanisch bevorzugte Metrik" erfüllt → einziger Gating-Kandidat.
+
+### Gating: v12d_pw05_best vs. v12b_lr_best
+
+Gepaartes SPRT (`tools/paired_gating.py`, beide @400 Sims, c_puct=1.5,
+H1 p=0.65, alpha=beta=0.05, Deckel 200 Paare).
+
+**Werkzeug-Fund unterwegs**: `paired_gating.py`s `DEFAULT_THREADS=0` läuft
+für `net_vs_net_arena_match` **einzeln-threaded** (Rust-Code in
+`self_play.rs::run_net_vs_net_arena`: `if num_threads <= 1 { sequenziell }`
+-- anders als der `num_threads=0`-"alle Kerne"-Kommentar bei den
+Self-Play-Funktionen in `lib.rs` vermuten lässt). Erster Gating-Versuch
+(Seed 637428818, Default-Threads) brauchte ~650s pro Block (25 Paare/50
+Spiele) und wurde nach 5 Blöcken (250 Spiele, ~54 Minuten) durch ein
+Laufzeitlimit des Hintergrund-Tasks abgebrochen, ohne Ergebnis-JSON (LLR-Pfad
+bereits rückläufig: +0.767 → +2.058 → +1.586 → −0.406 → −2.116). Neu
+gestartet mit `--threads 10` (von 12 Kernen) -- ca. 4× schneller
+(152-162s/Block).
+
+| Block | Paare kum. | Ergebnis kum. | LLR | Bericht-p |
+|---|---|---|---|---|
+| 1 | 25 | 21:29 (gegen pw05) | −1.804 | 0.3877 |
+| 2 | 50 | **42:58** (gegen pw05) | **−3.514** | 0.1338 |
+
+**SPRT-Entscheid nach Block 2 (50 Paare, 100 Spiele): H0 angenommen
+(LLR=−3.514 ≤ untere Schranke −2.944) -- kein Beleg, dass `v12d_pw05_best`
+besser ist; die Richtung zeigt sogar GEGEN pw05** (42:58, gepaarte Differenz
+−0.320, 95%-KI [−0.680, +0.040]). Ergebnis-JSON:
+`evaluations/paired_gating_result_v12d_pw05_best_vs_v12b_lr_best.json`.
+
+Auffällig: die beiden Gating-Versuche (verschiedene Basis-Seeds) zeigten
+gegenläufige Zwischentrends -- Versuch 1 lag bis Block 2 klar FÜR pw05
+(60:40, LLR=+2.058), Versuch 2 von Block 1 an GEGEN pw05. Das unterstreicht,
+wie verrauscht einzelne Zwischen-Blöcke sind und warum ausschließlich die
+SPRT-Stopp-Regel (nicht ein per Auge gelesener Zwischen-LLR-Wert) die
+Entscheidung tragen darf.
+
+### Entscheidung
+
+**Kein Champion-Wechsel.** `v12b_lr_best` bleibt Champion. `VALUE_WEIGHT`
+bleibt `0.2`, `POINTS_WEIGHT` bleibt `0.5` in `config.py` (Default,
+unverändert) -- keiner der vier Sweep-Punkte hat sich als echter Fortschritt
+bestätigt. **Kein Elo-Eintrag** (SPRT-Ergebnis H0, nicht ACCEPT_H1).
+
+**Lehre**: die Offline-Diagnose-Differenz zwischen `v12d_pw05_best` und der
+Referenz (Top-1 +0.3pp, R² +0.003 bis +0.007 über die Runden) lag
+größenordnungsmäßig in demselben Bereich wie die Differenz, die beim
+v12b_lr-Zyklus einen echten, arena-bestätigten Stärkegewinn anzeigte (dort
+u.a. R² Runde 1 SCHLECHTER, Runde 3 SCHLECHTER als die Vorgänger-Referenz,
+trotzdem arena-bestätigt überlegen) -- hier aber NICHT reproduzierbar, sogar
+mit leicht negativer Tendenz. Eine Offline-Diagnose aus einem EINZELNEN
+Trainingslauf (kein Seed-Ensemble, keine Wiederholung) bleibt ein
+unzuverlässiger alleiniger Prädiktor für echte Spielstärke -- das gepaarte
+Arena-Gating bleibt vor jedem Champion-Wechsel Pflicht, unabhängig davon wie
+eindeutig die Offline-Zahlen aussehen.
+
+**Werkzeug-Empfehlung**: künftige `paired_gating.py`-Läufe sollten
+`--threads` explizit setzen (hier 10 von 12 Kernen, ca. 4× Speedup
+gegenüber dem sequenziellen Default) -- sonst drohen Läufe mit vollem
+200-Paare-Deckel (~87 Minuten sequenziell) an Hintergrund-Task-Laufzeitlimits
+zu scheitern, wie im ersten Versuch dieses Zyklus geschehen.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
