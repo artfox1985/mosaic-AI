@@ -82,17 +82,22 @@ pub const N_SAMPLES_TRAIN: u32 = 24;
 pub const TIME_BUDGET_TRAIN: Duration = Duration::from_secs(5);
 
 /// Zeitbudget speziell für die Runde-4→5-Transition (siehe
-/// `round5::exact_round5_outcome`, self_play.rs-Aufrufstelle): dort kostet
-/// JEDER Sample-Aufruf selbst bis zu `round5::TIME_BUDGET` (150ms, ein
-/// voller Alpha-Beta-Solve statt eines ~0,2ms-Netz-Forward-Passes).
-/// Task #71, Determinismus-Fix: NUR NOCH äußerer Not-Deckel (der Sample-
-/// COUNT `N_SAMPLES_TRAIN`=24 ist der primäre, deterministische Cutoff --
-/// siehe `TIME_BUDGET_TRAIN`-Kommentar). Kalibrierung (2026-07-22, freie
-/// lokale Maschine, 8 netzgeführte v10_best-Spiele, sims=400): gemessene
-/// Laufzeit für die volle 24-Sample-Runde-4→5-Kette lag bei Median 3,83s
-/// (n=8, engster Bereich 3,8-3,93s) -- der alte Wert (5s) hatte damit real
-/// nur ~1,3x Marge, keine 3x. Neu: 3x Median aufgerundet.
-pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(12);
+/// `round5::exact_round5_outcome`, self_play.rs-Aufrufstelle): dort ist
+/// JEDER Sample-Aufruf selbst ein voller Alpha-Beta-Solve (statt eines
+/// ~0,2ms-Netz-Forward-Passes). Task #71, Determinismus-Fix: NUR NOCH
+/// äußerer Not-Deckel (der Sample-COUNT `N_SAMPLES_TRAIN`=24 ist der
+/// primäre, deterministische Cutoff -- siehe `TIME_BUDGET_TRAIN`-
+/// Kommentar). Historische Kalibrierung des zeit-primären Alt-Stands
+/// (2026-07-22, 8 netzgeführte v10_best-Spiele, sims=400): volle
+/// 24-Sample-Kette Median 3,83s bei 150ms je Solve → alter Wert 12s.
+/// NACHGEZOGEN mit der Knoten-primär-Umstellung von round5.rs
+/// (`round5::NODE_BUDGET`=200 statt 150ms-Deadline): ein Solve kostet
+/// jetzt stellungsabhängig ~60-900ms (siehe dortige Kalibrierung), Worst
+/// Case der Kette also ~24 x 0,9s ~ 21s -- mit dem alten 12s-Deckel wäre
+/// die Deadline wieder der bindende, lastabhängige Cutoff geworden und
+/// hätte den Determinismus-Gewinn genau hier (dem Runde-4-Label!) wieder
+/// zerstört. Neu: ~3x Worst-Case aufgerundet.
+pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(60);
 
 /// Ein Runden-End-Zustand, deterministisch bis unmittelbar vor den EINEN
 /// tatsächlich zufälligen Schritt vorgespult (den `EndTiling`-Aufruf des
