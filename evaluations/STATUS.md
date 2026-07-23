@@ -2242,6 +2242,155 @@ gegenüber dem sequenziellen Default) -- sonst drohen Läufe mit vollem
 200-Paare-Deckel (~87 Minuten sequenziell) an Hintergrund-Task-Laufzeitlimits
 zu scheitern, wie im ersten Versuch dieses Zyklus geschehen.
 
+## Task #80: Self-Play-Kostenprofil + rtv-Redundanz (2026-07-23)
+
+Ausgangsfrage: der v10b-Batch (2000 Spiele, `alphazero_v10_best.onnx`,
+`--threads 8`) brauchte 14h (~0.04 Spiele/s). Vermutung: die Task-#71-Label-
+Budgets (`round_transition_deep.rs`) überkompensieren den 1,94×-Suchspeedup.
+Zusätzliche Frage: ist `round_transition_value` (rtv) gegenüber dem
+billigeren `bootstrap_value` (TD-Bootstrap) noch informativ, oder redundant
+(Streichungskandidat)?
+
+### Kostenprofil (Instrumentierung)
+
+Neues Cargo-Feature `clone_profiling` (bereits vorhanden, für genau diesen
+Zweck gedacht -- siehe `profiling.rs`) um drei Zähler erweitert:
+`gumbel_move_ns`/`rtv_ns`/`bootstrap_ns`, je ein `profiling::timed(...)`-
+Aufruf um die drei Kostenblöcke in `self_play.rs::play_net_self_play_game`
+(Gumbel-Zugsuche, `sample_round_transition_for_round`,
+`bootstrap_value_after_rounds`). Ohne das Feature (Produktions-Wheel)
+sind alle drei No-Ops (wegkompiliert, wie die bestehenden
+`features_ns`/`net_eval_ns`-Zähler). Zusätzlich in `lib.rs::profiling_snapshot()`
+exponiert. Mess-Wheel gebaut mit
+`pip install . --force-reinstall --no-deps --config-settings=build-args="--features clone_profiling"`,
+danach wieder auf den Default-Wheel zurückgesetzt (kein Feature aktiv,
+`cargo test --release` grün, 151/151, vor UND nach der Mess-Wheel-Phase).
+
+Messung: 2× 20 Spiele, Champion `alphazero_v12b_lr_best.onnx`, sims=400,
+c_puct=1.5, add_root_noise=an, `--threads 8` und `--threads 11` (identische
+Parameter sonst). Alle Zähler sind CPU-Sekunden summiert über alle Threads
+(rayon-parallel) -- durch die Thread-Zahl geteilt ergibt die
+Wall-Clock-Äquivalenz; die Pro-Spiel-Mittelwerte unten sind threads-unabhängig
+(CPU-Sekunden/Spiel).
+
+| Kategorie | Ø CPU-s/Spiel | Anteil (von gumbel+rtv+bootstrap) |
+|---|---:|---:|
+| Gumbel-Suche der gespielten Züge (400 Sims) | ~18 | ~12% |
+| `round_transition_value` (rtv, rekursive Rundensimulation inkl. #71-Policy-Node-Budget-Suche) | ~119–123 | **~83%** |
+| `bootstrap_value` (TD-Bootstrap, Horizont 2 Runden) | ~7 | ~5% |
+| Sonstiges (Tiling/StartPlacement/Serialisierung, nicht instrumentiert) | ~28–35 | (separat, ~15-19% der Wall-Clock) |
+
+**Kernbefund**: `round_transition_value` dominiert die Kosten mit ~83% des
+gemessenen Suchaufwands -- die Vermutung aus dem Auftrag bestätigt sich
+deutlich. Würde rtv vollständig entfallen, bliebe (Gumbel + Bootstrap +
+Sonstiges) ≈ 18+7+30 ≈ 55s/Spiel gegenüber ≈ 174s/Spiel aktuell -- ein
+theoretisches Durchsatz-Potenzial von ~3× (nicht nur Faktor 2), FALLS die
+Label-Qualität das erlaubt (siehe Redundanz-Analyse unten -- **NICHT**
+gegeben ohne Weiteres).
+
+### rtv/Bootstrap-Redundanz (offline, `tools/rtv_redundancy_report.py`)
+
+Analyse des kompletten v10b-Korpus (2000 Spiele, 200 Dateien,
+`data/selfplay_v10b_*.pkl`, **nicht verändert**), dedupliziert je
+(`game_id`, Runde) -- rtv/bootstrap werden einmal je Rundenübergang berechnet
+und rückwirkend auf alle Züge der Runde gestempelt, ohne Dedupe wäre derselbe
+Wert ~15-20× gezählt worden. Ergebnis: `evaluations/rtv_redundancy_v10b.json`
+(16.000 deduplizierte (Spiel,Runde,Spieler)-Paare, Runde 1-4).
+
+| Runde | n | Pearson(rtv, bootstrap) | Pearson(rtv, Endergebnis) | Pearson(bootstrap, Endergebnis) | Δ Ziel bei rtv-Entfernung (mean\|Δ\|) |
+|---|---:|---:|---:|---:|---:|
+| 1 | 4000 | 0.138 | 0.141 | 0.255 | 0.220 |
+| 2 | 4000 | 0.236 | 0.200 | 0.369 | 0.214 |
+| 3 | 4000 | 0.242 | 0.244 | 0.475 | 0.212 |
+| 4 | 4000 | 0.268 | 0.275 | 0.662 | 0.209 |
+| **Gesamt** | 16000 | **0.222** | 0.215 | 0.445 | ~0.21 |
+
+("Endergebnis" = `tanh((own-opp)/50)` aus den finalen `scores_unclamped` --
+der Fallback-Wert ohne rtv-Override; "Δ Ziel" = tatsächliche Änderung des
+trainierten Schema-15-Targets, wenn der rtv-Override entfiele, aber der
+Bootstrap-Blend bliebe: `(1-TD_LAMBDA) * (rtv_val - fallback_val)`.)
+
+**Zwei Kernbefunde, gegenläufig zur reinen Kosten-Perspektive:**
+
+1. **rtv und bootstrap sind NICHT redundant** -- die Korrelation liegt bei
+   nur 0,14-0,27 (schwach). Sie kodieren unterschiedliche Information; man
+   kann bootstrap nicht einfach als "billigen Ersatz" für rtv annehmen.
+2. **rtv korreliert SCHWÄCHER mit dem tatsächlichen Spielausgang als das
+   viel billigere bootstrap** (Gesamt 0,215 vs. 0,445; in Runde 4 sogar
+   0,275 vs. 0,662). Trotz ~17× höherer Rechenkosten (119s vs. 7s/Spiel)
+   sagt rtv den echten Ausgang schlechter vorher als der kurze
+   TD-Bootstrap-Horizont. Plausible Ursache: rtv rekursiert bis zu 3
+   verschachtelte Zwischenrunden-Simulationen tief (Runde 1) und akkumuliert
+   dabei Modell-Fehler des SELBEN (noch trainierenden) Netzes über jede
+   Ebene -- Runde 1 zeigt konsequent die schwächste rtv-Korrelation sowohl
+   zu bootstrap (0,138) als auch zum Endergebnis (0,141).
+3. Die Zielwert-Änderung bei Entfernen des rtv-Override ist mit
+   mean\|Δ\|≈0,21 (Skala [-1,1]) **substanziell, nicht vernachlässigbar** --
+   ein Wegfall wäre ein echter Schema-Wechsel des Trainingsziels, kein
+   reiner Performance-Knopf.
+
+### Threads-Messung (8 vs. 11, Champion-Modell, identische Parameter)
+
+| Threads | Spiele | Wall-Clock | Spiele/s | Hochgerechnet auf 2000 Spiele |
+|---|---:|---:|---:|---:|
+| 8 | 20 | 468,1s | 0,0449 | ~12,4h |
+| 11 | 20 | 337,5s | 0,0622 | ~8,9h |
+
+Speedup 11 vs. 8 Threads: **~1,39×** (11/8=1,375 -- also nahezu perfekte
+lineare Skalierung, keine Anzeichen von Kontention). Keine Hänger, keine
+Watchdog-Abbrüche, alle 20 Spiele je Lauf `completed=true`. RAM unauffällig
+(Python-Hauptprozess 150-630MB Working-Set während der Läufe, per
+`Get-Process` stichprobenartig geprüft). Der historische 8-Threads-Grund
+(Gamma-Pruning-Hänger) ist damit für diese Stichprobengröße nicht mehr
+reproduzierbar -- konsistent mit den bereits gelandeten Fixes
+(`fill_large_factory`-Endlosschleife, 1a683d3; deterministische
+Knoten-Budgets statt Zeitbudgets, Task #71).
+
+### Empfehlungspaket für den v13-Batch (Priorität, NICHT umgesetzt)
+
+1. **[P1, niedriges Risiko, sofort nutzbar] `--threads` 8 → 11 anheben.**
+   Erwartung: ~14h → ~10h für 2000 Spiele (Übertragung des gemessenen
+   1,39×-Faktors auf die reale v10b-Baseline). Reine Infrastruktur-Änderung,
+   rührt weder Labels noch Trainingsziel an. Restrisiko: nur an 20-Spiele-
+   Stichproben geprüft, kein Langlauf-Stabilitätsbeleg über mehrere Stunden
+   -- vor dem vollen 2000er-Batch ggf. einen kürzeren Zwischen-Checkpoint
+   (z.B. nach 200-300 Spielen) beobachten.
+2. **[P2, NICHT als einfacher Performance-Knopf umsetzen] rtv-Reduktion/
+   -Streichung als eigenständiges Experiment, nicht als Kosten-Entscheidung.**
+   Bis zu ~3× Durchsatzgewinn theoretisch möglich (rtv ist ~83% der
+   Suchkosten), ABER: rtv und bootstrap sind nicht redundant (schwache
+   Korrelation) und rtv korreliert schwächer mit dem echten Spielausgang als
+   das billigere bootstrap -- die Kostendaten allein rechtfertigen KEINE
+   Entscheidung in irgendeine Richtung. Notwendig vor jeder Umsetzung: ein
+   Trainings-Vergleichstest (z.B. `TD_LAMBDA=1.0` oder rtv-Override
+   deaktiviert) mit vollem Arena-Gating gegen den amtierenden Champion --
+   siehe Nutzer-Vorgabe und die Erfahrung aus dem v12-Zyklus (teure Labels
+   haben dort nachweislich Stärke gebracht; nicht ohne Beleg rückgängig
+   machen, siehe `feedback_correctness_over_measured_benefit`).
+3. **[P3, aus diesem Task nicht weiter untersucht] Runde-1-rtv besonders
+   teuer UND am wenigsten informativ** (schwächste rtv↔bootstrap- UND
+   rtv↔Endergebnis-Korrelation aller vier Runden). Falls P2 verfolgt wird,
+   wäre eine differenzierte Variante (rtv nur Runde 2-4, Runde 1 nur
+   bootstrap) ein möglicher Zwischenweg -- ebenfalls nur über einen
+   Trainings-/Arena-Vergleichstest zu entscheiden, nicht spekulativ.
+4. **[P3, nicht instrumentiert] "Sonstiges"-Anteil** (Tiling/StartPlacement/
+   Serialisierung, ~28-35s/Spiel, ~15-19% der Wall-Clock) ist nicht
+   Bestandteil dieser Kategorisierung -- falls nach P1/P2 noch mehr Durchsatz
+   gebraucht wird, wäre das der nächste Profiling-Kandidat.
+
+### Repo-/Wheel-Endzustand
+
+`git diff --stat` (Commit folgt separat): `engine/src/profiling.rs`
+(+3 Zähler-Paare, `clone_profiling`-gated), `engine/src/self_play.rs`
+(3× `profiling::timed(...)`-Wrapper, kein Verhaltensunterschied ohne
+Feature), `engine/src/lib.rs` (`profiling_snapshot()` um die 3 Felder
+erweitert). `tools/rtv_redundancy_report.py` (neu, reine Offline-Analyse,
+`data/` unverändert). Installiertes Wheel am Task-Ende: Default-Features
+(kein `clone_profiling`), `cargo test --release` 151/151 grün, identisch zum
+committeten Stand. Mess-Zwischenstände (keine `.pkl`-Dateien in `data/`
+angefallen -- Direktaufruf von `mosaic_rust.net_self_play_games` ohne
+`progress_path`) wurden nicht persistiert, `data/tmp_task80/` wieder entfernt.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
