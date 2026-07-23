@@ -140,7 +140,9 @@ BLOCK_SIZE = 25
 MAX_PAIRS = 200                 # harter Deckel (Nutzer-Anstoss: 150 -> 200)
 DEFAULT_SIMS = 400
 DEFAULT_C_PUCT = 1.5
-DEFAULT_THREADS = 0
+# 0/1 laeuft in net_vs_net_arena_match sequenziell (self_play.rs: num_threads<=1);
+# 10 Threads messen ~4x schneller bei unveraenderter Seed-Paarung (Befund Task #79).
+DEFAULT_THREADS = 10
 
 # SPRT-Konvention (Fishtest-Muster, Nutzer-Anstoss 2026-07-23) -- siehe
 # Modul-Docstring fuer die volle Begruendung von p1=0.65.
