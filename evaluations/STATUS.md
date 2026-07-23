@@ -1719,17 +1719,33 @@ Champion). Ein **Paar** = ein Seed, zwei Spiele mit GETAUSCHTEN Brettern (die
 Rust-API bietet keinen eingebauten Brett-Tausch-Modus, daher zwei
 `net_vs_net_arena_match`-Aufrufe mit vertauschten Modell-/Sims-/c_puct-
 Zuordnungen bei identischem Seed) -- ein etwaiger Brett-/Zugreihenfolge-Bias
-faellt damit PRO PAAR heraus, nicht erst im Erwartungswert. Statistik bewusst
-KEIN klassisches "diskordante Paare"-McNemar (das wuerde "A gewinnt beide
-Spiele" faelschlich als uninformativ behandeln und haette dadurch keine Power
-gegen echte Staerkeunterschiede), sondern ein exakter Paar-Vorzeichentest:
-`b` = A gewinnt beide Spiele des Paares, `c` = B gewinnt beide, Splits (1:1)
-werden wie bei einem klassischen Vorzeichentest ausgeschlossen;
-`mcnemar_exact_p(b, c)` (dieselbe Formel/Funktion wie in
-`paired_arena_speedbundle.py`/`paired_arena_ismcts.py`) testet H0: P(A
-gewinnt Paar)=0.5. Zusaetzlich gepaarte Differenz `d_i in {-2,0,+2}` je Paar
-mit 95%-Normalapprox.-KI. Bloecke a 25 Paare (=50 Spiele), Stopp bei p<0.05
-oder 150 Paaren (=300 Spiele), JSON-Blocklogs, druckt am Ende eine fertige
+faellt damit PRO PAAR heraus, nicht erst im Erwartungswert. Jedes Paar wird in
+`b` (A gewinnt beide Spiele, "A-Sweep"), `c` (B gewinnt beide, "B-Sweep") oder
+Split (1:1, uninformativ) eingeteilt.
+
+**SPRT-Upgrade (Nutzer-Anstoss, noch am selben Tag)**: die erste Fassung
+brach bei "kumulativem McNemar p<0.05 je Block" ab -- informelles
+wiederholtes Testen ohne Sequenz-Korrektur, dasselbe Verfahrens-Problem wie
+bei der Floor-Shaping-Signifikanzanalyse (wiederholtes Peeking bei festem
+Alpha treibt das tatsaechliche Fehlerniveau auf ca. 7-10% statt 5%). Die
+STOPP-Entscheidung ist jetzt ein echtes Wald-SPRT (Fishtest-Muster) auf den
+INFORMATIVEN Paaren (b/c, Splits tragen nichts bei): H0 p=0.5, H1 p=0.65
+(Standard, per `--h1` anpassbar -- Konvention: bei ~35% informativer
+Paarrate ungefaehr +10 Prozentpunkte Winrate-Differenz), alpha=beta=0.05,
+Wald-Schranken `ln(beta/(1-alpha))`/`ln((1-beta)/alpha)` = ±2.9444 bei
+alpha=beta=0.05 (Rechen-Selbsttest gegen Handrechnung `ln(0.05/0.95)`/
+`ln(0.95/0.05)` bestaetigt, laeuft als `_sprt_bounds_selftest()` bei jedem
+Skriptstart automatisch mit). LLR-Update nach jedem Block: obere Schranke
+erreicht -> A signifikant besser (Gating-Entscheid); untere Schranke
+erreicht -> kein Beleg fuer A, Champion bleibt (spart Rechenzeit statt bis
+zum Deckel weiterzuspielen); harter Deckel jetzt 200 Paare (=400 Spiele,
+vorher 150) ohne SPRT-Entscheid -> "kein Entscheid im SPRT-Sinn" wird explizit
+ausgewiesen. Der exakte Paar-Vorzeichentest (`mcnemar_exact_p(b, c)`, gleiche
+Formel/Funktion wie in `paired_arena_speedbundle.py`/`paired_arena_ismcts.py`)
+und die gepaarte Differenz-KI (`d_i in {-2,0,+2}` je Paar, 95%-Normalapprox.)
+bleiben vollstaendig erhalten -- sie sind jetzt aber NUR NOCH die finale
+Fixed-n-Bericht-Statistik, nicht mehr die Stopp-Regel. Bloecke weiterhin a 25
+Paare, JSON-Blocklogs (inkl. LLR-Verlauf), druckt am Ende eine fertige
 `elo_tracker.py add`-Kommandozeile.
 
 **Dokumentation aktualisiert**: `elo_tracker.py`-Modul-Docstring markiert
@@ -1739,11 +1755,17 @@ nicht-gating-relevante Sanity-Checks nuetzlich, entscheidet aber nicht mehr
 ueber Champion-Wechsel).
 
 **Plumbing-Smoke** (Winz-Parameter, n=2 Paare/sims=20, v10_best gegen sich
-selbst auf BEIDEN Seiten -- Wheel nur lesend genutzt, nichts installiert):
-beide Aufrufrichtungen laufen durch, McNemar/CI rechnen ohne Fehler (bei
-identischen Modellen erwartungsgemaess kein signifikantes Ergebnis, reiner
-Plumbing-Check). Ein echter Gating-Lauf mit unterschiedlichen Kandidaten
-folgt in Phase B nach Batch-Ende.
+selbst auf BEIDEN Seiten -- Wheel nur lesend genutzt, nichts installiert,
+zweimal gelaufen: vor und nach dem SPRT-Upgrade): beide Aufrufrichtungen
+laufen durch, LLR/Wald-Schranken/Fixed-n-McNemar/CI rechnen ohne Fehler --
+bei identischen Modellen erwartungsgemaess beide Paare Splits (0 informative
+Paare), LLR bleibt bei 0.0, Deckel greift korrekt mit `SPRT_verdict=
+UNDECIDED_CAP_REACHED`. Zusaetzlich per synthetischem Skript bestaetigt:
+eine Kette reiner A-Sweeps ueberschreitet nach 12 Paaren die obere Wald-
+Schranke (+2.944), eine Kette reiner B-Sweeps unterschreitet nach 9 Paaren
+die untere (-2.944) -- beide SPRT-Richtungen sind also nachweislich
+erreichbar, nicht nur der Deckel-Pfad. Ein echter Gating-Lauf mit
+unterschiedlichen Kandidaten folgt in Phase B nach Batch-Ende.
 
 ## Quellen (Recherche 2026-07-19)
 
