@@ -361,6 +361,14 @@ fn profiling_snapshot() -> String {
         "gamestate_clone_count": crate::profiling::gamestate_clone_count(),
         "alphabeta_calls": crate::self_play::ALPHABETA_CALLS.load(std::sync::atomic::Ordering::Relaxed),
         "alphabeta_node_visits": crate::self_play::ALPHABETA_NODE_VISITS.load(std::sync::atomic::Ordering::Relaxed),
+        // Task #80: Self-Play-Kostenprofil (Gumbel-Zugsuche vs. rtv- vs.
+        // Bootstrap-Labels), siehe `play_net_self_play_game`.
+        "gumbel_move_count": crate::profiling::gumbel_move_count(),
+        "gumbel_move_ns": crate::profiling::gumbel_move_ns(),
+        "rtv_count": crate::profiling::rtv_count(),
+        "rtv_ns": crate::profiling::rtv_ns(),
+        "bootstrap_count": crate::profiling::bootstrap_count(),
+        "bootstrap_ns": crate::profiling::bootstrap_ns(),
     })
     .to_string()
 }
