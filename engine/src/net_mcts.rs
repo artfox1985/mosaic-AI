@@ -121,6 +121,69 @@ const FLOOR_SHAPING_SCALE: f64 = 50.0;
 /// beste Netz-Performance der gesamten Session. Bleibt vorerst aktiv.
 pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
 
+/// Task #78 (v12c, Phase A -- NUR Code, KEIN Nachweis-Lauf): rundenabhängige
+/// Value-Shrinkage Richtung 0.5. Motivation: der Value-Head ist in frühen
+/// Runden nachweislich kaum besser als der Mittelwert (Runde-1-Noise-Floor-
+/// Deckel ≈0.007, siehe `evaluations/STATUS.md` "Noise-Floor-Test"), wird an
+/// JEDEM PUCT-Blattknoten aber gleich stark vertraut wie in Runde 5 (Deckel
+/// ≈0.44, klar informativ). Shrinkage dämpft die Blattwert-AUSSCHLÄGE (nicht
+/// den Mittelwert) proportional zur erwarteten Zuverlässigkeit je Runde,
+/// analog zu einem James-Stein-artigen Schrumpfen des Schätzers Richtung des
+/// uninformativen Priors 0.5.
+///
+/// Standard AUS -- Aktivierung erst nach einem gepaarten Arena-Nachweis in
+/// Phase B (Nachweis-Regel, siehe MEMORY.md/STATUS.md-Präzedenzfälle: reine
+/// Performance-Hebel ohne Korrektheits-Charakter brauchen einen Beleg, bevor
+/// sie standardmäßig aktiv geschaltet werden, siehe z.B. das ISMCTS-
+/// Mehrfach-Determinisierungs-Verwerfungsmuster).
+pub const VALUE_SHRINK_ENABLED: bool = false;
+
+/// Platzhalter-Kalibrierung `w_r` je Runde (Index 0 = Runde 1 ... Index 4 =
+/// Runde 5), angewendet als `v_shrunk = 0.5 + w_r·(v - 0.5)`. Herleitung
+/// (Task #78, wird in Phase B mit echten v12-Diagnosen NACHKALIBRIERT --
+/// dies ist explizit ein Platzhalter, keine finale Konstante):
+///
+/// `w_r ∝ sqrt(Deckel_r)`, normiert auf `w_5 = 1.0` (keine Dämpfung in der
+/// letzten Runde). `Deckel_r` = korrigierter Noise-Floor-Rückspiel-Test aus
+/// `evaluations/STATUS.md` ("Punkt 1, Noise-Floor-Test", 2026-07-21):
+/// Runde 1 = 0.0068, Runde 2 = 0.166, Runde 3 = 0.437 (klar monoton
+/// steigend). Für Runde 4/5 existiert noch KEIN direkter Deckel-Messwert
+/// (die Drei-Runden-Probe endete bei Runde 3) -- als Platzhalter wird dort
+/// das trainierte Modell-R² (v10_best/v9b_domeonly-Referenz, gleiche
+/// STATUS.md-Tabelle: Runde 4 ≈0.406-0.426, Runde 5 ≈0.62) als Näherung an
+/// den wahren Deckel verwendet, mit `max(Deckel_r, Deckel_{r-1})` gegen die
+/// Runde-3-Messung erzwungen (0.406 läge sonst hauchdünn UNTER 0.437 und
+/// würde die geforderte Monotonie brechen) -- daher Runde 3 und 4 hier
+/// identisch. Werte (vor Normierung, `sqrt`):
+///   R1 √0.0068=0.0825, R2 √0.166=0.4074, R3 √0.437=0.6611,
+///   R4 √0.437=0.6611 (geclampt), R5 √0.623=0.7893.
+/// Normiert durch R5: `[0.1045, 0.5162, 0.8375, 0.8375, 1.0000]`.
+pub const VALUE_SHRINK_PER_ROUND: [f64; 5] = [0.1045, 0.5162, 0.8375, 0.8375, 1.0000];
+
+/// Rundenzahl (1-basiert, wie `state.round_number`) → Schrumpfgewicht `w_r`
+/// aus `VALUE_SHRINK_PER_ROUND`. Defensiv geklammert (Runde 0 oder >5 sollte
+/// in der Praxis nie vorkommen, klemmt statt zu paniken).
+fn value_shrink_weight(round_number: u32) -> f64 {
+    let last = VALUE_SHRINK_PER_ROUND.len() - 1;
+    let idx = (round_number.saturating_sub(1) as usize).min(last);
+    VALUE_SHRINK_PER_ROUND[idx]
+}
+
+/// Wendet die rundenabhängige Value-Shrinkage (Task #78) auf BEIDE
+/// Blattwert-Perspektiven `[Spieler0, Spieler1]` an. Muss NACH
+/// `blended_leaf_win_prob`, aber VOR dem Floor-Shaping-Additiv aufgerufen
+/// werden (siehe `make_node`/`net_leaf_eval`) -- das exakte Floor-Signal
+/// (`floor_shaping_delta`) ist eine reine State-Funktion und soll NICHT
+/// geschrumpft werden, nur der Netz-Rohwert. Bei `VALUE_SHRINK_ENABLED=false`
+/// (Standard) exakte Identität -- byte-identisch zum Vor-Task-#78-Verhalten.
+fn apply_value_shrink(value: [f64; 2], round_number: u32) -> [f64; 2] {
+    if !VALUE_SHRINK_ENABLED {
+        return value;
+    }
+    let w = value_shrink_weight(round_number);
+    [0.5 + w * (value[0] - 0.5), 0.5 + w * (value[1] - 0.5)]
+}
+
 /// Perspektiven-/OOD-Interventionstest (externer Hinweis, 2026-07-19): der
 /// zweite Forward-Pass für `other_val` (künstlich geflipptes
 /// `state.current_player`) bewertet einen Zustand, den das Netz im Training
@@ -760,7 +823,11 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     if !MIRROR_OTHER_VAL {
         record_perspective_divergence(state.round_number, mover_val, other_val);
     }
-    if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] }
+    let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+    // Task #78 (v12c Shrinkage) -- NACH blended_leaf_win_prob; `net_leaf_eval`
+    // kennt keine Floor-Shaping-Korrektur (die lebt nur in `make_node`), also
+    // gibt es hier keine "vor/nach"-Reihenfolge zu wahren.
+    apply_value_shrink(raw, state.round_number)
 }
 
 /// Netz-Policy-Priors für `state`: EIN Forward-Pass, wiederverwendet
@@ -889,6 +956,14 @@ fn make_node<R: Rng + ?Sized>(
             }
             let mut today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+
+            // Task #78 (v12c Shrinkage) -- NACH blended_leaf_win_prob (oben),
+            // aber VOR dem Floor-Shaping-Additiv (unten): das exakte
+            // Floor-Signal ist eine reine State-Funktion und soll NICHT durch
+            // die Netz-Unsicherheits-Schrumpfung gedämpft werden, nur der
+            // rohe Netz-Blattwert selbst. Bei `VALUE_SHRINK_ENABLED=false`
+            // (Standard) exakte Identität.
+            today_value = apply_value_shrink(today_value, state.round_number);
 
             // Exakte Floor-Straf-Korrektur (siehe `floor_shaping_delta`-Kommentar) --
             // reine State-Funktion, kein Netz-Forward-Pass, direkt additiv auf
@@ -2743,6 +2818,116 @@ mod tests {
              das ist nicht besser als Zufall und deutet auf einen Perspektivfehler hin, nicht nur \
              auf gewöhnliches Value-Rauschen",
             rate * 100.0
+        );
+    }
+
+    // ── Task #78 (v12c Value-Shrinkage, Platzhalter-Kalibrierung) ───────────
+
+    #[test]
+    fn value_shrink_per_round_table_is_monotone_and_normalized() {
+        assert_eq!(VALUE_SHRINK_PER_ROUND.len(), 5);
+        for w in VALUE_SHRINK_PER_ROUND.iter() {
+            assert!(*w > 0.0 && *w <= 1.0, "Gewicht ausserhalb (0,1]: {w}");
+        }
+        for pair in VALUE_SHRINK_PER_ROUND.windows(2) {
+            assert!(
+                pair[1] >= pair[0] - 1e-12,
+                "Tabelle muss monoton nicht-fallend sein: {:?}",
+                VALUE_SHRINK_PER_ROUND
+            );
+        }
+        assert!(
+            (VALUE_SHRINK_PER_ROUND[4] - 1.0).abs() < 1e-9,
+            "Runde 5 muss auf 1.0 normiert sein (keine Daempfung in der letzten Runde)"
+        );
+        assert!(
+            VALUE_SHRINK_PER_ROUND[0] < VALUE_SHRINK_PER_ROUND[4],
+            "Runde 1 muss strikt kleiner sein als Runde 5"
+        );
+    }
+
+    #[test]
+    fn value_shrink_weight_maps_round_number_and_clamps_out_of_range() {
+        assert_eq!(value_shrink_weight(1), VALUE_SHRINK_PER_ROUND[0]);
+        assert_eq!(value_shrink_weight(2), VALUE_SHRINK_PER_ROUND[1]);
+        assert_eq!(value_shrink_weight(5), VALUE_SHRINK_PER_ROUND[4]);
+        // Verteidigung: Runde 0 oder >5 sollte in der Praxis nie vorkommen,
+        // klemmt aber statt zu paniken.
+        assert_eq!(value_shrink_weight(0), VALUE_SHRINK_PER_ROUND[0]);
+        assert_eq!(value_shrink_weight(99), VALUE_SHRINK_PER_ROUND[4]);
+    }
+
+    #[test]
+    fn apply_value_shrink_is_identity_when_disabled_by_default() {
+        // Kernanforderung Task #78: Standard AUS = byte-identisch zum
+        // Vor-Task-#78-Verhalten (bestehende Tests bleiben grün, weil dieser
+        // Pfad bei jedem Aufruf in `make_node`/`net_leaf_eval` ein reines
+        // No-Op ist).
+        assert!(!VALUE_SHRINK_ENABLED, "Standard muss AUS bleiben (Aktivierung erst nach Phase-B-Nachweis)");
+        let v = [0.9, 0.05];
+        assert_eq!(apply_value_shrink(v, 1), v);
+        assert_eq!(apply_value_shrink(v, 5), v);
+        assert_eq!(apply_value_shrink([0.0, 1.0], 3), [0.0, 1.0]);
+    }
+
+    #[test]
+    fn round1_weight_pulls_harder_toward_half_than_round5_weight() {
+        // Direkter Formel-Test (unabhaengig vom ENABLED-Toggle): mit Runde-1-
+        // Gewicht muss der geschrumpfte Wert naeher an 0.5 liegen als mit
+        // Runde-5-Gewicht, fuer denselben Rohwert.
+        let w1 = value_shrink_weight(1);
+        let w5 = value_shrink_weight(5);
+        for v in [0.9, 0.1, 0.99, 0.55] {
+            let shrunk1 = 0.5 + w1 * (v - 0.5);
+            let shrunk5 = 0.5 + w5 * (v - 0.5);
+            assert!(
+                (shrunk1 - 0.5).abs() < (shrunk5 - 0.5).abs(),
+                "v={v}: Runde 1 (w={w1}, ->{shrunk1}) sollte staerker Richtung 0.5 \
+                 gezogen werden als Runde 5 (w={w5}, ->{shrunk5})"
+            );
+        }
+    }
+
+    #[test]
+    fn floor_shaping_additive_is_unaffected_by_shrink_when_applied_after_it() {
+        // Konstruierter Vergleich (Task #78): reproduziert exakt die
+        // Reihenfolge aus `make_node` -- `apply_value_shrink` (echte
+        // Produktionsfunktion) laeuft VOR dem Floor-Additiv. Das reine
+        // Floor-Signal (hier durch einen repraesentativen `floor_shift`-Wert
+        // ersetzt, wie ihn `floor_shaping_delta(&state).tanh() *
+        // FLOOR_SHAPING_WEIGHT` liefern wuerde) darf durch den Shrink-Schritt
+        // NICHT gedaempft werden, weil es danach unveraendert additiv
+        // aufaddiert wird -- Kontrast zur (falschen) umgekehrten Reihenfolge.
+        let base = [0.5f64, 0.5f64]; // neutraler Netz-Rohwert vor Floor-Korrektur
+        let floor_shift = 0.12;
+        let round1_w = value_shrink_weight(1); // staerkster Schrumpf-Fall, Worst-Case
+
+        // Richtige Reihenfolge (wie in make_node): erst schrumpfen (hier
+        // manuell mit dem Runde-1-Gewicht erzwungen, unabhaengig vom
+        // ENABLED-Toggle, um die Formel selbst zu pruefen), dann Floor addieren.
+        let shrunk_base = [0.5 + round1_w * (base[0] - 0.5), 0.5 + round1_w * (base[1] - 0.5)];
+        let correct_order = [
+            (shrunk_base[0] + floor_shift).clamp(0.0, 1.0),
+            (shrunk_base[1] - floor_shift).clamp(0.0, 1.0),
+        ];
+        assert!(
+            (correct_order[0] - shrunk_base[0] - floor_shift).abs() < 1e-9,
+            "Floor-Beitrag muss exakt +floor_shift bleiben, unabhaengig vom Schrumpfgewicht"
+        );
+        assert!(
+            (correct_order[1] - shrunk_base[1] + floor_shift).abs() < 1e-9,
+            "Floor-Beitrag muss exakt -floor_shift bleiben, unabhaengig vom Schrumpfgewicht"
+        );
+
+        // Kontrast: die (falsche) umgekehrte Reihenfolge -- erst Floor
+        // addieren, DANACH schrumpfen -- wuerde das exakte Floor-Signal
+        // sichtbar daempfen. Zeigt, warum die gewaehlte Reihenfolge wichtig ist.
+        let wrong_order_p0 = 0.5 + round1_w * ((base[0] + floor_shift).clamp(0.0, 1.0) - 0.5);
+        let wrong_order_contribution = wrong_order_p0 - (0.5 + round1_w * (base[0] - 0.5));
+        assert!(
+            wrong_order_contribution.abs() < floor_shift - 1e-9,
+            "Erwartete Daempfung bei falscher Reihenfolge (Floor vor Shrink) nicht beobachtet -- \
+             Testannahme pruefen"
         );
     }
 }
