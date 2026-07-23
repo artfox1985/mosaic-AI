@@ -1818,6 +1818,98 @@ die untere (-2.944) -- beide SPRT-Richtungen sind also nachweislich
 erreichbar, nicht nur der Deckel-Pfad. Ein echter Gating-Lauf mit
 unterschiedlichen Kandidaten folgt in Phase B nach Batch-Ende.
 
+## v12-Zyklus (2026-07-23)
+
+**Task #74. Build-Gate**: `cargo test --release` 151/151 grün (1 ignoriert,
+75.9s), Wheel neu gebaut/installiert (`pip install . --force-reinstall
+--no-deps` in `engine/`, das vorher installierte Wheel war hinter dem
+round5-Node-Budget-Merge `bd5a744` + Phase-A-Commits zurück).
+`engine_config_json()` bestätigt `use_gumbel_search: true`;
+`VALUE_SHRINK_ENABLED` bleibt unangetastet auf `false` (Rust-Konstante, kein
+Laufzeit-Feld in der JSON-Ausgabe, per Quellcode `net_mcts.rs:139`
+verifiziert -- Task #78, nicht dieser Zyklus).
+
+**Korpus**: die 200 Dateien `data/selfplay_v10b_*.pkl` (2000 Spiele,
+netzgeführtes Self-Play mit v10_best als Generator, base_sims=400, erste
+Generation mit dem #71-Knotenbudget statt Zeitbudget UND dem Regelfix-Stand
+`bd5a744`) -- unverändert übernommen, keine Dateien verschoben/ergänzt.
+
+**Training (`v12`)**: Warm-Start von `alphazero_v10_best.pth`, `--epochs 100`
+als Deckel, `TD_LAMBDA=0.5` (Code-Default, unverändert). 290.521 Trainings- /
+32.392 Val-Züge (Val-Split 20/200 Dateien, gleicher Seed wie immer). Early
+Stopping bei Epoche 15/100 (Val-Policy-Plateau seit Epoche 10). **Bester
+Checkpoint: Epoche 1** (`val_combined` = 1.8219) -- der Value-Val-R² fällt
+bereits ab Epoche 2 monoton (0.221 → 0.182 → 0.144 → ...), exakt das gleiche
+Frühplateau-Muster wie v11 (dort ebenfalls Epoche 2). Netzauslastung gesund
+(Dead 8%, Eff.Rank 40%). ONNX-Export automatisch mitgelaufen
+(`alphazero_v12.onnx` + `alphazero_v12_best.onnx`, beide frischer als der
+Trainingsstart). Manifest `models/manifest_train_v12_20260723_131750.json`
+bestätigt 200 Dateien / 2000 Spiele Präfix `v10b`.
+
+**Offline-Diagnose** (`v12_best`, echter Val-Split 20/200 Dateien, n=32.392
+Val-Züge, eigenes Diagnose-Skript, da `tools/diagnosis.py` keine
+Pro-Runde-R²/Top-1-Top-3-Metriken liefert -- Vorgehen mirrort MosaicDataset
+1:1 inkl. Runden-Index je Schritt):
+
+| Metrik | v12_best | v11_best (Referenz, anderer Korpus/Split) | v10_best (Referenz, anderer Korpus/Split) |
+|---|---|---|---|
+| Policy Top-1 (nur Drafting, n=23.638) | 39.8% | 38.2% | 44.0% |
+| Policy Top-3 | 68.5% | 66.8% | 74.3% |
+| Value Val-R² global | **0.2215** | 0.139 | 0.221 |
+| R² Runde 1 | **0.0377** | 0.029 | −0.063 |
+| R² Runde 2 | **0.1074** | 0.101 | 0.017 |
+| R² Runde 3 | 0.1818 | 0.138 | 0.195 |
+| R² Runde 4 | 0.2283 | 0.084 | 0.406 |
+| R² Runde 5 | 0.4757 | 0.290 | 0.623 |
+
+Referenzwerte für v11_best/v10_best wie in den jeweiligen Session-Abschnitten
+oben dokumentiert (andere Korpora/Splits, s. dortige Einschränkungen).
+**Zusätzlich direkt vergleichbar** (v10_best auf dem GLEICHEN v12-Val-Split
+neu ausgewertet, n=32.392): global R²=−0.0344, Runde 1–4 durchweg NEGATIV
+(−0.237/−0.354/−0.156/−0.046), nur Runde 5 positiv (0.492), Top-1=37.4%/
+Top-3=64.8%. Dieser direkte Vergleich ist aber selbst konfundiert (v10_best
+wurde auf dem alten, nicht TD-Bootstrap-geblendeten Werte-Schema trainiert --
+die Zielskala hat sich seither verschoben, s. `VALUE_SCHEMA_VERSION`-Historie
+in `neural_net.py`) und dient nur als Plausibilitätscheck, nicht als
+Bewertung "v10 ist schlechter geworden". **Kernbefund**: v12 verbessert
+gegenüber v11 (halbe Datenmenge, Zyklus davor) global-R² deutlich (0.139 →
+0.2215, wieder auf v10-Referenzniveau) UND hält die in v11 erstmals
+positiven Runde-1/2-Werte (0.029/0.101 → 0.038/0.107), bei gleichzeitig
+klar besserem Runde-4-Wert (0.084 → 0.228) -- die volle 2000-Spiele-
+Datenmenge auf dem netzgeführten completed-Q/TD-Bootstrap-Korpus zahlt sich
+aus. Geschwister-Tau wurde in diesem Zyklus NICHT reproduziert (kein
+Werkzeug dafür im Repo, nicht Teil der angeforderten Kernmetriken).
+
+**Gepaartes SPRT-Gating v12_best vs. v10_best** (`tools/paired_gating.py`,
+beide @400 Sims, deterministische Arena, H1 p=0.65, alpha=beta=0.05, Deckel
+200 Paare):
+
+| Block | Paare kum. | Ergebnis kum. | A-Sweep/B-Sweep/Split | LLR | Bericht-p |
+|---|---|---|---|---|---|
+| 1 | 25 | 26:24 | 8/7/10 | −0.398 | 1.000 |
+| 2 | 50 | 55:45 | 15/10/25 | +0.369 | 0.424 |
+| 3 | 75 | 90:60 | 28/13/34 | +2.709 | 0.028 |
+| 4 | 100 | **124:76** | 39/15/46 | **+4.882** | **0.0015** |
+
+**SPRT-Verdikt nach Block 4 (100 Paare, 200 Spiele): v12_best signifikant
+besser (LLR=+4.882 ≥ obere Schranke +2.944).** Gepaarte Differenz +0.480,
+95%-KI [+0.206, +0.754] -- eindeutig auf Seiten von v12. **Champion-Wechsel:
+v12_best löst v10_best als Champion und künftigen Self-Play-Generator ab.**
+Damit bestätigt sich die im v11-Abschnitt vermutete Erklärung: der
+Confounder "halbe Datenmenge" war der limitierende Faktor, nicht das
+completed-Q/TD-Bootstrap-Zielformat selbst -- bei voller 2000-Spiele-Menge
+schlägt das netzgeführte Verfahren den Heuristik-Korpus-Champion klar.
+
+**Elo-Kader aktualisiert** (`tools/elo_tracker.py add`, Match in
+`evaluations/elo_history.csv` eingetragen): v12_best@400 Elo 943
+[860, 1018] (124-76 über 200 Spiele) vs. v10_best@400 nun 858 [793, 915].
+Heuristik@200 bleibt fixer Anker bei 1000.
+
+**Nächste Schritte** (nicht Teil dieses Zyklus): Task #78
+(`VALUE_SHRINK_PER_ROUND`-Rekalibrierung) kann jetzt die oben gelisteten
+per-Runde-R²-Werte von v12_best als Grundlage nutzen; v12_best als neuer
+Generator für den nächsten Self-Play-Korpus (v13).
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)

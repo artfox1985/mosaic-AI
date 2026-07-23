@@ -2,3 +2,4 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-07-22,v11_best,400,v10_best,400,43,57,100,Gating-Match v11-Zyklus
 2026-07-22,v10_best,400,Heuristik,200,46,104,150,"Speed-Buendel-A/B NEU-Arm (Batching #63a+Gumbel-Tiefe1 #68+R6-Peek #70), gepaart vs ALT b0c6a9c getestet n=150 McNemar p=0.28 nicht signifikant; erster Heuristik@200-Kader-Datenpunkt"
 2026-07-22,v11_td07_best,400,Heuristik,200,30,70,100,"Task 73: TD_LAMBDA-Sweep-Kandidat (lambda=0.7) vs Heuristik@200, seed=730001, kein Early-Stop"
+2026-07-23,v12_best,400,v10_best,400,124,76,200,"Gepaartes Gating (Task #76), SPRT=v12_best, p=0.0015"
