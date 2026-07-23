@@ -1,0 +1,12 @@
+{
+  "done": 150,
+  "new_wins": 55,
+  "old_wins": 58,
+  "b_new_only": 2,
+  "c_old_only": 5,
+  "p": 0.453125,
+  "base_seed": 388494276,
+  "net_sims": 400,
+  "heur_sims": 200,
+  "model": "D:\\Archiv\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v10_best.onnx"
+}
