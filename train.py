@@ -186,7 +186,8 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none"):
+          show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
+          value_weight=None, points_weight=None):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -205,6 +206,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
+        "value_weight": value_weight, "points_weight": points_weight,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -262,12 +264,23 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # ohne --lr-schedule bleibt Adam mit konstanter LR wie bisher (kein
     # Scheduler-Objekt, kein zusaetzlicher .step()-Aufruf).
     effective_lr = lr if lr is not None else LEARNING_RATE
+    # --value-weight/--points-weight (Task #79, v12d): additiv analog zu
+    # --lr -- ohne die Flags bleiben VALUE_WEIGHT/POINTS_WEIGHT aus config.py
+    # unveraendert massgeblich (Bestandsverhalten). Beeinflussen NUR den
+    # Trainings-Loss (loss = p_loss + value_weight*v_loss + points_weight*
+    # points_loss) und die Checkpoint-Auswahl (dieselbe gewichtete Val-Metrik,
+    # siehe unten) -- NICHT die Targets selbst, der HDF5/Pickle-Cache bleibt
+    # deshalb fuer diesen Sweep unveraendert wiederverwendbar.
+    effective_value_weight = value_weight if value_weight is not None else VALUE_WEIGHT
+    effective_points_weight = points_weight if points_weight is not None else POINTS_WEIGHT
     print(f"⚙️  Hyperparameter (config.py, ggf. per CLI überschrieben):")
     print(f"   Learning Rate : {effective_lr}" + (f"  (Default {LEARNING_RATE})" if lr is not None else ""))
     print(f"   LR-Schedule   : {lr_schedule}")
     print(f"   Batch Size    : {BATCH_SIZE}")
-    print(f"   Value Weight  : {VALUE_WEIGHT}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)")
-    print(f"   Points Weight : {POINTS_WEIGHT}  (Punktestand-Prognose, Aux-Signal)")
+    print(f"   Value Weight  : {effective_value_weight}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)"
+          + (f"  (Default {VALUE_WEIGHT})" if value_weight is not None else ""))
+    print(f"   Points Weight : {effective_points_weight}  (Punktestand-Prognose, Aux-Signal)"
+          + (f"  (Default {POINTS_WEIGHT})" if points_weight is not None else ""))
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
 
     # Warm Start?
@@ -443,7 +456,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_loss = mse_loss(pred_v, targets_v)
             points_loss = mse_loss(pred_points, targets_points)
 
-            loss = p_loss + VALUE_WEIGHT * v_loss + POINTS_WEIGHT * points_loss
+            loss = p_loss + effective_value_weight * v_loss + effective_points_weight * points_loss
             loss.backward()
             optimizer.step()
 
@@ -540,9 +553,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # allein". Fallback (kein Val-Split) nutzt dieselbe Formel auf den
         # Trainings-Losses, konsistent mit dem bisherigen Fallback-Muster.
         if epoch_val_ploss is not None:
-            current_metric = epoch_val_ploss + VALUE_WEIGHT * epoch_val_vloss + POINTS_WEIGHT * epoch_val_pointsloss
+            current_metric = epoch_val_ploss + effective_value_weight * epoch_val_vloss + effective_points_weight * epoch_val_pointsloss
         else:
-            current_metric = epoch_ploss + VALUE_WEIGHT * epoch_vloss + POINTS_WEIGHT * epoch_pointsloss
+            current_metric = epoch_ploss + effective_value_weight * epoch_vloss + effective_points_weight * epoch_pointsloss
         if current_metric < best_combined_metric:
             best_combined_metric = current_metric
             best_epoch = epoch + 1
@@ -742,8 +755,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "final_points_val_loss": round(final_val_pointsloss, 4) if final_val_pointsloss is not None else None,
         "final_value_val_r2": round(final_value_r2, 4) if final_value_r2 is not None else None,
         "final_points_val_r2": round(final_points_r2, 4) if final_points_r2 is not None else None,
-        "value_weight":      VALUE_WEIGHT,
-        "points_weight":     POINTS_WEIGHT,
+        "value_weight":      effective_value_weight,
+        "points_weight":     effective_points_weight,
         "val_frac":          val_frac,
         "num_val_games":     len(val_dataset) if val_dataset is not None else 0,
         "policy_pct":        round(pct, 1),
@@ -829,10 +842,18 @@ if __name__ == "__main__":
     parser.add_argument("--lr-schedule", type=str, default="none", choices=["none", "cosine"],
                         help="LR-Verlauf ueber die Epochen. 'none' (Standard): konstante LR wie bisher. "
                              "'cosine': torch.optim.lr_scheduler.CosineAnnealingLR mit T_max=--epochs.")
+    parser.add_argument("--value-weight", type=float, default=None,
+                        help="Gewicht des Value-Aux-Loss im Gesamt-Loss (Standard: VALUE_WEIGHT aus "
+                             "config.py, aktuell 0.2). Task #79 (v12d): VALUE_WEIGHT/POINTS_WEIGHT-Sweep. "
+                             "Wirkt nur im Loss/der Checkpoint-Auswahl, nicht im Cache/Targets.")
+    parser.add_argument("--points-weight", type=float, default=None,
+                        help="Gewicht des Punktestand-Aux-Loss im Gesamt-Loss (Standard: POINTS_WEIGHT "
+                             "aus config.py, aktuell 0.5). Siehe --value-weight.")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,
-          train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule)
+          train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
+          value_weight=args.value_weight, points_weight=args.points_weight)
