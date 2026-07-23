@@ -1695,6 +1695,57 @@ auch die Live-Runde-5-Zugwahl (`choose_action`), also per Arena
 gegenprüfen. Bis dahin: Größenordnung im Label nach Verdünnung ~1e-3,
 für Arena-/Replays-Vergleiche vernachlässigbar, für exakte
 Reproduzierbarkeits-Tests (Prozess A == Prozess B) NICHT.
+**[ERLEDIGT: siehe nächster Abschnitt (2026-07-23) — round5.rs ist jetzt
+Knoten-primär, Arena-Gegenprobe ohne signifikanten Stärkeunterschied.]**
+
+## round5.rs Knoten-primär umgestellt: Runde-4/5-Label deterministisch, Arena-Gegenprobe bestanden (2026-07-23)
+
+Umsetzung des im vorigen Abschnitt offen gelassenen Folge-Tasks
+(Commit 9312be0, exakt das Task-#71-Muster).
+
+**Kalibrierung** (`round5_node_calibration_probe`, als ignorierter Test im
+Repo dokumentiert; freie lokale Maschine, Release-Build): 8 realistische
+Runde-5-Partien via `drive_to_round_start(seed, 5)`, je Entscheidung ein
+Negamax mit unbegrenztem Knotenbudget und 150ms-Deadline. Deadline-
+gebundene Entscheidungen (n=92): min 34, p25 88, Median 155, p75 203,
+p90 292, max 473 Knoten; vor der Deadline vollständig gelöste Teilbäume
+(n=24, Rundenausklang) <=144 Knoten. Kosten pro Knoten schwanken
+stellungsabhängig >10x (0,3-4,4ms) — die frühere "~500-4000"-Schätzung
+war zu hoch gegriffen, die direkte Messung ist konsistent mit der
+45-393s-Hochrechnung für 200k Knoten.
+
+**Umstellung** (`engine/src/round5.rs`): `NODE_BUDGET=200` (~p75 —
+Rechenparität zur typischen alten 150ms-Suche, deckt alle beobachteten
+natürlich terminierenden Teilbäume ab) ist jetzt der PRIMÄRE,
+deterministische Cutoff; `TIME_BUDGET` 150ms→5s, nur noch Not-Deckel
+(~5x Worst-Case 200x4,4ms). Betrifft `exact_round5_outcome` UND die
+Live-Zugwahl `choose_action`/`choose_action_with_analysis` (ein
+gemeinsamer Suchkern). WICHTIGER FOLGE-FIX: `TIME_BUDGET_TRAIN_ROUND4`
+12s→60s — die 24-Sample-Runde-4→5-Kette kostet jetzt worst-case ~24x0,9s
+~ 21s; mit dem alten 12s-Deckel wäre die Wanduhr genau am Runde-4-Label
+wieder bindend geworden und hätte den Determinismus-Gewinn dort sofort
+wieder zerstört. `EXTRA_GAME_TIMEOUT_SECS` entsprechend 207→255.
+
+**Determinismus-Nachweise**: (1) neuer Suite-Test: 3x
+`exact_round5_outcome` auf realistischer Stellung bit-identisch +
+`choose_action` reproduzierbar; (2) Task-#71-Kernmuster-Test: 10x
+aufgeblähte Deadline liefert dasselbe Bitmuster (`NODE_BUDGET` ist der
+bindende Cutoff); (3) E2E über Prozessgrenzen: identischer
+`net_arena_match`-Aufruf (2 Spiele, v10_best@400) in zwei separaten
+Prozessstarts BYTE-IDENTISCH — zusammen mit der tract-onnx-Bit-Exaktheit
+(voriger Abschnitt) ist die Prozess-A==Prozess-B-Reproduzierbarkeit
+damit geschlossen. 145/145 Tests grün (Release und Debug).
+
+**Arena-Gegenprobe** (`evaluations/paired_arena_round5.py`, Muster wie
+ISMCTS-/Speed-Bündel-A/B; ALT=5cb4f56 in eigenem Worktree+venv, NEU=
+9312be0; v10_best @ NET_SIMS=400 vs. Heuristik @ HEUR_SIMS=200, Blöcke à
+25, kumulativer exakter McNemar): **150 Paare ohne Signifikanz — NEU
+55:58 ALT, diskordant b=2/c=5, p=0,45.** Kein Beleg für einen
+Stärkeverlust; hohe Konkordanz (143/150 Paare gleich) wie erwartet, weil
+nur Runde-5-Züge betroffen sind. Laufzeitkosten der Umstellung: NEU-Arm
+~+25% je 25er-Block (88-111s vs. 67-94s) — Folge der p75-Wahl (mehr
+Knoten als der alte Median), bewusst in Kauf genommen — Determinismus
+ist hier der Zweck, nicht ein Speed-Trade.
 
 ## Gepaartes Gating als Standard (2026-07-23)
 
