@@ -138,27 +138,32 @@ pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
 /// Mehrfach-Determinisierungs-Verwerfungsmuster).
 pub const VALUE_SHRINK_ENABLED: bool = false;
 
-/// Platzhalter-Kalibrierung `w_r` je Runde (Index 0 = Runde 1 ... Index 4 =
-/// Runde 5), angewendet als `v_shrunk = 0.5 + w_r·(v - 0.5)`. Herleitung
-/// (Task #78, wird in Phase B mit echten v12-Diagnosen NACHKALIBRIERT --
-/// dies ist explizit ein Platzhalter, keine finale Konstante):
+/// Rekalibrierung (Task #78, 2026-07-23) `w_r` je Runde (Index 0 = Runde 1
+/// ... Index 4 = Runde 5), angewendet als `v_shrunk = 0.5 + w_r·(v - 0.5)`.
+/// Ersetzt die Phase-A-Platzhalterwerte (die auf dem separaten Noise-Floor-
+/// Rückspiel-Test + geclampter v10/v9b-Modell-R²-Näherung beruhten, siehe
+/// Git-Historie dieser Konstante).
 ///
-/// `w_r ∝ sqrt(Deckel_r)`, normiert auf `w_5 = 1.0` (keine Dämpfung in der
-/// letzten Runde). `Deckel_r` = korrigierter Noise-Floor-Rückspiel-Test aus
-/// `evaluations/STATUS.md` ("Punkt 1, Noise-Floor-Test", 2026-07-21):
-/// Runde 1 = 0.0068, Runde 2 = 0.166, Runde 3 = 0.437 (klar monoton
-/// steigend). Für Runde 4/5 existiert noch KEIN direkter Deckel-Messwert
-/// (die Drei-Runden-Probe endete bei Runde 3) -- als Platzhalter wird dort
-/// das trainierte Modell-R² (v10_best/v9b_domeonly-Referenz, gleiche
-/// STATUS.md-Tabelle: Runde 4 ≈0.406-0.426, Runde 5 ≈0.62) als Näherung an
-/// den wahren Deckel verwendet, mit `max(Deckel_r, Deckel_{r-1})` gegen die
-/// Runde-3-Messung erzwungen (0.406 läge sonst hauchdünn UNTER 0.437 und
-/// würde die geforderte Monotonie brechen) -- daher Runde 3 und 4 hier
-/// identisch. Werte (vor Normierung, `sqrt`):
-///   R1 √0.0068=0.0825, R2 √0.166=0.4074, R3 √0.437=0.6611,
-///   R4 √0.437=0.6611 (geclampt), R5 √0.623=0.7893.
-/// Normiert durch R5: `[0.1045, 0.5162, 0.8375, 0.8375, 1.0000]`.
-pub const VALUE_SHRINK_PER_ROUND: [f64; 5] = [0.1045, 0.5162, 0.8375, 0.8375, 1.0000];
+/// Quelle der Zahlen: `tools/offline_diagnose.py`-Lauf auf dem AMTIERENDEN
+/// Champion `v12b_lr_best` (2026-07-23, `evaluations/STATUS.md` Abschnitt
+/// "v12b: LR-Schedule + From-Scratch-Kontrolle"), echter Val-Split
+/// (n=32.392 Val-Züge). Für v12b_lr existiert KEIN separater Noise-Floor-
+/// Rückspiel-Test (die Drei-Runden-Probe wurde nur einmal, gegen ein
+/// anderes Modell/Korpus, gefahren) -- deshalb wird hier direkt das
+/// Modell-R² pro Runde als Verlässlichkeits-Näherung verwendet (derselbe
+/// Näherungsschritt, den Phase A bereits für Runde 4/5 mangels Deckel-
+/// Messwert brauchte, jetzt konsistent auf alle 5 Runden angewendet).
+///
+/// Herleitung, unverändert zur Phase-A-Formel: `w_r ∝ sqrt(max(0, R²_r))`,
+/// normiert auf `w_5 = 1.0` (keine Dämpfung in der letzten Runde). Die
+/// frischen R²-Werte sind bereits von sich aus streng monoton steigend
+/// (R1 0.0368 < R2 0.1106 < R3 0.1717 < R4 0.2298 < R5 0.5145) -- anders als
+/// in Phase A ist HIER kein `max(Deckel_r, Deckel_{r-1})`-Clamping nötig.
+/// Werte (vor Normierung, `sqrt`):
+///   R1 √0.0368=0.19183, R2 √0.1106=0.33257, R3 √0.1717=0.41437,
+///   R4 √0.2298=0.47937, R5 √0.5145=0.71729.
+/// Normiert durch R5: `[0.2674, 0.4636, 0.5777, 0.6683, 1.0000]`.
+pub const VALUE_SHRINK_PER_ROUND: [f64; 5] = [0.2674, 0.4636, 0.5777, 0.6683, 1.0000];
 
 /// Rundenzahl (1-basiert, wie `state.round_number`) → Schrumpfgewicht `w_r`
 /// aus `VALUE_SHRINK_PER_ROUND`. Defensiv geklammert (Runde 0 oder >5 sollte
@@ -2858,16 +2863,25 @@ mod tests {
     }
 
     #[test]
-    fn apply_value_shrink_is_identity_when_disabled_by_default() {
-        // Kernanforderung Task #78: Standard AUS = byte-identisch zum
-        // Vor-Task-#78-Verhalten (bestehende Tests bleiben grün, weil dieser
-        // Pfad bei jedem Aufruf in `make_node`/`net_leaf_eval` ein reines
-        // No-Op ist).
-        assert!(!VALUE_SHRINK_ENABLED, "Standard muss AUS bleiben (Aktivierung erst nach Phase-B-Nachweis)");
+    fn apply_value_shrink_matches_current_toggle_state() {
+        // Task #78, robust gegen den A/B-Toggle-Flip (2026-07-23): dieser Test
+        // muss bei `VALUE_SHRINK_ENABLED=false` UND `=true` gruen bleiben --
+        // waehrend des Phase-B-Nachweislaufs wird die Konstante temporaer auf
+        // `true` gesetzt (`cargo test --release` muss dabei gruen bleiben,
+        // siehe `evaluations/STATUS.md` "v12c"-Abschnitt), danach je nach
+        // Ergebnis wieder zurueckgesetzt. Bei AUS: reine Identitaet (byte-
+        // identisch zum Vor-Task-#78-Verhalten). Bei AN: Runde 5 bleibt
+        // Identitaet (w_5=1.0 per Normierung), fruehere Runden werden
+        // sichtbar Richtung 0.5 gezogen.
         let v = [0.9, 0.05];
-        assert_eq!(apply_value_shrink(v, 1), v);
-        assert_eq!(apply_value_shrink(v, 5), v);
-        assert_eq!(apply_value_shrink([0.0, 1.0], 3), [0.0, 1.0]);
+        if VALUE_SHRINK_ENABLED {
+            assert_ne!(apply_value_shrink(v, 1), v, "bei AN muss Runde 1 sichtbar geschrumpft werden");
+            assert_eq!(apply_value_shrink(v, 5), v, "Runde 5 bleibt Identitaet (w_5=1.0)");
+        } else {
+            assert_eq!(apply_value_shrink(v, 1), v);
+            assert_eq!(apply_value_shrink(v, 5), v);
+            assert_eq!(apply_value_shrink([0.0, 1.0], 3), [0.0, 1.0]);
+        }
     }
 
     #[test]
