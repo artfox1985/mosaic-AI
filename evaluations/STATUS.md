@@ -1113,7 +1113,7 @@ frischer Self-Play-Batch/Retrain damit gefahren, siehe "Nächste Schritte".
 
 **`dynamic_sims`-Entkopplung jetzt Standard** (Nutzer-Entscheidung,
 2026-07-21, unabhängig vom uneindeutigen 20%-Ablationsergebnis oben):
-`DECOUPLE_NET_SIMS_FROM_ACTIONS=true`. `arena.py`: `NET_SIMS=400` (flaches
+`DECOUPLE_NET_SIMS_FROM_ACTIONS=true`. `tools/arena.py`: `NET_SIMS=400` (flaches
 Budget, Nutzer-Vorgabe), `HEUR_SIMS` bewusst von `NET_SIMS` entkoppelt und
 bei 150 belassen (weiterhin `dynamic_sims`-skaliert, Vergleichbarkeit mit
 den 17-26%-Baselines bleibt erhalten). **Server (`server.py`) bewusst NICHT
@@ -1253,7 +1253,7 @@ Korpus (`selfplay_netcq_*`).
 - **Bugfix nebenbei**: `run_net_self_play` hängt einen
   `perspective_divergence_diagnostics`-Record ans JSON, den self_play.py
   als 11. "Spiel" in die .pkl schrieb — hätte das Training mit KeyError
-  gecrasht. Filter in self_play.py ergänzt (arena.py-Muster).
+  gecrasht. Filter in self_play.py ergänzt (tools/arena.py-Muster).
 - **Unterbrechungen**: tagsüber Nutzer-Abbruch (Rechner gebraucht, 50
   Spiele gesichert); abends Neustart kollidierte mit der parallelen
   Floor-Shaping-Ablation (lastabhängiger Gamma-Pruning-Chunk-Hänger, vom
@@ -1501,7 +1501,7 @@ Zeitbudgets machen rtv/bootstrap-Labels lastabhängig, Knoten-Budgets machen
 sie deterministisch).
 
 **Diversitäts-Monitoring (#67) — FERTIG, Urteil: GESUND, kein Kollaps.**
-`evaluations/selfplay_diversity_report.py` (wiederverwendbar als
+`tools/selfplay_diversity_report.py` (wiederverwendbar als
 Regressions-Check), alle 200 netcq-Dateien vs. 30 domefactB-Referenzdateien,
 Eröffnungen exakt aus den state-log-Diffs rekonstruiert: **1996/2000
 einzigartige 3-Zug-Eröffnungen** (normierte Entropie 1.00, häufigste
@@ -1510,7 +1510,7 @@ Spiellängen 161.5±4.3 (etwas kürzer als Heuristik 173.7±4.3 — plausibler
 Stilunterschied, kein Befund). **Keine Eröffnungs-Temperatur für v12 nötig.**
 
 **Elo-Tracker (#62) — Infrastruktur FERTIG, erste Kader-Matches ausstehend.**
-`evaluations/elo_tracker.py` + `elo_history.csv`: Bradley-Terry-MLE
+`tools/elo_tracker.py` + `elo_history.csv`: Bradley-Terry-MLE
 (MM-Algorithmus) je Zusammenhangskomponente des Match-Graphen,
 Heuristik@200 als fixer 1000-Anker, 95%-CI per Bootstrap, CLI add/report.
 Initial nur das kader-valide Gating-Match (v11 43:57 v10) eingetragen; alte
@@ -1579,7 +1579,7 @@ Tests grün (138 Baseline + 5 neu: Sims-Split-Arithmetik, synthetische
 Aggregations-Mathematik, n=1-Äquivalenz zum Alt-Pfad, n=3 zieht
 nachweislich 3 verschiedene `dome_tile_pool`-Ordnungen).
 
-**Gepaarter A/B** (`evaluations/paired_arena_ismcts.py`, Muster wie beim
+**Gepaarter A/B** (`tools/paired_arena_ismcts.py`, Muster wie beim
 Speed-Bündel-A/B): ALT (n=1, Worktree `../mosaic-ismcts-n1`) vs. NEU (n=3,
 Haupt-Wheel), v10_best @ NET_SIMS=400 vs. Heuristik @ HEUR_SIMS=200, Blöcke
 à 25, kumulativer exakter McNemar, Stopp bei p<0.05 oder 150 Paaren.
@@ -1736,7 +1736,7 @@ Prozessstarts BYTE-IDENTISCH — zusammen mit der tract-onnx-Bit-Exaktheit
 (voriger Abschnitt) ist die Prozess-A==Prozess-B-Reproduzierbarkeit
 damit geschlossen. 145/145 Tests grün (Release und Debug).
 
-**Arena-Gegenprobe** (`evaluations/paired_arena_round5.py`, Muster wie
+**Arena-Gegenprobe** (`tools/paired_arena_round5.py`, Muster wie
 ISMCTS-/Speed-Bündel-A/B; ALT=5cb4f56 in eigenem Worktree+venv, NEU=
 9312be0; v10_best @ NET_SIMS=400 vs. Heuristik @ HEUR_SIMS=200, Blöcke à
 25, kumulativer exakter McNemar): **150 Paare ohne Signifikanz — NEU
@@ -1764,7 +1764,7 @@ zwei unabhaengige Aufrufe mit gleichem Seed+Modellen liefern byte-identische
 Spielfolgen, UND Spiel `i=0` ist unabhaengig von `n_games` (reine Funktion
 von `seed+i`) -- Voraussetzung fuers gepaarte Design unten.
 
-**Neues Werkzeug `evaluations/paired_gating.py`**: gepaartes Netz-vs-Netz-
+**Neues Werkzeug `tools/paired_gating.py`**: gepaartes Netz-vs-Netz-
 Gating fuer Kandidat A vs. Kandidat B (z.B. neuer Checkpoint vs. amtierenden
 Champion). Ein **Paar** = ein Seed, zwei Spiele mit GETAUSCHTEN Brettern (die
 Rust-API bietet keinen eingebauten Brett-Tausch-Modus, daher zwei
@@ -1801,7 +1801,7 @@ Paare, JSON-Blocklogs (inkl. LLR-Verlauf), druckt am Ende eine fertige
 
 **Dokumentation aktualisiert**: `elo_tracker.py`-Modul-Docstring markiert
 `paired_gating.py` jetzt als Standardweg fuer Champion-Ablösungs-
-Entscheidungen (`arena.py::run_net_vs_net`s SPRT bleibt fuer schnelle,
+Entscheidungen (`tools/arena.py::run_net_vs_net`s SPRT bleibt fuer schnelle,
 nicht-gating-relevante Sanity-Checks nuetzlich, entscheidet aber nicht mehr
 ueber Champion-Wechsel).
 

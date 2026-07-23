@@ -1,9 +1,9 @@
 """
-utils/model_info.py — Zeigt Metadaten eines gespeicherten Modells an.
+tools/model_info.py — Zeigt Metadaten eines gespeicherten Modells an.
 
 Verwendung:
-    python -m utils.model_info --version v1
-    python -m utils.model_info --version v2
+    python tools/model_info.py --version v1
+    python tools/model_info.py --version v2
 """
 import argparse
 import torch

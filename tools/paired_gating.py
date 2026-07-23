@@ -2,9 +2,9 @@
 Vergleiche (Task #76, Phase A, 2026-07-23; SPRT-Upgrade 2026-07-23,
 Nutzer-Anstoss).
 
-## Warum ein eigenes Skript (statt `arena.py::run_net_vs_net` weiterzunutzen)
+## Warum ein eigenes Skript (statt `tools/arena.py::run_net_vs_net` weiterzunutzen)
 
-`arena.py::run_net_vs_net` spielt Kandidat A vs. Kandidat B direkt gegeneinander
+`tools/arena.py::run_net_vs_net` spielt Kandidat A vs. Kandidat B direkt gegeneinander
 und entscheidet per SPRT -- schnell, aber NICHT gepaart: Startspieler/Brett
 alternieren zwar ueber viele Spiele (i % 2), aber JE EINZELNES Spiel hat ein
 Kandidat zufaellig das potenziell staerkere/schwaechere Brett (falls es einen
@@ -103,7 +103,7 @@ Bloecke a 25 Paare (= 50 Spiele je Block), harter Deckel 200 Paare
 
 ## Nutzung
 
-    python evaluations/paired_gating.py --model-a models/alphazero_v12_best.onnx \\
+    python tools/paired_gating.py --model-a models/alphazero_v12_best.onnx \\
         --model-b models/alphazero_v10_best.onnx --name-a v12_best --name-b v10_best \\
         --sims 400
 
@@ -183,7 +183,7 @@ def paired_ci(diffs: list[int], z: float = 1.96) -> tuple[float, float, float]:
 
 def sprt_bounds(alpha: float = SPRT_ALPHA, beta: float = SPRT_BETA) -> tuple[float, float]:
     """Wald-Abbruchschranken (1945) fuer den truncated SPRT -- identische
-    Formel wie `arena.py::sprt_bounds` (dort auf EINZELSPIELE angewendet,
+    Formel wie `tools/arena.py::sprt_bounds` (dort auf EINZELSPIELE angewendet,
     hier auf INFORMATIVE PAARE, siehe Modul-Docstring). Untere Schranke
     `ln(beta/(1-alpha))`, obere Schranke `ln((1-beta)/alpha)`. Bei
     alpha=beta=0.05: ±ln(19) = ±2.9444... (symmetrisch, weil alpha=beta)."""
@@ -194,7 +194,7 @@ def sprt_bounds(alpha: float = SPRT_ALPHA, beta: float = SPRT_BETA) -> tuple[flo
 
 def sprt_llr_delta(a_won_pair: bool, p0: float = SPRT_P0, p1: float = SPRT_P1) -> float:
     """LLR-Zuwachs fuer EIN informatives Paar (identische Formel wie
-    `arena.py::sprt_llr_delta`, hier pro Paar statt pro Einzelspiel).
+    `tools/arena.py::sprt_llr_delta`, hier pro Paar statt pro Einzelspiel).
     `a_won_pair`: True fuer einen A-Sweep (b), False fuer einen B-Sweep (c)
     -- Splits rufen diese Funktion nie auf (siehe Aufrufstelle)."""
     if a_won_pair:
@@ -366,7 +366,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     print(f"  Gepaarte Differenz (A-Siege minus B-Siege pro Paar): "
           f"{mean_d:+.3f}  95%-KI [{ci_lo:+.3f}, {ci_hi:+.3f}]")
     print(f"  Hinweis fuers elo_tracker-Protokoll:")
-    print(f"    python evaluations/elo_tracker.py add --player-a {name_a} --sims-a {sims_a} "
+    print(f"    python tools/elo_tracker.py add --player-a {name_a} --sims-a {sims_a} "
           f"--player-b {name_b} --sims-b {sims_b} --wins-a {a_wins_total} "
           f"--wins-b {b_wins_total} --n {n_games_total} "
           f"--comment \"Gepaartes Gating (Task #76), SPRT={sprt_verdict}, p={final_p:.4f}\"")
@@ -410,7 +410,7 @@ def main() -> None:
     )
 
     out_path = Path(args.out) if args.out else (
-        Path(__file__).resolve().parent
+        Path(__file__).resolve().parent.parent / "evaluations"
         / f"paired_gating_result_{result['name_a']}_vs_{result['name_b']}.json"
     )
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")

@@ -19,7 +19,7 @@
 - **Batched inference** (`engine/src/net.rs`) — both leaf perspectives (mover + flipped) run as one batch=2 ONNX call (tract-onnx, ~1.9× search speedup).
 - **Self-Play Pipeline** (`self_play.py`) — network or heuristic mode; per-game flush (a crash costs ≤1 game), heartbeat supervision, preemptive per-game watchdog, Windows keep-awake, and a JSON run manifest (CLI args, git commit, full engine-constant snapshot) per run. Value labels (`round_transition_value`, TD-bootstrap `bootstrap_value`) are node-budgeted → deterministic and load-independent.
 - **Training** (`train.py`) — warm-start with shape-mismatch filtering, plateau-based early stopping, combined-metric checkpoint selection (policy+value+points), per-run corpus-composition log (games per version prefix), automatic ONNX export, network-utilization analysis (dead neurons / effective rank).
-- **Elo tracking & champion gating** (`evaluations/elo_tracker.py`) — Bradley-Terry Elo over the full match graph, anchored at Heuristik@200 = 1000; roster: current champion@400 + previous champion@400. A new model becomes champion (= next self-play generator) only by beating the incumbent.
+- **Elo tracking & champion gating** (`tools/elo_tracker.py`) — Bradley-Terry Elo over the full match graph, anchored at Heuristik@200 = 1000; roster: current champion@400 + previous champion@400. A new model becomes champion (= next self-play generator) only by beating the incumbent.
 - **Diagnostics suite** — sibling-ranking Kendall-tau vs. exact solver, per-round value R², noise-floor variance decomposition (bias-corrected), self-play diversity report, paired-seed arena A/B harness (McNemar).
 - **Web Interface** (`server.py` + `static/`) — Flask API on top of the Rust engine, browser UI for playing against the AI and a replay viewer.
 
@@ -47,20 +47,20 @@
 │   │   └── 📜 neural_net.py    # MosaicNet (PyTorch), MosaicDataset, state_to_tensor, action_to_id
 │   ├── 📜 Cargo.toml
 │   └── 📜 pyproject.toml       # maturin build config
-├── 📂 evaluations/            # STATUS.md (living status/roadmap), elo_tracker.py + elo_history.csv,
-│   │                          #   diversity report, paired-arena harnesses, diagrams.txt, eval reports
+├── 📂 evaluations/            # STATUS.md (living status/roadmap), elo_history.csv,
+│   │                          #   diagrams.txt, eval-result JSONs, eval reports (data + docs only)
 ├── 📂 data/                   # Self-play output (.pkl) + run manifests + HDF5 training cache
 │   └── 📂 archive_*/          # Retired corpora (never mixed back in — regime consistency)
 ├── 📂 models/                 # Checkpoints (.pth), ONNX exports (.onnx), training manifests, loss plots
 ├── 📂 static/                 # Web UI (index.html, debug.html, replay viewer, css/js)
-├── 📂 utils/                  # diagnosis.py, model_info.py, git_tree.py
+├── 📂 tools/                  # arena.py, elo_tracker.py, paired_gating.py, paired_arena_*.py,
+│   │                          #   selfplay_diversity_report.py, diagnosis.py, model_info.py, git_tree.py
 ├── 📂 docs/                   # engine_manual.md, reference CSVs (bonus chip/dome colors)
 ├── 📂 archive/                # Legacy: old pure-Python engine/agents, superseded eval reports
 ├── 📜 config.py               # Hyperparameters (INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, ...)
 ├── 📜 self_play.py            # ▶️ Self-play driver (calls into Rust, per-game flush, manifests)
 ├── 📜 train.py                # ▶️ Training (PyTorch/CUDA) + corpus log + auto ONNX export
 ├── 📜 export_onnx.py          # ▶️ .pth → .onnx (also run automatically at the end of train.py)
-├── 📜 arena.py                # ▶️ Net-vs-heuristic / net-vs-net matches
 └── 📜 server.py               # ▶️ Flask web server (browser UI)
 ```
 
@@ -94,10 +94,10 @@ Automatically exports to `.onnx` at the end.
 
 ### 3. Elo / champion gate
 ```bash
-# Roster matches (see evaluations/elo_tracker.py header for the workflow), then:
-python evaluations/elo_tracker.py report
+# Roster matches (see tools/elo_tracker.py header for the workflow), then:
+python tools/elo_tracker.py report
 ```
-Participants for raw matches are configured in `arena.py`'s `__main__` block. Set
+Participants for raw matches are configured in `tools/arena.py`'s `__main__` block. Set
 `threads=` explicitly (the Rust default is single-threaded).
 
 ### 4. Web interface
@@ -187,10 +187,10 @@ single sub-n=100 arms never overwrite reference numbers.
 ## 🛠️ Diagnostics & Tools
 
 ```bash
-python evaluations/elo_tracker.py report        # Elo table (Bradley-Terry, anchored)
-python evaluations/selfplay_diversity_report.py # opening entropy / collapse check
-python -m utils.diagnosis                       # policy quality analysis
-python -m utils.model_info --version v10        # model metadata
+python tools/elo_tracker.py report        # Elo table (Bradley-Terry, anchored)
+python tools/selfplay_diversity_report.py # opening entropy / collapse check
+python tools/diagnosis.py                 # policy quality analysis
+python tools/model_info.py --version v10  # model metadata
 ```
 Rust-side diagnostics exposed via `mosaic_rust`: `sibling_ranking_diagnostic`,
 `value_noise_floor_diagnostic`, `draw_stack_peek_impact_diagnostic`,

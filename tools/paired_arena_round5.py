@@ -11,7 +11,7 @@ p75 dessen, was 150ms real erreichten), der A/B ist eine GEGENPROBE, dass
 der Determinismus-Gewinn nicht mit Spielstaerke bezahlt wird.
 
 ## Design (identisch zum ISMCTS-/Speed-Buendel-A/B-Muster, siehe
-`evaluations/paired_arena_ismcts.py`):
+`tools/paired_arena_ismcts.py`):
 
 - Gepaarte Arena: identische Spiel-Seeds in beiden Armen.
 - Bloecke a 25 Paare, nach JEDEM vollstaendigen Block ein kumulativer
@@ -32,7 +32,7 @@ Paarung als Varianzreduktion, kein exakter Ceteris-paribus-Vergleich.
 
 ## Nutzung
 
-    python evaluations/paired_arena_round5.py
+    python tools/paired_arena_round5.py
 """
 import sys
 import json
@@ -145,6 +145,6 @@ if __name__ == "__main__":
             raise SystemExit(f"{name}-venv-Python nicht gefunden: {exe}")
     result = run_paired_ab()
     print(json.dumps(result, indent=2))
-    out_path = Path(__file__).resolve().parent / "paired_arena_round5_result.json"
+    out_path = BASE_DIR / "evaluations" / "paired_arena_round5_result.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"Ergebnis gespeichert: {out_path}")

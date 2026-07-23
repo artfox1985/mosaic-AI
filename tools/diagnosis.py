@@ -1,5 +1,5 @@
 """
-utils/diagnosis.py — Sanity Check der Trainingsdaten
+tools/diagnosis.py — Sanity Check der Trainingsdaten
 
 Prüft:
   - zero-mask rows  → sollte 0 sein
@@ -8,7 +8,7 @@ Prüft:
   - policy quality  → wie scharf/konzentriert sind die MCTS-Targets?
 
 Verwendung:
-    python -m utils.diagnosis
+    python tools/diagnosis.py
 """
 import sys, torch, os, math, glob, pickle, random
 import torch.nn.functional as F
