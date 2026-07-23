@@ -9,13 +9,13 @@ danach per `add` eingetragen.
 
 GEPAARTES GATING ALS STANDARD (Task #76, 2026-07-23): Champion-Ablösungs-
 Entscheidungen (neuer Kandidat vs. amtierenden Champion) laufen ab jetzt ueber
-`evaluations/paired_gating.py`, NICHT mehr ueber `arena.py::run_net_vs_net`s
+`tools/paired_gating.py`, NICHT mehr ueber `tools/arena.py::run_net_vs_net`s
 SPRT direkt. `paired_gating.py` spielt gepaarte Seed-Bloecke mit GETAUSCHTEN
 Brettern je Paar (Brett-/Zugreihenfolge-Bias faellt pro Paar heraus, nicht nur
 im Erwartungswert) und einen exakten Paar-Vorzeichentest statt SPRT. Das
 Ergebnis (a_wins_total/b_wins_total/n_games_total) wird GENAUSO per `add`
 eingetragen wie bisher -- dieses Skript hier aendert sich dadurch nicht,
-nur die Herkunft der eingetragenen Zahlen. `arena.py::run_net_vs_net` bleibt
+nur die Herkunft der eingetragenen Zahlen. `tools/arena.py::run_net_vs_net` bleibt
 fuer schnelle, nicht-gating-relevante Sanity-Checks nuetzlich.
 
 Kader (Nutzer-Entscheidung, siehe MEMORY.md "Plan, delegate to Sonnet agents"):
@@ -26,7 +26,7 @@ Kader (Nutzer-Entscheidung, siehe MEMORY.md "Plan, delegate to Sonnet agents"):
 Warum die alten Heuristik-Matches NICHT in die CSV zurueckgefuellt wurden
 --------------------------------------------------------------------------
 Die historischen Netz-vs-Heuristik-Ergebnisse (z.B. die 17-26%-Session-
-Baselines in arena.py) liefen mit Heuristik@150 (dynamic_sims-skaliert, Ø~330
+Baselines in tools/arena.py) liefen mit Heuristik@150 (dynamic_sims-skaliert, Ø~330
 tatsaechliche Sims) UND unter dem alten Regelwerk vor dem Regelbuch-Audit
 (82e8a88: Marker-/Tie-Break-/Monochrom-Fixes). Weder die Sims-Bedingung noch
 die Spielregeln sind mit dem aktuellen Kader (Heuristik@200, neue Regeln)
@@ -37,26 +37,26 @@ Bestandsergebnis (v11_best vs v10_best, 2026-07-22, siehe unten).
 Ablauf fuer kuenftige Generationen (AB TASK #76 GEPAART, siehe oben)
 --------------------------------------------------------------------
 1. Neues Modell (z.B. v12_best) spielt gegen JEDES Kader-Mitglied:
-   - vs. Heuristik@200: weiterhin `arena.py::run_net_arena` (kein Kandidat-
+   - vs. Heuristik@200: weiterhin `tools/arena.py::run_net_arena` (kein Kandidat-
      vs-Kandidat-Brett-Bias moeglich, Heuristik ist kein Netz-Brett).
    - vs. amtierenden/vorherigen Champion (Netz vs. Netz): NEU per
-     `evaluations/paired_gating.py`:
-       python evaluations/paired_gating.py \\
+     `tools/paired_gating.py`:
+       python tools/paired_gating.py \\
            --model-a models/alphazero_v12_best.onnx --name-a v12_best \\
            --model-b models/alphazero_v10_best.onnx --name-b v10_best \\
            --sims 400 --seed <FIXER_SEED>
      Druckt am Ende bereits eine fertige `add`-Kommandozeile (siehe
      `paired_gating.py`-Modul-Docstring fuer das gepaarte Brett-Tausch-Design).
 2. Jedes Ergebnis per `add` eintragen (Beispiel, Heuristik-Match):
-       python evaluations/elo_tracker.py add --player-a v12_best --sims-a 400 \\
+       python tools/elo_tracker.py add --player-a v12_best --sims-a 400 \\
            --player-b Heuristik --sims-b 200 --wins-a 61 --wins-b 39 --n 100 \\
            --comment "Kader-Match v12-Zyklus"
-3. `python evaluations/elo_tracker.py report` zeigt den aktuellen Elo-Verlauf
+3. `python tools/elo_tracker.py report` zeigt den aktuellen Elo-Verlauf
    (Bradley-Terry-Fit ueber den gesamten Graphen, Heuristik@200 fix auf 1000).
 4. Gating-Regel: ein neues Modell loest den amtierenden Champion nur ab, wenn
    es GEGEN DEN AMTIERENDEN CHAMPION signifikant gewinnt -- ab jetzt per
    `paired_gating.py`s exaktem Paar-Vorzeichentest (p<0.05, siehe dort), NICHT
-   mehr per `arena.py::run_net_vs_net`s SPRT. Ein blosser Sieg gegen die
+   mehr per `tools/arena.py::run_net_vs_net`s SPRT. Ein blosser Sieg gegen die
    Heuristik allein reicht weiterhin nicht.
 
 Die ERSTEN echten Kader-Matches (v10_best und v11_best je vs. Heuristik@200)
@@ -71,8 +71,8 @@ Regelwerk) -- deshalb als einziger Bestandswert uebernommen.
 
 CLI
 ---
-  python evaluations/elo_tracker.py report
-  python evaluations/elo_tracker.py add --player-a NAME --sims-a INT \\
+  python tools/elo_tracker.py report
+  python tools/elo_tracker.py add --player-a NAME --sims-a INT \\
       --player-b NAME --sims-b INT --wins-a INT --wins-b INT --n INT \\
       [--date YYYY-MM-DD] [--comment TEXT]
 """
@@ -84,13 +84,16 @@ import random
 import sys
 from collections import defaultdict
 from datetime import date as _date
+from pathlib import Path
 
 try:
     import numpy as _np
 except ImportError:  # pragma: no cover
     _np = None
 
-CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "elo_history.csv")
+# Datendatei bleibt in evaluations/ (Reorg 2026-07-23: Skript nach tools/
+# verschoben, Ergebnisdaten bleiben repo-Konvention nach in evaluations/).
+CSV_PATH = str(Path(__file__).resolve().parent.parent / "evaluations" / "elo_history.csv")
 HEADER = ["date", "player_a", "sims_a", "player_b", "sims_b", "wins_a", "wins_b", "n", "comment"]
 
 ANCHOR_NAME = "Heuristik"
@@ -138,7 +141,7 @@ def add_result(player_a, sims_a, player_b, sims_b, wins_a, wins_b, n,
                date=None, comment=""):
     """Traegt EIN Match-Ergebnis (aggregiert ueber n Spiele) in die CSV ein.
     wins_a + wins_b muss n ergeben (kein Draw-Feld -- Unentschieden werden im
-    Regelwerk per Marker-Tie-Break immer aufgeloest, siehe arena.py `winner`)."""
+    Regelwerk per Marker-Tie-Break immer aufgeloest, siehe tools/arena.py `winner`)."""
     if wins_a + wins_b != n:
         raise ValueError(f"wins_a({wins_a}) + wins_b({wins_b}) != n({n})")
     if n <= 0:

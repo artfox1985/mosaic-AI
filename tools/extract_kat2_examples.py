@@ -1,11 +1,11 @@
 """
-utils/extract_kat2_examples.py — Extrahiert konkrete Beispiel-Zustände fuer
+tools/extract_kat2_examples.py — Extrahiert konkrete Beispiel-Zustände fuer
 "Kategorie 2"-Faelle (Strafleiste als Top-Policy-Wahl TROTZ offener, nicht
 aussichtsloser Reihen-Alternative, UND mit deutlicher Prob-Marge > 0.2) aus
 den Self-Play-Trainingsdaten -- zum manuellen Nachpruefen im Debug-Log.
 
 Verwendung:
-    python -m utils.extract_kat2_examples [data_dir] [--prefix selfplay_v8]
+    python tools/extract_kat2_examples.py [data_dir] [--prefix selfplay_v8]
 """
 import sys, os, glob, pickle, json, argparse
 from pathlib import Path
@@ -14,7 +14,7 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
 from config import DATA_DIR
-from utils.diagnosis import (
+from diagnosis import (
     _dome_row_fully_built,
     _dome_row_has_open_matching_slot,
 )

@@ -5,7 +5,7 @@ unabhaengige Welten, Sims-Budget gesplittet, completed-Q-Politik ueber die
 Welten gemittelt).
 
 ## Design (identisch zum Speed-Buendel-A/B-Muster, siehe
-`evaluations/paired_arena_speedbundle.py`):
+`tools/paired_arena_speedbundle.py`):
 
 - Gepaarte Arena: identische Spiel-Seeds in beiden Armen (`net_arena_match`s
   interne Seed-Ableitung ist deterministisch je Spielindex, siehe
@@ -42,7 +42,7 @@ McNemar bleibt trotzdem sinnvoll fuer die Varianzreduktion.
 
 ## Nutzung
 
-    python evaluations/paired_arena_ismcts.py
+    python tools/paired_arena_ismcts.py
 
 Voraussetzung: `../mosaic-ismcts-n1/.venv-n1` existiert mit dem ALT-Wheel
 (NUM_DETERMINIZATIONS=1) installiert, UND dieses Skript wird mit dem
@@ -159,6 +159,6 @@ if __name__ == "__main__":
         )
     result = run_paired_ab()
     print(json.dumps(result, indent=2))
-    out_path = Path(__file__).resolve().parent / "paired_arena_ismcts_result.json"
+    out_path = BASE_DIR / "evaluations" / "paired_arena_ismcts_result.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"Ergebnis gespeichert: {out_path}")

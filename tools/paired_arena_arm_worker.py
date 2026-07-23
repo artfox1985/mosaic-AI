@@ -6,7 +6,7 @@ venv/Wheel-Stand aufgerufen (ALT = `../mosaic-speedbundle-old/.venv-old`,
 NEU = Haupt-venv) -- reiner dünner CLI-Wrapper um
 `mosaic_rust.net_arena_match`, druckt das rohe JSON auf stdout (ein
 `[{scores, winner, steps, total_floor, floor_per_round}, ...]`-Array, gleiches
-Format wie `arena.py`s `run_net_arena`).
+Format wie `tools/arena.py`s `run_net_arena`).
 
 Der Orchestrator (`paired_arena_speedbundle.py`) ruft dies für BEIDE Arme mit
 IDENTISCHEM `--seed` auf, damit `net_arena_match`s interne Pro-Spiel-Seed-

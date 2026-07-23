@@ -29,7 +29,7 @@ W=0.3 vs. W=0.0"):
 
 v10_best @ NET_SIMS=400 (flach, DECOUPLE_NET_SIMS_FROM_ACTIONS=true) vs.
 Heuristik @ HEUR_SIMS=200 (Basiswert, weiterhin intern `dynamic_sims`-
-skaliert wie in `arena.py`s bisherigem HEUR_SIMS=150 -- NUR der Basiswert
+skaliert wie in `tools/arena.py`s bisherigem HEUR_SIMS=150 -- NUR der Basiswert
 ist per Nutzer-Korrektur auf 200 angehoben, neuer Kader-Standard,
 `project_..._elo_kader`-Memory: Heuristik@200-Anker + Champion@400 +
 prev-Champion@400). Dieser A/B-Lauf IST damit zugleich der ERSTE
@@ -59,7 +59,7 @@ Phase-2b-Interpretation berücksichtigen.
 
 ## Nutzung (Phase 2b, NICHT jetzt)
 
-    python evaluations/paired_arena_speedbundle.py
+    python tools/paired_arena_speedbundle.py
 
 Voraussetzung: `../mosaic-speedbundle-old/.venv-old` existiert und hat das
 ALT-Wheel installiert (siehe Phase-2a-Statusbericht) UND dieses Skript wird
@@ -76,7 +76,7 @@ from math import comb
 # Windows-Konsolen (cp1252) koennen die Emoji-Ausgaben sonst nicht kodieren
 # (Fund Phase 2b: Crash NACH dem letzten Block, direkt vor der finalen JSON-
 # Ausgabe -- alle Daten waren zu dem Zeitpunkt bereits berechnet, nur der
-# Abschluss-Print schlug fehl). Gleiches Muster wie arena.py/self_play.py.
+# Abschluss-Print schlug fehl). Gleiches Muster wie tools/arena.py bzw. self_play.py.
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
