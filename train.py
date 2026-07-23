@@ -186,7 +186,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          show_plot=True, val_frac=0.1, train_file_limit=None):
+          show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none"):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -204,7 +204,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     _cli_args = {
         "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
-        "train_file_limit": train_file_limit,
+        "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -257,8 +257,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     from config import HIDDEN_SIZE as DEFAULT_HIDDEN
     hs = hidden_size if hidden_size is not None else DEFAULT_HIDDEN
     print(f"🧠 Netz-Architektur: {dataset.input_size}→{hs}→{hs}→{hs}")
-    print(f"⚙️  Hyperparameter (config.py):")
-    print(f"   Learning Rate : {LEARNING_RATE}")
+    # --lr/--lr-schedule (Task #77, v12b): additiv zum bisherigen Verhalten --
+    # ohne --lr bleibt LEARNING_RATE aus config.py unveraendert massgeblich,
+    # ohne --lr-schedule bleibt Adam mit konstanter LR wie bisher (kein
+    # Scheduler-Objekt, kein zusaetzlicher .step()-Aufruf).
+    effective_lr = lr if lr is not None else LEARNING_RATE
+    print(f"⚙️  Hyperparameter (config.py, ggf. per CLI überschrieben):")
+    print(f"   Learning Rate : {effective_lr}" + (f"  (Default {LEARNING_RATE})" if lr is not None else ""))
+    print(f"   LR-Schedule   : {lr_schedule}")
     print(f"   Batch Size    : {BATCH_SIZE}")
     print(f"   Value Weight  : {VALUE_WEIGHT}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)")
     print(f"   Points Weight : {POINTS_WEIGHT}  (Punktestand-Prognose, Aux-Signal)")
@@ -292,11 +298,24 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     model.to(device)
 
     # 4. Training Parameter
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(model.parameters(), lr=effective_lr)
 
     # Epochen-Anzahl ---
     epochs = input_epoch
     print(f"   Epochen       : {epochs}")
+
+    # LR-Scheduler (Task #77, v12b_lr): Cosine-Annealing ueber die angeforderten
+    # Epochen (`epochs`, NICHT die evtl. durch Early Stopping tatsaechlich
+    # gelaufenen -- T_max ist der volle Deckel, ein frueher Stopp bricht die
+    # Kurve einfach vorzeitig ab, das ist unproblematisch). `eta_min=0`
+    # (Standard-Verhalten von CosineAnnealingLR) -- die LR faellt bis Epoche
+    # `epochs` gegen 0. Kein Scheduler (None) reproduziert exakt das alte
+    # Verhalten (konstante LR).
+    lr_scheduler = None
+    if lr_schedule == "cosine":
+        lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    elif lr_schedule not in (None, "none"):
+        print(f"   ⚠️  Unbekanntes --lr-schedule '{lr_schedule}' -- ignoriert (konstante LR).")
     if load_version:
         print(f"🔄 Warm-Start erkannt: Trainiere für {epochs} Epochen.")
     else:
@@ -588,8 +607,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_r2_s = f"{epoch_val_value_r2:.3f}" if epoch_val_value_r2 is not None else "n/a"
             p_r2_s = f"{epoch_val_points_r2:.3f}" if epoch_val_points_r2 is not None else "n/a"
             val_r2_str = f" | Val-R² Value={v_r2_s} Points={p_r2_s}"
+        lr_str = f" | LR={optimizer.param_groups[0]['lr']:.2e}" if lr_scheduler is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{plateau_marker}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{plateau_marker}{lr_str}")
+
+        # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
+        # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
+        # einmal danach) -- bleibt bei lr_scheduler=None ein no-op.
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
         # ── Early Stopping (nur bei Policy-Plateau) ──────────────────────────
         if policy_plateau_since is not None:
@@ -706,7 +732,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "num_actions":       NUM_ACTIONS,
         "hidden_size":       hs,
         "batch_size":        BATCH_SIZE,
-        "lr":                LEARNING_RATE,
+        "lr":                effective_lr,
+        "lr_schedule":       lr_schedule,
         "final_policy_loss": round(final_p, 4),
         "final_policy_val_loss": round(final_val_ploss, 4) if final_val_ploss is not None else None,
         "final_value_loss":  round(value_history[-1], 4),
@@ -795,10 +822,17 @@ if __name__ == "__main__":
                         help="Begrenzt die TRAININGS-Dateien (nach Abzug des Val-Splits) auf N "
                              "(Daten-Skalierungs-Ablation, Task #69). Val-Split bleibt unveraendert "
                              "identisch zu einem Lauf ohne dieses Flag.")
+    parser.add_argument("--lr", type=float, default=None,
+                        help="Start-Learning-Rate fuer Adam (Standard: LEARNING_RATE aus config.py, "
+                             "aktuell 0.0004). Task #77 (v12b_lr): Warm-Start-Feintuning-Kontrolle "
+                             "mit niedrigerer Start-LR.")
+    parser.add_argument("--lr-schedule", type=str, default="none", choices=["none", "cosine"],
+                        help="LR-Verlauf ueber die Epochen. 'none' (Standard): konstante LR wie bisher. "
+                             "'cosine': torch.optim.lr_scheduler.CosineAnnealingLR mit T_max=--epochs.")
 
     args = parser.parse_args()
 
     train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,
-          train_file_limit=args.train_file_limit)
+          train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule)
