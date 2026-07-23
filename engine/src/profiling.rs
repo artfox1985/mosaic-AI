@@ -98,6 +98,35 @@ note_and_read!(note_features_ns, features_count, features_ns, reset_features, FE
 note_and_read!(note_net_eval_ns, net_eval_count, net_eval_ns, reset_net_eval, NET_EVAL_COUNT, NET_EVAL_NANOS);
 note_and_read!(note_dfs_eval_ns, dfs_eval_count, dfs_eval_ns, reset_dfs_eval, DFS_EVAL_COUNT, DFS_EVAL_NANOS);
 
+// ── Task #80: Self-Play-Kostenprofil (Gumbel-Zugsuche vs. rtv- vs.
+// Bootstrap-Labels) ─────────────────────────────────────────────────────────
+// Gleiches Muster wie oben: drei Zähler+Nanosekunden-Paare, je EIN
+// `timed()`-Aufruf pro Kategorie in `self_play.rs::play_net_self_play_game`.
+// Nur mit `clone_profiling` aktiv (Mess-Wheel) -- Normalbetrieb unverändert.
+
+#[cfg(feature = "clone_profiling")]
+static GUMBEL_MOVE_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static GUMBEL_MOVE_NANOS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "clone_profiling")]
+static RTV_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static RTV_NANOS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "clone_profiling")]
+static BOOTSTRAP_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static BOOTSTRAP_NANOS: AtomicU64 = AtomicU64::new(0);
+
+note_and_read!(
+    note_gumbel_move_ns, gumbel_move_count, gumbel_move_ns, reset_gumbel_move,
+    GUMBEL_MOVE_COUNT, GUMBEL_MOVE_NANOS
+);
+note_and_read!(note_rtv_ns, rtv_count, rtv_ns, reset_rtv, RTV_COUNT, RTV_NANOS);
+note_and_read!(
+    note_bootstrap_ns, bootstrap_count, bootstrap_ns, reset_bootstrap,
+    BOOTSTRAP_COUNT, BOOTSTRAP_NANOS
+);
+
 /// Misst `f()` und bucht die Dauer über `note` (z.B. [`note_net_eval_ns`]).
 /// No-Op-Timing ohne das Feature (spart die `Instant`-Aufrufe, `f()` läuft
 /// trotzdem ganz normal weiter).
@@ -122,4 +151,7 @@ pub fn reset_all() {
     reset_features();
     reset_net_eval();
     reset_dfs_eval();
+    reset_gumbel_move();
+    reset_rtv();
+    reset_bootstrap();
 }

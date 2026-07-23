@@ -1779,7 +1779,12 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
                         (a, vec![e])
                     } else {
-                        net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
+                        // Task #80: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
+                        // tatsaechlich gespielten Zuege. `timed()` ist ohne
+                        // `clone_profiling`-Feature ein No-Op (siehe profiling.rs).
+                        crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
+                            net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
+                        })
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
@@ -1811,14 +1816,24 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // Samples. Live gefunden: `round_transition_value`
                         // tauchte faelschlich auch in Runde-5-Records auf.
                         if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
-                            let v = sample_round_transition_for_round(round_before, &pre, net, rng);
+                            // Task #80: Kostenprofil-Kategorien (b)+(c) -- die teure
+                            // rekursive round_transition_value-Simulation (inkl. der
+                            // #71-Policy-Node-Budget-Suche in
+                            // `choose_drafting_action_pruned`) getrennt von (e) dem
+                            // TD-Bootstrap-Ziel gemessen, um die rtv/Bootstrap-
+                            // Redundanzfrage kostenseitig zu beantworten.
+                            let v = crate::profiling::timed(crate::profiling::note_rtv_ns, || {
+                                sample_round_transition_for_round(round_before, &pre, net, rng)
+                            });
                             round_transition_values.insert(round_before, v);
-                            let bv = crate::round_transition_deep::bootstrap_value_after_rounds(
-                                &pre,
-                                net,
-                                crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-                                rng,
-                            );
+                            let bv = crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
+                                crate::round_transition_deep::bootstrap_value_after_rounds(
+                                    &pre,
+                                    net,
+                                    crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                                    rng,
+                                )
+                            });
                             bootstrap_values.insert(round_before, bv);
                         }
                     }
