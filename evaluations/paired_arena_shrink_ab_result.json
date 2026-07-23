@@ -1,0 +1,16 @@
+{
+  "n_games": 100,
+  "base_seed": 20260723,
+  "model_champion": "D:\\Archiv\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v12b_lr_best.onnx",
+  "model_opponent": "D:\\Archiv\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v12_best.onnx",
+  "sims": 400,
+  "c_puct": 1.5,
+  "champion_wins_off": 61,
+  "champion_wins_on": 50,
+  "discordant_b_on_only": 15,
+  "discordant_c_off_only": 26,
+  "concordant_both_win": 35,
+  "concordant_both_lose": 24,
+  "mcnemar_p": 0.11727520595741225,
+  "decision": "OFF (kein signifikanter Vorteil fuer ON)"
+}
