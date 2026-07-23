@@ -1910,6 +1910,119 @@ Heuristik@200 bleibt fixer Anker bei 1000.
 per-Runde-R²-Werte von v12_best als Grundlage nutzen; v12_best als neuer
 Generator für den nächsten Self-Play-Korpus (v13).
 
+## v12b: LR-Schedule + From-Scratch-Kontrolle (2026-07-23)
+
+**Motivation**: sowohl v11 als auch v12 zeigten denselben Befund -- der beste
+Checkpoint (nach `val_combined`) war jeweils **Epoche 1**, das Value-Val-R²
+fällt ab Epoche 2 monoton (v12: 0.221 → 0.182 → 0.144 → ...). Verdacht: die
+Lernrate ist fürs Warm-Start-Feintuning zu hoch, das Netz "zerstört" ab
+Epoche 2 mehr an nützlichem Warm-Start-Wissen, als es aus den 2000 Spielen
+neu lernt. Task #77 testet zwei Kontrollen auf demselben `v10b`-Korpus
+(200 Dateien, unverändert, keine Dateien verschoben/ergänzt).
+
+**LR-Ist-Zustand vor diesem Zyklus** (`config.py`/`train.py` gelesen):
+Adam-Optimizer, `LEARNING_RATE = 0.0004` (`config.py`), **konstant über alle
+Epochen** -- kein Scheduler, kein CLI-Parameter dafür vorhanden. Ergänzt (Commit
+`27c3a3a`): `--lr` (Default: unverändert `LEARNING_RATE` aus `config.py`) und
+`--lr-schedule {none,cosine}` (Default `none` = alte, konstante LR).
+`none`/kein `--lr` reproduzieren exakt das bisherige Verhalten -- rein additiv,
+kein bestehender Aufruf ändert sich. `cosine` aktiviert
+`torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=<--epochs>)`,
+ein `.step()` je Epoche nach der Batch-Schleife.
+
+**Variante A (`v12b_lr`)**: Warm-Start von `alphazero_v10_best.pth` (exakt wie
+v12), `--lr 0.00005` (8× niedriger als der Default 0.0004, innerhalb der
+angeforderten 5-10×-Größenordnung) + `--lr-schedule cosine`, `--epochs 100`
+als Deckel. Early Stopping bei Epoche 15/100 (Val-Policy-Plateau seit Epoche
+10, gleiches Kriterium wie v12). **Bester Checkpoint: Epoche 4**
+(`val_combined`=1.8147 -- sogar leicht besser als v12s eigenes Optimum von
+1.8219 bei Epoche 1). Damit beantwortet: **ja, der beste Checkpoint liegt bei
+Variante A endlich NICHT mehr bei Epoche 1.** Val-R²-Verlauf (Value-Head)
+steigt von Epoche 1 (0.230) auf sein Maximum bei Epoche 2 (0.236), bleibt bis
+Epoche 5 nahe diesem Niveau (0.226) und fällt danach spürbar langsamer als
+bei v12 (Epoche 13: 0.173 hier vs. v12s Epoche-3-Wert von 0.144) -- das
+Zerfallsmuster ist flacher, nicht mehr verschwunden. Netzauslastung gesund
+(Dead 7%, Eff.Rank 38%).
+
+**Variante B (`v12b_scratch`)**: identisch zu v12, aber OHNE `--load`
+(frische Initialisierung), Standard-LR (`--lr`/`--lr-schedule` nicht
+gesetzt). Early Stopping ebenfalls bei Epoche 15/100 (Plateau seit Epoche
+10). **Bester Checkpoint: Epoche 3** (`val_combined`=1.9044 -- deutlich
+schlechter als v12/v12b_lr). Value-Val-R² bleibt durchgehend niedrig (Maximum
+0.088 bei Epoche 2, danach unter 0.05, teils negativ) -- ohne Warm-Start
+reicht die Datenmenge (2000 Spiele) offensichtlich nicht annähernd, um
+denselben Value-Head-Stand wie mit Warm-Start zu erreichen.
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`, neu gebaut -- das beim
+v12-Zyklus benutzte Skript war weder committet noch als Arbeitsdatei
+liegen geblieben, `git status` zum Zyklusbeginn war sauber. Rekonstruiert
+nach der STATUS.md-Beschreibung "mirrort MosaicDataset 1:1 inkl.
+Runden-Index je Schritt"; **Sanity-Check bestanden**: auf `v12_best`
+reproduziert es die im v12-Abschnitt dokumentierten Referenzwerte exakt
+(Top-1 39.8%, Top-3 68.5%, R² global 0.2215, R1-R5 0.0377/0.1074/0.1818/
+0.2283/0.4757 -- alle auf 4 Nachkommastellen identisch). Gleicher Val-Split
+wie v12 (Datei-Ebene, Seed 20260707, val_frac=0.1, 20/200 Dateien,
+n=32.392 Val-Züge, davon 23.638 Drafting-Schritte):
+
+| Metrik | v12b_lr_best | v12b_scratch_best | v12_best (Referenz) |
+|---|---|---|---|
+| Policy Top-1 (Drafting) | **40.0%** | 37.6% | 39.8% |
+| Policy Top-3 (Drafting) | **68.7%** | 66.2% | 68.5% |
+| Value Val-R² global | **0.2289** | 0.0464 | 0.2215 |
+| R² Runde 1 | 0.0368 | -0.0440 | 0.0377 |
+| R² Runde 2 | **0.1106** | -0.1156 | 0.1074 |
+| R² Runde 3 | 0.1717 | -0.0064 | 0.1818 |
+| R² Runde 4 | 0.2298 | 0.0125 | 0.2283 |
+| R² Runde 5 | **0.5145** | 0.3156 | 0.4757 |
+
+**Bewertung**: `v12b_scratch` ist auf jeder einzelnen Metrik klar schlechter
+als `v12_best` (global R² 0.0464 vs. 0.2215, Runde 1-4 durchweg nahe 0 oder
+negativ) -- der Warm-Start hilft also weiterhin deutlich, bremst die
+Generalisierung NICHT (die eingangs gestellte Frage "hilft Warm-Start
+überhaupt noch?" ist damit klar mit Ja beantwortet). `v12b_lr` ist
+konsistent, wenn auch moderat, besser als `v12_best`: global-R² (+0.0074),
+Policy Top-1/Top-3 (je +0.2pp), Runde 2 (+0.0032) und vor allem Runde 5
+(+0.0388) klar vorn; Runde 1 praktisch gleichauf (-0.0009, Rauschen), nur
+Runde 3 minimal schwächer (-0.0101). Zusammen mit dem klar verschobenen
+besten Checkpoint (Epoche 4 statt 1) und dem flacheren Zerfall ein
+konsistentes Bild: die niedrigere LR + Cosine-Annealing behebt das
+"Epoche-1-Overfitting"-Muster, ohne die erreichte Endqualität zu verschlechtern.
+
+**Gating-Entscheid**: nur `v12b_lr` erfüllt "klar besser" (primär globales
+R² + frühe Runden, sekundär Policy) -- `v12b_scratch` wird NICHT gegatet
+(eindeutig schlechter, kein Kandidat). Gepaartes SPRT-Gating
+`v12b_lr_best` vs. `v12_best` (`tools/paired_gating.py`, beide @400 Sims,
+c_puct=1.5, H1 p=0.65, alpha=beta=0.05, Deckel 200 Paare):
+
+| Block | Paare kum. | Ergebnis kum. | A-Sweep/B-Sweep/Split | LLR | Bericht-p |
+|---|---|---|---|---|---|
+| 1 | 25 | 34:16 | 11/2/12 | +2.173 | 0.0225 |
+| 2 | 50 | **65:35** | 22/7/21 | **+3.275** | **0.0081** |
+
+**SPRT-Verdikt nach Block 2 (50 Paare, 100 Spiele): v12b_lr_best
+signifikant besser (LLR=+3.275 ≥ obere Schranke +2.944).** Gepaarte
+Differenz +0.600, 95%-KI [+0.208, +0.992] -- eindeutig auf Seiten von
+v12b_lr. **Champion-Wechsel: v12b_lr_best löst v12_best als Champion und
+künftigen Self-Play-Generator ab** (Ergebnis-JSON:
+`evaluations/paired_gating_result_v12b_lr_best_vs_v12_best.json`).
+
+**Elo-Kader aktualisiert** (`tools/elo_tracker.py add`, Match in
+`evaluations/elo_history.csv` eingetragen): v12b_lr_best@400 Elo 1051
+[945, 1157] (65-35 über 100 Spiele); v12_best@400 im selben Neuberechnungs-
+Durchlauf nun 943 [866, 1018]. Heuristik@200 bleibt fixer Anker bei 1000.
+
+**Werkzeug-Neuzugang**: `tools/offline_diagnose.py` (Policy Top-1/Top-3 +
+Value-R² gesamt/pro Runde gegen den train.py-Val-Split) ist jetzt dauerhaft
+im Repo -- künftige Zyklen müssen dieses Skript nicht mehr neu bauen.
+
+**Nächste Schritte** (nicht Teil dieses Zyklus): `v12b_lr_best` als neuer
+Generator für den nächsten Self-Play-Korpus; die LR/Cosine-Kombination
+(`--lr 0.00005 --lr-schedule cosine`) ist jetzt als Standardrezept für
+künftige Warm-Start-Feintunings verfügbar (noch keine Entscheidung, ob sie
+DEFAULT werden soll -- bislang nur an einem Korpus getestet). Task #78
+(`VALUE_SHRINK_PER_ROUND`) kann wahlweise die v12b_lr- statt der v12-Werte
+als Grundlage nehmen (Unterschied gering, aber v12b_lr ist jetzt Champion).
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
