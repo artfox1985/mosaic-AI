@@ -2023,6 +2023,107 @@ DEFAULT werden soll -- bislang nur an einem Korpus getestet). Task #78
 (`VALUE_SHRINK_PER_ROUND`) kann wahlweise die v12b_lr- statt der v12-Werte
 als Grundlage nehmen (Unterschied gering, aber v12b_lr ist jetzt Champion).
 
+## v12c: Value-Shrinkage-Rekalibrierung + A/B (2026-07-23)
+
+**Ausgangslage**: Phase A (Commit 81e728b) hatte `VALUE_SHRINK_ENABLED=false`
++ `VALUE_SHRINK_PER_ROUND` als reinen Code-Platzhalter eingebaut (rundenabhängige
+Dämpfung der Blattwert-Ausschläge Richtung 0.5, angewendet nach
+`blended_leaf_win_prob`, vor dem Floor-Shaping-Additiv). Dieser Zyklus (Task
+#78) rekalibriert die Konstanten auf den amtierenden Champion und liefert den
+seinerzeit aufgeschobenen gepaarten Arena-Nachweis (Phase B) nach.
+
+### Rekalibrierung
+
+Gleiche Herleitungsformel wie Phase A: `w_r ∝ sqrt(max(0, R²_r))`, normiert
+auf `w_5 = 1.0` (keine Dämpfung in Runde 5). Neue Grundlage: die frische
+`tools/offline_diagnose.py`-Diagnose von `v12b_lr_best` (amtierender
+Champion, siehe Abschnitt "v12b" oben), NICHT mehr der separate
+Noise-Floor-Rückspiel-Test (für v12b_lr nicht neu gefahren) -- die
+R²-Werte sind bereits von sich aus streng monoton steigend, kein Clamping
+nötig (Phase A brauchte noch `max(Deckel_r, Deckel_{r-1})` für Runde 3/4).
+
+| Runde | R² (v12b_lr_best, 2026-07-23) | √R² | w_r (normiert) |
+|---|---|---|---|
+| 1 | 0.0368 | 0.19183 | 0.2674 |
+| 2 | 0.1106 | 0.33257 | 0.4636 |
+| 3 | 0.1717 | 0.41437 | 0.5777 |
+| 4 | 0.2298 | 0.47937 | 0.6683 |
+| 5 | 0.5145 | 0.71729 | 1.0000 |
+
+Alt (Phase A, Platzhalter): `[0.1045, 0.5162, 0.8375, 0.8375, 1.0000]`.
+Neu: `[0.2674, 0.4636, 0.5777, 0.6683, 1.0000]` -- durchweg schwächere
+Dämpfung als der Phase-A-Platzhalter (weniger extreme frühe-Runden-Werte in
+der frischen Diagnose als in den alten Noise-Floor-Deckeln). Nebenbei musste
+der Test `apply_value_shrink_is_identity_when_disabled_by_default` in
+`apply_value_shrink_matches_current_toggle_state` umgebaut werden (geht jetzt
+beide Toggle-Zustände durch), sonst hätte `cargo test --release` beim
+Umschalten auf `ENABLED=true` unweigerlich gebrochen. Commit `06f43a7`.
+
+### A/B-Design
+
+`VALUE_SHRINK_ENABLED` ist eine Compile-Zeit-Konstante -- Shrink-ON/-OFF
+können nicht im selben Prozess gegeneinander spielen. Neues Werkzeug
+`tools/paired_arena_shrink_ab.py` + `tools/paired_arena_shrink_arm_worker.py`
+(Muster wie `paired_arena_ismcts.py`/`paired_arena_speedbundle.py`, aber
+`net_vs_net_arena_match` statt `net_arena_match`, da Champion gegen einen
+Referenz-NETZGEGNER statt gegen die Heuristik antritt). Anders als bei den
+ISMCTS-/round5-A/Bs genügte hier EIN venv (kein Worktree/Zweit-venv nötig):
+die Arme laufen nie gleichzeitig, sondern sequenziell -- Arm OFF spielen,
+Quellcode-Toggle flippen, `cargo test --release`, Wheel neu bauen, Arm ON
+spielen (jeweils frischer Python-Prozess je Arm-Aufruf, damit garantiert das
+gerade gebaute Wheel geladen wird).
+
+Bedingungen: Champion `v12b_lr_best` (Brett 0) vs. Referenzgegner `v12_best`
+(Brett 1, Elo 943 vs. 1051 -- nah genug für Sensitivität), beide @400 Sims,
+`c_puct=1.5`, deterministische Arena. IDENTISCHE Basis-Seed (20260723) und
+Blockstruktur (4x25) in beiden Armen -- `net_vs_net_arena_match`s interne
+Pro-Spiel-Seed-Ableitung ist deterministisch aus `seed + i*const`, Spielindex
+`i` hat daher in beiden Armen dieselben Startbedingungen. Ausgewertet
+paarweise: Spiel `i` in Arm OFF vs. Spiel `i` in Arm ON, exakter zweiseitiger
+McNemar-Test auf den diskordanten Zellen (gleiche Formel wie
+`paired_gating.py`/`paired_arena_ismcts.py`). Fixed-n (100 Spiele je Arm, 200
+gesamt), kein SPRT-Nachziehen -- reine Sensitivitätsmessung, keine
+Champion-Gating-Entscheidung.
+
+### Ergebnis
+
+`cargo test --release` 151/151 grün in BEIDEN Toggle-Zuständen (OFF und ON).
+
+| Arm | Champion-Siege | Wheel-Hash (sha256, Kurzform) |
+|---|---|---|
+| OFF (Ist-Zustand) | 61:39 | 9b22dac5... |
+| ON (rekalibriert) | 50:50 | ae2eb99e... |
+
+Gepaarte Auswertung (`evaluations/paired_arena_shrink_ab_result.json`, Roh-
+daten in `paired_arena_shrink_off_raw.json`/`paired_arena_shrink_on_raw.json`):
+diskordante Paare `b` (nur ON gewinnt) = 15, `c` (nur OFF gewinnt) = 26,
+konkordant (beide gewinnen) = 35, konkordant (beide verlieren) = 24. Exakter
+McNemar-Test: **p = 0,1173** -- nicht signifikant, und die Richtung zeigt
+sogar leicht zugunsten OFF (c=26 > b=15), nicht zugunsten ON.
+
+### Entscheidung
+
+Evidenzregel (fest vereinbart): nur bei p<0.05 UND Vorteil für ON bleibt der
+Toggle an. Keine der beiden Bedingungen erfüllt (p=0,117, UND die Richtung
+zeigt sogar gegen ON) -- **`VALUE_SHRINK_ENABLED` bleibt/wird zurück auf
+`false` gesetzt.** Die rekalibrierten Konstanten (`VALUE_SHRINK_PER_ROUND =
+[0.2674, 0.4636, 0.5777, 0.6683, 1.0000]`) bleiben unverändert im Code
+(dokumentiert, harmlos bei `ENABLED=false` -- reine Identität, siehe
+`apply_value_shrink`).
+
+**Finaler System-Zustand**: Quellcode `engine/src/net_mcts.rs` mit
+`VALUE_SHRINK_ENABLED=false` (verifiziert per Quellcode-Stand + `cargo test
+--release` 151/151 grün + frischem `pip install . --force-reinstall --no-deps`
+Wheel-Rebuild NACH dem Zurücksetzen, sha256 `479c19e9...`, Plumbing-Smoke
+bestanden). `engine_config_json()` exponiert `VALUE_SHRINK_ENABLED` weiterhin
+NICHT (reine Rust-Konstante, kein Laufzeit-Feld) -- Verifikation läuft
+ausschließlich über Quellcode-Stand + Test-/Build-Nachweis, wie in Task #74
+bereits so gehandhabt.
+
+**Kein Champion-Wechsel, kein Elo-Eintrag** durch diesen Test -- es ändert
+sich höchstens die Engine-Konfiguration (hier: bleibt unverändert), nicht der
+Champion oder Self-Play-Generator.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
