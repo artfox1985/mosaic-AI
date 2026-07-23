@@ -3597,4 +3597,62 @@ mod tests {
             }
         }
     }
+
+    /// Lädt das lokale Referenz-Checkpoint fürs Gating-Seeding-Verifikat
+    /// (Task #76) -- `None`, falls kein Checkpoint vorhanden (z.B. CI ohne
+    /// Modell-Artefakte), Test überspringt sich dann selbst statt zu failen
+    /// (gleiches Muster wie `net_mcts::load_test_net`).
+    fn load_test_net_for_gating() -> Option<Net> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
+        match Net::load(path.to_str().unwrap(), crate::features::INPUT_SIZE) {
+            Ok(n) => Some(n),
+            Err(e) => {
+                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");
+                None
+            }
+        }
+    }
+
+    /// Task #76 (Gepaartes Gating als Standard) -- Verifikat: `run_net_vs_net_arena`
+    /// seedet je Spiel GENAUSO deterministisch aus `seed + i·const` wie
+    /// `run_net_arena_match`/`run_arena_match` (siehe deren `play`-Closures,
+    /// dieselbe Formel `seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))`).
+    /// Zwei komplett unabhängige Aufrufe mit demselben Seed UND denselben
+    /// Modellen (hier: dasselbe Netz gegen sich selbst) müssen daher
+    /// byte-identische Spielfolgen liefern -- Voraussetzung für das
+    /// gepaarte McNemar-Gating in `evaluations/paired_gating.py` (identische
+    /// Startbedingungen je Seed-Index über mehrere Prozessaufrufe/Arme hinweg).
+    #[test]
+    fn run_net_vs_net_arena_seeds_deterministically_like_run_net_arena_match() {
+        let Some(net) = load_test_net_for_gating() else { return };
+        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v10_best.onnx");
+        let model_path = model_path.to_str().unwrap();
+        drop(net); // nur zum Existenz-Check geladen, run_net_vs_net_arena laedt selbst neu
+
+        let seed = 13_579u64;
+        let n_games = 3usize;
+        let raw_a = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT)
+            .expect("Arena-Lauf A sollte gelingen (Checkpoint existiert laut Vorab-Check)");
+        let raw_b = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT)
+            .expect("Arena-Lauf B sollte gelingen");
+        assert_eq!(
+            raw_a, raw_b,
+            "run_net_vs_net_arena mit identischem Seed+Modellen muss byte-identische \
+             Spielfolgen liefern (Determinismus-Voraussetzung fuers gepaarte Gating)"
+        );
+
+        // Zusaetzlich: dieselbe Seed-Ableitungs-Formel wie run_net_arena_match
+        // (indirekter Beleg -- ein einzelnes Spiel bei n_games=1 mit Seed S
+        // muss IDENTISCH zum ersten Spiel eines n_games=3-Laufs mit Basis-Seed
+        // S sein, weil beide `i=0` denselben abgeleiteten Seed ergeben).
+        let raw_single = run_net_vs_net_arena(model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT)
+            .expect("Einzelspiel-Lauf sollte gelingen");
+        let games_a: Vec<Value> = serde_json::from_str(&raw_a).unwrap();
+        let games_single: Vec<Value> = serde_json::from_str(&raw_single).unwrap();
+        assert_eq!(
+            games_a[0], games_single[0],
+            "Spiel i=0 muss unabhaengig von n_games identisch sein (reine Funktion von seed+i)"
+        );
+    }
 }

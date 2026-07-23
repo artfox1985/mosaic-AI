@@ -1747,6 +1747,55 @@ nur Runde-5-Züge betroffen sind. Laufzeitkosten der Umstellung: NEU-Arm
 Knoten als der alte Median), bewusst in Kauf genommen — Determinismus
 ist hier der Zweck, nicht ein Speed-Trade.
 
+## Gepaartes Gating als Standard (2026-07-23)
+
+**Task #76, Phase A (nur Code, kein Nachweis-Lauf) -- der netcq2-Self-Play-
+Batch belegt das installierte Wheel bis ~13:00, deshalb keine Arena-/
+Trainings-Laeufe in diesem Zug.**
+
+**Seeding-Verifikat**: `run_net_vs_net_arena` (Rust,
+`self_play.rs::run_net_vs_net_arena`) seedet bereits VOR diesem Task jedes
+Spiel exakt so deterministisch wie `run_net_arena_match`/`run_arena_match`
+(`seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))`,
+identisch in allen drei Funktionen) -- KEINE Rust-Aenderung noetig, nur
+per neuem Test bestaetigt
+(`self_play::tests::run_net_vs_net_arena_seeds_deterministically_like_run_net_arena_match`):
+zwei unabhaengige Aufrufe mit gleichem Seed+Modellen liefern byte-identische
+Spielfolgen, UND Spiel `i=0` ist unabhaengig von `n_games` (reine Funktion
+von `seed+i`) -- Voraussetzung fuers gepaarte Design unten.
+
+**Neues Werkzeug `evaluations/paired_gating.py`**: gepaartes Netz-vs-Netz-
+Gating fuer Kandidat A vs. Kandidat B (z.B. neuer Checkpoint vs. amtierenden
+Champion). Ein **Paar** = ein Seed, zwei Spiele mit GETAUSCHTEN Brettern (die
+Rust-API bietet keinen eingebauten Brett-Tausch-Modus, daher zwei
+`net_vs_net_arena_match`-Aufrufe mit vertauschten Modell-/Sims-/c_puct-
+Zuordnungen bei identischem Seed) -- ein etwaiger Brett-/Zugreihenfolge-Bias
+faellt damit PRO PAAR heraus, nicht erst im Erwartungswert. Statistik bewusst
+KEIN klassisches "diskordante Paare"-McNemar (das wuerde "A gewinnt beide
+Spiele" faelschlich als uninformativ behandeln und haette dadurch keine Power
+gegen echte Staerkeunterschiede), sondern ein exakter Paar-Vorzeichentest:
+`b` = A gewinnt beide Spiele des Paares, `c` = B gewinnt beide, Splits (1:1)
+werden wie bei einem klassischen Vorzeichentest ausgeschlossen;
+`mcnemar_exact_p(b, c)` (dieselbe Formel/Funktion wie in
+`paired_arena_speedbundle.py`/`paired_arena_ismcts.py`) testet H0: P(A
+gewinnt Paar)=0.5. Zusaetzlich gepaarte Differenz `d_i in {-2,0,+2}` je Paar
+mit 95%-Normalapprox.-KI. Bloecke a 25 Paare (=50 Spiele), Stopp bei p<0.05
+oder 150 Paaren (=300 Spiele), JSON-Blocklogs, druckt am Ende eine fertige
+`elo_tracker.py add`-Kommandozeile.
+
+**Dokumentation aktualisiert**: `elo_tracker.py`-Modul-Docstring markiert
+`paired_gating.py` jetzt als Standardweg fuer Champion-Ablösungs-
+Entscheidungen (`arena.py::run_net_vs_net`s SPRT bleibt fuer schnelle,
+nicht-gating-relevante Sanity-Checks nuetzlich, entscheidet aber nicht mehr
+ueber Champion-Wechsel).
+
+**Plumbing-Smoke** (Winz-Parameter, n=2 Paare/sims=20, v10_best gegen sich
+selbst auf BEIDEN Seiten -- Wheel nur lesend genutzt, nichts installiert):
+beide Aufrufrichtungen laufen durch, McNemar/CI rechnen ohne Fehler (bei
+identischen Modellen erwartungsgemaess kein signifikantes Ergebnis, reiner
+Plumbing-Check). Ein echter Gating-Lauf mit unterschiedlichen Kandidaten
+folgt in Phase B nach Batch-Ende.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
