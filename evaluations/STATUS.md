@@ -2391,6 +2391,130 @@ committeten Stand. Mess-Zwischenstände (keine `.pkl`-Dateien in `data/`
 angefallen -- Direktaufruf von `mosaic_rust.net_self_play_games` ohne
 `progress_path`) wurden nicht persistiert, `data/tmp_task80/` wieder entfernt.
 
+## Eingefrorenes Eval-Set (frozen_v1, 2026-07-24)
+
+**Task #87. Motivation**: `tools/offline_diagnose.py::val_files()` zieht den
+Val-Split aus dem jeweils AKTUELLEN `data/`-Inhalt (Glob + Seed-Shuffle) --
+Diagnose-Zahlen zwischen Generationen sind dadurch nicht vergleichbar,
+sobald sich `data/` ändert. Verdacht: das im v12-Zyklus dokumentierte
+Policy-Top-1-Rätsel (v10_best 44.0% vs. v12_best 39.8%, andere
+Korpora/Splits) war teilweise Cross-Korpus-Artefakt statt eines echten
+Stärke-/Stil-Unterschieds. Dieser Task friert ein festes, generations-
+übergreifendes Set ein und erweitert `offline_diagnose.py` darum.
+
+**Nebenlauf-Disziplin**: parallel lief der 11-Thread-v12-Self-Play-Batch
+weiter (`data/selfplay_v12_*.pkl`). `data/` wurde ausschließlich gelesen;
+`tools/build_frozen_eval_set.py` verwendet nur v12-Dateien, deren mtime
+seit ≥10 Minuten unverändert ist (Schutz gegen den noch schreibenden
+Batch). Beide neuen/geänderten Skripte laufen mit reduziertem Thread-Budget
+(`torch.set_num_threads` explizit auf 2 begrenzt bzw. Default
+`max(1, CPU-2)` in `offline_diagnose.py`).
+
+**Set-Aufbau** (`tools/build_frozen_eval_set.py`, neu, Version `frozen_v1`,
+Seed 20260724): 1800 Zustände, stratifiziert nach Korpus × Runde (1-5), je
+Bucket exakt 180 (2 Korpora × 5 Runden = 10 Buckets à 180). Je Korpus wird
+eine feste, deterministisch permutierte Stichprobe von 20 Dateien komplett
+eingelesen (bewusst nicht "stop sobald ein Bucket voll ist", um Spiel-/
+Zeit-Diversität über den ganzen Korpus-Zeitraum zu erhalten), danach ein
+fester Zufallszug je Runden-Bucket.
+
+**Dritter Korpus (netcq) NICHT gefunden**: der Auftrag nannte
+`data/archive netcq` als dritte Quelle (v11-Trainingskorpus
+`selfplay_netcq_*.pkl`). Recherche — `data/` (keine Unterordner mehr
+vorhanden), Projekt-Root `archive/` (leer bis auf zwei alte `.md`-Dateien),
+rekursiver Scan des gesamten Projektbaums nach `*netcq*` und
+`selfplay_netcq_*.pkl`, sowie eine Suche über den gesamten
+`Projekte`-Ordner — ergab KEINEN Treffer. Der Korpus existiert auf dieser
+Maschine aktuell nicht mehr auf Platte (vermutlich bereits gelöscht, ohne
+dass ein `archive_netcq*`-Ordner zurückblieb, anders als bei
+`archive_domefact_preBausteinB`/`archive_domefactB_preRuleFix`). Das Set
+besteht daher aus **zwei** Korpora (v10b + v12) statt drei; das Skript
+dokumentiert das explizit im Manifest (`netcq_available: false`) statt den
+Lauf zu blockieren. Falls die netcq-Daten doch noch auffindbar sind (z.B.
+externes Backup), kann ein `frozen_v2` sie nachträglich ergänzen — `frozen_v1`
+bleibt dazu unangetastet (Versionierung ist bewusst additiv, kein Rebuild).
+
+**Zusammensetzung** (`evaluations/frozen_eval_set_manifest.json`):
+
+| Korpus | Runde 1 | Runde 2 | Runde 3 | Runde 4 | Runde 5 | Summe |
+|---|---|---|---|---|---|---|
+| v10b | 180 | 180 | 180 | 180 | 180 | 900 |
+| v12 | 180 | 180 | 180 | 180 | 180 | 900 |
+| **Gesamt** | 360 | 360 | 360 | 360 | 360 | **1800** |
+
+Ablage: `evaluations/frozen_eval_set.pkl` (Records: state, valid_actions,
+policy, scores/scores_unclamped, bootstrap_value, round_transition_value,
+winner, completed, player, round, source_corpus, source_file, game_id) +
+`evaluations/frozen_eval_set_manifest.json`. **Das Set ist ab jetzt
+unveränderlich** (`build_frozen_eval_set.py` bricht ab, falls die Zieldatei
+bereits existiert).
+
+**`offline_diagnose.py` erweitert** um `--frozen` (Default AUS, Bestands-
+verhalten ohne das Flag vollständig unverändert): lädt statt `val_files()`
+das eingefrorene Set, rechnet dieselben Metriken (Value-R² gesamt + je
+Runde, Policy Top-1/Top-3), zusätzlich aufgeschlüsselt je Quellkorpus
+(`--frozen`-Ergebnis-JSON enthält je Modell ein `by_corpus`-Feld,
+Konsolen-Ausgabe über eine eigene `print_corpus_table()`).
+
+**Messung** (`evaluations/offline_diagnose_frozen_v1.json`, `--threads 2`,
+n=1800, davon 1310 Drafting-Züge für Top-1/Top-3):
+
+| Modell | Top-1 | Top-3 | Value-R² global | R² v10b-Subset | R² v12-Subset |
+|---|---|---|---|---|---|
+| v10_best | 39.5% | 65.5% | 0.0495 | 0.1105 | −0.0310 |
+| v11_best | 40.5% | 69.3% | 0.2315 | 0.2548 | 0.2008 |
+| v11_td07_best | 41.8% | 68.8% | 0.2254 | 0.2533 | 0.1886 |
+| v12_best | 46.6% | 73.3% | 0.3482 | 0.4654 | 0.1936 |
+| v12b_lr_best (Champion, Elo 1051) | 46.6% | 74.1% | 0.3379 | 0.4217 | 0.2273 |
+| v12b_scratch_best | 43.6% | 71.7% | **0.3951** | **0.7058** | **−0.0148** |
+| v12d_pw05_best | 46.5% | 73.4% | 0.3299 | 0.3966 | 0.2420 |
+| v12d_pw2_best | 45.6% | 73.6% | 0.3475 | 0.4668 | 0.1900 |
+| v12d_vw05_best | 47.0% | 73.7% | 0.3304 | 0.4082 | 0.2277 |
+| v12d_vw2_best | 46.3% | 73.2% | 0.3451 | 0.4424 | 0.2166 |
+
+**Kernfrage 1 -- war 44.0% vs. 39.8% ein Korpus-Artefakt?** Ja, überwiegend.
+Auf dem festen Set dreht sich das Bild komplett: v12_best (46.6%) schlägt
+v10_best (39.5%) in Top-1 deutlich -- und zwar sowohl gesamt als auch in
+BEIDEN Korpus-Teilmengen (v10b-Subset 41.7% vs. 35.5%, v12-Subset 51.6% vs.
+43.6%). Die alte 44.0%-Zahl für v10_best stammte aus einer früheren
+Diagnose auf einem anderen (leichteren/älteren) Korpus/Split; STATUS.md
+hatte das damals bereits als "anderer Korpus/Split" geflaggt, aber ohne
+festes Set war keine saubere Trennung von Korpus- und Modell-Effekt
+möglich. Die direkte v12-Zyklus-Gegenprobe (v10_best auf v12s eigenem Split
+neu ausgewertet: 37.4%) zeigte in dieselbe Richtung und wird hier bestätigt
+und mit echter Runden-/Korpus-Stratifizierung untermauert.
+
+**Kernfrage 2 -- korreliert frozen-Top-1 besser mit der bekannten
+Stärke-Reihenfolge?** Nein, nicht durchgehend. Frozen-Top-1 trennt sauber
+zwischen den GENERATIONEN (v10/v11-Familie ~40-42% vs. v12-Familie
+~44-47%), aber INNERHALB der v12-Familie liefert es keine mit der
+Elo-Reihenfolge konsistente Sortierung: v12b_lr (Champion, Elo 1051) und
+v12_best (943) liegen mit 46.6% exakt gleichauf, v12d_pw05 (laut Vorgabe
+real schwächer als v12b_lr) liegt mit 46.5% praktisch identisch zu
+v12b_lr. Auch innerhalb der v10/v11-Familie gibt es eine Inversion: v10_best
+(858 Elo) hat das NIEDRIGSTE Top-1 (39.5%) der drei, obwohl v11_td07_best
+(853 Elo, praktisch gleichauf) und v11_best (809 Elo, schwächer) beide
+höhere Top-1-Werte zeigen (41.8%/40.5%). Das bestätigt das wiederkehrende
+Projekt-Muster (v11-/v12-Zyklen): Offline-Policy-/Value-Metriken bewegen
+sich mit dem Trainings-/Daten-Regime, aber nicht fein genug mit der
+tatsächlichen Spielstärke -- Stärke-Gewinne kamen bisher fast immer aus
+Such-Mechanik, nicht aus Netz-Metriken.
+
+**Auffälligkeit: v12b_scratch_best zeigt starken Korpus-Overfit.** Global
+hat es den höchsten Value-R² aller Modelle (0.3951), aber die
+Korpus-Aufschlüsselung zeigt warum: R²=0.7058 auf dem v10b-Subset (dem
+Korpus, auf dem es trainiert wurde -- from-scratch, kein Warm-Start) vs.
+R²=−0.0148 auf dem v12-Subset (schlechter als der Mittelwerts-Prädiktor).
+Kein anderes Modell zeigt eine annähernd so große Korpus-zu-Korpus-Spreizung
+(alle anderen liegen typischerweise innerhalb ~0.15-0.25 R²-Punkten
+zwischen den Subsets). Genau der Verteilungseffekt, den die
+Korpus-Aufschlüsselung sichtbar machen sollte: ein hoher globaler R² kann
+reines Auswendiglernen EINES Korpus sein statt echter Generalisierung.
+
+**Commits**: Code (`tools/build_frozen_eval_set.py` neu,
+`tools/offline_diagnose.py` `--frozen`/`--threads`/Korpus-Aufschlüsselung)
+und Doku (dieser Abschnitt) getrennt committet, siehe Git-Historie.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
