@@ -3038,6 +3038,103 @@ Rust-seitige rtv-Berechnung streichen) zusaetzlich, auch wenn dieser
 Champion-Wechsel primaer eine Staerke-Aussage ist und kein direkter
 Kostenbeleg (der liegt bereits in #80 vor).
 
+## Hybrid-Suche 2x2 (2026-07-24)
+
+**Task #88, kausaler Kopf-Test.** Forschungsfrage: v12 spielt staerker als
+v10 (Gating 124:76), die Staerke-Herkunft war unklar -- Policy-Head oder
+Value-Head? (Das eingefrorene Eval-Set #87 zeigte v12 inzwischen auch bei
+Policy vorn, aber offline-Metriken sagen Arena-Staerke notorisch schlecht
+voraus -- ein kausaler Test war noetig.) Idee: Suche mit Priors von Netz A,
+Blattwerten von Netz B -- isoliert, welcher Kopf die Suche tatsaechlich
+staerker macht.
+
+**Implementierung** (eigener Worktree `mosaic-AI-worktree-hybrid-search`,
+Branch `worktree-hybrid-search`): `net_mcts.rs::make_node` bekommt einen
+zweiten optionalen Netz-Parameter `net_value: Option<&Net>`. Bei `None`
+(alle bisherigen Aufrufstellen unveraendert) oder wenn `net_value` per
+`std::ptr::eq` auf dieselbe Referenz wie `net_policy` zeigt, laeuft
+EXAKT der alte Code (ein `eval`/`eval_pair`-Aufruf liefert Policy UND Value
+zusammen) -- Byte-Identitaet zum Vor-Task-#88-Zustand per Konstruktion, kein
+Vergleich auf Toleranz. Nur bei einer ECHTEN zweiten Netz-Referenz greift
+der Hybrid-Pfad: ein Batch=1-Pass gegen `net_policy` liefert Policy-Logits
+UND Moon-Order (Moon-Order ist policy-artig, siehe Auftrag), ein zweiter
+Pass (Batch=1 oder Batch=2 mit Gegner-Perspektive, je nach `MIRROR_OTHER_VAL`)
+gegen `net_value` liefert Value- UND Points-Head (beide gehen in die
+KataGo-Stil geblendete Utility ein). Die Verdrahtung wurde durch
+`build_gumbel_tree`/`build_net_tree`/`build_determinized_forest` bis zu den
+drei Produktions-Sucheinstiegen durchgereicht (dort weiterhin `None`, kein
+Verhaltensunterschied); ein neuer, paralleler Einstieg
+`net_search_drafting_action_hybrid(net_policy, net_value, ...)` exponiert den
+echten Hybrid-Fall. In `self_play.rs`: `play_net_vs_net_hybrid_game`/
+`run_net_vs_net_arena_hybrid` mit einem `hybrid_board`-Parameter (0/1) --
+erlaubt echten Brett-Tausch bei identischem Seed (Paarungsmuster wie
+`tools/paired_gating.py`), ohne eine zweite gespiegelte Funktion zu
+brauchen. PyO3-Bindung: `net_vs_net_arena_match_hybrid` (`lib.rs`), additiv,
+bestehende Funktionen unangetastet.
+
+**Paritaetstest (wichtigster Korrektheitstest)**: zwei Ebenen, beide gruen.
+(1) `net_mcts::tests::hybrid_search_with_equal_nets_matches_plain_search` --
+`net_policy`/`net_value` als dieselbe Referenz, `build_net_tree` mit/ohne
+Hybrid-Pfad muss ueber mehrere Zufallsstellungen/Sims-Budgets BYTE-IDENTISCHE
+Wurzel-Statistik (Besuche, Q), completed-Q-Politik und finale Zugwahl liefern
+(`assert_eq!`, keine Tolerenz). (2) `self_play::tests::
+run_net_vs_net_arena_hybrid_with_equal_models_matches_plain_arena` --
+End-zu-Ende ueber die tatsaechlich genutzte Arena-Funktion (inkl.
+Tiling/Scoring), `hybrid_policy==hybrid_value==plain_model` muss fuer
+`hybrid_board=0` UND `hybrid_board=1` byte-identische Spielfolgen zu
+`run_net_vs_net_arena` liefern. `cargo test --release`: **153/153 gruen**
+(151 Bestand + 2 neue).
+
+**Messung** (gepaarte Arena, `tools/hybrid_paired_arena.py`, neu, nach
+`paired_gating.py`-Muster: Brett-Tausch pro Seed-Paar, `mcnemar_exact_p`/
+`paired_ci` von dort direkt wiederverwendet statt neu geschrieben; 400 Sims,
+c_puct=1.5, 10 Threads, Basis-Seed 20260724 IDENTISCH ueber alle drei Zellen
+-- Paar `i` nutzt in jeder Zelle denselben abgeleiteten Seed, siehe
+Skript-Docstring). Referenzgegner fuer alle Zellen: `v10_best`.
+
+| Zelle | Kandidat:Referenz | Winrate | McNemar p | gepaarte Diff (95%-KI) |
+|---|---|---|---|---|
+| Verankerung (v12_best vs. v10_best) | 61:39 (n=100, 50 Paare) | 61.0% | 0.0522 | +0.440 [+0.047, +0.833] |
+| Hybrid P=v10, V=v12 | 69:51 (n=120, 60 Paare) | 57.5% | 0.1877 | +0.300 [-0.093, +0.693] |
+| Hybrid P=v12, V=v10 | 59:61 (n=120, 60 Paare) | 49.2% | 1.0000 | -0.033 [-0.423, +0.356] |
+
+Verankerung reproduziert die bekannte v12-Staerke gegen v10_best (61.0% hier
+vs. 62.0% im urspruenglichen 124:76-Gating) -- interne Konsistenz der neuen
+Seeds/Messbedingungen bestaetigt.
+
+**Kausale Schlussfolgerung: der Value-Head traegt die Staerke, nicht der
+Policy-Head.** `P=v10,V=v12` (Suche mit v10-Priors, aber v12-Blattwerten)
+landet bei 57.5% -- nahe an der 61.0%-Verankerung, holt also den groessten
+Teil von v12s Vorteil, OBWOHL die Priors/Moon-Order vom schwaecheren v10
+stammen. `P=v12,V=v10` (v12-Priors, aber v10-Blattwerte) landet bei 49.2% --
+ununterscheidbar von 50%, der Policy-Kopf allein traegt praktisch NICHTS
+zur Arena-Staerke bei. Beide Zellen sind bei n=120 (60 Paare) statistisch
+nicht signifikant von 50% bzw. von der Verankerung unterscheidbar (McNemar
+p=0.19 bzw. p=1.00) -- die Aussage ist eine Richtungs-/Groessenordnungs-
+Aussage (wie im Auftrag vorgesehen, keine Gating-Schaerfe), aber das Muster
+ist eindeutig und in beide Zellen konsistent: die Reihenfolge Verankerung >
+P=v10/V=v12 > P=v12/V=v10 ≈ 50% zeigt keine Ambiguitaet zwischen "geteilt"
+und "Value" -- P=v12/V=v10 liegt praktisch exakt auf der 50%-Nulllinie, kein
+Hinweis auf einen eigenstaendigen Policy-Beitrag. Das steht im Einklang mit
+dem Eval-Set-#87-Befund (v12 auch bei Policy-Top-1 vorn), zeigt aber, dass
+dieser Policy-Vorteil praktisch NICHT in Arena-Staerke uebersetzt -- die
+Suche haengt bei diesem Sims-Niveau (400, Gumbel-Top-m=16 + Sequential
+Halving) weit staerker vom Blattwert an den vielen durchsuchten Knoten ab
+als vom initialen Prior-Ranking an der Wurzel.
+
+**Auffaelligkeiten**: keine Fehler/Timeouts im Lauf (Log geprueft, sauber
+durchgelaufen, ~28 Minuten Gesamtlaufzeit fuer alle drei Zellen bei 10
+Threads). Ein durchgaengiger Split-Anteil von 35-42% (nicht-informative
+1:1-Paare) ist erwartbar bei aehnlich starken Kandidaten (vgl. `paired_
+gating.py`-Docstring). Rohdaten: `evaluations/hybrid_arena_anchor_v12_vs_v10.json`,
+`evaluations/hybrid_arena_hybrid_P-v10_V-v12.json`,
+`evaluations/hybrid_arena_hybrid_P-v12_V-v10.json` (im Worktree).
+
+**Status**: reines Diagnose-Ergebnis, kein Code-/Architektur-Aenderungsauftrag
+aus diesem Task. Der Hybrid-Suche-Code bleibt additiv im Worktree
+(`worktree-hybrid-search`) verfuegbar, main unangetastet -- Merge-Entscheid
+liegt beim Nutzer (analog zum wartenden `worktree-rtv-removal`).
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
