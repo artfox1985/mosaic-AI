@@ -407,11 +407,19 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # Gilt jetzt auch für --mode mcts (siehe unten, Netz-Rundenübergangs-
         # Labels) -- nicht mehr nur für --mode network.
         from pathlib import Path
-        model_path = Path(model)
-        if not model_path.exists():
-            model_path = MODELS_DIR / model
-        if not model_path.exists():
-            raise SystemExit(f"❌ Modell nicht gefunden: '{model}' (auch nicht in {MODELS_DIR}/)")
+        # Auflösungsreihenfolge (Kurzname genügt, wie bei train.py --load):
+        # 1. wörtlicher Pfad, 2. models/<name>, 3. models/<name>.onnx,
+        # 4. models/alphazero_<name>.onnx (z.B. --model v14b_best)
+        candidates = [Path(model), MODELS_DIR / model,
+                      MODELS_DIR / f"{model}.onnx",
+                      MODELS_DIR / f"alphazero_{model}.onnx"]
+        model_path = next((p for p in candidates if p.exists()), None)
+        if model_path is None:
+            raise SystemExit(
+                f"❌ Modell nicht gefunden: '{model}' — geprüft wurden: "
+                + ", ".join(str(p) for p in candidates))
+        if str(model_path) != model:
+            print(f"🔎 Modell aufgelöst: {model} -> {model_path}")
         model = str(model_path)
 
     import random as _random
