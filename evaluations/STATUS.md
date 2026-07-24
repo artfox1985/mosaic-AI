@@ -2993,6 +2993,51 @@ und Doku (dieser Abschnitt) getrennt committet, siehe Git-Historie. Modelle
 (`models/alphazero_v13_nortv*`, `models/alphazero_v13_nortv_r1*`, gitignored)
 und Trainings-Manifeste nicht Teil des Commits.
 
+## Champion-Gating v13_nortv vs. v12b_lr (2026-07-24)
+
+Direkte Fortsetzung der rtv-Ablation Phase 1 (Abschnitt oben): `v13_nortv_best`
+hatte das Nicht-Unterlegenheits-Gating gegen `v13_best` bereits deutlich
+bestanden (Fixed-n 62:38 FUER nortv, SPRT ACCEPT_H0 nach 50 Paaren). `v13_best`
+selbst spielte gegen den amtierenden Champion `v12b_lr_best` 212:188
+(SPRT UNDECIDED_CAP_REACHED, nicht signifikant). Offene Frage: schlaegt
+`v13_nortv_best` den Champion direkt?
+
+**Gepaartes SPRT-Gating** (`tools/paired_gating.py`, Kandidat A=`v13_nortv_best`,
+B=`v12b_lr_best`, beide @400 Sims, Threads 10, H1 p=0.65, alpha=beta=0.05):
+
+| Block | Paare kum. | Ergebnis kum. | A-Sweep/B-Sweep/Split | LLR | Bericht-p |
+|---|---|---|---|---|---|
+| 1 | 25 | 34:16 | 13/4/8 | +1.984 | 0.0490 |
+| 2 | 50 | 63:37 | 19/6/25 | +2.845 | 0.0146 |
+| 3 | 75 | 90:60 | 27/12/36 | +2.804 | 0.0237 |
+| 4 | 100 | 115:85 | 32/17/51 | +2.332 | 0.0444 |
+| 5 | 125 | 143:107 | 38/20/67 | +2.836 | 0.0247 |
+| 6 | 150 | **171:129** | 46/25/79 | **+3.152** | **0.0170** |
+
+**SPRT-Verdikt nach 6 Bloecken (150 Paare/300 Spiele): ACCEPT_H1**
+(LLR=+3.152 >= obere Schranke +2.944) -- **`v13_nortv_best` schlaegt den
+Champion `v12b_lr_best` signifikant** (171:129, gepaarte Differenz +0.280,
+95%-KI [+0.064, +0.496], exakter Vorzeichentest p=0.0170). Der LLR-Verlauf
+pendelte ab Block 2 durchgehend nahe der oberen Schranke (2.3-2.9), ohne je
+zur Null zu tendieren -- kein Hinweis auf einen instabilen/knappen Trend,
+sondern ein konsistenter Vorteil, der erst in Block 6 die formale Schranke
+ueberschritt. JSON:
+`evaluations/paired_gating_result_v13_nortv_best_vs_v12b_lr_best.json`.
+
+**Champion-Wechsel**: `v13_nortv_best` ist neuer Champion. Elo-Eintrag via
+`tools/elo_tracker.py add` (siehe `evaluations/elo_history.csv`, Zeile
+2026-07-24): Elo 1100 (95%-CI [990, 1214]) vs. `v12b_lr_best` 1051
+(nach Neuberechnung durch den neuen Datenpunkt).
+
+**Einordnung**: Das rtv-freie Value-Target ist damit doppelt bestaetigt --
+einmal im direkten Nicht-Unterlegenheits-Vergleich gegen sein rtv-basiertes
+Geschwistermodell `v13_best` (Abschnitt oben) und jetzt zusaetzlich durch
+einen echten Champion-Wechsel gegen die staerkste bisherige Vergleichsbasis.
+Das stuetzt die Empfehlung aus der rtv-Ablation (Phase 2 / #85: komplette
+Rust-seitige rtv-Berechnung streichen) zusaetzlich, auch wenn dieser
+Champion-Wechsel primaer eine Staerke-Aussage ist und kein direkter
+Kostenbeleg (der liegt bereits in #80 vor).
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
