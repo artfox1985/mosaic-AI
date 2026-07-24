@@ -1,0 +1,3 @@
+iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,avg_floor,avg_floor_gegner,zerozero_anteil
+2026-07-23T15:47:34,sonstige_backfill,v12b_lr_best[shrink_off],v12_best,400,100,0.61,34.49,29.29,15.96,16.81,0.0
+2026-07-23T15:47:34,sonstige_backfill,v12b_lr_best[shrink_on],v12_best,400,100,0.5,30.34,29.87,17.19,17.25,0.0

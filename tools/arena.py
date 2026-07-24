@@ -16,11 +16,15 @@ import json
 import math
 import random
 import itertools
+from pathlib import Path
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 
 try:
     import mosaic_rust as _mr
@@ -307,6 +311,17 @@ def run_net_arena(model, net_sims=200, heur_sims=60, games=100, threads=0,
     print(f"   Ø Floor-Strafe: {net_name} {floor[net_name]/done:.1f} | {heur_name} {floor[heur_name]/done:.1f}")
     print(f"   Elo: {net_name} {elo[net_name]} | {heur_name} {elo[heur_name]}")
 
+    # Task #92: Arena-Trend-Log -- eine Zeile aus Sicht des Netzes.
+    append_run(
+        quelle="arena_anchor", modell=net_name, gegner=heur_name, sims=net_sims,
+        n_spiele=done, winrate=n_wins / done if done else None,
+        avg_score=_st.mean(net_scores) if net_scores else None,
+        avg_score_gegner=_st.mean(heur_scores) if heur_scores else None,
+        avg_floor=floor[net_name] / done if done else None,
+        avg_floor_gegner=floor[heur_name] / done if done else None,
+        zerozero_anteil=wins["ZeroZero"] / done if done else None,
+    )
+
 
 def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, games=100,
                    threads=0, seed=None, chunk=10, c_puct=1.5, c_puct_a=None, c_puct_b=None,
@@ -342,6 +357,7 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, games=100,
 
     elo  = {name_a: 1000, name_b: 1000}
     wins = {name_a: 0, name_b: 0, "ZeroZero": 0}
+    floor = {name_a: 0, name_b: 0}   # Task #92: fuer den Arena-Trend-Log (nicht bisher ausgegeben)
     a_scores, b_scores = [], []
     base_seed = seed if seed is not None else random.randint(0, 10**9)
 
@@ -364,6 +380,8 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, games=100,
             winner = g["winner"]      # 0 = A, 1 = B
             steps  = g["steps"]
             a_scores.append(scores[0]); b_scores.append(scores[1])
+            floor[name_a] += g["total_floor"][0]
+            floor[name_b] += g["total_floor"][1]
             a_won = (winner == 0)
             if a_won:
                 winner_name, score_a = name_a, 1.0; a_wins += 1
@@ -419,6 +437,18 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, games=100,
     print(f"   Ø Score: {name_a} {_st.mean(a_scores):.1f} | {name_b} {_st.mean(b_scores):.1f}")
     print(f"   0:0-Spiele: {wins['ZeroZero']}/{done} ({wins['ZeroZero']/done*100:.1f}%)")
     print(f"   Elo: {name_a} {elo[name_a]} | {name_b} {elo[name_b]}")
+
+    # Task #92: Arena-Trend-Log -- eine Zeile aus Sicht von A (Netz-vs-Netz,
+    # daher Quelle "sonstige", nicht "paired_gating"/"arena_anchor").
+    append_run(
+        quelle="sonstige", modell=name_a, gegner=name_b, sims=sims_a,
+        n_spiele=done, winrate=a_wins / done if done else None,
+        avg_score=_st.mean(a_scores) if a_scores else None,
+        avg_score_gegner=_st.mean(b_scores) if b_scores else None,
+        avg_floor=floor[name_a] / done if done else None,
+        avg_floor_gegner=floor[name_b] / done if done else None,
+        zerozero_anteil=wins["ZeroZero"] / done if done else None,
+    )
 
 
 def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50,

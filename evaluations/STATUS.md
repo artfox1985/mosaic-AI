@@ -3502,6 +3502,49 @@ letzten zwei Vorgaenger, `project_replay_window_strategy`) -- 6000 frische
 `v14b_best`-Spiele waeren die neue Kern-Kohorte fuer das naechste
 Trainingsfenster.
 
+## Task #92: Arena-Trend-Log fuer Ø-Score/Floor (2026-07-24)
+
+Elo/Winrate sagen nur "staerker/schwaecher", nicht ob die Partien selbst
+besser werden (mehr Punkte, weniger Floor-Strafen). Neues, persistentes
+Append-Log dafuer: `tools/arena_trends.py` (`append_run` + CLI
+`python tools/arena_trends.py report [--model X] [--quelle Y]`) schreibt
+nach `evaluations/arena_trends.csv` (Header selbstanlegend), eine Zeile je
+Lauf aus Sicht des Kandidaten: `iso_datum, quelle, modell, gegner, sims,
+n_spiele, winrate, avg_score, avg_score_gegner, avg_floor,
+avg_floor_gegner, zerozero_anteil`.
+
+Eingebaute Hooks (reine Ergaenzung, bestehende Konsolenausgaben/
+Rueckgabewerte unveraendert):
+  - `tools/paired_gating.py::run_paired_gating` -- akkumuliert Score/Floor
+    jetzt zusaetzlich zu Sieg/Niederlage ueber BEIDE Brett-Orientierungen
+    jedes Paares, schreibt die Aggregate zusaetzlich ins Ergebnis-JSON
+    (`avg_score_a/b`, `avg_floor_a/b`, `zerozero_anteil`) und haengt eine
+    Zeile an (Quelle `paired_gating`).
+  - `tools/arena.py::run_net_arena` (Netz-vs-Heuristik-Anker) -- nutzt die
+    dort bereits vorhandenen `net_scores`/`heur_scores`/`floor`-Werte, die
+    bisher nur gedruckt, nie persistiert wurden (Quelle `arena_anchor`).
+  - `tools/arena.py::run_net_vs_net` (Generationen-Vergleich) -- Floor-
+    Tracking war hier NICHT vorhanden und wurde ergaenzt; Quelle `sonstige`.
+
+**Backfill-Befund**: von den bestehenden Ergebnis-JSONs in `evaluations/`
+enthalten NUR `paired_arena_shrink_off_raw.json`/`_on_raw.json` (Task #78,
+Value-Shrinkage-A/B) echte Spiel-Level-Scores/Floor -- 2 Zeilen rueckwirkend
+erzeugt (Quelle `sonstige_backfill`, Zeitstempel = Commit-Zeit 711f9bd).
+Alle sieben `paired_gating_result_*.json`-Dateien (v12_best_vs_v10_best bis
+v14b_best_vs_v14_best) enthalten NUR Sieg/Niederlage-Aggregate je Block,
+KEINE Scores/Floor je Spiel -- fuer diese ist ehrlich kein Backfill moeglich,
+der Score-/Floor-Trend beginnt also erst mit dem naechsten Gating-Lauf
+(der jetzt automatisch mitschreibt).
+
+Verifikation ohne Rechenlast (11-Thread-Self-Play `v14b_best`, 6000 Spiele,
+lief parallel -- keine eigenen Arena-/Rechenlaeufe): `py_compile` aller
+angefassten Dateien, Unit-Trockentest von `append_run`/`report` (Header,
+Rundung, `n_spiele<=0`-Guard, Filter), sowie ein End-zu-Ende-Trockentest der
+drei Hooks mit `mosaic_rust` durch ein Fake-Modul (kanonische, aber
+deterministisch generierte Spiel-Dicts) ersetzt -- Ergebnis-JSON-Felder und
+CSV-Zeilen gegen von-Hand nachgerechnete Aggregate aus den gemockten
+Spiel-Dicts geprueft, alle Assertions bestanden.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
