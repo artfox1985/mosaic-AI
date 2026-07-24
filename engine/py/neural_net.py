@@ -460,6 +460,23 @@ VALUE_SCALE = 50.0
 # keine Arena-/R²-Validierung, bei Bedarf anpassen.
 TD_LAMBDA = 0.5
 
+# rtv-Ablation Phase 1 (Task #84, 2026-07-24): Trainings-Varianten, die den
+# `round_transition_value`-Override beim Target-Bau ignorieren -- OHNE neues
+# Self-Play, rein um zu testen, ob `rtv` (81% der Self-Play-Kosten, siehe
+# #80/#81) im Value-Target ueberhaupt Staerke beitraegt.
+#   "default"  : Bestandsverhalten, byte-identisch zu vor Task #84 (rtv wird
+#                wie gehabt bevorzugt, wo vorhanden).
+#   "nortv"    : rtv-Override komplett deaktiviert -- Value-Target faellt fuer
+#                ALLE Schritte auf die tanh-Margin-Formel (own_total/opp_total)
+#                zurueck, der TD-Bootstrap-Blend (Punkt 6) bleibt unveraendert
+#                oben drauf.
+#   "nortv_r1" : rtv-Override NUR fuer Runde-1-Zustaende deaktiviert (Teil-
+#                ersparnis -- Runde 1 ist der teuerste rtv-Fall, siehe #80),
+#                Runden 2-5 verhalten sich wie "default". Rundenzuordnung je
+#                Record: `step["state"]["round"]`, dieselbe Quelle wie
+#                `tools/offline_diagnose.py::load_val_samples`.
+VALUE_TARGET_VARIANTS = ("default", "nortv", "nortv_r1")
+
 # Policy-Ziel-Schärfung (Experiment, 2026-07-19): die rohen MCTS-Visit-Anteile
 # (`step["policy"]`s `prob`-Werte, Heuristik-Selfplay) sind selbst oft recht
 # flach (Stone-only-Diagnose: Ø Max-Prob nur 0.503, 41.7% "sehr flach") --
@@ -473,16 +490,27 @@ POLICY_TARGET_SHARPEN_EXPONENT = 2.0
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", files=None):
+    def __init__(self, data_dir="data", files=None, value_target_variant="default"):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
         Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
         `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
         uebergebenen Liste ab, Train- und Val-Split bekommen also automatisch
-        getrennte HDF5-Caches im selben Ordner."""
+        getrennte HDF5-Caches im selben Ordner.
+
+        `value_target_variant`: siehe VALUE_TARGET_VARIANTS oben (Task #84,
+        rtv-Ablation Phase 1) -- steuert, ob/wo der rtv-Override beim
+        Target-Bau ignoriert wird. Standard "default" reproduziert exakt das
+        Bestandsverhalten."""
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
         import numpy as np
+
+        if value_target_variant not in VALUE_TARGET_VARIANTS:
+            raise ValueError(
+                f"Unbekannte value_target_variant={value_target_variant!r} -- "
+                f"erlaubt: {VALUE_TARGET_VARIANTS}"
+            )
 
         # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
         # TD_LAMBDA fehlte hier bisher im Hash (Retrain-Sweep-Audit,
@@ -491,10 +519,14 @@ class MosaicDataset(Dataset):
         # also stillschweigend den Cache der ersten je Dateiliste gebauten
         # Lambda-Variante wiederverwendet und NICHTS gemessen. Jetzt Teil des
         # Keys, gleiche Stelle wie POLICY_TARGET_SHARPEN_EXPONENT.
+        # value_target_variant (Task #84) genau dieselbe Falle: der rtv-
+        # Override wird ebenfalls VOR dem Caching eingerechnet -- ohne diesen
+        # String im Key wuerden "nortv"/"nortv_r1" stillschweigend den
+        # "default"-Cache derselben Dateiliste wiederverwenden.
         files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
-             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA)).encode()
+             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)).encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -596,6 +628,17 @@ class MosaicDataset(Dataset):
                             # daher direkt übernommen statt über die
                             # own_total/opp_total-Punkteformel geschickt.
                             rtv = step.get("round_transition_value")
+                            # Task #84 (rtv-Ablation Phase 1): Variante kann
+                            # den Override komplett ("nortv") oder nur fuer
+                            # Runde-1-Zustaende ("nortv_r1") unterdruecken --
+                            # Rundenzuordnung identisch zu
+                            # offline_diagnose.py::load_val_samples
+                            # (`step["state"]["round"]`).
+                            if rtv is not None and value_target_variant == "nortv":
+                                rtv = None
+                            elif (rtv is not None and value_target_variant == "nortv_r1"
+                                  and int(step["state"].get("round", 0)) == 1):
+                                rtv = None
                             if rtv is not None:
                                 own_rtv = float(rtv[p]) * 2.0 - 1.0
                                 opp_rtv = float(rtv[1 - p]) * 2.0 - 1.0
@@ -698,6 +741,7 @@ class MosaicDataset(Dataset):
             self.points_forecast    = torch.from_numpy(points_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
+        self.value_target_variant = value_target_variant
 
     def __len__(self): return len(self.states)
     def __getitem__(self, idx):

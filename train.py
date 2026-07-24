@@ -187,7 +187,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
-          value_weight=None, points_weight=None):
+          value_weight=None, points_weight=None, value_target_variant="default"):
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -207,6 +207,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
         "value_weight": value_weight, "points_weight": points_weight,
+        "value_target_variant": value_target_variant,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -233,14 +234,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"   Subsampling (Task #69): {len(train_files)} von {orig_n} Trainings-Dateien "
               f"(Seed 20260708, Val-Split unveraendert)")
 
-    dataset = MosaicDataset(str(DATA_DIR), files=train_files)
+    if value_target_variant != "default":
+        print(f"🧪 Value-Target-Variante (Task #84, rtv-Ablation): '{value_target_variant}'")
+    dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant)
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
 
     val_dataset = None
     if val_files:
-        val_dataset = MosaicDataset(str(DATA_DIR), files=val_files)
+        val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant)
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
 
@@ -761,6 +764,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "num_val_games":     len(val_dataset) if val_dataset is not None else 0,
         "policy_pct":        round(pct, 1),
         "load_version":      load_version,
+        "value_target_variant": value_target_variant,
     }
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
@@ -849,6 +853,14 @@ if __name__ == "__main__":
     parser.add_argument("--points-weight", type=float, default=None,
                         help="Gewicht des Punktestand-Aux-Loss im Gesamt-Loss (Standard: POINTS_WEIGHT "
                              "aus config.py, aktuell 0.5). Siehe --value-weight.")
+    parser.add_argument("--value-target-variant", type=str, default="default",
+                        choices=["default", "nortv", "nortv_r1"],
+                        help="Task #84 (rtv-Ablation Phase 1): 'default' (Standard) reproduziert das "
+                             "Bestandsverhalten byte-identisch (rtv-Override bevorzugt, wo vorhanden). "
+                             "'nortv' ignoriert den round_transition_value-Override komplett (Value-"
+                             "Target faellt auf die tanh-Margin-Formel zurueck). 'nortv_r1' ignoriert "
+                             "ihn nur fuer Runde-1-Zustaende. Aendert den HDF5-Cache-Key (siehe "
+                             "neural_net.py::MosaicDataset).")
 
     args = parser.parse_args()
 
@@ -856,4 +868,5 @@ if __name__ == "__main__":
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
-          value_weight=args.value_weight, points_weight=args.points_weight)
+          value_weight=args.value_weight, points_weight=args.points_weight,
+          value_target_variant=args.value_target_variant)
