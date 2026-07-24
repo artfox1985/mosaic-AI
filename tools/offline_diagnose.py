@@ -25,11 +25,24 @@ Verwendung:
     python tools/offline_diagnose.py --model v12_best
     python tools/offline_diagnose.py --model v12b_lr_best v12b_scratch_best v12_best
     python tools/offline_diagnose.py --model v12b_lr_best --out evaluations/offline_diagnose_v12b.json
+
+Task #87 (--frozen): rechnet dieselben Metriken stattdessen auf dem
+eingefrorenen, generationsuebergreifenden Set `evaluations/
+frozen_eval_set.pkl` (gebaut von `tools/build_frozen_eval_set.py`,
+Version "frozen_v1"). Motivation: `val_files()` zieht den Val-Split aus dem
+JEWEILS AKTUELLEN data/-Inhalt -- Diagnose-Zahlen zwischen Generationen sind
+dadurch NICHT vergleichbar, sobald sich data/ aendert (altes Korpus rotiert
+raus). Das frozen Set ist fix (mehrere Korpora, stratifiziert nach Runde)
+und macht Netz-Vergleiche ueber Generationen hinweg moeglich. Bestehendes
+Verhalten (ohne --frozen) bleibt vollstaendig unveraendert.
+
+    python tools/offline_diagnose.py --frozen --model v10_best v12_best v12b_lr_best
 """
 import argparse
 import glob
 import json
 import math
+import os
 import pickle
 import random
 import sys
@@ -60,6 +73,13 @@ from neural_net import (
 # Zahlen sind nicht vergleichbar.
 VAL_SEED = 20260707
 VAL_FRAC = 0.1
+
+# Task #87: eingefrorenes generationsuebergreifendes Set (siehe
+# tools/build_frozen_eval_set.py). Pfad + erwartete Version fix -- das Set
+# ist ab "frozen_v1" unveraenderlich, ein spaeterer frozen_v2 bekaeme einen
+# neuen Dateinamen statt diesen zu ueberschreiben.
+FROZEN_EVAL_PATH = Path(__file__).resolve().parent.parent / "evaluations" / "frozen_eval_set.pkl"
+FROZEN_EVAL_VERSION = "frozen_v1"
 
 
 def val_files() -> list[str]:
@@ -135,6 +155,84 @@ def load_val_samples(files: list[str]):
     )
 
 
+def load_frozen_samples(path: Path = FROZEN_EVAL_PATH):
+    """Laedt `evaluations/frozen_eval_set.pkl` (Task #87,
+    tools/build_frozen_eval_set.py). Value-Ziel-/Policy-Ziel-/Masken-
+    Berechnung ist 1:1 dieselbe wie in `load_val_samples()` -- die einzige
+    Ergaenzung ist das Quellkorpus-Label je Zustand (`source_corpus`, z.B.
+    "v10b"/"v12"), das `diagnose()` fuer die Verteilungs-Aufschluesselung
+    braucht."""
+    if not path.exists():
+        raise SystemExit(
+            f"Frozen-Eval-Set nicht gefunden unter {path} -- erst "
+            "`python tools/build_frozen_eval_set.py` ausfuehren."
+        )
+    with open(path, "rb") as fh:
+        blob = pickle.load(fh)
+    version = blob.get("version")
+    if version != FROZEN_EVAL_VERSION:
+        print(f"⚠️  Warnung: Set-Version {version!r} != erwartet {FROZEN_EVAL_VERSION!r}")
+    records = blob["records"]
+
+    states_l, values_l, rounds_l, polw_l = [], [], [], []
+    policy_l, masks_l, corpus_l = [], [], []
+
+    for rec in records:
+        state = rec["state"]
+        states_l.append(state_to_tensor(state).numpy())
+        rounds_l.append(int(rec.get("round", state.get("round", 0))))
+        corpus_l.append(rec["source_corpus"])
+
+        p = rec["player"]
+        scores_src = rec.get("scores_unclamped", rec.get("scores"))
+        own_total = float(scores_src[p])
+        opp_total = float(scores_src[1 - p])
+        val = math.tanh((own_total - opp_total) / VALUE_SCALE)
+
+        rtv = rec.get("round_transition_value")
+        if rtv is not None:
+            val = float(rtv[p]) * 2.0 - 1.0
+
+        bv = rec.get("bootstrap_value")
+        if bv is not None:
+            own_bootstrap = float(bv[p]) * 2.0 - 1.0
+            val = TD_LAMBDA * own_bootstrap + (1.0 - TD_LAMBDA) * val
+        values_l.append(val)
+
+        t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
+        for pe in rec["policy"]:
+            t_policy[action_to_id(pe["action"])] += pe["prob"]
+        s = t_policy.sum()
+        if s > 0:
+            t_policy /= s
+        policy_l.append(t_policy)
+
+        mask = np.zeros(NUM_ACTIONS, dtype=np.float32)
+        moves = rec.get("valid_actions") or state.get("valid_moves", [])
+        for mv in moves:
+            mask[action_to_id(mv)] = 1.0
+        for pe in rec["policy"]:
+            mask[action_to_id(pe["action"])] = 1.0
+        masks_l.append(mask)
+
+        phase = state.get("phase")
+        is_start = any(pe["action"].get("is_start") for pe in rec["policy"])
+        polw_l.append(1.0 if (phase == "drafting" and not is_start) else 0.0)
+
+    return (
+        torch.from_numpy(np.array(states_l, dtype=np.float32)),
+        np.array(values_l, dtype=np.float32),
+        np.array(rounds_l, dtype=np.int64),
+        np.array(polw_l, dtype=np.float32),
+        np.array(policy_l, dtype=np.float32),
+        np.array(masks_l, dtype=np.float32),
+        np.array(corpus_l),
+        version,
+        blob.get("seed"),
+        len(records),
+    )
+
+
 def _r2(y_true: np.ndarray, y_pred: np.ndarray) -> float | None:
     if len(y_true) == 0:
         return None
@@ -146,7 +244,8 @@ def _r2(y_true: np.ndarray, y_pred: np.ndarray) -> float | None:
 
 
 def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, masks,
-             batch_size: int = 4096, hidden_override: int | None = None) -> dict:
+             batch_size: int = 4096, hidden_override: int | None = None,
+             corpus_labels: np.ndarray | None = None) -> dict:
     ckpt_path = MODELS_DIR / f"alphazero_{model_name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
     hs = hidden_override if hidden_override is not None else ckpt.get("hidden_size", 512)
@@ -200,6 +299,30 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
         result["policy_top1"] = None
         result["policy_top3"] = None
 
+    # Task #87: Aufschluesselung je Quellkorpus (nur wenn --frozen genutzt
+    # wurde) -- zeigt, ob Metriken durch die Korpus-Zusammensetzung des
+    # jeweiligen Val-Splits verzerrt sind (Verteilungs-Effekt statt echtem
+    # Staerke-/Stil-Unterschied).
+    if corpus_labels is not None:
+        by_corpus: dict = {}
+        for c in sorted(set(corpus_labels.tolist())):
+            cmask = corpus_labels == c
+            entry: dict = {
+                "n": int(cmask.sum()),
+                "value_r2": _r2(values[cmask], value_preds[cmask]),
+            }
+            draft_c = cmask & draft_mask
+            n_draft_c = int(draft_c.sum())
+            entry["n_drafting"] = n_draft_c
+            if n_draft_c > 0:
+                entry["policy_top1"] = float(top1_hits[draft_c].mean())
+                entry["policy_top3"] = float(top3_hits[draft_c].mean())
+            else:
+                entry["policy_top1"] = None
+                entry["policy_top3"] = None
+            by_corpus[str(c)] = entry
+        result["by_corpus"] = by_corpus
+
     return result
 
 
@@ -230,6 +353,38 @@ def print_table(results: list[dict]) -> None:
     print("=" * 70)
 
 
+def print_corpus_table(results: list[dict]) -> None:
+    """Task #87: separate Tabelle je Quellkorpus (nur befuellt, wenn
+    --frozen genutzt wurde -- zeigt Verteilungs-Effekte)."""
+    if not results or "by_corpus" not in results[0]:
+        return
+    corpora = sorted(results[0]["by_corpus"].keys())
+    names = [r["model"] for r in results]
+    print("\n" + "=" * 70)
+    print("  AUFSCHLUESSELUNG JE QUELLKORPUS (frozen set)")
+    print("=" * 70)
+    for c in corpora:
+        header = f"Korpus '{c}'".ljust(28) + "".join(n.rjust(16) for n in names)
+        print(header)
+        print("-" * len(header))
+
+        def row(label, values):
+            print(("  " + label).ljust(28) + "".join(v.rjust(16) for v in values))
+
+        row("n", [str(r["by_corpus"][c]["n"]) for r in results])
+        row("Value R²",
+            [f"{r['by_corpus'][c]['value_r2']:.4f}" if r["by_corpus"][c]["value_r2"] is not None else "n/a"
+             for r in results])
+        row("Policy Top-1",
+            [f"{r['by_corpus'][c]['policy_top1']*100:.1f}%" if r["by_corpus"][c]["policy_top1"] is not None else "n/a"
+             for r in results])
+        row("Policy Top-3",
+            [f"{r['by_corpus'][c]['policy_top3']*100:.1f}%" if r["by_corpus"][c]["policy_top3"] is not None else "n/a"
+             for r in results])
+        print()
+    print("=" * 70)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--model", nargs="+", required=True,
@@ -238,29 +393,53 @@ def main() -> None:
     p.add_argument("--batch-size", type=int, default=4096)
     p.add_argument("--out", type=str, default=None,
                     help="Ziel-JSON-Pfad (Standard: evaluations/offline_diagnose_<model1>_vs_....json)")
+    p.add_argument("--frozen", action="store_true",
+                    help="Task #87: statt val_files() das eingefrorene, generationsuebergreifende "
+                         "Set evaluations/frozen_eval_set.pkl verwenden (Default AUS, "
+                         "Bestandsverhalten unveraendert).")
+    p.add_argument("--threads", type=int, default=None,
+                    help="torch.set_num_threads-Override (Standard: max(1, CPU-2) -- "
+                         "Schutz gegen parallel laufende Self-Play-Batches).")
     args = p.parse_args()
 
-    files = val_files()
-    print(f"📦 Val-Split: {len(files)} Dateien (Seed {VAL_SEED}, val_frac={VAL_FRAC})")
-    states, values, rounds, pol_w, policy_targets, masks = load_val_samples(files)
-    print(f"   {len(states):,} Val-Züge geladen.")
+    threads = args.threads if args.threads is not None else max(1, (os.cpu_count() or 4) - 2)
+    torch.set_num_threads(threads)
+    print(f"🧵 torch threads: {threads}")
+
+    corpus_labels = None
+    frozen_meta = {}
+    if args.frozen:
+        states, values, rounds, pol_w, policy_targets, masks, corpus_labels, f_version, f_seed, f_n = \
+            load_frozen_samples()
+        print(f"🧊 Frozen-Eval-Set: {FROZEN_EVAL_PATH} (Version {f_version}, Seed {f_seed}, n={f_n:,})")
+        frozen_meta = {"frozen": True, "frozen_version": f_version, "frozen_seed": f_seed,
+                       "frozen_path": str(FROZEN_EVAL_PATH)}
+    else:
+        files = val_files()
+        print(f"📦 Val-Split: {len(files)} Dateien (Seed {VAL_SEED}, val_frac={VAL_FRAC})")
+        states, values, rounds, pol_w, policy_targets, masks = load_val_samples(files)
+        frozen_meta = {"frozen": False, "val_seed": VAL_SEED, "val_frac": VAL_FRAC, "n_val_files": len(files)}
+    print(f"   {len(states):,} Züge geladen.")
 
     results = []
     for name in args.model:
         print(f"\n🔎 Diagnose: {name}")
         res = diagnose(name, states, values, rounds, pol_w, policy_targets, masks,
-                        batch_size=args.batch_size, hidden_override=args.hidden)
+                        batch_size=args.batch_size, hidden_override=args.hidden,
+                        corpus_labels=corpus_labels)
         results.append(res)
 
     print_table(results)
+    print_corpus_table(results)
 
     out_path = args.out
     if out_path is None:
         base = Path(__file__).resolve().parent.parent / "evaluations"
-        out_path = str(base / f"offline_diagnose_{'_vs_'.join(args.model)}.json")
+        suffix = "_frozen" if args.frozen else ""
+        out_path = str(base / f"offline_diagnose_{'_vs_'.join(args.model)}{suffix}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({
-            "val_seed": VAL_SEED, "val_frac": VAL_FRAC, "n_val_files": len(files),
+            **frozen_meta,
             "results": results,
         }, f, indent=2, ensure_ascii=False)
     print(f"\n📝 Ergebnis gespeichert unter: {out_path}")
