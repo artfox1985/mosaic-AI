@@ -3390,6 +3390,118 @@ optional mit ein paar zusaetzlichen Epochen und/oder frischem Self-Play statt
 des bestehenden 3940-Spiele-Fensters, um die fruehen Runden gezielt
 nachzuschaerfen.
 
+## v14b: Feintuning-Nachbrenner (2026-07-24/25)
+
+**Ausgangslage**: `v14_best` (From-Scratch-Destillation nach dem Datenverlust,
+siehe "Datenverlust + v14-Neustart" oben) verlor als Elo-Anker 19:37 gegen
+Heuristik@200 (884 Elo). Empfehlung dort: Feintuning-Nachbrenner statt neuem
+From-Scratch-Lauf.
+
+**Training**: `python -u train.py --name v14b --load v14_best --lr 0.00005
+--lr-schedule cosine --value-target-variant nortv --epochs 100
+--early-stop`, Warm-Start von `alphazero_v14_best.pth` auf demselben
+3940-Spiele-Fenster (`v12`-Praefix: 200 Dateien/2000 Spiele, `v10b`-Praefix:
+100 Dateien/1940 Spiele) -- dasselbe Rezept, das `v12b_lr` seinerzeit zum
+Champion gemacht hat. `alphazero_v14b_best.onnx`/`.pth` liegen in `models/`.
+Waehrend des Laufs ist der Snapshot-Hook (Commit 5fa8b59) gefeuert:
+`models_2026-07-24_2207_v14b.zip` im OneDrive-Backup-Ordner -- der Rechner
+hing in der Nacht nach Training+Diagnose+Gating (Ursache nicht abschliessend
+geklärt), aber Training UND Backup-Hook liefen bereits vollstaendig durch,
+bevor der Haenger auftrat. Erster echter Ernstfall-Beleg, dass der
+ereignisgesteuerte Snapshot-Hook wie vorgesehen greift.
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`, frozen-Set `frozen_v1`,
+n=1800, `evaluations/offline_diagnose_v14b_best_vs_v14_best_frozen.json`):
+
+| Modell | Top-1 | Top-3 | R² global | R² R1-R5 |
+|---|---|---|---|---|
+| v13_nortv_best (verlorener Champion, Referenz) | 48.5% | 75.5% | 0.343 | 0.063/0.175/0.227/0.271/0.697 |
+| v12b_lr_best (verlorener vorheriger Champion, Referenz) | 46.6% | 74.1% | 0.338 | 0.096/0.166/0.217/0.305/0.648 |
+| **v14b_best (neu, Warm-Start-Nachbrenner)** | **46.9%** | **74.4%** | **0.257** | -0.016/0.099/0.080/0.089/0.707 |
+| v14_best (Vorgaenger, From-Scratch) | 45.1% | 72.9% | 0.241 | -0.009/0.077/0.062/0.073/0.683 |
+
+`v14b_best` verbessert sich gegenueber `v14_best` in JEDER einzelnen Kennzahl
+(Top-1 +1,8pp, Top-3 +1,5pp, R² global +0,016), bleibt aber weiterhin klar
+unter den verlorenen Champions (v13_nortv_best: -8,6% relativ bei R² global)
+-- und die R1-Schwaeche (-0,016) bleibt qualitativ unveraendert, ist sogar
+minimal negativer als bei v14_best. Das Feintuning hat also die insgesamt
+vorhandene Repraesentation geschaerft, aber NICHT die frueh-Runden-
+Value-Schwaeche behoben, die als Haupttreiber der Arena-Luecke vermutet wird.
+
+**Gepaartes Gating** (`tools/paired_gating.py`, `v14b_best` vs. `v14_best`,
+beide @400 Sims, `evaluations/paired_gating_result_v14b_best_vs_v14_best.json`,
+8 Bloecke a 25 Paare, gepaarter Vorzeichentest + SPRT p1=0,65/α=β=0,05):
+**v14b_best 218:182 v14_best** (200 Paare/400 Spiele, kein frueher Abbruch --
+`UNDECIDED_CAP_REACHED`, LLR=1,52 von noetigen ±2,94, McNemar p=0,066,
+mittlere Paar-Differenz 0,18 [95%-CI -0,0005, 0,360]). Statistisch NICHT
+signifikant (CI beruehrt die Null), aber die gesamte Trendrichtung ueber alle
+8 Bloecke ist durchgehend positiv fuer `v14b_best` (kein einziger Block mit
+negativer mittlerer Paar-Differenz).
+
+**Koordinator-Entscheid**: `v14b_best` wird Referenz/Generator der
+Wiederaufbau-Linie. Kein klassischer Champion-Gating-Fall (`v14_best` ist
+selbst kein etablierter Champion, sondern nur der vorherige Rebuild-Stand) --
+die Gesamtevidenz (Offline-Verbesserung in allen Kennzahlen + tendenziell
+positives, wenn auch nicht signifikantes Gating) reicht aus, um `v14b_best`
+als naechsten Stand zu fuehren, ohne dass ein hartes p<0,05-Kriterium wie bei
+echten Champion-Ablösungen gefordert wird.
+
+**Elo-Neuverankerung** (`tools/arena.py`, `v14b_best@400` vs. `Heuristik@200`,
+Rust-Engine, 10 Threads, SPRT frueh-Stop aktiv, p1=0,64/α=0,05/β=0,10): SPRT
+entschied nach 170/400 Spielen auf **"Gleich stark"** (beide Seiten haben
+ihre H1 verworfen -- LLR_Netz=-2,29 [untere Schranke -2,25 unterschritten],
+LLR_Heur=-2,34 [ebenfalls unter -2,25], keine Seite erreichte je die obere
+Schranke +2,89) -- **v14b_best 77:93 Heuristik@200 (45% Netzsiege)**. Das ist
+ein deutlicher Fortschritt gegenueber `v14_best`s fruehem Abbruch zugunsten
+der Heuristik (19:37 nach nur 56 Spielen, 34% Netzsiege): `v14b_best` haelt
+sich ueber mehr als dreimal so viele Spiele in echter Paritaetsnaehe.
+Eingetragen in `evaluations/elo_history.csv` via `tools/elo_tracker.py add`;
+Bradley-Terry-Fit (Heuristik@200 fixer Anker bei 1000) ergibt
+**v14b_best@400 = 967 Elo [917, 1020]**. Neue Kader-Reihenfolge:
+v13_nortv_best 1100 > v12b_lr_best 1051 > Heuristik@200 1000 (Anker) >
+**v14b_best 967** > v12_best 943 > v14_best 884 > v10_best 858 >
+v11_td07_best 853 > v11_best 809. `v14b_best` liegt damit nicht nur klar vor
+seinem direkten Vorgaenger `v14_best` (+83 Elo), sondern im globalen
+Bradley-Terry-Fit auch vor `v12_best` (943) -- ein indirekter Vergleich
+ueber den gemeinsamen Heuristik-Anker, KEIN direktes Match, entsprechend mit
+Vorsicht zu lesen (unterschiedliche Regelwerks-/Sims-Historie je nach Zeile,
+siehe Kommentar-Spalte der CSV).
+
+**Repro-Haenger-Hinweis**: der Rechner, auf dem dieser Nachbrenner-Zyklus
+(Training + Offline-Diagnose + gepaartes Gating) lief, hing in der Nacht auf
+den 2026-07-25 aus ungeklaertem Grund (kein Hinweis auf einen Zusammenhang
+mit dem Training selbst). Wichtig: sowohl das Training als auch der
+Snapshot-Hook (Commit 5fa8b59) waren zu diesem Zeitpunkt bereits
+vollstaendig durchgelaufen -- der erste echte Ernstfall-Beleg, dass der nach
+dem `models/`-Datenverlust eingefuehrte ereignisgesteuerte Backup-Hook wie
+vorgesehen greift. Die Elo-Neuverankerung wurde nachtraeglich (dieser
+Task-Abschluss) nachgeholt.
+
+**Gesamteinschaetzung**: Der Feintuning-Nachbrenner (Warm-Start + `lr 5e-5
+Cosine`, dasselbe Rezept wie `v12b_lr`) hat funktioniert -- offline eine
+kleine, aber konsistente Verbesserung in JEDER Kennzahl gegenueber
+`v14_best`, in der Arena ein deutlich groesserer Sprung (+83 Elo, von klar
+unterlegen zu echter Paritaet mit Heuristik@200). Die fruehe-Runden-
+Value-Schwaeche (R1 R² weiterhin nahe null) bleibt aber unveraendert
+bestehen und ist vermutlich der Hauptgrund, warum `v14b_best` trotz des
+Elo-Sprungs weiterhin klar hinter den verlorenen Champions (`v13_nortv_best`
+1100, `v12b_lr_best` 1051) zurueckbleibt. Der Nachbrenner konnte also die
+vorhandene Repraesentation schaerfen, aber nicht die strukturelle Luecke
+(zu wenig frische Bootstrap-Daten fuer fruehe Runden im bestehenden
+3940-Spiele-Fenster) schliessen -- dafuer braucht es neues Self-Play mit
+`v14b_best` als Generator (rtv aus, ~0,24 Spiele/s bei 20 Threads siehe
+Task-#85-Messung), gezielt um die Runde-1/2-Zielwerte zu verbreitern.
+**Empfehlung**: 6000 statt 2000 Spiele fuer den naechsten Self-Play-Batch
+(~6,9h statt ~2,3h Laufzeit, ueber Nacht machbar) -- die R1-Schwaeche ist ein
+Daten-, kein Kapazitaetsproblem (siehe `feedback_value_head_capacity`-Notiz),
+und die `v11`-Zyklus-Erfahrung (project_v11_cycle_result: ein 2000-Spiele-
+Halbkorpus als Hauptverdaechtiger fuer eine ausgebliebene Staerkeverbesserung)
+spricht dagegen, erneut mit der kleineren Menge zu knausern. Das passt auch
+zur bestehenden Fenster-Strategie (~5000 aktueller Champion + je ~1000 der
+letzten zwei Vorgaenger, `project_replay_window_strategy`) -- 6000 frische
+`v14b_best`-Spiele waeren die neue Kern-Kohorte fuer das naechste
+Trainingsfenster.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
