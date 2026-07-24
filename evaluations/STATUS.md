@@ -2693,6 +2693,148 @@ reines Auswendiglernen EINES Korpus sein statt echter Generalisierung.
 `tools/offline_diagnose.py` `--frozen`/`--threads`/Korpus-Aufschlüsselung)
 und Doku (dieser Abschnitt) getrennt committet, siehe Git-Historie.
 
+## v13-Zyklus (2026-07-24)
+
+**Task #86. Build-Gate**: Wheel bereits aktuell (Stand `115b5ba`, Default-
+Features, 151/151 Tests) -- vor diesem Zyklus verifiziert, kein erneuter
+Rebuild noetig.
+
+**Replay-Fenster (Nutzer-Strategie: 2000 aktuelle + 1000 Alt-Champion)**:
+alle 200 `data/selfplay_v12_*.pkl` (Generator v12b_lr, 2000 Spiele)
+unveraendert uebernommen. Von den 200 `data/selfplay_v10b_*.pkl` (Altbestand,
+Generator v10) deterministisch 100 ausgewaehlt --
+`random.Random(20260724).sample(sorted(glob("data/selfplay_v10b_*.pkl")), 100)`
+-- die NICHT gewaehlten 100 Dateien nach `data/archive_v10b_beyond_window/`
+verschoben (reversibel, nichts geloescht; Auswahl-Manifest liegt dort als
+`selection_manifest.json`). Endzustand `data/`: 200×v12 + 100×v10b (+
+100 archivierte v10b in `archive_v10b_beyond_window/`).
+
+**Training (`v13`)**: Warm-Start von `alphazero_v12b_lr_best.pth`, Standard-
+Rezept `--lr 0.00005 --lr-schedule cosine --epochs 100`. **Zwischenfall**:
+erster Versuch mit `--load alphazero_v12b_lr_best` schlug fehl, ohne
+Exception -- `train.py` haengt selbst schon `alphazero_`-Praefix an
+(`load_path = MODELS_DIR / f"alphazero_{load_version}.pth"`), der gebaute
+Pfad `alphazero_alphazero_v12b_lr_best.pth` existierte nicht, Skript fiel
+still auf `Trainiere von null!` zurueck (Value-Val-R² startete bei 0.158
+statt sofort ~0.27 -- das war das erste Warnsignal). Lauf nach 6 Epochen
+sauber abgebrochen (`taskkill`, kein Checkpoint geschrieben, Cache-Dateien
++ Fehl-Manifest geloescht), korrekt mit `--load v12b_lr_best` neu gestartet.
+**Lehre**: `--load`-Argument ist der reine Versionsname OHNE `alphazero_`-
+Praefix.
+
+Neues Fenster erzwang neuen HDF5-Cache-Build (erwartet, ~204s/23.5s Train/Val-
+Load). 435.778 Trainings- / 48.446 Val-Zuege (Val-Split 30/300 Dateien,
+gleicher Seed wie immer). Manifest
+`models/manifest_train_v13_20260724_114623.json` bestaetigt
+`corpus_composition` **200 Dateien v12 (2000 Spiele) + 100 Dateien v10b
+(1940 Spiele)** -- exakt wie geplant. Warm-Start bestaetigt im Log
+("📥 Lade altes Model als Startpunkt: alphazero_v12b_lr_best.pth"), Value-
+Val-R² startet bei 0.270 (Epoche 1) und faellt danach monoton (0.264 → 0.257
+→ ... → 0.203 bei Epoche 15) -- dasselbe Fruehplateau-Muster wie v11/v12/v12b.
+Early Stopping bei Epoche 15/100 (Val-Policy-Plateau seit Epoche 10). **Bester
+Checkpoint: Epoche 4** (`val_combined`=1.6196, Value-Val-R²=0.253,
+Points-Val-R²=0.225) -- wie erwartet im Bereich Epoche 2-5 mit dem LR-Rezept.
+Netzauslastung gesund (Dead 6%, Eff.Rank 38%). ONNX-Export automatisch
+mitgelaufen und verifiziert (`alphazero_v13.onnx` + `alphazero_v13_best.onnx`,
+beide frischer als Trainingsstart, 4.85MB).
+
+**Offline-Diagnose, klassisch** (`tools/offline_diagnose.py`, echter
+Val-Split 30/300 Dateien, n=48.446 Val-Zuege, davon 35.325 Drafting-Schritte
+-- **Achtung, anderer Split als der v12-Zyklus-Referenzwert** (neues Fenster
+= neue Datei-Menge = andere Val-Auswahl trotz gleichem Seed), daher direkter
+Vergleich mit den v12b_lr-Referenzzahlen aus dem Auftrag (R² 0.2289 etc., auf
+einem v10b-Split) nur eingeschraenkt aussagekraeftig -- hier stattdessen
+v12b_lr_best NEU auf demselben v13-Split mitgerechnet):
+
+| Metrik | v13_best | v12b_lr_best (gleicher Split) |
+|---|---|---|
+| Policy Top-1 (Drafting) | 45.6% | 44.7% |
+| Policy Top-3 (Drafting) | 75.8% | 74.2% |
+| Value Val-R² global | 0.2528 | 0.2625 |
+| R² Runde 1 | 0.0162 | 0.0246 |
+| R² Runde 2 | 0.1138 | 0.1395 |
+| R² Runde 3 | 0.1107 | 0.1198 |
+| R² Runde 4 | 0.2270 | 0.2311 |
+| R² Runde 5 | 0.6151 | 0.6208 |
+
+Gemischtes Bild: v13 gewinnt bei Policy Top-1/Top-3, verliert leicht bei
+Value-R² (global und in jeder Runde) -- Unterschiede klein und angesichts des
+unterschiedlichen Splits ggue. der Auftrags-Referenz nicht ueberinterpretierbar.
+
+**Offline-Diagnose, frozen** (`--frozen`, `evaluations/frozen_eval_set.pkl`,
+Version `frozen_v1`, n=1.800, generationsuebergreifend vergleichbar --
+DIES ist der eigentlich belastbare Vergleich):
+
+| Metrik | v13_best | v12b_lr_best (frozen_v1-Referenz) |
+|---|---|---|
+| Policy Top-1 (Drafting) | **49.5%** | 46.6% |
+| Policy Top-3 (Drafting) | **75.5%** | 74.1% |
+| Value Val-R² global | **0.3688** | 0.3379 |
+| R² Runde 1 | **0.0991** | 0.0956 |
+| R² Runde 2 | **0.1941** | 0.1664 |
+| R² Runde 3 | **0.2555** | 0.2172 |
+| R² Runde 4 | **0.3339** | 0.3049 |
+| R² Runde 5 | **0.6921** | 0.6479 |
+
+Korpus-Aufschluesselung: v13_best schlaegt v12b_lr_best auf dem v12-Subset
+deutlich (Top-1 57.5% vs. 51.8%, R² 0.3424 vs. 0.2273), liegt auf dem
+v10b-Subset bei Top-1 praktisch gleichauf (41.8% vs. 41.7%) und leicht
+niedriger bei R² (0.3887 vs. 0.4217). **Auf dem frozen Set schlaegt v13_best
+v12b_lr_best in JEDER einzelnen Metrik** (Top-1, Top-3, R² global und alle
+fuenf Runden) -- klar bestes Offline-Ergebnis der bisherigen frozen_v1-Reihe.
+
+**Gepaartes SPRT-Gating v13_best vs. v12b_lr_best** (`tools/paired_gating.py`,
+beide @400 Sims, H1 p=0.65, alpha=beta=0.05, Default-Threads jetzt 10 --
+**Zwischenfall**: erster Versuch mit `--model-a v13_best --model-b
+v12b_lr_best` (Kurznamen statt Pfad) schlug sofort fehl
+(`ValueError: Opening "v13_best"`) -- das Skript erwartet den vollen
+`.onnx`-Pfad als Argument (`--model-a models/alphazero_v13_best.onnx`),
+anders als `offline_diagnose.py`s Kurzname-Konvention. Mit korrektem Pfad neu
+gestartet, kein Datenverlust, da der Fehlversuch vor dem ersten Block abbrach):
+
+| Block | Paare kum. | Ergebnis kum. | A-Sweep/B-Sweep/Split | LLR | Bericht-p |
+|---|---|---|---|---|---|
+| 1 | 25 | 24:26 | 7/8/10 | −1.017 | 1.000 |
+| 2 | 50 | 50:50 | 13/13/24 | −1.226 | 1.000 |
+| 3 | 75 | 74:76 | 18/19/38 | −2.054 | 1.000 |
+| 4 | 100 | 103:97 | 26/23/51 | −1.382 | 0.775 |
+| 5 | 125 | 132:118 | 34/27/64 | −0.710 | 0.443 |
+| 6 | 150 | 160:140 | 41/31/78 | −0.300 | 0.289 |
+| 7 | 175 | 185:165 | 45/35/95 | −0.677 | 0.314 |
+| 8 | 200 | **212:188** | 54/42/104 | **−0.813** | **0.262** |
+
+**SPRT-Verdikt: harter Deckel (200 Paare/400 Spiele) erreicht OHNE
+Entscheid** (LLR=−0.813, Schranken [−2.944, +2.944] nie ueberschritten --
+weder Richtung H1 noch Richtung H0). Fixed-n-Notbehelf: gepaarte Differenz
++0.120, 95%-KI [−0.072, +0.312] (schliesst Null ein), exakter Paar-
+Vorzeichentest p=0.2615 -- **nicht signifikant**. **Kein Champion-Wechsel:
+v12b_lr_best bleibt Champion.** Da kein Champion-Wechsel: keine neuen
+Elo-Kader-Eintraege (`tools/elo_tracker.py`), nur diese Gating-Zahlen
+dokumentiert. Hinweis-Kommandozeile fuers Protokoll (nicht ausgefuehrt, siehe
+Kader-Regel):
+
+    python tools/elo_tracker.py add --player-a v13_best --sims-a 400 \
+      --player-b v12b_lr_best --sims-b 400 --wins-a 212 --wins-b 188 --n 400 \
+      --comment "Gepaartes Gating (Task #86), SPRT=UNDECIDED_CAP_REACHED, p=0.2615"
+
+**Einordnung**: v13 zeigt auf dem frozen Set die klarste Offline-
+Verbesserung der bisherigen frozen_v1-Reihe (durchgehend besser in allen
+Metriken), UND schlaegt v12b_lr_best auch im Fixed-n-Rohergebnis (212:188,
+53%) -- aber das SPRT bleibt bei diesem n unentschieden, die 95%-KI
+schliesst Null mit ein. Passt zum wiederkehrenden Projekt-Muster (v11-/v12-
+/frozen_v1-Zyklen): Offline-Policy-/Value-Metriken bewegen sich mit dem
+Trainings-/Daten-Regime, aber uebersetzen sich nicht zuverlaessig 1:1 in
+messbare Arena-Staerke bei diesem Stichprobenumfang. Ein groesserer,
+kostenintensiverer Gating-Lauf (z.B. hoeherer harter Deckel) koennte die
+Frage klaeren, ist aber nicht Teil dieses Zyklus. `v12b_lr_best` bleibt
+sowohl Champion als auch Self-Play-Generator; `v13_best` steht als
+trainiertes, offline erfolgreiches, aber Arena-unbestaetigtes Modell bereit.
+
+**Commits**: Datenfenster-Verschiebung (`data/archive_v10b_beyond_window/` +
+Manifest, `data/` selbst ist gitignored, keine Code-Aenderung), Modelle
+(`models/alphazero_v13*`, gitignored) und Doku (dieser Abschnitt) getrennt
+committet, siehe Git-Historie.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
