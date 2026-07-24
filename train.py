@@ -841,6 +841,34 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             print(f"⚠️  ONNX-Export (Best) übersprungen "
                   f"(manuell nachholbar: python export_onnx.py --version {best_version_name}): {e}")
 
+    # 8. Modell-Snapshot ins OneDrive-Backup (Nutzer-Entscheid 2026-07-24 nach
+    #    dem models/-Datenverlust: ereignisgesteuert nach JEDEM Training statt
+    #    nur zeitgesteuert). Scheitert leise mit Warnung — ein Backup-Problem
+    #    darf nie ein fertiges Training entwerten.
+    _snapshot_models_to_backup(version_name)
+
+
+def _snapshot_models_to_backup(version_name: str) -> None:
+    """Zippt den kompletten models/-Ordner als datierten, nach dem Training
+    benannten Snapshot nach <OneDrive>\\Backups\\mosaic-AI\\models_snapshots\\."""
+    try:
+        import os
+        import shutil
+        from datetime import datetime
+        onedrive = os.environ.get("OneDrive")
+        if not onedrive:
+            print("⚠️  Modell-Snapshot übersprungen: OneDrive-Umgebungsvariable nicht gesetzt.")
+            return
+        snap_dir = Path(onedrive) / "Backups" / "mosaic-AI" / "models_snapshots"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+        target = snap_dir / f"models_{stamp}_{version_name}"
+        archive = shutil.make_archive(str(target), "zip", str(MODELS_DIR))
+        size_mb = os.path.getsize(archive) / 1e6
+        print(f"💾 Modell-Snapshot gesichert: {archive} ({size_mb:.0f} MB)")
+    except Exception as e:
+        print(f"⚠️  Modell-Snapshot fehlgeschlagen (Training davon unberührt): {e}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trainiere das Mosaic-AI Neuronale Netz")
