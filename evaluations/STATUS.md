@@ -2835,6 +2835,164 @@ Manifest, `data/` selbst ist gitignored, keine Code-Aenderung), Modelle
 (`models/alphazero_v13*`, gitignored) und Doku (dieser Abschnitt) getrennt
 committet, siehe Git-Historie.
 
+## rtv-Ablation Phase 1 (2026-07-24)
+
+**Task #84. Motivation**: `round_transition_value` (rtv) verursacht ~81% der
+Self-Play-Kosten (#80/#81), ist aber schwaecher outcome-korreliert als
+`bootstrap_value` (0.215 vs. 0.445, siehe Kostenprofil-Abschnitt oben, Task
+#80). Faellt rtv weg, wird Self-Play ~3x schneller. Ob rtv im Value-Target ueberhaupt
+Staerke beitraegt, wurde OHNE neues Self-Play getestet: zwei Trainings-
+Varianten auf demselben v13-Fenster (200x `data/selfplay_v12_*.pkl` +
+100x `data/selfplay_v10b_*.pkl`, unveraendert), die den rtv-Override beim
+Target-Bau ignorieren, gegen die Referenz `v13_best` (rtv wie gehabt) gepaart
+gegatet.
+
+**Varianten-Schalter** (`engine/py/neural_net.py::MosaicDataset`,
+`train.py --value-target-variant {default,nortv,nortv_r1}`, Commit
+`fef7e3e`): `nortv` deaktiviert den rtv-Override komplett (Value-Target
+faellt fuer ALLE Schritte auf die tanh-Margin-Formel zurueck, TD-Bootstrap-
+Blend bleibt oben drauf unveraendert); `nortv_r1` deaktiviert ihn nur fuer
+Runde-1-Zustaende (teuerster rtv-Fall, #80), Runden 2-5 bleiben wie
+`default`. `default` reproduziert das Bestandsverhalten byte-identisch.
+**Cache-Key-Nachweis** (dieselbe Falle wie TD_LAMBDA, 2026-07-22):
+`value_target_variant` ist jetzt Teil des HDF5-Cache-Key-Hashes
+(`neural_net.py::MosaicDataset.__init__`) -- ein Synthetik-Test mit einem
+einzelnen Runde-1-Record (`round_transition_value=[0.9,0.1]`,
+`scores_unclamped=[10,5]`) bestaetigte vor dem echten Training:
+`default` → Value-Target 0.800 (rtv-Override, `0.9*2-1`), `nortv` UND
+`nortv_r1` (Runde 1!) → beide 0.0997 (tanh-Margin-Fallback,
+`tanh((10-5)/50)`), UND alle drei Varianten erzeugten drei VERSCHIEDENE
+`.cache_*.h5`-Dateien im selben Ordner (kein stiller Cache-Reuse). Ein
+Zweit-Test mit Runde 2 bestaetigte, dass `nortv_r1` dort wie `default`
+den rtv-Wert (0.800) behaelt -- die Rundenbeschraenkung greift korrekt nur
+fuer Runde 1.
+
+**Training (`v13_nortv`, `v13_nortv_r1`)**: exakt das v13-Rezept, Warm-Start
+von `alphazero_v12b_lr_best.pth` (Footgun beachtet: `--load v12b_lr_best`
+OHNE `alphazero_`-Praefix), `--lr 0.00005 --lr-schedule cosine --epochs 100`,
+Cache-Build je Variante frisch (~203s/23s Train/Val-Load, identisch zu v13 --
+derselbe Datei-Umfang, nur neuer Cache-Key). **Warm-Start verifiziert** ueber
+Epoche-1-Val-R²: `v13_nortv` startet bei **0.456** (deutlich ueber der
+0.24-Schwelle), `v13_nortv_r1` bei **0.286** -- beide klar im Warm-Start-
+Bereich, kein stiller From-Scratch-Fallback wie beim v13-Zwischenfall.
+
+| Epoche | v13_nortv Val-R² (Value/Points) | v13_nortv_r1 Val-R² (Value/Points) |
+|---|---|---|
+| 1 | 0.456 / 0.511 | 0.286 / 0.278 |
+| 2 | 0.461 / 0.518 | 0.282 / 0.272 |
+| 3 | 0.464 / 0.521 | 0.278 / 0.268 |
+| 4 | **0.465 / 0.522** | 0.274 / 0.264 |
+| 5 | 0.464 / 0.522 | 0.268 / 0.259 |
+| ... | (monotoner Abfall danach) | (monotoner Abfall danach) |
+| 15 (Stop) | 0.443 / 0.502 | 0.229 / 0.212 |
+
+Beide Laeufe: Val-Policy-Plateau ab Epoche 10, Early Stopping bei Epoche
+15/100 (Patience 5, identisch zu v13). **Bester Checkpoint** nach
+gewichteter Val-Kombination: `v13_nortv_best` = Epoche 4
+(`val_combined`=1.5958), `v13_nortv_r1_best` = Epoche 3
+(`val_combined`=1.6135, trotz Epoche 1 minimal hoeherem reinen Value-R² --
+die Checkpoint-Auswahl gewichtet Policy+Value+Points gemeinsam, kein Fehler).
+Netzauslastung beider Laeufe gesund (Dead 7%, Eff.Rank 38%, wie v13). ONNX-
+Export automatisch mitgelaufen und verifiziert. Manifeste:
+`models/manifest_train_v13_nortv_20260724_124658.json`,
+`models/manifest_train_v13_nortv_r1_20260724_125959.json` (beide
+`git_commit=fef7e3e`).
+
+**Offline-Diagnose, klassisch** (`tools/offline_diagnose.py`, echter
+Val-Split 30/300 Dateien, n=48.446, davon 35.325 Drafting -- **WICHTIG**: das
+Skript baut das Referenz-Target IMMER MIT rtv-Override, ein niedrigeres R²
+der nortv-Varianten auf diesem Massstab ist daher erwartbar und KEIN
+Ausschlusskriterium, siehe Auftrag):
+
+| Metrik | v13_best | v13_nortv_best | v13_nortv_r1_best |
+|---|---|---|---|
+| Policy Top-1 (Drafting) | 45.6% | 45.8% | 45.7% |
+| Policy Top-3 (Drafting) | 75.8% | 75.8% | 75.8% |
+| Value Val-R² global | 0.2528 | 0.2491 | 0.2609 |
+| R² Runde 1 | 0.0162 | 0.0360 | 0.0290 |
+| R² Runde 2 | 0.1138 | 0.1354 | 0.1308 |
+| R² Runde 3 | 0.1107 | 0.0807 | 0.1160 |
+| R² Runde 4 | 0.2270 | 0.1726 | 0.2328 |
+| R² Runde 5 | 0.6151 | 0.6449 | 0.6190 |
+
+Policy-Metriken praktisch identisch (erwartet -- Policy-Ziel haengt nicht am
+Value-Target). Value-R² gemischt, KEIN klarer Abfall der nortv-Varianten
+(Runde 1 sogar hoeher als v13_best in beiden Varianten -- plausibel: das
+harte rtv-Ziel selbst ist fuer Runde 1 laut Noise-Floor-Test kaum von Null
+unterscheidbar, siehe VALUE_SCHEMA_VERSION=15-Kommentar).
+
+**Offline-Diagnose, frozen** (`--frozen`, `frozen_v1`, n=1.800, generations-
+uebergreifend, gleicher rtv-Referenz-Massstab-Vorbehalt):
+
+| Metrik | v13_best | v13_nortv_best | v13_nortv_r1_best |
+|---|---|---|---|
+| Policy Top-1 (Drafting) | **49.5%** | 48.5% | 48.0% |
+| Policy Top-3 (Drafting) | **75.5%** | 75.5% | 75.3% |
+| Value Val-R² global | **0.3688** | 0.3432 | 0.3629 |
+| R² Runde 1 | **0.0991** | 0.0628 | 0.0763 |
+| R² Runde 2 | 0.1941 | 0.1752 | **0.1971** |
+| R² Runde 3 | **0.2555** | 0.2273 | 0.2543 |
+| R² Runde 4 | **0.3339** | 0.2706 | 0.3272 |
+| R² Runde 5 | 0.6921 | **0.6971** | 0.6880 |
+
+Hier zeigt v13_best (mit rtv) durchgehend etwas hoehere Value-R²-Werte als
+`nortv` -- auf DIESEM rtv-basierten Massstab erwartbar (rtv-Override ist Teil
+der Referenz-Zielformel). Entscheidend fuer die eigentliche Frage ist wie
+im Auftrag vorgegeben die Arena, nicht diese Offline-Zahlen.
+JSON: `evaluations/offline_diagnose_v13_vs_nortv_variants.json` (klassisch),
+`evaluations/offline_diagnose_v13_vs_nortv_variants_frozen.json` (frozen).
+
+**Gepaartes Nicht-Unterlegenheits-Gating v13_best (A) vs. v13_nortv_best (B)**
+(`tools/paired_gating.py`, beide @400 Sims, Threads 10, H1 p=0.65,
+alpha=beta=0.05):
+
+| Block | Paare kum. | Ergebnis kum. | A-Sweep/B-Sweep/Split | LLR | Bericht-p |
+|---|---|---|---|---|---|
+| 1 | 25 | 20:30 | 5/10/10 | −2.255 | 0.3018 |
+| 2 | 50 | **38:62** | 6/18/26 | **−4.846** | **0.0227** |
+
+**SPRT-Verdikt nach nur 2 Bloecken (50 Paare/100 Spiele): ACCEPT_H0**
+(LLR=−4.846 <= untere Schranke −2.944) -- **kein Beleg, dass v13_best (mit
+rtv) besser ist als v13_nortv_best (ohne rtv)**. Auffaellig: die
+Fixed-n-Zahlen zeigen nicht bloss Gleichstand, sondern einen Vorteil fuer
+`nortv` (38:62, gepaarte Differenz −0.480, 95%-KI [−0.844, −0.116] schliesst
+Null NICHT ein, exakter Vorzeichentest p=0.0227) -- bei n=100 kein belastbarer
+Beleg fuer "nortv ist besser" (dafuer waere ein H1-Test mit vertauschten
+Rollen noetig, nicht Teil dieses Auftrags), aber definitiv KEIN Hinweis
+darauf, dass der teure rtv-Override im Value-Target gebraucht wird.
+JSON: `evaluations/paired_gating_result_v13_best_vs_v13_nortv_best.json`.
+
+**r1-Gating entfaellt** (wie im Auftrag vorgesehen): da das komplette
+`nortv` bereits ACCEPT_H0 erreicht hat (rtv-Streichung insgesamt
+gerechtfertigt), entfaellt die separate Pruefung von `v13_nortv_r1_best`
+gegen `v13_best` -- die Teilersparnis-Variante ist per Definition eine
+schwaechere Streichung als die komplette und braucht keinen eigenen Beleg,
+wenn die komplette bereits besteht. `v13_nortv_r1_best` wurde trotzdem
+vollstaendig trainiert und offline diagnostiziert (s.o.), fuer den Fall dass
+Phase 2 aus anderen Gruenden (z.B. Restrisiko) die konservativere
+Teilstreichung bevorzugt.
+
+**Einordnung & Empfehlung fuer Phase 2 (#85, Rust-Streichung)**: Das Ergebnis
+ist eindeutiger als erwartet -- nicht nur "nicht messbar schlechter", sondern
+im Fixed-n-Rohergebnis sogar zugunsten der rtv-freien Variante (bei kleinem
+n, SPRT stoppte frueh Richtung H0). Zusammen mit dem bereits dokumentierten
+Befund (#80: rtv = 81% der Self-Play-Kosten, schwaecher outcome-korreliert
+als bootstrap_value) ist die Evidenzlage klar: **rtv traegt im aktuellen
+Trainings-Setup keine messbare Staerke bei, kostet aber den grossen Teil der
+Self-Play-Zeit. Empfehlung: #85 sollte die komplette Rust-seitige
+rtv-Berechnung streichen (nicht nur die Runde-1-Teilersparnis)** -- das
+noch teurere `nortv_r1` als Kompromiss ist auf Basis dieser Daten nicht
+notwendig. Vor der eigentlichen Streichung in Rust: ein groesserer
+Gating-Lauf (mehr Paare) waere sinnvoll, um den Fixed-n-Vorteil von `nortv`
+entweder zu erhaerten oder als Rauschen bei n=100 zu entlarven -- fuer die
+Kernfrage dieses Auftrags ("ist rtv verzichtbar?") reicht das ACCEPT_H0
+bereits als Beleg.
+
+**Commits**: Code (`engine/py/neural_net.py`, `train.py`, Commit `fef7e3e`)
+und Doku (dieser Abschnitt) getrennt committet, siehe Git-Historie. Modelle
+(`models/alphazero_v13_nortv*`, `models/alphazero_v13_nortv_r1*`, gitignored)
+und Trainings-Manifeste nicht Teil des Commits.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
