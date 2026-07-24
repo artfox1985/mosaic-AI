@@ -3292,6 +3292,104 @@ liegt beim Nutzer (analog zum wartenden `worktree-rtv-removal`).
 gemergt und abgeraeumt; rtv-Streichung ist produktiv, Hybrid-Suche als
 Diagnose-Werkzeug in main verfuegbar.)*
 
+## Datenverlust + v14-Neustart (2026-07-24)
+
+**Task #89, Vorfallsbericht + From-Scratch-Neustart.** Am 2026-07-24 gingen
+saemtliche Modellgewichte (v10, v11-Varianten, v12-Familie, v13-Familie,
+inkl. Champion v13_nortv_best) unwiederbringlich verloren. Ursache: eine
+Junction im Hybrid-Suche-Worktree (`mosaic-AI-worktree-hybrid-search`) zeigte
+auf das Haupt-`models/`-Verzeichnis; `git worktree remove` hat beim Abraeumen
+des Worktrees dieser Junction gefolgt und das echte `models/` mit-geloescht,
+nicht nur die Worktree-Kopie. Ein `winfr`-Recovery-Versuch schlug fehl -- der
+Speicherplatz war zwischenzeitlich von mehreren `cargo`/`maturin`-Build-
+Laeufen ueberschrieben worden, die wiederhergestellten Dateien waren nur
+Nullbyte-Huellen (richtige Groesse, kein Inhalt). Korpora (`data/`), Code und
+Dokumentation (`evaluations/`, inkl. aller JSON-Diagnosen und dieser
+STATUS.md) waren von der Junction nicht betroffen und blieben intakt.
+
+**Backup-Konsequenz** (Nutzer-Entscheidung, noch am selben Tag umgesetzt):
+taeglicher OneDrive-Spiegel weiterhin aktiv, zusaetzlich ab sofort ein
+ereignisgesteuerter Modell-Snapshot nach JEDEM Trainingslauf --
+`train.py`-Hook, Commit 5fa8b59. Der laufende v14-Trainingsprozess hatte
+diesen Hook beim Start noch nicht geladen (Manifest zeigt `git_commit:
+330b988`, den direkten Elternstand von 5fa8b59); der Snapshot fuer v14 wurde
+deshalb manuell per `Start-ScheduledTask -TaskName "Mosaic-AI Backup"`
+angestossen -- Ergebnis: `models_2026-07-24.zip` (19,6 MB) im OneDrive-Ordner
+`Backups\mosaic-AI\models_snapshots\`, Inhalt verifiziert (alle acht
+`alphazero_v14*`-Dateien inkl. `alphazero_v14_best.onnx` enthalten).
+
+**v14-Training**: `python -u train.py --name v14 --value-target-variant
+nortv --lr-schedule cosine --epochs 100`, From-Scratch (kein `--load`) auf
+dem aktuellen 3000-Spiele-Fenster (`data/`: 200 Dateien `v12`-Praefix/2000
+Spiele + 100 Dateien `v10b`-Praefix/1940 Spiele, macht real 300
+Dateien/3940 Spiele). Lief 15 Epochen, Early-Stop-Plateau bei Epoche 10
+(Val-Policy-Loss-Minimum ~1.87, danach 5 Epochen Geduld ohne Verbesserung,
+Val-Policy-Loss steigt bis Epoche 15 auf ~2.00 -- klares Overfitting-Signal
+nach dem Plateau). `alphazero_v14_best.onnx` = Checkpoint Epoche 10.
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`, frozen-Set `frozen_v1`,
+n=1800, generationsuebergreifend vergleichbar -- Zahlen der verlorenen Netze
+stammen aus `evaluations/offline_diagnose_v13_vs_nortv_variants_frozen.json`
+und `evaluations/offline_diagnose_frozen_v1.json`, ueberlebten den
+Datenverlust unbeschadet):
+
+| Modell | Top-1 | Top-3 | R² global | R² R1-R5 | R² v10b-Korpus | R² v12-Korpus |
+|---|---|---|---|---|---|---|
+| v13_nortv_best (verlorener Champion) | 48.5% | 75.5% | 0.343 | 0.063/0.175/0.227/0.271/0.697 | 0.404 | 0.264 |
+| v12b_lr_best (vorheriger Champion) | 46.6% | 74.1% | 0.338 | 0.096/0.166/0.217/0.305/0.648 | 0.422 | 0.227 |
+| v12b_scratch (Warnbeispiel Korpus-Overfit) | 43.6% | -- | 0.395 | -- | **0.706** | **-0.015** |
+| **v14_best (neu, Epoche 10)** | **45.1%** | **72.9%** | **0.241** | -0.009/0.077/0.062/0.073/0.683 | 0.259 | 0.216 |
+| v14 (neu, Epoche 15, unstopped) | 52.3% | 76.0% | 0.216 | -0.087/0.044/0.079/0.154/0.587 | 0.189 | 0.250 |
+
+Rohdaten: `evaluations/offline_diagnose_v14_frozen.json` (frozen) und
+`evaluations/offline_diagnose_v14_classic.json` (klassisch, aktueller
+Val-Split, 48.446 Zuege -- NICHT generationsuebergreifend vergleichbar, nur
+als Kontrollmessung: v14_best dort Top-1 42,0% / Top-3 72,2% / R² 0,180).
+
+**Einordnung**: `v14_best` liegt bei Policy (Top-1/Top-3) ueberraschend nah
+an den verlorenen Champions (-3,4 / -2,6 Prozentpunkte ggue.
+v13_nortv_best), faellt aber beim Value-R² deutlich zurueck (0,241 vs. 0,343
+-- rund 30% relativer Rueckstand), am staerksten in den fruehen Runden
+(R1-R2 nahe 0, wo die verlorenen Netze schon 0,06-0,23 erreichten). Der
+Korpus-Split ist wichtig: `v14_best` zeigt KEIN v12b_scratch-Overfit-Muster
+(0,259 vs. 0,216, ein moderater Abstand statt 0,706 vs. -0,015) -- die
+From-Scratch-Destillation generalisiert einigermassen gleichmaessig ueber
+beide Korpora. Der unstopped Epoche-15-Checkpoint (`v14`, nicht `v14_best`)
+zeigt dagegen genau dieses Warnmuster im Kleinen: sein hoeherer Top-1-Wert
+(52,3%) kommt fast ausschliesslich vom dominanten `v12`-Korpus (69,5% Top-1,
+gegenueber nur 35,6%/61,5% bzw. 189/0,595 R² auf `v10b`) -- ein Beleg dafuer,
+dass das Plateau-Early-Stopping bei Epoche 10 die richtige Wahl war und
+`v14` (Epoche 15) trotz besserer Rohzahlen NICHT als Kandidat verwendet
+werden sollte.
+
+**Elo-Neuverankerung** (`tools/arena.py`, `v14_best@400` vs. `Heuristik@200`,
+Rust-Engine, 10 Threads, SPRT frueh-Stop aktiv, p1=0,64/α=0,05/β=0,10):
+SPRT entschied nach 56/400 Spielen zugunsten der Heuristik (LLR_Netz=-2,54,
+LLR_Heur=+2,89 >= obere Schranke) -- **v14_best 19:37 Heuristik@200 (34%
+Netzsiege)**. Eingetragen in `evaluations/elo_history.csv` via
+`tools/elo_tracker.py add`; `v14_best@400` = **884 Elo [792, 988]**
+(Heuristik@200 bleibt fixer Anker bei 1000). Kader-Einordnung:
+v13_nortv_best 1100 > v12b_lr_best 1051 > Heuristik@200 1000 (Anker) >
+v12_best 943 > **v14_best 884** > v10_best 858 > v11_td07_best 853 >
+v11_best 809. `v14_best` ist ab sofort der EINZIGE lebende Netz-Kader-Punkt
+-- die alten Zeilen bleiben als historische Referenz in der CSV stehen, sind
+aber als Gegner nicht mehr spielbar (Gewichte verloren).
+
+**Gesamteinschaetzung**: Die From-Scratch-Destillation (ein einziger
+Trainingslauf, 15 Epochen, kein Warm-Start, unveraendertes 3940-Spiele-
+Fenster) hat einen betraechtlichen, aber nicht den vollen Teil der
+verlorenen Staerke zurueckgeholt -- offline naeher dran (Policy fast auf
+Champion-Niveau) als in der Arena (216 Elo unter dem verlorenen Champion,
+sogar unter v12_best). Die Value-Head-Schwaeche in den fruehen Runden
+duerfte der Haupttreiber der Arena-Luecke sein (die Suche stuetzt sich laut
+Task-#88-Befund staerker auf den Value- als den Policy-Kopf). **Empfehlung**:
+Feintuning-Nachbrenner statt neuem From-Scratch-Lauf -- Warm-Start von
+`v14_best` mit `--lr 0.00005 --lr-schedule cosine` (dasselbe Rezept, das
+`v12b_lr` zum Champion gemacht hat, siehe `project_v12_cycle_result`-Notiz),
+optional mit ein paar zusaetzlichen Epochen und/oder frischem Self-Play statt
+des bestehenden 3940-Spiele-Fensters, um die fruehen Runden gezielt
+nachzuschaerfen.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
