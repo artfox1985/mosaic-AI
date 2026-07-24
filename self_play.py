@@ -141,12 +141,15 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
 
 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
-                      add_root_noise, deterministic, queue, progress_path, heartbeat_path):
+                      add_root_noise, deterministic, record_rtv, queue, progress_path, heartbeat_path):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
     durchgereicht -- Einzelspiel-Flush (JSONL) + periodischer Herzschlag,
-    siehe self_play.rs::run_net_self_play & Geschwister."""
+    siehe self_play.rs::run_net_self_play & Geschwister. `record_rtv`
+    (Task #85): steuert das teure round_transition_value-Sampling, siehe
+    --rtv-Flag-Hilfetext. Bei mode == "mcts" ohne Modell irrelevant (rtv
+    wurde dort noch nie berechnet)."""
     try:
         import mosaic_rust as mr
         if mode == "network":
@@ -154,12 +157,14 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
                 seed=seed, num_threads=threads, prefix=prefix,
                 add_root_noise=add_root_noise, deterministic=deterministic,
+                record_rtv=record_rtv,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
             )
         elif mode == "mcts" and model:
             raw = mr.self_play_games_with_net_labels(
                 model_path=model, n_games=n, base_sims=simulations,
                 seed=seed, num_threads=threads, prefix=prefix,
+                record_rtv=record_rtv,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
             )
         else:
@@ -212,7 +217,7 @@ def _cleanup_progress_files(progress_path, heartbeat_path) -> None:
 
 
 def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
-                          add_root_noise, deterministic, timeout_secs,
+                          add_root_noise, deterministic, record_rtv, timeout_secs,
                           progress_path, heartbeat_path) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
@@ -226,7 +231,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
     proc = mp.Process(
         target=_worker_run_chunk,
         args=(mode, model, n, simulations, c_puct, seed, threads, prefix,
-              add_root_noise, deterministic, queue,
+              add_root_noise, deterministic, record_rtv, queue,
               str(progress_path), str(heartbeat_path)),
     )
     proc.start()
@@ -387,7 +392,8 @@ def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict) -
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
                   tag: str = None, threads: int = 0, chunk: int = 10, seed: int = None,
                   per_file: int = 10, model: str = None, c_puct: float = 1.5,
-                  add_root_noise: bool = True, deterministic: bool = False):
+                  add_root_noise: bool = True, deterministic: bool = False,
+                  record_rtv: bool = False):
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -421,6 +427,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "tag": tag, "threads": threads, "chunk": chunk, "seed": base_seed,
         "per_file": per_file, "model": model, "c_puct": c_puct,
         "add_root_noise": add_root_noise, "deterministic": deterministic,
+        "record_rtv": record_rtv,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -429,23 +436,30 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # rohe Visit-Verteilung N/ΣN.
     has_model = bool(model)
     timeout_secs = _chunk_timeout_secs(chunk, threads, simulations, has_model and mode == "mcts")
+    # Task #85 (rtv-Ablation Phase 2): rtv wirkt nur, wenn ueberhaupt ein
+    # Netz beteiligt ist (--mode network oder --mode mcts --model) -- ohne
+    # Modell wurde rtv nie berechnet, das Flag ist dort ein No-Op.
+    rtv_status = "an (--rtv)" if record_rtv else "AUS (Standard, Task #85)"
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
+              f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
     elif mode == "mcts" and model:
-        # Heuristik entscheidet WEITERHIN ausschließlich über Züge -- zusätzlich
-        # werden die vier Rundenübergänge per Netz-Chance-Node-Sampling
-        # gelabelt (round_transition_value, siehe round_transition_deep.rs).
-        # Kein Vertrauen in die Netz-Suchqualität nötig, nur in dessen
-        # Blattbewertung an den Übergängen. ~20s/Partie zusätzlich (Stand
-        # dieser Kalibrierung, siehe round_transition_deep.rs-Kommentar).
-        print(f"🚀 Starte MCTS Self-Play (Rust) MIT Netz-Rundenübergangs-Labels: {num_games} Spiele | "
+        # Heuristik entscheidet WEITERHIN ausschließlich über Züge -- optional
+        # (Standard AUS, siehe --rtv) werden die vier Rundenübergänge
+        # zusätzlich per Netz-Chance-Node-Sampling gelabelt
+        # (round_transition_value, siehe round_transition_deep.rs). Kein
+        # Vertrauen in die Netz-Suchqualität nötig, nur in dessen
+        # Blattbewertung an den Übergängen. ~20s/Partie zusätzlich, wenn an
+        # (Stand dieser Kalibrierung, siehe round_transition_deep.rs-Kommentar).
+        print(f"🚀 Starte MCTS Self-Play (Rust) mit Netz-Rundenübergangs-Labels {rtv_status}: "
+              f"{num_games} Spiele | "
               f"Modell {model} | Sims {simulations} | Threads {threads or 'alle Kerne'} | "
-              f"Chunk {chunk} | {per_file} Spiele/Datei | ~20s/Partie zusätzlich fürs Sampling | "
+              f"Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
     else:
         print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
@@ -461,7 +475,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         heartbeat_path = DATA_DIR / f".heartbeat_{prefix}_c{chunk_idx}.json"
         raw = _run_chunk_supervised(
             mode, model, n, simulations, c_puct, base_seed + chunk_idx, threads,
-            f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, timeout_secs,
+            f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, record_rtv, timeout_secs,
             progress_path, heartbeat_path,
         )
         return raw, progress_path, heartbeat_path
@@ -567,6 +581,17 @@ if __name__ == "__main__":
                              "z.B. alphazero_s100.onnx (oder ein voller Pfad)")
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
+    parser.add_argument("--rtv", action="store_true",
+                        help="Task #85 (rtv-Ablation Phase 2): das teure "
+                             "round_transition_value-Sampling an den vier Rundenübergängen "
+                             "(Netz-Chance-Node-Sampling, ~81%% der Self-Play-Kosten laut "
+                             "Task #80/#81) REAKTIVIEREN. Standard: AUS -- die #84/#85-Gating-"
+                             "Evidenz zeigt, dass rtv im aktuellen Setup keine messbare "
+                             "Spielstärke beiträgt (v13_nortv_best schlägt Champion "
+                             "v12b_lr_best 171:129), aber ~3x Durchsatz kostet. Nur bei "
+                             "--mode network oder --mode mcts --model wirksam (ohne Modell "
+                             "wurde rtv nie berechnet). bootstrap_value bleibt in jedem Fall "
+                             "erhalten.")
     parser.add_argument("--games", type=int, default=100, help="Anzahl Spiele")
     parser.add_argument("--sims", type=int, default=100,
                         help="Basis-Simulationen pro Zug. Bei --mode mcts weiterhin dynamisch "
@@ -619,4 +644,5 @@ if __name__ == "__main__":
         c_puct=args.c_puct,
         add_root_noise=not args.no_root_noise,
         deterministic=args.deterministic,
+        record_rtv=args.rtv,
     )

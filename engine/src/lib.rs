@@ -84,9 +84,13 @@ fn self_play_games(
 /// Sampling (`round_transition.rs`/`round_transition_deep.rs`) bewertet --
 /// lässt den Value-Head vom rauschärmeren Ziel profitieren, ohne dass das
 /// Netz je eine Spielentscheidung trifft. `progress_path`/`heartbeat_path`:
-/// siehe `self_play_games` (Task #71).
+/// siehe `self_play_games` (Task #71). `record_rtv` (Task #85, rtv-Ablation
+/// Phase 2): Default `false` -- das teure `round_transition_value`-Sampling
+/// (~81% der Self-Play-Kosten, Task #80/#81) ist damit standardmässig AUS,
+/// per `self_play.py --rtv` reaktivierbar. `bootstrap_value` bleibt davon
+/// unberührt.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), progress_path=None, heartbeat_path=None))]
+#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), record_rtv=false, progress_path=None, heartbeat_path=None))]
 #[allow(clippy::too_many_arguments)]
 fn self_play_games_with_net_labels(
     py: Python<'_>,
@@ -97,13 +101,14 @@ fn self_play_games_with_net_labels(
     seed: Option<u64>,
     num_threads: usize,
     prefix: String,
+    record_rtv: bool,
     progress_path: Option<String>,
     heartbeat_path: Option<String>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_self_play_with_net_labels(
-            &model_path, n_games, base_sims, c, seed, num_threads, &prefix,
+            &model_path, n_games, base_sims, c, seed, num_threads, &prefix, record_rtv,
             progress_path.as_deref(), heartbeat_path.as_deref(),
         )
     })
@@ -258,8 +263,15 @@ fn net_vs_net_arena_match(
 /// self_play_games). `num_threads=0` = alle Kerne. `progress_path`/
 /// `heartbeat_path`: siehe `self_play_games` (Task #71) -- dies ist der Pfad
 /// des `--mode network`-v12-Batches, daher die primäre Zielfunktion.
+/// `record_rtv` (Task #85, rtv-Ablation Phase 2): Default `false` -- das
+/// teure `round_transition_value`-Sampling (~81% der Self-Play-Kosten laut
+/// Task #80/#81-Profiling) ist damit standardmässig AUS (erwarteter
+/// Durchsatzgewinn ~3x), per `self_play.py --rtv` reaktivierbar. Begründet
+/// durch die #84/#85-Gating-Evidenz (`evaluations/STATUS.md`): `v13_nortv_best`
+/// (Training ohne rtv-Override) schlägt den vorherigen Champion `v12b_lr_best`
+/// signifikant (171:129). `bootstrap_value` bleibt unabhängig davon erhalten.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, progress_path=None, heartbeat_path=None))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -272,6 +284,7 @@ fn net_self_play_games(
     prefix: String,
     add_root_noise: bool,
     deterministic: bool,
+    record_rtv: bool,
     progress_path: Option<String>,
     heartbeat_path: Option<String>,
 ) -> PyResult<String> {
@@ -279,7 +292,7 @@ fn net_self_play_games(
     py.detach(move || {
         crate::self_play::run_net_self_play(
             &model_path, n_games, base_sims, c_puct, seed, num_threads, &prefix, add_root_noise, deterministic,
-            progress_path.as_deref(), heartbeat_path.as_deref(),
+            record_rtv, progress_path.as_deref(), heartbeat_path.as_deref(),
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
