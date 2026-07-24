@@ -369,6 +369,21 @@ fn profiling_snapshot() -> String {
         "rtv_ns": crate::profiling::rtv_ns(),
         "bootstrap_count": crate::profiling::bootstrap_count(),
         "bootstrap_ns": crate::profiling::bootstrap_ns(),
+        // Task #81: Netz-Eval-Anteil je Kategorie (Amdahl-Split fuer den
+        // geplanten GPU-Batcher, Task #82) -- `*_net_eval_ns` ist die in der
+        // jeweiligen Kategorie enthaltene Netz-Forward-Pass-Zeit (Teilmenge von
+        // z.B. `gumbel_move_ns`), `*_net_eval_calls` die Aufrufzahl,
+        // `*_net_eval_instances` Aufrufe x Batchgroesse (1 fuer `Net::eval`, 2
+        // fuer `eval_pair`) -- ergibt die Evals/s-Nachfrage an den GPU-Batcher.
+        "gumbel_net_eval_ns": crate::profiling::gumbel_net_eval_ns(),
+        "gumbel_net_eval_calls": crate::profiling::gumbel_net_eval_calls(),
+        "gumbel_net_eval_instances": crate::profiling::gumbel_net_eval_instances(),
+        "rtv_net_eval_ns": crate::profiling::rtv_net_eval_ns(),
+        "rtv_net_eval_calls": crate::profiling::rtv_net_eval_calls(),
+        "rtv_net_eval_instances": crate::profiling::rtv_net_eval_instances(),
+        "bootstrap_net_eval_ns": crate::profiling::bootstrap_net_eval_ns(),
+        "bootstrap_net_eval_calls": crate::profiling::bootstrap_net_eval_calls(),
+        "bootstrap_net_eval_instances": crate::profiling::bootstrap_net_eval_instances(),
     })
     .to_string()
 }

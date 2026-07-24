@@ -2391,6 +2391,184 @@ committeten Stand. Mess-Zwischenstände (keine `.pkl`-Dateien in `data/`
 angefallen -- Direktaufruf von `mosaic_rust.net_self_play_games` ohne
 `progress_path`) wurden nicht persistiert, `data/tmp_task80/` wieder entfernt.
 
+## Task #81: Amdahl-Split für GPU-Umbau (2026-07-24)
+
+Ausgangsfrage: Task #82 plant einen zentralen GPU-Inferenz-Batcher (RTX 3060,
+Batch 256 ≈ 203k Evals/s laut torch-Benchmark, vs. CPU heute ~1600-3200
+Evals/s/Thread). Wieviel der GESAMTZEIT der drei Task-#80-Kategorien (Gumbel-
+Suche, rtv, Bootstrap) ist Netz-Inferenz (wandert auf GPU) vs. reine CPU-
+Spiellogik (Klonen, Zuggenerierung, Feature-Extraktion, Alpha-Beta-
+Zugsortierung -- bleibt CPU)? Der Logik-Anteil setzt die Amdahl-Obergrenze für
+den geplanten Umbau.
+
+### Instrumentierung
+
+`clone_profiling` (Feature bereits vorhanden) um einen Netz-Eval-vs-Logik-
+Split JE Kategorie erweitert (`engine/src/profiling.rs`):
+
+- Ein thread-lokaler Kategorie-Stack (`with_category(Category::{Gumbel,Rtv,
+  Bootstrap}, f)`) markiert den Geltungsbereich der drei bestehenden
+  `timed(note_gumbel_move_ns/note_rtv_ns/note_bootstrap_ns, ...)`-Blöcke in
+  `self_play.rs::play_net_self_play_game` (nur eine zusätzliche Hülle, keine
+  strukturelle Änderung).
+- `timed_net_eval(batch_size, f)` ersetzt an ALLEN `Net::eval`/`eval_pair`-
+  Aufrufstellen (`net_mcts.rs::net_leaf_eval`/`drafting_action_priors`/
+  `make_node`, `self_play.rs::negamax_value`/`alphabeta_choose_action`) das
+  bisherige `timed(note_net_eval_ns, ...)` 1:1 -- misst zusätzlich zum
+  unveränderten globalen Zähler die aktuell aktive Kategorie (Nanosekunden +
+  Aufrufzahl + Aufrufe×Batchgröße, `batch_size=1` für `Net::eval`, `=2` für
+  `eval_pair`s gebündelten Mover+Gegner-Pass). Kategorien laufen je Thread
+  strikt sequenziell (nie verschachtelt), ein einfacher "aktuelle Kategorie"-
+  Slot hätte gereicht -- der Stack ist defensiv.
+- `lib.rs::profiling_snapshot()` um 9 Felder erweitert (`{gumbel,rtv,
+  bootstrap}_net_eval_{ns,calls,instances}`).
+- Gleiches Feature-Gate wie bisher, alle neuen Funktionen ohne `clone_profiling`
+  No-Ops. Default-Build unverändert (verifiziert: `cargo build --release` ohne
+  Feature kompiliert sauber, nur die 3 vorbestehenden unabhängigen Warnungen).
+
+`cargo test --release`: **151/151 grün** (vor der Mess-Wheel-Phase). Mess-Wheel
+gebaut mit `pip install . --force-reinstall --no-deps
+--config-settings=build-args="--features clone_profiling"` (im `engine/`-
+Verzeichnis, wie in #80 -- `pip install .` im Repo-Root schlägt fehl, dort
+liegt kein `pyproject.toml`).
+
+### Messlauf
+
+Direktaufruf `mosaic_rust.net_self_play_games` (kein `progress_path`, daher
+keine `.pkl`-Dateien -- nur eine kleine Heartbeat-JSON unter
+`data/tmp_task81/`, am Ende entfernt), Champion `alphazero_v12b_lr_best.onnx`,
+`base_sims=400`, `c_puct=1.5`, `add_root_noise=true`. Zwei Läufe: 20 Spiele
+`--threads 11` (Produktionsbetrieb) und 3 Spiele `--threads 1` (unverzerrte
+Einzelspiel-Timings ohne Kern-Kontention). `data/`-Korpus (400 `.pkl`,
+200×v12 + 200×v10b) nicht angerührt, nachträglich per `ls`-Zählung verifiziert.
+
+| Kategorie | CPU-s/Spiel (11 Threads) | davon Netz-Eval | Eval-Anteil | CPU-s/Spiel (1 Thread) | Eval-Anteil |
+|---|---:|---:|---:|---:|---:|
+| Gumbel-Suche (gespielte Züge) | 25,6 | 7,16 | **28,0%** | 13,7 | 26,5% |
+| `round_transition_value` (rtv) | 149,7 | 5,31 | **3,5%** | 92,6 | 4,2% |
+| `bootstrap_value` (TD) | 9,25 | 0,47 | **5,0%** | 6,35 | 4,9% |
+| **Summe (gumbel+rtv+bootstrap)** | 184,6 | 12,94 | **7,01%** | 112,6 | 6,9% |
+| Sonstiges (Tiling/StartPlacement/Serialisierung) | ~45 (19,6% des CPU-Budgets) | -- | -- | ~0,8 (0,7%) | -- |
+
+Die Eval-Anteile sind zwischen 1 und 11 Threads praktisch identisch (7,01% vs.
+6,92%) -- Kern-Kontention verzerrt den Eval-vs-Logik-*Anteil* nicht spürbar,
+auch wenn sie die absoluten Zeiten stark aufbläht (dazu unten mehr). Das
+bestätigt die Kategorienverteilung aus #80 (rtv ~81% der Suchkosten hier,
+vs. ~83% dort -- reproduziert).
+
+### Amdahl-Obergrenze
+
+Netz-Eval ist innerhalb der drei Kategorien ein kleiner Anteil -- entsprechend
+niedrig die theoretische Obergrenze `1/(1-Eval-Anteil)` für den GPU-Umbau:
+
+| Kategorie | Eval-Anteil | Amdahl-Obergrenze |
+|---|---:|---:|
+| Gumbel-Suche | 28,0% | **1,39×** |
+| rtv | 3,5% | **1,04×** |
+| Bootstrap | 5,0% | **1,05×** |
+| Summe (gumbel+rtv+bootstrap) | 7,0% | **1,075×** |
+| **Gesamte Suche inkl. Sonstiges** (Eval-Anteil am vollen CPU-Budget: 258,8s / 4594,2s) | 5,6% | **1,06×** |
+
+**Kernbefund, gegen die Erwartung des Auftrags**: die theoretische
+GPU-Umbau-Obergrenze liegt bei nur **~6-8% Gesamtlaufzeit-Reduktion**, nicht
+bei einem Faktor 2-10, wie man von "Inferenz auf GPU auslagern" naiv erwarten
+könnte. Grund: `round_transition_value` dominiert die Kosten (~81-83%,
+konsistent #80), ist aber selbst zu >96% CPU-Spiellogik (Alpha-Beta-
+Zugsortierung + rekursive Rundensimulation aus `round_transition_deep.rs`,
+viele `GameState`-Klone/Zuggenerierungen je kleinem Netz-Aufruf, Batch=1) --
+Netz-Eval ist dort nur ein kleiner Annex, nicht der Flaschenhals. Die Gumbel-
+Suche hat den höchsten Eval-Anteil (28%, MCTS mit vielen Blattauswertungen je
+Sim), ist aber selbst nur ~14% der Gesamtkosten.
+
+**Konsequenz für #82**: ein reiner "Netz-Eval auf GPU"-Batcher (ohne
+Architekturänderung) bringt bestenfalls ~6-8% schnellere Einzelspiele. Der
+eigentliche Gewinn eines GPU-Batchers dürfte NICHT aus reduzierter
+Einzelspiel-Latenz kommen, sondern aus **Durchsatz durch mehr Parallelität**:
+sobald Netz-Aufrufe nicht mehr synchron denselben CPU-Kern blockieren (siehe
+Kontentions-Fund unten), lassen sich pro Kern deutlich mehr gleichzeitige
+Partien fahren, weil die wartende Zeit auf einen (jetzt asynchronen,
+gebündelten) GPU-Call keine CPU-Ressourcen mehr bindet. Das ist ein
+Durchsatz-, kein klassisches Amdahl-Latenz-Argument -- vor einer Umsetzung
+lohnt sich eine explizite Diskussion, ob #82 auf dieses Ziel (mehr parallele
+Spiele) statt auf "schnellere Einzelpartie" hin geplant wird. Ein zweiter,
+unabhängiger Hebel mit höherem Potenzial bliebe die rtv-Kostenreduktion
+(#80s P2, ~83% der Suchkosten, aber NICHT einfach als Performance-Knopf
+umsetzbar -- siehe dortige Redundanz-Analyse).
+
+### Evals/s-Nachfrage und Parallel-Spiele-Zahl für #82
+
+Bei 11 Threads/20 Spielen: 1.509.061 Netz-Eval-Instanzen (Aufrufe×Batchgröße)
+in 417,7s Wall-Clock = **~3.613 Evals/s Gesamtnachfrage** -- das ist nur
+**~1,8%** der GPU-Referenzkapazität (Batch 256 ≈ 203.000 Evals/s), die GPU
+wäre bei heutiger Parallelität massiv unterausgelastet. Pro-Thread/Spiel-Rate
+bei 11-Wege-Kontention: ~328 Evals/s; unkontendiert (1-Thread-Lauf): ~662
+Evals/s/Spiel (die Kontention halbiert grob auch die Anfrage-Rate, siehe
+Kontentions-Fund unten).
+
+Nötige Parallel-Spiele-Zahl, um GPU-Batches zu füllen (Rate × Sammelfenster =
+Ziel-Batchgröße, linear in der Spielezahl angenommen -- Workload ist
+logik-/CPU-dominiert, damit eine vertretbare Näherung):
+
+| Ziel-Batch | Sammelfenster 10ms | Sammelfenster 20ms |
+|---|---:|---:|
+| 64 | ~10-20 parallele Spiele | ~5-10 parallele Spiele |
+| 256 | ~39-78 parallele Spiele | ~20-39 parallele Spiele |
+
+(Spannen decken die kontendierte/unkontendierte Rate ab.) **Empfehlung für
+#82**: mit ~20-40 gleichzeitig laufenden Partien planen, um Batch~64-256
+zuverlässig in einem 10-20ms-Fenster zu füllen -- das liegt bereits deutlich
+über der heutigen Produktions-Parallelität (11 Threads = 11 Spiele
+gleichzeitig), erfordert also eine Architektur, die CPU-Spiellogik von der
+GPU-Wartezeit entkoppelt (z.B. async/Channel-basiertes Batching statt
+synchronem Blockieren je Thread).
+
+### Nebenbefund: Kern-Kontention (6 physische / 12 logische Kerne)
+
+Die Maschine hat 6 physische Kerne (12 logische, Hyperthreading). Pro-Spiel-
+CPU-Zeit ist bei 11 Threads deutlich höher als beim unkontendierten 1-Thread-
+Lauf: Summe gumbel+rtv+bootstrap 184,6s/Spiel (11 Threads) vs. 112,6s/Spiel
+(1 Thread) -- **+64%**. Lineare Hochrechnung vom 1-Thread-Wert auf 11 Threads
+ergäbe 0,0977 Spiele/s, gemessen wurden nur 0,0479 Spiele/s -- **~51% Effizienz**
+bei 11 Threads relativ zu dieser Idealannahme. Das relativiert #80s "~1,39×,
+nahezu perfekte lineare Skalierung" (8→11 Threads): der Vergleich dort hatte
+keinen unkontendierten 1-Thread-Anker, beide Konfigurationen (8 UND 11
+Threads) liefen vermutlich bereits mit einem ähnlichen Kontentions-Abschlag
+gegenüber einem echten Einzelkern -- Hyperthreading auf nur 6 physischen
+Kernen skaliert für diese CPU-lastige Workload erwartbar nicht linear über
+6-8 Threads hinaus. Für #82 relevant: falls der GPU-Batcher CPU-Kerne von
+lokalen ONNX-Aufrufen befreit, könnte ein Teil dieser Kontention entfallen
+(zusätzlich zum reinen Amdahl-Effekt oben) -- nicht separat quantifiziert,
+nur als Hinweis vermerkt.
+
+### Einordnung der -22%-Abweichung (#80-Prognose vs. realer Batch)
+
+#80 sagte (aus einer v10-Modell-Messung) 0,0622 Spiele/s bei 11 Threads voraus;
+der reale v12-Produktionsbatch lief mit 0,0471 Spiele/s (-22%). Dieser Messlauf
+(v12b_lr, 11 Threads, 20 Spiele) reproduziert **0,0479 Spiele/s** -- nur 1,6%
+über dem realen Wert, **erklärt die Abweichung also praktisch vollständig**:
+nicht Threads/Kontention (die waren in #80 bereits mit 11 Threads gemessen),
+sondern das TEURERE v12b_lr-Modell selbst. Pro-Spiel-CPU-Kosten sind bei
+v12b_lr klar höher als #80s v10-Baseline: gumbel 25,6s (vs. ~18s), rtv 149,7s
+(vs. ~119-123s), bootstrap 9,25s (vs. ~7s) -- Summe 184,6s vs. ~144-148s
+(**+25-28%**), was die 23%ige Lücke zwischen #80s Prognose und diesem
+Messlauf (0,0622→0,0479) fast exakt erklärt. Plausible Ursache: `round_
+transition_deep.rs`s Alpha-Beta-Zugsortierung nutzt Netz-Policy-Priors, die
+sich zwischen v10 und v12b_lr unterscheiden -- ob das zu mehr besuchten
+Knoten (weniger scharfe Priors) oder längeren Partien führt, wurde hier nicht
+weiter zerlegt (out of scope für #81).
+
+### Repo-/Wheel-Endzustand
+
+`engine/src/profiling.rs` (+Kategorie-Stack, `with_category`, `timed_net_eval`,
+9 neue Getter/Resets, `clone_profiling`-gated), `engine/src/net_mcts.rs`
+(5× `timed(note_net_eval_ns,...)` → `timed_net_eval(batch_size,...)`),
+`engine/src/self_play.rs` (2× dito + 3× `with_category`-Hülle um die
+bestehenden Task-#80-Blöcke), `engine/src/lib.rs` (`profiling_snapshot()` um
+9 Felder erweitert). Kein Verhaltensunterschied ohne Feature. Nach der
+Mess-Phase: Produktions-Wheel (Default-Features) neu gebaut/installiert,
+`cargo test --release` **151/151 grün**, `data/tmp_task81/` entfernt,
+`data/`-Korpus (400 `.pkl`) unverändert (vor/nach per Zählung verifiziert).
+
 ## Eingefrorenes Eval-Set (frozen_v1, 2026-07-24)
 
 **Task #87. Motivation**: `tools/offline_diagnose.py::val_files()` zieht den

@@ -146,6 +146,177 @@ pub fn timed<T>(note: fn(u64), f: impl FnOnce() -> T) -> T {
     }
 }
 
+// ── Task #81: Netz-Eval- vs. Spiellogik-Split je Kostenprofil-Kategorie ─────
+// Ausgangsfrage (GPU-Umbau, Task #82): welcher Anteil JEDER Task-#80-Kategorie
+// (Gumbel-Suche, rtv, Bootstrap) ist Netz-Forward-Pass (wandert auf die GPU)
+// vs. reine CPU-Spiellogik (Klonen, Zuggenerierung, Feature-Extraktion, bleibt
+// CPU -- setzt die Amdahl-Obergrenze fuer den Batcher)? Ein thread-lokaler
+// Kategorie-Marker macht die drei Kategorien fuer JEDEN `Net::eval`/
+// `eval_pair`-Aufruf (egal ob direkt in `net_mcts.rs` oder ueber
+// `round_transition[_deep].rs`s Alpha-Beta-Zugsortierung erreicht)
+// unterscheidbar, ohne jede Aufrufstelle einzeln umbauen zu muessen. Ein
+// simpler "aktuelle Kategorie"-Slot wuerde reichen (die drei Kategorien laufen
+// je Thread strikt sequenziell, nie verschachtelt) -- ein kleiner Stack ist
+// defensiv gegen kuenftige Verschachtelung und kostet ohne das Feature nichts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Category {
+    Gumbel,
+    Rtv,
+    Bootstrap,
+}
+
+#[cfg(feature = "clone_profiling")]
+thread_local! {
+    static CATEGORY_STACK: std::cell::RefCell<Vec<Category>> = std::cell::RefCell::new(Vec::new());
+}
+
+#[cfg(feature = "clone_profiling")]
+static GUMBEL_NET_EVAL_NANOS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "clone_profiling")]
+static GUMBEL_NET_EVAL_CALLS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static GUMBEL_NET_EVAL_INSTANCES: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static RTV_NET_EVAL_NANOS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "clone_profiling")]
+static RTV_NET_EVAL_CALLS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static RTV_NET_EVAL_INSTANCES: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static BOOTSTRAP_NET_EVAL_NANOS: AtomicU64 = AtomicU64::new(0);
+#[cfg(feature = "clone_profiling")]
+static BOOTSTRAP_NET_EVAL_CALLS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "clone_profiling")]
+static BOOTSTRAP_NET_EVAL_INSTANCES: AtomicUsize = AtomicUsize::new(0);
+
+/// Umschliesst `f()` mit dem Kategorie-Marker `_cat` -- alle waehrend `f()`
+/// gemessenen `Net::eval`/`eval_pair`-Aufrufe (via [`timed_net_eval`]) werden
+/// dieser Kategorie zugerechnet. Aufrufstellen in `self_play.rs` bleiben damit
+/// wie bisher (nur eine zusaetzliche Huelle um den bestehenden
+/// `timed(note_*_ns, ...)`-Block). Ohne Feature ein reiner Passthrough.
+#[inline(always)]
+pub fn with_category<T>(_cat: Category, f: impl FnOnce() -> T) -> T {
+    #[cfg(feature = "clone_profiling")]
+    {
+        CATEGORY_STACK.with(|s| s.borrow_mut().push(_cat));
+        let out = f();
+        CATEGORY_STACK.with(|s| {
+            s.borrow_mut().pop();
+        });
+        out
+    }
+    #[cfg(not(feature = "clone_profiling"))]
+    {
+        f()
+    }
+}
+
+#[cfg(feature = "clone_profiling")]
+fn note_net_eval_category(elapsed_ns: u64, batch_size: usize) {
+    let cat = CATEGORY_STACK.with(|s| s.borrow().last().copied());
+    match cat {
+        Some(Category::Gumbel) => {
+            GUMBEL_NET_EVAL_NANOS.fetch_add(elapsed_ns, Ordering::Relaxed);
+            GUMBEL_NET_EVAL_CALLS.fetch_add(1, Ordering::Relaxed);
+            GUMBEL_NET_EVAL_INSTANCES.fetch_add(batch_size, Ordering::Relaxed);
+        }
+        Some(Category::Rtv) => {
+            RTV_NET_EVAL_NANOS.fetch_add(elapsed_ns, Ordering::Relaxed);
+            RTV_NET_EVAL_CALLS.fetch_add(1, Ordering::Relaxed);
+            RTV_NET_EVAL_INSTANCES.fetch_add(batch_size, Ordering::Relaxed);
+        }
+        Some(Category::Bootstrap) => {
+            BOOTSTRAP_NET_EVAL_NANOS.fetch_add(elapsed_ns, Ordering::Relaxed);
+            BOOTSTRAP_NET_EVAL_CALLS.fetch_add(1, Ordering::Relaxed);
+            BOOTSTRAP_NET_EVAL_INSTANCES.fetch_add(batch_size, Ordering::Relaxed);
+        }
+        None => {
+            // Ausserhalb jeder Task-#80-Kategorie (z.B. `profiling_snapshot`-
+            // unabhaengige Testaufrufe) -- bewusst nicht gezaehlt, der globale
+            // `net_eval_ns/count` (oben) bleibt davon unberuehrt korrekt.
+        }
+    }
+}
+
+/// Wie `timed(note_net_eval_ns, f)`, misst zusaetzlich `batch_size` (Anzahl
+/// Forward-Pass-Instanzen in diesem Aufruf -- 1 fuer `Net::eval`, 2 fuer
+/// `Net::eval_pair`s gebuendelten Mover+Gegner-Pass) und bucht sie in die
+/// aktuell aktive [`Category`] (siehe [`with_category`]). Ersetzt an den
+/// Netz-Eval-Aufrufstellen `timed(note_net_eval_ns, ...)` 1:1 -- der globale
+/// Zaehler (`net_eval_count`/`net_eval_ns`) bleibt unveraendert mitgezaehlt.
+#[inline(always)]
+pub fn timed_net_eval<T>(_batch_size: usize, f: impl FnOnce() -> T) -> T {
+    #[cfg(feature = "clone_profiling")]
+    {
+        let start = Instant::now();
+        let out = f();
+        let elapsed = start.elapsed().as_nanos() as u64;
+        note_net_eval_ns(elapsed);
+        note_net_eval_category(elapsed, _batch_size);
+        out
+    }
+    #[cfg(not(feature = "clone_profiling"))]
+    {
+        f()
+    }
+}
+
+macro_rules! category_eval_getters {
+    ($ns_fn:ident, $calls_fn:ident, $instances_fn:ident, $reset_fn:ident, $nanos_static:ident, $calls_static:ident, $instances_static:ident) => {
+        pub fn $ns_fn() -> u64 {
+            #[cfg(feature = "clone_profiling")]
+            {
+                $nanos_static.load(Ordering::Relaxed)
+            }
+            #[cfg(not(feature = "clone_profiling"))]
+            {
+                0
+            }
+        }
+        pub fn $calls_fn() -> usize {
+            #[cfg(feature = "clone_profiling")]
+            {
+                $calls_static.load(Ordering::Relaxed)
+            }
+            #[cfg(not(feature = "clone_profiling"))]
+            {
+                0
+            }
+        }
+        pub fn $instances_fn() -> usize {
+            #[cfg(feature = "clone_profiling")]
+            {
+                $instances_static.load(Ordering::Relaxed)
+            }
+            #[cfg(not(feature = "clone_profiling"))]
+            {
+                0
+            }
+        }
+        pub fn $reset_fn() {
+            #[cfg(feature = "clone_profiling")]
+            {
+                $nanos_static.store(0, Ordering::Relaxed);
+                $calls_static.store(0, Ordering::Relaxed);
+                $instances_static.store(0, Ordering::Relaxed);
+            }
+        }
+    };
+}
+
+category_eval_getters!(
+    gumbel_net_eval_ns, gumbel_net_eval_calls, gumbel_net_eval_instances, reset_gumbel_net_eval,
+    GUMBEL_NET_EVAL_NANOS, GUMBEL_NET_EVAL_CALLS, GUMBEL_NET_EVAL_INSTANCES
+);
+category_eval_getters!(
+    rtv_net_eval_ns, rtv_net_eval_calls, rtv_net_eval_instances, reset_rtv_net_eval,
+    RTV_NET_EVAL_NANOS, RTV_NET_EVAL_CALLS, RTV_NET_EVAL_INSTANCES
+);
+category_eval_getters!(
+    bootstrap_net_eval_ns, bootstrap_net_eval_calls, bootstrap_net_eval_instances, reset_bootstrap_net_eval,
+    BOOTSTRAP_NET_EVAL_NANOS, BOOTSTRAP_NET_EVAL_CALLS, BOOTSTRAP_NET_EVAL_INSTANCES
+);
+
 pub fn reset_all() {
     reset_gamestate_clone_count();
     reset_features();
@@ -154,4 +325,7 @@ pub fn reset_all() {
     reset_gumbel_move();
     reset_rtv();
     reset_bootstrap();
+    reset_gumbel_net_eval();
+    reset_rtv_net_eval();
+    reset_bootstrap_net_eval();
 }

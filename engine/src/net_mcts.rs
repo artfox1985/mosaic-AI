@@ -807,8 +807,10 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     // siehe `net.rs::eval_pair_matches_two_single_evals`). Bei `true` entfällt
     // der zweite Pass ohnehin (reines `eval`, unverändert).
     let (mover_val, other_val) = if MIRROR_OTHER_VAL {
+        // Task #81: Batch=1 (ein einzelner Forward-Pass) -- fuer die Amdahl-
+        // Aufteilung des geplanten GPU-Batchers (Task #82).
         let (_logits, value, _moon, points) =
-            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            crate::profiling::timed_net_eval(1, || {
                 net.eval(&feats).unwrap_or_else(|_| {
                     (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
                 })
@@ -820,8 +822,9 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         let mut flipped = state.clone();
         flipped.current_player = 1 - state.current_player;
         let other_feats = state_to_features_direct(&flipped);
+        // Task #81: Batch=2 (`eval_pair` buendelt Mover+Gegner-Pass).
         let ((_logits, value, _moon, points), (_o_logits, o_value, _o_moon, o_points)) =
-            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            crate::profiling::timed_net_eval(2, || {
                 net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
                     (
                         (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
@@ -856,8 +859,9 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     }
     let feats =
         crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    // Task #81: Batch=1.
     let (logits, _value, moon, _points) =
-        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        crate::profiling::timed_net_eval(1, || {
             net.eval(&feats).unwrap_or_else(|_| {
                 (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
@@ -900,8 +904,9 @@ fn make_node<R: Rng + ?Sized>(
         let mut flipped = state.clone();
         flipped.current_player = 1 - state.current_player;
         let other_feats = state_to_features_direct(&flipped);
+        // Task #81: Batch=2 (`eval_pair`).
         let ((logits, value, moon, points), (_o_logits, o_value, _o_moon, o_points)) =
-            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            crate::profiling::timed_net_eval(2, || {
                 net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
                     (
                         (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
@@ -911,8 +916,9 @@ fn make_node<R: Rng + ?Sized>(
             });
         (logits, value, moon, points, Some((o_value, o_points)))
     } else {
+        // Task #81: Batch=1.
         let (logits, value, moon, points) =
-            crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+            crate::profiling::timed_net_eval(1, || {
                 net.eval(&feats).unwrap_or_else(|_| {
                     (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
                 })

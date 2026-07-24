@@ -1782,8 +1782,13 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // Task #80: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
                         // tatsaechlich gespielten Zuege. `timed()` ist ohne
                         // `clone_profiling`-Feature ein No-Op (siehe profiling.rs).
-                        crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
-                            net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
+                        // Task #81: `with_category` markiert zusaetzlich alle
+                        // Netz-Evals INNERHALB dieses Blocks als "Gumbel" fuer den
+                        // Eval-vs-Logik-Split (Amdahl-Grenze GPU-Umbau).
+                        crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
+                            crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
+                                net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
+                            })
                         })
                     };
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
@@ -1822,17 +1827,24 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                             // `choose_drafting_action_pruned`) getrennt von (e) dem
                             // TD-Bootstrap-Ziel gemessen, um die rtv/Bootstrap-
                             // Redundanzfrage kostenseitig zu beantworten.
-                            let v = crate::profiling::timed(crate::profiling::note_rtv_ns, || {
-                                sample_round_transition_for_round(round_before, &pre, net, rng)
+                            // Task #81: `with_category` markiert die Netz-Evals
+                            // dieses Blocks als "Rtv" (Eval-vs-Logik-Split).
+                            let v = crate::profiling::with_category(crate::profiling::Category::Rtv, || {
+                                crate::profiling::timed(crate::profiling::note_rtv_ns, || {
+                                    sample_round_transition_for_round(round_before, &pre, net, rng)
+                                })
                             });
                             round_transition_values.insert(round_before, v);
-                            let bv = crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
-                                crate::round_transition_deep::bootstrap_value_after_rounds(
-                                    &pre,
-                                    net,
-                                    crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-                                    rng,
-                                )
+                            // Task #81: dito, Kategorie "Bootstrap".
+                            let bv = crate::profiling::with_category(crate::profiling::Category::Bootstrap, || {
+                                crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
+                                    crate::round_transition_deep::bootstrap_value_after_rounds(
+                                        &pre,
+                                        net,
+                                        crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                                        rng,
+                                    )
+                                })
                             });
                             bootstrap_values.insert(round_before, bv);
                         }
@@ -2086,8 +2098,9 @@ fn negamax_value(
         });
     }
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    // Task #81: Batch=1.
     let (logits, _value, _m, _points) =
-        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        crate::profiling::timed_net_eval(1, || {
             net.eval(&feats).unwrap_or_else(|_| {
                 (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
@@ -2159,8 +2172,9 @@ fn alphabeta_choose_action(
     ALPHABETA_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let perspective = state.current_player;
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    // Task #81: Batch=1.
     let (logits, _value, _m, _points) =
-        crate::profiling::timed(crate::profiling::note_net_eval_ns, || {
+        crate::profiling::timed_net_eval(1, || {
             net.eval(&feats).unwrap_or_else(|_| {
                 (vec![0.0; crate::net_mcts::NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
