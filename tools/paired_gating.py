@@ -135,6 +135,8 @@ except Exception:
     pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 
 BLOCK_SIZE = 25
 MAX_PAIRS = 200                 # harter Deckel (Nutzer-Anstoss: 150 -> 200)
@@ -263,6 +265,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     a_wins_total = b_wins_total = 0
     pair_diffs: list[int] = []
     llr = 0.0
+    # Task #92: Score-/Floor-Trend zusaetzlich zu Sieg/Niederlage mitschreiben
+    # (beide Brett-Orientierungen aus Sicht von A/B, nicht nur wer gewinnt).
+    a_score_sum = b_score_sum = 0.0
+    a_floor_sum = b_floor_sum = 0.0
+    zerozero_count = 0
     sprt_verdict = None   # None=laeuft noch, name_a=A signifikant besser, "H0"=kein Beleg fuer A
     done_pairs = 0
     block_idx = 0
@@ -285,6 +292,16 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         for i in range(n):
             a_won_o1 = g1[i]["winner"] == 0  # A auf Brett 0 (Orientierung 1)
             a_won_o2 = g2[i]["winner"] == 1  # A auf Brett 1 (Orientierung 2, B auf Brett 0)
+            # Task #92: Score/Floor beider Spiele des Paares aus Sicht von A/B
+            # mitschreiben (Orientierung 1: A=Brett0, B=Brett1; Orientierung 2:
+            # vertauscht) -- unabhaengig davon, wer das Paar gewinnt.
+            a_score_sum += g1[i]["scores"][0] + g2[i]["scores"][1]
+            b_score_sum += g1[i]["scores"][1] + g2[i]["scores"][0]
+            a_floor_sum += g1[i]["total_floor"][0] + g2[i]["total_floor"][1]
+            b_floor_sum += g1[i]["total_floor"][1] + g2[i]["total_floor"][0]
+            for g in (g1[i], g2[i]):
+                if g["scores"][0] == 0 and g["scores"][1] == 0:
+                    zerozero_count += 1
             a_wins_pair = int(a_won_o1) + int(a_won_o2)
             b_wins_pair = 2 - a_wins_pair
             a_wins_total += a_wins_pair
@@ -338,6 +355,13 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     final_p = mcnemar_exact_p(pair_a_sweeps, pair_b_sweeps)
     mean_d, ci_lo, ci_hi = paired_ci(pair_diffs)
     n_games_total = done_pairs * 2
+    # Task #92: Score-/Floor-Trend ueber BEIDE Brett-Orientierungen (n_games_total
+    # Einzelspiele je Seite, nicht nur die done_pairs).
+    avg_score_a = a_score_sum / n_games_total if n_games_total else None
+    avg_score_b = b_score_sum / n_games_total if n_games_total else None
+    avg_floor_a = a_floor_sum / n_games_total if n_games_total else None
+    avg_floor_b = b_floor_sum / n_games_total if n_games_total else None
+    zerozero_anteil = zerozero_count / n_games_total if n_games_total else None
     result = {
         "name_a": name_a, "name_b": name_b, "model_a": model_a, "model_b": model_b,
         "sims_a": sims_a, "sims_b": sims_b, "c_puct_a": c_puct_a, "c_puct_b": c_puct_b,
@@ -349,7 +373,19 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         "sprt_p0": SPRT_P0, "sprt_p1": sprt_p1, "sprt_alpha": sprt_alpha, "sprt_beta": sprt_beta,
         "report_mcnemar_p": final_p, "mean_pair_diff": mean_d, "ci95": [ci_lo, ci_hi],
         "base_seed": base_seed, "blocks": block_logs,
+        "avg_score_a": avg_score_a, "avg_score_b": avg_score_b,
+        "avg_floor_a": avg_floor_a, "avg_floor_b": avg_floor_b,
+        "zerozero_anteil": zerozero_anteil,
     }
+
+    # Task #92: Arena-Trend-Log -- eine Zeile aus Sicht von A (Kandidat).
+    append_run(
+        quelle="paired_gating", modell=name_a, gegner=name_b, sims=sims_a,
+        n_spiele=n_games_total, winrate=(a_wins_total / n_games_total if n_games_total else None),
+        avg_score=avg_score_a, avg_score_gegner=avg_score_b,
+        avg_floor=avg_floor_a, avg_floor_gegner=avg_floor_b,
+        zerozero_anteil=zerozero_anteil,
+    )
 
     verdict_label = {
         name_a: f"{name_a} signifikant besser (SPRT)",
