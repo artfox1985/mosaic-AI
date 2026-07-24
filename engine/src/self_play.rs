@@ -947,6 +947,15 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, rng: &mut R) -> Map<String, Val
 /// GESAMTE bestehende Heuristik-Self-Play-Menge hinweg vom rauschärmeren
 /// Ziel profitieren, ohne dass das Netz je eine Spielentscheidung trifft
 /// (kein Vertrauen in dessen aktuelle Suchqualität nötig).
+/// `record_rtv` (Task #85, rtv-Ablation Phase 2): schaltet NUR das teure
+/// `round_transition_value`-Sampling ab (~81% der Self-Play-Kosten, siehe
+/// Task #80/#81 -- Evidenz in `evaluations/STATUS.md`: rtv traegt im
+/// aktuellen Setup keine messbare Spielstaerke bei, `v13_nortv_best` ist
+/// nach Champion-Gating gegen `v12b_lr` neuer Champion). `bootstrap_value`
+/// bleibt UNABHAENGIG von diesem Schalter erhalten (eigene, separat
+/// gemessene Kostenkategorie, nicht Teil dieser Ablation) -- wirkt nur,
+/// wenn `net` ohnehin `Some` ist (bei `net: None` war rtv schon vorher nie
+/// aktiv).
 pub fn play_one_game<R: Rng + ?Sized>(
     base_sims: u32,
     c: f64,
@@ -956,6 +965,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     game_id: &str,
     rng: &mut R,
     net: Option<&Net>,
+    record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
@@ -1000,8 +1010,13 @@ pub fn play_one_game<R: Rng + ?Sized>(
                             // Kommentar) -- `round_before < NUM_ROUNDS` filtert
                             // den bedeutungslosen Runde-5-Fall.
                             if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
-                                let v = sample_round_transition_for_round(round_before, &pre, net, rng);
-                                round_transition_values.insert(round_before, v);
+                                // Task #85: `record_rtv` gated NUR das teure
+                                // rtv-Sampling -- `bootstrap_value` unten laeuft
+                                // unveraendert immer mit (eigene Kostenkategorie).
+                                if record_rtv {
+                                    let v = sample_round_transition_for_round(round_before, &pre, net, rng);
+                                    round_transition_values.insert(round_before, v);
+                                }
                                 let bv = crate::round_transition_deep::bootstrap_value_after_rounds(
                                     &pre,
                                     net,
@@ -1090,7 +1105,9 @@ pub fn run_self_play(
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None, Some(&move_counter));
+        // `net: None` -- rtv wird hier ohnehin nie berechnet (siehe `play_one_game`s
+        // `net`-Gate), `record_rtv` daher irrelevant, aber als Parameter Pflicht.
+        let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter));
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
             append_game_progress(&progress_file, &steps);
@@ -1120,6 +1137,8 @@ pub fn run_self_play(
 /// Lädt das Netz EINMAL (wie `run_net_arena_match`), `Arc`-geteilt über alle
 /// Rayon-Threads.
 /// `progress_path`/`heartbeat_path`: siehe `run_self_play`-Dokumentation (Task #71).
+/// `record_rtv` (Task #85): siehe `play_one_game`-Dokumentation -- Default
+/// AUS auf `self_play.py`-CLI-Ebene, per `--rtv`-Flag reaktivierbar.
 #[allow(clippy::too_many_arguments)]
 pub fn run_self_play_with_net_labels(
     model_path: &str,
@@ -1129,6 +1148,7 @@ pub fn run_self_play_with_net_labels(
     seed: u64,
     num_threads: usize,
     prefix: &str,
+    record_rtv: bool,
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
@@ -1149,7 +1169,9 @@ pub fn run_self_play_with_net_labels(
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
-        let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, Some(&net), Some(&move_counter));
+        let steps = play_one_game(
+            base_sims, c, ids, names, first, &gid, &mut rng, Some(&net), record_rtv, Some(&move_counter),
+        );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
             append_game_progress(&progress_file, &steps);
@@ -1715,6 +1737,10 @@ fn sample_round_transition_for_round<R: Rng + ?Sized>(
 
 /// Ein netzgeführtes Self-Play-Spiel. Wie `play_one_game`, aber Drafting per
 /// Netz-PUCT (Priors vom Netz, Blatt per `leaf`) mit rohen Visit-Targets.
+/// `record_rtv` (Task #85, rtv-Ablation Phase 2): siehe `play_one_game`s
+/// gleichnamiger Parameter -- gated NUR das `round_transition_value`-Sampling
+/// (~81% der Self-Play-Kosten laut Task #80/#81-Profiling), `bootstrap_value`
+/// bleibt unabhaengig davon erhalten.
 #[allow(clippy::too_many_arguments)]
 fn play_net_self_play_game<R: Rng + ?Sized>(
     net: &Net,
@@ -1727,6 +1753,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     rng: &mut R,
     add_root_noise: bool,
     deterministic: bool,
+    record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
@@ -1829,13 +1856,28 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                             // Redundanzfrage kostenseitig zu beantworten.
                             // Task #81: `with_category` markiert die Netz-Evals
                             // dieses Blocks als "Rtv" (Eval-vs-Logik-Split).
-                            let v = crate::profiling::with_category(crate::profiling::Category::Rtv, || {
-                                crate::profiling::timed(crate::profiling::note_rtv_ns, || {
-                                    sample_round_transition_for_round(round_before, &pre, net, rng)
-                                })
-                            });
-                            round_transition_values.insert(round_before, v);
-                            // Task #81: dito, Kategorie "Bootstrap".
+                            // Task #85 (rtv-Ablation Phase 2): `record_rtv` gated
+                            // NUR diesen Block -- rtv ist laut #80 ~81% der
+                            // Self-Play-Kosten, korreliert aber laut #80s
+                            // Redundanzanalyse schwaecher mit dem echten
+                            // Spielausgang als `bootstrap_value` und traegt laut
+                            // der #84/#85-Gating-Evidenz (siehe
+                            // `evaluations/STATUS.md`, `v13_nortv_best` schlaegt
+                            // Champion `v12b_lr_best` 171:129) keine messbare
+                            // Staerke bei. Bei `record_rtv=false` bleiben die
+                            // #80/#81-Profiling-Kategorien fuer "Rtv" einfach bei
+                            // 0 (kein separater Zaehler noetig).
+                            if record_rtv {
+                                let v = crate::profiling::with_category(crate::profiling::Category::Rtv, || {
+                                    crate::profiling::timed(crate::profiling::note_rtv_ns, || {
+                                        sample_round_transition_for_round(round_before, &pre, net, rng)
+                                    })
+                                });
+                                round_transition_values.insert(round_before, v);
+                            }
+                            // Task #81: dito, Kategorie "Bootstrap". UNABHAENGIG
+                            // von `record_rtv` -- eigene, separat gemessene
+                            // Kostenkategorie, nicht Teil dieser Ablation.
                             let bv = crate::profiling::with_category(crate::profiling::Category::Bootstrap, || {
                                 crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
                                     crate::round_transition_deep::bootstrap_value_after_rounds(
@@ -1957,6 +1999,10 @@ where
 /// zurück. `progress_path`/`heartbeat_path`: siehe `run_self_play`-
 /// Dokumentation (Task #71) -- dies ist der Pfad des v12-Batches
 /// (`--mode network`), daher hier die primäre Zielfunktion für den Fix.
+/// `record_rtv` (Task #85, rtv-Ablation Phase 2): siehe `play_one_game`-
+/// Dokumentation. Default AUS auf `self_play.py`-CLI-Ebene (`--rtv`-Flag
+/// reaktiviert) -- erwarteter Durchsatzgewinn ~3x (rtv war laut Task #80
+/// ~81% der Self-Play-Kosten dieses Pfads).
 #[allow(clippy::too_many_arguments)]
 pub fn run_net_self_play(
     model_path: &str,
@@ -1968,6 +2014,7 @@ pub fn run_net_self_play(
     prefix: &str,
     add_root_noise: bool,
     deterministic: bool,
+    record_rtv: bool,
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
@@ -2007,7 +2054,7 @@ pub fn run_net_self_play(
         let result = run_with_watchdog(watchdog_deadline, move || {
             play_net_self_play_game(
                 &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise, deterministic,
-                Some(&move_counter_thread),
+                record_rtv, Some(&move_counter_thread),
             )
         });
         let steps = match result {
@@ -3437,6 +3484,7 @@ mod tests {
             "test_g1",
             &mut rng,
             None,
+            false,
             None,
         );
         assert!(!recs.is_empty(), "Spiel muss Records erzeugen");
@@ -3563,6 +3611,7 @@ mod tests {
                 "seedcheck",
                 &mut rng,
                 None,
+                false,
                 None,
             );
             assert!(
