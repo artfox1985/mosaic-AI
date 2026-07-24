@@ -3038,6 +3038,160 @@ Rust-seitige rtv-Berechnung streichen) zusaetzlich, auch wenn dieser
 Champion-Wechsel primaer eine Staerke-Aussage ist und kein direkter
 Kostenbeleg (der liegt bereits in #80 vor).
 
+## rtv-Ablation Phase 2 (2026-07-24)
+
+**Task #85. Auftrag**: die Evidenzlage aus #80 (rtv = ~81% der Self-Play-
+Kosten), #84 (rtv-freies Value-Target `v13_nortv_best` nicht unterlegen
+gegen `v13_best`, 62:38) und der Champion-Gating-Runde oben
+(`v13_nortv_best` schlaegt `v12b_lr_best` 171:129, neuer Champion) macht
+die teure `round_transition_value`-Berechnung im Self-Play verzichtbar.
+Dieser Task macht sie **abschaltbar** (Schalter, kein Hard-Delete) -- die
+rtv-Infrastruktur (`round_transition.rs`, `round_transition_deep.rs`)
+bleibt vollstaendig erhalten, nur der Aufruf im Self-Play-Loop wird
+gated. Umgesetzt in einem eigenen Worktree/Branch (`worktree-rtv-removal`),
+main unberuehrt.
+
+### Schalter-Design
+
+Neuer bool-Parameter `record_rtv` (Default `false` auf allen Rust->Python-
+Bindings) in `engine/src/self_play.rs`:
+
+- `play_one_game` (Heuristik-Self-Play + optionale Netz-Rundenuebergangs-
+  Labels) und `play_net_self_play_game` (Netz-PUCT-Self-Play, der
+  `--mode network`-Produktionspfad) bekommen je einen neuen `record_rtv:
+  bool`-Parameter. Er gated NUR den Block, der
+  `sample_round_transition_for_round` aufruft und `round_transition_value`
+  ins Record schreibt. Der direkt danebenliegende `bootstrap_value`-Block
+  (TD-Bootstrap, `round_transition_deep::bootstrap_value_after_rounds`)
+  bleibt **unveraendert aktiv** -- eigene, separat gemessene
+  Kostenkategorie (~5% laut #80/#81), nicht Teil dieser Ablation.
+- `run_self_play_with_net_labels` und `run_net_self_play` reichen
+  `record_rtv` durch.
+- PyO3-Bindings `self_play_games_with_net_labels`/`net_self_play_games`
+  (`engine/src/lib.rs`): neuer Parameter `record_rtv=false` (Default AUS
+  = neues Verhalten).
+- `self_play.py`: neues CLI-Flag `--rtv` (Default AUS, `action="store_true"`
+  reaktiviert rtv), durchgereicht durch `generate_data` ->
+  `_run_chunk_supervised` -> `_worker_run_chunk` -> `mosaic_rust`-Aufruf.
+  Bei `--mode mcts` ohne `--model` ist das Flag ein No-Op (rtv wurde dort
+  nie berechnet, `net` ist `None`).
+- Task-#80/#81-Profiling-Kategorien (`rtv_count`/`rtv_ns` in
+  `profiling.rs`) melden bei `record_rtv=false` einfach 0 -- kein
+  separater Zaehler noetig, der `with_category(Category::Rtv, ...)`-Block
+  wird schlicht nicht betreten.
+
+Geaenderte Dateien: `engine/src/self_play.rs`, `engine/src/lib.rs`,
+`self_play.py`. Kein Hard-Delete, keine Test-Loeschung.
+
+### Nebeneffekt-Pruefung
+
+- **Python-Target-Builder** (`engine/py/neural_net.py`, Zeile ~630):
+  `rtv = step.get("round_transition_value")` -- gibt `None` zurueck, wenn
+  das Feld fehlt, der nachfolgende Code faellt dann korrekt auf die
+  tanh-Margin-Formel zurueck (`val`/`points_val` unveraendert berechnet),
+  der TD-Bootstrap-Blend (`bv = step.get("bootstrap_value")`) greift
+  unabhaengig davon. Verifiziert durch Lesen des Codes UND konkret durch
+  einen Live-Aufruf (siehe Record-Stichprobe unten) -- Records ohne
+  `round_transition_value` sind kein neuer Fall (~17% der Bestandsdaten
+  hatten das Feld schon vorher nie, abgebrochene/Runde-5-Records), der
+  Fallback-Pfad ist also bereits vielfach durchlaufen.
+- **Sonstige Python-Konsumenten** (`tools/offline_diagnose.py`,
+  `tools/build_frozen_eval_set.py`, `tools/rtv_redundancy_report.py`,
+  `train.py`): alle lesen `round_transition_value` ausschliesslich per
+  `.get(...)`/`step.get(...)`, keiner erzwingt das Feld. Die
+  Redundanz-/Diagnose-Tools (#80s `rtv_redundancy_report.py`) sehen fuer
+  kuenftige rtv-freie Korpora schlicht 0 Paare -- erwartet, kein Bug.
+- **`--mode mcts --model X`-Pfad** (Heuristik-Self-Play mit Netz-Labels,
+  `run_self_play_with_net_labels`): ebenfalls auf `record_rtv=false`
+  standardisiert, aus denselben Gruenden.
+- **`py.rs`** (interaktive `PyGame`-Bindings fuer `server.py`): keine
+  rtv-Beruehrung, unveraendert.
+- Keine bestehenden rtv-spezifischen Rust-Unit-Tests gefunden, die
+  geloescht oder parametrisiert werden mussten (`grep` ueber
+  `self_play.rs`/`round_transition*.rs`-Testmodule) -- die vorhandenen
+  Tests fuer `resolve_to_pre_chance`/`sample_round_transition_value` testen
+  die tiefere Infrastruktur direkt und sind vom neuen Schalter nicht
+  betroffen.
+
+### Testresultat
+
+`cargo test --release` im Worktree: **151 passed, 1 ignored
+(`round5_node_calibration_probe`, praeexistent/unabhaengig), 0 failed**
+(85.6s Testlaufzeit). Volle Suite gruen, alle betroffenen Aufrufstellen
+(2 Produktions-Testfaelle `play_one_game_terminates_with_records`,
+`no_tiling_deadlock_across_seeds`, plus alle Aufrufer in `self_play.rs`/
+`lib.rs`) auf den neuen Parameter angepasst.
+
+### Durchsatzmessung
+
+Mess-Wheel aus dem Worktree gebaut (`maturin build --release`) und
+temporaer produktiv installiert (danach zurueckgebaut, siehe unten).
+Direktaufruf `mosaic_rust.net_self_play_games` (kein `progress_path`,
+keine `.pkl`/`data/`-Beruehrung, analog zur #81-Methodik), Champion
+`alphazero_v13_nortv_best.onnx`, `base_sims=400`, `c_puct=1.5`,
+`add_root_noise=true`, 11 Threads. Ergebnisse + Sample-Stats in
+`results.json` (scratchpad, nicht committed).
+
+| Konfiguration | Modell | Spiele | Wall-Clock | Spiele/s | Hochrechnung 2000 Spiele | Hochrechnung 6000 Spiele |
+|---|---|---:|---:|---:|---:|---:|
+| rtv AUS (Task #85, neuer Default) | v13_nortv_best | 20 | 83.8s | **0.2387** | ~2h20min | ~6h59min |
+| rtv AN (Kontrollmessung, gleiches Modell) | v13_nortv_best | 10 | 219.1s | 0.0456 | ~12h10min | ~36h31min |
+| rtv AN (#81-Referenz, zum Vergleich) | v12b_lr | 20 | 417.7s | 0.0479 | ~11h36min | ~34h47min |
+
+**Durchsatzgewinn**: 0.2387 / 0.0456 = **5.23x** gegenueber der
+modell-gleichen rtv-AN-Kontrollmessung, 0.2387 / 0.0479 = **4.98x**
+gegenueber der #81-Referenz (anderes Modell `v12b_lr`) -- beide klar
+**ueber** der im Auftrag erwarteten ~3x-Schaetzung (die aus #80/#81s
+CPU-Sekunden-Aufschluesselung stammt: Gumbel+Bootstrap+Sonstiges
+≈ 46-55 CPU-s/Spiel vs. rtv-inklusive ≈ 174-241 CPU-s/Spiel). Die
+rtv-AN-Kontrollmessung mit `v13_nortv_best` (0.0456 Spiele/s) liegt nahe
+an der #81-Referenz mit `v12b_lr` (0.0479 Spiele/s, -4.8%) -- der
+Modell-Effekt ist also klein gegenueber dem rtv-Effekt, die ~5x-
+Beschleunigung ist primaer dem abgeschalteten rtv zuzuschreiben, nicht
+einem schnelleren Modell. Warum die tatsaechliche Wall-Clock-Beschleunigung
+(~5x) ueber der reinen CPU-Sekunden-Schaetzung (~3x) liegt, wurde nicht
+weiter zerlegt (moegliche Ursache: geringere Thread-Kontention bei
+kuerzeren, gleichfoermigeren Partien ohne die teuren rtv-Rekursionsspitzen
+-- out of scope fuer diesen Task).
+
+### Record-Stichprobe (rtv AUS)
+
+Live-Aufruf, `record_rtv=false`, Beispiel-Record eines abgeschlossenen
+Spiels: Keys `['bootstrap_value', 'completed', 'game_id',
+'moon_order_target', 'player', 'policy', 'scores', 'scores_unclamped',
+'state', 'valid_actions', 'winner']` -- **kein** `round_transition_value`-
+Key, `bootstrap_value` vorhanden (z.B. `[0.507, 0.504]`),
+`scores_unclamped` vorhanden (z.B. `[4, -4]`), `policy` nicht-leer,
+`completed=True`. Ueber den vollen 20-Spiele-Lauf: 0/3214 Steps mit
+`round_transition_value`, 2670/3214 Steps mit `bootstrap_value` (nur
+Runde-1-4-Uebergangs-Steps werden gestempelt, Runde-5-Steps nie -- exakt
+das erwartete, unveraenderte Stempel-Muster). Gegenprobe rtv AN: 1333/1598
+Steps mit `round_transition_value` UND `bootstrap_value` (deckungsgleich,
+wie erwartet -- beide werden im selben Codeblock je Rundenuebergang
+gestempelt).
+
+### Repo-/Wheel-Endzustand
+
+Branch `worktree-rtv-removal` (eigener `git worktree`), main unberuehrt.
+Commit: Schalter-Implementierung (`engine/src/self_play.rs`,
+`engine/src/lib.rs`, `self_play.py`). Nach der Mess-Phase: Produktions-
+Wheel (main-Stand, Default-Features, `record_rtv`-Schalter Default-AUS
+existiert dort NICHT -- main hat noch die alte, ungegatete rtv-Berechnung)
+neu gebaut/installiert, Smoke-Test (`import mosaic_rust`) verifiziert.
+Worktree bleibt bestehen (nicht geloescht) -- Merge-Entscheidung liegt
+beim Nutzer.
+
+**Empfehlung**: Merge von `worktree-rtv-removal` nach main. Die
+Evidenzlage ist doppelt abgesichert (Nicht-Unterlegenheit UND
+Champion-Gating-Sieg des rtv-freien Modells), der gemessene
+Durchsatzgewinn (~5x, ueber der Erwartung) ist erheblich, und der Schalter
+ist rueckwaertskompatibel (`--rtv` reaktiviert das alte Verhalten
+verlustfrei, alte `.pkl`-Korpora mit `round_transition_value` bleiben
+gueltig und werden vom Target-Builder unveraendert bevorzugt). Einziger
+Wermutstropfen: die rtv-AN-Kontrollmessung nutzte nur 10 Spiele (Kosten-
+/Zeitgruende) -- fuer eine praezisere Spiele/s-Zahl waere ein groesserer
+Lauf moeglich, aendert aber nichts an der Groessenordnung der Aussage.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
