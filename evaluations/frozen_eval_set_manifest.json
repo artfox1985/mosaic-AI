@@ -1,0 +1,110 @@
+{
+  "version": "frozen_v1",
+  "build_date_utc": "2026-07-24T06:14:38.557187+00:00",
+  "git_commit": "d5b00b6d90b7605e88349c6dd392d604ec593f8a",
+  "seed": 20260724,
+  "n_target_total": 1800,
+  "n_buckets": 10,
+  "per_stratum_requested": 180,
+  "n_records_actual": 1800,
+  "rounds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "n_files_per_corpus_sampled": 20,
+  "min_file_age_secs_v12_filter": 600,
+  "corpora": {
+    "v10b": {
+      "n_files_scanned": 20,
+      "files_used": [
+        "selfplay_v10b_20260723_0403_g730.pkl",
+        "selfplay_v10b_20260723_0435_g810.pkl",
+        "selfplay_v10b_20260722_2343_g90.pkl",
+        "selfplay_v10b_20260723_0950_g1510.pkl",
+        "selfplay_v10b_20260723_0415_g760.pkl",
+        "selfplay_v10b_20260723_0805_g1320.pkl",
+        "selfplay_v10b_20260723_0619_g1070.pkl",
+        "selfplay_v10b_20260723_0614_g1060.pkl",
+        "selfplay_v10b_20260723_0045_g240.pkl",
+        "selfplay_v10b_20260723_0503_g880.pkl",
+        "selfplay_v10b_20260722_2340_g80.pkl",
+        "selfplay_v10b_20260723_0246_g540.pkl",
+        "selfplay_v10b_20260723_0330_g650.pkl",
+        "selfplay_v10b_20260723_0702_g1170.pkl",
+        "selfplay_v10b_20260723_1205_g1840.pkl",
+        "selfplay_v10b_20260723_1128_g1750.pkl",
+        "selfplay_v10b_20260723_0827_g1370.pkl",
+        "selfplay_v10b_20260723_0822_g1360.pkl",
+        "selfplay_v10b_20260723_1044_g1640.pkl",
+        "selfplay_v10b_20260723_1225_g1890.pkl"
+      ],
+      "per_round": {
+        "1": 180,
+        "2": 180,
+        "3": 180,
+        "4": 180,
+        "5": 180
+      },
+      "requested_per_round": 180
+    },
+    "v12": {
+      "n_files_scanned": 20,
+      "files_used": [
+        "selfplay_v12_20260724_0742_g1510.pkl",
+        "selfplay_v12_20260724_0504_g1050.pkl",
+        "selfplay_v12_20260724_0043_g270.pkl",
+        "selfplay_v12_20260724_0424_g930.pkl",
+        "selfplay_v12_20260724_0645_g1340.pkl",
+        "selfplay_v12_20260724_0131_g410.pkl",
+        "selfplay_v12_20260723_2322_g40.pkl",
+        "selfplay_v12_20260724_0245_g630.pkl",
+        "selfplay_v12_20260724_0430_g950.pkl",
+        "selfplay_v12_20260724_0348_g820.pkl",
+        "selfplay_v12_20260724_0107_g340.pkl",
+        "selfplay_v12_20260724_0147_g460.pkl",
+        "selfplay_v12_20260724_0702_g1390.pkl",
+        "selfplay_v12_20260724_0302_g680.pkl",
+        "selfplay_v12_20260724_0606_g1230.pkl",
+        "selfplay_v12_20260724_0454_g1020.pkl",
+        "selfplay_v12_20260724_0734_g1490.pkl",
+        "selfplay_v12_20260724_0521_g1100.pkl",
+        "selfplay_v12_20260724_0421_g920.pkl",
+        "selfplay_v12_20260724_0248_g640.pkl"
+      ],
+      "per_round": {
+        "1": 180,
+        "2": 180,
+        "3": 180,
+        "4": 180,
+        "5": 180
+      },
+      "requested_per_round": 180
+    },
+    "netcq": {
+      "available": false,
+      "note": "keine Dateien gefunden (siehe Docstring)"
+    }
+  },
+  "composition_corpus_x_round": {
+    "v10b": {
+      "1": 180,
+      "2": 180,
+      "3": 180,
+      "4": 180,
+      "5": 180
+    },
+    "v12": {
+      "1": 180,
+      "2": 180,
+      "3": 180,
+      "4": 180,
+      "5": 180
+    }
+  },
+  "netcq_available": false,
+  "notes": "netcq-Korpus (v11-Trainingsdaten, selfplay_netcq_*.pkl) wurde nicht gefunden -- weder unter data/, noch unter archive/, noch per rekursivem Scan des Projektbaums. Vermutlich bereits geloescht oder ausserhalb dieser Maschine archiviert. Set besteht daher aus v10b + v12.",
+  "immutable": true
+}
