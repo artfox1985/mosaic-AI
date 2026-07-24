@@ -393,7 +393,8 @@ fn split_sims_across_worlds(sims: u32, n: usize) -> Vec<u32> {
 /// zwischen den Welten einfach weitergereicht) -- kein separates Reseeding
 /// nötig, um unterschiedliche Welten zu bekommen.
 fn build_determinized_forest<R: Rng + ?Sized>(
-    net: &Net,
+    net_policy: &Net,
+    net_value: Option<&Net>,
     state: &GameState,
     sims: u32,
     c_puct: f64,
@@ -403,7 +404,9 @@ fn build_determinized_forest<R: Rng + ?Sized>(
 ) -> Vec<Vec<Node>> {
     split_sims_across_worlds(sims, n)
         .into_iter()
-        .map(|world_sims| build_net_tree(net, state, world_sims, c_puct, add_root_noise, rng, None))
+        .map(|world_sims| {
+            build_net_tree(net_policy, net_value, state, world_sims, c_puct, add_root_noise, rng, None)
+        })
         .collect()
 }
 
@@ -875,8 +878,22 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
 
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
 /// (per `ACTIVE_LEAF`: DFS-Solver oder Netz-Value).
+///
+/// Task #88 (Hybrid-Suche, kausaler Kopf-Test): `net_value` erlaubt ein
+/// ZWEITES Netz für Blattwerte (Value+Points), waehrend `net_policy` weiter
+/// die Priors (Policy-Logits) UND die Moon-Order (`moon`, policy-artig)
+/// liefert -- siehe Modul-weite Erklaerung bei `net_search_drafting_action_
+/// hybrid`. `net_value = None` (alle bisherigen Aufrufstellen) heisst
+/// "gleiches Netz fuer beides" -- intern per `std::ptr::eq`-Kurzschluss
+/// GENAU der alte Einzel-Netz-Codepfad (ein `eval`/`eval_pair`-Aufruf liefert
+/// Policy UND Value zusammen), damit dieser Fall BYTE-IDENTISCH zum
+/// Vor-Task-#88-Verhalten bleibt (Paritätstest siehe Testmodul unten:
+/// `hybrid_search_with_equal_nets_matches_plain_search`). Nur wenn
+/// `net_value` auf ein ANDERES Netz zeigt, greift der separate Hybrid-Pfad
+/// (ein Batch=1-Policy-Pass + ein eigener Value-Pass/-Paar).
 fn make_node<R: Rng + ?Sized>(
-    net: &Net,
+    net_policy: &Net,
+    net_value: Option<&Net>,
     state: GameState,
     parent: Option<usize>,
     action: Option<Action>,
@@ -899,31 +916,68 @@ fn make_node<R: Rng + ?Sized>(
     // Moon-Scores werden nur aus dem Mover-Pass gebraucht -- die geflippte
     // Perspektive dient ausschließlich `other_val`, siehe `other_pass` unten.
     let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
-    let (logits, value, moon, points, other_pass) = if need_other_pass {
-        crate::profiling::note_gamestate_clone();
-        let mut flipped = state.clone();
-        flipped.current_player = 1 - state.current_player;
-        let other_feats = state_to_features_direct(&flipped);
-        // Task #81: Batch=2 (`eval_pair`).
-        let ((logits, value, moon, points), (_o_logits, o_value, _o_moon, o_points)) =
-            crate::profiling::timed_net_eval(2, || {
-                net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
-                    (
-                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
-                        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                    )
-                })
-            });
-        (logits, value, moon, points, Some((o_value, o_points)))
+    let same_net = net_value.is_none_or(|v| std::ptr::eq(v, net_policy));
+    let (logits, value, moon, points, other_pass) = if same_net {
+        // Unveraendert gegenueber vor Task #88 (Paritaets-Codepfad).
+        let net = net_policy;
+        if need_other_pass {
+            crate::profiling::note_gamestate_clone();
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = state_to_features_direct(&flipped);
+            // Task #81: Batch=2 (`eval_pair`).
+            let ((logits, value, moon, points), (_o_logits, o_value, _o_moon, o_points)) =
+                crate::profiling::timed_net_eval(2, || {
+                    net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
+                        (
+                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        )
+                    })
+                });
+            (logits, value, moon, points, Some((o_value, o_points)))
+        } else {
+            // Task #81: Batch=1.
+            let (logits, value, moon, points) =
+                crate::profiling::timed_net_eval(1, || {
+                    net.eval(&feats).unwrap_or_else(|_| {
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+                    })
+                });
+            (logits, value, moon, points, None)
+        }
     } else {
-        // Task #81: Batch=1.
-        let (logits, value, moon, points) =
-            crate::profiling::timed_net_eval(1, || {
-                net.eval(&feats).unwrap_or_else(|_| {
-                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
-                })
+        // Task #88 Hybrid-Pfad: Policy/Moon von `net_policy` (EIN Batch=1-
+        // Pass, kein Gegner-Pass noetig -- Priors sind rein EGO-
+        // perspektivisch), Value/Points von `net_value` (Mover+Gegner-Pass
+        // wie im Nicht-Hybrid-Fall, siehe `net_leaf_eval`-Kommentar).
+        let net_value = net_value.expect("same_net=false impliziert Some(..)");
+        let (logits, _p_value, moon, _p_points) = crate::profiling::timed_net_eval(1, || {
+            net_policy
+                .eval(&feats)
+                .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
+        });
+        if need_other_pass {
+            crate::profiling::note_gamestate_clone();
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = state_to_features_direct(&flipped);
+            let ((_v_logits, value, _v_moon, points), (_o_logits, o_value, _o_moon, o_points)) =
+                crate::profiling::timed_net_eval(2, || {
+                    net_value.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
+                        (
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        )
+                    })
+                });
+            (logits, value, moon, points, Some((o_value, o_points)))
+        } else {
+            let (_v_logits, value, _v_moon, points) = crate::profiling::timed_net_eval(1, || {
+                net_value.eval(&feats).unwrap_or_else(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new()))
             });
-        (logits, value, moon, points, None)
+            (logits, value, moon, points, None)
+        }
     };
 
     let mut moon_scores = [0f32; 5];
@@ -1001,7 +1055,10 @@ fn make_node<R: Rng + ?Sized>(
                     Some(pre) => crate::round_transition::sample_round_transition_value(
                         &pre,
                         crate::round_transition::N_SAMPLES_SEARCH,
-                        |s, _rng| net_leaf_eval(net, s),
+                        // Dead Code bei `ROUND_TRANSITION_SAMPLING=false` (Standard) --
+                        // faellt fuer eine spaetere Aktivierung konsistent auf den
+                        // Value-Net (falls Hybrid) statt Policy-Net zurueck.
+                        |s, _rng| net_leaf_eval(net_value.unwrap_or(net_policy), s),
                         rng,
                         std::time::Instant::now() + crate::round_transition::TIME_BUDGET,
                     ),
@@ -1339,7 +1396,8 @@ fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
 /// `gumbel_scale=0`. Self-Play ruft mit `true` und behält die echte
 /// Gumbel-Exploration (G1, Vollaudit 2026-07-21).
 fn build_gumbel_tree<R: Rng + ?Sized>(
-    net: &Net,
+    net_policy: &Net,
+    net_value: Option<&Net>,
     state: &GameState,
     sims: u32,
     add_root_noise: bool,
@@ -1351,7 +1409,8 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
         determinize_hidden_information(&mut root_state, rng);
     }
     let root_player = root_state.current_player;
-    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, rng)];
+    let mut nodes =
+        vec![make_node(net_policy, net_value, root_state, None, None, 0.0, root_player, rng)];
 
     // Eine einzelne Tiefe-≥1-Deszension + Backprop, beginnend bei einem
     // bereits existierenden Knoten (typischerweise ein Wurzelkind). Paket 2
@@ -1364,7 +1423,13 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     // behält seinen eigenen Widening-Cap unverändert -- diese Funktion wird
     // von dort nie aufgerufen. Kein granularer Sim-Trace (siehe
     // `build_net_tree`-Dispatch-Kommentar).
-    fn descend_and_backprop<R: Rng + ?Sized>(net: &Net, nodes: &mut Vec<Node>, start_nid: usize, rng: &mut R) {
+    fn descend_and_backprop<R: Rng + ?Sized>(
+        net_policy: &Net,
+        net_value: Option<&Net>,
+        nodes: &mut Vec<Node>,
+        start_nid: usize,
+        rng: &mut R,
+    ) {
         let mut nid = start_nid;
         let mut expansion_failed = false;
         loop {
@@ -1393,7 +1458,8 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
             if g.apply_drafting(&act).is_ok() {
                 let mut child_state = g.state;
                 child_state.log.clear();
-                let child = make_node(net, child_state, Some(nid), Some(act), prior, mover, rng);
+                let child =
+                    make_node(net_policy, net_value, child_state, Some(nid), Some(act), prior, mover, rng);
                 let cid = nodes.len();
                 nodes.push(child);
                 nodes[nid].children.push(cid);
@@ -1461,7 +1527,7 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
         ($ci:expr) => {{
             let ci = $ci;
             match candidate_node[ci] {
-                Some(cid) => descend_and_backprop(net, &mut nodes, cid, rng),
+                Some(cid) => descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng),
                 None => {
                     let (act, prior, _g) = candidates[ci].clone();
                     let mover = nodes[0].state.current_player;
@@ -1473,7 +1539,8 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
                     if g.apply_drafting(&act).is_ok() {
                         let mut child_state = g.state;
                         child_state.log.clear();
-                        let child = make_node(net, child_state, Some(0), Some(act), prior, mover, rng);
+                        let child =
+                            make_node(net_policy, net_value, child_state, Some(0), Some(act), prior, mover, rng);
                         let cid = nodes.len();
                         nodes.push(child);
                         nodes[0].children.push(cid);
@@ -1585,7 +1652,8 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// Gumbel hat (noch) keinen granularen Sim-fuer-Sim-Trace (nur ein
 /// Platzhalter-Log-Eintrag), `log` wird in diesem Fall ignoriert.
 fn build_net_tree<R: Rng + ?Sized>(
-    net: &Net,
+    net_policy: &Net,
+    net_value: Option<&Net>,
     state: &GameState,
     sims: u32,
     c_puct: f64,
@@ -1597,7 +1665,7 @@ fn build_net_tree<R: Rng + ?Sized>(
         if let Some(l) = log.as_deref_mut() {
             l.push("  GUMBEL-SUCHE (kein granularer Sim-Trace)".to_string());
         }
-        return build_gumbel_tree(net, state, sims, add_root_noise, rng);
+        return build_gumbel_tree(net_policy, net_value, state, sims, add_root_noise, rng);
     }
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
@@ -1606,7 +1674,8 @@ fn build_net_tree<R: Rng + ?Sized>(
         determinize_hidden_information(&mut root_state, rng);
     }
     let root_player = root_state.current_player;
-    let mut nodes = vec![make_node(net, root_state, None, None, 0.0, root_player, rng)];
+    let mut nodes =
+        vec![make_node(net_policy, net_value, root_state, None, None, 0.0, root_player, rng)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -1682,7 +1751,16 @@ fn build_net_tree<R: Rng + ?Sized>(
                     let mut child_state = g.state;
                     child_state.log.clear();
                     let terminal = child_state.phase != Phase::Drafting;
-                    let child = make_node(net, child_state, Some(nid), Some(act.clone()), prior, mover, rng);
+                    let child = make_node(
+                        net_policy,
+                        net_value,
+                        child_state,
+                        Some(nid),
+                        Some(act.clone()),
+                        prior,
+                        mover,
+                        rng,
+                    );
                     let cid = nodes.len();
                     nodes.push(child);
                     nodes[nid].children.push(cid);
@@ -1775,7 +1853,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
         return crate::round5::choose_action(state);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None);
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
     }
@@ -1784,7 +1862,54 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // `average_completed_q_policy`-Kommentar), nicht mehr
     // `select_final_root_child` auf einem Einzelbaum -- letzteres hätte
     // keinen sinnvollen "einen" Baum mehr, über den es entscheiden könnte.
-    let forest = build_determinized_forest(net, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    let forest =
+        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    average_completed_q_policy(&forest)
+        .into_iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(a, _)| a)
+}
+
+/// Task #88 (Hybrid-Suche, kausaler Kopf-Test): wie [`net_search_drafting_action`],
+/// aber Priors/Moon-Order kommen von `net_policy`, Blattwert (Value+Points)
+/// von `net_value` -- zwei UNTERSCHIEDLICHE Netze, um zu isolieren, ob die
+/// Arena-Stärke eines Kandidaten aus dem Policy- oder dem Value-Kopf kommt
+/// (siehe `make_node`-Kommentar für die Verdrahtung). `net_policy`/`net_value`
+/// DÜRFEN dieselbe Referenz sein -- dann ist das Ergebnis BYTE-IDENTISCH zu
+/// `net_search_drafting_action(net_policy, ...)` (Paritätstest siehe
+/// Testmodul: `hybrid_search_with_equal_nets_matches_plain_search`). Nur für
+/// die diagnostische Arena gedacht (`self_play::run_net_vs_net_arena_hybrid`),
+/// KEIN Self-Play-/Trainingspfad.
+pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+) -> Option<Action> {
+    if state.phase != Phase::Drafting {
+        return None;
+    }
+    if crate::round5::applies(state) {
+        return crate::round5::choose_action(state);
+    }
+    if NUM_DETERMINIZATIONS <= 1 {
+        let nodes = build_net_tree(net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None);
+        let best = select_final_root_child(&nodes)?;
+        return nodes[best].action.clone();
+    }
+    let forest = build_determinized_forest(
+        net_policy,
+        Some(net_value),
+        state,
+        sims,
+        c_puct,
+        add_root_noise,
+        NUM_DETERMINIZATIONS,
+        rng,
+    );
     average_completed_q_policy(&forest)
         .into_iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -1818,7 +1943,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     // (`self_play::alphabeta_choose_action`s Shortlisting), nicht einer der
     // drei in Task #65 benannten Haupt-Sucheinstiege (Arena/Self-Play-Ziel/
     // Debug-UI) -- bleibt unverändert Einzelwelt.
-    let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
+    let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None);
     root_child_stats_from_nodes(&nodes)
 }
 
@@ -1853,14 +1978,15 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         return (stats, policy);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, None);
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None);
         return (root_child_stats_from_nodes(&nodes), root_completed_q_policy(&nodes));
     }
     // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
     // Besuche (treibt Self-Plays besuchsbasierte Sampling-Auswahl
     // unverändert weiter, jetzt über den Wald statt einer Welt), Policy-
     // Ziel = über die Welten gemittelte completed-Q-Politik.
-    let forest = build_determinized_forest(net, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    let forest =
+        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
     (aggregate_root_child_stats(&forest), average_completed_q_policy(&forest))
 }
 
@@ -1907,7 +2033,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
         return crate::round5::choose_action_with_analysis(state);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net, state, sims, c_puct, add_root_noise, rng, log);
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, log);
         return net_search_with_tree_from_nodes(state, sims, &nodes);
     }
     // ISMCTS-Mehrfach-Determinisierung: kein granularer Sim-für-Sim-Trace je
@@ -1919,7 +2045,8 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
             "  ISMCTS: {NUM_DETERMINIZATIONS} Determinisierungen (kein granularer Sim-Trace je Welt)"
         ));
     }
-    let forest = build_determinized_forest(net, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    let forest =
+        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
     net_search_with_tree_from_forest(state, sims, &forest)
 }
 
@@ -2719,12 +2846,12 @@ mod tests {
         let state = random_drafting_state(1, 10, &mut rng_state).expect("Testzustand sollte auswertbar sein");
 
         let mut rng_a = StdRng::seed_from_u64(999);
-        let nodes = build_net_tree(&net, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None);
+        let nodes = build_net_tree(&net, None, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None);
         let direct_stats = root_child_stats_from_nodes(&nodes);
         let direct_policy = root_completed_q_policy(&nodes);
 
         let mut rng_b = StdRng::seed_from_u64(999);
-        let forest = build_determinized_forest(&net, &state, 8, DEFAULT_C_PUCT, false, 1, &mut rng_b);
+        let forest = build_determinized_forest(&net, None, &state, 8, DEFAULT_C_PUCT, false, 1, &mut rng_b);
         assert_eq!(forest.len(), 1, "n=1 sollte genau einen Baum liefern");
         let forest_stats = aggregate_root_child_stats(&forest);
         let forest_policy = average_completed_q_policy(&forest);
@@ -2760,7 +2887,7 @@ mod tests {
             "Testvoraussetzung: genug Platten im verdeckten Stapel fuer eine aussagekraeftige Mischung"
         );
 
-        let forest = build_determinized_forest(&net, &state, 6, DEFAULT_C_PUCT, false, 3, &mut rng);
+        let forest = build_determinized_forest(&net, None, &state, 6, DEFAULT_C_PUCT, false, 3, &mut rng);
         assert_eq!(forest.len(), 3);
         let pools: Vec<Vec<usize>> = forest
             .iter()
@@ -2769,6 +2896,75 @@ mod tests {
         assert_ne!(pools[0], pools[1], "Welt 1 und 2 sollten unterschiedliche dome_tile_pool-Reihenfolgen ziehen");
         assert_ne!(pools[1], pools[2], "Welt 2 und 3 sollten unterschiedliche dome_tile_pool-Reihenfolgen ziehen");
         assert_ne!(pools[0], pools[2], "Welt 1 und 3 sollten unterschiedliche dome_tile_pool-Reihenfolgen ziehen");
+    }
+
+    #[test]
+    fn hybrid_search_with_equal_nets_matches_plain_search() {
+        // Task #88 (Hybrid-Suche, kausaler Kopf-Test) -- WICHTIGSTER Korrekt-
+        // heitstest fuer den neuen Hybrid-Codepfad: `net_policy` UND `net_value`
+        // als DIESELBE Referenz muss den `same_net`-Kurzschluss in `make_node`
+        // greifen lassen (siehe dortiger Kommentar) -- das Ergebnis muss dann
+        // BYTE-IDENTISCH zur normalen (Nicht-Hybrid) Suche sein, sonst haette
+        // jede kuenftige 2x2-Messung keinen sauberen A=B-Referenzpunkt. Prueft
+        // volle Wurzel-Statistik (Besuche, Q), completed-Q-Politik UND die
+        // finale Zugwahl, ueber mehrere zufaellige Stellungen und Sims-Budgets.
+        let Some(net) = load_test_net() else { return };
+        let mut setup_rng = StdRng::seed_from_u64(4242);
+        let mut checked = 0;
+        for gi in 0..6u64 {
+            let Some(state) = random_drafting_state(gi, 12, &mut setup_rng) else { continue };
+            for &sims in &[8u32, 24] {
+                let mut rng_plain = StdRng::seed_from_u64(1000 + gi);
+                let nodes_plain =
+                    build_net_tree(&net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None);
+                let stats_plain = root_child_stats_from_nodes(&nodes_plain);
+                let policy_plain = root_completed_q_policy(&nodes_plain);
+                let action_plain =
+                    select_final_root_child(&nodes_plain).and_then(|i| nodes_plain[i].action.clone());
+
+                let mut rng_hybrid = StdRng::seed_from_u64(1000 + gi);
+                let nodes_hybrid = build_net_tree(
+                    &net,
+                    Some(&net),
+                    &state,
+                    sims,
+                    DEFAULT_C_PUCT,
+                    false,
+                    &mut rng_hybrid,
+                    None,
+                );
+                let stats_hybrid = root_child_stats_from_nodes(&nodes_hybrid);
+                let policy_hybrid = root_completed_q_policy(&nodes_hybrid);
+                let action_hybrid =
+                    select_final_root_child(&nodes_hybrid).and_then(|i| nodes_hybrid[i].action.clone());
+
+                assert_eq!(
+                    nodes_plain.len(),
+                    nodes_hybrid.len(),
+                    "Spiel {gi} sims={sims}: Baumgroesse weicht ab"
+                );
+                assert_eq!(stats_plain.len(), stats_hybrid.len());
+                for ((a1, v1, q1), (a2, v2, q2)) in stats_plain.iter().zip(stats_hybrid.iter()) {
+                    assert_eq!(a1, a2, "Spiel {gi} sims={sims}: Aktionsreihenfolge weicht ab");
+                    assert_eq!(v1, v2, "Spiel {gi} sims={sims}: Besuche weichen ab (A={a1:?})");
+                    assert_eq!(
+                        q1, q2,
+                        "Spiel {gi} sims={sims}: Q nicht byte-identisch (A={a1:?}): {q1} vs {q2}"
+                    );
+                }
+                assert_eq!(policy_plain.len(), policy_hybrid.len());
+                for ((a1, p1), (a2, p2)) in policy_plain.iter().zip(policy_hybrid.iter()) {
+                    assert_eq!(a1, a2, "Spiel {gi} sims={sims}: Policy-Aktionsreihenfolge weicht ab");
+                    assert_eq!(
+                        p1, p2,
+                        "Spiel {gi} sims={sims}: completed-Q-Politik nicht byte-identisch (A={a1:?}): {p1} vs {p2}"
+                    );
+                }
+                assert_eq!(action_plain, action_hybrid, "Spiel {gi} sims={sims}: finale Zugwahl weicht ab");
+                checked += 1;
+            }
+        }
+        assert!(checked >= 6, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
     }
 
     #[test]

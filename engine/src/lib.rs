@@ -258,6 +258,44 @@ fn net_vs_net_arena_match(
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+/// Task #88 (Hybrid-Suche, kausaler Kopf-Test): Arena-Match Hybrid-Netz
+/// (Priors/Moon-Order von `hybrid_policy`, Blattwert von `hybrid_value`) vs.
+/// Einzel-Netz `plain_model`. `hybrid_board` (0 oder 1) waehlt, auf welchem
+/// Brett die Hybrid-Suche steht -- fuer echten Brett-Tausch bei identischem
+/// `seed` zwei Aufrufe mit vertauschtem `hybrid_board` UND vertauschten
+/// sims/c_puct (Muster wie `tools/paired_gating.py`). `hybrid_policy`/
+/// `hybrid_value` DÜRFEN identisch sein (Kontrollzelle, dann byte-identisch
+/// zu `net_vs_net_arena_match`, siehe `self_play::run_net_vs_net_arena_hybrid`-
+/// Kommentar). Gibt dasselbe JSON-Array-Format wie `net_vs_net_arena_match`
+/// zurück (Aufrufer muss `hybrid_board` selbst mitfuehren, um `winner`
+/// richtig zuzuordnen). Reines Diagnose-Werkzeug, kein Produktionspfad.
+#[pyfunction]
+#[pyo3(signature = (hybrid_policy, hybrid_value, plain_model, hybrid_board=0, sims_hybrid=200, sims_plain=200, n_games=50, seed=None, num_threads=1, c_puct_hybrid=1.5, c_puct_plain=1.5))]
+#[allow(clippy::too_many_arguments)]
+fn net_vs_net_arena_match_hybrid(
+    py: Python<'_>,
+    hybrid_policy: String,
+    hybrid_value: String,
+    plain_model: String,
+    hybrid_board: usize,
+    sims_hybrid: u32,
+    sims_plain: u32,
+    n_games: usize,
+    seed: Option<u64>,
+    num_threads: usize,
+    c_puct_hybrid: f64,
+    c_puct_plain: f64,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    py.detach(move || {
+        crate::self_play::run_net_vs_net_arena_hybrid(
+            &hybrid_policy, &hybrid_value, &plain_model, hybrid_board, sims_hybrid, sims_plain, n_games,
+            seed, num_threads, c_puct_hybrid, c_puct_plain,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Netzgeführtes Self-Play (AlphaZero-Loop, Stufe 1: DFS-Blatt, saubere
 /// Visit-Targets). Gibt alle Step-Records als JSON-Array zurück (Format wie
 /// self_play_games). `num_threads=0` = alle Kerne. `progress_path`/
@@ -492,6 +530,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(draw_stack_peek_impact_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(value_noise_floor_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(net_vs_net_arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(net_vs_net_arena_match_hybrid, m)?)?;
     m.add_function(wrap_pyfunction!(net_self_play_games, m)?)?;
     m.add_function(wrap_pyfunction!(stage3_vs_stage1_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(profiling_reset, m)?)?;

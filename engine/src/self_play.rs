@@ -31,7 +31,10 @@ use crate::game::{
 };
 use crate::mcts::{dynamic_sims, player_total, root_child_stats, search_drafting_action};
 use crate::net::Net;
-use crate::net_mcts::{net_effective_sims, net_root_child_stats, net_search_drafting_action};
+use crate::net_mcts::{
+    net_effective_sims, net_root_child_stats, net_search_drafting_action,
+    net_search_drafting_action_hybrid,
+};
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
@@ -1596,6 +1599,194 @@ pub fn run_net_vs_net_arena(
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
         play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng)
+    };
+
+    let all: Vec<Value> = if num_threads <= 1 {
+        (0..n_games).map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
+}
+
+// ── Hybrid-Suche (Task #88, kausaler Kopf-Test) ─────────────────────────────
+//
+// Forschungsfrage: v12 spielt staerker als v10 -- traegt der Policy- oder der
+// Value-Kopf die Staerke? Kausaler Test: EIN Brett sucht mit Priors/Moon-
+// Order von `hybrid_policy` UND Blattwert (Value+Points) von `hybrid_value`
+// (zwei UNTERSCHIEDLICHE Netze, siehe `net_mcts::make_node`-Kommentar fuer
+// die Verdrahtung); das ANDERE Brett bleibt ein normales Einzel-Netz
+// (`plain_net`, i.d.R. der feste Referenzgegner v10_best). `hybrid_board`
+// (0 oder 1) waehlt, WELCHES Brett die Hybrid-Suche nutzt -- ermoeglicht
+// echten Brett-Tausch bei gleichem Seed (Muster aus `tools/paired_gating.py`:
+// zwei Aufrufe mit vertauschtem `hybrid_board`/vertauschten sims/c_puct
+// heben einen etwaigen Brett-Bias pro Seed-Paar auf), OHNE eine zweite
+// gespiegelte Funktion zu brauchen. Reines Diagnose-Werkzeug -- schlank
+// gehalten, KEIN Self-Play-/Trainingspfad.
+
+/// Wie `play_net_vs_net_game`, aber EIN Brett (`hybrid_board`, 0 oder 1)
+/// zieht per Hybrid-Suche (`net_search_drafting_action_hybrid`): Priors/
+/// Moon-Order von `hybrid_policy`, Blattwert von `hybrid_value`. Das andere
+/// Brett bleibt eine normale Einzel-Netz-Suche (`plain_net`). `hybrid_policy`/
+/// `hybrid_value` DÜRFEN dieselbe Referenz sein (Kontrollzelle, dann Paritaet
+/// zu `play_net_vs_net_game`, siehe `net_mcts::make_node`-Kommentar zum
+/// `same_net`-Kurzschluss).
+#[allow(clippy::too_many_arguments)]
+fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
+    hybrid_policy: &Net,
+    hybrid_value: &Net,
+    plain_net: &Net,
+    hybrid_board: usize,
+    sims_hybrid: u32,
+    sims_plain: u32,
+    c_puct_hybrid: f64,
+    c_puct_plain: f64,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+) -> Value {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut steps = 0u32;
+    let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
+    let timeout_secs = net_game_timeout_secs(sims_hybrid.max(sims_plain));
+    loop {
+        guard += 1;
+        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    let first = game.state.current_player;
+                    let non_starter = 1 - first;
+                    let pi = if game.state.players[non_starter].start_tile_pending {
+                        non_starter
+                    } else if game.state.players[first].start_tile_pending {
+                        first
+                    } else {
+                        break;
+                    };
+                    match choose_start_placement(&game.state, pi) {
+                        Some((tid, r, c2, rot)) => {
+                            let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                        }
+                        None => break,
+                    }
+                    steps += 1;
+                } else if game.state.phase == Phase::Drafting {
+                    let pi = game.state.current_player;
+                    let actions = drafting_actions(&game.state);
+                    let chosen = if actions.len() == 1 {
+                        actions[0].clone()
+                    } else if pi == hybrid_board {
+                        let s = net_effective_sims(sims_hybrid, actions.len());
+                        net_search_drafting_action_hybrid(
+                            hybrid_policy, hybrid_value, &game.state, s, c_puct_hybrid, false, rng,
+                        )
+                        .unwrap_or_else(|| actions[0].clone())
+                    } else {
+                        let s = net_effective_sims(sims_plain, actions.len());
+                        net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng)
+                            .unwrap_or_else(|| actions[0].clone())
+                    };
+                    apply_chosen_action(&mut game, chosen);
+                    steps += 1;
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => {
+                let pi = game.state.current_player;
+                match resolve_tiling_step(&game.state, pi) {
+                    TilingStep::Place(ta) => {
+                        let _ = game.apply_single_tiling(pi, &ta);
+                    }
+                    TilingStep::Chips { row, chips } => {
+                        apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                    }
+                    TilingStep::End => {
+                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
+                    }
+                }
+                steps += 1;
+            }
+            _ => break,
+        }
+    }
+    if game.state.phase == Phase::End {
+        let _ = game.apply_end_scoring();
+    }
+    let p0 = &game.state.players[0];
+    let p1 = &game.state.players[1];
+    json!({
+        "scores": [p0.score, p1.score],
+        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
+        "winner": determine_winner(&game.state),
+        "steps": steps,
+        "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
+        "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+    })
+}
+
+/// `n_games` Spiele Hybrid-Netz (Priors/Moon von `hybrid_policy_path`, Value
+/// von `hybrid_value_path`) vs. Einzel-Netz `plain_model_path`, Startspieler
+/// alternierend. `hybrid_board` (0 oder 1) legt fest, auf welchem Brett die
+/// Hybrid-Suche steht -- fuer echten Brett-Tausch bei identischem `seed`
+/// zwei Aufrufe mit vertauschtem `hybrid_board` UND vertauschten sims/c_puct
+/// (Muster wie `tools/paired_gating.py::play_pair_block`). Gibt JSON-Array
+/// `[{scores:[Brett0,Brett1], winner, …}]` -- exakt dasselbe Format wie
+/// `run_net_vs_net_arena`, damit bestehende Auswertungsskripte unveraendert
+/// weiterverwendbar sind (Aufrufer muss `hybrid_board` selbst mitfuehren, um
+/// `winner` richtig zu interpretieren). Laedt `hybrid_policy`/`hybrid_value`
+/// NUR EINMAL gemeinsam, wenn beide Pfade IDENTISCH sind (String-Vergleich)
+/// -- das ist die Kontrollzelle (A=B) und garantiert per Konstruktion
+/// dieselbe `&Net`-Referenz auf beiden Seiten, also den `same_net`-
+/// Kurzschluss in `net_mcts::make_node` (byte-identisch zur Nicht-Hybrid-
+/// Suche, siehe dortiger Paritätstest).
+#[allow(clippy::too_many_arguments)]
+pub fn run_net_vs_net_arena_hybrid(
+    hybrid_policy_path: &str,
+    hybrid_value_path: &str,
+    plain_model_path: &str,
+    hybrid_board: usize,
+    sims_hybrid: u32,
+    sims_plain: u32,
+    n_games: usize,
+    seed: u64,
+    num_threads: usize,
+    c_puct_hybrid: f64,
+    c_puct_plain: f64,
+) -> Result<String, String> {
+    let hybrid_policy = std::sync::Arc::new(
+        Net::load(hybrid_policy_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?,
+    );
+    let hybrid_value = if hybrid_value_path == hybrid_policy_path {
+        hybrid_policy.clone()
+    } else {
+        std::sync::Arc::new(
+            Net::load(hybrid_value_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?,
+        )
+    };
+    let plain_net = std::sync::Arc::new(
+        Net::load(plain_model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?,
+    );
+    let hybrid_board = hybrid_board.min(1); // defensiv: nur 0/1 sinnvoll
+
+    let play = |i: usize| -> Value {
+        let mut rng =
+            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = i % 2;
+        let names = ["NetzA".to_string(), "NetzB".to_string()];
+        play_net_vs_net_hybrid_game(
+            &hybrid_policy, &hybrid_value, &plain_net, hybrid_board, sims_hybrid, sims_plain,
+            c_puct_hybrid, c_puct_plain, ids, names, first, &mut rng,
+        )
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -3731,6 +3922,60 @@ mod tests {
         assert_eq!(
             games_a[0], games_single[0],
             "Spiel i=0 muss unabhaengig von n_games identisch sein (reine Funktion von seed+i)"
+        );
+    }
+
+    /// Task #88 (Hybrid-Suche, kausaler Kopf-Test) -- End-zu-End-Paritaetstest
+    /// auf Ebene der tatsaechlich fuers 2x2-Design genutzten Arena-Funktion:
+    /// `run_net_vs_net_arena_hybrid` mit `policy_a_path == value_a_path` (die
+    /// Kontrollzelle, A=B) muss BYTE-IDENTISCHE Spielfolgen liefern wie
+    /// `run_net_vs_net_arena` mit denselben Modellen/Sims/Seed -- ergaenzt den
+    /// tieferen `net_mcts::hybrid_search_with_equal_nets_matches_plain_search`-
+    /// Test (dort: Baum-/Politik-Ebene) um den vollen Spielverlauf inkl.
+    /// Tiling/Scoring. `value_a_path == policy_a_path` (identischer String)
+    /// laesst `run_net_vs_net_arena_hybrid` intern EINMAL laden und dieselbe
+    /// `Arc<Net>`-Referenz fuer beide nutzen (siehe dortiger Kommentar) --
+    /// genau der `same_net`-Kurzschluss, den `make_node` fuer Byte-Identitaet
+    /// braucht.
+    #[test]
+    fn run_net_vs_net_arena_hybrid_with_equal_models_matches_plain_arena() {
+        let Some(net) = load_test_net_for_gating() else { return };
+        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v10_best.onnx");
+        let model_path = model_path.to_str().unwrap();
+        drop(net);
+
+        let seed = 24_680u64;
+        let n_games = 3usize;
+        let plain = run_net_vs_net_arena(
+            model_path, model_path, 8, 8, n_games, seed, 1,
+            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT,
+        )
+        .expect("Plain-Arena-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
+        let hybrid = run_net_vs_net_arena_hybrid(
+            model_path, model_path, model_path, 0, 8, 8, n_games, seed, 1,
+            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT,
+        )
+        .expect("Hybrid-Arena-Lauf (A=B, hybrid_board=0) sollte gelingen");
+        assert_eq!(
+            plain, hybrid,
+            "run_net_vs_net_arena_hybrid mit hybrid_policy==hybrid_value==plain_model muss \
+             byte-identisch zu run_net_vs_net_arena sein (A=B-Kontrollzelle des 2x2-Designs)"
+        );
+
+        // Auch bei vertauschtem `hybrid_board` (1 statt 0) bleibt die
+        // A=B-Kontrollzelle byte-identisch -- alle drei Modellpfade sind
+        // gleich, der `same_net`-Kurzschluss greift unabhaengig davon,
+        // welches Brett die (degenerierte) Hybrid-Suche nutzt.
+        let hybrid_swapped = run_net_vs_net_arena_hybrid(
+            model_path, model_path, model_path, 1, 8, 8, n_games, seed, 1,
+            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT,
+        )
+        .expect("Hybrid-Arena-Lauf (A=B, hybrid_board=1) sollte gelingen");
+        assert_eq!(
+            plain, hybrid_swapped,
+            "run_net_vs_net_arena_hybrid mit hybrid_board=1 muss bei A=B ebenfalls \
+             byte-identisch zu run_net_vs_net_arena sein"
         );
     }
 }
