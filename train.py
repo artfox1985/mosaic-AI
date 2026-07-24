@@ -188,6 +188,30 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           value_weight=None, points_weight=None, value_target_variant="default"):
+    # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
+    # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
+    # Dateinamen übergibt, landet bei alphazero_alphazero_*.pth. Das doppelte
+    # Präfix wird erkannt und mit Warnung korrigiert. Fehlt der aufgelöste
+    # Checkpoint, bricht das Training hart ab: der frühere stille
+    # From-Scratch-Fallback hat im v13-Zyklus 6 Epochen gekostet, weil er nur
+    # am zu niedrigen Epoche-1-Val-R² erkennbar war.
+    load_path = None
+    if load_version:
+        if load_version.startswith("alphazero_"):
+            corrected = load_version[len("alphazero_"):]
+            if (MODELS_DIR / f"alphazero_{corrected}.pth").exists():
+                print(f"⚠️  --load '{load_version}' enthält bereits das Präfix 'alphazero_' — "
+                      f"verwende '{corrected}'.")
+                load_version = corrected
+        load_path = MODELS_DIR / f"alphazero_{load_version}.pth"
+        if not load_path.exists():
+            sys.exit(
+                f"❌ Start-Modell nicht gefunden: {load_path}\n"
+                f"   --load erwartet den Versionsnamen OHNE 'alphazero_'-Präfix "
+                f"(z.B. --load v12b_lr_best für alphazero_v12b_lr_best.pth).\n"
+                f"   Abbruch, um stilles Training von null zu verhindern."
+            )
+
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
     # stark korreliert, ein Zug-Split wuerde nahezu identische Zustaende in
@@ -286,30 +310,25 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           + (f"  (Default {POINTS_WEIGHT})" if points_weight is not None else ""))
     model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
 
-    # Warm Start?
+    # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
-        load_path = MODELS_DIR / f"alphazero_{load_version}.pth"
-
-        if load_path.exists():
-            print(f"📥 Lade altes Model als Startpunkt: {load_path.name}")
-            ckpt = torch.load(str(load_path), map_location=device)
-            old_state = ckpt["model_state"]
-            new_state = model.state_dict()
-            # strict=False allein reicht NICHT bei INPUT_SIZE-Änderungen: es
-            # toleriert fehlende/zusätzliche Keys, aber KEINE Shape-Mismatches
-            # bei gleichnamigen Keys (z.B. body.0.weight bei geändertem
-            # INPUT_SIZE) — das würde crashen. Shape-inkompatible Keys daher
-            # vorher explizit rausfiltern; der Rest (tiefere Body-Schichten,
-            # alle Heads) startet weiterhin warm. Alte Checkpoints mit einem
-            # value_head.* haben automatisch keine Entsprechung mehr in
-            # new_state (Head existiert nicht mehr) -- werden einfach ignoriert.
-            skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
-            if skipped:
-                print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")
-                old_state = {k: v for k, v in old_state.items() if k not in skipped}
-            model.load_state_dict(old_state, strict=False)
-        else:
-            print(f"⚠️ Warnung: Start-Modell '{load_path}' nicht gefunden. Trainiere von null!")
+        print(f"📥 Lade altes Model als Startpunkt: {load_path.name}")
+        ckpt = torch.load(str(load_path), map_location=device)
+        old_state = ckpt["model_state"]
+        new_state = model.state_dict()
+        # strict=False allein reicht NICHT bei INPUT_SIZE-Änderungen: es
+        # toleriert fehlende/zusätzliche Keys, aber KEINE Shape-Mismatches
+        # bei gleichnamigen Keys (z.B. body.0.weight bei geändertem
+        # INPUT_SIZE) — das würde crashen. Shape-inkompatible Keys daher
+        # vorher explizit rausfiltern; der Rest (tiefere Body-Schichten,
+        # alle Heads) startet weiterhin warm. Alte Checkpoints mit einem
+        # value_head.* haben automatisch keine Entsprechung mehr in
+        # new_state (Head existiert nicht mehr) -- werden einfach ignoriert.
+        skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
+        if skipped:
+            print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")
+            old_state = {k: v for k, v in old_state.items() if k not in skipped}
+        model.load_state_dict(old_state, strict=False)
 
     model.to(device)
 
