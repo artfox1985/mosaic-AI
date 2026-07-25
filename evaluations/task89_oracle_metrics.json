@@ -1,0 +1,538 @@
+{
+  "oracle_manifest": {
+    "version": "frozen_v1_oracle_v1",
+    "based_on_frozen_version": "frozen_v1",
+    "build_date_utc": "2026-07-25T17:56:12.810857+00:00",
+    "git_commit": "10e641ee03919cc28a55817637bde5f0d299e2f4",
+    "model": "models/alphazero_v16_best.onnx",
+    "sims": 5000,
+    "c_puct": 1.5,
+    "seed_scheme": "SHA-256(json.dumps(state, sort_keys=True))[:8 bytes], big-endian, & 0x7FFFFFFFFFFFFFFF",
+    "n_frozen_records_total": 1800,
+    "n_non_drafting_excluded": 471,
+    "n_start_placement_adjacent_excluded": 19,
+    "n_pending_dome_choice_excluded": 125,
+    "n_labeled": 1185,
+    "n_root_candidates_mismatch": 0,
+    "n_errors": 0,
+    "total_elapsed_seconds": 968.5559663772583,
+    "immutable": true,
+    "notes": "Nur 'saubere' Phase::Drafting-Zustaende gelabelt -- siehe Docstring dieses Skripts fuer die genaue, empirisch verifizierte Scope-Einschraenkung (start-placement- und PendingDomeChoice-Zustaende ausgeschlossen, beide Kategorien im json_to_state-Doku-Kommentar in engine/src/serialize.rs dokumentiert)."
+  },
+  "elo_reference": {
+    "v14_best": 884,
+    "v14b_best": 961,
+    "v15_f2k_best": 987,
+    "v15_best": 1029,
+    "v16_best": 1132,
+    "v16": null
+  },
+  "per_model_aggregate": {
+    "v14_best": {
+      "overall": {
+        "n": 952,
+        "prior_recall_at_16": 0.9695378151260504,
+        "prior_mass_on_oracle_top3": 0.5686905684728301,
+        "value_pearson_r": 0.8097234877697593,
+        "value_spearman_r": 0.7777677113327812,
+        "kendall_tau_policy_vs_oracle_q": 0.22006276747544537,
+        "n_kendall_tau_states": 773
+      },
+      "by_round": {
+        "1": {
+          "n": 245,
+          "prior_recall_at_16": 0.963265306122449,
+          "prior_mass_on_oracle_top3": 0.5456018226335243,
+          "value_pearson_r": 0.7123080811494479,
+          "value_spearman_r": 0.7208879713420755,
+          "kendall_tau_policy_vs_oracle_q": 0.24415120574540863,
+          "n_kendall_tau_states": 207
+        },
+        "2": {
+          "n": 245,
+          "prior_recall_at_16": 0.9673469387755103,
+          "prior_mass_on_oracle_top3": 0.6001872171704866,
+          "value_pearson_r": 0.7763263272303007,
+          "value_spearman_r": 0.7507307281169167,
+          "kendall_tau_policy_vs_oracle_q": 0.2824647008320478,
+          "n_kendall_tau_states": 196
+        },
+        "3": {
+          "n": 231,
+          "prior_recall_at_16": 0.9826839826839827,
+          "prior_mass_on_oracle_top3": 0.6172360017960206,
+          "value_pearson_r": 0.8136655161132781,
+          "value_spearman_r": 0.7953756887789871,
+          "kendall_tau_policy_vs_oracle_q": 0.19926795736851602,
+          "n_kendall_tau_states": 179
+        },
+        "4": {
+          "n": 231,
+          "prior_recall_at_16": 0.9653679653679653,
+          "prior_mass_on_oracle_top3": 0.5112276624210856,
+          "value_pearson_r": 0.8452293990848286,
+          "value_spearman_r": 0.8288352576958274,
+          "kendall_tau_policy_vs_oracle_q": 0.14940928762918293,
+          "n_kendall_tau_states": 191
+        },
+        "5": {
+          "n": 0
+        }
+      }
+    },
+    "v14b_best": {
+      "overall": {
+        "n": 952,
+        "prior_recall_at_16": 0.9705882352941176,
+        "prior_mass_on_oracle_top3": 0.5848236132859245,
+        "value_pearson_r": 0.8133190003887487,
+        "value_spearman_r": 0.7888623508098843,
+        "kendall_tau_policy_vs_oracle_q": 0.21429830052081023,
+        "n_kendall_tau_states": 773
+      },
+      "by_round": {
+        "1": {
+          "n": 245,
+          "prior_recall_at_16": 0.9673469387755103,
+          "prior_mass_on_oracle_top3": 0.5675454663226799,
+          "value_pearson_r": 0.7252724357190342,
+          "value_spearman_r": 0.7266464842634376,
+          "kendall_tau_policy_vs_oracle_q": 0.25124003747192153,
+          "n_kendall_tau_states": 207
+        },
+        "2": {
+          "n": 245,
+          "prior_recall_at_16": 0.963265306122449,
+          "prior_mass_on_oracle_top3": 0.6180883854171452,
+          "value_pearson_r": 0.795244882764006,
+          "value_spearman_r": 0.7787782846045257,
+          "kendall_tau_policy_vs_oracle_q": 0.24893618286475433,
+          "n_kendall_tau_states": 196
+        },
+        "3": {
+          "n": 231,
+          "prior_recall_at_16": 0.9783549783549783,
+          "prior_mass_on_oracle_top3": 0.6305885667957011,
+          "value_pearson_r": 0.8007023188295204,
+          "value_spearman_r": 0.7880595416577426,
+          "kendall_tau_policy_vs_oracle_q": 0.19958623003315742,
+          "n_kendall_tau_states": 179
+        },
+        "4": {
+          "n": 231,
+          "prior_recall_at_16": 0.974025974025974,
+          "prior_mass_on_oracle_top3": 0.522103148234355,
+          "value_pearson_r": 0.8522022700273258,
+          "value_spearman_r": 0.8399092661461478,
+          "kendall_tau_policy_vs_oracle_q": 0.15250508653650016,
+          "n_kendall_tau_states": 191
+        },
+        "5": {
+          "n": 0
+        }
+      }
+    },
+    "v15_f2k_best": {
+      "overall": {
+        "n": 952,
+        "prior_recall_at_16": 0.9779411764705882,
+        "prior_mass_on_oracle_top3": 0.6022949047961875,
+        "value_pearson_r": 0.8328537050821022,
+        "value_spearman_r": 0.8058112709203298,
+        "kendall_tau_policy_vs_oracle_q": 0.2273135015049633,
+        "n_kendall_tau_states": 773
+      },
+      "by_round": {
+        "1": {
+          "n": 245,
+          "prior_recall_at_16": 0.9714285714285714,
+          "prior_mass_on_oracle_top3": 0.601814984332542,
+          "value_pearson_r": 0.744356132893548,
+          "value_spearman_r": 0.7383365021338404,
+          "kendall_tau_policy_vs_oracle_q": 0.2807205676770894,
+          "n_kendall_tau_states": 207
+        },
+        "2": {
+          "n": 245,
+          "prior_recall_at_16": 0.9795918367346939,
+          "prior_mass_on_oracle_top3": 0.6344701389040874,
+          "value_pearson_r": 0.8215860480343138,
+          "value_spearman_r": 0.801283568205371,
+          "kendall_tau_policy_vs_oracle_q": 0.25728911111564173,
+          "n_kendall_tau_states": 196
+        },
+        "3": {
+          "n": 231,
+          "prior_recall_at_16": 0.987012987012987,
+          "prior_mass_on_oracle_top3": 0.6423560885704441,
+          "value_pearson_r": 0.8238850083059166,
+          "value_spearman_r": 0.8074407601394108,
+          "kendall_tau_policy_vs_oracle_q": 0.20689363398860605,
+          "n_kendall_tau_states": 179
+        },
+        "4": {
+          "n": 231,
+          "prior_recall_at_16": 0.974025974025974,
+          "prior_mass_on_oracle_top3": 0.5286174792780246,
+          "value_pearson_r": 0.8652366869031188,
+          "value_spearman_r": 0.8544724391051228,
+          "kendall_tau_policy_vs_oracle_q": 0.1578091774426853,
+          "n_kendall_tau_states": 191
+        },
+        "5": {
+          "n": 0
+        }
+      }
+    },
+    "v15_best": {
+      "overall": {
+        "n": 952,
+        "prior_recall_at_16": 0.9821428571428571,
+        "prior_mass_on_oracle_top3": 0.6175119899088094,
+        "value_pearson_r": 0.8594418134059645,
+        "value_spearman_r": 0.8293072390309447,
+        "kendall_tau_policy_vs_oracle_q": 0.24450214870654713,
+        "n_kendall_tau_states": 773
+      },
+      "by_round": {
+        "1": {
+          "n": 245,
+          "prior_recall_at_16": 0.9877551020408163,
+          "prior_mass_on_oracle_top3": 0.6238047386918749,
+          "value_pearson_r": 0.7642718096656157,
+          "value_spearman_r": 0.7605292576846814,
+          "kendall_tau_policy_vs_oracle_q": 0.30047815844917297,
+          "n_kendall_tau_states": 207
+        },
+        "2": {
+          "n": 245,
+          "prior_recall_at_16": 0.9877551020408163,
+          "prior_mass_on_oracle_top3": 0.6485933252059075,
+          "value_pearson_r": 0.8616679814243509,
+          "value_spearman_r": 0.8342940374870462,
+          "kendall_tau_policy_vs_oracle_q": 0.27291396245477884,
+          "n_kendall_tau_states": 196
+        },
+        "3": {
+          "n": 231,
+          "prior_recall_at_16": 0.9826839826839827,
+          "prior_mass_on_oracle_top3": 0.6592586608805182,
+          "value_pearson_r": 0.8465923089634797,
+          "value_spearman_r": 0.8262115695399054,
+          "kendall_tau_policy_vs_oracle_q": 0.22156124446627237,
+          "n_kendall_tau_states": 179
+        },
+        "4": {
+          "n": 231,
+          "prior_recall_at_16": 0.9696969696969697,
+          "prior_mass_on_oracle_top3": 0.5361261388520787,
+          "value_pearson_r": 0.8886995590550397,
+          "value_spearman_r": 0.8752575011195701,
+          "kendall_tau_policy_vs_oracle_q": 0.1761810615213757,
+          "n_kendall_tau_states": 191
+        },
+        "5": {
+          "n": 0
+        }
+      }
+    },
+    "v16_best": {
+      "overall": {
+        "n": 952,
+        "prior_recall_at_16": 0.9989495798319328,
+        "prior_mass_on_oracle_top3": 0.6523585274792081,
+        "value_pearson_r": 0.8835365633167273,
+        "value_spearman_r": 0.8593824387130367,
+        "kendall_tau_policy_vs_oracle_q": 0.2790890437720968,
+        "n_kendall_tau_states": 773
+      },
+      "by_round": {
+        "1": {
+          "n": 245,
+          "prior_recall_at_16": 1.0,
+          "prior_mass_on_oracle_top3": 0.6784475428185293,
+          "value_pearson_r": 0.8099193324932299,
+          "value_spearman_r": 0.7998188479710159,
+          "kendall_tau_policy_vs_oracle_q": 0.3485741848060688,
+          "n_kendall_tau_states": 207
+        },
+        "2": {
+          "n": 245,
+          "prior_recall_at_16": 1.0,
+          "prior_mass_on_oracle_top3": 0.6799812360229541,
+          "value_pearson_r": 0.8886983007421445,
+          "value_spearman_r": 0.86465087434414,
+          "kendall_tau_policy_vs_oracle_q": 0.3129547889751972,
+          "n_kendall_tau_states": 196
+        },
+        "3": {
+          "n": 231,
+          "prior_recall_at_16": 1.0,
+          "prior_mass_on_oracle_top3": 0.6859031367031011,
+          "value_pearson_r": 0.8687726621649892,
+          "value_spearman_r": 0.8531971027473276,
+          "kendall_tau_policy_vs_oracle_q": 0.2441532706895836,
+          "n_kendall_tau_states": 179
+        },
+        "4": {
+          "n": 231,
+          "prior_recall_at_16": 0.9956709956709957,
+          "prior_mass_on_oracle_top3": 0.5618469383793346,
+          "value_pearson_r": 0.9112332996168825,
+          "value_spearman_r": 0.9026373177047841,
+          "kendall_tau_policy_vs_oracle_q": 0.20177173030576173,
+          "n_kendall_tau_states": 191
+        },
+        "5": {
+          "n": 0
+        }
+      }
+    },
+    "v16": {
+      "overall": {
+        "n": 952,
+        "prior_recall_at_16": 0.9968487394957983,
+        "prior_mass_on_oracle_top3": 0.6658838014837409,
+        "value_pearson_r": 0.8436657692861534,
+        "value_spearman_r": 0.8101234244132111,
+        "kendall_tau_policy_vs_oracle_q": 0.2883596423699917,
+        "n_kendall_tau_states": 773
+      },
+      "by_round": {
+        "1": {
+          "n": 245,
+          "prior_recall_at_16": 1.0,
+          "prior_mass_on_oracle_top3": 0.6957795490795861,
+          "value_pearson_r": 0.7366109020640277,
+          "value_spearman_r": 0.7158067385290783,
+          "kendall_tau_policy_vs_oracle_q": 0.3662156952012025,
+          "n_kendall_tau_states": 207
+        },
+        "2": {
+          "n": 245,
+          "prior_recall_at_16": 1.0,
+          "prior_mass_on_oracle_top3": 0.6982646290516975,
+          "value_pearson_r": 0.8215456357984007,
+          "value_spearman_r": 0.7975952476152398,
+          "kendall_tau_policy_vs_oracle_q": 0.31373399842787597,
+          "n_kendall_tau_states": 196
+        },
+        "3": {
+          "n": 231,
+          "prior_recall_at_16": 1.0,
+          "prior_mass_on_oracle_top3": 0.699525554182645,
+          "value_pearson_r": 0.8391089988267685,
+          "value_spearman_r": 0.8268687085028914,
+          "kendall_tau_policy_vs_oracle_q": 0.2566060568853865,
+          "n_kendall_tau_states": 179
+        },
+        "4": {
+          "n": 231,
+          "prior_recall_at_16": 0.987012987012987,
+          "prior_mass_on_oracle_top3": 0.5661911357323199,
+          "value_pearson_r": 0.8816288402975103,
+          "value_spearman_r": 0.8687844389493565,
+          "kendall_tau_policy_vs_oracle_q": 0.2077016061309255,
+          "n_kendall_tau_states": 191
+        },
+        "5": {
+          "n": 0
+        }
+      }
+    }
+  },
+  "elo_correlations": {
+    "prior_recall_at_16": {
+      "n": 5,
+      "models": [
+        "v14_best",
+        "v14b_best",
+        "v15_f2k_best",
+        "v15_best",
+        "v16_best"
+      ],
+      "spearman_r": 0.9999999999999999
+    },
+    "prior_mass_on_oracle_top3": {
+      "n": 5,
+      "models": [
+        "v14_best",
+        "v14b_best",
+        "v15_f2k_best",
+        "v15_best",
+        "v16_best"
+      ],
+      "spearman_r": 0.9999999999999999
+    },
+    "value_pearson_r": {
+      "n": 5,
+      "models": [
+        "v14_best",
+        "v14b_best",
+        "v15_f2k_best",
+        "v15_best",
+        "v16_best"
+      ],
+      "spearman_r": 0.9999999999999999
+    },
+    "value_spearman_r": {
+      "n": 5,
+      "models": [
+        "v14_best",
+        "v14b_best",
+        "v15_f2k_best",
+        "v15_best",
+        "v16_best"
+      ],
+      "spearman_r": 0.9999999999999999
+    },
+    "kendall_tau_policy_vs_oracle_q": {
+      "n": 5,
+      "models": [
+        "v14_best",
+        "v14b_best",
+        "v15_f2k_best",
+        "v15_best",
+        "v16_best"
+      ],
+      "spearman_r": 0.8999999999999998
+    }
+  },
+  "gating_retrospective": {
+    "prior_recall_at_16": {
+      "pairs": [
+        {
+          "winner": "v15_best",
+          "loser": "v14b_best",
+          "correct": true,
+          "prior_recall_at_16_winner": 0.9821428571428571,
+          "prior_recall_at_16_loser": 0.9705882352941176
+        },
+        {
+          "winner": "v16_best",
+          "loser": "v15_best",
+          "correct": true,
+          "prior_recall_at_16_winner": 0.9989495798319328,
+          "prior_recall_at_16_loser": 0.9821428571428571
+        },
+        {
+          "winner": "v15_best",
+          "loser": "v15_f2k_best",
+          "correct": true,
+          "prior_recall_at_16_winner": 0.9821428571428571,
+          "prior_recall_at_16_loser": 0.9779411764705882
+        }
+      ],
+      "n_correct": 3,
+      "n_evaluable": 3
+    },
+    "prior_mass_on_oracle_top3": {
+      "pairs": [
+        {
+          "winner": "v15_best",
+          "loser": "v14b_best",
+          "correct": true,
+          "prior_mass_on_oracle_top3_winner": 0.6175119899088094,
+          "prior_mass_on_oracle_top3_loser": 0.5848236132859245
+        },
+        {
+          "winner": "v16_best",
+          "loser": "v15_best",
+          "correct": true,
+          "prior_mass_on_oracle_top3_winner": 0.6523585274792081,
+          "prior_mass_on_oracle_top3_loser": 0.6175119899088094
+        },
+        {
+          "winner": "v15_best",
+          "loser": "v15_f2k_best",
+          "correct": true,
+          "prior_mass_on_oracle_top3_winner": 0.6175119899088094,
+          "prior_mass_on_oracle_top3_loser": 0.6022949047961875
+        }
+      ],
+      "n_correct": 3,
+      "n_evaluable": 3
+    },
+    "value_pearson_r": {
+      "pairs": [
+        {
+          "winner": "v15_best",
+          "loser": "v14b_best",
+          "correct": true,
+          "value_pearson_r_winner": 0.8594418134059645,
+          "value_pearson_r_loser": 0.8133190003887487
+        },
+        {
+          "winner": "v16_best",
+          "loser": "v15_best",
+          "correct": true,
+          "value_pearson_r_winner": 0.8835365633167273,
+          "value_pearson_r_loser": 0.8594418134059645
+        },
+        {
+          "winner": "v15_best",
+          "loser": "v15_f2k_best",
+          "correct": true,
+          "value_pearson_r_winner": 0.8594418134059645,
+          "value_pearson_r_loser": 0.8328537050821022
+        }
+      ],
+      "n_correct": 3,
+      "n_evaluable": 3
+    },
+    "value_spearman_r": {
+      "pairs": [
+        {
+          "winner": "v15_best",
+          "loser": "v14b_best",
+          "correct": true,
+          "value_spearman_r_winner": 0.8293072390309447,
+          "value_spearman_r_loser": 0.7888623508098843
+        },
+        {
+          "winner": "v16_best",
+          "loser": "v15_best",
+          "correct": true,
+          "value_spearman_r_winner": 0.8593824387130367,
+          "value_spearman_r_loser": 0.8293072390309447
+        },
+        {
+          "winner": "v15_best",
+          "loser": "v15_f2k_best",
+          "correct": true,
+          "value_spearman_r_winner": 0.8293072390309447,
+          "value_spearman_r_loser": 0.8058112709203298
+        }
+      ],
+      "n_correct": 3,
+      "n_evaluable": 3
+    },
+    "kendall_tau_policy_vs_oracle_q": {
+      "pairs": [
+        {
+          "winner": "v15_best",
+          "loser": "v14b_best",
+          "correct": true,
+          "kendall_tau_policy_vs_oracle_q_winner": 0.24450214870654713,
+          "kendall_tau_policy_vs_oracle_q_loser": 0.21429830052081023
+        },
+        {
+          "winner": "v16_best",
+          "loser": "v15_best",
+          "correct": true,
+          "kendall_tau_policy_vs_oracle_q_winner": 0.2790890437720968,
+          "kendall_tau_policy_vs_oracle_q_loser": 0.24450214870654713
+        },
+        {
+          "winner": "v15_best",
+          "loser": "v15_f2k_best",
+          "correct": true,
+          "kendall_tau_policy_vs_oracle_q_winner": 0.24450214870654713,
+          "kendall_tau_policy_vs_oracle_q_loser": 0.2273135015049633
+        }
+      ],
+      "n_correct": 3,
+      "n_evaluable": 3
+    }
+  }
+}
