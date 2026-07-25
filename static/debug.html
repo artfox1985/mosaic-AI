@@ -221,9 +221,19 @@ function renderValueBreakdown(vd) {
   if (!vd) { box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = 'grid';
   const item = (label, val, digits=3) => `<div class="vb-item"><div class="vb-num">${fmtNum(val, digits)}</div><div class="vb-label">${label}</div></div>`;
+  // Points-Head sagt die ENDDIFFERENZ voraus: tanh((eigene-gegner)/50).
+  // Ruecktransformation in Punkte: diff = 50 * atanh(p) (geklemmt, da atanh
+  // bei |p|->1 divergiert). Zwei absolute Punktzahlen gibt der Head nicht her.
+  let pointsDiffTxt = null;
+  if (vd.points_forecast != null) {
+    const p = Math.max(-0.999, Math.min(0.999, vd.points_forecast));
+    const diff = 50 * Math.atanh(p);
+    pointsDiffTxt = (diff >= 0 ? '+' : '') + diff.toFixed(1);
+  }
+  const itemTxt = (label, txt) => `<div class="vb-item"><div class="vb-num">${txt ?? '–'}</div><div class="vb-label">${label}</div></div>`;
   box.innerHTML =
     item('Roh-Value (tanh)', vd.raw_value) +
-    item('Points-Forecast', vd.points_forecast) +
+    itemTxt('Prognose Δ-Endpunkte (KI−Gegner)', pointsDiffTxt) +
     item('Win% (Ego)', vd.win_prob != null ? vd.win_prob * 100 : null, 1) +
     item('Blended Utility', vd.blended_utility) +
     item('Floor-Shaping +/-', vd.floor_shift) +
@@ -386,7 +396,7 @@ function showIdx(i) {
   document.getElementById('navInfo').textContent = `${IDX+1} / ${HISTORY.length}`;
   const chosen = (d.moves||[]).find(m => m.chosen);
   const valStr = (d.value != null)
-    ? `Value ${d.value.toFixed(3)} (Win ${d.win_pct}%)`
+    ? `Value ${d.value.toFixed(3)} (Win ${Number(d.win_pct).toFixed(2)}%)`
     : (chosen && chosen.mcts_win_pct != null ? `Win ${chosen.mcts_win_pct.toFixed(0)}%` : 'Heuristik');
   setStatus(`KI-Zug ${d.move_idx} (Runde ${d.round ?? '?'}): ${chosen ? chosen.description : 'Aktion '+d.ai_action} — ${valStr}`);
 }
