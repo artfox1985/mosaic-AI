@@ -45,3 +45,6 @@ Desktop.ini
 *.whl
 *.pyd
 *.xlsx
+
+# Konsolen-Mitschnitte der Hintergrundlaeufe (Ergebnisse liegen strukturiert in evaluations/)
+logs/
