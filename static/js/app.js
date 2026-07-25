@@ -66,8 +66,8 @@ async function startNewGame() {
 
   const playerName = document.getElementById('ng-name').value.trim() || 'Spieler 1';
   const aiEnabled  = document.getElementById('ng-ai-toggle').checked;
-  const model      = document.getElementById('ng-model').value.trim() || 'v2';
-  const sims       = parseInt(document.getElementById('ng-sims').value) || 40;
+  const model      = document.getElementById('ng-model').value.trim() || 'v16_best';
+  const sims       = parseInt(document.getElementById('ng-sims').value) || 400;
   const seedRaw    = document.getElementById('ng-seed').value.trim();
   const seed       = seedRaw === '' ? null : parseInt(seedRaw);
 
