@@ -87,11 +87,14 @@ _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
 
 # Difficulty Presets — Format: {"model": "<version>", "sims": <int>}
 DIFFICULTY_PRESETS = {
-    "easy":   None,
-    "medium": None,
-    "hard":   None,
-    "expert": None,
-    "_default": {"model": "v2", "sims": 40},
+    # Stand 2026-07-25 (Rebuild-Linie): expert = Arena-Staerke des amtierenden
+    # Referenz-Netzes v16_best (Elo ~1094); darunter dasselbe Netz mit weniger
+    # Sims; easy = Heuristik.
+    "easy":   {"model": "heuristic",  "sims": 60},
+    "medium": {"model": "v16_best",   "sims": 60},
+    "hard":   {"model": "v16_best",   "sims": 150},
+    "expert": {"model": "v16_best",   "sims": 400},
+    "_default": {"model": "v16_best", "sims": 400},
 }
 
 def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) -> dict:
