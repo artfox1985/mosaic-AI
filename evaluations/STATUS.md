@@ -3931,3 +3931,75 @@ Verwendung von Offline-Metriken als alleinigem Staerke-Praediktor (s.
 **data/-Integritaetsnachweis**: 100 v12 + 200 v14b + 600 v15 = 900 Dateien
 (vom Nutzer vorbereitet, unveraendert bestaetigt, `data/` nicht umgebaut).
 
+## Task #89: Oracle-Metriken (2026-07-25) -- BLOCKIERT (fehlender Such-Einstieg)
+
+**Ziel**: Tiefe Suche (v16_best, ~5000 Sims, deterministisch) je der 1800
+Zustaende aus `evaluations/frozen_eval_set.pkl` als "Oracle"-Referenz (beste
+Aktion, volles Q-/Besuchs-Ranking der Wurzelkandidaten, Root-Value), dann
+Offline-Metriken der 6 Kandidaten-Netze (v14_best, v14b_best, v15_f2k_best,
+v15_best, v16_best, v16 Epoche 15) gegen dieses Oracle vergleichen und
+Spearman-Rangkorrelation mit der bekannten Elo-Reihenfolge bilden --
+Hypothese aus `project_hybrid_head_attribution`: wertseitige Metriken gegen
+eine TIEFE-SUCHE-Referenz (statt reine Val-R²/Top-1) sollten Staerke
+vorhersagen, wo klassische Offline-Metriken (siehe `v16-Zyklus` oben)
+nachweislich versagen.
+
+**Befund vor Schritt 1 (Pruefung der PyO3-Bindings, `engine/src/lib.rs` +
+`engine/src/py.rs` + `engine/src/net_mcts.rs` + `engine/src/state.rs`
+durchsucht)**: es gibt KEINEN Such-Einstieg, der einen EXTERN gespeicherten
+Zustand (wie die JSON-Zustandsdicts in `frozen_eval_set.pkl`s
+`records[i]["state"]`) in die Rust-Engine laedt und dort eine
+konfigurierbare Netz-Suche darauf faehrt. Konkret:
+
+1. `GameState` (`engine/src/state.rs:46`) leitet nur `#[derive(Debug, Clone)]`
+   ab -- KEIN `Deserialize`. `serialize::state_to_json` (`engine/src/
+   serialize.rs:198`) ist eine EINBAHNSTRASSE (`GameState` → JSON fuers
+   Frontend); es existiert keine Umkehrfunktion, die ein JSON-Zustandsdict
+   zurueck in einen `GameState` baut.
+2. `PyGame::new` (`engine/src/py.rs:69`, einziger Konstruktor) startet IMMER
+   eine frische Partie ueber `Game::start(...)` (Namen/Startspieler/Seed/
+   Wertungsplatten) -- es gibt keinen Konstruktor/Setter, der einen
+   bestehenden Zustand injiziert. Ein gespeicherter Zustand aus dem frozen
+   Set liesse sich also nur erreichen, indem man dieselbe Partie Zug fuer
+   Zug von Neuem nachspielt -- fuer 1800 beliebige, aus verschiedenen
+   Korpora gezogene Zwischenzustaende praktisch nicht rekonstruierbar (die
+   exakte Zugfolge dorthin ist in den Pickle-Records nicht vollstaendig
+   mitgefuehrt).
+3. Alle `#[pyfunction]`-Eintraege in `lib.rs`, die eine Netz-Suche fahren
+   (`net_arena_match`, `net_vs_net_arena_match`, `net_self_play_games`,
+   `sibling_ranking_diagnostic`, `draw_stack_peek_impact_diagnostic`, ...)
+   spielen entweder komplette Partien von Grund auf (`Game::start`) oder
+   erzeugen ihre Zustaende SELBST durch einen internen Self-Play-Walk
+   (z.B. `self_play::sibling_ranking_diagnostic`, `engine/src/self_play.rs:
+   2866` -- vergleicht Netz-Value gegen den DFS-Solver an selbst erzeugten
+   Geschwister-Zustaenden, nicht gegen extern vorgegebene). Keine dieser
+   Funktionen nimmt einen beliebigen Zustand als Parameter entgegen.
+4. `PyGame::ai_debug_net_json`/`ai_step_net_json` (`py.rs:405-431`) rufen
+   zwar genau die richtige Maschinerie auf (`net_mcts::net_search_with_tree`,
+   konfigurierbare `simulations`, volle Wurzel-Analyse inkl. Q/Besuche je
+   Kandidat) -- aber NUR auf `self.game.state`, dem intern gefuehrten
+   Zustand der jeweiligen `PyGame`-Instanz, nicht auf einen von aussen
+   uebergebenen Zustand.
+
+**Es fehlen daher zwei neue Bausteine, um Schritt 1 auszufuehren** (beide
+sind Rust-Aenderungen -- laut Auftrag NICHT eigenmaechtig umzusetzen,
+Ruecksprache noetig):
+  - ein `json_to_state`-Deserializer (Umkehrung von `state_to_json`), der
+    ein `frozen_eval_set.pkl`-Zustandsdict in einen `GameState` baut, und
+  - eine neue PyO3-Funktion (z.B. `analyze_state_json(model_path, state_json,
+    sims, c_puct, deterministic)`), die daraus einen `GameState` baut und
+    `net_mcts::net_search_with_tree`/`net_root_child_stats_and_policy`
+    darauf aufruft, um Root-Value + volles Q-/Besuchs-Ranking der
+    Wurzelkandidaten zurueckzugeben.
+
+**Status**: Schritte 2-4 (Metriken je Netz, Rangkorrelation mit Elo,
+Gating-Rueckblick, Ergebnis-Tabellen) haengen vollstaendig von den in
+Schritt 1 erzeugten Oracle-Labels ab und wurden NICHT ausgefuehrt --
+jede Metrik gegen eine "Oracle"-Referenz waere ohne echte Tiefensuche auf
+den frozen-Set-Zustaenden nur eine Notloesung (z.B. DFS-Solver oder erneut
+klassische Offline-Metriken), die exakt die bereits widerlegte
+Fragestellung reproduzieren wuerde. Kein Code in `engine/` geaendert, kein
+Wheel neu gebaut, `evaluations/frozen_eval_set.pkl`/`data/` nur gelesen.
+Aufgabe pausiert bis zur Entscheidung, ob der fehlende Such-Einstieg
+ergaenzt werden soll.
+
