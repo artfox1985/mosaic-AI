@@ -3719,3 +3719,101 @@ entfernt.
   [`archive/STAGE2_TODO_ARCHIVED.md`](../archive/STAGE2_TODO_ARCHIVED.md)
 - Stufe-2-Ursachenforschung (0:0-Rate, Disagreement-Studie):
   [`archive/stage2_investigation.md`](../archive/stage2_investigation.md)
+
+## Wertungsplatten-Shaping A/B (Task #93, 2026-07-25)
+
+**Idee**: Analog zum validierten Floor-Shaping (`FLOOR_SHAPING_WEIGHT=0.3`,
+exakte Bodenstrafe additiv auf den Blattwert nach `blended_leaf_win_prob`,
+gepaart validiert +14pp) ein zweites exaktes Zustandssignal fuer die
+Wertungsplatten ergaenzen. Kontext: Der Value-Head traegt die Suchstaerke
+(#88), exakte Zusatzinformation am Blatt ist ein heisser Kandidat -- ABER
+das konzeptionell aehnliche Value-Shrinkage (#78) wurde im A/B klar
+widerlegt, Shaping-Ideen sind NICHT automatisch gut.
+
+**Heuristik-Befund**: `engine/src/scoring.rs` enthaelt bereits
+`wertung_progress(player, tile_ids)` -- eine stetige Ersatzformel fuer die
+8 Wertungsplatten, seit langem von der DFS-Heuristik-Blattbewertung
+(`mcts.rs::player_total`) genutzt. Die "Alles-oder-nichts"-Platten
+(Horizontale/Vertikale/Diagonale Reihen, Mehrfarbige Felder, Eckplatten,
+Farbenreiche Reihen) bekommen bei Teilfuellung einen quadratisch skalierten
+Teil-Bonus (`(fill/max)² × Punktwert`) statt hartem 0 -- bei voller Fuellung
+faellt die Formel exakt auf den echten `calculate_end_scoring`-Punktwert
+zurueck (keine Doppelzaehlung). Die additiven Platten (Aeussere Felder,
+Spezialfelder) bleiben unveraendert linear. Reine Zustandsfunktion, kein
+Netz-Forward-Pass -- exakt das Analogon zur exakten Floor-Straf-Korrektur,
+keine Neuentwicklung noetig.
+
+**Signal-Definition**: `plate_shaping_delta(state) = (wertung_progress(P0)
+− wertung_progress(P1)) / PLATE_SHAPING_SCALE` (Skala 50.0, gleiche
+Groessenordnung wie `FLOOR_SHAPING_SCALE`/`VALUE_SCALE`). Angewendet als
+`plate_shift = PLATE_SHAPING_WEIGHT · tanh(plate_shaping_delta)`,
+`value[0] += plate_shift`, `value[1] -= plate_shift` (beide auf `[0,1]`
+geklemmt) -- NACH dem Floor-Shaping-Additiv in `net_mcts.rs::make_node`,
+koexistiert additiv damit. `PLATE_SHAPING_WEIGHT=0.3` (Startwert analog
+Floor). `PLATE_SHAPING_ENABLED` (Compile-Konstante) schaltet den ganzen
+Block ein/aus -- bei `false` (Standard) wird `apply_plate_shaping` gar nicht
+wirksam ausgefuehrt, garantiert byte-identisches Bestandsverhalten.
+
+**Implementierung + Paritaetstest**: eigener Worktree
+`mosaic-AI-worktree-plate-shaping`, Branch `worktree-plate-shaping`. 3 neue
+Tests: (1) `plate_shaping_delta_matches_wertung_progress_difference` --
+Formel-Test gegen `wertung_progress` direkt, (2)
+`plate_shaping_disabled_is_exact_identity` -- Kern-Paritaetstest,
+`apply_plate_shaping` muss bei `ENABLED=false` die Eingabe ueber mehrere
+reale Stellungen UND synthetische Extremwerte unveraendert zurueckgeben,
+(3) `plate_shaping_disabled_search_matches_pre_task93_tree` --
+End-zu-Ende-Determinismus-Nachweis auf Baum-Ebene (uebersprungen statt
+fehlzuschlagen, wenn der Mess-Wheel-Arm aktiv ist, damit `cargo test
+--release` in BEIDEN Toggle-Zustaenden gruen bleibt). `cargo test --release`:
+**156/156 gruen** (153 Basis + 3 neu), in BEIDEN Toggle-Zustaenden
+(ENABLED=false UND ENABLED=true) verifiziert.
+
+**A/B-Design**: `tools/paired_arena_plate_ab.py` +
+`paired_arena_plate_arm_worker.py` (Muster von
+`paired_arena_shrink_ab.py`/`_arm_worker.py` kopiert). Referenz-Champion
+`v15_best` (Elo 1029, Brett 0) vs. Vor-Referenz `v14b_best` (Elo 961, Brett
+1), beide @400 Sims, 100 seed-gepaarte Spiele je Arm (identischer
+Basis-Seed 9315), sequenziell EIN venv (Arm OFF → Toggle-Flip + Rebuild →
+Arm ON, kein Worktree/Zweit-venv noetig, da die Arme nie gleichzeitig
+laufen muessen).
+
+**A/B-Ergebnis** (2026-07-25):
+
+| Arm | Champion:Gegner | Ø-Score Champion:Gegner | Ø-Floor Champion:Gegner |
+|---|---:|---:|---:|
+| OFF (Ist-Zustand) | 58:42 | 35.3 : 31.0 | 14.2 : 17.4 |
+| ON (`PLATE_SHAPING_ENABLED=true`) | 61:39 | 35.9 : 29.2 | 13.7 : 17.8 |
+
+Diskordante Paare (gleicher Seed, unterschiedliches Ergebnis):
+b(ON-only-Sieg)=16, c(OFF-only-Sieg)=13, konkordant(beide gewinnen)=45,
+konkordant(beide verlieren)=26. Exakter zweiseitiger McNemar-Test:
+**p=0.7111**.
+
+**Empfehlung**: **GEGEN Merge / Toggle bleibt AUS.** ON liegt zwar
+numerisch leicht vorn (61:39 vs. 58:42, etwas hoeherer Ø-Score, etwas
+niedrigerer Ø-Floor), aber die Diskordanz (16 vs. 13 von 100 Paaren) ist
+klein und weit von Signifikanz entfernt (p=0.7111, Evidenzregel verlangt
+p<0.05 UND Vorteil fuer ON). Analog zum Value-Shrinkage-Praezedenzfall
+(#78, p=0.117, ebenfalls verworfen): eine plausible, heuristisch gut
+begruendete Shaping-Idee bestaetigt sich im A/B NICHT automatisch. Moegliche
+Erklaerung: der Value-Head lernt den Wertungsplatten-Fortschritt (anders
+als die eskalierende, stark nichtlineare Floor-Strafskala) vermutlich schon
+recht gut selbst aus den Input-Features (`features.rs` enthaelt die
+Wertungsplatten-Auswahl + Board-Zustand direkt) -- der exakte Zusatz-Nudge
+bringt dann wenig zusaetzliche Information gegenueber dem, was das Netz
+ohnehin schon sieht (im Unterschied zur Floor-Strafe, deren NICHTLINEARE
+Eskalationsformel das Netz laut Rundenabhaengigkeits-Befund nachweislich
+schwerer selbst lernt).
+
+**Konstanten-Endzustand**: `PLATE_SHAPING_WEIGHT=0.3` (unveraendert, reine
+Dokumentation, kein neuer Beleg fuer eine Rekalibrierung),
+`PLATE_SHAPING_ENABLED=false` (Standard, byte-identisches
+Bestandsverhalten). Code + Tests + A/B-Ergebnis bleiben im Worktree
+dokumentiert, Merge-Entscheid liegt beim Nutzer.
+
+**Repo-/Wheel-Endzustand**: Branch `worktree-plate-shaping` (eigener `git
+worktree`), main unberuehrt. Nach der Mess-Phase: Produktions-Wheel
+(main-Stand, `PLATE_SHAPING_ENABLED` existiert dort gar nicht) neu
+gebaut/installiert, Smoke-Test (`import mosaic_rust`) verifiziert. Worktree
+bleibt bestehen (nicht geloescht).
+
