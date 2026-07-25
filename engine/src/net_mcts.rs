@@ -2076,6 +2076,14 @@ fn net_search_with_tree_from_nodes(state: &GameState, sims: u32, nodes: &[Node])
                 Some(a) => label_search_move(&SearchMove::Draft(a.clone()), Some(state)),
                 None => ("?", "?".to_string(), "pass", Value::Null),
             };
+            // Task #89: `action_to_env_dict`-Schema (self_play.rs) -- NICHT
+            // dasselbe wie `label_search_move`s `serialize::action_to_dict`
+            // (unterschiedliche Feldnamen, z.B. `display_index` vs. `tile_id`)!
+            // Nur `action_to_env_dict` passt zu `neural_net.py::action_to_id`
+            // und damit zur festen NUM_ACTIONS-Indizierung eines Kandidaten-
+            // Netzes (Oracle-Metriken, tools/oracle_metrics.py). Rein additiv,
+            // bisherige Konsumenten (Debug-UI) ignorieren das neue Feld.
+            let env_action = node.action.as_ref().map(|a| action_to_env_dict(state, a));
             let is_chosen = best == Some(cid);
             if is_chosen {
                 chosen_id = Some(i);
@@ -2085,6 +2093,7 @@ fn net_search_with_tree_from_nodes(state: &GameState, sims: u32, nodes: &[Node])
                 "type": typ,
                 "description": desc,
                 "category": cat,
+                "action": env_action,
                 "net_prob": node.prior,
                 "net_prob_norm": node.prior as f64 / prior_sum,
                 "mcts_visits": node.visits,
