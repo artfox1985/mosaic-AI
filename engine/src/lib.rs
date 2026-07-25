@@ -493,6 +493,78 @@ fn engine_config_json() -> String {
     .to_string()
 }
 
+/// Task #89 (Oracle-Metriken): Netz-Suche auf einem EXTERN gespeicherten
+/// Zustand statt `PyGame::state` -- der bisher fehlende Such-Einstieg (siehe
+/// `evaluations/STATUS.md`, "Task #89 ... BLOCKIERT", Commit `373acc1`).
+/// `state_json` ist ein `state_to_json`-Zustandsdict, wie es in Self-Play-
+/// Records und `evaluations/frozen_eval_set.pkl`s `records[i]["state"]`
+/// steht (Python: `json.dumps(record["state"])`). Baut den `GameState` per
+/// `serialize::json_to_state` (siehe dortiger Doku-Kommentar für die
+/// Rekonstruktions-Details/Näherungen), lädt das Netz und ruft dieselbe
+/// Maschinerie wie `PyGame::ai_debug_net_json` (`py.rs`) auf --
+/// `net_search_with_tree` mit `add_root_noise=false` (deterministische
+/// Analyse, keine Self-Play-Exploration). Gibt dasselbe Analyse-Dict zurück
+/// (`moves` = Wurzelkandidaten mit `action_id`/`mcts_visits`/`mcts_q`/
+/// `net_prob`(_norm), `ai_action` = Index der besten Aktion in `moves`),
+/// ergänzt um ein explizites Top-Level-Feld `root_value` (= Root-Q, gleiche
+/// Zahl wie `tree.win_pct/100`, hier nur bequemer benannt). Gibt für
+/// Nicht-Drafting-Zustände (z.B. Phase::Tiling) `moves: []`/`ai_action: null`
+/// zurück (identisches Verhalten zu `net_search_with_tree` selbst) --
+/// Aufrufer sollte vorab auf `state["phase"] == "drafting"` filtern.
+/// `seed` steuert sowohl die Rekonstruktions-Neumischung der verdeckten
+/// Sammlungen (`json_to_state`) als auch die anschließende
+/// `DETERMINIZE_ROOT_HIDDEN_INFO`-Mischung der Suche selbst (derselbe
+/// RNG-Strom, analog zum Determinisierungs-Muster in `net_mcts.rs`) -- fest
+/// pro Zustand (z.B. hash-abgeleitet) macht die Oracle-Erzeugung
+/// reproduzierbar.
+#[pyfunction]
+#[pyo3(signature = (state_json, model_path, sims=500, c_puct=1.5, seed=None))]
+fn net_search_state_json(
+    state_json: String,
+    model_path: String,
+    sims: u32,
+    c_puct: f64,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let seed = seed.unwrap_or_else(rand::random);
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+
+    let net = crate::net::Net::load(&model_path, crate::features::INPUT_SIZE)
+        .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+
+    let (_chosen, analysis) =
+        crate::net_mcts::net_search_with_tree(&net, &state, sims, c_puct, false, &mut rng, None);
+
+    // Nicht-Drafting-Zustände: `net_search_with_tree` liefert `Value::Null`
+    // (kein Baum gebaut) -- durch ein leeres, aber strukturgleiches Dict
+    // ersetzen, damit Aufrufer nicht zwischen "null" und "leere moves-Liste"
+    // unterscheiden müssen.
+    let mut analysis = if analysis.is_null() {
+        json!({ "has_net": true, "simulations": sims, "moves": [], "ai_action": serde_json::Value::Null })
+    } else {
+        analysis
+    };
+    if let Some(obj) = analysis.as_object_mut() {
+        let root_value = obj
+            .get("tree")
+            .and_then(|t| t.get("win_pct"))
+            .and_then(|w| w.as_f64())
+            .map(|w| w / 100.0);
+        obj.insert("root_value".to_string(), json!(root_value));
+        obj.insert("phase".to_string(), json!(state.phase.as_str()));
+        obj.insert("round".to_string(), json!(state.round_number));
+    }
+    Ok(analysis.to_string())
+}
+
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
@@ -536,6 +608,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(profiling_reset, m)?)?;
     m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
+    m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
