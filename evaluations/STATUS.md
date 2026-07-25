@@ -3816,4 +3816,6 @@ worktree`), main unberuehrt. Nach der Mess-Phase: Produktions-Wheel
 (main-Stand, `PLATE_SHAPING_ENABLED` existiert dort gar nicht) neu
 gebaut/installiert, Smoke-Test (`import mosaic_rust`) verifiziert. Worktree
 bleibt bestehen (nicht geloescht).
+*(Nachtrag 25.07.: nach Nutzer-Go aufgeraeumt — Worktree + Branch entfernt;
+Doku + Ergebnis-JSONs zuvor nach main uebernommen.)*
 
