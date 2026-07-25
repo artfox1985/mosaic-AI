@@ -541,7 +541,7 @@ fn net_search_state_json(
         .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
 
     let (_chosen, analysis) =
-        crate::net_mcts::net_search_with_tree(&net, &state, sims, c_puct, false, &mut rng, None);
+        crate::net_mcts::net_search_with_tree(&net, &state, sims, c_puct, false, &mut rng, None, false);
 
     // Nicht-Drafting-Zustände: `net_search_with_tree` liefert `Value::Null`
     // (kein Baum gebaut) -- durch ein leeres, aber strukturgleiches Dict

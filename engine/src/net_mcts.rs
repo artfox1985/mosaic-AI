@@ -405,7 +405,7 @@ fn build_determinized_forest<R: Rng + ?Sized>(
     split_sims_across_worlds(sims, n)
         .into_iter()
         .map(|world_sims| {
-            build_net_tree(net_policy, net_value, state, world_sims, c_puct, add_root_noise, rng, None)
+            build_net_tree(net_policy, net_value, state, world_sims, c_puct, add_root_noise, rng, None, None)
         })
         .collect()
 }
@@ -1381,6 +1381,205 @@ fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
     }
 }
 
+// ── Task #95: Debug-Trace (Value-Head-Einschätzung + granularer Gumbel-Trace) ──
+//
+// Beide unten definierten Strukturen fassen AUSSCHLIESSLICH bereits an anderer
+// Stelle berechnete Zwischenwerte zusammen -- kein zusätzlicher Netz-Aufruf im
+// Suchpfad selbst (`RootValueDebug` nutzt zwar EINEN eigenen `Net::eval`-aufruf,
+// aber NUR wenn explizit angefordert, siehe `compute_root_value_debug`, und
+// komplett losgelöst von `nodes`/RNG der eigentlichen Suche). Alle
+// Trace-Sammelstellen in `build_gumbel_tree` sind reine Lesezugriffe auf
+// bereits vorhandene lokale Werte (kein Effekt auf Auswahl/Backprop/RNG-Strom)
+// -- siehe Paritätstest `gumbel_trace_collection_does_not_change_search`.
+
+/// Root-Value-Debug-Breakdown (Anforderung 1, Task #95): rohe Value-/
+/// Points-Kopf-Ausgaben + alle Blend-/Shaping-Zwischenschritte für die
+/// ROOT-Position, aus Sicht des tatsächlich ziehenden Spielers (Ego). Nur
+/// über `compute_root_value_debug` befüllt, ausschließlich vom Debug-Pfad
+/// (`ai_debug_net_json`) angefordert.
+#[derive(Clone, Debug)]
+pub struct RootValueDebug {
+    /// Roher `value_head`-Tanh-Output (Ego-Perspektive, VOR jeder Blend-/
+    /// Shrink-/Floor-Korrektur).
+    pub raw_value: f32,
+    /// Roher `points_head`-Output, falls das Netz einen hat (ältere
+    /// Checkpoints ohne Punktekopf → `None`).
+    pub points_forecast: Option<f32>,
+    /// `value_to_win_prob(raw_value)` -- reine Sieg-Wahrscheinlichkeit ohne
+    /// Points-Blend.
+    pub win_prob: f64,
+    /// `blended_leaf_win_prob` (KataGo-Blend) NACH der Value-Shrinkage (Task
+    /// #78, aktuell `VALUE_SHRINK_ENABLED=false` ⇒ Identität) -- exakt die
+    /// Größe, die tatsächlich als Blattwert in die Suche einfließt, NUR noch
+    /// ohne das Floor-Shaping-Additiv (separat ausgewiesen).
+    pub blended_utility: f64,
+    /// Floor-Shaping-Additiv (`FLOOR_SHAPING_WEIGHT · tanh(floor_shaping_delta)`),
+    /// bereits auf Ego-Perspektive gedreht (positiv = Vorteil für den
+    /// ziehenden Spieler). 0.0, wenn `FLOOR_SHAPING_WEIGHT=0` (Feature aus).
+    pub floor_shift: f64,
+    /// `(blended_utility + floor_shift)`, geklammert auf [0,1] -- identisch
+    /// zum tatsächlichen `leaf_value[ego]` der Wurzel.
+    pub final_value: f64,
+}
+
+impl RootValueDebug {
+    fn to_json(&self) -> Value {
+        json!({
+            "raw_value": self.raw_value,
+            "points_forecast": self.points_forecast,
+            "win_prob": self.win_prob,
+            "blended_utility": self.blended_utility,
+            "floor_shift": self.floor_shift,
+            "final_value": self.final_value,
+        })
+    }
+}
+
+/// Rechnet den Netz-Value-/Points-Blattwert für `state` (Ego-Perspektive,
+/// EIN Batch=1-Forward-Pass) separat vom Suchpfad aus -- NUR für die
+/// Debug-Anzeige (Anforderung 1). Liest/schreibt weder `nodes` noch den
+/// RNG-Strom der Suche; `state` muss die bereits (falls
+/// `DETERMINIZE_ROOT_HIDDEN_INFO`) determinisierte Wurzelposition sein
+/// (`nodes[0].state`) -- KEINE zweite Determinisierung hier.
+fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &GameState) -> RootValueDebug {
+    let net = net_value.unwrap_or(net_policy);
+    let feats = state_to_features_direct(state);
+    let (_logits, value, _moon, points) = net
+        .eval(&feats)
+        .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()));
+    let raw_value = value.first().copied().unwrap_or(0.0);
+    let win_prob = value_to_win_prob(&value);
+    let blended_raw = blended_leaf_win_prob(&value, &points);
+    let blended_utility = if VALUE_SHRINK_ENABLED {
+        0.5 + value_shrink_weight(state.round_number) * (blended_raw - 0.5)
+    } else {
+        blended_raw
+    };
+    let points_forecast = points.first().copied();
+    let floor_raw = FLOOR_SHAPING_WEIGHT * floor_shaping_delta(state).tanh();
+    // `floor_shaping_delta` ist absolut Spieler0-minus-Spieler1 -- auf
+    // Ego-Perspektive (der an der Wurzel ziehende Spieler) drehen.
+    let floor_shift = if state.current_player == 0 { floor_raw } else { -floor_raw };
+    let final_value = (blended_utility + floor_shift).clamp(0.0, 1.0);
+    RootValueDebug { raw_value, points_forecast, win_prob, blended_utility, floor_shift, final_value }
+}
+
+/// Ein Wurzel-Kandidat in der Gumbel-Top-m-Auswahlphase (Anforderung 2b).
+#[derive(Clone, Debug)]
+pub struct GumbelTraceCandidate {
+    pub description: String,
+    pub prior: f64,
+    pub ln_prior: f64,
+    pub gumbel_g: f64,
+    pub score: f64,
+    pub selected_top_m: bool,
+}
+
+impl GumbelTraceCandidate {
+    fn to_json(&self) -> Value {
+        json!({
+            "description": self.description,
+            "prior": self.prior,
+            "ln_prior": self.ln_prior,
+            "gumbel_g": self.gumbel_g,
+            "score": self.score,
+            "selected_top_m": self.selected_top_m,
+        })
+    }
+}
+
+/// Ein Kandidat innerhalb EINER Sequential-Halving-Phase (Anforderung 2c).
+#[derive(Clone, Debug)]
+pub struct GumbelPhaseCandidate {
+    pub description: String,
+    pub visits: u32,
+    pub q: f64,
+    pub sigma_q: f64,
+    pub score: f64,
+    pub eliminated: bool,
+}
+
+impl GumbelPhaseCandidate {
+    fn to_json(&self) -> Value {
+        json!({
+            "description": self.description,
+            "visits": self.visits,
+            "q": self.q,
+            "sigma_q": self.sigma_q,
+            "score": self.score,
+            "eliminated": self.eliminated,
+        })
+    }
+}
+
+/// Eine Sequential-Halving-Phase (Anforderung 2c).
+#[derive(Clone, Debug)]
+pub struct GumbelPhase {
+    pub phase: u32,
+    pub sims_per_survivor: u32,
+    pub candidates: Vec<GumbelPhaseCandidate>,
+}
+
+impl GumbelPhase {
+    fn to_json(&self) -> Value {
+        json!({
+            "phase": self.phase,
+            "sims_per_survivor": self.sims_per_survivor,
+            "candidates": self.candidates.iter().map(|c| c.to_json()).collect::<Vec<_>>(),
+        })
+    }
+}
+
+/// Ein Finalist der letzten Max-Visit-Menge (Anforderung 2d).
+#[derive(Clone, Debug)]
+pub struct GumbelFinalist {
+    pub description: String,
+    pub visits: u32,
+    pub ln_prior: f64,
+    pub sigma_q: f64,
+    pub score: f64,
+}
+
+impl GumbelFinalist {
+    fn to_json(&self) -> Value {
+        json!({
+            "description": self.description,
+            "visits": self.visits,
+            "ln_prior": self.ln_prior,
+            "sigma_q": self.sigma_q,
+            "score": self.score,
+        })
+    }
+}
+
+/// Granularer Gumbel-Such-Trace (Task #95, Anforderung 2) -- ersetzt den
+/// bisherigen Platzhalter-Log-Eintrag „GUMBEL-SUCHE (kein granularer
+/// Sim-Trace)" durch eine strukturierte Aufzeichnung von Top-m-Auswahl,
+/// jeder Sequential-Halving-Phase und der finalen Wurzel-Zugwahl. Nur
+/// befüllt, wenn `collect_trace=true` an `build_gumbel_tree`/`build_net_tree`
+/// durchgereicht wird (siehe dortige Parameter) -- Self-Play/Arena rufen
+/// IMMER mit `None`, byte-identisch zum Vor-Task-#95-Verhalten (Paritätstest
+/// siehe Testmodul).
+#[derive(Clone, Debug, Default)]
+pub struct GumbelTrace {
+    pub determinize_active: bool,
+    pub root_value: Option<RootValueDebug>,
+    pub top_m: Vec<GumbelTraceCandidate>,
+    pub phases: Vec<GumbelPhase>,
+    pub finalists: Vec<GumbelFinalist>,
+}
+
+impl GumbelTrace {
+    pub fn to_json(&self) -> Value {
+        json!({
+            "determinize_active": self.determinize_active,
+            "top_m_selection": self.top_m.iter().map(|c| c.to_json()).collect::<Vec<_>>(),
+            "phases": self.phases.iter().map(|p| p.to_json()).collect::<Vec<_>>(),
+            "final_selection": self.finalists.iter().map(|f| f.to_json()).collect::<Vec<_>>(),
+        })
+    }
+}
+
 /// Gumbel-AlphaZero-Baumaufbau (siehe Modul-Kommentar "Gumbel AlphaZero" für
 /// die volle Herleitung) -- Ersatz für `build_net_tree`, wenn
 /// `USE_GUMBEL_SEARCH=true`. Wurzel: Gumbel-Top-m + Sequential Halving statt
@@ -1395,6 +1594,12 @@ fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
 /// `ln(prior) + σ(Q̂)` -- deterministisch, äquivalent zu mctx
 /// `gumbel_scale=0`. Self-Play ruft mit `true` und behält die echte
 /// Gumbel-Exploration (G1, Vollaudit 2026-07-21).
+///
+/// `trace` (Task #95, Anforderung 2/3): NUR wenn `Some`, wird zusätzlich ein
+/// granularer Trace (Top-m-Auswahl, jede Halving-Phase, finale Zugwahl)
+/// gesammelt -- ausschließlich additive Lesezugriffe auf ohnehin berechnete
+/// Werte, KEINE Änderung an Auswahl/Backprop/RNG-Verbrauch (siehe
+/// Paritätstest).
 fn build_gumbel_tree<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -1402,6 +1607,7 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     sims: u32,
     add_root_noise: bool,
     rng: &mut R,
+    mut trace: Option<&mut GumbelTrace>,
 ) -> Vec<Node> {
     let mut root_state = state.clone();
     root_state.log.clear();
@@ -1411,6 +1617,11 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     let root_player = root_state.current_player;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, 0.0, root_player, rng)];
+
+    if let Some(t) = trace.as_deref_mut() {
+        t.determinize_active = DETERMINIZE_ROOT_HIDDEN_INFO;
+        t.root_value = Some(compute_root_value_debug(net_policy, net_value, &nodes[0].state));
+    }
 
     // Eine einzelne Tiefe-≥1-Deszension + Backprop, beginnend bei einem
     // bereits existierenden Knoten (typischerweise ein Wurzelkind). Paket 2
@@ -1502,6 +1713,26 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
         })
         .collect();
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Anforderung 2b: ALLE legalen Wurzelkandidaten (nicht nur die Top-m) mit
+    // prior/ln(prior)/Gumbel-g/Score + Top-16-Kennzeichnung -- muss VOR dem
+    // Entfernen der gezogenen Einträge aus `nodes[0].untried` passieren
+    // (`scored` referenziert deren Indizes).
+    if let Some(t) = trace.as_deref_mut() {
+        for (rank, &(score, g, idx)) in scored.iter().enumerate() {
+            let (act, prior) = &nodes[0].untried[idx];
+            let description = label_search_move(&SearchMove::Draft(act.clone()), Some(&nodes[0].state)).1;
+            t.top_m.push(GumbelTraceCandidate {
+                description,
+                prior: *prior as f64,
+                ln_prior: (*prior as f64).max(1e-9).ln(),
+                gumbel_g: g,
+                score,
+                selected_top_m: rank < m_prime,
+            });
+        }
+    }
+
     let mut chosen: Vec<(usize, f64)> = scored.iter().take(m_prime).map(|&(_, g, i)| (i, g)).collect();
     // Absteigend nach urspruenglichem Untried-Index entfernen, damit sich
     // die Indizes der VERBLEIBENDEN (nicht gezogenen) Einträge beim
@@ -1579,7 +1810,9 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
         // per Tail-Loop nur auf die Finalisten.
         let mut remaining_phases = num_phases;
         let mut budget_used: u32 = 0;
+        let mut phase_num: u32 = 0;
         while current.len() > 1 && budget_used < sims {
+            phase_num += 1;
             let remaining_slots = (remaining_phases as usize) * current.len();
             // Invariante "jeder in current bekommt mind. 1 Sim je Phase"
             // (extra >= 1) gilt nur für sims >= m -- bei kleinerem Budget
@@ -1615,6 +1848,39 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
                 score(b).partial_cmp(&score(a)).unwrap_or(std::cmp::Ordering::Equal)
             });
             let keep = (current.len() / 2).max(2);
+
+            // Anforderung 2c: Trace-Eintrag für DIESE Phase -- `current` ist
+            // hier bereits absteigend nach Score sortiert (siehe `sort_by`
+            // oben), `rank >= keep` markiert exakt die Kandidaten, die
+            // gleich per `truncate` eliminiert werden. Reine Lesezugriffe auf
+            // bereits vorhandene Werte, kein Effekt auf `current` selbst.
+            if let Some(t) = trace.as_deref_mut() {
+                let mut phase_candidates = Vec::with_capacity(current.len());
+                for (rank, &ci) in current.iter().enumerate() {
+                    let (act, prior, g) = &candidates[ci];
+                    let (visits, q) = match candidate_node[ci] {
+                        Some(cid) if nodes[cid].visits > 0 => {
+                            (nodes[cid].visits, nodes[cid].value / nodes[cid].visits as f64)
+                        }
+                        Some(cid) => (nodes[cid].visits, 0.0),
+                        None => (0, 0.0),
+                    };
+                    let sigma_q = gumbel_sigma(q, max_n);
+                    let score = g + (*prior as f64).max(1e-9).ln() + sigma_q;
+                    let description =
+                        label_search_move(&SearchMove::Draft(act.clone()), Some(&nodes[0].state)).1;
+                    phase_candidates.push(GumbelPhaseCandidate {
+                        description,
+                        visits,
+                        q,
+                        sigma_q,
+                        score,
+                        eliminated: rank >= keep,
+                    });
+                }
+                t.phases.push(GumbelPhase { phase: phase_num, sims_per_survivor: extra, candidates: phase_candidates });
+            }
+
             current.truncate(keep);
             remaining_phases = remaining_phases.saturating_sub(1).max(1);
         }
@@ -1626,6 +1892,34 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
                 }
                 visit_candidate!(ci);
                 budget_used += 1;
+            }
+        }
+    }
+
+    // Anforderung 2d: finale Zugwahl -- die Max-Visit-Menge (Sequential-
+    // Halving-Überlebende) mit `ln(prior)+σ(Q)` je Finalist, exakt dieselbe
+    // Menge/Formel wie `gumbel_final_root_action` (dort erneut, aber
+    // unabhängig berechnet -- reiner Lesezugriff auf die fertigen `nodes`,
+    // kein Effekt auf das Ergebnis).
+    if let Some(t) = trace.as_deref_mut() {
+        let children = &nodes[0].children;
+        if !children.is_empty() {
+            let max_n = children.iter().map(|&c| nodes[c].visits).max().unwrap_or(0);
+            for &cid in children {
+                if nodes[cid].visits != max_n {
+                    continue;
+                }
+                let description = log_label(&nodes, cid);
+                let ln_prior = (nodes[cid].prior as f64).max(1e-9).ln();
+                let q = if nodes[cid].visits > 0 { nodes[cid].value / nodes[cid].visits as f64 } else { 0.0 };
+                let sigma_q = gumbel_sigma(q, max_n);
+                t.finalists.push(GumbelFinalist {
+                    description,
+                    visits: nodes[cid].visits,
+                    ln_prior,
+                    sigma_q,
+                    score: ln_prior + sigma_q,
+                });
             }
         }
     }
@@ -1649,8 +1943,14 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// Mit `log = Some(..)` wird jede Simulation (Selection/Expansion/Eval/Backprop)
 /// als Text protokolliert (für den Server-Debug-Log, analog `mcts::build_tree`).
 /// Dispatcht komplett auf `build_gumbel_tree`, wenn `USE_GUMBEL_SEARCH` --
-/// Gumbel hat (noch) keinen granularen Sim-fuer-Sim-Trace (nur ein
-/// Platzhalter-Log-Eintrag), `log` wird in diesem Fall ignoriert.
+/// `log` wird in diesem Fall ignoriert (der textuelle Platzhalter-Eintrag
+/// bleibt für Rückwärtskompatibilität, siehe `net_search_log_header`-
+/// Konsumenten). `trace` (Task #95, Anforderung 2/3): NUR wenn `Some`, wird
+/// zusätzlich der granulare Gumbel-Trace gesammelt (`build_gumbel_tree`) --
+/// bei `USE_GUMBEL_SEARCH=false` (PUCT-Legacy-Pfad) bleibt `trace` ungenutzt,
+/// PUCT hat keinen strukturierten Trace (nur den bestehenden Text-`log`).
+/// ALLE Produktions-Aufrufstellen (Self-Play/Arena) übergeben `None` --
+/// byte-identisch zum Vor-Task-#95-Verhalten.
 fn build_net_tree<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -1660,12 +1960,13 @@ fn build_net_tree<R: Rng + ?Sized>(
     add_root_noise: bool,
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
+    trace: Option<&mut GumbelTrace>,
 ) -> Vec<Node> {
     if USE_GUMBEL_SEARCH {
         if let Some(l) = log.as_deref_mut() {
-            l.push("  GUMBEL-SUCHE (kein granularer Sim-Trace)".to_string());
+            l.push("  GUMBEL-SUCHE (kein granularer Text-Sim-Trace -- strukturierter Trace siehe `gumbel_trace`-Feld, falls angefordert)".to_string());
         }
-        return build_gumbel_tree(net_policy, net_value, state, sims, add_root_noise, rng);
+        return build_gumbel_tree(net_policy, net_value, state, sims, add_root_noise, rng, trace);
     }
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
@@ -1853,7 +2154,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
         return crate::round5::choose_action(state);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None);
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
     }
@@ -1896,7 +2197,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
         return crate::round5::choose_action(state);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None);
+        let nodes = build_net_tree(net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None, None);
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
     }
@@ -1943,7 +2244,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     // (`self_play::alphabeta_choose_action`s Shortlisting), nicht einer der
     // drei in Task #65 benannten Haupt-Sucheinstiege (Arena/Self-Play-Ziel/
     // Debug-UI) -- bleibt unverändert Einzelwelt.
-    let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None);
+    let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
     root_child_stats_from_nodes(&nodes)
 }
 
@@ -1978,7 +2279,7 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         return (stats, policy);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None);
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
         return (root_child_stats_from_nodes(&nodes), root_completed_q_policy(&nodes));
     }
     // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
@@ -2016,7 +2317,16 @@ fn root_completed_q_policy(nodes: &[Node]) -> Vec<(Action, f64)> {
 /// (`mcts_visits`/`mcts_share`/`mcts_q`). Für den Server (Mensch-vs-Netz) und Debug-UI;
 /// `add_root_noise` hier i.d.R. `false` (Dirichlet-Noise ist nur ein Self-Play-Kniff).
 /// Mit `log = Some(..)` wird zusätzlich ein Sim-für-Sim-Trace protokolliert
-/// (für den Server-Debug-Log-Button, analog zur Heuristik).
+/// (für den Server-Debug-Log-Button, analog zur Heuristik). `collect_trace`
+/// (Task #95, Anforderung 1-3): NUR wenn `true`, werden zusätzlich der
+/// ROOT-Value-Breakdown (`value_debug`-Feld) und der granulare Gumbel-Trace
+/// (`gumbel_trace`-Feld) im Analyse-Dict befüllt -- kostet EINEN zusätzlichen
+/// Netz-Forward-Pass (`compute_root_value_debug`) plus ein paar zusätzliche
+/// `Vec`-Pushes während des Baumaufbaus, sonst KEINE Änderung an Auswahl/
+/// Backprop/RNG-Verbrauch (Paritätstest siehe Testmodul). Alle
+/// Produktions-Aufrufstellen (`ai_step_net_json`/`ai_drafting_net_step`)
+/// übergeben `false` -- nur `ai_debug_net_json` (reiner Analyse-Endpunkt,
+/// kein Zug wird angewendet) übergibt `true`.
 pub fn net_search_with_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -2025,6 +2335,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     add_root_noise: bool,
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
+    collect_trace: bool,
 ) -> (Option<Action>, Value) {
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
@@ -2033,13 +2344,16 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
         return crate::round5::choose_action_with_analysis(state);
     }
     if NUM_DETERMINIZATIONS <= 1 {
-        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, log);
-        return net_search_with_tree_from_nodes(state, sims, &nodes);
+        let mut trace = if collect_trace { Some(GumbelTrace::default()) } else { None };
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, log, trace.as_mut());
+        return net_search_with_tree_from_nodes(state, sims, &nodes, trace.as_ref());
     }
     // ISMCTS-Mehrfach-Determinisierung: kein granularer Sim-für-Sim-Trace je
     // Welt (würde N verschachtelte "=== Sim x/y ==="-Folgen ergeben, kaum
     // lesbar) -- ein einzelner Hinweis genügt, gleiches Muster wie
-    // `build_net_tree`s Gumbel-Dispatch-Log.
+    // `build_net_tree`s Gumbel-Dispatch-Log. Strukturierter Gumbel-Trace
+    // (`collect_trace`) ist im Mehrwelten-Pfad NICHT unterstützt (aktuell
+    // ohnehin nie aktiv, `NUM_DETERMINIZATIONS=1`, siehe dortige Konstante).
     if let Some(l) = log.as_deref_mut() {
         l.push(format!(
             "  ISMCTS: {NUM_DETERMINIZATIONS} Determinisierungen (kein granularer Sim-Trace je Welt)"
@@ -2052,7 +2366,14 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
 
 /// `net_search_with_tree`s Debug-Analyse-Dict aus einem EINZELNEN Baum
 /// (`NUM_DETERMINIZATIONS <= 1`-Pfad, unverändert gegenüber vor Task #65).
-fn net_search_with_tree_from_nodes(state: &GameState, sims: u32, nodes: &[Node]) -> (Option<Action>, Value) {
+/// `trace` (Task #95): nur `Some`, wenn `collect_trace=true` angefordert --
+/// befüllt zusätzlich `value_debug`/`gumbel_trace`/`value`/`win_pct`.
+fn net_search_with_tree_from_nodes(
+    state: &GameState,
+    sims: u32,
+    nodes: &[Node],
+    trace: Option<&GumbelTrace>,
+) -> (Option<Action>, Value) {
     let best = select_final_root_child(nodes);
     let total_visits: u32 = nodes[0].children.iter().map(|&c| nodes[c].visits).sum();
     let prior_sum: f64 = nodes[0]
@@ -2100,6 +2421,14 @@ fn net_search_with_tree_from_nodes(state: &GameState, sims: u32, nodes: &[Node])
                 "mcts_share": if total_visits > 0 { node.visits as f64 / total_visits as f64 } else { 0.0 },
                 "mcts_q": q,
                 "mcts_win_pct": q * 100.0,
+                // Task #95 (Anforderung 1): Netz-Blattwert DIESES Kindzustands,
+                // aus Sicht des Spielers, der den Zug gemacht hat (dieselbe
+                // Perspektive wie `mcts_q`/`node.value` -- siehe `node_own_value`-
+                // Kommentar) -- bereits bei Expansion berechnet (`make_node`),
+                // hier nur ausgelesen. Zeigt die Netz-ERSTEINSCHÄTZUNG dieses
+                // Zugs, VOR jeder weiteren Suchvertiefung -- Divergenz zu
+                // `mcts_q` zeigt, wo die Suche vom Netz abweicht.
+                "net_leaf_value": node.leaf_value[node.player_who_acted],
                 "max_depth": subtree_depth(nodes, cid),
                 "chosen": is_chosen,
             })
@@ -2109,11 +2438,30 @@ fn net_search_with_tree_from_nodes(state: &GameState, sims: u32, nodes: &[Node])
     let root_visits = nodes[0].visits.max(1) as f64;
     let root_q = nodes[0].value / root_visits;
 
+    // Task #95 (Anforderung 1): Root-Value-Anzeige -- `value`/`win_pct` sind
+    // bestehende, vom Frontend (`debug.html`) bereits konsumierte Top-Level-
+    // Felder (bisher IMMER `Null` im Netz-Pfad, siehe Git-Historie); mit
+    // `value_debug` befüllt (nur wenn `collect_trace=true`) zeigen sie jetzt
+    // den tatsächlichen Netz-Rohwert/die Ego-Win-Wahrscheinlichkeit der
+    // Wurzel. `gumbel_trace` (Anforderung 2) bleibt `Null`, wenn kein Trace
+    // angefordert wurde ODER die Suche nicht im Gumbel-Modus lief (PUCT-
+    // Legacy-Pfad sammelt keinen Trace, siehe `build_net_tree`-Kommentar).
+    let (value_field, win_pct_field, value_debug_field) = match trace.and_then(|t| t.root_value.as_ref()) {
+        Some(vd) => (json!(vd.raw_value), json!(vd.win_prob * 100.0), vd.to_json()),
+        None => (Value::Null, Value::Null, Value::Null),
+    };
+    let gumbel_trace_field = match trace {
+        Some(t) if !t.top_m.is_empty() || !t.finalists.is_empty() => t.to_json(),
+        _ => Value::Null,
+    };
+
     let analysis = json!({
         "current_player": nodes[0].player_who_acted,
         "ai_player": state.current_player,
-        "value": Value::Null,
-        "win_pct": Value::Null,
+        "value": value_field,
+        "win_pct": win_pct_field,
+        "value_debug": value_debug_field,
+        "gumbel_trace": gumbel_trace_field,
         "has_net": true,
         "simulations": sims,
         // Gesamtzahl legaler Züge (unabhängig vom Widening) vs. tatsächlich
@@ -2169,6 +2517,17 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
             .or_else(|| nodes0[0].untried.iter().find(|(act, _)| act == a).map(|(_, p)| *p))
             .unwrap_or(0.0)
     };
+    // Task #95: `net_leaf_value` repräsentativ aus der ERSTEN Welt (siehe
+    // Modul-Kommentar oben zu `prior_of`) -- `None`, wenn die Aktion in Welt 0
+    // nie zu einem Kind wurde (kleineres Pro-Welt-Sims-Budget, siehe
+    // `aggregate_root_child_stats`-Kommentar).
+    let leaf_value_of = |a: &Action| -> Option<f64> {
+        nodes0[0]
+            .children
+            .iter()
+            .find(|&&c| nodes0[c].action.as_ref() == Some(a))
+            .map(|&c| nodes0[c].leaf_value[nodes0[c].player_who_acted])
+    };
 
     let mut ordered = stats.clone();
     ordered.sort_by(|a, b| b.1.cmp(&a.1));
@@ -2195,6 +2554,7 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
                 "mcts_share": if total_visits > 0 { *visits as f64 / total_visits as f64 } else { 0.0 },
                 "mcts_q": *q,
                 "mcts_win_pct": *q * 100.0,
+                "net_leaf_value": leaf_value_of(act),
                 "max_depth": Value::Null,
                 "chosen": is_chosen,
             })
@@ -2212,6 +2572,11 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
         "ai_player": state.current_player,
         "value": Value::Null,
         "win_pct": Value::Null,
+        // Task #95: ROOT-Value-Breakdown/Gumbel-Trace nur im Einzelbaum-Pfad
+        // unterstützt (siehe `net_search_with_tree`-Kommentar) -- hier immer
+        // `Null`, damit das Analyse-Dict-Schema in beiden Pfaden gleich bleibt.
+        "value_debug": Value::Null,
+        "gumbel_trace": Value::Null,
         "has_net": true,
         "simulations": sims,
         "determinizations": NUM_DETERMINIZATIONS,
@@ -2855,7 +3220,7 @@ mod tests {
         let state = random_drafting_state(1, 10, &mut rng_state).expect("Testzustand sollte auswertbar sein");
 
         let mut rng_a = StdRng::seed_from_u64(999);
-        let nodes = build_net_tree(&net, None, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None);
+        let nodes = build_net_tree(&net, None, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None, None);
         let direct_stats = root_child_stats_from_nodes(&nodes);
         let direct_policy = root_completed_q_policy(&nodes);
 
@@ -2925,7 +3290,7 @@ mod tests {
             for &sims in &[8u32, 24] {
                 let mut rng_plain = StdRng::seed_from_u64(1000 + gi);
                 let nodes_plain =
-                    build_net_tree(&net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None);
+                    build_net_tree(&net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None, None);
                 let stats_plain = root_child_stats_from_nodes(&nodes_plain);
                 let policy_plain = root_completed_q_policy(&nodes_plain);
                 let action_plain =
@@ -2940,6 +3305,7 @@ mod tests {
                     DEFAULT_C_PUCT,
                     false,
                     &mut rng_hybrid,
+                    None,
                     None,
                 );
                 let stats_hybrid = root_child_stats_from_nodes(&nodes_hybrid);
@@ -2970,6 +3336,68 @@ mod tests {
                     );
                 }
                 assert_eq!(action_plain, action_hybrid, "Spiel {gi} sims={sims}: finale Zugwahl weicht ab");
+                checked += 1;
+            }
+        }
+        assert!(checked >= 6, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn gumbel_trace_collection_does_not_change_search() {
+        // Task #95 (Anforderung 3) -- WICHTIGSTER Korrektheitstest fuer den
+        // neuen Debug-Trace: `collect_trace=true` (also `trace=Some(..)` an
+        // `build_gumbel_tree`) darf die eigentliche Suche NICHT veraendern --
+        // gleicher RNG-Seed muss exakt denselben Baum (Groesse, Besuche, Q je
+        // Knoten) UND dieselbe finale Zugwahl liefern wie `trace=None`.
+        // Gleiches Muster wie `hybrid_search_with_equal_nets_matches_plain_search`
+        // (A=B-Referenzpunkt fuer einen additiven Codepfad).
+        let Some(net) = load_test_net() else { return };
+        let mut setup_rng = StdRng::seed_from_u64(9595);
+        let mut checked = 0;
+        for gi in 0..6u64 {
+            let Some(state) = random_drafting_state(gi, 12, &mut setup_rng) else { continue };
+            for &sims in &[8u32, 24] {
+                let mut rng_plain = StdRng::seed_from_u64(2000 + gi);
+                let nodes_plain =
+                    build_net_tree(&net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None, None);
+
+                let mut rng_traced = StdRng::seed_from_u64(2000 + gi);
+                let mut trace = GumbelTrace::default();
+                let nodes_traced = build_net_tree(
+                    &net,
+                    None,
+                    &state,
+                    sims,
+                    DEFAULT_C_PUCT,
+                    false,
+                    &mut rng_traced,
+                    None,
+                    Some(&mut trace),
+                );
+
+                assert_eq!(
+                    nodes_plain.len(),
+                    nodes_traced.len(),
+                    "Spiel {gi} sims={sims}: Baumgroesse weicht ab, obwohl nur Trace-Sammlung aktiviert wurde"
+                );
+                for (np, nt) in nodes_plain.iter().zip(nodes_traced.iter()) {
+                    assert_eq!(np.visits, nt.visits, "Spiel {gi} sims={sims}: Besuchszahl weicht ab");
+                    assert_eq!(np.value, nt.value, "Spiel {gi} sims={sims}: akkumulierter Wert weicht ab");
+                    assert_eq!(np.action, nt.action, "Spiel {gi} sims={sims}: Knoten-Aktion weicht ab");
+                    assert_eq!(np.prior, nt.prior, "Spiel {gi} sims={sims}: Prior weicht ab");
+                }
+                let action_plain =
+                    select_final_root_child(&nodes_plain).and_then(|i| nodes_plain[i].action.clone());
+                let action_traced =
+                    select_final_root_child(&nodes_traced).and_then(|i| nodes_traced[i].action.clone());
+                assert_eq!(action_plain, action_traced, "Spiel {gi} sims={sims}: finale Zugwahl weicht ab");
+
+                // Trace selbst muss sinnvoll befuellt sein (sonst waere der
+                // Paritaetstest trivial, weil gar kein Trace-Code lief).
+                assert!(!trace.top_m.is_empty(), "Spiel {gi} sims={sims}: Top-m-Trace ist leer");
+                assert!(!trace.finalists.is_empty(), "Spiel {gi} sims={sims}: Finalisten-Trace ist leer");
+                assert!(trace.root_value.is_some(), "Spiel {gi} sims={sims}: Root-Value-Debug fehlt");
+
                 checked += 1;
             }
         }
