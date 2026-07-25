@@ -585,7 +585,7 @@ if __name__ == "__main__":
     import os
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v10_best.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL = "models/alphazero_v15_best.onnx"   # Pfad zum ONNX-Netz
     NET_MODEL_PRE = "models/alphazero_v1c.onnx"
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
@@ -597,9 +597,9 @@ if __name__ == "__main__":
     # Vergleichbarkeit mit den bisherigen 17-26%-Session-Baselines.
     NET_SIMS  = 400
     HEUR_SIMS = 150
-    GAMES     = 100
+    GAMES     = 400
     run_net_arena(NET_MODEL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, net_name = NET_NAME,
-                  games=GAMES, threads=0, early_stop=False)
+                  games=GAMES, threads=10, early_stop=True)
     #run_net_vs_net(NET_MODEL, NET_MODEL_PRE, sims_a=NET_SIMS, sims_b=NET_SIMS, games=GAMES,
     #               threads=0, seed=None, chunk=10, c_puct=1.5, name_a=NET_NAME, name_b=NET_NAME_PRE)
 

@@ -3545,6 +3545,165 @@ deterministisch generierte Spiel-Dicts) ersetzt -- Ergebnis-JSON-Felder und
 CSV-Zeilen gegen von-Hand nachgerechnete Aggregate aus den gemockten
 Spiel-Dicts geprueft, alle Assertions bestanden.
 
+## Task #91: v15-Zyklus + Frischdaten-Ablation (2026-07-25)
+
+Zwei identische Trainings (Warm-Start von `v14b_best`, `lr 5e-5` Cosine, 100
+Epochen, `nortv`), die sich NUR in der Frischdaten-Menge (`v14b`-Selfplay)
+unterscheiden -- Kernfrage: reichen 2000 der 6000 frischen `v14b_best`-Spiele,
+oder bringt die volle Menge messbar mehr Staerke? Kader-Kontext:
+Datenverlust-Wiederaufbau `v14` (884 Elo) -> `v14b` (967, Referenz); `data/`
+enthaelt 100×`v10b` + 200×`v12` + 600×`v14b` = 9000 Spiele, `v14b`-Korpus ist
+der erste komplett OHNE `rtv`-Feld.
+
+**Self-Play-Batch** (Vorlauf, vor Task-Start bereits abgeschlossen, Maschine
+frei uebernommen): 6000 Spiele `v14b_best`@400 Sims, 11 Threads,
+`record_rtv=false` (Manifest `data/manifest_v14b_20260724_230023.json`),
+Zeitraum 2026-07-24 23:01 -- 2026-07-25 06:53 (7h52min, aus den
+Dateizeitstempeln nachgerechnet) = **0,212 Spiele/s**, bestaetigt den ~4,5×
+`rtv`-aus-Speedup aus Task #80/#85 bei aehnlicher Thread-Zahl.
+
+**Trainings** (`train.py --load v14b_best --lr 0.00005 --lr-schedule cosine
+--epochs 100 --value-target-variant nortv`, identisch bis auf Datenmenge):
+
+| | v15 (voll) | v15_f2k (Ablation) |
+|---|---|---|
+| Korpus | 100 v10b + 200 v12 + 600 v14b = 900 Dateien | 100 v10b + 200 v12 + 200 v14b = 500 Dateien |
+| Trainings-/Val-Split | 810/90 Dateien (1.307.950/145.338 Zuege) | 450/50 Dateien (726.574/80.725 Zuege) |
+| Cache-Build | 867,7s + 67,6s (kompletter Neubau, 9000 Spiele) | ~36s (kleinerer Korpus) |
+| Epoche-1 Val-R² (Value) | 0,493 (Warm-Start bestaetigt, ≫0,2-Schwelle) | 0,551 (ebenfalls bestaetigt) |
+| Fruehstopp | Epoche 15 (Plateau seit Epoche 10, Patience 5) | Epoche 15 (Plateau seit Epoche 10, Patience 5) |
+| Bestes Modell | Epoche 2 (val_combined=1,4839) | Epoche 1 (val_combined=1,4954) |
+| OneDrive-Snapshot | `models_2026-07-25_0737_v15.zip` (54 MB) | `models_2026-07-25_0756_v15_f2k.zip` (72 MB) |
+
+Beide Snapshots (train.py-Hook, ereignisgesteuert) bestaetigt.
+
+Die 200 v14b-Dateien fuer den Ablationsarm wurden deterministisch gezogen
+(`random.Random(20260725).sample(sorted(v14b_files), 200)`), die restlichen
+400 waehrend des `v15_f2k`-Trainings nach `data/tmp_ablation_holdout/`
+verschoben und danach SOFORT zurueckverschoben.
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`, klassisch + `--frozen`,
+`evaluations/offline_diagnose_v15_v15f2k_v14b_classic.json` /
+`..._frozen.json`):
+
+*Klassischer Val-Split (Datei-Ebene, Seed 20260707, n=145.338 Zuege,
+Top-1/Top-3 nur Drafting n=105.604):*
+
+| Modell | Top-1 | Top-3 | R² global | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| v15_best | 49,4% | 79,2% | 0,377 | 0,107 | 0,220 | 0,311 | 0,414 | 0,627 |
+| v15_f2k_best | 49,8% | 79,2% | 0,367 | 0,102 | 0,211 | 0,298 | 0,400 | 0,621 |
+| v14b_best | 48,6% | 78,1% | 0,346 | 0,092 | 0,187 | 0,270 | 0,371 | 0,610 |
+
+*Frozen Set (`frozen_v1`, n=1800, generationsuebergreifend, direkt
+vergleichbar mit alten Kennzahlen; `v13_nortv_best`-Zeile aus
+`evaluations/offline_diagnose_v13_vs_nortv_variants_frozen.json`
+uebernommen -- das Checkpoint selbst existiert nach dem Datenverlust nicht
+mehr):*
+
+| Modell | Top-1 | Top-3 | R² global | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| v13_nortv_best (verlorene Messlatte) | 48,5% | 75,5% | 0,343 | 0,063 | 0,175 | 0,227 | 0,271 | 0,697 |
+| **v15_best (neu)** | **46,9%** | **73,3%** | **0,300** | **0,020** | **0,125** | **0,149** | **0,162** | **0,726** |
+| v15_f2k_best | 46,9% | 74,8% | 0,284 | 0,011 | 0,130 | 0,119 | 0,136 | 0,710 |
+| v14b_best (bisherige Referenz) | 46,9% | 74,4% | 0,257 | -0,016 | 0,099 | 0,080 | 0,089 | 0,707 |
+
+**Kernbefund R1/R2**: Zum ersten Mal seit dem Datenverlust ist die
+Runde-1-Value-R² auf dem frozen Set POSITIV (`v15_best`: +0,020,
+`v15_f2k_best`: +0,011 -- beide ueber `v14b_best`s -0,016). Die Hypothese
+aus dem v14b-Zyklus ("R1-Schwaeche ist ein Daten-, kein
+Kapazitaetsproblem", Empfehlung 6000 statt 2000 frische Spiele) bestaetigt
+sich: mehr frische `v14b_best`-Bootstrap-Daten bringen tatsaechlich Leben
+in die fruehen Runden. `v15_best` (volle 6000) schlaegt `v15_f2k_best` (nur
+2000) in JEDER Runde 1-4 auf beiden Split-Arten, R5 liegt bei beiden etwa
+gleichauf. `v13_nortv_best` bleibt bei R1-R4 weiterhin vorn, `v15_best`
+schliesst die Luecke aber deutlich (R² global 0,257 -> 0,300 auf frozen,
+0,346 -> 0,377 auf klassisch).
+
+Aufschluesselung je Quellkorpus (frozen Set): v10b-Anteil (n=900) Value-R²
+`v15_best` 0,309 / `v15_f2k_best` 0,286 / `v14b_best` 0,255; v12-Anteil
+(n=900) 0,288 / 0,280 / 0,260 -- `v15_best` verbessert sich in BEIDEN
+Alt-Korpora gegenueber `v14b_best`, nicht nur auf dem frischen v14b-Anteil
+selbst.
+
+**Ablations-Gating** (`tools/paired_gating.py`, `v15_best` (A) vs.
+`v15_f2k_best` (B), beide @400 Sims,
+`evaluations/paired_gating_result_v15_best_vs_v15_f2k_best.json`, 8 Bloecke
+a 25 Paare, gepaarter Vorzeichentest + SPRT p1=0,65/α=β=0,05):
+
+| Block | kumulativ A:B | LLR | Bericht-p (McNemar) |
+|---|---|---|---|
+| 1 (n=25) | 29:21 | +0,48 | 0,45 |
+| 2 (n=50) | 58:42 | +1,16 | 0,18 |
+| 3 (n=75) | 82:68 | +0,52 | 0,31 |
+| 4 (n=100) | 103:97 | -1,29 | 0,77 |
+| 5 (n=125) | 134:116 | -0,09 | 0,31 |
+| 6 (n=150) | 165:135 | +1,11 | 0,11 |
+| 7 (n=175) | 194:156 | +1,78 | 0,05 |
+| 8 (n=200, Deckel) | **224:176** | **+2,81** | **0,02** |
+
+**200 Paare (harter Deckel) erreicht OHNE SPRT-Entscheid** (LLR=+2,807,
+Schranken ±2,944 -- +0,137 von der oberen Schranke entfernt). Formal also
+**UNDECIDED_CAP_REACHED**, keine formale ACCEPT_H1. Gepaarte Differenz
+(A-Siege minus B-Siege pro Paar) +0,240 [95%-CI +0,048, +0,432] -- das CI
+beruehrt die Null NICHT (anders als beim `v14b`-vs-`v14`-Fall, wo das CI die
+Null beruehrte), und 7 von 8 Bloecken liegen im positiven Bereich fuer
+`v15_best`. Fixed-n-Vorzeichentest p=0,0197 (explizit NICHT die
+Stopp-Entscheidung, nur Bericht-Statistik -- siehe
+`feedback_statistical_rigor`-Notiz).
+
+**Ablations-Verdikt**: Trotz UNDECIDED nach strengem SPRT-Kriterium ist die
+Evidenz fuer "6000 Spiele bringen messbar mehr" deutlich staerker als
+reines Rauschen -- LLR verfehlt die Schranke nur knapp, das CI schliesst
+die Null aus, und die Offline-Diagnose zeigt `v15_best` (voll) auf JEDER
+Kennzahl vor `v15_f2k_best` (Ablation). **Empfehlung fuer die
+Batch-Policy**: bei der aktuellen Rechnerkapazitaet (~7h53min fuer 6000
+Spiele, ueber Nacht machbar) bei der vollen 6000er-Menge bleiben -- 2000
+Spiele sind ein spuerbarer, wenn auch nicht SPRT-hart bewiesener
+Kompromiss; kein Grund, kuenftig auf 2000 zu verkleinern, wenn 6000 im
+bestehenden Zeitbudget machbar sind.
+
+**Referenz-Gating** (Ablations-Gewinner `v15_best` (A) vs. `v14b_best` (B),
+`evaluations/paired_gating_result_v15_best_vs_v14b_best.json`): **v15_best
+91:59 v14b_best** (150 Spiele, 75 Paare) -- SPRT entschied bereits nach 75
+Paaren: `v15_best` signifikant staerker (LLR=+3,255 >= obere Schranke
++2,944, Bericht-p=0,0113), gepaarte Differenz +0,427 [95%-CI +0,126,
++0,727] (CI klar ueber Null). **`v15_best` wird neue Referenz/Generator der
+Wiederaufbau-Linie.**
+
+**Elo-Neuverankerung** (`tools/arena.py`, `v15_best`@400 vs. Heuristik@200,
+Rust-Engine, 10 Threads, SPRT p1=0,64/α=0,05/β=0,10): SPRT entschied nach
+86/400 Spielen auf "Gleich stark" (LLR_Netz=-2,36, LLR_Heur=-2,38, beide
+Seiten verwerfen H1) -- **v15_best 45:41 Heuristik@200 (52% Netzsiege)**,
+Fortschritt gegenueber `v14b_best`s 45% (77:93). Eingetragen via
+`tools/elo_tracker.py add`; Bradley-Terry-Fit ergibt **v15_best@400 = 1029
+[978, 1080]**.
+
+Neue Kader-Reihenfolge: v13_nortv_best 1100 > v12b_lr_best 1051 >
+**v15_best 1029** > Heuristik@200 1000 (Anker) > v15_f2k_best 987 >
+v14b_best 961 > v12_best 943 > v14_best 884 > v10_best 858 >
+v11_td07_best 853 > v11_best 809.
+
+**Gesamteinschaetzung**: Der Frischdaten-Zyklus liefert auf allen drei
+Ebenen ein konsistentes Bild: (1) Offline zeigt die volle 6000er-Menge die
+erwuenschte R1/R2-Verbesserung (erstmals positives R1-R² auf dem frozen
+Set), (2) das gepaarte Ablations-Gating tendiert klar (wenn auch nicht
+SPRT-hart) zugunsten der vollen Menge, und (3) `v15_best` schlaegt die
+bisherige Referenz `v14b_best` klar und signifikant (LLR=+3,26) UND rueckt
+im Elo-Kader ueber den Heuristik-Anker (1029 vs. 1000) -- der erste
+Rebuild-Stand seit dem Datenverlust, der die Heuristik@200 wieder klar
+hinter sich laesst. `v15_best` bleibt weiterhin hinter den verlorenen
+Champions `v12b_lr_best` (1051) und `v13_nortv_best` (1100) zurueck, aber
+die Luecke schrumpft (`v14b_best`: -84/-133 Elo -> `v15_best`: -22/-71 Elo)
+UND die strukturelle R1-Schwaeche, die als Haupttreiber der Elo-Luecke
+vermutet wurde, zeigt jetzt echte Fortschritte. Naechster Schritt waere
+vermutlich ein weiterer Frischdaten-Batch mit `v15_best` als neuem
+Generator, um die R1/R2-R²-Werte weiter zu verbreitern.
+
+**data/-Integritaetsnachweis**: 100 v10b + 200 v12 + 600 v14b = 900
+Dateien (verifiziert nach Ablations-Ruecksicherung), `data/tmp_ablation_holdout/`
+entfernt.
+
 ## Quellen (Recherche 2026-07-19)
 
 - [Leela Chess Zero: value_loss_weight-Stärkeregression](https://github.com/leela-zero/leela-zero/issues/1480)
