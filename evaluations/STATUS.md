@@ -4178,3 +4178,30 @@ gueltig -- reines Label-Problem. Nutzer-Entscheid: Anker bleibt faktisch
 s150(dyn~330), Beschriftung ueberall korrigiert auf "Heuristik@150(dyn~330)".
 Alle aelteren "Heuristik@200"-Erwaehnungen in diesem Dokument sind
 entsprechend zu lesen.
+
+
+## Kader-Konsolidierung v16 vs. v14b (2026-07-25)
+
+Zusaetzliche Elo-Kante auf Nutzer-Anstoss (KEIN Gating -- v16_best ist
+bereits Referenz): `paired_gating.py` v16_best@400 vs. v14b_best@400, SPRT
+entschied frueh nach 50 Paaren zugunsten von v16_best (LLR=+3.275, obere
+Schranke +2.944 ueberschritten). Ergebnis **v16_best 65:35 v14b_best**
+(n=100, exakter Paar-Vorzeichentest p=0.0081, gepaarte Diff +0.600
+95%-KI [+0.208, +0.992]). Eingetragen in `elo_history.csv`.
+
+Neuer Bradley-Terry-Fit: v16_best 1132->**1094** (95%-KI [1037,1250] ->
+**[1033,1164]**, deutlich schmaler durch die zusaetzlichen 100 Spiele auf
+einer verbundenen Kante), v14b_best 961->968.
+
+**Transitivitaets-Check**: aus den VORHERIGEN Elo-Werten (v16 1132, v14b
+961, Differenz 171) folgt eine erwartete Winrate fuer v16 von rechnerisch
+~72.8%. Gemessen wurden 65% (65:35). Die Differenz (-7.8 Prozentpunkte)
+liegt an der unteren Seite, aber noch INNERHALB des 95%-KI der gemessenen
+Winrate (ca. [55%, 75%], aus der gepaarten Diff-KI umgerechnet) -- die
+erwarteten 72.8% beruehren gerade noch den oberen Rand. Einordnung: kein
+klarer Beleg fuer Nicht-Transitivitaet/Stil-Effekte, aber das Ergebnis liegt
+konsistent auf der schwaecheren Seite dessen, was der reine Elo-Abstand
+vorhersagen wuerde -- am ehesten normale Stichprobenstreuung bei n=100
+gepaarten Spielen, ein systematischer Effekt ist mit dieser Stichprobe nicht
+auszuschliessen, aber auch nicht separat belegt. Wie beauftragt: nur
+Beobachtung, keine weitere Massnahme.
