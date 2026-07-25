@@ -99,6 +99,28 @@
   .div-up { color: var(--row); }
   .div-down { color: var(--penalty); }
 
+  /* Task #95: Value-Head-Breakdown + granularer Gumbel-Trace */
+  .value-breakdown {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  }
+  .value-breakdown .vb-item { text-align: center; }
+  .value-breakdown .vb-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .value-breakdown .vb-num { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  details.trace { margin-top: 12px; }
+  details.trace summary {
+    cursor: pointer; font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 6px 0; user-select: none;
+  }
+  details.trace summary:hover { color: var(--text); }
+  .trace-phase { margin: 10px 0; padding: 8px 10px; background: var(--panel2); border-radius: 6px; }
+  .trace-phase h4 { margin: 0 0 6px 0; font-size: 12px; color: var(--accent); }
+  .trace-table { width: 100%; font-size: 12px; }
+  .trace-table th, .trace-table td { padding: 3px 6px; }
+  .trace-elim { opacity: 0.45; text-decoration: line-through; }
+  .trace-topm-out { opacity: 0.4; }
+  .trace-empty { color: var(--muted); font-style: italic; font-size: 12px; padding: 6px 0; }
+
   .empty { color: var(--muted); text-align: center; padding: 30px; font-style: italic; }
   .full { grid-column: 1 / -1; }
   .status { font-size: 12px; color: var(--muted); padding: 0 20px 10px; }
@@ -147,6 +169,7 @@
       <span>Simulationen: <b id="numSims">–</b></span>
 	  <span>Max. Suchtiefe: <b id="maxDepth" style="color: var(--accent);">–</b></span>
     </div>
+    <div id="valueBreakdown" class="value-breakdown" style="display:none"></div>
   </div>
 
   <div class="panel full">
@@ -172,6 +195,10 @@
       <button id="btnLastLog">🔎 Letzter KI-Zug: MCTS-Log</button>
       <span id="mctsLogResult" style="color:var(--muted);font-size:12px"></span>
     </div>
+    <details class="trace" id="traceDetails">
+      <summary>🌳 Granularer Gumbel-Such-Trace (Top-m-Auswahl · Sequential-Halving-Phasen · finale Zugwahl)</summary>
+      <div id="traceContainer"><div class="trace-empty">Kein Trace für diesen Zug.</div></div>
+    </details>
   </div>
 </main>
 
@@ -186,6 +213,69 @@ async function api(path, method='GET', body=null) {
 }
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
 function catClass(cat) { return 'cat-' + cat; }
+function fmtNum(x, digits=3) { return (x === null || x === undefined) ? '–' : Number(x).toFixed(digits); }
+
+// ── Task #95: Value-Head-Breakdown (Anforderung 1) ──────────────────────────
+function renderValueBreakdown(vd) {
+  const box = document.getElementById('valueBreakdown');
+  if (!vd) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'grid';
+  const item = (label, val, digits=3) => `<div class="vb-item"><div class="vb-num">${fmtNum(val, digits)}</div><div class="vb-label">${label}</div></div>`;
+  box.innerHTML =
+    item('Roh-Value (tanh)', vd.raw_value) +
+    item('Points-Forecast', vd.points_forecast) +
+    item('Win% (Ego)', vd.win_prob != null ? vd.win_prob * 100 : null, 1) +
+    item('Blended Utility', vd.blended_utility) +
+    item('Floor-Shaping +/-', vd.floor_shift) +
+    item('Finaler Blattwert', vd.final_value);
+}
+
+// ── Task #95: Granularer Gumbel-Such-Trace (Anforderung 2) ──────────────────
+function renderTrace(gt) {
+  const c = document.getElementById('traceContainer');
+  if (!gt || (!gt.top_m_selection?.length && !gt.final_selection?.length)) {
+    c.innerHTML = '<div class="trace-empty">Kein Trace für diesen Zug.</div>';
+    return;
+  }
+  let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">` +
+    `Determinisierung aktiv: <b>${gt.determinize_active ? 'ja' : 'nein'}</b></div>`;
+
+  // (b) Top-m-Auswahl
+  const topm = gt.top_m_selection || [];
+  html += `<div class="trace-phase"><h4>Top-m-Auswahl (${topm.filter(x=>x.selected_top_m).length}/${topm.length} Kandidaten in Top-m)</h4>`;
+  html += `<table class="trace-table"><thead><tr><th>Zug</th><th class="num">Prior</th><th class="num">ln(Prior)</th><th class="num">Gumbel g</th><th class="num">Score</th><th>Top-m</th></tr></thead><tbody>`;
+  for (const t of topm) {
+    html += `<tr class="${t.selected_top_m ? '' : 'trace-topm-out'}"><td>${t.description}</td>` +
+      `<td class="num">${(t.prior*100).toFixed(1)}%</td><td class="num">${fmtNum(t.ln_prior,2)}</td>` +
+      `<td class="num">${fmtNum(t.gumbel_g,2)}</td><td class="num">${fmtNum(t.score,2)}</td>` +
+      `<td>${t.selected_top_m ? '✓' : ''}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  // (c) Sequential-Halving-Phasen
+  for (const p of (gt.phases || [])) {
+    html += `<div class="trace-phase"><h4>Phase ${p.phase} — ${p.sims_per_survivor} Sims je Überlebendem</h4>`;
+    html += `<table class="trace-table"><thead><tr><th>Zug</th><th class="num">Visits</th><th class="num">Q</th><th class="num">σ(Q)</th><th class="num">Score</th></tr></thead><tbody>`;
+    for (const cand of p.candidates) {
+      html += `<tr class="${cand.eliminated ? 'trace-elim' : ''}"><td>${cand.description}</td>` +
+        `<td class="num">${cand.visits}</td><td class="num">${fmtNum(cand.q,3)}</td>` +
+        `<td class="num">${fmtNum(cand.sigma_q,2)}</td><td class="num">${fmtNum(cand.score,2)}</td></tr>`;
+    }
+    html += `</tbody></table></div>`;
+  }
+
+  // (d) Finale Zugwahl
+  const finalists = gt.final_selection || [];
+  html += `<div class="trace-phase"><h4>Finale Zugwahl (Max-Visit-Menge, ${finalists.length} Finalist${finalists.length===1?'':'en'})</h4>`;
+  html += `<table class="trace-table"><thead><tr><th>Zug</th><th class="num">Visits</th><th class="num">ln(Prior)</th><th class="num">σ(Q)</th><th class="num">Score</th></tr></thead><tbody>`;
+  for (const f of finalists) {
+    html += `<tr><td>${f.description}</td><td class="num">${f.visits}</td>` +
+      `<td class="num">${fmtNum(f.ln_prior,2)}</td><td class="num">${fmtNum(f.sigma_q,2)}</td><td class="num">${fmtNum(f.score,2)}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  c.innerHTML = html;
+}
 
 let HISTORY = [];
 let IDX = -1;
@@ -194,9 +284,9 @@ function renderAnalysis(d) {
   const hasNet = d.has_net !== false;  // default true für AlphaZero
   const fill = document.getElementById('valueFill');
   if (hasNet && d.win_pct !== null && d.win_pct !== undefined) {
-    const winPct = d.win_pct;
-    fill.style.width = winPct + '%';
-    fill.textContent = winPct + '%';
+    const winPct = Math.max(0, Math.min(100, d.win_pct));
+    fill.style.width = winPct.toFixed(1) + '%';
+    fill.textContent = winPct.toFixed(1) + '%';
     const hue = Math.round((winPct / 100) * 120);
     fill.style.background = `hsl(${hue}, 65%, 55%)`;
     document.getElementById('valueNum').textContent = (d.value >= 0 ? '+' : '') + d.value.toFixed(3);
@@ -216,6 +306,7 @@ function renderAnalysis(d) {
     : d.num_actions;
   document.getElementById('numSims').textContent = d.simulations;
   document.getElementById('maxDepth').textContent = d.max_depth !== undefined ? d.max_depth : '–';
+  renderValueBreakdown(d.value_debug);
 
   const moves = d.moves || [];
   if (!moves.length) {
@@ -231,6 +322,7 @@ function renderAnalysis(d) {
     (hasNet ? '<th class="num">Netz-Policy</th>' : '') +
     '<th class="num">MCTS-Visits</th>' +
     '<th class="num">MCTS Win%</th>' +
+    (hasNet ? '<th class="num" title="Netz-Ersteinschätzung bei Expansion, VOR Suchvertiefung">Netz-Blattwert</th>' : '') +
 	'<th class="num">Tiefe</th>' +
     (hasNet ? '<th class="num">Δ</th>' : '') +
     '</tr></thead><tbody>';
@@ -253,6 +345,9 @@ function renderAnalysis(d) {
       divCell = `<td class="num">${divStr}</td>`;
     }
 
+    const netLeafCell = hasNet
+      ? `<td class="num">${m.net_leaf_value != null ? (m.net_leaf_value*100).toFixed(1) + '%' : '–'}</td>`
+      : '';
 	html += `<tr${rowStyle}>
       <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
           <span class="pill">${m.action_id}</span></td>
@@ -260,6 +355,7 @@ function renderAnalysis(d) {
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
       <td class="num">${m.mcts_win_pct != null ? m.mcts_win_pct.toFixed(1) + '%' : '–'}</td>
+      ${netLeafCell}
       <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '–'}</td>
       ${divCell}
     </tr>`;
@@ -286,6 +382,7 @@ function showIdx(i) {
   const d = HISTORY[IDX];
   renderAnalysis(d);
   renderTree(d);
+  renderTrace(d.gumbel_trace);
   document.getElementById('navInfo').textContent = `${IDX+1} / ${HISTORY.length}`;
   const chosen = (d.moves||[]).find(m => m.chosen);
   const valStr = (d.value != null)
