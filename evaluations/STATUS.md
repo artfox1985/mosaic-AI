@@ -4003,6 +4003,168 @@ Wheel neu gebaut, `evaluations/frozen_eval_set.pkl`/`data/` nur gelesen.
 Aufgabe pausiert bis zur Entscheidung, ob der fehlende Such-Einstieg
 ergaenzt werden soll.
 
+**AUFGELÖST (2026-07-25, Fortsetzung)**: der fehlende Such-Einstieg wurde
+ergänzt (`engine/src/serialize.rs::json_to_state` + neue PyO3-Funktion
+`net_search_state_json`, Commits `392b680`/Folgecommit s.u.) -- Schritte 1-3
+sind jetzt durchgeführt, siehe Ergebnis-Abschnitt unten.
+
+## Task #89: Oracle-Metriken -- Ergebnisse (2026-07-25)
+
+**Teil A -- Engine-Erweiterung.** `json_to_state` (manueller Parser, kein
+serde-Derive: `state_to_json` ist keine bijektive Serialisierung) invertiert
+`state_to_json` für alle direkt/vollständig ableitbaren Felder. Drei
+Kategorien von Abweichungen, jede einzeln gegen den Engine-Code geprüft
+(ausführlicher Kommentar direkt vor der Funktion in `serialize.rs`):
+
+1. **Echte verdeckte Information** (bag/tower/dome_tile_pool/bonus_chip_pool):
+   JSON trägt nur Zähler/Masken. Rekonstruktion: die daraus ableitbare
+   Identitätsmenge, neu gemischt mit dem übergebenen RNG -- deckt sich mit
+   `net_mcts::determinize_hidden_information` (`DETERMINIZE_ROOT_HIDDEN_INFO`),
+   das an jedem echten Sucheinstieg ohnehin genau diese Felder neu mischt.
+   `bonus_chip_pool` ist ein Sonderfall (gar kein Zähler im JSON) -- Größe
+   deterministisch aus der Rundenzahl (20-4·Runde), Identität zufällig aus
+   den aktuell nicht sichtbaren Designs.
+2. **Vollständig ableitbare Felder**: `first_player_next_round` (Spieler mit
+   `marker=true`), `monochrome_fallback` der großen Fabrik (aus
+   `sun_tiles`-Farbhomogenität).
+3. **Dokumentierte, für die Wurzel-Legalität unschädliche Näherungen**:
+   `dome_tiles_placed_this_round` (0/2 je nach `can_place_dome`-Bool, exakt
+   für den Wurzelknoten, +/-1 Platzierung tiefer im Baum im seltenen
+   Zwischenwert-1-Fall), `tiled_max_row` (-1, exakt für JEDEN
+   `Phase::Drafting`-Zustand -- EINE geprüfte Ausnahme: `estimated_score`
+   via `tiling_solver::chippable_rows`, nur wenn der Spieler einen
+   ungenutzten Bonuschip hält), `pending_dome_choice` (nicht serialisiert,
+   IMMER als "Stufe 1 offen" statt "Stufe 2/Rotationswahl" rekonstruiert).
+
+**Roundtrip-Tests** (6 neue, `engine/src/serialize.rs::json_to_state_tests`):
+state → json → state → json strukturell stabil (Value-Vergleich,
+ordnungsunabhängig), inkl. Zufalls-Selfplay-Walk über mehrere Runden bis
+Runde 5 (PendingDomeChoice-/Stapelzug-Zwischenzustände eingeschlossen). Ein
+Vergleichs-Helfer toleriert GENAU die eine geprüfte `estimated_score`-Lücke
+(Kategorie 3, `tiled_max_row`) -- jede andere Abweichung bleibt ein harter
+Fehler. `cargo test --release`: 159/159 grün (156 Basis + 6 neu, 1 wie
+zuvor ignoriert). Wheel gebaut + installiert.
+
+**Empirische Kreuzvalidierung gegen echte `frozen_eval_set.pkl`-Zustände**
+deckte zwei Randgruppen auf, in denen die rekonstruierte Wurzel-
+Kandidatenzahl von der am echten Spielzustand aufgezeichneten
+`valid_actions`-Länge abweicht (Stichprobe 80 "sauberer" Zustände: 0
+Abweichungen danach):
+- **Startkuppel-angrenzende Zustände** (19 von 1329 Drafting-Zuständen):
+  `Phase::StartPlacement` wird in dieser Engine nie tatsächlich gesetzt
+  (`setup_new_game` schreibt immer `Phase::Drafting`, auch während beide
+  Spieler noch `start_tile_pending` sind) -- solche Zustände tragen
+  `phase="drafting"` im JSON, obwohl die Startkuppel-Wahl über eine
+  komplett separate, rein heuristische Route läuft
+  (`choose_start_placement`/`apply_start_placement`, NIE über
+  `net_search_with_tree`). Kein Rekonstruktionsfehler, sondern ein
+  Anwendungsbereich, den die neue Suchfunktion (wie `ai_debug_net_json`,
+  ihr Vorbild) von Haus aus nicht abdeckt.
+- **PendingDomeChoice-Zwischenzustände** (125 von 1329): die im
+  `json_to_state`-Kommentar dokumentierte Kategorie-3-Lücke -- betrifft
+  empirisch ca. 9% der Drafting-Zustände.
+
+Beide Kategorien werden beim Oracle-Labeling ausgeschlossen (s.u.),
+verbleiben 1185 "saubere" Zustände.
+
+**Teil B, Schritt 1 -- Oracle-Labels** (`tools/build_frozen_oracle_labels.py`,
+`evaluations/frozen_v1_oracle_labels.json`): v16_best, 5000 Sims/Zustand,
+c_puct=1.5, Seed je Zustand deterministisch aus SHA-256(kanonisches JSON)
+abgeleitet. 1185 Zustände gelabelt in 969s (16.1 Min, ~1.2 Zustände/s), **0
+Mismatches, 0 Fehler** (Wurzel-Kandidatenzahl gegen `valid_actions`
+durchgehend gegengeprüft). Von den 1800 Frozen-Set-Records: 471 nicht
+Drafting-Phase (Tiling/Scoring/etc. -- `net_search_with_tree` liefert dort
+strukturell immer leer, kein Rekonstruktionsproblem), 19
+startkuppel-angrenzend, 125 PendingDomeChoice -- ausgeschlossen wie oben
+begründet.
+
+**Teil B, Schritt 2 -- Metriken je Netz** (`tools/oracle_metrics.py`,
+`evaluations/task89_oracle_metrics.json`). **Wichtige zusätzliche
+Einschränkung, beim ersten Lauf entdeckt**: Runde 5 (`round5::applies`)
+fällt in `net_search_with_tree` auf den EXAKTEN Alpha-Beta-Solver zurück
+(architektonisch bewusst kein Netz-Entscheid in dieser Engine, siehe
+"Runde 5: exakte Alpha-Beta-Suche" oben) -- dessen Analyse-Struktur trägt
+weder `net_prob` noch `action`-Dict noch eine `[0,1]`-Root-Value, ist also
+für Policy-Prior-/Value-Korrelations-Metriken gegenstandslos. Konsequent
+ausgeschlossen (analog zur Startkuppel-Platzierung) -- verbleiben **952
+auswertbare Zustände** (Runden 1-4).
+
+Vier Metriken, GESAMT + je Runde (Runde 1-4; n=245/245/231/231):
+
+| Netz | Elo | Prior-Recall@16 | Prior-Masse Top-3 | Value Pearson-r | Value Spearman-r | Kendall-Tau (Policy vs. Oracle-Q) |
+|---|---|---|---|---|---|---|
+| v14_best | 884 | 0.970 | 0.569 | 0.810 | 0.778 | 0.220 |
+| v14b_best | 961 | 0.971 | 0.585 | 0.813 | 0.789 | 0.214 |
+| v15_f2k_best | 987 | 0.978 | 0.602 | 0.833 | 0.806 | 0.227 |
+| v15_best | 1029 | 0.982 | 0.618 | 0.859 | 0.829 | 0.245 |
+| v16_best | 1132 | 0.999 | 0.652 | 0.884 | 0.859 | 0.279 |
+| v16 (Epoche 15, kein Elo) | -- | 0.997 | 0.666 | 0.844 | 0.810 | 0.288 |
+
+(Prior-Recall@16/Prior-Masse-Top-3/Value-Pearson/Value-Spearman/Kendall-Tau
+je Runde: durchgehend dieselbe monotone Netz-Reihenfolge in Runde 1-3;
+Value-Pearson steigt zusätzlich mit der RUNDE selbst je Netz, deckt sich mit
+dem seit 2026-07-19 bekannten Runde-für-Runde-R²-Befund oben -- Runde 4
+0.85-0.91, Runde 1 0.71-0.81.)
+
+**Teil B, Schritt 3 -- Rangkorrelationen + Gating-Rückblick.** Spearman
+zwischen jeder Metrik (Gesamt) und der bekannten Elo-Reihe
+(884/961/987/1029/1132, NUR die 5 Netze mit Elo-Eintrag -- `v16` bleibt wie
+beauftragt Außenpunkt ohne eigenen Elo-Wert):
+
+| Metrik | Spearman-r vs. Elo (n=5) |
+|---|---|
+| Prior-Recall@16 | 1.000 |
+| Prior-Masse Top-3 | 1.000 |
+| Value Pearson-r | 1.000 |
+| Value Spearman-r | 1.000 |
+| Kendall-Tau | 0.900 |
+
+**Gating-Rückblick** (hätte die Metrik den bekannten Gewinner richtig
+vorhergesagt? 3 bekannte Gating-Ausgänge: v15_best>v14b_best,
+v16_best>v15_best, v15_best>v15_f2k_best): **alle 5 Metriken 3/3 richtig.**
+
+**EHRLICHE Einordnung (n=5, vorläufig, wie beauftragt)**: die
+Rangkorrelation ist bei ALLEN 5 Metriken nahezu perfekt (4 von 5 exakt 1.0)
+-- deutlich sauberer als die klassischen Offline-Metriken (Val-R²/Top-1),
+die beim v16-Zyklus nachweislich NICHT monoton mit der Stärke liefen (siehe
+"v16-Zyklus" oben: v16_best schlägt v15_best in der Arena trotz teils
+flacher/gemischter klassischer Metriken). Das stützt die Ausgangshypothese
+(`project_hybrid_head_attribution`): eine Tiefe-Suche-Referenz sagt Stärke
+hier besser vorher als reine Offline-Metriken. **ZWEI wichtige,
+einschränkende Vorbehalte, die dieses Ergebnis relativieren:**
+
+1. **v16_best ist sowohl Oracle-Quelle als auch einer der 6 bewerteten
+   Kandidaten** -- ein Netz, das gegen SICH SELBST (dieselbe tiefe Suche)
+   verglichen wird, gewinnt aus rein mechanischen Gründen (kein
+   Distributionsschift zwischen "Prior" und "Suche"), nicht notwendig, weil
+   "Prior/Value-Korrelation mit Tiefensuche" allgemein Stärke misst. v16_best
+   liegt in JEDER Metrik an der Spitze -- konsistent mit dieser
+   Erklärung, nicht eindeutig widerlegbar mit n=5.
+2. **Alle 6 Netze sind sequenziell warmgestartet** (v14→v14b→v15→v15_f2k/
+   v15_best→v16→v16_best) -- spätere Netze sind im Gewichtsraum tendenziell
+   ÄHNLICHER zu v16_best als frühere, unabhängig von echter Spielstärke. Die
+   fast perfekte Korrelation könnte teilweise "Nähe zur Oracle-Quelle in der
+   Trainingslinie" statt "Spielstärke" messen -- mit dieser einen
+   Trainingslinie (n=5, keine unabhängigen Architekturen/Läufe) nicht
+   auseinanderzuhalten.
+
+**Fazit -- welche Metrik taugt als Gate-Prädiktor?** Bei diesem n (5 Netze,
+eine Trainingslinie) unterscheiden sich die 5 Metriken NICHT klar
+voneinander (4 von 5 bei r=1.000) -- keine sticht als überlegen heraus.
+**Prior-Masse-Top-3** und **Value-Pearson-r** sind am einfachsten zu
+berechnen (kein Kandidatenlisten-Ranking nötig, robust gegen kleine
+Stichproben je Zustand) und daher pragmatisch die ersten Kandidaten für
+einen künftigen Gate-Zusatzcheck -- aber NUR als ergänzendes Signal, nicht
+als Ersatz für eine echte Arena-Messung, und nur mit einer unabhängigeren
+Stichprobe (andere Trainingslinie/Architektur, oder ein Oracle-Netz, das
+NICHT selbst zu den bewerteten Kandidaten zählt) erneut zu prüfen, bevor
+daraus eine Gate-Entscheidung abgeleitet wird.
+
+**Artefakte**: `evaluations/frozen_v1_oracle_labels.json` (Oracle-Labels,
+ab jetzt unveränderlich wie `frozen_eval_set.pkl` selbst),
+`evaluations/task89_oracle_metrics.json` (Metrik-/Korrelations-Ergebnisse),
+`tools/build_frozen_oracle_labels.py`, `tools/oracle_metrics.py`.
+
 
 ## Korrigendum Elo-Anker-Beschriftung (2026-07-25)
 
