@@ -3819,3 +3819,115 @@ bleibt bestehen (nicht geloescht).
 *(Nachtrag 25.07.: nach Nutzer-Go aufgeraeumt — Worktree + Branch entfernt;
 Doku + Ergebnis-JSONs zuvor nach main uebernommen.)*
 
+## Task #94: v16-Zyklus (2026-07-25)
+
+Naechster Frischdaten-Zyklus der Wiederaufbau-Linie: `v14` (884 Elo) ->
+`v14b` (961) -> `v15` (1029, bisherige Referenz) -> **v16**. Zielmarke bleibt
+der verlorene Alt-Champion (1100 Elo, `v13_nortv_best`). `data/` lag beim
+Task-Start bereits fertig vor (vom Nutzer vorbereitet): **100×`v12` +
+200×`v14b` + 600×`v15` = 900 Dateien / 9000 Spiele**, verifiziert. Der
+frische `v15`-Anteil (600 Dateien) traegt kein `rtv`-Feld (korrekt, seit
+`v13_nortv`-Umstellung Standard). Selfplay-Batch-Fakten fuer diesen frischen
+`v15`-Anteil (Vorlauf, vor Task-Start bereits gelaufen): 6000 Spiele in
+7h17min = **0,229 Spiele/s**.
+
+**Training** (`train.py --name v16 --load v15_best --lr 0.00005
+--lr-schedule cosine --epochs 100 --value-target-variant nortv`, kompletter
+Cache-Neubau fuers neue Fenster):
+
+| | v16 |
+|---|---|
+| Korpus | 100 v12 + 200 v14b + 600 v15 = 900 Dateien |
+| Trainings-/Val-Split | 810/90 Dateien (1.308.650/145.336 Zuege) |
+| Cache-Build | 986,5s + 97,0s (kompletter Neubau, 9000 Spiele) |
+| Epoche-1 Val-R² (Value/Points) | 0,463 / 0,543 (Warm-Start bestaetigt, ≫0,2-Schwelle) |
+| Fruehstopp | Epoche 15 (VAL-POLICY-PLATEAU seit Epoche 10, Patience 5) |
+| Bestes Modell | Epoche 3 (val_combined=1,3665) |
+| Netzauslastung | Dead 1% (layer3 3%), Eff.Rank 39% -- gesund |
+| OneDrive-Snapshot | `models_2026-07-25_1825_v16.zip` (90 MB), bestaetigt |
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`, klassisch + `--frozen`;
+`v13_nortv_best`-Checkpoint existiert nach dem Datenverlust nicht mehr, daher
+nur als feste Referenzzeile aus dem Task-Kontext uebernommen):
+
+*Klassischer Val-Split (Datei-Ebene, Seed 20260707, n=145.336 Zuege,
+Top-1/Top-3 nur Drafting n=105.370; `evaluations/offline_diagnose_v16_classic.json`):*
+
+| Modell | Top-1 | Top-3 | R² global | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| **v16_best** | **52,8%** | **82,4%** | **0,443** | **0,104** | **0,279** | **0,413** | **0,524** | **0,626** |
+| v15_best | 52,2% | 81,7% | 0,432 | 0,098 | 0,274 | 0,409 | 0,512 | 0,607 |
+
+*Frozen Set (`frozen_v1`, n=1800; `evaluations/offline_diagnose_v16_frozen.json`):*
+
+| Modell | Top-1 | Top-3 | R² global | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| v13_nortv_best (verlorene Messlatte) | 48,5% | 75,5% | 0,343 | 0,063 | 0,175 | 0,227 | 0,271 | 0,697 |
+| v15_best (bisherige Referenz) | 46,9% | 73,3% | 0,300 | 0,020 | 0,125 | 0,149 | 0,162 | 0,726 |
+| v16_best (neu) | 45,6% | 71,6% | 0,295 | 0,014 | 0,135 | 0,166 | 0,139 | 0,713 |
+
+Aufschluesselung je Quellkorpus (frozen Set): v10b-Anteil (n=900) Value-R²
+`v16_best` 0,316 / `v15_best` 0,309 (v16 leicht vorn); v12-Anteil (n=900)
+0,268 / 0,288 (v16 leicht zurueck).
+
+**Kernbefund R1/R2**: Die Frueshspiel-Erholung setzt sich auf dem frozen Set
+NICHT eindeutig fort -- R1 stagniert praktisch (0,014 vs. 0,0195, minimal
+schlechter), R2/R3 legen leicht zu (0,135/0,166 vs. 0,125/0,149), R4/R5
+fallen leicht ab. Auf dem klassischen (In-Distribution-)Val-Split zeigt
+`v16_best` dagegen in JEDER Runde eine kleine, durchgehende Verbesserung
+gegenueber `v15_best`. Insgesamt ein flaches, gemischtes Bild -- plausibel
+angesichts des sehr fruehen Stopps (bestes Modell bereits Epoche 3, LR
+5e-5 Warm-Start bewegt das Netz nur wenig von `v15_best` weg). Wichtig:
+trotz dieser flachen/gemischten Offline-Metriken zeigt das Live-Gating (s.u.)
+eine klare, signifikante Staerkeverbesserung -- bestaetigt erneut den
+`Hybrid-head-attribution`-Befund, dass Offline-Policy-/Value-Metriken kein
+verlaesslicher Staerke-Praediktor sind.
+
+**Gepaartes Gating** (`tools/paired_gating.py`, `v16_best` (A) vs.
+`v15_best` (B), beide @400 Sims,
+`evaluations/paired_gating_result_v16_best_vs_v15_best.json`, Bloecke a 25
+Paare, gepaarter Vorzeichentest + SPRT p1=0,65/α=β=0,05):
+
+| Block | kumulativ A:B | LLR | Bericht-p (McNemar) |
+|---|---|---|---|
+| 1 (n=25) | 31:19 | +1,10 | 0,21 |
+| 2 (n=50) | 61:39 | +1,94 | 0,07 |
+| 3 (n=75) | **91:59** | **+2,97** | **0,02** |
+
+**SPRT-Entscheid bereits nach 75 Paaren (150 Spielen)**: `v16_best`
+signifikant staerker (LLR=+2,972 >= obere Schranke +2,944, ACCEPT_H1).
+Gepaarte Differenz (A-Siege minus B-Siege pro Paar) +0,427 [95%-CI +0,100,
++0,754] -- CI klar ueber Null. **`v16_best` wird neue Referenz/Generator der
+Wiederaufbau-Linie.**
+
+**Elo-Neuverankerung** (`tools/arena.py`, `v16_best`@400 vs. Heuristik@200,
+Rust-Engine, 10 Threads, SPRT p1=0,64/α=0,05/β=0,10): SPRT entschied bereits
+nach 47/400 Spielen: `v16_best` signifikant staerker (LLR_Netz=+2,97,
+LLR_Heur=-2,38) -- **v16_best 32:15 Heuristik@200 (68% Netzsiege)**,
+deutlicher Sprung gegenueber `v15_best`s 52% (45:41). Eingetragen via
+`tools/elo_tracker.py add`; Bradley-Terry-Fit ergibt **v16_best@400 = 1132
+[1037, 1250]** (CI breit, kleines n=47 durch fruehen SPRT-Stopp).
+
+Neue Kader-Reihenfolge: **v16_best 1132** > v13_nortv_best 1100 (verlorener
+Alt-Champion) > v12b_lr_best 1051 > v15_best 1029 > Heuristik@200 1000
+(Anker) > v15_f2k_best 987 > v14b_best 961 > v12_best 943 > v14_best 884 >
+v10_best 858 > v11_td07_best 853 > v11_best 809.
+
+**Gesamteinschaetzung**: `v16_best` ist der erste Stand der
+Wiederaufbau-Linie, der die Zielmarke von 1100 Elo (verlorener
+`v13_nortv_best`-Champion) UEBERTRIFFT (1132 vs. 1100), trotz eines flachen
+bis leicht durchwachsenen Offline-Diagnose-Bilds auf dem frozen Set und
+eines sehr fruehen Trainings-Stopps (bestes Modell Epoche 3 von 100). Das
+gepaarte Gating (LLR=+2,97, ACCEPT_H1 nach nur 75 Paaren) UND die
+Elo-Neuverankerung (68% Netzsiege, SPRT nach nur 47 Spielen) sind beide
+deutlich eindeutiger als beim `v15`-Zyklus (dort jeweils "Gleich stark"
+bzw. knapp ueber der Grenze). Das CI der neuen Elo-Zahl ist wegen des sehr
+fruehen SPRT-Stopps breit (1037-1250) -- die Zahl 1132 sollte als vorlaeufig
+gelten, nicht als praezise Messung; ein zukuenftiger laengerer Lauf koennte
+den Wert nach unten UND oben korrigieren. Erneut ein Beleg gegen die
+Verwendung von Offline-Metriken als alleinigem Staerke-Praediktor (s.
+`project_hybrid_head_attribution`).
+
+**data/-Integritaetsnachweis**: 100 v12 + 200 v14b + 600 v15 = 900 Dateien
+(vom Nutzer vorbereitet, unveraendert bestaetigt, `data/` nicht umgebaut).
+
