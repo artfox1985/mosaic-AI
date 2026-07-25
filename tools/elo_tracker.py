@@ -19,7 +19,7 @@ nur die Herkunft der eingetragenen Zahlen. `tools/arena.py::run_net_vs_net` blei
 fuer schnelle, nicht-gating-relevante Sanity-Checks nuetzlich.
 
 Kader (Nutzer-Entscheidung, siehe MEMORY.md "Plan, delegate to Sonnet agents"):
-  - Heuristik@200 Sims   -- fester Elo-Anker, auf 1000 verankert (ANCHOR unten)
+  - Heuristik@150 Sims (nominal; Heuristik-Pfad nutzt dynamic_sims -> real Ø~330)   -- fester Elo-Anker, auf 1000 verankert (ANCHOR unten)
   - aktueller Netz-Champion@400 Sims   (derzeit v10_best)
   - vorheriger Netz-Champion@400 Sims  (sobald ein Nachfolger gated hat)
 
@@ -29,7 +29,7 @@ Die historischen Netz-vs-Heuristik-Ergebnisse (z.B. die 17-26%-Session-
 Baselines in tools/arena.py) liefen mit Heuristik@150 (dynamic_sims-skaliert, Ø~330
 tatsaechliche Sims) UND unter dem alten Regelwerk vor dem Regelbuch-Audit
 (82e8a88: Marker-/Tie-Break-/Monochrom-Fixes). Weder die Sims-Bedingung noch
-die Spielregeln sind mit dem aktuellen Kader (Heuristik@200, neue Regeln)
+die Spielregeln sind mit dem aktuellen Kader (Heuristik@150(dyn~330), neue Regeln)
 vergleichbar -- ein Backfill wuerde Aepfel mit Birnen im selben Elo-Graphen
 verrechnen. Die CSV startet daher bewusst NUR mit dem einen kader-validen
 Bestandsergebnis (v11_best vs v10_best, 2026-07-22, siehe unten).
@@ -37,7 +37,7 @@ Bestandsergebnis (v11_best vs v10_best, 2026-07-22, siehe unten).
 Ablauf fuer kuenftige Generationen (AB TASK #76 GEPAART, siehe oben)
 --------------------------------------------------------------------
 1. Neues Modell (z.B. v12_best) spielt gegen JEDES Kader-Mitglied:
-   - vs. Heuristik@200: weiterhin `tools/arena.py::run_net_arena` (kein Kandidat-
+   - vs. Heuristik@150(dyn~330): weiterhin `tools/arena.py::run_net_arena` (kein Kandidat-
      vs-Kandidat-Brett-Bias moeglich, Heuristik ist kein Netz-Brett).
    - vs. amtierenden/vorherigen Champion (Netz vs. Netz): NEU per
      `tools/paired_gating.py`:
@@ -52,14 +52,14 @@ Ablauf fuer kuenftige Generationen (AB TASK #76 GEPAART, siehe oben)
            --player-b Heuristik --sims-b 200 --wins-a 61 --wins-b 39 --n 100 \\
            --comment "Kader-Match v12-Zyklus"
 3. `python tools/elo_tracker.py report` zeigt den aktuellen Elo-Verlauf
-   (Bradley-Terry-Fit ueber den gesamten Graphen, Heuristik@200 fix auf 1000).
+   (Bradley-Terry-Fit ueber den gesamten Graphen, Heuristik@150(dyn~330) fix auf 1000).
 4. Gating-Regel: ein neues Modell loest den amtierenden Champion nur ab, wenn
    es GEGEN DEN AMTIERENDEN CHAMPION signifikant gewinnt -- ab jetzt per
    `paired_gating.py`s exaktem Paar-Vorzeichentest (p<0.05, siehe dort), NICHT
    mehr per `tools/arena.py::run_net_vs_net`s SPRT. Ein blosser Sieg gegen die
    Heuristik allein reicht weiterhin nicht.
 
-Die ERSTEN echten Kader-Matches (v10_best und v11_best je vs. Heuristik@200)
+Die ERSTEN echten Kader-Matches (v10_best und v11_best je vs. Heuristik@150(dyn~330))
 wurden bewusst NICHT ausgefuehrt (Maschine ist mit Training belegt) -- siehe
 Kommando-Vorlagen oben, Punkt 1. Der Koordinator triggert sie spaeter.
 

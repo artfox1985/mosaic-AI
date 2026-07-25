@@ -4003,3 +4003,16 @@ Wheel neu gebaut, `evaluations/frozen_eval_set.pkl`/`data/` nur gelesen.
 Aufgabe pausiert bis zur Entscheidung, ob der fehlende Such-Einstieg
 ergaenzt werden soll.
 
+
+## Korrigendum Elo-Anker-Beschriftung (2026-07-25)
+
+Nutzer-Nachfrage deckte eine Etikettier-Inkonsistenz auf: Alle Anker-Matches
+(v10 bis v16) liefen faktisch gegen die Heuristik mit HEUR_SIMS=150
+(arena.py-Konfig; nominal 150, durch dynamic_sims real Ø~330 Sims) -- die
+elo_history.csv und diverse Doku-Stellen etikettierten den Anker aber als
+"Heuristik@200" (urspruengliche Kader-Vorgabe, nie so umgesetzt). Da der
+Gegner ueber ALLE Eintraege identisch war, bleiben saemtliche Elo-Relationen
+gueltig -- reines Label-Problem. Nutzer-Entscheid: Anker bleibt faktisch
+s150(dyn~330), Beschriftung ueberall korrigiert auf "Heuristik@150(dyn~330)".
+Alle aelteren "Heuristik@200"-Erwaehnungen in diesem Dokument sind
+entsprechend zu lesen.

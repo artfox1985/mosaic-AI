@@ -31,9 +31,9 @@ v10_best @ NET_SIMS=400 (flach, DECOUPLE_NET_SIMS_FROM_ACTIONS=true) vs.
 Heuristik @ HEUR_SIMS=200 (Basiswert, weiterhin intern `dynamic_sims`-
 skaliert wie in `tools/arena.py`s bisherigem HEUR_SIMS=150 -- NUR der Basiswert
 ist per Nutzer-Korrektur auf 200 angehoben, neuer Kader-Standard,
-`project_..._elo_kader`-Memory: Heuristik@200-Anker + Champion@400 +
+`project_..._elo_kader`-Memory: Heuristik@150(dyn~330)-Anker + Champion@400 +
 prev-Champion@400). Dieser A/B-Lauf IST damit zugleich der ERSTE
-Heuristik@200-Referenzpunkt (bisherige Session-Baselines liefen alle mit
+Heuristik@150-Referenzpunkt (bisherige Session-Baselines liefen alle mit
 HEUR_SIMS=150) -- beim Interpretieren der absoluten Netz-Siegquote
 berücksichtigen, nicht direkt mit den alten 22-49%-Referenzen aus
 STATUS.md vergleichen (andere Heuristik-Stärke).
@@ -151,7 +151,7 @@ def run_paired_ab(max_pairs: int = MAX_PAIRS, block_size: int = BLOCK_SIZE,
     done = 0
     block_idx = 0
     print(f"Gepaarter A/B ALT(b0c6a9c) vs NEU(Speed-Bündel) -- v10_best @ NET_SIMS={NET_SIMS} "
-          f"vs. Heuristik @ HEUR_SIMS={HEUR_SIMS} (erster Heuristik@200-Referenzpunkt), "
+          f"vs. Heuristik @ HEUR_SIMS={HEUR_SIMS} (erster Heuristik@150-Referenzpunkt), "
           f"Basis-Seed={base_seed}")
     print(f"  ALT-Python: {OLD_PYTHON}")
     print(f"  NEU-Python: {sys.executable}")
