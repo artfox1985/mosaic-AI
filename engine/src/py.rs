@@ -418,7 +418,11 @@ impl PyGame {
 
     /// Wie `ai_debug_json`, aber mit dem geladenen Netz: Analyse-Dict mit
     /// echten Netz-Priors (`net_prob`/`net_prob_norm`) UND PUCT-Such-Stats
-    /// je Wurzelkind, ohne einen Zug auszuführen.
+    /// je Wurzelkind, ohne einen Zug auszuführen. Task #95: `collect_trace=true`
+    /// -- der EINZIGE Aufrufer, der den ROOT-Value-Breakdown (`value_debug`)
+    /// UND den granularen Gumbel-Trace (`gumbel_trace`) anfordert (reiner
+    /// Analyse-Endpunkt für `/api/ai/debug`, kein Zug wird angewendet, kein
+    /// Self-Play-/Arena-Performance-Pfad betroffen).
     #[pyo3(signature = (simulations=200, c_puct=1.5))]
     fn ai_debug_net_json(&mut self, simulations: u32, c_puct: f64) -> PyResult<String> {
         let net = self.net.as_ref().ok_or_else(|| {
@@ -426,7 +430,7 @@ impl PyGame {
         })?;
         let sims = net_mcts::net_effective_sims(simulations, drafting_actions(&self.game.state).len());
         let (_chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, None);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, None, true);
         Ok(analysis.to_string())
     }
 
@@ -586,6 +590,14 @@ impl PyGame {
     /// Drafting-Zug per Netz-PUCT (mit Priors+Such-Stats-Analyse). Erfordert
     /// zuvor `load_net()`. `log=true` hängt einen vollen Sim-für-Sim-Trace an
     /// (Selection/Expansion/Eval/Backprop je Simulation, analog zur Heuristik).
+    /// Task #95: `collect_trace=true` -- anders als die Massen-Aufrufstellen
+    /// (Self-Play/Arena laufen NIE über `net_search_with_tree`, sondern über
+    /// `net_search_drafting_action`/`net_root_child_stats*`, siehe dortige
+    /// Kommentare) ist dies ein EINZELNER Zug pro menschlichem Klick im
+    /// Server (Mensch-vs-KI) -- der zusätzliche Root-Value-Forward-Pass fällt
+    /// hier nicht ins Gewicht, macht die Debug-Historie (`/api/ai/debug_history`,
+    /// `debug.html`) aber erst nutzbar (sonst wäre `value_debug`/`gumbel_trace`
+    /// dort permanent `null`).
     fn ai_drafting_net_step(&mut self, simulations: u32, c_puct: f64, log: bool) -> PyResult<String> {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
@@ -604,7 +616,7 @@ impl PyGame {
         let mut lines: Vec<String> = Vec::new();
         let logger = if log { Some(&mut lines) } else { None };
         let (chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, logger);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, logger, true);
         let a = match chosen {
             Some(a) => a,
             None => {

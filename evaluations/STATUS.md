@@ -4205,3 +4205,71 @@ vorhersagen wuerde -- am ehesten normale Stichprobenstreuung bei n=100
 gepaarten Spielen, ein systematischer Effekt ist mit dieser Stichprobe nicht
 auszuschliessen, aber auch nicht separat belegt. Wie beauftragt: nur
 Beobachtung, keine weitere Massnahme.
+
+
+## Task #95: KI-Debugger -- Value-Head-Anzeige + granularer Gumbel-Trace (2026-07-25)
+
+Der KI-Debugger (`debug.html`/`/api/ai/debug*`) zeigte im Netz-Pfad bisher
+IMMER `value: null`/`win_pct: null` (Wurzel-Gauge blieb tot) und beim
+Gumbel-Suchpfad (`USE_GUMBEL_SEARCH=true`, seit Task #65 Standard) nur den
+Platzhaltertext "GUMBEL-SUCHE (kein granularer Sim-Trace)" statt eines
+echten Sim-Traces (Fundstelle: `net_mcts.rs::build_net_tree`s Dispatch-Zweig,
+vormals Zeile ~1666).
+
+**Value-Head-Anzeige** (`engine/src/net_mcts.rs`): neue `RootValueDebug`-
+Struktur fasst rohen `value_head`-Tanh-Output, `points_forecast`, reine
+Win-Wahrscheinlichkeit, KataGo-Blend NACH Value-Shrinkage (Task #78) und das
+(auf Ego-Perspektive gedrehte) Floor-Shaping-Additiv (Task #78, `evaluations/
+STATUS.md` "Floor-Shaping") zusammen -- berechnet in `compute_root_value_debug`
+per EINEM separaten `Net::eval`-Forward-Pass auf der bereits determinisierten
+Wurzelposition, komplett losgelöst vom Suchpfad (kein RNG-Verbrauch, kein
+Effekt auf `nodes`). Je Wurzelkind zusätzlich `net_leaf_value` (Netz-Blattwert
+bei Expansion, Perspektive des ziehenden Spielers -- direkt vergleichbar mit
+`mcts_q`, zeigt Netz-Ersteinschätzung vs. Such-Ergebnis).
+
+**Granularer Gumbel-Trace**: `GumbelTrace` sammelt (a) Determinisierungs-
+Status, (b) ALLE legalen Wurzelkandidaten der Top-m-Auswahl (Prior/ln(Prior)/
+Gumbel-g/Score/Top-16-Kennzeichnung), (c) je Sequential-Halving-Phase
+(Sims/Überlebendem, je Kandidat Visits/Q/σ(Q)/Score/Eliminierung), (d) die
+finale Max-Visit-Menge mit ln(Prior)+σ(Q) je Finalist -- als strukturiertes
+JSON (`gumbel_trace`-Feld), nicht mehr nur Text.
+
+**Nur der Debug-Pfad zahlt**: Trace-Sammlung hängt an einem neuen
+`trace: Option<&mut GumbelTrace>`-Parameter, durchgereicht durch
+`build_gumbel_tree`/`build_net_tree`. Alle Selbstspiel-/Arena-Aufrufstellen
+(`net_search_drafting_action`, `net_root_child_stats(_and_policy)`,
+`build_determinized_forest`) übergeben unverändert `None` -- keiner dieser
+Pfade läuft je über `net_search_with_tree` (das bleibt dem Server/Debug-UI +
+dem Oracle-Metriken-Tool vorbehalten). Neuer Paritätstest
+`gumbel_trace_collection_does_not_change_search` (analog zu
+`hybrid_search_with_equal_nets_matches_plain_search`) belegt: gleicher
+RNG-Seed liefert mit und ohne Trace-Sammlung bit-identische Besuchszahlen/
+Q-Werte je Knoten und dieselbe finale Zugwahl. `cargo test --release`:
+160/160 (vorher 159, +1 neuer Test), 1 weiterhin ignoriert
+(`round5_node_calibration_probe`, unveraendert).
+
+`ai_debug_net_json` (reiner `/api/ai/debug`-Analyse-Endpunkt) und
+`ai_drafting_net_step` (Mensch-vs-KI-Einzelzug im Server, füllt
+`/api/ai/debug_history`) rufen mit `collect_trace=true` -- beide sind
+Einzelzug-pro-Aufruf-Pfade, kein Self-Play/Arena-Hot-Path. Das Oracle-
+Metriken-Tool (`net_search_state_json`, `lib.rs`, potenziell tausende
+State-Aufrufe via `tools/build_frozen_oracle_labels.py`) bleibt bei
+`collect_trace=false`.
+
+`server.py`s `/api/ai/debug` reicht das Analyse-Dict bereits 1:1 durch
+(`analysis["ok"]=True; jsonify(analysis)`) -- keine Aenderung noetig.
+`debug.html` zeigt jetzt oben einen Value-Head-Breakdown (6 Kacheln:
+Roh-Value/Points-Forecast/Win%/Blended-Utility/Floor-Shift/Finaler
+Blattwert) und unten ein aufklappbares `<details>`-Trace-Panel
+(Top-m-Tabelle, je Halving-Phase eine Tabelle mit durchgestrichenen
+eliminierten Kandidaten, Finalisten-Tabelle) -- kein Framework, reines
+HTML/CSS/JS wie der Rest der Seite.
+
+**Wheel-Status**: Vorab-Check (`tasklist`/`Get-CimInstance Win32_Process`)
+fand 3 laufende `python.exe server.py`-Prozesse (Nutzer-Server aktiv) --
+gemaess Vorgabe KEIN `pip install` (gesperrte `.pyd`). Rust-Implementierung +
+`cargo test --release` vollstaendig abgeschlossen und gruen; der
+Wheel-Rebuild (`pip install -e engine/` bzw. `maturin develop`) UND der
+Live-Smoke-Test (`ai_debug_net_json` gegen `v16_best`, Kandidatenzahl 16,
+Phasen>0) stehen noch aus -- nachzuholen, sobald kein Server/Self-Play mehr
+laeuft.
