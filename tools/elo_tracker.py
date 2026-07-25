@@ -97,7 +97,9 @@ CSV_PATH = str(Path(__file__).resolve().parent.parent / "evaluations" / "elo_his
 HEADER = ["date", "player_a", "sims_a", "player_b", "sims_b", "wins_a", "wins_b", "n", "comment"]
 
 ANCHOR_NAME = "Heuristik"
-ANCHOR_SIMS = 200
+# Korrigendum 2026-07-25: Anker lief faktisch IMMER mit HEUR_SIMS=150
+# (nominal; dynamic_sims -> real Ø~330) -- Label war faelschlich 200.
+ANCHOR_SIMS = 150
 ANCHOR_ELO = 1000.0
 LN10_OVER_400 = math.log(10) / 400.0
 
