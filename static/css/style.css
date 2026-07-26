@@ -36,9 +36,10 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .blau{background:var(--blau)}.gelb{background:var(--gelb)}.rot{background:var(--rot)}
 .schwarz{background:var(--schwarz)}.tuerkis{background:var(--tuerkis)}
 /* Startspielerfliese-Marker (eigener .fslot links von -1): unbelegt =
-   helles Blau als Platzhalter, belegt = saettigteres Blau + "-2"-Text. */
-.fslot.marker-empty{background:#DBEAFE;border-color:#93C5FD}
-.fslot.marker-taken{background:var(--blau);border-style:solid;border-color:var(--blau);color:#fff;font-weight:700}
+   weiss gefuellt mit grauem Rand, belegt = weiss gefuellt mit durchgehendem
+   schwarzem Rand + schwarzem "-2"-Text. */
+.fslot.marker-empty{background:#fff;border-color:#D6D3D1;color:var(--text3);font-weight:700}
+.fslot.marker-taken{background:#fff;border-style:solid;border-color:#000;color:#000;font-weight:700}
 /* Phantom-Fliesen (per Bonuschip virtuell ergänzt, nie real gezogen):
    weiß gefüllt mit farbigem Rand statt voll gefüllt. */
 .tile.phantom{background:#fff;border-width:2.5px}
