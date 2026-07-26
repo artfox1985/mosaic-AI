@@ -1637,6 +1637,24 @@ async function _notifyGameEnd() {
   try { await api('/end_game_log', {}); } catch(e) {}
 }
 
+async function downloadGameLog() {
+  // Lädt das Log der aktuellen Partie herunter (Dateiname vom Server erfragen,
+  // damit auch nach einem Seitenreload der aktuelle Stand bekannt ist).
+  let file = null;
+  try {
+    const d = await api('/log_info');
+    if (d && d.ok) file = d.log_file;
+  } catch(e) { /* Server evtl. nicht erreichbar -- Fallback unten */ }
+  if (!file) file = window._gameLogFile;
+  if (!file) { showError('Noch kein Spiel-Log vorhanden — zuerst ein Spiel starten.'); return; }
+  const a = document.createElement('a');
+  a.href = `/static/log/${file}`;
+  a.download = file;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 async function confirmScoringTiles() {
   const ids = [...selectedScoringIds];
   const d = await api('/scoring_tiles/select', {ids});

@@ -255,6 +255,18 @@ def get_state():
     return jsonify(ok())
 
 
+@app.route('/api/log_info', methods=['GET'])
+def log_info():
+    """Dateiname des Spiel-Logs der laufenden Partie (für den Download-Button im Frontend)."""
+    if _game_log_path is None:
+        return jsonify(err("Noch kein Spiel-Log vorhanden."))
+    return jsonify({
+        "ok": True,
+        "log_file": _game_log_path.name,
+        "url": f"/static/log/{_game_log_path.name}",
+    })
+
+
 @app.route('/api/move/stone', methods=['POST'])
 def move_stone():
     if (e := _require_game()) is not None:
