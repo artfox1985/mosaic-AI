@@ -274,4 +274,26 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .confirm{width:100%;padding:9px;background:var(--text);color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px}
 .confirm:hover{background:#44403C}.confirm:disabled{background:var(--border);color:var(--text3);cursor:not-allowed}
 .cancel-btn{width:100%;padding:7px;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:7px;cursor:pointer;font-family:inherit;font-size:11px;margin-top:5px}
+
+/* Lehrer-Modus (Task #97): Zug-Hinweise (Stufe 1/2, "💡 Tipp") */
+.hint-mark{position:relative;outline:3px solid transparent;border-radius:6px;
+  animation:hint-pulse 1.6s ease-in-out infinite}
+.hint-mark.hint-1{outline-color:#F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.22)}
+.hint-mark.hint-2{outline-color:#94A3B8;box-shadow:0 0 0 3px rgba(148,163,184,.22)}
+.hint-mark.hint-3,.hint-mark.hint-4,.hint-mark.hint-5{outline-color:#B45309;box-shadow:0 0 0 3px rgba(180,83,9,.18)}
+@keyframes hint-pulse{0%,100%{outline-offset:1px}50%{outline-offset:3px}}
+.hint-badge{position:absolute;top:-9px;right:-9px;color:#fff;font-size:9px;font-weight:700;
+  padding:1px 5px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.25);pointer-events:none;z-index:5;
+  white-space:nowrap}
+.hint-badge.hint-1{background:#F59E0B}
+.hint-badge.hint-2{background:#94A3B8}
+.hint-badge.hint-3,.hint-badge.hint-4,.hint-badge.hint-5{background:#B45309}
+
+/* Lehrer-Modus: Coach-Feedback-Toast (Stufe 3) */
+#teacher-toast{position:fixed;right:16px;bottom:16px;max-width:280px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;padding:10px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);
+  z-index:9998;opacity:0;transform:translateY(10px);pointer-events:none;transition:all .25s ease;cursor:pointer}
+#teacher-toast.show{opacity:1;transform:translateY(0);pointer-events:all}
+#teacher-toast .tt-head{font-weight:700;font-size:12px;margin-bottom:3px}
+#teacher-toast .tt-sub{font-size:11px;color:var(--text2)}
 </style>

@@ -25,6 +25,7 @@ Alle Responses: {"ok": true, "state": {...}} oder {"ok": false, "error": "..."}
 
 import sys
 import os
+import re as _re
 import json as _json
 import datetime as _dt
 from pathlib import Path
@@ -96,6 +97,14 @@ _ai_c_puct   = 1.5         # PUCT-Konstante im Netz-Modus (Standard wie net_mcts
 _last_ai_log = None        # voller Such-Trace des zuletzt gespielten KI-Drafting-Zugs
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
+
+# ── Lehrer-Modus (Task #97) ──────────────────────────────────────────────────
+# 0=aus, 1=Kandidaten (ohne Zahlen), 2=+Bewertungen (Win%), 3=+Coach-Feedback.
+_teacher_level      = 0
+_teacher_sims       = 800   # Sims für /api/ai/hint
+_teacher_coach_sims = 400   # Sims für Coach-Feedback OHNE Cache-Treffer (schneller als ein voller Hint)
+_teacher_history    = []    # Liste der teacher_feedback-Einträge dieser Partie (für /api/teacher/summary)
+_teacher_cache = {"key": None, "analysis": None}  # (log_len, current_player) -> zuletzt berechnete Analyse
 
 # Difficulty Presets — Format: {"model": "<version>", "sims": <int>}
 DIFFICULTY_PRESETS = {
@@ -172,6 +181,179 @@ def _require_game():
     return None
 
 
+# ── Lehrer-Modus: Beschreibungs-Parsing + Analyse-Cache ─────────────────────
+# Die Regexe UND die move_key/played_key-Logik sind bewusst aus
+# tools/analyze_game_log.py dupliziert (dort battle-tested für exakt dasselbe
+# Problem: eine gespielte Aktion gegen die von ai_debug_*_json gelabelten
+# Kandidaten abgleichen), NICHT importiert -- tools/ wird nicht ins
+# PyInstaller-Bundle gepackt (siehe mosaic_release.spec), server.py muss
+# eigenständig lauffähig bleiben.
+_T_STONE_DESC_RE = _re.compile(r"Stein (?P<color>\S+) von (?P<src>F\d+|GF) → (?P<dest>Reihe \d+|Strafleiste)")
+_T_DOME_DISPLAY_DESC_RE = _re.compile(r"Kuppel #(?P<tile>\d+) → \((?P<r>\d+),(?P<c>\d+)\)")
+_T_DOME_STACK_DESC_RE = _re.compile(r"Stapel → \((?P<r>\d+),(?P<c>\d+)\)")
+_T_BONUS_DESC_RE = _re.compile(r"Bonuschip F(?P<fid>\d+)")
+
+
+def _teacher_move_key(typ: str, desc: str):
+    """Vergleichsschlüssel EINES Kandidaten aus moves[] (Analyse-Dict) --
+    Pendant zu analyze_game_log.py::move_key."""
+    if typ == "stone":
+        m = _T_STONE_DESC_RE.search(desc or "")
+        return ("stone", m.group("color"), m.group("src"), m.group("dest")) if m else None
+    if typ == "choose_dome_slot":
+        m = _T_DOME_DISPLAY_DESC_RE.search(desc or "")
+        return ("dome_display", m.group("tile"), m.group("r"), m.group("c")) if m else None
+    if typ == "choose_draw_stack_slot":
+        m = _T_DOME_STACK_DESC_RE.search(desc or "")
+        return ("dome_stack", m.group("r"), m.group("c")) if m else None
+    if typ == "dome_stack_peek":
+        return ("dome_stack_peek",)
+    if typ == "bonus_chip":
+        m = _T_BONUS_DESC_RE.search(desc or "")
+        return ("bonus_chip", m.group("fid")) if m else None
+    return None
+
+
+def _teacher_played_key(kind: str, **f):
+    """Vergleichsschlüssel der TATSÄCHLICH gespielten Aktion, direkt aus den
+    Request-Parametern gebaut (kein Text-Parsing nötig, wir haben die
+    strukturierten Felder bereits) -- Pendant zu analyze_game_log.py::played_key.
+    Gibt exakt dieselbe Tupel-Form wie `_teacher_move_key` zurück, damit beide
+    vergleichbar sind."""
+    if kind == "stone":
+        src = "GF" if f["factory_id"] is None else f"F{f['factory_id']}"
+        dest = "Strafleiste" if f["row"] < 0 else f"Reihe {f['row'] + 1}"
+        return ("stone", f["color"], src, dest)
+    if kind == "dome_display":
+        return ("dome_display", str(f["tile_id"]), str(f["slot_row"]), str(f["slot_col"]))
+    if kind == "dome_stack":
+        return ("dome_stack", str(f["slot_row"]), str(f["slot_col"]))
+    if kind == "dome_stack_peek":
+        return ("dome_stack_peek",)
+    if kind == "bonus_chip":
+        return ("bonus_chip", str(f["factory_id"]))
+    raise ValueError(kind)
+
+
+def _teacher_action_params(typ: str, desc: str) -> dict | None:
+    """Strukturierte Parameter EINES Kandidaten für die Brett-Markierung im
+    Frontend (Quell-Fabrik/Farbe/Zielreihe bzw. Kuppel-Slot). Funktioniert
+    identisch für Heuristik- UND Netz-Pfad (beide liefern `description` im
+    selben Format), anders als das rohe `action`-Feld aus moves[] (nur im
+    Netz-Pfad befüllt, siehe net_mcts.rs::action_to_env_dict)."""
+    if typ == "stone":
+        m = _T_STONE_DESC_RE.search(desc or "")
+        if not m:
+            return None
+        dest = m.group("dest")
+        row = -1 if dest == "Strafleiste" else int(dest.split(" ")[1]) - 1
+        src = m.group("src")
+        return {"color": m.group("color"), "factory_id": None if src == "GF" else int(src[1:]), "row": row}
+    if typ == "choose_dome_slot":
+        m = _T_DOME_DISPLAY_DESC_RE.search(desc or "")
+        if not m:
+            return None
+        return {"tile_id": int(m.group("tile")), "slot_row": int(m.group("r")), "slot_col": int(m.group("c"))}
+    if typ == "choose_draw_stack_slot":
+        m = _T_DOME_STACK_DESC_RE.search(desc or "")
+        if not m:
+            return None
+        return {"slot_row": int(m.group("r")), "slot_col": int(m.group("c"))}
+    if typ == "dome_stack_peek":
+        return {}
+    if typ == "bonus_chip":
+        m = _T_BONUS_DESC_RE.search(desc or "")
+        if not m:
+            return None
+        return {"factory_id": int(m.group("fid"))}
+    return None
+
+
+def _teacher_compute_analysis(sims: int) -> dict | None:
+    """Analyse der AKTUELLEN Stellung aus Sicht des current_player (Mensch
+    ODER KI, `ai_debug_net_json` ist bereits Ego-perspektivisch) -- identische
+    Semantik wie /api/ai/debug, nur mit eigener Sim-Zahl für den Lehrer-Modus.
+    Nutzt das GELADENE Netz (= der KI-Gegner dieser Partie). Ist keines
+    geladen (Heuristik-Gegner), fällt es pragmatisch auf die Heuristik-Analyse
+    zurück (`ai_debug_json`) -- ein Lehrer-Hinweis ist auch mit gröberer
+    Heuristik-Schätzung besser als gar keiner; der Aufrufer markiert diesen
+    Fall über `_ai_model is None` im Response (`note`-Feld)."""
+    if _rust is None:
+        return None
+    try:
+        if _ai_model is not None:
+            return _json.loads(_rust.ai_debug_net_json(sims, _ai_c_puct))
+        return _json.loads(_rust.ai_debug_json(sims))
+    except Exception:
+        return None
+
+
+def _teacher_cached_or_fresh_analysis(sims: int) -> dict | None:
+    """Cache-Schlüssel = (log_len, current_player) -- log_len steigt bei JEDER
+    zustandsändernden Aktion (siehe _rust_flush_log/Replay-Validierung in
+    tools/analyze_game_log.py), ist also ein zuverlässiger "Zustands-Zähler"
+    ohne eigene Zusatz-Buchhaltung. Ein vorheriger /api/ai/hint-Abruf
+    DERSELBEN Stellung wird hier wiederverwendet (eliminiert die Coach-
+    Latenz beim nachfolgenden Zug); sonst wird frisch mit `sims` gerechnet."""
+    global _teacher_cache
+    if _rust is None:
+        return None
+    key = (_rust.log_len(), _rust.current_player())
+    if _teacher_cache.get("key") == key and _teacher_cache.get("analysis") is not None:
+        return _teacher_cache["analysis"]
+    analysis = _teacher_compute_analysis(sims)
+    if analysis is not None:
+        _teacher_cache = {"key": key, "analysis": analysis}
+    return analysis
+
+
+def _teacher_pre_move_snapshot() -> dict | None:
+    """Vor einem menschlichen Drafting-Zug (nur Stufe 3 = Coach): liefert die
+    (evtl. gecachte) Analyse des VOR-Zustands, oder None, wenn Coach nicht
+    aktiv/anwendbar ist. Bei teacher_level != 3 wird sofort None
+    zurückgegeben -- KEIN zusätzlicher MCTS-Aufruf, KEINE Zusatzlatenz für
+    Stufe 0/1/2."""
+    try:
+        if _teacher_level != 3 or _ai_player is None or _rust is None:
+            return None
+        if _rust.phase() != "drafting" or _rust.current_player() == _ai_player:
+            return None
+        return _teacher_cached_or_fresh_analysis(_teacher_coach_sims)
+    except Exception:
+        return None
+
+
+def _teacher_feedback_from_snapshot(analysis: dict | None, kind: str, played_key) -> dict | None:
+    """Vergleicht die gespielte Aktion (`played_key`) gegen die VOR-Zustands-
+    Analyse `analysis` (aus `_teacher_pre_move_snapshot`, VOR dem Zug geholt).
+    Bei Kuppel-Zweistufigkeit wird -- wie in tools/analyze_game_log.py -- NUR
+    die erste Stufe (Kachel/Stapel + Slot) bewertet, nie die Rotationswahl
+    danach (die ist ohnehin kein eigener Analyse-Kandidat). Hängt bei Erfolg
+    einen Eintrag an `_teacher_history` (für /api/teacher/summary) und gibt
+    das Response-Feld {rang, delta_win_pp, bester_zug_description} zurück,
+    oder None (kein Match / keine Analyse verfügbar -> kein teacher_feedback
+    im Response, aber der Zug selbst bleibt unberührt)."""
+    if not analysis or played_key is None:
+        return None
+    moves = analysis.get("moves") or []
+    if not moves:
+        return None
+    matches = [m for m in moves if _teacher_move_key(m.get("type"), m.get("description", "")) == played_key]
+    if not matches:
+        return None
+    ranked = sorted(moves, key=lambda m: -(m.get("mcts_q") or 0.0))
+    top_q = ranked[0].get("mcts_q") or 0.0
+    top_desc = ranked[0].get("description")
+    played_q = max((m.get("mcts_q") or 0.0) for m in matches)
+    rang = 1 + sum(1 for m in moves if (m.get("mcts_q") or 0.0) > played_q + 1e-12)
+    delta = round((top_q - played_q) * 100.0, 1)
+    _teacher_history.append({
+        "round": _rust.round_number() if _rust is not None else None,
+        "kind": kind, "rang": rang, "delta_win_pp": delta, "top_desc": top_desc,
+    })
+    return {"rang": rang, "delta_win_pp": delta, "bester_zug_description": top_desc}
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -187,6 +369,7 @@ def debug_page():
 @app.route('/api/new_game', methods=['POST'])
 def new_game():
     global _rust, _rust_logged, _ai_sims, _ai_player, _ai_model, _ai_debug_history, _game_log_path
+    global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_history, _teacher_cache
     _ai_debug_history = []
     data = request.get_json(silent=True) or {}
     names      = data.get('names', ['Spieler 1', 'Spieler 2'])
@@ -194,6 +377,20 @@ def new_game():
     ai_enabled = data.get('ai_enabled', False)
     difficulty = data.get('difficulty', 'medium')
     ai_side    = data.get('ai_side', 1)   # 0 = KI ist P1, 1 = KI ist P2
+
+    # Lehrer-Modus (Task #97): 0=aus (Default -- Bestandsverhalten unverändert),
+    # 1=Kandidaten, 2=+Bewertungen, 3=+Coach-Feedback. Pro Partie zurückgesetzt.
+    try:
+        teacher_level = int(data.get('teacher_level', 0) or 0)
+    except (TypeError, ValueError):
+        teacher_level = 0
+    if teacher_level not in (0, 1, 2, 3):
+        teacher_level = 0
+    _teacher_level      = teacher_level
+    _teacher_sims       = int(data.get('teacher_sims', 800) or 800)
+    _teacher_coach_sims = int(data.get('teacher_coach_sims', 400) or 400)
+    _teacher_history    = []
+    _teacher_cache      = {"key": None, "analysis": None}
 
     import random as _random
     fp_raw = data.get('first_player', None)
@@ -244,6 +441,9 @@ def new_game():
             "ai_player":    _ai_player,
             "ai_model":     _ai_model or "heuristic",
             "ai_sims":      _ai_sims if ai_enabled else None,
+            "teacher_level":      _teacher_level,
+            "teacher_sims":       _teacher_sims if _teacher_level else None,
+            "teacher_coach_sims": _teacher_coach_sims if _teacher_level == 3 else None,
         }
         lf.write("# MOSAIC GAME LOG\n")
         lf.write(f"# {_json.dumps(meta, ensure_ascii=False)}\n")
@@ -257,6 +457,9 @@ def new_game():
         response['warning'] = model_warning
     response['log_file']    = _game_log_path.name
     response['seed']        = seed
+    response['teacher_level']      = _teacher_level
+    response['teacher_sims']       = _teacher_sims
+    response['teacher_coach_sims'] = _teacher_coach_sims
     return jsonify(response)
 
 
@@ -289,10 +492,17 @@ def move_stone():
     try:
         raw = d.get('factory_id')
         fid = int(raw) if raw is not None else None
-        _rust.apply_stone(d['source'], d['color'], int(d['row']),
+        row = int(d['row'])
+        pre_analysis = _teacher_pre_move_snapshot()
+        _rust.apply_stone(d['source'], d['color'], row,
                           fid, list(d.get('moon_order', [])))
         _flush_game_log()
-        return jsonify(ok())
+        resp = ok()
+        fb = _teacher_feedback_from_snapshot(
+            pre_analysis, "stone", _teacher_played_key("stone", color=d['color'], factory_id=fid, row=row))
+        if fb:
+            resp["teacher_feedback"] = fb
+        return jsonify(resp)
     except Exception as e:
         return jsonify(err(str(e)))
 
@@ -305,10 +515,17 @@ def move_dome():
         return jsonify(err("Startkacheln fehlen."))
     d = request.get_json()
     try:
-        _rust.apply_dome(int(d['tile_id']), int(d['slot_row']),
-                         int(d['slot_col']), int(d.get('rotation', 0)))
+        tile_id, slot_row, slot_col = int(d['tile_id']), int(d['slot_row']), int(d['slot_col'])
+        pre_analysis = _teacher_pre_move_snapshot()
+        _rust.apply_dome(tile_id, slot_row, slot_col, int(d.get('rotation', 0)))
         _flush_game_log()
-        return jsonify(ok())
+        resp = ok()
+        fb = _teacher_feedback_from_snapshot(
+            pre_analysis, "dome_display",
+            _teacher_played_key("dome_display", tile_id=tile_id, slot_row=slot_row, slot_col=slot_col))
+        if fb:
+            resp["teacher_feedback"] = fb
+        return jsonify(resp)
     except Exception as e:
         return jsonify(err(str(e) or "Zug abgelehnt."))
 
@@ -324,10 +541,14 @@ def move_dome_stack_peek():
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
     try:
+        pre_analysis = _teacher_pre_move_snapshot()
         typ = _rust.apply_dome_stack_peek()
         _flush_game_log()
         res = ok()
         res['type'] = typ
+        fb = _teacher_feedback_from_snapshot(pre_analysis, "dome_stack_peek", _teacher_played_key("dome_stack_peek"))
+        if fb:
+            res["teacher_feedback"] = fb
         return jsonify(res)
     except Exception as e:
         return jsonify(err(str(e) or "Zug abgelehnt."))
@@ -347,11 +568,18 @@ def move_dome_stack_choose():
         return_order = d.get('return_order')
         if return_order is not None:
             return_order = [int(x) for x in return_order]
+        slot_row, slot_col = int(d['slot_row']), int(d['slot_col'])
+        pre_analysis = _teacher_pre_move_snapshot()
         _rust.apply_dome_stack_choose(int(d['chosen_id']),
-                                      int(d['slot_row']), int(d['slot_col']),
+                                      slot_row, slot_col,
                                       int(d.get('rotation', 0)), return_order)
         _flush_game_log()
-        return jsonify(ok())
+        resp = ok()
+        fb = _teacher_feedback_from_snapshot(
+            pre_analysis, "dome_stack", _teacher_played_key("dome_stack", slot_row=slot_row, slot_col=slot_col))
+        if fb:
+            resp["teacher_feedback"] = fb
+        return jsonify(resp)
     except Exception as e:
         return jsonify(err(str(e) or "Zug abgelehnt."))
 
@@ -364,9 +592,16 @@ def move_bonus_chip():
         return jsonify(err("Startkacheln fehlen."))
     d = request.get_json()
     try:
-        _rust.apply_bonus_chip(int(d['factory_id']))
+        factory_id = int(d['factory_id'])
+        pre_analysis = _teacher_pre_move_snapshot()
+        _rust.apply_bonus_chip(factory_id)
         _flush_game_log()
-        return jsonify(ok())
+        resp = ok()
+        fb = _teacher_feedback_from_snapshot(
+            pre_analysis, "bonus_chip", _teacher_played_key("bonus_chip", factory_id=factory_id))
+        if fb:
+            resp["teacher_feedback"] = fb
+        return jsonify(resp)
     except Exception as e:
         return jsonify(err(str(e)))
 
@@ -524,6 +759,21 @@ def end_game_log():
                 lf.write(f"# {'='*60}\n")
                 lf.write(f"# SPIELENDE: {scores}\n")
                 lf.write(f"# Seed: {_rust.seed()}\n")
+                # Task #97: Lehrer-Kernzahlen als Kommentarzeile (Format-
+                # kompatibel -- tools/analyze_game_log.py::load_log()
+                # überspringt JEDE Zeile, die mit "#" beginnt und nicht mit
+                # "# {" (Header) startet oder auf SPIELENDE_RE matcht, siehe
+                # dortige `elif raw_line.startswith("#"): ... continue`).
+                if _teacher_level == 3 and _teacher_history:
+                    n = len(_teacher_history)
+                    avg = sum(h["delta_win_pp"] for h in _teacher_history) / n
+                    top1 = sum(1 for h in _teacher_history if h["rang"] == 1)
+                    top3 = sum(1 for h in _teacher_history if h["rang"] <= 3)
+                    summary = {
+                        "count": n, "avg_delta_win_pp": round(avg, 1),
+                        "top1_rate": round(top1 / n, 3), "top3_rate": round(top3 / n, 3),
+                    }
+                    lf.write(f"# TEACHER_SUMMARY: {_json.dumps(summary, ensure_ascii=False)}\n")
         except Exception:
             pass
     return jsonify(ok())
@@ -704,6 +954,113 @@ def ai_suggest():
         return jsonify({"ok": True, "suggestions": suggestions})
     except Exception as e:
         return jsonify(err(f"Suggest-Fehler: {str(e)}"))
+
+
+# ── Lehrer-Modus (Task #97) ──────────────────────────────────────────────────
+
+@app.route('/api/teacher/config', methods=['GET'])
+def teacher_config():
+    return jsonify({
+        "ok": True,
+        "level": _teacher_level,
+        "sims": _teacher_sims,
+        "coach_sims": _teacher_coach_sims,
+    })
+
+
+@app.route('/api/teacher/config', methods=['POST'])
+def teacher_config_set():
+    """Setzt Lehrer-Stufe/Sims während des Spiels (analog /api/ai/config)."""
+    global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_cache
+    d = request.get_json(silent=True) or {}
+    if 'level' in d:
+        try:
+            lvl = int(d['level'])
+        except (TypeError, ValueError):
+            return jsonify(err("teacher_level muss 0-3 sein."))
+        if lvl not in (0, 1, 2, 3):
+            return jsonify(err("teacher_level muss 0-3 sein."))
+        _teacher_level = lvl
+    if 'sims' in d:
+        _teacher_sims = int(d['sims'])
+    if 'coach_sims' in d:
+        _teacher_coach_sims = int(d['coach_sims'])
+    _teacher_cache = {"key": None, "analysis": None}  # Stufenwechsel -> alte Analyse verwerfen
+    return jsonify({"ok": True, "level": _teacher_level, "sims": _teacher_sims, "coach_sims": _teacher_coach_sims})
+
+
+@app.route('/api/ai/hint', methods=['GET'])
+def ai_hint():
+    """Lehrer-Tipp (Stufe 1/2/3): Top-5-Kandidaten der Analyse des
+    AKTUELLEN (menschlichen) Zustands -- nur gültig, wenn der Mensch am Zug
+    UND in der Drafting-Phase ist. Nutzt das geladene Netz des KI-Gegners
+    (`ai_debug_net_json`); ist keines geladen (Heuristik-Gegner), fällt die
+    Analyse pragmatisch auf die Heuristik zurück (`note`-Feld im Response
+    weist darauf hin) -- siehe `_teacher_compute_analysis`-Doku."""
+    if (e := _require_game()) is not None:
+        return e
+    if _teacher_level == 0:
+        return jsonify(err("Lehrer-Modus ist aus."))
+    if _ai_player is None:
+        return jsonify(err("Tipps gibt es nur im Spiel gegen die KI."))
+    if _rust.current_player() == _ai_player:
+        return jsonify(err("Nicht dein Zug."))
+    if _rust.phase() != "drafting":
+        return jsonify(err("Tipps gibt es nur in der Drafting-Phase."))
+    analysis = _teacher_cached_or_fresh_analysis(_teacher_sims)
+    moves = analysis.get("moves") if isinstance(analysis, dict) else None
+    if not moves:
+        return jsonify(err("Analyse derzeit nicht verfügbar."))
+
+    ranked = sorted(moves, key=lambda m: -(m.get("mcts_q") or 0.0))
+    top5 = ranked[:5]
+    top_win_pct = top5[0].get("mcts_win_pct") or 0.0
+    candidates = []
+    for i, mv in enumerate(top5):
+        cand = {
+            "rank":        i + 1,
+            "description": mv.get("description"),
+            "type":        mv.get("type"),
+            "action":      _teacher_action_params(mv.get("type"), mv.get("description", "")),
+        }
+        if _teacher_level >= 2:
+            wp = mv.get("mcts_win_pct")
+            cand["win_pct"]      = round(wp, 1) if wp is not None else None
+            cand["delta_win_pp"] = round(top_win_pct - wp, 1) if wp is not None else None
+        candidates.append(cand)
+
+    note = None
+    if _ai_model is None:
+        note = ("Lehrer-Analyse basiert auf der Heuristik-KI (kein Netz-Gegner geladen) -- "
+                "Gewinnschätzungen sind gröber als mit einem geladenen Netz.")
+    return jsonify({"ok": True, "level": _teacher_level, "candidates": candidates, "note": note})
+
+
+@app.route('/api/teacher/summary', methods=['GET'])
+def teacher_summary():
+    """Endbilanz des Coach-Modus (Stufe 3) der laufenden/letzten Partie."""
+    hist = _teacher_history
+    n = len(hist)
+    if n == 0:
+        return jsonify({
+            "ok": True, "count": 0, "avg_delta_win_pp": None,
+            "top1_rate": None, "top3_rate": None, "worst": [],
+        })
+    avg = sum(h["delta_win_pp"] for h in hist) / n
+    top1 = sum(1 for h in hist if h["rang"] == 1)
+    top3 = sum(1 for h in hist if h["rang"] <= 3)
+    worst = sorted(hist, key=lambda h: -h["delta_win_pp"])[:3]
+    return jsonify({
+        "ok": True,
+        "count": n,
+        "avg_delta_win_pp": round(avg, 1),
+        "top1_rate": round(top1 / n, 3),
+        "top3_rate": round(top3 / n, 3),
+        "worst": [{
+            "round": h["round"], "kind": h["kind"], "rang": h["rang"],
+            "delta_win_pp": h["delta_win_pp"], "top_desc": h["top_desc"],
+        } for h in worst],
+    })
 
 
 if __name__ == '__main__':

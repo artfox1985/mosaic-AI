@@ -16,6 +16,11 @@ let AI_ENABLED  = false;
 let AI_PLAYER   = 1;   // KI ist immer Spieler 2 (Index 1)
 let AI_THINKING = false;
 
+// Lehrer-Modus (Task #97): 0=aus, 1=Kandidaten, 2=+Bewertungen, 3=+Coach-Feedback.
+let TEACHER_LEVEL   = 0;
+let TEACHER_SIMS    = 800;
+let hintCandidates  = null;   // zuletzt vom Server geholte Top-Kandidaten (fürs Brett-Marker)
+
 function setAIThinking(on) {
   AI_THINKING = on;
   let overlay = document.getElementById('ai-thinking-overlay');
@@ -70,9 +75,14 @@ async function startNewGame() {
   const sims       = parseInt(document.getElementById('ng-sims').value) || 400;
   const seedRaw    = document.getElementById('ng-seed').value.trim();
   const seed       = seedRaw === '' ? null : parseInt(seedRaw);
+  const teacherLevel = aiEnabled ? parseInt(document.getElementById('ng-teacher-level').value) || 0 : 0;
+  const teacherSims  = parseInt(document.getElementById('ng-teacher-sims').value) || 800;
 
   AI_ENABLED = aiEnabled;
   AI_PLAYER  = 1;
+  TEACHER_LEVEL = teacherLevel;
+  TEACHER_SIMS  = teacherSims;
+  hintCandidates = null;
 
   // Startspieler aus Radio-Button lesen
   const startVal = document.querySelector('input[name="ng-start"]:checked')?.value || '0';
@@ -90,6 +100,8 @@ async function startNewGame() {
     model:        model,
     sims:         sims,
     first_player: firstPlayer,
+    teacher_level: teacherLevel,
+    teacher_sims:  teacherSims,
   };
   if (seed !== null && !Number.isNaN(seed)) {
     body.seed = seed;
@@ -99,6 +111,8 @@ async function startNewGame() {
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
   window._gameEndLogged = false;
+  if (d.teacher_level !== undefined) TEACHER_LEVEL = d.teacher_level;
+  if (d.teacher_sims !== undefined) TEACHER_SIMS = d.teacher_sims;
   if (d.seed !== undefined) {
     window._gameSeed    = d.seed;
     window._gameLogFile = d.log_file;
@@ -160,12 +174,130 @@ async function triggerAIMove() {
   }
 }
 
+// -- LEHRER-MODUS (Task #97) ---------------------------------------------------
+
+// Ist gerade ein Tipp-Abruf sinnvoll (Mensch dran, Drafting-Phase, Stufe>=1)?
+function teacherHintEligible() {
+  return TEACHER_LEVEL >= 1 && AI_ENABLED && S && S.phase === 'drafting' && S.current_player !== AI_PLAYER;
+}
+
+// Aktualisiert Sichtbarkeit/Enabled-Status des "💡 Tipp"-Buttons -- von render() aufgerufen.
+function updateTeacherUI() {
+  const btn = document.getElementById('teacher-hint-btn');
+  if (!btn) return;
+  const showBtn = TEACHER_LEVEL >= 1 && AI_ENABLED;
+  btn.style.display = showBtn ? 'inline-block' : 'none';
+  const eligible = teacherHintEligible();
+  btn.disabled = !eligible;
+  if (!eligible) {
+    clearHintHighlights();
+  } else if (hintCandidates) {
+    renderHintHighlights();  // nach jedem Re-Render (innerHTML wird neu gebaut) erneut anwenden
+  }
+}
+
+async function requestHint() {
+  if (!teacherHintEligible()) return;
+  const btn = document.getElementById('teacher-hint-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const d = await api('/ai/hint');
+    if (!d.ok) { showError(d.error); return; }
+    hintCandidates = d.candidates;
+    renderHintHighlights();
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function clearHintHighlights() {
+  hintCandidates = null;
+  document.querySelectorAll('.hint-mark').forEach(el => {
+    el.classList.remove('hint-mark', 'hint-1', 'hint-2', 'hint-3', 'hint-4', 'hint-5');
+    delete el.dataset.hintBestRank;
+  });
+  document.querySelectorAll('.hint-badge').forEach(el => el.remove());
+}
+
+// Markiert die Top-Kandidaten aus `hintCandidates` auf dem Brett (Quell-Fabrik/
+// Kuppelplatte + Zielreihe/-slot des MENSCHLICHEN Spielers). Wird nach jedem
+// render() erneut aufgerufen (die Boards werden per innerHTML neu gebaut,
+// alte Marker-Klassen gehen dabei verloren).
+function renderHintHighlights() {
+  document.querySelectorAll('.hint-mark').forEach(el => {
+    el.classList.remove('hint-mark', 'hint-1', 'hint-2', 'hint-3', 'hint-4', 'hint-5');
+    delete el.dataset.hintBestRank;
+  });
+  document.querySelectorAll('.hint-badge').forEach(el => el.remove());
+  if (!hintCandidates || !S) return;
+  const humanPi = AI_ENABLED ? (1 - AI_PLAYER) : S.current_player;
+
+  // Mehrere Kandidaten können auf dasselbe Element zeigen (z.B. mehrere
+  // Farben derselben Zielreihe) -- pro Element gewinnt NUR der beste
+  // (niedrigste rank-Zahl) Marker/Badge, statt Klassen/Badges zu stapeln.
+  const mark = (el, cand) => {
+    if (!el) return;
+    const prevRank = el.dataset.hintBestRank ? parseInt(el.dataset.hintBestRank, 10) : null;
+    if (prevRank !== null && prevRank <= cand.rank) return;
+    if (prevRank !== null) el.classList.remove(`hint-${prevRank}`);
+    const oldBadge = el.querySelector('.hint-badge');
+    if (oldBadge) oldBadge.remove();
+    el.dataset.hintBestRank = String(cand.rank);
+    el.classList.add('hint-mark', `hint-${cand.rank}`);
+    if (TEACHER_LEVEL >= 2 && cand.win_pct != null) {
+      const badge = document.createElement('div');
+      badge.className = `hint-badge hint-${cand.rank}`;
+      badge.textContent = `#${cand.rank} ${cand.win_pct.toFixed(0)}%`;
+      el.appendChild(badge);
+    }
+  };
+
+  hintCandidates.forEach(cand => {
+    const a = cand.action;
+    if (!a) return;
+    if (cand.type === 'stone') {
+      const fidSel = (a.factory_id === null) ? 'GF' : a.factory_id;
+      mark(document.querySelector(`#factories-area .fcard[data-fid="${fidSel}"]`), cand);
+      mark(document.querySelector(`#board${humanPi} .prow[data-ri="${a.row}"]`), cand);
+    } else if (cand.type === 'choose_dome_slot') {
+      mark(document.querySelector(`.dgtile[data-tile-id="${a.tile_id}"]`), cand);
+      mark(document.querySelector(`#board${humanPi} .dslot[data-row="${a.slot_row}"][data-col="${a.slot_col}"]`), cand);
+    } else if (cand.type === 'choose_draw_stack_slot' || cand.type === 'dome_stack_peek') {
+      mark(document.getElementById('stack-picker-btn'), cand);
+    } else if (cand.type === 'bonus_chip') {
+      mark(document.querySelector(`#factories-area .fcard[data-fid="${a.factory_id}"]`), cand);
+    }
+  });
+}
+
+// Coach-Feedback (Stufe 3): kurzer Toast nach jedem eigenen Zug.
+function showTeacherFeedback(fb) {
+  if (!fb) return;
+  let el = document.getElementById('teacher-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'teacher-toast';
+    el.onclick = () => el.classList.remove('show');
+    document.body.appendChild(el);
+  }
+  const isTop1 = fb.rang === 1;
+  const head = isTop1 ? '✅ Bester Zug!' : `Rang ${fb.rang} · −${fb.delta_win_pp.toFixed(1)} Prozentpunkte`;
+  const sub = isTop1
+    ? 'Genau das hätte die KI auch gespielt.'
+    : `Stärker gewesen wäre: ${fb.bester_zug_description}`;
+  el.innerHTML = `<div class="tt-head">${head}</div><div class="tt-sub">${sub}</div>`;
+  el.classList.add('show');
+  clearTimeout(window._teacherToastTimer);
+  window._teacherToastTimer = setTimeout(() => el.classList.remove('show'), 6000);
+}
+
 async function stoneMove(source, factory_id, color, row, moon_order=[]) {
   if (AI_THINKING) return;
   if (AI_ENABLED && S.current_player === AI_PLAYER) return;
   const d = await api('/move/stone', {source, factory_id, color, row, moon_order});
   if(!d.ok){showError(d.error);return;}
-  S=d.state; sel=null; render();
+  S=d.state; sel=null; clearHintHighlights(); render();
+  showTeacherFeedback(d.teacher_feedback);
   if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
@@ -174,7 +306,8 @@ async function stoneMove(source, factory_id, color, row, moon_order=[]) {
 async function domeMove(tile_id, slot_row, slot_col, rotation) {
   const d = await api('/move/dome', {tile_id, slot_row, slot_col, rotation});
   if(!d.ok){showError(d.error);return;}
-  S=d.state; closeDomeModal(); render();
+  S=d.state; closeDomeModal(); clearHintHighlights(); render();
+  showTeacherFeedback(d.teacher_feedback);
   if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
@@ -196,7 +329,8 @@ async function bonusChipMove(factory_id) {
   if (AI_ENABLED && S.current_player === AI_PLAYER) return;
   const d = await api('/move/bonus_chip', {factory_id});
   if(!d.ok){showError(d.error);return;}
-  S=d.state; sel=null; render();
+  S=d.state; sel=null; clearHintHighlights(); render();
+  showTeacherFeedback(d.teacher_feedback);
 	if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
@@ -398,7 +532,7 @@ function renderBoard(pi) {
            background:var(--blau,#3b82f6);margin-left:3px;vertical-align:middle;
            box-shadow:0 0 4px var(--blau,#3b82f6)" title="Diese Reihe ist als nächstes dran"></span>`
       : '';
-    return `<div class="prow ${cls}" ${onclick}>
+    return `<div class="prow ${cls}" data-ri="${ri}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
       <span class="rowlabel" style="color:var(--text3)">→ </span>${chipBtn}${nextDot}
     </div>`;
@@ -412,13 +546,13 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
     // In der Vorbereitungsphase bleibt isPending hier false, solange keine Karte gewählt ist.
     let cls = slot ? 'occ' : (isPending ? 'cando' : '');
     let ddata = isPending ? ` data-dome="${pi},${sr},${sc}"` : '';
-    
+
     const isTilingTarget = isTiling && tilingPi===pi && tilingRow!==null;
     const inner = slot
       ? dome2x2(slot.spaces, pi, sr, sc, isTilingTarget)
       : `<div style="font-size:9px;color:var(--text3);text-align:center;width:100%">+</div>`;
-      
-    return `<div class="dslot ${cls}"${ddata}>${inner}</div>`;
+
+    return `<div class="dslot ${cls}" data-row="${sr}" data-col="${sc}"${ddata}>${inner}</div>`;
 }).join('')).join('');
 
   const floorHTML = [...Array(4)].map((_,i)=>{
@@ -679,7 +813,7 @@ function renderCenter() {
           <span style="font-size:8px;color:var(--text3)">Stapel:</span>
           ${moonTopTiles.map(c=>`<div class="tile sm ${normColor(c)}" title="Oben: ${c}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
          </div>` : '';
-    return `<div class="fcard">
+    return `<div class="fcard" data-fid="${f.id}">
       <div class="fhead"><span>F${f.id}</span>${chipHTML}</div>
       <div class="ftiles">${f.sun.length?sunTiles:'<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
       ${moonTiles}
@@ -728,7 +862,7 @@ document.getElementById('factories-area').innerHTML = `
         && cp.start_placed
         && cp.can_place_dome
         && S.dome_stack_count > 0;
-      return canStack ? `<button class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
+      return canStack ? `<button id="stack-picker-btn" class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
         ${stackTopTypeIcon()} Vom Stapel ziehen (−1 Pkt/Karte) · ${S.dome_stack_count} verfügbar
       </button>` : '';
     })()}
@@ -737,7 +871,7 @@ document.getElementById('factories-area').innerHTML = `
     <div class="lbl" style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">Sonnenbereich</div>
     <div style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">
     ${facsHTML}
-    <div class="fcard">
+    <div class="fcard" data-fid="GF">
       <div class="fhead"><span>GF</span>${lf.marker?'<span style="color:#F59E0B">★</span>':''}</div>
       <div class="ftiles" style="margin-bottom:2px"><span style="font-size:8px;color:var(--text3)">Sun:</span>${lSun||'—'}</div>
       <div class="ftiles"><span style="font-size:8px;color:var(--text3)">Moon:</span>${lMoon||'—'}</div>
@@ -1242,6 +1376,8 @@ async function stackPeekMore() {
   const d = await api('/move/dome_stack_peek', {});
   if(!d.ok){ showError(d.error); return; }
   S = d.state;
+  clearHintHighlights();
+  showTeacherFeedback(d.teacher_feedback);
   renderStackPeekState();
 }
 
@@ -1461,7 +1597,8 @@ async function submitStartTile(pi, tile_id, sr, sc, rotation) {
 async function submitDisplayDome(tile_id, sr, sc, rotation) {
   const d = await api('/move/dome', {tile_id, slot_row: sr, slot_col: sc, rotation});
   if(!d.ok){ showError(d.error || 'Zug abgelehnt (unbekannter Fehler).'); return; }
-  S=d.state; pendingStackPlacement=null; closeDomeModal(); render();
+  S=d.state; pendingStackPlacement=null; closeDomeModal(); clearHintHighlights(); render();
+  showTeacherFeedback(d.teacher_feedback);
   if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
@@ -1478,7 +1615,8 @@ async function submitStackDraw(chosen_id, sr, sc, rotation, return_order) {
     chosen_id, slot_row: sr, slot_col: sc, rotation, return_order
   });
   if(!d.ok){showError(d.error || 'Zug abgelehnt (unbekannter Fehler).');return;}
-  S=d.state; pendingStackPlacement=null; closeDomeModal(); render();
+  S=d.state; pendingStackPlacement=null; closeDomeModal(); clearHintHighlights(); render();
+  showTeacherFeedback(d.teacher_feedback);
   // KI-Check erzwingen, egal in welcher Phase
   if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
@@ -1701,17 +1839,17 @@ async function calculateEndScoring() {
   if(!d.ok){showError(d.error);return;}
   S = d.state;
   console.log(d)
-  showEndResults(d.end_scoring);
+  await showEndResults(d.end_scoring);
   render();
 }
 
-function showEndResults(results) {
+async function showEndResults(results) {
   if (!S || !S.players) return;
   const p0 = S.players[0], p1 = S.players[1];
   const winner = p0.score > p1.score ? p0.name
     : p1.score > p0.score ? p1.name
     : p0.marker ? p0.name : p1.marker ? p1.name : 'Unentschieden';
-    
+
   const tileRows = (S.scoring_tile_ids||[]).map(tid=>{
     const t = allScoringTiles.find(t=>t.id===tid);
     const r0 = results['0']?.[tid], r1 = results['1']?.[tid];
@@ -1723,6 +1861,34 @@ function showEndResults(results) {
       <td style="padding:4px 8px;text-align:right">${pts(r1)}</td>
     </tr>`;
   }).join('');
+
+  // Lehrer-Endbilanz (Stufe 3): optionaler Zusatzblock im selben Modal.
+  let teacherHTML = '';
+  if (TEACHER_LEVEL === 3) {
+    try {
+      const sum = await api('/teacher/summary');
+      if (sum.ok && sum.count > 0) {
+        const worstHTML = sum.worst.map(w => `
+          <li style="font-size:10px;margin-bottom:2px">
+            Runde ${w.round}: −${w.delta_win_pp.toFixed(1)} pp (Rang ${w.rang}) — besser: ${w.top_desc}
+          </li>`).join('');
+        teacherHTML = `
+          <div class="sep" style="margin:10px 0"></div>
+          <div class="lbl">🎓 Lehrer-Bilanz</div>
+          <div style="font-size:11px;margin-bottom:6px">
+            ${sum.count} bewertete Züge · Ø Abweichung vom Bestzug:
+            <strong>${sum.avg_delta_win_pp.toFixed(1)} pp</strong> ·
+            Top-1: <strong>${(sum.top1_rate*100).toFixed(0)}%</strong> ·
+            Top-3: <strong>${(sum.top3_rate*100).toFixed(0)}%</strong>
+          </div>
+          ${worstHTML ? `<div style="font-size:10px;color:var(--text2);margin-bottom:4px">Größte Abweichungen:</div>
+            <ul style="padding-left:16px;margin-bottom:4px">${worstHTML}</ul>` : ''}
+        `;
+      }
+    } catch (e) {
+      // Bilanz ist ein Zusatzfeature -- ein Fehler hier darf die Endwertung nicht blockieren.
+    }
+  }
 
   // HIER WIRD DAS MODAL MIT DER .modal KLASSE ERSTELLT
   const html = `<div class="modal">
@@ -1743,7 +1909,8 @@ function showEndResults(results) {
     <div style="text-align:center;font-size:18px;font-weight:700;color:var(--blau);margin:10px 0">
       🥇 ${winner} gewinnt!
     </div>
-    <button style="width:100%;padding:9px;background:var(--text);color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px" onclick="document.getElementById('end-overlay').style.display='none';newGame()">Neues Spiel</button>
+    ${teacherHTML}
+    <button style="width:100%;padding:9px;background:var(--text);color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px;margin-top:8px" onclick="document.getElementById('end-overlay').style.display='none';newGame()">Neues Spiel</button>
   </div>`;
 
   let ov = document.getElementById('end-overlay');
@@ -1835,6 +2002,7 @@ function render() {
   renderBoard(0);
   renderBoard(1);
   renderCenter();
+  updateTeacherUI();
 
   // Platzierungs-Modus: gewählte Karte (Display oder Stapel) wartet auf Slot-Klick.
   if(pendingStackPlacement) {
