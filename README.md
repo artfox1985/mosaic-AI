@@ -4,245 +4,248 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Mosaic-AI** ist ein komplettes Reinforcement-Learning-Framework für das
-Training AlphaZero-artiger neuronaler Netze auf einem zweispieligen
-Tile-Drafting- und Kuppel-Bau-Brettspiel mit versteckter Information.
+**Mosaic-AI** is a complete reinforcement-learning framework for training
+AlphaZero-style neural networks on a two-player tile-drafting and
+dome-building board game with hidden information.
 
-> **⚠️ Disclaimer:** Dieses Projekt ist ein Lern-/Forschungsprojekt zu einer
-> generischen Tile-Drafting-/Wall-Tiling-Spielmechanik. Es wurde from scratch
-> gebaut und steht in keiner Verbindung zu bestehenden kommerziellen
-> Brettspielen, Verlagen oder Marken.
-
----
-
-## Aktueller Stand
-
-Referenz-/Champion-Netz: **`v16_best`**, Elo **≈1094** (95%-KI [1033, 1164]),
-verankert bei Heuristik@150(dyn. ~330 Sims) = 1000 (`tools/elo_tracker.py
-report`). Am 2026-07-24 gingen durch einen Worktree-Vorfall alle Modell-
-Checkpoints bis einschließlich des damaligen Champions verloren (Code und
-`data/`/`evaluations/` waren nicht betroffen); `v16_best` ist das Ergebnis
-der seitdem laufenden Wiederaufbau-Linie (`v14` → `v14b` → `v15` → `v16`) und
-hat den alten Champion-Elo-Wert bereits übertroffen. Volle Historie,
-Messwerte und laufende Untersuchungen: [`evaluations/STATUS.md`](evaluations/STATUS.md).
+> **⚠️ Disclaimer:** This project is a learning/research project around a
+> generic tile-drafting/wall-tiling game mechanic. It was built from scratch
+> and has no connection to any existing commercial board games, publishers,
+> or brands.
 
 ---
 
-## Engine-Kern in Kürze
+## Current Status
 
-- **Rust-Suche** (`engine/src/net_mcts.rs`): Gumbel-AlphaZero (Gumbel-Top-m,
-  `GUMBEL_TOP_M=16`, + Sequential Halving an der Wurzel), deterministisch in
-  Arena/Server, Gumbel-Exploration im Self-Play. Legacy-PUCT-Pfad bleibt
-  hinter `USE_GUMBEL_SEARCH` als Toggle erhalten.
-- **Value-Ziel**: `VALUE_SCHEMA_VERSION=15` (`engine/py/neural_net.py`) —
-  weiches symmetrisches Margin-Ziel, per Default OHNE
-  `round_transition_value` (rtv). rtv ist teuer (~81 % der Self-Play-Kosten)
-  und trug in der Ablation keine messbare Spielstärke bei; steuerbar über
-  `self_play.py --rtv` (`record_rtv`, Standard AUS).
-  `bootstrap_value` (TD-Bootstrap, `TD_LAMBDA=0.5`) bleibt in jedem Fall aktiv.
-- **Floor-Shaping** (`FLOOR_SHAPING_WEIGHT=0.3`): validiertes, exaktes
-  Blattwert-Additiv gegen Bodenstrafen-Spiralen (n=100, kein Early-Stop).
-  Plattenshaping/Value-Shrinkage wurden dagegen im A/B **widerlegt** und
-  bleiben deaktiviert — Details/Zahlen in `STATUS.md`.
-- **Runde 5**: exakte Alpha-Beta-Suche (`engine/src/round5.rs`), kein
-  Netz-Entscheid mehr, sobald keine verdeckte Information mehr im Spiel ist.
+Reference/champion net: **`v16_best`**, Elo **≈1094** (95% CI [1033, 1164]),
+anchored at Heuristic@150 (dyn. ~330 sims) = 1000 (`tools/elo_tracker.py
+report`). On 2026-07-24, a worktree incident wiped all model checkpoints up
+to and including the champion at the time (code and `data/`/`evaluations/`
+were unaffected); `v16_best` is the result of the rebuild line that has been
+running since (`v14` → `v14b` → `v15` → `v16`) and has already surpassed the
+old champion's Elo. Full history, measurements, and ongoing investigations:
+[`evaluations/STATUS.md`](evaluations/STATUS.md).
 
 ---
 
-## Der Generations-Zyklus (Trainingspipeline)
+## Engine Core in Brief
 
-Kernstück des Projekts — so entsteht aus dem amtierenden Champion die
-nächste Kandidaten-Generation:
+- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m,
+  `GUMBEL_TOP_M=16`, + Sequential Halving at the root), deterministic in
+  arena/server, Gumbel exploration in self-play. The legacy PUCT path is
+  still available behind the `USE_GUMBEL_SEARCH` toggle.
+- **Value target**: `VALUE_SCHEMA_VERSION=15` (`engine/py/neural_net.py`) —
+  soft symmetric margin target, without `round_transition_value` (rtv) by
+  default. rtv is expensive (~81% of self-play cost) and showed no
+  measurable strength contribution in the ablation; toggle via
+  `self_play.py --rtv` (`record_rtv`, default OFF). `bootstrap_value`
+  (TD bootstrap, `TD_LAMBDA=0.5`) stays active in every case.
+- **Floor shaping** (`FLOOR_SHAPING_WEIGHT=0.3`): validated, exact leaf-value
+  additive against floor-penalty spirals (n=100, no early stop). Plate
+  shaping/value shrinkage, by contrast, were **disproved** in an A/B test and
+  remain disabled — details/numbers in `STATUS.md`.
+- **Round 5**: exact alpha-beta search (`engine/src/round5.rs`), no more
+  network decisions once no hidden information remains in the game.
 
-1. **Self-Play-Batch** (Generator = amtierender Champion):
+---
+
+## The Generation Cycle (Training Pipeline)
+
+The heart of the project — this is how the next candidate generation is
+produced from the reigning champion:
+
+1. **Self-play batch** (generator = reigning champion):
    ```bash
    python -u self_play.py --mode network --games 6000 --sims 400 \
        --version <generator> --model <generator>_best --threads 11
    ```
-   ~7–8 h bei ~0,22 Spielen/s. Pro-Spiel-Flush (ein Absturz kostet ≤1 Spiel),
-   Heartbeat-Überwachung, JSON-Run-Manifest.
-2. **Replay-Fenster**: 6000 frische Spiele + 2000 eine Generation zurück +
-   1000 zwei Generationen zurück, auf Datei-Ebene zusammengestellt — der Rest
-   wandert nach `data/archive_*/` (alte Korpora werden nie wieder gemischt).
+   ~7–8 h at ~0.22 games/s. Per-game flush (a crash costs at most 1 game),
+   heartbeat monitoring, JSON run manifest.
+2. **Replay window**: 6000 fresh games + 2000 from one generation back +
+   1000 from two generations back, assembled at the file level — the rest
+   moves to `data/archive_*/` (old corpora are never mixed back in).
 3. **Training**:
    ```bash
    python -u train.py --name vN --load vN-1_best --lr 0.00005 \
        --lr-schedule cosine --epochs 100 --value-target-variant nortv
    ```
-   From-Scratch-Läufe (kein `--load`) nutzen die Default-LR. Nach jedem
-   Trainingslauf schreibt ein `train.py`-Hook automatisch einen
-   Modell-Snapshot ins OneDrive-Backup.
-4. **Diagnose**: `tools/offline_diagnose.py --frozen` (einziger
-   generationsübergreifend vergleichbarer Maßstab, fixes Eval-Set) +
-   `tools/oracle_metrics.py` (Zusatzsignal gegen eine Tiefensuche-Referenz,
-   **kein** Ersatz für eine echte Arena-Messung).
-5. **Gating**: `tools/paired_gating.py` (gepaarte Seed-Blöcke, getauschte
-   Bretter, Bernoulli-SPRT mit `H1: p1=0.65`) — nur ein `ACCEPT_H1` macht den
-   Kandidaten zur neuen Referenz/zum neuen Generator.
-6. **Elo**: `tools/elo_tracker.py` (Bradley-Terry über den vollen
-   Match-Graphen) + Anker-Match des neuen Champions via `tools/arena.py`.
-7. **Trends**: jeder Arena-/Gating-Lauf hängt eine Zeile an
-   `evaluations/arena_trends.csv` (Ø-Punkte, Floor-Strafen über die Zeit —
-   ergänzt Elo/Winrate um ein Qualitätssignal jenseits von "stärker/schwächer").
+   From-scratch runs (no `--load`) use the default LR. After every training
+   run, a `train.py` hook automatically writes a model snapshot to the
+   OneDrive backup.
+4. **Diagnosis**: `tools/offline_diagnose.py --frozen` (the only
+   cross-generation comparable metric, fixed eval set) +
+   `tools/oracle_metrics.py` (supplementary signal against a deep-search
+   reference, **not** a substitute for an actual arena measurement).
+5. **Gating**: `tools/paired_gating.py` (paired seed blocks, swapped boards,
+   Bernoulli SPRT with `H1: p1=0.65`) — only an `ACCEPT_H1` promotes the
+   candidate to the new reference/generator.
+6. **Elo**: `tools/elo_tracker.py` (Bradley-Terry over the full match graph)
+   + anchor match for the new champion via `tools/arena.py`.
+7. **Trends**: every arena/gating run appends a row to
+   `evaluations/arena_trends.csv` (avg. points, floor penalties over time —
+   complements Elo/win rate with a quality signal beyond "stronger/weaker").
 
 ---
 
-## Verzeichnis-Konvention
+## Directory Convention
 
-Root führt aus, `tools/` misst, `evaluations/` dokumentiert, `engine/`
-rechnet, `docs/` erklärt, `static/` spielt.
+**"Root führt aus, `tools/` misst, `evaluations/` dokumentiert, `engine/`
+rechnet, `docs/` erklärt, `static/` spielt."** — the project's directory
+mantra: root executes, `tools/` measures, `evaluations/` documents,
+`engine/` computes, `docs/` explains, `static/` plays.
 
 ```text
 📦 mosaic-AI/
-├── 📂 engine/       # Rust-Crate (mosaic_rust) — Spiel/Suche/Self-Play, PyO3-Bindings
-│   └── 📂 py/       # neural_net.py (MosaicNet, MosaicDataset, Value-Ziel)
-├── 📂 evaluations/  # STATUS.md, elo_history.csv, arena_trends.csv, Eval-JSONs/-Reports
-├── 📂 data/         # Self-Play-Output (.pkl) + Run-Manifeste, data/archive_*/ = retired
-├── 📂 models/       # Checkpoints (.pth/.onnx), Loss-Plots, Trainings-Manifeste
-├── 📂 static/       # Web-UI (index.html, debug.html, css/js, log/ = Spielprotokolle)
-├── 📂 tools/        # Diagnose-/Arena-/Gating-/Analyse-Skripte, siehe Tabelle unten
-├── 📂 docs/         # engine_manual.md, Referenz-CSVs
-├── 📂 archive/      # Legacy: alte Python-Engine/-Agenten, abgelöste Auswertungen
+├── 📂 engine/       # Rust crate (mosaic_rust) — game/search/self-play, PyO3 bindings
+│   └── 📂 py/       # neural_net.py (MosaicNet, MosaicDataset, value target)
+├── 📂 evaluations/  # STATUS.md, elo_history.csv, arena_trends.csv, eval JSONs/reports
+├── 📂 data/         # Self-play output (.pkl) + run manifests, data/archive_*/ = retired
+├── 📂 models/       # Checkpoints (.pth/.onnx), loss plots, training manifests
+├── 📂 static/       # Web UI (index.html, debug.html, css/js, log/ = game logs)
+├── 📂 tools/        # Diagnosis/arena/gating/analysis scripts, see table below
+├── 📂 docs/         # engine_manual.md, reference CSVs
+├── 📂 archive/      # Legacy: old Python engine/agents, superseded analyses
 ├── 📜 config.py     # INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, ...
-├── 📜 self_play.py  # ▶️ Self-Play-Treiber
-├── 📜 train.py      # ▶️ Training + Snapshot-Hook + Auto-ONNX-Export
+├── 📜 self_play.py  # ▶️ Self-play driver
+├── 📜 train.py      # ▶️ Training + snapshot hook + auto ONNX export
 ├── 📜 export_onnx.py# ▶️ .pth → .onnx
-└── 📜 server.py     # ▶️ Flask-Web-Server
+└── 📜 server.py     # ▶️ Flask web server
 ```
 
-Zusätzlich existiert ein Release-Bundle-Pfad für Endnutzer ohne
-Python/Rust-Installation: `run_mosaic.py` (Standalone-Launcher),
-`mosaic_release.spec` (PyInstaller-Spec) und `tools/build_release.py` bauen
-ein `dist/`-onedir-Bundle inkl. `README_SPIEL.txt` (Spielanleitung fürs
-gepackte Programm) — separat gepflegt, siehe deren eigene Docstrings.
+Additionally, there is a release-bundle path for end users without a
+Python/Rust installation: `run_mosaic.py` (standalone launcher),
+`mosaic_release.spec` (PyInstaller spec), and `tools/build_release.py` build
+a `dist/` onedir bundle including `README_SPIEL.txt` (game instructions for
+the packaged program, in German) — maintained separately, see their own
+docstrings.
 
-### `evaluations/` auf einen Blick
+### `evaluations/` at a Glance
 
-`STATUS.md` (lebendes Status-/Fahrplan-Dokument) und `elo_history.csv` sind
-die primären Quellen. Daneben: `arena_trends.csv` (Punkte-/Floor-Trend je
-Lauf), `frozen_eval_set.pkl` + `frozen_v1_oracle_labels.json` (eingefrorenes,
-generationsübergreifendes Eval-/Oracle-Set), diverse `offline_diagnose_*`-,
-`paired_gating_result_*`- und `paired_arena_*`-JSONs (Einzelläufe, per
-Dateiname einem STATUS.md-Abschnitt zuordenbar), `render_diagrams.py` +
-die daraus erzeugten `.svg`-Diagramme, sowie `reference_game.md` (Beispielpartie).
-`game_analysis_*.md`-Berichte werden vom Spiel-Analyse-Werkzeug
-(`tools/analyze_game_log.py`) erzeugt.
+`STATUS.md` (a living status/roadmap document, kept in German) and
+`elo_history.csv` are the primary sources. In addition: `arena_trends.csv`
+(points/floor trend per run), `frozen_eval_set.pkl` +
+`frozen_v1_oracle_labels.json` (frozen, cross-generation eval/oracle set),
+various `offline_diagnose_*`, `paired_gating_result_*`, and
+`paired_arena_*` JSONs (individual runs, each mapped to a STATUS.md section
+by filename), `render_diagrams.py` plus the `.svg` diagrams it generates,
+and `reference_game.md` (sample game). `game_analysis_*.md` reports are
+generated by the game-analysis tool (`tools/analyze_game_log.py`).
 
 ### `tools/`
 
-| Skript | Zweck |
+| Script | Purpose |
 |---|---|
-| `analyze_game_log.py` | Analysiert Mensch-vs-KI-Logs (`static/log/`): Parser+Replay-Kreuzvalidierung + Oracle-Bewertung jedes Zugs, Report als Markdown |
-| `arena.py` | Round-Robin/Anker-Matches (Heuristik-Konfigurationen und Netz-vs-Heuristik), Rust-Engine, SPRT |
-| `arena_trends.py` | Hängt je Arena-/Gating-Lauf eine Zeile (Ø-Score, Floor-Strafe) an `evaluations/arena_trends.csv` |
-| `build_frozen_eval_set.py` | Erzeugt das eingefrorene, generationsübergreifende Eval-Set (`frozen_eval_set.pkl`) |
-| `build_frozen_oracle_labels.py` | Labelt das Frozen-Set per tiefer Netzsuche (Oracle-Referenz für `oracle_metrics.py`) |
-| `build_release.py` | Baut das PyInstaller-Windows-Bundle + ZIP für Endnutzer |
-| `diagnosis.py` | Sanity-Check der Trainingsdaten (Zero-Mask, Policy-Leak, Policy-Schärfe) |
-| `elo_tracker.py` | Bradley-Terry-Elo-Buchhaltung über `evaluations/elo_history.csv` (reine Auswertung, startet keine Matches) |
-| `extract_kat2_examples.py` | Extrahiert Beispielzustände für "Strafleiste trotz Alternative"-Fälle aus Self-Play-Daten |
-| `git_tree.py` | Druckt einen bereinigten Projekt-Verzeichnisbaum |
-| `hybrid_paired_arena.py` | Gepaarter Arena-Runner für Hybrid-Suche (Priors von Netz A, Blattwerte von Netz B) |
-| `model_info.py` | Zeigt Metadaten eines gespeicherten Modell-Checkpoints an |
-| `offline_diagnose.py` | Value-Val-R² gesamt + je Runde, Policy-Top-1/Top-3, `--frozen` für generationsübergreifenden Vergleich |
-| `oracle_metrics.py` | Offline-Metriken der Kandidaten-Netze gegen die Oracle-Labels + Rangkorrelation mit Elo |
-| `paired_arena_arm_worker.py` | Ein-Arm-Worker für gepaarte Speed-Bündel-A/Bs (dünner CLI-Wrapper um `net_arena_match`) |
-| `paired_arena_ismcts.py` | Gepaarter A/B: Einzel- vs. Mehrfach-Determinisierung (ISMCTS) |
-| `paired_arena_round5.py` | Gepaarter A/B für die Runde-5-Budget-Umstellung (Zeit- vs. Node-Budget) |
-| `paired_arena_shrink_ab.py` | Gepaarter A/B für die Value-Shrinkage-Konstante (Orchestrator) |
-| `paired_arena_shrink_arm_worker.py` | Ein-Arm-Worker für den Value-Shrinkage-A/B (Netz vs. Netz) |
-| `paired_arena_speedbundle.py` | Gepaarter A/B für das Suche-Speed-Bündel (Inferenz-Batching, Gumbel-Tiefe-Fixes) |
-| `paired_gating.py` | Standard-Gating-Werkzeug: gepaarte Seeds/getauschte Bretter, SPRT (`p1=0.65`), Vorzeichentest |
-| `rtv_redundancy_report.py` | Offline-Analyse: liefert `round_transition_value` noch eigenständige Information ggü. `bootstrap_value`? |
-| `selfplay_diversity_report.py` | Öffnungs-/Verlaufs-Diversität im Self-Play-Korpus (Kollaps-Check) |
+| `analyze_game_log.py` | Analyzes human-vs-AI logs (`static/log/`): parser + replay cross-validation + oracle evaluation of every move, report as Markdown |
+| `arena.py` | Round-robin/anchor matches (heuristic configurations and network-vs-heuristic), Rust engine, SPRT |
+| `arena_trends.py` | Appends a row (avg. score, floor penalty) to `evaluations/arena_trends.csv` per arena/gating run |
+| `build_frozen_eval_set.py` | Builds the frozen, cross-generation eval set (`frozen_eval_set.pkl`) |
+| `build_frozen_oracle_labels.py` | Labels the frozen set via deep network search (oracle reference for `oracle_metrics.py`) |
+| `build_release.py` | Builds the PyInstaller Windows bundle + ZIP for end users |
+| `diagnosis.py` | Sanity check of the training data (zero mask, policy leak, policy sharpness) |
+| `elo_tracker.py` | Bradley-Terry Elo bookkeeping over `evaluations/elo_history.csv` (pure evaluation, does not run matches) |
+| `extract_kat2_examples.py` | Extracts example states for "floor penalty despite alternative" cases from self-play data |
+| `git_tree.py` | Prints a cleaned-up project directory tree |
+| `hybrid_paired_arena.py` | Paired arena runner for hybrid search (priors from network A, leaf values from network B) |
+| `model_info.py` | Shows metadata of a saved model checkpoint |
+| `offline_diagnose.py` | Value validation R² overall + per round, policy top-1/top-3, `--frozen` for cross-generation comparison |
+| `oracle_metrics.py` | Offline metrics of candidate networks against the oracle labels + rank correlation with Elo |
+| `paired_arena_arm_worker.py` | Single-arm worker for paired speed-bundle A/Bs (thin CLI wrapper around `net_arena_match`) |
+| `paired_arena_ismcts.py` | Paired A/B: single vs. multiple determinization (ISMCTS) |
+| `paired_arena_round5.py` | Paired A/B for the round-5 budget switch (time vs. node budget) |
+| `paired_arena_shrink_ab.py` | Paired A/B for the value shrinkage constant (orchestrator) |
+| `paired_arena_shrink_arm_worker.py` | Single-arm worker for the value shrinkage A/B (network vs. network) |
+| `paired_arena_speedbundle.py` | Paired A/B for the search speed bundle (inference batching, Gumbel depth fixes) |
+| `paired_gating.py` | Standard gating tool: paired seeds/swapped boards, SPRT (`p1=0.65`), sign test |
+| `rtv_redundancy_report.py` | Offline analysis: does `round_transition_value` still carry independent information over `bootstrap_value`? |
+| `selfplay_diversity_report.py` | Opening/trajectory diversity in the self-play corpus (collapse check) |
 
 ---
 
-## Spielen & Debuggen
+## Playing & Debugging
 
 ```bash
 python server.py
 # http://localhost:5000
 ```
-Schwierigkeitsgrade bis `expert` = `v16_best`@400 Sims (`server.py`s
-`DIFFICULTY_PRESETS`). Der KI-Debugger (`/debug`) zeigt einen
-Value-Head-Breakdown (Roh-Value, Points-Forecast, Win-%, geblendete
-Utility, Floor-Shift) sowie einen granularen Gumbel-Trace (Top-m-Kandidaten,
-Sequential-Halving-Phasen mit Eliminierungen, Finalisten) pro Zug an.
+Difficulty levels up to `expert` = `v16_best`@400 sims (`server.py`'s
+`DIFFICULTY_PRESETS`). The AI debugger (`/debug`) shows a value-head
+breakdown (raw value, points forecast, win %, blended utility, floor shift)
+as well as a granular Gumbel trace (top-m candidates, Sequential Halving
+phases with eliminations, finalists) per move.
 
-Partien gegen die KI werden als Log unter `static/log/game_*.log`
-mitgeschrieben. Analyse/Oracle-Bewertung dieser Logs ist in Arbeit
-(`tools/analyze_game_log.py`, separat betreut).
+Games against the AI are logged under `static/log/game_*.log`.
+Analysis/oracle evaluation of these logs is in progress
+(`tools/analyze_game_log.py`, maintained separately).
 
 ---
 
 ## Backup
 
-Täglicher, nicht-löschender OneDrive-Spiegel des Repos läuft als
-geplanter Task. Zusätzlich schreibt `train.py` nach jedem Trainingslauf
-automatisch einen benannten Modell-Snapshot nach
-`<OneDrive>\Backups\mosaic-AI\models_snapshots\` (ereignisgesteuert,
-eingeführt nach dem Modellverlust vom 2026-07-24 — scheitert leise mit
-Warnung, falls die `OneDrive`-Umgebungsvariable fehlt, bricht das Training
-selbst aber nicht ab).
+A daily, non-destructive OneDrive mirror of the repo runs as a scheduled
+task. In addition, `train.py` automatically writes a named model snapshot
+after every training run to
+`<OneDrive>\Backups\mosaic-AI\models_snapshots\` (event-driven, introduced
+after the model loss on 2026-07-24 — fails silently with a warning if the
+`OneDrive` environment variable is missing, but does not abort training
+itself).
 
 ---
 
-## Architektur (Kurzreferenz)
+## Architecture (Quick Reference)
 
-### Neuronales Netz (`MosaicNet`, `engine/py/neural_net.py`)
+### Neural Network (`MosaicNet`, `engine/py/neural_net.py`)
 ```
 Input (708) → Linear(512) → BN → ReLU
            → Linear(512) → BN → ReLU
            → Linear(512) → ReLU
-           ┌→ Policy Head:     Linear(256) → ReLU → Linear(406)   — Aktionslogits
+           ┌→ Policy Head:     Linear(256) → ReLU → Linear(406)   — action logits
            ├→ Value Head:      Linear(64)  → ReLU → Linear(1) → Tanh
-           ├→ Moon-Order Head: Linear(32)  → ReLU → Linear(5)     — Plackett-Luce-Scores
-           └→ Points Head:     Linear(64)  → ReLU → Linear(1) → Tanh  — Punktestand-Prognose (Aux)
+           ├→ Moon-Order Head: Linear(32)  → ReLU → Linear(5)     — Plackett-Luce scores
+           └→ Points Head:     Linear(64)  → ReLU → Linear(1) → Tanh  — score forecast (aux)
 ```
-ONNX-Export trägt genau diese 4 Ausgabe-Tensoren.
+The ONNX export carries exactly these 4 output tensors.
 
-### State-Tensor (708 Features)
-Quelle der Wahrheit: `engine/src/features.rs` ↔ `state_to_tensor` — globaler
-Zustand, aktive Wertungsplatten, Fabriken, beide Spielerboards in
-Ego-Perspektive, beide 3×3-Kuppelraster, Mond-/Kuppel-Stapel, verdeckte
-Information als Masken/Anteile.
+### State Tensor (708 Features)
+Source of truth: `engine/src/features.rs` ↔ `state_to_tensor` — global
+state, active scoring plates (Wertungsplatten), factories, both player
+boards in ego perspective, both 3×3 dome grids, moon/dome stacks, hidden
+information as masks/shares.
 
-### Aktionsraum (406 Aktionen)
-| Typ | IDs | Beschreibung |
+### Action Space (406 Actions)
+| Type | IDs | Description |
 |---|---|---|
-| pass | 0 | Kein legaler Zug |
-| end_tiling | 1 | Tiling-Phase beenden |
-| stone | 10–273 | Kacheln nehmen: Fabrik × Farbe × Zielreihe |
-| tiling | 274–327 | Kachel legen: Musterreihe × Slot |
-| choose_dome_slot | 328–354 | Kuppel-Platzierung Stufe 1: Auslage-Kachel × Slot |
-| choose_draw_stack_slot | 355–390 | Stapelzug-Platzierung Stufe 1: gezogene Kachel × Slot |
-| choose_dome_rotation | 391–394 | Kuppel-Platzierung Stufe 2: Rotation (beide Pfade gemeinsam) |
-| use_chips | 395–400 | Musterreihe per Bonuschip abschließen |
-| bonus_chip | 401–404 | Aufgedeckten Bonuschip nehmen |
-| dome_stack_peek | 405 | 1 Punkt zahlen, eine verdeckte Platte ziehen (wiederholbar) |
+| pass | 0 | No legal move |
+| end_tiling | 1 | End tiling phase |
+| stone | 10–273 | Take tiles: factory × color × target row |
+| tiling | 274–327 | Place tile: pattern row × slot |
+| choose_dome_slot | 328–354 | Dome placement stage 1: display tile × slot |
+| choose_draw_stack_slot | 355–390 | Draw-stack placement stage 1: drawn tile × slot |
+| choose_dome_rotation | 391–394 | Dome placement stage 2: rotation (shared by both paths) |
+| use_chips | 395–400 | Complete a pattern row using a bonus chip |
+| bonus_chip | 401–404 | Take a revealed bonus chip |
+| dome_stack_peek | 405 | Pay 1 point, draw a hidden plate (repeatable) |
 
 ---
 
-## Konfiguration (Auswahl)
+## Configuration (Selection)
 
-| Parameter | Wert | Wo | Beschreibung |
+| Parameter | Value | Where | Description |
 |---|---|---|---|
-| `INPUT_SIZE` | 708 | `config.py` | Größe des State-Tensors |
-| `NUM_ACTIONS` | 406 | `config.py` | Größe des Aktionsraums |
-| `HIDDEN_SIZE` | 512 | `config.py` | Neuronen pro Hidden Layer |
-| `TD_LAMBDA` | 0.5 | `engine/py/neural_net.py` | TD-Bootstrap-Blend im Value-Ziel |
-| `VALUE_SCHEMA_VERSION` | 15 | `engine/py/neural_net.py` | Value-Ziel-Formel-Version (Cache-Invalidierung bei Änderung) |
-| `USE_GUMBEL_SEARCH` | true | `engine/src/net_mcts.rs` | Gumbel-Suche (false = Legacy-PUCT) |
-| `GUMBEL_TOP_M` | 16 | `engine/src/net_mcts.rs` | Wurzel-Kandidaten für Sequential Halving |
-| `FLOOR_SHAPING_WEIGHT` | 0.3 | `engine/src/net_mcts.rs` | Exaktes Floor-Strafe-Blattwert-Additiv (validiert) |
-| `DETERMINIZE_ROOT_HIDDEN_INFO` | true | `engine/src/net_mcts.rs` | Einzel-Determinisierung der verdeckten Information an der Wurzel |
+| `INPUT_SIZE` | 708 | `config.py` | Size of the state tensor |
+| `NUM_ACTIONS` | 406 | `config.py` | Size of the action space |
+| `HIDDEN_SIZE` | 512 | `config.py` | Neurons per hidden layer |
+| `TD_LAMBDA` | 0.5 | `engine/py/neural_net.py` | TD-bootstrap blend in the value target |
+| `VALUE_SCHEMA_VERSION` | 15 | `engine/py/neural_net.py` | Value-target formula version (cache invalidation on change) |
+| `USE_GUMBEL_SEARCH` | true | `engine/src/net_mcts.rs` | Gumbel search (false = legacy PUCT) |
+| `GUMBEL_TOP_M` | 16 | `engine/src/net_mcts.rs` | Root candidates for Sequential Halving |
+| `FLOOR_SHAPING_WEIGHT` | 0.3 | `engine/src/net_mcts.rs` | Exact floor-penalty leaf-value additive (validated) |
+| `DETERMINIZE_ROOT_HIDDEN_INFO` | true | `engine/src/net_mcts.rs` | Single determinization of hidden information at the root |
 
-Weitere Konstanten samt Kalibrierungshistorie stehen als dokumentierte
-Rust-/Python-Konstanten im Code; jeder Self-Play-/Trainingslauf schreibt die
-aktive Konfiguration zusätzlich in ein JSON-Manifest neben seiner Ausgabe.
+Further constants along with their calibration history are documented as
+Rust/Python constants in the code; every self-play/training run also writes
+the active configuration to a JSON manifest next to its output.
 
 ---
 
-Ausführliche Historie, Messwerte, Ablations-Ergebnisse und offene Fragen:
+Detailed history, measurements, ablation results, and open questions:
 [`evaluations/STATUS.md`](evaluations/STATUS.md).
