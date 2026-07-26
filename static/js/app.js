@@ -527,6 +527,13 @@ function renderBoard(pi) {
   const p = S.players[pi];
   const isActive = S.current_player===pi && S.phase==='drafting';
   const isTiling = S.phase==='tiling';
+  // Task: Bonuschip-Restanzeige -- Chips, die diese Runde insgesamt noch
+  // ziehbar sind (aufgedeckt+ungezogen ODER noch verdeckt auf einer noch
+  // nicht geleerten Fabrik). Ein Chip ist "raus", sobald factory.bonus_chip
+  // beim Nehmen auf null gesetzt wird (siehe engine/src/game.rs::execute_take_bonus_chip)
+  // -- alles mit vorhandenem bonus_chip zaehlt also unabhaengig davon, ob er
+  // schon aufgedeckt ist oder erst spaeter in dieser Runde aufgedeckt wird.
+  const chipsRemainingThisRound = (S.factories || []).filter(f => f.bonus_chip).length;
 
   const tokHTML = S.round<5
     ? `<div class="tokens">${[0,1].map(i=>`<div class="tok ${i<p.tokens_used?'used':''}"></div>`).join('')}<span>${p.tokens_used}/2 Spielerplättchen</span></div>`
@@ -635,7 +642,7 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
         </div>
         
         <div style="margin-top:6px;font-size:9px;color:var(--text3)">
-          Chips (${p.chips_taken}/10):
+          Chips — Rest diese Runde: ${chipsRemainingThisRound}:
           <div class="chips-grid">
             ${Array.from({length: 10}, (_, i) => {
               const c = p.bonus_chips[i];
@@ -855,11 +862,22 @@ function renderCenter() {
       </div>`;
     }).join('');
     
-    const moonTopTiles = f.moon.map(stack => stack[stack.length-1]).filter(Boolean);
-    const moonTiles = moonTopTiles.length
-      ? `<div style="display:flex;gap:2px;align-items:center;margin-top:3px;flex-wrap:wrap">
+    // Task (Nutzer-Feedback): ALLE Fliesen jedes Mond-Stapels in korrekter
+    // Reihenfolge zeigen (nicht nur die oberste) -- state_json liefert je
+    // Fabrik eine Liste von Stapeln, jeweils Index 0 = unten ... letzter =
+    // oben/sichtbar (siehe engine/src/factory.rs::place_on_moon/take_from_moon).
+    // Darstellung: pro Stapel eine leicht ueberlappende Mini-Kachel-Kolonne,
+    // unterste Fliese zuerst, oberste (ziehbare) zuletzt/oben + hervorgehoben.
+    const nonEmptyStacks = f.moon.filter(stack => stack && stack.length);
+    const moonTiles = nonEmptyStacks.length
+      ? `<div style="display:flex;gap:6px;align-items:flex-start;margin-top:3px;flex-wrap:wrap">
           <span style="font-size:8px;color:var(--text3)">Stapel:</span>
-          ${moonTopTiles.map(c=>`<div class="tile sm ${normColor(c)}" title="Oben: ${c}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+          ${nonEmptyStacks.map(stack => {
+            const topDown = [...stack].reverse(); // topDown[0] = oben/ziehbar ... letzter = unten
+            return `<div style="display:flex;flex-direction:column" title="Stapel (oben→unten): ${topDown.join(' → ')}">
+              ${topDown.map((c,i)=>`<div class="tile sm ${normColor(c)}" style="margin-top:${i===0?'0':'-9px'};z-index:${topDown.length-i};${i===0?'outline:1.5px solid var(--text)':'opacity:.85'}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+            </div>`;
+          }).join('')}
          </div>` : '';
     return `<div class="fcard" data-fid="${f.id}">
       <div class="fhead"><span>F${f.id}</span>${chipHTML}</div>
@@ -898,7 +916,13 @@ function renderCenter() {
         </div>
        </div>` : '';
 
+  const towerTotal = (S.tower_colors || []).reduce((a,b)=>a+b, 0);
+
 document.getElementById('factories-area').innerHTML = `
+    <div class="lbl" style="display:flex;justify-content:space-between">
+      <span>🎒 ${S.bag_count} · 🗼 ${towerTotal}</span>
+      <span></span>
+    </div>
     <div class="lbl" style="display:flex;justify-content:space-between">
       <span>Kuppelplatten (${S.dome_display.length}/3)</span>
       <span style="color:var(--text3)">Stapel: ${S.dome_stack_count}${stackTopTypeLabel()}</span>
