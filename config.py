@@ -1,8 +1,15 @@
 import os
+import sys
 from pathlib import Path
 
-# Der absolute Pfad zu deinem Hauptordner (mosaic-AI)
-BASE_DIR = Path(__file__).resolve().parent
+# Der absolute Pfad zu deinem Hauptordner (mosaic-AI).
+# Im PyInstaller-Bundle (Task #96, onedir) existiert __file__ nicht als reale
+# Datei auf der Platte -- dort liegen die mitgelieferten Daten (models/, static/)
+# neben der EXE (sys._MEIPASS bei onedir: der "_internal"-Ordner daneben).
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(getattr(sys, "_MEIPASS", os.path.dirname(sys.executable)))
+else:
+    BASE_DIR = Path(__file__).resolve().parent
 
 # --- DYNAMISCHE PFADE ---
 DATA_DIR = BASE_DIR / "data"
