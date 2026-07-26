@@ -424,27 +424,29 @@ impl PyGame {
     /// Analyse-Endpunkt für `/api/ai/debug`, kein Zug wird angewendet, kein
     /// Self-Play-/Arena-Performance-Pfad betroffen).
     #[pyo3(signature = (simulations=200, c_puct=1.5))]
-    fn ai_debug_net_json(&mut self, simulations: u32, c_puct: f64) -> PyResult<String> {
+    fn ai_debug_net_json(&self, simulations: u32, c_puct: f64) -> PyResult<String> {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
         })?;
         let sims = net_mcts::net_effective_sims(simulations, drafting_actions(&self.game.state).len());
+        let mut rng = self.debug_rng();
         let (_chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, None, true);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut rng, None, true);
         Ok(analysis.to_string())
     }
 
     /// Analysiert die aktuelle Stellung per MCTS OHNE Zug auszuführen
     /// (für /api/ai/debug). Gibt das debug.html-Analyse-Dict zurück.
     #[pyo3(signature = (simulations=300))]
-    fn ai_debug_json(&mut self, simulations: u32) -> String {
+    fn ai_debug_json(&self, simulations: u32) -> String {
         let n = drafting_actions(&self.game.state).len();
         let sims = dynamic_sims(simulations, n);
+        let mut rng = self.debug_rng();
         let (_chosen, analysis) = search_with_tree(
             &self.game.state,
             sims,
             AI_C,
-            &mut self.rng,
+            &mut rng,
             AI_TREE_DEPTH,
             AI_TREE_TOPK,
             None,
@@ -456,13 +458,14 @@ impl PyGame {
     /// je Simulation) als Text — für /api/ai/debug_log. Volle dynamische Sim-Zahl
     /// (`simulations` = Basis). Wendet KEINEN Zug an; nur in der Drafting-Phase.
     #[pyo3(signature = (simulations=300))]
-    fn ai_debug_log(&mut self, simulations: u32) -> String {
+    fn ai_debug_log(&self, simulations: u32) -> String {
         if self.game.state.phase != Phase::Drafting {
             return "(Zustand nicht in der Drafting-Phase — kein MCTS-Log)".to_string();
         }
         let n = drafting_actions(&self.game.state).len();
         let sims = dynamic_sims(simulations, n);
-        search_log_text(&self.game.state, sims, AI_C, &mut self.rng)
+        let mut rng = self.debug_rng();
+        search_log_text(&self.game.state, sims, AI_C, &mut rng)
     }
 
     /// Platziert die Startkachel der KI per einfacher Farb-Häufigkeits-Heuristik
@@ -487,6 +490,18 @@ impl PyGame {
 
 // Interne KI-Schritt-Helfer (kein PyO3-Export).
 impl PyGame {
+    /// Separate RNG für reine Debug-/Analyse-Endpunkte (`ai_debug_*`): Die
+    /// Suche braucht Zufall, darf aber den Spiel-RNG NICHT fortschreiten
+    /// lassen — sonst verschiebt ein KI-Debugger-Aufruf während der Partie
+    /// unsichtbar den RNG-Zustand, und das Spiel ist ab der nächsten
+    /// Beutel-Neumischung (`Bag::refill_from_tower`) nicht mehr aus dem
+    /// Spiel-Log reproduzierbar (bricht die Replay-Validierung in
+    /// tools/analyze_game_log.py). `StdRng` ist bewusst nicht klonbar,
+    /// daher eine frische, vom Partie-Seed abgeleitete Instanz pro Aufruf
+    /// (deterministisch: gleiche Stellung → gleiche Analyse).
+    fn debug_rng(&self) -> StdRng {
+        StdRng::seed_from_u64(self.seed ^ 0xDEB0_6DEB_06DE_B06D)
+    }
     /// Drafting-Zug per MCTS (mit Debug-Baum). `log=true` schneidet den exakten
     /// Such-Trace mit und hängt ihn als `log_text` an.
     fn ai_drafting_step(&mut self, simulations: u32, log: bool) -> PyResult<String> {
@@ -762,5 +777,55 @@ mod tests {
 
         assert!(matches!(best_first_step_exact(&s, 0), TilingStep::End));
         assert!(generate_tiling_actions(&s, 0).is_empty());
+    }
+
+    /// Debug-/Analyse-Endpunkte dürfen den Spiel-RNG nicht fortschreiten
+    /// lassen: zwei identisch geseedete Partien müssen mit und ohne
+    /// zwischengeschaltete `ai_debug_*`-Aufrufe identisch verlaufen —
+    /// insbesondere über eine Beutel-Neumischung (`Bag::refill_from_tower`,
+    /// mischt mit dem Spiel-RNG) hinweg. Sonst ist die Partie nicht mehr aus
+    /// dem Spiel-Log reproduzierbar (Replay-Validierung, analyze_game_log.py).
+    #[test]
+    fn debug_endpoints_leave_game_rng_untouched() {
+        let mk = || PyGame::new(("A".into(), "B".into()), 0, Some(465392), None);
+        let mut plain = mk();
+        let mut probed = mk();
+
+        // Startkacheln: Nicht-Starter zuerst (Regel, siehe game.rs).
+        for p in [1usize, 0] {
+            plain.ai_start_tile_json(p).unwrap();
+            probed.ai_start_tile_json(p).unwrap();
+        }
+        assert_eq!(plain.state_json(), probed.state_json());
+
+        let mut refill_seen = false;
+        let mut prev_tower = probed.game.state.tower.count();
+        for _ in 0..600 {
+            if plain.game.is_over() {
+                break;
+            }
+            // Nur in `probed`: Debug-Aufrufe zwischenschalten — wie ein
+            // Nutzer, der während der Partie den KI-Debugger öffnet.
+            let _ = probed.ai_debug_json(20);
+            let _ = probed.ai_debug_log(20);
+
+            let r1 = plain.ai_step_json(20, false).unwrap();
+            let r2 = probed.ai_step_json(20, false).unwrap();
+            assert_eq!(r1, r2, "KI-Zug weicht nach Debug-Aufrufen ab");
+            assert_eq!(
+                plain.state_json(),
+                probed.state_json(),
+                "Zustand weicht nach Debug-Aufrufen ab"
+            );
+
+            // Turm schrumpft nur durch `refill_from_tower` → Neumischung erkannt.
+            let tower_now = probed.game.state.tower.count();
+            if tower_now < prev_tower {
+                refill_seen = true;
+            }
+            prev_tower = tower_now;
+        }
+        assert!(plain.game.is_over(), "Partie nicht zu Ende gespielt (Schrittlimit)");
+        assert!(refill_seen, "keine Beutel-Neumischung im Testspiel — Seed anpassen");
     }
 }
