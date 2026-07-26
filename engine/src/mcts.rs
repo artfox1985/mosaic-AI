@@ -804,6 +804,22 @@ pub fn search_with_tree<R: Rng + ?Sized>(
             if is_chosen {
                 chosen_id = Some(i);
             }
+            // Task #97: siehe ausführlichen Kommentar in
+            // net_mcts.rs::net_search_with_tree_from_nodes -- identisches Muster,
+            // rein lesend über bereits vorhandene Kind-Knoten, kein Effekt auf
+            // Suche/Selektion/Backprop.
+            let best_rotation = node
+                .children
+                .iter()
+                .filter_map(|&gc| match &nodes[gc].action {
+                    Some(SearchMove::Draft(Action::ChooseDomeRotation(rot))) => Some((&nodes[gc], *rot)),
+                    _ => None,
+                })
+                .max_by_key(|(gnode, _)| gnode.visits)
+                .map(|(gnode, rot)| {
+                    let gq = if gnode.visits > 0 { gnode.value / gnode.visits as f64 } else { 0.0 };
+                    json!({ "rotation": rot, "visits": gnode.visits, "q": gq, "win_pct": gq * 100.0 })
+                });
             json!({
                 "action_id": i,
                 "type": typ,
@@ -818,6 +834,7 @@ pub fn search_with_tree<R: Rng + ?Sized>(
                 "max_depth": subtree_depth(&nodes, cid),
                 "shaping": Value::Null,
                 "chosen": is_chosen,
+                "best_rotation": best_rotation,
             })
         })
         .collect();

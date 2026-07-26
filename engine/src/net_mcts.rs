@@ -2409,6 +2409,26 @@ fn net_search_with_tree_from_nodes(
             if is_chosen {
                 chosen_id = Some(i);
             }
+            // Task #97 (Lehrer-Modus-Feedback): `ChooseDomeSlot`/`ChooseDrawStackSlot`
+            // tragen selbst KEINE Rotation (Platzhalter 0, siehe moves.rs) -- die
+            // Rotationswahl ist ein separater `ChooseDomeRotation`-Zug, der als
+            // KIND dieses Wurzelkandidaten im Suchbaum steht (game.rs::drafting_actions
+            // liefert nach `ChooseDomeSlot`/`ChooseDrawStackSlot` via `pending_dome_choice`
+            // ausschließlich `ChooseDomeRotation`-Kandidaten). Rein lesender Zugriff auf
+            // bereits vorhandene Baumdaten (`node.children`) -- KEIN Effekt auf Suche/
+            // Selektion/Backprop/RNG (nur diese Debug-JSON-Zusammenstellung betroffen).
+            let best_rotation = node
+                .children
+                .iter()
+                .filter_map(|&gc| match &nodes[gc].action {
+                    Some(Action::ChooseDomeRotation(rot)) => Some((&nodes[gc], *rot)),
+                    _ => None,
+                })
+                .max_by_key(|(gnode, _)| gnode.visits)
+                .map(|(gnode, rot)| {
+                    let gq = if gnode.visits > 0 { gnode.value / gnode.visits as f64 } else { 0.0 };
+                    json!({ "rotation": rot, "visits": gnode.visits, "q": gq, "win_pct": gq * 100.0 })
+                });
             json!({
                 "action_id": i,
                 "type": typ,
@@ -2431,6 +2451,11 @@ fn net_search_with_tree_from_nodes(
                 "net_leaf_value": node.leaf_value[node.player_who_acted],
                 "max_depth": subtree_depth(nodes, cid),
                 "chosen": is_chosen,
+                // Task #97: besuchsstärkste Rotationswahl (Kind-Knoten) für
+                // choose_dome_slot/choose_draw_stack_slot -- `null`, falls die Suche
+                // diesen Kandidaten nie bis zur Rotationsstufe vertieft hat (kleines
+                // Sim-Budget) oder der Kandidat kein Kuppelzug ist.
+                "best_rotation": best_rotation,
             })
         })
         .collect();
@@ -2528,6 +2553,34 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
             .find(|&&c| nodes0[c].action.as_ref() == Some(a))
             .map(|&c| nodes0[c].leaf_value[nodes0[c].player_who_acted])
     };
+    // Task #97: wie `leaf_value_of` -- repräsentativ aus Welt 0, besuchsstärkste
+    // `ChooseDomeRotation`-KIND unter dem Wurzelkandidaten `a` (siehe ausführlicher
+    // Kommentar in `net_search_with_tree_from_nodes`). `None`, wenn `a` in Welt 0
+    // nie zu einem Kind wurde ODER dieses Kind nie bis zur Rotationsstufe vertieft
+    // wurde. Aktuell praktisch unerreicht (NUM_DETERMINIZATIONS == 1 -> dieser
+    // Forest-Pfad wird vom Debug-Endpunkt nicht durchlaufen), nur zur Schema-Parität
+    // mit `net_search_with_tree_from_nodes` ergänzt (siehe Modul-Kommentar oben).
+    let best_rotation_of = |a: &Action| -> Value {
+        nodes0[0]
+            .children
+            .iter()
+            .find(|&&c| nodes0[c].action.as_ref() == Some(a))
+            .and_then(|&c| {
+                nodes0[c]
+                    .children
+                    .iter()
+                    .filter_map(|&gc| match &nodes0[gc].action {
+                        Some(Action::ChooseDomeRotation(rot)) => Some((&nodes0[gc], *rot)),
+                        _ => None,
+                    })
+                    .max_by_key(|(gnode, _)| gnode.visits)
+                    .map(|(gnode, rot)| {
+                        let gq = if gnode.visits > 0 { gnode.value / gnode.visits as f64 } else { 0.0 };
+                        json!({ "rotation": rot, "visits": gnode.visits, "q": gq, "win_pct": gq * 100.0 })
+                    })
+            })
+            .unwrap_or(Value::Null)
+    };
 
     let mut ordered = stats.clone();
     ordered.sort_by(|a, b| b.1.cmp(&a.1));
@@ -2557,6 +2610,7 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
                 "net_leaf_value": leaf_value_of(act),
                 "max_depth": Value::Null,
                 "chosen": is_chosen,
+                "best_rotation": best_rotation_of(act),
             })
         })
         .collect();
