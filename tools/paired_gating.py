@@ -137,6 +137,7 @@ except Exception:
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
+from set_champion import set_champion as _set_champion  # noqa: E402  (Nutzer-Anstoss 2026-07-27)
 
 BLOCK_SIZE = 25
 MAX_PAIRS = 200                 # harter Deckel (Nutzer-Anstoss: 150 -> 200)
@@ -246,14 +247,26 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        c_puct_b: float = DEFAULT_C_PUCT, block_size: int = BLOCK_SIZE,
                        max_pairs: int = MAX_PAIRS, sprt_p1: float = SPRT_P1,
                        sprt_alpha: float = SPRT_ALPHA, sprt_beta: float = SPRT_BETA,
-                       base_seed: int | None = None, threads: int = DEFAULT_THREADS) -> dict:
+                       base_seed: int | None = None, threads: int = DEFAULT_THREADS,
+                       promote_winner: bool = False) -> dict:
     """Orchestriert das volle gepaarte Gating (siehe Modul-Docstring). Die
     STOPP-Entscheidung ist ein Wald-SPRT auf den informativen Paaren (b/c);
     bricht NACH einem VOLLSTAENDIGEN Block ab, sobald die LLR eine der beiden
     Wald-Schranken erreicht, oder wenn `max_pairs` Paare erreicht sind (dann
     OHNE SPRT-Entscheid). Importiert `mosaic_rust` HIER (nicht auf
     Modulebene) -- welches Wheel geladen wird, entscheidet allein der
-    aufrufende Python-Interpreter, nicht dieses Skript."""
+    aufrufende Python-Interpreter, nicht dieses Skript.
+
+    `promote_winner` (Nutzer-Anstoss 2026-07-27, "bau mir set_champion.py
+    direkt in den Gating-Prozess automatisch ein"): wird NUR wirksam, wenn
+    der SPRT `name_a` (den Kandidaten) als signifikant besser entscheidet --
+    NIE bei `H0` oder `UNDECIDED_CAP_REACHED`. Default hier bewusst `False`
+    (sichere Bibliotheks-Vorgabe fuer programmatische Aufrufer); die CLI
+    (`main()`, s.u.) setzt den Default auf `True`, da `paired_gating.py`
+    laut Modul-Docstring genau fuer die Frage "loest ein neuer Kandidat den
+    amtierenden Champion ab?" gebaut ist -- historisch wurde in diesem
+    Projekt JEDE entschiedene Gating-Runde als neue Referenz/neuer Generator
+    uebernommen (siehe evaluations/STATUS.md)."""
     import mosaic_rust as mr
 
     name_a = name_a or os.path.basename(model_a)
@@ -408,6 +421,19 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
           f"--player-b {name_b} --sims-b {sims_b} --wins-a {a_wins_total} "
           f"--wins-b {b_wins_total} --n {n_games_total} "
           f"--comment \"Gepaartes Gating (Task #76), SPRT={sprt_verdict}, p={final_p:.4f}\"")
+
+    if promote_winner:
+        if sprt_verdict == name_a:
+            try:
+                _set_champion(name_a)
+                print(f"  Champion automatisch gesetzt: {name_a} (models/champion.txt) "
+                      f"-- Server-Neustart noetig, damit es wirkt.")
+            except SystemExit as e:
+                print(f"  WARNUNG: Champion NICHT automatisch gesetzt ({e}).")
+        else:
+            print(f"  Champion NICHT automatisch gesetzt (SPRT-Entscheid={sprt_verdict}, "
+                  f"kein signifikanter Sieg fuer {name_a}).")
+
     return result
 
 
@@ -432,6 +458,15 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--threads", type=int, default=DEFAULT_THREADS)
     p.add_argument("--out", default=None, help="Ziel-JSON-Pfad (Default: evaluations/paired_gating_result_<a>_vs_<b>.json)")
+    p.add_argument("--promote-winner", dest="promote_winner", action="store_true", default=True,
+                    help="Setzt models/champion.txt automatisch auf --name-a, sobald der SPRT "
+                         "signifikant zu dessen Gunsten entscheidet (Standard: an -- "
+                         "paired_gating.py ist laut Design genau fuer Champion-Ablösungen "
+                         "gedacht). Server braucht danach einen Neustart.")
+    p.add_argument("--no-promote-winner", dest="promote_winner", action="store_false",
+                    help="Deaktiviert die automatische Champion-Uebernahme (z.B. fuer reine "
+                         "Ablations-/Experiment-Vergleiche, deren Sieger nicht der neue "
+                         "Server-Default werden soll).")
     args = p.parse_args()
 
     sims_a = args.sims if args.sims is not None else args.sims_a
@@ -444,7 +479,7 @@ def main() -> None:
         sims_a=sims_a, sims_b=sims_b, c_puct_a=c_puct_a, c_puct_b=c_puct_b,
         block_size=args.block_size, max_pairs=args.max_pairs, sprt_p1=args.sprt_p1,
         sprt_alpha=args.sprt_alpha, sprt_beta=args.sprt_beta,
-        base_seed=args.seed, threads=args.threads,
+        base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
     )
 
     out_path = Path(args.out) if args.out else (
