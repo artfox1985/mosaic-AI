@@ -4790,3 +4790,34 @@ struktion (Task #89, Oracle) leitet es nur NAEHERUNGSWEISE aus den
 ohne Auswirkung auf Suche/Oracle (das Feld wird dort nirgends gelesen).
 
 `cargo test --release`: 163/163 gruen (beide Fixes zusammen getestet).
+
+## Plate-Shaping-Code aus Git-Historie rekonstruiert (2026-07-27, Task #5 Vorbereitung)
+
+**Anlass**: Nutzer-Hypothese, das A/B-Nullergebnis von Task #93 (Wertungsplatten-
+Shaping, p=0,7111, s.o.) koennte an derselben Gumbel-Top-m-Rang-Invarianz
+liegen wie der Wertungsplatten-Sensitivitaets-Befund von Teil 3 der
+Wertungsplatten-Diagnose (2026-07-26). Fuer einen sauberen Folgetest
+(Task #5) wird der damalige `PLATE_SHAPING_ENABLED`-Toggle wieder gebraucht
+-- der Code existierte nur im (bereits aufgeraeumten) Worktree
+`worktree-plate-shaping`, NICHT auf `main`.
+
+**Rekonstruktion**: `git fsck --unreachable --no-reflogs` fand die beiden
+Commits noch als dangling (noch nicht GC'd): `3b7f36b` (Implementierung,
+`PLATE_SHAPING_ENABLED=false`) und `344970f` (A/B-Ergebnis-Kommentar +
+Test-Toleranz-Fix, gleiche Linie). Beide Diffs vor jedem GC-Risiko zuerst
+nach `/tmp` gesichert, dann MANUELL (kein Cherry-Pick -- `net_mcts.rs` hat
+sich seit dem Abzweigpunkt (Task #91) durch Task #89/95/97 stark
+weiterentwickelt) auf den aktuellen `net_mcts.rs`-Stand uebertragen:
+`PLATE_SHAPING_SCALE`/`PLATE_SHAPING_WEIGHT`/`PLATE_SHAPING_ENABLED`,
+`plate_shaping_delta`/`apply_plate_shaping`, Aufrufstelle in `make_node`
+(nach dem Floor-Shaping-Additiv), 3 Tests -- inhaltlich UNVERAENDERT zum
+Original, nur der `build_net_tree`-Testaufruf um den seit Task #89 neuen
+`trace`-Parameter (`None`) ergaenzt (Signatur ist sonst identisch
+geblieben). `tools/paired_arena_plate_ab.py`/`_arm_worker.py` (die
+A/B-Mess-Skripte) ebenfalls wiederhergestellt.
+
+`cargo test --release`: **166/166 gruen** (163 Basis + 3 rekonstruierte
+Plate-Shaping-Tests), Wheel neu gebaut + installiert. `PLATE_SHAPING_ENABLED`
+bleibt `false` (Standard, byte-identisches Bestandsverhalten) -- Task #5
+kann den Toggle jetzt bei Bedarf per Wheel-Rebuild auf `true` stellen, ohne
+den Code erneut schreiben zu muessen.

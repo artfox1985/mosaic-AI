@@ -31,6 +31,7 @@ use crate::game::{drafting_actions, Game};
 use crate::mcts::{label_search_move, SearchMove};
 use crate::moves::{Action, TakeSource};
 use crate::net::{softmax, Net};
+use crate::scoring::wertung_progress;
 use crate::self_play::action_to_env_dict;
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
@@ -522,6 +523,79 @@ fn floor_shaping_delta(state: &GameState) -> f64 {
     let theirs = (state.players[1].broken_penalty()
         + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
     (mine - theirs) / FLOOR_SHAPING_SCALE
+}
+
+// ── Wertungsplatten-Shaping (Task #93) ──────────────────────────────────────
+// Rekonstruiert 2026-07-27 aus Commit 3b7f36b/344970f (Worktree
+// `worktree-plate-shaping`, nach der A/B-Messung aufgeraeumt/geloescht) --
+// Nutzer-Anstoss: erneut fuer einen Folgetest (Task #5, Rang-Invarianz-
+// Hypothese der Gumbel-Suche) brauchbar machen. Inhaltlich UNVERAENDERT
+// gegenueber dem Original, siehe evaluations/STATUS.md Abschnitt
+// "Wertungsplatten-Shaping A/B (Task #93, 2026-07-25)" fuer das damalige
+// A/B-Ergebnis (p=0.7111, GEGEN Merge -- ENABLED bleibt daher `false`).
+
+/// Skala für das Wertungsplatten-Fortschritts-Additiv, gleiche Größenordnung
+/// wie `FLOOR_SHAPING_SCALE`/`VALUE_SCALE` (50.0) -- macht die Korrektur
+/// direkt vergleichbar mit dem own-minus-opp-Score-Margin, das `value`/
+/// `points_forecast` schon als Trainingsziel verwenden (gleiche Begründung
+/// wie bei `FLOOR_SHAPING_SCALE`).
+const PLATE_SHAPING_SCALE: f64 = 50.0;
+
+/// Gewicht des Wertungsplatten-Fortschritts-Additivs relativ zum
+/// Netz-Blattwert (Task #93, analog `FLOOR_SHAPING_WEIGHT`). Startwert 0.3
+/// aus Analogie zum validierten Floor-Shaping übernommen -- war der
+/// A/B-Testgegenstand (siehe `PLATE_SHAPING_ENABLED`-Kommentar für das
+/// Ergebnis), NICHT weiter rekalibriert (der Toggle blieb aus, eine
+/// Fein-Kalibrierung des Gewichts wäre reine Spekulation ohne neuen Beleg).
+pub const PLATE_SHAPING_WEIGHT: f64 = 0.3;
+
+/// Toggle für das Wertungsplatten-Shaping (Task #93, Compile-Konstante --
+/// Arm OFF/ON per Wheel-Rebuild wie beim Value-Shrinkage-A/B, siehe
+/// `VALUE_SHRINK_ENABLED`). `false` (Standard) = byte-identisches
+/// Bestandsverhalten, der Additiv-Block in `make_node` wird dann gar nicht
+/// erst ausgeführt (siehe `apply_plate_shaping`). Paritätstest:
+/// `plate_shaping_disabled_is_exact_identity`.
+///
+/// GEPAARTER A/B GEFAHREN (2026-07-25, `tools/paired_arena_plate_ab.py`,
+/// `v15_best`@400 vs. `v14b_best`@400, 100 seed-gepaarte Spiele je Arm,
+/// identischer Basis-Seed 9315 in beiden Armen): Arm OFF 58:42 (Score 35.3
+/// vs. 31.0, Floor 14.2 vs. 17.4), Arm ON 61:39 (Score 35.9 vs. 29.2, Floor
+/// 13.7 vs. 17.8) -- ON liegt zwar numerisch vorn, aber die Diskordanz
+/// (b=16 ON-only-Siege, c=13 OFF-only-Siege) ist klein und nicht signifikant
+/// (exakter McNemar p=0.7111). Evidenzregel (siehe MEMORY.md/STATUS.md-
+/// Präzedenzfälle, z.B. `VALUE_SHRINK_ENABLED`) verlangt p<0.05 UND Vorteil
+/// für ON -- nur Ersteres fehlt hier klar. Bleibt daher AUS. Details:
+/// `evaluations/STATUS.md` Abschnitt "Wertungsplatten-Shaping A/B (Task #93,
+/// 2026-07-25)".
+pub const PLATE_SHAPING_ENABLED: bool = false;
+
+/// Exakte, JETZT SCHON feststehende Wertungsplatten-Fortschritts-Differenz
+/// (Spieler0 minus Spieler1) -- reine State-Funktion
+/// ([`crate::scoring::wertung_progress`], dieselbe stetige Fortschritts-
+/// Heuristik, die die DFS-Blattbewertung in `mcts.rs::player_total` schon
+/// lange nutzt), KEIN Netz-Forward-Pass, analog `floor_shaping_delta`.
+/// `wertung_progress` selbst fällt bei voller Plattenfüllung exakt auf den
+/// echten `calculate_end_scoring`-Punktwert zurück (siehe dortiger
+/// Kommentar) -- keine Doppelzählung mit dem tatsächlichen Endwertungs-Score.
+fn plate_shaping_delta(state: &GameState) -> f64 {
+    let mine = wertung_progress(&state.players[0], &state.scoring_tile_ids);
+    let theirs = wertung_progress(&state.players[1], &state.scoring_tile_ids);
+    (mine - theirs) / PLATE_SHAPING_SCALE
+}
+
+/// Wendet das Wertungsplatten-Shaping-Additiv (Task #93) auf BEIDE
+/// Blattwert-Perspektiven `[Spieler0, Spieler1]` an -- muss NACH dem
+/// Floor-Shaping-Additiv aufgerufen werden (koexistiert additiv, siehe
+/// Aufrufstelle in `make_node`). Bei `PLATE_SHAPING_ENABLED=false`
+/// (Standard) exakte Identität -- der Block wird komplett übersprungen,
+/// nicht nur numerisch neutralisiert, damit garantiert byte-identisches
+/// Bestandsverhalten erhalten bleibt.
+fn apply_plate_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
+    if !PLATE_SHAPING_ENABLED {
+        return value;
+    }
+    let shift = PLATE_SHAPING_WEIGHT * plate_shaping_delta(state).tanh();
+    [(value[0] + shift).clamp(0.0, 1.0), (value[1] - shift).clamp(0.0, 1.0)]
 }
 
 // ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
@@ -1042,6 +1116,12 @@ fn make_node<R: Rng + ?Sized>(
             let floor_shift = FLOOR_SHAPING_WEIGHT * floor_shaping_delta(&state).tanh();
             today_value[0] = (today_value[0] + floor_shift).clamp(0.0, 1.0);
             today_value[1] = (today_value[1] - floor_shift).clamp(0.0, 1.0);
+
+            // Task #93: Wertungsplatten-Fortschritts-Additiv, NACH dem
+            // Floor-Shaping-Additiv (koexistiert additiv, siehe
+            // `apply_plate_shaping`-Kommentar). Bei `PLATE_SHAPING_ENABLED=false`
+            // (Standard) exakte Identität -- der Block wird gar nicht ausgeführt.
+            today_value = apply_plate_shaping(today_value, &state);
 
             // Rundenübergang (Phase wechselt von Drafting weg) per Chance-Node-
             // Sampling statt Einzelwert bewerten -- siehe round_transition.rs
@@ -3646,5 +3726,105 @@ mod tests {
             "Erwartete Daempfung bei falscher Reihenfolge (Floor vor Shrink) nicht beobachtet -- \
              Testannahme pruefen"
         );
+    }
+
+    // ── Wertungsplatten-Shaping (Task #93) ──────────────────────────────────
+
+    #[test]
+    fn plate_shaping_delta_matches_wertung_progress_difference() {
+        // Direkter Formel-Test: `plate_shaping_delta` muss exakt der (skalierten)
+        // Differenz der stetigen Wertungsplatten-Fortschritts-Heuristik
+        // entsprechen, die `mcts.rs::player_total` schon lange fuer die
+        // DFS-Blattbewertung nutzt -- keine eigene Neuimplementierung, reine
+        // Wiederverwendung.
+        let mut rng = StdRng::seed_from_u64(93);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 14, &mut rng) else { continue };
+            let expected = (wertung_progress(&state.players[0], &state.scoring_tile_ids)
+                - wertung_progress(&state.players[1], &state.scoring_tile_ids))
+                / PLATE_SHAPING_SCALE;
+            assert!(
+                (plate_shaping_delta(&state) - expected).abs() < 1e-12,
+                "Spiel {gi}: plate_shaping_delta weicht von der erwarteten Formel ab"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn plate_shaping_disabled_is_exact_identity() {
+        // Kern-Paritätstest (Task #93): bei `PLATE_SHAPING_ENABLED=false`
+        // (Standard) muss `apply_plate_shaping` die Eingabe UNVERÄNDERT
+        // zurückgeben -- der Additiv-Block wird komplett übersprungen (siehe
+        // Funktionskommentar), nicht nur numerisch neutralisiert. Geprüft über
+        // mehrere reale Stellungen (unterschiedliche Plattenfortschritte) UND
+        // synthetische Extremwerte, damit auch ein grosses `plate_shaping_delta`
+        // bei ENABLED=false garantiert folgenlos bleibt.
+        let mut rng = StdRng::seed_from_u64(931);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
+            for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
+                let out = apply_plate_shaping(v, &state);
+                if PLATE_SHAPING_ENABLED {
+                    // Falls der Toggle (Mess-Wheel-Arm) aktiv ist, muss das
+                    // Ergebnis weiterhin ein gueltiges [0,1]-Paar bleiben.
+                    assert!(out[0].is_finite() && (0.0..=1.0).contains(&out[0]));
+                    assert!(out[1].is_finite() && (0.0..=1.0).contains(&out[1]));
+                } else {
+                    assert_eq!(
+                        out, v,
+                        "Spiel {gi}: PLATE_SHAPING_ENABLED=false muss byte-identisch zur \
+                         Eingabe bleiben (v={v:?})"
+                    );
+                }
+            }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn plate_shaping_disabled_search_matches_pre_task93_tree() {
+        // End-zu-Ende-Parität auf Baum-Ebene: solange `PLATE_SHAPING_ENABLED`
+        // (Standard) `false` ist, muss `build_net_tree` exakt dieselben
+        // Wurzel-Statistiken/Politik/Zugwahl liefern wie vor Task #93 -- da
+        // `apply_plate_shaping` bei ENABLED=false reine Identität ist (siehe
+        // `plate_shaping_disabled_is_exact_identity`), reicht hier der
+        // Determinismus-Nachweis: zwei Läufe mit identischem Seed müssen
+        // uebereinstimmen. Bei aktivem Mess-Wheel-Arm (`ENABLED=true`, temporär
+        // fürs A/B) ist dieser Test KEIN Paritätsnachweis mehr -- übersprungen
+        // statt fehlzuschlagen, damit `cargo test --release` in BEIDEN
+        // Toggle-Zuständen grün bleibt (Konvention wie `apply_value_shrink`s
+        // Tests, die ebenfalls beide Zustände vertragen statt nur einen).
+        if PLATE_SHAPING_ENABLED {
+            eprintln!(
+                "  ⚠️  PLATE_SHAPING_ENABLED=true (Mess-Wheel-Arm) -- \
+                 Paritätstest übersprungen, kein Paritätsnachweis in diesem Zustand."
+            );
+            return;
+        }
+        let Some(net) = load_test_net() else { return };
+        let mut setup_rng = StdRng::seed_from_u64(9300);
+        let mut checked = 0;
+        for gi in 0..4u64 {
+            let Some(state) = random_drafting_state(gi, 12, &mut setup_rng) else { continue };
+            let mut rng_a = StdRng::seed_from_u64(2000 + gi);
+            let nodes_a = build_net_tree(&net, None, &state, 16, DEFAULT_C_PUCT, false, &mut rng_a, None, None);
+            let stats_a = root_child_stats_from_nodes(&nodes_a);
+            let policy_a = root_completed_q_policy(&nodes_a);
+
+            let mut rng_b = StdRng::seed_from_u64(2000 + gi);
+            let nodes_b = build_net_tree(&net, None, &state, 16, DEFAULT_C_PUCT, false, &mut rng_b, None, None);
+            let stats_b = root_child_stats_from_nodes(&nodes_b);
+            let policy_b = root_completed_q_policy(&nodes_b);
+
+            assert_eq!(stats_a, stats_b, "Spiel {gi}: Wurzel-Statistiken nicht deterministisch/identisch");
+            assert_eq!(policy_a, policy_b, "Spiel {gi}: completed-Q-Politik nicht deterministisch/identisch");
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
     }
 }
