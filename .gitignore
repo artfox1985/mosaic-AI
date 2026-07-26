@@ -48,3 +48,9 @@ Desktop.ini
 
 # Konsolen-Mitschnitte der Hintergrundlaeufe (Ergebnisse liegen strukturiert in evaluations/)
 logs/
+
+# 7. Release-Build (Task #96): PyInstaller-Output + gepackte Bundles.
+# Wird per tools/build_release.py erzeugt, nicht versionieren (groß, reproduzierbar).
+/dist/
+/build/
+*.zip

@@ -24,17 +24,29 @@ Alle Responses: {"ok": true, "state": {...}} oder {"ok": false, "error": "..."}
 """
 
 import sys
+import os
 import json as _json
 import datetime as _dt
 from pathlib import Path
 
-# Stelle sicher dass der Hauptordner im Python-Path ist
-BASE_DIR = str(Path(__file__).resolve().parent.parent)
-sys.path.insert(0, BASE_DIR)
+# Stelle sicher dass der Hauptordner im Python-Path ist (nur im normalen
+# Skriptbetrieb sinnvoll -- im PyInstaller-Bundle (Task #96) ist __file__
+# keine reale Datei auf der Platte und dieser Schritt wird übersprungen).
+if not getattr(sys, "frozen", False):
+    BASE_DIR = str(Path(__file__).resolve().parent.parent)
+    sys.path.insert(0, BASE_DIR)
 
 from flask import Flask, request, jsonify, send_from_directory
 import threading
 from config import MODELS_DIR
+
+# Frozen-Modus (PyInstaller onedir, Task #96): static/-Daten liegen neben der
+# EXE (sys._MEIPASS), nicht relativ zu __file__ -- Bestandsverhalten (Dev)
+# unverändert, da getattr(sys, "frozen", False) dort stets False ist.
+if getattr(sys, "frozen", False):
+    APP_DIR = Path(getattr(sys, "_MEIPASS", os.path.dirname(sys.executable)))
+else:
+    APP_DIR = Path(__file__).resolve().parent
 
 # Rust-Engine — einzige Engine. Ohne sie kann kein Spiel laufen.
 try:
@@ -42,7 +54,7 @@ try:
 except ImportError:
     _mr = None
 
-STATIC_DIR = Path(__file__).resolve().parent / 'static'
+STATIC_DIR = APP_DIR / 'static'
 app = Flask(__name__, static_folder=str(STATIC_DIR))
 try:
     from flask_cors import CORS
@@ -73,7 +85,7 @@ def _ensure_utf8(resp):
 _rust = None            # mosaic_rust.PyGame oder None
 _rust_logged = 0        # bereits in die Logdatei geschriebene Log-Zeilen
 _game_log_path: Path | None = None
-LOG_DIR = Path(__file__).parent / "static" / "log"
+LOG_DIR = APP_DIR / "static" / "log"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── KI-Konfiguration ─────────────────────────────────────────────────────────
