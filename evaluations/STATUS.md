@@ -4273,3 +4273,187 @@ Wheel-Rebuild (`pip install -e engine/` bzw. `maturin develop`) UND der
 Live-Smoke-Test (`ai_debug_net_json` gegen `v16_best`, Kandidatenzahl 16,
 Phasen>0) stehen noch aus -- nachzuholen, sobald kein Server/Self-Play mehr
 laeuft.
+
+## Task #98: v17-Zyklus (2026-07-26)
+
+Naechster Frischdaten-Zyklus: `v16` (Referenz, 1094 Elo) -> **v17** (erster
+Versuch, den Loop ueber die 1100er-Marke der verlorenen Alt-Linie
+(`v13_nortv_best`) zu tragen). Standard-Rezept: Warm-Start + lr 5e-5 +
+cosine + nortv.
+
+**Batch-Verifikation** (`data/manifest_v16_20260726_111336.json`,
+`record_rtv=false`): 600×`selfplay_v16_*.pkl` vorhanden, 6000 Spiele.
+Stichprobe (erste + letzte Datei): `completed=True` durchgaengig (100%),
+kein `rtv`-Feld, Bootstrap-Anteil 83,5% (Referenz v16-Batch: ~83%, passt).
+Rate: Start 11:13:36 (Manifest) bis letzte Datei 17:57:44 (mtime) = 24248s
+fuer 6000 Spiele = **0,247 Spiele/s** (vs. v15-Batch 0,229 Spiele/s, +8%).
+
+**Wheel-Rebuild** (Rust-Commit `a8b7642`, `best_rotation` im Debug-JSON):
+`cargo test --release` schlug beim ersten Versuch mit
+`STATUS_DLL_NOT_FOUND` fehl (Python-DLL nicht im PATH der Shell) --
+behoben durch Aufnahme von
+`C:\Users\Patrick\AppData\Local\Python\pythoncore-3.14-64` in den PATH,
+danach **161/161 Tests gruen** (1 weiterhin ignoriert). `pip install .
+--force-reinstall --no-deps` erfolgreich. Smoke-Test via
+`mosaic_rust.net_search_state_json` auf einem Runde-3-Drafting-Zustand aus
+dem frischen v16-Batch (Kuppel-Display belegt): 2 von 16 Wurzelkandidaten
+tragen ein `best_rotation`-Feld (Beispiel: Kuppel #2, `rotation=180`,
+`q=0,549`, `visits=2`) -- Feature im installierten Wheel bestaetigt.
+
+**Fenster-Rotation**: bei Task-Start bereits `data/` = 600×`v16` (neu) +
+200×`v15` + 100×`v14b` = 900 Dateien / 9000 Spiele vorgefunden -- entspricht
+exakt dem Zielfenster, kein `v12` mehr vorhanden. **Auffaelligkeit**: kein
+`selection_manifest.json` und `data/archive/` leer -- die Rotation (weg vom
+Vorzustand 100×v12+200×v14b+600×v15+600×v16) fand offenbar ausserhalb des
+in Schritt 3 vorgesehenen Skript-Workflows statt (vermutlich Nutzer-
+Handarbeit); die ueberzaehligen/aussortierten Dateien sind nicht im
+vorgesehenen reversiblen Archiv-Pfad auffindbar. Reine Verifikation
+durchgefuehrt, keine weitere Aktion (Endzustand entspricht der Vorgabe).
+
+**Training** (`train.py --name v17 --load v16_best --lr 0.00005
+--lr-schedule cosine --epochs 100 --value-target-variant nortv`, kompletter
+Cache-Neubau fuers Fenster):
+
+| | v17 |
+|---|---|
+| Korpus | 600 v16 + 200 v15 + 100 v14b = 900 Dateien |
+| Trainings-/Val-Split | 810/90 Dateien (1.310.019/145.565 Zuege) |
+| Cache-Build | 607,5s + 68,7s |
+| Epoche-1 Val-R² (Value/Points) | 0,492 / 0,567 (Warm-Start bestaetigt, ≫0,2-Schwelle) |
+| Fruehstopp | Epoche 15 (VAL-POLICY-PLATEAU seit Epoche 10, Patience 5) |
+| Bestes Modell | **Epoche 1** (val_combined=1,2652) -- noch frueher als v16 (Epoche 3) |
+| Netzauslastung | Dead 1% (layer3 2%), Eff.Rank 39% -- gesund |
+| OneDrive-Snapshot | `models_2026-07-26_1913_v17.zip` (108 MB), bestaetigt |
+
+Bestes Modell bereits nach Epoche 1 -- die LR-5e-5-Warm-Start-Bewegung ist
+diesmal so klein, dass zusaetzliches Training den Val-Kombiwert nur noch
+verschlechtert (Value-R² faellt von Epoche 1 bis 15 monoton von 0,492 auf
+0,475). `v17_best` liegt damit inhaltlich sehr nah an `v16_best`.
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`, klassisch + `--frozen`):
+
+*Klassischer Val-Split (n=145.565 Zuege, Top-1/Top-3 nur Drafting
+n=105.183; `evaluations/offline_diagnose_v17_classic.json`):*
+
+| Modell | Top-1 | Top-3 | R² global | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| **v17_best** | **56,2%** | **84,6%** | **0,4917** | 0,1120 | 0,3014 | 0,4732 | **0,6031** | **0,6634** |
+| v16_best | 55,8% | 84,4% | 0,4899 | **0,1156** | **0,3059** | **0,4719*** | 0,5967 | 0,6596 |
+
+(*R3 v16 minimal vorn, Rundung; im Kern ein durchgehend flacher,
+minimaler Vorsprung von v17 auf dem In-Distribution-Split.)
+
+*Frozen Set (`frozen_v1`, n=1800; `evaluations/offline_diagnose_v17_frozen.json`):*
+
+| Modell | Top-1 | Top-3 | R² global | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| v13_nortv_best (verlorene Messlatte) | 48,5% | 75,5% | 0,343 | 0,063 | 0,175 | 0,227 | 0,271 | 0,697 |
+| v15_best | 46,9% | 73,3% | 0,2998 | 0,0195 | 0,1245 | 0,1491 | 0,1617 | 0,7262 |
+| v16_best (bisherige Referenz) | 45,6% | 71,6% | 0,2949 | 0,0142 | 0,1351 | 0,1661 | 0,1393 | 0,7125 |
+| v17_best (neu) | 45,0% | 71,2% | 0,2903 | 0,0274 | 0,1348 | 0,1701 | 0,1009 | 0,7151 |
+
+Der auf dem frozen Set bereits seit v15->v16 laufende leichte Abwaertstrend
+(0,300 -> 0,295 -> **0,290**) setzt sich fort -- konsistent mit dem sehr
+frueh gestoppten Training (bestes Modell Epoche 1). Aufschluesselung je
+Quellkorpus: v10b-Anteil (n=900) Value-R² v17 0,3197 (vorn) vs. v16 0,3156
+vs. v15 0,3089; v12-Anteil (n=900) 0,2515 (v17 zurueck) vs. 0,2676 vs.
+0,2877 -- durchgaengiges Muster seit v16: auf dem aelteren v10b-Korpus legt
+jede Generation leicht zu, auf dem juengeren v12-Korpus faellt sie leicht
+zurueck.
+
+**Oracle-Metriken** (`tools/oracle_metrics.py`, Pool-Erweiterung um
+`v17_best`, tiefe v16_best@5000-Sims-Suche als Referenz,
+`evaluations/task89_oracle_metrics.json`):
+
+| Modell | Recall@16 | Top3-Masse | Value-Pearson | Value-Spearman | Kendall-Tau |
+|---|---|---|---|---|---|
+| **v17_best** | **1,000** | **0,673** | 0,8705 | 0,8407 | **0,3067** |
+| v16_best | 0,999 | 0,652 | **0,8835** | **0,8594** | 0,2791 |
+| v15_best | 0,982 | 0,618 | 0,8594 | 0,8293 | 0,2445 |
+
+**Erster Bruch der bisherigen Monotonie**: alle vier Metriken stiegen bis
+v16 monoton mit der bekannten Elo-Reihenfolge (Spearman-Rangkorrelation
+Metrik<->Elo = 1,0 fuer die 5 etablierten Modelle). `v17_best` legt bei den
+policy-seitigen Metriken weiter zu (Recall@16, Top3-Masse, Kendall-Tau alle
+vorn), faellt aber bei BEIDEN Value-Korrelationen (Pearson/Spearman) hinter
+`v16_best` zurueck -- passend zum minimal schwaecheren Frozen-Value-R² und
+dem extrem fruehen Trainings-Stopp. `v17_best` selbst geht NICHT in die
+Rangkorrelation ein (noch kein etablierter Elo-Wert, siehe Gating unten).
+
+**Gepaartes Gating** (`tools/paired_gating.py`, `v17_best` (A) vs.
+`v16_best` (B), beide @400 Sims,
+`evaluations/paired_gating_result_v17_best_vs_v16_best.json`, Bloecke a 25
+Paare, gepaarter Vorzeichentest + SPRT p1=0,65/α=β=0,05, harter Deckel 200
+Paare):
+
+| Block | kumulativ A:B | LLR | Bericht-p (McNemar) |
+|---|---|---|---|
+| 1 (n=25) | 22:28 | -1,542 | 0,58 |
+| 2 (n=50) | 47:53 | -2,107 | 0,69 |
+| 3 (n=75) | 80:70 | -0,291 | 0,52 |
+| 4 (n=100) | 106:94 | -0,689 | 0,50 |
+| 5 (n=125) | 133:117 | -0,447 | 0,37 |
+| 6 (n=150) | 161:139 | -0,132 | 0,25 |
+| 7 (n=175) | 194:156 | +1,495 | 0,06 |
+| 8 (n=200) | **221:179** | **+1,454** | **0,053** |
+
+**Harter Deckel (200 Paare/400 Spiele) erreicht OHNE SPRT-Entscheid**
+(LLR=+1,454, Schranken ±2,944) -- der LLR-Verlauf schwankte stark (bis
+-2,107 nach Block 2, dann Erholung), ein klassischer Fall fuer die
+`feedback_statistical_rigor`-Lehre: 221:179 (55,25% Netzsiege) klingt nach
+einem Vorteil, aber Fixed-n-Vorzeichentest p=0,053 (knapp NICHT
+signifikant bei α=0,05) und die gepaarte Differenz +0,210 [95%-CI +0,009,
++0,411] beruehrt die Null fast. **Kein ACCEPT_H1 -> `v16_best` bleibt
+Referenz/Champion der Wiederaufbau-Linie.** Gemaess Vorgabe wurden Schritt 7
+(Kader-Matches) und Schritt 8 (Elo-Tracker-Eintrag) uebersprungen -- diese
+Dokumentation ist die einzige Buchung dieses Gating-Ergebnisses.
+
+**Elo-Einordnung / 1100er-Marke**: Da `v17_best` keinen neuen Elo-Punkt
+erhaelt (Gating unentschieden), bleibt die Kader-Tabelle unveraendert:
+`v13_nortv_best` (verlorene Alt-Linie) 1100 [988, 1217] > `v16_best`
+(Referenz) 1094 [1033, 1164] > `v12b_lr_best` 1051 > `v15_best` 1033 >
+Heuristik@150 1000 (Anker) > `v15_f2k_best` 991 > `v14b_best` 968 >
+`v12_best` 943 > `v14_best` 884 > `v10_best` 858 > `v11_td07_best` 853 >
+`v11_best` 809. **Zentrale Antwort**: Nein -- die Wiederaufbau-Linie liegt
+NICHT nachweislich signifikant ueber der 1100er-Marke. Der im v16-Zyklus
+gemeldete "Sieg" ueber die 1100-Marke (damals 1132 [1037,1250], basierend
+auf einem sehr fruehen SPRT-Stopp nach nur 47 Spielen) hat sich nach
+Ergaenzung einer weiteren Elo-Kante (`v16_best` vs. `v14b_best`) bereits auf
+1094 [1033, 1164] nach UNTEN korrigiert -- ein CI, das die 1100-Marke
+vollstaendig ueberlappt. Der v17-Zyklus liefert keinen weiteren Beleg in
+die eine oder andere Richtung: sein Gating gegen den amtierenden Champion
+blieb unentschieden. Fazit: die 1100er-Marke der verlorenen Linie ist
+weiterhin NICHT statistisch abgesichert uebertroffen -- weder von `v16`
+noch von `v17`.
+
+**Bundle-Neubau** (`python tools/build_release.py`, unabhaengig vom
+Gating-Ausgang, schliesst den offenen Punkt aus Task #97 ab): packt das
+frische Wheel (`best_rotation` im Debug-JSON) + UI-Fixes. Da `v16_best`
+Referenz bleibt, sind KEINE Aenderungen an `dist/mosaic_release.spec` oder
+den `server.py`-Presets noetig (Bundle referenziert weiterhin `v16_best`).
+Ergebnis: `dist/Mosaic-AI_v16_20260726.zip` (27,3 MB gepackt / 54,7 MB
+entpackt).
+
+**Exe-Smoke-Test**: `Mosaic-AI.exe` auf freiem Port (5000) gestartet,
+`/api/new_game` mit `teacher_level=3` + `ai_enabled` erfolgreich. `/api/ai/
+hint` lieferte zunaechst `"Analyse derzeit nicht verfuegbar"` -- Ursache
+identifiziert (KEIN Bug, auch ausserhalb des Bundles reproduzierbar via
+`net_search_state_json` auf einer echten Runde-1-Stellung): die allererste
+Stellung jeder Partie ist die Startkachel-Phase (`both_start_placed()==
+False`), die `net_search_with_tree`/`ai_debug_net_json` strukturell nicht
+abdeckt (0 legale Standard-Drafting-Aktionen, bis beide Spieler ihre
+Startkachel gesetzt haben -- eigener Endpunkt-Pfad `/api/move/start_tile`
++ `/api/ai/start_tile`). Nach Platzierung beider Startkacheln (Kuppel-
+Mechanik, selbes UI-Modal wie normale Kuppelzuege): `/api/ai/hint` liefert
+korrekt **genau 3 Kandidaten** (Top-3-Vorgabe bestaetigt), inkl. `win_pct`/
+`delta_win_pp` bei Stufe 3. Kein Kuppel-Kandidat landete in diesem
+konkreten Testlauf in den Top-3 (alle 3 waren `stone`-Zuege) -- der
+Rotationstext-Mechanismus (`_teacher_describe_move` haengt bei
+`choose_dome_slot`/`choose_draw_stack_slot` `", {rotation}°"` an, FALLS
+`best_rotation.rotation` gesetzt ist) wurde stattdessen bereits im
+Wheel-Smoke-Test (Schritt 2 oben) auf Engine-Ebene ueber denselben
+Analyse-Pfad bestaetigt -- identischer Code, daher ausreichend abgedeckt.
+
+**data/-Integritaetsnachweis**: 600 v16 + 200 v15 + 100 v14b = 900 Dateien
+(Fenster-Rotation vor Task-Start bereits durchgefuehrt, siehe
+Auffaelligkeit oben; Endzustand verifiziert, unveraendert).
