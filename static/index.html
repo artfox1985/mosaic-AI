@@ -22,6 +22,7 @@
     <button class="btn pri" onclick="openNewGameModal()">Neu starten</button>
     <button onclick="showActiveScoringTiles()" class="btn">🎯 Aktive Ziele</button>
 	<button onclick="window.open('/debug','_blank')" class="btn">🔬 KI-Debugger</button>
+    <button id="teacher-hint-btn" class="btn" style="display:none" onclick="requestHint()" title="Zeigt die Top-Kandidaten der Lehrer-Analyse auf dem Brett">💡 Tipp</button>
     <button onclick="downloadGameLog()" class="btn" title="Spiel-Log der aktuellen Partie herunterladen">📄 Log</button>
   </div>
 </div>
@@ -197,6 +198,32 @@
 
       <div style="font-size:10px;color:var(--text2)">
         Mehr Simulationen = stärkere KI, aber langsamere Züge.
+      </div>
+
+      <div class="sep" style="margin:10px 0"></div>
+
+      <div class="lbl" style="margin-bottom:6px">🎓 Lehrer-Modus</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Stufe</div>
+          <select id="ng-teacher-level"
+            style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;
+                   background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+            <option value="0" selected>Aus</option>
+            <option value="1">Kandidaten (ohne Zahlen)</option>
+            <option value="2">+ Bewertungen (Win%)</option>
+            <option value="3">+ Coach-Feedback</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Lehrer-Sims</div>
+          <input id="ng-teacher-sims" type="number" value="800" min="20" max="5000"
+            style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;
+                   background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text2);margin-top:4px">
+        Kandidaten/Bewertungen: „💡 Tipp"-Button in der Kopfleiste. Coach: Feedback nach jedem eigenen Zug + Endbilanz.
       </div>
     </div>
 
