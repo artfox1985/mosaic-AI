@@ -51,6 +51,10 @@ logs/
 
 # 7. Release-Build (Task #96): PyInstaller-Output + gepackte Bundles.
 # Wird per tools/build_release.py erzeugt, nicht versionieren (groß, reproduzierbar).
-/dist/
+/dist/*
 /build/
 *.zip
+# Getrackte Build-Quellen in dist/ bleiben trotz Ordner-Ignore versioniert:
+!dist/mosaic_release.spec
+!dist/run_mosaic.py
+!dist/README_SPIEL.txt

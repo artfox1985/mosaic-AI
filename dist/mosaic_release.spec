@@ -11,7 +11,9 @@
 
 import os
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.abspath(SPEC)))
+# Spec liegt seit 2026-07-26 in dist/ (Nutzer-Wunsch: Root aufgeraeumt) --
+# der Projekt-Root ist daher das ELTERN-Verzeichnis des Spec-Ordners.
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(SPEC)), '..'))
 
 
 def collect_static_datas():

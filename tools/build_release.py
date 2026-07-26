@@ -31,7 +31,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DIST_DIR = PROJECT_ROOT / "dist" / "Mosaic-AI"
 BUILD_DIR = PROJECT_ROOT / "build" / "Mosaic-AI"
-SPEC_FILE = PROJECT_ROOT / "mosaic_release.spec"
+# Spec + Launcher liegen seit 2026-07-26 in dist/ (Root aufgeraeumt); das
+# fertige Zip landet ebenfalls dort statt im Projektroot.
+SPEC_FILE = PROJECT_ROOT / "dist" / "mosaic_release.spec"
 
 
 def run_pyinstaller() -> None:
@@ -52,7 +54,7 @@ def run_pyinstaller() -> None:
 
 def copy_docs() -> None:
     print("[3/4] Kopiere README_SPIEL.txt + Anleitung ins Bundle ...")
-    shutil.copy2(PROJECT_ROOT / "README_SPIEL.txt", DIST_DIR / "README_SPIEL.txt")
+    shutil.copy2(PROJECT_ROOT / "dist" / "README_SPIEL.txt", DIST_DIR / "README_SPIEL.txt")
     manual_src = PROJECT_ROOT / "docs" / "engine_manual.md"
     if manual_src.exists():
         shutil.copy2(manual_src, DIST_DIR / "engine_manual.md")
@@ -63,7 +65,7 @@ def copy_docs() -> None:
 def make_zip() -> Path:
     print("[4/4] Packe ZIP ...")
     date_str = datetime.datetime.now().strftime("%Y%m%d")
-    zip_path = PROJECT_ROOT / f"Mosaic-AI_v16_{date_str}.zip"
+    zip_path = PROJECT_ROOT / "dist" / f"Mosaic-AI_v16_{date_str}.zip"
     if zip_path.exists():
         zip_path.unlink()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
