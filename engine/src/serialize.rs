@@ -929,6 +929,180 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
     })
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Wertungsplatten-Diagnose (2026-07-26): end_scoring_from_state
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Endwertungs-Details je Spieler für einen extern gespeicherten Zustand
+/// (z.B. ein Self-Play-Record `state`-Feld) -- reine additive Lesefunktion
+/// für die Wertungsplatten-Diagnose (Nutzer-Verdacht "die KI ignoriert die
+/// Wertungsplatten"), berührt keine bestehende Suche/Produktion. Baut per
+/// [`json_to_state`] einen `GameState` und ruft für JEDEN Spieler
+/// [`crate::scoring::calculate_end_scoring`] mit den übergebenen `tile_ids`
+/// auf.
+///
+/// WICHTIG: `calculate_end_scoring` liest AUSSCHLIESSLICH
+/// `PlayerBoard::dome_grid` (siehe scoring.rs: `build_grid`/`collect_spaces`
+/// laufen nur über `dome_grid.dome_slots`, nie über Beutel/Turm/Stapel/Phase/
+/// etc.). `dome_grid` wird von `dome_grid_from_json` Space-für-Space EXAKT
+/// rekonstruiert -- keine der drei oben dokumentierten Näherungskategorien
+/// (verdeckte Information, abgeleitete Felder, Wurzel-Legalitäts-Näherungen)
+/// betrifft dieses Feld. Das Ergebnis ist also, anders als z.B.
+/// `estimated_score`, für JEDEN validen `state_json`-Zustand EXAKT (siehe
+/// Test `end_scoring_from_state_is_exact_after_roundtrip` unten) --
+/// unabhängig vom übergebenen `rng`, der nur die hier irrelevante Neumischung
+/// von bag/tower/dome_tile_pool/bonus_chip_pool treibt.
+pub fn end_scoring_from_state<R: Rng + ?Sized>(
+    state_json: &Value,
+    tile_ids: &[usize],
+    rng: &mut R,
+) -> Result<Value, String> {
+    let state = json_to_state(state_json, rng)?;
+    let mut per_player = Map::new();
+    for (pi, player) in state.players.iter().enumerate() {
+        let res = crate::scoring::calculate_end_scoring(player, tile_ids);
+        let details: Vec<Value> = res
+            .details
+            .iter()
+            .map(|d| {
+                json!({
+                    "id": d.id,
+                    "name": d.name,
+                    "emoji": d.emoji,
+                    "desc": d.description,
+                    "score": d.score,
+                })
+            })
+            .collect();
+        per_player.insert(
+            format!("player_{pi}"),
+            json!({ "details": details, "total": res.total }),
+        );
+    }
+    Ok(Value::Object(per_player))
+}
+
+#[cfg(test)]
+mod end_scoring_from_state_tests {
+    use super::*;
+    use crate::game::{drafting_actions, Game, TilingMove};
+    use crate::scoring::calculate_end_scoring;
+    use crate::state::NUM_ROUNDS;
+    use rand::rngs::StdRng;
+    use rand::RngExt as _;
+    use rand::SeedableRng;
+
+    fn names() -> [String; 2] {
+        ["Alpha".into(), "Beta".into()]
+    }
+
+    /// Treibt ein Zufalls-Spiel bis Runde 5 / Phase::Drafting (wie
+    /// `json_to_state_tests::roundtrip_reaches_round5_state`), gibt `None`
+    /// zurück, falls dieser Seed das nicht schafft.
+    fn drive_to_round5(seed: u64) -> Option<Game> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(names(), 0, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+        for pi in [1usize, 0usize] {
+            let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+            crate::game::apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).unwrap();
+        }
+        let mut steps = 0u32;
+        while game.state.round_number < NUM_ROUNDS && steps < 4000 {
+            steps += 1;
+            match game.state.phase {
+                Phase::Drafting => {
+                    let actions = drafting_actions(&game.state);
+                    if actions.is_empty() {
+                        break;
+                    }
+                    let idx = rng.random_range(0..actions.len());
+                    if game.apply_drafting(&actions[idx]).is_err() {
+                        break;
+                    }
+                }
+                Phase::Tiling => {
+                    for pi in 0..2 {
+                        loop {
+                            let acts = game.valid_tiling_actions(pi);
+                            let Some(a) = acts.first().copied() else { break };
+                            if game.apply_single_tiling(pi, &a).is_err() {
+                                break;
+                            }
+                        }
+                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng);
+                    }
+                }
+                _ => break,
+            }
+        }
+        if game.state.round_number >= NUM_ROUNDS && game.state.phase == Phase::Drafting {
+            Some(game)
+        } else {
+            None
+        }
+    }
+
+    /// Kern-Nachweis: `end_scoring_from_state` auf dem serialisierten Zustand
+    /// muss für JEDEN Spieler EXAKT dieselben Details/Total liefern wie
+    /// `calculate_end_scoring` direkt auf dem ORIGINAL-`PlayerBoard` (vor
+    /// jeder JSON-Serialisierung) -- das ist der Beweis, dass die
+    /// Rekonstruktion für die Wertungsplatten-Diagnose verlustfrei ist.
+    #[test]
+    fn end_scoring_from_state_is_exact_after_roundtrip() {
+        for seed in [3u64, 4, 5, 6, 7, 8, 9, 10] {
+            let Some(game) = drive_to_round5(seed) else { continue };
+            let tile_ids = game.state.scoring_tile_ids.clone();
+            let json1 = state_to_json(&game.state, true);
+            let mut rng2 = StdRng::seed_from_u64(seed.wrapping_add(777));
+            let got = end_scoring_from_state(&json1, &tile_ids, &mut rng2)
+                .unwrap_or_else(|e| panic!("seed {seed}: end_scoring_from_state fehlgeschlagen: {e}"));
+
+            for pi in 0..2 {
+                let expected = calculate_end_scoring(&game.state.players[pi], &tile_ids);
+                let key = format!("player_{pi}");
+                let entry = &got[&key];
+                assert_eq!(
+                    entry["total"].as_i64().unwrap() as i32,
+                    expected.total,
+                    "seed {seed} player {pi}: total weicht ab"
+                );
+                let details = entry["details"].as_array().unwrap();
+                assert_eq!(details.len(), expected.details.len(), "seed {seed} player {pi}: Detail-Anzahl");
+                // Summe der Details == total (Additivität der Endwertung).
+                let sum: i64 = details.iter().map(|d| d["score"].as_i64().unwrap()).sum();
+                assert_eq!(sum, expected.total as i64, "seed {seed} player {pi}: Summe der Details != total");
+                for (d, e) in details.iter().zip(expected.details.iter()) {
+                    assert_eq!(d["id"].as_u64().unwrap() as usize, e.id);
+                    assert_eq!(d["score"].as_i64().unwrap() as i32, e.score, "seed {seed} player {pi} tile {}", e.id);
+                }
+            }
+            return; // ein erreichter Runde-5-Zustand reicht für den Nachweis.
+        }
+        panic!("keiner der Test-Seeds erreichte Runde 5 -- Testaufbau prüfen");
+    }
+
+    /// Robustheit: funktioniert auch für einen frischen Spielstart (Runde 1,
+    /// leeres Brett) -- alle additiven Platten liefern 0, keine der
+    /// "alles-oder-nichts"-Platten greift, kein Panic bei leeren Slots.
+    #[test]
+    fn end_scoring_from_state_empty_board_all_zero() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let state = crate::state::setup_new_game(names(), 0, &mut rng);
+        let json1 = state_to_json(&state, true);
+        let mut rng2 = StdRng::seed_from_u64(43);
+        let got = end_scoring_from_state(&json1, &[0, 1, 2, 3, 4, 5, 6, 7], &mut rng2).unwrap();
+        for pi in 0..2 {
+            let key = format!("player_{pi}");
+            let total = got[&key]["total"].as_i64().unwrap();
+            // Startbrett: alles leer -- alle additiven/Alles-oder-nichts-Platten
+            // liefern 0, NUR "leere Spezialfelder" (id 6) könnte theoretisch
+            // negativ sein, aber ein frisches Brett hat noch keine gelegten
+            // Kuppelplatten -> auch dort 0 Spezialfelder vorhanden.
+            assert_eq!(total, 0, "player {pi}: frisches Brett sollte 0 Punkte ergeben");
+        }
+    }
+}
+
 #[cfg(test)]
 mod json_to_state_tests {
     use super::*;
