@@ -21,9 +21,10 @@
   <div style="display:flex;gap:6px">
     <button class="btn pri" onclick="openNewGameModal()">Neu starten</button>
     <button onclick="showActiveScoringTiles()" class="btn">🎯 Aktive Ziele</button>
-	<button onclick="window.open('/debug','_blank')" class="btn">🔬 KI-Debugger</button>
+	<button id="ki-debugger-btn" onclick="window.open('/debug','_blank')" class="btn">🔬 KI-Debugger</button>
     <button id="teacher-hint-btn" class="btn" style="display:none" onclick="requestHint()" title="Zeigt die Top-Kandidaten der Lehrer-Analyse auf dem Brett">💡 Tipp</button>
     <button onclick="downloadGameLog()" class="btn" title="Spiel-Log der aktuellen Partie herunterladen">📄 Log</button>
+    <div id="game-seed-display" style="display:none;font-size:10px;color:var(--text3);margin-left:4px;align-self:center;white-space:nowrap"></div>
   </div>
 </div>
 
@@ -32,16 +33,20 @@
     <div id="board0" class="panel"></div>
     <div id="board1" class="panel"></div>
   </div>
+  <div class="panel" id="factories-panel">
+    <div id="factories-list-area"></div>
+  </div>
   <div class="panel" id="center">
     <div class="phase-badge" id="phase-badge">—</div>
-    <div id="game-seed-display" style="display:none;font-size:10px;color:var(--text3);text-align:center;margin-top:2px"></div>
     <div id="info-area"></div>
-    <div id="factories-area"></div>
-    
+    <div id="auslage-area"></div>
+
     <div class="sep"></div>
-    <div class="lbl">Log</div>
+    <div class="lbl" id="log-toggle" onclick="toggleLogCollapsed()" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:4px">
+      <span id="log-toggle-arrow">▾</span><span>Log</span>
+    </div>
     <div class="log" id="log"></div>
-    
+
     <div class="sep"></div>
     <div class="lbl" style="display:flex;justify-content:space-between;align-items:center">
       <span>Wertungsplatten</span>
@@ -65,8 +70,11 @@
       Verbleibende Fliesen (klicke in gewünschter Reihenfolge unten→oben):
     </div>
     <div id="moon-tiles" style="display:flex;gap:5px;flex-wrap:wrap;min-height:32px;padding:6px;background:var(--bg);border-radius:6px;border:1px solid var(--border);margin-bottom:8px"></div>
-    <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Stapel (links=unten, rechts=oben):</div>
-    <div id="moon-stack" style="display:flex;gap:4px;flex-wrap:wrap;min-height:28px;padding:5px;background:var(--bg);border:1px dashed var(--border);margin-bottom:10px;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:10px;color:var(--text2)">Stapel (links=unten, rechts=oben) — Fliese anklicken zum Entfernen:</span>
+      <span id="moon-reset-btn" onclick="resetMoonStack()" style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;white-space:nowrap;margin-left:6px">↺ Zurücksetzen</span>
+    </div>
+    <div id="moon-stack" style="display:flex;flex-direction:column;align-items:flex-start;min-height:28px;padding:5px 5px 14px;background:var(--bg);border:1px dashed var(--border);margin-bottom:10px">
       <span id="moon-stack-empty" style="font-size:10px;color:var(--text3)">noch leer</span>
     </div>
     <button class="confirm" id="moon-confirm" disabled onclick="confirmMoonOrder()">Stapel bestätigen</button>
@@ -199,6 +207,11 @@
       <div style="font-size:10px;color:var(--text2)">
         Mehr Simulationen = stärkere KI, aber langsamere Züge.
       </div>
+
+      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-size:11px">
+        <input type="checkbox" id="ng-debug-toggle" checked style="cursor:pointer">
+        🔬 KI-Debugger-Button anzeigen
+      </label>
 
       <div class="sep" style="margin:10px 0"></div>
 
