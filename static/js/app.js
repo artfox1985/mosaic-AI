@@ -77,6 +77,9 @@ async function startNewGame() {
   const seed       = seedRaw === '' ? null : parseInt(seedRaw);
   const teacherLevel = aiEnabled ? parseInt(document.getElementById('ng-teacher-level').value) || 0 : 0;
   const teacherSims  = parseInt(document.getElementById('ng-teacher-sims').value) || 800;
+  const debugBtnOn   = document.getElementById('ng-debug-toggle').checked;
+  const debugBtn     = document.getElementById('ki-debugger-btn');
+  if (debugBtn) debugBtn.style.display = debugBtnOn ? '' : 'none';
 
   AI_ENABLED = aiEnabled;
   AI_PLAYER  = 1;
@@ -111,6 +114,7 @@ async function startNewGame() {
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
   window._gameEndLogged = false;
+  _chipGhosts = {0: [], 1: []}; _prevBonusChips = {0: null, 1: null};
   if (d.teacher_level !== undefined) TEACHER_LEVEL = d.teacher_level;
   if (d.teacher_sims !== undefined) TEACHER_SIMS = d.teacher_sims;
   if (d.seed !== undefined) {
@@ -267,10 +271,10 @@ function renderHintHighlights() {
       // Gruppe (Sonne zuerst), zusätzlich den globalen Mondbereich-Pool.
       let srcEl;
       if (a.factory_id !== null) {
-        srcEl = document.querySelector(`#factories-area .fcard[data-fid="${a.factory_id}"] .cgroup[data-color="${a.color}"]`);
+        srcEl = document.querySelector(`#factories-list-area .fcard[data-fid="${a.factory_id}"] .cgroup[data-color="${a.color}"]`);
       } else {
-        srcEl = document.querySelector(`#factories-area .fcard[data-fid="GF"] .cgroup[data-color="${a.color}"]`)
-             || document.querySelector(`#factories-area .cgroup[data-src="SMALL_FACTORY_MOON"][data-fid="ALL"][data-color="${a.color}"]`);
+        srcEl = document.querySelector(`#factories-list-area .fcard[data-fid="GF"] .cgroup[data-color="${a.color}"]`)
+             || document.querySelector(`#auslage-area .cgroup[data-src="SMALL_FACTORY_MOON"][data-fid="ALL"][data-color="${a.color}"]`);
       }
       mark(srcEl, cand);
       mark(document.querySelector(`#board${humanPi} .prow[data-ri="${a.row}"]`), cand);
@@ -280,7 +284,7 @@ function renderHintHighlights() {
     } else if (cand.type === 'choose_draw_stack_slot' || cand.type === 'dome_stack_peek') {
       mark(document.getElementById('stack-picker-btn'), cand);
     } else if (cand.type === 'bonus_chip') {
-      mark(document.querySelector(`#factories-area [data-chip-fid="${a.factory_id}"]`), cand);
+      mark(document.querySelector(`#factories-list-area [data-chip-fid="${a.factory_id}"]`), cand);
     }
   });
 
@@ -523,17 +527,32 @@ function estimatedRoundScore(p) {
   return est;
 }
 
+// Nutzer-Feedback: verbrauchte Bonuschips sollen nicht aus der Uebersicht
+// verschwinden, sondern als "umgedreht" (Ghost) sichtbar bleiben. Die
+// Engine haelt in p.bonus_chips nur noch die AKTUELL gehaltenen Chips vor
+// (verbrauchte werden entfernt) -- ohne Backend-Aenderung erkennen wir das
+// rein clientseitig per Diff zum vorherigen Render: was frueher da war und
+// jetzt fehlt, ist gerade verbraucht worden und wandert dauerhaft (bis zum
+// naechsten Spielstart, siehe startNewGame) in _chipGhosts.
+let _chipGhosts = {0: [], 1: []};
+let _prevBonusChips = {0: null, 1: null};
+function trackChipGhosts(pi, chips) {
+  const prev = _prevBonusChips[pi];
+  if (prev) {
+    const stillHeld = new Set(chips.map(c => c.id));
+    prev.filter(c => !stillHeld.has(c.id)).forEach(c => _chipGhosts[pi].push(c));
+  }
+  _prevBonusChips[pi] = chips;
+}
+
 function renderBoard(pi) {
   const p = S.players[pi];
   const isActive = S.current_player===pi && S.phase==='drafting';
   const isTiling = S.phase==='tiling';
-  // Task: Bonuschip-Restanzeige -- Chips, die diese Runde insgesamt noch
-  // ziehbar sind (aufgedeckt+ungezogen ODER noch verdeckt auf einer noch
-  // nicht geleerten Fabrik). Ein Chip ist "raus", sobald factory.bonus_chip
-  // beim Nehmen auf null gesetzt wird (siehe engine/src/game.rs::execute_take_bonus_chip)
-  // -- alles mit vorhandenem bonus_chip zaehlt also unabhaengig davon, ob er
-  // schon aufgedeckt ist oder erst spaeter in dieser Runde aufgedeckt wird.
-  const chipsRemainingThisRound = (S.factories || []).filter(f => f.bonus_chip).length;
+  // Nutzer-Feedback: einfach "genommen/Limit" zeigen -- Regel-Limit
+  // BONUS_CHIPS_PER_ROUND=2 (engine/src/board.rs), Stand ueber state_json
+  // p.chips_taken (= bonus_chips_used_this_round).
+  const chipsTakenThisRound = p.chips_taken || 0;
 
   const tokHTML = S.round<5
     ? `<div class="tokens">${[0,1].map(i=>`<div class="tok ${i<p.tokens_used?'used':''}"></div>`).join('')}<span>${p.tokens_used}/2 Spielerplättchen</span></div>`
@@ -610,11 +629,18 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
     return `<div class="dslot ${cls}" data-row="${sr}" data-col="${sc}"${ddata}>${inner}</div>`;
 }).join('')).join('');
 
+  // Nutzer-Feedback: Straf-Label (-1/-2/-3/-4) bleibt auch sichtbar, wenn eine
+  // Fliese das Feld belegt -- als weisse Beschriftung ueber der Fliese.
   const floorHTML = [...Array(4)].map((_,i)=>{
     const t = p.floor[i];
-    return `<div class="fslot">${t?`<div class="tile sm ${normColor(t)}"></div>`:`<span>${[-1,-2,-3,-4][i]}</span>`}</div>`;
+    const label = [-1,-2,-3,-4][i];
+    return `<div class="fslot" style="position:relative">${t?`<div class="tile sm ${normColor(t)}"></div>`:''}<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${t?'#fff':'var(--text3)'};text-shadow:${t?'0 1px 2px rgba(0,0,0,.6)':'none'};pointer-events:none">${label}</span></div>`;
   }).join('');
-  const markerHTML = p.marker ? `<div class="tile sm marker">1</div>` : '';
+  // Nutzer-Feedback: Startspielerfliesen-Marker in dieselbe Reihe wie die
+  // Straffelder (links von -1), nicht mehr in der Ueberschrift. Unbelegt =
+  // helles Blau (Platzhalter), belegt = saettigteres Blau + "-2" (fixe
+  // Startspielerfliese-Strafe, unabhaengig von den vier Straffeldern).
+  const markerHTML = `<div class="fslot ${p.marker ? 'marker-taken' : 'marker-empty'}">${p.marker ? '-2' : ''}</div>`;
 
   const est = p.estimated_score || 0;
   const estStr = (est >= 0 ? '+' : '') + est;
@@ -633,37 +659,45 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
     <div class="sep"></div>
     <div class="board-inner">
       <div>
-        <div class="lbl">Musterreihen</div>
-        <div id="plines${pi}">${plHTML}</div>
-        <div class="sep"></div>
-        <div class="lbl">Zerbrochene Fliesen ${markerHTML}</div>
-        <div class="floor">${floorHTML}
+        <div class="lbl">Zerbrochene Fliesen</div>
+        <div class="floor">${markerHTML}${floorHTML}
           ${sel&&isActive?`<button class="btn danger" style="padding:2px 8px;font-size:10px" onclick="onFloorDirect()">→ Boden</button>`:''}
         </div>
-        
+
+        ${(() => { trackChipGhosts(pi, p.bonus_chips || []); return ''; })()}
         <div style="margin-top:6px;font-size:9px;color:var(--text3)">
-          Chips — Rest diese Runde: ${chipsRemainingThisRound}:
+          Bonuschips (${chipsTakenThisRound}/2):
           <div class="chips-grid">
-            ${Array.from({length: 10}, (_, i) => {
-              const c = p.bonus_chips[i];
-              if (c && c.colors && c.colors.length > 0) {
-                const c1 = normColor(c.colors[0]);
-                const c2 = c.colors.length > 1 ? normColor(c.colors[1]) : 'empty';
-                return `<div class="bchip" title="${c.colors.join('+')}">
-                  <div class="bchip-half ${c1}"></div>
-                  <div class="bchip-half ${c2}"></div>
-                </div>`;
-              } else {
-                return `<div class="bchip placeholder"></div>`;
-              }
-            }).join('')}
+            ${(() => {
+              const slots = [
+                ..._chipGhosts[pi].map(c => ({...c, ghost: true})),
+                ...(p.bonus_chips || []).map(c => ({...c, ghost: false})),
+              ];
+              return Array.from({length: 10}, (_, i) => {
+                const c = slots[i];
+                if (c && c.colors && c.colors.length > 0) {
+                  if (c.ghost) {
+                    return `<div class="bchip ghost" title="${c.colors.join('+')} (verbraucht)"></div>`;
+                  }
+                  const c1 = normColor(c.colors[0]);
+                  const c2 = c.colors.length > 1 ? normColor(c.colors[1]) : 'empty';
+                  return `<div class="bchip" title="${c.colors.join('+')}">
+                    <div class="bchip-half ${c1}"></div>
+                    <div class="bchip-half ${c2}"></div>
+                  </div>`;
+                } else {
+                  return `<div class="bchip placeholder"></div>`;
+                }
+              }).join('');
+            })()}
           </div>
         </div>
-        </div>
+      </div>
       <div>
-        <div class="lbl" style="display:flex;justify-content:space-between">
-          <span>Kuppel</span><span>${p.dome_grid.flat().filter(Boolean).length}/9</span>
-        </div>
+        <div id="plines${pi}">${plHTML}</div>
+      </div>
+      <div>
+        <div class="lbl">Kuppel</div>
         <div class="dome-grid" id="dome${pi}">${domeHTML}</div>
       </div>
     </div>`;
@@ -682,6 +716,21 @@ function syncDomeHeight(pi) {
     }
   });
 }
+
+// -- LOG EINKLAPPBAR ------------------------------------------------------------
+function applyLogCollapsed(collapsed) {
+  const logEl = document.getElementById('log');
+  const arrowEl = document.getElementById('log-toggle-arrow');
+  if (!logEl || !arrowEl) return;
+  logEl.style.display = collapsed ? 'none' : '';
+  arrowEl.textContent = collapsed ? '▸' : '▾';
+}
+function toggleLogCollapsed() {
+  const collapsed = document.getElementById('log').style.display !== 'none';
+  localStorage.setItem('mosaic-log-collapsed', collapsed ? '1' : '0');
+  applyLogCollapsed(collapsed);
+}
+applyLogCollapsed(localStorage.getItem('mosaic-log-collapsed') !== '0');
 
 // -- RENDER CENTER -------------------------------------------------------------
 function renderCenter() {
@@ -870,7 +919,7 @@ function renderCenter() {
     // unterste Fliese zuerst, oberste (ziehbare) zuletzt/oben + hervorgehoben.
     const nonEmptyStacks = f.moon.filter(stack => stack && stack.length);
     const moonTiles = nonEmptyStacks.length
-      ? `<div style="display:flex;gap:6px;align-items:flex-start;margin-top:3px;flex-wrap:wrap">
+      ? `<div class="moon-area" style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">
           <span style="font-size:8px;color:var(--text3)">Stapel:</span>
           ${nonEmptyStacks.map(stack => {
             const topDown = [...stack].reverse(); // topDown[0] = oben/ziehbar ... letzter = unten
@@ -881,7 +930,7 @@ function renderCenter() {
          </div>` : '';
     return `<div class="fcard" data-fid="${f.id}">
       <div class="fhead"><span>F${f.id}</span>${chipHTML}</div>
-      <div class="ftiles">${f.sun.length?sunTiles:'<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
+      <div class="ftiles sun-area">${f.sun.length?sunTiles:(nonEmptyStacks.length?'':'<span style="font-size:9px;color:var(--text3)">leer</span>')}</div>
       ${moonTiles}
     </div>`;
   }).join('');
@@ -905,7 +954,7 @@ function renderCenter() {
   
   const moonActionHTML = moonTopEntries.length
     ? `<div style="margin-bottom:6px">
-        <div class="lbl">Mondbereich (alle Manufakturen)</div>
+        <div class="lbl">Geteilte Mondfliesen</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           ${moonTopEntries.map(([c, count]) => `
             <div class="cgroup" data-src="SMALL_FACTORY_MOON" data-fid="ALL" data-color="${c}"
@@ -918,15 +967,12 @@ function renderCenter() {
 
   const towerTotal = (S.tower_colors || []).reduce((a,b)=>a+b, 0);
 
-document.getElementById('factories-area').innerHTML = `
-    <div class="lbl" style="display:flex;justify-content:space-between">
-      <span>🎒 ${S.bag_count} · 🗼 ${towerTotal}</span>
+document.getElementById('auslage-area').innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+      <span style="font-size:15px;font-weight:600">🎒 ${S.bag_count} · 🗼 ${towerTotal}</span>
       <span></span>
     </div>
-    <div class="lbl" style="display:flex;justify-content:space-between">
-      <span>Kuppelplatten (${S.dome_display.length}/3)</span>
-      <span style="color:var(--text3)">Stapel: ${S.dome_stack_count}${stackTopTypeLabel()}</span>
-    </div>
+    <div class="lbl">Auslage (${S.dome_display.length}/3)</div>
     <div class="display-g">${displayHTML || '<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
     ${(() => {
       const cp = S.players[S.current_player];
@@ -934,19 +980,23 @@ document.getElementById('factories-area').innerHTML = `
         && cp.start_placed
         && cp.can_place_dome
         && S.dome_stack_count > 0;
-      return canStack ? `<button id="stack-picker-btn" class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
-        ${stackTopTypeIcon()} Vom Stapel ziehen (−1 Pkt/Karte) · ${S.dome_stack_count} verfügbar
-      </button>` : '';
+      if (!canStack) return '';
+      return `<div class="lbl" style="color:var(--text3);margin-bottom:2px">Stapel: ${S.dome_stack_count}</div>
+      <button id="stack-picker-btn" class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
+        ${stackTopTypeIcon()} Ziehen (−1 Pkt/Karte)
+      </button>`;
     })()}
     <div class="sep"></div>
-    ${moonActionHTML}
-    <div class="lbl" style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">Sonnenbereich</div>
+    ${moonActionHTML}`;
+
+  document.getElementById('factories-list-area').innerHTML = `
+    <div class="lbl" style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">Fabriken</div>
     <div style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">
     ${facsHTML}
     <div class="fcard" data-fid="GF">
       <div class="fhead"><span>GF</span>${lf.marker?'<span style="color:#F59E0B">★</span>':''}</div>
-      <div class="ftiles" style="margin-bottom:2px"><span style="font-size:8px;color:var(--text3)">Sun:</span>${lSun||'—'}</div>
-      <div class="ftiles"><span style="font-size:8px;color:var(--text3)">Moon:</span>${lMoon||'—'}</div>
+      <div class="ftiles sun-area" style="margin-bottom:2px">${lSun || '<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
+      ${lMoon ? `<div class="ftiles moon-area"><span style="font-size:8px;color:var(--text3)">Pool:</span>${lMoon}</div>` : ''}
     </div>
     </div>`;
 
@@ -1436,7 +1486,7 @@ function buildPreview() {
   const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
   const rotated = ROT[domeModal.rotation||0].map(i => tile.spaces[i]);
   
-  prev.innerHTML = `<div class="d2x2" style="width:46px; height:46px;">${rotated.map(sp => spaceHTML(sp)).join('')}</div>`;
+  prev.innerHTML = `<div class="d2x2 lg">${rotated.map(sp => spaceHTML(sp)).join('')}</div>`;
 }
 
 // Aktion A (Stapel-Variante), Schritt 1: eine weitere verdeckte Platte ziehen
@@ -1728,16 +1778,47 @@ function renderMoonModal() {
     empty.style.display = 'inline';
   } else {
     empty.style.display = 'none';
-    moonModal.ordered.forEach((item, i) => {
+    // Nutzer-Feedback: dieselbe vertikale Ueberlapp-Darstellung wie der
+    // spaetere Mondstapel auf dem Spielbrett (siehe renderBoard/moonTiles) --
+    // oberste (zuletzt geklickte) Fliese oben, restliche darunter versetzt.
+    const n = moonModal.ordered.length;
+    const topDown = [...moonModal.ordered].reverse(); // topDown[0] = oben/zuletzt geklickt
+    topDown.forEach((item, i) => {
+      const origIndex = n - 1 - i; // Index in moonModal.ordered fuer removeFromMoonStack
       const div = document.createElement('div');
-      div.className = `tile ${normColor(item.color)}`;
+      div.className = `tile ${normColor(item.color)} click`;
       div.textContent = normColor(item.color)[0].toUpperCase();
-      const isTop = i === moonModal.ordered.length - 1;
+      const isTop = i === 0;
+      div.style.marginTop = isTop ? '0' : '-9px';
+      div.style.zIndex = String(topDown.length - i);
       div.style.outline = isTop ? '2.5px solid var(--text)' : '';
-      div.title = isTop ? 'Oben (sichtbar im Mondbereich)' : `${i+1}. von unten`;
+      div.style.opacity = isTop ? '1' : '.85';
+      div.style.cursor = 'pointer';
+      div.title = (isTop ? 'Oben (sichtbar im Mondbereich)' : `${origIndex+1}. von unten`)
+        + ' — klicken zum Entfernen (auch alle Fliesen darüber)';
+      div.addEventListener('click', () => removeFromMoonStack(origIndex));
       stackDiv.insertBefore(div, empty);
     });
   }
+}
+
+// Nutzer-Feedback: Reihenfolge innerhalb des Modals korrigierbar machen, ohne
+// die ganze Aktion per "Abbrechen" abzubrechen. Klick auf eine gestapelte
+// Fliese wirft SIE UND ALLE DARUEBER (spaeter geklickten) zurueck in den Pool
+// -- "zurueckspulen bis hierher", Reihenfolge der Uebrigen bleibt erhalten.
+function removeFromMoonStack(index) {
+  if(!moonModal) return;
+  const removed = moonModal.ordered.splice(index);
+  moonModal.items.push(...removed);
+  document.getElementById('moon-confirm').disabled = true;
+  renderMoonModal();
+}
+
+function resetMoonStack() {
+  if(!moonModal) return;
+  moonModal.items.push(...moonModal.ordered.splice(0));
+  document.getElementById('moon-confirm').disabled = true;
+  renderMoonModal();
 }
 
 function addToMoonStack(uid) {
