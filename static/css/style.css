@@ -116,9 +116,15 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   height: 46px;
 }
 .ds{border-radius:3px;border:1px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
-.ds.N{}.ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
+/* Nutzer-Feedback: unbelegt (N, gefaerbt+halbtransparent) vs. belegt
+   (.filled, volldeckend) besser unterscheidbar -- weisse Beschriftung mit
+   Schatten (liest sich auf allen 5 Farben, auch dunklem Schwarz-Ton) UND
+   gestrichelter Rahmen (wie schon bei W/S) statt durchgezogen bei .filled. */
+.ds.N{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55);border-style:dashed;border-color:rgba(0,0,0,.35)}
+.ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
 .ds.S{background:var(--special);border-style:dashed;border-color:#aaa}
 .ds.S.locked{opacity:.25}
+.ds.filled{border-style:solid;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
 .ds.filled.blau{background:var(--blau);color:#fff}
 .ds.filled.gelb{background:var(--gelb);color:#fff}
 .ds.filled.rot{background:var(--rot);color:#fff}
