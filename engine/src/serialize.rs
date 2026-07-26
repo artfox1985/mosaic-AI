@@ -236,6 +236,13 @@ pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
         "scoring_confirmed": scoring_confirmed,
         "phase": state.phase.as_str(),
         "current_player": state.current_player,
+        // Ueberlebt (im Gegensatz zu `players[].marker`) die Rundenwertung
+        // jeder Runde inkl. Runde 5 (siehe game.rs::determine_winner-Kommentar)
+        // -- Frontend braucht das fuer den Punktegleichstand-Tie-Break im
+        // Endergebnis-Modal (Nutzer-Fund 2026-07-27: "Unentschieden gewinnt!"
+        // trotz Marker bei der KI, weil `marker` zu diesem Zeitpunkt schon
+        // geloescht war).
+        "first_player_next_round": state.first_player_next_round,
         "scoring_tile_ids": state.scoring_tile_ids,
         "can_pass": can_pass,
         "factories": state.factories.iter().map(serialize_factory).collect::<Vec<_>>(),
@@ -1137,6 +1144,26 @@ mod json_to_state_tests {
                 for k in keys {
                     if is_player_obj && k == "estimated_score" && bonus_chips_nonempty {
                         continue; // dokumentierte Ausnahme, s.o.
+                    }
+                    if k == "first_player_next_round" {
+                        // Dokumentierte Ausnahme (Kategorie 2, aber nur
+                        // NAEHERUNGSWEISE ableitbar, nicht exakt wie der
+                        // Doku-Kommentar bei json_to_state suggeriert):
+                        // `json_to_state` leitet dieses Feld aus
+                        // `players[].holds_first_player_marker` ab, faellt
+                        // aber auf `current_player` zurueck, sobald NIEMAND
+                        // die Marke aktuell haelt (z.B. Rundenbeginn, bevor
+                        // sie gezogen wurde) -- das muss nicht mit dem
+                        // tatsaechlich getrackten Live-Feld uebereinstimmen.
+                        // Ohne Einfluss auf Task #89 (Oracle/Suche liest
+                        // dieses Feld nirgends), nur `determine_winner`
+                        // (self_play.rs, ausschliesslich auf ECHTEN,
+                        // beendeten Live-Spielen aufgerufen, nie auf einem
+                        // json_to_state-Rekonstrukt) und das Endergebnis-
+                        // Modal im Frontend (server.py::state_to_json auf
+                        // dem LIVE-GameState, ebenfalls kein Roundtrip)
+                        // nutzen es wirklich.
+                        continue;
                     }
                     let sub_path = format!("{path}/{k}");
                     match (oa.get(k), ob.get(k)) {
