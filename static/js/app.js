@@ -845,7 +845,11 @@ function renderCenter() {
       </button>` : '');
   } else if(S.phase==='end' || S.phase==='final') {
     const [p0,p1]=S.players;
-    const w=p0.score>p1.score?p0.name:p1.score>p0.score?p1.name:p0.marker?p0.name:p1.marker?p1.name:'Unentschieden';
+    // Bei Punktegleichstand gewinnt, wer die Startspielerfliese haelt --
+    // `p.marker` taugt hier NICHT (wird bei JEDER Rundenwertung geloescht,
+    // siehe game.rs::determine_winner-Kommentar), daher `first_player_next_round`
+    // (ueberlebt die Wertung) statt der Marker-Flags.
+    const w=p0.score>p1.score?p0.name:p1.score>p0.score?p1.name:(S.first_player_next_round===0?p0.name:S.first_player_next_round===1?p1.name:'Unentschieden');
     if(S.phase==='end') {
       info.innerHTML=`<div class="info tiling" style="text-align:center">
         🏁 Runde 5 beendet!<br>
@@ -1998,9 +2002,12 @@ async function calculateEndScoring() {
 async function showEndResults(results) {
   if (!S || !S.players) return;
   const p0 = S.players[0], p1 = S.players[1];
+  // Tie-Break wie oben in render(): first_player_next_round statt der (bei
+  // Rundenwertung geloeschten) Marker-Flags.
   const winner = p0.score > p1.score ? p0.name
     : p1.score > p0.score ? p1.name
-    : p0.marker ? p0.name : p1.marker ? p1.name : 'Unentschieden';
+    : S.first_player_next_round === 0 ? p0.name
+    : S.first_player_next_round === 1 ? p1.name : 'Unentschieden';
 
   const tileRows = (S.scoring_tile_ids||[]).map(tid=>{
     const t = allScoringTiles.find(t=>t.id===tid);
