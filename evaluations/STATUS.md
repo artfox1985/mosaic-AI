@@ -4664,3 +4664,129 @@ um einzuordnen, WIE GROSS der potenzielle Effekt ueberhaupt sein muesste.
   `train.py --name v17_lrfix` liefen waehrend der gesamten Bearbeitung
   aktiv weiter. Nachtrag (Teil 1 ausfuehren + Ergebnis committen) erst,
   wenn die Maschine frei ist.
+
+## v17-Zyklus Hebel 1: Gating-Verlaengerung -> Champion-Wechsel (2026-07-27)
+
+**Ausgangslage**: Das urspruengliche Gating `v17_best` vs `v16_best` (Task
+#98) erreichte nach 200 Paaren den harten Deckel ohne SPRT-Entscheid
+(LLR=+1,454 von noetigen +-2,944, McNemar p=0,053 -- knapp NICHT
+signifikant). Nutzer-Vorgabe (2026-07-26): "Gating auf 400 Paare verlaengern
+-> mach das" (Prioritaet 1 von 2 vorgeschlagenen Hebeln, Prioritaet 2 --
+Netz-Kapazitaet 512->768/1024 -- wurde separat verworfen, siehe naechster
+Abschnitt).
+
+**Durchfuehrung**: `tools/paired_gating.py`, IDENTISCHER `base_seed`
+(323782701) wie der urspruengliche Lauf, `--max-pairs 400` statt 200 --
+Bloecke 1-8 (200 Paare) reproduzieren dadurch byte-identisch das alte
+Ergebnis (verifiziert: Block 1 exakt 22:28 wie zuvor), Bloecke 9-16 sind
+echte neue Paare. Lief ohne Unterbrechung im Hintergrund durch (~55 Minuten).
+
+**Ergebnis**: SPRT entschied bereits nach 375 Paaren (nicht erst beim
+400er-Deckel): **`v17_best` 417:333 `v16_best` (750 Spiele, LLR=+3,852 >=
++2,944)**. McNemar-Vorzeichentest p=0,0031, gepaarte Differenz +0,224
+[95%-CI +0,080, +0,368] -- das CI liegt komplett ueber Null, klar
+signifikant. **Lehre bestaetigt (`feedback_statistical_rigor`): der
+200-Paare-Deckel war schlicht zu niedrig fuer diesen Effekt, kein echtes
+Plateau.**
+
+**Champion-Wechsel**: `v17_best` loest `v16_best` als Referenz/
+Self-Play-Generator ab. Elo-Eintrag (`tools/elo_tracker.py add`,
+`evaluations/elo_history.csv`): **`v17_best`@400 = 1133 Elo [1064, 1211]**
+-- damit zum ersten Mal seit dem Datenverlust (2026-07-24) wieder VOR dem
+verlorenen `v13_nortv_best` (1100), neuer Bestwert der Wiederaufbau-Linie.
+Neue Kader-Reihenfolge: **v17_best 1133** > v13_nortv_best 1100 (verlorene
+Alt-Linie) > v16_best 1094 > v12b_lr_best 1051 > v15_best 1033 >
+Heuristik@150 1000 (Anker) > v15_f2k_best 991 > v14b_best 968 > v12_best 943
+> v14_best 884 > v10_best 858 > v11_td07_best 853 > v11_best 809.
+
+**Offen (nicht Teil dieses Hebels)**: Kader-Matches `v17_best` vs Heuristik
+und vs `v15_best` (urspruenglich Task #98 vorgesehen, bei UNDECIDED
+uebersprungen) sind mit dem jetzt entschiedenen Gating wieder sinnvoll,
+aber noch nicht durchgefuehrt -- naechster Schritt, sobald Rechenkapazitaet
+frei ist. Bundle-Rebuild (`tools/build_release.py`) inkl. `v17_best` als
+Referenzmodell ebenfalls noch offen.
+
+## v17-Zyklus Hebel 2: Netz-Kapazitaet verworfen, LR-Dynamik-Experiment (2026-07-26/27)
+
+**Netz-Kapazitaet (512->768/1024) verworfen, VOR jedem Trainingslauf**:
+`MosaicNet.analyze_capacity()` (train.py, bereits vorhanden seit dem
+v5-Policy-Head-Vorfall) auf `v17_best` mit echtem v16/v15-Datenbatch
+ausgefuehrt: Dead-Neuron-Ratio 0-3%, Effektiver Rang 55-77% je Trunk-Schicht
+-- deutlich gesuender als der historische "gesund, nicht saturiert"-
+Referenzwert (v5-Vorfall: Eff.Rank ~41%). Kein Kapazitaetsmangel-Signal.
+Nebenbefund: `alphazero_v17_best.pth` ist der EPOCHE-1-Checkpoint (volles
+Training lief 15 Epochen, frueh gestoppt bei Plateau-Epoche 10) --
+Val-Policy-Loss verschlechtert sich ab Epoche 1 monoton
+(`models/alphazero_v17_loss.png`).
+
+**Praezedenzfall-Einordnung (Nutzer-Hinweis 2026-07-27, "aehnliches Thema
+hatten wir bei v14")**: `v12b_lr` (Abschnitt "v12b: LR-Schedule +
+From-Scratch-Kontrolle") und `v14b` ("Feintuning-Nachbrenner") nutzten
+BEIDE bereits exakt dasselbe Rezept (`--lr 5e-5 --lr-schedule cosine
+--epochs 100`) mit demselben `T_max=100`-Merkmal wie v17 -- und waren
+trotzdem erfolgreich (`v12b_lr`: bester Checkpoint wanderte Epoche 1->4,
+gate-te signifikant 65:35; `v14b`: Offline-Verbesserung in jeder Kennzahl).
+Nachrechnung: bei `T_max=100` ist die Cosine-Kurve bei Epoche 4 (`v12b_lr`s
+Optimum) noch bei `cos(pi*4/100)=0,992` -> ~99,6% der Start-LR, praktisch
+KEIN Annealing hat zu diesem Zeitpunkt stattgefunden. Der historische
+Gewinn kam also hoechstwahrscheinlich von der 8x niedrigeren Basis-LR
+selbst (5e-5 statt Standard 4e-4), NICHT vom Cosine-Annealing-Effekt. Das
+laufende `v17_lrfix`-Experiment (`--epochs 20` statt 100, sonst identisch
+zu v17) testet daher eine ECHTE, bisher ungetestete Zusatzvariable
+(tatsaechliches Annealing bei realistischem T_max) -- ein positives
+Ergebnis waere ein zusaetzlicher, kleinerer Hebel oben auf dem seit
+`v12b_lr` etablierten Standardrezept, kein Fix eines neu entdeckten Bugs.
+Ergebnis des Experiments: siehe separater Nachtrag (Agent lief zum
+Zeitpunkt dieses Commits noch).
+
+**Relevante Neueinordnung**: Die urspruengliche Praemisse fuer diesen ganzen
+Hebel ("v17 plateaut gegen v16") hat sich durch Hebel 1 (s.o.) als reiner
+Power-Mangel des 200-Paare-Gatings herausgestellt, nicht als echtes
+Plateau -- `v17_best` ist mit 417:333/750 klar Champion. Das
+`v17_lrfix`-Experiment bleibt trotzdem informativ fuer KUENFTIGE Zyklen
+(Frage bleibt: hilft tatsaechliches Cosine-Annealing zusaetzlich zur
+LR-Senkung?), ist aber kein dringender Fix mehr.
+
+## Bugfixes: Runde-5-Lehrer-Prozentpunkte + Unentschieden-Tie-Break (2026-07-27)
+
+Zwei vom Nutzer waehrend des Live-Spielens gefundene Bugs, beide auf
+denselben Ursachen-Typ zurueckzufuehren: ein Feld, das anderswo im Code
+bereits korrekt behandelt wird, wurde an einer neuen/abweichenden Stelle
+(Runde 5, bzw. Frontend-Tie-Break) nicht konsistent mitgezogen.
+
+**1. Lehrer-Modus Runde 5: "-2500,0 pp" statt sinnvoller Prozentzahl.**
+Runde 5 nutzt exakte Alpha-Beta-Suche (`round5.rs`) statt MCTS, deren
+`mcts_q`-Feld bewusst den ROHEN Punkte-Margin trug (own_total-opp_total,
+z.B. -25), nicht die anderswo ueberall erwartete [0,1]-Gewinnwahr-
+scheinlichkeit. `server.py`s Coach-Feedback (`_teacher_feedback_from_
+snapshot`) multipliziert `mcts_q` ungeprueft mit 100 fuer "Prozentpunkte"
+-- korrekt fuer die MCTS-Skala, aber Unsinn fuer eine rohe Punkte-Margin.
+Fix (`round5.rs`): `mcts_q` wird jetzt ueber dieselbe Margin->[0,1]-Formel
+wie `mcts::normalize_score`/das Netz-Value-Ziel normalisiert
+(`((val/VALUE_SCALE).tanh()+1.0)/2.0`, VALUE_SCALE=50 wie ueberall sonst),
+`mcts_win_pct` wird befuellt (vorher `Null`, betraf auch die Lehrer-Stufe-2
+"Tipp"-Badges), der rohe Margin bleibt zusaetzlich unveraendert in
+`ab_value` erhalten. `tools/analyze_game_log.py` braucht KEINE Aenderung
+(liest denselben, jetzt bereits normalisierten `mcts_q`-Wert aus dem Log).
+
+**2. Endergebnis-Modal: "Unentschieden gewinnt!" trotz Punktegleichstand +
+Startspielerfliese bei einem Spieler.** Die Regel (`game.rs::
+determine_winner`, im Rust-Kern korrekt): bei Punktegleichstand gewinnt,
+wer die Startspielerfliese haelt -- dafuer NICHT `holds_first_player_
+marker` verwenden, das wird von `score_penalty` bei JEDER Rundenwertung
+(auch Runde 5) geloescht, sondern das separate `first_player_next_round`
+(ueberlebt die Wertung). Das Frontend (`app.js`) hatte dieselbe Tie-Break-
+Absicht, las aber `p.marker` (= das geloeschte Feld) statt eines
+Aequivalents zu `first_player_next_round` -- der Fall "beide `marker=false`"
+trat nach Runde-5-Wertung IMMER ein, das Modal landete deshalb selbst bei
+eindeutiger Marker-Historie immer im `'Unentschieden'`-Fallback. Fix: neues
+Top-Level-Feld `first_player_next_round` in `serialize.rs::state_to_json`
+(direkt vom Live-`GameState` gelesen, kein Roundtrip-Umweg), `app.js`
+nutzt es jetzt an beiden Stellen (Sidebar + End-Modal) statt der
+Marker-Flags. `json_to_state`s Roundtrip-Test (`serialize.rs`) bekam eine
+neue dokumentierte Ausnahme fuer dieses Feld -- die JSON->State-Rekon-
+struktion (Task #89, Oracle) leitet es nur NAEHERUNGSWEISE aus den
+(zum Rekonstruktionszeitpunkt oft schon geloeschten) Marker-Flags ab,
+ohne Auswirkung auf Suche/Oracle (das Feld wird dort nirgends gelesen).
+
+`cargo test --release`: 163/163 gruen (beide Fixes zusammen getestet).
