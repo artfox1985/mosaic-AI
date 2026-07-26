@@ -113,11 +113,21 @@ mantra: root executes, `tools/` measures, `evaluations/` documents,
 ```
 
 Additionally, there is a release-bundle path for end users without a
-Python/Rust installation: `run_mosaic.py` (standalone launcher),
-`mosaic_release.spec` (PyInstaller spec), and `tools/build_release.py` build
-a `dist/` onedir bundle including `README_SPIEL.txt` (game instructions for
-the packaged program, in German) — maintained separately, see their own
-docstrings.
+Python/Rust installation. The build sources live in `dist/`
+(`run_mosaic.py` standalone launcher, `mosaic_release.spec` PyInstaller
+spec, `README_SPIEL.txt` end-user instructions in German). Building the
+shippable bundle is one command:
+
+```bash
+python tools/build_release.py
+```
+
+This produces `dist/Mosaic-AI/` (onedir: exe + engine + web UI + the
+current reference net + `engine_manual.md`) and zips it to
+`dist/Mosaic-AI_v16_<date>.zip`. Prerequisite: the installed
+`mosaic_rust` wheel must be current (the bundle packages the wheel from
+site-packages, not from source) — rebuild it first after any engine
+change.
 
 ### `evaluations/` at a Glance
 
