@@ -235,6 +235,27 @@ def _teacher_played_key(kind: str, **f):
     raise ValueError(kind)
 
 
+TEACHER_HINT_TOP_N = 3  # Nutzer-Feedback: max. 3 Kandidaten (vorher 5), alle Stufen.
+
+
+def _teacher_describe_move(mv: dict) -> str:
+    """Anzeige-Beschreibung EINES Analyse-Kandidaten für Lehrer-Ausgaben (Hint-
+    Kandidaten UND Coach-`bester_zug_description`). Hängt bei Kuppel-Zügen
+    (choose_dome_slot/choose_draw_stack_slot) die Rotation an, FALLS die Suche
+    dafür eine Rotationswahl gefunden hat (`best_rotation`-Kind-Knoten-Feld,
+    siehe engine/src/net_mcts.rs bzw. mcts.rs -- `null`, wenn der Suchbaum an
+    dieser Stelle nie bis zur Rotationsstufe vertieft wurde, z.B. bei kleinem
+    Sim-Budget). Die ROHE `description` (ohne Rotation) bleibt unverändert für
+    das Matching in `_teacher_move_key` -- nur diese Anzeige-Variante wird
+    augmentiert."""
+    desc = mv.get("description") or ""
+    if mv.get("type") in ("choose_dome_slot", "choose_draw_stack_slot"):
+        br = mv.get("best_rotation")
+        if isinstance(br, dict) and br.get("rotation") is not None:
+            desc = f"{desc}, {int(br['rotation'])}°"
+    return desc
+
+
 def _teacher_action_params(typ: str, desc: str) -> dict | None:
     """Strukturierte Parameter EINES Kandidaten für die Brett-Markierung im
     Frontend (Quell-Fabrik/Farbe/Zielreihe bzw. Kuppel-Slot). Funktioniert
@@ -343,7 +364,7 @@ def _teacher_feedback_from_snapshot(analysis: dict | None, kind: str, played_key
         return None
     ranked = sorted(moves, key=lambda m: -(m.get("mcts_q") or 0.0))
     top_q = ranked[0].get("mcts_q") or 0.0
-    top_desc = ranked[0].get("description")
+    top_desc = _teacher_describe_move(ranked[0])
     played_q = max((m.get("mcts_q") or 0.0) for m in matches)
     rang = 1 + sum(1 for m in moves if (m.get("mcts_q") or 0.0) > played_q + 1e-12)
     delta = round((top_q - played_q) * 100.0, 1)
@@ -991,12 +1012,13 @@ def teacher_config_set():
 
 @app.route('/api/ai/hint', methods=['GET'])
 def ai_hint():
-    """Lehrer-Tipp (Stufe 1/2/3): Top-5-Kandidaten der Analyse des
-    AKTUELLEN (menschlichen) Zustands -- nur gültig, wenn der Mensch am Zug
-    UND in der Drafting-Phase ist. Nutzt das geladene Netz des KI-Gegners
-    (`ai_debug_net_json`); ist keines geladen (Heuristik-Gegner), fällt die
-    Analyse pragmatisch auf die Heuristik zurück (`note`-Feld im Response
-    weist darauf hin) -- siehe `_teacher_compute_analysis`-Doku."""
+    """Lehrer-Tipp (Stufe 1/2/3): Top-3-Kandidaten (Nutzer-Feedback, vorher
+    Top-5) der Analyse des AKTUELLEN (menschlichen) Zustands -- nur gültig,
+    wenn der Mensch am Zug UND in der Drafting-Phase ist. Nutzt das geladene
+    Netz des KI-Gegners (`ai_debug_net_json`); ist keines geladen (Heuristik-
+    Gegner), fällt die Analyse pragmatisch auf die Heuristik zurück (`note`-
+    Feld im Response weist darauf hin) -- siehe `_teacher_compute_analysis`-
+    Doku."""
     if (e := _require_game()) is not None:
         return e
     if _teacher_level == 0:
@@ -1013,15 +1035,20 @@ def ai_hint():
         return jsonify(err("Analyse derzeit nicht verfügbar."))
 
     ranked = sorted(moves, key=lambda m: -(m.get("mcts_q") or 0.0))
-    top5 = ranked[:5]
-    top_win_pct = top5[0].get("mcts_win_pct") or 0.0
+    top_n = ranked[:TEACHER_HINT_TOP_N]
+    top_win_pct = top_n[0].get("mcts_win_pct") or 0.0
     candidates = []
-    for i, mv in enumerate(top5):
+    for i, mv in enumerate(top_n):
+        typ = mv.get("type")
+        params = _teacher_action_params(typ, mv.get("description", ""))
+        br = mv.get("best_rotation")
+        if params is not None and isinstance(br, dict) and br.get("rotation") is not None:
+            params["rotation"] = int(br["rotation"])
         cand = {
             "rank":        i + 1,
-            "description": mv.get("description"),
-            "type":        mv.get("type"),
-            "action":      _teacher_action_params(mv.get("type"), mv.get("description", "")),
+            "description": _teacher_describe_move(mv),
+            "type":        typ,
+            "action":      params,
         }
         if _teacher_level >= 2:
             wp = mv.get("mcts_win_pct")

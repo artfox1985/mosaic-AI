@@ -217,6 +217,8 @@ function clearHintHighlights() {
     delete el.dataset.hintBestRank;
   });
   document.querySelectorAll('.hint-badge').forEach(el => el.remove());
+  const panel = document.getElementById('teacher-hint-panel');
+  if (panel) panel.remove();
 }
 
 // Markiert die Top-Kandidaten aus `hintCandidates` auf dem Brett (Quell-Fabrik/
@@ -256,8 +258,21 @@ function renderHintHighlights() {
     const a = cand.action;
     if (!a) return;
     if (cand.type === 'stone') {
-      const fidSel = (a.factory_id === null) ? 'GF' : a.factory_id;
-      mark(document.querySelector(`#factories-area .fcard[data-fid="${fidSel}"]`), cand);
+      // Nutzer-Feedback: nicht die ganze Fabrik-Karte hervorheben, sondern
+      // GENAU die Farbgruppe (Fliesen + Stückzahl) der empfohlenen Farbe --
+      // eindeutiger als "irgendwo in dieser Fabrik". Bei GF (factory_id=null)
+      // ist die Farbe evtl. sowohl im Sonnen- als auch im Mondbereich der
+      // Großfabrik vorhanden (Regeltext parst nur Farbe+Ziel, keine Sonne/
+      // Mond-Unterscheidung) -- Fallback markiert dann die erste passende
+      // Gruppe (Sonne zuerst), zusätzlich den globalen Mondbereich-Pool.
+      let srcEl;
+      if (a.factory_id !== null) {
+        srcEl = document.querySelector(`#factories-area .fcard[data-fid="${a.factory_id}"] .cgroup[data-color="${a.color}"]`);
+      } else {
+        srcEl = document.querySelector(`#factories-area .fcard[data-fid="GF"] .cgroup[data-color="${a.color}"]`)
+             || document.querySelector(`#factories-area .cgroup[data-src="SMALL_FACTORY_MOON"][data-fid="ALL"][data-color="${a.color}"]`);
+      }
+      mark(srcEl, cand);
       mark(document.querySelector(`#board${humanPi} .prow[data-ri="${a.row}"]`), cand);
     } else if (cand.type === 'choose_dome_slot') {
       mark(document.querySelector(`.dgtile[data-tile-id="${a.tile_id}"]`), cand);
@@ -265,9 +280,42 @@ function renderHintHighlights() {
     } else if (cand.type === 'choose_draw_stack_slot' || cand.type === 'dome_stack_peek') {
       mark(document.getElementById('stack-picker-btn'), cand);
     } else if (cand.type === 'bonus_chip') {
-      mark(document.querySelector(`#factories-area .fcard[data-fid="${a.factory_id}"]`), cand);
+      mark(document.querySelector(`#factories-area [data-chip-fid="${a.factory_id}"]`), cand);
     }
   });
+
+  renderHintPanel();
+}
+
+function _escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// Kompaktes Klartext-Panel mit den Top-Kandidaten (Nutzer-Feedback: die
+// Brett-Markierung allein ist nicht immer eindeutig deutbar) -- ergänzt die
+// Brett-Highlights, ersetzt sie nicht. Rang 1 kräftig, Rang 3 dezent (per CSS
+// .hint-1/.hint-2/.hint-3 -- dieselbe Rang-Farbskala wie die Brett-Marker).
+function renderHintPanel() {
+  let el = document.getElementById('teacher-hint-panel');
+  if (!hintCandidates || !hintCandidates.length) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'teacher-hint-panel';
+    document.body.appendChild(el);
+  }
+  const rows = hintCandidates.map(c => {
+    const winTxt = (TEACHER_LEVEL >= 2 && c.win_pct != null)
+      ? `<span class="thp-win">${c.win_pct.toFixed(0)}%</span>` : '';
+    return `<div class="thp-row">
+      <span class="thp-rank hint-${c.rank}">${c.rank}</span>${_escapeHtml(c.description)}${winTxt}
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="thp-title">💡 Top-${hintCandidates.length}</div>${rows}`;
 }
 
 // Coach-Feedback (Stufe 3): kurzer Toast nach jedem eigenen Zug.
@@ -796,7 +844,7 @@ function renderCenter() {
     }
     
     const chipHTML = f.bonus_chip
-      ? `<span style="cursor:${f.chip_revealed?'pointer':'default'}" onclick="${f.chip_revealed?`bonusChipMove(${f.id})`:''}" title="Bonusplättchen">${chipContent}</span>`
+      ? `<span data-chip-fid="${f.id}" style="cursor:${f.chip_revealed?'pointer':'default'}" onclick="${f.chip_revealed?`bonusChipMove(${f.id})`:''}" title="Bonusplättchen">${chipContent}</span>`
       : '';
       
     const sunTiles = sunColors.map(c=>{

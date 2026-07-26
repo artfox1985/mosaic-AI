@@ -289,6 +289,21 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .hint-badge.hint-2{background:#94A3B8}
 .hint-badge.hint-3,.hint-badge.hint-4,.hint-badge.hint-5{background:#B45309}
 
+/* Lehrer-Modus: Klartext-Hint-Panel (Top-3, ergänzt die Brett-Markierung) */
+#teacher-hint-panel{position:fixed;left:16px;bottom:16px;max-width:300px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;padding:8px 10px;box-shadow:0 8px 30px rgba(0,0,0,.18);
+  z-index:9997;font-size:11px}
+#teacher-hint-panel .thp-title{font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--text3);font-weight:600;margin-bottom:4px}
+#teacher-hint-panel .thp-row{padding:4px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+#teacher-hint-panel .thp-row:last-child{border-bottom:none}
+#teacher-hint-panel .thp-rank{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;color:#fff;font-size:9px;font-weight:700}
+#teacher-hint-panel .thp-rank.hint-1{background:#F59E0B}
+#teacher-hint-panel .thp-rank.hint-2{background:#94A3B8}
+#teacher-hint-panel .thp-rank.hint-3{background:#B45309}
+#teacher-hint-panel .thp-win{margin-left:auto;flex-shrink:0;color:var(--text2);font-size:10px;font-weight:600}
+
 /* Lehrer-Modus: Coach-Feedback-Toast (Stufe 3) */
 #teacher-toast{position:fixed;right:16px;bottom:16px;max-width:280px;background:var(--surface);
   border:1px solid var(--border);border-radius:10px;padding:10px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);
