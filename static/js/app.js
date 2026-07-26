@@ -640,7 +640,7 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
   // Straffelder (links von -1), nicht mehr in der Ueberschrift. Unbelegt =
   // helles Blau (Platzhalter), belegt = saettigteres Blau + "-2" (fixe
   // Startspielerfliese-Strafe, unabhaengig von den vier Straffeldern).
-  const markerHTML = `<div class="fslot ${p.marker ? 'marker-taken' : 'marker-empty'}">${p.marker ? '-2' : ''}</div>`;
+  const markerHTML = `<div class="fslot ${p.marker ? 'marker-taken' : 'marker-empty'}">-2</div>`;
 
   const est = p.estimated_score || 0;
   const estStr = (est >= 0 ? '+' : '') + est;
@@ -697,7 +697,6 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
         <div id="plines${pi}">${plHTML}</div>
       </div>
       <div>
-        <div class="lbl">Kuppel</div>
         <div class="dome-grid" id="dome${pi}">${domeHTML}</div>
       </div>
     </div>`;
