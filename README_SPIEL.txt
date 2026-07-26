@@ -47,6 +47,26 @@ SCHWIERIGKEITSGRADE
 - Mittel/Schwer/Experte: neuronales Netz "v16_best" mit steigender
   Bedenkzeit (mehr Suchsimulationen je Zug)
 
+LEHRER-MODUS
+------------
+Beim Start einer Partie "Gegen KI spielen" gibt es zusätzlich eine
+Lehrer-Stufe zu wählen:
+- Aus:               keine Hilfe (Standard).
+- Kandidaten:        ein "💡 Tipp"-Button in der Kopfleiste markiert auf
+                     Wunsch die besten Zugmöglichkeiten auf dem Brett,
+                     ohne Zahlen zu verraten.
+- + Bewertungen:     dieselbe Markierung, zusätzlich mit geschätzter
+                     Gewinnwahrscheinlichkeit je Kandidat.
+- + Coach-Feedback:  nach jedem eigenen Zug zeigt ein kurzer Hinweis, wie
+                     gut er im Vergleich zum besten Zug war; am Spielende
+                     gibt es eine Bilanz (Durchschnittsabweichung, Trefferquote,
+                     größte Ausreißer).
+Der Lehrer-Modus nutzt dieselbe KI-Analyse wie die Gegner-KI und braucht
+daher ebenfalls kurz Bedenkzeit (typisch 1-3 Sekunden je Tipp/Feedback).
+Ist die KI auf "Leicht" (Heuristik, kein neuronales Netz), fällt der Lehrer
+auf eine gröbere Heuristik-Schätzung zurück — ein Hinweis dazu erscheint
+dann im Tipp-Fenster.
+
 BEKANNTE EINSCHRÄNKUNGEN
 -------------------------
 - Der Port 5000 wird bevorzugt; ist er belegt, sucht das Programm
