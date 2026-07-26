@@ -106,16 +106,33 @@ _teacher_coach_sims = 400   # Sims für Coach-Feedback OHNE Cache-Treffer (schne
 _teacher_history    = []    # Liste der teacher_feedback-Einträge dieser Partie (für /api/teacher/summary)
 _teacher_cache = {"key": None, "analysis": None}  # (log_len, current_player) -> zuletzt berechnete Analyse
 
+def _load_champion_model(fallback: str = "v16_best") -> str:
+    """Liest den amtierenden Champion aus `models/champion.txt` (EINE Zeile,
+    Versionsname wie `v17_best`) -- einzige Quelle der Wahrheit fuer den
+    Server-Default, von `tools/set_champion.py` nach jedem entscheidenden
+    Gating aktualisiert (siehe Nutzer-Anstoss 2026-07-27: "sobald neuer
+    Champ da ist, sofort in das Server-Game ruebernehmen"). Fehlt die Datei
+    (frischer Checkout ohne `models/`-Snapshot) oder ist sie leer, faellt
+    dies auf `fallback` zurueck -- rein additiv, kein Hard-Error beim
+    Serverstart."""
+    try:
+        name = (MODELS_DIR / "champion.txt").read_text(encoding="utf-8").strip()
+        return name or fallback
+    except OSError:
+        return fallback
+
+_CHAMPION_MODEL = _load_champion_model()
+
 # Difficulty Presets — Format: {"model": "<version>", "sims": <int>}
 DIFFICULTY_PRESETS = {
-    # Stand 2026-07-25 (Rebuild-Linie): expert = Arena-Staerke des amtierenden
-    # Referenz-Netzes v16_best (Elo ~1094); darunter dasselbe Netz mit weniger
-    # Sims; easy = Heuristik.
-    "easy":   {"model": "heuristic",  "sims": 60},
-    "medium": {"model": "v16_best",   "sims": 60},
-    "hard":   {"model": "v16_best",   "sims": 150},
-    "expert": {"model": "v16_best",   "sims": 400},
-    "_default": {"model": "v16_best", "sims": 400},
+    # medium/hard/expert/_default zeigen alle auf denselben amtierenden
+    # Champion (nur die Sim-Zahl unterscheidet die Staerke) -- der Name
+    # kommt dynamisch aus `models/champion.txt`, s.o. `_load_champion_model`.
+    "easy":   {"model": "heuristic",     "sims": 60},
+    "medium": {"model": _CHAMPION_MODEL, "sims": 60},
+    "hard":   {"model": _CHAMPION_MODEL, "sims": 150},
+    "expert": {"model": _CHAMPION_MODEL, "sims": 400},
+    "_default": {"model": _CHAMPION_MODEL, "sims": 400},
 }
 
 def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) -> dict:
