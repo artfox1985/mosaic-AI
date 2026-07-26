@@ -565,6 +565,34 @@ fn net_search_state_json(
     Ok(analysis.to_string())
 }
 
+/// Wertungsplatten-Endwertung für einen extern gespeicherten Zustand (z.B.
+/// ein Self-Play-Record `state`-Feld, `json.dumps(record["state"])`) --
+/// reine additive Lesefunktion für die Wertungsplatten-Diagnose (2026-07-26,
+/// Nutzer-Verdacht "die KI ignoriert die Wertungsplatten"), berührt keine
+/// bestehende Suche/Produktion. Siehe `serialize::end_scoring_from_state`
+/// für die exakte Begründung, warum das Ergebnis (anders als z.B.
+/// `estimated_score`) für JEDEN validen Zustand EXAKT ist (nicht nur eine
+/// Näherung). Gibt `{"player_0": {"details":[{id,name,emoji,desc,score},…],
+/// "total": N}, "player_1": {…}}` zurück.
+#[pyfunction]
+#[pyo3(signature = (state_json, tile_ids, seed=None))]
+fn end_scoring_from_state_json(
+    state_json: String,
+    tile_ids: Vec<usize>,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let result = crate::serialize::end_scoring_from_state(&parsed, &tile_ids, &mut rng)
+        .map_err(PyValueError::new_err)?;
+    Ok(result.to_string())
+}
+
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
@@ -609,6 +637,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }
