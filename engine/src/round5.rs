@@ -287,6 +287,18 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
         .map(|(i, ((_, a, _), &val))| {
             let sm = SearchMove::Draft(a.clone());
             let (typ, desc, cat, _mv) = label_search_move(&sm, Some(state));
+            // `val` ist eine rohe Punkte-Margin (own_total - opp_total, siehe
+            // `leaf_value`), KEINE Gewinnwahrscheinlichkeit -- Lehrer-Modus/
+            // `tools/analyze_game_log.py` erwarten `mcts_q` aber überall sonst
+            // auf der [0,1]-Win-Prob-Skala (`net_mcts.rs::value_to_win_prob`,
+            // `mcts.rs::normalize_score`) und multiplizieren sie ungeprüft mit
+            // 100 für "Prozentpunkte" -- ohne diese Normalisierung ergab das in
+            // Runde 5 Werte wie "-2500 pp" statt einer sinnvollen Prozentzahl
+            // (Nutzer-Feedback 2026-07-27). Dieselbe Margin→[0,1]-Formel wie
+            // `crate::mcts::normalize_score`, nur für eine Differenz statt
+            // eines absoluten Scores (passt zu `self_play.rs`s
+            // `((own-opp)/VALUE_SCALE).tanh()`-Margin-Ziel).
+            let win_prob = ((val / crate::mcts::VALUE_SCALE).tanh() + 1.0) / 2.0;
             json!({
                 "action_id": i,
                 "type": typ,
@@ -296,8 +308,8 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
                 "net_prob_norm": Value::Null,
                 "mcts_visits": Value::Null,
                 "mcts_share": Value::Null,
-                "mcts_q": val,
-                "mcts_win_pct": Value::Null,
+                "mcts_q": win_prob,
+                "mcts_win_pct": win_prob * 100.0,
                 "ab_value": val,
                 "max_depth": Value::Null,
                 "shaping": Value::Null,
