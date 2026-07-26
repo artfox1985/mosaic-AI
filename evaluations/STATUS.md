@@ -4457,3 +4457,210 @@ Analyse-Pfad bestaetigt -- identischer Code, daher ausreichend abgedeckt.
 **data/-Integritaetsnachweis**: 600 v16 + 200 v15 + 100 v14b = 900 Dateien
 (Fenster-Rotation vor Task-Start bereits durchgefuehrt, siehe
 Auffaelligkeit oben; Endzustand verifiziert, unveraendert).
+
+## Wertungsplatten-Diagnose (2026-07-26)
+
+Nutzer-Verdacht: "die KI ignoriert die Wertungsplatten". Drei unabhaengige
+Teiluntersuchungen (Punkteanteil, Randomisierung, Policy-/Value-
+Sensitivitaet). **Zentrale Antwort: TEILWEISE ZUTREFFEND** -- die
+tatsaechliche Zugwahl der Suche (Gumbel-Top-m an der Wurzel, s.u.) reagierte
+in ALLEN 124 getesteten Faellen NICHT auf unterschiedliche Wertungsplatten,
+obwohl der rohe Policy-Head-Output nachweislich reagiert; der Value-Head
+reagiert moderat (~7x ueber Sitz-Rausch-Niveau). Die Randomisierung selbst
+(welche 3 Platten pro Spiel gezogen werden) ist NICHT der Fehler -- die ist
+sauber uniform.
+
+### Vorab-Check / Wheel-Status
+
+`tasklist` zeigte beim Task-Start UND durchgehend waehrend der gesamten
+Bearbeitung mehrere laufende Nutzerprozesse: 2× `server.py` (UI), UND --
+wichtiger -- ein aktives `tools/paired_gating.py` (gepaartes Gating,
+gestartet 23:40) sowie ein aktives `train.py --name v17_lrfix --load
+v16_best...` (Training, gestartet 23:57). Beide halten das installierte
+`mosaic_rust`-Wheel offensichtlich aktiv im Zugriff. Gemaess Vorgabe wurde
+der **Wheel-Neubau/-Install fuer Teil 1 daher NICHT durchgefuehrt** -- Code
+und Tests sind fertig (`cargo test --release`: 163/163 gruen, 161 Basis + 2
+neue), aber `tools/scoring_tile_impact.py` kann erst NACH einem
+`maturin develop`/Wheel-Neubau auf einer freien Maschine tatsaechlich
+laufen (das Skript bricht bewusst mit einer klaren Fehlermeldung ab, falls
+`mosaic_rust.end_scoring_from_state_json` fehlt, statt still falsche
+Ergebnisse zu liefern). Teil 2 und Teil 3 brauchen KEIN Wheel-Update:
+`net_search_state_json`/`json_to_state` aus Task #89 waren bereits
+installiert (verifiziert per `hasattr`), und Teil 2 liest nur `state[
+"scoring_tile_ids"]` direkt aus den Self-Play-Pickles (kein Rust-Aufruf
+noetig).
+
+### Formel-Nachweis: Grundwertung + Wertungsplatten = Gesamt
+
+Exakt aus dem Code hergeleitet (nicht angenommen), Fundstellen:
+- `board.rs:310 apply_score`: `score = max(0, score + delta)` (geklemmt),
+  `score_unclamped += delta` (nie geklemmt, nur Trainingslabel).
+- `round_end.rs:391 score_penalty`: Strafleiste `BROKEN_PENALTIES =
+  [-1,-2,-3,-4]` (additiv, max. 4 Fliesen) + `FIRST_PLAYER_MARKER_PENALTY =
+  -2`, falls der Spieler die Startspielerfliese haelt.
+- `game.rs:844 execute_end_tiling`: wendet `score_penalty` je Spieler an
+  (Rundenende-Abschluss, inkl. Runde 5).
+- `game.rs:897 apply_end_scoring`: ruft danach `scoring::
+  calculate_end_scoring(player, scoring_tile_ids)` auf und addiert
+  `res.total` per `apply_score` -- NACH der Strafleiste, nicht davor.
+
+Damit exakt (geklemmte Variante, direkt gegen `scores` im Self-Play-Record
+pruefbar):
+```
+Gesamt_final[i] = max(0, max(0, score_letzter_Snapshot[i] + score_penalty[i]) + wertung_total[i])
+```
+`tools/scoring_tile_impact.py` prueft diese Formel aktiv (nicht nur
+behauptet) gegen `scores`/`scores_unclamped` jedes abgeschlossenen Spiels,
+sobald es laufen kann (`formula_validation`-Feld im Ergebnis-JSON).
+
+**Neue Rust-Funktion** `end_scoring_from_state_json(state_json, tile_ids)`
+(`engine/src/lib.rs`, Kernlogik in `engine/src/serialize.rs::
+end_scoring_from_state`): deserialisiert per `json_to_state` (Task #89) und
+ruft fuer jeden Spieler `calculate_end_scoring` auf. **Beweis der Exaktheit**
+(nicht nur Naeherung): `calculate_end_scoring` liest AUSSCHLIESSLICH
+`PlayerBoard::dome_grid`, und `dome_grid` wird von `dome_grid_from_json`
+Space-fuer-Space EXAKT rekonstruiert -- keine der drei in `json_to_state`s
+Doku-Kommentar beschriebenen Naeherungskategorien (verdeckte Information,
+abgeleitete Felder, Wurzel-Legalitaets-Naeherungen) betrifft dieses Feld.
+Getestet in `serialize.rs::end_scoring_from_state_tests`
+(`end_scoring_from_state_is_exact_after_roundtrip`: Vergleich gegen
+`calculate_end_scoring` auf dem ORIGINAL-Board vor jeder Serialisierung,
+inkl. Runde-5-Zustand; `end_scoring_from_state_empty_board_all_zero`:
+Randfall frisches Brett). `cargo test --release`: **163/163 gruen** (161
+Basis + 2 neu).
+
+### Teil 1: Punkteanteil aus Wertungsplatten -- BLOCKIERT (Wheel)
+
+`tools/scoring_tile_impact.py` fertig implementiert: nimmt je abgeschlossenem
+Self-Play-Spiel den LETZTEN Record (empirisch verifiziert: an diesem Punkt
+gilt `valid_tiling_rows == [] und chippable_tiling_rows == []` fuer BEIDE
+Spieler -- das `dome_grid` aendert sich bis zum echten Spielende nicht mehr,
+die Endwertung darauf ist also exakt, keine Naeherung), ruft
+`end_scoring_from_state_json` auf, aggregiert Anteil = Wertungsplatten-Total
+/ Gesamtpunkte je Spieler-Spiel sowie Ø-Punkte je einzelner Platte. Kann
+mangels Wheel-Update in dieser Session NICHT ausgefuehrt werden (siehe
+Wheel-Status oben) -- **kein Ergebnis in diesem Zyklus, Nachtrag noetig,
+sobald die Maschine frei ist** (`python tools/scoring_tile_impact.py
+--data-glob "data/selfplay_v16_*.pkl"`, danach `evaluations/
+scoring_tile_impact_result.json` commiten).
+
+### Teil 2: Randomisierungs-Audit -- UNIFORM, KEIN BEFUND
+
+`tools/scoring_tile_distribution.py` ueber den **kompletten v16-Korpus**
+(600 Dateien, **6000 Spiele**, `evaluations/
+scoring_tile_distribution_v16.json`):
+
+- **0 Ausschluss-Konflikte** (`sample_valid_scoring_ids` haelt sein
+  Versprechen exakt ein).
+- Jede der 8 Platten wurde in **37,0%-37,9%** der Spiele gewaehlt (Erwartung
+  bei fairem Muenzwurf je Paar × 3-aus-4-Ziehung: 3/8 = 37,5% -- alle 8 Werte
+  liegen innerhalb ±0,5 Prozentpunkt davon).
+- Pro Ausschluss-Paar kam jede Seite in **49,7%-50,5%** der Faelle in den
+  Pool (Erwartung 50%): Horizontale/Farbenreiche 50,2%/49,8%, Spezialfelder/
+  Mehrfarbige 49,7%/50,3%, Aeussere/Vertikale 50,2%/49,8%, Diagonale/Ecken
+  50,5%/49,5%.
+- Alle **32 von 32** theoretisch moeglichen 3er-Kombinationen (4 Paare, 3
+  liefern eine Seite, C(4,3)×2³=32) wurden tatsaechlich beobachtet, mit
+  Anteilen zwischen 3,1% und 3,6% (Erwartung bei Gleichverteilung: 3,125%).
+
+**Befund**: die Ziehung selbst ist sauber, nachweislich uniform, kein
+Bias in Richtung bestimmter Platten oder Kombinationen. Der Nutzer-Verdacht
+laesst sich NICHT auf eine fehlerhafte/verzerrte Randomisierung
+zurueckfuehren.
+
+### Teil 3: Policy-/Value-Sensitivitaet -- POLICY-ENTSCHEIDUNG REAGIERT NICHT, VALUE-HEAD SCHWACH
+
+`tools/scoring_tile_sensitivity.py`: 16 echte Drafting-Zustaende aus
+`evaluations/frozen_eval_set.pkl` (gestreut ueber alle 5 Runden), Champion
+`models/alphazero_v16_best.onnx`, `sims=400`, `c_puct=1.5`, 8 verschiedene
+gueltige Wertungsplatten-3er-Kombinationen je Zustand (124
+Zustand-Kombination-Paare insgesamt), Ergebnis in `evaluations/
+scoring_tile_sensitivity_result.json`.
+
+**Baseline-Rauschen** (identische Kombination, 2 verschiedene Seeds --
+Seed treibt NUR die Neumischung von Beutel/Turm/Kuppelstapel/
+Bonusplaettchen-Pool, s. `json_to_state`-Doku): JS-Divergenz der
+MCTS-Besuchsverteilung = **exakt 0,0 in allen 16 Faellen**. Das ist selbst
+ein Befund (nicht nur "Rauschen ist klein"): bei den getesteten Zustaenden
+erreichte KEINE der 400 Simulationen einen Baum-Pfad, an dem die exakte
+Kuppelstapel-Reihenfolge das Netz-Ergebnis beeinflusst haette -- die Suche
+ist hier bit-exakt deterministisch bzgl. des Seeds. Root-Value-Baseline-
+Differenz (wo `root_value` ueberhaupt vorlag, n=13): Ø 0,006, Median 0,003,
+Max 0,035.
+
+**Wertungsplatten-Effekt bei FESTEM Seed** (gleiche Determinisierung, nur
+die Kombination unterscheidet sich):
+- **MCTS-Besuchsverteilung (`mcts_visits`, das, was die Suche tatsaechlich
+  als Zugpraeferenz ausgibt): JS-Divergenz = exakt 0,0 in ALLEN 124
+  getesteten Faellen.** Nicht ein einziges Mal aenderte sich die
+  Zugentscheidung der Suche durch eine andere Wertungsplatten-Wahl.
+- **Roher Policy-Prior (`net_prob`, das Netz-Signal VOR jeder Suche)
+  reagiert dagegen klar messbar**: JS-Divergenz Ø 0,046 Bit, Median 0,003
+  Bit, Max **0,58 Bit** (nahe am theoretischen Maximum ln2≈0,69 Bit) --
+  Beispiel: Runde 4, 15 Kandidaten, Original-Platten [4,5,6] (Aeussere
+  Felder/Eckplatten/Spezialfelder) vs. [2,3,4] (Diagonale Reihen/
+  Mehrfarbige Felder/Aeussere Felder): Policy-Prior-JS=0,579, aber
+  Besuchsverteilungs-JS=0,0 -- das Netz "weiss" von der Aenderung, die Suche
+  setzt es nicht um.
+- **Root-Value-Streuung ueber die Kombinationen** (n=13, gleicher Seed):
+  Ø 0,042, Median 0,044, Min 0,021, Max 0,061 -- **~7× ueber dem
+  Baseline-Rauschen** (0,006) -- der Value-Head reagiert also RICHTIG,
+  ABER nur mit ~2-6 Prozentpunkten Sieg-Wahrscheinlichkeits-Ausschlag
+  ueber sehr unterschiedliche Platten-Kombinationen hinweg -- schwach,
+  aber real und klar von Rauschen unterscheidbar.
+
+**Erklaerung des Policy/Suche-Widerspruchs** (aus dem Code, nicht geraten):
+das Projekt nutzt an der Wurzel "Gumbel AlphaZero" (Danihelka/Guez/
+Schrittwieser/Silver, ICLR 2022; `net_mcts.rs`, Abschnitt "Gumbel
+AlphaZero") -- Gumbel-Top-m + Sequential Halving statt klassischem PUCT.
+`net_search_state_json` ruft mit `add_root_noise=false` auf (wie Arena/
+Produktion) -- dann sind die echten Gumbel-Zufallsproben abgeschaltet
+(`gumbel_scale=0`, s. Kommentar bei `build_gumbel_tree`), die Top-m-Auswahl
+faellt auf reines RANKING nach Log-Prior zurueck. Ein verschobener, aber
+RANG-GLEICHER Prior aendert an diesem Ranking nichts -- die
+Sequential-Halving-Visit-Schedule (die Gruppengroessen/-Zuteilungen) bleibt
+bit-identisch, obwohl der Prior selbst sich deutlich verschoben hat. Mit
+anderen Worten: **die Wertungsplatten koennten die tatsaechliche Zugwahl
+nur dann beeinflussen, wenn der Effekt gross genug ist, um die relative
+Rangfolge der Top-Kandidaten zu kippen** -- das ist in KEINEM der 124
+getesteten Faelle passiert.
+
+**Einschraenkung**: Stichprobe von 16 Zustaenden × 8 Kombinationen (124
+Paare) -- ein Rangwechsel bei extremeren/saeltenen Kombinationen oder
+spezifischeren Board-Situationen (z.B. kurz vor Rundenende, wenn wenige
+Zuege das Board fast entscheiden) ist damit nicht ausgeschlossen, nur nicht
+beobachtet. Fuer 3 der 16 Zustaende (Runde 5) lieferte `net_search_state_json`
+kein `root_value` (Struktur-Randfall, nicht weiter untersucht) -- diese
+Zustaende sind nur in der `treatment_js`-Statistik enthalten, nicht in den
+Value-Statistiken.
+
+### Beantwortung der Nutzerfrage
+
+**Teilweise zutreffend.** Die Wertungsplatten-AUSWAHL selbst ist technisch
+sauber randomisiert (Teil 2: uniform, kein Bias). Der Value-Head
+beruecksichtigt Wertungsplatten leicht (Teil 3: ~7× ueber Rauschen, aber nur
+wenige Prozentpunkte Ausschlag). Die tatsaechliche ZUGENTSCHEIDUNG der
+Suche -- das, was der Nutzer beim Zusehen tatsaechlich als "die KI spielt
+so, als waeren die Platten egal" wahrnimmt -- hat sich in dieser Stichprobe
+in KEINEM einzigen von 124 getesteten Faellen durch eine andere
+Wertungsplatten-Kombination veraendert, OBWOHL der zugrundeliegende
+Policy-Head-Output nachweislich (teils stark) reagiert. Ursache ist
+strukturell (Gumbel-Top-m-Ranking bei `add_root_noise=false`), nicht ein
+simpler Trainingsfehler -- das Netz "weiss" von den Platten, die Suche in
+Analyse-/Arena-/Produktionsmodus setzt dieses Wissen aber nur um, wenn es
+stark genug ist, die Kandidaten-Rangfolge zu kippen. Punkteanteil
+(Teil 1) bleibt offen (Wheel blockiert), waere aber der naechste Schritt,
+um einzuordnen, WIE GROSS der potenzielle Effekt ueberhaupt sein muesste.
+
+### Commits / Wheel-Status (Zusammenfassung)
+
+- Rust-Erweiterung (`engine/src/lib.rs`, `engine/src/serialize.rs`):
+  `end_scoring_from_state_json` + Tests, `cargo test --release` 163/163.
+- Neue Tools: `tools/scoring_tile_impact.py`, `tools/
+  scoring_tile_distribution.py`, `tools/scoring_tile_sensitivity.py`.
+- Ergebnis-JSONs: `evaluations/scoring_tile_distribution_v16.json`,
+  `evaluations/scoring_tile_sensitivity_result.json` (Teil 1 fehlt, s.o.).
+- **Wheel NICHT neu gebaut/installiert** -- `tools/paired_gating.py` und
+  `train.py --name v17_lrfix` liefen waehrend der gesamten Bearbeitung
+  aktiv weiter. Nachtrag (Teil 1 ausfuehren + Ergebnis committen) erst,
+  wenn die Maschine frei ist.
