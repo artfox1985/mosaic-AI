@@ -5648,3 +5648,61 @@ guenstiger, falls Task #9 (Ownership-Head) landet, weil die Value-Seite dann
 Rauschen, und #13 vermutet, dass genau dieses Rauschen das Value-Ziel schon
 heute schaedigt (Runde-1-R² ~0). Reihenfolge daher: erst #13 klaeren, dann
 #14 mit diesem Wissen bewerten.
+
+### Task #13 geklaert: Play-Regel gemessen, Hypothese widerlegt (2026-07-28)
+
+Nutzer-Auftrag: "dann klaer mal #13".
+
+**Die Hypothese ist WIDERLEGT.** Angenommen wurde: visit-proportionales
+Sampling spielt ~12% verworfene Kandidaten -> Trajektorien-Rauschen ->
+verrauschtes Value-Ziel -> erklaert Runde-1-R² ~0. Dagegen steht der bereits
+im Projekt vorhandene **Noise-Floor-Test** (2026-07-21, bias-korrigiert,
+`self_play::value_noise_floor_diagnostic`), der die theoretische Obergrenze
+per **Heuristik-Rollouts** misst -- also voellig unabhaengig von der
+Netz-Play-Regel:
+
+| Runde | Deckel (max. erreichbares R²) | v10_best erreichte | ausgeschoepft |
+|---|---:|---:|---:|
+| 1 | **0,0068** | -0,063 | -- (unlernbar) |
+| 2 | 0,166 | 0,017 | **~10%** |
+| 3 | 0,437 | 0,195 | ~45% |
+
+Runde-1-Unvorhersagbarkeit ist durch **irreduziblen Spielzufall** (4
+kommende Fabrik-Neubefuellungen) bereits vollstaendig erklaert; auch eine
+perfekt rauschfreie Play-Regel kaeme dort nicht ueber ~0,7%. Lehre:
+vorhandene Messungen pruefen, BEVOR eine Erklaerung vorgeschlagen wird.
+
+**Die Messung selbst bleibt gueltig** (neues Werkzeug
+`tools/play_rule_cost.py`, 19 echte Drafting-Zustaende, `v17_best`@400 Sims;
+`mcts_q` ist eine Gewinnwahrscheinlichkeit in [0,1], die Kennzahl ist der
+erwartete Q-Verlust je Zug gegenueber dem besten Kandidaten):
+
+| Play-Regel | Ø Q-Verlust/Zug | Median | P(Verlust > 5pp) |
+|---|---:|---:|---:|
+| **visits (Ist-Zustand)** | **0,0198** | 0,0173 | **9,7%** |
+| argmax | 0,0032 | 0,0000 | 0,0% |
+| survivors | 0,0135 | 0,0117 | 4,3% |
+| q_softmax T=0,03 | 0,0174 | 0,0147 | 6,8% |
+| q_softmax T=0,10 | 0,0266 | 0,0216 | 15,3% |
+
+Gemessene Spielverteilung nach Besuchs-Rang: **59,3% / 21,2% / 12,5% / 7,0%**
+(Rang 1-2 / 3-4 / 5-8 / 9-16). Das theoretische Modell (48/22/18/12) war
+pessimistisch -- real gibt es nur Ø 11,4 statt 16 Wurzelkandidaten.
+
+**Warum trotzdem herabgestuft**: Die Regel verschenkt real ~2,0pp
+Gewinnwahrscheinlichkeit je Zug, aber ob das SCHAEDLICH ist, ist nicht
+gezeigt -- es ist zugleich Exploration, die AlphaZero braucht. Sie betrifft
+ausschliesslich die Trainingsdaten, NICHT die Arena-Staerke (dort
+`deterministic=true` -> argmax). Ein Test braeuchte zwei Korpora + zwei
+Trainings + Gating; bei weggefallener Hauptmotivation lohnt das nicht.
+Falls doch: `survivors` halbiert die grossen Fehlgriffe (9,7% -> 4,3%) bei
+-32% Q-Verlust und behaelt Exploration -- risikoarmer Kandidat.
+
+**Wertvoller Nebenbefund -> Task #15**: Die Deckel-Tabelle zeigt, dass der
+Value-Head in **Runde 2 nur ~10% des erreichbaren Signals** ausschoepft
+(0,017 von 0,166) und in Runde 3 ~45%. Historisch zielten die meisten
+Optimierungsversuche (rtv, TD-Bootstrap, Value-Shrinkage) auf Runde 1 --
+also auf die eine Runde, die nachweislich unlernbar ist. Kuenftige
+Zielmetrik sollte die **Luecke Deckel-minus-Ist je Runde** sein statt des
+globalen R² (das wird von Runde 5 dominiert, wo ohnehin fast alles
+erreichbar ist, und verdeckt damit genau die Runden mit echtem Potenzial).
