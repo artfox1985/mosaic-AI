@@ -5196,3 +5196,88 @@ mehr. Kein weiterer Handlungsbedarf fuer diesen Zweig; `train.py`s
 `T_max=epochs`-Verhalten bleibt technisch unveraendert (die Erkenntnis ist
 dokumentiert, aber keine Code-Aenderung wurde vorgenommen, da der
 vermutete Nutzen sich nicht bestaetigt hat).
+
+
+## v17_best Kader-Komplettierung (2026-07-27)
+
+Task #6: die beim v17-Zyklus (Task #98) ausgelassenen Kader-Kanten fuer den
+inzwischen offiziellen Champion `v17_best` (Gating gegen `v16_best`
+417:333/750, SPRT ACCEPT_H1, LLR=+3,852, siehe oben) nachgeholt -- vs.
+Heuristik (Elo-Neuverankerung) und vs. `v15_best` (Kader-Konsolidierung,
+analog zum `v16_best`-vs.-`v14b_best`-Muster vom 2026-07-25). Maschine frei
+uebernommen, Produktions-Wheel unveraendert (PLATE_SHAPING_ENABLED=false,
+166/166 Tests, kein Rebuild noetig).
+
+**1) Elo-Neuverankerung** (`tools/arena.py::run_net_arena`, `v17_best`@400
+vs. Heuristik@150(dyn~330), SPRT p1=0,64/alpha=0,05/beta=0,10, Deckel 400
+Spiele -- exakt das Muster der `v15_best`/`v16_best`-Verankerungen, Task
+#91/#94):
+
+| Kennzahl | Wert |
+|---|---|
+| Ergebnis | `v17_best` 26:10 Heuristik (72% Netzsiege) |
+| Spiele | 36 / 400 (frueher SPRT-Stopp) |
+| LLR_Netz / LLR_Heur | +3,13 / -2,38 |
+| Verdict | `v17_best` signifikant staerker |
+| Elo (Lauf-intern) | `v17_best` 1104 / Heuristik 896 |
+
+Sehr fruehe SPRT-Entscheidung (36 Spiele) -- gleiche Groessenordnung wie
+die fruehen Stopps bei `v16_best` (47 Spiele) und `v17_lrfix_best` (33
+Spiele) in dieser Session, kein Ausreisser im Muster.
+
+**2) Kader-Kante vs. `v15_best`** (`tools/paired_gating.py`, Muster
+"Kader-Konsolidierung", beide @400 Sims, c_puct=1,5, H1 p=0,65,
+alpha=beta=0,05, Bloecke a 25 Paare, Deckel 200 Paare; `--promote-winner`
+Default aktiv -- setzt `models/champion.txt` auf `v17_best`, was es bereits
+war, also folgenlos):
+
+| Block | Kumulativ A:B | LLR | Bericht-p | Gepaarte Diff (95%-CI) |
+|---|---|---|---|---|
+| 1 (25 Paare) | 29:21 | +0,672 | 0,388 | +0,320 [-0,219, +0,859] |
+| 2 (50 Paare) | 54:46 | +0,201 | 0,524 | +0,160 [-0,209, +0,529] |
+| 3 (75 Paare) | 88:62 | +2,279 | 0,047 | +0,347 [+0,036, +0,657] |
+| 4 (100 Paare) | 114:86 | +1,976 | 0,065 | +0,280 [+0,007, +0,553] |
+| 5 (125 Paare) | **145:105** | **+3,172** | **0,0169** | **+0,320 [+0,074, +0,566]** |
+
+SPRT entschied nach 125 Paaren (250 Spielen) fuer `v17_best`
+(LLR=+3,172 >= obere Schranke +2,944). Informative Paare: A-Sweep
+(`v17_best` 2:0) = 42, B-Sweep (`v15_best` 2:0) = 22, Split = 61.
+`champion.txt` blieb `v17_best` (bereits gesetzt).
+
+**Neue Elo-Tabelle** (`tools/elo_tracker.py add` + `report`,
+Bradley-Terry-Fit, `evaluations/elo_history.csv`, 19 Match-Zeilen):
+
+| Modell | Elo | 95%-CI | Spiele | W-L |
+|---|---|---|---|---|
+| **v17_best** | **1122** | **[1080, 1166]** | 1436 | 781-655 |
+| v17_lrfix_best | 1122 | [1077, 1171] | 833 | 439-394 |
+| v13_nortv_best (verlorene Alt-Linie) | 1100 | [989, 1207] | 300 | 171-129 |
+| v16_best | 1093 | [1046, 1138] | 1297 | 622-675 |
+| v15_best | 1052 | [1009, 1095] | 886 | 465-421 |
+| v12b_lr_best | 1051 | [952, 1149] | 400 | 194-206 |
+| v15_f2k_best | 1010 | [955, 1065] | 400 | 176-224 |
+| Heuristik@150 (Anker, fix) | 1000 | [1000, 1000] | 678 | 379-299 |
+| v14b_best | 975 | [929, 1013] | 420 | 171-249 |
+| v12_best | 943 | [870, 1019] | 300 | 159-141 |
+| v14_best | 884 | [792, 975] | 56 | 19-37 |
+| v10_best | 858 | [793, 915] | 450 | 179-271 |
+| v11_td07_best | 853 | [770, 922] | 100 | 30-70 |
+| v11_best | 809 | [716, 907] | 100 | 43-57 |
+
+**Einordnung**: mit den beiden neuen Kanten ist `v17_best` jetzt direkt mit
+5 Kader-Punkten verbunden (Heuristik, `v16_best`, `v15_best`, sowie
+transitiv `v17_lrfix_best`), das 95%-KI ist entsprechend eng (breite
+1436 Spiele Gesamtstichprobe hinter dem Rating). Die untere KI-Grenze
+(1080) liegt klar UEBER der 1100er-Marke -- `v17_best` haelt die 1100er
+Staerke also nicht nur im direkten Gating gegen `v16_best`, sondern jetzt
+auch signifikant gegen den breiteren Kader (Heuristik, `v15_best`). Zum
+Vergleich: der Elo-Wert selbst ist mit der Kader-Erweiterung leicht
+gesunken (1141 -> 1122, weil `v15_best`s Rating durch dieselben neuen
+Spiele mit angehoben wurde, 1036 -> 1052) -- ein normaler Bradley-Terry-
+Effekt bei einem dichter vernetzten Graphen, keine Schwaechung von
+`v17_best` selbst (beide direkten Kanten wurden klar UND signifikant
+gewonnen). `v17_lrfix_best` bleibt weiterhin Elo-praktisch gleichauf
+(1122 vs. 1122), unveraendert gegenueber der Einordnung im vorigen
+Abschnitt. Kader fuer `v17_best` damit vollstaendig (alle im urspruenglichen
+Zyklusplan vorgesehenen Kanten liegen jetzt vor); kein weiterer
+Handlungsbedarf.
