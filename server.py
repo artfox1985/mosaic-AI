@@ -508,6 +508,17 @@ def get_state():
     return jsonify(ok())
 
 
+@app.route('/api/champion', methods=['GET'])
+def get_champion():
+    """Amtierender Champion (`models/champion.txt`, siehe `_load_champion_model`)
+    -- Frontend nutzt das, um das Modell-Feld im Neues-Spiel-Modal beim Oeffnen
+    automatisch auf den aktuellen Stand zu setzen (Nutzer-Anstoss 2026-07-27:
+    "ich dachte hier wird dann immer der aktuelle Champ verwendet"), statt
+    einen Versionsnamen im HTML hart zu kodieren, der bei jedem Champion-
+    Wechsel veraltet."""
+    return jsonify({"ok": True, "model": _CHAMPION_MODEL})
+
+
 @app.route('/api/log_info', methods=['GET'])
 def log_info():
     """Dateiname des Spiel-Logs der laufenden Partie (für den Download-Button im Frontend)."""
