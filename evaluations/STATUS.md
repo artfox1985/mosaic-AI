@@ -5537,9 +5537,52 @@ Nicht sauber machbar.
 Vom Nutzer widerlegt -- die Policy-Targets der schwaecheren Seite ziehen das
 Netz aktiv Richtung schwaecheres Spiel. Filtern moeglich (`policy_weights`
 existiert bereits per Sample), kostet aber die halbe Policy-Ausbeute je
-Partie. Ersetzt durch **Eroeffnungs-Randomisierung** (Task #13): dieselbe
-Verteilungs-Verbreiterung, aber beide Seiten bleiben champion-stark, alle
-Policy-Targets bleiben verwertbar.
+Partie.
+
+**Eroeffnungs-Randomisierung** (Ersatzvorschlag fuer #5): ebenfalls
+hinfaellig, Nutzer-Einwand "haben wir doch schon". Zutreffend -- das
+Netz-Selfplay hat bereits `add_root_noise=true` (Gumbel-Rauschen auf
+`ln(prior)`), visit-proportionales Sampling der Zugwahl und pro Partie
+einen eigenen Seed (andere Wertungsplatten/Fabriken/Startspieler). Es fehlt
+nur eine zugnummer-abhaengige Temperatur -- die braeuchte es aber nicht,
+siehe naechster Abschnitt.
+
+### Unerwarteter Befund beim Nachpruefen: die Play-Regel (-> Task #13)
+
+Bei Sequential Halving sind die Besuchszahlen ein **Artefakt des
+Halbierungs-Fahrplans, kein Qualitaetssignal** -- jeder Kandidat behaelt
+seine 6 Phase-1-Sims dauerhaft, egal wie schlecht er sich erwiesen hat.
+Endverteilung bei sims=400/TOP_M=16: `[96,96,44,44,18,18,18,18,6,6,6,6,6,6,6,6]`.
+
+`self_play.rs::net_drafting_policy` sampelt die gespielte Aktion
+**proportional zu diesen rohen Besuchen** (`weighted_index`, Zeile ~1852):
+
+| Kandidaten-Rang | Spielwahrscheinlichkeit |
+|---|---:|
+| Top-2 (Halving-Finalisten) | 48,0% |
+| Rang 3-4 | 22,0% |
+| Rang 5-8 | 18,0% |
+| **Rang 9-16 (in Phase 1 verworfen)** | **12,0%** |
+
+Anders als bei klassischem PUCT, wo sich Besuche organisch auf gute Zuege
+konzentrieren. Zudem doppelte Exploration: Gumbel-Rauschen bei der
+Wurzelauswahl UND Sampling bei der Zugwahl (im Gumbel-AlphaZero-Paper kommt
+die Zufaelligkeit allein aus dem Gumbel-Rauschen, gespielt wird der
+Halving-Sieger).
+
+**Nicht betroffen**: das Policy-Ziel -- aufgezeichnet wird
+`completed_q_policy` (qualitaetsbasiert), nicht die Besuchsverteilung.
+Betroffen ist die Trajektorie und damit das ausgangsbasierte VALUE-Ziel.
+
+**Hypothese (unbewiesen, aber billig testbar)**: ~19 verworfene Zuege je
+162-Zug-Partie verrauschen den Spielausgang gegenueber dem wahren Wert der
+Ausgangsstellung. Aus Runde 1 liegen ~150 Zuege voraus (~18 solche), aus
+Runde 5 fast keine -- das passt zum seit vielen Zyklen dokumentierten
+Muster **Runde-1-R² ~0 vs. Runde-5-R² 0,6-0,7**, das bisher als
+"irreduzibles Zielrauschen" eingeordnet wurde. Test: Play-Regel schaerfen
+(nur unter Halving-Ueberlebenden sampeln, oder Temperatur auf die
+completed-Q-Policy statt auf rohe Besuche), dann Value-R² je Runde neu
+messen + Arena-A/B.
 
 ### Empfohlene Reihenfolge
 
