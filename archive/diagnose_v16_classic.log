@@ -1,0 +1,26 @@
+🧵 torch threads: 10
+📦 Val-Split: 90 Dateien (Seed 20260707, val_frac=0.1)
+   145,336 Züge geladen.
+
+🔎 Diagnose: v16_best
+
+🔎 Diagnose: v15_best
+
+======================================================================
+  OFFLINE-DIAGNOSE (Val-Split Datei-Ebene, Seed 20260707, val_frac=0.1)
+======================================================================
+Metrik                              v16_best        v15_best
+------------------------------------------------------------
+n (Val-Züge gesamt)                   145336          145336
+Policy Top-1 (Drafting)                52.8%           52.2%
+Policy Top-3 (Drafting)                82.4%           81.7%
+  (n Drafting)                        105370          105370
+Value Val-R² global                   0.4428          0.4321
+R² Runde 1                            0.1041          0.0979
+R² Runde 2                            0.2792          0.2739
+R² Runde 3                            0.4128          0.4090
+R² Runde 4                            0.5244          0.5119
+R² Runde 5                            0.6264          0.6070
+======================================================================
+
+📝 Ergebnis gespeichert unter: evaluations/offline_diagnose_v16_classic.json
