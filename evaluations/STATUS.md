@@ -5281,3 +5281,67 @@ gewonnen). `v17_lrfix_best` bleibt weiterhin Elo-praktisch gleichauf
 Abschnitt. Kader fuer `v17_best` damit vollstaendig (alle im urspruenglichen
 Zyklusplan vorgesehenen Kanten liegen jetzt vor); kein weiterer
 Handlungsbedarf.
+
+## Wertungsplatten-Diagnose Teil 1: Punkteanteil (2026-07-27)
+
+**Endlich ausgefuehrt** (`tools/scoring_tile_impact.py`, v16-Korpus, 200
+Dateien/2000 Spiele, Formel-Validierung 2000/2000 exakt getroffen (1.0)).
+Ergaenzung ggue. dem urspruenglichen Skript: `wertung_total_summary`
+(ABSOLUTE Summe der 3 aktiven Platten je Spieler-Spiel) -- der reine
+Ratio-Ansatz (`wertung_total / final_score`) war durch die stark negative
+`Spezialfelder`-Platte numerisch instabil (Mittelwert -1,35, min -21) und
+beantwortet die eigentliche Frage nicht direkt.
+
+**Nutzer-Erwartung vor der Messung**: 10-15 Punkte fuer "gesunde"
+Wertungsplatten-Ausnutzung, insbesondere vertikale Reihen und Aussenfelder
+als natuerliche, spielinhaerente Punktequellen.
+
+**Ergebnis -- deutlich unter der Erwartung:**
+
+| Metrik | Wert |
+|---|---|
+| **Ø Wertungsplatten-Total je Spieler-Spiel** | **+0,52 Punkte** |
+| Median | 0,0 (Haelfte aller Spieler-Spiele: Netto-Beitrag ≤ 0) |
+| p10 / p90 | -12 / +11 |
+| Stdev | 8,75 |
+
+**Je Platte (nur Spiele, in denen sie gewaehlt war):**
+
+| Platte | Punktwert/Treffer | Ø erzielt | Median | Einordnung |
+|---|---|---|---|---|
+| Horizontale Reihen | 3/Reihe | 0,40 | 0 | ~13% des Reihenwerts -- selten komplett |
+| **Vertikale Reihen** | 7/Reihe | **0,20** | 0 | nur **~2,9%** aller Spiele schliessen ueberhaupt 1 Reihe |
+| Diagonale Reihen | 10/Diagonale | 0,02 | 0 | praktisch nie |
+| Mehrfarbige Felder | 2/Feld (alles-oder-nichts) | 2,22 | 0 | gelegentlich |
+| **Äußere Felder** | 1/Fliese | **8,07** | 8 | **funktioniert wie erwartet** |
+| Eckplatten | 3 bzw. 8/Platte | 2,76 | 3 | moderat |
+| Spezialfelder | -3/leeres Feld | **-12,33** | -12 | starker, konsistenter Punktesenker |
+| Farbenreiche Reihen | 4/Reihe (≥5 Farben) | 0,12 | 0 | praktisch nie |
+
+**Einordnung**: Die Nutzer-Intuition war bei den "Aussenfeldern" exakt
+richtig (Ø 8,07 -- diese Platte performt wie erwartet), bei den
+"automatischen" Reihen-Platten aber widerlegt: Horizontale/Vertikale/
+Diagonale/Farbenreiche Reihen werden in der Praxis fast NIE vollstaendig
+abgeschlossen (0,4-11,4% des jeweiligen Punktwerts im Schnitt) -- entgegen
+der Erwartung, dass sich Reihen "praktisch selbst aus dem Spiel ergeben".
+Der insgesamt winzige Netto-Durchschnitt (+0,52 statt erwarteter 10-15)
+erklaert sich vor allem daraus, dass die verlaesslich positiven Platten
+(Aussenfelder +8, Eckplatten +2,8) fast exakt durch die verlaesslich
+negative `Spezialfelder`-Platte (-12,3, aktiv in ~38% der Spiele)
+aufgewogen werden.
+
+**Zusammen mit Teil 2/3 (s.o.) ein kohaerentes Bild**: die Suche reagiert
+nachweislich auf Wertungsplatten (23-30% Entscheidungswechsel, Task #5),
+das Netz "sieht" sie im Value/Policy -- aber die tatsaechlich ERREICHTEN
+Wertungsplatten-Ergebnisse bleiben weit unter dem Potenzial, weil die
+mehrstufige Brett-Planung fuer komplette Reihen (Mehrrunden-Vorausschau,
+kein Ein-Runden-Greedy-Gewinn) in der aktuellen Spielstaerke offenbar noch
+nicht gelingt. Das ist eher ein STRATEGISCHES/TRAININGS-Kapazitaetsthema
+als ein Suchmechanik-Bug (passt zur bereits dokumentierten "frueh-Runden-
+Value-Schwaeche" mehrerer frueherer Zyklen).
+
+**Naechster moeglicher Schritt** (nicht Teil dieser Diagnose): pruefen, ob
+staerkere Modelle (v17_best vs. fruehe Champions) einen steigenden Trend
+bei den Reihen-Platten zeigen -- wuerde zeigen, ob das Problem mit
+Spielstaerke von selbst abnimmt oder ein strukturelles Blindspot bleibt.
+
