@@ -125,6 +125,8 @@ def predict_final_score(last_record, wertung_total):
 def analyze(files, model_hint=None):
     ratios_clamped = []      # wertung_total / max(1, final_score_clamped), je Spieler-Spiel
     ratios_unclamped = []    # wertung_total / final_score_unclamped (nur falls > 0, sonst nicht aussagekraeftig)
+    wertung_totals = []      # ABSOLUTER Wertungsplatten-Punktetotal (Summe aller 3 aktiven Platten), je Spieler-Spiel --
+                             # direkter, nicht durch den (stark verrauschten, teils negativen) Ratio-Nenner verzerrter Wert
     per_tile_scores = defaultdict(list)   # tile_id -> Liste der erzielten Punkte in Spielen, wo sie gewählt war
     per_tile_negative = Counter()         # tile_id -> Anzahl Spiele mit negativem Beitrag
     n_games_used = 0
@@ -147,6 +149,7 @@ def analyze(files, model_hint=None):
 
             n_games_used += 1
             for pi in range(2):
+                wertung_totals.append(wertung_total[pi])
                 denom_c = max(1, final_clamped[pi])
                 ratios_clamped.append(wertung_total[pi] / denom_c)
                 if final_unclamped[pi] > 0:
@@ -198,6 +201,7 @@ def analyze(files, model_hint=None):
         "n_games_skipped_not_final": n_games_skipped_not_final,
         "ratio_clamped_summary": summarize(ratios_clamped),
         "ratio_unclamped_summary": summarize(ratios_unclamped),
+        "wertung_total_summary": summarize(wertung_totals),
         "per_tile": per_tile_summary,
         "formula_validation": {
             "n_checked": n_predictions_checked,
