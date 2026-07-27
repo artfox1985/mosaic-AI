@@ -5590,3 +5590,61 @@ messen + Arena-A/B.
 2. **#9 Ownership-Head** -- bester Aufwand/Nutzen, nutzt bestehenden Korpus
 3. **#14 Playout-Cap-Randomisierung** -- Multiplikator fuer alle weiteren Zyklen
 4. **#11 2D-Encoder** -- der eigentliche grosse Wurf, aber voller Stack-Umbau
+
+### Task #14 als Test spezifiziert: Playout-Cap-Randomisierung (2026-07-28)
+
+Nutzer-Auftrag: "als Test aufschreiben -- wieviel Zeit gewinnen wir, wieviel
+Self-Play-Qualitaet verlieren wir".
+
+**Gemessene Grundlagen** (100 v16-Spiele): 116,5 Drafting-Schritte je Spiel
+(72,1% -- MCTS-teuer UND einzige Policy-Target-Quelle), 43,1 Tiling (26,7%,
+laufen ueber den DFS-Solver, `pol_w=0`), 2,0 Start. Ø 161,6 Schritte/Spiel.
+
+**Blocker: `GUMBEL_TOP_M` muss mitskalieren.** Sims je Kandidat vor dem
+ersten Halving-Cull:
+
+| | TOP_M=16 | TOP_M=8 | TOP_M=4 |
+|---|---:|---:|---:|
+| sims=600 | 9 | 25 | 75 |
+| sims=100 | **1** | 4 | **12** |
+
+Bei `sims=100/TOP_M=16` ist die Kandidatenauswahl faktisch zufaellig (1 Sim
+je Kandidat). Mit `TOP_M=4` waeren es 12 -- mehr als die aktuelle Produktion
+(600/16 = 9), nur schmaler. Playout-Capping erfordert also `GUMBEL_TOP_M`
+als **Laufzeit-Parameter** (heute Compile-Konstante) -> koppelt an Task #10.
+
+**Test A -- Zeitgewinn** (billig): Modell `t(sims) = a + b·sims` je Spiel
+(`a` = fixer Anteil: Tiling-DFS, Spiellogik, Features, ONNX-Overhead).
+Drei kurze Batches (je ~30 Spiele, gleiche Threads) bei sims ∈ {100, 400,
+600}, Gerade fitten; vorhandener Ankerpunkt v16-Batch 0,247 Spiele/s @400
+Sims/11 Threads. Reine Sim-Zahl bei p=0,25/N=600/n=100: 26,2k statt 69,9k
+Sims je Spiel = **2,67×**; Wall-Clock-Gewinn kleiner um `a`.
+
+**Test B -- Qualitaetsverlust, zwei trennbare Komponenten:**
+
+- **B1 "weniger Policy-Targets"** -- SOFORT auf dem bestehenden Korpus
+  testbar, kein neues Self-Play: in `MosaicDataset` zufaellig 75% der
+  Drafting-Schritte auf `pol_w=0` setzen (Mechanik existiert bereits),
+  trainieren, Policy-Metriken gegen ein Volltraining vergleichen. Isoliert
+  exakt den 4×-weniger-Targets-Effekt ohne Trajektorien-Effekt.
+- **B2 "schwaechere Trajektorien"** -- braucht echtes neues Self-Play: die
+  reduzierten Zuege spielt eine schwaechere Suche, das ausgangsbasierte
+  Value-Ziel beschreibt also schwaecheres Spiel.
+
+**Fairness-Kriterium (entscheidend):** Vergleich bei **gleicher Rechenzeit**,
+nicht gleicher Spielzahl -- sonst misst man trivialerweise "weniger Daten
+ist schlechter". Bei 2,67× Speedup und p=0,25 je Zeiteinheit:
+
+| | Baseline | Playout-Cap | Delta |
+|---|---:|---:|---:|
+| Policy-Targets | 116,5 | 77,7 | **-33%** |
+| Value/Ownership-Targets | 161,6 | 431 | **+167%** |
+
+Der Handel ist also -33% Policy gegen +167% Value-Seite -- und wird deutlich
+guenstiger, falls Task #9 (Ownership-Head) landet, weil die Value-Seite dann
+72 statt 1 Label je Position traegt.
+
+**Wechselwirkung mit #13:** Playout-Capping ERHOEHT das Trajektorien-
+Rauschen, und #13 vermutet, dass genau dieses Rauschen das Value-Ziel schon
+heute schaedigt (Runde-1-R² ~0). Reihenfolge daher: erst #13 klaeren, dann
+#14 mit diesem Wissen bewerten.
