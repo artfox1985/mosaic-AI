@@ -99,7 +99,8 @@ def mcnemar_exact_p(b: int, c: int) -> float:
     return min(1.0, 2 * min(p_le, p_ge))
 
 
-def run_arm(arm: str, seed: int, n_games: int, block_size: int, threads: int) -> dict:
+def run_arm(arm: str, seed: int, n_games: int, block_size: int, threads: int,
+            out_prefix: str = "plate") -> dict:
     """Spielt einen Arm (OFF oder ON) in Bloecken, Champion (v15_best) IMMER
     auf Brett 0. Gibt {"games": [...alle Einzelspielergebnisse in Original-
     Reihenfolge...]} zurueck und speichert das Rohergebnis nach
@@ -141,7 +142,7 @@ def run_arm(arm: str, seed: int, n_games: int, block_size: int, threads: int) ->
         "sims": SIMS, "c_puct": C_PUCT, "model_champion": MODEL_CHAMPION,
         "model_opponent": MODEL_OPPONENT, "games": all_games,
     }
-    out_path = EVAL_DIR / f"paired_arena_plate_{arm}_raw.json"
+    out_path = EVAL_DIR / f"paired_arena_{out_prefix}_{arm}_raw.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     champ_wins = sum(1 for g in all_games if g["winner"] == 0)
     print(f"Arm {label} fertig: Champion {champ_wins}:{n_games - champ_wins} Vor-Referenz "
@@ -154,9 +155,9 @@ def _avg(games: list[dict], key: str, idx: int) -> float:
     return sum(vals) / len(vals) if vals else float("nan")
 
 
-def combine() -> dict:
-    off_path = EVAL_DIR / "paired_arena_plate_off_raw.json"
-    on_path = EVAL_DIR / "paired_arena_plate_on_raw.json"
+def combine(out_prefix: str = "plate") -> dict:
+    off_path = EVAL_DIR / f"paired_arena_{out_prefix}_off_raw.json"
+    on_path = EVAL_DIR / f"paired_arena_{out_prefix}_on_raw.json"
     off = json.loads(off_path.read_text(encoding="utf-8"))
     on = json.loads(on_path.read_text(encoding="utf-8"))
 
@@ -218,7 +219,7 @@ def combine() -> dict:
     print(f"McNemar exakter p-Wert: {p:.4f}")
     print(f"Evidenzregel-Entscheidung: {result['decision']}")
 
-    out_path = EVAL_DIR / "paired_arena_plate_ab_result.json"
+    out_path = EVAL_DIR / f"paired_arena_{out_prefix}_ab_result.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"Ergebnis gespeichert: {out_path}")
     return result
@@ -228,6 +229,11 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Task #93 Wertungsplatten-Shaping A/B (OFF vs. ON)")
     p.add_argument("--run-arm", choices=["off", "on"], default=None)
     p.add_argument("--combine", action="store_true")
+    p.add_argument("--out-prefix", default="plate",
+                    help="Praefix der Ergebnisdateien (paired_arena_<prefix>_{off,on}_raw.json / "
+                         "_ab_result.json). Default 'plate' = Bestandsverhalten. Erlaubt, dasselbe "
+                         "Werkzeug fuer weitere Compile-Toggle-A/Bs zu nutzen, ohne fruehere "
+                         "Ergebnisse zu ueberschreiben (z.B. GUMBEL_TOP_M-Kalibrierung, Task #9).")
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--n-games", type=int, default=DEFAULT_N_GAMES)
     p.add_argument("--block-size", type=int, default=DEFAULT_BLOCK_SIZE)
@@ -235,13 +241,14 @@ def main() -> None:
     args = p.parse_args()
 
     if args.combine:
-        combine()
+        combine(args.out_prefix)
         return
     if args.run_arm is None:
         raise SystemExit("Entweder --run-arm off|on oder --combine angeben.")
     if args.seed is None:
         raise SystemExit("--seed ist fuer --run-arm erforderlich (muss in OFF und ON identisch sein).")
-    run_arm(args.run_arm, args.seed, args.n_games, args.block_size, args.threads)
+    run_arm(args.run_arm, args.seed, args.n_games, args.block_size, args.threads,
+            args.out_prefix)
 
 
 if __name__ == "__main__":
