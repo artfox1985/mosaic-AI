@@ -1,0 +1,45 @@
+🧵 torch threads: 10
+🧊 Frozen-Eval-Set: D:\Archiv\Documents\Projekte\mosaic-AI\evaluations\frozen_eval_set.pkl (Version frozen_v1, Seed 20260724, n=1,800)
+   1,800 Züge geladen.
+
+🔎 Diagnose: v16_best
+
+🔎 Diagnose: v15_best
+
+======================================================================
+  OFFLINE-DIAGNOSE (Val-Split Datei-Ebene, Seed 20260707, val_frac=0.1)
+======================================================================
+Metrik                              v16_best        v15_best
+------------------------------------------------------------
+n (Val-Züge gesamt)                     1800            1800
+Policy Top-1 (Drafting)                45.6%           46.9%
+Policy Top-3 (Drafting)                71.6%           73.3%
+  (n Drafting)                          1310            1310
+Value Val-R² global                   0.2949          0.2998
+R² Runde 1                            0.0142          0.0195
+R² Runde 2                            0.1351          0.1245
+R² Runde 3                            0.1661          0.1491
+R² Runde 4                            0.1393          0.1617
+R² Runde 5                            0.7125          0.7262
+======================================================================
+
+======================================================================
+  AUFSCHLUESSELUNG JE QUELLKORPUS (frozen set)
+======================================================================
+Korpus 'v10b'                       v16_best        v15_best
+------------------------------------------------------------
+  n                                      900             900
+  Value R²                            0.3156          0.3089
+  Policy Top-1                         36.8%           37.9%
+  Policy Top-3                         62.1%           63.8%
+
+Korpus 'v12'                        v16_best        v15_best
+------------------------------------------------------------
+  n                                      900             900
+  Value R²                            0.2676          0.2877
+  Policy Top-1                         54.6%           56.3%
+  Policy Top-3                         81.4%           83.1%
+
+======================================================================
+
+📝 Ergebnis gespeichert unter: evaluations/offline_diagnose_v16_frozen.json

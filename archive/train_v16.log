@@ -1,0 +1,87 @@
+📝 Trainings-Manifest geschrieben: 'D:\Archiv\Documents\Projekte\mosaic-AI\models\manifest_train_v16_20260725_173843.json'
+📦 Trainingskorpus-Zusammensetzung (nach Versions-Präfix, aus Dateinamen):
+    600 Dateien v15                          (6000 Spiele)
+    200 Dateien v14b                         (2000 Spiele)
+    100 Dateien v12                          (1000 Spiele)
+🧪 Value-Target-Variante (Task #84, rtv-Ablation): 'nortv'
+Lade Daten aus 810 Dateien...
+Datensatz geladen: 1308650 Züge. (Features pro Zug: 708) — 986.5s
+💾 Speichere HDF5-Cache...
+✅ Cache gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\data\.cache_a22c78d4459e.h5
+Lade Daten aus 90 Dateien...
+Datensatz geladen: 145336 Züge. (Features pro Zug: 708) — 97.0s
+💾 Speichere HDF5-Cache...
+✅ Cache gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\data\.cache_7ccda1c61df6.h5
+   Val-Split: 810 Trainings-Dateien / 90 Val-Dateien (1,308,650 / 145,336 Züge)
+
+🚀 Starte PyTorch Training auf: CUDA
+🧠 Netz-Architektur: 708→512→512→512
+⚙️  Hyperparameter (config.py, ggf. per CLI überschrieben):
+   Learning Rate : 5e-05  (Default 0.0004)
+   LR-Schedule   : cosine
+   Batch Size    : 256
+   Value Weight  : 0.2  (Sieg/Niederlage, Aux-Signal fuer den Trunk)
+   Points Weight : 0.5  (Punktestand-Prognose, Aux-Signal)
+📥 Lade altes Model als Startpunkt: alphazero_v15_best.pth
+   Epochen       : 100
+🔄 Warm-Start erkannt: Trainiere für 100 Epochen.
+Epoche  1/100 | Policy Loss:   2.13 | Policy-Val= 1.35 | Value: 0.038 | Points: 0.023 | Val-R² Value=0.463 Points=0.543 | LR=5.00e-05
+Epoche  2/100 | Policy Loss:   2.10 | Policy-Val= 1.35 | Value: 0.037 | Points: 0.023 | Val-R² Value=0.465 Points=0.545 | LR=5.00e-05
+Epoche  3/100 | Policy Loss:   2.07 | Policy-Val= 1.35 | Value: 0.036 | Points: 0.022 | Val-R² Value=0.463 Points=0.545 | LR=5.00e-05
+Epoche  4/100 | Policy Loss:   2.05 | Policy-Val= 1.35 | Value: 0.036 | Points: 0.022 | Val-R² Value=0.465 Points=0.544 | LR=4.99e-05
+Epoche  5/100 | Policy Loss:   2.04 | Policy-Val= 1.35 | Value: 0.035 | Points: 0.022 | Val-R² Value=0.464 Points=0.543 | LR=4.98e-05
+Epoche  6/100 | Policy Loss:   2.02 | Policy-Val= 1.36 | Value: 0.035 | Points: 0.022 | Val-R² Value=0.462 Points=0.541 | LR=4.97e-05
+Epoche  7/100 | Policy Loss:   2.00 | Policy-Val= 1.36 | Value: 0.035 | Points: 0.022 | Val-R² Value=0.458 Points=0.537 | LR=4.96e-05
+Epoche  8/100 | Policy Loss:   1.99 | Policy-Val= 1.36 | Value: 0.035 | Points: 0.022 | Val-R² Value=0.457 Points=0.538 | LR=4.94e-05
+Epoche  9/100 | Policy Loss:   1.97 | Policy-Val= 1.37 | Value: 0.035 | Points: 0.021 | Val-R² Value=0.457 Points=0.534 | LR=4.92e-05
+Epoche 10/100 | Policy Loss:   1.95 | Policy-Val= 1.38 | Value: 0.035 | Points: 0.021 | Val-R² Value=0.454 Points=0.532  🟡 VAL-POLICY-PLATEAU | LR=4.90e-05
+Epoche 11/100 | Policy Loss:   1.93 | Policy-Val= 1.38 | Value: 0.035 | Points: 0.021 | Val-R² Value=0.449 Points=0.526  🟡 VAL-POLICY-PLATEAU | LR=4.88e-05
+Epoche 12/100 | Policy Loss:   1.91 | Policy-Val= 1.39 | Value: 0.034 | Points: 0.021 | Val-R² Value=0.449 Points=0.526  🟡 VAL-POLICY-PLATEAU | LR=4.85e-05
+Epoche 13/100 | Policy Loss:   1.89 | Policy-Val= 1.39 | Value: 0.034 | Points: 0.021 | Val-R² Value=0.447 Points=0.525  🟡 VAL-POLICY-PLATEAU | LR=4.82e-05
+Epoche 14/100 | Policy Loss:   1.86 | Policy-Val= 1.40 | Value: 0.034 | Points: 0.021 | Val-R² Value=0.445 Points=0.521  🟡 VAL-POLICY-PLATEAU | LR=4.79e-05
+Epoche 15/100 | Policy Loss:   1.84 | Policy-Val= 1.40 | Value: 0.034 | Points: 0.021 | Val-R² Value=0.443 Points=0.521  🟡 VAL-POLICY-PLATEAU | LR=4.76e-05
+
+⏹️  Early Stopping: VAL-POLICY-PLATEAU seit Epoche 10 (5 Epochen ohne Fortschritt).
+
+=======================================================
+  TRAINING SUMMARY
+=======================================================
+  Epochen:       100
+  Züge:          1,308,650  (+145,336 Val, nie trainiert)
+  Batches/Epoche:5111
+───────────────────────────────────────────────────────
+  Policy Loss:   1.8400 / 6.01 max  (30.6%)  🟡 Gut
+  Value Loss:    0.0343  (Aux, Sieg/Niederlage +1/-1, Training)
+  Points Loss:   0.0213  (Aux, Punktestand-Prognose, Training)
+  Policy Val-Loss: 1.4025  (Gap ggü. Train: -0.4374)
+  Value Val-Loss:  0.0390  (Val-R²: 0.4431)
+  Points Val-Loss: 0.0246  (Val-R²: 0.5210)
+───────────────────────────────────────────────────────
+  ⏹️  Early Stopping (Policy-Plateau) nach Epoche 15/100
+  🟡 Plateau ab Epoche 10.
+     → Für nächste Generation: mehr Sims im Self-Play.
+=======================================================
+
+=======================================================
+  NETZAUSLASTUNG (Hidden Size: 512)
+───────────────────────────────────────────────────────
+  Schicht          Dead   Aktiv-Rate        Eff.Rank
+  ───────────────────────────────────────────────────
+  layer1     0/512 (0%)          48%   215/512 (42%)
+  layer2     0/512 (0%)          49%   210/512 (41%)
+  layer3    13/512 (3%)          46%   181/512 (35%)
+  ───────────────────────────────────────────────────
+  🟢 Gesunde Auslastung (Dead 1%, Rank 39%).
+=======================================================
+
+✅ Training beendet! Neues Model gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16.pth
+⭐ Bestes Modell (Epoche 3, val_combined(p+v*value_w+pts*points_w)=1.3665) zusätzlich gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16_best.pth
+📈 Loss-Verlauf gespeichert unter:
+📂 D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16_loss.png
+✅ Exportiert: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16.onnx  (input=708, hidden=512, opset=13)
+📎 Referenz für Rust-Parität: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16.onnx.ref.txt
+✅ Exportiert: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16_best.onnx  (input=708, hidden=512, opset=13)
+📎 Referenz für Rust-Parität: D:\Archiv\Documents\Projekte\mosaic-AI\models\alphazero_v16_best.onnx.ref.txt
+💾 Modell-Snapshot gesichert: C:\Users\Patrick\OneDrive\Backups\mosaic-AI\models_snapshots\models_2026-07-25_1825_v16.zip (90 MB)

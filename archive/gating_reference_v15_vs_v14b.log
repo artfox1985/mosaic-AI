@@ -1,0 +1,15 @@
+Gepaartes Gating (Task #76): v15_best@400 (c_puct=1.5) vs v14b_best@400 (c_puct=1.5) -- Basis-Seed=62841696, Bloecke a 25 Paare, harter Deckel 200 Paare
+  SPRT: H0 p=0.5 vs. H1 p=0.65, alpha=0.05 beta=0.05, Wald-Schranken [-2.9444, +2.9444]
+  Block 1 (Seed=62841696, n=25 Paare, 133.0s): kumulativ v15_best 30:20 v14b_best | Paare 25 (A-Sweep b=6 B-Sweep c=1 Split=18) | LLR=+1.218 [-2.944,+2.944] | Bericht-McNemar p=0.1250 | gepaarte Diff +0.400 [+0.008,+0.792]
+  Block 2 (Seed=63841696, n=25 Paare, 129.0s): kumulativ v15_best 62:38 v14b_best | Paare 50 (A-Sweep b=16 B-Sweep c=4 Split=30) | LLR=+2.771 [-2.944,+2.944] | Bericht-McNemar p=0.0118 | gepaarte Diff +0.480 [+0.152,+0.808]
+  Block 3 (Seed=64841696, n=25 Paare, 130.6s): kumulativ v15_best 91:59 v14b_best | Paare 75 (A-Sweep b=26 B-Sweep c=10 Split=39) | LLR=+3.255 [-2.944,+2.944] | Bericht-McNemar p=0.0113 | gepaarte Diff +0.427 [+0.126,+0.727]
+  SPRT-Entscheid nach 75 Paaren: v15_best signifikant besser (LLR=+3.255 >= obere Schranke +2.944).
+------------------------------------------------------------
+ERGEBNIS: v15_best 91:59 v14b_best (von 150 Spielen, 75 Paaren)
+  SPRT-Entscheid: v15_best signifikant besser (SPRT)
+  Informative Paare: A-Sweep b=26  B-Sweep c=10  Split=39
+  Fixed-n-Bericht-Statistik (NICHT die Stopp-Entscheidung): exakter Paar-Vorzeichentest p=0.0113
+  Gepaarte Differenz (A-Siege minus B-Siege pro Paar): +0.427  95%-KI [+0.126, +0.727]
+  Hinweis fuers elo_tracker-Protokoll:
+    python tools/elo_tracker.py add --player-a v15_best --sims-a 400 --player-b v14b_best --sims-b 400 --wins-a 91 --wins-b 59 --n 150 --comment "Gepaartes Gating (Task #76), SPRT=v15_best, p=0.0113"
+Ergebnis gespeichert: evaluations\paired_gating_result_v15_best_vs_v14b_best.json
