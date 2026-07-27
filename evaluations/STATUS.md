@@ -4821,3 +4821,180 @@ Plate-Shaping-Tests), Wheel neu gebaut + installiert. `PLATE_SHAPING_ENABLED`
 bleibt `false` (Standard, byte-identisches Bestandsverhalten) -- Task #5
 kann den Toggle jetzt bei Bedarf per Wheel-Rebuild auf `true` stellen, ohne
 den Code erneut schreiben zu muessen.
+
+## v17 Hebel 2: LR-Dynamik-Experiment (2026-07-26/27)
+
+**Befund, der zum Experiment fuehrt**: `train.py` baut
+`CosineAnnealingLR(optimizer, T_max=epochs)` mit `epochs = --epochs`
+(dem ANGEFORDERTEN Limit, bei v15/v16/v17 jeweils 100), NICHT der
+tatsaechlich gelaufenen Epochenzahl. Alle drei Generationen wurden per
+Plateau-Erkennung schon um Epoche 10-15 gestoppt. Bei `T_max=100` ist die
+Cosine-Kurve zu diesem Zeitpunkt kaum abgesunken (verifiziert per
+`0.5*(1+cos(pi*(epoch-1)/T_max))`): Epoche 10 -> 98,0% des Start-LR, Epoche
+13 -> 96,5%, Epoche 15 -> 95,2%. Der Schedule hat in der Praxis NIE
+nennenswert annealt, obwohl der Code-Kommentar das fuer unproblematisch
+haelt. Die `_best`-Checkpoint-Epoche wird jede Generation frueher (v15: 2,
+v16: 3, v17: 1), waehrend der Trainingsloss ueber alle Epochen weiter
+faellt -- klassisches sofortiges Overfitting ohne LR-Abkuehlung.
+
+**Wichtig -- Einordnung**: dieses Muster ist NICHT neu bei v17 (v15/v16
+zeigen es identisch, v16 wurde trotzdem Champion). Das Experiment ist daher
+ein Test einer plausiblen strukturellen Verbesserung, nicht "der Bug, der
+v17 kaputt gemacht hat".
+
+**Experiment**: `v17_lrfix` -- byte-identisches Rezept zu `v17`
+(`train.py --load v16_best --lr 5e-5 --lr-schedule cosine
+--value-target-variant nortv`, gleiches Datenfenster: 600 v16 + 200 v15 +
+100 v14b = 900 Dateien, verifiziert per Korpus-Log), EINZIGER Unterschied:
+`--epochs 20` statt 100, damit `T_max` realistisch zur tatsaechlichen
+Trainingslaenge passt. Bei `T_max=20` faellt die Kurve tatsaechlich ab:
+Epoche 10 -> 57,8%, Epoche 13 -> 34,5%, Epoche 15 (frueher Stopp,
+Plateau seit Epoche 10) -> 20,6% des Start-LR (Log-Werte exakt bestaetigt:
+LR=2.89e-05/1.73e-05 bei Epoche 10/13 gg. Start 5.00e-05).
+
+**Ergebnis Training**:
+
+| | v16_best | v17_best | v17_lrfix_best |
+|---|---|---|---|
+| Epochen (Limit / frueher Stopp) | 100 / 15 | 100 / 15 | 20 / 15 |
+| Bestes Modell (Epoche) | 3 | 1 | **2** |
+| Value Val-R² (Checkpoint, `final_value_val_r2`) | 0,4629 | 0,4917 | **0,4938** |
+| Points Val-R² (Checkpoint) | 0,5450 | 0,5669 | 0,5674 |
+| Policy Val-Loss (Checkpoint) | 1,3473 | 1,2455 | **1,2454** |
+
+Best-Epoche verschiebt sich von 1 (v17) auf 2 (v17_lrfix) -- eine
+Verschiebung in die erwartete Richtung, aber winzig, nicht die erhoffte
+"deutlich spaetere Bestmarke".
+
+**Offline-Diagnose** (`tools/offline_diagnose.py`,
+`evaluations/offline_diagnose_v17_lrfix_classic.json` +
+`evaluations/offline_diagnose_v17_lrfix_frozen.json`):
+
+*Klassischer Val-Split (in-distribution, n=145.565):*
+
+| Modell | Top-1 | Top-3 | R² global |
+|---|---|---|---|
+| v16_best | 55,8% | 84,4% | 0,4899 |
+| v17_best | 56,2% | 84,6% | 0,4917 |
+| **v17_lrfix_best** | **56,2%** | **84,7%** | **0,4938** |
+
+*Frozen Set (generationsuebergreifend, n=1800):*
+
+| Modell | Top-1 | Top-3 | R² global |
+|---|---|---|---|
+| v16_best | 45,6% | 71,6% | 0,2949 |
+| v17_best | 45,0% | 71,2% | 0,2903 |
+| v17_lrfix_best | 44,6% | 71,9% | 0,2848 |
+
+Auf dem In-Distribution-Split liegt `v17_lrfix_best` in jeder Spalte
+minimal vorn; auf dem Frozen-Set (dem generalisationsrelevanteren Set)
+liegt es minimal ZURUECK -- ein durchgehendes, aber flaches Bild, keine
+klare Verbesserung.
+
+**Oracle-Metriken** (`tools/oracle_metrics.py`,
+`evaluations/oracle_metrics_v17_lrfix_vs_v17_v16.json` -- eigene Datei,
+NICHT `evaluations/task89_oracle_metrics.json` ueberschrieben, um die
+dortige generationsuebergreifende Historie nicht zu verlieren):
+
+| Modell | Recall@16 | Top3-Masse | Value-Pearson | Value-Spearman | Kendall-Tau |
+|---|---|---|---|---|---|
+| v16_best | 0,999 | 0,652 | **0,8835** | **0,8594** | 0,2791 |
+| v17_best | **1,000** | 0,673 | 0,8705 | 0,8407 | **0,3067** |
+| v17_lrfix_best | 0,999 | **0,677** | 0,8699 | 0,8430 | 0,3049 |
+
+`v17_lrfix_best` liegt bei jeder Metrik entweder minimal vor oder minimal
+hinter `v17_best` (Top3-Masse leicht vorn, Value-Pearson/Kendall-Tau
+minimal zurueck, Value-Spearman minimal vorn) -- durchgehend innerhalb der
+Rauschbreite der bereits beobachteten Generationsschritte. Kein Metrik
+zeigt einen klaren, konsistenten Sprung.
+
+**Einordnung gegen v12b_lr/v14b-Praezedenz**: das Rezept `lr 5e-5 +
+cosine`, T_max=100 (also strukturell identisch zum "kaum Annealing bis
+Epoche 10-15"-Verhalten, das die obige Hypothese beschreibt), wurde bereits
+ZWEIMAL erfolgreich eingesetzt -- `v12b_lr` (bestes Modell verschob sich von
+Epoche 1 auf 4, Val-R² 0,2215->0,2289, gate-te signifikant 65:35 gegen
+`v12_best`) und `v14b` (Feintuning-Nachbrenner, gleiches Rezept, Gating
+218:182 tendenziell positiv, p=0,066 nicht signifikant). Bei `T_max=100`
+liegt die Cosine-Kurve bei `v12b_lr`s Best-Epoche (4) bei ~99,2% des
+Start-LR -- praktisch KEIN Annealing hatte zu diesem Zeitpunkt
+stattgefunden. Der historische Erfolg dieses Rezepts kam also
+wahrscheinlich VOR ALLEM von der 8x niedrigeren Basis-LR (5e-5 statt
+4e-4), NICHT vom Cosine-Annealing-Effekt selbst. Dieses Experiment
+(`--epochs 20`) isoliert damit eine echte, bisher ungetestete Variable
+(tatsaechliches Anneal-Verhalten bei realistischem T_max) -- der kleine
+bis nicht vorhandene zusaetzliche Effekt hier ist also NICHT
+ueberraschend: der grosse Hebel (LR-Absenkung) ist bereits seit `v12b_lr`
+Standardrezept, dieses Experiment testet nur den verbleibenden,
+strukturell kleineren Zusatzhebel.
+
+**Fazit Hebel 2**: Hypothese NICHT klar bestaetigt. Best-Epoche verschiebt
+sich nur minimal (1->2), Offline-/Oracle-Metriken liegen durchgehend im
+Rauschen (mal minimal vorn, mal minimal zurueck, je nach Split/Metrik,
+keine konsistente Richtung). Die im Auftrag vorgesehene
+Entscheidungsregel ("klar schlechter -> kein Gating, gleichauf/besser ->
+Gating empfehlen") faellt auf GLEICHAUF -- das Ergebnis rechtfertigte
+also ein Kader-Gating (siehe naechster Abschnitt, das inzwischen per
+Nutzer-Freigabe durchgefuehrt wurde und den Befund bestaetigt: kein
+signifikanter Unterschied zu `v17_best`).
+
+## v17_lrfix: Kader-Matches (2026-07-27)
+
+Nutzer-Freigabe (direkt, 2026-07-27): `v17_lrfix_best` gegen den vollen
+Kader antreten lassen (Heuristik, `v17_best`, `v16_best`) -- unabhaengig
+vom Diagnose-Ergebnis oben. Zwischenzeitlich wurde ausserdem das
+urspruenglich unentschiedene Gating `v17_best` vs `v16_best` auf 400 Paare
+verlaengert und klar entschieden (SPRT=`v17_best`, 417:333/750,
+LLR=+3,852, p=0,0031) -- **`v17_best` ist damit der amtierende Champion**
+(nicht mehr `v16_best`), die Praemisse "v17 plateaut" fuer Hebel 2 gilt
+seitdem nicht mehr als dringender Fix, das Experiment bleibt trotzdem
+informativ (s.o.).
+
+**Gepaartes Gating** (`tools/paired_gating.py`, beide @400 Sims,
+c_puct=1.5, H1 p=0,65, alpha=beta=0,05, Bloecke a 25 Paare, Deckel 200
+Paare):
+
+| Gegner | A:B (Spiele) | LLR (Deckel) | SPRT-Entscheid | Bericht-p | Gepaarte Diff (95%-CI) |
+|---|---|---|---|---|---|
+| `v17_best` (amtierender Champion) | 207:193 | -2,596 | UNDECIDED_CAP_REACHED | 0,5507 | +0,070 [-0,127, +0,267] |
+| `v16_best` (vorheriger Champion) | 208:192 | -2,428 | UNDECIDED_CAP_REACHED | 0,4926 | +0,080 [-0,120, +0,280] |
+
+Beide Gatings erreichen den 200-Paare-Deckel ohne SPRT-Entscheid, LLR in
+beiden Faellen NEGATIV (Richtung H0, "gleich stark") und deutlich naeher
+an der unteren als an der oberen Schranke. `v17_lrfix_best` gewinnt beide
+Matches nominell knapp (~52%), aber die Konfidenzintervalle beruehren die
+Null klar -- kein statistisch abgesicherter Unterschied in irgendeine
+Richtung.
+
+**Elo-Neuverankerung vs. Heuristik** (`tools/arena.py::run_net_arena`,
+400/150 Sims, SPRT p1=0,64/alpha=0,05/beta=0,10): SPRT-Entscheid schon nach
+33/400 Spielen, `v17_lrfix_best` 24:9 Heuristik (73% Netzsiege, LLR_Netz
++2,97). Sehr frueher Stopp (kleine Stichprobe, entsprechend breites CI) --
+gleiche Groessenordnung wie die fruehen Heuristik-Stopps bei v16 (47
+Spiele) und v17 selbst (vermutlich aehnlich), also kein Ausreisser im
+Session-Muster.
+
+**Elo-Tabelle nach allen drei Eintraegen** (`tools/elo_tracker.py add` +
+`report`, Bradley-Terry-Fit, `evaluations/elo_history.csv`):
+
+| Modell | Elo | 95%-CI |
+|---|---|---|
+| **v17_best** | **1135** | [1072, 1199] |
+| v17_lrfix_best | 1133 | [1066, 1196] |
+| v16_best | 1103 | [1043, 1162] |
+| v13_nortv_best (verlorene Alt-Linie) | 1100 | [988, 1213] |
+
+`v17_lrfix_best` (1133) und `v17_best` (1135) sind Elo-praktisch identisch,
+CIs fast deckungsgleich -- exakt konsistent mit dem gepaarten Gating oben.
+
+**Entscheidung**: `v17_lrfix_best` gewinnt das Gating gegen den amtierenden
+Champion `v17_best` NICHT signifikant (SPRT=UNDECIDED_CAP_REACHED,
+p=0,55) -- gemaess der etablierten Gating-Regel ("ein neues Modell loest
+den Champion nur bei signifikantem Sieg ab") bleibt **`v17_best` Champion**.
+`v17_lrfix_best` wird NICHT befoerdert, aber auch nicht verworfen -- es ist
+Elo-gleichauf mit dem Champion und bestaetigt (negativ) die
+LR-Dynamik-Hypothese aus Hebel 2: das realistische `T_max` allein bringt
+bei diesem bereits LR-abgesenkten Rezept keinen messbaren Zusatznutzen
+mehr. Kein weiterer Handlungsbedarf fuer diesen Zweig; `train.py`s
+`T_max=epochs`-Verhalten bleibt technisch unveraendert (die Erkenntnis ist
+dokumentiert, aber keine Code-Aenderung wurde vorgenommen, da der
+vermutete Nutzen sich nicht bestaetigt hat).
