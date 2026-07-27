@@ -31,7 +31,11 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   flex-shrink: 0;
 }
 .tile.click{cursor:pointer;transition:transform .1s}.tile.click:hover{transform:scale(1.18)}
-.tile.sel{outline:2.5px solid var(--text)}
+/* Nutzer-Feedback (2026-07-27): war outline:var(--text) (fast schwarz) --
+   auf einer schwarzen Fliese praktisch unsichtbar. Selbe kraeftige Amber+
+   Halo-Sprache wie die Tipp-Hervorhebung (.hint-mark.hint-1), damit die
+   eigene Auswahl auf JEDER Fliesenfarbe klar erkennbar bleibt. */
+.tile.sel{outline:3px solid #F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.3)}
 .tile.empty{background:var(--bg);border-style:dashed;border-color:var(--border);color:var(--text3)}
 .blau{background:var(--blau)}.gelb{background:var(--gelb)}.rot{background:var(--rot)}
 .schwarz{background:var(--schwarz)}.tuerkis{background:var(--tuerkis)}
@@ -159,6 +163,11 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .ds.filled.special{background:#D6D3D1;color:var(--text2)}
 
 /* Bonus-Chips */
+/* Nutzer-Feedback (2026-07-27): der Bonuschip-Bereich selbst wird klickbar/
+   hervorgehoben, sobald mind. 1 Musterreihe chip-vervollstaendigbar ist --
+   ersetzt den bisherigen einzelnen 🎫-Reihen-Button. */
+.chips-usable{background:#DBEAFE;outline:2.5px solid var(--blau);box-shadow:0 0 0 3px rgba(59,130,246,.22)}
+.chips-usable:hover{background:#BFDBFE}
 .chips-grid {
   display: grid;
   grid-template-columns: repeat(5, 20px);
