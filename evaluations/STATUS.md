@@ -4822,6 +4822,204 @@ bleibt `false` (Standard, byte-identisches Bestandsverhalten) -- Task #5
 kann den Toggle jetzt bei Bedarf per Wheel-Rebuild auf `true` stellen, ohne
 den Code erneut schreiben zu muessen.
 
+## Task #5: Gumbel-Rang-Invarianz vs. Wertungsplatten (2026-07-27)
+
+Dreiteiliger Messplan zur Wertungsplatten-Diagnose Teil 3 (s.o.): quantifiziert
+das dort nur strukturell begruendete "die Suche setzt das Policy-Wissen nur
+um, wenn es die Rangfolge kippt" und prueft, ob das rekonstruierte
+Plate-Shaping (Task #93/#5-Vorbereitung) daran etwas aendern kann. **Zentraler
+Befund weicht vom urspruenglich erwarteten Bild ab**: die Suche ist NICHT
+robust rang-invariant gegenueber Wertungsplatten -- sie reagiert schon OHNE
+jedes Shaping in ~24-30% der getesteten Faelle auf die Platten, nur ueber
+einen anderen Kanal als den von Teil 3 gemessenen.
+
+### Vorbereitung: additiver Rust-Trace-Einstieg
+
+`engine/src/lib.rs`: neue PyO3-Funktion `net_search_state_json_trace`
+(Signatur identisch zu `net_search_state_json`, Task #89), ruft
+`net_mcts::net_search_with_tree(..., collect_trace=true)` -- liefert
+zusaetzlich `gumbel_trace` (Top-m-Auswahl + jede Sequential-Halving-Phase mit
+`q`/`sigma_q`/`score`/`eliminated` je Kandidat, Task #95) fuer einen
+BELIEBIGEN extern gespeicherten Zustand (vorher nur ueber
+`PyGame::ai_debug_net_json` auf dem Live-Server-Zustand verfuegbar). Rein
+additiv (eigene Funktion statt neuer Parameter an der bestehenden), bestehende
+Aufrufer unveraendert. Per direktem A/B-Test auf identischem
+Zustand/Seed/Modell verifiziert: `net_search_state_json` und
+`net_search_state_json_trace` liefern BIT-IDENTISCHE `mcts_visits` und
+`ai_action` (ergaenzt den bestehenden Rust-Paritaetstest
+`gumbel_trace_collection_does_not_change_search` um einen Python-seitigen
+Beleg). Neues Tool `tools/plate_rank_invariance.py` (Teil 1a, wiederverwendet
+`select_states`/`pick_representative_combos` aus
+`tools/scoring_tile_sensitivity.py` statt sie zu duplizieren).
+
+### Teil 1a: Score-Luecke vs. Platten-Signal -- UND EIN UEBERSEHENER KANAL
+
+Erste Messung (16 Zustaende x 8 Kombinationen, `v17_best`@400 Sims, wie Teil
+3): Rang1/2-Score-Luecke der letzten Halving-Phase (Median 1,54, Mittel 2,25,
+n=106) vs. platteninduzierte Sibling-Score-Spannweite der zwei tatsaechlich
+fuehrenden Kandidaten ueber die 8 Kombinationen (Median 21,5, Mittel 27,7,
+n=12 Zustaende mit >=2 auswertbaren Kombinationen) -- **Faktor
+Luecke/Spannweite = 0,071, d.h. das natuerliche (ungeshapte) Plattensignal ist
+im Median bereits ~14x GROESSER als die typische Entscheidungsmarge**, nicht
+zu klein wie urspruenglich vermutet.
+
+Das widerspricht auf den ersten Blick Teil 3 (JS=0,0 in 124/124) --
+Direktvergleich mit dem UNVERAENDERTEN Teil-3-Tool
+(`tools/scoring_tile_sensitivity.py`, `net_search_state_json` statt der
+neuen Trace-Funktion, `v16_best`@400) reproduziert dessen Ergebnis exakt
+(`treatment_js_diff_combo_same_seed`: Median/Mittel/Max = 0,0, n=124,
+`evaluations/plate_rank_invariance_sanity_original_tool.json`) -- **Teil 3s
+Messung war korrekt, aber blind fuer den eigentlichen Mechanismus**:
+
+**Mechanismus (per Einzelfall-Nachweis verifiziert, `Kuppel #12`/Runde-1-
+Zustand, Kombination `(0,4,5)` vs. `(0,1,2)`)**: die zwei fuehrenden
+Wurzelkandidaten enden nach Sequential Halving oft mit EXAKT GLEICHEN
+Besuchszahlen (Beispiel: 96 vs. 96) -- eine strukturelle Eigenschaft des
+Halving-Algorithmus (die finalen Ueberlebenden werden ab der letzten
+Halbierung `keep=max(current.len()/2,2)` gemeinsam mit identischem
+Sim-Kontingent je Phase weiterbesucht, akkumulieren also zwangslaeufig
+gleiche Besuchszahlen). `mcts_visits` ist dann fuer BEIDE Kombinationen
+bit-identisch (JS=0, Teil 3 korrekt), ABER `gumbel_final_root_action`
+(`net_mcts.rs:1434`) entscheidet bei Besuchsgleichstand explizit ueber
+`ln(prior) + sigma(Q)` -- und DAS kippt durch die Wertungsplatten
+tatsaechlich (im Beispiel: Kombination `(0,4,5)` waehlt "Stein rot -> Reihe
+2", Kombination `(0,1,2)` waehlt "Stein schwarz -> Reihe 6", exakt gleiche
+Besuchszahlen in beiden Faellen). Ein direkter Ground-Truth-Test (`ai_action`-
+Vergleich, nicht nur der abgeleitete Score-Marge-Proxy) bestaetigt das
+quantitativ: **`v17_best`@400 Sims, OHNE Shaping: 29 von 124 Zustand-
+Kombination-Paaren (23,4%) wechseln die tatsaechlich gewaehlte Aktion**
+(`evaluations/plate_rank_invariance_1a_off.json`, `v16_best` sogar 37/124 =
+29,8%, `evaluations/plate_rank_invariance_1a_off_v16_sanity.json`) --
+modellunabhaengig, also kein Trainingsartefakt eines einzelnen Checkpoints.
+
+**Neu-Einordnung der Teil-3-Aussage**: "die Suche ignoriert Wertungsplatten
+in 124/124 Faellen" ist als Aussage ueber `mcts_visits` richtig, aber als
+Aussage ueber die tatsaechliche Zugwahl FALSCH -- der Nutzer sieht beim
+Zusehen die tatsaechlich gespielte Aktion, nicht die Besuchsverteilung, und
+die aendert sich in ~24-30% der Faelle bereits ohne jedes Shaping, exakt bei
+knappen Entscheidungen (Besuchsgleichstand).
+
+### Teil 1b: Sims-Skalierung -- Kipprate SINKT mit mehr Sims (nicht wie erwartet)
+
+`v17_best`, OFF, `tools/scoring_tile_sensitivity.py --sims {400,800,1600}`
+(Parameter war bereits vorhanden, keine Ergaenzung noetig): `mcts_visits`-JS
+bleibt bei ALLEN drei Sims-Stufen exakt 0,0 in 124/124 Faellen (Halving-
+Struktur/Phasenzahl haengt an der Kandidatenzahl, nicht an Sims -- die
+Gleichstand-Eigenschaft der finalen Ueberlebenden bleibt sims-unabhaengig
+bestehen). Die ECHTE Kipprate (Ground-Truth-`ai_action`-Vergleich,
+`tools/plate_rank_invariance.py`) dagegen:
+
+| Sims | Kipp-Paare | Kipprate |
+|------|-----------|----------|
+| 400  | 29/124    | 23,4%    |
+| 800  | 17/124    | 13,7%    |
+| 1600 | 18/124    | 14,5%    |
+
+**Sinkt** mit mehr Sims statt zu steigen -- widerlegt die im Auftrag
+formulierte Magnitude-Hypothese ("sigma waechst mit max_N, hoehere Sims
+sollten mehr kippen"). Wahrscheinlichste Erklaerung: mit mehr Sims werden
+die Q-Schaetzungen der Ueberlebenden ueber mehr Simulationen gemittelt
+(stabiler, weniger vom rohen Netz-Blattwert einer einzelnen fruehen
+Phase-1-Visite dominiert) -- die Suche wird mit mehr Rechenzeit TENDENZIELL
+robuster gegen das Plattensignal, nicht empfindlicher.
+
+### Teil 1c: Shaping ON vs. OFF -- sigma-Beitrag wie vorhergesagt, aber Kipprate praktisch unveraendert
+
+`PLATE_SHAPING_ENABLED=true`, Wheel neu gebaut+installiert, `v17_best`@400
+Sims (`evaluations/scoring_tile_sensitivity_400sims_ON.json`,
+`evaluations/plate_rank_invariance_1c_on.json`), gegen den OFF-Arm aus Teil
+1a/1b:
+
+| Messgroesse | OFF | ON | Delta |
+|---|---|---|---|
+| `mcts_visits`-JS (124 Paare) | 0,0 | 0,0 | keine Aenderung (strukturell erwartet) |
+| Sibling-Sigma-Spannweite (Median, alle Kandidaten) | 4,09 | 6,62 | **+2,53** (trifft die im Auftrag vorhergesagte Groessenordnung "~1-3" gut) |
+| Root-Value-Spannweite ueber Kombinationen (Median, n=13) | 0,044 (v16_best, Referenzwert Teil 3) | 0,062 (v17_best) | +0,018 (Modellwechsel confounded, Richtung passt) |
+| **Echte Entscheidungs-Kipprate (Ground Truth)** | **29/124 (23,4%)** | **32/124 (25,8%)** | **+3 Paare, ~2,4 Prozentpunkte** |
+
+Der Kipprate-Unterschied (+2,4pp) liegt bei n=124 klar innerhalb des
+Rauschbands (Standardfehler der Differenz zweier unabhaengiger 124er-Anteile
+~5,5pp) -- **statistisch nicht von 0 unterscheidbar**. Shaping erhoeht die
+GESAMT-Streuung des Wurzel-Value messbar (wie vorhergesagt), aendert aber die
+Haeufigkeit tatsaechlicher Zugwechsel NICHT signifikant. Erklaerung ueber
+denselben Mechanismus, der schon fuer den GLOBALEN Root-Value-Shift im
+Auftrag notiert war ("kuerzt sich im Ranking weg"): `apply_plate_shaping`
+wertet `wertung_progress`(mine)-`wertung_progress`(theirs) NACH jedem
+Kindzustand neu aus -- fuer Geschwister-Kandidaten INNERHALB derselben
+Drafting-Entscheidung sind sich diese Deltas aber meist sehr aehnlich (das
+Brett vor dem Zug ist identisch, nur EIN Zug unterscheidet die Kinder), der
+Shift wirkt dadurch ueberwiegend als korrelierter "Common-Mode"-Term, der
+sich zwischen zwei nah beieinanderliegenden Geschwistern grossteils
+weg-kuerzt -- exakt wie der bereits dokumentierte Root-Value-Effekt, nur auf
+Geschwister- statt Wurzel-Ebene.
+
+### Handlungsempfehlung
+
+**Gegen eine blinde Erhoehung von `PLATE_SHAPING_WEIGHT` (urspruenglich als
+Phase 2 vorgesehen).** Die Praemisse "das Plattensignal ist zu schwach, um
+die Rangfolge zu kippen" ist durch Teil 1a widerlegt -- das NATUERLICHE
+(ungeshapte) Signal ist im Median bereits ~14x groesser als die typische
+Entscheidungsmarge und kippt schon jetzt ~24-30% der knappen Entscheidungen
+ueber den Tie-Break-Kanal. Der limitierende Faktor ist NICHT die Signal-
+Magnitude, sondern dass sowohl der natuerliche Netz-Value-Unterschied als
+auch das Shaping-Additiv weitgehend GLEICHFOERMIG ueber Geschwister-Kandidaten
+wirken (Common-Mode) und sich daher in der fuer die Entscheidung relevanten
+GESCHWISTER-DIFFERENZ groesstenteils aufheben -- eine hoehere Gewichtung
+wuerde primaer mehr Rauschen auf den Root-Value addieren (wie im Task-#93-
+A/B bereits gesehen: p=0,7111, kein signifikanter Staerkegewinn), ohne
+nachweislich mehr echte Geschwister-Differenzierung zu erzeugen (1c zeigt
+das direkt: +2,53 sigma Gesamt-Spannweite bei nur +2,4pp Kipprate, statistisch
+nicht signifikant).
+
+Empfehlung fuer die 3 Phasen des urspruenglichen Plans:
+- **Phase 2 (Gewicht kalibrieren) -- ZURUECKGESTELLT, nicht sinnvoll ohne
+  Struktur-Aenderung.** Ein rein numerischer Zielwert (z.B. "Gewicht x aus
+  0,3·(14/2,53)") waere irrefuehrend, weil 1c zeigt, dass die Sigma-Spannweite
+  nicht linear/proportional in die Kipprate uebersetzt -- die Grosse allein
+  ist nicht der Hebel. Falls dennoch reine Signalverstaerkung versucht werden
+  soll, muesste sie GESCHWISTER-DIFFERENZIEREND wirken (z.B. das Additiv nicht
+  aus `wertung_progress`(Kindzustand) allein, sondern aus der Differenz zum
+  ELTERN-Wert berechnen, um den korrelierten Common-Mode-Anteil explizit
+  herauszurechnen) -- das ist ein Formel-Redesign, kein reines
+  Gewichts-Tuning, und sollte separat evaluiert werden.
+- **Phase 3 (Trainings-Aux-Ziel) -- naeherliegender naechster Schritt**, falls
+  mehr Plattenreaktivitaet ausserhalb der bereits vorhandenen ~24-30%-
+  Tie-Break-Reaktivitaet gewuenscht ist: der Policy-Kopf reagiert nachweislich
+  bereits stark (Teil 3: JS bis 0,58 Bit) -- ein Trainingsziel, das dieses
+  Wissen direkt in eine SCHAERFERE (weniger tie-anfaellige) Kandidaten-
+  Differenzierung uebersetzt, umgeht das strukturelle Common-Mode-Problem der
+  reinen Inferenzzeit-Value-Korrektur voellig.
+- Der Nutzer-Verdacht "KI ignoriert Wertungsplatten" bleibt fuer die
+  ueberwiegende Mehrheit (~70-77%) der NICHT knappen Entscheidungen technisch
+  zutreffend UND vermutlich angemessen (dort dominiert ein Kandidat klar,
+  Wertungsplatten sollten das nicht kippen) -- die eigentliche Handlungsoption
+  liegt bei den ~24-30% knappen/Tie-Entscheidungen, wo die Suche schon jetzt
+  reagiert, nur nicht in einer fuer Menschen sichtbaren, konsistent
+  nachvollziehbaren Weise (Tie-Break ist fuer Aussenstehende nicht von echten
+  Zufall zu unterscheiden).
+
+### Rueckbau (zwingend, durchgefuehrt)
+
+`PLATE_SHAPING_ENABLED` zurueck auf `false`, `cargo test --release`:
+**166/166 gruen**, Produktions-Wheel neu gebaut + installiert,
+`python -c "import mosaic_rust"`-Smoke-Test erfolgreich. `git diff` auf
+`engine/src/net_mcts.rs` zeigt NACH dem Rueckbau keinerlei Restaenderung
+(byte-identisch zum Stand vor Teil 1c).
+
+### Dateien
+
+- `engine/src/lib.rs`: `net_search_state_json_trace` (additiv).
+- `tools/plate_rank_invariance.py`: neues Tool (Teil 1a/1b/1c-Ground-Truth).
+- Ergebnis-JSONs: `evaluations/plate_rank_invariance_1a_off.json`,
+  `evaluations/plate_rank_invariance_1a_off_v16_sanity.json`,
+  `evaluations/plate_rank_invariance_1b_off_800.json`,
+  `evaluations/plate_rank_invariance_1b_off_1600.json`,
+  `evaluations/plate_rank_invariance_1c_on.json`,
+  `evaluations/plate_rank_invariance_sanity_original_tool.json`,
+  `evaluations/scoring_tile_sensitivity_800sims.json`,
+  `evaluations/scoring_tile_sensitivity_1600sims.json`,
+  `evaluations/scoring_tile_sensitivity_400sims_ON.json`.
+
 ## v17 Hebel 2: LR-Dynamik-Experiment (2026-07-26/27)
 
 **Befund, der zum Experiment fuehrt**: `train.py` baut

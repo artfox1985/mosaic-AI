@@ -1,0 +1,1547 @@
+{
+  "summary": {
+    "model": "models/alphazero_v17_best.onnx",
+    "sims": 400,
+    "c_puct": 1.5,
+    "n_states": 16,
+    "n_combos_tested_per_state": 8,
+    "baseline_js_same_combo_diff_seed": {
+      "n": 16,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "treatment_js_diff_combo_same_seed": {
+      "n": 124,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "treatment_raw_prior_js_diff_combo_same_seed": {
+      "n": 124,
+      "mean": 0.02734655487680621,
+      "median": 0.003591836467183831,
+      "stdev": 0.054728542203098994,
+      "min": 0.0,
+      "max": 0.25836710631415954
+    },
+    "baseline_root_value_diff_two_seeds": {
+      "n": 13,
+      "mean": 0.008741153188600958,
+      "median": 0.005778938776289599,
+      "stdev": 0.010819608706220622,
+      "min": 0.0,
+      "max": 0.039622339928590655
+    },
+    "treatment_value_spread_across_combos": {
+      "n": 13,
+      "mean": 0.06333346644498604,
+      "median": 0.06235727891670306,
+      "stdev": 0.02867100902849959,
+      "min": 0.021594763355452185,
+      "max": 0.11058291903034528
+    }
+  },
+  "per_state": [
+    {
+      "state_index_in_eval_set": 917,
+      "round": 1,
+      "original_scoring_tile_ids": [
+        1,
+        3,
+        5
+      ],
+      "n_root_candidates": 4,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.016809184348075268,
+      "root_value_original_seed1000": 0.497766611603184,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.004111013717460319,
+          "root_value": 0.5042455145530075
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00222508508680796,
+          "root_value": 0.5055617748389443
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00043335075741742684,
+          "root_value": 0.5011582361868899
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0015952442894192767,
+          "root_value": 0.5042816769020654
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.002506136781183204,
+          "root_value": 0.4956077193145502
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.002804443840827696,
+          "root_value": 0.5040633136813771
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.008475781967127824,
+          "root_value": 0.4837162702388842
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.004028738990495056,
+          "root_value": 0.486679544052044
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.021845504600060073
+    },
+    {
+      "state_index_in_eval_set": 91,
+      "round": 1,
+      "original_scoring_tile_ids": [
+        0,
+        4,
+        5
+      ],
+      "n_root_candidates": 16,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.0006217418317235879,
+      "root_value_original_seed1000": 0.49930333934558213,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.007409142179776826,
+          "root_value": 0.49181144309303326
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.009341651774505692,
+          "root_value": 0.48258007340209064
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.019140219182288223,
+          "root_value": 0.4858975066306598
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.012670682299615545,
+          "root_value": 0.48310505648051516
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.028900655055983358,
+          "root_value": 0.48673974390065794
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.13126887614467092,
+          "root_value": 0.48566257146009517
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.16257491263833584,
+          "root_value": 0.4946443142598582
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.08517300533240196,
+          "root_value": 0.5041748367575428
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.021594763355452185
+    },
+    {
+      "state_index_in_eval_set": 967,
+      "round": 1,
+      "original_scoring_tile_ids": [
+        0,
+        1,
+        5
+      ],
+      "n_root_candidates": 6,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.001617510756477758,
+      "root_value_original_seed1000": 0.5376537805727233,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.02042436066582359,
+          "root_value": 0.542714300558578
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.01757731199362114,
+          "root_value": 0.544200603917848
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.021276461290908072,
+          "root_value": 0.5389413298504908
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.016754877416671955,
+          "root_value": 0.5467682576483597
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0006726115748434384,
+          "root_value": 0.5444956505602707
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.002432188777418079,
+          "root_value": 0.5518170751469691
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.07071098829565861,
+          "root_value": 0.47805111799235633
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.06204249944210347,
+          "root_value": 0.47964061772847594
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.07376595715461276
+    },
+    {
+      "state_index_in_eval_set": 211,
+      "round": 2,
+      "original_scoring_tile_ids": [
+        1,
+        2,
+        6
+      ],
+      "n_root_candidates": 2,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.002060721544548838,
+      "root_value_original_seed1000": 0.5583668439496755,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 1.88716906538535e-05,
+          "root_value": 0.49169022658896167
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00012936210630257617,
+          "root_value": 0.48096764721937374
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00020546873411687004,
+          "root_value": 0.4628966746578289
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0004904079312271683,
+          "root_value": 0.47322374854841365
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0036123685652043117,
+          "root_value": 0.4561101662871143
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.001214237751422811,
+          "root_value": 0.49041654160185083
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0004883143048657421,
+          "root_value": 0.5593570211936235
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0007461637157301325,
+          "root_value": 0.5635910834126946
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.10748091712558028
+    },
+    {
+      "state_index_in_eval_set": 227,
+      "round": 2,
+      "original_scoring_tile_ids": [
+        4,
+        6,
+        7
+      ],
+      "n_root_candidates": 5,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.01198996548951814,
+      "root_value_original_seed1000": 0.5286707930757742,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.005550322758304357,
+          "root_value": 0.502657318066142
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0017256029332825742,
+          "root_value": 0.4998576446251361
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0007986821347577971,
+          "root_value": 0.4997862414019073
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.003575690213052221,
+          "root_value": 0.5078106863661989
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.004643601907796422,
+          "root_value": 0.49333027024850123
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0067001460432847305,
+          "root_value": 0.5246870119246111
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0004075644471933245,
+          "root_value": 0.5266001842095512
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0014261500004564874,
+          "root_value": 0.5459073876794331
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.05257711743093191
+    },
+    {
+      "state_index_in_eval_set": 1251,
+      "round": 2,
+      "original_scoring_tile_ids": [
+        1,
+        3,
+        5
+      ],
+      "n_root_candidates": 2,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.039622339928590655,
+      "root_value_original_seed1000": 0.42056609832051206,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00010225969065266586,
+          "root_value": 0.4253877186373465
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0003853939857164936,
+          "root_value": 0.4139783121181238
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 1.5804243124478435e-08,
+          "root_value": 0.4174742207700433
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0005554343988176777,
+          "root_value": 0.42842983578986543
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 7.394575042017149e-05,
+          "root_value": 0.4250213244428578
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0009957288355633429,
+          "root_value": 0.4316916676073736
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00350771395755913,
+          "root_value": 0.3912397496134751
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0036079827213154406,
+          "root_value": 0.40535575075060115
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.04045191799389852
+    },
+    {
+      "state_index_in_eval_set": 423,
+      "round": 3,
+      "original_scoring_tile_ids": [
+        3,
+        4,
+        7
+      ],
+      "n_root_candidates": 5,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.0,
+      "root_value_original_seed1000": 0.44571964022844945,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00971327636282007,
+          "root_value": 0.48248907460139456
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.006709668786156827,
+          "root_value": 0.4743746487897538
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.009244216056306428,
+          "root_value": 0.44154448877654284
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00431512990912925,
+          "root_value": 0.4668773089609086
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0022143456354684283,
+          "root_value": 0.44786213870387953
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.005857920231203983,
+          "root_value": 0.4648017532708082
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.005747074944953007,
+          "root_value": 0.47028242403278775
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.013388040272234858,
+          "root_value": 0.4680790452121583
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.04094458582485172
+    },
+    {
+      "state_index_in_eval_set": 1335,
+      "round": 3,
+      "original_scoring_tile_ids": [
+        3,
+        4,
+        5
+      ],
+      "n_root_candidates": 14,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.018161822494147106,
+      "root_value_original_seed1000": 0.7423411038656631,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.005032043204401927,
+          "root_value": 0.7200727360720443
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0039864295083066725,
+          "root_value": 0.7189340195258156
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0024260970673254376,
+          "root_value": 0.7207295217331827
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0041303759273347675,
+          "root_value": 0.7334389126461285
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.001239057913777941,
+          "root_value": 0.7317673497822262
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0020928738882176863,
+          "root_value": 0.7386199379837963
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.009230491744457857,
+          "root_value": 0.6783584447793019
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.010873189488513933,
+          "root_value": 0.7116397635547925
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.06398265908636125
+    },
+    {
+      "state_index_in_eval_set": 391,
+      "round": 3,
+      "original_scoring_tile_ids": [
+        1,
+        6,
+        7
+      ],
+      "n_root_candidates": 16,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 1.7985889873561867e-06,
+      "root_value_original_seed1000": 0.4393738878826314,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.1576419393609411,
+          "root_value": 0.46657981636882156
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.24650921112427415,
+          "root_value": 0.43180108482628454
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.20525067756002446,
+          "root_value": 0.42668469012772164
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.20854655226841134,
+          "root_value": 0.4236121823387355
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.2189413060469535,
+          "root_value": 0.4186295163658668
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.25836710631415954,
+          "root_value": 0.42221495079703336
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.12862341390435741,
+          "root_value": 0.4510851980707933
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0025966393253764363,
+          "root_value": 0.43822312530852336
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.04795030000295475
+    },
+    {
+      "state_index_in_eval_set": 702,
+      "round": 4,
+      "original_scoring_tile_ids": [
+        2,
+        3,
+        7
+      ],
+      "n_root_candidates": 16,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.009967026353543074,
+      "root_value_original_seed1000": 0.4510011984296026,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.09359924080238691,
+          "root_value": 0.4624563948510482
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.00266173264565663,
+          "root_value": 0.44868103522052843
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.004111760197472782,
+          "root_value": 0.4480536532602048
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.07924462283381614,
+          "root_value": 0.443287520680123
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.09989402613263154,
+          "root_value": 0.44420339662533165
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0037082161940291862,
+          "root_value": 0.4764811298909432
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.08019891575614888,
+          "root_value": 0.41412385097424015
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.18182870436172768,
+          "root_value": 0.4428611693479192
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.06235727891670306
+    },
+    {
+      "state_index_in_eval_set": 567,
+      "round": 4,
+      "original_scoring_tile_ids": [
+        2,
+        6,
+        7
+      ],
+      "n_root_candidates": 1,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.0,
+      "root_value_original_seed1000": 0.43939974637958445,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.5129237745498543
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.5008289670591354
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.5006779354709182
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.5033910539233871
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.5209123468001188
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.4984862853520439
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": 0.42257175508567074
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.09834059171444803
+    },
+    {
+      "state_index_in_eval_set": 599,
+      "round": 4,
+      "original_scoring_tile_ids": [
+        4,
+        5,
+        6
+      ],
+      "n_root_candidates": 15,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.007003941339911057,
+      "root_value_original_seed1000": 0.4129028013749502,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0397545928084683,
+          "root_value": 0.4607195335880936
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.04370036526595304,
+          "root_value": 0.47937329385760874
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.04734104312385605,
+          "root_value": 0.48693944489534907
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.04391083523384508,
+          "root_value": 0.4619371891171176
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.05872464441482174,
+          "root_value": 0.45717211176081224
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.08382793690983759,
+          "root_value": 0.4785758590699512
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.03973438852818481,
+          "root_value": 0.3763565258650038
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.11058291903034528
+    },
+    {
+      "state_index_in_eval_set": 886,
+      "round": 5,
+      "original_scoring_tile_ids": [
+        0,
+        4,
+        5
+      ],
+      "n_root_candidates": 7,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": null,
+      "root_value_original_seed1000": null,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": null
+    },
+    {
+      "state_index_in_eval_set": 882,
+      "round": 5,
+      "original_scoring_tile_ids": [
+        0,
+        1,
+        6
+      ],
+      "n_root_candidates": 4,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": null,
+      "root_value_original_seed1000": null,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": null
+    },
+    {
+      "state_index_in_eval_set": 745,
+      "round": 5,
+      "original_scoring_tile_ids": [
+        0,
+        3,
+        5
+      ],
+      "n_root_candidates": 17,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": null,
+      "root_value_original_seed1000": null,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            1,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0,
+          "root_value": null
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": null
+    },
+    {
+      "state_index_in_eval_set": 537,
+      "round": 3,
+      "original_scoring_tile_ids": [
+        1,
+        2,
+        3
+      ],
+      "n_root_candidates": 16,
+      "baseline_js_two_seeds_same_combo": 0.0,
+      "baseline_root_value_diff_two_seeds": 0.005778938776289599,
+      "root_value_original_seed1000": 0.31513399078362525,
+      "combo_results_fixed_seed1000": [
+        {
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.012812572310484976,
+          "root_value": 0.30218412964920766
+        },
+        {
+          "combo": [
+            0,
+            2,
+            3
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.006186727722591831,
+          "root_value": 0.3140257583894967
+        },
+        {
+          "combo": [
+            0,
+            3,
+            5
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.06721812439353554,
+          "root_value": 0.3110146471525022
+        },
+        {
+          "combo": [
+            1,
+            3,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.0079033619769145,
+          "root_value": 0.32401547654324214
+        },
+        {
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.011438170747589117,
+          "root_value": 0.3093420427848986
+        },
+        {
+          "combo": [
+            2,
+            6,
+            7
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.08349533493851055,
+          "root_value": 0.26013243377225953
+        },
+        {
+          "combo": [
+            4,
+            5,
+            6
+          ],
+          "js_vs_reference": 0.0,
+          "raw_prior_js_vs_reference": 0.04148874070309527,
+          "root_value": 0.24255492499462344
+        }
+      ],
+      "value_spread_across_combos_fixed_seed": 0.0814605515486187
+    }
+  ]
+}
