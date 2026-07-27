@@ -565,6 +565,68 @@ fn net_search_state_json(
     Ok(analysis.to_string())
 }
 
+/// Wie [`net_search_state_json`], aber mit `collect_trace=true` (Task #95)
+/// -- liefert zusätzlich `value_debug` (Root-Value-Breakdown) und
+/// `gumbel_trace` (Top-m-Auswahl + jede Sequential-Halving-Phase mit
+/// `q`/`sigma_q`/`score`/`eliminated` je Kandidat, siehe `GumbelTrace` in
+/// `net_mcts.rs`) im Analyse-Dict. Rein additiv: eigene Funktion statt eines
+/// neuen Parameters an `net_search_state_json`, damit bestehende Aufrufer
+/// (Task #89, `tools/scoring_tile_sensitivity.py` etc.) unverändert bleiben.
+/// Für Task #5 (Gumbel-Rang-Invarianz vs. Wertungsplatten, 2026-07-27): der
+/// bisher fehlende Such-Einstieg, der einen strukturierten Gumbel-Trace auf
+/// einem BELIEBIGEN extern gespeicherten Zustand erlaubt (bisher nur über
+/// `PyGame::ai_debug_net_json` auf dem LIVE-Server-Zustand verfügbar). Kostet
+/// wie beim bestehenden `collect_trace=true`-Pfad einen zusätzlichen Netz-
+/// Forward-Pass (`compute_root_value_debug`), sonst keine Änderung an
+/// Auswahl/Backprop/RNG-Verbrauch (Paritätstest siehe `net_mcts.rs`-
+/// Testmodul, `gumbel_trace_collection_does_not_change_search`).
+#[pyfunction]
+#[pyo3(signature = (state_json, model_path, sims=500, c_puct=1.5, seed=None))]
+fn net_search_state_json_trace(
+    state_json: String,
+    model_path: String,
+    sims: u32,
+    c_puct: f64,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let seed = seed.unwrap_or_else(rand::random);
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+
+    let net = crate::net::Net::load(&model_path, crate::features::INPUT_SIZE)
+        .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+
+    let (_chosen, analysis) =
+        crate::net_mcts::net_search_with_tree(&net, &state, sims, c_puct, false, &mut rng, None, true);
+
+    let mut analysis = if analysis.is_null() {
+        json!({
+            "has_net": true, "simulations": sims, "moves": [], "ai_action": serde_json::Value::Null,
+            "value_debug": serde_json::Value::Null, "gumbel_trace": serde_json::Value::Null,
+        })
+    } else {
+        analysis
+    };
+    if let Some(obj) = analysis.as_object_mut() {
+        let root_value = obj
+            .get("tree")
+            .and_then(|t| t.get("win_pct"))
+            .and_then(|w| w.as_f64())
+            .map(|w| w / 100.0);
+        obj.insert("root_value".to_string(), json!(root_value));
+        obj.insert("phase".to_string(), json!(state.phase.as_str()));
+        obj.insert("round".to_string(), json!(state.round_number));
+    }
+    Ok(analysis.to_string())
+}
+
 /// Wertungsplatten-Endwertung für einen extern gespeicherten Zustand (z.B.
 /// ein Self-Play-Record `state`-Feld, `json.dumps(record["state"])`) --
 /// reine additive Lesefunktion für die Wertungsplatten-Diagnose (2026-07-26,
@@ -637,6 +699,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
