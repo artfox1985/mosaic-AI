@@ -5467,3 +5467,83 @@ niedergeschlagen. Wertungsplatten-Nutzung bleibt eine offene, aber
 niedrigpriorisierte Frage (Nutzer-Einordnung 2026-07-27: Spielstaerke
 insgesamt ist das eigentliche Ziel, nicht Wertungsplatten-Ausnutzung an
 sich).
+
+## Ideensammlung: Staerke-Hebel jenseits des Standard-Zyklus (2026-07-28)
+
+Nutzer-Frage: "sonst noch Ideen wie wir den AlphaZero-Agent besser bekommen,
+ausser dem ueblichen Muster trainieren -> Self-Play -> trainieren". Tasks
+#9-#14 angelegt.
+
+### Leitthese (bindet mehrere Befunde dieser Session zusammen)
+
+Das Nadeloehr ist **weder Rechenzeit noch Netzkapazitaet**, sondern
+**Signal pro Sample** und **induktiver Bias**:
+
+- `v17_best` ist der **Epoche-1-Checkpoint** -- das Netz saugt den Korpus
+  nach einer Epoche aus, danach nur noch Overfitting.
+- Kapazitaetsanalyse gesund (Dead 0-3%, Eff.Rank 55-77%) -> nicht zu klein.
+- LR-Dynamik-Experiment (v17_lrfix) wirkungslos -> kein Optimierungsproblem.
+- Der Trunk ist ein **flacher MLP** (3x Linear 512) auf einem 708er-Vektor,
+  waehrend `features.rs` **handgebaute Geometrie-Zaehler** enthaelt
+  (`row_fill`, `col_fill`, `diag_fill`, `corner_fill`, `border_fill`,
+  `line_geo`). Diese Features SIND der Workaround dafuer, dass die
+  Architektur kein 2D sieht -- und alle 8 Wertungsplatten sind rein
+  geometrisch. Das Spiel ist im Kern ein 2D-Geometrieproblem.
+
+### Quantifizierte Vorbefunde
+
+**Task #9 (Ownership-Head)** -- Messung auf 150 v16-Spielen:
+
+| Groesse | Wert |
+|---|---|
+| Kuppelfelder am Spielende belegt | 40,9% (Balance 41/59 -- ideal, kein Klassenungleichgewicht) |
+| Slots am Spielende belegt | 18/18 = 100% (keine Maskierung noetig) |
+| Ø Schritte je Spiel | 161,8 |
+| Supervision je Position | **72 binaere Labels statt 1 Skalar** |
+
+Ziel aus dem letzten Record je Spiel extrahierbar (das `dome_grid` aendert
+sich nach Tiling-Abschluss nicht mehr, Nachweis in
+`tools/scoring_tile_impact.py`), gilt fuer ALLE Schritte des Spiels.
+Retrain auf dem BESTEHENDEN Korpus moeglich.
+
+**Task #10 (Gumbel-Kalibrierung)** -- exakter Port der Budget-Schleife aus
+`net_mcts.rs::build_gumbel_tree`:
+
+| sims | TOP_M | Sims/Kandidat VOR erstem Cull | Phasenverlauf |
+|---|---|---|---|
+| 400 | 8 | **16** | 8@16 -> 4@34 -> 2@68 |
+| 400 | **16 (Ist)** | **6** | 16@6 -> 8@12 -> 4@26 -> 2@52 |
+| 400 | 32 | 2 | 32@2 -> 16@5 -> 8@10 -> 4@22 -> 2@44 |
+| 600 | 16 | 9 | 16@9 -> 8@19 -> 4@38 -> 2@76 |
+
+Im Ist-Zustand eliminiert die erste Halbierung **8 von 16 Kandidaten auf
+Basis von je 6 Simulationen**. Zweiter Befund: in Arena/deterministisch
+(`add_root_noise=false`, g=0) ist die Top-M-Auswahl **reiner Prior-Rang** --
+laut `evaluations/actions_per_round.md` gibt es zu Rundenbeginn 195/152/134/
+117 legale Aktionen, die Suche betrachtet dort also nur 8-13% der Zuege.
+Was der Prior falsch einschaetzt, findet die Suche NIE, egal wie viele Sims.
+
+### Geprueft und verworfen
+
+**Farb-Permutation als Daten-Augmentierung** (5! = 120x Daten gratis):
+Die Wertung ist zwar farbunabhaengig (alle 8 Platten rein geometrisch bzw.
+farbZAEHL-basiert), aber die 18 Kuppelplatten haben fest verdrahtete
+Farbmuster (`build_dome_tile_pool`: `n(Gelb), n(Schwarz), n(Tuerkis), s()`
+...). Eine Permutation erzeugt Platten, die im echten Pool nicht existieren
+-> Off-Distribution-Zustaende (die Features enthalten u.a. `dome_pool_mask`).
+Nicht sauber machbar.
+
+**Liga-Selfplay gegen Alt-Champions** (urspruenglich als #5 vorgeschlagen):
+Vom Nutzer widerlegt -- die Policy-Targets der schwaecheren Seite ziehen das
+Netz aktiv Richtung schwaecheres Spiel. Filtern moeglich (`policy_weights`
+existiert bereits per Sample), kostet aber die halbe Policy-Ausbeute je
+Partie. Ersetzt durch **Eroeffnungs-Randomisierung** (Task #13): dieselbe
+Verteilungs-Verbreiterung, aber beide Seiten bleiben champion-stark, alle
+Policy-Targets bleiben verwertbar.
+
+### Empfohlene Reihenfolge
+
+1. **#10 Gumbel-Kalibrierung** -- fast gratis (nur Arena-A/Bs, kein Retraining)
+2. **#9 Ownership-Head** -- bester Aufwand/Nutzen, nutzt bestehenden Korpus
+3. **#14 Playout-Cap-Randomisierung** -- Multiplikator fuer alle weiteren Zyklen
+4. **#11 2D-Encoder** -- der eigentliche grosse Wurf, aber voller Stack-Umbau
