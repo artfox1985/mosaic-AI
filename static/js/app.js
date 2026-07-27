@@ -43,8 +43,20 @@ async function api(path, body=null) {
   }
 }
 
+let CURRENT_CHAMPION = null;   // vom Server geladener amtierender Champion (models/champion.txt)
+
 function openNewGameModal() {
   document.getElementById('newgame-overlay').style.display = 'flex';
+  // Modell-Feld beim Öffnen IMMER auf den aktuellen Champion setzen (Nutzer-
+  // Anstoss 2026-07-27) -- statt eines im HTML hart kodierten Versionsnamens,
+  // der bei jedem Champion-Wechsel veraltet waere.
+  api('/champion').then(d => {
+    if (d.ok && d.model) {
+      CURRENT_CHAMPION = d.model;
+      const el = document.getElementById('ng-model');
+      if (el) el.value = d.model;
+    }
+  }).catch(() => {});
 }
 
 function ngToggleAI() {
@@ -71,7 +83,7 @@ async function startNewGame() {
 
   const playerName = document.getElementById('ng-name').value.trim() || 'Spieler 1';
   const aiEnabled  = document.getElementById('ng-ai-toggle').checked;
-  const model      = document.getElementById('ng-model').value.trim() || 'v16_best';
+  const model      = document.getElementById('ng-model').value.trim() || CURRENT_CHAMPION || 'v16_best';
   const sims       = parseInt(document.getElementById('ng-sims').value) || 400;
   const seedRaw    = document.getElementById('ng-seed').value.trim();
   const seed       = seedRaw === '' ? null : parseInt(seedRaw);
@@ -553,6 +565,13 @@ function renderBoard(pi) {
   // BONUS_CHIPS_PER_ROUND=2 (engine/src/board.rs), Stand ueber state_json
   // p.chips_taken (= bonus_chips_used_this_round).
   const chipsTakenThisRound = p.chips_taken || 0;
+  // Nutzer-Feedback (2026-07-27): kein Reihen-Button mehr fuer die
+  // Bonusplaettchen-Nutzung -- statt dessen wird der Bonuschips-Bereich
+  // selbst hervorgehoben/klickbar, sobald irgendeine Reihe chip-vervoll-
+  // staendigbar ist (Modal oeffnet sich fuer die erste solche Reihe, wie
+  // zuvor der Button es fuer GENAU eine Reihe tat).
+  const playerChippableRows = (S.chippable_tiling_rows || []).filter(cr => cr.pi === pi);
+  const chipAreaClickable = playerChippableRows.length > 0;
 
   const tokHTML = S.round<5
     ? `<div class="tokens">${[0,1].map(i=>`<div class="tok ${i<p.tokens_used?'used':''}"></div>`).join('')}<span>${p.tokens_used}/2 Spielerplättchen</span></div>`
@@ -572,18 +591,8 @@ function renderBoard(pi) {
     const allEarlierDone = earlierPlaceable.length === 0;
     if(isTiling && tilingRow===null && row.tiles.length===row.capacity && isPlaceable && allEarlierDone) cls='drop';
     else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
-    // 🎫 Chip-Button: nur wenn Server bestätigt dass Chips hier sinnvoll sind
-    // (Reihenfolge OK + nach Vollmachen platzierbar)
-    const chippableRows = S.chippable_tiling_rows || [];
-    const hasChips = isTiling
-      && row.tiles.length > 0
-      && row.tiles.length < row.capacity
-      && chippableRows.some(cr => cr.pi===pi && cr.ri===ri);
     const onclick = cls==='drop'
       ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
-      : '';
-    const chipBtn = hasChips
-      ? `<button onclick="event.stopPropagation();openChipModal(${pi},${ri})" style="font-size:9px;padding:1px 4px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--bg);margin-left:2px" title="Bonusplättchen nutzen">🎫</button>`
       : '';
     const phantomCount = row.phantom_count || 0;
     const cells = Array.from({length:row.capacity},(_,ci)=>{
@@ -608,7 +617,7 @@ function renderBoard(pi) {
       : '';
     return `<div class="prow ${cls}" data-ri="${ri}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
-      <span class="rowlabel" style="color:var(--text3)">→ </span>${chipBtn}${nextDot}
+      <span class="rowlabel" style="color:var(--text3)">→ </span>${nextDot}
     </div>`;
   }).join('');
 
@@ -665,7 +674,10 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
         </div>
 
         ${(() => { trackChipGhosts(pi, p.bonus_chips || []); return ''; })()}
-        <div style="margin-top:6px;font-size:9px;color:var(--text3)">
+        <div class="${chipAreaClickable ? 'chips-usable' : ''}"
+             style="margin-top:6px;font-size:9px;color:var(--text3);padding:4px;border-radius:6px;
+                    ${chipAreaClickable ? 'cursor:pointer' : ''}"
+             ${chipAreaClickable ? `onclick="openChipModal(${pi},${playerChippableRows[0].ri})" title="Bonusplättchen einsetzen"` : ''}>
           Bonuschips (${chipsTakenThisRound}/2):
           <div class="chips-grid">
             ${(() => {
