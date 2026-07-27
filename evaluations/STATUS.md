@@ -5410,3 +5410,60 @@ Spielen deutlich kleiner/unsicherer als die anderen.
 ein plattenspezifisches Trainings-Aux-Ziel (`wertung_progress`-Fortschritt
 als Regressionsziel, analog `points_forecast`) waere der naheliegendste
 naechste Hebel, falls eine gezielte Verbesserung gewuenscht ist.
+
+## Task #8: Marginal-Delta-Plate-Shaping -- verworfen (2026-07-28)
+
+**Hypothese** (aus Task #5-Analyse): Task #93s Shaping wandte `tanh` auf
+den ABSOLUTEN `plate_shaping_delta(state)` an -- Geschwister-Kandidaten
+teilen dieselbe grosse Baseline, `tanh'(baseline)` sinkt mit wachsendem
+|baseline|, die marginale Geschwister-Differenz wird dadurch gedaempft.
+Fix: `tanh` auf die Differenz zum Elternknoten anwenden (Baseline faellt
+VOR der Nichtlinearitaet weg). Code implementiert (`plate_shaping_marginal`,
+`make_node` bekommt `parent_state`-Parameter), 167/167 Tests gruen,
+`plate_shaping_marginal_isolates_parent_baseline`-Formeltest bestaetigt
+die Rechnung.
+
+**A/B-Test** (`tools/paired_arena_plate_ab.py`, auf Nutzer-Anstoss
+2026-07-28 von den veralteten v15_best/v14b_best -- Task #93 -- auf den
+AMTIERENDEN Champion `v17_best` vs. Vorgaenger `v16_best` umgestellt --
+Frage ist Spielstaerke des aktuellen Modells, nicht akademische
+Vergleichbarkeit mit einem alten Nullergebnis. Beide @400 Sims,
+identischer Seed 9315, 100 Spiele je Arm):
+
+| Arm | Champion:Gegner | Ø-Score Champion:Gegner | Ø-Floor Champion:Gegner |
+|---|---:|---:|---:|
+| OFF (Ist-Zustand) | 56:44 | 38,3 : 35,5 | 13,5 : 15,3 |
+| ON (Marginal-Delta) | 50:50 | 36,6 : 38,5 | 14,2 : 14,2 |
+
+Diskordante Paare: b(ON-only-Sieg)=10, c(OFF-only-Sieg)=16 -- MEHR
+OFF-only-Siege als ON-only. Exakter McNemar-Test: **p=0,3269**.
+
+**Ergebnis: NEGATIV, verworfen.** Nicht nur statistisch nicht signifikant
+(Evidenzregel verlangt p<0,05 UND Vorteil fuer ON -- keins von beiden
+erfuellt) -- die Richtung ist klar gegen ON: der Champion-Punktevorsprung
+kippt von +2,8 (OFF) auf -1,9 (ON). Bei n=100 ist das noch im Rauschband,
+aber definitiv kein Beleg fuer die Hypothese.
+
+**Einordnung**: Die Saettigungs-Erklaerung (tanh' sinkt mit wachsender
+Baseline) ist mathematisch korrekt, war aber offenbar nicht der
+dominante limitierende Faktor in der Praxis -- entweder sind die meisten
+entscheidungsrelevanten Board-Zustaende nicht tief genug in der
+Saettigungszone, oder das isolierte marginale Signal ist selbst bei
+voller Staerke schlicht zu schwach/verrauscht, um etwas beizutragen
+(konsistent mit der bereits im Original-Task-#93 geaeusserten Vermutung:
+der Value-Head lernt Wertungsplatten-Fortschritt vermutlich schon
+groesstenteils selbst aus den Features, der exakte Zusatz-Nudge bringt
+wenig neue Information).
+
+**Entscheid**: `PLATE_SHAPING_ENABLED` bleibt `false` (zurueckgesetzt,
+verifiziert: 167/167 Tests, Produktions-Wheel neu gebaut+installiert,
+Smoke-Test bestanden). Der Code (Marginal-Delta-Mechanik) bleibt im Repo
+erhalten (deaktiviert, byte-identisches Bestandsverhalten) fuer
+etwaige spaetere Experimente, aber Phase 2/3 aus der urspruenglichen
+3-Phasen-Ueberlegung (Aux-Trainingsziel, Self-Play-"Trainingsraeder")
+werden NICHT mehr auf Basis dieser Hypothese verfolgt -- die Grundannahme
+(Common-Mode-Washout ist behebbar) hat sich nicht in echter Spielstaerke
+niedergeschlagen. Wertungsplatten-Nutzung bleibt eine offene, aber
+niedrigpriorisierte Frage (Nutzer-Einordnung 2026-07-27: Spielstaerke
+insgesamt ist das eigentliche Ziel, nicht Wertungsplatten-Ausnutzung an
+sich).
