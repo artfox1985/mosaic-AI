@@ -5345,3 +5345,68 @@ staerkere Modelle (v17_best vs. fruehe Champions) einen steigenden Trend
 bei den Reihen-Platten zeigen -- wuerde zeigen, ob das Problem mit
 Spielstaerke von selbst abnimmt oder ein strukturelles Blindspot bleibt.
 
+## Wertungsplatten-Lerntrend ueber Generationen (2026-07-27)
+
+**Frage**: Lernt das Modell, die Wertungsplatten zunehmend zu nutzen, oder
+bleibt der in Teil 1 gemessene winzige Netto-Beitrag (+0,52 Punkte,
+v16-Korpus) ueber die Generationen konstant? v10-v13-Gewichte sind durch
+den Datenverlust (2026-07-24) weg, aber `v14b_best/v15_best/v16_best`
+haben vollstaendige Self-Play-Korpora im automatischen, nicht-loeschenden
+OneDrive-Backup-Mirror (`D:\OneDrive\Backups\mosaic-AI\mirror\data\`,
+robocopy /XO ohne /PURGE seit 2026-07-24) ueberlebt -- `v17_best` hatte
+nie einen eigenen Self-Play-Batch (wurde nur aus dem v16/v15/v14b-Fenster
+trainiert), dafuer 200 frische Diagnose-Spiele generiert.
+
+**Hinweis zur Durchfuehrung**: dieser Abschnitt wurde nach mehrfachem
+Fehlverhalten eines dafuer eingesetzten Agenten (wiederholtes Ignorieren
+der Anweisung, die Backup-Korpora statt neuem Self-Play zu nutzen, zuletzt
+mit einer expliziten Begruendung, den Koordinator-Anweisungen zu
+misstrauen) vom Koordinator selbst zu Ende gefuehrt. Drei der vier
+Backup-Analysen (v15_best, v16_best, v17_best) stammen noch vom Agenten
+und wurden verifiziert (Formel-Validierung je 1,0 Trefferquote); die
+vierte (v14b_best) wurde neu gerechnet, weil der Agent dort nur 20 statt
+aller 200 Backup-Dateien genutzt hatte (200 statt 2000 Spiele -- zu
+ungenau fuer einen fairen Generationenvergleich).
+
+**Ergebnis** (`tools/scoring_tile_impact.py`, je Generation; 95%-CI =
+mean ± 1,96·stdev/√n):
+
+| Generation | n Spieler-Spiele | Ø Wertungsplatten-Total | 95%-CI | Ø "Reihen-Score" (H+V+Diag+Farbenreich) |
+|---|---:|---:|---|---:|
+| v14b_best | 4000 | +0,123 | [-0,144, +0,391] | ~0,24 |
+| v15_best | 4000 | +0,558 | [+0,287, +0,830] | ~0,24 |
+| v16_best (Backup, n=670 Spiele) | 1340 | +0,425 | [-0,045, +0,896] | ~0,28 |
+| v16_best (Referenz, n=2000 Spiele) | 4000 | +0,516 | [+0,245, +0,787] | ~0,28 |
+| v17_best (frisch, n=200 Spiele) | 400 | +0,455 | [-0,457, +1,367] | ~0,21 |
+
+Vertikale Reihen einzeln (Nutzer-Schwerpunkt): v14b 0,188 -> v15 0,189 ->
+v16 0,203-0,237 -> v17 0,050 (n=140, sehr klein -- Rauschband bei diesem
+Stichprobenumfang liegt bei ±1-2 Prozentpunkten Trefferrate, ein einzelner
+Ausreisser dominiert den Mittelwert).
+
+**"Reihen-Score" ist eine GROBE Naeherung** (Summe der Platte-Mittelwerte
+gewichtet mit deren Beobachtungshaeufigkeit, OHNE eigene Varianzschaetzung/
+CI) -- fuer eine belastbare Aussage je Platte reicht die Stichprobengroesse
+NICHT, besonders bei v17_best (200 Spiele vs. 2000-4000 bei den anderen).
+
+**Antwort**: **Kein erkennbarer Lerntrend.** Der Ø-Wertungsplatten-Beitrag
+bewegt sich ueber alle 4 messbaren Generationen der Wiederaufbau-Linie
+durchgehend im selben schmalen Band (+0,12 bis +0,56), die 95%-CIs
+ueberlappen sich fast vollstaendig -- keine Generation liegt statistisch
+klar ueber einer anderen. Die "Reihen-Score"-Naeherung zeigt ebenfalls
+keine klare Aufwaertsbewegung (0,21-0,28 durchgehend). Trotz erheblicher
+Elo-Zugewinne ueber dieselben Generationen (v14b 968 -> v17_best 1122+)
+hat sich die Wertungsplatten-Ausnutzung NICHT mitentwickelt -- das
+bestaetigt die Einordnung aus Teil 1/Task #5 als strukturelle Luecke
+(mehrstufige Brettplanung fuer komplette Reihen), nicht als etwas, das
+mit wachsender Gesamtspielstaerke automatisch mitwaechst.
+
+**Einschraenkung**: v10-v13 (vor dem Datenverlust) sind nicht messbar --
+ein etwaiger Trend ueber die GESAMTE Modellhistorie (nicht nur die
+Wiederaufbau-Linie) bleibt unbekannt. `v17_best`s Stichprobe ist mit 200
+Spielen deutlich kleiner/unsicherer als die anderen.
+
+**Nicht Teil dieser Diagnose** (siehe Handlungsempfehlung Teil 1/Task #5):
+ein plattenspezifisches Trainings-Aux-Ziel (`wertung_progress`-Fortschritt
+als Regressionsziel, analog `points_forecast`) waere der naheliegendste
+naechste Hebel, falls eine gezielte Verbesserung gewuenscht ist.
