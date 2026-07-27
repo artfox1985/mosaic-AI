@@ -12,8 +12,11 @@
 # logs, HDF5-Trainingscaches (.cache*.h5).
 
 $ErrorActionPreference = "Continue"
-$src  = "D:\Archiv\Documents\Projekte\mosaic-AI"
-$dst  = "C:\Users\Patrick\OneDrive\Backups\mosaic-AI"
+# Relativ zum Skript-Standort (tools/mosaic_backup.ps1) statt hart kodiertem
+# Pfad -- der alte absolute D:\Archiv-Pfad war nach dem OneDrive-Vorfall
+# (2026-07-28) nicht mehr der echte Projektstandort.
+$src  = Split-Path -Parent $PSScriptRoot
+$dst  = "D:\OneDrive\Backups\mosaic-AI"
 $date = Get-Date -Format "yyyy-MM-dd"
 
 New-Item -ItemType Directory -Force "$dst\mirror"          | Out-Null
