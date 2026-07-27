@@ -2,8 +2,8 @@
 (PLATE_SHAPING_ENABLED false vs. true, 2026-07-25).
 
 Analog zu `paired_arena_shrink_arm_worker.py` (Task #78): Netz vs. Netz
-(`net_vs_net_arena_match`), Referenz-Champion `v15_best` (Brett 0) gegen die
-Vor-Referenz `v14b_best` (Brett 1), beide @ derselben Sims-Zahl.
+(`net_vs_net_arena_match`), Referenz-Champion `v17_best` (Brett 0) gegen die
+Vor-Referenz `v16_best` (Brett 1), beide @ derselben Sims-Zahl.
 
 Wird per `python paired_arena_plate_arm_worker.py ...` in JEWEILS EINEM
 Wheel-Stand aufgerufen -- OFF-Arm = Wheel-Build mit
@@ -19,14 +19,14 @@ run_net_vs_net_arena`) in beiden Armen dieselbe Spiel-Sequenz erzeugt --
 Voraussetzung fuer die gepaarte Auswertung (Spielindex i: OFF-Ergebnis vs.
 ON-Ergebnis).
 
-Champion (`v15_best`) bleibt in BEIDEN Armen auf Brett 0 (`model_a`) -- es
+Champion (`v17_best`) bleibt in BEIDEN Armen auf Brett 0 (`model_a`) -- es
 geht hier NICHT um Modell-A-vs-B-Fairness, sondern um die Frage "aendert der
 Plate-Shaping-Toggle, ob der Champion auf DENSELBEN Startbedingungen
 gewinnt" -- die Brettzuordnung ist zwischen den Armen ohnehin konstant, ein
 Brett-Bias faellt daher aus der Paarung heraus.
 
 Druckt das rohe JSON auf stdout (ein `[{scores, winner, ...}, ...]`-Array,
-`winner==0` bedeutet Champion (v15_best) gewinnt).
+`winner==0` bedeutet Champion (v17_best) gewinnt).
 """
 import sys
 import json

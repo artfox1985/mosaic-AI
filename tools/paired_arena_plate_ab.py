@@ -68,12 +68,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 WORKER_SCRIPT = Path(__file__).resolve().parent / "paired_arena_plate_arm_worker.py"
 EVAL_DIR = BASE_DIR / "evaluations"
 
-# Absolute Pfade in den HAUPT-Checkout (D:\...\mosaic-AI\models\...) -- NICHT
-# verlinkt/kopiert in den Worktree (Junction-Vorfall 2026-07-24, siehe
-# Auftrag). Der Worktree hat gar kein models/-Verzeichnis (gitignored).
-MAIN_CHECKOUT = Path(r"D:\Archiv\Documents\Projekte\mosaic-AI")
-MODEL_CHAMPION = str((MAIN_CHECKOUT / "models" / "alphazero_v15_best.onnx").resolve())
-MODEL_OPPONENT = str((MAIN_CHECKOUT / "models" / "alphazero_v14b_best.onnx").resolve())
+# Absolute Pfade in den HAUPT-Checkout (models/ ist gitignored, daher kein
+# relativer Pfad ueber __file__ allein verlaesslich, falls von einem
+# Worktree aus aufgerufen -- siehe Junction-Vorfall 2026-07-24).
+# Task #8 (2026-07-28, Nutzer-Anstoss "warum schaust dir nicht die
+# aktuellen Champions an?"): Referenz-Paar von v15_best/v14b_best (Task #93,
+# beide laengst nicht mehr relevant) auf den AMTIERENDEN Champion v17_best
+# vs. Vorgaenger v16_best umgestellt -- testet die tatsaechliche Staerke-
+# Frage statt akademischer Vergleichbarkeit mit dem alten Nullergebnis.
+MAIN_CHECKOUT = BASE_DIR
+MODEL_CHAMPION = str((MAIN_CHECKOUT / "models" / "alphazero_v17_best.onnx").resolve())
+MODEL_OPPONENT = str((MAIN_CHECKOUT / "models" / "alphazero_v16_best.onnx").resolve())
 SIMS = 400
 C_PUCT = 1.5
 DEFAULT_N_GAMES = 100
