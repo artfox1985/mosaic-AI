@@ -583,19 +583,47 @@ fn plate_shaping_delta(state: &GameState) -> f64 {
     (mine - theirs) / PLATE_SHAPING_SCALE
 }
 
-/// Wendet das Wertungsplatten-Shaping-Additiv (Task #93) auf BEIDE
-/// Blattwert-Perspektiven `[Spieler0, Spieler1]` an -- muss NACH dem
-/// Floor-Shaping-Additiv aufgerufen werden (koexistiert additiv, siehe
-/// Aufrufstelle in `make_node`). Bei `PLATE_SHAPING_ENABLED=false`
-/// (Standard) exakte Identität -- der Block wird komplett übersprungen,
-/// nicht nur numerisch neutralisiert, damit garantiert byte-identisches
-/// Bestandsverhalten erhalten bleibt.
-fn apply_plate_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
+/// Wendet das Wertungsplatten-Shaping-Additiv (Task #93, Experiment
+/// "Marginal-Delta" 2026-07-27, Task #8) auf BEIDE Blattwert-Perspektiven
+/// `[Spieler0, Spieler1]` an -- muss NACH dem Floor-Shaping-Additiv
+/// aufgerufen werden (koexistiert additiv, siehe Aufrufstelle in
+/// `make_node`). Bei `PLATE_SHAPING_ENABLED=false` (Standard) exakte
+/// Identität -- der Block wird komplett übersprungen, nicht nur numerisch
+/// neutralisiert, damit garantiert byte-identisches Bestandsverhalten
+/// erhalten bleibt.
+///
+/// URSPRUENGLICHE Version (Task #93) wandte `tanh` auf den ABSOLUTEN
+/// `plate_shaping_delta(state)` an -- A/B-Nullergebnis (p=0.7111). Task #5
+/// (Gumbel-Rang-Invarianz-Diagnose) liefert die Erklaerung: alle
+/// Geschwister-Kandidaten eines Knotens teilen denselben grossen
+/// Baseline-Fortschritt (nur EIN Zug unterscheidet sie), `tanh` an dieser
+/// Stelle hat dort eine kleine Ableitung (`tanh'(baseline)` sinkt mit
+/// wachsendem |baseline|) -- die tatsaechlich entscheidungsrelevante
+/// MARGINALE Differenz zwischen Geschwistern wird dadurch mit `tanh'
+/// (baseline)` gedaempft, nicht durch `tanh'(0)=1` wie beabsichtigt.
+/// Fix: `tanh` auf die Differenz zum ELTERNKNOTEN anwenden (isoliert den
+/// Beitrag GENAU dieses Zugs, eliminiert die gemeinsame Baseline VOR der
+/// Nichtlinearitaet statt danach). Bei fehlendem Elternknoten (Wurzel --
+/// hat keine Geschwister-Vergleichsbasis) bleibt der Shift 0.
+fn apply_plate_shaping(value: [f64; 2], state: &GameState, parent_state: Option<&GameState>) -> [f64; 2] {
     if !PLATE_SHAPING_ENABLED {
         return value;
     }
-    let shift = PLATE_SHAPING_WEIGHT * plate_shaping_delta(state).tanh();
+    let shift = PLATE_SHAPING_WEIGHT * plate_shaping_marginal(state, parent_state).tanh();
     [(value[0] + shift).clamp(0.0, 1.0), (value[1] - shift).clamp(0.0, 1.0)]
+}
+
+/// Marginaler Wertungsplatten-Fortschrittsbeitrag GENAU des Zugs, der von
+/// `parent_state` zu `state` führte -- isoliert von der gemeinsamen
+/// Baseline (siehe `apply_plate_shaping`-Kommentar). `None` (Wurzel, kein
+/// Elternknoten) -> 0.0 (kein Shift, keine Geschwister-Vergleichsbasis).
+/// Eigene, ungated Funktion (nicht hinter `PLATE_SHAPING_ENABLED`), damit
+/// die reine Formel unabhängig vom Toggle testbar ist.
+fn plate_shaping_marginal(state: &GameState, parent_state: Option<&GameState>) -> f64 {
+    match parent_state {
+        Some(ps) => plate_shaping_delta(state) - plate_shaping_delta(ps),
+        None => 0.0,
+    }
 }
 
 // ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
@@ -970,6 +998,7 @@ fn make_node<R: Rng + ?Sized>(
     net_value: Option<&Net>,
     state: GameState,
     parent: Option<usize>,
+    parent_state: Option<&GameState>,
     action: Option<Action>,
     prior: f32,
     player_who_acted: usize,
@@ -1121,7 +1150,7 @@ fn make_node<R: Rng + ?Sized>(
             // Floor-Shaping-Additiv (koexistiert additiv, siehe
             // `apply_plate_shaping`-Kommentar). Bei `PLATE_SHAPING_ENABLED=false`
             // (Standard) exakte Identität -- der Block wird gar nicht ausgeführt.
-            today_value = apply_plate_shaping(today_value, &state);
+            today_value = apply_plate_shaping(today_value, &state, parent_state);
 
             // Rundenübergang (Phase wechselt von Drafting weg) per Chance-Node-
             // Sampling statt Einzelwert bewerten -- siehe round_transition.rs
@@ -1696,7 +1725,7 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     }
     let root_player = root_state.current_player;
     let mut nodes =
-        vec![make_node(net_policy, net_value, root_state, None, None, 0.0, root_player, rng)];
+        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng)];
 
     if let Some(t) = trace.as_deref_mut() {
         t.determinize_active = DETERMINIZE_ROOT_HIDDEN_INFO;
@@ -1749,8 +1778,9 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
             if g.apply_drafting(&act).is_ok() {
                 let mut child_state = g.state;
                 child_state.log.clear();
-                let child =
-                    make_node(net_policy, net_value, child_state, Some(nid), Some(act), prior, mover, rng);
+                let child = make_node(
+                    net_policy, net_value, child_state, Some(nid), Some(&nodes[nid].state), Some(act), prior, mover, rng,
+                );
                 let cid = nodes.len();
                 nodes.push(child);
                 nodes[nid].children.push(cid);
@@ -1850,8 +1880,9 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
                     if g.apply_drafting(&act).is_ok() {
                         let mut child_state = g.state;
                         child_state.log.clear();
-                        let child =
-                            make_node(net_policy, net_value, child_state, Some(0), Some(act), prior, mover, rng);
+                        let child = make_node(
+                            net_policy, net_value, child_state, Some(0), Some(&nodes[0].state), Some(act), prior, mover, rng,
+                        );
                         let cid = nodes.len();
                         nodes.push(child);
                         nodes[0].children.push(cid);
@@ -2056,7 +2087,7 @@ fn build_net_tree<R: Rng + ?Sized>(
     }
     let root_player = root_state.current_player;
     let mut nodes =
-        vec![make_node(net_policy, net_value, root_state, None, None, 0.0, root_player, rng)];
+        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -2137,6 +2168,7 @@ fn build_net_tree<R: Rng + ?Sized>(
                         net_value,
                         child_state,
                         Some(nid),
+                        Some(&nodes[nid].state),
                         Some(act.clone()),
                         prior,
                         mover,
@@ -3767,7 +3799,7 @@ mod tests {
         for gi in 0..8u64 {
             let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
             for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
-                let out = apply_plate_shaping(v, &state);
+                let out = apply_plate_shaping(v, &state, None);
                 if PLATE_SHAPING_ENABLED {
                     // Falls der Toggle (Mess-Wheel-Arm) aktiv ist, muss das
                     // Ergebnis weiterhin ein gueltiges [0,1]-Paar bleiben.
@@ -3781,6 +3813,35 @@ mod tests {
                     );
                 }
             }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn plate_shaping_marginal_isolates_parent_baseline() {
+        // Marginal-Delta-Fix (Task #8, 2026-07-27): `plate_shaping_marginal`
+        // muss GENAU `plate_shaping_delta(state) - plate_shaping_delta(parent)`
+        // sein -- unabhaengig davon, wie GROSS die gemeinsame Baseline ist
+        // (das war der Kern des Fixes: die alte Version wandte tanh auf den
+        // ABSOLUTEN Wert an, wo eine grosse gemeinsame Baseline die kleine
+        // Geschwister-Differenz via tanh'(baseline)->0 daempfte). Kein
+        // Elternknoten (Wurzel) -> exakt 0.0.
+        let mut rng = StdRng::seed_from_u64(834);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(parent) = random_drafting_state(gi, 10, &mut rng) else { continue };
+            let Some(child) = random_drafting_state(gi + 100, 11, &mut rng) else { continue };
+            let expected = plate_shaping_delta(&child) - plate_shaping_delta(&parent);
+            assert!(
+                (plate_shaping_marginal(&child, Some(&parent)) - expected).abs() < 1e-12,
+                "Spiel {gi}: marginal weicht von delta(child)-delta(parent) ab"
+            );
+            assert_eq!(
+                plate_shaping_marginal(&child, None),
+                0.0,
+                "Spiel {gi}: ohne Elternknoten (Wurzel) muss marginal exakt 0 sein"
+            );
             checked += 1;
         }
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
