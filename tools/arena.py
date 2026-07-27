@@ -585,7 +585,7 @@ if __name__ == "__main__":
     import os
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v16_best.onnx"   # Pfad zum ONNX-Netz
+    NET_MODEL = "models/alphazero_v17_best.onnx"   # Pfad zum ONNX-Netz
     NET_MODEL_PRE = "models/alphazero_v1c.onnx"
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
