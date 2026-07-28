@@ -26,6 +26,28 @@ except Exception:
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 
+
+def _champion_model_path(fallback: str = "v18_best") -> str:
+    """ONNX-Pfad des amtierenden Champions aus `models/champion.txt`.
+
+    Gleiche Quelle wie `server.py::_load_champion_model` und
+    `tools/set_champion.py`, damit Arena, Server und Gating nicht
+    auseinanderlaufen. Faellt auf `fallback` zurueck, wenn die Datei fehlt
+    oder das ONNX dazu nicht existiert.
+    """
+    root = Path(__file__).resolve().parent.parent
+    name = fallback
+    try:
+        cand = (root / "models" / "champion.txt").read_text(encoding="utf-8").strip()
+        if cand:
+            name = cand
+    except Exception:
+        pass
+    p = root / "models" / f"alphazero_{name}.onnx"
+    if not p.exists():
+        p = root / "models" / f"alphazero_{fallback}.onnx"
+    return f"models/{p.name}"
+
 try:
     import mosaic_rust as _mr
 except ImportError as e:  # pragma: no cover
@@ -583,9 +605,27 @@ def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rol
 
 if __name__ == "__main__":
     import os
+
+    # Schutzabfrage: dieses Skript hat KEIN argparse -- es wird ueber die
+    # Konstanten unten konfiguriert. Ohne diese Abfrage startet ein
+    # `arena.py --help` sofort einen 400-Spiele-Lauf (2026-07-28 passiert,
+    # mitten in ein laufendes Kaderspiel hinein).
+    if len(sys.argv) > 1:
+        print(__doc__ or "")
+        print("tools/arena.py nimmt KEINE Argumente -- Teilnehmer werden im\n"
+              "__main__-Block dieser Datei eingestellt (NET_MODEL/NET_SIMS/\n"
+              "HEUR_SIMS/GAMES). NET_MODEL folgt standardmaessig dem Champion\n"
+              "aus models/champion.txt.\n\n"
+              f"Aktuell: NET_MODEL waere '{_champion_model_path()}'.\n"
+              "Aufruf ohne Argumente startet den Lauf.")
+        sys.exit(0)
+
     # ── Teilnehmer hier manuell einstellen ───────────────────────────────────
     # AlphaZero-Netz (ONNX, Brett 0) vs Heuristik-MCTS (Brett 1). Werte anpassen.
-    NET_MODEL = "models/alphazero_v17_best.onnx"   # Pfad zum ONNX-Netz
+    # NET_MODEL folgt standardmaessig dem AKTUELLEN CHAMPION (models/champion.txt),
+    # damit hier nicht -- wie bis 2026-07-28 -- ein veralteter Name stehenbleibt
+    # und versehentlich die falsche Generation vermessen wird.
+    NET_MODEL = _champion_model_path()
     NET_MODEL_PRE = "models/alphazero_v1c.onnx"
     NET_NAME = os.path.splitext(os.path.basename(NET_MODEL))[0].removeprefix("alphazero_")
     NET_NAME_PRE = os.path.splitext(os.path.basename(NET_MODEL_PRE))[0].removeprefix("alphazero_")
