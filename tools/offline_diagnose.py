@@ -267,7 +267,7 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
             sl = slice(i, i + batch_size)
             x = states[sl].to(device)
             m = masks_t[sl].to(device)
-            pred_p, pred_v, _pred_moon, _pred_points = model(x)
+            pred_p, pred_v, _pred_moon, _pred_points, *_own = model(x)
             value_preds[sl] = pred_v.squeeze(-1).cpu().numpy()
 
             masked_logits = pred_p + (m - 1) * 1e9

@@ -5,7 +5,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from config import NUM_ACTIONS, HIDDEN_SIZE
+from config import NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
@@ -489,6 +489,44 @@ VALUE_TARGET_VARIANTS = ("default", "nortv", "nortv_r1")
 POLICY_TARGET_SHARPEN_EXPONENT = 2.0
 
 
+def _ownership_from_dome(dome_grid) -> list[int]:
+    """36 Binaerlabels (3x3 Slots x 4 Felder) fuer EIN Spielerbrett: 1 = Feld
+    ist belegt, 0 = leer. Reihenfolge slot_row-major, dann space_index -- fix
+    und identisch zur Feature-Reihenfolge in `state_to_tensor`. Nicht
+    existierende Slots (mid-game moeglich) zaehlen als 0; im ENDZUSTAND, aus
+    dem das Ziel gebildet wird, sind empirisch alle 18 Slots belegt."""
+    out: list[int] = []
+    for sr in range(3):
+        row = dome_grid[sr] if sr < len(dome_grid) else []
+        for sc in range(3):
+            slot = row[sc] if sc < len(row) else None
+            spaces = (slot or {}).get("spaces", []) if slot else []
+            for si in range(4):
+                sp = spaces[si] if si < len(spaces) else None
+                out.append(1 if (sp and sp.get("filled") is not None) else 0)
+    return out
+
+
+def _final_ownership_by_game(game_data) -> dict:
+    """game_id -> (ownership_p0, ownership_p1) aus dem LETZTEN Record des
+    Spiels. Das `dome_grid` aendert sich nach Abschluss der Tiling-Phase nicht
+    mehr (Nachweis siehe tools/scoring_tile_impact.py), der letzte Record
+    traegt also den finalen Kuppelzustand. Unvollstaendige Spiele -> None
+    (Ziel wird dann als -1 markiert und im Loss maskiert)."""
+    last_by_gid = {}
+    for step in game_data:
+        last_by_gid[step["game_id"]] = step
+    out = {}
+    for gid, last in last_by_gid.items():
+        if not last.get("completed"):
+            out[gid] = None
+            continue
+        players = last["state"]["players"]
+        out[gid] = (_ownership_from_dome(players[0]["dome_grid"]),
+                    _ownership_from_dome(players[1]["dome_grid"]))
+    return out
+
+
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data", files=None, value_target_variant="default"):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
@@ -531,7 +569,7 @@ class MosaicDataset(Dataset):
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
              + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
-             + "+rounds_v1").encode()
+             + "+rounds_v1+own_v1").encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -556,8 +594,12 @@ class MosaicDataset(Dataset):
                     self.points_forecast = torch.zeros_like(self.values)
                 if 'rounds' in hf:
                     self.rounds = torch.from_numpy(hf['rounds'][:])
-                else:  # kann durch den "+rounds_v1"-Cache-Key eigentlich nicht auftreten
+                else:  # kann durch den Schema-Marker im Cache-Key eigentlich nicht auftreten
                     self.rounds = torch.zeros(len(self.states), dtype=torch.int8)
+                if 'ownership' in hf:
+                    self.ownership = torch.from_numpy(hf['ownership'][:])
+                else:
+                    self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -577,6 +619,7 @@ class MosaicDataset(Dataset):
             self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
             self.points_forecast = torch.zeros_like(self.values)  # Legacy .pt kennt kein Aux-Ziel
             self.rounds = torch.zeros(len(self.states), dtype=torch.int8)  # Legacy .pt kennt keine Runden
+            self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -587,6 +630,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('policy_weights',      data=self.policy_weights.numpy(),      compression='lzf')
                 hf.create_dataset('points_forecast',     data=self.points_forecast.numpy(),     compression='lzf')
                 hf.create_dataset('rounds',              data=self.rounds.numpy(),              compression='lzf')
+                hf.create_dataset('ownership',           data=self.ownership.numpy(),           compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -599,10 +643,12 @@ class MosaicDataset(Dataset):
             polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
             rounds_l = []  # Rundennummer je Sample (Task #15 B: rundenselektive Loss-Gewichtung)
+            own_l = []     # Ownership-Ziel je Sample (Task #9): 72 Binaerlabels, -1 = unbekannt
 
             for f in files:
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
+                    final_own = _final_ownership_by_game(game_data)
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if "scores" in step and "winner" in step:
@@ -717,6 +763,18 @@ class MosaicDataset(Dataset):
                         pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
                         polw_l.append(np.float32(pol_w))
                         rounds_l.append(np.int8(step["state"].get("round", 0)))
+                        # Ego-Perspektive: erst der Spieler am Zug, dann der
+                        # Gegner -- dieselbe Reihenfolge wie in state_to_tensor
+                        # (`me = players[curr_pi]`, dann `enemy`). Die FUELLUNG
+                        # stammt aus dem Endzustand DES SPIELS, gilt also fuer
+                        # alle Schritte dieser Partie.
+                        fo = final_own.get(step["game_id"])
+                        if fo is None:
+                            own_l.append(np.full(OWNERSHIP_TARGETS, -1, dtype=np.int8))
+                        else:
+                            c = step["state"].get("current_player", 0)
+                            first, second = (fo[0], fo[1]) if c == 0 else (fo[1], fo[0])
+                            own_l.append(np.array(first + second, dtype=np.int8))
 
             states_np    = np.array(states_l,    dtype=np.float32)
             policies_np  = np.array(policies_l,  dtype=np.float32)
@@ -726,12 +784,13 @@ class MosaicDataset(Dataset):
             polw_np      = np.array(polw_l,      dtype=np.float32)
             points_np    = np.array(points_l,    dtype=np.float32)
             rounds_np    = np.array(rounds_l,    dtype=np.int8)
+            own_np       = np.array(own_l,       dtype=np.int8)
             # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
             # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
             # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
             # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
             # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
-            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l, rounds_l
+            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l, rounds_l, own_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -745,6 +804,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('policy_weights',       data=polw_np,      compression='lzf')
                 hf.create_dataset('points_forecast',      data=points_np,    compression='lzf')
                 hf.create_dataset('rounds',               data=rounds_np,    compression='lzf')
+                hf.create_dataset('ownership',            data=own_np,       compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -755,6 +815,7 @@ class MosaicDataset(Dataset):
             self.policy_weights     = torch.from_numpy(polw_np)
             self.points_forecast    = torch.from_numpy(points_np)
             self.rounds             = torch.from_numpy(rounds_np)
+            self.ownership          = torch.from_numpy(own_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
         self.value_target_variant = value_target_variant
@@ -763,7 +824,7 @@ class MosaicDataset(Dataset):
     def __getitem__(self, idx):
         return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
                 self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx],
-                self.rounds[idx])
+                self.rounds[idx], self.ownership[idx])
 
 
 class MosaicNet(nn.Module):
@@ -834,14 +895,30 @@ class MosaicNet(nn.Module):
             nn.Linear(value_hidden, 1),
             nn.Tanh()
         )
+        # Ownership-Head (Task #9): je Kuppelfeld binaer "am Spielende belegt?".
+        # 72 Ausgaben = 2 Spieler x 3x3 Slots x 4 Felder, ego-perspektivisch
+        # (erst der Spieler am Zug, dann der Gegner -- dieselbe Reihenfolge wie
+        # in `state_to_tensor`). Rohe Logits, BCEWithLogits im Training.
+        # BEWUSST ZULETZT deklariert: dadurch bleibt die Initialisierungs-
+        # reihenfolge aller uebrigen Module unveraendert, ein Lauf mit
+        # OWNERSHIP_WEIGHT=0.0 ist also byte-identisch zum Stand ohne Kopf.
+        self.ownership_head = nn.Sequential(
+            nn.Linear(hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, OWNERSHIP_TARGETS),
+        )
 
     def forward(self, x):
         shared = self.body(x)
+        # Reihenfolge = ONNX-Ausgabereihenfolge. `ownership` steht ZULETZT,
+        # damit `net.rs`s positionsbasierte Indizes out[0..3] unveraendert
+        # bleiben (Rust liest den Kopf nicht -- reines Trainingssignal).
         return (
             self.policy_head(shared),
             self.value_head(shared),
             self.moon_order_head(shared),
             self.points_head(shared),
+            self.ownership_head(shared),
         )
 
     @torch.no_grad()

@@ -51,7 +51,8 @@ def plackett_luce_moon_loss(pred_moon, moon_targets):
 
 
 # Unsere dynamischen Pfade aus der Config laden
-from config import MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT, POINTS_WEIGHT
+from config import (MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT,
+                    POINTS_WEIGHT, OWNERSHIP_WEIGHT)
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
@@ -187,7 +188,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
-          exclude_round5=False,
+          exclude_round5=False, ownership_weight=None, seed=None,
           value_weight=None, points_weight=None, value_target_variant="default"):
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
@@ -231,7 +232,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
-        "exclude_round5": exclude_round5,
+        "exclude_round5": exclude_round5, "ownership_weight": ownership_weight,
+        "seed": seed,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant,
     }
@@ -281,6 +283,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                       if val_dataset is not None else None)
 
     # 2. Hardware Setup
+    # Reproduzierbarkeit (Task #9, 2026-07-28): bis dahin setzte train.py
+    # KEINEN Seed -- zwei Laeufe mit identischen Flags unterschieden sich durch
+    # Gewichts-Init UND Batch-Shuffling. Damit war jeder Trainings-A/B auf
+    # Einzellaeufen (v12b_lr, v17_lrfix, r5base/r5excl) nur bis auf eine
+    # UNBEKANNTE Lauf-zu-Lauf-Varianz interpretierbar. Mit --seed laufen zwei
+    # Arme auf identischer Init und identischer Batch-Reihenfolge, der
+    # Unterschied ist dann allein die getestete Aenderung.
+    # Default None = altes Verhalten (unseeded), damit Alt-Rezepte unveraendert
+    # bleiben. torch.manual_seed deckt Init UND DataLoader-Shuffle ab.
+    if seed is not None:
+        torch.manual_seed(seed)
+        random.seed(seed)
+        print(f"   Seed          : {seed} (reproduzierbar)")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n🚀 Starte PyTorch Training auf: {device.type.upper()}")
 
@@ -302,9 +317,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # deshalb fuer diesen Sweep unveraendert wiederverwendbar.
     effective_value_weight = value_weight if value_weight is not None else VALUE_WEIGHT
     effective_points_weight = points_weight if points_weight is not None else POINTS_WEIGHT
+    effective_ownership_weight = ownership_weight if ownership_weight is not None else OWNERSHIP_WEIGHT
     print(f"⚙️  Hyperparameter (config.py, ggf. per CLI überschrieben):")
     print(f"   Learning Rate : {effective_lr}" + (f"  (Default {LEARNING_RATE})" if lr is not None else ""))
     print(f"   LR-Schedule   : {lr_schedule}")
+    print(f"   Ownership-W   : {effective_ownership_weight}"          f"{'  (Kopf aus)' if effective_ownership_weight <= 0.0 else ''}")
     print(f"   Batch Size    : {BATCH_SIZE}")
     print(f"   Value Weight  : {effective_value_weight}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)"
           + (f"  (Default {VALUE_WEIGHT})" if value_weight is not None else ""))
@@ -436,7 +453,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
 
-        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds) in dataloader:
+        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds, s_own) in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
@@ -445,7 +462,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v, pred_moon, pred_points = model(states)
+            pred_p, pred_v, pred_moon, pred_points, pred_own = model(states)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -495,7 +512,22 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
                 points_loss = (((pred_points - targets_points) ** 2) * rw2).sum() / denom
 
-            loss = p_loss + effective_value_weight * v_loss + effective_points_weight * points_loss
+            # Ownership-Loss (Task #9): dichtes Hilfsziel, 72 Binaerlabels je
+            # Position statt eines Skalars. -1 = unbekannt (unvollstaendiges
+            # Spiel) und wird maskiert. Bei Gewicht 0.0 wird der Term komplett
+            # uebersprungen -- kein Gradient, Bestandsverhalten unveraendert.
+            own_loss = torch.zeros((), device=device)
+            if effective_ownership_weight > 0.0:
+                own_t = s_own.to(device).float()
+                own_m = (own_t >= 0).float()
+                if own_m.sum() > 0:
+                    own_bce = F.binary_cross_entropy_with_logits(
+                        pred_own, own_t.clamp(min=0.0), reduction="none")
+                    own_loss = (own_bce * own_m).sum() / own_m.sum()
+
+            loss = (p_loss + effective_value_weight * v_loss
+                    + effective_points_weight * points_loss
+                    + effective_ownership_weight * own_loss)
             loss.backward()
             optimizer.step()
 
@@ -531,7 +563,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             with torch.no_grad():
-                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points, v_rounds) in val_dataloader:
+                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points, v_rounds, v_own) in val_dataloader:
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
@@ -915,6 +947,21 @@ if __name__ == "__main__":
                         help="Start-Learning-Rate fuer Adam (Standard: LEARNING_RATE aus config.py, "
                              "aktuell 0.0004). Task #77 (v12b_lr): Warm-Start-Feintuning-Kontrolle "
                              "mit niedrigerer Start-LR.")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed fuer Gewichts-Init und Batch-Shuffling. Default None = "
+                             "altes, unseeded Verhalten. Zwei Arme eines A/B mit DEMSELBEN "
+                             "Seed unterscheiden sich allein durch die getestete Aenderung "
+                             "-- ohne Seed vermischt sich der Effekt mit der Lauf-zu-Lauf-"
+                             "Varianz (die in diesem Projekt bis 2026-07-28 nie gemessen wurde).")
+    parser.add_argument("--ownership-weight", type=float, default=None,
+                        help="Task #9: Gewicht des Ownership-Hilfsziels (72 Binaerlabels je "
+                             "Position: wird dieses Kuppelfeld am SPIELENDE belegt sein?). "
+                             "Standard OWNERSHIP_WEIGHT aus config.py (aktuell 0.0 = Kopf aus, "
+                             "Bestandsverhalten byte-identisch). Motivation: der beste "
+                             "Checkpoint lag bei v15/v16/v17 stets bei Epoche 1-3, dem Netz "
+                             "fehlt lernbares Signal pro Sample, nicht Sample-Anzahl -- dieser "
+                             "Kopf liefert 72 Gradienten statt eines Skalars. Zielbalance "
+                             "gemessen 41/59.")
     parser.add_argument("--exclude-round5", action="store_true",
                         help="Task #15 B: Runde-5-Samples komplett aus Value-, Points- UND "
                              "Policy-Loss nehmen (Training UND Validierung, damit die "
@@ -953,6 +1000,7 @@ if __name__ == "__main__":
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
-          exclude_round5=args.exclude_round5,
+          exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
+          seed=args.seed,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant)
