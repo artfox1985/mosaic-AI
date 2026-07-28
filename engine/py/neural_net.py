@@ -524,9 +524,14 @@ class MosaicDataset(Dataset):
         # String im Key wuerden "nortv"/"nortv_r1" stillschweigend den
         # "default"-Cache derselben Dateiliste wiederverwenden.
         files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+        # "+rounds_v1" (Task #15 B, 2026-07-28): der Cache fuehrt jetzt zusaetzlich
+        # die Rundennummer je Sample mit (fuer rundenselektive Loss-Gewichtung,
+        # z.B. --exclude-round5). Der Marker erzwingt einen einmaligen Rebuild
+        # aller Alt-Caches, statt sie stillschweigend ohne das Feld zu laden.
         cache_key = hashlib.md5(
             (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
-             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)).encode()
+             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
+             + "+rounds_v1").encode()
         ).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -549,6 +554,10 @@ class MosaicDataset(Dataset):
                     self.points_forecast = torch.from_numpy(hf['points_forecast'][:])
                 else:  # alter Cache ohne Aux-Ziel → 0.0 (wird durch VALUE_SCHEMA_VERSION eh selten erreicht)
                     self.points_forecast = torch.zeros_like(self.values)
+                if 'rounds' in hf:
+                    self.rounds = torch.from_numpy(hf['rounds'][:])
+                else:  # kann durch den "+rounds_v1"-Cache-Key eigentlich nicht auftreten
+                    self.rounds = torch.zeros(len(self.states), dtype=torch.int8)
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -567,6 +576,7 @@ class MosaicDataset(Dataset):
             self.moon_order_targets = mot if isinstance(mot, torch.Tensor) else torch.stack(mot)
             self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
             self.points_forecast = torch.zeros_like(self.values)  # Legacy .pt kennt kein Aux-Ziel
+            self.rounds = torch.zeros(len(self.states), dtype=torch.int8)  # Legacy .pt kennt keine Runden
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -576,6 +586,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('moon_order_targets',  data=self.moon_order_targets.numpy(),  compression='lzf')
                 hf.create_dataset('policy_weights',      data=self.policy_weights.numpy(),      compression='lzf')
                 hf.create_dataset('points_forecast',     data=self.points_forecast.numpy(),     compression='lzf')
+                hf.create_dataset('rounds',              data=self.rounds.numpy(),              compression='lzf')
             os.remove(cache_path_pt)
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
@@ -587,6 +598,7 @@ class MosaicDataset(Dataset):
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
             polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
+            rounds_l = []  # Rundennummer je Sample (Task #15 B: rundenselektive Loss-Gewichtung)
 
             for f in files:
                 with open(f, "rb") as file:
@@ -704,6 +716,7 @@ class MosaicDataset(Dataset):
                         is_start = any(pe["action"].get("is_start") for pe in step["policy"])
                         pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
                         polw_l.append(np.float32(pol_w))
+                        rounds_l.append(np.int8(step["state"].get("round", 0)))
 
             states_np    = np.array(states_l,    dtype=np.float32)
             policies_np  = np.array(policies_l,  dtype=np.float32)
@@ -712,12 +725,13 @@ class MosaicDataset(Dataset):
             moon_np      = np.array(moon_l,      dtype=np.float32)
             polw_np      = np.array(polw_l,      dtype=np.float32)
             points_np    = np.array(points_l,    dtype=np.float32)
+            rounds_np    = np.array(rounds_l,    dtype=np.int8)
             # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
             # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
             # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
             # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
             # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
-            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l
+            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l, rounds_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -730,6 +744,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('moon_order_targets',   data=moon_np,      compression='lzf')
                 hf.create_dataset('policy_weights',       data=polw_np,      compression='lzf')
                 hf.create_dataset('points_forecast',      data=points_np,    compression='lzf')
+                hf.create_dataset('rounds',               data=rounds_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -739,6 +754,7 @@ class MosaicDataset(Dataset):
             self.moon_order_targets = torch.from_numpy(moon_np)
             self.policy_weights     = torch.from_numpy(polw_np)
             self.points_forecast    = torch.from_numpy(points_np)
+            self.rounds             = torch.from_numpy(rounds_np)
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
         self.value_target_variant = value_target_variant
@@ -746,7 +762,8 @@ class MosaicDataset(Dataset):
     def __len__(self): return len(self.states)
     def __getitem__(self, idx):
         return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
-                self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx])
+                self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx],
+                self.rounds[idx])
 
 
 class MosaicNet(nn.Module):

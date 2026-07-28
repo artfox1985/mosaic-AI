@@ -187,6 +187,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
+          exclude_round5=False,
           value_weight=None, points_weight=None, value_target_variant="default"):
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
@@ -230,6 +231,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
+        "exclude_round5": exclude_round5,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant,
     }
@@ -434,7 +436,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
 
-        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points) in dataloader:
+        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds) in dataloader:
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
@@ -454,7 +456,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # Policy-Loss NUR auf echten Drafting-Schritten (pol_w=1); Tiling/Start-
             # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
             # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
-            w = pol_w
+            # Task #15 B (2026-07-28): Runde-5-Samples optional komplett aus
+            # dem Loss nehmen. Das Netz wird in Runde 5 NIE konsultiert
+            # (net_mcts.rs:2265 bypassed den Suchpfad zu round5::choose_action,
+            # der R4-Bootstrap nutzt round5::exact_round5_outcome) -- ~17% der
+            # Value- und ~15% der Policy-Samples gehen dort in Entscheidungen,
+            # die ein exakter Alpha-Beta-Solver trifft. Praezedenzfall: pol_w=0
+            # fuer Tiling-Schritte, weil das der DFS-Solver macht.
+            rw = (s_rounds.to(device) != 5).float() if exclude_round5 else None
+
+            w = pol_w if rw is None else pol_w * rw
             p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 
             # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter.
@@ -475,8 +486,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
             # evaluations/stage2_investigation.md) -- klein gewichtet, damit
             # sie den Policy-Loss nicht dominieren.
-            v_loss = mse_loss(pred_v, targets_v)
-            points_loss = mse_loss(pred_points, targets_points)
+            if rw is None:
+                v_loss = mse_loss(pred_v, targets_v)
+                points_loss = mse_loss(pred_points, targets_points)
+            else:
+                rw2 = rw.view(-1, 1)
+                denom = rw2.sum().clamp(min=1e-6)
+                v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
+                points_loss = (((pred_points - targets_points) ** 2) * rw2).sum() / denom
 
             loss = p_loss + effective_value_weight * v_loss + effective_points_weight * points_loss
             loss.backward()
@@ -514,7 +531,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             with torch.no_grad():
-                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points) in val_dataloader:
+                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points, v_rounds) in val_dataloader:
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
@@ -525,9 +542,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
-                    v_p_loss = (v_per_sample_ce * v_pol_w).sum() / v_pol_w.sum().clamp(min=1e-6)
-                    v_v_loss = mse_loss(v_pred_v, v_targets_v)
-                    v_points_loss = mse_loss(v_pred_points, v_targets_points)
+                    v_rw = (v_rounds.to(device) != 5).float() if exclude_round5 else None
+                    v_w = v_pol_w if v_rw is None else v_pol_w * v_rw
+                    v_p_loss = (v_per_sample_ce * v_w).sum() / v_w.sum().clamp(min=1e-6)
+                    if v_rw is None:
+                        v_v_loss = mse_loss(v_pred_v, v_targets_v)
+                        v_points_loss = mse_loss(v_pred_points, v_targets_points)
+                    else:
+                        v_rw2 = v_rw.view(-1, 1)
+                        v_den = v_rw2.sum().clamp(min=1e-6)
+                        v_v_loss = (((v_pred_v - v_targets_v) ** 2) * v_rw2).sum() / v_den
+                        v_points_loss = (((v_pred_points - v_targets_points) ** 2) * v_rw2).sum() / v_den
                     val_ploss_sum += v_p_loss.item()
                     val_vloss_sum += v_v_loss.item()
                     val_pointsloss_sum += v_points_loss.item()
@@ -890,6 +915,14 @@ if __name__ == "__main__":
                         help="Start-Learning-Rate fuer Adam (Standard: LEARNING_RATE aus config.py, "
                              "aktuell 0.0004). Task #77 (v12b_lr): Warm-Start-Feintuning-Kontrolle "
                              "mit niedrigerer Start-LR.")
+    parser.add_argument("--exclude-round5", action="store_true",
+                        help="Task #15 B: Runde-5-Samples komplett aus Value-, Points- UND "
+                             "Policy-Loss nehmen (Training UND Validierung, damit die "
+                             "Checkpoint-Auswahl konsistent ist). Begruendung: das Netz wird "
+                             "in Runde 5 nie konsultiert -- net_mcts.rs:2265 bypassed den "
+                             "Suchpfad zu round5::choose_action (exakte Alpha-Beta-Suche), "
+                             "und der Runde-4-Bootstrap nutzt round5::exact_round5_outcome. "
+                             "~17%% der Value- und ~15%% der Policy-Samples liegen dort.")
     parser.add_argument("--lr-schedule", type=str, default="none", choices=["none", "cosine"],
                         help="LR-Verlauf ueber die Epochen. 'none' (Standard): konstante LR wie bisher. "
                              "'cosine': torch.optim.lr_scheduler.CosineAnnealingLR mit T_max=--epochs.")
@@ -900,14 +933,19 @@ if __name__ == "__main__":
     parser.add_argument("--points-weight", type=float, default=None,
                         help="Gewicht des Punktestand-Aux-Loss im Gesamt-Loss (Standard: POINTS_WEIGHT "
                              "aus config.py, aktuell 0.5). Siehe --value-weight.")
-    parser.add_argument("--value-target-variant", type=str, default="default",
+    parser.add_argument("--value-target-variant", type=str, default="nortv",
                         choices=["default", "nortv", "nortv_r1"],
-                        help="Task #84 (rtv-Ablation Phase 1): 'default' (Standard) reproduziert das "
-                             "Bestandsverhalten byte-identisch (rtv-Override bevorzugt, wo vorhanden). "
-                             "'nortv' ignoriert den round_transition_value-Override komplett (Value-"
-                             "Target faellt auf die tanh-Margin-Formel zurueck). 'nortv_r1' ignoriert "
-                             "ihn nur fuer Runde-1-Zustaende. Aendert den HDF5-Cache-Key (siehe "
-                             "neural_net.py::MosaicDataset).")
+                        help="Task #84 (rtv-Ablation Phase 1). STANDARD SEIT 2026-07-28: 'nortv' "
+                             "(vorher 'default'). Begruendung: v13_nortv_best schlug den Champion "
+                             "v12b_lr_best 171:129 allein durch das Weglassen des rtv-Overrides im "
+                             "Value-Target, bei zugleich ~3x guenstigerem Self-Play -- und JEDE "
+                             "Generation seit v15 wurde ohnehin explizit mit 'nortv' trainiert, der "
+                             "alte Default wurde faktisch nie genutzt. Ihn stehen zu lassen war nur "
+                             "ein Footgun (Flag vergessen = stillschweigend schlechteres Netz). "
+                             "'default' bleibt waehlbar, um Alt-Laeufe byte-identisch zu "
+                             "reproduzieren (rtv-Override bevorzugt, wo vorhanden); 'nortv_r1' "
+                             "ignoriert den Override nur fuer Runde-1-Zustaende. Aendert den "
+                             "HDF5-Cache-Key (siehe neural_net.py::MosaicDataset).")
 
     args = parser.parse_args()
 
@@ -915,5 +953,6 @@ if __name__ == "__main__":
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
+          exclude_round5=args.exclude_round5,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant)
