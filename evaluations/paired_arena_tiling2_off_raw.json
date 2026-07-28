@@ -1,0 +1,12812 @@
+{
+  "arm": "off",
+  "base_seed": 77150271,
+  "n_games": 400,
+  "block_size": 25,
+  "sims": 400,
+  "c_puct": 1.5,
+  "model_champion": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v18_best.onnx",
+  "model_opponent": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v17_best.onnx",
+  "games": [
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          1,
+          1
+        ],
+        [
+          1,
+          6,
+          10,
+          3,
+          10
+        ]
+      ],
+      "scores": [
+        10,
+        0
+      ],
+      "scores_unclamped": [
+        10,
+        -13
+      ],
+      "steps": 161,
+      "total_floor": [
+        9,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          3,
+          0
+        ],
+        [
+          1,
+          10,
+          10,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        40,
+        18
+      ],
+      "scores_unclamped": [
+        40,
+        12
+      ],
+      "steps": 160,
+      "total_floor": [
+        4,
+        34
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          10,
+          1,
+          3
+        ]
+      ],
+      "scores": [
+        65,
+        43
+      ],
+      "scores_unclamped": [
+        65,
+        43
+      ],
+      "steps": 167,
+      "total_floor": [
+        10,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        83,
+        66
+      ],
+      "scores_unclamped": [
+        83,
+        66
+      ],
+      "steps": 169,
+      "total_floor": [
+        11,
+        2
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          1,
+          10,
+          3
+        ],
+        [
+          0,
+          1,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        19,
+        32
+      ],
+      "scores_unclamped": [
+        19,
+        32
+      ],
+      "steps": 164,
+      "total_floor": [
+        21,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          1,
+          3
+        ],
+        [
+          1,
+          10,
+          1,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        23,
+        0
+      ],
+      "scores_unclamped": [
+        23,
+        -3
+      ],
+      "steps": 161,
+      "total_floor": [
+        11,
+        32
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          1,
+          6
+        ],
+        [
+          0,
+          10,
+          1,
+          3,
+          10
+        ]
+      ],
+      "scores": [
+        25,
+        43
+      ],
+      "scores_unclamped": [
+        25,
+        42
+      ],
+      "steps": 165,
+      "total_floor": [
+        9,
+        24
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        25,
+        5
+      ],
+      "scores_unclamped": [
+        23,
+        -1
+      ],
+      "steps": 166,
+      "total_floor": [
+        13,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          10,
+          10
+        ],
+        [
+          1,
+          6,
+          1,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        0,
+        28
+      ],
+      "scores_unclamped": [
+        -10,
+        27
+      ],
+      "steps": 156,
+      "total_floor": [
+        33,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          1,
+          10
+        ],
+        [
+          0,
+          10,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        24,
+        29
+      ],
+      "scores_unclamped": [
+        24,
+        25
+      ],
+      "steps": 166,
+      "total_floor": [
+        11,
+        20
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          0,
+          10
+        ],
+        [
+          1,
+          3,
+          6,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        9,
+        53
+      ],
+      "scores_unclamped": [
+        9,
+        52
+      ],
+      "steps": 170,
+      "total_floor": [
+        13,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        43
+      ],
+      "scores_unclamped": [
+        48,
+        43
+      ],
+      "steps": 161,
+      "total_floor": [
+        10,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          6,
+          0,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        32,
+        42
+      ],
+      "scores_unclamped": [
+        32,
+        42
+      ],
+      "steps": 164,
+      "total_floor": [
+        21,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          6,
+          1
+        ],
+        [
+          1,
+          3,
+          10,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        32,
+        28
+      ],
+      "scores_unclamped": [
+        32,
+        28
+      ],
+      "steps": 167,
+      "total_floor": [
+        17,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        62,
+        51
+      ],
+      "scores_unclamped": [
+        62,
+        48
+      ],
+      "steps": 165,
+      "total_floor": [
+        4,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          3,
+          3
+        ],
+        [
+          1,
+          6,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        46,
+        66
+      ],
+      "scores_unclamped": [
+        46,
+        66
+      ],
+      "steps": 168,
+      "total_floor": [
+        19,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        61,
+        57
+      ],
+      "scores_unclamped": [
+        61,
+        57
+      ],
+      "steps": 172,
+      "total_floor": [
+        11,
+        1
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          1,
+          6,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        31,
+        24
+      ],
+      "scores_unclamped": [
+        30,
+        24
+      ],
+      "steps": 172,
+      "total_floor": [
+        10,
+        12
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          6,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        49,
+        55
+      ],
+      "scores_unclamped": [
+        49,
+        55
+      ],
+      "steps": 168,
+      "total_floor": [
+        18,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          6,
+          1
+        ],
+        [
+          0,
+          10,
+          6,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        41,
+        28
+      ],
+      "scores_unclamped": [
+        41,
+        28
+      ],
+      "steps": 161,
+      "total_floor": [
+        8,
+        36
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          1,
+          3,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        39,
+        53
+      ],
+      "scores_unclamped": [
+        39,
+        53
+      ],
+      "steps": 160,
+      "total_floor": [
+        16,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          10,
+          10,
+          1
+        ],
+        [
+          0,
+          0,
+          6,
+          0,
+          10
+        ]
+      ],
+      "scores": [
+        20,
+        24
+      ],
+      "scores_unclamped": [
+        20,
+        24
+      ],
+      "steps": 161,
+      "total_floor": [
+        28,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          0,
+          6
+        ],
+        [
+          1,
+          10,
+          6,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        55,
+        61
+      ],
+      "scores_unclamped": [
+        55,
+        61
+      ],
+      "steps": 170,
+      "total_floor": [
+        16,
+        18
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        20,
+        22
+      ],
+      "scores_unclamped": [
+        14,
+        22
+      ],
+      "steps": 164,
+      "total_floor": [
+        26,
+        18
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          3,
+          3
+        ],
+        [
+          1,
+          6,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        41,
+        43
+      ],
+      "scores_unclamped": [
+        41,
+        43
+      ],
+      "steps": 162,
+      "total_floor": [
+        11,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          10,
+          0
+        ],
+        [
+          1,
+          10,
+          3,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        40,
+        54
+      ],
+      "scores_unclamped": [
+        40,
+        54
+      ],
+      "steps": 167,
+      "total_floor": [
+        11,
+        24
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          3,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        39,
+        40
+      ],
+      "scores_unclamped": [
+        39,
+        40
+      ],
+      "steps": 176,
+      "total_floor": [
+        7,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          10,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        61,
+        47
+      ],
+      "scores_unclamped": [
+        61,
+        47
+      ],
+      "steps": 169,
+      "total_floor": [
+        1,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          6,
+          6,
+          0
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        37,
+        40
+      ],
+      "scores_unclamped": [
+        37,
+        40
+      ],
+      "steps": 167,
+      "total_floor": [
+        14,
+        21
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          10,
+          1
+        ],
+        [
+          0,
+          10,
+          6,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        15
+      ],
+      "scores_unclamped": [
+        26,
+        9
+      ],
+      "steps": 162,
+      "total_floor": [
+        12,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          10,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        56,
+        50
+      ],
+      "scores_unclamped": [
+        56,
+        50
+      ],
+      "steps": 172,
+      "total_floor": [
+        12,
+        7
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        50,
+        41
+      ],
+      "scores_unclamped": [
+        50,
+        41
+      ],
+      "steps": 165,
+      "total_floor": [
+        4,
+        8
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          1,
+          0
+        ],
+        [
+          1,
+          3,
+          3,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        68,
+        65
+      ],
+      "scores_unclamped": [
+        68,
+        65
+      ],
+      "steps": 162,
+      "total_floor": [
+        2,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          3,
+          3
+        ],
+        [
+          0,
+          6,
+          6,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        16,
+        19
+      ],
+      "scores_unclamped": [
+        16,
+        17
+      ],
+      "steps": 161,
+      "total_floor": [
+        10,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          10,
+          1
+        ],
+        [
+          1,
+          10,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        70,
+        31
+      ],
+      "scores_unclamped": [
+        70,
+        31
+      ],
+      "steps": 163,
+      "total_floor": [
+        11,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        74,
+        39
+      ],
+      "scores_unclamped": [
+        74,
+        34
+      ],
+      "steps": 168,
+      "total_floor": [
+        3,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          1,
+          1
+        ],
+        [
+          1,
+          3,
+          1,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        62,
+        62
+      ],
+      "scores_unclamped": [
+        62,
+        62
+      ],
+      "steps": 164,
+      "total_floor": [
+        5,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          3,
+          3,
+          1
+        ],
+        [
+          1,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        25
+      ],
+      "scores_unclamped": [
+        48,
+        18
+      ],
+      "steps": 162,
+      "total_floor": [
+        9,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          3,
+          6
+        ],
+        [
+          0,
+          6,
+          1,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        47,
+        47
+      ],
+      "scores_unclamped": [
+        47,
+        47
+      ],
+      "steps": 169,
+      "total_floor": [
+        13,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        27
+      ],
+      "scores_unclamped": [
+        20,
+        27
+      ],
+      "steps": 165,
+      "total_floor": [
+        23,
+        1
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          3,
+          1
+        ],
+        [
+          1,
+          3,
+          3,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        55,
+        48
+      ],
+      "scores_unclamped": [
+        55,
+        48
+      ],
+      "steps": 167,
+      "total_floor": [
+        6,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          3,
+          0
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        29,
+        19
+      ],
+      "scores_unclamped": [
+        29,
+        19
+      ],
+      "steps": 166,
+      "total_floor": [
+        9,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          3,
+          1
+        ],
+        [
+          1,
+          1,
+          10,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        69,
+        40
+      ],
+      "scores_unclamped": [
+        69,
+        40
+      ],
+      "steps": 168,
+      "total_floor": [
+        15,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          0,
+          10
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        30,
+        43
+      ],
+      "scores_unclamped": [
+        30,
+        43
+      ],
+      "steps": 168,
+      "total_floor": [
+        11,
+        27
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          0,
+          6,
+          1
+        ],
+        [
+          1,
+          0,
+          6,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        67,
+        51
+      ],
+      "scores_unclamped": [
+        67,
+        51
+      ],
+      "steps": 162,
+      "total_floor": [
+        14,
+        9
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          1,
+          6
+        ],
+        [
+          0,
+          10,
+          10,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        33,
+        19
+      ],
+      "scores_unclamped": [
+        33,
+        18
+      ],
+      "steps": 166,
+      "total_floor": [
+        14,
+        33
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          1,
+          0
+        ],
+        [
+          0,
+          6,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        54,
+        59
+      ],
+      "scores_unclamped": [
+        54,
+        59
+      ],
+      "steps": 165,
+      "total_floor": [
+        12,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          1,
+          0,
+          10
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        41,
+        24
+      ],
+      "scores_unclamped": [
+        41,
+        24
+      ],
+      "steps": 161,
+      "total_floor": [
+        13,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          1,
+          1
+        ],
+        [
+          1,
+          0,
+          10,
+          1,
+          3
+        ]
+      ],
+      "scores": [
+        72,
+        45
+      ],
+      "scores_unclamped": [
+        72,
+        45
+      ],
+      "steps": 163,
+      "total_floor": [
+        11,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          10,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        31,
+        50
+      ],
+      "scores_unclamped": [
+        27,
+        50
+      ],
+      "steps": 160,
+      "total_floor": [
+        31,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        55,
+        71
+      ],
+      "scores_unclamped": [
+        55,
+        71
+      ],
+      "steps": 162,
+      "total_floor": [
+        12,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          0,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        46,
+        37
+      ],
+      "scores_unclamped": [
+        46,
+        37
+      ],
+      "steps": 164,
+      "total_floor": [
+        20,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          6,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          3,
+          6
+        ]
+      ],
+      "scores": [
+        19,
+        24
+      ],
+      "scores_unclamped": [
+        17,
+        24
+      ],
+      "steps": 167,
+      "total_floor": [
+        27,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        20,
+        27
+      ],
+      "scores_unclamped": [
+        19,
+        27
+      ],
+      "steps": 166,
+      "total_floor": [
+        22,
+        20
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          10,
+          6
+        ],
+        [
+          1,
+          0,
+          0,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        32,
+        55
+      ],
+      "scores_unclamped": [
+        32,
+        55
+      ],
+      "steps": 164,
+      "total_floor": [
+        27,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          10,
+          10
+        ],
+        [
+          1,
+          1,
+          6,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        35,
+        61
+      ],
+      "scores_unclamped": [
+        35,
+        61
+      ],
+      "steps": 164,
+      "total_floor": [
+        27,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          3,
+          0
+        ],
+        [
+          0,
+          3,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        40,
+        24
+      ],
+      "scores_unclamped": [
+        40,
+        24
+      ],
+      "steps": 164,
+      "total_floor": [
+        14,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          6,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        65,
+        45
+      ],
+      "scores_unclamped": [
+        65,
+        45
+      ],
+      "steps": 168,
+      "total_floor": [
+        5,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          3,
+          3
+        ],
+        [
+          0,
+          3,
+          3,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        32,
+        26
+      ],
+      "scores_unclamped": [
+        32,
+        26
+      ],
+      "steps": 164,
+      "total_floor": [
+        17,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          3,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        24,
+        37
+      ],
+      "scores_unclamped": [
+        24,
+        31
+      ],
+      "steps": 170,
+      "total_floor": [
+        10,
+        15
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          0,
+          10
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        47,
+        28
+      ],
+      "scores_unclamped": [
+        47,
+        28
+      ],
+      "steps": 167,
+      "total_floor": [
+        19,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          6,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        25,
+        20
+      ],
+      "scores_unclamped": [
+        25,
+        20
+      ],
+      "steps": 164,
+      "total_floor": [
+        4,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          3,
+          1
+        ],
+        [
+          0,
+          3,
+          10,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        24,
+        16
+      ],
+      "scores_unclamped": [
+        23,
+        16
+      ],
+      "steps": 171,
+      "total_floor": [
+        8,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          10,
+          1
+        ],
+        [
+          3,
+          10,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        55,
+        53
+      ],
+      "scores_unclamped": [
+        55,
+        49
+      ],
+      "steps": 168,
+      "total_floor": [
+        12,
+        27
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          3,
+          0,
+          3,
+          3
+        ],
+        [
+          0,
+          3,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        10,
+        10
+      ],
+      "scores_unclamped": [
+        9,
+        10
+      ],
+      "steps": 152,
+      "total_floor": [
+        12,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          0,
+          6
+        ],
+        [
+          0,
+          3,
+          3,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        43,
+        36
+      ],
+      "scores_unclamped": [
+        43,
+        36
+      ],
+      "steps": 167,
+      "total_floor": [
+        7,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          6,
+          1
+        ],
+        [
+          1,
+          1,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        60
+      ],
+      "scores_unclamped": [
+        48,
+        60
+      ],
+      "steps": 170,
+      "total_floor": [
+        20,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          3,
+          6,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        44,
+        73
+      ],
+      "scores_unclamped": [
+        44,
+        73
+      ],
+      "steps": 162,
+      "total_floor": [
+        12,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          0,
+          1
+        ],
+        [
+          0,
+          10,
+          6,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        52,
+        29
+      ],
+      "scores_unclamped": [
+        52,
+        18
+      ],
+      "steps": 166,
+      "total_floor": [
+        8,
+        27
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        51,
+        35
+      ],
+      "scores_unclamped": [
+        51,
+        32
+      ],
+      "steps": 165,
+      "total_floor": [
+        4,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          6,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        18,
+        28
+      ],
+      "scores_unclamped": [
+        16,
+        28
+      ],
+      "steps": 165,
+      "total_floor": [
+        10,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          6,
+          3
+        ],
+        [
+          0,
+          3,
+          6,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        55,
+        34
+      ],
+      "scores_unclamped": [
+        55,
+        34
+      ],
+      "steps": 158,
+      "total_floor": [
+        23,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          10,
+          0
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        31,
+        25
+      ],
+      "scores_unclamped": [
+        31,
+        25
+      ],
+      "steps": 171,
+      "total_floor": [
+        14,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          1
+        ],
+        [
+          0,
+          3,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        35,
+        38
+      ],
+      "scores_unclamped": [
+        35,
+        38
+      ],
+      "steps": 163,
+      "total_floor": [
+        13,
+        23
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          10,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          0,
+          10
+        ]
+      ],
+      "scores": [
+        31,
+        22
+      ],
+      "scores_unclamped": [
+        26,
+        22
+      ],
+      "steps": 162,
+      "total_floor": [
+        24,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          3,
+          1
+        ],
+        [
+          1,
+          3,
+          6,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        54,
+        63
+      ],
+      "scores_unclamped": [
+        54,
+        63
+      ],
+      "steps": 171,
+      "total_floor": [
+        5,
+        23
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          1,
+          10
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        37,
+        31
+      ],
+      "scores_unclamped": [
+        37,
+        30
+      ],
+      "steps": 170,
+      "total_floor": [
+        24,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          6,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        43,
+        76
+      ],
+      "scores_unclamped": [
+        43,
+        76
+      ],
+      "steps": 171,
+      "total_floor": [
+        10,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        23,
+        51
+      ],
+      "scores_unclamped": [
+        14,
+        51
+      ],
+      "steps": 163,
+      "total_floor": [
+        30,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          3,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          1,
+          3
+        ]
+      ],
+      "scores": [
+        58,
+        50
+      ],
+      "scores_unclamped": [
+        58,
+        50
+      ],
+      "steps": 164,
+      "total_floor": [
+        10,
+        9
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          10,
+          6
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        37,
+        54
+      ],
+      "scores_unclamped": [
+        37,
+        54
+      ],
+      "steps": 162,
+      "total_floor": [
+        32,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          6,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          3,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        41,
+        18
+      ],
+      "scores_unclamped": [
+        41,
+        18
+      ],
+      "steps": 168,
+      "total_floor": [
+        13,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        30,
+        44
+      ],
+      "scores_unclamped": [
+        30,
+        44
+      ],
+      "steps": 167,
+      "total_floor": [
+        22,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          3,
+          0
+        ],
+        [
+          0,
+          6,
+          10,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        37,
+        11
+      ],
+      "scores_unclamped": [
+        37,
+        -1
+      ],
+      "steps": 159,
+      "total_floor": [
+        14,
+        36
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          6,
+          0
+        ],
+        [
+          1,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        20,
+        10
+      ],
+      "scores_unclamped": [
+        20,
+        9
+      ],
+      "steps": 165,
+      "total_floor": [
+        7,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          10,
+          1,
+          3
+        ],
+        [
+          1,
+          1,
+          6,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        36,
+        25
+      ],
+      "scores_unclamped": [
+        36,
+        25
+      ],
+      "steps": 166,
+      "total_floor": [
+        16,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          6,
+          1
+        ],
+        [
+          1,
+          0,
+          10,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        19,
+        11
+      ],
+      "scores_unclamped": [
+        19,
+        9
+      ],
+      "steps": 171,
+      "total_floor": [
+        10,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          10,
+          3
+        ],
+        [
+          1,
+          1,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        21,
+        27
+      ],
+      "scores_unclamped": [
+        21,
+        27
+      ],
+      "steps": 166,
+      "total_floor": [
+        16,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          10,
+          1,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        34,
+        29
+      ],
+      "scores_unclamped": [
+        34,
+        29
+      ],
+      "steps": 155,
+      "total_floor": [
+        21,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          6,
+          1
+        ],
+        [
+          0,
+          0,
+          10,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        56,
+        39
+      ],
+      "scores_unclamped": [
+        56,
+        39
+      ],
+      "steps": 165,
+      "total_floor": [
+        10,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          6
+        ],
+        [
+          0,
+          0,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        48,
+        39
+      ],
+      "scores_unclamped": [
+        48,
+        39
+      ],
+      "steps": 173,
+      "total_floor": [
+        9,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        36,
+        48
+      ],
+      "scores_unclamped": [
+        36,
+        48
+      ],
+      "steps": 173,
+      "total_floor": [
+        12,
+        15
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        64,
+        54
+      ],
+      "scores_unclamped": [
+        64,
+        54
+      ],
+      "steps": 168,
+      "total_floor": [
+        5,
+        6
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          3,
+          3
+        ],
+        [
+          1,
+          0,
+          1,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        26,
+        12
+      ],
+      "scores_unclamped": [
+        21,
+        12
+      ],
+      "steps": 158,
+      "total_floor": [
+        17,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          1,
+          10
+        ],
+        [
+          0,
+          1,
+          1,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        16,
+        48
+      ],
+      "scores_unclamped": [
+        15,
+        48
+      ],
+      "steps": 164,
+      "total_floor": [
+        27,
+        2
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          1,
+          10
+        ],
+        [
+          0,
+          1,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        13,
+        41
+      ],
+      "scores_unclamped": [
+        13,
+        41
+      ],
+      "steps": 168,
+      "total_floor": [
+        17,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        18,
+        14
+      ],
+      "scores_unclamped": [
+        18,
+        14
+      ],
+      "steps": 158,
+      "total_floor": [
+        15,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          6,
+          0
+        ],
+        [
+          3,
+          6,
+          0,
+          3,
+          10
+        ]
+      ],
+      "scores": [
+        35,
+        9
+      ],
+      "scores_unclamped": [
+        35,
+        7
+      ],
+      "steps": 168,
+      "total_floor": [
+        12,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          6,
+          0,
+          0
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        47,
+        41
+      ],
+      "scores_unclamped": [
+        47,
+        41
+      ],
+      "steps": 167,
+      "total_floor": [
+        17,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        33
+      ],
+      "scores_unclamped": [
+        26,
+        25
+      ],
+      "steps": 164,
+      "total_floor": [
+        12,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          6,
+          1
+        ],
+        [
+          0,
+          6,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        47,
+        34
+      ],
+      "scores_unclamped": [
+        47,
+        34
+      ],
+      "steps": 163,
+      "total_floor": [
+        13,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          3,
+          0
+        ],
+        [
+          1,
+          3,
+          10,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        53,
+        33
+      ],
+      "scores_unclamped": [
+        53,
+        32
+      ],
+      "steps": 165,
+      "total_floor": [
+        12,
+        27
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          0,
+          0
+        ],
+        [
+          1,
+          3,
+          10,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        47,
+        27
+      ],
+      "scores_unclamped": [
+        47,
+        27
+      ],
+      "steps": 165,
+      "total_floor": [
+        11,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          1,
+          3
+        ],
+        [
+          0,
+          6,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        36,
+        73
+      ],
+      "scores_unclamped": [
+        35,
+        73
+      ],
+      "steps": 165,
+      "total_floor": [
+        24,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          1,
+          3
+        ]
+      ],
+      "scores": [
+        31,
+        50
+      ],
+      "scores_unclamped": [
+        31,
+        45
+      ],
+      "steps": 155,
+      "total_floor": [
+        11,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          1,
+          0
+        ],
+        [
+          0,
+          10,
+          0,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        50,
+        61
+      ],
+      "scores_unclamped": [
+        50,
+        61
+      ],
+      "steps": 169,
+      "total_floor": [
+        12,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          10,
+          1
+        ],
+        [
+          1,
+          1,
+          3,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        55,
+        50
+      ],
+      "scores_unclamped": [
+        55,
+        50
+      ],
+      "steps": 166,
+      "total_floor": [
+        13,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          1,
+          3,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        11,
+        18
+      ],
+      "scores_unclamped": [
+        8,
+        15
+      ],
+      "steps": 162,
+      "total_floor": [
+        16,
+        21
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          1,
+          3,
+          1
+        ],
+        [
+          0,
+          3,
+          10,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        21,
+        19
+      ],
+      "scores_unclamped": [
+        19,
+        19
+      ],
+      "steps": 163,
+      "total_floor": [
+        11,
+        33
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          0,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        6,
+        31
+      ],
+      "scores_unclamped": [
+        2,
+        31
+      ],
+      "steps": 164,
+      "total_floor": [
+        15,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          10,
+          0
+        ],
+        [
+          0,
+          3,
+          6,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        26,
+        32
+      ],
+      "scores_unclamped": [
+        26,
+        32
+      ],
+      "steps": 169,
+      "total_floor": [
+        16,
+        29
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        75,
+        19
+      ],
+      "scores_unclamped": [
+        75,
+        9
+      ],
+      "steps": 166,
+      "total_floor": [
+        1,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          10,
+          10
+        ],
+        [
+          0,
+          3,
+          6,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        28,
+        49
+      ],
+      "scores_unclamped": [
+        28,
+        49
+      ],
+      "steps": 162,
+      "total_floor": [
+        31,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          6,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        36,
+        35
+      ],
+      "scores_unclamped": [
+        36,
+        35
+      ],
+      "steps": 161,
+      "total_floor": [
+        19,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          6,
+          1
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        21,
+        5
+      ],
+      "scores_unclamped": [
+        21,
+        0
+      ],
+      "steps": 164,
+      "total_floor": [
+        18,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          1,
+          3,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        32,
+        34
+      ],
+      "scores_unclamped": [
+        32,
+        34
+      ],
+      "steps": 161,
+      "total_floor": [
+        15,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          1,
+          3
+        ],
+        [
+          1,
+          3,
+          0,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        1,
+        34
+      ],
+      "scores_unclamped": [
+        1,
+        33
+      ],
+      "steps": 160,
+      "total_floor": [
+        17,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          6,
+          10,
+          6
+        ],
+        [
+          0,
+          1,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        11,
+        45
+      ],
+      "scores_unclamped": [
+        8,
+        45
+      ],
+      "steps": 168,
+      "total_floor": [
+        33,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        26,
+        32
+      ],
+      "scores_unclamped": [
+        25,
+        32
+      ],
+      "steps": 166,
+      "total_floor": [
+        18,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          3,
+          6
+        ]
+      ],
+      "scores": [
+        63,
+        54
+      ],
+      "scores_unclamped": [
+        63,
+        54
+      ],
+      "steps": 165,
+      "total_floor": [
+        9,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          6,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        62,
+        16
+      ],
+      "scores_unclamped": [
+        62,
+        16
+      ],
+      "steps": 164,
+      "total_floor": [
+        4,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          6,
+          10,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        64,
+        38
+      ],
+      "scores_unclamped": [
+        64,
+        37
+      ],
+      "steps": 171,
+      "total_floor": [
+        2,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          1,
+          0,
+          1
+        ],
+        [
+          1,
+          6,
+          10,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        61,
+        47
+      ],
+      "scores_unclamped": [
+        61,
+        47
+      ],
+      "steps": 169,
+      "total_floor": [
+        4,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          3,
+          0
+        ],
+        [
+          1,
+          3,
+          3,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        23,
+        25
+      ],
+      "scores_unclamped": [
+        23,
+        25
+      ],
+      "steps": 159,
+      "total_floor": [
+        12,
+        18
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          10,
+          1
+        ],
+        [
+          3,
+          10,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        19,
+        43
+      ],
+      "scores_unclamped": [
+        18,
+        41
+      ],
+      "steps": 157,
+      "total_floor": [
+        25,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          1,
+          10,
+          0
+        ],
+        [
+          1,
+          3,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        41,
+        18
+      ],
+      "scores_unclamped": [
+        40,
+        18
+      ],
+      "steps": 171,
+      "total_floor": [
+        13,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          3,
+          6,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        34,
+        33
+      ],
+      "scores_unclamped": [
+        34,
+        33
+      ],
+      "steps": 163,
+      "total_floor": [
+        8,
+        10
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        14,
+        23
+      ],
+      "scores_unclamped": [
+        13,
+        23
+      ],
+      "steps": 164,
+      "total_floor": [
+        17,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          6,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        16,
+        29
+      ],
+      "scores_unclamped": [
+        16,
+        29
+      ],
+      "steps": 166,
+      "total_floor": [
+        20,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          1,
+          3,
+          1
+        ],
+        [
+          1,
+          6,
+          3,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        29,
+        54
+      ],
+      "scores_unclamped": [
+        29,
+        54
+      ],
+      "steps": 169,
+      "total_floor": [
+        12,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          6,
+          10
+        ]
+      ],
+      "scores": [
+        50,
+        29
+      ],
+      "scores_unclamped": [
+        50,
+        29
+      ],
+      "steps": 163,
+      "total_floor": [
+        4,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          0,
+          3,
+          6
+        ]
+      ],
+      "scores": [
+        33,
+        25
+      ],
+      "scores_unclamped": [
+        33,
+        24
+      ],
+      "steps": 164,
+      "total_floor": [
+        13,
+        12
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          3,
+          1
+        ],
+        [
+          1,
+          3,
+          1,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        30,
+        56
+      ],
+      "scores_unclamped": [
+        30,
+        56
+      ],
+      "steps": 166,
+      "total_floor": [
+        20,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          10
+        ],
+        [
+          0,
+          10,
+          1,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        4,
+        15
+      ],
+      "scores_unclamped": [
+        4,
+        9
+      ],
+      "steps": 162,
+      "total_floor": [
+        22,
+        15
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          3,
+          1,
+          3
+        ],
+        [
+          0,
+          3,
+          10,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        37,
+        30
+      ],
+      "scores_unclamped": [
+        37,
+        29
+      ],
+      "steps": 160,
+      "total_floor": [
+        9,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          10,
+          0
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        33,
+        42
+      ],
+      "scores_unclamped": [
+        33,
+        42
+      ],
+      "steps": 161,
+      "total_floor": [
+        13,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          3,
+          6
+        ],
+        [
+          1,
+          1,
+          3,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        49,
+        21
+      ],
+      "scores_unclamped": [
+        49,
+        21
+      ],
+      "steps": 166,
+      "total_floor": [
+        14,
+        9
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          1,
+          3,
+          6
+        ],
+        [
+          0,
+          10,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        58,
+        43
+      ],
+      "scores_unclamped": [
+        58,
+        43
+      ],
+      "steps": 161,
+      "total_floor": [
+        12,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          6,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        59,
+        24
+      ],
+      "scores_unclamped": [
+        59,
+        22
+      ],
+      "steps": 165,
+      "total_floor": [
+        18,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        53,
+        19
+      ],
+      "scores_unclamped": [
+        53,
+        16
+      ],
+      "steps": 173,
+      "total_floor": [
+        12,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          10,
+          6,
+          6
+        ]
+      ],
+      "scores": [
+        60,
+        41
+      ],
+      "scores_unclamped": [
+        60,
+        41
+      ],
+      "steps": 166,
+      "total_floor": [
+        5,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          10,
+          3
+        ],
+        [
+          0,
+          10,
+          6,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        54,
+        44
+      ],
+      "scores_unclamped": [
+        54,
+        44
+      ],
+      "steps": 163,
+      "total_floor": [
+        14,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        31,
+        28
+      ],
+      "scores_unclamped": [
+        31,
+        24
+      ],
+      "steps": 155,
+      "total_floor": [
+        12,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          10,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        10,
+        30
+      ],
+      "scores_unclamped": [
+        -3,
+        30
+      ],
+      "steps": 154,
+      "total_floor": [
+        31,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          3,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        47,
+        16
+      ],
+      "scores_unclamped": [
+        47,
+        15
+      ],
+      "steps": 160,
+      "total_floor": [
+        7,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          10,
+          6
+        ],
+        [
+          0,
+          1,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        0,
+        24
+      ],
+      "scores_unclamped": [
+        -4,
+        24
+      ],
+      "steps": 155,
+      "total_floor": [
+        23,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          3,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        38,
+        53
+      ],
+      "scores_unclamped": [
+        38,
+        53
+      ],
+      "steps": 169,
+      "total_floor": [
+        14,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          3,
+          10,
+          1
+        ],
+        [
+          0,
+          3,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        56
+      ],
+      "scores_unclamped": [
+        25,
+        56
+      ],
+      "steps": 165,
+      "total_floor": [
+        21,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          0,
+          3
+        ],
+        [
+          1,
+          0,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        62,
+        44
+      ],
+      "scores_unclamped": [
+        62,
+        44
+      ],
+      "steps": 166,
+      "total_floor": [
+        16,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          1,
+          0
+        ],
+        [
+          1,
+          3,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        62,
+        29
+      ],
+      "scores_unclamped": [
+        62,
+        28
+      ],
+      "steps": 165,
+      "total_floor": [
+        7,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        51,
+        41
+      ],
+      "scores_unclamped": [
+        51,
+        39
+      ],
+      "steps": 168,
+      "total_floor": [
+        6,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          3,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        41,
+        37
+      ],
+      "scores_unclamped": [
+        41,
+        30
+      ],
+      "steps": 161,
+      "total_floor": [
+        6,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          6,
+          6,
+          1,
+          10,
+          3
+        ],
+        [
+          0,
+          3,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        35,
+        50
+      ],
+      "scores_unclamped": [
+        33,
+        50
+      ],
+      "steps": 167,
+      "total_floor": [
+        26,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          3,
+          10,
+          3,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        77,
+        17
+      ],
+      "scores_unclamped": [
+        77,
+        13
+      ],
+      "steps": 162,
+      "total_floor": [
+        4,
+        27
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          3,
+          10
+        ],
+        [
+          0,
+          6,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        24,
+        13
+      ],
+      "scores_unclamped": [
+        24,
+        10
+      ],
+      "steps": 162,
+      "total_floor": [
+        16,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          10,
+          6,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        19,
+        11
+      ],
+      "scores_unclamped": [
+        19,
+        5
+      ],
+      "steps": 162,
+      "total_floor": [
+        9,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          1,
+          1
+        ],
+        [
+          0,
+          6,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        63,
+        52
+      ],
+      "scores_unclamped": [
+        63,
+        52
+      ],
+      "steps": 164,
+      "total_floor": [
+        12,
+        7
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        57,
+        21
+      ],
+      "scores_unclamped": [
+        57,
+        21
+      ],
+      "steps": 163,
+      "total_floor": [
+        12,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          6,
+          10,
+          6,
+          10,
+          3
+        ],
+        [
+          0,
+          3,
+          0,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        13,
+        29
+      ],
+      "scores_unclamped": [
+        1,
+        29
+      ],
+      "steps": 172,
+      "total_floor": [
+        35,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          10,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        18,
+        30
+      ],
+      "scores_unclamped": [
+        18,
+        30
+      ],
+      "steps": 167,
+      "total_floor": [
+        17,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          1,
+          10
+        ],
+        [
+          1,
+          3,
+          1,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        44,
+        61
+      ],
+      "scores_unclamped": [
+        44,
+        61
+      ],
+      "steps": 171,
+      "total_floor": [
+        22,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        75,
+        53
+      ],
+      "scores_unclamped": [
+        75,
+        53
+      ],
+      "steps": 168,
+      "total_floor": [
+        1,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          6,
+          0,
+          3
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        39,
+        31
+      ],
+      "scores_unclamped": [
+        39,
+        31
+      ],
+      "steps": 163,
+      "total_floor": [
+        13,
+        2
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          3,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        17,
+        9
+      ],
+      "scores_unclamped": [
+        15,
+        9
+      ],
+      "steps": 163,
+      "total_floor": [
+        20,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          0,
+          1
+        ],
+        [
+          0,
+          6,
+          1,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        60,
+        57
+      ],
+      "scores_unclamped": [
+        60,
+        57
+      ],
+      "steps": 177,
+      "total_floor": [
+        10,
+        10
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          3,
+          10,
+          0
+        ],
+        [
+          1,
+          3,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        11
+      ],
+      "scores_unclamped": [
+        26,
+        11
+      ],
+      "steps": 158,
+      "total_floor": [
+        15,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          3,
+          6
+        ],
+        [
+          0,
+          3,
+          0,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        46,
+        50
+      ],
+      "scores_unclamped": [
+        46,
+        50
+      ],
+      "steps": 164,
+      "total_floor": [
+        16,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          1,
+          3
+        ],
+        [
+          0,
+          3,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        23
+      ],
+      "scores_unclamped": [
+        26,
+        18
+      ],
+      "steps": 165,
+      "total_floor": [
+        5,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        27,
+        46
+      ],
+      "scores_unclamped": [
+        25,
+        46
+      ],
+      "steps": 155,
+      "total_floor": [
+        17,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          10,
+          6
+        ],
+        [
+          0,
+          1,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        6,
+        48
+      ],
+      "scores_unclamped": [
+        4,
+        48
+      ],
+      "steps": 162,
+      "total_floor": [
+        22,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          10,
+          1
+        ],
+        [
+          1,
+          10,
+          6,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        48,
+        37
+      ],
+      "scores_unclamped": [
+        48,
+        33
+      ],
+      "steps": 163,
+      "total_floor": [
+        12,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          10,
+          1
+        ],
+        [
+          0,
+          10,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        20
+      ],
+      "scores_unclamped": [
+        26,
+        12
+      ],
+      "steps": 157,
+      "total_floor": [
+        12,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        46,
+        45
+      ],
+      "scores_unclamped": [
+        46,
+        45
+      ],
+      "steps": 164,
+      "total_floor": [
+        13,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        45,
+        7
+      ],
+      "scores_unclamped": [
+        45,
+        5
+      ],
+      "steps": 160,
+      "total_floor": [
+        4,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        15
+      ],
+      "scores_unclamped": [
+        48,
+        15
+      ],
+      "steps": 170,
+      "total_floor": [
+        13,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          10,
+          10
+        ],
+        [
+          1,
+          1,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        20,
+        11
+      ],
+      "scores_unclamped": [
+        20,
+        11
+      ],
+      "steps": 156,
+      "total_floor": [
+        22,
+        12
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          10,
+          6
+        ],
+        [
+          1,
+          1,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        22,
+        51
+      ],
+      "scores_unclamped": [
+        22,
+        51
+      ],
+      "steps": 167,
+      "total_floor": [
+        19,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          0,
+          10
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        5,
+        0
+      ],
+      "scores_unclamped": [
+        0,
+        -5
+      ],
+      "steps": 153,
+      "total_floor": [
+        24,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          10,
+          10
+        ],
+        [
+          1,
+          3,
+          6,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        29,
+        27
+      ],
+      "scores_unclamped": [
+        29,
+        21
+      ],
+      "steps": 158,
+      "total_floor": [
+        20,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        22,
+        26
+      ],
+      "scores_unclamped": [
+        22,
+        24
+      ],
+      "steps": 164,
+      "total_floor": [
+        4,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        49,
+        42
+      ],
+      "scores_unclamped": [
+        49,
+        42
+      ],
+      "steps": 171,
+      "total_floor": [
+        13,
+        8
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          10,
+          0
+        ],
+        [
+          0,
+          3,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        27,
+        23
+      ],
+      "scores_unclamped": [
+        27,
+        23
+      ],
+      "steps": 168,
+      "total_floor": [
+        19,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          1,
+          6,
+          3,
+          3
+        ],
+        [
+          0,
+          10,
+          0,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        13,
+        35
+      ],
+      "scores_unclamped": [
+        13,
+        30
+      ],
+      "steps": 169,
+      "total_floor": [
+        16,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          3,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        13,
+        1
+      ],
+      "scores_unclamped": [
+        7,
+        1
+      ],
+      "steps": 159,
+      "total_floor": [
+        23,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          3,
+          0
+        ],
+        [
+          0,
+          3,
+          3,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        49,
+        35
+      ],
+      "scores_unclamped": [
+        49,
+        35
+      ],
+      "steps": 170,
+      "total_floor": [
+        5,
+        9
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          10,
+          6,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        46,
+        84
+      ],
+      "scores_unclamped": [
+        46,
+        84
+      ],
+      "steps": 172,
+      "total_floor": [
+        23,
+        3
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          6,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        27,
+        27
+      ],
+      "scores_unclamped": [
+        25,
+        27
+      ],
+      "steps": 167,
+      "total_floor": [
+        14,
+        7
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          1,
+          3
+        ],
+        [
+          0,
+          0,
+          6,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        27,
+        33
+      ],
+      "scores_unclamped": [
+        21,
+        33
+      ],
+      "steps": 159,
+      "total_floor": [
+        24,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          3,
+          10,
+          1
+        ],
+        [
+          1,
+          10,
+          3,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        7,
+        9
+      ],
+      "scores_unclamped": [
+        5,
+        4
+      ],
+      "steps": 155,
+      "total_floor": [
+        15,
+        25
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          1
+        ],
+        [
+          1,
+          6,
+          1,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        38,
+        62
+      ],
+      "scores_unclamped": [
+        38,
+        62
+      ],
+      "steps": 170,
+      "total_floor": [
+        13,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          0,
+          3
+        ],
+        [
+          3,
+          10,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        56,
+        55
+      ],
+      "scores_unclamped": [
+        56,
+        55
+      ],
+      "steps": 165,
+      "total_floor": [
+        5,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          3,
+          3,
+          1
+        ],
+        [
+          0,
+          6,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        38,
+        26
+      ],
+      "scores_unclamped": [
+        38,
+        26
+      ],
+      "steps": 165,
+      "total_floor": [
+        11,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          0,
+          10
+        ],
+        [
+          0,
+          10,
+          6,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        49,
+        42
+      ],
+      "scores_unclamped": [
+        49,
+        42
+      ],
+      "steps": 170,
+      "total_floor": [
+        12,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          0,
+          10
+        ],
+        [
+          0,
+          3,
+          0,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        34,
+        48
+      ],
+      "scores_unclamped": [
+        34,
+        48
+      ],
+      "steps": 173,
+      "total_floor": [
+        30,
+        3
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          10,
+          1,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        62,
+        37
+      ],
+      "scores_unclamped": [
+        62,
+        23
+      ],
+      "steps": 162,
+      "total_floor": [
+        13,
+        31
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          1,
+          6
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        15,
+        20
+      ],
+      "scores_unclamped": [
+        14,
+        20
+      ],
+      "steps": 166,
+      "total_floor": [
+        23,
+        20
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          6,
+          3
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        8,
+        20
+      ],
+      "scores_unclamped": [
+        8,
+        20
+      ],
+      "steps": 169,
+      "total_floor": [
+        10,
+        21
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        25,
+        41
+      ],
+      "scores_unclamped": [
+        25,
+        41
+      ],
+      "steps": 173,
+      "total_floor": [
+        20,
+        3
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          3,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        44
+      ],
+      "scores_unclamped": [
+        48,
+        44
+      ],
+      "steps": 160,
+      "total_floor": [
+        5,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          3,
+          3,
+          0
+        ],
+        [
+          1,
+          1,
+          10,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        71,
+        31
+      ],
+      "scores_unclamped": [
+        71,
+        31
+      ],
+      "steps": 162,
+      "total_floor": [
+        7,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          6,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        13,
+        21
+      ],
+      "scores_unclamped": [
+        13,
+        17
+      ],
+      "steps": 162,
+      "total_floor": [
+        11,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        44,
+        19
+      ],
+      "scores_unclamped": [
+        44,
+        19
+      ],
+      "steps": 171,
+      "total_floor": [
+        8,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          6,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        28,
+        20
+      ],
+      "scores_unclamped": [
+        28,
+        18
+      ],
+      "steps": 166,
+      "total_floor": [
+        5,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          10,
+          6,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        42,
+        32
+      ],
+      "scores_unclamped": [
+        42,
+        32
+      ],
+      "steps": 163,
+      "total_floor": [
+        3,
+        28
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          3,
+          10
+        ],
+        [
+          0,
+          0,
+          0,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        22,
+        38
+      ],
+      "scores_unclamped": [
+        20,
+        38
+      ],
+      "steps": 167,
+      "total_floor": [
+        22,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          3,
+          3
+        ],
+        [
+          0,
+          3,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        54,
+        35
+      ],
+      "scores_unclamped": [
+        52,
+        32
+      ],
+      "steps": 162,
+      "total_floor": [
+        22,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          10,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        6,
+        6
+      ],
+      "scores_unclamped": [
+        6,
+        2
+      ],
+      "steps": 164,
+      "total_floor": [
+        12,
+        33
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          3,
+          10,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        36,
+        21
+      ],
+      "scores_unclamped": [
+        36,
+        21
+      ],
+      "steps": 162,
+      "total_floor": [
+        23,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        50,
+        53
+      ],
+      "scores_unclamped": [
+        50,
+        53
+      ],
+      "steps": 165,
+      "total_floor": [
+        14,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          0,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        36,
+        36
+      ],
+      "scores_unclamped": [
+        36,
+        36
+      ],
+      "steps": 160,
+      "total_floor": [
+        9,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          1,
+          1
+        ],
+        [
+          1,
+          10,
+          6,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        35,
+        25
+      ],
+      "scores_unclamped": [
+        35,
+        22
+      ],
+      "steps": 164,
+      "total_floor": [
+        15,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          6,
+          3
+        ],
+        [
+          0,
+          6,
+          6,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        47,
+        38
+      ],
+      "scores_unclamped": [
+        47,
+        37
+      ],
+      "steps": 169,
+      "total_floor": [
+        10,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          1,
+          6
+        ],
+        [
+          0,
+          1,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        22,
+        33
+      ],
+      "scores_unclamped": [
+        22,
+        30
+      ],
+      "steps": 165,
+      "total_floor": [
+        23,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        79,
+        44
+      ],
+      "scores_unclamped": [
+        79,
+        34
+      ],
+      "steps": 172,
+      "total_floor": [
+        1,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          6,
+          10,
+          3,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        51,
+        38
+      ],
+      "scores_unclamped": [
+        51,
+        38
+      ],
+      "steps": 164,
+      "total_floor": [
+        23,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          3,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        41,
+        46
+      ],
+      "scores_unclamped": [
+        41,
+        46
+      ],
+      "steps": 166,
+      "total_floor": [
+        12,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          6,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0,
+          10
+        ]
+      ],
+      "scores": [
+        66,
+        48
+      ],
+      "scores_unclamped": [
+        66,
+        48
+      ],
+      "steps": 168,
+      "total_floor": [
+        14,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          10,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        75,
+        44
+      ],
+      "scores_unclamped": [
+        75,
+        41
+      ],
+      "steps": 168,
+      "total_floor": [
+        2,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          3,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        60,
+        49
+      ],
+      "scores_unclamped": [
+        60,
+        49
+      ],
+      "steps": 170,
+      "total_floor": [
+        6,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          3,
+          3
+        ],
+        [
+          1,
+          10,
+          10,
+          6,
+          10
+        ]
+      ],
+      "scores": [
+        45,
+        7
+      ],
+      "scores_unclamped": [
+        45,
+        -2
+      ],
+      "steps": 169,
+      "total_floor": [
+        7,
+        37
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          3,
+          3,
+          3
+        ],
+        [
+          0,
+          1,
+          6,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        33,
+        29
+      ],
+      "scores_unclamped": [
+        33,
+        29
+      ],
+      "steps": 165,
+      "total_floor": [
+        16,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          6,
+          3,
+          3
+        ],
+        [
+          1,
+          1,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        12,
+        29
+      ],
+      "scores_unclamped": [
+        10,
+        29
+      ],
+      "steps": 166,
+      "total_floor": [
+        19,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          3,
+          0
+        ],
+        [
+          0,
+          6,
+          1,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        40,
+        0
+      ],
+      "scores_unclamped": [
+        40,
+        -1
+      ],
+      "steps": 160,
+      "total_floor": [
+        16,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          3,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        9,
+        44
+      ],
+      "scores_unclamped": [
+        -1,
+        44
+      ],
+      "steps": 162,
+      "total_floor": [
+        24,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          10,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        45,
+        34
+      ],
+      "scores_unclamped": [
+        45,
+        34
+      ],
+      "steps": 164,
+      "total_floor": [
+        26,
+        6
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          6,
+          3
+        ],
+        [
+          0,
+          0,
+          6,
+          0,
+          3
+        ]
+      ],
+      "scores": [
+        7,
+        29
+      ],
+      "scores_unclamped": [
+        6,
+        29
+      ],
+      "steps": 150,
+      "total_floor": [
+        25,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          3,
+          0
+        ],
+        [
+          1,
+          10,
+          10,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        62,
+        54
+      ],
+      "scores_unclamped": [
+        62,
+        51
+      ],
+      "steps": 167,
+      "total_floor": [
+        13,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          10,
+          1
+        ],
+        [
+          1,
+          3,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        20,
+        14
+      ],
+      "scores_unclamped": [
+        20,
+        14
+      ],
+      "steps": 159,
+      "total_floor": [
+        20,
+        10
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ],
+        [
+          0,
+          6,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        13,
+        39
+      ],
+      "scores_unclamped": [
+        8,
+        39
+      ],
+      "steps": 159,
+      "total_floor": [
+        20,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        0,
+        0
+      ],
+      "scores_unclamped": [
+        -4,
+        -8
+      ],
+      "steps": 158,
+      "total_floor": [
+        11,
+        29
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          10,
+          0
+        ],
+        [
+          0,
+          3,
+          1,
+          0,
+          10
+        ]
+      ],
+      "scores": [
+        8,
+        15
+      ],
+      "scores_unclamped": [
+        8,
+        15
+      ],
+      "steps": 166,
+      "total_floor": [
+        19,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          6,
+          1
+        ],
+        [
+          1,
+          10,
+          10,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        21,
+        20
+      ],
+      "scores_unclamped": [
+        21,
+        10
+      ],
+      "steps": 163,
+      "total_floor": [
+        14,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          3,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        37,
+        15
+      ],
+      "scores_unclamped": [
+        37,
+        11
+      ],
+      "steps": 157,
+      "total_floor": [
+        11,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        23,
+        22
+      ],
+      "scores_unclamped": [
+        23,
+        22
+      ],
+      "steps": 166,
+      "total_floor": [
+        8,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          3,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        57,
+        22
+      ],
+      "scores_unclamped": [
+        57,
+        22
+      ],
+      "steps": 162,
+      "total_floor": [
+        19,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          10,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        31,
+        56
+      ],
+      "scores_unclamped": [
+        28,
+        56
+      ],
+      "steps": 164,
+      "total_floor": [
+        31,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          3,
+          10
+        ],
+        [
+          0,
+          3,
+          10,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        32,
+        36
+      ],
+      "scores_unclamped": [
+        32,
+        36
+      ],
+      "steps": 163,
+      "total_floor": [
+        24,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          6,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        50,
+        46
+      ],
+      "scores_unclamped": [
+        50,
+        46
+      ],
+      "steps": 164,
+      "total_floor": [
+        3,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          10,
+          1
+        ],
+        [
+          1,
+          3,
+          0,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        47,
+        41
+      ],
+      "scores_unclamped": [
+        47,
+        41
+      ],
+      "steps": 168,
+      "total_floor": [
+        21,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          10,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        31,
+        43
+      ],
+      "scores_unclamped": [
+        31,
+        43
+      ],
+      "steps": 161,
+      "total_floor": [
+        23,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          6,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        33,
+        57
+      ],
+      "scores_unclamped": [
+        33,
+        57
+      ],
+      "steps": 164,
+      "total_floor": [
+        20,
+        2
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          0,
+          1
+        ],
+        [
+          3,
+          6,
+          1,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        48,
+        26
+      ],
+      "scores_unclamped": [
+        48,
+        24
+      ],
+      "steps": 172,
+      "total_floor": [
+        8,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          1,
+          0,
+          3
+        ],
+        [
+          0,
+          1,
+          0,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        30,
+        31
+      ],
+      "scores_unclamped": [
+        30,
+        31
+      ],
+      "steps": 175,
+      "total_floor": [
+        11,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          0,
+          3,
+          1
+        ],
+        [
+          1,
+          3,
+          10,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        62,
+        50
+      ],
+      "scores_unclamped": [
+        62,
+        50
+      ],
+      "steps": 169,
+      "total_floor": [
+        8,
+        27
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          1,
+          3
+        ],
+        [
+          1,
+          10,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        59,
+        48
+      ],
+      "scores_unclamped": [
+        59,
+        48
+      ],
+      "steps": 172,
+      "total_floor": [
+        5,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          3,
+          1,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        56,
+        31
+      ],
+      "scores_unclamped": [
+        56,
+        31
+      ],
+      "steps": 164,
+      "total_floor": [
+        16,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          6,
+          6
+        ]
+      ],
+      "scores": [
+        60,
+        64
+      ],
+      "scores_unclamped": [
+        60,
+        64
+      ],
+      "steps": 165,
+      "total_floor": [
+        12,
+        15
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        29,
+        31
+      ],
+      "scores_unclamped": [
+        26,
+        31
+      ],
+      "steps": 158,
+      "total_floor": [
+        8,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        62,
+        25
+      ],
+      "scores_unclamped": [
+        62,
+        19
+      ],
+      "steps": 166,
+      "total_floor": [
+        2,
+        27
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        41,
+        42
+      ],
+      "scores_unclamped": [
+        38,
+        42
+      ],
+      "steps": 164,
+      "total_floor": [
+        21,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        27,
+        22
+      ],
+      "scores_unclamped": [
+        27,
+        22
+      ],
+      "steps": 165,
+      "total_floor": [
+        15,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          10,
+          10,
+          3
+        ],
+        [
+          0,
+          6,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        32,
+        37
+      ],
+      "scores_unclamped": [
+        32,
+        37
+      ],
+      "steps": 169,
+      "total_floor": [
+        30,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          6,
+          1,
+          10,
+          3,
+          3
+        ],
+        [
+          0,
+          3,
+          0,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        43,
+        54
+      ],
+      "scores_unclamped": [
+        41,
+        54
+      ],
+      "steps": 176,
+      "total_floor": [
+        23,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          3,
+          1
+        ],
+        [
+          0,
+          10,
+          6,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        20,
+        21
+      ],
+      "scores_unclamped": [
+        20,
+        13
+      ],
+      "steps": 160,
+      "total_floor": [
+        7,
+        20
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          1,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        57,
+        68
+      ],
+      "scores_unclamped": [
+        57,
+        68
+      ],
+      "steps": 171,
+      "total_floor": [
+        14,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          10,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        16,
+        12
+      ],
+      "scores_unclamped": [
+        11,
+        12
+      ],
+      "steps": 163,
+      "total_floor": [
+        22,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          3
+        ],
+        [
+          0,
+          10,
+          10,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        12,
+        14
+      ],
+      "scores_unclamped": [
+        12,
+        6
+      ],
+      "steps": 164,
+      "total_floor": [
+        15,
+        26
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        14,
+        38
+      ],
+      "scores_unclamped": [
+        14,
+        38
+      ],
+      "steps": 158,
+      "total_floor": [
+        21,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          6,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        33,
+        43
+      ],
+      "scores_unclamped": [
+        33,
+        43
+      ],
+      "steps": 160,
+      "total_floor": [
+        3,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          1,
+          6
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        44,
+        36
+      ],
+      "scores_unclamped": [
+        44,
+        31
+      ],
+      "steps": 167,
+      "total_floor": [
+        10,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          0,
+          6,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        24,
+        24
+      ],
+      "scores_unclamped": [
+        18,
+        24
+      ],
+      "steps": 160,
+      "total_floor": [
+        21,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        49,
+        49
+      ],
+      "scores_unclamped": [
+        49,
+        49
+      ],
+      "steps": 161,
+      "total_floor": [
+        12,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          3,
+          0
+        ],
+        [
+          0,
+          3,
+          10,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        33,
+        19
+      ],
+      "scores_unclamped": [
+        33,
+        19
+      ],
+      "steps": 163,
+      "total_floor": [
+        19,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          6,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        67,
+        40
+      ],
+      "scores_unclamped": [
+        67,
+        40
+      ],
+      "steps": 162,
+      "total_floor": [
+        8,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          3,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        34,
+        2
+      ],
+      "scores_unclamped": [
+        30,
+        0
+      ],
+      "steps": 168,
+      "total_floor": [
+        16,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        19,
+        11
+      ],
+      "scores_unclamped": [
+        19,
+        11
+      ],
+      "steps": 164,
+      "total_floor": [
+        1,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          10,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        20,
+        32
+      ],
+      "scores_unclamped": [
+        20,
+        32
+      ],
+      "steps": 166,
+      "total_floor": [
+        20,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          10,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        40,
+        43
+      ],
+      "scores_unclamped": [
+        40,
+        43
+      ],
+      "steps": 164,
+      "total_floor": [
+        13,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        24,
+        17
+      ],
+      "scores_unclamped": [
+        16,
+        17
+      ],
+      "steps": 165,
+      "total_floor": [
+        21,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          3,
+          0,
+          1
+        ],
+        [
+          0,
+          10,
+          0,
+          3,
+          6
+        ]
+      ],
+      "scores": [
+        47,
+        41
+      ],
+      "scores_unclamped": [
+        47,
+        41
+      ],
+      "steps": 167,
+      "total_floor": [
+        5,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          10,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        35,
+        50
+      ],
+      "scores_unclamped": [
+        34,
+        50
+      ],
+      "steps": 170,
+      "total_floor": [
+        27,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          6,
+          3,
+          1,
+          6
+        ],
+        [
+          0,
+          1,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        33,
+        19
+      ],
+      "scores_unclamped": [
+        33,
+        19
+      ],
+      "steps": 167,
+      "total_floor": [
+        19,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          0,
+          0
+        ],
+        [
+          0,
+          3,
+          1,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        19,
+        25
+      ],
+      "scores_unclamped": [
+        19,
+        24
+      ],
+      "steps": 157,
+      "total_floor": [
+        9,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          1,
+          0,
+          0
+        ],
+        [
+          1,
+          10,
+          1,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        41,
+        36
+      ],
+      "scores_unclamped": [
+        41,
+        34
+      ],
+      "steps": 164,
+      "total_floor": [
+        1,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          3,
+          6,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        76,
+        43
+      ],
+      "scores_unclamped": [
+        76,
+        43
+      ],
+      "steps": 172,
+      "total_floor": [
+        3,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          6,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        12,
+        39
+      ],
+      "scores_unclamped": [
+        12,
+        39
+      ],
+      "steps": 162,
+      "total_floor": [
+        17,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          6,
+          0,
+          3
+        ],
+        [
+          0,
+          6,
+          0,
+          3,
+          6
+        ]
+      ],
+      "scores": [
+        54,
+        40
+      ],
+      "scores_unclamped": [
+        54,
+        40
+      ],
+      "steps": 165,
+      "total_floor": [
+        11,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          0,
+          6
+        ],
+        [
+          0,
+          10,
+          6,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        46,
+        32
+      ],
+      "scores_unclamped": [
+        46,
+        32
+      ],
+      "steps": 168,
+      "total_floor": [
+        10,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        41,
+        26
+      ],
+      "scores_unclamped": [
+        41,
+        24
+      ],
+      "steps": 168,
+      "total_floor": [
+        12,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          6,
+          1
+        ],
+        [
+          1,
+          3,
+          1,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        13,
+        35
+      ],
+      "scores_unclamped": [
+        13,
+        35
+      ],
+      "steps": 170,
+      "total_floor": [
+        18,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        27,
+        13
+      ],
+      "scores_unclamped": [
+        27,
+        13
+      ],
+      "steps": 159,
+      "total_floor": [
+        13,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          6,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        40,
+        22
+      ],
+      "scores_unclamped": [
+        40,
+        22
+      ],
+      "steps": 160,
+      "total_floor": [
+        18,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          1,
+          10,
+          1
+        ],
+        [
+          1,
+          10,
+          3,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        35,
+        44
+      ],
+      "scores_unclamped": [
+        35,
+        44
+      ],
+      "steps": 160,
+      "total_floor": [
+        14,
+        20
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          10,
+          0
+        ],
+        [
+          1,
+          10,
+          1,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        27,
+        23
+      ],
+      "scores_unclamped": [
+        27,
+        20
+      ],
+      "steps": 170,
+      "total_floor": [
+        13,
+        12
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          10,
+          0,
+          3
+        ],
+        [
+          0,
+          6,
+          3,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        15,
+        11
+      ],
+      "scores_unclamped": [
+        15,
+        11
+      ],
+      "steps": 161,
+      "total_floor": [
+        15,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          6,
+          0,
+          10
+        ],
+        [
+          0,
+          1,
+          1,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        18,
+        48
+      ],
+      "scores_unclamped": [
+        18,
+        48
+      ],
+      "steps": 172,
+      "total_floor": [
+        20,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          10,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        24,
+        18
+      ],
+      "scores_unclamped": [
+        18,
+        18
+      ],
+      "steps": 165,
+      "total_floor": [
+        22,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          6,
+          1,
+          3
+        ]
+      ],
+      "scores": [
+        13,
+        24
+      ],
+      "scores_unclamped": [
+        13,
+        24
+      ],
+      "steps": 165,
+      "total_floor": [
+        14,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          3,
+          3,
+          1
+        ],
+        [
+          1,
+          0,
+          6,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        53,
+        35
+      ],
+      "scores_unclamped": [
+        53,
+        35
+      ],
+      "steps": 156,
+      "total_floor": [
+        8,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          6,
+          1
+        ],
+        [
+          1,
+          3,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        65,
+        53
+      ],
+      "scores_unclamped": [
+        65,
+        53
+      ],
+      "steps": 168,
+      "total_floor": [
+        9,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          10,
+          1
+        ],
+        [
+          1,
+          1,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        34,
+        32
+      ],
+      "scores_unclamped": [
+        34,
+        32
+      ],
+      "steps": 171,
+      "total_floor": [
+        20,
+        12
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          6,
+          1
+        ],
+        [
+          0,
+          10,
+          6,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        15,
+        30
+      ],
+      "scores_unclamped": [
+        13,
+        30
+      ],
+      "steps": 165,
+      "total_floor": [
+        18,
+        22
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          10,
+          6
+        ],
+        [
+          0,
+          10,
+          3,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        29,
+        23
+      ],
+      "scores_unclamped": [
+        29,
+        23
+      ],
+      "steps": 165,
+      "total_floor": [
+        27,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        33,
+        22
+      ],
+      "scores_unclamped": [
+        33,
+        22
+      ],
+      "steps": 170,
+      "total_floor": [
+        17,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          3,
+          6,
+          1
+        ],
+        [
+          0,
+          0,
+          3,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        38,
+        40
+      ],
+      "scores_unclamped": [
+        38,
+        40
+      ],
+      "steps": 170,
+      "total_floor": [
+        17,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        6,
+        22
+      ],
+      "scores_unclamped": [
+        4,
+        22
+      ],
+      "steps": 166,
+      "total_floor": [
+        20,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          0,
+          10,
+          3
+        ],
+        [
+          0,
+          3,
+          10,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        63,
+        51
+      ],
+      "scores_unclamped": [
+        63,
+        51
+      ],
+      "steps": 167,
+      "total_floor": [
+        17,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          1,
+          3
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        35,
+        29
+      ],
+      "scores_unclamped": [
+        35,
+        29
+      ],
+      "steps": 164,
+      "total_floor": [
+        18,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          6,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        48,
+        52
+      ],
+      "scores_unclamped": [
+        48,
+        52
+      ],
+      "steps": 162,
+      "total_floor": [
+        4,
+        29
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          10,
+          10,
+          6
+        ],
+        [
+          0,
+          0,
+          0,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        22,
+        54
+      ],
+      "scores_unclamped": [
+        17,
+        54
+      ],
+      "steps": 166,
+      "total_floor": [
+        37,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          6,
+          3
+        ],
+        [
+          0,
+          1,
+          3,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        54,
+        78
+      ],
+      "scores_unclamped": [
+        54,
+        78
+      ],
+      "steps": 169,
+      "total_floor": [
+        11,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          0,
+          6
+        ],
+        [
+          3,
+          0,
+          3,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        64,
+        48
+      ],
+      "scores_unclamped": [
+        64,
+        48
+      ],
+      "steps": 165,
+      "total_floor": [
+        10,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          6,
+          1,
+          0
+        ],
+        [
+          0,
+          6,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        42,
+        30
+      ],
+      "scores_unclamped": [
+        42,
+        29
+      ],
+      "steps": 164,
+      "total_floor": [
+        9,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          6,
+          10,
+          1,
+          6
+        ],
+        [
+          1,
+          0,
+          0,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        10,
+        61
+      ],
+      "scores_unclamped": [
+        5,
+        61
+      ],
+      "steps": 169,
+      "total_floor": [
+        26,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          3,
+          3
+        ],
+        [
+          0,
+          6,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        65,
+        30
+      ],
+      "scores_unclamped": [
+        65,
+        23
+      ],
+      "steps": 166,
+      "total_floor": [
+        9,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          0,
+          1
+        ],
+        [
+          1,
+          6,
+          0,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        41,
+        69
+      ],
+      "scores_unclamped": [
+        41,
+        69
+      ],
+      "steps": 168,
+      "total_floor": [
+        12,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          10,
+          10,
+          1
+        ],
+        [
+          1,
+          10,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        19,
+        31
+      ],
+      "scores_unclamped": [
+        19,
+        26
+      ],
+      "steps": 161,
+      "total_floor": [
+        25,
+        14
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          1,
+          3
+        ],
+        [
+          0,
+          3,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        64,
+        56
+      ],
+      "scores_unclamped": [
+        64,
+        56
+      ],
+      "steps": 168,
+      "total_floor": [
+        8,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        59,
+        63
+      ],
+      "scores_unclamped": [
+        59,
+        63
+      ],
+      "steps": 161,
+      "total_floor": [
+        12,
+        11
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          6,
+          1
+        ],
+        [
+          0,
+          3,
+          0,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        37,
+        35
+      ],
+      "scores_unclamped": [
+        37,
+        35
+      ],
+      "steps": 171,
+      "total_floor": [
+        10,
+        10
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          10,
+          0
+        ],
+        [
+          1,
+          1,
+          6,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        25,
+        31
+      ],
+      "scores_unclamped": [
+        25,
+        31
+      ],
+      "steps": 163,
+      "total_floor": [
+        16,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          3,
+          1,
+          6
+        ],
+        [
+          1,
+          1,
+          3,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        27,
+        39
+      ],
+      "scores_unclamped": [
+        27,
+        39
+      ],
+      "steps": 169,
+      "total_floor": [
+        21,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          10,
+          10,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        27,
+        53
+      ],
+      "scores_unclamped": [
+        24,
+        53
+      ],
+      "steps": 164,
+      "total_floor": [
+        32,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          6
+        ],
+        [
+          1,
+          6,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        63,
+        57
+      ],
+      "scores_unclamped": [
+        63,
+        57
+      ],
+      "steps": 165,
+      "total_floor": [
+        9,
+        13
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        29,
+        54
+      ],
+      "scores_unclamped": [
+        27,
+        54
+      ],
+      "steps": 164,
+      "total_floor": [
+        22,
+        20
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          3,
+          0,
+          0
+        ],
+        [
+          0,
+          6,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        55,
+        33
+      ],
+      "scores_unclamped": [
+        55,
+        32
+      ],
+      "steps": 166,
+      "total_floor": [
+        9,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          10,
+          0
+        ],
+        [
+          1,
+          6,
+          10,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        32,
+        31
+      ],
+      "scores_unclamped": [
+        32,
+        31
+      ],
+      "steps": 164,
+      "total_floor": [
+        12,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          3,
+          1
+        ],
+        [
+          0,
+          1,
+          10,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        40,
+        34
+      ],
+      "scores_unclamped": [
+        40,
+        34
+      ],
+      "steps": 172,
+      "total_floor": [
+        5,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        23,
+        25
+      ],
+      "scores_unclamped": [
+        23,
+        25
+      ],
+      "steps": 167,
+      "total_floor": [
+        13,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        77,
+        30
+      ],
+      "scores_unclamped": [
+        77,
+        30
+      ],
+      "steps": 165,
+      "total_floor": [
+        5,
+        25
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          3,
+          1
+        ],
+        [
+          0,
+          0,
+          10,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        11,
+        18
+      ],
+      "scores_unclamped": [
+        11,
+        15
+      ],
+      "steps": 164,
+      "total_floor": [
+        8,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          10,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        52,
+        29
+      ],
+      "scores_unclamped": [
+        52,
+        29
+      ],
+      "steps": 160,
+      "total_floor": [
+        1,
+        15
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          0,
+          3,
+          6
+        ],
+        [
+          0,
+          10,
+          0,
+          0,
+          10
+        ]
+      ],
+      "scores": [
+        42,
+        40
+      ],
+      "scores_unclamped": [
+        42,
+        40
+      ],
+      "steps": 168,
+      "total_floor": [
+        13,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          6,
+          3
+        ],
+        [
+          0,
+          10,
+          1,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        47,
+        41
+      ],
+      "scores_unclamped": [
+        47,
+        41
+      ],
+      "steps": 165,
+      "total_floor": [
+        13,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          6,
+          10
+        ],
+        [
+          0,
+          0,
+          6,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        26,
+        56
+      ],
+      "scores_unclamped": [
+        26,
+        56
+      ],
+      "steps": 165,
+      "total_floor": [
+        18,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          1,
+          3
+        ],
+        [
+          3,
+          10,
+          6,
+          3,
+          10
+        ]
+      ],
+      "scores": [
+        45,
+        40
+      ],
+      "scores_unclamped": [
+        45,
+        40
+      ],
+      "steps": 166,
+      "total_floor": [
+        14,
+        32
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          0,
+          10
+        ],
+        [
+          1,
+          0,
+          3,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        17,
+        17
+      ],
+      "scores_unclamped": [
+        17,
+        17
+      ],
+      "steps": 171,
+      "total_floor": [
+        17,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          1,
+          6
+        ]
+      ],
+      "scores": [
+        63,
+        51
+      ],
+      "scores_unclamped": [
+        63,
+        51
+      ],
+      "steps": 166,
+      "total_floor": [
+        21,
+        10
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          3,
+          6
+        ],
+        [
+          3,
+          1,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        67,
+        41
+      ],
+      "scores_unclamped": [
+        67,
+        41
+      ],
+      "steps": 158,
+      "total_floor": [
+        11,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          1,
+          0
+        ],
+        [
+          1,
+          6,
+          3,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        23,
+        63
+      ],
+      "scores_unclamped": [
+        23,
+        63
+      ],
+      "steps": 160,
+      "total_floor": [
+        11,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          0,
+          10,
+          3
+        ],
+        [
+          0,
+          10,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        40,
+        21
+      ],
+      "scores_unclamped": [
+        40,
+        11
+      ],
+      "steps": 169,
+      "total_floor": [
+        13,
+        30
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          3,
+          3
+        ],
+        [
+          0,
+          1,
+          3,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        35,
+        73
+      ],
+      "scores_unclamped": [
+        35,
+        73
+      ],
+      "steps": 168,
+      "total_floor": [
+        22,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          1,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          6,
+          10
+        ]
+      ],
+      "scores": [
+        34,
+        28
+      ],
+      "scores_unclamped": [
+        34,
+        28
+      ],
+      "steps": 160,
+      "total_floor": [
+        8,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        30,
+        28
+      ],
+      "scores_unclamped": [
+        28,
+        28
+      ],
+      "steps": 166,
+      "total_floor": [
+        14,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          3,
+          1
+        ],
+        [
+          0,
+          10,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        33,
+        50
+      ],
+      "scores_unclamped": [
+        33,
+        48
+      ],
+      "steps": 164,
+      "total_floor": [
+        14,
+        24
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        42,
+        34
+      ],
+      "scores_unclamped": [
+        34,
+        34
+      ],
+      "steps": 161,
+      "total_floor": [
+        21,
+        5
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          10,
+          3,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        41,
+        44
+      ],
+      "scores_unclamped": [
+        41,
+        44
+      ],
+      "steps": 166,
+      "total_floor": [
+        6,
+        24
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        54,
+        75
+      ],
+      "scores_unclamped": [
+        54,
+        75
+      ],
+      "steps": 169,
+      "total_floor": [
+        9,
+        3
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          6,
+          6
+        ],
+        [
+          1,
+          0,
+          6,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        11,
+        44
+      ],
+      "scores_unclamped": [
+        7,
+        44
+      ],
+      "steps": 164,
+      "total_floor": [
+        32,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          1,
+          3,
+          6,
+          3
+        ],
+        [
+          0,
+          3,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        47,
+        33
+      ],
+      "scores_unclamped": [
+        47,
+        30
+      ],
+      "steps": 171,
+      "total_floor": [
+        16,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          6,
+          1,
+          3
+        ],
+        [
+          0,
+          1,
+          1,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        56,
+        43
+      ],
+      "scores_unclamped": [
+        56,
+        43
+      ],
+      "steps": 163,
+      "total_floor": [
+        20,
+        8
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        64,
+        43
+      ],
+      "scores_unclamped": [
+        64,
+        43
+      ],
+      "steps": 168,
+      "total_floor": [
+        10,
+        2
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          3,
+          3
+        ],
+        [
+          1,
+          10,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        59,
+        39
+      ],
+      "scores_unclamped": [
+        59,
+        33
+      ],
+      "steps": 169,
+      "total_floor": [
+        7,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          10,
+          1
+        ],
+        [
+          0,
+          6,
+          6,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        24,
+        35
+      ],
+      "scores_unclamped": [
+        24,
+        35
+      ],
+      "steps": 164,
+      "total_floor": [
+        18,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          6,
+          10,
+          1
+        ],
+        [
+          0,
+          10,
+          10,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        13,
+        30
+      ],
+      "scores_unclamped": [
+        13,
+        28
+      ],
+      "steps": 162,
+      "total_floor": [
+        18,
+        22
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          10,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        40,
+        25
+      ],
+      "scores_unclamped": [
+        40,
+        22
+      ],
+      "steps": 169,
+      "total_floor": [
+        14,
+        24
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          10,
+          1
+        ],
+        [
+          0,
+          6,
+          10,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        26,
+        59
+      ],
+      "scores_unclamped": [
+        26,
+        59
+      ],
+      "steps": 170,
+      "total_floor": [
+        24,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          1,
+          6,
+          6,
+          1
+        ],
+        [
+          1,
+          3,
+          6,
+          3,
+          3
+        ]
+      ],
+      "scores": [
+        45,
+        52
+      ],
+      "scores_unclamped": [
+        45,
+        52
+      ],
+      "steps": 170,
+      "total_floor": [
+        17,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          3,
+          3
+        ],
+        [
+          1,
+          0,
+          1,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        30,
+        22
+      ],
+      "scores_unclamped": [
+        30,
+        22
+      ],
+      "steps": 168,
+      "total_floor": [
+        10,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          6,
+          6
+        ],
+        [
+          0,
+          6,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        11,
+        43
+      ],
+      "scores_unclamped": [
+        11,
+        43
+      ],
+      "steps": 161,
+      "total_floor": [
+        25,
+        7
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          6,
+          1
+        ],
+        [
+          0,
+          6,
+          3,
+          3,
+          6
+        ]
+      ],
+      "scores": [
+        26,
+        7
+      ],
+      "scores_unclamped": [
+        26,
+        4
+      ],
+      "steps": 161,
+      "total_floor": [
+        11,
+        18
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          1,
+          0
+        ],
+        [
+          6,
+          10,
+          10,
+          6,
+          6
+        ]
+      ],
+      "scores": [
+        64,
+        16
+      ],
+      "scores_unclamped": [
+        64,
+        5
+      ],
+      "steps": 169,
+      "total_floor": [
+        4,
+        38
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          6,
+          1
+        ],
+        [
+          0,
+          3,
+          3,
+          3,
+          1
+        ]
+      ],
+      "scores": [
+        11,
+        30
+      ],
+      "scores_unclamped": [
+        11,
+        30
+      ],
+      "steps": 173,
+      "total_floor": [
+        18,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          1,
+          6,
+          0
+        ],
+        [
+          1,
+          6,
+          1,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        38,
+        30
+      ],
+      "scores_unclamped": [
+        34,
+        24
+      ],
+      "steps": 159,
+      "total_floor": [
+        17,
+        9
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        32
+      ],
+      "scores_unclamped": [
+        48,
+        32
+      ],
+      "steps": 169,
+      "total_floor": [
+        5,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          6,
+          6
+        ],
+        [
+          0,
+          10,
+          0,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        50,
+        39
+      ],
+      "scores_unclamped": [
+        50,
+        39
+      ],
+      "steps": 168,
+      "total_floor": [
+        22,
+        16
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          10,
+          6,
+          1
+        ],
+        [
+          0,
+          10,
+          1,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        32,
+        56
+      ],
+      "scores_unclamped": [
+        32,
+        56
+      ],
+      "steps": 166,
+      "total_floor": [
+        18,
+        18
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          1,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        59,
+        67
+      ],
+      "scores_unclamped": [
+        59,
+        67
+      ],
+      "steps": 176,
+      "total_floor": [
+        8,
+        21
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          6,
+          10,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          6,
+          1
+        ]
+      ],
+      "scores": [
+        21,
+        40
+      ],
+      "scores_unclamped": [
+        21,
+        40
+      ],
+      "steps": 168,
+      "total_floor": [
+        19,
+        8
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          1,
+          6,
+          10,
+          3
+        ]
+      ],
+      "scores": [
+        24,
+        20
+      ],
+      "scores_unclamped": [
+        24,
+        20
+      ],
+      "steps": 165,
+      "total_floor": [
+        13,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          1,
+          1,
+          1,
+          0
+        ],
+        [
+          1,
+          0,
+          6,
+          1,
+          10
+        ]
+      ],
+      "scores": [
+        14,
+        40
+      ],
+      "scores_unclamped": [
+        14,
+        40
+      ],
+      "steps": 162,
+      "total_floor": [
+        6,
+        18
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          3,
+          3,
+          6,
+          1,
+          6
+        ],
+        [
+          0,
+          0,
+          6,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        9,
+        31
+      ],
+      "scores_unclamped": [
+        9,
+        31
+      ],
+      "steps": 165,
+      "total_floor": [
+        19,
+        12
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          6,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        47,
+        33
+      ],
+      "scores_unclamped": [
+        47,
+        28
+      ],
+      "steps": 169,
+      "total_floor": [
+        7,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          6,
+          6,
+          1
+        ],
+        [
+          0,
+          10,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        90,
+        53
+      ],
+      "scores_unclamped": [
+        90,
+        53
+      ],
+      "steps": 165,
+      "total_floor": [
+        13,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          6,
+          6,
+          1
+        ],
+        [
+          0,
+          3,
+          3,
+          6,
+          10
+        ]
+      ],
+      "scores": [
+        21,
+        8
+      ],
+      "scores_unclamped": [
+        21,
+        8
+      ],
+      "steps": 158,
+      "total_floor": [
+        16,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          3,
+          1,
+          1
+        ],
+        [
+          0,
+          6,
+          6,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        56,
+        23
+      ],
+      "scores_unclamped": [
+        56,
+        23
+      ],
+      "steps": 166,
+      "total_floor": [
+        8,
+        23
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          3,
+          10,
+          10,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        52,
+        31
+      ],
+      "scores_unclamped": [
+        52,
+        20
+      ],
+      "steps": 169,
+      "total_floor": [
+        4,
+        29
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          3,
+          3
+        ],
+        [
+          0,
+          1,
+          3,
+          0,
+          6
+        ]
+      ],
+      "scores": [
+        22,
+        54
+      ],
+      "scores_unclamped": [
+        22,
+        54
+      ],
+      "steps": 169,
+      "total_floor": [
+        7,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          3,
+          3,
+          3
+        ],
+        [
+          1,
+          0,
+          10,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        65,
+        35
+      ],
+      "scores_unclamped": [
+        65,
+        35
+      ],
+      "steps": 171,
+      "total_floor": [
+        19,
+        14
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          3,
+          10,
+          3
+        ],
+        [
+          1,
+          3,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        20,
+        10
+      ],
+      "scores_unclamped": [
+        20,
+        10
+      ],
+      "steps": 161,
+      "total_floor": [
+        18,
+        8
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          0,
+          3
+        ],
+        [
+          0,
+          10,
+          10,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        68,
+        37
+      ],
+      "scores_unclamped": [
+        68,
+        30
+      ],
+      "steps": 165,
+      "total_floor": [
+        5,
+        36
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          10,
+          3,
+          3
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        12,
+        34
+      ],
+      "scores_unclamped": [
+        12,
+        34
+      ],
+      "steps": 159,
+      "total_floor": [
+        23,
+        2
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          0,
+          10,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          10,
+          6
+        ]
+      ],
+      "scores": [
+        12,
+        10
+      ],
+      "scores_unclamped": [
+        11,
+        10
+      ],
+      "steps": 164,
+      "total_floor": [
+        22,
+        17
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          6,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        45,
+        54
+      ],
+      "scores_unclamped": [
+        45,
+        54
+      ],
+      "steps": 170,
+      "total_floor": [
+        20,
+        10
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          0,
+          3
+        ],
+        [
+          1,
+          3,
+          0,
+          3,
+          10
+        ]
+      ],
+      "scores": [
+        44,
+        46
+      ],
+      "scores_unclamped": [
+        44,
+        46
+      ],
+      "steps": 167,
+      "total_floor": [
+        14,
+        17
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          3,
+          10,
+          6
+        ],
+        [
+          0,
+          1,
+          3,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        30,
+        30
+      ],
+      "scores_unclamped": [
+        30,
+        30
+      ],
+      "steps": 168,
+      "total_floor": [
+        22,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          6,
+          6,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          6,
+          3,
+          10
+        ]
+      ],
+      "scores": [
+        41,
+        32
+      ],
+      "scores_unclamped": [
+        41,
+        32
+      ],
+      "steps": 159,
+      "total_floor": [
+        14,
+        20
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          10,
+          1,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          1,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        28,
+        4
+      ],
+      "scores_unclamped": [
+        27,
+        4
+      ],
+      "steps": 156,
+      "total_floor": [
+        22,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          6,
+          3
+        ],
+        [
+          0,
+          10,
+          3,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        37,
+        47
+      ],
+      "scores_unclamped": [
+        37,
+        47
+      ],
+      "steps": 171,
+      "total_floor": [
+        20,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          6,
+          3,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        64,
+        48
+      ],
+      "scores_unclamped": [
+        64,
+        48
+      ],
+      "steps": 162,
+      "total_floor": [
+        3,
+        19
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        41,
+        36
+      ],
+      "scores_unclamped": [
+        41,
+        36
+      ],
+      "steps": 174,
+      "total_floor": [
+        3,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          1,
+          10,
+          1
+        ],
+        [
+          0,
+          0,
+          6,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        39,
+        47
+      ],
+      "scores_unclamped": [
+        39,
+        47
+      ],
+      "steps": 168,
+      "total_floor": [
+        18,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          10,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        29,
+        18
+      ],
+      "scores_unclamped": [
+        29,
+        18
+      ],
+      "steps": 170,
+      "total_floor": [
+        17,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          6,
+          6,
+          10
+        ],
+        [
+          0,
+          1,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        22,
+        69
+      ],
+      "scores_unclamped": [
+        19,
+        69
+      ],
+      "steps": 165,
+      "total_floor": [
+        28,
+        5
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          10,
+          10,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        9,
+        41
+      ],
+      "scores_unclamped": [
+        9,
+        41
+      ],
+      "steps": 162,
+      "total_floor": [
+        23,
+        1
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          1,
+          3,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        0,
+        29
+      ],
+      "scores_unclamped": [
+        -5,
+        29
+      ],
+      "steps": 168,
+      "total_floor": [
+        21,
+        6
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          1,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        57,
+        7
+      ],
+      "scores_unclamped": [
+        57,
+        -1
+      ],
+      "steps": 161,
+      "total_floor": [
+        5,
+        21
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          3,
+          1,
+          3
+        ],
+        [
+          0,
+          1,
+          6,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        48,
+        60
+      ],
+      "scores_unclamped": [
+        48,
+        60
+      ],
+      "steps": 164,
+      "total_floor": [
+        7,
+        13
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          1,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          6,
+          10,
+          10,
+          0
+        ]
+      ],
+      "scores": [
+        61,
+        25
+      ],
+      "scores_unclamped": [
+        61,
+        25
+      ],
+      "steps": 164,
+      "total_floor": [
+        3,
+        26
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          3,
+          0,
+          6
+        ],
+        [
+          3,
+          10,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        39,
+        49
+      ],
+      "scores_unclamped": [
+        39,
+        49
+      ],
+      "steps": 159,
+      "total_floor": [
+        13,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          3,
+          10,
+          0
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        3,
+        18
+      ],
+      "scores_unclamped": [
+        3,
+        18
+      ],
+      "steps": 158,
+      "total_floor": [
+        14,
+        22
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          10,
+          10,
+          0
+        ],
+        [
+          1,
+          1,
+          6,
+          1,
+          0
+        ]
+      ],
+      "scores": [
+        15,
+        34
+      ],
+      "scores_unclamped": [
+        14,
+        33
+      ],
+      "steps": 170,
+      "total_floor": [
+        21,
+        9
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          3,
+          0
+        ]
+      ],
+      "scores": [
+        54,
+        50
+      ],
+      "scores_unclamped": [
+        54,
+        50
+      ],
+      "steps": 168,
+      "total_floor": [
+        3,
+        7
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          0,
+          10,
+          10,
+          10
+        ],
+        [
+          0,
+          6,
+          1,
+          6,
+          3
+        ]
+      ],
+      "scores": [
+        17,
+        38
+      ],
+      "scores_unclamped": [
+        17,
+        38
+      ],
+      "steps": 165,
+      "total_floor": [
+        30,
+        16
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          1,
+          6,
+          1,
+          1
+        ],
+        [
+          0,
+          10,
+          1,
+          10,
+          1
+        ]
+      ],
+      "scores": [
+        60,
+        43
+      ],
+      "scores_unclamped": [
+        60,
+        43
+      ],
+      "steps": 170,
+      "total_floor": [
+        9,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          6,
+          0,
+          6,
+          0
+        ],
+        [
+          0,
+          1,
+          10,
+          0,
+          0
+        ]
+      ],
+      "scores": [
+        37,
+        37
+      ],
+      "scores_unclamped": [
+        37,
+        37
+      ],
+      "steps": 162,
+      "total_floor": [
+        12,
+        11
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          0,
+          1,
+          3,
+          0
+        ],
+        [
+          0,
+          10,
+          1,
+          0,
+          1
+        ]
+      ],
+      "scores": [
+        65,
+        42
+      ],
+      "scores_unclamped": [
+        65,
+        42
+      ],
+      "steps": 166,
+      "total_floor": [
+        5,
+        12
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          3,
+          0,
+          1,
+          3
+        ],
+        [
+          0,
+          1,
+          1,
+          10,
+          10
+        ]
+      ],
+      "scores": [
+        23,
+        10
+      ],
+      "scores_unclamped": [
+        22,
+        10
+      ],
+      "steps": 166,
+      "total_floor": [
+        7,
+        22
+      ],
+      "winner": 0
+    },
+    {
+      "floor_per_round": [
+        [
+          1,
+          3,
+          1,
+          6,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "scores": [
+        20,
+        44
+      ],
+      "scores_unclamped": [
+        18,
+        44
+      ],
+      "steps": 170,
+      "total_floor": [
+        11,
+        4
+      ],
+      "winner": 1
+    },
+    {
+      "floor_per_round": [
+        [
+          0,
+          10,
+          10,
+          0,
+          10
+        ],
+        [
+          0,
+          0,
+          0,
+          6,
+          0
+        ]
+      ],
+      "scores": [
+        44,
+        49
+      ],
+      "scores_unclamped": [
+        44,
+        49
+      ],
+      "steps": 165,
+      "total_floor": [
+        30,
+        6
+      ],
+      "winner": 1
+    }
+  ]
+}

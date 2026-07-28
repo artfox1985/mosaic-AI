@@ -6098,3 +6098,81 @@ die Modelle davonziehen. Beim Neubau (Kandidat: aktueller Champion) gilt die
 Regel aus Task #89 weiter -- die Orakel-Quelle darf NICHT selbst zu den
 bewerteten Kandidaten zaehlen, und die Validierung ist danach zu wiederholen.
 `frozen_v1_oracle_labels.json` bleibt als historische Grundlinie unveraendert.
+
+## Task #16: Tiling-Solver-Endwertungs-Shaping -- verworfen (2026-07-29)
+
+### Befund, der den Versuch ausgeloest hat
+
+`tiling_solver.rs::best_first_step_inner` maximierte `pts + solve_rec(..)`,
+also **reine Sofortpunkte der Runde**. `calculate_end_scoring` und
+`wertung_progress` kamen im gesamten Modul nicht vor. Da `best_first_step_exact`
+der Pfad fuer ALLE echten Platzierungen ist (`self_play.rs:894`, `py.rs:687`,
+`round_transition.rs:135/323`), waehlte die KI ihre Steine endwertungsblind --
+waehrend die Heuristik darueber (`mcts::player_total` =
+`solve_round_final_score` + `wertung_progress` + Straf-Term) den Term seit jeher
+mitfuehrt. Eine echte Inkonsistenz, kein Hirngespinst.
+
+### Umsetzung
+
+Derselbe Fortschritts-Term als Delta ueber den ERSTEN Schritt, Gewicht 1.0
+(gleiche Einheiten wie `player_total`). Bewusst nur auf der ersten Stufe, NICHT
+in `solve_rec`: dort ist der MCTS-Blatt-Hot-Path, und der Term wuerde mit
+`player_total`s eigenem `wertung_progress` doppelt zaehlen. Hinter
+`TILING_SHAPING_ENABLED` (Muster wie `PLATE_SHAPING_ENABLED`).
+
+Tests: `cargo test --release` 169/169 in BEIDEN Toggle-Zustaenden. Der
+Diskriminierungstest sucht ueber 200 Seeds eine Stellung, in der geshapt und
+ungeshapt VERSCHIEDENE Zuege waehlen, und bricht ab, wenn keine existiert --
+ohne diese Zusicherung waere er leer gruen gewesen. (Beim ersten Anlauf hat er
+genau das aufgedeckt: `tiling_state()` hat ein LEERES Kuppelraster, es gab
+ueberhaupt keine legalen Zuege.)
+
+### A/B-Ergebnis -- 1600 Spiele
+
+Gepaarter Arena-A/B, `v18_best`@400 vs `v17_best`@400, zwei Bloecke à 400
+Spiele je Arm, identischer Basis-Seed innerhalb jedes Blocks. Wheel fuer BEIDE
+Arme neu gebaut, damit sich die Arme wirklich nur im Toggle unterscheiden.
+
+| Block | OFF | ON | b(nur ON) | c(nur OFF) | McNemar p |
+|---|---|---|---|---|---|
+| 1 (Seed 5150271) | 226:174 | 245:155 | 63 | 44 | 0,0814 |
+| 2 (Seed 77150271) | 228:172 | 219:181 | 50 | 59 | 0,4437 |
+| **gepoolt** | **454 (56,8 %)** | **464 (58,0 %)** | **113** | **103** | **0,5404** |
+
+Ø-Score beider Seiten (das vorab benannte Hauptmass): Block 1 Summe 74,0 (OFF)
+vs 73,9 (ON), gepoolt 73,4 vs 74,1 -- die Richtung wechselt, kein Signal.
+
+**ENTSCHEIDUNG: `TILING_SHAPING_ENABLED` bleibt AUS.** Der Code bleibt inert
+erhalten, weil der Befund weiter gilt -- der Solver IST endwertungsblind, es ist
+an dieser Stelle nur nicht spielentscheidend.
+
+### Zwei Lehren
+
+**1. Nicht auf ein knappes p handeln, sondern replizieren.** Block 1 sah mit
+p=0,0814 nach einem Effekt aus. Haette man uebernommen, waere eine wirkungslose
+Aenderung eingebaut UND der Elo-Anker unnoetig entwertet worden: der Solver ist
+gemeinsamer Code und haette auch die HEURISTIK-Spielstaerke veraendert, womit
+`Heuristik@150 = 1000` und in der Folge jeder Elo-Wert neu zu vermessen gewesen
+waere. Deckt sich mit dem Ausreisser-Praezedenzfall vom 2026-07-22.
+
+**2. Das Hauptmass war schlecht konstruiert -- und das faellt einem nach dem
+Ergebnis ein.** Angekuendigt war der Ø-Score BEIDER Seiten, mit der Begruendung,
+dass ein engine-weites Shaping beide Spieler betrifft und sich deshalb nicht in
+der relativen Siegquote zeigen muss. Uebersehen: in einem Draft-Spiel
+konkurrieren beide um dieselben Steine, die Gesamtpunkte sind durch das Angebot
+gedeckelt. Spielen beide besser, muss die Summe nicht steigen. Die Metrik kann
+also unempfindlich sein, unabhaengig von der Wirkung. Hier war es egal (beide
+Masse sagen dasselbe), bei einem engeren Ergebnis waere es nicht egal gewesen.
+
+### Vorbehalt
+
+Die Verlaengerung von 400 auf 800 Spiele je Arm wurde NACH Sichtung von Block 1
+beschlossen. Optionales Stoppen inflationiert die Falsch-Positiv-Rate -- hier
+ohne Folgen, weil das Ergebnis negativ ausfiel (der Vorbehalt wirkt nur zugunsten
+von ON). `tools/pool_arena_ab.py` schreibt den Hinweis automatisch mit aus.
+
+### Nebenbefund, NICHT mitgeaendert
+
+`projected_unplaceable_penalty` fehlt dem Tiling-Solver ebenso, obwohl
+`player_total` ihn fuehrt. Separat zu testen -- zusammen waere kein A/B
+attribuierbar. Nach diesem Ergebnis aber mit gedaempfter Erwartung.

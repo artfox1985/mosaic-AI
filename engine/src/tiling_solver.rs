@@ -66,11 +66,30 @@ const NODE_BUDGET: u32 = 2_000;
 /// gemessen, nicht über den ganzen Rollout — Unterschätzung in Kauf genommen,
 /// weil `solve_rec` nur den Score liefert, nicht den Endzustand.
 ///
-/// STAND: AUS. Noch kein A/B gefahren. Freischalten erst nach dem v18-Zyklus
-/// (Nutzer-Entscheidung 2026-07-27: "sonst haben wir evtl. zuviel effekte
-/// drinnen"), dann isolierter Arena-A/B nach dem Muster von
-/// `PLATE_SHAPING_ENABLED`. ACHTUNG: Dies ändert auch die HEURISTIK-Spielstärke
-/// (der Solver ist gemeinsamer Code) → Elo-Anker muss neu vermessen werden.
+/// STAND: **AUS -- A/B GEFAHREN UND VERWORFEN (2026-07-29).**
+///
+/// Gepaarter Arena-A/B, `v18_best`@400 vs `v17_best`@400, 1600 Spiele
+/// (2 Blöcke à 400 je Arm, identischer Basis-Seed innerhalb jedes Blocks,
+/// `tools/paired_arena_plate_ab.py` + `tools/pool_arena_ab.py`):
+///
+/// | Block | OFF | ON | b(nur ON) | c(nur OFF) | p |
+/// |---|---|---|---|---|---|
+/// | 1 (Seed 5150271)  | 226 | 245 | 63 | 44 | 0,0814 |
+/// | 2 (Seed 77150271) | 228 | 219 | 50 | 59 | 0,4437 |
+/// | gepoolt           | 454 | 464 | 113 | 103 | **0,5404** |
+///
+/// Block 1 sah mit p=0,0814 nach einem Effekt aus, Block 2 kehrte die Richtung
+/// um. Gepoolt ein Münzwurf. Auch der Ø-Score beider Seiten ist inkonsistent
+/// (Summe Block 1: 74,0 OFF vs 73,9 ON; gepoolt 73,4 vs 74,1) -- kein Signal.
+///
+/// LEHRE, die den Aufwand wert war: hätte man nach Block 1 auf p=0,08
+/// übernommen, wäre eine wirkungslose Änderung eingebaut UND der Elo-Anker
+/// unnötig entwertet worden (der Solver ist gemeinsamer Code, er ändert auch
+/// die Heuristik-Spielstärke). Replizieren statt auf ein knappes p zu handeln.
+///
+/// Der Code bleibt inert erhalten -- der zugrundeliegende BEFUND stimmt ja
+/// weiterhin (der Solver ist endwertungsblind, die Heuristik darüber nicht).
+/// Er ist nur an dieser Stelle offenbar nicht spielentscheidend.
 pub const TILING_SHAPING_ENABLED: bool = false;
 
 /// Gewicht des Fortschritts-Terms. 1.0 = exakt die Gewichtung, mit der
