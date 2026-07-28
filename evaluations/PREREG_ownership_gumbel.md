@@ -175,3 +175,48 @@ statt einer Nacht. Der Arena-Test oben misst NUR die Spielstaerke bei festem
 Netz -- ein Nullergebnis schliesst einen Trainingsziel-Effekt nicht aus. Diese
 Einschraenkung wird im Abschlussbericht mitgenannt und NICHT als
 "kein Effekt vorhanden" verkauft.
+
+---
+
+## AENDERUNG B) am 2026-07-29, NACH Schritt 1, VOR dem A/B
+
+Schritt 1 ist gelaufen (`tools/gumbel_scale_calibration.py`, 216 auswertbare
+Stellungen aus dem frozen set, v18_best @ 400 Sims, letzte
+Sequential-Halving-Phase, delta_q und delta_ln(prior) ueber DIESELBE
+Kandidatenmenge):
+
+| Groesse | Median | IQR |
+|---|---|---|
+| delta_q | 0,0073 | 0,0029 .. 0,0140 |
+| delta_ln(prior) | 1,11 | 0,41 .. 2,12 |
+| max_N | 96 | (Schaetzung aus Sequential Halving war 93) |
+| **delta_sigma / delta_lnprior** | **1,23** | 0,43 .. 2,77 |
+
+Je Runde: 1,01 / 1,08 / 1,56 / 1,44 (n = 68/71/46/31) -- bemerkenswert stabil.
+
+**Befund: c_scale = 1,0 ist bereits nahe am Gleichgewicht.** q wiegt das
+1,23-Fache des Priors; fuer exakte Gleichheit waere c_scale = 0,81. Die
+Begruendung im Quellcode ("unsere q sind schon [0,1]") traegt damit -- die
+vermutete Fehlkalibrierung existiert nicht.
+
+**Konsequenz fuer den A/B, VOR der Erhebung festgelegt:** Der urspruenglich
+vorgesehene Vergleich "1,0 gegen den abgeleiteten Wert" waere 1,0 gegen 0,81 --
+19 % Unterschied, das testet nichts. Stattdessen wird ein Wert getestet, der die
+Balance DEUTLICH verschiebt: **c_scale = 0,3** (Prior wiegt dann rund das
+2,5-Fache von q statt 0,8-Fache).
+
+Damit ist der Test informativ, egal wie er ausgeht:
+* Gewinnt 0,3 signifikant, war die Balance doch falsch und die Messung misst
+  nicht das, worauf es ankommt.
+* Ist es ein Wash, ist die Suche gegen eine 3,3-fache Aenderung dieses Knopfes
+  unempfindlich -- zusammen mit dem TOP_M-Nullergebnis (16 vs 8, p=1,0000) ist
+  die **Gumbel-Familie dann abschliessend geschlossen**.
+
+Umfang: 400 Spiele je Arm, gepaart, identischer Basis-Seed, v18_best vs
+v17_best (dasselbe Muster wie Task #16). Entscheidungsregel unveraendert:
+exakter McNemar p < 0,05 UND Vorteil fuer den neuen Wert.
+
+**Sample-Groesse VORAB festgelegt auf 400 je Arm; eine Verlaengerung wird
+NICHT vorgenommen** -- bei Task #16 hat genau die Verlaengerung gezeigt, dass
+ein knappes p bei n=400 eine Fluktuation sein kann. Bleibt es hier knapp, gilt
+das als Wash und nicht als Anlass zum Weitermessen.
