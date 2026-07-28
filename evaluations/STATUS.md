@@ -5928,3 +5928,74 @@ lesen (bisher nicht eingetreten, aber moeglich).
 Rebuild ueber alle Dateien in `data/` (bei 787 Dateien mehrere Minuten
 CPU-Last, einzelthreadig) und konkurriert damit zusaetzlich mit dem
 11-Thread-Self-Play.
+
+## Seed-Sweep: drei Hebel gepaart ueber 6 Seeds -- alle drei folgenlos (2026-07-28)
+
+Erster A/B dieses Projekts mit MEHREREN Seeds je Arm. Vorgeschichte: alle
+frueheren Trainings-A/Bs verglichen je EINEN Lauf pro Arm gegen eine
+unbekannte Lauf-zu-Lauf-Varianz -- `train.py` setzte gar keinen Seed. Dazu kam
+die Korpus-Konfundierung des Vortags (siehe Abschnitt "KORREKTUR: Trainings-
+A/Bs waehrend laufendem Self-Play"). Beides ist hier behoben: 24 Laeufe
+(4 Arme x 6 Seeds), alle sequenziell auf einem **stabilen Korpus von 900
+Dateien**, gepaart ausgewertet (Seed s in Arm A gegen Seed s in Arm B --
+identische Gewichts-Init und Batch-Reihenfolge).
+
+Werkzeug: `tools/train_seed_sweep.py`. Basis-Rezept je Lauf:
+`--load v17_best --epochs 100 --lr 5e-5 --lr-schedule cosine --seed N`.
+
+**Entscheidungsmetrik vorab festgelegt**: `value_r2_rounds_1_4` auf dem
+frozen set (Task #15 A -- Runde 5 ausgeschlossen, weil das Netz dort nie
+konsultiert wird, das entscheidet der Alpha-Beta-Solver).
+
+### Ergebnis
+
+| Arm | Ø `value_r2_rounds_1_4` | gepaarte Diff | Richtung | Vorzeichentest |
+|---|---|---|---|---|
+| `base` (Referenz) | 0.1133 | -- | -- | -- |
+| `own` (`--ownership-weight 0.3`) | 0.1150 | **+0.0017** | 5:1 | p=0.2188 |
+| `r5x` (`--exclude-round5`) | 0.1144 | +0.0011 | 4:2 | p=0.6875 |
+| `lr1e5` (`--lr 1e-5 --epochs 40`) | 0.1120 | **-0.0013** | 2:4 | p=0.6875 |
+
+**Kein Arm ist signifikant.** Entscheidender Groessenvergleich: die Streuung
+des `base`-Arms ueber die sechs Seeds allein reicht von 0.1091 bis 0.1160 --
+eine Spanne von 0.0069, also das **Vier- bis Sechsfache** jedes gemessenen
+Arm-Effekts. Der Seed bewegt mehr als jeder der drei getesteten Hebel. Das
+ist selbst das Hauptergebnis: an diesen Stellschrauben ist nichts zu holen.
+
+### Methodischer Befund: `val_combined` taugt nicht als Arbiter
+
+Der `lr1e5`-Arm sah auf der Trainings-Validierung deutlich besser aus:
+val_combined 1.2550 gegen 1.2614 im `base`-Arm -- bei einer Seed-Streuung von
+nur ~0.0008 ist das rund die **achtfache Streuung**. Auf der vorregistrierten
+Metrik ist derselbe Arm dann **schlechter** (-0.0013, 2:4).
+
+Erklaerung: `val_combined` ist die Groesse, nach der auch der beste Checkpoint
+AUSGEWAEHLT wird. Ein Arm mit niedrigerer LR laeuft laenger, bevor das
+Plateau-Early-Stopping greift (bester Checkpoint bei Epoche 6-9 statt 2), hat
+also schlicht mehr Ziehungen auf demselben Split -- das drueckt das Minimum,
+ohne dass das Modell besser waere. Zwischen Armen mit verschiedenen
+Epochenbudgets ist `val_combined` damit systematisch verzerrt.
+
+**Konsequenz**: Metrik VOR dem Lauf festlegen und danach nicht wechseln. Hier
+hat genau das die falsche Abzweigung verhindert -- nach `val_combined` waere
+`lr 1e-5` als Gewinner ins Standard-Rezept gewandert.
+
+### Nebenbefund: Epoche-2-Konvergenz bestaetigt
+
+Bester Checkpoint im `base`-Arm ueber sechs Seeds: **[2,2,2,2,2,3]**. Damit ist
+die bisher nur aus Einzellaeufen vermutete Regel belegt. Praktische Folge: die
+Frage "cosine `T_max=100` annealt kaum" ist gegenstandslos -- bei Epoche 2-3
+steht die LR ohnehin noch bei 97,6-100 % des Startwerts, egal wie `T_max`
+gesetzt ist.
+
+### Entscheidungen
+
+* `OWNERSHIP_WEIGHT` bleibt **0.0**. Beste Tendenz der drei, aber 5:1 bei n=6
+  kann p<0.05 nicht erreichen (dafuer braeuchte es 6:0, p=0.031). Kandidat fuer
+  eine Wiederholung mit mehr Seeds. Der Kopf bleibt im Code und ist bei
+  Gewicht 0 inert; er ist ZULETZT in `__init__`/`forward` deklariert, damit
+  ONNX `out[0..3]` und die RNG-Init-Reihenfolge stabil bleiben.
+* `--exclude-round5` bleibt Default **AUS** (Wiederholung des konfundierten
+  Tests -- diesmal sauber, weiterhin Wash).
+* `--lr 1e-5` **verworfen**.
+* v18 uebernimmt damit unveraendert das Rezept aus dem `base`-Arm.
