@@ -5848,3 +5848,34 @@ Runde 1-4 ueber `v17_best` (0,121/0,122 vs 0,113), obwohl identisches Rezept
 und identischer Korpus -- einziger Unterschied ist `--epochs 20` statt 100
 (also ein realistischeres Cosine-T_max, vgl. v17_lrfix-Experiment). Kein
 kontrollierter Vergleich, nur eine Beobachtung.
+
+### Nachtrag: Heuristik spielt Runde 5 ebenfalls per Alpha-Beta (2026-07-28)
+
+Nutzer-Frage: "spielt die Heuristik in Runde 5 auch mit dem Alpha-Beta-
+Solver?" -- Ja, identisch. `mcts.rs` hat denselben `round5::applies(state)`-
+Gate an allen drei Einstiegspunkten: `drafting_policy` (~728, die im
+Self-Play aufgezeichnete Policy), `choose_drafting_action` (~759, die echte
+Zugwahl) und `choose_drafting_action_with_analysis` (~778). Wortgleich zu
+`net_mcts.rs:2265`.
+
+**Konsequenz -- unabhaengiges Argument fuer Metrik A (Task #15 A):** In
+Runde 5 sind Netz und Heuristik BUCHSTAEBLICH derselbe Spieler; beide
+berechnen aus demselben Zustand exakt dieselbe Alpha-Beta-Wahl. Daraus
+folgt: **jeder Elo-Unterschied zwischen zwei beliebigen Spielern entsteht
+ausschliesslich in Runde 1-4.** Auch der Anker Heuristik@150 = 1000 misst
+nur Runde-1-4-Spiel -- Runde 5 ist eine geteilte, identische Komponente, die
+sich in jedem Head-to-Head weghebt.
+
+Das ist staerker als die urspruengliche Begruendung fuer Metrik A (dort:
+"der Value-Head wird in Runde 5 nicht konsultiert"). Jetzt: Runde 5
+differenziert UEBERHAUPT KEINE zwei Spieler. Die Offline-Metrik
+(R² Runde 1-4) misst damit genau das, was die Elo-Leiter ueberhaupt messen
+kann -- vorher waren Offline-Massstab und Arena-Massstab an dieser Stelle
+systematisch entkoppelt.
+
+**Fuer Task #16 zusaetzlich relevant**: die Tiling-Aenderung greift auch in
+Runde 5 (das Alpha-Beta bewertet ueber `solve_round_final_score`, und die
+tatsaechlichen Platzierungen aendern sich) -- sie betrifft also beide Seiten
+und alle fuenf Runden, nicht nur 1-4. Verschaerft die Anker-Konsequenz:
+nach der Aenderung ist auch die Heuristik ein anderer Spieler, die
+Elo-Leiter braucht eine Neuverankerung.
