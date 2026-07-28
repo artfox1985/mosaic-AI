@@ -570,7 +570,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     v_targets_points = v_targets_points.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
-                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points = model(v_states)
+                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = model(v_states)
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
