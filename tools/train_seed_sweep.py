@@ -37,8 +37,17 @@ liefern nur eine Tendenz, keinen Beleg; das Skript sagt das im Bericht.
     python tools/train_seed_sweep.py --seeds 1 2 3 4 5 6 \
         --arm base:"" --arm r5x:"--exclude-round5" --arm own:"--ownership-weight 0.3"
 
-Der Arm `base` (leere Extra-Args) dient beiden Vergleichen als gemeinsame
+Der Arm `base` (leere Extra-Args) dient ALLEN Vergleichen als gemeinsame
 Referenz -- er muss nur EINMAL trainiert werden.
+
+Die Extra-Args eines Arms werden HINTER die Basis-Args gehaengt. Da argparse
+bei wiederholten Flags den LETZTEN Wert nimmt (verifiziert), kann ein Arm
+damit global gesetzte Werte gezielt ueberschreiben -- z.B.
+`--arm lr1e5:"--lr 1e-5 --epochs 40"` setzt fuer diesen Arm eine andere
+Lernrate UND einen anderen Epochendeckel, waehrend die uebrigen Arme die
+`--lr`/`--epochs` des Sweeps behalten. Gebraucht fuer den LR-Magnituden-Arm:
+bei niedrigerer LR greift das Plateau-Early-Stopping spaeter, der Arm braucht
+daher einen eigenen Deckel, damit er nicht ausufert.
 """
 from __future__ import annotations
 
