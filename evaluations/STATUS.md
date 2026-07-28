@@ -5999,3 +5999,102 @@ gesetzt ist.
   Tests -- diesmal sauber, weiterhin Wash).
 * `--lr 1e-5` **verworfen**.
 * v18 uebernimmt damit unveraendert das Rezept aus dem `base`-Arm.
+
+## Orakel-Metriken validiert: 7/7 auf entschiedenen Gatings (2026-07-28)
+
+**Anlass** (Nutzer): "wir haben bis dato noch immer keine belastbare offline
+metrik wie sich die modelle im vergleich in der arena schlagen werden."
+Zutreffend -- und mit `tools/offline_vs_arena.py` (neu) erstmals messbar.
+
+### Schritt 1: die klassischen Metriken sind widerlegt
+
+Neun gepaarte Gating-Laeufe (v14..v18) gegen die Frozen-Set-Diagnosen gejoint.
+`value_r2_rounds_1_4` musste fuer v14..v17_lrfix erst nachgerechnet werden --
+die Metrik existiert erst seit dem 2026-07-28, es gab also **keinen einzigen
+historischen Datenpunkt** fuer die Groesse, nach der an diesem Tag den ganzen
+Tag entschieden wurde.
+
+| Δ `value_r2_rounds_1_4` | Paare | Richtung richtig |
+|---|---|---|
+| gross (+0,016 .. +0,053) | 3 | **3/3** |
+| klein (-0,001 .. -0,009) | 3 | **0/3** |
+
+Aufloesungsgrenze bei grob Δ 0,015; darunter sagt die Metrik nichts. Das
+Pearson r = +0,717 (Permutations-p 0,031) wird vollstaendig von den drei
+grossen Punkten getragen -- Spannweiten-Artefakt.
+
+`policy_top3` zeigte in **6 von 6** entschiedenen Paaren auf den VERLIERER
+(Binomial p = 0,031, Pearson r = -0,82). Ursache mit hoher Wahrscheinlichkeit:
+das frozen set stammt aus ALTEN Korpora (v10b, v12) -- Uebereinstimmung mit
+aufgezeichneten Zuegen misst Aehnlichkeit zum alten Selbstspiel, nicht
+Qualitaet, und bestraft neuere Netze systematisch.
+
+### Schritt 2: das Orakel loest genau diesen Confounder
+
+`tools/build_frozen_oracle_labels.py` (Task #89, 2026-07-25) ersetzt die
+Referenz "aufgezeichneter alter Zug" durch "tiefe 5000-Sim-Suche" (v16_best,
+1185 saubere Drafting-Zustaende, davon 952 in Runde 1-4 auswertbar). Suche
+verstaerkt das Netz erheblich -- die Referenz ist deutlich staerker als das
+Netz, aus dem sie stammt.
+
+Der damalige Bericht validierte gegen 3 Gating-Ausgaenge und notierte selbst
+zwei Vorbehalte: (1) v16_best war zugleich Orakel-Quelle UND Kandidat, (2)
+alle Netze stammen aus derselben Warm-Start-Linie, spaetere sind dem Orakel
+im Gewichtsraum naeher. Beide waren mit n=5 nicht aufloesbar.
+
+**Jetzt sind sie aufloesbar**: v17_best, v17_lrfix_best und v18_best sind NACH
+dem Orakel entstanden. `oracle_metrics.py --models ...` auf alle acht Netze:
+
+| Netz | recall@16 | Top-3-Masse | Value-Pearson | Kendall-Tau |
+|---|---|---|---|---|
+| v14_best | 0,9695 | 0,5687 | 0,8097 | 0,2201 |
+| v14b_best | 0,9706 | 0,5848 | 0,8133 | 0,2143 |
+| v15_f2k_best | 0,9779 | 0,6023 | 0,8329 | 0,2273 |
+| v15_best | 0,9821 | 0,6175 | 0,8594 | 0,2445 |
+| **v16_best (Orakel-Quelle)** | 0,9989 | 0,6524 | **0,8835** | 0,2791 |
+| v17_best | 1,0000 | 0,6729 | 0,8705 | 0,3067 |
+| v17_lrfix_best | 0,9989 | 0,6765 | 0,8699 | 0,3049 |
+| v18_best | 0,9968 | **0,6861** | 0,8612 | **0,3272** |
+
+Gegen die **sieben entschiedenen** Gating-Paare (McNemar p<0,05):
+
+| Metrik | richtig | Binomial p |
+|---|---|---|
+| **Prior-Masse auf Orakel-Top-3** | **7/7** | **0,0156** |
+| **Kendall-Tau (Policy vs. Orakel-Q)** | **7/7** | **0,0156** |
+| Prior-Recall@16 | 6/7 | 0,125 |
+| Value-Pearson / -Spearman | 5/7 | 0,453 |
+| klassisch `value_r2_rounds_1_4` | 4/7 | 0,688 |
+
+### Die beiden alten Vorbehalte loesen sich GEGENLAEUFIG auf
+
+* **Fuer die zwei 7/7-Metriken widerlegt.** Sie steigen ueber die
+  Orakel-Quelle HINAUS monoton weiter (Top-3-Masse 0,6524 → 0,6729 → 0,6861
+  fuer v16 → v17 → v18). Waere es Naehe zu v16 im Gewichtsraum, muesste dort
+  ein Gipfel liegen. Liegt er nicht.
+* **Fuer die Value-Metriken bestaetigt.** `value_pearson` gipfelt EXAKT bei
+  v16_best (0,8835) und faellt danach -- und genau die beiden Nach-Orakel-Paare
+  (v17>v16, v18>v17) sind die zwei, die sie falsch vorhersagt. Der mechanische
+  Selbstbezugs-Vorteil war also real, betrifft aber spezifisch die Value-Seite.
+* **`recall@16` ist gesaettigt** (v17_best = 1,0000) und damit als
+  Unterscheidungsmass verbraucht.
+
+Bemerkenswert: es gewinnen POLICY-Metriken -- dieselbe Groesse, die gegen
+aufgezeichnete alte Zuege gemessen 6 von 6 mal auf den Verlierer zeigte. Nicht
+die Policy-Seite war das Problem, sondern die Referenz.
+
+### Konsequenz fuer den Zyklus
+
+`prior_mass_on_oracle_top3` und `kendall_tau_policy_vs_oracle_q` werden als
+Vor-Gating-Check in die Standard-Diagnose aufgenommen. Sie haetten v18 richtig
+vorhergesagt, wo die klassische Value-Metrik im blinden Bereich lag (+0,0030).
+
+**Kein Ersatz fuer die Arena.** Zwei Gruende: n=7 mit nicht unabhaengigen
+Paaren (Modelle wiederholen sich), und p=0,0156 ist bei 7/7 der bestmoegliche
+Wert -- mehr Trennschaerfe gibt die Stichprobe nicht her.
+
+**Orakel-Auffrischung**: die Referenz ist v16-basiert und veraltet, je weiter
+die Modelle davonziehen. Beim Neubau (Kandidat: aktueller Champion) gilt die
+Regel aus Task #89 weiter -- die Orakel-Quelle darf NICHT selbst zu den
+bewerteten Kandidaten zaehlen, und die Validierung ist danach zu wiederholen.
+`frozen_v1_oracle_labels.json` bleibt als historische Grundlinie unveraendert.
