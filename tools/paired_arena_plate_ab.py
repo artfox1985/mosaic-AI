@@ -77,8 +77,20 @@ EVAL_DIR = BASE_DIR / "evaluations"
 # vs. Vorgaenger v16_best umgestellt -- testet die tatsaechliche Staerke-
 # Frage statt akademischer Vergleichbarkeit mit dem alten Nullergebnis.
 MAIN_CHECKOUT = BASE_DIR
-MODEL_CHAMPION = str((MAIN_CHECKOUT / "models" / "alphazero_v17_best.onnx").resolve())
-MODEL_OPPONENT = str((MAIN_CHECKOUT / "models" / "alphazero_v16_best.onnx").resolve())
+# Ueberschreibbar per --model-champion/--model-opponent. Vorgabe: der
+# amtierende Champion aus models/champion.txt gegen die Vor-Referenz -- damit
+# hier nicht (wie bis 2026-07-28 in arena.py) ein veralteter Name stehenbleibt.
+def _champion_default() -> str:
+    try:
+        n = (MAIN_CHECKOUT / "models" / "champion.txt").read_text(encoding="utf-8").strip()
+    except Exception:
+        n = "v18_best"
+    p = MAIN_CHECKOUT / "models" / f"alphazero_{n}.onnx"
+    return str((p if p.exists() else MAIN_CHECKOUT / "models" / "alphazero_v18_best.onnx").resolve())
+
+
+MODEL_CHAMPION = _champion_default()
+MODEL_OPPONENT = str((MAIN_CHECKOUT / "models" / "alphazero_v17_best.onnx").resolve())
 SIMS = 400
 C_PUCT = 1.5
 DEFAULT_N_GAMES = 100
@@ -234,6 +246,8 @@ def main() -> None:
                          "_ab_result.json). Default 'plate' = Bestandsverhalten. Erlaubt, dasselbe "
                          "Werkzeug fuer weitere Compile-Toggle-A/Bs zu nutzen, ohne fruehere "
                          "Ergebnisse zu ueberschreiben (z.B. GUMBEL_TOP_M-Kalibrierung, Task #9).")
+    p.add_argument("--model-champion", default=None, help="ONNX Brett 0 (Vorgabe: champion.txt)")
+    p.add_argument("--model-opponent", default=None, help="ONNX Brett 1")
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--n-games", type=int, default=DEFAULT_N_GAMES)
     p.add_argument("--block-size", type=int, default=DEFAULT_BLOCK_SIZE)
@@ -243,6 +257,11 @@ def main() -> None:
     if args.combine:
         combine(args.out_prefix)
         return
+    global MODEL_CHAMPION, MODEL_OPPONENT
+    if args.model_champion:
+        MODEL_CHAMPION = str(Path(args.model_champion).resolve())
+    if args.model_opponent:
+        MODEL_OPPONENT = str(Path(args.model_opponent).resolve())
     if args.run_arm is None:
         raise SystemExit("Entweder --run-arm off|on oder --combine angeben.")
     if args.seed is None:
