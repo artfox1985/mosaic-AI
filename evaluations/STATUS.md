@@ -5879,3 +5879,52 @@ tatsaechlichen Platzierungen aendern sich) -- sie betrifft also beide Seiten
 und alle fuenf Runden, nicht nur 1-4. Verschaerft die Anker-Konsequenz:
 nach der Aenderung ist auch die Heuristik ein anderer Spieler, die
 Elo-Leiter braucht eine Neuverankerung.
+
+## KORREKTUR: Trainings-A/Bs waehrend laufendem Self-Play sind konfundiert (2026-07-28)
+
+**Nutzer-Fund**: "interferierst du nun eh nicht mit den Self Plays?" -- Ja,
+und zwar schwerwiegender als durch CPU-Konkurrenz.
+
+`MosaicDataset` wird von `train.py` mit `files=None` aufgerufen und globt
+dann `data/*.pkl` -- also GENAU das Verzeichnis, in das ein laufender
+Self-Play-Batch fortlaufend neue Dateien schreibt. Jeder Trainingslauf sieht
+dadurch einen ANDEREN Korpus. Aus den Lauf-Manifesten:
+
+| Lauf | Dateien | davon v17 |
+|---|---:|---:|
+| r5base | 382 | 82 |
+| r5excl | 404 | **104** |
+| own_off | 787 | **487** |
+
+**Folge 1 -- Task #15 B ist NICHT interpretierbar.** Die beiden Arme
+(`r5base` ohne, `r5excl` mit `--exclude-round5`) trainierten auf
+verschiedenen Korpora (382 vs. 404 Dateien, 22 zusaetzliche v17-Dateien im
+Experimentalarm). Der gemessene Unterschied von +0,0009 auf
+`value_r2_rounds_1_4` kann dem Flag NICHT zugeschrieben werden. Die
+DAMALIGE ENTSCHEIDUNG (Default bleibt aus) bleibt richtig -- aber die
+Begruendung war falsch: es ist nicht "kein Effekt gemessen", sondern
+"konfundiert, kein Effekt messbar". Ebenso sind die drei abgeleiteten
+Erkenntnisse neu zu bewerten:
+- "Mechanismus greift" (R5-R² 0,70 -> 0,61) bleibt gueltig -- so ein grosser,
+  gerichteter Effekt genau in der ausgeschlossenen Runde ist nicht durch
+  22 Zusatzdateien erklaerbar.
+- "Kalibrierungs-Anker-Gegenhypothese widerlegt" ist NICHT mehr gestuetzt
+  (die R3/R4-Verbesserungen koennten vom groesseren Korpus kommen).
+- "Metrik A hat sich bewaehrt" bleibt gueltig -- das ist ein Argument ueber
+  die Metrik selbst, unabhaengig vom Korpus.
+
+**Folge 2 -- der laufende Ownership-A/B wurde abgebrochen.** `own_off` lief
+auf 787 Dateien; bis `own_on` gelaufen waere, haette der Korpus weiter
+zugenommen. Beide Arme muessen auf einem STABILEN Korpus laufen.
+
+**Regel ab jetzt**: **Kein Training, waehrend Self-Play in dasselbe `data/`
+schreibt.** Das Lauf-Manifest (`corpus_composition`) ist das Mittel, das
+nachtraeglich aufzudecken -- genau so wurde es hier gefunden. Latentes
+Zusatzrisiko: `MosaicDataset` koennte eine gerade halb geschriebene `.pkl`
+lesen (bisher nicht eingetreten, aber moeglich).
+
+**Verstaerkend**: An diesem Tag wurde der HDF5-Cache-Key ZWEIMAL geaendert
+(`+rounds_v1`, dann `+own_v1`) -- jede Aenderung erzwingt einen vollen
+Rebuild ueber alle Dateien in `data/` (bei 787 Dateien mehrere Minuten
+CPU-Last, einzelthreadig) und konkurriert damit zusaetzlich mit dem
+11-Thread-Self-Play.

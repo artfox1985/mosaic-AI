@@ -63,13 +63,20 @@ def export(version: str, opset: int = 13) -> Path:
     torch.onnx.export(
         model, dummy, str(out),
         input_names=["state"],
-        output_names=["policy", "value", "moon", "points"],
+        # "ownership" steht ZULETZT (Task #9): net.rs liest die Ausgaenge
+        # positionsbasiert (out[0..3]), ein angehaengter Kopf laesst die
+        # bestehenden Indizes unveraendert und wird von Rust ignoriert.
+        output_names=["policy", "value", "moon", "points", "ownership"],
         dynamic_axes={
             "state":         {0: "batch"},
             "policy":        {0: "batch"},
             "value":         {0: "batch"},
             "moon":          {0: "batch"},
             "points":        {0: "batch"},
+            # MUSS mit aufgefuehrt werden -- fehlt der Eintrag, backt der
+            # Export hier eine FESTE Batch-Dimension ein, was den
+            # Batch=2-Pfad (net.rs::eval_pair) auf Graph-Ebene brechen kann.
+            "ownership":     {0: "batch"},
         },
         opset_version=opset,
         dynamo=False,
@@ -80,7 +87,7 @@ def export(version: str, opset: int = 13) -> Path:
     torch.manual_seed(0)
     x = torch.rand(1, in_size, dtype=torch.float32)
     with torch.no_grad():
-        p, v, m, pts = model(x)
+        p, v, m, pts, *_own = model(x)
     ref = MODELS_DIR / f"alphazero_{version}.onnx.ref.txt"
     with open(ref, "w") as f:
         f.write("# input\n" + " ".join(f"{z:.6f}" for z in x[0].tolist()) + "\n")

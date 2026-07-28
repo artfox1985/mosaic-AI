@@ -52,3 +52,15 @@ LEARNING_RATE = 0.0004
 # auswendig lernbare ±1-Ziel ausrichten.
 VALUE_WEIGHT  = 0.2
 POINTS_WEIGHT = 0.5
+# Ownership-Head (Task #9, 2026-07-28): dichtes Hilfsziel -- je Kuppelfeld
+# (3x3 Slots x 4 Felder x 2 Spieler = 72, ego-perspektivisch wie alle uebrigen
+# Features) binaer vorhersagen, ob es am SPIELENDE belegt sein wird. Motivation:
+# der beste Checkpoint lag bei v15/v16/v17 stets bei Epoche 1-3, das Netz saugt
+# den Korpus also fast sofort aus -- es fehlt lernbares SIGNAL pro Sample, nicht
+# Sample-Anzahl. Statt einem Skalar (value) liefert dieser Kopf 72 Gradienten je
+# Position. Gemessene Zielbalance auf 150 v16-Spielen: 40.9% belegt (41/59, kein
+# Klassenungleichgewicht), alle 18 Slots am Spielende belegt (keine Maskierung
+# noetig). 0.0 = Kopf aus (Bestandsverhalten byte-identisch, da der Kopf ZULETZT
+# initialisiert wird und den RNG-Strom der uebrigen Module nicht verschiebt).
+OWNERSHIP_TARGETS = 72
+OWNERSHIP_WEIGHT  = 0.0

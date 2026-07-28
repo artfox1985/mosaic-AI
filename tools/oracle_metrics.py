@@ -174,7 +174,7 @@ def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx:
     tensors = [state_to_tensor(states_by_idx[lbl["record_index"]]["state"]) for lbl in oracle_labels]
     batch = torch.stack(tensors, dim=0)
     with torch.no_grad():
-        pred_p, pred_v, _pred_moon, _pred_points = model(batch)
+        pred_p, pred_v, _pred_moon, _pred_points, *_own = model(batch)
     pred_p = pred_p.numpy()
     pred_v = pred_v.squeeze(-1).numpy()
 
