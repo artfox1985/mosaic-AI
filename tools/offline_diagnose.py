@@ -408,6 +408,92 @@ def print_corpus_table(results: list[dict]) -> None:
     print("=" * 70)
 
 
+# ── Orakel-Metriken (Task #19 A) ─────────────────────────────────────────────
+# Nur die ZWEI gegen die Arena validierten Groessen. Belegt am 2026-07-28 gegen
+# sieben ENTSCHIEDENE Gating-Paare (v14..v18, tools/offline_vs_arena.py):
+#     prior_mass_on_oracle_top3        7/7   Binomial p=0.0156
+#     kendall_tau_policy_vs_oracle_q   7/7   Binomial p=0.0156
+#     value_pearson_r / value_spearman 5/7
+#     prior_recall_at_16               6/7   -- GESAETTIGT (v17_best = 1.0000)
+#     value_r2_rounds_1_4 (klassisch)  4/7   p=0.688
+# Die beiden Value-Metriken gegen das Orakel scheitern genau an den zwei
+# Nach-Orakel-Paaren und gipfeln exakt bei der Orakel-Quelle v16_best -- der in
+# Task #89 vermutete Selbstbezugs-Vorteil ist damit fuer die VALUE-Seite
+# bestaetigt, fuer die beiden Policy-Metriken dagegen widerlegt (sie steigen
+# ueber v16 hinaus monoton weiter). Deshalb werden hier NUR die beiden
+# ausgegeben, nicht alle fuenf.
+ORACLE_KEYS = ("prior_mass_on_oracle_top3", "kendall_tau_policy_vs_oracle_q")
+
+
+def add_oracle_metrics(results: list[dict], model_names: list[str]) -> None:
+    """Ergaenzt jedes Ergebnis um die beiden validierten Orakel-Metriken.
+
+    Fehlschlaege sind BEWUSST nicht fatal: die Orakel-Labels sind ein
+    optionales Artefakt, eine fehlende/veraltete Datei darf die normale
+    Diagnose nicht kippen. Es wird dann eine Warnung ausgegeben.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from oracle_metrics import (aggregate, compute_for_model,  # noqa: E402
+                                    load_frozen_states, load_oracle)
+    except Exception as e:
+        print(f"\n⚠️  Orakel-Metriken uebersprungen (Import): {e}")
+        return
+    try:
+        manifest, labels = load_oracle()
+        states_by_idx = load_frozen_states([l["record_index"] for l in labels])
+    except FileNotFoundError:
+        print("\n⚠️  Orakel-Metriken uebersprungen: keine Orakel-Labels vorhanden "
+              "(tools/build_frozen_oracle_labels.py). Mit --no-oracle stumm schalten.")
+        return
+    except Exception as e:
+        print(f"\n⚠️  Orakel-Metriken uebersprungen (Laden): {e}")
+        return
+
+    # manifest["model"] traegt den vollen ONNX-Pfad ("models/alphazero_v16_best.onnx")
+    # -- auf den blossen Versionsnamen normalisieren, sonst greift die
+    # Quellen-Erkennung unten nie.
+    raw_src = manifest.get("oracle_model") or manifest.get("model") or "?"
+    src = Path(raw_src).stem.removeprefix("alphazero_")
+    print(f"\n🔮 Orakel-Metriken gegen {src} ({len(labels)} gelabelte Zustaende, "
+          f"{manifest.get('sims', '?')} Sims)")
+    for res, name in zip(results, model_names):
+        if name == src:
+            # Task #89, empirisch bestaetigt: ein Netz gegen die eigene tiefe
+            # Suche zu vergleichen gibt einen rein mechanischen Vorteil.
+            print(f"  ⚠️  {name} IST die Orakel-Quelle -- Werte nicht vergleichbar, markiert.")
+            res["oracle_is_source"] = True
+        try:
+            agg = aggregate(compute_for_model(name, labels, states_by_idx))["overall"]
+            for k in ORACLE_KEYS:
+                res[k] = agg.get(k)
+            res["oracle_n"] = agg.get("n")
+            res["oracle_source"] = src
+        except Exception as e:
+            print(f"  ⚠️  {name}: {e}")
+
+
+def print_oracle_table(results: list[dict]) -> None:
+    if not any(k in r for r in results for k in ORACLE_KEYS):
+        return
+    print("\n" + "=" * 70)
+    print("  ORAKEL-METRIKEN  (die einzigen arena-validierten Praediktoren)")
+    print("=" * 70)
+    names = [r["model"] for r in results]
+    print(f"{'Metrik':<34}" + "".join(f"{n:>16}" for n in names))
+    print("-" * 70)
+    for k, lbl in zip(ORACLE_KEYS, ("Prior-Masse auf Top-3", "Kendall-Tau vs Orakel-Q")):
+        row = "".join(
+            f"{r.get(k):>16.4f}" if isinstance(r.get(k), (int, float)) else f"{'--':>16}"
+            for r in results)
+        print(f"{lbl:<34}{row}")
+    if any(r.get("oracle_is_source") for r in results):
+        print("\n⚠️  Mindestens ein Netz ist die Orakel-Quelle selbst -- dessen Werte sind")
+        print("    mechanisch bevorteilt und NICHT mit den uebrigen vergleichbar.")
+    print("\nHoeher ist besser. 7/7 richtige Richtung auf entschiedenen Gating-Paaren")
+    print("(p=0.0156). ERSETZT DIE ARENA NICHT -- n=7, nicht unabhaengige Paare.")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--model", nargs="+", required=True,
@@ -423,6 +509,14 @@ def main() -> None:
     p.add_argument("--threads", type=int, default=None,
                     help="torch.set_num_threads-Override (Standard: max(1, CPU-2) -- "
                          "Schutz gegen parallel laufende Self-Play-Batches).")
+    p.add_argument("--no-oracle", action="store_true",
+                    help="Die beiden ORAKEL-Metriken weglassen. Standard: sie werden "
+                         "berechnet, sobald --frozen gesetzt ist und die Orakel-Labels "
+                         "vorliegen. Sie sind die einzigen gegen die Arena VALIDIERTEN "
+                         "Praediktoren (7/7 auf entschiedenen Gating-Paaren, Binomial "
+                         "p=0.0156) -- value_r2_rounds_1_4 kam auf 4/7 und ist unterhalb "
+                         "einer Differenz von etwa 0.015 nachweislich blind. Siehe "
+                         "STATUS.md 'Orakel-Metriken validiert (2026-07-28)'.")
     args = p.parse_args()
 
     threads = args.threads if args.threads is not None else max(1, (os.cpu_count() or 4) - 2)
@@ -452,8 +546,12 @@ def main() -> None:
                         corpus_labels=corpus_labels)
         results.append(res)
 
+    if args.frozen and not args.no_oracle:
+        add_oracle_metrics(results, args.model)
+
     print_table(results)
     print_corpus_table(results)
+    print_oracle_table(results)
 
     out_path = args.out
     if out_path is None:
