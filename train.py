@@ -188,7 +188,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
-          exclude_round5=False, ownership_weight=None, seed=None,
+          exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default"):
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
@@ -233,7 +233,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
         "exclude_round5": exclude_round5, "ownership_weight": ownership_weight,
-        "seed": seed,
+        "seed": seed, "snapshot": snapshot,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant,
     }
@@ -902,7 +902,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     #    dem models/-Datenverlust: ereignisgesteuert nach JEDEM Training statt
     #    nur zeitgesteuert). Scheitert leise mit Warnung — ein Backup-Problem
     #    darf nie ein fertiges Training entwerten.
-    _snapshot_models_to_backup(version_name)
+    if snapshot:
+        _snapshot_models_to_backup(version_name)
+    else:
+        print("💾 Modell-Snapshot uebersprungen (--no-snapshot): fuer Ablations-/Sweep-Laeufe, "
+              "deren Checkpoints per --seed reproduzierbar und keine Champions sind. "
+              "Ein Snapshot je Lauf zippt den GESAMTEN models/-Ordner (>140 MB).")
 
 
 def _snapshot_models_to_backup(version_name: str) -> None:
@@ -947,6 +952,13 @@ if __name__ == "__main__":
                         help="Start-Learning-Rate fuer Adam (Standard: LEARNING_RATE aus config.py, "
                              "aktuell 0.0004). Task #77 (v12b_lr): Warm-Start-Feintuning-Kontrolle "
                              "mit niedrigerer Start-LR.")
+    parser.add_argument("--no-snapshot", action="store_true",
+                        help="Den OneDrive-Modell-Snapshot nach dem Training auslassen. "
+                             "Gedacht fuer Ablations-/Seed-Sweep-Laeufe: der Hook zippt den "
+                             "GESAMTEN models/-Ordner (>140 MB) je Lauf, was bei einem Sweep "
+                             "mehrere GB fast identischer Archive erzeugt. Fuer echte "
+                             "Generationen NICHT setzen -- der Hook ist die Absicherung nach "
+                             "dem models/-Datenverlust vom 2026-07-24.")
     parser.add_argument("--seed", type=int, default=None,
                         help="Seed fuer Gewichts-Init und Batch-Shuffling. Default None = "
                              "altes, unseeded Verhalten. Zwei Arme eines A/B mit DEMSELBEN "
@@ -1001,6 +1013,6 @@ if __name__ == "__main__":
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
-          seed=args.seed,
+          seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant)
