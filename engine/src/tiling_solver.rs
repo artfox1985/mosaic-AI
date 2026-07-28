@@ -43,6 +43,40 @@ const MAX_DEPTH: u32 = 30;
 /// Doc-Kommentar oben klein).
 const NODE_BUDGET: u32 = 2_000;
 
+/// Task #16: Endwertungs-Bewusstsein für die Tiling-ZUGWAHL.
+///
+/// BEFUND (2026-07-28): `best_first_step_inner` maximiert `pts + solve_rec(..)`,
+/// also **reine Sofortpunkte der Runde**. `calculate_end_scoring` bzw.
+/// `wertung_progress` kommen im gesamten Modul nicht vor. Da
+/// `best_first_step_exact` der Pfad für ALLE echten Platzierungen ist
+/// (`self_play.rs:894`, `py.rs:687`, `round_transition.rs:135/323`), wählt die
+/// KI ihre Steine, ohne die Wertungsplatten je zu berücksichtigen — auch wenn
+/// die darüberliegende Suche sie sehr wohl bewertet.
+///
+/// Die Heuristik macht es seit jeher anders: `mcts::player_total` =
+/// `solve_round_final_score` **+ `wertung_progress`** + Straf-Term. Dieses
+/// Shaping überträgt denselben Term auf die Zugwahl des Solvers — deshalb
+/// Gewicht 1.0, dieselben Einheiten (Rundenpunkte), dieselbe Ersatzformel.
+///
+/// BEWUSST NUR auf der ersten Stufe (`best_first_step_inner`), NICHT in
+/// `solve_rec`: (a) `solve_rec` ist der Blatt-Bewertungs-Hot-Path des MCTS,
+/// dort würde der Term mit `player_total`s eigenem `wertung_progress`
+/// DOPPELT zählen; (b) die erste Stufe ist die, die den Zug tatsächlich
+/// bestimmt. Der Fortschritts-Delta wird daher nur über den ersten Schritt
+/// gemessen, nicht über den ganzen Rollout — Unterschätzung in Kauf genommen,
+/// weil `solve_rec` nur den Score liefert, nicht den Endzustand.
+///
+/// STAND: AUS. Noch kein A/B gefahren. Freischalten erst nach dem v18-Zyklus
+/// (Nutzer-Entscheidung 2026-07-27: "sonst haben wir evtl. zuviel effekte
+/// drinnen"), dann isolierter Arena-A/B nach dem Muster von
+/// `PLATE_SHAPING_ENABLED`. ACHTUNG: Dies ändert auch die HEURISTIK-Spielstärke
+/// (der Solver ist gemeinsamer Code) → Elo-Anker muss neu vermessen werden.
+pub const TILING_SHAPING_ENABLED: bool = false;
+
+/// Gewicht des Fortschritts-Terms. 1.0 = exakt die Gewichtung, mit der
+/// `mcts::player_total` denselben Term seit jeher führt.
+pub const TILING_SHAPING_WEIGHT: f64 = 1.0;
+
 /// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
 /// (Indizes in `bonus_chips`), damit der reale KI-Zug exakt dem Solver-Plan folgt.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,13 +219,27 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
     }
     let mut budget = NODE_BUDGET;
     let mut best_step = TilingStep::End;
-    let mut best_val = i32::MIN;
+    let mut best_val = f64::NEG_INFINITY;
+    // Basis-Fortschritt EINMAL vor der Schleife: der Shaping-Term ist ein
+    // Delta gegen den Zustand VOR dem Schritt (siehe TILING_SHAPING_ENABLED).
+    let base_progress = if TILING_SHAPING_ENABLED {
+        crate::scoring::wertung_progress(&state.players[pi], &state.scoring_tile_ids)
+    } else {
+        0.0
+    };
     for step in steps {
         if budget == 0 {
             break; // Budget erschöpft: bisher besten Schritt liefern statt hängen.
         }
         if let Some((next, pts)) = apply_step(state, pi, &step) {
-            let val = pts + solve_rec(&next, pi, 1, exact, &mut budget);
+            let mut val = f64::from(pts + solve_rec(&next, pi, 1, exact, &mut budget));
+            if TILING_SHAPING_ENABLED {
+                let delta = crate::scoring::wertung_progress(
+                    &next.players[pi],
+                    &next.scoring_tile_ids,
+                ) - base_progress;
+                val += TILING_SHAPING_WEIGHT * delta;
+            }
             if val > best_val {
                 best_val = val;
                 best_step = step;
@@ -221,6 +269,7 @@ mod tests {
     use crate::state::{setup_new_game, Phase};
     use crate::tile::TileColor::*;
     use rand::rngs::StdRng;
+    use rand::RngExt;
     use rand::SeedableRng;
 
     fn tiling_state(seed: u64) -> GameState {
@@ -404,6 +453,129 @@ mod tests {
         //    (Special zählt als gefüllter Nachbar). = 3.
         //  Summe = 7. (Ohne Special-Bonus: 5; ohne Nachbar-Effekt: 5.)
         assert_eq!(solve_max_tiling_points(&s, 0), 7);
+    }
+
+    /// Referenz-Implementierung der Zugwahl, beide Varianten getrennt
+    /// nachgerechnet -- bewusst dupliziert, damit der Test nicht dieselbe
+    /// Codezeile prueft, die er absichern soll.
+    fn reference_argmax(state: &GameState, pi: usize, shaped: bool) -> TilingStep {
+        let steps = legal_steps(state, pi, true);
+        if steps.is_empty() {
+            return TilingStep::End;
+        }
+        let mut budget = NODE_BUDGET;
+        let mut best_step = TilingStep::End;
+        let mut best_val = f64::NEG_INFINITY;
+        let base = crate::scoring::wertung_progress(&state.players[pi], &state.scoring_tile_ids);
+        for step in steps {
+            if budget == 0 {
+                break;
+            }
+            if let Some((next, pts)) = apply_step(state, pi, &step) {
+                let mut val = f64::from(pts + solve_rec(&next, pi, 1, true, &mut budget));
+                if shaped {
+                    val += TILING_SHAPING_WEIGHT
+                        * (crate::scoring::wertung_progress(
+                            &next.players[pi],
+                            &next.scoring_tile_ids,
+                        ) - base);
+                }
+                if val > best_val {
+                    best_val = val;
+                    best_step = step;
+                }
+            }
+        }
+        best_step
+    }
+
+    /// Reiche Tiling-Stellung: volles 3x3-Kuppelraster, ein Teil der Felder
+    /// vorbefuellt (erzeugt fast-volle Mosaikreihen/-spalten/-diagonalen, wo
+    /// `wertung_progress` grosse Deltas liefert), mehrere gefuellte Musterreihen.
+    ///
+    /// NOETIG, weil `tiling_state()` allein ein LEERES Kuppelraster hat: dort
+    /// gibt `generate_tiling_actions` nichts zurueck, jeder Vergleich waere
+    /// `End == End` und damit leer gruen.
+    fn rich_state(seed: u64) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut s = tiling_state(seed);
+        s.dome_display.clear();
+        s.scoring_tile_ids = vec![0, 1, 2]; // Reihen(3) / Spalten(7) / Diagonalen(10)
+        let pool = build_dome_tile_pool();
+        let mut tid = 300;
+        for r in 0..3 {
+            for c in 0..3 {
+                let mut t = pool[rng.random_range(0..pool.len())].clone();
+                t.tile_id = tid;
+                tid += 1;
+                for si in 0..4 {
+                    // ~60% vorbefuellt: genug fuer fast-volle Linien, laesst aber
+                    // noch freie Felder fuer echte Zugauswahl.
+                    if rng.random_range(0..100) < 60 {
+                        t.spaces[si].placed_color = t.spaces[si].required_color;
+                    }
+                }
+                let _ = s.players[0].dome_grid.place_dome_tile(t, r, c);
+            }
+        }
+        s.players[0].pattern_lines[1].add_tiles(&[Blau, Blau]);
+        s.players[0].pattern_lines[2].add_tiles(&[Rot, Rot, Rot]);
+        s.players[0].pattern_lines[3].add_tiles(&[Tuerkis, Tuerkis, Tuerkis, Tuerkis]);
+        s
+    }
+
+    #[test]
+    fn tiling_shaping_follows_toggle_and_position_discriminates() {
+        // Erste Stellung suchen, in der Sofortpunkte und Plattenfortschritt
+        // AUSEINANDER zeigen -- sonst wuerde der Test das Shaping nicht pruefen.
+        let mut found = None;
+        for seed in 1u64..=200 {
+            let s = rich_state(seed);
+            if legal_steps(&s, 0, true).len() < 2 {
+                continue;
+            }
+            let shaped = reference_argmax(&s, 0, true);
+            let unshaped = reference_argmax(&s, 0, false);
+            if shaped != unshaped {
+                found = Some((seed, s, shaped, unshaped));
+                break;
+            }
+        }
+        let (seed, s, shaped, unshaped) = found.expect(
+            "keine diskriminierende Stellung in 200 Seeds gefunden -- entweder ist der \
+             Shaping-Term wirkungslos oder rich_state() erzeugt keine echten Zugauswahlen",
+        );
+
+        let expected = if TILING_SHAPING_ENABLED { &shaped } else { &unshaped };
+        assert_eq!(
+            &best_first_step_exact(&s, 0),
+            expected,
+            "Seed {seed}: best_first_step_exact folgt TILING_SHAPING_ENABLED={TILING_SHAPING_ENABLED} nicht"
+        );
+    }
+
+    #[test]
+    fn tiling_shaping_off_is_pure_immediate_points() {
+        // Paritaet des f64-Refactors: solange der Toggle AUS ist, muss die
+        // Zugwahl exakt die alte i32-Sofortpunkte-Maximierung sein.
+        if TILING_SHAPING_ENABLED {
+            return;
+        }
+        let mut checked = 0;
+        for seed in 1u64..=60 {
+            let s = rich_state(seed);
+            if legal_steps(&s, 0, true).is_empty() {
+                continue;
+            }
+            checked += 1;
+            assert_eq!(
+                best_first_step_exact(&s, 0),
+                reference_argmax(&s, 0, false),
+                "Seed {seed}: OFF weicht von reiner Sofortpunkte-Maximierung ab"
+            );
+        }
+        // Schutz gegen einen leer gruenen Test.
+        assert!(checked >= 20, "nur {checked} Stellungen mit Zuegen geprueft");
     }
 
     #[test]
