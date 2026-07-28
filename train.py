@@ -52,7 +52,7 @@ def plackett_luce_moon_loss(pred_moon, moon_targets):
 
 # Unsere dynamischen Pfade aus der Config laden
 from config import (MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT,
-                    POINTS_WEIGHT, OWNERSHIP_WEIGHT)
+                    POINTS_WEIGHT, OWNERSHIP_WEIGHT, POINTS_DIST_BINS, POINTS_DIST_SIGMA)
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
@@ -75,6 +75,34 @@ from neural_net import (
 _SELFPLAY_FILENAME_RE = re.compile(
     r"^selfplay_(?P<prefix>.+)_(?P<date>\d{8})_(?P<time>\d{4})_g(?P<games>\d+)\.pkl$"
 )
+
+
+def points_dist_loss(logits, targets, model, rw2, denom):
+    """Task #12: Kreuzentropie des Verteilungs-Punktekopfs gegen ein
+    HL-Gauss-geglaettetes Ziel.
+
+    `targets` ist der skalare tanh-gestauchte Punktedifferenz-Wert in [-1, 1].
+    Statt ihn hart auf ein Bin zu legen (Two-Hot), wird eine Normalverteilung
+    um ihn gelegt und ueber die Bin-KANTEN integriert (Differenz der Gauss-CDF)
+    -- laut Farebrother et al. 2024 ("Stop Regressing") durchweg besser als
+    Two-Hot, weil benachbarte Bins Gradient bekommen und das Ziel damit
+    glatt in der Zielgroesse ist.
+
+    Ziele ausserhalb von [-1, 1] koennen nicht auftreten (tanh), die
+    Renormierung faengt aber die an den Raendern abgeschnittene
+    Wahrscheinlichkeitsmasse ab.
+    """
+    edges = model.points_bin_edges.to(logits.device)          # (B+1,)
+    sigma = POINTS_DIST_SIGMA * (edges[1] - edges[0])
+    y = targets.view(-1, 1)                                    # (N, 1)
+    # Gauss-CDF an jeder Bin-Kante: Phi(z) = 0.5*(1+erf(z/sqrt(2)))
+    cdf = 0.5 * (1.0 + torch.erf((edges.view(1, -1) - y) / (sigma * math.sqrt(2.0))))
+    probs = cdf[:, 1:] - cdf[:, :-1]                            # (N, B)
+    probs = probs / probs.sum(dim=1, keepdim=True).clamp(min=1e-8)
+    ce = -(probs * F.log_softmax(logits, dim=-1)).sum(dim=-1, keepdim=True)
+    if rw2 is None:
+        return ce.mean()
+    return (ce * rw2).sum() / denom
 
 
 def _git_commit_hash() -> str | None:
@@ -189,7 +217,8 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
-          value_weight=None, points_weight=None, value_target_variant="default"):
+          value_weight=None, points_weight=None, value_target_variant="default",
+          points_dist_bins=None):
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
     # Dateinamen übergibt, landet bei alphazero_alphazero_*.pth. Das doppelte
@@ -318,6 +347,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     effective_value_weight = value_weight if value_weight is not None else VALUE_WEIGHT
     effective_points_weight = points_weight if points_weight is not None else POINTS_WEIGHT
     effective_ownership_weight = ownership_weight if ownership_weight is not None else OWNERSHIP_WEIGHT
+    # Task #12: 0 = Skalar-Regression (Bestandsverhalten), >0 = Verteilungs-Kopf.
+    effective_points_dist_bins = (points_dist_bins if points_dist_bins is not None
+                                  else POINTS_DIST_BINS)
+    if effective_points_dist_bins > 0:
+        print(f"   Punkte-Kopf   : VERTEILUNG ueber {effective_points_dist_bins} Bins "
+              f"(HL-Gauss sigma={POINTS_DIST_SIGMA} Bin-Breiten, Task #12) -- "
+              f"Ausgabe bleibt der Erwartungswert")
     print(f"⚙️  Hyperparameter (config.py, ggf. per CLI überschrieben):")
     print(f"   Learning Rate : {effective_lr}" + (f"  (Default {LEARNING_RATE})" if lr is not None else ""))
     print(f"   LR-Schedule   : {lr_schedule}")
@@ -327,7 +363,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           + (f"  (Default {VALUE_WEIGHT})" if value_weight is not None else ""))
     print(f"   Points Weight : {effective_points_weight}  (Punktestand-Prognose, Aux-Signal)"
           + (f"  (Default {POINTS_WEIGHT})" if points_weight is not None else ""))
-    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs)
+    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
+                      points_dist_bins=effective_points_dist_bins)
 
     # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
@@ -462,7 +499,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
-            pred_p, pred_v, pred_moon, pred_points, pred_own = model(states)
+            _out = model(states)
+            pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
+            pred_points_logits = _out[5] if len(_out) > 5 else None
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -503,13 +542,24 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
             # evaluations/stage2_investigation.md) -- klein gewichtet, damit
             # sie den Policy-Loss nicht dominieren.
+            rw2 = rw.view(-1, 1) if rw is not None else None
+            denom = rw2.sum().clamp(min=1e-6) if rw2 is not None else None
             if rw is None:
                 v_loss = mse_loss(pred_v, targets_v)
+            else:
+                v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
+
+            # Task #12: bei aktivem Verteilungs-Kopf ist der Punkte-Verlust eine
+            # KREUZENTROPIE gegen ein HL-Gauss-geglaettetes Ziel statt MSE auf
+            # dem Erwartungswert -- reicheres Gradientensignal, robuster gegen
+            # Ausreisser (Farebrother et al. 2024). Der ausgegebene Skalar
+            # bleibt der Erwartungswert, die Schnittstelle also unveraendert.
+            if pred_points_logits is not None:
+                points_loss = points_dist_loss(
+                    pred_points_logits, targets_points, model, rw2, denom)
+            elif rw is None:
                 points_loss = mse_loss(pred_points, targets_points)
             else:
-                rw2 = rw.view(-1, 1)
-                denom = rw2.sum().clamp(min=1e-6)
-                v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
                 points_loss = (((pred_points - targets_points) ** 2) * rw2).sum() / denom
 
             # Ownership-Loss (Task #9): dichtes Hilfsziel, 72 Binaerlabels je
@@ -570,13 +620,23 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     v_targets_points = v_targets_points.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
-                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = model(v_states)
+                    _vout = model(v_states)
+                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
                     v_rw = (v_rounds.to(device) != 5).float() if exclude_round5 else None
                     v_w = v_pol_w if v_rw is None else v_pol_w * v_rw
                     v_p_loss = (v_per_sample_ce * v_w).sum() / v_w.sum().clamp(min=1e-6)
+                    # Task #12, WICHTIG: der VALIDIERUNGS-Punkteverlust bleibt
+                    # auch bei aktivem Verteilungs-Kopf MSE auf dem
+                    # ERWARTUNGSWERT -- absichtlich NICHT die Kreuzentropie des
+                    # Trainings. Grund: `val_combined` ist zugleich die
+                    # Auswahlmetrik fuer den besten Checkpoint. Waere sie in den
+                    # beiden A/B-Armen eine andere GROESSE, waeren die Arme nicht
+                    # vergleichbar -- genau der Fehler, der am 2026-07-28 beim
+                    # lr1e5-Arm beinahe zur falschen Entscheidung gefuehrt haette
+                    # (siehe STATUS.md "Seed-Sweep", Abschnitt val_combined).
                     if v_rw is None:
                         v_v_loss = mse_loss(v_pred_v, v_targets_v)
                         v_points_loss = mse_loss(v_pred_points, v_targets_points)
@@ -965,6 +1025,14 @@ if __name__ == "__main__":
                              "Seed unterscheiden sich allein durch die getestete Aenderung "
                              "-- ohne Seed vermischt sich der Effekt mit der Lauf-zu-Lauf-"
                              "Varianz (die in diesem Projekt bis 2026-07-28 nie gemessen wurde).")
+    parser.add_argument("--points-dist-bins", type=int, default=None,
+                        help="Task #12: Anzahl Bins fuer den DISTRIBUTIONALEN Punkte-Kopf. "
+                             "0 = aus (Skalar-Regression, Standard). Typisch 51 (C51). Der Kopf "
+                             "sagt dann eine Verteilung der tanh-gestauchten Punktedifferenz "
+                             "vorher und wird per Kreuzentropie gegen ein HL-Gauss-geglaettetes "
+                             "Ziel trainiert; nach aussen wird weiterhin der ERWARTUNGSWERT als "
+                             "Skalar ausgegeben, die ONNX-Schnittstelle out[0..3] bleibt also "
+                             "unveraendert. ACHTUNG: warm-gestartete points_head-Gewichte passen dann nicht mehr (Shape-Mismatch) und starten frisch -- die Warnung dazu ist erwuenscht.")
     parser.add_argument("--ownership-weight", type=float, default=None,
                         help="Task #9: Gewicht des Ownership-Hilfsziels (72 Binaerlabels je "
                              "Position: wird dieses Kuppelfeld am SPIELENDE belegt sein?). "
@@ -1008,7 +1076,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    train(version_name=args.name, load_version=args.load, input_epoch=args.epochs,
+    train(points_dist_bins=args.points_dist_bins,
+          version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,

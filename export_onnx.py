@@ -58,6 +58,18 @@ def export(version: str, opset: int = 13) -> Path:
     model.load_state_dict(state, strict=False)
     model.eval()
 
+    # Ausgabenamen/-achsen abhaengig vom Verteilungs-Kopf (Task #12): bei
+    # aktiven Bins haengt "points_dist" NOCH hinter "ownership". net.rs liest
+    # out[0..3] positionsbasiert, angehaengte Koepfe aendern daran nichts.
+    # JEDE Ausgabe MUSS in dynamic_axes stehen -- fehlt ein Eintrag, backt der
+    # Export eine FESTE Batch-Dimension ein, was den Batch=2-Pfad
+    # (net.rs::eval_pair) auf Graph-Ebene brechen kann.
+    out_names = ["policy", "value", "moon", "points", "ownership"]
+    if getattr(model, "points_dist_bins", 0) > 0:
+        out_names.append("points_dist")
+    dyn_axes = {"state": {0: "batch"}}
+    dyn_axes.update({n: {0: "batch"} for n in out_names})
+
     dummy = torch.zeros(1, in_size, dtype=torch.float32)
     out = MODELS_DIR / f"alphazero_{version}.onnx"
     torch.onnx.export(
@@ -66,18 +78,8 @@ def export(version: str, opset: int = 13) -> Path:
         # "ownership" steht ZULETZT (Task #9): net.rs liest die Ausgaenge
         # positionsbasiert (out[0..3]), ein angehaengter Kopf laesst die
         # bestehenden Indizes unveraendert und wird von Rust ignoriert.
-        output_names=["policy", "value", "moon", "points", "ownership"],
-        dynamic_axes={
-            "state":         {0: "batch"},
-            "policy":        {0: "batch"},
-            "value":         {0: "batch"},
-            "moon":          {0: "batch"},
-            "points":        {0: "batch"},
-            # MUSS mit aufgefuehrt werden -- fehlt der Eintrag, backt der
-            # Export hier eine FESTE Batch-Dimension ein, was den
-            # Batch=2-Pfad (net.rs::eval_pair) auf Graph-Ebene brechen kann.
-            "ownership":     {0: "batch"},
-        },
+        output_names=out_names,
+        dynamic_axes=dyn_axes,
         opset_version=opset,
         dynamo=False,
     )
