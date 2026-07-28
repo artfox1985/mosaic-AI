@@ -5796,3 +5796,55 @@ Gewicht von σ(Q) gegen `ln(prior)` in der Halbierungs-Rangfolge -- eine
 andere Achse als TOP_M). Angesichts des klaren Washes bei TOP_M und des
 weit groesseren Fundes in Task #16 (Tiling-Solver blind fuer die
 Endwertung) zurueckgestellt.
+
+## Task #15 B: Runde-5-Ausschluss im Loss -- Wash (2026-07-28)
+
+**Aufbau**: zwei identische Trainings (`--load v16_best --epochs 20 --lr 5e-5
+--lr-schedule cosine`, nortv), einziger Unterschied `--exclude-round5`
+(nimmt Runde-5-Samples aus Value-, Points- UND Policy-Loss, in Training UND
+Validierung). Bewertet mit `offline_diagnose --frozen` -- ein fuer beide Arme
+identischer externer Massstab, den keiner der beiden optimiert hat.
+
+| Metrik | r5base (Baseline) | r5excl (Experiment) | v17_best |
+|---|---:|---:|---:|
+| **Value R² Runde 1-4** (Entscheidung) | 0,1208 | **0,1217** | 0,1130 |
+| Value R² global (nur Info) | 0,2921 | 0,2644 | 0,2903 |
+| R² Runde 1 | 0,0151 | 0,0142 | 0,0274 |
+| R² Runde 2 | 0,1297 | 0,1259 | 0,1348 |
+| R² Runde 3 | 0,1948 | 0,1957 | 0,1701 |
+| R² Runde 4 | 0,1179 | 0,1236 | 0,1009 |
+| R² Runde 5 (irrelevant) | 0,7024 | 0,6060 | 0,7151 |
+| Policy Top-1 / Top-3 | 45,9% / 70,6% | 45,1% / 70,8% | 45,0% / 71,2% |
+
+**Ergebnis: Wash.** +0,0009 auf der Entscheidungsmetrik = 0,7% relativ, aus
+je EINEM Trainingslauf ohne Wiederholungen -- weit unter jeder
+verteidigbaren Effektschwelle. Kein Gewinner.
+
+**Drei Erkenntnisse trotzdem:**
+
+1. **Der Mechanismus greift**: R5 faellt von 0,70 auf 0,61 -- das Netz hoert
+   tatsaechlich auf, Runde 5 zu lernen. Kein stiller No-op.
+2. **Die Kalibrierungs-Anker-Gegenhypothese ist widerlegt**: die Sorge war,
+   Runde 5 koennte dem Value-Head die Skala geben und ihr Wegfall den fruehen
+   Runden schaden. Tut sie nicht -- R3/R4 wurden sogar minimal besser. Die
+   ~17% Samples tragen zu den relevanten Runden nichts bei, schaden aber
+   auch nicht.
+3. **Metrik A (Task #15 A) hat sich sofort bewaehrt**: global gemessen saehe
+   das nach klarer Verschlechterung aus (-0,028), der entscheidungsrelevante
+   Teil ist minimal besser. Ohne die Metrikumstellung waere dieses Experiment
+   als Fehlschlag abgehakt worden.
+
+**Entscheid: `--exclude-round5` bleibt Default AUS.** Kein gemessener Nutzen,
+kein Rechenzeitgewinn (die Samples werden weiterhin geladen und
+forward-gepasst, nur ihr Loss-Gewicht ist null), und eine Abweichung vom
+Rezept, das alle bisherigen Champions erzeugt hat, ohne Gegenwert. Das Flag
+bleibt verfuegbar.
+**Wiedervorlage**: wenn die freigewordene Kapazitaet ZUSAMMEN mit einem
+zusaetzlichen Ziel genutzt wird (Ownership-Head #9, distributionaler Kopf
+#12) -- dann koennte der Wegfall mehr bringen als isoliert.
+
+**Nebenbefund zum Vergleich mit v17_best**: beide neuen Arme liegen in
+Runde 1-4 ueber `v17_best` (0,121/0,122 vs 0,113), obwohl identisches Rezept
+und identischer Korpus -- einziger Unterschied ist `--epochs 20` statt 100
+(also ein realistischeres Cosine-T_max, vgl. v17_lrfix-Experiment). Kein
+kontrollierter Vergleich, nur eine Beobachtung.
