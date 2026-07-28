@@ -85,7 +85,7 @@ def selfplay_running() -> bool:
              "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
              "Where-Object {$_.CommandLine -like '*self_play.py*'} | Measure-Object | "
              "Select-Object -ExpandProperty Count"],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         return int((out.stdout or "0").strip() or 0) > 0
     except Exception:
         return False
@@ -104,7 +104,7 @@ def run_training(arm: str, seed: int, extra: str, load: str, epochs: int, lr: fl
     if extra.strip():
         cmd += extra.split()
     print(f"  [run ] {name}  ({' '.join(cmd[5:])})", flush=True)
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         print(f"  [FAIL] {name} rc={r.returncode}\n{r.stderr[-1500:]}", flush=True)
         return False
@@ -160,7 +160,7 @@ def main() -> None:
     print(f"\n[sweep] Diagnose ueber {len(models)} Checkpoints (frozen set)...")
     r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
                         "--model", *models, "--frozen", "--out", str(diag_out)],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         raise SystemExit(f"offline_diagnose fehlgeschlagen:\n{r.stderr[-2000:]}")
 
