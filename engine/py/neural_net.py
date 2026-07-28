@@ -5,7 +5,8 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from config import NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS
+from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
+                    POINTS_DIST_BINS)
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
@@ -829,7 +830,8 @@ class MosaicDataset(Dataset):
 
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
-                 policy_hidden=256, value_hidden=64):
+                 policy_hidden=256, value_hidden=64,
+                 points_dist_bins=POINTS_DIST_BINS):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
             nn.Linear(input_size, hidden_size),
@@ -889,12 +891,32 @@ class MosaicNet(nn.Module):
         # Punktedifferenz-Formel, die frueher der einzige Value-Head war --
         # jetzt als separater, feinerer Regressions-Kopf NEBEN dem robusteren
         # Sieg/Niederlage-Ziel (siehe VALUE_SCHEMA_VERSION in neural_net.py).
-        self.points_head = nn.Sequential(
-            nn.Linear(hidden_size, value_hidden),
-            nn.ReLU(),
-            nn.Linear(value_hidden, 1),
-            nn.Tanh()
-        )
+        # Task #12: bei POINTS_DIST_BINS > 0 sagt dieser Kopf eine VERTEILUNG
+        # ueber Bins der tanh-gestauchten Punktedifferenz vorher statt eines
+        # Skalars. Nach aussen bleibt die Schnittstelle identisch -- `forward`
+        # gibt an derselben Stelle weiterhin einen Skalar aus, naemlich den
+        # ERWARTUNGSWERT der Verteilung. `net.rs` (out[0..3], positionsbasiert)
+        # merkt davon nichts.
+        self.points_dist_bins = int(points_dist_bins)
+        if self.points_dist_bins > 0:
+            self.points_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, self.points_dist_bins),
+            )
+            # Bin-MITTEN ueber [-1, 1] (Wertebereich des tanh-Ziels).
+            # Als Buffer registriert -> wandert mit .to(device) und landet im
+            # state_dict, der Checkpoint ist damit selbstbeschreibend.
+            edges = torch.linspace(-1.0, 1.0, self.points_dist_bins + 1)
+            self.register_buffer("points_bin_edges", edges)
+            self.register_buffer("points_bin_centers", (edges[:-1] + edges[1:]) / 2)
+        else:
+            self.points_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh()
+            )
         # Ownership-Head (Task #9): je Kuppelfeld binaer "am Spielende belegt?".
         # 72 Ausgaben = 2 Spieler x 3x3 Slots x 4 Felder, ego-perspektivisch
         # (erst der Spieler am Zug, dann der Gegner -- dieselbe Reihenfolge wie
@@ -910,16 +932,28 @@ class MosaicNet(nn.Module):
 
     def forward(self, x):
         shared = self.body(x)
+        pts_out = self.points_head(shared)
+        pts_logits = None
+        if self.points_dist_bins > 0:
+            # Erwartungswert der Verteilung -> derselbe Skalar-Ausgang wie
+            # vorher (Task #12). Die Logits gehen ZUSAETZLICH raus, damit das
+            # Training die Kreuzentropie darauf rechnen kann.
+            pts_logits = pts_out
+            probs = torch.softmax(pts_logits, dim=-1)
+            pts_out = (probs * self.points_bin_centers).sum(dim=-1, keepdim=True)
         # Reihenfolge = ONNX-Ausgabereihenfolge. `ownership` steht ZULETZT,
         # damit `net.rs`s positionsbasierte Indizes out[0..3] unveraendert
         # bleiben (Rust liest den Kopf nicht -- reines Trainingssignal).
-        return (
+        # `points_dist` haengt bei aktivem Task #12 NOCH dahinter -- gleiches
+        # Muster, dieselbe Begruendung.
+        out = (
             self.policy_head(shared),
             self.value_head(shared),
             self.moon_order_head(shared),
-            self.points_head(shared),
+            pts_out,
             self.ownership_head(shared),
         )
+        return out + (pts_logits,) if pts_logits is not None else out
 
     @torch.no_grad()
     def analyze_capacity(self, x):

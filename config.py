@@ -64,3 +64,20 @@ POINTS_WEIGHT = 0.5
 # initialisiert wird und den RNG-Strom der uebrigen Module nicht verschiebt).
 OWNERSHIP_TARGETS = 72
 OWNERSHIP_WEIGHT  = 0.0
+
+# Task #12: Distributionaler Punkte-Kopf. 0 = AUS (Skalar-Regression wie bisher),
+# >0 = Anzahl der Bins, ueber die der `points_head` eine VERTEILUNG der
+# tanh-gestauchten Punktedifferenz vorhersagt statt eines Punktschaetzers.
+#
+# Idee (Bellemare et al. C51; Farebrother et al. 2024 "Stop Regressing"):
+# ein Kreuzentropie-Ziel ueber Bins liefert ein reicheres Gradientensignal als
+# MSE und ist gegen Ausreisser robuster -- bei identischer Schnittstelle nach
+# aussen, weil weiterhin der ERWARTUNGSWERT der Verteilung als Skalar
+# ausgegeben wird. `net.rs` liest out[0..3] positionsbasiert und merkt davon
+# nichts; die Verteilungs-Logits haengen ZULETZT an den Ausgaben (nach
+# `ownership`, gleiches Muster wie Task #9).
+#
+# 51 Bins = C51-Standardwert. Glaettung per HL-Gauss (Gauss-CDF-Differenzen
+# ueber die Bin-Kanten) statt Two-Hot -- laut "Stop Regressing" durchweg besser.
+POINTS_DIST_BINS   = 0
+POINTS_DIST_SIGMA  = 0.75   # Glaettungsbreite in BIN-BREITEN (Paper-Empfehlung)
