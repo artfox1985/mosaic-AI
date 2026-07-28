@@ -289,6 +289,21 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
         }
     result["value_r2_by_round"] = per_round
 
+    # Entscheidungsmetrik (Nutzer-Anstoss 2026-07-28, Task #15): das GLOBALE
+    # Value-R² taugt nicht zur Modellauswahl, weil Runde 5 es nach oben zieht --
+    # ausgerechnet die Runde, in der das Netz NIE konsultiert wird:
+    # `net_mcts.rs:2265` bypassed den gesamten Netz-Suchpfad zu
+    # `round5::choose_action` (exakte Alpha-Beta-Suche, gilt fuer Self-Play,
+    # Arena UND Server), und der Runde-4-Bootstrap nutzt
+    # `round5::exact_round5_outcome` -- auch dort haengt nichts am Netz-Value.
+    # Gemessen entfallen ~17% der Value-Samples auf Runde 5, bei zugleich dem
+    # hoechsten R² (~0.66-0.72). Dieses Aggregat laesst Runde 5 daher weg.
+    r14_mask = (rounds >= 1) & (rounds <= 4)
+    result["value_r2_rounds_1_4"] = _r2(values[r14_mask], value_preds[r14_mask])
+    result["n_rounds_1_4"] = int(r14_mask.sum())
+    r5_mask = rounds == 5
+    result["n_round_5_excluded"] = int(r5_mask.sum())
+
     draft_mask = pol_w > 0.5
     n_draft = int(draft_mask.sum())
     result["policy_n_drafting"] = n_draft
@@ -344,13 +359,21 @@ def print_table(results: list[dict]) -> None:
     row("Policy Top-3 (Drafting)",
         [f"{r['policy_top3']*100:.1f}%" if r["policy_top3"] is not None else "n/a" for r in results])
     row("  (n Drafting)", [str(r["policy_n_drafting"]) for r in results])
-    row("Value Val-R² global",
+    row("Value R² RUNDE 1-4  <- Entscheidungsmetrik",
+        [f"{r.get('value_r2_rounds_1_4'):.4f}" if r.get("value_r2_rounds_1_4") is not None else "n/a"
+         for r in results])
+    row("Value Val-R² global (nur Info)",
         [f"{r['value_r2_global']:.4f}" if r["value_r2_global"] is not None else "n/a" for r in results])
     for rd in range(1, 6):
-        row(f"R² Runde {rd}",
+        label = f"R² Runde {rd}" + ("  (irrelevant: Alpha-Beta)" if rd == 5 else "")
+        row(label,
             [(f"{r['value_r2_by_round'][str(rd)]['r2']:.4f}"
               if r['value_r2_by_round'][str(rd)]['r2'] is not None else "n/a") for r in results])
     print("=" * 70)
+    print("Hinweis: Runde 5 zaehlt NICHT zur Entscheidungsmetrik -- dort umgeht")
+    print("net_mcts.rs:2265 das Netz komplett (exakte Alpha-Beta-Suche), und der")
+    print("Runde-4-Bootstrap nutzt round5::exact_round5_outcome. Das globale R²")
+    print("wird von Runde 5 nach oben gezogen und ist daher irrefuehrend.")
 
 
 def print_corpus_table(results: list[dict]) -> None:
