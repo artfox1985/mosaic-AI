@@ -2,70 +2,60 @@
 digraph Spielablauf {
     rankdir=TB;
     fontname="Helvetica";
-    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.15,0.1"];
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    R1 [label="Runde 1 — Drafting\nAlphaZero: Netz-Policy-Priors + Gumbel-Suche\n(Top-m + Sequential Halving, siehe netz_suche)\n(Tiling danach: exakter DFS-Solver)", fillcolor="#cfe2ff"];
-    U1 [label="Rundenübergang r→r+1\nLabel: bootstrap_value (TD-Ziel: NUR\nBOOTSTRAP_HORIZON_ROUNDS=2 Runden voraus,\ndann direkte net_leaf_eval — näherer,\nlaut Noise-Floor-Test höherer R²-Deckel)\nround_transition_value STANDARDMÄSSIG AUS\n(record_rtv=false seit #85: war ~81% der\nSelf-Play-Kosten, im Arena-Test ohne Stärke-\nBeitrag — Infrastruktur erhalten, per --rtv\nreaktivierbar; Durchsatz real ~4.5×)\nRefill hänger-sicher (Root-Cause-Fix 1a683d3:\nErreichbarkeits-Check + Iterations-Deckel\nin fill_large_factory, Monochrom-Fallback R3)", fillcolor="#ffe5b4"];
-    R2 [label="Runde 2, 3, 4 — Drafting\n(gleicher Ablauf wie Runde 1, x3 wiederholt)", fillcolor="#cfe2ff"];
-    U4 [label="Übergang 4→5 (Sonderfall)\nKein Sampling nötig — Runde 5 hat keine\nKuppelplatzierung mehr, exact_round5_outcome\nlöst sie direkt exakt (Freebie)", fillcolor="#ffe5b4"];
-    R5 [label="Runde 5\nExakte Alpha-Beta-Suche\n(volle Information, kein Zufall mehr)\nGreift in BEIDEN Suchpfaden an allen vier\nNetz-Einstiegspunkten (round5::applies)", fillcolor="#cfe2ff"];
+    R1 [label="Runde 1-4: Drafting\nGumbel-Suche mit Netz-Priors", fillcolor="#cfe2ff"];
+    T  [label="Tiling\nexakter DFS-Solver", fillcolor="#d9f2d9"];
+    U  [label="Rundenübergang\nTD-Bootstrap-Label", fillcolor="#ffe5b4"];
+    R5 [label="Runde 5\nexakte Alpha-Beta-Suche\n(kein Netz, volle Information)", fillcolor="#e2d9f3"];
+    E  [label="Endwertung\n3 aktive Wertungsplatten", fillcolor="#f0f0f0"];
 
-    R1 -> U1 -> R2 -> U4 -> R5;
-    R2 -> U1 [label="wiederholt für 2→3, 3→4", style=dashed, constraint=false];
+    R1 -> T -> U;
+    U -> R1 [label="Runden 2-4", style=dashed, constraint=false];
+    U -> R5 [label="nach Runde 4"];
+    R5 -> E;
 }
 
 # ==netz_suche==
 digraph NetzSuche {
     rankdir=TB;
     fontname="Helvetica";
-    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.15,0.1"];
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    N1 [label="Netz-Forward-Pass\nstate[708] → policy_logits[406], value,\nmoon_scores[5], points_forecast, ownership[72]\n(5 Tensoren; Rust liest POSITIONSBASIERT out[0..3],\nangehängte Köpfe sind für die Suche unsichtbar)\nownership: Gewicht 0.0 — gemessen (6 Seeds gepaart)\n+0.0017, p=0.22, NICHT übernommen (Task #9)\npoints_dist (Task #12, POINTS_DIST_BINS=0/aus):\noptional Verteilung statt Skalar, Ausgabe bliebe\nder Erwartungswert → Schnittstelle unverändert", fillcolor="#cfe2ff"];
-    N2 [label="Prior-Berechnung\nAktionen → action_to_id (nur noch Moon-Order-\nVarianten teilen sich eine ID; Kuppelplatzierung\nist jetzt ein echter zweistufiger Suchknoten,\nkeine Dome-Faktorisierung mehr nötig)\n→ maskierte Softmax über eindeutige legale IDs\n→ Basis-Prior, Moon-Order-Faktorisierung drauf", fillcolor="#cfe2ff"];
-    N3 [label="Wurzel-Determinisierung (Fund 6)\nDETERMINIZE_ROOT_HIDDEN_INFO: Kuppelstapel +\nunaufgedeckte Bonuschips EINMAL pro Zugsuche\nneu gemischt — Suche danach deterministisch\nauf dieser einen Welt, kein In-Tree-Rauschen", fillcolor="#d9f2d9"];
-    N3B [label="Sims-Budget: 400 (flach)\nnet_effective_sims, DECOUPLE_NET_SIMS_FROM_\nACTIONS=true (Standard): base_sims wird NICHT\nmehr mit der Aktionszahl skaliert (vorher\ndynamic_sims, Ø~330 bei Basis 150) — Gumbels\nWurzelbreite ist ohnehin fix (GUMBEL_TOP_M)", fillcolor="#d9f2d9"];
-    N4 [label="Wurzel: Gumbel-Top-m\nGUMBEL_TOP_M=16: g(a)+ln(prior(a)) ziehen,\nTop m behalten — ersetzt Dirichlet-Noise\n+ 95%-Cutoff an der Wurzel komplett.\nG1-Fix: Self-Play = echte Gumbel-Samples\n(Exploration); Arena/Produktion = g(a)=0\n(add_root_noise=false, mctx gumbel_scale=0)\n→ Arena-Suche deterministisch", fillcolor="#ffe5b4"];
-    N5 [label="Sequential Halving\nBudget in log2(m) Phasen, jeder Überlebende\nbekommt gleich viele Sims, schlechtere Hälfte\n(nach g(a)+ln(prior)+σ(completed_Q)) fliegt raus.\nG2-Fix: Restbudget ÷ VERBLEIBENDE Phasen\n(mctx-konform, frühe Phasen nicht mehr\nunterbudgetiert)", fillcolor="#ffe5b4"];
-    N6 [label="Tiefe ≥1: Baustein B, mctx-treu (#68 DONE)\nKuppelplatten-Zug = zweistufiger Suchknoten\n(ChooseDomeSlot/ChooseDrawStackSlot → Choose-\nDomeRotation). Auswahl über ALLE Kandidaten\n(Kinder ∪ unerprobte, Expansion on demand) —\nProgressive Widening + Policy-Mass-Cutoff sind\naus dem Gumbel-Pfad ENTFERNT (nur Legacy-PUCT\nbehält sie)", fillcolor="#cfe2ff"];
-    N7 [label="Tiefe ≥1: deterministische Auswahl\nargmax[π'_node(a) − N(a)/(1+ΣN)],\nπ'_node = completed-Q-Softmax\n(improved_policy) — ersetzt best_puct\nim Gumbel-Pfad", fillcolor="#ffe5b4"];
-    N8 [label="Expansion + Blattbewertung\nNeuer Knoten (zurück zu Netz-Forward-Pass)\nACTIVE_LEAF=Net: value_to_win_prob\n(2 Forward-Pässe, Ego-Perspektive)\n+ Floor-Shaping (FLOOR_SHAPING_WEIGHT=0.3,\nexakte Bodenstrafe additiv — VALIDIERT:\ngepaart n=150, +14pp, McNemar p=0.0075)\nACTIVE_LEAF=Dfs (dormant): exakter Tiling-Solver", fillcolor="#ffe5b4"];
-    N9 [label="Backpropagation\nWert + Besuchszähler N entlang\ndes Pfads zur Wurzel zurückführen", fillcolor="#ffe5b4"];
-    N10 [label="Zugwahl\nArena/Produktion: unter den Max-Visit-\nÜberlebenden argmax[ln(prior)+σ(Q)]\n(gumbel_final_root_action, ohne g).\nSelf-Play: gespielte Aktion besuchsbasiert,\nTrainingsziel = completed-Q-Softmax über ALLE\nWurzelkandidaten (net_root_child_stats_and_policy)", fillcolor="#cfe2ff"];
-    LEGACY [label="Legacy PUCT-Pfad (USE_GUMBEL_SEARCH=false)\n95%-Cutoff (POLICY_MASS_CUTOFF) + Dirichlet-\nNoise vor Cutoff an der Wurzel (Fund 4) + PUCT\n(Q + c_puct·P·√N_eltern/(1+N_kind)) + Tie-Break\n(visits,Q,prior) statt schlechtestem Gleichstand.\ndynamic_sims(base,n): mehr Optionen -> mehr Sims\n— hier weiterhin aktiv (nur der Gumbel-Pfad\nist entkoppelt, siehe N3B)", fillcolor="#e8e8e8", style="rounded,filled,dashed"];
+    N1 [label="Forward-Pass\nstate[708] → Policy, Value,\nMoon, Points, Ownership", fillcolor="#cfe2ff"];
+    N2 [label="Priors\nmaskierte Softmax über legale Aktionen", fillcolor="#cfe2ff"];
+    N3 [label="Wurzel-Determinisierung\nverdeckte Information einmal mischen", fillcolor="#d9f2d9"];
+    N4 [label="Gumbel-Top-m\n16 Kandidaten ziehen", fillcolor="#ffe5b4"];
+    N5 [label="Sequential Halving\n400 Sims in log2(m) Phasen", fillcolor="#ffe5b4"];
+    N6 [label="Tiefe ≥ 1\nAuswahl über completed-Q", fillcolor="#ffe5b4"];
+    N7 [label="Expansion + Blattbewertung\nNetz-Value + Floor-Shaping", fillcolor="#ffe5b4"];
+    N8 [label="Backpropagation", fillcolor="#ffe5b4"];
+    N9 [label="Zugwahl\nArena: argmax  |  Self-Play: besuchsbasiert", fillcolor="#cfe2ff"];
 
-    TILING [label="Tiling-Zugwahl (tiling_solver.rs)\nbest_first_step_exact wählt JEDE echte Platzierung\n— maximiert bislang REINE SOFORTPUNKTE\n(pts + solve_rec), calculate_end_scoring/\nwertung_progress kommen im Modul nicht vor.\nDie Heuristik darüber (mcts::player_total) führt\nden Term seit jeher mit → Inkonsistenz.\nTILING_SHAPING_ENABLED=false, A/B läuft (Task #16).\nBerührt NUR die Zugwahl, nicht solve_rec —\nMCTS-Blattbewertung und Orakel-Labels bleiben gültig", fillcolor="#f8d7da", style="rounded,filled,dashed"];
-
-    N1 -> N2 -> N3 -> N3B -> N4 -> N5 -> N6 -> N7 -> N8 -> N9;
-    N10 -> TILING [label="nach dem Drafting", style=dotted, constraint=false];
-    N9 -> N6 [label="wiederholt bis Sims-Budget erreicht", style=dashed, constraint=false];
-    N9 -> N10 [label="Budget erreicht"];
-    N2 -> LEGACY [label="USE_GUMBEL_SEARCH=false", style=dotted, constraint=false];
+    N1 -> N2 -> N3 -> N4 -> N5 -> N6 -> N7 -> N8;
+    N8 -> N6 [label="bis Budget erschöpft", style=dashed, constraint=false];
+    N8 -> N9 [label="Budget erschöpft"];
 }
 
 # ==selfplay_training==
 digraph SelfplayTraining {
     rankdir=TB;
     fontname="Helvetica";
-    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.15,0.1"];
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    S1 [label="self_play.py --mode network\nKeep-Awake (SetThreadExecutionState, gegen\nWindows-Standby) + Chunk-Supervisor\n(MAX_CHUNK_TIMEOUT_SECS=450, Kill+Retry,\nHard-Abort nach 3 Hängern in Folge)", fillcolor="#cfe2ff"];
-    S2 [label="Je Partie: präemptiver Watchdog\n(run_with_watchdog, eigener OS-Thread mit\nharter recv_timeout-Deadline) — hängende\nPartie wird verworfen statt den Chunk\nzu blockieren (Fix nach fill_large_factory-\nEndlosschleife, Commit 1a683d3)", fillcolor="#d9f2d9"];
-    S3 [label="Records je Drafting-Schritt\npolicy = completed-Q-Verteilung (dicht, alle\nWurzelkandidaten) | bootstrap_value (r+2-Horizont,\n~83% der Records) | scores + scores_unclamped\n(Fund 7) | KEIN round_transition_value mehr\n(record_rtv=false Default seit #85, --rtv\nreaktivierbar) | Pseudo-Records gefiltert", fillcolor="#ffe5b4"];
-    S4 [label="Korpus: selfplay_<generator>_*.pkl\nChunks à 10 Spiele, Name = Generator-Netz\n(z.B. v14b-Batch von alphazero_v14b_best).\nRegel-Regime NICHT mischen: domefactB & älter\n(vor Regelfixes 82e8a88) dauerhaft archiviert.\nBackup: täglicher nicht-löschender OneDrive-\nSpiegel (nach dem models/-Datenverlust 24.07.)", fillcolor="#ffe5b4"];
-    S5 [label="MosaicDataset (VALUE_SCHEMA_VERSION=15)\nvalue-Ziel: tanh((own−opp)/50) auf scores_unclamped\n→ TD-Mix: val = TD_LAMBDA·bootstrap + (1−TD_LAMBDA)·val\n(TD_LAMBDA=0.5) | rtv-Override: nur bei Alt-Korpora\nrelevant, Standard --value-target-variant nortv\n(Arena-validiert: nortv-Netz wurde Champion) |\nSharpen-Exponent: toter Knopf auf completed-Q\n(v11-A/B) | Variante+TD_LAMBDA+\"+rounds_v1+own_v1\"\nim HDF5-Cache-Key (Key = TEILLISTE, daher je ein\nCache für Train- und Val-Split)\nREGEL: kein Training, während Self-Play in data/\nschreibt — sonst sieht jeder Arm einen anderen\nKorpus (gemessen 382/404/787 Dateien an einem Tag)", fillcolor="#cfe2ff"];
-    S6 [label="Training (Standard-Rezept seit v12b)\nWarm-Start Vorgänger + --lr 5e-5 + Cosine-\nSchedule (From-Scratch: 4e-4) | Early Stopping,\nCheckpoint-Auswahl C8 (p_loss + VALUE_WEIGHT·v_loss\n+ POINTS_WEIGHT·pts) | --load bricht bei fehlendem\nCheckpoint hart ab (Footgun-Fix) → Export ONNX\n→ Modell-Snapshot ins OneDrive (Hook 5fa8b59,\nnach JEDEM Training)\n--seed setzbar: der SEED bewegt value_r2_rounds_1_4\nums 4-6-Fache jedes getesteten Hyperparameters\n(base-Arm 0.1091..0.1160 über 6 Seeds) → Einzellauf-\nA/Bs sind nicht auswertbar, tools/train_seed_sweep.py\nmit ≥6 gepaarten Seeds nutzen\nBester Checkpoint liegt systematisch bei EPOCHE 2-3\n([2,2,2,2,2,3] über 6 Seeds) → Cosine-T_max ist\ngegenstandslos, die LR steht dort noch bei 97.6-100%", fillcolor="#cfe2ff"];
-    S7 [label="Diagnose-Kette — GEGEN DIE ARENA VALIDIERT\noffline_diagnose.py --frozen (frozen_v1, 1800 Zustände)\ngibt seit 29.07. die Orakel-Metriken mit aus.\ntools/offline_vs_arena.py prüft JEDE Metrik gegen die\n7 entschiedenen Gatings (v14→v18), wächst mit jeder\nGeneration weiter:\n  Orakel-Prior-Masse Top-3    7/7   p=0.0156  ✔\n  Orakel-Kendall-Tau          7/7   p=0.0156  ✔\n  value_r2_rounds_1_4         4/7   BLIND unter Δ0.015\n  policy_top3                 0/6   zeigt auf den VERLIERER\nUrsache policy_top3: das frozen set stammt aus ALTEN\nKorpora (v10b/v12) — Übereinstimmung mit aufgezeichneten\nZügen misst Ähnlichkeit zum alten Selbstspiel, nicht\nQualität, und bestraft neuere Netze systematisch.\nNicht die Policy-Seite war das Problem, die REFERENZ war es.", fillcolor="#d9f2d9"];
+    S1 [label="Self-Play\nChampion gegen sich selbst", fillcolor="#cfe2ff"];
+    S2 [label="Korpus\nReplay-Fenster: frisch + 2 Alt-Champions", fillcolor="#ffe5b4"];
+    S3 [label="Dataset\nPolicy = completed-Q, Value = TD-Mix", fillcolor="#ffe5b4"];
+    S4 [label="Training\nWarm-Start + Cosine-LR → ONNX", fillcolor="#cfe2ff"];
+    S5 [label="Diagnose\nOrakel-Metriken (arena-validiert)", fillcolor="#d9f2d9"];
+    S6 [label="Gating\ngepaarte Seeds, SPRT", fillcolor="#ffe5b4"];
+    S7 [label="Neuer Champion\n+ Elo-Kader", fillcolor="#e2d9f3"];
 
-    ORACLE [label="Orakel (build_frozen_oracle_labels.py)\nErsetzt die Referenz „aufgezeichneter alter Zug\"\ndurch eine TIEFE 5000-Sim-Suche (1185 saubere\nDrafting-Zustände, 952 in Runde 1-4 auswertbar).\nSuche verstärkt das Netz erheblich → Referenz ist\nstärker als das Netz, aus dem sie stammt.\nHARTE REGEL: die Orakel-QUELLE darf kein bewerteter\nKandidat sein. Beleg: die VALUE-Metriken gipfeln exakt\nbei der Quelle v16_best und sagen genau die beiden\nNach-Orakel-Paare falsch vorher (5/7). Für die zwei\nPolicy-Metriken ist der Nähe-Vorbehalt WIDERLEGT —\nsie steigen über v16 hinaus monoton weiter.\nprior_recall@16 ist gesättigt (v17=1.0000), verbraucht.", fillcolor="#e2d9f3"];
-    S8 [label="Gating + Elo (paired_gating.py, Standard)\nGepaarte Seed-Paare (Brett-Tausch), Bernoulli-\nSPRT auf informativen Paaren (H1 p=0.65,\nα=β=0.05) | Deckel 400 Paare — 200 war beim v17-\nGating reiner Power-Mangel (p=0.053 UNDECIDED),\nnicht ein echtes Plateau | --promote-winner ist\nCLI-STANDARD: setzt models/champion.txt automatisch,\nServer/arena.py lesen von dort (Neustart nötig) |\nElo-Kader: Heuristik@150(dyn~330) = fester Anker 1000,\nChampion@400, Alt-Champion@400 (elo_tracker.py) |\nschreibt Ø-Punkte/Floor ins Arena-Trend-Log", fillcolor="#ffe5b4"];
-    S9 [label="Nächste Generation (Replay-Fenster)\nNutzer-Schema: Frisch-Spiele vom Champion\n+ Alt-Champion-Anteile; Frischdaten-Menge\n2000-vs-6000 per Stärke-Ablation #91 kalibriert\n(rtv-aus macht 6000er-Batches über Nacht möglich)\nAKTUELL (v18-Zyklus): 900 Dateien =\n6000 v17 + 2000 v16 + 1000 v15\nAlt-Regel-Korpora treten nie wieder ein", fillcolor="#cfe2ff"];
-
-    S1 -> S2 -> S3 -> S4 -> S5 -> S6 -> S7 -> S8;
-    ORACLE -> S7 [label="liefert die validierten Prädiktoren", style=dashed];
-    S8 -> S9 [label="Champion gewechselt"];
-    S8 -> S6 [label="nicht bestanden: Hyperparameter/Daten\nnachziehen statt Generator wechseln", style=dashed, constraint=false];
-    S9 -> S1 [label="neuer Zyklus", style=dashed, constraint=false];
+    S1 -> S2 -> S3 -> S4 -> S5 -> S6;
+    S6 -> S7 [label="bestanden"];
+    S6 -> S4 [label="nicht bestanden", style=dashed, constraint=false];
+    S7 -> S1 [label="nächster Zyklus", style=dashed, constraint=false];
 }
