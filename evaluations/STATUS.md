@@ -5706,3 +5706,48 @@ also auf die eine Runde, die nachweislich unlernbar ist. Kuenftige
 Zielmetrik sollte die **Luecke Deckel-minus-Ist je Runde** sein statt des
 globalen R² (das wird von Runde 5 dominiert, wo ohnehin fast alles
 erreichbar ist, und verdeckt damit genau die Runden mit echtem Potenzial).
+
+### Zielzone praezisiert: Runde 2-4 (Nutzer-Einwand, 2026-07-28)
+
+Nutzer: "Runde 5 brauchen wir nichts messen, da haben wir Alpha-Beta-Solver
+drauf." Zutreffend -- und mit groesserer Reichweite als nur der Messung.
+
+**Verifiziert**: Das Netz wird in Runde 5 NIE konsultiert.
+`net_mcts.rs:2265` -- `if round5::applies(state) { return
+round5::choose_action(state) }` -- der Bypass sitzt im Netz-Suchpfad selbst,
+gilt also fuer Self-Play, Arena UND Server. Auch der Runde-4-Bootstrap
+braucht das Netz dort nicht: der Uebergang 4->5 nutzt
+`round5::exact_round5_outcome` ("exakter Freebie, kein Netz-Rauschen",
+`self_play.rs:1879`).
+
+**Gemessener Verschnitt** (10 v16-Dateien):
+
+| Runde | Records | Anteil | Policy-Samples |
+|---|---:|---:|---:|
+| 1 | 3233 | 20,0% | 2474 |
+| 2 | 3345 | 20,7% | 2502 |
+| 3 | 3456 | 21,4% | 2484 |
+| 4 | 3416 | 21,1% | 2495 |
+| **5** | **2710** | **16,8%** | **1698 (14,6%)** |
+
+**16,8% des Value-Signals und 14,6% des Policy-Signals** entfallen auf
+Entscheidungen, die das Netz nie trifft. Das Runde-5-Policy-Ziel ist sogar
+ein One-Hot auf die Alpha-Beta-Wahl (`net_mcts.rs:2388`:
+`round5::choose_action(...).map(|a| (a,1,1.0))`) -- das Netz lernt, einen
+exakten Solver zu imitieren, dessen Aufgabe es nie uebernimmt.
+Praezedenzfall im Code: `pol_w=0` fuer Tiling-Schritte, weil "Tiling macht
+der DFS-Solver" -- Runde 5 ist fuer BEIDE Koepfe dieselbe Situation.
+
+**Folge fuer die Zielmetrik:**
+
+| Runde | Status |
+|---|---|
+| 1 | **unlernbar** -- Deckel 0,0068, Zufall-dominiert |
+| 2-4 | **die eigentliche Zielzone** (Runde 2: nur ~10% des Deckels ausgeschoepft) |
+| 5 | **irrelevant** -- Alpha-Beta spielt, Bootstrap nutzt exakten Solver |
+
+Das globale Value-R², an dem ueber viele Zyklen Netze beurteilt wurden, wird
+von Runde 5 (0,6-0,7) nach oben gezogen -- ausgerechnet von der Runde ohne
+Beitrag zur Spielstaerke -- und verdeckt damit die Runden mit echtem
+Potenzial. Kuenftige Bewertung sollte auf **R² je Runde 2-4** bzw. die
+Luecke Deckel-minus-Ist dort umgestellt werden (Task #15).
