@@ -5751,3 +5751,48 @@ von Runde 5 (0,6-0,7) nach oben gezogen -- ausgerechnet von der Runde ohne
 Beitrag zur Spielstaerke -- und verdeckt damit die Runden mit echtem
 Potenzial. Kuenftige Bewertung sollte auf **R² je Runde 2-4** bzw. die
 Luecke Deckel-minus-Ist dort umgestellt werden (Task #15).
+
+## Task #10: Gumbel-Kalibrierung GUMBEL_TOP_M 16 vs. 8 -- Nullergebnis (2026-07-28)
+
+**Motivation** (aus dem Budget-Port, siehe Ideensammlung oben): bei
+`sims=400/TOP_M=16` eliminiert die erste Halbierung 8 von 16 Kandidaten auf
+Basis von je 6 Simulationen. `TOP_M=8` gaebe 16 Sims vor dem ersten Cull
+(2,7x zuverlaessiger), kostet aber Breite.
+
+**Methodisch wichtig -- Wheel-Isolation statt `site-packages`-Tausch:**
+`GUMBEL_TOP_M` ist eine Compile-Konstante, der A/B braucht also zwei Wheels.
+Waehrenddessen lief der 6000-Spiele-Self-Play-Batch. `self_play.py` startet
+pro 10er-Chunk einen FRISCHEN `mp.Process`, der `mosaic_rust` neu importiert
+(`_run_chunk_supervised`, Zeile ~231) -- ein `pip install` in `site-packages`
+haette die restlichen ~5500 Spiele mit `TOP_M=8` erzeugt, ohne jede Spur im
+Record (Mischkorpus, nachtraeglich nicht trennbar). Stattdessen:
+`pip install --target <scratchpad>` + `PYTHONPATH` nur fuer den ON-Arm.
+Funktionsnachweis statt Annahme -- dieselben 8 Zustaende durch beide
+Installationen: `site-packages` deckelt bei 16 Wurzelkandidaten, die
+isolierte bei 8, und bei Zustaenden mit nur 6/3/2 legalen Zuegen liefern
+beide identische Werte. Quelle nach dem Build sofort auf 16 zurueckgesetzt.
+
+**Ergebnis** (`v17_best` vs `v16_best` @400 Sims, Seed 4711, 100 Spiele je
+Arm, 3 Threads wegen paralleler Self-Play-Last):
+
+| Arm | Champion:Gegner | Ø-Score | Ø-Floor |
+|---|---:|---:|---:|
+| OFF (`TOP_M=16`, Ist) | 50:50 | 36,1 : 35,2 | 15,7 : 15,0 |
+| ON (`TOP_M=8`) | 51:49 | 34,3 : 34,5 | 16,2 : 15,4 |
+
+Diskordanz b(ON-only)=25, c(OFF-only)=24, konkordant 26/25. **Exakter
+McNemar p=1,0000.**
+
+**Bewertung: perfekter Wash, aber informativ.** Die Diskordanz ist mit 49
+von 100 Paaren SEHR hoch -- `TOP_M=8` aendert das Spiel massiv, ist aber
+exakt gleich stark. Der Tradeoff Breite gegen Cull-Zuverlaessigkeit hebt
+sich also praktisch vollstaendig auf: was an Kandidaten-Breite verloren
+geht (8 statt 16 betrachtete Zuege), wird durch die zuverlaessigere
+Halbierung (16 statt 6 Sims vor dem ersten Cull) genau kompensiert.
+`TOP_M=16` bleibt.
+
+**Nicht getestet**: `GUMBEL_C_VISIT=50` / `GUMBEL_C_SCALE=1.0` (steuern das
+Gewicht von σ(Q) gegen `ln(prior)` in der Halbierungs-Rangfolge -- eine
+andere Achse als TOP_M). Angesichts des klaren Washes bei TOP_M und des
+weit groesseren Fundes in Task #16 (Tiling-Solver blind fuer die
+Endwertung) zurueckgestellt.
