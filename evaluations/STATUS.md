@@ -6738,3 +6738,23 @@ die Zeilen sind nicht unabhaengig.
 Elo-Neuverankerung (feste n=150-Kante, ersetzt die duenne n=31) laeuft;
 Eintrag wird als Beginn der NEUEN ENGINE-AERA markiert -- #21 veraendert auch
 die Heuristik, Vorher/Nachher-Elo sind nur eingeschraenkt vergleichbar.
+
+### Elo-Neuverankerung nach der Aktivierung (2026-07-30)
+
+Feste n=150-Kante ohne Fruehstopp: **v18_best 88:62 Heuristik (58,7 %)**,
+Score 44,7 : 40,1, Floor 11,0 : 15,1. Ersetzt methodisch die duenne
+n=31-Kante (74,2 %) -- der Rueckgang ist ZWEI erwartbaren Effekten
+zuzuschreiben: Kleinstichproben-Ueberschaetzung der alten Kante UND die
+Heuristik selbst wurde durch #21 staerker (gemeinsamer Solver; ihr Ø-Score
+sprang von historisch ~32 auf 40,1). v18s Absolutscore stieg gleichzeitig
+41,7 -> 44,7 -- kein Rueckschritt, ein ehrlicherer Massstab.
+
+OFFENER PUNKT fuer spaeter: elo_history mischt jetzt Kanten gegen die alte
+und die neue Heuristik unter EINEM Ankerknoten (fix 1000). Mit v19+ werden
+die Neue-Aera-Kanten dominieren; falls die Verzerrung stoert, ist ein
+sauberer Schnitt (eigener Ankerknoten je Aera + Neuverankerung des Kaders)
+der richtige Weg -- bewusst NICHT jetzt gemacht.
+
+Damit sind Task #20 und #21 ABGESCHLOSSEN: implementiert, validiert,
+aktiviert, dokumentiert. Kein Self-Play gestartet (Nutzer-Vorgabe: erst mit
+dem 2D-Encoder-Ergebnis entscheiden).
