@@ -1,0 +1,20 @@
+Gepaartes Gating (Task #76): v17_best@400 (c_puct=1.5) vs v15_best@400 (c_puct=1.5) -- Basis-Seed=543024941, Bloecke a 25 Paare, harter Deckel 200 Paare
+  SPRT: H0 p=0.5 vs. H1 p=0.65, alpha=0.05 beta=0.05, Wald-Schranken [-2.9444, +2.9444]
+  Block 1 (Seed=543024941, n=25 Paare, 175.1s): kumulativ v17_best 29:21 v15_best | Paare 25 (A-Sweep b=8 B-Sweep c=4 Split=13) | LLR=+0.672 [-2.944,+2.944] | Bericht-McNemar p=0.3877 | gepaarte Diff +0.320 [-0.219,+0.859]
+  Block 2 (Seed=544024941, n=25 Paare, 156.1s): kumulativ v17_best 54:46 v15_best | Paare 50 (A-Sweep b=13 B-Sweep c=9 Split=28) | LLR=+0.201 [-2.944,+2.944] | Bericht-McNemar p=0.5235 | gepaarte Diff +0.160 [-0.209,+0.529]
+  Block 3 (Seed=545024941, n=25 Paare, 165.5s): kumulativ v17_best 88:62 v15_best | Paare 75 (A-Sweep b=25 B-Sweep c=12 Split=38) | LLR=+2.279 [-2.944,+2.944] | Bericht-McNemar p=0.0470 | gepaarte Diff +0.347 [+0.036,+0.657]
+  Block 4 (Seed=546024941, n=25 Paare, 169.1s): kumulativ v17_best 114:86 v15_best | Paare 100 (A-Sweep b=32 B-Sweep c=18 Split=50) | LLR=+1.976 [-2.944,+2.944] | Bericht-McNemar p=0.0649 | gepaarte Diff +0.280 [+0.007,+0.553]
+  Block 5 (Seed=547024941, n=25 Paare, 186.5s): kumulativ v17_best 145:105 v15_best | Paare 125 (A-Sweep b=42 B-Sweep c=22 Split=61) | LLR=+3.172 [-2.944,+2.944] | Bericht-McNemar p=0.0169 | gepaarte Diff +0.320 [+0.074,+0.566]
+  SPRT-Entscheid nach 125 Paaren: v17_best signifikant besser (LLR=+3.172 >= obere Schranke +2.944).
+------------------------------------------------------------
+ERGEBNIS: v17_best 145:105 v15_best (von 250 Spielen, 125 Paaren)
+  SPRT-Entscheid: v17_best signifikant besser (SPRT)
+  Informative Paare: A-Sweep b=42  B-Sweep c=22  Split=61
+  Fixed-n-Bericht-Statistik (NICHT die Stopp-Entscheidung): exakter Paar-Vorzeichentest p=0.0169
+  Gepaarte Differenz (A-Siege minus B-Siege pro Paar): +0.320  95%-KI [+0.074, +0.566]
+  Hinweis fuers elo_tracker-Protokoll:
+    python tools/elo_tracker.py add --player-a v17_best --sims-a 400 --player-b v15_best --sims-b 400 --wins-a 145 --wins-b 105 --n 250 --comment "Gepaartes Gating (Task #76), SPRT=v17_best, p=0.0169"
+Champion gesetzt: 'v17_best' -> 'v17_best' (D:\Archiv\Documents\Projekte\mosaic-AI\models\champion.txt).
+Wirkt erst nach einem Server-Neustart (DIFFICULTY_PRESETS wird beim Modul-Import gelesen).
+  Champion automatisch gesetzt: v17_best (models/champion.txt) -- Server-Neustart noetig, damit es wirkt.
+Ergebnis gespeichert: D:\Archiv\Documents\Projekte\mosaic-AI\evaluations\paired_gating_result_v17_best_vs_v15_best.json

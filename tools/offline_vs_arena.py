@@ -65,6 +65,10 @@ def binom_p_two_sided(k: int, n: int) -> float:
     return min(1.0, 2 * min(p_le, p_ge))
 
 
+def mcnemar_exact_p(b: int, c: int) -> float:
+    return binom_p_two_sided(b, b + c)
+
+
 def pearson(xs, ys) -> float:
     n = len(xs)
     if n < 3:
@@ -117,7 +121,14 @@ def perm_p(xs, ys, stat, n_perm=50000, seed=12345) -> float:
 def load_offline() -> tuple[dict, dict]:
     """model -> metriken, nur frozen-set. Zusaetzlich model -> frozen_version."""
     out, versions = {}, {}
-    for f in sorted(glob.glob(str(BASE_DIR / "evaluations" / "offline_diagnose_*.json"))):
+    # Auch archive/ scannen: dort liegen die Diagnosen der v10..v13-Generation,
+    # deren GEWICHTE beim Datenverlust am 2026-07-24 verlorengingen. Die
+    # damaligen Kennzahlen sind damit die einzige verbliebene Quelle -- neu
+    # rechnen (und damit value_r2_rounds_1_4 oder die Orakel-Metriken ergaenzen)
+    # ist fuer sie unmoeglich. evaluations/ hat Vorrang bei Namensgleichheit.
+    sources = (sorted(glob.glob(str(BASE_DIR / "evaluations" / "offline_diagnose_*.json")))
+               + sorted(glob.glob(str(BASE_DIR / "archive" / "offline_diagnose_*.json"))))
+    for f in sources:
         try:
             d = json.load(open(f, encoding="utf-8"))
         except Exception:
@@ -139,7 +150,10 @@ def load_offline() -> tuple[dict, dict]:
 
 def load_gatings(min_pairs: int) -> list[dict]:
     rows = []
-    for f in sorted(glob.glob(str(BASE_DIR / "evaluations" / "paired_gating_result_*.json"))):
+    seen_gatings = {}
+    seen_exact = set()
+    for f in (sorted(glob.glob(str(BASE_DIR / "evaluations" / "paired_gating_result_*.json")))
+              + sorted(glob.glob(str(BASE_DIR / "archive" / "paired_gating_result_*.json")))):
         try:
             d = json.load(open(f, encoding="utf-8"))
         except Exception:
@@ -150,14 +164,51 @@ def load_gatings(min_pairs: int) -> list[dict]:
             continue
         if (d.get("done_pairs") or 0) < min_pairs:
             continue
-        rows.append({
-            "file": os.path.basename(f), "a": a, "b": b,
-            "a_wins": aw, "b_wins": bw,
-            "winrate_a": aw / max(aw + bw, 1),
-            "verdict": d.get("sprt_verdict"),
-            "mcnemar_p": d.get("report_mcnemar_p"),
-            "pairs": d.get("done_pairs"),
-        })
+        # MEHRERE BLOECKE DERSELBEN FRAGE ZUSAMMENFASSEN. Wird ein Gating
+        # nachtraeglich repliziert (v18_dist: 75 Paare, dann 150 mit anderem
+        # Seed), liegen zwei Dateien fuer EINEN Vergleich vor. Beide als eigene
+        # Datenpunkte zu zaehlen ist doppelt falsch: es blaeht n auf UND es
+        # nimmt einen Block, der isoliert "entschieden" aussieht, als
+        # Grundwahrheit -- obwohl gerade die Replikation gezeigt hat, dass er es
+        # nicht ist. Zusammengefasst wird ueber Siege und diskordante Zaehler,
+        # der p-Wert danach EINMAL exakt gerechnet.
+        # ZUERST exakte Dubletten aussortieren: dieselbe Datei liegt teils in
+        # evaluations/ UND archive/. Ohne diesen Schritt wuerde das Zusammenfassen
+        # unten sie ADDIEREN -- die Paarzahl verdoppelt sich und der p-Wert
+        # schrumpft scheinbar dramatisch (beobachtet 2026-07-29: v14b vs v14
+        # sprang von 200 auf 400 Paare, p von 0.0662 auf 0.0074).
+        dup = (a, b, aw, bw, d.get("done_pairs"))
+        if dup in seen_exact:
+            continue
+        seen_exact.add(dup)
+
+        key = (a, b)
+        prev = seen_gatings.get(key)
+        blk = {"a_wins": aw, "b_wins": bw, "pairs": d.get("done_pairs") or 0,
+               "b_disc": d.get("pair_a_sweeps_b"), "c_disc": d.get("pair_b_sweeps_c")}
+        if prev is None:
+            seen_gatings[key] = blk
+            blk["file"] = os.path.basename(f)
+            blk["a"], blk["b"] = a, b
+            rows.append(blk)
+        else:
+            prev["a_wins"] += aw
+            prev["b_wins"] += bw
+            prev["pairs"] += blk["pairs"]
+            for k in ("b_disc", "c_disc"):
+                if prev.get(k) is not None and blk.get(k) is not None:
+                    prev[k] += blk[k]
+                else:
+                    prev[k] = None
+            prev["file"] += " + " + os.path.basename(f)
+
+    for r in rows:
+        r["winrate_a"] = r["a_wins"] / max(r["a_wins"] + r["b_wins"], 1)
+        # p aus den zusammengefassten diskordanten Zaehlern, sonst aus der Datei.
+        if r.get("b_disc") is not None and r.get("c_disc") is not None:
+            r["mcnemar_p"] = mcnemar_exact_p(r["b_disc"], r["c_disc"])
+        else:
+            r["mcnemar_p"] = None
     return rows
 
 
