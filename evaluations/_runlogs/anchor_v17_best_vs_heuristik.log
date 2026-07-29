@@ -1,0 +1,46 @@
+🏟️ Mosaic-AI ARENA — Netz vs Heuristik (Rust) 🏟️
+  v17_best (Brett 0, 400 Sims) vs Heuristik(s150) (Brett 1, 150 Sims) — 400 Spiele  [SPRT p1=0.64, α=0.05, β=0.1]
+--------------------------------------------------
+  #  1/400:  48:24  -> v17_best                 | Züge 170 | LLR_Netz +0.25 | LLR_Heur -0.33 | ΔElo~+120 | Stand Netz 1:0 Heur | Elo 1016/984
+  #  2/400:  37:31  -> v17_best                 | Züge 171 | LLR_Netz +0.49 | LLR_Heur -0.66 | ΔElo~+191 | Stand Netz 2:0 Heur | Elo 1031/969
+  #  3/400:  53:11  -> v17_best                 | Züge 167 | LLR_Netz +0.74 | LLR_Heur -0.99 | ΔElo~+241 | Stand Netz 3:0 Heur | Elo 1044/956
+  #  4/400:  74:27  -> v17_best                 | Züge 170 | LLR_Netz +0.99 | LLR_Heur -1.31 | ΔElo~+280 | Stand Netz 4:0 Heur | Elo 1056/944
+  #  5/400:  58:75  -> Heuristik(s150)          | Züge 175 | LLR_Netz +0.66 | LLR_Heur -1.07 | ΔElo~+159 | Stand Netz 4:1 Heur | Elo 1035/965
+  #  6/400:  30:38  -> Heuristik(s150)          | Züge 168 | LLR_Netz +0.33 | LLR_Heur -0.82 | ΔElo~+89 | Stand Netz 4:2 Heur | Elo 1016/984
+  #  7/400:  11:0   -> v17_best                 | Züge 178 | LLR_Netz +0.58 | LLR_Heur -1.15 | ΔElo~+120 | Stand Netz 5:2 Heur | Elo 1031/969
+  #  8/400:  26:14  -> v17_best                 | Züge 174 | LLR_Netz +0.82 | LLR_Heur -1.48 | ΔElo~+147 | Stand Netz 6:2 Heur | Elo 1044/956
+  #  9/400:  44:83  -> Heuristik(s150)          | Züge 172 | LLR_Netz +0.50 | LLR_Heur -1.23 | ΔElo~+97 | Stand Netz 6:3 Heur | Elo 1024/976
+  # 10/400:  47:52  -> Heuristik(s150)          | Züge 167 | LLR_Netz +0.17 | LLR_Heur -0.98 | ΔElo~+58 | Stand Netz 6:4 Heur | Elo 1006/994
+  # 11/400:  61:40  -> v17_best                 | Züge 171 | LLR_Netz +0.41 | LLR_Heur -1.31 | ΔElo~+82 | Stand Netz 7:4 Heur | Elo 1021/979
+  # 12/400:  37:37  -> Heuristik(s150)          | Züge 175 | LLR_Netz +0.09 | LLR_Heur -1.07 | ΔElo~+50 | Stand Netz 7:5 Heur | Elo 1003/997
+  # 13/400:  63:48  -> v17_best                 | Züge 171 | LLR_Netz +0.33 | LLR_Heur -1.39 | ΔElo~+70 | Stand Netz 8:5 Heur | Elo 1019/981
+  # 14/400:  39:33  -> v17_best                 | Züge 160 | LLR_Netz +0.58 | LLR_Heur -1.72 | ΔElo~+89 | Stand Netz 9:5 Heur | Elo 1033/967
+  # 15/400:  57:40  -> v17_best                 | Züge 182 | LLR_Netz +0.83 | LLR_Heur -2.05 | ΔElo~+105 | Stand Netz 10:5 Heur | Elo 1046/954
+  # 16/400:  58:44  -> v17_best                 | Züge 183 | LLR_Netz +1.07 | LLR_Heur -2.38 | ΔElo~+120 | Stand Netz 11:5 Heur | Elo 1058/942
+  # 17/400:  48:39  -> v17_best                 | Züge 178 | LLR_Netz +1.32 | LLR_Heur -2.38 | ΔElo~+134 | Stand Netz 12:5 Heur | Elo 1069/931
+  # 18/400:  43:12  -> v17_best                 | Züge 176 | LLR_Netz +1.57 | LLR_Heur -2.38 | ΔElo~+147 | Stand Netz 13:5 Heur | Elo 1079/921
+  # 19/400:  44:61  -> Heuristik(s150)          | Züge 167 | LLR_Netz +1.24 | LLR_Heur -2.38 | ΔElo~+120 | Stand Netz 13:6 Heur | Elo 1056/944
+  # 20/400:  31:26  -> v17_best                 | Züge 173 | LLR_Netz +1.49 | LLR_Heur -2.38 | ΔElo~+132 | Stand Netz 14:6 Heur | Elo 1067/933
+  # 21/400:  43:63  -> Heuristik(s150)          | Züge 164 | LLR_Netz +1.16 | LLR_Heur -2.38 | ΔElo~+109 | Stand Netz 14:7 Heur | Elo 1045/955
+  # 22/400:  50:40  -> v17_best                 | Züge 174 | LLR_Netz +1.40 | LLR_Heur -2.38 | ΔElo~+120 | Stand Netz 15:7 Heur | Elo 1057/943
+  # 23/400:  61:39  -> v17_best                 | Züge 163 | LLR_Netz +1.65 | LLR_Heur -2.38 | ΔElo~+131 | Stand Netz 16:7 Heur | Elo 1068/932
+  # 24/400:  42:26  -> v17_best                 | Züge 179 | LLR_Netz +1.90 | LLR_Heur -2.38 | ΔElo~+141 | Stand Netz 17:7 Heur | Elo 1078/922
+  # 25/400:  55:56  -> Heuristik(s150)          | Züge 172 | LLR_Netz +1.57 | LLR_Heur -2.38 | ΔElo~+120 | Stand Netz 17:8 Heur | Elo 1055/945
+  # 26/400:  46:33  -> v17_best                 | Züge 174 | LLR_Netz +1.82 | LLR_Heur -2.38 | ΔElo~+130 | Stand Netz 18:8 Heur | Elo 1066/934
+  # 27/400:  44:22  -> v17_best                 | Züge 176 | LLR_Netz +2.06 | LLR_Heur -2.38 | ΔElo~+139 | Stand Netz 19:8 Heur | Elo 1076/924
+  # 28/400:  26:39  -> Heuristik(s150)          | Züge 178 | LLR_Netz +1.73 | LLR_Heur -2.38 | ΔElo~+120 | Stand Netz 19:9 Heur | Elo 1053/947
+  # 29/400:  24:24  -> Heuristik(s150)          | Züge 174 | LLR_Netz +1.41 | LLR_Heur -2.38 | ΔElo~+104 | Stand Netz 19:10 Heur | Elo 1032/968
+  # 30/400:  44:22  -> v17_best                 | Züge 172 | LLR_Netz +1.65 | LLR_Heur -2.38 | ΔElo~+112 | Stand Netz 20:10 Heur | Elo 1045/955
+  # 31/400:  55:32  -> v17_best                 | Züge 173 | LLR_Netz +1.90 | LLR_Heur -2.38 | ΔElo~+120 | Stand Netz 21:10 Heur | Elo 1057/943
+  # 32/400:  63:31  -> v17_best                 | Züge 176 | LLR_Netz +2.15 | LLR_Heur -2.38 | ΔElo~+128 | Stand Netz 22:10 Heur | Elo 1068/932
+  # 33/400:  44:30  -> v17_best                 | Züge 173 | LLR_Netz +2.39 | LLR_Heur -2.38 | ΔElo~+136 | Stand Netz 23:10 Heur | Elo 1078/922
+  # 34/400:  56:44  -> v17_best                 | Züge 170 | LLR_Netz +2.64 | LLR_Heur -2.38 | ΔElo~+143 | Stand Netz 24:10 Heur | Elo 1087/913
+  # 35/400:  70:44  -> v17_best                 | Züge 180 | LLR_Netz +2.89 | LLR_Heur -2.38 | ΔElo~+149 | Stand Netz 25:10 Heur | Elo 1096/904
+  # 36/400:  62:47  -> v17_best                 | Züge 171 | LLR_Netz +3.13 | LLR_Heur -2.38 | ΔElo~+156 | Stand Netz 26:10 Heur | Elo 1104/896
+  ⏹️  SPRT-Entscheid nach 36 Spielen: v17_best signifikant staerker (LLR_Netz=+3.13, LLR_Heur=-2.38).
+--------------------------------------------------
+🏆 ERGEBNIS: v17_best 26:10 Heuristik(s150) (72% Netz-Siege) in 114.0s (0.3 Spiele/s)  [vorzeitig nach 36/400 Spielen]
+   Ø Score: v17_best 47.1 | Heuristik(s150) 36.9
+   0:0-Spiele: 0/36 (0.0%)  (Sauberkeits-Indikator)
+   Ø Floor-Strafe: v17_best 9.2 | Heuristik(s150) 16.9
+   Elo: v17_best 1104 | Heuristik(s150) 896
