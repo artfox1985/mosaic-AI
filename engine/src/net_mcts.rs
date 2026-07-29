@@ -1216,6 +1216,35 @@ fn make_node<R: Rng + ?Sized>(
 /// [0,1]-Win-Wahrscheinlichkeiten, keine zusaetzliche Min-Max-Rescale wie
 /// bei mctx' unbeschraenkten Atari-Rewards noetig.
 const GUMBEL_C_VISIT: f64 = 50.0;
+/// GEMESSEN UND BESTAETIGT (2026-07-29, Task #18) -- bleibt 1.0.
+///
+/// `tools/gumbel_scale_calibration.py` hat ueber 216 frozen-set-Stellungen
+/// (v18_best @ 400 Sims, letzte Sequential-Halving-Phase) erhoben, wie schwer
+/// `sigma(q)` gegenueber `ln(prior)` wiegt -- beide ueber DIESELBE
+/// Kandidatenmenge:
+///   delta_q          Median 0,0073   delta_ln(prior)  Median 1,11
+///   max_N            Median 96       Verhaeltnis      Median 1,23
+///   je Runde: 1,01 / 1,08 / 1,56 / 1,44
+/// q und Prior wiegen also praktisch gleich schwer; fuer exakte Gleichheit
+/// waere c_scale = 0,81 noetig. Die Begruendung oben traegt damit.
+///
+/// GEGENPROBE (gepaarter Arena-A/B, v18_best@400 vs v17_best@400, 400 Spiele
+/// je Arm, identischer Basis-Seed 31415926), c_scale 1,0 gegen 0,3:
+///   Arm 1,0: Champion 210:190 | Score 39,13 vs 37,77 (Summe 76,90) | Floor 13,85/14,97
+///   Arm 0,3: Champion 248:152 | Score 35,59 vs 31,32 (Summe 66,91) | Floor 15,61/17,32
+///   McNemar p = 0,0057
+///
+/// Die Siegquote spricht fuer 0,3 -- **uebernommen wurde es trotzdem NICHT**.
+/// Bei 0,3 spielen BEIDE Seiten massiv schlechter: zehn Punkte weniger in der
+/// Summe (-13 %) und deutlich mehr Bodenstrafen auf beiden Brettern. Ein
+/// kleineres c_scale verschiebt Gewicht von der SUCHE zum Policy-Prior; die
+/// Suche traegt dann weniger bei. Dass v18 dabei oefter gewinnt, misst nur, dass
+/// v17 unter der verschlechterten Suche staerker einbricht (v18 hat den besseren
+/// Prior) -- also RELATIVE Robustheit, nicht Staerke.
+///
+/// LEHRE: bei einer engine-weiten Aenderung, die BEIDE Seiten trifft, ist die
+/// Siegquote im Champion-gegen-Vorgaenger-Duell KEIN gueltiges Staerkemass. Der
+/// absolute Ø-Score ist hier das entscheidende Signal gewesen.
 const GUMBEL_C_SCALE: f64 = 1.0;
 
 /// Anzahl der per Gumbel-Top-m an der Wurzel gezogenen Kandidaten (vor
