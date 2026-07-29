@@ -218,7 +218,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
-          points_dist_bins=None):
+          points_dist_bins=None, reinit_points_head=False):
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
     # Dateinamen übergibt, landet bei alphazero_alphazero_*.pth. Das doppelte
@@ -380,6 +380,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # alle Heads) startet weiterhin warm. Alte Checkpoints mit einem
         # value_head.* haben automatisch keine Entsprechung mehr in
         # new_state (Head existiert nicht mehr) -- werden einfach ignoriert.
+        if reinit_points_head:
+            # Task #12, FAIRER KONTROLLARM: der Verteilungs-Kopf KANN nicht warm
+            # starten (andere Ausgabebreite) -- er beginnt zwangslaeufig zufaellig.
+            # Ein Kontrollarm, dessen Skalar-Kopf warm startet, waere deshalb im
+            # Vorteil, und der A/B wuerde "Verteilung vs. Skalar" mit "frisch vs.
+            # warm" vermischen. Mit dieser Option startet auch der Skalar-Kopf
+            # frisch, der Unterschied ist dann allein die Kopf-ART.
+            drop = [k for k in old_state if k.startswith("points_head.")]
+            print(f"   ↻ points_head wird NEU initialisiert ({len(drop)} Tensoren) "
+                  f"-- fairer Kontrollarm zu --points-dist-bins")
+            old_state = {k: v for k, v in old_state.items() if k not in drop}
         skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
         if skipped:
             print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")
@@ -1025,6 +1036,12 @@ if __name__ == "__main__":
                              "Seed unterscheiden sich allein durch die getestete Aenderung "
                              "-- ohne Seed vermischt sich der Effekt mit der Lauf-zu-Lauf-"
                              "Varianz (die in diesem Projekt bis 2026-07-28 nie gemessen wurde).")
+    parser.add_argument("--reinit-points-head", action="store_true",
+                        help="Den points_head beim Warm-Start NEU initialisieren statt ihn zu "
+                             "uebernehmen. Fairer Kontrollarm zu --points-dist-bins: der "
+                             "Verteilungs-Kopf kann nicht warm starten (andere Ausgabebreite), "
+                             "ein Vergleich gegen einen warm gestarteten Skalar-Kopf vermischt "
+                             "sonst 'Verteilung vs Skalar' mit 'frisch vs warm'.")
     parser.add_argument("--points-dist-bins", type=int, default=None,
                         help="Task #12: Anzahl Bins fuer den DISTRIBUTIONALEN Punkte-Kopf. "
                              "0 = aus (Skalar-Regression, Standard). Typisch 51 (C51). Der Kopf "
@@ -1076,7 +1093,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    train(points_dist_bins=args.points_dist_bins,
+    train(points_dist_bins=args.points_dist_bins, reinit_points_head=args.reinit_points_head,
           version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           show_plot=not args.no_plot, val_frac=args.val_frac,

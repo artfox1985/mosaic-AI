@@ -6255,3 +6255,82 @@ TOP_M-Nullergebnis (16 vs 8, perfekter Wash, p=1,0000 bei 49/100 diskordanten
 Paaren) ist die Parametrisierung dreifach geprueft: der eine Knopf ist
 wirkungslos, der andere sitzt gemessen am Gleichgewicht, und eine gezielte
 Verschiebung macht das Spiel schlechter.
+
+## Task #12: Distributionaler Punkte-Kopf -- nicht uebernommen (2026-07-29)
+
+### Umsetzung
+
+`points_head` sagt bei `POINTS_DIST_BINS>0` eine VERTEILUNG der tanh-gestauchten
+Punktedifferenz ueber Bins vorher (51 = C51-Standard) und wird per
+Kreuzentropie gegen ein HL-Gauss-geglaettetes Ziel trainiert (Gauss-CDF-
+Differenzen ueber die Bin-Kanten). Nach aussen unveraendert: `forward` gibt an
+Index 3 weiterhin einen Skalar aus, naemlich den ERWARTUNGSWERT; die Logits
+haengen hinter `ownership`.
+
+**Die Schnittstellen-Annahme haelt.** Rust laedt `v18_dist_best.onnx` ohne eine
+Zeile Aenderung und liefert plausible, vom Skalar-Netz verschiedene Werte
+(win_pct 52,67 vs 52,13). Das Muster "Erwartungswert an der alten Position,
+neuer Kopf hinten angehaengt" ist damit fuer kuenftige Kopf-Erweiterungen
+bestaetigt.
+
+Der VALIDIERUNGS-Verlust blieb bewusst MSE auf dem Erwartungswert -- auch im
+Verteilungs-Arm -- weil `val_combined` zugleich die Checkpoint-Auswahlmetrik ist
+und sonst in den Armen eine andere GROESSE waere.
+
+### Fairer Kontrollarm -- und eine widerlegte Hypothese
+
+Der Verteilungs-Kopf KANN nicht warm starten (andere Ausgabebreite). Der
+naheliegende Verdacht war, dass ein guter Teil seines Rueckstands vom Kaltstart
+kommt -- bei Early Stopping nach Epoche 2 plausibel. Dafuer wurde
+`--reinit-points-head` ergaenzt und `v18_freshpts` trainiert: identisches
+Rezept, aber der SKALAR-Kopf startet ebenfalls frisch.
+
+| | v18_dist | v18_freshpts | v18_best |
+|---|---|---|---|
+| `value_r2_rounds_1_4` | 0,0906 | **0,1160** | 0,1160 |
+| Orakel Prior-Masse Top-3 | 0,6845 | 0,6861 | 0,6861 |
+
+**Die Hypothese war falsch.** Ein frisch initialisierter Skalar-Kopf holt den
+Rueckstand innerhalb von zwei Epochen vollstaendig auf. Das Defizit des
+Verteilungs-Arms geht also auf die KOPF-ART zurueck, nicht auf den Kaltstart.
+(An den Gewichten gegengeprueft: `points_head` weicht um 0,20-0,28 ab, der Trunk
+um 0,009 -- die Neuinitialisierung hat nachweislich gegriffen.)
+
+### Arena -- und die dritte Replikation des Tages
+
+| Block | Paare | dist | v18 | b | c | p | Ø Score dist/v18 |
+|---|---|---|---|---|---|---|---|
+| 1 (SPRT-Stopp) | 75 | 92 | 58 | 28 | 11 | **0,0095** | 41,29 / 37,53 |
+| 2 (Seed 8675309) | 150 | 151 | 149 | 36 | 35 | **1,0000** | 39,27 / 37,02 |
+| **gepoolt** | 225 | 243 | 207 (54,0 %) | 64 | 46 | **0,1046** | -- |
+
+Block 1 sah mit p=0,0095 nach einem klaren Sieg aus -- Block 2 entschied den
+SPRT sogar in die GEGENRICHTUNG ("kein Beleg, dass v18_dist besser ist").
+Gepoolt nicht signifikant. **Nicht uebernommen, `POINTS_DIST_BINS` bleibt 0.**
+Der Code bleibt inert erhalten.
+
+Damit ist das an EINEM Tag der dritte Fall, in dem ein ueberzeugendes p bei
+Replikation verschwindet (Task #16: 0,0814 -> 0,5404; Task #18-Gegenprobe:
+0,0057, aber durch den absoluten Score entlarvt; hier: 0,0095 -> 0,1046). Die
+Projekt-Erfahrung "Ergebnisse bei n<=75 sind Kontext, nie Referenz" hat sich
+erneut bestaetigt.
+
+### Zwei Befunde, die BLEIBEN
+
+**1. Der Punkte-Vorsprung ist in BEIDEN Bloecken positiv** (+3,76 und +2,25).
+Der Verteilungs-Kopf holt in denselben Partien konsistent mehr Punkte, ohne das
+in Siege umzumuenzen. Fuer eine Aussage reicht es nicht -- aber es ist der
+einzige der heute geprueften Hebel, bei dem der absolute Punktwert konsistent in
+eine Richtung zeigt. Beim erklaerten Projektziel (Punktemaximierung) ist das
+notiert und nicht abgehakt.
+
+**2. Unser Offline-Instrumentarium misst den PUNKTE-Kopf ueberhaupt nicht.**
+`value_r2_rounds_1_4` misst den Value-Kopf, die beiden Orakel-Metriken messen
+Policy-Prior und Kandidatenrangfolge. Geaendert wurde aber ausschliesslich der
+Punkte-Kopf -- den die Engine an `out[3]` liest und in die Bewertung
+einrechnet. Die 8/8-Validierung der Orakel-Metriken beruht auf Vergleichen, bei
+denen sich Policy UND Value aenderten; fuer Punkte-Kopf-Aenderungen ist ihre
+Trefferquote schlicht ungemessen. **Die Orakel-Metriken sind kopfspezifisch
+validiert, nicht universell** -- das gehoert zu ihrer Beschreibung dazu.
+Konkrete Folgerung fuer Task #19: eine Punkte-Kopf-Metrik ins frozen-set-
+Instrumentarium aufnehmen.
