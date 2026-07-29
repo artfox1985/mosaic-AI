@@ -260,6 +260,133 @@ def state_to_tensor(data):
 
     return torch.tensor(features, dtype=torch.float32)
 
+
+# --- 2D-Encoder-Skelett (Task #11, Phase 1) --------------------------------
+# `state_to_planes` ist der 2D-Zweig NEBEN `state_to_tensor` (das oben
+# UNVERAENDERT bleibt) -- additiv, siehe docs/design_2d_encoder.md für die
+# vollständige Begründung der Kanal-Aufteilung und des Geometrie-Gatings.
+# Kein Training/HDF5-Cache-Bau in Phase 1 (Stopp-Linie) -- reines
+# Format-Skelett, per Selbsttest (siehe tools/) gegen echte Zustände geprüft.
+
+# Dieselben 5 Farben wie COLOR_MAP oben, aber als geordnete Liste (Index =
+# Kanal-Offset in state_to_planes, siehe _board_channels).
+DOME_COLORS_5 = ["blau", "gelb", "rot", "schwarz", "türkis"]
+_SPACE_TYPE_IDX = {"NORMAL": 0, "WILD": 1, "SPECIAL": 2}
+
+# Slot-Koordinaten (sr, sc) der 4 Eckplatten -- siehe
+# scoring.rs::score_corner_tiles: (0,0)/(0,2) zählen 3 Pkt, (2,0)/(2,2)
+# zählen 8 Pkt (asymmetrisch je Ecke) -- daher 4 EINZELNE Masken statt einer
+# gemeinsamen (design_2d_encoder.md Abschnitt 4).
+_CORNER_SLOTS = [(0, 0), (0, 2), (2, 0), (2, 2)]
+
+
+def _build_geometry_masks() -> dict:
+    """Konstante 6x6-Positions-Masken der Wertungsgeometrie (Zeilen/Spalten/
+    Diagonalen/Rand/Ecken) -- unabhängig vom Spielzustand, einmal berechnet.
+    Quelle der Geometrie: engine/src/scoring.rs (build_grid/score_*), siehe
+    docs/design_2d_encoder.md Abschnitt 2+4."""
+    row = torch.zeros(6, 6, 6)
+    col = torch.zeros(6, 6, 6)
+    for i in range(6):
+        row[i, i, :] = 1.0
+        col[i, :, i] = 1.0
+    diag = torch.zeros(2, 6, 6)
+    for i in range(6):
+        diag[0, i, i] = 1.0       # Hauptdiagonale
+        diag[1, i, 5 - i] = 1.0   # Nebendiagonale
+    border = torch.zeros(1, 6, 6)
+    for r in range(6):
+        for c in range(6):
+            if r in (0, 5) or c in (0, 5):
+                border[0, r, c] = 1.0
+    corner = torch.zeros(4, 6, 6)
+    for k, (sr, sc) in enumerate(_CORNER_SLOTS):
+        corner[k, sr * 2:sr * 2 + 2, sc * 2:sc * 2 + 2] = 1.0
+    return {"row": row, "col": col, "diag": diag, "border": border, "corner": corner}
+
+
+_GEOM = _build_geometry_masks()
+
+# Kanalzahl-Buchhaltung (siehe docs/design_2d_encoder.md Abschnitt 3/4):
+#   Belegung je Spieler: 16 (1 slot_exists + 5 placed_color + 1 placed_special
+#                            + 5 required_color + 3 type + 1 locked)
+#   -> 32 für beide Spieler (ego zuerst, dann Gegner -- state_to_tensor-Konvention)
+#   Geometrie roh:     19 (6 Zeilen + 6 Spalten + 2 Diagonalen + 1 Rand + 4 Ecken)
+#   Geometrie gegatet: 25 (6 Zeilen@Tile0 + 6 Zeilen@Tile7 + 6 Spalten@Tile1
+#                          + 2 Diagonalen@Tile2 + 1 Rand@Tile4 + 4 Ecken@Tile5)
+NUM_PLANES_CHANNELS = 2 * 16 + 19 + 25  # = 76
+
+
+def _board_channels(dome_grid) -> torch.Tensor:
+    """16 Kanäle für EIN Spielerbrett (6x6) -- siehe Tabelle in
+    docs/design_2d_encoder.md Abschnitt 3. `dome_grid`: 3x3-Liste von Slots
+    (oder None), jeder Slot ein Dict mit `spaces` (Liste von 4 Space-Dicts,
+    Reihenfolge TL,TR,BL,BR -- identisch zu scoring.rs::build_grid)."""
+    ch = torch.zeros(16, 6, 6)
+    for sr in range(3):
+        row = dome_grid[sr] if sr < len(dome_grid) else []
+        for sc in range(3):
+            slot = row[sc] if sc < len(row) else None
+            if slot is None:
+                continue
+            spaces = slot.get("spaces", [{}, {}, {}, {}])
+            for si in range(4):
+                sp = spaces[si] if si < len(spaces) else {}
+                r = sr * 2 + si // 2
+                c = sc * 2 + si % 2
+                ch[0, r, c] = 1.0  # Slot vorhanden
+                filled = sp.get("filled")
+                if filled in DOME_COLORS_5:
+                    ch[1 + DOME_COLORS_5.index(filled), r, c] = 1.0
+                elif filled == "special":
+                    ch[6, r, c] = 1.0
+                req = sp.get("color")
+                if req in DOME_COLORS_5:
+                    ch[7 + DOME_COLORS_5.index(req), r, c] = 1.0
+                sp_type = sp.get("type", "NORMAL")
+                ch[12 + _SPACE_TYPE_IDX.get(sp_type, 0), r, c] = 1.0
+                if sp.get("locked", False):
+                    ch[15, r, c] = 1.0
+    return ch
+
+
+def state_to_planes(data) -> torch.Tensor:
+    """2D-Gegenstück zu `state_to_tensor` (Task #11 Phase 1) -- Format
+    [C,6,6], C=NUM_PLANES_CHANNELS=76. ADDITIV: `state_to_tensor` bleibt
+    unverändert, dies ist ein PARALLELER Zweig für den geplanten
+    Conv-Encoder (siehe docs/design_2d_encoder.md). Ego-Perspektive wie
+    überall sonst: erst der Spieler am Zug, dann der Gegner."""
+    curr_pi = data.get("current_player", 0)
+    enemy_pi = 1 - curr_pi
+    players = data.get("players", [])
+    if len(players) != 2:
+        return torch.zeros(NUM_PLANES_CHANNELS, 6, 6)
+
+    me_grid = players[curr_pi].get("dome_grid", [])
+    enemy_grid = players[enemy_pi].get("dome_grid", [])
+    board = torch.cat([_board_channels(me_grid), _board_channels(enemy_grid)], dim=0)  # [32,6,6]
+
+    scoring_ids = set(data.get("scoring_tile_ids", []))
+
+    def gate(tid: int) -> float:
+        return 1.0 if tid in scoring_ids else 0.0
+
+    raw_geom = torch.cat(
+        [_GEOM["row"], _GEOM["col"], _GEOM["diag"], _GEOM["border"], _GEOM["corner"]], dim=0
+    )  # [19,6,6]
+
+    gated = torch.cat([
+        _GEOM["row"] * gate(0),
+        _GEOM["row"] * gate(7),
+        _GEOM["col"] * gate(1),
+        _GEOM["diag"] * gate(2),
+        _GEOM["border"] * gate(4),
+        _GEOM["corner"] * gate(5),
+    ], dim=0)  # [25,6,6]
+
+    return torch.cat([board, raw_geom, gated], dim=0)  # [76,6,6]
+
+
 MAX_PENDING_STACK_TILES = 4  # muss zu features.rs::MAX_PENDING_STACK_TILES passen
 
 def action_to_id(action: dict) -> int:
@@ -1017,3 +1144,144 @@ class MosaicNet(nn.Module):
                 "rank_pct":    eff_rank / n_neurons if n_neurons else 0,
             }
         return results
+
+
+class Mosaic2DNet(nn.Module):
+    """2D-Encoder-Skelett (Task #11, Phase 1) -- Conv-Zweig auf
+    `state_to_planes` [C,6,6] + Flach-Zweig auf `state_to_tensor` [input_size],
+    späte Fusion, dann EXAKT dieselben Köpfe/Ausgabereihenfolge wie
+    `MosaicNet` (policy, value, moon, points, ownership -- ownership zuletzt,
+    optional `points_dist`-Logits danach bei `points_dist_bins>0`). Siehe
+    docs/design_2d_encoder.md Abschnitt 5 für die Architektur-Begründung.
+
+    ADDITIV: ersetzt `MosaicNet` nicht, ist ein separates, paralleles Modul.
+    Kein Training in Phase 1 (Stopp-Linie) -- nur Architektur-Skelett für den
+    Rust<->2D-ONNX-Roundtrip-Beweis (Teil C.2 des Auftrags).
+
+    `x_flat` ist ABSICHTLICH optional (Default `None` -> Nullen): für den
+    reinen Rust-Lade-/Eval-Beweis exportiert `torch.onnx.export` das Modell
+    mit NUR `x_planes` als Graph-Input (Rang 4 `[batch,C,6,6]`) -- passend zu
+    `Net::load_auto`s Rang-basierter Layout-Erkennung (Teil A), die für Phase
+    1 bewusst EIN Input pro Modell voraussetzt (siehe design_2d_encoder.md
+    Abschnitt 6, offene Frage 3: ein echter Zwei-Input-Export ist eine
+    mögliche spätere Erweiterung, kein Phase-1-Ziel). Für ein künftiges
+    Training (Phase 2) wird `x_flat` regulär mitgegeben.
+    """
+
+    def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
+                 policy_hidden=256, value_hidden=64, points_dist_bins=POINTS_DIST_BINS,
+                 planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2):
+        super().__init__()
+        self.input_size = input_size
+        self.planes_channels = planes_channels
+
+        # Conv-Zweig: 2-3 Lagen 3x3, 32-64 Kanäle (Vorschlag, siehe
+        # design_2d_encoder.md Abschnitt 5) -- BatchNorm+ReLU analog zum
+        # bestehenden `MosaicNet.body`. `padding=1` erhält die 6x6-Form über
+        # alle Lagen (keine Downsample-Notwendigkeit bei so kleinem Brett).
+        conv = []
+        in_c = planes_channels
+        for _ in range(conv_layers):
+            conv += [
+                nn.Conv2d(in_c, conv_channels, kernel_size=3, padding=1),
+                nn.BatchNorm2d(conv_channels),
+                nn.ReLU(),
+            ]
+            in_c = conv_channels
+        self.conv = nn.Sequential(*conv)
+        conv_flat_size = conv_channels * 6 * 6
+
+        # Flach-Zweig: kleine Vorverarbeitung des nicht-räumlichen Rests
+        # (Fabriken/Beutel/Chips/Scores/Musterreihen -- `state_to_tensor`
+        # bleibt UNVERÄNDERT als Eingabequelle) auf eine feste Breite, bevor
+        # beide Zweige fusioniert werden.
+        self.flat_branch = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
+            nn.ReLU(),
+        )
+
+        self.fusion = nn.Sequential(
+            nn.Linear(conv_flat_size + hidden_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+        )
+
+        # Köpfe: BYTE-IDENTISCHE Struktur/Reihenfolge zu `MosaicNet` (siehe
+        # Klassendoku dort) -- `net.rs` (out[0..3] positionsbasiert) behandelt
+        # beide Modellfamilien gleich, ohne davon zu wissen.
+        if policy_hidden and policy_hidden > 0:
+            self.policy_head = nn.Sequential(
+                nn.Linear(hidden_size, policy_hidden),
+                nn.ReLU(),
+                nn.Linear(policy_hidden, num_actions),
+            )
+        else:
+            self.policy_head = nn.Sequential(nn.Linear(hidden_size, num_actions))
+
+        self.moon_order_head = nn.Sequential(
+            nn.Linear(hidden_size, 32),
+            nn.ReLU(),
+            nn.Linear(32, 5),
+        )
+
+        self.value_head = nn.Sequential(
+            nn.Linear(hidden_size, value_hidden),
+            nn.ReLU(),
+            nn.Linear(value_hidden, 1),
+            nn.Tanh(),
+        )
+
+        self.points_dist_bins = int(points_dist_bins)
+        if self.points_dist_bins > 0:
+            self.points_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, self.points_dist_bins),
+            )
+            edges = torch.linspace(-1.0, 1.0, self.points_dist_bins + 1)
+            self.register_buffer("points_bin_edges", edges)
+            self.register_buffer("points_bin_centers", (edges[:-1] + edges[1:]) / 2)
+        else:
+            self.points_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh(),
+            )
+
+        # Ownership-Head (72 Ausgaben, ego-perspektivisch) -- bewusst ZULETZT
+        # deklariert, gleiches Muster wie `MosaicNet`.
+        self.ownership_head = nn.Sequential(
+            nn.Linear(hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, OWNERSHIP_TARGETS),
+        )
+
+    def forward(self, x_planes, x_flat=None):
+        if x_flat is None:
+            x_flat = torch.zeros(
+                x_planes.shape[0], self.input_size, dtype=x_planes.dtype, device=x_planes.device
+            )
+        c = self.conv(x_planes).flatten(1)
+        f = self.flat_branch(x_flat)
+        shared = self.fusion(torch.cat([c, f], dim=1))
+
+        pts_out = self.points_head(shared)
+        pts_logits = None
+        if self.points_dist_bins > 0:
+            pts_logits = pts_out
+            probs = torch.softmax(pts_logits, dim=-1)
+            pts_out = (probs * self.points_bin_centers).sum(dim=-1, keepdim=True)
+
+        # Reihenfolge = ONNX-Ausgabereihenfolge, identisch zu `MosaicNet.forward`.
+        out = (
+            self.policy_head(shared),
+            self.value_head(shared),
+            self.moon_order_head(shared),
+            pts_out,
+            self.ownership_head(shared),
+        )
+        return out + (pts_logits,) if pts_logits is not None else out
