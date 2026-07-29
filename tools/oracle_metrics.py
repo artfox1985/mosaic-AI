@@ -49,6 +49,22 @@ from neural_net import (MosaicNet, action_to_id, points_dist_bins_from_state,  #
                         state_to_tensor)
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
+# AKTIV: das v16_best-Orakel. Gueltig fuer die Bewertung von v14..v18.
+#
+# BEREITSTEHEND: evaluations/frozen_v1_oracle_labels_v18.json (aus v18_best,
+# 5000 Sims, 1185 Labels, 0 Mismatches, gebaut 2026-07-29). NOCH NICHT AKTIV --
+# v18_best ist derzeit amtierender Champion und damit selbst Kandidat.
+#
+# HARTE REGEL (Task #89, am 2026-07-29 empirisch bestaetigt): die Orakel-QUELLE
+# darf nicht zu den bewerteten Kandidaten zaehlen. Beleg: die VALUE-Metriken
+# gipfeln exakt bei der Quelle v16_best (0,8835) und sagen genau die beiden
+# Nach-Orakel-Paare falsch vorher (5/7), waehrend die beiden Policy-Metriken,
+# fuer die der Naehe-Vorbehalt widerlegt ist, 8/8 treffen.
+#
+# UMSTELLUNG AB v19: diese Konstante auf die _v18-Datei zeigen lassen UND
+# tools/offline_vs_arena.py erneut laufen lassen -- die Validierung gilt dann
+# nur noch fuer Gating-Paare AB v19, die alte Trefferbilanz ist nicht
+# uebertragbar. Die v16-Labels bleiben als historische Grundlinie erhalten.
 ORACLE_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels.json"
 OUT_JSON = ROOT / "evaluations" / "task89_oracle_metrics.json"
 
