@@ -173,6 +173,30 @@ pub fn resolve_to_pre_chance(leaf_state: &GameState) -> Option<PreChanceState> {
 /// Konflikt). Bestehende, rng-unabhängige Evaluatoren (`net_leaf_eval`,
 /// `round5::exact_round5_outcome`) ignorieren den zweiten Parameter einfach
 /// (`|s, _rng| ...`).
+/// EINE Zufallsziehung des Rundenuebergangs, als Zustand statt als Bewertung.
+///
+/// Gleicher Kern wie der Schleifenrumpf von [`sample_round_transition_value`]
+/// (Beutel + Bonusplaettchen-Pool neu mischen, dann `EndTiling`), liefert aber
+/// den resultierenden Drafting-Zustand zurueck, statt ihn sofort zu bewerten.
+///
+/// Gebraucht fuer die Validierung der netz-gefuehrten Tiling-Auswahl (Task #20):
+/// die Kandidaten-Zustaende stehen in der TILING-Phase, wo `net_search_with_tree`
+/// strukturell nichts liefert. Erst nach dem Rundenuebergang ist eine
+/// Tiefensuche als Referenz moeglich. Wird derselbe `rng`-Seed fuer alle
+/// Kandidaten einer Stellung genutzt, ist der Vergleich GEPAART -- der einzige
+/// Unterschied bleibt das Brett.
+pub fn advance_one_chance<R: Rng + ?Sized>(
+    pre: &PreChanceState,
+    rng: &mut R,
+) -> Option<GameState> {
+    let mut game = Game { state: pre.state.clone() };
+    game.state.bag.tiles.shuffle(rng);
+    game.state.bonus_chip_pool.shuffle(rng);
+    game.apply_tiling(&TilingMove::EndTiling { player: pre.pending_end_tiling_player }, rng)
+        .ok()?;
+    Some(game.state)
+}
+
 pub fn sample_round_transition_value<R: Rng + ?Sized>(
     pre: &PreChanceState,
     n_samples: u32,
