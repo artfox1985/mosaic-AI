@@ -18,3 +18,4 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-07-28T23:44:55,arena_anchor,v18_best,Heuristik(s150),400,31,0.7419,41.71,32.645,11.806,14.742,0.0
 2026-07-29T03:14:18,paired_gating,v18_dist_best,v18_best,400,150,0.6133,41.293,37.527,14.373,14.747,0.0
 2026-07-29T03:28:31,paired_gating,v18_dist_best,v18_best,400,300,0.5033,39.267,37.017,14.78,14.667,0.0
+2026-07-30T00:51:59,arena_anchor,v18_best,Heuristik(s150),400,150,0.5867,44.733,40.087,10.967,15.127,0.0
