@@ -6688,3 +6688,53 @@ AUSSERDEM: `scoring_tile_ids` wird jetzt in allen drei Arena-Spielausgaben
 mitgeschrieben (net-vs-net, net-vs-Heuristik, Heuristik-Arena) -- kuenftige
 A/Bs sind damit nach Plattenkonfiguration aufschluesselbar; bei Task #16 blieb
 genau diese Frage offen.
+
+## AKTIVIERUNG Task #20 + #21 (2026-07-30) -- Doku-Lauf und Platten-Aufschluesselung
+
+Beide Toggles aktiv (Commit c59f8e3), 185/185 Tests im Aktivierungszustand,
+Wheel installiert. Der Arena-Lauf DOKUMENTIERT die Effektgroesse, er war
+ausdruecklich kein Gate (Nutzer-Entscheidung: Korrektheitsfix #21 bzw.
+Nullkosten-Regel #20 werden unabhaengig vom Ergebnis uebernommen).
+
+**Doku-Lauf** (v18_best vs v17_best, 400 Spiele je Arm, identischer Basis-Seed
+41507290, beide Arme mit scoring_tile_ids in der Ausgabe):
+
+| | OFF | ON | Differenz |
+|---|---|---|---|
+| Siege v18 | 228 (57,0 %) | 216 (54,0 %) | p=0,34, unauffaellig |
+| Score v18 | 39,12 | 40,17 | +1,05 |
+| Score v17 | 35,38 | 37,10 | +1,72 |
+| **Punktesumme** | **74,50** | **77,27** | **+2,77** |
+| Floor v18 / v17 | 13,98 / 15,77 | 13,79 / 15,20 | beide runter |
+
+**BEIDE Seiten spielen besser** -- mehr Punkte, weniger Strafen. Das ist die
+Signatur einer echten Engine-Verbesserung und das GEGENTEIL des
+c_scale-Fehlversuchs (dort fiel die Summe um 10 Punkte, waehrend die Siegquote
+"gewann"). Dass v17 etwas mehr profitiert als v18, erklaert die leicht
+gesunkene Siegquote -- der schwaechere Spieler gewinnt durch die Tiling-/
+Endspielkorrekturen mehr.
+
+**Erste Platten-Aufschluesselung ueberhaupt** (moeglich durch die neuen
+scoring_tile_ids; Differenz der Punktesumme ON-OFF, gepaart je Spiel, jedes
+Spiel zaehlt zu seinen 3 aktiven Platten):
+
+| Platte | n | Mittel-Differenz |
+|---|---|---|
+| Diagonalen | 134 | **+4,31** (SE 1,39) |
+| Spezialfelder | 157 | +3,89 (SE 1,53) |
+| Aussenfelder | 155 | +3,02 (SE 1,42) |
+| H-Reihen | 149 | +2,56 (SE 1,49) |
+| Mehrfarbig | 147 | +2,54 (SE 1,32) |
+| Eckplatten | 165 | +2,48 (SE 1,33) |
+| V-Reihen | 142 | +2,12 (SE 1,39) |
+| Farbenreich | 151 | +1,37 (SE 1,36) |
+
+Alle acht positiv; vorn liegen genau die zwei Platten, bei denen der
+Runde-5-Endwertungs-Fix mechanistisch am meisten holt (Diagonalen: 10 Punkte
+je Abschluss, vorher fuer die Zugwahl unsichtbar; Spezialfelder:
+Straf-Vermeidung). Vorbehalt: die Plattenmengen ueberlappen (3 je Spiel),
+die Zeilen sind nicht unabhaengig.
+
+Elo-Neuverankerung (feste n=150-Kante, ersetzt die duenne n=31) laeuft;
+Eintrag wird als Beginn der NEUEN ENGINE-AERA markiert -- #21 veraendert auch
+die Heuristik, Vorher/Nachher-Elo sind nur eingeschraenkt vergleichbar.
