@@ -96,6 +96,11 @@ pub const TILING_SHAPING_ENABLED: bool = false;
 /// `mcts::player_total` denselben Term seit jeher führt.
 pub const TILING_SHAPING_WEIGHT: f64 = 1.0;
 
+/// Task #21: exakte Endwertung in der Runde-5-Tiling-Zugwahl.
+/// Standard AUS bis gemessen ist, wie oft sie ueberhaupt einen anderen Zug
+/// waehlt -- dieselbe Disziplin wie bei TILING_SHAPING_ENABLED.
+pub const ROUND5_ENDSCORING_ENABLED: bool = false;
+
 /// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
 /// (Indizes in `bonus_chips`), damit der reale KI-Zug exakt dem Solver-Plan folgt.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -268,6 +273,150 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
     best_step
 }
 
+/// Task #20: bis zu `k` VOLLSTAENDIGE Tiling-Abschluesse mit ihren
+/// Folgezustaenden, absteigend nach Rundenpunkten.
+///
+/// Der bestehende Solver liefert nur EINEN Schritt und nur dessen Score. Fuer
+/// eine netz-gefuehrte Auswahl braucht es die fertigen Bretter -- das Netz
+/// bewertet den Zustand, aus dem die naechste Runde startet.
+///
+/// BEWUSST eine eigene Funktion: der Hot-Path (`solve_rec`,
+/// `solve_round_final_score`, MCTS-Blattbewertung) bleibt unangetastet.
+///
+/// Abbruch ueber dasselbe `NODE_BUDGET` wie der Solver plus eine Blatt-Obergrenze
+/// -- bei mehreren chippable Reihen kann der Baum sonst explodieren.
+/// Entartete Reihenfolgen (dieselben Steine, andere Reihenfolge) fuehren auf
+/// dasselbe Brett; dedupliziert wird ueber die Belegungssignatur, sonst
+/// erschiene die Value-Spreizung kuenstlich klein.
+const MAX_TILING_LEAVES: usize = 400;
+
+fn dome_fill_signature(state: &GameState, pi: usize) -> Vec<bool> {
+    let mut sig = Vec::with_capacity(36);
+    for sr in 0..3 {
+        for sc in 0..3 {
+            match &state.players[pi].dome_grid.dome_slots[sr][sc] {
+                Some(slot) => {
+                    for si in 0..4 {
+                        sig.push(slot.spaces.get(si).map_or(false, |sp| sp.placed_color.is_some()));
+                    }
+                }
+                None => sig.extend_from_slice(&[false; 4]),
+            }
+        }
+    }
+    sig
+}
+
+/// Ein vollstaendiger Tiling-Abschluss: Rundenpunkte, der ERSTE Schritt dorthin
+/// (das ist der Zug, den der Solver zurueckgeben muss) und das fertige Brett.
+pub struct TilingOutcome {
+    pub points: i32,
+    pub first_step: TilingStep,
+    pub final_state: GameState,
+}
+
+fn collect_tilings(
+    state: &GameState,
+    pi: usize,
+    acc: i32,
+    first: Option<&TilingStep>,
+    depth: u32,
+    budget: &mut u32,
+    out: &mut Vec<TilingOutcome>,
+) {
+    if *budget == 0 || out.len() >= MAX_TILING_LEAVES || depth >= MAX_DEPTH {
+        return;
+    }
+    let steps = legal_steps(state, pi, true);
+    if steps.is_empty() {
+        if let Some(f) = first {
+            out.push(TilingOutcome {
+                points: acc,
+                first_step: f.clone(),
+                final_state: state.clone(),
+            });
+        }
+        return;
+    }
+    for step in steps {
+        if *budget == 0 || out.len() >= MAX_TILING_LEAVES {
+            break;
+        }
+        *budget -= 1;
+        if let Some((next, pts)) = apply_step(state, pi, &step) {
+            let f = first.unwrap_or(&step).clone();
+            collect_tilings(&next, pi, acc + pts, Some(&f), depth + 1, budget, out);
+        }
+    }
+}
+
+/// Bis zu `k` vollstaendige Abschluesse, absteigend nach Punkten, ohne
+/// Duplikate gleicher Endbelegung.
+pub fn top_k_tilings(state: &GameState, pi: usize, k: usize) -> Vec<TilingOutcome> {
+    let mut out: Vec<TilingOutcome> = Vec::new();
+    let mut budget = NODE_BUDGET;
+    collect_tilings(state, pi, 0, None, 0, &mut budget, &mut out);
+    out.sort_by(|a, b| b.points.cmp(&a.points));
+    let mut seen: Vec<Vec<bool>> = Vec::new();
+    let mut uniq: Vec<TilingOutcome> = Vec::new();
+    for o in out {
+        let sig = dome_fill_signature(&o.final_state, pi);
+        if seen.iter().any(|s| *s == sig) {
+            continue;
+        }
+        seen.push(sig);
+        uniq.push(o);
+        if uniq.len() >= k {
+            break;
+        }
+    }
+    uniq
+}
+
+/// Task #21: Tiling-Zugwahl in Runde 5 mit EXAKTER Endwertung.
+///
+/// In den Runden 1-4 ist die Zukunft offen -- jede Endwertungs-Beruecksichtigung
+/// im Tiling ist dort eine Wette auf eine Absicht, die das Netz vielleicht gar
+/// nicht hat. Genau daran ist Task #16 gescheitert (1600 Spiele, p=0,5404).
+///
+/// In Runde 5 endet das Spiel NACH dem Tiling. Die Endwertung des fertigen
+/// Bretts ist damit exakt berechenbar -- kein Proxy, keine Unsicherheit, kein
+/// Gewicht. Maximiert wird deshalb
+///
+/// ```text
+/// Rundenpunkte(Abschluss) + calculate_end_scoring(Brett NACH dem Abschluss)
+/// ```
+///
+/// statt allein die Rundenpunkte.
+///
+/// WARUM DAS EIN KORREKTHEITS-FIX IST, kein Tuning: `round5::player_total_exact`
+/// rechnet heute `solve_round_final_score` (Punkte des punktemaximalen Tilings)
+/// PLUS `calculate_end_scoring` des Bretts DAVOR. Die beiden Terme beziehen sich
+/// auf verschiedene Brettzustaende -- gerade die Steine, die Reihen, Spalten und
+/// Diagonalen schliessen und damit die Endwertung treiben, fehlen in der
+/// Endwertungs-Rechnung. Zwei Drafting-Zuege mit gleichen Rundenpunkten, aber
+/// unterschiedlich viel ERREICHBARER Endwertung, sind dadurch fuer die
+/// Alpha-Beta-Suche ununterscheidbar.
+///
+/// Bedingung ist bewusst `round_number >= 5` und NICHT `round5::applies`:
+/// letzteres verlangt zusaetzlich `phase == Drafting` und waere im Tiling --
+/// also genau hier -- immer falsch.
+///
+/// Nur im echten Zug: `best_first_step_exact` ruft das, `solve_rec` und die
+/// MCTS-Blattbewertung bleiben unberuehrt.
+fn best_first_step_round5(state: &GameState, pi: usize) -> Option<TilingStep> {
+    let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
+    let best = cands.into_iter().max_by_key(|o| {
+        o.points
+            + crate::scoring::calculate_end_scoring(
+                &o.final_state.players[pi],
+                &o.final_state.scoring_tile_ids,
+            )
+            .total
+    })?;
+    Some(best.first_step)
+}
+
 /// Greedy-Variante (Hot-Path / Tests).
 pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
     best_first_step_inner(state, pi, false)
@@ -277,6 +426,13 @@ pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
 /// Chip-Allokationen, damit mehrfarbige Plättchen im Engpass optimal verteilt
 /// werden. Wird nur einmal pro Zug aufgerufen → bezahlbar.
 pub fn best_first_step_exact(state: &GameState, pi: usize) -> TilingStep {
+    // Task #21: in Runde 5 ist die Endwertung exakt berechenbar (das Spiel endet
+    // nach diesem Tiling) -- dort wird sie mitmaximiert statt ignoriert.
+    if ROUND5_ENDSCORING_ENABLED && state.round_number >= 5 {
+        if let Some(step) = best_first_step_round5(state, pi) {
+            return step;
+        }
+    }
     best_first_step_inner(state, pi, true)
 }
 
