@@ -99,7 +99,7 @@ pub const TILING_SHAPING_WEIGHT: f64 = 1.0;
 /// Task #21: exakte Endwertung in der Runde-5-Tiling-Zugwahl.
 /// Standard AUS bis gemessen ist, wie oft sie ueberhaupt einen anderen Zug
 /// waehlt -- dieselbe Disziplin wie bei TILING_SHAPING_ENABLED.
-pub const ROUND5_ENDSCORING_ENABLED: bool = false;
+pub const ROUND5_ENDSCORING_ENABLED: bool = true;
 
 /// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
 /// (Indizes in `bonus_chips`), damit der reale KI-Zug exakt dem Solver-Plan folgt.
@@ -524,7 +524,7 @@ fn best_first_step_round5(state: &GameState, pi: usize) -> Option<TilingStep> {
 /// Abschluessen mit (nahezu) IDENTISCHEN Punkten -- deshalb hier bewusst als
 /// Multiplikation und nicht als additiver Shaping-Term wie bei
 /// `TILING_SHAPING_ENABLED` implementiert.
-pub const NET_TILING_TIEBREAK_ENABLED: bool = false;
+pub const NET_TILING_TIEBREAK_ENABLED: bool = true;
 
 /// `k` fuer `top_k_tilings` beim netz-gefuehrten Stichentscheid -- identisch
 /// zur Messung in `tiling_candidate_spread.json` (dort mit `k=12` erhoben),
