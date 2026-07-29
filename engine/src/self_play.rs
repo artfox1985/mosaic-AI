@@ -1349,6 +1349,11 @@ fn play_arena_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
+        // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
+        // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
+        // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
+        "scoring_tile_ids": game.state.scoring_tile_ids,
     })
 }
 
@@ -1505,6 +1510,9 @@ fn play_net_game<R: Rng + ?Sized>(
         "net_board": net_board,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Siehe Kommentar in den Schwester-Funktionen: Platten-Konfiguration
+        // je Spiel, fuer die Aufschluesselung von Arena-A/Bs.
+        "scoring_tile_ids": game.state.scoring_tile_ids,
     })
 }
 
@@ -1647,6 +1655,11 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
+        // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
+        // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
+        // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
+        "scoring_tile_ids": game.state.scoring_tile_ids,
     })
 }
 
@@ -1807,6 +1820,11 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
+        // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
+        // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
+        // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
+        "scoring_tile_ids": game.state.scoring_tile_ids,
     })
 }
 
@@ -2833,6 +2851,11 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
+        // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
+        // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
+        // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
+        "scoring_tile_ids": game.state.scoring_tile_ids,
     })
 }
 

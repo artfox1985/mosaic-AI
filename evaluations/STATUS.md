@@ -6648,3 +6648,43 @@ verschmolzen -- genau zwischen solchen entscheidet die Regel besonders oft.)
 Beide Toggles bleiben AUS bis zur gemeinsamen Aktivierung (#20+#21: ein Wheel,
 ein Arena-Doku-Lauf, EINE Elo-Neuverankerung, dabei Ersatz der duennen
 n=31-Ankerkante durch festes n>=150).
+
+### Task #20: Referenz-Validierung komplett (2026-07-29) -- und die Runde-4-Ueberraschung
+
+Hauptlauf (`tools/tiling_value_reference_main.py`): rangiert v18s Value-Head
+punktgleiche Tiling-Abschluesse richtig? Referenz ist eine UNABHAENGIGE
+v17_best-Tiefensuche@2000 Sims auf der Folgestellung nach dem Rundenuebergang
+(`advance_after_tiling_json`, Nachfuell-Zufall gepaart, M=4 Ziehungen wie vom
+Piloten kalibriert), Stellungen aus data/ (das frozen set war nach dem Piloten
+erschoepft).
+
+| Runde | Trefferquote | Binomial-p |
+|---|---|---|
+| 2 | 84/118 (71,2 %) | < 0,0001 |
+| 3 | 110/134 (82,1 %) | < 0,0001 |
+| **4** | **70/145 (48,3 %)** | **0,74 -- ZUFALL** |
+
+Runden 2-3 klar belegt (gesamt 194/252, p=2,6e-18). **In Runde 4 rangiert der
+Value-Head nicht besser als eine Muenze** -- konsistent mit dem RMSE-Befund
+(dort am schwaechsten). Harmlos, nicht schaedlich: Zufall heisst gleichwertig
+zum bisherigen willkuerlichen Stichentscheid, und die Nullkosten-Eigenschaft
+gilt unveraendert. Fehlgriffe konzentrieren sich weiter dort, wo die Referenz
+die Kandidaten ohnehin fast gleich sieht (Median 0,0042 vs 0,0090 bei Treffern).
+
+ENTSCHEIDUNG: Fenster Runde 2-4 bleibt (Nutzer-Rationale: kostet nichts, erbt
+automatisch jede Value-Head-Verbesserung -- ein Zurueckschneiden auf 2-3 wuerde
+die heutige Schwaeche fest verdrahten, die genau das Ziel des 2D-Encoders ist).
+Nach dem naechsten Value-Head-Sprung ist die Messung fuer Minuten wiederholbar.
+
+ZWEI MESS-VORBEHALTE: (1) die R4-Referenz kommt aus einem ANDEREN Mechanismus
+als R2/R3 -- nach dem Uebergang steht Runde-5-Drafting, dort antwortet der
+Alpha-Beta-Solver (dessen Analyse kein root_value traegt; als Ersatz dient das
+mcts_q des gewaehlten Zugs -- entdeckt, nachdem ein erster R4-Lauf 1800
+Zustaende scannte und 0 Paare fand). Der Rundenvergleich mischt also
+Referenztypen. (2) Dieser Alpha-Beta traegt die bekannte #21-Schwaeche noch in
+sich; die wahre R4-Leistung koennte etwas besser sein als gemessen.
+
+AUSSERDEM: `scoring_tile_ids` wird jetzt in allen drei Arena-Spielausgaben
+mitgeschrieben (net-vs-net, net-vs-Heuristik, Heuristik-Arena) -- kuenftige
+A/Bs sind damit nach Plattenkonfiguration aufschluesselbar; bei Task #16 blieb
+genau diese Frage offen.
