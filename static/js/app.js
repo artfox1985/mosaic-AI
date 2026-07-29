@@ -9,6 +9,13 @@ let domeModal = null;  // {pi, slot_r, slot_c, tile_id, rotation, is_start}
 let pendingStackPlacement = null;
 let tilingPi = null, tilingRow = null;
 let humanTilingDone = false;
+// Nutzer-Feedback (2026-07-29, Folgeauftrag): Reihenfolge-Regel gilt nur fuer
+// die PLATZIERUNG voller Reihen -- eine nur-per-Chips-komplettierbare Reihe
+// darf der Mensch bewusst ueberspringen, um eine SPAETERE chip-faehige Reihe
+// zu bedienen (engine/src/round_end.rs::chippable_rows filtert nur `ri <
+// tiled_max`, nicht "nur die oberste"). Rein clientseitige Session-Sets pro
+// Spieler -- s. getTilingRowState()/render(). Key = Spielerindex (0/1).
+let skippedChipRows = {0: new Set(), 1: new Set()};
 
 // -- API -----------------------------------------------------------------------
 // KI-State
@@ -557,6 +564,54 @@ function trackChipGhosts(pi, chips) {
   _prevBonusChips[pi] = chips;
 }
 
+// Nutzer-Feedback (2026-07-29, Bugfix + Folgeauftrag): EIN Ort, der die
+// "aktuelle Tiling-Reihe" eines Spielers bestimmt -- von renderBoard() (Punkt
+// + Kasten + Reihen-Markierung) UND renderCenter() (Skip-Button-Liste)
+// genutzt, damit beide Stellen nie auseinanderlaufen koennen.
+//
+// Bugfix (Screenshot 1): der Bonuschips-Kasten leuchtete fuer "irgendeine"
+// chippable Reihe des Spielers auf, unabhaengig davon, ob das ueberhaupt die
+// AKTUELLE (von oben nach unten naechste) Reihe war -- und der blaue "aktuelle
+// Reihe"-Punkt wurde NIE fuer eine nur-per-Chips-komplettierbare Reihe
+// gesetzt, weil er ausschliesslich `S.valid_tiling_rows` (volle Reihen mit
+// direkter Platzierung) auswertete. `chippable_tiling_rows` (serialize.rs)
+// schliesst volle Reihen aus (`row.is_complete() -> continue`),
+// `valid_tiling_rows` enthaelt nur volle Reihen (`get_pending_tiling_rows`) --
+// die Ri-Mengen beider Listen sind also je Spieler disjunkt, daher reicht das
+// Minimum ueber beide als korrekte "von oben nach unten"-Reihenfolge.
+//
+// Folgeauftrag (Screenshot 2): die Oben-nach-unten-Regel gilt laut Engine nur
+// fuer die PLATZIERUNG voller Reihen (round_end.rs::validate_tiling_action
+// blockiert nur auf frueheren VOLLEN+platzierbaren Reihen). Eine nur-per-Chips
+// komplettierbare Reihe darf der Mensch bewusst ueberspringen (`skippedChipRows`),
+// um eine spaetere chip-faehige Reihe zu bedienen -- `chippable_tiling_rows`
+// listet ohnehin ALLE ab `tiled_max_row` in Frage kommenden Reihen, nicht nur
+// die oberste (engine/src/round_end.rs::chippable_rows). Eine volle
+// platzierbare Reihe bleibt NICHT ueberspringbar (die Engine erzwingt deren
+// Reihenfolge zwingend, s.o.).
+function getTilingRowState(pi) {
+  const playerPlaceableRis = (S.valid_tiling_rows || [])
+    .filter(vr => vr.pi === pi && vr.placeable === true)
+    .map(vr => vr.ri);
+  const playerChippableRis = (S.chippable_tiling_rows || [])
+    .filter(cr => cr.pi === pi)
+    .map(cr => cr.ri);
+  // Stale uebersprungene Reihen bereinigen: faellt eine Reihe aus
+  // chippable_tiling_rows heraus (weil inzwischen eine spaetere Reihe
+  // platziert wurde, s. tiled_max_row), ist sie endgueltig raus -- der
+  // Skip-Eintrag wird dann automatisch entfernt statt einen toten Zustand
+  // vorzugaukeln.
+  const skipSet = skippedChipRows[pi] || (skippedChipRows[pi] = new Set());
+  for (const ri of [...skipSet]) {
+    if (!playerChippableRis.includes(ri)) skipSet.delete(ri);
+  }
+  const activeChippableRis = playerChippableRis.filter(ri => !skipSet.has(ri));
+  const combined = [...playerPlaceableRis, ...activeChippableRis];
+  const currentTilingRi = combined.length ? Math.min(...combined) : null;
+  const isChipOnly = currentTilingRi !== null && activeChippableRis.includes(currentTilingRi);
+  return { playerPlaceableRis, playerChippableRis, activeChippableRis, currentTilingRi, isChipOnly, skipSet };
+}
+
 function renderBoard(pi) {
   const p = S.players[pi];
   const isActive = S.current_player===pi && S.phase==='drafting';
@@ -567,11 +622,20 @@ function renderBoard(pi) {
   const chipsTakenThisRound = p.chips_taken || 0;
   // Nutzer-Feedback (2026-07-27): kein Reihen-Button mehr fuer die
   // Bonusplaettchen-Nutzung -- statt dessen wird der Bonuschips-Bereich
-  // selbst hervorgehoben/klickbar, sobald irgendeine Reihe chip-vervoll-
-  // staendigbar ist (Modal oeffnet sich fuer die erste solche Reihe, wie
-  // zuvor der Button es fuer GENAU eine Reihe tat).
-  const playerChippableRows = (S.chippable_tiling_rows || []).filter(cr => cr.pi === pi);
-  const chipAreaClickable = playerChippableRows.length > 0;
+  // selbst hervorgehoben/klickbar, sobald die AKTUELLE Reihe chip-vervoll-
+  // staendigbar ist (Modal oeffnet sich fuer genau diese Reihe).
+  const {
+    playerPlaceableRis, playerChippableRis, activeChippableRis,
+    currentTilingRi, isChipOnly: chipAreaClickable, skipSet,
+  } = getTilingRowState(pi);
+  // Nutzer-Feedback (2026-07-30): Skip-/Reset-Steuerung aus der zentralen
+  // Info-Spalte (renderCenter) in die Spieler-Sidebar verschoben, direkt
+  // unterhalb des Bonuschips-Kastens -- s. Markup weiter unten. Bedingungen
+  // unveraendert (nur menschlicher Spieler, nur bei aktuell chip-only Reihe
+  // bzw. nicht-leerem Skip-Set); da renderBoard(pi) je Spielerpanel separat
+  // aufgerufen wird, landet der Button im Hotseat-Fall automatisch im
+  // richtigen Spielerbereich.
+  const showSkipControls = !AI_ENABLED || pi !== AI_PLAYER;
 
   const tokHTML = S.round<5
     ? `<div class="tokens">${[0,1].map(i=>`<div class="tok ${i<p.tokens_used?'used':''}"></div>`).join('')}<span>${p.tokens_used}/2 Spielerplättchen</span></div>`
@@ -584,12 +648,13 @@ function renderBoard(pi) {
       const ok = row.tiles.length < row.capacity && (!row.color || row.color===sel.color);
       cls = ok ? 'drop' : 'nodrop';
     }
-    // Reihe klickbar wenn sie platzierbar ist UND keine frühere platzierbare Reihe noch offen
-    const validRows = (S.valid_tiling_rows || []);
-    const isPlaceable = validRows.some(vr => vr.pi===pi && vr.ri===ri && vr.placeable === true);
-    const earlierPlaceable = validRows.filter(vr => vr.pi===pi && vr.ri<ri && vr.placeable === true);
-    const allEarlierDone = earlierPlaceable.length === 0;
-    if(isTiling && tilingRow===null && row.tiles.length===row.capacity && isPlaceable && allEarlierDone) cls='drop';
+    // Reihe klickbar (direkte Platzierung) wenn sie voll, platzierbar UND die
+    // aktuelle Reihe ist. `currentTilingRi` (oben in renderBoard berechnet)
+    // beruecksichtigt bereits beide Wege ("von oben nach unten" ueber volle
+    // UND chip-komplettierbare Reihen hinweg), keine separate earlier-Prüfung
+    // hier mehr noetig.
+    const isPlaceable = playerPlaceableRis.includes(ri);
+    if(isTiling && tilingRow===null && row.tiles.length===row.capacity && ri===currentTilingRi && isPlaceable) cls='drop';
     else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
     const onclick = cls==='drop'
       ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
@@ -608,14 +673,23 @@ function renderBoard(pi) {
       const isPhantom = tileIdx >= row.tiles.length - phantomCount;
       return `<div class="tile sm ${normColor(row.color)}${isPhantom ? ' phantom' : ''}"></div>`;
     }).join('');
-    // Visueller Indikator: nächste fällige Tiling-Reihe
-    const isNextTiling = isTiling && isPlaceable && allEarlierDone && row.tiles.length===row.capacity;
+    // Visueller Indikator: nächste fällige Tiling-Reihe. Bugfix (2026-07-29):
+    // gilt jetzt auch, wenn die einzige offene Aktion eine Chip-Komplettierung
+    // ist (Reihe also noch nicht voll ist) -- vorher war `isNextTiling` durch
+    // `row.tiles.length===row.capacity` fest an volle Reihen gekoppelt, eine
+    // nur-per-Chips-komplettierbare Reihe bekam nie den Punkt.
+    const isNextTiling = isTiling && ri === currentTilingRi;
     const nextDot = isNextTiling
       ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;
            background:var(--blau,#3b82f6);margin-left:3px;vertical-align:middle;
            box-shadow:0 0 4px var(--blau,#3b82f6)" title="Diese Reihe ist als nächstes dran"></span>`
       : '';
-    return `<div class="prow ${cls}" data-ri="${ri}" ${onclick}>
+    // Dezente Zusatzmarkierung: wenn die aktuelle Reihe nur per Bonuschips
+    // komplettierbar ist, bekommt die Reihe selbst denselben Hinweis-Ton wie
+    // der Bonuschips-Kasten (.chips-usable), damit der Bezug Kasten->Reihe
+    // sichtbar ist (Nutzer-Anforderung 2026-07-29).
+    const chipTargetCls = (isNextTiling && activeChippableRis.includes(ri)) ? ' chip-target' : '';
+    return `<div class="prow ${cls}${chipTargetCls}" data-ri="${ri}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
       <span class="rowlabel" style="color:var(--text3)">→ </span>${nextDot}
     </div>`;
@@ -677,7 +751,7 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
         <div class="${chipAreaClickable ? 'chips-usable' : ''}"
              style="margin-top:6px;font-size:9px;color:var(--text3);padding:4px;border-radius:6px;
                     ${chipAreaClickable ? 'cursor:pointer' : ''}"
-             ${chipAreaClickable ? `onclick="openChipModal(${pi},${playerChippableRows[0].ri})" title="Bonusplättchen einsetzen"` : ''}>
+             ${chipAreaClickable ? `onclick="openChipModal(${pi},${currentTilingRi})" title="Bonusplättchen einsetzen"` : ''}>
           Bonuschips (${chipsTakenThisRound}/2):
           <div class="chips-grid">
             ${(() => {
@@ -704,6 +778,31 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
             })()}
           </div>
         </div>
+        ${(() => {
+          // Nutzer-Feedback (2026-07-30): direkt unter dem Bonuschips-Kasten,
+          // kompakter als die frueheren Center-Pills, aber weiterhin klar als
+          // Aktion erkennbar (Button-Look statt reinem Text-Link). Gleiche
+          // Anzeige-Bedingungen wie zuvor in renderCenter: nur menschlicher
+          // Spieler, Skip-Button nur bei aktuell chip-only Reihe, Reset-Link
+          // nur bei nicht-leerem Skip-Set (bereits stale-bereinigt durch
+          // getTilingRowState()).
+          if (!showSkipControls) return '';
+          const parts = [];
+          if (chipAreaClickable) {
+            const rowLabel = `Reihe ${currentTilingRi+1}`;
+            parts.push(`<button class="btn" style="font-size:9px;padding:2px 5px;width:100%;text-align:left"
+              onclick="skipChipRow(${pi},${currentTilingRi})"
+              title="${rowLabel} bleibt vorerst liegen -- die Chip-Option verfällt endgültig, sobald danach eine SPÄTERE Reihe platziert wird.">
+              ⏭ ${rowLabel} für Bonuschips ignorieren
+            </button>`);
+          }
+          if (skipSet.size > 0) {
+            parts.push(`<span style="cursor:pointer;color:var(--text3);text-decoration:underline;font-size:9px" onclick="resetSkippedChipRows(${pi})">↺ übersprungene Reihen zurücksetzen</span>`);
+          }
+          return parts.length
+            ? `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;margin-top:4px">${parts.join('')}</div>`
+            : '';
+        })()}
       </div>
       <div>
         <div id="plines${pi}">${plHTML}</div>
@@ -742,6 +841,29 @@ function toggleLogCollapsed() {
   applyLogCollapsed(collapsed);
 }
 applyLogCollapsed(localStorage.getItem('mosaic-log-collapsed') !== '0');
+
+// -- GÜLTIGE ZÜGE EINKLAPPBAR (Nutzer-Auftrag 2026-07-29) -----------------------
+// Exakt dasselbe Muster wie das Log oben: eine Toggle-Funktion setzt
+// display+Pfeil, render()/renderCenter() fasst das beim Neu-Aufbau der
+// Zug-Liste NICHT an -- der Auf/Zu-Zustand ueberlebt also State-Updates
+// waehrend der Session unveraendert (wie beim Log). Einziger Unterschied zum
+// Log (Nutzer-Vorgabe: Persistenz nicht noetig): kein localStorage, reine
+// In-Memory-Variable -- Default nach jedem Seitenaufruf daher immer
+// eingeklappt (deckt sich mit dem Log-Default beim ALLERERSTEN Besuch ohne
+// gespeicherten Wert, s.o. `!== '0'`-Fallback).
+let validMovesCollapsed = true;
+function applyValidMovesCollapsed(collapsed) {
+  const vmEl = document.getElementById('valid-moves');
+  const arrowEl = document.getElementById('valid-moves-toggle-arrow');
+  if (!vmEl || !arrowEl) return;
+  vmEl.style.display = collapsed ? 'none' : '';
+  arrowEl.textContent = collapsed ? '▸' : '▾';
+}
+function toggleValidMovesCollapsed() {
+  validMovesCollapsed = !validMovesCollapsed;
+  applyValidMovesCollapsed(validMovesCollapsed);
+}
+applyValidMovesCollapsed(validMovesCollapsed);
 
 // -- RENDER CENTER -------------------------------------------------------------
 function renderCenter() {
@@ -812,12 +934,16 @@ function renderCenter() {
     const chippableRows2 = S.chippable_tiling_rows || [];
     const chippable = chippableRows2
       .filter(cr => !AI_ENABLED || cr.pi !== AI_PLAYER)
-        .map(cr => {                                      
+        .map(cr => {
         const p = S.players[cr.pi];
         const row = p.pattern_lines[cr.ri];
         return {pi: cr.pi, ri: cr.ri, color: row.color,
                 need: row.capacity - row.tiles.length, pname: p.name};
       });
+
+    // Nutzer-Feedback (2026-07-30): Skip-/Reset-Steuerung fuer chip-only
+    // Reihen lebt jetzt in renderBoard() direkt unter dem Bonuschips-Kasten
+    // der Spieler-Sidebar (nicht mehr hier in der zentralen Info-Spalte).
 
     let infoHTML = '';
     if(tilingRow!==null) {
@@ -1056,13 +1182,19 @@ const sdiv = document.getElementById('scoring-display');
 
   const vmDiv = document.getElementById('valid-moves');
   if(!vmDiv) return;
+  // Nutzer-Auftrag (2026-07-29): eingeklappter Kopf zeigt die Anzahl, damit
+  // man ohne Aufklappen sieht, dass es etwas zu tun gibt -- s.
+  // applyValidMovesCollapsed()/toggleValidMovesCollapsed() oben (gleiches
+  // Klapp-Muster wie das Log).
+  const vmCountEl = document.getElementById('valid-moves-count');
 
   if(S.phase === 'tiling') {
     let rows = (S.valid_tiling_rows||[]);
     if (AI_ENABLED) {
         rows = rows.filter(x => x.pi !== AI_PLAYER);
     }
-    
+    if (vmCountEl) vmCountEl.textContent = rows.length ? `(${rows.length})` : '';
+
     if(rows.length === 0) {
       vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Alle regulären Reihen gelegt ✓ (Nutze Chips oder beende das Tiling)</div>`;
     } else {
@@ -1082,9 +1214,11 @@ const sdiv = document.getElementById('scoring-display');
   }
 
   if(!S.valid_moves || S.valid_moves.length === 0) {
+    if (vmCountEl) vmCountEl.textContent = '';
     vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Keine Aktionen — Passen möglich</div>`;
     return;
   }
+  if (vmCountEl) vmCountEl.textContent = `(${S.valid_moves.length})`;
 
   const byType = {};
   for(const m of S.valid_moves) {
@@ -1191,6 +1325,26 @@ function onTilingRowClick(pi, ri) {
   const row = S.players[pi].pattern_lines[ri];
   if(row.tiles.length !== row.capacity) return;
   tilingPi=pi; tilingRow=ri;
+  render();
+}
+
+// -- CHIP-REIHE UEBERSPRINGEN (Nutzer-Folgeauftrag 2026-07-29) -----------------
+// Rein clientseitig -- die Engine erzwingt die "von oben nach unten"-Regel nur
+// beim Platzieren VOLLER Reihen (round_end.rs::validate_tiling_action), nicht
+// beim Chip-Komplettieren nicht-voller Reihen (round_end.rs::chippable_rows
+// filtert nur `ri < tiled_max_row`, listet also ALLE ab dort in Frage
+// kommenden Reihen). Ueberspringen heisst daher nur "diese Reihe fuer die
+// UI-Vorauswahl ignorieren, bis zurueckgesetzt oder bis eine spaetere Reihe
+// tatsaechlich platziert wird" -- kein Server-Aufruf noetig.
+function skipChipRow(pi, ri) {
+  if (AI_ENABLED && pi === AI_PLAYER) return;
+  if (!skippedChipRows[pi]) skippedChipRows[pi] = new Set();
+  skippedChipRows[pi].add(ri);
+  render();
+}
+
+function resetSkippedChipRows(pi) {
+  if (skippedChipRows[pi]) skippedChipRows[pi].clear();
   render();
 }
 
@@ -2166,9 +2320,16 @@ document.addEventListener('click', e=>{
 // -- RENDER --------------------------------------------------------------------
 function render() {
   if(!S) return;
-  
+
   if (S.phase === 'drafting') humanTilingDone = false;
-  
+  // Nutzer-Feedback (2026-07-29): uebersprungene Chip-Reihen leben nur fuer
+  // die Dauer EINER Tiling-Phase -- verlassen wir sie (naechste Runde,
+  // Rundenende, neues Spiel), muss der Session-Zustand weg statt in die
+  // naechste Runde durchzuschlagen.
+  if (S.phase !== 'tiling') {
+    skippedChipRows = {0: new Set(), 1: new Set()};
+  }
+
   document.getElementById('round-lbl').textContent=`Runde ${S.round}/5`;
   renderBoard(0);
   renderBoard(1);

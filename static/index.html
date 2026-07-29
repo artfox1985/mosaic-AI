@@ -54,7 +54,9 @@
     </div>
     <div id="scoring-display" style="font-size:10px;color:var(--text2);margin-bottom:4px"></div>
     <div class="sep"></div>
-    <div class="lbl">Gültige Züge</div>
+    <div class="lbl" id="valid-moves-toggle" onclick="toggleValidMovesCollapsed()" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:4px">
+      <span id="valid-moves-toggle-arrow">▸</span><span>Gültige Züge</span><span id="valid-moves-count" style="color:var(--text3);font-weight:400"></span>
+    </div>
     <div class="log" id="valid-moves" style="max-height:110px; font-size:10px; color:var(--text2);"></div>
   </div>
 </div>
