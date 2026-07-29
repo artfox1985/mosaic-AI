@@ -1,0 +1,107 @@
+{
+  "n_files": 200,
+  "n_games_used": 2000,
+  "n_games_skipped_not_final": 0,
+  "ratio_clamped_summary": {
+    "n": 4000,
+    "mean": -1.3481433311582809,
+    "median": 0.0,
+    "stdev": 3.853488495140731,
+    "p10": -5.0,
+    "p90": 0.4583333333333333,
+    "min": -21.0,
+    "max": 1.0
+  },
+  "ratio_unclamped_summary": {
+    "n": 3014,
+    "mean": -0.05900915141502798,
+    "median": 0.1875,
+    "stdev": 1.7197081849866016,
+    "p10": -1.0909090909090908,
+    "p90": 0.7777777777777778,
+    "min": -15.0,
+    "max": 11.0
+  },
+  "wertung_total_summary": {
+    "n": 4000,
+    "mean": 0.51575,
+    "median": 0.0,
+    "stdev": 8.752128423275106,
+    "p10": -12.0,
+    "p90": 11.0,
+    "min": -21,
+    "max": 24
+  },
+  "per_tile": {
+    "0": {
+      "name": "Horizontale Reihen",
+      "n_games_chosen": 1522,
+      "mean_score": 0.39816031537450725,
+      "median_score": 0.0,
+      "share_negative_or_zero": 0.8797634691195795,
+      "n_negative": 0
+    },
+    "1": {
+      "name": "Vertikale Reihen",
+      "n_games_chosen": 1446,
+      "mean_score": 0.2033195020746888,
+      "median_score": 0.0,
+      "share_negative_or_zero": 0.970954356846473,
+      "n_negative": 0
+    },
+    "2": {
+      "name": "Diagonale Reihen",
+      "n_games_chosen": 1538,
+      "mean_score": 0.01950585175552666,
+      "median_score": 0.0,
+      "share_negative_or_zero": 0.9980494148244473,
+      "n_negative": 0
+    },
+    "3": {
+      "name": "Mehrfarbige Felder",
+      "n_games_chosen": 1412,
+      "mean_score": 2.2223796033994336,
+      "median_score": 0.0,
+      "share_negative_or_zero": 0.7075070821529745,
+      "n_negative": 0
+    },
+    "4": {
+      "name": "Äußere Felder",
+      "n_games_chosen": 1562,
+      "mean_score": 8.069142125480154,
+      "median_score": 8.0,
+      "share_negative_or_zero": 0.0,
+      "n_negative": 0
+    },
+    "5": {
+      "name": "Eckplatten",
+      "n_games_chosen": 1468,
+      "mean_score": 2.758174386920981,
+      "median_score": 3.0,
+      "share_negative_or_zero": 0.1709809264305177,
+      "n_negative": 0
+    },
+    "6": {
+      "name": "Spezialfelder",
+      "n_games_chosen": 1528,
+      "mean_score": -12.333769633507853,
+      "median_score": -12.0,
+      "share_negative_or_zero": 1.0,
+      "n_negative": 1528
+    },
+    "7": {
+      "name": "Farbenreiche Reihen",
+      "n_games_chosen": 1524,
+      "mean_score": 0.12335958005249344,
+      "median_score": 0.0,
+      "share_negative_or_zero": 0.9691601049868767,
+      "n_negative": 0
+    }
+  },
+  "formula_validation": {
+    "n_checked": 2000,
+    "n_matched": 2000,
+    "match_rate": 1.0,
+    "mismatches_sample": []
+  }
+}
