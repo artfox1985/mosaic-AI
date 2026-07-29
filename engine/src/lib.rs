@@ -733,6 +733,32 @@ fn tiling_candidates_json(
     Ok(serde_json::Value::Array(out).to_string())
 }
 
+/// Task #20-Validierung: einen TILING-Zustand ueber den Rundenuebergang in die
+/// naechste DRAFTING-Stellung weiterschalten, mit gesetztem Zufalls-Seed.
+///
+/// Noetig, weil eine Tiefensuche in der Tiling-Phase strukturell nichts liefert
+/// -- die Referenz fuer "welcher Tiling-Abschluss ist wirklich besser" laesst
+/// sich erst danach erheben. Derselbe Seed fuer alle Kandidaten einer Stellung
+/// macht den Vergleich GEPAART: der Nachfuell-Wurf ist dann identisch, der
+/// einzige Unterschied ist das Brett.
+#[pyfunction]
+#[pyo3(signature = (state_json, seed))]
+fn advance_after_tiling_json(state_json: String, seed: u64) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    let pre = crate::round_transition::resolve_to_pre_chance(&state)
+        .ok_or_else(|| PyValueError::new_err("Zustand ist nicht in Phase::Tiling"))?;
+    let next = crate::round_transition::advance_one_chance(&pre, &mut rng)
+        .ok_or_else(|| PyValueError::new_err("Rundenuebergang fehlgeschlagen"))?;
+    Ok(crate::serialize::state_to_json(&next, true).to_string())
+}
+
 #[pymodule]
 fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
@@ -756,6 +782,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
+    m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())

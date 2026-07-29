@@ -79,10 +79,34 @@ pub fn applies(state: &GameState) -> bool {
 /// Exakter Endwert eines Spielers: exakter Rundenscore (Tiling-Solver) plus
 /// exakte Wertungsplatten-Endwertung (NICHT die Fortschritts-Heuristik --
 /// siehe Modul-Kommentar) plus projizierte Strafleisten-Punkte.
+///
+/// TASK #21 -- KORREKTHEITS-BEFUND (2026-07-29): die ERSTEN BEIDEN Terme
+/// (`solve_round_final_score` + `calculate_end_scoring`) bezogen sich bisher
+/// auf ZWEI VERSCHIEDENE Brettzustände. `solve_round_final_score` plant ein
+/// optimales Tiling und liefert dessen PUNKTE; `calculate_end_scoring`
+/// bewertete dabei das Brett DAVOR -- gerade die Steine, die Reihen, Spalten
+/// und Diagonalen schließen und damit die Endwertung treiben, fehlten also in
+/// der Endwertungs-Rechnung. Zwei Runde-5-Drafting-Züge mit gleichen
+/// Rundenpunkten, aber unterschiedlich viel ERREICHBARER Endwertung, waren
+/// dadurch für die Alpha-Beta-Suche ununterscheidbar.
+///
+/// Hinter demselben Toggle wie die Tiling-ZUGWAHL
+/// (`crate::tiling_solver::ROUND5_ENDSCORING_ENABLED`, siehe dort für die
+/// Gating-Historie des Zugwahl-Teils): ON nutzt stattdessen
+/// `solve_round_final_score_endaware`, das die Endwertung DES ERREICHTEN
+/// BRETTS bereits in seiner Blatt-Rekursion mit-maximiert. Die separate
+/// `calculate_end_scoring`-Addition entfällt dann bewusst -- sie ist im
+/// endaware-Term bereits enthalten, eine zusätzliche Addition wäre
+/// Doppelzählung.
 fn player_total_exact(state: &GameState, pi: usize) -> f64 {
-    solve_round_final_score(state, pi) as f64
-        + calculate_end_scoring(&state.players[pi], &state.scoring_tile_ids).total as f64
-        + projected_unplaceable_penalty(&state.players[pi]) as f64
+    if crate::tiling_solver::ROUND5_ENDSCORING_ENABLED {
+        crate::tiling_solver::solve_round_final_score_endaware(state, pi) as f64
+            + projected_unplaceable_penalty(&state.players[pi]) as f64
+    } else {
+        solve_round_final_score(state, pi) as f64
+            + calculate_end_scoring(&state.players[pi], &state.scoring_tile_ids).total as f64
+            + projected_unplaceable_penalty(&state.players[pi]) as f64
+    }
 }
 
 fn leaf_value(state: &GameState, perspective: usize) -> f64 {
@@ -569,5 +593,118 @@ mod tests {
         let chosen_count = moves.iter().filter(|m| m["chosen"] == true).count();
         assert_eq!(chosen_count, 1);
         assert_eq!(analysis["algorithm"], "alphabeta_round5");
+    }
+
+    /// Task #21: reiche Runde-5-Stellung mit teilbefuelltem 3x3-Kuppelraster +
+    /// mehreren vollen Musterreihen -- analog zu `tiling_solver::tests::rich_state`.
+    /// Noetig, weil ein leeres Kuppelraster (wie in `round5_state`) keine
+    /// platzierbaren Tiling-Aktionen erzeugt und jeder Vergleich zwischen alter
+    /// und endaware-Rechnung trivial gleich waere (`generate_tiling_actions`
+    /// prueft NICHT `state.phase` -- funktioniert also direkt auf einer
+    /// Drafting-Stellung, siehe `round_end::generate_tiling_actions`).
+    fn rich_round5_state(seed: u64) -> GameState {
+        use crate::dome::build_dome_tile_pool;
+        use crate::tile::TileColor::*;
+        use rand::rngs::StdRng;
+        use rand::RngExt;
+        use rand::SeedableRng;
+
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut s = round5_state(seed);
+        s.scoring_tile_ids = vec![0, 1, 2, 4]; // Reihen/Spalten/Diagonalen/Aussenfelder
+        let pool = build_dome_tile_pool();
+        let mut tid = 500;
+        for r in 0..3 {
+            for c in 0..3 {
+                let mut t = pool[rng.random_range(0..pool.len())].clone();
+                t.tile_id = tid;
+                tid += 1;
+                for si in 0..4 {
+                    // ~55% vorbefuellt: genug fuer echte Platzierungen und
+                    // fast-volle Linien, laesst aber noch offene Felder frei.
+                    if rng.random_range(0..100) < 55 {
+                        t.spaces[si].placed_color = t.spaces[si].required_color;
+                    }
+                }
+                let _ = s.players[0].dome_grid.place_dome_tile(t, r, c);
+            }
+        }
+        s.players[0].pattern_lines[1].add_tiles(&[Blau, Blau]);
+        s.players[0].pattern_lines[2].add_tiles(&[Rot, Rot, Rot]);
+        s.players[0].pattern_lines[3].add_tiles(&[Tuerkis, Tuerkis, Tuerkis, Tuerkis]);
+        s
+    }
+
+    /// Referenzformel, unabhaengig dupliziert (Muster: `tiling_solver`s
+    /// `reference_argmax`), damit der Test nicht dieselbe Codezeile prueft,
+    /// die er absichern soll.
+    fn reference_player_total(state: &GameState, pi: usize, endaware: bool) -> f64 {
+        if endaware {
+            crate::tiling_solver::solve_round_final_score_endaware(state, pi) as f64
+                + projected_unplaceable_penalty(&state.players[pi]) as f64
+        } else {
+            solve_round_final_score(state, pi) as f64
+                + calculate_end_scoring(&state.players[pi], &state.scoring_tile_ids).total as f64
+                + projected_unplaceable_penalty(&state.players[pi]) as f64
+        }
+    }
+
+    /// Paritaet: `player_total_exact` muss IMMER exakt der Referenzformel fuer
+    /// den jeweils aktiven Toggle-Zustand entsprechen -- bei
+    /// `ROUND5_ENDSCORING_ENABLED=false` (Ist-Zustand) also byte-identisch zur
+    /// alten Rechnung. Manuell in BEIDEN Toggle-Zustaenden gebaut/getestet
+    /// (siehe Konstanten-Kommentar in tiling_solver.rs) -- dieser Test prueft
+    /// generisch gegen den JEWEILS aktiven Wert der Konstante, damit er in
+    /// beiden Zustaenden gruen ist.
+    #[test]
+    fn player_total_exact_follows_toggle() {
+        let s = rich_round5_state(11);
+        for pi in 0..2 {
+            let expected = reference_player_total(
+                &s,
+                pi,
+                crate::tiling_solver::ROUND5_ENDSCORING_ENABLED,
+            );
+            assert_eq!(
+                player_total_exact(&s, pi),
+                expected,
+                "player_total_exact folgt ROUND5_ENDSCORING_ENABLED={} nicht (pi={pi})",
+                crate::tiling_solver::ROUND5_ENDSCORING_ENABLED
+            );
+        }
+    }
+
+    /// Diskriminierung: die alte Rechnung (`solve_round_final_score` +
+    /// `calculate_end_scoring` des Bretts DAVOR) und die endaware-Rechnung
+    /// (`solve_round_final_score_endaware`, Endwertung des Bretts NACH dem
+    /// geplanten Tiling) muessen sich in einer konstruierten Stellung
+    /// tatsaechlich unterscheiden -- sonst waere der ganze Task-#21-Befund
+    /// wirkungslos. Sucht ueber Seeds (Muster:
+    /// `tiling_solver::tests::tiling_shaping_follows_toggle_and_position_discriminates`)
+    /// und schlaegt fehl, wenn keine diskriminierende Stellung existiert --
+    /// eine leer gruene Suche waere hier schon zweimal aufgefallen.
+    #[test]
+    fn endaware_formula_discriminates_from_old_formula() {
+        let mut found = None;
+        'search: for seed in 1u64..=200 {
+            let s = rich_round5_state(seed);
+            for pi in 0..2 {
+                let old = reference_player_total(&s, pi, false);
+                let new = reference_player_total(&s, pi, true);
+                if (old - new).abs() > 1e-9 {
+                    found = Some((seed, pi, old, new));
+                    break 'search;
+                }
+            }
+        }
+        let (seed, pi, old, new) = found.expect(
+            "keine diskriminierende Stellung in 200 Seeds gefunden -- entweder ist die \
+             endaware-Rechnung wirkungslos oder rich_round5_state() erzeugt keine echten \
+             Platzierungen",
+        );
+        assert_ne!(
+            old, new,
+            "Seed {seed} pi={pi}: alte und endaware-Rechnung liefern denselben Wert ({old})"
+        );
     }
 }

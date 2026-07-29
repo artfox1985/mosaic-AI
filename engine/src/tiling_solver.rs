@@ -233,6 +233,67 @@ pub fn solve_round_final_score(state: &GameState, pi: usize) -> i32 {
     p.score + penalty + solve_max_tiling_points(state, pi)
 }
 
+/// Blatt-Rekursion für [`solve_round_final_score_endaware`]: wie `solve_rec`,
+/// aber an jedem BLATT (keine legalen Schritte mehr, Tiefen-/Budget-Deckel
+/// erreicht) wird zusätzlich `calculate_end_scoring` des dort erreichten
+/// Bretts aufaddiert, und die SUMME aus Platzierungspunkten + Endwertung wird
+/// maximiert statt nur die Punkte. Die "hier aufhören"-Baseline (siehe
+/// `solve_rec`-Kommentar: Stoppen ist immer eine erlaubte Alternative) ist
+/// hier folgerichtig nicht mehr 0, sondern die Endwertung des Bretts VOR
+/// diesem Schritt -- Stoppen ist ja selbst ein gültiges Blatt.
+///
+/// EIGENE Rekursion statt Wiederverwendung von `solve_rec`: `solve_rec` ist
+/// der Blatt-Bewertungs-Hot-Path der Runden 1-4 (MCTS, `solve_max_tiling_points`)
+/// und bleibt unangetastet. GREEDY-Chip-Politik (`exact=false`, wie der
+/// Hot-Path) und dasselbe `NODE_BUDGET`-Muster, weil diese Funktion an JEDEM
+/// Alpha-Beta-Blatt in Runde 5 läuft (`round5::player_total_exact`, hinter
+/// `ROUND5_ENDSCORING_ENABLED`) -- eine exakte Chip-Allokationssuche wäre dort
+/// unbezahlbar teuer.
+fn solve_rec_endaware(state: &GameState, pi: usize, depth: u32, budget: &mut u32) -> i32 {
+    let end_here =
+        crate::scoring::calculate_end_scoring(&state.players[pi], &state.scoring_tile_ids).total;
+    if depth >= MAX_DEPTH || *budget == 0 {
+        return end_here;
+    }
+    *budget -= 1;
+    let steps = legal_steps(state, pi, false);
+    if steps.is_empty() {
+        return end_here;
+    }
+    // Baseline = Endwertung DIESES Bretts ("hier aufhören", siehe Doc oben).
+    let mut best = end_here;
+    for step in &steps {
+        if *budget == 0 {
+            break; // Budget erschöpft: bisher bestes Ergebnis liefern statt hängen.
+        }
+        if let Some((next, pts)) = apply_step(state, pi, step) {
+            let total = pts + solve_rec_endaware(&next, pi, depth + 1, budget);
+            if total > best {
+                best = total;
+            }
+        }
+    }
+    best
+}
+
+/// Task #21: wie [`solve_round_final_score`], aber die Rekursion wertet am
+/// BLATT zusätzlich `calculate_end_scoring` des dort erreichten Bretts aus und
+/// maximiert die SUMME (Rundenpunkte + Endwertung) statt allein die Punkte.
+///
+/// Nur für Runde 5 sinnvoll -- dort ist `calculate_end_scoring` exakt (kein
+/// Näherungsfehler, das Kuppelraster ändert sich nicht mehr, siehe
+/// `round5.rs`-Modul-Kommentar). Aufgerufen von `round5::player_total_exact`
+/// hinter `ROUND5_ENDSCORING_ENABLED` -- dort ersetzt sie die bisherige Summe
+/// `solve_round_final_score(..) + calculate_end_scoring(Brett DAVOR, ..)`,
+/// die sich auf zwei VERSCHIEDENE Brettzustände bezog (siehe Doc dort).
+pub fn solve_round_final_score_endaware(state: &GameState, pi: usize) -> i32 {
+    let p = &state.players[pi];
+    let penalty = p.broken_penalty()
+        + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
+    let mut budget = NODE_BUDGET;
+    p.score + penalty + solve_rec_endaware(state, pi, 0, &mut budget)
+}
+
 /// Optimaler nächster Tiling-Schritt für Spieler `pi`. `End`, wenn nichts mehr
 /// platzierbar/komplettierbar ist. `exact` → exakte Chip-Allokationssuche
 /// (nur für den echten Zug verwenden, NICHT pro MCTS-Blatt).
@@ -290,21 +351,50 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
 /// erschiene die Value-Spreizung kuenstlich klein.
 const MAX_TILING_LEAVES: usize = 400;
 
-fn dome_fill_signature(state: &GameState, pi: usize) -> Vec<bool> {
-    let mut sig = Vec::with_capacity(36);
+/// Kanonische Signatur eines Tiling-ABSCHLUSSES: Kuppelfuellung UND
+/// verbleibender Bonuschip-Bestand.
+///
+/// BEFUND (2026-07-29): die alte Signatur (`dome_fill_signature`, nur die 36
+/// Fuellungs-Bools) verschmolz zwei Abschluesse mit identischem Endbrett aber
+/// UNTERSCHIEDLICHEM Chip-Rest -- verschiedene `chip_allocations` koennen
+/// dieselbe Reihenkomplettierung mit verschiedenen Chips erreichen. Der
+/// Abschluss mit weniger verbrauchten Chips wurde dabei verworfen, obwohl
+/// uebrige Bonuschips Zukunftskapital fuer spaetere Runden sind (sie wandern
+/// mit ins naechste Runden-Setup). Fuer die geplante netz-gefuehrte Auswahl
+/// (das Netz bewertet den FOLGEZUSTAND, nicht nur die Rundenpunkte) ist der
+/// Chip-Rest ein echter Unterschied zwischen zwei sonst identischen Brettern.
+///
+/// Jeder Chip wird durch die sortierte Liste seiner Farbnamen kodiert
+/// (mehrfarbige Chips tragen 1-2 Farben), die Chip-Liste selbst wird
+/// anschliessend sortiert -- die Signatur ist damit unabhaengig von der
+/// Reihenfolge im `bonus_chips`-Vec (reine Permutationen desselben Bestands
+/// duerfen NICHT als unterschiedlich gelten, sonst waechst die Kandidatenzahl
+/// kuenstlich).
+fn tiling_outcome_signature(state: &GameState, pi: usize) -> (Vec<bool>, Vec<String>) {
+    let mut fill = Vec::with_capacity(36);
     for sr in 0..3 {
         for sc in 0..3 {
             match &state.players[pi].dome_grid.dome_slots[sr][sc] {
                 Some(slot) => {
                     for si in 0..4 {
-                        sig.push(slot.spaces.get(si).map_or(false, |sp| sp.placed_color.is_some()));
+                        fill.push(slot.spaces.get(si).map_or(false, |sp| sp.placed_color.is_some()));
                     }
                 }
-                None => sig.extend_from_slice(&[false; 4]),
+                None => fill.extend_from_slice(&[false; 4]),
             }
         }
     }
-    sig
+    let mut chips: Vec<String> = state.players[pi]
+        .bonus_chips
+        .iter()
+        .map(|c| {
+            let mut colors: Vec<String> = c.colors.iter().map(|col| format!("{col:?}")).collect();
+            colors.sort();
+            colors.join(",")
+        })
+        .collect();
+    chips.sort();
+    (fill, chips)
 }
 
 /// Ein vollstaendiger Tiling-Abschluss: Rundenpunkte, der ERSTE Schritt dorthin
@@ -357,10 +447,10 @@ pub fn top_k_tilings(state: &GameState, pi: usize, k: usize) -> Vec<TilingOutcom
     let mut budget = NODE_BUDGET;
     collect_tilings(state, pi, 0, None, 0, &mut budget, &mut out);
     out.sort_by(|a, b| b.points.cmp(&a.points));
-    let mut seen: Vec<Vec<bool>> = Vec::new();
+    let mut seen: Vec<(Vec<bool>, Vec<String>)> = Vec::new();
     let mut uniq: Vec<TilingOutcome> = Vec::new();
     for o in out {
-        let sig = dome_fill_signature(&o.final_state, pi);
+        let sig = tiling_outcome_signature(&o.final_state, pi);
         if seen.iter().any(|s| *s == sig) {
             continue;
         }
@@ -751,6 +841,87 @@ mod tests {
         }
         // Schutz gegen einen leer gruenen Test.
         assert!(checked >= 20, "nur {checked} Stellungen mit Zuegen geprueft");
+    }
+
+    /// Formeltest fuer `tiling_outcome_signature` selbst: gleiche Fuellung
+    /// (hier: beide leer) + verschiedener Chip-Rest => verschiedene Signatur.
+    /// Zusaetzlich: Chip-REIHENFOLGE darf keine Rolle spielen (Permutation
+    /// desselben Bestands => gleiche Signatur), sonst waechst die
+    /// Kandidatenzahl in `top_k_tilings` kuenstlich durch reine Vec-Ordnung.
+    #[test]
+    fn tiling_outcome_signature_distinguishes_chip_remainder() {
+        use crate::dome::BonusChip;
+        let mut a = tiling_state(7);
+        let mut b = tiling_state(7);
+        a.players[0].bonus_chips = vec![BonusChip { chip_id: 0, colors: vec![Rot] }];
+        b.players[0].bonus_chips = vec![
+            BonusChip { chip_id: 0, colors: vec![Rot] },
+            BonusChip { chip_id: 1, colors: vec![Blau] },
+        ];
+        let sig_a = tiling_outcome_signature(&a, 0);
+        let sig_b = tiling_outcome_signature(&b, 0);
+        assert_eq!(sig_a.0, sig_b.0, "Fuellung sollte identisch sein (beide leer)");
+        assert_ne!(sig_a.1, sig_b.1, "unterschiedlicher Chip-Rest muss unterschiedliche Signatur ergeben");
+        assert_ne!(sig_a, sig_b);
+
+        // Permutation desselben Bestands => gleiche Signatur.
+        let mut c = tiling_state(7);
+        c.players[0].bonus_chips = vec![
+            BonusChip { chip_id: 1, colors: vec![Blau] },
+            BonusChip { chip_id: 0, colors: vec![Rot] },
+        ];
+        assert_eq!(
+            tiling_outcome_signature(&b, 0),
+            tiling_outcome_signature(&c, 0),
+            "reine Chip-Reihenfolge darf die Signatur nicht aendern"
+        );
+    }
+
+    /// End-zu-End-Beleg ueber `top_k_tilings`: eine echte Stellung, in der
+    /// ZWEI Chip-Allokationen dieselbe fehlende Musterreihe komplettieren
+    /// (2 farbgleiche Chips ODER 3 beliebige, siehe `chip_allocations`/
+    /// `chips_complete` in round_end.rs), danach folgt exakt EIN Platzierungs-
+    /// zug und keine weiteren Schritte. Beide Pfade landen auf demselben
+    /// Endbrett (identische Fuellung, identische Rundenpunkte), aber mit
+    /// unterschiedlichem Chip-Rest (0 vs. 1 uebrig). Vor dem Fix (Signatur nur
+    /// ueber die Fuellung) haette die Dedup-Schleife in `top_k_tilings` einen
+    /// der beiden verworfen.
+    #[test]
+    fn top_k_tilings_keeps_both_outcomes_with_different_chip_remainder() {
+        use crate::dome::BonusChip;
+        let mut s = tiling_state(7);
+        // Slot (1,0) = pool[2] [Tuerkis, Rot, Blau, Wild]; si1 = Rot @ 6x6(2,1)
+        // -> Reihe 3 (idx 2). Reihe 4 (idx 3) bleibt leer, damit der Blau-Slot
+        // (si2) NICHT platzierbar ist -- exakt ein Platzierungszug moeglich.
+        let tile = build_dome_tile_pool()[2].clone();
+        s.players[0].dome_grid.place_dome_tile(tile, 1, 0).unwrap();
+        s.players[0].pattern_lines[2].add_tiles(&[Rot, Rot]); // cap 3, 1 fehlt
+        // 2 rot-tragende Chips (s=2, komplettiert allein) + 1 fachfremder Chip,
+        // der nur in der "3-beliebige"-Allokation (s=3) mitgenutzt wird.
+        s.players[0].bonus_chips = vec![
+            BonusChip { chip_id: 0, colors: vec![Rot] },
+            BonusChip { chip_id: 1, colors: vec![Rot] },
+            BonusChip { chip_id: 2, colors: vec![Blau] },
+        ];
+
+        let outcomes = top_k_tilings(&s, 0, 10);
+        assert_eq!(
+            outcomes.len(),
+            2,
+            "erwarte genau 2 ueberlebende Abschluesse (0 bzw. 1 Chip uebrig): {:?}",
+            outcomes.iter().map(|o| o.final_state.players[0].bonus_chips.len()).collect::<Vec<_>>()
+        );
+        let mut remainders: Vec<usize> =
+            outcomes.iter().map(|o| o.final_state.players[0].bonus_chips.len()).collect();
+        remainders.sort_unstable();
+        assert_eq!(remainders, vec![0, 1], "Chip-Reste muessen 0 und 1 sein");
+        // Beide Abschluesse haben dieselben Rundenpunkte (identisches Endbrett).
+        assert_eq!(outcomes[0].points, outcomes[1].points);
+        // Und dieselbe Kuppelfuellung (nur der Chip-Rest unterscheidet sie).
+        assert_eq!(
+            tiling_outcome_signature(&outcomes[0].final_state, 0).0,
+            tiling_outcome_signature(&outcomes[1].final_state, 0).0
+        );
     }
 
     #[test]

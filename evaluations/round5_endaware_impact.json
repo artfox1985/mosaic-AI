@@ -1,0 +1,62 @@
+{
+  "model": "models/alphazero_v18_best.onnx",
+  "n_selected_off": 100,
+  "n_selected_on": 100,
+  "n_evaluable_off": 100,
+  "n_evaluable_on": 100,
+  "n_skipped_off": 0,
+  "n_skipped_on": 0,
+  "runtime": {
+    "off": {
+      "sample_size": 10,
+      "median_ms": 145.56104999974195,
+      "max_ms": 676.6300999988744,
+      "mean_ms": 220.49910999994609
+    },
+    "on": {
+      "sample_size": 10,
+      "median_ms": 156.79865000129212,
+      "max_ms": 728.7304000019503,
+      "mean_ms": 236.58876000008604
+    },
+    "ratio_median_on_over_off": 1.0772019712798862,
+    "ratio_max_on_over_off": 1.0769996782631495
+  },
+  "move_change": {
+    "n_common": 100,
+    "n_changed": 5,
+    "rate": 0.05,
+    "examples": [
+      {
+        "index": 13,
+        "round": 5,
+        "off": "2× Stein gelb von F1 → Reihe 1 [1/1] (+1 Strafleiste)",
+        "on": "2× Stein gelb von F1 → Reihe 2 [2/2]"
+      },
+      {
+        "index": 25,
+        "round": 5,
+        "off": "1× Stein gelb von F3 → Reihe 2 [1/2]",
+        "on": "1× Stein rot von F4 → Reihe 1 [1/1]"
+      },
+      {
+        "index": 35,
+        "round": 5,
+        "off": "2× Stein schwarz von GF → Reihe 5 [3/5]",
+        "on": "2× Stein türkis von GF → Reihe 2 [2/2]"
+      },
+      {
+        "index": 76,
+        "round": 5,
+        "off": "Bonuschip F4",
+        "on": "Bonuschip F1"
+      },
+      {
+        "index": 88,
+        "round": 5,
+        "off": "1× Stein schwarz von F4 → Reihe 2 [1/2]",
+        "on": "2× Stein blau von F4 → Reihe 3 [2/3]"
+      }
+    ]
+  }
+}
