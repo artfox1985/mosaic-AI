@@ -678,6 +678,61 @@ fn scoring_tiles_json() -> String {
 }
 
 /// Python-Modul `mosaic_rust`.
+/// Task #20: bis zu `k` VOLLSTAENDIGE Tiling-Abschluesse eines Zustands, je mit
+/// Rundenpunkten und dem resultierenden Zustand als JSON.
+///
+/// Zweck: die netz-gefuehrte Tiling-Auswahl (Punkte x Value) braucht die
+/// FERTIGEN Bretter -- das Netz bewertet den Zustand, aus dem die naechste Runde
+/// startet. Der bestehende Solver liefert nur einen Schritt und nur dessen Score.
+///
+/// Erste Nutzung ist eine MESSUNG: streuen die Value-Werte unter den Kandidaten
+/// ueberhaupt genug, damit eine Multiplikation je einen Punktabstand kippt?
+/// Ist die Spreizung winzig, erledigt sich das Feature ohne Arena-Lauf.
+///
+/// `json_to_state` mischt verdeckte Information neu (siehe dessen Doku) -- fuer
+/// die Tiling-Phase ohne Belang, dort werden keine verdeckten Bestaende
+/// angefasst. Der Seed wird trotzdem durchgereicht, damit Laeufe reproduzierbar
+/// bleiben.
+#[pyfunction]
+#[pyo3(signature = (state_json, player, k=8, seed=None))]
+fn tiling_candidates_json(
+    state_json: String,
+    player: usize,
+    k: usize,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    if player >= state.players.len() {
+        return Err(PyValueError::new_err(format!(
+            "player {player} ausserhalb (nur {} Spieler)",
+            state.players.len()
+        )));
+    }
+
+    let cands = crate::tiling_solver::top_k_tilings(&state, player, k);
+    let out: Vec<serde_json::Value> = cands
+        .into_iter()
+        .map(|o| {
+            serde_json::json!({
+                "points": o.points,
+                "end_scoring": crate::scoring::calculate_end_scoring(
+                    &o.final_state.players[player],
+                    &o.final_state.scoring_tile_ids,
+                ).total,
+                "state": crate::serialize::state_to_json(&o.final_state, true),
+            })
+        })
+        .collect();
+    Ok(serde_json::Value::Array(out).to_string())
+}
+
 #[pymodule]
 fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
@@ -700,6 +755,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
+    m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
