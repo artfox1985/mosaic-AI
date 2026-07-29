@@ -507,6 +507,102 @@ fn best_first_step_round5(state: &GameState, pi: usize) -> Option<TilingStep> {
     Some(best.first_step)
 }
 
+/// Task #20: netz-geführter Stichentscheid unter punktgleichen (oder
+/// -ähnlichen) Tiling-Abschlüssen.
+///
+/// STAND: AUS bis per Arena bestätigt -- gleiche Disziplin wie
+/// `TILING_SHAPING_ENABLED`/`ROUND5_ENDSCORING_ENABLED` oben.
+///
+/// BEFUND (`evaluations/tiling_candidate_spread.json`, `v18_best`, k=12,
+/// 142 Runde-2-4-Tiling-Stellungen mit >1 Kandidat, 51/51 Faelle mit
+/// Auswahlaenderung geprueft): die Multiplikation `punkte * value` hat in
+/// KEINEM der 51 Faelle einen echten Punktvorsprung ueberstimmt -- die
+/// mediane Value-Spreizung unter den Top-`k`-Kandidaten liegt bei 0,017
+/// (IQR [0,010; 0,028]), viel zu klein, um einen vollen Punkt zu kippen
+/// (siehe Formel im Modulkommentar von `tools/tiling_candidate_spread.py`).
+/// Sie wirkt in der Praxis ausschliesslich als Stichentscheid zwischen
+/// Abschluessen mit (nahezu) IDENTISCHEN Punkten -- deshalb hier bewusst als
+/// Multiplikation und nicht als additiver Shaping-Term wie bei
+/// `TILING_SHAPING_ENABLED` implementiert.
+pub const NET_TILING_TIEBREAK_ENABLED: bool = false;
+
+/// `k` fuer `top_k_tilings` beim netz-gefuehrten Stichentscheid -- identisch
+/// zur Messung in `tiling_candidate_spread.json` (dort mit `k=12` erhoben),
+/// damit der gemessene BEFUND (s.o.) tatsaechlich zum Verhalten passt.
+pub const NET_TILING_TOPK: usize = 12;
+
+/// Task #20: waehlt unter den bis zu `NET_TILING_TOPK` vollstaendigen
+/// Tiling-Abschluessen denjenigen mit maximalem `punkte * evaluator(final_state)`
+/// und liefert dessen ERSTEN Schritt (das ist der Zug, den der Aufrufer
+/// tatsaechlich ausfuehren muss -- siehe `TilingOutcome::first_step`).
+///
+/// `evaluator` ist bewusst eine generische Closure statt eines direkten
+/// `&Net`-Parameters: dieses Modul hat keinen Rust-Unit-Test-Praezedenzfall
+/// fuer `Net::load` in `#[cfg(test)]` (Projektkonvention, siehe Kommentar zu
+/// `uniform_priors` in `round_transition_deep.rs`) -- Tests injizieren hier
+/// stattdessen einen Fake-Evaluator, die Produktion (self_play.rs/py.rs) eine
+/// echte Netz-Closure ueber `net_mcts`/`net.rs`.
+///
+/// `None`, wenn keine Kandidaten existieren (leeres Tiling, siehe
+/// `top_k_tilings`) -- der Aufrufer faellt dann auf `best_first_step_exact`
+/// zurueck (identisch zum unveraenderten Pfad).
+pub fn best_first_step_valued(
+    state: &GameState,
+    pi: usize,
+    evaluator: &dyn Fn(&GameState) -> f64,
+) -> Option<TilingStep> {
+    let cands = top_k_tilings(state, pi, NET_TILING_TOPK);
+    let mut best: Option<(f64, TilingStep)> = None;
+    for c in cands {
+        let val = f64::from(c.points) * evaluator(&c.final_state);
+        let better = match &best {
+            Some((best_val, _)) => val > *best_val,
+            None => true,
+        };
+        if better {
+            best = Some((val, c.first_step));
+        }
+    }
+    best.map(|(_, step)| step)
+}
+
+/// Task #20: kompletter Entscheid fuer den echten Tiling-Zug INKLUSIVE der
+/// Anwendungsbedingung (Toggle + Rundenfenster) -- die einzige Stelle, die
+/// diese Bedingung kennt, damit `self_play.rs::resolve_tiling_step` und
+/// `py.rs::ai_tiling_step` sie nicht redundant duplizieren (und nie
+/// auseinanderlaufen koennen).
+///
+/// `evaluator: None` (Heuristik-Spieler, kein Netz geladen) oder Runde
+/// ausserhalb [2,4] oder Toggle aus → EXAKT `best_first_step_exact`, byte-
+/// identisch zum Vor-Task-#20-Verhalten. Andernfalls `best_first_step_valued`;
+/// liefert dieses `None` (keine Kandidaten, siehe dort), faellt ebenfalls auf
+/// `best_first_step_exact` zurueck.
+///
+/// Runde 1 bewusst ausgeschlossen: das Value-Head ist dort blind (RMSE 0,2531
+/// ~ Zielstreuung 0,2538, siehe Projekt-Notizen zu Task #20) -- eine
+/// Multiplikation mit im Wesentlichen Rauschen waere reiner Schaden. Runde
+/// >= 5 bewusst ausgeschlossen: dort gilt stattdessen Task #21
+/// (`ROUND5_ENDSCORING_ENABLED`/`best_first_step_round5`) -- die dort exakt
+/// berechenbare Endwertung schlaegt einen gelernten Proxy strukturell, siehe
+/// dessen Doku oben. `best_first_step_exact` deckt diesen Fall bereits selbst
+/// ab (eigene `ROUND5_ENDSCORING_ENABLED`-Verzweigung) -- hier also nichts
+/// zusaetzlich zu tun, nur nicht versehentlich mit dem Value-Stichentscheid
+/// ueberschreiben.
+pub fn best_first_step_exact_or_valued(
+    state: &GameState,
+    pi: usize,
+    evaluator: Option<&dyn Fn(&GameState) -> f64>,
+) -> TilingStep {
+    if NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
+        if let Some(eval) = evaluator {
+            if let Some(step) = best_first_step_valued(state, pi, eval) {
+                return step;
+            }
+        }
+    }
+    best_first_step_exact(state, pi)
+}
+
 /// Greedy-Variante (Hot-Path / Tests).
 pub fn best_first_step(state: &GameState, pi: usize) -> TilingStep {
     best_first_step_inner(state, pi, false)
@@ -934,5 +1030,183 @@ mod tests {
         s.players[0] = p;
         // Keine vollen Reihen → 0 Tiling-Punkte; Score 5 (Start) - 3 - 2 = 0.
         assert_eq!(solve_round_final_score(&s, 0), 5 - 3 - 2);
+    }
+
+    // ── Task #20: netz-gefuehrter Stichentscheid ────────────────────────────
+
+    /// Sucht eine `rich_state`-Stellung in Runde 2 mit mindestens zwei
+    /// punktegleichen Top-Abschluessen mit UNTERSCHIEDLICHEM ersten Schritt --
+    /// nur dort kann ein Stichentscheid ueberhaupt etwas kippen. Gibt
+    /// (Seed, Zustand, Kandidaten) zurueck. Gemeinsam genutzt von mehreren
+    /// Tests unten, damit die Suche nicht viermal dupliziert wird.
+    fn find_tied_tiling_candidates(max_seed: u64) -> Option<(u64, GameState, Vec<TilingOutcome>)> {
+        for seed in 1..=max_seed {
+            let mut s = rich_state(seed);
+            s.round_number = 2; // Task #20 gilt nur fuer Runden 2-4.
+            let cands = top_k_tilings(&s, 0, NET_TILING_TOPK);
+            if cands.len() < 2 {
+                continue;
+            }
+            if cands[0].points == cands[1].points && cands[0].first_step != cands[1].first_step {
+                return Some((seed, s, cands));
+            }
+        }
+        None
+    }
+
+    /// (a) Paritaet: `best_first_step_exact_or_valued` mit `evaluator: None`
+    /// (Heuristik-Pfad -- kein Netz geladen) ist byte-identisch zu
+    /// `best_first_step_exact`, unabhaengig vom Toggle und von der Runde.
+    /// `best_first_step_valued` wird dabei gar nicht erst aufgerufen (das
+    /// `if let Some(eval) = evaluator` in `best_first_step_exact_or_valued`
+    /// greift nie).
+    #[test]
+    fn exact_or_valued_without_evaluator_matches_exact() {
+        let mut checked = 0;
+        for seed in 1u64..=60 {
+            for round in [1u32, 2, 3, 4, 5] {
+                let mut s = rich_state(seed);
+                s.round_number = round;
+                if legal_steps(&s, 0, true).is_empty() {
+                    continue;
+                }
+                checked += 1;
+                assert_eq!(
+                    best_first_step_exact_or_valued(&s, 0, None),
+                    best_first_step_exact(&s, 0),
+                    "Seed {seed} Runde {round}: evaluator=None weicht von best_first_step_exact ab"
+                );
+            }
+        }
+        assert!(checked >= 20, "nur {checked} Stellungen geprueft");
+    }
+
+    /// (b) Diskriminierung: unter zwei punktegleichen Top-Abschluessen mit
+    /// unterschiedlichem ersten Schritt kippt ein gezielter Fake-Evaluator
+    /// (bevorzugt das ZWEITE Endbrett, per Signatur identifiziert, nicht per
+    /// Index) die Wahl weg vom neutralen (punktegierigen) Ergebnis. Muss
+    /// fehlschlagen statt leer-gruen zu sein, wenn keine diskriminierende
+    /// Stellung existiert -- `expect` statt `if let`.
+    #[test]
+    fn best_first_step_valued_biased_evaluator_flips_tied_choice() {
+        let (seed, s, cands) = find_tied_tiling_candidates(300).expect(
+            "keine Runde-2-Stellung mit >=2 punktegleichen, unterschiedlichen Top-Abschluessen \
+             in 300 Seeds gefunden -- Testkonstruktion ueberpruefen",
+        );
+
+        // Neutraler (konstanter) Evaluator: reine Punkte-Reihenfolge, cands[0]
+        // gewinnt (top_k_tilings sortiert absteigend, cands[0] kommt zuerst
+        // und `>` in der Argmax-Schleife bevorzugt den ZUERST gefundenen bei
+        // exaktem Gleichstand).
+        let neutral = |_: &GameState| 0.5;
+        let neutral_choice = best_first_step_valued(&s, 0, &neutral).expect("Kandidaten vorhanden");
+        assert_eq!(
+            neutral_choice, cands[0].first_step,
+            "Seed {seed}: neutraler Evaluator sollte den Punkte-Sieger waehlen"
+        );
+
+        // Diskriminierender Evaluator: bevorzugt gezielt das Endbrett von
+        // cands[1] (Signatur-Vergleich, weil der Evaluator nur das GameState
+        // sieht, keinen Kandidaten-Index).
+        let target_sig = tiling_outcome_signature(&cands[1].final_state, 0);
+        let biased = |gs: &GameState| if tiling_outcome_signature(gs, 0) == target_sig { 0.9 } else { 0.1 };
+        let biased_choice = best_first_step_valued(&s, 0, &biased).expect("Kandidaten vorhanden");
+        assert_eq!(
+            biased_choice, cands[1].first_step,
+            "Seed {seed}: Evaluator sollte den zweiten (punktegleichen) Abschluss erzwingen"
+        );
+        assert_ne!(
+            biased_choice, neutral_choice,
+            "Seed {seed}: Stichentscheid muss die Wahl gegenueber dem neutralen Evaluator tatsaechlich kippen"
+        );
+    }
+
+    /// (c) Nullkosten-Invariante bei REALISTISCH kleiner Value-Spreizung.
+    ///
+    /// ACHTUNG: das ist NICHT strukturell garantiert -- `punkte * value` ist
+    /// eine echte Multiplikation, ein extremer Evaluator-Ausschlag KANN
+    /// Punkte kosten (siehe Testfall b: dort wird das bewusst ausgenutzt).
+    /// Bei den GEMESSENEN Value-Spreizungen realer Netze (Median ~0,017,
+    /// siehe `NET_TILING_TIEBREAK_ENABLED`-Doku) passiert das laut
+    /// `tiling_candidate_spread.json` (51/51 Faelle) nie -- dort korreliert
+    /// der Wert eines echten Netzes NICHT systematisch invers mit den
+    /// Punkten. Ein Evaluator, der stattdessen streng nach Punkte-RANG
+    /// ansteigt (dem sortierten `top_k_tilings`-Index), waere das exakte
+    /// Gegenteil -- er wuerde SYSTEMATISCH die punktschwaecheren Kandidaten
+    /// bevorzugen und war in einer fruehen Version dieses Tests genau deshalb
+    /// rot (Seed 3: 20 statt 21 Punkte). Hier deshalb per Hash der
+    /// Endbrett-Signatur (unkorreliert zum Punkte-Rang) auf eine enge Spanne
+    /// [0,49; 0,51] (Spreizung 0,02, nahe am gemessenen Median 0,017)
+    /// verteilt -- NICHT als Beweis einer strukturellen Garantie, siehe
+    /// Testfall (b) fuer den Gegenbeweis mit einem gezielt adversen Evaluator.
+    #[test]
+    fn best_first_step_valued_small_spread_does_not_cost_points_empirically() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut checked = 0;
+        for seed in 1u64..=150 {
+            let mut s = rich_state(seed);
+            s.round_number = 2;
+            let cands = top_k_tilings(&s, 0, NET_TILING_TOPK);
+            if cands.len() < 2 {
+                continue;
+            }
+            checked += 1;
+            let max_points = cands.iter().map(|c| c.points).max().unwrap();
+
+            let evaluator = |gs: &GameState| {
+                let sig = tiling_outcome_signature(gs, 0);
+                let mut hasher = DefaultHasher::new();
+                sig.0.hash(&mut hasher);
+                sig.1.hash(&mut hasher);
+                let h = hasher.finish();
+                0.49 + 0.02 * ((h % 1_000_000) as f64 / 999_999.0)
+            };
+
+            // Referenz-Implementierung dupliziert (wie `reference_argmax`
+            // weiter oben) statt `best_first_step_valued`s eigene Codezeile
+            // zu pruefen -- liefert zusaetzlich die Punkte des gewaehlten
+            // Kandidaten, die `TilingStep` selbst nicht traegt.
+            let mut best: Option<(f64, i32)> = None;
+            for c in &cands {
+                let val = f64::from(c.points) * evaluator(&c.final_state);
+                if best.map_or(true, |(bv, _)| val > bv) {
+                    best = Some((val, c.points));
+                }
+            }
+            let (_, chosen_points) = best.expect("Kandidaten vorhanden");
+            assert_eq!(
+                chosen_points, max_points,
+                "Seed {seed}: realistisch kleine Evaluator-Spreizung hat Punkte gekostet"
+            );
+        }
+        assert!(checked >= 10, "nur {checked} Stellungen mit >=2 Kandidaten geprueft");
+    }
+
+    /// (d) Rundengrenzen: derselbe stark diskriminierende Evaluator wie in
+    /// Test (b), aber auf Runde 1 bzw. 5 angewendet -- `best_first_step_exact_or_valued`
+    /// muss dort die ALTE (reine Punkte-)Wahl liefern, unabhaengig vom
+    /// Evaluator. Nutzt dieselbe Stellung wie Test (b) (dort in Runde 2
+    /// gefunden), nur mit ueberschriebener `round_number` -- die
+    /// Kandidatenmenge selbst haengt nicht von `round_number` ab.
+    #[test]
+    fn exact_or_valued_ignores_evaluator_outside_rounds_2_to_4() {
+        let (seed, mut s, cands) = find_tied_tiling_candidates(300).expect(
+            "keine Runde-2-Stellung mit >=2 punktegleichen, unterschiedlichen Top-Abschluessen \
+             in 300 Seeds gefunden -- Testkonstruktion ueberpruefen",
+        );
+        let target_sig = tiling_outcome_signature(&cands[1].final_state, 0);
+        let biased = |gs: &GameState| if tiling_outcome_signature(gs, 0) == target_sig { 0.9 } else { 0.1 };
+
+        for round in [1u32, 5] {
+            s.round_number = round;
+            let expected = best_first_step_exact(&s, 0);
+            let actual = best_first_step_exact_or_valued(&s, 0, Some(&biased));
+            assert_eq!(
+                actual, expected,
+                "Seed {seed} Runde {round}: Evaluator haette die Wahl gekippt, \
+                 ausserhalb Runde 2-4 darf er das nicht"
+            );
+        }
     }
 }
