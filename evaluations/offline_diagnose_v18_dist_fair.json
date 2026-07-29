@@ -1,0 +1,167 @@
+{
+  "frozen": true,
+  "frozen_version": "frozen_v1",
+  "frozen_seed": 20260724,
+  "frozen_path": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\evaluations\\frozen_eval_set.pkl",
+  "results": [
+    {
+      "model": "v18_dist_best",
+      "n_total": 1800,
+      "value_r2_global": 0.26509452144740153,
+      "value_r2_by_round": {
+        "1": {
+          "n": 360,
+          "r2": -0.011797441944959575
+        },
+        "2": {
+          "n": 360,
+          "r2": 0.10778171072998133
+        },
+        "3": {
+          "n": 360,
+          "r2": 0.16486858548236327
+        },
+        "4": {
+          "n": 360,
+          "r2": 0.07902335702257202
+        },
+        "5": {
+          "n": 360,
+          "r2": 0.6829667232398391
+        }
+      },
+      "value_r2_rounds_1_4": 0.09064492124250334,
+      "n_rounds_1_4": 1440,
+      "n_round_5_excluded": 360,
+      "policy_n_drafting": 1310,
+      "policy_top1": 0.4480916030534351,
+      "policy_top3": 0.7091603053435115,
+      "by_corpus": {
+        "v10b": {
+          "n": 900,
+          "value_r2": 0.3124107713697297,
+          "n_drafting": 665,
+          "policy_top1": 0.3774436090225564,
+          "policy_top3": 0.6255639097744361
+        },
+        "v12": {
+          "n": 900,
+          "value_r2": 0.20266152567120477,
+          "n_drafting": 645,
+          "policy_top1": 0.5209302325581395,
+          "policy_top3": 0.7953488372093023
+        }
+      },
+      "prior_mass_on_oracle_top3": 0.6845137361444908,
+      "kendall_tau_policy_vs_oracle_q": 0.3202190507494518,
+      "oracle_n": 952,
+      "oracle_source": "v16_best"
+    },
+    {
+      "model": "v18_freshpts_best",
+      "n_total": 1800,
+      "value_r2_global": 0.29033107006706493,
+      "value_r2_by_round": {
+        "1": {
+          "n": 360,
+          "r2": 0.006816084096184949
+        },
+        "2": {
+          "n": 360,
+          "r2": 0.1319754141903643
+        },
+        "3": {
+          "n": 360,
+          "r2": 0.18309824015541543
+        },
+        "4": {
+          "n": 360,
+          "r2": 0.11673760173741177
+        },
+        "5": {
+          "n": 360,
+          "r2": 0.707891675051231
+        }
+      },
+      "value_r2_rounds_1_4": 0.11603245325208689,
+      "n_rounds_1_4": 1440,
+      "n_round_5_excluded": 360,
+      "policy_n_drafting": 1310,
+      "policy_top1": 0.44656488549618323,
+      "policy_top3": 0.7030534351145038,
+      "by_corpus": {
+        "v10b": {
+          "n": 900,
+          "value_r2": 0.3196922045273669,
+          "n_drafting": 665,
+          "policy_top1": 0.37894736842105264,
+          "policy_top3": 0.6240601503759399
+        },
+        "v12": {
+          "n": 900,
+          "value_r2": 0.25157953518936904,
+          "n_drafting": 645,
+          "policy_top1": 0.5162790697674419,
+          "policy_top3": 0.7844961240310078
+        }
+      },
+      "prior_mass_on_oracle_top3": 0.6860770073371055,
+      "kendall_tau_policy_vs_oracle_q": 0.3284564508367872,
+      "oracle_n": 952,
+      "oracle_source": "v16_best"
+    },
+    {
+      "model": "v18_best",
+      "n_total": 1800,
+      "value_r2_global": 0.2905247230670225,
+      "value_r2_by_round": {
+        "1": {
+          "n": 360,
+          "r2": 0.005257245400167365
+        },
+        "2": {
+          "n": 360,
+          "r2": 0.13373546092875155
+        },
+        "3": {
+          "n": 360,
+          "r2": 0.18422718084451695
+        },
+        "4": {
+          "n": 360,
+          "r2": 0.11565871337709421
+        },
+        "5": {
+          "n": 360,
+          "r2": 0.7085296118182154
+        }
+      },
+      "value_r2_rounds_1_4": 0.11604156527134657,
+      "n_rounds_1_4": 1440,
+      "n_round_5_excluded": 360,
+      "policy_n_drafting": 1310,
+      "policy_top1": 0.4488549618320611,
+      "policy_top3": 0.7038167938931298,
+      "by_corpus": {
+        "v10b": {
+          "n": 900,
+          "value_r2": 0.31937720076347575,
+          "n_drafting": 665,
+          "policy_top1": 0.3774436090225564,
+          "policy_top3": 0.6255639097744361
+        },
+        "v12": {
+          "n": 900,
+          "value_r2": 0.2524440481172935,
+          "n_drafting": 645,
+          "policy_top1": 0.5224806201550387,
+          "policy_top3": 0.7844961240310078
+        }
+      },
+      "prior_mass_on_oracle_top3": 0.6861154893491449,
+      "kendall_tau_policy_vs_oracle_q": 0.32716648020658373,
+      "oracle_n": 952,
+      "oracle_source": "v16_best"
+    }
+  ]
+}
