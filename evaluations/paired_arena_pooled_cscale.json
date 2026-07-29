@@ -1,0 +1,28 @@
+{
+  "blocks": [
+    {
+      "prefix": "cscale",
+      "base_seed": 31415926,
+      "n_games": 400,
+      "champion_wins_off": 210,
+      "champion_wins_on": 248,
+      "b_on_only": 109,
+      "c_off_only": 71,
+      "mcnemar_p_block": 0.005668282252577556
+    }
+  ],
+  "n_games_per_arm": 400,
+  "champion_wins_off": 210,
+  "champion_wins_on": 248,
+  "discordant_b_on_only": 109,
+  "discordant_c_off_only": 71,
+  "concordant_both_win": 139,
+  "concordant_both_lose": 81,
+  "mcnemar_p_pooled": 0.005668282252577556,
+  "verdict": "ON",
+  "avg_score_champion_off": 39.13,
+  "avg_score_opponent_off": 37.7675,
+  "avg_score_champion_on": 35.595,
+  "avg_score_opponent_on": 31.315,
+  "optional_stopping_caveat": false
+}

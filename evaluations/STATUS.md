@@ -6176,3 +6176,82 @@ von ON). `tools/pool_arena_ab.py` schreibt den Hinweis automatisch mit aus.
 `projected_unplaceable_penalty` fehlt dem Tiling-Solver ebenso, obwohl
 `player_total` ihn fuehrt. Separat zu testen -- zusammen waere kein A/B
 attribuierbar. Nach diesem Ergebnis aber mit gedaempfter Erwartung.
+
+## Task #18: Gumbel c_scale -- gemessen, gegengeprueft, bleibt 1,0 (2026-07-29)
+
+### Schritt 1: Messung statt Sprossenleiter
+
+`net_mcts.rs:1290`: `sigma(q) = (c_visit + max_N) * c_scale * q`, c_visit=50,
+c_scale=1,0. Der Quellcode begruendet 1,0 (statt mctx-Default 0,1) damit, dass
+unsere q schon [0,1]-Gewinnwahrscheinlichkeiten sind. Die Luecke darin: mctx'
+Min-Max-Normalisierung spannt die Kinder-q auf den VOLLEN Bereich, unsere rohen
+Werte nur so weit, wie sich die Stellungen unterscheiden. Die Kalibrierung
+haengt also an einer nie gemessenen Groesse.
+
+`tools/gumbel_scale_calibration.py` (neu) erhebt sie ueber
+`net_search_state_json_trace` auf 216 frozen-set-Stellungen:
+
+| Groesse | Median | IQR |
+|---|---|---|
+| delta_q | 0,0073 | 0,0029 .. 0,0140 |
+| delta_ln(prior) | 1,11 | 0,41 .. 2,12 |
+| max_N | 96 | (Schaetzung aus Sequential Halving war 93) |
+| **delta_sigma / delta_lnprior** | **1,23** | 0,43 .. 2,77 |
+
+Je Runde 1,01 / 1,08 / 1,56 / 1,44 (n=68/71/46/31). **q und Prior wiegen
+praktisch gleich schwer** -- fuer exakte Gleichheit waere c_scale = 0,81 noetig.
+Die vermutete Fehlkalibrierung existiert nicht.
+
+Damit ist auch B1 gestuetzt: `c_visit` braucht keinen eigenen Test. Beide
+Konstanten gehen multiplikativ in denselben Term, und mit gemessenem max_N = 96
+ist `c_visit 50 -> 0` numerisch fast identisch zu `c_scale 1,0 -> 0,66`.
+
+**Messfehler unterwegs, behoben:** im ersten Anlauf lief `delta_q` ueber die
+Ueberlebenden der letzten Phase, `delta_ln(prior)` aber ueber alle 16 top_m --
+darin stecken sehr unwahrscheinliche Aktionen mit stark negativem ln(prior).
+Das ergab ein Verhaeltnis von 0,05 statt 1,23, also die GEGENTEILIGE
+Schlussfolgerung ("Prior dominiert zwanzigfach"). Unentdeckt haette es einen
+A/B in die falsche Richtung ausgeloest.
+
+### Schritt 2: Gegenprobe -- und ein Fallstrick im Regelwerk
+
+Getestet wurde nicht 1,0 gegen 0,81 (das waere nichts), sondern **1,0 gegen
+0,3** -- ein Wert, der die Balance klar verschiebt. 400 Spiele je Arm,
+gepaart, identischer Basis-Seed, v18_best@400 vs v17_best@400.
+
+| Arm | Siegquote v18 | Score v18 | Score v17 | Summe | Floor v18 | Floor v17 |
+|---|---|---|---|---|---|---|
+| c_scale 1,0 | 210:190 (52,5 %) | 39,13 | 37,77 | **76,90** | 13,85 | 14,97 |
+| c_scale 0,3 | 248:152 (62,0 %) | 35,59 | 31,32 | **66,91** | 15,61 | 17,32 |
+
+McNemar p = 0,0057. Nach der WOERTLICHEN Evidenzregel (p<0,05 UND Vorteil fuer
+den neuen Wert) waere das eine Annahme.
+
+**Uebernommen wurde es NICHT.** Bei 0,3 spielen BEIDE Seiten massiv schlechter:
+zehn Punkte weniger in der Summe (-13 %) und deutlich mehr Bodenstrafen auf
+beiden Brettern. Ein kleineres c_scale verschiebt Gewicht von der SUCHE zum
+Policy-Prior -- die Suche traegt dann weniger bei. Dass v18 oefter gewinnt,
+misst nur, dass v17 unter der verschlechterten Suche staerker einbricht (v18 hat
+den besseren Prior): RELATIVE Robustheit, nicht Staerke.
+
+**Die vorregistrierte Regel war unvollstaendig.** Sie unterstellt, dass die
+Siegquote im Champion-gegen-Vorgaenger-Duell Staerke abbildet. Bei einer
+ENGINE-WEITEN Aenderung, die beide Seiten gleichermassen trifft, gilt das nicht
+-- die Siegquote misst dann nur, welcher Spieler die Aenderung besser vertraegt.
+Der absolute Ø-Score war hier das entscheidende Signal.
+
+Bemerkenswert im Kontrast zu Task #16: dort hatte ich befuerchtet, der Ø-Score
+sei als Mass unempfindlich (Draft-Spiel, Gesamtpunkte durchs Angebot gedeckelt).
+Hier ist er das Gegenteil -- eindeutig, gross und rettend. Beide Masse gehoeren
+also nebeneinander berichtet, nicht eines statt des anderen.
+
+### Ergebnis
+
+`GUMBEL_C_SCALE` bleibt **1,0**, `GUMBEL_C_VISIT` bleibt **50**. Quellcode auf
+1,0 zurueckgesetzt, Wheel neu gebaut, `cargo test --release` 169/169 gruen.
+
+**Die Gumbel-Familie ist damit geschlossen.** Zusammen mit dem
+TOP_M-Nullergebnis (16 vs 8, perfekter Wash, p=1,0000 bei 49/100 diskordanten
+Paaren) ist die Parametrisierung dreifach geprueft: der eine Knopf ist
+wirkungslos, der andere sitzt gemessen am Gleichgewicht, und eine gezielte
+Verschiebung macht das Spiel schlechter.
