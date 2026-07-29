@@ -19,8 +19,8 @@ use crate::net_mcts::{self, net_search_with_tree};
 use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, generate_tiling_actions, TilingAction};
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
-use crate::tiling_solver::{best_first_step_exact, solve_round_final_score, TilingStep};
-use crate::state::Phase;
+use crate::tiling_solver::{best_first_step_exact_or_valued, solve_round_final_score, TilingStep};
+use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
 
 /// Debug-Baum-Export: nur die Wurzel (debug.html zeigt keine Kind-Dropdowns mehr).
@@ -684,7 +684,21 @@ impl PyGame {
         // Waehrend des Tilings werden keine neuen Kuppelplatten gelegt (Regel) --
         // liefert der Solver `End`, ist die Tiling-Phase fuer diesen Spieler
         // wirklich zu Ende (offene volle Reihen ohne Slot bleiben liegen).
-        let step = best_first_step_exact(&self.game.state, pi);
+        //
+        // Task #20: ist ein Netz geladen (`self.net`), wird derselbe
+        // Stichentscheid wie im Rust-Self-Play-Pfad angewendet (siehe
+        // `self_play.rs::resolve_tiling_step`/`net_tiling_tiebreak_value`) --
+        // hinter `NET_TILING_TIEBREAK_ENABLED` + Rundenfenster 2-4, sonst
+        // exakt `best_first_step_exact`. Ohne geladenes Netz (`self.net ==
+        // None`, Heuristik-Debug-Sitzung) unveraendert.
+        let step = match self.net.as_ref() {
+            Some(net) => {
+                let evaluator =
+                    |final_state: &GameState| crate::self_play::net_tiling_tiebreak_value(net, final_state, pi);
+                best_first_step_exact_or_valued(&self.game.state, pi, Some(&evaluator))
+            }
+            None => best_first_step_exact_or_valued(&self.game.state, pi, None),
+        };
 
         let (typ, desc, cat, mv): (&str, String, &str, Value) = match step {
             TilingStep::Place(ta) => {
@@ -775,7 +789,7 @@ mod tests {
         // Reihe 0 (cap 1) voll mit Rot, Kuppel-Grid leer → keine Aktion möglich.
         s.players[0].pattern_lines[0].add_tiles(&[Rot]);
 
-        assert!(matches!(best_first_step_exact(&s, 0), TilingStep::End));
+        assert!(matches!(crate::tiling_solver::best_first_step_exact(&s, 0), TilingStep::End));
         assert!(generate_tiling_actions(&s, 0).is_empty());
     }
 

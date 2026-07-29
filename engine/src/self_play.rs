@@ -44,7 +44,7 @@ use crate::scoring::{sample_valid_scoring_ids, wertung_progress};
 use crate::serialize::state_to_json;
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
-use crate::tiling_solver::{best_first_step_exact, solve_round_final_score, TilingStep};
+use crate::tiling_solver::{best_first_step_exact_or_valued, solve_round_final_score, TilingStep};
 
 /// Standard-UCT-Konstante der Self-Play-Suche (= `py.rs::AI_C`).
 pub const SELF_PLAY_C: f64 = 0.3;
@@ -884,22 +884,76 @@ fn tiling_env_actions(state: &GameState, pi: usize) -> Vec<Value> {
     actions
 }
 
-/// Optimaler Tiling-Schritt: reiner exakter DFS-Solver. Während des Tilings
-/// werden keine neuen Kuppelplatten gelegt (Regel) -- eine volle Musterreihe
-/// ohne bereits belegten passenden Slot bleibt liegen (ggf. später per
-/// Strafleiste abgerechnet, siehe `process_unplaceable_rows`), statt am
-/// Tiling-Ende künstlich eine neue Platte zu installieren. Gemeinsam genutzt
-/// von Self-Play und Arena.
-fn resolve_tiling_step(state: &GameState, pi: usize) -> TilingStep {
-    best_first_step_exact(state, pi)
+/// Task #20: Netz-Blattwert eines Tiling-ABSCHLUSSES (`TilingOutcome::final_state`)
+/// aus Sicht von `pi`, als reine Gewinnwahrscheinlichkeit `(v+1)/2` -- KEIN
+/// `points`-Blending wie `net_mcts::blended_leaf_win_prob` (die Messung in
+/// `tiling_candidate_spread.json`, auf der `NET_TILING_TIEBREAK_ENABLED`
+/// beruht, hat exakt diese Formel benutzt, siehe `tools/tiling_candidate_spread.py`).
+///
+/// PERSPEKTIVE, verifiziert statt angenommen: `top_k_tilings`/`apply_step`
+/// (tiling_solver.rs) klonen den Zustand ohne `current_player` je anzufassen
+/// -- `final_state.current_player` bleibt also der `current_player` des
+/// UEBERGEBENEN Tiling-Zustands. JEDER Aufrufer von `resolve_tiling_step`
+/// (self_play.rs, py.rs) liest `pi` selbst wiederum aus
+/// `game.state.current_player` (kein einziger Aufruf mit externem `pi`,
+/// siehe alle `resolve_tiling_step(&game.state, pi)`-Stellen) -- `pi` und
+/// `final_state.current_player` sind damit strukturell IMMER gleich, ein
+/// Spiegeln (`1.0 - wp`) waere hier nie noetig. `debug_assert_eq!` unten haelt
+/// diese Annahme wach, `if`-Zweig bleibt als defensive Absicherung, falls ein
+/// kuenftiger Aufrufer diese Invariante bricht.
+///
+/// `pub(crate)`, weil `py.rs::ai_tiling_step` (der echte Netz-Tiling-Zug im
+/// Python-Bindungspfad, `PyGame` mit `self.net`) dieselbe Formel braucht --
+/// eine zweite, driftende Implementierung waere hier riskanter als eine
+/// Modulgrenze zu ueberschreiten.
+pub(crate) fn net_tiling_tiebreak_value(net: &Net, final_state: &GameState, pi: usize) -> f64 {
+    debug_assert_eq!(
+        final_state.current_player, pi,
+        "final_state.current_player sollte strukturell immer pi sein, siehe Doku"
+    );
+    let feats = state_to_features_direct(final_state);
+    let (_logits, value, _moon, _points) = net
+        .eval(&feats)
+        .unwrap_or_else(|_| (Vec::new(), vec![0.0], Vec::new(), Vec::new()));
+    let v = value.first().copied().unwrap_or(0.0) as f64;
+    let wp = (v + 1.0) / 2.0;
+    if final_state.current_player == pi { wp } else { 1.0 - wp }
+}
+
+/// Optimaler Tiling-Schritt. Standardpfad: reiner exakter DFS-Solver
+/// (`best_first_step_exact`). Während des Tilings werden keine neuen
+/// Kuppelplatten gelegt (Regel) -- eine volle Musterreihe ohne bereits
+/// belegten passenden Slot bleibt liegen (ggf. später per Strafleiste
+/// abgerechnet, siehe `process_unplaceable_rows`), statt am Tiling-Ende
+/// künstlich eine neue Platte zu installieren. Gemeinsam genutzt von
+/// Self-Play und Arena.
+///
+/// `net: None` (Heuristik-Spieler / kein Netz geladen) -> exakt das alte
+/// Verhalten, `best_first_step_exact_or_valued` faellt sofort darauf zurück.
+/// `net: Some(..)` -> Task #20-Stichentscheid IN RUNDEN 2-4 hinter
+/// `NET_TILING_TIEBREAK_ENABLED` (siehe dort), sonst ebenfalls unveraendert
+/// -- die vollständige Anwendungsbedingung (Toggle + Rundenfenster) lebt
+/// zentral in `best_first_step_exact_or_valued`, damit sie nicht an jeder
+/// Aufrufstelle erneut dupliziert wird.
+fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net>) -> TilingStep {
+    match net {
+        Some(n) => {
+            let evaluator = |final_state: &GameState| net_tiling_tiebreak_value(n, final_state, pi);
+            best_first_step_exact_or_valued(state, pi, Some(&evaluator))
+        }
+        None => best_first_step_exact_or_valued(state, pi, None),
+    }
 }
 
 /// Tiling-Zug per exaktem DFS-Solver (one-hot Policy auf den optimalen Schritt).
-fn tiling_step<R: Rng + ?Sized>(game: &mut Game, rng: &mut R) -> Map<String, Value> {
+/// `net`: siehe `resolve_tiling_step` -- `None` fuer alle Heuristik-Pfade
+/// (byte-identisch zum Vor-Task-#20-Verhalten), `Some(&Net)` nur fuer die
+/// echten Netz-Spielpfade (`play_net_self_play_game`).
+fn tiling_step<R: Rng + ?Sized>(game: &mut Game, net: Option<&Net>, rng: &mut R) -> Map<String, Value> {
     let pi = game.state.current_player;
     let state_json = state_to_json(&game.state, true);
     let valid_actions = tiling_env_actions(&game.state, pi);
-    let step = resolve_tiling_step(&game.state, pi);
+    let step = resolve_tiling_step(&game.state, pi, net);
 
     let chosen_env: Value = match &step {
         TilingStep::Place(ta) => json!({
@@ -1034,7 +1088,12 @@ pub fn play_one_game<R: Rng + ?Sized>(
                     break;
                 }
             }
-            Phase::Tiling => records.push(tiling_step(&mut game, rng)),
+            // Task #20: `net` ist hier bewusst NICHT durchgereicht, obwohl es
+            // (fuer Runde-Uebergangs-Label-Sampling oben) ggf. `Some` ist --
+            // `play_one_game`s Zuege bleiben Heuristik-gesteuert
+            // (`drafting_step`/`search_drafting_action`), der Netz-Stichentscheid
+            // gilt nur fuer ECHTE Netz-Spielpfade (siehe `resolve_tiling_step`-Doku).
+            Phase::Tiling => records.push(tiling_step(&mut game, None, rng)),
             _ => break, // Scoring/End/Final → Partie vorbei
         }
     }
@@ -1259,9 +1318,10 @@ fn play_arena_game<R: Rng + ?Sized>(
                     break;
                 }
             }
+            // Heuristik-vs-Heuristik-Arena, kein Netz -- `None` bleibt byte-identisch.
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi) {
+                match resolve_tiling_step(&game.state, pi, None) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -1402,9 +1462,14 @@ fn play_net_game<R: Rng + ?Sized>(
                     break;
                 }
             }
+            // Task #20 bewusst NICHT verdrahtet: `play_net_game` ist Netz-vs-
+            // Heuristik (nur EIN Spieler hat ein Netz) und war nicht Teil des
+            // benannten Aufgabenumfangs (`play_net_self_play_game`,
+            // `play_net_vs_net_game`) -- `net` waere hier zwar verfuegbar,
+            // bleibt aber ungenutzt, damit dieser Arena-Pfad unveraendert bleibt.
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi) {
+                match resolve_tiling_step(&game.state, pi, None) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -1542,9 +1607,12 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                     break;
                 }
             }
+            // Task #20: beide Spieler haben ein Netz -- Board 0 = `net_a`,
+            // Board 1 = `net_b` (dieselbe Zuordnung wie beim Drafting oben).
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi) {
+                let tiling_net = if pi == 0 { net_a } else { net_b };
+                match resolve_tiling_step(&game.state, pi, Some(tiling_net)) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -1700,9 +1768,11 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                     break;
                 }
             }
+            // Task #20 bewusst NICHT verdrahtet (Hybrid-Arena, nicht Teil des
+            // benannten Aufgabenumfangs) -- siehe `play_net_game`-Kommentar oben.
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi) {
+                match resolve_tiling_step(&game.state, pi, None) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -2096,7 +2166,11 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     break;
                 }
             }
-            Phase::Tiling => records.push(tiling_step(&mut game, rng)),
+            // Task #20: einer der beiden echten Netz-Spielpfade -- `net` wird
+            // durchgereicht, `resolve_tiling_step`/`best_first_step_exact_or_valued`
+            // entscheiden anhand von `NET_TILING_TIEBREAK_ENABLED` + Rundenfenster,
+            // ob er tatsaechlich wirkt (Toggle steht auf `false`, siehe dort).
+            Phase::Tiling => records.push(tiling_step(&mut game, Some(net), rng)),
             _ => break,
         }
     }
@@ -2539,8 +2613,15 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                         break;
                     }
                 }
+                // Task #20 bewusst NICHT verdrahtet: dies ist ein interner
+                // Rollout-SUCH-Kontext (Stufe 3, `mean_rollout_diff` bewertet
+                // hypothetische Fortsetzungen fuer die Drafting-Zugwahl von
+                // `play_stage3_vs_stage1_game`) -- analog zur Begruendung fuer
+                // `round_transition.rs::resolve_to_pre_chance` (siehe dort):
+                // Konsistenz der Such-/Rollout-Politik geht vor, `net` bliebe
+                // hier zwar verfuegbar, aber ungenutzt.
                 Phase::Tiling => {
-                    tiling_step(&mut g, rng);
+                    tiling_step(&mut g, None, rng);
                 }
                 _ => break,
             }
@@ -2713,9 +2794,11 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                     break;
                 }
             }
+            // Task #20 bewusst NICHT verdrahtet (Stage3-vs-Stage1-Diagnose-
+            // Arena, nicht Teil des benannten Aufgabenumfangs).
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi) {
+                match resolve_tiling_step(&game.state, pi, None) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -2963,9 +3046,11 @@ pub fn sibling_ranking_diagnostic(
                         break;
                     }
                 }
+                // Task #20 bewusst NICHT verdrahtet (Sibling-Ranking-
+                // Diagnose-Walk, nicht Teil des benannten Aufgabenumfangs).
                 Phase::Tiling => {
                     let pi = game.state.current_player;
-                    match resolve_tiling_step(&game.state, pi) {
+                    match resolve_tiling_step(&game.state, pi, None) {
                         TilingStep::Place(ta) => {
                             let _ = game.apply_single_tiling(pi, &ta);
                         }
@@ -3097,9 +3182,11 @@ pub fn draw_stack_peek_impact_diagnostic(
                         break;
                     }
                 }
+                // Task #20 bewusst NICHT verdrahtet (Draw-Stack-Peek-Impact-
+                // Diagnose, nicht Teil des benannten Aufgabenumfangs).
                 Phase::Tiling => {
                     let pi = game.state.current_player;
-                    match resolve_tiling_step(&game.state, pi) {
+                    match resolve_tiling_step(&game.state, pi, None) {
                         TilingStep::Place(ta) => {
                             let _ = game.apply_single_tiling(pi, &ta);
                         }
@@ -3246,8 +3333,10 @@ pub fn value_noise_floor_diagnostic(
                         break;
                     }
                 }
+                // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-Walk,
+                // kein Netz in diesem Kontext geladen).
                 Phase::Tiling => {
-                    tiling_step(&mut game, &mut rng);
+                    tiling_step(&mut game, None, &mut rng);
                 }
                 _ => break,
             }
@@ -3302,8 +3391,10 @@ pub fn value_noise_floor_diagnostic(
                                 break;
                             }
                         }
+                        // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-
+                        // Rollout, kein Netz in diesem Kontext geladen).
                         Phase::Tiling => {
-                            tiling_step(&mut g2, &mut rng);
+                            tiling_step(&mut g2, None, &mut rng);
                         }
                         _ => break,
                     }
@@ -3466,8 +3557,10 @@ mod tests {
                             break;
                         }
                     }
+                    // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-
+                    // Rollout, kein Netz in diesem Kontext geladen).
                     Phase::Tiling => {
-                        tiling_step(&mut game, &mut rng);
+                        tiling_step(&mut game, None, &mut rng);
                     }
                     _ => break,
                 }
@@ -3563,8 +3656,10 @@ mod tests {
                             break;
                         }
                     }
+                    // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-
+                    // Rollout, kein Netz in diesem Kontext geladen).
                     Phase::Tiling => {
-                        tiling_step(&mut g, &mut rng);
+                        tiling_step(&mut g, None, &mut rng);
                     }
                     _ => break,
                 }
