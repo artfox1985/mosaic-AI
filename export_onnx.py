@@ -18,7 +18,7 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
-from neural_net import MosaicNet  # noqa: E402
+from neural_net import MosaicNet, points_dist_bins_from_state  # noqa: E402
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
 
@@ -43,7 +43,8 @@ def export(version: str, opset: int = 13) -> Path:
     # siehe Vorfall bei v6).
     ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
 
-    model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph)
+    model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
+                      points_dist_bins=points_dist_bins_from_state(state))
     new_state = model.state_dict()
     # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
     # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads

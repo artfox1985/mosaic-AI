@@ -64,7 +64,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py")
 
 from config import DATA_DIR, MODELS_DIR, NUM_ACTIONS, INPUT_SIZE
 from neural_net import (
-    MosaicNet, state_to_tensor, action_to_id,
+    MosaicNet, points_dist_bins_from_state, state_to_tensor, action_to_id,
     VALUE_SCALE, VALUE_OPP_EPSILON, TD_LAMBDA,
 )
 
@@ -249,7 +249,8 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
     ckpt_path = MODELS_DIR / f"alphazero_{model_name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
     hs = hidden_override if hidden_override is not None else ckpt.get("hidden_size", 512)
-    model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS, hidden_size=hs)
+    model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS, hidden_size=hs,
+                      points_dist_bins=points_dist_bins_from_state(ckpt["model_state"]))
     model.load_state_dict(ckpt["model_state"], strict=False)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device).eval()

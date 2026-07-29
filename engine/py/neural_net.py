@@ -828,6 +828,25 @@ class MosaicDataset(Dataset):
                 self.rounds[idx], self.ownership[idx])
 
 
+def points_dist_bins_from_state(state: dict) -> int:
+    """Task #12: Bin-Zahl des Punkte-Kopfs AUS DEM CHECKPOINT ableiten.
+
+    Der Verteilungs-Kopf (POINTS_DIST_BINS>0) hat eine andere Ausgabebreite als
+    der Skalar-Kopf. Wer einen Checkpoint laedt, ohne das zu wissen, baut das
+    falsche Modell und scheitert an einem Shape-Mismatch. Statt sich auf ein
+    gespeichertes Feld zu verlassen (alte Checkpoints haben es nicht), wird die
+    Zahl aus der Gewichtsform gelesen -- das funktioniert fuer JEDEN Checkpoint,
+    auch rueckwirkend.
+
+    Rueckgabe: 0 = Skalar-Kopf (Bestandsverhalten), sonst die Bin-Zahl.
+    """
+    w = state.get("points_head.2.weight")
+    if w is None:
+        return 0
+    n = int(w.shape[0])
+    return 0 if n <= 1 else n
+
+
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64,

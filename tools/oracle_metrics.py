@@ -45,7 +45,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "engine" / "py"))
 
 from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
-from neural_net import MosaicNet, action_to_id, state_to_tensor  # noqa: E402
+from neural_net import (MosaicNet, action_to_id, points_dist_bins_from_state,  # noqa: E402
+                        state_to_tensor)
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 ORACLE_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels.json"
@@ -147,7 +148,8 @@ def load_model(name: str) -> torch.nn.Module:
     ckpt_path = MODELS_DIR / f"alphazero_{name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
     hs = ckpt.get("hidden_size", 512)
-    model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS, hidden_size=hs)
+    model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS, hidden_size=hs,
+                      points_dist_bins=points_dist_bins_from_state(ckpt["model_state"]))
     model.load_state_dict(ckpt["model_state"], strict=False)
     model.eval()
     return model
