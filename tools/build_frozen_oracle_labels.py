@@ -64,6 +64,15 @@ sys.path.insert(0, str(ROOT))
 import mosaic_rust  # noqa: E402
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
+# Ueber --model/--out ueberschreibbar. Die v16-Labels (frozen_v1_oracle_v1)
+# bleiben als historische Grundlinie UNVERAENDERT bestehen -- ein neues Orakel
+# bekommt einen eigenen Dateinamen statt das alte zu ueberschreiben.
+#
+# HARTE REGEL (Task #89, 2026-07-29 empirisch bestaetigt): die Orakel-QUELLE
+# darf NICHT zu den bewerteten Kandidaten zaehlen. Beleg: die Value-Metriken
+# gipfeln exakt bei der damaligen Quelle v16_best und sagen genau die beiden
+# Nach-Orakel-Paare falsch vorher. Ein aus v18 gebautes Orakel ist daher erst
+# ab v19 aufwaerts als Praediktor gueltig.
 OUT_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels.json"
 MODEL_PATH = ROOT / "models" / "alphazero_v16_best.onnx"
 SIMS = 5000
@@ -93,6 +102,31 @@ def is_start_adjacent(rec: dict) -> bool:
 def is_pending_rotation(rec: dict) -> bool:
     types = set(a.get("type") for a in rec["valid_actions"])
     return types == {"choose_dome_rotation"}
+
+
+def _parse_cli():
+    """--model/--out/--sims, damit das Orakel aus dem jeweils aktuellen
+    Champion neu gebaut werden kann, ohne die bestehenden Labels anzutasten."""
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--model", default=None, help="Versionsname, z.B. v18_best")
+    ap.add_argument("--out", default=None, help="Ziel-JSON")
+    ap.add_argument("--sims", type=int, default=None)
+    a = ap.parse_args()
+    global MODEL_PATH, OUT_JSON, SIMS
+    if a.model:
+        MODEL_PATH = ROOT / "models" / f"alphazero_{a.model}.onnx"
+        if not MODEL_PATH.exists():
+            raise SystemExit(f"Modell nicht gefunden: {MODEL_PATH}")
+    if a.out:
+        OUT_JSON = ROOT / a.out
+    if a.sims:
+        SIMS = a.sims
+    if OUT_JSON.exists():
+        raise SystemExit(
+            f"ABBRUCH: {OUT_JSON.name} existiert bereits. Orakel-Labels sind nach "
+            f"Fertigstellung UNVERAENDERLICH -- ein neues Orakel braucht einen neuen "
+            f"Dateinamen (--out), sonst geht die historische Grundlinie verloren.")
 
 
 def main() -> None:
@@ -213,4 +247,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    _parse_cli()
     main()

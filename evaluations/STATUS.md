@@ -6334,3 +6334,33 @@ Trefferquote schlicht ungemessen. **Die Orakel-Metriken sind kopfspezifisch
 validiert, nicht universell** -- das gehoert zu ihrer Beschreibung dazu.
 Konkrete Folgerung fuer Task #19: eine Punkte-Kopf-Metrik ins frozen-set-
 Instrumentarium aufnehmen.
+
+## Task #19: Orakel-Metriken in die Diagnose + Orakel aus v18 (2026-07-29)
+
+**Teil A.** `offline_diagnose.py --frozen` rechnet und zeigt jetzt die beiden
+gegen die Arena validierten Praediktoren mit (`prior_mass_on_oracle_top3`,
+`kendall_tau_policy_vs_oracle_q`). BEWUSST nur diese zwei: `prior_recall_at_16`
+ist gesaettigt (v17_best = 1,0000), die Value-Varianten kommen nur auf 5/7 und
+gipfeln exakt bei der Orakel-Quelle. Ist ein Kandidat selbst die Quelle, wird
+das erkannt und markiert. Fehlende Labels sind nicht fatal (Warnung,
+Diagnose laeuft weiter), abschaltbar per `--no-oracle`.
+
+**Teil B.** Neues Orakel aus `v18_best` gebaut: 1185 Labels, 5000 Sims,
+0 Mismatches, 0 Fehler, 15,1 min -> `evaluations/frozen_v1_oracle_labels_v18.json`.
+
+**NOCH NICHT AKTIV.** v18_best ist amtierender Champion und damit selbst
+Kandidat -- die harte Regel aus Task #89 (Quelle darf kein Kandidat sein) ist am
+selben Tag empirisch bestaetigt worden. Aktiv bleibt das v16-Orakel, gueltig
+fuer v14..v18. Umstellung ab v19: `ORACLE_JSON` in `tools/oracle_metrics.py`
+umhaengen UND `tools/offline_vs_arena.py` erneut laufen lassen -- die alte
+Trefferbilanz ist NICHT uebertragbar, sie gilt dann nur fuer Paare ab v19.
+Die v16-Labels bleiben als historische Grundlinie erhalten;
+`build_frozen_oracle_labels.py` verweigert jetzt das Ueberschreiben vorhandener
+Label-Dateien.
+
+**Einschraenkung, die aus Task #12 folgt und zur Beschreibung dazugehoert:**
+die 8/8-Bilanz der beiden Metriken beruht ausschliesslich auf Gating-Paaren, bei
+denen sich POLICY und VALUE aenderten. Beim Verteilungs-Punkte-Kopf, der
+ausschliesslich den PUNKTE-Kopf aendert, lagen beide falsch (0/1). **Die
+Orakel-Metriken sind kopfspezifisch validiert, nicht universell.** Eine
+Punkte-Kopf-Metrik fehlt im frozen-set-Instrumentarium komplett.
