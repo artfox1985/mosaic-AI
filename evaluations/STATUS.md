@@ -4706,6 +4706,25 @@ aber noch nicht durchgefuehrt -- naechster Schritt, sobald Rechenkapazitaet
 frei ist. Bundle-Rebuild (`tools/build_release.py`) inkl. `v17_best` als
 Referenzmodell ebenfalls noch offen.
 
+**Methodischer Nachtrag (2026-07-29):** Die Verlaengerung 200 -> 400 Paare
+wurde NACH Sichtung des Zwischenstands (p=0,053 bei 200 Paaren) beschlossen
+-- optionales Stoppen/Verlaengern nach Sichtung eines Zwischenergebnisses
+inflationiert die Falsch-Positiv-Rate, der oben berichtete Fixed-n-p-Wert
+(0,0031 bei 375 Paaren) ist entsprechend optimistisch zu lesen. Mildernd:
+der SPRT-Grenzuebertritt (LLR +3,852 >= +2,944) ist ein sequenzielles
+Kriterium, dafuer gebaut, waehrend des Laufs beobachtet zu werden -- er ist
+robuster gegen diesen Einwand als der p-Wert.
+
+Derselbe Vorbehalt wurde bei der Tiling-Shaping-Verlaengerung dokumentiert
+(Task #16, 2026-07-29, Abschnitt "Task #16: Tiling-Solver-Endwertungs-Shaping
+-- verworfen", dort 400 -> 800 Spiele je Arm nach Sichtung von Block 1) und
+gilt hier symmetrisch: derselbe methodische Eingriff, hier fiel das Ergebnis
+positiv aus, dort negativ.
+
+Seither gilt: Deckel VORAB festlegen, keine nachtraeglichen Verlaengerungen
+nach Zwischen-Sichtung -- nach demselben Vorregistrierungs-Prinzip wie in
+`evaluations/PREREG_ownership_gumbel.md` dokumentiert.
+
 ## v17-Zyklus Hebel 2: Netz-Kapazitaet verworfen, LR-Dynamik-Experiment (2026-07-26/27)
 
 **Netz-Kapazitaet (512->768/1024) verworfen, VOR jedem Trainingslauf**:
@@ -6099,6 +6118,43 @@ Regel aus Task #89 weiter -- die Orakel-Quelle darf NICHT selbst zu den
 bewerteten Kandidaten zaehlen, und die Validierung ist danach zu wiederholen.
 `frozen_v1_oracle_labels.json` bleibt als historische Grundlinie unveraendert.
 
+### KORREKTUR (2026-07-29, nach Archiv-Integration)
+
+Commit `43ccb08` kopierte 12 archivierte Gating-/Diagnose-Dateien der
+v10..v13-Generation aus `archive/` nach `evaluations/` (dort lagen sie fuer
+`offline_vs_arena.py` bislang unsichtbar). Damit waechst die Basis von 11 auf
+**18 auswertbare** und von 8 auf **12 entschiedene** Gating-Paare (McNemar
+p<0,05) -- verifiziert per Neulauf von `python tools/offline_vs_arena.py`:
+
+| Metrik | vorher | jetzt |
+|---|---|---|
+| `policy_top3` | 0/6 richtig (6/6 auf den VERLIERER), p=0,031 | **3/11** richtig, p=0,2266 |
+| `policy_top1` | 1/5 | **4/11**, p=0,5488 |
+| `value_r2_global` | 3/6 | **6/12**, p=1,0000 |
+| `value_r2_rounds_1_4` | 4/7 | **4/8** (Archiv traegt hier nichts bei -- die v10..v13-GEWICHTE sind seit dem Datenverlust vom 2026-07-24 weg, die Metrik ist fuer sie nicht nachrechenbar) |
+
+Die Aussage "`policy_top3` zeigte in 6 von 6 entschiedenen Paaren auf den
+VERLIERER (p=0,031)" war ein **Kleinstichproben-Artefakt**: mit 11
+auswertbaren entschiedenen Paaren sind es 3/11 richtig (Binomial p=0,2266) --
+weiterhin unter dem Zufallsniveau, aber NICHT mehr signifikant von Zufall zu
+unterscheiden. Die Kernaussage (`policy_top3` taugt nicht als
+Fortschrittsmass) bleibt bestehen, der dramatische Teil war Rauschen.
+
+`policy_top1` liegt bei 4/11 (p=0,5488), `value_r2_global` bei 6/12
+(p=1,0000), `value_r2_rounds_1_4` unveraendert bei 4/8 -- fuer Letzteres kann
+das Archiv nichts beitragen, weil die v10..v13-Gewichte seit dem Datenverlust
+vom 2026-07-24 fehlen und die Metrik ohne Gewichte nicht nachrechenbar ist.
+
+Die "Aufloesungsgrenze ~0,015" (Schritt 1 oben) beruht weiterhin auf nur 3
+Punkten je Regime (gross/klein) und ist als grobe Faustregel zu lesen, nicht
+als scharfe Schwelle -- das Archiv liefert dafuer keine zusaetzlichen
+Datenpunkte.
+
+Die beiden Orakel-Metriken (`prior_mass_on_oracle_top3`,
+`kendall_tau_policy_vs_oracle_q`) sind von dieser Korrektur NICHT betroffen:
+fuer v10..v13 sind sie mangels Gewichten nicht berechenbar, ihre 7/7-Bilanz
+stuetzt sich weiterhin ausschliesslich auf die v14+-Paare.
+
 ## Task #16: Tiling-Solver-Endwertungs-Shaping -- verworfen (2026-07-29)
 
 ### Befund, der den Versuch ausgeloest hat
@@ -6364,3 +6420,231 @@ denen sich POLICY und VALUE aenderten. Beim Verteilungs-Punkte-Kopf, der
 ausschliesslich den PUNKTE-Kopf aendert, lagen beide falsch (0/1). **Die
 Orakel-Metriken sind kopfspezifisch validiert, nicht universell.** Eine
 Punkte-Kopf-Metrik fehlt im frozen-set-Instrumentarium komplett.
+
+## v18-Zyklus: Training, Gating, Kader (2026-07-28/29)
+
+**Korpus**: 900 Dateien, stabil waehrend des gesamten Trainings -- 600
+v17-Dateien (6000 Spiele) + 200 v16-Dateien (2000 Spiele) + 100 v15-Dateien
+(1000 Spiele).
+
+**Rezept** (`models/manifest_train_v18_20260728_223600.json`): `--load
+v17_best --epochs 100 --lr 5e-5 --lr-schedule cosine --seed 2`,
+`value_target_variant=nortv`, `ownership_weight` unveraendert (0),
+`exclude_round5=false`. Seed 2 war der beste Seed des `base`-Arms im
+Seed-Sweep (Auswahl auf dem frozen set getroffen, das Gating urteilt
+unabhaengig davon). Bester Checkpoint Epoche 2, `val_combined` 1,2612 --
+reproduziert `base_s2` aus dem Sweep. Early Stopping griff nach Epoche 15.
+Snapshot-Hook ausgeloest (`models_2026-07-28_2305_v18.zip`).
+
+**Diagnose** (`evaluations/offline_diagnose_v18.json`): `value_r2_rounds_1_4`
+v18 0,1160 vs. v17 0,1130 -- liegt INNERHALB der ueber die sechs
+Seed-Sweep-Seeds gemessenen Streuung des `base`-Arms (0,1091..0,1160),
+offline also ein Wash. Je Runde: R1 fiel 0,0274 -> 0,0053, R3 stieg 0,1701
+-> 0,1842, R4 stieg 0,1009 -> 0,1157. Die beiden Orakel-Metriken sagten
+dagegen v18 RICHTIG voraus: `prior_mass_on_oracle_top3` 0,6861 vs. 0,6729
+(v17), `kendall_tau_policy_vs_oracle_q` 0,3272 vs. 0,3067.
+
+**Gating vs. `v17_best`**
+(`evaluations/paired_gating_result_v18_best_vs_v17_best.json`): **146:104
+(125 Paare, 250 Spiele)**, SPRT=`v18_best` (LLR=+3,718 >= +2,944),
+McNemar-Vorzeichentest p=0,0086, gepaarte Differenz +0,336 [95%-CI +0,101,
++0,571]. Champion automatisch via `--promote-winner` gesetzt
+(`models/champion.txt` = `v18_best`), Server-Neustart fuer den Live-Betrieb
+noetig.
+
+**Kader-Kante vs. `v16_best`**
+(`evaluations/paired_gating_result_v18_best_vs_v16_best.json`, kein
+Ablosungs-Gating -- `v18_best` ist bereits Champion): **150:100 (125 Paare,
+250 Spiele)**, SPRT=`v18_best` (LLR=+5,050), p=0,0013, gepaarte Differenz
++0,400 [95%-CI +0,173, +0,627]. Steht (wieder) in
+`evaluations/elo_history.csv`, gegen `paired_gating_result_v18_best_vs_v16_best.json`
+verifiziert -- siehe Vorfall-Absatz unten zur Historie dieses Eintrags.
+
+**Heuristik-Anker**: SPRT-Fruehstopp 23:8 nach 31/400 Spielen (74,2%
+Netzsiege, Score 41,7 vs. 32,6), Lauf vom 2026-07-28T23:44:55. Steht in
+`evaluations/elo_history.csv` und als Zeile in `evaluations/arena_trends.csv`
+(`winrate 0.7419` = 23/31, verifiziert). **Beide Zeilen sind ausdruecklich
+als REKONSTRUIERT markiert** (Quelle: Sitzungsaufzeichnung, nicht die
+Original-Ergebnisdatei -- siehe Vorfall-Absatz). Der Vorbehalt bleibt
+bestehen: n=31 ist ein SPRT-Fruehstopp, nach der Projektregel "n<=75 ist
+Kontext, keine Referenz" (`feedback_statistical_rigor`) eine duenne Kante;
+Nachmessung mit festem n>=150 ist bei der naechsten Neuverankerung
+eingeplant.
+
+**Vorfall (2026-07-29): Messdaten durch pauschalen `git checkout` verloren
+und rekonstruiert.** Bei einer OneDrive-Wiederherstellung (verschwundene
+Dateien, siehe `project_onedrive_file_disappearance`) wurde pauschal `git
+checkout -- evaluations/` statt einer selektiven Wiederherstellung nur der
+tatsaechlich fehlenden Dateien ausgefuehrt -- dabei gingen auch uncommittete
+MODIFIKATIONEN an getrackten Messdaten-CSVs (`elo_history.csv`,
+`arena_trends.csv`) verloren, darunter die Kader-Kante vs. `v16_best` und der
+Heuristik-Anker. Wiederhergestellt aus dem noch vorhandenen Gating-JSON
+(Kader-Kante) bzw. aus der Sitzungsaufzeichnung (Heuristik-Anker, dort als
+REKONSTRUIERT markiert). Regel ab jetzt: bei Wiederherstellungen NUR
+tatsaechlich geloeschte Dateien selektiv zuruecksetzen (`git status --short |
+grep '^ D'` -> Pfade einzeln per `git checkout -- <pfad>`), nie pauschal
+einen ganzen Ordner; Mess-CSVs zeitnah committen, damit uncommittete
+Aenderungen an ihnen erst gar nicht verlierbar sind.
+
+**Aktuelle Elo-Tabelle** (`python tools/elo_tracker.py report`, jetzt
+inklusive Kader-Kante und Heuristik-Anker):
+
+| Modell | Elo | 95%-CI | Spiele | W-L |
+|---|---:|---:|---:|---:|
+| v18_best@400 | 1172 | [1119, 1226] | 531 | 319-212 |
+| v17_lrfix_best@400 | 1122 | [1075, 1174] | 833 | 439-394 |
+| v17_best@400 | 1121 | [1076, 1167] | 1686 | 885-801 |
+| v13_nortv_best@400 | 1100 | [985, 1213] | 300 | 171-129 |
+| v16_best@400 | 1094 | [1052, 1141] | 1547 | 722-825 |
+| v15_best@400 | 1052 | [1005, 1094] | 886 | 465-421 |
+| v12b_lr_best@400 | 1051 | [940, 1154] | 400 | 194-206 |
+
+**Einordnung**: dritter Zyklus in Folge (nach v17 und der Orakel-Validierung
+selbst), in dem die Arena einen Gewinner findet, den die klassische
+Offline-Metrik (`value_r2_rounds_1_4`) nicht aufloest -- hier sogar mit
+leicht POSITIVEM Vorzeichen (+0,0030), also im "blinden Bereich" unterhalb
+der ~0,015-Aufloesungsgrenze.
+
+## Task #20/#21: Tiling-Auswahl -- Messungen und Implementierungsstand (2026-07-29)
+
+**Kontext**: Nutzer-Idee, das rein punktegierige Tiling mit dem Netz zu
+verbinden. Task #20: in Runde 2-4 `punkte * value(Folgezustand)` statt nur
+`punkte` als Auswahlkriterium (Value als Stichentscheid unter sonst
+gleichwertigen Abschluessen). Task #21: in Runde 5 direkt `punkte + exakte
+Endwertung` maximieren, weil das Spiel nach dem Tiling endet und die
+Endwertung dort exakt berechenbar ist (ein KORREKTHEITS-, kein
+Staerke-Fix).
+
+**Implementiert** (Commit `78b45d4`; weitere Arbeiten am Runde-5-Pfad und an
+der Dedup-Signatur liegen Stand dieser Doku als UNCOMMITTED Aenderungen im
+Arbeitsverzeichnis vor, siehe "Offene Punkte" unten): `tiling_solver::top_k_tilings`
+liefert bis zu k VOLLSTAENDIGE Tiling-Abschluesse (erster Schritt + fertiges
+Brett), dedupliziert ueber die Belegungssignatur. Neue pyfunctions
+`tiling_candidates_json` und `advance_after_tiling_json`. `best_first_step_round5`
+hinter `ROUND5_ENDSCORING_ENABLED` (Default `false`). `cargo test --release`
+169/169 gruen in beiden Toggle-Zustaenden (laut Commit-Nachricht).
+
+**Messung Kandidaten-Spreizung**
+(`evaluations/tiling_candidate_spread.json`, `v18_best`, 400
+frozen-set-Stellungen, k=12):
+
+- Task #21, Runde 5: andere Zugwahl in **2/33 Faellen (6,1%)**, dabei je
+  genau **8 Punkte** gewonnen (Median und Max identisch).
+- Task #20, Runden 2-4: Value-Spreizung unter den Kandidaten Median
+  **0,0216** (IQR 0,011..0,035). Wahl geaendert in **18/131 Faellen
+  (13,7%)** (JSON-Zahl, s.u.).
+  - Die Commit-Nachricht von `78b45d4` nennt fuer dieselbe Fragestellung
+    **19/133 (14,3%)** mit Aufschluesselung R2 11,1% / R3 4,7% / R4 24,1% je
+    Runde. Beide Zahlen sind korrekt, aber aus VERSCHIEDENEN Stichproben:
+    das JSON (18/131) stammt aus dem gespeicherten Tool-Lauf, der aus ALLEN
+    471 Tiling-Stellungen des frozen set 400 sampelt (`--max-states 400`,
+    inkl. Runde 1 und 5 im Sample, `n_rounds_2_4=131` davon in Runde 2-4);
+    die 19/133 stammen aus einem separaten Inline-Lauf ueber ALLE 279
+    echten Runde-2-4-Stellungen des frozen set OHNE Sampling (471
+    Tiling-Stellungen insgesamt, davon 78+100+101=279 in Runde 2-4 --
+    beide Zahlen gegen `evaluations/frozen_eval_set.pkl` verifiziert). Fuer
+    die Runde-2-4-Aussage ist der ungesampelte Lauf (19/133) massgeblich,
+    kein Datenproblem, sondern unterschiedliche Stichprobenziehung.
+
+**Zentraler Befund**: in allen (18 bzw. 19) Faellen betraegt der
+aufgegebene Punktwert **exakt 0** -- die Multiplikation ueberstimmt nie
+einen Punktvorsprung, sie wirkt nur als Stichentscheid unter punktgleichen
+Abschluessen. Eine Rundengewichtung (Exponent aus der gemessenen
+Zielstreuung, R2 1,00 / R3 1,10 / R4 1,18) aendert laut Commit-Nachricht
+KEINE einzige Entscheidung; der gewuenschte "spaeter staerker"-Effekt
+entsteht strukturell von selbst, weil es in Runde 4 mehr punktgleiche
+Abschluesse gibt als in Runde 2.
+
+**RMSE-Befund** (Commit `109a619`, neue Felder `rmse`/`target_std` je Runde
+in `tools/offline_diagnose.py`; zum Zeitpunkt dieser Doku noch in keiner
+`evaluations/offline_diagnose_*.json`-Datei persistiert, Zahlen aus der
+Commit-Nachricht):
+
+| Runde | R2 | RMSE | Zielstreuung |
+|---|---:|---:|---:|
+| 1 | 0,0053 | 0,2531 | 0,2538 |
+| 2 | 0,1337 | 0,2343 | 0,2517 |
+| 3 | 0,1842 | 0,2497 | 0,2765 |
+| 4 | 0,1157 | 0,2788 | 0,2964 |
+
+Value-RMSE steigt ab Runde 2 monoton (0,234 -> 0,250 -> 0,279), waehrend die
+Zielstreuung ebenfalls waechst (0,252 -> 0,296). Das widerlegt sowohl die
+Hypothese "Vertrauen waechst zum Rundenende" als auch die Schrumpf-Hypothese
+fuer den R2-Abfall in Runde 4 (die Streuung schrumpft nicht, sie waechst).
+Runde 1: RMSE 0,2531 bei Zielstreuung 0,2538 -- praktisch identisch, das
+Netz erklaert dort nichts. Das stuetzt "Runde 1 weglassen" sauber ueber
+RMSE~Zielstreuung.
+
+**Wichtige Richtigstellung**: fruehere Formulierungen im Projekt verglichen
+R2-Werte direkt mit den Noise-Floor-"Decken" aus dem
+`value_noise_floor_diagnostic`-Test (Runde 1 = 0,0068, siehe Abschnitt
+"Task #13 geklaert"). Das ist strukturell unzulaessig: die Decken sind gegen
+ein REINES Outcome-Ziel gemessen (`self_play.rs:3316`,
+`((own - opp) / VALUE_SCALE).tanh()`, kein TD-Bootstrap), waehrend
+`offline_diagnose.py` gegen das im Training tatsaechlich verwendete,
+TD-geblendete Ziel misst (`TD_LAMBDA=0,5`, siehe Trainings-Manifeste) --
+unterschiedliche Zielgroessen, direkter Vergleich ungueltig. Ein
+dokumentierter Praezedenzfall, wonach Modelle die Decke um das 16-Fache
+"uebertroffen" haetten, liess sich zum Zeitpunkt dieser Doku in keiner
+Quelldatei auffinden -- **[unverifiziert]**, nur der strukturelle Einwand
+selbst ist ueber den Code belegt. Die Runde-1-Aussage oben stuetzt sich
+bewusst auf RMSE~Zielstreuung, NICHT auf einen Vergleich mit der Decke.
+
+**Pilot Referenz-Validierung** (Task #20,
+`evaluations/tiling_value_reference_pilot.json`): 31 punktegleiche
+Kandidatenpaare -- das frozen set ist damit fuer diese Fragestellung
+ERSCHOEPFT. Nachfuell-Zufall gepaart ueber `advance_after_tiling_json` (16
+Ziehungen, 2000 Sims, `v18_best`): Streuung der gepaarten Differenz (Median
+0,0056) liegt klar unter dem Signal (Value-Spreizung 0,0216) -- schon
+wenige Ziehungen genuegen zur Unterscheidung. Richtungsuebereinstimmung
+29/31 (93,5%). ABER zwei Einschraenkungen: Selbstbezug (die
+Referenz-Tiefensuche nutzt denselben Value-Head wie das zu pruefende
+Kriterium) und die erschoepfte Stichprobe (nicht replizierbar, ohne die
+Datenbasis zu wechseln). Geplanter Hauptlauf: Stellungen aus `data/` statt
+dem frozen set, Referenzsuche mit `v17_best` statt `v18_best` (entkoppelt
+Kandidat und Referenz), M=4 Ziehungen.
+
+**Offene Punkte aus dem Review vom 2026-07-29** (bestaetigt: Stand dieser
+Doku liegen `engine/src/round5.rs`, `engine/src/tiling_solver.rs`,
+`engine/src/lib.rs` und `engine/src/round_transition.rs` als UNCOMMITTED
+Aenderungen im Arbeitsverzeichnis vor, inhaltlich deckungsgleich mit (a) und
+(b)):
+
+(a) Task #21 ist nur die HALBE Korrektur: `round5.rs::player_total_exact`
+berechnet die Endwertung fuer die DRAFTING-Zugwahl in Runde 5 weiterhin auf
+dem Brett VOR dem Tiling-Schritt -- nur die Tiling-eigene Zugwahl
+(`tiling_solver.rs`) wurde korrigiert, der Drafting-Teil der Runde-5-Suche
+noch nicht (in Arbeit).
+
+(b) Die Dedup-Signatur von `top_k_tilings` ignorierte urspruenglich den
+verbleibenden Bonuschip-Bestand (zwei Abschluesse mit identischer
+Steinbelegung, aber unterschiedlichem Chip-Rest, galten als Duplikat) --
+ebenfalls in Arbeit.
+
+(c) Arena zu #21 ist als reiner DOKU-Lauf geplant, ausdruecklich KEIN Gate:
+Nutzer-Entscheidung, die Korrektur wird als Korrektheitsfix so oder so
+aktiviert, unabhaengig vom Arena-Ausgang.
+
+### Nachtrag zu Task #20/#21 (2026-07-29, nach Dedup-Fix und Blattfix)
+
+Die beiden im Abschnitt oben als "in Arbeit" gefuehrten Punkte sind erledigt
+(Commit 3132b8c):
+
+**(a) Runde-5-Blattfix**: `player_total_exact` verzweigt jetzt hinter
+`ROUND5_ENDSCORING_ENABLED` auf `solve_round_final_score_endaware` (Endwertung
+des ERREICHTEN Bretts in der Blatt-Rekursion, keine Doppelzaehlung). Gemessen:
+5/100 Runde-5-DRAFTING-Stellungen (5,0 %) waehlen einen anderen Zug; Runtime
+ON/OFF x1,08. Tests 173/173 in beiden Toggle-Zustaenden.
+
+**(b) Dedup-Signatur** beruecksichtigt jetzt den verbleibenden Bonuschip-
+Bestand. Damit AKTUALISIERTE #20-Kennzahlen (ersetzen die oben genannten
+19/133 bzw. 18/131): Stellungen mit >1 Kandidat 187 -> 201, Umentscheidungen
+**51/142 (35,9 %)**, Value-Spreizung Median 0,0169. Die Nullkosten-Eigenschaft
+haelt auf der dreifachen Fallzahl: aufgegebene Punkte in ALLEN 51 Faellen
+exakt 0. (Die Verdreifachung der Rate ist der Fix selbst: vorher wurden
+Abschluesse mit gleichem Brett, aber verschiedenem Chip-Rest faelschlich
+verschmolzen -- genau zwischen solchen entscheidet die Regel besonders oft.)
+
+Beide Toggles bleiben AUS bis zur gemeinsamen Aktivierung (#20+#21: ein Wheel,
+ein Arena-Doku-Lauf, EINE Elo-Neuverankerung, dabei Ersatz der duennen
+n=31-Ankerkante durch festes n>=150).
