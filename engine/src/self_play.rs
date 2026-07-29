@@ -1462,14 +1462,21 @@ fn play_net_game<R: Rng + ?Sized>(
                     break;
                 }
             }
-            // Task #20 bewusst NICHT verdrahtet: `play_net_game` ist Netz-vs-
-            // Heuristik (nur EIN Spieler hat ein Netz) und war nicht Teil des
-            // benannten Aufgabenumfangs (`play_net_self_play_game`,
-            // `play_net_vs_net_game`) -- `net` waere hier zwar verfuegbar,
-            // bleibt aber ungenutzt, damit dieser Arena-Pfad unveraendert bleibt.
+            // Task #20 (Folgeauftrag, Koordinator 2026-07-29): NUR die Netz-
+            // Seite (`pi == net_board`) bekommt `Some(net)` -- die Heuristik-
+            // Seite bleibt `None`. Begruendung: `play_net_game` ist der Pfad
+            // hinter `arena.py::run_net_arena -> net_arena_match ->
+            // play_net_game`, also der Elo-Verankerungs-/Gating-Lauf. Der
+            // "Netz-Spieler" muss dort IDENTISCH definiert sein wie in
+            // Self-Play (`play_net_self_play_game`) und der reinen Netz-
+            // Arena (`play_net_vs_net_game`) -- sonst misst diese Arena einen
+            // ANDEREN Spieler als den, der tatsaechlich gated/trainiert wird.
+            // Die Heuristik-Seite bleibt bewusst unveraendert (kein Netz
+            // vorhanden, `None` ist dort ohnehin die einzig sinnvolle Wahl).
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi, None) {
+                let tiling_net = if pi == net_board { Some(net) } else { None };
+                match resolve_tiling_step(&game.state, pi, tiling_net) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
