@@ -25,8 +25,47 @@
 //! Reshape/Broadcast-Zielformen) schlechter optimiert werden.
 
 use tract_onnx::prelude::*;
+use tract_onnx::tract_hir::infer::Factoid;
+use tract_onnx::tract_hir::internal::DimLike;
 
 type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
+/// Roh geparster (noch nicht Shape-fixierter) Graph, wie ihn `model_for_path`
+/// liefert -- Basis für `with_input_fact`, egal ob Flat- oder Planes-Pfad.
+type RawModel = InferenceModel;
+
+/// Deklarierte Input-Form eines geladenen Netzes (Task #11 Phase 1,
+/// 2D-Encoder-Kompatibilitätsschicht). Wird EINMAL beim Laden aus der ONNX-
+/// Datei selbst bestimmt (`detect_layout`, per `probe_input_shape`-Beispiel
+/// belegt: tract liefert die deklarierte, nicht-Batch-Dimension konkret,
+/// die Batch-Achse bleibt erwartungsgemäß symbolisch) -- NICHT aus
+/// `features::INPUT_SIZE` erraten. Rang 2 `[batch, N]` = der bisherige
+/// flache Pfad (alle Bestandsmodelle v1..v18, N=708). Rang 4
+/// `[batch, C, H, W]` = neuer 2D-Pfad für künftige Modelle mit Conv-Zweig
+/// (siehe docs/design_2d_encoder.md). Jeder andere Rang ist ein Fehler --
+/// bewusst kein stiller Fallback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputLayout {
+    Flat(usize),
+    Planes { c: usize, h: usize, w: usize },
+}
+
+impl InputLayout {
+    /// Gesamtzahl der Eingabe-Floats pro Sample (N bzw. C*H*W) -- die Länge,
+    /// die `eval`/`eval_pair` von ihrem `&[f32]`-Argument erwarten.
+    fn flat_len(&self) -> usize {
+        match *self {
+            InputLayout::Flat(n) => n,
+            InputLayout::Planes { c, h, w } => c * h * w,
+        }
+    }
+
+    fn fact_for_batch(&self, batch: usize) -> InferenceFact {
+        match *self {
+            InputLayout::Flat(n) => f32::fact([batch, n]).into(),
+            InputLayout::Planes { c, h, w } => f32::fact([batch, c, h, w]).into(),
+        }
+    }
+}
 
 /// Geladenes, optimiertes Netz (thread-safe → über rayon teilbar).
 pub struct Net {
@@ -34,6 +73,7 @@ pub struct Net {
     /// Zweiter Plan, Batch fix = 2 (Paket 1, siehe Modul-Kommentar).
     model_pair: Model,
     input_size: usize,
+    layout: InputLayout,
 }
 
 impl Net {
@@ -43,18 +83,62 @@ impl Net {
     /// Pläne (Batch=1 für `eval`, Batch=2 für `eval_pair`) -- ein `.clone()`
     /// vor dem jeweiligen `with_input_fact`/`into_optimized`, kein zweites
     /// Parsen der Datei von der Platte nötig.
+    ///
+    /// UNVERÄNDERTES Verhalten ggü. vor Task #11 (Phase 1, 2D-Encoder-
+    /// Kompatibilitätsschicht): erzwingt weiterhin IMMER Rang 2 `[batch,
+    /// input_size]`, unabhängig davon, was die ONNX-Datei selbst deklariert
+    /// -- alle 8 bestehenden Aufrufstellen (`lib.rs`, `py.rs`, `self_play.rs`,
+    /// `net_mcts.rs`, `round_transition_deep.rs`, Beispiele) bleiben also
+    /// byte-identisch unangetastet. Teilt sich die eigentliche Lade-Logik nur
+    /// intern mit `load_auto` (`build_from_layout`) -- kein zweiter,
+    /// abweichender Codepfad.
     pub fn load(path: &str, input_size: usize) -> TractResult<Net> {
-        let base = tract_onnx::onnx().model_for_path(path)?;
+        let base: RawModel = tract_onnx::onnx().model_for_path(path)?;
+        Net::build_from_layout(base, InputLayout::Flat(input_size))
+    }
+
+    /// Neuer Konstruktor (Task #11 Phase 1): liest die deklarierte Input-Form
+    /// AUS DEM MODELL selbst statt sie vom Aufrufer zu verlangen. Rang 2
+    /// `[_, N]` -> `InputLayout::Flat(N)` (bestehendes Verhalten, N=708 für
+    /// alle Bestandsmodelle -- `Net::load(path, 708)` und `Net::load_auto(path)`
+    /// sind für diese Modelle bit-identisch, siehe
+    /// `examples/net_load_auto_backcompat.rs`). Rang 4 `[_, C, H, W]` ->
+    /// `InputLayout::Planes` (neuer 2D-Pfad). Jeder andere Rang/nicht-konkrete
+    /// Nicht-Batch-Dimension ist ein harter Fehler.
+    pub fn load_auto(path: &str) -> TractResult<Net> {
+        let base: RawModel = tract_onnx::onnx().model_for_path(path)?;
+        let layout = detect_layout(&base)?;
+        Net::build_from_layout(base, layout)
+    }
+
+    /// Gemeinsamer Bauschritt für `load`/`load_auto`: fixiert die Input-Fact
+    /// auf Batch=1 (für `model`) bzw. Batch=2 (für `model_pair`) gemäß
+    /// `layout`, dann `into_optimized().into_runnable()` -- exakt dieselbe
+    /// Operationsfolge, die `load` vor Task #11 direkt (unfaktoriert) ausführte.
+    fn build_from_layout(base: RawModel, layout: InputLayout) -> TractResult<Net> {
         let model = base
             .clone()
-            .with_input_fact(0, f32::fact([1, input_size]).into())?
+            .with_input_fact(0, layout.fact_for_batch(1))?
             .into_optimized()?
             .into_runnable()?;
         let model_pair = base
-            .with_input_fact(0, f32::fact([2, input_size]).into())?
+            .with_input_fact(0, layout.fact_for_batch(2))?
             .into_optimized()?
             .into_runnable()?;
-        Ok(Net { model, model_pair, input_size })
+        Ok(Net { model, model_pair, input_size: layout.flat_len(), layout })
+    }
+
+    /// Baut den Eingabe-Tensor für `batch` Positionen aus einem flach
+    /// aneinandergereihten `&[f32]` (Länge `batch * layout.flat_len()`) --
+    /// beim Flat-Layout `[batch, N]` (unverändert ggü. vor Task #11), beim
+    /// Planes-Layout `[batch, C, H, W]`.
+    fn tensor_from_flat(&self, batch: usize, flat: Vec<f32>) -> TractResult<Tensor> {
+        match self.layout {
+            InputLayout::Flat(n) => Ok(tract_ndarray::Array2::from_shape_vec((batch, n), flat)?.into()),
+            InputLayout::Planes { c, h, w } => {
+                Ok(tract_ndarray::Array4::from_shape_vec((batch, c, h, w), flat)?.into())
+            }
+        }
     }
 
     /// Forward-Pass für eine Stellung. Gibt (policy_logits, value, moon_logits,
@@ -63,8 +147,7 @@ impl Net {
         &self,
         feats: &[f32],
     ) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
-        let input: Tensor =
-            tract_ndarray::Array2::from_shape_vec((1, self.input_size), feats.to_vec())?.into();
+        let input: Tensor = self.tensor_from_flat(1, feats.to_vec())?;
         let out = self.model.run(tvec!(input.into()))?;
         let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
         let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
@@ -91,7 +174,7 @@ impl Net {
         let mut buf = Vec::with_capacity(2 * self.input_size);
         buf.extend_from_slice(feats_a);
         buf.extend_from_slice(feats_b);
-        let input: Tensor = tract_ndarray::Array2::from_shape_vec((2, self.input_size), buf)?.into();
+        let input: Tensor = self.tensor_from_flat(2, buf)?;
         let out = self.model_pair.run(tvec!(input.into()))?;
         let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
         let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
@@ -102,6 +185,58 @@ impl Net {
         let (moon_a, moon_b) = split_batch2(moon);
         let (points_a, points_b) = split_batch2(points);
         Ok(((policy_a, value_a, moon_a, points_a), (policy_b, value_b, moon_b, points_b)))
+    }
+}
+
+/// Liest die im ONNX-Graph DEKLARIERTE Input-Fact aus (VOR jedem
+/// `with_input_fact`-Override) und bestimmt daraus das `InputLayout`
+/// (Task #11 Phase 1). Beweis, dass das überhaupt geht, siehe
+/// `examples/probe_input_shape.rs` -- gegen `alphazero_v18_best.onnx`
+/// liefert tract für den einzigen Input `batch,708,F32`: Rang konkret (2),
+/// Dim 0 symbolisch (`Sym(batch)`, aus `export_onnx.py`s `dynamic_axes`),
+/// Dim 1 konkret (`Val(708)`) -- die Batch-Achse ist erwartungsgemäß NIE
+/// konkret (sonst könnte `eval_pair` seinen festen Batch=2-Plan nicht bauen),
+/// alle übrigen Achsen sind es bei jedem regulär exportierten Modell
+/// (`export_onnx.py` exportiert immer mit `torch.zeros(1, in_size)`/
+/// `torch.rand(1, in_size)` als Dummy, die Nicht-Batch-Dims sind also
+/// niemals symbolisch). Ein Manifest-Feld als Fallback ist NICHT nötig --
+/// die deklarierte Fact ist für jedes bisher exportierte Modell sauber lesbar.
+fn detect_layout(model: &RawModel) -> TractResult<InputLayout> {
+    let outlet = *model
+        .inputs
+        .first()
+        .ok_or_else(|| TractError::msg("ONNX-Modell hat keinen Input"))?;
+    let fact = model.outlet_fact(outlet)?;
+
+    let rank = fact
+        .shape
+        .rank()
+        .concretize()
+        .ok_or_else(|| TractError::msg("Input-Rang nicht konkret bestimmbar (symbolischer Rang)"))?;
+
+    let dim_usize = |d: usize| -> TractResult<usize> {
+        fact.shape
+            .dim(d)
+            .and_then(|f| f.concretize())
+            .ok_or_else(|| TractError::msg(format!("Input-Dimension {d} nicht konkret (symbolisch/unbekannt)")))?
+            .to_usize()
+            .map_err(|e| TractError::msg(format!("Input-Dimension {d} nicht in usize konvertierbar: {e}")))
+    };
+
+    match rank {
+        2 => {
+            let n = dim_usize(1)?;
+            Ok(InputLayout::Flat(n))
+        }
+        4 => {
+            let c = dim_usize(1)?;
+            let h = dim_usize(2)?;
+            let w = dim_usize(3)?;
+            Ok(InputLayout::Planes { c, h, w })
+        }
+        other => Err(TractError::msg(format!(
+            "Unerwarteter Input-Rang {other} (erwartet 2 = Flat[batch,N] oder 4 = Planes[batch,C,H,W])"
+        ))),
     }
 }
 
