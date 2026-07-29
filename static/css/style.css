@@ -95,6 +95,12 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 }
 .prow.drop{background:#DBEAFE;cursor:pointer}.prow.drop:hover{background:#BFDBFE}
 .prow.nodrop{opacity:.35}
+/* Nutzer-Feedback (2026-07-29): dezente Markierung der aktuellen Reihe, wenn
+   sie nur per Bonuschips (nicht direkt) komplettierbar ist -- kein cursor:
+   pointer, die Reihe selbst ist nicht klickbar, nur der Bonuschips-Kasten
+   (.chips-usable) ist es. Gestrichelter Rahmen statt Vollflaeche grenzt das
+   optisch von .drop (direkt klickbar) ab. */
+.prow.chip-target{outline:1.5px dashed var(--blau);outline-offset:-1px;border-radius:5px}
 .rownum{font-size:9px;color:var(--text3);min-width:14px;text-align:right}
 .rowlabel{font-size:8px;color:var(--text3);min-width:16px;text-align:left;margin-left:2px}
 .prow:nth-child(2), .prow:nth-child(4) {
