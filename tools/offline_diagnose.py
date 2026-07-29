@@ -243,6 +243,32 @@ def _r2(y_true: np.ndarray, y_pred: np.ndarray) -> float | None:
     return 1.0 - ss_res / ss_tot
 
 
+def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float | None:
+    """Absoluter Vorhersagefehler -- Task #20, Schritt 0.
+
+    NOETIG NEBEN R2, weil R2 den Fehler ins Verhaeltnis zur VORHANDENEN Streuung
+    setzt: sind in einer Runde viele Partien bereits entschieden, schrumpft die
+    Ausgangsstreuung und R2 faellt, obwohl die Vorhersage gleich gut oder besser
+    ist. Fuer die Frage "wie sehr darf ich dem Value-Head in dieser Runde
+    trauen" ist der absolute Fehler das richtige Mass.
+
+    Konkreter Anlass: v18_best hat R2 0.1842 in Runde 3, aber nur 0.1157 in
+    Runde 4 -- nach R2 wuerde das Vertrauen zum Rundenende hin SINKEN, was der
+    Intuition (kuerzerer Horizont = sicherer) widerspricht.
+    """
+    if len(y_true) == 0:
+        return None
+    return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+
+
+def _target_std(y_true: np.ndarray) -> float | None:
+    """Streuung des Ziels selbst -- macht sichtbar, ob ein R2-Abfall von einer
+    schrumpfenden Ausgangsstreuung kommt statt von schlechterer Vorhersage."""
+    if len(y_true) == 0:
+        return None
+    return float(np.std(y_true))
+
+
 def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, masks,
              batch_size: int = 4096, hidden_override: int | None = None,
              corpus_labels: np.ndarray | None = None) -> dict:
@@ -287,6 +313,8 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
         per_round[str(r)] = {
             "n": int(rmask.sum()),
             "r2": _r2(values[rmask], value_preds[rmask]),
+            "rmse": _rmse(values[rmask], value_preds[rmask]),
+            "target_std": _target_std(values[rmask]),
         }
     result["value_r2_by_round"] = per_round
 
@@ -370,6 +398,20 @@ def print_table(results: list[dict]) -> None:
         row(label,
             [(f"{r['value_r2_by_round'][str(rd)]['r2']:.4f}"
               if r['value_r2_by_round'][str(rd)]['r2'] is not None else "n/a") for r in results])
+    print("-" * (34 + 16 * len(results)))
+    print("  Absoluter Value-Fehler je Runde (RMSE) + Streuung des Ziels --")
+    print("  Task #20: R² faellt, wenn die ZIELSTREUUNG schrumpft, auch bei gleicher")
+    print("  Vorhersagequalitaet. Fuer Vertrauens-Gewichtung zaehlt der RMSE.")
+    for rd in range(1, 6):
+        row(f"RMSE Runde {rd}",
+            [(f"{r['value_r2_by_round'][str(rd)]['rmse']:.4f}"
+              if r['value_r2_by_round'][str(rd)].get('rmse') is not None else "n/a")
+             for r in results])
+    for rd in range(1, 6):
+        row(f"  Zielstreuung R{rd}",
+            [(f"{r['value_r2_by_round'][str(rd)]['target_std']:.4f}"
+              if r['value_r2_by_round'][str(rd)].get('target_std') is not None else "n/a")
+             for r in results])
     print("=" * 70)
     print("Hinweis: Runde 5 zaehlt NICHT zur Entscheidungsmetrik -- dort umgeht")
     print("net_mcts.rs:2265 das Netz komplett (exakte Alpha-Beta-Suche), und der")
