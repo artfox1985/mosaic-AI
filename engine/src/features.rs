@@ -744,6 +744,180 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     f
 }
 
+// ── 2D-Encoder: Planes-Direktpfad (Task #11 Phase 2) ─────────────────────────
+//
+// Rust-Zwilling von `neural_net.py::state_to_planes` -- MUSS Kanal für Kanal
+// IDENTISCH sein (siehe Paritätstest `examples/planes_parity.rs`, Toleranz
+// 0). Layout `[C,H,W] = [76,6,6]`, C-Major/NCHW-kontiguierlich (Kanal c,
+// Zeile r, Spalte w liegt bei Index `c*36 + r*6 + w`) -- exakt die Form, in
+// der PyTorch `torch.zeros(1,76,6,6)` beim ONNX-Export linearisiert, und die
+// `net.rs::InputLayout::Planes`/`PlanesPlusFlat` erwarten.
+//
+// Kanal-Aufteilung (docs/design_2d_encoder.md Abschnitt 3/4, 1:1 aus
+// `neural_net.py::state_to_planes`/`_board_channels`/`_build_geometry_masks`
+// übernommen):
+//   0..16  : Belegung Ego-Brett   (state_to_planes::_board_channels(me))
+//   16..32 : Belegung Gegner-Brett
+//   32..38 : Zeilen-Rohmasken (6)      38..44 : Spalten-Rohmasken (6)
+//   44..46 : Diagonal-Rohmasken (2)    46..47 : Rand-Rohmaske (1)
+//   47..51 : Ecken-Rohmasken (4)
+//   51..57 : Zeilen@Tile0-gegated (6)  57..63 : Zeilen@Tile7-gegated (6)
+//   63..69 : Spalten@Tile1-gegated (6) 69..71 : Diagonalen@Tile2-gegated (2)
+//   71..72 : Rand@Tile4-gegated (1)    72..76 : Ecken@Tile5-gegated (4)
+pub const NUM_PLANES_CHANNELS: usize = 76;
+const PLANES_H: usize = 6;
+const PLANES_W: usize = 6;
+
+/// Slot-Koordinaten (sr, sc) der 4 Eckplatten -- Pendant zu
+/// `neural_net.py::_CORNER_SLOTS` (siehe dort für die Punktwert-Asymmetrie-
+/// Begründung, 4 einzelne Masken statt einer gemeinsamen).
+const CORNER_SLOTS: [(usize, usize); 4] = [(0, 0), (0, 2), (2, 0), (2, 2)];
+
+fn row_mask(mask_idx: usize, r: usize) -> bool {
+    r == mask_idx
+}
+fn col_mask(mask_idx: usize, c: usize) -> bool {
+    c == mask_idx
+}
+fn diag_mask(mask_idx: usize, r: usize, c: usize) -> bool {
+    if mask_idx == 0 {
+        r == c
+    } else {
+        c == 5 - r
+    }
+}
+fn border_mask(r: usize, c: usize) -> bool {
+    r == 0 || r == 5 || c == 0 || c == 5
+}
+fn corner_mask(mask_idx: usize, r: usize, c: usize) -> bool {
+    let (sr, sc) = CORNER_SLOTS[mask_idx];
+    (sr * 2..sr * 2 + 2).contains(&r) && (sc * 2..sc * 2 + 2).contains(&c)
+}
+
+/// Index in den flachen `[76,6,6]`-C-Major-Puffer.
+fn planes_idx(c: usize, r: usize, w: usize) -> usize {
+    c * PLANES_H * PLANES_W + r * PLANES_W + w
+}
+
+/// 16 Kanäle für EIN Spielerbrett (6x6) -- Rust-Zwilling von
+/// `neural_net.py::_board_channels`. `out` muss bereits mit 0.0 vorbelegt
+/// sein: fehlt ein Slot (midgame möglich), bleiben dessen 4 Zellen in ALLEN
+/// 16 Kanälen 0 (identisch zum Python-`continue`-Zweig) -- schreibt in
+/// `out[planes_idx(channel_offset + k, r, w)]` für die 16 Sub-Kanäle
+/// `k=0..16` dieses Bretts.
+fn write_board_channels_direct(out: &mut [f32], channel_offset: usize, grid: &crate::board::DomeGrid) {
+    for sr in 0..3 {
+        for sc in 0..3 {
+            let Some(tile) = &grid.dome_slots[sr][sc] else { continue };
+            for (si, sp) in tile.spaces.iter().enumerate() {
+                let r = sr * 2 + si / 2;
+                let w = sc * 2 + si % 2;
+                out[planes_idx(channel_offset, r, w)] = 1.0; // Slot vorhanden
+                if sp.placed_special {
+                    out[planes_idx(channel_offset + 6, r, w)] = 1.0;
+                } else if let Some(pc) = sp.placed_color {
+                    let ci = color_idx_direct(pc);
+                    if (0..5).contains(&ci) {
+                        out[planes_idx(channel_offset + 1 + ci as usize, r, w)] = 1.0;
+                    }
+                }
+                if let Some(rc) = sp.required_color {
+                    let ci = color_idx_direct(rc);
+                    if (0..5).contains(&ci) {
+                        out[planes_idx(channel_offset + 7 + ci as usize, r, w)] = 1.0;
+                    }
+                }
+                let type_idx = match sp.space_type {
+                    SpaceType::Normal => 0,
+                    SpaceType::Wild => 1,
+                    SpaceType::Special => 2,
+                };
+                out[planes_idx(channel_offset + 12 + type_idx, r, w)] = 1.0;
+                if sp.is_locked {
+                    out[planes_idx(channel_offset + 15, r, w)] = 1.0;
+                }
+            }
+        }
+    }
+}
+
+/// Wie [`state_to_features`]/[`state_to_features_direct`], aber der
+/// 2D-Zweig: Rust-Zwilling von `neural_net.py::state_to_planes`, direkt aus
+/// `GameState` (kein JSON-Umweg -- es gibt hier gar keinen JSON-Pfad, anders
+/// als beim Flach-Vektor, da `state_to_planes` in Python bereits ohne
+/// Rust-Äquivalent Phase-1-Skelett war). Ego-Perspektive: erst der Spieler
+/// am Zug, dann der Gegner (dieselbe Konvention wie überall sonst). Bei
+/// `state.players.len() != 2` (sollte nie vorkommen, siehe `state_to_planes`-
+/// Python-Pendant) ein Nullvektor der korrekten Länge.
+pub fn state_to_planes_direct(state: &GameState) -> Vec<f32> {
+    let mut out = vec![0.0f32; NUM_PLANES_CHANNELS * PLANES_H * PLANES_W];
+    if state.players.len() != 2 {
+        return out;
+    }
+    let curr_pi = state.current_player;
+    let enemy_pi = 1 - curr_pi;
+    write_board_channels_direct(&mut out, 0, &state.players[curr_pi].dome_grid);
+    write_board_channels_direct(&mut out, 16, &state.players[enemy_pi].dome_grid);
+
+    let gate = |tid: usize| -> bool { state.scoring_tile_ids.contains(&tid) };
+
+    for r in 0..6usize {
+        for w in 0..6usize {
+            for m in 0..6usize {
+                if row_mask(m, r) {
+                    out[planes_idx(32 + m, r, w)] = 1.0;
+                    if gate(0) {
+                        out[planes_idx(51 + m, r, w)] = 1.0;
+                    }
+                    if gate(7) {
+                        out[planes_idx(57 + m, r, w)] = 1.0;
+                    }
+                }
+                if col_mask(m, w) {
+                    out[planes_idx(38 + m, r, w)] = 1.0;
+                    if gate(1) {
+                        out[planes_idx(63 + m, r, w)] = 1.0;
+                    }
+                }
+            }
+            for m in 0..2usize {
+                if diag_mask(m, r, w) {
+                    out[planes_idx(44 + m, r, w)] = 1.0;
+                    if gate(2) {
+                        out[planes_idx(69 + m, r, w)] = 1.0;
+                    }
+                }
+            }
+            if border_mask(r, w) {
+                out[planes_idx(46, r, w)] = 1.0;
+                if gate(4) {
+                    out[planes_idx(71, r, w)] = 1.0;
+                }
+            }
+            for m in 0..4usize {
+                if corner_mask(m, r, w) {
+                    out[planes_idx(47 + m, r, w)] = 1.0;
+                    if gate(5) {
+                        out[planes_idx(72 + m, r, w)] = 1.0;
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Kombinierter Puffer für `net.rs::InputLayout::PlanesPlusFlat`-Eval:
+/// Planes-Teil (`NUM_PLANES_CHANNELS*6*6` = 2736 Werte) gefolgt vom Flat-Teil
+/// (`INPUT_SIZE` = 708 Werte, byte-identisch zu `state_to_features_direct`)
+/// -- exakt die Konvention, die `net.rs::Net::build_inputs` (`eval`/
+/// `eval_pair`) für `PlanesPlusFlat`-Modelle erwartet.
+pub fn state_to_features_2d_direct(state: &GameState) -> Vec<f32> {
+    let mut out = state_to_planes_direct(state);
+    out.extend(state_to_features_direct(state));
+    out
+}
+
 /// Obergrenze für die `pending_index`-ID-Dimension bei `dome_stack`
 /// (Position der gewählten Platte in der deduplizierten
 /// `pending_stack_draw`-Liste, siehe `self_play.rs::action_to_env_dict`) --

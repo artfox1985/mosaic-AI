@@ -33,36 +33,58 @@ type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn Ty
 /// liefert -- Basis für `with_input_fact`, egal ob Flat- oder Planes-Pfad.
 type RawModel = InferenceModel;
 
-/// Deklarierte Input-Form eines geladenen Netzes (Task #11 Phase 1,
+/// Deklarierte Input-Form eines geladenen Netzes (Task #11 Phase 1+2,
 /// 2D-Encoder-Kompatibilitätsschicht). Wird EINMAL beim Laden aus der ONNX-
 /// Datei selbst bestimmt (`detect_layout`, per `probe_input_shape`-Beispiel
 /// belegt: tract liefert die deklarierte, nicht-Batch-Dimension konkret,
 /// die Batch-Achse bleibt erwartungsgemäß symbolisch) -- NICHT aus
 /// `features::INPUT_SIZE` erraten. Rang 2 `[batch, N]` = der bisherige
 /// flache Pfad (alle Bestandsmodelle v1..v18, N=708). Rang 4
-/// `[batch, C, H, W]` = neuer 2D-Pfad für künftige Modelle mit Conv-Zweig
-/// (siehe docs/design_2d_encoder.md). Jeder andere Rang ist ein Fehler --
-/// bewusst kein stiller Fallback.
+/// `[batch, C, H, W]` = der Ein-Input-2D-Pfad (Phase 1, nie trainiert).
+/// ZWEI Inputs (Rang 4 `[batch,C,H,W]` gefolgt von Rang 2 `[batch,F]`) =
+/// `PlanesPlusFlat`, der tatsächlich trainierte Phase-2-2D-Pfad
+/// (`Mosaic2DNet`, siehe docs/design_2d_encoder.md Abschnitt 8 Phase-2-
+/// Entscheidung: Voll-Broadcast auf ein Rang-4-Tensor verworfen, eval_pair
+/// brach dabei auf das 6,5-fache ein -- zwei getrennte Inputs bleiben
+/// günstig). Jede andere Kombination ist ein Fehler -- bewusst kein
+/// stiller Fallback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputLayout {
     Flat(usize),
     Planes { c: usize, h: usize, w: usize },
+    /// Zwei ONNX-Graph-Inputs: Input 0 = Planes `[batch,c,h,w]` (Conv-Zweig),
+    /// Input 1 = Flat `[batch,flat]` (der bestehende 708er `state_to_tensor`-
+    /// Vektor, unveraendert). `eval`/`eval_pair` erwarten weiterhin EINEN
+    /// zusammenhaengenden `&[f32]`-Puffer pro Sample -- Konvention: Planes-
+    /// Teil (c*h*w Werte) gefolgt vom Flat-Teil (flat Werte), intern beim
+    /// Tensor-Bau in zwei ONNX-Inputs gesplittet (siehe `build_inputs`).
+    PlanesPlusFlat { c: usize, h: usize, w: usize, flat: usize },
 }
 
 impl InputLayout {
-    /// Gesamtzahl der Eingabe-Floats pro Sample (N bzw. C*H*W) -- die Länge,
-    /// die `eval`/`eval_pair` von ihrem `&[f32]`-Argument erwarten.
+    /// Gesamtzahl der Eingabe-Floats pro Sample -- die Länge, die
+    /// `eval`/`eval_pair` von ihrem `&[f32]`-Argument je Position erwarten.
     fn flat_len(&self) -> usize {
         match *self {
             InputLayout::Flat(n) => n,
             InputLayout::Planes { c, h, w } => c * h * w,
+            InputLayout::PlanesPlusFlat { c, h, w, flat } => c * h * w + flat,
         }
     }
 
-    fn fact_for_batch(&self, batch: usize) -> InferenceFact {
+    /// Fixiert die Input-Fact(s) von `base` auf `batch` gemäß diesem Layout
+    /// -- ein `with_input_fact`-Aufruf je ONNX-Graph-Input. Ersetzt das
+    /// frühere `fact_for_batch` (Ein-Input-only), gemeinsame Stelle für
+    /// `build_from_layout`s Batch=1- und Batch=2-Plan.
+    fn apply_input_facts(&self, base: RawModel, batch: usize) -> TractResult<RawModel> {
         match *self {
-            InputLayout::Flat(n) => f32::fact([batch, n]).into(),
-            InputLayout::Planes { c, h, w } => f32::fact([batch, c, h, w]).into(),
+            InputLayout::Flat(n) => base.with_input_fact(0, f32::fact([batch, n]).into()),
+            InputLayout::Planes { c, h, w } => {
+                base.with_input_fact(0, f32::fact([batch, c, h, w]).into())
+            }
+            InputLayout::PlanesPlusFlat { c, h, w, flat } => base
+                .with_input_fact(0, f32::fact([batch, c, h, w]).into())?
+                .with_input_fact(1, f32::fact([batch, flat]).into()),
         }
     }
 }
@@ -116,27 +138,52 @@ impl Net {
     /// `layout`, dann `into_optimized().into_runnable()` -- exakt dieselbe
     /// Operationsfolge, die `load` vor Task #11 direkt (unfaktoriert) ausführte.
     fn build_from_layout(base: RawModel, layout: InputLayout) -> TractResult<Net> {
-        let model = base
-            .clone()
-            .with_input_fact(0, layout.fact_for_batch(1))?
+        let model = layout
+            .apply_input_facts(base.clone(), 1)?
             .into_optimized()?
             .into_runnable()?;
-        let model_pair = base
-            .with_input_fact(0, layout.fact_for_batch(2))?
+        let model_pair = layout
+            .apply_input_facts(base, 2)?
             .into_optimized()?
             .into_runnable()?;
         Ok(Net { model, model_pair, input_size: layout.flat_len(), layout })
     }
 
-    /// Baut den Eingabe-Tensor für `batch` Positionen aus einem flach
-    /// aneinandergereihten `&[f32]` (Länge `batch * layout.flat_len()`) --
-    /// beim Flat-Layout `[batch, N]` (unverändert ggü. vor Task #11), beim
-    /// Planes-Layout `[batch, C, H, W]`.
-    fn tensor_from_flat(&self, batch: usize, flat: Vec<f32>) -> TractResult<Tensor> {
+    /// Baut die ONNX-Eingabe-Tensor(en) für `samples.len()` Positionen --
+    /// `samples[i]` ist EIN zusammenhaengender Puffer der Länge
+    /// `layout.flat_len()` (Konvention siehe `InputLayout`-Doku). Beim
+    /// Flat-/Planes-Layout (unverändert ggü. vor Task #11 Phase 2) EIN
+    /// Tensor `[batch, N]` bzw. `[batch, C, H, W]`. Bei `PlanesPlusFlat`
+    /// wird jedes Sample intern in Planes-Teil (erste `c*h*w` Werte) und
+    /// Flat-Teil (restliche `flat` Werte) gesplittet, dann je Teil
+    /// batch-weise zu einem eigenen Tensor zusammengesetzt (ZWEI ONNX-
+    /// Graph-Inputs, Reihenfolge Planes zuerst, Flat zweitens -- muss zum
+    /// Export in `export_onnx.py`s 2D-Zweig passen).
+    fn build_inputs(&self, samples: &[&[f32]]) -> TractResult<TVec<TValue>> {
+        let batch = samples.len();
         match self.layout {
-            InputLayout::Flat(n) => Ok(tract_ndarray::Array2::from_shape_vec((batch, n), flat)?.into()),
+            InputLayout::Flat(n) => {
+                let mut buf = Vec::with_capacity(batch * n);
+                for s in samples {
+                    buf.extend_from_slice(s);
+                }
+                let t: Tensor = tract_ndarray::Array2::from_shape_vec((batch, n), buf)?.into();
+                Ok(tvec!(t.into()))
+            }
             InputLayout::Planes { c, h, w } => {
-                Ok(tract_ndarray::Array4::from_shape_vec((batch, c, h, w), flat)?.into())
+                let mut buf = Vec::with_capacity(batch * c * h * w);
+                for s in samples {
+                    buf.extend_from_slice(s);
+                }
+                let t: Tensor = tract_ndarray::Array4::from_shape_vec((batch, c, h, w), buf)?.into();
+                Ok(tvec!(t.into()))
+            }
+            InputLayout::PlanesPlusFlat { c, h, w, flat: flat_n } => {
+                let planes_len = c * h * w;
+                let (planes_buf, flat_buf) = split_planes_flat_batch(samples, planes_len, flat_n);
+                let planes_t: Tensor = tract_ndarray::Array4::from_shape_vec((batch, c, h, w), planes_buf)?.into();
+                let flat_t: Tensor = tract_ndarray::Array2::from_shape_vec((batch, flat_n), flat_buf)?.into();
+                Ok(tvec!(planes_t.into(), flat_t.into()))
             }
         }
     }
@@ -147,8 +194,8 @@ impl Net {
         &self,
         feats: &[f32],
     ) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
-        let input: Tensor = self.tensor_from_flat(1, feats.to_vec())?;
-        let out = self.model.run(tvec!(input.into()))?;
+        let inputs = self.build_inputs(&[feats])?;
+        let out = self.model.run(inputs)?;
         let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
         let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
         let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
@@ -171,11 +218,8 @@ impl Net {
         (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
         (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
     )> {
-        let mut buf = Vec::with_capacity(2 * self.input_size);
-        buf.extend_from_slice(feats_a);
-        buf.extend_from_slice(feats_b);
-        let input: Tensor = self.tensor_from_flat(2, buf)?;
-        let out = self.model_pair.run(tvec!(input.into()))?;
+        let inputs = self.build_inputs(&[feats_a, feats_b])?;
+        let out = self.model_pair.run(inputs)?;
         let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
         let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
         let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
@@ -201,43 +245,75 @@ impl Net {
 /// `torch.rand(1, in_size)` als Dummy, die Nicht-Batch-Dims sind also
 /// niemals symbolisch). Ein Manifest-Feld als Fallback ist NICHT nötig --
 /// die deklarierte Fact ist für jedes bisher exportierte Modell sauber lesbar.
-fn detect_layout(model: &RawModel) -> TractResult<InputLayout> {
-    let outlet = *model
-        .inputs
-        .first()
-        .ok_or_else(|| TractError::msg("ONNX-Modell hat keinen Input"))?;
-    let fact = model.outlet_fact(outlet)?;
-
-    let rank = fact
-        .shape
+/// Liest Rang + konkrete Nicht-Batch-Dimensionen EINES Inputs (Outlet) aus.
+fn concrete_rank(fact: &InferenceFact) -> TractResult<usize> {
+    fact.shape
         .rank()
         .concretize()
-        .ok_or_else(|| TractError::msg("Input-Rang nicht konkret bestimmbar (symbolischer Rang)"))?;
+        .ok_or_else(|| TractError::msg("Input-Rang nicht konkret bestimmbar (symbolischer Rang)"))
+        .map(|r| r as usize)
+}
 
-    let dim_usize = |d: usize| -> TractResult<usize> {
-        fact.shape
-            .dim(d)
-            .and_then(|f| f.concretize())
-            .ok_or_else(|| TractError::msg(format!("Input-Dimension {d} nicht konkret (symbolisch/unbekannt)")))?
-            .to_usize()
-            .map_err(|e| TractError::msg(format!("Input-Dimension {d} nicht in usize konvertierbar: {e}")))
-    };
+fn concrete_dim(fact: &InferenceFact, d: usize) -> TractResult<usize> {
+    fact.shape
+        .dim(d)
+        .and_then(|f| f.concretize())
+        .ok_or_else(|| TractError::msg(format!("Input-Dimension {d} nicht konkret (symbolisch/unbekannt)")))?
+        .to_usize()
+        .map_err(|e| TractError::msg(format!("Input-Dimension {d} nicht in usize konvertierbar: {e}")))
+}
 
-    match rank {
-        2 => {
-            let n = dim_usize(1)?;
-            Ok(InputLayout::Flat(n))
-        }
-        4 => {
-            let c = dim_usize(1)?;
-            let h = dim_usize(2)?;
-            let w = dim_usize(3)?;
-            Ok(InputLayout::Planes { c, h, w })
-        }
+/// Rang 2 `[_, N]` -> `Flat(N)`, Rang 4 `[_, C, H, W]` -> `Planes{c,h,w}`.
+/// Gemeinsame Auswertung für den Ein-Input-Fall UND je Outlet des
+/// Zwei-Input-Falls (Task #11 Phase 2).
+fn detect_single_outlet(fact: &InferenceFact) -> TractResult<InputLayout> {
+    match concrete_rank(fact)? {
+        2 => Ok(InputLayout::Flat(concrete_dim(fact, 1)?)),
+        4 => Ok(InputLayout::Planes {
+            c: concrete_dim(fact, 1)?,
+            h: concrete_dim(fact, 2)?,
+            w: concrete_dim(fact, 3)?,
+        }),
         other => Err(TractError::msg(format!(
             "Unerwarteter Input-Rang {other} (erwartet 2 = Flat[batch,N] oder 4 = Planes[batch,C,H,W])"
         ))),
     }
+}
+
+/// Reine Kombinationslogik (kein tract-Aufruf): leitet aus den je ONNX-Input
+/// bereits erkannten Einzel-Layouts das Gesamt-`InputLayout` ab. Von
+/// `detect_layout` getrennt, damit die Regel -- EIN Input = Flat/Planes
+/// unverändert, ZWEI Inputs NUR in der Reihenfolge Planes(Rang4) dann
+/// Flat(Rang2) = `PlanesPlusFlat`, alles andere ein harter Fehler -- ohne
+/// echtes ONNX-Modell testbar ist (siehe `tests::combine_layouts_*`).
+fn combine_layouts(inputs: &[InputLayout]) -> TractResult<InputLayout> {
+    match inputs {
+        [] => Err(TractError::msg("ONNX-Modell hat keinen Input")),
+        [single] => Ok(*single),
+        // Task #11 Phase 2: Zwei-Input-Modell (Mosaic2DNet-Export) -- Input 0
+        // MUSS Rang 4 (Planes) sein, Input 1 Rang 2 (Flat), siehe
+        // `export_onnx.py`s 2D-Zweig und `InputLayout::PlanesPlusFlat`-Doku.
+        [InputLayout::Planes { c, h, w }, InputLayout::Flat(flat)] => {
+            Ok(InputLayout::PlanesPlusFlat { c: *c, h: *h, w: *w, flat: *flat })
+        }
+        [a, b] => Err(TractError::msg(format!(
+            "Zwei-Input-Modell mit unerwarteter Kombination (erwartet Input 0 = Planes[batch,C,H,W], \
+             Input 1 = Flat[batch,N]): {a:?} / {b:?}"
+        ))),
+        other => Err(TractError::msg(format!(
+            "Unerwartete Anzahl ONNX-Inputs: {} (erwartet 1 = Flat/Planes oder 2 = PlanesPlusFlat)",
+            other.len()
+        ))),
+    }
+}
+
+fn detect_layout(model: &RawModel) -> TractResult<InputLayout> {
+    let mut layouts = Vec::with_capacity(model.inputs.len());
+    for &outlet in &model.inputs {
+        let fact = model.outlet_fact(outlet)?;
+        layouts.push(detect_single_outlet(fact)?);
+    }
+    combine_layouts(&layouts)
 }
 
 /// Teilt einen zeilenweise (Batch zuerst) flach ausgelesenen Batch=2-Output
@@ -250,6 +326,24 @@ fn split_batch2(flat: Vec<f32>) -> (Vec<f32>, Vec<f32>) {
     let mut a = flat;
     let b = a.split_off(half);
     (a, b)
+}
+
+/// Puffer-Split für `InputLayout::PlanesPlusFlat` (Task #11 Phase 2): jedes
+/// Sample in `samples` ist EIN zusammenhaengender Puffer `[Planes-Teil
+/// (planes_len Werte), Flat-Teil (flat_len Werte)]` -- baut daraus ZWEI
+/// batch-weise Puffer (Planes zuerst, dann Flat je Sample angehängt), row-
+/// major mit Batch als führender Achse (Standard-ONNX-Layout). Reine
+/// Arithmetik ohne tract-Aufruf, daher direkt testbar (`tests::split_planes_flat_*`)
+/// -- von `Net::build_inputs` für den eigentlichen Tensor-Bau genutzt.
+fn split_planes_flat_batch(samples: &[&[f32]], planes_len: usize, flat_len: usize) -> (Vec<f32>, Vec<f32>) {
+    let batch = samples.len();
+    let mut planes_buf = Vec::with_capacity(batch * planes_len);
+    let mut flat_buf = Vec::with_capacity(batch * flat_len);
+    for s in samples {
+        planes_buf.extend_from_slice(&s[..planes_len]);
+        flat_buf.extend_from_slice(&s[planes_len..planes_len + flat_len]);
+    }
+    (planes_buf, flat_buf)
 }
 
 /// Softmax über Logits (für Policy-Priors).
@@ -269,6 +363,76 @@ mod tests {
     use super::*;
     use rand::rngs::StdRng;
     use rand::{RngExt, SeedableRng};
+
+    // ── Task #11 Phase 2: Layout-Erkennung + Puffer-Split (rein, kein ONNX) ──
+
+    #[test]
+    fn flat_len_matches_layout_variant() {
+        assert_eq!(InputLayout::Flat(708).flat_len(), 708);
+        assert_eq!(InputLayout::Planes { c: 76, h: 6, w: 6 }.flat_len(), 76 * 6 * 6);
+        assert_eq!(
+            InputLayout::PlanesPlusFlat { c: 76, h: 6, w: 6, flat: 708 }.flat_len(),
+            76 * 6 * 6 + 708
+        );
+    }
+
+    #[test]
+    fn combine_layouts_single_input_passes_through() {
+        let flat = InputLayout::Flat(708);
+        assert_eq!(combine_layouts(&[flat]).unwrap(), flat);
+        let planes = InputLayout::Planes { c: 76, h: 6, w: 6 };
+        assert_eq!(combine_layouts(&[planes]).unwrap(), planes);
+    }
+
+    #[test]
+    fn combine_layouts_two_inputs_planes_then_flat_is_planes_plus_flat() {
+        let planes = InputLayout::Planes { c: 76, h: 6, w: 6 };
+        let flat = InputLayout::Flat(708);
+        let combined = combine_layouts(&[planes, flat]).expect("gueltige Kombination");
+        assert_eq!(combined, InputLayout::PlanesPlusFlat { c: 76, h: 6, w: 6, flat: 708 });
+    }
+
+    #[test]
+    fn combine_layouts_two_inputs_wrong_order_is_a_hard_error() {
+        // Flat zuerst, Planes zweitens -- NICHT die vereinbarte Konvention
+        // (Planes muss Input 0 sein) -- muss fehlschlagen, kein stiller Fallback.
+        let flat = InputLayout::Flat(708);
+        let planes = InputLayout::Planes { c: 76, h: 6, w: 6 };
+        assert!(combine_layouts(&[flat, planes]).is_err());
+    }
+
+    #[test]
+    fn combine_layouts_two_flat_inputs_is_a_hard_error() {
+        assert!(combine_layouts(&[InputLayout::Flat(708), InputLayout::Flat(5)]).is_err());
+    }
+
+    #[test]
+    fn combine_layouts_zero_or_three_inputs_is_a_hard_error() {
+        assert!(combine_layouts(&[]).is_err());
+        let flat = InputLayout::Flat(708);
+        assert!(combine_layouts(&[flat, flat, flat]).is_err());
+    }
+
+    #[test]
+    fn split_planes_flat_batch_splits_each_sample_and_concatenates_per_part() {
+        // 2 Samples, planes_len=3, flat_len=2 -- je Sample [p0,p1,p2,f0,f1].
+        let sample_a: Vec<f32> = vec![1.0, 2.0, 3.0, 100.0, 200.0];
+        let sample_b: Vec<f32> = vec![4.0, 5.0, 6.0, 300.0, 400.0];
+        let (planes_buf, flat_buf) =
+            split_planes_flat_batch(&[&sample_a, &sample_b], 3, 2);
+        assert_eq!(planes_buf, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        assert_eq!(flat_buf, vec![100.0, 200.0, 300.0, 400.0]);
+    }
+
+    #[test]
+    fn split_planes_flat_batch_single_sample_roundtrips() {
+        let sample: Vec<f32> = (0..79).map(|i| i as f32).collect(); // 76 planes + 3 flat
+        let (planes_buf, flat_buf) = split_planes_flat_batch(&[&sample], 76, 3);
+        assert_eq!(planes_buf.len(), 76);
+        assert_eq!(flat_buf.len(), 3);
+        assert_eq!(planes_buf, sample[..76].to_vec());
+        assert_eq!(flat_buf, sample[76..].to_vec());
+    }
 
     /// Lädt das aktuelle Produktionsmodell für den Batching-Paritätstest
     /// (Paket 1) -- gleiches Skip-statt-Fail-Muster wie

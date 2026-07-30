@@ -45,8 +45,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "engine" / "py"))
 
 from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
-from neural_net import (MosaicNet, action_to_id, points_dist_bins_from_state,  # noqa: E402
-                        state_to_tensor)
+from neural_net import (action_to_id, state_to_tensor, state_to_planes,  # noqa: E402
+                        build_model_from_checkpoint)
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 # AKTIV: das v16_best-Orakel. Gueltig fuer die Bewertung von v14..v18.
@@ -160,15 +160,16 @@ def load_frozen_states(record_indices: list[int]) -> dict[int, dict]:
     return {idx: records[idx] for idx in record_indices}
 
 
-def load_model(name: str) -> torch.nn.Module:
+def load_model(name: str):
+    """Gibt `(model, encoder)` zurueck -- `encoder` in {"flat","2d"} (Task #11
+    Phase 2, M3.3), aus dem `state_dict` erkannt (`build_model_from_checkpoint`,
+    `neural_net.py::encoder_from_state_dict`), rueckwirkend fuer JEDEN
+    Checkpoint funktionsfaehig."""
     ckpt_path = MODELS_DIR / f"alphazero_{name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
-    hs = ckpt.get("hidden_size", 512)
-    model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS, hidden_size=hs,
-                      points_dist_bins=points_dist_bins_from_state(ckpt["model_state"]))
-    model.load_state_dict(ckpt["model_state"], strict=False)
+    model, encoder = build_model_from_checkpoint(ckpt, input_size=INPUT_SIZE, num_actions=NUM_ACTIONS)
     model.eval()
-    return model
+    return model, encoder
 
 
 def masked_softmax(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -186,13 +187,18 @@ def masked_softmax(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
 def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx: dict[int, dict]):
     print(f"  Netz {model_name} ...", flush=True)
-    model = load_model(model_name)
+    model, encoder = load_model(model_name)
 
     # Batched Forward-Pass ueber ALLE gelabelten Zustaende (Reihenfolge wie oracle_labels).
     tensors = [state_to_tensor(states_by_idx[lbl["record_index"]]["state"]) for lbl in oracle_labels]
     batch = torch.stack(tensors, dim=0)
     with torch.no_grad():
-        pred_p, pred_v, _pred_moon, _pred_points, *_own = model(batch)
+        if encoder == "2d":
+            planes_tensors = [state_to_planes(states_by_idx[lbl["record_index"]]["state"]) for lbl in oracle_labels]
+            planes_batch = torch.stack(planes_tensors, dim=0)
+            pred_p, pred_v, _pred_moon, _pred_points, *_own = model(planes_batch, batch)
+        else:
+            pred_p, pred_v, _pred_moon, _pred_points, *_own = model(batch)
     pred_p = pred_p.numpy()
     pred_v = pred_v.squeeze(-1).numpy()
 
