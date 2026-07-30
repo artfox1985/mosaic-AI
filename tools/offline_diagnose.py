@@ -64,8 +64,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py")
 
 from config import DATA_DIR, MODELS_DIR, NUM_ACTIONS, INPUT_SIZE
 from neural_net import (
-    MosaicNet, points_dist_bins_from_state, state_to_tensor, action_to_id,
-    VALUE_SCALE, VALUE_OPP_EPSILON, TD_LAMBDA,
+    state_to_tensor, state_to_planes, action_to_id,
+    VALUE_SCALE, VALUE_OPP_EPSILON, TD_LAMBDA, build_model_from_checkpoint, encoder_from_state_dict,
 )
 
 # Muss 1:1 zu train.py::train() bleiben (val_frac=0.1-Default, Seed 20260707)
@@ -90,14 +90,22 @@ def val_files() -> list[str]:
     return sorted(shuffled[:n_val])
 
 
-def load_val_samples(files: list[str]):
+def load_val_samples(files: list[str], include_planes: bool = False):
     """Läd alle Val-Schritte direkt aus den Pickles -- Value-Ziel/Policy-
     Ziel/Maske sind 1:1-Kopien der Logik aus `MosaicDataset.__init__`
     (neural_net.py), zusätzlich mit Runden-Index je Schritt (der einzige
     Grund, warum hier nicht einfach der bestehende HDF5-Cache
-    wiederverwendet wird)."""
+    wiederverwendet wird).
+
+    `include_planes` (Task #11 Phase 2, M3.3): zusätzlich `state_to_planes`
+    je Schritt berechnen -- NUR wenn mindestens einer der angefragten
+    Checkpoints ein 2D-Checkpoint ist (`main()` entscheidet das VORAB per
+    `encoder_from_state_dict`), sonst bleibt das Bestandsverhalten
+    unverändert und ungebremst (Planes-Berechnung kostet spürbar Zeit über
+    den vollen Val-Split)."""
     states_l, values_l, rounds_l, polw_l = [], [], [], []
     policy_l, masks_l = [], []
+    planes_l = [] if include_planes else None
 
     for f in files:
         with open(f, "rb") as fh:
@@ -107,6 +115,8 @@ def load_val_samples(files: list[str]):
                 continue
             state = step["state"]
             states_l.append(state_to_tensor(state).numpy())
+            if planes_l is not None:
+                planes_l.append(state_to_planes(state).numpy())
             rounds_l.append(int(state.get("round", 0)))
 
             p = step["player"]
@@ -145,6 +155,7 @@ def load_val_samples(files: list[str]):
             is_start = any(pe["action"].get("is_start") for pe in step["policy"])
             polw_l.append(1.0 if (phase == "drafting" and not is_start) else 0.0)
 
+    planes_out = torch.from_numpy(np.array(planes_l, dtype=np.float32)) if planes_l is not None else None
     return (
         torch.from_numpy(np.array(states_l, dtype=np.float32)),
         np.array(values_l, dtype=np.float32),
@@ -152,16 +163,21 @@ def load_val_samples(files: list[str]):
         np.array(polw_l, dtype=np.float32),
         np.array(policy_l, dtype=np.float32),
         np.array(masks_l, dtype=np.float32),
+        planes_out,
     )
 
 
-def load_frozen_samples(path: Path = FROZEN_EVAL_PATH):
+def load_frozen_samples(path: Path = FROZEN_EVAL_PATH, include_planes: bool = False):
     """Laedt `evaluations/frozen_eval_set.pkl` (Task #87,
     tools/build_frozen_eval_set.py). Value-Ziel-/Policy-Ziel-/Masken-
     Berechnung ist 1:1 dieselbe wie in `load_val_samples()` -- die einzige
     Ergaenzung ist das Quellkorpus-Label je Zustand (`source_corpus`, z.B.
     "v10b"/"v12"), das `diagnose()` fuer die Verteilungs-Aufschluesselung
-    braucht."""
+    braucht.
+
+    `include_planes`: siehe `load_val_samples` -- Task #11 Phase 2 (M3.3),
+    nur berechnet wenn mindestens ein angefragter Checkpoint ein
+    2D-Checkpoint ist."""
     if not path.exists():
         raise SystemExit(
             f"Frozen-Eval-Set nicht gefunden unter {path} -- erst "
@@ -176,10 +192,13 @@ def load_frozen_samples(path: Path = FROZEN_EVAL_PATH):
 
     states_l, values_l, rounds_l, polw_l = [], [], [], []
     policy_l, masks_l, corpus_l = [], [], []
+    planes_l = [] if include_planes else None
 
     for rec in records:
         state = rec["state"]
         states_l.append(state_to_tensor(state).numpy())
+        if planes_l is not None:
+            planes_l.append(state_to_planes(state).numpy())
         rounds_l.append(int(rec.get("round", state.get("round", 0))))
         corpus_l.append(rec["source_corpus"])
 
@@ -219,6 +238,7 @@ def load_frozen_samples(path: Path = FROZEN_EVAL_PATH):
         is_start = any(pe["action"].get("is_start") for pe in rec["policy"])
         polw_l.append(1.0 if (phase == "drafting" and not is_start) else 0.0)
 
+    planes_out = torch.from_numpy(np.array(planes_l, dtype=np.float32)) if planes_l is not None else None
     return (
         torch.from_numpy(np.array(states_l, dtype=np.float32)),
         np.array(values_l, dtype=np.float32),
@@ -230,6 +250,7 @@ def load_frozen_samples(path: Path = FROZEN_EVAL_PATH):
         version,
         blob.get("seed"),
         len(records),
+        planes_out,
     )
 
 
@@ -271,13 +292,21 @@ def _target_std(y_true: np.ndarray) -> float | None:
 
 def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, masks,
              batch_size: int = 4096, hidden_override: int | None = None,
-             corpus_labels: np.ndarray | None = None) -> dict:
+             corpus_labels: np.ndarray | None = None, planes=None) -> dict:
+    """`planes`: Task #11 Phase 2 (M3.3) -- Planes-Tensor `[N,76,6,6]`, NUR
+    gebraucht (und mit einem klaren Fehler statt stillem Ausfall geprüft),
+    wenn dieser Checkpoint ein 2D-Checkpoint ist (`build_model_from_checkpoint`
+    erkennt das aus dem `state_dict`, siehe `neural_net.py::encoder_from_state_dict`)."""
     ckpt_path = MODELS_DIR / f"alphazero_{model_name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
-    hs = hidden_override if hidden_override is not None else ckpt.get("hidden_size", 512)
-    model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS, hidden_size=hs,
-                      points_dist_bins=points_dist_bins_from_state(ckpt["model_state"]))
-    model.load_state_dict(ckpt["model_state"], strict=False)
+    model, encoder = build_model_from_checkpoint(ckpt, input_size=INPUT_SIZE, num_actions=NUM_ACTIONS,
+                                                  hidden_override=hidden_override)
+    if encoder == "2d" and planes is None:
+        raise RuntimeError(
+            f"{model_name} ist ein 2D-Checkpoint, aber es wurden keine Planes-Daten geladen -- "
+            f"main() muss `include_planes=True` an load_val_samples/load_frozen_samples uebergeben, "
+            f"sobald mindestens ein angefragtes Modell encoder='2d' ist."
+        )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device).eval()
 
@@ -294,7 +323,11 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
             sl = slice(i, i + batch_size)
             x = states[sl].to(device)
             m = masks_t[sl].to(device)
-            pred_p, pred_v, _pred_moon, _pred_points, *_own = model(x)
+            if encoder == "2d":
+                xp = planes[sl].to(device)
+                pred_p, pred_v, _pred_moon, _pred_points, *_own = model(xp, x)
+            else:
+                pred_p, pred_v, _pred_moon, _pred_points, *_own = model(x)
             value_preds[sl] = pred_v.squeeze(-1).cpu().numpy()
 
             masked_logits = pred_p + (m - 1) * 1e9
@@ -566,27 +599,46 @@ def main() -> None:
     torch.set_num_threads(threads)
     print(f"🧵 torch threads: {threads}")
 
+    # Task #11 Phase 2 (M3.3): VORAB pruefen, ob mindestens einer der
+    # angefragten Checkpoints ein 2D-Checkpoint ist -- nur dann werden die
+    # (spuerbar teureren) Planes mitgeladen. `torch.load` hier ist ein
+    # zusaetzlicher, aber billiger Peek-Read (dieselbe Datei wird in
+    # `diagnose()` je Modell ohnehin nochmal geladen).
+    model_encoders = {}
+    for name in args.model:
+        ckpt_path = MODELS_DIR / f"alphazero_{name}.pth"
+        if not ckpt_path.exists():
+            raise SystemExit(f"❌ Modell nicht gefunden: {ckpt_path}")
+        peek = torch.load(str(ckpt_path), map_location="cpu")
+        model_encoders[name] = encoder_from_state_dict(peek["model_state"])
+    need_planes = any(enc == "2d" for enc in model_encoders.values())
+    if need_planes:
+        two_d = [n for n, e in model_encoders.items() if e == "2d"]
+        print(f"🧩 2D-Checkpoint(s) erkannt ({', '.join(two_d)}) -- Planes werden mitgeladen "
+              f"(Task #11 Phase 2, kostet zusaetzliche Ladezeit).")
+
     corpus_labels = None
     frozen_meta = {}
     if args.frozen:
-        states, values, rounds, pol_w, policy_targets, masks, corpus_labels, f_version, f_seed, f_n = \
-            load_frozen_samples()
+        states, values, rounds, pol_w, policy_targets, masks, corpus_labels, f_version, f_seed, f_n, planes = \
+            load_frozen_samples(include_planes=need_planes)
         print(f"🧊 Frozen-Eval-Set: {FROZEN_EVAL_PATH} (Version {f_version}, Seed {f_seed}, n={f_n:,})")
         frozen_meta = {"frozen": True, "frozen_version": f_version, "frozen_seed": f_seed,
                        "frozen_path": str(FROZEN_EVAL_PATH)}
     else:
         files = val_files()
         print(f"📦 Val-Split: {len(files)} Dateien (Seed {VAL_SEED}, val_frac={VAL_FRAC})")
-        states, values, rounds, pol_w, policy_targets, masks = load_val_samples(files)
+        states, values, rounds, pol_w, policy_targets, masks, planes = load_val_samples(
+            files, include_planes=need_planes)
         frozen_meta = {"frozen": False, "val_seed": VAL_SEED, "val_frac": VAL_FRAC, "n_val_files": len(files)}
     print(f"   {len(states):,} Züge geladen.")
 
     results = []
     for name in args.model:
-        print(f"\n🔎 Diagnose: {name}")
+        print(f"\n🔎 Diagnose: {name} (encoder={model_encoders[name]})")
         res = diagnose(name, states, values, rounds, pol_w, policy_targets, masks,
                         batch_size=args.batch_size, hidden_override=args.hidden,
-                        corpus_labels=corpus_labels)
+                        corpus_labels=corpus_labels, planes=planes)
         results.append(res)
 
     if args.frozen and not args.no_oracle:

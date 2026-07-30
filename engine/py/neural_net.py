@@ -656,7 +656,7 @@ def _final_ownership_by_game(game_data) -> dict:
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", files=None, value_target_variant="default"):
+    def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat"):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
         Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
         `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
@@ -666,10 +666,26 @@ class MosaicDataset(Dataset):
         `value_target_variant`: siehe VALUE_TARGET_VARIANTS oben (Task #84,
         rtv-Ablation Phase 1) -- steuert, ob/wo der rtv-Override beim
         Target-Bau ignoriert wird. Standard "default" reproduziert exakt das
-        Bestandsverhalten."""
+        Bestandsverhalten.
+
+        `encoder`: Task #11 Phase 2. "flat" (Standard) = Bestandsverhalten
+        BYTE-IDENTISCH (Cache-Key/-Inhalt/`__getitem__`-Tupel unveraendert).
+        "2d" ergaenzt ein zusaetzliches `planes`-HDF5-Dataset ([N,76,6,6],
+        `neural_net.py::state_to_planes`) NEBEN den bestehenden Datasets --
+        der Cache-Key bekommt dafuer den Suffix "+enc2d_v1" (siehe
+        docs/design_2d_encoder.md Abschnitt 7), ein Flach-Cache derselben
+        Dateiliste bleibt davon unberuehrt (eigener Dateiname). Speicherformat
+        uint8 (0/1) statt float32: JEDER der 76 Kanaele ist binaer (One-Hot-
+        Belegung + 0/1-Geometriemasken, siehe design_2d_encoder.md Abschnitt
+        3/4) -- 4x kleiner als float32 bei exakt derselben Information,
+        `__getitem__` wandelt pro Sample nach float32 zurueck."""
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
+
+        if encoder not in ("flat", "2d"):
+            raise ValueError(f"Unbekannter encoder={encoder!r} -- erlaubt: 'flat', '2d'")
+        self.encoder = encoder
         import numpy as np
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
@@ -694,11 +710,17 @@ class MosaicDataset(Dataset):
         # die Rundennummer je Sample mit (fuer rundenselektive Loss-Gewichtung,
         # z.B. --exclude-round5). Der Marker erzwingt einen einmaligen Rebuild
         # aller Alt-Caches, statt sie stillschweigend ohne das Feld zu laden.
-        cache_key = hashlib.md5(
-            (str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
-             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
-             + "+rounds_v1+own_v1").encode()
-        ).hexdigest()[:12]
+        # "+enc2d_v1" (Task #11 Phase 2): NUR im 2D-Modus angehaengt, siehe
+        # `encoder`-Doku oben -- der Flach-Modus-Key bleibt dadurch UNVERAENDERT,
+        # bestehende Flach-Caches werden also nicht ungueltig.
+        cache_key_material = (
+            str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
+            + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
+            + "+rounds_v1+own_v1"
+        )
+        if encoder == "2d":
+            cache_key_material += "+enc2d_v1"
+        cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
 
@@ -728,11 +750,30 @@ class MosaicDataset(Dataset):
                     self.ownership = torch.from_numpy(hf['ownership'][:])
                 else:
                     self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
+                if self.encoder == "2d":
+                    if 'planes' not in hf:
+                        raise RuntimeError(
+                            f"HDF5-Cache {cache_path_h5} hat den '+enc2d_v1'-Key, aber kein "
+                            f"'planes'-Dataset -- Cache-Korruption? Datei loeschen und neu bauen lassen."
+                        )
+                    self.planes = torch.from_numpy(hf['planes'][:])  # uint8 [N,76,6,6]
+                else:
+                    self.planes = None
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
         elif os.path.exists(cache_path_pt):
-            # Alten .pt Cache laden und nach HDF5 migrieren
+            # Alten .pt Cache laden und nach HDF5 migrieren -- kann fuer
+            # encoder="2d" praktisch nie greifen (der "+enc2d_v1"-Key-Suffix
+            # existiert erst seit Task #11 Phase 2, ein .pt-Cache mit diesem
+            # Key kann also nicht vorliegen), aber defensiv statt eines
+            # stillen `planes=None` trotzdem hart pruefen.
+            if self.encoder == "2d":
+                raise RuntimeError(
+                    f"Alter .pt-Cache {cache_path_pt} passt zum '+enc2d_v1'-Key -- das kann "
+                    f"eigentlich nicht vorkommen (der Suffix ist neuer als jeder .pt-Cache). "
+                    f"Cache-Datei loeschen und neu bauen lassen."
+                )
             print(f"📦 Migriere .pt → HDF5 Cache...")
             t0 = time.time()
             bundle = torch.load(cache_path_pt, weights_only=False)
@@ -760,6 +801,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('rounds',              data=self.rounds.numpy(),              compression='lzf')
                 hf.create_dataset('ownership',           data=self.ownership.numpy(),           compression='lzf')
             os.remove(cache_path_pt)
+            self.planes = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -772,6 +814,11 @@ class MosaicDataset(Dataset):
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
             rounds_l = []  # Rundennummer je Sample (Task #15 B: rundenselektive Loss-Gewichtung)
             own_l = []     # Ownership-Ziel je Sample (Task #9): 72 Binaerlabels, -1 = unbekannt
+            # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
+            # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
+            # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
+            # `encoder`-Doku oben -- jeder der 76 Kanaele ist binaer.
+            planes_l = [] if self.encoder == "2d" else None
 
             for f in files:
                 with open(f, "rb") as file:
@@ -779,6 +826,8 @@ class MosaicDataset(Dataset):
                     final_own = _final_ownership_by_game(game_data)
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
+                        if planes_l is not None:
+                            planes_l.append(state_to_planes(step["state"]).numpy().astype(np.uint8))
                         if "scores" in step and "winner" in step:
                             p = step["player"]
                             scores_src = step.get("scores_unclamped", step["scores"])
@@ -913,12 +962,15 @@ class MosaicDataset(Dataset):
             points_np    = np.array(points_l,    dtype=np.float32)
             rounds_np    = np.array(rounds_l,    dtype=np.int8)
             own_np       = np.array(own_l,       dtype=np.int8)
+            planes_np    = np.array(planes_l,    dtype=np.uint8) if planes_l is not None else None
             # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
             # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
             # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
             # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
             # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
             del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l, rounds_l, own_l
+            if planes_l is not None:
+                del planes_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -933,6 +985,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('points_forecast',      data=points_np,    compression='lzf')
                 hf.create_dataset('rounds',               data=rounds_np,    compression='lzf')
                 hf.create_dataset('ownership',            data=own_np,       compression='lzf')
+                if planes_np is not None:
+                    hf.create_dataset('planes',           data=planes_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
 
             self.states             = torch.from_numpy(states_np)
@@ -944,15 +998,23 @@ class MosaicDataset(Dataset):
             self.points_forecast    = torch.from_numpy(points_np)
             self.rounds             = torch.from_numpy(rounds_np)
             self.ownership          = torch.from_numpy(own_np)
+            self.planes             = torch.from_numpy(planes_np) if planes_np is not None else None
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
         self.value_target_variant = value_target_variant
 
     def __len__(self): return len(self.states)
     def __getitem__(self, idx):
-        return (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
+        base = (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
                 self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx],
                 self.rounds[idx], self.ownership[idx])
+        # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
+        # vorangestellt (10-Tupel statt 9) -- `encoder="flat"` (Standard)
+        # bleibt exakt das bisherige 9-Tupel, byte-identisches Bestandsverhalten
+        # für alle Aufrufer, die den `encoder`-Parameter nicht kennen.
+        if self.encoder == "2d":
+            return (self.planes[idx].float(),) + base
+        return base
 
 
 def points_dist_bins_from_state(state: dict) -> int:
@@ -972,6 +1034,17 @@ def points_dist_bins_from_state(state: dict) -> int:
         return 0
     n = int(w.shape[0])
     return 0 if n <= 1 else n
+
+
+def encoder_from_state_dict(state: dict) -> str:
+    """Task #11 Phase 2 (M2.1): 'flat' oder '2d' AUS DEM CHECKPOINT ableiten --
+    dasselbe Muster wie `points_dist_bins_from_state`. Ein 2D-Checkpoint
+    (`Mosaic2DNet`) hat einen `conv.0.weight`-Key (Conv-Zweig), ein
+    Flach-Checkpoint (`MosaicNet`) nicht. Funktioniert rückwirkend für JEDEN
+    Checkpoint, kein zusätzliches Manifest-Feld nötig -- das optionale
+    `encoder`-Feld im `.pth`-Dict (siehe `train.py`) ist nur ein
+    Bequemlichkeits-/Dokumentationswert, keine Voraussetzung."""
+    return "2d" if "conv.0.weight" in state else "flat"
 
 
 class MosaicNet(nn.Module):
@@ -1285,3 +1358,34 @@ class Mosaic2DNet(nn.Module):
             self.ownership_head(shared),
         )
         return out + (pts_logits,) if pts_logits is not None else out
+
+
+def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_actions: int = NUM_ACTIONS,
+                                hidden_override: int | None = None):
+    """Baut ein `MosaicNet` ODER `Mosaic2DNet` passend zu `ckpt` (ein bereits
+    geladenes `.pth`-Dict) und lädt die Gewichte -- gemeinsame Stelle für
+    `export_onnx.py`/`tools/offline_diagnose.py`/`tools/oracle_metrics.py`,
+    die vorher alle denselben `MosaicNet`-Konstruktionscode dupliziert hatten
+    (Task #11 Phase 2, M2.1). `encoder` wird aus dem `state_dict` abgeleitet
+    (`encoder_from_state_dict`), NICHT aus dem optionalen `ckpt["encoder"]` --
+    funktioniert so auch für Checkpoints ohne dieses Feld (rückwirkend).
+
+    Gibt `(model, encoder)` zurück, `encoder` in `{"flat", "2d"}`. Das Modell
+    wird NICHT automatisch in `.eval()`-Modus versetzt -- das bleibt beim
+    Aufrufer (unterschiedliche Konventionen in den bestehenden Skripten)."""
+    state = ckpt["model_state"]
+    encoder = encoder_from_state_dict(state)
+    hs = hidden_override if hidden_override is not None else ckpt.get("hidden_size", HIDDEN_SIZE)
+    bins = points_dist_bins_from_state(state)
+    if encoder == "2d":
+        in_size = input_size if input_size is not None else state["flat_branch.0.weight"].shape[1]
+        ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
+        model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
+                            policy_hidden=ph, points_dist_bins=bins)
+    else:
+        in_size = input_size if input_size is not None else state["body.0.weight"].shape[1]
+        ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
+        model = MosaicNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
+                          policy_hidden=ph, points_dist_bins=bins)
+    model.load_state_dict(state, strict=False)
+    return model, encoder

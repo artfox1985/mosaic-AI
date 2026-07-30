@@ -57,7 +57,8 @@ from config import (MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (
-    MosaicNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT, VALUE_SCHEMA_VERSION,
+    MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
+    VALUE_SCHEMA_VERSION, encoder_from_state_dict,
 )
 
 
@@ -218,7 +219,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
-          points_dist_bins=None, reinit_points_head=False):
+          points_dist_bins=None, reinit_points_head=False, encoder="flat"):
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
     # Dateinamen übergibt, landet bei alphazero_alphazero_*.pth. Das doppelte
@@ -226,6 +227,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Checkpoint, bricht das Training hart ab: der frühere stille
     # From-Scratch-Fallback hat im v13-Zyklus 6 Epochen gekostet, weil er nur
     # am zu niedrigen Epoche-1-Val-R² erkennbar war.
+    if encoder not in ("flat", "2d"):
+        sys.exit(f"❌ Unbekannter --encoder '{encoder}' -- erlaubt: 'flat', '2d'.")
     load_path = None
     if load_version:
         if load_version.startswith("alphazero_"):
@@ -241,6 +244,22 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 f"   --load erwartet den Versionsnamen OHNE 'alphazero_'-Präfix "
                 f"(z.B. --load v12b_lr_best für alphazero_v12b_lr_best.pth).\n"
                 f"   Abbruch, um stilles Training von null zu verhindern."
+            )
+        # Task #11 Phase 2: im 2D-Modus darf NUR von einem 2D-Checkpoint warm
+        # gestartet werden -- ein stiller Teil-Load (Flach-Checkpoint hat
+        # z.B. kein `conv.*`, aber teils gleich benannte `policy_head.*`/
+        # `value_head.*`-Keys, die load_state_dict(strict=False) klaglos
+        # uebernehmen wuerde) wuerde den Conv-Zweig zufaellig lassen, OHNE
+        # dass das auffiele -- harter Fehler statt stillem Teil-Load.
+        _load_ckpt_encoder = encoder_from_state_dict(
+            torch.load(str(load_path), map_location="cpu")["model_state"]
+        )
+        if _load_ckpt_encoder != encoder:
+            sys.exit(
+                f"❌ --encoder {encoder!r}, aber --load '{load_version}' ist ein "
+                f"{_load_ckpt_encoder!r}-Checkpoint. Warm-Start ueber Encoder-Grenzen "
+                f"hinweg ist nicht sinnvoll (Architektur passt nicht) -- Abbruch statt "
+                f"stillem Teil-Load."
             )
 
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
@@ -264,7 +283,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "exclude_round5": exclude_round5, "ownership_weight": ownership_weight,
         "seed": seed, "snapshot": snapshot,
         "value_weight": value_weight, "points_weight": points_weight,
-        "value_target_variant": value_target_variant,
+        "value_target_variant": value_target_variant, "encoder": encoder,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -293,14 +312,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     if value_target_variant != "default":
         print(f"🧪 Value-Target-Variante (Task #84, rtv-Ablation): '{value_target_variant}'")
-    dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant)
+    if encoder == "2d":
+        print(f"🧩 Encoder: '2d' (Task #11 Phase 2, Mosaic2DNet -- Conv-Zweig auf state_to_planes "
+              f"+ Flach-Zweig auf state_to_tensor)")
+    dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant,
+                            encoder=encoder)
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
 
     val_dataset = None
     if val_files:
-        val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant)
+        val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant,
+                                    encoder=encoder)
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
 
@@ -363,8 +387,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           + (f"  (Default {VALUE_WEIGHT})" if value_weight is not None else ""))
     print(f"   Points Weight : {effective_points_weight}  (Punktestand-Prognose, Aux-Signal)"
           + (f"  (Default {POINTS_WEIGHT})" if points_weight is not None else ""))
-    model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
-                      points_dist_bins=effective_points_dist_bins)
+    if encoder == "2d":
+        model = Mosaic2DNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
+                            points_dist_bins=effective_points_dist_bins)
+    else:
+        model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
+                          points_dist_bins=effective_points_dist_bins)
 
     # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
@@ -501,7 +529,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
 
-        for (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds, s_own) in dataloader:
+        for _batch in dataloader:
+            # Task #11 Phase 2: MosaicDataset liefert bei encoder="2d" ein
+            # 10-Tupel (planes VORAN), bei encoder="flat" (Standard) weiterhin
+            # das bestehende 9-Tupel byte-identisch -- siehe
+            # `neural_net.py::MosaicDataset.__getitem__`.
+            if encoder == "2d":
+                planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds, s_own = _batch
+                planes = planes.to(device)
+            else:
+                states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds, s_own = _batch
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
@@ -510,7 +547,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
-            _out = model(states)
+            _out = model(planes, states) if encoder == "2d" else model(states)
             pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
             pred_points_logits = _out[5] if len(_out) > 5 else None
 
@@ -624,14 +661,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             with torch.no_grad():
-                for (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w, v_targets_points, v_rounds, v_own) in val_dataloader:
+                for _v_batch in val_dataloader:
+                    if encoder == "2d":
+                        (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
+                         v_targets_points, v_rounds, v_own) = _v_batch
+                        v_planes = v_planes.to(device)
+                    else:
+                        (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
+                         v_targets_points, v_rounds, v_own) = _v_batch
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
                     v_targets_points = v_targets_points.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
-                    _vout = model(v_states)
+                    _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
@@ -912,6 +956,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "policy_pct":        round(pct, 1),
         "load_version":      load_version,
         "value_target_variant": value_target_variant,
+        # Task #11 Phase 2: nur ein Bequemlichkeits-/Dokumentationsfeld --
+        # `neural_net.py::encoder_from_state_dict` bleibt die maßgebliche,
+        # rückwirkend funktionierende Quelle (Erkennung aus `model_state`).
+        "encoder":           encoder,
     }
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
@@ -1090,6 +1138,14 @@ if __name__ == "__main__":
                              "reproduzieren (rtv-Override bevorzugt, wo vorhanden); 'nortv_r1' "
                              "ignoriert den Override nur fuer Runde-1-Zustaende. Aendert den "
                              "HDF5-Cache-Key (siehe neural_net.py::MosaicDataset).")
+    parser.add_argument("--encoder", type=str, default="flat", choices=["flat", "2d"],
+                        help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
+                             "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
+                             "Conv-Zweig auf state_to_planes ([76,6,6]) + Flach-Zweig auf demselben "
+                             "708er-Vektor, spaete Fusion (siehe docs/design_2d_encoder.md). "
+                             "Aendert den HDF5-Cache-Key (Suffix '+enc2d_v1', der Flach-Cache derselben "
+                             "Dateiliste bleibt unberuehrt). --load erwartet dann einen 2D-Checkpoint "
+                             "(harter Fehler bei Encoder-Mismatch statt stillem Teil-Load).")
 
     args = parser.parse_args()
 
@@ -1101,4 +1157,4 @@ if __name__ == "__main__":
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
           seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
-          value_target_variant=args.value_target_variant)
+          value_target_variant=args.value_target_variant, encoder=args.encoder)

@@ -1,10 +1,52 @@
-# Design-Dokument: 2D-Encoder (Task #11, Phase 1)
+# Design-Dokument: 2D-Encoder (Task #11, Phase 1 + 2)
 
-Status: Phase 1 (Kompatibilitätsschicht + Skelett) abgeschlossen, KEIN Training. Dieses
-Dokument begründet die Design-Entscheidungen für den geplanten 2D-Encoder-Zweig,
-der additiv NEBEN dem bestehenden flachen 708-Feature-Netz entsteht (siehe
-`feedback`/Memory "2D-Encoder muss additiv sein": bestehende ONNX-Modelle
-v1..v18 müssen ladbar UND spielbar bleiben — Arena, Gating, Kader, Server).
+Status: Phase 1 (Kompatibilitätsschicht + Skelett) abgeschlossen. Phase 2
+(Zwei-Input-Training, siehe Abschnitt 10) läuft. Dieses Dokument begründet die
+Design-Entscheidungen für den 2D-Encoder-Zweig, der additiv NEBEN dem
+bestehenden flachen 708-Feature-Netz entsteht (siehe `feedback`/Memory
+"2D-Encoder muss additiv sein": bestehende ONNX-Modelle v1..v18 müssen ladbar
+UND spielbar bleiben — Arena, Gating, Kader, Server).
+
+## 10. Phase-2-Entscheidung (2026-07-29/30): Zwei-Input statt Ein-Input
+
+Die in Abschnitt 6 offen gelassene Frage 3 ist ENTSCHIEDEN, GEGEN die
+Phase-1-Annahme: der Export nutzt **zwei ONNX-Graph-Inputs** (`planes`
+`[batch,76,6,6]`, `state` `[batch,708]`), nicht einen kombinierten Rang-4-
+Tensor. Grund: eine Latenz-Messung (`examples/latency_2d_vs_flat.rs`,
+Commit 4992e7a) zeigte, dass ein Voll-Broadcast des nicht-räumlichen Rests in
+Zusatzkanäle (die ursprünglich in Abschnitt 6 skizzierte Alternative)
+`eval_pair` auf das **6,5-fache** verlangsamt hätte — bei 400 Sims/Zug im
+Self-Play inakzeptabel. Reine Conv-Kosten (76 Kanäle, 2 Lagen à 48 Kanäle,
+6×6 räumlich) sind dagegen günstig (gemessen 1,46× ggü. dem rein flachen
+Pfad) — kein Engpass.
+
+Konsequenzen:
+- `net.rs::InputLayout` bekommt eine dritte Variante `PlanesPlusFlat{c,h,w,flat}`
+  (Task #11 Phase 2). `detect_layout` erkennt sie an ZWEI ONNX-Graph-Inputs
+  (Input 0 = Rang 4/Planes, Input 1 = Rang 2/Flat — jede andere Kombination/
+  Reihenfolge ist ein harter Fehler). `eval`/`eval_pair` nehmen weiterhin
+  EINEN zusammenhängenden `&[f32]`-Puffer je Sample (Konvention: Planes-Teil
+  gefolgt vom Flat-Teil), intern in zwei Tensoren gesplittet
+  (`Net::build_inputs`/`split_planes_flat_batch`).
+- Der Flach-Zweig bekommt den KOMPLETTEN bestehenden 708er-Vektor
+  (`state_to_tensor`/`state_to_features_direct` UNVERÄNDERT) statt eines
+  reduzierten "nicht-räumlichen Rests" — Redundanz zum Kuppel-Anteil des
+  Flach-Vektors bewusst akzeptiert: kein neues Feature-Engineering, der
+  Flach-Zweig bleibt byte-identisch zum `MosaicNet`-Input.
+- `Mosaic2DNet.forward(x_planes, x_flat)`: `x_flat` ist im Phase-1-Skelett
+  optional (Nullen-Default) geblieben, ist im Phase-2-Trainingspfad aber
+  PFLICHT (siehe `train.py --encoder 2d`).
+- Rust-Zwilling `features::state_to_planes_direct`/`state_to_features_2d_direct`
+  ergänzt (Phase 1 hatte nur den Python-Pfad `neural_net.py::state_to_planes`,
+  kein Rust-Äquivalent). Paritätstest (`examples/planes_parity.rs` +
+  Python-Vergleich) bestätigt exakte Übereinstimmung (Toleranz 0) über 60
+  echte Zustände aus `evaluations/frozen_eval_set.pkl`, gestreut über alle
+  5 Runden.
+- Der ONNX-Zwei-Input-Roundtrip (`examples/net_2d_probe_two_input.rs`) belegt
+  die komplette Kette Python-Export -> `Net::load_auto` -> `eval`/`eval_pair`
+  ohne Wheel-Install. Bestehende Ein-Input-Pfade (Flat, Planes) bleiben
+  nachweislich byte-identisch (`net_load_auto_backcompat.rs` weiterhin grün
+  gegen `alphazero_v17_best.onnx`/`alphazero_v18_best.onnx`).
 
 ## 1. Motivation
 
