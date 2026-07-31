@@ -686,6 +686,16 @@ class MosaicDataset(Dataset):
         if encoder not in ("flat", "2d"):
             raise ValueError(f"Unbekannter encoder={encoder!r} -- erlaubt: 'flat', '2d'")
         self.encoder = encoder
+        # RAM-Fix (2026-07-31): `planes` wird NICHT mehr komplett ins RAM
+        # geladen (siehe `_open_planes_h5` unten fuer die volle Begruendung --
+        # ein realer from-scratch-2D-Lauf auf dem vollen Korpus ist damit
+        # nach 5 Epochen spurlos gestorben, kein Traceback, kein Windows-
+        # OOM-Ereignis im Protokoll, aber ein plausibel zu grosser RAM-
+        # Fussabdruck war die einzige verbleibende Erklaerung). Nur der
+        # Dateipfad wird gemerkt, ein offener h5py-Handle entsteht lazy beim
+        # ersten `__getitem__`-Zugriff.
+        self._planes_h5_path = None
+        self._planes_h5_file = None
         import numpy as np
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
@@ -756,9 +766,13 @@ class MosaicDataset(Dataset):
                             f"HDF5-Cache {cache_path_h5} hat den '+enc2d_v1'-Key, aber kein "
                             f"'planes'-Dataset -- Cache-Korruption? Datei loeschen und neu bauen lassen."
                         )
-                    self.planes = torch.from_numpy(hf['planes'][:])  # uint8 [N,76,6,6]
+                    # RAM-Fix: NICHT `hf['planes'][:]` (voller Einlese-Sog),
+                    # nur den Pfad merken -- `_open_planes_h5` oeffnet lazy
+                    # einen eigenen, separaten Handle (dieser `with`-Block
+                    # schliesst `hf` gleich).
+                    self._planes_h5_path = cache_path_h5
                 else:
-                    self.planes = None
+                    self._planes_h5_path = None
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -801,7 +815,7 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('rounds',              data=self.rounds.numpy(),              compression='lzf')
                 hf.create_dataset('ownership',           data=self.ownership.numpy(),           compression='lzf')
             os.remove(cache_path_pt)
-            self.planes = None  # kann hier nur "flat" sein, s.o. Guard
+            self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -953,23 +967,30 @@ class MosaicDataset(Dataset):
                             first, second = (fo[0], fo[1]) if c == 0 else (fo[1], fo[0])
                             own_l.append(np.array(first + second, dtype=np.int8))
 
-            states_np    = np.array(states_l,    dtype=np.float32)
-            policies_np  = np.array(policies_l,  dtype=np.float32)
-            values_np    = np.array(values_l,    dtype=np.float32)
-            masks_np     = np.array(masks_l,     dtype=np.float32)
-            moon_np      = np.array(moon_l,      dtype=np.float32)
-            polw_np      = np.array(polw_l,      dtype=np.float32)
-            points_np    = np.array(points_l,    dtype=np.float32)
-            rounds_np    = np.array(rounds_l,    dtype=np.int8)
-            own_np       = np.array(own_l,       dtype=np.int8)
-            planes_np    = np.array(planes_l,    dtype=np.uint8) if planes_l is not None else None
-            # Die Python-Listen aus lauter einzelnen kleinen Arrays (ein Objekt pro
-            # Zug, viel Overhead ggü. den kompakten *_np-Arrays) werden ab hier nicht
-            # mehr gebraucht — explizit freigeben, statt sie bis Funktionsende (inkl.
-            # dem folgenden HDF5-Schreiben) im Speicher mitzuschleppen. Bei größeren
-            # Fenstern (mehrere hunderttausend Züge) sonst ein echtes Speicher-Nadelöhr.
-            del states_l, policies_l, values_l, masks_l, moon_l, polw_l, points_l, rounds_l, own_l
+            # RAM-Fix (2026-07-31): jede *_l-Liste wird SOFORT nach ihrer
+            # *_np-Konvertierung freigegeben (statt alle Listen bis nach der
+            # letzten Konvertierung inkl. `planes_np` mitzuschleppen) -- senkt
+            # die Transientspitze waehrend des Cache-Baus, an der Liste UND
+            # fertiges Array je Feld kurzzeitig gleichzeitig im Speicher
+            # standen. Bei ~1,3 Mio. Zuegen (voller Korpus) sind `states_l`/
+            # `policies_l`/`masks_l`/`planes_l` allein je mehrere GB (Python-
+            # Objekt-Overhead pro Listenelement kommt oben drauf) -- ein
+            # realer from-scratch-2D-Lauf auf dem vollen Korpus ist mit der
+            # alten Reihenfolge (ein Sammel-`del` ganz am Ende) vermutlich an
+            # genau dieser Spitze bzw. der anschliessenden Dauerlast
+            # gestorben (spurlos, kein Traceback, siehe `_open_planes_h5`).
+            states_np    = np.array(states_l,    dtype=np.float32); del states_l
+            policies_np  = np.array(policies_l,  dtype=np.float32); del policies_l
+            values_np    = np.array(values_l,    dtype=np.float32); del values_l
+            masks_np     = np.array(masks_l,     dtype=np.float32); del masks_l
+            moon_np      = np.array(moon_l,      dtype=np.float32); del moon_l
+            polw_np      = np.array(polw_l,      dtype=np.float32); del polw_l
+            points_np    = np.array(points_l,    dtype=np.float32); del points_l
+            rounds_np    = np.array(rounds_l,    dtype=np.int8);    del rounds_l
+            own_np       = np.array(own_l,       dtype=np.int8);    del own_l
+            planes_np    = None
             if planes_l is not None:
+                planes_np = np.array(planes_l, dtype=np.uint8)
                 del planes_l
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
@@ -988,6 +1009,13 @@ class MosaicDataset(Dataset):
                 if planes_np is not None:
                     hf.create_dataset('planes',           data=planes_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
+            # RAM-Fix: `planes_np` (die groesste Einzelstruktur, ~3,6 GB beim
+            # vollen Korpus) wird NACH dem Schreiben verworfen statt als
+            # `self.planes` fuer die gesamte Trainingsdauer im RAM zu bleiben
+            # -- `_open_planes_h5` liest ab jetzt lazy aus der gerade
+            # geschriebenen Datei, identisch zum Cache-Lade-Pfad oben.
+            self._planes_h5_path = cache_path_h5 if planes_np is not None else None
+            del planes_np
 
             self.states             = torch.from_numpy(states_np)
             self.policies           = torch.from_numpy(policies_np)
@@ -998,12 +1026,51 @@ class MosaicDataset(Dataset):
             self.points_forecast    = torch.from_numpy(points_np)
             self.rounds             = torch.from_numpy(rounds_np)
             self.ownership          = torch.from_numpy(own_np)
-            self.planes             = torch.from_numpy(planes_np) if planes_np is not None else None
+            # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
+            # kein `self.planes`-Tensor mehr hier.
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
         self.value_target_variant = value_target_variant
 
     def __len__(self): return len(self.states)
+
+    def _open_planes_h5(self):
+        """Lazily öffnet den HDF5-Cache für Pro-Index-Planes-Zugriff (RAM-Fix
+        2026-07-31): `planes` wird NICHT mehr komplett ins RAM geladen (bei
+        ~1,3 Mio. Zügen ~3,6 GB je Split uint8 -- zusammen mit den bereits
+        eager geladenen Flach-Feldern hat das einen realen from-scratch-2D-
+        Lauf auf dem vollen Korpus nach 5 Epochen spurlos sterben lassen,
+        kein Python-Traceback, keine Windows-OOM-Meldung im Ereignis-
+        protokoll gefunden -- Speicherdruck blieb die einzige plausible
+        Erklärung). Nur der Dateipfad steht in `self._planes_h5_path`, der
+        offene Handle entsteht PRO PROZESS beim ersten Zugriff.
+
+        Vorsicht bei künftigem `DataLoader(..., num_workers>0)` unter
+        Windows: ein gepickeltes offenes `h5py.File` ist zwischen Prozessen
+        nicht sicher teilbar. `__getstate__`/`__setstate__` unten lassen den
+        Handle beim Pickeln (Worker-Start) bewusst aus, jeder Worker öffnet
+        sich seinen eigenen -- aktuell nutzt `train.py` `num_workers=0`
+        (Default, kein expliziter Wert), daher unkritisch, aber vorbereitet."""
+        if self._planes_h5_file is None:
+            import h5py
+            self._planes_h5_file = h5py.File(self._planes_h5_path, "r")
+        return self._planes_h5_file
+
+    def _get_planes_tensor(self, idx):
+        hf = self._open_planes_h5()
+        arr = hf["planes"][idx]  # uint8 [76,6,6], EIN Sample -- kein Voll-Array-Read
+        return torch.from_numpy(arr.astype("float32"))
+
+    def __getstate__(self):
+        """Siehe `_open_planes_h5` -- der offene h5py-Handle darf nicht mit-
+        gepickelt werden, nur der Pfad überlebt."""
+        state = self.__dict__.copy()
+        state["_planes_h5_file"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
     def __getitem__(self, idx):
         base = (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
                 self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx],
@@ -1013,7 +1080,7 @@ class MosaicDataset(Dataset):
         # bleibt exakt das bisherige 9-Tupel, byte-identisches Bestandsverhalten
         # für alle Aufrufer, die den `encoder`-Parameter nicht kennen.
         if self.encoder == "2d":
-            return (self.planes[idx].float(),) + base
+            return (self._get_planes_tensor(idx),) + base
         return base
 
 
