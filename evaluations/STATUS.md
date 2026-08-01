@@ -6845,3 +6845,69 @@ Einschraenkung, analog zur bereits bekannten Selbstbezugs-Vorbehalt-Regel
 
 Querverweis: `evaluations/RESEARCH_alphazero_verbesserungen_2026-08-01.md`
 (Ideen-Pipeline jenseits des 2D-Encoders, frisch angelegt).
+
+## Korpus-Dosis-Messung (2026-08-01)
+
+**Frage**: hilft schlicht MEHR Self-Play-Spiele in der aktuellen Engine-Aera
+der Netzqualitaet ueberhaupt -- als Vorstudie zu Task #14
+(Playout-Cap-Randomisierung, STATUS.md 2026-07-28: "Test B", der Zeit gegen
+Spielmenge tauscht)? Praezedenzfall v11 (Memory `project_v11_cycle_result`,
+"halber Korpus"-Verdacht als moegliche Mitursache fuer den ausbleibenden
+Staerkegewinn) war laut Nutzer-Einschaetzung nicht mehr uebertragbar --
+andere Engine-Aera, andere Netzarchitektur, kein direkter Vergleich.
+
+**Design** (vorregistriert, `evaluations/PREREG_corpus_dose.md`, VOR dem
+ersten Lauf festgeschrieben): `voll` (900 Dateien, kompletter Korpus zum
+Stichtag) vs. `halb` (450 Dateien, stratifiziert je Versions-Praefix gezogen
+-- 300 v17 + 100 v16 + 50 v15, Zusammensetzungsverhaeltnis exakt erhalten,
+fester Seed `20260801`), 6 gepaarte Seeds, beide Arme from scratch, flacher
+Encoder, identisches Rezept bis auf Korpusgroesse. Technisch ueber
+eingefrorene HARDLINK-Sandboxes geloest (`data_dose_voll/`,
+`data_dose_halb/`, additive `MOSAIC_DATA_DIR`-Env-Var in `config.py`,
+`train.py` unangetastet) -- immun gegen die PARALLEL laufenden
+v18-Self-Plays, die waehrend des Sweeps neue Dateien nach `data/` schrieben
+(v19-Kampagne zum Zeitpunkt der Split-Ziehung, siehe unten).
+
+**ERGEBNIS** (`evaluations/train_corpus_dose_result.json`): `voll` auf
+BEIDEN vorregistrierten, arena-validierten Orakel-Metriken gepaart 6/6
+Seeds besser:
+
+| Metrik | Ø-Differenz (voll-halb) | Richtung | gepaarter t-Test |
+|---|---|---|---|
+| `prior_mass_on_oracle_top3` | **+0,0221** | 6/6 | p=0,0013 |
+| `kendall_tau_policy_vs_oracle_q` | **+0,0189** | 6/6 | p=0,0067 |
+
+**Einordnung gegen den 2D-Architektur-Befund** (Task #11 oben, gleicher
+Tag, gleiche Orakel-Metriken, gleiche 6-Seed-Methodik): der Mengen-Effekt
+ist auf `prior_mass_on_oracle_top3` **~2,2x** so gross (+0,0221 vs. +0,0100)
+und auf `kendall_tau_policy_vs_oracle_q` **~1,3x** so gross (+0,0189 vs.
++0,0149) wie der 2D-Encoder-Effekt -- im Mittel rund doppelt so gross,
+staerker auf der Top-3-Metrik als auf der Rang-Metrik. Beide Befunde sind
+unabhaengig entstanden (verschiedene Stellschrauben, gleiche Diagnose-
+Pipeline), direkter Zahlenvergleich ist informativ, kein formaler Test.
+
+**KONSEQUENZ**: Task #14 (Playout-Cap-Randomisierung) steigt deutlich in
+der Prioritaet -- der in `PREREG_corpus_dose.md` vorab festgelegte
+Interpretationspfad "`voll` auf BEIDEN Metriken gepaart besser -> starker
+Befund fuer Menge-hilft, erhoeht die Prioritaet von Task #14 (Test B2)
+deutlich" greift.
+
+**EINSCHRAENKUNG (wiederholt aus der PREREG, bleibt bestehen)**: getestet
+wurde nur "hilft Menge ueberhaupt, bei UNVERAENDERTER Suchtiefe" -- NICHT
+der eigentliche Task-#14-Tradeoff (mehr, aber schwaechere Trajektorien
+durch Playout-Capping, bei GLEICHEM Rechenaufwand pro Zug). Ein positiver
+Befund hier ist notwendig, aber NICHT hinreichend fuer eine
+Task-#14-Entscheidung -- die eigentliche Trajektorienqualitaets-Frage
+(Test B2, STATUS.md 2026-07-28) braucht weiterhin echtes neues Self-Play
+mit reduzierten Sims.
+
+**Betriebsnotiz**: ein Cleanup-Reihenfolge-Bug im Treiber
+(`tools/train_corpus_dose.py`) hat den ersten Sweep-Durchlauf getroffen --
+die Sandbox-Aufraeumung lief VOR `run_diagnose_and_eval`, ein
+`PermissionError` beim Entfernen von `data_dose_voll/` (haengendes
+Windows-Datei-Handle) liess den Lauf dort abstuerzen, die Diagnose musste
+per `--skip-training` nachgeholt werden. Gefixt: Diagnose+Auswertung laeuft
+jetzt IMMER vor jedem Cleanup-Schritt, und `remove_sandbox_dir()` ist
+fehlertolerant (Warnung statt Absturz bei `OSError`) -- ein haengendes
+Datei-Handle beim Aufraeumen darf nie wieder ein bereits fertiges
+Messergebnis verhindern.
