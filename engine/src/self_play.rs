@@ -1908,6 +1908,10 @@ pub fn run_net_vs_net_arena_hybrid(
 /// `deterministic=true`: dann wird wie in der Arena immer der meistbesuchte
 /// Zug gespielt. Nur das aufgezeichnete Policy-Ziel ändert sich, nicht die
 /// Selbstspiel-Trajektorie/Explorationsvielfalt.
+/// Rückgabe seit dem Root-Q-Logging (v19-Vorbereitung, siehe
+/// `net_mcts::net_root_child_stats_and_policy`-Doku): drittes Element ist
+/// der Wurzel-Q-Wert der Suche (`Some`, außer bei leerer/fehlgeschlagener
+/// Suche) -- additiv, ändert weder die gewählte Aktion noch das Policy-Ziel.
 fn net_drafting_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -1917,14 +1921,14 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     rng: &mut R,
     add_root_noise: bool,
     deterministic: bool,
-) -> (Action, Vec<Value>) {
+) -> (Action, Vec<Value>, Option<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
-    let (stats, completed_q_policy) =
+    let (stats, completed_q_policy, root_q) =
         crate::net_mcts::net_root_child_stats_and_policy(net, state, sims, c_puct, add_root_noise, rng);
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
-        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })]);
+        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })], None);
     }
     let policy: Vec<Value> = completed_q_policy
         .iter()
@@ -1947,7 +1951,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
         weighted_index(&weights, total, rng)
     };
-    (stats[idx].0.clone(), policy)
+    (stats[idx].0.clone(), policy, root_q)
 }
 
 /// Bewertet den Rundenübergang `round_before -> round_before+1` per
@@ -2087,10 +2091,10 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     let actions = drafting_actions(&game.state);
                     let valid_actions: Vec<Value> =
                         actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
-                    let (chosen, policy) = if actions.len() == 1 {
+                    let (chosen, policy, root_q) = if actions.len() == 1 {
                         let a = actions[0].clone();
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
-                        (a, vec![e])
+                        (a, vec![e], None)
                     } else {
                         // Task #80: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
                         // tatsaechlich gespielten Zuege. `timed()` ist ohne
@@ -2186,6 +2190,17 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
                     );
                     m.insert("player".into(), json!(player));
+                    // v19-Vorbereitung (Root-Q-Logging, Recherche Fund 1):
+                    // additiv, NUR vorhanden wenn eine echte Suche/Analyse
+                    // stattfand (`actions.len()>1`, siehe `net_drafting_policy`/
+                    // `net_mcts::net_root_child_stats_and_policy`). Feld fehlt
+                    // bei der Ein-Aktion-Kurzschluss-Zeile oben UND bei
+                    // fehlgeschlagener Suche -- Konsumenten müssen das Fehlen
+                    // tolerieren (train.py reicht es vorerst nur durch/ignoriert
+                    // es, kein Konsument liest es aktuell).
+                    if let Some(rq) = root_q {
+                        m.insert("root_q".into(), json!(rq));
+                    }
                     records.push(m);
                 } else {
                     break;
@@ -2632,7 +2647,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                         } else if let Some((depth, node_budget)) = alphabeta {
                             alphabeta_choose_action(net, &g.state, &actions, depth, node_budget)
                         } else {
-                            let (a, _) = net_drafting_policy(
+                            let (a, _, _) = net_drafting_policy(
                                 net, &g.state, &actions, base_sims, c_puct, rng, false, true,
                             );
                             a
