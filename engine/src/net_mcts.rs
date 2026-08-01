@@ -2419,6 +2419,17 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
 /// GESPIELTE Aktion bleibt weiterhin besuchsbasiert (Sequential-Halving-
 /// Ergebnis) — nur das aufgezeichnete Trainingsziel ändert sich, siehe
 /// `self_play::net_drafting_policy`.
+///
+/// DRITTES Rückgabeelement (v19-Vorbereitung, Root-Q-Logging für das
+/// geplante Misch-Value-Target-Experiment λ·z+(1−λ)·q_root, Recherche Fund 1):
+/// der Wurzel-Q-Wert der Suche selbst, aus Sicht des ziehenden Spielers
+/// (`state.current_player`), auf DERSELBEN [0,1]-Gewinnwahrscheinlichkeits-
+/// Skala wie `mcts_q`/`win_pct` überall sonst (`value_to_win_prob`,
+/// `crate::mcts::normalize_score`) -- also NICHT die [-1,1]-tanh-Skala des
+/// späteren `z`-Labels; Python remapt beim Cache-Bau ohnehin `*2-1` (siehe
+/// `round_transition_value`-Konvention, `neural_net.py::MosaicDataset`),
+/// `root_q` folgt exakt demselben Muster. `None` nur, wenn keine Bewertung
+/// zustande kam (kein Kandidat/leere Suche).
 pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -2426,28 +2437,64 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
-) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>) {
+) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>) {
     if state.phase != Phase::Drafting {
-        return (Vec::new(), Vec::new());
+        return (Vec::new(), Vec::new(), None);
     }
     if crate::round5::applies(state) {
         let stats: Vec<(Action, u32, f64)> =
             crate::round5::choose_action(state).into_iter().map(|a| (a, 1, 1.0)).collect();
         let n = stats.len().max(1);
         let policy: Vec<(Action, f64)> = stats.iter().map(|(a, _, _)| (a.clone(), 1.0 / n as f64)).collect();
-        return (stats, policy);
+        // Runde 5 hat KEINEN MCTS-Baum (Alpha-Beta statt Netz-Suche, siehe
+        // oben) -- der exakte Minimax-Wurzelwert kommt separat aus
+        // `round5::choose_action_with_analysis`, die BEREITS (round5.rs,
+        // nicht hier neu erfunden) exakt dieselbe tanh-Margin-Normierung auf
+        // die [0,1]-Gewinnwahrscheinlichkeits-Skala anwendet wie das MCTS-
+        // `root_q` unten (`((val/VALUE_SCALE).tanh()+1.0)/2.0`, siehe dortiger
+        // Kommentar zu `mcts_q`). BEWUSST NICHT `choose_action`s eigene Suche
+        // wiederverwendet: `choose_action` bricht bei Budget-/Zeit-
+        // Überschreitung früh ab und lässt spätere Kandidaten UNBEWERTET,
+        // während `choose_action_with_analysis` stattdessen auf einen
+        // billigen `leaf_value`-Ersatzwert zurückfällt -- ein gemeinsamer Aufruf
+        // könnte dadurch eine ANDERE Aktion als Sieger markieren. Die
+        // tatsächlich GESPIELTE Aktion bleibt ausschließlich `choose_action`s
+        // Ergebnis (oben, unverändert); die Zusatzanalyse dient NUR der
+        // Root-Q-Metadatenerzeugung. Kosten: ein zusätzlicher, aber sehr
+        // billiger Alpha-Beta-Lauf (NODE_BUDGET=200, keine Netz-Evals) --
+        // anders als beim MCTS-Pfad unten NICHT wortwörtlich kostenlos, aber
+        // neben der dominanten Netz-Suchkoste vernachlässigbar.
+        let root_q = crate::round5::choose_action_with_analysis(state)
+            .1
+            .get("moves")
+            .and_then(|m| m.as_array())
+            .and_then(|moves| {
+                moves.iter().find(|mv| mv.get("chosen").and_then(Value::as_bool) == Some(true))
+            })
+            .and_then(|mv| mv.get("mcts_q"))
+            .and_then(Value::as_f64);
+        return (stats, policy, root_q);
     }
     if NUM_DETERMINIZATIONS <= 1 {
         let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
-        return (root_child_stats_from_nodes(&nodes), root_completed_q_policy(&nodes));
+        let root_visits = nodes[0].visits.max(1) as f64;
+        let root_q = Some(nodes[0].value / root_visits);
+        return (root_child_stats_from_nodes(&nodes), root_completed_q_policy(&nodes), root_q);
     }
     // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
     // Besuche (treibt Self-Plays besuchsbasierte Sampling-Auswahl
     // unverändert weiter, jetzt über den Wald statt einer Welt), Policy-
-    // Ziel = über die Welten gemittelte completed-Q-Politik.
+    // Ziel = über die Welten gemittelte completed-Q-Politik. `root_q`
+    // folgt demselben Summen-Muster wie `aggregate_root_child_stats`
+    // (Σvalue/Σvisits über die Welten, NICHT das arithmetische Mittel der
+    // Pro-Welt-Quotienten).
     let forest =
         build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
-    (aggregate_root_child_stats(&forest), average_completed_q_policy(&forest))
+    let (visits_sum, value_sum) = forest.iter().fold((0.0f64, 0.0f64), |(vs, vals), nodes| {
+        (vs + nodes[0].visits as f64, vals + nodes[0].value)
+    });
+    let root_q = if visits_sum > 0.0 { Some(value_sum / visits_sum) } else { None };
+    (aggregate_root_child_stats(&forest), average_completed_q_policy(&forest), root_q)
 }
 
 /// Zippt `improved_policy(nodes, 0)` (reine Zahlen, Reihenfolge
