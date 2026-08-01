@@ -6758,3 +6758,90 @@ der richtige Weg -- bewusst NICHT jetzt gemacht.
 Damit sind Task #20 und #21 ABGESCHLOSSEN: implementiert, validiert,
 aktiviert, dokumentiert. Kein Self-Play gestartet (Nutzer-Vorgabe: erst mit
 dem 2D-Encoder-Ergebnis entscheiden).
+
+## Task #11: 2D-Encoder -- from-scratch-Vergleich, Engine-Verdrahtung, Gating (2026-08-01)
+
+Phase 2 abgeschlossen: `Mosaic2DNet` (Conv-Zweig auf `state_to_planes`
+[76,6,6] + Flach-Zweig auf dem bestehenden 708er-Vektor, siehe
+`docs/design_2d_encoder.md`) gegen das bestehende `MosaicNet` from-scratch
+verglichen (`evaluations/PREREG_2d_encoder.md`, 6 gepaarte Seeds, identisches
+Rezept bis auf `--encoder`), anschliessend Engine-seitig verdrahtet und
+gegatet.
+
+**PREREG-Ergebnis, hoechste Befundstufe** (`evaluations/train_2d_vs_flat_fs_result.json`):
+auf BEIDEN vorregistrierten, arena-validierten Orakel-Metriken gepaart 6/6
+Seeds pro `fs_2d`:
+
+| Metrik | Ø-Differenz (2D-flach) | Richtung | gepaarter t-Test |
+|---|---|---|---|
+| `prior_mass_on_oracle_top3` | **+0,0100** | 6/6 | p=0,0019 |
+| `kendall_tau_policy_vs_oracle_q` | **+0,0149** | 6/6 | p=0,0046 |
+
+**Value-Head-Paarvergleich** (`evaluations/offline_diagnose_2d_vs_flat_fs_frozen.json`,
+`value_r2_rounds_1_4`): 4/6 Seeds pro 2D, Ø **+0,0088**, gemischte Vorzeichen
+(Seeds 1/2 negativ, 3-6 positiv) -- unterhalb der bekannten ~0,015-Aufloesungsgrenze
+dieser Metrik (Memory `project_offline_metric_resolution_limit`). **Value-Heads
+gelten als gleichwertig**, der Policy-seitige Orakel-Befund traegt den
+2D-Vorteil allein.
+
+**Arena-Gating** (`fs_2d_s2_best` vs. `fs_flat_s3_best`, je Arm bester Seed nach
+den Orakel-Metriken, 400 gepaarte Partien fix, `evaluations/paired_gating_result_fs_2d_s2_best_vs_fs_flat_s3_best.json`,
+im elo_tracker protokolliert): **416:384**, gepaarte Differenz +0,080,
+95%-KI [-0,063, +0,223], exakter McNemar p=0,3029 -- **KEIN nachweisbarer
+Staerkeunterschied** (bewusst nicht als "Sieg" formuliert; das KI schliesst
+0 nicht aus). Konsistent mit dem Value-Head-Befund: die Policy ist gemessen
+staerker, der Value-Head unveraendert -- und Value traegt bei 400 Sims die
+Spielstaerke (Memory `project_hybrid_head_attribution`, 2×2-Kopf-Attribution),
+Policy allein reicht hier nicht fuer einen Arena-sichtbaren Sprung.
+
+**Kosten**: 2D-Training ~30x langsamer als flach (Wanduhr), aber absolut nur
+~1-2 h auf einer freien GPU -- die anfangs beobachteten ~14 h/Lauf waren zu
+~90% GPU-Konkurrenz durch ein parallel laufendes Spiel auf derselben Maschine,
+kein Pipeline-Problem (Profiling bestaetigte: Daten-Pfad + H2D + Compute
+zusammen nur ~26-29 ms/Batch von den beobachteten ~250 ms/Batch -- siehe
+Betriebs-Lektion: GPU-exklusiv fuer produktive Laeufe reservieren). **Inferenz
+bleibt 1,46x teurer als flach** (gemessen vor dem Training, `examples/latency_2d_vs_flat.rs`)
+-- der eigentliche Dauerposten, unabhaengig vom heutigen Gating-Ausgang.
+
+**Engine-Verdrahtung** (M3.5, Commit `43d62aa`): `net.rs`/`features.rs` hatten
+seit Phase 1/2 `load_auto`/`InputLayout`/`state_to_features_2d_direct`, aber
+KEIN Aufrufer nutzte sie -- alle Produktions-Einstiegspunkte luden weiter
+zwangsflach (`Net::load(path, INPUT_SIZE)`), `net_vs_net_arena` auf einem
+2D-Checkpoint crashte beim Laden (tract-Shape-Fehler am ersten Conv-Knoten).
+Additiv geschlossen: alle Lade-Stellen auf `Net::load_auto` umgestellt, ein
+zentraler Dispatch-Helfer `features::features_for_net`/`features_for_layout`
+waehlt die Feature-Erzeugung pro geladenem Netz (Flat -> unveraendert,
+PlanesPlusFlat -> der kombinierte Puffer) -- inklusive `net_mcts::make_node`s
+Hybrid-Pfad, wo Policy- und Value-Netz UNTERSCHIEDLICHE Layouts haben koennen.
+Flach-Modelle bleiben nachweislich byte-identisch (`net_load_auto_backcompat.rs`
+weiterhin bit-identisch gegen `v17_best`/`v18_best`). 189/189 Tests gruen
+(+4 neue ONNX-freie Dispatch-Tests).
+
+**`--load`-Footgun-Pruefung** (v13-Praezedenzfall: stiller From-scratch-Fallback):
+bereits durch einen bestehenden Schutz abgedeckt, kein Fix noetig.
+Warm-Start von `fs_2d_s2_best` mit `--encoder 2d` zeigt eine explizite
+Lade-Meldung UND Epoche-1-Metriken weit ueber From-scratch-Niveau (Val-R²
+Value +0,46 vs. -0,18 from scratch). Ein Encoder-Mismatch (`--load` eines
+2D-Checkpoints ohne `--encoder 2d` bzw. umgekehrt) bricht in BEIDE Richtungen
+hart ab (`sys.exit`, kein Teil-Load).
+
+**ENTSCHEIDUNGEN (Nutzer):**
+- v19-Generator bleibt `v18_best` (unveraendert, kein Ersatz durch 2D).
+- `fs_2d_s2_best` wird als `alphazero_v18_2d.*` designiert -- der
+  2D-Warm-Start-Anker der v18-Generation (Kopien liegen in `models/`).
+- v19 trainiert BEIDE Arme warm (flach von `v18_best`, 2D von `v18_2d`),
+  Adoption ausschliesslich ueber Champion-Gating -- kein Vorschuss-Vertrauen
+  in die Architektur trotz des Orakel-Befunds.
+
+**Kalibrier-Notiz Orakel-Metriken**: erstmals auf einem
+ARCHITEKTUR-Vergleich getestet (bisher nur Generationen-Vergleiche
+innerhalb derselben Architektur, Memory `project_oracle_metrics_validated`,
+7/7). Hier: beide Metriken signifikant pro 2D, Arena aber Gleichstand --
+der Validierungszaehler gilt WEITERHIN fuer Generationen-Vergleiche
+(unveraendert 7/7), fuer Architektur-Vergleiche steht er jetzt bei 0/1 als
+Staerke-Praediktor. Praezedenzfall fuer eine kopf-/kontextspezifische
+Einschraenkung, analog zur bereits bekannten Selbstbezugs-Vorbehalt-Regel
+(Task #89).
+
+Querverweis: `evaluations/RESEARCH_alphazero_verbesserungen_2026-08-01.md`
+(Ideen-Pipeline jenseits des 2D-Encoders, frisch angelegt).
