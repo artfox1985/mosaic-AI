@@ -151,9 +151,14 @@ def run_training(arm: str, seed: int, encoder: str) -> bool:
     if ckpt.exists():
         print(f"  [skip] {name}: Checkpoint existiert schon", flush=True)
         return True
-    cmd = ([sys.executable, "-u", str(BASE_DIR / "train.py"),
+    # -X faulthandler bleibt AN fuer alle Laeufe der Strecke (2026-07-31,
+    # Absturz-/Kriech-Untersuchung fs_2d_s1) -- kostet nichts, faengt einen
+    # echten nativen Crash (Access Violation) mit C-Level-Traceback ab, statt
+    # spurlos zu enden. train.py's eigenes [mem]-Herzschlag-Logging (alle 100
+    # Batches) ist unbedingt aktiv, kein Flag noetig.
+    cmd = ([sys.executable, "-X", "faulthandler", "-u", str(BASE_DIR / "train.py"),
             "--name", name, "--encoder", encoder, "--seed", str(seed)] + RECIPE)
-    print(f"  [run ] {name}  ({' '.join(cmd[4:])})", flush=True)
+    print(f"  [run ] {name}  ({' '.join(cmd[5:])})", flush=True)
     t0 = time.time()
     # Bewusst OHNE capture_output: die Live-Ausgabe (Epochen-Fortschritt, ETA)
     # bleibt im Log sichtbar, statt erst am Prozessende gepuffert aufzutauchen

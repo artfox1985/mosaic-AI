@@ -26,7 +26,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, RngExt};
 use serde_json::{json, Value};
 
-use crate::features::{action_to_id, state_to_features_direct};
+use crate::features::action_to_id;
 use crate::game::{drafting_actions, Game};
 use crate::mcts::{label_search_move, SearchMove};
 use crate::moves::{Action, TakeSource};
@@ -903,8 +903,9 @@ fn blended_leaf_win_prob(value: &[f32], points: &[f32]) -> f64 {
 /// über Runden-Neubefüllungen, siehe `round_transition.rs`) wiederverwendet,
 /// da beide denselben Netz-Blattwert brauchen.
 pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
-    let feats =
-        crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+        crate::features::features_for_net(net, state)
+    });
     // Paket 1 (Inferenz-Batching, 2026-07-22): bei `MIRROR_OTHER_VAL=false`
     // braucht dieser Aufruf ohnehin ZWEI Forward-Pässe (Mover-/geflippte
     // Perspektive) -- `Net::eval_pair` fasst sie zu einem Batch=2-Aufruf
@@ -926,7 +927,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         crate::profiling::note_gamestate_clone();
         let mut flipped = state.clone();
         flipped.current_player = 1 - state.current_player;
-        let other_feats = state_to_features_direct(&flipped);
+        let other_feats = crate::features::features_for_net(net, &flipped);
         // Task #81: Batch=2 (`eval_pair` buendelt Mover+Gegner-Pass).
         let ((_logits, value, _moon, points), (_o_logits, o_value, _o_moon, o_points)) =
             crate::profiling::timed_net_eval(2, || {
@@ -962,8 +963,9 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     if state.phase != Phase::Drafting {
         return Vec::new();
     }
-    let feats =
-        crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+        crate::features::features_for_net(net, state)
+    });
     // Task #81: Batch=1.
     let (logits, _value, moon, _points) =
         crate::profiling::timed_net_eval(1, || {
@@ -1005,8 +1007,6 @@ fn make_node<R: Rng + ?Sized>(
     rng: &mut R,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
-    let feats =
-        crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(&state));
     // `points` fließt bei ACTIVE_LEAF=Net jetzt in `blended_leaf_win_prob` mit
     // ein (KataGo-Stil Score-Utility, siehe `POINTS_UTILITY_WEIGHT`-Kommentar).
     //
@@ -1018,16 +1018,26 @@ fn make_node<R: Rng + ?Sized>(
     // siehe `net.rs::eval_pair_matches_two_single_evals`). Policy-Logits/
     // Moon-Scores werden nur aus dem Mover-Pass gebraucht -- die geflippte
     // Perspektive dient ausschließlich `other_val`, siehe `other_pass` unten.
+    //
+    // Task #11 Phase 2 (M3.5): Feature-Erzeugung läuft PRO NETZ
+    // (`crate::features::features_for_net`), nicht mehr global VOR der
+    // Verzweigung -- im Hybrid-Pfad (`same_net=false`) können `net_policy`
+    // und `net_value` unterschiedliche Layouts haben (z.B. ein 2D- und ein
+    // flaches Modell im selben Vergleich), ein einzelner geteilter
+    // Feature-Puffer wäre für mindestens eines der beiden Netze falsch.
     let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
     let same_net = net_value.is_none_or(|v| std::ptr::eq(v, net_policy));
     let (logits, value, moon, points, other_pass) = if same_net {
         // Unveraendert gegenueber vor Task #88 (Paritaets-Codepfad).
         let net = net_policy;
+        let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+            crate::features::features_for_net(net, &state)
+        });
         if need_other_pass {
             crate::profiling::note_gamestate_clone();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
-            let other_feats = state_to_features_direct(&flipped);
+            let other_feats = crate::features::features_for_net(net, &flipped);
             // Task #81: Batch=2 (`eval_pair`).
             let ((logits, value, moon, points), (_o_logits, o_value, _o_moon, o_points)) =
                 crate::profiling::timed_net_eval(2, || {
@@ -1054,20 +1064,27 @@ fn make_node<R: Rng + ?Sized>(
         // Pass, kein Gegner-Pass noetig -- Priors sind rein EGO-
         // perspektivisch), Value/Points von `net_value` (Mover+Gegner-Pass
         // wie im Nicht-Hybrid-Fall, siehe `net_leaf_eval`-Kommentar).
+        // Task #11 Phase 2 (M3.5): jeweils EIGENER, netz-spezifischer
+        // Feature-Puffer -- `net_policy` und `net_value` koennen
+        // unterschiedliche Layouts haben.
         let net_value = net_value.expect("same_net=false impliziert Some(..)");
+        let feats_policy = crate::profiling::timed(crate::profiling::note_features_ns, || {
+            crate::features::features_for_net(net_policy, &state)
+        });
         let (logits, _p_value, moon, _p_points) = crate::profiling::timed_net_eval(1, || {
             net_policy
-                .eval(&feats)
+                .eval(&feats_policy)
                 .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
         });
         if need_other_pass {
             crate::profiling::note_gamestate_clone();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
-            let other_feats = state_to_features_direct(&flipped);
+            let feats_value = crate::features::features_for_net(net_value, &state);
+            let other_feats_value = crate::features::features_for_net(net_value, &flipped);
             let ((_v_logits, value, _v_moon, points), (_o_logits, o_value, _o_moon, o_points)) =
                 crate::profiling::timed_net_eval(2, || {
-                    net_value.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
+                    net_value.eval_pair(&feats_value, &other_feats_value).unwrap_or_else(|_| {
                         (
                             (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                             (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
@@ -1076,8 +1093,9 @@ fn make_node<R: Rng + ?Sized>(
                 });
             (logits, value, moon, points, Some((o_value, o_points)))
         } else {
+            let feats_value = crate::features::features_for_net(net_value, &state);
             let (_v_logits, value, _v_moon, points) = crate::profiling::timed_net_eval(1, || {
-                net_value.eval(&feats).unwrap_or_else(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new()))
+                net_value.eval(&feats_value).unwrap_or_else(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new()))
             });
             (logits, value, moon, points, None)
         }
@@ -1581,7 +1599,7 @@ impl RootValueDebug {
 /// (`nodes[0].state`) -- KEINE zweite Determinisierung hier.
 fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &GameState) -> RootValueDebug {
     let net = net_value.unwrap_or(net_policy);
-    let feats = state_to_features_direct(state);
+    let feats = crate::features::features_for_net(net, state);
     let (_logits, value, _moon, points) = net
         .eval(&feats)
         .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()));
@@ -3360,7 +3378,7 @@ mod tests {
     /// haette also sonst einen harten Testfehler ohne jeden eigenen Fehler.
     fn load_test_net() -> Option<Net> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
-        match Net::load(path.to_str().unwrap(), crate::features::INPUT_SIZE) {
+        match Net::load_auto(path.to_str().unwrap()) {
             Ok(n) => Some(n),
             Err(e) => {
                 eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");

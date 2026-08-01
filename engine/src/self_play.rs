@@ -24,7 +24,7 @@ use rayon::prelude::*;
 use serde_json::{json, Map, Value};
 
 use crate::dome::SpaceType;
-use crate::features::{action_to_id, state_to_features_direct};
+use crate::features::action_to_id;
 use crate::game::{
     apply_start_placement, determine_winner, drafting_actions, execute_draw_from_stack, Game,
     TilingMove,
@@ -911,7 +911,7 @@ pub(crate) fn net_tiling_tiebreak_value(net: &Net, final_state: &GameState, pi: 
         final_state.current_player, pi,
         "final_state.current_player sollte strukturell immer pi sein, siehe Doku"
     );
-    let feats = state_to_features_direct(final_state);
+    let feats = crate::features::features_for_net(net, final_state);
     let (_logits, value, _moon, _points) = net
         .eval(&feats)
         .unwrap_or_else(|_| (Vec::new(), vec![0.0], Vec::new(), Vec::new()));
@@ -1214,7 +1214,7 @@ pub fn run_self_play_with_net_labels(
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
-    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
     let progress_file = open_progress_file(progress_path);
     let move_counter = Arc::new(AtomicU64::new(0));
@@ -1529,7 +1529,7 @@ pub fn run_net_arena_match(
     c: f64,
     c_puct: f64,
 ) -> Result<String, String> {
-    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
 
     let play = |i: usize| -> Value {
@@ -1677,8 +1677,8 @@ pub fn run_net_vs_net_arena(
     c_puct_a: f64,
     c_puct_b: f64,
 ) -> Result<String, String> {
-    let net_a = std::sync::Arc::new(Net::load(model_a, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
-    let net_b = std::sync::Arc::new(Net::load(model_b, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+    let net_a = std::sync::Arc::new(Net::load_auto(model_a).map_err(|e| e.to_string())?);
+    let net_b = std::sync::Arc::new(Net::load_auto(model_b).map_err(|e| e.to_string())?);
 
     let play = |i: usize| -> Value {
         let mut rng =
@@ -1858,17 +1858,17 @@ pub fn run_net_vs_net_arena_hybrid(
     c_puct_plain: f64,
 ) -> Result<String, String> {
     let hybrid_policy = std::sync::Arc::new(
-        Net::load(hybrid_policy_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?,
+        Net::load_auto(hybrid_policy_path).map_err(|e| e.to_string())?,
     );
     let hybrid_value = if hybrid_value_path == hybrid_policy_path {
         hybrid_policy.clone()
     } else {
         std::sync::Arc::new(
-            Net::load(hybrid_value_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?,
+            Net::load_auto(hybrid_value_path).map_err(|e| e.to_string())?,
         )
     };
     let plain_net = std::sync::Arc::new(
-        Net::load(plain_model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?,
+        Net::load_auto(plain_model_path).map_err(|e| e.to_string())?,
     );
     let hybrid_board = hybrid_board.min(1); // defensiv: nur 0/1 sinnvoll
 
@@ -2308,7 +2308,7 @@ pub fn run_net_self_play(
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
-    let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+    let net = std::sync::Arc::new(Net::load_auto(model_path).map_err(|e| e.to_string())?);
     let progress_file = open_progress_file(progress_path);
     let move_counter = Arc::new(AtomicU64::new(0));
     let games_counter = Arc::new(AtomicU64::new(0));
@@ -2434,7 +2434,9 @@ fn negamax_value(
             player_total(state, perspective) - player_total(state, 1 - perspective)
         });
     }
-    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+        crate::features::features_for_net(net, state)
+    });
     // Task #81: Batch=1.
     let (logits, _value, _m, _points) =
         crate::profiling::timed_net_eval(1, || {
@@ -2508,7 +2510,9 @@ fn alphabeta_choose_action(
     }
     ALPHABETA_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let perspective = state.current_player;
-    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || state_to_features_direct(state));
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+        crate::features::features_for_net(net, state)
+    });
     // Task #81: Batch=1.
     let (logits, _value, _m, _points) =
         crate::profiling::timed_net_eval(1, || {
@@ -2880,7 +2884,7 @@ pub fn run_stage3_vs_stage1_arena(
     seed: u64,
     num_threads: usize,
 ) -> Result<String, String> {
-    let net = std::sync::Arc::new(Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?);
+    let net = std::sync::Arc::new(Net::load_auto(model_path).map_err(|e| e.to_string())?);
     use std::sync::atomic::Ordering;
     STAGE3_DECISIONS.store(0, Ordering::Relaxed);
     STAGE3_ROLLOUTS_TRIGGERED.store(0, Ordering::Relaxed);
@@ -2983,7 +2987,7 @@ pub fn sibling_ranking_diagnostic(
     walk_sims: u32,
     seed: u64,
 ) -> Result<String, String> {
-    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let mut rng = StdRng::seed_from_u64(seed);
     let target_rounds = [1u32, 2u32];
     let mut taus: std::collections::HashMap<u32, Vec<f64>> = std::collections::HashMap::new();
@@ -3045,7 +3049,7 @@ pub fn sibling_ranking_diagnostic(
                             for act in &sampled {
                                 let mut g2 = Game { state: game.state.clone() };
                                 if g2.apply_drafting(act).is_ok() {
-                                    let feats = state_to_features_direct(&g2.state);
+                                    let feats = crate::features::features_for_net(&net, &g2.state);
                                     let net_mover_val = net
                                         .eval(&feats)
                                         .map(|(_, v, _, _)| {
@@ -3132,7 +3136,7 @@ pub fn draw_stack_peek_impact_diagnostic(
     walk_sims: u32,
     seed: u64,
 ) -> Result<String, String> {
-    let net = Net::load(model_path, crate::features::INPUT_SIZE).map_err(|e| e.to_string())?;
+    let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let mut rng = StdRng::seed_from_u64(seed);
     let mut total_decisions: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
     let mut peek_offered: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
@@ -3195,7 +3199,7 @@ pub fn draw_stack_peek_impact_diagnostic(
                                     let mut hypo = game.state.clone();
                                     hypo.players[mover].apply_score(-1);
                                     hypo.pending_stack_draw.push(tile.clone());
-                                    let feats = state_to_features_direct(&hypo);
+                                    let feats = crate::features::features_for_net(&net, &hypo);
                                     if let Ok((_, v, _, _)) = net.eval(&feats) {
                                         vals.push((v.first().copied().unwrap_or(0.0) as f64 + 1.0) / 2.0);
                                     }
@@ -3998,7 +4002,7 @@ mod tests {
     /// (gleiches Muster wie `net_mcts::load_test_net`).
     fn load_test_net_for_gating() -> Option<Net> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
-        match Net::load(path.to_str().unwrap(), crate::features::INPUT_SIZE) {
+        match Net::load_auto(path.to_str().unwrap()) {
             Ok(n) => Some(n),
             Err(e) => {
                 eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");

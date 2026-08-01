@@ -441,13 +441,19 @@ fn profiling_snapshot() -> String {
 
 /// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
 /// Feature-Vektor aus und gibt (policy_logits, value, moon_logits, points)
-/// zurück -- passend zur Referenzdatei aus `export_onnx.py`.
+/// zurück -- passend zur Referenzdatei aus `export_onnx.py`. Task #11 Phase 2
+/// (M3.5): `Net::load_auto` statt `Net::load(path, features.len())` -- das
+/// erzwungene `InputLayout::Flat(features.len())` brach für Zwei-Input-2D-
+/// Modelle bereits beim Laden (Shape-Mismatch mit dem echten Graphen). Für
+/// Flach-Modelle byte-identisch (siehe `examples/net_load_auto_backcompat.rs`);
+/// für 2D-Modelle erwartet `features` weiterhin EINEN zusammenhängenden
+/// Puffer (Planes-Teil gefolgt vom Flat-Teil, siehe `net.rs::Net::build_inputs`).
 #[pyfunction]
 fn onnx_eval(
     path: String,
     features: Vec<f32>,
 ) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
-    let net = crate::net::Net::load(&path, features.len())
+    let net = crate::net::Net::load_auto(&path)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     net.eval(&features)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
@@ -537,7 +543,7 @@ fn net_search_state_json(
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
     let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
 
-    let net = crate::net::Net::load(&model_path, crate::features::INPUT_SIZE)
+    let net = crate::net::Net::load_auto(&model_path)
         .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
 
     let (_chosen, analysis) =
@@ -600,7 +606,7 @@ fn net_search_state_json_trace(
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
     let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
 
-    let net = crate::net::Net::load(&model_path, crate::features::INPUT_SIZE)
+    let net = crate::net::Net::load_auto(&model_path)
         .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
 
     let (_chosen, analysis) =
