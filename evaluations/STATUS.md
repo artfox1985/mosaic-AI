@@ -6911,3 +6911,14 @@ jetzt IMMER vor jedem Cleanup-Schritt, und `remove_sandbox_dir()` ist
 fehlertolerant (Warnung statt Absturz bei `OSError`) -- ein haengendes
 Datei-Handle beim Aufraeumen darf nie wieder ein bereits fertiges
 Messergebnis verhindern.
+
+**Nachtrag Dosis-Arena (2026-08-01, auf User-Anstoss):** Die Orakel-Befunde wurden
+zusaetzlich in der echten Arena bestaetigt -- voll_s3_best 479:321 halb_s3_best
+(400 fixe Paare, exakter McNemar p<0.0001, gepaarte Differenz +0.395,
+95%-KI [+0.255, +0.535], keine Promotion; Ergebnis:
+`evaluations/paired_gating_result_voll_s3_best_vs_halb_s3_best.json`, im
+elo_tracker protokolliert). Damit steht der #14-Befund auf zwei Beinen
+(Orakel-Metriken + Arena), und die Orakel-Metriken sind in ihrem validierten
+Regime (gleiche Architektur, unterschiedliche Daten) jetzt 8/8 als
+Staerke-Praediktor -- im Kontrast zum Architektur-Regime (0/1, siehe
+Task-#11-Abschnitt).
