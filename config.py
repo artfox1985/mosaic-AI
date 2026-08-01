@@ -12,7 +12,20 @@ else:
     BASE_DIR = Path(__file__).resolve().parent
 
 # --- DYNAMISCHE PFADE ---
-DATA_DIR = BASE_DIR / "data"
+# MOSAIC_DATA_DIR (additiv, 2026-08-01, Korpus-Dosis-Wirkungs-Vorstudie,
+# evaluations/PREREG_corpus_dose.md): optionaler Override des Korpus-Ordners
+# fuer train.py/self_play.py/server.py. Default (Env-Var NICHT gesetzt) ist
+# byte-identisch zum bisherigen Verhalten -- BASE_DIR/"data". Grund: train.py
+# hat keine Datei-Listen-/Teilmengen-Option, die eine STRATIFIZIERTE Ziehung
+# (Zusammensetzungsverhaeltnis je Versions-Praefix erhalten) unterstuetzt
+# (nur `--train-file-limit`, ein reines Zaehler-Sample mit fest verdrahtetem
+# Seed). Statt train.py/neural_net.py anzufassen (siehe Auftragssperre),
+# zeigt dieser Override testweise auf einen SEPARATEN Ordner mit HARDLINKS
+# auf eine Teilmenge der echten Dateien (`tools/train_corpus_dose.py`) --
+# data/ selbst wird dabei nie verschoben/umbenannt/geloescht (Memory
+# `project_onedrive_file_disappearance`: data/ liegt unter OneDrive-Sync,
+# Massenoperationen auf dem echten Ordner sind bewusst vermieden).
+DATA_DIR = Path(os.environ.get("MOSAIC_DATA_DIR", str(BASE_DIR / "data")))
 MODELS_DIR = BASE_DIR / "models"
 
 # --- ORDNER AUTOMATISCH ERSTELLEN ---
