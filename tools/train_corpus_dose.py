@@ -385,12 +385,31 @@ def remove_sandbox_dir(d: Path, label: str) -> None:
     sonst schlaegt `rmdir()` mit WinError 145 [Verzeichnis nicht leer] fehl).
     Assert als Sicherheitsnetz: `d` darf NIE der echte `data/`-Ordner sein --
     diese Funktion loescht rekursiv, ein Vertipper hier waere sonst
-    katastrophal (Memory `project_onedrive_file_disappearance`)."""
+    katastrophal (Memory `project_onedrive_file_disappearance`).
+
+    FEHLERTOLERANT (2026-08-01 Nachbesserung, 3. Runde): `shutil.rmtree` kann
+    unter Windows mit `PermissionError` scheitern, wenn irgendein Prozess
+    (Explorer, ein haengender Dateihandle, Virenscanner) noch eine Datei in
+    `d` offen haelt. Das ist reines Aufraeumen NACH dem eigentlichen Sweep --
+    ein haengendes Handle darf niemals ein bereits fertiges Messergebnis
+    verhindern (Praezedenzfall: genau das brach den ersten echten Sweep-Lauf,
+    `run_diagnose_and_eval` lief nie durch, musste per `--skip-training`
+    nachgeholt werden). Deshalb: Warnung statt Absturz, Aufruf-Reihenfolge in
+    `main()` stellt zusaetzlich sicher, dass die Diagnose/Auswertung IMMER
+    VOR dem Cleanup laeuft, unabhaengig davon, ob das Cleanup klappt."""
     assert d != DATA_DIR and d.resolve() != DATA_DIR.resolve(), \
         f"SICHERHEITSSTOPP: remove_sandbox_dir() sollte NIE data/ selbst loeschen ({d})."
-    if d.exists():
+    if not d.exists():
+        return
+    try:
         shutil.rmtree(d)
         print(f"[cleanup] {label}-Sandbox entfernt: {d}", flush=True)
+    except OSError as e:
+        print(f"[cleanup][WARNUNG] {label}-Sandbox {d} konnte nicht vollstaendig entfernt werden "
+              f"({e!r}) -- vermutlich haengt noch ein Datei-Handle (Explorer/Virenscanner/o.ae.). "
+              f"KEIN Abbruch (das Messergebnis ist zu diesem Zeitpunkt laengst geschrieben) -- "
+              f"Ordner manuell nachraeumen oder beim naechsten Lauf erneut versuchen "
+              f"(ensure_hardlink_mirror/remove_sandbox_dir sind beide idempotent).", flush=True)
 
 
 # ── Trainings-Sweep ──────────────────────────────────────────────────────
@@ -710,19 +729,28 @@ def main() -> None:
             print(f"[sweep] Seed {seed} fertig nach {(time.time()-t_pair0)/60:.1f} min (beide Arme).\n",
                   flush=True)
 
-        # Cleanup NACH dem GESAMTEN Sweep (alle 12 Laeufe erfolgreich durch):
-        # beide eingefrorenen Sandboxes samt ihrer je eigenen HDF5-Caches
-        # werden entfernt -- data/ selbst bleibt zu jedem Zeitpunkt
-        # unangetastet (remove_sandbox_dir() hat einen eigenen Assert-Schutz
-        # dagegen). Absichtlich NICHT in einem finally/except -- bei einem
-        # fehlgeschlagenen Lauf (SystemExit oben) sollen die Sandboxes fuer
-        # eine Wiederaufnahme/Fehlersuche stehen bleiben.
-        remove_sandbox_dir(VOLL_DIR, "voll")
-        remove_sandbox_dir(HALB_DIR, "halb")
-
+    # Diagnose+Auswertung ZUERST, Sandbox-Cleanup ALS LETZTER SCHRITT (2026-
+    # 08-01 Nachbesserung, 3. Runde: die urspruengliche Reihenfolge raeumte
+    # VOR der Diagnose auf -- ein PermissionError in remove_sandbox_dir()
+    # [Windows-Handle auf data_dose_voll] liess den Sweep dort abstuerzen,
+    # `run_diagnose_and_eval` lief nie, musste per `--skip-training`
+    # nachgeholt werden. Das eigentliche Messergebnis (Diagnose+Auswertung)
+    # ist der Grund fuer den ganzen Sweep -- es muss VOR jedem Aufraeumschritt
+    # feststehen, egal ob das Cleanup danach klappt oder nicht (siehe
+    # remove_sandbox_dir()-Fehlertoleranz).
     model_pairs = [(f"voll_s{s}", f"halb_s{s}") for s in args.seeds]
     run_diagnose_and_eval(model_pairs, BASE_DIR / args.diag_out, BASE_DIR / args.out,
                           n_corpus_voll=n_voll, n_corpus_halb=n_halb)
+
+    if not args.skip_training:
+        # Cleanup NACH dem GESAMTEN Sweep UND nach der Diagnose/Auswertung
+        # (siehe Kommentar oben) -- beide eingefrorenen Sandboxes samt ihrer
+        # je eigenen HDF5-Caches werden entfernt, data/ selbst bleibt zu
+        # jedem Zeitpunkt unangetastet (remove_sandbox_dir() hat einen
+        # eigenen Assert-Schutz dagegen UND ist jetzt fehlertolerant --
+        # ein haengendes Datei-Handle warnt nur noch, statt abzubrechen).
+        remove_sandbox_dir(VOLL_DIR, "voll")
+        remove_sandbox_dir(HALB_DIR, "halb")
 
 
 if __name__ == "__main__":
