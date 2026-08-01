@@ -910,7 +910,7 @@ mod tests {
     #[test]
     fn bootstrap_value_after_rounds_is_deterministic_for_same_seed() {
         let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v10_best.onnx");
-        let net = match Net::load(model_path, crate::features::INPUT_SIZE) {
+        let net = match Net::load_auto(model_path) {
             Ok(n) => n,
             Err(e) => {
                 eprintln!(

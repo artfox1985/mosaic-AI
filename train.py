@@ -23,6 +23,98 @@ from datetime import datetime
 from torch.utils.data import DataLoader
 
 
+# ── Diagnose-Instrumentierung (2026-07-31, Task #11 Phase 2, fs_2d_s1-
+# Absturzuntersuchung) ────────────────────────────────────────────────────
+# Kein psutil installiert (Sicherheitsregel: kein pip ins System-Python) --
+# direkt ueber die Windows-API (`GetProcessMemoryInfo`, psapi.dll), analog zu
+# dem, was `psutil.Process().memory_info()` intern ebenfalls tut. Best-effort:
+# auf Nicht-Windows oder bei jedem API-Fehler liefert die Funktion `None`,
+# der Aufrufer ueberspringt die Zeile dann einfach -- die Instrumentierung
+# darf das eigentliche Training nie gefaehrden.
+def _mem_info_gb():
+    """(WorkingSetSize, PrivateUsage) in GB, oder None bei Fehler/Nicht-Windows.
+    WorkingSetSize ~= RSS (physisch resident), PrivateUsage ~= Commit Charge
+    (inkl. reserviertem, noch nicht physisch belegtem virtuellem Speicher --
+    die Kennzahl, die bei einem `MemoryError`/Allokationsfehler zuerst an
+    ein Limit stoesst)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _PROCESS_MEMORY_COUNTERS_EX(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+                ("PrivateUsage", ctypes.c_size_t),
+            ]
+
+        # WICHTIG: `ctypes.windll.kernel32.GetCurrentProcess()` OHNE explizites
+        # `restype` truncated das (Pseudo-)Handle stillschweigend auf `c_int`
+        # -- `GetProcessMemoryInfo` scheitert dann leise (Rueckgabe 0, keine
+        # Python-Exception). Explizite `WinDLL`+`restype`/`argtypes` beheben das.
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel32.GetCurrentProcess.argtypes = []
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(_PROCESS_MEMORY_COUNTERS_EX), wintypes.DWORD,
+        ]
+
+        counters = _PROCESS_MEMORY_COUNTERS_EX()
+        counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS_EX)
+        handle = kernel32.GetCurrentProcess()
+        ok = psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb)
+        if not ok:
+            return None
+        return (counters.WorkingSetSize / 1e9, counters.PrivateUsage / 1e9)
+    except Exception:
+        return None
+
+
+def _system_mem_info_gb():
+    """(TotalPhys, AvailPhys, TotalPageFile/Commit-Limit, AvailPageFile) in GB,
+    oder None -- einmalig beim Start geloggt (2026-07-31 Diagnose-Auftrag,
+    Arm B/A), damit die Bewertung von Arm A ("laeuft RSS gegen die Commit-
+    Grenze?") einen konkreten Nenner hat statt eines geschaetzten Werts."""
+    try:
+        import ctypes
+
+        class _MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_uint64),
+                ("ullAvailPhys", ctypes.c_uint64),
+                ("ullTotalPageFile", ctypes.c_uint64),
+                ("ullAvailPageFile", ctypes.c_uint64),
+                ("ullTotalVirtual", ctypes.c_uint64),
+                ("ullAvailVirtual", ctypes.c_uint64),
+                ("ullAvailExtendedVirtual", ctypes.c_uint64),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GlobalMemoryStatusEx.restype = ctypes.c_int
+        kernel32.GlobalMemoryStatusEx.argtypes = [ctypes.POINTER(_MEMORYSTATUSEX)]
+        stat = _MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(_MEMORYSTATUSEX)
+        ok = kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        if not ok:
+            return None
+        return (stat.ullTotalPhys / 1e9, stat.ullAvailPhys / 1e9,
+                stat.ullTotalPageFile / 1e9, stat.ullAvailPageFile / 1e9)
+    except Exception:
+        return None
+
+
 def plackett_luce_moon_loss(pred_moon, moon_targets):
     """Negative Log-Likelihood der DFS-Referenz-Reihenfolge unter einem
     Plackett-Luce-Modell über die 5 rohen Moon-Head-Scores (sequenzieller
@@ -229,6 +321,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # am zu niedrigen Epoche-1-Val-R² erkennbar war.
     if encoder not in ("flat", "2d"):
         sys.exit(f"❌ Unbekannter --encoder '{encoder}' -- erlaubt: 'flat', '2d'.")
+    # Diagnose-Instrumentierung (2026-07-31, Arm A/B): einmalig physisches
+    # Gesamt-RAM + Commit-Limit der Maschine loggen -- Nenner fuer die
+    # RSS/Commit-Log-Interpretation waehrend des Laufs (siehe _mem_info_gb).
+    _sys_mem = _system_mem_info_gb()
+    if _sys_mem is not None:
+        total_phys, avail_phys, total_commit, avail_commit = _sys_mem
+        print(f"🖥️  System-RAM: {total_phys:.1f} GB gesamt, {avail_phys:.1f} GB frei beim Start "
+              f"| Commit-Limit: {total_commit:.1f} GB, {avail_commit:.1f} GB frei beim Start")
     load_path = None
     if load_version:
         if load_version.startswith("alphazero_"):
@@ -526,10 +626,22 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             print(f"⚠️  Live-Plot deaktiviert (kein Display?): {e}")
             plot = None
 
+    # Diagnose-Instrumentierung (2026-07-31): alle 100 Batches eine RSS/Commit-
+    # Zeile, MIT flush=True -- falls der Prozess stirbt, bevor der naechste
+    # Puffer-Flush ohnehin faellig waere, steht die letzte Messung trotzdem
+    # in der Log-Datei. Absichtlich unabhaengig vom Encoder (auch im Flach-
+    # Pfad aktiv) fuer eine direkte Vergleichsbasis.
+    _mem_log_every = 100
+
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
 
-        for _batch in dataloader:
+        for _batch_idx, _batch in enumerate(dataloader):
+            if _batch_idx % _mem_log_every == 0:
+                _mi = _mem_info_gb()
+                if _mi is not None:
+                    print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
+                          f"rss={_mi[0]:.2f}GB commit={_mi[1]:.2f}GB", flush=True)
             # Task #11 Phase 2: MosaicDataset liefert bei encoder="2d" ein
             # 10-Tupel (planes VORAN), bei encoder="flat" (Standard) weiterhin
             # das bestehende 9-Tupel byte-identisch -- siehe

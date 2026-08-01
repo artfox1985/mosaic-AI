@@ -918,6 +918,48 @@ pub fn state_to_features_2d_direct(state: &GameState) -> Vec<f32> {
     out
 }
 
+/// Layout-getriebene Feature-Erzeugung für die ONNX-Auswertung EINES
+/// konkreten, bereits geladenen Netzes (Task #11 Phase 2, M3.5: Engine-
+/// Verdrahtung). Zentraler Dispatch-Helfer statt verstreuter
+/// match-Blöcke an jeder Aufrufstelle -- `net.layout()` (siehe `net.rs`)
+/// entscheidet pro Netz, welcher Feature-Puffer gebaut wird:
+///   - `InputLayout::Flat` -> `state_to_features_direct` (bestehender
+///     708er-Vektor, UNVERÄNDERT -- Bestandsmodelle bleiben byte-identisch).
+///   - `InputLayout::PlanesPlusFlat` -> `state_to_features_2d_direct`
+///     (kombinierter Planes+Flat-Puffer, siehe `net.rs::Net::build_inputs`-
+///     Konvention: Planes-Teil gefolgt vom Flat-Teil).
+///
+/// WICHTIG bei `eval_pair`/Mover-Vergleichen: der Dispatch läuft PRO NETZ,
+/// nicht global -- zwei Netze im selben Vergleich (z.B. Arena/Gating
+/// zwischen einem 2D- und einem flachen Modell) können unterschiedliche
+/// Layouts haben, jede Seite ruft `features_for_net` mit IHREM eigenen
+/// `Net` auf.
+///
+/// `InputLayout::Planes` (Ein-Input-Rang-4, Phase 1, nie trainiert) ist
+/// bewusst NICHT unterstützt -- kein Aufrufer/Trainingspfad erzeugt solche
+/// Modelle, ein Treffer hier wäre ein Bug im Aufrufer (falsches Modell
+/// geladen), kein regulärer Laufzeitfall. Harter Panic statt stillem
+/// Fallback, konsistent mit `detect_layout`s Fehlerphilosophie.
+pub fn features_for_net(net: &crate::net::Net, state: &GameState) -> Vec<f32> {
+    features_for_layout(net.layout(), state)
+}
+
+/// Reine Dispatch-Logik hinter [`features_for_net`], von der ONNX-Datei
+/// entkoppelt (nimmt ein bereits bekanntes `InputLayout` statt eines
+/// geladenen `Net`) -- damit ohne ONNX-Fixture unit-testbar (siehe
+/// `tests::features_for_layout_*` unten). `features_for_net` ist nur noch
+/// ein dünner Wrapper, der `net.layout()` einsetzt.
+fn features_for_layout(layout: crate::net::InputLayout, state: &GameState) -> Vec<f32> {
+    match layout {
+        crate::net::InputLayout::Flat(_) => state_to_features_direct(state),
+        crate::net::InputLayout::PlanesPlusFlat { .. } => state_to_features_2d_direct(state),
+        other => panic!(
+            "features_for_net: InputLayout {other:?} wird von keinem Aufrufer unterstützt \
+             (Ein-Input-Planes ist ein nie trainiertes Phase-1-Skelett) -- falsches Modell geladen?"
+        ),
+    }
+}
+
 /// Obergrenze für die `pending_index`-ID-Dimension bei `dome_stack`
 /// (Position der gewählten Platte in der deduplizierten
 /// `pending_stack_draw`-Liste, siehe `self_play.rs::action_to_env_dict`) --
@@ -1163,5 +1205,85 @@ mod tests {
             crate::net_mcts::NUM_ACTIONS,
             global_max + 1
         );
+    }
+
+    // ── Task #11 Phase 2, M3.5: `features_for_layout`-Dispatch (ONNX-frei) ──
+    //
+    // `features_for_net` selbst braucht ein geladenes `Net` (also eine ONNX-
+    // Datei) und ist deshalb nicht ohne Fixture testbar -- die eigentliche
+    // Entscheidungslogik ist aber in `features_for_layout` ausgelagert, die
+    // NUR ein `InputLayout` (keine ONNX-Datei) braucht. Reale Zustände via
+    // `random_drafting_states` (bereits oben definiert), keine Fixture nötig.
+
+    #[test]
+    fn features_for_layout_flat_matches_state_to_features_direct() {
+        for seed in 0..3u64 {
+            for (i, s) in random_drafting_states(seed, 15).into_iter().enumerate() {
+                let via_dispatch =
+                    features_for_layout(crate::net::InputLayout::Flat(INPUT_SIZE), &s);
+                let direct = state_to_features_direct(&s);
+                assert_eq!(
+                    via_dispatch, direct,
+                    "seed={seed} step={i}: Flat-Dispatch weicht von state_to_features_direct ab"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn features_for_layout_planes_plus_flat_matches_state_to_features_2d_direct() {
+        let layout = crate::net::InputLayout::PlanesPlusFlat {
+            c: NUM_PLANES_CHANNELS,
+            h: 6,
+            w: 6,
+            flat: INPUT_SIZE,
+        };
+        for seed in 0..3u64 {
+            for (i, s) in random_drafting_states(seed, 15).into_iter().enumerate() {
+                let via_dispatch = features_for_layout(layout, &s);
+                let direct = state_to_features_2d_direct(&s);
+                assert_eq!(
+                    via_dispatch.len(),
+                    NUM_PLANES_CHANNELS * 6 * 6 + INPUT_SIZE,
+                    "seed={seed} step={i}: falsche Puffer-Laenge"
+                );
+                assert_eq!(
+                    via_dispatch, direct,
+                    "seed={seed} step={i}: PlanesPlusFlat-Dispatch weicht von \
+                     state_to_features_2d_direct ab"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn features_for_layout_two_input_order_is_planes_then_flat() {
+        // Konvention (net.rs::Net::build_inputs / export_onnx.py 2D-Zweig):
+        // Planes-Teil ZUERST, Flat-Teil DANACH im selben Puffer.
+        let mut rng = StdRng::seed_from_u64(0);
+        let s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        let layout = crate::net::InputLayout::PlanesPlusFlat {
+            c: NUM_PLANES_CHANNELS,
+            h: 6,
+            w: 6,
+            flat: INPUT_SIZE,
+        };
+        let combined = features_for_layout(layout, &s);
+        let planes_part = &combined[..NUM_PLANES_CHANNELS * 6 * 6];
+        let flat_part = &combined[NUM_PLANES_CHANNELS * 6 * 6..];
+        assert_eq!(planes_part, state_to_planes_direct(&s).as_slice());
+        assert_eq!(flat_part, state_to_features_direct(&s).as_slice());
+    }
+
+    #[test]
+    #[should_panic(expected = "wird von keinem Aufrufer unterstützt")]
+    fn features_for_layout_bare_planes_panics() {
+        // InputLayout::Planes (Ein-Input-Rang-4, Phase-1-Skelett) hat KEINEN
+        // Konsumenten -- ein Treffer hier waere ein Bug im Aufrufer (falsches
+        // Modell geladen), harter Panic statt stillem Fallback ist Absicht.
+        let mut rng = StdRng::seed_from_u64(0);
+        let s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        let layout = crate::net::InputLayout::Planes { c: NUM_PLANES_CHANNELS, h: 6, w: 6 };
+        let _ = features_for_layout(layout, &s);
     }
 }

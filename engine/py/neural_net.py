@@ -655,6 +655,28 @@ def _final_ownership_by_game(game_data) -> dict:
     return out
 
 
+def _resolve_planes_h5_path(cache_path_h5: str) -> str:
+    """DIAGNOSE-Override (2026-07-31, Task #11 Phase 2, fs_2d_s1-Absturz-
+    Untersuchung): wenn `MOSAIC_PLANES_H5_DIR` gesetzt ist, wird der lazy
+    Planes-HDF5-Handle (`MosaicDataset._open_planes_h5`) aus DIESEM Ordner
+    statt aus `cache_path_h5`s eigentlichem Ordner geoeffnet (gleicher
+    Dateiname, nur andere Directory) -- Ausschlusstest, ob ein
+    stundenlang offen gehaltener h5py-Handle auf eine OneDrive-synchronisierte
+    Datei (`data/` liegt unter OneDrive, siehe Memory
+    "OneDrive-Dateiverschwinde-Vorfaelle") die stillen Abstuerze verursacht.
+    Standardverhalten (Env-Var NICHT gesetzt) ist UNVERAENDERT: `cache_path_h5`
+    selbst. NUR die Planes-Datei ist betroffen -- die uebrigen (Flach-)Felder
+    bleiben auf dem regulaeren `data_dir`-Pfad, da nur der 2D-Pfad je
+    abgestuerzt ist."""
+    override_dir = os.environ.get("MOSAIC_PLANES_H5_DIR")
+    if not override_dir:
+        return cache_path_h5
+    resolved = os.path.join(override_dir, os.path.basename(cache_path_h5))
+    print(f"⚠️  DIAGNOSE-Override MOSAIC_PLANES_H5_DIR aktiv: Planes werden aus "
+          f"'{resolved}' gelesen statt '{cache_path_h5}'.")
+    return resolved
+
+
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat"):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
@@ -686,16 +708,22 @@ class MosaicDataset(Dataset):
         if encoder not in ("flat", "2d"):
             raise ValueError(f"Unbekannter encoder={encoder!r} -- erlaubt: 'flat', '2d'")
         self.encoder = encoder
-        # RAM-Fix (2026-07-31): `planes` wird NICHT mehr komplett ins RAM
-        # geladen (siehe `_open_planes_h5` unten fuer die volle Begruendung --
-        # ein realer from-scratch-2D-Lauf auf dem vollen Korpus ist damit
-        # nach 5 Epochen spurlos gestorben, kein Traceback, kein Windows-
-        # OOM-Ereignis im Protokoll, aber ein plausibel zu grosser RAM-
-        # Fussabdruck war die einzige verbleibende Erklaerung). Nur der
-        # Dateipfad wird gemerkt, ein offener h5py-Handle entsteht lazy beim
-        # ersten `__getitem__`-Zugriff.
+        # Planes-Ladeverhalten (Task #11 Phase 2, Historie 2026-07-31):
+        # STANDARD ist seit 2026-07-31 wieder komplett ins RAM (`_planes_eager_tensor`,
+        # siehe `_maybe_load_planes_eager`) -- ein 30s-Vergleichsmesswert auf dem
+        # echten 1,3-Mio-Sample-Cache zeigte lazy Pro-Index-h5py-Zugriffe als
+        # ~400.000x langsamer (205ms/Sample vs. 0,5µs/Sample), was drei
+        # vermeintliche "stille Abstuerze" beim ersten from-scratch-2D-Sweep
+        # tatsaechlich erklaert (kein Crash, sondern ein Prozess, der bei
+        # Batch=256 ~52s/Batch fuer reine Planes-I/O gebraucht haette und beim
+        # Task-Management beendet wurde) -- KEIN Speicherproblem: die Maschine
+        # hat 34,3 GB RAM, ein Planes-Split braucht ~3,6 GB. `MOSAIC_PLANES_LAZY=1`
+        # schaltet den lazy Pro-Index-HDF5-Zugriff optional wieder ein --
+        # NUR fuer echt knappe RAM-Verhaeltnisse gedacht (siehe
+        # `_maybe_load_planes_eager`-Docstring fuer die Kosten-Abwaegung).
         self._planes_h5_path = None
         self._planes_h5_file = None
+        self._planes_eager_tensor = None
         import numpy as np
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
@@ -770,7 +798,7 @@ class MosaicDataset(Dataset):
                     # nur den Pfad merken -- `_open_planes_h5` oeffnet lazy
                     # einen eigenen, separaten Handle (dieser `with`-Block
                     # schliesst `hf` gleich).
-                    self._planes_h5_path = cache_path_h5
+                    self._planes_h5_path = _resolve_planes_h5_path(cache_path_h5)
                 else:
                     self._planes_h5_path = None
             print(f"Datensatz geladen: {len(self.states)} Züge. "
@@ -1014,7 +1042,11 @@ class MosaicDataset(Dataset):
             # `self.planes` fuer die gesamte Trainingsdauer im RAM zu bleiben
             # -- `_open_planes_h5` liest ab jetzt lazy aus der gerade
             # geschriebenen Datei, identisch zum Cache-Lade-Pfad oben.
-            self._planes_h5_path = cache_path_h5 if planes_np is not None else None
+            # Hinweis: `_resolve_planes_h5_path` liest hier NUR den Pfad um --
+            # die Datei selbst wird weiterhin unter `cache_path_h5` (regulaerer
+            # Ort) geschrieben; ein Override muesste die frisch geschriebene
+            # Datei zusaetzlich manuell an den Override-Ort kopieren.
+            self._planes_h5_path = _resolve_planes_h5_path(cache_path_h5) if planes_np is not None else None
             del planes_np
 
             self.states             = torch.from_numpy(states_np)
@@ -1031,19 +1063,57 @@ class MosaicDataset(Dataset):
 
         self.input_size = self.states.shape[1] if len(self.states) > 0 else 100
         self.value_target_variant = value_target_variant
+        self._maybe_load_planes_eager()
+
+    def _maybe_load_planes_eager(self):
+        """Laedt den kompletten Planes-HDF5-Inhalt EINMALIG ins RAM
+        (`self._planes_eager_tensor`) -- Task #11 Phase 2, seit 2026-07-31
+        STANDARDVERHALTEN (vorher lazy als Standard, siehe Historie unten).
+
+        GEMESSENER GRUND FUER DIE UMKEHR: `hf['planes'][idx]`-Einzelzugriffe
+        auf den lzf-komprimierten Cache sind ~400.000x langsamer als ein
+        In-RAM-Indexzugriff nach einmaligem Voll-Read (205 ms/Sample lazy vs.
+        0,5 µs/Sample in-RAM, gemessen auf dem echten 1,3-Mio-Sample-2D-
+        Trainingscache) -- bei Batch=256 macht das ~52 s/Batch allein fuer
+        Planes-I/O, ein Epoche-1-Batch-100-Herzschlag waere erst nach ~87 min
+        faellig gewesen. Die drei vermeintlichen "stillen Abstuerze" des
+        lazy-Pfads (2026-07-31) waren mit hoher Wahrscheinlichkeit KEINE
+        Abstuerze, sondern kriechend langsame, technisch weiterlaufende
+        Prozesse, die beim Task-Management (Stop/Resume) beendet wurden --
+        nicht ein Speicherproblem, das laut System-RAM-Log (34,3 GB, 3,6 GB
+        Planes je Split) nie real existiert hat.
+
+        `MOSAIC_PLANES_LAZY=1` schaltet auf den lazy Pro-Index-HDF5-Zugriff
+        zurueck -- NUR fuer echt knappe RAM-Verhaeltnisse gedacht (Faktor
+        ~400.000x langsamer nachweislich in Kauf zu nehmen, wenn 3,6 GB/Split
+        nicht ins RAM passen). Kein Effekt bei encoder="flat" (kein
+        `_planes_h5_path`)."""
+        if self._planes_h5_path is None:
+            return
+        if os.environ.get("MOSAIC_PLANES_LAZY") == "1":
+            print(f"ℹ️  MOSAIC_PLANES_LAZY=1: Planes bleiben lazy (h5py-Pro-Index-Zugriff) -- "
+                  f"NUR fuer knappe RAM-Verhaeltnisse gedacht, ~400.000x langsamer als in-RAM "
+                  f"(gemessen 2026-07-31, siehe Docstring).")
+            return
+        import h5py
+        with h5py.File(self._planes_h5_path, "r") as hf:
+            arr = hf["planes"][:]
+        self._planes_eager_tensor = torch.from_numpy(arr)
+        gb = self._planes_eager_tensor.element_size() * self._planes_eager_tensor.nelement() / 1e9
+        print(f"Planes komplett ins RAM geladen ({tuple(self._planes_eager_tensor.shape)}, {gb:.2f} GB).")
 
     def __len__(self): return len(self.states)
 
     def _open_planes_h5(self):
-        """Lazily öffnet den HDF5-Cache für Pro-Index-Planes-Zugriff (RAM-Fix
-        2026-07-31): `planes` wird NICHT mehr komplett ins RAM geladen (bei
-        ~1,3 Mio. Zügen ~3,6 GB je Split uint8 -- zusammen mit den bereits
-        eager geladenen Flach-Feldern hat das einen realen from-scratch-2D-
-        Lauf auf dem vollen Korpus nach 5 Epochen spurlos sterben lassen,
-        kein Python-Traceback, keine Windows-OOM-Meldung im Ereignis-
-        protokoll gefunden -- Speicherdruck blieb die einzige plausible
-        Erklärung). Nur der Dateipfad steht in `self._planes_h5_path`, der
-        offene Handle entsteht PRO PROZESS beim ersten Zugriff.
+        """Öffnet lazy einen HDF5-Handle für Pro-Index-Planes-Zugriff -- NUR
+        genutzt, wenn `MOSAIC_PLANES_LAZY=1` gesetzt ist (`_maybe_load_planes_eager`);
+        Standardpfad ist seit 2026-07-31 `self._planes_eager_tensor` (siehe
+        dort für die Begründung: lazy Pro-Index-Zugriff ist gemessen
+        ~400.000x langsamer, kein Speichervorteil, der das rechtfertigt --
+        3,6 GB/Split passen komfortabel ins RAM). Bleibt im Code für echt
+        knappe RAM-Verhältnisse. Nur der Dateipfad steht in
+        `self._planes_h5_path`, der offene Handle entsteht PRO PROZESS beim
+        ersten Zugriff.
 
         Vorsicht bei künftigem `DataLoader(..., num_workers>0)` unter
         Windows: ein gepickeltes offenes `h5py.File` ist zwischen Prozessen
@@ -1057,6 +1127,8 @@ class MosaicDataset(Dataset):
         return self._planes_h5_file
 
     def _get_planes_tensor(self, idx):
+        if self._planes_eager_tensor is not None:
+            return self._planes_eager_tensor[idx].float()
         hf = self._open_planes_h5()
         arr = hf["planes"][idx]  # uint8 [76,6,6], EIN Sample -- kein Voll-Array-Read
         return torch.from_numpy(arr.astype("float32"))

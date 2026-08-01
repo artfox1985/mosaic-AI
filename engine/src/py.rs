@@ -89,7 +89,11 @@ impl PyGame {
         if self.net_path.as_deref() == Some(model_path.as_str()) {
             return Ok(()); // schon geladen
         }
-        let net = Net::load(&model_path, crate::features::INPUT_SIZE)
+        // Task #11 Phase 2 (M3.5): `load_auto` statt `load(path, INPUT_SIZE)`
+        // -- der Server-Modellwähler (`/api/new_game`) muss auch 2D-Modelle
+        // laden können, ohne fest den flachen 708er-Input zu erzwingen.
+        // Byte-identisch für Bestandsmodelle (Rang 2 -> InputLayout::Flat).
+        let net = Net::load_auto(&model_path)
             .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
         self.net = Some(net);
         self.net_path = Some(model_path);

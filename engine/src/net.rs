@@ -99,6 +99,15 @@ pub struct Net {
 }
 
 impl Net {
+    /// Deklariertes Input-Layout dieses geladenen Netzes (Task #11 Phase 2,
+    /// M3.5: Engine-Verdrahtung) -- Aufrufer nutzen dies, um pro Netz die
+    /// passende Feature-Erzeugung zu waehlen (`features::features_for_net`),
+    /// statt fest verdrahtet den flachen 708er-Pfad anzunehmen. `Copy`, also
+    /// billig per Wert zurueckgegeben.
+    pub fn layout(&self) -> InputLayout {
+        self.layout
+    }
+
     /// Lädt ein ONNX-Netz; `input_size` muss zur Feature-Länge passen
     /// (siehe `features::INPUT_SIZE` — dort übergeben, nicht hier hardcoden).
     /// Baut aus derselben geparsten Graph-Struktur ZWEI unabhängig optimierte
@@ -441,7 +450,7 @@ mod tests {
     /// ohne jeden eigenen Fehler).
     fn load_test_net() -> Option<Net> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
-        match Net::load(path.to_str().unwrap(), crate::features::INPUT_SIZE) {
+        match Net::load_auto(path.to_str().unwrap()) {
             Ok(n) => Some(n),
             Err(e) => {
                 eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");
