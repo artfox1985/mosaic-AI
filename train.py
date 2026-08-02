@@ -311,7 +311,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
-          points_dist_bins=None, reinit_points_head=False, encoder="flat"):
+          points_dist_bins=None, reinit_points_head=False, encoder="flat",
+          value_target_lambda=1.0):
+    # λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z"):
+    # harte Validierung VOR jedem teuren Daten-Laden -- kein stiller Clamp
+    # (siehe train.py --load-Footgun-Historie im Modulkommentar/Memory
+    # feedback_num_actions_change_breaks_old_checkpoints: neue Flags muessen
+    # hart abbrechen statt still auf unerwartetes Verhalten zurueckzufallen).
+    if not (0.0 <= value_target_lambda <= 1.0):
+        sys.exit(
+            f"❌ --value-target-lambda {value_target_lambda!r} ausserhalb [0,1] -- Abbruch. "
+            f"1.0 = Bestandsverhalten (kein Mix), 0.0 = ausschliesslich root_q."
+        )
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
     # Dateinamen übergibt, landet bei alphazero_alphazero_*.pth. Das doppelte
@@ -384,6 +395,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "seed": seed, "snapshot": snapshot,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant, "encoder": encoder,
+        "value_target_lambda": value_target_lambda,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -420,13 +432,31 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
+    # λ-Misch-Value-Target-Experiment: mischt self.values IN-PLACE, direkt
+    # nach dem Laden, VOR dem DataLoader-Wrap (siehe
+    # MosaicDataset.apply_value_target_lambda-Docstring). Wird auch bei
+    # value_target_lambda=1.0 aufgerufen -- die Methode ruehrt `values` dann
+    # NICHT an (frueher Return), liefert aber den Praesenz-Anteil fuers Log
+    # (PREREG_lambda_target.md verlangt den Misch-Anteil dokumentiert, auch
+    # als Baseline-Referenz).
+    train_root_q_frac = dataset.apply_value_target_lambda(value_target_lambda)
+    if value_target_lambda < 1.0:
+        print(f"🧪 λ-Misch-Value-Target (Willemsen et al. 2021, soft-Z): λ={value_target_lambda} "
+              f"-- {train_root_q_frac*100:.1f}% der Trainings-Samples haben root_q (gemischt), "
+              f"Rest bleibt beim bisherigen Ziel.")
+    else:
+        print(f"ℹ️  λ-Misch-Value-Target: λ=1.0 (kein Mix, Bestandsverhalten) -- "
+              f"{train_root_q_frac*100:.1f}% der Trainings-Samples HAETTEN root_q (informativ).")
 
     val_dataset = None
     if val_files:
         val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant,
                                     encoder=encoder)
+        val_root_q_frac = val_dataset.apply_value_target_lambda(value_target_lambda)
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
+        if value_target_lambda < 1.0:
+            print(f"   Val-root_q-Anteil (gemischt): {val_root_q_frac*100:.1f}%")
 
     # drop_last=True: ohne das kann die letzte Batch einer Epoche zufällig auf
     # Größe 1 fallen (Datensatzgröße mod BATCH_SIZE == 1) — BatchNorm im Netz
@@ -1068,6 +1098,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "policy_pct":        round(pct, 1),
         "load_version":      load_version,
         "value_target_variant": value_target_variant,
+        "value_target_lambda": value_target_lambda,
         # Task #11 Phase 2: nur ein Bequemlichkeits-/Dokumentationsfeld --
         # `neural_net.py::encoder_from_state_dict` bleibt die maßgebliche,
         # rückwirkend funktionierende Quelle (Erkennung aus `model_state`).
@@ -1250,6 +1281,17 @@ if __name__ == "__main__":
                              "reproduzieren (rtv-Override bevorzugt, wo vorhanden); 'nortv_r1' "
                              "ignoriert den Override nur fuer Runde-1-Zustaende. Aendert den "
                              "HDF5-Cache-Key (siehe neural_net.py::MosaicDataset).")
+    parser.add_argument("--value-target-lambda", type=float, default=1.0,
+                        help="λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, 'soft-Z' -- "
+                             "Varianzreduktion des HAUPT-Value-Targets durch Mischen mit dem "
+                             "Root-Suchwert). target = λ*z + (1-λ)*root_q_remapped fuer Samples mit "
+                             "geloggtem root_q (Commit 2718b9a, aktuell nur selfplay_v18_*-Dateien), "
+                             "sonst bleibt z unveraendert. STANDARD 1.0 = KEIN Mix, byte-identisches "
+                             "Bestandsverhalten (values-Tensor bleibt unangetastet). Harte Validierung "
+                             "0<=λ<=1 (kein stiller Clamp). Siehe "
+                             "neural_net.py::MosaicDataset.apply_value_target_lambda, "
+                             "evaluations/PREREG_lambda_target.md. Aendert den HDF5-Cache-Key NICHT "
+                             "(root_q ist additiv im Cache, der Mix passiert erst hier).")
     parser.add_argument("--encoder", type=str, default="flat", choices=["flat", "2d"],
                         help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
                              "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
@@ -1269,4 +1311,5 @@ if __name__ == "__main__":
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
           seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
-          value_target_variant=args.value_target_variant, encoder=args.encoder)
+          value_target_variant=args.value_target_variant, encoder=args.encoder,
+          value_target_lambda=args.value_target_lambda)

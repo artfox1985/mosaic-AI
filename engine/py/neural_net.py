@@ -588,6 +588,39 @@ VALUE_SCALE = 50.0
 # keine Arena-/R²-Validierung, bei Bedarf anpassen.
 TD_LAMBDA = 0.5
 
+# λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z" --
+# Varianzreduktion des HAUPT-Value-Targets durch Mischen mit dem
+# Root-Suchwert). Seit Commit 2718b9a tragen Self-Play-Records optional das
+# Feld "root_q" ([0,1]-Skala, wie `rtv`) -- der aggregierte Root-Q-Wert der
+# waehrend des Zugs tatsaechlich durchgefuehrten Suche (net_mcts.rs /
+# self_play.rs), NUR vorhanden bei echter Mehr-Aktionen-Suche (fehlt beim
+# Ein-Aktion-Kurzschluss und bei aelteren Dateien ohne dieses Feld, z.B.
+# v16/v17). ABGRENZUNG zu `rtv`/`bootstrap_value` oben: jene ERSETZEN das
+# Value-Target VOR dem Caching (Teil der `val`/`points_val`-Formel, daher im
+# `VALUE_SCHEMA_VERSION`/Cache-Key gebunden) -- `root_q` wird dagegen NUR
+# roh (remapped auf [-1,1] wie `rtv`, `*2.0-1.0`) + eine Praesenz-Maske in
+# den Cache geschrieben, OHNE `values`/`points_forecast` zu veraendern. Der
+# eigentliche λ-Mix (`target = λ·z + (1-λ)·root_q`) passiert ERST in
+# `train.py` (Flag `--value-target-lambda`, `apply_value_target_lambda()`
+# unten) -- so kann derselbe HDF5-Cache fuer beliebig viele λ-Werte im Sweep
+# wiederverwendet werden, statt fuer jeden λ-Arm neu gebaut werden zu
+# muessen (waere bei ~1,3 Mio. Samples/Sweep-Arm unnoetig teuer).
+#
+# CACHE-VERSIONIERUNG (bewusste Entscheidung, WEICHT vom `rounds`/`ownership`-
+# Praezedenzfall ab): `root_q`/`root_q_mask` haengen NICHT im `cache_key`
+# (kein neuer Suffix-Marker wie "+rounds_v1"). Grund: ein Marker wuerde jeden
+# BESTEHENDEN Cache (auch fuer Dateien OHNE root_q, z.B. reine v16/v17-Korpora)
+# einmalig zwingend neu bauen -- unnoetig teuer, wenn root_q dort ohnehin nur
+# ueberall Maske=0 waere. Stattdessen rein additiv wie `policy_weights`/
+# `points_forecast`: ein Alt-Cache OHNE 'root_q'-Dataset laedt weiterhin
+# unveraendert (Fallback unten: Wert 0.0, Maske komplett 0 -- identisch zu
+# `value_target_lambda=1.0`, dem Standardverhalten). Ein FRISCH gebauter
+# Cache (neue Dateiliste, kein bestehender Treffer) enthaelt automatisch die
+# echten root_q-Werte der zugrundeliegenden Dateien, weil der Baucode unten
+# geaendert wurde -- ohne dass sich am `values`/`points_forecast`-Inhalt
+# selbst irgendetwas aendert (der λ-Mix ist eine reine train.py-Nachbearbeitung).
+ROOT_Q_CACHE_FIELDS = ("root_q", "root_q_mask")
+
 # rtv-Ablation Phase 1 (Task #84, 2026-07-24): Trainings-Varianten, die den
 # `round_transition_value`-Override beim Target-Bau ignorieren -- OHNE neues
 # Self-Play, rein um zu testen, ob `rtv` (81% der Self-Play-Kosten, siehe
@@ -788,6 +821,15 @@ class MosaicDataset(Dataset):
                     self.ownership = torch.from_numpy(hf['ownership'][:])
                 else:
                     self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
+                if 'root_q' in hf:
+                    self.root_q = torch.from_numpy(hf['root_q'][:])
+                    self.root_q_mask = torch.from_numpy(hf['root_q_mask'][:])
+                else:
+                    # Alt-Cache ohne root_q (siehe ROOT_Q_CACHE_FIELDS-Kommentar
+                    # oben) -- Maske komplett 0, identisch zu
+                    # value_target_lambda=1.0 (Bestandsverhalten).
+                    self.root_q = torch.zeros(len(self.states), dtype=torch.float32)
+                    self.root_q_mask = torch.zeros(len(self.states), dtype=torch.float32)
                 if self.encoder == "2d":
                     if 'planes' not in hf:
                         raise RuntimeError(
@@ -831,6 +873,10 @@ class MosaicDataset(Dataset):
             self.points_forecast = torch.zeros_like(self.values)  # Legacy .pt kennt kein Aux-Ziel
             self.rounds = torch.zeros(len(self.states), dtype=torch.int8)  # Legacy .pt kennt keine Runden
             self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
+            # Legacy .pt stammt aus einer Aera lange vor root_q (Commit
+            # 2718b9a) -- Maske komplett 0, siehe ROOT_Q_CACHE_FIELDS-Kommentar.
+            self.root_q = torch.zeros(len(self.states), dtype=torch.float32)
+            self.root_q_mask = torch.zeros(len(self.states), dtype=torch.float32)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -842,6 +888,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('points_forecast',     data=self.points_forecast.numpy(),     compression='lzf')
                 hf.create_dataset('rounds',              data=self.rounds.numpy(),              compression='lzf')
                 hf.create_dataset('ownership',           data=self.ownership.numpy(),           compression='lzf')
+                hf.create_dataset('root_q',              data=self.root_q.numpy(),              compression='lzf')
+                hf.create_dataset('root_q_mask',         data=self.root_q_mask.numpy(),         compression='lzf')
             os.remove(cache_path_pt)
             self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
@@ -856,6 +904,8 @@ class MosaicDataset(Dataset):
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
             rounds_l = []  # Rundennummer je Sample (Task #15 B: rundenselektive Loss-Gewichtung)
             own_l = []     # Ownership-Ziel je Sample (Task #9): 72 Binaerlabels, -1 = unbekannt
+            root_q_l = []       # λ-Misch-Experiment: roher Root-Suchwert, remapped [-1,1]
+            root_q_mask_l = []  # 1.0 = root_q vorhanden (echte Suche geloggt), sonst 0.0
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
             # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
             # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
@@ -870,6 +920,21 @@ class MosaicDataset(Dataset):
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if planes_l is not None:
                             planes_l.append(state_to_planes(step["state"]).numpy().astype(np.uint8))
+                        # λ-Misch-Value-Target-Experiment (siehe ROOT_Q_CACHE_FIELDS-
+                        # Kommentar oben): root_q ist ein Roh-Feld je Schritt,
+                        # UNABHAENGIG davon, ob die Partie abgeschlossen ist (anders
+                        # als val/points_val unten) -- daher hier, VOR dem
+                        # scores/winner-Zweig, extrahiert. [0,1]-Skala wie rtv,
+                        # Remap auf [-1,1] beim Cache-Bau (*2.0-1.0). Fehlt bei
+                        # Ein-Aktion-Zuegen und in Dateien ohne dieses Feld
+                        # (Commit 2718b9a, v18 aufwaerts) -- dann Maske 0.
+                        rq = step.get("root_q")
+                        if rq is not None:
+                            root_q_l.append(float(rq) * 2.0 - 1.0)
+                            root_q_mask_l.append(1.0)
+                        else:
+                            root_q_l.append(0.0)
+                            root_q_mask_l.append(0.0)
                         if "scores" in step and "winner" in step:
                             p = step["player"]
                             scores_src = step.get("scores_unclamped", step["scores"])
@@ -1016,6 +1081,8 @@ class MosaicDataset(Dataset):
             points_np    = np.array(points_l,    dtype=np.float32); del points_l
             rounds_np    = np.array(rounds_l,    dtype=np.int8);    del rounds_l
             own_np       = np.array(own_l,       dtype=np.int8);    del own_l
+            root_q_np      = np.array(root_q_l,      dtype=np.float32); del root_q_l
+            root_q_mask_np = np.array(root_q_mask_l, dtype=np.float32); del root_q_mask_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -1034,6 +1101,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('points_forecast',      data=points_np,    compression='lzf')
                 hf.create_dataset('rounds',               data=rounds_np,    compression='lzf')
                 hf.create_dataset('ownership',            data=own_np,       compression='lzf')
+                hf.create_dataset('root_q',               data=root_q_np,      compression='lzf')
+                hf.create_dataset('root_q_mask',          data=root_q_mask_np, compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset('planes',           data=planes_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
@@ -1058,6 +1127,8 @@ class MosaicDataset(Dataset):
             self.points_forecast    = torch.from_numpy(points_np)
             self.rounds             = torch.from_numpy(rounds_np)
             self.ownership          = torch.from_numpy(own_np)
+            self.root_q             = torch.from_numpy(root_q_np)
+            self.root_q_mask        = torch.from_numpy(root_q_mask_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -1103,6 +1174,45 @@ class MosaicDataset(Dataset):
         print(f"Planes komplett ins RAM geladen ({tuple(self._planes_eager_tensor.shape)}, {gb:.2f} GB).")
 
     def __len__(self): return len(self.states)
+
+    def apply_value_target_lambda(self, lam: float) -> float:
+        """λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z"):
+        mischt das HAUPT-Value-Target `self.values` (Shape [N,1]) IN-PLACE mit
+        dem rohen Root-Suchwert `self.root_q` ueberall dort, wo
+        `self.root_q_mask` 1 ist -- `target = lam*values + (1-lam)*root_q`.
+        Samples ohne root_q (Maske 0, z.B. Ein-Aktion-Zuege oder Dateien ohne
+        das Feld) bleiben unveraendert bei `values` (identisch zu lam=1.0),
+        unabhaengig von `lam`.
+
+        `lam=1.0` (Standard/Bestandsverhalten) laesst `self.values` KOMPLETT
+        UNVERAENDERT (frueher Return, keine Tensor-Operation auf `values`) --
+        train.py ruft diese Methode auch bei lam=1.0 auf (fuer den
+        Misch-Anteil-Log), das Trainingsergebnis bleibt dadurch byte-identisch
+        zum Verhalten vor diesem Feature.
+
+        Aufrufer (train.py) ruft dies EINMALIG je Dataset (Train- UND
+        Val-Split) direkt NACH dem Laden auf, VOR dem `DataLoader`-Wrap --
+        jeder Batch liest danach automatisch aus dem gemischten `self.values`,
+        keine Aenderung an `__getitem__`/der Tupel-Form noetig.
+
+        Rueckgabe: Anteil der Samples mit `root_q_mask==1` (Praesenz-Anteil,
+        NICHT abhaengig von `lam`) -- fuer das train.py-Logging (PREREG
+        verlangt den Misch-Anteil dokumentiert, auch bei lam=1.0 informativ)."""
+        if not (0.0 <= lam <= 1.0):
+            raise ValueError(
+                f"value_target_lambda={lam!r} ausserhalb [0,1] -- harter Abbruch "
+                f"statt stillem Clamp (siehe train.py --load-Footgun-Historie)."
+            )
+        n = len(self.values)
+        if n == 0:
+            return 0.0
+        frac = float(self.root_q_mask.mean().item())
+        if lam < 1.0:
+            mask_col = self.root_q_mask.unsqueeze(1).bool()  # [N] -> [N,1], matcht self.values
+            root_q_col = self.root_q.unsqueeze(1)
+            mixed = lam * self.values + (1.0 - lam) * root_q_col
+            self.values = torch.where(mask_col, mixed, self.values)
+        return frac
 
     def _open_planes_h5(self):
         """Öffnet lazy einen HDF5-Handle für Pro-Index-Planes-Zugriff -- NUR
