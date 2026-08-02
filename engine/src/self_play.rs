@@ -827,8 +827,13 @@ fn drafting_step<R: Rng + ?Sized>(
     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
     let state_json = state_to_json(&game.state, true);
 
-    // Zug anwenden (sollte stets gültig sein — aus drafting_actions stammend).
-    let _ = game.apply_drafting(&chosen);
+    // Zug anwenden -- `chosen` stammt aus `drafting_actions`/`drafting_policy`
+    // (also zum Wahlzeitpunkt "legal"). Ein `Err` hier waere ein Engine-Bug
+    // (Zustandsinkonsistenz zwischen Angebot und Ausfuehrung, analog Commit
+    // 80f3698/apply_chosen_action) -- laut verschlucken wuerde den
+    // Trainings-Record mit einem NICHT angewendeten Zug beschriften.
+    game.apply_drafting(&chosen)
+        .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
 
     let mut m = Map::new();
     m.insert("state".into(), state_json);
@@ -1320,7 +1325,10 @@ fn play_arena_game<R: Rng + ?Sized>(
                         search_drafting_action(&game.state, s, c, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    let _ = game.apply_drafting(&chosen);
+                    // Siehe `drafting_step`-Kommentar: `chosen` stammt aus
+                    // `drafting_actions`, ein `Err` waere ein Engine-Bug.
+                    game.apply_drafting(&chosen)
+                        .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
                     steps += 1;
                 } else {
                     break;
@@ -1469,7 +1477,12 @@ fn play_net_game<R: Rng + ?Sized>(
                         apply_chosen_action(&mut game, chosen)
                             .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     } else {
-                        let _ = game.apply_drafting(&chosen);
+                        // Heuristik-Seite braucht `apply_chosen_action` nicht
+                        // (siehe Kommentar oben), aber dieselbe Fehler-
+                        // maskierungs-Familie wie 80f3698: `chosen` stammt aus
+                        // `drafting_actions`, ein `Err` waere ein Engine-Bug.
+                        game.apply_drafting(&chosen)
+                            .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
                     }
                     steps += 1;
                 } else {
@@ -2784,7 +2797,14 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
         // wird neu resampelt.
         g.state.bag.tiles.shuffle(rng);
         g.state.dome_tile_pool.shuffle(rng);
-        let _ = g.apply_drafting(first_action);
+        // `first_action` wurde vom Aufrufer gegen den urspruenglichen
+        // (sichtbaren) Zustand als legal ermittelt -- das Reshuffle oben
+        // betrifft nur die verdeckte Reihenfolge (Beutel-Rest/Kuppelstapel),
+        // NICHT die fuer Legalitaet massgeblichen sichtbaren Felder
+        // (Spielerbretter, Fabriken, Token-/Kuppel-Zaehler). Ein `Err` hier
+        // waere daher ein Engine-Bug, keine erwartbare Ablehnung.
+        g.apply_drafting(first_action)
+            .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
         let mut guard = 0u32;
         loop {
             guard += 1;
@@ -3544,7 +3564,7 @@ pub fn value_noise_floor_diagnostic(
                         let s = dynamic_sims(walk_sims, actions.len());
                         let a = search_drafting_action(&game.state, s, 1.5, &mut rng)
                             .unwrap_or_else(|| actions[0].clone());
-                        let _ = game.apply_drafting(&a);
+                        game.apply_drafting(&a)?;
                     } else {
                         break;
                     }
@@ -3768,7 +3788,11 @@ mod tests {
                                 break;
                             }
                             let a = actions.choose(&mut rng).cloned().unwrap_or(Action::Pass);
-                            let _ = game.apply_drafting(&a);
+                            // `a` stammt aus `drafting_actions`, ein `Err` waere ein
+                            // Engine-Bug -- der Test soll dann fehlschlagen, nicht
+                            // still weiterlaufen (verfaelscht sonst die geprueften
+                            // Invarianten).
+                            game.apply_drafting(&a).expect("apply_drafting sollte hier erfolgreich sein");
                         } else {
                             break;
                         }
@@ -3867,7 +3891,9 @@ mod tests {
                                 break;
                             }
                             let a = actions.choose(&mut rng).cloned().unwrap_or(Action::Pass);
-                            let _ = g.apply_drafting(&a);
+                            // Siehe Kommentar oben (gleiches Muster):
+                            // `a` stammt aus `drafting_actions`.
+                            g.apply_drafting(&a).expect("apply_drafting sollte hier erfolgreich sein");
                         } else {
                             break;
                         }
