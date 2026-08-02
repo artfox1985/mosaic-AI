@@ -255,6 +255,57 @@ def _teacher_played_key(kind: str, **f):
 TEACHER_HINT_TOP_N = 3  # Nutzer-Feedback: max. 3 Kandidaten (vorher 5), alle Stufen.
 
 
+# Punkt 9 (Nutzer-Feedback 2026-08-02, Live-Spiel-Log game_20260802_151513_seed631890):
+# `label_search_move` (engine/src/mcts.rs) baut die Anzeige-Beschreibung eines
+# Stein-Zugs als "...Stein {color} von {src} → {dest}" mit
+#     src = match m.take.factory_id { Some(id) => "F{id}", None => "GF" }
+# -- das ist NUR fuer echte Grossfabrik-SONNEN-Zuege (TakeSource::LargeFactorySun)
+# korrekt. Aktion C (geteilter Mondpool, TakeSource::SmallFactoryMoon mit
+# factory_id=None -- der EINZIGE andere Fall, der ebenfalls factory_id=None
+# hat, siehe engine/src/moves.rs::is_global_moon_take) wird von derselben
+# match-Arme faelschlich GENAUSO als "GF" gelabelt, obwohl sie aus einer oder
+# mehreren KLEINEN Fabriken (und/oder der GF) gleichzeitig zieht -- die Engine
+# ignoriert dabei komplett, welche Fabriken tatsaechlich beigetragen haben
+# (siehe execute_moon_take in execution.rs, wo das RICHTIG gemacht wird: die
+# echten Log-Zeilen listen alle beitragenden Quellen einzeln auf). Der reale
+# Spiel-LOG ist also bereits korrekt -- nur dieser Lehrer-Tipp-/Coach-Text war
+# falsch, und zwar unabhaengig von Punkt 7 (Staedtenamen-Mapping) -- der Bug
+# lag schon vorher in der Engine-Beschreibung, Punkt 7 hat ihn nur sichtbarer
+# gemacht ("GF" -> "GF (Frankfurt)").
+#
+# Fix OHNE Engine-Aenderung (Auftrag: engine/src nur lesen): der Live-
+# Spielzustand (`_rust.state_json()`) verraet zuverlaessig, ob "GF" hier
+# wirklich stimmt -- eine legale Sonnen-Ziehung "von GF" setzt voraus, dass
+# die genannte Farbe auf der Sonnenseite der großen Fabrik liegt. Steht sie
+# dort NICHT, kann die factory_id=None-Ziehung nur der geteilte Mondpool
+# gewesen sein (die einzige verbleibende Moeglichkeit) -- dann wird das Label
+# hier auf Text-Ebene korrigiert. Funktioniert fuer BEIDEN Analyse-Pfade
+# (Netz- und Heuristik-Suche), da es nicht vom (nur im Netz-Pfad gefuellten)
+# `action`/`factory_index`-Feld abhaengt, siehe _teacher_action_params-Doku.
+_T_STONE_GF_RE = _re.compile(r"^((?:\d+× )?Stein (?P<color>\S+) )von GF( → .*)$")
+
+
+def _fix_moon_pool_label(desc: str) -> str:
+    """Korrigiert NUR die Anzeige (nicht die rohe `description`, siehe
+    `_teacher_describe_move`-Aufrufer) -- ersetzt "von GF" durch "vom
+    geteilten Mondpool", wenn der Live-Zustand zeigt, dass die genannte Farbe
+    gar nicht auf der GF-Sonnenseite liegt (siehe Modul-Kommentar oben)."""
+    m = _T_STONE_GF_RE.match(desc)
+    if not m:
+        return desc
+    color = m.group("color")
+    try:
+        state = _json.loads(_rust.state_json()) if _rust is not None else None
+    except Exception:
+        return desc  # im Zweifel unveraendert lassen, kein Rust-Call riskieren
+    if not isinstance(state, dict):
+        return desc
+    gf_sun = (state.get("large_factory") or {}).get("sun") or []
+    if color in gf_sun:
+        return desc  # echte Grossfabrik-Sonnen-Ziehung -- "GF" stimmt
+    return _T_STONE_GF_RE.sub(r"\1vom geteilten Mondpool\3", desc)
+
+
 def _teacher_describe_move(mv: dict) -> str:
     """Anzeige-Beschreibung EINES Analyse-Kandidaten für Lehrer-Ausgaben (Hint-
     Kandidaten UND Coach-`bester_zug_description`). Hängt bei Kuppel-Zügen
@@ -264,8 +315,11 @@ def _teacher_describe_move(mv: dict) -> str:
     dieser Stelle nie bis zur Rotationsstufe vertieft wurde, z.B. bei kleinem
     Sim-Budget). Die ROHE `description` (ohne Rotation) bleibt unverändert für
     das Matching in `_teacher_move_key` -- nur diese Anzeige-Variante wird
-    augmentiert."""
+    augmentiert. Punkt 9: bei Stein-Zügen wird zusätzlich das faelschlich auf
+    "GF" fallende Mondpool-Label korrigiert (`_fix_moon_pool_label`)."""
     desc = mv.get("description") or ""
+    if mv.get("type") == "stone":
+        desc = _fix_moon_pool_label(desc)
     if mv.get("type") in ("choose_dome_slot", "choose_draw_stack_slot"):
         br = mv.get("best_rotation")
         if isinstance(br, dict) and br.get("rotation") is not None:
