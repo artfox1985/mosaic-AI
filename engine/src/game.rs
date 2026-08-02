@@ -202,6 +202,29 @@ pub fn validate_draw_from_stack(state: &GameState, m: &DrawFromStackMove) -> Opt
         return Some(format!("Kachel {} nicht unter den gezogenen.", m.chosen_id));
     }
     let player = &state.players[state.current_player];
+    // BUGFIX (2026-08-02, Folgefund zum Live-Server-Haenger-Bugfix): fehlte
+    // hier bisher, obwohl `validate_dome_move` (Ablage-Variante) exakt diesen
+    // Check hat -- Asymmetrie zwischen beiden Kuppel-Erwerbswegen. Ohne
+    // diesen Check bot `draw_stack_slot_rotation_candidates` (nutzt diese
+    // Funktion als Filter) Rotationen an, die `execute_draw_from_stack`
+    // spaeter GARANTIERT ablehnt (`register_dome_placement` prueft das
+    // 2-Kacheln-Limit erst zur Ausfuehrungszeit) -- ein Kandidat, den
+    // `drafting_actions()` als "legal" auswies, konnte also nie erfolgreich
+    // angewendet werden. Reproduziert (Live-Log-Untersuchung): nach der nun
+    // behobenen Zustandskorruption (`apply_drafting`s Pending-Guard) erbte
+    // ein Spieler, der sein Limit bereits erreicht hatte, eine verwaiste
+    // `pending_stack_draw`-Kachel -- die Rotationswahl schlug dadurch mit
+    // "hat bereits 2 Kacheln diese Runde gelegt" fehl, obwohl sie als legaler
+    // Kandidat angeboten worden war.
+    if !player.can_place_dome_tile(state.round_number) {
+        if state.round_number >= 5 {
+            return Some("In Runde 5 werden keine Kuppeln mehr gelegt.".into());
+        }
+        if player.dome_tiles_placed_this_round >= 2 {
+            return Some(format!("{} hat bereits 2 Kuppeln diese Runde gelegt.", player.name));
+        }
+        return Some("Das 3×3-Raster ist bereits voll.".into());
+    }
     if player.dome_grid.dome_slots[m.slot_row][m.slot_col].is_some() {
         return Some(format!("Slot ({},{}) ist bereits belegt.", m.slot_row, m.slot_col));
     }
