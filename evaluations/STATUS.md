@@ -7125,6 +7125,16 @@ Nutzer-Einwand 2026-08-03)**:
   der Guardrail reisst; der beste λ_aggr ist der letzte VOR dem
   Kipppunkt.
 
+- **Konsequenz (Nutzer, 2026-08-03): `VALUE_OPP_EPSILON` wird damit
+  obsolet.** Zielbild: reiner Own-Punkte-Kopf (ε=0) + reiner
+  Opp-Punkte-Kopf -- JEDE Mischung inkl. der bisherigen 0,1er-Semantik
+  ist dann ein Laufzeit-Spezialfall (own − λ·opp, λ=0,1). Migration im
+  SELBEN Schema-Schritt wie der neue Kopf (ein Cache-Bump); betroffene
+  Konsumenten klein (debug.html-Ruecktransformation zeigt dann reine
+  eigene Punkte, rtv-Zweig der Formel). Alt-Checkpoints behalten ihre
+  Alt-Semantik (kein opp-Kopf vorhanden, w=0-Default -> Live-Verhalten
+  byte-identisch, Additiv-Regel eingehalten).
+
 **Einordnung**: nach der laufenden Experimentkette (Lambda -> PCR -> R5 ->
 R4) und dem v20-Zyklus einplanen -- kein Blocker fuer v20, aber ein
 direkt spuerbarer GUI-Spielstaerke-/Spielstil-Hebel.
