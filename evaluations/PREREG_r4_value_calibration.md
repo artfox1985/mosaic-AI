@@ -6,16 +6,47 @@ separat freigegeben. Die Regeln unten dürfen nach Sichtung von
 Zwischenergebnissen nicht mehr geändert werden (Präzedenzfälle
 `PREREG_lambda_target.md`/`PREREG_r5_value_calibration.md`).
 
-## Übergeordnetes Ziel (Nutzer-Vorgabe 2026-08-03)
+## Übergeordnetes Ziel (Nutzer-Vorgabe 2026-08-03, präzisiert)
 
-Den Value-Head **an die maximal mögliche Vorhersagequalität heranführen** —
-ab Runde 2 ist da "noch ordentlich Luft nach oben". Dieses Dokument ist der
-Runde-4-Baustein dieser Agenda: es misst nicht nur, WIE gut der Value-Head
-am Runde-4-Ende kalibriert ist, sondern quantifiziert erstmals auch die
-**theoretische Obergrenze** (den irreduziblen Zufallsanteil des
-Rundenübergangs), gegen die "maximal möglich" überhaupt definiert ist.
-Runde 3/2 sind Ausblick (verschachtelte Chance-Knoten, siehe unten), nicht
-Teil dieser Vorregistrierung.
+Den Value-Head **an den maximal möglichen R² heranführen** — ab Runde 2 ist
+da "noch ordentlich Luft nach oben" (gemeint: der gemessene Value-R² je
+Runde, vgl. `value_r2_rounds_1_4`/die Runden-Spalten von
+`offline_diagnose.py`, liegt deutlich unter dem, was angesichts des
+Restzufalls überhaupt erreichbar wäre). Der maximal mögliche R² ist wegen
+der Chance-Knoten (Rundenübergänge, in R2/R3 zusätzlich verdeckte
+Kuppelplatten) STRIKT kleiner als 1 — selbst ein perfekter Schätzer von
+`E[Ausgang | Zustand]` erreicht nur
+
+```
+R²_max = Var(E[z|s]) / ( Var(E[z|s]) + E[Var(z|s)] )
+```
+
+(Varianzzerlegung; `E[Var(z|s)]` = irreduzibler Zufallsanteil).
+
+**Diese Decke wurde für Runden 1–3 BEREITS gemessen** (STATUS.md,
+2026-07-21, `self_play::value_noise_floor_diagnostic`, bias-korrigierte
+Varianzzerlegung, n=120 Zustände / K=16 Heuristik-Fortsetzungen je Runde):
+
+| Runde | R²_max (korrigiert) | Modell damals (v10_best) |
+|---|---|---|
+| 1 | 0,0068 | −0,063 |
+| 2 | 0,166 | 0,017 |
+| 3 | 0,437 | 0,195 |
+
+Genau DIESE Serie ist die Quelle des "ab Runde 2 Luft nach oben"-Befunds.
+Dieses Dokument setzt die Serie am **Runde-4-Ende** fort — mit einer
+METHODISCH SCHÄRFEREN Decke: die alte Messung nutzt K Heuristik-Rollouts
+bis Spielende (deren Spielzug-Zufall zählt mit ins "irreduzible" Rauschen
+— die Decke ist damit eine UNTERSCHÄTZUNG der unter optimalem Spiel
+erreichbaren), das R4-Design ersetzt die Fortsetzung durch EXAKTES
+Optimal-Spiel (`round5.rs`) — als Rauschquelle bleibt allein der echte
+Chance-Knoten (Fabrik-Neubefüllung). Erwartung daher: exakte R4-Decke ≥
+eine heuristische R4-Decke. Zusätzlich misst dieses Experiment die
+KALIBRIERUNG des Modells gegen `E[z|s]` selbst — das konnte die alte
+Methode nicht (sie lieferte nur die Zerlegungs-Terme, keinen
+Zustand-für-Zustand-Ground-Truth-Vergleich). Runde 3/2 sind Ausblick
+(verschachtelte Chance-Knoten, siehe unten), nicht Teil dieser
+Vorregistrierung.
 
 ## Kern-Erkenntnis, die dieses Design trägt (Nutzer-Fund, code-verifiziert)
 
@@ -123,14 +154,35 @@ im R5-Dokument):
    `true_winprob`.
 2. **Punkte-Kopf**: OLS-Steigung + R² von `50*atanh(clamp(raw_points))`
    gegen `true_margin`.
-3. **Decken-Quantifizierung ("Luft nach oben")**: je Zustand die
-   Refill-Streuung (`std(ab_value_k)`; Binomial-SE der Winrate
-   `sqrt(p̂(1−p̂)/K)`), gemittelt über Zustände = **irreduzibler
-   Unsicherheitsanteil am R4-Ende**. Dagegen gestellt: RMSE des
-   Modell-Value gegen `true_winprob`. Modell-RMSE ≫ Sampling-Rauschen
-   → echte, schließbare Lücke; Modell-RMSE ≲ 1,5× Sampling-Rauschen
-   → "nahe an der Decke" (dann ist die R3/R2-Erweiterung der
-   wichtigere nächste Hebel, nicht weiteres R4-Tuning).
+3. **Decken-Quantifizierung: maximal möglicher R² am R4-Ende** (das
+   Kernstück der Nutzer-Agenda). Über die N Zustände, je Skala:
+   - **Sieg-Skala** (`z_k = ±1` je Refill, Value-Kopf-Ziel):
+     `R²_max = Var_s(2·p_s−1) / ( Var_s(2·p_s−1) + mean_s[4·p_s(1−p_s)·K/(K−1)] )`
+     mit `p_s` = Refill-Gewinnquote des Zustands (K/(K−1) =
+     Endlichkeits-Korrektur des Binnen-Varianz-Schätzers).
+   - **Margen-Skala** (Punkte-Kopf):
+     `R²_max = Var_s(true_margin_s) / ( Var_s(true_margin_s) + mean_s[Var_k(ab_value_k)] )`
+     (Binnen-Varianz mit Stichproben-Korrektur n−1).
+   Dagegen gestellt: der **realisierte Modell-R²** auf denselben N
+   Zuständen, je Kopf auf seiner Skala — einmal gegen die EINZELNEN
+   Refill-Ausgänge (direkt vergleichbar mit R²_max, gleiche Definition wie
+   die bestehende `value_r2`-Metrik: Prädiktor vs. realisierter Ausgang)
+   und einmal gegen `E[z|s]`/`true_margin` (misst den reinen
+   Schätzfehler-Anteil, frei vom irreduziblen Term). Die Differenz
+   `R²_max − R²_modell` ist die **beziffbare "Luft nach oben"** am
+   R4-Ende.
+
+### Anschlussmessung an die bestehende Noise-Floor-Serie (sekundär)
+
+Zur Serien-Vergleichbarkeit mit den R1–R3-Werten läuft ZUSÄTZLICH die
+BESTEHENDE Diagnostik `self_play::value_noise_floor_diagnostic` mit
+`target_round=4` (identische Parameter wie 2026-07-21: n_states=120,
+k_rollouts=16 — vorhandenes Werkzeug, Memory
+`feedback_check_existing_tools_first`). Erwartung: heuristische R4-Decke
+zwischen R3-Wert (0,437) und der exakten Decke dieses Experiments. Eine
+DEUTLICHE Abweichung von dieser Ordnung (exakt < heuristisch, außerhalb der
+Schätzfehler) wäre ein Methoden-Alarm (eine der beiden Messungen hätte dann
+ein Problem) und wird VOR jeder inhaltlichen Interpretation geklärt.
 
 ## Parameter (VORAB festgelegt)
 
@@ -163,9 +215,13 @@ im R5-Dokument):
   Ursachenanalyse.
 - **R² < 0,1**: kein interpretierbarer Befund (mehr Zustände/Refills nötig,
   bevor irgendeine Aussage getroffen wird).
-- **Decken-Regel** (unabhängig von den obigen): Modell-RMSE ≤ 1,5× des
-  mittleren Sampling-Rauschens → als "nahe an der Decke" einstufen, R3/R2
-  priorisieren (siehe Ausblick).
+- **Decken-Regel** (unabhängig von den obigen, auf der Sieg-Skala des
+  Value-Kopfs): `R²_modell ≥ 0,8 · R²_max` → als "nahe an der Decke"
+  einstufen, R3/R2 priorisieren (siehe Ausblick); `R²_modell < 0,5 · R²_max`
+  → große schließbare Lücke, R4-Ende bleibt eigener Hebel. Dazwischen:
+  beides berichten, keine automatische Priorisierung. (Die Schwellen sind
+  bewusst grob — bei N=24/K=16 trägt `R²_max` selbst einen Schätzfehler,
+  der per Bootstrap über die Zustände mitberichtet wird.)
 
 ## Bekannte Einschränkungen, bewusst akzeptiert
 
@@ -186,13 +242,18 @@ im R5-Dokument):
 
 ## Ausblick Runde 3/2 (Nutzer-Ziel "ab Runde 2", NICHT Teil dieser Vorregistrierung)
 
-Runde 3-/2-Zustände haben VERSCHACHTELTE Chance-Knoten (jeder weitere
-Rundenübergang einer) plus in R2/R3 noch echte verdeckte Kuppelplatten —
-eine Ground Truth dort ist nur per rekursivem Sampling + Suche statt exakter
-Rechnung erreichbar (Kostenexplosion: jedes R3-Sample bräuchte selbst wieder
-eine R4-Bewertung wie oben). Ob und wie das angegangen wird, entscheidet
-sich NACH dem Ergebnis dieses Experiments (Decken-Regel oben liefert genau
-dafür die Priorisierung).
+Für Runde 2/3 existieren bereits HEURISTISCHE Decken (Serie 2026-07-21,
+siehe oben) — dort ist die Lücke zum Modell der eigentliche Befund (R2:
+0,166 möglich vs. 0,017 erreicht). Eine SCHÄRFERE (exakte) Ground Truth wie
+in diesem R4-Design ist dort nicht direkt übertragbar: Runde 3-/2-Zustände
+haben VERSCHACHTELTE Chance-Knoten (jeder weitere Rundenübergang einer)
+plus echte verdeckte Kuppelplatten — exaktere Decken dort gingen nur per
+rekursivem Sampling + Suche (Kostenexplosion: jedes R3-Sample bräuchte
+selbst wieder eine R4-Bewertung wie oben). Der näherliegende R2/R3-Hebel
+ist laut damaligem Befund ohnehin TRAINING (Lücke schließen), nicht
+Decken-Messung (Lücke neu vermessen). Ob und wie das angegangen wird,
+entscheidet sich NACH dem Ergebnis dieses Experiments (Decken-Regel oben
+liefert genau dafür die Priorisierung).
 
 ## Ausführungsplan
 
