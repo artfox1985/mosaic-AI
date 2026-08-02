@@ -7068,3 +7068,50 @@ Auswertung (bei Lambda: nach einem evtl. Arena-Gating) geloescht --
 Konvention wie `voll_s*`/`halb_s*`/`fs_2d_s*` (nur Manifeste bleiben).
 Sandboxes raeumen die Treiber selbst ab; OneDrive-Handle-Reste werden
 manuell nachgeraeumt (Smoke-Sandboxes 2026-08-03 so bereinigt).
+
+## Task #28 (vorgemerkt): Aggressiveres Spiel -- Score-/Denial-Utility (2026-08-03)
+
+**Nutzer-Wunsch**: die KI soll aktiv dem Gegner schaden (Punkte wegnehmen/
+verhindern), solange es das eigene Gewinnen nicht gefaehrdet -- nicht nur
+selbst sammeln. Nutzer-Vorschlag: `VALUE_OPP_EPSILON` (Punkte-Kopf-Ziel)
+hochsetzen im Sweep, dann Punkte eines GLEICHBLEIBENDEN Gegners vergleichen.
+
+**Verdrahtungs-Befund (2026-08-03, code-geprueft)**: der Punkte-Kopf
+beeinflusst die Live-Suche aktuell GAR NICHT --
+`net_mcts.rs::POINTS_UTILITY_WEIGHT = 0.0` (KataGo-Stil-Blend
+`(1-w)*winprob + w*points` existiert, ist aber aus). Ein reiner
+ε-Sweep (`VALUE_OPP_EPSILON`, aktuell 0.1, `neural_net.py:583`) wuerde
+das Live-Verhalten daher NICHT aendern -- ε wirkt nur ins TRAINING des
+Punkte-Kopfs. Beide Hebel muessen gekoppelt werden. Zusaetzlich zu wissen:
+`round5.rs` spielt Runde 5 bereits exakt auf Marge (eigen-gegner) --
+maximal "aggressiv" im Endspiel; der Hebel betrifft Runden 1-4.
+
+**Historischer Kontext (Warnung)**: POINTS_UTILITY_WEIGHT 0.5/1.0 wurde
+2026-07-19 (v9b-Aera, kaputte Head-Generation, 150 Sims) getestet und
+scheiterte klar -- Kommentar an der Konstante. Der Retest heute hat zwei
+andere Vorzeichen: gesunde Koepfe (v19_2d, Punkte-Kopf-R² historisch
+0.33-0.44) und ein KLEINES w-Regime (0.05-0.2 statt 0.5/1.0) -- genau dort
+liefert der Blend das Gewuenschte: solange die Partie offen ist, dominiert
+winprob; ist sie (fast) entschieden, saettigt winprob und der
+Punkte-/Denial-Term uebernimmt den Gradienten.
+
+**Design-Skizze (zweiphasig, PREREG folgt bei Angehen)**:
+- **Phase A (billig, OHNE Retraining)**: `POINTS_UTILITY_WEIGHT`
+  laufzeit-konfigurierbar machen (additiv, Praezedenz GUMBEL_TOP_M/PCR),
+  Sweep w ∈ {0, 0.05, 0.1, 0.2} mit dem BESTEHENDEN Champion-Punkte-Kopf
+  (ε=0.1). Messung wie vom Nutzer vorgeschlagen: gepaarte Arena gegen
+  FESTEN Gegner (amtierender Champion mit w=0), Primaermetrik =
+  Ø-Gegnerpunkte (Aggressions-Nachweis), **Guardrail = eigene Win-Rate
+  darf nicht signifikant fallen** (Nicht-Unterlegenheit, McNemar --
+  das operationalisiert "solange es dem Gewinnen nicht im Weg ist"),
+  sekundaer eigene Punkte + Bodenstrafe.
+- **Phase B (nur falls A wirkt, aber zu schwach)**: ε-Sweep im
+  Punkte-Kopf-ZIEL (Nutzer-Vorschlag), z.B. ε ∈ {0.1, 0.3, 0.6, 1.0} --
+  braucht Retraining je Arm; Umsetzung train-zeitlich statt
+  cache-zeitlich (λ-Mix-Praezedenz: EIN Cache fuer alle Arme),
+  gepaarte Seeds (Seed-Varianz-Memory), danach Arena-Messung wie A
+  mit dem besten w aus Phase A.
+
+**Einordnung**: nach der laufenden Experimentkette (Lambda -> PCR -> R5 ->
+R4) und dem v20-Zyklus einplanen -- kein Blocker fuer v20, aber ein
+direkt spuerbarer GUI-Spielstaerke-/Spielstil-Hebel.
