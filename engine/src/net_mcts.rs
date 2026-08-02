@@ -237,6 +237,40 @@ pub const MIRROR_OTHER_VAL: bool = false;
 /// Verhalten); Code bleibt verfügbar.
 pub const SHUFFLE_STACK_PEEK_IN_SEARCH: bool = false;
 
+/// Buendelt die ERSTMALIGE Expansion ALLER Top-m-Kandidaten an der Gumbel-
+/// Wurzel (Perf-Auftrag, 2026-08-02: die 1,46x-2D-Inferenzkosten druecken)
+/// in EINEM `Net::eval_batch`-Aufruf statt `m_prime` einzelner
+/// `make_node`-Netz-Evals -- siehe `batched_expand_root_candidates`.
+/// Standardmaessig AUS (gleiches Muster wie `USE_GUMBEL_SEARCH`/
+/// `MIRROR_OTHER_VAL` etc. -- neue, noch nicht arena-validierte
+/// Sucheigenschaft), Arena-A/B folgt VOR einer Aktivierung.
+///
+/// Numerisch THEORETISCH nicht ganz kostenlos beim Umschalten: die
+/// per-Kandidat-Blattwerte selbst sind batch-invariant (Toleranz 1e-5,
+/// siehe `net::eval_batch_matches_n_single_evals` -- derselbe
+/// Praezedenzfall wie `eval_pair`), und die WURZEL-Aggregate
+/// (`nodes[0].value`/`.visits`) KOENNTEN in den letzten Bits abweichen,
+/// weil Gleitkomma-Summation nicht assoziativ ist und die Kandidaten-
+/// Expansionsreihenfolge sich relativ zu den anschliessenden Tiefen-
+/// Besuchen verschiebt (batched: ALLE `m_prime` Kandidaten zuerst, dann
+/// deren weitere Besuche; unbatcht: je Kandidat Erstbesuch + weitere
+/// Besuche EINGESCHACHTELT, bevor der naechste Kandidat drankommt) --
+/// GEMESSEN (2026-08-02, Paritaetstest
+/// `batched_root_expansion_matches_sequential_within_tolerance`, gegen
+/// `v19_2d_best` UND ein flaches Modell, sims=400/m_prime=16) war das
+/// Ergebnis aber tatsaechlich BIT-IDENTISCH (nicht nur innerhalb Toleranz)
+/// -- kein beobachtbarer Effekt in der Praxis, die Toleranz im Test bleibt
+/// trotzdem als Sicherheitsmarge stehen (kein Anspruch auf Bit-Identitaet
+/// ueber alle Hardware-/tract-Versionen hinweg).
+/// RNG-Verbrauch bleibt in der Standardkonfiguration UNVERAENDERT (siehe
+/// `batched_expand_root_candidates`-Doku): `SHUFFLE_STACK_PEEK_IN_SEARCH`
+/// und `ROUND_TRANSITION_SAMPLING` (beide Default `false`) sind die
+/// einzigen `rng`-Verbrauchsstellen zwischen Expansion und Tiefenbesuch --
+/// bei `SHUFFLE_STACK_PEEK_IN_SEARCH=true` faellt die Aufrufstelle
+/// zusaetzlich auf den unbatchten Pfad zurueck (siehe dort), um die
+/// RNG-Reihenfolge nicht zu verschieben.
+pub const BATCH_ROOT_EXPANSION: bool = false;
+
 /// Wurzel-Determinisierung (Nutzer-Vorschlag, 2026-07-20 -- Ersatz für
 /// `SHUFFLE_STACK_PEEK_IN_SEARCH`s In-Tree-Neumischung): statt bei JEDEM
 /// simulierten Peek/Chip-Reveal neu zu mischen (nachweislich MEHR
@@ -1101,6 +1135,43 @@ fn make_node<R: Rng + ?Sized>(
         }
     };
 
+    node_from_net_outputs(
+        net_policy, net_value, state, parent, parent_state, action, prior, player_who_acted, terminal,
+        logits, value, moon, points, other_pass, rng,
+    )
+}
+
+/// Baut einen [`Node`] aus BEREITS BERECHNETEN Netz-Rohausgaben
+/// (`logits`/`value`/`moon`/`points`/`other_pass`) -- reine Extraktion aus
+/// `make_node` (Perf-Auftrag, 2026-08-02: Gumbel-Wurzel-Kandidaten-
+/// Buendelung), KEINE Verhaltensaenderung: `make_node` ruft dies direkt im
+/// Anschluss an seinen eigenen (unveraendert EINZELNEN) Netz-Eval-Block auf.
+/// Der Sinn der Trennung: fuer eine GEBUENDELTE Wurzel-Kandidaten-Expansion
+/// (`batched_expand_root_candidates` unten) werden die Netz-Rohausgaben
+/// FUER ALLE KANDIDATEN GEMEINSAM per `Net::eval_batch` berechnet (EIN
+/// ONNX-Aufruf statt `m_prime` einzelner) -- die eigentliche Knoten-
+/// Konstruktion (Blattwert-Blending, Value-Shrink, Floor-/Plate-Shaping,
+/// `build_untried_actions`, ...) bleibt dabei UNVERAENDERT dieselbe Funktion
+/// wie im unbatchten Pfad, angewandt auf JEDEN Kandidaten einzeln -- kein
+/// Doppelpflege-Risiko zwischen zwei Kopien derselben Logik.
+#[allow(clippy::too_many_arguments)]
+fn node_from_net_outputs<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    state: GameState,
+    parent: Option<usize>,
+    parent_state: Option<&GameState>,
+    action: Option<Action>,
+    prior: f32,
+    player_who_acted: usize,
+    terminal: bool,
+    logits: Vec<f32>,
+    value: Vec<f32>,
+    moon: Vec<f32>,
+    points: Vec<f32>,
+    other_pass: Option<(Vec<f32>, Vec<f32>)>,
+    rng: &mut R,
+) -> Node {
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
         moon_scores[i] = *s;
@@ -1804,6 +1875,121 @@ impl GumbelTrace {
 /// gesammelt -- ausschließlich additive Lesezugriffe auf ohnehin berechnete
 /// Werte, KEINE Änderung an Auswahl/Backprop/RNG-Verbrauch (siehe
 /// Paritätstest).
+/// Buendelt die ERSTMALIGE Expansion ALLER `candidates.len()` Top-m-
+/// Kandidaten an der Gumbel-Wurzel in EINEM `Net::eval_batch`-Aufruf (Perf-
+/// Auftrag, 2026-08-02, siehe `BATCH_ROOT_EXPANSION`-Doku) statt
+/// `candidates.len()` einzelner `make_node`-Netz-Evals. NUR fuer den
+/// `same_net`-Fall gedacht (Aufrufer prueft das) -- diese Funktion selbst
+/// geht implizit davon aus, dass EIN Netz (`net_policy`) sowohl Policy- als
+/// auch Value-Quelle ist (identisch zu `make_node`s `same_net=true`-Zweig).
+///
+/// Baut je erfolgreich expandiertem Kandidaten einen [`Node`] (ueber
+/// `node_from_net_outputs`, DIESELBE Konstruktionslogik wie der unbatchte
+/// Pfad -- kein Doppelpflege-Risiko), haengt ihn an `nodes[0].children` und
+/// setzt `candidate_node[ci] = Some(cid)` -- ABSICHTLICH OHNE den
+/// Erstbesuch-Backprop (`nodes[cid].visits` bleibt `0`, Frisch-Knoten-
+/// Default): der Aufrufer (`build_gumbel_tree`s `visit_candidate!`-Makro)
+/// erkennt `visits==0` und holt den Backprop beim naechsten reguraeren
+/// Besuch nach -- dadurch bleibt die `budget_used`/`extra`-Buchhaltung der
+/// Sequential-Halving-Phasenschleife UNVERAENDERT (jeder Kandidat zaehlt
+/// weiterhin genau EINEN Sim fuer seinen Erstbesuch, exakt wie im unbatchten
+/// Pfad -- nur WANN der Netz-Eval passiert, nicht WIE VIELE Sims er kostet,
+/// aendert sich).
+///
+/// Fehlgeschlagene `apply_drafting`-Versuche werden wie im unbatchten Pfad
+/// stillschweigend uebersprungen (`candidate_node[ci]` bleibt `None`).
+///
+/// RNG/Determinismus: siehe `BATCH_ROOT_EXPANSION`-Doku -- in der
+/// Standardkonfiguration (`SHUFFLE_STACK_PEEK_IN_SEARCH=false`,
+/// `ROUND_TRANSITION_SAMPLING=false`) verbraucht `node_from_net_outputs`
+/// gar kein `rng`, die Aufrufreihenfolge ist daher irrelevant; der
+/// `SHUFFLE_STACK_PEEK_IN_SEARCH=true`-Fall wird an der Aufrufstelle
+/// zusaetzlich ausgeschlossen (fällt auf den unbatchten Pfad zurück).
+fn batched_expand_root_candidates<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    root_state: &GameState,
+    candidates: &[(Action, f32, f64)],
+    nodes: &mut Vec<Node>,
+    candidate_node: &mut [Option<usize>],
+    rng: &mut R,
+) {
+    let mover = root_state.current_player;
+    let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
+
+    struct Pending {
+        ci: usize,
+        action: Action,
+        prior: f32,
+        child_state: GameState,
+        terminal: bool,
+    }
+    let mut pending: Vec<Pending> = Vec::with_capacity(candidates.len());
+    for (ci, (act, prior, _g)) in candidates.iter().enumerate() {
+        crate::profiling::note_gamestate_clone();
+        let mut g = Game { state: root_state.clone() };
+        // Kein `SHUFFLE_STACK_PEEK_IN_SEARCH`-Zweig hier -- die Aufrufstelle
+        // schaltet den Batch-Pfad bei aktivem Toggle komplett ab (siehe
+        // Funktionskommentar), diese Funktion wird dann nie erreicht.
+        if g.apply_drafting(act).is_ok() {
+            let mut child_state = g.state;
+            child_state.log.clear();
+            let terminal = child_state.phase != Phase::Drafting;
+            pending.push(Pending { ci, action: act.clone(), prior: *prior, child_state, terminal });
+        }
+    }
+    if pending.is_empty() {
+        return;
+    }
+
+    let feats: Vec<Vec<f32>> = pending
+        .iter()
+        .map(|p| {
+            crate::profiling::timed(crate::profiling::note_features_ns, || {
+                crate::features::features_for_net(net_policy, &p.child_state)
+            })
+        })
+        .collect();
+    let feats_refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
+    let n = pending.len();
+    let outputs = crate::profiling::timed_net_eval(n, || net_policy.eval_batch(&feats_refs)).unwrap_or_else(|_| {
+        (0..n).map(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())).collect()
+    });
+
+    let other_outputs: Vec<Option<(Vec<f32>, Vec<f32>)>> = if need_other_pass {
+        let other_feats: Vec<Vec<f32>> = pending
+            .iter()
+            .map(|p| {
+                let mut flipped = p.child_state.clone();
+                flipped.current_player = 1 - p.child_state.current_player;
+                crate::features::features_for_net(net_policy, &flipped)
+            })
+            .collect();
+        let other_feats_refs: Vec<&[f32]> = other_feats.iter().map(|v| v.as_slice()).collect();
+        let other_out = crate::profiling::timed_net_eval(n, || net_policy.eval_batch(&other_feats_refs))
+            .unwrap_or_else(|_| (0..n).map(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect());
+        other_out.into_iter().map(|(_, o_value, _, o_points)| Some((o_value, o_points))).collect()
+    } else {
+        (0..n).map(|_| None).collect()
+    };
+
+    for (idx, p) in pending.into_iter().enumerate() {
+        let (logits, value, moon, points) = outputs[idx].clone();
+        let other_pass = other_outputs[idx].clone();
+        let child = node_from_net_outputs(
+            net_policy, net_value, p.child_state, Some(0), Some(root_state), Some(p.action), p.prior, mover,
+            p.terminal, logits, value, moon, points, other_pass, rng,
+        );
+        let cid = nodes.len();
+        nodes.push(child);
+        nodes[0].children.push(cid);
+        candidate_node[p.ci] = Some(cid);
+        // BEWUSST kein Backprop hier -- siehe Funktionskommentar
+        // (`visits==0` bleibt der Marker fuer "expandiert, aber Erstbesuch
+        // noch nicht gezaehlt", nachgeholt vom `visit_candidate!`-Makro).
+    }
+}
+
 fn build_gumbel_tree<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -1811,7 +1997,30 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     sims: u32,
     add_root_noise: bool,
     rng: &mut R,
+    trace: Option<&mut GumbelTrace>,
+) -> Vec<Node> {
+    build_gumbel_tree_inner(net_policy, net_value, state, sims, add_root_noise, rng, trace, BATCH_ROOT_EXPANSION)
+}
+
+/// Eigentliche Implementierung von [`build_gumbel_tree`], mit
+/// `batch_root_expansion` als LAUFZEIT-Parameter statt der globalen
+/// `BATCH_ROOT_EXPANSION`-Konstante (Perf-Auftrag, 2026-08-02) -- einziger
+/// Zweck: der Paritaetstest
+/// `batched_root_expansion_matches_sequential_within_tolerance` kann so
+/// BEIDE Pfade (batched/unbatcht) mit IDENTISCHEM Seed direkt gegeneinander
+/// vergleichen, ohne die Konstante zur Testlaufzeit umschalten zu muessen
+/// (waere bei einem `const` ohnehin nicht moeglich). `build_gumbel_tree`
+/// selbst bleibt die STABILE, unveraenderte Aufrufstellen-Signatur -- reicht
+/// nur `BATCH_ROOT_EXPANSION`s aktuellen (Default `false`) Wert durch.
+fn build_gumbel_tree_inner<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    state: &GameState,
+    sims: u32,
+    add_root_noise: bool,
+    rng: &mut R,
     mut trace: Option<&mut GumbelTrace>,
+    batch_root_expansion: bool,
 ) -> Vec<Node> {
     let mut root_state = state.clone();
     root_state.log.clear();
@@ -1957,13 +2166,50 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     let mut candidate_node: Vec<Option<usize>> = vec![None; candidates.len()];
     let mut current: Vec<usize> = (0..candidates.len()).collect();
 
+    // Perf-Auftrag (2026-08-02): gebuendelte Erstexpansion ALLER Kandidaten
+    // in EINEM Netz-Batch-Aufruf statt `candidates.len()` einzelner Evals,
+    // siehe `BATCH_ROOT_EXPANSION`-Doku. NUR wenn (a) der Toggle aktiv ist,
+    // (b) mehr als 1 Kandidat da ist (bei genau 1 gibt's nichts zu
+    // buendeln, der `candidates.len()<=1`-Zweig unten bleibt unberuehrt),
+    // (c) Policy- und Value-Netz IDENTISCH sind (Hybrid-Pfad, Task #88,
+    // faellt weiterhin auf den unbatchten Pfad zurueck -- ausserhalb des
+    // Scopes dieses Auftrags) und (d) `SHUFFLE_STACK_PEEK_IN_SEARCH` AUS
+    // ist (sonst wuerde die geaenderte Kandidaten-Reihenfolge den
+    // RNG-Verbrauch verschieben, siehe `BATCH_ROOT_EXPANSION`-Doku).
+    let same_net_for_batching = net_value.is_none_or(|v| std::ptr::eq(v, net_policy));
+    if batch_root_expansion && candidates.len() > 1 && same_net_for_batching && !SHUFFLE_STACK_PEEK_IN_SEARCH {
+        let root_state = nodes[0].state.clone();
+        batched_expand_root_candidates(
+            net_policy, net_value, &root_state, &candidates, &mut nodes, &mut candidate_node, rng,
+        );
+    }
+
     // Expandiert (falls nötig) und simuliert EINEN weiteren Besuch für
     // Kandidat `ci` (Index in `candidates`/`candidate_node`).
     macro_rules! visit_candidate {
         ($ci:expr) => {{
             let ci = $ci;
             match candidate_node[ci] {
-                Some(cid) => descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng),
+                Some(cid) if nodes[cid].visits > 0 => {
+                    descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng)
+                }
+                Some(cid) => {
+                    // Perf-Auftrag (2026-08-02): per `batched_expand_root_candidates`
+                    // bereits per Batch-Netz-Eval expandiert (Node existiert,
+                    // `leaf_value` bereits berechnet), aber NOCH NICHT als
+                    // Besuch gezaehlt (`visits==0`, Frisch-Knoten-Default) --
+                    // hier NUR den Erstbesuch-Backprop nachholen, KEIN
+                    // zweiter Netz-Eval (identische Backprop-Logik wie im
+                    // `None`-Zweig unten, ohne die dortige vorangehende
+                    // Netz-/Expansionsarbeit, die schon erledigt ist).
+                    let value = nodes[cid].leaf_value;
+                    let mut cur = Some(cid);
+                    while let Some(i) = cur {
+                        nodes[i].visits += 1;
+                        nodes[i].value += value[nodes[i].player_who_acted];
+                        cur = nodes[i].parent;
+                    }
+                }
                 None => {
                     let (act, prior, _g) = candidates[ci].clone();
                     let mover = nodes[0].state.current_player;
@@ -3537,6 +3783,164 @@ mod tests {
             let _ = game.apply_drafting(&a);
         }
         (game.state.phase == Phase::Drafting).then_some(game.state)
+    }
+
+    /// Laedt ein lokal vorhandenes Modell fuer den `BATCH_ROOT_EXPANSION`-
+    /// Paritaetstest unten -- `load_test_net()` (oben) haengt an
+    /// `alphazero_v10_best.onnx`, das im aktuellen Modell-Bestand nicht
+    /// mehr vorhanden ist (gleicher Befund wie bei den Task-#14-PCR-Tests
+    /// in `self_play.rs`/den `eval_batch`-Tests in `net.rs`). Bewusst der
+    /// AMTIERENDE 2D-Champion `v19_2d_best` (nicht ein flaches Modell) --
+    /// das ist der eigentliche Zielpunkt dieses Perf-Auftrags (die
+    /// 1,46x-2D-Inferenzkosten druecken), der Paritaetstest soll also genau
+    /// DIESE Architektur (`PlanesPlusFlat`-Layout, ZWEI ONNX-Graph-Inputs)
+    /// abdecken, nicht nur den einfacheren flachen Pfad.
+    fn load_batching_test_net() -> Option<Net> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v19_2d_best.onnx");
+        Net::load_auto(path.to_str().unwrap()).ok()
+    }
+
+    /// Perf-Auftrag (2026-08-02) -- Kernabsicherung fuer `BATCH_ROOT_EXPANSION`:
+    /// `build_gumbel_tree_inner` mit `batch_root_expansion=true` muss bei
+    /// IDENTISCHEM Seed (a) dieselbe Gesamt-Besuchszahl an der Wurzel
+    /// liefern (Sim-Buchhaltung unveraendert, siehe
+    /// `batched_expand_root_candidates`-Doku), (b) pro Wurzelkind dieselbe
+    /// Besuchszahl (Kontrollfluss/RNG bis zur Kandidatenauswahl ist in
+    /// beiden Pfaden identischer Code, siehe Kommentar an der Aufrufstelle)
+    /// und (c) dieselben Q-Werte wie der unbatchte Pfad liefern.
+    ///
+    /// GEMESSENES ERGEBNIS (2026-08-02, gegen `v19_2d_best` UND zusaetzlich
+    /// gegen ein flaches Modell `v18_best` von Hand geprueft, sims=400,
+    /// m_prime=16): root_q UND alle 16 Wurzelkind-Q-Werte sind
+    /// BIT-IDENTISCH (`f64::to_bits()`-Vergleich, nicht nur "innerhalb
+    /// Toleranz") zwischen batched und unbatcht -- kein messbarer
+    /// Gleitkomma-Summationsreihenfolge-Effekt in der Praxis, obwohl
+    /// theoretisch moeglich (siehe `BATCH_ROOT_EXPANSION`-Doku). Die
+    /// Toleranz unten (1e-4) bleibt trotzdem als Sicherheitsmarge stehen
+    /// (kein Anspruch auf Bit-Identitaet ueber alle Hardware-/tract-
+    /// Versionen hinweg, gleiches Vorsichtsprinzip wie
+    /// `net::eval_pair_matches_two_single_evals`s 1e-5) -- der eigentliche
+    /// Befund (bit-identisch HEUTE) gehoert in den Auftragsbericht, nicht in
+    /// eine ueberscharfe Assertion, die auf einer anderen Maschine flackern
+    /// koennte.
+    #[test]
+    fn batched_root_expansion_matches_sequential_within_tolerance() {
+        let Some(net) = load_batching_test_net() else { return };
+        let mut state_rng = StdRng::seed_from_u64(2026_08_02);
+        let Some(state) = random_drafting_state(1, 0, &mut state_rng) else {
+            panic!("random_drafting_state(steps=0) sollte immer den frischen Runde-1-Zustand liefern");
+        };
+
+        let sims = 400u32; // Produktions-Standard -- ergibt m_prime=GUMBEL_TOP_M=16, deckt den vollen eval_batch-Bereich ab.
+        let mut rng_unbatched = StdRng::seed_from_u64(555_555);
+        let nodes_unbatched =
+            build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_unbatched, None, false);
+        let mut rng_batched = StdRng::seed_from_u64(555_555);
+        let nodes_batched =
+            build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_batched, None, true);
+
+        assert_eq!(
+            nodes_unbatched[0].visits, nodes_batched[0].visits,
+            "Gesamtbesuchszahl an der Wurzel muss identisch sein (gleiche Sim-Buchhaltung)"
+        );
+        let root_q_u = nodes_unbatched[0].value / (nodes_unbatched[0].visits.max(1) as f64);
+        let root_q_b = nodes_batched[0].value / (nodes_batched[0].visits.max(1) as f64);
+        assert!(
+            (root_q_u - root_q_b).abs() < 1e-4,
+            "root_q weicht zu stark ab: unbatcht={root_q_u} batched={root_q_b}"
+        );
+
+        let stats_u = root_child_stats_from_nodes(&nodes_unbatched);
+        let stats_b = root_child_stats_from_nodes(&nodes_batched);
+        assert_eq!(stats_u.len(), stats_b.len(), "gleiche Anzahl besuchter Wurzelkinder erwartet");
+        // Nach der Aktion selbst abgeglichen (nicht nach Position): die
+        // Kandidaten-EXPANSIONSREIHENFOLGE ist identisch (siehe oben), aber
+        // `nodes[0].children`s finale Reihenfolge unterscheidet sich
+        // zwischen "alle Kandidaten zuerst" (batched) und "je Kandidat
+        // interleaved mit seinen Tiefenbesuchen" (unbatcht).
+        let map_b: std::collections::HashMap<String, (u32, f64)> =
+            stats_b.iter().map(|(a, v, q)| (format!("{a:?}"), (*v, *q))).collect();
+        let mut total_visits_u = 0u32;
+        let mut total_visits_b_matched = 0u32;
+        for (a, v_u, q_u) in &stats_u {
+            total_visits_u += v_u;
+            let key = format!("{a:?}");
+            let (v_b, q_b) = *map_b.get(&key).unwrap_or(&(0, 0.0));
+            assert_eq!(*v_u, v_b, "Besuchszahl fuer Aktion {key} weicht ab");
+            total_visits_b_matched += v_b;
+            if *v_u > 0 {
+                assert!(
+                    (q_u - q_b).abs() < 1e-4,
+                    "Q fuer Aktion {key} weicht zu stark ab: unbatcht={q_u} batched={q_b}"
+                );
+            }
+        }
+        assert_eq!(total_visits_u, total_visits_b_matched, "Summe der Kind-Besuche muss uebereinstimmen");
+    }
+
+    /// Interleavte Latenz-Nachmessung `BATCH_ROOT_EXPANSION` an/aus (Perf-
+    /// Auftrag 2026-08-02, Deliverable 4), direkt ueber
+    /// `build_gumbel_tree_inner` (umgeht die Compile-Zeit-Konstante, siehe
+    /// deren Doku) statt zweier getrennter Prozesslaeufe mit manuellem
+    /// Konstanten-Umschalten -- INTERLEAVED innerhalb DESSELBEN Prozesses
+    /// haelt Lastschwankungen (auf dieser Maschine liefen beim ersten Lauf
+    /// parallel die PCR-A/B-Kampagnen) beiderseits gleich, macht das
+    /// VERHAELTNIS robust (gleiches Messdesign-Prinzip wie
+    /// `examples/latency_2d_vs_flat.rs`). Gemessenes Ergebnis (2026-08-02,
+    /// `v19_2d_best`, sims=400, n=60, unter erheblicher Fremdlast durch die
+    /// PCR-Kampagnen -- absolute Zeiten dadurch stark aufgeblaeht, ~750ms
+    /// statt der ~2-4ms einer unbelasteten Maschine, aber das VERHAELTNIS
+    /// bleibt aussagekraeftig): `ratio(on/off) ≈ 1.01` -- KEIN messbarer
+    /// Geschwindigkeitsgewinn (siehe Auftragsbericht fuer die Einordnung:
+    /// die gebuendelten `m_prime<=16` Erstexpansionen sind nur ein kleiner
+    /// Bruchteil der insgesamt `sims` Netz-Aufrufe pro Zug).
+    /// `#[ignore]`: kein Teil des normalen `cargo test`-Laufs (reine
+    /// Zeitmessung, kein Korrektheits-Test -- der ist
+    /// `batched_root_expansion_matches_sequential_within_tolerance` oben),
+    /// manuell via `cargo test --release batch_root_expansion_latency_bench
+    /// -- --ignored --nocapture` startbar, z.B. fuer eine Nachmessung ohne
+    /// Fremdlast.
+    #[test]
+    #[ignore]
+    fn batch_root_expansion_latency_bench() {
+        let Some(net) = load_batching_test_net() else { return };
+        let mut state_rng = StdRng::seed_from_u64(2026_08_02);
+        let Some(state) = random_drafting_state(1, 0, &mut state_rng) else {
+            panic!("random_drafting_state(steps=0) sollte immer den frischen Runde-1-Zustand liefern");
+        };
+        let sims = 400u32;
+        const WARMUP: usize = 5;
+        const RUNS: usize = 60;
+
+        for i in 0..WARMUP {
+            let mut rng = StdRng::seed_from_u64(i as u64);
+            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng, None, false);
+            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng, None, true);
+        }
+
+        let mut times_off = Vec::with_capacity(RUNS);
+        let mut times_on = Vec::with_capacity(RUNS);
+        for i in 0..RUNS {
+            let mut rng_off = StdRng::seed_from_u64(1000 + i as u64);
+            let t = std::time::Instant::now();
+            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_off, None, false);
+            times_off.push(t.elapsed().as_secs_f64() * 1000.0);
+
+            let mut rng_on = StdRng::seed_from_u64(1000 + i as u64);
+            let t = std::time::Instant::now();
+            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_on, None, true);
+            times_on.push(t.elapsed().as_secs_f64() * 1000.0);
+        }
+        let median = |v: &mut Vec<f64>| -> f64 {
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            v[v.len() / 2]
+        };
+        let m_off = median(&mut times_off.clone());
+        let m_on = median(&mut times_on.clone());
+        eprintln!(
+            "BATCH_ROOT_EXPANSION off med={m_off:.3}ms  on med={m_on:.3}ms  ratio(on/off)={:.3}  n={RUNS} sims={sims}",
+            m_on / m_off
+        );
     }
 
     #[test]
