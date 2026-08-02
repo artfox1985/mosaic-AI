@@ -7049,10 +7049,16 @@ Restunsicherheit ist die Fabrik-Neubefuellung 4->5. Design: Ground Truth =
 Erwartung ueber K=16 gesampelte Neubefuellungen des exakten
 R5-Alpha-Beta-Werts; `true_winprob` = Refill-Gewinnquote liegt DIREKT auf
 der Value-Kopf-Skala (keine Kennlinie noetig, Saettigungsproblem des
-R5-Designs entfaellt). Misst zusaetzlich erstmals die theoretische
-OBERGRENZE (irreduzibler Zufallsanteil des Uebergangs) -- Baustein des
-uebergeordneten Nutzer-Ziels "Value-Head an das maximal Moegliche
-heranfuehren, ab Runde 2 ist Luft nach oben". Rust-Vorbedingung: additives
+R5-Designs entfaellt). Setzt die Noise-Floor-Serie vom 2026-07-21
+(R²_max korrigiert: R1 0,0068 / R2 0,166 / R3 0,437) am R4-Ende fort,
+mit SCHAERFERER Methode: exaktes Optimal-Spiel statt Heuristik-Rollouts
+-- als Rauschen zaehlt nur noch der echte Chance-Knoten; zusaetzlich
+Anschlussmessung mit der bestehenden `value_noise_floor_diagnostic`
+(target_round=4) zur Serien-Vergleichbarkeit. Baustein des
+uebergeordneten Nutzer-Ziels "Value-Head an den maximal moeglichen R²
+heranfuehren, ab Runde 2 ist Luft nach oben" (Praezisierung 2026-08-03:
+gemeint ist der R²-Wert; Referenz ist genau diese Serie -- R2: 0,017
+erreicht vs. 0,166 moeglich, R3: 0,195 vs. 0,437, jeweils v10-Stand). Rust-Vorbedingung: additives
 Binding `resample_round_transition_json` (existiert noch nicht) +
 Wheel-Build. Ausfuehrung gated hinter dem vollen R5-Lauf; R3/R2 =
 Ausblick mit Decken-Priorisierungsregel.
