@@ -234,10 +234,20 @@ function renderValueBreakdown(vd) {
   box.innerHTML =
     item('Roh-Value (tanh)', vd.raw_value) +
     itemTxt('Prognose Δ-Endpunkte (KI−Gegner)', pointsDiffTxt) +
-    item('Win% (Ego)', vd.win_prob != null ? vd.win_prob * 100 : null, 1) +
+    item('Win% (Value-Kopf, Ego)', vd.win_prob != null ? vd.win_prob * 100 : null, 1) +
     item('Blended Utility', vd.blended_utility) +
     item('Floor-Shaping +/-', vd.floor_shift) +
-    item('Finaler Blattwert', vd.final_value);
+    item('Finaler Blattwert', vd.final_value) +
+    // Forensik 2026-08-02 (game_20260802_155431_seed216416, KI-Zug 63): Win%
+    // und die Punkte-Delta-Prognose sind ZWEI unabhaengige Netzkoepfe
+    // (POINTS_UTILITY_WEIGHT=0 in net_mcts.rs -- keine Blend-Verrechnung
+    // zwischen ihnen). Abweichende Tendenzen (z.B. niedriges Win% bei
+    // deutlich positiver Punkteprognose) sind daher normal, kein Bug --
+    // besonders in Runde 5 (frozen_eval_set-Kalibrierung: r=0.68 vs. 0.79-0.93
+    // in Runde 1-4, 8.1% starke Widersprueche vs. 0% in Runde 1-4).
+    `<div class="vb-item" style="grid-column:1/-1;font-size:11px;color:var(--muted);text-align:left;padding-top:2px">` +
+    `Win%- und Δ-Punkte-Kopf sind unabhängige Netzköpfe (kein Blend, POINTS_UTILITY_WEIGHT=0) — Abweichungen sind erwartbar, besonders in Runde 5.` +
+    `</div>`;
 }
 
 // ── Task #95: Granularer Gumbel-Such-Trace (Anforderung 2) ──────────────────

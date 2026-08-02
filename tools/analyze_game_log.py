@@ -215,7 +215,9 @@ def deterministic_seed(log_name: str, turn_idx: int) -> int:
     return int.from_bytes(h[:8], "big") & 0x7FFFFFFFFFFFFFFF
 
 
-STONE_DESC_RE = re.compile(r"Stein (?P<color>\S+) von (?P<src>F\d+|GF) → (?P<dest>Reihe \d+|Strafleiste)")
+STONE_DESC_RE = re.compile(
+    r"Stein (?P<color>\S+) (?:von|vom) (?P<src>F\d+|GF|Mondpool) → (?P<dest>Reihe \d+|Strafleiste)"
+)
 DOME_DISPLAY_DESC_RE = re.compile(r"Kuppel #(?P<tile>\d+) → \((?P<r>\d+),(?P<c>\d+)\)")
 DOME_STACK_DESC_RE = re.compile(r"Stapel → \((?P<r>\d+),(?P<c>\d+)\)")
 BONUS_DESC_RE = re.compile(r"Bonuschip F(?P<fid>\d+)")
@@ -653,7 +655,12 @@ def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines:
             actor = name_to_idx[m.group("name")]
             rep.ensure_drafting_actor(actor, li)
             is_global = cat == "MOON_GLOBAL_TAKE"
-            src_label = "GF" if is_global else m.group("src")
+            # Engine-Fix (mcts.rs::label_search_move) disambiguiert factory_id=None
+            # jetzt selbst: "Mondpool" fuer Aktion C (is_global), "GF" nur noch fuer
+            # echte Grossfabrik-Ziehungen -- played_key() muss dieselbe Konvention
+            # nutzen wie move_key()/STONE_DESC_RE, sonst schlaegt der Oracle-Abgleich
+            # fuer JEDEN globalen Mondpool-Zug fehl ("nicht unter Kandidaten identifiziert").
+            src_label = "Mondpool" if is_global else m.group("src")
             fields = {"color": m.group("color"), "src": src_label, "dest": m.group("dest")}
             rep.maybe_oracle(actor, "stone", cur.body, fields)
             li = rep.resolve_stone(lines, li, m, is_global, actor)

@@ -605,10 +605,24 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                 } else {
                     format!("Reihe {}", m.place.row_index + 1)
                 };
-                let src = match m.take.factory_id {
-                    Some(id) => format!("F{id}"),
-                    None => "GF".to_string(),
+                // Zwei Faelle liefern factory_id=None: echte Grossfabrik-Ziehung
+                // (TakeSource::LargeFactorySun/-Moon) UND der globale Mondpool-Zug
+                // (Aktion C, TakeSource::SmallFactoryMoon mit factory_id=None, siehe
+                // moves.rs::is_global_moon_take) -- beide vorher faelschlich "GF"
+                // gelabelt, obwohl der Mondpool-Zug aus einer oder mehreren KLEINEN
+                // Fabriken (und/oder der GF) gleichzeitig zieht. server.py duplizierte
+                // dieses Wissen bisher in einer Nachbearbeitung (_fix_moon_pool_label);
+                // mit dieser Disambiguierung an der Quelle ist die Nachbearbeitung
+                // ueberfluessig geworden (dort zurueckgebaut).
+                let src = if m.is_global_moon_take() {
+                    "Mondpool".to_string()
+                } else {
+                    match m.take.factory_id {
+                        Some(id) => format!("F{id}"),
+                        None => "GF".to_string(),
+                    }
                 };
+                let prep = if m.is_global_moon_take() { "vom" } else { "von" };
                 // Mit Zustand: Steinanzahl voranstellen und Füllstand der Zielreihe
                 // NACH dem Zug anhängen ([gefüllt/Kapazität], wie im Game-Log) --
                 // plus Überlauf-Hinweis, falls mehr Steine genommen werden, als in
@@ -633,7 +647,7 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                     }
                     None => (String::new(), String::new()),
                 };
-                let desc = format!("{amount}Stein {} von {src} → {dest}{fill}", m.take.color.value());
+                let desc = format!("{amount}Stein {} {prep} {src} → {dest}{fill}", m.take.color.value());
                 ("stone", desc, cat, action_to_dict(a))
             }
             Action::ChooseDomeSlot(m) => (
@@ -939,6 +953,96 @@ mod tests {
             desc.contains(&format!("(+{overflow} Strafleiste)")),
             "Überlauf-Hinweis fehlt im Label: {desc}"
         );
+    }
+
+    // Regressionstests für den Mondpool/GF-Disambiguierungs-Fix (Folgeauftrag
+    // 2026-08-02): factory_id=None trat vorher fuer ZWEI verschiedene Faelle
+    // auf (echte Grossfabrik-Ziehung UND Aktion C, der globale Mondpool-Zug)
+    // und wurde beide Male faelschlich "GF" gelabelt. Diese drei Tests decken
+    // je einen Fall ab: echte GF-Ziehung bleibt "GF", der globale Mondpool-Zug
+    // wird jetzt "Mondpool" (mit Praeposition "vom"), F1-F4-Ziehungen mit
+    // gesetzter factory_id bleiben unveraendert "F{id}" (mit "von").
+
+    #[test]
+    fn label_search_move_global_moon_take_says_mondpool_not_gf() {
+        use crate::moves::{Move, PlaceAction, TakeAction, TakeSource};
+        let s = drafting_state(7);
+        let sm = SearchMove::Draft(Action::Stone(Move {
+            take: TakeAction {
+                source: TakeSource::SmallFactoryMoon,
+                color: TileColor::Blau,
+                factory_id: None,
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: 0 },
+        }));
+        assert!(sm_is_global_moon_take(&sm));
+        let (_, desc, _, _) = label_search_move(&sm, Some(&s));
+        assert!(
+            desc.contains("vom Mondpool"),
+            "globaler Mondpool-Zug muss 'vom Mondpool' labeln, nicht 'GF': {desc}"
+        );
+        assert!(!desc.contains("GF"), "darf NICHT als GF gelabelt werden: {desc}");
+    }
+
+    #[test]
+    fn label_search_move_large_factory_sun_still_says_gf() {
+        use crate::moves::{Move, PlaceAction, TakeAction, TakeSource};
+        let s = drafting_state(7);
+        let sm = SearchMove::Draft(Action::Stone(Move {
+            take: TakeAction {
+                source: TakeSource::LargeFactorySun,
+                color: TileColor::Blau,
+                factory_id: None,
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: 0 },
+        }));
+        assert!(!sm_is_global_moon_take(&sm));
+        let (_, desc, _, _) = label_search_move(&sm, Some(&s));
+        assert!(desc.contains("von GF"), "echte Grossfabrik-Sonnen-Ziehung muss 'von GF' bleiben: {desc}");
+    }
+
+    #[test]
+    fn label_search_move_large_factory_moon_still_says_gf() {
+        use crate::moves::{Move, PlaceAction, TakeAction, TakeSource};
+        let s = drafting_state(7);
+        let sm = SearchMove::Draft(Action::Stone(Move {
+            take: TakeAction {
+                source: TakeSource::LargeFactoryMoon,
+                color: TileColor::Blau,
+                factory_id: None,
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: 0 },
+        }));
+        assert!(!sm_is_global_moon_take(&sm));
+        let (_, desc, _, _) = label_search_move(&sm, Some(&s));
+        assert!(desc.contains("von GF"), "echte Grossfabrik-Mond-Ziehung muss 'von GF' bleiben: {desc}");
+    }
+
+    #[test]
+    fn label_search_move_small_factory_picks_unaffected_by_fix() {
+        // F1-F4 (factory_id gesetzt) sind von der GF/Mondpool-Ambiguitaet gar
+        // nicht betroffen -- Regression, dass der Fix diesen Fall unveraendert
+        // laesst (sowohl Sonnen- als auch Mond-Ziehung derselben Fabrik).
+        use crate::moves::{Move, PlaceAction, TakeAction, TakeSource};
+        let s = drafting_state(7);
+        for source in [TakeSource::SmallFactorySun, TakeSource::SmallFactoryMoon] {
+            let sm = SearchMove::Draft(Action::Stone(Move {
+                take: TakeAction { source, color: TileColor::Blau, factory_id: Some(2), moon_order: Vec::new() },
+                place: PlaceAction { row_index: 0 },
+            }));
+            let (_, desc, _, _) = label_search_move(&sm, Some(&s));
+            assert!(desc.contains("von F2"), "F1-F4-Ziehung ({source:?}) muss 'von F2' bleiben: {desc}");
+        }
+    }
+
+    fn sm_is_global_moon_take(sm: &SearchMove) -> bool {
+        match sm {
+            SearchMove::Draft(Action::Stone(m)) => m.is_global_moon_take(),
+            _ => false,
+        }
     }
 
     #[test]
