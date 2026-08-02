@@ -798,17 +798,20 @@ function renderBoard(pi) {
       const isPhantom = tileIdx >= row.tiles.length - phantomCount;
       return `<div class="tile sm ${normColor(row.color)}${isPhantom ? ' phantom' : ''}"></div>`;
     }).join('');
-    // Visueller Indikator: nächste fällige Tiling-Reihe. Bugfix (2026-07-29):
-    // gilt jetzt auch, wenn die einzige offene Aktion eine Chip-Komplettierung
-    // ist (Reihe also noch nicht voll ist) -- vorher war `isNextTiling` durch
+    // Naechste faellige Tiling-Reihe: `isNextTiling` bleibt fuer die
+    // Chip-Ziel-Markierung unten noetig. Bugfix (2026-07-29): gilt auch, wenn
+    // die einzige offene Aktion eine Chip-Komplettierung ist (Reihe also noch
+    // nicht voll ist) -- vorher war `isNextTiling` durch
     // `row.tiles.length===row.capacity` fest an volle Reihen gekoppelt, eine
-    // nur-per-Chips-komplettierbare Reihe bekam nie den Punkt.
+    // nur-per-Chips-komplettierbare Reihe wurde nie erkannt.
+    //
+    // Nutzer-Feedback (2026-08-02): der frueher hier gerenderte blaue Punkt
+    // (visueller Zusatzindikator "diese Reihe ist dran") ist ERSATZLOS
+    // entfernt -- er verursachte beim Erscheinen einen Layout-Sprung
+    // (Musterreihen ruckten ein) und war ohnehin redundant zur bereits
+    // vorhandenen blauen Reihen-Hervorhebung (.prow.drop Hintergrund, siehe
+    // style.css) bzw. der gestrichelten Chip-Ziel-Markierung (.prow.chip-target).
     const isNextTiling = isTiling && ri === currentTilingRi;
-    const nextDot = isNextTiling
-      ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;
-           background:var(--blau,#3b82f6);margin-left:3px;vertical-align:middle;
-           box-shadow:0 0 4px var(--blau,#3b82f6)" title="Diese Reihe ist als nächstes dran"></span>`
-      : '';
     // Dezente Zusatzmarkierung: wenn die aktuelle Reihe nur per Bonuschips
     // komplettierbar ist, bekommt die Reihe selbst denselben Hinweis-Ton wie
     // der Bonuschips-Kasten (.chips-usable), damit der Bezug Kasten->Reihe
@@ -816,7 +819,7 @@ function renderBoard(pi) {
     const chipTargetCls = (isNextTiling && activeChippableRis.includes(ri)) ? ' chip-target' : '';
     return `<div class="prow ${cls}${chipTargetCls}" data-ri="${ri}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
-      <span class="rowlabel" style="color:var(--text3)">→ </span>${nextDot}
+      <span class="rowlabel" style="color:var(--text3)">→</span>
     </div>`;
   }).join('');
 
