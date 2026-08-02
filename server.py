@@ -1011,13 +1011,30 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
     out = {"0": None, "1": None, "note": None}
 
     def _record(pid, opponent_label, opponent_rating, opponent_is_estimate, result):
-        if rated:
-            return _pp.apply_result(pid, opponent_label, opponent_rating,
-                                     opponent_is_estimate, result, False,
-                                     seed=seed, log=_log_ref())
-        return _pp.record_unrated(pid, opponent_label, opponent_rating,
-                                   opponent_is_estimate, result,
-                                   seed=seed, log=_orig_log_name)
+        # Vorfall 2026-08-02: pro-Profil abgesichert, damit ein fehlendes/
+        # nicht mehr auffindbares Profil (Datei zwischenzeitlich geleert/
+        # ersetzt) NICHT die Wertung der ANDEREN Seite mitreisst (Mensch-vs-
+        # Mensch) und v.a. NICHT die gesamte /api/end_scoring-Antwort zum
+        # Fehler macht (siehe End-Route: dort sitzt zusaetzlich ein globaler
+        # Schutz als zweite Verteidigungslinie fuer alles andere).
+        try:
+            if rated:
+                return _pp.apply_result(pid, opponent_label, opponent_rating,
+                                         opponent_is_estimate, result, False,
+                                         seed=seed, log=_log_ref())
+            return _pp.record_unrated(pid, opponent_label, opponent_rating,
+                                       opponent_is_estimate, result,
+                                       seed=seed, log=_orig_log_name)
+        except KeyError:
+            print(f"WARNUNG: Elo-Update fuer Profil-ID '{pid}' uebersprungen -- "
+                  f"Profil nicht gefunden (Datei evtl. zwischenzeitlich geleert/ersetzt).")
+            out["note"] = out["note"] or "Rating nicht gespeichert: Profil nicht gefunden."
+            return None
+        except Exception as e:
+            print(f"WARNUNG: Elo-Update fuer Profil-ID '{pid}' fehlgeschlagen "
+                  f"({type(e).__name__}: {e}).")
+            out["note"] = out["note"] or f"Rating nicht gespeichert: {e}"
+            return None
 
     if _ai_player is not None:
         # Mensch gegen KI: nur die menschliche Seite kann ein Profil haben,
@@ -1076,20 +1093,42 @@ def end_scoring():
         return e
     if _rust.phase() != "end":
         return jsonify(err("Spiel noch nicht beendet"))
+    # Die eigentliche Punktewertung (apply_end_scoring in der Engine) ist
+    # STATEFUL und darf nicht an einem spaeteren Profil-/Rating-Fehler
+    # scheitern -- eigener try/except NUR dafuer.
     try:
         results = _json.loads(_rust.end_scoring_json())
         _flush_game_log()
-        state = _rust_state()
-        response = {"ok": True, "state": state, **results}
-        # Spielerprofile: Elo-Wertung GENAU EINMAL pro Partie (Idempotenz-
-        # Schutz, falls der Client /api/end_scoring mehrfach aufruft, z.B.
-        # nach einem Seiten-Reload nach Spielende).
-        if not _game_rated:
-            response["rating_updates"] = _apply_elo_for_finished_game(state)
-            _game_rated = True
-        return jsonify(response)
     except Exception as e:
         return jsonify(err(str(e)))
+
+    state = _rust_state()
+    response = {"ok": True, "state": state, **results}
+
+    # Spielerprofile/Elo: darf die Endwertung NIEMALS zum Scheitern bringen
+    # (Vorfall 2026-08-02: eine Profil-Ausnahme hier hat vorher die GESAMTE
+    # /api/end_scoring-Antwort als Fehler zurueckgegeben, obwohl die
+    # eigentliche Punktewertung oben laengst erfolgreich und bereits
+    # state-veraendernd durchgelaufen war -- der Spieler bekam einen Fehler
+    # UND keine Endwertung angezeigt, obwohl das Spiel serverseitig fertig
+    # war. Deshalb: eigener, komplett isolierter try/except NUR um die
+    # Rating-Logik, mit Server-Log-Zeile bei Fehlern; Elo-Wertung GENAU
+    # EINMAL pro Partie (Idempotenz-Schutz per `_game_rated`, falls der
+    # Client /api/end_scoring mehrfach aufruft, z.B. nach einem Reload).
+    if not _game_rated:
+        try:
+            response["rating_updates"] = _apply_elo_for_finished_game(state)
+        except Exception as e:
+            print(f"WARNUNG: Elo-Wertung fuer beendete Partie fehlgeschlagen "
+                  f"({type(e).__name__}: {e}) -- Endwertung wird trotzdem normal "
+                  f"ausgeliefert, Rating-Teil wird uebersprungen.")
+            response["rating_updates"] = {
+                "0": None, "1": None,
+                "note": "Rating nicht gespeichert: Profil nicht gefunden.",
+            }
+        _game_rated = True
+
+    return jsonify(response)
 
 
 @app.route('/api/end_game_log', methods=['POST'])
