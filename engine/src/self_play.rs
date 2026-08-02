@@ -474,8 +474,8 @@ fn avg_remaining_type_value(state: &GameState) -> f64 {
 /// aufhören, abschließend die beste gezogene Platte in den besten Slot legen.
 /// Mehrere echte `apply_drafting`-Aufrufe -- der Zug ist erst danach beendet
 /// (switch_player passiert im letzten `DrawStack`-Aufruf).
-fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
-    let _ = game.apply_drafting(&Action::DrawStackPeek);
+fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
+    game.apply_drafting(&Action::DrawStackPeek)?;
     // Terminierung: `can_draw_stack_peek` wird false, sobald
     // `state.dome_tile_pool` leer ist (`validate_draw_stack_peek`,
     // game.rs) -- jeder Redraw entnimmt per `dome_tile_pool.remove(0)`
@@ -506,7 +506,7 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
         if continue_estimate <= stop_value {
             break;
         }
-        let _ = game.apply_drafting(&Action::DrawStackPeek);
+        game.apply_drafting(&Action::DrawStackPeek)?;
         peeks += 1;
     }
 
@@ -538,9 +538,9 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
     // Zeitpunkt bereits angewendet.
     let mv = DrawFromStackMove { chosen_id, slot_row: sr, slot_col: sc, rotation: 0, return_order };
     let final_action = Action::ChooseDrawStackSlot(mv);
-    let _ = game.apply_drafting(&final_action);
-    let _ = game.apply_drafting(&Action::ChooseDomeRotation(rotation));
-    final_action
+    game.apply_drafting(&final_action)?;
+    game.apply_drafting(&Action::ChooseDomeRotation(rotation))?;
+    Ok(final_action)
 }
 
 /// Wendet eine gewählte Drafting-Aktion an. Bei `Action::DrawStackPeek`
@@ -548,17 +548,25 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Action {
 /// komplette Peek-Entscheiden-Wählen-Prozedere (mehrere echte
 /// `apply_drafting`-Aufrufe) -- der Aufrufer sieht danach den fertig
 /// abgeschlossenen Zustand (Zug beendet). Alle anderen Aktionen einmalig
-/// normal angewendet. Gibt die TATSÄCHLICH final ausgeführte Aktion zurück
-/// (bei DrawStackPeek also das konkrete `DrawStack`, nicht den Peek selbst)
-/// -- für Aufrufer, die den echten Zug anzeigen/loggen müssen. Zentraler
-/// Einhängepunkt für jede Stelle, die eine gewählte Drafting-Aktion
+/// normal angewendet. Gibt bei Erfolg die TATSÄCHLICH final ausgeführte
+/// Aktion zurück (bei DrawStackPeek also das konkrete `DrawStack`, nicht den
+/// Peek selbst) -- für Aufrufer, die den echten Zug anzeigen/loggen müssen.
+/// Zentraler Einhängepunkt für jede Stelle, die eine gewählte Drafting-Aktion
 /// tatsächlich ausführt.
-pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Action {
+///
+/// Gibt `Err` weiter, statt es zu verschlucken: `a` stammt zwar immer aus
+/// `drafting_actions()` (also zum Zeitpunkt der Wahl "legal"), aber bei
+/// zweistufigen Zügen (Kuppel/Stapel-Rotation) kann sich der Rundenzustand
+/// zwischen Stufe 1 und Stufe 2 durch einen Engine-Bug ändern (siehe
+/// `validate_draw_from_stack`-Kommentar zur Kuppel-Rundenkappe) -- ein
+/// stilles `let _ =` würde dem Aufrufer dann `applied: true` für einen nie
+/// angewendeten Zug vortäuschen und Server-/Trainingszustand entsynchronisieren.
+pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Result<Action, String> {
     match a {
         Action::DrawStackPeek => resolve_and_apply_stack_draw(game),
         other => {
-            let _ = game.apply_drafting(&other);
-            other
+            game.apply_drafting(&other)?;
+            Ok(other)
         }
     }
 }
@@ -1458,7 +1466,8 @@ fn play_net_game<R: Rng + ?Sized>(
                     // Folge-Entscheidungen (weiterziehen/waehlen) kommen automatisch
                     // ueber den naechsten Schleifendurchlauf.
                     if pi == net_board {
-                        apply_chosen_action(&mut game, chosen);
+                        apply_chosen_action(&mut game, chosen)
+                            .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     } else {
                         let _ = game.apply_drafting(&chosen);
                     }
@@ -1616,7 +1625,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                         net_search_drafting_action(net, &game.state, s, cp, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    apply_chosen_action(&mut game, chosen);
+                    apply_chosen_action(&mut game, chosen)
+                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     steps += 1;
                 } else {
                     break;
@@ -1782,7 +1792,8 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                         net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    apply_chosen_action(&mut game, chosen);
+                    apply_chosen_action(&mut game, chosen)
+                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     steps += 1;
                 } else {
                     break;
@@ -2249,7 +2260,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     let moon_t = moon_order_target(&game.state, &chosen, player, rng);
                     let state_json = state_to_json(&game.state, true);
                     let round_before = game.state.round_number;
-                    apply_chosen_action(&mut game, chosen);
+                    apply_chosen_action(&mut game, chosen)
+                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
                         // Rundenübergang gerade erreicht -- Chance-Node-
                         // Sampling für ein rauschärmeres Trainingsziel (siehe
@@ -2805,7 +2817,8 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                             );
                             a
                         };
-                        apply_chosen_action(&mut g, a);
+                        apply_chosen_action(&mut g, a)
+                            .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     } else {
                         break;
                     }
@@ -2985,7 +2998,8 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
-                    apply_chosen_action(&mut game, chosen);
+                    apply_chosen_action(&mut game, chosen)
+                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     steps += 1;
                 } else {
                     break;
@@ -3240,7 +3254,7 @@ pub fn sibling_ranking_diagnostic(
                         let s = net_effective_sims(walk_sims, actions.len());
                         match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game) {
                             Some(act) => {
-                                apply_chosen_action(&mut game, act);
+                                apply_chosen_action(&mut game, act)?;
                             }
                             None => break,
                         }
@@ -3379,7 +3393,7 @@ pub fn draw_stack_peek_impact_diagnostic(
                                 }
                             }
                         }
-                        apply_chosen_action(&mut game, chosen);
+                        apply_chosen_action(&mut game, chosen)?;
                     } else {
                         break;
                     }
@@ -3898,7 +3912,8 @@ mod tests {
         assert!(state.dome_tile_pool.len() > 1, "Test braucht einen Pool mit mehreren Kacheln");
         let mut game = Game { state };
 
-        let final_action = resolve_and_apply_stack_draw(&mut game);
+        let final_action = resolve_and_apply_stack_draw(&mut game)
+            .expect("resolve_and_apply_stack_draw sollte hier erfolgreich sein");
         match final_action {
             Action::ChooseDrawStackSlot(m) => {
                 assert!(
@@ -3949,7 +3964,8 @@ mod tests {
         state.dome_tile_pool = vec![junk(), junk(), junk(), jackpot.clone()];
         let mut game = Game { state };
 
-        let final_action = resolve_and_apply_stack_draw(&mut game);
+        let final_action = resolve_and_apply_stack_draw(&mut game)
+            .expect("resolve_and_apply_stack_draw sollte hier erfolgreich sein");
         match final_action {
             Action::ChooseDrawStackSlot(m) => assert_eq!(
                 m.chosen_id, jackpot.tile_id,
