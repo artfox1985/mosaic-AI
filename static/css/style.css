@@ -64,6 +64,12 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .phead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
 .pname{font-size:14px;font-weight:600}
 .pscore{font-size:22px;font-weight:700}
+/* Spielerprofile / Elo (Nutzer-Feature 2026-08-02): Rating-Badge neben dem
+   Spielernamen -- "~" (im Text selbst, s. app.js::_ratingBadgeHTML) markiert
+   einen Schaetzwert (kein direkter Arena-Anker fuer diese Sims-Stufe). */
+.rating-badge{font-size:10px;font-weight:600;color:var(--text2);background:var(--bg);
+  border:1px solid var(--border);border-radius:8px;padding:1px 6px;margin-left:4px;
+  vertical-align:middle}
 .tokens{display:flex;gap:3px;align-items:center;font-size:10px;color:var(--text2);margin-bottom:4px}
 .tok{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg)}
 .tok.used{background:var(--blau);border-color:var(--blau)}

@@ -52,6 +52,28 @@ async function api(path, body=null) {
 
 let CURRENT_CHAMPION = null;   // vom Server geladener amtierender Champion (models/champion.txt)
 
+// Spielerprofile / Elo (Nutzer-Feature 2026-08-02). RATING_INFO haelt die
+// vom Server bei /new_game aufgeloesten Profile + KI-Anker fuer die LAUFENDE
+// Partie (Rating-Anzeige am Spielernamen, s. renderBoard/render()).
+let RATING_INFO = {p0: null, p1: null, ai: null};
+
+// Rating-Badge-HTML neben dem Spielernamen in renderBoard(pi) -- "~" markiert
+// einen Schaetzwert (KI-Anker ohne direkte Arena-Kante bei dieser Sims-Zahl,
+// siehe player_profiles.py::estimate_ai_anchor). Leerer String, wenn fuer
+// diesen Spielerindex weder Profil noch KI-Anker bekannt ist (Gast-Spiel).
+function _ratingBadgeHTML(pi) {
+  if (AI_ENABLED && pi === AI_PLAYER) {
+    const ai = RATING_INFO.ai;
+    if (!ai || ai.elo == null) return '';
+    const val = Math.round(ai.elo);
+    const title = `KI-Elo-Anker ${ai.node}${ai.is_estimate ? ' (geschätzt -- keine direkte Arena-Kante bei dieser Sims-Zahl)' : ''}`;
+    return ` <span class="rating-badge" title="${title}">${ai.is_estimate ? '~' : ''}${val}</span>`;
+  }
+  const prof = pi === 0 ? RATING_INFO.p0 : RATING_INFO.p1;
+  if (!prof) return '';
+  return ` <span class="rating-badge" title="Profil-Rating (Elo)">${Math.round(prof.rating)}</span>`;
+}
+
 function openNewGameModal() {
   document.getElementById('newgame-overlay').style.display = 'flex';
   // Modell-Feld beim Öffnen IMMER auf den aktuellen Champion setzen (Nutzer-
@@ -64,11 +86,49 @@ function openNewGameModal() {
       if (el) el.value = d.model;
     }
   }).catch(() => {});
+  ngLoadProfiles();
+}
+
+// Laedt die Profil-Liste vom Server und befuellt beide Auswahl-Dropdowns
+// (P1 immer, P2 nur relevant bei Mensch-gegen-Mensch, s. #ng-p2-block).
+// `keepSelection`: aktuell gewaehlte IDs behalten, falls noch vorhanden
+// (z.B. nach dem Anlegen eines neuen Profils via ngCreateProfile).
+async function ngLoadProfiles(keepSelection = true) {
+  const selP0 = document.getElementById('ng-profile-p0');
+  const selP1 = document.getElementById('ng-profile-p1');
+  if (!selP0 || !selP1) return;
+  const prevP0 = keepSelection ? selP0.value : '';
+  const prevP1 = keepSelection ? selP1.value : '';
+  const d = await api('/profiles');
+  if (!d.ok) return;
+  const opts = ['<option value="">Gast (ungewertet)</option>']
+    .concat(d.profiles.map(p => `<option value="${p.id}">${_escapeHtml(p.name)} (${Math.round(p.rating)})</option>`))
+    .join('');
+  selP0.innerHTML = opts;
+  selP1.innerHTML = opts;
+  if (d.profiles.some(p => p.id === prevP0)) selP0.value = prevP0;
+  if (d.profiles.some(p => p.id === prevP1)) selP1.value = prevP1;
+}
+
+// "+ Neu"-Button neben den Profil-Dropdowns: legt per einfachem Prompt ein
+// neues Profil an (Start-Rating 1000) und waehlt es sofort aus.
+async function ngCreateProfile(which) {
+  const name = (prompt('Name für das neue Profil:') || '').trim();
+  if (!name) return;
+  const d = await api('/profiles', {name});
+  if (!d.ok) { showError(d.error || 'Profil konnte nicht angelegt werden.'); return; }
+  await ngLoadProfiles(false);
+  const sel = document.getElementById(which === 'p1' ? 'ng-profile-p1' : 'ng-profile-p0');
+  if (sel) sel.value = d.profile.id;
 }
 
 function ngToggleAI() {
   const on = document.getElementById('ng-ai-toggle').checked;
   document.getElementById('ng-ai-settings').style.display = on ? 'block' : 'none';
+  // Spieler-2-Block (Name + Profil) nur bei Mensch-gegen-Mensch relevant --
+  // gegen die KI hat "Spieler 2" kein eigenes Profil (die KI ist der Anker).
+  const p2block = document.getElementById('ng-p2-block');
+  if (p2block) p2block.style.display = on ? 'none' : 'block';
   const track = document.getElementById('ng-toggle-track');
   const thumb = document.getElementById('ng-toggle-thumb');
   track.style.background = on ? 'var(--blau, #3b82f6)' : 'var(--border)';
@@ -79,8 +139,10 @@ function ngToggleAI() {
 function ngUpdateStartLabels() {
   const aiOn    = document.getElementById('ng-ai-toggle').checked;
   const p1name  = document.getElementById('ng-name').value.trim() || 'Spieler 1';
+  const p2nameEl = document.getElementById('ng-name-p2');
+  const p2name  = (p2nameEl && p2nameEl.value.trim()) || 'Spieler 2';
   const p2label = document.getElementById('ng-start-p2-text');
-  if (p2label) p2label.textContent = aiOn ? 'KI' : 'Spieler 2';
+  if (p2label) p2label.textContent = aiOn ? 'KI' : p2name;
   const p1label = document.getElementById('ng-start-p1-text');
   if (p1label) p1label.textContent = p1name;
 }
@@ -90,6 +152,8 @@ async function startNewGame() {
 
   const playerName = document.getElementById('ng-name').value.trim() || 'Spieler 1';
   const aiEnabled  = document.getElementById('ng-ai-toggle').checked;
+  const p2NameEl   = document.getElementById('ng-name-p2');
+  const player2Name = aiEnabled ? 'KI' : ((p2NameEl && p2NameEl.value.trim()) || 'Spieler 2');
   const model      = document.getElementById('ng-model').value.trim() || CURRENT_CHAMPION || 'v16_best';
   const sims       = parseInt(document.getElementById('ng-sims').value) || 400;
   const seedRaw    = document.getElementById('ng-seed').value.trim();
@@ -99,6 +163,11 @@ async function startNewGame() {
   const debugBtnOn   = document.getElementById('ng-debug-toggle').checked;
   const debugBtn     = document.getElementById('ki-debugger-btn');
   if (debugBtn) debugBtn.style.display = debugBtnOn ? '' : 'none';
+
+  // Spielerprofile (Nutzer-Feature 2026-08-02): P1 immer moeglich, P2 nur
+  // bei Mensch-gegen-Mensch (gegen die KI hat "Spieler 2" kein Profil).
+  const profileP0 = document.getElementById('ng-profile-p0')?.value || null;
+  const profileP1 = aiEnabled ? null : (document.getElementById('ng-profile-p1')?.value || null);
 
   AI_ENABLED = aiEnabled;
   AI_PLAYER  = 1;
@@ -116,7 +185,7 @@ async function startNewGame() {
   }
 
   const body = {
-    names:        [playerName, aiEnabled ? 'KI' : 'Spieler 2'],
+    names:        [playerName, player2Name],
     ai_enabled:   aiEnabled,
     ai_side:      1,
     model:        model,
@@ -124,6 +193,8 @@ async function startNewGame() {
     first_player: firstPlayer,
     teacher_level: teacherLevel,
     teacher_sims:  teacherSims,
+    profile_p0:   profileP0,
+    profile_p1:   profileP1,
   };
   if (seed !== null && !Number.isNaN(seed)) {
     body.seed = seed;
@@ -134,6 +205,9 @@ async function startNewGame() {
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
   window._gameEndLogged = false;
   _chipGhosts = {0: [], 1: []}; _prevBonusChips = {0: null, 1: null};
+  // Spielerprofile: vom Server aufgeloeste Profil-/KI-Rating-Info fuer die
+  // laufende Partie merken (Rating-Anzeige am Spielernamen, s. renderBoard()).
+  RATING_INFO = {p0: d.profile_p0 || null, p1: d.profile_p1 || null, ai: d.ai_rating || null};
   if (d.teacher_level !== undefined) TEACHER_LEVEL = d.teacher_level;
   if (d.teacher_sims !== undefined) TEACHER_SIMS = d.teacher_sims;
   if (d.seed !== undefined) {
@@ -783,7 +857,7 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
   document.getElementById(`board${pi}`).className = `panel${isActive?' active':''}`;
   document.getElementById(`board${pi}`).innerHTML = `
     <div class="phead">
-      <span class="pname">${isActive?'▶ ':''}${p.name}${p.start_placed?'':' ⚠ Erste Kuppelplatte legen!'}</span>
+      <span class="pname">${isActive?'▶ ':''}${p.name}${_ratingBadgeHTML(pi)}${p.start_placed?'':' ⚠ Erste Kuppelplatte legen!'}</span>
       <span style="display:flex;align-items:baseline;gap:5px">
         <span class="pscore">${p.score}</span>
         <span style="font-size:11px;color:${estColor}" title="Geschätzte Punkte diese Runde">(${estStr})</span>
@@ -2246,11 +2320,29 @@ async function calculateEndScoring() {
   if(!d.ok){showError(d.error);return;}
   S = d.state;
   console.log(d)
-  await showEndResults(d.end_scoring);
+  await showEndResults(d.end_scoring, d.rating_updates);
   render();
 }
 
-async function showEndResults(results) {
+// Spielerprofile: baut die Rating-Zeile "Rating: 1000 -> 1016 (+16) vs
+// v19_2d_best@400 (1326)" aus EINEM Historien-Eintrag (s.
+// player_profiles.py::apply_result). `~` vor der Gegner-Elo markiert einen
+// Schaetzwert (opponent_is_estimate).
+function _ratingUpdateLineHTML(name, entry) {
+  if (!entry) return '';
+  const sign = entry.delta >= 0 ? '+' : '';
+  const deltaColor = entry.delta > 0 ? '#059669' : entry.delta < 0 ? '#DC2626' : 'var(--text2)';
+  const oppRating = `${entry.opponent_is_estimate ? '~' : ''}${Math.round(entry.opponent_rating)}`;
+  const hintsNote = entry.hints_used ? ' <span style="color:var(--text3)">(mit KI-Tipps)</span>' : '';
+  return `<div style="font-size:11px;margin-top:4px">
+    <strong>${_escapeHtml(name)}</strong>: Rating: ${Math.round(entry.rating_before)}
+    → ${Math.round(entry.rating_after)}
+    (<span style="color:${deltaColor};font-weight:600">${sign}${entry.delta}</span>)
+    vs ${_escapeHtml(entry.opponent)} (${oppRating})${hintsNote}
+  </div>`;
+}
+
+async function showEndResults(results, ratingUpdates) {
   if (!S || !S.players) return;
   const p0 = S.players[0], p1 = S.players[1];
   // Tie-Break wie oben in render(): first_player_next_round statt der (bei
@@ -2271,6 +2363,24 @@ async function showEndResults(results) {
       <td style="padding:4px 8px;text-align:right">${pts(r1)}</td>
     </tr>`;
   }).join('');
+
+  // Spielerprofile: Rating-Aenderung(en) dieser Partie (s. _apply_elo_for_
+  // finished_game in server.py) -- ein Eintrag je gewertetem Profil, oder
+  // ein erklaerender Hinweis, wieso NICHT gewertet wurde (z.B. kein Profil
+  // ausgewaehlt, kein Elo-Anker fuer die KI-Stufe bekannt).
+  let ratingHTML = '';
+  if (ratingUpdates) {
+    const line0 = _ratingUpdateLineHTML(p0.name, ratingUpdates['0']);
+    const line1 = _ratingUpdateLineHTML(p1.name, ratingUpdates['1']);
+    if (line0 || line1) {
+      ratingHTML = `<div class="sep" style="margin:10px 0"></div>
+        <div class="lbl" style="margin-bottom:4px">📈 Elo-Wertung</div>
+        ${line0}${line1}`;
+    } else if (ratingUpdates.note) {
+      ratingHTML = `<div class="sep" style="margin:10px 0"></div>
+        <div style="font-size:10px;color:var(--text3)">📈 ${_escapeHtml(ratingUpdates.note)}</div>`;
+    }
+  }
 
   // Lehrer-Endbilanz (Stufe 3): optionaler Zusatzblock im selben Modal.
   let teacherHTML = '';
@@ -2319,6 +2429,7 @@ async function showEndResults(results) {
     <div style="text-align:center;font-size:18px;font-weight:700;color:var(--blau);margin:10px 0">
       🥇 ${winner} gewinnt!
     </div>
+    ${ratingHTML}
     ${teacherHTML}
     <button style="width:100%;padding:9px;background:var(--text);color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px;margin-top:8px" onclick="document.getElementById('end-overlay').style.display='none';newGame()">Neues Spiel</button>
   </div>`;
