@@ -1269,7 +1269,55 @@ const GUMBEL_C_SCALE: f64 = 1.0;
 /// Sequential Halving). Paper-/mctx-Standardwert, aus Go/Schach-Experimenten
 /// mit aehnlichem/groesserem Verzweigungsfaktor -- fuer dieses Spiel noch
 /// nicht eigens kalibriert (siehe Plan-Dokument, "Offene Risiken").
+///
+/// Dient seit Task #14 (PCR-Vorbereitung, 2026-08-02) als OBERE Grenze
+/// (Ceiling) fuer `gumbel_top_m_for_budget` unten, nicht mehr als der fuer
+/// JEDEN Suchaufruf feste Wert -- bleibt als eigene Konstante bestehen, weil
+/// `lib.rs::engine_config_json` sie weiterhin als Referenz-/Ceiling-Wert ins
+/// Lauf-Manifest schreibt (das tatsaechliche, budgetabhaengige M eines
+/// einzelnen Suchaufrufs steht dort NICHT drin, nur die Obergrenze).
 pub const GUMBEL_TOP_M: usize = 16;
+
+/// Sim-budget-abhaengige Ober-Grenze fuer die Gumbel-Top-m-Kandidatenzahl
+/// (Task #14, PCR-Vorbereitung, 2026-08-02): vorher war `GUMBEL_TOP_M` eine
+/// reine Compile-Time-Konstante, gleich fuer JEDEN Suchaufruf, unabhaengig
+/// vom tatsaechlichen Sim-Budget dieses Zugs. Mit Playout-Cap-Randomization
+/// (KataGo-Vorbild, siehe `self_play.rs`) laufen im selben Prozess klassische
+/// Voll-Suchen (400/600 Sims) UND sehr guenstige Cheap-Suchen (z.B. 150 Sims
+/// oder weniger). Bei fixem M=16 wuerde eine Cheap-Suche mit z.B. 64 Sims
+/// versuchen, 16 Kandidaten ueber `ceil(log2(16))=4` Sequential-Halving-Phasen
+/// zu verteilen: 16*4=64 Sim-"Slots" (siehe `remaining_slots` unten) sind dann
+/// schon aufgebraucht, nur um JEDEN Kandidaten EINMAL pro Phase zu besuchen --
+/// keine Reserve mehr fuer die eigentliche Differenzierung (Sequential
+/// Halving braucht MEHRERE Besuche pro Kandidat pro Phase, damit die
+/// Q-Schaetzung, nach der die naechste Haelfte eliminiert wird, ueberhaupt
+/// aussagekraeftig ist).
+///
+/// Formel: `m(budget) = clamp(round(budget / 16), 4, GUMBEL_TOP_M)`.
+/// - Referenzteiler 16: bei den bisherigen Standard-Budgets ergibt
+///   `round(400/16)=25` bzw. `round(600/16)=38`, beide werden vom oberen
+///   Clamp auf `GUMBEL_TOP_M=16` gekappt -- IDENTISCHES Verhalten zur alten
+///   fixen Konstante bei allen bisher produktiv genutzten Sim-Zahlen (400,
+///   600). Regressionstest: `gumbel_top_m_for_budget_unchanged_at_400_and_600_sims`.
+/// - Obere Grenze `GUMBEL_TOP_M`: der bisherige Paper-/mctx-Standardwert wird
+///   durch die Skalierung nie ueberschritten -- keine unkalibrierte
+///   Vergroesserung der Wurzelbreite ueber den bisher genutzten Bereich
+///   hinaus.
+/// - Untere Grenze 4: unter 4 Kandidaten verliert Sequential Halving an Sinn
+///   (mit `ceil(log2(m))`-Phasen braucht selbst `m=2` schon eine
+///   Halbierungs-Phase; bei `m=1` degeneriert die Suche zur reinen
+///   Tiefensuche eines einzigen Zugs, siehe `candidates.len() <= 1`-Zweig
+///   unten) -- 4 haelt auch bei sehr kleinen Cheap-Budgets eine minimale
+///   Kandidaten-Diversitaet an der Wurzel.
+/// - Dazwischen (z.B. Cheap-Suche mit 150 Sims -> `round(150/16)=9`):
+///   proportional zum Budget, damit jeder Halbierungs-"Slot"
+///   (`remaining_slots = remaining_phases * current.len()`, s.u.) im Schnitt
+///   in einer aehnlichen Groessenordnung Sims pro Kandidat bleibt wie beim
+///   bisherigen 400/600-Sims-Betrieb bei M=16.
+pub fn gumbel_top_m_for_budget(sims: u32) -> usize {
+    let raw = (sims as f64 / 16.0).round() as i64;
+    raw.clamp(4, GUMBEL_TOP_M as i64) as usize
+}
 
 /// Schaltet die Suche komplett auf Gumbel-AlphaZero um (Wurzel: Gumbel-Top-m
 /// + Sequential Halving statt Dirichlet-Noise + PUCT; Tiefe≥1: neue
@@ -1858,7 +1906,7 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     // Wert ziehen, Score = g(a) + ln(prior(a)), Top m' behalten. `g(a)`
     // wird für die spätere Halbierungs-Rangfolge (§2) aufbewahrt (NICHT neu
     // gezogen).
-    let m_prime = GUMBEL_TOP_M.min(n_root);
+    let m_prime = gumbel_top_m_for_budget(sims).min(n_root);
     let mut scored: Vec<(f64, f64, usize)> = nodes[0]
         .untried
         .iter()
@@ -2958,6 +3006,32 @@ mod tests {
 
         // 0 Restfliesen -> 1 leere Reihenfolge (kein Stapel nötig).
         assert_eq!(unique_moon_orders(&[]), vec![Vec::<TileColor>::new()]);
+    }
+
+    #[test]
+    fn gumbel_top_m_for_budget_unchanged_at_400_and_600_sims() {
+        // Task #14: bei den bisherigen Standard-Suchbudgets (Arena/Self-Play,
+        // s. `DECOUPLE_NET_SIMS_FROM_ACTIONS`-Kommentar) MUSS die neue
+        // budgetabhaengige Formel exakt dieselbe Wurzelbreite liefern wie die
+        // alte fixe Konstante -- sonst waere die Aenderung nicht additiv.
+        assert_eq!(gumbel_top_m_for_budget(400), GUMBEL_TOP_M);
+        assert_eq!(gumbel_top_m_for_budget(600), GUMBEL_TOP_M);
+        // Auch knapp unterhalb/oberhalb bleibt es beim Ceiling (16*16=256 ist
+        // die kleinste Sim-Zahl, bei der round(sims/16) ueberhaupt >= 16
+        // wird -- alles ab da wird gekappt).
+        assert_eq!(gumbel_top_m_for_budget(256), GUMBEL_TOP_M);
+        assert_eq!(gumbel_top_m_for_budget(1000), GUMBEL_TOP_M);
+
+        // Untere Clamp-Grenze: sehr kleine (z.B. PCR-Cheap-)Budgets duerfen
+        // nie unter 4 Kandidaten fallen.
+        assert_eq!(gumbel_top_m_for_budget(1), 4);
+        assert_eq!(gumbel_top_m_for_budget(32), 4);
+
+        // Dazwischen: proportional zum Budget (Sequential-Halving-Argument
+        // im Funktionskommentar), gerundet.
+        assert_eq!(gumbel_top_m_for_budget(150), 9); // round(150/16) = 9.375 -> 9
+        assert_eq!(gumbel_top_m_for_budget(64), 4); // round(64/16) = 4 (untere Grenze exakt getroffen)
+        assert_eq!(gumbel_top_m_for_budget(128), 8); // round(128/16) = 8
     }
 
     #[test]

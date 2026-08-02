@@ -141,7 +141,8 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
 
 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
-                      add_root_noise, deterministic, record_rtv, queue, progress_path, heartbeat_path):
+                      add_root_noise, deterministic, record_rtv, pcr_full_prob,
+                      pcr_cheap_sims, queue, progress_path, heartbeat_path):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -158,6 +159,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 seed=seed, num_threads=threads, prefix=prefix,
                 add_root_noise=add_root_noise, deterministic=deterministic,
                 record_rtv=record_rtv,
+                pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
             )
         elif mode == "mcts" and model:
@@ -218,7 +220,8 @@ def _cleanup_progress_files(progress_path, heartbeat_path) -> None:
 
 def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
                           add_root_noise, deterministic, record_rtv, timeout_secs,
-                          progress_path, heartbeat_path) -> str | None:
+                          progress_path, heartbeat_path,
+                          pcr_full_prob=None, pcr_cheap_sims=150) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -231,7 +234,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
     proc = mp.Process(
         target=_worker_run_chunk,
         args=(mode, model, n, simulations, c_puct, seed, threads, prefix,
-              add_root_noise, deterministic, record_rtv, queue,
+              add_root_noise, deterministic, record_rtv, pcr_full_prob,
+              pcr_cheap_sims, queue,
               str(progress_path), str(heartbeat_path)),
     )
     proc.start()
@@ -393,7 +397,12 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   tag: str = None, threads: int = 0, chunk: int = 10, seed: int = None,
                   per_file: int = 10, model: str = None, c_puct: float = 1.5,
                   add_root_noise: bool = True, deterministic: bool = False,
-                  record_rtv: bool = False):
+                  record_rtv: bool = False,
+                  pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150):
+    # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
+    # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
+    if pcr_full_prob is not None and not (0.0 < pcr_full_prob <= 1.0):
+        raise SystemExit(f"❌ --pcr-full-prob muss in (0,1] liegen, ist {pcr_full_prob}.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -485,6 +494,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             mode, model, n, simulations, c_puct, base_seed + chunk_idx, threads,
             f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, record_rtv, timeout_secs,
             progress_path, heartbeat_path,
+            pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
         )
         return raw, progress_path, heartbeat_path
 
@@ -627,6 +637,12 @@ if __name__ == "__main__":
                         help="Basis-Seed (für reproduzierbare Läufe). Standard: zufällig.")
     parser.add_argument("--depth", type=int, default=0,
                         help="(Kompatibilität; ignoriert — Rust bewertet Blätter exakt per Tiling-Solver)")
+    parser.add_argument("--pcr-full-prob", dest="pcr_full_prob", type=float, default=None,
+                        help="Task #14 PCR: Anteil Voll-Suche pro Zug (z.B. 0.25); "
+                             "None/weggelassen = AUS (Bestandsverhalten). Nur --mode network.")
+    parser.add_argument("--pcr-cheap-sims", dest="pcr_cheap_sims", type=int, default=150,
+                        help="Task #14 PCR: Sim-Budget der Sparsuche (Default 150; "
+                             "GUMBEL_TOP_M skaliert automatisch mit).")
     parser.add_argument("--no-root-noise", action="store_true",
                         help="Dirichlet-Wurzel-Rauschen abschalten (nur --mode network; Standard: an). "
                              "Diagnose-Flag fuer den Stufe-2-0:0-Test, siehe evaluations/stage2_investigation.md")
@@ -653,4 +669,6 @@ if __name__ == "__main__":
         add_root_noise=not args.no_root_noise,
         deterministic=args.deterministic,
         record_rtv=args.rtv,
+        pcr_full_prob=args.pcr_full_prob,
+        pcr_cheap_sims=args.pcr_cheap_sims,
     )

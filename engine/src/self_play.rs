@@ -1927,8 +1927,39 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         crate::net_mcts::net_root_child_stats_and_policy(net, state, sims, c_puct, add_root_noise, rng);
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
+        // BUGFIX (2026-08-02): dieser Fallback (leere/nutzlose `stats` -- der
+        // Baum konnte keine brauchbare Besuchsverteilung liefern, Zugwahl
+        // faellt auf eine rein zufaellige legale Aktion zurueck) warf bisher
+        // ein eventuell bereits von `net_root_child_stats_and_policy`
+        // erfolgreich berechnetes `Some(root_q)` weg und gab hartkodiert
+        // `None` zurueck. `root_q` (Wurzel-Gewinnwahrscheinlichkeit) ist von
+        // der Policy-/Zugwahl-Frage UNABHAENGIG: `nodes[0].value/visits`
+        // (bzw. Runde-5-`mcts_q`) ist unabhaengig davon gueltig, ob die
+        // KIND-Statistiken fuer eine sinnvolle Zugauswahl ausreichen --
+        // daher jetzt durchgereicht statt verworfen. `stats`/`total`/die
+        // Zugwahl selbst bleiben unveraendert (Sicherheitsregel: KEINE
+        // Aenderung an der tatsaechlich gespielten Aktion).
+        //
+        // Einordnung (2026-08-02, nach diesem Fix erneut gemessen): ein
+        // frueherer Rauchtest waehrend Task #14 hatte faelschlich eine
+        // "~20%-Root-Q-Luecke" gemeldet -- das Diagnose-Skript zaehlte
+        // `tiling_step`-Records (haben ebenfalls "policy"/"valid_actions",
+        // durchlaufen aber NIE `net_drafting_policy`, `root_q` fehlt dort BY
+        // DESIGN) faelschlich als "Mehr-Aktionen-Drafting-Entscheide" mit.
+        // Nach Korrektur der Messung (Tiling-/StartPlacement-Records korrekt
+        // ausgeschlossen) lag die Root-Q-Abdeckung fuer ECHTE Mehr-Aktionen-
+        // Drafting-Entscheide SCHON VOR diesem Fix bei 100% (863/863 direkt
+        // instrumentierte `net_drafting_policy`-Aufrufe, `v19_2d_best`) --
+        // dieser Fallback-Zweig wurde in der Praxis nie beobachtet
+        // (`stats.is_empty()||!(total>0.0)` scheint bei laufender Suche
+        // faktisch nie einzutreten). Der Fix bleibt trotzdem drin (echte,
+        // harmlose Korrektheits-Verbesserung fuer den theoretischen Fall,
+        // Praezedenzfall Memory `feedback_correctness_over_measured_benefit`
+        // -- Korrektheits-Fixes bleiben auch bei flachem/keinem gemessenen
+        // Effekt), aber die urspruenglich gemeldete ~20%-Zahl war ein
+        // Messfehler in der eigenen Diagnose, kein reales Engine-Verhalten.
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
-        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })], None);
+        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })], root_q);
     }
     let policy: Vec<Value> = completed_q_policy
         .iter()
@@ -2031,6 +2062,86 @@ fn sample_round_transition_for_round<R: Rng + ?Sized>(
 /// gleichnamiger Parameter -- gated NUR das `round_transition_value`-Sampling
 /// (~81% der Self-Play-Kosten laut Task #80/#81-Profiling), `bootstrap_value`
 /// bleibt unabhaengig davon erhalten.
+///
+/// `pcr_full_prob`/`pcr_cheap_sims` (Task #14, Playout-Cap-Randomization,
+/// 2026-08-02, KataGo-Vorbild): additiv, Default (aus `run_net_self_play`)
+/// `pcr_full_prob=None` = AUS, dann BYTE-IDENTISCHES Verhalten zu vorher --
+/// kein Münzwurf, kein neues JSON-Feld, jeder Drafting-Zug bekommt wie
+/// bisher eine Voll-Suche mit `base_sims`. Ist `pcr_full_prob=Some(p)`
+/// gesetzt, wird je ECHTEM Drafting-Entscheid (`actions.len() > 1`, exakt
+/// dieselbe Bedingung wie die bestehende Ein-Aktion-Kurzschluss-Zeile) EIN
+/// Münzwurf aus `rng` gezogen (also aus dem PARTIE-EIGENEN, per Spiel-Seed
+/// deterministischen RNG-Strom -- gleiches Muster wie `moon_order_target`/
+/// `weighted_index` weiter unten, keine separate/neue Zufallsquelle): mit
+/// Wahrscheinlichkeit `p` eine Voll-Suche (`base_sims`, Policy-Ziel wie
+/// bisher verlaesslich), sonst eine guenstige Suche (`pcr_cheap_sims`,
+/// Policy-Ziel MINDERER Qualitaet -- markiert per additivem
+/// `"policy_target_valid": false`-Feld im Record, siehe unten).
+///
+/// WICHTIG (Qualitaets-Tradeoff, KataGo-Praezedenz): die guenstige
+/// Cheap-Suche liefert einen schwaecheren Policy-Ziel-Vektor (weniger Sims
+/// -> flacheres Sequential-Halving, siehe `gumbel_top_m_for_budget`) als
+/// eine Voll-Suche -- das ist ein BEWUSST akzeptierter Tradeoff, kein Bug:
+/// die einzelne Cheap-Zug-Qualitaet sinkt, aber die Anzahl an
+/// Value-Samples (Spielausgang-Labels, die JEDE Position bekommt,
+/// unabhaengig von Voll- oder Cheap-Suche -- `root_q`/`scores`/`winner`
+/// bleiben in BEIDEN Zweigen vorhanden) pro Wall-Clock-Stunde steigt
+/// deutlich, weil Cheap-Suchen viel billiger sind als Voll-Suchen. KataGo
+/// hat dieselbe Abwaegung getroffen (mehr, aber im Schnitt etwas
+/// schwaechere Selbstspiel-Positionen schlagen weniger, aber staerkere).
+/// `root_q` selbst ist von dieser Qualitaetsfrage KONZEPTIONELL nicht
+/// betroffen: JEDE Suche (voll oder cheap) hat eine Wurzel,
+/// `net_drafting_policy` liefert `root_q` in beiden Faellen ueber
+/// `net_mcts::net_root_child_stats_and_policy` (siehe dortige Root-Q-Logik).
+/// **Fund + Korrektur (2026-08-02):** ein erster Rauchtest waehrend dieses
+/// Auftrags MELDETE eine vermeintliche ~20%-Root-Q-Luecke bei Mehr-Aktionen-
+/// Drafting-Entscheiden -- das war jedoch ein MESSFEHLER im Diagnose-Skript
+/// selbst, kein Engine-Verhalten: es zaehlte `tiling_step`-Records (haben
+/// ebenfalls "policy"/"valid_actions", durchlaufen aber NIE
+/// `net_drafting_policy` -- `root_q` fehlt dort BY DESIGN, ca. 27% aller
+/// Records laut STATUS.md-Kennzahlen vom 2026-07-28) faelschlich als
+/// "Mehr-Aktionen-Drafting-Entscheide" mit. Nach Korrektur (Tiling-/
+/// StartPlacement-Records sauber ausgeschlossen, per Aktionstyp
+/// unterschieden -- Tiling: `"type"` ∈ {"tiling","use_chips","end_tiling"},
+/// StartPlacement: alle Eintraege `"is_start":true`) lag die Root-Q-
+/// Abdeckung fuer ECHTE Mehr-Aktionen-Drafting-Entscheide SCHON VOR jeder
+/// Code-Aenderung bei 100% -- direkt bestaetigt durch 863 instrumentierte
+/// `net_drafting_policy`-Aufrufe (0 mit `root_q=None`), UND nach Korrektur
+/// des Diagnose-Skripts (4 Spiele, `v19_2d_best`, `base_sims=600`): PCR AUS
+/// 434/434 (100%); PCR AN (`p=0.25`, `cheap=150`) 424/424 (100%; davon 86
+/// voll, 338 cheap, je 100%).
+///
+/// `net_drafting_policy`s eigener Fallback (`stats.is_empty() ||
+/// !(total > 0.0)`, greift wenn der Baum keine brauchbare Kind-
+/// Besuchsverteilung liefert und die Zugwahl auf eine zufaellige legale
+/// Aktion zurueckfaellt) warf trotzdem bis 2026-08-02 ein eventuell bereits
+/// berechnetes `Some(root_q)` weg -- BEHOBEN (siehe dortiger Kommentar),
+/// bleibt als Korrektheits-Fix drin, obwohl der Zweig in der Praxis nie
+/// beobachtet wurde (Memory `feedback_correctness_over_measured_benefit`).
+/// Die tatsaechlich gespielte Aktion war und bleibt davon unberuehrt. Nur
+/// der EIN-Aktion-Kurzschluss (keine echte Suche) liefert weiterhin IMMER
+/// `None`, das ist by design.
+/// Task #14 (Playout-Cap-Randomization, 2026-08-02): reiner Muenzwurf-
+/// Entscheid fuer EINEN Drafting-Zug, ausgelagert aus
+/// `play_net_self_play_game`s Zug-Schleife, damit er ISOLIERT (ohne volles
+/// Self-Play-Spiel) unit-testbar ist -- ein komplettes Spiel ist wegen der
+/// wall-clock-deadline-basierten `round_transition_deep`-Stichproben nicht
+/// lauflaengen-deterministisch (unabhaengig von PCR, siehe Aufrufstellen-
+/// Kommentar), ein isolierter Funktionsaufruf mit einem lokal geseedeten RNG
+/// dagegen schon.
+///
+/// - `pcr_full_prob=None` (PCR aus): `None` zurueck, `rng` bleibt UNBERUEHRT
+///   (kein Aufruf von `rng.random()`) -- Voraussetzung fuer additive/
+///   byte-identische Nebenwirkung bei PCR aus.
+/// - `n_actions <= 1` (kein echter Entscheid -- das einzige legale Ziel ist
+///   ohnehin exakt): `Some(true)`, ebenfalls OHNE `rng`-Verbrauch (gleiche
+///   Kurzschluss-Bedingung wie die Ein-Aktion-Zeile im Aufrufer).
+/// - Sonst: genau EIN `rng.random::<f64>()`-Aufruf, `Some(true)` mit
+///   Wahrscheinlichkeit `p`, sonst `Some(false)`.
+fn pcr_decide_full<R: Rng + ?Sized>(pcr_full_prob: Option<f64>, n_actions: usize, rng: &mut R) -> Option<bool> {
+    pcr_full_prob.map(|p| n_actions <= 1 || rng.random::<f64>() < p)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn play_net_self_play_game<R: Rng + ?Sized>(
     net: &Net,
@@ -2045,6 +2156,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     deterministic: bool,
     record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
+    pcr_full_prob: Option<f64>,
+    pcr_cheap_sims: u32,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
@@ -2091,6 +2204,24 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     let actions = drafting_actions(&game.state);
                     let valid_actions: Vec<Value> =
                         actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
+                    // Task #14 (PCR): pro echtem Entscheid (>1 legale Aktion)
+                    // EIN Muenzwurf aus dem partie-eigenen `rng`-Strom -- nur
+                    // gezogen, wenn PCR ueberhaupt aktiv ist (`pcr_full_prob`
+                    // gesetzt), damit der RNG-Verbrauch bei `pcr_full_prob=None`
+                    // identisch zum Vor-PCR-Verhalten bleibt (kein zusaetzlicher
+                    // `rng`-Aufruf, keine Verschiebung nachfolgender Ziehungen wie
+                    // `moon_order_target`/`weighted_index`). Ausgelagert in
+                    // `pcr_decide_full`, damit dieser Entscheid isoliert
+                    // (unit-testbar OHNE volles Self-Play-Spiel) geprueft werden
+                    // kann -- ein komplettes Spiel ist wegen der wall-clock-
+                    // deadline-basierten `round_transition_deep`-Stichproben
+                    // (siehe dortige `Instant::now() + BUDGET`-Schleifen) NICHT
+                    // lauflaengen-deterministisch, unabhaengig von PCR.
+                    let pcr_is_full: Option<bool> = pcr_decide_full(pcr_full_prob, actions.len(), rng);
+                    let effective_sims = match pcr_is_full {
+                        Some(false) => pcr_cheap_sims,
+                        _ => base_sims,
+                    };
                     let (chosen, policy, root_q) = if actions.len() == 1 {
                         let a = actions[0].clone();
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
@@ -2102,9 +2233,16 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // Task #81: `with_category` markiert zusaetzlich alle
                         // Netz-Evals INNERHALB dieses Blocks als "Gumbel" fuer den
                         // Eval-vs-Logik-Split (Amdahl-Grenze GPU-Umbau).
+                        //
+                        // Task #14 (PCR): `effective_sims` ist bei aktivem PCR und
+                        // Cheap-Zweig `pcr_cheap_sims` statt `base_sims`, sonst
+                        // (PCR aus ODER Voll-Zweig) unveraendert `base_sims` --
+                        // `net_drafting_policy` selbst kennt PCR nicht, sieht nur
+                        // eine andere Sims-Zahl (dieselbe Funktion, die auch ohne
+                        // PCR jede Voll-Suche ausfuehrt).
                         crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
                             crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
-                                net_drafting_policy(net, &game.state, &actions, base_sims, c_puct, rng, add_root_noise, deterministic)
+                                net_drafting_policy(net, &game.state, &actions, effective_sims, c_puct, rng, add_root_noise, deterministic)
                             })
                         })
                     };
@@ -2200,6 +2338,15 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     // es, kein Konsument liest es aktuell).
                     if let Some(rq) = root_q {
                         m.insert("root_q".into(), json!(rq));
+                    }
+                    // Task #14 (PCR): additiv, NUR vorhanden wenn PCR aktiv ist
+                    // (`pcr_full_prob.is_some()`) -- bei PCR AUS fehlt das Feld
+                    // komplett (Byte-Identitaet zum Vor-PCR-JSON-Format). Bei PCR
+                    // AN ist es in JEDEM Drafting-Record vorhanden (auch beim
+                    // Ein-Aktion-Kurzschluss, dort immer `true`: das einzige
+                    // legale Ziel ist exakt, unabhaengig von Suchqualitaet).
+                    if let Some(is_full) = pcr_is_full {
+                        m.insert("policy_target_valid".into(), json!(is_full));
                     }
                     records.push(m);
                 } else {
@@ -2308,6 +2455,10 @@ where
 /// Dokumentation. Default AUS auf `self_play.py`-CLI-Ebene (`--rtv`-Flag
 /// reaktiviert) -- erwarteter Durchsatzgewinn ~3x (rtv war laut Task #80
 /// ~81% der Self-Play-Kosten dieses Pfads).
+/// `pcr_full_prob`/`pcr_cheap_sims` (Task #14, Playout-Cap-Randomization):
+/// siehe `play_net_self_play_game`-Dokumentation -- reine Durchreichung,
+/// `pcr_full_prob=None` (Default in `lib.rs`s pyo3-Signatur) ist byte-
+/// identisch zum Vor-PCR-Verhalten.
 #[allow(clippy::too_many_arguments)]
 pub fn run_net_self_play(
     model_path: &str,
@@ -2322,6 +2473,8 @@ pub fn run_net_self_play(
     record_rtv: bool,
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
+    pcr_full_prob: Option<f64>,
+    pcr_cheap_sims: u32,
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load_auto(model_path).map_err(|e| e.to_string())?);
     let progress_file = open_progress_file(progress_path);
@@ -2359,7 +2512,7 @@ pub fn run_net_self_play(
         let result = run_with_watchdog(watchdog_deadline, move || {
             play_net_self_play_game(
                 &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise, deterministic,
-                record_rtv, Some(&move_counter_thread),
+                record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
             )
         });
         let steps = match result {
@@ -4121,5 +4274,194 @@ mod tests {
             "run_net_vs_net_arena_hybrid mit hybrid_board=1 muss bei A=B ebenfalls \
              byte-identisch zu run_net_vs_net_arena sein"
         );
+    }
+
+    /// Task #14 (PCR) -- isolierter Unit-Test fuer den Muenzwurf-Entscheid
+    /// selbst, OHNE volles Self-Play-Spiel (dessen `round_transition_deep`-
+    /// Stichproben wall-clock-Deadlines nutzen, siehe `pcr_decide_full`-Doku
+    /// -- ein voller Spiellauf ist deshalb grundsaetzlich NICHT
+    /// lauflaengen-/byte-deterministisch, unabhaengig von PCR). Diese
+    /// Funktion dagegen ist eine reine, RNG-basierte Funktion -- hier IST
+    /// Byte-Determinismus garantiert und wird geprueft.
+    #[test]
+    fn pcr_decide_full_none_when_pcr_off_and_consumes_no_rng() {
+        let mut rng = StdRng::seed_from_u64(1);
+        let mut rng_control = StdRng::seed_from_u64(1);
+        assert_eq!(pcr_decide_full(None, 5, &mut rng), None);
+        // Kanarien-Ziehung: wenn `pcr_decide_full` bei PCR AUS `rng` NICHT
+        // beruehrt hat, muss `rng` danach exakt im selben Zustand sein wie
+        // ein identisch geseedeter Kontroll-RNG, der ueberhaupt nicht
+        // aufgerufen wurde.
+        let a: f64 = rng.random();
+        let b: f64 = rng_control.random();
+        assert_eq!(a, b, "PCR aus darf keinen RNG-Wert verbrauchen (sonst verschiebt es moon_order_target/weighted_index)");
+    }
+
+    #[test]
+    fn pcr_decide_full_single_action_is_always_full_without_rng_draw() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let mut rng_control = StdRng::seed_from_u64(7);
+        // p=0.0 wuerde bei einem ECHTEN Entscheid immer "cheap" ergeben --
+        // bei nur 1 legaler Aktion (kein echter Entscheid) trotzdem "voll".
+        assert_eq!(pcr_decide_full(Some(0.0), 1, &mut rng), Some(true));
+        let a: f64 = rng.random();
+        let b: f64 = rng_control.random();
+        assert_eq!(a, b, "Ein-Aktion-Kurzschluss darf ebenfalls keinen RNG-Wert verbrauchen");
+    }
+
+    #[test]
+    fn pcr_decide_full_extremes_are_deterministic_over_many_draws() {
+        let mut rng = StdRng::seed_from_u64(99);
+        for _ in 0..20 {
+            assert_eq!(pcr_decide_full(Some(1.0), 5, &mut rng), Some(true));
+        }
+        let mut rng2 = StdRng::seed_from_u64(99);
+        for _ in 0..20 {
+            assert_eq!(pcr_decide_full(Some(0.0), 5, &mut rng2), Some(false));
+        }
+    }
+
+    #[test]
+    fn pcr_decide_full_matches_target_probability_over_many_draws() {
+        let mut rng = StdRng::seed_from_u64(2024);
+        let n = 20_000;
+        let full_count = (0..n).filter(|_| pcr_decide_full(Some(0.25), 5, &mut rng) == Some(true)).count();
+        let frac = full_count as f64 / n as f64;
+        assert!(
+            (frac - 0.25).abs() < 0.02,
+            "beobachtete Vollsuche-Quote {frac} weicht bei n={n} zu stark von p=0.25 ab"
+        );
+    }
+
+    /// Task #14 (Playout-Cap-Randomization) -- Verhaltenstest direkt auf
+    /// `run_net_self_play`-Ebene (kein Python noetig fuer diesen Rauchtest).
+    /// Deckt NICHT Byte-Determinismus ab (siehe `pcr_decide_full`-Tests oben
+    /// fuer die deterministische Muenzwurf-Logik selbst -- ein volles
+    /// Self-Play-Spiel ist wegen `round_transition_deep`s wall-clock-
+    /// Deadlines grundsaetzlich nicht lauflaengendeterministisch, auch OHNE
+    /// PCR), sondern die additive JSON-Struktur:
+    /// 1) `pcr_full_prob=None` (Default): kein `policy_target_valid`-Feld im
+    ///    JSON (additiv -- Vor-PCR-Format bleibt strukturell unveraendert).
+    /// 2) `pcr_full_prob=Some(1.0)` (Muenzwurf faellt IMMER auf voll): jeder
+    ///    echte Entscheid (>1 legale Aktion) bekommt `policy_target_valid=true`
+    ///    UND `root_q`.
+    /// 3) `pcr_full_prob=Some(0.0)` (Muenzwurf faellt IMMER auf cheap): jeder
+    ///    echte Entscheid bekommt `policy_target_valid=false`, UND `root_q`
+    ///    bleibt trotzdem vorhanden (jede Suche -- voll oder cheap -- hat eine
+    ///    Wurzel). Frueherer Stand hier haette nur "mindestens ein Record"
+    ///    behauptet (vermeintliche ~20%-Root-Q-Luecke) -- diese Behauptung
+    ///    beruhte auf einem Messfehler in einem Ad-hoc-Diagnoseskript, das
+    ///    `tiling_step`-Records (kein `root_q` BY DESIGN) faelschlich
+    ///    mitzaehlte, siehe `play_net_self_play_game`s Root-Q-Kommentar. Nach
+    ///    Korrektur der Messung war die Abdeckung schon vor jeder
+    ///    Code-Aenderung 100% -- die Zusicherung hier ist entsprechend jetzt
+    ///    wieder die strenge ("JEDER", nicht nur "mindestens einer").
+    #[test]
+    fn pcr_full_prob_gates_policy_target_valid_and_stays_off_by_default() {
+        // Nutzt bewusst NICHT `load_test_net_for_gating` (haengt an
+        // `alphazero_v10_best.onnx`, das im aktuellen Modell-Bestand nicht
+        // mehr vorhanden ist -- `v18_best` ist der naechstliegende lokal
+        // real vorhandene flache Checkpoint, gleiches Skip-Muster bei
+        // Abwesenheit).
+        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v18_best.onnx");
+        let model_path = model_path.to_str().unwrap();
+        if Net::load_auto(model_path).is_err() {
+            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
+            return;
+        }
+
+        let seed = 42_042u64;
+        // n_games=1 (statt mehr) haelt die Testlaufzeit im Rahmen -- jedes
+        // Spiel durchlaeuft `round_transition_deep`s wall-clock-budgetierte
+        // Stichproben (mehrere Sekunden je Rundenuebergang), das dominiert
+        // die Laufzeit weit staerker als `base_sims`. Fuer die geprueften
+        // Struktur-Eigenschaften (Feld vorhanden/fehlt, Wert stimmt) reicht
+        // ein einzelnes vollstaendiges Spiel je Variante.
+        let n_games = 1usize;
+        let base_sims = 40u32; // klein fuers Testtempo -- Sims-Skalierung selbst ist bereits separat getestet (gumbel_top_m_for_budget_*)
+
+        // (1) PCR AUS -- Default (pcr_full_prob=None): kein neues Feld.
+        let off_a = run_net_self_play(
+            model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
+            false, None, None, None, 150,
+        )
+        .expect("PCR-AUS-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
+        let off_games: Vec<Value> = serde_json::from_str(&off_a).unwrap();
+        for step in &off_games {
+            if let Some(obj) = step.as_object() {
+                assert!(
+                    !obj.contains_key("policy_target_valid"),
+                    "PCR AUS (pcr_full_prob=None) darf kein policy_target_valid-Feld erzeugen"
+                );
+            }
+        }
+
+        // (2) PCR AN, p=1.0 -- Muenzwurf faellt IMMER auf "voll". JEDER ECHTE
+        // Mehr-Aktionen-Entscheid (>1 legale Aktion) muss sowohl
+        // `policy_target_valid=true` ALS AUCH `root_q` tragen. WICHTIG: der
+        // Ein-Aktion-Kurzschluss setzt `policy_target_valid` ebenfalls auf
+        // `true` (siehe `pcr_decide_full`: `n_actions<=1` -> `Some(true)`
+        // OHNE Suche), traegt aber NIE `root_q` (by design, keine Suche) --
+        // `policy_target_valid==true` ALLEIN ist daher NICHT gleichbedeutend
+        // mit "echte Suche fand statt"; erst zusammen mit
+        // `valid_actions.len() > 1` ist es das (identische Bedingung wie
+        // `pcr_decide_full`s eigener Kurzschluss-Check). Ohne dieses Filter
+        // schlaegt die root_q-Zusicherung faelschlich auf Ein-Aktion-
+        // Kurzschluss-Records fehl (live beobachtet, 2026-08-02).
+        let full = run_net_self_play(
+            model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
+            false, None, None, Some(1.0), 20,
+        )
+        .expect("PCR p=1.0-Lauf sollte gelingen");
+        let full_games: Vec<Value> = serde_json::from_str(&full).unwrap();
+        let mut saw_full_decision = false;
+        for step in &full_games {
+            if let Some(obj) = step.as_object() {
+                let n_valid = obj.get("valid_actions").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                if let Some(v) = obj.get("policy_target_valid") {
+                    assert_eq!(v, &Value::Bool(true), "p=1.0 muss JEDEN echten Entscheid als voll markieren");
+                    if n_valid > 1 {
+                        saw_full_decision = true;
+                        assert!(
+                            obj.contains_key("root_q"),
+                            "JEDER echte (>1 Aktion) Voll-Suche-Record muss root_q tragen (Suche liefert immer eine Wurzel)"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(
+            saw_full_decision,
+            "Testlauf sollte mindestens einen echten Drafting-Entscheid (>1 legale Aktion) enthalten"
+        );
+
+        // (3) PCR AN, p=0.0 -- Muenzwurf faellt IMMER auf "cheap". `root_q`
+        // ist auch bei einer Cheap-Suche vorhanden (jede Suche -- voll oder
+        // cheap -- hat eine Wurzel, JEDER Record muss `root_q` tragen). KEIN
+        // `n_valid>1`-Filter noetig wie bei (2): `policy_target_valid=false`
+        // kann laut `pcr_decide_full` NIE vom Ein-Aktion-Kurzschluss kommen
+        // (der mapped IMMER auf `Some(true)`, nie `Some(false)`) -- jedes
+        // `false`-Record ist bereits garantiert ein echter Mehr-Aktionen-
+        // Entscheid.
+        let cheap = run_net_self_play(
+            model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
+            false, None, None, Some(0.0), 20,
+        )
+        .expect("PCR p=0.0-Lauf sollte gelingen");
+        let cheap_games: Vec<Value> = serde_json::from_str(&cheap).unwrap();
+        let mut saw_cheap_decision = false;
+        for step in &cheap_games {
+            if let Some(obj) = step.as_object() {
+                if obj.get("policy_target_valid") == Some(&Value::Bool(false)) {
+                    saw_cheap_decision = true;
+                    assert!(
+                        obj.contains_key("root_q"),
+                        "JEDER Cheap-Suche-Record muss root_q tragen (auch eine Cheap-Suche hat eine Wurzel)"
+                    );
+                }
+            }
+        }
+        assert!(saw_cheap_decision, "Testlauf sollte mindestens eine Cheap-Suche (policy_target_valid=false) enthalten");
     }
 }
