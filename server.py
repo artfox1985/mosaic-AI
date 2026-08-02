@@ -205,7 +205,9 @@ def _require_game():
 # Kandidaten abgleichen), NICHT importiert -- tools/ wird nicht ins
 # PyInstaller-Bundle gepackt (siehe mosaic_release.spec), server.py muss
 # eigenständig lauffähig bleiben.
-_T_STONE_DESC_RE = _re.compile(r"Stein (?P<color>\S+) von (?P<src>F\d+|GF) → (?P<dest>Reihe \d+|Strafleiste)")
+_T_STONE_DESC_RE = _re.compile(
+    r"Stein (?P<color>\S+) (?:von|vom) (?P<src>F\d+|GF|Mondpool) → (?P<dest>Reihe \d+|Strafleiste)"
+)
 _T_DOME_DISPLAY_DESC_RE = _re.compile(r"Kuppel #(?P<tile>\d+) → \((?P<r>\d+),(?P<c>\d+)\)")
 _T_DOME_STACK_DESC_RE = _re.compile(r"Stapel → \((?P<r>\d+),(?P<c>\d+)\)")
 _T_BONUS_DESC_RE = _re.compile(r"Bonuschip F(?P<fid>\d+)")
@@ -238,7 +240,19 @@ def _teacher_played_key(kind: str, **f):
     Gibt exakt dieselbe Tupel-Form wie `_teacher_move_key` zurück, damit beide
     vergleichbar sind."""
     if kind == "stone":
-        src = "GF" if f["factory_id"] is None else f"F{f['factory_id']}"
+        # Punkt 9-Nachtrag (engine-seitige Disambiguierung in
+        # mcts.rs::label_search_move, siehe Kommentar unten): factory_id=None
+        # ist zweideutig (echte Grossfabrik-Ziehung ODER globaler Mondpool-Zug,
+        # Aktion C) -- der `source`-Rohwert aus der Request (identisch zu
+        # `serialize::source_name`, z.B. "SMALL_FACTORY_MOON") loest das auf.
+        # `source` ist optional (Rueckwaertskompatibilitaet mit Aufrufern, die
+        # ihn nicht mitgeben) -- fehlt er, wird wie bisher auf "GF" geraten.
+        if f["factory_id"] is not None:
+            src = f"F{f['factory_id']}"
+        elif f.get("source") == "SMALL_FACTORY_MOON":
+            src = "Mondpool"
+        else:
+            src = "GF"
         dest = "Strafleiste" if f["row"] < 0 else f"Reihe {f['row'] + 1}"
         return ("stone", f["color"], src, dest)
     if kind == "dome_display":
@@ -255,57 +269,27 @@ def _teacher_played_key(kind: str, **f):
 TEACHER_HINT_TOP_N = 3  # Nutzer-Feedback: max. 3 Kandidaten (vorher 5), alle Stufen.
 
 
-# Punkt 9 (Nutzer-Feedback 2026-08-02, Live-Spiel-Log game_20260802_151513_seed631890):
-# `label_search_move` (engine/src/mcts.rs) baut die Anzeige-Beschreibung eines
-# Stein-Zugs als "...Stein {color} von {src} → {dest}" mit
+# Punkt 9 (Nutzer-Feedback 2026-08-02, Live-Spiel-Log game_20260802_151513_seed631890),
+# NACHTRAG (Folgeauftrag am selben Tag): `label_search_move` (engine/src/mcts.rs)
+# baute die Anzeige-Beschreibung eines Stein-Zugs bisher als
+# "...Stein {color} von {src} → {dest}" mit
 #     src = match m.take.factory_id { Some(id) => "F{id}", None => "GF" }
-# -- das ist NUR fuer echte Grossfabrik-SONNEN-Zuege (TakeSource::LargeFactorySun)
-# korrekt. Aktion C (geteilter Mondpool, TakeSource::SmallFactoryMoon mit
-# factory_id=None -- der EINZIGE andere Fall, der ebenfalls factory_id=None
-# hat, siehe engine/src/moves.rs::is_global_moon_take) wird von derselben
-# match-Arme faelschlich GENAUSO als "GF" gelabelt, obwohl sie aus einer oder
-# mehreren KLEINEN Fabriken (und/oder der GF) gleichzeitig zieht -- die Engine
-# ignoriert dabei komplett, welche Fabriken tatsaechlich beigetragen haben
-# (siehe execute_moon_take in execution.rs, wo das RICHTIG gemacht wird: die
-# echten Log-Zeilen listen alle beitragenden Quellen einzeln auf). Der reale
-# Spiel-LOG ist also bereits korrekt -- nur dieser Lehrer-Tipp-/Coach-Text war
-# falsch, und zwar unabhaengig von Punkt 7 (Staedtenamen-Mapping) -- der Bug
-# lag schon vorher in der Engine-Beschreibung, Punkt 7 hat ihn nur sichtbarer
-# gemacht ("GF" -> "GF (Frankfurt)").
+# -- das war NUR fuer echte Grossfabrik-Ziehungen (TakeSource::LargeFactorySun/
+# -Moon) korrekt. Aktion C (geteilter Mondpool, TakeSource::SmallFactoryMoon mit
+# factory_id=None -- der EINZIGE andere Fall, der ebenfalls factory_id=None hat,
+# siehe engine/src/moves.rs::is_global_moon_take) wurde von derselben Match-Arm
+# faelschlich GENAUSO als "GF" gelabelt. Der reale Spiel-LOG war davon nie
+# betroffen (execute_moon_take in execution.rs listet die beitragenden Fabriken
+# einzeln auf) -- nur dieser Lehrer-Tipp-/Coach-Text.
 #
-# Fix OHNE Engine-Aenderung (Auftrag: engine/src nur lesen): der Live-
-# Spielzustand (`_rust.state_json()`) verraet zuverlaessig, ob "GF" hier
-# wirklich stimmt -- eine legale Sonnen-Ziehung "von GF" setzt voraus, dass
-# die genannte Farbe auf der Sonnenseite der großen Fabrik liegt. Steht sie
-# dort NICHT, kann die factory_id=None-Ziehung nur der geteilte Mondpool
-# gewesen sein (die einzige verbleibende Moeglichkeit) -- dann wird das Label
-# hier auf Text-Ebene korrigiert. Funktioniert fuer BEIDEN Analyse-Pfade
-# (Netz- und Heuristik-Suche), da es nicht vom (nur im Netz-Pfad gefuellten)
-# `action`/`factory_index`-Feld abhaengt, siehe _teacher_action_params-Doku.
-_T_STONE_GF_RE = _re.compile(r"^((?:\d+× )?Stein (?P<color>\S+) )von GF( → .*)$")
-
-
-def _fix_moon_pool_label(desc: str) -> str:
-    """Korrigiert NUR die Anzeige (nicht die rohe `description`, siehe
-    `_teacher_describe_move`-Aufrufer) -- ersetzt "von GF" durch "vom
-    geteilten Mondpool", wenn der Live-Zustand zeigt, dass die genannte Farbe
-    gar nicht auf der GF-Sonnenseite liegt (siehe Modul-Kommentar oben)."""
-    m = _T_STONE_GF_RE.match(desc)
-    if not m:
-        return desc
-    color = m.group("color")
-    try:
-        state = _json.loads(_rust.state_json()) if _rust is not None else None
-    except Exception:
-        return desc  # im Zweifel unveraendert lassen, kein Rust-Call riskieren
-    if not isinstance(state, dict):
-        return desc
-    gf_sun = (state.get("large_factory") or {}).get("sun") or []
-    if color in gf_sun:
-        return desc  # echte Grossfabrik-Sonnen-Ziehung -- "GF" stimmt
-    return _T_STONE_GF_RE.sub(r"\1vom geteilten Mondpool\3", desc)
-
-
+# FIX AN DER QUELLE: `label_search_move` disambiguiert jetzt selbst (emittiert
+# "Mondpool" statt "GF" fuer Aktion C, inkl. korrekter Praeposition "vom").
+# Die frueher hier lebende Nachbearbeitung (`_fix_moon_pool_label`, Text-Regex
+# + Live-State-Abfrage) ist dadurch ueberfluessig geworden und wurde entfernt.
+# `_T_STONE_DESC_RE` akzeptiert "Mondpool" als dritten `src`-Wert (neben
+# F\d+/GF); `_teacher_played_key` loest die verbleibende Ambiguitaet der
+# GESPIELTEN Aktion (dort liegt kein Text vor) ueber das rohe `source`-Feld
+# der Request auf (siehe dort).
 def _teacher_describe_move(mv: dict) -> str:
     """Anzeige-Beschreibung EINES Analyse-Kandidaten für Lehrer-Ausgaben (Hint-
     Kandidaten UND Coach-`bester_zug_description`). Hängt bei Kuppel-Zügen
@@ -314,12 +298,8 @@ def _teacher_describe_move(mv: dict) -> str:
     siehe engine/src/net_mcts.rs bzw. mcts.rs -- `null`, wenn der Suchbaum an
     dieser Stelle nie bis zur Rotationsstufe vertieft wurde, z.B. bei kleinem
     Sim-Budget). Die ROHE `description` (ohne Rotation) bleibt unverändert für
-    das Matching in `_teacher_move_key` -- nur diese Anzeige-Variante wird
-    augmentiert. Punkt 9: bei Stein-Zügen wird zusätzlich das faelschlich auf
-    "GF" fallende Mondpool-Label korrigiert (`_fix_moon_pool_label`)."""
+    das Matching in `_teacher_move_key`."""
     desc = mv.get("description") or ""
-    if mv.get("type") == "stone":
-        desc = _fix_moon_pool_label(desc)
     if mv.get("type") in ("choose_dome_slot", "choose_draw_stack_slot"):
         br = mv.get("best_rotation")
         if isinstance(br, dict) and br.get("rotation") is not None:
@@ -340,7 +320,13 @@ def _teacher_action_params(typ: str, desc: str) -> dict | None:
         dest = m.group("dest")
         row = -1 if dest == "Strafleiste" else int(dest.split(" ")[1]) - 1
         src = m.group("src")
-        return {"color": m.group("color"), "factory_id": None if src == "GF" else int(src[1:]), "row": row}
+        factory_id = int(src[1:]) if src not in ("GF", "Mondpool") else None
+        # `source` ist die disambiguierte Roh-Quelle ("GF"/"Mondpool"/"F3") --
+        # rein additiv, loest die vorher auf factory_id=None kollabierte
+        # GF/Mondpool-Ambiguitaet fuer Konsumenten (z.B. Brett-Highlight im
+        # Frontend) explizit auf, ohne bestehende `factory_id`-Semantik zu
+        # aendern (die bleibt fuer beide Faelle None, wie schon immer).
+        return {"color": m.group("color"), "factory_id": factory_id, "row": row, "source": src}
     if typ == "choose_dome_slot":
         m = _T_DOME_DISPLAY_DESC_RE.search(desc or "")
         if not m:
@@ -602,7 +588,8 @@ def move_stone():
         _flush_game_log()
         resp = ok()
         fb = _teacher_feedback_from_snapshot(
-            pre_analysis, "stone", _teacher_played_key("stone", color=d['color'], factory_id=fid, row=row))
+            pre_analysis, "stone",
+            _teacher_played_key("stone", color=d['color'], factory_id=fid, row=row, source=d.get('source')))
         if fb:
             resp["teacher_feedback"] = fb
         return jsonify(resp)
