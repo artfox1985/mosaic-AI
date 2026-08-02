@@ -308,8 +308,14 @@ fn net_vs_net_arena_match_hybrid(
 /// durch die #84/#85-Gating-Evidenz (`evaluations/STATUS.md`): `v13_nortv_best`
 /// (Training ohne rtv-Override) schlägt den vorherigen Champion `v12b_lr_best`
 /// signifikant (171:129). `bootstrap_value` bleibt unabhängig davon erhalten.
+/// `pcr_full_prob`/`pcr_cheap_sims` (Task #14, Playout-Cap-Randomization,
+/// 2026-08-02): siehe `self_play.rs::play_net_self_play_game`-Dokumentation.
+/// Default `pcr_full_prob=None` = AUS -- byte-identisch zum Vor-PCR-Verhalten
+/// (kein neuer RNG-Verbrauch, kein neues JSON-Feld). `pcr_cheap_sims=150`
+/// (KataGo-Groessenordnung fuer eine guenstige Suche) wirkt NUR, wenn
+/// `pcr_full_prob` gesetzt ist.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None, pcr_full_prob=None, pcr_cheap_sims=150))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -325,12 +331,14 @@ fn net_self_play_games(
     record_rtv: bool,
     progress_path: Option<String>,
     heartbeat_path: Option<String>,
+    pcr_full_prob: Option<f64>,
+    pcr_cheap_sims: u32,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_self_play(
             &model_path, n_games, base_sims, c_puct, seed, num_threads, &prefix, add_root_noise, deterministic,
-            record_rtv, progress_path.as_deref(), heartbeat_path.as_deref(),
+            record_rtv, progress_path.as_deref(), heartbeat_path.as_deref(), pcr_full_prob, pcr_cheap_sims,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
