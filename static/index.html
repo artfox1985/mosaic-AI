@@ -34,6 +34,7 @@
     <div id="board1" class="panel"></div>
   </div>
   <div class="panel" id="factories-panel">
+    <div id="moon-shared-area"></div>
     <div id="factories-list-area"></div>
   </div>
   <div class="panel" id="center">
@@ -73,7 +74,7 @@
     </div>
     <div id="moon-tiles" style="display:flex;gap:5px;flex-wrap:wrap;min-height:32px;padding:6px;background:var(--bg);border-radius:6px;border:1px solid var(--border);margin-bottom:8px"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <span style="font-size:10px;color:var(--text2)">Stapel (links=unten, rechts=oben) — Fliese anklicken zum Entfernen:</span>
+      <span style="font-size:10px;color:var(--text2)">Stapel (oben=oberste/zuletzt geklickt, unten=unterste) — Fliese anklicken zum Entfernen:</span>
       <span id="moon-reset-btn" onclick="resetMoonStack()" style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;white-space:nowrap;margin-left:6px">↺ Zurücksetzen</span>
     </div>
     <div id="moon-stack" style="display:flex;flex-direction:column;align-items:flex-start;min-height:28px;padding:5px 5px 14px;background:var(--bg);border:1px dashed var(--border);margin-bottom:10px">
