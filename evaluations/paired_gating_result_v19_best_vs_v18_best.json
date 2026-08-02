@@ -1,0 +1,110 @@
+{
+  "name_a": "v19_best",
+  "name_b": "v18_best",
+  "model_a": "models/alphazero_v19_best.onnx",
+  "model_b": "models/alphazero_v18_best.onnx",
+  "sims_a": 400,
+  "sims_b": 400,
+  "c_puct_a": 1.5,
+  "c_puct_b": 1.5,
+  "done_pairs": 75,
+  "n_games_total": 150,
+  "a_wins_total": 96,
+  "b_wins_total": 54,
+  "pair_a_sweeps_b": 30,
+  "pair_b_sweeps_c": 9,
+  "pair_splits": 36,
+  "sprt_verdict": "v19_best",
+  "sprt_llr": 4.660853438576142,
+  "sprt_bounds": [
+    -2.9444389791664403,
+    2.9444389791664403
+  ],
+  "sprt_p0": 0.5,
+  "sprt_p1": 0.65,
+  "sprt_alpha": 0.05,
+  "sprt_beta": 0.05,
+  "report_mcnemar_p": 0.0010650196345523,
+  "mean_pair_diff": 0.56,
+  "ci95": [
+    0.2571798714248502,
+    0.8628201285751499
+  ],
+  "base_seed": 20260803,
+  "blocks": [
+    {
+      "block": 1,
+      "seed": 20260803,
+      "n_pairs_block": 25,
+      "done_pairs": 25,
+      "a_wins_total": 30,
+      "b_wins_total": 20,
+      "pair_a_sweeps_b": 9,
+      "pair_b_sweeps_c": 4,
+      "pair_splits": 12,
+      "llr": 0.9345786044524897,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.266845703125,
+      "mean_pair_diff": 0.4,
+      "ci95": [
+        -0.15437171645025338,
+        0.9543717164502534
+      ],
+      "duration_s": 181.35311031341553
+    },
+    {
+      "block": 2,
+      "seed": 21260803,
+      "n_pairs_block": 25,
+      "done_pairs": 50,
+      "a_wins_total": 61,
+      "b_wins_total": 39,
+      "pair_a_sweeps_b": 19,
+      "pair_b_sweeps_c": 8,
+      "pair_splits": 23,
+      "llr": 2.1315214733724703,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.052238985896110535,
+      "mean_pair_diff": 0.44,
+      "ci95": [
+        0.04736052159773846,
+        0.8326394784022615
+      ],
+      "duration_s": 194.80855059623718
+    },
+    {
+      "block": 3,
+      "seed": 22260803,
+      "n_pairs_block": 25,
+      "done_pairs": 75,
+      "a_wins_total": 96,
+      "b_wins_total": 54,
+      "pair_a_sweeps_b": 30,
+      "pair_b_sweeps_c": 9,
+      "pair_splits": 36,
+      "llr": 4.660853438576142,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.0010650196345523,
+      "mean_pair_diff": 0.56,
+      "ci95": [
+        0.2571798714248502,
+        0.8628201285751499
+      ],
+      "duration_s": 181.90313529968262
+    }
+  ],
+  "avg_score_a": 43.93333333333333,
+  "avg_score_b": 37.96,
+  "avg_floor_a": 12.713333333333333,
+  "avg_floor_b": 16.293333333333333,
+  "zerozero_anteil": 0.0
+}
