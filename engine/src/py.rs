@@ -664,7 +664,22 @@ impl PyGame {
         // aufgeloest (mehrere echte Zuege bis Wahl+Platzierung) -- die
         // zurueckgegebene Aktion ist die tatsaechlich final ausgefuehrte
         // (bei DrawStackPeek also das konkrete DrawStack, nicht der Peek).
-        let resolved = crate::self_play::apply_chosen_action(&mut self.game, a);
+        // `a` stammt aus `drafting_actions()`, kann bei zweistufigen Zuegen
+        // (Kuppel/Stapel-Rotation) aber trotzdem an Stufe 2 scheitern (siehe
+        // `apply_chosen_action`-Kommentar) -- NICHT verschlucken: sonst
+        // meldet der Server `applied: true` fuer einen nie angewendeten Zug
+        // und Engine-/Server-Zustand laufen auseinander.
+        let resolved = match crate::self_play::apply_chosen_action(&mut self.game, a) {
+            Ok(resolved) => resolved,
+            Err(e) => {
+                return Ok(json!({
+                    "applied": false,
+                    "phase": self.game.state.phase.as_str(),
+                    "reason": format!("apply_chosen_action fehlgeschlagen: {e}"),
+                })
+                .to_string());
+            }
+        };
         let action_json = search_move_json(&SearchMove::Draft(resolved), Some(&self.game.state));
 
         let mut obj = serde_json::Map::new();
