@@ -656,6 +656,46 @@ impl Game {
         if self.state.players.iter().any(|p| p.start_tile_pending) {
             return Err("Startkuppel-Platzierung noch ausstehend -- keine Drafting-Aktion erlaubt.".into());
         }
+        // BUGFIX (2026-08-02, Live-Server-Haenger-Report): `drafting_actions`
+        // (die "Single Source of Truth" fuer Suche/Server, siehe dortiger
+        // Kommentar) schliesst bei offener Kuppel-Rotation
+        // (`pending_dome_choice`) bzw. laufendem Stapel-Zug
+        // (`pending_stack_draw` nicht leer) ALLE anderen Aktionen aus --
+        // dieser Dispatcher hier hat das bisher NICHT durchgesetzt, weil
+        // `validate_dome_move`/`validate_move`/`validate_moon_take`/
+        // `validate_take_bonus_chip` diese beiden Felder gar nicht kennen.
+        // Ergebnis (reproduziert, `static/log/game_20260802_123817_seed433494.log`):
+        // ein `Action::ChooseDomeSlot` (Kachel aus der offenen Ablage) wurde
+        // WAEHREND eines laufenden Stapel-Zugs angenommen -- der Server-Route
+        // `/api/move/dome` ruft `apply_dome(...)` direkt auf, unabhaengig
+        // davon, was der Spieler gerade eigentlich tun sollte. Das liess die
+        // bereits gezogene Stapel-Kachel dauerhaft in `pending_stack_draw`
+        // haengen (nie zurueckgelegt, nie platziert) -- der NAECHSTE Spieler
+        // (hier: die KI) erbte diesen verwaisten Zustand und wurde durch
+        // `drafting_actions` in einen fuer sie voellig untypischen
+        // Stapel-Zug-Zweig gezwungen (normalerweise startet NUR ein Mensch
+        // freiwillig einen Stapel-Zug). Die Suche selbst kam damit klar
+        // (siehe Untersuchungsbericht) -- der eigentliche Fehler ist diese
+        // Zustandskorruption, nicht die KI/das Netz. Zentraler Guard hier
+        // (statt vier einzelne Validatoren zu patchen) haelt `apply_drafting`
+        // konsistent mit `drafting_actions`s eigener Rangfolge/Erlaubnisliste
+        // (`pending_dome_choice` zuerst, dann `pending_stack_draw`, `Pass`
+        // nur als Sackgassen-Fallback wie dort).
+        if self.state.pending_dome_choice.is_some() {
+            if !matches!(action, Action::ChooseDomeRotation(_) | Action::Pass) {
+                return Err(
+                    "Offene Kuppel-Rotation muss zuerst abgeschlossen werden (Aktion A/B Stufe 2)."
+                        .into(),
+                );
+            }
+        } else if !self.state.pending_stack_draw.is_empty() {
+            if !matches!(action, Action::DrawStackPeek | Action::ChooseDrawStackSlot(_) | Action::Pass) {
+                return Err(
+                    "Laufender Stapel-Zug (Aktion A) muss zuerst abgeschlossen werden (weiterziehen oder waehlen)."
+                        .into(),
+                );
+            }
+        }
         match action {
             Action::Stone(m) => {
                 let err = if m.is_global_moon_take() {
@@ -920,6 +960,8 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::moves::{Move, PlaceAction, TakeAction, TakeSource};
+    use crate::tile::TileColor;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -1006,6 +1048,123 @@ mod tests {
         let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
         assert!(game.state.players.iter().any(|p| p.start_tile_pending));
         assert!(game.apply_drafting(&Action::Pass).is_err());
+    }
+
+    /// Live-Server-Haenger-Bugfix (2026-08-02): der genau reproduzierte
+    /// Fehler aus `static/log/game_20260802_123817_seed433494.log` --
+    /// waehrend eines laufenden Stapel-Zugs (Aktion A, `pending_stack_draw`
+    /// nicht leer) durfte bisher trotzdem eine Kachel aus der OFFENEN
+    /// ABLAGE gewaehlt werden (`Action::ChooseDomeSlot`), weil
+    /// `validate_dome_move` `pending_stack_draw` nicht kennt. Das liess die
+    /// bereits gezogene Stapel-Kachel dauerhaft verwaist zurueck (nie
+    /// platziert, nie zurueckgelegt) -- der naechste Spieler (im Live-Fall:
+    /// die KI) erbte diesen Zustand und wurde in einen fuer sie untypischen
+    /// Stapel-Zug-Zweig gezwungen. `drafting_actions` (die "Single Source of
+    /// Truth") hat diese Aktion nie angeboten -- der Fehler war ausschliesslich
+    /// in `apply_drafting`s fehlender Durchsetzung dieser Regel.
+    #[test]
+    fn apply_drafting_blocked_dome_display_pick_while_stack_draw_pending() {
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game.apply_drafting(&Action::DrawStackPeek).expect("Ziehung sollte gelingen");
+        assert!(!game.state.pending_stack_draw.is_empty(), "Testvoraussetzung: Ziehung liegt an");
+
+        let display_tile_id = game.state.dome_display[0].tile_id;
+        let attempt = PlaceDomeTileMove { dome_tile_id: display_tile_id, slot_row: 0, slot_col: 0, rotation: 0 };
+        let err = game.apply_drafting(&Action::ChooseDomeSlot(attempt));
+        assert!(
+            err.is_err(),
+            "ChooseDomeSlot (Ablage-Kachel) waehrend eines laufenden Stapel-Zugs muss abgelehnt werden"
+        );
+        assert!(
+            !game.state.pending_stack_draw.is_empty(),
+            "pending_stack_draw darf durch den abgelehnten Versuch nicht veraendert werden (keine Verwaisung)"
+        );
+        assert!(
+            game.state.pending_dome_choice.is_none(),
+            "kein PendingDomeChoice darf durch den abgelehnten Versuch entstehen"
+        );
+    }
+
+    /// Systemischer Teil desselben Bugfixes: NICHT nur `ChooseDomeSlot`,
+    /// sondern JEDE andere Aktion (Stein nehmen, Bonuschip nehmen, ...) muss
+    /// waehrend eines laufenden Stapel-Zugs abgelehnt werden -- der zentrale
+    /// Guard in `apply_drafting` deckt alle Aktionstypen ab, nicht nur den im
+    /// Live-Log konkret beobachteten Fall.
+    #[test]
+    fn apply_drafting_blocked_stone_and_bonus_chip_while_stack_draw_pending() {
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game.apply_drafting(&Action::DrawStackPeek).expect("Ziehung sollte gelingen");
+
+        let stone_attempt = Action::Stone(Move {
+            take: TakeAction {
+                source: TakeSource::SmallFactorySun,
+                color: TileColor::Rot,
+                factory_id: Some(1),
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: 0 },
+        });
+        assert!(
+            game.apply_drafting(&stone_attempt).is_err(),
+            "Stein-Zug waehrend eines laufenden Stapel-Zugs muss abgelehnt werden"
+        );
+
+        let chip_attempt = Action::BonusChip(TakeBonusChipMove { factory_id: 1 });
+        assert!(
+            game.apply_drafting(&chip_attempt).is_err(),
+            "Bonuschip-Zug waehrend eines laufenden Stapel-Zugs muss abgelehnt werden"
+        );
+
+        // Die legitime Fortsetzung bleibt unveraendert erlaubt (Regressions-
+        // Sicherung: der neue Guard darf den NORMALEN Stapel-Zug-Ablauf nicht
+        // versehentlich mit blockieren).
+        assert!(
+            game.apply_drafting(&Action::DrawStackPeek).is_ok(),
+            "weiterziehen muss waehrend eines laufenden Stapel-Zugs weiterhin erlaubt sein"
+        );
+    }
+
+    /// Analoger Guard fuer die ANDERE Pending-Situation (offene Kuppel-
+    /// Rotation, Stufe 2 nach Kachel/Slot-Wahl) -- dieselbe Fehlerklasse
+    /// (`pending_dome_choice` wurde bisher ebenfalls von keinem Validator
+    /// geprueft), hier fuer die Ablage-Variante (`FromDisplay`) getestet.
+    #[test]
+    fn apply_drafting_blocked_other_action_while_dome_rotation_pending() {
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let display_tile_id = game.state.dome_display[0].tile_id;
+        game.apply_drafting(&Action::ChooseDomeSlot(PlaceDomeTileMove {
+            dome_tile_id: display_tile_id,
+            slot_row: 0,
+            slot_col: 0,
+            rotation: 0,
+        }))
+        .expect("Kachel+Slot-Wahl sollte gelingen");
+        assert!(game.state.pending_dome_choice.is_some(), "Testvoraussetzung: Rotation steht aus");
+
+        let chip_attempt = Action::BonusChip(TakeBonusChipMove { factory_id: 1 });
+        assert!(
+            game.apply_drafting(&chip_attempt).is_err(),
+            "Bonuschip-Zug waehrend offener Kuppel-Rotation muss abgelehnt werden"
+        );
+        assert!(game.state.pending_dome_choice.is_some(), "PendingDomeChoice darf durch den abgelehnten Versuch nicht verschwinden");
+
+        // Legitime Fortsetzung bleibt erlaubt.
+        assert!(
+            game.apply_drafting(&Action::ChooseDomeRotation(0)).is_ok(),
+            "die Rotation selbst muss weiterhin angenommen werden"
+        );
     }
 
     #[test]
