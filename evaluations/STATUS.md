@@ -7006,3 +7006,59 @@ Koordinator fuehrte kurz zu einem haengenden `elo_tracker`-Prozess UND
 einem stumm gestarteten Gating-Lauf (keine sichtbare Ausgabe) -- bereinigt,
 die Start-Routine ist seither verschaerft (kein `&`-Loesloesen mehr ohne
 expliziten Log-Pfad/Prozess-Tracking).
+
+## Lambda-Sweep + PCR-A/B: Laeufe angelaufen, PCR-Policy-Maske nachgeruestet (2026-08-02/03)
+
+**Drei vorregistrierte Experimente in der Pipeline** (Reihenfolge fix:
+Lambda -> PCR -> R5-Kalibrierung voller Lauf -> R4-Kalibrierung):
+
+**1. λ-Misch-Value-Target** (`PREREG_lambda_target.md`,
+`tools/train_lambda_sweep.py`): 24 from-scratch-Laeufe (4 Arme
+λ∈{1.0, 0.7, 0.5, 0.3} × 6 Seeds) auf der eingefrorenen 900-Datei-Sandbox
+`data_lambda_sweep/`. Sample-Misch-Anteil exakt gemessen und in der PREREG
+nachgetragen: **43,83%** (640.246 von 1.460.731 Samples tragen `root_q`).
+Sweep lief am 2026-08-02 bis Lauf 13 (Unterbrechung bei `lam07_s4`), am
+2026-08-03 per Skip-Logik wiederaufgenommen -- Diagnose + gepaarte
+Auswertung (`train_lambda_sweep_result.json`) laufen nach dem letzten Lauf
+automatisch. Primaermetrik `value_r2_rounds_1_4` (Aufloesungsgrenze 0,015),
+Arena-Gating nur bei Signal (`--no-promote-winner`).
+
+**2. PCR-A/B, Task #14** (`PREREG_pcr.md`): Self-Play beider Arme ist
+abgeschlossen (`data_pcr_ab/`: `pcrkontrolle` 117 Dateien/1170 Spiele
+klassisch @600 Sims, `pcrpcr` 210 Dateien/2100 Spiele PCR p=0,25/cheap=150
+-- gleicher Generator `v19_2d_best`, Wandzeit-gematcht). **Kritische Luecke
+vor dem Training gefunden und geschlossen** (Commit `2777cf6`): die Engine
+schreibt `policy_target_valid=false` an Cheap-Suche-Zuege, aber die
+Trainings-Pipeline ignorierte das Feld -- ~75% des pcr-Korpus waeren mit
+unzuverlaessigen 150-Sim-Visit-Zielen in den Policy-Loss gelaufen.
+Fix additiv in `neural_net.py` (Cache-Bau: `policy_weight=0` fuer solche
+Records, No-Op fuer alle Nicht-PCR-Korpora, kein Cache-Schema-Bump).
+Treiber `tools/train_pcr_dose.py` neu (Vorbild `train_corpus_dose.py`):
+12 Laeufe (6 Seeds × 2 Arme), Orakel-Metriken primaer, PREREG-Verdikt
+automatisch. Rauchtest gruen inkl. exakter Masken-Verifikation gegen den
+HDF5-Cache (706==706). Voll-Suche-Quote im pcr-Korpus: **25,1%** (Soll
+~25%); Kontroll-Korpus traegt das Feld nirgends -- Arm-Design bestaetigt.
+Sandboxes (`data_pcr_kontrolle/`, `data_pcr_pcr/`) stehen; Training startet
+nach Sweep-Ende (GPU-Serialisierung).
+
+**3. R4-Ende-Value-Kalibrierung NEU vorregistriert**
+(`PREREG_r4_value_calibration.md`, 2026-08-03): Nutzer-Fund, code- und
+datenverifiziert -- ab Runde-4-Ende ist das Brett vollstaendig bekannt
+(`dome_stack_count=0` in allen geprueften letzten R4-Records), einzige
+Restunsicherheit ist die Fabrik-Neubefuellung 4->5. Design: Ground Truth =
+Erwartung ueber K=16 gesampelte Neubefuellungen des exakten
+R5-Alpha-Beta-Werts; `true_winprob` = Refill-Gewinnquote liegt DIREKT auf
+der Value-Kopf-Skala (keine Kennlinie noetig, Saettigungsproblem des
+R5-Designs entfaellt). Misst zusaetzlich erstmals die theoretische
+OBERGRENZE (irreduzibler Zufallsanteil des Uebergangs) -- Baustein des
+uebergeordneten Nutzer-Ziels "Value-Head an das maximal Moegliche
+heranfuehren, ab Runde 2 ist Luft nach oben". Rust-Vorbedingung: additives
+Binding `resample_round_transition_json` (existiert noch nicht) +
+Wheel-Build. Ausfuehrung gated hinter dem vollen R5-Lauf; R3/R2 =
+Ausblick mit Decken-Priorisierungsregel.
+
+**Aufraeum-Notiz**: Experiment-Checkpoints (`lam*`, `pcr*`) werden nach
+Auswertung (bei Lambda: nach einem evtl. Arena-Gating) geloescht --
+Konvention wie `voll_s*`/`halb_s*`/`fs_2d_s*` (nur Manifeste bleiben).
+Sandboxes raeumen die Treiber selbst ab; OneDrive-Handle-Reste werden
+manuell nachgeraeumt (Smoke-Sandboxes 2026-08-03 so bereinigt).
