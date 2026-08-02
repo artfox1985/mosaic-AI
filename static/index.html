@@ -162,11 +162,43 @@
     <div class="sep" style="margin:8px 0 12px"></div>
 
     <!-- Spieler -->
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:8px">
       <div class="lbl" style="margin-bottom:6px">Spieler 1 (Du)</div>
-      <input id="ng-name" type="text" value="Spieler 1"
+      <input id="ng-name" type="text" value="Spieler 1" oninput="ngUpdateStartLabels()"
         style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
                background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;box-sizing:border-box">
+    </div>
+
+    <!-- Spielerprofil P1 (Elo-Rating, Nutzer-Feature 2026-08-02) -->
+    <div style="margin-bottom:12px">
+      <div class="lbl" style="margin-bottom:6px">Profil <span style="font-weight:400;color:var(--text3);font-size:9px">(optional — nur mit Profil wird das Spiel gewertet)</span></div>
+      <div style="display:flex;gap:6px">
+        <select id="ng-profile-p0" style="flex:1;padding:7px 8px;border:1px solid var(--border);border-radius:6px;
+                 background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+          <option value="">Gast (ungewertet)</option>
+        </select>
+        <button type="button" class="btn" onclick="ngCreateProfile('p0')" style="font-size:11px;white-space:nowrap;padding:0 10px">+ Neu</button>
+      </div>
+    </div>
+
+    <!-- Spieler 2 (nur relevant bei Mensch-gegen-Mensch) -->
+    <div id="ng-p2-block" style="display:none">
+      <div style="margin-bottom:8px">
+        <div class="lbl" style="margin-bottom:6px">Spieler 2</div>
+        <input id="ng-name-p2" type="text" value="Spieler 2" oninput="ngUpdateStartLabels()"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+                 background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:12px">
+        <div class="lbl" style="margin-bottom:6px">Profil <span style="font-weight:400;color:var(--text3);font-size:9px">(beide Profile ausgewählt → beide werden gewertet)</span></div>
+        <div style="display:flex;gap:6px">
+          <select id="ng-profile-p1" style="flex:1;padding:7px 8px;border:1px solid var(--border);border-radius:6px;
+                   background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
+            <option value="">Gast (ungewertet)</option>
+          </select>
+          <button type="button" class="btn" onclick="ngCreateProfile('p1')" style="font-size:11px;white-space:nowrap;padding:0 10px">+ Neu</button>
+        </div>
+      </div>
     </div>
 
     <div class="sep" style="margin:0 0 12px"></div>

@@ -40,6 +40,7 @@ if not getattr(sys, "frozen", False):
 from flask import Flask, request, jsonify, send_from_directory
 import threading
 from config import MODELS_DIR
+import player_profiles as _pp
 
 # Frozen-Modus (PyInstaller onedir, Task #96): static/-Daten liegen neben der
 # EXE (sys._MEIPASS), nicht relativ zu __file__ -- Bestandsverhalten (Dev)
@@ -97,6 +98,28 @@ _ai_c_puct   = 1.5         # PUCT-Konstante im Netz-Modus (Standard wie net_mcts
 _last_ai_log = None        # voller Such-Trace des zuletzt gespielten KI-Drafting-Zugs
 _ai_lock     = threading.Lock()
 _ai_debug_history = []     # Liste aller KI-Zug-Analysen des aktuellen Spiels
+
+# ── Spielerprofile / Elo (Nutzer-Feature 2026-08-02) ─────────────────────────
+# Aktive Profil-IDs (oder None = Gast/ungewertet) je Spielerindex fuer die
+# LAUFENDE Partie -- gesetzt in /api/new_game, konsumiert in /api/end_scoring.
+# `_game_rated` verhindert Doppel-Wertung, falls der Client /api/end_scoring
+# mehrfach aufruft (z.B. Seiten-Reload nach Spielende). `_hints_used_this_game`
+# wird in /api/ai/hint gesetzt (Feld `hints_used` im Historien-Eintrag, siehe
+# player_profiles.py::apply_result -- ob deswegen spaeter mal automatisch
+# unwertet werden soll, ist eine offene User-Entscheidung, siehe Bericht).
+_profile_p0: str | None = None
+_profile_p1: str | None = None
+_game_rated = False
+_hints_used_this_game = False
+
+# Anker-Tabelle (Bradley-Terry-Fit aus evaluations/elo_history.csv) einmal
+# beim Serverstart berechnen -- WIEDERVERWENDET tools/elo_tracker.py::fit_all,
+# keine eigene Elo-Rechnung (siehe player_profiles.py-Moduldoc).
+try:
+    _pp.refresh_anchor_table()
+except Exception as _e:
+    print(f"WARNUNG: Elo-Anker-Tabelle konnte nicht geladen werden ({_e}) -- "
+          f"Spielerprofile bleiben ungewertet, bis evaluations/elo_history.csv lesbar ist.")
 
 # ── Lehrer-Modus (Task #97) ──────────────────────────────────────────────────
 # 0=aus, 1=Kandidaten (ohne Zahlen), 2=+Bewertungen (Win%), 3=+Coach-Feedback.
@@ -448,6 +471,7 @@ def debug_page():
 def new_game():
     global _rust, _rust_logged, _ai_sims, _ai_player, _ai_model, _ai_debug_history, _game_log_path
     global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_history, _teacher_cache
+    global _profile_p0, _profile_p1, _game_rated, _hints_used_this_game
     _ai_debug_history = []
     data = request.get_json(silent=True) or {}
     names      = data.get('names', ['Spieler 1', 'Spieler 2'])
@@ -455,6 +479,18 @@ def new_game():
     ai_enabled = data.get('ai_enabled', False)
     difficulty = data.get('difficulty', 'medium')
     ai_side    = data.get('ai_side', 1)   # 0 = KI ist P1, 1 = KI ist P2
+
+    # Spielerprofile (Nutzer-Feature 2026-08-02): ungueltige/leere IDs werden
+    # stillschweigend als Gast (None, ungewertet) behandelt -- kein Hard-Error,
+    # das Spiel soll auch ohne Profil-Auswahl ganz normal starten.
+    def _resolve_profile_id(raw):
+        pid = (raw or "").strip() if isinstance(raw, str) else None
+        return pid if pid and _pp.get_profile(pid) is not None else None
+
+    _profile_p0 = _resolve_profile_id(data.get('profile_p0'))
+    _profile_p1 = _resolve_profile_id(data.get('profile_p1'))
+    _game_rated = False
+    _hints_used_this_game = False
 
     # Lehrer-Modus (Task #97): 0=aus (Default -- Bestandsverhalten unverändert),
     # 1=Kandidaten, 2=+Bewertungen, 3=+Coach-Feedback. Pro Partie zurückgesetzt.
@@ -538,6 +574,20 @@ def new_game():
     response['teacher_level']      = _teacher_level
     response['teacher_sims']       = _teacher_sims
     response['teacher_coach_sims'] = _teacher_coach_sims
+
+    # Spielerprofile: aufgeloeste Profil-Daten (fuer sofortige Rating-Anzeige
+    # im Frontend ohne Extra-Request) + KI-Elo-Anker (falls gegen KI gespielt
+    # wird) -- Schaetzwerte (is_estimate=True) markiert das Frontend mit "~".
+    response['profile_p0'] = _pp.get_profile(_profile_p0) if _profile_p0 else None
+    response['profile_p1'] = _pp.get_profile(_profile_p1) if _profile_p1 else None
+    if ai_enabled:
+        ai_identity = _ai_model or "Heuristik"
+        ai_elo, ai_is_estimate, ai_node = _pp.estimate_ai_anchor(ai_identity, _ai_sims)
+        response['ai_rating'] = {
+            "node": ai_node or f"{ai_identity}@{_ai_sims}",
+            "elo": round(ai_elo, 1) if ai_elo is not None else None,
+            "is_estimate": ai_is_estimate,
+        }
     return jsonify(response)
 
 
@@ -557,6 +607,24 @@ def get_champion():
     einen Versionsnamen im HTML hart zu kodieren, der bei jedem Champion-
     Wechsel veraltet."""
     return jsonify({"ok": True, "model": _CHAMPION_MODEL})
+
+
+@app.route('/api/profiles', methods=['GET'])
+def list_profiles():
+    """Alle lokalen Spielerprofile (id/name/rating/games_rated), alphabetisch
+    -- fuer die Profil-Auswahl im Neues-Spiel-Modal."""
+    return jsonify({"ok": True, "profiles": _pp.list_profiles()})
+
+
+@app.route('/api/profiles', methods=['POST'])
+def create_profile():
+    """Legt ein neues Spielerprofil an (Start-Rating 1000)."""
+    data = request.get_json(silent=True) or {}
+    try:
+        profile = _pp.create_profile(data.get('name', ''))
+        return jsonify({"ok": True, "profile": profile})
+    except ValueError as e:
+        return jsonify(err(str(e)))
 
 
 @app.route('/api/log_info', methods=['GET'])
@@ -822,8 +890,91 @@ def select_scoring_tiles():
         return jsonify(err(str(e)))
 
 
+def _mirror_determine_winner(state: dict) -> int:
+    """Python-Nachbildung von engine/src/game.rs::determine_winner (REIN
+    LESEND aus state_json, keine Engine-Aenderung) -- Punktegleichstand wird
+    exakt wie dort per `first_player_next_round` aufgeloest (siehe
+    game.rs-Kommentar: `holds_first_player_marker` ist zu diesem Zeitpunkt
+    immer false, score_penalty loescht es bei jeder Rundenwertung)."""
+    s0 = state["players"][0]["score"]
+    s1 = state["players"][1]["score"]
+    if s0 > s1:
+        return 0
+    if s1 > s0:
+        return 1
+    return state["first_player_next_round"]
+
+
+def _apply_elo_for_finished_game(state: dict) -> dict:
+    """Spielerprofile-Feature (2026-08-02): wertet die GERADE beendete
+    Partie fuer alle ausgewaehlten Profile per Standard-Elo (KI-Ratings sind
+    fixe Anker, siehe player_profiles.py). Wird vom Aufrufer GENAU EINMAL
+    pro Partie aufgerufen (Idempotenz-Schutz per `_game_rated`-Flag) -- ein
+    spaeterer Reload/erneuter /api/end_scoring-Aufruf darf nicht nochmal
+    werten. Gibt {"0": entry|None, "1": entry|None, "note": str|None}
+    zurueck, vom Frontend fuer die Endwertungs-Anzeige genutzt.
+
+    Abgebrochene Spiele (kein /api/end_scoring erreicht) werten sich von
+    selbst nie -- es gibt bewusst keinen expliziten Abbruch-Zustand."""
+    winner = _mirror_determine_winner(state)
+    # Unentschieden ist nach aktuellem Regelwerk NIE erreichbar (siehe
+    # determine_winner-Tie-Break oben) -- Pfad bleibt fuer kuenftige
+    # Regelaenderungen (Design-Vorgabe #4).
+    result_p0 = 1.0 if winner == 0 else 0.0
+    result_p1 = 1.0 - result_p0
+
+    out = {"0": None, "1": None, "note": None}
+
+    if _ai_player is not None:
+        # Mensch gegen KI: nur die menschliche Seite kann ein Profil haben,
+        # die KI ist der fixe Anker (wird selbst nie aktualisiert).
+        human_pi = 1 - _ai_player
+        human_profile_id = _profile_p0 if human_pi == 0 else _profile_p1
+        if human_profile_id is None:
+            out["note"] = "Kein Profil ausgewählt — Spiel ungewertet."
+            return out
+        ai_identity = _ai_model or "Heuristik"
+        ai_elo, ai_is_estimate, ai_node = _pp.estimate_ai_anchor(ai_identity, _ai_sims)
+        if ai_elo is None:
+            out["note"] = f"Kein Elo-Anker für {ai_identity}@{_ai_sims} bekannt — Spiel ungewertet."
+            return out
+        result = result_p0 if human_pi == 0 else result_p1
+        entry = _pp.apply_result(
+            human_profile_id, ai_node or f"{ai_identity}@{_ai_sims}", ai_elo,
+            ai_is_estimate, result, _hints_used_this_game,
+        )
+        out[str(human_pi)] = entry
+        return out
+
+    # Mensch gegen Mensch: nur werten, wenn BEIDE Seiten ein (unterschiedliches)
+    # Profil ausgewählt haben — ohne Gegner-Rating gibt es keinen Anker für
+    # eine Elo-Aktualisierung (Design-Vorgabe #3).
+    if not _profile_p0 or not _profile_p1:
+        out["note"] = "Werten nur, wenn beide Spieler ein Profil ausgewählt haben."
+        return out
+    if _profile_p0 == _profile_p1:
+        out["note"] = "Beide Seiten haben dasselbe Profil ausgewählt — ungewertet."
+        return out
+    p0 = _pp.get_profile(_profile_p0)
+    p1 = _pp.get_profile(_profile_p1)
+    if p0 is None or p1 is None:
+        out["note"] = "Profil nicht gefunden — ungewertet."
+        return out
+    # Beide Ratings VOR dem Update einfrieren (symmetrisches Matchup) --
+    # Standard-Elo-Konvention für gegenseitige Updates, sonst würde die
+    # Reihenfolge der apply_result-Aufrufe das Ergebnis leicht verzerren.
+    rating_p0_before = p0["rating"]
+    rating_p1_before = p1["rating"]
+    out["0"] = _pp.apply_result(_profile_p0, p1["name"], rating_p1_before, False,
+                                 result_p0, _hints_used_this_game)
+    out["1"] = _pp.apply_result(_profile_p1, p0["name"], rating_p0_before, False,
+                                 result_p1, _hints_used_this_game)
+    return out
+
+
 @app.route('/api/end_scoring', methods=['POST'])
 def end_scoring():
+    global _game_rated
     if (e := _require_game()) is not None:
         return e
     if _rust.phase() != "end":
@@ -831,7 +982,15 @@ def end_scoring():
     try:
         results = _json.loads(_rust.end_scoring_json())
         _flush_game_log()
-        return jsonify({"ok": True, "state": _rust_state(), **results})
+        state = _rust_state()
+        response = {"ok": True, "state": state, **results}
+        # Spielerprofile: Elo-Wertung GENAU EINMAL pro Partie (Idempotenz-
+        # Schutz, falls der Client /api/end_scoring mehrfach aufruft, z.B.
+        # nach einem Seiten-Reload nach Spielende).
+        if not _game_rated:
+            response["rating_updates"] = _apply_elo_for_finished_game(state)
+            _game_rated = True
+        return jsonify(response)
     except Exception as e:
         return jsonify(err(str(e)))
 
@@ -1088,6 +1247,7 @@ def ai_hint():
     Gegner), fällt die Analyse pragmatisch auf die Heuristik zurück (`note`-
     Feld im Response weist darauf hin) -- siehe `_teacher_compute_analysis`-
     Doku."""
+    global _hints_used_this_game
     if (e := _require_game()) is not None:
         return e
     if _teacher_level == 0:
@@ -1098,6 +1258,10 @@ def ai_hint():
         return jsonify(err("Nicht dein Zug."))
     if _rust.phase() != "drafting":
         return jsonify(err("Tipps gibt es nur in der Drafting-Phase."))
+    # Spielerprofile: Tipp-Nutzung wird im Elo-Historien-Eintrag vermerkt
+    # (Feld hints_used, siehe player_profiles.py::apply_result) -- das Spiel
+    # zaehlt trotzdem ganz normal (Design-Vorgabe #4: werten, nur vermerken).
+    _hints_used_this_game = True
     analysis = _teacher_cached_or_fresh_analysis(_teacher_sims)
     moves = analysis.get("moves") if isinstance(analysis, dict) else None
     if not moves:
