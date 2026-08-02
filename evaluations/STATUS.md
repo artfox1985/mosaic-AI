@@ -6922,3 +6922,87 @@ elo_tracker protokolliert). Damit steht der #14-Befund auf zwei Beinen
 Regime (gleiche Architektur, unterschiedliche Daten) jetzt 8/8 als
 Staerke-Praediktor -- im Kontrast zum Architektur-Regime (0/1, siehe
 Task-#11-Abschnitt).
+
+## v19-Zyklus: ERSTER 2D-CHAMPION (2026-08-02)
+
+**Self-Play**: 6000 Spiele / 974.937 Zuege in 14,6h, `v18_best`@600 Sims,
+11 Threads -- ERSTMALS mit `root_q`-Labels (Commit `2718b9a`, siehe
+Task-#11-Nachtrag zum v19-Vorbereitungsauftrag). Naming-Korrektur im
+Nachgang: Dateien liefen als `selfplay_v19_*` an, wurden auf
+`selfplay_v18_*` umbenannt (Generator-Konvention -- der Dateiname traegt
+das Netz, das die Zuege gemacht hat, nicht die kuenftige Generation; die
+`game_id`-Strings INNERHALB der Dateien tragen kosmetisch weiter `v19`,
+das ist bekannt und harmlos).
+
+**Fenster-Rotation** (Nutzer-Entscheid): 600×`v18` + 200×`v17` + 100×`v16`
+= 900 Dateien (9000 Spiele), `v15` faellt komplett raus, alte Caches
+geloescht (bestaetigt: `data/` traegt aktuell exakt 600/200/100 nach
+Versions-Praefix).
+
+**Doppel-Arm-Training** (Champion-Warm-Start-Rezept, `lr 5e-5`, cosine,
+Seed 2, `nortv`): `v19` (flach, warm von `v18_best`) `val_combined`
+**1,2376**, `v19_2d` (warm von `v18_2d`, dem in Task #11 designierten
+2D-Anker) **1,1729** -- identischer Val-Split, direkt vergleichbar.
+
+**Orakel-Umstellung vollzogen** (`tools/oracle_metrics.py`): `ORACLE_JSON`
+zeigt jetzt auf `frozen_v1_oracle_labels_v18.json` (vorbereitet seit
+2026-07-29, siehe damaliger Kommentar zur "UMSTELLUNG AB v19"). Die alte
+v16-Trefferbilanz ist NICHT auf diese neue Quelle uebertragbar -- eine neue
+Bilanz beginnt bei null. Quelle-nie-Kandidat-Regel (Task #89) bleibt in
+Kraft: `v18_best` wird selbst nicht gescored.
+
+**Diagnose** (`evaluations/offline_diagnose_v19_arms_frozen.json`,
+verifiziert): `v19_2d_best` fuehrt auf allen drei Spalten vor `v19_best`:
+
+| Metrik | v19_best | v19_2d_best |
+|---|---|---|
+| `prior_mass_on_oracle_top3` | 0,7020 | **0,7187** |
+| `kendall_tau_policy_vs_oracle_q` | 0,3296 | **0,3558** |
+| `value_r2_rounds_1_4` (nur Fingerzeig, unter Aufloesungsgrenze) | 0,0906 | 0,1009 |
+
+Zusaetzlich: `v19_2d_best` schlaegt `v18_2d` auf ALLEN drei Spalten
+(0,7187>0,7040, 0,3558>0,3383, 0,1009>0,0830) -- die 2D-Linie lernt ueber
+Generationen weiter, kein Einmaleffekt.
+
+**Gating 1** (`evaluations/paired_gating_result_v19_best_vs_v18_best.json`):
+**`v19_best` 96:54 `v18_best`**, SPRT-Entscheid nach 75 Paaren, exakter
+McNemar p=0,0011, gepaarte Differenz +0,56 -> `v19_best` neuer flacher
+Champion.
+
+**Gating 2 / FINALE**
+(`evaluations/paired_gating_result_v19_2d_best_vs_v19_best.json`):
+**`v19_2d_best` 64:36 `v19_best`**, SPRT-Entscheid nach 50 Paaren, exakter
+McNemar p=0,0094, gepaarte Differenz +0,56 -> **`v19_2d_best` ist der ERSTE
+2D-CHAMPION der Projektgeschichte.**
+
+Einordnung gegen den from-scratch-Befund (Task #11, 2026-08-01): der
+damalige `fs_2d`-vs-`fs_flat`-Arena-Vergleich war ein Staerke-Wash (416:384,
+p=0,30, kein nachweisbarer Unterschied). Mit Warm-Start-Symmetrie (beide
+Arme von derselben v18-Generation gestartet, `v18_2d` als eigens dafuer
+designierter Anker, Nutzer-Entscheid Task #11) uebersetzt sich derselbe
+Policy-Vorsprung (Orakel-Metriken, gleiche Richtung wie im from-scratch-
+Vergleich) jetzt in echte Spielstaerke. Dies ist zugleich der ERSTE Treffer
+der neuen v18-Label-Orakel-Validierungsbilanz: die Metriken sagten dieses
+Duell (`v19_2d_best` vor `v19_best`) VOR dem Gating korrekt voraus.
+
+**Konsequenzen**:
+- Die Champion-Linie ist ab jetzt 2D-nativ -- kuenftige Warm-Starts gehen
+  von `v19_2d_best` aus.
+- Der flache Arm wird zum Parallel-Arm (weiterlaufend, aber nicht mehr die
+  Haupt-Linie).
+- Self-Play ab v20 mit dem 2D-Generator = 1,46x Inferenzkosten (siehe
+  Task-#11-Kostenmessung) -- der Nutzer-Vorentscheid vom 2026-07-30 ("wenn
+  dann gleich mit 2D") ist damit eingeloest, kein halber Schritt.
+- Der GUI-Server braucht einen Neustart, um den neuen Champion zu laden.
+
+**Laufend/offen**: Heuristik-Anker-Match fuer `v19_2d_best` (feste
+n=150-Kante, ohne Fruehstopp, Muster wie beim v18-Anker) laeuft noch.
+Naechste Hebel: Task #14 (Playout-Cap-Randomisierung, Dosis-Effekt jetzt
+validiert, siehe Abschnitt oben) und das Misch-Value-Target-Experiment
+(`λ·z+(1−λ)·q_root`) -- `root_q` liegt seit diesem Zyklus im Korpus vor.
+
+**Betriebsnotiz**: ein losgeloester Prozessstart (`&`-Kette) beim
+Koordinator fuehrte kurz zu einem haengenden `elo_tracker`-Prozess UND
+einem stumm gestarteten Gating-Lauf (keine sichtbare Ausgabe) -- bereinigt,
+die Start-Routine ist seither verschaerft (kein `&`-Loesloesen mehr ohne
+expliziten Log-Pfad/Prozess-Tracking).

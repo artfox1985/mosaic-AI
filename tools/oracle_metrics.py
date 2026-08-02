@@ -49,23 +49,24 @@ from neural_net import (action_to_id, state_to_tensor, state_to_planes,  # noqa:
                         build_model_from_checkpoint)
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
-# AKTIV: das v16_best-Orakel. Gueltig fuer die Bewertung von v14..v18.
+# AKTIV SEIT 2026-08-02 (v19-Zyklus): das v18_best-Orakel
+# (frozen_v1_oracle_labels_v18.json, 5000 Sims, 1185 Labels, 0 Mismatches,
+# gebaut 2026-07-29). Umstellung wie unten geplant vollzogen, nachdem die
+# v19-Kandidaten trainiert waren.
 #
-# BEREITSTEHEND: evaluations/frozen_v1_oracle_labels_v18.json (aus v18_best,
-# 5000 Sims, 1185 Labels, 0 Mismatches, gebaut 2026-07-29). NOCH NICHT AKTIV --
-# v18_best ist derzeit amtierender Champion und damit selbst Kandidat.
+# HISTORISCH: frozen_v1_oracle_labels.json (v16_best-Orakel) -- galt fuer die
+# Bewertung v14..v18 und die dortige Trefferbilanz (Daten-Regime 8/8,
+# Architektur-Regime 0/1). Die alte Bilanz ist NICHT auf die neuen Labels
+# uebertragbar; tools/offline_vs_arena.py sammelt ab v19 eine neue.
 #
 # HARTE REGEL (Task #89, am 2026-07-29 empirisch bestaetigt): die Orakel-QUELLE
 # darf nicht zu den bewerteten Kandidaten zaehlen. Beleg: die VALUE-Metriken
 # gipfeln exakt bei der Quelle v16_best (0,8835) und sagen genau die beiden
 # Nach-Orakel-Paare falsch vorher (5/7), waehrend die beiden Policy-Metriken,
 # fuer die der Naehe-Vorbehalt widerlegt ist, 8/8 treffen.
-#
-# UMSTELLUNG AB v19: diese Konstante auf die _v18-Datei zeigen lassen UND
-# tools/offline_vs_arena.py erneut laufen lassen -- die Validierung gilt dann
-# nur noch fuer Gating-Paare AB v19, die alte Trefferbilanz ist nicht
-# uebertragbar. Die v16-Labels bleiben als historische Grundlinie erhalten.
-ORACLE_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels.json"
+# KONKRET JETZT: v18_best (Quelle) wird unter diesen Labels nicht gescored --
+# ueber v19-Kandidaten vs. Champion entscheidet allein die Arena.
+ORACLE_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels_v18.json"
 OUT_JSON = ROOT / "evaluations" / "task89_oracle_metrics.json"
 
 CANDIDATE_MODELS = ["v14_best", "v14b_best", "v15_f2k_best", "v15_best", "v16_best", "v16"]
