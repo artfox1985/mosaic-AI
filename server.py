@@ -89,6 +89,11 @@ _rust_logged = 0        # bereits in die Logdatei geschriebene Log-Zeilen
 _game_log_path: Path | None = None
 LOG_DIR = APP_DIR / "static" / "log"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+# Spielerprofile / Elo (Nutzer-Erweiterung 2026-08-02): Logs GEWERTETER
+# Partien werden zusaetzlich hierhin KOPIERT (Original bleibt in LOG_DIR
+# liegen) -- siehe _archive_rated_game_log().
+ELO_LOG_DIR = LOG_DIR / "elo"
+ELO_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── KI-Konfiguration ─────────────────────────────────────────────────────────
 _ai_player   = None        # 0 oder 1 — welcher Spieler ist die KI
@@ -506,6 +511,22 @@ def new_game():
     _teacher_history    = []
     _teacher_cache      = {"key": None, "analysis": None}
 
+    # Spielerprofile / Elo (User-Entscheid 2026-08-02): Coach-Stufe 3 gibt
+    # AUTOMATISCH nach jedem Zug eine KI-Zugempfehlung (_teacher_feedback_
+    # from_snapshot in den Move-Handlern, "bester_zug_description") -- das
+    # ist eine KI-Hilfe genau wie der manuelle Tipp-Button (/api/ai/hint,
+    # setzt dasselbe Flag), nur eben automatisch statt auf Klick. Die Partie
+    # gilt daher schon ab Spielstart als "mit KI-Hilfe" -- NICHT erst, wenn
+    # tatsaechlich mal ein Feedback-Match gefunden wird (waere unnoetig
+    # unklar: die Stufe wurde bewusst gewaehlt). Stufe 1/2 geben NUR auf
+    # Klick Hinweise (derselbe /api/ai/hint-Kanal) -- kein automatischer
+    # Trigger hier. Das reine Debug-Panel (/debug, ai_debug_json/ai_suggest)
+    # zaehlt bewusst NICHT: es zeigt Bewertungen/Analyse, aber liefert keine
+    # Zugempfehlung im normalen Spielfluss und ist nur ueber die separate
+    # Debug-Seite erreichbar, nicht Teil der Partie-UI.
+    if teacher_level == 3 and ai_enabled:
+        _hints_used_this_game = True
+
     import random as _random
     fp_raw = data.get('first_player', None)
     first_player = _random.randint(0, 1) if fp_raw is None else int(fp_raw)
@@ -580,6 +601,10 @@ def new_game():
     # wird) -- Schaetzwerte (is_estimate=True) markiert das Frontend mit "~".
     response['profile_p0'] = _pp.get_profile(_profile_p0) if _profile_p0 else None
     response['profile_p1'] = _pp.get_profile(_profile_p1) if _profile_p1 else None
+    # Coach-Stufe 3 macht die Partie schon ab Start ungewertet (s.o.) --
+    # Frontend zeigt das persistente "ungewertet"-Badge dann sofort, ohne
+    # auf einen Tipp-Klick zu warten.
+    response['hints_used'] = _hints_used_this_game
     if ai_enabled:
         ai_identity = _ai_model or "Heuristik"
         ai_elo, ai_is_estimate, ai_node = _pp.estimate_ai_anchor(ai_identity, _ai_sims)
@@ -890,6 +915,39 @@ def select_scoring_tiles():
         return jsonify(err(str(e)))
 
 
+def _archive_rated_game_log() -> str | None:
+    """Kopiert das Log der GERADE beendeten (gewerteten) Partie nach
+    ELO_LOG_DIR (static/log/elo/) -- Nutzer-Erweiterung 2026-08-02. Original
+    bleibt UNVERAENDERT in LOG_DIR liegen (kein `move`/`rename`): der
+    Log-Writer haelt nie eine offene Dateihandle zwischen Requests (jeder
+    `_flush_game_log()`-Aufruf oeffnet/schreibt/schliesst synchron innerhalb
+    EINES Requests, siehe dortige `with open(..., 'a') as lf:`-Musters) --
+    zum Zeitpunkt dieses Aufrufs (innerhalb von /api/end_scoring, NACH dem
+    dortigen `_flush_game_log()`) ist die Datei also immer vollstaendig
+    geschrieben und geschlossen, ein direktes Kopieren ist sicher. Trotzdem
+    bewusst KOPIEREN statt VERSCHIEBEN (nicht `move`): (a) der Client ruft
+    `/api/end_game_log` (haengt die SPIELENDE-Zusammenfassung an) typischerweise
+    VOR `/api/end_scoring` auf, aber ungesichert per Race (beides sind
+    unabhaengige Fetches) -- ein `move` hier koennte der ANHAENGENDEN
+    end_game_log-Schreibung die Datei unter den Fuessen wegziehen und einen
+    FileNotFoundError ausloesen; (b) der bestehende Download-Button
+    ("📄 Log") zeigt weiterhin auf LOG_DIR und soll nach der Wertung nicht
+    kaputtgehen. Gibt den Dateinamen im Archiv zurueck, oder None bei Fehler
+    (dann faellt der Historien-Eintrag auf den Original-Dateinamen in
+    LOG_DIR zurueck -- nie ein Hard-Error, Wertung selbst bleibt unberuehrt)."""
+    if _game_log_path is None or not _game_log_path.exists():
+        return None
+    try:
+        import shutil as _shutil
+        dest = ELO_LOG_DIR / _game_log_path.name
+        _shutil.copy2(_game_log_path, dest)
+        return dest.name
+    except OSError as e:
+        print(f"WARNUNG: Log-Archivierung fuer gewertete Partie fehlgeschlagen ({e}) -- "
+              f"Original bleibt in {LOG_DIR}, nur die Elo-Historie referenziert den Original-Pfad.")
+        return None
+
+
 def _mirror_determine_winner(state: dict) -> int:
     """Python-Nachbildung von engine/src/game.rs::determine_winner (REIN
     LESEND aus state_json, keine Engine-Aenderung) -- Punktegleichstand wird
@@ -914,6 +972,14 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
     werten. Gibt {"0": entry|None, "1": entry|None, "note": str|None}
     zurueck, vom Frontend fuer die Endwertungs-Anzeige genutzt.
 
+    User-Entscheid 2026-08-02: sobald IRGENDWO in der Partie KI-Hilfe genutzt
+    wurde (`_hints_used_this_game` -- manueller Tipp ODER automatisches
+    Coach-Feedback Stufe 3, siehe new_game()/ai_hint()), wird sie fuer ALLE
+    beteiligten Profile ungewertet (`_pp.record_unrated` statt
+    `_pp.apply_result`) -- Rating bleibt unveraendert, aber ein Historien-
+    Eintrag mit `rated:false` wird trotzdem geschrieben (Transparenz: "das
+    hast du gespielt", keine Wertungsgrundlage).
+
     Abgebrochene Spiele (kein /api/end_scoring erreicht) werten sich von
     selbst nie -- es gibt bewusst keinen expliziten Abbruch-Zustand."""
     winner = _mirror_determine_winner(state)
@@ -922,8 +988,36 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
     # Regelaenderungen (Design-Vorgabe #4).
     result_p0 = 1.0 if winner == 0 else 0.0
     result_p1 = 1.0 - result_p0
+    rated = not _hints_used_this_game
+
+    # Seed + Log-Referenz (Nutzer-Erweiterung 2026-08-02): NUR gewertete
+    # Partien werden nach ELO_LOG_DIR kopiert (Original bleibt zusaetzlich in
+    # LOG_DIR) -- ungewertete Partien (Tipps genutzt) referenzieren weiterhin
+    # den Original-Dateinamen in LOG_DIR, siehe player_profiles.py-Doku. Die
+    # Archivierung passiert LAZY (memoized Closure) und hoechstens einmal je
+    # Partie -- NICHT schon hier oben, sonst wuerden auch Gast-Spiele ohne
+    # jedes ausgewaehlte Profil unnoetig archiviert (erst `_record()` weiss,
+    # ob ueberhaupt ein Profil tatsaechlich gewertet wird).
+    seed = _rust.seed() if _rust is not None else None
+    _orig_log_name = _game_log_path.name if _game_log_path is not None else None
+    _archive_cache = {"done": False, "name": _orig_log_name}
+
+    def _log_ref():
+        if rated and not _archive_cache["done"]:
+            _archive_cache["name"] = _archive_rated_game_log() or _orig_log_name
+            _archive_cache["done"] = True
+        return _archive_cache["name"]
 
     out = {"0": None, "1": None, "note": None}
+
+    def _record(pid, opponent_label, opponent_rating, opponent_is_estimate, result):
+        if rated:
+            return _pp.apply_result(pid, opponent_label, opponent_rating,
+                                     opponent_is_estimate, result, False,
+                                     seed=seed, log=_log_ref())
+        return _pp.record_unrated(pid, opponent_label, opponent_rating,
+                                   opponent_is_estimate, result,
+                                   seed=seed, log=_orig_log_name)
 
     if _ai_player is not None:
         # Mensch gegen KI: nur die menschliche Seite kann ein Profil haben,
@@ -935,20 +1029,24 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
             return out
         ai_identity = _ai_model or "Heuristik"
         ai_elo, ai_is_estimate, ai_node = _pp.estimate_ai_anchor(ai_identity, _ai_sims)
-        if ai_elo is None:
+        if ai_elo is None and rated:
+            # Kein Anker bekannt: nur bei GEWERTETEN Spielen ein Problem
+            # (ohne Anker keine Elo-Rechnung moeglich) -- bei ungewerteten
+            # Spielen (Tipps genutzt) wird trotzdem ein Historien-Eintrag
+            # geschrieben, auch ohne bekannten Gegner-Wert (opponent_rating=None).
             out["note"] = f"Kein Elo-Anker für {ai_identity}@{_ai_sims} bekannt — Spiel ungewertet."
             return out
         result = result_p0 if human_pi == 0 else result_p1
-        entry = _pp.apply_result(
-            human_profile_id, ai_node or f"{ai_identity}@{_ai_sims}", ai_elo,
-            ai_is_estimate, result, _hints_used_this_game,
-        )
+        entry = _record(human_profile_id, ai_node or f"{ai_identity}@{_ai_sims}",
+                         ai_elo, ai_is_estimate, result)
         out[str(human_pi)] = entry
         return out
 
     # Mensch gegen Mensch: nur werten, wenn BEIDE Seiten ein (unterschiedliches)
     # Profil ausgewählt haben — ohne Gegner-Rating gibt es keinen Anker für
-    # eine Elo-Aktualisierung (Design-Vorgabe #3).
+    # eine Elo-Aktualisierung (Design-Vorgabe #3). Bei genutzten Tipps
+    # (rated=False) gilt dieselbe Grundvoraussetzung: ohne Gegner-Profil kein
+    # sinnvoller Historien-Eintrag.
     if not _profile_p0 or not _profile_p1:
         out["note"] = "Werten nur, wenn beide Spieler ein Profil ausgewählt haben."
         return out
@@ -962,13 +1060,12 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
         return out
     # Beide Ratings VOR dem Update einfrieren (symmetrisches Matchup) --
     # Standard-Elo-Konvention für gegenseitige Updates, sonst würde die
-    # Reihenfolge der apply_result-Aufrufe das Ergebnis leicht verzerren.
+    # Reihenfolge der Aufrufe das Ergebnis leicht verzerren (nur relevant,
+    # wenn rated=True -- bei record_unrated aendert sich ohnehin nichts).
     rating_p0_before = p0["rating"]
     rating_p1_before = p1["rating"]
-    out["0"] = _pp.apply_result(_profile_p0, p1["name"], rating_p1_before, False,
-                                 result_p0, _hints_used_this_game)
-    out["1"] = _pp.apply_result(_profile_p1, p0["name"], rating_p0_before, False,
-                                 result_p1, _hints_used_this_game)
+    out["0"] = _record(_profile_p0, p1["name"], rating_p1_before, False, result_p0)
+    out["1"] = _record(_profile_p1, p0["name"], rating_p0_before, False, result_p1)
     return out
 
 
