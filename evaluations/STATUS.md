@@ -7095,22 +7095,35 @@ liefert der Blend das Gewuenschte: solange die Partie offen ist, dominiert
 winprob; ist sie (fast) entschieden, saettigt winprob und der
 Punkte-/Denial-Term uebernimmt den Gradienten.
 
-**Design-Skizze (zweiphasig, PREREG folgt bei Angehen)**:
-- **Phase A (billig, OHNE Retraining)**: `POINTS_UTILITY_WEIGHT`
-  laufzeit-konfigurierbar machen (additiv, Praezedenz GUMBEL_TOP_M/PCR),
-  Sweep w ∈ {0, 0.05, 0.1, 0.2} mit dem BESTEHENDEN Champion-Punkte-Kopf
-  (ε=0.1). Messung wie vom Nutzer vorgeschlagen: gepaarte Arena gegen
-  FESTEN Gegner (amtierender Champion mit w=0), Primaermetrik =
-  Ø-Gegnerpunkte (Aggressions-Nachweis), **Guardrail = eigene Win-Rate
-  darf nicht signifikant fallen** (Nicht-Unterlegenheit, McNemar --
-  das operationalisiert "solange es dem Gewinnen nicht im Weg ist"),
-  sekundaer eigene Punkte + Bodenstrafe.
-- **Phase B (nur falls A wirkt, aber zu schwach)**: ε-Sweep im
-  Punkte-Kopf-ZIEL (Nutzer-Vorschlag), z.B. ε ∈ {0.1, 0.3, 0.6, 1.0} --
-  braucht Retraining je Arm; Umsetzung train-zeitlich statt
-  cache-zeitlich (λ-Mix-Praezedenz: EIN Cache fuer alle Arme),
-  gepaarte Seeds (Seed-Varianz-Memory), danach Arena-Messung wie A
-  mit dem besten w aus Phase A.
+**Design-Skizze (zweiphasig, PREREG folgt bei Angehen; ueberarbeitet nach
+Nutzer-Einwand 2026-08-03)**:
+- **Nutzer-Einwand zum ersten Entwurf (korrekt)**: ein reiner
+  `POINTS_UTILITY_WEIGHT`-Sweep mit dem BESTEHENDEN Kopf (ε=0.1) blendet
+  zu ~90% EIGENE Punktemaximierung ein, nur ~10% Gegner-Term -- das ist
+  "Gier", nicht "Schaden". Der Denial-Anteil haengt allein an ε, und ε
+  steckt aktuell im TRAININGSZIEL (cache-zeitlich eingebacken) -- jede
+  Aggressions-Stufe wuerde ein eigenes Retraining kosten.
+- **Phase A (Architektur, EIN Retraining)**: separater
+  **Gegner-Punkte-Kopf** (`opp_points_head`, Aux-Ziel
+  `tanh(opp_total/VALUE_SCALE)` -- additiv, Praezedenz value/points/moon/
+  ownership-Mehrkopf-Struktur). Damit wird die Utility zur Laufzeit frei
+  mischbar, OHNE weitere Retrainings:
+  `utility = (1-w)*winprob + w*(own_pts - λ_aggr*opp_pts)`,
+  `w`/`λ_aggr` laufzeit-konfigurierbar (Praezedenz GUMBEL_TOP_M/PCR).
+  ε im bestehenden Punkte-Kopf-Ziel bleibt unangetastet (kein Eingriff in
+  die Bestandsheads, kein VALUE_SCHEMA-Bruch fuer alte Caches noetig --
+  additives Feld wie root_q/ownership).
+- **Phase B (Messung, Nutzer-Design)**: λ_aggr-Sweep zur Laufzeit (z.B.
+  {0, 0.5, 1.0, 2.0} bei festem kleinem w) -- gepaarte Arena gegen FESTEN
+  Gegner (amtierender Champion, w=0), Primaermetrik = Ø-GEGNERpunkte
+  (Denial-Nachweis: sinken sie, WEIL λ_aggr steigt?), **Guardrail =
+  eigene Win-Rate darf nicht signifikant fallen** (Nicht-Unterlegenheit,
+  McNemar -- operationalisiert "solange es dem Gewinnen nicht im Weg
+  ist"), sekundaer eigene Punkte + Bodenstrafe. Erwartbares Muster bei
+  steigendem λ_aggr: Gegnerpunkte sinken, eigene Punkte sinken leicht
+  (Denial kostet Tempo), Win-Rate stabil -- bis zum Kipppunkt, ab dem
+  der Guardrail reisst; der beste λ_aggr ist der letzte VOR dem
+  Kipppunkt.
 
 **Einordnung**: nach der laufenden Experimentkette (Lambda -> PCR -> R5 ->
 R4) und dem v20-Zyklus einplanen -- kein Blocker fuer v20, aber ein
