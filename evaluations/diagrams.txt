@@ -6,15 +6,16 @@ digraph Spielablauf {
     edge [fontname="Helvetica", fontsize=9];
 
     R1 [label="Runde 1-4: Drafting\nGumbel-Suche mit Netz-Priors", fillcolor="#cfe2ff"];
-    T  [label="Tiling\nexakter DFS-Solver", fillcolor="#d9f2d9"];
+    T  [label="Tiling\nDFS-Punkte-Kandidaten,\nNetz-Tiebreak (Runde 2-4)", fillcolor="#d9f2d9"];
     U  [label="Rundenübergang\nTD-Bootstrap-Label", fillcolor="#ffe5b4"];
     R5 [label="Runde 5\nexakte Alpha-Beta-Suche\n(kein Netz, volle Information)", fillcolor="#e2d9f3"];
+    T5 [label="Tiling Runde 5\nexakte Endwertung mitmaximiert", fillcolor="#d9f2d9"];
     E  [label="Endwertung\n3 aktive Wertungsplatten", fillcolor="#f0f0f0"];
 
     R1 -> T -> U;
     U -> R1 [label="Runden 2-4", style=dashed, constraint=false];
     U -> R5 [label="nach Runde 4"];
-    R5 -> E;
+    R5 -> T5 -> E;
 }
 
 # ==netz_suche==
@@ -24,11 +25,11 @@ digraph NetzSuche {
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    N1 [label="Forward-Pass\nstate[708] → Policy, Value,\nMoon, Points, Ownership", fillcolor="#cfe2ff"];
+    N1 [label="Forward-Pass\nPlanes[76,6,6] + State[708]\n→ Policy, Value, Moon, Points", fillcolor="#cfe2ff"];
     N2 [label="Priors\nmaskierte Softmax über legale Aktionen", fillcolor="#cfe2ff"];
     N3 [label="Wurzel-Determinisierung\nverdeckte Information einmal mischen", fillcolor="#d9f2d9"];
-    N4 [label="Gumbel-Top-m\n16 Kandidaten ziehen", fillcolor="#ffe5b4"];
-    N5 [label="Sequential Halving\n400 Sims in log2(m) Phasen", fillcolor="#ffe5b4"];
+    N4 [label="Gumbel-Top-m\nbudget-skaliert (4-16, Standard 16)", fillcolor="#ffe5b4"];
+    N5 [label="Sequential Halving\nSelf-Play 600 / Arena 400 Sims\nin log2(m) Phasen", fillcolor="#ffe5b4"];
     N6 [label="Tiefe ≥ 1\nAuswahl über completed-Q", fillcolor="#ffe5b4"];
     N7 [label="Expansion + Blattbewertung\nNetz-Value + Floor-Shaping", fillcolor="#ffe5b4"];
     N8 [label="Backpropagation", fillcolor="#ffe5b4"];
@@ -48,9 +49,9 @@ digraph SelfplayTraining {
 
     S1 [label="Self-Play\nChampion gegen sich selbst", fillcolor="#cfe2ff"];
     S2 [label="Korpus\nReplay-Fenster: frisch + 2 Alt-Champions", fillcolor="#ffe5b4"];
-    S3 [label="Dataset\nPolicy = completed-Q, Value = TD-Mix", fillcolor="#ffe5b4"];
-    S4 [label="Training\nWarm-Start + Cosine-LR → ONNX", fillcolor="#cfe2ff"];
-    S5 [label="Diagnose\nOrakel-Metriken (arena-validiert)", fillcolor="#d9f2d9"];
+    S3 [label="Dataset\nPolicy = completed-Q, Value = TD-Mix (nortv)", fillcolor="#ffe5b4"];
+    S4 [label="Training\nDoppel-Arm warm (flach + 2D)\nLinie seit v19 2D-nativ → ONNX", fillcolor="#cfe2ff"];
+    S5 [label="Diagnose\nOrakel-Metriken (v18-Referenz,\narena-validiert im Daten-Regime)", fillcolor="#d9f2d9"];
     S6 [label="Gating\ngepaarte Seeds, SPRT", fillcolor="#ffe5b4"];
     S7 [label="Neuer Champion\n+ Elo-Kader", fillcolor="#e2d9f3"];
 
