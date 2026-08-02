@@ -43,7 +43,18 @@ from tools.elo_tracker import (
     node_key as _anchor_node_key,
 )
 
-PROFILES_PATH = Path(__file__).resolve().parent / "player_profiles.json"
+# Isolation (Vorfall 2026-08-02): eine Testserver-Instanz hat versehentlich
+# gegen dieselbe Datei wie der Live-Server geschrieben und mitten in einer
+# echten Partie das Profil des Users geleert -- Test-/Zweitinstanzen MUESSEN
+# ab jetzt per MOSAIC_PROFILES_PATH einen eigenen Pfad setzen (Scratchpad/
+# Temp). Default bleibt unveraendert der Projektroot (Live-Server-Verhalten).
+_env_path = os.environ.get("MOSAIC_PROFILES_PATH")
+PROFILES_PATH = Path(_env_path) if _env_path else (Path(__file__).resolve().parent / "player_profiles.json")
+# Selbstheilung (Vorfall 2026-08-02): bei jedem erfolgreichen Save wird
+# zusaetzlich eine .bak geschrieben (siehe _save_profiles) -- beim Laden
+# einer leeren/beschaedigten Hauptdatei wird sie bevorzugt statt sofort mit
+# einem leeren Profil-Set zu starten (siehe _load_profiles_raw).
+BAK_PATH = PROFILES_PATH.with_name(PROFILES_PATH.name + ".bak")
 
 DEFAULT_RATING = 1000.0
 MAX_HISTORY_ENTRIES = 50  # pro Profil in der JSON behalten (Datei bleibt klein)
@@ -194,24 +205,68 @@ def _atomic_write_json(path: Path, data: dict) -> None:
     os.replace(tmp, path)  # atomar unter Windows (>=Py3.3) wie POSIX
 
 
-def _load_profiles_raw() -> dict:
-    if not PROFILES_PATH.exists():
-        return {"version": 1, "profiles": {}}
+def _save_profiles(data: dict) -> None:
+    """Speichert die Hauptdatei UND eine .bak-Kopie (gleiche atomare
+    Technik) -- Selbstheilung (Vorfall 2026-08-02): geht die Hauptdatei
+    spaeter verloren/kaputt (Test-Kollision, OneDrive-Sync, o.ae.), liefert
+    .bak beim naechsten Laden die letzte bekannte gute Version zurueck,
+    statt dass ALLE Profile+Historie unwiederbringlich weg sind. Ein
+    Backup-Schreibfehler ist NICHT fatal (Hauptsache ist die Hauptdatei),
+    wird aber geloggt."""
+    _atomic_write_json(PROFILES_PATH, data)
     try:
-        with open(PROFILES_PATH, encoding="utf-8") as f:
+        _atomic_write_json(BAK_PATH, data)
+    except OSError as e:
+        print(f"WARNUNG player_profiles: Backup-Schreibversuch fehlgeschlagen ({e}) -- "
+              f"Hauptdatei {PROFILES_PATH.name} wurde trotzdem erfolgreich gespeichert.")
+
+
+def _try_load_json(path: Path) -> dict | None:
+    """Laedt+validiert eine Profile-JSON-Datei. None bei fehlender Datei
+    ODER ungueltigem Inhalt -- der Aufrufer entscheidet, ob/wie er das
+    meldet (unterschiedlich fuer Haupt- vs. Backup-Datei, siehe unten)."""
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        if not isinstance(data, dict) or not isinstance(data.get("profiles"), dict):
-            raise ValueError("unerwartetes Format")
-        return data
+        if isinstance(data, dict) and isinstance(data.get("profiles"), dict):
+            return data
     except Exception:
-        # Korrupte/leere Datei (z.B. abgebrochener OneDrive-Sync) -- nicht
-        # crashen. Kaputte Datei zur Seite legen statt sie stillschweigend
-        # zu ueberschreiben (kein zusaetzlicher Datenverlust).
+        pass
+    return None
+
+
+def _load_profiles_raw() -> dict:
+    data = _try_load_json(PROFILES_PATH)
+    if data is not None:
+        return data
+
+    # Hauptdatei fehlt/ist leer/beschaedigt. Selbstheilung (Vorfall
+    # 2026-08-02): NICHT sofort mit einem leeren Profil-Set weitermachen --
+    # erst das Backup versuchen. Existierte die Hauptdatei (aber war
+    # kaputt), wird sie zur Seite gelegt (Forensik, NICHT ueberschrieben)
+    # und eine Warnung geloggt; fehlte sie schlicht (normaler Erststart),
+    # ist das kein Fehlerfall und bleibt still.
+    main_existed = PROFILES_PATH.exists()
+    if main_existed:
+        print(f"WARNUNG player_profiles: {PROFILES_PATH.name} ist vorhanden, aber leer/"
+              f"beschaedigt/kein gueltiges Profil-Format -- versuche Backup {BAK_PATH.name}.")
         try:
-            PROFILES_PATH.replace(PROFILES_PATH.with_suffix(".json.corrupt"))
-        except OSError:
-            pass
-        return {"version": 1, "profiles": {}}
+            PROFILES_PATH.replace(PROFILES_PATH.with_name(PROFILES_PATH.name + ".corrupt"))
+        except OSError as e:
+            print(f"WARNUNG player_profiles: kaputte Datei konnte nicht zur Seite gelegt werden ({e}).")
+
+    bak_data = _try_load_json(BAK_PATH)
+    if bak_data is not None:
+        print(f"player_profiles: Selbstheilung -- Profile aus Backup {BAK_PATH.name} wiederhergestellt "
+              f"(werden beim naechsten erfolgreichen Speichern automatisch nach {PROFILES_PATH.name} "
+              f"zurueckgeschrieben).")
+        return bak_data
+
+    if main_existed:
+        print("WARNUNG player_profiles: kein nutzbares Backup gefunden -- starte mit leerem Profil-Set.")
+    return {"version": 1, "profiles": {}}
 
 
 # ── Öffentliche API ──────────────────────────────────────────────────────────
@@ -246,7 +301,7 @@ def create_profile(name: str) -> dict:
         "history": [],
     }
     data["profiles"][pid] = profile
-    _atomic_write_json(PROFILES_PATH, data)
+    _save_profiles(data)
     return {"id": pid, "name": name, "rating": DEFAULT_RATING, "games_rated": 0}
 
 
@@ -307,7 +362,7 @@ def apply_result(pid: str, opponent_label: str, opponent_rating: float,
     profile.setdefault("history", []).insert(0, entry)
     profile["history"] = profile["history"][:MAX_HISTORY_ENTRIES]
 
-    _atomic_write_json(PROFILES_PATH, data)
+    _save_profiles(data)
     return entry
 
 
@@ -349,5 +404,5 @@ def record_unrated(pid: str, opponent_label: str, opponent_rating: float | None,
     profile.setdefault("history", []).insert(0, entry)
     profile["history"] = profile["history"][:MAX_HISTORY_ENTRIES]
 
-    _atomic_write_json(PROFILES_PATH, data)
+    _save_profiles(data)
     return entry
