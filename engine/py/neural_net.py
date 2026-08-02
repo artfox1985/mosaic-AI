@@ -1045,6 +1045,15 @@ class MosaicDataset(Dataset):
                         phase = step["state"].get("phase")
                         is_start = any(pe["action"].get("is_start") for pe in step["policy"])
                         pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
+                        # PCR (Task #14): Cheap-Suche-Zuege tragen ein explizites
+                        # `policy_target_valid=false` (self_play.rs, Feld nur bei
+                        # aktivem PCR vorhanden) -- ihr Visit-Ziel stammt aus einer
+                        # verkuerzten Suche und ist als Policy-Ziel unzuverlaessig
+                        # (PREREG_pcr.md). Maske 0 wie Tiling/Start-Schritte; das
+                        # Value-/Punkte-/root_q-Ziel bleibt unmaskiert. Feld fehlt
+                        # (None) in allen Nicht-PCR-Korpora -> dort byte-identisch.
+                        if step.get("policy_target_valid") is False:
+                            pol_w = 0.0
                         polw_l.append(np.float32(pol_w))
                         rounds_l.append(np.int8(step["state"].get("round", 0)))
                         # Ego-Perspektive: erst der Spieler am Zug, dann der

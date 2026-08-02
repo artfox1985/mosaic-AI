@@ -63,8 +63,10 @@ Start-/Ein-Aktion-Schritte bleiben immer ohne). Der exakte Wert wird VOR dem
 ersten Trainingslauf im Manifest festgehalten und hier nach dem Build-Schritt
 nachgetragen (Platzhalter, bis `--build-only` gelaufen ist):
 
-> **Sample-Misch-Anteil (gesamtes 900-Datei-Fenster): _[nach `--build-only`
-> auszufüllen — siehe `train_lambda_sweep_split.json::sample_root_q_frac`]_**
+> **Sample-Misch-Anteil (gesamtes 900-Datei-Fenster): 640.246 von 1.460.731
+> Samples = 43,83%** (`train_lambda_sweep_split.json::sample_root_q_frac`,
+> gemessen beim `--build-only`-Schritt 2026-08-02 — nachgetragen wie oben
+> vorgesehen, VOR Sichtung irgendeines Trainingsergebnisses).
 
 ## Arme
 
