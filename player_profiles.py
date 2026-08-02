@@ -256,13 +256,25 @@ def get_profile(pid: str) -> dict | None:
 
 def apply_result(pid: str, opponent_label: str, opponent_rating: float,
                   opponent_is_estimate: bool, result: float,
-                  hints_used: bool) -> dict:
-    """Aktualisiert EIN Profil nach einem gewerteten Spiel. `result`:
+                  hints_used: bool, seed=None, log=None) -> dict:
+    """Aktualisiert EIN Profil nach einem GEWERTETEN Spiel. `result`:
     1.0=Sieg, 0.0=Niederlage, 0.5=Unentschieden (aktuell laut Regelwerk NIE
     erreichbar -- game.rs::determine_winner loest jeden Gleichstand per
     Startspieler-Marker-Tie-Break eindeutig auf, siehe Vollaudit-Kommentar
-    dort; das Feld bleibt trotzdem fuer kuenftige Regelaenderungen). Gibt
-    den fertigen Historien-Eintrag zurueck (fuers API-Response)."""
+    dort; das Feld bleibt trotzdem fuer kuenftige Regelaenderungen). `seed`/
+    `log` (Nutzer-Erweiterung 2026-08-02): Spiel-Seed + Log-Dateiname als
+    Referenz, damit eine gewertete Partie spaeter nachvollzogen werden kann
+    (`log` zeigt auf die ARCHIVIERTE Kopie unter static/log/elo/, siehe
+    server.py::_archive_rated_game_log -- das Original bleibt zusaetzlich in
+    static/log/ liegen, wird NICHT verschoben). Gibt den fertigen Historien-
+    Eintrag zurueck (fuers API-Response).
+
+    `hints_used` sollte hier IMMER False sein -- User-Entscheid 2026-08-02:
+    sobald KI-Tipps genutzt wurden, ist die Partie komplett ungewertet
+    (siehe `record_unrated` statt hier aufzurufen). Der Parameter bleibt
+    trotzdem bestehen (Historien-Feld, defensiv falls der Aufrufer sich
+    irrt) -- server.py::_apply_elo_for_finished_game ruft bei
+    hints_used=True NICHT diese Funktion auf, sondern `record_unrated`."""
     data = _load_profiles_raw()
     profile = data["profiles"].get(pid)
     if profile is None:
@@ -285,10 +297,55 @@ def apply_result(pid: str, opponent_label: str, opponent_rating: float,
         "delta": round(delta, 1),
         "k_factor": round(k, 1),
         "hints_used": hints_used,
+        "rated": True,
+        "seed": seed,
+        "log": log,
     }
 
     profile["rating"] = rating_after
     profile["games_rated"] = profile.get("games_rated", 0) + 1
+    profile.setdefault("history", []).insert(0, entry)
+    profile["history"] = profile["history"][:MAX_HISTORY_ENTRIES]
+
+    _atomic_write_json(PROFILES_PATH, data)
+    return entry
+
+
+def record_unrated(pid: str, opponent_label: str, opponent_rating: float | None,
+                    opponent_is_estimate: bool, result: float, seed=None, log=None) -> dict:
+    """Schreibt einen Historien-Eintrag OHNE das Rating zu aendern (User-
+    Entscheid 2026-08-02: Partien, in denen KI-Tipps genutzt wurden, sind
+    fuer ALLE beteiligten Profile komplett ungewertet, nicht nur markiert --
+    `hints_used`-Feld existierte vorher schon, hat aber bloss vermerkt,
+    NICHT die Wertung abgeschaltet). `games_rated` bleibt unveraendert --
+    die Historie dient hier reiner Transparenz ("das hast du gespielt"),
+    nicht der Rating-Grundlage. `seed`/`log`: siehe apply_result-Doku --
+    `log` zeigt hier auf die UNVERAENDERTE Datei in static/log/ (ungewertete
+    Partien werden NICHT nach static/log/elo/ archiviert). Gibt den Eintrag
+    zurueck (fuers API-Response, Frontend zeigt statt einer Rating-Aenderung
+    einen Hinweistext)."""
+    data = _load_profiles_raw()
+    profile = data["profiles"].get(pid)
+    if profile is None:
+        raise KeyError(pid)
+
+    rating = profile["rating"]
+    entry = {
+        "date": _dt.now().isoformat(timespec="seconds"),
+        "opponent": opponent_label,
+        "opponent_rating": round(opponent_rating, 1) if opponent_rating is not None else None,
+        "opponent_is_estimate": opponent_is_estimate,
+        "result": result,
+        "rating_before": round(rating, 1),
+        "rating_after": round(rating, 1),
+        "delta": 0.0,
+        "k_factor": None,
+        "hints_used": True,
+        "rated": False,
+        "seed": seed,
+        "log": log,
+    }
+
     profile.setdefault("history", []).insert(0, entry)
     profile["history"] = profile["history"][:MAX_HISTORY_ENTRIES]
 

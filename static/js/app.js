@@ -55,12 +55,18 @@ let CURRENT_CHAMPION = null;   // vom Server geladener amtierender Champion (mod
 // Spielerprofile / Elo (Nutzer-Feature 2026-08-02). RATING_INFO haelt die
 // vom Server bei /new_game aufgeloesten Profile + KI-Anker fuer die LAUFENDE
 // Partie (Rating-Anzeige am Spielernamen, s. renderBoard/render()).
-let RATING_INFO = {p0: null, p1: null, ai: null};
+let RATING_INFO = {p0: null, p1: null, ai: null, unrated: false};
 
 // Rating-Badge-HTML neben dem Spielernamen in renderBoard(pi) -- "~" markiert
 // einen Schaetzwert (KI-Anker ohne direkte Arena-Kante bei dieser Sims-Zahl,
 // siehe player_profiles.py::estimate_ai_anchor). Leerer String, wenn fuer
 // diesen Spielerindex weder Profil noch KI-Anker bekannt ist (Gast-Spiel).
+//
+// User-Entscheid 2026-08-02: sobald in der Partie KI-Tipps genutzt wurden
+// (RATING_INFO.unrated, gesetzt bei Coach-Stufe 3 ab Spielstart bzw. beim
+// ersten bestaetigten Tipp-Klick, s. requestHint()) zeigt JEDE Profil-Seite
+// dauerhaft ein "ungewertet"-Badge statt der Zahl -- die KI-Seite bleibt
+// unveraendert (ihr Anker aendert sich ohnehin nie).
 function _ratingBadgeHTML(pi) {
   if (AI_ENABLED && pi === AI_PLAYER) {
     const ai = RATING_INFO.ai;
@@ -71,6 +77,9 @@ function _ratingBadgeHTML(pi) {
   }
   const prof = pi === 0 ? RATING_INFO.p0 : RATING_INFO.p1;
   if (!prof) return '';
+  if (RATING_INFO.unrated) {
+    return ` <span class="rating-badge unrated" title="KI-Tipps genutzt — diese Partie zählt nicht fürs Rating">ungewertet</span>`;
+  }
   return ` <span class="rating-badge" title="Profil-Rating (Elo)">${Math.round(prof.rating)}</span>`;
 }
 
@@ -207,7 +216,10 @@ async function startNewGame() {
   _chipGhosts = {0: [], 1: []}; _prevBonusChips = {0: null, 1: null};
   // Spielerprofile: vom Server aufgeloeste Profil-/KI-Rating-Info fuer die
   // laufende Partie merken (Rating-Anzeige am Spielernamen, s. renderBoard()).
-  RATING_INFO = {p0: d.profile_p0 || null, p1: d.profile_p1 || null, ai: d.ai_rating || null};
+  // hints_used=true kommt vom Server schon HIER, wenn Coach-Stufe 3 gewaehlt
+  // wurde (automatisches Zug-Feedback nach jedem Zug) -- die Partie ist dann
+  // von Anfang an ungewertet, kein Warten auf einen Tipp-Klick noetig.
+  RATING_INFO = {p0: d.profile_p0 || null, p1: d.profile_p1 || null, ai: d.ai_rating || null, unrated: !!d.hints_used};
   if (d.teacher_level !== undefined) TEACHER_LEVEL = d.teacher_level;
   if (d.teacher_sims !== undefined) TEACHER_SIMS = d.teacher_sims;
   if (d.seed !== undefined) {
@@ -293,14 +305,33 @@ function updateTeacherUI() {
   }
 }
 
+// User-Entscheid 2026-08-02: KI-Tipps machen die Partie ungewertet (Server
+// setzt hints_used bei /api/ai/hint, s. dortige Doku). Vor dem ERSTEN Klick
+// in einer bislang gewerteten Partie (mind. ein Profil ausgewaehlt, noch
+// nicht ungewertet) wird das per Bestaetigungsdialog transparent gemacht --
+// bricht der Nutzer ab, wird kein Tipp abgerufen und nichts markiert.
+function _confirmHintWillUnrate() {
+  const hasProfile = !!(RATING_INFO.p0 || RATING_INFO.p1);
+  if (!hasProfile || RATING_INFO.unrated) return true;  // nichts zu gewinnen/verlieren
+  return confirm('Tipp nutzen? Die Partie wird dadurch ungewertet.');
+}
+
 async function requestHint() {
   if (!teacherHintEligible()) return;
+  if (!_confirmHintWillUnrate()) return;
   const btn = document.getElementById('teacher-hint-btn');
   if (btn) btn.disabled = true;
   try {
     const d = await api('/ai/hint');
     if (!d.ok) { showError(d.error); return; }
     hintCandidates = d.candidates;
+    // Server hat hints_used serverseitig gesetzt (bei Erfolg immer) --
+    // Client spiegelt das sofort fuers dauerhafte "ungewertet"-Badge, ohne
+    // auf render() aus einem spaeteren API-Call zu warten.
+    if (RATING_INFO.p0 || RATING_INFO.p1) {
+      RATING_INFO.unrated = true;
+      render();
+    }
     renderHintHighlights();
   } finally {
     if (btn) btn.disabled = false;
@@ -2330,18 +2361,27 @@ async function calculateEndScoring() {
 // Spielerprofile: baut die Rating-Zeile "Rating: 1000 -> 1016 (+16) vs
 // v19_2d_best@400 (1326)" aus EINEM Historien-Eintrag (s.
 // player_profiles.py::apply_result). `~` vor der Gegner-Elo markiert einen
-// Schaetzwert (opponent_is_estimate).
+// Schaetzwert (opponent_is_estimate). User-Entscheid 2026-08-02: bei
+// `rated===false` (KI-Tipps genutzt, s. player_profiles.py::record_unrated)
+// wird STATT der Rating-Aenderung ein erklaerender Hinweis gezeigt --
+// rating_before===rating_after in diesem Fall ohnehin (keine echte Aenderung).
 function _ratingUpdateLineHTML(name, entry) {
   if (!entry) return '';
+  if (entry.rated === false) {
+    return `<div style="font-size:11px;margin-top:4px">
+      <strong>${_escapeHtml(name)}</strong>:
+      <span style="color:#B45309">ungewertet (KI-Tipps genutzt)</span>
+      <span style="color:var(--text3)">— Rating bleibt bei ${Math.round(entry.rating_before)}</span>
+    </div>`;
+  }
   const sign = entry.delta >= 0 ? '+' : '';
   const deltaColor = entry.delta > 0 ? '#059669' : entry.delta < 0 ? '#DC2626' : 'var(--text2)';
   const oppRating = `${entry.opponent_is_estimate ? '~' : ''}${Math.round(entry.opponent_rating)}`;
-  const hintsNote = entry.hints_used ? ' <span style="color:var(--text3)">(mit KI-Tipps)</span>' : '';
   return `<div style="font-size:11px;margin-top:4px">
     <strong>${_escapeHtml(name)}</strong>: Rating: ${Math.round(entry.rating_before)}
     → ${Math.round(entry.rating_after)}
     (<span style="color:${deltaColor};font-weight:600">${sign}${entry.delta}</span>)
-    vs ${_escapeHtml(entry.opponent)} (${oppRating})${hintsNote}
+    vs ${_escapeHtml(entry.opponent)} (${oppRating})
   </div>`;
 }
 
