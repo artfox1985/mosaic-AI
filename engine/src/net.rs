@@ -89,11 +89,41 @@ impl InputLayout {
     }
 }
 
+/// Oberste Batchgroesse, fuer die `eval_batch` einen fest optimierten Plan
+/// vorhaelt (Perf-Auftrag, 2026-08-02: Gumbel-Wurzel-Kandidaten-Buendelung).
+/// Mirrort `net_mcts::GUMBEL_TOP_M` (die Ober-Grenze der Top-m-Kandidatenzahl
+/// an der Gumbel-Wurzel, s. dortige Doku) -- ABSICHTLICH als eigene lokale
+/// Konstante dupliziert statt importiert: `net.rs` ist die tiefere Schicht
+/// (net_mcts.rs haengt von net.rs ab, nicht umgekehrt), ein Re-Import wuerde
+/// diese Schichtung umkehren. Bleibt die Konstante hier hinter `net_mcts`s
+/// zurueck (z.B. weil `GUMBEL_TOP_M` spaeter erhoeht wird), faellt
+/// `eval_batch` fuer N > `EVAL_BATCH_MAX_N` einfach auf einen klaren Fehler
+/// zurueck (kein stiller Bug) -- Aufrufer mit N im gueltigen Bereich (heute:
+/// jedes `net_mcts`-`m_prime` per Konstruktion `<= GUMBEL_TOP_M`) sind
+/// unbetroffen.
+pub const EVAL_BATCH_MAX_N: usize = 16;
+
 /// Geladenes, optimiertes Netz (thread-safe → über rayon teilbar).
 pub struct Net {
     model: Model,
     /// Zweiter Plan, Batch fix = 2 (Paket 1, siehe Modul-Kommentar).
     model_pair: Model,
+    /// Zusaetzliche fest optimierte Plaene fuer `eval_batch(N)`,
+    /// `N in 1..=EVAL_BATCH_MAX_N`, EAGER beim Laden gebaut (Perf-Auftrag,
+    /// 2026-08-02) -- exakt dieselbe Technik wie `model`/`model_pair`
+    /// (`with_input_fact` auf einen KONKRETEN Batch-Wert statt einer
+    /// symbolischen Achse, dann `into_optimized().into_runnable()`, siehe
+    /// Modul-Kommentar oben zur Begruendung "fester Shape statt symbolischer
+    /// Achse"). Eager statt lazy-mit-Cache: `Net` muss `Sync` bleiben (wird
+    /// per `Arc<Net>` unveraendert ueber rayon-Threads geteilt, siehe
+    /// `self_play.rs`) -- ein lazy gefuellter Cache braeuchte interne
+    /// Mutation (`Mutex`/`RefCell`), die entweder `Sync` bricht (`RefCell`)
+    /// oder `.run()` selbst unter einem Lock serialisieren wuerde (`Mutex`
+    /// um den ganzen Eintrag) und damit die rayon-Parallelitaet der
+    /// Self-Play-/Arena-Laeufe zunichte machen wuerde -- ein `HashMap`, das
+    /// NACH dem Bau nie wieder mutiert wird, ist dagegen trivial `Sync`
+    /// (nur `&self`-Lesezugriffe zur Laufzeit).
+    model_batch: std::collections::HashMap<usize, Model>,
     input_size: usize,
     layout: InputLayout,
 }
@@ -152,10 +182,27 @@ impl Net {
             .into_optimized()?
             .into_runnable()?;
         let model_pair = layout
-            .apply_input_facts(base, 2)?
+            .apply_input_facts(base.clone(), 2)?
             .into_optimized()?
             .into_runnable()?;
-        Ok(Net { model, model_pair, input_size: layout.flat_len(), layout })
+        // `eval_batch`-Plaene (Perf-Auftrag, 2026-08-02): EAGER fuer
+        // `N in 1..=EVAL_BATCH_MAX_N` gebaut, siehe `model_batch`-Feld-
+        // Kommentar fuer die Sync-Begruendung. `N=1`/`N=2` dupliziert bewusst
+        // `model`/`model_pair` (eigener, unabhaengiger Plan) -- haelt
+        // `eval_batch` als eigenstaendigen Pfad einfach/isoliert von
+        // `eval`/`eval_pair`, minimal messbarer Mehraufwand beim Laden (siehe
+        // `examples/eval_batch_build_cost.rs`), aber NULL Risiko fuer die
+        // bestehenden `eval`/`eval_pair`-Pfade (komplett unangetastet).
+        let mut model_batch = std::collections::HashMap::with_capacity(EVAL_BATCH_MAX_N);
+        for n in 1..EVAL_BATCH_MAX_N {
+            let plan = layout.apply_input_facts(base.clone(), n)?.into_optimized()?.into_runnable()?;
+            model_batch.insert(n, plan);
+        }
+        // Letzter Eintrag: `base` selbst (kein weiterer Klon noetig, `base`
+        // wird danach nicht mehr gebraucht).
+        let plan = layout.apply_input_facts(base, EVAL_BATCH_MAX_N)?.into_optimized()?.into_runnable()?;
+        model_batch.insert(EVAL_BATCH_MAX_N, plan);
+        Ok(Net { model, model_pair, model_batch, input_size: layout.flat_len(), layout })
     }
 
     /// Baut die ONNX-Eingabe-Tensor(en) für `samples.len()` Positionen --
@@ -238,6 +285,56 @@ impl Net {
         let (moon_a, moon_b) = split_batch2(moon);
         let (points_a, points_b) = split_batch2(points);
         Ok(((policy_a, value_a, moon_a, points_a), (policy_b, value_b, moon_b, points_b)))
+    }
+
+    /// Forward-Pass fuer `feats.len()` UNABHAENGIGE Stellungen in EINEM
+    /// Batch=N-Aufruf (Perf-Auftrag, 2026-08-02: Verallgemeinerung von
+    /// `eval_pair` auf beliebiges `N` -- gleiche Technik, fest optimierter
+    /// Plan statt symbolischer Batch-Achse, siehe `model_batch`-Feld-
+    /// Kommentar). Elementweise aequivalent zu `N` sequenziellen
+    /// `eval(feats[i])`-Aufrufen (Paritaetstest
+    /// `eval_batch_matches_n_single_evals` unten), aber EIN ONNX-Graph-
+    /// Durchlauf. Zeile `i` = `feats[i]`, Rueckgabe in derselben Reihenfolge.
+    ///
+    /// Erfordert `1 <= feats.len() <= EVAL_BATCH_MAX_N` (kein Plan fuer
+    /// `N=0` -- ein leerer Batch ist immer ein Aufrufer-Bug, kein
+    /// gueltiger Sonderfall; kein Plan fuer `N > EVAL_BATCH_MAX_N`, siehe
+    /// dortiger Kommentar) -- sonst ein klarer Fehler statt eines stillen
+    /// Fallbacks auf Einzelaufrufe (Aufrufer, die N kennen sollten -- z.B.
+    /// `net_mcts`s Gumbel-Wurzel mit `m_prime <= GUMBEL_TOP_M` -- bekommen
+    /// so einen sofortigen Fehlschlag statt einer versteckten
+    /// Performance-Regression, falls sich die beiden Konstanten je
+    /// auseinander bewegen).
+    pub fn eval_batch(
+        &self,
+        feats: &[&[f32]],
+    ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        let n = feats.len();
+        let model = self.model_batch.get(&n).ok_or_else(|| {
+            TractError::msg(format!(
+                "eval_batch: kein vorgebauter Plan fuer N={n} (gueltig: 1..={EVAL_BATCH_MAX_N})"
+            ))
+        })?;
+        let inputs = self.build_inputs(feats)?;
+        let out = model.run(inputs)?;
+        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+        let policy_rows = split_batch_n(policy, n);
+        let value_rows = split_batch_n(value, n);
+        let moon_rows = split_batch_n(moon, n);
+        let points_rows = split_batch_n(points, n);
+        Ok((0..n)
+            .map(|i| {
+                (
+                    policy_rows[i].clone(),
+                    value_rows[i].clone(),
+                    moon_rows[i].clone(),
+                    points_rows[i].clone(),
+                )
+            })
+            .collect())
     }
 }
 
@@ -335,6 +432,19 @@ fn split_batch2(flat: Vec<f32>) -> (Vec<f32>, Vec<f32>) {
     let mut a = flat;
     let b = a.split_off(half);
     (a, b)
+}
+
+/// Verallgemeinerung von `split_batch2` auf `n` Zeilen (Perf-Auftrag,
+/// 2026-08-02, `eval_batch`) -- `flat` ist ein row-major `[n, row_width]`-
+/// Puffer (Standard-ONNX-Ausgabelayout, Batch als fuehrende Achse), `n`
+/// muss `flat.len()` gerade teilen (garantiert: jede der vier Kopf-
+/// Ausgaben hat fuer alle `n` Zeilen dieselbe Breite).
+fn split_batch_n(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
+    if n == 0 {
+        return Vec::new();
+    }
+    let row_width = flat.len() / n;
+    flat.chunks(row_width.max(1)).map(|c| c.to_vec()).collect()
 }
 
 /// Puffer-Split für `InputLayout::PlanesPlusFlat` (Task #11 Phase 2): jedes
@@ -489,5 +599,59 @@ mod tests {
             assert!(close(&mb, &mb2), "Durchlauf {trial}: moon_b weicht ab");
             assert!(close(&ptb, &ptb2), "Durchlauf {trial}: points_b weicht ab");
         }
+    }
+
+    /// Laedt ein lokal vorhandenes Modell fuer `eval_batch`-Tests --
+    /// `load_test_net()` (oben) haengt an `alphazero_v10_best.onnx`, das im
+    /// aktuellen Modell-Bestand nicht mehr vorhanden ist (siehe Task #14,
+    /// gleicher Befund bei `self_play.rs`s PCR-Tests) -- `v18_best` ist der
+    /// naechstliegende lokal real vorhandene flache Checkpoint, gleiches
+    /// Skip-statt-Fail-Muster bei Abwesenheit.
+    fn load_eval_batch_test_net() -> Option<Net> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v18_best.onnx");
+        Net::load_auto(path.to_str().unwrap()).ok()
+    }
+
+    /// Perf-Auftrag (2026-08-02), Kernabsicherung fuer `eval_batch`: fuer
+    /// mehrere `N` muss `eval_batch(feats[0..N])` elementweise (gleiche
+    /// Toleranz 1e-5 wie `eval_pair_matches_two_single_evals` oben -- kein
+    /// strengerer Anspruch als der bestehende Praezedenzfall, tract liefert
+    /// fuer verschiedene Batch-Plaene NICHT garantiert bitgleiche Werte,
+    /// siehe dortiger Kommentar) dasselbe liefern wie `N` sequenzielle
+    /// `eval()`-Aufrufe. Deckt zusaetzlich `N=1` (Batch=1-eigener Plan,
+    /// nicht `self.model` selbst) und `N=EVAL_BATCH_MAX_N` (Randwert) ab.
+    #[test]
+    fn eval_batch_matches_n_single_evals() {
+        let Some(net) = load_eval_batch_test_net() else { return };
+        let mut rng = StdRng::seed_from_u64(11);
+        let close = |x: &[f32], y: &[f32]| -> bool {
+            x.len() == y.len() && x.iter().zip(y).all(|(u, v)| (u - v).abs() < 1e-5)
+        };
+        for &n in &[1usize, 2, 3, 5, 9, 16] {
+            let feats: Vec<Vec<f32>> = (0..n)
+                .map(|_| (0..net.input_size).map(|_| rng.random_range(-1.0f32..1.0)).collect())
+                .collect();
+            let feats_refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
+            let single: Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> =
+                feats.iter().map(|f| net.eval(f).expect("eval")).collect();
+            let batched = net.eval_batch(&feats_refs).expect("eval_batch");
+            assert_eq!(batched.len(), n, "N={n}: eval_batch muss genau N Ergebnisse liefern");
+            for i in 0..n {
+                assert!(close(&single[i].0, &batched[i].0), "N={n} Zeile {i}: policy weicht ab");
+                assert!(close(&single[i].1, &batched[i].1), "N={n} Zeile {i}: value weicht ab");
+                assert!(close(&single[i].2, &batched[i].2), "N={n} Zeile {i}: moon weicht ab");
+                assert!(close(&single[i].3, &batched[i].3), "N={n} Zeile {i}: points weicht ab");
+            }
+        }
+    }
+
+    /// `eval_batch` muss fuer nicht vorgebaute Batchgroessen einen klaren
+    /// Fehler liefern (kein stiller Fallback, siehe `eval_batch`-Doku).
+    #[test]
+    fn eval_batch_rejects_batch_size_beyond_max() {
+        let Some(net) = load_eval_batch_test_net() else { return };
+        let feats: Vec<f32> = vec![0.0; net.input_size];
+        let refs: Vec<&[f32]> = (0..EVAL_BATCH_MAX_N + 1).map(|_| feats.as_slice()).collect();
+        assert!(net.eval_batch(&refs).is_err(), "N > EVAL_BATCH_MAX_N muss fehlschlagen, nicht still zurueckfallen");
     }
 }
