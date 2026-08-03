@@ -7207,6 +7207,38 @@ das Zielrauschen IST reduzierbar -- uebersetzt aber (noch) nicht in
 Staerke). Naechster Diagnose-Baustein: R4-Ende-Kalibrierung
 (PREREG_r4_value_calibration.md, wartet auf Rust-Vorbedingung + Freigabe).
 
+## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
+
+**Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
+vermutlich nicht der richtige Hebel fuer Arena-Staerke. Belege: (1)
+v11-TD-Bootstrap hob R1/R2-R², keine Staerke; (2) Lambda-Sweep 6/6 Seeds
+offline positiv, Arena SPRT-H0; (3) PCR value_r2 +0,04 fuer pcr,
+Arena-Trend negativ. GLEICHZEITIG traegt der Value-Head die Staerke
+(2x2-Kopftausch bei 400 Sims). Aufloesung: die Suche konsumiert lokale
+ORDNUNG von Blatt-/Geschwisterzustaenden, nicht globale
+Ausgangs-Vorhersage -- R² misst die falsche Eigenschaft. Konsistent:
+beide arena-validierten Policy-Praediktoren sind Ordnungs-Metriken;
+v8d-Postmortem-Fingerzeig (Sibling-Ranking-Tau R1 besser als R²
+suggerierte).
+
+**Plan (PREREG bei Angehen)**:
+1. Metrik `value_kendall_tau_vs_oracle_q` (Arbeitsname): Value-Head auf
+   den AFTERSTATES der Wurzelkandidaten der frozen-set-Zustaende
+   auswerten (wie die Suche an Blaettern), Kendall-Tau gegen die
+   Orakel-Q-Ordnung (`frozen_v1_oracle_labels_v18`); R5-Teilmenge
+   optional gegen exakte ab_values.
+2. Historische Validierung ueber die entschiedenen Gating-Paare
+   (`tools/offline_vs_arena.py`-Prozedur -- dieselbe, mit der value_r2
+   als Fein-Praediktor durchfiel und die Orakel-Metriken bestanden).
+3. NUR bei bestandener Validierung: Metrik wird Entscheidungskriterium
+   fuer Value-Experimente; danach erst ueber Ranking-orientierte
+   Trainingsziele nachdenken (Paarvergleichs-/Margin-Loss) -- als
+   separate PREREG.
+
+**Einordnung**: VOR jedem weiteren Value-Trainingsexperiment (sonst wird
+wieder am falschen Messziel optimiert). Research-Agent (2026-08-03) hat
+die These als Fokus-Nachtrag erhalten.
+
 ## Task #28 (vorgemerkt): Aggressiveres Spiel -- Score-/Denial-Utility (2026-08-03)
 
 **Nutzer-Wunsch**: die KI soll aktiv dem Gegner schaden (Punkte wegnehmen/
