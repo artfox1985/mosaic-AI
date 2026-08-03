@@ -7232,6 +7232,12 @@ n=150 vs 2 Anker, Ziel-Baender ~leicht 700-800 / mittel ~1000 / schwer
 (Laufzeit-Parameter + Server-Preset + GUI-Dropdown). OFFEN (Nutzer):
 Ziel-Baender ok? Darf "leicht" sichtbar Endspiele verstolpern?
 
+**GATE (Nutzer-Entscheid 2026-08-03): ZURUECKGESTELLT** -- wird erst
+angegangen, wenn ein Champion existiert, der auch gute menschliche
+Spieler wirklich fordert. Bis dahin bleibt die Prioritaet auf
+Staerke-Arbeit (v20-Zyklus, Value-Head-Front #29/#30, lambda=0.7-
+Kandidat), nicht auf Schwierigkeits-UX.
+
 ## Lambda-v18only: ARENA-SIGNIFIKANTER SIEG -- λ=0.7 wird v20-Standard-Kandidat (2026-08-03)
 
 **Kehrtwende nach dem 900er-Null** (`PREREG_lambda_v18only.md`, Nutzer-
