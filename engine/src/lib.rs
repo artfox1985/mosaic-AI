@@ -483,7 +483,7 @@ fn engine_config_json() -> String {
         FLOOR_SHAPING_WEIGHT, GUMBEL_TOP_M, LeafEval, MIRROR_OTHER_VAL, NUM_ACTIONS,
         POINTS_UTILITY_WEIGHT, POLICY_MASS_CUTOFF, ROUND_TRANSITION_SAMPLING,
         SHUFFLE_STACK_PEEK_IN_SEARCH, USE_GUMBEL_SEARCH, VALUE_OPP_EPSILON,
-        aggr_lambda, points_utility_w,
+        aggr_lambda, points_utility_w, value_cal_a, value_cal_b,
     };
     let active_leaf = match ACTIVE_LEAF {
         LeafEval::Net => "Net",
@@ -506,6 +506,13 @@ fn engine_config_json() -> String {
         "points_utility_w": points_utility_w(),
         "aggr_lambda": aggr_lambda(),
         "value_opp_epsilon": VALUE_OPP_EPSILON,
+        // Task #30 (`evaluations/STATUS.md` Abschnitt "Task #30"): monotone
+        // Logit-Skalen-Korrektur des Value-Kopf-Outputs. Aus
+        // `MOSAIC_VALUE_CAL_A`/`MOSAIC_VALUE_CAL_B` gelesen, einmalig gecacht.
+        // Defaults 0.0/1.0, solange die Env-Vars nicht gesetzt sind
+        // (byte-identisches Bestandsverhalten).
+        "value_cal_a": value_cal_a(),
+        "value_cal_b": value_cal_b(),
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

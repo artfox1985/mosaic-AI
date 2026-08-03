@@ -188,6 +188,66 @@ fn warn_missing_opp_head_once() {
     });
 }
 
+// ── Task #30 (`evaluations/STATUS.md` Abschnitt "Task #30"): monotone
+// Skalen-Korrektur (Platt-artig) des Value-Kopf-Outputs als Laufzeit-Knopf.
+// Motivation: Gumbels σ ist LINEAR in der completed-Q-Perturbation, die
+// gemessene 6-9%-Wertstauchung (R5-Kalibrierung, Task #27) wird also 1:1 in
+// eine zu schwache Perturbation durchgereicht -- eine monotone Logit-Skalen-
+// Korrektur AENDERT DIE ORDNUNG PER DEFINITION NICHT, kann aber die Stauchung
+// aufheben. Gleiches OnceLock-Env-Var-Cache-Muster wie Task #28
+// (`POINTS_UTILITY_W`/`AGGR_LAMBDA` oben) -- siehe `read_f64_env`-Doku.
+
+/// Laufzeit-Cache fuer `MOSAIC_VALUE_CAL_A` (einmalig gelesen, siehe
+/// `value_cal_a()`). Default `0.0` (kein Logit-Shift).
+static VALUE_CAL_A: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Laufzeit-Cache fuer `MOSAIC_VALUE_CAL_B` (einmalig gelesen, siehe
+/// `value_cal_b()`). Default `1.0` (keine Logit-Streckung).
+static VALUE_CAL_B: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Laufzeit-Logit-Shift `A` (Task #30), einmalig aus `MOSAIC_VALUE_CAL_A`
+/// gelesen und gecacht (NICHT pro Suchknoten neu geparst). Default `0.0`.
+pub(crate) fn value_cal_a() -> f64 {
+    *VALUE_CAL_A.get_or_init(|| read_f64_env("MOSAIC_VALUE_CAL_A", 0.0))
+}
+
+/// Laufzeit-Logit-Streckung `B` (Task #30), gleiches Cache-Muster wie
+/// `value_cal_a`. Default `1.0`.
+pub(crate) fn value_cal_b() -> f64 {
+    *VALUE_CAL_B.get_or_init(|| read_f64_env("MOSAIC_VALUE_CAL_B", 1.0))
+}
+
+/// Clamp-Epsilon fuer die Logit-Transformation -- verhindert `ln(0/1)` bzw.
+/// `ln(x/0)` (±∞) an den Raendern des `[0,1]`-Win-Prob-Bereichs.
+const VALUE_CAL_EPS: f64 = 1e-6;
+
+/// Reine Kalibrierungs-Formel (Task #30, kein Netz-/Env-Zugriff -- direkt
+/// testbar, gleiches Trennungsmuster wie `blended_leaf_win_prob`/`_with`):
+/// `p' = sigmoid(a + b*logit(p))`, `p` vorher auf `[EPS, 1-EPS]` geklemmt.
+/// MONOTON in `p` fuer jedes `b>0` (Sigmoid und Logit sind beide streng
+/// monoton steigend, `a + b*x` ist es fuer `b>0` auch) -- die Suchordnung
+/// bleibt also per Konstruktion erhalten, siehe Eigenschafts-Test unten.
+///
+/// Early-Out bei `(a,b)==(0.0,1.0)` (Default): gibt `p` UNVERAENDERT zurueck,
+/// kein Logit-/Sigmoid-Roundtrip -- byte-identisches Bestandsverhalten (kein
+/// zusaetzlicher Rechenpfad, keine Rundungsdifferenz durch `ln`/`exp`).
+pub(crate) fn calibrate_win_prob_with(p: f64, a: f64, b: f64) -> f64 {
+    if a == 0.0 && b == 1.0 {
+        return p;
+    }
+    let clamped = p.clamp(VALUE_CAL_EPS, 1.0 - VALUE_CAL_EPS);
+    let logit = (clamped / (1.0 - clamped)).ln();
+    let z = a + b * logit;
+    1.0 / (1.0 + (-z).exp())
+}
+
+/// Laufzeit-Wrapper von [`calibrate_win_prob_with`], liest `A`/`B` aus dem
+/// Prozess-weiten `OnceLock`-Cache (`value_cal_a()`/`value_cal_b()`) --
+/// gleiches Trennungsmuster wie `blended_leaf_win_prob`/`_with`.
+pub(crate) fn calibrate_win_prob(p: f64) -> f64 {
+    calibrate_win_prob_with(p, value_cal_a(), value_cal_b())
+}
+
 /// Reine Blend-Formel (Task #28, PREREG Punkt 4, kein Netz-/Env-Zugriff --
 /// direkt ohne ONNX-Fixture testbar). `pts_raw`/`opp_raw` sind die ROHEN
 /// tanh-Outputs (Bereich [-1,1]) der Punkte-/Gegner-Punkte-Koepfe, VOR jeder
@@ -1036,28 +1096,41 @@ fn value_to_win_prob(value: &[f32]) -> f64 {
 ///   3. `w>0` UND `opp_points` vorhanden -> `opp_aware_points_utility`
 ///      (own-minus-lambda_aggr*opp-Blend, siehe dortige Doku für die
 ///      Skalenkonvention).
+///
+/// Task #30: `value_to_win_prob(value)` (die reine Netz-Win-Prob `wr`) läuft
+/// zusätzlich durch [`calibrate_win_prob`] -- VOR jeder weiteren Verwendung
+/// inkl. dieses Blends, siehe dortige Doku. Der Punkte-Term (`pts`/
+/// `opp_aware_points_utility`) bleibt bewusst UNKORRIGIERT (andere Skala/
+/// Kopf, eigene Kalibrierung wäre ein separates Experiment).
 fn blended_leaf_win_prob(value: &[f32], points: &[f32], opp_points: &[f32]) -> f64 {
-    blended_leaf_win_prob_with(value, points, opp_points, points_utility_w(), aggr_lambda())
+    blended_leaf_win_prob_with(
+        value, points, opp_points, points_utility_w(), aggr_lambda(), value_cal_a(), value_cal_b(),
+    )
 }
 
 /// Reiner Entscheidungskern von [`blended_leaf_win_prob`], OHNE Env-Var-
-/// Zugriff -- nimmt `w`/`lambda_aggr` als Parameter statt sie aus dem
-/// Prozess-weiten `OnceLock`-Cache (`points_utility_w()`/`aggr_lambda()`) zu
-/// lesen. Getrennt, damit die VOLLSTAENDIGE Blend-Entscheidungslogik
-/// (Early-Out bei `w=0`, Legacy-Fallback bei fehlendem opp-Kopf, echter
-/// Blend) OHNE die "einmal pro Prozess gecacht"-Falle direkt testbar ist --
-/// `points_utility_w()`/`aggr_lambda()` sind ABSICHTLICH nur einmal pro
-/// Prozess lesbar (siehe deren Doku), ein Test, der den Cache nach dem
-/// ersten Aufruf per Env-Var umstellen will, kaeme nie an sein Ziel. Gleiches
-/// Trennungsmuster wie `net.rs`s `detect_layout`/`combine_layouts`.
+/// Zugriff -- nimmt `w`/`lambda_aggr`/`cal_a`/`cal_b` als Parameter statt sie
+/// aus dem Prozess-weiten `OnceLock`-Cache (`points_utility_w()`/
+/// `aggr_lambda()`/`value_cal_a()`/`value_cal_b()`) zu lesen. Getrennt, damit
+/// die VOLLSTAENDIGE Blend-Entscheidungslogik (Early-Out bei `w=0`,
+/// Legacy-Fallback bei fehlendem opp-Kopf, echter Blend, Task-#30-Kalibrierung)
+/// OHNE die "einmal pro Prozess gecacht"-Falle direkt testbar ist -- diese
+/// Getter sind ABSICHTLICH nur einmal pro Prozess lesbar (siehe deren Doku),
+/// ein Test, der den Cache nach dem ersten Aufruf per Env-Var umstellen will,
+/// kaeme nie an sein Ziel. Gleiches Trennungsmuster wie `net.rs`s
+/// `detect_layout`/`combine_layouts`.
 fn blended_leaf_win_prob_with(
     value: &[f32],
     points: &[f32],
     opp_points: &[f32],
     w: f64,
     lambda_aggr: f64,
+    cal_a: f64,
+    cal_b: f64,
 ) -> f64 {
-    let wr = value_to_win_prob(value);
+    // Task #30: Skalen-Korrektur auf `wr`, VOR jeder weiteren Verwendung --
+    // `points`/`opp_points` bleiben unkorrigiert (siehe Funktionskommentar).
+    let wr = calibrate_win_prob_with(value_to_win_prob(value), cal_a, cal_b);
     if points.is_empty() {
         return wr;
     }
@@ -1861,12 +1934,19 @@ pub struct RootValueDebug {
     /// `net.rs::has_opp_head`).
     pub opp_points_forecast: Option<f32>,
     /// `value_to_win_prob(raw_value)` -- reine Sieg-Wahrscheinlichkeit ohne
-    /// Points-Blend.
+    /// Points-Blend, OHNE Task-#30-Kalibrierung (roher Wert, siehe
+    /// `win_prob_calibrated` fuer das Gegenstueck).
     pub win_prob: f64,
-    /// `blended_leaf_win_prob` (KataGo-Blend) NACH der Value-Shrinkage (Task
-    /// #78, aktuell `VALUE_SHRINK_ENABLED=false` ⇒ Identität) -- exakt die
-    /// Größe, die tatsächlich als Blattwert in die Suche einfließt, NUR noch
-    /// ohne das Floor-Shaping-Additiv (separat ausgewiesen).
+    /// Task #30: additives Feld, `calibrate_win_prob(win_prob)` -- der
+    /// tatsaechlich in `blended_utility` (und damit in die Suche) einfließende
+    /// Wert VOR dem Task-#28-Blend. Bei Default-Parametern (a=0,b=1) identisch
+    /// zu `win_prob`.
+    pub win_prob_calibrated: f64,
+    /// `blended_leaf_win_prob` (KataGo-Blend, MIT Task-#30-Kalibrierung auf
+    /// `wr`) NACH der Value-Shrinkage (Task #78, aktuell
+    /// `VALUE_SHRINK_ENABLED=false` ⇒ Identität) -- exakt die Größe, die
+    /// tatsächlich als Blattwert in die Suche einfließt, NUR noch ohne das
+    /// Floor-Shaping-Additiv (separat ausgewiesen).
     pub blended_utility: f64,
     /// Floor-Shaping-Additiv (`FLOOR_SHAPING_WEIGHT · tanh(floor_shaping_delta)`),
     /// bereits auf Ego-Perspektive gedreht (positiv = Vorteil für den
@@ -1884,6 +1964,7 @@ impl RootValueDebug {
             "points_forecast": self.points_forecast,
             "opp_points_forecast": self.opp_points_forecast,
             "win_prob": self.win_prob,
+            "win_prob_calibrated": self.win_prob_calibrated,
             "blended_utility": self.blended_utility,
             "floor_shift": self.floor_shift,
             "final_value": self.final_value,
@@ -1907,6 +1988,9 @@ fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &G
         .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()));
     let raw_value = value.first().copied().unwrap_or(0.0);
     let win_prob = value_to_win_prob(&value);
+    // Task #30: additiv, roher UND korrigierter Wert nebeneinander (siehe
+    // `RootValueDebug::win_prob_calibrated`-Doku).
+    let win_prob_calibrated = calibrate_win_prob(win_prob);
     let blended_raw = blended_leaf_win_prob(&value, &points, &opp_points);
     let blended_utility = if VALUE_SHRINK_ENABLED {
         0.5 + value_shrink_weight(state.round_number) * (blended_raw - 0.5)
@@ -1925,6 +2009,7 @@ fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &G
         points_forecast,
         opp_points_forecast,
         win_prob,
+        win_prob_calibrated,
         blended_utility,
         floor_shift,
         final_value,
@@ -4725,10 +4810,10 @@ mod tests {
     fn blended_leaf_win_prob_with_w_zero_ignores_points_and_opp_entirely() {
         let value = vec![0.3f32];
         let wr = value_to_win_prob(&value);
-        assert_eq!(blended_leaf_win_prob_with(&value, &[], &[], 0.0, 0.0), wr);
-        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[], 0.0, 0.0), wr);
-        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[-0.7], 0.0, 5.0), wr);
-        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[-0.7], 0.0, 0.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[], &[], 0.0, 0.0, 0.0, 1.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[], 0.0, 0.0, 0.0, 1.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[-0.7], 0.0, 5.0, 0.0, 1.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[-0.7], 0.0, 0.0, 0.0, 1.0), wr);
     }
 
     /// `w>0`, aber `opp_points` leer (Legacy-Modell ohne den Kopf) -> muss
@@ -4739,7 +4824,7 @@ mod tests {
         let value = vec![0.3f32];
         let points = vec![0.6f32];
         let wr = value_to_win_prob(&value);
-        let via_missing_opp = blended_leaf_win_prob_with(&value, &points, &[], 0.5, 1.0);
+        let via_missing_opp = blended_leaf_win_prob_with(&value, &points, &[], 0.5, 1.0, 0.0, 1.0);
         assert_eq!(via_missing_opp, wr, "fehlender opp-Kopf muss exakt den w=0-Legacy-Pfad liefern");
     }
 
@@ -4804,7 +4889,7 @@ mod tests {
         let value = vec![0.0f32];
         let points = vec![0.4f32];
         let opp_points = vec![0.2f32];
-        let u = blended_leaf_win_prob_with(&value, &points, &opp_points, 0.5, 0.5);
+        let u = blended_leaf_win_prob_with(&value, &points, &opp_points, 0.5, 0.5, 0.0, 1.0);
         // Toleranz 1e-6 statt 1e-12 -- `value`/`points` sind `f32`-Vektoren
         // (wie reale ONNX-Outputs), die Konvertierung nach `f64` fuer die
         // Blend-Arithmetik ist nicht bit-exakt zur reinen `f64`-Handrechnung.
@@ -4866,5 +4951,218 @@ mod tests {
     fn points_utility_w_and_aggr_lambda_default_to_zero() {
         assert_eq!(points_utility_w(), 0.0);
         assert_eq!(aggr_lambda(), 0.0);
+    }
+
+    // ── Task #30: monotone Value-Skalen-Korrektur (`calibrate_win_prob_with`) ──
+
+    /// Die gecachten Laufzeit-Getter muessen (in dieser Test-Umgebung, in der
+    /// `MOSAIC_VALUE_CAL_A`/`MOSAIC_VALUE_CAL_B` nie gesetzt werden) auf ihre
+    /// dokumentierten Defaults `0.0`/`1.0` zurueckfallen (Identitaet).
+    #[test]
+    fn value_cal_a_and_b_default_to_identity() {
+        assert_eq!(value_cal_a(), 0.0);
+        assert_eq!(value_cal_b(), 1.0);
+    }
+
+    /// (a,b)=(0,1) muss fuer JEDES `p` in `(0,1)` exakte Identitaet liefern
+    /// (Early-Out, kein Logit-/Sigmoid-Roundtrip -- byte-identisch, nicht nur
+    /// "numerisch nah dran").
+    #[test]
+    fn calibrate_win_prob_with_identity_at_default_params() {
+        for p in [0.0001, 0.05, 0.3, 0.5, 0.5000001, 0.7, 0.9999] {
+            assert_eq!(
+                calibrate_win_prob_with(p, 0.0, 1.0),
+                p,
+                "p={p}: (a,b)=(0,1) muss EXAKTE Identitaet sein (Early-Out)"
+            );
+        }
+    }
+
+    /// Randfaelle `p=0.0`/`p=1.0` muessen ebenfalls exakt (nicht nur
+    /// naeherungsweise) durchgereicht werden -- der Early-Out greift VOR dem
+    /// Clamp, ein Clamp-dann-Sigmoid-Pfad wuerde hier `EPS`/`1-EPS` statt
+    /// `0.0`/`1.0` liefern.
+    #[test]
+    fn calibrate_win_prob_with_identity_at_exact_boundaries() {
+        assert_eq!(calibrate_win_prob_with(0.0, 0.0, 1.0), 0.0);
+        assert_eq!(calibrate_win_prob_with(1.0, 0.0, 1.0), 1.0);
+    }
+
+    /// `B>1` muss die Kalibrierung um `p=0.5` "strecken" (schärfer machen):
+    /// fuer `p>0.5` ist `p' > p` (Logit>0 wird verstaerkt).
+    #[test]
+    fn calibrate_win_prob_with_b_greater_than_one_stretches_above_half() {
+        let p = 0.6;
+        let p_stretched = calibrate_win_prob_with(p, 0.0, 2.0);
+        assert!(p_stretched > p, "b=2.0 sollte p=0.6 anheben, war {p_stretched}");
+    }
+
+    /// Symmetrisches Gegenstueck unterhalb 0.5: `B>1` senkt `p<0.5` weiter ab.
+    #[test]
+    fn calibrate_win_prob_with_b_greater_than_one_stretches_below_half() {
+        let p = 0.4;
+        let p_stretched = calibrate_win_prob_with(p, 0.0, 2.0);
+        assert!(p_stretched < p, "b=2.0 sollte p=0.4 senken, war {p_stretched}");
+    }
+
+    /// `B<1` (Stauchung Richtung 0.5) ist das Gegenteil: `p=0.6` -> naeher an
+    /// 0.5 heran, nicht davon weg.
+    #[test]
+    fn calibrate_win_prob_with_b_less_than_one_shrinks_toward_half() {
+        let p = 0.6;
+        let p_shrunk = calibrate_win_prob_with(p, 0.0, 0.5);
+        assert!(p_shrunk < p && p_shrunk > 0.5, "b=0.5 sollte p=0.6 Richtung 0.5 stauchen, war {p_shrunk}");
+    }
+
+    /// `A` verschiebt den Logit additiv -- bei `b=1.0` muss `A>0` JEDES `p`
+    /// anheben (positiver Shift), unabhaengig vom Ausgangswert.
+    #[test]
+    fn calibrate_win_prob_with_positive_a_shifts_up() {
+        for p in [0.1, 0.3, 0.5, 0.7, 0.9] {
+            let shifted = calibrate_win_prob_with(p, 1.0, 1.0);
+            assert!(shifted > p, "p={p}: a=1.0 sollte anheben, war {shifted}");
+        }
+    }
+
+    /// Symmetrisches Gegenstueck: `A<0` senkt JEDES `p`.
+    #[test]
+    fn calibrate_win_prob_with_negative_a_shifts_down() {
+        for p in [0.1, 0.3, 0.5, 0.7, 0.9] {
+            let shifted = calibrate_win_prob_with(p, -1.0, 1.0);
+            assert!(shifted < p, "p={p}: a=-1.0 sollte senken, war {shifted}");
+        }
+    }
+
+    /// Kern-Eigenschaft (PREREG-Anspruch: "aendert die Ordnung per Definition
+    /// NICHT"): fuer `b>0` ist `calibrate_win_prob_with` STRENG MONOTON in `p`
+    /// -- Stichproben-Property-Test ueber zufaellig gezogene `(p1,p2,a,b)`-
+    /// Quadrupel (deterministischer Seed, reproduzierbar).
+    #[test]
+    fn calibrate_win_prob_with_preserves_order_for_random_pairs_and_params() {
+        let mut rng = StdRng::seed_from_u64(30001);
+        let mut checked = 0;
+        for _ in 0..500 {
+            let p1: f64 = rng.random_range(1e-4..(1.0 - 1e-4));
+            let p2: f64 = rng.random_range(1e-4..(1.0 - 1e-4));
+            if (p1 - p2).abs() < 1e-9 {
+                continue; // gleiche Werte sind kein Ordnungs-Test
+            }
+            let a: f64 = rng.random_range(-3.0..3.0);
+            let b: f64 = rng.random_range(0.05..5.0); // b>0 -- Voraussetzung fuer Monotonie
+            let c1 = calibrate_win_prob_with(p1, a, b);
+            let c2 = calibrate_win_prob_with(p2, a, b);
+            let same_order = (p1 < p2) == (c1 < c2);
+            assert!(
+                same_order,
+                "Ordnung verletzt: p1={p1} p2={p2} a={a} b={b} -> c1={c1} c2={c2}"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 400, "zu wenige gueltige Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    /// Env-Var-Parsing fuer die beiden neuen Namen -- reine `read_f64_env`-
+    /// Weiterverwendung (die generische Parsing-Logik ist bereits oben
+    /// getestet), hier nur der Vertrag "richtiger Default-Wert je Var".
+    #[test]
+    fn read_f64_env_value_cal_a_default_and_parsing() {
+        let name = "MOSAIC_TEST_ENV_CAL_A_30A";
+        std::env::remove_var(name);
+        assert_eq!(read_f64_env(name, 0.0), 0.0);
+        std::env::set_var(name, "0.75");
+        assert_eq!(read_f64_env(name, 0.0), 0.75);
+        std::env::remove_var(name);
+    }
+
+    #[test]
+    fn read_f64_env_value_cal_b_default_and_parsing() {
+        let name = "MOSAIC_TEST_ENV_CAL_B_30B";
+        std::env::remove_var(name);
+        assert_eq!(read_f64_env(name, 1.0), 1.0);
+        std::env::set_var(name, "1.5");
+        assert_eq!(read_f64_env(name, 1.0), 1.5);
+        std::env::remove_var(name);
+    }
+
+    #[test]
+    fn read_f64_env_value_cal_invalid_falls_back_to_documented_default() {
+        let name_a = "MOSAIC_TEST_ENV_CAL_A_INVALID_30C";
+        std::env::set_var(name_a, "nope");
+        assert_eq!(read_f64_env(name_a, 0.0), 0.0);
+        std::env::remove_var(name_a);
+
+        let name_b = "MOSAIC_TEST_ENV_CAL_B_INVALID_30D";
+        std::env::set_var(name_b, "nope");
+        assert_eq!(read_f64_env(name_b, 1.0), 1.0);
+        std::env::remove_var(name_b);
+    }
+
+    // ── Task #30 x Task #28 Interaktion: Korrektur wirkt auf `wr`, NICHT auf
+    // `pts`/`opp` ──
+
+    /// Bei `w=0` (Task #28 Blend aus) muss `blended_leaf_win_prob_with` mit
+    /// aktiver Kalibrierung (`a,b != 0,1`) exakt `calibrate_win_prob_with(
+    /// value_to_win_prob(value), a, b)` liefern -- die Kalibrierung greift
+    /// unabhaengig vom Task-#28-Blend-Status.
+    #[test]
+    fn blended_leaf_win_prob_with_applies_calibration_to_wr_when_w_is_zero() {
+        let value = vec![0.3f32];
+        let expected = calibrate_win_prob_with(value_to_win_prob(&value), 0.5, 2.0);
+        let actual = blended_leaf_win_prob_with(&value, &[], &[], 0.0, 0.0, 0.5, 2.0);
+        assert_eq!(actual, expected);
+    }
+
+    /// Voller `w>0`+opp-vorhanden-Blend MIT aktiver Kalibrierung: die
+    /// Korrektur darf NUR in `wr` einfliessen, `pts`/`u_pts` (also
+    /// `opp_aware_points_utility`, das `points`/`opp_points` konsumiert)
+    /// bleiben unangetastet -- Nachweis per Handrechnung.
+    #[test]
+    fn blended_leaf_win_prob_with_calibration_affects_only_wr_not_points_or_opp() {
+        let value = vec![0.0f32]; // value_to_win_prob -> 0.5
+        let points = vec![0.4f32];
+        let opp_points = vec![0.2f32];
+        let a = 0.5;
+        let b = 1.5;
+        // Erwartung: wr_calibrated statt rohem wr=0.5, u_pts unveraendert
+        // (0.66, siehe `opp_aware_points_utility_matches_hand_calculation`).
+        let wr_calibrated = calibrate_win_prob_with(0.5, a, b);
+        let u_pts = opp_aware_points_utility(0.4, 0.2, 0.5);
+        let w = 0.5;
+        let expected = (1.0 - w) * wr_calibrated + w * u_pts;
+        let actual = blended_leaf_win_prob_with(&value, &points, &opp_points, w, 0.5, a, b);
+        // Toleranz 1e-6 statt 1e-9 -- `value`/`points`/`opp_points` sind
+        // `f32`-Vektoren (wie reale ONNX-Outputs), die Konvertierung nach
+        // `f64` fuer die Blend-/Kalibrierungs-Arithmetik ist nicht bit-exakt
+        // zur reinen `f64`-Handrechnung (gleiche Begruendung wie beim
+        // bestehenden `blended_leaf_win_prob_with_full_blend_matches_hand_
+        // calculation`-Test).
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "actual={actual} expected={expected} (wr_calibrated={wr_calibrated}, u_pts={u_pts})"
+        );
+        // Gegenprobe: wenn die Korrektur faelschlich AUCH auf u_pts wirken
+        // wuerde, kaeme ein anderer Wert heraus -- schliesst das explizit aus.
+        let wrong_if_points_were_calibrated =
+            (1.0 - w) * wr_calibrated + w * calibrate_win_prob_with(u_pts, a, b);
+        assert!(
+            (actual - wrong_if_points_were_calibrated).abs() > 1e-6,
+            "u_pts darf NICHT kalibriert werden -- actual={actual} sollte von \
+             wrong_if_points_were_calibrated={wrong_if_points_were_calibrated} abweichen"
+        );
+    }
+
+    /// Reiner Formel-Nachweis, dass Default-Kalibrierung (0,1) den bereits
+    /// bestehenden `w>0`-Hand-Rechnungs-Test (`blended_leaf_win_prob_with_
+    /// full_blend_matches_hand_calculation`) unveraendert reproduziert --
+    /// zusaetzliche Absicherung, dass die neuen Parameter am Ende der
+    /// Signatur additiv sind (keine Verschiebung bestehender Positional-
+    /// Argumente).
+    #[test]
+    fn blended_leaf_win_prob_with_default_calibration_matches_pre_task30_result() {
+        let value = vec![0.0f32];
+        let points = vec![0.4f32];
+        let opp_points = vec![0.2f32];
+        let u = blended_leaf_win_prob_with(&value, &points, &opp_points, 0.5, 0.5, 0.0, 1.0);
+        assert!((u - 0.58).abs() < 1e-6, "u={u}, erwartet 0.58 (identisch zum Vor-Task-#30-Ergebnis)");
     }
 }
