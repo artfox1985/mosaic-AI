@@ -127,13 +127,37 @@ pub const POINTS_UTILITY_WEIGHT: f64 = 0.0;
 /// `opp_points_head` mit derselben Blending-Struktur trainiert wurde).
 pub(crate) const VALUE_OPP_EPSILON: f64 = 0.1;
 
-/// Laufzeit-Cache fuer `MOSAIC_POINTS_UTILITY_W` (einmalig gelesen, siehe
-/// `points_utility_w()`).
-static POINTS_UTILITY_W: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+/// Laufzeit-Zelle fuer `MOSAIC_POINTS_UTILITY_W` -- `OnceLock` initialisiert
+/// EINMALIG aus der Env-Var (Prozessstart-Default, siehe `read_f64_env`),
+/// der innere `AtomicU64` (f64-Bitmuster via `to_bits`/`from_bits`) ist
+/// danach beliebig oft NEU setzbar -- GUI-Live-Regler (`set_aggression_
+/// params`, PyO3-Bindung in `lib.rs`) schreibt hier hinein, OHNE dass die
+/// Suche pro Knoten neu parst (`Ordering::Relaxed` reicht: kein weiterer
+/// Zustand haengt kausal an diesem Wert, ein kurzzeitig "gemischter" Wert
+/// zwischen zwei laufenden Suchen ist unkritisch, siehe `points_utility_w()`).
+static POINTS_UTILITY_W: std::sync::OnceLock<std::sync::atomic::AtomicU64> =
+    std::sync::OnceLock::new();
 
-/// Laufzeit-Cache fuer `MOSAIC_AGGR_LAMBDA` (einmalig gelesen, siehe
-/// `aggr_lambda()`).
-static AGGR_LAMBDA: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+/// Laufzeit-Zelle fuer `MOSAIC_AGGR_LAMBDA`, gleiches Muster wie
+/// `POINTS_UTILITY_W` oben (siehe `aggr_lambda()`).
+static AGGR_LAMBDA: std::sync::OnceLock<std::sync::atomic::AtomicU64> = std::sync::OnceLock::new();
+
+/// Interne Zellen-Getter (initialisieren aus der Env-Var beim ERSTEN Zugriff,
+/// liefern danach immer dieselbe `AtomicU64`-Referenz) -- getrennt von den
+/// oeffentlichen `points_utility_w()`/`aggr_lambda()`-Lese-Funktionen, damit
+/// `set_aggression_params` dieselbe Zelle zum Schreiben greifen kann, ohne
+/// den Bit-Umweg ueber eine zweite `OnceLock::get_or_init`-Doku zu noeten.
+fn points_utility_w_cell() -> &'static std::sync::atomic::AtomicU64 {
+    POINTS_UTILITY_W.get_or_init(|| {
+        std::sync::atomic::AtomicU64::new(read_f64_env("MOSAIC_POINTS_UTILITY_W", 0.0).to_bits())
+    })
+}
+
+fn aggr_lambda_cell() -> &'static std::sync::atomic::AtomicU64 {
+    AGGR_LAMBDA.get_or_init(|| {
+        std::sync::atomic::AtomicU64::new(read_f64_env("MOSAIC_AGGR_LAMBDA", 0.0).to_bits())
+    })
+}
 
 /// Markiert, ob die "Modell hat keinen opp_points-Kopf, obwohl w>0"-Warnung
 /// bereits einmal geloggt wurde (verhindert Log-Spam ueber tausende
@@ -159,19 +183,47 @@ fn read_f64_env(name: &str, default: f64) -> f64 {
     }
 }
 
-/// Laufzeit-Utility-Blend-Gewicht `w` (Task #28), einmalig aus
-/// `MOSAIC_POINTS_UTILITY_W` gelesen und gecacht (NICHT pro Suchknoten neu
-/// geparst). Default `0.0` -> `blended_leaf_win_prob` nimmt den Early-Out
+/// Laufzeit-Utility-Blend-Gewicht `w` (Task #28). INITIAL aus
+/// `MOSAIC_POINTS_UTILITY_W` gelesen (Prozessstart-Default, gleiches Parsing
+/// wie zuvor), danach per [`set_aggression_params`] jederzeit neu setzbar
+/// (GUI-Live-Regler) -- `Ordering::Relaxed`-Load, KEIN Neu-Parsen pro
+/// Suchknoten. Default `0.0` -> `blended_leaf_win_prob` nimmt den Early-Out
 /// (byte-identisches Bestandsverhalten, kein zusaetzlicher Rechenpfad).
 pub(crate) fn points_utility_w() -> f64 {
-    *POINTS_UTILITY_W.get_or_init(|| read_f64_env("MOSAIC_POINTS_UTILITY_W", 0.0))
+    f64::from_bits(points_utility_w_cell().load(std::sync::atomic::Ordering::Relaxed))
 }
 
-/// Laufzeit-Denial-Gewicht `lambda_aggr` (Task #28), einmalig aus
-/// `MOSAIC_AGGR_LAMBDA` gelesen, gleiches Cache-Muster wie `points_utility_w`.
-/// Default `0.0` (kein Gegner-Punkte-Abzug).
+/// Laufzeit-Denial-Gewicht `lambda_aggr` (Task #28). INITIAL aus
+/// `MOSAIC_AGGR_LAMBDA` gelesen, gleiches Zellen-/Cache-Muster wie
+/// `points_utility_w`. Default `0.0` (kein Gegner-Punkte-Abzug).
 pub(crate) fn aggr_lambda() -> f64 {
-    *AGGR_LAMBDA.get_or_init(|| read_f64_env("MOSAIC_AGGR_LAMBDA", 0.0))
+    f64::from_bits(aggr_lambda_cell().load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// GUI-Live-Regler (Task #28, `PREREG_task28_aggression.md` Punkt 4 "Engine
+/// (additiv, laufzeit-konfigurierbar)"): setzt `w`/`lambda_aggr` ATOMAR neu
+/// (naechste PUCT-Blattauswertung sieht sofort den neuen Wert, kein
+/// Prozess-Neustart noetig) -- PyO3-Bindung `set_aggression_params` in
+/// `lib.rs` ruft dies direkt auf. Defensiv geklemmt auf die im PREREG
+/// gemessenen/als sicher belegten Wertebereiche: `w` in `[0,1]` (gemessener
+/// Betriebspunkt `w=0.1`, `w=1.0` waere reiner Punkte-Utility ohne
+/// Win-Anteil -- ausserhalb bleibt undefiniertes Terrain), `lambda_aggr` in
+/// `[0,5]` (Sweep deckte `{0; 0.5; 1; 2}` ab, `5` laesst Luft nach oben ohne
+/// eine voellig unvalidierte Groessenordnung zuzulassen). Nicht-endliche
+/// Eingaben (NaN/Inf, z.B. durch einen kaputten GUI-Request) fallen auf
+/// `0.0` zurueck -- `f64::clamp` selbst liesse NaN unveraendert durch (siehe
+/// dessen Doku), das waere hier keine echte Klemme.
+pub(crate) fn set_aggression_params(w: f64, lambda_aggr: f64) {
+    let w = if w.is_finite() { w.clamp(0.0, 1.0) } else { 0.0 };
+    let lambda_aggr = if lambda_aggr.is_finite() { lambda_aggr.clamp(0.0, 5.0) } else { 0.0 };
+    points_utility_w_cell().store(w.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    aggr_lambda_cell().store(lambda_aggr.to_bits(), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Gegenstueck zu [`set_aggression_params`] -- liest beide Laufzeit-Werte in
+/// einem Aufruf (PyO3-Bindung `get_aggression_params` in `lib.rs`).
+pub(crate) fn get_aggression_params() -> (f64, f64) {
+    (points_utility_w(), aggr_lambda())
 }
 
 /// Einmalige Warnung, wenn `w>0` konfiguriert ist, das geladene Netz aber
@@ -4951,6 +5003,81 @@ mod tests {
     fn points_utility_w_and_aggr_lambda_default_to_zero() {
         assert_eq!(points_utility_w(), 0.0);
         assert_eq!(aggr_lambda(), 0.0);
+    }
+
+    // ── `set_aggression_params`/`get_aggression_params` (Task #28 GUI-Regler)
+    // -- ANDERS als die reine Env-Var-Lese-Tests oben (`read_f64_env_*`,
+    // eindeutige SYNTHETISCHE Var-Namen je Test) schreiben diese Tests auf
+    // die ECHTEN Prozess-weiten `points_utility_w`/`aggr_lambda`-Zellen --
+    // das ist der ganze Punkt des Atomic-Umbaus (Live-Regler). Das ist mit
+    // `cargo test`s Standard-Parallelitaet (mehrere Tests im selben
+    // Prozess/mehreren Threads) NICHT frei von Interferenz: ein anderer,
+    // parallel laufender Test, der `points_utility_w()`/`aggr_lambda()`
+    // liest (z.B. `points_utility_w_and_aggr_lambda_default_to_zero` oben
+    // oder `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero`),
+    // kann waehrend des Test-Fensters hier einen zwischenzeitlich gesetzten
+    // Nicht-Default-Wert sehen. `AGGRESSION_TEST_LOCK` serialisiert
+    // wenigstens die Tests IN DIESER GRUPPE untereinander, UND jeder Test
+    // stellt den Default (0.0, 0.0) am Ende wieder her (best effort) -- ein
+    // vollstaendiger Ausschluss gegenueber ALLEN anderen Tests im Binary
+    // waere nur mit globaler Serialisierung (`--test-threads=1`) oder einem
+    // Mutex um wirklich jeden Lesezugriff moeglich; beides wuerde ueber
+    // dieses additive Feature hinausgehen. Falls dieser Test-Block spaeter
+    // sporadisch fehlschlaegt (Flakiness durch echte Parallelitaet), ist das
+    // der bekannte Kompromiss, kein neuer Bug.
+    static AGGRESSION_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn set_aggression_params_round_trips_valid_values() {
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        set_aggression_params(0.1, 2.0);
+        assert_eq!(get_aggression_params(), (0.1, 2.0));
+        assert_eq!(points_utility_w(), 0.1);
+        assert_eq!(aggr_lambda(), 2.0);
+        set_aggression_params(0.0, 0.0);
+    }
+
+    #[test]
+    fn set_aggression_params_clamps_w_to_zero_one() {
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        set_aggression_params(-3.5, 0.0);
+        assert_eq!(get_aggression_params(), (0.0, 0.0), "w<0 muss auf 0.0 geklemmt werden");
+        set_aggression_params(7.0, 0.0);
+        assert_eq!(get_aggression_params(), (1.0, 0.0), "w>1 muss auf 1.0 geklemmt werden");
+        set_aggression_params(0.0, 0.0);
+    }
+
+    #[test]
+    fn set_aggression_params_clamps_lambda_aggr_to_zero_five() {
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        set_aggression_params(0.0, -1.0);
+        assert_eq!(get_aggression_params(), (0.0, 0.0), "lambda_aggr<0 muss auf 0.0 geklemmt werden");
+        set_aggression_params(0.0, 42.0);
+        assert_eq!(get_aggression_params(), (0.0, 5.0), "lambda_aggr>5 muss auf 5.0 geklemmt werden");
+        set_aggression_params(0.0, 0.0);
+    }
+
+    #[test]
+    fn set_aggression_params_non_finite_inputs_fall_back_to_zero() {
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // NaN wuerde `f64::clamp` unveraendert durchlassen (siehe dessen
+        // Doku) -- `set_aggression_params` muss das explizit abfangen, sonst
+        // koennte ein kaputter GUI-Request die Suche mit NaN vergiften.
+        set_aggression_params(f64::NAN, f64::INFINITY);
+        assert_eq!(get_aggression_params(), (0.0, 0.0));
+        set_aggression_params(f64::NEG_INFINITY, f64::NAN);
+        assert_eq!(get_aggression_params(), (0.0, 0.0));
+    }
+
+    #[test]
+    fn set_aggression_params_boundary_values_are_kept_unclamped() {
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // Randwerte selbst (0.0/1.0 fuer w, 0.0/5.0 fuer lambda_aggr) sind
+        // gueltig und duerfen NICHT durch die Klemme veraendert werden.
+        set_aggression_params(1.0, 5.0);
+        assert_eq!(get_aggression_params(), (1.0, 5.0));
+        set_aggression_params(0.0, 0.0);
+        assert_eq!(get_aggression_params(), (0.0, 0.0));
     }
 
     // ── Task #30: monotone Value-Skalen-Korrektur (`calibrate_win_prob_with`) ──

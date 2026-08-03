@@ -18,6 +18,8 @@ Endpoints:
   POST /api/end_tiling        — Tiling-Phase abschließen
   GET  /api/ai/config         — KI-Konfiguration abrufen
   POST /api/ai/config         — Schwierigkeit setzen
+  GET  /api/aggression        — Task #28: Aggressivitäts-Regler abrufen (w, lambda_aggr)
+  POST /api/aggression        — Task #28: Aggressivitäts-Regler setzen (sofort wirksam)
   POST /api/ai/move           — KI führt ihren nächsten Zug aus
 
 Alle Responses: {"ok": true, "state": {...}} oder {"ok": false, "error": "..."}
@@ -27,6 +29,7 @@ import sys
 import os
 import re as _re
 import json as _json
+import math as _math
 import datetime as _dt
 from pathlib import Path
 
@@ -1212,6 +1215,64 @@ def ai_config_set():
         else:
             _ai_model = None
     return jsonify({"ok": True, "sims": _ai_sims, "model": _ai_model or "heuristic"})
+
+
+# ── Task #28 (PREREG_task28_aggression.md): Aggressivitäts-Regler ───────────
+# Setzt/liest die beiden Laufzeit-Parameter des Score-/Denial-Utility-Blends
+# in der Rust-Engine (`net_mcts::set_aggression_params`/`get_aggression_
+# params`, ATOMAR, wirkt SOFORT auf die naechste KI-Suche — kein
+# Server-Neustart noetig). Engine-weiter Zustand, NICHT an eine laufende
+# Partie gebunden (funktioniert unabhaengig von `_rust`/`PyGame`, direkt
+# ueber das `mosaic_rust`-Modul). KEIN Persistieren ueber einen Server-
+# Neustart hinweg — danach gelten wieder die `MOSAIC_POINTS_UTILITY_W`/
+# `MOSAIC_AGGR_LAMBDA`-Env-Var-Defaults (siehe net_mcts.rs-Doku); ein
+# `models/champion.txt`-Analogon fuer den Regler ist bewusst nicht vorgesehen
+# (Nutzer-Wunsch: "kein Persistieren noetig").
+#
+# Die Rust-Bindungen existieren erst NACH dem naechsten Wheel-Build/-Install
+# (dieser Server-Code wurde parallel zum Engine-Umbau geschrieben) — beide
+# Endpunkte pruefen defensiv per `hasattr`, ob `mosaic_rust` die neuen
+# Funktionen schon mitbringt, und antworten sonst mit 503 statt den Server
+# mit einem AttributeError abstuerzen zu lassen (Server muss mit einem NOCH
+# ALTEN Wheel weiterlaufen).
+_AGGRESSION_UNAVAILABLE_MSG = (
+    "Aggressivitäts-Regler nicht verfügbar — Wheel-Update nötig "
+    "(installiertes mosaic_rust-Wheel kennt set_aggression_params/"
+    "get_aggression_params noch nicht, Server-Neustart nach dem Update nötig)."
+)
+
+
+@app.route('/api/aggression', methods=['GET'])
+def get_aggression():
+    """Aktueller Stand des Reglers (w, lambda_aggr) — Frontend nutzt das, um
+    den Slider beim Laden auf den tatsächlichen Serverzustand zu setzen."""
+    if _mr is None or not hasattr(_mr, 'get_aggression_params'):
+        return jsonify(err(_AGGRESSION_UNAVAILABLE_MSG)), 503
+    w, lambda_aggr = _mr.get_aggression_params()
+    return jsonify({"ok": True, "w": w, "lambda_aggr": lambda_aggr})
+
+
+@app.route('/api/aggression', methods=['POST'])
+def set_aggression():
+    """Setzt den Regler. Body: {"w": float, "lambda_aggr": float} — beide
+    optional (Default 0.0 = aus). Wertebereiche werden zusätzlich in der
+    Rust-Engine geklemmt (w in [0,1], lambda_aggr in [0,5], siehe
+    `net_mcts::set_aggression_params`-Doku); hier nur Typ-/Endlichkeits-
+    Prüfung, damit ein kaputter Request eine klare Fehlermeldung statt eines
+    500ers liefert."""
+    if _mr is None or not hasattr(_mr, 'set_aggression_params'):
+        return jsonify(err(_AGGRESSION_UNAVAILABLE_MSG)), 503
+    d = request.get_json(silent=True) or {}
+    try:
+        w = float(d.get('w', 0.0))
+        lambda_aggr = float(d.get('lambda_aggr', 0.0))
+    except (TypeError, ValueError):
+        return jsonify(err("w/lambda_aggr müssen Zahlen sein."))
+    if not _math.isfinite(w) or not _math.isfinite(lambda_aggr):
+        return jsonify(err("w/lambda_aggr müssen endliche Zahlen sein."))
+    _mr.set_aggression_params(w, lambda_aggr)
+    actual_w, actual_lambda_aggr = _mr.get_aggression_params()
+    return jsonify({"ok": True, "w": actual_w, "lambda_aggr": actual_lambda_aggr})
 
 
 @app.route('/api/ai/move', methods=['GET', 'POST'])
