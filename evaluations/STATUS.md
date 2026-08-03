@@ -7309,6 +7309,13 @@ gegnerfeindlicher bei gleicher Staerke (GUI-Server-Env). v19_2d_opp-
 Checkpoints bleiben (Traeger des Reglers; ein Champion-Wechsel auf
 v19_2d_opp waere ein separates Gating).
 
+**REVISION (Nutzer-Entscheid 2026-08-04)**: Der GUI-Schieberegler wird
+WIEDER ENTFERNT -- stattdessen EIN Standardwert: (w=0,1, lambda =
+hoechstes sicheres lambda aus der Kartierung PREREG_lambda_ceiling_and_
+gating), beim Serverstart gesetzt (Engine-Bindings + /api/aggression
+bleiben als Infrastruktur). lambda-nach-Schwierigkeit wird Baustein des
+geparkten Task #31. Umsetzung nach Vorliegen des Kartierungs-Ergebnisses.
+
 ## Task #28 Power-Erweiterung: WIDERSPRUCH zwischen Stichproben -- Konfirmation AUSGESETZT (2026-08-03)
 
 **Frische Stichprobe** (PREREG_task28_power_extension, 150 Paare/Arm,
