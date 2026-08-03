@@ -59,6 +59,14 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
+# Windows-Konsole ohne UTF-8 (cp1252, z.B. Hintergrund-Prozesse): die
+# λ-Zeichen in den Auswertungs-Prints wuerfen sonst UnicodeEncodeError --
+# live passiert am 2026-08-03 NACH 24 fertigen Laeufen+Diagnose, der Crash
+# kostete nur den letzten (billigen) Auswertungsschritt.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # Identisch fuer alle 4 Arme -- siehe PREREG_lambda_target.md "Rezept". NUR
 # --name/--seed/--value-target-lambda unterscheiden die 24 Laeufe voneinander.
 RECIPE = ["--epochs", "40", "--lr", "4e-4", "--lr-schedule", "cosine",
@@ -456,13 +464,30 @@ def run_diagnose_and_eval(seeds: list[int], diag_out: Path, result_out: Path,
     all_names = [f"{arm}_s{s}" for arm in arm_lambdas for s in seeds]
     resolved = [resolve_checkpoint_name(n) for n in all_names]
 
-    print(f"\n[diag] Diagnose (frozen, Orakel-Metriken + value_r2) ueber {len(resolved)} "
-          f"Checkpoints...", flush=True)
-    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
-                        "--model", *resolved, "--frozen", "--out", str(diag_out)],
-                       cwd=str(BASE_DIR))
-    if r.returncode != 0:
-        raise SystemExit("offline_diagnose fehlgeschlagen -- siehe Ausgabe oben.")
+    # Wiederaufnahme-Guard (2026-08-03): deckt ein BEREITS geschriebenes
+    # Diagnose-JSON alle benoetigten Modelle ab, wird es wiederverwendet
+    # statt die teure 24-Checkpoint-Diagnose zu wiederholen (der
+    # UnicodeEncodeError-Crash oben passierte NACH fertiger Diagnose --
+    # nur der billige Auswertungsschritt fehlte). Rein mechanisch, keine
+    # Metrik-/Regelaenderung (PREREG-konform).
+    reuse = False
+    if diag_out.exists():
+        try:
+            existing = {e["model"] for e in json.loads(diag_out.read_text(encoding="utf-8"))["results"]}
+            reuse = set(resolved) <= existing
+        except Exception:
+            reuse = False
+    if reuse:
+        print(f"\n[diag] Wiederverwendet: {diag_out.name} deckt alle {len(resolved)} "
+              f"Checkpoints ab -- keine Neu-Diagnose.", flush=True)
+    else:
+        print(f"\n[diag] Diagnose (frozen, Orakel-Metriken + value_r2) ueber {len(resolved)} "
+              f"Checkpoints...", flush=True)
+        r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
+                            "--model", *resolved, "--frozen", "--out", str(diag_out)],
+                           cwd=str(BASE_DIR))
+        if r.returncode != 0:
+            raise SystemExit("offline_diagnose fehlgeschlagen -- siehe Ausgabe oben.")
 
     blob = json.loads(diag_out.read_text(encoding="utf-8"))
     by_name = {e["model"]: e for e in blob["results"]}
