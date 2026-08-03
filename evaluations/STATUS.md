@@ -7148,6 +7148,23 @@ bleibt vorerst -- Nutzer-Entscheid ueber Archivierung/Loeschung steht aus
 die kontrolle-Spiele waeren prinzipiell nutzbar, laufen aber unter
 pcrkontrolle-Praefix ausserhalb der Fenster-Rotation).
 
+**NACHTRAG -- Doku-Arena (2026-08-03, Nutzer-Anstoss "vertraust du den
+Orakel-Metriken?")**: Der Offline-Befund lag an zwei bekannten Raendern
+des Orakel-Vertrauensbereichs (Korpus-Regime-Grenze analog zum
+Architektur-0/1; 2x2-Befund "Value traegt Staerke bei 400 Sims" +
+gegenlaeufige value_r2-Prognose +0,04 fuer pcr). Deshalb Doku-Arena
+(keine Promotion): beste Checkpoints je Arm (kontrolle_s6, pcr_s5) aus
+Manifest+Seed+Rezept reproduziert (statistische Zwillinge, GPU nicht
+bit-deterministisch), dann gepaartes Gating. **Ergebnis: pcrpcr 67:83
+pcrkontrolle, SPRT-H0 nach 75 Paaren** (gepaarte Diff -0,213, KI
+[-0,534,+0,107], McNemar p=0,26; elo_tracker protokolliert). Die
+Orakel-RICHTUNG bestaetigt sich, die value_r2-Gegenprognose
+materialisiert sich NICHT -- das PCR-Verdikt steht damit doppelt.
+Zweite Lehre desselben Tages (nach Lambda): value_r2-Offline-Gewinne
+uebersetzen wiederholt nicht in Arena-Staerke. Lehre fuers Aufraeumen
+umgesetzt: die zwei reproduzierten Checkpoints bleiben bis zum Abschluss
+der Ergebnis-Diskussion liegen.
+
 ## R5-Value-Kalibrierung (Task #27) ABGESCHLOSSEN: Unterkalibrierung BESTAETIGT (2026-08-03)
 
 **Voller Lauf nach PREREG_r5_value_calibration.md** (24 Zustaende x 6
