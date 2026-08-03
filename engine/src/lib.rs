@@ -499,10 +499,11 @@ fn engine_config_json() -> String {
         "floor_shaping_weight": FLOOR_SHAPING_WEIGHT,
         "points_utility_weight": POINTS_UTILITY_WEIGHT,
         // Task #28 (PREREG_task28_aggression.md): LAUFZEIT-Nachfolger von
-        // `points_utility_weight` (siehe dortiger Kommentar) -- aus
-        // `MOSAIC_POINTS_UTILITY_W`/`MOSAIC_AGGR_LAMBDA` gelesen, einmalig
-        // gecacht. Beide 0.0, solange die Env-Vars nicht gesetzt sind
-        // (byte-identisches Bestandsverhalten).
+        // `points_utility_weight` (siehe dortiger Kommentar) -- INITIAL aus
+        // `MOSAIC_POINTS_UTILITY_W`/`MOSAIC_AGGR_LAMBDA` gelesen, danach per
+        // `set_aggression_params` (GUI-Regler) jederzeit neu setzbar (Atomic-
+        // Zellen, siehe `net_mcts.rs`). Beide 0.0, solange weder Env-Var
+        // noch Regler gesetzt wurden (byte-identisches Bestandsverhalten).
         "points_utility_w": points_utility_w(),
         "aggr_lambda": aggr_lambda(),
         "value_opp_epsilon": VALUE_OPP_EPSILON,
@@ -522,6 +523,35 @@ fn engine_config_json() -> String {
         "bootstrap_horizon_rounds": crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
     })
     .to_string()
+}
+
+/// GUI-Aggressivitäts-Regler (Task #28, `PREREG_task28_aggression.md` Punkt 4
+/// + `evaluations/STATUS.md` Abschnitt "Task #28 DURCHGEFUEHRT"): setzt die
+/// beiden Laufzeit-Parameter des Score-/Denial-Utility-Blends SOFORT neu
+/// (nächste PUCT-Blattauswertung sieht den neuen Wert, kein Server-/Prozess-
+/// Neustart nötig) — dünner Wrapper um `net_mcts::set_aggression_params`,
+/// das die Werte defensiv klemmt (`w` in `[0,1]`, `lambda_aggr` in `[0,5]`,
+/// nicht-endliche Eingaben fallen auf `0.0` zurück, siehe dortige Doku).
+/// Wirkt nur bei einem geladenen Netz MIT `opp_points`-Kopf — bei einem
+/// Legacy-Modell ohne den Kopf verhält sich jeder `w>0` wie `w=0` (Additiv-
+/// Regel, einmalige Warnung auf stderr, siehe `net_mcts::blended_leaf_win_
+/// prob_with`-Doku). Persistiert NICHT über einen Serverneustart hinweg —
+/// nach einem Neustart gelten wieder die `MOSAIC_POINTS_UTILITY_W`/
+/// `MOSAIC_AGGR_LAMBDA`-Env-Var-Defaults (Server-seitig dokumentiert in
+/// `server.py`).
+#[pyfunction]
+fn set_aggression_params(w: f64, lambda_aggr: f64) {
+    crate::net_mcts::set_aggression_params(w, lambda_aggr);
+}
+
+/// Gegenstück zu [`set_aggression_params`]: liest die aktuell aktiven
+/// `(w, lambda_aggr)`-Werte (nach Klemmung) — für den GET-Endpunkt der GUI
+/// (`server.py::get_aggression`), damit der Regler beim Öffnen der
+/// Einstellungen den tatsächlichen Serverzustand anzeigt statt eines
+/// hart kodierten Defaults.
+#[pyfunction]
+fn get_aggression_params() -> (f64, f64) {
+    crate::net_mcts::get_aggression_params()
 }
 
 /// Task #89 (Oracle-Metriken): Netz-Suche auf einem EXTERN gespeicherten
@@ -932,6 +962,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(profiling_reset, m)?)?;
     m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
+    m.add_function(wrap_pyfunction!(set_aggression_params, m)?)?;
+    m.add_function(wrap_pyfunction!(get_aggression_params, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
