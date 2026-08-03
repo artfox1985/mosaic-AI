@@ -29,3 +29,4 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-08-02,v19_2d_best,400,Heuristik@150,150,113,37,150,"v19-Zyklus Elo-Verankerung: festes n=150 ohne Fruehstopp, 75% Siege, Score 47.3/35.6"
 2026-08-03,lam07_s3_best,400,lam10_s4_best,400,43,57,100,"Gepaartes Gating (Task #76), SPRT=H0, p=0.2478"
 2026-08-03,pcrpcr_s5_best,400,pcrkontrolle_s6_best,400,67,83,150,"PCR-Doku-Arena (Task #14, keine Promotion): SPRT=H0 nach 75 Paaren, p=0.2559 -- Orakel-Verdikt bestaetigt, value_r2-Gegenprognose nicht materialisiert"
+2026-08-03,l07v18_s6_best,400,l10v18_s3_best,400,227,173,400,"Lambda-v18only-Arena (PREREG_lambda_v18only, keine Promotion): SPRT=l07v18 bei 200 Paaren, p=0.0101 -- lambda=0.7 wird v20-Standard-Kandidat"
