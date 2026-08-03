@@ -7132,8 +7132,14 @@ geliefert (`value_r2_rounds_1_4` sekundaer: +0,0402, 5/6 pcr besser,
 p=0,04 -- konsistent mit dem Dosis-Befund), aber der Policy-Verlust
 dominiert klar auf den einzigen arena-validierten Praediktoren. Bekannte
 Einschraenkung bleibt: flacher Encoder als Messproxy, cheap=150/p=0,25 als
-einziger Messpunkt -- ein anderes Regime (z.B. mit Ownership-Kopf, Task #9)
-waere ein neuer Messpunkt, kein Widerspruch.
+einziger Messpunkt -- mildere Regime (hoeheres p, mehr cheap-Sims) waeren
+neue Messpunkte, kein Widerspruch. KORREKTUR 2026-08-03: die im
+PCR-PREREG (Einschraenkung 5) zitierte Ownership-Kopf-These ("PCR-Handel
+wird guenstiger, sobald Task #9 landet") war beim Schreiben bereits
+ueberholt -- Task #9 ist seit 2026-07-28 GESCHLOSSEN
+(PREREG_ownership_gumbel.md: OWNERSHIP_WEIGHT bleibt 0,0, Effekt +0,0017
+= ~1/10 der Metrik-Aufloesung, Wiedereroeffnung nur mit Arena-Instrument)
+-- sie zaehlt NICHT als PCR-Wiedereroeffnungsgrund.
 
 **Aufgeraeumt**: 12 Checkpoints geloescht (Manifeste + Ergebnis-JSONs
 bleiben), beide Sandboxes entfernt. `data_pcr_ab/` (327 Roh-Dateien)
