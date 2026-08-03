@@ -7316,6 +7316,16 @@ gating), beim Serverstart gesetzt (Engine-Bindings + /api/aggression
 bleiben als Infrastruktur). lambda-nach-Schwierigkeit wird Baustein des
 geparkten Task #31. Umsetzung nach Vorliegen des Kartierungs-Ergebnisses.
 
+**NACHT-PIPELINE 2026-08-04 (sequenziell auf Abschluss-Meldungen)**:
+A) lambda-Kartierung {0,3,5} + Champion-Gating v19_2d_opp@w=0.1/
+lambda_Kartierung (laeuft) -> B) #29-Erweiterungs-Arenen + Rangmetrik-
+Validierung, parallel B') GUI-Umbau Slider->Startup-Default -> C) #30
+Platt-Fit + Skalen-A/B -> D) R4b-PREREG + Playout-Ground-Truth-Werkzeug
+(cargo erst ab hier) -> E) Task-#32-Kostenprofil-Messung (ruhigste
+Maschine zuletzt). NICHT automatisiert (Morgen-Entscheide): Promotion +
+Server-Neustart, v20-Start + lambda07-Uebernahme-Gating, Modell-
+Aufraeumen Runde 2, git push.
+
 ## Task #28 Power-Erweiterung: WIDERSPRUCH zwischen Stichproben -- Konfirmation AUSGESETZT (2026-08-03)
 
 **Frische Stichprobe** (PREREG_task28_power_extension, 150 Paare/Arm,
