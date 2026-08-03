@@ -7207,6 +7207,39 @@ das Zielrauschen IST reduzierbar -- uebersetzt aber (noch) nicht in
 Staerke). Naechster Diagnose-Baustein: R4-Ende-Kalibrierung
 (PREREG_r4_value_calibration.md, wartet auf Rust-Vorbedingung + Freigabe).
 
+## Lambda-v18only: ARENA-SIGNIFIKANTER SIEG -- λ=0.7 wird v20-Standard-Kandidat (2026-08-03)
+
+**Kehrtwende nach dem 900er-Null** (`PREREG_lambda_v18only.md`, Nutzer-
+Vorschlag "Dosis vorziehen statt auf v20 warten"): 12 Laeufe auf dem
+reinen v18-Korpus (600 Dateien, Sample-Misch-Anteil 65,67% = strukturelles
+Maximum, 1,5x der 900er-Dosis).
+
+- **Offline-Gate**: +0,0183 auf `value_r2_rounds_1_4` (5/6 Seeds, t-Test
+  p=0,065) -- knapp UEBER der 0,015-Grenze, aber SCHWAECHER als das
+  900er-Signal (+0,027) trotz hoeherer Dosis. Orakel-Metriken flach.
+- **Arena (Pflichtschritt, entscheidend)**: `l07v18_s6` (bester Seed nach
+  Primaermetrik, 0,1236) vs `l10v18_s3` (0,1075): **227:173 (56,75%),
+  SPRT-H1 bei exakt 200 Paaren (LLR +3,50), McNemar p=0,0101, gepaarte
+  Diff +0,27 [KI +0,074, +0,466]**
+  (`paired_gating_result_l07v18_s6_best_vs_l10v18_s3_best.json`,
+  elo_tracker protokolliert).
+
+**Konsequenz nach PREREG-Regel 3**: λ=0,7 ist TRAININGS-STANDARD-KANDIDAT
+fuer v20 -- finale Uebernahme faellt im v20-Zyklus selbst (dort dann auf
+dem echten v20-Fenster, 2D-Warm-Start-Regime, gegen den amtierenden
+Champion gated). KEINE Champion-Promotion aus diesem Ablationstest.
+
+**Wissenschaftliche Einordnung (wichtig fuer Task #29)**: Das
+Offline-Signal war im ERFOLGREICHEN Experiment KLEINER als im
+gescheiterten (0,018 vs 0,027) -- die value_r2-Magnitude trackt den
+Arena-Effekt weiterhin nicht (vierter Beleg). Der Unterschied zum
+900er-Null liegt plausibel im Korpus-Regime (reiner v18-Korpus ohne
+Alt-Generationen-Verduennung, 66% statt 44% Mix-Dosis) -- und/oder in
+Checkpoint-Paar-Varianz (andere Seeds). Ehrliche Restunsicherheit: EIN
+Arena-Paar; die v20-Uebernahme-Entscheidung liefert die Replikation.
+Checkpoints bleiben bis zum Abschluss der Diskussion liegen
+(Aufraeum-Lektion).
+
 ## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
