@@ -1,0 +1,511 @@
+{
+  "meta": {
+    "model": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v19_2d_opp_best.onnx",
+    "eval_set": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\evaluations\\frozen_eval_set.pkl",
+    "sims": 50,
+    "c_puct": 1.5,
+    "seed": 42,
+    "combos": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.1,
+        0.0
+      ],
+      [
+        0.1,
+        2.0
+      ]
+    ],
+    "picked_indices": [
+      80,
+      212,
+      470,
+      490,
+      672,
+      957,
+      1035,
+      1115,
+      1243,
+      1324
+    ],
+    "wheel1_python": "C:\\Users\\Patrick\\AppData\\Local\\Temp\\claude\\D--OneDrive-Documents-Projekte-mosaic-AI\\c9453d70-4f31-432e-91b3-b3e84ac5f0d4\\scratchpad\\venv_wheel1\\Scripts\\python.exe",
+    "wheel2_python": "C:\\Users\\Patrick\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+    "wheel1_commit": "5219d77",
+    "wheel2_commit": "HEAD"
+  },
+  "states": [
+    {
+      "index": 80,
+      "round": 1,
+      "game_id": "v10b_20260722_230556_c53_g10",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.43315317984791357,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.43315317984791357,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.43889790878636886,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.43889790878636886,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.4148307674693546,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.4148307674693546,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 212,
+      "round": 2,
+      "game_id": "v10b_20260722_230556_c164_g1",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.38953729752008415,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.38953729752008415,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.3908615072243344,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.3908615072243344,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.386932325502676,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.386932325502676,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 470,
+      "round": 3,
+      "game_id": "v10b_20260722_230556_c163_g10",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.40313486389815806,
+            "ai_action": 1,
+            "num_actions_considered": 3
+          },
+          "wheel2": {
+            "root_value": 0.40313486389815806,
+            "ai_action": 1,
+            "num_actions_considered": 3
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.405149376519397,
+            "ai_action": 1,
+            "num_actions_considered": 3
+          },
+          "wheel2": {
+            "root_value": 0.405149376519397,
+            "ai_action": 1,
+            "num_actions_considered": 3
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.39330307640768586,
+            "ai_action": 1,
+            "num_actions_considered": 3
+          },
+          "wheel2": {
+            "root_value": 0.39330307640768586,
+            "ai_action": 1,
+            "num_actions_considered": 3
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 490,
+      "round": 3,
+      "game_id": "v10b_20260722_230556_c8_g8",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5073420352500397,
+            "ai_action": 0,
+            "num_actions_considered": 1
+          },
+          "wheel2": {
+            "root_value": 0.5073420352500397,
+            "ai_action": 0,
+            "num_actions_considered": 1
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5103754527761831,
+            "ai_action": 0,
+            "num_actions_considered": 1
+          },
+          "wheel2": {
+            "root_value": 0.5103754527761831,
+            "ai_action": 0,
+            "num_actions_considered": 1
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.5086884323477049,
+            "ai_action": 0,
+            "num_actions_considered": 1
+          },
+          "wheel2": {
+            "root_value": 0.5086884323477049,
+            "ai_action": 0,
+            "num_actions_considered": 1
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 672,
+      "round": 4,
+      "game_id": "v10b_20260722_230556_c106_g10",
+      "player": 0,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.6576320339359016,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.6576320339359016,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.6634623379215266,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.6634623379215266,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.6612319405652254,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.6612319405652254,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 957,
+      "round": 1,
+      "game_id": "v12_20260723_230723_c101_g2",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5110667981840755,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.5110667981840755,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.520173832923718,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.520173832923718,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.4881187356837327,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.4881187356837327,
+            "ai_action": 0,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 1035,
+      "round": 1,
+      "game_id": "v12_20260723_230723_c133_g1",
+      "player": 0,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5288030808090443,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.5288030808090443,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5360523070133881,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.5360523070133881,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.529237938257421,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.529237938257421,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 1115,
+      "round": 2,
+      "game_id": "v12_20260723_230723_c40_g6",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5001764001825112,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.5001764001825112,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.5076747767085201,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.5076747767085201,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.4921583440495143,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.4921583440495143,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 1243,
+      "round": 2,
+      "game_id": "v12_20260723_230723_c33_g5",
+      "player": 0,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.47144979130930426,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.47144979130930426,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.47971987519907705,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.47971987519907705,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.46706110647878063,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "wheel2": {
+            "root_value": 0.46706110647878063,
+            "ai_action": 1,
+            "num_actions_considered": 4
+          },
+          "identical": true
+        }
+      }
+    },
+    {
+      "index": 1324,
+      "round": 3,
+      "game_id": "v12_20260723_230723_c133_g7",
+      "player": 1,
+      "probes": {
+        "w=0.0_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.6791049518163831,
+            "ai_action": 1,
+            "num_actions_considered": 2
+          },
+          "wheel2": {
+            "root_value": 0.6791049518163831,
+            "ai_action": 1,
+            "num_actions_considered": 2
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=0.0": {
+          "wheel1": {
+            "root_value": 0.6787978746752756,
+            "ai_action": 1,
+            "num_actions_considered": 2
+          },
+          "wheel2": {
+            "root_value": 0.6787978746752756,
+            "ai_action": 1,
+            "num_actions_considered": 2
+          },
+          "identical": true
+        },
+        "w=0.1_lambda=2.0": {
+          "wheel1": {
+            "root_value": 0.6850090723793525,
+            "ai_action": 1,
+            "num_actions_considered": 2
+          },
+          "wheel2": {
+            "root_value": 0.6850090723793525,
+            "ai_action": 1,
+            "num_actions_considered": 2
+          },
+          "identical": true
+        }
+      }
+    }
+  ]
+}

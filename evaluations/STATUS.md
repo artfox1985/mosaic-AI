@@ -7362,6 +7362,43 @@ bootstrap_value/round_transition_deep (laeuft je Zug; das alte
 unvermessen). Erst mit dem Profil entscheiden, wo die 21h wirklich
 herkommen.
 
+## AUFLOESUNG des Stichproben-Widerspruchs: BLOCK-KORRELATION, nicht Wheel (2026-08-04)
+
+**Forensik** (Wheel #1 aus 5219d77 im Scratchpad-Worktree rekonstruiert,
+Sonden-Vergleich, `wheel_forensics_w_path.json`): **Wheel-These
+WIDERLEGT** -- 30/30 Sonden byte-identisch zwischen den Wheels, w- und
+lambda-Wirkung nachweisbar und identisch. Nebenbefund des Agenten fuehrte
+zur wahren Ursache:
+
+**Paare innerhalb eines 25er-Arena-Blocks sind KORRELIERT** (ein
+Block-Seed formt die Spiel-Population; Block-Mittel der Scores streuen
+~4 SE ueber das, was i.i.d.-Paare erlaubten -- z.B. la00-Bloecke 69 vs 92
+Punkte/Paarsumme). Die Paar-Ebene-Statistik unterschaetzt die
+Standardfehler systematisch. **Block-Ebene-Reanalyse:**
+- Erst-Sweep-Denial (-6,16, "p=0,078"): kam aus EINEM Extremblock
+  (+2,4/+6,2/-27,1) -> Block-p=0,62. ARTEFAKT.
+- Frische Gegenrichtung (+9,63, "p=0,0001"): Block-p=0,061. Nicht
+  belastbar.
+- la00-Champion-Sieg (173:127, "p=0,0076"): Block-Winraten 54/66/48/54/
+  70/54%, 5/6 ueber 50%, Block-p=0,076 -> TREND, nicht Beleg.
+
+**Konsequenzen:**
+1. **lambda_aggr-Fazit final**: KEIN belegter Denial-Effekt in beide
+   Richtungen; der Regler bleibt als gefahrloser Stil-Knopf (Guardrail
+   win-basiert nie gerissen), ohne belegten Score-Effekt. Kipppunkt-
+   Kartierung gestrichen (Frage hinfaellig ohne belegten Effekt).
+2. **v19_2d_opp @ w=0,1 als Champion-Kandidat**: drei unabhaengige
+   positive Stichproben (Gate-2 52,3%, Erst-la00 54%, frisch 57,7%) --
+   verdient ein REGULAERES Champion-Gating mit block-bewusster
+   Auswertung (viele Bloecke; Block-Ebene-Bericht zusaetzlich zu SPRT).
+3. **METHODIK-LEHRE (projektweit)**: Score-basierte Paar-Analysen
+   MUESSEN auf Block-Ebene gerechnet werden; win-basierte SPRT/McNemar-
+   Gatings sind vermutlich milder betroffen (relative Ausgaenge), aber
+   kuenftige Berichte ergaenzen Block-Ebene-Zahlen. Historische
+   Champion-Gatings mit grossen Margen (96:54 etc.) bleiben plausibel,
+   knappe Score-Nebenbefunde (z.B. Task-#12-Punkte-Trend) sind neu zu
+   bewerten.
+
 ## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
