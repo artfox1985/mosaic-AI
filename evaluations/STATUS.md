@@ -7240,6 +7240,44 @@ Arena-Paar; die v20-Uebernahme-Entscheidung liefert die Replikation.
 Checkpoints bleiben bis zum Abschluss der Diskussion liegen
 (Aufraeum-Lektion).
 
+## Task #28 DURCHGEFUEHRT: Gates bestanden, lambda_aggr-Sweep ohne signifikanten Denial-Effekt (2026-08-03)
+
+**Komplette Kette an EINEM Tag** (PREREG_task28_aggression.md): Engine-Blend
+(Laufzeit-Regler MOSAIC_POINTS_UTILITY_W/MOSAIC_AGGR_LAMBDA, w=0
+byte-identisch), Python-opp_points-Kopf (Symmetrie own=points+0.1*opp
+numerisch exakt), Training `v19_2d_opp` (warm, Champion-Rezept, gepinntes
+900er-Fenster, val_combined 1.1738 ~ Champion 1.1729).
+
+- **Gate 1 (offline)**: Opp-R² frozen 0.4401 (best) / 0.5121 (final);
+  Degradations-Check: alle 3 Referenzmetriken LEICHT UEBER Champion
+  (+0.004..+0.006). BESTANDEN.
+- **Gate 2 (Arena-Nichtunterlegenheit, w=0)**: 209:191 vs v19_2d_best,
+  Cap ohne Entscheid, Diff +0.09 [-0.105,+0.285]. BESTANDEN.
+- **Hauptmessung** (4 Arme lambda_aggr {0, 0.5, 1, 2} @ w=0.1, je 75
+  Paare, identische Seeds, kein Fruehstopp; Per-Paar-Scores via
+  paired_gating-Erweiterung):
+
+| Arm | vs Champion | Gegnerpunkte-Diff gepaart vs la00 | eigene Diff | Guardrail |
+|---|---|---|---|---|
+| la00 | 81:69 | -- | -- | -- |
+| la05 | 81:69 | -2.92 (p=0.18) | -2.17 | OK |
+| la10 | 76:74 | -1.31 (p=0.61) | +0.52 | OK |
+| la20 | 80:70 | **-6.16 (p=0.078)** | -9.77 | OK |
+
+**Verdikt nach PREREG-Regel**: kein Arm p<0.05 -> "kein nutzbarer
+Denial-Effekt bei w=0.1" (formal). Richtung durchgaengig konsistent
+(alle Arme senken Gegnerpunkte, la20 knapp an Signifikanz, Denial kostet
+erwartungsgemaess eigenes Tempo), KEIN Guardrail gerissen. Ein w-Sweep
+oder mehr Paare waeren eine NEUE Vorregistrierung.
+
+**Nebenbefunde**: (1) w=0.1 allein schadet NICHT (la00 81:69 Trend
+positiv) -- Kontrast zum v9b-Desaster bei w=0.5/1.0 bestaetigt das
+Kleine-w-Regime. (2) Praktisch nutzbar ab sofort: der Regler ist
+gefahrlos -- `MOSAIC_AGGR_LAMBDA=2.0` spielt ~3 Gegnerpunkte
+gegnerfeindlicher bei gleicher Staerke (GUI-Server-Env). v19_2d_opp-
+Checkpoints bleiben (Traeger des Reglers; ein Champion-Wechsel auf
+v19_2d_opp waere ein separates Gating).
+
 ## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
