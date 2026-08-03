@@ -1,0 +1,11 @@
+{
+  "k_rollouts": 16,
+  "max_achievable_r2": 0.6042142346945684,
+  "max_achievable_r2_naive_biased": 0.6137682978093647,
+  "n_states": 120,
+  "target_round": 4,
+  "var_between_states_corrected": 0.07124731268448437,
+  "var_between_states_raw_biased": 0.07416418704766435,
+  "var_total": 0.11791730249536414,
+  "var_within_state_mean": 0.04666998981087977
+}
