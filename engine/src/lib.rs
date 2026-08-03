@@ -482,7 +482,8 @@ fn engine_config_json() -> String {
         ACTIVE_LEAF, DECOUPLE_NET_SIMS_FROM_ACTIONS, DETERMINIZE_ROOT_HIDDEN_INFO,
         FLOOR_SHAPING_WEIGHT, GUMBEL_TOP_M, LeafEval, MIRROR_OTHER_VAL, NUM_ACTIONS,
         POINTS_UTILITY_WEIGHT, POLICY_MASS_CUTOFF, ROUND_TRANSITION_SAMPLING,
-        SHUFFLE_STACK_PEEK_IN_SEARCH, USE_GUMBEL_SEARCH,
+        SHUFFLE_STACK_PEEK_IN_SEARCH, USE_GUMBEL_SEARCH, VALUE_OPP_EPSILON,
+        aggr_lambda, points_utility_w,
     };
     let active_leaf = match ACTIVE_LEAF {
         LeafEval::Net => "Net",
@@ -497,6 +498,14 @@ fn engine_config_json() -> String {
         "decouple_net_sims_from_actions": DECOUPLE_NET_SIMS_FROM_ACTIONS,
         "floor_shaping_weight": FLOOR_SHAPING_WEIGHT,
         "points_utility_weight": POINTS_UTILITY_WEIGHT,
+        // Task #28 (PREREG_task28_aggression.md): LAUFZEIT-Nachfolger von
+        // `points_utility_weight` (siehe dortiger Kommentar) -- aus
+        // `MOSAIC_POINTS_UTILITY_W`/`MOSAIC_AGGR_LAMBDA` gelesen, einmalig
+        // gecacht. Beide 0.0, solange die Env-Vars nicht gesetzt sind
+        // (byte-identisches Bestandsverhalten).
+        "points_utility_w": points_utility_w(),
+        "aggr_lambda": aggr_lambda(),
+        "value_opp_epsilon": VALUE_OPP_EPSILON,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,
@@ -756,6 +765,24 @@ fn tiling_candidates_json(
 /// sich erst danach erheben. Derselbe Seed fuer alle Kandidaten einer Stellung
 /// macht den Vergleich GEPAART: der Nachfuell-Wurf ist dann identisch, der
 /// einzige Unterschied ist das Brett.
+#[pyfunction]
+#[pyo3(signature = (state_json, seed))]
+fn advance_after_tiling_json(state_json: String, seed: u64) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    let pre = crate::round_transition::resolve_to_pre_chance(&state)
+        .ok_or_else(|| PyValueError::new_err("Zustand ist nicht in Phase::Tiling"))?;
+    let next = crate::round_transition::advance_one_chance(&pre, &mut rng)
+        .ok_or_else(|| PyValueError::new_err("Rundenuebergang fehlgeschlagen"))?;
+    Ok(crate::serialize::state_to_json(&next, true).to_string())
+}
+
 /// PREREG_r4_value_calibration.md, Abschnitt "Vorbedingung": invertiert die
 /// Fabrik-Neubefüllung eines Runde-5-Startzustands (Übergang 4→5,
 /// `state.rs::setup_new_round`/`fill_factories`) und sampelt `n_samples`
@@ -765,6 +792,16 @@ fn tiling_candidates_json(
 /// keinen Python-Einstieg für diese RÜCKWÄRTS-Richtung (nur
 /// `advance_after_tiling_json` direkt oberhalb, die VORWÄRTS-Richtung
 /// Tiling-Leaf → nächste Runde).
+///
+/// **BEFUND 2026-08-03 (Koordinator, 9000-Partien-Korpus): 87,6 % der echten
+/// Runde-5-Starts haben einen leeren Turm** -- die Ausschlussregel dieser
+/// Funktion (Turm-Reshuffle-Grenzfall, siehe
+/// `round_transition_resample`-Moduldoku) würde also fast das ganze
+/// PREREG-Substrat verwerfen. Diese Funktion bleibt additiv erhalten (für den
+/// verbleibenden ~12,4%-Fall weiterhin exakt), der PREREG-r4-Pfad selbst
+/// nutzt aber ab jetzt [`autoplay_to_round5_and_resample_json`] weiter unten
+/// (Vorwärts-Pfad ab dem echten Runde-4-Zustand, umgeht die Turm-Ambiguität
+/// komplett, siehe dortige Doku).
 ///
 /// `r5_start_state_json` muss ein UNBERÜHRTER Runde-5-Start sein (Phase
 /// Drafting, `round==5`, alle Fabriken frisch befüllt: 4 kleine × 4
@@ -807,22 +844,65 @@ fn resample_round_transition_json(
     Ok(serde_json::Value::Array(out).to_string())
 }
 
+/// PREREG_r4_value_calibration.md, Vorbedingung -- VORWÄRTS-Ersatz für
+/// [`resample_round_transition_json`] (siehe dessen Doku für den
+/// 87,6%-Turm-leer-Befund, der die Inversion für das PREREG-Substrat
+/// praktisch unbrauchbar macht). Setzt beim echten "letzten R4-Record"
+/// (`round==4`, `phase=="tiling"`, PREREG "Positions-Substrat") an, wo
+/// Beutel/Turm noch als EXAKTE Multisets bekannt sind (kein
+/// Zähler-Rekonstruktions-Verlust) -- keine Inversion, keine
+/// Ausschlussregel, der natürliche Beutel-leer→Turm-Reshuffle-Pfad läuft
+/// beim Resampling einfach mit.
+///
+/// Nutzt ausschließlich bestehende Bausteine (`round_transition::
+/// resolve_to_pre_chance` + `advance_one_chance`), siehe
+/// `round_transition_resample::autoplay_to_round5_and_resample` für die
+/// vollständige Doku (RNG-Freiheit des deterministischen Vorlaufs dort
+/// explizit geprüft, nicht nur behauptet).
+///
+/// Rückgabe: EIN JSON-OBJEKT (bewusst kein bloßes Array, um den
+/// R4-Ende-Zustand nicht implizit als "Element 0" zu verstecken):
+/// ```json
+/// {
+///   "r4_end_state": <state_to_json des deterministisch erreichten
+///                     Runde-4-Ende-Zustands -- round==4, phase=="tiling",
+///                     EIN EndTiling-Aufruf steht noch aus; Strafen/
+///                     Boden-Abwürfe NOCH NICHT angewendet, siehe
+///                     autoplay_to_round5_and_resample-Doku>,
+///   "r5_samples": [<state_to_json>, ... n_samples Runde-5-Start-Zustände]
+/// }
+/// ```
+/// `r4_end_state` ist für den Python-seitigen Konsistenz-Check gedacht
+/// (PREREG "Konsistenz der beiden Seiten": muss modulo Befüllung zum ersten
+/// echten Runde-5-Record der Partie passen).
 #[pyfunction]
-#[pyo3(signature = (state_json, seed))]
-fn advance_after_tiling_json(state_json: String, seed: u64) -> PyResult<String> {
+#[pyo3(signature = (r4_state_json, n_samples, seed))]
+fn autoplay_to_round5_and_resample_json(
+    r4_state_json: &str,
+    n_samples: u32,
+    seed: u64,
+) -> PyResult<String> {
     use pyo3::exceptions::PyValueError;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
-    let mut rng = StdRng::seed_from_u64(seed);
-    let parsed: serde_json::Value = serde_json::from_str(&state_json)
-        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
-    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
-    let pre = crate::round_transition::resolve_to_pre_chance(&state)
-        .ok_or_else(|| PyValueError::new_err("Zustand ist nicht in Phase::Tiling"))?;
-    let next = crate::round_transition::advance_one_chance(&pre, &mut rng)
-        .ok_or_else(|| PyValueError::new_err("Rundenuebergang fehlgeschlagen"))?;
-    Ok(crate::serialize::state_to_json(&next, true).to_string())
+    let mut recon_rng = StdRng::seed_from_u64(seed);
+    let parsed: serde_json::Value = serde_json::from_str(r4_state_json)
+        .map_err(|e| PyValueError::new_err(format!("r4_state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut recon_rng).map_err(PyValueError::new_err)?;
+
+    let (r4_end_state, samples) =
+        crate::round_transition_resample::autoplay_to_round5_and_resample(&state, n_samples, seed)
+            .map_err(PyValueError::new_err)?;
+
+    let out = json!({
+        "r4_end_state": crate::serialize::state_to_json(&r4_end_state, true),
+        "r5_samples": samples
+            .iter()
+            .map(|s| crate::serialize::state_to_json(s, true))
+            .collect::<Vec<_>>(),
+    });
+    Ok(out.to_string())
 }
 
 #[pymodule]
@@ -850,6 +930,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
+    m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())

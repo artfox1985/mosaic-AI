@@ -110,6 +110,16 @@ pub struct PreChanceState {
     pending_end_tiling_player: usize,
 }
 
+impl PreChanceState {
+    /// Lesender Zugriff auf den deterministisch vorgespulten Zustand (additiv,
+    /// Task `round_transition_resample::autoplay_to_round5_and_resample`: der
+    /// PREREG-r4-Pfad braucht genau DIESEN Zustand als Rückgabewert für den
+    /// Python-seitigen Konsistenz-Check -- siehe dortige Doku).
+    pub fn state(&self) -> &GameState {
+        &self.state
+    }
+}
+
 /// Spult `leaf_state` (Phase muss `Tiling` sein -- ein per `terminal`-Flag
 /// erkannter Runden-End-Knoten) deterministisch vor: beide Spieler platzieren
 /// per exaktem DFS-Solver (`best_first_step_exact`, dieselbe Politik wie
@@ -327,6 +337,19 @@ pub(crate) fn drive_to_round_start(seed: u64, target_round: u32) -> GameState {
         }
     }
     state
+}
+
+/// Wie [`drive_to_round_start`], aber bis zum Tiling-LEAF von `target_round`
+/// (statt bis zum Drafting-START der FOLGENDEN Runde) -- für Tests, die einen
+/// echten "letzter R-N-Record"-Zustand brauchen (Phase::Tiling, VOR dem
+/// letzten Rundenübergang, analog zu `drive_to_first_round_end`s
+/// Runde-1-Variante). Gebraucht von `round_transition_resample.rs`s
+/// Vorwärts-Pfad (`autoplay_to_round5_and_resample`), dessen Eingabe laut
+/// PREREG_r4_value_calibration.md genau so ein Zustand ist ("letzter
+/// R4-Record ... Regel: phase=='tiling'").
+#[cfg(test)]
+pub(crate) fn drive_to_round_tiling_leaf(seed: u64, target_round: u32) -> GameState {
+    drive_drafting_to_leaf_naive(drive_to_round_start(seed, target_round))
 }
 
 #[cfg(test)]

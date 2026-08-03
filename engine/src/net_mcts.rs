@@ -106,6 +106,109 @@ pub const ROUND_TRANSITION_SAMPLING: bool = false;
 /// `project_v8d_value_head_root_cause`-Memory für die volle Diskussion.
 pub const POINTS_UTILITY_WEIGHT: f64 = 0.0;
 
+// ── Task #28 (`evaluations/PREREG_task28_aggression.md`): Score-/Denial-
+// Utility -- LAUFZEIT-konfigurierbarer Nachfolger des toten `POINTS_UTILITY_
+// WEIGHT`-Blends oben (die Konstante bleibt bewusst stehen, siehe deren
+// GETESTET-Historie -- dieser neue Blend ERSETZT sie an der Blend-Stelle
+// `blended_leaf_win_prob`, loescht sie aber nicht). Unterschied zum alten
+// Blend: nicht nur EIGENE Punkte einmischen (das waere reine "Gier"), sondern
+// per separatem `opp_points`-Kopf explizit GEGNER-Punkte abziehen ("Denial"),
+// gewichtet mit `lambda_aggr`. Siehe PREREG Abschnitt "Minimal-invasiver
+// Zuschnitt" Punkt 4 fuer die volle Herleitung.
+
+/// Gewicht des `points_head`-Ziels beim TRAINING (nicht Laufzeit!) fuer den
+/// Gegner-Anteil im BESTEHENDEN `points_head` -- der aktuelle `points_head`
+/// ist NICHT rein auf Eigenpunkte trainiert, sondern auf
+/// `tanh(own_total + VALUE_OPP_EPSILON*opp_total)` (`neural_net.py:583`).
+/// Damit steckt im rohen `points`-Output ein kleiner (0.1-gewichteter)
+/// Gegner-Anteil, den `opp_aware_points_utility` algebraisch wieder
+/// herausrechnet: `own_pts = pts_raw + VALUE_OPP_EPSILON*opp_raw` (siehe
+/// PREREG Punkt 2, "algebraische Rueckgewinnung" -- gilt EXAKT nur, wenn
+/// `opp_points_head` mit derselben Blending-Struktur trainiert wurde).
+pub(crate) const VALUE_OPP_EPSILON: f64 = 0.1;
+
+/// Laufzeit-Cache fuer `MOSAIC_POINTS_UTILITY_W` (einmalig gelesen, siehe
+/// `points_utility_w()`).
+static POINTS_UTILITY_W: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Laufzeit-Cache fuer `MOSAIC_AGGR_LAMBDA` (einmalig gelesen, siehe
+/// `aggr_lambda()`).
+static AGGR_LAMBDA: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Markiert, ob die "Modell hat keinen opp_points-Kopf, obwohl w>0"-Warnung
+/// bereits einmal geloggt wurde (verhindert Log-Spam ueber tausende
+/// PUCT-Blattauswertungen einer einzigen Suche).
+static WARNED_NO_OPP_HEAD: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
+/// Liest eine `MOSAIC_*`-Env-Var einmalig als `f64` -- fehlend/leer -> Default
+/// (kein Fehler), nicht parsbar -> Default + EINMALIGE Warnung auf stderr
+/// (kein Panic; Laufzeit-Konfiguration darf einen Prozess nie abstuerzen
+/// lassen). Selbes Muster wie die bestehenden Python-seitigen `MOSAIC_*`-Env-
+/// Var-Leser (z.B. `config.py::MOSAIC_DATA_DIR`, `player_profiles.py::
+/// MOSAIC_PROFILES_PATH`) -- hier auf Rusts `std::env::var` uebertragen.
+fn read_f64_env(name: &str, default: f64) -> f64 {
+    match std::env::var(name) {
+        Ok(s) => match s.trim().parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!("⚠️  {name}={s:?} nicht als Zahl lesbar -- verwende Default {default}");
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
+/// Laufzeit-Utility-Blend-Gewicht `w` (Task #28), einmalig aus
+/// `MOSAIC_POINTS_UTILITY_W` gelesen und gecacht (NICHT pro Suchknoten neu
+/// geparst). Default `0.0` -> `blended_leaf_win_prob` nimmt den Early-Out
+/// (byte-identisches Bestandsverhalten, kein zusaetzlicher Rechenpfad).
+pub(crate) fn points_utility_w() -> f64 {
+    *POINTS_UTILITY_W.get_or_init(|| read_f64_env("MOSAIC_POINTS_UTILITY_W", 0.0))
+}
+
+/// Laufzeit-Denial-Gewicht `lambda_aggr` (Task #28), einmalig aus
+/// `MOSAIC_AGGR_LAMBDA` gelesen, gleiches Cache-Muster wie `points_utility_w`.
+/// Default `0.0` (kein Gegner-Punkte-Abzug).
+pub(crate) fn aggr_lambda() -> f64 {
+    *AGGR_LAMBDA.get_or_init(|| read_f64_env("MOSAIC_AGGR_LAMBDA", 0.0))
+}
+
+/// Einmalige Warnung, wenn `w>0` konfiguriert ist, das geladene Netz aber
+/// keinen `opp_points`-Kopf hat -- Legacy-Modelle bleiben dadurch unbeeinflusst
+/// (Additiv-Regel), der Nutzer soll aber sehen, dass die Konfiguration
+/// wirkungslos ist.
+fn warn_missing_opp_head_once() {
+    WARNED_NO_OPP_HEAD.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_POINTS_UTILITY_W>0 gesetzt, aber das geladene Netz hat keinen \
+             opp_points-Kopf -- verhaelt sich wie w=0 (Legacy-Pfad, siehe \
+             PREREG_task28_aggression.md)."
+        );
+    });
+}
+
+/// Reine Blend-Formel (Task #28, PREREG Punkt 4, kein Netz-/Env-Zugriff --
+/// direkt ohne ONNX-Fixture testbar). `pts_raw`/`opp_raw` sind die ROHEN
+/// tanh-Outputs (Bereich [-1,1]) der Punkte-/Gegner-Punkte-Koepfe, VOR jeder
+/// [0,1]-Skalierung.
+///
+/// 1. Algebraische Rueckgewinnung (siehe `VALUE_OPP_EPSILON`-Doku oben):
+///    `own_pts = pts_raw + VALUE_OPP_EPSILON*opp_raw`.
+/// 2. Denial-Abzug + Clamp auf den gueltigen Tanh-Bereich:
+///    `combined = clamp(own_pts - lambda_aggr*opp_raw, -1, 1)`.
+/// 3. Skalenkonvention identisch zu `value_to_win_prob`/der bestehenden
+///    `pts = value_to_win_prob(points)`-Zeile in `blended_leaf_win_prob`
+///    (Tanh[-1,1] -> [0,1] via `(v+1)/2`) -- der Punkte-Term muss auf
+///    DIESELBE Skala wie `wr` (Win-Wahrscheinlichkeit, [0,1]) gebracht
+///    werden, sonst wäre der `(1-w)*wr + w*u_pts`-Blend in
+///    `blended_leaf_win_prob` dimensional inkonsistent.
+pub(crate) fn opp_aware_points_utility(pts_raw: f64, opp_raw: f64, lambda_aggr: f64) -> f64 {
+    let own_pts = pts_raw + VALUE_OPP_EPSILON * opp_raw;
+    let combined = (own_pts - lambda_aggr * opp_raw).clamp(-1.0, 1.0);
+    (combined + 1.0) * 0.5
+}
+
 /// Skala für die Floor-Straf-Korrektur (siehe `floor_shaping_delta`), gleiche
 /// Größenordnung wie `VALUE_SCALE` in `neural_net.py` (dort 50.0) — macht die
 /// Korrektur direkt vergleichbar mit dem own-minus-opp-Score-Margin, den
@@ -913,18 +1016,70 @@ fn value_to_win_prob(value: &[f32]) -> f64 {
 }
 
 /// KataGo-Stil geblendete Blattbewertung: mischt `value_head`s Sieg-Wahr-
-/// scheinlichkeit mit `points_head`s Punktestand-Prognose (`POINTS_UTILITY_
-/// WEIGHT`, siehe dortiger Kommentar für die Begründung). `points` nutzt
+/// scheinlichkeit mit `points_head`s Punktestand-Prognose. `points` nutzt
 /// dieselbe Tanh→[0,1]-Skalierung wie `value` (andere Zielformel, gleiche
 /// Skala) — bei fehlendem `points`-Kopf (z.B. ältere ONNX-Checkpoints ohne
 /// den Kopf) fällt dies auf reines `value` zurück, kein Panik/Skip nötig.
-fn blended_leaf_win_prob(value: &[f32], points: &[f32]) -> f64 {
+///
+/// Task #28 (`evaluations/PREREG_task28_aggression.md`, "Minimal-invasiver
+/// Zuschnitt" Punkt 4): `opp_points` ist der optionale Gegner-Punkte-Kopf
+/// (leer bei jedem Netz ohne `opp_points`-ONNX-Output, siehe
+/// `net.rs::eval_ex`/`has_opp_head`). Ablauf, drei Stufen:
+///   1. `w = points_utility_w() == 0.0` (Default) -> Early-Out, exakt
+///      dieselbe Formel wie VOR diesem Task (`POINTS_UTILITY_WEIGHT` bleibt
+///      dabei unangetastet als eigener, stehen gelassener toter Pfad -- der
+///      aktuell IMMER 0 beitraegt, `legacy_blended` ist also numerisch
+///      identisch zu `wr`). Byte-identisches Bestandsverhalten, KEIN
+///      zusaetzlicher Rechenpfad.
+///   2. `w>0`, aber `opp_points` leer (Legacy-Modell ohne den Kopf) ->
+///      verhaelt sich wie `w=0` (einmalige Warnung statt stillem Ignorieren).
+///   3. `w>0` UND `opp_points` vorhanden -> `opp_aware_points_utility`
+///      (own-minus-lambda_aggr*opp-Blend, siehe dortige Doku für die
+///      Skalenkonvention).
+fn blended_leaf_win_prob(value: &[f32], points: &[f32], opp_points: &[f32]) -> f64 {
+    blended_leaf_win_prob_with(value, points, opp_points, points_utility_w(), aggr_lambda())
+}
+
+/// Reiner Entscheidungskern von [`blended_leaf_win_prob`], OHNE Env-Var-
+/// Zugriff -- nimmt `w`/`lambda_aggr` als Parameter statt sie aus dem
+/// Prozess-weiten `OnceLock`-Cache (`points_utility_w()`/`aggr_lambda()`) zu
+/// lesen. Getrennt, damit die VOLLSTAENDIGE Blend-Entscheidungslogik
+/// (Early-Out bei `w=0`, Legacy-Fallback bei fehlendem opp-Kopf, echter
+/// Blend) OHNE die "einmal pro Prozess gecacht"-Falle direkt testbar ist --
+/// `points_utility_w()`/`aggr_lambda()` sind ABSICHTLICH nur einmal pro
+/// Prozess lesbar (siehe deren Doku), ein Test, der den Cache nach dem
+/// ersten Aufruf per Env-Var umstellen will, kaeme nie an sein Ziel. Gleiches
+/// Trennungsmuster wie `net.rs`s `detect_layout`/`combine_layouts`.
+fn blended_leaf_win_prob_with(
+    value: &[f32],
+    points: &[f32],
+    opp_points: &[f32],
+    w: f64,
+    lambda_aggr: f64,
+) -> f64 {
     let wr = value_to_win_prob(value);
     if points.is_empty() {
         return wr;
     }
     let pts = value_to_win_prob(points);
-    (1.0 - POINTS_UTILITY_WEIGHT) * wr + POINTS_UTILITY_WEIGHT * pts
+    // Alter (toter) KataGo-Blend -- `POINTS_UTILITY_WEIGHT` ist konstant 0.0
+    // (siehe dortiger GETESTET-Kommentar), dieser Ausdruck ist also aktuell
+    // IMMER numerisch `wr`. Bewusst weiter berechnet (nicht durch `wr`
+    // ersetzt), damit die Konstante an dieser Stelle sichtbar referenziert
+    // bleibt, falls sie je rekalibriert wird.
+    let legacy_blended = (1.0 - POINTS_UTILITY_WEIGHT) * wr + POINTS_UTILITY_WEIGHT * pts;
+
+    if w == 0.0 {
+        return legacy_blended;
+    }
+    if opp_points.is_empty() {
+        warn_missing_opp_head_once();
+        return legacy_blended;
+    }
+    let pts_raw = points.first().copied().unwrap_or(0.0) as f64;
+    let opp_raw = opp_points.first().copied().unwrap_or(0.0) as f64;
+    let u_pts = opp_aware_points_utility(pts_raw, opp_raw, lambda_aggr);
+    (1.0 - w) * wr + w * u_pts
 }
 
 /// Netz-Blattwert für `state`: unabhängige Pro-Spieler-Werte. Das Netz liefert
@@ -949,30 +1104,38 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     let (mover_val, other_val) = if MIRROR_OTHER_VAL {
         // Task #81: Batch=1 (ein einzelner Forward-Pass) -- fuer die Amdahl-
         // Aufteilung des geplanten GPU-Batchers (Task #82).
-        let (_logits, value, _moon, points) =
+        // Task #28: `eval_ex` statt `eval` -- liest zusaetzlich den optionalen
+        // `opp_points`-Kopf (leerer Vec bei jedem Netz ohne den Kopf, siehe
+        // `net.rs::eval_ex`-Doku), sonst BYTE-IDENTISCH (gleiche Extraktion
+        // der ersten vier Ausgaben).
+        let (_logits, value, _moon, points, opp_points) =
             crate::profiling::timed_net_eval(1, || {
-                net.eval(&feats).unwrap_or_else(|_| {
-                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+                net.eval_ex(&feats).unwrap_or_else(|_| {
+                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new())
                 })
             });
-        let mv = blended_leaf_win_prob(&value, &points);
+        let mv = blended_leaf_win_prob(&value, &points, &opp_points);
         (mv, 1.0 - mv)
     } else {
         crate::profiling::note_gamestate_clone();
         let mut flipped = state.clone();
         flipped.current_player = 1 - state.current_player;
         let other_feats = crate::features::features_for_net(net, &flipped);
-        // Task #81: Batch=2 (`eval_pair` buendelt Mover+Gegner-Pass).
-        let ((_logits, value, _moon, points), (_o_logits, o_value, _o_moon, o_points)) =
+        // Task #81: Batch=2 (`eval_pair` buendelt Mover+Gegner-Pass). Task #28:
+        // `eval_pair_ex` (siehe Kommentar oben zu `eval_ex`).
+        let ((_logits, value, _moon, points, opp_points), (_o_logits, o_value, _o_moon, o_points, o_opp_points)) =
             crate::profiling::timed_net_eval(2, || {
-                net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
+                net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
                     (
-                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
-                        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                     )
                 })
             });
-        (blended_leaf_win_prob(&value, &points), blended_leaf_win_prob(&o_value, &o_points))
+        (
+            blended_leaf_win_prob(&value, &points, &opp_points),
+            blended_leaf_win_prob(&o_value, &o_points, &o_opp_points),
+        )
     };
     if !MIRROR_OTHER_VAL {
         record_perspective_divergence(state.round_number, mover_val, other_val);
@@ -1061,7 +1224,10 @@ fn make_node<R: Rng + ?Sized>(
     // Feature-Puffer wäre für mindestens eines der beiden Netze falsch.
     let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
     let same_net = net_value.is_none_or(|v| std::ptr::eq(v, net_policy));
-    let (logits, value, moon, points, other_pass) = if same_net {
+    // Task #28: `_ex`-Varianten statt `eval`/`eval_pair` -- lesen zusaetzlich
+    // den optionalen `opp_points`-Kopf (leer bei jedem Netz ohne den Kopf),
+    // sonst BYTE-IDENTISCH (gleiche Extraktion von logits/value/moon/points).
+    let (logits, value, moon, points, opp_points, other_pass) = if same_net {
         // Unveraendert gegenueber vor Task #88 (Paritaets-Codepfad).
         let net = net_policy;
         let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
@@ -1073,25 +1239,27 @@ fn make_node<R: Rng + ?Sized>(
             flipped.current_player = 1 - state.current_player;
             let other_feats = crate::features::features_for_net(net, &flipped);
             // Task #81: Batch=2 (`eval_pair`).
-            let ((logits, value, moon, points), (_o_logits, o_value, _o_moon, o_points)) =
-                crate::profiling::timed_net_eval(2, || {
-                    net.eval_pair(&feats, &other_feats).unwrap_or_else(|_| {
-                        (
-                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()),
-                            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                        )
-                    })
-                });
-            (logits, value, moon, points, Some((o_value, o_points)))
+            let (
+                (logits, value, moon, points, opp_points),
+                (_o_logits, o_value, _o_moon, o_points, o_opp_points),
+            ) = crate::profiling::timed_net_eval(2, || {
+                net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
+                    (
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                    )
+                })
+            });
+            (logits, value, moon, points, opp_points, Some((o_value, o_points, o_opp_points)))
         } else {
             // Task #81: Batch=1.
-            let (logits, value, moon, points) =
+            let (logits, value, moon, points, opp_points) =
                 crate::profiling::timed_net_eval(1, || {
-                    net.eval(&feats).unwrap_or_else(|_| {
-                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+                    net.eval_ex(&feats).unwrap_or_else(|_| {
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new())
                     })
                 });
-            (logits, value, moon, points, None)
+            (logits, value, moon, points, opp_points, None)
         }
     } else {
         // Task #88 Hybrid-Pfad: Policy/Moon von `net_policy` (EIN Batch=1-
@@ -1116,28 +1284,32 @@ fn make_node<R: Rng + ?Sized>(
             flipped.current_player = 1 - state.current_player;
             let feats_value = crate::features::features_for_net(net_value, &state);
             let other_feats_value = crate::features::features_for_net(net_value, &flipped);
-            let ((_v_logits, value, _v_moon, points), (_o_logits, o_value, _o_moon, o_points)) =
-                crate::profiling::timed_net_eval(2, || {
-                    net_value.eval_pair(&feats_value, &other_feats_value).unwrap_or_else(|_| {
-                        (
-                            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                        )
-                    })
-                });
-            (logits, value, moon, points, Some((o_value, o_points)))
+            let (
+                (_v_logits, value, _v_moon, points, opp_points),
+                (_o_logits, o_value, _o_moon, o_points, o_opp_points),
+            ) = crate::profiling::timed_net_eval(2, || {
+                net_value.eval_pair_ex(&feats_value, &other_feats_value).unwrap_or_else(|_| {
+                    (
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                    )
+                })
+            });
+            (logits, value, moon, points, opp_points, Some((o_value, o_points, o_opp_points)))
         } else {
             let feats_value = crate::features::features_for_net(net_value, &state);
-            let (_v_logits, value, _v_moon, points) = crate::profiling::timed_net_eval(1, || {
-                net_value.eval(&feats_value).unwrap_or_else(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new()))
+            let (_v_logits, value, _v_moon, points, opp_points) = crate::profiling::timed_net_eval(1, || {
+                net_value
+                    .eval_ex(&feats_value)
+                    .unwrap_or_else(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()))
             });
-            (logits, value, moon, points, None)
+            (logits, value, moon, points, opp_points, None)
         }
     };
 
     node_from_net_outputs(
         net_policy, net_value, state, parent, parent_state, action, prior, player_who_acted, terminal,
-        logits, value, moon, points, other_pass, rng,
+        logits, value, moon, points, opp_points, other_pass, rng,
     )
 }
 
@@ -1169,7 +1341,11 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     value: Vec<f32>,
     moon: Vec<f32>,
     points: Vec<f32>,
-    other_pass: Option<(Vec<f32>, Vec<f32>)>,
+    // Task #28: optionaler Gegner-Punkte-Kopf, leer bei jedem Netz ohne
+    // `opp_points`-Output -- `other_pass`s 3. Tupel-Element ist das
+    // Gegenstueck aus der geflippten Perspektive.
+    opp_points: Vec<f32>,
+    other_pass: Option<(Vec<f32>, Vec<f32>, Vec<f32>)>,
     rng: &mut R,
 ) -> Node {
     let mut moon_scores = [0f32; 5];
@@ -1199,16 +1375,16 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     // Forward-Pass mit geflipptem `current_player`, nicht einfach `1-wert`.
     let leaf_value = match ACTIVE_LEAF {
         LeafEval::Net => {
-            let mover_val = blended_leaf_win_prob(&value, &points);
+            let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
             let other_val = if MIRROR_OTHER_VAL {
                 1.0 - mover_val
             } else {
                 // `other_pass` wurde oben bereits per `eval_pair` MIT dem
                 // Mover-Pass zusammen berechnet (Paket 1) -- hier nur noch
                 // auslesen, kein zweiter Forward-Pass mehr nötig.
-                let (o_value, o_points) =
+                let (o_value, o_points, o_opp_points) =
                     other_pass.expect("need_other_pass deckt genau diesen Zweig ab");
-                blended_leaf_win_prob(&o_value, &o_points)
+                blended_leaf_win_prob(&o_value, &o_points, &o_opp_points)
             };
             // Perspektiven-/OOD-Audit (siehe Modul-Kommentar oben) -- nur
             // aussagekräftig, wenn `other_val` ein ECHTER zweiter Forward-Pass
@@ -1680,6 +1856,10 @@ pub struct RootValueDebug {
     /// Roher `points_head`-Output, falls das Netz einen hat (ältere
     /// Checkpoints ohne Punktekopf → `None`).
     pub points_forecast: Option<f32>,
+    /// Task #28: roher `opp_points_head`-Output, falls das Netz den neuen
+    /// Gegner-Punkte-Kopf hat (`None` bei jedem Netz ohne den Kopf, siehe
+    /// `net.rs::has_opp_head`).
+    pub opp_points_forecast: Option<f32>,
     /// `value_to_win_prob(raw_value)` -- reine Sieg-Wahrscheinlichkeit ohne
     /// Points-Blend.
     pub win_prob: f64,
@@ -1702,6 +1882,7 @@ impl RootValueDebug {
         json!({
             "raw_value": self.raw_value,
             "points_forecast": self.points_forecast,
+            "opp_points_forecast": self.opp_points_forecast,
             "win_prob": self.win_prob,
             "blended_utility": self.blended_utility,
             "floor_shift": self.floor_shift,
@@ -1719,24 +1900,35 @@ impl RootValueDebug {
 fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &GameState) -> RootValueDebug {
     let net = net_value.unwrap_or(net_policy);
     let feats = crate::features::features_for_net(net, state);
-    let (_logits, value, _moon, points) = net
-        .eval(&feats)
-        .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()));
+    // Task #28: `eval_ex` statt `eval` -- liest zusaetzlich den optionalen
+    // `opp_points`-Kopf (leerer Vec bei jedem Netz ohne den Kopf).
+    let (_logits, value, _moon, points, opp_points) = net
+        .eval_ex(&feats)
+        .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()));
     let raw_value = value.first().copied().unwrap_or(0.0);
     let win_prob = value_to_win_prob(&value);
-    let blended_raw = blended_leaf_win_prob(&value, &points);
+    let blended_raw = blended_leaf_win_prob(&value, &points, &opp_points);
     let blended_utility = if VALUE_SHRINK_ENABLED {
         0.5 + value_shrink_weight(state.round_number) * (blended_raw - 0.5)
     } else {
         blended_raw
     };
     let points_forecast = points.first().copied();
+    let opp_points_forecast = opp_points.first().copied();
     let floor_raw = FLOOR_SHAPING_WEIGHT * floor_shaping_delta(state).tanh();
     // `floor_shaping_delta` ist absolut Spieler0-minus-Spieler1 -- auf
     // Ego-Perspektive (der an der Wurzel ziehende Spieler) drehen.
     let floor_shift = if state.current_player == 0 { floor_raw } else { -floor_raw };
     let final_value = (blended_utility + floor_shift).clamp(0.0, 1.0);
-    RootValueDebug { raw_value, points_forecast, win_prob, blended_utility, floor_shift, final_value }
+    RootValueDebug {
+        raw_value,
+        points_forecast,
+        opp_points_forecast,
+        win_prob,
+        blended_utility,
+        floor_shift,
+        final_value,
+    }
 }
 
 /// Ein Wurzel-Kandidat in der Gumbel-Top-m-Auswahlphase (Anforderung 2b).
@@ -1952,11 +2144,14 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
         .collect();
     let feats_refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
     let n = pending.len();
-    let outputs = crate::profiling::timed_net_eval(n, || net_policy.eval_batch(&feats_refs)).unwrap_or_else(|_| {
-        (0..n).map(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())).collect()
-    });
+    // Task #28: `eval_batch_ex` statt `eval_batch` -- liest zusaetzlich den
+    // optionalen `opp_points`-Kopf je Zeile (leer bei jedem Netz ohne den
+    // Kopf), sonst BYTE-IDENTISCH.
+    let outputs = crate::profiling::timed_net_eval(n, || net_policy.eval_batch_ex(&feats_refs)).unwrap_or_else(
+        |_| (0..n).map(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect(),
+    );
 
-    let other_outputs: Vec<Option<(Vec<f32>, Vec<f32>)>> = if need_other_pass {
+    let other_outputs: Vec<Option<(Vec<f32>, Vec<f32>, Vec<f32>)>> = if need_other_pass {
         let other_feats: Vec<Vec<f32>> = pending
             .iter()
             .map(|p| {
@@ -1966,19 +2161,21 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
             })
             .collect();
         let other_feats_refs: Vec<&[f32]> = other_feats.iter().map(|v| v.as_slice()).collect();
-        let other_out = crate::profiling::timed_net_eval(n, || net_policy.eval_batch(&other_feats_refs))
-            .unwrap_or_else(|_| (0..n).map(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect());
-        other_out.into_iter().map(|(_, o_value, _, o_points)| Some((o_value, o_points))).collect()
+        let other_out = crate::profiling::timed_net_eval(n, || net_policy.eval_batch_ex(&other_feats_refs))
+            .unwrap_or_else(|_| {
+                (0..n).map(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect()
+            });
+        other_out.into_iter().map(|(_, o_value, _, o_points, o_opp_points)| Some((o_value, o_points, o_opp_points))).collect()
     } else {
         (0..n).map(|_| None).collect()
     };
 
     for (idx, p) in pending.into_iter().enumerate() {
-        let (logits, value, moon, points) = outputs[idx].clone();
+        let (logits, value, moon, points, opp_points) = outputs[idx].clone();
         let other_pass = other_outputs[idx].clone();
         let child = node_from_net_outputs(
             net_policy, net_value, p.child_state, Some(0), Some(root_state), Some(p.action), p.prior, mover,
-            p.terminal, logits, value, moon, points, other_pass, rng,
+            p.terminal, logits, value, moon, points, opp_points, other_pass, rng,
         );
         let cid = nodes.len();
         nodes.push(child);
@@ -4459,5 +4656,215 @@ mod tests {
             checked += 1;
         }
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Task #28 (`evaluations/PREREG_task28_aggression.md`): Score-/Denial-
+    // Utility -- Engine-Seite (Utility-Blend, Laufzeit-Parameter, ONNX-
+    // Vertrag-Erkennung).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Laedt `alphazero_v18_best.onnx` -- flaches Legacy-Modell OHNE
+    /// `opp_points`-Kopf, lokal vorhanden (anders als `load_test_net()`s
+    /// `v10`, siehe dortiger Kommentar). Gleiches Skip-statt-Fail-Muster bei
+    /// Abwesenheit (frischer Klon ohne `models/`, `.gitignore`).
+    fn load_v18_legacy_test_net() -> Option<Net> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v18_best.onnx");
+        Net::load_auto(path.to_str().unwrap()).ok()
+    }
+
+    // ── Byte-Identitaet bei w=0 (Default) gegen den Alt-Pfad ──
+
+    /// `net_leaf_eval` muss bei `w=0` (Default, keine `MOSAIC_POINTS_UTILITY_
+    /// W`-Env-Var in dieser Test-Umgebung gesetzt) exakt denselben Blattwert
+    /// liefern wie der Alt-Pfad VOR Task #28: reiner `value_to_win_prob`-
+    /// Blend ohne jeden Punkte-Anteil (`POINTS_UTILITY_WEIGHT=0` machte
+    /// `blended_leaf_win_prob` schon vor diesem Task numerisch identisch zu
+    /// `value_to_win_prob`, siehe dortiger GETESTET-Kommentar) -- verglichen
+    /// gegen einen direkten `eval_pair`-Aufruf (nicht `eval_pair_ex`), der
+    /// ALT-Pfad-Code also unveraendert.
+    #[test]
+    fn net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero() {
+        let Some(net) = load_v18_legacy_test_net() else { return };
+        assert!(!net.has_opp_head(), "v18_best hat noch keinen opp_points-Kopf (Vertrag noch nicht exportiert)");
+        assert_eq!(points_utility_w(), 0.0, "Test-Voraussetzung: MOSAIC_POINTS_UTILITY_W darf hier nicht gesetzt sein");
+
+        let mut rng = StdRng::seed_from_u64(2801);
+        let mut checked = 0;
+        for seed_tag in 0..8u64 {
+            let Some(state) = random_drafting_state(seed_tag, 6, &mut rng) else { continue };
+            let actual = net_leaf_eval(&net, &state);
+
+            // Alt-Pfad: direkter `eval_pair` (kein `_ex`), reines
+            // `value_to_win_prob` je Perspektive, keine Punkte-Beteiligung.
+            let feats = crate::features::features_for_net(&net, &state);
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = crate::features::features_for_net(&net, &flipped);
+            let ((_l, value, _m, _p), (_ol, o_value, _om, _op)) =
+                net.eval_pair(&feats, &other_feats).expect("eval_pair (Alt-Pfad)");
+            let mover_val = value_to_win_prob(&value);
+            let other_val = value_to_win_prob(&o_value);
+            let expected =
+                if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+
+            assert!(
+                (actual[0] - expected[0]).abs() < 1e-12 && (actual[1] - expected[1]).abs() < 1e-12,
+                "Spiel {seed_tag}: net_leaf_eval {actual:?} weicht vom Alt-Pfad {expected:?} ab"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    /// Gleicher Nachweis auf `blended_leaf_win_prob`-Ebene direkt (ohne
+    /// Netz/State) -- egal was in `points`/`opp_points` steht, bei `w=0`
+    /// muss IMMER `value_to_win_prob(value)` herauskommen (Early-Out, kein
+    /// zusaetzlicher Rechenpfad).
+    #[test]
+    fn blended_leaf_win_prob_with_w_zero_ignores_points_and_opp_entirely() {
+        let value = vec![0.3f32];
+        let wr = value_to_win_prob(&value);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[], &[], 0.0, 0.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[], 0.0, 0.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[-0.7], 0.0, 5.0), wr);
+        assert_eq!(blended_leaf_win_prob_with(&value, &[0.9], &[-0.7], 0.0, 0.0), wr);
+    }
+
+    /// `w>0`, aber `opp_points` leer (Legacy-Modell ohne den Kopf) -> muss
+    /// sich wie `w=0` verhalten (Additiv-Regel, PREREG Punkt 4), NICHT wie
+    /// der `w>0`-Blend mit `opp_raw=0`.
+    #[test]
+    fn blended_leaf_win_prob_with_missing_opp_head_falls_back_to_legacy() {
+        let value = vec![0.3f32];
+        let points = vec![0.6f32];
+        let wr = value_to_win_prob(&value);
+        let via_missing_opp = blended_leaf_win_prob_with(&value, &points, &[], 0.5, 1.0);
+        assert_eq!(via_missing_opp, wr, "fehlender opp-Kopf muss exakt den w=0-Legacy-Pfad liefern");
+    }
+
+    // ── Reine Blend-Formel (`opp_aware_points_utility`, kein Netz/ONNX) ──
+
+    #[test]
+    fn opp_aware_points_utility_clamps_to_valid_tanh_range() {
+        // Extreme Eingaben (own+eps*opp weit ausserhalb [-1,1]) muessen auf
+        // den gueltigen Tanh-Bereich geklammert werden, BEVOR auf [0,1]
+        // reskaliert wird -- sonst koennte `u` selbst ausserhalb [0,1] liegen.
+        let u_hi = opp_aware_points_utility(10.0, 10.0, 0.0);
+        let u_lo = opp_aware_points_utility(-10.0, -10.0, 0.0);
+        assert_eq!(u_hi, 1.0);
+        assert_eq!(u_lo, 0.0);
+    }
+
+    #[test]
+    fn opp_aware_points_utility_zero_inputs_yield_midpoint() {
+        assert_eq!(opp_aware_points_utility(0.0, 0.0, 0.0), 0.5);
+        assert_eq!(opp_aware_points_utility(0.0, 0.0, 2.0), 0.5);
+    }
+
+    #[test]
+    fn opp_aware_points_utility_higher_lambda_lowers_utility_for_positive_opp() {
+        // Kernanspruch der PREREG ("Denial"): bei POSITIVEM `opp_raw`
+        // (Gegner steht gut) muss ein hoeheres `lambda_aggr` die Utility
+        // SENKEN (staerkerer Abzug) -- Wirkrichtung des Denial-Hebels.
+        let pts_raw = 0.2;
+        let opp_raw = 0.5;
+        let u_low_lambda = opp_aware_points_utility(pts_raw, opp_raw, 0.0);
+        let u_mid_lambda = opp_aware_points_utility(pts_raw, opp_raw, 1.0);
+        let u_high_lambda = opp_aware_points_utility(pts_raw, opp_raw, 2.0);
+        assert!(u_low_lambda > u_mid_lambda, "u(lambda=0) sollte > u(lambda=1) sein");
+        assert!(u_mid_lambda > u_high_lambda, "u(lambda=1) sollte > u(lambda=2) sein");
+    }
+
+    #[test]
+    fn opp_aware_points_utility_negative_opp_with_lambda_raises_utility() {
+        // Symmetrisch: NEGATIVER `opp_raw` (Gegner steht schlecht) + Denial-
+        // Abzug (`-lambda_aggr*opp_raw`) muss die Utility ANHEBEN.
+        let u_no_lambda = opp_aware_points_utility(0.0, -0.5, 0.0);
+        let u_with_lambda = opp_aware_points_utility(0.0, -0.5, 1.0);
+        assert!(u_with_lambda > u_no_lambda);
+    }
+
+    #[test]
+    fn opp_aware_points_utility_matches_hand_calculation() {
+        // own_pts = 0.4 + 0.1*0.2 = 0.42; combined = 0.42 - 0.5*0.2 = 0.32;
+        // u = (0.32+1)*0.5 = 0.66.
+        let u = opp_aware_points_utility(0.4, 0.2, 0.5);
+        assert!((u - 0.66).abs() < 1e-12, "u={u}, erwartet 0.66");
+    }
+
+    /// End-zu-Ende der VOLLEN `w>0`+opp-vorhanden-Blend-Formel ueber
+    /// `blended_leaf_win_prob_with` (nicht nur den `opp_aware_points_utility`-
+    /// Kern) -- deckt zusaetzlich den `(1-w)*wr + w*u_pts`-Aussenblend ab.
+    #[test]
+    fn blended_leaf_win_prob_with_full_blend_matches_hand_calculation() {
+        // wr = value_to_win_prob([0.0]) = 0.5. points=[0.4], opp=[0.2],
+        // lambda_aggr=0.5 -> u_pts=0.66 (siehe Test oben). w=0.5 ->
+        // 0.5*0.5 + 0.5*0.66 = 0.58.
+        let value = vec![0.0f32];
+        let points = vec![0.4f32];
+        let opp_points = vec![0.2f32];
+        let u = blended_leaf_win_prob_with(&value, &points, &opp_points, 0.5, 0.5);
+        // Toleranz 1e-6 statt 1e-12 -- `value`/`points` sind `f32`-Vektoren
+        // (wie reale ONNX-Outputs), die Konvertierung nach `f64` fuer die
+        // Blend-Arithmetik ist nicht bit-exakt zur reinen `f64`-Handrechnung.
+        assert!((u - 0.58).abs() < 1e-6, "u={u}, erwartet 0.58");
+    }
+
+    // ── Env-Var-Parsing (`read_f64_env`) -- eindeutige, synthetische
+    // Var-Namen je Test (NICHT die echten `MOSAIC_POINTS_UTILITY_W`/
+    // `MOSAIC_AGGR_LAMBDA`, um den Prozess-weiten `OnceLock`-Cache anderer
+    // Tests nicht zu beeinflussen UND um Races zwischen parallel laufenden
+    // Tests auf demselben Env-Var-Namen auszuschliessen). ──
+
+    #[test]
+    fn read_f64_env_missing_var_yields_default() {
+        let name = "MOSAIC_TEST_ENV_MISSING_28A";
+        std::env::remove_var(name);
+        assert_eq!(read_f64_env(name, 0.0), 0.0);
+        assert_eq!(read_f64_env(name, 3.5), 3.5);
+    }
+
+    #[test]
+    fn read_f64_env_valid_value_is_parsed() {
+        let name = "MOSAIC_TEST_ENV_VALID_28B";
+        std::env::set_var(name, "1.25");
+        assert_eq!(read_f64_env(name, 0.0), 1.25);
+        std::env::remove_var(name);
+    }
+
+    #[test]
+    fn read_f64_env_negative_and_whitespace_values_are_parsed() {
+        let name = "MOSAIC_TEST_ENV_NEG_28C";
+        std::env::set_var(name, "  -2.0  ");
+        assert_eq!(read_f64_env(name, 0.0), -2.0);
+        std::env::remove_var(name);
+    }
+
+    #[test]
+    fn read_f64_env_invalid_value_falls_back_to_default_no_panic() {
+        let name = "MOSAIC_TEST_ENV_INVALID_28D";
+        std::env::set_var(name, "not_a_number");
+        // Darf nicht paniken -- Default zurueck, das Testende erreicht zu
+        // haben ist bereits Teil des Nachweises.
+        assert_eq!(read_f64_env(name, 0.7), 0.7);
+        std::env::remove_var(name);
+    }
+
+    #[test]
+    fn read_f64_env_empty_value_falls_back_to_default_no_panic() {
+        let name = "MOSAIC_TEST_ENV_EMPTY_28E";
+        std::env::set_var(name, "");
+        assert_eq!(read_f64_env(name, 1.1), 1.1);
+        std::env::remove_var(name);
+    }
+
+    /// Die gecachten Laufzeit-Getter selbst muessen (in dieser Test-Umgebung,
+    /// in der die ECHTEN `MOSAIC_*`-Namen nie gesetzt werden) auf ihren
+    /// dokumentierten Default `0.0` zurueckfallen.
+    #[test]
+    fn points_utility_w_and_aggr_lambda_default_to_zero() {
+        assert_eq!(points_utility_w(), 0.0);
+        assert_eq!(aggr_lambda(), 0.0);
     }
 }
