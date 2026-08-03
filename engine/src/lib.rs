@@ -23,6 +23,7 @@ pub mod round5;
 pub mod round_end;
 pub mod round_transition;
 pub mod round_transition_deep;
+pub mod round_transition_resample;
 pub mod scoring;
 pub mod search_common;
 pub mod self_play;
@@ -755,6 +756,57 @@ fn tiling_candidates_json(
 /// sich erst danach erheben. Derselbe Seed fuer alle Kandidaten einer Stellung
 /// macht den Vergleich GEPAART: der Nachfuell-Wurf ist dann identisch, der
 /// einzige Unterschied ist das Brett.
+/// PREREG_r4_value_calibration.md, Abschnitt "Vorbedingung": invertiert die
+/// Fabrik-Neubefüllung eines Runde-5-Startzustands (Übergang 4→5,
+/// `state.rs::setup_new_round`/`fill_factories`) und sampelt `n_samples`
+/// frische Neubefüllungen DESSELBEN Vor-Befüllungs-Bretts -- Grundlage für
+/// die Runde-4-Ende-Ground-Truth (`ab_value` je Sample über `round5.rs`,
+/// siehe PREREG-Dokument, Abschnitt "Ground Truth"). Additiv: es gab bisher
+/// keinen Python-Einstieg für diese RÜCKWÄRTS-Richtung (nur
+/// `advance_after_tiling_json` direkt oberhalb, die VORWÄRTS-Richtung
+/// Tiling-Leaf → nächste Runde).
+///
+/// `r5_start_state_json` muss ein UNBERÜHRTER Runde-5-Start sein (Phase
+/// Drafting, `round==5`, alle Fabriken frisch befüllt: 4 kleine × 4
+/// Sonnenplättchen + große × 5, kein Mond-Vorrat, Bonuschips unaufgedeckt) --
+/// siehe `round_transition_resample::invert_round5_fill` für die exakte
+/// Validierung inkl. Turm-Reshuffle-Grenzfall (PREREG "Bekannte
+/// Einschränkungen": mehrdeutig invertierbare Zustände geben `Err` statt
+/// einer stillen Näherung, s. dortiger Moduldoku-Kommentar). `seed` treibt
+/// sowohl die `json_to_state`-Rekonstruktion der (für die Fabrik-Inversion
+/// irrelevanten) verdeckten Sammlungen als auch, je Sample-Index
+/// deterministisch abgeleitet (`seed + i`), die eigentliche Neubefüllung.
+/// Rückgabe: JSON-Array von `n_samples` `state_to_json`-Zustandsdicts
+/// (dasselbe Format, das `json_to_state`/`net_search_state_json` wieder
+/// einliest).
+#[pyfunction]
+#[pyo3(signature = (r5_start_state_json, n_samples, seed))]
+fn resample_round_transition_json(
+    r5_start_state_json: &str,
+    n_samples: u32,
+    seed: u64,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut recon_rng = StdRng::seed_from_u64(seed);
+    let parsed: serde_json::Value = serde_json::from_str(r5_start_state_json).map_err(|e| {
+        PyValueError::new_err(format!("r5_start_state_json: JSON-Parse-Fehler: {e}"))
+    })?;
+    let state = crate::serialize::json_to_state(&parsed, &mut recon_rng).map_err(PyValueError::new_err)?;
+
+    let samples =
+        crate::round_transition_resample::resample_round5_start(&state, n_samples, seed)
+            .map_err(PyValueError::new_err)?;
+
+    let out: Vec<serde_json::Value> = samples
+        .iter()
+        .map(|s| crate::serialize::state_to_json(s, true))
+        .collect();
+    Ok(serde_json::Value::Array(out).to_string())
+}
+
 #[pyfunction]
 #[pyo3(signature = (state_json, seed))]
 fn advance_after_tiling_json(state_json: String, seed: u64) -> PyResult<String> {
@@ -797,6 +849,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
+    m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
