@@ -283,6 +283,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     a_score_sum = b_score_sum = 0.0
     a_floor_sum = b_floor_sum = 0.0
     zerozero_count = 0
+    # Task #28 (2026-08-03, additiv): Per-Paar-Scores fuers Ergebnis-JSON --
+    # der lambda_aggr-Sweep braucht je Seed-Paar gepaarte Gegnerpunkte ueber
+    # mehrere Arme hinweg (identischer base_seed => Paar i ist ueber Arme
+    # vergleichbar). Reine Zusatzfelder, keine Verhaltensaenderung.
+    per_pair_scores: list[dict] = []
     sprt_verdict = None   # None=laeuft noch, name_a=A signifikant besser, "H0"=kein Beleg fuer A
     done_pairs = 0
     block_idx = 0
@@ -312,6 +317,12 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
             b_score_sum += g1[i]["scores"][1] + g2[i]["scores"][0]
             a_floor_sum += g1[i]["total_floor"][0] + g2[i]["total_floor"][1]
             b_floor_sum += g1[i]["total_floor"][1] + g2[i]["total_floor"][0]
+            per_pair_scores.append({
+                "pair_index": done_pairs + i, "block_seed": seed,
+                "a_score": g1[i]["scores"][0] + g2[i]["scores"][1],
+                "b_score": g1[i]["scores"][1] + g2[i]["scores"][0],
+                "a_wins_pair": int(g1[i]["winner"] == 0) + int(g2[i]["winner"] == 1),
+            })
             for g in (g1[i], g2[i]):
                 if g["scores"][0] == 0 and g["scores"][1] == 0:
                     zerozero_count += 1
@@ -387,6 +398,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         "report_mcnemar_p": final_p, "mean_pair_diff": mean_d, "ci95": [ci_lo, ci_hi],
         "base_seed": base_seed, "blocks": block_logs,
         "avg_score_a": avg_score_a, "avg_score_b": avg_score_b,
+        "per_pair_scores": per_pair_scores,
         "avg_floor_a": avg_floor_a, "avg_floor_b": avg_floor_b,
         "zerozero_anteil": zerozero_anteil,
     }
