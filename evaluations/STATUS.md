@@ -7340,6 +7340,28 @@ nicht nur Defaults. Forensik-Plan (morgen): Wheel #1 aus 5219d77 im
 Worktree bauen, Sonden-Vergleich w=0/0,1/lambda auf identischen
 Zustaenden, dann entscheiden, welche Stichprobe zaehlt.
 
+## PCR-mild (p=0,5/cheap=300): Wandzeit-Kriterium VERFEHLT -- nicht empfohlen (2026-08-03/04)
+
+**Voller Lauf** (PREREG_pcr_mild.md): 1320 Spiele / 215.791 Zuege in
+4,04h = **327 Spiele/h** vs. Kontrolle 292,5/h -> **Faktor 1,118x**,
+UNTER der vorregistrierten 1,15x-Schwelle (Kalibrierungs-Batch 330/h
+hatte es angekuendigt). Da die Uebernahme-Regel (a)UND(b)UND(c) verlangt
+und (c) messbar verfehlt ist, sind die 12 Trainings + Arena
+GEGENSTANDSLOS -- begruendeter Abbruch des Ausfuehrungsplans (keine
+Regel-/Metrikaenderung; das Adoption-Verdikt steht unabhaengig vom
+Qualitaets-Ausgang fest). Korpus nach data/archive_pcrmild/ (Fenster-
+Politik: PCR-Spiele nie als Tail).
+
+**Tiefere Erkenntnis (wichtig fuer die 21h-Frage)**: 25% Sims-Reduktion
+(600->450 Oe) ergab nur 11,8% Wandzeit -- der FIX-Kostenanteil je Zug
+dominiert (~60%). Damit ist JEDE Such-Verbilligung (auch uniform weniger
+Sims) als Self-Play-Beschleuniger nahezu wirkungslos. **Task #32
+(vorgemerkt): Self-Play-Kostenprofil neu vermessen** -- Hauptverdaechtiger
+bootstrap_value/round_transition_deep (laeuft je Zug; das alte
+83%-rtv-Profil ist seit nortv Geschichte, der heutige Fix-Anteil ist
+unvermessen). Erst mit dem Profil entscheiden, wo die 21h wirklich
+herkommen.
+
 ## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
