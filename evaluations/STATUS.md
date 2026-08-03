@@ -7239,6 +7239,36 @@ suggerierte).
 wieder am falschen Messziel optimiert). Research-Agent (2026-08-03) hat
 die These als Fokus-Nachtrag erhalten.
 
+## Task #30 (vorgemerkt): Skalen-Korrektur-A/B -- monotone Value-Rekalibrierung als Laufzeit-Knopf (2026-08-03)
+
+**Motivation (Research-Report Idee 4.1 + 7.3, Gumbel-Paper-Volltext)**: Die
+Gumbel-Policy-Improvement-Beweise verlangen von σ nur Monotonie, die
+implementierte Instanz ist aber LINEAR in q̂ -- unsere gemessene
+6-9%-Wertstauchung (R5-Kalibrierung, Task #27) wird 1:1 in eine zu
+schwache completed-Q-Perturbation durchgereicht: die Suche zieht sich
+staerker zum Policy-Prior zurueck, als die wahren Wert-Differenzen
+rechtfertigen. Eine MONOTONE Skalen-Korrektur (Platt-artig) aendert die
+Ordnung per Definition NICHT -- hebt sie die Arena-Staerke, war die Skala
+der Engpass (und R² nur der falsche Proxy dafuer).
+
+**Design-Skizze (PREREG bei Angehen)**: Laufzeit-Parameter in der Engine
+(monotone Streckung des Value-Outputs vor der σ-Konsumtion, z.B.
+Logit-Skalierung; Kalibrierungs-Quelle und Fit-Split VORAB festlegen --
+Kandidat: frozen-set-Ausgaenge je Runde, R5-Kurve aus Task #27 als
+Startpunkt), dann gepaarte Arena DESSELBEN Netzes mit vs. ohne Korrektur
+(n>=150, fixe Sims, kein Fruehstopp). Kein Retraining, kein Self-Play.
+
+**Diagnose-Paar mit der Ordnungs-Seite**: Task #30 ist die reine
+SKALA-Intervention; das reine ORDNUNGs-Gegenstueck (Ranking-Loss auf
+Geschwister-Q, Report Idee 7.1) wird ERST nach bestandener
+#29-Metrik-Validierung als eigenes Experiment aufgesetzt. Zusammen
+beantworten sie, welche Eigenschaft "R² war der falsche Hebel" konkret
+war (Ordnung, Skala, oder beides).
+
+**Reihenfolge (Nutzer-Entscheid 2026-08-03)**: #29 und #30 direkt NACH
+der laufenden Queue (v18only-Lambda -> Task #28 -> R4-Kalibrierung),
+VOR jedem neuen Value-Trainingsexperiment und vor dem v20-Zyklus-Start.
+
 ## Task #28 (vorgemerkt): Aggressiveres Spiel -- Score-/Denial-Utility (2026-08-03)
 
 **Nutzer-Wunsch**: die KI soll aktiv dem Gegner schaden (Punkte wegnehmen/
