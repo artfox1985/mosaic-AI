@@ -1,0 +1,87 @@
+{
+  "name_a": "lam07_s3_best",
+  "name_b": "lam10_s4_best",
+  "model_a": "models/alphazero_lam07_s3_best.onnx",
+  "model_b": "models/alphazero_lam10_s4_best.onnx",
+  "sims_a": 400,
+  "sims_b": 400,
+  "c_puct_a": 1.5,
+  "c_puct_b": 1.5,
+  "done_pairs": 50,
+  "n_games_total": 100,
+  "a_wins_total": 43,
+  "b_wins_total": 57,
+  "pair_a_sweeps_b": 10,
+  "pair_b_sweeps_c": 17,
+  "pair_splits": 23,
+  "sprt_verdict": "H0",
+  "sprt_llr": -3.4398314022835397,
+  "sprt_bounds": [
+    -2.9444389791664403,
+    2.9444389791664403
+  ],
+  "sprt_p0": 0.5,
+  "sprt_p1": 0.65,
+  "sprt_alpha": 0.05,
+  "sprt_beta": 0.05,
+  "report_mcnemar_p": 0.24778856337070465,
+  "mean_pair_diff": -0.28,
+  "ci95": [
+    -0.6839770290499201,
+    0.12397702904992008
+  ],
+  "base_seed": 102738299,
+  "blocks": [
+    {
+      "block": 1,
+      "seed": 102738299,
+      "n_pairs_block": 25,
+      "done_pairs": 25,
+      "a_wins_total": 19,
+      "b_wins_total": 31,
+      "pair_a_sweeps_b": 3,
+      "pair_b_sweeps_c": 9,
+      "pair_splits": 13,
+      "llr": -2.422981702046119,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.14599609375,
+      "mean_pair_diff": -0.48,
+      "ci95": [
+        -1.0000467671277267,
+        0.0400467671277267
+      ],
+      "duration_s": 208.4514708518982
+    },
+    {
+      "block": 2,
+      "seed": 103738299,
+      "n_pairs_block": 25,
+      "done_pairs": 50,
+      "a_wins_total": 43,
+      "b_wins_total": 57,
+      "pair_a_sweeps_b": 10,
+      "pair_b_sweeps_c": 17,
+      "pair_splits": 23,
+      "llr": -3.4398314022835397,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.24778856337070465,
+      "mean_pair_diff": -0.28,
+      "ci95": [
+        -0.6839770290499201,
+        0.12397702904992008
+      ],
+      "duration_s": 211.8028655052185
+    }
+  ],
+  "avg_score_a": 39.82,
+  "avg_score_b": 42.58,
+  "avg_floor_a": 14.35,
+  "avg_floor_b": 14.0,
+  "zerozero_anteil": 0.0
+}
