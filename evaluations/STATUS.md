@@ -7309,6 +7309,37 @@ gegnerfeindlicher bei gleicher Staerke (GUI-Server-Env). v19_2d_opp-
 Checkpoints bleiben (Traeger des Reglers; ein Champion-Wechsel auf
 v19_2d_opp waere ein separates Gating).
 
+## Task #28 Power-Erweiterung: WIDERSPRUCH zwischen Stichproben -- Konfirmation AUSGESETZT (2026-08-03)
+
+**Frische Stichprobe** (PREREG_task28_power_extension, 150 Paare/Arm,
+Seed 30260803, NEUES Wheel #2 mit #30-Knopf + Regler-Atomics):
+- la00 (w=0,1, lambda=0): **173:127 vs Champion, McNemar p=0,0076,
+  Diff +0,307 [0,094, 0,519]** -- SIGNIFIKANTER Sieg ueber v19_2d_best!
+- la20 frisch: 155:145 (p=0,64)
+- **PRIMAERTEST la20-la00 (frische Paare): Gegnerpunkte +9,63 (p=0,0001)
+  -- GEGENRICHTUNG zum Erst-Sweep** (-6,16, p=0,078). Beide Arme
+  tauschten komplette Score-Profile (Erst-Sweep: la20 senkt beide
+  Scores; frisch: la20 hebt beide). ~5 SE Widerspruch -- das ist kein
+  Stichprobenrauschen.
+
+**Konfundierung**: zwischen den Stichproben wurde Wheel #2 installiert
+(#30-Skalen-Knopf + Regler-Atomic-Refactor). Byte-Identitaets-Tests
+deckten NUR w=0 ab -- die aktiven w>0-Pfade waren zwischen Wheels nie
+gepinnt. Sonden-Check Wheel #2: Env-Mapping korrekt, Blend reagiert in
+Design-Richtung (0,538 -> +w: 0,544 -> +lambda2: 0,530). Wheel #1
+(Commit 5219d77) ist ueberschrieben -- Forensik braucht Worktree-Rebuild
++ identische Sonde + ggf. Mini-Arena.
+
+**Konsequenz (ehrlich)**: lambda=2-Konfirmation AUSGESETZT (keine
+Richtung wird akzeptiert), der la00-Sieg ueber den Champion bleibt UNTER
+VORBEHALT (falls Wheel #2 korrekt ist, waere das ein Champion-Gating-
+wuerdiger Befund: v19_2d_opp@w=0,1 schlaegt v19_2d_best signifikant --
+konsistent mit der Skalen-These #30!), Kipppunkt-Arme pausiert.
+**Lehre**: Verhaltens-Pins muessen auch AKTIVE Parameter-Pfade abdecken,
+nicht nur Defaults. Forensik-Plan (morgen): Wheel #1 aus 5219d77 im
+Worktree bauen, Sonden-Vergleich w=0/0,1/lambda auf identischen
+Zustaenden, dann entscheiden, welche Stichprobe zaehlt.
+
 ## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
