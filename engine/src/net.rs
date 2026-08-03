@@ -126,9 +126,26 @@ pub struct Net {
     model_batch: std::collections::HashMap<usize, Model>,
     input_size: usize,
     layout: InputLayout,
+    /// Task #28 (`PREREG_task28_aggression.md`, Engine-Vertrag): `true`, wenn
+    /// die geladene ONNX-Datei einen ZUSAETZLICHEN Output namens
+    /// `"opp_points"` deklariert (Gegner-Punkte-Kopf, hinter allen
+    /// bestehenden Outputs angehaengt) -- per Output-NAME erkannt
+    /// (`detect_opp_head`), nicht nur per Output-Anzahl, damit ein spaeterer
+    /// weiterer Aux-Kopf diese Erkennung nicht bricht. Einmalig beim Laden
+    /// bestimmt (siehe `build_from_layout`), danach nur noch gelesen --
+    /// steuert, ob `eval_ex`/`eval_pair_ex`/`eval_batch_ex` den 5. Output
+    /// tatsaechlich extrahieren oder einen leeren `Vec` liefern (Legacy-
+    /// Modelle ohne den Kopf: identisch leer wie `points` bei sehr alten
+    /// Checkpoints ohne Punkte-Kopf).
+    has_opp_head: bool,
 }
 
 impl Net {
+    /// Task #28: `true`, wenn dieses geladene Netz den optionalen
+    /// `opp_points`-Output hat (siehe `has_opp_head`-Feld-Doku).
+    pub fn has_opp_head(&self) -> bool {
+        self.has_opp_head
+    }
     /// Deklariertes Input-Layout dieses geladenen Netzes (Task #11 Phase 2,
     /// M3.5: Engine-Verdrahtung) -- Aufrufer nutzen dies, um pro Netz die
     /// passende Feature-Erzeugung zu waehlen (`features::features_for_net`),
@@ -177,6 +194,11 @@ impl Net {
     /// `layout`, dann `into_optimized().into_runnable()` -- exakt dieselbe
     /// Operationsfolge, die `load` vor Task #11 direkt (unfaktoriert) ausführte.
     fn build_from_layout(base: RawModel, layout: InputLayout) -> TractResult<Net> {
+        // Task #28: NUR am rohen, noch nicht optimierten Graph zuverlaessig
+        // lesbar (`into_optimized()` kann Outlet-Reihenfolge/-Labels
+        // veraendern) -- analog zu `detect_layout`, das aus demselben Grund
+        // ebenfalls vor jedem `apply_input_facts`/`into_optimized` laeuft.
+        let has_opp_head = detect_opp_head(&base)?;
         let model = layout
             .apply_input_facts(base.clone(), 1)?
             .into_optimized()?
@@ -202,7 +224,7 @@ impl Net {
         // wird danach nicht mehr gebraucht).
         let plan = layout.apply_input_facts(base, EVAL_BATCH_MAX_N)?.into_optimized()?.into_runnable()?;
         model_batch.insert(EVAL_BATCH_MAX_N, plan);
-        Ok(Net { model, model_pair, model_batch, input_size: layout.flat_len(), layout })
+        Ok(Net { model, model_pair, model_batch, input_size: layout.flat_len(), layout, has_opp_head })
     }
 
     /// Baut die ONNX-Eingabe-Tensor(en) für `samples.len()` Positionen --
@@ -336,6 +358,112 @@ impl Net {
             })
             .collect())
     }
+
+    // ── Task #28 (`PREREG_task28_aggression.md`): `opp_points`-erweiterte
+    // Varianten. Getrennte Methoden statt `eval`/`eval_pair`/`eval_batch`-
+    // Signaturaenderung -- deren 4-Tupel-Rueckgabetyp und ALLE bestehenden
+    // Aufrufstellen (net_mcts.rs-Nicht-Blend-Pfade, self_play.rs, py.rs,
+    // lib.rs, examples/) bleiben dadurch komplett unangetastet (Additiv-
+    // Regel, siehe Modul-Kommentar). Jeweils EIN Forward-Pass liefert
+    // ohnehin schon alle ONNX-Outputs -- der 5. Output wird hier nur
+    // zusaetzlich ausgelesen, kein zweiter ONNX-Aufruf.
+
+    /// Wie [`Net::eval`], zusaetzlich der optionale `opp_points`-Kopf als 5.
+    /// Rueckgabewert -- leerer `Vec`, wenn das Netz keinen `opp_points`-
+    /// Output hat (`has_opp_head() == false`) ODER der Graph trotz
+    /// `has_opp_head() == true` unerwartet nur 4 Outputs liefert (defensiv,
+    /// sollte durch die Namens-Erkennung beim Laden nie vorkommen).
+    pub fn eval_ex(&self, feats: &[f32]) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+        let inputs = self.build_inputs(&[feats])?;
+        let out = self.model.run(inputs)?;
+        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+        let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
+            out[4].to_array_view::<f32>()?.iter().copied().collect()
+        } else {
+            Vec::new()
+        };
+        Ok((policy, value, moon, points, opp_points))
+    }
+
+    /// Wie [`Net::eval_pair`], zusaetzlich `opp_points` je Zeile (5. Tupel-
+    /// Element), gleiche Leer-Semantik wie [`Net::eval_ex`].
+    #[allow(clippy::type_complexity)]
+    pub fn eval_pair_ex(
+        &self,
+        feats_a: &[f32],
+        feats_b: &[f32],
+    ) -> TractResult<(
+        (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+        (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+    )> {
+        let inputs = self.build_inputs(&[feats_a, feats_b])?;
+        let out = self.model_pair.run(inputs)?;
+        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+        let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
+            out[4].to_array_view::<f32>()?.iter().copied().collect()
+        } else {
+            Vec::new()
+        };
+        let (policy_a, policy_b) = split_batch2(policy);
+        let (value_a, value_b) = split_batch2(value);
+        let (moon_a, moon_b) = split_batch2(moon);
+        let (points_a, points_b) = split_batch2(points);
+        let (opp_a, opp_b) = split_batch2(opp_points);
+        Ok(((policy_a, value_a, moon_a, points_a, opp_a), (policy_b, value_b, moon_b, points_b, opp_b)))
+    }
+
+    /// Wie [`Net::eval_batch`], zusaetzlich `opp_points` je Zeile (5. Tupel-
+    /// Element). `split_batch_n` (unveraendert fuer policy/value/moon/points
+    /// wiederverwendet) wuerde bei LEEREM `opp_points` (Legacy-Modell/kein
+    /// Kopf) NICHT `n` leere Zeilen liefern, sondern eine leere Liste (0/N
+    /// teilt nicht sauber je Zeile auf) -- `split_batch_n_or_empty_rows`
+    /// deckt genau diesen Fall ab, damit `opp_rows[i]` fuer JEDES `i in 0..n`
+    /// definiert bleibt.
+    #[allow(clippy::type_complexity)]
+    pub fn eval_batch_ex(
+        &self,
+        feats: &[&[f32]],
+    ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        let n = feats.len();
+        let model = self.model_batch.get(&n).ok_or_else(|| {
+            TractError::msg(format!(
+                "eval_batch_ex: kein vorgebauter Plan fuer N={n} (gueltig: 1..={EVAL_BATCH_MAX_N})"
+            ))
+        })?;
+        let inputs = self.build_inputs(feats)?;
+        let out = model.run(inputs)?;
+        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+        let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
+            out[4].to_array_view::<f32>()?.iter().copied().collect()
+        } else {
+            Vec::new()
+        };
+        let policy_rows = split_batch_n(policy, n);
+        let value_rows = split_batch_n(value, n);
+        let moon_rows = split_batch_n(moon, n);
+        let points_rows = split_batch_n(points, n);
+        let opp_rows = split_batch_n_or_empty_rows(opp_points, n);
+        Ok((0..n)
+            .map(|i| {
+                (
+                    policy_rows[i].clone(),
+                    value_rows[i].clone(),
+                    moon_rows[i].clone(),
+                    points_rows[i].clone(),
+                    opp_rows[i].clone(),
+                )
+            })
+            .collect())
+    }
 }
 
 /// Liest die im ONNX-Graph DEKLARIERTE Input-Fact aus (VOR jedem
@@ -422,6 +550,33 @@ fn detect_layout(model: &RawModel) -> TractResult<InputLayout> {
     combine_layouts(&layouts)
 }
 
+/// Reine Namens-Pruefung (Task #28, `PREREG_task28_aggression.md`): der
+/// ONNX-Vertrag fuer den kuenftigen Gegner-Punkte-Kopf ist "Modelle MIT dem
+/// Kopf haengen GENAU EINEN zusaetzlichen Output namens `opp_points` HINTER
+/// allen bestehenden Outputs an" -- Namens- statt Positions-/Anzahl-basiert
+/// erkannt, damit ein spaeterer weiterer Aux-Kopf diese Erkennung nicht
+/// bricht. Von `detect_opp_head` (die den tract-Graph abfragt) getrennt,
+/// damit die eigentliche Entscheidungslogik OHNE ein echtes ONNX-Modell
+/// testbar ist -- es existiert noch KEIN exportiertes Netz mit diesem Kopf
+/// (Python-Export folgt erst nach diesem Engine-Auftrag, siehe PREREG
+/// Abschnitt "Ausfuehrungsplan" Punkt 1 vs. 2) -- gleiches Trennungsmuster
+/// wie `combine_layouts`/`detect_layout` oben (siehe `tests::combine_layouts_*`).
+fn output_names_have_opp_head(names: &[Option<&str>]) -> bool {
+    names.iter().any(|n| *n == Some("opp_points"))
+}
+
+/// Liest die ONNX-Output-Namen aus dem ROHEN (noch nicht optimierten) Graph
+/// und wertet sie per `output_names_have_opp_head` aus. Muss VOR jedem
+/// `apply_input_facts`/`into_optimized()`-Aufruf laufen (siehe
+/// `build_from_layout`) -- Optimierung kann Outlet-Reihenfolge/-Labels
+/// veraendern, die ONNX-Deklaration selbst ist dagegen immer robust lesbar
+/// (analog `detect_layout`s Input-seitiges Pendant).
+fn detect_opp_head(model: &RawModel) -> TractResult<bool> {
+    let outlets = model.output_outlets()?;
+    let names: Vec<Option<&str>> = outlets.iter().map(|&o| model.outlet_label(o)).collect();
+    Ok(output_names_have_opp_head(&names))
+}
+
 /// Teilt einen zeilenweise (Batch zuerst) flach ausgelesenen Batch=2-Output
 /// exakt in der Mitte -- funktioniert für jede Kopfgröße (policy/value/moon/
 /// points), solange der Tensor row-major mit Batch als führender Achse ist
@@ -445,6 +600,20 @@ fn split_batch_n(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
     }
     let row_width = flat.len() / n;
     flat.chunks(row_width.max(1)).map(|c| c.to_vec()).collect()
+}
+
+/// Wie `split_batch_n`, aber fuer optionale Koepfe (Task #28 `opp_points`):
+/// ein LEERER `flat`-Puffer bedeutet "Kopf fehlt im Modell", nicht "0 Werte
+/// pro Zeile" -- `split_batch_n` selbst wuerde dafuer (da `flat.len()/n == 0`
+/// UND `flat` leer ist) `chunks(1)` auf einem leeren Slice aufrufen, was 0
+/// Chunks statt `n` leerer Zeilen liefert. `eval_batch_ex`s Aufrufer indiziert
+/// `opp_rows[i]` aber fuer JEDES `i in 0..n` -- diese Variante haelt die
+/// Invariante "genau `n` Zeilen" auch im leeren Fall.
+fn split_batch_n_or_empty_rows(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
+    if flat.is_empty() {
+        return vec![Vec::new(); n];
+    }
+    split_batch_n(flat, n)
 }
 
 /// Puffer-Split für `InputLayout::PlanesPlusFlat` (Task #11 Phase 2): jedes
@@ -653,5 +822,82 @@ mod tests {
         let feats: Vec<f32> = vec![0.0; net.input_size];
         let refs: Vec<&[f32]> = (0..EVAL_BATCH_MAX_N + 1).map(|_| feats.as_slice()).collect();
         assert!(net.eval_batch(&refs).is_err(), "N > EVAL_BATCH_MAX_N muss fehlschlagen, nicht still zurueckfallen");
+    }
+
+    // ── Task #28 (`PREREG_task28_aggression.md`): `opp_points`-Kopf-Erkennung ──
+    // Kein reales Modell mit dem Kopf existiert bislang (Python-Export folgt
+    // erst nach diesem Engine-Auftrag) -- die Erkennungslogik ist deshalb rein
+    // ueber die Namens-Liste getestet, kein ONNX-Zugriff noetig (analog
+    // `combine_layouts_*` oben).
+
+    #[test]
+    fn output_names_have_opp_head_detects_trailing_name() {
+        // Vertrag: opp_points HINTER allen bestehenden Outputs (policy, value,
+        // moon, points).
+        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points"), Some("opp_points")];
+        assert!(output_names_have_opp_head(&names));
+    }
+
+    #[test]
+    fn output_names_have_opp_head_absent_on_legacy_four_output_model() {
+        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points")];
+        assert!(!output_names_have_opp_head(&names));
+    }
+
+    #[test]
+    fn output_names_have_opp_head_ignores_unnamed_or_unlabeled_outlets() {
+        // tract liefert `None`, wenn ein Outlet kein explizites Label hat --
+        // darf die Suche nicht crashen lassen, nur "nicht gefunden" liefern.
+        let names = vec![None, Some("value"), None, Some("points")];
+        assert!(!output_names_have_opp_head(&names));
+    }
+
+    #[test]
+    fn output_names_have_opp_head_is_position_independent() {
+        // Namens- statt Positions-basiert (Doku-Anspruch): auch wenn
+        // `opp_points` (hypothetisch) nicht an letzter Stelle stünde, muss die
+        // Erkennung greifen.
+        let names = vec![Some("policy"), Some("opp_points"), Some("value")];
+        assert!(output_names_have_opp_head(&names));
+    }
+
+    #[test]
+    fn output_names_have_opp_head_empty_list_is_false() {
+        assert!(!output_names_have_opp_head(&[]));
+    }
+
+    // ── Task #28: `split_batch_n_or_empty_rows` (reine Puffer-Arithmetik) ──
+
+    #[test]
+    fn split_batch_n_or_empty_rows_empty_input_yields_n_empty_rows() {
+        let rows = split_batch_n_or_empty_rows(Vec::new(), 5);
+        assert_eq!(rows.len(), 5, "leerer opp-Puffer muss trotzdem N Zeilen liefern");
+        assert!(rows.iter().all(|r| r.is_empty()));
+    }
+
+    #[test]
+    fn split_batch_n_or_empty_rows_nonempty_input_matches_split_batch_n() {
+        let flat = vec![1.0f32, 2.0, 3.0, 4.0];
+        let expected = split_batch_n(flat.clone(), 2);
+        let actual = split_batch_n_or_empty_rows(flat, 2);
+        assert_eq!(actual, expected);
+    }
+
+    // ── Task #28: `eval_ex` muss auf Legacy-Modellen (kein opp-Kopf) exakt
+    // dieselben ersten vier Ausgaben liefern wie `eval` -- byte-identischer
+    // Kern, nur ein zusaetzlicher (hier leerer) 5. Wert.
+
+    #[test]
+    fn eval_ex_matches_eval_on_legacy_model_and_opp_is_empty() {
+        let Some(net) = load_eval_batch_test_net() else { return };
+        assert!(!net.has_opp_head(), "v18_best hat noch keinen opp_points-Kopf");
+        let feats: Vec<f32> = vec![0.1; net.input_size];
+        let (p1, v1, m1, pt1) = net.eval(&feats).expect("eval");
+        let (p2, v2, m2, pt2, opp) = net.eval_ex(&feats).expect("eval_ex");
+        assert_eq!(p1, p2);
+        assert_eq!(v1, v2);
+        assert_eq!(m1, m2);
+        assert_eq!(pt1, pt2);
+        assert!(opp.is_empty(), "Legacy-Modell darf keinen opp_points-Wert liefern");
     }
 }

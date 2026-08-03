@@ -155,6 +155,11 @@ Rekonstruktions-Brücke über den ersten R5-Record entfällt als
 Fehlerquelle; der erste echte R5-Record dient weiterhin als
 Konsistenz-Anker: der deterministische Vorlauf muss sein Brett modulo
 Befüllung reproduzieren). Wheel-Build nötig (Koordinator).
+Implementierungs-Detail (Agent-Befund): der zurückgegebene `r4_end_state`
+liegt VOR dem finalen `EndTiling` — Rundenend-Strafen/Bodenräumung sind
+dort noch nicht verrechnet (passieren je Sample in `advance_one_chance`).
+Der Konsistenz-Anker vergleicht daher KUPPEL-BRETTER (dome_grids), nicht
+Scores/Bodenreihen.
 
 ## Messgrößen (je Modell separat: `v19_2d_best` primär [Champion],
 ## `v18_best`/`v19_best` sekundär zur Generationen-Einordnung)

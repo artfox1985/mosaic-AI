@@ -3704,14 +3704,18 @@ pub fn value_noise_floor_diagnostic(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// Zaehlt alle Vorkommen von `color` im GESAMTEN Spielzustand: Beutel,
     /// Turm, alle Fabriken (Sun+Mond), Spielerreihen, Strafleiste, verlegte
     /// Kuppel-Spaces. Grundlage fuer den Bilanz-Sanity-Check unten (Basis fuer
     /// das geplante Beutel-Farbanteil-Feature, siehe stage2_investigation.md).
-    fn count_color(state: &GameState, color: crate::tile::TileColor) -> usize {
+    /// `pub(crate)` (2026-08-03, Task
+    /// `round_transition_resample::autoplay_to_round5_and_resample`-Tests):
+    /// wiederverwendet statt dupliziert, Memory
+    /// `feedback_check_existing_tools_first`.
+    pub(crate) fn count_color(state: &GameState, color: crate::tile::TileColor) -> usize {
         let mut n = 0;
         n += state.bag.tiles.iter().filter(|&&c| c == color).count();
         n += state.tower.tiles.iter().filter(|&&c| c == color).count();
