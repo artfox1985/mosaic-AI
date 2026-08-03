@@ -106,8 +106,10 @@ heute: v19-Kampagne in `data/`): dort trägt jede abgeschlossene Partie
   Netz in Training und Suche), Regel: `phase=="tiling"` verlangt, sonst
   Partie ausschließen (Ausschlussquote wird berichtet);
 - den **ersten R5-Record** (Zustand NACH der echten Befüllung, VOR dem
-  ersten R5-Zug) — aus ihm wird die Befüllung invertiert und neu gesampelt
-  (siehe Vorbedingung unten).
+  ersten R5-Zug) — dient als Konsistenz-Anker des deterministischen
+  Vorlaufs und liefert die reale Befüllung als 17. Sample (siehe
+  Vorbedingung unten; Redesign 2026-08-03: Vorwärts-Sampling statt
+  Inversion).
 
 **Konsistenz der beiden Seiten**: zwischen letztem R4-Record und Rundenende
 liegt nur noch Solver-Tiling (beide Spieler, DFS-Solver, exakt/optimal und
@@ -123,25 +125,36 @@ aus Sicht des R5-Startspielers (`current_player` des ersten R5-Records,
 des R4-End-Records — beide werden auf eine feste Spieler-0-Perspektive
 gemappt (Margin-Vorzeichen flippen bzw. p → 1−p, wo nötig).
 
-## Vorbedingung (Rust, additiv — noch NICHT gebaut)
+## Vorbedingung (Rust, additiv) — REDESIGN 2026-08-03, VOR jeder Messung
 
-Es gibt keinen Python-Einstieg fürs Übergangs-Sampling (geprüft:
-`lib.rs`/`py.rs` exportieren nur `net_search_state_json`/`_trace` u.ä.).
-Nötig ist ein kleiner additiver Binding-Einstieg:
+**Erster Entwurf (Inversion vom R5-Start aus,
+`resample_round_transition_json`) ist implementiert und getestet, aber
+für den Messpfad VERWORFEN**: Die Turm-Reshuffle-Ausschlussregel (leerer
+Turm nach Befüllung = nicht eindeutig invertierbar) trifft auf dem
+vollen Korpus **87,6% aller Partien** (9000 gescannt; ein früherer
+0%-Befund war ein Messfehler — `tower_colors` ist ein Farb-Zähl-Array,
+leer heißt Summe==0). Ein 12%-Rest-Substrat wäre zudem systematisch
+verzerrt (Partien ohne Turm-Reshuffle am Übergang).
+
+**Messpfad-Binding (Vorwärts-Sampling, vermeidet die Ambiguität
+vollständig):**
 
 ```
-mosaic_rust.resample_round_transition_json(r5_start_state_json, n_samples, seed)
-  -> Liste von n_samples R5-Start-state_jsons
+mosaic_rust.autoplay_to_round5_and_resample_json(r4_state_json, n_samples, seed)
 ```
 
-Semantik: `json_to_state` (mit Neumischung verdeckter Information wie
-gehabt), dann Fabrik-Inhalte + Bonus-Chips zurücklegen (Beutel/Pool),
-dann `fill_factories` n-mal mit frisch geseedetem RNG. Wheel-Build nötig
-(Koordinator). **Turm-Reshuffle-Grenzfall**: Partien, bei denen die
-ORIGINAL-Befüllung einen Turm-Reshuffle in den Beutel auslöste, sind nicht
-eindeutig invertierbar — solche Zustände werden AUSGESCHLOSSEN (Detektion
-konservativ, z.B. über das Log-Ereignis bzw. die Beutel-Zählung; Umsetzung
-beim Implementierer, Ausschlussquote wird berichtet).
+Semantik: `json_to_state` auf dem LETZTEN R4-Record (Beutel/Turm sind
+dort als exakte Zähl-Multisets öffentlich bekannt), dann DETERMINISTISCHER
+Vorlauf bis zum Rundenende (Solver-Tiling beider Spieler +
+Rundenende-Wertung/Abwürfe — bestehende Engine-Pfade, kein RNG), dann
+n-mal `setup_new_round` mit per-Sample-RNG auf Kopien — der natürliche
+Beutel-leer→Turm-Reshuffle-Pfad läuft dabei regelkonform mit. KEIN
+Ausschluss, 100% Substrat, und Modell-Input (letzter R4-Record) und
+Ground-Truth-Ausgangspunkt sind DERSELBE Zustand (die frühere
+Rekonstruktions-Brücke über den ersten R5-Record entfällt als
+Fehlerquelle; der erste echte R5-Record dient weiterhin als
+Konsistenz-Anker: der deterministische Vorlauf muss sein Brett modulo
+Befüllung reproduzieren). Wheel-Build nötig (Koordinator).
 
 ## Messgrößen (je Modell separat: `v19_2d_best` primär [Champion],
 ## `v18_best`/`v19_best` sekundär zur Generationen-Einordnung)
