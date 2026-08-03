@@ -7207,6 +7207,31 @@ das Zielrauschen IST reduzierbar -- uebersetzt aber (noch) nicht in
 Staerke). Naechster Diagnose-Baustein: R4-Ende-Kalibrierung
 (PREREG_r4_value_calibration.md, wartet auf Rust-Vorbedingung + Freigabe).
 
+## Task #31 (vorgemerkt): Menschen-Schwierigkeitsstufen leicht/mittel/schwer/extrem (2026-08-03)
+
+**Nutzer-Auftrag**: Staerke-Skalierung fuer Mensch-Spiele; Einschaetzung
+"Sims allein richten es nicht" ist KORREKT und hier besonders: (a) R5-
+Alpha-Beta + Tiling-DFS spielen sim-unabhaengig exakt -- eine 20-Sims-KI
+spielt trotzdem perfekte Endspiele; (b) Gumbel+Policy-Prior traegt auch
+Mini-Budgets -- flacher, aber nicht menschlich-fehlbar.
+
+**Design-Skizze (3 Hebel je Stufe)**: Sims-Budget + Endspiel-/Tiling-
+Degradation (R5-Knotenbudget-Override bzw. Policy-Sampling statt Solver,
+Tiling greedy statt exakt bei "leicht") + Fehler-Injektion via Root-
+Temperatur-Sampling mit Q-GAP-DECKEL (nur plausible Fehler <=3-5 Punkte;
+menschlich-fehlbar statt gleichmaessig-flach; loest auch Ausrechenbarkeit).
+Stufen: extrem=Champion@600-800 (optional lambda_aggr als Stil),
+schwer=heutiger Stand @400, mittel=~100-150 Sims + Deckel-Sampling +
+reduziertes R5-Budget, leicht=~8-16 Sims + Temperatur hoeher + epsilon +
+Greedy-Tiling. ABGERATEN: alte Generationen als Stufen (Wartung,
+OneDrive-Risiko, Regel-Fix-Inkompatibilitaeten, "gleichmaessig schwach").
+
+**Kalibrierung**: vorhandene Elo-Leiter + Heuristik-Anker; je Konfiguration
+n=150 vs 2 Anker, Ziel-Baender ~leicht 700-800 / mittel ~1000 / schwer
+~1150-1200 / extrem=Champion. Umsetzung nach Muster Task #28
+(Laufzeit-Parameter + Server-Preset + GUI-Dropdown). OFFEN (Nutzer):
+Ziel-Baender ok? Darf "leicht" sichtbar Endspiele verstolpern?
+
 ## Lambda-v18only: ARENA-SIGNIFIKANTER SIEG -- λ=0.7 wird v20-Standard-Kandidat (2026-08-03)
 
 **Kehrtwende nach dem 900er-Null** (`PREREG_lambda_v18only.md`, Nutzer-
