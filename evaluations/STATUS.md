@@ -7069,6 +7069,45 @@ Konvention wie `voll_s*`/`halb_s*`/`fs_2d_s*` (nur Manifeste bleiben).
 Sandboxes raeumen die Treiber selbst ab; OneDrive-Handle-Reste werden
 manuell nachgeraeumt (Smoke-Sandboxes 2026-08-03 so bereinigt).
 
+## Lambda-Sweep ABGESCHLOSSEN: klares Offline-Signal, KEINE Arena-Bestaetigung (2026-08-03)
+
+**Offline (24 Laeufe, 6 gepaarte Seeds x 4 Arme, PREREG_lambda_target.md)**:
+ALLE drei λ-Arme schlagen die lam10-Baseline auf der Primaermetrik
+`value_r2_rounds_1_4`, jeweils 6/6 Seeds, alle ueber der
+0,015-Aufloesungsgrenze:
+
+| Arm | Ø-Diff vs lam10 | Richtung | t-Test |
+|---|---|---|---|
+| lam07 (λ=0.7) | **+0,0270** | 6/6 | p=0,0061 |
+| lam05 (λ=0.5) | +0,0233 | 6/6 | p=0,0001 |
+| lam03 (λ=0.3) | +0,0269 | 6/6 | p=0,0061 |
+
+Orakel-Metriken flach ueber alle Arme (Sanity bestanden: reiner
+Value-Kopf-Effekt, Policy unberuehrt). Die Varianzreduktions-Hypothese
+(soft-Z) traegt OFFLINE klar -- bemerkenswert bei nur 43,83%
+root_q-Sample-Anteil.
+
+**Arena (vorregistrierter Schritt, `--no-promote-winner`)**: bester Arm
+lam07 (Checkpoint-Wahl je Arm: bester Seed nach Primaermetrik, s3 vs s4)
+gegen lam10: **43:57, SPRT nimmt H0 nach 50 Paaren an** (LLR=-3,44,
+gepaarte Diff -0,28 [KI -0,68..+0,12], Bericht-McNemar p=0,25;
+`paired_gating_result_lam07_s3_best_vs_lam10_s4_best.json`, im
+elo_tracker protokolliert).
+
+**Verdikt nach PREREG-Regel 4**: Offline-Signal OHNE Arena-Bestaetigung =
+Beobachtung, KEIN Rezeptwechsel -- `--value-target-lambda` bleibt 1.0
+(Standard). Einordnung: passt zum v11-Praezedenzfall (TD-Bootstrap hob
+R1/R2-R², brachte aber keine Staerke) und zur bekannten Offline-Arena-
+Luecke des Value-R². Wiedervorlage laut PREREG-Interpretationsregel:
+wiederholen, wenn ein groesserer Korpusanteil root_q traegt (nach v20-
+Self-Play faellt v16/v17 aus dem Fenster, dann ~100% root_q-faehige
+Dateien). Aufgeraeumt: 24 Checkpoints geloescht (Manifeste + Ergebnis-
+JSONs bleiben), data_lambda_sweep/ entfernt.
+
+**Nebenbefund**: der offene Heuristik-Anker fuer v19_2d_best ist laengst
+gelaufen (2026-08-02, festes n=150: 113:37, 75% Siege, Elo 1326) --
+offener Punkt geschlossen.
+
 ## Task #28 (vorgemerkt): Aggressiveres Spiel -- Score-/Denial-Utility (2026-08-03)
 
 **Nutzer-Wunsch**: die KI soll aktiv dem Gegner schaden (Punkte wegnehmen/
