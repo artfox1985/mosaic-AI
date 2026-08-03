@@ -198,6 +198,28 @@ def points_dist_loss(logits, targets, model, rw2, denom):
     return (ce * rw2).sum() / denom
 
 
+def _unpack_optional_outputs(model, out_tuple):
+    """Task #28 (PREREG_task28_aggression.md): `model(...)` haengt bis zu zwei
+    OPTIONALE Ausgaben hinter den festen 5 (policy/value/moon/points/
+    ownership) an -- `points_dist`-Logits (Task #12, `points_dist_bins>0`)
+    und/oder `opp_points` (additiver Kopf, ZULETZT). Deren Reihenfolge/
+    Anwesenheit haengt vom MODELL ab, nicht von der Tupel-LAENGE allein
+    (eine Laenge von 6 ist sonst mehrdeutig: entweder nur points_dist ODER
+    nur opp_points) -- daher Introspektion ueber die Modell-Attribute statt
+    reinem Index-Raten. Gibt `(pred_points_logits, pred_opp_points)` zurueck,
+    je `None` wenn nicht vorhanden."""
+    idx = 5
+    pred_points_logits = None
+    if getattr(model, "points_dist_bins", 0) > 0:
+        pred_points_logits = out_tuple[idx]
+        idx += 1
+    pred_opp_points = None
+    if getattr(model, "has_opp_points_head", False):
+        pred_opp_points = out_tuple[idx]
+        idx += 1
+    return pred_points_logits, pred_opp_points
+
+
 def _git_commit_hash() -> str | None:
     """Best-effort HEAD-Commit-Hash. None, wenn nicht ermittelbar."""
     try:
@@ -312,7 +334,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
-          value_target_lambda=1.0):
+          value_target_lambda=1.0, opp_points_head=False):
     # λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z"):
     # harte Validierung VOR jedem teuren Daten-Laden -- kein stiller Clamp
     # (siehe train.py --load-Footgun-Historie im Modulkommentar/Memory
@@ -395,7 +417,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "seed": seed, "snapshot": snapshot,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant, "encoder": encoder,
-        "value_target_lambda": value_target_lambda,
+        "value_target_lambda": value_target_lambda, "opp_points_head": opp_points_head,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -517,12 +539,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           + (f"  (Default {VALUE_WEIGHT})" if value_weight is not None else ""))
     print(f"   Points Weight : {effective_points_weight}  (Punktestand-Prognose, Aux-Signal)"
           + (f"  (Default {POINTS_WEIGHT})" if points_weight is not None else ""))
+    if opp_points_head:
+        print(f"   Opp-Punkte-Kopf: AN (Task #28, PREREG_task28_aggression.md) -- "
+              f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NICHT Teil von val_combined")
     if encoder == "2d":
         model = Mosaic2DNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
-                            points_dist_bins=effective_points_dist_bins)
+                            points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head)
     else:
         model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
-                          points_dist_bins=effective_points_dist_bins)
+                          points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head)
 
     # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
@@ -588,6 +613,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     policy_history  = []
     value_history   = []
     points_history  = []
+    # Task #28: nur befuellt, wenn --opp-points-head aktiv ist -- rein
+    # informatives Logging/Checkpoint-Feld, NICHT Teil der Checkpoint-
+    # Auswahl (siehe Kommentar an der `current_metric`-Stelle unten).
+    opp_points_history = []
     val_ploss_history = []
     # Value/Points hatten bisher KEINEN Val-Split-Loss/R² -- nur der rohe
     # Trainings-Loss wurde reported (siehe TRAINING SUMMARY unten). Für den
@@ -599,6 +628,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     val_pointsloss_history = []
     val_value_r2_history = []
     val_points_r2_history = []
+    val_opp_pointsloss_history = []
+    val_opp_points_r2_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -665,6 +696,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
+        t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
 
         for _batch_idx, _batch in enumerate(dataloader):
             if _batch_idx % _mem_log_every == 0:
@@ -672,26 +704,33 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 if _mi is not None:
                     print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
                           f"rss={_mi[0]:.2f}GB commit={_mi[1]:.2f}GB", flush=True)
-            # Task #11 Phase 2: MosaicDataset liefert bei encoder="2d" ein
-            # 10-Tupel (planes VORAN), bei encoder="flat" (Standard) weiterhin
-            # das bestehende 9-Tupel byte-identisch -- siehe
-            # `neural_net.py::MosaicDataset.__getitem__`.
+            # Task #11 Phase 2 / Task #28: MosaicDataset liefert bei
+            # encoder="2d" ein 12-Tupel (planes VORAN), bei encoder="flat"
+            # (Standard) das 11-Tupel -- die letzten 2 Elemente
+            # (opp_points_forecast, opp_points_mask) sind additiv ANS ENDE
+            # angehaengt (siehe `neural_net.py::MosaicDataset.__getitem__`),
+            # unabhaengig davon, ob `--opp-points-head` aktiv ist (das Cache-
+            # Feld existiert immer, wird nur ggf. nicht im Loss genutzt).
             if encoder == "2d":
-                planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds, s_own = _batch
+                (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
+                 s_rounds, s_own, targets_opp_points, s_opp_mask) = _batch
                 planes = planes.to(device)
             else:
-                states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points, s_rounds, s_own = _batch
+                (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
+                 s_rounds, s_own, targets_opp_points, s_opp_mask) = _batch
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             targets_points = targets_points.to(device)
+            targets_opp_points = targets_opp_points.to(device)
+            s_opp_mask = s_opp_mask.to(device)
             masks     = masks.to(device)
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
             _out = model(planes, states) if encoder == "2d" else model(states)
             pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
-            pred_points_logits = _out[5] if len(_out) > 5 else None
+            pred_points_logits, pred_opp_points = _unpack_optional_outputs(model, _out)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -765,9 +804,27 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                         pred_own, own_t.clamp(min=0.0), reduction="none")
                     own_loss = (own_bce * own_m).sum() / own_m.sum()
 
+            # Task #28 (PREREG_task28_aggression.md "Minimal-invasiver
+            # Zuschnitt" Punkt 2): Opp-Punkte-Aux-Loss, NUR wenn der additive
+            # Kopf aktiv ist. MSE, Gewicht = POINTS_WEIGHT (symmetrisch zum
+            # eigenen Punkte-Kopf, kein neues Tuning), maskiert mit
+            # `s_opp_mask` (0 bei unvollstaendigen Partien ODER einem Alt-
+            # Cache ohne das Feld -- kein erfundener Zielwert geht in den
+            # Loss ein) UND zusaetzlich mit `rw` (--exclude-round5), falls
+            # aktiv -- gleiches Kombinationsmuster wie beim Punkte-Loss oben.
+            # Geht NICHT in `val_combined`/die Checkpoint-Auswahl ein (siehe
+            # Kommentar an der Auswahlstelle unten) -- Bestandsmetrik bleibt
+            # unveraendert vergleichbar mit Alt-Laeufen.
+            opp_loss = torch.zeros((), device=device)
+            if pred_opp_points is not None:
+                opp_w = s_opp_mask.view(-1, 1) if rw2 is None else s_opp_mask.view(-1, 1) * rw2
+                opp_denom = opp_w.sum().clamp(min=1e-6)
+                opp_loss = (((pred_opp_points - targets_opp_points) ** 2) * opp_w).sum() / opp_denom
+
             loss = (p_loss + effective_value_weight * v_loss
                     + effective_points_weight * points_loss
-                    + effective_ownership_weight * own_loss)
+                    + effective_ownership_weight * own_loss
+                    + effective_points_weight * opp_loss)
             loss.backward()
             optimizer.step()
 
@@ -775,14 +832,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             t_ploss      += p_loss.item()
             t_vloss      += v_loss.item()
             t_pointsloss += points_loss.item()
+            if pred_opp_points is not None:
+                t_opp_pointsloss += opp_loss.item()
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
         epoch_pointsloss = t_pointsloss / n_batches
+        epoch_opp_pointsloss = t_opp_pointsloss / n_batches
         epoch_tloss = t_loss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
         points_history.append(epoch_pointsloss)
+        opp_points_history.append(epoch_opp_pointsloss)
         total_history.append(epoch_tloss)
 
         # ── Validierung (Policy + Value + Points) auf dem NIE trainierten
@@ -797,28 +858,35 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_val_pointsloss = None
         epoch_val_value_r2 = None
         epoch_val_points_r2 = None
+        epoch_val_opp_pointsloss = None
+        epoch_val_opp_points_r2 = None
         if val_dataloader is not None:
             model.eval()
             val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
+            val_opp_pointsloss_sum, val_opp_batches = 0.0, 0  # Task #28, nur relevant wenn opp_points_head aktiv
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
+            opp_sum, opp_sumsq, opp_sqerr_sum, n_opp = 0.0, 0.0, 0.0, 0
             with torch.no_grad():
                 for _v_batch in val_dataloader:
                     if encoder == "2d":
                         (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
-                         v_targets_points, v_rounds, v_own) = _v_batch
+                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask) = _v_batch
                         v_planes = v_planes.to(device)
                     else:
                         (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
-                         v_targets_points, v_rounds, v_own) = _v_batch
+                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask) = _v_batch
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
                     v_targets_points = v_targets_points.to(device)
+                    v_targets_opp_points = v_targets_opp_points.to(device)
+                    v_opp_mask = v_opp_mask.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
                     _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
+                    _v_pred_points_logits, v_pred_opp_points = _unpack_optional_outputs(model, _vout)
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
@@ -856,10 +924,31 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     pts_sumsq += (v_targets_points ** 2).sum().item()
                     pts_sqerr_sum += ((v_targets_points - v_pred_points) ** 2).sum().item()
                     n_pts += v_targets_points.numel()
+
+                    # Task #28: Val-MSE + R² NUR ueber die tatsaechlich
+                    # gemaskten (opp_mask==1) Samples -- analog zum
+                    # Ownership-Loss-Muster, NICHT die volle Val-Menge (sonst
+                    # verwaesserte ein Alt-Cache-Anteil ohne das Feld die
+                    # Kennzahl mit erfundenen Nullen).
+                    if v_pred_opp_points is not None:
+                        opp_m = v_opp_mask.view(-1, 1)
+                        opp_n_batch = opp_m.sum().item()
+                        if opp_n_batch > 0:
+                            opp_batch_loss = (((v_targets_opp_points - v_pred_opp_points) ** 2)
+                                              * opp_m).sum() / opp_m.sum().clamp(min=1e-6)
+                            val_opp_pointsloss_sum += opp_batch_loss.item()
+                            val_opp_batches += 1
+                            opp_sum += (v_targets_opp_points * opp_m).sum().item()
+                            opp_sumsq += ((v_targets_opp_points ** 2) * opp_m).sum().item()
+                            opp_sqerr_sum += (((v_targets_opp_points - v_pred_opp_points) ** 2)
+                                              * opp_m).sum().item()
+                            n_opp += opp_n_batch
             model.train()
             epoch_val_ploss = val_ploss_sum / max(val_batches, 1)
             epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
             epoch_val_pointsloss = val_pointsloss_sum / max(val_batches, 1)
+            epoch_val_opp_pointsloss = (val_opp_pointsloss_sum / val_opp_batches
+                                        if val_opp_batches > 0 else None)
 
             def _r2(sum_y, sumsq_y, sqerr, n):
                 if n == 0:
@@ -871,11 +960,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
             epoch_val_value_r2 = _r2(v_sum, v_sumsq, v_sqerr_sum, n_v)
             epoch_val_points_r2 = _r2(pts_sum, pts_sumsq, pts_sqerr_sum, n_pts)
+            epoch_val_opp_points_r2 = _r2(opp_sum, opp_sumsq, opp_sqerr_sum, n_opp)
         val_ploss_history.append(epoch_val_ploss)
         val_vloss_history.append(epoch_val_vloss)
         val_pointsloss_history.append(epoch_val_pointsloss)
         val_value_r2_history.append(epoch_val_value_r2)
         val_points_r2_history.append(epoch_val_points_r2)
+        val_opp_pointsloss_history.append(epoch_val_opp_pointsloss)
+        val_opp_points_r2_history.append(epoch_val_opp_points_r2)
 
         # Fund 8 (externer Hinweis, Bugfixes.txt Abschnitt C): "bestes Modell"
         # wurde bisher NUR nach Policy-Val-Loss gewählt -- der Value-Head
@@ -888,6 +980,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # bedeutet jetzt "bestes GESAMTZIEL", nicht mehr "bestes Policy-Val
         # allein". Fallback (kein Val-Split) nutzt dieselbe Formel auf den
         # Trainings-Losses, konsistent mit dem bisherigen Fallback-Muster.
+        #
+        # Task #28 (PREREG_task28_aggression.md "Minimal-invasiver Zuschnitt"
+        # Punkt 2): der opp-Punkte-Loss geht BEWUSST NICHT in `current_metric`
+        # ein, obwohl er mit POINTS_WEIGHT in den Trainings-`loss` einfliesst
+        # (siehe oben) -- `val_combined` bleibt dieselbe GROESSE wie vor
+        # diesem Task, Checkpoints aus Laeufen MIT und OHNE --opp-points-head
+        # bleiben damit anhand dieser Metrik vergleichbar (sonst waeren
+        # --opp-points-head-Laeufe stillschweigend auf einer anderen Skala
+        # ausgewaehlt worden als alle Alt-Laeufe).
         if epoch_val_ploss is not None:
             current_metric = epoch_val_ploss + effective_value_weight * epoch_val_vloss + effective_points_weight * epoch_val_pointsloss
         else:
@@ -1013,6 +1114,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     final_val_pointsloss = _last_valid(val_pointsloss_history)
     final_value_r2 = _last_valid(val_value_r2_history)
     final_points_r2 = _last_valid(val_points_r2_history)
+    final_opp_points_val_loss = _last_valid(val_opp_pointsloss_history)
+    final_opp_points_r2 = _last_valid(val_opp_points_r2_history)
     if final_val_ploss is not None:
         policy_val_gap = final_val_ploss - final_p
         print(f"  Policy Val-Loss: {final_val_ploss:.4f}  (Gap ggü. Train: {policy_val_gap:+.4f})")
@@ -1025,6 +1128,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if final_val_pointsloss is not None:
         r2_s = f"{final_points_r2:.4f}" if final_points_r2 is not None else "n/a"
         print(f"  Points Val-Loss: {final_val_pointsloss:.4f}  (Val-R²: {r2_s})")
+    if final_opp_points_val_loss is not None:
+        r2_s = f"{final_opp_points_r2:.4f}" if final_opp_points_r2 is not None else "n/a"
+        print(f"  Opp-Punkte Val-Loss: {final_opp_points_val_loss:.4f}  (Val-R²: {r2_s})  "
+              f"(Task #28, NICHT Teil von val_combined)")
     print(f"{'─'*55}")
     if stopped_early:
         print(f"  ⏹️  Early Stopping (Policy-Plateau) nach Epoche {len(policy_history)}/{epochs}")
@@ -1103,6 +1210,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # `neural_net.py::encoder_from_state_dict` bleibt die maßgebliche,
         # rückwirkend funktionierende Quelle (Erkennung aus `model_state`).
         "encoder":           encoder,
+        # Task #28 (PREREG_task28_aggression.md): analoges Bequemlichkeits-
+        # feld -- `neural_net.py::opp_points_head_present` bleibt die
+        # massgebliche, rueckwirkend funktionierende Quelle. `final_opp_*`
+        # sind rein informativ, NICHT Teil von val_combined/der Checkpoint-
+        # Auswahl (siehe Kommentar an der `current_metric`-Stelle oben).
+        "opp_points_head":   bool(opp_points_head),
+        "final_opp_points_loss": round(opp_points_history[-1], 4) if opp_points_history else None,
+        "final_opp_points_val_loss": (
+            round(final_opp_points_val_loss, 4) if final_opp_points_val_loss is not None else None),
+        "final_opp_points_val_r2": (
+            round(final_opp_points_r2, 4) if final_opp_points_r2 is not None else None),
     }
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
@@ -1129,6 +1247,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             round(val_value_r2_history[best_idx], 4) if val_value_r2_history[best_idx] is not None else None)
         best_checkpoint["final_points_val_r2"] = (
             round(val_points_r2_history[best_idx], 4) if val_points_r2_history[best_idx] is not None else None)
+        # Task #28: rein informativ am selben best_idx, siehe Kommentar oben.
+        best_checkpoint["final_opp_points_loss"] = (
+            round(opp_points_history[best_idx], 4) if best_idx < len(opp_points_history) else None)
+        best_checkpoint["final_opp_points_val_loss"] = (
+            round(val_opp_pointsloss_history[best_idx], 4)
+            if best_idx < len(val_opp_pointsloss_history) and val_opp_pointsloss_history[best_idx] is not None
+            else None)
+        best_checkpoint["final_opp_points_val_r2"] = (
+            round(val_opp_points_r2_history[best_idx], 4)
+            if best_idx < len(val_opp_points_r2_history) and val_opp_points_r2_history[best_idx] is not None
+            else None)
         best_version_name = f"{version_name}_best"
         best_save_path = MODELS_DIR / f"alphazero_{best_version_name}.pth"
         torch.save(best_checkpoint, str(best_save_path))
@@ -1292,6 +1421,17 @@ if __name__ == "__main__":
                              "neural_net.py::MosaicDataset.apply_value_target_lambda, "
                              "evaluations/PREREG_lambda_target.md. Aendert den HDF5-Cache-Key NICHT "
                              "(root_q ist additiv im Cache, der Mix passiert erst hier).")
+    parser.add_argument("--opp-points-head", action="store_true",
+                        help="Task #28 (PREREG_task28_aggression.md): additiven opp_points_head "
+                             "aktivieren (reine GEGNER-Punkteprognose, gleiche Architektur wie der "
+                             "skalare points_head, Gewicht=POINTS_WEIGHT, MSE, maskiert wo das "
+                             "Cache-Feld 'opp_points_forecast' fehlt/0 ist). STANDARD AUS -- ohne "
+                             "dieses Flag byte-identisches Bestandsverhalten (Kopf existiert nicht "
+                             "im Modell, kein ONNX-Output 'opp_points'). Der opp-Loss geht NICHT in "
+                             "val_combined/die Checkpoint-Auswahl ein (Bestandsmetrik bleibt "
+                             "unveraendert vergleichbar mit Alt-Laeufen), nur separat geloggt. "
+                             "--load von einem Alt-Checkpoint OHNE diesen Kopf funktioniert "
+                             "(fehlende Keys -> frisch initialisiert, Rest warm).")
     parser.add_argument("--encoder", type=str, default="flat", choices=["flat", "2d"],
                         help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
                              "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
@@ -1312,4 +1452,4 @@ if __name__ == "__main__":
           seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant, encoder=args.encoder,
-          value_target_lambda=args.value_target_lambda)
+          value_target_lambda=args.value_target_lambda, opp_points_head=args.opp_points_head)

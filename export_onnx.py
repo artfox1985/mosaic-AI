@@ -5,13 +5,20 @@ Rust-Inferenz (Phase B).
   python export_onnx.py --version s100
 
 Erzeugt models/alphazero_<version>.onnx mit 5 Outputs (policy, value, moon,
-points, ownership[, points_dist]) und dynamischer Batch-Achse. Die Rust-Engine
-(tract-onnx) lädt diese Datei für den Network-Modus (Self-Play / Arena).
-`value`/`points`/`ownership` sind reine Trainings-Zusatzsignale -- die Suche
-(Stage 1/3) liest nur `policy`/`moon`. (Baustein B: die frueheren
-dome_slot/dome_rotation-Outputs sind entfallen -- Kuppelplatten-Slot/Rotation
-haben jetzt eigene Policy-IDs statt einer separaten Kopf-Faktorisierung, siehe
-net_mcts.rs::build_untried_actions.)
+points, ownership[, points_dist[, opp_points]]) und dynamischer Batch-Achse.
+Die Rust-Engine (tract-onnx) lädt diese Datei für den Network-Modus
+(Self-Play / Arena). `value`/`points`/`ownership` sind reine Trainings-
+Zusatzsignale -- die Suche (Stage 1/3) liest nur `policy`/`moon`. (Baustein B:
+die frueheren dome_slot/dome_rotation-Outputs sind entfallen -- Kuppelplatten-
+Slot/Rotation haben jetzt eigene Policy-IDs statt einer separaten Kopf-
+Faktorisierung, siehe net_mcts.rs::build_untried_actions.)
+
+Task #28 (PREREG_task28_aggression.md): optionaler 6. (bzw. 7., falls
+`points_dist` aktiv) Output `opp_points` -- reine GEGNER-Punkteprognose,
+NUR wenn der Checkpoint den additiven `opp_points_head` traegt
+(`neural_net.py::opp_points_head_present`). Alt-Modelle ohne diesen Kopf
+exportieren byte-identisch wie zuvor. Die Engine erkennt den Output per
+NAME, nicht Position.
 
 Task #11 Phase 2 (M2.1): zusätzlicher 2D-Zweig für `Mosaic2DNet`-Checkpoints
 (`--encoder 2d` beim Training, siehe `train.py`) -- ZWEI ONNX-Graph-Inputs
@@ -28,7 +35,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (MosaicNet, Mosaic2DNet, points_dist_bins_from_state,  # noqa: E402
-                        encoder_from_state_dict)
+                        encoder_from_state_dict, opp_points_head_present)
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
 
@@ -50,9 +57,13 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     # das hätte den Policy-Head beim Re-Export stillschweigend kaputt gemacht,
     # siehe Vorfall bei v6).
     ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
+    # Task #28 (PREREG_task28_aggression.md): additiver opp_points_head NUR,
+    # wenn der Checkpoint ihn traegt -- Alt-Modelle exportieren dadurch
+    # byte-identisch (5 Outputs) wie vor dieser Aenderung.
+    opp_head = opp_points_head_present(state)
 
     model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
-                      points_dist_bins=points_dist_bins_from_state(state))
+                      points_dist_bins=points_dist_bins_from_state(state), opp_points_head=opp_head)
     new_state = model.state_dict()
     # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
     # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads
@@ -76,6 +87,12 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     out_names = ["policy", "value", "moon", "points", "ownership"]
     if getattr(model, "points_dist_bins", 0) > 0:
         out_names.append("points_dist")
+    # Task #28: "opp_points" MUSS der ZULETZT angehaengte Output sein (ONNX-
+    # Vertrag mit der Engine-Seite, siehe PREREG_task28_aggression.md) --
+    # deshalb nach "points_dist", nicht davor. Die Engine erkennt ihn per
+    # Output-NAME, nicht per Position.
+    if getattr(model, "has_opp_points_head", False):
+        out_names.append("opp_points")
     dyn_axes = {"state": {0: "batch"}}
     dyn_axes.update({n: {0: "batch"} for n in out_names})
 
@@ -129,10 +146,13 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
     conv_layers = sum(1 for k in state if k.startswith("conv.") and k.endswith(".weight")
                       and "running" not in k and int(k.split(".")[1]) % 3 == 0)
 
+    # Task #28: siehe _export_flat-Kommentar -- additiv, nur wenn im Checkpoint vorhanden.
+    opp_head = opp_points_head_present(state)
+
     model = Mosaic2DNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
                         points_dist_bins=points_dist_bins_from_state(state),
                         planes_channels=planes_channels, conv_channels=conv_channels,
-                        conv_layers=max(conv_layers, 1))
+                        conv_layers=max(conv_layers, 1), opp_points_head=opp_head)
     new_state = model.state_dict()
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
     if skipped:
@@ -144,6 +164,9 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
     out_names = ["policy", "value", "moon", "points", "ownership"]
     if getattr(model, "points_dist_bins", 0) > 0:
         out_names.append("points_dist")
+    # Task #28: "opp_points" ZULETZT (siehe _export_flat-Kommentar).
+    if getattr(model, "has_opp_points_head", False):
+        out_names.append("opp_points")
     # JEDE Ein-/Ausgabe muss in dynamic_axes stehen (siehe Flach-Zweig-Kommentar
     # oben) -- gilt hier für BEIDE Inputs.
     dyn_axes = {"planes": {0: "batch"}, "state": {0: "batch"}}
