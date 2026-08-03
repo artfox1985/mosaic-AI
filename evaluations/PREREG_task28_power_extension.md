@@ -41,3 +41,27 @@ gepoolte Auswertung waere Optional Stopping (Alpha-Inflation). Deshalb:
 Nach dem laufenden R4-Lauf (CPU-Ruhe), VOR Wheel-Install und PCR-Nachtlauf.
 Kosten: 2 x 150 Paare ~ 2 x 20-25 min. Auswertungs-Code identisch zum
 Erst-Sweep (per_pair_scores, gleiche Statistikfunktionen).
+
+## NACHTRAG (2026-08-03, VOR diesen Partien): Kipppunkt-Kartierung nach oben
+
+**Nutzer-Einwand**: der Erst-Sweep fand bis lambda=2 KEINEN Guardrail-Riss
+-- der Break-Even ("ab wann verliert zu aggressives Spiel") ist unkartiert,
+die "letzter Arm VOR dem Kipppunkt"-Regel damit unvollstaendig.
+
+- **Zwei Erkundungs-Arme**: lambda_aggr ∈ {3,0; 5,0} @ w=0,1 (5,0 =
+  Engine-Klemm-Maximum; dort saettigt der geklemmte Utility-Term praktisch
+  auf reines Anti-Gegner-Vorzeichen). Je **75 Paare**, Basis-Seed
+  **20260803** (identisch zum Erst-Sweep) -> direkt paarbar mit dem
+  vorhandenen la00-Arm.
+- **Kipppunkt-Regel (VORAB)**: Kipppunkt = kleinstes gemessenes lambda mit
+  signifikant negativer Win-Paar-Differenz vs la00 (exakter
+  Vorzeichentest, p<0,05). Zusaetzlich deskriptiv: Gegner-/Eigenpunkte-
+  Verlauf ueber die volle Dosis-Kurve {0; 0,5; 1; 2; 3; 5}.
+- **Empfehlungs-Update**: die dokumentierte GUI-Empfehlung bleibt das
+  groesste lambda OHNE Riss UNTER den konfirmierten Stufen (Konfirmation
+  weiterhin nur fuer lambda=2 via frischer Stichprobe oben) -- die
+  Erkundungs-Arme dienen der Kartierung, nicht der Empfehlung (75 Paare,
+  Erst-Blick-Charakter). Reisst der Guardrail schon bei lambda=3, ist
+  lambda=2 nahe am Optimum; reisst er selbst bei 5 nicht, ist der
+  Kipppunkt jenseits des Klemm-Maximums (eigener, dokumentierter Befund:
+  die Win-Rate ist im gesamten einstellbaren Bereich robust).
