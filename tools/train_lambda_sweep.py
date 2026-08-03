@@ -512,8 +512,8 @@ def run_diagnose_and_eval(seeds: list[int], diag_out: Path, result_out: Path,
     }
 
     for arm in non_baseline:
-        comp: dict = {"lambda": ARM_LAMBDAS[arm], "metrics": {}}
-        print(f"\n--- {arm} (λ={ARM_LAMBDAS[arm]}) vs {BASELINE_ARM} (Baseline, λ=1.0) ---")
+        comp: dict = {"lambda": arm_lambdas[arm], "metrics": {}}
+        print(f"\n--- {arm} (λ={arm_lambdas[arm]}) vs {BASELINE_ARM} (Baseline, λ=1.0) ---")
         for mk in metric_keys:
             common = sorted(s for s in seeds
                             if s in vals[arm] and s in vals[BASELINE_ARM]
@@ -697,7 +697,25 @@ def main() -> None:
                     help="Nur Split-Manifest + Hardlink-Sandbox (data_lambda_sweep/) aufbauen und "
                          "den Sample-Misch-Anteil messen, KEINE Trainingslaeufe starten. Zum "
                          "Vorbereiten VOR dem eigentlichen Sweep-Start.")
+    ap.add_argument("--corpus", choices=["full", "v18only"], default="full",
+                    help="'v18only' (PREREG_lambda_v18only.md, 2026-08-03): NUR die 600 "
+                         "v18-Dateien als Korpus -- hebt den Sample-Misch-Anteil von ~44%% auf "
+                         "das erreichbare Maximum (~66%%), 2 Arme (l10v18/l07v18) statt 4, "
+                         "eigene Sandbox/Manifeste/Namen (keine Kollision mit dem 900er-Sweep).")
     args = ap.parse_args()
+
+    if args.corpus == "v18only":
+        global EXPECTED_COUNTS, VERSION_PREFIXES, ARM_LAMBDAS, BASELINE_ARM, SWEEP_DIR, SPLIT_MANIFEST
+        EXPECTED_COUNTS = {"v18": 600}
+        VERSION_PREFIXES = ("v18",)
+        ARM_LAMBDAS = {"l10v18": 1.0, "l07v18": 0.7}
+        BASELINE_ARM = "l10v18"
+        SWEEP_DIR = BASE_DIR / "data_lambda_sweep_v18"
+        SPLIT_MANIFEST = BASE_DIR / "evaluations" / "train_lambda_sweep_v18only_split.json"
+        if args.out == ap.get_default("out"):
+            args.out = "evaluations/train_lambda_sweep_v18only_result.json"
+        if args.diag_out == ap.get_default("diag_out"):
+            args.diag_out = "evaluations/offline_diagnose_lambda_v18only_frozen.json"
 
     if args.smoke:
         run_smoke()
