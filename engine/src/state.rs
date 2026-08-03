@@ -316,6 +316,30 @@ pub fn setup_new_round<R: Rng + ?Sized>(state: &mut GameState, rng: &mut R) {
     state.log_event(format!("Runde {rn} beginnt. {starter} ist Startspieler."));
 }
 
+/// PREREG_r4_value_calibration.md, Abschnitt "Vorbedingung"
+/// (`resample_round_transition_json`, `lib.rs`): befüllt Fabriken auf einem
+/// bereits VOR-Befüllung zurückgesetzten Zustand -- dünner öffentlicher
+/// Wrapper um das private `fill_factories`, EXAKT derselbe Aufruf wie in
+/// `setup_new_round` oben (Fabriken + große Fabrik + Bonuschip-Pool),
+/// isoliert von den dortigen Runden-/Spieler-Feldern (`round_number`,
+/// `phase`, `current_player`, `players[].reset_dome_placements`), die beim
+/// Zurücksetzen/Resampeln eines bereits bestehenden Runde-5-Starts unverändert
+/// bleiben müssen (nur die Fabrik-Neubefüllung ist der zu resampelnde
+/// Zufallsknoten, siehe PREREG). `state.large_factory` muss vom Aufrufer
+/// bereits per `reset_for_new_round()` zurückgesetzt sein (wie in
+/// `setup_new_round`), sonst überlebt ein altes `monochrome_fallback=true`
+/// fälschlich in den Vergleichs-Pfad von `fill_large_factory`.
+pub fn fill_factories_for_resample<R: Rng + ?Sized>(state: &mut GameState, rng: &mut R) {
+    fill_factories(
+        &mut state.factories,
+        &mut state.large_factory,
+        &mut state.bag,
+        &mut state.tower,
+        rng,
+        Some(&mut state.bonus_chip_pool),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
