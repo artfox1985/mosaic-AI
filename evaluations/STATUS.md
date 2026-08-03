@@ -7142,6 +7142,48 @@ bleibt vorerst -- Nutzer-Entscheid ueber Archivierung/Loeschung steht aus
 die kontrolle-Spiele waeren prinzipiell nutzbar, laufen aber unter
 pcrkontrolle-Praefix ausserhalb der Fenster-Rotation).
 
+## R5-Value-Kalibrierung (Task #27) ABGESCHLOSSEN: Unterkalibrierung BESTAETIGT (2026-08-03)
+
+**Voller Lauf nach PREREG_r5_value_calibration.md** (24 Zustaende x 6
+Kombinationen, 139 auswertbare Paare je Modell, Kennlinie aus 233
+R5-Records, `r5_value_calibration_result.json`).
+
+**Kennlinie**: b=0,128 Logit/Punkt, McFadden-R²=0,316 -- KNAPP ueber der
+0,3-Kaskaden-Schwelle (Hauptmessung damit interpretierbar, aber die
+Kennlinie selbst ist deutlich schwaecher als der 2-Zustaende-Rauchtest
+suggerierte; mid-Drafting-R5-Records tragen offenbar mehr Restrauschen
+als Rundenstart-Endspiele, u.a. verdeckte-Info-Neumischung).
+
+**Kalibrierungs-Steigungen** (Modell-Reaktion auf Wertungsplatten-Tausch
+vs. erwartete Reaktion aus exakter Alpha-Beta-Ground-Truth; Soll ~1):
+
+| Modell | Value-Kopf Steigung | R² | Punkte-Kopf Steigung | R² |
+|---|---|---|---|---|
+| v18_best | **0,087** | 0,152 | 0,258 | 0,021 |
+| v19_best | 0,061 | 0,097 | 0,263 | 0,023 |
+| v19_2d_best | **0,061** | 0,134 | 0,156 | 0,008 |
+
+**Verdikt nach den vorregistrierten Regeln**:
+- **Value-Kopf: Unterkalibrierung BESTAETIGT** fuer v18_best und
+  v19_2d_best (R²>0,1, KI-Obergrenze der Steigung weit unter 0,85) --
+  der Kopf zeigt nur **~6-9% der erwarteten Win-Prob-Reaktion** auf
+  Platten-Aenderungen. Der Nutzer-Verdacht "unterkalibriert, nicht klein-
+  aber-real" ist damit quantitativ belegt. v19_best liegt mit R²=0,097
+  haarscharf unter der 0,1-Interpretationsschwelle (formal "kein
+  Befund", Zahlen praktisch deckungsgleich mit v19_2d).
+- **Punkte-Kopf: kein Befund** (R² 0,008-0,023, weit unter 0,1 -- zu
+  verrauscht relativ zum Signal; keine Aussage, ob kopf-spezifisch).
+- Anschauung aus den Rohdaten: exakt entschiedene +29-Punkte-Endspiele
+  bewertet das Modell mit nur 60-64% Win -- dasselbe Muster wie der
+  Live-Fund game_155431.
+
+**Handlungsempfehlung laut PREREG** (kein automatischer Rezeptwechsel):
+Kandidat fuers Value-Zielrauschen-Thema. Passt konsistent zum
+Lambda-Befund vom selben Tag (root_q-Mix hebt value_r2 offline klar --
+das Zielrauschen IST reduzierbar -- uebersetzt aber (noch) nicht in
+Staerke). Naechster Diagnose-Baustein: R4-Ende-Kalibrierung
+(PREREG_r4_value_calibration.md, wartet auf Rust-Vorbedingung + Freigabe).
+
 ## Task #28 (vorgemerkt): Aggressiveres Spiel -- Score-/Denial-Utility (2026-08-03)
 
 **Nutzer-Wunsch**: die KI soll aktiv dem Gegner schaden (Punkte wegnehmen/
