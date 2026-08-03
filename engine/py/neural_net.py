@@ -621,6 +621,20 @@ TD_LAMBDA = 0.5
 # selbst irgendetwas aendert (der λ-Mix ist eine reine train.py-Nachbearbeitung).
 ROOT_Q_CACHE_FIELDS = ("root_q", "root_q_mask")
 
+# Task #28 (evaluations/PREREG_task28_aggression.md, "Minimal-invasiver
+# Zuschnitt" Punkt 2): reine GEGNER-Punkteprognose als additives Aux-Ziel,
+# NEBEN `points_forecast` (das bleibt unveraendert, epsilon-Ziel fuer den
+# eigenen Punkte-Kopf). Genau wie `root_q` NICHT im `cache_key` -- ein
+# Alt-Cache ohne dieses Dataset laedt unveraendert weiter, Fallback unten ist
+# Wert 0.0 + Maske 0.0 (der opp-Loss in train.py wird dann fuer diese Samples
+# einfach maskiert, kein erfundener Zielwert). Wird mit EXAKT derselben
+# Blending-Struktur wie der own-seitige Term INNERHALB von `points_val`
+# konstruiert (Basis tanh(opp_total/VALUE_SCALE), rtv-Zweig opp_rtv,
+# TD-Bootstrap-Blend mit opp_bootstrap) -- NUR dadurch gilt die algebraische
+# Rueckgewinnung `own_pts = points_pred + VALUE_OPP_EPSILON*opp_pred` exakt
+# (siehe Kommentar an der Baustelle unten).
+OPP_POINTS_CACHE_FIELDS = ("opp_points_forecast", "opp_points_mask")
+
 # rtv-Ablation Phase 1 (Task #84, 2026-07-24): Trainings-Varianten, die den
 # `round_transition_value`-Override beim Target-Bau ignorieren -- OHNE neues
 # Self-Play, rein um zu testen, ob `rtv` (81% der Self-Play-Kosten, siehe
@@ -830,6 +844,15 @@ class MosaicDataset(Dataset):
                     # value_target_lambda=1.0 (Bestandsverhalten).
                     self.root_q = torch.zeros(len(self.states), dtype=torch.float32)
                     self.root_q_mask = torch.zeros(len(self.states), dtype=torch.float32)
+                if 'opp_points_forecast' in hf:
+                    self.opp_points_forecast = torch.from_numpy(hf['opp_points_forecast'][:])
+                    self.opp_points_mask = torch.from_numpy(hf['opp_points_mask'][:])
+                else:
+                    # Alt-Cache ohne den Task-#28-Kopf (siehe
+                    # OPP_POINTS_CACHE_FIELDS-Kommentar oben) -- Maske
+                    # komplett 0, `values`/`points_forecast` bleiben unberuehrt.
+                    self.opp_points_forecast = torch.zeros_like(self.values)
+                    self.opp_points_mask = torch.zeros(len(self.states), dtype=torch.float32)
                 if self.encoder == "2d":
                     if 'planes' not in hf:
                         raise RuntimeError(
@@ -877,6 +900,10 @@ class MosaicDataset(Dataset):
             # 2718b9a) -- Maske komplett 0, siehe ROOT_Q_CACHE_FIELDS-Kommentar.
             self.root_q = torch.zeros(len(self.states), dtype=torch.float32)
             self.root_q_mask = torch.zeros(len(self.states), dtype=torch.float32)
+            # Legacy .pt kennt auch keinen Task-#28-Kopf -- gleiches
+            # Fallback-Muster wie root_q oben.
+            self.opp_points_forecast = torch.zeros_like(self.values)
+            self.opp_points_mask = torch.zeros(len(self.states), dtype=torch.float32)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -890,6 +917,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('ownership',           data=self.ownership.numpy(),           compression='lzf')
                 hf.create_dataset('root_q',              data=self.root_q.numpy(),              compression='lzf')
                 hf.create_dataset('root_q_mask',         data=self.root_q_mask.numpy(),         compression='lzf')
+                hf.create_dataset('opp_points_forecast', data=self.opp_points_forecast.numpy(), compression='lzf')
+                hf.create_dataset('opp_points_mask',     data=self.opp_points_mask.numpy(),     compression='lzf')
             os.remove(cache_path_pt)
             self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
@@ -906,6 +935,8 @@ class MosaicDataset(Dataset):
             own_l = []     # Ownership-Ziel je Sample (Task #9): 72 Binaerlabels, -1 = unbekannt
             root_q_l = []       # λ-Misch-Experiment: roher Root-Suchwert, remapped [-1,1]
             root_q_mask_l = []  # 1.0 = root_q vorhanden (echte Suche geloggt), sonst 0.0
+            opp_points_l = []       # Task #28: reine Gegner-Punkteprognose (siehe OPP_POINTS_CACHE_FIELDS)
+            opp_points_mask_l = []  # 1.0 = echter Wert (scores/winner vorhanden), sonst 0.0
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
             # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
             # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
@@ -950,6 +981,24 @@ class MosaicDataset(Dataset):
                             # erhalten (bereits inkl. Wertungsplatten).
                             points_val = (math.tanh(own_total / VALUE_SCALE)
                                           - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
+                            # Task #28 (PREREG_task28_aggression.md, "Minimal-
+                            # invasiver Zuschnitt" Punkt 2): eigenstaendiger
+                            # Aux-Ziel-Track fuer den additiven
+                            # `opp_points_head` -- spiegelt JEDEN Zweig, der
+                            # oben in `points_val` den own-seitigen Term
+                            # (tanh(own_total/SCALE) -> own_rtv ->
+                            # TD-Blend mit own_bootstrap) bildet, 1:1 auf den
+                            # opp-Groessen. NUR durch diese Spiegelung gilt
+                            # `points_val == own-Term - EPSILON*opp_points_val`
+                            # in JEDEM Zweig (Induktion ueber rtv-/Bootstrap-
+                            # Override) -- und damit algebraisch exakt
+                            # `own_pts (= own-Term) = points_pred +
+                            # VALUE_OPP_EPSILON * opp_pred` bei perfekter
+                            # Kopf-Vorhersage. opp_points_val ist ausdruecklich
+                            # NICHT `val` gespiegelt (dessen Basis ist die
+                            # MARGIN (own-opp)/SCALE, nicht own_total allein).
+                            opp_points_val = math.tanh(opp_total / VALUE_SCALE)
+                            opp_points_mask = 1.0
                             # Rundenübergangs-Ziel (siehe round_transition.rs/
                             # self_play.rs::play_net_self_play_game): über
                             # mehrere Chance-Node-Samples (verschiedene mögliche
@@ -986,6 +1035,7 @@ class MosaicDataset(Dataset):
                                 opp_rtv = float(rtv[1 - p]) * 2.0 - 1.0
                                 val = own_rtv
                                 points_val = own_rtv - VALUE_OPP_EPSILON * opp_rtv
+                                opp_points_val = opp_rtv  # Task #28: spiegelt own_rtv-Override
                             # Punkt 6 (VALUE_SCHEMA_VERSION=15): TD-Bootstrap-
                             # Blend, siehe Kommentar oben -- mischt HINEIN
                             # (ersetzt `val`/`points_val` nicht komplett wie
@@ -998,11 +1048,24 @@ class MosaicDataset(Dataset):
                                 points_bootstrap = own_bootstrap - VALUE_OPP_EPSILON * opp_bootstrap
                                 val = TD_LAMBDA * own_bootstrap + (1.0 - TD_LAMBDA) * val
                                 points_val = TD_LAMBDA * points_bootstrap + (1.0 - TD_LAMBDA) * points_val
+                                # Task #28: identischer TD-Blend, opp-Seite
+                                # (gleiches TD_LAMBDA, gleiche Blend-Formel).
+                                opp_points_val = (TD_LAMBDA * opp_bootstrap
+                                                  + (1.0 - TD_LAMBDA) * opp_points_val)
                         else:
                             val = float(step["value"])
                             points_val = val
+                            # Task #28: unvollstaendige Partie (kein scores/
+                            # winner) -- gleicher Fallback-PFAD wie points_val
+                            # (`points_val = val`), aber hier Maske 0 statt
+                            # eines erfundenen Werts (PREREG-Vorgabe: "Maske 0
+                            # statt eines erfundenen Werts").
+                            opp_points_val = 0.0
+                            opp_points_mask = 0.0
                         values_l.append([val])
                         points_l.append([points_val])
+                        opp_points_l.append([opp_points_val])
+                        opp_points_mask_l.append(opp_points_mask)
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for pe in step["policy"]:
@@ -1092,6 +1155,8 @@ class MosaicDataset(Dataset):
             own_np       = np.array(own_l,       dtype=np.int8);    del own_l
             root_q_np      = np.array(root_q_l,      dtype=np.float32); del root_q_l
             root_q_mask_np = np.array(root_q_mask_l, dtype=np.float32); del root_q_mask_l
+            opp_points_np      = np.array(opp_points_l,      dtype=np.float32); del opp_points_l
+            opp_points_mask_np = np.array(opp_points_mask_l, dtype=np.float32); del opp_points_mask_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -1112,6 +1177,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('ownership',            data=own_np,       compression='lzf')
                 hf.create_dataset('root_q',               data=root_q_np,      compression='lzf')
                 hf.create_dataset('root_q_mask',          data=root_q_mask_np, compression='lzf')
+                hf.create_dataset('opp_points_forecast',  data=opp_points_np,      compression='lzf')
+                hf.create_dataset('opp_points_mask',      data=opp_points_mask_np, compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset('planes',           data=planes_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
@@ -1138,6 +1205,8 @@ class MosaicDataset(Dataset):
             self.ownership          = torch.from_numpy(own_np)
             self.root_q             = torch.from_numpy(root_q_np)
             self.root_q_mask        = torch.from_numpy(root_q_mask_np)
+            self.opp_points_forecast = torch.from_numpy(opp_points_np)
+            self.opp_points_mask     = torch.from_numpy(opp_points_mask_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -1265,11 +1334,17 @@ class MosaicDataset(Dataset):
     def __getitem__(self, idx):
         base = (self.states[idx], self.policies[idx], self.values[idx], self.masks[idx],
                 self.moon_order_targets[idx], self.policy_weights[idx], self.points_forecast[idx],
-                self.rounds[idx], self.ownership[idx])
+                self.rounds[idx], self.ownership[idx],
+                # Task #28 (PREREG_task28_aggression.md): additiv ANS ENDE
+                # angehaengt -- Aufrufer, die dieses 9-Tupel noch kennen (z.B.
+                # `tools/diagnosis.py`s `*_`-Catch-all), bleiben unberuehrt,
+                # solange sie nicht die letzten 2 Elemente per Index erwarten.
+                self.opp_points_forecast[idx], self.opp_points_mask[idx])
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
-        # vorangestellt (10-Tupel statt 9) -- `encoder="flat"` (Standard)
-        # bleibt exakt das bisherige 9-Tupel, byte-identisches Bestandsverhalten
-        # für alle Aufrufer, die den `encoder`-Parameter nicht kennen.
+        # vorangestellt (12-Tupel statt 11) -- `encoder="flat"` (Standard)
+        # bleibt exakt das bisherige Tupel-Layout, byte-identisches
+        # Bestandsverhalten für alle Aufrufer, die den `encoder`-Parameter
+        # nicht kennen.
         if self.encoder == "2d":
             return (self._get_planes_tensor(idx),) + base
         return base
@@ -1294,6 +1369,17 @@ def points_dist_bins_from_state(state: dict) -> int:
     return 0 if n <= 1 else n
 
 
+def opp_points_head_present(state: dict) -> bool:
+    """Task #28 (PREREG_task28_aggression.md): ob ein Checkpoint den additiven
+    `opp_points_head` (reine Gegner-Punkteprognose) traegt -- AUS DEM
+    STATE_DICT abgeleitet, dasselbe Muster wie `points_dist_bins_from_state`/
+    `encoder_from_state_dict`. Alt-Checkpoints ohne den Kopf liefern False und
+    bleiben dadurch OHNE ihn ladbar/exportierbar (Additiv-Regel: kein
+    zufallsinitialisierter Kopf wird stillschweigend an ein Alt-Modell
+    angehaengt)."""
+    return "opp_points_head.0.weight" in state
+
+
 def encoder_from_state_dict(state: dict) -> str:
     """Task #11 Phase 2 (M2.1): 'flat' oder '2d' AUS DEM CHECKPOINT ableiten --
     dasselbe Muster wie `points_dist_bins_from_state`. Ein 2D-Checkpoint
@@ -1308,7 +1394,7 @@ def encoder_from_state_dict(state: dict) -> str:
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64,
-                 points_dist_bins=POINTS_DIST_BINS):
+                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False):
         super(MosaicNet, self).__init__()
         self.body = nn.Sequential(
             nn.Linear(input_size, hidden_size),
@@ -1406,6 +1492,26 @@ class MosaicNet(nn.Module):
             nn.ReLU(),
             nn.Linear(128, OWNERSHIP_TARGETS),
         )
+        # opp_points_head (Task #28, PREREG_task28_aggression.md "Minimal-
+        # invasiver Zuschnitt" Punkt 2): reine GEGNER-Punkteprognose, additiv,
+        # standardmaessig AUS (`opp_points_head=False` -> Attribut existiert
+        # gar nicht, Alt-Verhalten byte-identisch, kein Zufallsgewicht
+        # irgendwo im Graphen). Gleiche Architektur wie der SKALARE Zweig von
+        # `points_head` (bewusste Vereinfachung: der Verteilungs-Kopf aus
+        # Task #12 wird hier NICHT gespiegelt -- POINTS_DIST_BINS ist per
+        # Projektstandard 0/inert, siehe STATUS.md Task #12, eine Kombination
+        # aus beiden Kopf-Arten ist kein aktueller Anwendungsfall). BEWUSST
+        # NACH ownership_head deklariert (gleiches "zuletzt"-Muster) --
+        # Initialisierungsreihenfolge aller uebrigen Module bleibt dadurch
+        # unveraendert.
+        self.has_opp_points_head = bool(opp_points_head)
+        if self.has_opp_points_head:
+            self.opp_points_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh(),
+            )
 
     def forward(self, x):
         shared = self.body(x)
@@ -1430,7 +1536,15 @@ class MosaicNet(nn.Module):
             pts_out,
             self.ownership_head(shared),
         )
-        return out + (pts_logits,) if pts_logits is not None else out
+        # Task #28: `opp_points` haengt HINTER ALLEM (auch hinter
+        # `pts_logits`, falls Task #12 aktiv waere) -- ONNX-Vertrag mit der
+        # Engine-Seite: "opp_points" ist der LETZTE Output, von Rust per NAME
+        # (nicht Position) erkannt.
+        if pts_logits is not None:
+            out = out + (pts_logits,)
+        if self.has_opp_points_head:
+            out = out + (self.opp_points_head(shared),)
+        return out
 
     @torch.no_grad()
     def analyze_capacity(self, x):
@@ -1501,7 +1615,8 @@ class Mosaic2DNet(nn.Module):
 
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64, points_dist_bins=POINTS_DIST_BINS,
-                 planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2):
+                 planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2,
+                 opp_points_head=False):
         super().__init__()
         self.input_size = input_size
         self.planes_channels = planes_channels
@@ -1591,6 +1706,17 @@ class Mosaic2DNet(nn.Module):
             nn.Linear(128, OWNERSHIP_TARGETS),
         )
 
+        # opp_points_head (Task #28) -- BYTE-IDENTISCHE Architektur/Begruendung
+        # zu `MosaicNet` (siehe dortiger Kommentar), additiv/standardmaessig AUS.
+        self.has_opp_points_head = bool(opp_points_head)
+        if self.has_opp_points_head:
+            self.opp_points_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh(),
+            )
+
     def forward(self, x_planes, x_flat=None):
         if x_flat is None:
             x_flat = torch.zeros(
@@ -1615,7 +1741,13 @@ class Mosaic2DNet(nn.Module):
             pts_out,
             self.ownership_head(shared),
         )
-        return out + (pts_logits,) if pts_logits is not None else out
+        # Task #28: `opp_points` haengt HINTER ALLEM, identisches Muster zu
+        # `MosaicNet.forward`.
+        if pts_logits is not None:
+            out = out + (pts_logits,)
+        if self.has_opp_points_head:
+            out = out + (self.opp_points_head(shared),)
+        return out
 
 
 def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_actions: int = NUM_ACTIONS,
@@ -1635,15 +1767,20 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     encoder = encoder_from_state_dict(state)
     hs = hidden_override if hidden_override is not None else ckpt.get("hidden_size", HIDDEN_SIZE)
     bins = points_dist_bins_from_state(state)
+    # Task #28: Praesenz des additiven opp_points_head AUS DEM CHECKPOINT
+    # ableiten (gleiches Muster wie `bins`/`encoder` oben) -- ein Alt-
+    # Checkpoint ohne diese Keys baut das Modell OHNE den Kopf, bleibt also
+    # ladbar/exportierbar wie bisher.
+    opp_head = opp_points_head_present(state)
     if encoder == "2d":
         in_size = input_size if input_size is not None else state["flat_branch.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
-                            policy_hidden=ph, points_dist_bins=bins)
+                            policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head)
     else:
         in_size = input_size if input_size is not None else state["body.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = MosaicNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
-                          policy_hidden=ph, points_dist_bins=bins)
+                          policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head)
     model.load_state_dict(state, strict=False)
     return model, encoder
