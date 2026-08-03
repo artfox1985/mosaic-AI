@@ -7108,6 +7108,40 @@ JSONs bleiben), data_lambda_sweep/ entfernt.
 gelaufen (2026-08-02, festes n=150: 113:37, 75% Siege, Elo 1326) --
 offener Punkt geschlossen.
 
+## PCR-A/B ABGESCHLOSSEN: Task #14 wird NICHT produktiv eingesetzt (2026-08-03)
+
+**12 Laeufe (6 gepaarte Seeds x kontrolle/pcr, flacher Encoder from scratch,
+PREREG_pcr.md), Policy-Maske aktiv** (Cheap-Zuege mit
+`policy_target_valid=false` -> `policy_weight=0`, Rauchtest-verifiziert).
+
+**Primaermetriken (arena-validierte Orakel-Praediktoren), pcr - kontrolle:**
+
+| Metrik | Ø-Diff | Richtung | t-Test |
+|---|---|---|---|
+| `prior_mass_on_oracle_top3` | **-0,0262** | 0/6 pcr besser | p=0,0008 |
+| `kendall_tau_policy_vs_oracle_q` | **-0,0211** | 0/6 pcr besser | p=0,0020 |
+
+**Verdikt nach PREREG-Abbruchregel**: pcr auf BEIDEN Orakel-Metriken
+gepaart schlechter -- der Tausch Suchqualitaet-gegen-Menge lohnt sich fuer
+dieses Design NICHT. Kein Arena-Gating, KEIN Zwei-Kampagnen-Betrieb ab v20;
+v20-Self-Play laeuft klassisch (jeder Zug Voll-Suche @600 Sims).
+
+**Einordnung**: die Wette war "mehr, aber teils schwaechere Value-Masse
+gegen weniger, aber verlaessliche Policy-Masse". Die Value-Seite hat sogar
+geliefert (`value_r2_rounds_1_4` sekundaer: +0,0402, 5/6 pcr besser,
+p=0,04 -- konsistent mit dem Dosis-Befund), aber der Policy-Verlust
+dominiert klar auf den einzigen arena-validierten Praediktoren. Bekannte
+Einschraenkung bleibt: flacher Encoder als Messproxy, cheap=150/p=0,25 als
+einziger Messpunkt -- ein anderes Regime (z.B. mit Ownership-Kopf, Task #9)
+waere ein neuer Messpunkt, kein Widerspruch.
+
+**Aufgeraeumt**: 12 Checkpoints geloescht (Manifeste + Ergebnis-JSONs
+bleiben), beide Sandboxes entfernt. `data_pcr_ab/` (327 Roh-Dateien)
+bleibt vorerst -- Nutzer-Entscheid ueber Archivierung/Loeschung steht aus
+(PCR-Spiele duerfen laut Fenster-Politik NIE als Tail in Trainingsfenster,
+die kontrolle-Spiele waeren prinzipiell nutzbar, laufen aber unter
+pcrkontrolle-Praefix ausserhalb der Fenster-Rotation).
+
 ## Task #28 (vorgemerkt): Aggressiveres Spiel -- Score-/Denial-Utility (2026-08-03)
 
 **Nutzer-Wunsch**: die KI soll aktiv dem Gegner schaden (Punkte wegnehmen/
