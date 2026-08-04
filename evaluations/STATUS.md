@@ -7373,11 +7373,21 @@ Politik: PCR-Spiele nie als Tail).
 (600->450 Oe) ergab nur 11,8% Wandzeit -- der FIX-Kostenanteil je Zug
 dominiert (~60%). Damit ist JEDE Such-Verbilligung (auch uniform weniger
 Sims) als Self-Play-Beschleuniger nahezu wirkungslos. **Task #32
-(vorgemerkt): Self-Play-Kostenprofil neu vermessen** -- Hauptverdaechtiger
-bootstrap_value/round_transition_deep (laeuft je Zug; das alte
-83%-rtv-Profil ist seit nortv Geschichte, der heutige Fix-Anteil ist
-unvermessen). Erst mit dem Profil entscheiden, wo die 21h wirklich
-herkommen.
+(vorgemerkt): Self-Play-Kostenprofil neu vermessen** -- der Fix-Anteil
+ist seit `nortv` (altes 83%-rtv-Profil hinfaellig) voellig unvermessen.
+KORREKTUR 2026-08-04 (code-geprueft): `bootstrap_value` laeuft NICHT je
+Zug, sondern per HashMap einmal PRO RUNDE (`bootstrap_values.insert(
+round_before, bv)`, self_play.rs:1096/2336) -- also ~4x/Partie, als
+Haupttreiber weitgehend ausgeschieden. Neue Kandidatenliste:
+(1) **Runde-5-Alpha-Beta** (`round5.rs`, NODE_BUDGET=200, je Knoten eine
+EXAKTE Endwertung inkl. Tiling-Solve) -- vollstaendig sim-unabhaengig und
+betrifft ~20% aller Zuege: neuer Hauptverdaechtiger;
+(2) Tiling-DFS-Solver je Runde/Spieler;
+(3) fixer Knoten-Overhead (Feature-Extraktion, ONNX-Aufrufkosten, dort
+wirkt der 2D-Aufschlag 1,46-1,8x);
+(4) bootstrap_value (4x/Partie, aber 2-Runden-Vorausschau je Aufruf --
+messen statt vermuten).
+Erst mit dem Profil entscheiden, wo die ~20h wirklich herkommen.
 
 ## AUFLOESUNG des Stichproben-Widerspruchs: BLOCK-KORRELATION, nicht Wheel (2026-08-04)
 
