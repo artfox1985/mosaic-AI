@@ -7746,6 +7746,37 @@ Nur falls die Steigung flach BLEIBT, ist ein gezielter Eingriff
 (Platten-Encoding / Aux-Kopf auf den Platten-Endbonus) gerechtfertigt --
 dann aber als eigene Vorregistrierung mit dann bekanntem Ausgangswert.
 
+### ZUSAMMENFUEHRUNG (Nutzer-Frage 2026-08-04): WDL ist NICHT hinfaellig, sondern die UMSETZUNG von #34
+
+Zwei unabhaengige Achsen: (1) ZIEL -- weiche Punkte-Marge vs. hartes
+Sieg/Niederlage; (2) KOPF/VERLUST -- Tanh-Regression + MSE vs.
+Softmax-Klassifikation + Kreuzentropie.
+
+Vor Schema 13 hatte das Projekt "hartes Ziel + MSE" -- und GENAU das
+wurde wegen Overfitting verworfen. Wuerde #34 nur das Ziel zurueckdrehen
+und MSE behalten, landen wir exakt in dem gescheiterten Setup.
+**Kreuzentropie ist die Standardantwort auf diesen Fehlermodus**: bei
+Tanh+MSE verschwinden die Gradienten an den Saettigungsraendern, bei
+Klassifikation nicht. Lesart: die v13-DIAGNOSE war vermutlich richtig,
+die THERAPIE (Ziel aufweichen) war die falsche der beiden Optionen.
+
+**Bonus-Befund**: der aktuelle TD-Bootstrap-Blend ist semantisch
+INKOHAERENT -- er addiert `tanh((own-opp)/SCALE)` (Punkte-Marge) und
+`2*win_prob-1` (Gewinnwahrscheinlichkeit) auf derselben Zahlenachse. Mit
+einem Wahrscheinlichkeits-Ziel liegen beide Komponenten auf DERSELBEN
+Skala und der Blend wird sinnvoll. Kreuzentropie arbeitet auch mit
+WEICHEN Labels (Standard bei Label-Smoothing/Distillation) -- der
+varianzreduzierende Bootstrap-Anteil muss also nicht geopfert werden.
+
+**#34 damit konkret**: Ziel = Gewinnwahrscheinlichkeit (harter Ausgang,
+optional weiter mit dem Bootstrap-Win-Prob geblendet, gleiche Skala),
+Verlust = Kreuzentropie, Kopf = 2 Logits statt Tanh-Skalar. Report-Idee
+1.2 ist damit die Implementierung, kein eigenes Experiment.
+
+**Falls #34 scheitert**: erst DANN als Diagnose-Arm "hartes Ziel + MSE"
+nachziehen, um Ziel- und Verlust-Aenderung zu trennen -- nicht vorab
+(spart ein Gating).
+
 ### (urspruenglicher Zuschnitt) WDL-/Klassifikations-Value-Kopf (Report 1.2)
 KataGo/lc0 ersetzen die Tanh-Regression durch Softmax-Klassifikation
 ueber Ergebnisklassen; lc0s expliziter Ausloeser war exakt unser
