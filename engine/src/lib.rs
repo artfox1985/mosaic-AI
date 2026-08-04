@@ -448,6 +448,32 @@ fn profiling_snapshot() -> String {
     .to_string()
 }
 
+/// Task #32 (`profiling.rs`-Modulkopf "Task #32", `evaluations/STATUS.md`
+/// Abschnitt "Task #32"): setzt das env-gegatete Self-Play-Zeitprofil
+/// zurück -- vor einem zu profilierenden `net_self_play_games`-Lauf
+/// aufrufen (`MOSAIC_PROFILE_SELFPLAY=1` muss gesetzt sein, sonst bleibt
+/// ohnehin alles bei 0). UNABHÄNGIG von `profiling_reset`/`reset_all` oben
+/// (andere Zähler, anderes Gate -- Env statt `clone_profiling`-Feature).
+#[pyfunction]
+fn selfplay_profile_reset() {
+    crate::profiling::selfplay_profile::reset();
+}
+
+/// Liest den aktuellen Self-Play-Zeitprofil-Snapshot (Task #32) als JSON:
+/// alle fünf Basiskategorien (`net_inference`, `round5_alphabeta`,
+/// `tiling_solver`, `bootstrap_value`, `total_selfplay`) in Nanosekunden +
+/// Aufrufzahl + Prozentanteil an `total_selfplay_ns`, PLUS die drei
+/// Überschneidungs-Zusatzzähler und die daraus vorgerechneten
+/// überschneidungsfreien Restgrößen `round5_bookkeeping_ns`/
+/// `bootstrap_nonnet_ns` -- siehe `profiling.rs::selfplay_profile`-
+/// Modulkopf-Doku für die vollständige Kategorisierungs-Regel. Bleibt bei
+/// `MOSAIC_PROFILE_SELFPLAY` nicht gesetzt komplett bei 0 (`"enabled":
+/// false` im Snapshot zeigt das an).
+#[pyfunction]
+fn selfplay_profile_json() -> String {
+    crate::profiling::selfplay_profile::snapshot_json()
+}
+
 /// ONNX-Inferenz für die Phase-B-Paritätsprüfung: lädt das Netz, wertet den
 /// Feature-Vektor aus und gibt (policy_logits, value, moon_logits, points)
 /// zurück -- passend zur Referenzdatei aus `export_onnx.py`. Task #11 Phase 2
@@ -971,6 +997,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
+    m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
 }

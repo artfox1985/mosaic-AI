@@ -227,10 +227,15 @@ pub fn solve_max_tiling_points_exact(state: &GameState, pi: usize) -> i32 {
 /// Optimaler finaler Runden-Score für Spieler `pi`: aktueller Score +
 /// max. Tiling-Punkte + (fixe) Boden-/Marker-Strafen.
 pub fn solve_round_final_score(state: &GameState, pi: usize) -> i32 {
-    let p = &state.players[pi];
-    let penalty = p.broken_penalty()
-        + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
-    p.score + penalty + solve_max_tiling_points(state, pi)
+    // Task #32 (`profiling.rs`-Modulkopf "Task #32"): Haupteinstiegspunkt der
+    // "tiling_solver"-Kategorie -- die interne Rekursion (`solve_rec`) bleibt
+    // uninstrumentiert (siehe dortige Regel "keine Rekursion einzeln zaehlen").
+    crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::TilingSolver, || {
+        let p = &state.players[pi];
+        let penalty = p.broken_penalty()
+            + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
+        p.score + penalty + solve_max_tiling_points(state, pi)
+    })
 }
 
 /// Blatt-Rekursion für [`solve_round_final_score_endaware`]: wie `solve_rec`,
@@ -287,11 +292,18 @@ fn solve_rec_endaware(state: &GameState, pi: usize, depth: u32, budget: &mut u32
 /// `solve_round_final_score(..) + calculate_end_scoring(Brett DAVOR, ..)`,
 /// die sich auf zwei VERSCHIEDENE Brettzustände bezog (siehe Doc dort).
 pub fn solve_round_final_score_endaware(state: &GameState, pi: usize) -> i32 {
-    let p = &state.players[pi];
-    let penalty = p.broken_penalty()
-        + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
-    let mut budget = NODE_BUDGET;
-    p.score + penalty + solve_rec_endaware(state, pi, 0, &mut budget)
+    // Task #32: zweiter Haupteinstiegspunkt der "tiling_solver"-Kategorie --
+    // wird an JEDEM `round5.rs`-Alpha-Beta-Blatt aufgerufen (siehe
+    // `profiling.rs`-Modulkopf); die daraus resultierende Verschachtelung mit
+    // `round5_alphabeta` wird dort ueber `tiling_solver_inside_round5_ns`
+    // getrennt ausgewiesen, kein Sonderfall hier noetig.
+    crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::TilingSolver, || {
+        let p = &state.players[pi];
+        let penalty = p.broken_penalty()
+            + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
+        let mut budget = NODE_BUDGET;
+        p.score + penalty + solve_rec_endaware(state, pi, 0, &mut budget)
+    })
 }
 
 /// Optimaler nächster Tiling-Schritt für Spieler `pi`. `End`, wenn nichts mehr

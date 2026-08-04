@@ -7510,6 +7510,49 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
+## Task #32 GEMESSEN: Netz-Inferenz dominiert, Runde-5-Hypothese widerlegt (2026-08-04)
+
+Instrumentierung (`engine/src/profiling.rs::selfplay_profile`, env-gegated
+`MOSAIC_PROFILE_SELFPLAY=1`, ueberlappende Kategorien + Zusatzzaehler),
+Messlauf 30 Partien / v19_2d_best / 600 Sims / 11 Threads / 500,6s
+Wandzeit = 4845s Thread-Zeit (`selfplay_time_profile.json`):
+
+| Kategorie | Zeit | Anteil | Aufrufe |
+|---|---|---|---|
+| Netz-Inferenz | 3002 s | **62,0%** | 1.314.962 |
+| Tiling-Solver | 1311 s | **27,1%** | 6.324.160 |
+| bootstrap_value | 401 s | 8,3% | 120 |
+| round5-Alpha-Beta | 206 s | **4,3%** | 451 |
+
+Ueberlappungen aufgeloest: von 206s Runde-5 sind 192s Tiling-Solver, nur
+14s echte Alpha-Beta-Buchfuehrung; Netz-Zeit in Runde 5 **exakt 0**
+(round5 ruft das Netz nie -- Agent-Vorhersage bestaetigt). Disjunkt:
+Netz 62,0% | Tiling ausserhalb R5 23,1% | bootstrap ohne Netz 6,9% |
+R5-Buchfuehrung 0,3% | Rest 3,8%.
+
+**KORREKTUR meiner beiden Verdaechtigen**: weder `bootstrap_value`
+(8,3%, laeuft pro Runde) noch der Runde-5-Alpha-Beta (4,3%) treibt die
+Kosten. Die Endspiel-Verbilligungs-Idee ist damit ERLEDIGT (selbst eine
+Halbierung braechte 2%).
+
+**KORREKTUR der S/F-Herleitung vom selben Tag** (S~42%/F~58%): widerlegt.
+Ursache des Fehlers: sie stuetzte sich auf "Kontroll-Lauf = 4h" -- aus
+dem PREREG-PLAN uebernommen, nie als Dauer GEMESSEN; eine Annahme, die
+wie ein Messwert behandelt wurde. Direkte Messung: **~85% der Zeit
+skaliert mit Suchaufwand (Netz+Tiling), nur ~15% sind echt fix.** Sims
+sind also doch der Haupthebel.
+
+**Neuer Optimierungskandidat: Tiling-Solver-Memoisierung.** 6,3 Mio
+Aufrufe bei 30 Partien (210k je Partie, 4,8 je Netz-Aufruf) auf 27% der
+Laufzeit -- Transpositionen sind bei dieser Aufrufdichte wahrscheinlich,
+und ein Cache liefert BITGLEICHE Ergebnisse (kein Qualitaetsrisiko,
+anders als jede Budget-Kuerzung).
+
+**Fuer die v20-Planung beziffert**: bei 1,8x 2D-Aufschlag entfallen
+~1334s von 4845s auf den 2D-Mehrpreis -- **der 2D-Encoder kostet ~27,5%
+der Self-Play-Zeit** gegenueber flach (Stand: exakt gemessen, nicht mehr
+geschaetzt). Static Folding (1,8->1,58x) braechte entsprechend ~7,6%.
+
 ## Task #30 ERGEBNIS: Skalen-Korrektur +6pp, knapp nicht signifikant (2026-08-04)
 
 Gepaarter A/B nach `PREREG_value_scale_correction.md` (Netz vs. Heuristik,

@@ -273,6 +273,12 @@ pub fn choose_action(state: &GameState) -> Option<Action> {
 /// MCTS-Besuchsbaum). `mcts_q` trägt hier den exakten Alpha-Beta-Wert
 /// (Score-Differenz Ich-Gegner) statt einer Gewinnwahrscheinlichkeit.
 pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value) {
+    // Task #32 (`profiling.rs`-Modulkopf "Task #32"): GANZER Funktionskörper
+    // als Haupteinstiegspunkt der "round5_alphabeta"-Kategorie -- deckt ALLE
+    // Aufrufer (`mcts.rs`, `net_mcts.rs`) automatisch ab, ohne dort einzeln
+    // instrumentieren zu müssen. `return` innerhalb dieser Closure verlässt
+    // NUR die Closure (= die bisherige Funktionslogik unverändert).
+    crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::Round5Alphabeta, || {
     let perspective = state.current_player;
     let children = ordered_children(state, perspective);
     if children.is_empty() {
@@ -360,6 +366,7 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
     });
 
     (Some(children[best_idx].1.clone()), analysis)
+    })
 }
 
 #[cfg(test)]

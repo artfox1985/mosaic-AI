@@ -2535,9 +2535,17 @@ pub fn run_net_self_play(
         let gid_thread = gid.clone();
         let move_counter_thread = Arc::clone(&move_counter);
         let result = run_with_watchdog(watchdog_deadline, move || {
-            play_net_self_play_game(
-                &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise, deterministic,
-                record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
+            // Task #32 (`profiling.rs`-Modulkopf "Task #32"): "total_selfplay"
+            // -- die GANZE Spielschleife dieser einen Partie (einziger
+            // Aufrufer von `play_net_self_play_game`).
+            crate::profiling::selfplay_profile::timed(
+                crate::profiling::selfplay_profile::SelfplayCat::TotalSelfplay,
+                || {
+                    play_net_self_play_game(
+                        &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
+                        deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
+                    )
+                },
             )
         });
         let steps = match result {
