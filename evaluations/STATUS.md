@@ -7485,6 +7485,59 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
+## Tasks #33-#35 (eingetaktet 2026-08-04): drei Value-Head-Hebel aus dem Research-Report
+
+Gemeinsame Randbedingung: Es gibt KEINEN validierten Offline-Praediktor
+fuer die Value-Seite (#29 gescheitert, value_r2 4x widerlegt) -- jeder
+dieser Hebel braucht ein eigenes Arena-Gating (~1h). Offline-Kennzahlen
+werden nur deskriptiv berichtet.
+
+### Task #33: Value-/Policy-Loss-Gewicht-Sweep (Report 5.3) -- BILLIGSTER, zuerst
+Leiden-Befund (CoG 2019): reines Value-Loss schlaegt die AlphaZero-Summe
+in 3 von 4 Spielen; bei uns nie systematisch variiert
+(`VALUE_WEIGHT=0.2`, `POINTS_WEIGHT=0.5`). **Kein Code noetig** --
+`train.py` hat bereits `--value-weight`/`--points-weight`.
+Arme: value_weight ∈ {0.2 (Kontrolle), 0.5, 1.0}, warm von
+`v19_2d_best`, sonst Champion-Rezept.
+**FALLE, vorab benannt**: `val_combined` ist die Checkpoint-Auswahl-
+Metrik UND enthaelt `value_weight` als Faktor -- zwischen Armen hat sie
+also eine ANDERE DEFINITION und ist als Vergleichsgroesse UNGUELTIG
+([[feedback-preregister-decision-metric]]). Auswahl je Arm daher intern
+per val_combined (Bestandslogik), Vergleich NUR per Arena.
+
+### Task #34: WDL-/Klassifikations-Value-Kopf (Report 1.2)
+KataGo/lc0 ersetzen die Tanh-Regression durch Softmax-Klassifikation
+ueber Ergebnisklassen; lc0s expliziter Ausloeser war exakt unser
+Nichtlinearitaets-Symptom. Aufwand: Python (Kopf 1 Skalar -> 2 Logits,
+MSE -> Kreuzentropie) + Rust (`value_to_win_prob` liest P(win) statt
+(tanh+1)/2) + ONNX-Vertrag wie beim opp-Kopf (additiv, per Name erkannt,
+Alt-Modelle unberuehrt).
+**KONZEPTIONELLER VORBEHALT, vorab benannt**: Klassifikation braucht ein
+HARTES Ergebnis-Ziel -- das Projekt hat sich mit VALUE_SCHEMA_VERSION=13
+bewusst vom harten +-1 zum weichen tanh-Margin bewegt. WDL ist damit
+teilweise eine Rueckabwicklung dieser Entscheidung; die Kombination
+"weiches Margin-Ziel + Klassifikationsverlust" ist NICHT
+literaturgestuetzt. Vor dem Bau ist zu entscheiden, welches Ziel gilt
+(Vorschlag: hartes Sieg/Niederlage als eigener Arm, weil genau das der
+lc0/KataGo-Praezedenzfall ist).
+
+### Task #35: Ranking-Loss auf Geschwister-Q (Report 7.1) -- BRAUCHT ENGINE-VORLAUF
+**Datenlage geprueft 2026-08-04**: Self-Play-Records tragen NUR
+`policy[].prob` und ein SKALARES `root_q` -- **kein Q je Wurzelkind**.
+Der Ranking-Loss braucht aber genau diese Paare.
+**Konsequenz fuer die Reihenfolge**: das additive Logging (completed-Q je
+Wurzelkind, analog zum `root_q`-Commit 2718b9a) muss VOR der
+v20-Self-Play-Kampagne in die Engine -- sonst kostet das Experiment
+spaeter eine eigene Kampagne (~20h) oder eine teure Nachannotation.
+Danach: Trainings-Loss (RankNet-Stil auf Geschwisterpaaren) + Arena.
+Dass #29 die Rang-METRIK verworfen hat, praejudiziert das Rang-TRAINING
+nicht -- nur die Vorauswahl per Metrik faellt weg.
+
+### Reihenfolge
+#33 (heute/morgen, kein Code) -> #35-Engine-Logging (VOR v20-Self-Play,
+klein und additiv) -> #34 (Code + Ziel-Entscheidung) -> #35-Training
+(nach v20-Self-Play, wenn die Labels da sind).
+
 ## Task #29 ERGEBNIS: Value-Rangmetrik NICHT VALIDIERT (2026-08-04)
 
 **Paar-Basis erweitert** (3 neue SPRT-Arenen, alle entschieden):
