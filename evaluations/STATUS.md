@@ -7510,6 +7510,47 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
+## Chance-Knoten-Vortest: Afterstate-These NICHT gestuetzt -- Projekt bleibt geparkt (2026-08-04)
+
+Vor der Entscheidung ueber einen eigenen Worktree fuer den
+Stochastic-MuZero-Afterstate-Kopf (Report 3.1) der vom Report selbst
+empfohlene billige Vortest (`tools/chance_node_pretest.py`, neu).
+
+**Designlogik**: ein reiner R²-Vergleich vor/nach dem Chance-Knoten waere
+WERTLOS (vor dem Knoten ist der Ausgang objektiv unsicherer, da MUSS R²
+sinken -- das misst die Aufgabe, nicht das Modell). Die eigentliche
+Signatur der These ist die KALIBRIERUNG: ein sauber spezifizierter
+Schaetzer bleibt auch unter Unsicherheit kalibriert (er sagt dann Werte
+nahe 0,5). Fehlkalibrierung SPEZIELL vor Chance-Knoten waere der Beleg,
+dass der Skalar zwei Unsicherheitsarten nicht trennen kann.
+
+**Ergebnis** (v19_2d_best, frozen_eval_set, Runden 1-4, Gruppierung ueber
+den Fabrik-Fuellstand):
+
+| Gruppe | n | Platt-B | Brier | R² |
+|---|---|---|---|---|
+| nach Chance-Knoten (Fuellstand >=15) | 246 | 1,880 | 0,2384 | 0,045 |
+| vor Chance-Knoten (Fuellstand <=6) | 515 | 2,021 | 0,2323 | 0,071 |
+
+**Die Stauchung ist GLEICHMAESSIG ueber die Runde verteilt** (B~2 in
+beiden Gruppen, praktisch identisch zum globalen Platt-Fit B=1,93). Die
+These haette B_vor deutlich weiter von 1 verlangt, Richtung
+UEBERkonfidenz (B<1) -- weder das eine noch das andere.
+
+**Einschraenkungen, ehrlich**: (a) CONFOUND -- niedriger Fuellstand heisst
+auch "weiter fortgeschritten in der Runde" (mehr Information); das
+erklaert vermutlich das hoehere R² VOR dem Knoten, was der naiven
+Erwartung widerspricht. Fuer die Kalibrierungsfrage wiegt es weniger,
+sauber ist es nicht. (b) Zellen von 50-150 -> die Einzelrunden-Fits
+schwanken zwischen -2,8 und +4,0 und sind NICHT interpretierbar, nur die
+gepoolten Zahlen tragen. (c) gemessen am aktuellen, fehlgeleiteten
+Value-Ziel (siehe #34).
+
+**ENTSCHEIDUNG: kein Worktree, Afterstate-Projekt bleibt geparkt.**
+Wiedervorlage nur, falls #34 die Kalibrierung global repariert UND
+danach eine RESTlücke speziell an Chance-Knoten sichtbar bleibt -- dann
+mit sauber herausgerechnetem Fortschritts-Confound.
+
 ## Tasks #33-#35 (eingetaktet 2026-08-04): drei Value-Head-Hebel aus dem Research-Report
 
 Gemeinsame Randbedingung: Es gibt KEINEN validierten Offline-Praediktor
