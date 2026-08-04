@@ -62,7 +62,12 @@ Zwei Dinge ausdrücklich NICHT auf dem Tisch:
   PUCT-Blattknoten im ganzen Baum gelesen, nicht nur an Rundenübergängen.
   Produktions-Code steht auf `ACTIVE_LEAF=Net` (Entscheidung s.o.), der
   Diagnose-Flip war nur ein temporärer Test, sofort zurückgesetzt.
-- **Value-Head**: `MosaicNet` hat `value_head` (±1 Sieg/Niederlage, Tanh)
+- **Value-Head**: `MosaicNet` hat `value_head` (Sieg/Niederlage-Achse,
+  Tanh; STAND 2026-08-04: das ZIEL ist seit `VALUE_SCHEMA_VERSION=13`
+  kein hartes ±1 mehr, sondern `tanh((own-opp)/VALUE_SCALE)`, seit v15
+  zusaetzlich per `TD_LAMBDA` mit dem Bootstrap-Wert gemischt --
+  `neural_net.py:979/1049`. Hartes ±1 nur noch als Fallback fuer
+  unvollstaendige Partien, Zeile 1056)
   PLUS separaten `points_head` (Hilfsziel/Aux-Head, alte Score-Regression,
   ursprünglich der einzige Value-Head, dann bewusst aufgesplittet — der
   Nutzer wollte explizit einen Sieg/Niederlage-Head UND einen Punkte-Head
