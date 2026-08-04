@@ -7777,6 +7777,30 @@ Verlust = Kreuzentropie, Kopf = 2 Logits statt Tanh-Skalar. Report-Idee
 nachziehen, um Ziel- und Verlust-Aenderung zu trennen -- nicht vorab
 (spart ein Gating).
 
+### rtv: konditionale Wiedereroeffnung (Nutzer-Frage 2026-08-04)
+
+`rtv` ist `2*win_prob-1`, also eine GEWINNWAHRSCHEINLICHKEIT, und hat
+den Zielwert an Rundenuebergaengen komplett ueberschrieben -- in einem
+Ziel, das ansonsten eine Punkte-Marge ist. Das Trainingsziel war damit
+INNERHALB einer Partie inkonsistent (normale Zustaende: Punktedifferenz,
+Uebergangszustaende: Wahrscheinlichkeit, auf derselben Zahlenachse) --
+dieselbe Inkohaerenz wie beim Bootstrap-Blend und eine plausible
+Erklaerung dafuer, warum rtv das Netz nicht nur nicht half, sondern
+aktiv verschlechterte (v13 mit rtv scheiterte am Gating, v13_nortv wurde
+Champion, [[project-v13-cycle-result]]).
+
+**Bleibt trotzdem GESCHLOSSEN**, mit ausformulierter
+Wiedereroeffnungsbedingung (Muster [[project-ownership-head-closed]]):
+1. NUR wenn #34 arena-erfolgreich ist (dann ist die Inkohaerenz-These
+   bestaetigt und rtv hat ein echtes neues Argument) -- nicht vorher,
+   sonst stapeln sich zwei Spekulationen;
+2. dann NICHT in der alten Vollform: rtv kostete ~83% der Self-Play-Zeit
+   (alte Engine-Generation gemessen) -- bei heutigen ~20h waeren das
+   100h+. Nur als billige Teilvariante denkbar (weniger Chance-Samples,
+   oder nur in einer kleinen Qualitaetskampagne);
+3. Kosten VORHER neu messen ueber die frische Profiling-Infrastruktur
+   (`MOSAIC_PROFILE_SELFPLAY=1`), nicht die alte 83%-Zahl fortschreiben.
+
 ### (urspruenglicher Zuschnitt) WDL-/Klassifikations-Value-Kopf (Report 1.2)
 KataGo/lc0 ersetzen die Tanh-Regression durch Softmax-Klassifikation
 ueber Ergebnisklassen; lc0s expliziter Ausloeser war exakt unser
