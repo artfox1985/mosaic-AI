@@ -7510,6 +7510,36 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
+## Task #30 ERGEBNIS: Skalen-Korrektur +6pp, knapp nicht signifikant (2026-08-04)
+
+Gepaarter A/B nach `PREREG_value_scale_correction.md` (Netz vs. Heuristik,
+je 200 Spiele, identische Seeds, gepaart je Spielindex, fixed-n):
+
+| Arm | Netz-Siege | Ø Score | Ø Floor |
+|---|---|---|---|
+| OFF (A=0, B=1) | 136/200 = **68,0%** | 49,74 | 9,22 |
+| ON (A=0,00507, B=1,92689) | 148/200 = **74,0%** | 49,51 | 9,43 |
+
+Diskordant: b(ON)=43, c(OFF)=31, konkordant 126 -> **exakter McNemar
+p=0,2007**.
+
+**VERDIKT nach PREREG-Regel: KEIN Staerkebeleg, kein Standardwechsel.**
+
+**Einordnung**: +6 Prozentpunkte ist der GROESSTE gerichtete Effekt, den
+eine value-seitige Intervention in diesem Projekt bisher gezeigt hat, und
+es fehlen nur ~3 diskordante Paare zur Signifikanz -- ein unterpowerter
+Beinahe-Treffer, kein Nullergebnis. Der Mechanismus passt zur
+Report-Vorhersage (Idee 7.3): Gumbels `sigma(q)` ist linear in q,
+gestreckte Werte setzen sich staerker gegen den Policy-Prior durch.
+
+**Entscheidung zur Reihenfolge**: #30 (Platt-Korrektur) ist ein PFLASTER
+auf der Stauchung, #34 zielt auf deren URSACHE (Kopf lernt Punkte-Marge
+statt Sieg/Niederlage). Wirkt #34, sollte Platt-B von 1,93 Richtung 1
+fallen und die Korrektur GEGENSTANDSLOS werden. Daher: **erst #34, dann
+pruefen, ob #30 ueberhaupt noch gebraucht wird** -- statt jetzt ~2h in
+eine Bestaetigungsmessung zu stecken, die #34 obsolet machen koennte.
+Rohdaten: `value_scale_ab_arm_off.json` / `_arm_on.json`.
+
 ## Chance-Knoten-Vortest: Afterstate-These NICHT gestuetzt -- Projekt bleibt geparkt (2026-08-04)
 
 Vor der Entscheidung ueber einen eigenen Worktree fuer den
