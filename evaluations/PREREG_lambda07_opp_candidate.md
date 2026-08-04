@@ -46,9 +46,20 @@ deutlich hoeheren Mix-Anteil haben wird, weil v16/v17 herausrotieren).
    Value-Seite arena-validiert; #29 hat auch die Rangmetrik verworfen).
 2. **Entscheidend: Arena-Gating gegen den amtierenden Champion**
    `v19_2d_best`, `tools/paired_gating.py --sims 400 --block-size 5
-   --max-pairs 200 --no-promote-winner`, Standard-SPRT. Laeuft mit
-   Aggressions-Defaults AUS (`w=0`), damit die λ-Frage nicht mit dem
-   Utility-Blend konfundiert.
+   --max-pairs 200 --no-promote-winner`, Standard-SPRT.
+   **AENDERUNG 2026-08-04, VOR der ersten Partie (Nutzer-Entscheid):
+   laeuft MIT den produktiven Aggressions-Defaults `w=0,1`,
+   `lambda_aggr=2,0`** statt mit w=0. Begruendung: Arenalaeufe werden
+   kuenftig generell so gefahren -- gegatet wird also die Konfiguration,
+   die auch ausgeliefert wird ("gate what you ship"), womit der frueher
+   notierte Vorbehalt "Promotion einer ungetesteten Konfiguration"
+   entfaellt. Sauber bleibt der Vergleich, weil die Engine den Blend PRO
+   MODELL anwendet: `v19_2d_best` hat keinen opp-Kopf und faellt
+   automatisch auf Bestandsverhalten zurueck -- das Gating vergleicht
+   also "Kandidat wie er spielen wuerde" gegen "Champion wie er spielt".
+   PREIS, bewusst akzeptiert: der reine λ-Effekt ist in diesem Lauf nicht
+   isoliert (Punkt 3 liefert die Isolation nach, dort tragen BEIDE Seiten
+   den opp-Kopf, der Blend wirkt also symmetrisch).
 3. **Zusatz-Arena (nur bei positivem Gating)**: Kandidat vs.
    `v19_2d_opp_best` (die λ=1,0-Kontrolle) -- isoliert den REINEN
    λ-Effekt im 2D-Warm-Start-Regime, ohne Generationsunterschied.
