@@ -7460,7 +7460,49 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
-## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
+## Task #29 ERGEBNIS: Value-Rangmetrik NICHT VALIDIERT (2026-08-04)
+
+**Paar-Basis erweitert** (3 neue SPRT-Arenen, alle entschieden):
+v19_2d_best 53:27 v17_best | v19_best 81:39 v17_best | v19_2d_best 85:55
+v18_best -- damit 6 auswertbare entschiedene Paare statt 4.
+
+**Validierung** (`value_rank_metric_validation.json`, 952 Orakel-Zustaende
+je Modell, mean_overlap 0.94-0.97):
+
+| Paar | Siegq. A | Δtau | richtig? | Δvalue_r2 | richtig? |
+|---|---|---|---|---|---|
+| l07v18_s6 vs l10v18_s3 | 0.568 | +0.0016 | JA | +0.0162 | JA |
+| v18_best vs v17_best | 0.584 | +0.0068 | JA | +0.0030 | JA |
+| v19_2d_best vs v18_best | 0.607 | -0.1056 | nein | -0.0152 | nein |
+| v19_2d_best vs v19_best | 0.640 | -0.0980 | nein | +0.0102 | JA |
+| v19_best vs v17_best | 0.675 | -0.0007 | nein | -0.0224 | nein |
+| v19_best vs v18_best | 0.640 | -0.0075 | nein | -0.0254 | nein |
+
+**`value_kendall_tau_vs_oracle_q`: 2/6 richtig (p=0.69) -- NICHT
+VALIDIERT**, sogar schlechter als das globale `value_r2_rounds_1_4`
+(3/6, p=1.0). Beide auf Zufallsniveau.
+
+**Einordnung (ehrlich)**: Die Ordnungs-These ist damit NICHT bestaetigt --
+zumindest nicht in DIESER Operationalisierung (Kendall-Tau der
+Value-Kopf-Blattwerte ueber Wurzelkandidaten gegen die Orakel-Q-Ordnung).
+Moegliche Gruende, unentschieden: (a) die Orakel-Q-Referenz stammt selbst
+aus einer 5000-Sims-SUCHE (policy-gefuehrt) -- eine Value-Ordnung dagegen
+zu messen vergleicht evtl. Aepfel mit Birnen; (b) relevant koennte die
+Ordnung an TIEFEREN Blaettern sein, nicht an Wurzelkindern.
+
+**Auffaelliger Nebenbefund**: Der 2D-Champion hat eine deutlich
+SCHLECHTERE Value-Rangordnung als die flachen Netze, die er schlaegt
+(tau 0.241 vs 0.339) -- konsistent mit dem alten Befund, dass
+Offline-Metriken ueber ARCHITEKTUR-Grenzen hinweg nicht tragen
+([[project-2d-encoder-phase2-result]]). Der 2D-Vorteil liegt offenbar
+nicht in der Value-Rangordnung.
+
+**Konsequenz fuer den Projektbetrieb**: Es gibt weiterhin KEINEN
+validierten Offline-Praediktor fuer die Value-Seite. Value-Experimente
+muessen per Arena entschieden werden -- teuer, aber ehrlich. Das
+Ranking-Loss-Experiment (Report-Idee 7.1) war hinter dieser Validierung
+gegated; es kann weiterhin gefahren werden, aber NUR mit Arena als
+Schiedsrichter (die Metrik taugt nicht zur Vorauswahl).
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
 vermutlich nicht der richtige Hebel fuer Arena-Staerke. Belege: (1)
