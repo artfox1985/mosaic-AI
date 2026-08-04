@@ -7416,6 +7416,50 @@ Standardfehler systematisch. **Block-Ebene-Reanalyse:**
    knappe Score-Nebenbefunde (z.B. Task-#12-Punkte-Trend) sind neu zu
    bewerten.
 
+## Kartierung + Champion-Gating v19_2d_opp: KEIN Staerkebeleg, Promotion offen (2026-08-04)
+
+**Betriebsvorfall vorweg**: Agent A (Nacht-Pipeline) startete Arm 1 als
+Hintergrund-Prozess und wachte danach nie wieder auf -- ~7,5h Maschine
+idle, Pipeline B-E lief nie an. Lehre in Memory
+`feedback_agent_background_process_discipline` ergaenzt: Laeufe >10 min
+NUR vom Koordinator als harness-getrackte Tasks takten.
+
+**lambda-Kartierung** (w=0.1, je 75 Paare, block-size 5, 15 Bloecke):
+
+| lambda | Siege | Winrate | Block-Diff vs lam=0 | p |
+|---|---|---|---|---|
+| 0 | 80:70 | 53.3% | Referenz | -- |
+| 3.0 | 74:76 | 49.3% | -0.040 | 0.41 |
+| 5.0 | 64:86 | 42.7% | -0.107 | 0.084 |
+
+**BREAK-EVEN GEFUNDEN**: monoton fallend, Klippe zwischen lambda=2 und 5,
+Wendepunkt um 3. lambda=5 dreht die Bilanz gegen den Champion.
+
+**w-Leiter** (lambda=0, je 75 Paare): 0.1 -> 53.3% | 0.2 -> 52.0%
+(p=0.78) | 0.3 -> 55.3% (p=0.66) -- **FLACH, kein Einbruch bis 0.3**;
+das v9b-Desaster bei w=0.5 war kopf-, nicht w-bedingt. Nebenbefund gegen
+eine starke Skalen-Kompensations-These: mehr Punkte-Blend hilft NICHT
+mehr -- erhoeht die Bedeutung von #30 (direkte Skalen-Korrektur).
+
+**Champion-Gating** (w=0.1, lambda=2.0, 200 Paare, block-size 5,
+`--no-promote-winner`): **205:195 = 51.25%, KEIN SPRT-Entscheid**
+(LLR=-2.932, Deckel), McNemar p=0.68, Block-Ebene 17/40 Bloecke ueber
+50%, t=+0.48 p=0.63.
+
+**Gesamtbild ueber ALLE 7 Stichproben (1850 Spiele): 984:866 = 53.2%**
+(i.i.d.-KI 50.9-55.5%, echtes KI wegen Block-Korrelation breiter --
+beruehrt die 50%). Muster: **je hoeher die Power, desto kleiner der
+Effekt** (57.7% bei n=300 -> 51.2% bei n=400) -- klassische Regression
+zur Mitte, die frueheren "Siege" waren ueberschaetzt.
+
+**VERDIKT**: KEIN Staerkebeleg -> **keine Promotion auf Staerke-Gruenden**.
+Der Kandidat ist aber auch nicht schlechter (7/7 Stichproben >=50%).
+**Offene Nutzer-Entscheidung**: Die Aggressions-Funktion existiert
+produktiv NUR, wenn v19_2d_opp geladen ist (der Champion hat keinen
+opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
+(gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
+(b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
+
 ## Task #29 (vorgemerkt, PRIORITAER vor weiteren Value-Trainingsexperimenten): Value-Rangmetrik + historische Validierung (2026-08-03)
 
 **Nutzer-These nach der Dreifach-Evidenz des Tages**: value_r2 ist
