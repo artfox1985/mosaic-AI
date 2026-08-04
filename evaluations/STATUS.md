@@ -7510,6 +7510,53 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
+## Folgetest-Plan nach #34: was die Ziel-Reparatur alles entwertet (2026-08-04)
+
+Nutzer-Anstoss: #34 ist kein isoliertes Experiment -- die Umstellung des
+Value-ZIELS (weiche Punkte-Marge -> hartes Sieg/Niederlage) entwertet
+einen Teil der bestehenden Messbasis. Diese Liste ist VOR #34
+festgeschrieben, damit hinterher nicht selektiv nachgemessen wird.
+
+### A) Direkt an #34 gekoppelt (billig, Teil der Auswertung)
+- **R5-Plattenkalibrierung** (`tools/r5_value_calibration.py`):
+  Steigung heute 0,06-0,09 -> ?
+- **Platt-Fit** (Verfahren aus `value_calibration_fit.json`): B=1,93 -> ?
+- **Chance-Knoten-Vortest** (`tools/chance_node_pretest.py`): lief
+  komplett am fehlgeleiteten Kopf, Wiederholung noetig.
+
+### B) Wird durch #34 UNGUELTIG -- Neuentscheidung erforderlich
+- **#30 Skalen-Korrektur**: faellt B Richtung 1 -> gegenstandslos.
+  Bleibt B~2 -> die +6pp (p=0,20) verdienen eine Bestaetigungsmessung.
+- **λ=0,7**: der Mix ist `λ*z + (1-λ)*root_q`. Aendert sich **z** von
+  weicher Marge auf hartes Ergebnis, mischt λ etwas ANDERES -- der
+  Arena-Sieg vom 2026-08-03 (227:173) gilt fuer den ALTEN z. **Vor der
+  v20-Uebernahme neu zu testen.**
+- **Deckenwerte R1-R4** (0,0068 / 0,166 / 0,437 / 0,604): zielspezifisch
+  berechnet (Schema-15-Formel, `value_noise_floor_diagnostic`). Mit
+  hartem Ziel aendern sie sich -> die gesamte "Luft nach oben"-Analyse
+  muss neu gerechnet werden. Unangenehmster Posten, weil daran die
+  Priorisierung der Value-Agenda haengt (evtl. Rust-seitige Anpassung
+  der Diagnostik noetig, sie rechnet auf der aktuellen Zielformel).
+- **TD_LAMBDA=0,5**: der Bootstrap-Wert ist bereits win-prob-artig; mit
+  hartem z werden beide Mischkomponenten homogener -> Verhaeltnis
+  moeglicherweise neu zu justieren.
+
+### C) Reihenfolge-Korrektur
+- **#33 (Loss-Gewichte) laeuft NACH #34**, nicht davor: das Optimum
+  zwischen Value- und Policy-Gewicht haengt vom Charakter des
+  Value-Ziels ab -- vorher zu messen hiesse, fuer ein Ziel zu
+  optimieren, das gleich ersetzt wird.
+
+### D) Kostenposten
+- #34 aendert die Zielformel -> **`VALUE_SCHEMA_VERSION`-Bump ->
+  kompletter Cache-Neubau ueber die 900 Dateien**. KEIN neues Self-Play
+  noetig (die Rohdaten tragen `scores`/`winner` bereits), aber eine
+  spuerbare Wartezeit vor dem ersten Trainingslauf.
+
+### Ablauf
+laufendes λ07-Gating -> #34 bauen -> Cache-Neubau -> #34-Training +
+Kontrolle -> Diagnostiken (A) -> Neuentscheidung (B) -> #33 -> v20-Planung.
+
 ## Task #32 GEMESSEN: Netz-Inferenz dominiert, Runde-5-Hypothese widerlegt (2026-08-04)
 
 Instrumentierung (`engine/src/profiling.rs::selfplay_profile`, env-gegated
