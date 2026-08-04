@@ -12,12 +12,13 @@
 //! Bonus-Chip-Komplettierung passender Reihen. Reihenfolge oben→unten
 //! (Regelwerk S.7) steckt bereits in `validate_tiling_action`/`generate_tiling_actions`.
 
-use crate::board::FIRST_PLAYER_MARKER_PENALTY;
+use crate::board::{PlayerBoard, FIRST_PLAYER_MARKER_PENALTY};
 use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, chip_allocations, execute_full_tiling,
     generate_tiling_actions, greedy_chip_alloc, row_has_open_matching_slot, TilingAction,
 };
 use crate::state::GameState;
+use crate::tile::TileColor;
 
 /// Defensive Rekursionsgrenze (Branching ist klein; nur als Sicherung).
 const MAX_DEPTH: u32 = 30;
@@ -224,6 +225,255 @@ pub fn solve_max_tiling_points_exact(state: &GameState, pi: usize) -> i32 {
     solve_rec(state, pi, 0, true, &mut budget)
 }
 
+// ── Task #33: Transpositions-Memoisierung ───────────────────────────────────
+//
+// HERLEITUNG DES CACHE-SCHLÜSSELS (Auftrag Schritt 1a, Code gelesen 2026-08-04):
+// `solve_round_final_score`/`solve_max_tiling_points` (und transitiv `solve_rec`,
+// `legal_steps`, `chippable_rows`, `apply_step` -> `execute_full_tiling`,
+// `check_special_trigger`, `score_placed_tile`, `count_line`, `apply_bonus_chips_with`)
+// lesen NACHWEISLICH ausschließlich `state.players[pi]` -- kein Zugriff auf
+// `state.current_player`, `state.factories`, den jeweils ANDEREN Spieler, RNG
+// oder sonstige globale Zustände. Die Funktion ist damit rein/deterministisch
+// bei festem `PlayerBoard`. Innerhalb von `PlayerBoard` sind laut Code-Audit
+// NUR folgende Felder ergebnisrelevant:
+//   - `pattern_lines[].tiles`        (volle Reihen, Farbe/Füllstand)
+//   - `dome_grid.dome_slots`         (Layout inkl. `space_type` -- Wild
+//                                     akzeptiert jede Farbe, Special keine,
+//                                     UNABHÄNGIG von `required_color`;
+//                                     `required_color`/`placed_color`/
+//                                     `placed_special`/`is_locked` steuern
+//                                     `accepts`/`is_filled`/Special-Trigger;
+//                                     `tile_id` wird defensiv mitgehasht,
+//                                     ändert nichts an der Korrektheit)
+//   - `bonus_chips[].colors`         (NUR `.colors`, s. `chip_sig`/
+//                                     `greedy_chip_indices`/`chip_allocations`
+//                                     in round_end.rs -- `chip_id` fließt NIE
+//                                     in eine Score-Berechnung ein)
+//   - `tiled_max_row`                (`chippable_rows`-Untergrenze)
+//   - `score`                        (Basiswert, direkt addiert)
+//   - `broken_tiles`                 (`broken_penalty()`)
+//   - `holds_first_player_marker`    (Marker-Strafe)
+// NICHT gehasht, weil nachweislich nie von diesem Aufrufpfad gelesen:
+// `player_id`, `name`, `score_unclamped`, `dome_tiles_placed_this_round`,
+// `player_tokens_used`, `start_dome_tile`, `start_tile_pending`,
+// `bonus_chips_used_this_round`, `total_floor_penalties`,
+// `floor_penalties_per_round`.
+//
+// `solve_round_final_score_endaware` ruft zusätzlich `calculate_end_scoring`
+// an jedem Blatt auf (`scoring::calculate_end_scoring(player, tile_ids)`) --
+// deren zweiter Parameter ist `state.scoring_tile_ids`, das deshalb NUR beim
+// endaware-Schlüssel zusätzlich einfließt (siehe `TilingKeyEndaware` unten).
+//
+// KOLLISIONS-SCHUTZ: statt eines rohen u64-Hashs als HashMap-Schlüssel (der
+// bei einer Kollision STILL das falsche Ergebnis liefern würde) trägt
+// `TilingKey` die vollständigen, geklonten Werte selbst. `HashMap::get`
+// vergleicht bei Bucket-Kollisionen per `Eq` -- zwei strukturell
+// unterschiedliche Stellungen können daher NIE denselben Cache-Treffer
+// erzeugen, unabhängig vom internen Hash. Test:
+// `tiling_key_differs_on_result_relevant_field_change` unten.
+type SpaceKey = (u8, Option<TileColor>, Option<TileColor>, bool, bool);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct TilingKey {
+    score: i32,
+    tiled_max_row: i32,
+    holds_first_player_marker: bool,
+    broken_tiles: Vec<TileColor>,
+    pattern_lines: Vec<Vec<TileColor>>,
+    dome_slots: Vec<Option<(usize, Vec<SpaceKey>)>>,
+    bonus_chip_colors: Vec<Vec<TileColor>>,
+}
+
+fn tiling_key(player: &PlayerBoard) -> TilingKey {
+    let dome_slots = player
+        .dome_grid
+        .dome_slots
+        .iter()
+        .flatten()
+        .map(|slot| {
+            slot.as_ref().map(|t| {
+                let spaces: Vec<SpaceKey> = t
+                    .spaces
+                    .iter()
+                    .map(|sp| {
+                        (sp.space_type as u8, sp.required_color, sp.placed_color, sp.placed_special, sp.is_locked)
+                    })
+                    .collect();
+                (t.tile_id, spaces)
+            })
+        })
+        .collect();
+    TilingKey {
+        score: player.score,
+        tiled_max_row: player.tiled_max_row,
+        holds_first_player_marker: player.holds_first_player_marker,
+        broken_tiles: player.broken_tiles.clone(),
+        pattern_lines: player.pattern_lines.iter().map(|l| l.tiles.clone()).collect(),
+        dome_slots,
+        bonus_chip_colors: player.bonus_chips.iter().map(|c| c.colors.clone()).collect(),
+    }
+}
+
+/// Schlüssel für die endwertungsbewusste Variante -- `TilingKey` plus die
+/// aktiven Wertungsplatten-IDs (siehe Herleitung oben).
+type TilingKeyEndaware = (TilingKey, Vec<usize>);
+
+fn tiling_key_endaware(player: &PlayerBoard, scoring_tile_ids: &[usize]) -> TilingKeyEndaware {
+    (tiling_key(player), scoring_tile_ids.to_vec())
+}
+
+/// Obergrenze je Thread-lokalem Cache. GRÖSSENDECKEL statt Rundengrenze:
+/// eine Rundengrenzen-Leerung müsste an JEDER Stelle, die einen Runden-
+/// übergang auslöst (self_play.rs, net_mcts.rs, round_transition*.rs),
+/// einen zusätzlichen Reset-Aufruf einführen -- invasiv und leicht zu
+/// vergessen. Ein Größendeckel bleibt vollständig innerhalb dieses Moduls.
+/// Korrektheit ist von der Wahl der Zahl UNABHÄNGIG (bitgleiches Ergebnis
+/// bei Treffer, Neuberechnung bei `clear()`) -- 20_000 Einträge sind groß
+/// genug, um die Transpositionen INNERHALB einer Suche (ein Zug: einige
+/// hundert bis wenige tausend Solver-Aufrufe, siehe `NODE_BUDGET`) fast
+/// immer im Cache zu halten, aber klein genug, um den Speicher pro der 11
+/// Self-Play-Threads (Task-#33-Kontext) begrenzt zu halten.
+const CACHE_CAP: usize = 20_000;
+
+thread_local! {
+    static PLAIN_CACHE: std::cell::RefCell<std::collections::HashMap<TilingKey, i32>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+    static ENDAWARE_CACHE: std::cell::RefCell<std::collections::HashMap<TilingKeyEndaware, i32>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+    static PLAIN_STATS: std::cell::RefCell<std::collections::HashMap<TilingKey, u32>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+    static ENDAWARE_STATS: std::cell::RefCell<std::collections::HashMap<TilingKeyEndaware, u32>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+    /// Test-Override, siehe `stats_enabled`/`cache_enabled` -- thread-lokal,
+    /// deshalb ohne Race gegen andere `cargo test`-Threads, die dieselbe
+    /// `OnceLock`-gecachte Env-Var evtl. schon (als AUS) gelesen haben.
+    static STATS_OVERRIDE: std::cell::Cell<Option<bool>> = std::cell::Cell::new(None);
+    static CACHE_OVERRIDE: std::cell::Cell<Option<bool>> = std::cell::Cell::new(None);
+}
+
+/// `MOSAIC_TILING_CACHE_STATS=1`: zählt nur, wie oft derselbe Schlüssel
+/// wiederkehrt (Schritt 2 des Auftrags) -- KEIN Cache, keine Ergebnis-
+/// Veränderung, praktisch kostenlos wenn aus (ein `bool`-Vergleich,
+/// `OnceLock` liest die Env-Var nur beim ersten Aufruf je Prozess).
+fn stats_enabled_env() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var("MOSAIC_TILING_CACHE_STATS").map(|v| v == "1").unwrap_or(false))
+}
+
+/// `MOSAIC_TILING_CACHE=1`: echte Memoisierung (Schritt 3). Standard AUS --
+/// siehe Bericht/Auftrag ("im Zweifel Default AUS, damit der Koordinator den
+/// A/B fahren kann").
+fn cache_enabled_env() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var("MOSAIC_TILING_CACHE").map(|v| v == "1").unwrap_or(false))
+}
+
+fn stats_enabled() -> bool {
+    STATS_OVERRIDE.with(|c| c.get()).unwrap_or_else(stats_enabled_env)
+}
+
+fn cache_enabled() -> bool {
+    CACHE_OVERRIDE.with(|c| c.get()).unwrap_or_else(cache_enabled_env)
+}
+
+fn compute_plain(state: &GameState, pi: usize) -> i32 {
+    let p = &state.players[pi];
+    let penalty =
+        p.broken_penalty() + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
+    p.score + penalty + solve_max_tiling_points(state, pi)
+}
+
+fn cached_plain(state: &GameState, pi: usize) -> i32 {
+    if !stats_enabled() && !cache_enabled() {
+        return compute_plain(state, pi);
+    }
+    let key = tiling_key(&state.players[pi]);
+    if stats_enabled() {
+        PLAIN_STATS.with(|s| *s.borrow_mut().entry(key.clone()).or_insert(0) += 1);
+    }
+    if cache_enabled() {
+        if let Some(v) = PLAIN_CACHE.with(|c| c.borrow().get(&key).copied()) {
+            return v;
+        }
+        let v = compute_plain(state, pi);
+        PLAIN_CACHE.with(|c| {
+            let mut c = c.borrow_mut();
+            if c.len() >= CACHE_CAP {
+                c.clear();
+            }
+            c.insert(key, v);
+        });
+        return v;
+    }
+    compute_plain(state, pi)
+}
+
+fn compute_endaware(state: &GameState, pi: usize) -> i32 {
+    let p = &state.players[pi];
+    let penalty =
+        p.broken_penalty() + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
+    let mut budget = NODE_BUDGET;
+    p.score + penalty + solve_rec_endaware(state, pi, 0, &mut budget)
+}
+
+fn cached_endaware(state: &GameState, pi: usize) -> i32 {
+    if !stats_enabled() && !cache_enabled() {
+        return compute_endaware(state, pi);
+    }
+    let key = tiling_key_endaware(&state.players[pi], &state.scoring_tile_ids);
+    if stats_enabled() {
+        ENDAWARE_STATS.with(|s| *s.borrow_mut().entry(key.clone()).or_insert(0) += 1);
+    }
+    if cache_enabled() {
+        if let Some(v) = ENDAWARE_CACHE.with(|c| c.borrow().get(&key).copied()) {
+            return v;
+        }
+        let v = compute_endaware(state, pi);
+        ENDAWARE_CACHE.with(|c| {
+            let mut c = c.borrow_mut();
+            if c.len() >= CACHE_CAP {
+                c.clear();
+            }
+            c.insert(key, v);
+        });
+        return v;
+    }
+    compute_endaware(state, pi)
+}
+
+#[cfg(test)]
+pub(crate) fn set_stats_override_for_test(v: Option<bool>) {
+    STATS_OVERRIDE.with(|c| c.set(v));
+}
+#[cfg(test)]
+pub(crate) fn set_cache_override_for_test(v: Option<bool>) {
+    CACHE_OVERRIDE.with(|c| c.set(v));
+}
+#[cfg(test)]
+pub(crate) fn clear_tiling_caches_for_test() {
+    PLAIN_CACHE.with(|c| c.borrow_mut().clear());
+    ENDAWARE_CACHE.with(|c| c.borrow_mut().clear());
+    PLAIN_STATS.with(|c| c.borrow_mut().clear());
+    ENDAWARE_STATS.with(|c| c.borrow_mut().clear());
+}
+/// (Gesamtaufrufe, distinkte Schlüssel, max. Wiederholungen eines Schlüssels).
+#[cfg(test)]
+pub(crate) fn plain_stats_summary_for_test() -> (u64, usize, u32) {
+    PLAIN_STATS.with(|s| {
+        let s = s.borrow();
+        let total: u64 = s.values().map(|&v| v as u64).sum();
+        (total, s.len(), s.values().copied().max().unwrap_or(0))
+    })
+}
+#[cfg(test)]
+pub(crate) fn endaware_stats_summary_for_test() -> (u64, usize, u32) {
+    ENDAWARE_STATS.with(|s| {
+        let s = s.borrow();
+        let total: u64 = s.values().map(|&v| v as u64).sum();
+        (total, s.len(), s.values().copied().max().unwrap_or(0))
+    })
+}
+
 /// Optimaler finaler Runden-Score für Spieler `pi`: aktueller Score +
 /// max. Tiling-Punkte + (fixe) Boden-/Marker-Strafen.
 pub fn solve_round_final_score(state: &GameState, pi: usize) -> i32 {
@@ -231,10 +481,7 @@ pub fn solve_round_final_score(state: &GameState, pi: usize) -> i32 {
     // "tiling_solver"-Kategorie -- die interne Rekursion (`solve_rec`) bleibt
     // uninstrumentiert (siehe dortige Regel "keine Rekursion einzeln zaehlen").
     crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::TilingSolver, || {
-        let p = &state.players[pi];
-        let penalty = p.broken_penalty()
-            + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
-        p.score + penalty + solve_max_tiling_points(state, pi)
+        cached_plain(state, pi)
     })
 }
 
@@ -298,11 +545,7 @@ pub fn solve_round_final_score_endaware(state: &GameState, pi: usize) -> i32 {
     // `round5_alphabeta` wird dort ueber `tiling_solver_inside_round5_ns`
     // getrennt ausgewiesen, kein Sonderfall hier noetig.
     crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::TilingSolver, || {
-        let p = &state.players[pi];
-        let penalty = p.broken_penalty()
-            + if p.holds_first_player_marker { FIRST_PLAYER_MARKER_PENALTY } else { 0 };
-        let mut budget = NODE_BUDGET;
-        p.score + penalty + solve_rec_endaware(state, pi, 0, &mut budget)
+        cached_endaware(state, pi)
     })
 }
 
@@ -1220,5 +1463,262 @@ mod tests {
                  ausserhalb Runde 2-4 darf er das nicht"
             );
         }
+    }
+
+    // ── Task #33: Transpositions-Memoisierung ────────────────────────────────
+
+    /// Auftrag Schritt 2: Wiederholungsrate MESSEN, bevor ein echter Cache
+    /// gebaut wird. Treibt REALE Produktionscodepfade -- Netz-Feature-Build
+    /// inkl. der echten `flipped`-Gegner-Pass-Verdopplung aus
+    /// `net_mcts.rs::net_leaf_eval` (`let mut flipped = state.clone();
+    /// flipped.current_player = 1 - state.current_player;`), die klassische
+    /// Heuristik-MCTS-Baumsuche (`mcts::search_action`) und die Runde-5-
+    /// Alpha-Beta-Suche (`round5::choose_action_with_analysis`) -- über eine
+    /// vielfältige Menge echter Zustände (mehrere Saaten, Runden 2-5, via
+    /// `round_transition::drive_to_round_start`) und zählt per
+    /// `PLAIN_STATS`/`ENDAWARE_STATS` (Test-Override statt Env-Var, siehe
+    /// `set_stats_override_for_test`-Doku), wie oft derselbe Solver-Schlüssel
+    /// wiederkehrt. Kein `assert` auf eine Mindest-Trefferquote -- das
+    /// Ergebnis ENTSCHEIDET (siehe Bericht), es wird hier nur reproduzierbar
+    /// gemessen und geloggt (`cargo test -- --nocapture`).
+    #[test]
+    fn tiling_cache_hit_rate_measurement() {
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+
+        clear_tiling_caches_for_test();
+        set_stats_override_for_test(Some(true));
+        set_cache_override_for_test(Some(false)); // reine Zaehlung, keine Wertveraenderung
+
+        // (a) Netz-Feature-Build inkl. der echten `flipped`-Verdopplung.
+        for seed in 1u64..=25 {
+            for round in [2u32, 3, 4, 5] {
+                let state = crate::round_transition::drive_to_round_start(seed, round);
+                let _ = crate::features::state_to_features_direct(&state);
+                let mut flipped = state.clone();
+                flipped.current_player = 1 - state.current_player;
+                let _ = crate::features::state_to_features_direct(&flipped);
+            }
+        }
+
+        // (b) Klassische Heuristik-MCTS-Baumsuche (`mcts::evaluate` an jedem
+        // neuen Knoten -> 2x `player_total` -> 2x `solve_round_final_score`).
+        let mut rng = StdRng::seed_from_u64(4242);
+        for seed in 1u64..=8 {
+            let state = crate::round_transition::drive_to_round_start(seed, 2);
+            let _ = crate::mcts::search_action(&state, 150, crate::mcts::DEFAULT_C, &mut rng);
+        }
+
+        let (plain_total, plain_distinct, plain_max) = plain_stats_summary_for_test();
+
+        // (c) Runde-5-Alpha-Beta (endaware-Variante: Move-Ordering ruft
+        // `leaf_value` -- und damit `player_total_exact` -- an JEDEM
+        // Kandidaten-Kind auf, zusätzlich zur eigentlichen Negamax-Rekursion).
+        for seed in 1u64..=5 {
+            let state = crate::round_transition::drive_to_round_start(seed, 5);
+            let _ = crate::round5::choose_action_with_analysis(&state);
+        }
+        let (end_total, end_distinct, end_max) = endaware_stats_summary_for_test();
+
+        set_stats_override_for_test(None);
+        set_cache_override_for_test(None);
+        clear_tiling_caches_for_test();
+
+        let plain_hit_rate =
+            if plain_total > 0 { 100.0 * (1.0 - plain_distinct as f64 / plain_total as f64) } else { 0.0 };
+        let end_hit_rate =
+            if end_total > 0 { 100.0 * (1.0 - end_distinct as f64 / end_total as f64) } else { 0.0 };
+        eprintln!(
+            "[tiling_cache_hit_rate] plain: total={plain_total} distinct={plain_distinct} \
+             max_repeat={plain_max} hit_rate={plain_hit_rate:.1}%"
+        );
+        eprintln!(
+            "[tiling_cache_hit_rate] endaware: total={end_total} distinct={end_distinct} \
+             max_repeat={end_max} hit_rate={end_hit_rate:.1}%"
+        );
+
+        // Reiner Sanity-Check gegen einen leer-aussagekraftlosen Messlauf --
+        // KEIN Kriterium fuer die Bau-Entscheidung selbst.
+        assert!(plain_total >= 100, "zu wenige Aufrufe gemessen: {plain_total}");
+        assert!(end_total >= 20, "zu wenige Endaware-Aufrufe gemessen: {end_total}");
+    }
+
+    /// `tiling_key` muss auf JEDES ergebnisrelevante Feld reagieren (siehe
+    /// Herleitung im Modulkommentar oben) -- sonst würde eine Memoisierung
+    /// STILL falsche Ergebnisse liefern. `space_type` wird separat geprüft,
+    /// weil es NICHT über `required_color` mitkodiert ist (Wild hat wie
+    /// Special `required_color: None`, aber `accepts()` verhält sich für
+    /// beide fundamental unterschiedlich, siehe `dome.rs::DomeSpace::accepts`).
+    #[test]
+    fn tiling_key_distinguishes_all_result_relevant_fields() {
+        use crate::dome::BonusChip;
+        use crate::dome::{DomeSpace, DomeTile};
+
+        let base = {
+            let mut p = PlayerBoard::new(0, "P");
+            p.pattern_lines[0].add_tiles(&[Rot]);
+            p
+        };
+        let base_key = tiling_key(&base);
+
+        let variants: Vec<(&str, PlayerBoard)> = vec![
+            ("score", {
+                let mut p = base.clone();
+                p.score += 3;
+                p
+            }),
+            ("tiled_max_row", {
+                let mut p = base.clone();
+                p.tiled_max_row = 2;
+                p
+            }),
+            ("holds_first_player_marker", {
+                let mut p = base.clone();
+                p.holds_first_player_marker = true;
+                p
+            }),
+            ("broken_tiles", {
+                let mut p = base.clone();
+                p.add_broken(&[Blau]);
+                p
+            }),
+            ("pattern_line_tiles", {
+                let mut p = base.clone();
+                p.pattern_lines[1].add_tiles(&[Blau, Blau]);
+                p
+            }),
+            ("bonus_chip_colors", {
+                let mut p = base.clone();
+                p.bonus_chips.push(BonusChip { chip_id: 0, colors: vec![Rot] });
+                p
+            }),
+        ];
+        for (label, variant) in &variants {
+            assert_ne!(tiling_key(variant), base_key, "Feld '{label}' aendert den Schluessel nicht");
+        }
+
+        // Dome-Grid-Layout: identische Fuellung/Farben, aber Wild- statt
+        // Special-Space an derselben Position.
+        let mut with_wild = base.clone();
+        with_wild
+            .dome_grid
+            .place_dome_tile(
+                DomeTile::new(
+                    1,
+                    vec![DomeSpace::wild(), DomeSpace::normal(Rot), DomeSpace::normal(Blau), DomeSpace::normal(Tuerkis)],
+                    0,
+                ),
+                0,
+                0,
+            )
+            .unwrap();
+        let mut with_special = base.clone();
+        with_special
+            .dome_grid
+            .place_dome_tile(
+                DomeTile::new(
+                    1,
+                    vec![DomeSpace::special(), DomeSpace::normal(Rot), DomeSpace::normal(Blau), DomeSpace::normal(Tuerkis)],
+                    0,
+                ),
+                0,
+                0,
+            )
+            .unwrap();
+        assert_ne!(
+            tiling_key(&with_wild),
+            tiling_key(&with_special),
+            "space_type (Wild vs. Special) aendert den Schluessel nicht, obwohl `accepts()` unterschiedlich ist"
+        );
+
+        // Endaware-Schlüssel: gleiches Brett, unterschiedliche `scoring_tile_ids`.
+        let key_a = tiling_key_endaware(&base, &[0, 1, 2]);
+        let key_b = tiling_key_endaware(&base, &[0, 1, 3]);
+        assert_ne!(key_a, key_b, "unterschiedliche scoring_tile_ids aendern den Endaware-Schluessel nicht");
+    }
+
+    /// Auftrag Schritt 4a: Bit-Identitäts-Beweis. Über eine große, vielfältige
+    /// Menge echter Zustände (synthetische `rich_state`/`tiling_state`-
+    /// Fixtures UND reale `drive_to_round_start`-Partien über die Runden 2-5,
+    /// mehrere Spieler) muss `solve_round_final_score`/
+    /// `solve_round_final_score_endaware` MIT aktivem Cache (kalt UND warm)
+    /// exakt denselben `i32` liefern wie OHNE Cache. Mehrere hundert
+    /// Aufrufe, wie im Auftrag verlangt.
+    #[test]
+    fn tiling_cache_bit_identical_over_diverse_states() {
+        clear_tiling_caches_for_test();
+
+        let mut states: Vec<GameState> = Vec::new();
+        for seed in 1u64..=40 {
+            states.push(rich_state(seed));
+        }
+        for seed in 1u64..=15 {
+            states.push(tiling_state(seed));
+        }
+        for seed in 1u64..=12 {
+            for round in [2u32, 3, 4, 5] {
+                states.push(crate::round_transition::drive_to_round_start(seed, round));
+            }
+        }
+
+        let mut checked = 0u32;
+        for s in &states {
+            for pi in 0..2usize {
+                set_cache_override_for_test(Some(false));
+                let uncached_plain = compute_plain(s, pi);
+                let uncached_end = compute_endaware(s, pi);
+
+                set_cache_override_for_test(Some(true));
+                let cold_plain = cached_plain(s, pi); // Miss: befuellt den Cache
+                let warm_plain = cached_plain(s, pi); // Hit: muss denselben Wert liefern
+                let cold_end = cached_endaware(s, pi);
+                let warm_end = cached_endaware(s, pi);
+
+                assert_eq!(cold_plain, uncached_plain, "plain (kalt) weicht ab");
+                assert_eq!(warm_plain, uncached_plain, "plain (warm/Cache-Treffer) weicht ab");
+                assert_eq!(cold_end, uncached_end, "endaware (kalt) weicht ab");
+                assert_eq!(warm_end, uncached_end, "endaware (warm/Cache-Treffer) weicht ab");
+                checked += 2; // plain + endaware
+            }
+        }
+        set_cache_override_for_test(None);
+        clear_tiling_caches_for_test();
+
+        assert!(checked >= 400, "zu wenige Vergleiche durchgefuehrt: {checked}");
+    }
+
+    /// Auftrag Schritt 4b: Kollisions-Schutz. Zwei Zustände, die sich NUR in
+    /// einem ergebnisrelevanten Feld unterscheiden (hier: Startspieler-
+    /// Marker), dürfen im Cache NICHT denselben Eintrag treffen -- Zustand B
+    /// muss nach Zustand A (bereits im Cache) weiterhin seinen EIGENEN,
+    /// korrekten Wert liefern.
+    #[test]
+    fn tiling_cache_does_not_collide_between_near_identical_states() {
+        clear_tiling_caches_for_test();
+        set_cache_override_for_test(Some(true));
+
+        let mut s_a = tiling_state(11);
+        let tile = build_dome_tile_pool()[2].clone();
+        s_a.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        s_a.players[0].pattern_lines[0].add_tiles(&[Rot]);
+
+        let mut s_b = s_a.clone();
+        s_b.players[0].holds_first_player_marker = true; // einziger Unterschied
+
+        let val_a = cached_plain(&s_a, 0); // befuellt den Cache mit Zustand A
+        let val_b_direct = compute_plain(&s_b, 0);
+        let val_b_cached = cached_plain(&s_b, 0);
+
+        set_cache_override_for_test(None);
+        clear_tiling_caches_for_test();
+
+        assert_ne!(
+            val_a, val_b_direct,
+            "Testkonstruktion diskriminiert nicht (Marker-Strafe muesste den Wert aendern)"
+        );
+        assert_eq!(
+            val_b_cached, val_b_direct,
+            "Cache-Kollision: Zustand B erhielt faelschlich Zustand As gecachten Wert"
+        );
     }
 }
