@@ -7777,6 +7777,42 @@ Verlust = Kreuzentropie, Kopf = 2 Logits statt Tanh-Skalar. Report-Idee
 nachziehen, um Ziel- und Verlust-Aenderung zu trennen -- nicht vorab
 (spart ein Gating).
 
+### KNOPF-INTERAKTIONEN bei #34 (Nutzer-Warnung 2026-08-04): #33 muss HINEIN, nicht danach
+
+Nutzer: "kann auch ganz schlecht laufen mit unseren derzeitigen
+eingestellten Knoepfen" -- beziffert und bestaetigt:
+
+**Loss-Skalen-Sprung (das Hauptrisiko)**: Value-Loss heute (MSE auf
+weichem Ziel) ~**0,029**, Policy-Loss ~1,90 (Trainingslogs). Kreuzentropie
+auf binaerem Ausgang liegt bei ~**0,65-0,69** -- Faktor ~22. Mit
+unveraendertem `VALUE_WEIGHT=0.2` stiege der Value-Anteil am Gesamtverlust
+von ~0,3% auf ~6,4%: der Value-Kopf bekaeme **~22x mehr Gewicht im
+gemeinsamen Trunk**, ohne dass das beschlossen waere. Das Experiment
+teste dann nicht "hartes Ziel + CE", sondern "... + massiv umgewichtetes
+Training" -- und ein Fehlschlag waere nicht zuordenbar. Ironie: genau das
+ist der v13-Vorwurf (Value-Kopf drueckt den Trunk ins Overfitting), dann
+aber von uns selbst verursacht.
+
+**Konsequenz: Task #33 wandert IN #34 hinein** (nicht davor, nicht
+danach): `VALUE_WEIGHT` wird mitvariierter Arm, mindestens
+"loss-angepasst" (~0,009, haelt den Beitrag konstant) gegen
+"unveraendert" (0,2). Anmerkung: Loss-Magnitude != Gradienten-Magnitude
+(MSE auf tanh hat den verschwindenden Faktor (1-tanh²), CE auf Logits
+den gutartigen (p-y)) -- die "richtige" Invariante ist NICHT offensichtlich,
+weshalb sie empirisch aufgespannt statt errechnet wird.
+
+**Weitere gepruefte Knoepfe**:
+- `VALUE_SHRINK_ENABLED = false` (net_mcts.rs:361) -- GLUECK GEHABT: waere
+  die rundenabhaengige Daempfung an, wuerde sie nach #34 korrekte Werte
+  kuenstlich stauchen.
+- `val_combined` enthaelt `value_weight * value_val` -> mit CE aendert die
+  Checkpoint-AUSWAHL-Metrik ihre Bedeutung (Falle wie bei #33, schaerfer:
+  hier aendert sich zusaetzlich die Einheit).
+- `DEFAULT_C_PUCT=1.5` / `GUMBEL_C_SCALE=1.0` sind such-seitig fuer den
+  GESTAUCHTEN Kopf eingestellt; ein nativ kalibrierter Kopf spreizt
+  staerker -- laut #30 (+6pp bei ~2x Streckung) eher hilfreich, bleibt
+  aber eine unkontrollierte Aenderung, die im Bericht zu nennen ist.
+
 ### rtv: konditionale Wiedereroeffnung (Nutzer-Frage 2026-08-04)
 
 `rtv` ist `2*win_prob-1`, also eine GEWINNWAHRSCHEINLICHKEIT, und hat
