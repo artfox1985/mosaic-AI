@@ -7510,7 +7510,46 @@ also eine ANDERE DEFINITION und ist als Vergleichsgroesse UNGUELTIG
 ([[feedback-preregister-decision-metric]]). Auswahl je Arm daher intern
 per val_combined (Bestandslogik), Vergleich NUR per Arena.
 
-### Task #34: WDL-/Klassifikations-Value-Kopf (Report 1.2)
+### Task #34 (HOCHGESTUFT 2026-08-04): Sieg/Niederlage-Ziel wiederherstellen -- die Kopf-Trennung ist faktisch aufgehoben
+
+**Nutzer-Einwand 2026-08-04**: "wir haben extra einen value head mit
+sieg/niederlage und einen point head mit dem forecast der eigenen
+punkte" -- code-geprueft und BESTAETIGT, mit einer Historie, die das
+Problem groesser macht als gedacht:
+
+1. **Vor Schema 13 war der Value-Kopf genau das.** Der v13-Kommentar
+   (`neural_net.py:538ff`) sagt woertlich: *"points_forecast gewichtet
+   own_total stark, values ist reines Sieg/Niederlage"*, gemessen
+   `corr(val_true, pts_true)=0,49` -- zwei klar verschiedene Ziele.
+2. **Die Umstellung war eine HYPOTHESE, kein A/B**: *"Hypothese: das
+   HARTE ±1-Ziel ... treibt den gemeinsamen Trunk staerker Richtung
+   Overfitting"*. Ein Test dazu ist nirgends dokumentiert.
+3. **Die Diagnose stammt aus der v8e-Aera** -- der Generation mit
+   Val-R²<0, in der der Value-Kopf die Suche nachweislich
+   VERSCHLECHTERTE.
+4. **Es war damals nur der FALLBACK** (*"rtv bleibt unveraendert
+   bevorzugt, wo vorhanden"*). Als `nortv` am 2026-07-28 Standard wurde,
+   ist dieser Fallback STILLSCHWEIGEND zum Hauptziel befoerdert worden --
+   in dieser Rolle nie getestet.
+
+**Konsequenz**: Der Value-Kopf trainiert heute auf
+`tanh((own-opp)/SCALE)` -- eine gestauchte PUNKTE-MARGE, also dasselbe
+Material wie der Punkte-Kopf. `(v+1)/2` ist damit keine
+Gewinnwahrscheinlichkeit, sondern eine umetikettierte Punktedifferenz.
+Das erklaert die gemessenen Pathologien zwanglos: Runde-5-Fehlanzeige
+(Δ+18 Punkte -> 31-37% angezeigt), Kopf-Uneinigkeit r=0,68, und die
+Platten-Blindheit (Steigung 0,06).
+
+**Neuer Zuschnitt**: Hauptarm = hartes Sieg/Niederlage-Ziel
+(Kreuzentropie statt MSE), womit die beabsichtigte Kopf-Trennung
+wiederhergestellt ist; der WDL-/Klassifikations-Umbau (Report 1.2) ist
+dann die technisch saubere Umsetzung davon, kein eigenstaendiges
+Experiment. Der v13-Overfitting-Einwand wird dabei mitgetestet (er
+koennte in der heutigen, gesunden Kopf-Generation schlicht nicht mehr
+gelten) -- Kontrolle ist das aktuelle weiche Ziel, Entscheidung per
+Arena. **Prioritaet: vor #33 und #35.**
+
+### (urspruenglicher Zuschnitt) WDL-/Klassifikations-Value-Kopf (Report 1.2)
 KataGo/lc0 ersetzen die Tanh-Regression durch Softmax-Klassifikation
 ueber Ergebnisklassen; lc0s expliziter Ausloeser war exakt unser
 Nichtlinearitaets-Symptom. Aufwand: Python (Kopf 1 Skalar -> 2 Logits,
