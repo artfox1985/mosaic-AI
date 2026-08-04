@@ -7394,6 +7394,26 @@ wirkt der 2D-Aufschlag 1,46-1,8x);
 messen statt vermuten).
 Erst mit dem Profil entscheiden, wo die ~20h wirklich herkommen.
 
+**HERLEITUNG 2026-08-04 (Nutzer-Anstoss "der 2D-Umstieg war dann teurer,
+wenn nur dieser Anteil zaehlt")**: Die 1,46x sind ein reiner
+INFERENZ-Mikrobenchmark (`examples/latency_2d_vs_flat.rs`, "gemessen vor
+dem Training"), KEINE Gesamtdurchsatz-Zahl. Aus PCR-mild folgt
+25% weniger Ø-Sims -> 10,6% weniger Zeit/Partie, also
+`0,25*S/(F+S)=0,106` -> **S~42%, F~58%**. F ist reine Nicht-Netz-Arbeit
+(R5-Alpha-Beta, Tiling-DFS, Spiellogik) und damit zwischen flach und 2D
+IDENTISCH. Daraus:
+- 2D-Gesamtaufschlag = 1,15x (bei 1,46x Inferenz) bzw. 1,23x (bei den
+  nachgemessenen 1,8x) -- der Fixanteil VERDUENNT den Netz-Aufschlag,
+  der Umstieg war also billiger als die Schlagzeile suggeriert.
+- **Kehrseite, entscheidungsrelevant**: dieselbe Verduennung trifft jede
+  Inferenz-OPTIMIERUNG. Static Folding (1,8x -> 1,58x, geschaetzt 3-5
+  Tage) braechte `S*1,58/1,8 = 0,372` -> Gesamt 0,948, also **nur ~5%
+  Wandzeit**. **Damit ist Static Folding erledigt, ohne es zu bauen** --
+  der Hebel liegt im F-Anteil (58%), allen voran R5-Alpha-Beta.
+- Konsequenz fuer die #32-Messung: das Profil MUSS Netz-Zeit und
+  Nicht-Netz-Zeit getrennt ausweisen, sonst wiederholt sich der
+  Fehlschluss.
+
 ## AUFLOESUNG des Stichproben-Widerspruchs: BLOCK-KORRELATION, nicht Wheel (2026-08-04)
 
 **Forensik** (Wheel #1 aus 5219d77 im Scratchpad-Worktree rekonstruiert,
