@@ -1,0 +1,70 @@
+{
+  "prereg": "PREREG_lambda_ceiling_and_gating.md",
+  "design": {
+    "paare_je_arm": 75,
+    "block_size": 5,
+    "n_bloecke": 15,
+    "basis_seed": 40260803,
+    "modell_a": "v19_2d_opp_best",
+    "modell_b": "v19_2d_best (Champion, kein opp-Kopf)"
+  },
+  "referenz_arm": {
+    "tag": "ceil_la00",
+    "w": 0.1,
+    "lambda_aggr": 0.0,
+    "siege": "80:70",
+    "winrate": 0.5333333333333333
+  },
+  "arme": {
+    "la30": {
+      "w": 0.1,
+      "lambda_aggr": 3.0,
+      "siege": "74:76",
+      "winrate": 0.49333333333333335,
+      "block_diff_vs_referenz": -0.039999999999999994,
+      "t_stat": -0.840168050416806,
+      "p_value": 0.41493260366942986,
+      "df": 14,
+      "regel_verdikt_woertlich": "sicher"
+    },
+    "la50": {
+      "w": 0.1,
+      "lambda_aggr": 5.0,
+      "siege": "64:86",
+      "winrate": 0.4266666666666667,
+      "block_diff_vs_referenz": -0.10666666666666666,
+      "t_stat": -1.8617601538345883,
+      "p_value": 0.0837608349151904,
+      "df": 14,
+      "regel_verdikt_woertlich": "sicher"
+    },
+    "w02": {
+      "w": 0.2,
+      "lambda_aggr": 0.0,
+      "siege": "78:72",
+      "winrate": 0.52,
+      "block_diff_vs_referenz": -0.013333333333333327,
+      "t_stat": -0.2857142857142856,
+      "p_value": 0.7792807749779802,
+      "df": 14,
+      "regel_verdikt_woertlich": "sicher"
+    },
+    "w03": {
+      "w": 0.3,
+      "lambda_aggr": 0.0,
+      "siege": "83:67",
+      "winrate": 0.5533333333333333,
+      "block_diff_vs_referenz": 0.019999999999999993,
+      "t_stat": 0.44509909856926216,
+      "p_value": 0.6630526564968119,
+      "df": 14,
+      "regel_verdikt_woertlich": "sicher"
+    }
+  },
+  "auswahl": {
+    "gewaehlt_w": 0.1,
+    "gewaehlt_lambda": 2.0,
+    "begruendung": "w-Leiter FLACH (0.1/0.2/0.3 statistisch ununterscheidbar, p=0.78/0.66) -- Einbruchskante liegt oberhalb 0.3; das v9b-Desaster bei w=0.5 war Kopf-, nicht w-bedingt. w=0.1 gewaehlt statt des nominal fuehrenden w=0.3: +2pp aus EINER 75-Paar-Stichprobe waere Erst-Blick-auf-Rauschen (Praezedenz Tasks #16/#18/#12); w=0.1 hat 4 Stichproben / 600+ Spiele. lambda=2.0 statt des woertlich 'sicheren' lambda=5: -10.7pp bei p=0.084 ist ein NICHTNACHWEIS, kein Unbedenklichkeitsnachweis; Richtung monoton fallend (53.3 -> 49.3 -> 42.7%). lambda=2 ist ueber 225 Paare als unschaedlich etabliert (PREREG-Fallback-Klausel).",
+    "break_even_befund": "Klippe zwischen lambda=2 und lambda=5, Wendepunkt um lambda=3."
+  }
+}
