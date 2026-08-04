@@ -272,13 +272,23 @@ impl Net {
         &self,
         feats: &[f32],
     ) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
-        let inputs = self.build_inputs(&[feats])?;
-        let out = self.model.run(inputs)?;
-        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
-        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        Ok((policy, value, moon, points))
+        // Task #32 (`profiling.rs`-Modulkopf "Task #32"): DIREKT im
+        // Methodenkoerper statt an den Aufrufstellen instrumentiert, damit
+        // JEDER `Net::eval*`-Aufruf erfasst ist, auch solche ausserhalb des
+        // Task-#80/#81-`timed_net_eval`-Wrappers (z.B. `lib.rs`, `py.rs`,
+        // `self_play.rs::negamax_value`).
+        crate::profiling::selfplay_profile::timed(
+            crate::profiling::selfplay_profile::SelfplayCat::NetInference,
+            || {
+                let inputs = self.build_inputs(&[feats])?;
+                let out = self.model.run(inputs)?;
+                let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+                let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+                let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+                let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+                Ok((policy, value, moon, points))
+            },
+        )
     }
 
     /// Forward-Pass für ZWEI unabhängige Stellungen in einem Batch=2-Aufruf
@@ -296,17 +306,23 @@ impl Net {
         (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
         (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
     )> {
-        let inputs = self.build_inputs(&[feats_a, feats_b])?;
-        let out = self.model_pair.run(inputs)?;
-        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
-        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        let (policy_a, policy_b) = split_batch2(policy);
-        let (value_a, value_b) = split_batch2(value);
-        let (moon_a, moon_b) = split_batch2(moon);
-        let (points_a, points_b) = split_batch2(points);
-        Ok(((policy_a, value_a, moon_a, points_a), (policy_b, value_b, moon_b, points_b)))
+        // Task #32: siehe `eval`-Kommentar oben.
+        crate::profiling::selfplay_profile::timed(
+            crate::profiling::selfplay_profile::SelfplayCat::NetInference,
+            || {
+                let inputs = self.build_inputs(&[feats_a, feats_b])?;
+                let out = self.model_pair.run(inputs)?;
+                let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+                let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+                let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+                let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+                let (policy_a, policy_b) = split_batch2(policy);
+                let (value_a, value_b) = split_batch2(value);
+                let (moon_a, moon_b) = split_batch2(moon);
+                let (points_a, points_b) = split_batch2(points);
+                Ok(((policy_a, value_a, moon_a, points_a), (policy_b, value_b, moon_b, points_b)))
+            },
+        )
     }
 
     /// Forward-Pass fuer `feats.len()` UNABHAENGIGE Stellungen in EINEM
@@ -331,32 +347,38 @@ impl Net {
         &self,
         feats: &[&[f32]],
     ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
-        let n = feats.len();
-        let model = self.model_batch.get(&n).ok_or_else(|| {
-            TractError::msg(format!(
-                "eval_batch: kein vorgebauter Plan fuer N={n} (gueltig: 1..={EVAL_BATCH_MAX_N})"
-            ))
-        })?;
-        let inputs = self.build_inputs(feats)?;
-        let out = model.run(inputs)?;
-        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
-        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        let policy_rows = split_batch_n(policy, n);
-        let value_rows = split_batch_n(value, n);
-        let moon_rows = split_batch_n(moon, n);
-        let points_rows = split_batch_n(points, n);
-        Ok((0..n)
-            .map(|i| {
-                (
-                    policy_rows[i].clone(),
-                    value_rows[i].clone(),
-                    moon_rows[i].clone(),
-                    points_rows[i].clone(),
-                )
-            })
-            .collect())
+        // Task #32: siehe `eval`-Kommentar oben.
+        crate::profiling::selfplay_profile::timed(
+            crate::profiling::selfplay_profile::SelfplayCat::NetInference,
+            || {
+                let n = feats.len();
+                let model = self.model_batch.get(&n).ok_or_else(|| {
+                    TractError::msg(format!(
+                        "eval_batch: kein vorgebauter Plan fuer N={n} (gueltig: 1..={EVAL_BATCH_MAX_N})"
+                    ))
+                })?;
+                let inputs = self.build_inputs(feats)?;
+                let out = model.run(inputs)?;
+                let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+                let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+                let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+                let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+                let policy_rows = split_batch_n(policy, n);
+                let value_rows = split_batch_n(value, n);
+                let moon_rows = split_batch_n(moon, n);
+                let points_rows = split_batch_n(points, n);
+                Ok((0..n)
+                    .map(|i| {
+                        (
+                            policy_rows[i].clone(),
+                            value_rows[i].clone(),
+                            moon_rows[i].clone(),
+                            points_rows[i].clone(),
+                        )
+                    })
+                    .collect())
+            },
+        )
     }
 
     // ── Task #28 (`PREREG_task28_aggression.md`): `opp_points`-erweiterte
@@ -374,18 +396,24 @@ impl Net {
     /// `has_opp_head() == true` unerwartet nur 4 Outputs liefert (defensiv,
     /// sollte durch die Namens-Erkennung beim Laden nie vorkommen).
     pub fn eval_ex(&self, feats: &[f32]) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
-        let inputs = self.build_inputs(&[feats])?;
-        let out = self.model.run(inputs)?;
-        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
-        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
-            out[4].to_array_view::<f32>()?.iter().copied().collect()
-        } else {
-            Vec::new()
-        };
-        Ok((policy, value, moon, points, opp_points))
+        // Task #32: siehe `eval`-Kommentar oben.
+        crate::profiling::selfplay_profile::timed(
+            crate::profiling::selfplay_profile::SelfplayCat::NetInference,
+            || {
+                let inputs = self.build_inputs(&[feats])?;
+                let out = self.model.run(inputs)?;
+                let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+                let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+                let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+                let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+                let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
+                    out[4].to_array_view::<f32>()?.iter().copied().collect()
+                } else {
+                    Vec::new()
+                };
+                Ok((policy, value, moon, points, opp_points))
+            },
+        )
     }
 
     /// Wie [`Net::eval_pair`], zusaetzlich `opp_points` je Zeile (5. Tupel-
@@ -399,23 +427,32 @@ impl Net {
         (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
         (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
     )> {
-        let inputs = self.build_inputs(&[feats_a, feats_b])?;
-        let out = self.model_pair.run(inputs)?;
-        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
-        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
-            out[4].to_array_view::<f32>()?.iter().copied().collect()
-        } else {
-            Vec::new()
-        };
-        let (policy_a, policy_b) = split_batch2(policy);
-        let (value_a, value_b) = split_batch2(value);
-        let (moon_a, moon_b) = split_batch2(moon);
-        let (points_a, points_b) = split_batch2(points);
-        let (opp_a, opp_b) = split_batch2(opp_points);
-        Ok(((policy_a, value_a, moon_a, points_a, opp_a), (policy_b, value_b, moon_b, points_b, opp_b)))
+        // Task #32: siehe `eval`-Kommentar oben.
+        crate::profiling::selfplay_profile::timed(
+            crate::profiling::selfplay_profile::SelfplayCat::NetInference,
+            || {
+                let inputs = self.build_inputs(&[feats_a, feats_b])?;
+                let out = self.model_pair.run(inputs)?;
+                let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+                let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+                let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+                let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+                let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
+                    out[4].to_array_view::<f32>()?.iter().copied().collect()
+                } else {
+                    Vec::new()
+                };
+                let (policy_a, policy_b) = split_batch2(policy);
+                let (value_a, value_b) = split_batch2(value);
+                let (moon_a, moon_b) = split_batch2(moon);
+                let (points_a, points_b) = split_batch2(points);
+                let (opp_a, opp_b) = split_batch2(opp_points);
+                Ok((
+                    (policy_a, value_a, moon_a, points_a, opp_a),
+                    (policy_b, value_b, moon_b, points_b, opp_b),
+                ))
+            },
+        )
     }
 
     /// Wie [`Net::eval_batch`], zusaetzlich `opp_points` je Zeile (5. Tupel-
@@ -430,39 +467,45 @@ impl Net {
         &self,
         feats: &[&[f32]],
     ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
-        let n = feats.len();
-        let model = self.model_batch.get(&n).ok_or_else(|| {
-            TractError::msg(format!(
-                "eval_batch_ex: kein vorgebauter Plan fuer N={n} (gueltig: 1..={EVAL_BATCH_MAX_N})"
-            ))
-        })?;
-        let inputs = self.build_inputs(feats)?;
-        let out = model.run(inputs)?;
-        let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
-        let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
-        let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
-        let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-        let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
-            out[4].to_array_view::<f32>()?.iter().copied().collect()
-        } else {
-            Vec::new()
-        };
-        let policy_rows = split_batch_n(policy, n);
-        let value_rows = split_batch_n(value, n);
-        let moon_rows = split_batch_n(moon, n);
-        let points_rows = split_batch_n(points, n);
-        let opp_rows = split_batch_n_or_empty_rows(opp_points, n);
-        Ok((0..n)
-            .map(|i| {
-                (
-                    policy_rows[i].clone(),
-                    value_rows[i].clone(),
-                    moon_rows[i].clone(),
-                    points_rows[i].clone(),
-                    opp_rows[i].clone(),
-                )
-            })
-            .collect())
+        // Task #32: siehe `eval`-Kommentar oben.
+        crate::profiling::selfplay_profile::timed(
+            crate::profiling::selfplay_profile::SelfplayCat::NetInference,
+            || {
+                let n = feats.len();
+                let model = self.model_batch.get(&n).ok_or_else(|| {
+                    TractError::msg(format!(
+                        "eval_batch_ex: kein vorgebauter Plan fuer N={n} (gueltig: 1..={EVAL_BATCH_MAX_N})"
+                    ))
+                })?;
+                let inputs = self.build_inputs(feats)?;
+                let out = model.run(inputs)?;
+                let policy: Vec<f32> = out[0].to_array_view::<f32>()?.iter().copied().collect();
+                let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
+                let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
+                let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
+                let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
+                    out[4].to_array_view::<f32>()?.iter().copied().collect()
+                } else {
+                    Vec::new()
+                };
+                let policy_rows = split_batch_n(policy, n);
+                let value_rows = split_batch_n(value, n);
+                let moon_rows = split_batch_n(moon, n);
+                let points_rows = split_batch_n(points, n);
+                let opp_rows = split_batch_n_or_empty_rows(opp_points, n);
+                Ok((0..n)
+                    .map(|i| {
+                        (
+                            policy_rows[i].clone(),
+                            value_rows[i].clone(),
+                            moon_rows[i].clone(),
+                            points_rows[i].clone(),
+                            opp_rows[i].clone(),
+                        )
+                    })
+                    .collect())
+            },
+        )
     }
 }
 

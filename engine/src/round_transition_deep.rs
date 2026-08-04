@@ -664,6 +664,12 @@ pub(crate) fn bootstrap_value_after_rounds<R: Rng + ?Sized>(
     horizon_rounds: u32,
     rng: &mut R,
 ) -> [f64; 2] {
+    // Task #32 (`profiling.rs`-Modulkopf "Task #32"): Haupteinstiegspunkt der
+    // "bootstrap_value"-Kategorie -- ruft INTERN `Net::eval*` auf
+    // (`net_leaf_eval`/`drafting_action_priors`), die daraus resultierende
+    // Verschachtelung mit "net_inference" wird dort ueber
+    // `net_inference_inside_bootstrap_ns` getrennt ausgewiesen.
+    crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::BootstrapValue, || {
     let mut captured: Option<GameState> = None;
     let deadline0 = Instant::now() + INNER_SAMPLE_TIME_BUDGET;
     round_transition::sample_round_transition_value(
@@ -711,6 +717,7 @@ pub(crate) fn bootstrap_value_after_rounds<R: Rng + ?Sized>(
         }
     }
     crate::net_mcts::net_leaf_eval(net, &state)
+    })
 }
 
 #[cfg(test)]
