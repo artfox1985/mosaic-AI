@@ -7452,6 +7452,21 @@ beruehrt die 50%). Muster: **je hoeher die Power, desto kleiner der
 Effekt** (57.7% bei n=300 -> 51.2% bei n=400) -- klassische Regression
 zur Mitte, die frueheren "Siege" waren ueberschaetzt.
 
+**NUTZER-ENTSCHEID (2026-08-04)**: Champion bleibt **v19_2d_best**.
+Der opp-Kopf kommt ueber die naechste Generation in die Champion-Linie
+(`v20_2d_opp`) -- Promotion also nicht jetzt auf Feature-Gruenden,
+sondern regulaer per Generations-Gating. Planungs-Konsequenzen fuer v20:
+(a) **Warm-Start von `v19_2d_opp_best`** (nicht v19_2d_best) -- der
+opp-Kopf ist dort bereits trainiert (Opp-R² 0,44), beide Netze sind
+arena-gleichwertig (205:195), kostet also keine Staerke; (b) das
+v20-Gating testet dann Generationssprung UND opp-Kopf gemeinsam --
+vertretbar, weil der Kopf in Gate 1/2 als staerkeneutral nachgewiesen
+ist; bei einem Fehlschlag waere ein Zusatz-Gating ohne Kopf noetig, um
+die Ursache zu trennen; (c) der Aggressions-Standardwert (w=0,1,
+lambda=2,0) wird produktiv wirksam, sobald v20_2d_opp Champion ist --
+bis dahin bleibt er Labor-Einstellung; (d) `v19_2d_opp_best`-Checkpoints
+NICHT loeschen (Warm-Start-Basis).
+
 **VERDIKT**: KEIN Staerkebeleg -> **keine Promotion auf Staerke-Gruenden**.
 Der Kandidat ist aber auch nicht schlechter (7/7 Stichproben >=50%).
 **Offene Nutzer-Entscheidung**: Die Aggressions-Funktion existiert
