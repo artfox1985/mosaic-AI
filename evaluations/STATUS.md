@@ -7549,6 +7549,22 @@ koennte in der heutigen, gesunden Kopf-Generation schlicht nicht mehr
 gelten) -- Kontrolle ist das aktuelle weiche Ziel, Entscheidung per
 Arena. **Prioritaet: vor #33 und #35.**
 
+**PFLICHT-DIAGNOSTIK zu #34 (Nutzer-Entscheid 2026-08-04)**: Nach dem
+Training `tools/r5_value_calibration.py` auf dem neuen Netz wiederholen
+(identische Parameter wie der Lauf vom 2026-08-03: 24 Zustaende x 6
+Kombinationen, 3 Modelle -> hier nur das neue + das weiche Kontrollnetz).
+Frage: steigt die Wertungsplatten-Kalibrierungssteigung von heute
+**0,06-0,09** Richtung 1? Ausserdem den Platt-Fit
+(`value_calibration_fit.json`-Verfahren) wiederholen: faellt B von
+**1,93** Richtung 1?
+
+**Damit ist die separat angedachte WERTUNGSPLATTEN-INTERVENTION
+ZURUECKGESTELLT** (Symptom vs. Ursache): erst messen, ob die
+Platten-Blindheit nach der Ziel-Reparatur ueberhaupt noch existiert.
+Nur falls die Steigung flach BLEIBT, ist ein gezielter Eingriff
+(Platten-Encoding / Aux-Kopf auf den Platten-Endbonus) gerechtfertigt --
+dann aber als eigene Vorregistrierung mit dann bekanntem Ausgangswert.
+
 ### (urspruenglicher Zuschnitt) WDL-/Klassifikations-Value-Kopf (Report 1.2)
 KataGo/lc0 ersetzen die Tanh-Regression durch Softmax-Klassifikation
 ueber Ergebnisklassen; lc0s expliziter Ausloeser war exakt unser
