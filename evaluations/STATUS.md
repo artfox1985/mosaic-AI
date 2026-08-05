@@ -227,6 +227,24 @@ schlechter kalibriert ist.
 Value/Brier) + `--select-by-brier`. Arena-Runde 2 laeuft mit beiden
 Schaltern und fairem Reifegrad.
 
+### Arena-Runde 3 (2026-08-05): brierbest-Checkpoint spielt PARITAET
+
+| Vergleich | Ergebnis | p (Fixed-n) |
+|---|---|---|
+| wdlhard_brierbest (E2) vs t34_tanh (final) | 65:75 (46,4%) | 0,47 |
+| **wdlhard_brierbest (E2) vs v19_2d_best (Champion)** | **106:114 (48,2%)** | **0,65** |
+
+Beide SPRT-H0, beide KIs decken 0 ab. Bemerkenswert: ein Kopf mit ZWEI
+Epochen sauberem Sieg/Niederlage-Training (Brier 0,1970, bester Wert
+aller Arme) spielt statistische PARITAET mit dem Champion. Damit steht
+nach 6 Gatings ueber 3 Runden ein konsistentes Bild: **das Value-Ziel
+bewegt die Spielstaerke bei 400 Sims nicht messbar** (Aufloesungsgrenze
+~8pp beachtet) -- die Kalibrierung verbessert sich drastisch, die
+Staerke ist invariant. Fuer das #34-Verdikt heisst das: die Ziel-Wahl
+entscheidet sich an Kalibrierung/Nutzbarkeit (GUI-Anzeige,
+Blend-Semantik, kuenftige Suche mit korrekten Wahrscheinlichkeiten)
+und an der TRAININGS-Stabilitaet (Erosions-Arme), nicht an der Arena.
+
 **Noch offen**: R5-Plattenkalibrierung (zweite Pflicht-Diagnostik --
 faellt die Steigung von 0,06-0,09 Richtung 1?).
 
