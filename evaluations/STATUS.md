@@ -115,11 +115,41 @@ entscheidet die Arena.
    WDL-Armen faktisch den untrainierten frischen Kopf (Value-Term
    entweder vernachlaessigbar bei w=0,009 oder unit-fremd bei w=0,2/BCE).
    Die ersten drei Gatings pruefen also nicht das ZIEL.
-2. Der Value-Kopf startete FRISCH (Shape-Mismatch tanh->wdl), die
-   Kontrolle uebernahm einen ueber ~10 Generationen gereiften Kopf --
-   und das Early Stopping (nur Policy-Plateau) stoppte nach 15 Epochen.
-   Auch der Endstand-Vergleich ist damit "15 Epochen gegen 10
-   Generationen", nicht "Ziel A gegen Ziel B".
+2. Der Value-Kopf startete FRISCH (Shape-Mismatch tanh->wdl) und das
+   Early Stopping (nur Policy-Plateau) stoppte nach 15 Epochen -- der
+   neue Kopf war also untertrainiert.
+
+**KORREKTUR meiner Einordnung (Nutzer 2026-08-05)**: Ich hatte den
+Kontrollarm als "ueber ~10 Generationen gereiften Kopf" beschrieben. Das
+ist FALSCH -- so einen Kopf gibt es nicht. Die Historie
+(`archive/history.md`) sagt das Gegenteil: der binaere +-1-Value-Kopf
+hatte ueber VIER Generationen durchgehend NEGATIVES Val-R² (v8 -0,43 ->
+v8d -0,25, schlechter als der blosse Mittelwert) und verschlechterte die
+Suche AKTIV (0% Siegquote gegen die Heuristik; der Diagnose-Flip auf
+DFS-Blatt sprang sofort auf 26%). Der `points_forecast`-Kopf am SELBEN
+Trunk kam gleichzeitig auf 0,27-0,34. **Genau deshalb wurde der
+Punkte-Kopf ueberhaupt etabliert.** Die damalige Erklaerung steht
+woertlich im Archiv: das binaere Ziel kollabiert bei knappen Ergebnissen
+zu einem "reinen Vorzeichen-Zufall", waehrend die kontinuierliche Marge
+Abstufungen transportiert.
+
+**Folge fuer die Deutung**: Das WDL-Arena-Ergebnis ist KEIN
+Konfound-Artefakt, sondern die **Wiederholung eines dokumentierten
+Befunds**. Neu ist nur die bessere Verlustgeometrie (Kreuzentropie statt
+MSE) plus TD-Blend -- das hat die KALIBRIERUNG dramatisch verbessert
+(B 1,93 -> 0,98), am LERNSIGNAL-Problem aber nichts geaendert.
+
+**Damit ist die eigentliche Spannung benannt**: die architektonisch
+korrekte Trennung (Sieg/Niederlage vs. Punkte) und das
+trainingseffektivste Ziel sind NICHT dasselbe. Der weiche Margin war kein
+Fehler, sondern ein Workaround fuer ein reales Problem.
+
+**Naheliegender naechster Arm statt Rueckzug**: unser WDL-Ziel ist bereits
+HALB kontinuierlich (`TD_LAMBDA*bootstrap_winprob + (1-TD_LAMBDA)*harter
+Ausgang`, TD_LAMBDA=0,5). Ein HOEHERES TD_LAMBDA behaelt die
+Wahrscheinlichkeits-Semantik und holt Informationsreichtum zurueck --
+das ist der Hebel, den die v8-Aera nicht hatte (dort war das Ziel rein
+binaer).
 
 **Inhaltlich bemerkenswert bleibt trotzdem**: der WDL-Kopf ist praktisch
 perfekt kalibriert (Platt-B **0,98** vs 1,70 der Kontrolle) und spielt
