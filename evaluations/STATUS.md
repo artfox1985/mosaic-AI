@@ -31,7 +31,7 @@ Sequenzialisierung verloren).
 | — | GUI: Slider raus, Startwert setzen | offen, klein | — | history (Task #28) |
 | #29 | Value-Rangmetrik | **geschlossen**: NICHT validiert (2/6) | — | history |
 | #28 | Aggressions-Utility (opp-Kopf + Regler) | **geschlossen**: kein Denial-Beleg, Regler nutzbar | — | history |
-| #14 | PCR (beide Regime) | **geschlossen**: negativ | — | history |
+| #14 | PCR (beide Regime) | **geschlossen**, Wiedereroeffnung konditional | #34 + #36 + Durchsatz-Neumessung | unten |
 | #27 | R5-Value-Kalibrierung | **geschlossen**: Unterkalibrierung belegt | — | history |
 | #9 | Ownership-Kopf | **geschlossen** 2026-07-28 | Wiedereroeffnung nur mit Arena-Instrument | history |
 | #12 | Distributionaler Punkte-Kopf | **geschlossen**: nicht uebernommen | — | history |
@@ -138,6 +138,43 @@ die FORM, nicht der Absolutwert.
 (~50 min je Groesse), das ist der Hauptposten -- Sample-Ebene-Subsampling
 geht NICHT, weil das Value-Ziel per PARTIE definiert ist, also muessen
 Dateien/Partien subsampled werden.
+
+### PCR (Task #14): konditionale WIEDEREROEFFNUNG (Nutzer-Frage 2026-08-05)
+
+Zwei unabhaengige Gruende, warum das geschlossene PCR neu zu bewerten ist:
+
+1. **Das Verdikt fiel auf POLICY-Metriken.** Die Abbruchregel griff, weil
+   beide Orakel-Metriken schlechter waren -- reine Policy-Masse. Die
+   Value-Seite war bei pcr sogar BESSER (+0,04 `value_r2`), nur zu Recht
+   nicht gewichtet, weil das Mass untauglich ist. Die eigentliche
+   PCR-Wette ("mehr, aber schwaechere Value-Masse gegen weniger, aber
+   verlaessliche Policy-Masse") wurde damit NIE mit einem gueltigen
+   Value-Mass bewertet. Nach #34 gibt es eines (Brier), nach #36 wissen
+   wir zusaetzlich, ob der Value-Kopf ueberhaupt spielhungrig ist.
+2. **Der Tiling-Cache hat die OEKONOMIE verschoben** (seit 2026-08-05).
+   PCR-mild scheiterte am Wandzeit-Kriterium (1,118x < 1,15x) -- gemessen,
+   als der Tiling-Solver 30% der Zeit fraß. Jetzt sind es 4,8%, der
+   Netz-Anteil stieg dadurch von ~60% auf **~81%** der Thread-Zeit.
+   Sim-Reduktion hat entsprechend mehr Hebel: dieselbe 25%-Kuerzung
+   spart rechnerisch ~20% statt ~11% (Faktor ~1,25x) -- ueber der
+   Schwelle, an der PCR-mild scheiterte.
+
+**Gegengewichte, ehrlich**: (a) die PCR-Doku-Arena war NEGATIV (67:83,
+SPRT-H0) -- ein Arena-Ergebnis, kein Proxy, und damit das staerkste
+Argument dagegen; allerdings mit Netzen auf dem ALTEN Value-Ziel.
+(b) Die Oekonomie-Rechnung oben ist PROFIL-ARITHMETIK, keine Messung --
+genau diese Sorte Rechnung lag am 2026-08-04 schon einmal daneben
+(S/F-Herleitung 42/58, widerlegt durch direkte Messung). Der Durchsatz
+ist end-to-end neu zu messen, nicht hochzurechnen.
+
+**Bedingungen fuer eine Wiedereroeffnung** (alle drei, sonst bleibt zu):
+(i) #34 abgeschlossen und der Value-Kopf auf Wahrscheinlichkeits-Ziel;
+(ii) #36 zeigt, dass der Value-Kopf mit mehr Partien weiter besser wird
+(saettigt er frueh, ist PCRs ganze Wette wertlos);
+(iii) Durchsatz mit aktivem Tiling-Cache END-TO-END nachgemessen (nicht
+aus dem Profil abgeleitet), Kriterium unveraendert >=1,15x.
+Dann als NEUES Experiment mit neu trainierten Armen auf dem neuen Ziel --
+keine Neulesung der alten Zahlen.
 
 **Konsequenz je Ausgang**: saettigt der Value-Kopf frueh -> Self-Play-Budget
 kann sinken (oder in Qualitaet statt Menge fliessen). Waechst er weiter ->
