@@ -110,6 +110,9 @@ def main() -> None:
     per_round: dict[int, list[int]] = {2: [], 3: [], 4: []}
     refdiff_agree: list[float] = []
     refdiff_disagree: list[float] = []
+    tie_tot = 0                      # Instrument-Fix 2026-08-05, s.u.
+    per_round_ties: dict[int, int] = {}
+    pair_log: list[dict] = []
     done = False
 
     for fi, f in enumerate(files):
@@ -184,11 +187,26 @@ def main() -> None:
                     if len(da) < 2:
                         continue
                     m = stats.mean(da)
-                    ok = (wp[a] - wp[b]) * m > 0
+                    dwp = float(wp[a] - wp[b])
+                    # Instrument-Fix 2026-08-05: REFERENZ-GLEICHSTAENDE (m==0,
+                    # in R4 haeufig -- die Referenz ist dort der EXAKTE
+                    # Alpha-Beta-Wert und oft identisch) zaehlten vorher als
+                    # Fehlgriff (`(wp_a-wp_b)*0 > 0` ist False) und drueckten
+                    # die Trefferquote kuenstlich unter 50% -- das betraf auch
+                    # die Juli-Zahlen (R4 "48,3%"). Jetzt eigene Kategorie,
+                    # nicht in agree/n enthalten; Pro-Paar-Rohdaten werden
+                    # mitgeschrieben, damit Nachanalysen ohne Re-Lauf gehen.
+                    if m == 0.0 or dwp == 0.0:
+                        tie_tot += 1
+                        per_round_ties[rnd] = per_round_ties.get(rnd, 0) + 1
+                        pair_log.append({"round": rnd, "m": m, "dwp": dwp, "tie": True})
+                        continue
+                    ok = dwp * m > 0
                     agree_tot += int(ok)
                     n_tot += 1
                     per_round[rnd].append(int(ok))
                     (refdiff_agree if ok else refdiff_disagree).append(abs(m))
+                    pair_log.append({"round": rnd, "m": m, "dwp": dwp, "tie": False, "ok": ok})
                     if n_tot >= args.max_pairs:
                         done = True
         if (fi + 1) % 10 == 0:
@@ -209,6 +227,8 @@ def main() -> None:
         if v:
             print(f"  Runde {r}: {sum(v)}/{len(v)} ({sum(v)/len(v):.1%})   "
                   f"p = {binom_p(sum(v), len(v)):.4f}")
+    print(f"  Referenz-Gleichstaende (eigene Kategorie, NICHT in agree/n): {tie_tot} "
+          f"{ {r: c for r, c in sorted(per_round_ties.items())} }")
     if refdiff_agree and refdiff_disagree:
         print(f"\n  |Referenz-Differenz| bei Treffern:    Median {stats.median(refdiff_agree):.4f}")
         print(f"  |Referenz-Differenz| bei Fehlgriffen: Median {stats.median(refdiff_disagree):.4f}")
@@ -219,9 +239,11 @@ def main() -> None:
         "rank_model": args.rank_model, "ref_model": args.ref_model,
         "k": args.k, "draws": args.draws, "sims": args.sims,
         "agree": agree_tot, "n_pairs": n_tot, "binom_p": binom_p(agree_tot, n_tot),
+        "ties": tie_tot, "per_round_ties": {str(r): c for r, c in per_round_ties.items()},
         "per_round": {str(r): [sum(v), len(v)] for r, v in per_round.items() if v},
         "refdiff_agree_median": stats.median(refdiff_agree) if refdiff_agree else None,
         "refdiff_disagree_median": stats.median(refdiff_disagree) if refdiff_disagree else None,
+        "pairs": pair_log,
     }, indent=2), encoding="utf-8")
     print(f"\nErgebnis: {ROOT / args.out}")
 
