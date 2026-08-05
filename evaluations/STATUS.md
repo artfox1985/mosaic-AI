@@ -985,10 +985,14 @@ Expansion). Zwei nie untersuchte Punkte fuer spaeter:
    nur Sonnenzuege betrifft, potenziell ~1/3 des Policy-Gradienten. Nie
    gesweept (VALUE_WEIGHT-Blindfleck-Muster). Als Arm in einen
    kuenftigen Loss-Gewichts-Sweep.
-2. **Myopisches Label**: Referenz maximiert den RUNDENendstand
-   (`solve_round_final_score`) -- spaeter zahlende Reihenfolge-Effekte
-   (Farbverfuegbarkeit, Kuppel-Slots) unsichtbar. Erledigt sich von
-   selbst, falls Labels je aus Suche statt Rundensolver kommen.
+2. **Label-Horizont** (Nutzer-Einordnung 2026-08-05, RELATIVIERT):
+   Referenz maximiert den RUNDENendstand (`solve_round_final_score`).
+   Da die Fabriken zu Rundenbeginn NEU befuellt werden, ist der
+   Wirkhorizont einer Reihenfolge im Wesentlichen die laufende Runde --
+   das Solver-Label ist also naeher am Optimum als zunaechst vermutet,
+   Restpunkt sind allenfalls Randeffekte. Falls Labels je aus der Suche
+   kommen (root_child_q aus #35 liefert die Q-Ordnung der Varianten ab
+   v20 gratis), waere das ein billiger A/B, kein Pflichtumbau.
 Kein akuter Bedarf: Policy-Seite ist ueber die Orakel-Metriken
 arena-validiert, inkl. PL-Aufteilung.
 
