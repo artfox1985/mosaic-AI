@@ -26,7 +26,7 @@ Sequenzialisierung verloren).
 | #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Nutzer) | Champion, der gute Spieler fordert | unten |
 | **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | geplant | #34 (braucht den Brier-Score) | unten |
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
-| — | v20-Zyklus (Self-Play + Gating) | geplant | #34-Ausgang, Fenster-Entscheid | unten |
+| — | v20-Zyklus (Self-Play + Gating) | geplant | **#34-Ausgang + #36 + #14-Entscheid** (Nutzer 2026-08-05: Start erst, wenn klar ist, wie viele Spiele/Sims wirklich sinnvoll sind) | unten |
 | — | R4b (Playout-Ground-Truth) | geplant | — | history (#R4-Alarm) |
 | — | GUI: Slider raus, Startwert setzen | offen, klein | — | history (Task #28) |
 | #29 | Value-Rangmetrik | **geschlossen**: NICHT validiert (2/6) | — | history |
@@ -45,6 +45,12 @@ Sequenzialisierung verloren).
 - **Champion**: `v19_2d_best` bleibt (Nutzer 2026-08-04). Der opp-Kopf
   kommt ueber `v20_2d_opp` in die Linie; v20 warm von
   `v19_2d_opp_best` starten (Kopf bereits trainiert).
+- **v20-Kampagne (Nutzer 2026-08-05): Start ERST, wenn Spiel- und
+  Sim-Budget belegt sind** -- also nach #36 (Spielzahl: saettigt der
+  Value-Kopf?) und dem #14-Entscheid (Sims: lohnt PCR-Sim-Reduktion?).
+  Die ~20h-Kampagne wird nicht auf geratenen Budgets gefahren. #36 ist
+  damit auf dem KRITISCHEN PFAD zu v20 (laeuft dank `--wdl-hard-only`
+  komplett sauber auf dem Bestandskorpus, kein v20 noetig).
 - **λ (Value-Target-Mix)**: bis nach #34 ZURUECKGESTELLT -- #34 aendert
   `z` auf eine Gewinnwahrscheinlichkeit, damit mischt λ zwei Groessen
   derselben Art. Befundlage: gewinnt bei 65,7% root_q-Mix, verliert bei
