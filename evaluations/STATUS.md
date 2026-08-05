@@ -24,6 +24,7 @@ Sequenzialisierung verloren).
 | #33 | Value-/Policy-Loss-Gewicht | wartet | in #34 integriert (Loss-Skala springt ~22x) | unten |
 | #35b | Ranking-Loss-Training | wartet | #35-Logging + v20-Self-Play | unten |
 | #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Nutzer) | Champion, der gute Spieler fordert | unten |
+| **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | geplant | #34 (braucht den Brier-Score) | unten |
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
 | — | v20-Zyklus (Self-Play + Gating) | geplant | #34-Ausgang, Fenster-Entscheid | unten |
 | — | R4b (Playout-Ground-Truth) | geplant | — | history (#R4-Alarm) |
@@ -101,6 +102,47 @@ NICHT automatisch wieder offen, aber mit konkretem Anlass:
 
 **Reihenfolge**: erst #34-Ergebnis + Pflicht-Diagnostiken abwarten, dann
 diese vier Punkte in EINEM Zug bewerten -- nicht einzeln aufmachen.
+
+## Task #36 (NEU, Nutzer 2026-08-05): Saettigt der Value-Kopf ueber die Spielzahl wie die Policy?
+
+**Frage**: Wird der Value-Kopf mit mehr Self-Play-Partien immer besser,
+oder saettigt er wie die Policy? Das geht DIREKT in die
+Self-Play-Budgetierung (~20h je Kampagne).
+
+**Warum das nie beantwortet wurde**: Die Korpus-Dosis-Studie
+(2026-08-01) belegte "Menge hilft" mit **6/6 auf den Orakel-Metriken** --
+das sind reine POLICY-Masse. Fuer die Value-Seite lag nur `value_r2` vor,
+inzwischen viermal als arena-untauglich belegt. Die Value-Frage ist also
+schlicht offen.
+
+**Starkes theoretisches Vorargument (asymmetrische Stichprobengroesse)**:
+Die Policy bekommt pro ENTSCHEIDUNG ein eigenes Ziel (~1,3 Mio im
+900-Datei-Fenster). Der Value-Kopf bekommt pro PARTIE im Kern EIN BIT
+(gewonnen/verloren), das sich alle ~145 Zustaende der Partie teilen --
+effektiv ~9.000 unabhaengige Samples, ein Faktor ~145 weniger. Saettigung
+der Policy bei 9.000 Partien sagt ueber den Value-Kopf daher NICHTS. Der
+TD-Bootstrap-Blend mildert das etwas (er bringt zustandsabhaengige
+Information ein), hebt die Asymmetrie aber nicht auf.
+
+**Voraussetzung: NACH #34.** Vorher waere die Saettigungskurve die des
+FALSCHEN Ziels (gestauchte Punkte-Marge), und es gaebe kein gueltiges
+Mass -- der arm-uebergreifend vergleichbare **Brier-Score** entsteht erst
+mit #34.
+
+**Design-Skizze (PREREG bei Angehen)**: 3-4 Korpusgroessen (z.B. 225 /
+450 / 900 Dateien, stratifiziert wie `train_corpus_dose.py`), gepaarte
+Seeds, je Groesse: Brier (Value) UND Orakel-Metriken (Policy) messen ->
+die beiden Saettigungskurven direkt uebereinanderlegen. Entscheidend ist
+die FORM, nicht der Absolutwert.
+**Kostenhinweis**: die Groessen brauchen je einen eigenen HDF5-Cache
+(~50 min je Groesse), das ist der Hauptposten -- Sample-Ebene-Subsampling
+geht NICHT, weil das Value-Ziel per PARTIE definiert ist, also muessen
+Dateien/Partien subsampled werden.
+
+**Konsequenz je Ausgang**: saettigt der Value-Kopf frueh -> Self-Play-Budget
+kann sinken (oder in Qualitaet statt Menge fliessen). Waechst er weiter ->
+mehr Partien sind der billigste Value-Hebel ueberhaupt, und die
+Tiling-Cache-Ersparnis (-20%) laesst sich direkt in mehr Spiele umsetzen.
 
 ---
 ## Architektur, Stand jetzt (Konstanten am Code verifiziert 2026-08-05)
