@@ -65,6 +65,46 @@ Sequenzialisierung verloren).
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
   braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
 
+## Task #34 ZWISCHENSTAND: Offline-Seite EINDEUTIG -- Stauchung von 1,93 auf 1,20 (2026-08-05)
+
+Drei Arme trainiert (warm von `v19_2d_best`, 2D, Seed 2, Champion-Rezept,
+900er-Fenster, neuer Cache `VALUE_SCHEMA_VERSION=16`):
+
+| Arm | Ziel | VALUE_WEIGHT | **Brier** | **Platt-B** |
+|---|---|---|---|---|
+| `v20_ctrl_tanh` | weich (Bestand) | 0,2 | 0,2157 | 1,9055 |
+| `v20_wdl_lossadj` | **Sieg/Niederlage** | 0,009 | 0,2048 | **1,2134** |
+| `v20_wdl_w02` | **Sieg/Niederlage** | 0,2 | **0,2030** | **1,2037** |
+| (Referenz `v19_2d_best`) | weich | 0,2 | -- | 1,9269 |
+
+**Die Stauchung faellt von 1,93 auf 1,20** -- der Rest-Fehler schrumpft um
+zwei Drittel (B=1 waere perfekt kalibriert). Die Kontrolle bleibt bei
+1,91, praktisch identisch zum Champion: es liegt WEDER am neuen Cache
+NOCH am Warm-Start, sondern am ZIEL. Brier verbessert sich parallel
+(0,2157 -> 0,2030, -5,9% relativ).
+
+**Damit ist die Diagnose quantitativ bestaetigt**: der Value-Kopf war
+gestaucht, WEIL er eine Punkte-Marge lernte und als
+Gewinnwahrscheinlichkeit gelesen wurde. Ziel repariert -> Kalibrierung
+repariert.
+
+**Einordnung gegen die vier gescheiterten Offline-Signale**: das hier ist
+keine Fit-Metrik, die zufaellig besser aussieht, sondern eine aus erster
+Ursache VORHERGESAGTE Groesse, die exakt dort landet, wo die Theorie sie
+erwartet. Das ist eine andere Qualitaet von Befund -- macht es aber NICHT
+automatisch zu Spielstaerke. Gatings laufen.
+
+**Nebenbefund**: die WDL-Arme starteten mit FRISCH initialisiertem
+Value-Kopf (Shape-Mismatch gegen den tanh-Checkpoint), die Kontrolle
+uebernahm ihren warm -- der WDL-Vorteil ist also eher unter- als
+ueberschaetzt. Der hoehere VALUE_WEIGHT (0,2) liefert den besseren
+Value-Fit (Brier 0,2030 vs 0,2048); ob er der Gesamtstaerke schadet,
+entscheidet die Arena.
+
+**Noch offen**: R5-Plattenkalibrierung (zweite Pflicht-Diagnostik --
+faellt die Steigung von 0,06-0,09 Richtung 1?), Arena-Gatings
+(wdl_w02 vs ctrl_tanh isoliert #34; wdl_w02 vs Champion = Promotionsfrage).
+
 ## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
 
 Bestaetigungslauf mit FRISCHEN Seeds (90260805, sonst identisches Design:
