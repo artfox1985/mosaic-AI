@@ -18,8 +18,8 @@ Sequenzialisierung verloren).
 
 | Nr | Titel | Status | haengt ab von | Details |
 |---|---|---|---|---|
-| **#34** | Sieg/Niederlage-Ziel + Kreuzentropie (WDL) wiederherstellen | **laeuft** (Implementierung) | — | unten |
-| **#35** | Q je Wurzelkind loggen (Ranking-Loss-Vorlauf) | **laeuft** (Engine) | — (ZEITKRITISCH: vor v20-Self-Play) | unten |
+| **#34** | Sieg/Niederlage-Ziel + Kreuzentropie (WDL) wiederherstellen | **laeuft** (Arena/Diagnostik; AUDIT unten) | — | unten |
+| **#35** | Q je Wurzelkind loggen (Ranking-Loss-Vorlauf) | **Engine-Teil erledigt** 2026-08-04 (root_child_q, Default AN) | #35b wartet auf v20-Self-Play | unten |
 | #30 | Value-Skalen-Korrektur (Platt) | **geschlossen**: Effekt repliziert NICHT (p=0,90) | — | unten |
 | #33 | Value-/Policy-Loss-Gewicht | wartet | in #34 integriert (Loss-Skala springt ~22x) | unten |
 | #35b | Ranking-Loss-Training | wartet | #35-Logging + v20-Self-Play | unten |
@@ -89,6 +89,10 @@ einer neuen Self-Play-Kampagne.
 | `v20_wdl_lossadj` | **Sieg/Niederlage** | 0,009 | 0,2048 | **1,2134** |
 | `v20_wdl_w02` | **Sieg/Niederlage** | 0,2 | **0,2030** | **1,2037** |
 | (Referenz `v19_2d_best`) | weich | 0,2 | -- | 1,9269 |
+
+*(AUDIT-Anmerkung 2026-08-05: die B-Werte der WDL-Zeilen gehoeren zu den
+`_best`-Checkpoints = **Epoche 1**, also fast untrainierten Koepfen; der
+TRAINIERTE finale wdl02-Kopf hat **B=0,98**. Brier-Spalte = Endstaende.)*
 
 **Die Stauchung faellt von 1,93 auf 1,20** -- der Rest-Fehler schrumpft um
 zwei Drittel (B=1 waere perfekt kalibriert). Die Kontrolle bleibt bei
@@ -189,7 +193,10 @@ HALB kontinuierlich (`TD_LAMBDA*bootstrap_winprob + (1-TD_LAMBDA)*harter
 Ausgang`, TD_LAMBDA=0,5). Ein HOEHERES TD_LAMBDA behaelt die
 Wahrscheinlichkeits-Semantik und holt Informationsreichtum zurueck --
 das ist der Hebel, den die v8-Aera nicht hatte (dort war das Ziel rein
-binaer).
+binaer). **AUDIT-KORREKTUR 2026-08-05: erst NACH sauberem Bootstrap
+umsetzbar -- der heutige bootstrap_value traegt Alt-Semantik (Befund 1
+im Audit unten); ein hoeheres TD_LAMBDA erhoehte JETZT den kontaminierten
+Anteil.**
 
 **Inhaltlich bemerkenswert bleibt trotzdem**: der WDL-Kopf ist praktisch
 perfekt kalibriert (Platt-B **0,98** vs 1,70 der Kontrolle) und spielt
@@ -207,6 +214,87 @@ Schaltern und fairem Reifegrad.
 
 **Noch offen**: R5-Plattenkalibrierung (zweite Pflicht-Diagnostik --
 faellt die Steigung von 0,06-0,09 Richtung 1?).
+
+## AUDIT 2026-08-05 (Nutzer-Auftrag): Konsistenz aller Tasks & Messketten nach dem Soft-Head-Fund
+
+Der eher zufaellige Fund des weichen Value-Ziels wirft Annahmen und
+Messketten durcheinander -- systematisch geprueft, sechs Befunde:
+
+### Befund 1 (SCHWERSTER): auch das NEUE WDL-Ziel ist zur Haelfte kontaminiert
+`values_wdl = 0,5*bootstrap_value + 0,5*harter Ausgang` -- aber
+`bootstrap_value` wurde beim Self-Play von den GENERATOR-Netzen (v16-v18,
+tanh-Kopf, Platt-B~1,9) berechnet: eine gestauchte Punkte-Marge, per
+`value_to_win_prob` als "Wahrscheinlichkeit" etikettiert. **#34 hat also
+noch nie ein sauberes Wahrscheinlichkeits-Ziel getestet** -- die Haelfte
+des Ziels ist Richtung 0,5 verzerrtes Alt-Material. Dasselbe gilt fuer
+`root_q` in ALLEN Bestandskorpora (betrifft die λ-Mix-Ergebnisse: auch
+der "Arena-Sieger" λ=0,7 mischte margen-artige root_q).
+**Konsequenzen**: (a) neuer Arm **`t34_wdlhard`** (`--wdl-hard-only`,
+trainiert auf dem ROHEN `wdl_outcome`) -- laeuft; (b) "hoeheres
+TD_LAMBDA" erst nach einer Kampagne mit WDL-Generator (oder mit
+Platt-entstauchtem Bootstrap als Cache-Option -- nicht gebaut);
+(c) erst die v20-Kampagne mit WDL-Kopf liefert unkontaminierte
+bootstrap/root_q-Labels.
+
+### Befund 2: "WDL spielt schlechter" ist NICHT belegt
+Einziges sauberes Gating: 43:57, p=0,23, EIN Seed-Satz -- bei ~8pp
+dokumentierter Seed-Streuung kein Beleg. Die drei anderen Gatings waren
+Epoche-1-konfundiert. Ehrliche Lage: **kein nachweisbarer
+Staerke-Unterschied in beide Richtungen**, nicht "WDL verliert".
+
+### Befund 3: "Runde 2" war KEINE Replikation, sondern ein deterministischer Re-Run
+Seed 2 identisch zu Runde 1 -> Brier-Trajektorien zahlengleich
+(0,2157/0,2030), Stopp wieder E15, Auswahl wieder E1 (der Policy-Term
+~1,16 dominiert val_combined auch mit `--select-by-brier`; der
+Brier-Term traegt nur ~0,04). Die `t34b_*`-Dateien waren Duplikate ->
+geloescht. Ein Gating "Runde 2 vs Kontrolle" haette NULL neue
+Information geliefert -> entfaellt.
+
+### Befund 4: der WDL-Value-Fit DEGRADIERT ab Epoche ~3 (neuer Primaerbefund)
+wdl02: Brier 0,1990 (E3) -> 0,2030 (E15), MONOTON schlechter; tanh:
+flach (0,2147->0,2157). Fortgesetztes Policy-Training erodiert den
+harten Value-Fit -- ein direkt messbarer Trunk-Konflikt, den das weiche
+Ziel nicht zeigt. Die v13-Konflikt-DIAGNOSE bekommt damit erstmals ein
+Messbild (Richtung umgekehrt: Policy erodiert Value). Der value-optimale
+Zustand (E3) existierte nie als Datei -> `train.py` speichert jetzt
+zusaetzlich einen **`_brierbest`**-Checkpoint (+ONNX).
+
+### Befund 5: Brier-Aufloesung -- und zwei sich widersprechende Brier-Messungen
+Effektive Value-Stichprobe = PARTIEN, nicht Zustaende (~162 Zustaende
+teilen sich EIN Ausgangs-Bit). Frozen-Set (385 Partien): wdl-tanh =
+-0,0030, 95%-KI [-0,0077, +0,0018] -> nicht aufloesbar. Val-Split (~900
+Partien, aktuelle Verteilung): Luecke 0,0127 >> geschaetzte SE ~0,003 ->
+dort real. Plausibelste Deutung: VERTEILUNGS-SHIFT -- das
+`frozen_eval_set` stammt aus der **v12-Aera** (gebaut 2026-07-24, 5
+Generationen alt). **Alle darauf gerechneten Diagnostiken (Platt-Fits,
+Chance-Knoten-Vortest, Brier-Vergleiche) tragen diesen Vorbehalt; nach
+#34 neu bauen** (`tools/build_frozen_eval_set.py` existiert).
+
+### Befund 6: Konsistenzfehler in diesem Dokument (korrigiert)
+Platt-B-Tabelle: 1,20 = Epoche-1-Checkpoint, trainierter Kopf = 0,98
+(Anmerkung ergaenzt); #35-Engine-Teil war laengst erledigt (Index
+korrigiert); die alte "Reihenfolge"-Zeile (#33 VOR #34) widersprach der
+beschlossenen Korrektur C (#33 IN #34) -- bereinigt.
+
+### Kontaminationskarte: was der Soft-Head-Fund entwertet -- und was nicht
+- **GUELTIG bleiben**: alle Arena-/Elo-Ergebnisse (ausgangsbasiert), die
+  Champion-Kette, die Orakel-POLICY-Validierung 7/7 (empirisch gegen die
+  Arena), Korpus-Dosis (Policy-Metriken), Profiling/Tiling-Cache.
+- **UMZUDEUTEN (Messung ok, Interpretation neu)**: R5-Steigung 0,06-0,09,
+  Kopf-Uneinigkeit r=0,68, B=1,93, rtv-Scheitern, #30-Nullbefund --
+  alles Symptome der Ziel-Semantik, keine "Defekte" des Kopfes.
+- **ENTWERTET / NEU NOETIG**: Chance-Knoten-Vortest (Kalibrier-Signatur
+  am falschen Kopf -- Wiederholung nach #34 steht schon im Plan);
+  Rauschboden-Serie R1-R4 (Schema-15-Formel; daran haengt die gesamte
+  "Luft nach oben"-Priorisierung); #29-2/6 (Aepfel-Birnen, siehe "NACH
+  #34"); **Orakel-Q-Referenzen fuer kuenftige VALUE-Validierungen** (die
+  5000-Sim-Suchen liefen mit Alt-Kopf -- vor einer #29-Wiederholung neu
+  erzeugen; die POLICY-seitige 7/7-Validierung bleibt davon unberuehrt).
+- **VERSTECKT KONTAMINIERT**: `bootstrap_value` und `root_q` in allen
+  Bestandskorpora (Befund 1) -- heilt erst die v20-Kampagne mit WDL-Kopf.
+
+**Laufend**: c_scale-Kompensations-Diagnose (`MOSAIC_VALUE_CAL_B` 0,55
+vs 1,0 am WDL-Netz, Netz-vs-Heuristik 2x200) + `t34_wdlhard`-Training.
 
 ## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
 
@@ -586,10 +674,10 @@ Danach: Trainings-Loss (RankNet-Stil auf Geschwisterpaaren) + Arena.
 Dass #29 die Rang-METRIK verworfen hat, praejudiziert das Rang-TRAINING
 nicht -- nur die Vorauswahl per Metrik faellt weg.
 
-### Reihenfolge
-#33 (heute/morgen, kein Code) -> #35-Engine-Logging (VOR v20-Self-Play,
-klein und additiv) -> #34 (Code + Ziel-Entscheidung) -> #35-Training
-(nach v20-Self-Play, wenn die Labels da sind).
+### Reihenfolge (bereinigt im Audit 2026-08-05)
+#34 laeuft (mit #33 als integriertem Arm, siehe Korrektur C oben);
+#35-Engine-Logging ist erledigt (Default AN); #35b-Training folgt nach
+dem v20-Self-Play, wenn die Labels da sind.
 
 ---
 

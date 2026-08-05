@@ -336,7 +336,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
-          select_by_brier=False,
+          select_by_brier=False, wdl_hard_only=False,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
@@ -703,6 +703,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     best_combined_metric = float("inf")
     best_epoch = None
     best_state_dict = None
+    # Task #34 Audit: separater VALUE-optimaler Checkpoint (siehe Kommentar an
+    # der Tracking-Stelle im Epoch-Loop).
+    best_brier_metric = float("inf")
+    best_brier_epoch = None
+    best_brier_state_dict = None
 
     # ── Live-Plot (zusätzlich zur Textausgabe) ──────────────────────────────
     plot = None
@@ -844,12 +849,32 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # wdl-Laeufen (siehe Kommentar an der current_metric-Stelle).
             if pred_value_wdl_logits is not None:
                 logit_diff = pred_value_wdl_logits[:, 1] - pred_value_wdl_logits[:, 0]
-                v_wdl_target = targets_v_wdl.view(-1)
-                if rw is None:
-                    v_loss = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target)
+                # Task #34 Audit 2026-08-05 (`--wdl-hard-only`): `values_wdl`
+                # ist TD-geblendet mit `bootstrap_value` -- und der stammt aus
+                # Self-Play-Suchen der GENERATOR-Netze (v16-v18, tanh-Kopf,
+                # Platt-B~1,9): eine gestauchte Punkte-Marge, als
+                # Wahrscheinlichkeit gelesen. Die Haelfte (TD_LAMBDA=0,5) des
+                # "kohaerenten" WDL-Ziels traegt also die ALTE Semantik weiter.
+                # Dieser Schalter trainiert stattdessen auf dem ROHEN Ausgang
+                # `wdl_outcome` (-1 = unbekannt -> maskiert) -- das einzige auf
+                # Bestandskorpora saubere Wahrscheinlichkeits-Ziel, bis eine
+                # Kampagne mit WDL-Generator neue Bootstrap-Werte liefert.
+                if wdl_hard_only:
+                    v_wdl_target = s_wdl_outcome.view(-1)
+                    wdl_mask = (v_wdl_target >= 0.0).float()
+                    v_bce = F.binary_cross_entropy_with_logits(
+                        logit_diff, v_wdl_target.clamp(min=0.0), reduction="none") * wdl_mask
+                    if rw is None:
+                        v_loss = v_bce.sum() / wdl_mask.sum().clamp(min=1.0)
+                    else:
+                        v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
                 else:
-                    v_bce = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target, reduction="none")
-                    v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
+                    v_wdl_target = targets_v_wdl.view(-1)
+                    if rw is None:
+                        v_loss = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target)
+                    else:
+                        v_bce = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target, reduction="none")
+                        v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
             elif rw is None:
                 v_loss = mse_loss(pred_v, targets_v)
             else:
@@ -998,7 +1023,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     if v_pred_value_wdl_logits is not None:
                         v_logit_diff = v_pred_value_wdl_logits[:, 1] - v_pred_value_wdl_logits[:, 0]
                         v_wdl_target = v_targets_v_wdl.view(-1)
-                        if v_rw is None:
+                        # `--wdl-hard-only`: Val-Loss konsistent zum Trainings-
+                        # Ziel auf dem rohen Ausgang (Maskierung wie im
+                        # Trainingsblock; der Brier unten bleibt unveraendert,
+                        # er nutzt ohnehin schon `wdl_outcome`).
+                        if wdl_hard_only:
+                            v_raw = v_wdl_outcome.view(-1)
+                            v_mask = (v_raw >= 0.0).float()
+                            v_bce_h = F.binary_cross_entropy_with_logits(
+                                v_logit_diff, v_raw.clamp(min=0.0), reduction="none") * v_mask
+                            v_v_loss = v_bce_h.sum() / v_mask.sum().clamp(min=1.0)
+                        elif v_rw is None:
                             v_v_loss = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target)
                         else:
                             v_rw2 = v_rw.view(-1, 1)
@@ -1161,6 +1196,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             best_combined_metric = current_metric
             best_epoch = epoch + 1
             best_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+
+        # Task #34 Audit 2026-08-05: der VALUE-optimale Checkpoint existierte
+        # bisher nie als Datei. Beobachtet (t34-Laeufe): der WDL-Brier ist bei
+        # Epoche ~3 minimal (0,1990) und steigt danach MONOTON (0,2030 bei
+        # E15) -- fortgesetztes Policy-Training erodiert den Value-Fit. Die
+        # val_combined-Auswahl kann das nie einfangen, weil der Policy-Term
+        # (~1,16) den Brier-Term (~0,2*w) IMMER dominiert -- auch mit
+        # --select-by-brier faellt die Wahl auf das Policy-Optimum (E1).
+        # Daher zusaetzlich den brier-besten Zustand festhalten (nur Tracking,
+        # aendert Auswahl/Verhalten nicht; gespeichert wird am Trainingsende
+        # als `_brierbest`, nur falls von final/best verschieden).
+        if epoch_val_brier is not None and epoch_val_brier < best_brier_metric:
+            best_brier_metric = epoch_val_brier
+            best_brier_epoch = epoch + 1
+            best_brier_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
         # ── Plateau-Erkennung (auf Val-Policy-Loss wenn vorhanden, sonst
         # Fallback auf Train-Loss) ───────────────────────────────────────────
@@ -1475,6 +1525,28 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     elif best_state_dict is not None:
         print(f"ℹ️  Letzte Epoche ({actual_epochs}) war bereits die beste — kein separater Best-Checkpoint nötig.")
 
+    # Task #34 Audit: VALUE-optimalen Checkpoint (`_brierbest`) speichern, nur
+    # falls er weder mit dem finalen noch mit dem val_combined-besten Stand
+    # zusammenfaellt (sonst waere er ein Duplikat).
+    brierbest_version_name = None
+    if (best_brier_state_dict is not None
+            and best_brier_epoch not in (actual_epochs, best_epoch)):
+        bb_idx = best_brier_epoch - 1
+        bb_checkpoint = dict(checkpoint)
+        bb_checkpoint["model_state"] = best_brier_state_dict
+        bb_checkpoint["epochs"] = best_brier_epoch
+        bb_checkpoint["is_best_checkpoint"] = True
+        bb_checkpoint["selected_by"] = "val_brier(value-optimal, Task #34 Audit)"
+        bb_checkpoint["final_policy_val_loss"] = (
+            round(val_ploss_history[bb_idx], 4)
+            if bb_idx < len(val_ploss_history) and val_ploss_history[bb_idx] is not None else None)
+        bb_checkpoint["final_value_val_brier"] = round(best_brier_metric, 4)
+        brierbest_version_name = f"{version_name}_brierbest"
+        bb_save_path = MODELS_DIR / f"alphazero_{brierbest_version_name}.pth"
+        torch.save(bb_checkpoint, str(bb_save_path))
+        print(f"🎯 Value-optimales Modell (Epoche {best_brier_epoch}, val_brier={best_brier_metric:.4f}) "
+              f"zusätzlich gespeichert unter:\n📂 {bb_save_path}")
+
     if plot is not None:
         try:
             plot_path = MODELS_DIR / f"alphazero_{version_name}_loss.png"
@@ -1497,6 +1569,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         except Exception as e:
             print(f"⚠️  ONNX-Export (Best) übersprungen "
                   f"(manuell nachholbar: python export_onnx.py --version {best_version_name}): {e}")
+    if brierbest_version_name is not None:
+        try:
+            from export_onnx import export
+            export(brierbest_version_name)
+        except Exception as e:
+            print(f"⚠️  ONNX-Export (Brierbest) übersprungen "
+                  f"(manuell nachholbar: python export_onnx.py --version {brierbest_version_name}): {e}")
 
     # 8. Modell-Snapshot ins OneDrive-Backup (Nutzer-Entscheid 2026-07-24 nach
     #    dem models/-Datenverlust: ereignisgesteuert nach JEDEM Training statt
@@ -1541,6 +1620,11 @@ if __name__ == "__main__":
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
     parser.add_argument("--select-by-brier", action="store_true",
                         help="Checkpoint-Auswahl: Brier statt roher Value-Loss im kombinierten Mass (Task #34 -- noetig bei --value-head wdl, sonst waehlt die Auswahl einen praktisch untrainierten frischen Kopf). Default AUS = byte-identisch.")
+    parser.add_argument("--wdl-hard-only", action="store_true",
+                        help="Task #34 Audit: WDL-Ziel = ROHER Ausgang (`wdl_outcome`) statt TD-geblendetes "
+                             "`values_wdl` -- der Blend-Anteil (bootstrap_value) stammt aus Alt-Netz-Suchen "
+                             "(tanh-Kopf, B~1,9) und traegt die gestauchte Alt-Semantik ins neue Ziel. "
+                             "Nur zusammen mit --value-head wdl sinnvoll. Default AUS = byte-identisch.")
     parser.add_argument("--no-plot", action="store_true",
                         help="Live-Loss-Plot deaktivieren (z.B. ohne Display)")
     parser.add_argument("--val-frac", type=float, default=0.1,
@@ -1673,7 +1757,7 @@ if __name__ == "__main__":
     train(points_dist_bins=args.points_dist_bins, reinit_points_head=args.reinit_points_head,
           version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
-          select_by_brier=args.select_by_brier,
+          select_by_brier=args.select_by_brier, wdl_hard_only=args.wdl_hard_only,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
