@@ -28,7 +28,7 @@ Sequenzialisierung verloren).
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
 | — | v20-Zyklus (Self-Play + Gating) | geplant | **#34-Ausgang + #36 + #14-Entscheid** (Nutzer 2026-08-05: Start erst, wenn klar ist, wie viele Spiele/Sims wirklich sinnvoll sind) | unten |
 | — | R4b (Playout-Ground-Truth) | geplant | — | history (#R4-Alarm) |
-| — | GUI: Slider raus, Startwert setzen | offen, klein | — | history (Task #28) |
+| — | GUI: Aggressions-Slider entfernen | **erledigt** 2026-08-05 (kein Startwert -- Blend ueberall 0, s. Regeln) | — | history (Task #28) |
 | #29 | Value-Rangmetrik | **geschlossen**: NICHT validiert (2/6) | — | history |
 | #28 | Aggressions-Utility (opp-Kopf + Regler) | **ERGEBNISSE UNGUELTIG** (Engine-Audit F1: ownership-Logit als Gegner-Punkte gelesen) | Neumessung nach Fix noetig | unten (Engine-Audit) |
 | #14 | PCR (beide Regime) | **geschlossen**, Wiedereroeffnung konditional | #34 + #36 + Durchsatz-Neumessung | unten |
@@ -60,17 +60,17 @@ Sequenzialisierung verloren).
   opp-Modell auf Kandidatenseite -- der Kandidat spielte mit
   ownership-Logit im Blend, das Ergebnis ist KONTAMINIERT und zaehlt
   nicht als λ-Beleg (weder dafuer noch dagegen).**
-- **Arena-Konvention**: Laeufe kuenftig mit `w=0,1` / `λ_aggr=2,0`
-  (Nutzer 2026-08-04) -- gegatet wird, was ausgeliefert wird. Modelle
-  ohne opp-Kopf fallen automatisch auf Bestandsverhalten zurueck.
-  **ACHTUNG (Engine-Audit F1, 2026-08-05): die empirische Basis der
-  Zahlenwerte (λ-Kartierung, w-Leiter) ist UNGUELTIG -- der Blend las bei
-  opp-Modellen den ownership-Logit statt der Gegner-Prognose. Die
-  Konvention selbst (Nutzer-Entscheid "gate what you ship") bleibt, die
-  WERTE muessen nach dem Fix neu kartiert werden (im Nach-#34-Paket).**
-- **Aggressions-Default**: (w=0,1, λ_aggr=2,0), beim Serverstart gesetzt;
-  GUI-Slider wird entfernt. Wirksam erst mit einem Modell, das den
-  opp-Kopf traegt.
+- **Aggressions-Blend: UEBERALL AUF 0 / INAKTIV (Nutzer 2026-08-05,
+  nach Engine-Audit F1)**: "wir wissen ja nicht was er tut" -- alle
+  Blend-Messungen waren ungueltig (ownership-Logit statt Gegner-Prognose
+  gelesen). Konkret: Engine-Env-Defaults bleiben 0; die fruehere
+  Arena-Konvention w=0,1/λ_aggr=2,0 ist AUFGEHOBEN (Gatings laufen ohne
+  Blend); kein Serverstart-Default; **GUI-Slider ENTFERNT** (2026-08-05,
+  im Browser verifiziert). Der Engine-Knopf (set_aggression_params,
+  POST /api/aggression, Env-Vars) bleibt als inertes Werkzeug fuer die
+  Neukartierung im v20-Zyklus -- nichts ruft ihn mehr auf. "Gate what
+  you ship" gilt weiter und heisst jetzt: ausgeliefert wird OHNE Blend,
+  also wird auch ohne Blend gegatet.
 - **Tiling-Cache**: Default AN seit 2026-08-05 (-20,1% Self-Play-Wandzeit,
   bitgleich); `MOSAIC_TILING_CACHE=0` schaltet ab.
 - **Statistik-Regel**: Score-basierte Arena-Auswertungen IMMER auf
