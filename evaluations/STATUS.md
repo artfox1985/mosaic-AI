@@ -18,7 +18,7 @@ Sequenzialisierung verloren).
 
 | Nr | Titel | Status | haengt ab von | Details |
 |---|---|---|---|---|
-| **#34** | Sieg/Niederlage-Ziel + Kreuzentropie (WDL) wiederherstellen | **laeuft** (Arena/Diagnostik; AUDIT unten) | — | unten |
+| **#34** | Sieg/Niederlage-Ziel + Kreuzentropie (WDL) wiederherstellen | **VERDIKT GEFAELLT** 2026-08-05: v20 = WDL + destretch-Blend + brierbest-Checkpoint | Umsetzung im v20-Zyklus | unten |
 | **#35** | Q je Wurzelkind loggen (Ranking-Loss-Vorlauf) | **Engine-Teil erledigt** 2026-08-04 (root_child_q, Default AN) | #35b wartet auf v20-Self-Play | unten |
 | #30 | Value-Skalen-Korrektur (Platt) | **geschlossen**: Effekt repliziert NICHT (p=0,90) | — | unten |
 | #33 | Value-/Policy-Loss-Gewicht | wartet | in #34 integriert (Loss-Skala springt ~22x) | unten |
@@ -277,7 +277,11 @@ Stabilisator; entstaucht liefert er sie ohne Alt-Kontamination.
   dann flach, ist der gezielte Eingriff (Platten-Encoding/Aux-Kopf)
   gerechtfertigt.
 
-**#34-VERDIKT (Entwurf, vorbehaltlich der laufenden destretch-Gatings)**:
+### destretch-Gatings (2026-08-05, Abschluss): 75:85 vs tanh (p=0,51),
+65:75 vs Champion (p=0,52) -- beide H0, KIs decken 0. Damit **acht
+Gatings, acht Mal Ziel-Invarianz** der Arena.
+
+**#34-VERDIKT (FINAL 2026-08-05)**:
 v20-Zielkonfiguration = **WDL (2-Logit-CE) + entstauchter
 Bootstrap-Blend** (`--value-head wdl --wdl-bootstrap-destretch`),
 Checkpoint-Politik: `_brierbest` zusaetzlich sichern (Peak vor der
