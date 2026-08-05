@@ -1,0 +1,4260 @@
+{
+  "summary": {
+    "eval_set": "evaluations/frozen_eval_set.pkl",
+    "n_states": 24,
+    "n_combos": 6,
+    "sims": 400,
+    "c_puct": 1.5,
+    "curve_n_states": 233,
+    "curve": {
+      "n_points": 233,
+      "a": -1.2050064644541325,
+      "b": 0.1279184605662076,
+      "mcfadden_r2": 0.3161444280648502,
+      "n_iter": 7,
+      "x_range": [
+        -24.0,
+        51.0
+      ],
+      "y_mean": 0.49356223175965663
+    },
+    "models": {
+      "models/alphazero_t34_wdldestretch_brierbest.pth": {
+        "n_state_combo_pairs": 139,
+        "value_head": {
+          "slope": 0.27281446538388343,
+          "intercept": 0.01674055647871996,
+          "r2": 0.15734413718501927,
+          "n": 139
+        },
+        "points_head": {
+          "slope": 0.1624085873360548,
+          "intercept": 0.0943204726010648,
+          "r2": 0.008862431411747584,
+          "n": 139
+        }
+      },
+      "models/alphazero_t34_tanh.pth": {
+        "n_state_combo_pairs": 139,
+        "value_head": {
+          "slope": 0.08593409632102042,
+          "intercept": 0.0067126505106181135,
+          "r2": 0.12514711688762592,
+          "n": 139
+        },
+        "points_head": {
+          "slope": 0.1721370545492992,
+          "intercept": 0.09040994144701889,
+          "r2": 0.01051610903818656,
+          "n": 139
+        }
+      }
+    }
+  },
+  "per_model": {
+    "models/alphazero_t34_wdldestretch_brierbest.pth": {
+      "n_state_combo_pairs": 139,
+      "value_head": {
+        "slope": 0.27281446538388343,
+        "intercept": 0.01674055647871996,
+        "r2": 0.15734413718501927,
+        "n": 139
+      },
+      "points_head": {
+        "slope": 0.1624085873360548,
+        "intercept": 0.0943204726010648,
+        "r2": 0.008862431411747584,
+        "n": 139
+      },
+      "per_pair": [
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03728628758496992,
+          "model_value_delta_winprob": 0.03572571277618408,
+          "model_points_delta_pts": -5.858824855896239,
+          "model_points_delta_winprob": -0.07281794282897236
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03728628758496992,
+          "model_value_delta_winprob": -0.03363141417503357,
+          "model_points_delta_pts": -11.347172599498466,
+          "model_points_delta_winprob": -0.1410313136070635
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -13.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.07457257516993984,
+          "model_value_delta_winprob": 0.017707526683807373,
+          "model_points_delta_pts": -1.133342686275638,
+          "model_points_delta_winprob": -0.014086047110931926
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03728628758496992,
+          "model_value_delta_winprob": -0.013958156108856201,
+          "model_points_delta_pts": 2.1012667830543847,
+          "model_points_delta_winprob": 0.026116145855236795
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -9.0,
+          "expected_delta_winprob": -0.11185886275490976,
+          "model_value_delta_winprob": -0.02199217677116394,
+          "model_points_delta_pts": 4.230576568384555,
+          "model_points_delta_winprob": 0.052580831526340556
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.017193317413330078,
+          "model_points_delta_pts": 1.6519598507076783,
+          "model_points_delta_winprob": 0.014755971132792528
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.00565105676651001,
+          "model_points_delta_pts": 5.956669359790395,
+          "model_points_delta_winprob": 0.05320737128266351
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 46.0,
+          "true_delta_pts": 17.0,
+          "expected_delta_winprob": 0.15185085106639332,
+          "model_value_delta_winprob": 0.04256439208984375,
+          "model_points_delta_pts": -0.2683091573537695,
+          "model_points_delta_winprob": -0.002396645523122161
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 24.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04466201501952745,
+          "model_value_delta_winprob": -0.05073314905166626,
+          "model_points_delta_pts": 2.1042658447123372,
+          "model_points_delta_winprob": 0.0187961505523242
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 25.0,
+          "true_delta_pts": -4.0,
+          "expected_delta_winprob": -0.035729612015621956,
+          "model_value_delta_winprob": -0.024806082248687744,
+          "model_points_delta_pts": 4.40832828770767,
+          "model_points_delta_winprob": 0.039376964839321536
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 24.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04466201501952745,
+          "model_value_delta_winprob": -0.05216360092163086,
+          "model_points_delta_pts": 5.790392627645362,
+          "model_points_delta_winprob": 0.05172212050097163
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 19.0,
+          "true_delta_pts": -10.0,
+          "expected_delta_winprob": -0.0893240300390549,
+          "model_value_delta_winprob": -0.0308801531791687,
+          "model_points_delta_pts": -0.46626482208473785,
+          "model_points_delta_winprob": -0.004164865297405171
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.053594418023432934,
+          "model_value_delta_winprob": -0.014251649379730225,
+          "model_points_delta_pts": 5.2833587572461065,
+          "model_points_delta_winprob": 0.047193089633935495
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 26.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.026797209011716467,
+          "model_value_delta_winprob": -0.006212949752807617,
+          "model_points_delta_pts": -1.5409634839742976,
+          "model_points_delta_winprob": -0.013764506853160684
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 14.0,
+          "true_delta_pts": -15.0,
+          "expected_delta_winprob": -0.13398604505858233,
+          "model_value_delta_winprob": -0.0790134072303772,
+          "model_points_delta_pts": 1.3852789937342171,
+          "model_points_delta_winprob": 0.012373870244878694
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": -14.0,
+          "expected_delta_winprob": -0.12505364205467684,
+          "model_value_delta_winprob": -0.028874874114990234,
+          "model_points_delta_pts": 5.317903953433029,
+          "model_points_delta_winprob": 0.04750166124812606
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": -11.0,
+          "expected_delta_winprob": -0.09825643304296038,
+          "model_value_delta_winprob": -0.050442516803741455,
+          "model_points_delta_pts": 7.163233823874742,
+          "model_points_delta_winprob": 0.06398489132605614
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.09475252032279968,
+          "model_points_delta_pts": 12.27578680869408,
+          "model_points_delta_winprob": 0.3331689781099885
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.02714033595582063,
+          "model_value_delta_winprob": 0.21223172545433044,
+          "model_points_delta_pts": 19.762528893218814,
+          "model_points_delta_winprob": 0.5363616734985707
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.02714033595582063,
+          "model_value_delta_winprob": 0.13448092341423035,
+          "model_points_delta_pts": 9.305262095421746,
+          "model_points_delta_winprob": 0.2525479394267096
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.02714033595582063,
+          "model_value_delta_winprob": 0.15218418836593628,
+          "model_points_delta_pts": 17.473233936780012,
+          "model_points_delta_winprob": 0.4742294392788558
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 6.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.08142100786746188,
+          "model_value_delta_winprob": 0.2447422444820404,
+          "model_points_delta_pts": 21.609022814915193,
+          "model_points_delta_winprob": 0.5864761388737911
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.24262607097625732,
+          "model_points_delta_pts": 23.915162813467433,
+          "model_points_delta_winprob": 0.6490655531956546
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 0.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.18298136809616505,
+          "model_value_delta_winprob": -0.01168757677078247,
+          "model_points_delta_pts": -8.811657359815534,
+          "model_points_delta_winprob": -0.26872818648228136
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": -1.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.21347826277885923,
+          "model_value_delta_winprob": -0.00789421796798706,
+          "model_points_delta_pts": -4.2356422391493425,
+          "model_points_delta_winprob": -0.12917393528090843
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -4.0,
+          "expected_delta_winprob": -0.1219875787307767,
+          "model_value_delta_winprob": -0.007120668888092041,
+          "model_points_delta_pts": -12.635029724659775,
+          "model_points_delta_winprob": -0.38532917082565954
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 7.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.030496894682694176,
+          "model_value_delta_winprob": -0.006930947303771973,
+          "model_points_delta_pts": -4.780041409604124,
+          "model_points_delta_winprob": -0.14577641944761396
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.09149068404808253,
+          "model_value_delta_winprob": -0.004632532596588135,
+          "model_points_delta_pts": -2.290933199107471,
+          "model_points_delta_winprob": -0.06986634849826819
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 8.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.0949658669688257,
+          "model_value_delta_winprob": -0.00014090538024902344,
+          "model_points_delta_pts": -3.443406019984616,
+          "model_points_delta_winprob": -0.10900201267117088
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.06331057797921713,
+          "model_value_delta_winprob": -0.007987022399902344,
+          "model_points_delta_pts": 2.6218165350696356,
+          "model_points_delta_winprob": 0.08299436009536351
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.031655288989608565,
+          "model_value_delta_winprob": -0.006999671459197998,
+          "model_points_delta_pts": -6.308876358509538,
+          "model_points_delta_winprob": -0.19970930432832876
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.06331057797921713,
+          "model_value_delta_winprob": 0.018346786499023438,
+          "model_points_delta_pts": 1.070519239312027,
+          "model_points_delta_winprob": 0.03388759588935815
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.015003025531768799,
+          "model_points_delta_pts": 4.898089090923484,
+          "model_points_delta_winprob": 0.155050425670032
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 14.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.0949658669688257,
+          "model_value_delta_winprob": -0.00877755880355835,
+          "model_points_delta_pts": 6.763371014334918,
+          "model_points_delta_winprob": 0.21409646400271384
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03368557024520739,
+          "model_value_delta_winprob": -0.13550296425819397,
+          "model_points_delta_pts": 8.452973007027412,
+          "model_points_delta_winprob": 0.09491440533635459
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -9.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.011228523415069129,
+          "model_value_delta_winprob": -0.11345523595809937,
+          "model_points_delta_pts": 16.032167439049356,
+          "model_points_delta_winprob": 0.18001756748367456
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -6.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.022457046830138258,
+          "model_value_delta_winprob": -0.03930532932281494,
+          "model_points_delta_pts": 7.44866672864252,
+          "model_points_delta_winprob": 0.0836375287736089
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -8.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.04760560393333435,
+          "model_points_delta_pts": 15.719272313014702,
+          "model_points_delta_winprob": 0.17650421723453344
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -7.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.011228523415069129,
+          "model_value_delta_winprob": -0.11291265487670898,
+          "model_points_delta_pts": 18.860499788690813,
+          "model_points_delta_winprob": 0.21177556349722115
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -7.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.011228523415069129,
+          "model_value_delta_winprob": -0.05732452869415283,
+          "model_points_delta_pts": 23.000442256647652,
+          "model_points_delta_winprob": 0.2582610044357136
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.0680843388353598,
+          "model_value_delta_winprob": -0.15353602170944214,
+          "model_points_delta_pts": -0.0901405137399891,
+          "model_points_delta_winprob": -0.0020457190934222744
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": 5.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.11347389805893299,
+          "model_value_delta_winprob": -0.17725390195846558,
+          "model_points_delta_pts": 4.97157895475984,
+          "model_points_delta_winprob": 0.11282888870087095
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": 8.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.1815582368942928,
+          "model_value_delta_winprob": -0.008555799722671509,
+          "model_points_delta_pts": -0.9686137226184748,
+          "model_points_delta_winprob": -0.021982474963778482
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -10.0,
+          "expected_delta_winprob": -0.22694779611786597,
+          "model_value_delta_winprob": -0.2018183469772339,
+          "model_points_delta_pts": 1.0197097568315225,
+          "model_points_delta_winprob": 0.023142088199279907
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": -3.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.0680843388353598,
+          "model_value_delta_winprob": -0.22386914491653442,
+          "model_points_delta_pts": 4.894412340562743,
+          "model_points_delta_winprob": 0.11107760939828007
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": -8.0,
+          "true_delta_pts": -8.0,
+          "expected_delta_winprob": -0.1815582368942928,
+          "model_value_delta_winprob": -0.22311702370643616,
+          "model_points_delta_pts": 6.205097207185526,
+          "model_points_delta_winprob": 0.14082331358678804
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.012532055377960205,
+          "model_points_delta_pts": -3.316874082594225,
+          "model_points_delta_winprob": -0.027022827732086425
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": 0.0025311708450317383,
+          "model_points_delta_pts": 4.116277900217538,
+          "model_points_delta_winprob": 0.03353563199118309
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": -0.014917224645614624,
+          "model_points_delta_pts": -8.133006613725273,
+          "model_points_delta_winprob": -0.06626022911750803
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.006099492311477661,
+          "model_points_delta_pts": 0.970371142389272,
+          "model_points_delta_winprob": 0.007905688176279539
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": -0.010695010423660278,
+          "model_points_delta_pts": 4.971139437295392,
+          "model_points_delta_winprob": 0.04050025454724156
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": -0.003672271966934204,
+          "model_points_delta_pts": 8.559464769762169,
+          "model_points_delta_winprob": 0.06973461644683195
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.13461517724247268,
+          "model_value_delta_winprob": 0.02839946746826172,
+          "model_points_delta_pts": -8.226883119201647,
+          "model_points_delta_winprob": -0.22149266584888724
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": 0.03710979223251343,
+          "model_points_delta_pts": -1.8836853027172147,
+          "model_points_delta_winprob": -0.05071452617886374
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": 0.06415748596191406,
+          "model_points_delta_pts": -11.903180989044122,
+          "model_points_delta_winprob": -0.32046976371788116
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 21.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.13461517724247268,
+          "model_value_delta_winprob": 0.01002722978591919,
+          "model_points_delta_pts": -5.088873909056311,
+          "model_points_delta_winprob": -0.137007932646442
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 20.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.10769214179397815,
+          "model_value_delta_winprob": 0.00399857759475708,
+          "model_points_delta_pts": -1.69461687828586,
+          "model_points_delta_winprob": -0.04562423028570736
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 20.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.10769214179397815,
+          "model_value_delta_winprob": 0.03360646963119507,
+          "model_points_delta_pts": 1.1354690623658712,
+          "model_points_delta_winprob": 0.030570273816745205
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 14.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.030359961013043113,
+          "model_value_delta_winprob": 0.002280503511428833,
+          "model_points_delta_pts": -8.786322742003472,
+          "model_points_delta_winprob": -0.26675241589523946
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.0010910332202911377,
+          "model_points_delta_pts": -2.410703060089819,
+          "model_points_delta_winprob": -0.07318885091835065
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.001731187105178833,
+          "model_points_delta_pts": -13.817440767082262,
+          "model_points_delta_winprob": -0.41949696298865
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.060719922026086226,
+          "model_value_delta_winprob": 0.0017339885234832764,
+          "model_points_delta_pts": -4.703332978521871,
+          "model_points_delta_winprob": -0.14279300585928395
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.00280877947807312,
+          "model_points_delta_pts": 0.044800158988563155,
+          "model_points_delta_winprob": 0.0013601310802709105
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.09107988303912934,
+          "model_value_delta_winprob": 0.0009320378303527832,
+          "model_points_delta_pts": 1.4299396896609986,
+          "model_points_delta_winprob": 0.04341291322911089
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.1530082169905545,
+          "model_value_delta_winprob": 0.16886910796165466,
+          "model_points_delta_pts": 6.296699423131638,
+          "model_points_delta_winprob": 0.16057445860980415
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 25.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.20401095598740598,
+          "model_value_delta_winprob": 0.17557397484779358,
+          "model_points_delta_pts": 11.635293835541685,
+          "model_points_delta_winprob": 0.29671592732290386
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 19.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.051002738996851496,
+          "model_value_delta_winprob": 0.07565316557884216,
+          "model_points_delta_pts": 3.913870537802355,
+          "model_points_delta_winprob": 0.09980905875350014
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.051002738996851496,
+          "model_value_delta_winprob": 0.18618366122245789,
+          "model_points_delta_pts": 8.407573106481083,
+          "model_points_delta_winprob": 0.2144046283734013
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": -4.0,
+          "expected_delta_winprob": -0.10200547799370299,
+          "model_value_delta_winprob": 0.1739191710948944,
+          "model_points_delta_pts": 11.315337902395463,
+          "model_points_delta_winprob": 0.28855661284852846
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 16.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.025501369498425748,
+          "model_value_delta_winprob": 0.21325555443763733,
+          "model_points_delta_pts": 14.100207873627674,
+          "model_points_delta_winprob": 0.35957461098999133
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": 1.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.05866354374568715,
+          "model_value_delta_winprob": 0.05286303162574768,
+          "model_points_delta_pts": -0.18375367312293633,
+          "model_points_delta_winprob": -0.0035932138805593577
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -1.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.019554514581895718,
+          "model_value_delta_winprob": 0.0521770715713501,
+          "model_points_delta_pts": 3.443841252409023,
+          "model_points_delta_winprob": 0.06734264398796624
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.07821805832758287,
+          "model_value_delta_winprob": 0.029622256755828857,
+          "model_points_delta_pts": -3.6874250016184655,
+          "model_points_delta_winprob": -0.07210580596379512
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -2.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.026852518320083618,
+          "model_points_delta_pts": 0.39729438135632694,
+          "model_points_delta_winprob": 0.007768898773537533
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -1.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.019554514581895718,
+          "model_value_delta_winprob": 0.019335567951202393,
+          "model_points_delta_pts": 3.777094024853829,
+          "model_points_delta_winprob": 0.07385924018619539
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -4.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.039109029163791435,
+          "model_value_delta_winprob": -0.024957746267318726,
+          "model_points_delta_pts": 3.6227406709389696,
+          "model_points_delta_winprob": 0.07084093527630275
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 8.0,
+          "true_delta_pts": -9.0,
+          "expected_delta_winprob": -0.22951232548583173,
+          "model_value_delta_winprob": 0.008256912231445312,
+          "model_points_delta_pts": 12.15283740922907,
+          "model_points_delta_winprob": 0.3099139972270416
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.12750684749212873,
+          "model_value_delta_winprob": 0.009800136089324951,
+          "model_points_delta_pts": 21.559337051326494,
+          "model_points_delta_winprob": 0.5497926202869776
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.025501369498425748,
+          "model_value_delta_winprob": 0.0351523756980896,
+          "model_points_delta_pts": 8.37000110861815,
+          "model_points_delta_winprob": 0.21344649097310456
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": -14.0,
+          "expected_delta_winprob": -0.3570191729779605,
+          "model_value_delta_winprob": 0.03298163414001465,
+          "model_points_delta_pts": 16.348584937027592,
+          "model_points_delta_winprob": 0.41691130525553804
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": -13.0,
+          "expected_delta_winprob": -0.33151780347953475,
+          "model_value_delta_winprob": 0.007559061050415039,
+          "model_points_delta_pts": 22.211872620025225,
+          "model_points_delta_winprob": 0.5664331709352293
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 7.0,
+          "true_delta_pts": -10.0,
+          "expected_delta_winprob": -0.25501369498425747,
+          "model_value_delta_winprob": 0.020876407623291016,
+          "model_points_delta_pts": 24.92440314363592,
+          "model_points_delta_winprob": 0.6356064140935839
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -5.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.016514809524250874,
+          "model_value_delta_winprob": -0.028788745403289795,
+          "model_points_delta_pts": -5.021202654964743,
+          "model_points_delta_winprob": -0.0829242054294055
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -4.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.07295936346054077,
+          "model_points_delta_pts": 0.5141960309576685,
+          "model_points_delta_winprob": 0.008491849509391702
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -7.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.049544428572752625,
+          "model_value_delta_winprob": -0.20249837636947632,
+          "model_points_delta_pts": -10.79179679305305,
+          "model_points_delta_winprob": -0.17822446846169254
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -6.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.03302961904850175,
+          "model_value_delta_winprob": -0.08137357234954834,
+          "model_points_delta_pts": 1.8363284250336118,
+          "model_points_delta_winprob": 0.0303266141633977
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -3.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.016514809524250874,
+          "model_value_delta_winprob": -0.057062745094299316,
+          "model_points_delta_pts": 5.238194668208591,
+          "model_points_delta_winprob": 0.08650778719641138
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.14212283633023295,
+          "model_value_delta_winprob": 0.05269044637680054,
+          "model_points_delta_pts": -4.161447977036062,
+          "model_points_delta_winprob": -0.11828735794741503
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 1.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.08527370179813977,
+          "model_value_delta_winprob": -0.0044921040534973145,
+          "model_points_delta_pts": 0.21903476722710025,
+          "model_points_delta_winprob": 0.006225968474649568
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": -8.0,
+          "true_delta_pts": -12.0,
+          "expected_delta_winprob": -0.3410948071925591,
+          "model_value_delta_winprob": 0.021330714225769043,
+          "model_points_delta_pts": -7.263178285051007,
+          "model_points_delta_winprob": -0.20645269972872124
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.2273965381283727,
+          "model_value_delta_winprob": 0.07197529077529907,
+          "model_points_delta_pts": -0.6290121645623898,
+          "model_points_delta_winprob": -0.017879398582765216
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.022170662879943848,
+          "model_points_delta_pts": 3.775998636985115,
+          "model_points_delta_winprob": 0.10733112725348364
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.026923035448494538,
+          "model_value_delta_winprob": 0.01818615198135376,
+          "model_points_delta_pts": -10.925099873012883,
+          "model_points_delta_winprob": -0.294136851159469
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 16.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.05081436038017273,
+          "model_points_delta_pts": -2.265826521992043,
+          "model_points_delta_winprob": -0.061002927771730865
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 22.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.16153821269096724,
+          "model_value_delta_winprob": 0.05748581886291504,
+          "model_points_delta_pts": -15.437315093108708,
+          "model_points_delta_winprob": -0.41561938148134553
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.18846124813946177,
+          "model_value_delta_winprob": -0.06226789951324463,
+          "model_points_delta_pts": -7.911290537769387,
+          "model_points_delta_winprob": -0.21299595559170464
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": -0.02834424376487732,
+          "model_points_delta_pts": -1.311560830658614,
+          "model_points_delta_winprob": -0.0353111987366788
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": -0.06773295998573303,
+          "model_points_delta_pts": 1.246554507558443,
+          "model_points_delta_winprob": 0.03356103119547661
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -9.0,
+          "true_delta_pts": 12.0,
+          "expected_delta_winprob": 0.03010162271250163,
+          "model_value_delta_winprob": 0.0943664014339447,
+          "model_points_delta_pts": 5.962951493888313,
+          "model_points_delta_winprob": 0.014957876343497831
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.02508468559375136,
+          "model_value_delta_winprob": 0.07836827635765076,
+          "model_points_delta_pts": 9.258367444778921,
+          "model_points_delta_winprob": 0.023224323646370237
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -20.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.002508468559375136,
+          "model_value_delta_winprob": -0.0010962486267089844,
+          "model_points_delta_pts": 3.0074523721130166,
+          "model_points_delta_winprob": 0.007544099719263674
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -18.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.007525405678125407,
+          "model_value_delta_winprob": 0.17652636766433716,
+          "model_points_delta_pts": 7.26325714781642,
+          "model_points_delta_winprob": 0.018219652193954213
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -17.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.010033874237500543,
+          "model_value_delta_winprob": 0.1721579134464264,
+          "model_points_delta_pts": 10.829898171044347,
+          "model_points_delta_winprob": 0.02716645906329903
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -20.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.002508468559375136,
+          "model_value_delta_winprob": 0.1456012725830078,
+          "model_points_delta_pts": 11.260805160109554,
+          "model_points_delta_winprob": 0.028247375697384107
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": -8.0,
+          "expected_delta_winprob": -0.2532423119168685,
+          "model_value_delta_winprob": 0.00975269079208374,
+          "model_points_delta_pts": 5.717981326026383,
+          "model_points_delta_winprob": 0.18100435131255033
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 5.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.1899317339376514,
+          "model_value_delta_winprob": 0.013800621032714844,
+          "model_points_delta_pts": 12.264366756811011,
+          "model_points_delta_winprob": 0.3882320739614009
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.011701762676239014,
+          "model_points_delta_pts": 2.2560687449727688,
+          "model_points_delta_winprob": 0.0714165081025365
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.06331057797921713,
+          "model_value_delta_winprob": -0.002043426036834717,
+          "model_points_delta_pts": 7.68737237689826,
+          "model_points_delta_winprob": 0.24334599416144853
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.12662115595843426,
+          "model_value_delta_winprob": 0.0025086402893066406,
+          "model_points_delta_pts": 10.275472385421207,
+          "model_points_delta_winprob": 0.3252730478652508
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.12662115595843426,
+          "model_value_delta_winprob": -0.001970946788787842,
+          "model_points_delta_pts": 13.076865678005877,
+          "model_points_delta_winprob": 0.41395196211556956
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 6.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.09586961038019436,
+          "model_value_delta_winprob": -0.05565902590751648,
+          "model_points_delta_pts": 9.152979002307482,
+          "model_points_delta_winprob": 0.29249751025643944
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 6.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.09586961038019436,
+          "model_value_delta_winprob": -0.07844293117523193,
+          "model_points_delta_pts": 16.021206139503317,
+          "model_points_delta_winprob": 0.5119822634716535
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.03393137454986572,
+          "model_points_delta_pts": 6.524351365121364,
+          "model_points_delta_winprob": 0.2084956744525581
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.22369575755378684,
+          "model_value_delta_winprob": -0.022179067134857178,
+          "model_points_delta_pts": 13.58532143610461,
+          "model_points_delta_winprob": 0.4341398243230172
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.22369575755378684,
+          "model_value_delta_winprob": -0.015888571739196777,
+          "model_points_delta_pts": 16.977261001601313,
+          "model_points_delta_winprob": 0.5425344658487954
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.22369575755378684,
+          "model_value_delta_winprob": -0.038157641887664795,
+          "model_points_delta_pts": 19.77448634829362,
+          "model_points_delta_winprob": 0.6319241005597939
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": 9.0,
+          "expected_delta_winprob": 0.2316139349760833,
+          "model_value_delta_winprob": 0.19516825675964355,
+          "model_points_delta_pts": 11.847553824495776,
+          "model_points_delta_winprob": 0.3048953956813791
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.25734881664009257,
+          "model_value_delta_winprob": 0.2125038504600525,
+          "model_points_delta_pts": 20.62029372334781,
+          "model_points_delta_winprob": 0.5306608188474687
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.025734881664009255,
+          "model_value_delta_winprob": 0.06561893224716187,
+          "model_points_delta_pts": 5.506338873194078,
+          "model_points_delta_winprob": 0.14170497930358367
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 17.0,
+          "true_delta_pts": 15.0,
+          "expected_delta_winprob": 0.3860232249601388,
+          "model_value_delta_winprob": 0.25245964527130127,
+          "model_points_delta_pts": 20.261825506256258,
+          "model_points_delta_winprob": 0.5214356817003092
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": 16.0,
+          "expected_delta_winprob": 0.4117581066241481,
+          "model_value_delta_winprob": 0.246384859085083,
+          "model_points_delta_pts": 24.343995392805816,
+          "model_points_delta_winprob": 0.6264898406630441
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": 16.0,
+          "expected_delta_winprob": 0.4117581066241481,
+          "model_value_delta_winprob": 0.2687522768974304,
+          "model_points_delta_pts": 28.709272513833906,
+          "model_points_delta_winprob": 0.738829730803309
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 36.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.12231233783854789,
+          "model_value_delta_winprob": -0.0023186206817626953,
+          "model_points_delta_pts": -3.768346000281367,
+          "model_points_delta_winprob": -0.046091520907895527
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 36.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.12231233783854789,
+          "model_value_delta_winprob": 0.02854180335998535,
+          "model_points_delta_pts": 1.9457464322021139,
+          "model_points_delta_winprob": 0.023798879496365416
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.03669370135156437,
+          "model_value_delta_winprob": 0.03576606512069702,
+          "model_points_delta_pts": -9.32885446795211,
+          "model_points_delta_winprob": -0.11410339993308055
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 34.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.09784987027083832,
+          "model_value_delta_winprob": 0.011690258979797363,
+          "model_points_delta_pts": 1.8804824314803703,
+          "model_points_delta_winprob": 0.023000620245868103
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 36.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.12231233783854789,
+          "model_value_delta_winprob": 0.06590884923934937,
+          "model_points_delta_pts": 5.495170366191278,
+          "model_points_delta_winprob": 0.06721271343099645
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 34.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.09784987027083832,
+          "model_value_delta_winprob": 0.05291110277175903,
+          "model_points_delta_pts": 7.475035927628799,
+          "model_points_delta_winprob": 0.0914289119735417
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 24.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.11222283837733366,
+          "model_value_delta_winprob": -0.054045021533966064,
+          "model_points_delta_pts": 2.3208857268910283,
+          "model_points_delta_winprob": 0.052091276764230476
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 25.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.13466740605280036,
+          "model_value_delta_winprob": -0.055092453956604004,
+          "model_points_delta_pts": 8.927160031859177,
+          "model_points_delta_winprob": 0.20036624748478504
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 27.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.17955654140373384,
+          "model_value_delta_winprob": -0.008056581020355225,
+          "model_points_delta_pts": 7.217850795332872,
+          "model_points_delta_winprob": 0.16200154064727001
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 28.0,
+          "true_delta_pts": 9.0,
+          "expected_delta_winprob": 0.20200110907920057,
+          "model_value_delta_winprob": -0.05129349231719971,
+          "model_points_delta_pts": 10.937626254570223,
+          "model_points_delta_winprob": 0.24549029267966305
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 28.0,
+          "true_delta_pts": 9.0,
+          "expected_delta_winprob": 0.20200110907920057,
+          "model_value_delta_winprob": -0.013955533504486084,
+          "model_points_delta_pts": 13.998465062041918,
+          "model_points_delta_winprob": 0.3141894964376564
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 26.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.04884263746046205,
+          "model_value_delta_winprob": 0.014997810125350952,
+          "model_points_delta_pts": -5.609724879232657,
+          "model_points_delta_winprob": -0.09133125284309832
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.022134482860565186,
+          "model_points_delta_pts": 1.2566279351326912,
+          "model_points_delta_winprob": 0.020459007552791685
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.0976852749209241,
+          "model_value_delta_winprob": 0.10058870911598206,
+          "model_points_delta_pts": -8.658864279610727,
+          "model_points_delta_winprob": -0.14097392294279054
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 26.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.04884263746046205,
+          "model_value_delta_winprob": 0.019345015287399292,
+          "model_points_delta_pts": -2.6992106143776695,
+          "model_points_delta_winprob": -0.04394552182249318
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.03404739499092102,
+          "model_points_delta_pts": 2.5539499371315415,
+          "model_points_delta_winprob": 0.04158055029049524
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.014041244983673096,
+          "model_points_delta_pts": 4.177149361011242,
+          "model_points_delta_winprob": 0.06800766395269094
+        }
+      ]
+    },
+    "models/alphazero_t34_tanh.pth": {
+      "n_state_combo_pairs": 139,
+      "value_head": {
+        "slope": 0.08593409632102042,
+        "intercept": 0.0067126505106181135,
+        "r2": 0.12514711688762592,
+        "n": 139
+      },
+      "points_head": {
+        "slope": 0.1721370545492992,
+        "intercept": 0.09040994144701889,
+        "r2": 0.01051610903818656,
+        "n": 139
+      },
+      "per_pair": [
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03728628758496992,
+          "model_value_delta_winprob": -0.011309400200843811,
+          "model_points_delta_pts": -7.801361534623955,
+          "model_points_delta_winprob": -0.09696126991143701
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03728628758496992,
+          "model_value_delta_winprob": -0.02207048237323761,
+          "model_points_delta_pts": -10.461360138145828,
+          "model_points_delta_winprob": -0.130021760880282
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -13.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.07457257516993984,
+          "model_value_delta_winprob": -0.018581822514533997,
+          "model_points_delta_pts": -4.307340213175419,
+          "model_points_delta_winprob": -0.05353490863825477
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03728628758496992,
+          "model_value_delta_winprob": -0.012312233448028564,
+          "model_points_delta_pts": 2.0748028718139455,
+          "model_points_delta_winprob": 0.02578723218685875
+        },
+        {
+          "state_index_in_eval_set": 1723,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -7.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -9.0,
+          "expected_delta_winprob": -0.11185886275490976,
+          "model_value_delta_winprob": -0.011962547898292542,
+          "model_points_delta_pts": 2.399952267556076,
+          "model_points_delta_winprob": 0.029828436812765504
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.006654620170593262,
+          "model_points_delta_pts": 1.9420867442597416,
+          "model_points_delta_winprob": 0.017347501468270746
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.006271004676818848,
+          "model_points_delta_pts": 5.000003497814761,
+          "model_points_delta_winprob": 0.04466204626341853
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 46.0,
+          "true_delta_pts": 17.0,
+          "expected_delta_winprob": 0.15185085106639332,
+          "model_value_delta_winprob": 0.01687900722026825,
+          "model_points_delta_pts": -1.2068258891005055,
+          "model_points_delta_winprob": -0.010779855196992268
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 24.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04466201501952745,
+          "model_value_delta_winprob": -0.036308661103248596,
+          "model_points_delta_pts": 0.3877426727213411,
+          "model_points_delta_winprob": 0.00346347381455845
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 25.0,
+          "true_delta_pts": -4.0,
+          "expected_delta_winprob": -0.035729612015621956,
+          "model_value_delta_winprob": -0.006094112992286682,
+          "model_points_delta_pts": 3.4331540790780206,
+          "model_points_delta_winprob": 0.030666315808826894
+        },
+        {
+          "state_index_in_eval_set": 1794,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 24.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04466201501952745,
+          "model_value_delta_winprob": -0.019953086972236633,
+          "model_points_delta_pts": 4.52400637251244,
+          "model_points_delta_winprob": 0.0404102481115177
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 19.0,
+          "true_delta_pts": -10.0,
+          "expected_delta_winprob": -0.0893240300390549,
+          "model_value_delta_winprob": -0.013087749481201172,
+          "model_points_delta_pts": 2.617640375666216,
+          "model_points_delta_winprob": 0.023381818754745202
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.053594418023432934,
+          "model_value_delta_winprob": -0.005050854757428169,
+          "model_points_delta_pts": 7.361881731871556,
+          "model_points_delta_winprob": 0.06575929449616642
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 26.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.026797209011716467,
+          "model_value_delta_winprob": 0.0068918438628315926,
+          "model_points_delta_pts": -0.8789133334725332,
+          "model_points_delta_winprob": -0.007850808100082643
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 14.0,
+          "true_delta_pts": -15.0,
+          "expected_delta_winprob": -0.13398604505858233,
+          "model_value_delta_winprob": -0.04004278127104044,
+          "model_points_delta_pts": 4.465488632919492,
+          "model_points_delta_winprob": 0.039887544078595884
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": -14.0,
+          "expected_delta_winprob": -0.12505364205467684,
+          "model_value_delta_winprob": -0.02228612545877695,
+          "model_points_delta_pts": 7.682950430364172,
+          "model_points_delta_winprob": 0.0686272095030419
+        },
+        {
+          "state_index_in_eval_set": 1720,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 29.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": -11.0,
+          "expected_delta_winprob": -0.09825643304296038,
+          "model_value_delta_winprob": -0.019733078312128782,
+          "model_points_delta_pts": 10.15340098285353,
+          "model_points_delta_winprob": 0.09069426943909781
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.05210795998573303,
+          "model_points_delta_pts": 13.679394370276615,
+          "model_points_delta_winprob": 0.3712633588814687
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.02714033595582063,
+          "model_value_delta_winprob": 0.0843308623880148,
+          "model_points_delta_pts": 19.640575996453972,
+          "model_points_delta_winprob": 0.5330518309095873
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.02714033595582063,
+          "model_value_delta_winprob": 0.060551051050424576,
+          "model_points_delta_pts": 10.443606532607124,
+          "model_points_delta_winprob": 0.2834429898853603
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.02714033595582063,
+          "model_value_delta_winprob": 0.04575945809483528,
+          "model_points_delta_pts": 16.998607045265718,
+          "model_points_delta_winprob": 0.46134790598949105
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 6.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.08142100786746188,
+          "model_value_delta_winprob": 0.07633930444717407,
+          "model_points_delta_pts": 20.44873752591246,
+          "model_points_delta_winprob": 0.5549856063256605
+        },
+        {
+          "state_index_in_eval_set": 877,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 3.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.08745971228927374,
+          "model_points_delta_pts": 23.11725415521074,
+          "model_points_delta_winprob": 0.6274100441485099
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 0.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.18298136809616505,
+          "model_value_delta_winprob": -0.030225008726119995,
+          "model_points_delta_pts": -8.249662377076802,
+          "model_points_delta_winprob": -0.2515890846814957
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": -1.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.21347826277885923,
+          "model_value_delta_winprob": -0.016964301466941833,
+          "model_points_delta_pts": -3.8162230482167594,
+          "model_points_delta_winprob": -0.11638295238713665
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -4.0,
+          "expected_delta_winprob": -0.1219875787307767,
+          "model_value_delta_winprob": 0.0021823644638061523,
+          "model_points_delta_pts": -12.110683412184008,
+          "model_points_delta_winprob": -0.369338236556827
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 7.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.030496894682694176,
+          "model_value_delta_winprob": -0.020129933953285217,
+          "model_points_delta_pts": -4.583512853480006,
+          "model_points_delta_winprob": -0.13978290876935479
+        },
+        {
+          "state_index_in_eval_set": 1744,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 6.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.09149068404808253,
+          "model_value_delta_winprob": -0.0049048662185668945,
+          "model_points_delta_pts": -1.8867052275507348,
+          "model_points_delta_winprob": -0.05753865062190331
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 8.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.0949658669688257,
+          "model_value_delta_winprob": -0.01132144033908844,
+          "model_points_delta_pts": -5.003117821328328,
+          "model_points_delta_winprob": -0.158375140483209
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.06331057797921713,
+          "model_value_delta_winprob": -0.021072685718536377,
+          "model_points_delta_pts": 0.9011593025146087,
+          "model_points_delta_winprob": 0.028526458146774028
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.031655288989608565,
+          "model_value_delta_winprob": -0.020597808063030243,
+          "model_points_delta_pts": -8.855825587975602,
+          "model_points_delta_winprob": -0.2803337182289379
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.06331057797921713,
+          "model_value_delta_winprob": 0.004945032298564911,
+          "model_points_delta_pts": 2.2943312564334644,
+          "model_points_delta_winprob": 0.07262771896029303
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.01944449543952942,
+          "model_points_delta_pts": 6.086494239113003,
+          "model_points_delta_winprob": 0.19266973407270982
+        },
+        {
+          "state_index_in_eval_set": 767,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 14.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.0949658669688257,
+          "model_value_delta_winprob": -0.019145779311656952,
+          "model_points_delta_pts": 6.971022848828339,
+          "model_points_delta_winprob": 0.22066974283282545
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.03368557024520739,
+          "model_value_delta_winprob": -0.017886584624648094,
+          "model_points_delta_pts": 10.086849146261022,
+          "model_points_delta_winprob": 0.11326042182306194
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -9.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.011228523415069129,
+          "model_value_delta_winprob": -3.679096698760986e-05,
+          "model_points_delta_pts": 15.116525339434045,
+          "model_points_delta_winprob": 0.169736258728321
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -6.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.022457046830138258,
+          "model_value_delta_winprob": 0.010574700776487589,
+          "model_points_delta_pts": 6.843148212094492,
+          "model_points_delta_winprob": 0.07683844993229146
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -8.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.013303989777341485,
+          "model_points_delta_pts": 16.229516796348598,
+          "model_points_delta_winprob": 0.18223350936305796
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -7.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.011228523415069129,
+          "model_value_delta_winprob": 0.014250363921746612,
+          "model_points_delta_pts": 18.640732826869645,
+          "model_points_delta_winprob": 0.20930790502055358
+        },
+        {
+          "state_index_in_eval_set": 1745,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -8.0,
+          "ab_value_treatment": -7.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.011228523415069129,
+          "model_value_delta_winprob": 0.029114254750311375,
+          "model_points_delta_pts": 22.576616186794666,
+          "model_points_delta_winprob": 0.2535020634864526
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.0680843388353598,
+          "model_value_delta_winprob": -0.0074990615248680115,
+          "model_points_delta_pts": -0.49403605620595314,
+          "model_points_delta_winprob": -0.011212039415870324
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": 5.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.11347389805893299,
+          "model_value_delta_winprob": -0.00858192890882492,
+          "model_points_delta_pts": 6.259344426993691,
+          "model_points_delta_winprob": 0.14205444228488648
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": 8.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.1815582368942928,
+          "model_value_delta_winprob": 0.0017483159899711609,
+          "model_points_delta_pts": -0.5295988856704312,
+          "model_points_delta_winprob": -0.012019129992938204
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": -10.0,
+          "true_delta_pts": -10.0,
+          "expected_delta_winprob": -0.22694779611786597,
+          "model_value_delta_winprob": -0.01644284278154373,
+          "model_points_delta_pts": 2.2676010231521513,
+          "model_points_delta_winprob": 0.051462705467899876
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": -3.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.0680843388353598,
+          "model_value_delta_winprob": -0.01787269115447998,
+          "model_points_delta_pts": 6.315381496595341,
+          "model_points_delta_winprob": 0.14332619122958629
+        },
+        {
+          "state_index_in_eval_set": 820,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 0.0,
+          "ab_value_treatment": -8.0,
+          "true_delta_pts": -8.0,
+          "expected_delta_winprob": -0.1815582368942928,
+          "model_value_delta_winprob": -0.019365303218364716,
+          "model_points_delta_pts": 7.254505764005229,
+          "model_points_delta_winprob": 0.16463940950653422
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.002354159951210022,
+          "model_points_delta_pts": -3.2498627972746235,
+          "model_points_delta_winprob": -0.026476881647247118
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": 0.018636107444763184,
+          "model_points_delta_pts": 4.286330820710123,
+          "model_points_delta_winprob": 0.0349210661865672
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": 0.009689070284366608,
+          "model_points_delta_pts": -7.503338645586307,
+          "model_points_delta_winprob": -0.061130275851955095
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.011900991201400757,
+          "model_points_delta_pts": -0.4753332245665316,
+          "model_points_delta_winprob": -0.0038725762639600114
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": 0.023693963885307312,
+          "model_points_delta_pts": 4.799698091782737,
+          "model_points_delta_winprob": 0.03910350874665268
+        },
+        {
+          "state_index_in_eval_set": 850,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -11.0,
+          "ab_value_treatment": -16.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.04073538376674082,
+          "model_value_delta_winprob": 0.02524818480014801,
+          "model_points_delta_pts": 7.525542977343182,
+          "model_points_delta_winprob": 0.06131117624703516
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.13461517724247268,
+          "model_value_delta_winprob": -0.005798913538455963,
+          "model_points_delta_pts": -7.291727151636604,
+          "model_points_delta_winprob": -0.19631542858426237
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": -0.010304152965545654,
+          "model_points_delta_pts": -2.0317036294183275,
+          "model_points_delta_winprob": -0.05469962883566464
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": 0.011329792439937592,
+          "model_points_delta_pts": -10.521039172870191,
+          "model_points_delta_winprob": -0.2832583106061838
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 21.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.13461517724247268,
+          "model_value_delta_winprob": -0.00835176557302475,
+          "model_points_delta_pts": -4.210392041524145,
+          "model_points_delta_winprob": -0.11335653418601384
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 20.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.10769214179397815,
+          "model_value_delta_winprob": -0.015184100717306137,
+          "model_points_delta_pts": -0.9595832319348894,
+          "model_points_delta_winprob": -0.025834893369163982
+        },
+        {
+          "state_index_in_eval_set": 869,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 20.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.10769214179397815,
+          "model_value_delta_winprob": -0.012751966714859009,
+          "model_points_delta_pts": 0.3949315249724137,
+          "model_points_delta_winprob": 0.0106327554465603
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 14.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.030359961013043113,
+          "model_value_delta_winprob": 0.018677979707717896,
+          "model_points_delta_pts": -8.436361462123106,
+          "model_points_delta_winprob": -0.2561276050819969
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.017639189958572388,
+          "model_points_delta_pts": -1.6060631264053482,
+          "model_points_delta_winprob": -0.0487600139021525
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.01919296383857727,
+          "model_points_delta_pts": -14.765689998917708,
+          "model_points_delta_winprob": -0.4482857726978222
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.060719922026086226,
+          "model_value_delta_winprob": 0.00985175371170044,
+          "model_points_delta_pts": -5.855685103923359,
+          "model_points_delta_winprob": -0.1777783714597705
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.03774392604827881,
+          "model_points_delta_pts": 0.10837912515371517,
+          "model_points_delta_winprob": 0.003290386014294513
+        },
+        {
+          "state_index_in_eval_set": 774,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 13.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.09107988303912934,
+          "model_value_delta_winprob": 0.013867408037185669,
+          "model_points_delta_pts": -0.3025652190120969,
+          "model_points_delta_winprob": -0.009185868253110113
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.1530082169905545,
+          "model_value_delta_winprob": 0.011789662763476372,
+          "model_points_delta_pts": 7.070987419768505,
+          "model_points_delta_winprob": 0.18031986291023674
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 25.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.20401095598740598,
+          "model_value_delta_winprob": -0.013187205418944359,
+          "model_points_delta_pts": 10.742079906827232,
+          "model_points_delta_winprob": 0.27393774888561606
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 19.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.051002738996851496,
+          "model_value_delta_winprob": 0.009906046092510223,
+          "model_points_delta_pts": 5.234024117854918,
+          "model_points_delta_winprob": 0.13347478299309012
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.051002738996851496,
+          "model_value_delta_winprob": -0.012021004920825362,
+          "model_points_delta_pts": 9.928891584744516,
+          "model_points_delta_winprob": 0.2532003330123799
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": -4.0,
+          "expected_delta_winprob": -0.10200547799370299,
+          "model_value_delta_winprob": -0.01917193178087473,
+          "model_points_delta_pts": 10.287485699044641,
+          "model_points_delta_winprob": 0.26234497402110807
+        },
+        {
+          "state_index_in_eval_set": 838,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 16.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.025501369498425748,
+          "model_value_delta_winprob": -0.01949106901884079,
+          "model_points_delta_pts": 14.458703368577321,
+          "model_points_delta_winprob": 0.36871673707022334
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": 1.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.05866354374568715,
+          "model_value_delta_winprob": 0.023011550307273865,
+          "model_points_delta_pts": 0.467669015134784,
+          "model_points_delta_winprob": 0.009145040575953943
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -1.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.019554514581895718,
+          "model_value_delta_winprob": 0.01449275016784668,
+          "model_points_delta_pts": 5.3045579765561515,
+          "model_points_delta_winprob": 0.1037280563030785
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.07821805832758287,
+          "model_value_delta_winprob": 0.01411198079586029,
+          "model_points_delta_pts": -3.9665054715638464,
+          "model_points_delta_winprob": -0.07756308908286438
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -2.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.011956438422203064,
+          "model_points_delta_pts": 1.6072930004768384,
+          "model_points_delta_winprob": 0.03142983441520326
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -1.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.019554514581895718,
+          "model_value_delta_winprob": 0.012742191553115845,
+          "model_points_delta_pts": 7.003428573294981,
+          "model_points_delta_winprob": 0.13694864615976182
+        },
+        {
+          "state_index_in_eval_set": 785,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -2.0,
+          "ab_value_treatment": -4.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.039109029163791435,
+          "model_value_delta_winprob": -0.00523000955581665,
+          "model_points_delta_pts": 6.380873899361452,
+          "model_points_delta_winprob": 0.1247748917103013
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 8.0,
+          "true_delta_pts": -9.0,
+          "expected_delta_winprob": -0.22951232548583173,
+          "model_value_delta_winprob": 0.017980089411139488,
+          "model_points_delta_pts": 9.967216013026855,
+          "model_points_delta_winprob": 0.2541776584188237
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": -5.0,
+          "expected_delta_winprob": -0.12750684749212873,
+          "model_value_delta_winprob": 0.01199742779135704,
+          "model_points_delta_pts": 19.31834750128099,
+          "model_points_delta_winprob": 0.4926443177291563
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.025501369498425748,
+          "model_value_delta_winprob": 0.018840620294213295,
+          "model_points_delta_pts": 5.751914735261432,
+          "model_points_delta_winprob": 0.1466817029873415
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": -14.0,
+          "expected_delta_winprob": -0.3570191729779605,
+          "model_value_delta_winprob": 0.03216492012143135,
+          "model_points_delta_pts": 15.693953902012861,
+          "model_points_delta_winprob": 0.4002173173464905
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": -13.0,
+          "expected_delta_winprob": -0.33151780347953475,
+          "model_value_delta_winprob": 0.017728574573993683,
+          "model_points_delta_pts": 21.527509490072156,
+          "model_points_delta_winprob": 0.5489809738871969
+        },
+        {
+          "state_index_in_eval_set": 1738,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 17.0,
+          "ab_value_treatment": 7.0,
+          "true_delta_pts": -10.0,
+          "expected_delta_winprob": -0.25501369498425747,
+          "model_value_delta_winprob": 0.024021770805120468,
+          "model_points_delta_pts": 24.31000532283214,
+          "model_points_delta_winprob": 0.6199384282462391
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -5.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.016514809524250874,
+          "model_value_delta_winprob": -0.005991986021399498,
+          "model_points_delta_pts": -5.025770381993872,
+          "model_points_delta_winprob": -0.08299964057125034
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -4.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.007770484313368797,
+          "model_points_delta_pts": 0.9279742951939083,
+          "model_points_delta_winprob": 0.015325318728528348
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -7.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.049544428572752625,
+          "model_value_delta_winprob": -0.015923617407679558,
+          "model_points_delta_pts": -8.839849038303848,
+          "model_points_delta_winprob": -0.14598842309072033
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -6.0,
+          "true_delta_pts": -2.0,
+          "expected_delta_winprob": -0.03302961904850175,
+          "model_value_delta_winprob": 0.003958147019147873,
+          "model_points_delta_pts": 2.9879158245505337,
+          "model_points_delta_winprob": 0.049344860716947055
+        },
+        {
+          "state_index_in_eval_set": 1701,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -4.0,
+          "ab_value_treatment": -3.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.016514809524250874,
+          "model_value_delta_winprob": -0.0029324162751436234,
+          "model_points_delta_pts": 5.118460927251363,
+          "model_points_delta_winprob": 0.08453040727087677
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.14212283633023295,
+          "model_value_delta_winprob": 0.016558103263378143,
+          "model_points_delta_pts": -5.381454299922893,
+          "model_points_delta_winprob": -0.15296550973731393
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 1.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.08527370179813977,
+          "model_value_delta_winprob": 0.00473291240632534,
+          "model_points_delta_pts": -1.3426942217595084,
+          "model_points_delta_winprob": -0.03816550222413522
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": -8.0,
+          "true_delta_pts": -12.0,
+          "expected_delta_winprob": -0.3410948071925591,
+          "model_value_delta_winprob": 0.012729007750749588,
+          "model_points_delta_pts": -9.421665641768122,
+          "model_points_delta_winprob": -0.267806768792638
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.2273965381283727,
+          "model_value_delta_winprob": 0.018948405981063843,
+          "model_points_delta_pts": -0.36196351575677355,
+          "model_points_delta_winprob": -0.010288656301483123
+        },
+        {
+          "state_index_in_eval_set": 1756,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 4.0,
+          "ab_value_treatment": 4.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.0002949833869934082,
+          "model_points_delta_pts": 3.8718429160613397,
+          "model_points_delta_winprob": 0.11005545941115152
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": -1.0,
+          "expected_delta_winprob": -0.026923035448494538,
+          "model_value_delta_winprob": -0.01783693116158247,
+          "model_points_delta_pts": -8.715632402154842,
+          "model_points_delta_winprob": -0.23465128011926242
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 16.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.0014384109526872635,
+          "model_points_delta_pts": -2.0121849077223164,
+          "model_points_delta_winprob": -0.054174125599533635
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 22.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.16153821269096724,
+          "model_value_delta_winprob": 0.03025028295814991,
+          "model_points_delta_pts": -14.410407203952404,
+          "model_points_delta_winprob": -0.38797190397925163
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.18846124813946177,
+          "model_value_delta_winprob": -0.04197243042290211,
+          "model_points_delta_pts": -6.396509518956174,
+          "model_points_delta_winprob": -0.1722134525254898
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": -0.014856561087071896,
+          "model_points_delta_pts": -0.2808810951001224,
+          "model_points_delta_winprob": -0.007562171680192561
+        },
+        {
+          "state_index_in_eval_set": 727,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 16.0,
+          "ab_value_treatment": 10.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.16153821269096724,
+          "model_value_delta_winprob": -0.015451406128704548,
+          "model_points_delta_pts": 1.520659473392536,
+          "model_points_delta_winprob": 0.04094076890723628
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -9.0,
+          "true_delta_pts": 12.0,
+          "expected_delta_winprob": 0.03010162271250163,
+          "model_value_delta_winprob": 0.011168308556079865,
+          "model_points_delta_pts": 5.960524240027804,
+          "model_points_delta_winprob": 0.014951787653503123
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -11.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.02508468559375136,
+          "model_value_delta_winprob": 0.008581094443798065,
+          "model_points_delta_pts": 9.291748434134806,
+          "model_points_delta_winprob": 0.023308058808650313
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -20.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.002508468559375136,
+          "model_value_delta_winprob": -0.013109952211380005,
+          "model_points_delta_pts": 3.2634038115964366,
+          "model_points_delta_winprob": 0.00818614585793464
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -18.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.007525405678125407,
+          "model_value_delta_winprob": 0.03277621418237686,
+          "model_points_delta_pts": 7.723746273647162,
+          "model_points_delta_winprob": 0.01937477468803477
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -17.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.010033874237500543,
+          "model_value_delta_winprob": 0.03365986794233322,
+          "model_points_delta_pts": 10.587575907615154,
+          "model_points_delta_winprob": 0.02655860128425028
+        },
+        {
+          "state_index_in_eval_set": 1730,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": -21.0,
+          "ab_value_treatment": -20.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.002508468559375136,
+          "model_value_delta_winprob": 0.030174359679222107,
+          "model_points_delta_pts": 10.673685968227963,
+          "model_points_delta_winprob": 0.0267746056639434
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": -8.0,
+          "expected_delta_winprob": -0.2532423119168685,
+          "model_value_delta_winprob": 0.025442659854888916,
+          "model_points_delta_pts": 5.72703006097964,
+          "model_points_delta_winprob": 0.18129079163248607
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 5.0,
+          "true_delta_pts": -6.0,
+          "expected_delta_winprob": -0.1899317339376514,
+          "model_value_delta_winprob": 0.012238383293151855,
+          "model_points_delta_pts": 10.4095080179283,
+          "model_points_delta_winprob": 0.3295159845471678
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.015551522374153137,
+          "model_points_delta_pts": 0.7434975323107054,
+          "model_points_delta_winprob": 0.02353562924835621
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 13.0,
+          "true_delta_pts": 2.0,
+          "expected_delta_winprob": 0.06331057797921713,
+          "model_value_delta_winprob": 0.016648560762405396,
+          "model_points_delta_pts": 8.03503266762759,
+          "model_points_delta_winprob": 0.2543512811346968
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.12662115595843426,
+          "model_value_delta_winprob": 0.011397406458854675,
+          "model_points_delta_pts": 11.467474112487253,
+          "model_points_delta_winprob": 0.363006207011639
+        },
+        {
+          "state_index_in_eval_set": 731,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 11.0,
+          "ab_value_treatment": 15.0,
+          "true_delta_pts": 4.0,
+          "expected_delta_winprob": 0.12662115595843426,
+          "model_value_delta_winprob": 0.0007651448249816895,
+          "model_points_delta_pts": 12.47372652416421,
+          "model_points_delta_winprob": 0.39485941789976364
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 6.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.09586961038019436,
+          "model_value_delta_winprob": 0.020995400846004486,
+          "model_points_delta_pts": 9.228005197557938,
+          "model_points_delta_winprob": 0.2948950876254293
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 6.0,
+          "true_delta_pts": -3.0,
+          "expected_delta_winprob": -0.09586961038019436,
+          "model_value_delta_winprob": 0.009310372173786163,
+          "model_points_delta_pts": 14.904784593528191,
+          "model_points_delta_winprob": 0.47630529726075704
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 9.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": 0.004303198307752609,
+          "model_points_delta_pts": 8.13109911759224,
+          "model_points_delta_winprob": 0.2598417681221034
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.22369575755378684,
+          "model_value_delta_winprob": 0.0019433684647083282,
+          "model_points_delta_pts": 11.13619712631944,
+          "model_points_delta_winprob": 0.3558742932057616
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.22369575755378684,
+          "model_value_delta_winprob": 0.006072845309972763,
+          "model_points_delta_pts": 15.64940052035897,
+          "model_points_delta_winprob": 0.500100643523475
+        },
+        {
+          "state_index_in_eval_set": 1700,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 9.0,
+          "ab_value_treatment": 2.0,
+          "true_delta_pts": -7.0,
+          "expected_delta_winprob": -0.22369575755378684,
+          "model_value_delta_winprob": -0.01135321706533432,
+          "model_points_delta_pts": 17.431798323189376,
+          "model_points_delta_winprob": 0.5570599044900969
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 11.0,
+          "true_delta_pts": 9.0,
+          "expected_delta_winprob": 0.2316139349760833,
+          "model_value_delta_winprob": 0.07730526104569435,
+          "model_points_delta_pts": 10.811966456634284,
+          "model_points_delta_winprob": 0.27824467731672076
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 12.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.25734881664009257,
+          "model_value_delta_winprob": 0.108224306255579,
+          "model_points_delta_pts": 20.439322638939917,
+          "model_points_delta_winprob": 0.5260035494056241
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 3.0,
+          "true_delta_pts": 1.0,
+          "expected_delta_winprob": 0.025734881664009255,
+          "model_value_delta_winprob": 0.0432526133954525,
+          "model_points_delta_pts": 4.758027278519183,
+          "model_points_delta_winprob": 0.12244726896681918
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 17.0,
+          "true_delta_pts": 15.0,
+          "expected_delta_winprob": 0.3860232249601388,
+          "model_value_delta_winprob": 0.12001229450106621,
+          "model_points_delta_pts": 18.281865811581806,
+          "model_points_delta_winprob": 0.4704816532583543
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": 16.0,
+          "expected_delta_winprob": 0.4117581066241481,
+          "model_value_delta_winprob": 0.1354578398168087,
+          "model_points_delta_pts": 23.94210720117148,
+          "model_points_delta_winprob": 0.6161472956091719
+        },
+        {
+          "state_index_in_eval_set": 1799,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 2.0,
+          "ab_value_treatment": 18.0,
+          "true_delta_pts": 16.0,
+          "expected_delta_winprob": 0.4117581066241481,
+          "model_value_delta_winprob": 0.13801096007227898,
+          "model_points_delta_pts": 26.889405231218113,
+          "model_points_delta_winprob": 0.6919956616409896
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 36.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.12231233783854789,
+          "model_value_delta_winprob": -0.013359032571315765,
+          "model_points_delta_pts": -5.428514048849806,
+          "model_points_delta_winprob": -0.0663974244304221
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 36.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.12231233783854789,
+          "model_value_delta_winprob": 0.004297927021980286,
+          "model_points_delta_pts": -0.21552629083910801,
+          "model_points_delta_winprob": -0.002636152449820211
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.03669370135156437,
+          "model_value_delta_winprob": -0.024704579263925552,
+          "model_points_delta_pts": -12.811578366834738,
+          "model_points_delta_winprob": -0.15670141014493222
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 34.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.09784987027083832,
+          "model_value_delta_winprob": 0.011051096022129059,
+          "model_points_delta_pts": 1.3057983766230024,
+          "model_points_delta_winprob": 0.015971525219054008
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 36.0,
+          "true_delta_pts": 10.0,
+          "expected_delta_winprob": 0.12231233783854789,
+          "model_value_delta_winprob": 0.038127101957798004,
+          "model_points_delta_pts": 3.067715590548996,
+          "model_points_delta_winprob": 0.03752194657038093
+        },
+        {
+          "state_index_in_eval_set": 1627,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 26.0,
+          "ab_value_treatment": 34.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.09784987027083832,
+          "model_value_delta_winprob": 0.03848349303007126,
+          "model_points_delta_pts": 6.548149417444758,
+          "model_points_delta_winprob": 0.08009194637637938
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 24.0,
+          "true_delta_pts": 5.0,
+          "expected_delta_winprob": 0.11222283837733366,
+          "model_value_delta_winprob": -0.07179145142436028,
+          "model_points_delta_pts": 0.651439022623225,
+          "model_points_delta_winprob": 0.014621267229706874
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 25.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.13466740605280036,
+          "model_value_delta_winprob": -0.03940466791391373,
+          "model_points_delta_pts": 10.041717165993035,
+          "model_points_delta_winprob": 0.22538200051002663
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 27.0,
+          "true_delta_pts": 8.0,
+          "expected_delta_winprob": 0.17955654140373384,
+          "model_value_delta_winprob": -0.037888385355472565,
+          "model_points_delta_pts": 6.833515888029384,
+          "model_points_delta_winprob": 0.15337530981025263
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 28.0,
+          "true_delta_pts": 9.0,
+          "expected_delta_winprob": 0.20200110907920057,
+          "model_value_delta_winprob": -0.04594344645738602,
+          "model_points_delta_pts": 12.010051687262681,
+          "model_points_delta_winprob": 0.26956041788062063
+        },
+        {
+          "state_index_in_eval_set": 1620,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 19.0,
+          "ab_value_treatment": 28.0,
+          "true_delta_pts": 9.0,
+          "expected_delta_winprob": 0.20200110907920057,
+          "model_value_delta_winprob": -0.030848823487758636,
+          "model_points_delta_pts": 14.514621715245834,
+          "model_points_delta_winprob": 0.3257744093716341
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            0,
+            1,
+            2
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 26.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.04884263746046205,
+          "model_value_delta_winprob": -0.011277943849563599,
+          "model_points_delta_pts": -7.51345133451863,
+          "model_points_delta_winprob": -0.12232559320290606
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            0,
+            2,
+            4
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.004848256707191467,
+          "model_points_delta_pts": 0.2540731776314864,
+          "model_points_delta_winprob": 0.004136534701160755
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            0,
+            4,
+            6
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 29.0,
+          "true_delta_pts": 6.0,
+          "expected_delta_winprob": 0.0976852749209241,
+          "model_value_delta_winprob": -0.0037689656019210815,
+          "model_points_delta_pts": -10.529130477498803,
+          "model_points_delta_winprob": -0.17142350089545857
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            1,
+            3,
+            5
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 26.0,
+          "true_delta_pts": 3.0,
+          "expected_delta_winprob": 0.04884263746046205,
+          "model_value_delta_winprob": -0.012580230832099915,
+          "model_points_delta_pts": -5.596460916004528,
+          "model_points_delta_winprob": -0.09111530386068484
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            2,
+            3,
+            4
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.0007351785898208618,
+          "model_points_delta_pts": 1.7254111907191874,
+          "model_points_delta_winprob": 0.028091211086173802
+        },
+        {
+          "state_index_in_eval_set": 1790,
+          "combo": [
+            3,
+            4,
+            5
+          ],
+          "ab_value_ref": 23.0,
+          "ab_value_treatment": 23.0,
+          "true_delta_pts": 0.0,
+          "expected_delta_winprob": 0.0,
+          "model_value_delta_winprob": -0.017161667346954346,
+          "model_points_delta_pts": 1.4645218551076056,
+          "model_points_delta_winprob": 0.023843703340648035
+        }
+      ]
+    }
+  }
+}
