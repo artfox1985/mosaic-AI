@@ -208,6 +208,14 @@ fn fill_factories<R: Rng + ?Sized>(
     rng: &mut R,
     mut bonus_pool: Option<&mut Vec<BonusChip>>,
 ) {
+    // Regelbuch-Audit O1 (Nutzer-Entscheid 2026-08-06): das Original
+    // (Regelbuch S. 3 + S. 10) befuellt ZUERST die grosse Manufaktur, DANN
+    // die kleinen -- vorher stand die grosse hier am Ende. Der Unterschied
+    // wirkt nur bei Vorratsknappheit (Beutel+Turm < 21, in R4/R5 real
+    // erreichbar, weil Kuppel-Fliesen den Kreislauf dauerhaft verlassen):
+    // jetzt bekommt die grosse Fabrik garantiert ihre 5 Fliesen und die
+    // kleinen laufen leer, nicht umgekehrt.
+    fill_large_factory(large_factory, bag, tower, rng);
     for factory in factories.iter_mut() {
         factory.sun_tiles.clear();
         factory.moon_stacks.clear();
@@ -225,7 +233,6 @@ fn fill_factories<R: Rng + ?Sized>(
             factory.bonus_chip_revealed = true;
         }
     }
-    fill_large_factory(large_factory, bag, tower, rng);
 }
 
 // ── Öffentliche Setup-Funktionen ─────────────────────────────────────────────
@@ -348,6 +355,23 @@ mod tests {
 
     fn names() -> [String; 2] {
         ["Spieler 1".into(), "Spieler 2".into()]
+    }
+
+    #[test]
+    fn fill_factories_scarcity_feeds_large_factory_first() {
+        // Regelbuch-Audit O1 (Original S. 3/S. 10): bei Vorratsknappheit
+        // bekommt die GROSSE Fabrik zuerst ihre 5 Fliesen, die kleinen
+        // laufen leer -- nicht umgekehrt. Vorrat: nur 7 Fliesen, 2 Farben.
+        let mut rng = StdRng::seed_from_u64(7);
+        let mut bag = Bag { tiles: vec![TileColor::Blau; 4] };
+        bag.tiles.extend(vec![TileColor::Rot; 3]);
+        let mut tower = Tower { tiles: Vec::new() };
+        let mut factories: Vec<Factory> = (0..4).map(Factory::new).collect();
+        let mut large = LargeFactory::default();
+        fill_factories(&mut factories, &mut large, &mut bag, &mut tower, &mut rng, None);
+        assert_eq!(large.sun_tiles.len(), 5, "grosse Fabrik muss voll sein");
+        let small_total: usize = factories.iter().map(|f| f.sun_tiles.len()).sum();
+        assert_eq!(small_total, 2, "Rest (7-5=2) geht an die kleinen Fabriken");
     }
 
     #[test]
