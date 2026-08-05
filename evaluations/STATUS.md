@@ -245,8 +245,47 @@ entscheidet sich an Kalibrierung/Nutzbarkeit (GUI-Anzeige,
 Blend-Semantik, kuenftige Suche mit korrekten Wahrscheinlichkeiten)
 und an der TRAININGS-Stabilitaet (Erosions-Arme), nicht an der Arena.
 
-**Noch offen**: R5-Plattenkalibrierung (zweite Pflicht-Diagnostik --
-faellt die Steigung von 0,06-0,09 Richtung 1?).
+### Erosions-Arme (PREREG_task34_erosion_arms.md) -- ERGEBNIS 2026-08-05
+
+| Arm | Ziel | Peak-Brier (Ep.) | Final E15 | Erosion |
+|---|---|---|---|---|
+| tanh (Bestand) | weiche Marge | 0,2147 (E2) | 0,2157 | +0,001 |
+| wdl02 | Blend kontaminiert | 0,1990 (E3) | 0,2030 | +0,004 |
+| wdlhard | hart pur | 0,1970 (E2) | 0,2440 | +0,047 |
+| wdlsmooth | hart + eps=0,1 | 0,1971 (E3) | 0,2148 | +0,018 |
+| **wdldestretch** | **Blend entstaucht** | **0,1971 (E3/4)** | **0,2018** | **+0,005** |
+
+Beide Hypothesen bestaetigt, klare Rangfolge: Label-Smoothing daempft
+die Erosion um ~60% (Memorisierung ist ein realer Hauptmechanismus),
+aber der ENTSTAUCHTE BLEND schlaegt alles -- bester Peak (zugleich
+hoechstes Val-R² aller WDL-Arme: 0,346), mildeste Erosion, bester
+Endstand. Die pro-Zustand-Information des Bootstraps ist der eigentliche
+Stabilisator; entstaucht liefert er sie ohne Alt-Kontamination.
+
+### Pflicht-Diagnostiken am Verdikts-Kandidaten (t34_wdldestretch_brierbest)
+
+- **Platt-Fit**: B = **0,97** (praktisch perfekt; der erodierte
+  E15-Endstand kippt auf B=0,81 = UEBERkonfident -- passt zur
+  Memorisierungs-Drift). Frozen-Set-Vorbehalt (v12-Aera) gilt.
+- **R5-Plattenkalibrierung** (`r5_value_calibration_wdl.json`):
+  tanh-Kontrolle reproduziert den Altbefund (Steigung 0,086); der
+  WDL-Kandidat kommt auf **0,273** -- Faktor ~3 besser, aber weiterhin
+  WEIT von 1. Die Ziel-Reparatur erklaert die Platten-Blindheit also nur
+  TEILWEISE. Wertungsplatten-Intervention bleibt GEPARKT, aber die
+  Wiedervorlage-Bedingung ist jetzt konkret: nach v20 (nativer sauberer
+  Blend + laengeres Value-Training) neu messen; bleibt die Steigung
+  dann flach, ist der gezielte Eingriff (Platten-Encoding/Aux-Kopf)
+  gerechtfertigt.
+
+**#34-VERDIKT (Entwurf, vorbehaltlich der laufenden destretch-Gatings)**:
+v20-Zielkonfiguration = **WDL (2-Logit-CE) + entstauchter
+Bootstrap-Blend** (`--value-head wdl --wdl-bootstrap-destretch`),
+Checkpoint-Politik: `_brierbest` zusaetzlich sichern (Peak vor der
+Erosion). Ab der v20-Kampagne liefert der WDL-Generator native
+[0,1]-Bootstraps -- die Entstauchung entfaellt dann von selbst.
+Begruendung: Arena ist ziel-invariant (6 Gatings), also entscheiden
+Kalibrierung (B 1,93 -> 0,97), Trainings-Stabilitaet (Erosionstabelle)
+und Semantik-Nutzbarkeit.
 
 ## AUDIT 2026-08-05 (Nutzer-Auftrag): Konsistenz aller Tasks & Messketten nach dem Soft-Head-Fund
 
