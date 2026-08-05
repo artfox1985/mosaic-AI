@@ -43,3 +43,4 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-08-04T11:44:26,paired_gating,v19_2d_best,v17_best,400,80,0.6625,42.175,36.587,13.125,15.45,0.0
 2026-08-04T11:52:12,paired_gating,v19_best,v17_best,400,120,0.675,42.708,35.858,13.058,15.492,0.0
 2026-08-04T12:04:57,paired_gating,v19_2d_best,v18_best,400,140,0.6071,44.621,38.807,12.679,14.986,0.0
+2026-08-05T00:23:39,paired_gating,v19_2d_opp_l07,v19_2d_best,400,80,0.4125,42.45,46.55,13.75,13.25,0.0

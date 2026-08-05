@@ -7510,6 +7510,42 @@ opp-Kopf). Also entweder (a) Promotion auf FEATURE-Gruenden
 (gleichstark + Aggressions-Faehigkeit, dokumentiert als solche) oder
 (b) Aggression bleibt Labor-Feature und der Champion bleibt v19_2d_best.
 
+## lambda=0.7 auf dem 900er-Korpus: NEGATIV -- der Mix-Anteil ist der Faktor (2026-08-05)
+
+`v19_2d_opp_l07` (warm von v19_2d_best, opp-Kopf, λ=0,7, Seed 2, 900er-
+Fenster) gegen den Champion, mit produktiven Aggressions-Defaults
+(w=0,1 / λ_aggr=2,0): **33:47, SPRT-H0 nach 40 Paaren** (Fruehstopp),
+gepaarte Diff -0,35 [-0,77, +0,07], McNemar p=0,167. Der Kandidat ist
+eher SCHLECHTER. Zusatz-Arena entfaellt (war an ein positives Gating
+gebunden). val_combined war mit 1,1723 vs 1,1738 der Kontrolle minimal
+"besser" -- erneut ohne jede Aussagekraft.
+
+**Block-Nachpruefung des alten λ-Siegs** (der lief mit Block-Groesse 25,
+also VOR der Block-Korrelations-Lektion): Block-Winraten 0,500 / 0,560 /
+0,560 / 0,620 / 0,520 / 0,520 / 0,600 / 0,660 -- **7/8 Bloecke ueber
+50%**, Block-Ebene t=+3,44, df=7, **p=0,0108** (Paar-Ebene war 0,0101).
+Kein Extremblock-Artefakt: **der Sieg haelt stand.**
+
+**Gesamtbild ueber drei Messungen:**
+
+| Korpus | Mix-Anteil | Regime | Ergebnis |
+|---|---|---|---|
+| 900 Dateien | 43,8% | flach, from scratch | 43:57 verloren |
+| 600 v18 | **65,67%** | flach, from scratch | **227:173 gewonnen** |
+| 900 Dateien | 43,8% | 2D, warm | 33:47 verloren |
+
+Konstanter Faktor ist der **KORPUS (Mix-Anteil)**, nicht das
+Trainingsregime -- beide Verlierer teilen 43,8%, quer ueber flach/2D und
+from-scratch/warm. Sauberste Erklaerung fuer alle drei Punkte: λ=0,7
+braucht hohe root_q-Dichte; bei 43,8% schadet es tendenziell sogar.
+
+**KONSEQUENZ FUER v20 (entscheidungsrelevant)**: ein Fenster aus
+v19+v18+v17 haette ~58% Mix -- ZWISCHEN den beiden gemessenen Punkten,
+also unbekanntes Terrain. Entweder das v20-Fenster **root_q-rein** bauen
+(nur v19+v18, kein v17-Tail -- kostet Korpusgroesse, siehe Dosis-Befund)
+ODER λ beim tatsaechlichen v20-Mischanteil neu testen, BEVOR es
+uebernommen wird. λ=0,7 bleibt bis dahin Kandidat, nicht Standard.
+
 ## Folgetest-Plan nach #34: was die Ziel-Reparatur alles entwertet (2026-08-04)
 
 Nutzer-Anstoss: #34 ist kein isoliertes Experiment -- die Umstellung des
