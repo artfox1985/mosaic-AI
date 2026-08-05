@@ -299,8 +299,18 @@ beschlossenen Korrektur C (#33 IN #34) -- bereinigt.
 - **VERSTECKT KONTAMINIERT**: `bootstrap_value` und `root_q` in allen
   Bestandskorpora (Befund 1) -- heilt erst die v20-Kampagne mit WDL-Kopf.
 
-**Laufend**: c_scale-Kompensations-Diagnose (`MOSAIC_VALUE_CAL_B` 0,55
-vs 1,0 am WDL-Netz, Netz-vs-Heuristik 2x200) + `t34_wdlhard`-Training.
+**c_scale-Diagnose ERLEDIGT (2026-08-05)**: WDL-Netz vs Heuristik,
+identische Seeds, gepaart: B=1,0 -> 62,5%, B=0,55 -> 64,5%, diskordant
+49:45, McNemar p=0,76 -- **kein Effekt, die Suchparametrierungs-These
+faellt**. Zusammen mit dem #30-Nullbefund (Streckung am ALTEN Netz:
+nichts) ist die Gumbel-sigma-Linearitaets-These in BEIDE Richtungen
+widerlegt: die Suche ist robust gegen die Value-Spreizung,
+c_scale/c_puct muessen fuer den WDL-Kopf NICHT neu kalibriert werden.
+Verbleibende Erklaerungskandidaten fuer die Arena-Paritaet des sauberen
+Ziels: Korpus-Co-Adaption und/oder das weiche Ziel als real besseres
+Trunk-Lernsignal (Befund 4).
+
+**Laufend**: `t34_wdlhard`-Training + Engine-Gegenpruefungs-Agent.
 
 ## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
 
