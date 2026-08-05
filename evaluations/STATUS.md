@@ -455,6 +455,39 @@ Key, paired_gating-Zuordnung/SPRT, bootstrap/rtv-Perspektive.
 NICHT abgedeckt: Voll-Audit der 4 Regel-Fixes gegen das Regelbuch,
 ~35 weitere tools/-Skripte, py.rs-Bindungsschicht, profiling.rs.
 
+## REGELBUCH-AUDIT (Agent-Dreiecksvergleich Manual/Original-PDF/Engine, 2026-08-06)
+
+Nutzer-Auftrag; Agent-Befunde stichprobenartig selbst verifiziert (A1/A2/O1
+am Code bestaetigt). **Kern-Fazit: KEIN Engine-Fehler gegenueber dem
+Manual gefunden -- in allen drei Konfliktfaellen stand der Code auf der
+Seite des Original-Regelbuchs, das MANUAL war falsch.** Manual korrigiert
+(Commit dieses Stands): Linien-Wertung ist farbUNabhaengig (nicht
+"gleichfarbig"), 4 Chips je Runde / genau 2 je Spieler Pflicht (nicht
+"2 verfuegbar, max 2 optional"), Unplatzierbarkeits-Bedingung (3 Platten
+voll + kein passendes Feld; Carry-over in Folgerunde) -- plus 8 ergaenzte
+Luecken (Kuppelplatten-Pflicht 2/Runde + R5-Verbot, Start=5 Punkte,
+Stapel-Zug-Mechanik, Ablage=3 ohne Nachfuellen, Wildfelder, Mond-Stapel-
+Reihenfolge waehlt der Nehmer, Pass-Pflicht, Vorrats-Erschoepfung).
+
+**OFFEN, Nutzer-Entscheid noetig (O1)**: Befuellungs-REIHENFOLGE der
+Fabriken. Original S. 10: zuerst grosse Fabrik, dann kleine; Engine
+(`state.rs:203-229`): kleine zuerst, grosse zuletzt. Wirkt NUR bei
+Vorratsknappheit (Beutel+Turm < 21, in R4/R5 real erreichbar) -- dann
+bekommt im Code die grosse Fabrik ggf. nichts, im Original blieben
+kleine leer: anderes Draft-Angebot. Nirgends als Absicht dokumentiert ->
+Kandidat im Stil der 4 Juli-Fixes. NICHT eigenmaechtig geaendert
+(Regel-Hoheit beim Nutzer); Fix waere 3 Zeilen + Regeltest.
+
+**Klein, defensiv (U1)**: `apply_tiling_chips` (game.rs/py.rs) prueft die
+Chip-Top-down-Sperre nicht auf Apply-Ebene (nur Solver/UI-seitig
+durchgesetzt; regulaeres Spiel nicht betroffen, direkter API-Aufruf
+koennte sie umgehen). Als kleiner Defensiv-Task offen.
+
+Nebenbefunde: Gratis-Stapelziehung bei 0 Punkten ist DOKUMENTIERTE
+Hausregel (82e8a88 R6); Tie-Break-Verdachtsfall aufgeloest (Marker wird
+strukturell in jeder Runde genommen, `factory.rs:214` +
+`check_drafting_complete` -- Manual, Original und Code deckungsgleich).
+
 ## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
 
 Bestaetigungslauf mit FRISCHEN Seeds (90260805, sonst identisches Design:
