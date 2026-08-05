@@ -23,7 +23,8 @@ Sequenzialisierung verloren).
 | #30 | Value-Skalen-Korrektur (Platt) | **geschlossen**: Effekt repliziert NICHT (p=0,90) | — | unten |
 | #33 | Value-/Policy-Loss-Gewicht | wartet | in #34 integriert (Loss-Skala springt ~22x) | unten |
 | #35b | Ranking-Loss-Training | wartet | #35-Logging + v20-Self-Play | unten |
-| #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Nutzer) | Champion, der gute Spieler fordert | unten |
+| #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Arbeitskreis "Spaeter", Nutzer) | Champion, der gute Spieler fordert | unten |
+| #38 | Moon-Head-Feinschliff (Loss-Gewicht + myopisches Label) | **geparkt** (Arbeitskreis "Spaeter", Nutzer 2026-08-05) | wie #31 | unten |
 | **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | **laeuft** (9 Trainings, PREREG + Amendment) | — | unten |
 | **#37** | Tiling-Auswahlkriterium: `punkte*P(Sieg)` vs reines P(Sieg)-Ranking | **vorgemerkt fuer v20-Aera** (Nutzer 2026-08-05) | v20-Champion mit reifem WDL-Kopf | unten |
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
@@ -971,6 +972,25 @@ laufendes λ07-Gating -> #34 bauen -> Cache-Neubau -> #34-Training +
 Kontrolle -> Diagnostiken (A) -> Neuentscheidung (B) -> #33 -> v20-Planung.
 
 ---
+
+## Task #38 (geparkt, Arbeitskreis "Spaeter" mit #31): Moon-Head-Feinschliff (2026-08-05)
+
+Befund aus einer Interesse-Frage des Nutzers, Code verifiziert. Der Kopf
+selbst ist solide (Plackett-Luce-Faktorisierung der Mond-Reihenfolge aus
+dem Policy-Raum, Labels vom exakten Rundensolver, Prior-Aufteilung in der
+Expansion). Zwei nie untersuchte Punkte fuer spaeter:
+1. **Loss-Gewicht**: `moon_nll` wird mit VOLLEM Gewicht 1,0 in den
+   Policy-Loss addiert (train.py, `p_loss + moon_nll[sun_mask].mean()`)
+   -- bei NLL ~0,5-1 gegen Policy ~1,9 beansprucht ein Teilproblem, das
+   nur Sonnenzuege betrifft, potenziell ~1/3 des Policy-Gradienten. Nie
+   gesweept (VALUE_WEIGHT-Blindfleck-Muster). Als Arm in einen
+   kuenftigen Loss-Gewichts-Sweep.
+2. **Myopisches Label**: Referenz maximiert den RUNDENendstand
+   (`solve_round_final_score`) -- spaeter zahlende Reihenfolge-Effekte
+   (Farbverfuegbarkeit, Kuppel-Slots) unsichtbar. Erledigt sich von
+   selbst, falls Labels je aus Suche statt Rundensolver kommen.
+Kein akuter Bedarf: Policy-Seite ist ueber die Orakel-Metriken
+arena-validiert, inkl. PL-Aufteilung.
 
 ## Task #31 (vorgemerkt): Menschen-Schwierigkeitsstufen leicht/mittel/schwer/extrem (2026-08-03)
 
