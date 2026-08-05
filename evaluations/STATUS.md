@@ -347,8 +347,11 @@ Wheel neu gebaut + installiert, Smoke-Test am echten opp-Modell gruen.
 - die Zahlenbasis der Arena-Konvention w=0,1/λ_aggr=2,0.
 **NICHT betroffen**: alle #34-Gatings und -Trainings (Modelle ohne
 opp-Kopf, Blend inert), alle w=0-Laeufe, das reine opp-Kopf-TRAINING
-(Python-seitig, korrekt). Neumessung der Aggressions-Kartierung im
-Nach-#34-Paket.
+(Python-seitig, korrekt). **Neumessung der Aggressions-Kartierung:
+Nutzer-Entscheid 2026-08-05 -- erst im NAECHSTEN Korpus/Generation
+(v20-Zyklus), NICHT im Nach-#34-Paket.** Bis dahin bleibt der Blend in
+Arena-Laeufen faktisch ohne belegte Parameter; das Nach-#34-Paket
+schrumpft auf #9, #12, #29 (+Offline-Praediktoren).
 
 ### F2 (MITTEL, GEFIXT): Abbruch-Partien lieferten harte Sieg-Labels
 Rust stempelt `scores`/`winner` auch bei Timeout-Abbruch; der versprochene
@@ -424,7 +427,8 @@ PUNKTE-MARGE auf eine GEWINNWAHRSCHEINLICHKEIT. Alles, was am alten Ziel
 gemessen oder darauf eingestellt wurde, steht damit zur Nachpruefung --
 NICHT automatisch wieder offen, aber mit konkretem Anlass:
 
-1. **Arena-Konvention (w=0,1 / λ_aggr=2,0)**: der Blend ist
+1. **Arena-Konvention (w=0,1 / λ_aggr=2,0)** -- **VERSCHOBEN in den
+   v20-Zyklus (Nutzer 2026-08-05, nach Audit-F1)**: der Blend ist
    `(1-w)*winprob + w*(own - λ*opp)`. Spreizt `winprob` nach der
    Reparatur staerker, verschiebt sich das Gewicht des Punkte-Terms von
    selbst. Instrument existiert: der vorregistrierte Blend-Balance-Monitor
