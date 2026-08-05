@@ -469,14 +469,16 @@ Luecken (Kuppelplatten-Pflicht 2/Runde + R5-Verbot, Start=5 Punkte,
 Stapel-Zug-Mechanik, Ablage=3 ohne Nachfuellen, Wildfelder, Mond-Stapel-
 Reihenfolge waehlt der Nehmer, Pass-Pflicht, Vorrats-Erschoepfung).
 
-**OFFEN, Nutzer-Entscheid noetig (O1)**: Befuellungs-REIHENFOLGE der
-Fabriken. Original S. 10: zuerst grosse Fabrik, dann kleine; Engine
-(`state.rs:203-229`): kleine zuerst, grosse zuletzt. Wirkt NUR bei
-Vorratsknappheit (Beutel+Turm < 21, in R4/R5 real erreichbar) -- dann
-bekommt im Code die grosse Fabrik ggf. nichts, im Original blieben
-kleine leer: anderes Draft-Angebot. Nirgends als Absicht dokumentiert ->
-Kandidat im Stil der 4 Juli-Fixes. NICHT eigenmaechtig geaendert
-(Regel-Hoheit beim Nutzer); Fix waere 3 Zeilen + Regeltest.
+**O1 ENTSCHIEDEN + GEFIXT (Nutzer 2026-08-06, Commit 3aacf2a)**:
+Befuellungs-Reihenfolge auf Original umgestellt -- grosse Fabrik ZUERST,
+dann die kleinen. Wirkt nur bei Vorratsknappheit (Beutel+Turm < 21);
+Regeltest `fill_factories_scarcity_feeds_large_factory_first`, alle 279
+Engine-Tests gruen, Wheel neu installiert. Nebenwirkung dokumentiert:
+gleiche Seeds ziehen jetzt eine andere Fliesen-Verteilung (RNG-Strom-
+Reihenfolge) -- alte Partie-Replays sind nicht bit-identisch, laufende
+Messreihen (Trainings) unbetroffen (nutzen fertige Korpora). Der
+900er-Bestandskorpus traegt die alte Reihenfolge nur in seltenen
+Knappheits-Situationen -- vernachlaessigbar, v20 wird voll konsistent.
 
 **Klein, defensiv (U1)**: `apply_tiling_chips` (game.rs/py.rs) prueft die
 Chip-Top-down-Sperre nicht auf Apply-Ebene (nur Solver/UI-seitig
