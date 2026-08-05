@@ -62,7 +62,45 @@ Sequenzialisierung verloren).
   milder betroffen, Block-Zahlen trotzdem mitberichten.
 - **Kein validierter Offline-Praediktor fuer die Value-Seite** (#29
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
-  braucht ein Arena-Gating.
+  braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
+
+## NACH #34 NEU ZU BEWERTEN (Nutzer-Anmerkungen 2026-08-05)
+
+#34 aendert die Semantik des Value-Kopfs von einer gestauchten
+PUNKTE-MARGE auf eine GEWINNWAHRSCHEINLICHKEIT. Alles, was am alten Ziel
+gemessen oder darauf eingestellt wurde, steht damit zur Nachpruefung --
+NICHT automatisch wieder offen, aber mit konkretem Anlass:
+
+1. **Arena-Konvention (w=0,1 / λ_aggr=2,0)**: der Blend ist
+   `(1-w)*winprob + w*(own - λ*opp)`. Spreizt `winprob` nach der
+   Reparatur staerker, verschiebt sich das Gewicht des Punkte-Terms von
+   selbst. Instrument existiert: der vorregistrierte Blend-Balance-Monitor
+   (`PREREG_lambda_ceiling_and_gating.md`, Nachtrag) mit Umrechnungsformel
+   und Mini-Leiter statt voller Neukartierung.
+2. **Offline-Praediktoren allgemein** (`value_r2`, Rangmetrik #29): alle
+   vier Gegenbelege und die 2/6-Niederlage wurden am ALTEN Ziel gemessen.
+   **Konkreter Verdacht zu #29**: die Rangmetrik verglich die Ordnung der
+   Value-Blattwerte mit der **Orakel-Q**-Ordnung -- Orakel-Q ist eine
+   Gewinnwahrscheinlichkeit aus einer 5000-Sims-Suche, der Value-Kopf sagte
+   aber eine Punkte-Marge vorher. Das war ein Aepfel-Birnen-Vergleich; nach
+   #34 sind beide Seiten Gewinnwahrscheinlichkeiten. Die 2/6 koennten also
+   ein SEMANTIK-Problem gewesen sein, kein Metrik-Problem -- Wiederholung
+   der Validierung ist billig (Werkzeug + Paar-Basis stehen).
+3. **#9 Ownership-Kopf**: Effekt (+0,0017) am alten Ziel gemessen.
+   Zusatzargument fuer eine Nachpruefung: ein BINAERES Hauptziel liefert
+   weniger Gradientensignal als eine kontinuierliche Marge -- Hilfsziele
+   koennten danach MEHR beitragen, nicht weniger (KataGo-Begruendung fuer
+   zerlegbare Subereignisse). Schliessungsregel bleibt: Wiedereroeffnung
+   nur mit ARENA-Instrument, nicht mit Offline-Metriken.
+4. **#12 Distributionaler Punkte-Kopf**: bleibender Befund war "mehr
+   Punkte in beiden Arena-Bloecken, ohne Siege daraus zu machen". Nach #34
+   sind Value- und Punkte-Kopf erstmals WIRKLICH verschiedene Groessen
+   (vorher sagten beide eine Punkte-Groesse vorher) -- und die Kombination
+   *Gewinnwahrscheinlichkeit + Score-Verteilung* ist exakt die
+   KataGo-Architektur (Report-Idee 1.1).
+
+**Reihenfolge**: erst #34-Ergebnis + Pflicht-Diagnostiken abwarten, dann
+diese vier Punkte in EINEM Zug bewerten -- nicht einzeln aufmachen.
 
 ---
 ## Architektur, Stand jetzt (Konstanten am Code verifiziert 2026-08-05)
