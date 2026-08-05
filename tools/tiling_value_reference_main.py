@@ -41,7 +41,8 @@ import torch  # noqa: E402
 
 from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
 from neural_net import (MosaicNet, points_dist_bins_from_state,  # noqa: E402
-                        state_to_tensor)
+                        state_to_tensor, state_to_planes,
+                        build_model_from_checkpoint)
 
 
 def binom_p(k: int, n: int) -> float:
@@ -75,12 +76,27 @@ def main() -> None:
     import mosaic_rust as mr
 
     ref_path = str(MODELS_DIR / f"alphazero_{args.ref_model}.onnx")
-    ck = torch.load(str(MODELS_DIR / f"alphazero_{args.rank_model}.pth"), map_location="cpu")
-    net = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS,
-                    hidden_size=ck.get("hidden_size", 512),
-                    points_dist_bins=points_dist_bins_from_state(ck["model_state"]))
-    net.load_state_dict(ck["model_state"], strict=False)
+    # Aufgeruestet 2026-08-05: Checkpoint-basierter Lader statt hart
+    # verdrahtetem Flach-MosaicNet -- das Original stammte aus der
+    # Flach-Aera und haette 2D-/WDL-Checkpoints mit `strict=False` STILL
+    # falsch geladen (2D-Trunk-Gewichte einfach uebersprungen).
+    ck = torch.load(str(MODELS_DIR / f"alphazero_{args.rank_model}.pth"),
+                    map_location="cpu", weights_only=False)
+    net, rank_encoder = build_model_from_checkpoint(ck)[:2]
     net.eval()
+
+    def rank_win_probs(states):
+        """[0,1]-Value je Zustand -- Encoder-korrekt (2D: Planes+Flat).
+        Beim WDL-Kopf liefert `forward()` an der Value-Position bereits
+        `2*P(Sieg)-1`, die (v+1)/2-Formel unten gilt also fuer BEIDE
+        Kopfarten unveraendert."""
+        flat = torch.stack([state_to_tensor(s) for s in states])
+        if rank_encoder == "2d":
+            planes = torch.stack([state_to_planes(s) for s in states])
+            out = net(planes, flat)
+        else:
+            out = net(flat)
+        return ((out[1].squeeze(-1).numpy()) + 1) / 2
 
     files = sorted(glob.glob(str(ROOT / "data" / "*.pkl")))
     # Deterministisch ueber den Korpus streuen (jede ~10. Datei), damit
@@ -129,8 +145,7 @@ def main() -> None:
                 continue
 
             with torch.no_grad():
-                wp = ((net(torch.stack([state_to_tensor(c["state"]) for c in tied]))[1]
-                       .squeeze(-1).numpy()) + 1) / 2
+                wp = rank_win_probs([c["state"] for c in tied])
 
             ref = [[] for _ in tied]
             for d in range(args.draws):
