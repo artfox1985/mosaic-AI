@@ -29,7 +29,7 @@ Sequenzialisierung verloren).
 | **#37** | Tiling-Auswahlkriterium: `punkte*P(Sieg)` vs reines P(Sieg)-Ranking | **vorgemerkt fuer v20-Aera** (Nutzer 2026-08-05) | v20-Champion mit reifem WDL-Kopf | unten |
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
 | — | v20-Zyklus (Self-Play + Gating) | geplant | **#34-Ausgang + #36 + #14-Entscheid** (Nutzer 2026-08-05: Start erst, wenn klar ist, wie viele Spiele/Sims wirklich sinnvoll sind) | unten |
-| — | R4b (Playout-Ground-Truth) | geplant | — | history (#R4-Alarm) |
+| — | R4b (Playout-Ground-Truth) | **Lauf 1 (N=24) NICHT INTERPRETIERBAR** per PREREG-Leseregel (beide Koepfe R²<0,1; Steigungen negativ = Rauschen; Werkzeug geprueft: Perspektive+Lader sauber) | Eskalation N=72 im naechsten idle-CPU-Fenster (Betriebsregel: Ground Truth braucht ruhige Maschine) | `r4b_value_calibration_wdl.json` |
 | — | GUI: Aggressions-Slider entfernen | **erledigt** 2026-08-05 (kein Startwert -- Blend ueberall 0, s. Regeln) | — | history (Task #28) |
 | #29 | Value-Rangmetrik | **geschlossen**: NICHT validiert (2/6) | — | history |
 | #28 | Aggressions-Utility (opp-Kopf + Regler) | **ERGEBNISSE UNGUELTIG** (Engine-Audit F1: ownership-Logit als Gegner-Punkte gelesen) | Neumessung nach Fix noetig | unten (Engine-Audit) |
