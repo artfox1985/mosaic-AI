@@ -150,7 +150,8 @@ from config import (MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (
     MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
-    VALUE_SCHEMA_VERSION, encoder_from_state_dict,
+    VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
+    value_head_variant_from_state,
 )
 
 
@@ -199,25 +200,30 @@ def points_dist_loss(logits, targets, model, rw2, denom):
 
 
 def _unpack_optional_outputs(model, out_tuple):
-    """Task #28 (PREREG_task28_aggression.md): `model(...)` haengt bis zu zwei
-    OPTIONALE Ausgaben hinter den festen 5 (policy/value/moon/points/
-    ownership) an -- `points_dist`-Logits (Task #12, `points_dist_bins>0`)
-    und/oder `opp_points` (additiver Kopf, ZULETZT). Deren Reihenfolge/
-    Anwesenheit haengt vom MODELL ab, nicht von der Tupel-LAENGE allein
-    (eine Laenge von 6 ist sonst mehrdeutig: entweder nur points_dist ODER
-    nur opp_points) -- daher Introspektion ueber die Modell-Attribute statt
-    reinem Index-Raten. Gibt `(pred_points_logits, pred_opp_points)` zurueck,
-    je `None` wenn nicht vorhanden."""
+    """Task #28 (PREREG_task28_aggression.md) / Task #34: `model(...)` haengt
+    bis zu drei OPTIONALE Ausgaben hinter den festen 5 (policy/value/moon/
+    points/ownership) an, IN DIESER REIHENFOLGE -- `points_dist`-Logits
+    (Task #12, `points_dist_bins>0`), `value_wdl_logits` (Task #34,
+    `value_head_variant=='wdl'`), und/oder `opp_points` (additiver Kopf,
+    ZULETZT, Task #28). Deren Reihenfolge/Anwesenheit haengt vom MODELL ab,
+    nicht von der Tupel-LAENGE allein (mehrdeutig sonst, z.B. Laenge 6) --
+    daher Introspektion ueber die Modell-Attribute statt reinem Index-Raten.
+    Gibt `(pred_points_logits, pred_value_wdl_logits, pred_opp_points)`
+    zurueck, je `None` wenn nicht vorhanden."""
     idx = 5
     pred_points_logits = None
     if getattr(model, "points_dist_bins", 0) > 0:
         pred_points_logits = out_tuple[idx]
         idx += 1
+    pred_value_wdl_logits = None
+    if getattr(model, "value_head_variant", "tanh") == "wdl":
+        pred_value_wdl_logits = out_tuple[idx]
+        idx += 1
     pred_opp_points = None
     if getattr(model, "has_opp_points_head", False):
         pred_opp_points = out_tuple[idx]
         idx += 1
-    return pred_points_logits, pred_opp_points
+    return pred_points_logits, pred_value_wdl_logits, pred_opp_points
 
 
 def _git_commit_hash() -> str | None:
@@ -334,7 +340,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
-          value_target_lambda=1.0, opp_points_head=False):
+          value_target_lambda=1.0, opp_points_head=False, value_head="tanh"):
+    # Task #34: harte Validierung wie bei --value-target-lambda -- kein
+    # stiller Fallback auf einen unbekannten Wert.
+    if value_head not in VALUE_HEAD_VARIANTS:
+        sys.exit(f"❌ --value-head {value_head!r} unbekannt -- erlaubt: {VALUE_HEAD_VARIANTS}.")
     # λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z"):
     # harte Validierung VOR jedem teuren Daten-Laden -- kein stiller Clamp
     # (siehe train.py --load-Footgun-Historie im Modulkommentar/Memory
@@ -384,9 +394,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # `value_head.*`-Keys, die load_state_dict(strict=False) klaglos
         # uebernehmen wuerde) wuerde den Conv-Zweig zufaellig lassen, OHNE
         # dass das auffiele -- harter Fehler statt stillem Teil-Load.
-        _load_ckpt_encoder = encoder_from_state_dict(
-            torch.load(str(load_path), map_location="cpu")["model_state"]
-        )
+        _load_ckpt_state = torch.load(str(load_path), map_location="cpu")["model_state"]
+        _load_ckpt_encoder = encoder_from_state_dict(_load_ckpt_state)
         if _load_ckpt_encoder != encoder:
             sys.exit(
                 f"❌ --encoder {encoder!r}, aber --load '{load_version}' ist ein "
@@ -394,6 +403,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 f"hinweg ist nicht sinnvoll (Architektur passt nicht) -- Abbruch statt "
                 f"stillem Teil-Load."
             )
+        # Task #34: KEIN harter Abbruch (anders als beim Encoder oben) -- ein
+        # Wechsel der Value-Kopf-Variante beim Warm-Start ist bewusst erlaubt
+        # (analog zu --reinit-points-head/--points-dist-bins): die bestehende
+        # Shape-Mismatch-Skip-Logik weiter unten erkennt `value_head.*`
+        # automatisch und laesst NUR diesen Kopf frisch starten, Trunk/Policy/
+        # uebrige Koepfe bleiben warm. Nur ein informativer Hinweis vorab.
+        _load_ckpt_value_head = value_head_variant_from_state(_load_ckpt_state)
+        if _load_ckpt_value_head != value_head:
+            print(f"ℹ️  --value-head {value_head!r}, aber --load '{load_version}' ist ein "
+                  f"{_load_ckpt_value_head!r}-Checkpoint -- der Value-Kopf startet FRISCH "
+                  f"(automatischer Shape-Mismatch-Skip weiter unten), Trunk/Policy/uebrige "
+                  f"Koepfe starten warm.")
 
     # 1. Daten laden (Nutzt jetzt dynamisch den DATA_DIR Pfad)
     # Val-Split auf DATEI-Ebene (nicht Zug-Ebene!): Zuege derselben Partie sind
@@ -418,6 +439,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant, "encoder": encoder,
         "value_target_lambda": value_target_lambda, "opp_points_head": opp_points_head,
+        "value_head": value_head,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -542,12 +564,23 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if opp_points_head:
         print(f"   Opp-Punkte-Kopf: AN (Task #28, PREREG_task28_aggression.md) -- "
               f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NICHT Teil von val_combined")
+    if value_head == "wdl":
+        print(f"   Value-Kopf    : WDL (Task #34) -- 2-Logit-Softmax-Klassifikation, "
+              f"Kreuzentropie auf Sieg/Niederlage-Ziel (`values_wdl`). ACHTUNG: val_combined "
+              f"ist damit NICHT gegen einen 'tanh'-Lauf vergleichbar (andere Loss-EINHEIT, "
+              f"siehe Kommentar an der current_metric-Stelle) -- Value-Brier-Score (unten) "
+              f"ist die arm-uebergreifend vergleichbare Kennzahl.")
+    else:
+        print(f"   Value-Kopf    : tanh (Bestandsverhalten) -- Skalar-Regression, MSE auf "
+              f"`values`.")
     if encoder == "2d":
         model = Mosaic2DNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
-                            points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head)
+                            points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
+                            value_head_variant=value_head)
     else:
         model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
-                          points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head)
+                          points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
+                          value_head_variant=value_head)
 
     # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
@@ -630,6 +663,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     val_points_r2_history = []
     val_opp_pointsloss_history = []
     val_opp_points_r2_history = []
+    # Task #34: Brier-Score von P(Sieg) gegen den echten Spielausgang -- die
+    # ARM-UEBERGREIFEND vergleichbare Value-Kalibrierungskennzahl (siehe
+    # Kommentar an der Berechnungsstelle im Val-Loop). Anders als
+    # val_vloss/value_r2 gilt sie fuer 'tanh'- UND 'wdl'-Laeufe gleichermassen.
+    val_brier_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -704,33 +742,38 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 if _mi is not None:
                     print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
                           f"rss={_mi[0]:.2f}GB commit={_mi[1]:.2f}GB", flush=True)
-            # Task #11 Phase 2 / Task #28: MosaicDataset liefert bei
-            # encoder="2d" ein 12-Tupel (planes VORAN), bei encoder="flat"
-            # (Standard) das 11-Tupel -- die letzten 2 Elemente
-            # (opp_points_forecast, opp_points_mask) sind additiv ANS ENDE
-            # angehaengt (siehe `neural_net.py::MosaicDataset.__getitem__`),
-            # unabhaengig davon, ob `--opp-points-head` aktiv ist (das Cache-
-            # Feld existiert immer, wird nur ggf. nicht im Loss genutzt).
+            # Task #11 Phase 2 / Task #28 / Task #34: MosaicDataset liefert bei
+            # encoder="2d" ein 14-Tupel (planes VORAN), bei encoder="flat"
+            # (Standard) das 13-Tupel -- die letzten 4 Elemente
+            # (opp_points_forecast, opp_points_mask, values_wdl, wdl_outcome)
+            # sind additiv ANS ENDE angehaengt (siehe
+            # `neural_net.py::MosaicDataset.__getitem__`), unabhaengig davon,
+            # ob `--opp-points-head`/`--value-head wdl` aktiv sind (die Cache-
+            # Felder existieren immer, werden nur ggf. nicht im Loss genutzt).
             if encoder == "2d":
                 (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
-                 s_rounds, s_own, targets_opp_points, s_opp_mask) = _batch
+                 s_rounds, s_own, targets_opp_points, s_opp_mask,
+                 targets_v_wdl, s_wdl_outcome) = _batch
                 planes = planes.to(device)
             else:
                 (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
-                 s_rounds, s_own, targets_opp_points, s_opp_mask) = _batch
+                 s_rounds, s_own, targets_opp_points, s_opp_mask,
+                 targets_v_wdl, s_wdl_outcome) = _batch
             states    = states.to(device)
             targets_p = targets_p.to(device)
             targets_v = targets_v.to(device)
             targets_points = targets_points.to(device)
             targets_opp_points = targets_opp_points.to(device)
             s_opp_mask = s_opp_mask.to(device)
+            targets_v_wdl = targets_v_wdl.to(device)
+            s_wdl_outcome = s_wdl_outcome.to(device)
             masks     = masks.to(device)
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
             _out = model(planes, states) if encoder == "2d" else model(states)
             pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
-            pred_points_logits, pred_opp_points = _unpack_optional_outputs(model, _out)
+            pred_points_logits, pred_value_wdl_logits, pred_opp_points = _unpack_optional_outputs(model, _out)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -773,7 +816,27 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # sie den Policy-Loss nicht dominieren.
             rw2 = rw.view(-1, 1) if rw is not None else None
             denom = rw2.sum().clamp(min=1e-6) if rw2 is not None else None
-            if rw is None:
+            # Task #34: bei aktivem WDL-Kopf ist der Value-Verlust eine
+            # Kreuzentropie mit WEICHEN Labels statt MSE (siehe
+            # VALUE_SCHEMA_VERSION=16-Kommentar in neural_net.py). Ein
+            # 2-Logit-Softmax reduziert algebraisch auf BCEWithLogits der
+            # Logit-DIFFERENZ gegen die Ziel-Wahrscheinlichkeit `targets_v_wdl`
+            # -- numerisch identisch zur kategorialen Kreuzentropie
+            # -log(softmax)[y], aber stabiler (kein manuelles log(softmax)).
+            # ACHTUNG (STATUS.md "val_combined"-Falle): diese Loss-GROESSE hat
+            # eine ANDERE Einheit als die MSE des tanh-Arms -- `val_combined`
+            # (current_metric weiter unten) ist damit NUR arm-INTERN fuer die
+            # Checkpoint-Auswahl vergleichbar, NICHT zwischen tanh- und
+            # wdl-Laeufen (siehe Kommentar an der current_metric-Stelle).
+            if pred_value_wdl_logits is not None:
+                logit_diff = pred_value_wdl_logits[:, 1] - pred_value_wdl_logits[:, 0]
+                v_wdl_target = targets_v_wdl.view(-1)
+                if rw is None:
+                    v_loss = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target)
+                else:
+                    v_bce = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target, reduction="none")
+                    v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
+            elif rw is None:
                 v_loss = mse_loss(pred_v, targets_v)
             else:
                 v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
@@ -860,6 +923,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_val_points_r2 = None
         epoch_val_opp_pointsloss = None
         epoch_val_opp_points_r2 = None
+        epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
         if val_dataloader is not None:
             model.eval()
             val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
@@ -867,26 +931,32 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             opp_sum, opp_sumsq, opp_sqerr_sum, n_opp = 0.0, 0.0, 0.0, 0
+            brier_sqerr_sum, n_brier = 0.0, 0  # Task #34
             with torch.no_grad():
                 for _v_batch in val_dataloader:
                     if encoder == "2d":
                         (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
-                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask) = _v_batch
+                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
+                         v_targets_v_wdl, v_wdl_outcome) = _v_batch
                         v_planes = v_planes.to(device)
                     else:
                         (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
-                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask) = _v_batch
+                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
+                         v_targets_v_wdl, v_wdl_outcome) = _v_batch
                     v_states = v_states.to(device)
                     v_targets_p = v_targets_p.to(device)
                     v_targets_v = v_targets_v.to(device)
                     v_targets_points = v_targets_points.to(device)
                     v_targets_opp_points = v_targets_opp_points.to(device)
                     v_opp_mask = v_opp_mask.to(device)
+                    v_targets_v_wdl = v_targets_v_wdl.to(device)
+                    v_wdl_outcome = v_wdl_outcome.to(device)
                     v_masks = v_masks.to(device)
                     v_pol_w = v_pol_w.to(device)
                     _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
-                    _v_pred_points_logits, v_pred_opp_points = _unpack_optional_outputs(model, _vout)
+                    (_v_pred_points_logits, v_pred_value_wdl_logits,
+                     v_pred_opp_points) = _unpack_optional_outputs(model, _vout)
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
@@ -902,23 +972,79 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     # vergleichbar -- genau der Fehler, der am 2026-07-28 beim
                     # lr1e5-Arm beinahe zur falschen Entscheidung gefuehrt haette
                     # (siehe STATUS.md "Seed-Sweep", Abschnitt val_combined).
-                    if v_rw is None:
+                    # Task #34: der VALIDIERUNGS-Value-Verlust folgt (anders
+                    # als der Punkte-Verlust oben) bewusst DEMSELBEN Loss wie
+                    # das Training des jeweiligen Arms (MSE fuer 'tanh', BCE
+                    # fuer 'wdl') -- die STATUS.md-Vorgabe akzeptiert
+                    # ausdruecklich, dass `val_combined` dadurch zwischen den
+                    # Armen NICHT vergleichbar ist (nur armintern zur
+                    # Checkpoint-Auswahl, siehe Kommentar an der v_loss-Stelle
+                    # oben im Trainingsblock). Der arm-uebergreifend
+                    # vergleichbare Wert ist der Brier-Score weiter unten.
+                    if v_pred_value_wdl_logits is not None:
+                        v_logit_diff = v_pred_value_wdl_logits[:, 1] - v_pred_value_wdl_logits[:, 0]
+                        v_wdl_target = v_targets_v_wdl.view(-1)
+                        if v_rw is None:
+                            v_v_loss = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target)
+                        else:
+                            v_rw2 = v_rw.view(-1, 1)
+                            v_den = v_rw2.sum().clamp(min=1e-6)
+                            v_bce = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target, reduction="none")
+                            v_v_loss = (v_bce.view(-1, 1) * v_rw2).sum() / v_den
+                    elif v_rw is None:
                         v_v_loss = mse_loss(v_pred_v, v_targets_v)
-                        v_points_loss = mse_loss(v_pred_points, v_targets_points)
                     else:
                         v_rw2 = v_rw.view(-1, 1)
                         v_den = v_rw2.sum().clamp(min=1e-6)
                         v_v_loss = (((v_pred_v - v_targets_v) ** 2) * v_rw2).sum() / v_den
+                    if v_rw is None:
+                        v_points_loss = mse_loss(v_pred_points, v_targets_points)
+                    else:
+                        v_rw2 = v_rw.view(-1, 1)
+                        v_den = v_rw2.sum().clamp(min=1e-6)
                         v_points_loss = (((v_pred_points - v_targets_points) ** 2) * v_rw2).sum() / v_den
                     val_ploss_sum += v_p_loss.item()
                     val_vloss_sum += v_v_loss.item()
                     val_pointsloss_sum += v_points_loss.item()
                     val_batches += 1
 
-                    v_sum += v_targets_v.sum().item()
-                    v_sumsq += (v_targets_v ** 2).sum().item()
-                    v_sqerr_sum += ((v_targets_v - v_pred_v) ** 2).sum().item()
-                    n_v += v_targets_v.numel()
+                    # Task #34: R² auf der ARM-EIGENEN Groesse -- 'tanh'
+                    # bleibt byte-identisch (targets_v/pred_v, [-1,1]-Marge),
+                    # 'wdl' vergleicht auf der [0,1]-Wahrscheinlichkeitsskala
+                    # (P(Sieg) = (v_pred_v+1)/2 gegen targets_v_wdl) -- dieselben
+                    # Groessen wie der Loss oben, daher intern konsistent, aber
+                    # NICHT direkt mit dem 'tanh'-R² vergleichbar (andere
+                    # Zielgroesse).
+                    if v_pred_value_wdl_logits is not None:
+                        v_p_win = (v_pred_v + 1.0) * 0.5
+                        v_sum += v_targets_v_wdl.sum().item()
+                        v_sumsq += (v_targets_v_wdl ** 2).sum().item()
+                        v_sqerr_sum += ((v_targets_v_wdl - v_p_win) ** 2).sum().item()
+                        n_v += v_targets_v_wdl.numel()
+                    else:
+                        v_sum += v_targets_v.sum().item()
+                        v_sumsq += (v_targets_v ** 2).sum().item()
+                        v_sqerr_sum += ((v_targets_v - v_pred_v) ** 2).sum().item()
+                        n_v += v_targets_v.numel()
+
+                    # Task #34 (STATUS.md "gib pro Epoche eine Value-
+                    # KALIBRIERUNGSKENNZAHL aus, die zwischen Armen
+                    # vergleichbar ist"): Brier-Score von P(Sieg)=(pred_v+1)/2
+                    # gegen den ROHEN, UNGEBLENDETEN tatsaechlichen Ausgang
+                    # (`wdl_outcome`, -1 = unbekannt/maskiert) -- UNABHAENGIG
+                    # vom Arm, weil `pred_v` in BEIDEN Armen auf derselben
+                    # [-1,1]-Position/Skala liegt (siehe forward()-Kommentar in
+                    # neural_net.py). Anders als `targets_v`/`targets_v_wdl`
+                    # (beide TD-geblendet) ist `wdl_outcome` NICHT geblendet --
+                    # genau deshalb ist dieser Wert arm-uebergreifend
+                    # vergleichbar, waehrend val_vloss/value_r2 es nicht sind.
+                    brier_p_win = (v_pred_v + 1.0) * 0.5
+                    brier_mask = (v_wdl_outcome >= 0.0).float()
+                    brier_n_batch = brier_mask.sum().item()
+                    if brier_n_batch > 0:
+                        brier_sqerr_sum += (((brier_p_win - v_wdl_outcome.clamp(min=0.0)) ** 2)
+                                            * brier_mask).sum().item()
+                        n_brier += brier_n_batch
 
                     pts_sum += v_targets_points.sum().item()
                     pts_sumsq += (v_targets_points ** 2).sum().item()
@@ -961,6 +1087,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             epoch_val_value_r2 = _r2(v_sum, v_sumsq, v_sqerr_sum, n_v)
             epoch_val_points_r2 = _r2(pts_sum, pts_sumsq, pts_sqerr_sum, n_pts)
             epoch_val_opp_points_r2 = _r2(opp_sum, opp_sumsq, opp_sqerr_sum, n_opp)
+            epoch_val_brier = brier_sqerr_sum / n_brier if n_brier > 0 else None
         val_ploss_history.append(epoch_val_ploss)
         val_vloss_history.append(epoch_val_vloss)
         val_pointsloss_history.append(epoch_val_pointsloss)
@@ -968,6 +1095,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_points_r2_history.append(epoch_val_points_r2)
         val_opp_pointsloss_history.append(epoch_val_opp_pointsloss)
         val_opp_points_r2_history.append(epoch_val_opp_points_r2)
+        val_brier_history.append(epoch_val_brier)
 
         # Fund 8 (externer Hinweis, Bugfixes.txt Abschnitt C): "bestes Modell"
         # wurde bisher NUR nach Policy-Val-Loss gewählt -- der Value-Head
@@ -989,6 +1117,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # bleiben damit anhand dieser Metrik vergleichbar (sonst waeren
         # --opp-points-head-Laeufe stillschweigend auf einer anderen Skala
         # ausgewaehlt worden als alle Alt-Laeufe).
+        #
+        # Task #34 (STATUS.md "Achtung val_combined"): bei `--value-head wdl`
+        # ist `epoch_val_vloss` eine Kreuzentropie (~0.65-0.69 auf binaerem
+        # Ausgang) statt der bisherigen MSE (~0.03 auf dem weichen Ziel) --
+        # FAKTOR ~22 unterschiedliche EINHEIT. `current_metric`/`val_combined`
+        # bleibt dadurch NUR ARM-INTERN sinnvoll (zur Checkpoint-Auswahl
+        # INNERHALB eines Laufs) -- ein direkter Zahlenvergleich
+        # `val_combined(tanh-Lauf)` vs. `val_combined(wdl-Lauf)` ist UNGUELTIG
+        # (vergleicht nicht dieselbe Groesse, exakt dasselbe Muster wie beim
+        # `--value-weight`-Sweep, [[feedback-preregister-decision-metric]]).
+        # Die arm-uebergreifend vergleichbare Kennzahl ist `epoch_val_brier`
+        # (siehe Berechnung im Val-Loop oben) -- NICHT Teil von
+        # `current_metric`, nur separat geloggt/gespeichert.
         if epoch_val_ploss is not None:
             current_metric = epoch_val_ploss + effective_value_weight * epoch_val_vloss + effective_points_weight * epoch_val_pointsloss
         else:
@@ -1057,9 +1198,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             v_r2_s = f"{epoch_val_value_r2:.3f}" if epoch_val_value_r2 is not None else "n/a"
             p_r2_s = f"{epoch_val_points_r2:.3f}" if epoch_val_points_r2 is not None else "n/a"
             val_r2_str = f" | Val-R² Value={v_r2_s} Points={p_r2_s}"
+        # Task #34: Brier-Score separat ausgewiesen (arm-uebergreifend
+        # vergleichbar, siehe Kommentar an der Berechnungsstelle).
+        val_brier_str = f" | Value-Brier={epoch_val_brier:.4f}" if epoch_val_brier is not None else ""
         lr_str = f" | LR={optimizer.param_groups[0]['lr']:.2e}" if lr_scheduler is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{plateau_marker}{lr_str}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{plateau_marker}{lr_str}")
 
         # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
@@ -1116,6 +1260,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     final_points_r2 = _last_valid(val_points_r2_history)
     final_opp_points_val_loss = _last_valid(val_opp_pointsloss_history)
     final_opp_points_r2 = _last_valid(val_opp_points_r2_history)
+    final_value_brier = _last_valid(val_brier_history)
     if final_val_ploss is not None:
         policy_val_gap = final_val_ploss - final_p
         print(f"  Policy Val-Loss: {final_val_ploss:.4f}  (Gap ggü. Train: {policy_val_gap:+.4f})")
@@ -1124,7 +1269,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Loss allein sagt ohne Referenz-Skala wenig aus.
     if final_val_vloss is not None:
         r2_s = f"{final_value_r2:.4f}" if final_value_r2 is not None else "n/a"
-        print(f"  Value Val-Loss:  {final_val_vloss:.4f}  (Val-R²: {r2_s})")
+        _head_label = "wdl/BCE, [0,1]-Skala" if value_head == "wdl" else "tanh/MSE, [-1,1]-Skala"
+        print(f"  Value Val-Loss:  {final_val_vloss:.4f}  (Val-R²: {r2_s}, {_head_label} -- "
+              f"NUR armintern vergleichbar, Task #34)")
+    if final_value_brier is not None:
+        print(f"  Value Brier:     {final_value_brier:.4f}  (P(Sieg) vs. echter Ausgang -- "
+              f"ARM-UEBERGREIFEND vergleichbar, Task #34)")
     if final_val_pointsloss is not None:
         r2_s = f"{final_points_r2:.4f}" if final_points_r2 is not None else "n/a"
         print(f"  Points Val-Loss: {final_val_pointsloss:.4f}  (Val-R²: {r2_s})")
@@ -1221,6 +1371,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             round(final_opp_points_val_loss, 4) if final_opp_points_val_loss is not None else None),
         "final_opp_points_val_r2": (
             round(final_opp_points_r2, 4) if final_opp_points_r2 is not None else None),
+        # Task #34: `neural_net.py::value_head_variant_from_state` bleibt die
+        # massgebliche, rueckwirkend funktionierende Quelle (analog zu
+        # `encoder`/`opp_points_head` oben) -- dieses Feld ist nur ein
+        # Bequemlichkeits-/Dokumentationswert. `final_value_val_brier` ist die
+        # arm-uebergreifend vergleichbare Kalibrierungskennzahl (siehe
+        # Kommentar an der current_metric-Stelle) -- NICHT Teil von
+        # val_combined/der Checkpoint-Auswahl, nur informativ.
+        "value_head":        value_head,
+        "final_value_val_brier": (
+            round(final_value_brier, 4) if final_value_brier is not None else None),
     }
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
@@ -1257,6 +1417,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         best_checkpoint["final_opp_points_val_r2"] = (
             round(val_opp_points_r2_history[best_idx], 4)
             if best_idx < len(val_opp_points_r2_history) and val_opp_points_r2_history[best_idx] is not None
+            else None)
+        # Task #34: rein informativ am selben best_idx, siehe Kommentar oben.
+        best_checkpoint["final_value_val_brier"] = (
+            round(val_brier_history[best_idx], 4)
+            if best_idx < len(val_brier_history) and val_brier_history[best_idx] is not None
             else None)
         best_version_name = f"{version_name}_best"
         best_save_path = MODELS_DIR / f"alphazero_{best_version_name}.pth"
@@ -1440,6 +1605,22 @@ if __name__ == "__main__":
                              "Aendert den HDF5-Cache-Key (Suffix '+enc2d_v1', der Flach-Cache derselben "
                              "Dateiliste bleibt unberuehrt). --load erwartet dann einen 2D-Checkpoint "
                              "(harter Fehler bei Encoder-Mismatch statt stillem Teil-Load).")
+    parser.add_argument("--value-head", type=str, default="tanh", choices=list(VALUE_HEAD_VARIANTS),
+                        help="Task #34 (STATUS.md 'Sieg/Niederlage-Ziel wiederherstellen'). 'tanh' "
+                             "(Standard, Bestandsverhalten byte-identisch): Skalar-Regressionskopf, "
+                             "MSE auf der weichen Punkte-Marge ('values'). 'wdl': 2-Logit-Softmax-"
+                             "Klassifikationskopf, Kreuzentropie mit weichen Labels auf der harten "
+                             "Sieg/Niederlage-Wahrscheinlichkeit ('values_wdl') -- `forward()` gibt an "
+                             "der BESTEHENDEN Position weiterhin `2*P(Sieg)-1` aus (identische Skala/"
+                             "Position, `net_mcts.rs::value_to_win_prob` unveraendert kompatibel, keine "
+                             "Rust-Aenderung noetig). Schaltet ZIEL+LOSS+ARCHITEKTUR gemeinsam um. "
+                             "ACHTUNG: val_combined ist zwischen 'tanh'- und 'wdl'-Laeufen NICHT "
+                             "vergleichbar (andere Loss-Einheit) -- fuer den Arm-Vergleich den "
+                             "geloggten/gespeicherten Value-Brier-Score nutzen (arm-uebergreifend "
+                             "vergleichbar). Checkpoint speichert die Wahl; "
+                             "`build_model_from_checkpoint`/`value_head_variant_from_state` erkennen "
+                             "sie rueckwirkend aus dem state_dict, Alt-Checkpoints bleiben unveraendert "
+                             "ladbar (gleiches Muster wie --points-dist-bins/--opp-points-head).")
 
     args = parser.parse_args()
 
@@ -1452,4 +1633,5 @@ if __name__ == "__main__":
           seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant, encoder=args.encoder,
-          value_target_lambda=args.value_target_lambda, opp_points_head=args.opp_points_head)
+          value_target_lambda=args.value_target_lambda, opp_points_head=args.opp_points_head,
+          value_head=args.value_head)
