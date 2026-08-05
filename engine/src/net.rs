@@ -133,18 +133,19 @@ pub struct Net {
     /// (`detect_opp_head`), nicht nur per Output-Anzahl, damit ein spaeterer
     /// weiterer Aux-Kopf diese Erkennung nicht bricht. Einmalig beim Laden
     /// bestimmt (siehe `build_from_layout`), danach nur noch gelesen --
-    /// steuert, ob `eval_ex`/`eval_pair_ex`/`eval_batch_ex` den 5. Output
-    /// tatsaechlich extrahieren oder einen leeren `Vec` liefern (Legacy-
-    /// Modelle ohne den Kopf: identisch leer wie `points` bei sehr alten
-    /// Checkpoints ohne Punkte-Kopf).
-    has_opp_head: bool,
+    /// Index des `opp_points`-Outputs im ONNX-Graphen (per Namens-Erkennung
+    /// beim Laden, `None` = Legacy-Modell ohne den Kopf). AUDIT-F1
+    /// 2026-08-05: `eval_ex`/`eval_pair_ex`/`eval_batch_ex` extrahieren ueber
+    /// DIESEN Index -- vorher wurde positionsbasiert `out[4]` gelesen, das
+    /// ist aber der `ownership`-Head (opp_points liegt real auf Index 5).
+    opp_head_index: Option<usize>,
 }
 
 impl Net {
     /// Task #28: `true`, wenn dieses geladene Netz den optionalen
-    /// `opp_points`-Output hat (siehe `has_opp_head`-Feld-Doku).
+    /// `opp_points`-Output hat (siehe `opp_head_index`-Feld-Doku).
     pub fn has_opp_head(&self) -> bool {
-        self.has_opp_head
+        self.opp_head_index.is_some()
     }
     /// Deklariertes Input-Layout dieses geladenen Netzes (Task #11 Phase 2,
     /// M3.5: Engine-Verdrahtung) -- Aufrufer nutzen dies, um pro Netz die
@@ -198,7 +199,7 @@ impl Net {
         // lesbar (`into_optimized()` kann Outlet-Reihenfolge/-Labels
         // veraendern) -- analog zu `detect_layout`, das aus demselben Grund
         // ebenfalls vor jedem `apply_input_facts`/`into_optimized` laeuft.
-        let has_opp_head = detect_opp_head(&base)?;
+        let opp_head_index = detect_opp_head(&base)?;
         let model = layout
             .apply_input_facts(base.clone(), 1)?
             .into_optimized()?
@@ -224,7 +225,7 @@ impl Net {
         // wird danach nicht mehr gebraucht).
         let plan = layout.apply_input_facts(base, EVAL_BATCH_MAX_N)?.into_optimized()?.into_runnable()?;
         model_batch.insert(EVAL_BATCH_MAX_N, plan);
-        Ok(Net { model, model_pair, model_batch, input_size: layout.flat_len(), layout, has_opp_head })
+        Ok(Net { model, model_pair, model_batch, input_size: layout.flat_len(), layout, opp_head_index })
     }
 
     /// Baut die ONNX-Eingabe-Tensor(en) für `samples.len()` Positionen --
@@ -406,10 +407,11 @@ impl Net {
                 let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
                 let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
                 let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-                let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
-                    out[4].to_array_view::<f32>()?.iter().copied().collect()
-                } else {
-                    Vec::new()
+                let opp_points: Vec<f32> = match self.opp_head_index {
+                    Some(idx) if out.len() > idx => {
+                        out[idx].to_array_view::<f32>()?.iter().copied().collect()
+                    }
+                    _ => Vec::new(),
                 };
                 Ok((policy, value, moon, points, opp_points))
             },
@@ -437,10 +439,11 @@ impl Net {
                 let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
                 let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
                 let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-                let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
-                    out[4].to_array_view::<f32>()?.iter().copied().collect()
-                } else {
-                    Vec::new()
+                let opp_points: Vec<f32> = match self.opp_head_index {
+                    Some(idx) if out.len() > idx => {
+                        out[idx].to_array_view::<f32>()?.iter().copied().collect()
+                    }
+                    _ => Vec::new(),
                 };
                 let (policy_a, policy_b) = split_batch2(policy);
                 let (value_a, value_b) = split_batch2(value);
@@ -483,10 +486,11 @@ impl Net {
                 let value: Vec<f32> = out[1].to_array_view::<f32>()?.iter().copied().collect();
                 let moon: Vec<f32> = out[2].to_array_view::<f32>()?.iter().copied().collect();
                 let points: Vec<f32> = out[3].to_array_view::<f32>()?.iter().copied().collect();
-                let opp_points: Vec<f32> = if self.has_opp_head && out.len() > 4 {
-                    out[4].to_array_view::<f32>()?.iter().copied().collect()
-                } else {
-                    Vec::new()
+                let opp_points: Vec<f32> = match self.opp_head_index {
+                    Some(idx) if out.len() > idx => {
+                        out[idx].to_array_view::<f32>()?.iter().copied().collect()
+                    }
+                    _ => Vec::new(),
                 };
                 let policy_rows = split_batch_n(policy, n);
                 let value_rows = split_batch_n(value, n);
@@ -604,8 +608,14 @@ fn detect_layout(model: &RawModel) -> TractResult<InputLayout> {
 /// (Python-Export folgt erst nach diesem Engine-Auftrag, siehe PREREG
 /// Abschnitt "Ausfuehrungsplan" Punkt 1 vs. 2) -- gleiches Trennungsmuster
 /// wie `combine_layouts`/`detect_layout` oben (siehe `tests::combine_layouts_*`).
-fn output_names_have_opp_head(names: &[Option<&str>]) -> bool {
-    names.iter().any(|n| *n == Some("opp_points"))
+/// AUDIT-F1 2026-08-05: liefert den INDEX von `opp_points` statt nur
+/// ja/nein. Die Extraktion las vorher positionsbasiert `out[4]` -- das ist
+/// laut Export-Vertrag (export_onnx.py) aber der 72-dim `ownership`-Head;
+/// `opp_points` haengt HINTER ownership (und ggf. points_dist/
+/// value_wdl_logits), bei realen opp-Modellen also Index 5. Der Blend las
+/// damit den rohen ownership-Logit von Feld (0,0) als "Gegner-Punkte".
+fn output_opp_head_index(names: &[Option<&str>]) -> Option<usize> {
+    names.iter().position(|n| *n == Some("opp_points"))
 }
 
 /// Liest die ONNX-Output-Namen aus dem ROHEN (noch nicht optimierten) Graph
@@ -614,10 +624,10 @@ fn output_names_have_opp_head(names: &[Option<&str>]) -> bool {
 /// `build_from_layout`) -- Optimierung kann Outlet-Reihenfolge/-Labels
 /// veraendern, die ONNX-Deklaration selbst ist dagegen immer robust lesbar
 /// (analog `detect_layout`s Input-seitiges Pendant).
-fn detect_opp_head(model: &RawModel) -> TractResult<bool> {
+fn detect_opp_head(model: &RawModel) -> TractResult<Option<usize>> {
     let outlets = model.output_outlets()?;
     let names: Vec<Option<&str>> = outlets.iter().map(|&o| model.outlet_label(o)).collect();
-    Ok(output_names_have_opp_head(&names))
+    Ok(output_opp_head_index(&names))
 }
 
 /// Teilt einen zeilenweise (Batch zuerst) flach ausgelesenen Batch=2-Output
@@ -874,39 +884,55 @@ mod tests {
     // `combine_layouts_*` oben).
 
     #[test]
-    fn output_names_have_opp_head_detects_trailing_name() {
-        // Vertrag: opp_points HINTER allen bestehenden Outputs (policy, value,
-        // moon, points).
-        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points"), Some("opp_points")];
-        assert!(output_names_have_opp_head(&names));
+    fn output_opp_head_index_real_export_order_is_five() {
+        // REALER Export-Vertrag (export_onnx.py, gegen echtes ONNX
+        // verifiziert 2026-08-05): opp_points haengt HINTER ownership.
+        // AUDIT-F1: der Vorgaenger-Test liess `ownership` aus der Liste weg
+        // und dokumentierte damit genau den Vertrag, den der Export nie
+        // erfuellt hat -- die Extraktion las out[4] = ownership (72 Logits)
+        // als Gegner-Punkte.
+        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points"),
+                         Some("ownership"), Some("opp_points")];
+        assert_eq!(output_opp_head_index(&names), Some(5));
     }
 
     #[test]
-    fn output_names_have_opp_head_absent_on_legacy_four_output_model() {
-        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points")];
-        assert!(!output_names_have_opp_head(&names));
+    fn output_opp_head_index_with_points_dist_and_wdl_is_last() {
+        // Vollausbau (points_dist + value_wdl_logits aktiv): opp_points
+        // bleibt laut Export-Doku IMMER der zuletzt angehaengte Output.
+        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points"),
+                         Some("ownership"), Some("points_dist"), Some("value_wdl_logits"),
+                         Some("opp_points")];
+        assert_eq!(output_opp_head_index(&names), Some(7));
     }
 
     #[test]
-    fn output_names_have_opp_head_ignores_unnamed_or_unlabeled_outlets() {
+    fn output_opp_head_index_absent_on_legacy_model() {
+        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points"),
+                         Some("ownership")];
+        assert_eq!(output_opp_head_index(&names), None);
+    }
+
+    #[test]
+    fn output_opp_head_index_ignores_unnamed_or_unlabeled_outlets() {
         // tract liefert `None`, wenn ein Outlet kein explizites Label hat --
         // darf die Suche nicht crashen lassen, nur "nicht gefunden" liefern.
         let names = vec![None, Some("value"), None, Some("points")];
-        assert!(!output_names_have_opp_head(&names));
+        assert_eq!(output_opp_head_index(&names), None);
     }
 
     #[test]
-    fn output_names_have_opp_head_is_position_independent() {
-        // Namens- statt Positions-basiert (Doku-Anspruch): auch wenn
-        // `opp_points` (hypothetisch) nicht an letzter Stelle stünde, muss die
-        // Erkennung greifen.
+    fn output_opp_head_index_is_position_independent() {
+        // Namens- statt Positions-basiert: auch wenn `opp_points`
+        // (hypothetisch) nicht an letzter Stelle stuende, muss der korrekte
+        // Index geliefert werden.
         let names = vec![Some("policy"), Some("opp_points"), Some("value")];
-        assert!(output_names_have_opp_head(&names));
+        assert_eq!(output_opp_head_index(&names), Some(1));
     }
 
     #[test]
-    fn output_names_have_opp_head_empty_list_is_false() {
-        assert!(!output_names_have_opp_head(&[]));
+    fn output_opp_head_index_empty_list_is_none() {
+        assert_eq!(output_opp_head_index(&[]), None);
     }
 
     // ── Task #28: `split_batch_n_or_empty_rows` (reine Puffer-Arithmetik) ──
