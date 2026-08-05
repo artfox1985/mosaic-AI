@@ -28,23 +28,12 @@
   </div>
 </div>
 
-<!-- Task #28 (PREREG_task28_aggression.md): KI-Aggressivitäts-Regler.
-     Nur sichtbar waehrend eines laufenden KI-Spiels (siehe updateAggressionUI()
-     in app.js, gleiches Sichtbarkeits-Muster wie #teacher-hint-btn). Engine-
-     weiter Laufzeit-Parameter (POST /api/aggression), NICHT an eine Partie
-     gebunden -- wirkt sofort auf den naechsten KI-Zug. -->
-<div id="aggression-ctrl" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;
-     margin-bottom:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);
-     border-radius:var(--r);box-shadow:var(--shadow);font-size:10px;color:var(--text2)">
-  <span style="font-weight:600;color:var(--text);white-space:nowrap">⚔️ KI-Aggressivität</span>
-  <input type="range" id="aggression-slider" min="0" max="4" step="1" value="0"
-         oninput="onAggressionSliderChange()" style="width:110px;vertical-align:middle"
-         title="Aus / 0,5 / 1,0 / 1,5 / 2,0 — höher = drängt Gegnerpunkte stärker zurück">
-  <span id="aggression-value-label" style="min-width:28px;display:inline-block;font-weight:600;color:var(--text)">Aus</span>
-  <span id="aggression-hint" style="color:var(--text3)">
-    Verhindert aktiv Gegnerpunkte, solange es den eigenen Sieg nicht gefährdet.
-  </span>
-</div>
+<!-- Task #28: der KI-Aggressivitäts-Regler wurde am 2026-08-05 wieder
+     entfernt (Nutzer-Entscheid nach Engine-Audit F1: alle Blend-Messungen
+     waren ungueltig, der Blend bleibt engine-weit auf 0/inaktiv bis zur
+     Neukartierung im v20-Zyklus). Der Laufzeit-Knopf in der Engine
+     (set_aggression_params / MOSAIC_POINTS_UTILITY_W) existiert weiter,
+     Default 0 = wirkungslos. -->
 
 <div class="layout">
   <div class="players">

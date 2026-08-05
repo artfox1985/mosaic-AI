@@ -220,9 +220,6 @@ async function startNewGame() {
   // wurde (automatisches Zug-Feedback nach jedem Zug) -- die Partie ist dann
   // von Anfang an ungewertet, kein Warten auf einen Tipp-Klick noetig.
   RATING_INFO = {p0: d.profile_p0 || null, p1: d.profile_p1 || null, ai: d.ai_rating || null, unrated: !!d.hints_used};
-  // Task #28: Hinweis-Text neben dem Aggressivitäts-Regler an das gerade
-  // geladene KI-Modell koppeln (server.py::new_game liefert `ai_model`).
-  _aggressionUpdateModelHint(d.ai_model);
   if (d.teacher_level !== undefined) TEACHER_LEVEL = d.teacher_level;
   if (d.teacher_sims !== undefined) TEACHER_SIMS = d.teacher_sims;
   if (d.seed !== undefined) {
@@ -286,113 +283,12 @@ async function triggerAIMove() {
   }
 }
 
-// -- AGGRESSIVITAETS-REGLER (Task #28, PREREG_task28_aggression.md) ------------
-// Slider-Stufen (Index -> lambda_aggr), fest verdrahtet auf den einzigen
-// STATUS.md-validierten Betriebspunkt w=0.1 (Abschnitt "Task #28
-// DURCHGEFUEHRT": w=0.1 allein ist gefahrlos, lambda_aggr bis 2.0 im Sweep
-// geprüft, kein Guardrail gerissen). Stufe 0 ("Aus") setzt BEIDE Parameter
-// auf 0.0 -- byte-identisches Bestandsverhalten, nicht nur lambda_aggr=0 bei
-// laufendem w=0.1.
-const AGGRESSION_LEVELS = [0.0, 0.5, 1.0, 1.5, 2.0];
-const AGGRESSION_W = 0.1;   // fester, gemessener sicherer Betriebspunkt (s.o.)
-let AGGRESSION_AVAILABLE = false;  // erst true nach erfolgreichem GET (Wheel hat die Bindung)
-let CURRENT_AI_MODEL = null;       // zuletzt vom Server gemeldetes KI-Modell (fürs Hinweis-Text-Update)
-
-function _aggressionLevelLabel(idx) {
-  return idx === 0 ? 'Aus' : AGGRESSION_LEVELS[idx].toFixed(1).replace('.', ',');
-}
-
-function _aggressionUpdateLabel(idx) {
-  const lbl = document.getElementById('aggression-value-label');
-  if (lbl) lbl.textContent = _aggressionLevelLabel(idx);
-}
-
-// Setzt Slider-Position passend zu einem vom Server gelesenen (w, lambda_aggr)
-// -- nur lambda_aggr bestimmt die Stufe (die GUI bietet nur den einen
-// Betriebspunkt w=0.1 an; ein extern per MOSAIC_POINTS_UTILITY_W anders
-// gesetztes w wird hier nur naeherungsweise auf eine Stufe abgebildet, reiner
-// Anzeige-Kompromiss -- der naechste Regler-Schub ueberschreibt ohnehin beide
-// Werte exakt).
-function _aggressionSyncSliderFrom(w, lambdaAggr) {
-  const slider = document.getElementById('aggression-slider');
-  if (!slider) return;
-  let idx = 0;
-  if (w > 0) {
-    let best = 0, bestDiff = Infinity;
-    AGGRESSION_LEVELS.forEach((lv, i) => {
-      const diff = Math.abs(lv - lambdaAggr);
-      if (diff < bestDiff) { bestDiff = diff; best = i; }
-    });
-    idx = best;
-  }
-  slider.value = idx;
-  _aggressionUpdateLabel(idx);
-}
-
-// Hinweis-Text an das aktuell geladene KI-Modell koppeln (Task-#28-Vorgabe:
-// "verknüpfe den Hinweis damit, falls der Server anzeigt, welches Modell
-// geladen ist"). Reine Namens-Heuristik (kein eigener Rust-/Server-Vertrag
-// für "hat opp_points-Kopf" -- der amtierende Champion v19_2d_best hat noch
-// keinen, der Träger-Checkpoint heißt "..._opp_..."), siehe
-// PREREG_task28_aggression.md / STATUS.md Task #28.
-function _aggressionUpdateModelHint(modelName) {
-  CURRENT_AI_MODEL = modelName || null;
-  const hint = document.getElementById('aggression-hint');
-  if (!hint) return;
-  const name = CURRENT_AI_MODEL || '';
-  if (/opp/i.test(name)) {
-    hint.textContent =
-      `Verhindert aktiv Gegnerpunkte, solange es den eigenen Sieg nicht gefährdet. ` +
-      `Aktives Modell „${name}“ hat den nötigen opp_points-Kopf — der Regler wirkt.`;
-  } else if (name && name !== 'heuristic') {
-    hint.textContent =
-      `Verhindert aktiv Gegnerpunkte, solange es den eigenen Sieg nicht gefährdet. ` +
-      `Wirkt nur mit einem Modell mit „opp_points“-Kopf (z. B. alphazero_v19_2d_opp_best) — ` +
-      `das aktive Modell „${name}“ hat diesen Kopf noch nicht, die KI spielt auf jeder Stufe unverändert.`;
-  } else {
-    hint.textContent =
-      `Verhindert aktiv Gegnerpunkte, solange es den eigenen Sieg nicht gefährdet. ` +
-      `Wirkt nur mit einem KI-Modell mit „opp_points“-Kopf (z. B. alphazero_v19_2d_opp_best); ` +
-      `die Heuristik-KI und der amtierende Champion haben diesen Kopf noch nicht.`;
-  }
-}
-
-// Beim Seitenladen: liest den aktuellen Serverzustand (falls die Bindung im
-// installierten Wheel schon existiert, siehe server.py::get_aggression) und
-// synchronisiert den Slider. Bei 503 (altes Wheel) bleibt der Regler
-// dauerhaft ausgeblendet (updateAggressionUI() prüft AGGRESSION_AVAILABLE).
-async function initAggressionControl() {
-  try {
-    const d = await api('/aggression');
-    AGGRESSION_AVAILABLE = !!d.ok;
-    if (d.ok) _aggressionSyncSliderFrom(d.w, d.lambda_aggr);
-  } catch (e) {
-    AGGRESSION_AVAILABLE = false;
-  }
-  updateAggressionUI();
-}
-
-async function onAggressionSliderChange() {
-  if (!AGGRESSION_AVAILABLE) return;
-  const slider = document.getElementById('aggression-slider');
-  const idx = parseInt(slider.value, 10) || 0;
-  _aggressionUpdateLabel(idx);
-  const w = idx === 0 ? 0.0 : AGGRESSION_W;
-  const lambdaAggr = idx === 0 ? 0.0 : AGGRESSION_LEVELS[idx];
-  const d = await api('/aggression', {w: w, lambda_aggr: lambdaAggr});
-  if (!d.ok) {
-    showError(d.error || 'Aggressivität konnte nicht gesetzt werden.');
-  }
-}
-
-// Sichtbarkeit: nur waehrend eines laufenden KI-Spiels UND wenn die
-// Server-Bindung existiert -- gleiches An/Aus-Muster wie updateTeacherUI()
-// (von render() aufgerufen).
-function updateAggressionUI() {
-  const ctrl = document.getElementById('aggression-ctrl');
-  if (!ctrl) return;
-  ctrl.style.display = (AI_ENABLED && AGGRESSION_AVAILABLE) ? 'flex' : 'none';
-}
+// -- AGGRESSIVITAETS-REGLER (Task #28): ENTFERNT 2026-08-05 --------------------
+// Nutzer-Entscheid nach Engine-Audit F1 (opp_points las den ownership-Head):
+// alle Blend-Messungen waren ungueltig, der Blend bleibt engine-weit auf
+// 0/inaktiv (Env-Defaults), bis er im v20-Zyklus mit korrektem Signal neu
+// kartiert ist. Der Engine-Knopf (set_aggression_params, POST /api/aggression)
+// existiert weiter -- er wird nur von nichts mehr aufgerufen.
 
 // -- LEHRER-MODUS (Task #97) ---------------------------------------------------
 
@@ -2685,7 +2581,6 @@ function render() {
   renderBoard(1);
   renderCenter();
   updateTeacherUI();
-  updateAggressionUI();
 
   // Platzierungs-Modus: gewählte Karte (Display oder Stapel) wartet auf Slot-Klick.
   if(pendingStackPlacement) {
@@ -2767,8 +2662,6 @@ makeDraggable('scoring-overlay');
 
 // Task #28: Aggressivitäts-Regler-Zustand laden (unabhängig vom Spielzustand,
 // engine-weiter Parameter) -- auch bei fehlendem/altem Wheel ungefährlich
-// (initAggressionControl() faengt den 503-Fall ab).
-initAggressionControl();
 
 // Beim Laden: State synchronisieren und lokales Gedächtnis wiederherstellen
 (async () => {
@@ -2788,7 +2681,6 @@ initAggressionControl();
     if (aiData.ok && aiData.ai_enabled) {
       AI_ENABLED = true;
       AI_PLAYER = aiData.ai_player;
-      _aggressionUpdateModelHint(aiData.model);
     } else {
       AI_ENABLED = false;
     }
