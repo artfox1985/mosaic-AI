@@ -20,7 +20,7 @@ Sequenzialisierung verloren).
 |---|---|---|---|---|
 | **#34** | Sieg/Niederlage-Ziel + Kreuzentropie (WDL) wiederherstellen | **laeuft** (Implementierung) | — | unten |
 | **#35** | Q je Wurzelkind loggen (Ranking-Loss-Vorlauf) | **laeuft** (Engine) | — (ZEITKRITISCH: vor v20-Self-Play) | unten |
-| **#30** | Value-Skalen-Korrektur (Platt) | Bestaetigungslauf laeuft | Neubewertung nach #34 | history + unten |
+| #30 | Value-Skalen-Korrektur (Platt) | **geschlossen**: Effekt repliziert NICHT (p=0,90) | — | unten |
 | #33 | Value-/Policy-Loss-Gewicht | wartet | in #34 integriert (Loss-Skala springt ~22x) | unten |
 | #35b | Ranking-Loss-Training | wartet | #35-Logging + v20-Self-Play | unten |
 | #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Nutzer) | Champion, der gute Spieler fordert | unten |
@@ -64,6 +64,34 @@ Sequenzialisierung verloren).
 - **Kein validierter Offline-Praediktor fuer die Value-Seite** (#29
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
   braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
+
+## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
+
+Bestaetigungslauf mit FRISCHEN Seeds (90260805, sonst identisches Design:
+Netz vs. Heuristik, 2x200, gepaart je Spielindex):
+
+| | OFF | ON | diskordant b/c | McNemar p |
+|---|---|---|---|---|
+| Erstlauf (2026-08-04) | 68,0% | 74,0% | 43 / 31 | 0,20 |
+| **Bestaetigung** | **76,0%** | **77,0%** | **31 / 29** | **0,90** |
+| gepoolt (nur deskriptiv) | 72,0% | 75,5% | 74 / 60 | 0,26 |
+
+**VERDIKT: kein Effekt.** Die +6pp des Erstlaufs replizieren nicht.
+Die Gumbel-sigma-Linearitaets-These (Report-Idee 7.3) ist damit ueber
+diesen Weg NICHT gestuetzt. Der Laufzeit-Knopf `MOSAIC_VALUE_CAL_A/B`
+bleibt im Code (Default 0/1 = inert, bitgleich) -- falls nach #34 noch
+eine Restfehlkalibrierung messbar ist, ist er sofort einsetzbar.
+
+**WICHTIGER METHODEN-BEFUND, ueber #30 hinaus**: die OFF-Referenz sprang
+zwischen den Seed-Saetzen von **68,0% auf 76,0%** -- identisches Modell,
+identische Einstellungen, nur andere Seeds. Ein 8-Prozentpunkte-Schwung
+allein in der Referenz. Ein 6-Punkte-Unterschied zwischen Armen liegt
+damit im Rauschen dieses Aufbaus. **Konsequenz fuer alle kuenftigen
+Netz-vs-Heuristik-Messungen**: Effekte unter ~8pp brauchen entweder
+deutlich mehr Spiele oder mehrere Seed-Saetze; die gepaarte Struktur
+faengt die Streuung NICHT vollstaendig ab (sie paart Spielindizes, nicht
+Seed-Saetze). Zusammen mit der Block-Korrelations-Lektion (2026-08-04)
+das zweite Mal, dass unsere Arena-Statistik zu optimistisch war.
 
 ## NACH #34 NEU ZU BEWERTEN (Nutzer-Anmerkungen 2026-08-05)
 
