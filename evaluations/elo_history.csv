@@ -32,3 +32,4 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-08-03,l07v18_s6_best,400,l10v18_s3_best,400,227,173,400,"Lambda-v18only-Arena (PREREG_lambda_v18only, keine Promotion): SPRT=l07v18 bei 200 Paaren, p=0.0101 -- lambda=0.7 wird v20-Standard-Kandidat"
 2026-08-03,v19_2d_opp_best,400,v19_2d_best,400,209,191,400,"Task #28 Gate 2 (Nichtunterlegenheit, w=0, keine Promotion): UNDECIDED_CAP_REACHED, p=0.4215 -- Gate bestanden"
 2026-08-04,v19_2d_opp_w01_la20,400,v19_2d_best,400,205,195,400,"Champion-Kandidaten-Gating v19_2d_opp@w=0.1/lambda=2.0, block-size 5, keine Promotion: UNDECIDED_CAP_REACHED, p=0.6817"
+2026-08-05,v19_2d_opp_l07,400,v19_2d_best,400,33,47,80,"lambda=0.7+opp auf 900er-Korpus (43.8% Mix), w=0.1/la=2.0: SPRT-H0 nach 40 Paaren, p=0.1671"
