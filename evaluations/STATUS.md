@@ -485,8 +485,11 @@ Chip-Top-down-Sperre nicht auf Apply-Ebene (nur Solver/UI-seitig
 durchgesetzt; regulaeres Spiel nicht betroffen, direkter API-Aufruf
 koennte sie umgehen). Als kleiner Defensiv-Task offen.
 
-Nebenbefunde: Gratis-Stapelziehung bei 0 Punkten ist DOKUMENTIERTE
-Hausregel (82e8a88 R6); Tie-Break-Verdachtsfall aufgeloest (Marker wird
+Nebenbefunde: Gratis-Stapelziehung bei 0 Punkten ist KEINE Hausregel,
+sondern die Auslegung einer REGELLUECKE (Nutzer-Klarstellung 2026-08-06:
+das Original spezifiziert den 0-Punkte-Fall schlicht nicht; die
+Engine-Loesung folgt konsistent aus "nie unter 0", dokumentiert
+82e8a88 R6); Tie-Break-Verdachtsfall aufgeloest (Marker wird
 strukturell in jeder Runde genommen, `factory.rs:214` +
 `check_drafting_complete` -- Manual, Original und Code deckungsgleich).
 
