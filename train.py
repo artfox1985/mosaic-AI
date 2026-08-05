@@ -335,8 +335,35 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
         print(f"   {c['files']:>4} Dateien {c['prefix']:<28} ({games_s})")
 
 
+def _destretch_wdl_target(targets_v_wdl, wdl_outcome, a, b):
+    """Erosions-Arm B (`--wdl-bootstrap-destretch`): entstaucht den
+    Bootstrap-Anteil des `values_wdl`-Ziels OHNE Cache-Neubau.
+
+    Hintergrund (Audit Befund 1): `bootstrap_value` stammt aus Suchen der
+    Generator-Netze (tanh-Kopf) -- eine per `(v+1)/2` als Wahrscheinlichkeit
+    etikettierte, gestauchte Punkte-Marge (gemessener Platt-Fit des
+    Champions: B~1,93). Der Cache speichert nur das fertige Blend
+    `t = TD_LAMBDA*bv + (1-TD_LAMBDA)*y`, aber `y` (`wdl_outcome`) liegt roh
+    daneben -- `bv` ist daher algebraisch exakt rekonstruierbar
+    (`bv = (t - (1-TD_LAMBDA)*y) / TD_LAMBDA`; der [0,1]-Clamp beim Cache-Bau
+    kann nie gebunden haben, ein Konvex-Blend zweier [0,1]-Werte bleibt in
+    [0,1]). Dann Platt-Streckung `sigmoid(a + b*logit(bv))` und Neu-Blend.
+    Wo `y == -1` (kein echter Ausgang) bleibt das Ziel unveraendert.
+    Grenzfall bv==y (Record ohne bootstrap_value): logit sattigt, sigmoid
+    reproduziert ~y, Ziel bleibt effektiv unveraendert -- korrekt."""
+    valid = wdl_outcome >= 0.0
+    y = wdl_outcome.clamp(min=0.0)
+    bv = ((targets_v_wdl - (1.0 - TD_LAMBDA) * y) / TD_LAMBDA).clamp(1e-6, 1.0 - 1e-6)
+    logit_bv = torch.log(bv / (1.0 - bv))
+    bv_corr = torch.sigmoid(a + b * logit_bv)
+    t_corr = TD_LAMBDA * bv_corr + (1.0 - TD_LAMBDA) * y
+    return torch.where(valid, t_corr, targets_v_wdl)
+
+
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           select_by_brier=False, wdl_hard_only=False,
+          wdl_label_smooth=0.0, wdl_bootstrap_destretch=False,
+          destretch_a=0.0051, destretch_b=1.9269,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
@@ -862,8 +889,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 if wdl_hard_only:
                     v_wdl_target = s_wdl_outcome.view(-1)
                     wdl_mask = (v_wdl_target >= 0.0).float()
+                    # Erosions-Arm A (`--wdl-label-smooth`): weiche Labels
+                    # 1-eps/2 bzw. eps/2 statt 1/0 -- testet die
+                    # Memorisierungs-Hypothese (Trainings-Loss 0,60->0,39 bei
+                    # steigendem Val-Brier). Brier unten bleibt gegen den
+                    # ROHEN Ausgang gerechnet, unveraendert vergleichbar.
+                    hard_t = v_wdl_target.clamp(min=0.0)
+                    if wdl_label_smooth > 0.0:
+                        hard_t = hard_t * (1.0 - wdl_label_smooth) + 0.5 * wdl_label_smooth
                     v_bce = F.binary_cross_entropy_with_logits(
-                        logit_diff, v_wdl_target.clamp(min=0.0), reduction="none") * wdl_mask
+                        logit_diff, hard_t, reduction="none") * wdl_mask
                     if rw is None:
                         v_loss = v_bce.sum() / wdl_mask.sum().clamp(min=1.0)
                     else:
@@ -874,6 +909,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                                   / (wdl_mask.view(-1, 1) * rw2).sum().clamp(min=1e-6))
                 else:
                     v_wdl_target = targets_v_wdl.view(-1)
+                    if wdl_bootstrap_destretch:
+                        v_wdl_target = _destretch_wdl_target(
+                            v_wdl_target, s_wdl_outcome.view(-1),
+                            destretch_a, destretch_b)
                     if rw is None:
                         v_loss = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target)
                     else:
@@ -1031,6 +1070,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                         # Ziel auf dem rohen Ausgang (Maskierung wie im
                         # Trainingsblock; der Brier unten bleibt unveraendert,
                         # er nutzt ohnehin schon `wdl_outcome`).
+                        if wdl_bootstrap_destretch:
+                            # Erosions-Arm B: Val-Ziel identisch zum
+                            # Trainingsziel transformieren (sonst misst der
+                            # Val-Loss ein anderes Ziel als trainiert wird).
+                            v_wdl_target = _destretch_wdl_target(
+                                v_wdl_target, v_wdl_outcome.view(-1),
+                                destretch_a, destretch_b)
                         if wdl_hard_only:
                             v_raw = v_wdl_outcome.view(-1)
                             v_mask = (v_raw >= 0.0).float()
@@ -1040,8 +1086,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                             # `--exclude-round5` andere Samples als der Loss.
                             if v_rw is not None:
                                 v_mask = v_mask * v_rw.view(-1)
+                            v_hard_t = v_raw.clamp(min=0.0)
+                            if wdl_label_smooth > 0.0:
+                                v_hard_t = v_hard_t * (1.0 - wdl_label_smooth) + 0.5 * wdl_label_smooth
                             v_bce_h = F.binary_cross_entropy_with_logits(
-                                v_logit_diff, v_raw.clamp(min=0.0), reduction="none") * v_mask
+                                v_logit_diff, v_hard_t, reduction="none") * v_mask
                             v_v_loss = v_bce_h.sum() / v_mask.sum().clamp(min=1e-6)
                         elif v_rw is None:
                             v_v_loss = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target)
@@ -1630,6 +1679,20 @@ if __name__ == "__main__":
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
     parser.add_argument("--select-by-brier", action="store_true",
                         help="Checkpoint-Auswahl: Brier statt roher Value-Loss im kombinierten Mass (Task #34 -- noetig bei --value-head wdl, sonst waehlt die Auswahl einen praktisch untrainierten frischen Kopf). Default AUS = byte-identisch.")
+    parser.add_argument("--wdl-label-smooth", type=float, default=0.0,
+                        help="Erosions-Arm A: Label-Smoothing eps auf dem harten WDL-Ziel "
+                             "(1 -> 1-eps/2, 0 -> eps/2) -- testet die Memorisierungs-Hypothese. "
+                             "Nur zusammen mit --wdl-hard-only. Default 0 = byte-identisch.")
+    parser.add_argument("--wdl-bootstrap-destretch", action="store_true",
+                        help="Erosions-Arm B: entstaucht den Bootstrap-Anteil des values_wdl-Blends "
+                             "per Platt-Streckung (Champion-Fit A/B, siehe --destretch-a/-b) -- "
+                             "macht den Stabilisator sauber, ohne Cache-Neubau (bv wird aus "
+                             "values_wdl + wdl_outcome rekonstruiert). Nicht mit --wdl-hard-only "
+                             "kombinieren. Default AUS = byte-identisch.")
+    parser.add_argument("--destretch-a", type=float, default=0.0051,
+                        help="Platt-A fuer --wdl-bootstrap-destretch (Default: v19_2d_best-Fit, value_calibration_fit.json 'full').")
+    parser.add_argument("--destretch-b", type=float, default=1.9269,
+                        help="Platt-B fuer --wdl-bootstrap-destretch (Default: v19_2d_best-Fit).")
     parser.add_argument("--wdl-hard-only", action="store_true",
                         help="Task #34 Audit: WDL-Ziel = ROHER Ausgang (`wdl_outcome`) statt TD-geblendetes "
                              "`values_wdl` -- der Blend-Anteil (bootstrap_value) stammt aus Alt-Netz-Suchen "
@@ -1768,6 +1831,9 @@ if __name__ == "__main__":
           version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
           select_by_brier=args.select_by_brier, wdl_hard_only=args.wdl_hard_only,
+          wdl_label_smooth=args.wdl_label_smooth,
+          wdl_bootstrap_destretch=args.wdl_bootstrap_destretch,
+          destretch_a=args.destretch_a, destretch_b=args.destretch_b,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
