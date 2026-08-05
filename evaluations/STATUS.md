@@ -529,6 +529,27 @@ NICHT automatisch wieder offen, aber mit konkretem Anlass:
    Relevanz: `resolve_tiling_step` laeuft im SELF-PLAY -- die v20-Kampagne
    wuerde sonst mit unvermessenem, semantisch verschobenem
    Tiling-Verhalten generieren.
+
+   **WIEDERHOLUNGSMESSUNG DURCHGEFUEHRT (2026-08-05, Original-Referenz
+   v17_best@2000 aus Nutzer-Backup)** -- mit INSTRUMENT-FIX: Referenz-
+   Gleichstaende (m=0; in R4 37% aller Paare, weil die Referenz dort der
+   EXAKTE Alpha-Beta-Wert ist) zaehlten bisher als Fehlgriff und
+   drueckten die Quote kuenstlich -- auch die Juli-"Muenze" (48,3%) war
+   grossteils dieses Artefakt. Bereinigt, identische Zustaende/Paare:
+
+   | R4 (267 Paare + 157 Ties) | Quote | p |
+   |---|---|---|
+   | t34_wdldestretch_brierbest | **74,5%** | 4e-16 |
+   | t34_tanh (Kontrolle) | 68,2% | 3e-9 |
+
+   **Gepaart: 19:2 diskordant fuer WDL, McNemar p=0,0002** -- der
+   reparierte Kopf rangiert R4-Tilings signifikant besser; ERSTER
+   Befund, in dem das neue Ziel einen funktionalen Vorteil jenseits der
+   Kalibrierung zeigt. R2: 81,5% (Juli 71,2%). OFFEN: R3 fiel beim
+   WDL-Kandidaten auf 50,0% (0 Ties, also echt; Juli mit v18-flach:
+   82,1%) -- tanh-Kontrolle fuer R2/R3 laeuft, um Kopf- von
+   Zustands-Effekt zu trennen. Danach Entscheid ueber Fenster und
+   Kriterium (`punkte * P(Sieg)` vs reines P(Sieg)-Ranking).
 5. **#12 Distributionaler Punkte-Kopf**: bleibender Befund war "mehr
    Punkte in beiden Arena-Bloecken, ohne Siege daraus zu machen". Nach #34
    sind Value- und Punkte-Kopf erstmals WIRKLICH verschiedene Groessen
