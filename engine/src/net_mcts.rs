@@ -183,6 +183,41 @@ fn read_f64_env(name: &str, default: f64) -> f64 {
     }
 }
 
+thread_local! {
+    /// Test-Override fuer [`root_child_q_logging_enabled`] -- thread-lokal,
+    /// gleiches Muster wie `tiling_solver::STATS_OVERRIDE`/`CACHE_OVERRIDE`:
+    /// verhindert, dass ein Test die Prozess-weite `OnceLock`-gecachte
+    /// Env-Var fuer ALLE parallel laufenden `cargo test`-Threads festlegt
+    /// (`std::env::set_var` + `OnceLock::get_or_init` racet sonst gegen
+    /// andere Test-Threads, die den Wert evtl. schon gelesen/gecacht haben).
+    static ROOT_CHILD_Q_OVERRIDE: std::cell::Cell<Option<bool>> = std::cell::Cell::new(None);
+}
+
+/// `MOSAIC_ROOT_CHILD_Q=0` schaltet das Task-#35-Wurzelkind-Q-Logging ab
+/// (Default AN, siehe STATUS.md Task #35 "Ranking-Loss auf Geschwister-Q").
+/// Begruendung fuer den Default: `root_completed_q_raw`/`average_completed_q_raw`
+/// serialisieren nur Werte, die `completed_q_per_candidate` fuer die ohnehin
+/// bestehende `policy`-Softmax-Zielverteilung SCHON berechnet -- kein
+/// zusaetzlicher Suchaufwand (keine weiteren Sims, kein weiterer Netz-Eval),
+/// nur ein zusaetzlicher `Vec`-Clone kleiner `f64`-Listen je Drafting-
+/// Entscheid. Abgeschaltet: `self_play.rs` prueft dieses Flag VOR dem
+/// `root_child_q`-JSON-Insert (nicht hier in der Suche selbst) -- das
+/// Self-Play-JSON ist dann byte-identisch zum Vor-#35-Format.
+pub(crate) fn root_child_q_logging_enabled() -> bool {
+    ROOT_CHILD_Q_OVERRIDE.with(|c| c.get()).unwrap_or_else(root_child_q_logging_enabled_env)
+}
+
+fn root_child_q_logging_enabled_env() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    // Gleiches OnceLock-Cache-Muster wie `tiling_solver::cache_enabled_env`.
+    *ENABLED.get_or_init(|| std::env::var("MOSAIC_ROOT_CHILD_Q").map(|v| v != "0").unwrap_or(true))
+}
+
+#[cfg(test)]
+pub(crate) fn set_root_child_q_logging_override_for_test(v: Option<bool>) {
+    ROOT_CHILD_Q_OVERRIDE.with(|c| c.set(v));
+}
+
 /// Laufzeit-Utility-Blend-Gewicht `w` (Task #28). INITIAL aus
 /// `MOSAIC_POINTS_UTILITY_W` gelesen (Prozessstart-Default, gleiches Parsing
 /// wie zuvor), danach per [`set_aggression_params`] jederzeit neu setzbar
@@ -3058,6 +3093,22 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
 /// `round_transition_value`-Konvention, `neural_net.py::MosaicDataset`),
 /// `root_q` folgt exakt demselben Muster. `None` nur, wenn keine Bewertung
 /// zustande kam (kein Kandidat/leere Suche).
+///
+/// VIERTES Rückgabeelement (Task #35, Ranking-Loss-Vorlauf, siehe
+/// STATUS.md "Ranking-Loss auf Geschwister-Q"/Research-Report Idee 7.1):
+/// `(Action, completed-Q)` je Wurzelkandidat, EXAKT dieselbe Reihenfolge
+/// UND Länge wie das zweite Rückgabeelement (`completed_q_policy`) --
+/// beide werden aus demselben Baum/Wald mit derselben `children ∪ untried`-
+/// Traversierung gebaut (`root_completed_q_raw`/`root_completed_q_policy`
+/// bzw. `average_completed_q_raw`/`average_completed_q_policy`), lassen sich
+/// also 1:1 per Index zippen -- kein Aktions-Matching auf Python-Seite
+/// nötig. Perspektive/Skala IDENTISCH zu `root_q` (drittes Element):
+/// [0,1]-Gewinnwahrscheinlichkeit aus Sicht des an der WURZEL ziehenden
+/// Spielers (`state.current_player`) -- besuchte Kandidaten tragen ihr
+/// eigenes `value/visits`, unbesuchte `v_mix` (siehe
+/// `completed_q_per_candidate`), NICHT die Softmax-transformierte
+/// `policy`-Wahrscheinlichkeit. Leerer Vektor, wenn `completed_q_policy`
+/// leer ist (keine Suche / Fallback, siehe `self_play::net_drafting_policy`).
 pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -3065,9 +3116,9 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
-) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>) {
+) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>, Vec<(Action, f64)>) {
     if state.phase != Phase::Drafting {
-        return (Vec::new(), Vec::new(), None);
+        return (Vec::new(), Vec::new(), None, Vec::new());
     }
     if crate::round5::applies(state) {
         let stats: Vec<(Action, u32, f64)> =
@@ -3101,13 +3152,28 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
             })
             .and_then(|mv| mv.get("mcts_q"))
             .and_then(Value::as_f64);
-        return (stats, policy, root_q);
+        // Task #35: Runde 5 hat -- anders als der Gumbel-Baumpfad unten --
+        // KEIN echtes Geschwister-Set in `stats`/`policy` (by design nur die
+        // EINE alphabeta-optimale Aktion, siehe oben), also auch kein echtes
+        // Ranking-Loss-Paar. Trotzdem parallel befüllt (gleiches Kriterium
+        // wie `root_q`: additiv, überall vorhanden, wo auch `root_q`
+        // vorhanden ist) -- hier ein 1-elementiger Vektor mit demselben Wert
+        // wie `root_q`, statt eines fehlenden Felds. Echte Geschwisterpaare
+        // für das Training kommen ausschließlich aus Runden 1-4.
+        let root_child_q: Vec<(Action, f64)> =
+            stats.iter().map(|(a, _, _)| (a.clone(), root_q.unwrap_or(0.5))).collect();
+        return (stats, policy, root_q, root_child_q);
     }
     if NUM_DETERMINIZATIONS <= 1 {
         let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
         let root_visits = nodes[0].visits.max(1) as f64;
         let root_q = Some(nodes[0].value / root_visits);
-        return (root_child_stats_from_nodes(&nodes), root_completed_q_policy(&nodes), root_q);
+        return (
+            root_child_stats_from_nodes(&nodes),
+            root_completed_q_policy(&nodes),
+            root_q,
+            root_completed_q_raw(&nodes),
+        );
     }
     // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
     // Besuche (treibt Self-Plays besuchsbasierte Sampling-Auswahl
@@ -3122,7 +3188,12 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         (vs + nodes[0].visits as f64, vals + nodes[0].value)
     });
     let root_q = if visits_sum > 0.0 { Some(value_sum / visits_sum) } else { None };
-    (aggregate_root_child_stats(&forest), average_completed_q_policy(&forest), root_q)
+    (
+        aggregate_root_child_stats(&forest),
+        average_completed_q_policy(&forest),
+        root_q,
+        average_completed_q_raw(&forest),
+    )
 }
 
 /// Zippt `improved_policy(nodes, 0)` (reine Zahlen, Reihenfolge
@@ -3143,6 +3214,61 @@ fn root_completed_q_policy(nodes: &[Node]) -> Vec<(Action, f64)> {
         policy.push((act.clone(), improved[n_children + i]));
     }
     policy
+}
+
+/// Task #35 (Ranking-Loss-Vorlauf, siehe STATUS.md): wie
+/// [`root_completed_q_policy`], aber die ROHEN (nicht softmax-
+/// transformierten) completed-Q-Werte je Wurzelkandidat --
+/// `completed_q_per_candidate(nodes, 0)`s zweite Komponente, dieselbe
+/// Groesse, die `improved_policy` intern fuer den Gumbel-Sigma-Score
+/// verwendet (besuchtes Kind: eigenes `value/visits`; unbesucht: `v_mix`,
+/// siehe dortige Kommentare), hier nur OHNE die anschliessende Softmax.
+/// GLEICHE Traversierung/Reihenfolge wie `root_completed_q_policy`
+/// (`children` zuerst, dann `untried`, exakt `completed_q_per_candidate`s
+/// Reihenfolge) -- beide Funktionen laufen ueber denselben `nodes[0]`, die
+/// Ergebnisse lassen sich daher 1:1 per Index zippen (`self_play.rs` baut
+/// daraus das gleichnamige additive `root_child_q`-JSON-Feld, parallel zu
+/// `policy`). Bewusst NICHT durch Wiederverwendung von `improved_policy`
+/// implementiert -- die wuerde den rohen Wert VOR der Softmax gar nicht mehr
+/// preisgeben.
+fn root_completed_q_raw(nodes: &[Node]) -> Vec<(Action, f64)> {
+    let cq = completed_q_per_candidate(nodes, 0);
+    let mut out: Vec<(Action, f64)> = Vec::with_capacity(cq.len());
+    for (i, &cid) in nodes[0].children.iter().enumerate() {
+        if let Some(a) = nodes[cid].action.clone() {
+            out.push((a, cq[i].1));
+        }
+    }
+    let n_children = nodes[0].children.len();
+    for (i, (act, _prior)) in nodes[0].untried.iter().enumerate() {
+        out.push((act.clone(), cq[n_children + i].1));
+    }
+    out
+}
+
+/// Task #35: wie [`average_completed_q_policy`], aber fuer die ROHEN
+/// completed-Q-Werte (`root_completed_q_raw` je Welt statt
+/// `root_completed_q_policy`) -- arithmetisches Mittel ueber den
+/// Determinisierungs-Wald, Aktions-Schluessel wie dort. KEINE Renormierung
+/// am Ende: anders als die Softmax-Politik sind rohe Q-Werte keine
+/// Wahrscheinlichkeiten, muessen nicht zu 1 summieren.
+fn average_completed_q_raw(forest: &[Vec<Node>]) -> Vec<(Action, f64)> {
+    let per_world: Vec<Vec<(Action, f64)>> =
+        forest.iter().map(|nodes| root_completed_q_raw(nodes)).collect();
+    let Some(reference) = per_world.first() else { return Vec::new() };
+    let mut out: Vec<(Action, f64)> = Vec::with_capacity(reference.len());
+    for (act, _) in reference {
+        let mut sum = 0.0f64;
+        let mut count = 0usize;
+        for world in &per_world {
+            if let Some(&(_, q)) = world.iter().find(|(a, _)| a == act) {
+                sum += q;
+                count += 1;
+            }
+        }
+        out.push((act.clone(), if count > 0 { sum / count as f64 } else { 0.0 }));
+    }
+    out
 }
 
 /// Wie [`net_search_drafting_action`], liefert zusätzlich ein debug.html-kompatibles
@@ -3984,6 +4110,46 @@ mod tests {
         assert!((paired[2].1 - numeric[2]).abs() < 1e-12);
     }
 
+    #[test]
+    fn root_completed_q_raw_reports_own_q_for_visited_and_vmix_for_unvisited_in_policy_order() {
+        // Task #35 (Ranking-Loss-Vorlauf): gleicher Baum wie im
+        // `root_completed_q_policy`-Test oben, aber diesmal wird die ROHE
+        // completed-Q gegen die Handrechnung geprueft (nicht die Softmax-
+        // Politik) -- UND dass die Aktions-Reihenfolge exakt der von
+        // `root_completed_q_policy` entspricht (Voraussetzung dafuer, dass
+        // sich `policy`- und `root_child_q`-JSON-Felder in self_play.rs rein
+        // positionsbasiert zippen lassen).
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.4, 0.6];
+        let mut child = gumbel_test_node(0.5, 3, 1.8, 1); // Q = 1.8/3 = 0.6, besucht
+        child.action = Some(Action::Pass);
+        let mut nodes = vec![root, child];
+        nodes[0].children.push(1);
+        nodes[0].untried.push((Action::DrawStackPeek, 0.3));
+        nodes[0].untried.push((Action::ChooseDomeRotation(1), 0.2));
+
+        let raw = root_completed_q_raw(&nodes);
+        let policy = root_completed_q_policy(&nodes);
+        assert_eq!(raw.len(), 3);
+        assert_eq!(raw.len(), policy.len());
+        for i in 0..raw.len() {
+            assert_eq!(raw[i].0, policy[i].0, "Aktions-Reihenfolge muss zu root_completed_q_policy passen");
+        }
+
+        // Von Hand: besuchtes Kind traegt sein eigenes Q, unbesuchte Kandidaten
+        // TEILEN sich denselben v_mix = (v(root) + N_total*mean_visited_q)/(1+N_total)
+        // = (0.4 + 3*0.6)/4 = 0.55 (siehe `v_mix`-Kommentar).
+        let vmix_expected = (0.4 + 3.0 * 0.6) / 4.0;
+        assert_eq!(raw[0].0, Action::Pass);
+        assert!((raw[0].1 - 0.6).abs() < 1e-12, "besuchtes Kind sollte eigenes Q=0.6 tragen, war {}", raw[0].1);
+        assert_eq!(raw[1].0, Action::DrawStackPeek);
+        assert!((raw[1].1 - vmix_expected).abs() < 1e-12);
+        assert_eq!(raw[2].0, Action::ChooseDomeRotation(1));
+        assert!((raw[2].1 - vmix_expected).abs() < 1e-12);
+        // Q-Werte sind KEINE Wahrscheinlichkeiten -- keine Summe-zu-1-Erwartung
+        // (anders als `root_completed_q_policy`).
+    }
+
     // ── ISMCTS-Mehrfach-Determinisierung (Task #65) ─────────────────────────
 
     #[test]
@@ -4029,6 +4195,69 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn average_completed_q_raw_averages_raw_q_without_renormalizing_to_one() {
+        // Task #35: gleiche zwei Welten wie im
+        // `average_completed_q_policy`-Mittelungstest oben, diesmal auf der
+        // ROHEN completed-Q -- prueft (a) arithmetisches Mittel je Aktion,
+        // (b) KEINE Renormierung (Summe muss NICHT 1 sein, anders als bei der
+        // Softmax-Politik), (c) Aktions-Reihenfolge identisch zu
+        // `average_completed_q_policy` (Voraussetzung fuer positionsbasiertes
+        // Zippen von `policy`/`root_child_q` im Self-Play-JSON).
+        fn make_world(child_visits: u32, child_value: f64, root_leaf: [f64; 2]) -> Vec<Node> {
+            let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+            root.leaf_value = root_leaf;
+            let mut child = gumbel_test_node(0.5, child_visits, child_value, 1);
+            child.action = Some(Action::Pass);
+            let mut nodes = vec![root, child];
+            nodes[0].children.push(1);
+            nodes[0].untried.push((Action::DrawStackPeek, 0.3));
+            nodes[0].untried.push((Action::ChooseDomeRotation(1), 0.2));
+            nodes
+        }
+
+        let world1 = make_world(3, 1.8, [0.4, 0.6]); // Q_pass = 0.6
+        let world2 = make_world(5, 2.0, [0.5, 0.5]); // Q_pass = 0.4
+        let r1 = root_completed_q_raw(&world1);
+        let r2 = root_completed_q_raw(&world2);
+        let forest = vec![world1, world2];
+
+        let averaged_raw = average_completed_q_raw(&forest);
+        let averaged_policy = average_completed_q_policy(&forest);
+        assert_eq!(averaged_raw.len(), 3);
+        assert_eq!(averaged_raw.len(), averaged_policy.len());
+
+        for i in 0..3 {
+            assert_eq!(averaged_raw[i].0, r1[i].0);
+            assert_eq!(averaged_raw[i].0, r2[i].0);
+            assert_eq!(
+                averaged_raw[i].0, averaged_policy[i].0,
+                "root_child_q und policy muessen dieselbe Aktions-Reihenfolge haben (Index-Zip in self_play.rs)"
+            );
+            let expected = (r1[i].1 + r2[i].1) / 2.0;
+            assert!(
+                (averaged_raw[i].1 - expected).abs() < 1e-9,
+                "Aktion {:?}: gemittelt={} erwartet={}",
+                averaged_raw[i].0,
+                averaged_raw[i].1,
+                expected
+            );
+        }
+        // Von Hand: v_mix1 = (0.4+3*0.6)/4 = 0.55, v_mix2 = (0.5+5*0.4)/6 = 0.41666...
+        // gemittelte Summe = 0.5 (Pass) + 2*0.483333.. (die zwei unbesuchten,
+        // teilen sich je Welt denselben v_mix) = 1.46666.. -- explizit WEIT
+        // weg von 1.0, zum Nachweis, dass hier (anders als bei der
+        // Softmax-Politik) keine Renormierung stattfindet.
+        let vmix1 = (0.4 + 3.0 * 0.6) / 4.0;
+        let vmix2 = (0.5 + 5.0 * 0.4) / 6.0;
+        let expected_sum = (0.6 + 0.4) / 2.0 + 2.0 * ((vmix1 + vmix2) / 2.0);
+        let sum: f64 = averaged_raw.iter().map(|(_, q)| q).sum();
+        let sum_policy: f64 = averaged_policy.iter().map(|(_, p)| p).sum();
+        assert!((sum_policy - 1.0).abs() < 1e-9, "Kontrollwert: Softmax-Politik MUSS zu 1 summieren");
+        assert!((sum - expected_sum).abs() < 1e-9, "Summe={sum} erwartet={expected_sum}");
+        assert!((sum - 1.0).abs() > 0.1, "rohe completed-Q darf (anders als die Politik) nicht auf 1.0 renormiert sein, Summe={sum}");
     }
 
     #[test]
