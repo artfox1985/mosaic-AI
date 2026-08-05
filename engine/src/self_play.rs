@@ -1936,6 +1936,11 @@ pub fn run_net_vs_net_arena_hybrid(
 /// `net_mcts::net_root_child_stats_and_policy`-Doku): drittes Element ist
 /// der Wurzel-Q-Wert der Suche (`Some`, außer bei leerer/fehlgeschlagener
 /// Suche) -- additiv, ändert weder die gewählte Aktion noch das Policy-Ziel.
+/// VIERTES Element (Task #35, Ranking-Loss-Vorlauf): completed-Q je
+/// Wurzelkandidat, EXAKT dieselbe Reihenfolge/Länge wie das zweite
+/// Rückgabeelement (`policy`) -- siehe
+/// `net_mcts::net_root_child_stats_and_policy`-Doku für Perspektive/Skala.
+/// Leerer Vektor im Fallback-Zweig unten (kein Kandidatensatz).
 fn net_drafting_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -1945,9 +1950,9 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     rng: &mut R,
     add_root_noise: bool,
     deterministic: bool,
-) -> (Action, Vec<Value>, Option<f64>) {
+) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
-    let (stats, completed_q_policy, root_q) =
+    let (stats, completed_q_policy, root_q, root_child_q) =
         crate::net_mcts::net_root_child_stats_and_policy(net, state, sims, c_puct, add_root_noise, rng);
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
@@ -1983,12 +1988,33 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         // Effekt), aber die urspruenglich gemeldete ~20%-Zahl war ein
         // Messfehler in der eigenen Diagnose, kein reales Engine-Verhalten.
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
-        return (a.clone(), vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })], root_q);
+        return (
+            a.clone(),
+            vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })],
+            root_q,
+            Vec::new(),
+        );
     }
+    // Task #35: `root_child_q` MUSS exakt dieselbe Reihenfolge/Länge wie
+    // `completed_q_policy` haben (beide kommen aus derselben Baum-/Wald-
+    // Traversierung, siehe `net_mcts::root_completed_q_raw`/-`policy`-Doku)
+    // -- debug_assert statt stillem Vertrauen, damit ein künftiger
+    // Refactor-Bug sofort in Tests auffällt statt als stille
+    // Trainingsdaten-Korruption (falsch gepaarte Geschwister-Q-Werte).
+    debug_assert_eq!(
+        completed_q_policy.len(),
+        root_child_q.len(),
+        "root_child_q muss dieselbe Laenge wie completed_q_policy haben"
+    );
+    debug_assert!(
+        completed_q_policy.iter().zip(root_child_q.iter()).all(|((a1, _), (a2, _))| a1 == a2),
+        "root_child_q muss aktionsweise exakt zu completed_q_policy passen (gleiche Reihenfolge)"
+    );
     let policy: Vec<Value> = completed_q_policy
         .iter()
         .map(|(a, p)| json!({ "action": action_to_env_dict(state, a), "prob": p }))
         .collect();
+    let child_q: Vec<f64> = root_child_q.iter().map(|(_, q)| *q).collect();
     let idx = if deterministic {
         // Fund 2 (B2, Vollaudit 2026-07-21): Tie-Break visits, dann Q --
         // gleiches Muster wie net_mcts::best_root_child. Nacktes
@@ -2006,7 +2032,27 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
         weighted_index(&weights, total, rng)
     };
-    (stats[idx].0.clone(), policy, root_q)
+    (stats[idx].0.clone(), policy, root_q, child_q)
+}
+
+/// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive
+/// `root_child_q`-JSON-Feld fuer einen Drafting-Record geschrieben werden
+/// soll, und baut bei "ja" den `Value`. `None` (Feld fehlt komplett) wenn
+/// entweder (a) kein echter Kandidatensatz vorliegt (`root_child_q.is_empty()`
+/// -- Ein-Aktion-Kurzschluss, Tiling-Schritt, oder der seltene leere-Stats-
+/// Fallback in `net_drafting_policy`) oder (b) das Logging per Env-Var/Test-
+/// Override abgeschaltet ist (`net_mcts::root_child_q_logging_enabled`,
+/// Default AN, `MOSAIC_ROOT_CHILD_Q=0` schaltet ab). Eigene, kleine, reine
+/// Funktion statt Inline-Code im Spielloop -- damit sich das Gating isoliert
+/// unit-testen laesst, OHNE ein komplettes Self-Play-Spiel zu durchlaufen
+/// (volle Spiele sind wegen `round_transition_deep`s wall-clock-Deadlines
+/// grundsaetzlich nicht lauflaengendeterministisch, siehe
+/// `net_drafting_policy`-Kommentare weiter oben).
+fn root_child_q_field(root_child_q: &[f64]) -> Option<Value> {
+    if root_child_q.is_empty() || !crate::net_mcts::root_child_q_logging_enabled() {
+        return None;
+    }
+    Some(json!(root_child_q))
 }
 
 /// Bewertet den Rundenübergang `round_before -> round_before+1` per
@@ -2246,10 +2292,10 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         Some(false) => pcr_cheap_sims,
                         _ => base_sims,
                     };
-                    let (chosen, policy, root_q) = if actions.len() == 1 {
+                    let (chosen, policy, root_q, root_child_q) = if actions.len() == 1 {
                         let a = actions[0].clone();
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
-                        (a, vec![e], None)
+                        (a, vec![e], None, Vec::new())
                     } else {
                         // Task #80: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
                         // tatsaechlich gespielten Zuege. `timed()` ist ohne
@@ -2363,6 +2409,26 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     // es, kein Konsument liest es aktuell).
                     if let Some(rq) = root_q {
                         m.insert("root_q".into(), json!(rq));
+                    }
+                    // Task #35 (Ranking-Loss-Vorlauf, siehe STATUS.md
+                    // "Ranking-Loss auf Geschwister-Q"/Research-Report Idee
+                    // 7.1): additiv, NUR vorhanden bei echten Mehr-Aktionen-
+                    // Entscheiden mit erfolgreicher Suche (`!root_child_q.is_empty()`
+                    // -- fehlt bei Ein-Aktion-Kurzschluss UND beim leeren-Stats-
+                    // Fallback in `net_drafting_policy`, exakt wie `root_q` dort
+                    // fehlen kann, siehe dessen Kommentar) UND wenn das Logging
+                    // per Env-Var eingeschaltet ist (Default AN, siehe
+                    // `net_mcts::root_child_q_logging_enabled` --
+                    // `MOSAIC_ROOT_CHILD_Q=0` schaltet ab, JSON dann byte-
+                    // identisch zum Vor-#35-Format). `Vec<f64>`, Reihenfolge/
+                    // Länge deckungsgleich mit `policy` (siehe
+                    // `net_drafting_policy`-Kommentar) -- Python kann Paare
+                    // rein positionsbasiert bilden, ohne Aktionen zu matchen.
+                    // Gating ausgelagert in `root_child_q_field` (siehe dortige
+                    // Doku) -- isoliert unit-testbar OHNE ein komplettes,
+                    // wall-clock-nichtdeterministisches Self-Play-Spiel.
+                    if let Some(v) = root_child_q_field(&root_child_q) {
+                        m.insert("root_child_q".into(), v);
                     }
                     // Task #14 (PCR): additiv, NUR vorhanden wenn PCR aktiv ist
                     // (`pcr_full_prob.is_some()`) -- bei PCR AUS fehlt das Feld
@@ -2840,7 +2906,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                         } else if let Some((depth, node_budget)) = alphabeta {
                             alphabeta_choose_action(net, &g.state, &actions, depth, node_budget)
                         } else {
-                            let (a, _, _) = net_drafting_policy(
+                            let (a, _, _, _) = net_drafting_policy(
                                 net, &g.state, &actions, base_sims, c_puct, rng, false, true,
                             );
                             a
@@ -4517,5 +4583,131 @@ pub(crate) mod tests {
             }
         }
         assert!(saw_cheap_decision, "Testlauf sollte mindestens eine Cheap-Suche (policy_target_valid=false) enthalten");
+    }
+
+    // ── Task #35: root_child_q-Logging (Ranking-Loss-Vorlauf) ───────────────
+
+    /// Isolierter Test des Gatings selbst (KEIN Self-Play-Spiel -- die
+    /// `net_mcts::set_root_child_q_logging_override_for_test`-Overrides
+    /// wirken thread-lokal und wuerden einen `run_net_self_play`-Aufruf mit
+    /// `num_threads=1` NICHT erreichen, weil der intern trotzdem ueber einen
+    /// frisch gebauten Rayon-Pool laeuft, siehe `run_net_self_play`s
+    /// `ThreadPoolBuilder::new().num_threads(num_threads).build()` -- der
+    /// Worker-Thread ist ein ANDERER als der Test-Thread, thread-lokale
+    /// Overrides vererben sich in Rust nicht zwischen Threads). Deshalb hier
+    /// direkt gegen `root_child_q_field` getestet, exakt der Funktion, die
+    /// die Spielschleife pro Record aufruft.
+    #[test]
+    fn root_child_q_field_respects_override_and_empty_input() {
+        // (1) Leerer Kandidatensatz -> IMMER `None`, unabhaengig vom Override
+        // (Ein-Aktion-Kurzschluss/Tiling/leerer Fallback duerfen das Feld nie
+        // tragen, selbst wenn das Logging eingeschaltet ist).
+        crate::net_mcts::set_root_child_q_logging_override_for_test(Some(true));
+        assert_eq!(root_child_q_field(&[]), None, "leerer Kandidatensatz darf nie root_child_q erzeugen");
+
+        // (2) Logging AUS -> `None`, auch bei nicht-leerem Kandidatensatz.
+        crate::net_mcts::set_root_child_q_logging_override_for_test(Some(false));
+        assert_eq!(
+            root_child_q_field(&[0.3, 0.7, 0.5]),
+            None,
+            "MOSAIC_ROOT_CHILD_Q=0 (bzw. Override AUS) muss das Feld vollstaendig unterdruecken"
+        );
+
+        // (3) Logging AN (Default) -> Some(Array) mit exakt den Eingabewerten,
+        // in derselben Reihenfolge (positionsbasiertes Zippen mit `policy` in
+        // self_play.rs setzt das voraus).
+        crate::net_mcts::set_root_child_q_logging_override_for_test(Some(true));
+        let vals = [0.3, 0.7, 0.5];
+        let field = root_child_q_field(&vals).expect("Logging AN + nicht-leer -> Feld muss vorhanden sein");
+        assert_eq!(field, json!([0.3, 0.7, 0.5]));
+
+        crate::net_mcts::set_root_child_q_logging_override_for_test(None);
+    }
+
+    /// End-zu-Ende-Rauchtest ueber ein echtes Self-Play-Spiel (Default-Pfad,
+    /// KEIN Override -- prueft damit den tatsaechlichen Produktions-Default
+    /// `MOSAIC_ROOT_CHILD_Q` unveraendert/unwahr, siehe
+    /// `net_mcts::root_child_q_logging_enabled_env`): das Gating-Kriterium
+    /// fuer `root_child_q` ist -- wie im PCR-Test oben fuer `root_q` selbst
+    /// -- die PRAESENZ von `root_q` (nicht `policy.len()>1`!): Runde 5 hat
+    /// zwar einen echten Mehr-Aktionen-Entscheid (`actions.len()>1`, geht
+    /// durch `net_drafting_policy`), aber `policy` kollabiert dort by design
+    /// (alphabeta liefert nur den EINEN optimalen Zug, siehe
+    /// `net_mcts::net_root_child_stats_and_policy`s Runde-5-Zweig) auf genau
+    /// 1 Eintrag -- `root_child_q` folgt dieser Laenge (1-elementig, kein
+    /// echtes Geschwisterpaar), ist aber trotzdem vorhanden, weil `root_q`
+    /// vorhanden ist. Echte MEHRERE Kandidaten (Runden 1-4, Gumbel-Baum)
+    /// werden separat geprueft (`saw_multi_sibling_decision`). Ein-Aktion-
+    /// Kurzschluesse UND Tiling-Schritte (kein `root_q`) muessen das Feld
+    /// dagegen NIE tragen.
+    #[test]
+    fn root_child_q_present_for_real_decisions_absent_for_shortcuts_and_tiling() {
+        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v18_best.onnx");
+        let model_path = model_path.to_str().unwrap();
+        if Net::load_auto(model_path).is_err() {
+            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
+            return;
+        }
+
+        let seed = 35_035u64;
+        let n_games = 1usize;
+        let base_sims = 40u32;
+        let out = run_net_self_play(
+            model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "rootchildqtest", true,
+            false, false, None, None, None, 150,
+        )
+        .expect("Self-Play-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
+        let games: Vec<Value> = serde_json::from_str(&out).unwrap();
+
+        let mut saw_real_decision = false;
+        let mut saw_multi_sibling_decision = false;
+        let mut saw_shortcut_or_tiling = false;
+        for step in &games {
+            let Some(obj) = step.as_object() else { continue };
+            let has_root_q = obj.contains_key("root_q");
+            let policy_len = obj.get("policy").and_then(|p| p.as_array()).map(|a| a.len()).unwrap_or(0);
+            if has_root_q {
+                saw_real_decision = true;
+                if policy_len > 1 {
+                    saw_multi_sibling_decision = true;
+                }
+                let child_q = obj
+                    .get("root_child_q")
+                    .and_then(|v| v.as_array())
+                    .unwrap_or_else(|| panic!("Record mit root_q ohne root_child_q: {obj:?}"));
+                assert_eq!(
+                    child_q.len(),
+                    policy_len,
+                    "root_child_q-Laenge ({}) muss policy-Laenge ({}) matchen",
+                    child_q.len(),
+                    policy_len
+                );
+                for v in child_q {
+                    let q = v.as_f64().expect("root_child_q-Eintrag muss eine Zahl sein");
+                    assert!(q.is_finite(), "root_child_q enthaelt Nicht-Zahl: {q}");
+                    assert!(
+                        (-0.02..=1.02).contains(&q),
+                        "root_child_q={q} ausserhalb des erwarteten [0,1]-Gewinnwahrscheinlichkeitsbereichs"
+                    );
+                }
+            } else {
+                saw_shortcut_or_tiling = true;
+                assert!(
+                    !obj.contains_key("root_child_q"),
+                    "Ein-Aktion-Kurzschluss-/Tiling-Record darf kein root_child_q tragen: {obj:?}"
+                );
+            }
+        }
+        assert!(saw_real_decision, "Testlauf sollte mindestens einen Record mit root_q enthalten");
+        assert!(
+            saw_multi_sibling_decision,
+            "Testlauf sollte mindestens einen echten Mehr-KANDIDATEN-Entscheid (policy.len()>1, Runden 1-4) \
+             enthalten -- sonst waere die Laengenpruefung nur gegen Runde-5s degenerierten 1-Element-Fall getestet"
+        );
+        assert!(
+            saw_shortcut_or_tiling,
+            "Testlauf sollte mindestens einen Kurzschluss-/Tiling-Record enthalten"
+        );
     }
 }
