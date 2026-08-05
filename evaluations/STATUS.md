@@ -157,6 +157,33 @@ korrekte Trennung (Sieg/Niederlage vs. Punkte) und das
 trainingseffektivste Ziel sind NICHT dasselbe. Der weiche Margin war kein
 Fehler, sondern ein Workaround fuer ein reales Problem.
 
+**RAHMUNG (Nutzer 2026-08-05, wichtiger als das Einzelergebnis)**: Es war
+nie zu erwarten, dass der binaere Kopf den etablierten Champion sofort
+schlaegt -- **zu viele Knoepfe sind auf den Champion hin optimiert**. Der
+Champion ist kein einzelnes Modell, sondern das Zentrum eines
+CO-ADAPTIERTEN Systems:
+- `VALUE_WEIGHT=0,2` eingestellt fuer MSE auf weichem Ziel,
+- `TD_LAMBDA=0,5` ebenso,
+- `c_puct=1,5` und `GUMBEL_C_SCALE=1,0` kalibriert (Task #18), ALS die
+  Werte um ~Faktor 2 gestaucht waren,
+- selbst der KORPUS stammt von Netzen mit weichem Ziel.
+Eine Ein-Faktor-Aenderung gegen ein vollstaendig abgestimmtes System muss
+verlieren. Erfolgsmassstab fuer #34 ist daher NICHT "schlaegt den
+Champion sofort", sondern "ist die bessere Grundlage" -- die Entscheidung
+dafuer ist gefallen (Nutzer: "#34 wird so oder so kommen").
+
+**KONKRETER, BILLIG PRUEFBARER VERDACHT**: die SUCHPARAMETER sind fuer den
+neuen Kopf fehlkalibriert. Gumbels `sigma(q)` ist LINEAR in q; der
+WDL-Kopf spreizt ~2x weiter als der alte (Platt-B 1,93 -> 0,98), die
+effektive Perturbation ist damit ~2x staerker als die, fuer die
+`c_scale=1,0` eingestellt wurde -- und laut Gumbel-Paper (Atari-Ablation)
+schadet ZU GROSSES c_scale. Test ohne jeden Umbau: `MOSAIC_VALUE_CAL_B`
+(Task-#30-Knopf, monotone Logit-Skalierung) auf **~0,55** setzen bringt
+die Spreizung des WDL-Netzes auf das Niveau zurueck, fuer das die Suche
+eingestellt ist. **Hilft das, ist nicht das ZIEL das Problem, sondern die
+SUCH-Parametrierung** -- und der richtige Fix waere, c_scale/c_puct fuer
+das neue Regime neu zu kalibrieren, statt das Ziel aufzugeben.
+
 **Naheliegender naechster Arm statt Rueckzug**: unser WDL-Ziel ist bereits
 HALB kontinuierlich (`TD_LAMBDA*bootstrap_winprob + (1-TD_LAMBDA)*harter
 Ausgang`, TD_LAMBDA=0,5). Ein HOEHERES TD_LAMBDA behaelt die
