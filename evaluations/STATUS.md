@@ -506,7 +506,30 @@ NICHT automatisch wieder offen, aber mit konkretem Anlass:
    koennten danach MEHR beitragen, nicht weniger (KataGo-Begruendung fuer
    zerlegbare Subereignisse). Schliessungsregel bleibt: Wiedereroeffnung
    nur mit ARENA-Instrument, nicht mit Offline-Metriken.
-4. **#12 Distributionaler Punkte-Kopf**: bleibender Befund war "mehr
+4. **NEU (Nutzer 2026-08-05): Task-#20-Kopplung Value-Kopf <-> Tiling-Solver**.
+   Der Value-Kopf ist seit #20 in die TILING-AUSWAHL eingebaut (Runden 2-4,
+   `NET_TILING_TIEBREAK_ENABLED=true`): unter den Top-12 punktbesten
+   Tiling-Abschluessen gewinnt der mit maximalem **`punkte *
+   value(Folgezustand)`** (tiling_solver.rs:793, roh `(v+1)/2`, kein Blend).
+   Drei Gruende fuer die Nachpruefung, VOR der v20-Kampagne:
+   a) **Stille Semantik-Verschiebung durch #34**: mit dem Margen-Kopf war
+      `punkte * (v+1)/2` ein doppelt punkte-lastiges Kriterium; mit
+      WDL-Kopf wird es `punkte * P(Sieg)` -- ein ANDERES Kriterium bei
+      unveraendertem Code (exakt die Audit-Fehlerklasse). Design-Frage:
+      unter einem kalibrierten Kopf ist vermutlich reines P(Sieg)-Ranking
+      das sauberere Kriterium (das Produkt zaehlt Punkte doppelt).
+   b) **Validierung ist ziel-veraltet**: Referenz-Lauf 2026-07-29 (v18,
+      R2 71%/R3 82% belegt, **R4 48% = Muenze**) lief am alten Kopf; die
+      damalige Entscheidung "Fenster 2-4 bleibt" beruhte auf "erbt
+      automatisch jede Value-Head-Verbesserung" -- #34 IST dieser Sprung,
+      die vorgesehene Wiederholungsmessung ist faellig.
+   c) Die alte Referenz (v17_best@2000) ist geloescht; Neuauflage mit
+      Champion-Referenz + WDL-Kandidat (`tiling_value_reference_main.py
+      --rank-model ... --ref-model v19_2d_best`), ein Abendlauf (CPU).
+   Relevanz: `resolve_tiling_step` laeuft im SELF-PLAY -- die v20-Kampagne
+   wuerde sonst mit unvermessenem, semantisch verschobenem
+   Tiling-Verhalten generieren.
+5. **#12 Distributionaler Punkte-Kopf**: bleibender Befund war "mehr
    Punkte in beiden Arena-Bloecken, ohne Siege daraus zu machen". Nach #34
    sind Value- und Punkte-Kopf erstmals WIRKLICH verschiedene Groessen
    (vorher sagten beide eine Punkte-Groesse vorher) -- und die Kombination
