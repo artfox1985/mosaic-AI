@@ -38,6 +38,24 @@ mehr Partien der billigste Value-Hebel), oder saettigt er wie die Policy
   zwischen den Seeds widerspruechlich ist).
 - Warm-Start `v19_2d_best`, Champion-Rezept (lr 5e-5, cosine,
   `--select-by-brier`, doppeltes Early Stopping), `VALUE_WEIGHT=0,2`.
+
+**AMENDMENT 2026-08-05, VOR dem ersten Lauf** (das #34-Verdikt fiel
+zwischen PREREG und Start): Ziel-Konfiguration = **`--value-head wdl
+--wdl-bootstrap-destretch`** (die beschlossene v20-Konfiguration) statt
+`--wdl-hard-only` -- gemessen wird die Saettigung des Ziels, das v20
+tatsaechlich trainiert. Der rohe `wdl_outcome` bleibt die BEWERTUNGS-
+Groesse (Brier), unveraendert sauber.
+**Umsetzungsdetails, vorab festgelegt**: (a) Messset-Erzwingung ueber
+EXTERNE Brier-Auswertung: die 90 Val-Dateien (Seed-20260707-Split) sind
+aus ALLEN Trainings-Sandboxes ausgeschlossen; Brier je Checkpoint
+(brierbest + final) wird nach dem Training per separatem Skript auf
+diesen 90 Dateien gerechnet (train.py-interner Val-Split steuert nur das
+Early Stopping und darf je Groesse abweichen). (b) Subsets als
+Hardlink-Sandboxes (`data_t36_202/`, `data_t36_405/`) nach dem
+`train_corpus_dose.py`-Muster, stratifiziert per Praefix, Ziehungs-Seed
+20260805. (c) Effektive Trainingsmengen sind ~90% der Poolgroessen
+(interner Val-Split) -- proportional ueber alle Groessen, daher fuer die
+Kurven-FORM unerheblich. (d) Namen `t36_g<pool>_s<seed>`.
 - Je Groesse eigener HDF5-Cache (Partien-Ebene; Sample-Subsampling ist
   ungueltig, weil das Value-Ziel per Partie definiert ist).
 
