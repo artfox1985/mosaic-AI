@@ -7546,6 +7546,14 @@ also unbekanntes Terrain. Entweder das v20-Fenster **root_q-rein** bauen
 ODER λ beim tatsaechlichen v20-Mischanteil neu testen, BEVOR es
 uebernommen wird. λ=0,7 bleibt bis dahin Kandidat, nicht Standard.
 
+**NUTZER-ENTSCHEID 2026-08-05: λ wird ZURUECKGESTELLT bis nach #34.**
+Begruendung: der λ-Mix ist `λ*z + (1-λ)*root_q` -- #34 aendert **z** von
+der weichen Punkte-Marge auf eine Gewinnwahrscheinlichkeit, und `root_q`
+IST bereits eine Gewinnwahrscheinlichkeit. Nach #34 mischt λ also zwei
+Groessen DERSELBEN Art (heute: zwei verschiedener Arten) -- der ganze
+Effekt muss danach neu bewertet werden, jede Messung davor waere
+verbrannte Rechenzeit.
+
 ## Folgetest-Plan nach #34: was die Ziel-Reparatur alles entwertet (2026-08-04)
 
 Nutzer-Anstoss: #34 ist kein isoliertes Experiment -- die Umstellung des
