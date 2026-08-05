@@ -1,0 +1,1319 @@
+{
+  "name_a": "t34_wdlhard_brierbest",
+  "name_b": "v19_2d_best",
+  "model_a": "models/alphazero_t34_wdlhard_brierbest.onnx",
+  "model_b": "models/alphazero_v19_2d_best.onnx",
+  "sims_a": 400,
+  "sims_b": 400,
+  "c_puct_a": 1.5,
+  "c_puct_b": 1.5,
+  "done_pairs": 110,
+  "n_games_total": 220,
+  "a_wins_total": 106,
+  "b_wins_total": 114,
+  "pair_a_sweeps_b": 20,
+  "pair_b_sweeps_c": 24,
+  "pair_splits": 66,
+  "sprt_verdict": "H0",
+  "sprt_llr": -3.3129133651797558,
+  "sprt_bounds": [
+    -2.9444389791664403,
+    2.9444389791664403
+  ],
+  "sprt_p0": 0.5,
+  "sprt_p1": 0.65,
+  "sprt_alpha": 0.05,
+  "sprt_beta": 0.05,
+  "report_mcnemar_p": 0.651587827208914,
+  "mean_pair_diff": -0.07272727272727272,
+  "ci95": [
+    -0.30980119363811576,
+    0.16434664818357028
+  ],
+  "base_seed": 21994613,
+  "blocks": [
+    {
+      "block": 1,
+      "seed": 21994613,
+      "n_pairs_block": 5,
+      "done_pairs": 5,
+      "a_wins_total": 6,
+      "b_wins_total": 4,
+      "pair_a_sweeps_b": 1,
+      "pair_b_sweeps_c": 0,
+      "pair_splits": 4,
+      "llr": 0.26236426446749106,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 1.0,
+      "mean_pair_diff": 0.4,
+      "ci95": [
+        -0.384,
+        1.1840000000000002
+      ],
+      "duration_s": 100.18329405784607
+    },
+    {
+      "block": 2,
+      "seed": 22994613,
+      "n_pairs_block": 5,
+      "done_pairs": 10,
+      "a_wins_total": 10,
+      "b_wins_total": 10,
+      "pair_a_sweeps_b": 1,
+      "pair_b_sweeps_c": 1,
+      "pair_splits": 8,
+      "llr": -0.09431067947124139,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 1.0,
+      "mean_pair_diff": 0.0,
+      "ci95": [
+        -0.5843590981199449,
+        0.5843590981199449
+      ],
+      "duration_s": 96.57077050209045
+    },
+    {
+      "block": 3,
+      "seed": 23994613,
+      "n_pairs_block": 5,
+      "done_pairs": 15,
+      "a_wins_total": 13,
+      "b_wins_total": 17,
+      "pair_a_sweeps_b": 1,
+      "pair_b_sweeps_c": 3,
+      "pair_splits": 11,
+      "llr": -0.8076605673487063,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.625,
+      "mean_pair_diff": -0.26666666666666666,
+      "ci95": [
+        -0.7893333333333332,
+        0.25599999999999995
+      ],
+      "duration_s": 94.49011516571045
+    },
+    {
+      "block": 4,
+      "seed": 24994613,
+      "n_pairs_block": 5,
+      "done_pairs": 20,
+      "a_wins_total": 16,
+      "b_wins_total": 24,
+      "pair_a_sweeps_b": 1,
+      "pair_b_sweeps_c": 5,
+      "pair_splits": 14,
+      "llr": -1.5210104552261712,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.21875,
+      "mean_pair_diff": -0.4,
+      "ci95": [
+        -0.8585597590626319,
+        0.05855975906263183
+      ],
+      "duration_s": 107.21148681640625
+    },
+    {
+      "block": 5,
+      "seed": 25994613,
+      "n_pairs_block": 5,
+      "done_pairs": 25,
+      "a_wins_total": 21,
+      "b_wins_total": 29,
+      "pair_a_sweeps_b": 1,
+      "pair_b_sweeps_c": 5,
+      "pair_splits": 19,
+      "llr": -1.5210104552261712,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.21875,
+      "mean_pair_diff": -0.32,
+      "ci95": [
+        -0.6905039450982045,
+        0.05050394509820444
+      ],
+      "duration_s": 103.17824387550354
+    },
+    {
+      "block": 6,
+      "seed": 26994613,
+      "n_pairs_block": 5,
+      "done_pairs": 30,
+      "a_wins_total": 25,
+      "b_wins_total": 35,
+      "pair_a_sweeps_b": 1,
+      "pair_b_sweeps_c": 6,
+      "pair_splits": 23,
+      "llr": -1.8776853991649036,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.125,
+      "mean_pair_diff": -0.3333333333333333,
+      "ci95": [
+        -0.6633620096677773,
+        -0.0033046569988894325
+      ],
+      "duration_s": 101.61987090110779
+    },
+    {
+      "block": 7,
+      "seed": 27994613,
+      "n_pairs_block": 5,
+      "done_pairs": 35,
+      "a_wins_total": 30,
+      "b_wins_total": 40,
+      "pair_a_sweeps_b": 2,
+      "pair_b_sweeps_c": 7,
+      "pair_splits": 26,
+      "llr": -1.971996078636145,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.1796875,
+      "mean_pair_diff": -0.2857142857142857,
+      "ci95": [
+        -0.6128120404856545,
+        0.04138346905708318
+      ],
+      "duration_s": 101.20954251289368
+    },
+    {
+      "block": 8,
+      "seed": 28994613,
+      "n_pairs_block": 5,
+      "done_pairs": 40,
+      "a_wins_total": 36,
+      "b_wins_total": 44,
+      "pair_a_sweeps_b": 4,
+      "pair_b_sweeps_c": 8,
+      "pair_splits": 28,
+      "llr": -1.8039424936398953,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.3876953125,
+      "mean_pair_diff": -0.2,
+      "ci95": [
+        -0.53802806741301,
+        0.13802806741300994
+      ],
+      "duration_s": 95.80040121078491
+    },
+    {
+      "block": 9,
+      "seed": 29994613,
+      "n_pairs_block": 5,
+      "done_pairs": 45,
+      "a_wins_total": 40,
+      "b_wins_total": 50,
+      "pair_a_sweeps_b": 4,
+      "pair_b_sweeps_c": 9,
+      "pair_splits": 32,
+      "llr": -2.160617437578628,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.266845703125,
+      "mean_pair_diff": -0.2222222222222222,
+      "ci95": [
+        -0.5329937540677432,
+        0.08854930962329877
+      ],
+      "duration_s": 100.05958580970764
+    },
+    {
+      "block": 10,
+      "seed": 30994613,
+      "n_pairs_block": 5,
+      "done_pairs": 50,
+      "a_wins_total": 44,
+      "b_wins_total": 56,
+      "pair_a_sweeps_b": 4,
+      "pair_b_sweeps_c": 10,
+      "pair_splits": 36,
+      "llr": -2.5172923815173602,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.1795654296875,
+      "mean_pair_diff": -0.24,
+      "ci95": [
+        -0.5286038114786428,
+        0.04860381147864279
+      ],
+      "duration_s": 99.50484418869019
+    },
+    {
+      "block": 11,
+      "seed": 31994613,
+      "n_pairs_block": 5,
+      "done_pairs": 55,
+      "a_wins_total": 50,
+      "b_wins_total": 60,
+      "pair_a_sweeps_b": 5,
+      "pair_b_sweeps_c": 10,
+      "pair_splits": 40,
+      "llr": -2.254928117049869,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.3017578125,
+      "mean_pair_diff": -0.18181818181818182,
+      "ci95": [
+        -0.4561470369967676,
+        0.09251067336040397
+      ],
+      "duration_s": 100.58836698532104
+    },
+    {
+      "block": 12,
+      "seed": 32994613,
+      "n_pairs_block": 5,
+      "done_pairs": 60,
+      "a_wins_total": 55,
+      "b_wins_total": 65,
+      "pair_a_sweeps_b": 6,
+      "pair_b_sweeps_c": 11,
+      "pair_splits": 43,
+      "llr": -2.34923879652111,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.332305908203125,
+      "mean_pair_diff": -0.16666666666666666,
+      "ci95": [
+        -0.4349664680596146,
+        0.10163313472628124
+      ],
+      "duration_s": 96.75624823570251
+    },
+    {
+      "block": 13,
+      "seed": 33994613,
+      "n_pairs_block": 5,
+      "done_pairs": 65,
+      "a_wins_total": 59,
+      "b_wins_total": 71,
+      "pair_a_sweeps_b": 7,
+      "pair_b_sweeps_c": 13,
+      "pair_splits": 45,
+      "llr": -2.8002244199310837,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.26317596435546875,
+      "mean_pair_diff": -0.18461538461538463,
+      "ci95": [
+        -0.45262863166059314,
+        0.08339786242982389
+      ],
+      "duration_s": 98.71514821052551
+    },
+    {
+      "block": 14,
+      "seed": 34994613,
+      "n_pairs_block": 5,
+      "done_pairs": 70,
+      "a_wins_total": 67,
+      "b_wins_total": 73,
+      "pair_a_sweeps_b": 10,
+      "pair_b_sweeps_c": 13,
+      "pair_splits": 47,
+      "llr": -2.01313162652861,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.6776394844055176,
+      "mean_pair_diff": -0.08571428571428572,
+      "ci95": [
+        -0.35546285356047924,
+        0.18403428213190778
+      ],
+      "duration_s": 94.98745656013489
+    },
+    {
+      "block": 15,
+      "seed": 35994613,
+      "n_pairs_block": 5,
+      "done_pairs": 75,
+      "a_wins_total": 70,
+      "b_wins_total": 80,
+      "pair_a_sweeps_b": 10,
+      "pair_b_sweeps_c": 15,
+      "pair_splits": 50,
+      "llr": -2.726481514406075,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.42435622215270996,
+      "mean_pair_diff": -0.13333333333333333,
+      "ci95": [
+        -0.3946666666666667,
+        0.12800000000000003
+      ],
+      "duration_s": 96.43241286277771
+    },
+    {
+      "block": 16,
+      "seed": 36994613,
+      "n_pairs_block": 5,
+      "done_pairs": 80,
+      "a_wins_total": 76,
+      "b_wins_total": 84,
+      "pair_a_sweeps_b": 11,
+      "pair_b_sweeps_c": 15,
+      "pair_splits": 54,
+      "llr": -2.4641172499385835,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.557197093963623,
+      "mean_pair_diff": -0.1,
+      "ci95": [
+        -0.3504594259568462,
+        0.15045942595684617
+      ],
+      "duration_s": 96.17251992225647
+    },
+    {
+      "block": 17,
+      "seed": 37994613,
+      "n_pairs_block": 5,
+      "done_pairs": 85,
+      "a_wins_total": 84,
+      "b_wins_total": 86,
+      "pair_a_sweeps_b": 14,
+      "pair_b_sweeps_c": 15,
+      "pair_splits": 56,
+      "llr": -1.67702445653611,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 1.0,
+      "mean_pair_diff": -0.023529411764705882,
+      "ci95": [
+        -0.27330376898959186,
+        0.2262449454601801
+      ],
+      "duration_s": 102.07866835594177
+    },
+    {
+      "block": 18,
+      "seed": 38994613,
+      "n_pairs_block": 5,
+      "done_pairs": 90,
+      "a_wins_total": 87,
+      "b_wins_total": 93,
+      "pair_a_sweeps_b": 15,
+      "pair_b_sweeps_c": 18,
+      "pair_splits": 57,
+      "llr": -2.4846850238848166,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.7283324808813632,
+      "mean_pair_diff": -0.06666666666666667,
+      "ci95": [
+        -0.31789450293855087,
+        0.18456116960521757
+      ],
+      "duration_s": 101.79159760475159
+    },
+    {
+      "block": 19,
+      "seed": 39994613,
+      "n_pairs_block": 5,
+      "done_pairs": 95,
+      "a_wins_total": 95,
+      "b_wins_total": 95,
+      "pair_a_sweeps_b": 18,
+      "pair_b_sweeps_c": 18,
+      "pair_splits": 59,
+      "llr": -1.6975922304823432,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 1.0,
+      "mean_pair_diff": 0.0,
+      "ci95": [
+        -0.24889237275152842,
+        0.24889237275152842
+      ],
+      "duration_s": 113.94939422607422
+    },
+    {
+      "block": 20,
+      "seed": 40994613,
+      "n_pairs_block": 5,
+      "done_pairs": 100,
+      "a_wins_total": 98,
+      "b_wins_total": 102,
+      "pair_a_sweeps_b": 18,
+      "pair_b_sweeps_c": 20,
+      "pair_splits": 62,
+      "llr": -2.410942118359808,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.8714146793645341,
+      "mean_pair_diff": -0.04,
+      "ci95": [
+        -0.28273453596366327,
+        0.20273453596366328
+      ],
+      "duration_s": 107.4229245185852
+    },
+    {
+      "block": 21,
+      "seed": 41994613,
+      "n_pairs_block": 5,
+      "done_pairs": 105,
+      "a_wins_total": 102,
+      "b_wins_total": 108,
+      "pair_a_sweeps_b": 18,
+      "pair_b_sweeps_c": 21,
+      "pair_splits": 66,
+      "llr": -2.7676170622985405,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.7492586247608415,
+      "mean_pair_diff": -0.05714285714285714,
+      "ci95": [
+        -0.29115008911525714,
+        0.17686437482954284
+      ],
+      "duration_s": 115.90116691589355
+    },
+    {
+      "block": 22,
+      "seed": 42994613,
+      "n_pairs_block": 5,
+      "done_pairs": 110,
+      "a_wins_total": 106,
+      "b_wins_total": 114,
+      "pair_a_sweeps_b": 20,
+      "pair_b_sweeps_c": 24,
+      "pair_splits": 66,
+      "llr": -3.3129133651797558,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.651587827208914,
+      "mean_pair_diff": -0.07272727272727272,
+      "ci95": [
+        -0.30980119363811576,
+        0.16434664818357028
+      ],
+      "duration_s": 111.267498254776
+    }
+  ],
+  "avg_score_a": 41.92727272727273,
+  "avg_score_b": 42.877272727272725,
+  "per_pair_scores": [
+    {
+      "pair_index": 0,
+      "block_seed": 21994613,
+      "a_score": 112,
+      "b_score": 66,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 1,
+      "block_seed": 21994613,
+      "a_score": 104,
+      "b_score": 98,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 2,
+      "block_seed": 21994613,
+      "a_score": 96,
+      "b_score": 98,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 3,
+      "block_seed": 21994613,
+      "a_score": 66,
+      "b_score": 56,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 4,
+      "block_seed": 21994613,
+      "a_score": 113,
+      "b_score": 119,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 5,
+      "block_seed": 22994613,
+      "a_score": 84,
+      "b_score": 90,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 6,
+      "block_seed": 22994613,
+      "a_score": 92,
+      "b_score": 91,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 7,
+      "block_seed": 22994613,
+      "a_score": 85,
+      "b_score": 77,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 8,
+      "block_seed": 22994613,
+      "a_score": 96,
+      "b_score": 96,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 9,
+      "block_seed": 22994613,
+      "a_score": 88,
+      "b_score": 76,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 10,
+      "block_seed": 23994613,
+      "a_score": 58,
+      "b_score": 70,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 11,
+      "block_seed": 23994613,
+      "a_score": 52,
+      "b_score": 74,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 12,
+      "block_seed": 23994613,
+      "a_score": 124,
+      "b_score": 112,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 13,
+      "block_seed": 23994613,
+      "a_score": 61,
+      "b_score": 59,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 14,
+      "block_seed": 23994613,
+      "a_score": 66,
+      "b_score": 98,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 15,
+      "block_seed": 24994613,
+      "a_score": 43,
+      "b_score": 83,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 16,
+      "block_seed": 24994613,
+      "a_score": 85,
+      "b_score": 85,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 17,
+      "block_seed": 24994613,
+      "a_score": 53,
+      "b_score": 67,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 18,
+      "block_seed": 24994613,
+      "a_score": 80,
+      "b_score": 81,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 19,
+      "block_seed": 24994613,
+      "a_score": 115,
+      "b_score": 107,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 20,
+      "block_seed": 25994613,
+      "a_score": 92,
+      "b_score": 100,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 21,
+      "block_seed": 25994613,
+      "a_score": 72,
+      "b_score": 87,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 22,
+      "block_seed": 25994613,
+      "a_score": 63,
+      "b_score": 53,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 23,
+      "block_seed": 25994613,
+      "a_score": 58,
+      "b_score": 57,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 24,
+      "block_seed": 25994613,
+      "a_score": 85,
+      "b_score": 97,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 25,
+      "block_seed": 26994613,
+      "a_score": 98,
+      "b_score": 89,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 26,
+      "block_seed": 26994613,
+      "a_score": 49,
+      "b_score": 68,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 27,
+      "block_seed": 26994613,
+      "a_score": 68,
+      "b_score": 89,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 28,
+      "block_seed": 26994613,
+      "a_score": 56,
+      "b_score": 46,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 29,
+      "block_seed": 26994613,
+      "a_score": 82,
+      "b_score": 130,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 30,
+      "block_seed": 27994613,
+      "a_score": 69,
+      "b_score": 77,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 31,
+      "block_seed": 27994613,
+      "a_score": 51,
+      "b_score": 65,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 32,
+      "block_seed": 27994613,
+      "a_score": 93,
+      "b_score": 66,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 33,
+      "block_seed": 27994613,
+      "a_score": 67,
+      "b_score": 94,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 34,
+      "block_seed": 27994613,
+      "a_score": 102,
+      "b_score": 103,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 35,
+      "block_seed": 28994613,
+      "a_score": 31,
+      "b_score": 46,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 36,
+      "block_seed": 28994613,
+      "a_score": 111,
+      "b_score": 85,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 37,
+      "block_seed": 28994613,
+      "a_score": 127,
+      "b_score": 93,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 38,
+      "block_seed": 28994613,
+      "a_score": 122,
+      "b_score": 70,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 39,
+      "block_seed": 28994613,
+      "a_score": 86,
+      "b_score": 120,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 40,
+      "block_seed": 29994613,
+      "a_score": 116,
+      "b_score": 103,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 41,
+      "block_seed": 29994613,
+      "a_score": 108,
+      "b_score": 103,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 42,
+      "block_seed": 29994613,
+      "a_score": 53,
+      "b_score": 96,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 43,
+      "block_seed": 29994613,
+      "a_score": 72,
+      "b_score": 74,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 44,
+      "block_seed": 29994613,
+      "a_score": 73,
+      "b_score": 89,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 45,
+      "block_seed": 30994613,
+      "a_score": 134,
+      "b_score": 131,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 46,
+      "block_seed": 30994613,
+      "a_score": 97,
+      "b_score": 89,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 47,
+      "block_seed": 30994613,
+      "a_score": 110,
+      "b_score": 98,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 48,
+      "block_seed": 30994613,
+      "a_score": 74,
+      "b_score": 79,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 49,
+      "block_seed": 30994613,
+      "a_score": 46,
+      "b_score": 108,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 50,
+      "block_seed": 31994613,
+      "a_score": 99,
+      "b_score": 109,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 51,
+      "block_seed": 31994613,
+      "a_score": 85,
+      "b_score": 80,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 52,
+      "block_seed": 31994613,
+      "a_score": 121,
+      "b_score": 115,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 53,
+      "block_seed": 31994613,
+      "a_score": 117,
+      "b_score": 117,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 54,
+      "block_seed": 31994613,
+      "a_score": 115,
+      "b_score": 103,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 55,
+      "block_seed": 32994613,
+      "a_score": 64,
+      "b_score": 71,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 56,
+      "block_seed": 32994613,
+      "a_score": 106,
+      "b_score": 84,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 57,
+      "block_seed": 32994613,
+      "a_score": 64,
+      "b_score": 81,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 58,
+      "block_seed": 32994613,
+      "a_score": 42,
+      "b_score": 52,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 59,
+      "block_seed": 32994613,
+      "a_score": 143,
+      "b_score": 123,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 60,
+      "block_seed": 33994613,
+      "a_score": 99,
+      "b_score": 133,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 61,
+      "block_seed": 33994613,
+      "a_score": 158,
+      "b_score": 127,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 62,
+      "block_seed": 33994613,
+      "a_score": 87,
+      "b_score": 78,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 63,
+      "block_seed": 33994613,
+      "a_score": 112,
+      "b_score": 102,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 64,
+      "block_seed": 33994613,
+      "a_score": 116,
+      "b_score": 129,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 65,
+      "block_seed": 34994613,
+      "a_score": 98,
+      "b_score": 52,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 66,
+      "block_seed": 34994613,
+      "a_score": 56,
+      "b_score": 56,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 67,
+      "block_seed": 34994613,
+      "a_score": 97,
+      "b_score": 74,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 68,
+      "block_seed": 34994613,
+      "a_score": 106,
+      "b_score": 82,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 69,
+      "block_seed": 34994613,
+      "a_score": 99,
+      "b_score": 66,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 70,
+      "block_seed": 35994613,
+      "a_score": 30,
+      "b_score": 36,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 71,
+      "block_seed": 35994613,
+      "a_score": 60,
+      "b_score": 68,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 72,
+      "block_seed": 35994613,
+      "a_score": 76,
+      "b_score": 92,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 73,
+      "block_seed": 35994613,
+      "a_score": 113,
+      "b_score": 96,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 74,
+      "block_seed": 35994613,
+      "a_score": 98,
+      "b_score": 118,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 75,
+      "block_seed": 36994613,
+      "a_score": 75,
+      "b_score": 104,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 76,
+      "block_seed": 36994613,
+      "a_score": 82,
+      "b_score": 72,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 77,
+      "block_seed": 36994613,
+      "a_score": 112,
+      "b_score": 141,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 78,
+      "block_seed": 36994613,
+      "a_score": 82,
+      "b_score": 87,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 79,
+      "block_seed": 36994613,
+      "a_score": 54,
+      "b_score": 37,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 80,
+      "block_seed": 37994613,
+      "a_score": 85,
+      "b_score": 54,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 81,
+      "block_seed": 37994613,
+      "a_score": 119,
+      "b_score": 76,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 82,
+      "block_seed": 37994613,
+      "a_score": 130,
+      "b_score": 112,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 83,
+      "block_seed": 37994613,
+      "a_score": 39,
+      "b_score": 60,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 84,
+      "block_seed": 37994613,
+      "a_score": 70,
+      "b_score": 73,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 85,
+      "block_seed": 38994613,
+      "a_score": 44,
+      "b_score": 49,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 86,
+      "block_seed": 38994613,
+      "a_score": 116,
+      "b_score": 110,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 87,
+      "block_seed": 38994613,
+      "a_score": 43,
+      "b_score": 101,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 88,
+      "block_seed": 38994613,
+      "a_score": 88,
+      "b_score": 102,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 89,
+      "block_seed": 38994613,
+      "a_score": 111,
+      "b_score": 106,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 90,
+      "block_seed": 39994613,
+      "a_score": 121,
+      "b_score": 66,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 91,
+      "block_seed": 39994613,
+      "a_score": 38,
+      "b_score": 78,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 92,
+      "block_seed": 39994613,
+      "a_score": 120,
+      "b_score": 100,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 93,
+      "block_seed": 39994613,
+      "a_score": 91,
+      "b_score": 96,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 94,
+      "block_seed": 39994613,
+      "a_score": 117,
+      "b_score": 63,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 95,
+      "block_seed": 40994613,
+      "a_score": 58,
+      "b_score": 61,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 96,
+      "block_seed": 40994613,
+      "a_score": 85,
+      "b_score": 73,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 97,
+      "block_seed": 40994613,
+      "a_score": 53,
+      "b_score": 101,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 98,
+      "block_seed": 40994613,
+      "a_score": 83,
+      "b_score": 91,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 99,
+      "block_seed": 40994613,
+      "a_score": 46,
+      "b_score": 72,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 100,
+      "block_seed": 41994613,
+      "a_score": 53,
+      "b_score": 61,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 101,
+      "block_seed": 41994613,
+      "a_score": 70,
+      "b_score": 93,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 102,
+      "block_seed": 41994613,
+      "a_score": 27,
+      "b_score": 30,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 103,
+      "block_seed": 41994613,
+      "a_score": 96,
+      "b_score": 106,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 104,
+      "block_seed": 41994613,
+      "a_score": 59,
+      "b_score": 51,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 105,
+      "block_seed": 42994613,
+      "a_score": 93,
+      "b_score": 89,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 106,
+      "block_seed": 42994613,
+      "a_score": 63,
+      "b_score": 138,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 107,
+      "block_seed": 42994613,
+      "a_score": 54,
+      "b_score": 59,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 108,
+      "block_seed": 42994613,
+      "a_score": 26,
+      "b_score": 68,
+      "a_wins_pair": 0
+    },
+    {
+      "pair_index": 109,
+      "block_seed": 42994613,
+      "a_score": 122,
+      "b_score": 101,
+      "a_wins_pair": 2
+    }
+  ],
+  "avg_floor_a": 15.995454545454546,
+  "avg_floor_b": 12.631818181818181,
+  "zerozero_anteil": 0.0
+}
