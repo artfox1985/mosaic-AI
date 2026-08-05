@@ -101,9 +101,42 @@ ueberschaetzt. Der hoehere VALUE_WEIGHT (0,2) liefert den besseren
 Value-Fit (Brier 0,2030 vs 0,2048); ob er der Gesamtstaerke schadet,
 entscheidet die Arena.
 
+### Arena-Runde 1: ALLE VIER Gatings negativ -- aber alle konfundiert
+
+| Vergleich | Ergebnis | Anmerkung |
+|---|---|---|
+| wdl_w02_best vs ctrl_tanh_best | 12:28 (30%) | Epoche-1-Checkpoints |
+| wdl_w02_best vs v19_2d_best | 28:42 (40%) | Epoche-1-Checkpoints |
+| wdl_lossadj_best vs ctrl_tanh_best | 47:63 (43%) | Epoche-1-Checkpoints |
+| **wdl_w02_final vs ctrl_tanh_final** | **43:57 (43%)** | Endstaende, p=0,23 |
+
+**Zwei Konstruktionsfehler, beide von mir**:
+1. Die `_best`-Checkpoints waren **Epoche 1** -- `val_combined` waehlt bei
+   WDL-Armen faktisch den untrainierten frischen Kopf (Value-Term
+   entweder vernachlaessigbar bei w=0,009 oder unit-fremd bei w=0,2/BCE).
+   Die ersten drei Gatings pruefen also nicht das ZIEL.
+2. Der Value-Kopf startete FRISCH (Shape-Mismatch tanh->wdl), die
+   Kontrolle uebernahm einen ueber ~10 Generationen gereiften Kopf --
+   und das Early Stopping (nur Policy-Plateau) stoppte nach 15 Epochen.
+   Auch der Endstand-Vergleich ist damit "15 Epochen gegen 10
+   Generationen", nicht "Ziel A gegen Ziel B".
+
+**Inhaltlich bemerkenswert bleibt trotzdem**: der WDL-Kopf ist praktisch
+perfekt kalibriert (Platt-B **0,98** vs 1,70 der Kontrolle) und spielt
+dennoch schlechter. Kein Widerspruch, sondern ein Hinweis auf einen
+Zielkonflikt -- und die v13-Begruendung liest sich rueckblickend
+plausibler: das weiche Margin-Ziel transportiert MEHR Information pro
+Sample ("knapp gewonnen" vs "klar gewonnen"), das harte kollabiert das
+auf ein Vorzeichen. Fuer den gemeinsamen Trunk ist die reichere Groesse
+offenbar das bessere Lernsignal, auch wenn sie als Wahrscheinlichkeit
+schlechter kalibriert ist.
+
+**Behoben (Commit 6c01eb7)**: doppeltes Early Stopping (Policy UND
+Value/Brier) + `--select-by-brier`. Arena-Runde 2 laeuft mit beiden
+Schaltern und fairem Reifegrad.
+
 **Noch offen**: R5-Plattenkalibrierung (zweite Pflicht-Diagnostik --
-faellt die Steigung von 0,06-0,09 Richtung 1?), Arena-Gatings
-(wdl_w02 vs ctrl_tanh isoliert #34; wdl_w02 vs Champion = Promotionsfrage).
+faellt die Steigung von 0,06-0,09 Richtung 1?).
 
 ## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
 
