@@ -45,7 +45,14 @@ def _champion_model_path(fallback: str = "v18_best") -> str:
         pass
     p = root / "models" / f"alphazero_{name}.onnx"
     if not p.exists():
-        p = root / "models" / f"alphazero_{fallback}.onnx"
+        # Audit-V2 (2026-08-05): vorher STILLER Fallback auf ein altes Modell
+        # -- bei der dokumentierten OneDrive-Datei-Verschwinde-Historie haette
+        # eine Messung kommentarlos gegen das falsche Netz laufen koennen.
+        # Ein fehlendes Champion-ONNX ist ein Fehlerzustand, kein Default.
+        raise FileNotFoundError(
+            f"Champion-ONNX fehlt: {p} (champion.txt -> {name!r}). "
+            f"Kein stiller Fallback -- models/ pruefen (OneDrive-Verlust?) "
+            f"oder champion.txt korrigieren.")
     return f"models/{p.name}"
 
 try:

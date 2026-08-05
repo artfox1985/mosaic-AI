@@ -148,9 +148,19 @@ def _load_champion_model(fallback: str = "v16_best") -> str:
     Serverstart."""
     try:
         name = (MODELS_DIR / "champion.txt").read_text(encoding="utf-8").strip()
-        return name or fallback
+        name = name or fallback
     except OSError:
-        return fallback
+        name = fallback
+    # Audit-V2 (2026-08-05): Existenz des ONNX pruefen und LAUT warnen --
+    # vorher konnte der Server bei fehlender Datei (OneDrive-Verlust)
+    # kommentarlos mit einem falschen/fehlenden Modell starten. Bewusst
+    # weiterhin kein Hard-Error beim Serverstart (GUI soll hochkommen),
+    # aber die Warnung macht den Zustand sichtbar.
+    if not (MODELS_DIR / f"alphazero_{name}.onnx").exists():
+        print(f"⚠️  WARNUNG: Champion-ONNX 'alphazero_{name}.onnx' fehlt in "
+              f"{MODELS_DIR} -- Modell-Laden wird fehlschlagen "
+              f"(champion.txt pruefen, OneDrive-Verlust?).")
+    return name
 
 _CHAMPION_MODEL = _load_champion_model()
 

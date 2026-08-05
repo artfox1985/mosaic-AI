@@ -1047,6 +1047,22 @@ class MosaicDataset(Dataset):
                         else:
                             root_q_l.append(0.0)
                             root_q_mask_l.append(0.0)
+                        # Audit-F2 (2026-08-05): Rust stempelt `scores`/`winner`
+                        # auch bei TIMEOUT-ABBRUCH bedingungslos (self_play.rs,
+                        # dortiger Kommentar verspricht faelschlich einen
+                        # Downstream-Filter, der nie existierte -- self_play.py
+                        # WARNT nur). Der -1-Sentinel-Zweig unten war damit auf
+                        # Rust-Korpora UNERREICHBAR und Abbruch-Zwischenstaende
+                        # wurden zu harten Sieg-Labels. `game_completed` sperrt
+                        # unten wdl_outcome (Sentinel -1) und opp_points_mask
+                        # (0); die weichen val/points-Ziele behalten den
+                        # Zwischenstand (dokumentierte Restunsicherheit, kein
+                        # erfundenes HARTES Label). Fehlendes Feld = Alt-Korpus
+                        # = vertrauenswuerdig; nur explizites False sperrt.
+                        # Aktueller 900er-Korpus: 0% betroffen (Stichprobe 90
+                        # Dateien) -- Korrektheits-Fix fuer kuenftige
+                        # Kampagnen, kein Label-Shift, daher KEIN Schema-Bump.
+                        game_completed = step.get("completed", True) is not False
                         if "scores" in step and "winner" in step:
                             p = step["player"]
                             scores_src = step.get("scores_unclamped", step["scores"])
@@ -1079,7 +1095,10 @@ class MosaicDataset(Dataset):
                             # NICHT `val` gespiegelt (dessen Basis ist die
                             # MARGIN (own-opp)/SCALE, nicht own_total allein).
                             opp_points_val = math.tanh(opp_total / VALUE_SCALE)
-                            opp_points_mask = 1.0
+                            # Audit-F2: Abbruch-Zwischenstand ist kein echter
+                            # Endpunktestand -- Maske 0 (Konvention wie im
+                            # Legacy-Zweig unten).
+                            opp_points_mask = 1.0 if game_completed else 0.0
                             # Rundenübergangs-Ziel (siehe round_transition.rs/
                             # self_play.rs::play_net_self_play_game): über
                             # mehrere Chance-Node-Samples (verschiedene mögliche
@@ -1143,11 +1162,19 @@ class MosaicDataset(Dataset):
                             # Gewinnwahrscheinlichkeit, hier direkt geblendet
                             # (macht den Blend semantisch kohaerent, siehe
                             # STATUS.md "Bonus-Befund").
-                            wdl_outcome_val = 1.0 if int(step["winner"]) == p else 0.0
-                            value_wdl = wdl_outcome_val
-                            if bv is not None:
-                                value_wdl = TD_LAMBDA * float(bv[p]) + (1.0 - TD_LAMBDA) * wdl_outcome_val
-                            value_wdl = min(1.0, max(0.0, value_wdl))
+                            # Audit-F2: nur ECHTE Ausgaenge liefern ein hartes
+                            # Label; Abbruch -> Sentinel -1 (wie der Legacy-
+                            # Zweig unten) und value_wdl = weiche Projektion
+                            # statt eines erfundenen harten Anteils.
+                            if game_completed:
+                                wdl_outcome_val = 1.0 if int(step["winner"]) == p else 0.0
+                                value_wdl = wdl_outcome_val
+                                if bv is not None:
+                                    value_wdl = TD_LAMBDA * float(bv[p]) + (1.0 - TD_LAMBDA) * wdl_outcome_val
+                                value_wdl = min(1.0, max(0.0, value_wdl))
+                            else:
+                                wdl_outcome_val = -1.0
+                                value_wdl = min(1.0, max(0.0, (val + 1.0) * 0.5))
                         else:
                             val = float(step["value"])
                             points_val = val

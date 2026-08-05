@@ -867,7 +867,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     if rw is None:
                         v_loss = v_bce.sum() / wdl_mask.sum().clamp(min=1.0)
                     else:
-                        v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
+                        # Audit-F3: Nenner muss die MASKIERTE Gewichtssumme
+                        # sein -- `denom` (=rw2.sum()) zaehlt auch
+                        # wdl_mask==0-Samples und verduennte den Loss.
+                        v_loss = ((v_bce.view(-1, 1) * rw2).sum()
+                                  / (wdl_mask.view(-1, 1) * rw2).sum().clamp(min=1e-6))
                 else:
                     v_wdl_target = targets_v_wdl.view(-1)
                     if rw is None:
@@ -1030,9 +1034,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                         if wdl_hard_only:
                             v_raw = v_wdl_outcome.view(-1)
                             v_mask = (v_raw >= 0.0).float()
+                            # Audit-F3: Val-Zweig muss `v_rw` genauso
+                            # respektieren wie der Trainingszweig -- sonst
+                            # enthaelt val_combined (Auswahlmetrik!) bei
+                            # `--exclude-round5` andere Samples als der Loss.
+                            if v_rw is not None:
+                                v_mask = v_mask * v_rw.view(-1)
                             v_bce_h = F.binary_cross_entropy_with_logits(
                                 v_logit_diff, v_raw.clamp(min=0.0), reduction="none") * v_mask
-                            v_v_loss = v_bce_h.sum() / v_mask.sum().clamp(min=1.0)
+                            v_v_loss = v_bce_h.sum() / v_mask.sum().clamp(min=1e-6)
                         elif v_rw is None:
                             v_v_loss = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target)
                         else:

@@ -30,7 +30,7 @@ Sequenzialisierung verloren).
 | — | R4b (Playout-Ground-Truth) | geplant | — | history (#R4-Alarm) |
 | — | GUI: Slider raus, Startwert setzen | offen, klein | — | history (Task #28) |
 | #29 | Value-Rangmetrik | **geschlossen**: NICHT validiert (2/6) | — | history |
-| #28 | Aggressions-Utility (opp-Kopf + Regler) | **geschlossen**: kein Denial-Beleg, Regler nutzbar | — | history |
+| #28 | Aggressions-Utility (opp-Kopf + Regler) | **ERGEBNISSE UNGUELTIG** (Engine-Audit F1: ownership-Logit als Gegner-Punkte gelesen) | Neumessung nach Fix noetig | unten (Engine-Audit) |
 | #14 | PCR (beide Regime) | **geschlossen**, Wiedereroeffnung konditional | #34 + #36 + Durchsatz-Neumessung | unten |
 | #27 | R5-Value-Kalibrierung | **geschlossen**: Unterkalibrierung belegt | — | history |
 | #9 | Ownership-Kopf | **geschlossen** 2026-07-28 | Wiedereroeffnung nur mit Arena-Instrument | history |
@@ -56,9 +56,18 @@ Sequenzialisierung verloren).
   derselben Art. Befundlage: gewinnt bei 65,7% root_q-Mix, verliert bei
   43,8% (zweimal, quer ueber Regime) -> **Korpus-Mischanteil entscheidet**.
   v20-Fenster entweder root_q-rein bauen oder λ neu messen.
+  **Engine-Audit F1: das λ07_opp-Gating (33:47) lief mit w=0,1 und
+  opp-Modell auf Kandidatenseite -- der Kandidat spielte mit
+  ownership-Logit im Blend, das Ergebnis ist KONTAMINIERT und zaehlt
+  nicht als λ-Beleg (weder dafuer noch dagegen).**
 - **Arena-Konvention**: Laeufe kuenftig mit `w=0,1` / `λ_aggr=2,0`
   (Nutzer 2026-08-04) -- gegatet wird, was ausgeliefert wird. Modelle
   ohne opp-Kopf fallen automatisch auf Bestandsverhalten zurueck.
+  **ACHTUNG (Engine-Audit F1, 2026-08-05): die empirische Basis der
+  Zahlenwerte (λ-Kartierung, w-Leiter) ist UNGUELTIG -- der Blend las bei
+  opp-Modellen den ownership-Logit statt der Gegner-Prognose. Die
+  Konvention selbst (Nutzer-Entscheid "gate what you ship") bleibt, die
+  WERTE muessen nach dem Fix neu kartiert werden (im Nach-#34-Paket).**
 - **Aggressions-Default**: (w=0,1, λ_aggr=2,0), beim Serverstart gesetzt;
   GUI-Slider wird entfernt. Wirksam erst mit einem Modell, das den
   opp-Kopf traegt.
@@ -311,6 +320,74 @@ Ziels: Korpus-Co-Adaption und/oder das weiche Ziel als real besseres
 Trunk-Lernsignal (Befund 4).
 
 **Laufend**: `t34_wdlhard`-Training + Engine-Gegenpruefungs-Agent.
+
+## ENGINE-GEGENPRUEFUNG (Agent-Audit, Nutzer-Auftrag 2026-08-05): 3 bestaetigte Fehler, alle gefixt
+
+Vollpruefung von Suchbaum-Perspektive, Wertebereichen, Encoding, Masken,
+ONNX-Vertrag, Regelkonsistenz, Arena-Werkzeugen und Loss-Arithmetik --
+mit dem Soft-Head-Fund als Fehler-Muster. Alle Agent-Befunde vor
+Uebernahme selbst am Code verifiziert.
+
+### F1 (HOCH, GEFIXT): opp_points las den ownership-Head -- ONNX-Index-Fehler
+`net.rs` extrahierte `out[4]` als Gegner-Punkte-Prognose; laut
+Export-Vertrag ist `out[4]` aber der 72-dim `ownership`-Head, `opp_points`
+haengt dahinter (real Index 5). Der #28-Blend las damit den **rohen
+ownership-Logit von Feld (0,0)** als "Gegner-Punkte" -- kein Crash, nur
+leise falsch. Der Rust-Vertragstest kodierte die Output-Liste OHNE
+ownership und dokumentierte damit exakt den Vertrag, den der Export nie
+erfuellt hat.
+**Fix**: Extraktion jetzt ueber den beim Laden erkannten Namens-Index
+(`opp_head_index`), Tests auf die reale Export-Reihenfolge umgestellt,
+Wheel neu gebaut + installiert, Smoke-Test am echten opp-Modell gruen.
+**ENTWERTET sind alle Messungen mit w>0 + opp-Modell**:
+- die komplette λ_aggr-Kartierung nach oben ("bis 2,0 ohne
+  Winprob-Verlust") und die w-Leiter (0,2/0,3),
+- der #28-Befund "kein Denial-Beleg",
+- das λ07_opp-Champion-Gating (33:47),
+- die Zahlenbasis der Arena-Konvention w=0,1/λ_aggr=2,0.
+**NICHT betroffen**: alle #34-Gatings und -Trainings (Modelle ohne
+opp-Kopf, Blend inert), alle w=0-Laeufe, das reine opp-Kopf-TRAINING
+(Python-seitig, korrekt). Neumessung der Aggressions-Kartierung im
+Nach-#34-Paket.
+
+### F2 (MITTEL, GEFIXT): Abbruch-Partien lieferten harte Sieg-Labels
+Rust stempelt `scores`/`winner` auch bei Timeout-Abbruch; der versprochene
+Downstream-Filter existierte nie (self_play.py warnt nur). Der
+`-1`-Sentinel fuer `wdl_outcome` war auf Rust-Korpora UNERREICHBAR --
+Abbruch-Zwischenstaende wurden zu harten Labels (auch fuer Brier und
+`--wdl-hard-only`). **Gemessen: aktueller 900er-Korpus 0% betroffen**
+(Stichprobe 90 Dateien, alle 900 Partien completed) -- Korrektheits-Fix
+fuer kuenftige Kampagnen, kein Label-Shift, daher kein Schema-Bump.
+Fix in neural_net.py: `completed=False` -> wdl_outcome=-1,
+opp_points_mask=0, value_wdl=weiche Projektion.
+
+### F3 (KLEIN, GEFIXT): Nenner/Val-Inkonsistenz im neuen --wdl-hard-only
+Gewichteter Trainingspfad teilte durch die UNmaskierte Gewichtssumme;
+Val-Zweig ignorierte `v_rw` (bei `--exclude-round5` haette val_combined
+andere Samples enthalten als der Loss). Beides behoben; der gelaufene
+wdlhard-Lauf war nicht betroffen (rw=None-Pfad).
+
+### Verdachtsfaelle
+- **V1 (offen, klein)**: Arena-Partien tragen kein `completed`-Flag --
+  ein Timeout-Abbruch zaehlt als normaler Sieg im SPRT. Kein Beleg fuer
+  konkreten Schaden; additives Flag + Zaehlung als kleiner Folgetask.
+- **V2 (GEFIXT)**: stille Champion-Fallbacks -- arena.py fiel bei
+  fehlendem Champion-ONNX kommentarlos auf v18_best zurueck (jetzt
+  Hard-Error), server.py startete kommentarlos ohne Modell (jetzt laute
+  Warnung).
+- **V3 (GEPRUEFT, SAUBER)**: placed_color/placed_special-Praezedenz
+  zwischen den Encodern -- per Konstruktion exklusiv (Special-Felder
+  akzeptieren nie Farben, Normal/Wild nie Weiss), unerreichbar.
+
+### Geprueft und sauber (Agent + Stichproben-Gegenpruefung)
+Ply-Paritaet/Backup-Perspektive, root_q/root_child_q-Konventionen,
+Kalibrierungs-Knopf-Achse, #28-Blend-Skalen (abgesehen von F1s falscher
+Quelle), Gumbel-sigma/v_mix, Beobachtungs-Encoding (JSON- und
+Direct-Pfad, 1D+2D), Masken-Nenner (ausser F3), WDL-ONNX-Vertrag,
+Regelkonsistenz-Stichprobe (alle Zuege via Game::apply_*), Tiling-Memo-
+Key, paired_gating-Zuordnung/SPRT, bootstrap/rtv-Perspektive.
+NICHT abgedeckt: Voll-Audit der 4 Regel-Fixes gegen das Regelbuch,
+~35 weitere tools/-Skripte, py.rs-Bindungsschicht, profiling.rs.
 
 ## Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert NICHT (2026-08-05)
 
