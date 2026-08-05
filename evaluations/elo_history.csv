@@ -33,3 +33,7 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-08-03,v19_2d_opp_best,400,v19_2d_best,400,209,191,400,"Task #28 Gate 2 (Nichtunterlegenheit, w=0, keine Promotion): UNDECIDED_CAP_REACHED, p=0.4215 -- Gate bestanden"
 2026-08-04,v19_2d_opp_w01_la20,400,v19_2d_best,400,205,195,400,"Champion-Kandidaten-Gating v19_2d_opp@w=0.1/lambda=2.0, block-size 5, keine Promotion: UNDECIDED_CAP_REACHED, p=0.6817"
 2026-08-05,v19_2d_opp_l07,400,v19_2d_best,400,33,47,80,"lambda=0.7+opp auf 900er-Korpus (43.8% Mix), w=0.1/la=2.0: SPRT-H0 nach 40 Paaren, p=0.1671"
+2026-08-05,t34_wdlhard_brierbest,400,t34_tanh,400,65,75,140,"Gepaartes Gating (Task #76), SPRT=H0, p=0.4731"
+2026-08-05,t34_wdlhard_brierbest,400,v19_2d_best,400,106,114,220,"Gepaartes Gating (Task #76), SPRT=H0, p=0.6516"
+2026-08-05,t34_wdldestretch_brierbest,400,t34_tanh,400,75,85,160,"Gepaartes Gating (Task #76), SPRT=H0, p=0.5114"
+2026-08-05,t34_wdldestretch_brierbest,400,v19_2d_best,400,65,75,140,"Gepaartes Gating (Task #76), SPRT=H0, p=0.5224"

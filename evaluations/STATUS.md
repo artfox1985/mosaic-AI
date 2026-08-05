@@ -24,7 +24,8 @@ Sequenzialisierung verloren).
 | #33 | Value-/Policy-Loss-Gewicht | wartet | in #34 integriert (Loss-Skala springt ~22x) | unten |
 | #35b | Ranking-Loss-Training | wartet | #35-Logging + v20-Self-Play | unten |
 | #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Nutzer) | Champion, der gute Spieler fordert | unten |
-| **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | geplant | #34 (braucht den Brier-Score) | unten |
+| **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | **laeuft** (9 Trainings, PREREG + Amendment) | — | unten |
+| **#37** | Tiling-Auswahlkriterium: `punkte*P(Sieg)` vs reines P(Sieg)-Ranking | **vorgemerkt fuer v20-Aera** (Nutzer 2026-08-05) | v20-Champion mit reifem WDL-Kopf | unten |
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
 | — | v20-Zyklus (Self-Play + Gating) | geplant | **#34-Ausgang + #36 + #14-Entscheid** (Nutzer 2026-08-05: Start erst, wenn klar ist, wie viele Spiele/Sims wirklich sinnvoll sind) | unten |
 | — | R4b (Playout-Ground-Truth) | geplant | — | history (#R4-Alarm) |
@@ -611,6 +612,33 @@ die FORM, nicht der Absolutwert.
 (~50 min je Groesse), das ist der Hauptposten -- Sample-Ebene-Subsampling
 geht NICHT, weil das Value-Ziel per PARTIE definiert ist, also muessen
 Dateien/Partien subsampled werden.
+
+## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
+
+**Frage**: Welches Kriterium waehlt unter den Top-12-Tiling-Abschluessen
+(Task-#20-Kopplung, `tiling_solver.rs::best_first_step_valued`):
+(a) Bestand `punkte * P(Sieg)`, (b) reines P(Sieg)-Ranking,
+(c) P(Sieg) mit Punkte-Tiebreak nur bei nahezu gleichem P?
+
+**Hintergrund** (Diskussion 2026-08-05): Mit dem kalibrierten WDL-Kopf
+fliesst die Punkte-Information beim Produkt ZWEIMAL ein -- einmal korrekt
+dosiert via P(Sieg|Folgezustand), einmal als eigener Faktor mit
+willkuerlichem Wechselkurs (ob die bessere Siegchance sich durchsetzt,
+haengt vom absoluten Punkteniveau ab). Mit dem ALTEN Margen-Kopf war das
+Produkt in sich stimmig und wirkte wegen der Stauchung de facto als
+reiner Punkte-Stichentscheid -- der kalibrierte Kopf spreizt ~2x weiter
+und kann Punktunterschiede real ueberstimmen (stille
+Verhaltensverschiebung ohne Codeaenderung).
+
+**GEGENARGUMENT, vorab notiert**: der Punkte-Faktor wirkt derzeit als
+robuster PRIOR, der Value-Rauschen baendigt (Kopf nach 2-3 Epochen noch
+verrauscht) -- moeglicherweise ist das Produkt genau deshalb praktisch
+robust. Entscheid daher NUR per Arena, nicht am Schreibtisch.
+
+**Zuschnitt**: v20-Aera (reifer WDL-Kopf im Champion), Arena-A/B der
+Varianten (a) vs (b), ggf. (c) als dritter Arm; Laufzeit-Schalter analog
+Task-#30-Muster, damit kein Rebuild je Arm noetig ist. Bis dahin bleibt
+(a) Bestandsverhalten.
 
 ### PCR (Task #14): konditionale WIEDEREROEFFNUNG (Nutzer-Frage 2026-08-05)
 
