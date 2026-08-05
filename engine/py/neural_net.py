@@ -579,7 +579,51 @@ def action_to_id(action: dict) -> int:
 #                    bisherigen Ziel gemischt (TD_LAMBDA, siehe unten) --
 #                    ERSETZT `val`/`points_val` NICHT vollstaendig wie `rtv`,
 #                    sondern mischt hinein. Erster, ungetesteter Wert.
-VALUE_SCHEMA_VERSION = 15
+# Ab Version 16 (Task #34, STATUS.md "Sieg/Niederlage-Ziel wiederherstellen"
+#                    /"ZUSAMMENFUEHRUNG ... WDL ist NICHT hinfaellig"): die
+#                    v13-Umstellung (siehe Version-13-Absatz oben) hat den
+#                    Value-Kopf faktisch zu einem zweiten Punkte-Kopf gemacht
+#                    (`corr(val_true, pts_true)` nur 0.49 vor Schema 13, seither
+#                    beide Koepfe auf derselben tanh-Punkte-Marge) -- die
+#                    beabsichtigte Kopf-TRENNUNG (Sieg/Niederlage vs.
+#                    Punktestand) war seit Version 13 aufgehoben. Zwei neue,
+#                    rein ADDITIVE Cache-Felder (aendern `values`/
+#                    `points_forecast` NICHT):
+#                      - `values_wdl`  : GEWINNWAHRSCHEINLICHKEIT in [0,1].
+#                        Hartes Ziel `y = 1.0 falls winner==player sonst 0.0`,
+#                        wo vorhanden TD(lambda)-geblendet mit `bootstrap_value`
+#                        -- EXAKT dieselbe Blend-Formel/dasselbe TD_LAMBDA wie
+#                        beim bisherigen Ziel oben, ABER `bootstrap_value`
+#                        liegt bereits als [0,1]-Wahrscheinlichkeit vor und wird
+#                        hier NICHT wie beim tanh-Ziel per `*2-1` auf [-1,1]
+#                        remappt -- direkt als Wahrscheinlichkeit geblendet.
+#                        Macht den TD-Blend semantisch kohaerent (STATUS.md
+#                        "Bonus-Befund": beide Anteile jetzt auf derselben
+#                        Skala, anders als beim tanh-Ziel, das eine
+#                        Punkte-Marge mit einer Gewinnwahrscheinlichkeit
+#                        mischt). Der rtv-Zweig bleibt unangetastet/deaktiviert
+#                        (`nortv` ist Standard) -- `values_wdl` ignoriert ihn
+#                        komplett, unabhaengig von `value_target_variant`.
+#                      - `wdl_outcome` : der ROHE, UNGEBLENDETE tatsaechliche
+#                        Spielausgang (0.0/1.0, -1.0 = unbekannt bei
+#                        unvollstaendigen Partien) -- NICHT das Trainingsziel,
+#                        sondern die Referenz fuer eine ARM-uebergreifend
+#                        vergleichbare Kalibrierungskennzahl (Brier-Score,
+#                        siehe train.py) -- `values`/`values_wdl` sind beide
+#                        TD-geblendet und damit dafuer ungeeignet.
+#                    Modellseitig (siehe `MosaicNet`/`Mosaic2DNet`,
+#                    `--value-head wdl` in train.py): der Value-Kopf bekommt
+#                    intern 2 Logits + Softmax -> P(Sieg), `forward()` gibt an
+#                    der BESTEHENDEN Position weiterhin einen Skalar zurueck,
+#                    naemlich `2*P(Sieg)-1` -- exakt dieselbe [-1,1]-Skala/
+#                    Position wie der alte Tanh-Kopf. Dadurch gilt
+#                    `net_mcts.rs::value_to_win_prob(2*P(Sieg)-1) == P(Sieg)`
+#                    EXAKT (geprueft: `value_to_win_prob(v) = (v+1)/2`) -- KEINE
+#                    Rust-Aenderung noetig, jeder bestehende ONNX-Konsument
+#                    funktioniert unveraendert. Default bleibt der Tanh-Kopf
+#                    (`--value-head tanh`) -- byte-identisches
+#                    Bestandsverhalten, wenn das Flag nicht gesetzt ist.
+VALUE_SCHEMA_VERSION = 16
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 # Mischgewicht fuer `bootstrap_value` (Punkt 6) -- 0.0 = nur bisheriges Ziel
@@ -634,6 +678,20 @@ ROOT_Q_CACHE_FIELDS = ("root_q", "root_q_mask")
 # Rueckgewinnung `own_pts = points_pred + VALUE_OPP_EPSILON*opp_pred` exakt
 # (siehe Kommentar an der Baustelle unten).
 OPP_POINTS_CACHE_FIELDS = ("opp_points_forecast", "opp_points_mask")
+
+# Task #34 (STATUS.md "Sieg/Niederlage-Ziel wiederherstellen"): additive
+# Cache-Felder fuers WDL-Ziel (siehe VALUE_SCHEMA_VERSION=16-Kommentar oben
+# fuer die Herleitung) -- immer mitgebaut, unabhaengig davon, ob ein Lauf
+# `--value-head wdl` nutzt (analog zu `points_forecast`, das auch immer
+# gebaut wird, egal ob POINTS_WEIGHT>0).
+WDL_CACHE_FIELDS = ("values_wdl", "wdl_outcome")
+
+# Task #34: welcher Value-Kopf/welches Value-Ziel aktiv ist -- siehe
+# `--value-head` in train.py. "tanh" (Standard) ist das BESTANDSVERHALTEN
+# (Skalar-Regressionskopf auf `values`, MSE); "wdl" ist der neue
+# 2-Logit-Softmax-Klassifikationskopf auf `values_wdl`, Kreuzentropie mit
+# weichen Labels (siehe `MosaicNet`/`Mosaic2DNet`).
+VALUE_HEAD_VARIANTS = ("tanh", "wdl")
 
 # rtv-Ablation Phase 1 (Task #84, 2026-07-24): Trainings-Varianten, die den
 # `round_transition_value`-Override beim Target-Bau ignorieren -- OHNE neues
@@ -853,6 +911,21 @@ class MosaicDataset(Dataset):
                     # komplett 0, `values`/`points_forecast` bleiben unberuehrt.
                     self.opp_points_forecast = torch.zeros_like(self.values)
                     self.opp_points_mask = torch.zeros(len(self.states), dtype=torch.float32)
+                if 'values_wdl' in hf:
+                    self.values_wdl = torch.from_numpy(hf['values_wdl'][:])
+                    self.wdl_outcome = torch.from_numpy(hf['wdl_outcome'][:])
+                else:
+                    # Task #34 (WDL_CACHE_FIELDS-Kommentar oben): kann durch
+                    # den VALUE_SCHEMA_VERSION=16-Marker im Cache-Key
+                    # eigentlich nicht auftreten (jeder Cache mit passendem
+                    # Key wurde vom neuen Baucode geschrieben) -- defensiver
+                    # Fallback trotzdem, gleiches Muster wie bei `rounds`.
+                    # 0.5 = neutral/uninformativ (kein Ziel bekannt),
+                    # -1.0 = "Ausgang unbekannt" (identisch zur Ownership-
+                    # Konvention), NICHT 0.0 (das waere ein erfundenes
+                    # "Niederlage"-Label).
+                    self.values_wdl = torch.full_like(self.values, 0.5)
+                    self.wdl_outcome = torch.full_like(self.values, -1.0)
                 if self.encoder == "2d":
                     if 'planes' not in hf:
                         raise RuntimeError(
@@ -904,6 +977,10 @@ class MosaicDataset(Dataset):
             # Fallback-Muster wie root_q oben.
             self.opp_points_forecast = torch.zeros_like(self.values)
             self.opp_points_mask = torch.zeros(len(self.states), dtype=torch.float32)
+            # Legacy .pt stammt lange vor Task #34 -- gleiches Fallback-Muster
+            # wie root_q/opp_points oben (siehe WDL_CACHE_FIELDS-Kommentar).
+            self.values_wdl = torch.full_like(self.values, 0.5)
+            self.wdl_outcome = torch.full_like(self.values, -1.0)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -919,6 +996,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('root_q_mask',         data=self.root_q_mask.numpy(),         compression='lzf')
                 hf.create_dataset('opp_points_forecast', data=self.opp_points_forecast.numpy(), compression='lzf')
                 hf.create_dataset('opp_points_mask',     data=self.opp_points_mask.numpy(),     compression='lzf')
+                hf.create_dataset('values_wdl',          data=self.values_wdl.numpy(),          compression='lzf')
+                hf.create_dataset('wdl_outcome',         data=self.wdl_outcome.numpy(),         compression='lzf')
             os.remove(cache_path_pt)
             self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
@@ -937,6 +1016,8 @@ class MosaicDataset(Dataset):
             root_q_mask_l = []  # 1.0 = root_q vorhanden (echte Suche geloggt), sonst 0.0
             opp_points_l = []       # Task #28: reine Gegner-Punkteprognose (siehe OPP_POINTS_CACHE_FIELDS)
             opp_points_mask_l = []  # 1.0 = echter Wert (scores/winner vorhanden), sonst 0.0
+            value_wdl_l = []    # Task #34: Gewinnwahrscheinlichkeit [0,1] (siehe WDL_CACHE_FIELDS)
+            wdl_outcome_l = []  # Task #34: roher Spielausgang 0.0/1.0, -1.0 = unbekannt
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
             # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
             # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
@@ -1052,6 +1133,21 @@ class MosaicDataset(Dataset):
                                 # (gleiches TD_LAMBDA, gleiche Blend-Formel).
                                 opp_points_val = (TD_LAMBDA * opp_bootstrap
                                                   + (1.0 - TD_LAMBDA) * opp_points_val)
+                            # Task #34 (VALUE_SCHEMA_VERSION=16, WDL_CACHE_FIELDS):
+                            # eigenstaendiges, PARALLELES Ziel -- UNABHAENGIG von
+                            # `val`/`rtv` oben (der rtv-Zweig bleibt bewusst
+                            # unangetastet, siehe Kopf-Kommentar). Hartes
+                            # Sieg/Niederlage-Label plus derselbe TD-Blend-Formel
+                            # wie oben, ABER `bv[p]` NICHT auf [-1,1] remappen --
+                            # `bootstrap_value` ist bereits eine [0,1]-
+                            # Gewinnwahrscheinlichkeit, hier direkt geblendet
+                            # (macht den Blend semantisch kohaerent, siehe
+                            # STATUS.md "Bonus-Befund").
+                            wdl_outcome_val = 1.0 if int(step["winner"]) == p else 0.0
+                            value_wdl = wdl_outcome_val
+                            if bv is not None:
+                                value_wdl = TD_LAMBDA * float(bv[p]) + (1.0 - TD_LAMBDA) * wdl_outcome_val
+                            value_wdl = min(1.0, max(0.0, value_wdl))
                         else:
                             val = float(step["value"])
                             points_val = val
@@ -1062,10 +1158,20 @@ class MosaicDataset(Dataset):
                             # statt eines erfundenen Werts").
                             opp_points_val = 0.0
                             opp_points_mask = 0.0
+                            # Task #34: kein echtes Sieg/Niederlage-Label
+                            # vorhanden -- grobe Projektion der alten
+                            # tanh-Marge auf [0,1] als bestmoegliche Naeherung
+                            # (kein erfundenes hartes Label), `wdl_outcome`
+                            # bekommt den "unbekannt"-Sentinel -1.0 (analog zur
+                            # Ownership-Konvention).
+                            value_wdl = (val + 1.0) * 0.5
+                            wdl_outcome_val = -1.0
                         values_l.append([val])
                         points_l.append([points_val])
                         opp_points_l.append([opp_points_val])
                         opp_points_mask_l.append(opp_points_mask)
+                        value_wdl_l.append([value_wdl])
+                        wdl_outcome_l.append([wdl_outcome_val])
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for pe in step["policy"]:
@@ -1157,6 +1263,8 @@ class MosaicDataset(Dataset):
             root_q_mask_np = np.array(root_q_mask_l, dtype=np.float32); del root_q_mask_l
             opp_points_np      = np.array(opp_points_l,      dtype=np.float32); del opp_points_l
             opp_points_mask_np = np.array(opp_points_mask_l, dtype=np.float32); del opp_points_mask_l
+            value_wdl_np    = np.array(value_wdl_l,    dtype=np.float32); del value_wdl_l
+            wdl_outcome_np  = np.array(wdl_outcome_l,  dtype=np.float32); del wdl_outcome_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -1179,6 +1287,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('root_q_mask',          data=root_q_mask_np, compression='lzf')
                 hf.create_dataset('opp_points_forecast',  data=opp_points_np,      compression='lzf')
                 hf.create_dataset('opp_points_mask',      data=opp_points_mask_np, compression='lzf')
+                hf.create_dataset('values_wdl',           data=value_wdl_np,     compression='lzf')
+                hf.create_dataset('wdl_outcome',          data=wdl_outcome_np,   compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset('planes',           data=planes_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
@@ -1207,6 +1317,8 @@ class MosaicDataset(Dataset):
             self.root_q_mask        = torch.from_numpy(root_q_mask_np)
             self.opp_points_forecast = torch.from_numpy(opp_points_np)
             self.opp_points_mask     = torch.from_numpy(opp_points_mask_np)
+            self.values_wdl          = torch.from_numpy(value_wdl_np)
+            self.wdl_outcome         = torch.from_numpy(wdl_outcome_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -1339,7 +1451,12 @@ class MosaicDataset(Dataset):
                 # angehaengt -- Aufrufer, die dieses 9-Tupel noch kennen (z.B.
                 # `tools/diagnosis.py`s `*_`-Catch-all), bleiben unberuehrt,
                 # solange sie nicht die letzten 2 Elemente per Index erwarten.
-                self.opp_points_forecast[idx], self.opp_points_mask[idx])
+                self.opp_points_forecast[idx], self.opp_points_mask[idx],
+                # Task #34: erneut additiv ANS ENDE angehaengt (gleiches
+                # Muster) -- `values_wdl` (TD-geblendetes WDL-Trainingsziel)
+                # + `wdl_outcome` (roher, ungeblendeter Ausgang fuer den
+                # arm-uebergreifend vergleichbaren Brier-Score, siehe train.py).
+                self.values_wdl[idx], self.wdl_outcome[idx])
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
         # vorangestellt (12-Tupel statt 11) -- `encoder="flat"` (Standard)
         # bleibt exakt das bisherige Tupel-Layout, byte-identisches
@@ -1380,6 +1497,21 @@ def opp_points_head_present(state: dict) -> bool:
     return "opp_points_head.0.weight" in state
 
 
+def value_head_variant_from_state(state: dict) -> str:
+    """Task #34: 'tanh' (Skalar-Regressionskopf, Bestandsverhalten) oder
+    'wdl' (2-Logit-Softmax-Klassifikationskopf) AUS DEM CHECKPOINT ableiten --
+    dasselbe Muster wie `points_dist_bins_from_state`/`opp_points_head_present`.
+    `value_head.2.weight` ist bei 'tanh' der letzte Linear-Layer VOR `Tanh()`
+    (Ausgabebreite 1); bei 'wdl' ist es der letzte Linear-Layer des Kopfes
+    (Ausgabebreite 2, rohe Logits -- Softmax passiert erst in `forward`, siehe
+    dortigen Kommentar). Alt-Checkpoints (kein solcher Key, oder Breite 1)
+    liefern 'tanh' und bleiben dadurch unveraendert ladbar/exportierbar."""
+    w = state.get("value_head.2.weight")
+    if w is None:
+        return "tanh"
+    return "wdl" if int(w.shape[0]) == 2 else "tanh"
+
+
 def encoder_from_state_dict(state: dict) -> str:
     """Task #11 Phase 2 (M2.1): 'flat' oder '2d' AUS DEM CHECKPOINT ableiten --
     dasselbe Muster wie `points_dist_bins_from_state`. Ein 2D-Checkpoint
@@ -1394,8 +1526,14 @@ def encoder_from_state_dict(state: dict) -> str:
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64,
-                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False):
+                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False,
+                 value_head_variant="tanh"):
         super(MosaicNet, self).__init__()
+        if value_head_variant not in VALUE_HEAD_VARIANTS:
+            raise ValueError(
+                f"Unbekannter value_head_variant={value_head_variant!r} -- "
+                f"erlaubt: {VALUE_HEAD_VARIANTS}"
+            )
         self.body = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.BatchNorm1d(hidden_size),
@@ -1440,16 +1578,31 @@ class MosaicNet(nn.Module):
             nn.ReLU(),
             nn.Linear(32, 5)   # 5 Farben: blau, gelb, rot, schwarz, türkis
         )
-        # Value-Head: Sieg/Niederlage (+1/-1), klassisches AlphaZero-Ziel --
-        # zurueckgeholt, aber NICHT mehr fuer die Suche gedacht (Stufe 2 bleibt
-        # tot, siehe evaluations/stage2_investigation.md), sondern als
-        # Trainings-Zusatzsignal fuer den gemeinsamen Trunk.
-        self.value_head = nn.Sequential(
-            nn.Linear(hidden_size, value_hidden),
-            nn.ReLU(),
-            nn.Linear(value_hidden, 1),
-            nn.Tanh()
-        )
+        # Value-Head: Sieg/Niederlage, klassisches AlphaZero-Ziel -- zurueck-
+        # geholt, aber NICHT mehr fuer die Suche gedacht (Stufe 2 bleibt tot,
+        # siehe evaluations/stage2_investigation.md), sondern als Trainings-
+        # Zusatzsignal fuer den gemeinsamen Trunk.
+        # Task #34 (VALUE_SCHEMA_VERSION=16-Kommentar oben): zwei Varianten --
+        #   "tanh" (Standard, Bestandsverhalten byte-identisch): Skalar-
+        #     Regressionskopf, Tanh-aktiviert, Ausgabe direkt in [-1,1].
+        #   "wdl": 2 ROHE Logits (KEIN Tanh) -- `forward()` bildet daraus per
+        #     Softmax P(Sieg) und gibt an DERSELBEN Position/Skala weiterhin
+        #     `2*P(Sieg)-1` aus (siehe dortiger Kommentar). Dadurch bleibt
+        #     `net_mcts.rs::value_to_win_prob` unveraendert kompatibel.
+        self.value_head_variant = value_head_variant
+        if self.value_head_variant == "wdl":
+            self.value_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 2),   # rohe Logits [P(Niederlage), P(Sieg)]
+            )
+        else:
+            self.value_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh()
+            )
         # Punktestand-Prognose-Head (Aux-Ziel): dieselbe tanh-gestauchte
         # Punktedifferenz-Formel, die frueher der einzige Value-Head war --
         # jetzt als separater, feinerer Regressions-Kopf NEBEN dem robusteren
@@ -1524,6 +1677,22 @@ class MosaicNet(nn.Module):
             pts_logits = pts_out
             probs = torch.softmax(pts_logits, dim=-1)
             pts_out = (probs * self.points_bin_centers).sum(dim=-1, keepdim=True)
+        # Task #34: "wdl"-Variante liefert 2 rohe Logits statt eines
+        # Tanh-Skalars -- Softmax -> P(Sieg), dann auf DIESELBE [-1,1]-Position/
+        # Skala wie der alte Tanh-Kopf zurueckprojiziert (`2*P(Sieg)-1`), damit
+        # `net_mcts.rs::value_to_win_prob((v+1)/2)` unveraendert `P(Sieg)`
+        # liefert -- KEINE Rust-Aenderung noetig. Die rohen Logits gehen
+        # ZUSAETZLICH raus (analog zu `pts_logits`), damit train.py eine
+        # numerisch stabile Kreuzentropie (BCEWithLogits auf der Logit-
+        # Differenz) statt manuellem log(softmax) rechnen kann.
+        value_raw = self.value_head(shared)
+        value_wdl_logits = None
+        if self.value_head_variant == "wdl":
+            value_wdl_logits = value_raw
+            p_win = torch.softmax(value_wdl_logits, dim=-1)[:, 1:2]
+            value_out = 2.0 * p_win - 1.0
+        else:
+            value_out = value_raw
         # Reihenfolge = ONNX-Ausgabereihenfolge. `ownership` steht ZULETZT,
         # damit `net.rs`s positionsbasierte Indizes out[0..3] unveraendert
         # bleiben (Rust liest den Kopf nicht -- reines Trainingssignal).
@@ -1531,17 +1700,21 @@ class MosaicNet(nn.Module):
         # Muster, dieselbe Begruendung.
         out = (
             self.policy_head(shared),
-            self.value_head(shared),
+            value_out,
             self.moon_order_head(shared),
             pts_out,
             self.ownership_head(shared),
         )
-        # Task #28: `opp_points` haengt HINTER ALLEM (auch hinter
-        # `pts_logits`, falls Task #12 aktiv waere) -- ONNX-Vertrag mit der
-        # Engine-Seite: "opp_points" ist der LETZTE Output, von Rust per NAME
-        # (nicht Position) erkannt.
         if pts_logits is not None:
             out = out + (pts_logits,)
+        # Task #34: `value_wdl_logits` haengt NACH `pts_logits`, aber VOR
+        # `opp_points` -- `opp_points` muss der ZULETZT angehaengte Output
+        # bleiben (Task #28, ONNX-Vertrag mit der Engine-Seite).
+        if value_wdl_logits is not None:
+            out = out + (value_wdl_logits,)
+        # Task #28: `opp_points` haengt HINTER ALLEM -- ONNX-Vertrag mit der
+        # Engine-Seite: "opp_points" ist der LETZTE Output, von Rust per NAME
+        # (nicht Position) erkannt.
         if self.has_opp_points_head:
             out = out + (self.opp_points_head(shared),)
         return out
@@ -1616,8 +1789,13 @@ class Mosaic2DNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64, points_dist_bins=POINTS_DIST_BINS,
                  planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2,
-                 opp_points_head=False):
+                 opp_points_head=False, value_head_variant="tanh"):
         super().__init__()
+        if value_head_variant not in VALUE_HEAD_VARIANTS:
+            raise ValueError(
+                f"Unbekannter value_head_variant={value_head_variant!r} -- "
+                f"erlaubt: {VALUE_HEAD_VARIANTS}"
+            )
         self.input_size = input_size
         self.planes_channels = planes_channels
 
@@ -1673,12 +1851,22 @@ class Mosaic2DNet(nn.Module):
             nn.Linear(32, 5),
         )
 
-        self.value_head = nn.Sequential(
-            nn.Linear(hidden_size, value_hidden),
-            nn.ReLU(),
-            nn.Linear(value_hidden, 1),
-            nn.Tanh(),
-        )
+        # Task #34: siehe `MosaicNet`-Kommentar -- identische Logik/Begruendung,
+        # BYTE-IDENTISCHE Architektur je Variante.
+        self.value_head_variant = value_head_variant
+        if self.value_head_variant == "wdl":
+            self.value_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 2),
+            )
+        else:
+            self.value_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh(),
+            )
 
         self.points_dist_bins = int(points_dist_bins)
         if self.points_dist_bins > 0:
@@ -1733,18 +1921,31 @@ class Mosaic2DNet(nn.Module):
             probs = torch.softmax(pts_logits, dim=-1)
             pts_out = (probs * self.points_bin_centers).sum(dim=-1, keepdim=True)
 
+        # Task #34: identische Logik zu `MosaicNet.forward` -- siehe dortiger
+        # Kommentar fuer die vollstaendige Begruendung.
+        value_raw = self.value_head(shared)
+        value_wdl_logits = None
+        if self.value_head_variant == "wdl":
+            value_wdl_logits = value_raw
+            p_win = torch.softmax(value_wdl_logits, dim=-1)[:, 1:2]
+            value_out = 2.0 * p_win - 1.0
+        else:
+            value_out = value_raw
+
         # Reihenfolge = ONNX-Ausgabereihenfolge, identisch zu `MosaicNet.forward`.
         out = (
             self.policy_head(shared),
-            self.value_head(shared),
+            value_out,
             self.moon_order_head(shared),
             pts_out,
             self.ownership_head(shared),
         )
-        # Task #28: `opp_points` haengt HINTER ALLEM, identisches Muster zu
-        # `MosaicNet.forward`.
         if pts_logits is not None:
             out = out + (pts_logits,)
+        if value_wdl_logits is not None:
+            out = out + (value_wdl_logits,)
+        # Task #28: `opp_points` haengt HINTER ALLEM, identisches Muster zu
+        # `MosaicNet.forward`.
         if self.has_opp_points_head:
             out = out + (self.opp_points_head(shared),)
         return out
@@ -1772,15 +1973,21 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     # Checkpoint ohne diese Keys baut das Modell OHNE den Kopf, bleibt also
     # ladbar/exportierbar wie bisher.
     opp_head = opp_points_head_present(state)
+    # Task #34: 'tanh' oder 'wdl' AUS DEM CHECKPOINT ableiten (gleiches Muster) --
+    # ein Alt-Checkpoint (kein `value_head.2.weight` mit Breite 2) baut den
+    # klassischen Tanh-Kopf, bleibt also unveraendert ladbar/exportierbar.
+    value_head_variant = value_head_variant_from_state(state)
     if encoder == "2d":
         in_size = input_size if input_size is not None else state["flat_branch.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
-                            policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head)
+                            policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
+                            value_head_variant=value_head_variant)
     else:
         in_size = input_size if input_size is not None else state["body.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = MosaicNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
-                          policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head)
+                          policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
+                          value_head_variant=value_head_variant)
     model.load_state_dict(state, strict=False)
     return model, encoder

@@ -26,6 +26,17 @@ Task #11 Phase 2 (M2.1): zusätzlicher 2D-Zweig für `Mosaic2DNet`-Checkpoints
 im Checkpoint (`neural_net.py::encoder_from_state_dict`, rückwirkend
 funktionsfähig, kein Manifest-Feld nötig). Der bestehende Flach-Zweig bleibt
 UNVERÄNDERT (byte-identisches Verhalten für alle `MosaicNet`-Checkpoints).
+
+Task #34: bei einem 'wdl'-Value-Kopf (`--value-head wdl` beim Training,
+erkannt an `value_head.2.weight` mit Breite 2, siehe
+`neural_net.py::value_head_variant_from_state`) haengt zusaetzlich ein
+optionaler Output `value_wdl_logits` (rohe 2-Logit-Ausgabe) NACH `points_dist`
+(falls aktiv), aber VOR `opp_points`. Der bestehende `value`-Output bleibt an
+SEINER Position UND auf der GLEICHEN [-1,1]-Skala (`2*P(Sieg)-1`) -- die
+Engine-Seite (`net_mcts.rs::value_to_win_prob`) liest ihn unveraendert,
+`value_wdl_logits` ist reine Trainings-/Diagnose-Zusatzinformation, von der
+Rust-Suche nicht konsumiert. Alt-Modelle (Tanh-Kopf) exportieren
+byte-identisch wie zuvor.
 """
 import sys
 import argparse
@@ -35,7 +46,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (MosaicNet, Mosaic2DNet, points_dist_bins_from_state,  # noqa: E402
-                        encoder_from_state_dict, opp_points_head_present)
+                        encoder_from_state_dict, opp_points_head_present,
+                        value_head_variant_from_state)
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
 
@@ -61,9 +73,13 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     # wenn der Checkpoint ihn traegt -- Alt-Modelle exportieren dadurch
     # byte-identisch (5 Outputs) wie vor dieser Aenderung.
     opp_head = opp_points_head_present(state)
+    # Task #34: 'tanh' oder 'wdl' AUS DEM CHECKPOINT -- Alt-Modelle (kein
+    # `value_head.2.weight` mit Breite 2) exportieren byte-identisch.
+    value_head_variant = value_head_variant_from_state(state)
 
     model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
-                      points_dist_bins=points_dist_bins_from_state(state), opp_points_head=opp_head)
+                      points_dist_bins=points_dist_bins_from_state(state), opp_points_head=opp_head,
+                      value_head_variant=value_head_variant)
     new_state = model.state_dict()
     # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
     # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads
@@ -87,10 +103,15 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     out_names = ["policy", "value", "moon", "points", "ownership"]
     if getattr(model, "points_dist_bins", 0) > 0:
         out_names.append("points_dist")
+    # Task #34: "value_wdl_logits" haengt NACH "points_dist", aber VOR
+    # "opp_points" -- muss exakt der Anhaenge-Reihenfolge in
+    # `MosaicNet.forward` entsprechen (sonst Output-Name/Tensor-Mismatch).
+    if getattr(model, "value_head_variant", "tanh") == "wdl":
+        out_names.append("value_wdl_logits")
     # Task #28: "opp_points" MUSS der ZULETZT angehaengte Output sein (ONNX-
     # Vertrag mit der Engine-Seite, siehe PREREG_task28_aggression.md) --
-    # deshalb nach "points_dist", nicht davor. Die Engine erkennt ihn per
-    # Output-NAME, nicht per Position.
+    # deshalb nach "points_dist"/"value_wdl_logits", nicht davor. Die Engine
+    # erkennt ihn per Output-NAME, nicht per Position.
     if getattr(model, "has_opp_points_head", False):
         out_names.append("opp_points")
     dyn_axes = {"state": {0: "batch"}}
@@ -148,11 +169,14 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
 
     # Task #28: siehe _export_flat-Kommentar -- additiv, nur wenn im Checkpoint vorhanden.
     opp_head = opp_points_head_present(state)
+    # Task #34: siehe _export_flat-Kommentar.
+    value_head_variant = value_head_variant_from_state(state)
 
     model = Mosaic2DNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
                         points_dist_bins=points_dist_bins_from_state(state),
                         planes_channels=planes_channels, conv_channels=conv_channels,
-                        conv_layers=max(conv_layers, 1), opp_points_head=opp_head)
+                        conv_layers=max(conv_layers, 1), opp_points_head=opp_head,
+                        value_head_variant=value_head_variant)
     new_state = model.state_dict()
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
     if skipped:
@@ -164,6 +188,10 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
     out_names = ["policy", "value", "moon", "points", "ownership"]
     if getattr(model, "points_dist_bins", 0) > 0:
         out_names.append("points_dist")
+    # Task #34: "value_wdl_logits" NACH "points_dist", VOR "opp_points" (siehe
+    # _export_flat-Kommentar).
+    if getattr(model, "value_head_variant", "tanh") == "wdl":
+        out_names.append("value_wdl_logits")
     # Task #28: "opp_points" ZULETZT (siehe _export_flat-Kommentar).
     if getattr(model, "has_opp_points_head", False):
         out_names.append("opp_points")
