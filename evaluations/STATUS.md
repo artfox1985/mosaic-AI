@@ -33,7 +33,7 @@ Sequenzialisierung verloren).
 | — | GUI: Aggressions-Slider entfernen | **erledigt** 2026-08-05 (kein Startwert -- Blend ueberall 0, s. Regeln) | — | history (Task #28) |
 | #29 | Value-Rangmetrik | **geschlossen**: NICHT validiert (2/6) | — | history |
 | #28 | Aggressions-Utility (opp-Kopf + Regler) | **ERGEBNISSE UNGUELTIG** (Engine-Audit F1: ownership-Logit als Gegner-Punkte gelesen) | Neumessung nach Fix noetig | unten (Engine-Audit) |
-| #14 | PCR (beide Regime) | **geschlossen**, Wiedereroeffnung konditional | #34 + #36 + Durchsatz-Neumessung | unten |
+| #14 | PCR (beide Regime) | **WIEDEREROEFFNET 2026-08-06: alle 3 Bedingungen erfuellt** (#34 ✓, #36 spielhungrig ✓, Durchsatz **1,37x** end-to-end ✓) | Design-Entscheid gehoert in die v20-Planung (Nutzer) | unten |
 | #27 | R5-Value-Kalibrierung | **geschlossen**: Unterkalibrierung belegt | — | history |
 | #9 | Ownership-Kopf | **geschlossen** 2026-07-28 | Wiedereroeffnung nur mit Arena-Instrument | history |
 | #12 | Distributionaler Punkte-Kopf | **geschlossen**: nicht uebernommen | — | history |
@@ -747,6 +747,19 @@ keine Neulesung der alten Zahlen.
 kann sinken (oder in Qualitaet statt Menge fliessen). Waechst er weiter ->
 mehr Partien sind der billigste Value-Hebel ueberhaupt, und die
 Tiling-Cache-Ersparnis (-20%) laesst sich direkt in mehr Spiele umsetzen.
+
+**DURCHSATZ-MESSUNG (Bedingung iii, 2026-08-06)**: end-to-end, je 30
+Partien, Champion@600, 11 Threads, Tiling-Cache an: Standard 233s vs
+PCR-mild (0,5/300) 170s -> **1,371x**, klar ueber der 1,15x-Schwelle
+(Messpartien sofort aus data/ geloescht). **#14 ist damit formal
+WIEDEREROEFFNET** -- alle drei Bedingungen erfuellt. WICHTIG:
+Wiedereroeffnung heisst NICHT Uebernahme. Die neue PCR-Wette lautet
+jetzt praezise: +37% Partien (pro #36: log-linear ~+0,0005 Brier)
+GEGEN schwaechere Policy-Ziele auf der Haelfte der Zuege (woran PCR im
+Juli auf den Policy-Metriken scheiterte) -- und die Doku-Arena war
+damals NEGATIV. Der Entscheid, ob v20 (oder eine Teilkampagne) PCR-mild
+faehrt, ist ein v20-Design-Entscheid des Nutzers; PREREG dann als neues
+Experiment auf dem neuen Ziel, keine Neulesung alter Zahlen.
 
 ---
 ## Architektur, Stand jetzt (Konstanten am Code verifiziert 2026-08-05)
