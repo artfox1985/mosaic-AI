@@ -545,11 +545,23 @@ NICHT automatisch wieder offen, aber mit konkretem Anlass:
    **Gepaart: 19:2 diskordant fuer WDL, McNemar p=0,0002** -- der
    reparierte Kopf rangiert R4-Tilings signifikant besser; ERSTER
    Befund, in dem das neue Ziel einen funktionalen Vorteil jenseits der
-   Kalibrierung zeigt. R2: 81,5% (Juli 71,2%). OFFEN: R3 fiel beim
-   WDL-Kandidaten auf 50,0% (0 Ties, also echt; Juli mit v18-flach:
-   82,1%) -- tanh-Kontrolle fuer R2/R3 laeuft, um Kopf- von
-   Zustands-Effekt zu trennen. Danach Entscheid ueber Fenster und
-   Kriterium (`punkte * P(Sieg)` vs reines P(Sieg)-Ranking).
+   Kalibrierung zeigt. R2: 81,5% (Juli 71,2%). R3-AUFKLAERUNG (tanh-Kontrolle,
+   identische Paare): R2 -- beide Koepfe treffen IDENTISCHE
+   Entscheidungen (0 diskordant, je 81,5%). R3 -- tanh 65,2% vs WDL
+   50,0%, diskordant 9:39, p<0,0001. ABER: die R2/R3-Referenz ist eine
+   v17-SUCHE, also ein Alt-Familien-Margen-Kopf -- sie misst
+   FAMILIEN-NAEHE, nicht Qualitaet (dieselbe Verzerrung steckte in der
+   Juli-Validierung v18-vs-v17). Nur die R4-Referenz ist exakt (Alpha-
+   Beta-Ground-Truth), und dort gewinnt WDL 19:2.
+
+   **#20-ENTSCHEID (Beleg-Lage)**: Fenster 2-4 BLEIBT -- R2 identisch,
+   R4 klar pro WDL, R3 nicht valide arbitrierbar (Referenz-Familien-
+   Bias; die Arena, die den Tiebreak in den laufenden Gatings ja
+   MITSPIELT, zeigt Paritaet -> kein Alarmsignal). Kriteriums-Frage
+   (`punkte * P(Sieg)` vs reines P(Sieg)) bleibt offen fuer die
+   v20-Aera; eine kuenftige R2/R3-Neuvalidierung braucht eine
+   familien-neutrale Referenz (z.B. Playout-Ground-Truth wie R4b statt
+   Alt-Netz-Suche).
 5. **#12 Distributionaler Punkte-Kopf**: bleibender Befund war "mehr
    Punkte in beiden Arena-Bloecken, ohne Siege daraus zu machen". Nach #34
    sind Value- und Punkte-Kopf erstmals WIRKLICH verschiedene Groessen
