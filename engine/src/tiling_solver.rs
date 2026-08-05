@@ -360,12 +360,16 @@ fn stats_enabled_env() -> bool {
     *ENABLED.get_or_init(|| std::env::var("MOSAIC_TILING_CACHE_STATS").map(|v| v == "1").unwrap_or(false))
 }
 
-/// `MOSAIC_TILING_CACHE=1`: echte Memoisierung (Schritt 3). Standard AUS --
-/// siehe Bericht/Auftrag ("im Zweifel Default AUS, damit der Koordinator den
-/// A/B fahren kann").
+/// Echte Memoisierung. **Standard AN** (Nutzer-Entscheid 2026-08-05, nachdem
+/// der A/B gelaufen war); `MOSAIC_TILING_CACHE=0` schaltet ab.
 fn cache_enabled_env() -> bool {
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ENABLED.get_or_init(|| std::env::var("MOSAIC_TILING_CACHE").map(|v| v == "1").unwrap_or(false))
+    // Standard AN seit 2026-08-05 (Nutzer-Entscheid): der gemessene A/B auf
+    // ruhiger Maschine ergab -20,1% Self-Play-Wandzeit (276,7s -> 221,0s ueber
+    // 30 Partien) bei BITGLEICHEN Ergebnissen (Bit-Identitaets-Test ueber 400+
+    // Vergleiche, kalt und warm). `MOSAIC_TILING_CACHE=0` schaltet ihn ab --
+    // fuer A/Bs, Debugging oder falls der Speicherbedarf je Thread stoert.
+    *ENABLED.get_or_init(|| std::env::var("MOSAIC_TILING_CACHE").map(|v| v != "0").unwrap_or(true))
 }
 
 fn stats_enabled() -> bool {
