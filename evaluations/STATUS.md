@@ -3,8 +3,10 @@
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene (gelaufene
 Experimente, Messergebnisse, verworfene Ideen, Zyklus-Berichte v9-v19,
 Bugfix-Historie) wurde am 2026-08-05 nach **`../archive/history.md`**
-ausgelagert -- STATUS war mit >8000 Zeilen nicht mehr benutzbar. Noch
-aeltere Historie: `../archive/STAGE2_TODO_ARCHIVED.md`.
+ausgelagert -- STATUS war mit >8000 Zeilen nicht mehr benutzbar. Die noch
+aeltere Stufe-1-Historie (`STAGE2_TODO_ARCHIVED.md`, war mit dem alten
+`archive/`-Ordner geloescht worden) wurde aus der Git-Historie zurueckgeholt
+und haengt dort als Anhang.
 
 ---
 
