@@ -336,6 +336,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
+          select_by_brier=False,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
@@ -672,6 +673,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
     policy_plateau_since = None
+    # Task #34 (2026-08-05, Nutzer-Vorschlag): DOPPELTES Early Stopping.
+    # Bisher wurde NUR das Val-Policy-Plateau ueberwacht. Bei einem Lauf mit
+    # FRISCH initialisiertem Value-Kopf (z.B. Wechsel tanh->wdl, Shape-
+    # Mismatch beim Warm-Start) plateaut die warm gestartete Policy sofort,
+    # waehrend der neue Value-Kopf noch lernt -- der Lauf stoppte damit
+    # systematisch zu frueh (real beobachtet 2026-08-05: die v20_wdl-Arme
+    # stoppten bei Epoche 15 mit einem 15 Epochen alten Kopf gegen eine ueber
+    # 10 Generationen gereifte Kontrolle -- der Arena-Vergleich mass damit
+    # nicht das ZIEL, sondern die Kopf-Reife).
+    # Jetzt: Stop erst, wenn BEIDE Seiten plateauen. Value-Seite ueber den
+    # BRIER-Score (arm-uebergreifend vergleichbar, existiert fuer tanh- UND
+    # wdl-Arme; die rohen Value-Losses waeren es nicht).
+    value_plateau_since = None
     stopped_early = False
     stop_reason = None
     total_history = []
@@ -1130,8 +1144,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Die arm-uebergreifend vergleichbare Kennzahl ist `epoch_val_brier`
         # (siehe Berechnung im Val-Loop oben) -- NICHT Teil von
         # `current_metric`, nur separat geloggt/gespeichert.
+        # Task #34 (2026-08-05): `--select-by-brier` ersetzt den VALUE-Term durch
+        # den Brier-Score. Grund: bei WDL-Armen ist `epoch_val_vloss` eine BCE
+        # (~0,6) statt einer MSE (~0,03) -- der Term ist damit entweder
+        # vernachlaessigbar (kleines value_weight) oder dominiert (grosses), und
+        # die Auswahl faellt real auf Epoche 1, also einen praktisch
+        # untrainierten frischen Kopf (beobachtet 2026-08-05). Der Brier liegt
+        # fuer BEIDE Kopfarten im selben Wertebereich (~0,2) und macht den Term
+        # wieder sinnvoll gewichtet. Default AUS -> byte-identisches Verhalten.
+        value_term_val = epoch_val_brier if (select_by_brier and epoch_val_brier is not None) else epoch_val_vloss
         if epoch_val_ploss is not None:
-            current_metric = epoch_val_ploss + effective_value_weight * epoch_val_vloss + effective_points_weight * epoch_val_pointsloss
+            current_metric = epoch_val_ploss + effective_value_weight * value_term_val + effective_points_weight * epoch_val_pointsloss
         else:
             current_metric = epoch_ploss + effective_value_weight * epoch_vloss + effective_points_weight * epoch_pointsloss
         if current_metric < best_combined_metric:
@@ -1165,6 +1188,26 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if policy_plateau_since is None:
                 policy_plateau_since = epoch + 1
             plateau_marker = f"  🟡 {plateau_label}"
+        else:
+            policy_plateau_since = None      # Plateau muss zusammenhaengen
+
+        # ── Value-Plateau (Task #34): identische Fensterlogik auf dem Brier ──
+        brier_series = [b for b in val_brier_history if b is not None]
+        value_plateaued = False
+        if len(brier_series) >= plateau_window * 2:
+            b_recent   = sum(brier_series[-plateau_window:]) / plateau_window
+            b_previous = sum(brier_series[-plateau_window*2:-plateau_window]) / plateau_window
+            b_rel = (b_previous - b_recent) / b_previous if b_previous > 0 else 0
+            if b_rel < plateau_threshold:
+                value_plateaued = True
+        elif not brier_series:
+            value_plateaued = True           # kein Brier messbar -> Bestandsverhalten
+        if value_plateaued:
+            if value_plateau_since is None:
+                value_plateau_since = epoch + 1
+            plateau_marker += "  🟠 VALUE-PLATEAU"
+        else:
+            value_plateau_since = None
 
         # ── Live-Plot aktualisieren (zusätzlich zur Textzeile unten) ────────
         if plot is not None:
@@ -1211,12 +1254,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if lr_scheduler is not None:
             lr_scheduler.step()
 
-        # ── Early Stopping (nur bei Policy-Plateau) ──────────────────────────
-        if policy_plateau_since is not None:
-            since = (epoch + 1) - policy_plateau_since
+        # ── Early Stopping: BEIDE Koepfe muessen plateauen (Task #34) ──
+        if policy_plateau_since is not None and value_plateau_since is not None:
+            since = (epoch + 1) - max(policy_plateau_since, value_plateau_since)
             if since >= early_stop_patience:
                 print(f"\n⏹️  Early Stopping: {plateau_label} seit Epoche {policy_plateau_since} "
-                      f"({since} Epochen ohne Fortschritt).")
+                      f"+ VALUE-PLATEAU (Brier) seit Epoche {value_plateau_since} "
+                      f"({since} Epochen ohne Fortschritt auf BEIDEN Seiten).")
                 stopped_early = True
                 stop_reason = "plateau"
                 break
@@ -1495,6 +1539,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
+    parser.add_argument("--select-by-brier", action="store_true",
+                        help="Checkpoint-Auswahl: Brier statt roher Value-Loss im kombinierten Mass (Task #34 -- noetig bei --value-head wdl, sonst waehlt die Auswahl einen praktisch untrainierten frischen Kopf). Default AUS = byte-identisch.")
     parser.add_argument("--no-plot", action="store_true",
                         help="Live-Loss-Plot deaktivieren (z.B. ohne Display)")
     parser.add_argument("--val-frac", type=float, default=0.1,
@@ -1627,6 +1673,7 @@ if __name__ == "__main__":
     train(points_dist_bins=args.points_dist_bins, reinit_points_head=args.reinit_points_head,
           version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
+          select_by_brier=args.select_by_brier,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
