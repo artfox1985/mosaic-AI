@@ -68,7 +68,20 @@ Sequenzialisierung verloren).
 ## Task #34 ZWISCHENSTAND: Offline-Seite EINDEUTIG -- Stauchung von 1,93 auf 1,20 (2026-08-05)
 
 Drei Arme trainiert (warm von `v19_2d_best`, 2D, Seed 2, Champion-Rezept,
-900er-Fenster, neuer Cache `VALUE_SCHEMA_VERSION=16`):
+900er-Fenster, neuer Cache `VALUE_SCHEMA_VERSION=16`).
+
+**NAMENS-KORREKTUR (Nutzer 2026-08-05)**: die Arme hiessen zunaechst
+`v20_*` -- falsch, denn Versionsnummern bezeichnen in diesem Projekt
+GENERATIONEN, und eine Generation entsteht aus einer NEUEN
+Self-Play-Kampagne. Diese Arme laufen auf dem BESTEHENDEN 900-Datei-
+Fenster (v16/v17/v18-Partien), also demselben Korpus, aus dem schon v19
+entstand. Es sind Ablationen, keine Generation -- umbenannt nach dem
+Ablations-Muster des Projekts (`lam07_s3`, `pcrkontrolle_s6`, `fs_2d_s2`):
+`v20_ctrl_tanh` -> **`t34_tanh`**, `v20_wdl_w02` -> **`t34_wdl02`**,
+`v20_wdl_lossadj` -> **`t34_wdladj`**; Runde 2 entsprechend `t34b_*`.
+Die Gating-Ergebnis-JSONs tragen weiterhin die alten Namen (datierte
+Aufzeichnungen, bewusst unveraendert). Ein echtes v20 gibt es erst mit
+einer neuen Self-Play-Kampagne.
 
 | Arm | Ziel | VALUE_WEIGHT | **Brier** | **Platt-B** |
 |---|---|---|---|---|
