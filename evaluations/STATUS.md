@@ -25,7 +25,7 @@ Sequenzialisierung verloren).
 | #35b | Ranking-Loss-Training | wartet | #35-Logging + v20-Self-Play | unten |
 | #31 | Schwierigkeitsstufen leicht/mittel/schwer/extrem | **geparkt** (Arbeitskreis "Spaeter", Nutzer) | Champion, der gute Spieler fordert | unten |
 | #38 | Moon-Head-Feinschliff (Loss-Gewicht + myopisches Label) | **geparkt** (Arbeitskreis "Spaeter", Nutzer 2026-08-05) | wie #31 | unten |
-| **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | **laeuft** (9 Trainings, PREREG + Amendment) | — | unten |
+| **#36** | Saettigt der Value-Kopf ueber die Spielzahl? | **BEANTWORTET 2026-08-06: NEIN -- spielhungrig, log-linear** | — | unten |
 | **#37** | Tiling-Auswahlkriterium: `punkte*P(Sieg)` vs reines P(Sieg)-Ranking | **vorgemerkt fuer v20-Aera** (Nutzer 2026-08-05) | v20-Champion mit reifem WDL-Kopf | unten |
 | #32 | Self-Play-Kostenprofil | **erledigt** 2026-08-04 | — | history |
 | — | v20-Zyklus (Self-Play + Gating) | geplant | **#34-Ausgang + #36 + #14-Entscheid** (Nutzer 2026-08-05: Start erst, wenn klar ist, wie viele Spiele/Sims wirklich sinnvoll sind) | unten |
@@ -678,6 +678,33 @@ robust. Entscheid daher NUR per Arena, nicht am Schreibtisch.
 Varianten (a) vs (b), ggf. (c) als dritter Arm; Laufzeit-Schalter analog
 Task-#30-Muster, damit kein Rebuild je Arm noetig ist. Bis dahin bleibt
 (a) Bestandsverhalten.
+
+### Task #36 ERGEBNIS (2026-08-06): Value-Kopf saettigt NICHT -- Spielzahl ist ein echter Hebel
+
+Externe Brier-Auswertung aller 18 Checkpoints auf dem gemeinsamen
+90-Dateien-Messset (900 Partien, `tools/t36_curve_eval.py`):
+
+| Pool | brierbest (Mittel 3 Seeds) | Peak-Epochen |
+|---|---|---|
+| 202 | 0,19934 | 2-4 |
+| 405 | 0,19813 | 4-6 |
+| 810 | **0,19695** | 2-4 |
+
+- **Monoton in ALLEN drei Seeds** (9/9 Ordnungen korrekt), Endstaende
+  zeigen dieselbe Ordnung.
+- **Gepaart signifikant**: 202-810 in allen drei Seeds ausserhalb des
+  95%-Partie-Bootstrap-KI (+0,0020..+0,0030); 405-810 dreimal positiv,
+  einmal signifikant. PREREG-Leseregel "spielhungrig" ist mit 3/3 erfuellt.
+- **Form: log-linear** -- jede VERDOPPLUNG bringt ~0,0012 Brier, kein
+  Knick im gemessenen Bereich. Extrapolation (vorsichtig): auch jenseits
+  von 8.100 Partien ist weiterer Gewinn zu erwarten.
+- Nebenbefund: die Peak-Epoche wandert mit weniger Daten leicht nach
+  hinten (405: E4-6) -- konsistent mit dem Erosions-/Memorisierungsbild.
+
+**Konsequenzen**: (a) v20-Spielbudget NICHT kuerzen -- mehr Partien sind
+der billigste Value-Hebel (Tiling-Cache-Ersparnis -20% direkt in Spiele
+umsetzbar); (b) PCR-Bedingung (ii) ERFUELLT -> Durchsatz-Messung
+(Bedingung iii) laeuft als naechstes end-to-end.
 
 ### PCR (Task #14): konditionale WIEDEREROEFFNUNG (Nutzer-Frage 2026-08-05)
 
