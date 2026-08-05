@@ -670,9 +670,13 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     bg=''; cls=`ds filled ${normColor(sp.filled)}`; lbl='';
   } else if(sp.type === 'N' || !sp.type || sp.type === 'NORMAL') {
     const hexFull={blau:'#2563EB',gelb:'#D97706',rot:'#DC2626',schwarz:'#292524',tuerkis:'#0891B2'};
-    const hex = hexFull[nc] || (nc ? '#FF00FF' : '#999'); 
-    bg = `background:${hex};opacity:.7;`; 
-    cls = 'ds N'; 
+    const hex = hexFull[nc] || (nc ? '#FF00FF' : '#999');
+    // Nutzer-Design (2026-08-06): unbelegte Farbfelder deutlich von belegten
+    // unterscheiden -- helle Zelle mit gestricheltem Rahmen, die Sollfarbe
+    // nur noch als VERKLEINERTE Kachel in der Mitte (CSS .ds.N zeichnet sie
+    // aus --slot), statt vollflaechig halbtransparent.
+    bg = `--slot:${hex};`;
+    cls = 'ds N';
     lbl = nc ? nc[0].toUpperCase() : '?';
   } else if(sp.type === 'WILD') {
     bg = 'background:#EDE9FE;'; cls = 'ds W'; lbl = '★';
