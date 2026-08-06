@@ -893,18 +893,23 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
     return `<div class="dslot ${cls}" data-row="${sr}" data-col="${sc}"${ddata}>${inner}</div>`;
 }).join('')).join('');
 
-  // Nutzer-Feedback: Straf-Label (-1/-2/-3/-4) bleibt auch sichtbar, wenn eine
-  // Fliese das Feld belegt -- als weisse Beschriftung ueber der Fliese.
+  // Nutzer-Feedback 2026-08-07: die Farbenblinden-Symbole kollidierten mit
+  // dem Straf-Label AUF der Fliese -- Labels wandern in eine eigene Zeile
+  // UNTER die Slots. Der Startspielerstein fuegt sich homogen ein: statt
+  // weisser Fliese das ❖-Symbol (wie an der grossen Fabrik), Label -2
+  // ebenfalls in der Zeile darunter.
   const floorHTML = [...Array(4)].map((_,i)=>{
     const t = p.floor[i];
     const label = [-1,-2,-3,-4][i];
-    return `<div class="fslot" style="position:relative">${t?`<div class="tile sm ${normColor(t)}"></div>`:''}<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${t?'#fff':'var(--text3)'};text-shadow:${t?'0 1px 2px rgba(0,0,0,.6)':'none'};pointer-events:none">${label}</span></div>`;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+      <div class="fslot">${t?`<div class="tile sm ${normColor(t)}"></div>`:''}</div>
+      <span style="font-size:8px;font-weight:700;color:var(--text3);line-height:1">${label}</span>
+    </div>`;
   }).join('');
-  // Nutzer-Feedback: Startspielerfliesen-Marker in dieselbe Reihe wie die
-  // Straffelder (links von -1), nicht mehr in der Ueberschrift. Unbelegt =
-  // helles Blau (Platzhalter), belegt = saettigteres Blau + "-2" (fixe
-  // Startspielerfliese-Strafe, unabhaengig von den vier Straffeldern).
-  const markerHTML = `<div class="fslot ${p.marker ? 'marker-taken' : 'marker-empty'}">-2</div>`;
+  const markerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+    <div class="fslot ${p.marker ? 'marker-taken' : 'marker-empty'}" title="Startspielerstein">❖</div>
+    <span style="font-size:8px;font-weight:700;color:var(--text3);line-height:1">-2</span>
+  </div>`;
 
   const est = p.estimated_score || 0;
   const estStr = (est >= 0 ? '+' : '') + est;

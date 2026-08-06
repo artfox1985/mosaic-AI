@@ -72,11 +72,12 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 
 .blau{background:var(--blau)}.gelb{background:var(--gelb)}.rot{background:var(--rot)}
 .schwarz{background:var(--schwarz)}.tuerkis{background:var(--tuerkis)}
-/* Startspielerfliese-Marker (eigener .fslot links von -1): unbelegt =
-   weiss gefuellt mit grauem Rand, belegt = weiss gefuellt mit durchgehendem
-   schwarzem Rand + schwarzem "-2"-Text. */
-.fslot.marker-empty{background:#fff;border-color:#D6D3D1;color:var(--text3);font-weight:700}
-.fslot.marker-taken{background:#fff;border-style:solid;border-color:#000;color:#000;font-weight:700}
+/* Startspielerfliese-Marker (eigener .fslot links von -1): zeigt das
+   ❖-Symbol wie an der grossen Fabrik (Nutzer 2026-08-07) -- unbelegt =
+   blasser Platzhalter, belegt = amber + fester Rand. Das -2-Label steht
+   wie bei den Straffeldern in der Zeile darunter. */
+.fslot.marker-empty{background:#fff;border-color:#D6D3D1;color:#E7E5E4;font-weight:700;font-size:13px}
+.fslot.marker-taken{background:#fff;border-style:solid;border-color:#F59E0B;color:#F59E0B;font-weight:700;font-size:13px}
 /* Phantom-Fliesen (per Bonuschip virtuell ergänzt, nie real gezogen):
    weiß gefüllt mit farbigem Rand statt voll gefüllt. */
 .tile.phantom{background:#fff;border-width:2.5px}
@@ -203,7 +204,10 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    Gradient-Trick, damit die Beschriftung darueber lesbar bleibt) -- belegte
    Felder (.filled) bleiben volldeckend mit durchgezogenem Rahmen. */
 .ds.N{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55);border-style:dashed;border-color:rgba(0,0,0,.4);
-  background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/62% 62% no-repeat,#FAFAF9}
+  background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/62% 62% no-repeat,#FAFAF9;
+  /* Nutzer 2026-08-07: Soll-Farben abgedunkelt (aehnlich dem gesperrten
+     Spezialfeld-Stern), damit GELEGTE Fliesen klar dominieren. */
+  opacity:.35}
 .ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
 .ds.S{background:var(--special);border-style:dashed;border-color:#aaa}
 .ds.S.locked{opacity:.25}
