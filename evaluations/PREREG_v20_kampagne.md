@@ -12,8 +12,8 @@ Champion belegt 65:75/p=0,52) -- liefert ab sofort NATIVE
 
 | Klasse | Tag/Quelle | Partien | Sims | Policy | Value |
 |---|---|---|---|---|---|
-| Sockel | `v20wdl` (neu) | 4.000 | 600 | aktiv | aktiv |
-| Schwarm | `v20wdlsw` (neu) | 8.000 | ~150 (PCR-Maske) | maskiert | aktiv |
+| Sockel | `v19wdl` (neu) | 4.000 | 600 | aktiv | aktiv |
+| Schwarm | `v19wdlsw` (neu) | 8.000 | 150 (`--value-only`) | maskiert | aktiv |
 | Alt-Traeger | 135 v18- + 45 v17-Dateien (Manifest) | 1.800 | — | aktiv | aktiv |
 | Alt-Value | restliche v18/v17/v16-Dateien | ~7.200 | — | maskiert | aktiv |
 | **Summe** | | **~21.000** | | **5.800** | **~21.000** |
@@ -27,7 +27,7 @@ Champion belegt 65:75/p=0,52) -- liefert ab sofort NATIVE
   zeitlich gestreute Auswahl), Cache-Bau maskiert Nicht-Traeger
   (Schema 17, Manifest-Inhalt im Cache-Key).
 - **Schema 17**: `values_wdl` blendet Alt-Datei-Bootstraps
-  Platt-ENTSTAUCHT (A=0,0051/B=1,9269), `v20wdl*`-Bootstraps ROH.
+  Platt-ENTSTAUCHT (A=0,0051/B=1,9269), `v19wdl*`-Bootstraps (WDL-Generator) ROH.
   `--wdl-bootstrap-destretch` darf mit Schema-17-Caches NICHT mehr
   gesetzt werden (Doppel-Streckung).
 - **Backup-Altbestaende bleiben aussen** (Nutzer: Verlaeufe tragen die
@@ -69,3 +69,10 @@ Value startet frisch (bekannt, unkritisch: Peak liegt bei E2-4).
 Sockel 4.000@600 ~10-11h; Schwarm 8.000@150 ~8-9h (Netz ~81% der Zeit,
 150/600-Sims ~2,5x billiger je Partie); Cache-Neubau Schema 17 ~1h;
 Training ~40min; Gating ~1-2h. Gesamt ~22h Maschine.
+
+**NAMENS-KORREKTUR (Nutzer 2026-08-06, vor dem Cache-Bau)**: Tags sind
+`v19wdl`/`v19wdlsw` -- Dateien heissen nach dem GENERATOR (v19-Aera-
+Modell), nicht nach der Ziel-Generation (Konvention; zweiter
+Koordinator-Fehler dieser Art, diesmal ohne Schaden gefangen:
+WDL_GENERATOR_PREFIXES haette sonst die nativen Bootstraps der neuen
+Dateien faelschlich entstaucht).

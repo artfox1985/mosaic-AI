@@ -27,8 +27,8 @@
 
 ## NAECHSTE SCHRITTE (v20-Pipeline)
 
-1. **Nutzer**: Sockel-Self-Play (4.000 @600, `--version v20wdl`), danach
-   Schwarm (8.000 @150, `--version v20wdlsw --value-only`). Kommandos in
+1. **Nutzer**: Sockel-Self-Play (4.000 @600, `--version v19wdl`), danach
+   Schwarm (8.000 @150, `--version v19wdlsw --value-only`). Kommandos in
    PREREG_v20_kampagne.md.
 2. Cache-Neubau Schema 17 (~1h, automatisch beim ersten Training).
 3. Training warm von `v19_2d_opp_best` (Rezept siehe PREREG).
@@ -300,7 +300,7 @@ Experiment auf dem neuen Ziel, keine Neulesung alter Zahlen.
 - **Value-ZIEL (#34-Verdikt, Schema 17)**: `values_wdl` = TD-Blend aus
   Bootstrap-Gewinnwahrscheinlichkeit und hartem Ausgang; Alt-Datei-
   Bootstraps werden beim Cache-Bau Platt-entstaucht (A=0,0051/B=1,9269),
-  `selfplay_v20wdl*`-Bootstraps (WDL-Generator) bleiben roh. Training:
+  `selfplay_v19wdl*`-Bootstraps (WDL-Generator) bleiben roh. Training:
   `--value-head wdl --select-by-brier` (KEIN destretch-Flag mehr noetig).
   Policy-Traeger-Manifest `data/policy_carrier_manifest_v20.json`
   maskiert Alt-Dateien ausser 135 v18 + 45 v17 (im Cache-Key).
