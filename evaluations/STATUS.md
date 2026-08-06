@@ -35,8 +35,8 @@ Sequenzialisierung verloren).
 | #28 | Aggressions-Utility (opp-Kopf + Regler) | **ERGEBNISSE UNGUELTIG** (Engine-Audit F1: ownership-Logit als Gegner-Punkte gelesen) | Neumessung nach Fix noetig | unten (Engine-Audit) |
 | #14 | PCR (beide Regime) | **WIEDEREROEFFNET 2026-08-06: alle 3 Bedingungen erfuellt** (#34 ✓, #36 spielhungrig ✓, Durchsatz **1,37x** end-to-end ✓) | Design-Entscheid gehoert in die v20-Planung (Nutzer) | unten |
 | #27 | R5-Value-Kalibrierung | **geschlossen**: Unterkalibrierung belegt | — | history |
-| #9 | Ownership-Kopf | **geschlossen** 2026-07-28 | Wiedereroeffnung nur mit Arena-Instrument | history |
-| #12 | Distributionaler Punkte-Kopf | **geschlossen**: nicht uebernommen | — | history |
+| #9 | Ownership-Kopf | **ERNEUT GESCHLOSSEN 2026-08-06**: auch am neuen Ziel kein Arena-Beleg (197:193/390, p=0,91; 145:145/290) -- perfekte Paritaet mit Arena-Instrument | — | history + PREREG_nach34_paket |
+| #12 | Distributionaler Punkte-Kopf | **IN REPLIKATION**: erster SPRT-H1 der WDL-Aera vs Referenz (54:26, p=0,0066), ABER 33:47 vs Champion -- widerspruechlich, Frisch-Seed-Replikation laeuft | Replikations-Ausgang | unten (Paket) |
 | — | Afterstate-Kopf (Stochastic MuZero) | **geparkt**: Vortest ohne Signal | Neubewertung nach #34 | history |
 | — | Wertungsplatten-Intervention | **geparkt**: Symptom, nicht Ursache | R5-Diagnostik nach #34 | history |
 | — | rtv | **geschlossen**, Bedingung formuliert | arena-erfolgreiches #34 | unten |
@@ -705,6 +705,31 @@ Externe Brier-Auswertung aller 18 Checkpoints auf dem gemeinsamen
 der billigste Value-Hebel (Tiling-Cache-Ersparnis -20% direkt in Spiele
 umsetzbar); (b) PCR-Bedingung (ii) ERFUELLT -> Durchsatz-Messung
 (Bedingung iii) laeuft als naechstes end-to-end.
+
+### Nach-#34-Paket ERGEBNISSE (2026-08-06, PREREG_nach34_paket.md)
+
+Beide Arme offline: t9_own deckungsgleich mit Referenz (0,1970/0,2018);
+t12_dist Peak 0,1979, staerkere Erosion (0,2108), Punkte-R² FAELLT
+(0,48 vs 0,56 Skalar). Arena (brierbest vs brierbest, je + Champion):
+
+| Gating | Ergebnis | p |
+|---|---|---|
+| **t12_dist vs t34_wdldestretch** | **54:26 (67,5%) -- SPRT-H1!** | **0,0066** |
+| t12_dist vs v19_2d_best | 33:47 (41,3%), H0 | 0,19 |
+| t9_own vs t34_wdldestretch | 197:193 (50,5%), H0 | 0,91 |
+| t9_own vs v19_2d_best | 145:145 (50,0%), H0 | 1,00 |
+
+- **#9 ERNEUT GESCHLOSSEN** (vorregistrierte Regel): perfekte Paritaet
+  ueber 390+290 Partien -- das Arena-Instrument war da, der Effekt nicht.
+- **#12: erster SPRT-H1 der gesamten WDL-Aera** -- und zugleich ein
+  WIDERSPRUCH: schlaegt die Referenz klar, verliert (n.s.) gegen den
+  Champion, waehrend die Referenz dort Paritaet spielte. Moegliche
+  Deutungen: Nicht-Transitivitaet (Stilpaarung), Seed-Satz-Rauschen im
+  80-Paare-Champion-Lauf, oder echter Effekt nur gegen WDL-Familie.
+  **Frisch-Seed-Replikation beider t12-Gatings laeuft** (PREREG-Regel:
+  keine Uebernahme ohne repliziertes, klares Bild + intakten Brier --
+  Letzteres ist mit der staerkeren Erosion ohnehin fraglich).
+- #29: Instrument-Teil wartet auf frozen-Set-Neubau (siehe PREREG).
 
 ### PCR (Task #14): konditionale WIEDEREROEFFNUNG (Nutzer-Frage 2026-08-05)
 
