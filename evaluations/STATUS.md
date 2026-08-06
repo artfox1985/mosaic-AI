@@ -347,16 +347,23 @@ sie nie).
 
 **Nutzer-Einordnung (2026-08-06, schaerft den Zuschnitt)**: die Ecke an
 sich ist strategisch RICHTIG (Rand/Diagonale/Eckplatten honorieren sie
-alle) -- das Problem ist die MONOTONIE, nicht die Position. Restliche
-echte Differenzierungen: (1) Ecken-RANG -- Eckplatten zahlen 3 oben /
-8 UNTEN, der Tie-Break waehlt stur die 3-Punkte-Ecke (0,0), obwohl die
-aktive Plattenwahl bekannt ist; (2) ROTATION -- bestimmt, welche Farben
-zur Brettmitte zeigen und wo Wild-/Spezialfeld landet, heute komplett
-verschenkt (Score rotationsinvariant).
+alle) -- das Problem ist die MONOTONIE, nicht die Position.
+**KORREKTUR (Nutzer 2026-08-06, zweite Runde)**: auch der Ecken-Rang
+(3 oben / 8 unten) ist KEIN Bewertungsfehler -- Kuppelzeile 0 wird von
+den SCHNELLSTEN Musterreihen (1-2, Kapazitaet 1-2 Steine) gespeist: die
+obere Ecke kommt frueher in Wertung + Orthogonal-Bonus und wird
+zuverlaessiger ueberhaupt komplett; die 8 Punkte unten haengen an den
+traegsten Reihen (5-6). Der (0,0)-Tie-Break loest den Trade-off implizit
+RICHTIG auf. Verbleibende Substanz von #39:
+(1) ROTATION -- bestimmt Farb-Ausrichtung zur Brettmitte und
+Sonderfeld-Lage, heute verschenkt (Score rotationsinvariant);
+(2) MONOTONIE/Tie-Break -- Diversitaets-Frage (GUI-Abwechslung +
+Korpus-Vielfalt), keine Staerke-Frage.
 **Verbesserungs-Optionen (bei Angehen abzuwaegen)**:
-a) Heuristik-Upgrade: Ecken-Rang (3 vs 8) bei aktiver Eckplatten-
-   Wertung, Rotations-Bewertung (Farb-Ausrichtung/Sonderfeld-Lage),
-   Tie-Break randomisieren (bricht Monotonie + Diversitaets-Bonus).
+a) Heuristik-Upgrade: Rotations-Bewertung + randomisierter Tie-Break
+   unter nahezu gleichwertigen Kandidaten; jede Aenderung per Arena
+   gegen den Bestand pruefen (die Strategie-Intuition des Koordinators
+   lag hier zweimal daneben, die des Nutzers zweimal richtig).
 b) Prinzipiell: Platzierung in den Aktionsraum der Suche -- ACHTUNG
    NUM_ACTIONS-Aenderung macht alte Checkpoints unbrauchbar
    ([[num-actions-change-breaks-old-checkpoints]]), teuer.
