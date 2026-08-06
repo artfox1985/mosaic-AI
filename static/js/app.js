@@ -1424,17 +1424,15 @@ const sdiv = document.getElementById('scoring-display');
   }
 
   if(byType['stone']) {
+    // Nutzer-Feedback 2026-08-07: die grosse Fabrik ist spielerisch KEINE
+    // eigene Zug-Kategorie -- die getrennten Frankfurt-Zeilen spiegelten nur
+    // die Quellen-Enums der Engine. Sonne = Union aller Fabriken; Mond ist
+    // ohnehin ein globaler Sammelzug (Aktion C).
     const sunColors = [...new Set(byType['stone']
-      .filter(m=>m.source==='SMALL_FACTORY_SUN')
+      .filter(m=>m.source==='SMALL_FACTORY_SUN'||m.source==='LARGE_FACTORY_SUN')
       .map(m=>m.color))];
     const moonColors = [...new Set(byType['stone']
-      .filter(m=>m.source==='SMALL_FACTORY_MOON')
-      .map(m=>m.color))];
-    const lSunColors = [...new Set(byType['stone']
-      .filter(m=>m.source==='LARGE_FACTORY_SUN')
-      .map(m=>m.color))];
-    const lMoonColors = [...new Set(byType['stone']
-      .filter(m=>m.source==='LARGE_FACTORY_MOON')
+      .filter(m=>m.source==='SMALL_FACTORY_MOON'||m.source==='LARGE_FACTORY_MOON')
       .map(m=>m.color))];
 
     if(sunColors.length)
@@ -1447,26 +1445,14 @@ const sdiv = document.getElementById('scoring-display');
         🌙 Mond (alle):
         ${moonColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
       </div>`);
-    if(lSunColors.length)
-      lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
-        ☀️ ${factoryCityName(null)}:
-        ${lSunColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
-      </div>`);
-    if(lMoonColors.length)
-      lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
-        🌙 ${factoryCityName(null)} Mond:
-        ${lMoonColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
-      </div>`);
   }
 
   if(byType['dome_display']) {
-    // Punkt 8: keine Platten-IDs mehr auflisten, nur noch Anzahl.
-    const n = new Set(byType['dome_display'].map(m=>m.tile_id)).size;
-    lines.push(`<div class="le" style="padding:2px 0">🧩 Kuppelplatte aus Display legbar (${n})</div>`);
+    lines.push(`<div class="le" style="padding:2px 0">🧩 Kuppelplatte aus Ablage legbar</div>`);
   }
 
   if(byType['dome_stack_peek']) {
-    lines.push(`<div class="le" style="padding:2px 0">📦 Verdeckt vom Stapel ziehen (−1 Pkt)</div>`);
+    lines.push(`<div class="le" style="padding:2px 0">📦 Vom Stapel ziehen</div>`);
   }
 
   if(byType['dome_stack']) {
@@ -1475,7 +1461,7 @@ const sdiv = document.getElementById('scoring-display');
 
   if(byType['bonus_chip']) {
     const fnames = byType['bonus_chip'].map(m=>factoryCityName(m.factory_id)).join(', ');
-    lines.push(`<div class="le" style="padding:2px 0">🎫 Bonusplättchen: ${fnames}</div>`);
+    lines.push(`<div class="le" style="padding:2px 0">🎴 Bonusplättchen: ${fnames}</div>`);
   }
 
   vmDiv.innerHTML = lines.join('') || `<div class="le" style="color:var(--text3)">—</div>`;
