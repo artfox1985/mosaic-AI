@@ -677,9 +677,28 @@ def log_info():
     })
 
 
+def _stack_draw_lock():
+    """Nutzer-Feedback 2026-08-07: Aktion A (Stapel-Zug) ist EIN
+    durchgaengiger Zug. Laufen bereits Ziehungen (pending_stack_draw),
+    sind andere Drafting-Aktionen ungueltig -- die Engine GENERIERT sie
+    korrekt nicht mehr (game.rs::drafting_actions), aber die Move-
+    Endpoints wandten Zuege bisher ohne diese Pruefung an (gleiche
+    Fehlerklasse wie Audit-U1: Apply-Ebene ohne Sperre). Hier die
+    apply-seitige Verteidigungslinie."""
+    try:
+        st = _json.loads(_rust.state_json())
+        if st.get('pending_stack_draw'):
+            return jsonify(err("Stapel-Zug läuft — bitte erst eine gezogene Platte wählen und legen."))
+    except Exception:
+        pass
+    return None
+
+
 @app.route('/api/move/stone', methods=['POST'])
 def move_stone():
     if (e := _require_game()) is not None:
+        return e
+    if (e := _stack_draw_lock()) is not None:
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
@@ -706,6 +725,8 @@ def move_stone():
 @app.route('/api/move/dome', methods=['POST'])
 def move_dome():
     if (e := _require_game()) is not None:
+        return e
+    if (e := _stack_draw_lock()) is not None:
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
@@ -783,6 +804,8 @@ def move_dome_stack_choose():
 @app.route('/api/move/bonus_chip', methods=['POST'])
 def move_bonus_chip():
     if (e := _require_game()) is not None:
+        return e
+    if (e := _stack_draw_lock()) is not None:
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
