@@ -1244,7 +1244,7 @@ function renderCenter() {
           ${nonEmptyStacks.map(stack => {
             const topDown = [...stack].reverse(); // topDown[0] = oben/ziehbar ... letzter = unten
             return `<div style="display:flex;flex-direction:column" title="Stapel (oben→unten): ${topDown.join(' → ')}">
-              ${topDown.map((c,i)=>`<div class="tile sm ${normColor(c)}" style="margin-top:${i===0?'0':'-9px'};z-index:${topDown.length-i};${i===0?'outline:1.5px solid var(--text)':'opacity:.85'}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+              ${topDown.map((c,i)=>`<div class="tile sm ${normColor(c)}" style="margin-top:${i===0?'0':'-9px'};z-index:${topDown.length-i};${i===0?'outline:1.5px solid var(--text)':'opacity:.85'}"></div>`).join('')}
             </div>`;
           }).join('')}
          </div>` : '';
@@ -2142,7 +2142,6 @@ function renderMoonModal() {
     div.className = `tile ${normColor(item.color)} click`;
     div.style.cursor = 'pointer';
     div.title = `${item.color} — klicken zum Stapeln`;
-    div.textContent = normColor(item.color)[0].toUpperCase();
     div.addEventListener('click', () => addToMoonStack(item.uid));
     tilesDiv.appendChild(div);
   });
@@ -2161,7 +2160,6 @@ function renderMoonModal() {
       const origIndex = n - 1 - i; // Index in moonModal.ordered fuer removeFromMoonStack
       const div = document.createElement('div');
       div.className = `tile ${normColor(item.color)} click`;
-      div.textContent = normColor(item.color)[0].toUpperCase();
       const isTop = i === 0;
       div.style.marginTop = isTop ? '0' : '-9px';
       div.style.zIndex = String(topDown.length - i);
