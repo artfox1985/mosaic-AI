@@ -629,6 +629,13 @@ function tileDiv(color, extra='', size='') {
   return `<div class="tile ${nc} ${size} ${extra}">${COLOR_LABELS[color]||''}</div>`;
 }
 
+// Farbenblinden-Symbole (Nutzer 2026-08-07): jede Fliesenfarbe traegt
+// ueberall ein weisses Form-Symbol -- Rot ✦, Blau ✢, Schwarz ▣,
+// Tuerkis ◈, Gelb ❂. Fuer .tile-Elemente rendert das CSS (::after auf
+// der Farbklasse, style.css), fuer Kuppelfelder setzt spaceHTML das
+// Symbol als Label.
+const TILE_SYMBOL = {rot:'✦', blau:'✢', schwarz:'▣', tuerkis:'◈', gelb:'❂'};
+
 function normColor(c) {
   if (!c) return '';
   const low = c.toLowerCase();
@@ -677,7 +684,7 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     // aus --slot), statt vollflaechig halbtransparent.
     bg = `--slot:${hex};`;
     cls = 'ds N';
-    lbl = nc ? nc[0].toUpperCase() : '?';
+    lbl = TILE_SYMBOL[nc] || '?';
   } else if(sp.type === 'WILD') {
     // Nutzer-Feedback 2026-08-07: 🌀 statt ★ -- konsistent mit der
     // Wild-Rueckseite im Stapel-Dialog (WILD_BACK_ICON).
@@ -1124,7 +1131,7 @@ function renderCenter() {
       const col = S.players[tilingPi].pattern_lines[tilingRow].color;
       infoHTML = `<div class="info tiling" style="display:flex;align-items:center;justify-content:space-between">
         <span>→ <strong>${S.players[tilingPi].name}</strong> Reihe ${tilingRow+1}
-          <span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px">${normColor(col)[0].toUpperCase()}</span>
+          <span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px"></span>
           — passendes Kuppelfeld anklicken
         </span>
         <button class="btn" onclick="tilingPi=null;tilingRow=null;render()" style="font-size:10px;flex-shrink:0">✕</button>
@@ -1133,7 +1140,7 @@ function renderCenter() {
       const rows = pending.map(x=>
         `<span style="cursor:pointer;display:inline-flex;align-items:center;gap:2px;padding:1px 4px;border-radius:4px;background:#D1FAE5;border:1px solid #34D399"
           onclick="tilingPi=${x.pi};tilingRow=${x.ri};render()">
-          <span class="tile sm ${normColor(x.color)}">${normColor(x.color)[0].toUpperCase()}</span>
+          <span class="tile sm ${normColor(x.color)}"></span>
           R${x.ri+1} ${x.pname}
         </span>`
       ).join(' ');
@@ -1393,7 +1400,7 @@ const sdiv = document.getElementById('scoring-display');
         return `<div class="le" style="display:flex;align-items:center;gap:4px;padding:2px 0">
           <span style="color:var(--text3)">${p.name}</span>
           Reihe ${x.ri+1}
-          <div class="tile sm ${nc}" style="flex-shrink:0">${nc[0].toUpperCase()}</div>
+          <div class="tile sm ${nc}" style="flex-shrink:0"></div>
           <span style="color:var(--text3)">→ Kuppelreihe ${Math.floor(x.ri/2)}</span>
         </div>`;
       }).join('');
@@ -1438,12 +1445,12 @@ const sdiv = document.getElementById('scoring-display');
     if(sunColors.length)
       lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
         ☀️ Sonne:
-        ${sunColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+        ${sunColors.map(c=>`<div class="tile sm ${normColor(c)}"></div>`).join('')}
       </div>`);
     if(moonColors.length)
       lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
         🌙 Mond:
-        ${moonColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
+        ${moonColors.map(c=>`<div class="tile sm ${normColor(c)}"></div>`).join('')}
       </div>`);
   }
 
@@ -1624,7 +1631,7 @@ function renderChipModal() {
   const preview=document.getElementById('chip-row-preview');
   preview.innerHTML=Array.from({length:cap},(_,i)=>
     i>=cap-have
-      ?`<div class="tile sm ${normColor(color)}">${normColor(color)[0].toUpperCase()}</div>`
+      ?`<div class="tile sm ${normColor(color)}"></div>`
       :`<div class="tile sm empty"></div>`
   ).join('')+`<span style="font-size:10px;color:var(--text2);margin-left:6px">${have}/${cap}${have===cap?' ✓':''}</span>`;
 
