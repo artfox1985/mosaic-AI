@@ -236,6 +236,13 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 
 /* Factories */
 .fcard{border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:5px}
+/* Nutzer-Feedback 2026-08-07: grosse Fabrik (Frankfurt) hebt sich per
+   Hintergrund von den kleinen Fabriken ab -- dieselbe Flaechenfarbe
+   var(--bg), die auch die (leeren) Musterreihen-Felder nutzen (.tile.empty). */
+.fcard.gf{background:var(--bg)}
+/* Nutzer-Feedback 2026-08-07: Symbole in Bonuschip-Groessenordnung (.bchip =
+   20px) -- fuer Fabrik-Icons, Startspielerstein 🏁 und verdeckten Chip 🔒. */
+.icon-chip{font-size:16px;line-height:1}
 .fhead {
   font-size: 9px;
   color: var(--text3);
@@ -382,4 +389,3 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 #teacher-toast.show{opacity:1;transform:translateY(0);pointer-events:all}
 #teacher-toast .tt-head{font-weight:700;font-size:12px;margin-bottom:3px}
 #teacher-toast .tt-sub{font-size:11px;color:var(--text2)}
-</style>

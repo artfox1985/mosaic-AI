@@ -635,14 +635,11 @@ function normColor(c) {
   return low === 'türkis' ? 'tuerkis' : low;
 }
 
-// Wild-Rueckseiten-Icon (Nutzer-Feedback: 🃏 war bei den kleinen Schriftgroessen
-// (10-11px) der Rueckseiten-Anzeige schlecht erkennbar -- die feinen Kartendetails
-// des Emojis verschwimmen). User-Entscheid: 🤡 als Joker-/Rueckseiten-Symbol
-// (ersetzt die zuvor evaluierten Kandidaten 🃏/★/"?"-Kontrastkreis). Hinweis:
-// je nach Emoji-Font kann auch 🤡 bei 10-11px unscharf wirken (dasselbe
-// Grundproblem wie bei 🃏, da es sich ebenfalls um ein detailreiches
-// mehrfarbiges Emoji handelt) -- gemaess Vorgabe trotzdem umgesetzt.
-const WILD_BACK_ICON = '🤡';
+// Wild-Rueckseiten-Icon. Historie: 🃏 -> 🤡 (beide bei 10-11px schlecht
+// erkennbar). Nutzer-Feedback 2026-08-07: 🌀 als einheitliches Wild-Symbol --
+// identisch auf Kuppel-Wildfeldern (.ds.W, s. spaceHTML) und den
+// Rueckseiten im Stapel-Zieh-Dialog/Stapel-Button.
+const WILD_BACK_ICON = '🌀';
 
 // Rückseite der obersten Kuppelstapel-Platte -- an einem physischen Tisch
 // für ALLE Spieler jederzeit sichtbar (Nutzer-Anstoss), nicht erst beim
@@ -667,7 +664,10 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
   let bg='', cls='', lbl='', tdata='';
   
   if(sp.filled) {
-    bg=''; cls=`ds filled ${normColor(sp.filled)}`; lbl='';
+    // Nutzer-Feedback 2026-08-07: gelegte Spezialfliese zeigt den gelben
+    // Stern (wie die Spezial-Rueckseite im Stapel-Dialog), statt ohne Label.
+    bg=''; cls=`ds filled ${normColor(sp.filled)}`;
+    lbl = normColor(sp.filled) === 'special' ? '⭐' : '';
   } else if(sp.type === 'N' || !sp.type || sp.type === 'NORMAL') {
     const hexFull={blau:'#2563EB',gelb:'#D97706',rot:'#DC2626',schwarz:'#292524',tuerkis:'#0891B2'};
     const hex = hexFull[nc] || (nc ? '#FF00FF' : '#999');
@@ -679,9 +679,13 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     cls = 'ds N';
     lbl = nc ? nc[0].toUpperCase() : '?';
   } else if(sp.type === 'WILD') {
-    bg = 'background:#EDE9FE;'; cls = 'ds W'; lbl = '★';
+    // Nutzer-Feedback 2026-08-07: 🌀 statt ★ -- konsistent mit der
+    // Wild-Rueckseite im Stapel-Dialog (WILD_BACK_ICON).
+    bg = 'background:#EDE9FE;'; cls = 'ds W'; lbl = '🌀';
   } else {
-    bg = 'background:#E7E5E4;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '🔒' : '◎';
+    // Nutzer-Feedback 2026-08-07: gesperrtes Spezialfeld zeigt den gelben
+    // Stern der Spezial-Rueckseite (⭐, s. stackTopTypeIcon) statt 🔒.
+    bg = 'background:#E7E5E4;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '⭐' : '◎';
   }
   
   if(tiling && si >= 0) {
@@ -1202,7 +1206,9 @@ function renderCenter() {
     const sunColors = [...new Set(f.sun)];
     const moonTops  = [...new Set(f.moon.map(s=>s[s.length-1]).filter(Boolean))];
     
-    let chipContent = '🔒';
+    // Nutzer-Feedback 2026-08-07: verdeckter Bonuschip (Schloss) in
+    // Bonuschip-Groesse (.icon-chip ~ .bchip 20px) statt winzig.
+    let chipContent = '<span class="icon-chip">🔒</span>';
     if (f.chip_revealed && f.bonus_chip && f.bonus_chip.colors) {
       const c1 = normColor(f.bonus_chip.colors[0]);
       const c2 = f.bonus_chip.colors.length > 1 ? normColor(f.bonus_chip.colors[1]) : 'empty';
@@ -1242,8 +1248,9 @@ function renderCenter() {
             </div>`;
           }).join('')}
          </div>` : '';
+    // Nutzer-Feedback 2026-08-07: 🏭 neben dem Stadtnamen (Bonuschip-Groesse).
     return `<div class="fcard" data-fid="${f.id}">
-      <div class="fhead"><span>${factoryCityName(f.id)}</span>${chipHTML}</div>
+      <div class="fhead"><span style="display:inline-flex;align-items:center;gap:4px"><span class="icon-chip">🏭</span>${factoryCityName(f.id)}</span>${chipHTML}</div>
       <div class="ftiles sun-area">${f.sun.length?sunTiles:(nonEmptyStacks.length?'':'<span style="font-size:9px;color:var(--text3)">leer</span>')}</div>
       ${moonTiles}
     </div>`;
@@ -1311,9 +1318,13 @@ document.getElementById('auslage-area').innerHTML = `
     <div class="lbl" style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">Fabriken</div>
     <div style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">
     ${facsHTML}
-    <div class="fcard" data-fid="GF">
-      <div class="fhead"><span>${factoryCityName(null)}</span>${lf.marker?'<span style="color:#F59E0B">★</span>':''}</div>
-      <div class="ftiles sun-area" style="margin-bottom:2px">${lSun || '<span style="font-size:9px;color:var(--text3)">leer</span>'}</div>
+    <!-- Nutzer-Feedback 2026-08-07: .gf = eigener Hintergrund (Musterreihen-
+         Flaechenfarbe); 🏭 🏗️ neben dem Namen; Startspielerstein als 🏁
+         (konsistent mit dem Log) in Bonuschip-Groesse statt kleinem ★;
+         "leer" nur, wenn Sonne UND Moon-Pool leer sind. -->
+    <div class="fcard gf" data-fid="GF">
+      <div class="fhead"><span style="display:inline-flex;align-items:center;gap:4px"><span class="icon-chip">🏭 🏗️</span>${factoryCityName(null)}</span>${lf.marker?'<span class="icon-chip" title="Startspielerstein">🏁</span>':''}</div>
+      <div class="ftiles sun-area" style="margin-bottom:2px">${lSun || (lMoon ? '' : '<span style="font-size:9px;color:var(--text3)">leer</span>')}</div>
       ${lMoon ? `<div class="ftiles moon-area"><span style="font-size:8px;color:var(--text3)">Pool:</span>${lMoon}</div>` : ''}
     </div>
     </div>`;
