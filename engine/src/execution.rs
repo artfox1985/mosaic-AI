@@ -256,7 +256,7 @@ fn apply_first_player_marker(state: &mut GameState) {
         (p.name.clone(), p.score)
     };
     state.log_event(format!(
-        "🏁 {name}: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell {score} Pkt)"
+        "❖ {name}: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell {score} Pkt)"
     ));
 }
 
@@ -447,6 +447,6 @@ mod tests {
         assert!(s.players[1].holds_first_player_marker);
         assert_eq!(s.first_player_next_round, 1);
         assert!(!s.large_factory.has_first_player_marker);
-        assert!(s.log.iter().any(|l| l.contains("🏁")));
+        assert!(s.log.iter().any(|l| l.contains("❖")));
     }
 }
