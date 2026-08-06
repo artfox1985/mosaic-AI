@@ -800,20 +800,24 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
                  targets_v_wdl, s_wdl_outcome) = _batch
-                planes = planes.to(device)
+                # RAM-Optimierung v20: Cache liefert kompakte Typen (planes
+                # uint8, states/policies fp16, masks uint8) -- Cast auf
+                # float32 erst NACH dem Device-Move (billig, spart Transfer).
+                # `.float()` ist fuer Alt-Caches in float32 ein No-op.
+                planes = planes.to(device).float()
             else:
                 (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
                  targets_v_wdl, s_wdl_outcome) = _batch
-            states    = states.to(device)
-            targets_p = targets_p.to(device)
+            states    = states.to(device).float()
+            targets_p = targets_p.to(device).float()
             targets_v = targets_v.to(device)
             targets_points = targets_points.to(device)
             targets_opp_points = targets_opp_points.to(device)
             s_opp_mask = s_opp_mask.to(device)
             targets_v_wdl = targets_v_wdl.to(device)
             s_wdl_outcome = s_wdl_outcome.to(device)
-            masks     = masks.to(device)
+            masks     = masks.to(device).float()
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
@@ -1020,20 +1024,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                         (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
                          v_targets_v_wdl, v_wdl_outcome) = _v_batch
-                        v_planes = v_planes.to(device)
+                        # RAM-Optimierung v20: Cast wie im Trainingszweig.
+                        v_planes = v_planes.to(device).float()
                     else:
                         (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
                          v_targets_v_wdl, v_wdl_outcome) = _v_batch
-                    v_states = v_states.to(device)
-                    v_targets_p = v_targets_p.to(device)
+                    v_states = v_states.to(device).float()
+                    v_targets_p = v_targets_p.to(device).float()
                     v_targets_v = v_targets_v.to(device)
                     v_targets_points = v_targets_points.to(device)
                     v_targets_opp_points = v_targets_opp_points.to(device)
                     v_opp_mask = v_opp_mask.to(device)
                     v_targets_v_wdl = v_targets_v_wdl.to(device)
                     v_wdl_outcome = v_wdl_outcome.to(device)
-                    v_masks = v_masks.to(device)
+                    v_masks = v_masks.to(device).float()
                     v_pol_w = v_pol_w.to(device)
                     _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
