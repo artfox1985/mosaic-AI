@@ -701,6 +701,19 @@ Externe Brier-Auswertung aller 18 Checkpoints auf dem gemeinsamen
 - Nebenbefund: die Peak-Epoche wandert mit weniger Daten leicht nach
   hinten (405: E4-6) -- konsistent mit dem Erosions-/Memorisierungsbild.
 
+**POLICY-GEGENKURVE (PREREG-Sekundaermessung, 2026-08-06)**: dieselben 9
+Arme, Orakel-Metriken auf dem frozen-Set: prior_mass 0,7240/0,7250/0,7247,
+kendall_tau 0,363/0,361/0,366 -- **FLACH ueber 202->810, beide Metriken,
+kein Trend**. Im Warm-Start-Regime ist die Policy also DATEN-GESAETTIGT,
+waehrend der Value-Kopf log-linear gewinnt -- die theoretisch erwartete
+Schere (145 Ziele/Partie vs 1 Bit/Partie) ist damit direkt gemessen.
+Abgrenzung: die Korpus-Dosis-Studie (6/6 Policy-Gewinne 450->900) lief im
+From-Scratch-aehnlichen Rezept (lr 4e-4/40 Epochen) -- anderes Regime,
+kein Widerspruch. **Games/Sims-Bild fuer v20 damit komplett: die
+Spielzahl wird allein vom VALUE-Kopf getrieben; Policy-seitig gibt es im
+Warm-Start-Regime keinen Grund gegen mehr Partien und keinen Bedarf nach
+mehr.**
+
 **Konsequenzen**: (a) v20-Spielbudget NICHT kuerzen -- mehr Partien sind
 der billigste Value-Hebel (Tiling-Cache-Ersparnis -20% direkt in Spiele
 umsetzbar); (b) PCR-Bedingung (ii) ERFUELLT -> Durchsatz-Messung
