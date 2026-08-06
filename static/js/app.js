@@ -1896,6 +1896,10 @@ function stackStopAndChoose() {
   if(!domeModal) return;
   const n = (S.pending_stack_draw || []).length;
   if(n === 0) return;
+  // Nutzer-Feedback 2026-08-07: in der Waehl-Phase gibt es kein Zurueck in
+  // den freien Zugmodus mehr (Kosten bezahlt) -- Abbrechen-Button aus.
+  const cbtn = document.querySelector('#dome-overlay .cancel-btn');
+  if(cbtn) cbtn.style.display = 'none';
   domeModal.slot_r = -1;
   domeModal.slot_c = -1;
 
@@ -2624,8 +2628,19 @@ function render() {
 }
 
 function cancelStackPlacement() {
+  // Nutzer-Feedback 2026-08-07: der Stapel-Zug (Aktion A) ist ein
+  // VERBINDLICHER, durchgaengiger Zug -- die Kosten sind bezahlt, die
+  // Engine haelt pending_stack_draw. "Abbrechen" in der Slot-Phase fuehrt
+  // deshalb ZURUECK zur Platten-/Rotationswahl, nicht in den freien
+  // Zugmodus (dort waeren andere Aktionen ohnehin engine-seitig gesperrt).
+  const wasStack = pendingStackPlacement && pendingStackPlacement.source === 'stack';
   pendingStackPlacement = null;
   document.getElementById('info-area').innerHTML = '';
+  if (wasStack && (S.pending_stack_draw || []).length > 0) {
+    openDomeModal(S.current_player, -1, -1, true);
+    stackStopAndChoose();
+    return;
+  }
   render();
 }
 
