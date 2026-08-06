@@ -149,8 +149,11 @@ erste GF-Mond-Nahme), kein Tempo-Kauf. Das TATSAECHLICHE Spielkonzept
   werden voll); ECKPLATTEN normal 1x3 + 1x8 erreichbar; DIAGONALE
   zwiegespalten (widerspricht dem orthogonalen Aufbau); HORIZONTAL und
   FARBENREICH bringen wenig extra; MEHRFARBIG ok.
-- Spezialfeld-Taktik: Spezial-Kuppeln in die ERSTEN (schnellen) Reihen,
-  Wild-Kuppeln AGGRESSIV nehmen.
+- Spezialfeld-Taktik (NUR bei aktiver Spezialfelder-Wertungsplatte
+  Nr. 7, Nutzer-Praezisierung 2026-08-06): Spezial-Kuppeln in die
+  ERSTEN (schnellen) Reihen, Wild-Kuppeln AGGRESSIV nehmen -- die
+  Taktik ist an die -3-je-leeres-Spezialfeld-Wertung gebunden, nicht
+  generisch.
 Die KI-Chip-Duerre gegen den Menschen ist damit eher Folge dessen
 STRUKTUR-Vorsprungs (Kreuze + Spezial-Timing) als aktiven Denials.
 
