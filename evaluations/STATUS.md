@@ -332,6 +332,32 @@ Expansion). Zwei nie untersuchte Punkte fuer spaeter:
 Kein akuter Bedarf: Policy-Seite ist ueber die Orakel-Metriken
 arena-validiert, inkl. PL-Aufteilung.
 
+## Task #39 (geparkt, Arbeitskreis "Spaeter" mit #31/#38): Startkuppel-Platzierung (2026-08-06)
+
+Nutzer-Beobachtung "setzt sie gefuehlt immer an dieselbe Position" --
+am Code bestaetigt und MECHANISCH erklaert
+(`self_play.rs::choose_start_placement`): der Farb-Score ist
+POSITIONS-unabhaengig (summiert nur Fabrik-Farbhaeufigkeiten je Feld),
+der Eckbonus fuer alle 4 Ecken identisch (0,5), Ties behaelt der erste
+Kandidat -> IMMER Ecke (0,0); die Feld-Summe ist zudem
+ROTATIONS-invariant -> immer 0 Grad. Position/Rotation sind tote
+Freiheitsgrade; nur die Platten-WAHL variiert. Gilt ueberall (GUI,
+Arena, Self-Play; Startplatzierung ist policy-maskiert, das Netz lernt
+sie nie).
+
+**Verbesserungs-Optionen (bei Angehen abzuwaegen)**:
+a) Heuristik-Upgrade: Wertungsplatten-Bewusstsein (die 3 aktiven
+   Platten sind zum Zeitpunkt der Platzierung BEKANNT: Ecken/Rand/
+   Diagonalen bewerten Positionen verschieden!), positionsabhaengige
+   Linien-/Nachbarschaftsvorschau, Tie-Break randomisieren.
+b) Prinzipiell: Platzierung in den Aktionsraum der Suche -- ACHTUNG
+   NUM_ACTIONS-Aenderung macht alte Checkpoints unbrauchbar
+   ([[num-actions-change-breaks-old-checkpoints]]), teuer.
+**Randbedingung**: NICHT waehrend einer laufenden Kampagne aendern
+(verschiebt die Self-Play-Zustandsverteilung); fruehestens v21-Setup.
+Nebenaspekt: die heutige Uniformitaet kostet auch Zustands-Diversitaet
+im Korpus.
+
 ## Task #31 (vorgemerkt): Menschen-Schwierigkeitsstufen leicht/mittel/schwer/extrem (2026-08-03)
 
 **Nutzer-Auftrag**: Staerke-Skalierung fuer Mensch-Spiele; Einschaetzung
