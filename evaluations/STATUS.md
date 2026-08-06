@@ -126,13 +126,26 @@ STRUKTURELLE Strategien, die sie nicht spielt:
 3. Startkachel: Mensch variiert ((0,0)@0/270, (2,0)@180), KI klemmt
    deterministisch (#39).
 
-**Verwertung**: (a) v20-AUSWERTUNGS-WATCHLIST -- prueft der neue
-WDL-Champion Chips/Spezials haeufiger? (messbar an GUI-/Arena-Logs und
-indirekt am Spielstil); (b) falls nicht, ist "Chip-/Spezial-Planung im
-Drafting" der bestbelegte Kandidat fuer einen gezielten Eingriff
-(zusammen mit der Wertungsplatten-Wiedervorlage); (c) Elo-Realitaet:
-Champion-Elo (~1311) ist gegen diesen Menschen um ~350 Elo
-ueberschaetzt -- #31-Kalibrierung muss menschliche Gegner einbeziehen.
+**MECHANIK-VERTIEFUNG (2026-08-06)**: die Suche sieht die Tiling-Phase
+STRUKTURELL nicht -- der Baum endet an der Drafting-Grenze
+(`ROUND_TRANSITION_SAMPLING=false`), Blattwert = reine Netz-Bewertung.
+Chips liegen komplett ausserhalb des Suchhorizonts; ihr Wert muesste
+allein vom Value-Kopf getragen werden (dessen Kaskaden-Blindheit belegt
+ist). **SELBSTVERSTAERKENDE SCHLEIFE**: Korpus enthaelt das Muster nie
+-> Netz kann es nicht lernen -> Suche probiert es nie -> Korpus...
+Erwartung daher NUECHTERN: v20 wird die Chip-Maschine NICHT von selbst
+finden (die Watchlist prueft es trotzdem).
+
+**Verwertung**: (a) v20-Watchlist (chippt der neue Champion?);
+(b) Eingriffs-Routen, falls nein (bestbelegter Kandidat, mit
+Wertungsplatten-Wiedervorlage): (i) Tiling-Aufloesung IN den Suchbaum
+(Rundengrenze per Solver spielen -- Infrastruktur in
+round_transition.rs vorhanden, kostet Sims), (ii) Explorations-
+Injektion (das Muster in den Korpus zwingen, z.B. erzwungene
+Chip-Linien in einem Teil der Partien), (iii) Aux-Ziel/Shaping fuer
+Chip-Potenzial. (c) Elo-Realitaet: Champion-Elo (~1311) gegen diesen
+Menschen um ~350 ueberschaetzt -- #31-Kalibrierung braucht menschliche
+Anker.
 
 ## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
 
