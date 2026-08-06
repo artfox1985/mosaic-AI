@@ -18,9 +18,11 @@ Champion belegt 65:75/p=0,52) -- liefert ab sofort NATIVE
 | Alt-Value | restliche v18/v17/v16-Dateien | ~7.200 | — | maskiert | aktiv |
 | **Summe** | | **~21.000** | | **5.800** | **~21.000** |
 
-- Schwarm-Implementierung: `--pcr-full-prob 0.000001 --pcr-cheap-sims 150`
-  -> praktisch jeder Zug cheap + `policy_target_valid=false` (bestehende
-  PCR-Infrastruktur; kein Engine-Umbau). #35b filtert auf dasselbe Flag.
+- Schwarm-Implementierung (Nutzer-Einwand "Epsilon ist nicht sauber",
+  behoben): expliziter **`--value-only`-Modus** in self_play.py --
+  intern `pcr_full_prob=0.0` ("kein Zug voll", Rust-seitig exakt
+  definiert), `--sims` wird das Budget jedes Zugs, alle Policy-Ziele
+  `policy_target_valid=false`. #35b filtert auf dasselbe Flag.
 - Alt-Maskierung: `data/policy_carrier_manifest_v20.json` (Seed 20260806,
   zeitlich gestreute Auswahl), Cache-Bau maskiert Nicht-Traeger
   (Schema 17, Manifest-Inhalt im Cache-Key).

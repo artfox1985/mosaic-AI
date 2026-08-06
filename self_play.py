@@ -401,8 +401,14 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
-    if pcr_full_prob is not None and not (0.0 < pcr_full_prob <= 1.0):
-        raise SystemExit(f"❌ --pcr-full-prob muss in (0,1] liegen, ist {pcr_full_prob}.")
+    # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
+    # via --value-only gesetzt): JEDER Mehrfach-Aktions-Zug laeuft mit
+    # pcr_cheap_sims und traegt `policy_target_valid=false` -- die Partie
+    # liefert nur Value-Material (Ausgang + Bootstrap), keine Policy-Ziele.
+    # Rust-seitig sauber definiert: `rng.random::<f64>() < 0.0` ist nie wahr
+    # (self_play.rs::pcr_decide_full), kein Epsilon-Hack noetig.
+    if pcr_full_prob is not None and not (0.0 <= pcr_full_prob <= 1.0):
+        raise SystemExit(f"❌ --pcr-full-prob muss in [0,1] liegen (0 = value-only), ist {pcr_full_prob}.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -640,6 +646,12 @@ if __name__ == "__main__":
     parser.add_argument("--pcr-full-prob", dest="pcr_full_prob", type=float, default=None,
                         help="Task #14 PCR: Anteil Voll-Suche pro Zug (z.B. 0.25); "
                              "None/weggelassen = AUS (Bestandsverhalten). Nur --mode network.")
+    parser.add_argument("--value-only", dest="value_only", action="store_true",
+                        help="v20-Zwei-Klassen-Schwarm: Partie liefert NUR Value-Material -- "
+                             "jeder Zug laeuft mit dem --sims-Budget, alle Policy-Ziele werden "
+                             "als ungueltig markiert (policy_target_valid=false). Aequivalent zu "
+                             "--pcr-full-prob 0 --pcr-cheap-sims <--sims>; nicht mit "
+                             "--pcr-full-prob kombinierbar. Nur --mode network.")
     parser.add_argument("--pcr-cheap-sims", dest="pcr_cheap_sims", type=int, default=150,
                         help="Task #14 PCR: Sim-Budget der Sparsuche (Default 150; "
                              "GUMBEL_TOP_M skaliert automatisch mit).")
@@ -653,6 +665,19 @@ if __name__ == "__main__":
                              "evaluations/stage2_investigation.md. NICHT fuer reguläre Trainingsdaten-"
                              "Generierung gedacht (weniger Zustandsvielfalt).")
     args = parser.parse_args()
+
+    # --value-only (v20-Zwei-Klassen-Schwarm): expliziter Modus statt
+    # Epsilon-Hack -- pcr_full_prob=0.0 heisst "kein Zug voll", das
+    # --sims-Budget wird zum Cheap-Budget jedes Zugs.
+    _resolved_pcr_full_prob = args.pcr_full_prob
+    _resolved_pcr_cheap_sims = args.pcr_cheap_sims
+    if args.value_only:
+        if args.pcr_full_prob is not None:
+            raise SystemExit("❌ --value-only und --pcr-full-prob schliessen sich aus.")
+        if args.mode != "network":
+            raise SystemExit("❌ --value-only ist nur mit --mode network sinnvoll.")
+        _resolved_pcr_full_prob = 0.0
+        _resolved_pcr_cheap_sims = args.sims
 
     generate_data(
         mode=args.mode,
@@ -669,6 +694,6 @@ if __name__ == "__main__":
         add_root_noise=not args.no_root_noise,
         deterministic=args.deterministic,
         record_rtv=args.rtv,
-        pcr_full_prob=args.pcr_full_prob,
-        pcr_cheap_sims=args.pcr_cheap_sims,
+        pcr_full_prob=_resolved_pcr_full_prob,
+        pcr_cheap_sims=_resolved_pcr_cheap_sims,
     )
