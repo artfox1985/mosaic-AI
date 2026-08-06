@@ -47,6 +47,23 @@ Sequenzialisierung verloren).
 - **Champion**: `v19_2d_best` bleibt (Nutzer 2026-08-04). Der opp-Kopf
   kommt ueber `v20_2d_opp` in die Linie; v20 warm von
   `v19_2d_opp_best` starten (Kopf bereits trainiert).
+- **v20-KAMPAGNEN-DESIGN, drei Optionen (Stand 2026-08-06, Nutzer-Entscheid
+  offen)** -- Grundlage: #36-Schere (Policy im Warm-Start-Regime satt,
+  Value log-linear hungrig) + Durchsatz 1,37x + Nutzer-Schluss "wenn die
+  Policy satt ist, kommt sie mit weniger Policy-Traeger-Partien aus":
+  - **A Standard**: 6000+ Partien @600, alles wie gehabt (+20% mehr
+    Partien durch Tiling-Cache).
+  - **B PCR-mild**: +37% Partien, aber schwaechere Policy-Labels auf der
+    Haelfte der Zuege JEDER Partie (Juli-Schwachstelle).
+  - **C ZWEI-KLASSEN (Nutzer-Idee 2026-08-06, praeferierter Kandidat)**:
+    Sockel voller Partien @600 (Policy-Traeger) + Schwarm reiner
+    VALUE-Partien @~150 Sims (~2,5x billiger; `policy_target_valid=false`
+    -> pol_w=0, Infrastruktur existiert aus PCR-Bau). Value-Label-Verlust
+    minimal: Ziel = bootstrap (netz-, nicht sims-abhaengig) + Ausgang;
+    root_q ungenutzt. Vorteil vs B: Policy-Labels des Sockels UNBERUEHRT.
+    Offene Design-Groessen: Sockel-/Schwarm-Verhaeltnis (Praezedenz
+    Mix-Anteil-Befund der λ-Serie beachten), Schwarm-Sims (150?),
+    PREREG vor Start.
 - **v20-Kampagne (Nutzer 2026-08-05): Start ERST, wenn Spiel- und
   Sim-Budget belegt sind** -- also nach #36 (Spielzahl: saettigt der
   Value-Kopf?) und dem #14-Entscheid (Sims: lohnt PCR-Sim-Reduktion?).
