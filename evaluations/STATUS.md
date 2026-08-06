@@ -345,11 +345,18 @@ Freiheitsgrade; nur die Platten-WAHL variiert. Gilt ueberall (GUI,
 Arena, Self-Play; Startplatzierung ist policy-maskiert, das Netz lernt
 sie nie).
 
+**Nutzer-Einordnung (2026-08-06, schaerft den Zuschnitt)**: die Ecke an
+sich ist strategisch RICHTIG (Rand/Diagonale/Eckplatten honorieren sie
+alle) -- das Problem ist die MONOTONIE, nicht die Position. Restliche
+echte Differenzierungen: (1) Ecken-RANG -- Eckplatten zahlen 3 oben /
+8 UNTEN, der Tie-Break waehlt stur die 3-Punkte-Ecke (0,0), obwohl die
+aktive Plattenwahl bekannt ist; (2) ROTATION -- bestimmt, welche Farben
+zur Brettmitte zeigen und wo Wild-/Spezialfeld landet, heute komplett
+verschenkt (Score rotationsinvariant).
 **Verbesserungs-Optionen (bei Angehen abzuwaegen)**:
-a) Heuristik-Upgrade: Wertungsplatten-Bewusstsein (die 3 aktiven
-   Platten sind zum Zeitpunkt der Platzierung BEKANNT: Ecken/Rand/
-   Diagonalen bewerten Positionen verschieden!), positionsabhaengige
-   Linien-/Nachbarschaftsvorschau, Tie-Break randomisieren.
+a) Heuristik-Upgrade: Ecken-Rang (3 vs 8) bei aktiver Eckplatten-
+   Wertung, Rotations-Bewertung (Farb-Ausrichtung/Sonderfeld-Lage),
+   Tie-Break randomisieren (bricht Monotonie + Diversitaets-Bonus).
 b) Prinzipiell: Platzierung in den Aktionsraum der Suche -- ACHTUNG
    NUM_ACTIONS-Aenderung macht alte Checkpoints unbrauchbar
    ([[num-actions-change-breaks-old-checkpoints]]), teuer.
