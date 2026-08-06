@@ -633,7 +633,12 @@ def action_to_id(action: dict) -> int:
 # UEBERFLUESSIG und darf NICHT zusaetzlich gesetzt werden (doppelte
 # Streckung); der Flag bleibt nur fuer Alt-Experimente auf Schema-16.
 VALUE_SCHEMA_VERSION = 17
-WDL_GENERATOR_PREFIXES = ("selfplay_v20wdl",)
+# Namenskonvention: Dateien heissen nach dem GENERATOR (v19-Aera-Modell
+# t34_wdldestretch_brierbest -> "v19wdl"), NICHT nach der Ziel-Generation
+# (Koordinator-Fehler #2 mit dieser Konvention, vom Nutzer 2026-08-06
+# gefangen -- BEVOR falsch entstaucht wurde). Kuenftige WDL-Generatoren
+# ergaenzen ihre Praefixe hier.
+WDL_GENERATOR_PREFIXES = ("selfplay_v19wdl", "selfplay_v20wdl")
 DESTRETCH_A = 0.0051
 DESTRETCH_B = 1.9269
 
@@ -1336,10 +1341,21 @@ class MosaicDataset(Dataset):
             # alten Reihenfolge (ein Sammel-`del` ganz am Ende) vermutlich an
             # genau dieser Spitze bzw. der anschliessenden Dauerlast
             # gestorben (spurlos, kein Traceback, siehe `_open_planes_h5`).
-            states_np    = np.array(states_l,    dtype=np.float32); del states_l
-            policies_np  = np.array(policies_l,  dtype=np.float32); del policies_l
+            # RAM-Optimierung v20 (2026-08-06, Nutzer-Auftrag): das
+            # 21k-Partien-Fenster (~3,4 Mio Zustaende) wuerde in float32
+            # ~35-40 GB RSS kosten (gemessen: 12,1 KB/Zustand bei 9k Partien,
+            # 32 GB Maschine). Kompakte Typen druecken das auf ~6 KB/Zustand:
+            # - states/policies -> float16 (Eingaben/Soft-Targets; Quantisierung
+            #   ~6e-4 relativ, weit unter Seed-Rauschen; NICHT bit-identisch,
+            #   Notausstieg MOSAIC_CACHE_F32=1),
+            # - masks -> uint8 (0/1, EXAKT),
+            # - planes waren bereits uint8, ownership bereits int8.
+            # train.py castet je Batch nach dem Device-Move auf float32.
+            _f = np.float32 if os.environ.get("MOSAIC_CACHE_F32") == "1" else np.float16
+            states_np    = np.array(states_l,    dtype=_f);         del states_l
+            policies_np  = np.array(policies_l,  dtype=_f);         del policies_l
             values_np    = np.array(values_l,    dtype=np.float32); del values_l
-            masks_np     = np.array(masks_l,     dtype=np.float32); del masks_l
+            masks_np     = np.array(masks_l,     dtype=np.uint8);   del masks_l
             moon_np      = np.array(moon_l,      dtype=np.float32); del moon_l
             polw_np      = np.array(polw_l,      dtype=np.float32); del polw_l
             points_np    = np.array(points_l,    dtype=np.float32); del points_l
@@ -1513,11 +1529,14 @@ class MosaicDataset(Dataset):
         return self._planes_h5_file
 
     def _get_planes_tensor(self, idx):
+        # RAM-Optimierung v20: uint8 bleibt bis NACH dem Device-Move erhalten
+        # (train.py castet batchweise) -- spart 4x Collate-/Transfer-Volumen
+        # gegenueber dem frueheren Per-Sample-`.float()`.
         if self._planes_eager_tensor is not None:
-            return self._planes_eager_tensor[idx].float()
+            return self._planes_eager_tensor[idx]
         hf = self._open_planes_h5()
         arr = hf["planes"][idx]  # uint8 [76,6,6], EIN Sample -- kein Voll-Array-Read
-        return torch.from_numpy(arr.astype("float32"))
+        return torch.from_numpy(arr)
 
     def __getstate__(self):
         """Siehe `_open_planes_h5` -- der offene h5py-Handle darf nicht mit-
