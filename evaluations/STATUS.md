@@ -108,6 +108,32 @@
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
   braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
 
+## MENSCH-vs-KI-BEFUND (Nutzer-Anstoss 2026-08-06): 9 gewertete Partien analysiert
+
+Nutzer schlaegt v19_2d_best@400 **8:1** (Log-Analyse
+static/log/, Profil artfox). Die KI ist im Kleinen minimal besser
+(3,47 vs 3,30 Pkt je Kuppel-Legung) und verliert ueber zwei
+STRUKTURELLE Strategien, die sie nicht spielt:
+1. **Chip-Spezial-Maschine**: Mensch 1,9 Chip-Reihenabschluesse und
+   10,8 Spezialpunkte je Partie, KI 0,0 / 0,4. Der Tiling-Solver KANN
+   chippen (TilingStep::Chips existiert) -- aber die Drafting-Policy
+   baut nie chipbare tiefe Reihen auf (R5+R6-Nahmen: Mensch 37%, KI
+   22%). Mechanistisch = die bekannte Platten-Kaskaden-Blindheit des
+   Value-Kopfs, erstmals als Spielfolge sichtbar.
+2. **Tempo**: Startspielerstein-Nahmen 34:7 fuer den Menschen -- die KI
+   bewertet das Startrecht systematisch zu niedrig (-2 wirken im alten
+   Punkte-Margen-Value teurer als das Tempo wert ist?).
+3. Startkachel: Mensch variiert ((0,0)@0/270, (2,0)@180), KI klemmt
+   deterministisch (#39).
+
+**Verwertung**: (a) v20-AUSWERTUNGS-WATCHLIST -- prueft der neue
+WDL-Champion Chips/Spezials haeufiger? (messbar an GUI-/Arena-Logs und
+indirekt am Spielstil); (b) falls nicht, ist "Chip-/Spezial-Planung im
+Drafting" der bestbelegte Kandidat fuer einen gezielten Eingriff
+(zusammen mit der Wertungsplatten-Wiedervorlage); (c) Elo-Realitaet:
+Champion-Elo (~1311) ist gegen diesen Menschen um ~350 Elo
+ueberschaetzt -- #31-Kalibrierung muss menschliche Gegner einbeziehen.
+
 ## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
 
 **Frage**: Welches Kriterium waehlt unter den Top-12-Tiling-Abschluessen
