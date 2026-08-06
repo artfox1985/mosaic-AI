@@ -1267,13 +1267,13 @@ function renderCenter() {
   const lSun = [...new Set(lf.sun)].map(c=>{
     const cnt=lf.sun.filter(x=>x===c).length;
     return `<div class="cgroup" data-src="LARGE_FACTORY_SUN" data-fid="null" data-color="${c}">
-      <div class="tile ${normColor(c)} click"></div><span class="cnt">×${cnt}</span>
+      <div class="tile ${normColor(c)} click ${sel?.source==='LARGE_FACTORY_SUN'&&sel?.color===c?'sel':''}"></div><span class="cnt">×${cnt}</span>
     </div>`;
   }).join('');
   const lMoon = [...new Set(lf.moon)].map(c=>{
     const cnt=lf.moon.filter(x=>x===c).length;
     return `<div class="cgroup" data-src="LARGE_FACTORY_MOON" data-fid="null" data-color="${c}">
-      <div class="tile ${normColor(c)} click"></div><span class="cnt">×${cnt}</span>
+      <div class="tile ${normColor(c)} click ${sel?.source==='LARGE_FACTORY_MOON'&&sel?.color===c?'sel':''}"></div><span class="cnt">×${cnt}</span>
     </div>`;
   }).join('');
 
