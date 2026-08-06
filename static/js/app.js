@@ -1442,7 +1442,7 @@ const sdiv = document.getElementById('scoring-display');
       </div>`);
     if(moonColors.length)
       lines.push(`<div class="le" style="display:flex;align-items:center;gap:3px;padding:2px 0">
-        🌙 Mond (alle):
+        🌙 Mond:
         ${moonColors.map(c=>`<div class="tile sm ${normColor(c)}">${normColor(c)[0].toUpperCase()}</div>`).join('')}
       </div>`);
   }
