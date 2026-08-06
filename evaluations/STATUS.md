@@ -61,9 +61,19 @@ Sequenzialisierung verloren).
     -> pol_w=0, Infrastruktur existiert aus PCR-Bau). Value-Label-Verlust
     minimal: Ziel = bootstrap (netz-, nicht sims-abhaengig) + Ausgang;
     root_q ungenutzt. Vorteil vs B: Policy-Labels des Sockels UNBERUEHRT.
-    Offene Design-Groessen: Sockel-/Schwarm-Verhaeltnis (Praezedenz
-    Mix-Anteil-Befund der λ-Serie beachten), Schwarm-Sims (150?),
-    PREREG vor Start.
+    **Fenster-Zuschnitt (Nutzer 2026-08-06)**: Sockel 4000 @600 (Policy
+    aktiv) + Schwarm 8000 @~150 (Policy maskiert) vom v20-Generator;
+    Alt-Einfluss: 1350 v18- + 450 v17-Partien als Policy-Traeger
+    (Summe 5800 Policy-aktiv), restliche ~7200 v18/v17/v16-Partien als
+    reines Value-Material -> ~21.000 Value-Partien gesamt. Nachschub-
+    Ventil: bei Gating-Fehlschlag weitere Policy-Partien nachwerfen.
+    **Backup-Altbestaende bleiben AUSSEN (Nutzer-Entscheid): ihre
+    Verlaeufe tragen die alte Policy** -- Value-Kalibrierung soll auf
+    der Zustandsverteilung des aktuellen Spiels stehen (deckt sich mit
+    "Alt-Regel-Korpora nie wieder" von 2026-07-21).
+    OFFEN: Generator-Wahl (v19_2d_best/tanh = Entstauchung global
+    weiter, vs t34_wdldestretch_brierbest/WDL = saubere Bootstraps ab
+    sofort + aera-gesteuerte Entstauchung noetig); PREREG vor Start.
 - **v20-Kampagne (Nutzer 2026-08-05): Start ERST, wenn Spiel- und
   Sim-Budget belegt sind** -- also nach #36 (Spielzahl: saettigt der
   Value-Kopf?) und dem #14-Entscheid (Sims: lohnt PCR-Sim-Reduktion?).
