@@ -36,7 +36,7 @@ Sequenzialisierung verloren).
 | #14 | PCR (beide Regime) | **WIEDEREROEFFNET 2026-08-06: alle 3 Bedingungen erfuellt** (#34 ✓, #36 spielhungrig ✓, Durchsatz **1,37x** end-to-end ✓) | Design-Entscheid gehoert in die v20-Planung (Nutzer) | unten |
 | #27 | R5-Value-Kalibrierung | **geschlossen**: Unterkalibrierung belegt | — | history |
 | #9 | Ownership-Kopf | **ERNEUT GESCHLOSSEN 2026-08-06**: auch am neuen Ziel kein Arena-Beleg (197:193/390, p=0,91; 145:145/290) -- perfekte Paritaet mit Arena-Instrument | — | history + PREREG_nach34_paket |
-| #12 | Distributionaler Punkte-Kopf | **IN REPLIKATION**: erster SPRT-H1 der WDL-Aera vs Referenz (54:26, p=0,0066), ABER 33:47 vs Champion -- widerspruechlich, Frisch-Seed-Replikation laeuft | Replikations-Ausgang | unten (Paket) |
+| #12 | Distributionaler Punkte-Kopf | **ERNEUT GESCHLOSSEN 2026-08-06**: beide Erstlauf-Extreme replizieren NICHT (206:194/400 p=0,60; 181:179/360 p=1,0) -- SPRT-H1 bei n=80 war Falsch-Positiv; dazu Offline-Kosten (Erosion 0,2108, Punkte-R² 0,48<0,56) | — | unten (Paket) |
 | — | Afterstate-Kopf (Stochastic MuZero) | **geparkt**: Vortest ohne Signal | Neubewertung nach #34 | history |
 | — | Wertungsplatten-Intervention | **geparkt**: Symptom, nicht Ursache | R5-Diagnostik nach #34 | history |
 | — | rtv | **geschlossen**, Bedingung formuliert | arena-erfolgreiches #34 | unten |
@@ -726,10 +726,21 @@ t12_dist Peak 0,1979, staerkere Erosion (0,2108), Punkte-R² FAELLT
   Champion, waehrend die Referenz dort Paritaet spielte. Moegliche
   Deutungen: Nicht-Transitivitaet (Stilpaarung), Seed-Satz-Rauschen im
   80-Paare-Champion-Lauf, oder echter Effekt nur gegen WDL-Familie.
-  **Frisch-Seed-Replikation beider t12-Gatings laeuft** (PREREG-Regel:
-  keine Uebernahme ohne repliziertes, klares Bild + intakten Brier --
-  Letzteres ist mit der staerkeren Erosion ohnehin fraglich).
+  **Frisch-Seed-Replikation (Ergebnis)**: vs Referenz 206:194 ueber
+  VOLLE 400 Partien (51,5%, p=0,60), vs Champion 181:179 (50,3%, p=1,0)
+  -- BEIDE Erstlauf-Extreme waren Seed-Satz-Rauschen, die Wahrheit ist
+  beidseitige Paritaet. Der SPRT-H1 bei n=80 war ein Falsch-Positiv des
+  fruehen Stopps (alpha-Fehler); die Replikationsregel hat ihn gefangen.
+  **#12 ERNEUT GESCHLOSSEN** per PREREG ("keine Uebernahme ohne
+  repliziertes klares Bild + intakten Brier" -- beides verfehlt:
+  Paritaet statt Effekt, Erosion 0,2108 + Punkte-R²-Verlust).
+  METHODEN-LEHRE (dritter Beleg): SPRT-Fruehstopps bei n<=80 sind bei
+  unserer Effektlage anfaellig -- Einzel-H1 ohne Replikation zaehlt
+  nicht als Uebernahme-Beleg.
 - #29: Instrument-Teil wartet auf frozen-Set-Neubau (siehe PREREG).
+- **Paket-Fazit**: #9 zu, #12 zu, #29 vertagt -- das Nach-#34-Paket ist
+  ABGESCHLOSSEN. Kein Aux-Kopf-Hebel traegt am neuen Ziel; die
+  belegten Hebel bleiben Spielzahl (#36) und die v20-Kampagne selbst.
 
 ### PCR (Task #14): konditionale WIEDEREROEFFNUNG (Nutzer-Frage 2026-08-05)
 
