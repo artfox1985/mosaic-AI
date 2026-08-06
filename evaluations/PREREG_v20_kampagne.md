@@ -76,3 +76,12 @@ Modell), nicht nach der Ziel-Generation (Konvention; zweiter
 Koordinator-Fehler dieser Art, diesmal ohne Schaden gefangen:
 WDL_GENERATOR_PREFIXES haette sonst die nativen Bootstraps der neuen
 Dateien faelschlich entstaucht).
+
+**ABWEICHUNGS-NOTIZ (2026-08-06, waehrend des Schwarm-Laufs erkannt)**:
+Der Schwarm laeuft via `gumbel_top_m_for_budget` mit Wurzelbreite m=9
+(150 Sims) statt m=16 -- diese Formel ist nie staerke-gemessen
+(Suchpfad-Inventar). Bewusst NICHT abgebrochen: Policy der
+Schwarm-Partien ist maskiert, das Value-Ziel (Bootstrap+Ausgang) ist
+sim-/breiten-robust, und der 16-vs-8-Wash bei 400 Sims spricht gegen
+grosse Effekte. Nachmessung der m-Formel steht auf der
+Nach-v20-Kandidatenliste.

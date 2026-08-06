@@ -173,6 +173,53 @@ ohne die Mensch-Belegt-Behauptung; (c) das Strategie-Dossier ist
 Referenzmaterial fuer #31 (Stil-Stufen) und kuenftige Eval-Arbeit.
 Elo-Anmerkung zu #31 GESTRICHEN (Nutzer: pendelt sich selbst ein).
 
+## SUCHPFAD-VERIFIKATIONS-INVENTAR (Agent-Audit, Nutzer-Auftrag 2026-08-06)
+
+Alle aktiven Modifikatoren/Konstanten im Netz-Suchpfad gegen
+STATUS/history abgeglichen (Kernbelege stichprobenverifiziert).
+**Pointe: der Nutzer-Verdachtsfall Floor-Shaping ist als FEATURE der
+bestverifizierte Shaping-Term im Code** (gepaarter A/B +14pp, McNemar
+p=0,0075, history:1104-1137; plus v10-Ablation). Offen daran nur:
+der GEWICHTS-Wert 0,3 (0,15/0,6-Sweep nie gefahren) und die
+Re-Validierung in der WDL-Aera (Additiv auf einer Achse, deren
+Spreizung sich ~2x geaendert hat).
+
+**UNVERIFIZIERT + AKTIV (Ertrag, nach Relevanz):**
+1. **`gumbel_top_m_for_budget`** (net_mcts.rs:1724): bei 150 Sims ->
+   m=9 statt 16 -- nie staerke-gemessen; **der laufende v20-Schwarm
+   spielt damit** (Milderung: Policy maskiert, Value-Ziel =
+   Bootstrap+Ausgang, root_q ungenutzt; 16-vs-8-Wash bei 400 Sims
+   deutet auf geringe Sensitivitaet). Nachmessung im Nach-v20-Fenster.
+2. **tau=1-Besuchs-Sampling ohne Annealing** (ganze Partie,
+   self_play.rs:2031): Design-Entscheid, nie A/B vs Annealing.
+3. **Heuristik-Anker-Parameterpaket** (SELF_PLAY_C, Temperaturleiter,
+   visits^(1/tau)*q^2 u.a.): definiert den Elo-Anker@200 --
+   NICHT-ANFASSEN-Regel (jede Aenderung entwertet die Elo-Leiter,
+   Praezedenz #21-Neuverankerung).
+4. Startkuppel-Heuristik (= #39, geparkt), `GUMBEL_C_VISIT=50` (nur
+   indirekt via c_scale gedeckt), Bootstrap-Label-Budgets
+   (Horizont 2/Budget 40, wirken auf Labels, nicht Live-Staerke;
+   dort lebt auch POLICY_MASS_CUTOFF=0.95 weiter, im Livepfad tot).
+
+**TEIL-VERIFIZIERT** (Offline-/Aequivalenz-Belege, keine isolierte
+Staerke-Messung): #20-Tiebreak (Referenz-validiert, Kriterium = #37),
+PL-Moon-Split (via Orakel-Instrument), DETERMINIZE (Korrektheit schlaegt
+Messwert, dokumentiert), DECOUPLE_NET_SIMS, Gumbel-Umstieg selbst
+(nur "nicht schlechter" bei n=100, danach System-Ko-Evolution),
+completed-Q-Ziel, VALUE_SCALE=50 (Nutzer-Fixpunkt), R5-/Tiling-Budgets
+(Aequivalenz- bzw. Haenger-kalibriert).
+
+**VERIFIZIERT/INERT**: Floor-Shaping-Feature, c_scale (2x), TOP_M@400,
+endaware, NUM_DET=1, Tiling-Cache; alle Aus-Schalter mit Beleg
+(VALUE_SHRINK, PLATE/TILING_SHAPING, POINTS_UTILITY, MIRROR,
+STACK_PEEK, CAL_A/B, Aggression w=0); Dirichlet/c_puct = tote Knoepfe
+im Legacy-Pfad. Details: Agent-Report 2026-08-06 (Transkript).
+
+**Nach-v20-Kandidatenliste daraus** (billige Ein-Faktor-Gatings, wenn
+die Arena-Maschine warm ist): Floor-Gewicht 0,15/0,3/0,6 in der
+WDL-Aera; m(150)-Formel-Messung; tau-Annealing-A/B. KEINE Aenderung
+vor dem v20-Gating (laufende Kampagne nicht kontaminieren).
+
 ## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
 
 **Frage**: Welches Kriterium waehlt unter den Top-12-Tiling-Abschluessen
