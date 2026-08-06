@@ -37,6 +37,39 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    eigene Auswahl auf JEDER Fliesenfarbe klar erkennbar bleibt. */
 .tile.sel{outline:3px solid #F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.3)}
 .tile.empty{background:var(--bg);border-style:dashed;border-color:var(--border);color:var(--text3)}
+/* Farbenblinden-Symbole (Nutzer 2026-08-07): jede farbige Fliese traegt ein
+   weisses Form-Symbol (Rot ✦ Blau ✢ Schwarz ▣ Tuerkis ◈ Gelb ❂) -- zentral
+   per ::after auf der Farbklasse, gilt automatisch ueberall (.tile in
+   Fabriken, Reihen, Boden, Stapeln, Modals, Zug-Liste). Kuppelfelder (.ds)
+   bekommen ihr Symbol via spaceHTML-Label bzw. hier fuer belegte Felder. */
+.tile.blau::after{content:'✢'}
+.tile.gelb::after{content:'❂'}
+.tile.rot::after{content:'✦'}
+.tile.schwarz::after{content:'▣'}
+.tile.tuerkis::after{content:'◈'}
+.tile.blau::after,.tile.gelb::after,.tile.rot::after,.tile.schwarz::after,.tile.tuerkis::after{
+  color:#fff;font-size:12px;font-weight:400;line-height:1;
+  text-shadow:0 1px 1px rgba(0,0,0,.35)}
+/* Phantom-Fliesen (weisse Fuellung): weisses Symbol waere unsichtbar --
+   Symbol in der Randfarbe. */
+.tile.phantom.blau::after{color:var(--blau)}
+.tile.phantom.gelb::after{color:var(--gelb)}
+.tile.phantom.rot::after{color:var(--rot)}
+.tile.phantom.schwarz::after{color:var(--schwarz)}
+.tile.phantom.tuerkis::after{color:var(--tuerkis)}
+/* Belegte Kuppelfelder (lbl ist leer): Symbol per CSS. */
+.ds.filled.blau::after{content:'✢'}
+.ds.filled.gelb::after{content:'❂'}
+.ds.filled.rot::after{content:'✦'}
+.ds.filled.schwarz::after{content:'▣'}
+.ds.filled.tuerkis::after{content:'◈'}
+.ds.filled.blau::after,.ds.filled.gelb::after,.ds.filled.rot::after,.ds.filled.schwarz::after,.ds.filled.tuerkis::after{
+  color:#fff;font-size:11px;font-weight:400;line-height:1;
+  text-shadow:0 1px 1px rgba(0,0,0,.35)}
+/* Unbelegte Kuppel-Farbfelder: Label-Symbol (spaceHTML) etwas groesser als
+   die 9px-Basis, damit die Form erkennbar ist. */
+.ds.N{font-size:11px;font-weight:400}
+
 .blau{background:var(--blau)}.gelb{background:var(--gelb)}.rot{background:var(--rot)}
 .schwarz{background:var(--schwarz)}.tuerkis{background:var(--tuerkis)}
 /* Startspielerfliese-Marker (eigener .fslot links von -1): unbelegt =
