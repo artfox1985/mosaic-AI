@@ -107,9 +107,11 @@
 - **Elo-Betrugsschutz (GUI, 2026-08-06)**: gewertete Spiele NUR gegen
   KI-Konfigurationen mit direkter Arena-Kante (`is_estimate=False`) --
   Sims-Tier-Schaetzwerte werten nicht mehr (Farming-Luecke geschlossen).
-  Bekannte Restluecke, bewusst offen: Abbruch einer verlorenen Partie
-  vermeidet den Elo-Verlust (Wertung erst bei end_scoring) -- Fix waere
-  "Aufgabe = Niederlage", braucht Nutzer-Entscheid zur UX.
+  Abbruch-Verhalten (verlorene Partie neu starten vermeidet
+  Elo-Verlust): NUTZER-ENTSCHEID 2026-08-06 -- bleibt so, kein Fix.
+  Zukunftsoffen: sobald #31-Kalibrierung Preset-Konfigurationen (z.B.
+  champion@60) per Arena verankert, werden sie automatisch ehrlich
+  wertbar.
 - **Kein validierter Offline-Praediktor fuer die Value-Seite** (#29
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
   braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
