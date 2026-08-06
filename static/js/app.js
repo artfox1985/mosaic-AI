@@ -1250,7 +1250,7 @@ function renderCenter() {
          </div>` : '';
     // Nutzer-Feedback 2026-08-07: 🏭 neben dem Stadtnamen (Bonuschip-Groesse).
     return `<div class="fcard" data-fid="${f.id}">
-      <div class="fhead"><span style="display:inline-flex;align-items:center;gap:4px"><span class="icon-chip">🏭</span>${factoryCityName(f.id)}</span>${chipHTML}</div>
+      <div class="fhead"><span style="display:inline-flex;align-items:center;gap:4px"><span class="icon-chip">🏗️</span>${factoryCityName(f.id)}</span>${chipHTML}</div>
       <div class="ftiles sun-area">${f.sun.length?sunTiles:(nonEmptyStacks.length?'':'<span style="font-size:9px;color:var(--text3)">leer</span>')}</div>
       ${moonTiles}
     </div>`;
@@ -1319,11 +1319,11 @@ document.getElementById('auslage-area').innerHTML = `
     <div style="${!S.players.every(p=>p.start_placed)?'opacity:.35;pointer-events:none':''}">
     ${facsHTML}
     <!-- Nutzer-Feedback 2026-08-07: .gf = eigener Hintergrund (Musterreihen-
-         Flaechenfarbe); 🏭 🏗️ neben dem Namen; Startspielerstein als 🏁
+         Flaechenfarbe); 🏭 neben dem Namen (kleine: 🏗️); Startspielerstein als ❖ (Nutzer 2026-08-07)
          (konsistent mit dem Log) in Bonuschip-Groesse statt kleinem ★;
          "leer" nur, wenn Sonne UND Moon-Pool leer sind. -->
     <div class="fcard gf" data-fid="GF">
-      <div class="fhead"><span style="display:inline-flex;align-items:center;gap:4px"><span class="icon-chip">🏭 🏗️</span>${factoryCityName(null)}</span>${lf.marker?'<span class="icon-chip" title="Startspielerstein">🏁</span>':''}</div>
+      <div class="fhead"><span style="display:inline-flex;align-items:center;gap:4px"><span class="icon-chip">🏭</span>${factoryCityName(null)}</span>${lf.marker?'<span class="icon-chip" title="Startspielerstein" style="color:#F59E0B">❖</span>':''}</div>
       <div class="ftiles sun-area" style="margin-bottom:2px">${lSun || (lMoon ? '' : '<span style="font-size:9px;color:var(--text3)">leer</span>')}</div>
       ${lMoon ? `<div class="ftiles moon-area"><span style="font-size:8px;color:var(--text3)">Pool:</span>${lMoon}</div>` : ''}
     </div>
@@ -1338,7 +1338,7 @@ document.getElementById('auslage-area').innerHTML = `
       style='color:#DC2626'; 
     } else if(e.includes('⭐')){
       style='color:#7C3AED;font-weight:600'; 
-    } else if(e.includes('🏁')){
+    } else if(e.includes('❖') || e.includes('🏁')){
       style='color:#F59E0B'; 
     } else if(e.includes('📦')){
       style='color:#DC2626'; 
