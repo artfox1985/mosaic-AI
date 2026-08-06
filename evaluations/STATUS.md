@@ -35,7 +35,12 @@
 4. Champion-Gating vs `v19_2d_best` (Fruehstopp-Regel beachten!),
    Policy-Wacht (Orakel-Metriken vs v19), Saettigungs-Nachfit
    (4. Stuetzpunkt), Pflicht-Diagnostiken (Platt, R5, R4b).
-5. Danach eigene Schritte: frozen-Set-Neubau -> #29-Instrument;
+5. **Suchpfad-Nachmessungen** (PREREG_suchpfad_nachmessungen.md):
+   Env-Knoepfe bauen (MOSAIC_FLOOR_SHAPING_W, MOSAIC_GUMBEL_TOP_M,
+   Paritaets-Nachweis) -> Floor-Gewicht-Sweep 0,15/0,3/0,6 ->
+   m-Formel-Messung @150 Sims -> (eigenes Nutzer-Go, Kostenklasse
+   ~1 Tag) τ-Annealing-Korpus-A/B.
+6. Danach eigene Schritte: frozen-Set-Neubau -> #29-Instrument;
    Aggressions-Neukartierung; #37; λ.
 
 ## OFFENE ENTSCHEIDUNGEN & GELTENDE REGELN
