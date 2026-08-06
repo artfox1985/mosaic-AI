@@ -1563,16 +1563,13 @@ function renderChipModal() {
     div.className='chip-pill'+(inSel?' in-sel':'');
     div.style.opacity=inGroup?'0.3':'1';
     div.style.cursor=inGroup?'not-allowed':'pointer';
+    // Nutzer-Feedback 2026-08-07: Farbe spricht fuer sich -- keine
+    // Buchstaben-Kuerzel, keine Chip-ID.
     chip.colors.forEach(c=>{
       const s=document.createElement('div');
       s.className=`tile sm ${normColor(c)}`;
-      s.textContent=normColor(c)[0].toUpperCase();
       div.appendChild(s);
     });
-    const id=document.createElement('span');
-    id.style.cssText='font-size:8px;color:var(--text3);margin-left:2px';
-    id.textContent='#'+chip.id;
-    div.appendChild(id);
     if(!inGroup) div.addEventListener('click',()=>{toggleChipInSelection(chip.id);});
     pool.appendChild(div);
   });
@@ -1590,7 +1587,6 @@ function renderChipModal() {
       chip.colors.forEach(c=>{
         const s=document.createElement('div');
         s.className=`tile sm ${normColor(c)}`;
-        s.textContent=normColor(c)[0].toUpperCase();
         div.appendChild(s);
       });
       div.addEventListener('click',()=>toggleChipInSelection(id));
@@ -1615,7 +1611,7 @@ function renderChipModal() {
     gDiv.innerHTML=confirmedGroups.map((g,gi)=>{
       const cchips=g.chip_ids.map(id=>availableChips.find(c=>c.id===id)).filter(Boolean);
       return `<div style="display:inline-flex;align-items:center;gap:2px;padding:3px 7px;background:#D1FAE5;border:1px solid #34D399;border-radius:5px;font-size:10px">
-        ${cchips.map(c=>c.colors.map(col=>`<div class="tile sm ${normColor(col)}">${normColor(col)[0].toUpperCase()}</div>`).join('')).join('<span style="color:var(--text3)">+</span>')}
+        ${cchips.map(c=>c.colors.map(col=>`<div class="tile sm ${normColor(col)}"></div>`).join('')).join('<span style="color:var(--text3)">+</span>')}
         <span style="color:#065F46;margin-left:3px">→ 1 Fliese</span>
         <span onclick="removeChipGroup(${gi})" style="cursor:pointer;color:var(--rot);margin-left:4px">✕</span>
       </div>`;
