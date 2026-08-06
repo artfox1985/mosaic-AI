@@ -20,7 +20,7 @@
 | — | #29-Instrument | Orakel-Referenzen neu nach frozen-Set-Neubau (v20-Aera); Validierung braucht arena-differenzierte Paare | PREREG_nach34_paket |
 | — | Aggressions-Neukartierung | v20-Aera, nach Gating (F1-gefixte Engine); Blend bis dahin UEBERALL 0 | history |
 | — | λ (Value-Target-Mix) | vertagt: am echten v20-Mischanteil neu bewerten | history |
-| — | U1 Chip-Sperre Apply-Ebene | offen, klein (defensiv, kein Regel-Bug) | history (Engine-Audit) |
+| — | U1 Chip-Sperre Apply-Ebene **+ U2: apply_stone panict bei factory_id=None statt Err** (2026-08-07) | offen, klein (defensiv) | history (Engine-Audit) |
 | #31 | Schwierigkeitsstufen | geparkt (Arbeitskreis "Spaeter") | unten |
 | #38 | Moon-Head-Feinschliff | geparkt (Arbeitskreis "Spaeter") | unten |
 | #9 #12 #27 #28 #29 #30 | Aux-/Kalibrier-Serie | alle geschlossen (Details history) | history |
