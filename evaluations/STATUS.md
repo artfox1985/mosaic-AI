@@ -136,23 +136,31 @@ STRUKTURELLE Strategien, die sie nicht spielt:
    (v18-Korpus, 400 Partien) und 4,85/Partie (frische v19wdl-Sockel,
    200 Partien). Die KI chippt im Self-Play routiniert.
 
-**NEUE DIAGNOSE -- die Luecke ist MATCHUP-SPEZIFISCH**: gegen DIESEN
-Menschen 0,0 Chip-Abschluesse in 9 Partien (Erwartung ~22 Ereignisse).
-Der Mensch UNTERDRUECKT die Chip-/Spezial-Oekonomie der KI aktiv:
-Tempo-Dominanz (Marker 34:7 -> Erstzug fast jede Runde) + Farb-Denial
-lassen die KI-Reihen entweder natuerlich vollaufen oder un-chipbar
-stranden, waehrend die eigene Maschine ungestoert laeuft (10,8 vs 0,4
-Spezialpunkte). **Das ist der Denial-BELEG, den Task #28 nie liefern
-konnte** (damals mit F1-kaputtem Instrument gemessen) -- diesmal von
-einem Menschen live erbracht.
+**DIAGNOSE, DRITTE ITERATION (Nutzer-Selbstauskunft 2026-08-06)**: die
+Tempo-/Denial-Deutung war ebenfalls die des Koordinators, nicht die des
+Spielers. Nutzer: "wuerde den Startspielerstein nicht ueberbewerten" --
+die 34:7-Marker-Statistik ist mutmasslich NEBENPRODUKT des mondlastigen
+Sammelstils (19,9 Mond-Nahmen/Partie; der Stein geht zwangsweise an die
+erste GF-Mond-Nahme), kein Tempo-Kauf. Das TATSAECHLICHE Spielkonzept
+(woertlich festgehalten als Strategie-Dossier):
+- Kern: ORTHOGONALE Reihen (Kreuz-Aufbau fuer Linienboni) + hoeherwertige
+  SPEZIALFELDER; Chips/Spezials sind Teil dieses Strukturplans.
+- Wertungsplatten als BONUS, selektiv: VERTIKAL immer gerne (~2 Spalten
+  werden voll); ECKPLATTEN normal 1x3 + 1x8 erreichbar; DIAGONALE
+  zwiegespalten (widerspricht dem orthogonalen Aufbau); HORIZONTAL und
+  FARBENREICH bringen wenig extra; MEHRFARBIG ok.
+- Spezialfeld-Taktik: Spezial-Kuppeln in die ERSTEN (schnellen) Reihen,
+  Wild-Kuppeln AGGRESSIV nehmen.
+Die KI-Chip-Duerre gegen den Menschen ist damit eher Folge dessen
+STRUKTUR-Vorsprungs (Kreuze + Spezial-Timing) als aktiven Denials.
 
-**Verwertung (neu geschnitten)**: (a) v20-Watchlist: nicht "chippt er?"
-(tut er), sondern Verhalten GEGEN MENSCHEN + Marker-/Tempo-Bewertung;
-(b) die Aggressions-/Denial-Neukartierung in der v20-Aera (F1-gefixt,
-Blend derzeit 0) hat jetzt eine konkrete, menschlich belegte
-Zielvorgabe; (c) Tempo-Bewertung (Wert des Startspielerrechts im
-Value-Kopf) als eigener Pruefpunkt. Elo-Anmerkung zu #31 GESTRICHEN
-(Nutzer 2026-08-06: pendelt sich mit staerkeren Champions selbst ein).
+**Verwertung (final geschnitten)**: (a) v20-Watchlist gegen Menschen:
+Struktur-Metriken (Kreuz-/Spaltenaufbau, Spezial-Unlock-Timing,
+Wild-Kuppel-Anteil, Chip-Oekonomie unter Druck) statt Tempo;
+(b) Denial-/Aggressions-Neukartierung v20-Aera behaelt ihren Wert, aber
+ohne die Mensch-Belegt-Behauptung; (c) das Strategie-Dossier ist
+Referenzmaterial fuer #31 (Stil-Stufen) und kuenftige Eval-Arbeit.
+Elo-Anmerkung zu #31 GESTRICHEN (Nutzer: pendelt sich selbst ein).
 
 ## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
 
