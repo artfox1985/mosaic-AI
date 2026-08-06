@@ -684,7 +684,10 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     // aus --slot), statt vollflaechig halbtransparent.
     bg = `--slot:${hex};`;
     cls = 'ds N';
-    lbl = TILE_SYMBOL[nc] || '?';
+    // Feintuning 2026-08-07: Symbol via data-sym/::after (geometrisch
+    // zentriert) statt als Text-Label mit Baseline-Versatz.
+    tdata = ` data-sym="${TILE_SYMBOL[nc] || '?'}"`;
+    lbl = '';
   } else if(sp.type === 'WILD') {
     // Nutzer-Feedback 2026-08-07: 🌀 statt ★ -- konsistent mit der
     // Wild-Rueckseite im Stapel-Dialog (WILD_BACK_ICON).
@@ -696,7 +699,7 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
   }
   
   if(tiling && si >= 0) {
-    tdata = ` data-tiling="${pi},${sr},${sc},${si}"`;
+    tdata += ` data-tiling="${pi},${sr},${sc},${si}"`;
     cls += ' click';
     bg += 'cursor:pointer;';
   }
