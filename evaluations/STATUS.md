@@ -126,26 +126,33 @@ STRUKTURELLE Strategien, die sie nicht spielt:
 3. Startkachel: Mensch variiert ((0,0)@0/270, (2,0)@180), KI klemmt
    deterministisch (#39).
 
-**MECHANIK-VERTIEFUNG (2026-08-06)**: die Suche sieht die Tiling-Phase
-STRUKTURELL nicht -- der Baum endet an der Drafting-Grenze
-(`ROUND_TRANSITION_SAMPLING=false`), Blattwert = reine Netz-Bewertung.
-Chips liegen komplett ausserhalb des Suchhorizonts; ihr Wert muesste
-allein vom Value-Kopf getragen werden (dessen Kaskaden-Blindheit belegt
-ist). **SELBSTVERSTAERKENDE SCHLEIFE**: Korpus enthaelt das Muster nie
--> Netz kann es nicht lernen -> Suche probiert es nie -> Korpus...
-Erwartung daher NUECHTERN: v20 wird die Chip-Maschine NICHT von selbst
-finden (die Watchlist prueft es trotzdem).
+**MECHANIK-AUFKLAERUNG (2026-08-06, zwei Korrekturen)**:
+1. Nutzer-Design-Punkt bestaetigt: die Suche braucht die Tiling-Phase
+   NICHT zu sehen -- "chip-abschliessbar" ist eine ZUSTANDSEIGENSCHAFT,
+   und sie ist BEREITS als expliziter Netz-Input kodiert (Chip-Farb-
+   Zaehler + Abschliessbarkeits-Flag je Musterreihe, state_to_tensor).
+2. Koordinator-Irrtum "selbstverstaerkende Schleife" ZURUECKGEZOGEN:
+   der Korpus ist VOLL mit Chip-Abschluessen -- gemessen 4,92/Partie
+   (v18-Korpus, 400 Partien) und 4,85/Partie (frische v19wdl-Sockel,
+   200 Partien). Die KI chippt im Self-Play routiniert.
 
-**Verwertung**: (a) v20-Watchlist (chippt der neue Champion?);
-(b) Eingriffs-Routen, falls nein (bestbelegter Kandidat, mit
-Wertungsplatten-Wiedervorlage): (i) Tiling-Aufloesung IN den Suchbaum
-(Rundengrenze per Solver spielen -- Infrastruktur in
-round_transition.rs vorhanden, kostet Sims), (ii) Explorations-
-Injektion (das Muster in den Korpus zwingen, z.B. erzwungene
-Chip-Linien in einem Teil der Partien), (iii) Aux-Ziel/Shaping fuer
-Chip-Potenzial. (c) Elo-Realitaet: Champion-Elo (~1311) gegen diesen
-Menschen um ~350 ueberschaetzt -- #31-Kalibrierung braucht menschliche
-Anker.
+**NEUE DIAGNOSE -- die Luecke ist MATCHUP-SPEZIFISCH**: gegen DIESEN
+Menschen 0,0 Chip-Abschluesse in 9 Partien (Erwartung ~22 Ereignisse).
+Der Mensch UNTERDRUECKT die Chip-/Spezial-Oekonomie der KI aktiv:
+Tempo-Dominanz (Marker 34:7 -> Erstzug fast jede Runde) + Farb-Denial
+lassen die KI-Reihen entweder natuerlich vollaufen oder un-chipbar
+stranden, waehrend die eigene Maschine ungestoert laeuft (10,8 vs 0,4
+Spezialpunkte). **Das ist der Denial-BELEG, den Task #28 nie liefern
+konnte** (damals mit F1-kaputtem Instrument gemessen) -- diesmal von
+einem Menschen live erbracht.
+
+**Verwertung (neu geschnitten)**: (a) v20-Watchlist: nicht "chippt er?"
+(tut er), sondern Verhalten GEGEN MENSCHEN + Marker-/Tempo-Bewertung;
+(b) die Aggressions-/Denial-Neukartierung in der v20-Aera (F1-gefixt,
+Blend derzeit 0) hat jetzt eine konkrete, menschlich belegte
+Zielvorgabe; (c) Tempo-Bewertung (Wert des Startspielerrechts im
+Value-Kopf) als eigener Pruefpunkt. Elo-Anmerkung zu #31 GESTRICHEN
+(Nutzer 2026-08-06: pendelt sich mit staerkeren Champions selbst ein).
 
 ## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
 
