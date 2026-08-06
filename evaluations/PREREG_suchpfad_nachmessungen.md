@@ -52,11 +52,15 @@ dann aber explizit am Brier eines Schwarm-Ablations-Trainings geprueft).
 
 **Frage**: Verbessert Standard-Annealing (fruehe Zuege τ=1, spaete
 argmax) die Korpus-Qualitaet gegenueber durchgehend τ=1?
-**Achtung Kostenklasse**: τ wirkt NUR auf die Self-Play-Zugwahl --
-das ist ein KORPUS-Experiment, kein Gating: 2 Batches a ~2.000
-Sockel-Partien (τ=1 vs annealed ab Zug ~30), 2 gepaarte Trainings
-(identisches Rezept/Fenster bis auf den Batch), Gating der beiden Arme
-gegeneinander + Brier/Orakel deskriptiv. ~1 Tag Maschine.
+**Kostenklasse (halbiert, Nutzer-Hinweis 2026-08-06)**: die
+τ=1-KONTROLLE existiert bereits -- die 4.000 v19wdl-Sockel-Partien SIND
+durchgehend-τ=1-Material vom selben Generator. Frisch noetig ist NUR
+der Annealing-Batch: ~2.000 Sockel-Partien mit argmax ab Zug ~30
+(self_play-Erweiterung im Post-Kampagnen-Fenster). Design: Arm A =
+v20-Fenster unveraendert; Arm B = identisches Fenster, aber 2.000 der
+4.000 Sockel-Partien (feste, seed-bestimmte Auswahl) gegen die 2.000
+Annealing-Partien getauscht -- alles andere in beiden Armen identisch.
+2 Trainings + 1 Gating + Brier/Orakel deskriptiv. ~0,5 Tage Maschine.
 **Vorab-Festlegung**: Annealing-Schwelle Zug 30 (grob 1. Runde+),
 danach argmax; R5 bleibt Alpha-Beta-exakt (unberuehrt).
 **Entscheid**: Uebernahme nur bei repliziertem Arena-Vorteil.
