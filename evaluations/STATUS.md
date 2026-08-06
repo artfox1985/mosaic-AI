@@ -104,6 +104,12 @@
   liegen im Seed-Satz-Rauschen. (3) **SPRT-Fruehstopps unter ~150 Paaren
   zaehlen NICHT ohne Frisch-Seed-Replikation** (t12-Falsch-Positiv
   2026-08-06: H1 bei n=80, Replikation ueber 400 Partien = Paritaet).
+- **Elo-Betrugsschutz (GUI, 2026-08-06)**: gewertete Spiele NUR gegen
+  KI-Konfigurationen mit direkter Arena-Kante (`is_estimate=False`) --
+  Sims-Tier-Schaetzwerte werten nicht mehr (Farming-Luecke geschlossen).
+  Bekannte Restluecke, bewusst offen: Abbruch einer verlorenen Partie
+  vermeidet den Elo-Verlust (Wertung erst bei end_scoring) -- Fix waere
+  "Aufgabe = Niederlage", braucht Nutzer-Entscheid zur UX.
 - **Kein validierter Offline-Praediktor fuer die Value-Seite** (#29
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
   braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).

@@ -1059,6 +1059,17 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
             return out
         ai_identity = _ai_model or "Heuristik"
         ai_elo, ai_is_estimate, ai_node = _pp.estimate_ai_anchor(ai_identity, _ai_sims)
+        # Elo-Betrugsschutz (Nutzer 2026-08-06): GEWERTET wird nur gegen
+        # Konfigurationen mit DIREKTER Arena-Kante (is_estimate=False).
+        # Vorher wertete auch der Sims-Tier-SCHAETZWERT -- damit liess sich
+        # Elo farmen (z.B. Champion@60 schlagen, Anker aber nahe der
+        # @400-Staerke geschaetzt). Historien-Eintrag wird trotzdem
+        # geschrieben (rated:false, Transparenz wie beim Tipp-Fall).
+        if rated and ai_is_estimate:
+            out["note"] = (f"{ai_identity}@{_ai_sims} hat keinen direkten Arena-Anker "
+                           f"(nur Schätzwert) — Spiel ungewertet. Gewertete Spiele nur "
+                           f"gegen verankerte Konfigurationen (z.B. @400).")
+            rated = False
         if ai_elo is None and rated:
             # Kein Anker bekannt: nur bei GEWERTETEN Spielen ein Problem
             # (ohne Anker keine Elo-Rechnung moeglich) -- bei ungewerteten
