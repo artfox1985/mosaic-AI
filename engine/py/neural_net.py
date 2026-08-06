@@ -1,5 +1,6 @@
 import os
 import glob
+import json
 import math
 import pickle
 import torch
@@ -623,7 +624,25 @@ def action_to_id(action: dict) -> int:
 #                    funktioniert unveraendert. Default bleibt der Tanh-Kopf
 #                    (`--value-head tanh`) -- byte-identisches
 #                    Bestandsverhalten, wenn das Flag nicht gesetzt ist.
-VALUE_SCHEMA_VERSION = 16
+# Schema 17 (2026-08-06, v20-Kampagne): `values_wdl` wird fuer Dateien von
+# ALT-Generatoren (tanh-Kopf, gestauchte Marge als "Wahrscheinlichkeit")
+# bereits beim Cache-Bau Platt-ENTSTAUCHT geblendet (Konstanten unten,
+# v19_2d_best-Fit aus value_calibration_fit.json "full"); Dateien von
+# WDL-Generatoren (Prefix-Liste) blenden den nativen [0,1]-Bootstrap roh.
+# train.py's `--wdl-bootstrap-destretch` ist damit fuer Schema>=17-Caches
+# UEBERFLUESSIG und darf NICHT zusaetzlich gesetzt werden (doppelte
+# Streckung); der Flag bleibt nur fuer Alt-Experimente auf Schema-16.
+VALUE_SCHEMA_VERSION = 17
+WDL_GENERATOR_PREFIXES = ("selfplay_v20wdl",)
+DESTRETCH_A = 0.0051
+DESTRETCH_B = 1.9269
+
+
+def _destretch_prob(p: float) -> float:
+    """Platt-Streckung einer gestauchten Alt-Kopf-'Wahrscheinlichkeit'."""
+    p = min(max(p, 1e-6), 1.0 - 1e-6)
+    z = math.log(p / (1.0 - p))
+    return 1.0 / (1.0 + math.exp(-(DESTRETCH_A + DESTRETCH_B * z)))
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 # Mischgewicht fuer `bootstrap_value` (Punkt 6) -- 0.0 = nur bisheriges Ziel
@@ -856,11 +875,23 @@ class MosaicDataset(Dataset):
         # "+enc2d_v1" (Task #11 Phase 2): NUR im 2D-Modus angehaengt, siehe
         # `encoder`-Doku oben -- der Flach-Modus-Key bleibt dadurch UNVERAENDERT,
         # bestehende Flach-Caches werden also nicht ungueltig.
+        # Schema 17: Policy-Traeger-Manifest (v20-Zwei-Klassen-Fenster).
+        # Fehlt die Datei -> None = Bestandsverhalten (alle Dateien tragen
+        # Policy). Inhalt geht in den Cache-Key ein (anderer Traeger-Satz =
+        # anderer Cache).
+        manifest_path = os.path.join(data_dir, "policy_carrier_manifest_v20.json")
+        policy_carrier_set = None
+        if os.path.exists(manifest_path):
+            with open(manifest_path, encoding="utf-8") as mf:
+                policy_carrier_set = frozenset(json.load(mf)["policy_carrier_files"])
+
         cache_key_material = (
             str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
             + "+rounds_v1+own_v1"
         )
+        if policy_carrier_set is not None:
+            cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
         if encoder == "2d":
             cache_key_material += "+enc2d_v1"
         cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
@@ -1025,6 +1056,19 @@ class MosaicDataset(Dataset):
             planes_l = [] if self.encoder == "2d" else None
 
             for f in files:
+                # Schema 17 (v20-Aera): stammt die Datei von einem
+                # WDL-Generator, ist `bootstrap_value` eine NATIVE
+                # [0,1]-Gewinnwahrscheinlichkeit; Alt-Generatoren (tanh-Kopf)
+                # liefern eine gestauchte Marge, die unten Platt-entstaucht
+                # wird (Audit Befund 1 + Erosions-Arm-B-Ergebnis).
+                bootstrap_native = os.path.basename(f).startswith(WDL_GENERATOR_PREFIXES)
+                # Policy-Traeger-Regel (siehe pol_w-Kommentar unten): ohne
+                # Manifest traegt jede Datei Policy (Bestandsverhalten);
+                # mit Manifest nur v20wdl*-Dateien und gelistete Alt-Dateien.
+                file_policy_carrier = (
+                    policy_carrier_set is None
+                    or bootstrap_native
+                    or os.path.basename(f) in policy_carrier_set)
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
                     final_own = _final_ownership_by_game(game_data)
@@ -1170,7 +1214,13 @@ class MosaicDataset(Dataset):
                                 wdl_outcome_val = 1.0 if int(step["winner"]) == p else 0.0
                                 value_wdl = wdl_outcome_val
                                 if bv is not None:
-                                    value_wdl = TD_LAMBDA * float(bv[p]) + (1.0 - TD_LAMBDA) * wdl_outcome_val
+                                    # Schema 17: Alt-Generator-Bootstrap wird
+                                    # entstaucht, WDL-nativer bleibt roh
+                                    # (siehe VALUE_SCHEMA_VERSION-Kommentar).
+                                    bvp = float(bv[p])
+                                    if not bootstrap_native:
+                                        bvp = _destretch_prob(bvp)
+                                    value_wdl = TD_LAMBDA * bvp + (1.0 - TD_LAMBDA) * wdl_outcome_val
                                 value_wdl = min(1.0, max(0.0, value_wdl))
                             else:
                                 wdl_outcome_val = -1.0
@@ -1241,6 +1291,15 @@ class MosaicDataset(Dataset):
                         phase = step["state"].get("phase")
                         is_start = any(pe["action"].get("is_start") for pe in step["policy"])
                         pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
+                        # Schema 17 / v20-Zwei-Klassen-Fenster: liegt ein
+                        # Policy-Traeger-Manifest vor, tragen ALT-Dateien nur
+                        # dann Policy-Ziele, wenn sie darin gelistet sind --
+                        # alle uebrigen Alt-Dateien sind reines Value-Material
+                        # (Nutzer-Design 2026-08-06: 1350 v18- + 450
+                        # v17-Partien Policy-aktiv). v20wdl*-Dateien regeln
+                        # sich selbst ueber `policy_target_valid` (Schwarm).
+                        if not file_policy_carrier:
+                            pol_w = 0.0
                         # PCR (Task #14): Cheap-Suche-Zuege tragen ein explizites
                         # `policy_target_valid=false` (self_play.rs, Feld nur bei
                         # aktivem PCR vorhanden) -- ihr Visit-Ziel stammt aus einer
