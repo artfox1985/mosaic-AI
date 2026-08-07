@@ -10298,3 +10298,27 @@ Task-#30-Muster, damit kein Rebuild je Arm noetig ist. Bis dahin bleibt
   gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
   braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
 
+
+## WATCHLIST-ZWISCHENLESE v20 + MESSKETTEN-KORREKTUR (2026-08-07 nachts)
+
+10 bewertete Partien artfox vs v20_2d_opp_brierbest analysiert
+(evaluations/watchlist_v20_zwischenlese.md, Agent-Lauf, reine
+Log-Auswertung). Kernbefunde: Bilanz 7:3 Mensch (v19: 8:1);
+Spezial-Unlock-Gap unveraendert (Mensch bis R2 in 9/10, KI nie vor R4,
+6/10 gar nicht); tiefe-Reihen-Anteil eingefroren (~40% vs ~23%);
+KI-Effizienzvorsprung je Kuppel-Legung verschwunden (3,51 vs 3,53);
+Spezialpunkte-Gap bleibt (10,3 vs 1,3); Marker-Verhaeltnis stabil ~4:1.
+
+**MESSKETTEN-KORREKTUR (wichtig)**: die v19-Aera-Zahl "KI 0,0
+Chip-Reihenabschluesse gegen den Menschen" war mutmasslich ein
+MESSARTEFAKT -- der KI-Tiling-Pfad loggt die 🎫-Zeile nicht
+(dokumentierte Logging-Luecke). Fuellstands-korrigierte Inferenz fuer
+v20: KI ~2,0/Partie vs Mensch 2,3 (~Paritaet). Der fruehere
+"Struktur-Unterdrueckungs"-Befund ist damit in diesem Punkt NICHT
+belastbar; saubere Neubewertung braeuchte eine gleichartige Re-Messung
+der v19-Logs. (Der Spezialpunkte-/Unlock-Gap bleibt davon unberuehrt
+-- der beruht auf ⭐-Zeilen, die sauber geloggt werden.)
+
+Tool-Fixes aus dem Lauf: MARKER-Regex akzeptiert ❖ (GUI-Umstellung
+2026-08-06 hatte analyze_game_log.py stumm gebrochen);
+FINAL_SCORE-Regex akzeptiert negative Endwertung (leere Spezialfelder).

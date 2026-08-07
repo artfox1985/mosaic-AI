@@ -119,10 +119,14 @@ PATTERNS: dict[str, re.Pattern] = {
     "GAME_OVER": re.compile(r"^Das Spiel ist beendet!$"),
     "ROUND_STRAFE": re.compile(r"^(?P<name>.+?): Strafe (?P<pen>-?\d+) Pkt → (?P<score>-?\d+) Gesamt$"),
     "UNPLACEABLE": re.compile(r"^⚠️\s*(?P<name>.+?): Musterreihe"),
-    "FINAL_SCORE": re.compile(r"^🏆 (?P<name>.+?): Endwertung (?P<total>\d+) Pkt → Gesamt: (?P<score>\d+) Pkt$"),
+    # Watchlist-Fund 2026-08-07: Endwertung kann NEGATIV sein (leere
+    # Spezialfelder bei aktiver Platte 7) -- Vorzeichen zulassen.
+    "FINAL_SCORE": re.compile(r"^🏆 (?P<name>.+?): Endwertung (?P<total>-?\d+) Pkt → Gesamt: (?P<score>\d+) Pkt$"),
     # Rein informativ (werden nie als naechste primaere Zeile erwartet,
     # sondern immer als Anhang eines vorausgehenden consume_block verbraucht):
-    "MARKER": re.compile(r"^🏁\s*(?P<name>.+?): Startspielerstein genommen"),
+    # GUI-Symbol seit 2026-08-06: ❖ statt 🏁 (beide akzeptieren --
+    # Alt-Logs bleiben parsebar; Watchlist-Fund 2026-08-07).
+    "MARKER": re.compile(r"^[🏁❖]\s*(?P<name>.+?): Startspielerstein genommen"),
     "MOON_STACK_INFO": re.compile(r"^🌙 F(?P<fid>\d+) Mond-Stapel(?: nach Entnahme)?: (?P<desc>.+)$"),
     "MOON_POOL_INFO": re.compile(r"^🌙 GF Moon-Pool: (?P<desc>.+)$"),
     "CHIP_REVEAL": re.compile(r"^🎴 F(?P<fid>\d+): Bonusplättchen aufgedeckt!$"),
