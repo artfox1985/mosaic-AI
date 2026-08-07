@@ -29,12 +29,19 @@ v21-Schwarm.
    der Siegquote unter der Kontrolle liegt.
 2. **Raub-Metriken** (Block-Ebene, 16 gepaarte Bloecke, t-Test):
    Gegner-Punkte-Senkung und/oder Gegner-Floor-Erhoehung mit p<0,05.
-3. **Uebernahme als Live-/Stil-Preset**, wenn Regel 1 bestanden UND
-   Regel 2 erfuellt. Qualifizieren beide Kandidaten, gewinnt der mit
-   der besseren Siegquoten-Differenz; Gleichstand -> (0.1,2.0).
+3. **Uebernahme als Live-/Stil-Preset UND ins Self-Play** (Nutzer
+   2026-08-07: "ich wuerd es in das self play auch geben. schafft mehr
+   diversitaet"), wenn Regel 1 bestanden UND Regel 2 erfuellt.
+   Qualifizieren beide Kandidaten, gewinnt der mit der besseren
+   Siegquoten-Differenz; Gleichstand -> (0.1,2.0).
+   Self-Play-Umsetzung (Koordinator-Empfehlung, Veto offen):
+   **Mischung 50/50** -- seed-bestimmter Anteil von 50% der Partien
+   mit Preset, Rest w=0 (zwei Stile im Fenster = mehr Diversitaet als
+   ein Voll-Umstieg; w=0-Haelfte bleibt Stil-Anker zu Altbestaenden).
+   Gilt ab der ersten Generierung NACH dem Verdikt (in der v21-Queue:
+   Schwarm und Sockel, sofern das Verdikt vor deren Start faellt).
 4. Vor Einsatz in BEWERTETEN Partien braucht das gewaehlte Preset eine
    eigene Anker-Kante (Gating Champion+Preset vs Champion w=0,
-   Elo-Betrugsschutz-Regel). Self-Play-Generierung bleibt bei w=0
-   (Korpus-Stil ist NICHT Gegenstand dieser Messung).
+   Elo-Betrugsschutz-Regel).
 5. Beide Kandidaten scheitern -> w=0 bleibt, Punkt zu; die
    deskriptiven Stil-Befunde werden nur dokumentiert.
