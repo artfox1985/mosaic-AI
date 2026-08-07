@@ -136,3 +136,17 @@ pair_index-Paaren); (2) Raub-Metriken Block-Ebene (a/b-Scores,
 avg_floor aus per_pair_scores; 37 Bloecke a 5 Paare); Uebernahme-Logik
 wie gehabt (Wache = Gate, Raub = Kuer, Nutzer-Philosophie "rein wenn
 es nicht schadet").
+
+## STARK-GEGNER-ERGEBNIS (2026-08-08): Blend auch vs Nahe-Peer INERT
+
+Blend-Lauf vs v19_2d_best auf den identischen 185 Seed-Paaren des
+Champion-Gatings: **beide Laeufe exakt 208:162**; diskordante Einheiten
+61:61, McNemar p=1,0 (Wache bestanden, Nutzer-Forecast exakt).
+Raub-Metriken (37 Block-Paare): Champion-Punkte -1,9 (t=-1,2, n.s.),
+Gegner-Punkte +1,0 in der FALSCHEN Richtung (t=+0,6), Floors
+unauffaellig. Die Off-Distribution-These (opp-Kopf kennt Nahe-Peer aus
+dem Training) hat sich NICHT materialisiert. **Verdikt: keine
+Uebernahme -- der Blend ist gegen schwache UND starke Gegner inert;
+das Aggressions-Programm bleibt geschlossen, auch die
+Stark-Gegner-Tuer ist jetzt datengestuetzt zu.** Wiedervorlage
+unveraendert nur mit messbar schaerferem opp-/Punkte-Kopf.
