@@ -10,7 +10,7 @@
 
 | Nr | Titel | Status | Details |
 |---|---|---|---|
-| — | **v20-KAMPAGNE (Zwei-Klassen, WDL-Generator)** | **BEREIT — Nutzer startet Self-Plays** | `PREREG_v20_kampagne.md` |
+| — | **v20-KAMPAGNE (Zwei-Klassen, WDL-Generator)** | **GATING GEWONNEN 2026-08-07 — `v20_2d_opp_brierbest` = CHAMPION (Elo 1349)** | `PREREG_v20_kampagne.md` |
 | #34 | Sieg/Niederlage-Ziel (WDL) | **ABGESCHLOSSEN**: Verdikt = WDL + entstauchter Blend + brierbest; Arena ziel-invariant (8 Gatings), Platt-B 0,97 | history |
 | #36 | Saettigung ueber Spielzahl | **BEANTWORTET**: Value log-linear hungrig (~0,0012 Brier/Verdopplung), Policy im Warm-Start-Regime satt (flach ab <=2.020 Partien) | history |
 | #14 | PCR | **AUFGEGANGEN in Design C**: alle 3 Wiedereroeffnungs-Bedingungen erfuellt (Durchsatz 1,37x), die Wette ist im Zwei-Klassen-Schwarm strukturell besser umgesetzt -- klassisches PCR-mild obsolet | history |
@@ -35,9 +35,15 @@
    (neues Fenster, NICHT mit 900er-Fenster-Werten vergleichbar);
    val_combined-best = E1 (0,4838), Policy-Val 0,49, Points-R² 0,48.
    Snapshot models_2026-08-07_0341_v20_2d_opp.zip.
-4. **LAUFEND**: Champion-Gating `v20_2d_opp_brierbest` vs `v19_2d_best`
-   (400 Sims, 200 Paare, Fruehstopp-Regel beachten!). Danach
-   Pflicht-Diagnostiken (R5, R4b -- CPU-schwer, NACH dem Gating).
+4. ~~Champion-Gating~~ **GEWONNEN 2026-08-07: `v20_2d_opp_brierbest`
+   ist NEUER CHAMPION (WDL-Aera).** SPRT-H1 nach 185 Paaren (ueber der
+   150er-Fruehstopp-Schwelle -> keine Replikation noetig): **208:162**
+   (370 Spiele), p=0,0178, gepaarte Diff +0,249 [+0,054, +0,444].
+   Elo: **1349** [1269, 1437] (Kader-Kante vs v19_2d_best@400 1306;
+   CSV-Eintrag auf Kader-Namen korrigiert). `tools/set_champion.py`
+   ausgefuehrt (champion.txt: v19_2d_best -> v20_2d_opp_brierbest;
+   Server lief nicht, naechster Start laedt automatisch).
+   Pflicht-Diagnostiken R5/R4b laufen (CPU nach dem Gating frei).
    - **Policy-Wacht ERLEDIGT 2026-08-07** (offline_diagnose --frozen):
      Orakel-Metriken auf PARITAET -- Prior-Masse Top-3 0,7098 (v20) vs
      0,7187 (v19), Kendall-Tau 0,3588 vs 0,3558. Der 4.000er-Sockel
@@ -80,9 +86,12 @@
 
 ## OFFENE ENTSCHEIDUNGEN & GELTENDE REGELN
 
-- **Champion**: `v19_2d_best` bleibt (Nutzer 2026-08-04). Der opp-Kopf
-  kommt ueber `v20_2d_opp` in die Linie; v20 warm von
-  `v19_2d_opp_best` starten (Kopf bereits trainiert).
+- **Champion**: `v20_2d_opp_brierbest` seit 2026-08-07 (Gating 208:162
+  vs `v19_2d_best`, p=0,0178; Nutzer-Vorab-Entscheid "naechste
+  Generation wechselt auf v20_2d_opp"). Erster Champion der WDL-Aera,
+  opp-Kopf damit in der Linie. Self-Play-Generator kuenftiger
+  Kampagnen = dieser Champion (Namenskonvention: Dateien nach dem
+  GENERATOR benennen, also `selfplay_v20wdl_*`).
 - **v20-KAMPAGNEN-DESIGN, drei Optionen (Stand 2026-08-06, Nutzer-Entscheid
   offen)** -- Grundlage: #36-Schere (Policy im Warm-Start-Regime satt,
   Value log-linear hungrig) + Durchsatz 1,37x + Nutzer-Schluss "wenn die
