@@ -1,5 +1,6 @@
 import os
 import glob
+import re
 import json
 import math
 import pickle
@@ -964,6 +965,18 @@ class MosaicDataset(Dataset):
         # String im Key wuerden "nortv"/"nortv_r1" stillschweigend den
         # "default"-Cache derselben Dateiliste wiederverwenden.
         files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+        # MOSAIC_DATA_EXCLUDE (2026-08-07, Fenster-Pinning): Regex, der
+        # Dateien VOR Key-Bildung und Training ausschliesst. Noetig, weil
+        # data/ waehrend laufender Generierungen WAECHST (Vorfall: der
+        # pi_ctrl_s3-Neustart glob-te frisch gelandete v19wdlann-Dateien
+        # mit ein -> Cache-Voll-Neubau + kontaminiertes Kontroll-Fenster).
+        # Der gefilterte Datei-Liste steckt via `str(files)` ohnehin im
+        # Cache-Key -- gleicher Filter => gleicher Key => Cache-Hit.
+        _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
+        if _excl:
+            _n0 = len(files)
+            files = [f for f in files if not re.search(_excl, os.path.basename(f))]
+            print(f"🔒 MOSAIC_DATA_EXCLUDE={_excl!r}: {_n0 - len(files)} von {_n0} Dateien ausgeschlossen.")
         # "+rounds_v1" (Task #15 B, 2026-07-28): der Cache fuehrt jetzt zusaetzlich
         # die Rundennummer je Sample mit (fuer rundenselektive Loss-Gewichtung,
         # z.B. --exclude-round5). Der Marker erzwingt einen einmaligen Rebuild
