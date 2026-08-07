@@ -37,8 +37,14 @@
    Snapshot models_2026-08-07_0341_v20_2d_opp.zip.
 4. **LAUFEND**: Champion-Gating `v20_2d_opp_brierbest` vs `v19_2d_best`
    (400 Sims, 200 Paare, Fruehstopp-Regel beachten!). Danach
-   Policy-Wacht (Orakel-Metriken vs v19), Pflicht-Diagnostiken
-   (R5, R4b -- CPU-schwer, NACH dem Gating).
+   Pflicht-Diagnostiken (R5, R4b -- CPU-schwer, NACH dem Gating).
+   - **Policy-Wacht ERLEDIGT 2026-08-07** (offline_diagnose --frozen):
+     Orakel-Metriken auf PARITAET -- Prior-Masse Top-3 0,7098 (v20) vs
+     0,7187 (v19), Kendall-Tau 0,3588 vs 0,3558. Der 4.000er-Sockel
+     (+Alt-Traeger-Manifest) hat die Policy gehalten; kein Einbruch.
+     Frozen-Value-R² fuer v20 negativ = ARTEFAKT (alte gestauchte
+     Soft-Targets vs WDL-Kopf); Frozen-BRIER v20 0,2263 vs v19 0,2327
+     (besser, siehe platt_fit_v20.json).
    - **Platt-Fit ERLEDIGT 2026-08-07** (neues Tool tools/platt_fit.py,
      validiert: reproduziert v19-Referenz B=1,9269/A=+0,0051 exakt;
      platt_fit_v20.json): v20_brierbest **B=0,930**, v20_best (E1)
