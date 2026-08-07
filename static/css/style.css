@@ -43,20 +43,24 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    per ::after auf der Farbklasse, gilt automatisch ueberall (.tile in
    Fabriken, Reihen, Boden, Stapeln, Modals, Zug-Liste). Kuppelfelder (.ds)
    bekommen ihr Symbol via spaceHTML-Label bzw. hier fuer belegte Felder. */
-.tile.blau::after{content:'✢'}
-.tile.gelb::after{content:'❂'}
-.tile.rot::after{content:'✦'}
-.tile.schwarz::after{content:'▣'}
-.tile.tuerkis::after{content:'◈'}
+/* Symbol-Rendering v3 (2026-08-07): SVG-Hintergrundbilder statt Font-
+   Glyphen -- Text-Rasterung snappt je nach Browser-Zoom horizontal auf
+   Geraetepixel (Nutzer-Report), Hintergrundbilder werden kontinuierlich
+   resampelt und background-position:center ist exakt. --sym haengt an
+   der Farbklasse und vererbt sich in die ::after-Overlays. */
+.blau{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A2%3C/text%3E%3C/svg%3E")}
+.gelb{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9D%82%3C/text%3E%3C/svg%3E")}
+.rot{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E")}
+.schwarz{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%96%A3%3C/text%3E%3C/svg%3E")}
+.tuerkis{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%97%88%3C/text%3E%3C/svg%3E")}
+.tile.phantom.blau{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%232563EB' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A2%3C/text%3E%3C/svg%3E")}
+.tile.phantom.gelb{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%23D97706' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%9D%82%3C/text%3E%3C/svg%3E")}
+.tile.phantom.rot{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%23DC2626' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E")}
+.tile.phantom.schwarz{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%23292524' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%96%A3%3C/text%3E%3C/svg%3E")}
+.tile.phantom.tuerkis{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%230891B2' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%97%88%3C/text%3E%3C/svg%3E")}
 .tile.blau::after,.tile.gelb::after,.tile.rot::after,.tile.schwarz::after,.tile.tuerkis::after{
-  /* Feintuning 2026-08-07 v2: Transform-Zentrierung statt Grid -- bei 22px-
-     Zellen laesst Grid einen halben Pixel Rest, der stets nach UNTEN rundet
-     (im 31px-Modal teilt es glatt, daher fiel es nur auf dem Brett auf).
-     translate(-50%,-50%) rendert subpixelgenau; Schatten symmetrisch, damit
-     die Tinte nicht optisch nach unten kippt. */
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  color:#fff;font-size:12px;font-weight:400;line-height:1;
-  text-shadow:0 0 2px rgba(0,0,0,.45)}
+  content:'';position:absolute;inset:0;
+  background:var(--sym) center/13px no-repeat}
 /* Phantom-Fliesen (weisse Fuellung): weisses Symbol waere unsichtbar --
    Symbol in der Randfarbe. */
 .tile.phantom.blau::after{color:var(--blau)}
@@ -65,15 +69,9 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .tile.phantom.schwarz::after{color:var(--schwarz)}
 .tile.phantom.tuerkis::after{color:var(--tuerkis)}
 /* Belegte Kuppelfelder (lbl ist leer): Symbol per CSS. */
-.ds.filled.blau::after{content:'✢'}
-.ds.filled.gelb::after{content:'❂'}
-.ds.filled.rot::after{content:'✦'}
-.ds.filled.schwarz::after{content:'▣'}
-.ds.filled.tuerkis::after{content:'◈'}
 .ds.filled.blau::after,.ds.filled.gelb::after,.ds.filled.rot::after,.ds.filled.schwarz::after,.ds.filled.tuerkis::after{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  color:#fff;font-size:11px;font-weight:400;line-height:1;
-  text-shadow:0 0 2px rgba(0,0,0,.45)}
+  content:'';position:absolute;inset:0;
+  background:var(--sym) center/12px no-repeat}
 /* Unbelegte Kuppel-Farbfelder: Label-Symbol (spaceHTML) etwas groesser als
    die 9px-Basis, damit die Form erkennbar ist. */
 .ds.N{font-size:11px;font-weight:400}
@@ -216,11 +214,9 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   /* Nutzer 2026-08-07: Soll-Farben abgedunkelt (aehnlich dem gesperrten
      Spezialfeld-Stern), damit GELEGTE Fliesen klar dominieren. */
   opacity:.35}
-/* Symbol der Soll-Farbe: aus data-sym (spaceHTML), geometrisch zentriert. */
-.ds.N::after{content:attr(data-sym);position:absolute;top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  color:#fff;font-size:11px;font-weight:400;line-height:1;
-  text-shadow:0 0 2px rgba(0,0,0,.55)}
+/* Symbol der Soll-Farbe: Farbklasse liefert --sym (siehe v3-Block oben). */
+.ds.N::after{content:'';position:absolute;inset:0;
+  background:var(--sym) center/12px no-repeat}
 .ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
 .ds.S{background:var(--special);border-style:dashed;border-color:#aaa}
 .ds.S.locked{opacity:.25}
