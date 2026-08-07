@@ -734,6 +734,16 @@ impl PyGame {
                 if !apply_bonus_chips_with(&mut self.game.state.players[pi], row, &chips) {
                     return Err(PyValueError::new_err("KI: Chip-Komplettierung fehlgeschlagen."));
                 }
+                // Logging-Luecke geschlossen (2026-08-07, Watchlist-Messartefakt):
+                // der Menschen-Pfad `apply_tiling_chips` (oben, ~Zeile 298) loggt
+                // die Reihen-Komplettierung per Bonuschip, dieser KI-Pfad (Solver-
+                // Schritt `TilingStep::Chips`) tat es bisher NICHT -- identischer
+                // Wortlaut wie dort, damit `analyze_game_log.py`s 🎫-Regex beide
+                // Akteure gleich erfasst.
+                let name = self.game.state.players[pi].name.clone();
+                self.game
+                    .state
+                    .log_event(format!("🎫 {name} komplettiert Reihe {} mit Bonus-Chips!", row + 1));
                 ("use_chips", format!("Chips R{}", row + 1), "chip", json!({ "type": "use_chips", "pattern_row": row }))
             }
             TilingStep::End => {
@@ -860,5 +870,46 @@ mod tests {
         }
         assert!(plain.game.is_over(), "Partie nicht zu Ende gespielt (Schrittlimit)");
         assert!(refill_seen, "keine Beutel-Neumischung im Testspiel — Seed anpassen");
+    }
+
+    /// Watchlist-Messartefakt (2026-08-07, evaluations/watchlist_v20_zwischenlese.md):
+    /// der KI-Pfad `ai_tiling_step` (Solver-Schritt `TilingStep::Chips`) loggte
+    /// Reihen-Komplettierungen per Bonuschip bisher NICHT, obwohl der Menschen-Pfad
+    /// `apply_tiling_chips` (oben) das immer tat -- Log-Analysen unterschaetzten
+    /// dadurch die KI-Chip-Nutzung. Kontentions-Aufbau identisch zu
+    /// `tiling_solver::tests::greedy_chip_alloc_tradeoff_in_contention`: erzwingt
+    /// deterministisch `TilingStep::Chips` als exakt ersten Solver-Schritt.
+    #[test]
+    fn ai_tiling_step_logs_chip_completion() {
+        use crate::dome::{build_dome_tile_pool, BonusChip};
+        use crate::tile::TileColor::{Blau, Rot};
+
+        let mut pg = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        pg.game.state.phase = Phase::Tiling;
+        for p in pg.game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        // Slot (1,0) = pool[2] [Tuerkis, Rot, Blau, Wild]:
+        //   si1 = Rot @ 6x6 (2,1) -> Reihe 3 (idx 2, 1 fehlt).
+        //   si2 = Blau @ 6x6 (3,0) -> Reihe 4 (idx 3, 1 fehlt).
+        let tile = build_dome_tile_pool()[2].clone();
+        pg.game.state.players[0].dome_grid.place_dome_tile(tile, 1, 0).unwrap();
+        pg.game.state.players[0].pattern_lines[2].add_tiles(&[Rot, Rot]); // cap 3
+        pg.game.state.players[0].pattern_lines[3].add_tiles(&[Blau, Blau, Blau]); // cap 4
+        pg.game.state.players[0].bonus_chips = vec![
+            BonusChip { chip_id: 0, colors: vec![Blau, Rot] },
+            BonusChip { chip_id: 1, colors: vec![Blau, Rot] },
+            BonusChip { chip_id: 2, colors: vec![Blau] },
+            BonusChip { chip_id: 3, colors: vec![Rot] },
+        ];
+        pg.game.state.current_player = 0;
+
+        let before = pg.game.state.log.len();
+        pg.ai_tiling_step().expect("KI-Tiling-Schritt sollte gelingen");
+        let new_lines = &pg.game.state.log[before..];
+        assert!(
+            new_lines.iter().any(|l| l.contains('🎫') && l.contains("komplettiert Reihe")),
+            "KI-Chip-Komplettierung sollte geloggt werden, neue Log-Zeilen: {new_lines:?}"
+        );
     }
 }
