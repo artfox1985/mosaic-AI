@@ -465,11 +465,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Gesamtliste (Vorfall pi_ctrl_s3: frisch gelandete v19wdlann-Dateien
     # verschoben den Seed-Shuffle -> anderer Key, Voll-Neubau,
     # kontaminiertes Fenster). Gleicher Filter wie in neural_net.py.
-    _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
+    import os as _os
+    _excl = _os.environ.get("MOSAIC_DATA_EXCLUDE")
     if _excl:
         import re as _re
         _n0 = len(all_files)
-        all_files = [f for f in all_files if not _re.search(_excl, os.path.basename(f))]
+        all_files = [f for f in all_files if not _re.search(_excl, _os.path.basename(f))]
         print(f"🔒 MOSAIC_DATA_EXCLUDE={_excl!r}: {_n0 - len(all_files)} von {_n0} Dateien ausgeschlossen (vor Split).")
 
     # Lauf-Manifest + Korpus-Log (#64 Teil 2) -- siehe Funktionskommentare
