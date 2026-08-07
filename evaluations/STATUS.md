@@ -37,10 +37,12 @@ Probe R²=0,91 -> Platten-Intervention via Aux-Kopf gerechtfertigt;
 Checkpoint-Umkehrung E15/E5 zwischen neuem Val und Alt-Messset.
 
 **LAUFEND (Parallel-Betrieb, Nutzer-Go "dann los")**:
-1. CPU-Bahn: ~~E15/E5-Gating~~ (H0, brierbest re-validiert),
-   ~~Neukartierung~~ (H0 ueberall, s. Task-Index) -> CPU gehoert jetzt
-   den NUTZER-PARTIEN; danach/nachts: τ-Annealing-Generierung
-   (2.000 @600, Tag v19wdlann, nach Wheel-Fenster).
+1. CPU-Bahn (Nutzer verzichtet auf Partien, 2026-08-07): **LAEUFT:
+   τ-Annealing-Batch 2.000 @600 (`v19wdlann`, argmax ab Zug 30;
+   τ-Wheel via PYTHONPATH-Seiteninstall, Paritaets-Hash bitgleich)**
+   -> danach v21-Schwarm 8.000 @150 (`v20wdlsw`) -> v21-Sockel gemaess
+   τ-Verdikt. **v21-Fenster: PREREG_v21_fenster.md** (Nutzer-Zuschnitt;
+   2 Detail-Empfehlungen mit offenem Veto).
 2. GPU-Bahn: pi_ctrl_s3 (Kontroll-Seed, laeuft) -> danach
    **Endgame-Arm** `pi_endgame_s2` (--endgame-head, Seed 2 = gepaart
    zum Champion-Lauf; Schema-18-Cache baut sich beim Start; NICHT
