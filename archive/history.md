@@ -10097,20 +10097,15 @@ Experiment auf dem neuen Ziel, keine Neulesung alter Zahlen.
 
 ## AUSGELAGERT aus STATUS.md (2026-08-07 abends, Nutzer-Aufraeumauftrag)
 
-### Auf Nutzer-Anweisung GESCHLOSSENE Tasks (2026-08-07)
+### Index-Bereinigung (2026-08-07; KORRIGIERT nach Nutzer-Rueckfrage)
 
-- **λ (Value-Target-Mix)**: geschlossen. Letzter Stand: Korpus-
-  Mischanteil entscheidet (gewinnt bei 65,7% root_q-Mix, verliert bei
-  43,8%); λ07_opp-Gating durch Engine-Audit F1 kontaminiert (zaehlt
-  in keine Richtung). Wiedereroeffnung nur mit neuem Prereg.
-- **#29-Instrument (validierter Offline-Value-Praediktor)**:
-  geschlossen ohne Instrument -- value_r2 blieb viermal widerlegt.
-  Die operative Regel ("jede Value-Aenderung braucht ein
-  Arena-Gating") lebt in den GELTENDEN REGELN weiter.
-- **#37 (Tiling-Auswahlkriterium punkte*P vs reines P)**: geschlossen
-  ungetestet; Originaltext unten. Bei Wiederaufnahme: Arena-entschieden.
-- **#14 (PCR)**: war bereits "aufgegangen in Design C" -- Zeile aus dem
-  Index entfernt.
+- **#14 (PCR)**: abgeschlossen ("aufgegangen in Design C") -- aus dem
+  Index entfernt. **NUR #14** -- die Erstfassung dieses Abschnitts
+  hatte faelschlich auch λ/#29/#37 als geschlossen deklariert
+  (Koordinator-Fehllesung der Nutzer-Nachricht); die drei sind OFFEN
+  und stehen wieder im STATUS-Index. Der Mensch-vs-KI-Befund, das
+  Suchpfad-Inventar und der #37-VOLLTEXT unten sind reine
+  Archiv-Auslagerungen (Referenzmaterial), keine Schliessungen.
 
 ### Original-Bloecke (verbatim)
 
