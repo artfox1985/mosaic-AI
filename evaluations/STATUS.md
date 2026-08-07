@@ -99,10 +99,20 @@
      (76,5%) vs W=0,15 144/200 (McNemar p=0,31) vs W=0,6 145/200
      (p=0,36). Beide H0, Richtung pro Kontrolle -> **Default 0,3
      bleibt, Punkt WDL-re-validiert.**
-   - Messung 2 (m-Formel @150) LAEUFT.
+   - ~~Messung 2 (m-Formel @150)~~ ERLEDIGT 2026-08-07
+     (paired_arena_env_topm150_m2.json): Formel m=9 138/200 vs fest
+     m=16 144/200, McNemar p=0,54 -> **H0, Formel bestaetigt;
+     Abweichungsnotiz der v20-Kampagne GESCHLOSSEN** (Schwarm gilt als
+     unbelastet). Sekundaermessung @64 entfaellt (nur bei Signifikanz).
    - (eigenes Nutzer-Go, Kostenklasse ~0,5 Tage) τ-Annealing-Korpus-A/B.
-6. Danach eigene Schritte: frozen-Set-Neubau -> #29-Instrument;
-   Aggressions-Neukartierung; #37; λ.
+6. v20-Aera-Liste (Reihenfolge offen, Nutzer-Prioritaet morgens):
+   frozen-Set-Neubau -> #29-Instrument; Aggressions-Neukartierung;
+   #37; λ; **NEU: Wertungsplatten-Intervention** (R5-Wiedervorlage-
+   Bedingung erfuellt, s.o.); **NEU: E15-vs-E5-Checkpoint-Gating**
+   (billig, Ein-Faktor; Checkpoint-Umkehrungs-Befund s.o.);
+   Struktur-Watchlist (braucht bewertete Partien des neuen Champions
+   gegen den Nutzer); #35b Ranking-Loss (Daten liegen vor);
+   Endspiel-Zonen-Ursachenanalyse; Fenster-Rotations-A/B fuer v21.
 
 ## OFFENE ENTSCHEIDUNGEN & GELTENDE REGELN
 

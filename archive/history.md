@@ -9836,3 +9836,63 @@ laufendes λ07-Gating -> #34 bauen -> Cache-Neubau -> #34-Training +
 Kontrolle -> Diagnostiken (A) -> Neuentscheidung (B) -> #33 -> v20-Planung.
 
 ---
+
+## KAPITEL 2026-08-07: v20-CHAMPION-NACHT (autonome Pipeline nach "mach du weiter nach plan")
+
+**Training** (warm von v19_2d_opp_best, 2100-Datei-Fenster Schema 17,
+3.077.538 Train-/341.824 Val-Zuege, fp16/uint8-Cache, Peak ~20,4 GB RSS):
+Early Stop E15 (Plateau ab E10), brierbest=E5 (val_brier 0,1950),
+val_combined-best=E1. Snapshot models_2026-08-07_0341_v20_2d_opp.zip.
+
+**CHAMPION-GATING GEWONNEN**: v20_2d_opp_brierbest 208:162 v19_2d_best
+(SPRT-H1 nach 185 Paaren > 150er-Fruehstopp-Schwelle, p=0,0178,
+gepaarte Diff +0,249 [+0,054, +0,444]). Elo 1349 [1269, 1437].
+set_champion ausgefuehrt (Server lief nicht, laedt beim naechsten
+Start). Erster Champion der WDL-Aera. Elo-CSV-Eintrag zunaechst mit
+Datei- statt Kader-Namen erfasst, sofort korrigiert.
+
+**Auswertungs-Paket** (alles committet):
+- Saettigungs-Nachfit: Messset exakt rekonstruiert (--exclude-file-regex
+  + Validierung gegen Referenz-JSON, 900 Partien/146.187 Zustaende).
+  Alt-Kurve 0,19934 -> 0,19813 -> 0,19695 (0,0012/Verdopplung);
+  Dosis-Prognose @18.900 Spiele 0,1955; IST brierbest 0,18749, final
+  0,18305 -- der 4. Punkt liegt WEIT unter der Kurve: Aera-Wechsel
+  (WDL-Generator, Zwei-Klassen-Fenster) schlaegt Dosis um Faktor ~7-12.
+- Checkpoint-Umkehrung: intern ist E5 brierbest, auf dem Alt-Messset
+  ist E15 besser (0,18305 vs 0,18749) -- Verteilungs-Shift; E15-vs-E5
+  als billiges Ein-Faktor-Gating notiert.
+- Policy-Wacht: Orakel-Metriken Paritaet (0,7098/0,7187 Prior-Masse;
+  0,3588/0,3558 Tau) -- der 4.000er-Sockel hat die Policy gehalten.
+  Frozen-Value-R2 negativ = Artefakt (alte gestauchte Soft-Targets);
+  Frozen-BRIER v20 0,2263 < v19 0,2327.
+- Platt-Fit (NEUES TOOL tools/platt_fit.py, reproduziert v19-Referenz
+  B=1,9269 exakt): v20_brierbest B=0,930; E15 0,885 (milde
+  Ueberkonfidenz-Drift, wie t34 nur schwaecher).
+- R5-Plattenkalibrierung: Steigung 0,349 (0,086 tanh -> 0,273 t34 ->
+  0,349 v20), weiterhin weit unter 1 -> WIEDERVORLAGE-BEDINGUNG
+  ERFUELLT, Wertungsplatten-Intervention jetzt gerechtfertigt.
+- R4b (N=72): Value 0,056 bei R2=0,008 -> kein Signal (Prereg-Regel).
+
+**Engine-Fenster** (Commit 2cd364e, 282 Tests gruen): Env-Knoepfe
+MOSAIC_FLOOR_SHAPING_W / MOSAIC_GUMBEL_TOP_M (OnceLock, Default =
+Bestandsverhalten; Paritaets-Hash vor/nach Wheel-Neubau bitgleich,
+Wirksamkeit per Hash-Differenz belegt) + Engine-Audit U1
+(Chip-Top-down-Sperre jetzt auch auf Apply-Ebene, round_end.rs) und U2
+(validate_small_suns `factory_id?` liess None passieren ->
+execute_take-Panic; jetzt Err).
+
+**Suchpfad-Messungen 1+2** (Instrument-AMENDMENT vor dem ersten Lauf:
+Env ist prozessweit -> Zwei-Arm Netz-vs-Heuristik nach #30-Muster,
+neues Tool tools/paired_arena_env_ab.py, identische Seeds, exakter
+McNemar):
+- Messung 1 Floor-Sweep: W=0,3 153/200 vs W=0,15 144/200 (p=0,31) vs
+  W=0,6 145/200 (p=0,36) -> Default 0,3 bleibt, Feature
+  WDL-re-validiert.
+- Messung 2 m-Formel @150: m=9 138/200 vs m=16 144/200 (p=0,54) -> H0,
+  Formel bestaetigt, ABWEICHUNGSNOTIZ der v20-Kampagne GESCHLOSSEN
+  (Schwarm unbelastet). Sekundaermessung @64 entfaellt.
+
+**Sonstiges**: Nachschub-Ventil vom Nutzer gestrichen (bei H0 waeren
+direkt die Stellschrauben drangewesen -- H1 machte es gegenstandslos);
+zwei per OneDrive verschwundene GUI-Screenshots aus Git restauriert;
+τ-Annealing (Messung 3) wartet designgemaess auf eigenes Nutzer-Go.
