@@ -47,6 +47,19 @@ korrekt). Backup-/Alt-Regel-Korpora bleiben AUSSEN (stehende Regel).
 3. v21-Sockel 4.000 @600 `--version v20wdl`, τ gemaess Messung-3-Verdikt
    (Uebernahme nur bei repliziertem Arena-Vorteil, sonst τ=1).
 
+## RAM-Voraussetzung (Nutzer-Einwand 2026-08-07)
+
+Der Zuschnitt (~4,8 M Zustaende) wuerde im heutigen Cache-Format
+~21,5 GB Cache / ~28-29 GB Trainings-Peak kosten -- zu knapp fuer
+32 GB. **Voraussetzung fuer das v21-Training ist daher das
+Planes-/Masken-BITPACKING** (planes sind strikt binaer: 2.736 -> 342 B,
+masks 406 -> 51 B; Ziel ~2,6 KB/Zustand => ~12,5 GB Cache, Peak
+~19-20 GB), verlustfrei, mit eigenem Cache-Key und
+bit-identischer Validierung gegen den ungepackten Pfad
+(Escape: MOSAIC_CACHE_NOPACK=1). Faellt das Bitpacking durch die
+Validierung, wird stattdessen das Fenster beschnitten (zuerst der
+5.000er-v18-Block) -- Nutzer-Entscheid dann neu.
+
 ## Training/Gating
 
 Champion-Rezept (warm, lr 5e-5 cosine, wdl, brierbest-Politik,
