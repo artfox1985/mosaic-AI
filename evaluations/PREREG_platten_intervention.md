@@ -88,3 +88,14 @@ Training: Early Stop E15, brierbest E6 (interner val_brier 0,1939 vs
    der Offline-Teilerfolg dokumentiert, Kopf optional fuer den
    v21-Generator... korrekt: fuer das Training der NAECHSTEN
    Generation auf dem v21-Fenster).
+
+## ARENA-ERGEBNIS (2026-08-08): H0 -- Kopf wird Trainings-Upgrade
+
+Gating 97:103 nach 100 Paaren (SPRT-H0, p=0,76, gepaarte Diff -0,06
+[-0,32,+0,20]) -- Paritaet, wie vom Nutzer prognostiziert und von der
+Aufloesungsgrenzen-Regel erwartet (Brier-Gap 0,0016 << 0,015; Regel
+steht damit bei 0/4). VERDIKT gemaess Prereg: Champion bleibt
+`v20_2d_opp_brierbest`; **`--endgame-head` geht als Standard-Rezept-
+Bestandteil ins Training der naechsten Generation** (Offline-Gewinne
+real: R5-Steigung 0,457, Alt-Brier -0,0016, Kalibrierung sauber;
+Arena-Kosten: keine). Elo-Kante eingetragen.

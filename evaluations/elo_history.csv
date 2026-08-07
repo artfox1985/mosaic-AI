@@ -45,3 +45,4 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-08-06,t12_dist_brierbest,400,v19_2d_best,400,181,179,360,"Replikation, SPRT=H0, p=1.0000"
 2026-08-07,v20_2d_opp_brierbest,400,v19_2d_best,400,208,162,370,"Champion-Gating v20-Zyklus: SPRT nach 185 Paaren, p=0.0178 -- v20_2d_opp_brierbest NEUER CHAMPION (WDL-Aera)"
 2026-08-07,v20_2d_opp_e15,400,v20_2d_opp_brierbest,400,44,56,100,"E15-vs-E5-Checkpoint-Gating (Ein-Faktor, no-promote): SPRT-H0 nach 50 Paaren, p=0.3269 -- brierbest-Politik arena-seitig re-validiert"
+2026-08-07,pi_endgame_s2_brierbest,400,v20_2d_opp_brierbest,400,97,103,200,"Platten-Interventions-Gating: SPRT-H0 nach 100 Paaren, p=0.7608 -- Paritaet; endgame_head wird Trainings-Upgrade der naechsten Generation (Offline: R5-Steigung 0,457, Alt-Brier -0,0016)"
