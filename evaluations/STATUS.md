@@ -19,7 +19,7 @@ Suchpfad-Messungen 1+2, Zonen-Probe -- als "KAPITEL 2026-08-07").
 | #37 | Tiling-Auswahlkriterium (`punkte*P` vs reines P) | vorgemerkt v20-Aera, Arena-entschieden | unten |
 | — | R4b/Endspiel-Zone | **URSACHE GEFUNDEN 2026-08-07**: Trunk traegt die Info (Probe R²=0,91), Koepfe/Ziele nutzen sie nicht -> Ziel-Problem; Leitbefund fuer die Platten-Intervention | history |
 | — | #29-Instrument | Orakel-Referenzen neu nach frozen-Set-Neubau (v20-Aera); Validierung braucht arena-differenzierte Paare | PREREG_nach34_paket |
-| — | Aggressions-Neukartierung | **ERLEDIGT 2026-08-07: alle 3 Arme H0** (Kontrolle 149/200 vs 154/161/155; p=0,59/0,17/0,54) -> **w bleibt UEBERALL 0**, Punkt zu bis zur naechsten Kopf-Generation; (0,1;2,0)-Richtung (+6pp, p=0,17) deskriptiv notiert -- erster Kandidat, falls ein kuenftiger opp-Kopf schaerfer wird. Nutzer-Partien FREIGEGEBEN (Preset w=0 = verankerte Konfig) | `paired_arena_env_aggr_neukartierung.json` |
+| — | Aggressions-Programm (Neukartierung + Stilmessung + Leiter E1/E2/E3) | **KOMPLETT GESCHLOSSEN 2026-08-07**: kein kostenloser Raub-Hebel im aktuellen Kopf (Blend/E1/E2 flach, E3 -13,75pp schaedlich); alle Defaults bleiben (w=0, λ=0, ε=0, bias=1); Wiedervorlage nur mit messbar schaerferem opp-Kopf (Details PREREG_aggression_stilmessung/PREREG_denial_tiebreak) |  |
 | — | λ (Value-Target-Mix) | vertagt: am echten v20-Mischanteil neu bewerten | history |
 | — | U1+U2 Defensiv-Fixes | **ERLEDIGT 2026-08-07** (Commit 2cd364e, Tests) | history |
 | #31 | Schwierigkeitsstufen | geparkt (Arbeitskreis "Spaeter") | unten |
