@@ -790,10 +790,113 @@ pub const NET_TILING_TIEBREAK_ENABLED: bool = true;
 /// damit der gemessene BEFUND (s.o.) tatsaechlich zum Verhalten passt.
 pub const NET_TILING_TOPK: usize = 12;
 
+/// Task #37 (NEU, Nutzer 2026-08-05, siehe `archive/history.md` Abschnitt
+/// "Task #37"): Laufzeit-Wahl des Auswahlkriteriums unter den
+/// `top_k_tilings`-Kandidaten -- `MOSAIC_TILING_SELECT` ueberschreibt den
+/// Default (OnceLock, einmalig pro Prozess gelesen, gleiches Muster wie
+/// `MOSAIC_FLOOR_SHAPING_W`/`net_mcts::floor_shaping_weight`). Ganzzahl-
+/// Modus statt `f64`, weil es sich um eine ENDLICHE Auswahl von Formeln
+/// handelt, nicht um ein stufenloses Gewicht:
+///
+/// - `0` (Default): Bestandskriterium, siehe `select_best_tiling_candidate`.
+/// - `1`: Nutzer-Idee "reines P(Sieg)-Ranking" (History-Option (b) --
+///   `punkte` fliesst NICHT mehr ein), siehe dort.
+///
+/// Ungueltige Werte (nicht 0/1, nicht parsbar) fallen mit einer einmaligen
+/// stderr-Warnung auf `0` zurueck -- Laufzeit-Konfiguration darf nie einen
+/// Self-Play-Prozess abstuerzen lassen (gleiche Disziplin wie `read_f64_env`
+/// in `net_mcts.rs`).
+fn tiling_select_mode_env() -> u8 {
+    static MODE: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *MODE.get_or_init(|| match std::env::var("MOSAIC_TILING_SELECT") {
+        Ok(s) => match s.trim().parse::<i64>() {
+            Ok(0) => 0,
+            Ok(1) => 1,
+            Ok(v) => {
+                eprintln!(
+                    "⚠️  MOSAIC_TILING_SELECT={v} nicht 0 oder 1 -- verwende Default 0 (Bestandskriterium)"
+                );
+                0
+            }
+            Err(_) => {
+                eprintln!(
+                    "⚠️  MOSAIC_TILING_SELECT={s:?} nicht als Zahl lesbar -- verwende Default 0 (Bestandskriterium)"
+                );
+                0
+            }
+        },
+        Err(_) => 0,
+    })
+}
+
+/// Task #20/#37: reiner Auswahlkern OHNE Env-Zugriff -- nimmt `mode` als
+/// Parameter, damit er ohne `OnceLock`-Prozess-Cache/Env-Var-Umgebung direkt
+/// mit synthetischen Kandidaten testbar ist. `best_first_step_valued`
+/// (unten) ist nur noch ein duenner Wrapper, der `mode` aus
+/// `tiling_select_mode_env` liest.
+///
+/// Beide Modi lesen NUR Werte, die der Solver (`c.points`) bzw. der
+/// Aufrufer-Evaluator (`evaluator(&c.final_state)`) ohnehin schon fuer JEDEN
+/// Kandidaten berechnen -- **kein zusaetzlicher Netz-Forward** gegenueber dem
+/// Vor-Task-#37-Code, in keinem der beiden Modi. Der Evaluator wird weiterhin
+/// genau einmal pro Kandidat aufgerufen (Reihenfolge/Anzahl unveraendert).
+///
+/// - `mode == 0` (Default, **Bestandskriterium, BYTE-IDENTISCH** zum
+///   Vor-Task-#37-Code): `wert(Kandidat) = punkte(Kandidat) *
+///   P(Sieg|final_state)`. `punkte` = `TilingOutcome::points`, die
+///   Rundenpunkte DIESES Tiling-Abschlusses (Solver-Ausgabe, kein Score-
+///   Zuwachs-Proxy). `P(Sieg)` = `evaluator(&c.final_state)`, in der
+///   Produktion der kalibrierte WDL-Netz-Value-Kopf auf dem Folgezustand
+///   NACH dem Abschluss. Entspricht History-Option (a) ("Bestand
+///   `punkte * P(Sieg)`", Task #20).
+/// - `mode == 1`: **"reines P(Sieg)-Ranking"** (History-Option (b)) --
+///   `wert(Kandidat) = P(Sieg|final_state)`, der Punktefaktor entfaellt
+///   komplett. Adressiert das im Task-#37-Befund notierte Risiko, dass der
+///   kalibrierte WDL-Kopf (im Gegensatz zum alten, gestauchten Margen-Kopf)
+///   ~2x weiter spreizt und damit die Punkte-Information im Produkt ZWEIMAL
+///   einrechnet (einmal korrekt dosiert via `P(Sieg|Folgezustand)`, einmal
+///   als eigener Faktor mit willkuerlichem Wechselkurs).
+///
+/// **Wichtiger Befund beim Nachlesen des Bestandscodes (dieser Task):** die
+/// im urspruenglichen Task-#37-Auftrag als "Nutzer-Idee, abweichend vom
+/// Bestand" bezeichnete Formel "punkte × P(Sieg)" IST bereits das
+/// Bestandskriterium (Task #20, seit 2026-07-xx aktiv) -- die eigentliche,
+/// in `archive/history.md` dokumentierte offene Frage ist Bestand (a) vs.
+/// reines P(Sieg)-Ranking (b) [ggf. (c) als spaeterer dritter Arm, hier NICHT
+/// umgesetzt]. `mode=0`/`mode=1` bilden deshalb (a) bzw. (b) ab, nicht zwei
+/// identische Varianten der Produktformel.
+///
+/// Beide Modi: bei Wertegleichheit gewinnt deterministisch der ERSTE
+/// Kandidat -- `>` statt `>=` in der Vergleichsschleife, kein Zufall, keine
+/// zusaetzliche Tiebreak-Logik.
+fn select_best_tiling_candidate(
+    cands: Vec<TilingOutcome>,
+    mode: u8,
+    evaluator: &dyn Fn(&GameState) -> f64,
+) -> Option<TilingStep> {
+    let mut best: Option<(f64, TilingStep)> = None;
+    for c in cands {
+        let p_win = evaluator(&c.final_state);
+        let val = match mode {
+            1 => p_win,
+            _ => f64::from(c.points) * p_win,
+        };
+        let better = match &best {
+            Some((best_val, _)) => val > *best_val,
+            None => true,
+        };
+        if better {
+            best = Some((val, c.first_step));
+        }
+    }
+    best.map(|(_, step)| step)
+}
+
 /// Task #20: waehlt unter den bis zu `NET_TILING_TOPK` vollstaendigen
-/// Tiling-Abschluessen denjenigen mit maximalem `punkte * evaluator(final_state)`
-/// und liefert dessen ERSTEN Schritt (das ist der Zug, den der Aufrufer
-/// tatsaechlich ausfuehren muss -- siehe `TilingOutcome::first_step`).
+/// Tiling-Abschluessen den nach `select_best_tiling_candidate`
+/// (`MOSAIC_TILING_SELECT`, Default-Modus `0` = Bestand) besten und liefert
+/// dessen ERSTEN Schritt (das ist der Zug, den der Aufrufer tatsaechlich
+/// ausfuehren muss -- siehe `TilingOutcome::first_step`).
 ///
 /// `evaluator` ist bewusst eine generische Closure statt eines direkten
 /// `&Net`-Parameters: dieses Modul hat keinen Rust-Unit-Test-Praezedenzfall
@@ -811,18 +914,7 @@ pub fn best_first_step_valued(
     evaluator: &dyn Fn(&GameState) -> f64,
 ) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, NET_TILING_TOPK);
-    let mut best: Option<(f64, TilingStep)> = None;
-    for c in cands {
-        let val = f64::from(c.points) * evaluator(&c.final_state);
-        let better = match &best {
-            Some((best_val, _)) => val > *best_val,
-            None => true,
-        };
-        if better {
-            best = Some((val, c.first_step));
-        }
-    }
-    best.map(|(_, step)| step)
+    select_best_tiling_candidate(cands, tiling_select_mode_env(), evaluator)
 }
 
 /// Task #20: kompletter Entscheid fuer den echten Tiling-Zug INKLUSIVE der
@@ -1465,6 +1557,113 @@ mod tests {
                 actual, expected,
                 "Seed {seed} Runde {round}: Evaluator haette die Wahl gekippt, \
                  ausserhalb Runde 2-4 darf er das nicht"
+            );
+        }
+    }
+
+    // ── Task #37: Laufzeit-Auswahlkriterium (MOSAIC_TILING_SELECT) ──────────
+
+    /// Paritaets-Bedingung (gleiches Muster wie
+    /// `net_mcts::tests::env_knoepfe_defaults_sind_bestandsverhalten`): ohne
+    /// gesetzte `MOSAIC_TILING_SELECT`-Env-Var MUSS der Laufzeit-Knopf exakt
+    /// den Default-Modus `0` liefern (OnceLock cached den ungesetzten Zustand
+    /// in der Testumgebung).
+    #[test]
+    fn env_knoepfe_defaults_sind_bestandsverhalten() {
+        assert_eq!(tiling_select_mode_env(), 0);
+    }
+
+    /// Auswahlkern, Modus 0 (Bestand): bei synthetischen Kandidaten mit
+    /// unterschiedlichen Punkten UND unterschiedlichem P(Sieg) gewinnt das
+    /// PRODUKT `punkte * P(Sieg)` -- hier bewusst so konstruiert, dass der
+    /// Kandidat mit den WENIGEREN Punkten wegen der hoeheren Siegchance das
+    /// hoehere Produkt hat (10*0.9=9.0 > 20*0.4=8.0), um Modus 0 von einer
+    /// reinen "hoechste Punkte gewinnen"-Regel zu unterscheiden.
+    #[test]
+    fn select_best_tiling_candidate_mode0_is_points_times_pwin_product() {
+        let s = rich_state(1);
+        let base_round = s.round_number;
+        let expected_first_step = TilingStep::End;
+        let mut s2 = s.clone();
+        s2.round_number = s2.round_number.wrapping_add(1).min(5); // anderer "Fingerabdruck" fuer den Fake-Evaluator
+        let cands = vec![
+            TilingOutcome {
+                points: 10,
+                first_step: expected_first_step.clone(),
+                final_state: s,
+            },
+            TilingOutcome {
+                points: 20,
+                first_step: TilingStep::Chips { row: 0, chips: vec![] },
+                final_state: s2,
+            },
+        ];
+        let evaluator = |gs: &GameState| if gs.round_number == base_round { 0.9 } else { 0.4 };
+        let chosen = select_best_tiling_candidate(cands, 0, &evaluator);
+        assert_eq!(
+            chosen,
+            Some(expected_first_step),
+            "Modus 0 muss 10*0.9=9.0 gegen 20*0.4=8.0 gewinnen lassen -- reines Punkte-Ranking waere hier falsch"
+        );
+    }
+
+    /// Auswahlkern, Modus 1 (reines P(Sieg)-Ranking): identische Kandidaten
+    /// wie oben, aber diesmal muss der Punktevorsprung des zweiten Kandidaten
+    /// IGNORIERT werden -- Modus 1 waehlt ausschliesslich nach `P(Sieg)`,
+    /// unabhaengig von `punkte`.
+    #[test]
+    fn select_best_tiling_candidate_mode1_ignores_points_pure_pwin_ranking() {
+        let s = rich_state(1);
+        let base_round = s.round_number;
+        let expected_first_step = TilingStep::End;
+        let mut s2 = s.clone();
+        s2.round_number = s2.round_number.wrapping_add(1).min(5);
+        let cands = vec![
+            TilingOutcome {
+                points: 5, // sogar noch weniger Punkte als im Modus-0-Test
+                first_step: expected_first_step.clone(),
+                final_state: s,
+            },
+            TilingOutcome {
+                points: 100,
+                first_step: TilingStep::Chips { row: 0, chips: vec![] },
+                final_state: s2,
+            },
+        ];
+        let evaluator = |gs: &GameState| if gs.round_number == base_round { 0.9 } else { 0.4 };
+        let chosen = select_best_tiling_candidate(cands, 1, &evaluator);
+        assert_eq!(
+            chosen,
+            Some(expected_first_step),
+            "Modus 1 muss ausschliesslich nach P(Sieg) waehlen (0.9 > 0.4), egal wie gross der Punkteunterschied ist"
+        );
+    }
+
+    /// Beide Modi: bei exaktem Wertegleichstand gewinnt deterministisch der
+    /// ERSTE Kandidat in der uebergebenen Reihenfolge (kein Zufall).
+    #[test]
+    fn select_best_tiling_candidate_tie_picks_first_candidate_both_modes() {
+        let s = rich_state(1);
+        let expected_first_step = TilingStep::End;
+        let evaluator = |_: &GameState| 0.5; // fuer beide Kandidaten identisch -> exakter Gleichstand in BEIDEN Modi
+        for mode in [0u8, 1] {
+            let cands = vec![
+                TilingOutcome {
+                    points: 10,
+                    first_step: expected_first_step.clone(),
+                    final_state: s.clone(),
+                },
+                TilingOutcome {
+                    points: 10,
+                    first_step: TilingStep::Chips { row: 0, chips: vec![] },
+                    final_state: s.clone(),
+                },
+            ];
+            let chosen = select_best_tiling_candidate(cands, mode, &evaluator);
+            assert_eq!(
+                chosen,
+                Some(expected_first_step.clone()),
+                "Modus {mode}: bei Gleichstand muss der erste Kandidat gewinnen"
             );
         }
     }
