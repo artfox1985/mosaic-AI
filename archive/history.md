@@ -10322,3 +10322,11 @@ der v19-Logs. (Der Spezialpunkte-/Unlock-Gap bleibt davon unberuehrt
 Tool-Fixes aus dem Lauf: MARKER-Regex akzeptiert ❖ (GUI-Umstellung
 2026-08-06 hatte analyze_game_log.py stumm gebrochen);
 FINAL_SCORE-Regex akzeptiert negative Endwertung (leere Spezialfelder).
+
+**Nutzer-Urteil zum v20-Champion (2026-08-07 nachts, nach 10 bewerteten
+Partien, woertlich)**: "Musste bei diesem gegner nun mehr ueberlegen
+und im vorhinein denken. alles in allem der richtige weg." -- Der
+WDL-Kopf spielt fuer den Menschen spuerbar vorausschauender; deckt sich
+mit dem Watchlist-Befund (Effizienz-Paritaet, engere Bilanz 7:3).
+KI-Chip-Logging-Fix (🎫-Zeile im KI-Tiling-Pfad) auf Nutzer-Anweisung
+beauftragt.
