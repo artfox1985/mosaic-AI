@@ -16,10 +16,10 @@ geschlossen).
 | **v21-Fenster fuellen** | Generator-Frage GEKLAERT (Endgame-H0 -> `v20_2d_opp_brierbest` bleibt): 2.090 Schwarm-Partien ZURUECK in data/, Schwarm-Rest 5.910 startet nach dem Stark-Gegner-Nachtest; Sockel nach τ-Verdikt. `PREREG_v21_fenster.md` |
 | **Messset-Snapshot + v16/v17-Freigabe** | Snapshot ERLEDIGT 2026-08-07 abends (`altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
-| **#35b Ranking-Loss** | offen, GPU-Kandidat (Daten liegen vor; Seed-Varianz-Regel) |
-| **λ (Value-Target-Mix)** | OFFEN (vertagt): am echten v20/v21-Mischanteil neu bewerten; λ07_opp-Altbeleg durch F1 kontaminiert. Kontext in history |
+| **#35b Ranking-Loss** | Implementierung beim Agent (--ranking-loss-weight, Default aus; ggf. Schema 19 fuer root_child_q-Cache-Feld); Trainings danach in die GPU-Queue (Seed-Varianz-Regel) |
+| **λ (Value-Target-Mix)** | **AKTIVIERT (Nutzer-Anstoss 2026-08-08)**: v20/v21-Fenster hat ~95% root_q-Anteil, weit ueber den 66%, bei denen λ=0,7 GEWANN -> λ=0,7-Arm in die GPU-Queue hinter t3ann_s2 |
 | **#29-Instrument (Offline-Value-Praediktor)** | OFFEN: braucht frozen-Set-Neubau + arena-differenzierte Paare zur Validierung. `PREREG_nach34_paket` |
-| **#37 Tiling-Auswahlkriterium (punkte*P vs reines P)** | OFFEN, vorgemerkt fuer die naechste Generation, Arena-entschieden; Volltext in history |
+| **#37 Tiling-Auswahlkriterium (punkte*P vs reines P)** | **VORGEZOGEN (Nutzer-Anstoss 2026-08-08): VOR die Schwarm-Fortsetzung** (Kriterium wirkt im Tiling jedes Self-Plays -> ganzer v21-Korpus soll das Sieger-Kriterium nutzen). Knopf beim Agent (MOSAIC_TILING_SELECT); danach Zwei-Arm-A/B (#30-Muster -- Solver ist prozessglobal, wirkt auf BEIDE Seiten) |
 | **frozen-Set-Neubau** | OFFEN (Vorbedingung fuer #29; Referenz-Set ist v12-Aera) -- Nutzer-Prioritaet |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
