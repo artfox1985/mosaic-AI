@@ -88,10 +88,19 @@
      der Befund ist als Kandidat fuer eine Nach-Gating-Pruefung
      notiert (E15 vs E5 waere ein billiges Ein-Faktor-Gating).
 5. **Suchpfad-Nachmessungen** (PREREG_suchpfad_nachmessungen.md):
-   Env-Knoepfe bauen (MOSAIC_FLOOR_SHAPING_W, MOSAIC_GUMBEL_TOP_M,
-   Paritaets-Nachweis) -> Floor-Gewicht-Sweep 0,15/0,3/0,6 ->
-   m-Formel-Messung @150 Sims -> (eigenes Nutzer-Go, Kostenklasse
-   ~1 Tag) τ-Annealing-Korpus-A/B.
+   - ~~Env-Knoepfe~~ GEBAUT 2026-08-07 (Commit 2cd364e): Wheel
+     installiert, Paritaets-Hash bitgleich (Default-Env identisch zu
+     vorher), Wirksamkeit beider Knoepfe per Hash-Differenz belegt.
+     Instrument-AMENDMENT vor dem ersten Lauf: Zwei-Arm
+     Netz-vs-Heuristik (#30-Muster), da Env prozessweit (OnceLock) --
+     neues Tool tools/paired_arena_env_ab.py.
+   - ~~Messung 1 (Floor-Sweep)~~ ERLEDIGT 2026-08-07
+     (paired_arena_env_floorw_m1.json): W=0,3 Kontrolle 153/200
+     (76,5%) vs W=0,15 144/200 (McNemar p=0,31) vs W=0,6 145/200
+     (p=0,36). Beide H0, Richtung pro Kontrolle -> **Default 0,3
+     bleibt, Punkt WDL-re-validiert.**
+   - Messung 2 (m-Formel @150) LAEUFT.
+   - (eigenes Nutzer-Go, Kostenklasse ~0,5 Tage) τ-Annealing-Korpus-A/B.
 6. Danach eigene Schritte: frozen-Set-Neubau -> #29-Instrument;
    Aggressions-Neukartierung; #37; λ.
 
