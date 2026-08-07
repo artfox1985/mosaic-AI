@@ -11,9 +11,9 @@ geschlossen).
 
 | Task | Status |
 |---|---|
-| **Platten-Intervention (endgame_head)** | Training `pi_endgame_s2` LAEUFT (E3+, ETA ~01-02 Uhr); danach R5-Steigung (Ziel >0,5) + Brier-Alt-Set (±0,002 Seed-Skala) -> ggf. Gating vs Champion. `PREREG_platten_intervention.md` |
-| **τ-Annealing (Messung 3)** | Korpus fertig (2.000 `v19wdlann`); Arm-B-Training + Gating in der GPU-Queue nach dem Endgame-Arm. `PREREG_suchpfad_nachmessungen.md` |
-| **v21-Fenster fuellen** | WARTET auf die Modell-Verdikte (Reihenfolge-Regel unten): Schwarm 8.000 (2.090 in `data_quarantaene/` geparkt) + Sockel 4.000 vom finalen v20-Aera-Champion. `PREREG_v21_fenster.md` |
+| **Platten-Intervention (endgame_head)** | **ABGESCHLOSSEN 2026-08-08: Arena H0 (97:103), Offline-Gewinne real (R5 0,457, Brier -0,0016) -> `--endgame-head` wird Standard-Rezept der naechsten Generation**; Champion bleibt. `PREREG_platten_intervention.md` |
+| **τ-Annealing (Messung 3)** | Arm-B-Training `t3ann_s2` LAEUFT (Swap-Fenster 200 raus/200 rein via Manifest+Exclude, Cache baut); danach Gating vs Champion -> Sockel-Entscheid. `PREREG_suchpfad_nachmessungen.md` |
+| **v21-Fenster fuellen** | Generator-Frage GEKLAERT (Endgame-H0 -> `v20_2d_opp_brierbest` bleibt): 2.090 Schwarm-Partien ZURUECK in data/, Schwarm-Rest 5.910 startet nach dem Stark-Gegner-Nachtest; Sockel nach τ-Verdikt. `PREREG_v21_fenster.md` |
 | **Messset-Snapshot + v16/v17-Freigabe** | Snapshot ERLEDIGT 2026-08-07 abends (`altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
 | **#35b Ranking-Loss** | offen, GPU-Kandidat (Daten liegen vor; Seed-Varianz-Regel) |
