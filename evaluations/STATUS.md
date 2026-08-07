@@ -66,8 +66,9 @@
     aktiv) + Schwarm 8000 @~150 (Policy maskiert) vom v20-Generator;
     Alt-Einfluss: 1350 v18- + 450 v17-Partien als Policy-Traeger
     (Summe 5800 Policy-aktiv), restliche ~7200 v18/v17/v16-Partien als
-    reines Value-Material -> ~21.000 Value-Partien gesamt. Nachschub-
-    Ventil: bei Gating-Fehlschlag weitere Policy-Partien nachwerfen.
+    reines Value-Material -> ~21.000 Value-Partien gesamt. Nachschub-Ventil
+    GESTRICHEN (Nutzer 2026-08-07): bei Gating-Fehlschlag keine
+    Zusatz-Partien -- andere Stellschrauben zuerst.
     **Backup-Altbestaende bleiben AUSSEN (Nutzer-Entscheid): ihre
     Verlaeufe tragen die alte Policy** -- Value-Kalibrierung soll auf
     der Zustandsverteilung des aktuellen Spiels stehen (deckt sich mit
