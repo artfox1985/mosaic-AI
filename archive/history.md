@@ -10094,3 +10094,212 @@ faehrt, ist ein v20-Design-Entscheid des Nutzers; PREREG dann als neues
 Experiment auf dem neuen Ziel, keine Neulesung alter Zahlen.
 
 ---
+
+## AUSGELAGERT aus STATUS.md (2026-08-07 abends, Nutzer-Aufraeumauftrag)
+
+### Auf Nutzer-Anweisung GESCHLOSSENE Tasks (2026-08-07)
+
+- **λ (Value-Target-Mix)**: geschlossen. Letzter Stand: Korpus-
+  Mischanteil entscheidet (gewinnt bei 65,7% root_q-Mix, verliert bei
+  43,8%); λ07_opp-Gating durch Engine-Audit F1 kontaminiert (zaehlt
+  in keine Richtung). Wiedereroeffnung nur mit neuem Prereg.
+- **#29-Instrument (validierter Offline-Value-Praediktor)**:
+  geschlossen ohne Instrument -- value_r2 blieb viermal widerlegt.
+  Die operative Regel ("jede Value-Aenderung braucht ein
+  Arena-Gating") lebt in den GELTENDEN REGELN weiter.
+- **#37 (Tiling-Auswahlkriterium punkte*P vs reines P)**: geschlossen
+  ungetestet; Originaltext unten. Bei Wiederaufnahme: Arena-entschieden.
+- **#14 (PCR)**: war bereits "aufgegangen in Design C" -- Zeile aus dem
+  Index entfernt.
+
+### Original-Bloecke (verbatim)
+
+## MENSCH-vs-KI-BEFUND (Nutzer-Anstoss 2026-08-06): 9 gewertete Partien analysiert
+
+Nutzer schlaegt v19_2d_best@400 **8:1** (Log-Analyse
+static/log/, Profil artfox). Die KI ist im Kleinen minimal besser
+(3,47 vs 3,30 Pkt je Kuppel-Legung) und verliert ueber zwei
+STRUKTURELLE Strategien, die sie nicht spielt:
+1. **Chip-Spezial-Maschine**: Mensch 1,9 Chip-Reihenabschluesse und
+   10,8 Spezialpunkte je Partie, KI 0,0 / 0,4. Der Tiling-Solver KANN
+   chippen (TilingStep::Chips existiert) -- aber die Drafting-Policy
+   baut nie chipbare tiefe Reihen auf (R5+R6-Nahmen: Mensch 37%, KI
+   22%). Mechanistisch = die bekannte Platten-Kaskaden-Blindheit des
+   Value-Kopfs, erstmals als Spielfolge sichtbar.
+2. **Tempo**: Startspielerstein-Nahmen 34:7 fuer den Menschen -- die KI
+   bewertet das Startrecht systematisch zu niedrig (-2 wirken im alten
+   Punkte-Margen-Value teurer als das Tempo wert ist?).
+3. Startkachel: Mensch variiert ((0,0)@0/270, (2,0)@180), KI klemmt
+   deterministisch (#39).
+
+**MECHANIK-AUFKLAERUNG (2026-08-06, zwei Korrekturen)**:
+1. Nutzer-Design-Punkt bestaetigt: die Suche braucht die Tiling-Phase
+   NICHT zu sehen -- "chip-abschliessbar" ist eine ZUSTANDSEIGENSCHAFT,
+   und sie ist BEREITS als expliziter Netz-Input kodiert (Chip-Farb-
+   Zaehler + Abschliessbarkeits-Flag je Musterreihe, state_to_tensor).
+2. Koordinator-Irrtum "selbstverstaerkende Schleife" ZURUECKGEZOGEN:
+   der Korpus ist VOLL mit Chip-Abschluessen -- gemessen 4,92/Partie
+   (v18-Korpus, 400 Partien) und 4,85/Partie (frische v19wdl-Sockel,
+   200 Partien). Die KI chippt im Self-Play routiniert.
+
+**DIAGNOSE, DRITTE ITERATION (Nutzer-Selbstauskunft 2026-08-06)**: die
+Tempo-/Denial-Deutung war ebenfalls die des Koordinators, nicht die des
+Spielers. Nutzer: "wuerde den Startspielerstein nicht ueberbewerten" --
+die 34:7-Marker-Statistik ist mutmasslich NEBENPRODUKT des mondlastigen
+Sammelstils (19,9 Mond-Nahmen/Partie; der Stein geht zwangsweise an die
+erste GF-Mond-Nahme), kein Tempo-Kauf. Das TATSAECHLICHE Spielkonzept
+(woertlich festgehalten als Strategie-Dossier):
+- Kern: ORTHOGONALE Reihen (Kreuz-Aufbau fuer Linienboni) + hoeherwertige
+  SPEZIALFELDER; Chips/Spezials sind Teil dieses Strukturplans.
+- Wertungsplatten als BONUS, selektiv: VERTIKAL immer gerne (~2 Spalten
+  werden voll); ECKPLATTEN normal 1x3 + 1x8 erreichbar; DIAGONALE
+  zwiegespalten (widerspricht dem orthogonalen Aufbau); HORIZONTAL und
+  FARBENREICH bringen wenig extra; MEHRFARBIG ok.
+- Spezialfeld-Taktik (NUR bei aktiver Spezialfelder-Wertungsplatte
+  Nr. 7, Nutzer-Praezisierung 2026-08-06): Spezial-Kuppeln in die
+  ERSTEN (schnellen) Reihen, Wild-Kuppeln AGGRESSIV nehmen -- die
+  Taktik ist an die -3-je-leeres-Spezialfeld-Wertung gebunden, nicht
+  generisch.
+Die KI-Chip-Duerre gegen den Menschen ist damit eher Folge dessen
+STRUKTUR-Vorsprungs (Kreuze + Spezial-Timing) als aktiven Denials.
+
+**Verwertung (final geschnitten)**: (a) v20-Watchlist gegen Menschen:
+Struktur-Metriken (Kreuz-/Spaltenaufbau, Spezial-Unlock-Timing,
+Wild-Kuppel-Anteil, Chip-Oekonomie unter Druck) statt Tempo;
+(b) Denial-/Aggressions-Neukartierung v20-Aera behaelt ihren Wert, aber
+ohne die Mensch-Belegt-Behauptung; (c) das Strategie-Dossier ist
+Referenzmaterial fuer #31 (Stil-Stufen) und kuenftige Eval-Arbeit.
+Elo-Anmerkung zu #31 GESTRICHEN (Nutzer: pendelt sich selbst ein).
+
+
+## SUCHPFAD-VERIFIKATIONS-INVENTAR (Agent-Audit, Nutzer-Auftrag 2026-08-06)
+
+Alle aktiven Modifikatoren/Konstanten im Netz-Suchpfad gegen
+STATUS/history abgeglichen (Kernbelege stichprobenverifiziert).
+**Pointe: der Nutzer-Verdachtsfall Floor-Shaping ist als FEATURE der
+bestverifizierte Shaping-Term im Code** (gepaarter A/B +14pp, McNemar
+p=0,0075, history:1104-1137; plus v10-Ablation). Offen daran nur:
+der GEWICHTS-Wert 0,3 (0,15/0,6-Sweep nie gefahren) und die
+Re-Validierung in der WDL-Aera (Additiv auf einer Achse, deren
+Spreizung sich ~2x geaendert hat).
+
+**UNVERIFIZIERT + AKTIV (Ertrag, nach Relevanz):**
+1. **`gumbel_top_m_for_budget`** (net_mcts.rs:1724): bei 150 Sims ->
+   m=9 statt 16 -- nie staerke-gemessen; **der laufende v20-Schwarm
+   spielt damit** (Milderung: Policy maskiert, Value-Ziel =
+   Bootstrap+Ausgang, root_q ungenutzt; 16-vs-8-Wash bei 400 Sims
+   deutet auf geringe Sensitivitaet). Nachmessung im Nach-v20-Fenster.
+2. **tau=1-Besuchs-Sampling ohne Annealing** (ganze Partie,
+   self_play.rs:2031): Design-Entscheid, nie A/B vs Annealing.
+3. **Heuristik-Anker-Parameterpaket** (SELF_PLAY_C, Temperaturleiter,
+   visits^(1/tau)*q^2 u.a.): definiert den Elo-Anker@200 --
+   NICHT-ANFASSEN-Regel (jede Aenderung entwertet die Elo-Leiter,
+   Praezedenz #21-Neuverankerung).
+4. Startkuppel-Heuristik (= #39, geparkt), `GUMBEL_C_VISIT=50` (nur
+   indirekt via c_scale gedeckt), Bootstrap-Label-Budgets
+   (Horizont 2/Budget 40, wirken auf Labels, nicht Live-Staerke;
+   dort lebt auch POLICY_MASS_CUTOFF=0.95 weiter, im Livepfad tot).
+
+**TEIL-VERIFIZIERT** (Offline-/Aequivalenz-Belege, keine isolierte
+Staerke-Messung): #20-Tiebreak (Referenz-validiert, Kriterium = #37),
+PL-Moon-Split (via Orakel-Instrument), DETERMINIZE (Korrektheit schlaegt
+Messwert, dokumentiert), DECOUPLE_NET_SIMS, Gumbel-Umstieg selbst
+(nur "nicht schlechter" bei n=100, danach System-Ko-Evolution),
+completed-Q-Ziel, VALUE_SCALE=50 (Nutzer-Fixpunkt), R5-/Tiling-Budgets
+(Aequivalenz- bzw. Haenger-kalibriert).
+
+**VERIFIZIERT/INERT**: Floor-Shaping-Feature, c_scale (2x), TOP_M@400,
+endaware, NUM_DET=1, Tiling-Cache; alle Aus-Schalter mit Beleg
+(VALUE_SHRINK, PLATE/TILING_SHAPING, POINTS_UTILITY, MIRROR,
+STACK_PEEK, CAL_A/B, Aggression w=0); Dirichlet/c_puct = tote Knoepfe
+im Legacy-Pfad. Details: Agent-Report 2026-08-06 (Transkript).
+
+**Nach-v20-Kandidatenliste daraus** (billige Ein-Faktor-Gatings, wenn
+die Arena-Maschine warm ist): Floor-Gewicht 0,15/0,3/0,6 in der
+WDL-Aera; m(150)-Formel-Messung; tau-Annealing-A/B. KEINE Aenderung
+vor dem v20-Gating (laufende Kampagne nicht kontaminieren).
+
+
+## Task #37 (NEU, Nutzer 2026-08-05): Tiling-Auswahlkriterium fuer die naechste Generation
+
+**Frage**: Welches Kriterium waehlt unter den Top-12-Tiling-Abschluessen
+(Task-#20-Kopplung, `tiling_solver.rs::best_first_step_valued`):
+(a) Bestand `punkte * P(Sieg)`, (b) reines P(Sieg)-Ranking,
+(c) P(Sieg) mit Punkte-Tiebreak nur bei nahezu gleichem P?
+
+**Hintergrund** (Diskussion 2026-08-05): Mit dem kalibrierten WDL-Kopf
+fliesst die Punkte-Information beim Produkt ZWEIMAL ein -- einmal korrekt
+dosiert via P(Sieg|Folgezustand), einmal als eigener Faktor mit
+willkuerlichem Wechselkurs (ob die bessere Siegchance sich durchsetzt,
+haengt vom absoluten Punkteniveau ab). Mit dem ALTEN Margen-Kopf war das
+Produkt in sich stimmig und wirkte wegen der Stauchung de facto als
+reiner Punkte-Stichentscheid -- der kalibrierte Kopf spreizt ~2x weiter
+und kann Punktunterschiede real ueberstimmen (stille
+Verhaltensverschiebung ohne Codeaenderung).
+
+**GEGENARGUMENT, vorab notiert**: der Punkte-Faktor wirkt derzeit als
+robuster PRIOR, der Value-Rauschen baendigt (Kopf nach 2-3 Epochen noch
+verrauscht) -- moeglicherweise ist das Produkt genau deshalb praktisch
+robust. Entscheid daher NUR per Arena, nicht am Schreibtisch.
+
+**Zuschnitt**: v20-Aera (reifer WDL-Kopf im Champion), Arena-A/B der
+Varianten (a) vs (b), ggf. (c) als dritter Arm; Laufzeit-Schalter analog
+Task-#30-Muster, damit kein Rebuild je Arm noetig ist. Bis dahin bleibt
+(a) Bestandsverhalten.
+
+
+### Alt-Fassung der Regel-Bullets (ersetzt durch Kompaktfassung)
+
+## OFFENE ENTSCHEIDUNGEN & GELTENDE REGELN
+
+- **Champion**: `v20_2d_opp_brierbest` seit 2026-08-07 (Gating 208:162
+  vs `v19_2d_best`, p=0,0178; Nutzer-Vorab-Entscheid "naechste
+  Generation wechselt auf v20_2d_opp"). Erster Champion der WDL-Aera,
+  opp-Kopf damit in der Linie. Self-Play-Generator kuenftiger
+  Kampagnen = dieser Champion (Namenskonvention: Dateien nach dem
+  GENERATOR benennen, also `selfplay_v20wdl_*`).
+- **v20-Kampagnen-Design**: Option C (Zwei-Klassen, Nutzer-Idee) wurde
+  umgesetzt und hat den Zyklus gewonnen -- Design-Details in
+  `PREREG_v20_kampagne.md`, Diskussions-Historie in history
+  ("AUSGELAGERT aus STATUS 2026-08-07"). Merkregel bleibt: Backup-/
+  Alt-Regel-Korpora NIE wieder; Dateien nach dem GENERATOR benennen.
+- **λ (Value-Target-Mix)**: bis nach #34 ZURUECKGESTELLT -- #34 aendert
+  `z` auf eine Gewinnwahrscheinlichkeit, damit mischt λ zwei Groessen
+  derselben Art. Befundlage: gewinnt bei 65,7% root_q-Mix, verliert bei
+  43,8% (zweimal, quer ueber Regime) -> **Korpus-Mischanteil entscheidet**.
+  v20-Fenster entweder root_q-rein bauen oder λ neu messen.
+  **Engine-Audit F1: das λ07_opp-Gating (33:47) lief mit w=0,1 und
+  opp-Modell auf Kandidatenseite -- der Kandidat spielte mit
+  ownership-Logit im Blend, das Ergebnis ist KONTAMINIERT und zaehlt
+  nicht als λ-Beleg (weder dafuer noch dagegen).**
+- **Aggressions-Blend: UEBERALL AUF 0 / INAKTIV (Nutzer 2026-08-05,
+  nach Engine-Audit F1)**: "wir wissen ja nicht was er tut" -- alle
+  Blend-Messungen waren ungueltig (ownership-Logit statt Gegner-Prognose
+  gelesen). Konkret: Engine-Env-Defaults bleiben 0; die fruehere
+  Arena-Konvention w=0,1/λ_aggr=2,0 ist AUFGEHOBEN (Gatings laufen ohne
+  Blend); kein Serverstart-Default; **GUI-Slider ENTFERNT** (2026-08-05,
+  im Browser verifiziert). Der Engine-Knopf (set_aggression_params,
+  POST /api/aggression, Env-Vars) bleibt als inertes Werkzeug fuer die
+  Neukartierung im v20-Zyklus -- nichts ruft ihn mehr auf. "Gate what
+  you ship" gilt weiter und heisst jetzt: ausgeliefert wird OHNE Blend,
+  also wird auch ohne Blend gegatet.
+- **Tiling-Cache**: Default AN seit 2026-08-05 (-20,1% Self-Play-Wandzeit,
+  bitgleich); `MOSAIC_TILING_CACHE=0` schaltet ab.
+- **Statistik-Regeln**: (1) Score-basierte Arena-Auswertungen IMMER auf
+  Block-Ebene (Paar-SEs unterschaetzen massiv); Win-SPRT milder betroffen,
+  Block-Zahlen trotzdem mitberichten. (2) Netz-vs-Heuristik: Effekte <8pp
+  liegen im Seed-Satz-Rauschen. (3) **SPRT-Fruehstopps unter ~150 Paaren
+  zaehlen NICHT ohne Frisch-Seed-Replikation** (t12-Falsch-Positiv
+  2026-08-06: H1 bei n=80, Replikation ueber 400 Partien = Paritaet).
+- **Elo-Betrugsschutz (GUI, 2026-08-06)**: gewertete Spiele NUR gegen
+  KI-Konfigurationen mit direkter Arena-Kante (`is_estimate=False`) --
+  Sims-Tier-Schaetzwerte werten nicht mehr (Farming-Luecke geschlossen).
+  Abbruch-Verhalten (verlorene Partie neu starten vermeidet
+  Elo-Verlust): NUTZER-ENTSCHEID 2026-08-06 -- bleibt so, kein Fix.
+  Zukunftsoffen: sobald #31-Kalibrierung Preset-Konfigurationen (z.B.
+  champion@60) per Arena verankert, werden sie automatisch ehrlich
+  wertbar.
+- **Kein validierter Offline-Praediktor fuer die Value-Seite** (#29
+  gescheitert, value_r2 viermal widerlegt) -> jede Value-Aenderung
+  braucht ein Arena-Gating. **Nach #34 neu zu pruefen** (siehe unten).
+
