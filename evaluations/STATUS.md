@@ -19,7 +19,7 @@ Suchpfad-Messungen 1+2, Zonen-Probe -- als "KAPITEL 2026-08-07").
 | #37 | Tiling-Auswahlkriterium (`punkte*P` vs reines P) | vorgemerkt v20-Aera, Arena-entschieden | unten |
 | — | R4b/Endspiel-Zone | **URSACHE GEFUNDEN 2026-08-07**: Trunk traegt die Info (Probe R²=0,91), Koepfe/Ziele nutzen sie nicht -> Ziel-Problem; Leitbefund fuer die Platten-Intervention | history |
 | — | #29-Instrument | Orakel-Referenzen neu nach frozen-Set-Neubau (v20-Aera); Validierung braucht arena-differenzierte Paare | PREREG_nach34_paket |
-| — | Aggressions-Neukartierung | **PREREG steht, laeuft nach dem E15/E5-Gating** (CPU-Bahn); Nutzer spielt erst danach; Blend bis zum Verdikt UEBERALL 0 | `PREREG_aggressions_neukartierung.md` |
+| — | Aggressions-Neukartierung | **ERLEDIGT 2026-08-07: alle 3 Arme H0** (Kontrolle 149/200 vs 154/161/155; p=0,59/0,17/0,54) -> **w bleibt UEBERALL 0**, Punkt zu bis zur naechsten Kopf-Generation; (0,1;2,0)-Richtung (+6pp, p=0,17) deskriptiv notiert -- erster Kandidat, falls ein kuenftiger opp-Kopf schaerfer wird. Nutzer-Partien FREIGEGEBEN (Preset w=0 = verankerte Konfig) | `paired_arena_env_aggr_neukartierung.json` |
 | — | λ (Value-Target-Mix) | vertagt: am echten v20-Mischanteil neu bewerten | history |
 | — | U1+U2 Defensiv-Fixes | **ERLEDIGT 2026-08-07** (Commit 2cd364e, Tests) | history |
 | #31 | Schwierigkeitsstufen | geparkt (Arbeitskreis "Spaeter") | unten |
@@ -37,15 +37,17 @@ Probe R²=0,91 -> Platten-Intervention via Aux-Kopf gerechtfertigt;
 Checkpoint-Umkehrung E15/E5 zwischen neuem Val und Alt-Messset.
 
 **LAUFEND (Parallel-Betrieb, Nutzer-Go "dann los")**:
-1. CPU-Bahn: E15-vs-E5-Checkpoint-Gating (no-promote) -> danach
-   **Aggressions-Neukartierung** (PREREG_aggressions_neukartierung.md,
-   4 Arme (w,λ), ~40 min). **Nutzer startet bewertete Partien erst
-   nach deren Abschluss** -- Preset gemaess Prereg-Regeln 1-3.
-2. GPU-Bahn frei fuer: #35b Ranking-Loss (Seed-Varianz-Regel!),
-   spaeter Platten-Interventions-Training.
-3. Koordinator-Bahn: PREREG_platten_intervention.md (ENTWURF, wartet
-   auf Nutzer-Go, Kostenklasse Training) angelegt; als naechstes
-   τ-Annealing-Erweiterung in self_play.py vorbereiten.
+1. CPU-Bahn: ~~E15/E5-Gating~~ (H0, brierbest re-validiert),
+   ~~Neukartierung~~ (H0 ueberall, s. Task-Index) -> CPU gehoert jetzt
+   den NUTZER-PARTIEN; danach/nachts: τ-Annealing-Generierung
+   (2.000 @600, Tag v19wdlann, nach Wheel-Fenster).
+2. GPU-Bahn: pi_ctrl_s3 (Kontroll-Seed, laeuft) -> danach
+   **Endgame-Arm** `pi_endgame_s2` (--endgame-head, Seed 2 = gepaart
+   zum Champion-Lauf; Schema-18-Cache baut sich beim Start; NICHT
+   parallel zu pi_ctrl starten -- RAM-Budget 32 GB!).
+3. Koordinator-Bahn: PREREG_platten_intervention.md EINGEFROREN
+   (Nutzer-Go), Schema 18 committet (a871123); τ-Annealing-Erweiterung
+   beim Agent (MOSAIC_TAU_ARGMAX_FROM_MOVE), Go liegt vor.
 
 **OFFEN (Reihenfolge = Nutzer-Prioritaet)**:
 - τ-Annealing-Korpus-A/B (Messung 3, eigenes Nutzer-Go, ~0,5 Tage).
