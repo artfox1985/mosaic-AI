@@ -142,7 +142,7 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
                       add_root_noise, deterministic, record_rtv, pcr_full_prob,
-                      pcr_cheap_sims, queue, progress_path, heartbeat_path):
+                      pcr_cheap_sims, tau_argmax_from_move, queue, progress_path, heartbeat_path):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -150,7 +150,18 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     siehe self_play.rs::run_net_self_play & Geschwister. `record_rtv`
     (Task #85): steuert das teure round_transition_value-Sampling, siehe
     --rtv-Flag-Hilfetext. Bei mode == "mcts" ohne Modell irrelevant (rtv
-    wurde dort noch nie berechnet)."""
+    wurde dort noch nie berechnet).
+    `tau_argmax_from_move` (PREREG_suchpfad_nachmessungen.md, Messung 3):
+    KEIN pyo3-Parameter -- Rust liest `MOSAIC_TAU_ARGMAX_FROM_MOVE` selbst
+    per OnceLock-Env-Var (net_mcts::tau_argmax_from_move), gleiches Muster
+    wie MOSAIC_GUMBEL_TOP_M/MOSAIC_FLOOR_SHAPING_W. Deshalb hier VOR dem
+    `import mosaic_rust`, in DIESEM Subprozess gesetzt (jeder Chunk läuft in
+    einem frischen `mp.Process`, der Prozess-weite OnceLock-Cache der
+    Rust-Seite wird also pro Chunk neu initialisiert -- kein Stale-Value-
+    Risiko über Chunks hinweg). `0` (Default) setzt den Wert explizit auf
+    "0" -- Rust behandelt das identisch zu "ungesetzt" (AUS), siehe
+    `tau_argmax_from_move`s `n>=1.0`-Prüfung."""
+    os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
     try:
         import mosaic_rust as mr
         if mode == "network":
@@ -221,7 +232,8 @@ def _cleanup_progress_files(progress_path, heartbeat_path) -> None:
 def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
                           add_root_noise, deterministic, record_rtv, timeout_secs,
                           progress_path, heartbeat_path,
-                          pcr_full_prob=None, pcr_cheap_sims=150) -> str | None:
+                          pcr_full_prob=None, pcr_cheap_sims=150,
+                          tau_argmax_from_move=0) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -235,7 +247,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
         target=_worker_run_chunk,
         args=(mode, model, n, simulations, c_puct, seed, threads, prefix,
               add_root_noise, deterministic, record_rtv, pcr_full_prob,
-              pcr_cheap_sims, queue,
+              pcr_cheap_sims, tau_argmax_from_move, queue,
               str(progress_path), str(heartbeat_path)),
     )
     proc.start()
@@ -398,7 +410,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   per_file: int = 10, model: str = None, c_puct: float = 1.5,
                   add_root_noise: bool = True, deterministic: bool = False,
                   record_rtv: bool = False,
-                  pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150):
+                  pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150,
+                  tau_argmax_from_move: int = 0):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -409,6 +422,15 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # (self_play.rs::pcr_decide_full), kein Epsilon-Hack noetig.
     if pcr_full_prob is not None and not (0.0 <= pcr_full_prob <= 1.0):
         raise SystemExit(f"❌ --pcr-full-prob muss in [0,1] liegen (0 = value-only), ist {pcr_full_prob}.")
+    # τ-Annealing (PREREG_suchpfad_nachmessungen.md, Messung 3): wirkt nur im
+    # netzgeführten Self-Play-Pfad (net_drafting_policy, siehe self_play.rs).
+    # --mode mcts liest MOSAIC_TAU_ARGMAX_FROM_MOVE gar nicht -- kein Fehler,
+    # nur ein wirkungsloses Flag, deshalb Warnung statt SystemExit.
+    if tau_argmax_from_move < 0:
+        raise SystemExit(f"❌ --tau-argmax-from-move darf nicht negativ sein, ist {tau_argmax_from_move}.")
+    if tau_argmax_from_move and mode != "network":
+        print(f"  ⚠️  --tau-argmax-from-move={tau_argmax_from_move} wirkt nur bei --mode network "
+              f"(net_drafting_policy) -- bei --mode {mode!r} ist es ein No-Op.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -450,7 +472,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "tag": tag, "threads": threads, "chunk": chunk, "seed": base_seed,
         "per_file": per_file, "model": model, "c_puct": c_puct,
         "add_root_noise": add_root_noise, "deterministic": deterministic,
-        "record_rtv": record_rtv,
+        "record_rtv": record_rtv, "tau_argmax_from_move": tau_argmax_from_move,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -463,11 +485,22 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # Netz beteiligt ist (--mode network oder --mode mcts --model) -- ohne
     # Modell wurde rtv nie berechnet, das Flag ist dort ein No-Op.
     rtv_status = "an (--rtv)" if record_rtv else "AUS (Standard, Task #85)"
+    # τ-Annealing (PREREG Messung 3): nur informativ, solange --deterministic
+    # nicht gesetzt ist -- dieses Flag argmaxt ohnehin die GANZE Partie, der
+    # Zug-Schwellenwert waere dann wirkungslos (net_drafting_policy prüft
+    # `deterministic` zuerst).
+    if deterministic:
+        tau_status = "irrelevant (--deterministic argmaxt bereits die ganze Partie)"
+    elif tau_argmax_from_move:
+        tau_status = f"ab Zug {tau_argmax_from_move} ARGMAX (Messung 3)"
+    else:
+        tau_status = "AUS (Standard, τ=1/Sampling durchgehend)"
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
+              f"τ-Annealing {tau_status} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -501,6 +534,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, record_rtv, timeout_secs,
             progress_path, heartbeat_path,
             pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
+            tau_argmax_from_move=tau_argmax_from_move,
         )
         return raw, progress_path, heartbeat_path
 
@@ -664,6 +698,16 @@ if __name__ == "__main__":
                              "um rauschfreie Trajektorien wie in der Arena aufzuzeichnen -- siehe "
                              "evaluations/stage2_investigation.md. NICHT fuer reguläre Trainingsdaten-"
                              "Generierung gedacht (weniger Zustandsvielfalt).")
+    parser.add_argument("--tau-argmax-from-move", dest="tau_argmax_from_move", type=int, default=0,
+                        help="PREREG_suchpfad_nachmessungen.md, Messung 3 (τ-Annealing): ab dem N-ten "
+                             "Halbzug EINER Partie (1-basiert, beide Spieler zusammen gezählt) wird "
+                             "statt visit-proportional zu sampeln der argmax der Besuchsverteilung "
+                             "gespielt -- frühe Züge bleiben τ=1 (Sampling, Bestandsverhalten). "
+                             "Vorab-Festlegung im PREREG: 30 (grob Runde 1+). Default 0 = AUS "
+                             "(Bestandsverhalten, durchgehend Sampling). Setzt NUR "
+                             "MOSAIC_TAU_ARGMAX_FROM_MOVE für den Rust-Aufruf, siehe net_mcts.rs. "
+                             "Nur bei --mode network wirksam; Runde 5 bleibt davon unberührt "
+                             "(Alpha-Beta-exakt, round5.rs).")
     args = parser.parse_args()
 
     # --value-only (v20-Zwei-Klassen-Schwarm): expliziter Modus statt
@@ -696,4 +740,5 @@ if __name__ == "__main__":
         record_rtv=args.rtv,
         pcr_full_prob=_resolved_pcr_full_prob,
         pcr_cheap_sims=_resolved_pcr_cheap_sims,
+        tau_argmax_from_move=args.tau_argmax_from_move,
     )

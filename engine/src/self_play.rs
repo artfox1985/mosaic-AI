@@ -386,6 +386,26 @@ fn weighted_index<R: Rng + ?Sized>(weights: &[f64], total: f64, rng: &mut R) -> 
     weights.len().saturating_sub(1)
 }
 
+/// Deterministisches Gegenstueck zu [`weighted_index`] (τ-Annealing,
+/// `evaluations/PREREG_suchpfad_nachmessungen.md` Messung 3): liefert den
+/// Index des GROESSTEN Eintrags in `weights` -- bei Gleichstand den ERSTEN
+/// (stabil, reproduzierbar, kein RNG-Verbrauch). Reine Funktion ohne Netz-/
+/// Env-/RNG-Zugriff, direkt ohne Suchbaum testbar. Leeres `weights` gibt `0`
+/// zurueck (der einzige Aufrufer `net_drafting_policy` garantiert an dieser
+/// Stelle bereits nicht-leere `stats`/`weights` -- der leere Fall ist dort
+/// VOR der idx-Berechnung per Fruehausstieg abgefangen).
+fn argmax_index(weights: &[f64]) -> usize {
+    let mut best_i = 0usize;
+    let mut best_v = f64::NEG_INFINITY;
+    for (i, &w) in weights.iter().enumerate() {
+        if w > best_v {
+            best_v = w;
+            best_i = i;
+        }
+    }
+    best_i
+}
+
 // ── Stapel-Zieh-Aufloesung (Aktion A: weiterziehen oder aufhoeren?) ─────────
 //
 // Regelwerk (Nutzer-Fund): beim Ziehen zeigt die RUECKSEITE nur den TYP der
@@ -1941,6 +1961,13 @@ pub fn run_net_vs_net_arena_hybrid(
 /// Rückgabeelement (`policy`) -- siehe
 /// `net_mcts::net_root_child_stats_and_policy`-Doku für Perspektive/Skala.
 /// Leerer Vektor im Fallback-Zweig unten (kein Kandidatensatz).
+/// `move_number`: fortlaufender 1-basierter Halbzug-Zaehler DIESER Partie
+/// (beide Spieler zusammen gezaehlt, siehe `play_net_self_play_game`s
+/// `move_number`-Deklaration) -- einziger Zweck ist die τ-Annealing-
+/// Schwellenpruefung (`net_mcts::tau_argmax_from_move`) unten. Beim ZWEITEN
+/// Aufrufer (`mean_rollout_diff`, `deterministic=true`) wird `0` als
+/// bedeutungsloser Platzhalter uebergeben -- der `deterministic`-Zweig hat
+/// dort ohnehin Vorrang, der τ-Zweig ist unerreichbar.
 fn net_drafting_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -1950,6 +1977,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     rng: &mut R,
     add_root_noise: bool,
     deterministic: bool,
+    move_number: u64,
 ) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
     let (stats, completed_q_policy, root_q, root_child_q) =
@@ -2015,6 +2043,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
         .map(|(a, p)| json!({ "action": action_to_env_dict(state, a), "prob": p }))
         .collect();
     let child_q: Vec<f64> = root_child_q.iter().map(|(_, q)| *q).collect();
+    let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
     let idx = if deterministic {
         // Fund 2 (B2, Vollaudit 2026-07-21): Tie-Break visits, dann Q --
         // gleiches Muster wie net_mcts::best_root_child. Nacktes
@@ -2028,8 +2057,24 @@ fn net_drafting_policy<R: Rng + ?Sized>(
             })
             .map(|(i, _)| i)
             .unwrap_or(0)
+    } else if crate::net_mcts::tau_argmax_from_move().is_some_and(|n| move_number as usize >= n) {
+        // τ-Annealing (PREREG_suchpfad_nachmessungen.md, Messung 3):
+        // `MOSAIC_TAU_ARGMAX_FROM_MOVE=N` gesetzt UND dieser Halbzug (>=N) --
+        // ab hier wird der argmax der Besuchsverteilung gespielt statt
+        // gesampelt. NUR die Zugwahl aendert sich: `policy`/`root_q`/
+        // `child_q` oben sind bereits fertig berechnet (completed-Q-Softmax-
+        // Zielverteilung fuer das Training) und bleiben UNVERAENDERT -- exakt
+        // wie im `deterministic`-Zweig oben, der dieselben Werte unangetastet
+        // laesst. RNG-Verbrauch: der `weighted_index`-Zug (ein
+        // `rng.random_range`-Aufruf) entfaellt in diesem Zweig -- das
+        // verschiebt den RNG-Strom nachfolgender Ziehungen (z.B.
+        // `moon_order_target`) gegenueber dem Default-Lauf, ist aber
+        // unschaedlich: dieser Zweig ist nur erreichbar, wenn die Env-Var
+        // explizit gesetzt ist (Nicht-Default). Bei AUS (Default, `None`)
+        // bleibt dieser `else if` immer falsch -- Parität gilt nur fuer
+        // Default AUS, siehe `net_mcts::tau_argmax_from_move`-Doku.
+        argmax_index(&weights)
     } else {
-        let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
         weighted_index(&weights, total, rng)
     };
     (stats[idx].0.clone(), policy, root_q, child_q)
@@ -2241,6 +2286,16 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // zusätzlich zum vollen `round_transition_value`, siehe
     // `bootstrap_value_after_rounds`-Doku (round_transition_deep.rs).
     let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
+    // τ-Annealing (`net_mcts::tau_argmax_from_move`, PREREG Messung 3):
+    // fortlaufender 1-BASIERTER Halbzug-Zaehler DIESER Partie -- beide
+    // Spieler zusammen gezaehlt (der erste ECHTE Drafting-Entscheid, egal ob
+    // Ein- oder Mehr-Aktionen-Fall, egal welcher Spieler, ist Zug 1), gleiche
+    // "Zug"-Konvention wie `evaluations/actions_per_round.md` ("Zug 1 -> 195
+    // Aktionen"). Zaehlt NUR echte Drafting-Entscheide -- StartPlacement-
+    // Schritte (Startfliesen legen) und Tiling-Schritte erhoehen ihn NICHT,
+    // da nur `net_drafting_policy`s Sampling/argmax-Wahl von diesem Zaehler
+    // abhaengt und dort nie durchlaeuft.
+    let mut move_number: u64 = 0;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
     // `+ EXTRA_GAME_TIMEOUT_SECS`: BUGFIX, live gefunden. `net_game_timeout_secs`
@@ -2270,6 +2325,11 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         None => break,
                     }
                 } else if game.state.phase == Phase::Drafting {
+                    // τ-Annealing-Zaehler (siehe Deklaration oben): ZUERST
+                    // erhoehen, dann verwenden -> der erste Entscheid dieser
+                    // Partie ist Zug 1 (1-basiert), passend zu
+                    // `evaluations/actions_per_round.md`s "Zug 1"-Konvention.
+                    move_number += 1;
                     let player = game.state.current_player;
                     let actions = drafting_actions(&game.state);
                     let valid_actions: Vec<Value> =
@@ -2312,7 +2372,10 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         // PCR jede Voll-Suche ausfuehrt).
                         crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
                             crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
-                                net_drafting_policy(net, &game.state, &actions, effective_sims, c_puct, rng, add_root_noise, deterministic)
+                                net_drafting_policy(
+                                    net, &game.state, &actions, effective_sims, c_puct, rng, add_root_noise,
+                                    deterministic, move_number,
+                                )
                             })
                         })
                     };
@@ -2906,8 +2969,12 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                         } else if let Some((depth, node_budget)) = alphabeta {
                             alphabeta_choose_action(net, &g.state, &actions, depth, node_budget)
                         } else {
+                            // `move_number=0`-Platzhalter: `deterministic=true`
+                            // hat in `net_drafting_policy` Vorrang vor dem
+                            // τ-Annealing-Zweig, der Wert wird hier nie gelesen
+                            // (siehe `net_drafting_policy`s `move_number`-Doku).
                             let (a, _, _, _) = net_drafting_policy(
-                                net, &g.state, &actions, base_sims, c_puct, rng, false, true,
+                                net, &g.state, &actions, base_sims, c_puct, rng, false, true, 0,
                             );
                             a
                         };
@@ -4709,5 +4776,53 @@ pub(crate) mod tests {
             saw_shortcut_or_tiling,
             "Testlauf sollte mindestens einen Kurzschluss-/Tiling-Record enthalten"
         );
+    }
+
+    // ── τ-Annealing (PREREG_suchpfad_nachmessungen.md, Messung 3) ───────────
+
+    /// Isolierter Test von [`argmax_index`] selbst (KEIN Suchbaum/Self-Play-
+    /// Spiel noetig -- reine Funktion): gegebene Verteilung -> deterministisch
+    /// der Index des groessten Eintrags.
+    #[test]
+    fn argmax_index_picks_largest_entry() {
+        // Eindeutiges Maximum in der Mitte.
+        assert_eq!(argmax_index(&[0.1, 0.7, 0.2]), 1);
+        // Maximum am Anfang bzw. am Ende.
+        assert_eq!(argmax_index(&[5.0, 1.0, 2.0]), 0);
+        assert_eq!(argmax_index(&[1.0, 2.0, 9.0]), 2);
+        // Gleichstand -> deterministisch der ERSTE Eintrag (nicht der letzte).
+        assert_eq!(argmax_index(&[3.0, 3.0, 1.0]), 0);
+        assert_eq!(argmax_index(&[0.0, 4.0, 4.0, 4.0]), 1);
+        // Einzelner Eintrag.
+        assert_eq!(argmax_index(&[42.0]), 0);
+        // Realistische Besuchszahlen (visits als f64, wie in
+        // `net_drafting_policy`s `weights`).
+        assert_eq!(argmax_index(&[12.0, 340.0, 48.0, 0.0]), 1);
+    }
+
+    /// Default-Paritaet (MOSAIC_TAU_ARGMAX_FROM_MOVE ungesetzt): der
+    /// τ-Annealing-`else if`-Zweig in `net_drafting_policy` darf NIEMALS
+    /// erreicht werden, unabhaengig von `move_number` -- die Env-Var wird in
+    /// der Testumgebung nicht gesetzt, `tau_argmax_from_move()` liefert daher
+    /// `None` (siehe auch die analoge Parity-Assertion in
+    /// `net_mcts::tests::env_knoepfe_defaults_sind_bestandsverhalten`).
+    /// Direkt gegen die Env-Var-Funktion getestet statt gegen ein komplettes
+    /// Self-Play-Spiel, weil Letzteres (round_transition_deep-Wallclock-
+    /// Deadlines) grundsaetzlich nicht lauflaengendeterministisch ist, siehe
+    /// `net_drafting_policy`-Kommentare weiter oben.
+    #[test]
+    fn tau_argmax_from_move_defaults_to_off_regardless_of_move_number() {
+        assert_eq!(crate::net_mcts::tau_argmax_from_move(), None);
+        // Exakt dieselbe Guard-Bedingung wie in `net_drafting_policy`s
+        // `else if`-Zweig -- muss fuer JEDEN `move_number`-Wert `false`
+        // bleiben, solange die Env-Var ungesetzt ist.
+        for move_number in [0u64, 1, 29, 30, 31, 1000] {
+            let triggers_argmax =
+                crate::net_mcts::tau_argmax_from_move().is_some_and(|n| move_number as usize >= n);
+            assert!(
+                !triggers_argmax,
+                "bei ungesetzter Env-Var muss der τ-Zweig fuer move_number={move_number} unerreichbar bleiben"
+            );
+        }
     }
 }
