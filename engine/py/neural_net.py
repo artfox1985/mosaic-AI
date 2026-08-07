@@ -3,6 +3,7 @@ import glob
 import json
 import math
 import pickle
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -794,6 +795,67 @@ def _final_ownership_by_game(game_data) -> dict:
     return out
 
 
+# ── Bitpacking planes/masks (RAM-Optimierung v21, 2026-08-07) ──────────────
+# PREREG_v21_fenster.md, Abschnitt "RAM-Voraussetzung": das ~4,8-Mio-Zustaende-
+# Fenster passt im heutigen Cache-Format (planes uint8 [76,6,6]=2.736 B,
+# masks uint8 [406]=406 B) nicht mehr komfortabel in 32 GB RAM. Beide Felder
+# sind STRIKT binaer (nur 0/1, siehe state_to_planes/mask-Bau oben) --
+# np.packbits/np.unpackbits packt 8 Bits verlustfrei in 1 Byte.
+#
+# LAYOUT (exakt): pro Sample wird das Feld zuerst C-kontiguos auf 1D
+# geflacht (planes [76,6,6] -> [2736], masks ist bereits 1D [406]),
+# anschliessend `np.packbits(..., axis=-1)` -- NumPy-Standard-Bitreihenfolge
+# 'big': Bit-Index 0 des flachen Arrays landet im HOECHSTWERTIGEN Bit (0x80)
+# des ERSTEN Ausgabe-Bytes. planes: 2736 Bit / 8 = exakt 342 Byte (kein
+# Padding). masks: 406 Bit / 8 = 50,75 -> 51 Byte (letztes Byte hat 2
+# Padding-Nullbits). Entpacken mit `np.unpackbits(..., count=K)` schneidet
+# das Padding exakt wieder ab -- `count` ist deshalb Pflichtparameter, kein
+# optionales Detail.
+def _pack_bits(arr: np.ndarray) -> np.ndarray:
+    """Bitpackt ein striktes 0/1-uint8-Array entlang der letzten Achse.
+    [..., K] -> [..., ceil(K/8)]. Siehe Kopf-Kommentar fuer das exakte
+    Layout (Bitreihenfolge 'big', Padding-Konvention)."""
+    return np.packbits(arr, axis=-1)
+
+
+# ENTPACK-STRATEGIE (Micro-Benchmark 2026-08-07, synthetisch, Batch=256,
+# 200 Batches, 1 Thread -- echte Trainings-/Self-Play-Prozesse liefen
+# parallel, Messung daher CPU-gedrosselt und konservativ):
+#   baseline (heute, kein Packing, direkter uint8-Read):        ~0,72-0,86 s
+#   (a) Entpacken PRO SAMPLE in __getitem__ (np.unpackbits/Sample):
+#                                                                 ~1,48-1,82 s  (+70-110%)
+#   (b1) Entpacken PRO BATCH, torch-Bit-Shift (nach Stack):      ~1,18-1,33 s  (+40-60%)
+#   (b2) Entpacken PRO BATCH, EIN np.unpackbits-Aufruf auf den
+#        gesamten Batch (NOCH VOR dem Device-Move):              ~0,48-0,52 s  (SCHNELLER als baseline!)
+# Variante (a) verliert klar (256 einzelne Python/NumPy-Aufrufe je Batch).
+# Variante (b2) gewinnt sogar gegen die heutige Baseline: das Stapeln vieler
+# KLEINER gepackter Tensoren im DataLoader-`default_collate` (342/51 B je
+# Sample) ist guenstiger als das Stapeln vieler GROSSER entpackter Tensoren
+# (2.736/406 B je Sample), und EIN vektorisierter `np.unpackbits`-Aufruf ueber
+# den ganzen Batch schlaegt den Mehraufwand des Entpackens. GEWAEHLTE
+# VARIANTE: (b2) -- Entpacken einmal pro Batch in train.py, NOCH VOR dem
+# `.to(device)`-Move (siehe `unpack_planes_batch`/`unpack_masks_batch` unten,
+# Aufrufstellen in train.py). Ergebnis: 0% messbarer Overhead (eher ein
+# kleiner Gewinn) statt der geforderten "hoechstens ~1-2%".
+def unpack_planes_batch(packed: torch.Tensor) -> torch.Tensor:
+    """Entpackt einen KOMPLETTEN Batch bitgepackter planes IN EINEM
+    vektorisierten `np.unpackbits`-Aufruf (gewaehlte Variante b2, siehe
+    Benchmark-Kommentar oben) -- NICHT pro Sample. `packed`: [B,342] uint8
+    (CPU, NOCH VOR dem `.to(device)`-Move, siehe train.py) -> [B,76,6,6]
+    uint8 (0/1), identisch zum unentpackten Bestandsformat vor der
+    Bitpacking-Aenderung."""
+    n = packed.shape[0]
+    flat = np.unpackbits(packed.numpy(), axis=-1, count=NUM_PLANES_CHANNELS * 36)
+    return torch.from_numpy(flat.reshape(n, NUM_PLANES_CHANNELS, 6, 6))
+
+
+def unpack_masks_batch(packed: torch.Tensor) -> torch.Tensor:
+    """Analog zu `unpack_planes_batch` fuer masks: [B,51] uint8 (CPU) ->
+    [B,NUM_ACTIONS] uint8 (0/1)."""
+    flat = np.unpackbits(packed.numpy(), axis=-1, count=NUM_ACTIONS)
+    return torch.from_numpy(flat)
+
+
 def _resolve_planes_h5_path(cache_path_h5: str) -> str:
     """DIAGNOSE-Override (2026-07-31, Task #11 Phase 2, fs_2d_s1-Absturz-
     Untersuchung): wenn `MOSAIC_PLANES_H5_DIR` gesetzt ist, wird der lazy
@@ -829,17 +891,35 @@ class MosaicDataset(Dataset):
         Target-Bau ignoriert wird. Standard "default" reproduziert exakt das
         Bestandsverhalten.
 
-        `encoder`: Task #11 Phase 2. "flat" (Standard) = Bestandsverhalten
-        BYTE-IDENTISCH (Cache-Key/-Inhalt/`__getitem__`-Tupel unveraendert).
-        "2d" ergaenzt ein zusaetzliches `planes`-HDF5-Dataset ([N,76,6,6],
-        `neural_net.py::state_to_planes`) NEBEN den bestehenden Datasets --
-        der Cache-Key bekommt dafuer den Suffix "+enc2d_v1" (siehe
-        docs/design_2d_encoder.md Abschnitt 7), ein Flach-Cache derselben
-        Dateiliste bleibt davon unberuehrt (eigener Dateiname). Speicherformat
-        uint8 (0/1) statt float32: JEDER der 76 Kanaele ist binaer (One-Hot-
-        Belegung + 0/1-Geometriemasken, siehe design_2d_encoder.md Abschnitt
-        3/4) -- 4x kleiner als float32 bei exakt derselben Information,
-        `__getitem__` wandelt pro Sample nach float32 zurueck."""
+        `encoder`: Task #11 Phase 2. "flat" (Standard) ist bzgl. `states`/
+        `policies`/etc. Bestandsverhalten -- ABER `masks` ist seit der
+        Bitpacking-Aenderung (RAM-Optimierung v21, s.u.) NICHT mehr
+        byte-identisch zum Vor-v21-Verhalten (Cache-Key/-Inhalt/
+        `__getitem__`-Tupel-INHALT aendert sich; die Tupel-FORM/-POSITION
+        bleibt gleich). "2d" ergaenzt ein zusaetzliches `planes`-HDF5-Dataset
+        ([N,76,6,6], `neural_net.py::state_to_planes`) NEBEN den bestehenden
+        Datasets -- der Cache-Key bekommt dafuer den Suffix "+enc2d_v1"
+        (siehe docs/design_2d_encoder.md Abschnitt 7), ein Flach-Cache
+        derselben Dateiliste bleibt davon unberuehrt (eigener Dateiname).
+        Speicherformat uint8 (0/1) statt float32: JEDER der 76 Kanaele ist
+        binaer (One-Hot-Belegung + 0/1-Geometriemasken, siehe
+        design_2d_encoder.md Abschnitt 3/4).
+
+        BITPACKING (RAM-Optimierung v21, 2026-08-07, PREREG_v21_fenster.md
+        "RAM-Voraussetzung"): sowohl `masks` (406 Bit/Sample) als auch
+        `planes` (2.736 Bit/Sample, NUR "2d") sind STANDARDMAESSIG bitgepackt
+        im Cache (siehe `_pack_bits`-Kommentar oben fuer das exakte Layout;
+        406 B -> 51 B bzw. 2.736 B -> 342 B). `__getitem__` liefert dann die
+        GEPACKTEN Bytes (kuerzere letzte Dimension) statt der entpackten
+        Werte -- das Entpacken passiert bewusst NICHT hier pro Sample,
+        sondern EINMAL pro Batch in train.py (`unpack_masks_batch`/
+        `unpack_planes_batch`, Benchmark-Begruendung dort), NOCH VOR dem
+        Device-Move. `self.bitpacked` (bool, nach dem Laden/Bauen gesetzt)
+        zeigt Aufrufern, ob dieser Schritt noetig ist. Escape-Hatch
+        `MOSAIC_CACHE_NOPACK=1` erzwingt das alte unkomprimierte Format
+        (eigener Cache-Key-Suffix, siehe dort) -- dann liefert `__getitem__`
+        weiterhin die vollen [406]/[76,6,6]-Werte wie vor v21 und
+        `self.bitpacked` ist False."""
         from config import INPUT_SIZE
         import hashlib, time
         import h5py
@@ -863,7 +943,8 @@ class MosaicDataset(Dataset):
         self._planes_h5_path = None
         self._planes_h5_file = None
         self._planes_eager_tensor = None
-        import numpy as np
+        self._planes_dataset_name = None  # 'planes' oder 'planes_packed' (RAM-Optimierung v21)
+        self.bitpacked = False  # True, sobald masks/planes gepackt geladen/gebaut werden (unten)
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
             raise ValueError(
@@ -909,6 +990,18 @@ class MosaicDataset(Dataset):
             cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
         if encoder == "2d":
             cache_key_material += "+enc2d_v1"
+        # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
+        # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
+        # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
+        # eigener Suffix erzwingt einen Rebuild ALLER Alt-Caches (flat UND
+        # 2d, masks sind in beiden Modi betroffen), kein stilles
+        # Fehlinterpretieren des alten unkomprimierten Formats. Escape-Hatch
+        # MOSAIC_CACHE_NOPACK=1 (Muster wie MOSAIC_CACHE_F32) erzwingt exakt
+        # das alte Format -- eigener Suffix, damit die beiden Formate nie
+        # denselben Cache-Key treffen (falls die Bitpack-Validierung mal
+        # durchfaellt und zurueckgeschaltet werden muss).
+        cache_nopack = os.environ.get("MOSAIC_CACHE_NOPACK") == "1"
+        cache_key_material += "+nopack_v1" if cache_nopack else "+bitpack_v1"
         cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -921,7 +1014,18 @@ class MosaicDataset(Dataset):
                 self.states             = torch.from_numpy(hf['states'][:])
                 self.policies           = torch.from_numpy(hf['policies'][:])
                 self.values             = torch.from_numpy(hf['values'][:])
-                self.masks              = torch.from_numpy(hf['masks'][:])
+                # Bitpacking (RAM-Optimierung v21): selbstbeschreibend ueber
+                # den Dataset-Namen (nicht ueber den aktuellen Env-Var-Stand)
+                # -- `self.bitpacked` steuert unten in `__getitem__`/train.py,
+                # ob masks/planes noch gepackt sind (Entpacken passiert dann
+                # EINMAL pro Batch, siehe `unpack_masks_batch`/
+                # `unpack_planes_batch`). 'masks_packed' vorhanden <=> Cache
+                # wurde OHNE MOSAIC_CACHE_NOPACK=1 gebaut.
+                self.bitpacked = 'masks_packed' in hf
+                if self.bitpacked:
+                    self.masks = torch.from_numpy(hf['masks_packed'][:])  # [N,51] uint8, gepackt
+                else:
+                    self.masks = torch.from_numpy(hf['masks'][:])         # [N,406] uint8, Bestandsformat
                 self.moon_order_targets = torch.from_numpy(hf['moon_order_targets'][:])
                 if 'policy_weights' in hf:
                     self.policy_weights = torch.from_numpy(hf['policy_weights'][:])
@@ -981,18 +1085,30 @@ class MosaicDataset(Dataset):
                     self.endgame_margin = torch.full_like(self.values, 0.5)
                     self.endgame_mask = torch.zeros(len(self.states), dtype=torch.float32)
                 if self.encoder == "2d":
-                    if 'planes' not in hf:
+                    # Bitpacking (RAM-Optimierung v21): Dataset-Name
+                    # selbstbeschreibend, unabhaengig vom `self.bitpacked`-
+                    # Wert oben (der ueber `masks_packed` bestimmt wird) --
+                    # beide werden zwar immer gemeinsam im selben Bauschritt
+                    # geschrieben, die getrennte Pruefung ist defensiv gegen
+                    # Cache-Korruption (klarer Fehler statt stillem Fallback).
+                    if 'planes_packed' in hf:
+                        self._planes_dataset_name = 'planes_packed'
+                    elif 'planes' in hf:
+                        self._planes_dataset_name = 'planes'
+                    else:
                         raise RuntimeError(
-                            f"HDF5-Cache {cache_path_h5} hat den '+enc2d_v1'-Key, aber kein "
-                            f"'planes'-Dataset -- Cache-Korruption? Datei loeschen und neu bauen lassen."
+                            f"HDF5-Cache {cache_path_h5} hat den '+enc2d_v1'-Key, aber weder "
+                            f"'planes' noch 'planes_packed' -- Cache-Korruption? Datei loeschen "
+                            f"und neu bauen lassen."
                         )
-                    # RAM-Fix: NICHT `hf['planes'][:]` (voller Einlese-Sog),
+                    # RAM-Fix: NICHT `hf['planes...'][:]` (voller Einlese-Sog),
                     # nur den Pfad merken -- `_open_planes_h5` oeffnet lazy
                     # einen eigenen, separaten Handle (dieser `with`-Block
                     # schliesst `hf` gleich).
                     self._planes_h5_path = _resolve_planes_h5_path(cache_path_h5)
                 else:
                     self._planes_h5_path = None
+                    self._planes_dataset_name = None
             print(f"Datensatz geladen: {len(self.states)} Züge. "
                   f"(Features pro Zug: {self.states.shape[1]}) — {time.time()-t0:.1f}s")
 
@@ -1415,14 +1531,35 @@ class MosaicDataset(Dataset):
                 planes_np = np.array(planes_l, dtype=np.uint8)
                 del planes_l
 
+            # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
+            # Voraussetzung"): masks/planes sind striktes 0/1 -- `_pack_bits`
+            # packt verlustfrei auf 1/8 der Byte-Groesse (masks 406->51 B,
+            # planes 2736->342 B je Sample, exaktes Layout siehe
+            # `_pack_bits`-Kopf-Kommentar oben). `cache_nopack` (bereits Teil
+            # des Cache-Keys, s.o.) erzwingt als Notausstieg das alte
+            # unkomprimierte Format 1:1. `masks_np`/`planes_np` werden ab hier
+            # durch die (ggf. gepackte) Speicherform ERSETZT -- alles danach
+            # (HDF5-Schreiben, `self.masks`) bleibt dadurch unabhaengig vom
+            # Packmodus unveraendert einfach.
+            self.bitpacked = not cache_nopack
+            planes_orig_shape = (NUM_PLANES_CHANNELS, 6, 6)
+            if self.bitpacked:
+                masks_np = _pack_bits(masks_np)  # [N,406] -> [N,51]
+                if planes_np is not None:
+                    planes_np = _pack_bits(planes_np.reshape(len(planes_np), -1))  # [N,76,6,6] -> [N,342]
+
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
             print(f"💾 Speichere HDF5-Cache...")
+            _masks_key = 'masks_packed' if self.bitpacked else 'masks'
+            _planes_key = 'planes_packed' if self.bitpacked else 'planes'
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',               data=states_np,    compression='lzf')
                 hf.create_dataset('policies',             data=policies_np,  compression='lzf')
                 hf.create_dataset('values',               data=values_np,    compression='lzf')
-                hf.create_dataset('masks',                data=masks_np,     compression='lzf')
+                hf.create_dataset(_masks_key,             data=masks_np,     compression='lzf')
+                if self.bitpacked:
+                    hf[_masks_key].attrs['orig_count'] = NUM_ACTIONS
                 hf.create_dataset('moon_order_targets',   data=moon_np,      compression='lzf')
                 hf.create_dataset('policy_weights',       data=polw_np,      compression='lzf')
                 hf.create_dataset('points_forecast',      data=points_np,    compression='lzf')
@@ -1437,17 +1574,21 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('endgame_margin',       data=endgame_np,       compression='lzf')
                 hf.create_dataset('endgame_mask',         data=endgame_mask_np,  compression='lzf')
                 if planes_np is not None:
-                    hf.create_dataset('planes',           data=planes_np,    compression='lzf')
+                    hf.create_dataset(_planes_key,        data=planes_np,    compression='lzf')
+                    if self.bitpacked:
+                        hf[_planes_key].attrs['orig_shape'] = planes_orig_shape
             print(f"✅ Cache gespeichert: {cache_path_h5}")
             # RAM-Fix: `planes_np` (die groesste Einzelstruktur, ~3,6 GB beim
-            # vollen Korpus) wird NACH dem Schreiben verworfen statt als
-            # `self.planes` fuer die gesamte Trainingsdauer im RAM zu bleiben
-            # -- `_open_planes_h5` liest ab jetzt lazy aus der gerade
-            # geschriebenen Datei, identisch zum Cache-Lade-Pfad oben.
+            # vollen Korpus, dank Bitpacking jetzt ~450 MB) wird NACH dem
+            # Schreiben verworfen statt als `self.planes` fuer die gesamte
+            # Trainingsdauer im RAM zu bleiben -- `_open_planes_h5` liest ab
+            # jetzt lazy aus der gerade geschriebenen Datei, identisch zum
+            # Cache-Lade-Pfad oben.
             # Hinweis: `_resolve_planes_h5_path` liest hier NUR den Pfad um --
             # die Datei selbst wird weiterhin unter `cache_path_h5` (regulaerer
             # Ort) geschrieben; ein Override muesste die frisch geschriebene
             # Datei zusaetzlich manuell an den Override-Ort kopieren.
+            self._planes_dataset_name = _planes_key if planes_np is not None else None
             self._planes_h5_path = _resolve_planes_h5_path(cache_path_h5) if planes_np is not None else None
             del planes_np
 
@@ -1506,11 +1647,15 @@ class MosaicDataset(Dataset):
                   f"(gemessen 2026-07-31, siehe Docstring).")
             return
         import h5py
+        # `self._planes_dataset_name`: 'planes_packed' oder 'planes' (RAM-
+        # Optimierung v21, Bitpacking) -- selbstbeschreibend am Cache
+        # bestimmt, kein zusaetzlicher Zustand noetig.
         with h5py.File(self._planes_h5_path, "r") as hf:
-            arr = hf["planes"][:]
+            arr = hf[self._planes_dataset_name][:]
         self._planes_eager_tensor = torch.from_numpy(arr)
         gb = self._planes_eager_tensor.element_size() * self._planes_eager_tensor.nelement() / 1e9
-        print(f"Planes komplett ins RAM geladen ({tuple(self._planes_eager_tensor.shape)}, {gb:.2f} GB).")
+        print(f"Planes komplett ins RAM geladen ({tuple(self._planes_eager_tensor.shape)}, {gb:.2f} GB"
+              f"{', gepackt' if self.bitpacked else ''}).")
 
     def __len__(self): return len(self.states)
 
@@ -1579,10 +1724,14 @@ class MosaicDataset(Dataset):
         # RAM-Optimierung v20: uint8 bleibt bis NACH dem Device-Move erhalten
         # (train.py castet batchweise) -- spart 4x Collate-/Transfer-Volumen
         # gegenueber dem frueheren Per-Sample-`.float()`.
+        # RAM-Optimierung v21 (Bitpacking): ist `self.bitpacked` True, liefert
+        # dies ein FLACHES [342]-Byte-Sample statt [76,6,6] -- das Entpacken
+        # passiert NICHT hier (pro Sample), sondern EINMAL pro Batch in
+        # train.py (`unpack_planes_batch`, siehe Benchmark-Kommentar dort).
         if self._planes_eager_tensor is not None:
             return self._planes_eager_tensor[idx]
         hf = self._open_planes_h5()
-        arr = hf["planes"][idx]  # uint8 [76,6,6], EIN Sample -- kein Voll-Array-Read
+        arr = hf[self._planes_dataset_name][idx]  # EIN Sample -- kein Voll-Array-Read
         return torch.from_numpy(arr)
 
     def __getstate__(self):
@@ -1613,10 +1762,12 @@ class MosaicDataset(Dataset):
                 # ENDE, gleiches Muster -- exakter R5-Wurzelwert + Maske.
                 self.endgame_margin[idx], self.endgame_mask[idx])
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
-        # vorangestellt (12-Tupel statt 11) -- `encoder="flat"` (Standard)
-        # bleibt exakt das bisherige Tupel-Layout, byte-identisches
-        # Bestandsverhalten für alle Aufrufer, die den `encoder`-Parameter
-        # nicht kennen.
+        # vorangestellt -- `encoder="flat"` (Standard) behaelt exakt die
+        # bisherige Tupel-FORM/-POSITION fuer Aufrufer, die den `encoder`-
+        # Parameter nicht kennen. Der masks-INHALT (Element 4, `base[3]`) ist
+        # seit RAM-Optimierung v21 aber ggf. bitgepackt (siehe `bitpacked`-
+        # Doku im Klassen-Docstring) -- Konsumenten muessen `self.bitpacked`
+        # pruefen, statt sich auf die Elementform zu verlassen.
         if self.encoder == "2d":
             return (self._get_planes_tensor(idx),) + base
         return base

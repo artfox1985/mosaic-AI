@@ -19,7 +19,7 @@ from collections import Counter
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
-from neural_net import MosaicDataset, MosaicNet, action_to_id
+from neural_net import MosaicDataset, MosaicNet, action_to_id, unpack_masks_batch
 from config import DATA_DIR, INPUT_SIZE, NUM_ACTIONS
 
 
@@ -37,6 +37,11 @@ def run_diagnosis(data_dir: str, label: str):
 
     loader = DataLoader(dataset, batch_size=32, shuffle=False)
     states, targets_p, targets_v, masks, *_ = next(iter(loader))
+    # RAM-Optimierung v21 (Bitpacking, neural_net.py): masks kommen seit
+    # diesem Feature standardmaessig gepackt ([B,51] statt [B,406]) aus dem
+    # Cache -- hier einmalig fuer diesen einen Diagnose-Batch entpackt.
+    if dataset.bitpacked:
+        masks = unpack_masks_batch(masks)
 
     zero_mask   = (masks.sum(1) == 0).sum().item()
     leak        = (targets_p * (1 - masks)).sum(1).max().item()
