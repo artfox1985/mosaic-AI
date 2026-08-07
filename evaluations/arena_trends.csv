@@ -59,3 +59,4 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-08-06T04:49:17,paired_gating,t12_dist_brierbest,t34_wdldestretch_brierbest,400,400,0.515,42.875,42.565,14.092,13.697,0.0
 2026-08-06T05:39:11,paired_gating,t12_dist_brierbest,v19_2d_best,400,360,0.5028,43.194,42.161,14.503,12.469,0.0
 2026-08-07T04:33:59,paired_gating,alphazero_v20_2d_opp_brierbest.onnx,alphazero_v19_2d_best.onnx,400,370,0.5622,45.93,42.822,14.808,13.168,0.0
+2026-08-07T08:15:06,paired_gating,alphazero_v20_2d_opp.onnx,alphazero_v20_2d_opp_brierbest.onnx,400,100,0.44,42.65,46.7,14.33,13.69,0.0

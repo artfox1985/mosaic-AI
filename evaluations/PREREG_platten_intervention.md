@@ -1,8 +1,7 @@
-# Vorregistrierung (ENTWURF): Wertungsplatten-/Endspiel-Zonen-Intervention
+# Vorregistrierung: Wertungsplatten-/Endspiel-Zonen-Intervention (Aux-Kopf)
 
-**Angelegt 2026-08-07 als ENTWURF** -- Trainings-Kostenklasse, finales
-Go + Prioritaet liegt beim Nutzer. Messregeln werden vor dem ersten
-Lauf eingefroren; bis dahin duerfen sich nur Design-Details aendern.
+**Angelegt 2026-08-07 als Entwurf; Nutzer-Go "dann takte es ein" am
+selben Tag -- Messregeln hiermit EINGEFROREN.**
 
 ## Ausgangslage (zwei konvergierende Befunde, beide 2026-08-07)
 
@@ -26,14 +25,21 @@ die Wert-Schaetzung zwingt.
 
 Neuer Aux-Kopf `endgame_margin` (Skalar, MLP auf `shared`, Muster
 `opp_points_head`/Task #28):
-- **Ziel**: exakte Alpha-Beta-Marge (eigen-gegner, /VALUE_SCALE) aus
-  `round5::exact_round5_outcome` -- Label NUR fuer Zustaende der Zone
-  (Runde >= 4-Ende bis Runde 5), Maske 0 sonst (Muster
-  `opp_points_mask`).
-- **Label-Erzeugung**: beim Cache-Bau (Schema 18) fuer Zonen-Zustaende
-  den exakten Solver rufen. Kostenabschaetzung VOR dem Go messen
-  (Stichprobe 1.000 Zustaende); Fallback bei zu teuer: Labels nur fuer
-  R5-Zustaende (dort ist der Solver ohnehin der Spielpfad).
+- **Ziel (KONKRETISIERT nach Datenpruefung 2026-08-07)**: `root_q`
+  der R5-Drafting-Records = exakter Minimax-Wurzelwert in
+  tanh-Normierung `((margin/VALUE_SCALE).tanh()+1)/2` (net_mcts.rs
+  R5-Zweig via `round5::choose_action_with_analysis`) -- die Labels
+  stehen BEREITS IN DEN RECORDS, kein Solver-Lauf beim Cache-Bau, die
+  geplante Kostenmessung ENTFAELLT. Scope = NUR R5-Drafting (der
+  R4-Ende-Teil braeuchte teure Refill-Erwartungen; die Zonen-Probe
+  zeigt, dass der Trunk auch dessen Info schon traegt -- die
+  R5-Supervision wirkt ueber den shared Trunk).
+  Abdeckung im v20-Fenster: v18/v19wdl/v19wdlsw ~87% der R5-Zustaende
+  (~265k Labels); v16/v17 ohne root_q -> Maske 0. Bekanntes
+  Label-Rauschen: seltener leaf_value-Fallback bei Budget-Overrun
+  (net_mcts.rs-Doku), akzeptiert.
+- **Cache**: Schema 18, neue Felder `endgame_margin` ([0,1]-Skala wie
+  root_q) + `endgame_mask` (uint8), Muster `opp_points_mask`.
 - **Loss**: MSE, Gewicht analog points_forecast; ONNX-Ausgang HINTEN
   angehaengt (net.rs-Indizes stabil, 2D-additiv-Regel beachtet:
   bestehende Modelle bleiben ladbar).
