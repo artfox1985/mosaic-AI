@@ -2,8 +2,8 @@
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
 **`../archive/history.md`** (zuletzt ausgelagert 2026-08-07 abends:
-Mensch-vs-KI-Befund, Suchpfad-Inventar, #37; λ/#29/#37/#14 auf
-Nutzer-Anweisung geschlossen).
+Mensch-vs-KI-Befund, Suchpfad-Inventar, #37-Volltext; #14
+geschlossen).
 
 ---
 
@@ -17,7 +17,10 @@ Nutzer-Anweisung geschlossen).
 | **Messset-Snapshot + v16/v17-Freigabe** | klein, nach dem Endgame-Cache: 90-Dateien-Altmessset einfrieren -> danach v16/v17 ins Backup (Nutzer-Wunsch) |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
 | **#35b Ranking-Loss** | offen, GPU-Kandidat (Daten liegen vor; Seed-Varianz-Regel) |
-| **frozen-Set-Neubau** | optionale Wartung (Referenz-Set ist v12-Aera); ohne #29 kein Zwang -- Nutzer-Prioritaet |
+| **λ (Value-Target-Mix)** | OFFEN (vertagt): am echten v20/v21-Mischanteil neu bewerten; λ07_opp-Altbeleg durch F1 kontaminiert. Kontext in history |
+| **#29-Instrument (Offline-Value-Praediktor)** | OFFEN: braucht frozen-Set-Neubau + arena-differenzierte Paare zur Validierung. `PREREG_nach34_paket` |
+| **#37 Tiling-Auswahlkriterium (punkte*P vs reines P)** | OFFEN, vorgemerkt fuer die naechste Generation, Arena-entschieden; Volltext in history |
+| **frozen-Set-Neubau** | OFFEN (Vorbedingung fuer #29; Referenz-Set ist v12-Aera) -- Nutzer-Prioritaet |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
 ## NAECHSTE SCHRITTE (Reihenfolge-Regel: Modell-Verdikte VOR Korpus-Generierung)
@@ -47,7 +50,7 @@ Nutzer-Anweisung geschlossen).
   (2) Netz-vs-Heuristik-Effekte <8pp = Seed-Rauschen; (3) SPRT-
   Fruehstopps <150 Paare zaehlen nur mit Frisch-Seed-Replikation.
 - **Value-Aenderungen brauchen Arena-Gating** (kein validierter
-  Offline-Praediktor; #29 geschlossen).
+  Offline-Praediktor, solange #29 offen/unvalidiert ist).
 - **Aggressions-/Denial-Programm GESCHLOSSEN** (2026-08-07): alle
   Knoepfe auf Default (w=0, λ=0, ε=0, bias=1); "gate what you ship";
   Wiedervorlage nur mit messbar schaerferem opp-Kopf
