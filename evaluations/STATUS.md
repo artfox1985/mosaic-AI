@@ -43,7 +43,18 @@
    CSV-Eintrag auf Kader-Namen korrigiert). `tools/set_champion.py`
    ausgefuehrt (champion.txt: v19_2d_best -> v20_2d_opp_brierbest;
    Server lief nicht, naechster Start laedt automatisch).
-   Pflicht-Diagnostiken R5/R4b laufen (CPU nach dem Gating frei).
+   Pflicht-Diagnostiken R5/R4b ERLEDIGT 2026-08-07:
+   - **R5-Plattenkalibrierung** (r5_value_calibration_v20.json):
+     Value-Kopf-Steigung **0,349** (R²=0,28, n=139) -- Verlauf
+     0,086 (tanh) -> 0,273 (t34) -> 0,349 (v20), weiterhin WEIT unter 1.
+     **Wiedervorlage-Bedingung ERFUELLT**: die Steigung bleibt nach
+     nativem Blend + laengerem Value-Training flach -> der gezielte
+     Eingriff (Platten-Encoding/Aux-Kopf) ist jetzt gerechtfertigt und
+     rueckt als v20-Aera-Task nach. Punkte-Kopf weiterhin kein Befund
+     (0,23, R²=0,02). Kennlinien-Caveat 0,316 gilt.
+   - **R4b (N=72)** (r4b_value_calibration_v20_n72.json): Value-Kopf
+     0,056 bei R²=0,008 -> nach Prereg-Regel (R²<0,1) KEIN belastbares
+     Signal, unveraendert zur t34-Aera. Punkte-Kopf 0,32 (R²=0,18).
    - **Policy-Wacht ERLEDIGT 2026-08-07** (offline_diagnose --frozen):
      Orakel-Metriken auf PARITAET -- Prior-Masse Top-3 0,7098 (v20) vs
      0,7187 (v19), Kendall-Tau 0,3588 vs 0,3558. Der 4.000er-Sockel
