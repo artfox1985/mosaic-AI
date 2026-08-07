@@ -48,9 +48,11 @@ Value startet frisch (bekannt, unkritisch: Peak liegt bei E2-4).
 
 1. **Champion-Gating**: v20-Kandidat vs `v19_2d_best`, Standard-SPRT bis
    200 Paare, OHNE Blend. **Kein Fruehstopp-Entscheid unter n=150 Paaren
-   ohne Frisch-Seed-Replikation** (Lehre t12-Falsch-Positiv). Bei
-   Gating-Fehlschlag: Nachschub-Ventil (weitere `v20wdl`-Sockel-Partien
-   generieren, Neutraining) VOR jeder Design-Revision.
+   ohne Frisch-Seed-Replikation** (Lehre t12-Falsch-Positiv). **AENDERUNG (Nutzer 2026-08-07, vor dem Gating): das Nachschub-Ventil
+   ENTFAELLT** -- bei Gating-Fehlschlag KEINE weiteren Sockel-Partien;
+   stattdessen werden die ohnehin anstehenden Stellschrauben abgearbeitet
+   (Suchpfad-Nachmessungen, Diagnostik-Paket, v20-Aera-Liste) und der
+   Befund dokumentiert.
 2. **Policy-Wacht**: Orakel-Metriken des Kandidaten vs v19-Referenz --
    faellt prior_mass/kendall_tau messbar, ist der 4000er-Sockel zu klein
    (erste Messung der Fortschritts-Untergrenze; Erhalts-Knie liegt
