@@ -37,10 +37,8 @@ Probe R²=0,91 -> Platten-Intervention via Aux-Kopf gerechtfertigt;
 Checkpoint-Umkehrung E15/E5 zwischen neuem Val und Alt-Messset.
 
 **LAUFEND (Parallel-Betrieb, Nutzer-Go "dann los")**:
-1. CPU-Bahn (nach App-Neustart-Abbruch 2026-08-07 vormittags alle
-   Hintergrundaufgaben WIEDER AUFGENOMMEN): **LAEUFT: τ-Annealing-Rest
-   1.900 @600 (`v19wdlann`, 100 Partien ueberlebten den Abbruch;
-   Tail-Regenerierung, frischer Seed)** -> danach
+1. CPU-Bahn: ~~τ-Annealing-Batch~~ **FERTIG 2026-08-07 15:00 (2.000
+   Partien / 200 Dateien / 312.785 Zuege komplett)** -> **LAEUFT:**
    **Aggressions-STILMESSUNG (PREREG_aggression_stilmessung.md;
    Nutzer-Auftrag "Punkte rauben ohne Siegquoten-Schaden"; 3 Arme a
    400: Kontrolle/(0.1,2.0)/(0.2,2.0); Erst-Sweep-Deskriptiv:
