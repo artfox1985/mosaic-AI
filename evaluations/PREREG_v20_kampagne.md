@@ -87,3 +87,7 @@ Schwarm-Partien ist maskiert, das Value-Ziel (Bootstrap+Ausgang) ist
 sim-/breiten-robust, und der 16-vs-8-Wash bei 400 Sims spricht gegen
 grosse Effekte. Nachmessung der m-Formel steht auf der
 Nach-v20-Kandidatenliste.
+**GESCHLOSSEN 2026-08-07 (Messung 2, PREREG_suchpfad_nachmessungen)**:
+m=9 (Formel) 138/200 vs m=16 fest 144/200 @150 Netz-Sims, gepaarter
+McNemar p=0,54 -> H0, Formel bestaetigt; die Schwarm-Partien gelten
+als unbelastet.
