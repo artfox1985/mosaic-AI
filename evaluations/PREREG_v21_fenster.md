@@ -51,7 +51,16 @@ korrekt). Backup-/Alt-Regel-Korpora bleiben AUSSEN (stehende Regel).
 3. v21-Sockel 4.000 @600 `--version v20wdl`, τ gemaess Messung-3-Verdikt
    (Uebernahme nur bei repliziertem Arena-Vorteil, sonst τ=1).
 
-## RAM-Voraussetzung (Nutzer-Einwand 2026-08-07)
+## RAM-Voraussetzung (Nutzer-Einwand 2026-08-07) -- ERFUELLT
+
+**Bitpacking ist umgesetzt und validiert (Commit 34b150b)**: planes/
+masks 1-Bit-gepackt, 2,69 KB/Zustand gemessen, 100% bit-identisch
+gegen den ungepackten Pfad (beide Encoder, end-to-end durch den
+DataLoader), Batch-Unpack im Benchmark SCHNELLER als die Baseline.
+v21-Hochrechnung: ~13,2 GB Cache -- passt komfortabel in 32 GB.
+Der urspruengliche Wortlaut bleibt unten als Kontext stehen.
+
+## (urspruenglicher Wortlaut)
 
 Der Zuschnitt (~4,8 M Zustaende) wuerde im heutigen Cache-Format
 ~21,5 GB Cache / ~28-29 GB Trainings-Peak kosten -- zu knapp fuer
