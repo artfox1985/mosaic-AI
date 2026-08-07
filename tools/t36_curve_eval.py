@@ -35,9 +35,20 @@ from neural_net import (build_model_from_checkpoint, state_to_planes,  # noqa: E
                         state_to_tensor)
 
 
-def val_files() -> list[str]:
-    """Exakt der train.py-Split: Seed-20260707-Shuffle, erste 10%."""
+def val_files(exclude_file_regex: str | None = None) -> list[str]:
+    """Exakt der train.py-Split: Seed-20260707-Shuffle, erste 10%.
+
+    exclude_file_regex: filtert Dateien VOR dem Shuffle heraus. Noetig,
+    um das historische Messset zu rekonstruieren, nachdem data/ um
+    neue Kampagnen-Dateien gewachsen ist (der Split haengt von der
+    Dateiliste ab). Validierung gegen die game_ids des Erst-Laufs via
+    --validate-games-json.
+    """
+    import re
     all_files = sorted(glob.glob(str(BASE_DIR / "data" / "*.pkl")))
+    if exclude_file_regex:
+        all_files = [f for f in all_files
+                     if not re.search(exclude_file_regex, f)]
     sh = all_files[:]
     random.Random(20260707).shuffle(sh)
     n_val = max(1, round(len(sh) * 0.1))
@@ -51,10 +62,16 @@ def main() -> None:
                     help="Versionsnamen (alphazero_<name>.pth in models/)")
     ap.add_argument("--out", default="evaluations/t36_curve_eval.json")
     ap.add_argument("--batch", type=int, default=512)
+    ap.add_argument("--exclude-file-regex", default=None,
+                    help="Dateien vor dem Split ausschliessen (Messset-"
+                         "Rekonstruktion bei gewachsenem data/)")
+    ap.add_argument("--validate-games-json", default=None,
+                    help="Pfad eines frueheren Ergebnis-JSONs; bricht ab, "
+                         "wenn die Partie-Menge nicht exakt uebereinstimmt")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    files = val_files()
+    files = val_files(args.exclude_file_regex)
     print(f"Messset: {len(files)} Val-Dateien | Geraet: {device}")
 
     # Einmalige Vorverarbeitung (identisch fuer alle Modelle).
@@ -74,6 +91,17 @@ def main() -> None:
     games = sorted(set(gid_l))
     gidx = {g: i for i, g in enumerate(games)}
     print(f"{len(y)} Zustaende aus {len(games)} Partien vorverarbeitet.")
+
+    if args.validate_games_json:
+        ref = json.loads((BASE_DIR / args.validate_games_json)
+                         .read_text(encoding="utf-8"))
+        if sorted(ref["games"]) != games or ref["n_states"] != len(y_l):
+            raise SystemExit(
+                f"MESSSET-ABWEICHUNG: {len(games)} Partien/{len(y_l)} "
+                f"Zustaende vs. Referenz {ref['n_games']}/{ref['n_states']}"
+                " -- Rekonstruktion NICHT identisch, Abbruch.")
+        print("Messset-Validierung OK: Partie-Menge und Zustandszahl "
+              "identisch zum Referenz-Lauf.")
 
     result = {"n_states": len(y_l), "n_games": len(games), "models": {}}
     for name in args.models:
