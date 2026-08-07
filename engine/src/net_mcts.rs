@@ -399,6 +399,23 @@ pub fn floor_shaping_weight() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_FLOOR_SHAPING_W", FLOOR_SHAPING_WEIGHT))
 }
 
+/// Default der Gegner-Gewichtung fuer das Floor-Shaping (Eskalationsstufe
+/// E2, `evaluations/PREREG_aggression_stilmessung.md`) -- `1.0` = der
+/// GEGNER-Anteil (`opp`) fliesst genauso stark ein wie der EIGENE Anteil
+/// (`own`), exakt das bisherige, arena-verifizierte Verhalten.
+pub const FLOOR_SHAPING_OPP_BIAS: f64 = 1.0;
+
+/// Laufzeit-Wert der Floor-Shaping-Gegner-Gewichtung: `MOSAIC_FLOOR_SHAPING_
+/// OPP_BIAS` ueberschreibt `FLOOR_SHAPING_OPP_BIAS` (gleiches OnceLock-Muster
+/// wie `floor_shaping_weight`). `bias>1` belohnt Zuege, die dem GEGNER
+/// Floor-Strafen zuschieben, STAERKER als eigene Floor-Vermeidung (siehe
+/// `floor_shaping_delta_ego`-Kommentar fuer die exakte Formel). Ohne
+/// gesetzte Env-Var byte-identisches Bestandsverhalten (Default 1.0).
+pub fn floor_shaping_opp_bias() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_FLOOR_SHAPING_OPP_BIAS", FLOOR_SHAPING_OPP_BIAS))
+}
+
 /// Task #78 (v12c): rundenabhängige Value-Shrinkage Richtung 0.5. Motivation:
 /// der Value-Head ist in frühen Runden nachweislich kaum besser als der
 /// Mittelwert (Runde-1-Noise-Floor-Deckel ≈0.007, siehe
@@ -829,11 +846,42 @@ fn average_completed_q_policy(forest: &[Vec<Node>]) -> Vec<(Action, f64)> {
 /// die Korrektur an einem Rundenende-Knoten oft noch 0 Boden, obwohl er beim
 /// tatsächlichen Übergang unausweichlich feststeht.
 fn floor_shaping_delta(state: &GameState) -> f64 {
+    let (mine, theirs) = floor_penalties(state);
+    (mine - theirs) / FLOOR_SHAPING_SCALE
+}
+
+/// Rohe (unskalierte) Floor-Strafsumme je Spieler -- Extraktion aus
+/// `floor_shaping_delta`, damit `floor_shaping_delta_ego` (Eskalationsstufe
+/// E2, Gegner-Bias) dieselben zwei Quellen ohne Doppelpflege wiederverwendet.
+fn floor_penalties(state: &GameState) -> (f64, f64) {
     let mine = (state.players[0].broken_penalty()
         + crate::round_end::projected_unplaceable_penalty(&state.players[0])) as f64;
     let theirs = (state.players[1].broken_penalty()
         + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
-    (mine - theirs) / FLOOR_SHAPING_SCALE
+    (mine, theirs)
+}
+
+/// Eskalationsstufe E2 (`evaluations/PREREG_aggression_stilmessung.md`,
+/// `MOSAIC_FLOOR_SHAPING_OPP_BIAS`): verallgemeinert `floor_shaping_delta`
+/// von der festen Spieler0-minus-Spieler1-Differenz auf eine EGO-
+/// perspektivische, asymmetrisch gewichtete Fassung:
+/// `delta_ego = (own - opp_bias * opp) / FLOOR_SHAPING_SCALE`, wobei `own`
+/// die Floor-Strafsumme von `ego` und `opp` die des jeweils ANDEREN Spielers
+/// ist. Vorzeichenkonvention wie beim Bestand: `own`/`mine` = weniger
+/// negativ = besser fuer `ego` (die eigene Strafe soll klein sein), `opp`
+/// wird mit `opp_bias` skaliert, BEVOR es abgezogen wird -- `opp_bias>1`
+/// gewichtet eine hohe GEGNER-Strafe staerker als die eigene, `opp_bias=1`
+/// ist exakt die alte, symmetrische Definition (own - opp, ungewichtet).
+///
+/// Bei `opp_bias == 1.0` liefert dies fuer `ego=0` bit-identisch denselben
+/// Wert wie `floor_shaping_delta` (Multiplikation mit exakt `1.0` rundet
+/// nie, siehe IEEE754) -- die Aufrufstellen verzweigen trotzdem explizit
+/// auf den alten Ausdruck, um jeden Zweifel an Bit-Identitaet auszuschliessen
+/// (kein Vertrauen auf `tanh`s exakte Ungeradheit ueber Systemgrenzen).
+fn floor_shaping_delta_ego(state: &GameState, ego: usize, opp_bias: f64) -> f64 {
+    let (mine, theirs) = floor_penalties(state);
+    let (own, opp) = if ego == 0 { (mine, theirs) } else { (theirs, mine) };
+    (own - opp_bias * opp) / FLOOR_SHAPING_SCALE
 }
 
 // ── Wertungsplatten-Shaping (Task #93) ──────────────────────────────────────
@@ -1608,10 +1656,28 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
 
             // Exakte Floor-Straf-Korrektur (siehe `floor_shaping_delta`-Kommentar) --
             // reine State-Funktion, kein Netz-Forward-Pass, direkt additiv auf
-            // beide Perspektiven (Nullsummen-Charakter wie beim own-opp-Value-Ziel).
-            let floor_shift = floor_shaping_weight() * floor_shaping_delta(&state).tanh();
-            today_value[0] = (today_value[0] + floor_shift).clamp(0.0, 1.0);
-            today_value[1] = (today_value[1] - floor_shift).clamp(0.0, 1.0);
+            // beide Perspektiven (Nullsummen-Charakter wie beim own-opp-Value-Ziel
+            // bei `opp_bias=1.0`; siehe `floor_shaping_delta_ego`-Kommentar fuer
+            // Eskalationsstufe E2 -- ab `opp_bias!=1.0` KEIN Nullsummen-Additiv
+            // mehr, jeder Spieler bekommt seinen eigenen, asymmetrisch
+            // gewichteten own-minus-bias*opp-Anteil).
+            let opp_bias = floor_shaping_opp_bias();
+            let (floor_shift0, floor_shift1) = if opp_bias == 1.0 {
+                // Bestand, UNVERAENDERTER Rechenweg (kein zusaetzlicher
+                // Rundungsschritt) -- `today_value[1] -= shift` ist bit-identisch
+                // zu `today_value[1] += (-shift)` (IEEE754-Negation ist exakt).
+                let shift = floor_shaping_weight() * floor_shaping_delta(&state).tanh();
+                (shift, -shift)
+            } else {
+                // E2: pro Spieler eigener own-minus-opp_bias*opp-Anteil, siehe
+                // `floor_shaping_delta_ego`.
+                let w = floor_shaping_weight();
+                let d0 = floor_shaping_delta_ego(&state, 0, opp_bias);
+                let d1 = floor_shaping_delta_ego(&state, 1, opp_bias);
+                (w * d0.tanh(), w * d1.tanh())
+            };
+            today_value[0] = (today_value[0] + floor_shift0).clamp(0.0, 1.0);
+            today_value[1] = (today_value[1] + floor_shift1).clamp(0.0, 1.0);
 
             // Task #93: Wertungsplatten-Fortschritts-Additiv, NACH dem
             // Floor-Shaping-Additiv (koexistiert additiv, siehe
@@ -2351,10 +2417,20 @@ fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &G
     };
     let points_forecast = points.first().copied();
     let opp_points_forecast = opp_points.first().copied();
-    let floor_raw = floor_shaping_weight() * floor_shaping_delta(state).tanh();
     // `floor_shaping_delta` ist absolut Spieler0-minus-Spieler1 -- auf
-    // Ego-Perspektive (der an der Wurzel ziehende Spieler) drehen.
-    let floor_shift = if state.current_player == 0 { floor_raw } else { -floor_raw };
+    // Ego-Perspektive (der an der Wurzel ziehende Spieler) drehen. Bei
+    // `opp_bias!=1.0` (Eskalationsstufe E2) darf das NICHT mehr per simplem
+    // Vorzeichenwechsel geschehen (own/opp sind dann nicht mehr symmetrisch
+    // vertauschbar) -- `floor_shaping_delta_ego` rechnet direkt aus Sicht von
+    // `state.current_player`, `opp_bias=1.0` bleibt bit-identisch zum alten
+    // Drehungs-Trick (siehe `floor_shaping_delta_ego`-Kommentar).
+    let opp_bias = floor_shaping_opp_bias();
+    let floor_shift = if opp_bias == 1.0 {
+        let floor_raw = floor_shaping_weight() * floor_shaping_delta(state).tanh();
+        if state.current_player == 0 { floor_raw } else { -floor_raw }
+    } else {
+        floor_shaping_weight() * floor_shaping_delta_ego(state, state.current_player, opp_bias).tanh()
+    };
     let final_value = (blended_utility + floor_shift).clamp(0.0, 1.0);
     RootValueDebug {
         raw_value,
@@ -3986,6 +4062,10 @@ mod tests {
         // (Paritaets-Bedingung; die Env-Vars sind in der Testumgebung
         // nicht gesetzt, OnceLock cached den Default).
         assert_eq!(floor_shaping_weight(), FLOOR_SHAPING_WEIGHT);
+        // E2 (PREREG_aggression_stilmessung.md, MOSAIC_FLOOR_SHAPING_OPP_BIAS):
+        // ungesetzt -> 1.0 -> alle Aufrufstellen nehmen den `opp_bias==1.0`-
+        // Zweig, byte-identisch zum Bestand vor E2.
+        assert_eq!(floor_shaping_opp_bias(), FLOOR_SHAPING_OPP_BIAS);
         assert_eq!(gumbel_top_m_for_budget(150), 9);
         assert_eq!(gumbel_top_m_for_budget(400), GUMBEL_TOP_M);
         // τ-Annealing (Messung 3, MOSAIC_TAU_ARGMAX_FROM_MOVE): ungesetzt ->
@@ -5319,6 +5399,76 @@ mod tests {
             "Erwartete Daempfung bei falscher Reihenfolge (Floor vor Shrink) nicht beobachtet -- \
              Testannahme pruefen"
         );
+    }
+
+    // ── Floor-Shaping-Opp-Bias (Eskalationsstufe E2, PREREG_aggression_
+    // stilmessung.md) ────────────────────────────────────────────────────────
+
+    #[test]
+    fn floor_shaping_delta_ego_bias_one_matches_legacy_delta() {
+        // `opp_bias=1.0` muss fuer ego=0 exakt (bit-identisch) den alten,
+        // symmetrischen `floor_shaping_delta`-Wert liefern -- die Formel
+        // own-1.0*opp reduziert sich exakt auf own-opp (Multiplikation mit
+        // 1.0 rundet nie).
+        let mut rng = StdRng::seed_from_u64(2026);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 12, &mut rng) else { continue };
+            let legacy = floor_shaping_delta(&state);
+            assert_eq!(
+                floor_shaping_delta_ego(&state, 0, 1.0),
+                legacy,
+                "Spiel {gi}: ego=0, opp_bias=1.0 muss bit-identisch zu floor_shaping_delta sein"
+            );
+            // ego=1 bei bias=1.0 muss exakt der gespiegelte (own/opp vertauschte)
+            // Wert sein -- own=theirs, opp=mine, also theirs-mine = -(mine-theirs).
+            assert_eq!(
+                floor_shaping_delta_ego(&state, 1, 1.0),
+                -legacy,
+                "Spiel {gi}: ego=1, opp_bias=1.0 muss exakt -floor_shaping_delta sein"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn floor_shaping_delta_ego_bias_two_doubles_opp_term() {
+        // `opp_bias=2.0`: der GEGNER-Anteil geht doppelt gewichtet ein, der
+        // EIGENE Anteil bleibt unveraendert -- direkter Formel-Nachweis
+        // gegen die rohen Strafsummen (`floor_penalties` ueber die
+        // oeffentlich sichtbare Board-Query, hier via `broken_penalty`/
+        // `projected_unplaceable_penalty` nachgebaut, analog
+        // `floor_shaping_delta`-Definition).
+        let mut rng = StdRng::seed_from_u64(2027);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 15, &mut rng) else { continue };
+            let mine = (state.players[0].broken_penalty()
+                + crate::round_end::projected_unplaceable_penalty(&state.players[0])) as f64;
+            let theirs = (state.players[1].broken_penalty()
+                + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
+            let expected_ego0 = (mine - 2.0 * theirs) / FLOOR_SHAPING_SCALE;
+            let expected_ego1 = (theirs - 2.0 * mine) / FLOOR_SHAPING_SCALE;
+            assert!(
+                (floor_shaping_delta_ego(&state, 0, 2.0) - expected_ego0).abs() < 1e-12,
+                "Spiel {gi}: ego=0, opp_bias=2.0 -- own-2*opp erwartet"
+            );
+            assert!(
+                (floor_shaping_delta_ego(&state, 1, 2.0) - expected_ego1).abs() < 1e-12,
+                "Spiel {gi}: ego=1, opp_bias=2.0 -- own-2*opp (vertauscht) erwartet"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn floor_shaping_opp_bias_default_is_env_knopf_pattern() {
+        // Gleiches Muster wie `floor_shaping_weight` -- ohne gesetzte Env-Var
+        // liefert der Laufzeit-Knopf exakt die Compile-Konstante.
+        assert_eq!(floor_shaping_opp_bias(), FLOOR_SHAPING_OPP_BIAS);
+        assert_eq!(FLOOR_SHAPING_OPP_BIAS, 1.0);
     }
 
     // ── Wertungsplatten-Shaping (Task #93) ──────────────────────────────────
