@@ -27,14 +27,19 @@
 
 ## NAECHSTE SCHRITTE (v20-Pipeline)
 
-1. **Nutzer**: Sockel-Self-Play (4.000 @600, `--version v19wdl`), danach
-   Schwarm (8.000 @150, `--version v19wdlsw --value-only`). Kommandos in
-   PREREG_v20_kampagne.md.
-2. Cache-Neubau Schema 17 (~1h, automatisch beim ersten Training).
-3. Training warm von `v19_2d_opp_best` (Rezept siehe PREREG).
-4. Champion-Gating vs `v19_2d_best` (Fruehstopp-Regel beachten!),
+1. ~~Self-Plays~~ ERLEDIGT (Sockel 4.000 @600 + Schwarm 8.000 @150).
+2. ~~Cache Schema 17~~ ERLEDIGT: Train 3.077.538 Zuege + Val 341.824,
+   fp16/uint8-Format, Peak ~20,4 GB RSS im Training (32-GB-Maschine ok).
+3. ~~Training~~ ERLEDIGT 2026-08-07 03:41: warm von `v19_2d_opp_best`,
+   Early Stop E15 (Plateau ab E10). **brierbest = E5, val_brier 0,1950**
+   (neues Fenster, NICHT mit 900er-Fenster-Werten vergleichbar);
+   val_combined-best = E1 (0,4838), Policy-Val 0,49, Points-R² 0,48.
+   Snapshot models_2026-08-07_0341_v20_2d_opp.zip.
+4. **LAUFEND**: Champion-Gating `v20_2d_opp_brierbest` vs `v19_2d_best`
+   (400 Sims, 200 Paare, Fruehstopp-Regel beachten!). Danach
    Policy-Wacht (Orakel-Metriken vs v19), Saettigungs-Nachfit
-   (4. Stuetzpunkt), Pflicht-Diagnostiken (Platt, R5, R4b).
+   (4. Stuetzpunkt, ALTES 90-Dateien-Messset rekonstruieren!),
+   Pflicht-Diagnostiken (Platt, R5, R4b).
 5. **Suchpfad-Nachmessungen** (PREREG_suchpfad_nachmessungen.md):
    Env-Knoepfe bauen (MOSAIC_FLOOR_SHAPING_W, MOSAIC_GUMBEL_TOP_M,
    Paritaets-Nachweis) -> Floor-Gewicht-Sweep 0,15/0,3/0,6 ->
