@@ -14,7 +14,7 @@ geschlossen).
 | **Platten-Intervention (endgame_head)** | Training `pi_endgame_s2` LAEUFT (E3+, ETA ~01-02 Uhr); danach R5-Steigung (Ziel >0,5) + Brier-Alt-Set (±0,002 Seed-Skala) -> ggf. Gating vs Champion. `PREREG_platten_intervention.md` |
 | **τ-Annealing (Messung 3)** | Korpus fertig (2.000 `v19wdlann`); Arm-B-Training + Gating in der GPU-Queue nach dem Endgame-Arm. `PREREG_suchpfad_nachmessungen.md` |
 | **v21-Fenster fuellen** | WARTET auf die Modell-Verdikte (Reihenfolge-Regel unten): Schwarm 8.000 (2.090 in `data_quarantaene/` geparkt) + Sockel 4.000 vom finalen v20-Aera-Champion. `PREREG_v21_fenster.md` |
-| **Messset-Snapshot + v16/v17-Freigabe** | klein, nach dem Endgame-Cache: 90-Dateien-Altmessset einfrieren -> danach v16/v17 ins Backup (Nutzer-Wunsch) |
+| **Messset-Snapshot + v16/v17-Freigabe** | Snapshot ERLEDIGT 2026-08-07 abends (`altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
 | **#35b Ranking-Loss** | offen, GPU-Kandidat (Daten liegen vor; Seed-Varianz-Regel) |
 | **λ (Value-Target-Mix)** | OFFEN (vertagt): am echten v20/v21-Mischanteil neu bewerten; λ07_opp-Altbeleg durch F1 kontaminiert. Kontext in history |
@@ -34,8 +34,11 @@ geschlossen).
 3. **Dann CPU**: v20-Schwarm fortsetzen/neu (Generator = finaler
    v20-Aera-Champion; Quarantaene-Entscheid beim Nutzer, falls
    Champion wechselt) -> v20-Sockel gemaess τ-Verdikt.
-4. Kleinkram im naechsten CPU-Fenster: Messset-Snapshot, R5-Steigungs-
-   Seed-Streuung am Kontroll-Modell (pi_ctrl_s3).
+4. ~~Kleinkram~~ ERLEDIGT 2026-08-07 abends: Messset-Snapshot (s.o.)
+   + **R5-Steigungs-Seed-Skala: s2 0,349 vs s3 0,295 -> ~0,05**
+   (r5_value_calibration_pi_ctrl.json). Lesart fuers Endgame-Verdikt:
+   ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
+   Seed-Sigma darueber.
 
 ## GELTENDE REGELN (kompakt)
 

@@ -62,6 +62,11 @@ def main() -> None:
                     help="Versionsnamen (alphazero_<name>.pth in models/)")
     ap.add_argument("--out", default="evaluations/t36_curve_eval.json")
     ap.add_argument("--batch", type=int, default=512)
+    ap.add_argument("--snapshot-dir", default=None,
+                    help="Verzeichnis mit dem EINGEFRORENEN Messset (z.B. "
+                         "altmess_90files/): ALLE .pkl dort bilden das Set, "
+                         "kein Split/Reconstruct -- macht die Messung "
+                         "unabhaengig vom data/-Bestand (v16/v17-Backup).")
     ap.add_argument("--exclude-file-regex", default=None,
                     help="Dateien vor dem Split ausschliessen (Messset-"
                          "Rekonstruktion bei gewachsenem data/)")
@@ -71,7 +76,10 @@ def main() -> None:
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    files = val_files(args.exclude_file_regex)
+    if args.snapshot_dir:
+        files = sorted(glob.glob(str(Path(args.snapshot_dir) / "*.pkl")))
+    else:
+        files = val_files(args.exclude_file_regex)
     print(f"Messset: {len(files)} Val-Dateien | Geraet: {device}")
 
     # Einmalige Vorverarbeitung (identisch fuer alle Modelle).
