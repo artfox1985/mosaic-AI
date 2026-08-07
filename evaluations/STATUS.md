@@ -19,7 +19,7 @@ geschlossen).
 | **#35b Ranking-Loss** | Implementierung beim Agent (--ranking-loss-weight, Default aus; ggf. Schema 19 fuer root_child_q-Cache-Feld); Trainings danach in die GPU-Queue (Seed-Varianz-Regel) |
 | **λ (Value-Target-Mix)** | **UMGESTUFT (Nutzer 2026-08-08, 2. Korrektur): KEIN Replikationskandidat** -- der λ=0,7-Sieg stammt aus der tanh-/Margen-Aera, der Mechanismus uebertraegt sich nicht auf den binaeren WDL-Kopf (Aera-Grenzen-Lektion). Bleibt als NEUES WDL-Aera-Experiment auf Hypothesen-Niveau in der GPU-Queue (root_q ist jetzt immerhin skalengleich zum Ziel); eigenes Prereg mit offener Erwartung vor dem Start, Prioritaet hinter t3ann/#35b -- oder Streichung auf Zuruf |
 | **#29-Instrument (Offline-Value-Praediktor)** | OFFEN: braucht frozen-Set-Neubau + arena-differenzierte Paare zur Validierung. `PREREG_nach34_paket` |
-| **#37 Tiling-Auswahlkriterium (punkte*P vs reines P)** | **VORGEZOGEN (Nutzer-Anstoss 2026-08-08): VOR die Schwarm-Fortsetzung** (Kriterium wirkt im Tiling jedes Self-Plays -> ganzer v21-Korpus soll das Sieger-Kriterium nutzen). Knopf beim Agent (MOSAIC_TILING_SELECT); danach Zwei-Arm-A/B (#30-Muster -- Solver ist prozessglobal, wirkt auf BEIDE Seiten) |
+| **#37 Tiling-Auswahlkriterium** | **GESCHLOSSEN 2026-08-08: H0 (284 vs 292, p=0,33)** -- Bestand punkte*P bestaetigt, Knopf MOSAIC_TILING_SELECT bleibt inert. `PREREG_t37_tiling_kriterium.md` |
 | **frozen-Set-Neubau** | **AKTIVIERT**: in die CPU-Queue nach dem Stark-Gegner-Nachtest und #37-A/B (Orakel-Labels CPU-schwer; Korpus-Generierung wartet ohnehin) -> danach #29-Validierung an den Aera-Gating-Paaren |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
