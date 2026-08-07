@@ -50,10 +50,15 @@ Checkpoint-Umkehrung E15/E5 zwischen neuem Val und Alt-Messset.
    (`v20wdlsw`) -> v21-Sockel gemaess τ-Verdikt.
    **v21-Fenster FIX: PREREG_v21_fenster.md** (29.450 Partien;
    RAM-Vorbedingung Bitpacking, Agent laeuft).
-2. GPU-Bahn: pi_ctrl_s3 (Kontroll-Seed, laeuft) -> danach
-   **Endgame-Arm** `pi_endgame_s2` (--endgame-head, Seed 2 = gepaart
-   zum Champion-Lauf; Schema-18-Cache baut sich beim Start; NICHT
-   parallel zu pi_ctrl starten -- RAM-Budget 32 GB!).
+2. GPU-Bahn: ~~pi_ctrl_s3~~ FERTIG (brierbest E4 0,1950 intern --
+   identisch zum Champion-Seed; Alt-Messset: s2 0,18749 vs s3 0,18813
+   -> **externe Brier-Seed-Skala ~0,0006**; Checkpoint-Umkehrung
+   E15<E5 repliziert im 2. Seed = systematisch,
+   t36_curve_eval_pi_ctrl.json). **LAEUFT: Endgame-Arm
+   `pi_endgame_s2`** (--endgame-head, Seed 2, Fenster gepinnt via
+   MOSAIC_DATA_EXCLUDE, Cache-Neubau Schema 18 gepackt). Danach:
+   R5-Steigung Endgame-Arm + Seed-Streuung der Steigung am
+   Kontroll-Modell (CPU, nach den Stil-/E3-Messungen); τ-Arm-B-Training.
 3. Koordinator-Bahn: PREREG_platten_intervention.md EINGEFROREN
    (Nutzer-Go), Schema 18 committet (a871123); τ-Annealing-Erweiterung
    beim Agent (MOSAIC_TAU_ARGMAX_FROM_MOVE), Go liegt vor.
