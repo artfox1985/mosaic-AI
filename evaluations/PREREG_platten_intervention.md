@@ -68,3 +68,23 @@ value_r2-Aequivalent), VOR dem Arena-Schritt paarige Seeds nachziehen.
 
 Cache-Neubau Schema 18 (Solver-Labels: messen!), 1 Training (~3-4h
 GPU), 1 Gating (~1-2h CPU). Kein neuer Self-Play-Korpus noetig.
+
+## OFFLINE-ERGEBNIS (2026-08-08 nachts, pi_endgame_s2 vs Champion/Kontrolle)
+
+Training: Early Stop E15, brierbest E6 (interner val_brier 0,1939 vs
+0,1950/0,1950 der beiden kopflosen Seeds).
+
+1. **R5-Steigung (primaer): 0,457** (R²=0,37, n=139) -- die
+   vorregistrierte 0,5-Schwelle KNAPP VERFEHLT, aber +0,108 ueber dem
+   Champion (0,349) bei Seed-Skala ~0,054 (s2/s3-Paar) => ~2
+   Seed-Sigma; Verlauf 0,086 -> 0,273 -> 0,349 -> 0,457. Punkte-Kopf
+   0,342 (R²=0,04, weiterhin kein belastbares Signal).
+2. **Brier-Nichtunterlegenheit: UEBERTROFFEN** -- Alt-Messset
+   (Snapshot) brierbest 0,18587 vs Champion 0,18749 vs Kontrolle
+   0,18813 (Delta -0,0016 ~ 2,7x Seed-Skala 0,0006); E15 0,18240 =
+   Serien-Bestwert.
+3. Arena-Gating vs `v20_2d_opp_brierbest` LAEUFT (Schritt 3 der
+   Messkette; nur H1 macht den Kopf zur Champion-Linie -- bei H0 wird
+   der Offline-Teilerfolg dokumentiert, Kopf optional fuer den
+   v21-Generator... korrekt: fuer das Training der NAECHSTEN
+   Generation auf dem v21-Fenster).
