@@ -1,0 +1,31 @@
+{
+ "n": 72,
+ "heads_realized_r2": {
+  "win_scale_vs_individual_refills": -0.32798039916354305,
+  "win_scale_vs_expected": -0.33752654925184267,
+  "margin_scale_vs_individual_refills": 0.030109821159237216,
+  "margin_scale_vs_expected": 0.030858204038275217
+ },
+ "r2_max": {
+  "win_scale": 0.967163673594502,
+  "margin_scale": 0.9741726224407942
+ },
+ "probes": {
+  "trunk_512->true_margin": {
+   "alpha": 1.0,
+   "r2": 0.9115436615995762
+  },
+  "trunk_512->true_winprob": {
+   "alpha": 1.0,
+   "r2": 0.9159251122445595
+  },
+  "input_raw->true_margin": {
+   "alpha": 1.0,
+   "r2": -0.008541943408185704
+  },
+  "input_raw->true_winprob": {
+   "alpha": 10000.0,
+   "r2": -0.02662865843056772
+  }
+ }
+}

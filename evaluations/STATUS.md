@@ -108,11 +108,25 @@
 6. v20-Aera-Liste (Reihenfolge offen, Nutzer-Prioritaet morgens):
    frozen-Set-Neubau -> #29-Instrument; Aggressions-Neukartierung;
    #37; λ; **NEU: Wertungsplatten-Intervention** (R5-Wiedervorlage-
-   Bedingung erfuellt, s.o.); **NEU: E15-vs-E5-Checkpoint-Gating**
-   (billig, Ein-Faktor; Checkpoint-Umkehrungs-Befund s.o.);
+   Bedingung erfuellt, s.o.; Design-Leitbefund: Zonen-Probe unten);
+   **NEU: E15-vs-E5-Checkpoint-Gating** (billig, Ein-Faktor;
+   Checkpoint-Umkehrungs-Befund s.o.);
    Struktur-Watchlist (braucht bewertete Partien des neuen Champions
    gegen den Nutzer); #35b Ranking-Loss (Daten liegen vor);
-   Endspiel-Zonen-Ursachenanalyse; Fenster-Rotations-A/B fuer v21.
+   ~~Endspiel-Zonen-Ursachenanalyse~~ **ERLEDIGT 2026-08-07
+   (tools/r4b_zone_probe.py, r4b_zone_probe_v20.json)**: LOO-Ridge-Probe
+   auf dem fusion-Trunk (512d) der 72 R4b-Zustaende erreicht **R²=0,91**
+   gegen die exakte Refill-Erwartungs-Ground-Truth (Decke 0,97) --
+   waehrend die Koepfe -0,34/+0,03 realisieren. Verdikt: **die
+   Information IST im Trunk (fast vollstaendig, linear abgreifbar), die
+   Koepfe/Ziele nutzen sie nicht** -- Ziel-Problem (Outcome+Bootstrap
+   belohnen die Endspiel-Exaktheit nie), KEIN Encoding-/Kapazitaets-
+   Problem. Input-Roh-Probe ~0 (erwartet: linear am Input nicht
+   zugaenglich, der Conv-Trunk leistet die Berechnung). Caveat n=72.
+   **Konsequenz fuers Platten-Design: Aux-Kopf mit exakten
+   AB-abgeleiteten Zonen-Zielen (Destillation aus round5.rs) ist der
+   direkteste Hebel** -- billige Supervision fuer bereits vorhandene
+   Repraesentation. Fenster-Rotations-A/B fuer v21.
 
 ## OFFENE ENTSCHEIDUNGEN & GELTENDE REGELN
 
