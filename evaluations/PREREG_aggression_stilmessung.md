@@ -43,5 +43,32 @@ v21-Schwarm.
 4. Vor Einsatz in BEWERTETEN Partien braucht das gewaehlte Preset eine
    eigene Anker-Kante (Gating Champion+Preset vs Champion w=0,
    Elo-Betrugsschutz-Regel).
-5. Beide Kandidaten scheitern -> w=0 bleibt, Punkt zu; die
-   deskriptiven Stil-Befunde werden nur dokumentiert.
+5. Beide Kandidaten scheitern -> w=0 bleibt; dann greift die
+   ESKALATIONSLEITER unten (Nutzer 2026-08-07: "dann muessen wir uns
+   was anderes ueberlegen damit wir dem gegner seinen punkteaufbau
+   aktiv vermiesen").
+
+## Eskalationsleiter bei Doppel-H0 (vorgemerkt, je eigenes Mini-Prereg)
+
+Reihenfolge nach Kosten; jede Stufe mit demselben Instrument
+(3-Arm-Stilmessung, Siegquoten-Wache + Raub-Metriken) gemessen:
+
+- **E1 — λ-hoch-Arm** (nur Messung, 0 Code): (w=0,1; λ=5,0) --
+  verschiebt den Blend Richtung reiner Gegner-Unterdrueckung
+  (u_pts = f(own - λ·opp) wird opp-dominiert). Billigster Test, ob
+  die Dosis-Richtung stimmt und nur der Hebelarm zu kurz war.
+- **E2 — Floor-Shaping-Opp-Bias** (kleiner Env-Knopf): das verifizierte
+  Floor-Shaping (`floor_shaping_delta`, symmetrisch own-opp) bekommt
+  eine asymmetrische Gegner-Gewichtung (`MOSAIC_FLOOR_SHAPING_OPP_BIAS`,
+  Default 1,0 = Bestand). Begruendung: die Stil-Analyse zeigt, dass der
+  Raub-Effekt ueber den FLOOR-Kanal laeuft -- E2 zielt direkt darauf,
+  statt ueber den Punkte-Kopf-Umweg.
+- **E3 — Denial-Tie-Break an der Wurzel** (Suchpfad-Erweiterung):
+  unter allen Wurzelzuegen innerhalb eines ε-Fensters um den besten
+  completed-Q (z.B. ε=0,01) wird der Zug mit der niedrigsten
+  prognostizierten GEGNER-Punktzahl (opp_points-Kopf) gespielt.
+  Strukturell siegquoten-schonend (es werden nur quasi-gleichwertige
+  Zuege getauscht) -- die Nutzer-Nebenbedingung "wenn es uns nicht
+  schadet" ist hier BAUART, nicht Messhoffnung. Teuerste Stufe
+  (Engine-Aenderung + Paritaets-Nachweis), aber der sauberste
+  Mechanismus.
