@@ -49,11 +49,14 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .tile.schwarz::after{content:'▣'}
 .tile.tuerkis::after{content:'◈'}
 .tile.blau::after,.tile.gelb::after,.tile.rot::after,.tile.schwarz::after,.tile.tuerkis::after{
-  /* Feintuning 2026-08-07: absolut + grid-zentriert statt Flex-Textfluss --
-     Glyphen-Baseline-Versatz (❂/◈ etc.) kann die Mitte nicht mehr verschieben. */
-  position:absolute;inset:0;display:grid;place-items:center;
+  /* Feintuning 2026-08-07 v2: Transform-Zentrierung statt Grid -- bei 22px-
+     Zellen laesst Grid einen halben Pixel Rest, der stets nach UNTEN rundet
+     (im 31px-Modal teilt es glatt, daher fiel es nur auf dem Brett auf).
+     translate(-50%,-50%) rendert subpixelgenau; Schatten symmetrisch, damit
+     die Tinte nicht optisch nach unten kippt. */
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   color:#fff;font-size:12px;font-weight:400;line-height:1;
-  text-shadow:0 1px 1px rgba(0,0,0,.35)}
+  text-shadow:0 0 2px rgba(0,0,0,.45)}
 /* Phantom-Fliesen (weisse Fuellung): weisses Symbol waere unsichtbar --
    Symbol in der Randfarbe. */
 .tile.phantom.blau::after{color:var(--blau)}
@@ -68,9 +71,9 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .ds.filled.schwarz::after{content:'▣'}
 .ds.filled.tuerkis::after{content:'◈'}
 .ds.filled.blau::after,.ds.filled.gelb::after,.ds.filled.rot::after,.ds.filled.schwarz::after,.ds.filled.tuerkis::after{
-  position:absolute;inset:0;display:grid;place-items:center;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   color:#fff;font-size:11px;font-weight:400;line-height:1;
-  text-shadow:0 1px 1px rgba(0,0,0,.35)}
+  text-shadow:0 0 2px rgba(0,0,0,.45)}
 /* Unbelegte Kuppel-Farbfelder: Label-Symbol (spaceHTML) etwas groesser als
    die 9px-Basis, damit die Form erkennbar ist. */
 .ds.N{font-size:11px;font-weight:400}
@@ -214,9 +217,10 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
      Spezialfeld-Stern), damit GELEGTE Fliesen klar dominieren. */
   opacity:.35}
 /* Symbol der Soll-Farbe: aus data-sym (spaceHTML), geometrisch zentriert. */
-.ds.N::after{content:attr(data-sym);position:absolute;inset:0;display:grid;place-items:center;
+.ds.N::after{content:attr(data-sym);position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
   color:#fff;font-size:11px;font-weight:400;line-height:1;
-  text-shadow:0 1px 2px rgba(0,0,0,.55)}
+  text-shadow:0 0 2px rgba(0,0,0,.55)}
 .ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
 .ds.S{background:var(--special);border-style:dashed;border-color:#aaa}
 .ds.S.locked{opacity:.25}
