@@ -44,11 +44,13 @@ korrekt). Backup-/Alt-Regel-Korpora bleiben AUSSEN (stehende Regel).
 1. **LAEUFT**: τ-Annealing-Batch 2.000 @600 (`v19wdlann`, Messung 3)
    -- dessen Verdikt entscheidet, ob der v21-SOCKEL mit
    `--tau-argmax-from-move 30` generiert wird.
-2. v21-Schwarm 8.000 @150 `--value-only --version v20wdlsw`
+2. v20-SCHWARM 8.000 @150 `--value-only --version v20wdlsw`
+   (Generator = v20-Champion; die Partien SIND v20-Self-Plays und
+   fuellen das v21-Fenster -- Namens-Konvention!)
    (τ-unabhaengig; Schwarm-Klasse bleibt durchgehend τ=1 --
    Value-Ziele sind zugwahl-robust, und die τ-Messung betrifft die
    Policy-Traeger-Qualitaet).
-3. v21-Sockel 4.000 @600 `--version v20wdl`, τ gemaess Messung-3-Verdikt
+3. v20-SOCKEL 4.000 @600 `--version v20wdl`, τ gemaess Messung-3-Verdikt
    (Uebernahme nur bei repliziertem Arena-Vorteil, sonst τ=1).
 
 ## RAM-Voraussetzung (Nutzer-Einwand 2026-08-07) -- ERFUELLT
