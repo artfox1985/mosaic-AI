@@ -275,6 +275,23 @@ fn warn_missing_opp_head_once() {
     });
 }
 
+/// `warn_missing_opp_head_once`-Pendant fuer den Denial-Tie-Break
+/// (PREREG_denial_tiebreak.md): eigene `OnceLock`+Funktion statt der obigen
+/// wiederverwendet, weil die Meldung den jeweils betroffenen Env-Knopf beim
+/// Namen nennen soll (sonst verwechselbar mit dem Task-#28-Blend, der einen
+/// eigenen, unabhaengigen Knopf hat).
+static WARNED_NO_OPP_HEAD_DENIAL_TIEBREAK: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
+fn warn_missing_opp_head_for_denial_tiebreak_once() {
+    WARNED_NO_OPP_HEAD_DENIAL_TIEBREAK.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_DENIAL_TIEBREAK_EPS>0 gesetzt, aber das geladene Netz hat keinen \
+             opp_points-Kopf -- Denial-Tie-Break bleibt inert (siehe \
+             PREREG_denial_tiebreak.md)."
+        );
+    });
+}
+
 // ── Task #30 (`evaluations/STATUS.md` Abschnitt "Task #30"): monotone
 // Skalen-Korrektur (Platt-artig) des Value-Kopf-Outputs als Laufzeit-Knopf.
 // Motivation: Gumbels σ ist LINEAR in der completed-Q-Perturbation, die
@@ -1064,6 +1081,21 @@ struct Node {
     /// für die "Gültige Aktionen"-Anzeige (Server-Debug-UI), unabhängig davon,
     /// wie viele davon durchs Widening tatsächlich zu Kindern wurden.
     n_actions: usize,
+    /// PREREG_denial_tiebreak.md (Task E3): roher `points_head`-Output dieses
+    /// Knotens (ego-perspektivisch bzgl. `state.current_player`), `None` bei
+    /// jedem Netz ohne Punkte-Kopf. War bislang ein reiner Zwischenwert in
+    /// `node_from_net_outputs` (nur für `blended_leaf_win_prob` gebraucht,
+    /// danach verworfen) -- hier zusätzlich GESPEICHERT, weil der Denial-
+    /// Tie-Break denselben, ohnehin schon berechneten Wert für die Wurzel-
+    /// kinder braucht (KEIN zusätzlicher Netz-Forward-Pass, siehe
+    /// `apply_denial_tiebreak`-Kommentar für die Kostenrechnung).
+    points_forecast: Option<f32>,
+    /// Wie [`Node::points_forecast`], aber der optionale `opp_points_head`-
+    /// Output (Task #28, `net.rs::has_opp_head`) -- ebenfalls ego-
+    /// perspektivisch bzgl. `state.current_player` (Gegner-Punkte AUS SICHT
+    /// des an DIESEM Knoten ziehenden Spielers, nicht zwingend der Wurzel-
+    /// Gegner, siehe `opp_points_forecast_from_root_perspective`).
+    opp_points_forecast: Option<f32>,
 }
 
 impl crate::search_common::SearchNode for Node {
@@ -1630,6 +1662,11 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         terminal,
         leaf_value,
         n_actions,
+        // PREREG_denial_tiebreak.md: dieselben `points`/`opp_points`-Rohwerte,
+        // die oben bereits fuer `blended_leaf_win_prob` berechnet wurden --
+        // hier zusaetzlich abgelegt statt verworfen (kein Zusatz-Forward-Pass).
+        points_forecast: points.first().copied(),
+        opp_points_forecast: opp_points.first().copied(),
     }
 }
 
@@ -1777,6 +1814,20 @@ pub(crate) fn tau_argmax_from_move() -> Option<usize> {
         let n = read_f64_env("MOSAIC_TAU_ARGMAX_FROM_MOVE", 0.0);
         if n >= 1.0 { Some(n.round() as usize) } else { None }
     })
+}
+
+/// ε-Fenster des Denial-Tie-Breaks (PREREG_denial_tiebreak.md, Task E3) via
+/// `MOSAIC_DENIAL_TIEBREAK_EPS` -- Default `0.0` = AUS = byte-identisches
+/// Bestandsverhalten (`apply_denial_tiebreak`s Fruehausstieg liest diesen
+/// Wert). Einmalig gelesen (OnceLock, #30-Muster, siehe `floor_shaping_
+/// weight`/`gumbel_top_m_override` oben). ε liegt auf der completed-Q-Skala
+/// ([0,1]-Gewinnwahrscheinlichkeit, siehe `completed_q_per_candidate`) --
+/// KEINE separate Klemmung noetig, negative/absurd grosse Werte degenerieren
+/// von selbst zu "nie ausserhalb des Fensters" bzw. "Fenster leer" in
+/// `apply_denial_tiebreak_with`.
+fn denial_tiebreak_eps() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_DENIAL_TIEBREAK_EPS", 0.0))
 }
 
 /// Schaltet die Suche komplett auf Gumbel-AlphaZero um (Wurzel: Gumbel-Top-m
@@ -2035,11 +2086,172 @@ fn gumbel_final_root_action(nodes: &[Node]) -> Option<usize> {
         })
 }
 
+// ── PREREG_denial_tiebreak.md (Task E3): Denial-Tie-Break an der Wurzel ────
+//
+// Unter allen Wurzelkindern, deren completed-Q im ε-Fenster um das der
+// `gumbel_final_root_action`-Basisaktion liegt (quasi-gleichwertige Züge),
+// spielt die Suche stattdessen den Zug mit der NIEDRIGSTEN prognostizierten
+// Gegner-Punktzahl (aus Wurzelspieler-Sicht). ε=0.0 (Default) => sofortiger
+// Return der Basisaktion, kein zusätzlicher Vergleich, kein Netz-/RNG-
+// Verbrauch -- byte-identisches Bestandsverhalten (gleiches Additiv-Muster
+// wie `MOSAIC_FLOOR_SHAPING_W`/`MOSAIC_TAU_ARGMAX_FROM_MOVE`).
+
+static DENIAL_TIEBREAK_FIRED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static DENIAL_TIEBREAK_TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Zaehlt eine Denial-Tie-Break-Auswertung -- nur erreicht, wenn `ε>0` UND
+/// das Netz einen `opp_points`-Kopf hat (siehe `apply_denial_tiebreak_with`s
+/// Fruehausstiege; bei `ε=0`/Legacy-Netz bleiben BEIDE Zaehler unveraendert,
+/// keine "leere" Buchung). `fired`: true, wenn tatsaechlich eine ANDERE
+/// Aktion als die Gumbel-Basisaktion gewaehlt wurde. Billiges Debug-
+/// Instrument fuer die PREREG-Messgroesse "Anteil getauschter Zuege" -- zwei
+/// `AtomicU64`, `Ordering::Relaxed` (keine kausale Abhaengigkeit anderer
+/// Zustandsaenderungen an diesem Zaehler, gleiches Muster wie
+/// `profiling.rs`s Zaehler-Paare).
+fn note_denial_tiebreak(fired: bool) {
+    DENIAL_TIEBREAK_TOTAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if fired {
+        DENIAL_TIEBREAK_FIRED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Snapshot `(fired, total)` der Denial-Tie-Break-Zaehler -- fuer die
+/// Stichproben-Auswertung "wie oft feuert der Tie-Break" aus
+/// PREREG_denial_tiebreak.md.
+pub fn denial_tiebreak_stats() -> (u64, u64) {
+    (
+        DENIAL_TIEBREAK_FIRED.load(std::sync::atomic::Ordering::Relaxed),
+        DENIAL_TIEBREAK_TOTAL.load(std::sync::atomic::Ordering::Relaxed),
+    )
+}
+
+/// Setzt beide Denial-Tie-Break-Zaehler zurueck (Test-/Mess-Helfer, gleiches
+/// Muster wie `profiling::reset_all`).
+pub fn reset_denial_tiebreak_stats() {
+    DENIAL_TIEBREAK_FIRED.store(0, std::sync::atomic::Ordering::Relaxed);
+    DENIAL_TIEBREAK_TOTAL.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Perspektiv-Logik des Denial-Tie-Breaks (Implementierungsauftrag Punkt 2):
+/// `Node::points_forecast`/`opp_points_forecast` sind IMMER ego-
+/// perspektivisch bezüglich `nodes[cid].state.current_player` (siehe
+/// `node_from_net_outputs`/Task #28), NICHT zwingend bezüglich des an der
+/// WURZEL ziehenden Spielers `root_player` -- die meisten Aktionen wechseln
+/// den Zieher (`GameState::switch_player`), manche mehrstufigen Aktionen
+/// (z.B. `ChooseDrawStackSlot`, siehe `moves.rs`-Kommentar "über zwei
+/// Spielerentscheidungen ... ohne switch_player()") NICHT. Zwei Fälle:
+///   - Kind-Zieher == `root_player` (Zug wechselt NICHT): das Kind bewertet
+///     mit seinem EIGENEN `points_forecast` weiterhin die Punkte von
+///     `root_player` selbst -- der gesuchte GEGNER-Wert steckt in seinem
+///     `opp_points_forecast`.
+///   - Kind-Zieher == `1 - root_player` (Normalfall, Zug wechselt): das Kind
+///     bewertet mit seinem EIGENEN `points_forecast` bereits die Punkte
+///     SEINES Ziehers, also des WURZEL-GEGNERS -- direkt verwenden;
+///     `opp_points_forecast` wäre hier fälschlich wieder `root_player`s
+///     eigene Punkte.
+/// `None`, wenn der jeweils benötigte Wert am Kind fehlt (sollte bei
+/// vorhandenem `opp_points`-Kopf nicht vorkommen -- Aufrufer-Gating in
+/// `apply_denial_tiebreak_with` prüft das netzweit an der Wurzel; hier
+/// trotzdem defensiv `Option` statt `unwrap`).
+fn opp_points_forecast_from_root_perspective(nodes: &[Node], root_player: usize, cid: usize) -> Option<f64> {
+    let child = &nodes[cid];
+    let raw = if child.state.current_player == root_player {
+        child.opp_points_forecast
+    } else {
+        child.points_forecast
+    };
+    raw.map(|v| v as f64)
+}
+
+/// Reiner Entscheidungskern des Denial-Tie-Breaks, OHNE Env-Var-Zugriff --
+/// nimmt `eps` als Parameter statt ihn aus dem Prozess-weiten `OnceLock`-
+/// Cache (`denial_tiebreak_eps()`) zu lesen (gleiches Trennungsmuster wie
+/// `blended_leaf_win_prob`/`_with`), damit Tests das Fenster ohne die
+/// "einmal pro Prozess gecacht"-Falle direkt durchspielen können.
+///
+/// Kandidatenmenge: NUR `nodes[0].children` (dieselbe Population, über die
+/// bereits `gumbel_final_root_action` entscheidet) -- bewusst NICHT
+/// `nodes[0].untried`: unbesuchte Kandidaten haben nie einen eigenen
+/// `make_node`-Aufruf gesehen (kein `points_forecast`/`opp_points_forecast`
+/// vorhanden) und teilen sich ohnehin alle denselben `v_mix`-Platzhalter
+/// statt einer echten completed-Q-Schätzung (siehe `completed_q_per_
+/// candidate`) -- kein "quasi-gleichwertiger Zug" im Sinne der PREREG. Ein
+/// Einbezug würde IMMER den im PREREG als Fallback erlaubten Zusatz-Batch-
+/// Forward erzwingen; da `baseline` (`gumbel_final_root_action`) ohnehin nie
+/// aus `untried` kommt, bleibt die Tie-Break-Population konsistent zur
+/// Baseline-Auswahl. KOSTEN dieser Funktion: NULL zusätzliche Netz-Forward-
+/// Pässe -- jedes Wurzelkind hat seinen `points_forecast`/`opp_points_
+/// forecast` bereits bei seiner eigenen `make_node`-Expansion berechnet
+/// bekommen (siehe `node_from_net_outputs`), hier nur zusätzlich gelesen
+/// statt (wie vorher) nach der Blattwert-Blendung verworfen.
+fn apply_denial_tiebreak_with(nodes: &[Node], baseline: usize, eps: f64) -> usize {
+    if eps <= 0.0 {
+        return baseline;
+    }
+    if nodes[0].opp_points_forecast.is_none() {
+        warn_missing_opp_head_for_denial_tiebreak_once();
+        return baseline;
+    }
+    let children = &nodes[0].children;
+    if children.len() <= 1 {
+        note_denial_tiebreak(false);
+        return baseline;
+    }
+    let Some(baseline_pos) = children.iter().position(|&c| c == baseline) else {
+        // Sollte nie vorkommen (`gumbel_final_root_action` waehlt IMMER aus
+        // `nodes[0].children`) -- defensiv trotzdem unveraendert zurueck
+        // statt zu paniken.
+        return baseline;
+    };
+    let root_player = nodes[0].state.current_player;
+    let cq = completed_q_per_candidate(nodes, 0);
+    let best_q = cq[baseline_pos].1;
+    let mut chosen_idx = baseline_pos;
+    let mut chosen_opp = opp_points_forecast_from_root_perspective(nodes, root_player, baseline);
+    for (i, &cid) in children.iter().enumerate() {
+        if i == baseline_pos {
+            continue;
+        }
+        if cq[i].1 < best_q - eps {
+            continue; // ausserhalb des Aequivalenzfensters
+        }
+        let Some(opp) = opp_points_forecast_from_root_perspective(nodes, root_player, cid) else {
+            continue;
+        };
+        if chosen_opp.is_none_or(|b| opp < b) {
+            chosen_opp = Some(opp);
+            chosen_idx = i;
+        }
+    }
+    let chosen = children[chosen_idx];
+    note_denial_tiebreak(chosen != baseline);
+    chosen
+}
+
+/// Env-gelesener Wrapper von [`apply_denial_tiebreak_with`] (produktiver
+/// Aufrufer: `select_final_root_child`).
+fn apply_denial_tiebreak(nodes: &[Node], baseline: usize) -> usize {
+    apply_denial_tiebreak_with(nodes, baseline, denial_tiebreak_eps())
+}
+
 /// Dispatcht die finale Wurzel-Zugwahl auf `gumbel_final_root_action`
 /// (Gumbel-Modus) oder `best_root_child` (PUCT), je nach `USE_GUMBEL_SEARCH`.
+/// Der Denial-Tie-Break (`apply_denial_tiebreak`) wirkt NUR im Gumbel-Zweig
+/// (PREREG_denial_tiebreak.md: "Wirkt bei der finalen Wurzelzug-Wahl der
+/// Netz-Suche (Gumbel-Pfad)") -- der PUCT-Legacy-Zweig bleibt unangetastet.
+/// Gemeinsame Stelle für ALLE Aufrufer der finalen Zugwahl (Self-Play über
+/// `net_search_drafting_action`/`net_root_child_stats_and_policy`, Arena über
+/// `net_search_drafting_action[_hybrid]`, GUI/Debug über
+/// `net_search_with_tree[_from_nodes]`) -- eine einzige Änderungsstelle wirkt
+/// dadurch überall dort, wo die tatsächlich gespielte Aktion aus dem
+/// Suchergebnis bestimmt wird, OHNE `root_q`/`root_child_q`/die aufgezeich-
+/// neten Policy-Targets zu berühren (die werden weiterhin unabhängig davon in
+/// `net_root_child_stats_and_policy` aus `nodes`/`forest` gebaut, siehe
+/// dortige Kommentare) -- exakt dasselbe Trennungsmuster wie beim τ-
+/// Annealing (Commit 4c5db0e): reine Zugwahl, kein Trainingsziel-Einfluss.
 fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
     if USE_GUMBEL_SEARCH {
-        gumbel_final_root_action(nodes)
+        gumbel_final_root_action(nodes).map(|baseline| apply_denial_tiebreak(nodes, baseline))
     } else {
         best_root_child(nodes, &nodes[0].children)
     }
@@ -3780,6 +3992,10 @@ mod tests {
         // None -> self_play::net_drafting_policy nimmt weiterhin IMMER den
         // weighted_index-Sampling-Zweig (kein argmax-Zweig erreichbar).
         assert_eq!(tau_argmax_from_move(), None);
+        // Denial-Tie-Break (PREREG_denial_tiebreak.md, MOSAIC_DENIAL_TIEBREAK_EPS):
+        // ungesetzt -> 0.0 -> `apply_denial_tiebreak_with`s Fruehausstieg greift
+        // IMMER, `select_final_root_child` bleibt exakt `gumbel_final_root_action`.
+        assert_eq!(denial_tiebreak_eps(), 0.0);
     }
 
     #[test]
@@ -4023,6 +4239,8 @@ mod tests {
             terminal: false,
             leaf_value: [0.0, 0.0],
             n_actions: 0,
+            points_forecast: None,
+            opp_points_forecast: None,
         }
     }
 
@@ -4093,6 +4311,146 @@ mod tests {
         assert!((cq[1].1 - vmix).abs() < 1e-12, "unbesucht #1 bekommt v_mix");
         assert!((cq[2].1 - vmix).abs() < 1e-12, "unbesucht #2 bekommt v_mix");
         assert!((cq[1].1 - cq[2].1).abs() < 1e-12, "alle unbesuchten Kandidaten teilen denselben v_mix");
+    }
+
+    // ── PREREG_denial_tiebreak.md (Task E3): Perspektiv-Logik ───────────────
+
+    #[test]
+    fn opp_points_forecast_uses_own_opp_head_when_child_mover_equals_root_player() {
+        // Zug wechselt NICHT (Kind-Zieher == root_player, z.B. ein
+        // Mehrschritt-Zug ohne switch_player()): das Kind bewertet mit
+        // `points_forecast` weiterhin root_player's EIGENE Punkte -- der
+        // Gegner-Wert steckt im Kind-eigenen `opp_points_forecast`.
+        let root_player = 0;
+        let mut root = gumbel_test_node(0.0, 0, 0.0, root_player);
+        root.opp_points_forecast = Some(0.0); // nur fuer den Kopf-Praesenz-Check relevant
+        let mut child = gumbel_test_node(0.5, 1, 0.5, root_player); // Kind-Zieher == root_player
+        child.points_forecast = Some(0.9); // waere root_player's EIGENE Punkte -- NICHT verwenden
+        child.opp_points_forecast = Some(0.3); // root_player's GEGNER -- das gesuchte Ergebnis
+        let nodes = vec![root, child];
+        let got = opp_points_forecast_from_root_perspective(&nodes, root_player, 1).expect("Wert vorhanden");
+        assert!((got - 0.3).abs() < 1e-6, "got={got}, erwartet 0.3 (opp_points_forecast des Kindes)");
+    }
+
+    #[test]
+    fn opp_points_forecast_uses_own_points_head_when_child_mover_is_the_opponent() {
+        // Normalfall: Zug wechselt (Kind-Zieher == 1-root_player). Das Kind
+        // bewertet mit seinem EIGENEN `points_forecast` bereits die Punkte
+        // SEINES Ziehers, also des Wurzel-GEGNERS -- direkt verwenden.
+        let root_player = 0;
+        let mut root = gumbel_test_node(0.0, 0, 0.0, root_player);
+        root.opp_points_forecast = Some(0.0);
+        let mut child = gumbel_test_node(0.5, 1, 0.5, 1 - root_player); // Kind-Zieher == Gegner
+        child.points_forecast = Some(0.4); // Gegners EIGENE Punkte -- das gesuchte Ergebnis
+        child.opp_points_forecast = Some(0.9); // waere hier faelschlich root_player's EIGENE Punkte
+        let nodes = vec![root, child];
+        let got = opp_points_forecast_from_root_perspective(&nodes, root_player, 1).expect("Wert vorhanden");
+        assert!((got - 0.4).abs() < 1e-6, "got={got}, erwartet 0.4 (points_forecast des Kindes)");
+    }
+
+    #[test]
+    fn opp_points_forecast_is_none_when_the_needed_head_is_missing_on_the_child() {
+        // Zug wechselt (braucht `points_forecast`), aber genau der fehlt am
+        // Kind -- KEIN Rueckfall auf `opp_points_forecast` (der waere hier
+        // die FALSCHE Perspektive), stattdessen `None`.
+        let root_player = 0;
+        let root = gumbel_test_node(0.0, 0, 0.0, root_player);
+        let mut child = gumbel_test_node(0.5, 1, 0.5, 1 - root_player);
+        child.points_forecast = None;
+        child.opp_points_forecast = Some(0.7);
+        let nodes = vec![root, child];
+        assert_eq!(opp_points_forecast_from_root_perspective(&nodes, root_player, 1), None);
+    }
+
+    // ── PREREG_denial_tiebreak.md (Task E3): Tie-Break-Kern ─────────────────
+    //
+    // Alle Kern-Tests bauen dieselbe Zwei-Kind-Wurzel (Normalfall: Kinder
+    // wechseln den Zieher, siehe `opp_points_forecast_uses_own_points_head_
+    // when_child_mover_is_the_opponent` oben) und variieren nur `eps`/die
+    // Kandidaten-Werte -- `apply_denial_tiebreak_with` ist der reine,
+    // env-freie Entscheidungskern (siehe dessen Doku), direkt testbar.
+    //
+    // Gemeinsamer Zaehler-Zugriff (`note_denial_tiebreak`/`denial_tiebreak_
+    // stats`) ist prozessweit -- ein Mutex serialisiert wenigstens diese
+    // Testgruppe untereinander, gleiches Kompromiss-Muster wie
+    // `AGGRESSION_TEST_LOCK` weiter unten.
+    static DENIAL_TIEBREAK_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Baut Wurzel (current_player=0, opp-Kopf vorhanden) + zwei Kinder
+    /// (current_player=1, Normalfall) mit fest verdrahteten `(Q, points_
+    /// forecast)`-Paaren -- `nodes[1]`/`nodes[2]` sind Kandidat A/B.
+    fn denial_tiebreak_test_nodes(q_a: f64, opp_a: f32, q_b: f64, opp_b: f32) -> Vec<Node> {
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.opp_points_forecast = Some(0.0); // Kopf-Praesenz-Check
+        root.children = vec![1, 2];
+        let mut child_a = gumbel_test_node(0.5, 10, q_a * 10.0, 1);
+        child_a.points_forecast = Some(opp_a);
+        let mut child_b = gumbel_test_node(0.5, 10, q_b * 10.0, 1);
+        child_b.points_forecast = Some(opp_b);
+        vec![root, child_a, child_b]
+    }
+
+    #[test]
+    fn denial_tiebreak_eps_zero_returns_baseline_unchanged_byte_identical() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        // B waere bei jedem eps>0 der Gewinner (gleiches Q, viel niedrigere
+        // Gegner-Punkte) -- bei eps=0.0 MUSS trotzdem exakt `baseline`
+        // zurueckkommen (Bestandsverhalten, kein Vergleich stattgefunden).
+        let nodes = denial_tiebreak_test_nodes(0.6, 0.5, 0.6, 0.1);
+        assert_eq!(apply_denial_tiebreak_with(&nodes, 1, 0.0), 1);
+        assert_eq!(denial_tiebreak_stats(), (0, 0), "eps=0.0 darf die Zaehler nicht anfassen");
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_swaps_to_lower_opp_points_inside_the_window() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        // A: Q=0.60 (Basis), Gegner-Punkte 0.5. B: Q=0.58 (innerhalb eps=0.05
+        // um 0.60), Gegner-Punkte 0.1 (niedriger) -- B muss gewinnen.
+        let nodes = denial_tiebreak_test_nodes(0.6, 0.5, 0.58, 0.1);
+        assert_eq!(apply_denial_tiebreak_with(&nodes, 1, 0.05), 2);
+        assert_eq!(denial_tiebreak_stats(), (1, 1), "ein Feuern von einer Gesamtauswertung");
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_ignores_candidates_outside_the_window() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        // Wie oben, aber B liegt mit Q=0.50 ausserhalb des eps=0.05-Fensters
+        // um 0.60 -- trotz niedrigerer Gegner-Punkte bleibt die Basis A.
+        let nodes = denial_tiebreak_test_nodes(0.6, 0.5, 0.50, 0.1);
+        assert_eq!(apply_denial_tiebreak_with(&nodes, 1, 0.05), 1);
+        assert_eq!(denial_tiebreak_stats(), (0, 1), "kein Feuern, aber EINE Gesamtauswertung");
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_single_child_returns_baseline_unchanged() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.opp_points_forecast = Some(0.0);
+        root.children = vec![1];
+        let mut only_child = gumbel_test_node(0.5, 10, 6.0, 1);
+        only_child.points_forecast = Some(0.9);
+        let nodes = vec![root, only_child];
+        assert_eq!(apply_denial_tiebreak_with(&nodes, 1, 0.5), 1, "einziger Kandidat bleibt Basis");
+        assert_eq!(denial_tiebreak_stats(), (0, 1));
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_missing_opp_head_is_inert_and_does_not_touch_counters() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        let mut nodes = denial_tiebreak_test_nodes(0.6, 0.5, 0.58, 0.1);
+        nodes[0].opp_points_forecast = None; // Legacy-Netz ohne opp_points-Kopf
+        assert_eq!(apply_denial_tiebreak_with(&nodes, 1, 0.05), 1, "inert -> Basis unveraendert");
+        assert_eq!(denial_tiebreak_stats(), (0, 0), "kein Kopf -> gar keine Auswertung gezaehlt");
+        reset_denial_tiebreak_stats();
     }
 
     #[test]
