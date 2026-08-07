@@ -37,9 +37,27 @@
    Snapshot models_2026-08-07_0341_v20_2d_opp.zip.
 4. **LAUFEND**: Champion-Gating `v20_2d_opp_brierbest` vs `v19_2d_best`
    (400 Sims, 200 Paare, Fruehstopp-Regel beachten!). Danach
-   Policy-Wacht (Orakel-Metriken vs v19), Saettigungs-Nachfit
-   (4. Stuetzpunkt, ALTES 90-Dateien-Messset rekonstruieren!),
-   Pflicht-Diagnostiken (Platt, R5, R4b).
+   Policy-Wacht (Orakel-Metriken vs v19), Pflicht-Diagnostiken
+   (Platt, R5, R4b).
+   - **Saettigungs-Nachfit ERLEDIGT 2026-08-07** (Messset exakt
+     rekonstruiert + gegen Referenz-JSON validiert; 900 Partien,
+     146.187 Zustaende; t36_curve_eval_v20punkt.json):
+     Dosis-Kurve alt (Seed-Mittel, extern): 2.020 Sp. 0,19934 ->
+     4.050 Sp. 0,19813 -> 8.100 Sp. 0,19695 (0,0012/Verdopplung).
+     Reine Dosis-Prognose @18.900 Sp.: 0,1955. **IST: brierbest (E5)
+     0,18749, final (E15) 0,18305** -- ~7-12x besser als die
+     Dosis-Prognose. Der 4. Punkt liegt also NICHT auf der alten
+     Kurve: der Sprung ist Aera-Wechsel (WDL-nativer Generator,
+     Zwei-Klassen-Fenster), nicht Spielzahl. Referenz auf demselben
+     Set: Generator t34_wdldestretch_brierbest 0,19706 (= g810-Niveau,
+     Konsistenz-Check bestanden).
+   - **Checkpoint-Umkehrung (Verteilungs-Shift)**: intern (neues
+     Val-Fenster) ist E5 brierbest (0,1950 < 0,1967); auf dem ALTEN
+     Messset ist E15 besser (0,18305 < 0,18749). Interne
+     Checkpoint-Wahl und Alt-Verteilungs-Guete divergieren --
+     fuers Gating gilt die preregistrierte brierbest-Politik,
+     der Befund ist als Kandidat fuer eine Nach-Gating-Pruefung
+     notiert (E15 vs E5 waere ein billiges Ein-Faktor-Gating).
 5. **Suchpfad-Nachmessungen** (PREREG_suchpfad_nachmessungen.md):
    Env-Knoepfe bauen (MOSAIC_FLOOR_SHAPING_W, MOSAIC_GUMBEL_TOP_M,
    Paritaets-Nachweis) -> Floor-Gewicht-Sweep 0,15/0,3/0,6 ->
