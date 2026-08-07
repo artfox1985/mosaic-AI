@@ -15,19 +15,23 @@ Nutzer-Veto; der Rest ist fix.
 | Sockel-Traeger aelter | `v18` (45 Dateien, seed-bestimmt) | 450 | 400 | aktiv | aktiv |
 | Schwarm NEU | `v20wdlsw` (`--value-only`) | 8.000 | 150 | maskiert | aktiv |
 | Schwarm alt | `v19wdlsw` (komplett) | 8.000 | 150 | maskiert | aktiv |
-| Alt-Value | `v18` (500 Dateien inkl. der 45 Traeger) | 5.000 | 400 | maskiert (ausser Traeger) | aktiv |
-| Alt-Value (Empf. 1) | `v19wdl`-Rest (265 Dateien) | 2.650 | 600 | maskiert | aktiv |
+| Alt-Value | `v18` (500 Dateien, DISJUNKT von den 45 Traeger-Dateien) | 5.000 | 400 | maskiert | aktiv |
+| Alt-Value | `v19wdl`-Rest (265 Dateien) | 2.650 | 600 | maskiert | aktiv |
+
+**Praezisierung (Nutzer 2026-08-07)**: die 450 Traeger-Partien sind
+ZUSAETZLICH zu den 5.000 maskierten -- insgesamt **5.450 v18-Partien**
+im Training (545 von 600 v18-Dateien; 55 Dateien bleiben draussen,
+seed-bestimmte Auswahl im Manifest). Gesamtfenster damit 29.450
+Partien.
 
 Rotations-Logik: jede Generation altert eine Stufe (v19wdl uebernimmt
 die 1.350er-Traegerrolle, v18 die 450er); **v16/v17 rotieren komplett
 raus** (Nutzer-Zuschnitt). Value-Fenster waechst ~21.000 -> ~29.450.
 
-**Empfehlung 1 (Veto offen)**: die 2.650 Nicht-Traeger-Partien des
-v19wdl-Sockels bleiben als maskiertes Value-Material im Fenster
-(v20-Muster: Nicht-Traeger = Value; kostet nichts).
-**Empfehlung 2 (Veto offen)**: die 450 v18-Traeger sind TEILMENGE der
-5.000 (45 von 500 v18-Dateien tragen zusaetzlich Policy) -- keine
-separaten Extra-Partien. Struktur wie v20.
+Beide frueheren Detail-Empfehlungen sind durch die Nutzer-Praezisierung
+ERSETZT: v19wdl-Rest (2.650) ist als maskiertes Value-Material vom
+Nutzer BESTAETIGT; die 450 v18-Traeger sind SEPARATE Dateien (nicht
+Teilmenge der 5.000) -- kein offenes Veto mehr, der Zuschnitt ist fix.
 
 Umsetzung wie v20: `policy_carrier_manifest_v21.json` (Traeger-Dateien
 + Seed), Manifest-Inhalt im Cache-Key. Dateien nach dem GENERATOR
