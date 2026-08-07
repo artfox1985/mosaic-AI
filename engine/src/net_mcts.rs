@@ -1753,6 +1753,32 @@ fn gumbel_top_m_override() -> Option<usize> {
     })
 }
 
+/// τ-Annealing-Schwelle fuer den SELF-PLAY-Zugwahl-Pfad via
+/// `MOSAIC_TAU_ARGMAX_FROM_MOVE` (`evaluations/PREREG_suchpfad_nachmessungen.md`,
+/// Messung 3 -- "fruehe Zuege τ=1 (Sampling, Bestandsverhalten), ab einem
+/// Schwellen-Zug argmax"). `0`/nicht gesetzt/nicht parsbar = `None` = AUS
+/// (Bestandsverhalten: die GANZE Partie wird weiterhin proportional zur
+/// Besuchsverteilung gesampelt, siehe `self_play::net_drafting_policy`).
+/// Einmalig gelesen (OnceLock, #30-Muster). N>=1: ab dem N-ten Halbzug EINER
+/// Partie (1-basiert, beide Spieler zusammen gezaehlt -- siehe
+/// `self_play::play_net_self_play_game`s `move_number`-Zaehler) wird statt
+/// gesampelt der argmax der bestehenden Besuchsverteilung gespielt
+/// (Gleichstand: deterministisch der erste Eintrag, siehe
+/// `self_play::argmax_index`). Vorab-Festlegung im PREREG: Schwelle 30 (grob
+/// Runde 1+, siehe `evaluations/actions_per_round.md`: ~11 Zuege/Runde/
+/// Spieler). Wirkt NUR im Self-Play-Pfad (`self_play::net_drafting_policy`,
+/// einziger produktiver Aufrufer ist `run_net_self_play`/
+/// `play_net_self_play_game`) -- der Arena-/GUI-Pfad
+/// (`net_search_state_json`/`net_search_with_tree` in `lib.rs`) ruft weder
+/// diese Funktion noch `net_drafting_policy` auf und bleibt unveraendert.
+pub(crate) fn tau_argmax_from_move() -> Option<usize> {
+    static CELL: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let n = read_f64_env("MOSAIC_TAU_ARGMAX_FROM_MOVE", 0.0);
+        if n >= 1.0 { Some(n.round() as usize) } else { None }
+    })
+}
+
 /// Schaltet die Suche komplett auf Gumbel-AlphaZero um (Wurzel: Gumbel-Top-m
 /// + Sequential Halving statt Dirichlet-Noise + PUCT; Tiefe≥1: neue
 /// deterministische Auswahlregel statt `best_puct`; Policy-Ziel: completed-Q-
@@ -3750,6 +3776,10 @@ mod tests {
         assert_eq!(floor_shaping_weight(), FLOOR_SHAPING_WEIGHT);
         assert_eq!(gumbel_top_m_for_budget(150), 9);
         assert_eq!(gumbel_top_m_for_budget(400), GUMBEL_TOP_M);
+        // τ-Annealing (Messung 3, MOSAIC_TAU_ARGMAX_FROM_MOVE): ungesetzt ->
+        // None -> self_play::net_drafting_policy nimmt weiterhin IMMER den
+        // weighted_index-Sampling-Zweig (kein argmax-Zweig erreichbar).
+        assert_eq!(tau_argmax_from_move(), None);
     }
 
     #[test]
