@@ -97,3 +97,24 @@ schwaecher als beim (0,1;2,0)-Arm). Die Dosis-These "mehr λ = mehr
 Gegner-Unterdrueckung" materialisiert sich nicht. KEINE Uebernahme
 (auch die gelockerte E3-Philosophie gaebe nichts her: Effekt = 0).
 E1 zu -> naechste Sprosse E2 (Floor-Shaping-Opp-Bias).
+
+## E2-ERGEBNIS + LEITER-ABSCHLUSS (2026-08-07, 3x400, Seed 20260813)
+
+bias=1,5: 296/400 (-1pp, faellt an der Wache); einzige "signifikante"
+Effekte des Laufs zeigen in die FALSCHE Richtung (Gegner-Punkte +1,44
+t=+2,23; Gegner-Floor -0,65 t=-2,15) -- bei 10 Tests/Lauf und
+Nicht-Monotonie als Rauschen/Such-Interaktion gelesen, ohnehin kein
+Kandidat. bias=2,0: 302/400 (Wache bestanden), Raub-Metriken flach
+(Gegner-Punkte -0,18 t=-0,29; Gegner-Floor +0,59 t=+1,24) -> kein
+messbarer Effekt, keine Uebernahme.
+
+**LEITER GESCHLOSSEN -- GESAMTVERDIKT AGGRESSIONS-PROGRAMM
+2026-08-07**: der aktuelle Kopf gibt KEINEN kostenlosen Raub-Hebel
+her: w/λ-Blend flach (Bestaetigungslauf), λ-hoch flach (E1), E3
+signifikant schaedlich (-13,75pp bei ε=0,03), Floor-Opp-Bias flach
+(E2). Alle Live-/Self-Play-Konfigurationen bleiben auf den Defaults
+(w=0, λ=0, ε=0, bias=1). **Wiedervorlage-Bedingung**: neuer Anlauf
+(Startkandidat (0,1;2,0)) erst, wenn eine kuenftige Kopf-Generation
+den opp-/Punkte-Kopf messbar schaerft (z.B. via Endgame-Aux-Kopf,
+PREREG_platten_intervention) -- Praediktor: opp-Kopf-R² deutlich
+ueber den heutigen ~0,48.
