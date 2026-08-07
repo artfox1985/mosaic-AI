@@ -37,6 +37,13 @@ Engine-Seite (`net_mcts.rs::value_to_win_prob`) liest ihn unveraendert,
 `value_wdl_logits` ist reine Trainings-/Diagnose-Zusatzinformation, von der
 Rust-Suche nicht konsumiert. Alt-Modelle (Tanh-Kopf) exportieren
 byte-identisch wie zuvor.
+
+Schema 18 (evaluations/PREREG_platten_intervention.md): optionaler LETZTER
+Output `endgame_margin` -- exakter R5-Wurzelwert-Aux-Kopf, NUR wenn der
+Checkpoint den additiven `endgame_head` traegt
+(`neural_net.py::endgame_head_present`), haengt HINTER `opp_points` (falls
+beide aktiv). Alt-Modelle ohne diesen Kopf exportieren byte-identisch wie
+zuvor. Die Engine erkennt den Output per NAME, nicht Position (net.rs).
 """
 import sys
 import argparse
@@ -47,7 +54,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (MosaicNet, Mosaic2DNet, points_dist_bins_from_state,  # noqa: E402
                         encoder_from_state_dict, opp_points_head_present,
-                        value_head_variant_from_state)
+                        endgame_head_present, value_head_variant_from_state)
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
 
@@ -76,10 +83,13 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     # Task #34: 'tanh' oder 'wdl' AUS DEM CHECKPOINT -- Alt-Modelle (kein
     # `value_head.2.weight` mit Breite 2) exportieren byte-identisch.
     value_head_variant = value_head_variant_from_state(state)
+    # Schema 18 (PREREG_platten_intervention.md): siehe Modul-Kommentar --
+    # additiv, nur wenn im Checkpoint vorhanden (Muster opp_head).
+    eg_head = endgame_head_present(state)
 
     model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
                       points_dist_bins=points_dist_bins_from_state(state), opp_points_head=opp_head,
-                      value_head_variant=value_head_variant)
+                      endgame_head=eg_head, value_head_variant=value_head_variant)
     new_state = model.state_dict()
     # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
     # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads
@@ -114,6 +124,11 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     # erkennt ihn per Output-NAME, nicht per Position.
     if getattr(model, "has_opp_points_head", False):
         out_names.append("opp_points")
+    # Schema 18: "endgame_margin" MUSS der ALLERLETZTE Output sein (haengt
+    # HINTER "opp_points", siehe Modul-Kommentar) -- Engine erkennt ihn per
+    # Output-NAME, nicht per Position.
+    if getattr(model, "has_endgame_head", False):
+        out_names.append("endgame_margin")
     dyn_axes = {"state": {0: "batch"}}
     dyn_axes.update({n: {0: "batch"} for n in out_names})
 
@@ -171,12 +186,14 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
     opp_head = opp_points_head_present(state)
     # Task #34: siehe _export_flat-Kommentar.
     value_head_variant = value_head_variant_from_state(state)
+    # Schema 18: siehe _export_flat-Kommentar.
+    eg_head = endgame_head_present(state)
 
     model = Mosaic2DNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
                         points_dist_bins=points_dist_bins_from_state(state),
                         planes_channels=planes_channels, conv_channels=conv_channels,
                         conv_layers=max(conv_layers, 1), opp_points_head=opp_head,
-                        value_head_variant=value_head_variant)
+                        endgame_head=eg_head, value_head_variant=value_head_variant)
     new_state = model.state_dict()
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
     if skipped:
@@ -195,6 +212,9 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
     # Task #28: "opp_points" ZULETZT (siehe _export_flat-Kommentar).
     if getattr(model, "has_opp_points_head", False):
         out_names.append("opp_points")
+    # Schema 18: "endgame_margin" ALLERLETZT (siehe _export_flat-Kommentar).
+    if getattr(model, "has_endgame_head", False):
+        out_names.append("endgame_margin")
     # JEDE Ein-/Ausgabe muss in dynamic_axes stehen (siehe Flach-Zweig-Kommentar
     # oben) -- gilt hier für BEIDE Inputs.
     dyn_axes = {"planes": {0: "batch"}, "state": {0: "batch"}}

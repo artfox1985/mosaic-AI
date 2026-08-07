@@ -223,7 +223,12 @@ def _unpack_optional_outputs(model, out_tuple):
     if getattr(model, "has_opp_points_head", False):
         pred_opp_points = out_tuple[idx]
         idx += 1
-    return pred_points_logits, pred_value_wdl_logits, pred_opp_points
+    # Schema 18: endgame_head haengt ZULETZT (hinter opp_points).
+    pred_endgame = None
+    if getattr(model, "has_endgame_head", False):
+        pred_endgame = out_tuple[idx]
+        idx += 1
+    return pred_points_logits, pred_value_wdl_logits, pred_opp_points, pred_endgame
 
 
 def _git_commit_hash() -> str | None:
@@ -368,7 +373,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
-          value_target_lambda=1.0, opp_points_head=False, value_head="tanh"):
+          value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh"):
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -467,6 +472,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant, "encoder": encoder,
         "value_target_lambda": value_target_lambda, "opp_points_head": opp_points_head,
+        "endgame_head": endgame_head,
         "value_head": value_head,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
@@ -592,6 +598,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if opp_points_head:
         print(f"   Opp-Punkte-Kopf: AN (Task #28, PREREG_task28_aggression.md) -- "
               f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NICHT Teil von val_combined")
+    if endgame_head:
+        print(f"   Endgame-Kopf  : AN (Schema 18, PREREG_platten_intervention.md) -- "
+              f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NUR R5-Drafting-Zone "
+              f"maskiert, NICHT Teil von val_combined")
     if value_head == "wdl":
         print(f"   Value-Kopf    : WDL (Task #34) -- 2-Logit-Softmax-Klassifikation, "
               f"Kreuzentropie auf Sieg/Niederlage-Ziel (`values_wdl`). ACHTUNG: val_combined "
@@ -604,11 +614,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if encoder == "2d":
         model = Mosaic2DNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
                             points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
-                            value_head_variant=value_head)
+                            endgame_head=endgame_head, value_head_variant=value_head)
     else:
         model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
                           points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
-                          value_head_variant=value_head)
+                          endgame_head=endgame_head, value_head_variant=value_head)
 
     # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
@@ -678,6 +688,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # informatives Logging/Checkpoint-Feld, NICHT Teil der Checkpoint-
     # Auswahl (siehe Kommentar an der `current_metric`-Stelle unten).
     opp_points_history = []
+    # Schema 18 (PREREG_platten_intervention.md): nur befuellt, wenn
+    # --endgame-head aktiv ist -- gleiches Muster wie opp_points_history.
+    endgame_history = []
     val_ploss_history = []
     # Value/Points hatten bisher KEINEN Val-Split-Loss/R² -- nur der rohe
     # Trainings-Loss wurde reported (siehe TRAINING SUMMARY unten). Für den
@@ -691,6 +704,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     val_points_r2_history = []
     val_opp_pointsloss_history = []
     val_opp_points_r2_history = []
+    # Schema 18: maskiertes Val-MSE des endgame_head, nur relevant wenn aktiv
+    # (Muster val_opp_pointsloss_history, aber kein R² -- root_q-Ziel ist auf
+    # der R5-Zone stark einseitig verteilt, R² waere hier keine sinnvolle
+    # Zusatzkennzahl, siehe PREREG_platten_intervention.md).
+    val_endgame_mse_history = []
     # Task #34: Brier-Score von P(Sieg) gegen den echten Spielausgang -- die
     # ARM-UEBERGREIFEND vergleichbare Value-Kalibrierungskennzahl (siehe
     # Kommentar an der Berechnungsstelle im Val-Loop). Anders als
@@ -781,6 +799,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
         t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
+        t_endgameloss = 0  # Schema 18: nur != 0 relevant, wenn endgame_head aktiv
 
         for _batch_idx, _batch in enumerate(dataloader):
             if _batch_idx % _mem_log_every == 0:
@@ -799,7 +818,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if encoder == "2d":
                 (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
-                 targets_v_wdl, s_wdl_outcome) = _batch
+                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask) = _batch
                 # RAM-Optimierung v20: Cache liefert kompakte Typen (planes
                 # uint8, states/policies fp16, masks uint8) -- Cast auf
                 # float32 erst NACH dem Device-Move (billig, spart Transfer).
@@ -808,7 +827,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             else:
                 (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
-                 targets_v_wdl, s_wdl_outcome) = _batch
+                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask) = _batch
             states    = states.to(device).float()
             targets_p = targets_p.to(device).float()
             targets_v = targets_v.to(device)
@@ -817,13 +836,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             s_opp_mask = s_opp_mask.to(device)
             targets_v_wdl = targets_v_wdl.to(device)
             s_wdl_outcome = s_wdl_outcome.to(device)
+            targets_endgame = targets_endgame.to(device)
+            s_endgame_mask = s_endgame_mask.to(device)
             masks     = masks.to(device).float()
             pol_w     = pol_w.to(device)
 
             optimizer.zero_grad()
             _out = model(planes, states) if encoder == "2d" else model(states)
             pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
-            pred_points_logits, pred_value_wdl_logits, pred_opp_points = _unpack_optional_outputs(model, _out)
+            (pred_points_logits, pred_value_wdl_logits, pred_opp_points,
+             pred_endgame) = _unpack_optional_outputs(model, _out)
 
             # Policy Loss mit Masking:
             # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
@@ -970,10 +992,26 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 opp_denom = opp_w.sum().clamp(min=1e-6)
                 opp_loss = (((pred_opp_points - targets_opp_points) ** 2) * opp_w).sum() / opp_denom
 
+            # Schema 18 (PREREG_platten_intervention.md): Endgame-Aux-Loss,
+            # NUR bei aktivem Kopf. MSE gegen den exakten R5-Wurzelwert
+            # (Cache [0,1] -> Remap auf die Tanh-Skala [-1,1]), maskiert mit
+            # `s_endgame_mask` (nur R5-Drafting mit root_q). Gewicht =
+            # POINTS_WEIGHT (symmetrisch, kein neues Tuning, Muster opp_loss).
+            # KEIN rw2: --exclude-round5 wuerde die Zone komplett leeren --
+            # der Kopf ist ausdruecklich ein R5-Zonen-Signal. Geht NICHT in
+            # val_combined/Brier-Checkpoint-Auswahl ein.
+            endgame_loss = torch.zeros((), device=device)
+            if pred_endgame is not None:
+                eg_w = s_endgame_mask.view(-1, 1)
+                eg_denom = eg_w.sum().clamp(min=1e-6)
+                eg_target = targets_endgame * 2.0 - 1.0
+                endgame_loss = (((pred_endgame - eg_target) ** 2) * eg_w).sum() / eg_denom
+
             loss = (p_loss + effective_value_weight * v_loss
                     + effective_points_weight * points_loss
                     + effective_ownership_weight * own_loss
-                    + effective_points_weight * opp_loss)
+                    + effective_points_weight * opp_loss
+                    + effective_points_weight * endgame_loss)
             loss.backward()
             optimizer.step()
 
@@ -983,16 +1021,20 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             t_pointsloss += points_loss.item()
             if pred_opp_points is not None:
                 t_opp_pointsloss += opp_loss.item()
+            if pred_endgame is not None:
+                t_endgameloss += endgame_loss.item()
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
         epoch_pointsloss = t_pointsloss / n_batches
         epoch_opp_pointsloss = t_opp_pointsloss / n_batches
+        epoch_endgameloss = t_endgameloss / n_batches
         epoch_tloss = t_loss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
         points_history.append(epoch_pointsloss)
         opp_points_history.append(epoch_opp_pointsloss)
+        endgame_history.append(epoch_endgameloss)
         total_history.append(epoch_tloss)
 
         # ── Validierung (Policy + Value + Points) auf dem NIE trainierten
@@ -1009,11 +1051,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_val_points_r2 = None
         epoch_val_opp_pointsloss = None
         epoch_val_opp_points_r2 = None
+        epoch_val_endgame_mse = None
         epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
         if val_dataloader is not None:
             model.eval()
             val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
             val_opp_pointsloss_sum, val_opp_batches = 0.0, 0  # Task #28, nur relevant wenn opp_points_head aktiv
+            val_endgame_sqerr_sum, val_endgame_n = 0.0, 0.0  # Schema 18, nur relevant wenn endgame_head aktiv
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             opp_sum, opp_sumsq, opp_sqerr_sum, n_opp = 0.0, 0.0, 0.0, 0
@@ -1023,13 +1067,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     if encoder == "2d":
                         (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
-                         v_targets_v_wdl, v_wdl_outcome) = _v_batch
+                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask) = _v_batch
                         # RAM-Optimierung v20: Cast wie im Trainingszweig.
                         v_planes = v_planes.to(device).float()
                     else:
                         (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
-                         v_targets_v_wdl, v_wdl_outcome) = _v_batch
+                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask) = _v_batch
                     v_states = v_states.to(device).float()
                     v_targets_p = v_targets_p.to(device).float()
                     v_targets_v = v_targets_v.to(device)
@@ -1038,12 +1082,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     v_opp_mask = v_opp_mask.to(device)
                     v_targets_v_wdl = v_targets_v_wdl.to(device)
                     v_wdl_outcome = v_wdl_outcome.to(device)
+                    v_targets_endgame = v_targets_endgame.to(device)
+                    v_endgame_mask = v_endgame_mask.to(device)
                     v_masks = v_masks.to(device).float()
                     v_pol_w = v_pol_w.to(device)
                     _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
                     (_v_pred_points_logits, v_pred_value_wdl_logits,
-                     v_pred_opp_points) = _unpack_optional_outputs(model, _vout)
+                     v_pred_opp_points, v_pred_endgame) = _unpack_optional_outputs(model, _vout)
+                    if v_pred_endgame is not None:
+                        _eg_w = v_endgame_mask.view(-1, 1)
+                        val_endgame_sqerr_sum += (((v_pred_endgame - (v_targets_endgame * 2.0 - 1.0)) ** 2) * _eg_w).sum().item()
+                        val_endgame_n += _eg_w.sum().item()
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
@@ -1188,6 +1238,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             epoch_val_pointsloss = val_pointsloss_sum / max(val_batches, 1)
             epoch_val_opp_pointsloss = (val_opp_pointsloss_sum / val_opp_batches
                                         if val_opp_batches > 0 else None)
+            # Schema 18: maskiertes Val-MSE des endgame_head -- None (statt
+            # einer erfundenen 0.0), wenn kein einziges maskiertes Sample im
+            # Val-Split lag (Alt-Cache/Kopf inaktiv). Geht NICHT in
+            # val_combined/die Brier-Checkpoint-Auswahl ein (Muster opp_loss,
+            # siehe Kommentar am Trainings-Loss-Block oben).
+            epoch_val_endgame_mse = (val_endgame_sqerr_sum / val_endgame_n
+                                     if val_endgame_n > 0 else None)
 
             def _r2(sum_y, sumsq_y, sqerr, n):
                 if n == 0:
@@ -1208,6 +1265,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_points_r2_history.append(epoch_val_points_r2)
         val_opp_pointsloss_history.append(epoch_val_opp_pointsloss)
         val_opp_points_r2_history.append(epoch_val_opp_points_r2)
+        val_endgame_mse_history.append(epoch_val_endgame_mse)
         val_brier_history.append(epoch_val_brier)
 
         # Fund 8 (externer Hinweis, Bugfixes.txt Abschnitt C): "bestes Modell"
@@ -1358,9 +1416,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Task #34: Brier-Score separat ausgewiesen (arm-uebergreifend
         # vergleichbar, siehe Kommentar an der Berechnungsstelle).
         val_brier_str = f" | Value-Brier={epoch_val_brier:.4f}" if epoch_val_brier is not None else ""
+        # Schema 18 (PREREG_platten_intervention.md): kompakte Zusatz-Zeile
+        # NUR bei aktivem Kopf, sonst bleibt die Ausgabe unveraendert (Muster
+        # der uebrigen optionalen Koepfe hier, z.B. val_brier_str).
+        endgame_str = ""
+        if getattr(model, "has_endgame_head", False):
+            _eg_val_s = f"{epoch_val_endgame_mse:.4f}" if epoch_val_endgame_mse is not None else "n/a"
+            endgame_str = f" | Endgame: {epoch_endgameloss:.4f} / Val-MSE {_eg_val_s}"
         lr_str = f" | LR={optimizer.param_groups[0]['lr']:.2e}" if lr_scheduler is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{plateau_marker}{lr_str}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{endgame_str}{plateau_marker}{lr_str}")
 
         # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
@@ -1805,6 +1870,20 @@ if __name__ == "__main__":
                              "unveraendert vergleichbar mit Alt-Laeufen), nur separat geloggt. "
                              "--load von einem Alt-Checkpoint OHNE diesen Kopf funktioniert "
                              "(fehlende Keys -> frisch initialisiert, Rest warm).")
+    parser.add_argument("--endgame-head", action="store_true",
+                        help="Schema 18 (evaluations/PREREG_platten_intervention.md): additiven "
+                             "endgame_head aktivieren -- MLP auf `shared`, Ziel = exakter R5-"
+                             "Wurzelwert (root_q der R5-Drafting-Records, [0,1]-Skala im Cache -> "
+                             "Tanh-Remap [-1,1] im Loss), MSE, Gewicht=POINTS_WEIGHT, maskiert mit "
+                             "'endgame_mask' (nur R5-Drafting-Zustaende mit geloggtem root_q; Alt-"
+                             "Caches/Nicht-R5-Zustaende -> Maske 0). STANDARD AUS -- ohne dieses "
+                             "Flag byte-identisches Bestandsverhalten (Kopf existiert nicht im "
+                             "Modell, kein ONNX-Output 'endgame_margin'). Der Loss geht NICHT in "
+                             "val_combined/die Checkpoint-Auswahl ein (Bestandsmetrik bleibt "
+                             "unveraendert vergleichbar mit Alt-Laeufen), nur separat geloggt. "
+                             "--load von einem Alt-Checkpoint OHNE diesen Kopf funktioniert "
+                             "(fehlende Keys -> frisch initialisiert, Rest warm, gleiches Muster "
+                             "wie --opp-points-head).")
     parser.add_argument("--encoder", type=str, default="flat", choices=["flat", "2d"],
                         help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
                              "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
@@ -1846,4 +1925,5 @@ if __name__ == "__main__":
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant, encoder=args.encoder,
           value_target_lambda=args.value_target_lambda, opp_points_head=args.opp_points_head,
+          endgame_head=args.endgame_head,
           value_head=args.value_head)
