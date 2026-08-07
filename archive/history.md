@@ -9896,3 +9896,201 @@ McNemar):
 direkt die Stellschrauben drangewesen -- H1 machte es gegenstandslos);
 zwei per OneDrive verschwundene GUI-Screenshots aus Git restauriert;
 τ-Annealing (Messung 3) wartet designgemaess auf eigenes Nutzer-Go.
+
+### Nachtrag Vormittag 2026-08-07 (nach dem Morgenbericht)
+
+- **Endspiel-Zonen-Ursachenanalyse ERLEDIGT** (tools/r4b_zone_probe.py,
+  r4b_zone_probe_v20.json): LOO-Ridge-Probe auf dem fusion-Trunk (512d)
+  der 72 R4b-Zustaende erreicht R²=0,91 gegen die exakte
+  Refill-Erwartungs-Ground-Truth (Decke 0,97), die Koepfe realisieren
+  -0,34/+0,03; Input-Roh-Probe ~0 (linear am Input nicht zugaenglich,
+  der Conv-Trunk leistet die Berechnung). Verdikt: ZIEL-Problem
+  (Outcome+Bootstrap belohnen Endspiel-Exaktheit nie), kein
+  Encoding-/Kapazitaets-Problem. Caveat n=72. Konsequenz: Aux-Kopf mit
+  exakten AB-Zonen-Zielen = Leitkandidat der Platten-Intervention
+  (PREREG_platten_intervention.md, ENTWURF).
+- **Saettigungs-Nachfit-Detail** (fuer die Kurvenakte): Alt-Kurve
+  Seed-Mittel extern 2.020 Sp. 0,19934 / 4.050 Sp. 0,19813 / 8.100 Sp.
+  0,19695; Generator-Referenz t34_wdldestretch_brierbest auf demselben
+  Set 0,19706 (=g810-Niveau, Konsistenz-Check bestanden). v20-Werte und
+  Verdikt siehe Kapitel oben.
+- **Parallel-Betrieb gestartet** (Nutzer: "dann los"): CPU-Bahn
+  E15-vs-E5-Checkpoint-Gating (400 Sims, 200 Paare, no-promote),
+  danach Aggressions-Neukartierung
+  (PREREG_aggressions_neukartierung.md, 4 Arme (w,λ): (0,0)/(0.1,1)/
+  (0.1,2)/(0.2,2) vs Heuristik, Seed 20260809; Nutzer startet seine
+  bewerteten Partien erst danach). env_ab-Tool auf Mehrfach-Env-Vars
+  erweitert.
+- STATUS.md-Aufraeumung auf Nutzer-Wunsch: erledigte v20-Pipeline-
+  Bloecke (Training/Gating/Diagnostik/Messungen, Details alle in diesem
+  Kapitel) aus STATUS entfernt.
+
+## AUSGELAGERT aus STATUS.md (2026-08-07): abgeschlossene Bloecke
+
+- **v20-KAMPAGNEN-DESIGN, drei Optionen (Stand 2026-08-06, Nutzer-Entscheid
+  offen)** -- Grundlage: #36-Schere (Policy im Warm-Start-Regime satt,
+  Value log-linear hungrig) + Durchsatz 1,37x + Nutzer-Schluss "wenn die
+  Policy satt ist, kommt sie mit weniger Policy-Traeger-Partien aus":
+  - **A Standard**: 6000+ Partien @600, alles wie gehabt (+20% mehr
+    Partien durch Tiling-Cache).
+  - **B PCR-mild**: +37% Partien, aber schwaechere Policy-Labels auf der
+    Haelfte der Zuege JEDER Partie (Juli-Schwachstelle).
+  - **C ZWEI-KLASSEN (Nutzer-Idee 2026-08-06, praeferierter Kandidat)**:
+    Sockel voller Partien @600 (Policy-Traeger) + Schwarm reiner
+    VALUE-Partien @~150 Sims (~2,5x billiger; `policy_target_valid=false`
+    -> pol_w=0, Infrastruktur existiert aus PCR-Bau). Value-Label-Verlust
+    minimal: Ziel = bootstrap (netz-, nicht sims-abhaengig) + Ausgang;
+    root_q ungenutzt. Vorteil vs B: Policy-Labels des Sockels UNBERUEHRT.
+    **Fenster-Zuschnitt (Nutzer 2026-08-06)**: Sockel 4000 @600 (Policy
+    aktiv) + Schwarm 8000 @~150 (Policy maskiert) vom v20-Generator;
+    Alt-Einfluss: 1350 v18- + 450 v17-Partien als Policy-Traeger
+    (Summe 5800 Policy-aktiv), restliche ~7200 v18/v17/v16-Partien als
+    reines Value-Material -> ~21.000 Value-Partien gesamt. Nachschub-Ventil
+    GESTRICHEN (Nutzer 2026-08-07): bei Gating-Fehlschlag keine
+    Zusatz-Partien -- andere Stellschrauben zuerst.
+    **Backup-Altbestaende bleiben AUSSEN (Nutzer-Entscheid): ihre
+    Verlaeufe tragen die alte Policy** -- Value-Kalibrierung soll auf
+    der Zustandsverteilung des aktuellen Spiels stehen (deckt sich mit
+    "Alt-Regel-Korpora nie wieder" von 2026-07-21).
+    OFFEN: Generator-Wahl (v19_2d_best/tanh = Entstauchung global
+    weiter, vs t34_wdldestretch_brierbest/WDL = saubere Bootstraps ab
+    sofort + aera-gesteuerte Entstauchung noetig); PREREG vor Start.
+- **v20-Kampagne (Nutzer 2026-08-05): Start ERST, wenn Spiel- und
+  Sim-Budget belegt sind** -- also nach #36 (Spielzahl: saettigt der
+  Value-Kopf?) und dem #14-Entscheid (Sims: lohnt PCR-Sim-Reduktion?).
+  Die ~20h-Kampagne wird nicht auf geratenen Budgets gefahren. #36 ist
+  damit auf dem KRITISCHEN PFAD zu v20 (laeuft dank `--wdl-hard-only`
+  komplett sauber auf dem Bestandskorpus, kein v20 noetig).
+
+### Task #36 ERGEBNIS (2026-08-06): Value-Kopf saettigt NICHT -- Spielzahl ist ein echter Hebel
+
+Externe Brier-Auswertung aller 18 Checkpoints auf dem gemeinsamen
+90-Dateien-Messset (900 Partien, `tools/t36_curve_eval.py`):
+
+| Pool | brierbest (Mittel 3 Seeds) | Peak-Epochen |
+|---|---|---|
+| 202 | 0,19934 | 2-4 |
+| 405 | 0,19813 | 4-6 |
+| 810 | **0,19695** | 2-4 |
+
+- **Monoton in ALLEN drei Seeds** (9/9 Ordnungen korrekt), Endstaende
+  zeigen dieselbe Ordnung.
+- **Gepaart signifikant**: 202-810 in allen drei Seeds ausserhalb des
+  95%-Partie-Bootstrap-KI (+0,0020..+0,0030); 405-810 dreimal positiv,
+  einmal signifikant. PREREG-Leseregel "spielhungrig" ist mit 3/3 erfuellt.
+- **Form: log-linear** -- jede VERDOPPLUNG bringt ~0,0012 Brier, kein
+  Knick im gemessenen Bereich. Extrapolation (vorsichtig): auch jenseits
+  von 8.100 Partien ist weiterer Gewinn zu erwarten.
+- Nebenbefund: die Peak-Epoche wandert mit weniger Daten leicht nach
+  hinten (405: E4-6) -- konsistent mit dem Erosions-/Memorisierungsbild.
+
+**POLICY-GEGENKURVE (PREREG-Sekundaermessung, 2026-08-06)**: dieselben 9
+Arme, Orakel-Metriken auf dem frozen-Set: prior_mass 0,7240/0,7250/0,7247,
+kendall_tau 0,363/0,361/0,366 -- **FLACH ueber 202->810, beide Metriken,
+kein Trend**. Im Warm-Start-Regime ist die Policy also DATEN-GESAETTIGT,
+waehrend der Value-Kopf log-linear gewinnt -- die theoretisch erwartete
+Schere (145 Ziele/Partie vs 1 Bit/Partie) ist damit direkt gemessen.
+Abgrenzung: die Korpus-Dosis-Studie (6/6 Policy-Gewinne 450->900) lief im
+From-Scratch-aehnlichen Rezept (lr 4e-4/40 Epochen) -- anderes Regime,
+kein Widerspruch. **Games/Sims-Bild fuer v20 damit komplett: die
+Spielzahl wird allein vom VALUE-Kopf getrieben; Policy-seitig gibt es im
+Warm-Start-Regime keinen Grund gegen mehr Partien und keinen Bedarf nach
+mehr.**
+
+**Konsequenzen**: (a) v20-Spielbudget NICHT kuerzen -- mehr Partien sind
+der billigste Value-Hebel (Tiling-Cache-Ersparnis -20% direkt in Spiele
+umsetzbar); (b) PCR-Bedingung (ii) ERFUELLT -> Durchsatz-Messung
+(Bedingung iii) laeuft als naechstes end-to-end.
+
+### Nach-#34-Paket ERGEBNISSE (2026-08-06, PREREG_nach34_paket.md)
+
+Beide Arme offline: t9_own deckungsgleich mit Referenz (0,1970/0,2018);
+t12_dist Peak 0,1979, staerkere Erosion (0,2108), Punkte-R² FAELLT
+(0,48 vs 0,56 Skalar). Arena (brierbest vs brierbest, je + Champion):
+
+| Gating | Ergebnis | p |
+|---|---|---|
+| **t12_dist vs t34_wdldestretch** | **54:26 (67,5%) -- SPRT-H1!** | **0,0066** |
+| t12_dist vs v19_2d_best | 33:47 (41,3%), H0 | 0,19 |
+| t9_own vs t34_wdldestretch | 197:193 (50,5%), H0 | 0,91 |
+| t9_own vs v19_2d_best | 145:145 (50,0%), H0 | 1,00 |
+
+- **#9 ERNEUT GESCHLOSSEN** (vorregistrierte Regel): perfekte Paritaet
+  ueber 390+290 Partien -- das Arena-Instrument war da, der Effekt nicht.
+- **#12: erster SPRT-H1 der gesamten WDL-Aera** -- und zugleich ein
+  WIDERSPRUCH: schlaegt die Referenz klar, verliert (n.s.) gegen den
+  Champion, waehrend die Referenz dort Paritaet spielte. Moegliche
+  Deutungen: Nicht-Transitivitaet (Stilpaarung), Seed-Satz-Rauschen im
+  80-Paare-Champion-Lauf, oder echter Effekt nur gegen WDL-Familie.
+  **Frisch-Seed-Replikation (Ergebnis)**: vs Referenz 206:194 ueber
+  VOLLE 400 Partien (51,5%, p=0,60), vs Champion 181:179 (50,3%, p=1,0)
+  -- BEIDE Erstlauf-Extreme waren Seed-Satz-Rauschen, die Wahrheit ist
+  beidseitige Paritaet. Der SPRT-H1 bei n=80 war ein Falsch-Positiv des
+  fruehen Stopps (alpha-Fehler); die Replikationsregel hat ihn gefangen.
+  **#12 ERNEUT GESCHLOSSEN** per PREREG ("keine Uebernahme ohne
+  repliziertes klares Bild + intakten Brier" -- beides verfehlt:
+  Paritaet statt Effekt, Erosion 0,2108 + Punkte-R²-Verlust).
+  METHODEN-LEHRE (dritter Beleg): SPRT-Fruehstopps bei n<=80 sind bei
+  unserer Effektlage anfaellig -- Einzel-H1 ohne Replikation zaehlt
+  nicht als Uebernahme-Beleg.
+- #29: Instrument-Teil wartet auf frozen-Set-Neubau (siehe PREREG).
+- **Paket-Fazit**: #9 zu, #12 zu, #29 vertagt -- das Nach-#34-Paket ist
+  ABGESCHLOSSEN. Kein Aux-Kopf-Hebel traegt am neuen Ziel; die
+  belegten Hebel bleiben Spielzahl (#36) und die v20-Kampagne selbst.
+
+### PCR (Task #14): konditionale WIEDEREROEFFNUNG (Nutzer-Frage 2026-08-05)
+
+Zwei unabhaengige Gruende, warum das geschlossene PCR neu zu bewerten ist:
+
+1. **Das Verdikt fiel auf POLICY-Metriken.** Die Abbruchregel griff, weil
+   beide Orakel-Metriken schlechter waren -- reine Policy-Masse. Die
+   Value-Seite war bei pcr sogar BESSER (+0,04 `value_r2`), nur zu Recht
+   nicht gewichtet, weil das Mass untauglich ist. Die eigentliche
+   PCR-Wette ("mehr, aber schwaechere Value-Masse gegen weniger, aber
+   verlaessliche Policy-Masse") wurde damit NIE mit einem gueltigen
+   Value-Mass bewertet. Nach #34 gibt es eines (Brier), nach #36 wissen
+   wir zusaetzlich, ob der Value-Kopf ueberhaupt spielhungrig ist.
+2. **Der Tiling-Cache hat die OEKONOMIE verschoben** (seit 2026-08-05).
+   PCR-mild scheiterte am Wandzeit-Kriterium (1,118x < 1,15x) -- gemessen,
+   als der Tiling-Solver 30% der Zeit fraß. Jetzt sind es 4,8%, der
+   Netz-Anteil stieg dadurch von ~60% auf **~81%** der Thread-Zeit.
+   Sim-Reduktion hat entsprechend mehr Hebel: dieselbe 25%-Kuerzung
+   spart rechnerisch ~20% statt ~11% (Faktor ~1,25x) -- ueber der
+   Schwelle, an der PCR-mild scheiterte.
+
+**Gegengewichte, ehrlich**: (a) die PCR-Doku-Arena war NEGATIV (67:83,
+SPRT-H0) -- ein Arena-Ergebnis, kein Proxy, und damit das staerkste
+Argument dagegen; allerdings mit Netzen auf dem ALTEN Value-Ziel.
+(b) Die Oekonomie-Rechnung oben ist PROFIL-ARITHMETIK, keine Messung --
+genau diese Sorte Rechnung lag am 2026-08-04 schon einmal daneben
+(S/F-Herleitung 42/58, widerlegt durch direkte Messung). Der Durchsatz
+ist end-to-end neu zu messen, nicht hochzurechnen.
+
+**Bedingungen fuer eine Wiedereroeffnung** (alle drei, sonst bleibt zu):
+(i) #34 abgeschlossen und der Value-Kopf auf Wahrscheinlichkeits-Ziel;
+(ii) #36 zeigt, dass der Value-Kopf mit mehr Partien weiter besser wird
+(saettigt er frueh, ist PCRs ganze Wette wertlos);
+(iii) Durchsatz mit aktivem Tiling-Cache END-TO-END nachgemessen (nicht
+aus dem Profil abgeleitet), Kriterium unveraendert >=1,15x.
+Dann als NEUES Experiment mit neu trainierten Armen auf dem neuen Ziel --
+keine Neulesung der alten Zahlen.
+
+**Konsequenz je Ausgang**: saettigt der Value-Kopf frueh -> Self-Play-Budget
+kann sinken (oder in Qualitaet statt Menge fliessen). Waechst er weiter ->
+mehr Partien sind der billigste Value-Hebel ueberhaupt, und die
+Tiling-Cache-Ersparnis (-20%) laesst sich direkt in mehr Spiele umsetzen.
+
+**DURCHSATZ-MESSUNG (Bedingung iii, 2026-08-06)**: end-to-end, je 30
+Partien, Champion@600, 11 Threads, Tiling-Cache an: Standard 233s vs
+PCR-mild (0,5/300) 170s -> **1,371x**, klar ueber der 1,15x-Schwelle
+(Messpartien sofort aus data/ geloescht). **#14 ist damit formal
+WIEDEREROEFFNET** -- alle drei Bedingungen erfuellt. WICHTIG:
+Wiedereroeffnung heisst NICHT Uebernahme. Die neue PCR-Wette lautet
+jetzt praezise: +37% Partien (pro #36: log-linear ~+0,0005 Brier)
+GEGEN schwaechere Policy-Ziele auf der Haelfte der Zuege (woran PCR im
+Juli auf den Policy-Metriken scheiterte) -- und die Doku-Arena war
+damals NEGATIV. Der Entscheid, ob v20 (oder eine Teilkampagne) PCR-mild
+faehrt, ist ein v20-Design-Entscheid des Nutzers; PREREG dann als neues
+Experiment auf dem neuen Ziel, keine Neulesung alter Zahlen.
+
+---
