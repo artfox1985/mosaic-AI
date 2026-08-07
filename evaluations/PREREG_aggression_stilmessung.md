@@ -72,3 +72,18 @@ Reihenfolge nach Kosten; jede Stufe mit demselben Instrument
   schadet" ist hier BAUART, nicht Messhoffnung. Teuerste Stufe
   (Engine-Aenderung + Paritaets-Nachweis), aber der sauberste
   Mechanismus.
+
+## ERGEBNIS (2026-08-07, Bestaetigungslauf 3x400, Seed 20260810)
+
+Siegquoten: Kontrolle 296/400 (74,0%), (0,1;2,0) 305/400 (+2,25pp,
+McNemar p=0,48), (0,2;2,0) 284/400 (-3pp, p=0,37).
+**VERDIKT: beide Kandidaten SCHEITERN.** (0,2;2,0) faellt an Regel 1
+(Punktschaetzung unter Kontrolle). (0,1;2,0) besteht Regel 1, aber
+KEINE Raub-Metrik erreicht Regel 2 (16 Bloecke: Gegner-Punkte -0,57
+t=-0,71; Gegner-Floor +0,68 t=+1,32; Grenze |t|>=2,13) -- alle
+Richtungen stimmen, Staerke reicht nicht. Die Erst-Sweep-Signatur
+Gegner-Floor +2,1 (t~4,5) bei (0,2;2,0) REPLIZIERT NICHT (+0,25,
+t=0,53) -- Erst-Sweep-Artefakt, Replikationsregel bestaetigt sich.
+**w bleibt 0 (ueberall, inkl. Self-Play); Regel 5 -> Eskalationsleiter
+aktiv: E3 laeuft (eigenes Nutzer-Go), danach E1 (λ-hoch) als
+naechste Sprosse, falls E3 nicht liefert.**
