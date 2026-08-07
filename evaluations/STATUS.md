@@ -46,8 +46,15 @@ Checkpoint-Umkehrung E15/E5 zwischen neuem Val und Alt-Messset.
    **Denial-Tie-Break-Messung (E3, PREREG_denial_tiebreak.md --
    Nutzer-Go unabhaengig vom w/λ-Ausgang; 3 Arme ε=0/0,01/0,03;
    IMPLEMENTIERT: Commit 9-Tests-gruen, Wheel als Seiteninstall bereit,
-   Default-Paritaets-Hash bitgleich, ε=0,03 nachweislich wirksam)** -> v21-Schwarm 8.000 @150
-   (`v20wdlsw`) -> v21-Sockel gemaess τ-Verdikt.
+   Default-Paritaets-Hash bitgleich, ε=0,03 nachweislich wirksam)**.
+   DANACH (NEUE REIHENFOLGE, Nutzer-Einwand 2026-08-07 abends):
+   **Modell-Verdikte VOR Korpus-Generierung** -- der v20-Schwarm wurde
+   nach 2.090 Partien GESTOPPT und nach data_quarantaene/ geparkt
+   (Generator-Wahl haengt am Endgame-Gating: gewinnt pi_endgame_s2,
+   generiert der NEUE Champion; bleibt der alte, kehren die 209
+   Dateien zurueck und der Schwarm laeuft die restlichen 5.910
+   weiter). Reihenfolge: Endgame-Verdikt+Gating -> τ-Arm-B+Gating ->
+   Schwarm+Sockel vom finalen v20-Aera-Champion.
    **v21-Fenster FIX: PREREG_v21_fenster.md** (29.450 Partien;
    RAM-Vorbedingung Bitpacking, Agent laeuft).
 2. GPU-Bahn: ~~pi_ctrl_s3~~ FERTIG (brierbest E4 0,1950 intern --
