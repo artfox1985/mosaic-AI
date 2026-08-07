@@ -67,3 +67,23 @@ strukturell nichts.
 - Uebernahme-Ziel bei Bestehen: Live-/Stil-Preset UND Self-Play
   (Diversitaets-Entscheid des Nutzers gilt sinngemaess; Anker-Kante
   vor bewertetem Einsatz).
+
+## ERGEBNIS (2026-08-07, 3x400, Seed 20260811): E3 GESCHEITERT
+
+Kontrolle 296/400 (74,0%); ε=0,01: 273/400 (-5,75pp, McNemar p=0,085);
+ε=0,03: 241/400 (**-13,75pp, p<0,0001**). Beide Arme fallen an der
+Siegquoten-Wache -> KEINE Uebernahme (auch nach der gelockerten Regel).
+
+**Ursachen-Lesart (wichtig fuers Archiv)**: die "bauartbedingt
+siegquoten-schonend"-Annahme war FALSCH. Das ε-Fenster liegt auf
+GESCHAETZTEN completed-Q-Werten: der Suchsieger traegt positiven
+Schaetzfehler (Auswahl-Bias), die Fenster-Nachbarn haben weniger
+Besuche und sind real oft deutlich mehr als ε schlechter -- der
+Tie-Break tauscht damit systematisch GEGEN das Urteil der Suche, und
+der Schaden waechst mit ε (Dosis-Wirkung -5,75 -> -13,75pp).
+Q-Schaetzwerte sind keine Aequivalenzklassen.
+
+Moeglicher spaeterer E3b-Ansatz (NUR mit neuem Prereg + Nutzer-Go):
+Fenster auf besuchs-gewichteten Konfidenzintervallen statt roher
+Q-Differenz, oder Beschraenkung auf Kandidaten mit >=X% der Besuche
+des Siegers. NICHT eingeplant.
