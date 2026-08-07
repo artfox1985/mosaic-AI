@@ -38,7 +38,13 @@
 4. **LAUFEND**: Champion-Gating `v20_2d_opp_brierbest` vs `v19_2d_best`
    (400 Sims, 200 Paare, Fruehstopp-Regel beachten!). Danach
    Policy-Wacht (Orakel-Metriken vs v19), Pflicht-Diagnostiken
-   (Platt, R5, R4b).
+   (R5, R4b -- CPU-schwer, NACH dem Gating).
+   - **Platt-Fit ERLEDIGT 2026-08-07** (neues Tool tools/platt_fit.py,
+     validiert: reproduziert v19-Referenz B=1,9269/A=+0,0051 exakt;
+     platt_fit_v20.json): v20_brierbest **B=0,930**, v20_best (E1)
+     0,933, v20 final (E15) 0,885 -- leicht ueberkonfident, Drift
+     Richtung B<1 mit Trainingsdauer wie bei t34 (0,97 -> E15 0,81),
+     aber deutlich milder. Kalibrierung der WDL-Aera bestaetigt.
    - **Saettigungs-Nachfit ERLEDIGT 2026-08-07** (Messset exakt
      rekonstruiert + gegen Referenz-JSON validiert; 900 Partien,
      146.187 Zustaende; t36_curve_eval_v20punkt.json):
