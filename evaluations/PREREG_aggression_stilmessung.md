@@ -118,3 +118,21 @@ signifikant schaedlich (-13,75pp bei ε=0,03), Floor-Opp-Bias flach
 den opp-/Punkte-Kopf messbar schaerft (z.B. via Endgame-Aux-Kopf,
 PREREG_platten_intervention) -- Praediktor: opp-Kopf-R² deutlich
 ueber den heutigen ~0,48.
+
+## STARK-GEGNER-NACHTEST (Nutzer-Hypothese 2026-08-07/08, PREREG vor dem Lauf)
+
+Hypothese: die Raub-/Blend-Effekte greifen evtl. erst gegen einen
+Nahe-Peer (alle bisherigen Messungen liefen vs Heuristik@150).
+**Design**: paired_gating Champion(+Blend w=0,1/λ=2,0 via Env) vs
+`v19_2d_best` (OHNE opp-Kopf -> Blend strukturell inert auf B-Seite,
+kein Zwei-Arm-Umweg noetig), Basis-Seed 313795193 = IDENTISCH zum
+Champion-Gating vom 2026-08-07 (208:162, 185 Paare, per-Paar-Daten im
+JSON) -> gepaarte Auswertung je pair_index ueber die beiden Laeufe
+(#30-Muster), max 185 Paare, no-promote. Ein moeglicher SPRT-Fruehstopp
+verkuerzt nur das gemeinsame Praefix.
+**Auswertung**: (1) Siegquoten-Wache (gepaart, Blend-Lauf darf nicht
+unter 208/370 fallen -- Punktschaetzung + McNemar auf diskordanten
+pair_index-Paaren); (2) Raub-Metriken Block-Ebene (a/b-Scores,
+avg_floor aus per_pair_scores; 37 Bloecke a 5 Paare); Uebernahme-Logik
+wie gehabt (Wache = Gate, Raub = Kuer, Nutzer-Philosophie "rein wenn
+es nicht schadet").
