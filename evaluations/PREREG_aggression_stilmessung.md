@@ -87,3 +87,13 @@ t=0,53) -- Erst-Sweep-Artefakt, Replikationsregel bestaetigt sich.
 **w bleibt 0 (ueberall, inkl. Self-Play); Regel 5 -> Eskalationsleiter
 aktiv: E3 laeuft (eigenes Nutzer-Go), danach E1 (λ-hoch) als
 naechste Sprosse, falls E3 nicht liefert.**
+
+## E1-ERGEBNIS (2026-08-07, 2x400, Seed 20260812): GESCHEITERT
+
+(0,1;5,0): Siegquote 299/400 vs Kontrolle 297/400 (Wache bestanden,
+p=0,93) -- aber Raub-Metriken KOMPLETT flach (16 Bloecke: Gegner-Punkte
++0,13 t=+0,14 FALSCHE Richtung; Gegner-Floor +0,26 t=+0,47; alles
+schwaecher als beim (0,1;2,0)-Arm). Die Dosis-These "mehr λ = mehr
+Gegner-Unterdrueckung" materialisiert sich nicht. KEINE Uebernahme
+(auch die gelockerte E3-Philosophie gaebe nichts her: Effekt = 0).
+E1 zu -> naechste Sprosse E2 (Floor-Shaping-Opp-Bias).
