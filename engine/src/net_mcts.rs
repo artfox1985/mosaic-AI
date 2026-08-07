@@ -372,6 +372,16 @@ const FLOOR_SHAPING_SCALE: f64 = 50.0;
 /// beste Netz-Performance der gesamten Session. Bleibt vorerst aktiv.
 pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
 
+/// Laufzeit-Wert des Floor-Shaping-Gewichts: `MOSAIC_FLOOR_SHAPING_W`
+/// ueberschreibt den Default `FLOOR_SHAPING_WEIGHT` (PREREG_suchpfad_
+/// nachmessungen.md, Messung 1 -- Sweep 0,15/0,3/0,6 ohne Neubau).
+/// Einmalig beim ersten Zugriff gelesen (OnceLock, #30-Muster); ohne
+/// gesetzte Env-Var byte-identisches Bestandsverhalten.
+pub fn floor_shaping_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_FLOOR_SHAPING_W", FLOOR_SHAPING_WEIGHT))
+}
+
 /// Task #78 (v12c): rundenabhängige Value-Shrinkage Richtung 0.5. Motivation:
 /// der Value-Head ist in frühen Runden nachweislich kaum besser als der
 /// Mittelwert (Runde-1-Noise-Floor-Deckel ≈0.007, siehe
@@ -1567,7 +1577,7 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // Exakte Floor-Straf-Korrektur (siehe `floor_shaping_delta`-Kommentar) --
             // reine State-Funktion, kein Netz-Forward-Pass, direkt additiv auf
             // beide Perspektiven (Nullsummen-Charakter wie beim own-opp-Value-Ziel).
-            let floor_shift = FLOOR_SHAPING_WEIGHT * floor_shaping_delta(&state).tanh();
+            let floor_shift = floor_shaping_weight() * floor_shaping_delta(&state).tanh();
             today_value[0] = (today_value[0] + floor_shift).clamp(0.0, 1.0);
             today_value[1] = (today_value[1] - floor_shift).clamp(0.0, 1.0);
 
@@ -1722,8 +1732,25 @@ pub const GUMBEL_TOP_M: usize = 16;
 ///   in einer aehnlichen Groessenordnung Sims pro Kandidat bleibt wie beim
 ///   bisherigen 400/600-Sims-Betrieb bei M=16.
 pub fn gumbel_top_m_for_budget(sims: u32) -> usize {
+    if let Some(m) = gumbel_top_m_override() {
+        return m;
+    }
     let raw = (sims as f64 / 16.0).round() as i64;
     raw.clamp(4, GUMBEL_TOP_M as i64) as usize
+}
+
+/// Fester Wurzelbreiten-Override via `MOSAIC_GUMBEL_TOP_M` (PREREG_
+/// suchpfad_nachmessungen.md, Messung 2 -- m-Formel vs feste Breite bei
+/// niedrigen Sims). `0`/nicht gesetzt/nicht parsbar = `None` = Formel
+/// (Bestandsverhalten). Einmalig gelesen (OnceLock, #30-Muster); wirkt
+/// auf JEDEN `gumbel_top_m_for_budget`-Aufruf, `m_prime = min(m, n_root)`
+/// begrenzt weiterhin auf die legale Zugzahl.
+fn gumbel_top_m_override() -> Option<usize> {
+    static CELL: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let m = read_f64_env("MOSAIC_GUMBEL_TOP_M", 0.0);
+        if m >= 1.0 { Some(m.round() as usize) } else { None }
+    })
 }
 
 /// Schaltet die Suche komplett auf Gumbel-AlphaZero um (Wurzel: Gumbel-Top-m
@@ -2086,7 +2113,7 @@ fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &G
     };
     let points_forecast = points.first().copied();
     let opp_points_forecast = opp_points.first().copied();
-    let floor_raw = FLOOR_SHAPING_WEIGHT * floor_shaping_delta(state).tanh();
+    let floor_raw = floor_shaping_weight() * floor_shaping_delta(state).tanh();
     // `floor_shaping_delta` ist absolut Spieler0-minus-Spieler1 -- auf
     // Ego-Perspektive (der an der Wurzel ziehende Spieler) drehen.
     let floor_shift = if state.current_player == 0 { floor_raw } else { -floor_raw };
@@ -3712,6 +3739,17 @@ mod tests {
 
         // 0 Restfliesen -> 1 leere Reihenfolge (kein Stapel nötig).
         assert_eq!(unique_moon_orders(&[]), vec![Vec::<TileColor>::new()]);
+    }
+
+    #[test]
+    fn env_knoepfe_defaults_sind_bestandsverhalten() {
+        // PREREG_suchpfad_nachmessungen: ohne gesetzte Env-Vars muessen
+        // beide Laufzeit-Knoepfe exakt die bisherigen Konstanten liefern
+        // (Paritaets-Bedingung; die Env-Vars sind in der Testumgebung
+        // nicht gesetzt, OnceLock cached den Default).
+        assert_eq!(floor_shaping_weight(), FLOOR_SHAPING_WEIGHT);
+        assert_eq!(gumbel_top_m_for_budget(150), 9);
+        assert_eq!(gumbel_top_m_for_budget(400), GUMBEL_TOP_M);
     }
 
     #[test]
