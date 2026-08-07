@@ -27,3 +27,11 @@ Arm A MOSAIC_TILING_SELECT=0 (Kontrolle), Arm B =1.
 4. Instrument-Vorbehalt dokumentiert: Netz-vs-Heuristik; ein
    Nahe-Peer-Nachtest nur, falls Modus 1 hier gewinnt (dann VOR der
    Uebernahme, Zwei-Arm symmetrisch vs v19_2d_best).
+
+## ERGEBNIS (2026-08-08): H0 -- #37 GESCHLOSSEN
+
+Modus 0 (Bestand punkte*P) 284/400 vs Modus 1 (reines P) 292/400,
+diskordant 30:22, McNemar p=0,33. Regel 2 greift: Bestand bestaetigt,
+der Punktefaktor bleibt Default; kein Nahe-Peer-Nachtest noetig
+(nur bei Modus-1-Sieg vorgesehen). MOSAIC_TILING_SELECT bleibt als
+inerter Knopf fuer kuenftige Regime.
