@@ -15,6 +15,7 @@ import json
 import re
 import subprocess
 import random
+import itertools
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -151,7 +152,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (
     MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
-    value_head_variant_from_state, unpack_planes_batch, unpack_masks_batch,
+    value_head_variant_from_state, unpack_planes_batch, unpack_masks_batch, RANKING_TOPK,
 )
 
 
@@ -229,6 +230,93 @@ def _unpack_optional_outputs(model, out_tuple):
         pred_endgame = out_tuple[idx]
         idx += 1
     return pred_points_logits, pred_value_wdl_logits, pred_opp_points, pred_endgame
+
+
+# ── Task #35b, "Ranking-Loss auf Geschwister-Q" (Research-Report Idee 7.1)
+# ──────────────────────────────────────────────────────────────────────────
+# Paarweiser RankNet-Stil-Loss auf den Policy-LOGITS: fuer je zwei
+# Geschwister-Kandidaten (RANKING_CACHE_FIELDS, siehe neural_net.py) mit
+# klar unterschiedlichem Suchwert Q soll der Kandidat mit dem GROESSEREN Q
+# auch den GROESSEREN Policy-Logit bekommen -- ein zusaetzliches Signal
+# neben der bestehenden Kreuzentropie auf der Besuchs-Softmax (die nur die
+# GESAMTVERTEILUNG trifft, nicht explizit die paarweise REIHENFOLGE der
+# Kandidaten trainiert). Additiv, `--ranking-loss-weight` (Default 0.0 =
+# AUS) multipliziert das Gewicht in den Gesamt-Loss -- bei 0.0 wird der
+# Term unten in `train()` komplett uebersprungen (kein Gradient, keine
+# zusaetzliche Rechenzeit, byte-identisches Bestandsverhalten).
+#
+# MARGIN: nur Paare mit |q_i - q_j| > RANKING_MARGIN fliessen ein (Rauschen
+# zwischen nahezu gleichwertigen Kandidaten soll kein hartes Rang-Signal
+# erzeugen, siehe Task-Vorgabe "klare Q-Differenz"). Bewusst eine
+# Code-Konstante statt ein weiteres CLI-Flag -- Loss-Design soll einfach
+# bleiben (STATUS.md-Vorgabe); kann bei Bedarf spaeter zum Flag werden.
+RANKING_MARGIN = 0.02
+
+# Alle ungeordneten Paare aus den RANKING_TOPK Cache-Slots, EINMAL
+# vorberechnet (K=8 -> 28 Paare) -- vektorisiert per Gather/Index statt
+# einer Python-Schleife ueber Paare je Sample.
+_RANKING_PAIR_IDX = list(itertools.combinations(range(RANKING_TOPK), 2))
+_RANKING_PAIR_I = [i for i, _ in _RANKING_PAIR_IDX]
+_RANKING_PAIR_J = [j for _, j in _RANKING_PAIR_IDX]
+
+
+def _pairwise_ranking_loss(policy_logits, ranking_action_ids, ranking_child_q, ranking_mask):
+    """Task #35b: paarweiser Ranking-Loss + deskriptive Ranking-Accuracy.
+
+    `policy_logits`: (B, NUM_ACTIONS) rohe Policy-Logits (VOR Masking/
+    Softmax -- die gespeicherten Geschwister-Aktionen sind per Konstruktion
+    immer legale, tatsaechlich im Root-Suchbaum gesehene Kandidaten, ein
+    zusaetzliches illegal-Masking ist hier nicht noetig).
+    `ranking_action_ids`: (B, RANKING_TOPK) int, -1 = nicht belegter Slot.
+    `ranking_child_q`: (B, RANKING_TOPK) float, [0,1]-Skala (root_child_q roh,
+    siehe RANKING_CACHE_FIELDS-Kommentar in neural_net.py -- kein Remap
+    noetig, nur Differenzen/Vorzeichen gehen ein).
+    `ranking_mask`: (B,) float, 1.0 = Sample nutzbar (deckt bereits
+    <2-Geschwister UND pol_w==0 ab, siehe Cache-Bau).
+
+    Fuer jedes Paar (i,j) aus den RANKING_TOPK Slots mit BEIDEN Slots belegt,
+    Sample-Maske=1 UND |q_i-q_j|>RANKING_MARGIN: RankNet-Logistik-Loss
+    `softplus(-sign(q_i-q_j) * (logit_i-logit_j))` -- 0 (im Limit), wenn der
+    Logit mit dem groesseren Q auch tatsaechlich groesser ist, waechst sonst.
+
+    Rueckgabe `(loss, accuracy_or_None, n_pairs)`: `loss` ist ein
+    Skalar-Tensor (0.0 bei keinem einzigen gueltigen Paar im Batch, sicher
+    endlich/differenzierbar). `accuracy` ist der Anteil der gueltigen Paare,
+    bei denen das Logit-Vorzeichen zum Q-Vorzeichen passt (rein deskriptiv,
+    STATUS.md-Vorgabe "Val-Metrik: paarweise Ranking-Accuracy") -- `None`
+    bei keinem gueltigen Paar im Batch. `n_pairs` = Anzahl gueltiger Paare
+    (fuer Batch-uebergreifende Mittelung im Aufrufer)."""
+    device = policy_logits.device
+    ids = ranking_action_ids.long()
+    valid_slot = ids >= 0                                   # (B,K) bool
+    ids_clamped = ids.clamp(min=0)
+    logits_k = policy_logits.gather(1, ids_clamped)          # (B,K)
+    q_k = ranking_child_q.float()                            # (B,K)
+
+    idx_i = torch.tensor(_RANKING_PAIR_I, device=device, dtype=torch.long)
+    idx_j = torch.tensor(_RANKING_PAIR_J, device=device, dtype=torch.long)
+    logit_i = logits_k[:, idx_i]                              # (B,P) P=28
+    logit_j = logits_k[:, idx_j]
+    q_i = q_k[:, idx_i]
+    q_j = q_k[:, idx_j]
+    valid_pair = (valid_slot[:, idx_i] & valid_slot[:, idx_j]).float()
+
+    dq = q_i - q_j
+    margin_ok = (dq.abs() > RANKING_MARGIN).float()
+    sample_ok = ranking_mask.view(-1, 1).float()
+    w = valid_pair * margin_ok * sample_ok                   # (B,P)
+
+    sign = torch.sign(dq)
+    logit_diff = logit_i - logit_j
+    per_pair_loss = F.softplus(-sign * logit_diff)
+    n_pairs = w.sum().item()
+    loss = (per_pair_loss * w).sum() / w.sum().clamp(min=1e-6)
+
+    accuracy = None
+    if n_pairs > 0:
+        correct = ((sign * logit_diff) > 0).float()
+        accuracy = (correct * w).sum().item() / n_pairs
+    return loss, accuracy, n_pairs
 
 
 def _git_commit_hash() -> str | None:
@@ -373,7 +461,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
-          value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh"):
+          value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
+          ranking_loss_weight=0.0):
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -487,6 +576,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_target_lambda": value_target_lambda, "opp_points_head": opp_points_head,
         "endgame_head": endgame_head,
         "value_head": value_head,
+        "ranking_loss_weight": ranking_loss_weight,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -615,6 +705,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"   Endgame-Kopf  : AN (Schema 18, PREREG_platten_intervention.md) -- "
               f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NUR R5-Drafting-Zone "
               f"maskiert, NICHT Teil von val_combined")
+    if ranking_loss_weight > 0.0:
+        print(f"   Ranking-Loss  : AN (Task #35b, Geschwister-Q) -- Gewicht={ranking_loss_weight}, "
+              f"Margin={RANKING_MARGIN}, Top-{RANKING_TOPK}-Geschwister/Zustand, "
+              f"NICHT Teil von val_combined (rein additiv, kein neuer Modell-Kopf)")
     if value_head == "wdl":
         print(f"   Value-Kopf    : WDL (Task #34) -- 2-Logit-Softmax-Klassifikation, "
               f"Kreuzentropie auf Sieg/Niederlage-Ziel (`values_wdl`). ACHTUNG: val_combined "
@@ -704,6 +798,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Schema 18 (PREREG_platten_intervention.md): nur befuellt, wenn
     # --endgame-head aktiv ist -- gleiches Muster wie opp_points_history.
     endgame_history = []
+    # Task #35b: nur befuellt, wenn ranking_loss_weight>0 ist -- gleiches
+    # Muster wie endgame_history/opp_points_history. NICHT Teil von
+    # val_combined (siehe Kommentar an der current_metric-Stelle unten).
+    ranking_loss_history = []
     val_ploss_history = []
     # Value/Points hatten bisher KEINEN Val-Split-Loss/R² -- nur der rohe
     # Trainings-Loss wurde reported (siehe TRAINING SUMMARY unten). Für den
@@ -722,6 +820,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # der R5-Zone stark einseitig verteilt, R² waere hier keine sinnvolle
     # Zusatzkennzahl, siehe PREREG_platten_intervention.md).
     val_endgame_mse_history = []
+    # Task #35b: deskriptive paarweise Ranking-Accuracy auf dem Val-Split
+    # (STATUS.md-Vorgabe) -- nur befuellt, wenn ranking_loss_weight>0.
+    # NICHT Teil von val_combined/der Checkpoint-Auswahl (rein informativ,
+    # gleiches Muster wie val_endgame_mse_history).
+    val_ranking_acc_history = []
     # Task #34: Brier-Score von P(Sieg) gegen den echten Spielausgang -- die
     # ARM-UEBERGREIFEND vergleichbare Value-Kalibrierungskennzahl (siehe
     # Kommentar an der Berechnungsstelle im Val-Loop). Anders als
@@ -813,6 +916,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
         t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
         t_endgameloss = 0  # Schema 18: nur != 0 relevant, wenn endgame_head aktiv
+        t_rankingloss = 0  # Task #35b: nur != 0 relevant, wenn ranking_loss_weight>0
 
         for _batch_idx, _batch in enumerate(dataloader):
             if _batch_idx % _mem_log_every == 0:
@@ -831,7 +935,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if encoder == "2d":
                 (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
-                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask) = _batch
+                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask,
+                 s_rank_ids, s_rank_q, s_rank_mask) = _batch
                 # RAM-Optimierung v21 (Bitpacking): liegt der Cache gepackt
                 # vor (`dataset.bitpacked`, Standard seit diesem Feature),
                 # kommt `planes` als [B,342]-Bytes statt [B,76,6,6] aus dem
@@ -851,7 +956,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             else:
                 (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
-                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask) = _batch
+                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask,
+                 s_rank_ids, s_rank_q, s_rank_mask) = _batch
             # RAM-Optimierung v21 (Bitpacking): masks-Entpacken analog zu
             # planes oben, UNABHAENGIG vom Encoder (masks gehoeren zum
             # Basis-Tupel, siehe MosaicDataset.__getitem__).
@@ -869,6 +975,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             s_endgame_mask = s_endgame_mask.to(device)
             masks     = masks.to(device).float()
             pol_w     = pol_w.to(device)
+            # Task #35b: NUR bei aktivem Gewicht auf Device verschoben --
+            # bei ranking_loss_weight==0.0 (Default) bleibt der Batch-Pfad
+            # sonst byte-identisch zum Bestand (kein zusaetzlicher Transfer).
+            if ranking_loss_weight > 0.0:
+                s_rank_ids  = s_rank_ids.to(device)
+                s_rank_q    = s_rank_q.to(device)
+                s_rank_mask = s_rank_mask.to(device)
 
             optimizer.zero_grad()
             _out = model(planes, states) if encoder == "2d" else model(states)
@@ -1036,11 +1149,25 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 eg_target = targets_endgame * 2.0 - 1.0
                 endgame_loss = (((pred_endgame - eg_target) ** 2) * eg_w).sum() / eg_denom
 
+            # Task #35b ("Ranking-Loss auf Geschwister-Q"): NUR berechnet,
+            # wenn `ranking_loss_weight>0` -- bei 0.0 (Default) komplett
+            # uebersprungen, kein zusaetzlicher Gradient/keine zusaetzliche
+            # Rechenzeit, byte-identisches Bestandsverhalten. Kein eigener
+            # Modell-Kopf (nutzt die bestehenden Policy-Logits `pred_p`
+            # VOR dem Illegal-Masking, siehe `_pairwise_ranking_loss`-
+            # Docstring). Geht NICHT in val_combined/Brier-Checkpoint-
+            # Auswahl ein (Muster opp_loss/endgame_loss oben).
+            ranking_loss = torch.zeros((), device=device)
+            if ranking_loss_weight > 0.0:
+                ranking_loss, _rk_acc, _rk_n = _pairwise_ranking_loss(
+                    pred_p, s_rank_ids, s_rank_q, s_rank_mask)
+
             loss = (p_loss + effective_value_weight * v_loss
                     + effective_points_weight * points_loss
                     + effective_ownership_weight * own_loss
                     + effective_points_weight * opp_loss
-                    + effective_points_weight * endgame_loss)
+                    + effective_points_weight * endgame_loss
+                    + ranking_loss_weight * ranking_loss)
             loss.backward()
             optimizer.step()
 
@@ -1052,18 +1179,22 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 t_opp_pointsloss += opp_loss.item()
             if pred_endgame is not None:
                 t_endgameloss += endgame_loss.item()
+            if ranking_loss_weight > 0.0:
+                t_rankingloss += ranking_loss.item()
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
         epoch_pointsloss = t_pointsloss / n_batches
         epoch_opp_pointsloss = t_opp_pointsloss / n_batches
         epoch_endgameloss = t_endgameloss / n_batches
+        epoch_rankingloss = t_rankingloss / n_batches
         epoch_tloss = t_loss / n_batches
         policy_history.append(epoch_ploss)
         value_history.append(epoch_vloss)
         points_history.append(epoch_pointsloss)
         opp_points_history.append(epoch_opp_pointsloss)
         endgame_history.append(epoch_endgameloss)
+        ranking_loss_history.append(epoch_rankingloss)
         total_history.append(epoch_tloss)
 
         # ── Validierung (Policy + Value + Points) auf dem NIE trainierten
@@ -1081,12 +1212,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_val_opp_pointsloss = None
         epoch_val_opp_points_r2 = None
         epoch_val_endgame_mse = None
+        epoch_val_ranking_acc = None  # Task #35b: rein deskriptiv, siehe val_ranking_acc_history
         epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
         if val_dataloader is not None:
             model.eval()
             val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
             val_opp_pointsloss_sum, val_opp_batches = 0.0, 0  # Task #28, nur relevant wenn opp_points_head aktiv
             val_endgame_sqerr_sum, val_endgame_n = 0.0, 0.0  # Schema 18, nur relevant wenn endgame_head aktiv
+            val_rank_correct_sum, val_rank_n = 0.0, 0.0  # Task #35b, nur relevant wenn ranking_loss_weight>0
             v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
             pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
             opp_sum, opp_sumsq, opp_sqerr_sum, n_opp = 0.0, 0.0, 0.0, 0
@@ -1096,7 +1229,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     if encoder == "2d":
                         (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
-                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask) = _v_batch
+                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask,
+                         v_rank_ids, v_rank_q, v_rank_mask) = _v_batch
                         # RAM-Optimierung v21 (Bitpacking): Entpacken wie im
                         # Trainingszweig, siehe dortigen Kommentar.
                         if val_dataset.bitpacked:
@@ -1106,7 +1240,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     else:
                         (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
-                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask) = _v_batch
+                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask,
+                         v_rank_ids, v_rank_q, v_rank_mask) = _v_batch
                     if val_dataset.bitpacked:
                         v_masks = unpack_masks_batch(v_masks)
                     v_states = v_states.to(device).float()
@@ -1121,6 +1256,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     v_endgame_mask = v_endgame_mask.to(device)
                     v_masks = v_masks.to(device).float()
                     v_pol_w = v_pol_w.to(device)
+                    if ranking_loss_weight > 0.0:
+                        v_rank_ids  = v_rank_ids.to(device)
+                        v_rank_q    = v_rank_q.to(device)
+                        v_rank_mask = v_rank_mask.to(device)
                     _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
                     (_v_pred_points_logits, v_pred_value_wdl_logits,
@@ -1129,6 +1268,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                         _eg_w = v_endgame_mask.view(-1, 1)
                         val_endgame_sqerr_sum += (((v_pred_endgame - (v_targets_endgame * 2.0 - 1.0)) ** 2) * _eg_w).sum().item()
                         val_endgame_n += _eg_w.sum().item()
+                    # Task #35b: rein DESKRIPTIVE Val-Metrik (paarweise
+                    # Ranking-Accuracy, STATUS.md-Vorgabe) -- NICHT Teil von
+                    # val_combined/der Checkpoint-Auswahl. Gewichtete Summe
+                    # ueber alle Val-Batches (Anzahl gueltiger Paare variiert
+                    # je Batch, ein einfaches Batch-Mittel wuerde kleine
+                    # Batches ueberbewerten).
+                    if ranking_loss_weight > 0.0:
+                        _, _v_rk_acc, _v_rk_n = _pairwise_ranking_loss(
+                            v_pred_p, v_rank_ids, v_rank_q, v_rank_mask)
+                        if _v_rk_acc is not None:
+                            val_rank_correct_sum += _v_rk_acc * _v_rk_n
+                            val_rank_n += _v_rk_n
                     v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
                     v_log_probs = F.log_softmax(v_masked_logits, dim=1)
                     v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
@@ -1280,6 +1431,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # siehe Kommentar am Trainings-Loss-Block oben).
             epoch_val_endgame_mse = (val_endgame_sqerr_sum / val_endgame_n
                                      if val_endgame_n > 0 else None)
+            # Task #35b: gewichtetes Mittel ueber alle Val-Batches -- None
+            # (statt einer erfundenen 0.0), wenn kein einziges gueltiges Paar
+            # im Val-Split lag (Gewicht 0.0/Alt-Cache-Split ohne Geschwister-
+            # Set). Rein deskriptiv, geht NICHT in val_combined ein.
+            epoch_val_ranking_acc = (val_rank_correct_sum / val_rank_n
+                                     if val_rank_n > 0 else None)
 
             def _r2(sum_y, sumsq_y, sqerr, n):
                 if n == 0:
@@ -1301,6 +1458,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_opp_pointsloss_history.append(epoch_val_opp_pointsloss)
         val_opp_points_r2_history.append(epoch_val_opp_points_r2)
         val_endgame_mse_history.append(epoch_val_endgame_mse)
+        val_ranking_acc_history.append(epoch_val_ranking_acc)
         val_brier_history.append(epoch_val_brier)
 
         # Fund 8 (externer Hinweis, Bugfixes.txt Abschnitt C): "bestes Modell"
@@ -1458,9 +1616,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if getattr(model, "has_endgame_head", False):
             _eg_val_s = f"{epoch_val_endgame_mse:.4f}" if epoch_val_endgame_mse is not None else "n/a"
             endgame_str = f" | Endgame: {epoch_endgameloss:.4f} / Val-MSE {_eg_val_s}"
+        # Task #35b: kompakte Zusatz-Zeile NUR bei aktivem Gewicht, sonst
+        # bleibt die Ausgabe unveraendert (gleiches Muster wie endgame_str).
+        ranking_str = ""
+        if ranking_loss_weight > 0.0:
+            _rk_acc_s = f"{epoch_val_ranking_acc:.3f}" if epoch_val_ranking_acc is not None else "n/a"
+            ranking_str = f" | Ranking: {epoch_rankingloss:.4f} / Val-Acc {_rk_acc_s}"
         lr_str = f" | LR={optimizer.param_groups[0]['lr']:.2e}" if lr_scheduler is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{endgame_str}{plateau_marker}{lr_str}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{endgame_str}{ranking_str}{plateau_marker}{lr_str}")
 
         # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
@@ -1639,6 +1803,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_head":        value_head,
         "final_value_val_brier": (
             round(final_value_brier, 4) if final_value_brier is not None else None),
+        # Task #35b: analoges Bequemlichkeitsfeld -- kein neuer Modell-Kopf
+        # (nutzt die bestehenden Policy-Logits), daher keine "*_present"-
+        # Rueckerkennungsfunktion in neural_net.py noetig/vorhanden. Rein
+        # informativ, NICHT Teil von val_combined/der Checkpoint-Auswahl.
+        "ranking_loss_weight": ranking_loss_weight,
+        "final_ranking_loss": round(ranking_loss_history[-1], 4) if ranking_loss_history else None,
+        "final_ranking_val_acc": (
+            round(val_ranking_acc_history[-1], 4)
+            if val_ranking_acc_history and val_ranking_acc_history[-1] is not None else None),
     }
     torch.save(checkpoint, str(save_path))
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
@@ -1680,6 +1853,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         best_checkpoint["final_value_val_brier"] = (
             round(val_brier_history[best_idx], 4)
             if best_idx < len(val_brier_history) and val_brier_history[best_idx] is not None
+            else None)
+        # Task #35b: rein informativ am selben best_idx, siehe Kommentar oben.
+        best_checkpoint["final_ranking_loss"] = (
+            round(ranking_loss_history[best_idx], 4) if best_idx < len(ranking_loss_history) else None)
+        best_checkpoint["final_ranking_val_acc"] = (
+            round(val_ranking_acc_history[best_idx], 4)
+            if best_idx < len(val_ranking_acc_history) and val_ranking_acc_history[best_idx] is not None
             else None)
         best_version_name = f"{version_name}_best"
         best_save_path = MODELS_DIR / f"alphazero_{best_version_name}.pth"
@@ -1943,6 +2123,22 @@ if __name__ == "__main__":
                              "`build_model_from_checkpoint`/`value_head_variant_from_state` erkennen "
                              "sie rueckwirkend aus dem state_dict, Alt-Checkpoints bleiben unveraendert "
                              "ladbar (gleiches Muster wie --points-dist-bins/--opp-points-head).")
+    parser.add_argument("--ranking-loss-weight", type=float, default=0.0,
+                        help="Task #35b (Research-Report Idee 7.1, 'Ranking-Loss auf Geschwister-Q'). "
+                             "Zusaetzlicher paarweiser RankNet-Stil-Loss auf den Policy-LOGITS: fuer "
+                             "Geschwister-Kandidaten (Top-8 Root-Q-Paare je Zustand, "
+                             "RANKING_CACHE_FIELDS in neural_net.py) mit klarer Q-Differenz "
+                             "(|dq|>0.02) soll der Kandidat mit dem groesseren Suchwert Q auch den "
+                             "groesseren Policy-Logit bekommen -- ergaenzt die bestehende Kreuzentropie "
+                             "auf der Besuchs-Softmax (die nur die Gesamtverteilung trifft, nicht "
+                             "explizit die paarweise Reihenfolge). STANDARD 0.0 = AUS, dann komplett "
+                             "uebersprungen (kein neuer Modell-Kopf, kein Gradient, byte-identisches "
+                             "Bestandsverhalten). Gewicht multiplikativ ins Gesamt-Loss, geht NICHT in "
+                             "val_combined/die Brier-Checkpoint-Auswahl ein -- separat geloggt "
+                             "(Trainings-Loss + deskriptive paarweise Val-Ranking-Accuracy). Nur "
+                             "nutzbar auf Zuegen mit `pol_w>0` UND geloggtem Geschwister-Set "
+                             "(v19wdl/v19wdlann-Sockel-Partien; policy-maskierte Schwarm-Partien tragen "
+                             "kein nutzbares Set, Maske dort 0).")
 
     args = parser.parse_args()
 
@@ -1961,4 +2157,5 @@ if __name__ == "__main__":
           value_target_variant=args.value_target_variant, encoder=args.encoder,
           value_target_lambda=args.value_target_lambda, opp_points_head=args.opp_points_head,
           endgame_head=args.endgame_head,
-          value_head=args.value_head)
+          value_head=args.value_head,
+          ranking_loss_weight=args.ranking_loss_weight)

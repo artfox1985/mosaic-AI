@@ -4,6 +4,7 @@ import re
 import json
 import math
 import pickle
+import statistics
 import numpy as np
 import torch
 import torch.nn as nn
@@ -640,7 +641,19 @@ def action_to_id(action: dict) -> int:
 # [0,1]-tanh-Normierung, net_mcts.rs-R5-Zweig). Labels sind GRATIS (kein
 # Solver-Lauf beim Cache-Bau); Zustaende ohne root_q bzw. ausserhalb der
 # R5-Drafting-Zone tragen Maske 0 (v16/v17-Dateien komplett).
-VALUE_SCHEMA_VERSION = 18
+# Schema 19 (2026-08-08, Task #35b, "Ranking-Loss auf Geschwister-Q"):
+# additive Felder `ranking_action_ids`/`ranking_child_q`/`ranking_mask`
+# (RANKING_CACHE_FIELDS unten) -- Top-K Geschwister-(Aktion,Q)-Paare fuer
+# den paarweisen Policy-Ranking-Loss in train.py (`--ranking-loss-weight`,
+# Default 0.0 = AUS). Quelle ist das additive `root_child_q`-JSON-Feld
+# (Engine-Teil von Task #35, self_play.rs/net_mcts.rs, seit Commit-Historie
+# Default AN) -- NUR vorhanden bei echter Mehr-Aktionen-Suche, GLEICHE
+# Reihenfolge/Laenge wie `step["policy"]` (self_play.rs-Vertrag). Labels
+# sind GRATIS wie bei Schema 18 (kein zusaetzlicher Solver-/Suchlauf beim
+# Cache-Bau). v16/v17/Ein-Aktion-Zuege und Zuege mit `pol_w==0` (Tiling/
+# Start-Schritte ODER `policy_target_valid=False`, siehe pol_w-Kommentar im
+# Baucode unten) tragen Maske 0.
+VALUE_SCHEMA_VERSION = 19
 # Namenskonvention: Dateien heissen nach dem GENERATOR (v19-Aera-Modell
 # t34_wdldestretch_brierbest -> "v19wdl"), NICHT nach der Ziel-Generation
 # (Koordinator-Fehler #2 mit dieser Konvention, vom Nutzer 2026-08-06
@@ -721,6 +734,75 @@ WDL_CACHE_FIELDS = ("values_wdl", "wdl_outcome")
 # Schema 18 (PREREG_platten_intervention.md): exakte R5-Zonen-Ziele fuer den
 # additiven `endgame_head` -- immer mitgebaut (Muster points_forecast/WDL).
 ENDGAME_CACHE_FIELDS = ("endgame_margin", "endgame_mask")
+
+# Schema 19 (Task #35b, "Ranking-Loss auf Geschwister-Q", Research-Report
+# Idee 7.1): additive Cache-Felder fuer den paarweisen Policy-Ranking-Loss
+# in train.py (`--ranking-loss-weight`, Default 0.0 = AUS -> Feld existiert,
+# wird aber nirgends gelesen, gleiches "immer mitgebaut"-Muster wie
+# WDL_CACHE_FIELDS/ENDGAME_CACHE_FIELDS).
+#
+# FELD-DESIGN (Cache-Feld-Entscheidung, siehe Baucode unten fuer die
+# Extraktion): `root_child_q` (JSON, engine-seitig) ist ein Roh-Array je
+# Zug MIT VARIABLER LAENGE -- Korpus-Stichprobe (v19wdlann, 2026-08-08)
+# zeigt 2 bis >300 Geschwister je Drafting-Entscheidung (frueher/breiter
+# Zug = mehr Kandidaten). Ein festes Padding auf die ROHE Maximallaenge
+# waere extrem RAM-ineffizient (>300 Slots fuer die grosse Mehrheit
+# leer) -- stattdessen RANKING_TOPK=8 Paare je Zustand:
+#   - `ranking_action_ids` : int16, Shape (N, RANKING_TOPK), Sentinel -1
+#                            fuer nicht belegte Slots (Alt-Cache-Faellback/
+#                            <8 Geschwister). int16 reicht komfortabel
+#                            (NUM_ACTIONS=406 << 32767).
+#   - `ranking_child_q`    : float16, Shape (N, RANKING_TOPK), [0,1]-Skala
+#                            wie `root_q` (KEIN Remap auf [-1,1] -- die
+#                            Ranking-Paarbildung in train.py braucht nur
+#                            Differenzen/Vorzeichen, die Skala ist egal;
+#                            float16 spart Speicher, Quantisierungsfehler
+#                            ~4e-4 relativ ist fuer den |dq|>Margin-Filter
+#                            irrelevant, gleiche Kompromiss-Klasse wie
+#                            `states`/`policies` oben).
+#   - `ranking_mask`       : float32, Shape (N,), 1.0 = Sample nutzbar
+#                            (>=2 Geschwister vorhanden UND `pol_w>0` --
+#                            deckt Tiling/Start-Schritte UND
+#                            `policy_target_valid=False` ab, siehe
+#                            pol_w-Kommentar im Baucode), sonst 0.0.
+# AUSWAHL der 8 Paare bei >8 Geschwistern: die `RANKING_TOPK` Eintraege mit
+# der GROESSTEN Abweichung vom Median-Q (`_ranking_topk_pairs` unten) --
+# NICHT die ersten 8 in `root_child_q`-Reihenfolge (das ist die interne
+# Sucheihenfolge, trägt keine Rang-Bedeutung). Die informativsten Paare
+# fuer einen paarweisen Ranking-Loss sind die mit dem GROESSTEN Q-Abstand
+# (klar unterscheidbare "besser/schlechter"-Paare, siehe |dq|>Margin-Filter
+# in train.py) -- eine willkuerliche Erst-8-Auswahl wuerde bei hoher
+# Verzweigung ueberwiegend nahezu identische Q-Werte treffen (kein Signal).
+#
+# SPEICHERBUDGET je Zustand (additiv, Bitpacking-Aera, siehe
+# PREREG_v21_fenster.md "~2,6 KB/Zustand"): 8*int16 (16 B) + 8*float16
+# (16 B) + 1*float32 (4 B) = 36 Byte/Zustand -- << 2% des bestehenden
+# Gesamtbudgets, kein RAM-Vorbehalt.
+#
+# CACHE-VERSIONIERUNG: wie ENDGAME_CACHE_FIELDS ueber den
+# VALUE_SCHEMA_VERSION=19-Bump erzwungen (kein separater Cache-Key-Suffix
+# noetig) -- jeder Cache mit passendem Key wurde vom neuen Baucode
+# geschrieben, der defensive Alt-Cache-Fallback unten (Maske komplett 0,
+# IDs -1, Q 0.0) kann daher nur ueber den `.pt`-Legacy-Migrationspfad
+# erreicht werden, gleiches Muster wie bei `values_wdl`/`endgame_margin`.
+RANKING_TOPK = 8
+RANKING_CACHE_FIELDS = ("ranking_action_ids", "ranking_child_q", "ranking_mask")
+
+
+def _ranking_topk_pairs(action_ids, qs, k):
+    """Waehlt bis zu `k` (Aktions-ID, Q)-Paare aus `zip(action_ids, qs)` --
+    bei <=k Paaren werden ALLE unveraendert (Original-Reihenfolge)
+    uebernommen, bei >k Paaren die `k` mit der GROESSTEN Abweichung vom
+    Median-Q (siehe RANKING_CACHE_FIELDS-Kommentar oben: das sind die
+    informativsten Paare fuer den |dq|>Margin-Filter des Ranking-Loss,
+    nicht die ersten `k` in Sucheihenfolge). Reine Hilfsfunktion, isoliert
+    unit-testbar."""
+    n = len(action_ids)
+    if n <= k:
+        return list(zip(action_ids, qs))
+    median_q = statistics.median(qs)
+    order = sorted(range(n), key=lambda i: abs(qs[i] - median_q), reverse=True)[:k]
+    return [(action_ids[i], qs[i]) for i in order]
 
 # Task #34: welcher Value-Kopf/welches Value-Ziel aktiv ist -- siehe
 # `--value-head` in train.py. "tanh" (Standard) ist das BESTANDSVERHALTEN
@@ -1097,6 +1179,19 @@ class MosaicDataset(Dataset):
                     # wie bei values_wdl -- Maske komplett 0, Ziel neutral 0.5.
                     self.endgame_margin = torch.full_like(self.values, 0.5)
                     self.endgame_mask = torch.zeros(len(self.states), dtype=torch.float32)
+                if 'ranking_action_ids' in hf:
+                    self.ranking_action_ids = torch.from_numpy(hf['ranking_action_ids'][:])
+                    self.ranking_child_q    = torch.from_numpy(hf['ranking_child_q'][:])
+                    self.ranking_mask       = torch.from_numpy(hf['ranking_mask'][:])
+                else:
+                    # Schema 19 (RANKING_CACHE_FIELDS): defensiver Fallback,
+                    # kann durch den VALUE_SCHEMA_VERSION=19-Marker im
+                    # Cache-Key eigentlich nicht auftreten (gleiches Muster
+                    # wie bei endgame_margin/values_wdl) -- Maske komplett 0,
+                    # IDs -1 (kein belegter Slot), Q 0.0.
+                    self.ranking_action_ids = torch.full((len(self.states), RANKING_TOPK), -1, dtype=torch.int16)
+                    self.ranking_child_q    = torch.zeros((len(self.states), RANKING_TOPK), dtype=torch.float16)
+                    self.ranking_mask       = torch.zeros(len(self.states), dtype=torch.float32)
                 if self.encoder == "2d":
                     # Bitpacking (RAM-Optimierung v21): Dataset-Name
                     # selbstbeschreibend, unabhaengig vom `self.bitpacked`-
@@ -1167,6 +1262,12 @@ class MosaicDataset(Dataset):
             # wie root_q/opp_points oben (siehe WDL_CACHE_FIELDS-Kommentar).
             self.values_wdl = torch.full_like(self.values, 0.5)
             self.wdl_outcome = torch.full_like(self.values, -1.0)
+            # Legacy .pt stammt lange vor Schema 19 -- gleiches Fallback-
+            # Muster wie endgame_margin oben (siehe RANKING_CACHE_FIELDS-
+            # Kommentar): Maske komplett 0, IDs -1, Q 0.0.
+            self.ranking_action_ids = torch.full((len(self.states), RANKING_TOPK), -1, dtype=torch.int16)
+            self.ranking_child_q    = torch.zeros((len(self.states), RANKING_TOPK), dtype=torch.float16)
+            self.ranking_mask       = torch.zeros(len(self.states), dtype=torch.float32)
             # Als HDF5 speichern
             with h5py.File(cache_path_h5, 'w') as hf:
                 hf.create_dataset('states',              data=self.states.numpy(),              compression='lzf')
@@ -1186,6 +1287,9 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('wdl_outcome',         data=self.wdl_outcome.numpy(),         compression='lzf')
                 hf.create_dataset('endgame_margin',      data=self.endgame_margin.numpy(),      compression='lzf')
                 hf.create_dataset('endgame_mask',        data=self.endgame_mask.numpy(),        compression='lzf')
+                hf.create_dataset('ranking_action_ids',  data=self.ranking_action_ids.numpy(),  compression='lzf')
+                hf.create_dataset('ranking_child_q',     data=self.ranking_child_q.numpy(),     compression='lzf')
+                hf.create_dataset('ranking_mask',        data=self.ranking_mask.numpy(),        compression='lzf')
             os.remove(cache_path_pt)
             self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
@@ -1206,6 +1310,9 @@ class MosaicDataset(Dataset):
             opp_points_mask_l = []  # 1.0 = echter Wert (scores/winner vorhanden), sonst 0.0
             endgame_l = []       # Schema 18: exakter R5-Wurzelwert [0,1] (ENDGAME_CACHE_FIELDS)
             endgame_mask_l = []  # 1.0 = R5-Drafting mit root_q, sonst 0.0
+            ranking_ids_l = []   # Schema 19: Top-K Geschwister-Aktions-IDs (RANKING_CACHE_FIELDS)
+            ranking_q_l = []     # Schema 19: zugehoerige Q-Werte, [0,1], fp16
+            ranking_mask_l = []  # Schema 19: 1.0 = Geschwister-Set vorhanden UND pol_w>0
             value_wdl_l = []    # Task #34: Gewinnwahrscheinlichkeit [0,1] (siehe WDL_CACHE_FIELDS)
             wdl_outcome_l = []  # Task #34: roher Spielausgang 0.0/1.0, -1.0 = unbekannt
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
@@ -1266,6 +1373,29 @@ class MosaicDataset(Dataset):
                         else:
                             endgame_l.append([0.0])
                             endgame_mask_l.append(0.0)
+                        # Schema 19 (RANKING_CACHE_FIELDS, Task #35b): additives
+                        # `root_child_q`-JSON-Feld -- GLEICHE Reihenfolge/Laenge
+                        # wie `step["policy"]` (self_play.rs-Vertrag, siehe
+                        # dortigen root_child_q_field-Kommentar). Braucht
+                        # mindestens 2 Geschwister, um ueberhaupt ein Paar bilden
+                        # zu koennen. Die finale `ranking_mask` haengt ZUSAETZLICH
+                        # von `pol_w` ab (Tiling/Start/`policy_target_valid=False`)
+                        # -- `pol_w` wird aber erst weiter unten berechnet, daher
+                        # hier nur die Rohwerte sammeln (`_rk_ids`/`_rk_q`/
+                        # `_rk_avail`) und den Append ZUSAMMEN mit `polw_l.append`
+                        # weiter unten nachziehen (gleiche Loop-Iteration,
+                        # Reihenfolge der Listen bleibt dadurch synchron).
+                        rcq = step.get("root_child_q")
+                        _rk_ids = np.full(RANKING_TOPK, -1, dtype=np.int16)
+                        _rk_q = np.zeros(RANKING_TOPK, dtype=np.float16)
+                        _rk_avail = 0.0
+                        if rcq is not None and len(rcq) >= 2:
+                            _act_ids = [action_to_id(pe["action"]) for pe in step["policy"]]
+                            _pairs = _ranking_topk_pairs(_act_ids, [float(q) for q in rcq], RANKING_TOPK)
+                            for _i, (_aid, _q) in enumerate(_pairs):
+                                _rk_ids[_i] = _aid
+                                _rk_q[_i] = _q
+                            _rk_avail = 1.0
                         # Audit-F2 (2026-08-05): Rust stempelt `scores`/`winner`
                         # auch bei TIMEOUT-ABBRUCH bedingungslos (self_play.rs,
                         # dortiger Kommentar verspricht faelschlich einen
@@ -1485,6 +1615,14 @@ class MosaicDataset(Dataset):
                         if step.get("policy_target_valid") is False:
                             pol_w = 0.0
                         polw_l.append(np.float32(pol_w))
+                        # Schema 19 (RANKING_CACHE_FIELDS): finale Maske erst
+                        # HIER moeglich -- `pol_w` (inkl. aller obigen
+                        # Sonderfaelle: Tiling/Start, Policy-Traeger-Manifest,
+                        # PCR) ist jetzt final berechnet. `_rk_avail` kam aus
+                        # dem `root_child_q`-Block oben (gleiche Loop-Iteration).
+                        ranking_ids_l.append(_rk_ids)
+                        ranking_q_l.append(_rk_q)
+                        ranking_mask_l.append(np.float32(_rk_avail if pol_w > 0.0 else 0.0))
                         rounds_l.append(np.int8(step["state"].get("round", 0)))
                         # Ego-Perspektive: erst der Spieler am Zug, dann der
                         # Gegner -- dieselbe Reihenfolge wie in state_to_tensor
@@ -1539,6 +1677,9 @@ class MosaicDataset(Dataset):
             wdl_outcome_np  = np.array(wdl_outcome_l,  dtype=np.float32); del wdl_outcome_l
             endgame_np      = np.array(endgame_l,      dtype=np.float32); del endgame_l
             endgame_mask_np = np.array(endgame_mask_l, dtype=np.float32); del endgame_mask_l
+            ranking_ids_np  = np.array(ranking_ids_l,  dtype=np.int16);   del ranking_ids_l
+            ranking_q_np    = np.array(ranking_q_l,    dtype=np.float16); del ranking_q_l
+            ranking_mask_np = np.array(ranking_mask_l, dtype=np.float32); del ranking_mask_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -1586,6 +1727,9 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('wdl_outcome',          data=wdl_outcome_np,   compression='lzf')
                 hf.create_dataset('endgame_margin',       data=endgame_np,       compression='lzf')
                 hf.create_dataset('endgame_mask',         data=endgame_mask_np,  compression='lzf')
+                hf.create_dataset('ranking_action_ids',   data=ranking_ids_np,   compression='lzf')
+                hf.create_dataset('ranking_child_q',      data=ranking_q_np,     compression='lzf')
+                hf.create_dataset('ranking_mask',         data=ranking_mask_np,  compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset(_planes_key,        data=planes_np,    compression='lzf')
                     if self.bitpacked:
@@ -1622,6 +1766,9 @@ class MosaicDataset(Dataset):
             self.wdl_outcome         = torch.from_numpy(wdl_outcome_np)
             self.endgame_margin      = torch.from_numpy(endgame_np)
             self.endgame_mask        = torch.from_numpy(endgame_mask_np)
+            self.ranking_action_ids  = torch.from_numpy(ranking_ids_np)
+            self.ranking_child_q     = torch.from_numpy(ranking_q_np)
+            self.ranking_mask        = torch.from_numpy(ranking_mask_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -1773,7 +1920,12 @@ class MosaicDataset(Dataset):
                 self.values_wdl[idx], self.wdl_outcome[idx],
                 # Schema 18 (PREREG_platten_intervention.md): additiv ANS
                 # ENDE, gleiches Muster -- exakter R5-Wurzelwert + Maske.
-                self.endgame_margin[idx], self.endgame_mask[idx])
+                self.endgame_margin[idx], self.endgame_mask[idx],
+                # Schema 19 (Task #35b, RANKING_CACHE_FIELDS): additiv ANS
+                # ENDE, gleiches Muster -- Top-K Geschwister-Aktions-IDs +
+                # Q-Werte + Verfuegbarkeits-/pol_w-Maske fuer den paarweisen
+                # Policy-Ranking-Loss in train.py (`--ranking-loss-weight`).
+                self.ranking_action_ids[idx], self.ranking_child_q[idx], self.ranking_mask[idx])
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
         # vorangestellt -- `encoder="flat"` (Standard) behaelt exakt die
         # bisherige Tupel-FORM/-POSITION fuer Aufrufer, die den `encoder`-
