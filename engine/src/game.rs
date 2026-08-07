@@ -1155,6 +1155,33 @@ mod tests {
         );
     }
 
+    /// Engine-Audit U2 (2026-08-07): ein Sun-Zug von kleiner Fabrik OHNE
+    /// factory_id muss als Err abgelehnt werden -- vorher liess
+    /// `validate_small_sun`s `factory_id?` ihn passieren und `execute_take`
+    /// panickte (`expect("small sun braucht factory_id")`), was direkten
+    /// API-Aufrufern (server.py) den Prozess riss.
+    #[test]
+    fn apply_drafting_rejects_small_sun_without_factory_id() {
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let stone = Action::Stone(Move {
+            take: TakeAction {
+                source: TakeSource::SmallFactorySun,
+                color: TileColor::Rot,
+                factory_id: None,
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: -1 },
+        });
+        assert!(
+            game.apply_drafting(&stone).is_err(),
+            "Sun-Zug ohne factory_id muss Err liefern (kein Panic)"
+        );
+    }
+
     /// Analoger Guard fuer die ANDERE Pending-Situation (offene Kuppel-
     /// Rotation, Stufe 2 nach Kachel/Slot-Wahl) -- dieselbe Fehlerklasse
     /// (`pending_dome_choice` wurde bisher ebenfalls von keinem Validator

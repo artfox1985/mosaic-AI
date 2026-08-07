@@ -422,6 +422,14 @@ pub fn can_complete_row_with_chips(player: &PlayerBoard, row_idx: usize) -> bool
 /// Greedy-Auswahl + Ausführung über [`greedy_chip_alloc`]/[`apply_bonus_chips_with`]
 /// (dieselbe Regel, keine eigene zweite Simulation mehr).
 pub fn apply_bonus_chips_to_row(player: &mut PlayerBoard, row_idx: usize) -> bool {
+    // Engine-Audit U1 (2026-08-07): Top-down-Sperre auch auf Apply-Ebene
+    // durchsetzen (Manual: "Gesperrte Reihen koennen nicht mehr per Chip
+    // befuellt werden"). Bisher nur Solver-/UI-seitig gefiltert
+    // (self_play.rs/serialize.rs: `ri >= tiled_max_row`) -- ein direkter
+    // API-Aufruf (server.py /api/tiling/bonus_chips) konnte sie umgehen.
+    if (row_idx as i32) < player.tiled_max_row {
+        return false;
+    }
     match greedy_chip_alloc(player, row_idx) {
         Some(indices) => apply_bonus_chips_with(player, row_idx, &indices),
         None => false,
@@ -781,6 +789,26 @@ mod tests {
         assert!(apply_bonus_chips_to_row(&mut p, 2));
         assert!(p.pattern_lines[2].is_complete());
         assert!(p.bonus_chips.is_empty());
+    }
+
+    #[test]
+    fn bonus_chips_blocked_on_locked_row() {
+        // Engine-Audit U1: Top-down-Sperre auf Apply-Ebene. Wurde bereits
+        // eine tiefere Reihe gelegt (tiled_max_row), sind Reihen darueber
+        // fuer Chips gesperrt (Manual: "Gesperrte Reihen koennen nicht mehr
+        // per Chip befuellt werden").
+        use crate::dome::BonusChip;
+        let mut p = PlayerBoard::new(0, "P");
+        p.pattern_lines[2].add_tiles(&[Rot]);
+        for i in 0..4 {
+            p.bonus_chips.push(BonusChip { chip_id: i, colors: vec![Rot] });
+        }
+        p.tiled_max_row = 4; // Reihe 5 wurde schon gelegt -> Reihe 3 gesperrt.
+        assert!(!apply_bonus_chips_to_row(&mut p, 2));
+        assert!(!p.pattern_lines[2].is_complete());
+        assert_eq!(p.bonus_chips.len(), 4); // nichts verbraucht
+        p.tiled_max_row = 1; // Sperre unterhalb -> Reihe 3 wieder erlaubt.
+        assert!(apply_bonus_chips_to_row(&mut p, 2));
     }
 
     #[test]

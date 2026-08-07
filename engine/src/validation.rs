@@ -29,7 +29,15 @@ fn validate_take(state: &GameState, take: &TakeAction) -> Option<String> {
 }
 
 fn validate_small_sun(state: &GameState, take: &TakeAction) -> Option<String> {
-    let fid = take.factory_id?;
+    // Engine-Audit U2 (2026-08-07): `factory_id?` gab bei None faelschlich
+    // "kein Fehler" zurueck (fruehes return None des Validators) -- der Zug
+    // passierte die Validierung und panickte erst in `execute_take`s
+    // `expect("small sun braucht factory_id")`. Direkte API-Aufrufer
+    // (server.py /api/move/stone ohne factory_id) rissen so den Prozess.
+    let fid = match take.factory_id {
+        Some(id) => id,
+        None => return Some("Sun-Zug von kleiner Fabrik braucht factory_id.".into()),
+    };
     let f = match get_small_factory(state, fid) {
         Some(f) => f,
         None => return Some(format!("Fabrik {fid} nicht gefunden.")),
