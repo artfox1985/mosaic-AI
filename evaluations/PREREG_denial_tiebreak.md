@@ -41,10 +41,22 @@ Gegner-Punkte ↓ / Gegner-Floor ↑, p<0,05). Zusaetzlich deskriptiv:
 wie oft feuert der Tie-Break (Anteil getauschter Zuege, aus einem
 Debug-Zaehler oder Stichproben-Traces).
 
-**Erwartung/Lesart**: Siegquote ~unveraendert (Bauart); entscheidend
-ist allein die Raub-Signatur. ε=0,03 aggressiver, aber naeher an der
-Grenze, wo "quasi-gleichwertig" nicht mehr stimmt -- faellt die
-Siegquote dort, gilt nur ε=0,01.
+**Erwartung/Lesart**: Siegquote ~unveraendert (Bauart). ε=0,03
+aggressiver, aber naeher an der Grenze, wo "quasi-gleichwertig" nicht
+mehr stimmt -- faellt die Siegquote dort, gilt nur ε=0,01.
+
+**REGEL-AENDERUNG (Nutzer 2026-08-07, VOR Sichtung der Ergebnisse,
+Lauf noch in der Arena): "e3 kommt so oder so rein wenn sie die
+gewinnchance nicht verringert."** Uebernahme-Gate ist damit ALLEIN
+die Siegquoten-Wache (Arm faellt nur, wenn Punktschaetzung unter der
+Kontrolle ODER signifikant schlechter); die Raub-Signifikanz ist
+Dokumentation, kein Gate mehr. Bestehen mehrere ε-Arme die Wache,
+gewinnt das GROESSERE ε (mehr Denial-Wirkung), bei praktisch gleicher
+Siegquote; sonst das ε mit der besseren Siegquoten-Differenz.
+Risiko-Einordnung: bauartbedingt tauscht E3 nur Zuege im
+Aequivalenzfenster, und der Feuerraten-Zaehler belegt die Aktivitaet
+mechanisch -- eine Uebernahme auf schwacher Raub-Evidenz kostet daher
+strukturell nichts.
 
 ## Einordnung / Kombination
 
