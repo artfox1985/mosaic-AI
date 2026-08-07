@@ -65,8 +65,16 @@ def champion_model() -> str:
 
 def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int,
             n_games: int, seed: int, block_size: int, threads: int) -> list[dict]:
+    """`env_name` darf mehrere komma-getrennte Var-Namen tragen; `value`
+    dann entsprechend viele komma-getrennte Werte (Aggressions-
+    Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt)."""
     env = os.environ.copy()
-    env[env_name] = value
+    names = [n.strip() for n in env_name.split(",")]
+    vals = [v.strip() for v in value.split(",")]
+    if len(names) != len(vals):
+        raise SystemExit(f"Arm {value!r}: {len(vals)} Werte fuer {len(names)} Env-Vars")
+    for n, v in zip(names, vals):
+        env[n] = v
     games: list[dict] = []
     done, block_idx = 0, 0
     print(f"Arm {env_name}={value}: {os.path.basename(model)}@{net_sims} vs "
