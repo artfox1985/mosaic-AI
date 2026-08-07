@@ -13,14 +13,14 @@ geschlossen).
 |---|---|
 | **Platten-Intervention (endgame_head)** | **ABGESCHLOSSEN 2026-08-08: Arena H0 (97:103), Offline-Gewinne real (R5 0,457, Brier -0,0016) -> `--endgame-head` wird Standard-Rezept der naechsten Generation**; Champion bleibt. `PREREG_platten_intervention.md` |
 | **τ-Annealing (Messung 3)** | Arm-B-Training `t3ann_s2` LAEUFT (Swap-Fenster 200 raus/200 rein via Manifest+Exclude, Cache baut); danach Gating vs Champion -> Sockel-Entscheid. `PREREG_suchpfad_nachmessungen.md` |
-| **v21-Fenster fuellen** | Generator-Frage GEKLAERT (Endgame-H0 -> `v20_2d_opp_brierbest` bleibt): 2.090 Schwarm-Partien ZURUECK in data/, Schwarm-Rest 5.910 startet nach dem Stark-Gegner-Nachtest; Sockel nach τ-Verdikt. `PREREG_v21_fenster.md` |
+| **v21-Fenster fuellen** | **ZURUECKGESTELLT (Nutzer 2026-08-08: "nicht so auf die self plays stuerzen")**: Generator-Frage geklaert (Champion bleibt), 2.090 Schwarm-Partien zurueck in data/; Generierung erst, wenn die offene Task-Liste abgearbeitet ist (und ohnehin nach τ- und #37-Verdikt). `PREREG_v21_fenster.md` |
 | **Messset-Snapshot + v16/v17-Freigabe** | Snapshot ERLEDIGT 2026-08-07 abends (`altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
 | **#35b Ranking-Loss** | Implementierung beim Agent (--ranking-loss-weight, Default aus; ggf. Schema 19 fuer root_child_q-Cache-Feld); Trainings danach in die GPU-Queue (Seed-Varianz-Regel) |
 | **λ (Value-Target-Mix)** | **AKTIVIERT (Nutzer-Anstoss 2026-08-08)**: v20/v21-Fenster hat ~95% root_q-Anteil, weit ueber den 66%, bei denen λ=0,7 GEWANN -> λ=0,7-Arm in die GPU-Queue hinter t3ann_s2 |
 | **#29-Instrument (Offline-Value-Praediktor)** | OFFEN: braucht frozen-Set-Neubau + arena-differenzierte Paare zur Validierung. `PREREG_nach34_paket` |
 | **#37 Tiling-Auswahlkriterium (punkte*P vs reines P)** | **VORGEZOGEN (Nutzer-Anstoss 2026-08-08): VOR die Schwarm-Fortsetzung** (Kriterium wirkt im Tiling jedes Self-Plays -> ganzer v21-Korpus soll das Sieger-Kriterium nutzen). Knopf beim Agent (MOSAIC_TILING_SELECT); danach Zwei-Arm-A/B (#30-Muster -- Solver ist prozessglobal, wirkt auf BEIDE Seiten) |
-| **frozen-Set-Neubau** | OFFEN (Vorbedingung fuer #29; Referenz-Set ist v12-Aera) -- Nutzer-Prioritaet |
+| **frozen-Set-Neubau** | **AKTIVIERT**: in die CPU-Queue nach dem Stark-Gegner-Nachtest und #37-A/B (Orakel-Labels CPU-schwer; Korpus-Generierung wartet ohnehin) -> danach #29-Validierung an den Aera-Gating-Paaren |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
 ## NAECHSTE SCHRITTE (Reihenfolge-Regel: Modell-Verdikte VOR Korpus-Generierung)
