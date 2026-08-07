@@ -151,7 +151,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (
     MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
-    value_head_variant_from_state,
+    value_head_variant_from_state, unpack_planes_batch, unpack_masks_batch,
 )
 
 
@@ -819,6 +819,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
                  targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask) = _batch
+                # RAM-Optimierung v21 (Bitpacking): liegt der Cache gepackt
+                # vor (`dataset.bitpacked`, Standard seit diesem Feature),
+                # kommt `planes` als [B,342]-Bytes statt [B,76,6,6] aus dem
+                # DataLoader -- EINMAL pro Batch entpackt, NOCH VOR dem
+                # Device-Move (Micro-Benchmark in neural_net.py zeigt diese
+                # Reihenfolge als schnellsten Pfad, siehe
+                # `unpack_planes_batch`-Kommentar). Alt-Cache/
+                # MOSAIC_CACHE_NOPACK=1 -> `bitpacked=False`, `planes` ist
+                # bereits [B,76,6,6] wie bisher, Aufruf entfaellt.
+                if dataset.bitpacked:
+                    planes = unpack_planes_batch(planes)
                 # RAM-Optimierung v20: Cache liefert kompakte Typen (planes
                 # uint8, states/policies fp16, masks uint8) -- Cast auf
                 # float32 erst NACH dem Device-Move (billig, spart Transfer).
@@ -828,6 +839,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
                  s_rounds, s_own, targets_opp_points, s_opp_mask,
                  targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask) = _batch
+            # RAM-Optimierung v21 (Bitpacking): masks-Entpacken analog zu
+            # planes oben, UNABHAENGIG vom Encoder (masks gehoeren zum
+            # Basis-Tupel, siehe MosaicDataset.__getitem__).
+            if dataset.bitpacked:
+                masks = unpack_masks_batch(masks)
             states    = states.to(device).float()
             targets_p = targets_p.to(device).float()
             targets_v = targets_v.to(device)
@@ -1068,12 +1084,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                         (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
                          v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask) = _v_batch
+                        # RAM-Optimierung v21 (Bitpacking): Entpacken wie im
+                        # Trainingszweig, siehe dortigen Kommentar.
+                        if val_dataset.bitpacked:
+                            v_planes = unpack_planes_batch(v_planes)
                         # RAM-Optimierung v20: Cast wie im Trainingszweig.
                         v_planes = v_planes.to(device).float()
                     else:
                         (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                          v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
                          v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask) = _v_batch
+                    if val_dataset.bitpacked:
+                        v_masks = unpack_masks_batch(v_masks)
                     v_states = v_states.to(device).float()
                     v_targets_p = v_targets_p.to(device).float()
                     v_targets_v = v_targets_v.to(device)
