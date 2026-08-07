@@ -18,16 +18,32 @@ die Self-Play-Prozesse beendet sind (DLL-Lock):
 Beide mit Paritaets-Nachweis (Default-Lauf bitgleich zu vorher) und
 Engine-Tests vor Einsatz.
 
+## AMENDMENT Instrument (2026-08-07, VOR dem ersten Messlauf)
+
+Die urspruengliche Formulierung "Modell auf BEIDEN Seiten identisch, nur
+Env verschieden" ist mit den gebauten Knoepfen NICHT ausfuehrbar: die
+Env-Vars sind prozessweit (OnceLock, einmalig gelesen), ein
+Netz-vs-Netz-Match traegt den Wert also zwingend auf BEIDEN Seiten --
+ein Spiegelmatch desselben Modells misst dann nichts. Ersatz-Instrument
+= das etablierte Zwei-Arm-Muster (#30-Skalen-Korrektur,
+Floor-Erstvalidierung): **je Arm ein eigener Prozess (Env gesetzt),
+Champion-Netz vs Heuristik@150(dyn) -- die Heuristik liest keinen der
+beiden Knoepfe, die Differenz attribuiert sauber auf die Netz-Seite.**
+Identische Basis-Seeds je Spielindex ueber die Arme, fixed-n, exakter
+zweiseitiger McNemar auf den diskordanten Paaren (Formel wie
+paired_gating.py). Entscheidungsregeln der Messungen unveraendert.
+
 ## Messung 1 — Floor-Gewicht-Sweep in der WDL-Aera (billig, zuerst)
 
 **Frage**: Ist 0,3 noch der richtige Wert, nachdem sich die
 Value-Spreizung seit der Kalibrierung ~2x geaendert hat (WDL-Aera)?
 Der 0,15/0,6-Sweep steht seit Juli als "optional" offen.
-**Design**: Modell = v20-Champion (bzw. bester v20-Kandidat, falls
-Gating H0). Zwei gepaarte Gatings à 200 Paare, identische Seeds je
-Paar, Modell auf BEIDEN SeITEN identisch, nur Env verschieden:
-W=0,3 vs W=0,15 und W=0,3 vs W=0,6. Optional Bestaetigung W=0,3 vs
-W=0,0 (Re-Validierung des Features am neuen Kopf).
+**Design (gem. Amendment oben)**: Modell = v20-Champion
+(`v20_2d_opp_brierbest`, Gating gewonnen). DREI Arme a 200 Spiele
+(Champion@400 vs Heuristik@150dyn, identische Seeds ueber die Arme):
+W=0,3 (Kontrolle), W=0,15, W=0,6. Vergleiche 0,3-vs-0,15 und
+0,3-vs-0,6 per gepaartem McNemar. Optional Bestaetigung W=0,0
+(Re-Validierung des Features am neuen Kopf).
 **Entscheid**: Wechsel des Defaults nur bei SPRT-H1 GEGEN 0,3 plus
 Frisch-Seed-Replikation (Statistik-Regel 3); sonst bleibt 0,3 und der
 Punkt gilt als WDL-re-validiert.
@@ -38,9 +54,11 @@ Punkt gilt als WDL-re-validiert.
 **Frage**: Kostet die Budget-Formel (150 Sims -> m=9) Staerke gegenueber
 fester Breite m=16? Relevanz: Schwarm-Klasse kuenftiger Kampagnen und
 alle Niedrig-Sims-Presets (GUI/#31).
-**Design**: gepaartes Gating, SELBES Modell beidseitig @150 Sims,
-Seite A `MOSAIC_GUMBEL_TOP_M=0` (Formel, m=9), Seite B `=16`;
-200 Paare. Sekundaer identisch @64 Sims (m=4 vs 16), falls A signifikant.
+**Design (gem. Amendment oben)**: ZWEI Arme a 200 Spiele
+(Champion@150 vs Heuristik@150dyn, identische Seeds), Arm A
+`MOSAIC_GUMBEL_TOP_M=0` (Formel, m=9), Arm B `=16`; gepaarter
+McNemar. Sekundaer identisch @64 Netz-Sims (m=4 vs 16), falls A
+signifikant.
 **Entscheid**: H0 -> Formel bestaetigt (Abweichungsnotiz der
 v20-Kampagne wird geschlossen). Signifikanter Unterschied -> Formel
 anpassen UND bewerten, ob der v19wdlsw-Schwarm als Value-Material
