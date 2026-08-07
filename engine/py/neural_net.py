@@ -632,7 +632,13 @@ def action_to_id(action: dict) -> int:
 # train.py's `--wdl-bootstrap-destretch` ist damit fuer Schema>=17-Caches
 # UEBERFLUESSIG und darf NICHT zusaetzlich gesetzt werden (doppelte
 # Streckung); der Flag bleibt nur fuer Alt-Experimente auf Schema-16.
-VALUE_SCHEMA_VERSION = 17
+# Schema 18 (2026-08-07, PREREG_platten_intervention.md): additive Felder
+# `endgame_margin`/`endgame_mask` (ENDGAME_CACHE_FIELDS unten) -- exakter
+# R5-Minimax-Wurzelwert aus den Records (root_q der R5-Drafting-Schritte,
+# [0,1]-tanh-Normierung, net_mcts.rs-R5-Zweig). Labels sind GRATIS (kein
+# Solver-Lauf beim Cache-Bau); Zustaende ohne root_q bzw. ausserhalb der
+# R5-Drafting-Zone tragen Maske 0 (v16/v17-Dateien komplett).
+VALUE_SCHEMA_VERSION = 18
 # Namenskonvention: Dateien heissen nach dem GENERATOR (v19-Aera-Modell
 # t34_wdldestretch_brierbest -> "v19wdl"), NICHT nach der Ziel-Generation
 # (Koordinator-Fehler #2 mit dieser Konvention, vom Nutzer 2026-08-06
@@ -709,6 +715,10 @@ OPP_POINTS_CACHE_FIELDS = ("opp_points_forecast", "opp_points_mask")
 # `--value-head wdl` nutzt (analog zu `points_forecast`, das auch immer
 # gebaut wird, egal ob POINTS_WEIGHT>0).
 WDL_CACHE_FIELDS = ("values_wdl", "wdl_outcome")
+
+# Schema 18 (PREREG_platten_intervention.md): exakte R5-Zonen-Ziele fuer den
+# additiven `endgame_head` -- immer mitgebaut (Muster points_forecast/WDL).
+ENDGAME_CACHE_FIELDS = ("endgame_margin", "endgame_mask")
 
 # Task #34: welcher Value-Kopf/welches Value-Ziel aktiv ist -- siehe
 # `--value-head` in train.py. "tanh" (Standard) ist das BESTANDSVERHALTEN
@@ -962,6 +972,14 @@ class MosaicDataset(Dataset):
                     # "Niederlage"-Label).
                     self.values_wdl = torch.full_like(self.values, 0.5)
                     self.wdl_outcome = torch.full_like(self.values, -1.0)
+                if 'endgame_margin' in hf:
+                    self.endgame_margin = torch.from_numpy(hf['endgame_margin'][:])
+                    self.endgame_mask = torch.from_numpy(hf['endgame_mask'][:])
+                else:
+                    # Schema 18 (ENDGAME_CACHE_FIELDS): defensiver Fallback
+                    # wie bei values_wdl -- Maske komplett 0, Ziel neutral 0.5.
+                    self.endgame_margin = torch.full_like(self.values, 0.5)
+                    self.endgame_mask = torch.zeros(len(self.states), dtype=torch.float32)
                 if self.encoder == "2d":
                     if 'planes' not in hf:
                         raise RuntimeError(
@@ -1013,6 +1031,9 @@ class MosaicDataset(Dataset):
             # Fallback-Muster wie root_q oben.
             self.opp_points_forecast = torch.zeros_like(self.values)
             self.opp_points_mask = torch.zeros(len(self.states), dtype=torch.float32)
+            # Legacy .pt stammt lange vor Schema 18 -- gleiches Muster.
+            self.endgame_margin = torch.full_like(self.values, 0.5)
+            self.endgame_mask = torch.zeros(len(self.states), dtype=torch.float32)
             # Legacy .pt stammt lange vor Task #34 -- gleiches Fallback-Muster
             # wie root_q/opp_points oben (siehe WDL_CACHE_FIELDS-Kommentar).
             self.values_wdl = torch.full_like(self.values, 0.5)
@@ -1034,6 +1055,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('opp_points_mask',     data=self.opp_points_mask.numpy(),     compression='lzf')
                 hf.create_dataset('values_wdl',          data=self.values_wdl.numpy(),          compression='lzf')
                 hf.create_dataset('wdl_outcome',         data=self.wdl_outcome.numpy(),         compression='lzf')
+                hf.create_dataset('endgame_margin',      data=self.endgame_margin.numpy(),      compression='lzf')
+                hf.create_dataset('endgame_mask',        data=self.endgame_mask.numpy(),        compression='lzf')
             os.remove(cache_path_pt)
             self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
@@ -1052,6 +1075,8 @@ class MosaicDataset(Dataset):
             root_q_mask_l = []  # 1.0 = root_q vorhanden (echte Suche geloggt), sonst 0.0
             opp_points_l = []       # Task #28: reine Gegner-Punkteprognose (siehe OPP_POINTS_CACHE_FIELDS)
             opp_points_mask_l = []  # 1.0 = echter Wert (scores/winner vorhanden), sonst 0.0
+            endgame_l = []       # Schema 18: exakter R5-Wurzelwert [0,1] (ENDGAME_CACHE_FIELDS)
+            endgame_mask_l = []  # 1.0 = R5-Drafting mit root_q, sonst 0.0
             value_wdl_l = []    # Task #34: Gewinnwahrscheinlichkeit [0,1] (siehe WDL_CACHE_FIELDS)
             wdl_outcome_l = []  # Task #34: roher Spielausgang 0.0/1.0, -1.0 = unbekannt
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
@@ -1096,6 +1121,22 @@ class MosaicDataset(Dataset):
                         else:
                             root_q_l.append(0.0)
                             root_q_mask_l.append(0.0)
+                        # Schema 18 (ENDGAME_CACHE_FIELDS): in der R5-Drafting-
+                        # Zone ist root_q der EXAKTE Minimax-Wurzelwert
+                        # (round5.rs via net_mcts.rs-R5-Zweig, [0,1]-Skala) --
+                        # als eigenes Aux-Ziel `endgame_margin` gefuehrt.
+                        # Unabhaengig von `completed` gueltig (der AB-Wert
+                        # haengt nicht vom Partieausgang ab). Ausserhalb der
+                        # Zone bzw. ohne root_q (v16/v17, Ein-Aktion-Zuege):
+                        # Maske 0.
+                        _st = step["state"]
+                        if (rq is not None and _st.get("round") == 5
+                                and _st.get("phase") == "drafting"):
+                            endgame_l.append([float(rq)])
+                            endgame_mask_l.append(1.0)
+                        else:
+                            endgame_l.append([0.0])
+                            endgame_mask_l.append(0.0)
                         # Audit-F2 (2026-08-05): Rust stempelt `scores`/`winner`
                         # auch bei TIMEOUT-ABBRUCH bedingungslos (self_play.rs,
                         # dortiger Kommentar verspricht faelschlich einen
@@ -1367,6 +1408,8 @@ class MosaicDataset(Dataset):
             opp_points_mask_np = np.array(opp_points_mask_l, dtype=np.float32); del opp_points_mask_l
             value_wdl_np    = np.array(value_wdl_l,    dtype=np.float32); del value_wdl_l
             wdl_outcome_np  = np.array(wdl_outcome_l,  dtype=np.float32); del wdl_outcome_l
+            endgame_np      = np.array(endgame_l,      dtype=np.float32); del endgame_l
+            endgame_mask_np = np.array(endgame_mask_l, dtype=np.float32); del endgame_mask_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -1391,6 +1434,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('opp_points_mask',      data=opp_points_mask_np, compression='lzf')
                 hf.create_dataset('values_wdl',           data=value_wdl_np,     compression='lzf')
                 hf.create_dataset('wdl_outcome',          data=wdl_outcome_np,   compression='lzf')
+                hf.create_dataset('endgame_margin',       data=endgame_np,       compression='lzf')
+                hf.create_dataset('endgame_mask',         data=endgame_mask_np,  compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset('planes',           data=planes_np,    compression='lzf')
             print(f"✅ Cache gespeichert: {cache_path_h5}")
@@ -1421,6 +1466,8 @@ class MosaicDataset(Dataset):
             self.opp_points_mask     = torch.from_numpy(opp_points_mask_np)
             self.values_wdl          = torch.from_numpy(value_wdl_np)
             self.wdl_outcome         = torch.from_numpy(wdl_outcome_np)
+            self.endgame_margin      = torch.from_numpy(endgame_np)
+            self.endgame_mask        = torch.from_numpy(endgame_mask_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -1561,7 +1608,10 @@ class MosaicDataset(Dataset):
                 # Muster) -- `values_wdl` (TD-geblendetes WDL-Trainingsziel)
                 # + `wdl_outcome` (roher, ungeblendeter Ausgang fuer den
                 # arm-uebergreifend vergleichbaren Brier-Score, siehe train.py).
-                self.values_wdl[idx], self.wdl_outcome[idx])
+                self.values_wdl[idx], self.wdl_outcome[idx],
+                # Schema 18 (PREREG_platten_intervention.md): additiv ANS
+                # ENDE, gleiches Muster -- exakter R5-Wurzelwert + Maske.
+                self.endgame_margin[idx], self.endgame_mask[idx])
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
         # vorangestellt (12-Tupel statt 11) -- `encoder="flat"` (Standard)
         # bleibt exakt das bisherige Tupel-Layout, byte-identisches
@@ -1589,6 +1639,12 @@ def points_dist_bins_from_state(state: dict) -> int:
         return 0
     n = int(w.shape[0])
     return 0 if n <= 1 else n
+
+
+def endgame_head_present(state: dict) -> bool:
+    """Schema 18: Praesenz des additiven `endgame_head` AUS DEM CHECKPOINT
+    ableiten -- identisches Muster wie `opp_points_head_present`."""
+    return "endgame_head.0.weight" in state
 
 
 def opp_points_head_present(state: dict) -> bool:
@@ -1631,7 +1687,7 @@ def encoder_from_state_dict(state: dict) -> str:
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64,
-                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False,
+                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False, endgame_head=False,
                  value_head_variant="tanh"):
         super(MosaicNet, self).__init__()
         if value_head_variant not in VALUE_HEAD_VARIANTS:
@@ -1770,6 +1826,20 @@ class MosaicNet(nn.Module):
                 nn.Linear(value_hidden, 1),
                 nn.Tanh(),
             )
+        # endgame_head (PREREG_platten_intervention.md, Schema 18): exaktes
+        # R5-Zonen-Ziel (Minimax-Wurzelwert), additiv/standardmaessig AUS --
+        # gleiches "zuletzt deklariert"-Muster und gleiche Architektur wie
+        # opp_points_head. Tanh-Ausgang [-1,1]; das [0,1]-Cache-Ziel wird in
+        # train.py per 2x-1 remapped. Reines Trainingssignal (Suche liest
+        # den Kopf nicht).
+        self.has_endgame_head = bool(endgame_head)
+        if self.has_endgame_head:
+            self.endgame_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh(),
+            )
 
     def forward(self, x):
         shared = self.body(x)
@@ -1822,6 +1892,10 @@ class MosaicNet(nn.Module):
         # (nicht Position) erkannt.
         if self.has_opp_points_head:
             out = out + (self.opp_points_head(shared),)
+        # Schema 18: endgame haengt HINTER opp_points (additiv; Rust liest
+        # per NAME bzw. ignoriert unbekannte Outputs -- Indizes 0..3 stabil).
+        if self.has_endgame_head:
+            out = out + (self.endgame_head(shared),)
         return out
 
     @torch.no_grad()
@@ -1894,7 +1968,7 @@ class Mosaic2DNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64, points_dist_bins=POINTS_DIST_BINS,
                  planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2,
-                 opp_points_head=False, value_head_variant="tanh"):
+                 opp_points_head=False, endgame_head=False, value_head_variant="tanh"):
         super().__init__()
         if value_head_variant not in VALUE_HEAD_VARIANTS:
             raise ValueError(
@@ -2009,6 +2083,20 @@ class Mosaic2DNet(nn.Module):
                 nn.Linear(value_hidden, 1),
                 nn.Tanh(),
             )
+        # endgame_head (PREREG_platten_intervention.md, Schema 18): exaktes
+        # R5-Zonen-Ziel (Minimax-Wurzelwert), additiv/standardmaessig AUS --
+        # gleiches "zuletzt deklariert"-Muster und gleiche Architektur wie
+        # opp_points_head. Tanh-Ausgang [-1,1]; das [0,1]-Cache-Ziel wird in
+        # train.py per 2x-1 remapped. Reines Trainingssignal (Suche liest
+        # den Kopf nicht).
+        self.has_endgame_head = bool(endgame_head)
+        if self.has_endgame_head:
+            self.endgame_head = nn.Sequential(
+                nn.Linear(hidden_size, value_hidden),
+                nn.ReLU(),
+                nn.Linear(value_hidden, 1),
+                nn.Tanh(),
+            )
 
     def forward(self, x_planes, x_flat=None):
         if x_flat is None:
@@ -2053,6 +2141,10 @@ class Mosaic2DNet(nn.Module):
         # `MosaicNet.forward`.
         if self.has_opp_points_head:
             out = out + (self.opp_points_head(shared),)
+        # Schema 18: endgame haengt HINTER opp_points (additiv; Rust liest
+        # per NAME bzw. ignoriert unbekannte Outputs -- Indizes 0..3 stabil).
+        if self.has_endgame_head:
+            out = out + (self.endgame_head(shared),)
         return out
 
 
@@ -2078,6 +2170,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     # Checkpoint ohne diese Keys baut das Modell OHNE den Kopf, bleibt also
     # ladbar/exportierbar wie bisher.
     opp_head = opp_points_head_present(state)
+    eg_head = endgame_head_present(state)
     # Task #34: 'tanh' oder 'wdl' AUS DEM CHECKPOINT ableiten (gleiches Muster) --
     # ein Alt-Checkpoint (kein `value_head.2.weight` mit Breite 2) baut den
     # klassischen Tanh-Kopf, bleibt also unveraendert ladbar/exportierbar.
@@ -2087,12 +2180,14 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
                             policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
+                            endgame_head=eg_head,
                             value_head_variant=value_head_variant)
     else:
         in_size = input_size if input_size is not None else state["body.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = MosaicNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
                           policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
+                          endgame_head=eg_head,
                           value_head_variant=value_head_variant)
     model.load_state_dict(state, strict=False)
     return model, encoder
