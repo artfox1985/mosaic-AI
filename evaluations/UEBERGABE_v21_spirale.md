@@ -188,6 +188,11 @@ das λ-gemischte, glattere Ziel gemessen) und zaehlt nicht.
 
 ## 5c. NACH-v21-QUEUE, VOLLSTAENDIG (Reihenfolge + Bahnen)
 
+**PRIORITAETS-REGEL (Nutzer 2026-08-08): diese Queue kommt VOR jeder
+weiteren Korpus-Generierung.** Kein v22-Self-Play, solange 1-7 nicht
+abgearbeitet sind -- `PREREG_v22_fenster.md` ist ein Design-Dokument auf
+Halde, kein Fahrplan-Punkt.
+
 Vorregistrierung aller vier Review-Tasks: `EXTERNES_REVIEW_2026-08-08.md`
 (Abschnitt "VORREGISTRIERUNG A-D"), E3b/ISMCTS-k siehe 5b.
 
