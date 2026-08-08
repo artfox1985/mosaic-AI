@@ -1,9 +1,17 @@
 # Vorregistrierung: v22-Fenster (Nutzer-Zuschnitt 2026-08-08)
 
-**Angelegt VOR der v22-Generierung** (und vor dem Abschluss des
-v21-Zyklus). Zuschnitt vom Nutzer festgelegt; der juengste Value-Posten
-ist eine bewusste Nutzer-Entscheidung (siehe "Begruendung" unten).
-Ausfuehrung erst NACH dem v21-Gating.
+**Angelegt VOR der v22-Generierung.** Zuschnitt vom Nutzer festgelegt;
+der juengste Value-Posten ist eine bewusste Nutzer-Entscheidung (siehe
+"Begruendung" unten).
+
+> **NICHT EINGEPLANT (Nutzer-Entscheid 2026-08-08): "v22 laesst du mal
+> weg. keine self plays in die richtung. als erstes v21 tasks
+> abarbeiten."** Dieses Dokument ist damit ein reines DESIGN-Dokument
+> auf Halde -- es wird NICHT ausgefuehrt, solange die v21-Task-Queue
+> (B, A, E3b, ISMCTS-k, D) nicht abgearbeitet ist. Kein
+> v22-Self-Play, keine Generierung, keine Vorbereitung. Der Zuschnitt
+> ist festgehalten, damit er nicht neu diskutiert werden muss, wenn der
+> Zeitpunkt kommt.
 
 ## Fenster (29.450 Partien, 2.945 Dateien -- identische Form wie v21)
 

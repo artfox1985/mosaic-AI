@@ -43,7 +43,10 @@ geschlossen).
    ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
    Seed-Sigma darueber.
 
-### v22-FENSTER (Design fixiert 2026-08-08, Nutzer-Zuschnitt)
+### v22-FENSTER -- DESIGN AUF HALDE, NICHT EINGEPLANT
+**Nutzer-Entscheid 2026-08-08: keine v22-Self-Plays; erst die
+v21-Task-Queue abarbeiten.** Der Zuschnitt ist nur festgehalten, damit
+er spaeter nicht neu diskutiert werden muss.
 
 `PREREG_v22_fenster.md`: gleiche Form wie v21 (5.800 Policy / 23.650
 Value / 29.450 gesamt), alles altert eine Stufe. Juengster Value-Posten
