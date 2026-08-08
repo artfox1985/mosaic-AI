@@ -99,6 +99,26 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
   Fruehstopps <150 Paare zaehlen nur mit Frisch-Seed-Replikation.
 - **Value-Aenderungen brauchen Arena-Gating** (kein validierter
   Offline-Praediktor, solange #29 offen/unvalidiert ist).
+- **AUFLOESUNG SCHLAEGT SPARSAMKEIT (Nutzer-Regel 2026-08-08)**: Wenn
+  eine Entscheidung an einer Differenz haengt, die UNTERHALB der
+  Auflösung des Offline-Instruments liegt (Value-Seite: Brier-Gaps
+  <0,015 sagten 0/4 die Arena voraus; gemessene Seed-Skala ~0,0006),
+  dann darf das Offline-Mass die Entscheidung NICHT tragen -- auch nicht
+  als Spar-Vorfilter ("nur gaten, wenn Brier X schlaegt"). Stattdessen
+  die ARENA in die Abwaegung nehmen und die Kosten AUSRECHNEN, nicht
+  schaetzen: ein Gating (~1-1,5h CPU, 200 Paare @400) ist regelmaessig
+  BILLIGER als das Training, das man sich mit dem Vorfilter sparen
+  wollte (~3,5h GPU) -- und es ist das einzige validierte Instrument.
+  Wer auf einem blinden Mass spart, spart die billige Ressource und
+  riskiert die teure Fehlentscheidung.
+  **Ausnahme Policy-Seite**: die Orakel-Metriken (Prior-Masse Top-3,
+  Kendall-Tau) sind arena-validiert (7/7) und DUERFEN als Vorfilter
+  dienen -- so entschieden bei #35b (beide Metriken schlechter -> kein
+  Gating). Der Unterschied ist der Validierungsstand, nicht die
+  Bequemlichkeit.
+  Zusatznutzen, den man mitnehmen soll: jedes gefahrene Gating liefert
+  ein arena-ENTSCHIEDENES Paar -- die Waehrung, in der #29 (Validierung
+  eines Offline-Value-Praediktors) bezahlt wird (Stand ~3, noetig >=6).
 - **Aggressions-/Denial-Programm GESCHLOSSEN** (2026-08-07): alle
   Knoepfe auf Default (w=0, λ=0, ε=0, bias=1); "gate what you ship";
   Wiedervorlage nur mit messbar schaerferem opp-Kopf
