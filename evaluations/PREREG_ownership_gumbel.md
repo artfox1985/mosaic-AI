@@ -220,3 +220,19 @@ exakter McNemar p < 0,05 UND Vorteil fuer den neuen Wert.
 NICHT vorgenommen** -- bei Task #16 hat genau die Verlaengerung gezeigt, dass
 ein knappes p bei n=400 eine Fluktuation sein kann. Bleibt es hier knapp, gilt
 das als Wash und nicht als Anlass zum Weitermessen.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Teil A ist bereits WEITER
+OBEN in dieser Datei selbst entschieden (Abschnitt "AENDERUNG A) am
+2026-07-28": `OWNERSHIP_WEIGHT` bleibt 0,0, Erhebung entfaellt). Teil B
+(Gumbel c_scale) lief als "Task #18" (2026-07-29): c_scale=0,3 gewann
+zwar die Siegquote (248:152=62,0% vs 210:190=52,5% bei c_scale=1,0,
+McNemar p=0,0057), wurde aber NICHT uebernommen -- die absolute
+Punktesumme brach bei 0,3 fuer BEIDE Seiten ein (66,91 vs 76,90, -13%),
+die hoehere Siegquote misst also nur relative Robustheit (v18 hat den
+staerkeren Prior), nicht Staerke. `GUMBEL_C_SCALE` bleibt 1,0,
+`GUMBEL_C_VISIT` bleibt 50, die Gumbel-Familie gilt als geschlossen.
+Belegstelle: archive/history.md, Abschnitt "Task #18: Gumbel c_scale --
+gemessen, gegengeprueft, bleibt 1,0 (2026-07-29)", Zeile ~6133-6210;
+evaluations/STATUS.md Zeile 71 (c_visit-Sweep zurueckgezogen, weil
+c_scale sich als folgenlos erwiesen hat).

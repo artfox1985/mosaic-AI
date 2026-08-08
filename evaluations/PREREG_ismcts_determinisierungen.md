@@ -78,3 +78,14 @@ Kosten: ~1,5x Wandzeit pro Arm (~30 min statt ~21 min), ~90 min gesamt.
    waere dann ein Welten-Mittel). Das waere ein eigener Korpus-Arm mit
    eigenem Prereg -- erst sinnvoll, wenn die Spielstaerke-Frage
    positiv beantwortet ist.
+
+---
+**STATUS (Stand 2026-08-08): OFFEN** -- der Knopf
+(`MOSAIC_NUM_DETERMINIZATIONS`) ist vorbereitet, die Messung selbst
+steht laut STATUS.md ausdruecklich in der "NACH-v21-QUEUE" (Nutzer-Go
+2026-08-08) und ist noch nicht gelaufen. Die einzige verwandte Messung
+in archive/history.md ("Task #65", 2026-07-22) ist eine AELTERE, ANDERE
+Messung aus dem Vor-WDL-/Vor-Gumbel-Regime, die damals verworfen wurde
+-- keine Antwort auf die hier reaktivierte 600-Sims-Messung. Belegstelle:
+evaluations/STATUS.md, Abschnitt "NACH-v21-QUEUE (Nutzer-Go 2026-08-08)",
+Punkt 2 ("ISMCTS-k"); kein Ergebnis in archive/history.md.

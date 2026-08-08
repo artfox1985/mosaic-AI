@@ -97,3 +97,17 @@ Nachschub-Ventil (stehende Nutzer-Regel). Auswertungs-Paket wie v20
 vorliegen). Fenster-Rotations-A/B (Memory-Punkt fuer v21) gilt durch
 diesen Zuschnitt als DESIGN-UMGESETZT; ein separater A/B-Arm nur auf
 expliziten Nutzer-Wunsch.
+
+---
+**STATUS (Stand 2026-08-08): OFFEN** -- der Fenster-/Korpus-Zuschnitt
+selbst ist fix entschieden (kein offenes Veto mehr, siehe Datei). Die
+eine bereits gelaufene Teilfrage (τ-Annealing fuer den Sockel) ist
+GESCHLOSSEN: Messung 3 ergab H0 (112:118, p=0,78) -> τ=1 bleibt, der
+v21-Sockel wird ohne Annealing generiert. Die eigentliche Fenster-
+Befuellung/Training/Gating wurde vom Nutzer am 2026-08-08 ausdruecklich
+ZURUECKGESTELLT ("nicht so auf die self plays stuerzen"); 2.090 bereits
+generierte Schwarm-Partien liegen in `data/`, die Generierung startet
+erst nach Abarbeitung der offenen Task-Liste. Kein Trainings- oder
+Gating-Ergebnis fuer v21 existiert bislang. Belegstelle:
+evaluations/STATUS.md, Zeile 15 ("τ-Annealing ... GESCHLOSSEN
+2026-08-08") und Zeile 16 ("v21-Fenster fuellen | ZURUECKGESTELLT ...").

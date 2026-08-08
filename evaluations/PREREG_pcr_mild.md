@@ -84,3 +84,18 @@ Commit 2777cf6 in der Trainings-Pipeline aktiv und rauchtest-verifiziert.
 3. Arena (Pflicht), elo_tracker-Protokoll.
 4. Bericht inkl. implizierter v20-Wandzeit; Checkpoints erst nach
    Ergebnis-Diskussion loeschen.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN (nicht empfohlen)** -- der volle
+Self-Play-Kalibrierungslauf ergab nur Faktor 1,118x (327 vs 292,5
+Spiele/h), unter der vorregistrierten 1,15x-Schwelle (Bedingung c). Weil
+diese Vorbedingung zwingend ist, wurden die 12 Trainingslaeufe + die
+Arena dieser PREREG NIE ausgefuehrt (`train_pcr_mild_result.json` existiert
+nicht) -- kein offener Rest, sondern ein durch die Vorbedingung selbst
+entschiedener Abbruch. Fix-Kostenanteil je Zug dominiert (~60%), Such-
+Verbilligung bringt kaum Wandzeit. Spaeter (2026-08-06) fuehrte ein
+anderer End-to-End-Durchsatz-Befund (Tiling-Cache, 1,371x) zur
+allgemeinen Wiedereroeffnung von Task #14 (siehe `PREREG_pcr.md`) --
+diese spezifische Messung wurde dabei nicht wiederholt. Belegstelle:
+archive/history.md, Abschnitt "PCR-mild (p=0,5/cheap=300): Wandzeit-
+Kriterium VERFEHLT -- nicht empfohlen", Zeile ~7226-7256.

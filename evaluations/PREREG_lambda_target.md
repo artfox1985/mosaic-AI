@@ -277,3 +277,13 @@ weitere Empfehlung ausgesprochen wird.
 6. NUR falls Schritt 5 einen Arm bestimmt: Arena-Gating (`paired_gating.py`,
    `--no-promote-winner`) manuell anstoßen, siehe Kommando oben.
 7. Bericht an den Koordinator.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Offline klar positiv (alle 3
+Arme 6/6 Seeds ueber der Aufloesungsgrenze, lam07 +0,027, p=0,0061), aber
+das Arena-Gating lam07 vs lam10 verlor: 43:57, SPRT nimmt H0 an (McNemar
+p=0,25). Verdikt: Offline-Signal ohne Arena-Bestaetigung bleibt Beobachtung,
+kein Rezeptwechsel; λ bleibt 1,0 auf diesem 900er-Fenster (43,8%
+root_q-Mix). Belegstelle: archive/history.md, Abschnitt "Lambda-Sweep
+ABGESCHLOSSEN: klares Offline-Signal, KEINE Arena-Bestaetigung
+(2026-08-03)", Zeile ~6969-7002; evaluations/train_lambda_sweep_result.json.

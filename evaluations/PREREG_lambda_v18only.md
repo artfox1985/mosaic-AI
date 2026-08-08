@@ -72,3 +72,15 @@ duerfen nach Sichtung von Zwischenergebnissen nicht mehr geaendert werden.
 4. Bericht; Aufraeumen der Checkpoints ERST nach Abschluss der
    Ergebnis-Diskussion (Lektion 2026-08-03: nicht direkt nach dem
    automatischen Verdikt loeschen).
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Offline-Signal schwaecher als
+im 900er-Sweep (+0,0183, p=0,065, knapp ueber der Grenze), aber die Arena
+gewann: `l07v18_s6` vs `l10v18_s3` 227:173 (56,75%), SPRT-H1 bei 200
+Paaren, McNemar p=0,0101. λ=0,7 wurde damit Trainings-Standard-KANDIDAT
+fuer v20 (finale Uebernahme erst im v20-Zyklus selbst); spaeter durch die
+WDL-Aera-Grenze relativiert (der Mechanismus gilt als nicht uebertragbar,
+siehe `PREREG_lambda_wdl_arm.md`). Belegstelle: archive/history.md,
+Abschnitt "Lambda-v18only: ARENA-SIGNIFIKANTER SIEG -- λ=0.7 wird
+v20-Standard-Kandidat (2026-08-03)", Zeile ~7107-7138;
+evaluations/train_lambda_sweep_v18only_result.json.

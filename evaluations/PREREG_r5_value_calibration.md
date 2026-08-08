@@ -366,3 +366,13 @@ laden MUSS (API-Zwang), inhaltlich für Runde-5-Zustände irrelevant (siehe
 3. NACH separater Freigabe (nach Lambda-/PCR-Auswertung): voller Lauf
    (`--n-states 24 --n-combos 6` über alle 3 Modelle) + Bericht mit den
    vorregistrierten Kennzahlen und Interpretation gemäß den Regeln oben.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- der volle Lauf (24 Zustaende
+x 6 Kombinationen, Kennlinie aus 233 R5-Records) fand statt: Kennlinie
+b=0,128 Logit/Punkt, McFadden-R²=0,316. Value-Kopf-Steigungen: v18_best
+0,087, v19_best 0,061, v19_2d_best 0,061 (Soll ~1) -- Unterkalibrierung
+fuer v18_best und v19_2d_best bestaetigt (nur ~6-9% der erwarteten
+Reaktion). Belegstelle: archive/history.md, Abschnitt "R5-Value-
+Kalibrierung (Task #27) ABGESCHLOSSEN: Unterkalibrierung BESTAETIGT",
+Zeile ~7065-7089; evaluations/r5_value_calibration_result.json.

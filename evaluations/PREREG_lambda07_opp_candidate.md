@@ -75,3 +75,15 @@ deutlich hoeheren Mix-Anteil haben wird, weil v16/v17 herausrotieren).
 
 Ein Warm-Start-Training (~15 Epochen bis Early Stop, Praezedenz
 v19_2d_opp: ~35 min) + ein Gating (bis 200 Paare, ~60 min).
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Kandidat verlor das
+Arena-Gating: 33:47 gegen `v19_2d_best`, SPRT-H0 nach 40 Paaren
+(Fruehstopp), McNemar p=0,167. Die Zusatz-Arena zur Isolation des reinen
+λ-Effekts entfiel (an ein positives Gating gebunden). Ueber alle 3
+λ=0,7-Messungen hinweg korreliert Erfolg/Fehlschlag mit dem
+root_q-Mix-Anteil des Korpus (43,8% = beide Verlust-Faelle), nicht mit dem
+Trainingsregime -- der Nutzer stellte λ danach bis nach Task #34 zurueck.
+Belegstelle: archive/history.md, Abschnitt "lambda=0.7 auf dem
+900er-Korpus: NEGATIV -- der Mix-Anteil ist der Faktor (2026-08-05)",
+Zeile ~7374-7416.

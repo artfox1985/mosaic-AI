@@ -82,3 +82,17 @@ verallgemeinert (deckt Sockel UND Schwarm), neu gestartet.
 **Regel-Verscharfung: Exclude-Regex bei JEDEM Start neu aus dem
 IST-Bestand ableiten -- generierende Tags aendern sich waehrend der
 Kampagne (hier: Schwarm fertig, Sockel neu).**
+
+---
+**STATUS (Stand 2026-08-08): OFFEN** -- `lam07_wdl2_s2` ist gueltig
+trainiert (Zielfeld `values_wdl` verifiziert; Offline: Brier-Paritaet,
+Platt-B 0,9966 vs Champion 0,930), aber das entscheidende Arena-Gating
+gegen `v20_2d_opp_brierbest` wurde bislang NICHT durchgefuehrt (kein
+Ergebnis in archive/history.md oder in einer JSON-Datei auffindbar).
+Der Nutzer hat die Frage zusaetzlich a priori auf "kein
+Replikationskandidat" heruntergestuft (Aera-Grenzen-Argument, der
+tanh-Aera-Befund uebertraegt sich vermutlich nicht auf den WDL-Kopf) --
+das Gating bleibt aber der offene, ausstehende Schritt. Belegstelle:
+evaluations/STATUS.md, Abschnitt "OFFENES GATING (v20-Aera, hat
+Vorrang)" ("λ-Arm `lam07_wdl2_s2`: ... Gating steht aus") und Zeile 20
+("λ ... UMGESTUFT").

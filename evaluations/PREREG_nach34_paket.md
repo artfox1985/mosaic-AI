@@ -64,3 +64,16 @@ sequenziell), Gatings (CPU, je ~1-2h, sequenziell), parallel R4b-Lauf
 nur auf sonst idler CPU (Betriebsregel Ground-Truth). Danach
 #14-Entscheid gemaess seinen drei Bedingungen (#36-Ausgang, Durchsatz
 end-to-end). Frozen-Set-Neubau (v19-Aera) vor Punkt #29.1.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Arm 2 (`t9_own`) erneut
+geschlossen (Paritaet 197:193 und 145:145, beide H0). Arm 1 (`t12_dist`)
+zeigte zunaechst SPRT-H1 (54:26 gegen die Referenz), erwies sich in der
+vorregistrierten Frisch-Seed-Replikation aber als Seed-Satz-Rauschen
+(206:194 bzw. 181:179, beide n.s.) -> ebenfalls geschlossen. #29 (die
+Rangmetrik-Instrumentierung) bleibt formal vertagt -- reines Instrument,
+Validierung wartet weiterhin auf arena-differenzierte Paare nach dem
+Frozen-Set-Neubau. Paket-Fazit: kein Aux-Kopf-Hebel am neuen #34-Ziel;
+einziger belegter Hebel bleibt die Spielzahl (#36). Belegstelle:
+archive/history.md, Abschnitt "Nach-#34-Paket ERGEBNISSE (2026-08-06,
+PREREG_nach34_paket.md)", Zeile ~10005-10039.

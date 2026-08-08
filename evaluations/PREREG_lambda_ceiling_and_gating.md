@@ -114,3 +114,15 @@ Fehlers ueber Fortsetzung/Wiederholung.
 - elo_tracker-Eintrag fuer Teil 2 (Kommando-Muster vom Tool ausgegeben,
   Kommentar "Champion-Kandidaten-Gating v19_2d_opp@w=0.1/la<lambda>,
   block-size 5, keine Promotion").
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Teil 1 (Leiter lambda in
+{0;3;5}, je 75 Paare): monoton fallend, kein Arm signifikant unter
+lambda=2 (lambda=3: 49,3%, p=0,41; lambda=5: 42,7%, p=0,084), gewaehltes
+lambda=2,0 als Fallback. Teil 2 (Champion-Gating v19_2d_opp@w=0,1/lambda=2,0
+vs v19_2d_best, 200 Paare): 205:195 (51,25%), SPRT ohne Entscheid (Deckel),
+McNemar p=0,68 -- kein Staerkebeleg, keine Promotion; Champion blieb
+`v19_2d_best` (Nutzer-Entscheid 2026-08-04). Belegstelle: archive/history.md,
+Abschnitt "Kartierung + Champion-Gating v19_2d_opp: KEIN Staerkebeleg,
+Promotion offen (2026-08-04)", Zeile ~7315-7351;
+evaluations/lambda_ceiling_result.json.
