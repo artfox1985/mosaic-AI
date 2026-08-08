@@ -188,29 +188,48 @@ inkl. --endgame-head, Seed 2, Cache-Hit da Gewichte nicht im Cache-Key):**
 
 | Arm | VALUE_WEIGHT | POINTS_WEIGHT | Value-Anteil am Loss |
 |---|---|---|---|
-| Kontrolle | 0,2 | 0,5 | 6,5% |
+| Kontrolle = **das v21-Training selbst** | 0,2 | 0,5 | 6,5% |
 | **vw04** | **0,4** | 0,5 | 12,2% |
 | **vw08** | **0,8** | 0,5 | 21,7% |
 | **pw025** | 0,2 | **0,25** | 6,6% (Aux halbiert) |
 
+Die Kontrolle muss NICHT eigens trainiert werden: `v21_2d` laeuft mit
+genau diesen Default-Gewichten, identischem Fenster, Rezept und Seed 2 --
+jeder Arm unterscheidet sich davon in GENAU EINEM Faktor. Damit sind es
+3 Trainings (~10,5h GPU), nicht 4.
 Reihenfolge: vw04 -> vw08 -> pw025 (die VW-Richtung ist mechanistisch
-besser begruendet). Kosten ~3,5h GPU je Arm.
+besser begruendet).
 
 ## TASK D -- Entscheidungsregeln (unveraendert gueltig)
 
 Arme auf dem v21-Fenster, sonst exakt das v21-Rezept (inkl.
 `--endgame-head`), Seed 2: `--points-weight` 0,25 / 0,5 (Kontrolle =
 Default) / 1,0. Cache-Hit (Gewichte stehen NICHT im Cache-Key).
-**Entscheidungsmetrik: Brier** (arm-vergleichbar), sekundaer
-Platt-B/R5-Steigung deskriptiv; R² ist ausdruecklich KEIN Kriterium.
-**Interpretationsgrenze (Seed-Regel)**: die externe Brier-Seed-Skala
-liegt bei ~0,0006 (s2 0,18749 vs s3 0,18813 am identischen Rezept).
-Arm-Differenzen unter **0,0015** (2,5x) gelten NICHT als Gewichts-Effekt
--- Einzel-Seed-Arme sind nur oberhalb dieser Schwelle interpretierbar
-(die Alternative, 6 gepaarte Seeds je Arm, waere ~84h GPU und steht
-nicht zur Debatte). Checkpoint-Auswahl ist davon unberuehrt: sie laeuft
-ueber den Brier, nicht ueber val_combined (in dem die Gewichte
-vorkommen).
+**AENDERUNG (Nutzer 2026-08-08): die ARENA entscheidet, nicht der
+Brier.** Begruendung des Nutzers, und sie ist richtig: ein Gating
+(~1-1,5h CPU) ist BILLIGER als ein Training (~3,5h GPU) und zugleich
+das einzige validierte Instrument -- eine Brier-Vorschaltschwelle haette
+die Entscheidung an eine Metrik gehaengt, die unterhalb ~0,015
+nachweislich nichts vorhersagt (0/4). Die vorher geplante
+0,0015-Schwelle ist damit GESTRICHEN.
+
+**Ablauf je Arm**: Gating gegen die KONTROLLE (`v21_2d_brierbest`) --
+das isoliert den Gewichts-Effekt bei sonst identischem Setup. Gewinnt
+ein Arm dort (SPRT-H1, Fruehstopp-Regel, Verlaengerungsregel wie im
+v21-Prereg), folgt ein zweites Gating gegen den AMTIERENDEN Champion;
+nur das entscheidet ueber Promotion und einen `config.py`-Default-Wechsel.
+Brier/Platt-B/R5-Steigung laufen weiter mit, aber ausschliesslich
+DESKRIPTIV.
+
+**Nebengewinn (Nutzer-Argument zu Ende gedacht)**: drei zusaetzliche
+Arena-ENTSCHIEDENE Paare sind genau das, was #29 fehlt (Stand ~3, der
+Validierungs-Standard braucht >=6). Der Sweep finanziert also die
+Validierung des Offline-Praediktors mit -- deshalb werden je Arm
+Brier UND Orakel-Metriken protokolliert, egal wie das Gating ausgeht.
+
+**Kosten gesamt**: 3 Trainings (~10,5h GPU) + 3 Gatings (~4h CPU,
+laufen PARALLEL zum jeweils naechsten Training) + ggf.
+Promotions-Gatings. Pipeline-Wandzeit ~12h.
 **Entscheid**: bester Arm nur dann gegen den Champion gaten, wenn sein
 Brier-Vorsprung >= 0,0015 betraegt (2,5x Seed-Skala 0,0006) -- sonst ist
 das Gating nach der Aufloesungsgrenzen-Regel (0/4) verschwendet und der

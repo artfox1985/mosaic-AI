@@ -199,7 +199,7 @@ Vorregistrierung aller vier Review-Tasks: `EXTERNES_REVIEW_2026-08-08.md`
 | 4 | **ISMCTS-k** k=1/2/4 @600 Sims | Arena 3x400 | ~1,5h |
 | ~~5~~ | ~~C c_visit~~ ZURUECKGEZOGEN (Prereg ownership_gumbel B1 hat die sigma-Familie geschlossen) | -- | -- |
 | 6 | **E3b Stufe 2** (nur bei Feuerrate >=5%) | Arena 2x400 | ~1h |
-| 7 | **D** POINTS_WEIGHT 0,25/0,5/1,0 | GPU, parallel | ~10h |
+| 7 | **D** Gewichts-Sweep: vw04, vw08, pw025 (Kontrolle = v21_2d selbst); je Arm Gating vs Kontrolle, Sieger vs Champion | GPU + CPU, parallel | ~12h |
 
 Wichtig: 7 laeuft auf der GPU PARALLEL zu 1-6 (Arena ist CPU) -- aber
 Fenster pinnen und die Brier-Schwelle 0,0015 fuers Gating beachten.
