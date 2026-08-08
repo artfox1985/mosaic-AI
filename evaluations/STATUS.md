@@ -43,6 +43,16 @@ geschlossen).
    ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
    Seed-Sigma darueber.
 
+### v22-FENSTER (Design fixiert 2026-08-08, Nutzer-Zuschnitt)
+
+`PREREG_v22_fenster.md`: gleiche Form wie v21 (5.800 Policy / 23.650
+Value / 29.450 gesamt), alles altert eine Stufe. Juengster Value-Posten
+= **3.550 v19wdl-Rest (@600, vollstaendig) + 1.450 v19wdlsw** statt
+5.000 Schwarm -> Schwarm-Anteil bleibt bei 74% statt auf 89% zu
+steigen. **Ab v22 ist die Rotationsregel stationaer** (v21 war die
+letzte Uebergangsgeneration). Vorbehalt fuer v21-Gating-H0: neuer
+Batch desselben Generators braucht ein Suffix (`v20wdlb`).
+
 ### OFFENES GATING (v20-Aera, hat Vorrang)
 
 **λ-Arm `lam07_wdl2_s2`**: trainiert, gueltig (Zielfeld `values_wdl`
