@@ -120,7 +120,11 @@ Elo-Eintrag MIT KADER-NAMEN (nicht Dateinamen!):
 ```bash
 python tools/elo_tracker.py add --player-a v21_2d_brierbest --sims-a 400 --player-b v20_2d_opp_brierbest --sims-b 400 --wins-a <A> --wins-b <B> --n <N> --comment "Champion-Gating v21-Zyklus: ..."
 ```
-Bei H0: KEIN Nachschub-Ventil (stehende Regel) -- dokumentieren,
+Bei UNDECIDED_CAP mit POSITIVER gepaarter Differenz: auf demselben
+Basis-Seed auf 400 Paare verlaengern (`--max-pairs 400 --seed <derselbe>`;
+Praezedenz v17-Zyklus, Regel steht in PREREG_v21_fenster.md
+"Gating-Verlaengerungsregel"). Bei H0-Schranke oder nicht-positiver
+Differenz: KEINE Verlaengerung, kein Nachschub-Ventil -- dokumentieren,
 Ursachenarbeit mit dem Nutzer.
 
 ## 4. AUSWERTUNGS-PAKET (nach dem Gating, Reihenfolge egal)
