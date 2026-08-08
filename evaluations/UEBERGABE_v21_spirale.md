@@ -141,6 +141,26 @@ Struktur-Watchlist: bei ~10+ frischen Nutzer-Partien vs neuen Champion
 Log-Analyse wie evaluations/watchlist_v20_zwischenlese.md (Agent,
 --no-oracle-Stil; Chip-Zaehlung ist nach dem Logging-Fix jetzt direkt).
 
+
+## 5b. NACH-v21-QUEUE (Nutzer-Go 2026-08-08, Reihenfolge fix)
+
+Beides erst NACH v21-Training + Gating + Auswertungs-Paket; beides
+CPU-Arena. Knoepfe werden vorab gebaut (Default aus, Paritaets-Hash).
+
+1. **E3b -- Denial-Tie-Break mit Unsicherheits-Fenster**
+   (`PREREG_denial_tiebreak.md`, Abschnitt E3b). ZUERST Stufe 1:
+   Feuerrate messen (`MOSAIC_DENIAL_UNCERT_Z=1.0`,
+   `MOSAIC_DENIAL_MIN_VISIT_FRAC=0.5`, 200 Partien @400, Debug-Zaehler
+   fired/total). **Feuerrate < 5% -> Punkt OHNE Arena geschlossen.**
+   Nur darueber: Stufe 2, zwei Arme a 400 (z=0 vs z=1) via
+   paired_arena_env_ab, Siegquoten-Wache = Gate.
+2. **ISMCTS-k -- Mehrfach-Determinisierung**
+   (`PREREG_ismcts_determinisierungen.md`): drei Arme a 400
+   (`MOSAIC_NUM_DETERMINIZATIONS` = 1/2/4), Basis-Seed 20260820.
+   Rechen-neutral (Sims werden ueber die Welten gesplittet). Confound
+   Wurzelbreite (m = round(Sims_pro_Welt/16)) ist vorregistriert.
+   Default-Wechsel NUR mit Signifikanz + Frisch-Seed-Replikation.
+
 ## 5. STEHENDE REGELN (Kurzform -- Langform in STATUS.md)
 
 1. **Fenster-Pinning**: JEDES Training mit MOSAIC_DATA_EXCLUDE pinnen,

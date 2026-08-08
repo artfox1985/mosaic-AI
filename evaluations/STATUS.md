@@ -43,6 +43,17 @@ geschlossen).
    ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
    Seed-Sigma darueber.
 
+### NACH-v21-QUEUE (Nutzer-Go 2026-08-08)
+
+1. **E3b** (Denial-Tie-Break mit Besuchs-Gate + Zwei-Anteils-SE statt
+   roher Q-Differenz): Stufe 1 = Feuerraten-Messung, Abbruch bei <5%;
+   Stufe 2 = 2x400 Arena. `PREREG_denial_tiebreak.md`
+2. **ISMCTS-k** (Mehrfach-Determinisierung, k=1/2/4, rechen-neutral --
+   Sims-Split; greift die PIMC-Strategy-Fusion an):
+   `PREREG_ismcts_determinisierungen.md`
+Knoepfe (MOSAIC_DENIAL_UNCERT_Z / _MIN_VISIT_FRAC /
+MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
+
 ## GELTENDE REGELN (kompakt)
 
 - **Champion**: `v20_2d_opp_brierbest` (Elo 1349, seit 2026-08-07).
