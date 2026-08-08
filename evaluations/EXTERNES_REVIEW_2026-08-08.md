@@ -159,13 +159,58 @@ Alt-Beleg ist aera-gebunden). Signifikant FUER 0,3 -> Feature bleibt und
 ist erstmals aera-korrekt belegt. Signifikant FUER 0,0 -> Abschaltung
 zusaetzlich mit Frisch-Seed-Replikation bestaetigen (Default-Aenderung).
 
-## TASK D -- POINTS_WEIGHT-Re-Sweep (GPU, 3 Trainings + 1 Gating)
+## TASK D -- GEWICHTS-SWEEP, ERWEITERT (Nutzer 2026-08-08: "da ist noch
+## Puffer, insbesondere points/value weight -- bei weitem nicht optimiert")
+
+**Loss-Anteils-Rechnung (gemessen an den Trainings-Logs des Champions:
+Policy-CE 1,53 | Value-BCE 0,551 | Punkte 0,051 | Gegner-Punkte 0,051 |
+Endgame 0,0122; VW=0,2, PW=0,5):**
+
+| Term | Beitrag | Anteil am Gesamt-Loss (~1,70) |
+|---|---|---|
+| Policy (CE) | 1,530 | **90,1%** |
+| Value (BCE) x VW | 0,110 | **6,5%** |
+| Aux-Block (3 Koepfe) x PW | 0,057 | 3,4% (davor, mit EINEM Kopf: 1,5%) |
+
+Dagegen steht der Kopf-Attributions-Befund (2x2-Hybrid-Arena, v20-Aera):
+**die STAERKE haengt am VALUE-Kopf**, nicht am Policy-Kopf (P=v10/V=v12
+-> 57,5% Siege; P=v12/V=v10 -> 49,2%). Der Kopf, der die Staerke traegt,
+bekommt also 6,5% des Gradientenbudgets. Zusaetzlich: VALUE_WEIGHT=0,2
+wurde in der tanh-Aera kalibriert, wo der Value-Loss eine MSE auf einer
+Marge war -- seit #34 ist es eine Kreuzentropie auf P(Sieg), also eine
+andere Verlust-SKALA; die Gewichtung wurde beim Aera-Wechsel nie
+nachgezogen. In der WDL-Aera existieren ausschliesslich Messpunkte NACH
+UNTEN (0,009 vs 0,2 im #34-Vergleich, 0,2 gewann) -- nach OBEN ist
+ungemessenes Gebiet.
+
+**Arme (je 1 Training auf dem v21-Fenster, sonst exakt das v21-Rezept
+inkl. --endgame-head, Seed 2, Cache-Hit da Gewichte nicht im Cache-Key):**
+
+| Arm | VALUE_WEIGHT | POINTS_WEIGHT | Value-Anteil am Loss |
+|---|---|---|---|
+| Kontrolle | 0,2 | 0,5 | 6,5% |
+| **vw04** | **0,4** | 0,5 | 12,2% |
+| **vw08** | **0,8** | 0,5 | 21,7% |
+| **pw025** | 0,2 | **0,25** | 6,6% (Aux halbiert) |
+
+Reihenfolge: vw04 -> vw08 -> pw025 (die VW-Richtung ist mechanistisch
+besser begruendet). Kosten ~3,5h GPU je Arm.
+
+## TASK D -- Entscheidungsregeln (unveraendert gueltig)
 
 Arme auf dem v21-Fenster, sonst exakt das v21-Rezept (inkl.
 `--endgame-head`), Seed 2: `--points-weight` 0,25 / 0,5 (Kontrolle =
 Default) / 1,0. Cache-Hit (Gewichte stehen NICHT im Cache-Key).
 **Entscheidungsmetrik: Brier** (arm-vergleichbar), sekundaer
 Platt-B/R5-Steigung deskriptiv; R² ist ausdruecklich KEIN Kriterium.
+**Interpretationsgrenze (Seed-Regel)**: die externe Brier-Seed-Skala
+liegt bei ~0,0006 (s2 0,18749 vs s3 0,18813 am identischen Rezept).
+Arm-Differenzen unter **0,0015** (2,5x) gelten NICHT als Gewichts-Effekt
+-- Einzel-Seed-Arme sind nur oberhalb dieser Schwelle interpretierbar
+(die Alternative, 6 gepaarte Seeds je Arm, waere ~84h GPU und steht
+nicht zur Debatte). Checkpoint-Auswahl ist davon unberuehrt: sie laeuft
+ueber den Brier, nicht ueber val_combined (in dem die Gewichte
+vorkommen).
 **Entscheid**: bester Arm nur dann gegen den Champion gaten, wenn sein
 Brier-Vorsprung >= 0,0015 betraegt (2,5x Seed-Skala 0,0006) -- sonst ist
 das Gating nach der Aufloesungsgrenzen-Regel (0/4) verschwendet und der
