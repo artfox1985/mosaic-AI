@@ -42,3 +42,28 @@ disqualifiziert (s.o.) und nur als WDL-Erstmessung zaehlt.
    nach Nutzer-Entscheid. H0 -> λ in der WDL-Aera GESCHLOSSEN
    (Alt-Befund gilt dann als aera-gebunden), Metriken in die
    #29-Buchfuehrung.
+
+## ERSTLAUF UNGUELTIG (2026-08-08): λ war im WDL-Modus INERT
+
+`lam07_wdl_s2` lieferte Metriken bit-nah identisch zum Champion
+(Value-Brier 0,1967 vs 0,1967; Value-Loss 0,551 vs 0,551; Val-R² 0,374
+vs 0,374; Early Stop ebenfalls E15). Ursache (Koordinator-verifiziert):
+`apply_value_target_lambda` mischt `root_q` in `self.values` (altes
+tanh-Margen-Ziel), der WDL-Kopf trainiert aber gegen `values_wdl`.
+Die Mischung lief also korrekt -- **ins Leere**. Das Log ("55,8% der
+Samples haben root_q") war irrefuehrend, weil es das Zielfeld nicht
+nannte.
+
+**Lehrsatz**: bei Aera-Wechseln muessen auch die STELLSCHRAUBEN auf das
+neue Ziel umgezogen werden, nicht nur die Ziel-Definition selbst. Das
+ist die zweite Auspraegung derselben Klasse wie der
+Traeger-Kurzschluss (bootstrap_native) -- Alt-Code, der unter neuen
+Semantiken still etwas anderes tut als sein Name behauptet.
+
+**Konsequenz**: Fix (Mischung auf `values_wdl` mit Skalen-Rueckrechnung
+`p_root=(root_q+1)/2`, Log nennt das Feld) beauftragt; danach
+Wiederholung des Arms unter identischem Rezept/Seed. Das ungueltige
+Modell `lam07_wdl_s2*` bleibt als Dokument liegen, wird NICHT gegatet
+und NICHT in die Elo-Tabelle eingetragen. Die 55,8%-Messung der
+root_q-Fraktion bleibt gueltig (sie beschreibt den Korpus, nicht die
+Mischung).
