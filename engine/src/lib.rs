@@ -580,6 +580,32 @@ fn get_aggression_params() -> (f64, f64) {
     crate::net_mcts::get_aggression_params()
 }
 
+/// Liest den Denial-Tie-Break-Debug-Zaehler (`net_mcts::denial_tiebreak_
+/// stats`) aus Python -- Stufe-1-Instrument aus
+/// `evaluations/PREREG_denial_tiebreak.md` (Abschnitt "E3b", "Feuerrate
+/// messen"), ohne Log-Parsing. War bislang NICHT nach Python gebunden
+/// (Engine-Task E3b, 2026-08-08) -- der Zaehler existierte schon (E3), aber
+/// nur ueber Rust-interne Tests erreichbar. `(fired, total)`: `fired` =
+/// Anzahl der Suchentscheidungen, bei denen der Tie-Break tatsaechlich eine
+/// ANDERE Aktion als die Gumbel-Basisaktion gewaehlt hat, `total` = Anzahl
+/// aller ausgewerteten Entscheidungen. E3 (`MOSAIC_DENIAL_TIEBREAK_EPS`) und
+/// E3b (`MOSAIC_DENIAL_UNCERT_Z`) teilen sich denselben prozessweiten
+/// Zaehler -- die beiden Mechanismen sind gegenseitig exklusiv (siehe
+/// `net_mcts::apply_denial_tiebreak`s Abbruch bei beiden `>0`), ein
+/// gemeinsamer Zaehler vermischt also nie Ergebnisse zweier Mechanismen.
+#[pyfunction]
+fn denial_tiebreak_stats() -> (u64, u64) {
+    crate::net_mcts::denial_tiebreak_stats()
+}
+
+/// Setzt den Denial-Tie-Break-Debug-Zaehler zurueck -- vor einem zu
+/// messenden Lauf aufrufen (Feuerrate-Messung, siehe
+/// `evaluations/PREREG_denial_tiebreak.md` Abschnitt "E3b", Stufe 1).
+#[pyfunction]
+fn reset_denial_tiebreak_stats() {
+    crate::net_mcts::reset_denial_tiebreak_stats();
+}
+
 /// Task #89 (Oracle-Metriken): Netz-Suche auf einem EXTERN gespeicherten
 /// Zustand statt `PyGame::state` -- der bisher fehlende Such-Einstieg (siehe
 /// `evaluations/STATUS.md`, "Task #89 ... BLOCKIERT", Commit `373acc1`).
@@ -990,6 +1016,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
     m.add_function(wrap_pyfunction!(set_aggression_params, m)?)?;
     m.add_function(wrap_pyfunction!(get_aggression_params, m)?)?;
+    m.add_function(wrap_pyfunction!(denial_tiebreak_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_denial_tiebreak_stats, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;

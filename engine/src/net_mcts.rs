@@ -703,6 +703,33 @@ fn determinize_hidden_information<R: Rng + ?Sized>(state: &mut GameState, rng: &
 /// könnte).
 pub const NUM_DETERMINIZATIONS: usize = 1;
 
+/// Laufzeit-Wert der ISMCTS-Mehrfach-Determinisierung `k`
+/// (PREREG_ismcts_determinisierungen.md) via `MOSAIC_NUM_DETERMINIZATIONS` --
+/// ueberschreibt die Konstante [`NUM_DETERMINIZATIONS`] oben (bleibt als
+/// Default-Quelle stehen, siehe deren GETESTET-Absatz: `k=1` ist der
+/// arena-belegte Standard). Einmalig gelesen (OnceLock, #30-Muster wie
+/// `floor_shaping_weight`). ALLE Aufrufstellen, die frueher direkt die
+/// Konstante lasen (die drei Sucheinstiege `net_search_drafting_action`/
+/// `net_root_child_stats_and_policy`/`net_search_with_tree`, PLUS die
+/// Hybrid-Variante `net_search_drafting_action_hybrid` und das Debug-JSON-
+/// Feld `net_search_with_tree_from_forest`), lesen jetzt diesen Getter --
+/// die `<= 1`-Kurzschluesse an jeder dieser Stellen bleiben ERHALTEN, damit
+/// `k=1` weiterhin byte-identisch zum Alt-Verhalten ist (unveraendert
+/// derselbe Einzelbaum-Codepfad, nur die Quelle des Vergleichswerts ist neu).
+///
+/// Werte `<1` (inkl. ungesetzt/nicht parsbar -- `read_f64_env`s Default-
+/// Fallback IST die Konstante selbst, `1.0`) werden auf mindestens `1`
+/// geklemmt: `k=0` haette eine leere Welten-Liste zur Folge
+/// (`build_determinized_forest` erwartet `n>=1`, siehe dortige Doku).
+/// Nachkommastellen werden gerundet (z.B. `2.6` -> `3`).
+pub fn num_determinizations() -> usize {
+    static CELL: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = read_f64_env("MOSAIC_NUM_DETERMINIZATIONS", NUM_DETERMINIZATIONS as f64);
+        (raw.round() as i64).max(1) as usize
+    })
+}
+
 /// Teilt `sims` gleichmäßig auf `n` Welten auf (Rest an die ERSTE Welt).
 /// `n` wird an den Aufrufstellen immer `NUM_DETERMINIZATIONS` sein.
 fn split_sims_across_worlds(sims: u32, n: usize) -> Vec<u32> {
@@ -1896,6 +1923,29 @@ fn denial_tiebreak_eps() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_DENIAL_TIEBREAK_EPS", 0.0))
 }
 
+/// z-Schwelle des E3b-Unsicherheits-Fensters (PREREG_denial_tiebreak.md,
+/// Abschnitt "E3b" -- Nachfolger von E3, siehe dortiges ERGEBNIS) via
+/// `MOSAIC_DENIAL_UNCERT_Z` -- Default `0.0` = AUS = byte-identisches
+/// Bestandsverhalten (`apply_denial_tiebreak_uncert_with`s Fruehausstieg
+/// liest diesen Wert, gleiches Muster wie `denial_tiebreak_eps` oben).
+/// Einmalig gelesen (OnceLock, #30-Muster). `z` skaliert den Zwei-Anteils-
+/// Standardfehler in `denial_uncert_qualifies` -- KEINE separate Klemmung
+/// noetig (negative Werte degenerieren von selbst zu "Fenster nie erfuellt
+/// ausser bei exakter Q-Gleichheit").
+fn denial_uncert_z() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_DENIAL_UNCERT_Z", 0.0))
+}
+
+/// Mindest-Besuchsanteil `f` des E3b-Besuchs-Gates (PREREG_denial_tiebreak.md,
+/// Abschnitt "E3b") via `MOSAIC_DENIAL_MIN_VISIT_FRAC` -- Default `0,5`
+/// (PREREG-Vorgabe). Nur wirksam, wenn `denial_uncert_z() > 0.0` (siehe
+/// dortige Doku); gleiches OnceLock-Cache-Muster wie `denial_uncert_z`.
+fn denial_min_visit_frac() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_DENIAL_MIN_VISIT_FRAC", 0.5))
+}
+
 /// Schaltet die Suche komplett auf Gumbel-AlphaZero um (Wurzel: Gumbel-Top-m
 /// + Sequential Halving statt Dirichlet-Noise + PUCT; Tiefe≥1: neue
 /// deterministische Auswahlregel statt `best_puct`; Policy-Ziel: completed-Q-
@@ -2294,10 +2344,159 @@ fn apply_denial_tiebreak_with(nodes: &[Node], baseline: usize, eps: f64) -> usiz
     chosen
 }
 
-/// Env-gelesener Wrapper von [`apply_denial_tiebreak_with`] (produktiver
-/// Aufrufer: `select_final_root_child`).
+// ── PREREG_denial_tiebreak.md, Abschnitt "E3b": Denial-Tie-Break mit
+// UNSICHERHEITS-Fenster -- ersetzt E3s rohe ε-Q-Differenz (dort refutiert,
+// siehe ERGEBNIS oben: der Suchsieger traegt Auswahl-Bias, Fenster-Nachbarn
+// mit wenig Besuchen sind real oft schlechter als ε) durch ein besuchs-
+// gewichtetes Aequivalenz-Kriterium. E3 (`MOSAIC_DENIAL_TIEBREAK_EPS`)
+// bleibt UNVERAENDERT bestehen (Default AUS) -- E3b ist ein ZWEITER,
+// alternativer Mechanismus an derselben Stelle, keine Ablösung im Code.
+
+/// Reines E3b-Qualifikations-Kriterium (PREREG_denial_tiebreak.md, Abschnitt
+/// "E3b"), OHNE Env-/Node-Zugriff -- direkt mit synthetischen Werten testbar
+/// (gleiches Trennungsmuster wie `apply_denial_tiebreak_with`/`calibrate_
+/// win_prob_with`). Kandidat `a` (`n_a` Besuche, completed-Q `q_a`) gilt als
+/// gleichwertig zum Sieger `b` (`n_b`, `q_b`), wenn BEIDE Bedingungen halten:
+///
+/// 1. Besuchs-Gate: `n_a >= min_visit_frac * n_b` -- eliminiert die im
+///    Sequential Halving frueh weggehalbierten Kandidaten (vergleichbare
+///    Schaetzerqualitaet wie der Sieger).
+/// 2. Unsicherheits-Fenster: `q_b - q_a <= z * SE`, mit dem Zwei-Anteils-
+///    Standardfehler `SE = sqrt(Q_pool*(1-Q_pool)*(1/n_a+1/n_b))`,
+///    `Q_pool = (q_a*n_a + q_b*n_b)/(n_a+n_b)` (defensiv auf `[0,1]`
+///    geklemmt -- completed-Q ist eine Gewinnwahrscheinlichkeit und sollte
+///    dort ohnehin liegen, der Clamp schuetzt nur vor Gleitkomma-
+///    Ausreissern knapp ausserhalb der Grenzen).
+///
+/// Randfall `n_a<=0.0 || n_b<=0.0` (Division durch 0 in `1/n_a`/`1/n_b`
+/// waere undefiniert) ODER `SE<=0.0` (Q_pool exakt auf `0`/`1` geklemmt --
+/// bei gueltigen `[0,1]`-Q-Werten impliziert das ohnehin schon `q_a==q_b`,
+/// der Test bleibt trotzdem als explizite Absicherung stehen): qualifiziert
+/// dann NUR bei exakter Q-Gleichheit (PREREG: "behandle N=0/SE=0 sauber").
+///
+/// `z<=0.0` ist HIER bewusst NICHT gesondert behandelt (kein Early-Return) --
+/// das AUS-Verhalten des Gesamt-Features lebt in `apply_denial_tiebreak_
+/// uncert_with`s eigenem Fruehausstieg (byte-identisch + keine Zaehler-
+/// Buchung), diese reine Funktion bleibt fuer JEDES `z` (auch `<=0`)
+/// mathematisch wohldefiniert und direkt testbar.
+pub(crate) fn denial_uncert_qualifies(n_a: f64, q_a: f64, n_b: f64, q_b: f64, z: f64, min_visit_frac: f64) -> bool {
+    if n_a < min_visit_frac * n_b {
+        return false;
+    }
+    if n_a <= 0.0 || n_b <= 0.0 {
+        return q_a == q_b;
+    }
+    let q_pool = ((q_a * n_a + q_b * n_b) / (n_a + n_b)).clamp(0.0, 1.0);
+    let se_sq = q_pool * (1.0 - q_pool) * (1.0 / n_a + 1.0 / n_b);
+    if se_sq <= 0.0 {
+        return q_a == q_b;
+    }
+    q_b - q_a <= z * se_sq.sqrt()
+}
+
+/// E3b-Variante von [`apply_denial_tiebreak_with`]: ersetzt dessen rohes
+/// ε-Fenster durch `denial_uncert_qualifies` (Besuchs-Gate + Unsicherheits-
+/// Fenster um die completed-Q-Differenz zum Sieger). Gleiches Trennungs-
+/// muster: reiner Entscheidungskern, `z`/`min_visit_frac` als Parameter statt
+/// aus den Env-Var-Caches gelesen. `z<=0.0` -> sofortiger Return der
+/// Basisaktion, KEIN Vergleich, KEINE Zaehler-Buchung -- byte-identisches
+/// Bestandsverhalten, exakt wie `apply_denial_tiebreak_with`s `eps<=0.0`-
+/// Fruehausstieg. Kandidatenmenge/opp-Kopf-Gating/Perspektiven-Logik IDENTISCH
+/// zu `apply_denial_tiebreak_with` (siehe dortige Kommentare fuer die
+/// Begruendung, insbesondere warum NUR `nodes[0].children`, nicht `untried`,
+/// betrachtet wird). Bucht DENSELBEN prozessweiten Debug-Zaehler
+/// (`note_denial_tiebreak`/`denial_tiebreak_stats`) wie der E3-Pfad -- die
+/// Feuerrate ist laut PREREG Stufe 1 das Entscheidungsinstrument fuer BEIDE
+/// Mechanismen, und `apply_denial_tiebreak` stellt (Abbruch bei `eps>0 &&
+/// z>0`) sicher, dass zu jedem Zeitpunkt hoechstens EINER der beiden Pfade
+/// aktiv ist, ein gemeinsamer Zaehler also nie Ergebnisse zweier Mechanismen
+/// vermischt.
+fn apply_denial_tiebreak_uncert_with(nodes: &[Node], baseline: usize, z: f64, min_visit_frac: f64) -> usize {
+    if z <= 0.0 {
+        return baseline;
+    }
+    if nodes[0].opp_points_forecast.is_none() {
+        warn_missing_opp_head_for_denial_tiebreak_once();
+        return baseline;
+    }
+    let children = &nodes[0].children;
+    if children.len() <= 1 {
+        note_denial_tiebreak(false);
+        return baseline;
+    }
+    let Some(baseline_pos) = children.iter().position(|&c| c == baseline) else {
+        // Siehe `apply_denial_tiebreak_with`-Kommentar: sollte nie vorkommen,
+        // defensiv trotzdem unveraendert zurueck statt zu paniken.
+        return baseline;
+    };
+    let root_player = nodes[0].state.current_player;
+    let cq = completed_q_per_candidate(nodes, 0);
+    let n_b = nodes[baseline].visits as f64;
+    let q_b = cq[baseline_pos].1;
+    let mut chosen_idx = baseline_pos;
+    let mut chosen_opp = opp_points_forecast_from_root_perspective(nodes, root_player, baseline);
+    for (i, &cid) in children.iter().enumerate() {
+        if i == baseline_pos {
+            continue;
+        }
+        let n_a = nodes[cid].visits as f64;
+        let q_a = cq[i].1;
+        if !denial_uncert_qualifies(n_a, q_a, n_b, q_b, z, min_visit_frac) {
+            continue; // ausserhalb des Aequivalenzfensters oder zu wenig Besuche
+        }
+        let Some(opp) = opp_points_forecast_from_root_perspective(nodes, root_player, cid) else {
+            continue;
+        };
+        if chosen_opp.is_none_or(|b| opp < b) {
+            chosen_opp = Some(opp);
+            chosen_idx = i;
+        }
+    }
+    let chosen = children[chosen_idx];
+    note_denial_tiebreak(chosen != baseline);
+    chosen
+}
+
+/// Reine Guard-Funktion des E3/E3b-Konfigurationskonflikts (siehe
+/// `apply_denial_tiebreak`), OHNE Env-Zugriff -- direkt mit synthetischen
+/// `eps`/`z`-Werten testbar (`#[should_panic]`), damit der Panic-Pfad
+/// geprueft werden kann, OHNE die echten, prozessweit gecachten
+/// `denial_tiebreak_eps()`/`denial_uncert_z()`-OnceLocks anzufassen (die
+/// duerfen in `cargo test`s gemeinsamem Testprozess NIE auf einen
+/// Nicht-Default-Wert gesetzt werden, sonst wuerden alle anderen, parallel
+/// laufenden Denial-Tie-Break-Tests kontaminiert).
+fn assert_denial_tiebreak_config_not_conflicting(eps: f64, z: f64) {
+    if eps > 0.0 && z > 0.0 {
+        panic!(
+            "MOSAIC_DENIAL_TIEBREAK_EPS>0 ({eps}) UND MOSAIC_DENIAL_UNCERT_Z>0 ({z}) gleichzeitig \
+             gesetzt -- zwei widerspruechliche Denial-Tie-Break-Aequivalenzdefinitionen (E3: rohes \
+             Q-Fenster, refutiert; E3b: besuchsgewichtetes Unsicherheitsfenster, siehe \
+             evaluations/PREREG_denial_tiebreak.md). Genau einen der beiden Env-Knoepfe setzen, \
+             nicht beide."
+        );
+    }
+}
+
+/// Env-gelesener Wrapper von [`apply_denial_tiebreak_with`]/
+/// [`apply_denial_tiebreak_uncert_with`] (produktiver Aufrufer:
+/// `select_final_root_child`). Liest BEIDE Denial-Tie-Break-Env-Knoepfe (E3
+/// `MOSAIC_DENIAL_TIEBREAK_EPS` und E3b `MOSAIC_DENIAL_UNCERT_Z`) und bricht
+/// hart ab, wenn beide gleichzeitig `>0` sind (`assert_denial_tiebreak_
+/// config_not_conflicting`) -- eine stille Praeferenz fuer einen der beiden
+/// Mechanismen wuerde einen Nutzer glauben lassen, er teste E3, obwohl
+/// tatsaechlich E3b greift (oder umgekehrt). Sonst: `z>0` -> E3b-Pfad
+/// (`apply_denial_tiebreak_uncert_with`), sonst E3-Pfad
+/// (`apply_denial_tiebreak_with`, inkl. dessen `eps<=0.0`-Fruehausstieg bei
+/// beiden Default-Werten).
 fn apply_denial_tiebreak(nodes: &[Node], baseline: usize) -> usize {
-    apply_denial_tiebreak_with(nodes, baseline, denial_tiebreak_eps())
+    let eps = denial_tiebreak_eps();
+    let z = denial_uncert_z();
+    assert_denial_tiebreak_config_not_conflicting(eps, z);
+    if z > 0.0 {
+        apply_denial_tiebreak_uncert_with(nodes, baseline, z, denial_min_visit_frac())
+    } else {
+        apply_denial_tiebreak_with(nodes, baseline, eps)
+    }
 }
 
 /// Dispatcht die finale Wurzel-Zugwahl auf `gumbel_final_root_action`
@@ -3316,7 +3515,11 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     if crate::round5::applies(state) {
         return crate::round5::choose_action(state);
     }
-    if NUM_DETERMINIZATIONS <= 1 {
+    // PREREG_ismcts_determinisierungen.md: Getter statt Konstante (siehe
+    // `num_determinizations`-Doku) -- der `<= 1`-Kurzschluss bleibt exakt
+    // erhalten, `k=1` (Default) ist weiterhin byte-identisch.
+    let k = num_determinizations();
+    if k <= 1 {
         let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
@@ -3326,8 +3529,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // `average_completed_q_policy`-Kommentar), nicht mehr
     // `select_final_root_child` auf einem Einzelbaum -- letzteres hätte
     // keinen sinnvollen "einen" Baum mehr, über den es entscheiden könnte.
-    let forest =
-        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng);
     average_completed_q_policy(&forest)
         .into_iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -3359,7 +3561,8 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
     if crate::round5::applies(state) {
         return crate::round5::choose_action(state);
     }
-    if NUM_DETERMINIZATIONS <= 1 {
+    let k = num_determinizations();
+    if k <= 1 {
         let nodes = build_net_tree(net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None, None);
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
@@ -3371,7 +3574,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
         sims,
         c_puct,
         add_root_noise,
-        NUM_DETERMINIZATIONS,
+        k,
         rng,
     );
     average_completed_q_policy(&forest)
@@ -3505,7 +3708,8 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
             stats.iter().map(|(a, _, _)| (a.clone(), root_q.unwrap_or(0.5))).collect();
         return (stats, policy, root_q, root_child_q);
     }
-    if NUM_DETERMINIZATIONS <= 1 {
+    let k = num_determinizations();
+    if k <= 1 {
         let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
         let root_visits = nodes[0].visits.max(1) as f64;
         let root_q = Some(nodes[0].value / root_visits);
@@ -3523,8 +3727,7 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     // folgt demselben Summen-Muster wie `aggregate_root_child_stats`
     // (Σvalue/Σvisits über die Welten, NICHT das arithmetische Mittel der
     // Pro-Welt-Quotienten).
-    let forest =
-        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng);
     let (visits_sum, value_sum) = forest.iter().fold((0.0f64, 0.0f64), |(vs, vals), nodes| {
         (vs + nodes[0].visits as f64, vals + nodes[0].value)
     });
@@ -3644,7 +3847,8 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     if crate::round5::applies(state) {
         return crate::round5::choose_action_with_analysis(state);
     }
-    if NUM_DETERMINIZATIONS <= 1 {
+    let k = num_determinizations();
+    if k <= 1 {
         let mut trace = if collect_trace { Some(GumbelTrace::default()) } else { None };
         let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, log, trace.as_mut());
         return net_search_with_tree_from_nodes(state, sims, &nodes, trace.as_ref());
@@ -3654,14 +3858,12 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     // lesbar) -- ein einzelner Hinweis genügt, gleiches Muster wie
     // `build_net_tree`s Gumbel-Dispatch-Log. Strukturierter Gumbel-Trace
     // (`collect_trace`) ist im Mehrwelten-Pfad NICHT unterstützt (aktuell
-    // ohnehin nie aktiv, `NUM_DETERMINIZATIONS=1`, siehe dortige Konstante).
+    // ohnehin nur ueber `MOSAIC_NUM_DETERMINIZATIONS>1` erreichbar, Default
+    // weiterhin `k=1`, siehe `num_determinizations`-Doku).
     if let Some(l) = log.as_deref_mut() {
-        l.push(format!(
-            "  ISMCTS: {NUM_DETERMINIZATIONS} Determinisierungen (kein granularer Sim-Trace je Welt)"
-        ));
+        l.push(format!("  ISMCTS: {k} Determinisierungen (kein granularer Sim-Trace je Welt)"));
     }
-    let forest =
-        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, NUM_DETERMINIZATIONS, rng);
+    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng);
     net_search_with_tree_from_forest(state, sims, &forest)
 }
 
@@ -3934,7 +4136,12 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
         "gumbel_trace": Value::Null,
         "has_net": true,
         "simulations": sims,
-        "determinizations": NUM_DETERMINIZATIONS,
+        // PREREG_ismcts_determinisierungen.md: `forest.len()` statt der
+        // Konstante/des Getters -- `build_determinized_forest` erzeugt IMMER
+        // genau `forest.len()` Welten (siehe `split_sims_across_worlds`,
+        // Laenge = `n.max(1)`), das ist hier die tatsaechlich verwendete
+        // Welten-Anzahl, ohne einen weiteren (wenn auch gecachten) Env-Read.
+        "determinizations": forest.len(),
         "num_actions": nodes0[0].n_actions,
         "num_actions_considered": stats.len(),
         "max_depth": max_depth,
@@ -4076,6 +4283,17 @@ mod tests {
         // ungesetzt -> 0.0 -> `apply_denial_tiebreak_with`s Fruehausstieg greift
         // IMMER, `select_final_root_child` bleibt exakt `gumbel_final_root_action`.
         assert_eq!(denial_tiebreak_eps(), 0.0);
+        // E3b (PREREG_denial_tiebreak.md, Abschnitt "E3b"): beide neuen Knoepfe
+        // ungesetzt -> `MOSAIC_DENIAL_UNCERT_Z` liefert 0.0 (AUS, `apply_denial_
+        // tiebreak_uncert_with`s Fruehausstieg greift IMMER), `MOSAIC_DENIAL_
+        // MIN_VISIT_FRAC` liefert den PREREG-Default 0.5 (nur wirksam, wenn z>0).
+        assert_eq!(denial_uncert_z(), 0.0);
+        assert_eq!(denial_min_visit_frac(), 0.5);
+        // ISMCTS-k (PREREG_ismcts_determinisierungen.md, MOSAIC_NUM_
+        // DETERMINIZATIONS): ungesetzt -> liefert exakt die Konstante
+        // `NUM_DETERMINIZATIONS` (heute 1) -- alle vier Sucheinstiege bleiben
+        // im `<= 1`-Einzelbaum-Codepfad, byte-identisch zum Bestand.
+        assert_eq!(num_determinizations(), NUM_DETERMINIZATIONS);
     }
 
     #[test]
@@ -4529,6 +4747,168 @@ mod tests {
         let mut nodes = denial_tiebreak_test_nodes(0.6, 0.5, 0.58, 0.1);
         nodes[0].opp_points_forecast = None; // Legacy-Netz ohne opp_points-Kopf
         assert_eq!(apply_denial_tiebreak_with(&nodes, 1, 0.05), 1, "inert -> Basis unveraendert");
+        assert_eq!(denial_tiebreak_stats(), (0, 0), "kein Kopf -> gar keine Auswertung gezaehlt");
+        reset_denial_tiebreak_stats();
+    }
+
+    // ── PREREG_denial_tiebreak.md, Abschnitt "E3b": reines Qualifikations-
+    // kriterium (`denial_uncert_qualifies`) -- Tests (a)-(e) aus dem
+    // Implementierungsauftrag, direkt auf der reinen Funktion (kein Node-
+    // Fixture noetig, kein Env-/Zaehler-Zugriff).
+
+    #[test]
+    fn denial_uncert_qualifies_rejects_candidate_with_too_few_visits() {
+        // (a) Besuchs-Gate greift VOR dem Unsicherheits-Fenster: n_a=40 <
+        // 0.5*100=50 -- disqualifiziert, OBWOHL q_a==q_b (das Fenster selbst
+        // waere trivial erfuellt).
+        assert!(!denial_uncert_qualifies(40.0, 0.6, 100.0, 0.6, 1.0, 0.5));
+    }
+
+    #[test]
+    fn denial_uncert_qualifies_accepts_candidate_inside_the_se_window() {
+        // (b) n_a=n_b=100 (Besuchs-Gate erfuellt), q_a=0.55, q_b=0.6, z=1.0:
+        // Q_pool=(0.55+0.6)/2=0.575, SE=sqrt(0.575*0.425*(1/100+1/100))
+        // =sqrt(0.0048875)=0.069911..., q_b-q_a=0.05 <= 1.0*SE -- qualifiziert.
+        assert!(denial_uncert_qualifies(100.0, 0.55, 100.0, 0.6, 1.0, 0.5));
+    }
+
+    #[test]
+    fn denial_uncert_qualifies_rejects_candidate_outside_the_se_window() {
+        // (c) Gleiche Besuchszahlen wie (b), aber q_a=0.4 (deutlich
+        // schlechter): Q_pool=0.5, SE=sqrt(0.5*0.5*0.02)=0.070711...,
+        // q_b-q_a=0.2 liegt klar ausserhalb -- nicht qualifiziert.
+        assert!(!denial_uncert_qualifies(100.0, 0.4, 100.0, 0.6, 1.0, 0.5));
+    }
+
+    #[test]
+    fn denial_uncert_qualifies_with_z_zero_only_the_winner_itself_qualifies() {
+        // (d) z=0.0 kollabiert das Fenster auf `q_b-q_a<=0`: ein schwaecherer
+        // Kandidat (q_a<q_b) qualifiziert NIE, nur der Sieger im Vergleich mit
+        // sich selbst (q_a==q_b) -- "aus", exakt wie bei E3s eps=0.
+        assert!(!denial_uncert_qualifies(100.0, 0.55, 100.0, 0.6, 0.0, 0.5));
+        assert!(denial_uncert_qualifies(100.0, 0.6, 100.0, 0.6, 0.0, 0.5));
+    }
+
+    #[test]
+    fn denial_uncert_qualifies_handles_zero_visits_and_zero_se_edge_cases() {
+        // (e) N=0: `1/n_a`/`1/n_b` waere undefiniert -- Randfall-Regel greift
+        // (nur EXAKTE Q-Gleichheit qualifiziert). `min_visit_frac=0.0`, damit
+        // das Besuchs-Gate selbst hier nicht schon vorher blockiert (n_a=0 >=
+        // 0.0*n_b ist immer wahr).
+        assert!(
+            !denial_uncert_qualifies(0.0, 0.5, 100.0, 0.6, 1.0, 0.0),
+            "n_a=0, Q ungleich -> nicht qualifiziert"
+        );
+        assert!(
+            denial_uncert_qualifies(0.0, 0.6, 100.0, 0.6, 1.0, 0.0),
+            "n_a=0, Q gleich -> qualifiziert"
+        );
+        assert!(
+            denial_uncert_qualifies(100.0, 0.5, 0.0, 0.5, 1.0, 0.0),
+            "n_b=0, Q gleich -> qualifiziert"
+        );
+        // SE=0 auch ueber den Q_pool-Rand erreichbar (n_a=n_b=100, beide Q=1.0
+        // -> Q_pool exakt 1.0 -> SE=0), NICHT ueber N=0 -- andere Ursache,
+        // gleiche Randfall-Regel.
+        assert!(
+            denial_uncert_qualifies(100.0, 1.0, 100.0, 1.0, 1.0, 0.5),
+            "Q_pool=1.0 => SE=0, aber Q gleich -> qualifiziert"
+        );
+    }
+
+    // ── PREREG_denial_tiebreak.md, Abschnitt "E3b": Konfigurations-Konflikt
+    // (E3 UND E3b gleichzeitig aktiv) -- reine Guard-Funktion, bewusst OHNE
+    // die echten `denial_tiebreak_eps()`/`denial_uncert_z()`-OnceLocks
+    // anzufassen (siehe deren Doku-Warnung vor Test-Kontamination).
+
+    #[test]
+    #[should_panic(expected = "MOSAIC_DENIAL_TIEBREAK_EPS")]
+    fn denial_tiebreak_config_panics_when_both_mechanisms_are_set() {
+        assert_denial_tiebreak_config_not_conflicting(0.01, 1.0);
+    }
+
+    #[test]
+    fn denial_tiebreak_config_allows_either_mechanism_alone_or_neither() {
+        assert_denial_tiebreak_config_not_conflicting(0.0, 0.0); // beide aus
+        assert_denial_tiebreak_config_not_conflicting(0.01, 0.0); // nur E3
+        assert_denial_tiebreak_config_not_conflicting(0.0, 1.0); // nur E3b
+        // Kein Panic bis hierher = Testerfolg.
+    }
+
+    // ── PREREG_denial_tiebreak.md, Abschnitt "E3b": `apply_denial_tiebreak_
+    // uncert_with` End-zu-End auf echten `Node`-Fixtures (Verdrahtung von
+    // Besuchs-Gate + SE-Fenster + Perspektiven-Logik + Debug-Zaehler) --
+    // gleiches Lock-/Reset-Muster wie die E3-Kern-Tests oben.
+
+    /// Wie `denial_tiebreak_test_nodes`, aber mit KONFIGURIERBAREN
+    /// Besuchszahlen je Kandidat (E3b braucht das Besuchs-Gate, E3 nicht --
+    /// dort waren die Besuche daher auf einen festen Wert verdrahtet).
+    fn denial_tiebreak_uncert_test_nodes(
+        q_a: f64,
+        n_a: u32,
+        opp_a: f32,
+        q_b: f64,
+        n_b: u32,
+        opp_b: f32,
+    ) -> Vec<Node> {
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.opp_points_forecast = Some(0.0); // Kopf-Praesenz-Check
+        root.children = vec![1, 2];
+        let mut child_a = gumbel_test_node(0.5, n_a, q_a * n_a as f64, 1);
+        child_a.points_forecast = Some(opp_a);
+        let mut child_b = gumbel_test_node(0.5, n_b, q_b * n_b as f64, 1);
+        child_b.points_forecast = Some(opp_b);
+        vec![root, child_a, child_b]
+    }
+
+    #[test]
+    fn denial_tiebreak_uncert_z_zero_returns_baseline_unchanged_byte_identical() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        // B waere bei jedem z>0 (weites Fenster, gleiche Besuche) der Gewinner
+        // (gleiches Q, viel niedrigere Gegner-Punkte) -- bei z=0.0 MUSS
+        // trotzdem exakt `baseline` zurueckkommen, keine Zaehler-Buchung.
+        let nodes = denial_tiebreak_uncert_test_nodes(0.6, 100, 0.5, 0.6, 100, 0.1);
+        assert_eq!(apply_denial_tiebreak_uncert_with(&nodes, 1, 0.0, 0.5), 1);
+        assert_eq!(denial_tiebreak_stats(), (0, 0), "z=0.0 darf die Zaehler nicht anfassen");
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_uncert_swaps_to_lower_opp_points_inside_the_se_window() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        // A (Basis): Q=0.6, N=100, Gegner-Punkte 0.5. B: Q=0.55 (innerhalb des
+        // z=1.0-SE-Fensters, siehe `denial_uncert_qualifies_accepts_candidate_
+        // inside_the_se_window`), N=100 (Besuchs-Gate erfuellt), Gegner-Punkte
+        // 0.1 -- B muss gewinnen.
+        let nodes = denial_tiebreak_uncert_test_nodes(0.6, 100, 0.5, 0.55, 100, 0.1);
+        assert_eq!(apply_denial_tiebreak_uncert_with(&nodes, 1, 1.0, 0.5), 2);
+        assert_eq!(denial_tiebreak_stats(), (1, 1), "ein Feuern von einer Gesamtauswertung");
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_uncert_visit_gate_excludes_low_visit_candidate() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        // B haette (gleiches Q wie A, niedrigere Gegner-Punkte) OHNE
+        // Besuchs-Gate gewonnen -- aber N(B)=40 < 0.5*N(A)=50, das Gate
+        // blockiert VOR dem SE-Fenster (siehe `denial_uncert_qualifies_
+        // rejects_candidate_with_too_few_visits`).
+        let nodes = denial_tiebreak_uncert_test_nodes(0.6, 100, 0.5, 0.6, 40, 0.1);
+        assert_eq!(apply_denial_tiebreak_uncert_with(&nodes, 1, 1.0, 0.5), 1);
+        assert_eq!(denial_tiebreak_stats(), (0, 1), "kein Feuern, aber EINE Gesamtauswertung");
+        reset_denial_tiebreak_stats();
+    }
+
+    #[test]
+    fn denial_tiebreak_uncert_missing_opp_head_is_inert_and_does_not_touch_counters() {
+        let _guard = DENIAL_TIEBREAK_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_denial_tiebreak_stats();
+        let mut nodes = denial_tiebreak_uncert_test_nodes(0.6, 100, 0.5, 0.55, 100, 0.1);
+        nodes[0].opp_points_forecast = None; // Legacy-Netz ohne opp_points-Kopf
+        assert_eq!(apply_denial_tiebreak_uncert_with(&nodes, 1, 1.0, 0.5), 1, "inert -> Basis unveraendert");
         assert_eq!(denial_tiebreak_stats(), (0, 0), "kein Kopf -> gar keine Auswertung gezaehlt");
         reset_denial_tiebreak_stats();
     }
