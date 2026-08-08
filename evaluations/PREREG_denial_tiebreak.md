@@ -87,3 +87,67 @@ Moeglicher spaeterer E3b-Ansatz (NUR mit neuem Prereg + Nutzer-Go):
 Fenster auf besuchs-gewichteten Konfidenzintervallen statt roher
 Q-Differenz, oder Beschraenkung auf Kandidaten mit >=X% der Besuche
 des Siegers. NICHT eingeplant.
+
+# ==================================================================
+# E3b: Denial-Tie-Break mit UNSICHERHEITS-Fenster (Nutzer-Go 2026-08-08)
+# ==================================================================
+
+**Angelegt VOR Implementierung und Messung.** Einplanung: NACH
+v21-Training + Gating + Auswertungs-Paket (Nutzer-Zuschnitt
+"eintakten nach dem v21 training, gating usw.").
+
+## Warum ein zweiter Versuch ueberhaupt zulaessig ist
+
+E3 ist nicht daran gescheitert, dass Denial schaedlich waere, sondern
+daran, dass das Fenster auf ROHEN Q-Differenzen lag: der Suchsieger
+traegt Auswahl-Bias und die meisten Besuche, die Fenster-Nachbarn
+wurden im Sequential Halving frueh eliminiert und sind real oft mehr
+als ε schlechter. Der Tausch ging damit systematisch gegen das Urteil
+der Suche (Dosis-Wirkung -5,75pp -> -13,75pp). E3b ersetzt die
+Aequivalenz-DEFINITION, nicht das Ziel.
+
+## Aequivalenz-Kriterium (statt roher ε-Differenz)
+
+Kandidat `a` gilt nur dann als gleichwertig zum Sieger `b`, wenn BEIDE
+Bedingungen halten:
+1. **Besuchs-Gate**: `N(a) >= f * N(b)` (Default f=0,5) -- vergleichbare
+   Schaetzerqualitaet; eliminiert die frueh weggehalbierten Kandidaten.
+2. **Unsicherheits-Fenster**: `Q(b) - Q(a) <= z * SE`, mit
+   `SE = sqrt(Q_pool*(1-Q_pool)*(1/N(a) + 1/N(b)))` (Zwei-Anteils-
+   Standardfehler; completed-Q ist eine Gewinnwahrscheinlichkeit, die
+   Bernoulli-Approximation ist damit sachlich begruendet). Default z=1,0.
+Unter den qualifizierten Kandidaten wird wie in E3 der mit der
+NIEDRIGSTEN Gegner-Punkte-Prognose gespielt (opp-Kopf, kein
+Zusatz-Forward). `v(s)` und alle Trainings-Ziele bleiben unberuehrt.
+
+## Stufe 1 (BILLIG, entscheidet ueber Stufe 2): Feuerrate messen
+
+Erwartung: im Sequential Halving haben am Ende typischerweise nur 1-2
+Kandidaten hohe Besuchszahlen -- das Besuchs-Gate kann E3b also stark
+ausbremsen. Deshalb ZUERST der bestehende Debug-Zaehler
+(`denial_tiebreak_stats`, fired/total) in einem einzigen Lauf
+(200 Partien @400 Sims, z=1,0, f=0,5).
+**Abbruchregel**: Feuerrate < 5% der Entscheidungen -> E3b gilt als
+IRRELEVANT (die Arena koennte einen Effekt dieser Groesse ohnehin nicht
+aufloesen), Punkt ohne Arena geschlossen, Ergebnis dokumentiert.
+Feuerrate >= 5% -> Stufe 2.
+
+## Stufe 2 (nur bei ausreichender Feuerrate)
+
+Zwei Arme a 400 Spiele, Champion@400 vs Heuristik@150dyn, identische
+Seeds (tools/paired_arena_env_ab.py): Kontrolle (z=0 = aus) vs z=1,0.
+Auswertung wie in der Stilmessung: **Siegquoten-Wache = Gate**
+(Nutzer-Philosophie "rein, wenn es nicht schadet"), Raub-Metriken auf
+Block-Ebene deskriptiv. Bei bestandener Wache: Uebernahme als
+Live-Preset UND Self-Play (Diversitaets-Entscheid gilt sinngemaess),
+Anker-Kante vor bewertetem Einsatz. Sekundaer bei Bestehen: z=2,0 als
+Dosis-Punkt.
+
+## Implementierung (klein, Env-Knopf-Muster)
+
+`MOSAIC_DENIAL_UNCERT_Z` (Default 0,0 = AUS = byte-identisch) und
+`MOSAIC_DENIAL_MIN_VISIT_FRAC` (Default 0,5); wirkt an derselben
+Stelle wie E3 (`select_final_root_child`/Gumbel-Zweig), nutzt die
+bereits vorhandenen Besuchszahlen und `opp_points_forecast`-Felder.
+Das alte `MOSAIC_DENIAL_TIEBREAK_EPS` bleibt bestehen (refutiert,
+Default 0) -- beide gleichzeitig gesetzt = Abbruch mit Fehlermeldung.
