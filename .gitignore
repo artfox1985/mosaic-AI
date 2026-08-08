@@ -65,4 +65,4 @@ logs/
 !dist/run_mosaic.py
 !dist/README_SPIEL.txt
 docs/DE_AzulDuel_Rulebook_compressed2.pdf
-altmess_90files/
+data/altmess_90files/
