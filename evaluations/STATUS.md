@@ -12,7 +12,7 @@ geschlossen).
 | Task | Status |
 |---|---|
 | **Platten-Intervention (endgame_head)** | **ABGESCHLOSSEN 2026-08-08: Arena H0 (97:103), Offline-Gewinne real (R5 0,457, Brier -0,0016) -> `--endgame-head` wird Standard-Rezept der naechsten Generation**; Champion bleibt. `PREREG_platten_intervention.md` |
-| **τ-Annealing (Messung 3)** | Arm-B-Training `t3ann_s2` LAEUFT (Swap-Fenster 200 raus/200 rein via Manifest+Exclude, Cache baut); danach Gating vs Champion -> Sockel-Entscheid. `PREREG_suchpfad_nachmessungen.md` |
+| **τ-Annealing (Messung 3)** | **GESCHLOSSEN 2026-08-08: H0 (112:118, p=0,78) -> τ=1 bleibt, v21-Sockel OHNE Annealing.** Suchpfad-Prereg M1-3 damit KOMPLETT (3x Status quo re-validiert). `PREREG_suchpfad_nachmessungen.md` |
 | **v21-Fenster fuellen** | **ZURUECKGESTELLT (Nutzer 2026-08-08: "nicht so auf die self plays stuerzen")**: Generator-Frage geklaert (Champion bleibt), 2.090 Schwarm-Partien zurueck in data/; Generierung erst, wenn die offene Task-Liste abgearbeitet ist (und ohnehin nach τ- und #37-Verdikt). `PREREG_v21_fenster.md` |
 | **Messset-Snapshot + v16/v17-Freigabe** | Snapshot ERLEDIGT 2026-08-07 abends (`altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
