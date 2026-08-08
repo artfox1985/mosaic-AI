@@ -1,16 +1,23 @@
+# Stand 2026-08-08 (WDL-Aera, Champion v20_2d_opp_brierbest, Elo 1349).
+# Rendern: python evaluations/render_diagrams.py [name] [--format png]
+# Farbcode: blau = Netz/Modell, gruen = exakt/verifiziert, orange = Suche/
+# Daten-Pipeline, violett = Ergebnis/Artefakt, grau = Regelwerk.
+
 # ==spielablauf==
 digraph Spielablauf {
     rankdir=TB;
     fontname="Helvetica";
+    label="Spielablauf (Azul-Duel-Variante, 2 Spieler, 5 Runden)";
+    labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    R1 [label="Runde 1-4: Drafting\nGumbel-Suche mit Netz-Priors", fillcolor="#cfe2ff"];
-    T  [label="Tiling\nDFS-Punkte-Kandidaten,\nNetz-Tiebreak (Runde 2-4)", fillcolor="#d9f2d9"];
-    U  [label="Rundenübergang\nTD-Bootstrap-Label", fillcolor="#ffe5b4"];
-    R5 [label="Runde 5\nexakte Alpha-Beta-Suche\n(kein Netz, volle Information)", fillcolor="#e2d9f3"];
+    R1 [label="Runde 1-4: Drafting\nGumbel-Suche mit Netz-Priors\n(600 Sims Self-Play / 400 Arena)", fillcolor="#cfe2ff"];
+    T  [label="Tiling (Rundenende)\nDFS-Solver ueber Punkte-Kandidaten,\nAuswahl = Punkte x P(Sieg)\n(#37 arena-bestaetigt 2026-08-08)", fillcolor="#d9f2d9"];
+    U  [label="Rundenuebergang\nFabrik-Neubefuellung (Zufallsknoten)\n-> TD-Bootstrap-Label", fillcolor="#ffe5b4"];
+    R5 [label="Runde 5\nEXAKTE Alpha-Beta-Suche\n(kein Netz, volle Information)", fillcolor="#d9f2d9"];
     T5 [label="Tiling Runde 5\nexakte Endwertung mitmaximiert", fillcolor="#d9f2d9"];
-    E  [label="Endwertung\n3 aktive Wertungsplatten", fillcolor="#f0f0f0"];
+    E  [label="Endwertung\n3 aktive Wertungsplatten\n(Linien / Ecken / Spezialfelder ...)", fillcolor="#f0f0f0"];
 
     R1 -> T -> U;
     U -> R1 [label="Runden 2-4", style=dashed, constraint=false];
@@ -22,41 +29,113 @@ digraph Spielablauf {
 digraph NetzSuche {
     rankdir=TB;
     fontname="Helvetica";
+    label="Netz-Suche pro Zug (Gumbel-AlphaZero, Rust-Engine)";
+    labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    N1 [label="Forward-Pass\nPlanes[76,6,6] + State[708]\n→ Policy, Value, Moon, Points", fillcolor="#cfe2ff"];
-    N2 [label="Priors\nmaskierte Softmax über legale Aktionen", fillcolor="#cfe2ff"];
-    N3 [label="Wurzel-Determinisierung\nverdeckte Information einmal mischen", fillcolor="#d9f2d9"];
-    N4 [label="Gumbel-Top-m\nbudget-skaliert (4-16, Standard 16)", fillcolor="#ffe5b4"];
-    N5 [label="Sequential Halving\nSelf-Play 600 / Arena 400 Sims\nin log2(m) Phasen", fillcolor="#ffe5b4"];
-    N6 [label="Tiefe ≥ 1\nAuswahl über completed-Q", fillcolor="#ffe5b4"];
-    N7 [label="Expansion + Blattbewertung\nNetz-Value + Floor-Shaping", fillcolor="#ffe5b4"];
-    N8 [label="Backpropagation", fillcolor="#ffe5b4"];
-    N9 [label="Zugwahl\nArena: argmax  |  Self-Play: besuchsbasiert", fillcolor="#cfe2ff"];
+    N1 [label="Forward-Pass (ONNX)\nPlanes[76,6,6] + Flach[708]\n-> Policy[406], Value (WDL: 2 Logits -> P(Sieg)),\nMoon, Punkte, [Gegner-Punkte], [Endgame]", fillcolor="#cfe2ff"];
+    N2 [label="Priors\nmaskierte Softmax ueber legale Aktionen", fillcolor="#cfe2ff"];
+    N3 [label="Wurzel-Determinisierung\nverdeckte Information EINMAL mischen\n(Korrektheit vor Messwert)", fillcolor="#d9f2d9"];
+    N4 [label="Gumbel-Top-m\nm = clamp(round(Sims/16), 4, 16)\n400 Sims -> 16 | 150 Sims -> 9\n(Formel arena-bestaetigt, Messung 2)", fillcolor="#ffe5b4"];
+    N5 [label="Sequential Halving\nlog2(m) Phasen", fillcolor="#ffe5b4"];
+    N6 [label="Tiefe >= 1\nAuswahl ueber completed-Q", fillcolor="#ffe5b4"];
+    N7 [label="Blattbewertung\nP(Sieg) des Value-Kopfs\n+ Floor-Shaping (w=0,3, WDL-re-validiert)\n+ R6-Peek / R5-Kurzschluss (exakt)", fillcolor="#ffe5b4"];
+    N8 [label="Backpropagation (completed-Q)", fillcolor="#ffe5b4"];
+    N9 [label="Zugwahl\nArena/GUI: argmax\nSelf-Play: besuchsbasiert, tau=1 durchgehend\n(Annealing gemessen -> kein Vorteil, Messung 3)", fillcolor="#cfe2ff"];
+    OFF [label="INERTE Laufzeit-Knoepfe (alle gemessen, alle H0):\nAggressions-Blend w/lambda = 0 | Denial-Tie-Break eps = 0\nFloor-Opp-Bias = 1 | Gumbel-m-Override = aus\nTiling-Kriterium = Bestand | tau-Annealing = aus", shape=note, fillcolor="#f0f0f0", fontsize=9];
 
     N1 -> N2 -> N3 -> N4 -> N5 -> N6 -> N7 -> N8;
-    N8 -> N6 [label="bis Budget erschöpft", style=dashed, constraint=false];
-    N8 -> N9 [label="Budget erschöpft"];
+    N8 -> N6 [label="bis Budget erschoepft", style=dashed, constraint=false];
+    N8 -> N9 [label="Budget erschoepft"];
+    N9 -> OFF [style=invis];
+}
+
+# ==value_ziel==
+digraph ValueZiel {
+    rankdir=TB;
+    fontname="Helvetica";
+    label="Value-Ziel-Konstruktion (Task #34, Cache-Schema 17-19)";
+    labelloc=t; fontsize=13;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    B  [label="Bootstrap je Zustand\nNetz-P(Sieg) am naechsten Rundenuebergang,\nueber 8 Fabrik-Neubefuellungen gemittelt", fillcolor="#ffe5b4"];
+    D  [label="Platt-Entstauchung\nNUR fuer Alt-Aera-Dateien (tanh-Generator):\nsigmoid(A + B*logit(p)), A=0,0051 B=1,9269", fillcolor="#d9f2d9"];
+    NAT[label="WDL-Generatoren (v19wdl, v20wdl*)\nBootstrap ist NATIV P(Sieg)\n-> keine Entstauchung", fillcolor="#d9f2d9"];
+    O  [label="Spielausgang z in {0,1}\n(nur abgeschlossene Partien;\nAbbruch -> Maske 0)", fillcolor="#f0f0f0"];
+    M  [label="TD-Blend\nvalues_wdl = 0,5*Bootstrap + 0,5*z", fillcolor="#ffe5b4"];
+    H  [label="Value-Kopf: 2 Logits -> Softmax\nKreuzentropie auf values_wdl\n(Platt-B 0,93 = fast kalibriert;\nvorher tanh-Marge, B=1,93 gestaucht)", fillcolor="#cfe2ff"];
+    BR [label="wdl_outcome (roher Ausgang)\n-> Brier-Score, arm-uebergreifend\nvergleichbar = Checkpoint-Kriterium", fillcolor="#e2d9f3"];
+    AUX[label="Aux-Koepfe (Trainingssignal, Suche liest sie nicht)\nPunkte | Gegner-Punkte | Moon-Reihenfolge |\nOwnership | endgame_margin (exakter R5-Wurzelwert)", fillcolor="#cfe2ff"];
+
+    B -> D [label="Alt-Dateien"];
+    B -> NAT [label="WDL-Dateien"];
+    D -> M; NAT -> M; O -> M;
+    M -> H -> BR;
+    H -> AUX [style=invis];
+}
+
+# ==fenster_v21==
+digraph FensterV21 {
+    rankdir=LR;
+    fontname="Helvetica";
+    label="Replay-Fenster v21: Zwei-Klassen-Design mit Generations-Rotation (29.450 Partien)";
+    labelloc=t; fontsize=13;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, margin="0.16,0.10"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    subgraph cluster_p {
+        label="POLICY-KLASSE (5.800 Partien, teuer: 600 Sims)\nvolle Suche -> completed-Q-Policy-Ziele";
+        style=filled; fillcolor="#eef4ff"; fontsize=10;
+        P1 [label="4.000 NEU\nselfplay_v20wdl_*\n(Champion-Generator)", fillcolor="#cfe2ff"];
+        P2 [label="1.350 ALT\n135 v19wdl-Dateien\n(Manifest)", fillcolor="#cfe2ff"];
+        P3 [label="450 AELTER\n45 v18-Dateien\n(Manifest)", fillcolor="#cfe2ff"];
+    }
+    subgraph cluster_v {
+        label="VALUE-KLASSE (23.650 Partien, billig: 150 Sims, --value-only)\nPolicy maskiert (pol_w=0), nur Value-/Bootstrap-Ziele";
+        style=filled; fillcolor="#fff6e6"; fontsize=10;
+        V1 [label="8.000 NEU\nv20wdlsw_*", fillcolor="#ffe5b4"];
+        V2 [label="8.000 v19wdlsw", fillcolor="#ffe5b4"];
+        V3 [label="2.650 v19wdl-Rest", fillcolor="#ffe5b4"];
+        V4 [label="5.000 v18", fillcolor="#ffe5b4"];
+    }
+    MAN [label="policy_carrier_manifest_v21.json\nTraeger-Dateiliste + carrier_prefixes\n-> steckt im Cache-Key\n(Fix 2026-08-08: kein Praefix-Kurzschluss mehr)", shape=note, fillcolor="#d9f2d9", fontsize=9];
+    OUT [label="Cache (bitgepackt)\n~4,8 Mio. Zustaende, ~13 GB\nplanes/masks 1 Bit/Feld", fillcolor="#e2d9f3"];
+    ROT [label="Rotation je Generation:\nv16/v17 raus | v18 uebernimmt die 450er-Traegerrolle |\nv19wdl die 1.350er | Backup-Korpora NIE zurueck", shape=note, fillcolor="#f0f0f0", fontsize=9];
+
+    P1 -> OUT; P2 -> OUT; P3 -> OUT;
+    V1 -> OUT; V2 -> OUT; V3 -> OUT; V4 -> OUT;
+    MAN -> P2 [style=dashed, label="waehlt Traeger"];
+    ROT -> V4 [style=invis];
 }
 
 # ==selfplay_training==
 digraph SelfplayTraining {
     rankdir=TB;
     fontname="Helvetica";
+    label="Verbesserungs-Zyklus mit Entscheidungs-Gates";
+    labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    S1 [label="Self-Play\nChampion gegen sich selbst", fillcolor="#cfe2ff"];
-    S2 [label="Korpus\nReplay-Fenster: frisch + 2 Alt-Champions", fillcolor="#ffe5b4"];
-    S3 [label="Dataset\nPolicy = completed-Q, Value = TD-Mix (nortv)", fillcolor="#ffe5b4"];
-    S4 [label="Training\nDoppel-Arm warm (flach + 2D)\nLinie seit v19 2D-nativ → ONNX", fillcolor="#cfe2ff"];
-    S5 [label="Diagnose\nOrakel-Metriken (v18-Referenz,\narena-validiert im Daten-Regime)", fillcolor="#d9f2d9"];
-    S6 [label="Gating\ngepaarte Seeds, SPRT", fillcolor="#ffe5b4"];
-    S7 [label="Neuer Champion\n+ Elo-Kader", fillcolor="#e2d9f3"];
+    S1 [label="Self-Play\nChampion gegen sich selbst,\nzwei Klassen (Sockel 600 / Schwarm 150 Sims)", fillcolor="#cfe2ff"];
+    S2 [label="Replay-Fenster\nzwei Klassen + Generations-Rotation\n(siehe Diagramm fenster_v21)", fillcolor="#ffe5b4"];
+    S3 [label="Cache\nPolicy = completed-Q (nur Traeger)\nValue = WDL-TD-Blend (siehe value_ziel)\nSchema im Cache-Key (Reproduzierbarkeit)", fillcolor="#ffe5b4"];
+    S4 [label="Training\nwarm vom Champion, lr 5e-5 cosine,\nEarly Stop bei Policy- UND Value-Plateau\nCheckpoint = bester Brier (arena-re-validiert)", fillcolor="#cfe2ff"];
+    S5 [label="Offline-Diagnose\nOrakel-Metriken auf eingefrorenem Set\n(Prior-Masse Top-3, Kendall-Tau):\nEINZIGE arena-validierten Praediktoren (7/7)", fillcolor="#d9f2d9"];
+    S6 [label="Arena-Gating\ngepaarte Seeds, SPRT (H0 50% / H1 65%),\nbis 200 Paare, Kandidat vs Champion", fillcolor="#ffe5b4"];
+    S7 [label="Neuer Champion\n+ Elo-Kader (Anker: Heuristik@150)\n+ Server-Default fuer Mensch-Partien", fillcolor="#e2d9f3"];
+    S8 [label="Pflicht-Diagnostik am Sieger\nPlatt-Kalibrierung | R5-Plattensteigung |\nBrier auf eingefrorenem Alt-Messset |\nStruktur-Watchlist gegen Mensch-Partien", fillcolor="#d9f2d9"];
 
-    S1 -> S2 -> S3 -> S4 -> S5 -> S6;
-    S6 -> S7 [label="bestanden"];
-    S6 -> S4 [label="nicht bestanden", style=dashed, constraint=false];
-    S7 -> S1 [label="nächster Zyklus", style=dashed, constraint=false];
+    REG [label="MESS-DISZIPLIN (aus Fehlschlaegen gelernt)\n1. Vorregistrierung: Design + Entscheidungsregel VOR dem Lauf\n2. Value-Offline-Gaps < 0,015 sagen NICHTS (0/4) -> Arena entscheidet\n3. SPRT-Fruehstopp < 150 Paare nur mit Frisch-Seed-Replikation\n4. Score-Analysen auf Block-Ebene (Paar-SEs unterschaetzen)\n5. Aera-Grenzen: Alt-Befunde sind keine Argumente nach Ziel-Wechsel\n6. Fenster pinnen, wenn parallel generiert wird (Cache-Key haengt an der Dateiliste)", shape=note, fillcolor="#f0f0f0", fontsize=9];
+
+    S1 -> S2 -> S3 -> S4 -> S5;
+    S5 -> S6 [label="Metriken nicht schlechter"];
+    S5 -> S4 [label="beide Metriken schlechter\n-> Arena gespart", style=dashed, constraint=false];
+    S6 -> S7 [label="H1 (signifikant besser)"];
+    S6 -> S4 [label="H0 -> Rezept-Baustein\nfuer die naechste Generation\n(kein Nachschub-Ventil)", style=dashed, constraint=false];
+    S7 -> S8;
+    S8 -> S1 [label="naechster Zyklus", style=dashed, constraint=false];
+    S8 -> REG [style=invis];
 }
