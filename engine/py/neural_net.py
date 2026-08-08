@@ -669,6 +669,37 @@ def _destretch_prob(p: float) -> float:
     p = min(max(p, 1e-6), 1.0 - 1e-6)
     z = math.log(p / (1.0 - p))
     return 1.0 / (1.0 + math.exp(-(DESTRETCH_A + DESTRETCH_B * z)))
+
+
+def _is_policy_carrier(basename, carrier_set, carrier_prefixes, bootstrap_native):
+    """Entscheidet, ob eine Self-Play-Datei Policy-Ziele traegt (pol_w>0-Vorfrage).
+
+    Schema 17 (v20) hatte hier einen Kurzschluss: JEDE Datei eines
+    WDL-Generators (`bootstrap_native`) trug automatisch Policy, egal ob sie
+    im Manifest gelistet war -- fuer v20 harmlos (dort SOLLTEN alle
+    v19wdl-Sockel-Dateien tragen), fuer v21 falsch (nur ein Teilsatz der
+    v19wdl-Dateien soll Traeger sein). `bootstrap_native` bleibt fuer die
+    Platt-Entstauchung (siehe Aufrufer, `not bootstrap_native`) unangetastet
+    -- diese Funktion regelt NUR die Policy-Traeger-Frage.
+
+    - `carrier_set is None` (kein Manifest gefunden): JEDE Datei traegt
+      (Bestandsverhalten, manifest-unabhaengig).
+    - `carrier_prefixes is None` (Manifest OHNE das neue Feld = v20-Schema):
+      Alt-Verhalten EXAKT erhalten, inkl. `bootstrap_native`-Kurzschluss --
+      Rueckwaerts-Kompatibilitaet/bit-identische v20-Caches sind Pflicht.
+    - `carrier_prefixes` vorhanden (auch als leere Liste; v21+-Schema): der
+      `bootstrap_native`-Kurzschluss wird NICHT mehr benutzt. Traeger ist nur,
+      wer im `carrier_set` gelistet ist ODER dessen Basename mit einem der
+      Praefixe beginnt (str.startswith -- "selfplay_v20wdl_" matcht NICHT
+      "selfplay_v20wdlsw_...", der Unterstrich ist Teil des Praefixes).
+    """
+    if carrier_set is None:
+        return True
+    if carrier_prefixes is None:
+        return bootstrap_native or basename in carrier_set
+    return basename in carrier_set or basename.startswith(tuple(carrier_prefixes))
+
+
 VALUE_OPP_EPSILON = 0.1
 VALUE_SCALE = 50.0
 # Mischgewicht fuer `bootstrap_value` (Punkt 6) -- 0.0 = nur bisheriges Ziel
@@ -1073,13 +1104,26 @@ class MosaicDataset(Dataset):
         # MOSAIC_CARRIER_MANIFEST (2026-08-08, v21-Uebergabe): Dateiname des
         # Traeger-Manifests, Default = v20-Bestand. Inhalt steckt via
         # policy_carrier_set ohnehin im Cache-Key.
+        # `carrier_prefixes` (2026-08-08, v21-Fix): additives, OPTIONALES
+        # Manifest-Feld -- Liste von Dateinamen-Praefixen, die (zusaetzlich
+        # zum `policy_carrier_set`) als Traeger gelten. Ist das Feld
+        # VORHANDEN (auch als leere Liste), schaltet `_is_policy_carrier`
+        # den `bootstrap_native`-Kurzschluss ab (siehe Funktionskommentar
+        # dort) -- notwendig, weil der Kurzschluss fuer v21 ALLE
+        # `selfplay_v19wdl_*`-Dateien zu Traegern macht, obwohl nur ein
+        # seed-bestimmter Teilsatz tragen soll. Fehlt das Feld (v20-Manifest,
+        # kein Rebuild-Zwang): None -> Alt-Verhalten EXAKT erhalten.
         manifest_path = os.path.join(
             data_dir,
             os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
         policy_carrier_set = None
+        carrier_prefixes = None
         if os.path.exists(manifest_path):
             with open(manifest_path, encoding="utf-8") as mf:
-                policy_carrier_set = frozenset(json.load(mf)["policy_carrier_files"])
+                _manifest = json.load(mf)
+                policy_carrier_set = frozenset(_manifest["policy_carrier_files"])
+                if "carrier_prefixes" in _manifest:
+                    carrier_prefixes = list(_manifest["carrier_prefixes"])
 
         cache_key_material = (
             str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
@@ -1088,6 +1132,12 @@ class MosaicDataset(Dataset):
         )
         if policy_carrier_set is not None:
             cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
+        if carrier_prefixes is not None:
+            # Eigene Komponente (nicht Teil von "+carriers:"): sonst wuerden
+            # zwei Manifeste mit identischem policy_carrier_set aber
+            # unterschiedlichen carrier_prefixes denselben Cache treffen
+            # (Fenster-Kollision, siehe Auftrag Punkt 3).
+            cache_key_material += "+carrier_prefixes:" + ",".join(sorted(carrier_prefixes))
         if encoder == "2d":
             cache_key_material += "+enc2d_v1"
         # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
@@ -1333,13 +1383,16 @@ class MosaicDataset(Dataset):
                 # liefern eine gestauchte Marge, die unten Platt-entstaucht
                 # wird (Audit Befund 1 + Erosions-Arm-B-Ergebnis).
                 bootstrap_native = os.path.basename(f).startswith(WDL_GENERATOR_PREFIXES)
-                # Policy-Traeger-Regel (siehe pol_w-Kommentar unten): ohne
-                # Manifest traegt jede Datei Policy (Bestandsverhalten);
-                # mit Manifest nur v20wdl*-Dateien und gelistete Alt-Dateien.
-                file_policy_carrier = (
-                    policy_carrier_set is None
-                    or bootstrap_native
-                    or os.path.basename(f) in policy_carrier_set)
+                # Policy-Traeger-Regel (siehe pol_w-Kommentar unten und
+                # `_is_policy_carrier`-Doku oben): ohne Manifest traegt jede
+                # Datei Policy (Bestandsverhalten); mit v20-Manifest (kein
+                # `carrier_prefixes`-Feld) nur v20wdl*-Dateien und gelistete
+                # Alt-Dateien (Alt-Verhalten, Rueckwaerts-kompatibel); mit
+                # v21-Manifest (`carrier_prefixes` gesetzt) nur die
+                # gelisteten Dateien plus explizite Praefix-Treffer -- der
+                # bootstrap_native-Kurzschluss greift dann NICHT mehr.
+                file_policy_carrier = _is_policy_carrier(
+                    os.path.basename(f), policy_carrier_set, carrier_prefixes, bootstrap_native)
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
                     final_own = _final_ownership_by_game(game_data)
