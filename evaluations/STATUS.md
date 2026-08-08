@@ -58,7 +58,7 @@ belegt, CPU frei). Kommando + Regeln: UEBERGABE §5a,
 | **A: Floor-Shaping W=0 vs 0,3** | die nie gefahrene Kontrolle des WDL-Sweeps; der +14pp-Beleg ist Alt-Aera -> H0 wuerde eine Handheuristik ersatzlos streichen. 2x400 |
 | **D: POINTS_WEIGHT-Re-Sweep** | Gewicht steuert inzwischen DREI Aux-Koepfe (train.py:1174-1177), Alt-Sweep war tanh+R2-basiert. 3 Arme (0,25/0,5/1,0), Metrik Brier |
 | **B: Zerlegungs-Diagnose** | zweistufige (Slot,Rotation)-Wahl vs flache Enumeration auf Frozen-Zustaenden; billig, KEINE Arena. Praemisse "PUCT verzerrt" trifft nicht (Gumbel), Kern aber ungemessen |
-| **C: c_visit-Sweep** | `GUMBEL_C_VISIT=50` ist der letzte unverifizierte Gumbel-Parameter (eigenes Inventar). 3 Arme 25/50/100 |
+| ~~C: c_visit-Sweep~~ | **ZURUECKGEZOGEN**: `PREREG_ownership_gumbel.md` B1 hat die sigma-Familie regelkonform geschlossen, nachdem c_scale sich als folgenlos erwies (Task #18) -- ein Sweep waere ein Test gegen die eigene Vorregistrierung |
 
 Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
 zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
