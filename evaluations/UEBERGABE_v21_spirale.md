@@ -155,10 +155,11 @@ CPU-Arena. Knoepfe werden vorab gebaut (Default aus, Paritaets-Hash).
    Nur darueber: Stufe 2, zwei Arme a 400 (z=0 vs z=1) via
    paired_arena_env_ab, Siegquoten-Wache = Gate.
 2. **ISMCTS-k -- Mehrfach-Determinisierung**
-   (`PREREG_ismcts_determinisierungen.md`): drei Arme a 400
-   (`MOSAIC_NUM_DETERMINIZATIONS` = 1/2/4), Basis-Seed 20260820.
-   Rechen-neutral (Sims werden ueber die Welten gesplittet). Confound
-   Wurzelbreite (m = round(Sims_pro_Welt/16)) ist vorregistriert.
+   (`PREREG_ismcts_determinisierungen.md`): drei Arme a 400 Spiele
+   (`MOSAIC_NUM_DETERMINIZATIONS` = 1/2/4), **bei 600 Netz-Sims**
+   (Nutzer-Hinweis: Sockel-Regime; dadurch bleibt k=2 bei m=16 =
+   confound-frei und k=4 landet auf dem als neutral gemessenen m=9),
+   Basis-Seed 20260820. Rechen-neutral (Sims-Split ueber die Welten).
    Default-Wechsel NUR mit Signifikanz + Frisch-Seed-Replikation.
 
 ## 5. STEHENDE REGELN (Kurzform -- Langform in STATUS.md)
