@@ -20,7 +20,8 @@ geschlossen).
 | **λ (Value-Target-Mix)** | **UMGESTUFT (Nutzer 2026-08-08, 2. Korrektur): KEIN Replikationskandidat** -- der λ=0,7-Sieg stammt aus der tanh-/Margen-Aera, der Mechanismus uebertraegt sich nicht auf den binaeren WDL-Kopf (Aera-Grenzen-Lektion). Bleibt als NEUES WDL-Aera-Experiment auf Hypothesen-Niveau in der GPU-Queue (root_q ist jetzt immerhin skalengleich zum Ziel); eigenes Prereg mit offener Erwartung vor dem Start, Prioritaet hinter t3ann/#35b -- oder Streichung auf Zuruf |
 | **#29-Instrument (Offline-Value-Praediktor)** | OFFEN: braucht frozen-Set-Neubau + arena-differenzierte Paare zur Validierung. `PREREG_nach34_paket` |
 | **#37 Tiling-Auswahlkriterium** | **GESCHLOSSEN 2026-08-08: H0 (284 vs 292, p=0,33)** -- Bestand punkte*P bestaetigt, Knopf MOSAIC_TILING_SELECT bleibt inert. `PREREG_t37_tiling_kriterium.md` |
-| **frozen-Set-Neubau** | **AKTIVIERT**: in die CPU-Queue nach dem Stark-Gegner-Nachtest und #37-A/B (Orakel-Labels CPU-schwer; Korpus-Generierung wartet ohnehin) -> danach #29-Validierung an den Aera-Gating-Paaren |
+| **frozen-Set-Neubau** | **ERLEDIGT 2026-08-08**: `frozen_eval_set_v2.pkl` (1.800 Zustaende, 4 Aera-Korpora, 0 Duplikate, v1 hash-unveraendert) + `frozen_v2_oracle_labels.json` (1.148 Labels, Orakel = Champion, 0 Fehler) |
+| **#29-Instrument** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
 ## NAECHSTE SCHRITTE (Reihenfolge-Regel: Modell-Verdikte VOR Korpus-Generierung)
