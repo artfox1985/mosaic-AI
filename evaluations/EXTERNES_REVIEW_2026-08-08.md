@@ -115,3 +115,75 @@ eine Handheuristik ersatzlos streichen), **TASK D** (Gewichte: ein
 Trainings-Faktor, der sich verdreifacht hat), **TASK B** (Diagnose ohne
 Arena), **TASK C** (letzter unverifizierter Gumbel-Parameter).
 Alle vier hinter der bestehenden Nach-v21-Queue (E3b, ISMCTS-k).
+
+# ==================================================================
+# VORREGISTRIERUNG A-D (2026-08-08, Nutzer-Go "eintakten nach v21")
+# ==================================================================
+
+Gemeinsame Regeln: Instrument `tools/paired_arena_env_ab.py`
+(Netz-vs-Heuristik, weil die Knoepfe prozessweit sind), identische Seeds
+je Arm, Auswertung Siegquote per exaktem McNemar + Scores/Floors auf
+Block-Ebene (16 Bloecke a 25). Statistik-Regeln 1-3 gelten. Alle vier
+Tasks laufen NACH v21-Training + Gating + Auswertungs-Paket.
+
+## TASK A -- Floor-Shaping W=0 (Arena, 2 Arme, hoechste Prioritaet)
+
+Arme: `MOSAIC_FLOOR_SHAPING_W` = 0,3 (Kontrolle) und 0,0, je 400 Spiele,
+Champion@400 vs Heuristik@150dyn, Basis-Seed 20260825. 400 Sims bewusst
+(vergleichbar mit dem 0,15/0,6-Sweep vom 2026-08-07).
+**Entscheid**: H0 -> das Feature wird ERSATZLOS ABGESCHALTET
+(FLOOR_SHAPING_WEIGHT-Default auf 0,0; eine Handheuristik weniger im
+Blattwert, Begruendung: es traegt in der WDL-Aera nichts mehr und der
+Alt-Beleg ist aera-gebunden). Signifikant FUER 0,3 -> Feature bleibt und
+ist erstmals aera-korrekt belegt. Signifikant FUER 0,0 -> Abschaltung
+zusaetzlich mit Frisch-Seed-Replikation bestaetigen (Default-Aenderung).
+
+## TASK D -- POINTS_WEIGHT-Re-Sweep (GPU, 3 Trainings + 1 Gating)
+
+Arme auf dem v21-Fenster, sonst exakt das v21-Rezept (inkl.
+`--endgame-head`), Seed 2: `--points-weight` 0,25 / 0,5 (Kontrolle =
+Default) / 1,0. Cache-Hit (Gewichte stehen NICHT im Cache-Key).
+**Entscheidungsmetrik: Brier** (arm-vergleichbar), sekundaer
+Platt-B/R5-Steigung deskriptiv; R² ist ausdruecklich KEIN Kriterium.
+**Entscheid**: bester Arm nur dann gegen den Champion gaten, wenn sein
+Brier-Vorsprung >= 0,0015 betraegt (2,5x Seed-Skala 0,0006) -- sonst ist
+das Gating nach der Aufloesungsgrenzen-Regel (0/4) verschwendet und der
+Sweep endet mit "Default bleibt". VALUE_WEIGHT bleibt 0,2 (nicht Teil
+dieses Sweeps).
+
+## TASK B -- Zerlegungs-Diagnose (kein Arena-Slot, laeuft jederzeit)
+
+Neues Werkzeug `tools/dome_split_diagnose.py`: auf allen
+Frozen-Set-Zustaenden (frozen_v2), in denen ein Kuppelplatten-Zug legal
+ist, (1) die von der zweistufigen Suche gewaehlte (Slot, Rotation)
+ermitteln, (2) ALLE legalen (Slot, Rotation)-Kombinationen flach
+enumerieren und je Kombination mit demselben Gesamtbudget bewerten,
+(3) vergleichen. **Kennzahlen**: Anteil der Zustaende mit suboptimaler
+Wahl, mittlere und maximale Q-Differenz zum flachen Optimum.
+**Lesart (vorab)**: Anteil <5% ODER mittlere Differenz < 0,01 (completed-Q-
+Skala) -> die Zerlegung kostet nichts Messbares, Punkt 3 des Reviews ist
+mit Beleg geschlossen, faktorierte Policy bleibt UNGEBAUT. Darueber ->
+faktorierte Policy/Action-Attention wird begruendeter Kandidat (eigenes
+Prereg, Architektur-Kostenklasse).
+
+## TASK C -- c_visit-Sweep (Arena, 3 Arme)
+
+Neuer Env-Knopf `MOSAIC_GUMBEL_C_VISIT` (Default = Konstante 50).
+Arme 25 / 50 / 100, je 400 Spiele bei 600 Netz-Sims (Sockel-Regime),
+Basis-Seed 20260830.
+**Entscheid**: Default-Wechsel nur bei Signifikanz + Frisch-Seed-
+Replikation (Such-Default). H0 -> der letzte unverifizierte
+Gumbel-Parameter ist als unkritisch belegt, Suchpfad-Inventar
+vollstaendig abgeschlossen.
+
+## REIHENFOLGE DER NACH-v21-QUEUE (Bahnen)
+
+| # | Task | Bahn | Kosten | Warum diese Position |
+|---|---|---|---|---|
+| 1 | B Zerlegungs-Diagnose | CPU leicht | ~1h | blockiert nichts, kein Arena-Slot |
+| 2 | A Floor W=0 | Arena | ~1h | billigste Arena mit dem groessten Aufraeum-Potenzial |
+| 3 | E3b Stufe 1 (Feuerrate) | CPU leicht | ~30min | Abbruchregel spart ggf. Stufe 2 |
+| 4 | ISMCTS-k (k=1/2/4) | Arena | ~1,5h | greift die PIMC-Schwaeche an |
+| 5 | C c_visit | Arena | ~1,5h | letzter unverifizierter Gumbel-Parameter |
+| 6 | E3b Stufe 2 | Arena | ~1h | nur falls Feuerrate >= 5% |
+| 7 | D POINTS_WEIGHT | GPU | ~10h + Gating | laeuft parallel zu 1-6 auf der GPU |

@@ -162,6 +162,24 @@ CPU-Arena. Knoepfe werden vorab gebaut (Default aus, Paritaets-Hash).
    Basis-Seed 20260820. Rechen-neutral (Sims-Split ueber die Welten).
    Default-Wechsel NUR mit Signifikanz + Frisch-Seed-Replikation.
 
+## 5c. NACH-v21-QUEUE, VOLLSTAENDIG (Reihenfolge + Bahnen)
+
+Vorregistrierung aller vier Review-Tasks: `EXTERNES_REVIEW_2026-08-08.md`
+(Abschnitt "VORREGISTRIERUNG A-D"), E3b/ISMCTS-k siehe 5b.
+
+| # | Task | Bahn | Kosten |
+|---|---|---|---|
+| 1 | **B** Zerlegungs-Diagnose (Slot/Rotation flach vs zweistufig) | CPU leicht | ~1h |
+| 2 | **A** Floor-Shaping W=0 vs 0,3 | Arena 2x400 | ~1h |
+| 3 | **E3b Stufe 1** Feuerrate (Abbruch <5%) | CPU leicht | ~30min |
+| 4 | **ISMCTS-k** k=1/2/4 @600 Sims | Arena 3x400 | ~1,5h |
+| 5 | **C** c_visit 25/50/100 @600 Sims | Arena 3x400 | ~1,5h |
+| 6 | **E3b Stufe 2** (nur bei Feuerrate >=5%) | Arena 2x400 | ~1h |
+| 7 | **D** POINTS_WEIGHT 0,25/0,5/1,0 | GPU, parallel | ~10h |
+
+Wichtig: 7 laeuft auf der GPU PARALLEL zu 1-6 (Arena ist CPU) -- aber
+Fenster pinnen und die Brier-Schwelle 0,0015 fuers Gating beachten.
+
 ## 5. STEHENDE REGELN (Kurzform -- Langform in STATUS.md)
 
 1. **Fenster-Pinning**: JEDES Training mit MOSAIC_DATA_EXCLUDE pinnen,
