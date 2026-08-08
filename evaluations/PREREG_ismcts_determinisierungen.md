@@ -37,8 +37,30 @@ Paritaets-Hash vor Einsatz.
 
 Instrument = `tools/paired_arena_env_ab.py` (Amendment-Muster: der Knopf
 ist prozessweit, daher Netz-vs-Heuristik -- die Heuristik liest ihn
-nicht). DREI Arme a 400 Spiele, Champion@400 vs Heuristik@150dyn,
-identische Seeds, Basis-Seed 20260820: k=1 (Kontrolle), k=2, k=4.
+nicht). DREI Arme a 400 Spiele, identische Seeds, Basis-Seed 20260820:
+k=1 (Kontrolle), k=2, k=4.
+
+**AENDERUNG vor dem Lauf (Nutzer-Hinweis 2026-08-08): gemessen wird bei
+600 Netz-Sims, nicht 400** -- "wir gehen bei den sockel spielen eh mit
+600 sims ins rennen". Das entschaerft den oben benannten Confound
+weitgehend, weil die Wurzelbreite pro Welt vom gesplitteten Budget
+abhaengt (verifiziert: `split_sims_across_worlds` -> `build_net_tree` ->
+`gumbel_top_m_for_budget(sims)`):
+
+| Budget | k=1 | k=2 | k=4 |
+|---|---|---|---|
+| 400 Sims | 400/Welt, m=16 | 200/Welt, **m=13** | 100/Welt, **m=6** |
+| 600 Sims | 600/Welt, m=16 | 300/Welt, **m=16** | 150/Welt, **m=9** |
+
+Bei 600 Sims ist k=2 damit ein Effekt OHNE Breiten-Aenderung (m bleibt
+16, weil 300/16 ueber dem Deckel liegt) -- der reine
+Determinisierungs-Effekt. Und k=4 landet auf m=9, also exakt der
+Konfiguration, die Messung 2 als staerke-neutral gegen m=16 gemessen hat
+(H0, p=0,54). Der Confound ist damit fuer k=2 strukturell ausgeschlossen
+und fuer k=4 empirisch gedeckt. Zusaetzlicher Vorteil: 600 Sims sind das
+Regime, in dem die Sockel-Self-Plays tatsaechlich laufen -- ein positives
+Ergebnis waere direkt auf die Korpus-Erzeugung uebertragbar.
+Kosten: ~1,5x Wandzeit pro Arm (~30 min statt ~21 min), ~90 min gesamt.
 
 ## Entscheidungsregeln
 
