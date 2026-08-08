@@ -97,6 +97,25 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
   mit `MOSAIC_DATA_EXCLUDE` pinnen (Split+Cache-Key haengen an der
   Dateiliste). Verifikation: "Lade HDF5-Cache"-Zeile.
 - **Backup-/Alt-Regel-Korpora**: kommen NIE wieder ins Training.
+- **LOESCHEN NUR MIT EXPLIZITER RUECKFRAGE (Nutzer-Regel 2026-08-08,
+  dritter Vorfall dieser Klasse -- "inakzeptabel")**: Kein Loeschen,
+  Verschieben oder Ueberschreiben von Dateien, Ordnern oder Worktrees
+  ohne vorherige, den KONKRETEN Pfad benennende Nutzer-Freigabe.
+  Ausnahme: das eigene Scratch-Verzeichnis.
+  Im Einzelnen:
+  1. **Eine FRAGE ist keine Anweisung.** "Ist X noch aktuell?", "kann
+     man X weg?", "brauchen wir X?" verlangen eine ANTWORT. Handeln
+     erst nach einem Imperativ, der das Ziel nennt.
+  2. Als Loeschen gelten auch: `git worktree remove`, `git checkout --`,
+     `git reset --hard`, `git clean -fd`, `mv` aus dem Projekt heraus,
+     `rm` auf generierte Artefakte (Caches sind KEINE Ausnahme -- die
+     Freigabe vom 2026-08-08 galt fuer sechs namentlich genannte Dateien).
+  3. Vor jeder freigegebenen Loeschung: Ziel ANSEHEN (Inhalt, Groesse,
+     Reparse-Points bei Worktrees -- Junction-Vorfall 2026-07-24), das
+     Ergebnis der Pruefung BERICHTEN, und nur dann ausfuehren.
+  4. Gilt fuer Sub-Agents identisch und steht in jedem Agent-Prompt.
+  5. "Aufraeumen" ist niemals selbst-autorisiert -- auch dann nicht,
+     wenn etwas offensichtlich veraltet ist.
 - **Statistik**: (1) Score-Auswertungen IMMER auf Block-Ebene;
   (2) Netz-vs-Heuristik-Effekte <8pp = Seed-Rauschen; (3) SPRT-
   Fruehstopps <150 Paare zaehlen nur mit Frisch-Seed-Replikation.
