@@ -72,7 +72,8 @@ uebrig = [f for f in rest18 if f not in tr_v18]
 maskiert_v18 = sorted(rng.sample(uebrig, 500))    # 5.000 maskierte Partien
 raus_v18 = sorted(set(uebrig) - set(maskiert_v18)); assert len(raus_v18)==55
 json.dump({"seed": 20260815, "policy_carrier_files": tr_v19 + tr_v18,
-           "hinweis": "v21: Traeger = 135 v19wdl + 45 v18; v20wdl-Dateien sind IMMER Traeger (Praefix-Regel im Cache pruefen!); 55 v18-Dateien komplett raus (raus_v18)",
+           "carrier_prefixes": ["selfplay_v20wdl_"],
+           "hinweis": "v21: Traeger = 135 v19wdl + 45 v18 (gelistet) + ALLE selfplay_v20wdl_*-Sockeldateien (carrier_prefixes, Unterstrich-Grenze -> selfplay_v20wdlsw_* matcht NICHT); 55 v18-Dateien komplett raus (raus_v18)",
            "raus_v18": raus_v18},
           open("data/policy_carrier_manifest_v21.json","w",encoding="utf-8"), indent=1)
 alt = "|".join(re.escape(b) for b in raus_v18)
@@ -80,15 +81,21 @@ open("evaluations/v21_exclude_regex.txt","w").write(f"selfplay_v16_|selfplay_v17
 print("Manifest + Exclude-Regex geschrieben")
 PY
 ```
-**PRUEFPFLICHT vor dem Training** (Koordinator-Fehlerklasse dieser
-Session): im Cache-Code (neural_net.py, Traeger-Logik um Zeile ~1073)
-verifizieren, wie NEUE `v20wdl*`-Dateien behandelt werden, wenn ein
-Manifest existiert -- Schema-17-Kommentar sagt "mit Manifest nur
-v20wdl*-Dateien und gelistete Alt-Dateien" tragen Policy. Erwartung
-v21: Sockel `v20wdl_*` traegt, Schwarm `v20wdlsw_*` ist value-only
-(via policy_target_valid=False ohnehin maskiert) -- am ersten Cache-Log
+**Geltende Traeger-Regel (Fix 2026-08-08, `_is_policy_carrier` in
+neural_net.py)**: das v21-Manifest setzt das additive Feld
+`carrier_prefixes: ["selfplay_v20wdl_"]`. Ist dieses Feld VORHANDEN,
+gilt NUR NOCH `basename in policy_carrier_files ODER
+basename.startswith(carrier_prefixes)` -- der alte
+`bootstrap_native`-Kurzschluss (der frueher JEDE `v19wdl*`/`v20wdl*`-
+Datei automatisch zum Traeger gemacht haette, egal ob gelistet) greift
+dann NICHT mehr. Damit tragen genau: die 135 gelisteten `v19wdl`- +
+45 gelisteten `v18`-Dateien + ALLE `selfplay_v20wdl_*`-Sockeldateien
+(Praefix-Match, Unterstrich ist Teil des Praefixes -> `v20wdlsw_*`
+matcht nicht). Fehlt `carrier_prefixes` im Manifest (v20-Altbestand),
+bleibt die alte Logik inkl. Kurzschluss unveraendert (Rueckwaerts-
+Kompatibilitaet, bit-identische v20-Caches). Am ersten Cache-Log
 ("Policy-Traeger"-Zaehlung bzw. pol_w-Statistik) verifizieren, dass
-GENAU 5.800 Partien Policy tragen.
+GENAU 5.800 Partien Policy tragen (1.350 + 450 + 4.000).
 
 ## 3. v21-TRAINING + GATING
 

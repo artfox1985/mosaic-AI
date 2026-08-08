@@ -39,6 +39,15 @@ benannt (`selfplay_v20wdl_*`/`selfplay_v20wdlsw_*` -- Praefix-Match
 haelt die native Bootstrap-Behandlung in Schema>=17 automatisch
 korrekt). Backup-/Alt-Regel-Korpora bleiben AUSSEN (stehende Regel).
 
+**Traeger-Mechanismus (Fix 2026-08-08)**: das Manifest setzt zusaetzlich
+`carrier_prefixes: ["selfplay_v20wdl_"]` -- damit entscheidet
+`_is_policy_carrier` (neural_net.py) NUR ueber `policy_carrier_files`
+(die gelisteten 135 v19wdl- + 45 v18-Dateien) plus Praefix-Treffer (alle
+`selfplay_v20wdl_*`-Sockeldateien); der alte `bootstrap_native`-
+Kurzschluss, der frueher pauschal ALLE `v19wdl*`-Dateien zu Traegern
+gemacht haette (400 statt 135), ist damit fuer v21 abgeschaltet. Ohne
+`carrier_prefixes` (v20-Manifest) bleibt die Alt-Logik unveraendert.
+
 ## Generierungs-Reihenfolge (CPU-Bahn, kritischer Pfad)
 
 1. **LAEUFT**: τ-Annealing-Batch 2.000 @600 (`v19wdlann`, Messung 3)
