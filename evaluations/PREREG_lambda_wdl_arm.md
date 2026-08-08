@@ -67,3 +67,18 @@ Modell `lam07_wdl_s2*` bleibt als Dokument liegen, wird NICHT gegatet
 und NICHT in die Elo-Tabelle eingetragen. Die 55,8%-Messung der
 root_q-Fraktion bleibt gueltig (sie beschreibt den Korpus, nicht die
 Mischung).
+
+## WIEDERHOLUNG `lam07_wdl2_s2` (2026-08-08, gueltig)
+
+Fix committet (5976700): Log nennt jetzt das Zielfeld --
+**"λ=0.7 auf Zielfeld 'values_wdl' -- 55.8% der Samples gemischt"**,
+Cache-HIT auf 1890 Dateien (v20-Fenster, identisch zum Champion).
+Fehlstart-Notiz: der erste Wiederholungs-Versuch lief mit dem alten
+Exclude-Regex `selfplay_v20wdlsw_|...` -- der inzwischen GESTARTETE
+Sockel schreibt `selfplay_v20wdl_*` und fiel NICHT darunter
+(Unterstrich-Grenze), Fenster wuchs auf 1926 Dateien, Cache-Miss.
+Sofort gestoppt, Regex auf `selfplay_v20wdl|selfplay_v19wdlann_`
+verallgemeinert (deckt Sockel UND Schwarm), neu gestartet.
+**Regel-Verscharfung: Exclude-Regex bei JEDEM Start neu aus dem
+IST-Bestand ableiten -- generierende Tags aendern sich waehrend der
+Kampagne (hier: Schwarm fertig, Sockel neu).**
