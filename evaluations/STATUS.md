@@ -43,6 +43,19 @@ geschlossen).
    ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
    Seed-Sigma darueber.
 
+### AUS EXTERNEM REVIEW 2026-08-08 (`EXTERNES_REVIEW_2026-08-08.md`)
+
+| Task | Kurz |
+|---|---|
+| **A: Floor-Shaping W=0 vs 0,3** | die nie gefahrene Kontrolle des WDL-Sweeps; der +14pp-Beleg ist Alt-Aera -> H0 wuerde eine Handheuristik ersatzlos streichen. 2x400 |
+| **D: POINTS_WEIGHT-Re-Sweep** | Gewicht steuert inzwischen DREI Aux-Koepfe (train.py:1174-1177), Alt-Sweep war tanh+R2-basiert. 3 Arme (0,25/0,5/1,0), Metrik Brier |
+| **B: Zerlegungs-Diagnose** | zweistufige (Slot,Rotation)-Wahl vs flache Enumeration auf Frozen-Zustaenden; billig, KEINE Arena. Praemisse "PUCT verzerrt" trifft nicht (Gumbel), Kern aber ungemessen |
+| **C: c_visit-Sweep** | `GUMBEL_C_VISIT=50` ist der letzte unverifizierte Gumbel-Parameter (eigenes Inventar). 3 Arme 25/50/100 |
+
+Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
+zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
+Policy erst nach Task B; tau-Wiederaufnahme ohne neuen Mechanismus nein.
+
 ### NACH-v21-QUEUE (Nutzer-Go 2026-08-08)
 
 1. **E3b** (Denial-Tie-Break mit Besuchs-Gate + Zwei-Anteils-SE statt
