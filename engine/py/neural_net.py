@@ -1070,7 +1070,12 @@ class MosaicDataset(Dataset):
         # Fehlt die Datei -> None = Bestandsverhalten (alle Dateien tragen
         # Policy). Inhalt geht in den Cache-Key ein (anderer Traeger-Satz =
         # anderer Cache).
-        manifest_path = os.path.join(data_dir, "policy_carrier_manifest_v20.json")
+        # MOSAIC_CARRIER_MANIFEST (2026-08-08, v21-Uebergabe): Dateiname des
+        # Traeger-Manifests, Default = v20-Bestand. Inhalt steckt via
+        # policy_carrier_set ohnehin im Cache-Key.
+        manifest_path = os.path.join(
+            data_dir,
+            os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
         policy_carrier_set = None
         if os.path.exists(manifest_path):
             with open(manifest_path, encoding="utf-8") as mf:

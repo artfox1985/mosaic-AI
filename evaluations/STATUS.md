@@ -24,6 +24,8 @@ geschlossen).
 | **#29-Instrument** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
+**UEBERGABE-DOKUMENT (2026-08-08): `evaluations/UEBERGABE_v21_spirale.md`** -- vollstaendige Kommandos + Regeln fuer die v21-Spirale, geschrieben fuer den naechsten Koordinator; dort zuerst lesen.
+
 ## NAECHSTE SCHRITTE (Reihenfolge-Regel: Modell-Verdikte VOR Korpus-Generierung)
 
 1. **Heute Nacht (automatisch)**: `pi_endgame_s2` fertig -> Verdikt
