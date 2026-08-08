@@ -84,6 +84,31 @@ bit-identischer Validierung gegen den ungepackten Pfad
 Validierung, wird stattdessen das Fenster beschnitten (zuerst der
 5.000er-v18-Block) -- Nutzer-Entscheid dann neu.
 
+## Gating-Verlaengerungsregel (VORAB festgelegt 2026-08-08)
+
+Die Gating-Margen schrumpfen ueber die Generationen (v18->v19: 64%,
+v19_2d->v19: 64%, v20->v19: 56,2%). Unser SPRT prueft H0=50% gegen
+H1=65% -- ein real ~53%-Kandidat wird davon konstruktionsgemaess
+abgelehnt (Power-Mangel, nicht Fehlen von Fortschritt). Damit das nicht
+erst beim Anblick eines knappen Ergebnisses diskutiert wird, gilt
+vorab:
+
+1. Standard-Gating bis 200 Paare (Fruehstopp-Regel unveraendert:
+   kein Entscheid <150 Paare ohne Frisch-Seed-Replikation).
+2. Endet es **UNDECIDED_CAP_REACHED mit POSITIVER Punktschaetzung**
+   (gepaarte Differenz > 0), wird auf **demselben Basis-Seed** auf
+   400 Paare verlaengert -- Praezedenzfall v17-Zyklus (dort:
+   UNDECIDED bei 200 Paaren/p=0,053 -> Verlaengerung -> SPRT-H1 nach
+   375 Paaren, Bloecke 1-8 reproduzierten exakt). Die SPRT-Schranken
+   bleiben unveraendert; die Verlaengerung erhoeht nur die Power.
+3. Endet es UNDECIDED mit negativer oder Null-Punktschaetzung, oder
+   erreicht es die H0-Schranke: KEINE Verlaengerung, H0 gilt
+   (kein Nachschub-Ventil, keine dritte Runde).
+4. Kein Absenken von H1 nach dem Sehen von Daten. Wollen wir kuenftig
+   generell kleinere Gewinne aufloesen, ist das eine eigene
+   Vorab-Entscheidung fuer die NAECHSTE Generation (H1=0,58 braeuchte
+   grob 3,5x mehr Paare, ~600-700, also ~3-4h Arena).
+
 ## Training/Gating
 
 Champion-Rezept (warm, lr 5e-5 cosine, wdl, brierbest-Politik,
