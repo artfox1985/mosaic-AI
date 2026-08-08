@@ -91,3 +91,15 @@ v20: Cache -> Training -> Gating -> Diagnostik/Watchlist ->
 **[Knoepfe bauen] -> Messung 1 -> Messung 2** -> (Nutzer-Go) Messung 3.
 Parallel dazu unveraendert: frozen-Set-Neubau, #29-Instrument,
 Aggressions-Neukartierung, #37.
+
+## MESSUNG-3-ERGEBNIS (2026-08-08): H0 -- tau=1 bleibt
+
+Arm B (t3ann_s2, 2.000 Sockel-Partien seed-bestimmt gegen v19wdlann
+getauscht, sonst identisches Fenster/Rezept/Seed) vs Champion:
+112:118 nach 115 Paaren, SPRT-H0, p=0,78. Deskriptiv: Alt-Messset-Brier
+0,18201 (E15) im Serienband, kein Ausreisser. **Uebernahme-Regel greift
+nicht -> DURCHGEHEND tau=1/Sampling bleibt Standard; der v21-Sockel
+wird OHNE --tau-argmax-from-move generiert.** Der Knopf bleibt als
+inertes Werkzeug. Damit sind Messung 1-3 KOMPLETT: dreimal Status quo
+bestaetigt (Floor-W 0,3; m-Formel; tau=1) -- der Suchpfad ist in der
+WDL-Aera vollstaendig re-validiert.
