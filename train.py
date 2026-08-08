@@ -613,31 +613,39 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
-    # λ-Misch-Value-Target-Experiment: mischt self.values IN-PLACE, direkt
-    # nach dem Laden, VOR dem DataLoader-Wrap (siehe
-    # MosaicDataset.apply_value_target_lambda-Docstring). Wird auch bei
-    # value_target_lambda=1.0 aufgerufen -- die Methode ruehrt `values` dann
-    # NICHT an (frueher Return), liefert aber den Praesenz-Anteil fuers Log
-    # (PREREG_lambda_target.md verlangt den Misch-Anteil dokumentiert, auch
-    # als Baseline-Referenz).
-    train_root_q_frac = dataset.apply_value_target_lambda(value_target_lambda)
+    # λ-Misch-Value-Target-Experiment: mischt das TATSAECHLICH trainierte
+    # Zielfeld IN-PLACE, direkt nach dem Laden, VOR dem DataLoader-Wrap
+    # (siehe MosaicDataset.apply_value_target_lambda-Docstring). KORREKTHEITS-
+    # FIX (Koordinator-Befund 2026-08-08): frueher wurde immer `self.values`
+    # (tanh-Ziel) gemischt, auch wenn `--value-head wdl` gegen `self.values_wdl`
+    # trainiert -- der Mix lief in dem Fall komplett ins Leere. `wdl=` waehlt
+    # jetzt das zum aktiven Kopf passende Feld; das gemischte Feld heisst im
+    # Log ausdruecklich beim Namen, damit ein solcher Irrtum kuenftig sofort
+    # auffaellt. Wird auch bei value_target_lambda=1.0 aufgerufen -- die
+    # Methode ruehrt das Zielfeld dann NICHT an (frueher Return), liefert
+    # aber den Praesenz-Anteil fuers Log (PREREG_lambda_target.md verlangt
+    # den Misch-Anteil dokumentiert, auch als Baseline-Referenz).
+    _lambda_mix_wdl = (value_head == "wdl")
+    _lambda_mix_field = "values_wdl" if _lambda_mix_wdl else "values"
+    train_root_q_frac = dataset.apply_value_target_lambda(value_target_lambda, wdl=_lambda_mix_wdl)
     if value_target_lambda < 1.0:
         print(f"🧪 λ-Misch-Value-Target (Willemsen et al. 2021, soft-Z): λ={value_target_lambda} "
-              f"-- {train_root_q_frac*100:.1f}% der Trainings-Samples haben root_q (gemischt), "
-              f"Rest bleibt beim bisherigen Ziel.")
+              f"auf Zielfeld '{_lambda_mix_field}' -- {train_root_q_frac*100:.1f}% der "
+              f"Trainings-Samples haben root_q (gemischt), Rest bleibt beim bisherigen Ziel.")
     else:
-        print(f"ℹ️  λ-Misch-Value-Target: λ=1.0 (kein Mix, Bestandsverhalten) -- "
-              f"{train_root_q_frac*100:.1f}% der Trainings-Samples HAETTEN root_q (informativ).")
+        print(f"ℹ️  λ-Misch-Value-Target: λ=1.0 (kein Mix, Bestandsverhalten, Zielfeld waere "
+              f"'{_lambda_mix_field}') -- {train_root_q_frac*100:.1f}% der Trainings-Samples "
+              f"HAETTEN root_q (informativ).")
 
     val_dataset = None
     if val_files:
         val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant,
                                     encoder=encoder)
-        val_root_q_frac = val_dataset.apply_value_target_lambda(value_target_lambda)
+        val_root_q_frac = val_dataset.apply_value_target_lambda(value_target_lambda, wdl=_lambda_mix_wdl)
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
         if value_target_lambda < 1.0:
-            print(f"   Val-root_q-Anteil (gemischt): {val_root_q_frac*100:.1f}%")
+            print(f"   Val-root_q-Anteil (gemischt auf '{_lambda_mix_field}'): {val_root_q_frac*100:.1f}%")
 
     # drop_last=True: ohne das kann die letzte Batch einer Epoche zufällig auf
     # Größe 1 fallen (Datensatzgröße mod BATCH_SIZE == 1) — BatchNorm im Netz
@@ -2073,7 +2081,11 @@ if __name__ == "__main__":
                              "0<=λ<=1 (kein stiller Clamp). Siehe "
                              "neural_net.py::MosaicDataset.apply_value_target_lambda, "
                              "evaluations/PREREG_lambda_target.md. Aendert den HDF5-Cache-Key NICHT "
-                             "(root_q ist additiv im Cache, der Mix passiert erst hier).")
+                             "(root_q ist additiv im Cache, der Mix passiert erst hier). "
+                             "KORREKTHEITS-FIX 2026-08-08: bei --value-head wdl mischt dies "
+                             "stattdessen 'values_wdl' (Skala [0,1], root_q wird dafuer von [-1,1] "
+                             "zurueckgerechnet) -- vorher wirkte λ in dem Fall folgenlos auf "
+                             "'values', das der WDL-Kopf gar nicht sieht.")
     parser.add_argument("--opp-points-head", action="store_true",
                         help="Task #28 (PREREG_task28_aggression.md): additiven opp_points_head "
                              "aktivieren (reine GEGNER-Punkteprognose, gleiche Architektur wie der "

@@ -1877,28 +1877,51 @@ class MosaicDataset(Dataset):
 
     def __len__(self): return len(self.states)
 
-    def apply_value_target_lambda(self, lam: float) -> float:
+    def apply_value_target_lambda(self, lam: float, wdl: bool = False) -> float:
         """λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z"):
-        mischt das HAUPT-Value-Target `self.values` (Shape [N,1]) IN-PLACE mit
-        dem rohen Root-Suchwert `self.root_q` ueberall dort, wo
-        `self.root_q_mask` 1 ist -- `target = lam*values + (1-lam)*root_q`.
+        mischt ein Value-Target IN-PLACE mit dem rohen Root-Suchwert
+        `self.root_q` ueberall dort, wo `self.root_q_mask` 1 ist --
+        `target = lam*target + (1-lam)*root_q(-Skala je nach Zweig)`.
         Samples ohne root_q (Maske 0, z.B. Ein-Aktion-Zuege oder Dateien ohne
-        das Feld) bleiben unveraendert bei `values` (identisch zu lam=1.0),
-        unabhaengig von `lam`.
+        das Feld) bleiben unveraendert (identisch zu lam=1.0), unabhaengig
+        von `lam`.
 
-        `lam=1.0` (Standard/Bestandsverhalten) laesst `self.values` KOMPLETT
-        UNVERAENDERT (frueher Return, keine Tensor-Operation auf `values`) --
-        train.py ruft diese Methode auch bei lam=1.0 auf (fuer den
-        Misch-Anteil-Log), das Trainingsergebnis bleibt dadurch byte-identisch
-        zum Verhalten vor diesem Feature.
+        KORREKTHEITS-FIX (Koordinator-Befund 2026-08-08): frueher mischte
+        diese Methode IMMER `self.values` (tanh-Ziel), auch wenn train.py
+        mit `--value-head wdl` gegen `self.values_wdl` trainierte -- die
+        Mischung lief damit fuer WDL-Laeufe komplett ins Leere (Metriken
+        eines λ<1.0-Laufs waren bit-nah identisch zu λ=1.0). `wdl` waehlt
+        jetzt explizit das tatsaechlich trainierte Zielfeld:
+
+        - `wdl=False` (Default/Bestandsverhalten): mischt `self.values`
+          (tanh-Ziel, Skala [-1,1]) -- fuer diesen Zweig ist nichts anders
+          als vorher, `lam=1.0` laesst `self.values` weiterhin KOMPLETT
+          UNVERAENDERT (frueher Return-Pfad, keine Tensor-Operation).
+        - `wdl=True`: mischt stattdessen `self.values_wdl` (WDL-Ziel, Skala
+          [0,1]). SKALEN-DETAIL: `self.root_q` liegt im Cache remapped auf
+          [-1,1] (Cache-Bau: `root_q_l.append(float(rq) * 2.0 - 1.0)`),
+          `values_wdl` dagegen auf [0,1] (Gewinnwahrscheinlichkeit). Vor der
+          Mischung wird root_q daher zurueckgerechnet: `p_root = (root_q+1)/2`
+          -- sonst liefe ein [-1,1]-Rohwert direkt in ein [0,1]-Ziel und das
+          Ergebnis koennte aus [0,1] herauslaufen (z.B. root_q=-1 wuerde ohne
+          Remap ein Ziel von -1 statt 0 mischen). `self.values` bleibt im
+          `wdl=True`-Zweig unangetastet, `self.values_wdl` bleibt im
+          `wdl=False`-Zweig unangetastet -- jeder Aufruf ruehrt GENAU eines
+          der beiden Zielfelder an.
+
+        λ wirkt hier bewusst VOR/unabhaengig von `--wdl-hard-only`
+        (trainiert stattdessen auf dem rohen `wdl_outcome`, siehe train.py)
+        und `_destretch_wdl_target` (entstaucht `targets_v_wdl` erst im
+        Trainings-Loop) -- diese Methode mischt nur das Cache-Feld, das
+        `--wdl-hard-only`/destretch als Eingabe sehen.
 
         Aufrufer (train.py) ruft dies EINMALIG je Dataset (Train- UND
         Val-Split) direkt NACH dem Laden auf, VOR dem `DataLoader`-Wrap --
-        jeder Batch liest danach automatisch aus dem gemischten `self.values`,
+        jeder Batch liest danach automatisch aus dem gemischten Zielfeld,
         keine Aenderung an `__getitem__`/der Tupel-Form noetig.
 
         Rueckgabe: Anteil der Samples mit `root_q_mask==1` (Praesenz-Anteil,
-        NICHT abhaengig von `lam`) -- fuer das train.py-Logging (PREREG
+        NICHT abhaengig von `lam`/`wdl`) -- fuer das train.py-Logging (PREREG
         verlangt den Misch-Anteil dokumentiert, auch bei lam=1.0 informativ)."""
         if not (0.0 <= lam <= 1.0):
             raise ValueError(
@@ -1910,10 +1933,22 @@ class MosaicDataset(Dataset):
             return 0.0
         frac = float(self.root_q_mask.mean().item())
         if lam < 1.0:
-            mask_col = self.root_q_mask.unsqueeze(1).bool()  # [N] -> [N,1], matcht self.values
+            mask_col = self.root_q_mask.unsqueeze(1).bool()  # [N] -> [N,1], matcht self.values/values_wdl
             root_q_col = self.root_q.unsqueeze(1)
-            mixed = lam * self.values + (1.0 - lam) * root_q_col
-            self.values = torch.where(mask_col, mixed, self.values)
+            if wdl:
+                # Skalen-Fix: root_q ([-1,1]) zurueck auf [0,1] wie values_wdl.
+                p_root_col = (root_q_col + 1.0) / 2.0
+                mixed = lam * self.values_wdl + (1.0 - lam) * p_root_col
+                # Defensiv geclampt: lam in [0,1] und p_root_col in [0,1] (da
+                # root_q in [-1,1]) garantieren eine Konvexkombination in
+                # [0,1] nur MATHEMATISCH exakt -- Float-Rundung koennte
+                # hauchduenn drueber/drunter landen; klare Grenze statt
+                # stillem Downstream-Effekt auf die BCE-Loss (Log(0) o.ae.).
+                mixed = mixed.clamp(0.0, 1.0)
+                self.values_wdl = torch.where(mask_col, mixed, self.values_wdl)
+            else:
+                mixed = lam * self.values + (1.0 - lam) * root_q_col
+                self.values = torch.where(mask_col, mixed, self.values)
         return frac
 
     def _open_planes_h5(self):
