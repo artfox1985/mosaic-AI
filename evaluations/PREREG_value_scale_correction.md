@@ -85,3 +85,15 @@ ein von der Korrektur UNBEEINFLUSSTER Massstab.
 3. Ein Nullergebnis widerlegt die Skalen-These nicht generell -- es
    widerlegt sie fuer diese Korrekturgroesse (B~1,93) in diesem
    Sim-Regime (400).
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN (Nullbefund nach Replikation)**
+-- Erstlauf (2026-08-04): ON 74,0% vs OFF 68,0% Netz-Siege gegen die
+Heuristik, +6pp, McNemar p=0,20 -- nach Vorab-Regel kein Staerkebeleg.
+Bestaetigungslauf mit frischen Seeds (2026-08-05): OFF sprang auf 76,0%,
+ON 77,0%, McNemar p=0,90 -- der Effekt repliziert NICHT. Endverdikt: kein
+Effekt; der Laufzeit-Knopf (`MOSAIC_VALUE_CAL_A/B`) bleibt als inerter
+Default (0/1) im Code. Belegstelle: archive/history.md, "Task #30
+ERGEBNIS: Skalen-Korrektur +6pp, knapp nicht signifikant" (Zeile
+~7461-7489) und "Task #30 ABGESCHLOSSEN: Skalen-Korrektur repliziert
+NICHT" (Zeile ~9431-9457).

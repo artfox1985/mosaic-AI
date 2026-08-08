@@ -105,3 +105,16 @@ dass das neue Netz SCHLECHTER ist) -> STOPP. H0/Unentschieden/H1-fuer-opp
 4. Hauptmessung (4 x 150 Partien), Auswertung nach den Regeln oben,
    elo_tracker-Protokoll der Matches.
 5. Bericht; Checkpoint-Aufraeumen erst nach Ergebnis-Diskussion.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- beide Gates bestanden
+(Opp-Kopf-R² 0,44/0,51; Nichtunterlegenheit 209:191). Die Hauptmessung
+(4 Arme λ_aggr in {0; 0,5; 1; 2}, je 75 Paare) erreichte in KEINEM Arm
+p<0,05 (bester Arm la20: Gegnerpunkte -6,16, p=0,078); die Guardrail riss
+nie. Formales Verdikt: kein nutzbarer Denial-Effekt bei w=0,1 in dieser
+Generation; der Regler bleibt als gefahrloser, aber unbelegter Stil-Knopf
+(spaeter weiter nachgemessen in `PREREG_task28_power_extension.md`, dort
+UEBERHOLT durch einen Block-Korrelations-Befund). Belegstelle:
+archive/history.md, Abschnitt "Task #28 DURCHGEFUEHRT: Gates bestanden,
+lambda_aggr-Sweep ohne signifikanten Denial-Effekt (2026-08-03)", Zeile
+~7140-7183.

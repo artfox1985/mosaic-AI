@@ -301,3 +301,16 @@ Engine-Code, reine Prozess-/Dateibenennungsregel:
    v20 (Fenster-Politik oben).
 8. Bericht an den Koordinator -- kein Gating, kein Wheel-Install, keine
    Arena durch den Ausfuehrenden dieser Vorregistrierung.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN (negativ)** -- 12 Laeufe, beide
+Orakel-Metriken 0/6 fuer `pcr` (schlechter): `prior_mass` -0,0262
+(p=0,0008), `kendall_tau` -0,0211 (p=0,0020) -> nach Abbruchregel kein
+Gating, v20-Self-Play blieb klassisch. Bestaetigt durch Doku-Arena:
+`pcrpcr` 67:83 gegen `pcrkontrolle`, SPRT-H0, McNemar p=0,26. Am
+2026-08-06 wurde Task #14 formal WIEDER eroeffnet, aber als NEUES
+Experiment (neues Value-Ziel nach #34, neu gemessener
+Tiling-Cache-Durchsatz 1,371x) -- keine Neulesung dieser Zahlen.
+Belegstelle: archive/history.md, Abschnitt "PCR-A/B ABGESCHLOSSEN: Task
+#14 wird NICHT produktiv eingesetzt", Zeile ~7008-7063; Wiedereroeffnung
+Zeile ~10041-10094; evaluations/train_pcr_dose_result.json.

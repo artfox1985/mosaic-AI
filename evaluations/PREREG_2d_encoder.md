@@ -169,3 +169,16 @@ dann hohe Priorität.
 4. Bericht an den Koordinator (Stopp-Punkt M4, siehe Auftrag) — kein Gating,
    kein Wheel-Install, keine Arena durch den Ausführenden dieser
    Vorregistrierung.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Beide Orakel-Metriken 6/6
+signifikant fuer `fs_2d` (`prior_mass_on_oracle_top3` +0,0100, p=0,0019;
+`kendall_tau` +0,0149, p=0,0046). Das anschliessende Arena-Gating
+(`fs_2d_s2_best` vs `fs_flat_s3_best`, 400 Partien) ergab jedoch 416:384,
+McNemar p=0,30 -- kein nachweisbarer Staerkeunterschied (Wash). Konsequenz:
+`fs_2d_s2_best` wurde als `alphazero_v18_2d` designiert (2D-Warm-Start-
+Anker fuer v19); Orakel-Metriken gelten seither nur 0/1 als
+ARCHITEKTUR-Staerke-Praediktor (bleiben 7/7 fuer Generationenvergleiche).
+Belegstelle: archive/history.md, Zeile ~6660-6741 ("PREREG-Ergebnis" /
+"Arena-Gating" / "ENTSCHEIDUNGEN (Nutzer)");
+evaluations/train_2d_vs_flat_fs_result.json.

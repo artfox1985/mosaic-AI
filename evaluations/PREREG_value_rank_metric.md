@@ -241,3 +241,17 @@ Entscheidungsmetrik, nur Rauchtest):
 4. Bei bestandener Validierung: Schritt 3 aus der STATUS.md-Planskizze
    (Ranking-orientierte Trainingsziele, Paarvergleichs-/Margin-Loss) ist
    ausdruecklich ein SEPARATES, spaeteres Vorhaben mit eigener PREREG.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Die volle Validierung (6
+entschiedene Paare) ergab NICHT VALIDIERT: nur 2/6 Richtungen korrekt
+(p=0,69), Zufallsniveau, sogar schlechter als das globale
+`value_r2_rounds_1_4` (3/6). Die Ordnungs-These auf der Value-Seite ist in
+dieser Operationalisierung widerlegt. Achtung Verwechslungsgefahr: dies ist
+NICHT dieselbe Frage wie `PREREG_t35b_ranking.md` (dort: Ranking-LOSS als
+Trainingsziel, separat "GESCHLOSSEN"). Das aktuelle `evaluations/STATUS.md`
+fuehrt "#29-Instrument" als OFFEN -- das betrifft eine NEUE Wiederaufnahme
+unter der WDL-Aera (neue frozen_v2-Labels), nicht diese bereits
+beantwortete Frage. Belegstelle: archive/history.md, Abschnitt "Task #29
+ERGEBNIS: Value-Rangmetrik NICHT VALIDIERT (2026-08-04)", Zeile
+~7532-7567; evaluations/value_rank_metric_validation.json.

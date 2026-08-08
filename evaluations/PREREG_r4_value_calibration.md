@@ -287,3 +287,21 @@ liefert genau dafür die Priorisierung).
    (N=24, K=16+1, alle 3 Modelle) → `evaluations/r4_value_calibration_result.json`.
 6. Bericht mit den vorregistrierten Kennzahlen; danach Entscheidung über
    die R3/R2-Folge-Vorregistrierung.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- der volle Lauf (N=24, K=16,
+3 Modelle) fand statt und erzeugte `evaluations/r4_value_calibration_result.json`.
+Formales Ergebnis nach eigener Regel: "kein Befund" (Modell-R² aller drei
+Netze negativ, -0,15 bis -0,21). Der eingebaute Vorzeichen-Anker-Check
+deckte zusaetzlich einen METHODEN-ALARM auf: nur 9/24 korrekt (statt
+hoher Trefferquote) -- `NODE_BUDGET=200` bindet am Rundenstart praktisch
+immer, `ab_value` ist dort nur eine flache Naeherung statt exakt (erklaert
+rueckwirkend auch die schwache R5-Kennlinie, McFadden 0,316). Konsequenz:
+eine methodisch schaerfere Nachfolge-Messung ("R4b", Playout-Ground-Truth,
+N=72) wurde initiiert. Belegstelle: Git-Commit `cb4773d` ("R4-Kalibrierung
++ Noise-Floor-R4: METHODEN-ALARM durch eigenen Anker-Check", 2026-08-03) --
+in archive/history.md selbst gibt es dazu KEINEN Prosa-Absatz, nur
+Vorbereitung (Zeile ~6941-6958); die Commit-Message ist die einzige
+textuelle Verdikt-Quelle. Nicht zu verwechseln mit dem spaeteren, separaten
+"R4b"-Task (`evaluations/r4b_value_calibration_wdl.json`, N=72, andere
+Methodik, eigene Vorregistrierung/eigenes Werkzeug).

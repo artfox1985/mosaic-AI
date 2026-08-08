@@ -294,3 +294,15 @@ Trajektorienqualitäts-Frage (B2) offen bleibt.
    `evaluations/train_corpus_dose_result.json`.
 6. Bericht an den Koordinator — Interpretationsregel oben automatisch
    angewendet (rein deskriptiv, der Mensch entscheidet trotzdem).
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- Beide Orakel-Metriken 6/6
+gepaart fuer `voll`: `prior_mass_on_oracle_top3` +0,0221 (p=0,0013),
+`kendall_tau` +0,0189 (p=0,0067) -- rund 2x der 2D-Encoder-Effektgroesse.
+Zusaetzlich in der echten Arena bestaetigt: `voll_s3_best` 479:321 gegen
+`halb_s3_best`, McNemar p<0,0001. Konsequenz: Task #14
+(Playout-Cap-Randomisierung) stieg deutlich in der Prioritaet (dort dann
+negativ ausgegangen, siehe `PREREG_pcr.md`). Belegstelle:
+archive/history.md, Abschnitt "Korpus-Dosis-Messung (2026-08-01)" /
+"ERGEBNIS" / "Nachtrag Dosis-Arena", Zeile ~6746-6821;
+evaluations/train_corpus_dose_result.json.

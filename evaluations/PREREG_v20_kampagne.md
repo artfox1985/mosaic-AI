@@ -91,3 +91,14 @@ Nach-v20-Kandidatenliste.
 m=9 (Formel) 138/200 vs m=16 fest 144/200 @150 Netz-Sims, gepaarter
 McNemar p=0,54 -> H0, Formel bestaetigt; die Schwarm-Partien gelten
 als unbelastet.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- das Champion-Gating (Punkt
+1 der "Entscheid & Auswertung") wurde gewonnen: `v20_2d_opp_brierbest`
+208:162 gegen `v19_2d_best`, p=0,0178 -- erster Champion der WDL-Aera,
+seit 2026-08-07 amtierend. Die uebrigen Pflicht-Diagnostiken (Policy-
+Wacht, Saettigungs-Nachfit, R5-/R4b-Wiederholung) liefen als Teil des
+Kampagnen-Abschlusses mit. Belegstelle: archive/history.md, Zeile ~9847
+("CHAMPION-GATING GEWONNEN") und Zeile ~10250 ("OFFENE ENTSCHEIDUNGEN &
+GELTENDE REGELN" -- Champion-Eintrag); evaluations/STATUS.md, Abschnitt
+"GELTENDE REGELN" ("Champion: v20_2d_opp_brierbest").

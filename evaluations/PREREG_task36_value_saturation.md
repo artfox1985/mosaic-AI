@@ -87,3 +87,15 @@ Kurven-FORM unerheblich. (d) Namen `t36_g<pool>_s<seed>`.
 parallelisierbar mit laufenden Arena-Messungen (GPU vs CPU getrennt).
 Start: nach dem #34-Verdikt (Zielkonfiguration bestaetigt), Caches
 duerfen frueher gebaut werden (zielunabhaengig).
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- die Brier-Auswertung ueber
+die 202/405/810-Dateien-Pools zeigt monotone Verbesserung in allen 3
+Seeds (0,19934 -> 0,19813 -> 0,19695, log-linear, ~0,0012 Brier je
+Verdopplung), ausserhalb des Bootstrap-Konfidenzintervalls -> der
+Value-Kopf ist "spielhungrig" gemaess der vorregistrierten Leseregel
+(saettigt NICHT). Die Policy-Gegenkurve bleibt dagegen flach
+(daten-gesaettigt). Konsequenz: das v20-Spielbudget wurde NICHT gekuerzt;
+PCR-Bedingung (ii) damit erfuellt. Belegstelle: archive/history.md,
+Abschnitt "Task #36 ERGEBNIS (2026-08-06): Value-Kopf saettigt NICHT --
+Spielzahl ist ein echter Hebel", Zeile ~9965-9998.

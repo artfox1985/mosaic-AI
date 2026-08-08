@@ -50,3 +50,14 @@ Ergebnis fliesst ins #34-VERDIKT (Zielkonfiguration fuer v20:
 hard+smooth vs entstauchter Blend vs Bestands-Blend). Aggressions-Blend-
 Neukartierung ist davon getrennt und kommt erst im naechsten Korpus
 (Nutzer-Entscheid 2026-08-05 nach Audit-F1).
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- beide Hypothesen bestaetigt:
+Label-Smoothing (Arm A) daempft die Erosion um ~60% (wdlsmooth +0,018 vs
+wdlhard +0,047), aber der entstauchte Bootstrap-Blend (Arm B,
+`t34_wdldestretch`) schlaegt beide -- bester Peak (Brier 0,1971), mildeste
+Erosion (+0,005), hoechstes Val-R² (0,346). Ergebnis floss direkt ins
+finale #34-VERDIKT: v20-Zielkonfiguration = WDL + entstauchter
+Bootstrap-Blend. Belegstelle: archive/history.md, Abschnitt "Erosions-Arme
+(PREREG_task34_erosion_arms.md) -- ERGEBNIS 2026-08-05", Zeile
+~9185-9200; "#34-VERDIKT (FINAL 2026-08-05)", Zeile ~9221-9229.

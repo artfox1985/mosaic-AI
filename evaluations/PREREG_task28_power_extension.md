@@ -65,3 +65,15 @@ die "letzter Arm VOR dem Kipppunkt"-Regel damit unvollstaendig.
   lambda=2 nahe am Optimum; reisst er selbst bei 5 nicht, ist der
   Kipppunkt jenseits des Klemm-Maximums (eigener, dokumentierter Befund:
   die Win-Rate ist im gesamten einstellbaren Bereich robust).
+
+---
+**STATUS (Stand 2026-08-08): UEBERHOLT** -- die frische Konfirmations-
+Stichprobe widersprach zunaechst dem Erst-Sweep (Gegenrichtung, ~5 SE).
+Forensik entlarvte die Ursache als BLOCK-KORRELATION (Paare innerhalb
+eines Arena-Blocks sind korreliert, keine Wheel-Regression): auf
+Block-Ebene sind beide "Effekte" Artefakte. Finales Fazit: kein belegter
+Denial-Effekt in irgendeine Richtung; die Kipppunkt-Kartierung wurde als
+gegenstandslos gestrichen, weil ihre Praemisse (ein realer Effekt)
+entfiel. Belegstelle: archive/history.md, Abschnitt "AUFLOESUNG des
+Stichproben-Widerspruchs: BLOCK-KORRELATION, nicht Wheel (2026-08-04)",
+Zeile ~7278-7313 (insb. "Kipppunkt-Kartierung gestrichen").

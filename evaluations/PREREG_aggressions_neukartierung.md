@@ -55,3 +55,13 @@ Basis-Seed 20260809. Kosten ~40 min.
 Nach Abschluss (egal welches Ergebnis) ist die Nutzer-Wartebedingung
 erfuellt: bewertete Partien gegen den Champion koennen starten --
 Preset gemaess Regel 1-3.
+
+---
+**STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- alle 3 Arme H0 gegen die
+Kontrolle (0,0: 149/200 vs Heuristik): (0.1,1.0) 154/200, p=0,59;
+(0.1,2.0) 161/200, p=0,169; (0.2,2.0) 155/200, p=0,54. Kein signifikanter
+Staerkegewinn -> w bleibt ueberall 0, der Punkt gilt als geschlossen bis
+zur naechsten Kopf-Generation; die (0,1;2,0)-Richtung ist deskriptiv
+(+6pp) fuer kuenftige Kopf-Generationen vermerkt, keine
+Style-Interpretation. Belegstelle: evaluations/paired_arena_env_aggr_neukartierung.json
+(Felder `arm_wins`, `comparisons`); Commit b5123df.
