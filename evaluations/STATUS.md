@@ -43,6 +43,14 @@ geschlossen).
    ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
    Seed-Sigma darueber.
 
+### OFFENES GATING (v20-Aera, hat Vorrang)
+
+**λ-Arm `lam07_wdl2_s2`**: trainiert, gueltig (Zielfeld `values_wdl`
+verifiziert), **Gating steht aus** -- Slot = v21-Trainingsfenster (GPU
+belegt, CPU frei). Kommando + Regeln: UEBERGABE §5a,
+`PREREG_lambda_wdl_arm.md`. Offline: Brier-Paritaet, aber Platt-B
+0,9966 (Champion 0,930).
+
 ### AUS EXTERNEM REVIEW 2026-08-08 (`EXTERNES_REVIEW_2026-08-08.md`)
 
 | Task | Kurz |

@@ -162,6 +162,26 @@ CPU-Arena. Knoepfe werden vorab gebaut (Default aus, Paritaets-Hash).
    Basis-Seed 20260820. Rechen-neutral (Sims-Split ueber die Welten).
    Default-Wechsel NUR mit Signifikanz + Frisch-Seed-Replikation.
 
+## 5a. OFFENES GATING AUS DER v20-AERA (zuerst, nicht vergessen!)
+
+**λ-Arm `lam07_wdl2_s2` ist trainiert und GUELTIG, sein Gating fehlt
+noch.** Er haengt NICHT an v21 (trainiert auf dem v20-Fenster, 1890
+Dateien) -- idealer Slot ist das **v21-TRAININGSFENSTER**: dort ist die
+GPU belegt und die CPU frei, also kollidiert er weder mit dem
+Sockel-Self-Play noch mit der Nach-v21-Arena-Queue.
+
+```bash
+python -u tools/paired_gating.py --model-a models/alphazero_lam07_wdl2_s2_brierbest.onnx     --model-b models/alphazero_v20_2d_opp_brierbest.onnx --sims 400     --block-size 5 --max-pairs 200 --no-promote-winner     --out evaluations/paired_gating_lam07wdl2_vs_champion.json
+```
+Entscheidungsregeln: `PREREG_lambda_wdl_arm.md` (Standard-SPRT,
+Fruehstopp-Regel; H1 -> λ=0,7 wird Rezept-Kandidat neben
+`--endgame-head`, Promotion nach Nutzer-Entscheid; H0 -> λ in der
+WDL-Aera GESCHLOSSEN). Offline-Stand (deskriptiv, KEINE Entscheidung):
+Brier 0,1957 vs 0,1950 (Champion) = Paritaet, Alt-Set 0,18937 vs
+0,18749, **Platt-B 0,9966 vs 0,930 = fast perfekt kalibriert** (der
+einzige echte Unterschied). Val-R² 0,441 vs 0,374 ist ARTEFAKT (gegen
+das λ-gemischte, glattere Ziel gemessen) und zaehlt nicht.
+
 ## 5c. NACH-v21-QUEUE, VOLLSTAENDIG (Reihenfolge + Bahnen)
 
 Vorregistrierung aller vier Review-Tasks: `EXTERNES_REVIEW_2026-08-08.md`
