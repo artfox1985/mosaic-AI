@@ -17,75 +17,118 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Reference/champion net: **`v16_best`**, Elo **≈1094** (95% CI [1033, 1164]),
+Champion: **`v20_2d_opp_brierbest`**, Elo **1349** (95% CI [1269, 1437]),
 anchored at Heuristic@150 (dyn. ~330 sims) = 1000 (`tools/elo_tracker.py
-report`). On 2026-07-24, a worktree incident wiped all model checkpoints up
-to and including the champion at the time (code and `data/`/`evaluations/`
-were unaffected); `v16_best` is the result of the rebuild line that has been
-running since (`v14` → `v14b` → `v15` → `v16`) and has already surpassed the
-old champion's Elo. Full history, measurements, and ongoing investigations:
-[`evaluations/STATUS.md`](evaluations/STATUS.md).
+report`). It is the first champion of the **WDL era**: since task #34 the
+value head predicts a win *probability* (two logits + softmax, cross-entropy)
+instead of a squashed point margin — the previous target was measurably
+under-calibrated (Platt slope B = 1.93; the current champion sits at 0.93,
+where 1.0 is perfect).
 
----
+The v21 cycle is in progress: a two-class replay window of 29,450 games is
+being generated (see *The Generation Cycle* below). Full history, all
+measurements and the standing methodology rules:
+[`evaluations/STATUS.md`](evaluations/STATUS.md); rendered process diagrams:
+[`evaluations/diagrams.txt`](evaluations/diagrams.txt) (`spielablauf`,
+`netz_suche`, `value_ziel`, `fenster_v21`, `selfplay_training` — render via
+`python evaluations/render_diagrams.py`).
 
 ## Engine Core in Brief
 
-- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m,
-  `GUMBEL_TOP_M=16`, + Sequential Halving at the root), deterministic in
-  arena/server, Gumbel exploration in self-play. The legacy PUCT path is
-  still available behind the `USE_GUMBEL_SEARCH` toggle.
-- **Value target**: `VALUE_SCHEMA_VERSION=15` (`engine/py/neural_net.py`) —
-  soft symmetric margin target, without `round_transition_value` (rtv) by
-  default. rtv is expensive (~81% of self-play cost) and showed no
-  measurable strength contribution in the ablation; toggle via
-  `self_play.py --rtv` (`record_rtv`, default OFF). `bootstrap_value`
-  (TD bootstrap, `TD_LAMBDA=0.5`) stays active in every case.
-- **Floor shaping** (`FLOOR_SHAPING_WEIGHT=0.3`): validated, exact leaf-value
-  additive against floor-penalty spirals (n=100, no early stop). Plate
-  shaping/value shrinkage, by contrast, were **disproved** in an A/B test and
-  remain disabled — details/numbers in `STATUS.md`.
-- **Round 5**: exact alpha-beta search (`engine/src/round5.rs`), no more
-  network decisions once no hidden information remains in the game.
-
----
+- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m
+  + Sequential Halving at the root), deterministic in arena/server, sampled
+  in self-play (τ = 1 throughout — annealing was measured and brought no
+  gain). Root width follows the budget: `m = clamp(round(sims/16), 4, 16)`,
+  i.e. 16 at 400/600 sims and 9 at 150 sims (measured strength-neutral).
+  The legacy PUCT path is still available behind `USE_GUMBEL_SEARCH`.
+- **Network** (`engine/py/neural_net.py`): 2D encoder (`Mosaic2DNet`) —
+  conv branch over 76 binary 6x6 planes + flat branch over 708 features,
+  fused into a 512-wide trunk. Heads: policy (406 actions), value
+  (WDL: two logits -> P(win)), moon order, own points, opponent points,
+  ownership, and optionally `endgame_margin` (the exact round-5 minimax
+  value as an auxiliary target). Aux heads are training signal only — the
+  search never reads them.
+- **Value target**: `VALUE_SCHEMA_VERSION=19` — `values_wdl` is a TD blend
+  (`TD_LAMBDA=0.5`) of the bootstrap win probability at the next round
+  transition and the actual game outcome. Bootstraps from pre-WDL
+  generators are Platt-destretched first (A=0.0051, B=1.9269) so that old
+  and new corpora carry the same semantics. The raw outcome is kept
+  separately (`wdl_outcome`) and yields the **Brier score**, the only
+  cross-arm comparable value metric — it also selects the checkpoint
+  (`_brierbest`, re-validated in the arena).
+- **Cache**: HDF5, planes and legal-move masks bit-packed (1 bit per field),
+  ~2.7 KB per state — a 4.8 M-state window fits in ~13 GB.
+- **Floor shaping** (`FLOOR_SHAPING_WEIGHT=0.3`, override
+  `MOSAIC_FLOOR_SHAPING_W`): exact leaf-value additive against
+  floor-penalty spirals; re-validated in the WDL era (0.15/0.6 sweep: H0).
+  Plate shaping and value shrinkage were disproved and stay off.
+- **Round 5**: exact alpha-beta search (`engine/src/round5.rs`) — no network
+  decisions once no hidden information remains. Its exact values also feed
+  training: the round-4 bootstrap uses `round5::exact_round5_outcome`, and
+  the optional `endgame_margin` head distils the round-5 root value.
+- **Runtime knobs**: every experimental lever is an `MOSAIC_*` environment
+  variable whose default reproduces the previous behaviour bit-for-bit
+  (verified by a hash probe before use). Currently all of them are inert
+  by measurement: aggression blend (w/λ), denial tie-break, floor-opponent
+  bias, root-width override, tiling criterion, τ annealing.
 
 ## The Generation Cycle (Training Pipeline)
 
-The heart of the project — this is how the next candidate generation is
-produced from the reigning champion:
+The heart of the project — how the next candidate generation is produced
+from the reigning champion. Every step has a written pre-registration in
+`evaluations/PREREG_*.md`: design **and** decision rule are fixed *before*
+the run, so a result cannot be reinterpreted afterwards.
 
-1. **Self-play batch** (generator = reigning champion):
+1. **Self-play in two classes** (generator = reigning champion). Policy
+   targets are expensive, value targets are cheap — so they are bought
+   separately:
    ```bash
-   python -u self_play.py --mode network --games 6000 --sims 400 \
-       --version <generator> --model <generator>_best --threads 11
+   # Base class: full search, carries the policy targets
+   python -u self_play.py --mode network --model models/alphazero_<champion>.onnx        --games 4000 --sims 600 --version <gen>wdl --threads 11
+   # Swarm class: cheap, value targets only (policy masked)
+   python -u self_play.py --mode network --model models/alphazero_<champion>.onnx        --games 8000 --sims 150 --version <gen>wdlsw --value-only --threads 11
    ```
-   ~7–8 h at ~0.22 games/s. Per-game flush (a crash costs at most 1 game),
-   heartbeat monitoring, JSON run manifest.
-2. **Replay window**: 6000 fresh games + 2000 from one generation back +
-   1000 from two generations back, assembled at the file level — the rest
-   moves to `data/archive_*/` (old corpora are never mixed back in).
-3. **Training**:
+   The swarm costs ~2.5x less per game; the value target (bootstrap +
+   outcome) is robust to the smaller search budget, whereas the policy
+   target is not — hence the split.
+2. **Replay window with generation rotation** (~29,000 games): the new base
+   class plus a seed-determined subset of older generations as additional
+   policy carriers (`data/policy_carrier_manifest_v21.json`, whose content
+   enters the cache key), plus all older swarm material as masked
+   value-only data. Each generation ages one step; the oldest rotates out.
+   Backup/legacy-rule corpora are never mixed back in.
+3. **Training** (warm start from the champion):
    ```bash
-   python -u train.py --name vN --load vN-1_best --lr 0.00005 \
-       --lr-schedule cosine --epochs 100 --value-target-variant nortv
+   MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v21.json    python -u train.py --name v21_2d --load <champion> --lr 5e-5        --lr-schedule cosine --encoder 2d --value-head wdl        --opp-points-head --endgame-head --value-target-variant nortv
    ```
-   From-scratch runs (no `--load`) use the default LR. After every training
-   run, a `train.py` hook automatically writes a model snapshot to the
-   OneDrive backup.
-4. **Diagnosis**: `tools/offline_diagnose.py --frozen` (the only
-   cross-generation comparable metric, fixed eval set) +
-   `tools/oracle_metrics.py` (supplementary signal against a deep-search
-   reference, **not** a substitute for an actual arena measurement).
-5. **Gating**: `tools/paired_gating.py` (paired seed blocks, swapped boards,
-   Bernoulli SPRT with `H1: p1=0.65`) — only an `ACCEPT_H1` promotes the
-   candidate to the new reference/generator.
-6. **Elo**: `tools/elo_tracker.py` (Bradley-Terry over the full match graph)
-   + anchor match for the new champion via `tools/arena.py`.
-7. **Trends**: every arena/gating run appends a row to
-   `evaluations/arena_trends.csv` (avg. points, floor penalties over time —
-   complements Elo/win rate with a quality signal beyond "stronger/weaker").
+   Early stopping requires a plateau on *both* sides (policy and value);
+   the shipped checkpoint is the best Brier, not the best combined loss.
+   `MOSAIC_DATA_EXCLUDE` pins the window while other generation runs are
+   still writing to `data/` (the cache key depends on the file list).
+4. **Offline diagnosis** — with an explicit resolution limit. On the policy
+   side, `tools/offline_diagnose.py --frozen` reports the two *arena-
+   validated* predictors (prior mass on the oracle top-3, Kendall tau vs.
+   oracle Q; correct direction in 7 of 7 decided pairs). On the value side
+   there is **no** validated offline predictor: gaps below ~0.015 predicted
+   the arena outcome in 0 of 4 cases, so the arena decides.
+5. **Gating**: `tools/paired_gating.py` — paired seed blocks, swapped
+   boards, Bernoulli SPRT (`H1: p1=0.65`), cap 200 pairs. An early stop
+   below ~150 pairs only counts after a fresh-seed replication (a false
+   positive taught us that). Only `ACCEPT_H1` promotes.
+6. **Promotion & bookkeeping**: `tools/set_champion.py` (server default for
+   human games), `tools/elo_tracker.py add` (Bradley-Terry over the whole
+   match graph, cadre names only — never file names).
+7. **Mandatory diagnostics on the winner**: Platt calibration
+   (`tools/platt_fit.py`), round-5 plate sensitivity
+   (`tools/r5_value_calibration.py`), Brier on a frozen legacy measurement
+   set (`tools/t36_curve_eval.py --snapshot-dir altmess_90files`), and a
+   structure watchlist against rated human games.
 
----
+A failed gating does **not** trigger more self-play games ("no top-up
+valve"): a candidate that only wins with additional data is not evidence
+for the change under test. Instead its measured components go into the
+recipe for the next generation — this is how the `endgame_margin` head
+entered the standard recipe despite a drawn arena result.
 
 ## Directory Convention
 
@@ -124,7 +167,7 @@ python tools/build_release.py
 
 This produces `dist/Mosaic-AI/` (onedir: exe + engine + web UI + the
 current reference net + `engine_manual.md`) and zips it to
-`dist/Mosaic-AI_v16_<date>.zip`. Prerequisite: the installed
+`dist/Mosaic-AI_<version>_<date>.zip`. Prerequisite: the installed
 `mosaic_rust` wheel must be current (the bundle packages the wheel from
 site-packages, not from source) — rebuild it first after any engine
 change.
