@@ -112,8 +112,15 @@ def _parse_cli():
     ap.add_argument("--model", default=None, help="Versionsname, z.B. v18_best")
     ap.add_argument("--out", default=None, help="Ziel-JSON")
     ap.add_argument("--sims", type=int, default=None)
+    ap.add_argument("--set", dest="set_pkl", default=None,
+                    help="Frozen-Set-Pfad (Default: frozen_eval_set.pkl/v1) -- "
+                         "fuer frozen_v2 usw. (2026-08-08)")
     a = ap.parse_args()
-    global MODEL_PATH, OUT_JSON, SIMS
+    global MODEL_PATH, OUT_JSON, SIMS, FROZEN_PKL
+    if a.set_pkl:
+        FROZEN_PKL = ROOT / a.set_pkl
+        if not FROZEN_PKL.exists():
+            raise SystemExit(f"Frozen-Set nicht gefunden: {FROZEN_PKL}")
     if a.model:
         MODEL_PATH = ROOT / "models" / f"alphazero_{a.model}.onnx"
         if not MODEL_PATH.exists():
