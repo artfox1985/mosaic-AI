@@ -193,7 +193,7 @@ Vorregistrierung aller vier Review-Tasks: `EXTERNES_REVIEW_2026-08-08.md`
 | 2 | **A** Floor-Shaping W=0 vs 0,3 | Arena 2x400 | ~1h |
 | 3 | **E3b Stufe 1** Feuerrate (Abbruch <5%) | CPU leicht | ~30min |
 | 4 | **ISMCTS-k** k=1/2/4 @600 Sims | Arena 3x400 | ~1,5h |
-| 5 | **C** c_visit 25/50/100 @600 Sims | Arena 3x400 | ~1,5h |
+| ~~5~~ | ~~C c_visit~~ ZURUECKGEZOGEN (Prereg ownership_gumbel B1 hat die sigma-Familie geschlossen) | -- | -- |
 | 6 | **E3b Stufe 2** (nur bei Feuerrate >=5%) | Arena 2x400 | ~1h |
 | 7 | **D** POINTS_WEIGHT 0,25/0,5/1,0 | GPU, parallel | ~10h |
 

@@ -89,9 +89,28 @@ hingegen daneben: unser tau-Test war ein KORPUS-Test (Label-Qualitaet,
 2.000 getauschte Sockel-Partien, H0), keine Suchparameter-Frage. Ohne
 neuen Mechanismus wird er nicht wieder aufgemacht.
 
-**-> TASK C: c_visit-Sweep** (Env-Knopf nach Standardmuster, 3 Arme
-25/50/100 a 400 Spiele bei 600 Sims). Default-Wechsel nur mit
-Signifikanz + Frisch-Seed-Replikation (Such-Default).
+**~~-> TASK C: c_visit-Sweep~~ ZURUECKGEZOGEN 2026-08-08 (Koordinator-
+Fehler, beim Prereg-Durchgang auf Nutzer-Auftrag gefunden).**
+`PREREG_ownership_gumbel.md` (2026-07-28) hat diese Frage BEREITS
+vorregistriert entschieden, Abschnitt B1: beide Konstanten gehen
+MULTIPLIKATIV in denselben sigma-Term ein
+(`sigma(q) = (c_visit + max_N) * c_scale * q`), an der Wurzel ist
+`c_visit: 50 -> 0` numerisch IDENTISCH zu `c_scale: 1,0 -> 0,65` --
+eine c_scale-Variation deckt die c_visit-Achse dort also ab. Die
+vorregistrierte **Regel** lautete: "c_visit bekommt nur dann einen
+eigenen Test, wenn sich c_scale als sensibel erweist. Erweist sich
+c_scale als folgenlos, ist die gesamte Gumbel-sigma-Familie
+geschlossen." Task #18 (2026-07-29) hat c_scale gemessen UND
+arena-gegengeprueft -- folgenlos, bleibt 1,0. Damit ist die Familie
+regelkonform geschlossen; ein c_visit-Sweep waere ein
+Nachtraeglich-doch-noch-Testen gegen die eigene Vorregistrierung.
+Die Formulierung des Suchpfad-Inventars ("nur indirekt via c_scale
+gedeckt") beschreibt genau diese GEWOLLTE Abdeckung, nicht eine Luecke
+-- ich habe sie als Luecke gelesen. Rest-Vorbehalt, der schon 2026-07-28
+bewusst akzeptiert wurde: an INNEREN Knoten mit kleinem max_N setzt
+c_visit einen Boden, den die c_scale-Messung nicht separat aufloest.
+Eine Wiederaufnahme braucht einen NEUEN Mechanismus-Verdacht, nicht den
+generischen Hinweis "Gumbel ist hyperparameter-sensibel".
 
 ## Zusatz-Task aus der Nutzer-Frage (2026-08-08)
 
@@ -113,8 +132,10 @@ WDL-Aera indirekt bestaetigt: 0,2 schlug 0,009 im #34-Vergleich).
 Reihenfolge nach Ertrag/Kosten: **TASK A** (Floor W=0: billig, koennte
 eine Handheuristik ersatzlos streichen), **TASK D** (Gewichte: ein
 Trainings-Faktor, der sich verdreifacht hat), **TASK B** (Diagnose ohne
-Arena), **TASK C** (letzter unverifizierter Gumbel-Parameter).
-Alle vier hinter der bestehenden Nach-v21-Queue (E3b, ISMCTS-k).
+Arena). **Task C zurueckgezogen** (s.o.) -- vom Review bleiben damit
+ZWEI verwertbare Punkte (2 und, als Diagnose, 3), Punkt 1 war schon
+umgesetzt, Punkt 4 durch eine bestehende Vorregistrierung erledigt.
+Alle drei hinter der bestehenden Nach-v21-Queue (E3b, ISMCTS-k).
 
 # ==================================================================
 # VORREGISTRIERUNG A-D (2026-08-08, Nutzer-Go "eintakten nach v21")
