@@ -64,7 +64,7 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--snapshot-dir", default=None,
                     help="Verzeichnis mit dem EINGEFRORENEN Messset (z.B. "
-                         "altmess_90files/): ALLE .pkl dort bilden das Set, "
+                         "data/altmess_90files/): ALLE .pkl dort bilden das Set, "
                          "kein Split/Reconstruct -- macht die Messung "
                          "unabhaengig vom data/-Bestand (v16/v17-Backup).")
     ap.add_argument("--exclude-file-regex", default=None,

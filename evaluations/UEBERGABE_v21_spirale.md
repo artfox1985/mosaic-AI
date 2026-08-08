@@ -41,7 +41,7 @@ Referenz-Hash dann einmalig neu setzen und dokumentieren.)
 `data/selfplay_v16_*` + `selfplay_v17_*` ins Backup -- ABER erst
 pruefen, dass kein weiterer v20-Fenster-Cache-Neubau mehr ansteht
 (jedes neue Schema/Fenster-Pinning-Rebuild braeuchte sie). Messset ist
-unabhaengig (altmess_90files/ Snapshot). Nutzer macht das Verschieben.
+unabhaengig (data/altmess_90files/ Snapshot). Nutzer macht das Verschieben.
 
 ## 1. SELF-PLAYS (CPU, Reihenfolge egal, NUR mit Nutzer-Go)
 
@@ -131,7 +131,7 @@ Ursachenarbeit mit dem Nutzer.
 
 ```bash
 # Saettigungs-/Aera-Punkt (Snapshot-Messset, split-unabhaengig):
-python -u tools/t36_curve_eval.py --models v21_2d_brierbest v21_2d --snapshot-dir altmess_90files --validate-games-json evaluations/t36_curve_eval.json --out evaluations/t36_curve_eval_v21.json
+python -u tools/t36_curve_eval.py --models v21_2d_brierbest v21_2d --snapshot-dir data/altmess_90files --validate-games-json evaluations/t36_curve_eval.json --out evaluations/t36_curve_eval_v21.json
 # Platt-Kalibrierung (Referenzen: v19 1,9269 / v20 0,930):
 python -u tools/platt_fit.py --models models/alphazero_v21_2d_brierbest.pth --out evaluations/platt_fit_v21.json
 # R5-Plattensteigung (Verlauf 0,086/0,273/0,349/0,457; Seed-Skala ~0,05):
