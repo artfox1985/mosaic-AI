@@ -42,9 +42,35 @@ Stratifizierung: pro Korpus x Runde (1-5) ein eigener "Bucket". Innerhalb
 eines Buckets wird zufaellig (fester Seed) aus allen gefundenen
 Kandidaten-Steps gezogen -- gleichmaessige Rundenabdeckung je Korpus.
 
-Verwendung:
+Verwendung (frozen_v1, Bestandsverhalten, unveraendert):
     python tools/build_frozen_eval_set.py
     python tools/build_frozen_eval_set.py --dry-run   # nur Zaehlen, nichts schreiben
+
+Verwendung (neue Versionen, additiv seit Task "frozen_v2"):
+    python tools/build_frozen_eval_set.py --frozen-version frozen_v2 \
+        --corpora v18,v19wdl,v19wdlsw,v19wdlann --seed 20260808
+
+--- Versionierung / Namenskonvention (additiv, frozen_v1 bleibt unberuehrt) ---
+--frozen-version waehlt die Manifest-"version" UND (ueber _out_paths()) den
+Dateinamen:
+  - "frozen_v1" (Default) -> evaluations/frozen_eval_set.pkl +
+    evaluations/frozen_eval_set_manifest.json (Bestandsverhalten, Korpora
+    v10b/v12/netcq, Seed FROZEN_SEED -- unveraenderlich, wird bei
+    existierender Datei mit SystemExit verweigert).
+  - jede andere Version "frozen_vN" -> evaluations/frozen_eval_set_vN.pkl +
+    evaluations/frozen_eval_set_vN_manifest.json (Praefix "frozen_" wird fuer
+    den Dateinamen abgeschnitten). --out ueberschreibt den .pkl-Pfad explizit
+    (Manifest liegt dann daneben als <name>_manifest.json).
+--corpora ist eine Komma-Liste von Datei-Praefixen; jedes Praefix wird zu
+  data/selfplay_<praefix>_*.pkl aufgeloest (generischer Zweig in
+  _candidate_files(), inkl. der gleichen mtime-Sicherheitsregel wie beim
+  v12-Zweig). PFLICHT ausser bei --frozen-version frozen_v1 (dort Default
+  v10b,v12,netcq).
+--seed ist analog PFLICHT ausser bei frozen_v1 (dort Default FROZEN_SEED) --
+  bewusst kein impliziter Default fuer neue Versionen, damit nie versehentlich
+  derselbe Seed wie frozen_v1 verwendet wird.
+Fuer JEDE Version gilt weiterhin: existiert die Ziel-.pkl-Datei bereits, wird
+der Lauf mit SystemExit verweigert (Unveraenderlichkeit ab dem ersten Bau).
 """
 import argparse
 import glob
@@ -78,8 +104,33 @@ N_FILES_PER_CORPUS = 20   # feste Datei-Stichprobe je Korpus (deterministisch
                            # Spiele je Korpus, IO bleibt trotzdem leicht
                            # (~300MB/Korpus).
 
+# Default-Korpora fuer frozen_v1 (Bestandsverhalten, NICHT aendern -- neue
+# Versionen liefern ihre Korpus-Liste ueber --corpora).
+FROZEN_V1_CORPORA = ["v10b", "v12", "netcq"]
+
 OUT_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 OUT_MANIFEST = ROOT / "evaluations" / "frozen_eval_set_manifest.json"
+
+
+def _out_paths(frozen_version: str, out_override: str | None) -> tuple[Path, Path]:
+    """Namenskonvention fuer --frozen-version (additiv, siehe Docstring oben).
+    frozen_v1 bleibt exakt bei den alten Konstanten OUT_PKL/OUT_MANIFEST.
+    Jede andere Version bekommt evaluations/frozen_eval_set_<suffix>.pkl (+
+    ..._manifest.json), <suffix> = frozen_version ohne das Praefix "frozen_".
+    --out ueberschreibt den .pkl-Pfad explizit; das Manifest liegt dann
+    daneben als <out-stem>_manifest.json."""
+    if out_override:
+        pkl = Path(out_override)
+        if not pkl.is_absolute():
+            pkl = ROOT / pkl
+        manifest = pkl.with_name(pkl.stem + "_manifest.json")
+        return pkl, manifest
+    if frozen_version == FROZEN_VERSION:
+        return OUT_PKL, OUT_MANIFEST
+    suffix = frozen_version[len("frozen_"):] if frozen_version.startswith("frozen_") else frozen_version
+    pkl = ROOT / "evaluations" / f"frozen_eval_set_{suffix}.pkl"
+    manifest = ROOT / "evaluations" / f"frozen_eval_set_{suffix}_manifest.json"
+    return pkl, manifest
 
 
 def _git_commit() -> str | None:
@@ -113,7 +164,15 @@ def _candidate_files(name: str) -> list[str]:
         # auch ausserhalb data/ (Projekt-Root archive/) probieren
         found.extend(glob.glob(str(ROOT / "archive" / "**" / "selfplay_netcq_*.pkl"), recursive=True))
         return sorted(set(found))
-    raise ValueError(name)
+    # Generischer Zweig (additiv, fuer frozen_v2+ und beliebige --corpora-
+    # Praefixe): einfaches Praefix-Glob unter DATA_DIR, PLUS die gleiche
+    # mtime-Sicherheitsregel wie beim v12-Zweig -- defensiv auch dann
+    # angewendet, wenn aktuell kein Self-Play-Batch mehr aktiv in data/
+    # schreibt (Auftrag frozen_v2, 2026-08-08: Korpus ist bereits fertig,
+    # aber die Regel kostet nichts und schuetzt vor kuenftigen Regressionen).
+    now = time.time()
+    all_files = sorted(glob.glob(str(DATA_DIR / f"selfplay_{name}_*.pkl")))
+    return [f for f in all_files if now - os.path.getmtime(f) > MIN_FILE_AGE_SECS]
 
 
 def _eligible_steps(file_path: str):
@@ -203,26 +262,60 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="nur zaehlen/planen, nichts schreiben")
     ap.add_argument("--n-total", type=int, default=N_TARGET_TOTAL)
+    ap.add_argument("--frozen-version", default=FROZEN_VERSION,
+                     help=f"Versions-Tag fuer Manifest + Dateiname (Default {FROZEN_VERSION!r} = "
+                          "Bestandsverhalten). Namenskonvention siehe Docstring / _out_paths().")
+    ap.add_argument("--corpora", default=None,
+                     help="Komma-Liste von Datei-Praefixen, z.B. v18,v19wdl,v19wdlsw,v19wdlann -- "
+                          "jedes wird zu data/selfplay_<praefix>_*.pkl aufgeloest. PFLICHT ausser bei "
+                          f"--frozen-version {FROZEN_VERSION} (dort Default {FROZEN_V1_CORPORA}).")
+    ap.add_argument("--seed", type=int, default=None,
+                     help=f"Seed fuer Datei-/Sample-Auswahl. PFLICHT ausser bei --frozen-version "
+                          f"{FROZEN_VERSION} (dort Default FROZEN_SEED={FROZEN_SEED}) -- bewusst kein "
+                          "impliziter Default fuer neue Versionen.")
+    ap.add_argument("--out", default=None,
+                     help="Expliziter .pkl-Ausgabepfad (ueberschreibt die Namenskonvention aus "
+                          "--frozen-version). Manifest landet daneben als <name>_manifest.json.")
     args = ap.parse_args()
 
-    corpora_names = ["v10b", "v12", "netcq"]
+    is_v1 = args.frozen_version == FROZEN_VERSION
+
+    if args.corpora is not None:
+        corpora_names = [c.strip() for c in args.corpora.split(",") if c.strip()]
+    elif is_v1:
+        corpora_names = list(FROZEN_V1_CORPORA)
+    else:
+        raise SystemExit("--corpora ist PFLICHT, wenn --frozen-version != "
+                          f"{FROZEN_VERSION} (kein impliziter Default fuer neue Versionen).")
+
+    if args.seed is not None:
+        seed = args.seed
+    elif is_v1:
+        seed = FROZEN_SEED
+    else:
+        raise SystemExit("--seed ist PFLICHT, wenn --frozen-version != "
+                          f"{FROZEN_VERSION} (kein impliziter Default fuer neue Versionen).")
+
+    out_pkl, out_manifest = _out_paths(args.frozen_version, args.out)
+
     available = {name: bool(_candidate_files(name)) for name in corpora_names}
     active_corpora = [n for n in corpora_names if available[n]]
     if not active_corpora:
-        raise SystemExit("Keine der drei Korpora hat verfuegbare Dateien -- Abbruch.")
+        raise SystemExit("Keine der angegebenen Korpora hat verfuegbare Dateien -- Abbruch.")
 
     n_buckets = len(active_corpora) * len(ROUNDS)
     per_stratum = args.n_total // n_buckets
 
-    print(f"Frozen-Eval-Set-Build ({FROZEN_VERSION}, Seed {FROZEN_SEED})")
-    print(f"Verfuegbare Korpora: {active_corpora} (netcq gefunden: {available['netcq']})")
+    netcq_note = f" (netcq gefunden: {available['netcq']})" if "netcq" in corpora_names else ""
+    print(f"Frozen-Eval-Set-Build ({args.frozen_version}, Seed {seed})")
+    print(f"Verfuegbare Korpora: {active_corpora}{netcq_note}")
     print(f"Ziel: {args.n_total} Zustaende / {n_buckets} Buckets = {per_stratum} je Bucket (Korpus x Runde)")
 
     corpora_selected = {}
     manifest_corpora = {}
     for name in active_corpora:
         print(f"\n== Korpus {name} ==")
-        selected, files_used, n_scanned = collect_corpus(name, per_stratum, FROZEN_SEED)
+        selected, files_used, n_scanned = collect_corpus(name, per_stratum, seed)
         corpora_selected[name] = selected
         manifest_corpora[name] = {
             "n_files_scanned": n_scanned,
@@ -248,55 +341,59 @@ def main() -> None:
         print(f"  {name:8s} Runde1-5: {row}  Summe={sum(row)}")
 
     manifest = {
-        "version": FROZEN_VERSION,
+        "version": args.frozen_version,
         "build_date_utc": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_commit(),
-        "seed": FROZEN_SEED,
+        "seed": seed,
         "n_target_total": args.n_total,
         "n_buckets": n_buckets,
         "per_stratum_requested": per_stratum,
         "n_records_actual": len(records),
         "rounds": list(ROUNDS),
         "n_files_per_corpus_sampled": N_FILES_PER_CORPUS,
-        "min_file_age_secs_v12_filter": MIN_FILE_AGE_SECS,
+        "min_file_age_secs_filter": MIN_FILE_AGE_SECS,
+        "corpora_requested": corpora_names,
         "corpora": manifest_corpora,
         "composition_corpus_x_round": {
             name: {str(r): comp[name][r] for r in ROUNDS} for name in active_corpora
         },
-        "netcq_available": available["netcq"],
-        "notes": (
+        "immutable": True,
+    }
+    if "netcq" in corpora_names:
+        manifest["netcq_available"] = available["netcq"]
+    if is_v1:
+        # Bestandsverhalten (frozen_v1): netcq-Recherche-Befund dokumentieren.
+        manifest["notes"] = (
             "netcq-Korpus (v11-Trainingsdaten, selfplay_netcq_*.pkl) wurde nicht "
             "gefunden -- weder unter data/, noch unter archive/, noch per "
             "rekursivem Scan des Projektbaums. Vermutlich bereits geloescht "
             "oder ausserhalb dieser Maschine archiviert. Set besteht daher aus "
             "v10b + v12."
-        ) if not available["netcq"] else "alle drei Korpora verfuegbar.",
-        "immutable": True,
-    }
+        ) if not available.get("netcq", False) else "alle drei Korpora verfuegbar."
 
     if args.dry_run:
         print("\n--dry-run: nichts geschrieben.")
         print(json.dumps(manifest, indent=2, ensure_ascii=False)[:2000])
         return
 
-    if OUT_PKL.exists():
+    if out_pkl.exists():
         raise SystemExit(
-            f"ABBRUCH: {OUT_PKL} existiert bereits -- {FROZEN_VERSION} ist UNVERAENDERLICH. "
-            "Fuer ein neues Set eine neue Versionsnummer/Dateinamen verwenden."
+            f"ABBRUCH: {out_pkl} existiert bereits -- {args.frozen_version} ist UNVERAENDERLICH. "
+            "Fuer ein neues Set eine neue Versionsnummer/Dateinamen verwenden (--frozen-version / --out)."
         )
 
-    OUT_PKL.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUT_PKL, "wb") as fh:
+    out_pkl.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_pkl, "wb") as fh:
         pickle.dump({
-            "version": FROZEN_VERSION,
-            "seed": FROZEN_SEED,
+            "version": args.frozen_version,
+            "seed": seed,
             "records": records,
         }, fh, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(OUT_MANIFEST, "w", encoding="utf-8") as fh:
+    with open(out_manifest, "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=2, ensure_ascii=False)
 
-    print(f"\nGeschrieben: {OUT_PKL} ({len(records)} Records)")
-    print(f"Manifest: {OUT_MANIFEST}")
+    print(f"\nGeschrieben: {out_pkl} ({len(records)} Records)")
+    print(f"Manifest: {out_manifest}")
 
 
 if __name__ == "__main__":
