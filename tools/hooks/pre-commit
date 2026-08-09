@@ -1,0 +1,29 @@
+#!/bin/sh
+# tools/hooks/pre-commit -- ruft den Konventions-Linter (Baustein A5) auf.
+#
+# Aktivierung (einmalig, siehe tools/hooks/README.md):
+#   git config core.hooksPath tools/hooks
+#
+# Budget: < 3 s (siehe evaluations/DESIGN_konventionen_als_pruefungen.md,
+# Abschnitt "Entscheid: LOKALER GIT-HOOK"). Nur textnahe Pruefungen -- keine
+# Compilierung, kein Netz, keine Korpus-Dateien.
+#
+# Fehlalarm? Dieser Haken ist ein Werkzeug gegen VERSEHEN, kein Zwang:
+#   git commit --no-verify
+
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+cd "$REPO_ROOT" || exit 1
+
+PYTHON_BIN="python"
+command -v python >/dev/null 2>&1 || PYTHON_BIN="python3"
+
+"$PYTHON_BIN" tools/check_conventions.py --staged
+STATUS=$?
+
+if [ "$STATUS" -ne 0 ]; then
+    echo "" >&2
+    echo "pre-commit: Konventions-Check (A5) rot -- Commit abgebrochen. Details oben." >&2
+    echo "Ausweg: Verstoss beheben, oder falls es ein Fehlalarm ist: git commit --no-verify" >&2
+fi
+
+exit "$STATUS"
