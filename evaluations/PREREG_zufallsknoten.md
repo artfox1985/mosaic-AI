@@ -462,3 +462,54 @@ Knoten abgeschnitten** -- exakt ist die BLATTBEWERTUNG
   selten tief genug, um eine Manufaktur leerzuraeumen, den Chip
   aufzudecken und ihn zu nehmen. Das ist eine testbare Vorhersage fuer
   Teil D, vorab notiert.
+
+### Anker-Wechsel per Anker-KANTE statt per Knopf (Nutzer 2026-08-10)
+
+*"ich wuerd einfach eine neue heuristik reinmachen, diese dann gegen die
+standard heuristik gaten und mit dem elo wert als neuen anker verwenden"*
+
+Besser als mein Knopf-Vorschlag, und aus einem Grund, den ich nicht bedacht
+hatte: das **verbindet** die Leitern statt sie zu trennen. Der Knopf haette
+die alte Reihe reproduzierbar gehalten, aber keinen UMRECHNUNGSFAKTOR
+geliefert -- ein Elo-Wert nach dem Fix waere mit einem davor weiter
+unvergleichbar. Die Anker-Kante misst genau diesen Faktor:
+
+    Elo(neuer Anker) = Elo(alter Anker) + gemessene Kante
+
+Der Knopf bleibt als BAUTEIL: er ist die Art, wie die zweite Heuristik ohne
+Code-Fork entsteht. Knopf implementiert die Variante, Gating misst die
+Kante, der Anker erbt den Versatz. (Etablierte Praxis im Projekt, vgl.
+Regel 3 in `PREREG_punkte_blend_w.md`: "braucht erst eine eigene
+Anker-Kante, damit bewertete Partien Elo-regelkonform bleiben".)
+
+#### Vorab: H0 ist hier das ERWUENSCHTE Ergebnis
+
+Eine Brueckenmessung invertiert die Entscheidungsregel. Findet das Gating
+keinen Unterschied, heisst das NICHT "unentschieden" -- es heisst, der Anker
+laesst sich ohne Sprung austauschen, Versatz null, die Leiter bleibt
+buchstaeblich dieselbe. Das ist also keine Ueberlegenheitspruefung, sondern
+eine **AEQUIVALENZPRUEFUNG**, und die braucht vorab eine MARGE statt einer
+Signifikanzschwelle:
+
+- n=400, Block-SE ~2,2pp -> der Unterschied ist auf ca. **+-4,4pp** (2 SE)
+  einklammerbar.
+- |Delta| innerhalb der Marge -> "kein Versatz", Anker wird 1:1 getauscht.
+- |Delta| ausserhalb -> der gemessene Wert wird als **Versatz verbucht**,
+  nicht verworfen.
+
+Ohne diese Vorab-Festlegung wuerde H0 als "nichts gelernt" fehlgelesen --
+genau der Fehler, gegen den `feedback_preregister_decision_metric` steht.
+
+#### Zwei Randbedingungen
+
+1. **Die Kante ist simzahl-spezifisch.** Sie muss bei der Simzahl gemessen
+   werden, in der der Anker BENUTZT wird: Heuristik@200 in der
+   Elo-Kaderung, @150dyn in den Env-A/Bs sind zwei verschiedene Bruecken,
+   falls der Effekt simzahlabhaengig ist. Im Zweifel beide messen.
+2. **Der neue Anker friert nach dem Gating ein**, wie der alte, dessen
+   grobes `-3 * special_empty` bewusst nicht angefasst wird
+   (`project_v8d_value_head_root_cause` / Elo-Lineal-Regel). Ein Lineal,
+   das sich mitbewegt, ist keines.
+
+Erwarteter Ausgang nach der NODE_BUDGET-Vorhersage oben: Versatz nicht
+nachweisbar, Anker tauschbar.
