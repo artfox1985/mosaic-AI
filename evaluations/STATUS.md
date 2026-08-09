@@ -90,8 +90,13 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
 
 ## GELTENDE REGELN (kompakt)
 
-- **Champion**: `v21_2d_brierbest` seit 2026-08-09, **Elo 1416**
-  [1325, 1510] (Vorgaenger `v20_2d_opp_brierbest` 1336). Gating 75:45
+- **Champion**: `v21_2d_brierbest` seit 2026-08-09, **Elo 1358**
+  [1292, 1434] (Vorgaenger `v20_2d_opp_brierbest` 1295). Die
+  Erst-Schaetzung nach dem Gating (1416, CI +-92) beruhte auf einer
+  einzigen Gegnerkante; mit Anker- und Champion-2-Kante sinkt das
+  Niveau auf 1358 und das CI wird 23% enger (+-71) -- der ABSTAND zum
+  Vorgaenger (+63) bleibt. Belegt den Wert von
+  Promotions-Checkliste Punkt 3+4. Gating 75:45
   (SPRT-H1 nach 60 Paaren, p=0,0059) UND Frisch-Seed-Replikation 97:63
   (H1 nach 80 Paaren, p=0,0095) -- die Fruehstopp-Regel ist damit
   erfuellt. Alt-Messset-Brier 0,18636 vs 0,18749. **Erster Champion aus
