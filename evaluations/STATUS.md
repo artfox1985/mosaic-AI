@@ -1,10 +1,14 @@
 # Mosaic-AI — Status & Fahrplan
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
-**`../archive/history.md`** (zuletzt ausgelagert 2026-08-09: TASK-INDEX-
-Zeilen Platten-Intervention/τ-Annealing/v21-Fenster-Altstand/Messset-
-Snapshot-Teil/#35b/λ/#37/frozen-Set-Neubau, Abschnitt NAECHSTE
-SCHRITTE, Abschnitt OFFENES GATING (λ-Arm), Review-Punkte B+C).
+**`../archive/history.md`** (ausgelagert 2026-08-09, erste Runde:
+TASK-INDEX-Zeilen Platten-Intervention/τ-Annealing/v21-Fenster-Altstand/
+Messset-Snapshot-Teil/#35b/λ/#37/frozen-Set-Neubau, Abschnitt NAECHSTE
+SCHRITTE, Abschnitt OFFENES GATING (λ-Arm), Review-Punkte B+C; zweite
+Runde: TASK-INDEX-Zeile Messset-Snapshot+v16/v17-Freigabe (jetzt
+komplett erledigt), Review-Zeile A + Abgelehnt/erledigt-Sammelnotiz,
+kompletter Abschnitt "AUS EXTERNEM REVIEW R2 2026-08-09" (E/F/G),
+NACH-v21-QUEUE Punkt 1/E3b).
 
 ---
 
@@ -12,7 +16,6 @@ SCHRITTE, Abschnitt OFFENES GATING (λ-Arm), Review-Punkte B+C).
 
 | Task | Status |
 |---|---|
-| **Messset-Snapshot + v16/v17-Freigabe** | v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
 | **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen. `PREREG_nach34_paket.md` |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
@@ -36,34 +39,7 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 
 | Task | Kurz |
 |---|---|
-| ~~A: Floor-Shaping W=0 vs 0,3~~ | **ENTSCHIEDEN 2026-08-09: FEATURE BESTAETIGT, W=0,3 BLEIBT.** Abschalten KOSTET signifikant Staerke: W=0,3 322/400 vs W=0,0 277/400 (80,5% vs 69,3%, **-11,25pp**), gepaarter exakter McNemar **p=0,0001** (b=43 / c=88), Champion@400 vs Heuristik@150dyn, Seed 20260825. Block-Ebene bestaetigt (Pflichtregel): **13 von 16 Bloecken** fuer W=0,3, mittlere Block-Differenz +2,81 Siege je 25 Partien, Block-SE 0,71, **t=3,94** -- auch mit der konservativen Block-SE klar signifikant. Der Alt-Aera-Beleg (+14pp) ist damit in der WDL-/2D-Aera repliziert (+11,25pp). **Strukturbefund: Floor-Shaping ist ein SCHALTER, kein Regler** -- ob es an ist, macht ~11pp; welchen Wert es zwischen 0,15 und 0,6 hat, macht nichts (Sweep 0,15/0,6 vs 0,3 beide H0, p=0,31/0,36). Keine Frisch-Seed-Replikation noetig, weil KEINE Aenderung folgt; wer die Effektgroesse selbst zitieren will, braucht sie. `evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json` |
 | **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
-
-Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
-zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
-Policy erst nach Task B; tau-Wiederaufnahme ohne neuen Mechanismus nein.
-
-### AUS EXTERNEM REVIEW R2 2026-08-09 (Gumbel-spezifisch) -- `PREREG_prior_blindfleck.md`
-
-Von drei behaupteten Engpaessen tragen zwei nicht: die Q-Skalierung ist
-in Task #18 gemessen (Verhaeltnis sigma/Prior 1,23 -- keine Dominanz,
-und der behauptete Varianztreiber Aggressions-Blend steht ueberall auf
-w=0), und "zu wenig Tiefe fuer taktische Linien" verfehlt die
-Architektur (Runde 5 laeuft ueber den exakten Alpha-Beta-Loeser, nicht
-ueber Gumbel). Der dritte Punkt trifft eine echte Luecke:
-
-| Task | Kurz |
-|---|---|
-| ~~E: Prior-Blindfleck-Rate~~ | **GESCHLOSSEN 2026-08-09, Regel 1**: `miss_rate_gumbel_m16` = **1,21%** (n=930, Champion, frozen_v2) -- weit unter der 5%-Schwelle. Trotz nur 32% Medianabdeckung nimmt die Gumbel-Ziehung den Orakel-Top-1 fast immer mit, weil die Prior-Masse konzentriert ist. Einordnung: der bereits als Wash gemessene Sprung m=8 vs m=16 entspricht **9,6pp** Miss-Rate, der von m=32 noch erreichbare Rest nur **1,2pp** -- ~8x kleiner als ein folgenloser Unterschied. Buckets/Rundenverlauf NICHT auswertbar (Unterschiede = 2-3 Einzelzustaende). `evaluations/t_e_prior_blindfleck.json` |
-| ~~F: Wurzelbreite m=16/32/64~~ | **NICHT EINGETAKTET** -- E-Gate nicht erreicht, damit per Prereg kein Arena-Budget. Wiedereroeffnung nur nach Aera-Wechsel oder wenn E in einer spaeteren Generation >=5% zeigt. Lehrsatz: geringe ABDECKUNG ist kein Blindfleck, solange der Prior scharf ist -- Hebel bleibt die Prior-QUALITAET (validierte Orakel-Metriken) |
-| ~~G: c_scale-Nachmessung~~ | **ERLEDIGT 2026-08-09 -- AERA-EFFEKT BESTAETIGT, keine Wiedereroeffnung.** sigma/Prior-Verhaeltnis **1,232 (v18) -> 2,287 (v21)**; Ursache eindeutig: `delta_q` verdoppelt (0,0073 -> 0,0143), `delta_ln(prior)` unveraendert (1,110 -> 1,114) -- der WDL-Kopf nutzt fast den vollen [0,1]-Bereich statt einer gestauchten tanh-Marge. Je Runde R1 1,91 / R2 2,82 / **R3 2,97** / R4 2,53. Die Prereg-Schwelle (>3) ist NICHT erreicht, c_visit/c_scale bleiben -- keine nachtraegliche Schwellenverschiebung (das war der Grund fuer den Rueckzug von Task C). **Die externe Q-Skalierungs-Kritik ist damit teilweise bestaetigt: Richtung richtig, Dominanz-Schwelle noch nicht erreicht.** Folge: Pflicht-Diagnostik je Champion (Checkliste 5c), Wiedereroeffnung dann per Regel. `evaluations/t_g_gumbel_scale_v21.json` |
-
-Telemetrie-Antwort auf die externe Frage: Q-Skalierungs-Varianz JA
-(`tools/gumbel_scale_calibration.py`), **Ueberlebensrate im Sequential
-Halving NEIN** -- protokolliert sind `root_child_q`,
-`root_num_actions(_considered)` und `max_depth`, aber nicht, welcher
-Kandidat welche Halbierungsphase uebersteht. Bewusst nicht
-nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 
 ### LAUFENDE QUEUE (Stand 2026-08-09 mittags, Server-Game beendet)
 
@@ -122,22 +98,7 @@ Alt-Wheel schon lebt -- empirisch bewiesen dadurch, dass die Arme
 deutlich verschiedene Ergebnisse liefern (322 vs 277); ein inerter
 Regler haette identische Zahlen ergeben.
 
-1. ~~**E3b**~~ **GESCHLOSSEN 2026-08-09: Siegquoten-Wache NICHT
-   bestanden.** Stufe 1 Feuerrate 36,52% (weit ueber dem 5%-Gate, die
-   Prereg-Erwartung eines ausbremsenden Besuchs-Gates war falsch),
-   Stufe 2 dann 308/400 (77,0%) mit z=0 gegen 289/400 (72,2%) mit
-   z=1,0 -- **-4,75pp**, McNemar p=0,1042, Block-Ebene 9:4 fuer AUS
-   (t=1,78). Kein Schadensnachweis, aber die Wache verlangt
-   Schadensfreiheit ("rein, wenn es nicht schadet") und die ist nicht
-   erbracht ⇒ `z` bleibt 0, keine Preset-/Self-Play-Uebernahme, der
-   Dosis-Punkt z=2,0 entfaellt. **Die Denial-Tie-Break-Familie ist
-   damit zweimal gemessen und zu**: E3 -13,75pp, E3b -4,75pp -- die
-   neue Aequivalenz-Definition verkleinerte den Schaden, erzeugte aber
-   keinen Gewinn. Aussagekraeftig statt grenzwertig, weil der
-   Mechanismus bei 36,5% Feuerrate ueber ein Drittel aller
-   Wurzelentscheidungen aendert. Wiedereroeffnung nur mit NEUEM
-   Mechanismus. `PREREG_denial_tiebreak.md`
-2. **ISMCTS-k** (Mehrfach-Determinisierung, k=1/2/4, rechen-neutral --
+1. **ISMCTS-k** (Mehrfach-Determinisierung, k=1/2/4, rechen-neutral --
    Sims-Split; greift die PIMC-Strategy-Fusion an):
    `PREREG_ismcts_determinisierungen.md`
 Knoepfe (MOSAIC_DENIAL_UNCERT_Z / _MIN_VISIT_FRAC /
@@ -324,6 +285,15 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
   (`MOSAIC_TILING_CACHE=0` schaltet ab).
 - **Checkpoint-Politik**: brierbest (arena-re-validiert 2026-08-07,
   E15-Alt-Set-Vorsprung uebersetzt nicht in Staerke).
+- **Telemetrie-Stand Q-Skalierung/Sequential-Halving** (externes Review
+  R2 2026-08-09, `PREREG_prior_blindfleck.md`, Tasks E/F/G dazu
+  geschlossen -> history): Q-Skalierungs-Varianz ist JA protokolliert
+  (`tools/gumbel_scale_calibration.py`), **Ueberlebensrate im
+  Sequential Halving NEIN** -- vorhanden sind `root_child_q`,
+  `root_num_actions(_considered)` und `max_depth`, aber nicht, welcher
+  Kandidat welche Halbierungsphase uebersteht. Bewusst nicht
+  nachgeruestet: Task E hatte zuerst zeigen muessen, ob die MENGE
+  stimmt (Ergebnis: Miss-Rate 1,21%, weit unter der 5%-Schwelle).
 
 ## Architektur, Stand jetzt (aktualisiert 2026-08-06)
 
