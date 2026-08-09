@@ -36,7 +36,7 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 
 | Task | Kurz |
 |---|---|
-| **A: Floor-Shaping W=0 vs 0,3** | die nie gefahrene Kontrolle des WDL-Sweeps; der +14pp-Beleg ist Alt-Aera -> H0 wuerde eine Handheuristik ersatzlos streichen. 2x400 |
+| ~~A: Floor-Shaping W=0 vs 0,3~~ | **ENTSCHIEDEN 2026-08-09: FEATURE BESTAETIGT, W=0,3 BLEIBT.** Abschalten KOSTET signifikant Staerke: W=0,3 322/400 vs W=0,0 277/400 (80,5% vs 69,3%, **-11,25pp**), gepaarter exakter McNemar **p=0,0001** (b=43 / c=88), Champion@400 vs Heuristik@150dyn, Seed 20260825. Block-Ebene bestaetigt (Pflichtregel): **13 von 16 Bloecken** fuer W=0,3, mittlere Block-Differenz +2,81 Siege je 25 Partien, Block-SE 0,71, **t=3,94** -- auch mit der konservativen Block-SE klar signifikant. Der Alt-Aera-Beleg (+14pp) ist damit in der WDL-/2D-Aera repliziert (+11,25pp). **Strukturbefund: Floor-Shaping ist ein SCHALTER, kein Regler** -- ob es an ist, macht ~11pp; welchen Wert es zwischen 0,15 und 0,6 hat, macht nichts (Sweep 0,15/0,6 vs 0,3 beide H0, p=0,31/0,36). Keine Frisch-Seed-Replikation noetig, weil KEINE Aenderung folgt; wer die Effektgroesse selbst zitieren will, braucht sie. `evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json` |
 | **D: GEWICHTS-SWEEP (erweitert)** | Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
 Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
@@ -70,14 +70,31 @@ nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
 | **GPU** | Task D Arm `t_d_vw04` (Epoche 10, Fenster verifiziert 2.945 Dateien = v21-Fenster) | `t_d_vw08` (0,8), dann `t_d_pw025` (0,25); je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
-| **CPU** | Task A Floor-Shaping `W=0,3` vs `W=0,0`, 2x400 @400 Sims, Seed 20260825 | E3b Stufe 1 (Feuerrate, 200 Spiele, Abbruch <5%), dann ISMCTS-k (3x400 @600) |
+| **CPU** | **BLOCKIERT auf die Wheel-Installation** (Task A fertig, s.u.) | E3b Stufe 1 (Feuerrate, 200 Spiele, Abbruch <5%), dann ISMCTS-k (3x400 @600) |
 | **offline** | Task E Prior-Blindfleck (CPU-Inferenz, Agent) | Task G c_scale-Nachmessung; Task F nur bei E-Gate >=5% |
 
-Zu Task A: der Floor-W-Sweep lief bereits mit 0,3/0,15/0,6 (Kontrolle
-0,3, n=200, v20-Champion) und ergab **beide H0** (p=0,31 / p=0,36) --
-**W=0 wurde dabei nie gefahren**. Genau das ist Task A; H0 wuerde die
-Handheuristik ersatzlos streichen (Default `FLOOR_SHAPING_WEIGHT = 0.3`,
-`engine/src/net_mcts.rs:390`).
+**WHEEL-BLOCKADE (erkannt 2026-08-09): beide restlichen CPU-Tasks
+haengen daran.** Das installierte Wheel ist vom **2026-08-07 04:49**,
+`engine/src/net_mcts.rs` aber vom **2026-08-08 20:38** -- die E3b-Knoepfe
+(`MOSAIC_DENIAL_UNCERT_Z`, `_MIN_VISIT_FRAC`), `MOSAIC_NUM_DETERMINIZATIONS`
+und der Chip-Logging-Fix sind NICHT installiert (verifiziert: kein
+`denial_tiebreak_stats` im importierten Modul -- und E3b Stufe 1 misst
+genau diesen Zaehler). Das gebaute Wheel (2026-08-08 00:44) war
+ebenfalls zu alt, wird daher neu gebaut. Reihenfolge:
+1. Wheel bauen (laeuft, braucht die DLL NICHT frei).
+2. `pip install --force-reinstall --no-deps` erst wenn WEDER Server NOCH
+   Training laeuft (Windows-Dateisperre; train.py haelt `mosaic_rust`
+   ueber den Encoder). Aktuell blockiert durch `t_d_vw04`.
+3. Paritaets-Probe MUSS
+   `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`
+   liefern -- sonst sind die Defaults nicht byte-identisch und der
+   laufende Task-D-Sweep waere ueber die Arme hinweg nicht vergleichbar.
+4. Danach parallel: `t_d_vw08` (GPU) + E3b Stufe 1 (CPU).
+
+Nicht betroffen: Task A hat `MOSAIC_FLOOR_SHAPING_W` benutzt, das im
+Alt-Wheel schon lebt -- empirisch bewiesen dadurch, dass die Arme
+deutlich verschiedene Ergebnisse liefern (322 vs 277); ein inerter
+Regler haette identische Zahlen ergeben.
 
 1. **E3b** (Denial-Tie-Break mit Besuchs-Gate + Zwei-Anteils-SE statt
    roher Q-Differenz): Stufe 1 = Feuerraten-Messung, Abbruch bei <5%;
