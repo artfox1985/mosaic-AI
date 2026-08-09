@@ -304,3 +304,73 @@ vergleichbar).
   Hauptursache.
 - Keine Aenderung an Suchreglern. Die Wurzel-Regler-Familie hat in
   dieser Sitzung zweimal H0 und einmal Schaden geliefert.
+
+---
+## ERGEBNIS Stufe 2 (2026-08-09): REGEL 2a fuer ALLE DREI Groessen -- zug-differenzierend
+
+`tools/punktekopf_stufe2.py`, Champion, 400 Sims, Seed 1000, 16 Zustaende
+x 8 feste Kombinationen; 12 nutzbar (3x Runde 5 ohne Netz, 1x nur ein
+Kandidat). Belegstelle `evaluations/punktekopf_platten_stufe2.json`.
+
+| Groesse | Tau-Median | Relative Verschiebung | Regel |
+|---|---|---|---|
+| `net_points_forecast` | 0,792 | 0,261 | **2a** |
+| `net_opp_points_forecast` | 0,640 | 0,396 | **2a** |
+| `net_raw_value` | 0,778 | 0,345 | **2a** |
+
+**Warum der Tau hier belastbar ist**: der Forward-Pass ist
+deterministisch, bei identischer Kombination waere Tau **exakt 1,0**.
+Jeder Wert darunter ist eine echte, plattenverursachte Umsortierung --
+kein Rauschboden noetig, und damit die erste Platten-Metrik heute ohne
+degeneriertes Nebenkriterium.
+
+### KORREKTUR meiner eigenen Erzaehlung
+
+Ich habe heute mehrfach behauptet, die Plattenwirkung komme als
+NIVEAU-Verschiebung an und kuerze sich im Ranking weg. **Das ist fuer den
+Value-Kopf widerlegt** (Tau 0,778). Die 4,7x-Zahl aus der
+Wurzel-Messung konnte zwischen Niveau und Differenzierung nicht
+unterscheiden -- ich habe die Unentschiedenheit als Niveau gelesen und
+daraus eine Erklaerung gebaut, die die Messung nicht hergab.
+
+Warum `PLATE_SHAPING` dann trotzdem folgenlos blieb: der Shaping-TERM war
+level-artig (globale Differenz `wertung_progress(P0)-wertung_progress(P1)`,
+identisch fuer alle Kandidaten eines Knotens). Dass ein hinzugefuegter
+globaler Term sich wegkuerzt, sagt nichts darueber, ob der GELERNTE
+Value-Kopf differenziert. Ich habe beides gleichgesetzt -- zwei
+verschiedene Dinge.
+
+### Der eigentliche Befund: ein gemessenes, aber UNGENUTZTES Signal
+
+Der Punkte-Kopf sortiert die Zuege plattenabhaengig um (Tau 0,792), der
+Gegner-Kopf noch staerker (0,640). **Beide haben in der Suche derzeit das
+Gewicht Null**: `points_utility_w = 0.0` und `points_utility_weight =
+0.0` (Engine-Konfig, nach der Aggressions-Neukartierung ueberall auf 0).
+Ihre plattenbezogene Zug-Differenzierung wird also berechnet und
+verworfen.
+
+Damit ist der Anschluss aus dem Abschnitt "Die GEGNER-Richtung" erfuellt:
+das war die vorab benannte Bedingung, unter der w>0 ein **NEUES**
+Argument bekommt und kein Wiederaufguss ist. Die Neukartierung hatte die
+allgemeine Punkte-Marge getestet, nicht plattenspezifische
+Differenzierung. Der naechste Schritt ist damit eine eigene
+Vorregistrierung fuer w>0 mit Arena-Entscheid -- nicht der
+Analogieschluss, dass es schon helfen werde.
+
+### Was an der Messung wackelt (vom Agenten gemeldet, hier uebernommen)
+
+- n=12 Zustaende; Streuung je Zustand gross (Tau 0,138-1,0, relative
+  Verschiebung 0,017-1,068). Die Medianwerte tragen, einzelne Zustaende
+  nicht.
+- Zwei der zwoelf Zustaende haben nach Kandidaten-Angleichung nur 2
+  Kandidaten -- dort kann Tau nur ±1 annehmen. Grob aufgeloest, aber
+  nicht falsch.
+- Die Aggregations-REIHENFOLGE (je Zustand ueber Kombinationspaare
+  mitteln, dann Median ueber Zustaende) war eine Praezisierung des
+  Agenten; mein Amendment liess sie offen. Im JSON dokumentiert.
+- Ausrichtung der Kandidaten ueber `description`, weil `action_id`
+  zwischen Aufrufen nachweislich instabil ist.
+- Ein Zustand zeigt Tau 0,554 bei relativer Verschiebung 0,017 -- die
+  beiden Metriken erfassen verschiedene Aspekte und stimmen nicht immer
+  ueberein. Die Regel verlangt beide, das ist hier die konservative
+  Seite.

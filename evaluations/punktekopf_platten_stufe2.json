@@ -1,0 +1,1135 @@
+{
+  "summary": {
+    "prereg": "evaluations/PREREG_punktekopf_platten.md (Stufe 2, mit Amendment)",
+    "model": "models/alphazero_v21_2d_brierbest.onnx",
+    "sims": 400,
+    "c_puct": 1.5,
+    "seed": 1000,
+    "n_states_requested": 16,
+    "n_states_selected": 16,
+    "n_states_usable": 12,
+    "n_states_skipped_no_net_or_no_candidates": 3,
+    "n_states_skipped_too_few_candidates_after_alignment": 1,
+    "n_combos_per_state": 8,
+    "combos": [
+      [
+        0,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        3
+      ],
+      [
+        0,
+        3,
+        5
+      ],
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        1,
+        3,
+        7
+      ],
+      [
+        2,
+        3,
+        4
+      ],
+      [
+        2,
+        6,
+        7
+      ],
+      [
+        4,
+        5,
+        6
+      ]
+    ],
+    "n_candidates_after_alignment_per_state": [
+      4,
+      13,
+      6,
+      2,
+      5,
+      2,
+      5,
+      14,
+      6,
+      15,
+      1,
+      15,
+      15
+    ],
+    "n_candidates_after_alignment_summary": {
+      "n": 13,
+      "mean": 7.923076923076923,
+      "median": 6,
+      "stdev": 5.341586316694529,
+      "min": 1,
+      "max": 15
+    },
+    "degenerate_std_a_zero_events_total": 0,
+    "aggregation_methodology_note": "Tau: je Zustand Mittelwert ueber alle C(8,2)=28 Kombinationspaare (Rohvektor, tau-invariant gegen additive Konstante), dann Median dieser Zustandswerte ueber die Zustaende ('alle Paare, dann Median ueber Zustaende', wortgetreu aus dem Amendment). Relative Verschiebung: je Zustand Median ueber alle 56 GERICHTETEN Kombinationspaare (A!=B, Nenner=Streuung von A), dann Median dieser Zustandswerte ueber die Zustaende -- diese zweistufige Aggregation ist eine Praezisierung, die das Amendment nicht explizit festlegt (siehe Modul-Docstring).",
+    "heads": {
+      "net_points_forecast": {
+        "state_mean_pairwise_tau__summary_over_states": {
+          "n": 12,
+          "mean": 0.7166579452293738,
+          "median": 0.7923731030873888,
+          "stdev": 0.24964538667416902,
+          "min": 0.1380952380952381,
+          "max": 1.0
+        },
+        "tau_median": 0.7923731030873888,
+        "state_median_pairwise_relshift__summary_over_states": {
+          "n": 12,
+          "mean": 0.37235196370619134,
+          "median": 0.26094357246649397,
+          "stdev": 0.30268908624121704,
+          "min": 0.016992907121260836,
+          "max": 1.06763855128934
+        },
+        "relative_shift_median": 0.26094357246649397,
+        "regel": "2a",
+        "niveau_spread_across_combos__summary_over_states": {
+          "n": 12,
+          "mean": 0.20884966787020617,
+          "median": 0.20252329918245476,
+          "stdev": 0.05204270521367128,
+          "min": 0.1435179904103279,
+          "max": 0.31216354668140406
+        },
+        "mean_centered_spread_across_candidates__summary_over_states": {
+          "n": 12,
+          "mean": 0.05331015805066765,
+          "median": 0.03492262727348134,
+          "stdev": 0.03615884497956488,
+          "min": 0.014950729078716704,
+          "max": 0.11011237775286038
+        },
+        "niveau_spread_median_over_centered_spread_median_ratio_DESKRIPTIV": 5.799199974173815
+      },
+      "net_opp_points_forecast": {
+        "state_mean_pairwise_tau__summary_over_states": {
+          "n": 12,
+          "mean": 0.6673622012907727,
+          "median": 0.6404761904761904,
+          "stdev": 0.20850164548079478,
+          "min": 0.32857142857142857,
+          "max": 1.0
+        },
+        "tau_median": 0.6404761904761904,
+        "state_median_pairwise_relshift__summary_over_states": {
+          "n": 12,
+          "mean": 0.38371215426524397,
+          "median": 0.3960660622151883,
+          "stdev": 0.2569495492869271,
+          "min": 0.033355711653878586,
+          "max": 0.9225266678404866
+        },
+        "relative_shift_median": 0.3960660622151883,
+        "regel": "2a",
+        "niveau_spread_across_combos__summary_over_states": {
+          "n": 12,
+          "mean": 0.20047849696086917,
+          "median": 0.19573059137910603,
+          "stdev": 0.040567649631399375,
+          "min": 0.13938412244121232,
+          "max": 0.25972289172932506
+        },
+        "mean_centered_spread_across_candidates__summary_over_states": {
+          "n": 12,
+          "mean": 0.047537007073495306,
+          "median": 0.04097091434730424,
+          "stdev": 0.02569430148967443,
+          "min": 0.01862198021262884,
+          "max": 0.09351750463247299
+        },
+        "niveau_spread_median_over_centered_spread_median_ratio_DESKRIPTIV": 4.777305913163847
+      },
+      "net_raw_value": {
+        "state_mean_pairwise_tau__summary_over_states": {
+          "n": 12,
+          "mean": 0.7274223792080935,
+          "median": 0.7780873888016745,
+          "stdev": 0.2191986452736403,
+          "min": 0.3047619047619048,
+          "max": 1.0
+        },
+        "tau_median": 0.7780873888016745,
+        "state_median_pairwise_relshift__summary_over_states": {
+          "n": 12,
+          "mean": 0.39551973862566814,
+          "median": 0.3446692067364664,
+          "stdev": 0.2921565839683462,
+          "min": 0.012973869130987277,
+          "max": 0.8634335506448454
+        },
+        "relative_shift_median": 0.3446692067364664,
+        "regel": "2a",
+        "niveau_spread_across_combos__summary_over_states": {
+          "n": 12,
+          "mean": 0.09876221865597516,
+          "median": 0.07657362620035807,
+          "stdev": 0.07890743388430378,
+          "min": 0.02892613410949707,
+          "max": 0.28462531566619875
+        },
+        "mean_centered_spread_across_candidates__summary_over_states": {
+          "n": 12,
+          "mean": 0.08960674702036872,
+          "median": 0.06455651994262421,
+          "stdev": 0.0609843971471684,
+          "min": 0.020978450775146484,
+          "max": 0.20985923449198404
+        },
+        "niveau_spread_median_over_centered_spread_median_ratio_DESKRIPTIV": 1.1861486069635458
+      }
+    }
+  },
+  "per_state": [
+    {
+      "state_index_in_eval_set": 917,
+      "round": 1,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "n_candidates_after_alignment": 4,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.0521208728896454,
+            0.07465420011430979,
+            0.09616120159626007,
+            0.06950721691828221,
+            0.0788533091545105,
+            0.1280901562422514,
+            -0.03665758471470326,
+            0.060923224315047264
+          ],
+          "niveau_spread_across_combos": 0.16474774095695466,
+          "mean_centered_spread_across_candidates": 0.04041083774063736,
+          "state_mean_pairwise_tau": 0.8333333333333334,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.18637043661267857,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.21685681492090225,
+            0.2354888953268528,
+            0.2532201372087002,
+            0.2350807785987854,
+            0.23489028960466385,
+            0.2964349575340748,
+            0.10131646133959293,
+            0.19683127105236053
+          ],
+          "niveau_spread_across_combos": 0.19511849619448185,
+          "mean_centered_spread_across_candidates": 0.050180988386273384,
+          "state_mean_pairwise_tau": 0.5833333333333333,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.4182784269621326,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            -0.12192590534687042,
+            -0.11681422591209412,
+            -0.11528883874416351,
+            -0.1230735182762146,
+            -0.12071460485458374,
+            -0.10694549977779388,
+            -0.11538733541965485,
+            -0.08283311128616333
+          ],
+          "niveau_spread_across_combos": 0.04024040699005127,
+          "mean_centered_spread_across_candidates": 0.10347280278801918,
+          "state_mean_pairwise_tau": 0.8571428571428571,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.22781898066705286,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 91,
+      "round": 1,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "n_candidates_after_alignment": 13,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.18341011783251396,
+            0.1946971955207678,
+            0.22160547971725464,
+            0.1942622157243582,
+            0.20138061161224657,
+            0.24182589581379524,
+            0.06294910022272514,
+            0.16104760135595614
+          ],
+          "niveau_spread_across_combos": 0.17887679559107011,
+          "mean_centered_spread_across_candidates": 0.02801426109918476,
+          "state_mean_pairwise_tau": 0.8269230769230769,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.31214907483692217,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.23627504706382751,
+            0.2587922868820337,
+            0.27150582120968747,
+            0.23761458694934845,
+            0.22399228925888354,
+            0.3030487149953842,
+            0.15105338681202668,
+            0.2320559391608605
+          ],
+          "niveau_spread_across_combos": 0.15199532818335754,
+          "mean_centered_spread_across_candidates": 0.04203253786063053,
+          "state_mean_pairwise_tau": 0.5805860805860806,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.3869200928847363,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.01817600543682392,
+            0.013443800119253306,
+            0.021383427656613864,
+            0.02052612488086407,
+            0.019907272779024564,
+            0.024535866884084847,
+            -0.006402552127838135,
+            0.021933555603027344
+          ],
+          "niveau_spread_across_combos": 0.03093841901192298,
+          "mean_centered_spread_across_candidates": 0.04654472748908771,
+          "state_mean_pairwise_tau": 0.7554945054945055,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.36935220720463746,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 967,
+      "round": 1,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "n_candidates_after_alignment": 6,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.14110196630160013,
+            0.15900757163763046,
+            0.20036269476016363,
+            0.16402841359376907,
+            0.19260887801647186,
+            0.25746400902668637,
+            0.03909061476588249,
+            0.16786441455284754
+          ],
+          "niveau_spread_across_combos": 0.21837339426080388,
+          "mean_centered_spread_across_candidates": 0.014950729078716704,
+          "state_mean_pairwise_tau": 0.4095238095238095,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.6730911921346896,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.12964453548192978,
+            0.16370403269926706,
+            0.19752786805232367,
+            0.15082112203041712,
+            0.1583631212512652,
+            0.22851301729679108,
+            -0.03120987443253398,
+            0.09165117268760999
+          ],
+          "niveau_spread_across_combos": 0.25972289172932506,
+          "mean_centered_spread_across_candidates": 0.021662896499037746,
+          "state_mean_pairwise_tau": 0.32857142857142857,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.9225266678404866,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.015339930852254232,
+            0.013812810182571411,
+            0.04697148005167643,
+            0.023924986521402996,
+            0.058045427004496254,
+            0.07792329788208008,
+            0.050020694732666016,
+            0.11109091838200887
+          ],
+          "niveau_spread_across_combos": 0.09727810819943745,
+          "mean_centered_spread_across_candidates": 0.040945548150274486,
+          "state_mean_pairwise_tau": 0.3047619047619048,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.8462423189853936,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 211,
+      "round": 2,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "n_candidates_after_alignment": 2,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.20351457968354225,
+            0.23067176342010498,
+            0.26268935203552246,
+            0.22833918780088425,
+            0.23888948559761047,
+            0.2650871053338051,
+            0.0998256467282772,
+            0.1974228173494339
+          ],
+          "niveau_spread_across_combos": 0.16526145860552788,
+          "mean_centered_spread_across_candidates": 0.09934032335877419,
+          "state_mean_pairwise_tau": 1.0,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.2732602096267486,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.20330621302127838,
+            0.20727960020303726,
+            0.23524107784032822,
+            0.20769912749528885,
+            0.21138526499271393,
+            0.277975931763649,
+            0.06337295472621918,
+            0.17151889950037003
+          ],
+          "niveau_spread_across_combos": 0.2146029770374298,
+          "mean_centered_spread_across_candidates": 0.09351750463247299,
+          "state_mean_pairwise_tau": 1.0,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.362016125657759,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.1006973385810852,
+            0.11316043138504028,
+            0.11670458316802979,
+            0.1119953989982605,
+            0.10799393057823181,
+            0.10855337977409363,
+            0.10050857067108154,
+            0.1294347047805786
+          ],
+          "niveau_spread_across_combos": 0.02892613410949707,
+          "mean_centered_spread_across_candidates": 0.1737288534641266,
+          "state_mean_pairwise_tau": 1.0,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.530008321748908,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 227,
+      "round": 2,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "n_candidates_after_alignment": 5,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.08539199233055114,
+            0.14360786080360413,
+            0.16086381077766418,
+            0.12521358877420424,
+            0.1473302274942398,
+            0.20336627066135407,
+            -0.07395590916275978,
+            0.02704786309041083
+          ],
+          "niveau_spread_across_combos": 0.27732217982411383,
+          "mean_centered_spread_across_candidates": 0.029434416806325314,
+          "state_mean_pairwise_tau": 0.5714285714285714,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.6163930824376089,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.06634453609585762,
+            0.07091025337576866,
+            0.12076852470636368,
+            0.07935213148593903,
+            0.08683971390128135,
+            0.12682318240404128,
+            -0.030266201682388784,
+            0.09766741693019867
+          ],
+          "niveau_spread_across_combos": 0.15708938408643006,
+          "mean_centered_spread_across_candidates": 0.0245384981110692,
+          "state_mean_pairwise_tau": 0.5571428571428572,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.40521203154564034,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            -0.09282952547073364,
+            -0.018060731887817382,
+            -0.009620893001556396,
+            -0.05361928939819336,
+            -0.020833170413970946,
+            0.058359074592590335,
+            -0.18105252981185913,
+            -0.1345575451850891
+          ],
+          "niveau_spread_across_combos": 0.23941160440444947,
+          "mean_centered_spread_across_candidates": 0.04510138988494873,
+          "state_mean_pairwise_tau": 0.6285714285714286,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.5553101148613164,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 1251,
+      "round": 2,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "n_candidates_after_alignment": 2,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.26784607023000717,
+            0.27871134877204895,
+            0.29691945016384125,
+            0.2592678666114807,
+            0.2766169011592865,
+            0.30964240431785583,
+            0.16285183280706406,
+            0.23925887048244476
+          ],
+          "niveau_spread_across_combos": 0.14679057151079178,
+          "mean_centered_spread_across_candidates": 0.0176834836602211,
+          "state_mean_pairwise_tau": 1.0,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.2486269353062394,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.05079875700175762,
+            0.08656434342265129,
+            0.12578954547643661,
+            0.09269169811159372,
+            0.0906709861010313,
+            0.1577860377728939,
+            -0.09656209126114845,
+            0.04233188182115555
+          ],
+          "niveau_spread_across_combos": 0.25434812903404236,
+          "mean_centered_spread_across_candidates": 0.01862198021262884,
+          "state_mean_pairwise_tau": 1.0,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.13696083794936875,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.19102197885513306,
+            0.19176417589187622,
+            0.19998443126678467,
+            0.16786783933639526,
+            0.18968647718429565,
+            0.18274110555648804,
+            0.200733482837677,
+            0.20045191049575806
+          ],
+          "niveau_spread_across_combos": 0.03286564350128174,
+          "mean_centered_spread_across_candidates": 0.020978450775146484,
+          "state_mean_pairwise_tau": 1.0,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.06282347522756258,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 423,
+      "round": 3,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "n_candidates_after_alignment": 5,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.41769261956214904,
+            0.48245773315429685,
+            0.4787196755409241,
+            0.4853473961353302,
+            0.502036452293396,
+            0.5357212245464325,
+            0.2235576778650284,
+            0.29155215322971345
+          ],
+          "niveau_spread_across_combos": 0.31216354668140406,
+          "mean_centered_spread_across_candidates": 0.02668111741542818,
+          "state_mean_pairwise_tau": 0.95,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.22220414087091933,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            -0.08075085207819939,
+            -0.10076665133237839,
+            -0.03855805657804012,
+            -0.12369267046451568,
+            -0.11816268116235733,
+            -0.023976064880844205,
+            -0.08833290487527848,
+            0.07265001609921455
+          ],
+          "niveau_spread_across_combos": 0.19634268656373022,
+          "mean_centered_spread_across_candidates": 0.0281664261338301,
+          "state_mean_pairwise_tau": 0.6285714285714286,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.46300747177380164,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.4519759178161621,
+            0.5252466440200806,
+            0.4923607587814331,
+            0.5278237819671631,
+            0.5497651100158691,
+            0.5389456033706665,
+            0.2651397943496704,
+            0.2672175645828247
+          ],
+          "niveau_spread_across_combos": 0.28462531566619875,
+          "mean_centered_spread_across_candidates": 0.05777786254882811,
+          "state_mean_pairwise_tau": 0.9142857142857143,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.3199862062682953,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 1335,
+      "round": 3,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        14,
+        14,
+        14,
+        14,
+        14,
+        14,
+        14,
+        14
+      ],
+      "n_candidates_after_alignment": 14,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            -0.01163489477975028,
+            0.03727196369852338,
+            0.07385743409395218,
+            0.020917833915778568,
+            0.022165531558649882,
+            0.11345700952889663,
+            -0.15262715305600846,
+            -0.04452683137995856
+          ],
+          "niveau_spread_across_combos": 0.2660841625849051,
+          "mean_centered_spread_across_candidates": 0.0525105836116994,
+          "state_mean_pairwise_tau": 0.8814756671899528,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.04503253109399881,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.26348530714000973,
+            0.2744444044572966,
+            0.2986167749123914,
+            0.2690980051245008,
+            0.27200045543057577,
+            0.3254409868802343,
+            0.1512517354318074,
+            0.25756948654140743
+          ],
+          "niveau_spread_across_combos": 0.17418925144842692,
+          "mean_centered_spread_across_candidates": 0.03615593054921042,
+          "state_mean_pairwise_tau": 0.8893249607535322,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.053897306452007354,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            -0.15514665416308812,
+            -0.12512479509626115,
+            -0.09736448100634984,
+            -0.1286981020654951,
+            -0.13341952647481645,
+            -0.08460158535412379,
+            -0.2022615671157837,
+            -0.16885724237986974
+          ],
+          "niveau_spread_across_combos": 0.1176599817616599,
+          "mean_centered_spread_across_candidates": 0.07133517733642032,
+          "state_mean_pairwise_tau": 0.9191522762951334,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.05815970170166379,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 391,
+      "round": 3,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        9,
+        8,
+        8,
+        9,
+        8,
+        8,
+        10,
+        10
+      ],
+      "n_candidates_after_alignment": 6,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.08295601730545361,
+            0.09509726986289024,
+            0.10010050361355145,
+            0.1223503624399503,
+            0.10279118766387303,
+            0.1597035489976406,
+            -0.061684232826034226,
+            0.04810412600636482
+          ],
+          "niveau_spread_across_combos": 0.22138778182367483,
+          "mean_centered_spread_across_candidates": 0.11011237775286038,
+          "state_mean_pairwise_tau": 0.1380952380952381,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 1.06763855128934,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.19237849861383438,
+            0.2269085223476092,
+            0.24166109909613928,
+            0.2086722751458486,
+            0.2053623671332995,
+            0.2720969890554746,
+            0.09698299691081047,
+            0.18026394893725714
+          ],
+          "niveau_spread_across_combos": 0.1751139921446641,
+          "mean_centered_spread_across_candidates": 0.04132618092828327,
+          "state_mean_pairwise_tau": 0.3476190476190476,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.74163851237525,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            -0.06655292709668477,
+            -0.09260323643684387,
+            -0.10337372620900472,
+            -0.04672388235727946,
+            -0.0621238648891449,
+            -0.06732528408368428,
+            -0.09610209862391154,
+            -0.051936338345209755
+          ],
+          "niveau_spread_across_combos": 0.05664984385172526,
+          "mean_centered_spread_across_candidates": 0.11426968044704862,
+          "state_mean_pairwise_tau": 0.43333333333333335,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.8634335506448454,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 702,
+      "round": 4,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "n_candidates_after_alignment": 15,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.08080227275689443,
+            0.09117437675595283,
+            0.11645101904869079,
+            0.10970128973325094,
+            0.10429578870534897,
+            0.16276161670684813,
+            0.019243626296520232,
+            0.09516158459397654
+          ],
+          "niveau_spread_across_combos": 0.1435179904103279,
+          "mean_centered_spread_across_candidates": 0.10323278338337938,
+          "state_mean_pairwise_tau": 0.6775510204081633,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.6723181183363289,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.05823885123245418,
+            0.09862704984843731,
+            0.11830823644995689,
+            0.0638302638505896,
+            0.05095059561232726,
+            0.15233796102305253,
+            -0.08861855529248715,
+            0.013606090335330615
+          ],
+          "niveau_spread_across_combos": 0.24095651631553966,
+          "mean_centered_spread_across_candidates": 0.08133577600043888,
+          "state_mean_pairwise_tau": 0.7210884353741497,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.5264405945400252,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.0537611722946167,
+            0.036296188831329346,
+            0.06524355411529541,
+            0.08668725490570069,
+            0.0908797025680542,
+            0.09405214786529541,
+            0.11761070887247721,
+            0.1397001028060913
+          ],
+          "niveau_spread_across_combos": 0.10340391397476195,
+          "mean_centered_spread_across_candidates": 0.1661993638674418,
+          "state_mean_pairwise_tau": 0.536734693877551,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.721401124616526,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 567,
+      "round": 4,
+      "skipped": true,
+      "skip_reason": "zu_wenige_kandidaten_nach_angleichung",
+      "n_candidates_before_alignment_per_combo": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "n_candidates_after_alignment": 1
+    },
+    {
+      "state_index_in_eval_set": 599,
+      "round": 4,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "n_candidates_after_alignment": 15,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            0.1394462913274765,
+            0.15744459082682927,
+            0.2078140487273534,
+            0.15678011973698933,
+            0.17059602787097294,
+            0.23346509182204803,
+            0.00846790373325348,
+            0.12995671729246774
+          ],
+          "niveau_spread_across_combos": 0.22499718808879454,
+          "mean_centered_spread_across_candidates": 0.09719599049124451,
+          "state_mean_pairwise_tau": 0.7578231292517007,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.13414638480756114,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.06237350404262543,
+            0.1030172144373258,
+            0.11485294823845228,
+            0.07879792948563893,
+            0.06875236692527929,
+            0.1704132840037346,
+            -0.07646490434805552,
+            0.008736554781595867
+          ],
+          "niveau_spread_across_combos": 0.2468781883517901,
+          "mean_centered_spread_across_candidates": 0.09228971780174308,
+          "state_mean_pairwise_tau": 0.7197278911564626,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.15429207154784133,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            0.0583431084950765,
+            0.04218972126642863,
+            0.0893251895904541,
+            0.07575292587280273,
+            0.08864991267522176,
+            0.08517738978068033,
+            0.07098579406738281,
+            0.12048912445704142
+          ],
+          "niveau_spread_across_combos": 0.07829940319061279,
+          "mean_centered_spread_across_candidates": 0.20985923449198404,
+          "state_mean_pairwise_tau": 0.8006802721088435,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.17872699245082901,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    },
+    {
+      "state_index_in_eval_set": 886,
+      "round": 5,
+      "skipped": true,
+      "skip_reason": "kein_netz_oder_keine_kandidaten"
+    },
+    {
+      "state_index_in_eval_set": 882,
+      "round": 5,
+      "skipped": true,
+      "skip_reason": "kein_netz_oder_keine_kandidaten"
+    },
+    {
+      "state_index_in_eval_set": 745,
+      "round": 5,
+      "skipped": true,
+      "skip_reason": "kein_netz_oder_keine_kandidaten"
+    },
+    {
+      "state_index_in_eval_set": 537,
+      "round": 3,
+      "skipped": false,
+      "n_candidates_before_alignment_per_combo": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "n_candidates_after_alignment": 15,
+      "heads": {
+        "net_points_forecast": {
+          "niveau_per_combo": [
+            -0.07200650175412496,
+            -0.05319054325421651,
+            -0.048936500151952105,
+            -0.029646543661753337,
+            -0.04035571018854777,
+            -0.0010683019955952963,
+            -0.18774150609970092,
+            -0.14812336762746176
+          ],
+          "niveau_spread_across_combos": 0.18667320410410562,
+          "mean_centered_spread_across_candidates": 0.020154992209540513,
+          "state_mean_pairwise_tau": 0.5537414965986395,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.016992907121260836,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_opp_points_forecast": {
+          "niveau_per_combo": [
+            0.3259408553441366,
+            0.34183358525236446,
+            0.38124314080923793,
+            0.31911725203196206,
+            0.3379091672599316,
+            0.3815220254162947,
+            0.2421379029750824,
+            0.33684835632642113
+          ],
+          "niveau_spread_across_combos": 0.13938412244121232,
+          "mean_centered_spread_across_candidates": 0.04061564776632521,
+          "state_mean_pairwise_tau": 0.6523809523809524,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.033355711653878586,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        },
+        "net_raw_value": {
+          "niveau_per_combo": [
+            -0.3229550361633301,
+            -0.317699392636617,
+            -0.34011638959248863,
+            -0.2895026167233785,
+            -0.3087985833485921,
+            -0.29436674118041994,
+            -0.3526461919148763,
+            -0.36435046593348186
+          ],
+          "niveau_spread_across_combos": 0.07484784921010335,
+          "mean_centered_spread_across_candidates": 0.025067873001098633,
+          "state_mean_pairwise_tau": 0.5789115646258504,
+          "n_pairs_tau": 28,
+          "state_median_pairwise_relshift": 0.012973869130987277,
+          "n_pairs_relshift": 56,
+          "n_degenerate_std_a_zero": 0
+        }
+      }
+    }
+  ]
+}
