@@ -16,6 +16,49 @@ NICHT aufgefuehrt und wurde nicht angefasst.
 
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT.
 
+## NAMENSKONVENTION (verbindlich ab 2026-08-09)
+
+**Anlass**: Nutzer-Kritik *"warum genau hast du immer wieder
+unterschiedliche Nummerierung fuer die tasks. das ist verwirrend"* --
+berechtigt. Es liefen drei Serien parallel, und die Buchstabenserie war
+eine Erfindung des Koordinators, die eine bereits belegte Notation
+ueberschrieben hat.
+
+**REGEL: Die Vorregistrierungs-DATEI ist die Kennung.**
+1. Jede Entscheidungseinheit hat genau eine `PREREG_*.md`; diese Tabelle
+   ist die Registratur. Kurzform = der Datei-Slug
+   (`prior_blindfleck`, `task_d_gewichte`, `plattenkopf`), NICHT ein
+   Buchstabe.
+2. Buchstaben/Zahlen NUR INNERHALB einer Prereg fuer deren eigene Arme
+   und Stufen. Keine dokumentuebergreifende Buchstabenserie mehr.
+3. Die `#NN`-Serie ist reine RUECKWAERTS-Referenz auf Alt-Befunde in
+   `archive/history.md`. **Keine neuen `#NN` vergeben** -- es gibt keine
+   Registratur dafuer, niemand kann pruefen was frei ist.
+4. Neue Arbeit ohne Prereg bekommt auch keine Kennung. Wer eine Kennung
+   braucht, schreibt die Prereg (Task D hatte bis 2026-08-09 keine,
+   obwohl er ein mehrarmiges Arena-Experiment ist -- genau der Fall, den
+   Regel 1 verhindert).
+
+### Zuordnung der Alt-Buchstaben (damit Chat und Commits auffindbar bleiben)
+
+| Alt-Kennung | Herkunft | gilt jetzt als |
+|---|---|---|
+| Task A (Floor-Shaping W) | Review 2026-08-08 | ohne eigene Prereg; Ergebnis in `archive/history.md` + `paired_arena_env_paired_arena_env_floorw_taskA.json` |
+| Task B (Zerlegungs-Diagnose) | Review 2026-08-08 | geschlossen, ohne eigene Prereg; `archive/history.md` |
+| Task C (c_visit-Sweep) | Review 2026-08-08 | zurueckgezogen; abgedeckt von `PREREG_ownership_gumbel.md` §B1 |
+| Task D (Gewichts-Sweep) | Review 2026-08-08 | **`PREREG_task_d_gewichte.md`** |
+| Task E / F / G | Review R2 2026-08-09 | **`PREREG_prior_blindfleck.md`** (E=Blindfleck-Rate, F=Wurzelbreite, G=c_scale-Nachmessung) |
+| E1 / E2 | Eskalationsstufen | `PREREG_aggression_stilmessung.md` |
+| E3 / E3b | Eskalationsstufen | `PREREG_denial_tiebreak.md` |
+
+**Die Kollision, die das noetig gemacht hat**: "E" (Prior-Blindfleck,
+Review R2) und "E3b" (Denial-Tie-Break-Eskalation) haben nichts
+miteinander zu tun, sahen aber wie Geschwister aus -- der Koordinator
+hat fuer die Review-Tasks Buchstaben genommen, die in den
+Eskalations-Preregs laengst belegt waren.
+
+
+
 ## OFFEN (3)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
