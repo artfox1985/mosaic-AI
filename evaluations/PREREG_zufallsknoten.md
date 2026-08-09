@@ -574,3 +574,36 @@ nicht noetig -- wer sie will, braucht zwei Gatings statt einem.
 - Stapelzug: `MOSAIC_STACK_DRAW_RESEARCH=1` (subsumiert den
   Spezialfeld-Bug)
 - danach eingefroren
+
+#### KORREKTUR: die Heuristik laeuft nie durch den Aufloeser
+
+Der Abschnitt direkt oben ruht auf einer falschen Praemisse. Belegt:
+
+- Self-Play-/Arena-Schleife: `if pi == net_board { apply_chosen_action(..) }
+  else { game.apply_drafting(&chosen) }` (`self_play.rs:1527-1537`) -- der
+  Kommentar dort nennt es ausdruecklich "Sequenzielle
+  Stapel-Zieh-Aufloesung nur fuer den Netz-Spieler ... die Heuristik-Seite
+  braucht das laut Nutzer-Vorgabe nicht".
+- Python-Seite: `apply_chosen_action` unter der Ueberschrift "Stufe 2
+  (Netz)" (`py.rs:663`).
+- Und `self_play.rs:432` sagt es selbst: "nur der Netz-Pfad nutzt diese
+  Funktion".
+
+**Folge: in der HEURISTIK gibt es keinen Spezialfeld-Bug.**
+`wertung_progress` ist fuer Kriterium 6 exakt, und die reihenabhaengigen
+1..6 fallen in der Simulation ueber die echte Spiellogik an. Der neue Anker
+schrumpft auf die R5-Chipbehandlung; der oben beschriebene
+Attributionsverlust der Buendelung entfaellt.
+
+**Nebenprodukt, wertvoller als der Fix**: die Heuristik IST die
+Referenzimplementierung von "Peek ausfuehren und neu suchen" -- sie wendet
+die Einzelaktion an und laesst die Folgeentscheidung im naechsten
+Schleifendurchlauf entstehen (`self_play.rs:1530-1536`). Genau das ist die
+Nutzer-Vorgabe fuer den Netzpfad. Das Design ist erprobt, nicht spekulativ.
+
+**Empfehlung gegen einen Patch der flachen 3 im Netzpfad**: (1) er aendert
+die Zugwahl des Champions und braeuchte ein eigenes Gating, um Elo-legal zu
+bleiben; (2) das Bauteil ist zur Abloesung vorgesehen
+(`MOSAIC_STACK_DRAW_RESEARCH`); (3) der Ersatz laeuft auf der
+Heuristikseite bereits. Der direkte Weg ist der Forschungsknopf fuers Netz,
+und der braucht nur den Korpus mit Zwischenzustaenden.
