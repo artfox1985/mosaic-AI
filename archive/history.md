@@ -10330,3 +10330,66 @@ WDL-Kopf spielt fuer den Menschen spuerbar vorausschauender; deckt sich
 mit dem Watchlist-Befund (Effizienz-Paritaet, engere Bilanz 7:3).
 KI-Chip-Logging-Fix (🎫-Zeile im KI-Tiling-Pfad) auf Nutzer-Anweisung
 beauftragt.
+
+---
+
+## AUSGELAGERT aus STATUS.md (2026-08-09): abgeschlossene Bloecke
+
+Sieben TASK-INDEX-Zeilen (davon eine nur teilweise -- der offene Rest
+bleibt zusaetzlich in STATUS.md) sowie der Abschnitt NAECHSTE SCHRITTE,
+der Abschnitt OFFENES GATING und zwei Zeilen aus der Review-Tabelle
+2026-08-08 (B, C) ausgelagert. Die #29-Instrument-Dublette wurde NICHT
+ausgelagert, sondern in STATUS.md verlustfrei zu einer Zeile
+zusammengefuehrt (Bereinigung, kein Verschieben).
+
+### Original-Zeilen aus TASK-INDEX (verbatim)
+
+- **Platten-Intervention (endgame_head)** | **ABGESCHLOSSEN 2026-08-08: Arena H0 (97:103), Offline-Gewinne real (R5 0,457, Brier -0,0016) -> `--endgame-head` wird Standard-Rezept der naechsten Generation**; Champion bleibt. `PREREG_platten_intervention.md`
+- **τ-Annealing (Messung 3)** | **GESCHLOSSEN 2026-08-08: H0 (112:118, p=0,78) -> τ=1 bleibt, v21-Sockel OHNE Annealing.** Suchpfad-Prereg M1-3 damit KOMPLETT (3x Status quo re-validiert). `PREREG_suchpfad_nachmessungen.md`
+- **v21-Fenster fuellen** | **ZURUECKGESTELLT (Nutzer 2026-08-08: "nicht so auf die self plays stuerzen")**: Generator-Frage geklaert (Champion bleibt), 2.090 Schwarm-Partien zurueck in data/; Generierung erst, wenn die offene Task-Liste abgearbeitet ist (und ohnehin nach τ- und #37-Verdikt). `PREREG_v21_fenster.md` -- **UEBERHOLT (2026-08-09): v21 ist inzwischen trainiert und Champion** (`v21_2d_brierbest`, s. Abschnitt GELTENDE REGELN in STATUS.md)
+- **Messset-Snapshot + v16/v17-Freigabe** (Snapshot-Teil ausgelagert, der offene Rest steht weiter in STATUS.md) | Snapshot ERLEDIGT 2026-08-07 abends (`data/altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor
+- **#35b Ranking-Loss** | **GESCHLOSSEN 2026-08-08**: Loss arbeitet (Val-Ranking-Acc 0,740, Policy-Val 0,47 < 0,49), aber Orakel-Vorpruefung NEGATIV (Top-3-Masse 0,688 vs 0,710) -> per Prereg kein Gating. Lehrsatz: verbessert die NICHT-validierte Metrik, verschlechtert die validierte. `PREREG_t35b_ranking.md`
+- ~~λ (Value-Target-Mix)~~ | **GESCHLOSSEN 2026-08-09**: Ein-Faktor-Gating 63:77 (H0, p=0,21, Richtung gegen λ) -> λ=0,7 hilft im WDL-Ziel nicht, Alt-Befund als aera-gebunden bestaetigt. Nebenbefund: Platt-B 0,9966 (perfekte Kalibrierung ohne Staerkegewinn) -- notiert fuer #31, kein Champion-Hebel
+- **#37 Tiling-Auswahlkriterium** | **GESCHLOSSEN 2026-08-08: H0 (284 vs 292, p=0,33)** -- Bestand punkte*P bestaetigt, Knopf MOSAIC_TILING_SELECT bleibt inert. `PREREG_t37_tiling_kriterium.md`
+- **frozen-Set-Neubau** | **ERLEDIGT 2026-08-08**: `frozen_eval_set_v2.pkl` (1.800 Zustaende, 4 Aera-Korpora, 0 Duplikate, v1 hash-unveraendert) + `frozen_v2_oracle_labels.json` (1.148 Labels, Orakel = Champion, 0 Fehler)
+
+### Original-Abschnitt "NAECHSTE SCHRITTE" (verbatim)
+
+## NAECHSTE SCHRITTE (Reihenfolge-Regel: Modell-Verdikte VOR Korpus-Generierung)
+
+1. **Heute Nacht (automatisch)**: `pi_endgame_s2` fertig -> Verdikt
+   (R5-Steigung/Brier) -> bei Bestehen Gating vs `v20_2d_opp_brierbest`
+   (Fruehstopp-Regel).
+2. **Danach GPU**: τ-Arm-B-Training (v20-Fenster, 2.000 Sockel-Partien
+   seed-bestimmt gegen `v19wdlann` getauscht; MOSAIC_DATA_EXCLUDE-
+   Pinning!) -> Gating -> τ-Verdikt fuer den Sockel.
+3. **Dann CPU**: v20-Schwarm fortsetzen/neu (Generator = finaler
+   v20-Aera-Champion; Quarantaene-Entscheid beim Nutzer, falls
+   Champion wechselt) -> v20-Sockel gemaess τ-Verdikt.
+4. ~~Kleinkram~~ ERLEDIGT 2026-08-07 abends: Messset-Snapshot (s.o.)
+   + **R5-Steigungs-Seed-Skala: s2 0,349 vs s3 0,295 -> ~0,05**
+   (r5_value_calibration_pi_ctrl.json). Lesart fuers Endgame-Verdikt:
+   ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
+   Seed-Sigma darueber.
+
+(Alle vier Punkte durch die inzwischen gefallenen Verdikte ueberholt;
+die aktuelle Bahn-Aufteilung steht in STATUS.md im Abschnitt LAUFENDE
+QUEUE, Stand 2026-08-09 mittags.)
+
+### Original-Abschnitt "OFFENES GATING" (verbatim)
+
+### OFFENES GATING (v20-Aera, hat Vorrang)
+
+**λ-Arm `lam07_wdl2_s2`**: trainiert, gueltig (Zielfeld `values_wdl`
+verifiziert), **Gating steht aus** -- Slot = v21-Trainingsfenster (GPU
+belegt, CPU frei). Kommando + Regeln: UEBERGABE §5a,
+`PREREG_lambda_wdl_arm.md`. Offline: Brier-Paritaet, aber Platt-B
+0,9966 (Champion 0,930).
+
+(UEBERHOLT: der λ-Arm ist inzwischen gegated und H0, s. TASK-INDEX-
+Zeile "λ (Value-Target-Mix)" oben.)
+
+### Zwei Zeilen aus der Review-Tabelle "AUS EXTERNEM REVIEW 2026-08-08" (verbatim; Task A und Task D bleiben in STATUS.md, da laufend/offen)
+
+- ~~B: Zerlegungs-Diagnose~~ | **GESCHLOSSEN 2026-08-09**: within-tree-Messung (gleiches Budget/Breite) ergibt mittlere Q-Differenz 0,00015 -- 66x unter der Schwelle; faktorierte Policy bleibt ungebaut. Rotations-Ebene nur mit Engine-Eingriff messbar, Proxy zeigt geringe Groessenordnung. Erst-Instrument war budget-konfundiert (0,0138)
+- ~~C: c_visit-Sweep~~ | **ZURUECKGEZOGEN**: `PREREG_ownership_gumbel.md` B1 hat die sigma-Familie regelkonform geschlossen, nachdem c_scale sich als folgenlos erwies (Task #18) -- ein Sweep waere ein Test gegen die eigene Vorregistrierung
