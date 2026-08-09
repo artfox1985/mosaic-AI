@@ -144,3 +144,67 @@ daher nur mit einem NEUEN Mechanismus, nicht mit einer weiteren
 k-Stufe -- und Regel 4 (Policy-Ziel-Qualitaet im Self-Play) entfaellt
 per Prereg, weil sie eine positiv beantwortete Staerke-Frage
 voraussetzte.
+
+---
+## WIEDEREROEFFNUNG 2026-08-09 (Nutzer-Einwand) -- NEUE Frage, nicht dieselbe Messung
+
+Nutzer: *"bin ich noch nicht überzeugt. 'Zwei Welten mitteln die
+verdeckte Information nicht besser als eine' hört sich für mich eher nach
+einem design fehler an. mehr info sollte eigentlich immer besser sein."*
+
+**Der Einwand trifft, und der Code belegt ihn.** Unsere Implementierung
+ist **nicht** ISMCTS, sondern PIMC mit Wurzel-Mittelung:
+`build_determinized_forest` (`net_mcts.rs:751`) baut *n unabhaengige*
+Suchbaeume (`Vec<Vec<Node>>`), zusammengefuehrt wird erst an der Wurzel
+(`aggregate_root_child_stats:794`, `average_completed_q_policy:822`).
+Echtes ISMCTS haelt EINEN Baum, dessen Knoten Informationsmengen sind;
+jede Simulation zieht eine frische Determinisierung und alle
+Simulationen sammeln Statistik in DENSELBEN Knoten -- die Vielfalt kommt
+ohne Teilung der Statistik.
+
+Folge: das H0-Ergebnis oben vermischt zwei Aenderungen. k=2 halbiert die
+Sims je Welt UND liefert den Vielfalts-Gewinn nur an der Wurzel; die
+Tiefenstruktur profitiert nicht. Gemessen wurde also "gleiches Budget,
+anders aufgeteilt", nicht "mehr Information". **Das H0-Verdikt bleibt
+gueltig fuer die rechen-neutrale Frage** (und damit fuer die
+Praxis-Entscheidung k=1) -- aber es beantwortet die Frage des Nutzers
+nicht.
+
+Regelkonformitaet: der Prereg erlaubt Wiedereroeffnung "nur mit einem
+NEUEN Mechanismus, nicht mit einer weiteren k-Stufe". Ein gemeinsamer
+Informationsmengen-Baum IST ein neuer Mechanismus. Die Wiedereroeffnung
+biegt die Regel also nicht.
+
+### Trenn-Messung (kein Code noetig): gleiche TIEFE, eine Welt vs zwei
+
+`split_sims_across_worlds` teilt das UEBERGEBENE Budget. Mit
+`--net-sims 1200` bei k=2 bekommt jede Welt 600 Sims -- **gleiche Tiefe
+wie die Kontrolle k=1@600, gleiche Wurzelbreite m=16 in beiden**
+(`gumbel_top_m_for_budget(600)`=16). Einziger Unterschied: eine Welt
+gegen zwei gemittelte. Ausdruecklich NICHT rechen-neutral (2x Kosten) --
+das ist der Zweck.
+
+Umsetzung: zwei Laeufe von `tools/paired_arena_env_ab.py` mit
+IDENTISCHEM Basis-Seed 20260828 (die Spiel-Seeds sind je Spielindex
+deterministisch abgeleitet, die Laeufe sind damit gepaart), je 400
+Partien: (A) k=1, `--net-sims 600`; (B) k=2, `--net-sims 1200`.
+Auswertung per exaktem McNemar auf den diskordanten Paaren ueber den
+Spielindex, PLUS Block-Ebene (Pflichtregel).
+
+**Entscheidungsregeln (vorab):**
+1. **k=2@600/Welt schlaegt k=1@600 signifikant** (McNemar p<0,05 UND
+   Block-SE-t>2) ⇒ die Vielfalt traegt, und die rechen-neutrale
+   Niederlage lag an der Tiefen-Teilung. Dann ist der gemeinsame
+   Informationsmengen-Baum GERECHTFERTIGT (er liefert Vielfalt ohne
+   Teilung) und bekommt eine eigene Vorregistrierung mit
+   Aufwandsschaetzung. **Dieser Arm selbst wird NICHT Preset** -- er
+   kostet 2x Rechenzeit, das ist im Self-Play nicht bezahlbar.
+2. **H0** ⇒ die Vielfalts-Hypothese selbst ist schwach, unabhaengig von
+   der Implementierung. Dann ist der Punkt endgueltig zu, und ein
+   Umbau auf gemeinsamen Baum waere nicht durch Messung gedeckt.
+3. **k=2@600/Welt ist schlechter** ⇒ ebenfalls zu; die Mittelung
+   schadet dann sogar bei gleicher Tiefe (moegliche Lesart:
+   Strategy-Fusion-Mittelung verwaessert eine in der gezogenen Welt
+   korrekte Linie).
+4. Deskriptiv: Zeit je Partie beider Arme (Beleg, dass B wirklich ~2x
+   kostet und die Tiefe nicht heimlich anders liegt).
