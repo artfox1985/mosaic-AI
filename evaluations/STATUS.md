@@ -104,6 +104,23 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
   mit `MOSAIC_DATA_EXCLUDE` pinnen (Split+Cache-Key haengen an der
   Dateiliste). Verifikation: "Lade HDF5-Cache"-Zeile.
 - **Backup-/Alt-Regel-Korpora**: kommen NIE wieder ins Training.
+- **PROMOTIONS-CHECKLISTE (Nutzer-Hinweis 2026-08-09: die Kader-Praxis
+  wurde bis dato nicht konsequent umgesetzt)** -- bei JEDEM
+  Champion-Wechsel vollstaendig abarbeiten, nicht aus dem Gedaechtnis:
+  1. `tools/set_champion.py <neu>` (Server-Default, wirkt nach Neustart).
+  2. Elo-Kante **Gating** (Champion-1) -- inkl. Replikations-Zeile, falls
+     Fruehstopp <150 Paare.
+  3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=150 ohne
+     Fruehstopp** (Praezedenz v18/v19/v20-Verankerung).
+  4. Elo-Kante **Champion-2** (der Vorvorgaenger, @400) -- **das ist der
+     Punkt, der bei v20 UND v21 zunaechst fehlte**; ohne ihn ruht die
+     Elo-Schaetzung auf zu wenigen Kanten (v21 nach dem Gating:
+     CI +-90 Punkte).
+  5. Pflicht-Diagnostiken am Sieger (Platt, R5, Alt-Set-Brier, R4b) +
+     Eintrag in die #29-Buchfuehrung.
+  6. STATUS-Champion-Zeile + history-Kapitel.
+  Nachtrag-Schuld: v20 fehlt die Kante zu `v19_best` (Champion-2 seiner
+  Generation) -- billig nachholbar, Nutzer-Entscheid.
 - **LOESCHEN NUR MIT EXPLIZITER RUECKFRAGE (Nutzer-Regel 2026-08-08,
   dritter Vorfall dieser Klasse -- "inakzeptabel")**: Kein Loeschen,
   Verschieben oder Ueberschreiben von Dateien, Ordnern oder Worktrees
