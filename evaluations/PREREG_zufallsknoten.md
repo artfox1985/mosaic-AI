@@ -415,3 +415,50 @@ Belegung). Klein -> Weg B vertretbar. Gross -> die 24x sind gerechtfertigt.
 Die k=4-Evidenz (`PREREG_ismcts_determinisierungen.md`: rechenneutral
 monoton fallend, -8,75pp bei k=4) mahnt dabei zum Kostentor: Baum-
 Vervielfachung hat sich in diesem Projekt schon einmal nicht bezahlt.
+
+### Der Loeser sitzt in BEIDEN Bahnen -- das Leck ist symmetrisch (Nutzer 2026-08-10)
+
+*"die heuristik hat aber auch den alpha beta solver drinnen oder?"* -- ja.
+`round5::choose_action` wird gerufen von `search_action` (`mcts.rs:767`),
+`search_with_tree` (`mcts.rs:783`) und `root_child_stats` (`mcts.rs:732`),
+also der HEURISTIK-Bahn, ebenso von `net_mcts.rs:3573/:3619`.
+
+**Folge 1 -- keine Verzerrung der bisherigen Messungen.** Anker und Netz
+haben dasselbe Orakelwissen in Runde 5. Jede Arena Netz-gegen-Heuristik ist
+davon unberuehrt, weil es eine GEMEINSAME Komponente ist. Meine Warnung,
+das Schliessen koennte die Champion-Elo druecken, war falsch begruendet.
+
+**Folge 2 -- ein Fix aendert den ANKER.** Heuristik@150/@200 ist das
+Elo-Lineal der gesamten Leiter. Eine Korrektur in `round5.rs` macht
+Elo-Werte davor und danach unvergleichbar -- dieselbe Klasse wie die
+Regelwerk-Fixes (`project_rulebook_audit_fixes`), weswegen domefactB/v10
+vor jenem Schnitt liegen.
+
+**Loesung nach der Knopf-Disziplin des Projekts**: `MOSAIC_*`-Knopf mit
+Default = heutiges Verhalten. Die alte Leiter bleibt unter Knopf=0
+reproduzierbar, die neue Messreihe startet bewusst mit Knopf=1 auf BEIDEN
+Seiten. Kein stiller Ankerwechsel. (Arbeitsname `MOSAIC_R5_HIDE_CHIPS`.)
+
+### Teil D wird billiger als geplant
+
+Nicht eine Arena, sondern eine **Uneinigkeitszaehlung**: die von
+`round5::choose_action` gewaehlte Aktion unter der WAHREN Belegung gegen die
+gewaehlte Aktion unter permutierten Belegungen. Kein Spiel muss zu Ende
+gespielt werden. Entscheidungsgroesse = Anteil der R5-Zustaende, in denen
+die Wahl kippt.
+
+### NODE_BUDGET dreht das Kostenbild
+
+`round5::NODE_BUDGET = 200` (`round5.rs:59`), `TIME_BUDGET` nur noch
+Notdeckel (`:67`). Der "exakte Loeser" ist damit **heute schon bei 200
+Knoten abgeschnitten** -- exakt ist die BLATTBEWERTUNG
+(`calculate_end_scoring` + Tiling-Solver), nicht die Loesung der Runde.
+
+- Die <=24-fache Verzweigung trifft ein winziges Budget: 4.800 Knoten sind
+  neben 400 Netz-Sims mit 2D-Inferenz nichts. Mein Kostenbedenken oben
+  ("bis 24x", Warnung aus der k=4-Evidenz) war **ueberzogen** -- die
+  k=4-Evidenz betraf volle Netz-Wurzelbaeume, nicht 200-Knoten-Alpha-Beta.
+- Mechanistisch ist das Leck wahrscheinlich **klein**: 200 Knoten reichen
+  selten tief genug, um eine Manufaktur leerzuraeumen, den Chip
+  aufzudecken und ihn zu nehmen. Das ist eine testbare Vorhersage fuer
+  Teil D, vorab notiert.
