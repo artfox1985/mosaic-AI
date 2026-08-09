@@ -103,8 +103,36 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
 - **Fenster-Pinning**: Trainings waehrend laufender Generierung IMMER
   mit `MOSAIC_DATA_EXCLUDE` pinnen (Split+Cache-Key haengen an der
   Dateiliste). Verifikation: "Lade HDF5-Cache"-Zeile.
-- **FENSTERGROESSE IST FIXIERT (Nutzer-Entscheid 2026-08-09: "das
-  Fenster bleibt nun so")**: 29.450 Partien / 2.945 Dateien / ~4,8 Mio.
+- **NACHSCHUB BEI GATING-FEHLSCHLAG -- KORRIGIERTE FASSUNG
+  (Nutzer 2026-08-09)**: Die Streichung des Nachschub-Ventils vom
+  2026-08-07 war **generationsspezifisch** (v20-Zyklus, weil dort eine
+  lange Nebentask-Liste offen war) und **KEINE stehende Anweisung** --
+  ich hatte sie faelschlich verallgemeinert (auch in
+  PREREG_v21_fenster.md, dort korrigiert).
+  **ERSETZUNG (frischer Batch desselben Generators + Rausrotieren einer
+  Alt-Generation) ist VERWORFEN** -- Nutzer-Argument, und es ist
+  richtig: das ist indirekt mehr Volumen vom SELBEN Champion, waehrend
+  die Diversitaet der alten Generationen aus dem Fenster fliegt. Genau
+  die Generationen-Spreizung ist aber der Grund, ueberhaupt Alt-Material
+  mitzufuehren.
+  **Was bleibt: gezielte INJEKTION** (Sockel-Partien dazu, nichts
+  verdraengt -- schont die Diversitaet). Bedingungen, damit daraus kein
+  "solange nachlegen bis der Kandidat gewinnt" wird:
+  1. Umfang und Entscheidungsregel VOR der Injektion schriftlich
+     (Mini-Prereg), nicht nach dem verlorenen Gating improvisiert.
+  2. Einmalig und begrenzt je Generation (Vorschlag: +2.000 Sockel),
+     kein iteratives Nachlegen.
+  3. Naming: derselbe Generator erzeugt ein Batch mit
+     Unterscheidungs-Suffix (`v20wdlb`), sonst Datei-Kollision.
+  4. Lesart des Ergebnisses: ein Sieg NACH Injektion belegt "die
+     Generation brauchte mehr Policy-Material" -- NICHT, dass eine
+     etwaige Rezept-Aenderung des Kandidaten gewirkt hat. Diese
+     Unterscheidung muss im Verdikt stehen.
+  5. Diagnostischer Rueckenwind erwuenscht (Policy-Wacht: fallen die
+     Orakel-Metriken gegen die Vorgeneration, ist die Policy-Klasse der
+     belegte Engpass), aber keine harte Vorbedingung -- Nutzer-Entscheid.
+- **FENSTERGROESSE: FIXIERTE BASIS, Injektion ist die benannte Ausnahme
+  (Nutzer-Entscheide 2026-08-09)**: 29.450 Partien / 2.945 Dateien / ~4,8 Mio.
   Zustaende bleiben die stehende Groesse. Die Rotation haelt sie
   konstant -- pro Windung 12.000 NEUE Partien (4.000 Sockel @600 +
   8.000 Schwarm @150), gleich viel altes Material rotiert raus. Folgen:
@@ -113,11 +141,12 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
   Windung FRISCHER statt groesser; (c) RAM/Cache-Budget stabil
   (~13 GB im Training, ~1 GB auf Platte).
   **Nicht neu aufrollen**: der Dosis-Befund ("Volumen half 6/6") ist
-  eine stehende Versuchung, das Fenster wieder zu vergroessern -- die
+  eine stehende Versuchung, das Fenster generell zu vergroessern -- die
   Entscheidung dagegen ist bewusst gefallen (planbare Kosten,
-  stationaeres Design ab v22). Eine Vergroesserung braucht einen
-  ausdruecklichen neuen Nutzer-Entscheid, keine Ableitung aus dem
-  Dosis-Befund.
+  stationaeres Design ab v22). Eine DAUERHAFTE Vergroesserung braucht
+  einen ausdruecklichen neuen Nutzer-Entscheid. Die einmalige,
+  vorregistrierte Injektion bei Gating-Fehlschlag (s.o.) ist davon
+  ausgenommen und veraendert die Basisgroesse nicht.
 - **Backup-/Alt-Regel-Korpora**: kommen NIE wieder ins Training.
 - **PROMOTIONS-CHECKLISTE (Nutzer-Hinweis 2026-08-09: die Kader-Praxis
   wurde bis dato nicht konsequent umgesetzt)** -- bei JEDEM

@@ -115,8 +115,10 @@ Champion-Rezept (warm, lr 5e-5 cosine, wdl, brierbest-Politik,
 Schema 18); Kopf-Konfiguration (mit/ohne `--endgame-head`) gemaess dem
 Verdikt der Platten-Intervention VOR dem v21-Training. Gating vs
 `v20_2d_opp_brierbest`, Standard-SPRT bis 200 Paare, Fruehstopp-Regel
-(kein Entscheid <150 Paare ohne Frisch-Seed-Replikation). Kein
-Nachschub-Ventil (stehende Nutzer-Regel). Auswertungs-Paket wie v20
+(kein Entscheid <150 Paare ohne Frisch-Seed-Replikation). Nachschub: die Streichung des Ventils war v20-spezifisch (Klarstellung
+Nutzer 2026-08-09) -- bei H0 ist eine EINMALIGE, vorregistrierte
+Sockel-Injektion zulaessig (Ersetzung/Rausrotieren ist verworfen:
+zerstoert Generationen-Diversitaet). Details: STATUS, Regel-Block. Auswertungs-Paket wie v20
 (Policy-Wacht, Platt, R5, R4b, Saettigungspunkt auf dem
 90-Dateien-Altmessset, Struktur-Watchlist sobald Nutzer-Partien
 vorliegen). Fenster-Rotations-A/B (Memory-Punkt fuer v21) gilt durch
