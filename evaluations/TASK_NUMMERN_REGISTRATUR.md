@@ -174,6 +174,30 @@ arbeitende Agenten/Sessions unabhaengig voneinander dieselbe freie Nummer
 gezogen haben. Genau das Risiko, das die neue Namenskonvention
 (`PREREG_INDEX.md`) beheben soll.
 
+### REPARATUR 2026-08-09 (Nutzer-Entscheid: "duplikate sind nicht aktzeptabel")
+
+Die Kollision ist aufgeloest: der **Rust-Block wurde auf `#99`
+umnummeriert** (`engine/src/tiling_solver.rs`, drei Stellen, mit
+Reparatur-Notiz im Code). Die history.md-Bedeutung behaelt `#33`.
+
+Warum diese Richtung: die Loss-Sweep-Bedeutung steckt an **fuenf**
+Stellen in einer Entscheidungs-Erzaehlung (`#33 VOR #34` -> korrigiert
+zu `#33 IN #34`, "Prioritaet: vor #33 und #35") -- ein Umschreiben
+haette den dokumentierten Ablauf verfaelscht. Die Memoisierung stand an
+**drei** Stellen in einer einzigen Datei.
+
+Warum `#99` und nicht eine der freien Luecken: die Luecken sind NICHT
+beweisbar frei. Nummern koennen im Chat vergeben worden sein, ohne Spur
+in den Dateien zu lassen (siehe Warnhinweis im LUECKEN-Abschnitt) --
+eine Interior-Luecke zu recyceln koennte eine NEUE Kollision erzeugen.
+Oberhalb des bisherigen Maximums `#98` ist das ausgeschlossen.
+`cargo build --release` nach der Umnummerierung gruen.
+
+**Dies ist die einzige zulaessige Vergabe einer neuen `#NN`**: eine
+Reparatur an einem bestehenden Widerspruch, keine Kennung fuer neue
+Arbeit. Fuer neue Arbeit gilt unveraendert die Namenskonvention
+(Prereg-Datei ist die Kennung).
+
 **Ein weicher, historischer Fund**: **`#5`** wurde laut
 `archive/history.md:5452` ("**Liga-Selfplay gegen Alt-Champions**
 (urspruenglich als #5 vorgeschlagen)") zunaechst fuer eine Idee

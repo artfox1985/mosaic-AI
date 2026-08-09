@@ -225,8 +225,19 @@ pub fn solve_max_tiling_points_exact(state: &GameState, pi: usize) -> i32 {
     solve_rec(state, pi, 0, true, &mut budget)
 }
 
-// ── Task #33: Transpositions-Memoisierung ───────────────────────────────────
+// ── Task #99: Transpositions-Memoisierung ───────────────────────────────────
 //
+// NUMMERN-REPARATUR 2026-08-09: dieser Block trug bis dahin die Nummer #33,
+// die am 2026-08-04 parallel auch fuer den "Value-/Policy-Loss-Gewicht-Sweep"
+// vergeben wurde (archive/history.md:9597) -- zwei unabhaengige Themen, gleiche
+// Nummer, weil es damals keine Registratur gab. Umnummeriert wurde DIESE Seite,
+// weil die andere Bedeutung an fuenf Stellen in einer Entscheidungs-Erzaehlung
+// steht ("#33 IN #34", "vor #33 und #35") und ein Umschreiben den historischen
+// Ablauf verfaelschen wuerde; hier waren es drei Stellen in einer Datei.
+// #99 statt einer der freien Luecken (40-61 usw.): Luecken koennen im Chat
+// vergeben worden sein, ohne Spur in den Dateien -- oberhalb des bisherigen
+// Maximums #98 ist eine Neu-Kollision ausgeschlossen.
+// Registratur: evaluations/TASK_NUMMERN_REGISTRATUR.md
 // HERLEITUNG DES CACHE-SCHLÜSSELS (Auftrag Schritt 1a, Code gelesen 2026-08-04):
 // `solve_round_final_score`/`solve_max_tiling_points` (und transitiv `solve_rec`,
 // `legal_steps`, `chippable_rows`, `apply_step` -> `execute_full_tiling`,
@@ -332,7 +343,7 @@ fn tiling_key_endaware(player: &PlayerBoard, scoring_tile_ids: &[usize]) -> Tili
 /// genug, um die Transpositionen INNERHALB einer Suche (ein Zug: einige
 /// hundert bis wenige tausend Solver-Aufrufe, siehe `NODE_BUDGET`) fast
 /// immer im Cache zu halten, aber klein genug, um den Speicher pro der 11
-/// Self-Play-Threads (Task-#33-Kontext) begrenzt zu halten.
+/// Self-Play-Threads (Task-#99-Kontext, vormals #33) begrenzt zu halten.
 const CACHE_CAP: usize = 20_000;
 
 thread_local! {
@@ -1668,7 +1679,7 @@ mod tests {
         }
     }
 
-    // ── Task #33: Transpositions-Memoisierung ────────────────────────────────
+    // ── Task #99 (vormals #33): Transpositions-Memoisierung ──────────────────
 
     /// Auftrag Schritt 2: Wiederholungsrate MESSEN, bevor ein echter Cache
     /// gebaut wird. Treibt REALE Produktionscodepfade -- Netz-Feature-Build
