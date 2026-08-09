@@ -69,9 +69,25 @@ nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
-| **GPU** | Task D Arm `t_d_vw08` (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
-| **CPU** | frei -- **E3b GESCHLOSSEN** (s.u.) | ISMCTS-k (3x400 @600, Tool `tools/paired_arena_ismcts.py` existiert), dann die Task-D-Gatings (sequenziell, gleiche Bahn) |
-| **offline** | frei | — |
+| **GPU** | Task D Arm `t_d_vw08`, Epoche 5-6 (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (points_weight 0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion. `PREREG_task_d_gewichte.md` |
+| **CPU** | **ISMCTS-k** (3x400 @600 Sims, Basis-Seed 20260820, `MOSAIC_NUM_DETERMINIZATIONS` 1/2/4) -- Arm 1 bei Block 10/16 | die Task-D-Gatings, sequenziell auf derselben Bahn |
+| **offline** | frei | Punkte-Kopf **Stufe 2** -- WARTET auf die Wheel-Installation (s.u.) |
+
+**BLOCKIERT: Wheel-Installation.** Das Stufe-2-Instrument ist gebaut
+(je Wurzelkandidat `moves[].net_raw_value` / `net_points_forecast` /
+`net_opp_points_forecast`; 311 Tests gruen, Paritaetstest
+`gumbel_trace_collection_does_not_change_search` ok), aber **nicht
+installiert** -- Windows sperrt die DLL, und sowohl das Training (ueber
+den Encoder) als auch die Arena halten sie. Abfolge, sobald BEIDE
+Bahnen leer sind:
+1. `python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`
+2. Paritaets-Probe MUSS `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` liefern.
+3. Dann Stufe-2-Messung (Kendall-Tau der Zug-Reihenfolge ueber
+   Plattenkombinationen, plus Pflicht-Beigabe `raw_value`).
+
+**Danach eingetaktet**: Plattenkopf (`PREREG_plattenkopf.md`) -- erst
+NACH Abschluss von Task D, weil der Schema-Bump den gemeinsamen Cache
+invalidiert und `pw025` sonst auf einem anderen Korpus trainierte.
 
 **Wheel-Stand**: neu gebaut und installiert 2026-08-09 13:1x, 311 Tests
 gruen, **Paritaets-Hash exakt getroffen**
