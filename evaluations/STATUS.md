@@ -1,47 +1,23 @@
 # Mosaic-AI — Status & Fahrplan
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
-**`../archive/history.md`** (zuletzt ausgelagert 2026-08-07 abends:
-Mensch-vs-KI-Befund, Suchpfad-Inventar, #37-Volltext; #14
-geschlossen).
+**`../archive/history.md`** (zuletzt ausgelagert 2026-08-09: TASK-INDEX-
+Zeilen Platten-Intervention/τ-Annealing/v21-Fenster-Altstand/Messset-
+Snapshot-Teil/#35b/λ/#37/frozen-Set-Neubau, Abschnitt NAECHSTE
+SCHRITTE, Abschnitt OFFENES GATING (λ-Arm), Review-Punkte B+C).
 
 ---
 
-## TASK-INDEX (nur OFFEN/LAUFEND, Stand 2026-08-07 abends)
+## TASK-INDEX (nur OFFEN/LAUFEND, Stand 2026-08-09)
 
 | Task | Status |
 |---|---|
-| **Platten-Intervention (endgame_head)** | **ABGESCHLOSSEN 2026-08-08: Arena H0 (97:103), Offline-Gewinne real (R5 0,457, Brier -0,0016) -> `--endgame-head` wird Standard-Rezept der naechsten Generation**; Champion bleibt. `PREREG_platten_intervention.md` |
-| **τ-Annealing (Messung 3)** | **GESCHLOSSEN 2026-08-08: H0 (112:118, p=0,78) -> τ=1 bleibt, v21-Sockel OHNE Annealing.** Suchpfad-Prereg M1-3 damit KOMPLETT (3x Status quo re-validiert). `PREREG_suchpfad_nachmessungen.md` |
-| **v21-Fenster fuellen** | **ZURUECKGESTELLT (Nutzer 2026-08-08: "nicht so auf die self plays stuerzen")**: Generator-Frage geklaert (Champion bleibt), 2.090 Schwarm-Partien zurueck in data/; Generierung erst, wenn die offene Task-Liste abgearbeitet ist (und ohnehin nach τ- und #37-Verdikt). `PREREG_v21_fenster.md` |
-| **Messset-Snapshot + v16/v17-Freigabe** | Snapshot ERLEDIGT 2026-08-07 abends (`data/altmess_90files/`, Tool-Flag `--snapshot-dir`, gegen Referenz validiert, Brier bitgenau reproduziert). v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
+| **Messset-Snapshot + v16/v17-Freigabe** | v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor |
 | **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
-| **#35b Ranking-Loss** | **GESCHLOSSEN 2026-08-08**: Loss arbeitet (Val-Ranking-Acc 0,740, Policy-Val 0,47 < 0,49), aber Orakel-Vorpruefung NEGATIV (Top-3-Masse 0,688 vs 0,710) -> per Prereg kein Gating. Lehrsatz: verbessert die NICHT-validierte Metrik, verschlechtert die validierte. `PREREG_t35b_ranking.md` |
-| ~~λ (Value-Target-Mix)~~ | **GESCHLOSSEN 2026-08-09**: Ein-Faktor-Gating 63:77 (H0, p=0,21, Richtung gegen λ) -> λ=0,7 hilft im WDL-Ziel nicht, Alt-Befund als aera-gebunden bestaetigt. Nebenbefund: Platt-B 0,9966 (perfekte Kalibrierung ohne Staerkegewinn) -- notiert fuer #31, kein Champion-Hebel |
-| **#29-Instrument (Offline-Value-Praediktor)** | OFFEN: braucht frozen-Set-Neubau + arena-differenzierte Paare zur Validierung. `PREREG_nach34_paket` |
-| **#37 Tiling-Auswahlkriterium** | **GESCHLOSSEN 2026-08-08: H0 (284 vs 292, p=0,33)** -- Bestand punkte*P bestaetigt, Knopf MOSAIC_TILING_SELECT bleibt inert. `PREREG_t37_tiling_kriterium.md` |
-| **frozen-Set-Neubau** | **ERLEDIGT 2026-08-08**: `frozen_eval_set_v2.pkl` (1.800 Zustaende, 4 Aera-Korpora, 0 Duplikate, v1 hash-unveraendert) + `frozen_v2_oracle_labels.json` (1.148 Labels, Orakel = Champion, 0 Fehler) |
-| **#29-Instrument** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen |
+| **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen. `PREREG_nach34_paket.md` |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
 **UEBERGABE-DOKUMENT (2026-08-08): `evaluations/UEBERGABE_v21_spirale.md`** -- vollstaendige Kommandos + Regeln fuer die v21-Spirale, geschrieben fuer den naechsten Koordinator; dort zuerst lesen.
-
-## NAECHSTE SCHRITTE (Reihenfolge-Regel: Modell-Verdikte VOR Korpus-Generierung)
-
-1. **Heute Nacht (automatisch)**: `pi_endgame_s2` fertig -> Verdikt
-   (R5-Steigung/Brier) -> bei Bestehen Gating vs `v20_2d_opp_brierbest`
-   (Fruehstopp-Regel).
-2. **Danach GPU**: τ-Arm-B-Training (v20-Fenster, 2.000 Sockel-Partien
-   seed-bestimmt gegen `v19wdlann` getauscht; MOSAIC_DATA_EXCLUDE-
-   Pinning!) -> Gating -> τ-Verdikt fuer den Sockel.
-3. **Dann CPU**: v20-Schwarm fortsetzen/neu (Generator = finaler
-   v20-Aera-Champion; Quarantaene-Entscheid beim Nutzer, falls
-   Champion wechselt) -> v20-Sockel gemaess τ-Verdikt.
-4. ~~Kleinkram~~ ERLEDIGT 2026-08-07 abends: Messset-Snapshot (s.o.)
-   + **R5-Steigungs-Seed-Skala: s2 0,349 vs s3 0,295 -> ~0,05**
-   (r5_value_calibration_pi_ctrl.json). Lesart fuers Endgame-Verdikt:
-   ±0,05 um 0,349 = Seed-Klasse; die 0,5-Schwelle liegt ~3
-   Seed-Sigma darueber.
 
 ### v22-FENSTER -- DESIGN AUF HALDE, NICHT EINGEPLANT
 **Nutzer-Entscheid 2026-08-08: keine v22-Self-Plays; erst die
@@ -56,22 +32,12 @@ steigen. **Ab v22 ist die Rotationsregel stationaer** (v21 war die
 letzte Uebergangsgeneration). Vorbehalt fuer v21-Gating-H0: neuer
 Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 
-### OFFENES GATING (v20-Aera, hat Vorrang)
-
-**λ-Arm `lam07_wdl2_s2`**: trainiert, gueltig (Zielfeld `values_wdl`
-verifiziert), **Gating steht aus** -- Slot = v21-Trainingsfenster (GPU
-belegt, CPU frei). Kommando + Regeln: UEBERGABE §5a,
-`PREREG_lambda_wdl_arm.md`. Offline: Brier-Paritaet, aber Platt-B
-0,9966 (Champion 0,930).
-
 ### AUS EXTERNEM REVIEW 2026-08-08 (`EXTERNES_REVIEW_2026-08-08.md`)
 
 | Task | Kurz |
 |---|---|
 | **A: Floor-Shaping W=0 vs 0,3** | die nie gefahrene Kontrolle des WDL-Sweeps; der +14pp-Beleg ist Alt-Aera -> H0 wuerde eine Handheuristik ersatzlos streichen. 2x400 |
 | **D: GEWICHTS-SWEEP (erweitert)** | Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
-| ~~B: Zerlegungs-Diagnose~~ | **GESCHLOSSEN 2026-08-09**: within-tree-Messung (gleiches Budget/Breite) ergibt mittlere Q-Differenz 0,00015 -- 66x unter der Schwelle; faktorierte Policy bleibt ungebaut. Rotations-Ebene nur mit Engine-Eingriff messbar, Proxy zeigt geringe Groessenordnung. Erst-Instrument war budget-konfundiert (0,0138) |
-| ~~C: c_visit-Sweep~~ | **ZURUECKGEZOGEN**: `PREREG_ownership_gumbel.md` B1 hat die sigma-Familie regelkonform geschlossen, nachdem c_scale sich als folgenlos erwies (Task #18) -- ein Sweep waere ein Test gegen die eigene Vorregistrierung |
 
 Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
 zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
