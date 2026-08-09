@@ -327,3 +327,52 @@ ist der Preis fuer die dreiviertel Varianzreduktion.
 **Das vorige H0 bleibt gueltig fuer seine Frage** (k=2, gleiche Tiefe:
 -4,75pp) und ebenso das rechen-neutrale H0 (k=1 bleibt Default). Neu ist
 nur, dass die Hypothese in ihrer STARKEN Form noch offen war.
+
+---
+## FESTGELEGTER NACHFOLGER, falls k=4 nicht wirkt (Nutzer 2026-08-09)
+
+Nutzer: *"und wenn k=4 nicht wirkt, müssen wir uns was anderes überlegen
+wie wir die welten simulieren. k=1 find ich einfach nicht sauber und geht
+am ziel vorbei."* Das deckt sich mit der stehenden Nutzer-Regel
+"Korrektheit vor gemessenem Nutzen" -- ein H0 macht k=1 nicht sauber,
+es macht nur k>1 zu keinem Hebel.
+
+Die Code-Sichtung zeigt: es gibt **drei** Unsicherheits-Mechanismen, und
+der k-Regler betrifft den unwichtigsten.
+
+| Mechanismus | Stand | Bewertung |
+|---|---|---|
+| `DETERMINIZE_ROOT_HIDDEN_INFO=true` -- EINE Stichwelt je Zugsuche fuer Kuppelstapel + verdeckte Bonuschips, danach laeuft die ganze Suche darauf | an | der klassische Determinisierungsfehler; hier setzt k>1 an |
+| `SHUFFLE_STACK_PEEK_IN_SEARCH=false` -- Neumischung bei jedem simulierten Peek | aus, **gemessen schaedlich** | mehr Suchvarianz als Bias-Korrektur; "ueberall neu ziehen" ist nachweislich nicht die Antwort |
+| **`ROUND_TRANSITION_SAMPLING=false`** -- die Fabrik-Neubefuellung am Rundenuebergang | **aus, toter Code** | die eigentliche Luecke, s.u. |
+
+**Der Nachfolger ist damit bestimmt: Chance-Node-Sampling am
+Rundenuebergang im SUCHPFAD.** Begruendung:
+
+1. Die Fabrik-Neubefuellung entscheidet, was BEIDE Spieler die ganze
+   naechste Runde draften koennen -- laut Code-Kommentar ist sie
+   "nirgends als echter Zufallsknoten repraesentiert". Das ist ein
+   groesseres Loch als die Stichwelt fuer Stapel und Chips.
+2. **Die Maschinerie existiert vollstaendig**:
+   `round_transition::sample_round_transition_value` mit
+   `N_SAMPLES_SEARCH=8` und eigenem `TIME_BUDGET`, angebunden in
+   `net_mcts.rs:1732`. Es ist ein Schalter, kein Neubau.
+3. Die Abschaltbegruendung im Code ("erst nach einer Val-R²-Verbesserung
+   im Trainingsziel-Pfad aktivieren") **vermischt zwei Fragen**:
+   Sampling im SUCHPFAD (Blattbewertung am Uebergang) ist unabhaengig von
+   Sampling im TRAININGSZIEL. Die Suchseite wartet damit seit Wochen auf
+   eine Verbesserung an anderer Stelle und ist nie eigenstaendig
+   getestet worden.
+4. Es ist die richtige Lehre aus dem `SHUFFLE_STACK_PEEK`-Befund: nicht
+   ueberall neu ziehen, sondern **genau am echten Zufallsknoten**.
+
+**Vor dem Arena-Arm zuerst die Kosten messen** (eigene Vorregistrierung,
+noch nicht angelegt): welcher Anteil der Blaetter sind
+Rundenuebergangs-Blaetter, und was kostet 8-faches Sampling dort? Nur
+Uebergangs-Blaetter sind betroffen, nicht alle -- der Aufschlag koennte
+klein sein. Ein Arm, dessen Kosten unbekannt sind, ist nicht
+rechen-neutral vergleichbar.
+
+Reihenfolge: k=4-Ergebnis abwarten (laeuft), dann diese Kostenmessung,
+dann der Arena-Arm. Bei einem k=4-SIEG gilt weiter Regel 1 oben (dann
+zuerst der gemeinsame Informationsmengen-Baum).
