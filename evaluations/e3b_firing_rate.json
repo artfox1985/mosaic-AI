@@ -1,0 +1,17 @@
+{
+  "task": "E3b Stufe 1 (Feuerrate)",
+  "prereg": "evaluations/PREREG_denial_tiebreak.md",
+  "model": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v21_2d_brierbest.onnx",
+  "net_sims": 400,
+  "heur_sims": 150,
+  "n_games": 200,
+  "base_seed": 20260826,
+  "uncert_z": "1.0",
+  "min_visit_frac": "0.5",
+  "denial_tiebreak_fired": 3260,
+  "denial_tiebreak_total": 8926,
+  "firing_rate": 0.36522518485323774,
+  "net_wins": 143,
+  "verdict": "STUFE 2 GERECHTFERTIGT",
+  "detail": "Feuerrate 36.52% >= 5% -- 2x400-Arena gemaess Prereg."
+}

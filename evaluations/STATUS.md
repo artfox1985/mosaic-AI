@@ -70,7 +70,7 @@ nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
 | **GPU** | Task D Arm `t_d_vw08` (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
-| **CPU** | E3b Stufe 1 laeuft (Feuerrate stabil ~36,5% ueber 6 Bloecke) | ISMCTS-k (3x400 @600) -- Tool `tools/paired_arena_ismcts.py` existiert bereits |
+| **CPU** | **FREI GEHALTEN fuer das Nutzer-Server-Game** (E3b Stufe 1 fertig) | E3b **Stufe 2** (2x400, gepaart, z=1,0 vs aus), dann ISMCTS-k (3x400 @600) -- Tool `tools/paired_arena_ismcts.py` existiert bereits |
 | **offline** | frei | — |
 
 **Wheel-Stand**: neu gebaut und installiert 2026-08-09 13:1x, 311 Tests

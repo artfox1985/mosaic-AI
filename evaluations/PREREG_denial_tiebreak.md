@@ -132,6 +132,40 @@ IRRELEVANT (die Arena koennte einen Effekt dieser Groesse ohnehin nicht
 aufloesen), Punkt ohne Arena geschlossen, Ergebnis dokumentiert.
 Feuerrate >= 5% -> Stufe 2.
 
+### ERGEBNIS Stufe 1 (2026-08-09): 36,52% -- STUFE 2 GERECHTFERTIGT
+
+`tools/e3b_firing_rate.py` (eigener Treiber, s.u.), Champion@400 vs
+Heuristik@150dyn, 200 Partien, Seed 20260826, z=1,0, f=0,5:
+**fired 3.260 / total 8.926 = 36,52%**, ueber alle 8 Bloecke stabil
+(36,58 / 36,50 / 36,40 / 36,52 / 36,55 / 36,52 -- keine Drift).
+Belegstelle `evaluations/e3b_firing_rate.json`.
+
+**Die Erwartung der Vorregistrierung war falsch.** Erwartet war eine
+starke Ausbremsung durch das Besuchs-Gate ("am Ende typischerweise nur
+1-2 Kandidaten mit hohen Besuchszahlen"); tatsaechlich qualifizieren
+sich in ueber einem Drittel aller Wurzelentscheidungen Alternativen und
+werden getauscht. Das Gate greift also viel seltener als gedacht --
+lesbar als Hinweis, dass das Sequential Halving am Ende mehrere
+Kandidaten mit vergleichbarer Besuchszahl hinterlaesst.
+
+**WERKZEUG-HINWEIS (wichtig fuer jede Wiederholung)**: Die Messung
+BRAUCHT `tools/e3b_firing_rate.py`. `DENIAL_TIEBREAK_FIRED/TOTAL` sind
+prozessglobale Atomics; `self_play.py` (frischer `mp.Process` je
+10er-Chunk) und `paired_arena_env_ab.py` (Worker je Arm) wuerden sie im
+KIND fuehren, der Elternprozess liest `(0, 0)` -- das saehe wie
+"Feuerrate 0%" aus und haette die Abbruchregel FALSCH-POSITIV
+ausgeloest. Der Treiber prueft darum zusaetzlich `total > 0` und meldet
+sonst "INSTRUMENT KAPUTT" statt einer Rate.
+
+**Deskriptiver Vorab-Hinweis, NICHT entscheidend**: In diesem Lauf (mit
+E3b AKTIV) gewann das Netz 143/200 = 71,5%. Task A hat am selben Tag,
+gleiche Sims, gleicher Gegner, aber anderem Seed und OHNE E3b 322/400 =
+80,5% gemessen. Die ~9pp Abstand liegen bei einer Block-SE von ~2,9pp
+in der Groessenordnung von 3 SE -- das ist ein ernstzunehmender Hinweis,
+dass E3b wie E3 SCHADET. Entschieden wird das trotzdem erst durch die
+GEPAARTE Stufe 2 (identische Seeds), weil hier zwei ungepaarte Laeufe
+mit verschiedenen Seeds verglichen werden.
+
 ## Stufe 2 (nur bei ausreichender Feuerrate)
 
 Zwei Arme a 400 Spiele, Champion@400 vs Heuristik@150dyn, identische
