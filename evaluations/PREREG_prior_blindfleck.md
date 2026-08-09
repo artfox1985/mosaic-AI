@@ -178,6 +178,66 @@ d.h. echter Dominanz einer Seite). Kosten ~10 min.
   Vergleichen. Task E ersetzt ihn durch das Orakel-Set, das genau
   diese Referenzrolle hat und schon gebaut ist.
 
+---
+## ERGEBNIS Task E (2026-08-09): REGEL 1 -- PUNKT GESCHLOSSEN
+
+Lauf am Champion `v21_2d_brierbest` gegen `frozen_v2_oracle_labels.json`,
+n=930 (Runden 1-4; Runde 5 per Altcode ausgeschlossen, dort exakter
+Loeser). Belegstelle `evaluations/t_e_prior_blindfleck.json`.
+
+| m | rauschfrei `prior_recall_at_m` | rausch-treu `gumbel_recall_at_m` |
+|---|---|---|
+| 8 | 0,9215 | 0,8922 |
+| **16** | 0,9978 | **0,9879** |
+| 32 | 1,0000 | 0,99993 |
+| 64 | 1,0000 | 1,0000 |
+
+**Entscheidungsmetrik `miss_rate_gumbel_m16` = 1,21%** -- deutlich unter
+der 5%-Schwelle, damit greift Regel 1: **Task F wird NICHT eingetaktet,
+kein Arena-Budget.** Regel 2b greift ebenfalls nicht (rauschfrei 0,22%,
+rausch-treu 1,21% -- die Kluft ist da, aber beide unter der Schwelle).
+
+Zum zweiten, im Prereg nicht numerisch definierten Kriterium von Regel 1
+("m=32 bringt keine relevante Verbesserung"): m=32 senkt die Miss-Rate um
+**1,2 Prozentpunkte** (1,21% -> 0,007%). Diese Groesse ist einordbar,
+weil die Arena die Staerke-Empfindlichkeit der Miss-Rate schon einmal
+abgesteckt hat: **m=8 gegen m=16 bei 400 Sims war ein Wash**, und
+zwischen diesen beiden liegen laut Tabelle **9,6 Prozentpunkte**
+Miss-Rate (10,78% vs 1,21%). Ein bereits als folgenlos gemessener
+Unterschied ist also ~8x groesser als der maximal noch erreichbare.
+Einschraenkung, damit das nicht als Beweis gelesen wird: bei festen Sims
+kauft m=8 zugleich mehr Tiefe je Kandidat, der Wash ist ein NETTO-Effekt
+und isoliert den Abdeckungs-Term nicht. Es waere ein Zufall, wenn sich
+ein grosser Abdeckungsschaden und ein grosser Tiefengewinn exakt
+aufhoben -- ausgeschlossen ist es nicht.
+
+**Die Aufschluesselung ist NICHT auswertbar** und wird bewusst nicht
+interpretiert: der hoechste Bucket-Wert (33-64 Aktionen, 4,15% bei
+n=149) entspricht ~6 Zustaenden gegen ~3,5 im Bucket >64 (2,86%,
+n=122), und der "monoton steigende" Rundenverlauf (R1 0,77% -> R4
+1,64%) sind ~2 gegen ~4 Zustaende. Alles Einzelzustands-Rauschen; die
+Substruktur ist bei n=930 nicht aufgeloest. Festzuhalten ist nur:
+**in allen Buckets niedrig**, inklusive des Falls mit >64 legalen
+Aktionen, wo die Abdeckung nominell nur ~10-25% betraegt. Genau die
+dort erwartete Haeufung tritt nicht auf.
+
+Bemerkenswert und der eigentliche Grund fuer den Befund: die
+Prior-Verteilung ist offenbar scharf genug, dass eine Ziehung ohne
+Zuruecklegen aus ihr den Orakel-Top-1 fast immer mitnimmt, obwohl nur
+32% der legalen Aktionen betrachtet werden. Die geringe ABDECKUNG ist
+also kein Blindfleck, solange die Prior-Masse konzentriert ist -- die
+Wurzelbreite ist die falsche Stelle zum Ansetzen, die Prior-QUALITAET
+bleibt der Hebel (dafuer existieren die validierten Orakel-Metriken).
+
+Selbsttest bestanden (m = Anzahl legaler Aktionen ⇒ Aufnahme-Rate exakt
+1,0 in allen 930 Zustaenden). Additivitaets-Nachweis: die historische
+v14-Zahl war nicht reproduzierbar, weil die 7 in
+`task89_oracle_metrics.json` gescorten Checkpoints nicht mehr auf der
+Platte liegen (Vorzustand, siehe NUM_ACTIONS-Orphaning). Ersatzweise --
+und starker -- Pre-Edit- gegen Post-Edit-Modul auf `v18_2d`:
+**bitgleich** ueber alle 952 Zeilen, `prior_recall_at_16` 0,9863445...
+in beiden.
+
 ## Telemetrie-Antwort (externe Frage)
 
 - **Varianz der Q-Skalierung: JA**, `tools/gumbel_scale_calibration.py`

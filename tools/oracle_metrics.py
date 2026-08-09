@@ -30,6 +30,14 @@ Vier Metriken je Netz, GESAMT + je Runde:
 
 Reine Auswertung/Lesezugriffe -- evaluations/frozen_v1_oracle_labels.json
 sowie frozen_eval_set.pkl werden nur GELESEN.
+
+ADDITIV ERWEITERT 2026-08-09 (Task E, evaluations/PREREG_prior_blindfleck.md):
+zusaetzliche Recall-Breiten (8/16/32/64, rauschfrei), eine rausch-treue
+Gumbel-Top-m-Aufnahmerate (Monte Carlo auf logit+Gumbel(0,1), das ECHTE
+Wurzelverfahren der Engine), Rangverteilung des Orakel-Top-1 im Prior sowie
+Aufschluesselung nach Aktionsanzahl/Runde -- nur ueber neue Funktionen und
+optionale, defaultfreie CLI-Flags (`--extra-metrics`, aus per Default); die
+bestehenden Aufrufe/Ausgaben oben bleiben davon unberuehrt.
 """
 import argparse
 import json
@@ -148,14 +156,14 @@ def _kendall_tau_a(x, y) -> float | None:
     return (concordant - discordant) / total_pairs
 
 
-def load_oracle():
-    with open(ORACLE_JSON, "r", encoding="utf-8") as fh:
+def load_oracle(oracle_json: Path = ORACLE_JSON):
+    with open(oracle_json, "r", encoding="utf-8") as fh:
         blob = json.load(fh)
     return blob["manifest"], blob["labels"]
 
 
-def load_frozen_states(record_indices: list[int]) -> dict[int, dict]:
-    with open(FROZEN_PKL, "rb") as fh:
+def load_frozen_states(record_indices: list[int], frozen_pkl: Path = FROZEN_PKL) -> dict[int, dict]:
+    with open(frozen_pkl, "rb") as fh:
         blob = pickle.load(fh)
     records = blob["records"]
     return {idx: records[idx] for idx in record_indices}
@@ -186,7 +194,72 @@ def masked_softmax(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
     return e / s
 
 
-def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx: dict[int, dict]):
+# ---------------------------------------------------------------------------
+# Task E (PREREG_prior_blindfleck.md) -- additive Erweiterung, aendert keine
+# der obigen Funktionen/Konstanten.
+# ---------------------------------------------------------------------------
+DEFAULT_RECALL_WIDTHS = (8, 16, 32, 64)
+DEFAULT_GUMBEL_SEED = 20260809
+DEFAULT_GUMBEL_DRAWS = 200
+ACTION_COUNT_BUCKETS = ("<=16", "17-32", "33-64", ">64")
+
+
+def masked_logits(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Rohe Netz-Logits mit additiver Grossstrafe auf illegale Aktionen --
+    exakt dieselbe Konstruktion wie der interne `masked`-Schritt in
+    masked_softmax() oben (logits + (mask-1)*1e9). Separat exponiert, weil
+    die Gumbel-Top-m-Ziehung der Engine (logit + Gumbel(0,1), dann Top-m) auf
+    LOGITS operiert, nicht auf Wahrscheinlichkeiten.
+    Aequivalenz zu log(masked_softmax(logits, mask)): beide Groessen
+    unterscheiden sich nur um logsumexp(masked_logits(logits, mask)), eine
+    pro Zustand FIXE Konstante -- eine Verschiebung aller Werte um dieselbe
+    Konstante aendert die argsort-Rangfolge von logit+Gumbel(0,1) nicht.
+    Beide Varianten liefern also identische Gumbel-Top-m-Mengen; hier direkt
+    die maskierten Rohlogits verwendet (kein Log/Exp-Umweg noetig)."""
+    return logits + (mask - 1.0) * 1e9
+
+
+def action_count_bucket(n_legal: int) -> str:
+    """Bucket fuer die Miss-Rate-Aufschluesselung nach Wurzelbreite (Task E,
+    Teil c). Prereg-Erwartung: der Fall mit vielen legalen Aktionen ist der
+    interessante (Abdeckung dort laut dome_split_diagnose.json nur ~10%)."""
+    if n_legal <= 16:
+        return "<=16"
+    if n_legal <= 32:
+        return "17-32"
+    if n_legal <= 64:
+        return "33-64"
+    return ">64"
+
+
+def gumbel_recall_rates(masked_logit_row: np.ndarray, best_id: int, widths,
+                         rng: np.random.Generator, n_draws: int) -> dict[int, float]:
+    """Rausch-treue Aufnahme-Rate des Orakel-Top-1 unter dem ECHTEN
+    Wurzelverfahren der Engine: Gumbel-Top-m auf logit+Gumbel(0,1) (eine
+    Ziehung ohne Zuruecklegen aus der Prior-Verteilung), dann die m
+    hoechsten. Monte Carlo mit `n_draws` Ziehungen aus EINEM, von aussen
+    uebergebenen Generator (Task E: ein Generator fuer den GANZEN Lauf, nicht
+    einer pro Zustand, damit die komplette Sequenz vom festen Seed
+    determiniert ist). Illegale Aktionen tragen die Grossstrafe aus
+    masked_logits() und werden dadurch auch nach Gumbel-Rauschen praktisch
+    nie gezogen (Selbsttest unten prueft das explizit)."""
+    n = masked_logit_row.shape[0]
+    gumbel = rng.gumbel(loc=0.0, scale=1.0, size=(n_draws, n))
+    perturbed = masked_logit_row[None, :] + gumbel
+    order = np.argsort(-perturbed, axis=1)
+    rates: dict[int, float] = {}
+    for m in widths:
+        top = order[:, :m]
+        hit = np.any(top == best_id, axis=1)
+        rates[int(m)] = float(np.mean(hit))
+    return rates
+
+
+def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx: dict[int, dict],
+                       extra_metrics: bool = False,
+                       recall_widths=DEFAULT_RECALL_WIDTHS,
+                       gumbel_rng: np.random.Generator | None = None,
+                       gumbel_draws: int = DEFAULT_GUMBEL_DRAWS):
     print(f"  Netz {model_name} ...", flush=True)
     model, encoder = load_model(model_name)
 
@@ -247,7 +320,7 @@ def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx:
         if len(moves) >= 3:
             tau = _kendall_tau_a(cand_prior, cand_q)
 
-        per_state.append({
+        row = {
             "record_index": lbl["record_index"],
             "round": lbl["round"],
             "value_pred": float(pred_v[i]),
@@ -255,7 +328,44 @@ def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx:
             "recall16_hit": recall16_hit,
             "prior_mass_top3": prior_mass_top3,
             "kendall_tau": tau,
-        })
+        }
+
+        if extra_metrics:
+            # Task E -- rein additiv: alle Basisfelder oben sind bereits
+            # berechnet und unveraendert; hier werden nur ZUSAETZLICHE
+            # Schluessel angehaengt.
+            n_legal = len(legal_ids)
+            order_full = np.argsort(-prior)  # identische Aufrufsignatur wie
+                                              # oben (top16_ids) -- m=16 bleibt
+                                              # dadurch bitgleich zum Altwert
+            prior_rank_best = int(np.where(order_full == best_id)[0][0]) + 1
+
+            recall_at_m = {}
+            for m in recall_widths:
+                recall_at_m[str(m)] = bool(best_id in set(order_full[:m].tolist()))
+            if 16 in recall_widths:
+                assert recall_at_m["16"] == recall16_hit, (
+                    "Additivitaets-Konsistenzbruch: recall_at_m[16] != recall16_hit"
+                )
+
+            mlogits = masked_logits(pred_p[i], mask)
+            # n_legal zusaetzlich als Selbsttest-Breite: bei m == Anzahl
+            # legaler Aktionen MUSS die Gumbel-Aufnahmerate exakt 1.0 sein
+            # (die Top-n_legal unter Grossstrafe-maskierten Logits sind immer
+            # exakt die legalen Aktionen, egal welches Gumbel-Rauschen faellt).
+            gumbel_widths = tuple(recall_widths) + (n_legal,)
+            rates = gumbel_recall_rates(mlogits, best_id, gumbel_widths, gumbel_rng, gumbel_draws)
+
+            row.update({
+                "num_legal_actions": n_legal,
+                "action_count_bucket": action_count_bucket(n_legal),
+                "prior_rank_best": prior_rank_best,
+                "recall_at_m": recall_at_m,
+                "gumbel_recall_at_m": {str(m): rates[m] for m in recall_widths},
+                "gumbel_selftest_rate_at_n_legal": rates[n_legal],
+            })
+
+        per_state.append(row)
 
     return per_state
 
@@ -288,6 +398,67 @@ def aggregate(per_state: list[dict], rounds=range(1, 6)) -> dict:
     result = {"overall": block(per_state)}
     result["by_round"] = {str(r): block([x for x in per_state if x["round"] == r]) for r in rounds}
     return result
+
+
+def _task_e_block(rows: list[dict], recall_widths=DEFAULT_RECALL_WIDTHS) -> dict:
+    """Ein Aggregations-Block (rauschfreie + rausch-treue Recall-Raten samt
+    Miss-Rate bei m=16) ueber eine beliebige Teilmenge von Zeilen -- Baustein
+    fuer overall/by_action_count_bucket/by_round in aggregate_task_e()."""
+    n = len(rows)
+    if n == 0:
+        return {"n": 0}
+    prior_recall = {
+        f"prior_recall_at_{m}": float(np.mean([r["recall_at_m"][str(m)] for r in rows]))
+        for m in recall_widths
+    }
+    gumbel_recall = {
+        f"gumbel_recall_at_{m}": float(np.mean([r["gumbel_recall_at_m"][str(m)] for r in rows]))
+        for m in recall_widths
+    }
+    out = {"n": n, **prior_recall, **gumbel_recall}
+    if 16 in recall_widths:
+        out["miss_rate_top16"] = 1.0 - prior_recall["prior_recall_at_16"]
+        out["miss_rate_gumbel_m16"] = 1.0 - gumbel_recall["gumbel_recall_at_16"]
+    return out
+
+
+def aggregate_task_e(per_state: list[dict], recall_widths=DEFAULT_RECALL_WIDTHS,
+                      rounds=range(1, 5)) -> dict:
+    """Task E (PREREG_prior_blindfleck.md) -- Aggregation der Zusatzfelder aus
+    compute_for_model(..., extra_metrics=True). Runde >=5 ist in per_state
+    bereits nicht enthalten (Alpha-Beta-Ausschluss oben, unveraendert), daher
+    `rounds` hier nur 1-4."""
+    rows = [r for r in per_state if "gumbel_recall_at_m" in r]
+    n = len(rows)
+    if n == 0:
+        return {"n": 0}
+
+    overall = _task_e_block(rows, recall_widths)
+
+    ranks = np.array([r["prior_rank_best"] for r in rows], dtype=float)
+    overall["oracle_top1_prior_rank"] = {
+        "median": float(np.median(ranks)),
+        "p90": float(np.percentile(ranks, 90)),
+        "max": float(np.max(ranks)),
+    }
+
+    selftest_rates = np.array([r["gumbel_selftest_rate_at_n_legal"] for r in rows], dtype=float)
+    overall["gumbel_selftest"] = {
+        "n": n,
+        "all_exactly_1_0": bool(np.all(selftest_rates == 1.0)),
+        "min_rate": float(np.min(selftest_rates)),
+    }
+
+    by_bucket = {b: _task_e_block([r for r in rows if r["action_count_bucket"] == b], recall_widths)
+                 for b in ACTION_COUNT_BUCKETS}
+    by_round = {str(rd): _task_e_block([r for r in rows if r["round"] == rd], recall_widths)
+                for rd in rounds}
+
+    return {
+        "overall": overall,
+        "by_action_count_bucket": by_bucket,
+        "by_round": by_round,
+    }
 
 
 def spearman_with_elo(model_names: list[str], metric_values: dict[str, float | None]) -> dict:
@@ -343,20 +514,56 @@ def gating_retrospective(per_model_aggregate: dict, metric_keys: list[str]) -> d
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--models", nargs="*", default=CANDIDATE_MODELS)
+    # Alle folgenden Flags sind additiv (Task E) -- Default reproduziert das
+    # Altverhalten exakt (gleiche Pfade, kein Zusatz-Block, keine RNG-Nutzung).
+    ap.add_argument("--oracle-json", default=None,
+                    help="Override fuer ORACLE_JSON (Default unveraendert: "
+                         f"{ORACLE_JSON.name})")
+    ap.add_argument("--frozen-set", default=None,
+                    help="Override fuer FROZEN_PKL (Default unveraendert: "
+                         f"{FROZEN_PKL.name})")
+    ap.add_argument("--out", default=None,
+                    help="Override fuer OUT_JSON (Default unveraendert: "
+                         f"{OUT_JSON.name})")
+    ap.add_argument("--extra-metrics", action="store_true",
+                    help="Task E (PREREG_prior_blindfleck.md): zusaetzliche "
+                         "Recall-Breiten, rausch-treue Gumbel-Top-m-"
+                         "Aufnahmerate, Rangverteilung, Aufschluesselung nach "
+                         "Aktionsanzahl/Runde. Default AUS -- ohne dieses "
+                         "Flag bleibt Verhalten/Ausgabe unveraendert.")
+    ap.add_argument("--recall-widths", nargs="*", type=int, default=list(DEFAULT_RECALL_WIDTHS))
+    ap.add_argument("--gumbel-seed", type=int, default=DEFAULT_GUMBEL_SEED)
+    ap.add_argument("--gumbel-draws", type=int, default=DEFAULT_GUMBEL_DRAWS)
     args = ap.parse_args()
 
-    print(f"Lade Oracle-Labels von {ORACLE_JSON} ...")
-    manifest, labels = load_oracle()
+    oracle_json = (ROOT / args.oracle_json) if args.oracle_json else ORACLE_JSON
+    frozen_pkl = (ROOT / args.frozen_set) if args.frozen_set else FROZEN_PKL
+    out_json = (ROOT / args.out) if args.out else OUT_JSON
+    recall_widths = tuple(args.recall_widths)
+
+    print(f"Lade Oracle-Labels von {oracle_json} ...")
+    manifest, labels = load_oracle(oracle_json)
     print(f"  {len(labels)} Oracle-Labels (Modell {manifest['model']}, sims={manifest['sims']})")
 
     record_indices = [lbl["record_index"] for lbl in labels]
-    print(f"Lade zugehoerige Zustaende aus {FROZEN_PKL} ...")
-    states_by_idx = load_frozen_states(record_indices)
+    print(f"Lade zugehoerige Zustaende aus {frozen_pkl} ...")
+    states_by_idx = load_frozen_states(record_indices, frozen_pkl)
+
+    # EIN Generator fuer den ganzen Lauf (Task E: Reproduzierbarkeit ueber
+    # die komplette Ziehungssequenz, nicht pro Zustand neu geseedet).
+    gumbel_rng = np.random.default_rng(args.gumbel_seed) if args.extra_metrics else None
 
     per_model_metrics = {}
     per_model_aggregate = {}
+    per_model_task_e = {}
     for name in args.models:
-        per_state = compute_for_model(name, labels, states_by_idx)
+        per_state = compute_for_model(
+            name, labels, states_by_idx,
+            extra_metrics=args.extra_metrics,
+            recall_widths=recall_widths,
+            gumbel_rng=gumbel_rng,
+            gumbel_draws=args.gumbel_draws,
+        )
         agg = aggregate(per_state)
         per_model_metrics[name] = per_state
         per_model_aggregate[name] = agg
@@ -367,6 +574,15 @@ def main() -> None:
             f"value_pearson={ov['value_pearson_r']} value_spearman={ov['value_spearman_r']} "
             f"tau={ov['kendall_tau_policy_vs_oracle_q']}"
         )
+        if args.extra_metrics:
+            task_e = aggregate_task_e(per_state, recall_widths=recall_widths)
+            per_model_task_e[name] = task_e
+            te_ov = task_e.get("overall", {})
+            print(
+                f"    [Task E] miss_rate_gumbel_m16={te_ov.get('miss_rate_gumbel_m16')} "
+                f"miss_rate_top16={te_ov.get('miss_rate_top16')} "
+                f"selftest_all_1.0={te_ov.get('gumbel_selftest', {}).get('all_exactly_1_0')}"
+            )
 
     # Rangkorrelation jeder Metrik (Overall) mit der bekannten Elo-Reihenfolge.
     metric_keys = [
@@ -399,9 +615,28 @@ def main() -> None:
         "elo_correlations": elo_correlations,
         "gating_retrospective": retro,
     }
-    with open(OUT_JSON, "w", encoding="utf-8") as fh:
+    if args.extra_metrics:
+        def _rel(p: Path) -> str:
+            try:
+                return str(p.relative_to(ROOT))
+            except ValueError:
+                return str(p)
+
+        out["task_e_prior_blindfleck"] = per_model_task_e
+        out["task_e_manifest"] = {
+            "models": args.models,
+            "oracle_label_file": _rel(oracle_json),
+            "frozen_set_file": _rel(frozen_pkl),
+            "n_states_labeled": len(labels),
+            "gumbel_seed": args.gumbel_seed,
+            "n_gumbel_draws": args.gumbel_draws,
+            "recall_widths": list(recall_widths),
+            "action_count_buckets": list(ACTION_COUNT_BUCKETS),
+            "decision_metric": "miss_rate_gumbel_m16",
+        }
+    with open(out_json, "w", encoding="utf-8") as fh:
         json.dump(out, fh, ensure_ascii=False, indent=2)
-    print(f"\nGeschrieben: {OUT_JSON}")
+    print(f"\nGeschrieben: {out_json}")
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT.
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_ismcts_determinisierungen.md` | Verbessert Mehrfach-Determinisierung (k=1/2/4, rechen-neutral via Sims-Split) bei 600 Netz-Sims die Spielstaerke gegen die PIMC-Strategy-Fusion? | Knopf vorbereitet, Messung steht in der "NACH-v21-QUEUE" (Nutzer-Go 2026-08-08), noch nicht gelaufen; `evaluations/STATUS.md`, Abschnitt "NACH-v21-QUEUE", Punkt 2 |
-| `PREREG_prior_blindfleck.md` | Verpasst die fixe Gumbel-Wurzelmenge (m=16 bei Median 50 legalen Aktionen) gute Zuege, und hilft eine groessere Wurzelbreite? | **Design auf Halde, NICHT eingetaktet** (2026-08-09, aus externem Review R2). Task E offline als Gate, F nur bei Miss-Rate >=5%; Abdeckungszahlen aus `evaluations/dome_split_diagnose.json` |
+| `PREREG_prior_blindfleck.md` | Verpasst die fixe Gumbel-Wurzelmenge (m=16 bei Median 50 legalen Aktionen) gute Zuege, und hilft eine groessere Wurzelbreite? | **Task E ENTSCHIEDEN (Regel 1)**: Miss-Rate 1,21% ⇒ Task F nicht eingetaktet. Task G (c_scale-Aera-Nachmessung) laeuft noch. `evaluations/t_e_prior_blindfleck.json`, Ergebnis-Abschnitt in der Prereg-Datei |
 
 ## ENTSCHIEDEN (27)
 
