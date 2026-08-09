@@ -144,6 +144,32 @@ def per_candidate_final_score(analysis):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Vorregistrierung Stufe 1 (evaluations/PREREG_punktekopf_platten.md,
+# 2026-08-09): traegt der PUNKTE-Kopf (und der opp_points_head, sowie -- als
+# Referenz -- der rohe raw_value) Wertungsplatten-Information an der WURZEL?
+# Rein additiv zum obigen Gumbel-Rang-Invarianz-Test: nutzt denselben Trace
+# (`value_debug`, `RootValueDebug` in net_mcts.rs ~Zeile 2539), der bei jedem
+# `run_trace`-Aufruf oben schon anfaellt -- kein zusaetzliches Sims-Budget je
+# Aufruf. Rauschboden-Protokoll 1:1 aus scoring_tile_sensitivity.py's
+# `baseline_*_two_seeds` gespiegelt (dieselbe Original-Kombination, zwei
+# Seeds), NICHT neu erfunden.
+# ---------------------------------------------------------------------------
+HEAD_FIELDS = ("points_forecast", "opp_points_forecast", "raw_value")
+
+
+def value_debug_heads(analysis):
+    """`value_debug`-Feld -> {points_forecast, opp_points_forecast, raw_value}.
+    Fehlt `value_debug` komplett (laut `net_search_state_json_trace`-Doku in
+    lib.rs nur der 0-Wurzelkandidaten-Randfall), liefert das Dict ueberall
+    None -- ein eigenstaendiger Anomalie-Fall, kein regulaeres "Kopf fehlt"
+    (siehe Aufrufer/Regel (e))."""
+    vd = analysis.get("value_debug")
+    if not vd:
+        return {f: None for f in HEAD_FIELDS}
+    return {f: vd.get(f) for f in HEAD_FIELDS}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--eval-set", default="evaluations/frozen_eval_set.pkl")
@@ -153,9 +179,16 @@ def main():
     ap.add_argument("--n-states", type=int, default=16)
     ap.add_argument("--n-combos", type=int, default=8)
     ap.add_argument("--seed", type=int, default=1000)
+    ap.add_argument("--seed2", type=int, default=None,
+                     help="PREREG_punktekopf_platten.md Stufe 1 (c): zweiter Seed fuer den "
+                          "Rauschboden (dieselbe Original-Kombination, zwei Seeds -- 1:1 aus "
+                          "scoring_tile_sensitivity.py's baseline_*_two_seeds gespiegelt). "
+                          "Default (None) = --seed + 1000, reproduziert dort die dortigen "
+                          "hartkodierten 1000/2000.")
     ap.add_argument("--arm", default="off", help="Label fuer PLATE_SHAPING_ENABLED-Zustand des installierten Wheels (nur Doku im Ergebnis-JSON, wird nicht geprueft)")
     ap.add_argument("--out", default="evaluations/plate_rank_invariance_result.json")
     args = ap.parse_args()
+    seed2 = args.seed2 if args.seed2 is not None else args.seed + 1000
 
     import pickle
 
@@ -178,6 +211,10 @@ def main():
     all_actual_decision_tracked = 0
     n_skipped_single_candidate = 0
     n_skipped_no_finalphase = 0
+    # -- Stufe 1 (PREREG_punktekopf_platten.md) --
+    all_plate_spread = {f: [] for f in HEAD_FIELDS}
+    all_seed_noise = {f: [] for f in HEAD_FIELDS}
+    heads_missing_states = {f: [] for f in HEAD_FIELDS}
 
     for idx, (record_index, rec) in enumerate(states):
         state = rec["state"]
@@ -186,6 +223,8 @@ def main():
         combos_for_state = [original_ids] + combos_for_state
 
         combo_gaps = []
+        # ci -> {points_forecast, opp_points_forecast, raw_value} (Stufe 1)
+        head_by_combo = {}
         # description -> {combo_index: sigma_q}
         sigma_by_desc = {}
         # ci -> {description: score}  (fuer den gezielten Top-2-Margin-Test)
@@ -200,6 +239,7 @@ def main():
             if not out.get("moves"):
                 continue
             n_root_candidates = len(out["moves"])
+            head_by_combo[ci] = value_debug_heads(out)  # Stufe 1
             gap, cands = last_phase_rank_gap(out)
             if gap is None:
                 if n_root_candidates <= 1:
@@ -233,6 +273,49 @@ def main():
                 sigma_by_desc.setdefault(desc, {})[ci] = sigma
 
             score_by_combo[ci] = per_candidate_final_score(out)
+
+        # -- Stufe 1 (b): Platten-Spannweite je Kopf ueber die 8 (FESTER
+        # Seed=args.seed) bereits oben ausgefuehrten Kombinationen -- kein
+        # Zusatzaufruf. Fehlender Kopf (None) wird NICHT als 0 gerechnet
+        # (Regel (e)): wird aus der Spannweite ausgeschlossen und separat als
+        # "fehlt in mind. 1 Kombination" vermerkt.
+        head_plate_spread = {}
+        head_plate_present_all = {}
+        for f in HEAD_FIELDS:
+            vals = [hv[f] for hv in head_by_combo.values() if hv[f] is not None]
+            n_missing = sum(1 for hv in head_by_combo.values() if hv[f] is None)
+            head_plate_present_all[f] = bool(head_by_combo) and n_missing == 0
+            head_plate_spread[f] = (max(vals) - min(vals)) if len(vals) >= 2 else None
+
+        # -- Stufe 1 (c): Seed-Rauschboden, 1:1 aus scoring_tile_sensitivity.py
+        # `baseline_*_two_seeds` gespiegelt -- dieselbe Original-Kombination,
+        # zwei Seeds. ci=0 im obigen Loop IST bereits "Seed A" (Original-
+        # Kombination, seed=args.seed); hier nur der EINE zusaetzliche
+        # "Seed B"-Aufruf noetig (analog `out_seed_b` dort).
+        head_seed_noise = {f: None for f in HEAD_FIELDS}
+        seed_a_heads = head_by_combo.get(0)
+        head_debug_seed_b = None
+        if seed_a_heads is not None:
+            out_seed_b = run_trace(state, original_ids, args.model, args.sims, args.c_puct, seed2)
+            head_debug_seed_b = value_debug_heads(out_seed_b)
+            for f in HEAD_FIELDS:
+                a, b = seed_a_heads[f], head_debug_seed_b[f]
+                if a is not None and b is not None:
+                    head_seed_noise[f] = abs(a - b)
+
+        for f in HEAD_FIELDS:
+            if head_plate_spread[f] is not None:
+                all_plate_spread[f].append(head_plate_spread[f])
+            if head_seed_noise[f] is not None:
+                all_seed_noise[f].append(head_seed_noise[f])
+            if not head_plate_present_all[f]:
+                heads_missing_states[f].append(record_index)
+
+        head_debug_by_combo = [
+            {"combo": list(combo), **head_by_combo[ci]}
+            for ci, combo in enumerate(combos_for_state)
+            if ci in head_by_combo
+        ]
 
         all_actual_decision_flips += state_decision_flips
         all_actual_decision_tracked += state_decision_tracked
@@ -280,6 +363,18 @@ def main():
             "top2_flips_of_8": top2_flips,
             "actual_decision_flips": state_decision_flips,
             "actual_decision_tracked": state_decision_tracked,
+            # -- Stufe 1 (PREREG_punktekopf_platten.md), additiv --
+            "head_debug_by_combo": head_debug_by_combo,
+            "head_debug_seed_b_original_combo": head_debug_seed_b,
+            "points_forecast_plate_spread": head_plate_spread["points_forecast"],
+            "opp_points_forecast_plate_spread": head_plate_spread["opp_points_forecast"],
+            "raw_value_plate_spread": head_plate_spread["raw_value"],
+            "points_forecast_seed_noise_two_seeds": head_seed_noise["points_forecast"],
+            "opp_points_forecast_seed_noise_two_seeds": head_seed_noise["opp_points_forecast"],
+            "raw_value_seed_noise_two_seeds": head_seed_noise["raw_value"],
+            "points_forecast_head_present_all_combos": head_plate_present_all["points_forecast"],
+            "opp_points_forecast_head_present_all_combos": head_plate_present_all["opp_points_forecast"],
+            "raw_value_head_present_all_combos": head_plate_present_all["raw_value"],
         })
         print(f"  Zustand {idx} (round={state['round']}, cands={n_root_candidates}): "
               f"gap_mean={per_state_results[-1]['rank1_2_gap_mean']}  "
@@ -287,6 +382,10 @@ def main():
               f"top2_margin_spread={top2_margin_spread} top2_flips={top2_flips}/8 "
               f"actual_decision_flips={state_decision_flips}/{state_decision_tracked} "
               f"(n_gaps={len(combo_gaps)}, n_sigma={len(state_sigma_spreads)})")
+        print(f"    [Stufe1] plate_spread points={head_plate_spread['points_forecast']} "
+              f"opp_points={head_plate_spread['opp_points_forecast']} raw_value={head_plate_spread['raw_value']} "
+              f"| seed_noise points={head_seed_noise['points_forecast']} "
+              f"opp_points={head_seed_noise['opp_points_forecast']} raw_value={head_seed_noise['raw_value']}")
 
     def summarize(vals):
         vals = [v for v in vals if v is not None]
@@ -344,6 +443,31 @@ def main():
         summary["factor_gap_median_over_sigma_spread_median_ALL_CANDIDATES"] = gap_summary["median"] / sigma_summary["median"]
     if gap_summary and top2_spread_summary and top2_spread_summary["median"] > 0:
         summary["factor_gap_median_over_top2_margin_spread_median"] = gap_summary["median"] / top2_spread_summary["median"]
+
+    # -- Stufe 1 (PREREG_punktekopf_platten.md), additiv: Kennzahl je Kopf
+    # (und raw_value als Pflicht-Referenz) = Median(Platten-Spannweite) /
+    # Median(Seed-Rauschboden), plus Mittelwerte/n (Punkt (d) im Auftrag).
+    summary["seed2"] = seed2
+    heads_summary = {}
+    for f in HEAD_FIELDS:
+        plate_summary = summarize(all_plate_spread[f])
+        noise_summary = summarize(all_seed_noise[f])
+        ratio = None
+        if plate_summary and noise_summary and noise_summary["median"] > 0:
+            ratio = plate_summary["median"] / noise_summary["median"]
+        heads_summary[f] = {
+            "plate_spread_across_8_combos_fixed_seed": plate_summary,
+            "seed_noise_floor_two_seeds_same_combo": noise_summary,
+            "ratio_plate_spread_median_over_seed_noise_median": ratio,
+            "n_states_with_head_missing_in_at_least_one_combo": len(heads_missing_states[f]),
+            "states_with_head_missing": heads_missing_states[f],
+        }
+    summary["punktekopf_platten_stufe1"] = {
+        "prereg": "evaluations/PREREG_punktekopf_platten.md (Stufe 1)",
+        "seed_a": args.seed,
+        "seed_b": seed2,
+        "heads": heads_summary,
+    }
 
     print("\n=== ZUSAMMENFASSUNG ===")
     print(json.dumps(summary, indent=2, ensure_ascii=True))
