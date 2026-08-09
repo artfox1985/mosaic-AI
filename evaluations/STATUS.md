@@ -46,7 +46,7 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
 | **GPU** | Task D Arm `t_d_vw08`, Epoche 5-6 (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (points_weight 0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion. `PREREG_task_d_gewichte.md` |
-| **CPU** | **ISMCTS-k** (3x400 @600 Sims, Basis-Seed 20260820, `MOSAIC_NUM_DETERMINIZATIONS` 1/2/4) -- Arm 1 bei Block 10/16 | die Task-D-Gatings, sequenziell auf derselben Bahn |
+| **CPU** | frei -- **ISMCTS-k GESCHLOSSEN** (H0, k=1 bleibt; s.u.) | die Gewichts-Sweep-Gatings, sequenziell auf derselben Bahn |
 | **offline** | frei | Punkte-Kopf **Stufe 2** -- WARTET auf die Wheel-Installation (s.u.) |
 
 **BLOCKIERT: Wheel-Installation.** Das Stufe-2-Instrument ist gebaut
