@@ -677,3 +677,72 @@ invariant (0/247). Der Test belegt also nicht, dass ein wirksamer Defekt
 behoben wurde -- er schuetzt die Eigenschaft fuer kuenftig groessere
 Budgets, wo sie zu greifen beginnt. Als Kommentar im Test festgehalten,
 damit er spaeter nicht ueberschaetzt wird.
+
+## BEFUND: NODE_BUDGET = 200 ist nicht ausreichend (Nutzer-Frage 2026-08-10)
+
+*"sind 200 knoten ueberhaupt ausreichend"* -- nein, belegt.
+
+`node_budget_sufficiency_probe` (`#[ignore]`), dieselben 8 realistischen
+Partien, je Entscheidung die Zugwahl bei 200 gegen die bei hoeherem Budget:
+
+| Budget | Zugwahlen, die sich gegenueber 200 aendern |
+|--------|--------------------------------------------|
+| 400 | 8/137 = **5,8 %** |
+| 1000 | 13/137 = **9,5 %** |
+| 4000 | 18/137 = **13,1 %** |
+
+Mittlere Wurzelverzweigung 19,6. Die Kurve **steigt noch** -- die Suche ist
+bei 4000 Knoten nicht konvergiert. Jede achte Entscheidung fiele tiefer
+anders aus.
+
+Das war zu erwarten und steht sogar im Kalibrierungs-Kommentar: die 200 sind
+das p75 dessen, was der alte 150ms-Wanduhr-Deckel ERREICHTE -- eine
+**Tragbarkeitszahl fuers Self-Play, keine Suffizienzzahl**. Bei Verzweigung
+~20 reichen 200 Knoten mit Alpha-Beta fuer effektiv ~3 Halbzuege. "Exakt"
+ist die BLATTBEWERTUNG (`solve_round_final_score_endaware` +
+`calculate_end_scoring`), nicht die Suche. Der Modulkopf ("exakte
+Minimax-Suche mit Alpha-Beta-Pruning") ueberverkauft das.
+
+### Damit ist eine nie gestellte Frage offen: Loeser oder Netz?
+
+`round5.rs` kam in **98dffa3** gebuendelt mit der Kuppelstapel-Mechanik und
+Server-Fixes herein -- **ohne eigenes Gating**. Gerechtfertigt wurde die
+Ersetzung des Netzes in Runde 5 allein durch das Argument, die Runde sei
+exakt loesbar. Dieses Argument ist jetzt zweifach entkraeftet: die Runde ist
+nicht vollinformiert (Chips, siehe oben), und die Suche ist keine Loesung,
+sondern ~3 Halbzuege.
+
+**Eine Arena taugt dafuer NICHT.** Der Loeser sitzt in beiden Bahnen
+(`mcts.rs:767/783/732` und `net_mcts.rs:3573/3619`), ein groesseres Budget
+hebt also beide Seiten gleichzeitig und die Siegquote bleibt blind --
+derselbe Symmetrie-Fallstrick wie beim Chip-Leck. Wer das ohne diese Notiz
+als Arena ansetzt, misst garantiert H0 und schliesst falsch.
+
+### Instrument: ORAKEL-UEBEREINSTIMMUNG (Teil E, neu)
+
+Eine sehr tiefe Referenzsuche (Arbeitswert 50.000 Knoten, `TIME_BUDGET`
+entsprechend hoch) auf denselben ~137 Entscheidungen, dann der Anteil
+uebereinstimmender Zugwahl je Kandidat:
+
+- Loeser@200 (Status quo)
+- Loeser@1000 / @4000
+- **Netz@400** (braucht einen Knopf, der `round5::applies` fuer den
+  Netzpfad ausschaltet -- existiert noch nicht)
+
+Drei Zahlen auf derselben Skala, ohne Arena, ohne Symmetrieproblem. Der
+Vergleich Loeser-gegen-Netz fällt als Nebenprodukt ab.
+
+**Bezahlbarkeit**: Commit 6af37ca hat gemessen, dass der Runde-5-Loeser nur
+**4,3 %** der Self-Play-Kosten traegt (Task #32, "Hypothese widerlegt").
+Budget x5 kostet also insgesamt ~x1,17, x20 ~x1,8 -- fuer eine Entscheidung,
+die sich in 9,5 bzw. 13,1 % der Faelle aendert, billig.
+
+### Vorab-Vermutung (damit sie pruefbar ist, nicht hinterher plausibel)
+
+Der Loeser gewinnt, weil seine Blattbewertung optimales Tiling UND
+Endwertung des erreichten Bretts EXAKT kennt -- Information, die das Netz nur
+schaetzen kann. Dem Netz fehlt nicht Tiefe, sondern diese Exaktheit.
+Umgekehrt duerfte der Loeser bei der DRAFTING-Dynamik verlieren, und die
+kostet Tiefe; bei ~3 Halbzuegen koennte das Netz dort vorne liegen. Ein
+Sieg des Netzes waere also kein Widerspruch, sondern ein Hinweis, dass die
+Drafting-Interaktion mehr wiegt als die exakte Endabrechnung.
