@@ -77,7 +77,41 @@ Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
 zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
 Policy erst nach Task B; tau-Wiederaufnahme ohne neuen Mechanismus nein.
 
-### NACH-v21-QUEUE (Nutzer-Go 2026-08-08)
+### AUS EXTERNEM REVIEW R2 2026-08-09 (Gumbel-spezifisch) -- `PREREG_prior_blindfleck.md`
+
+Von drei behaupteten Engpaessen tragen zwei nicht: die Q-Skalierung ist
+in Task #18 gemessen (Verhaeltnis sigma/Prior 1,23 -- keine Dominanz,
+und der behauptete Varianztreiber Aggressions-Blend steht ueberall auf
+w=0), und "zu wenig Tiefe fuer taktische Linien" verfehlt die
+Architektur (Runde 5 laeuft ueber den exakten Alpha-Beta-Loeser, nicht
+ueber Gumbel). Der dritte Punkt trifft eine echte Luecke:
+
+| Task | Kurz |
+|---|---|
+| **E: Prior-Blindfleck-Rate** | **LAEUFT 2026-08-09.** Die Wurzelmenge ist fix (m=16), bei im Median **50 legalen Aktionen** (Max 158) -- Medianabdeckung **32%, Minimum 10%**. Gemessen ist bisher nur m INNERHALB 8-16 (beides H0); m>16 nie. Instrument war zu 90% vorhanden: `prior_recall_at_16` in `tools/oracle_metrics.py`. Entscheidungsmetrik ist die RAUSCH-TREUE Variante (Gumbel-Top-m, nicht Prior-Top-m), offline auf frozen_v2, ~15 min, kein Arena-Budget. Gate: <5% ⇒ Punkt geschlossen |
+| **F: Wurzelbreite m=16/32/64** | **NUR bei E-Miss-Rate >=5%.** 3x400 @600 Sims, Seed 20260830, `MOSAIC_GUMBEL_TOP_M` (umgeht die 16er-Klemme, kein Code noetig). Vorab festgehalten: Breite wird bei festen Sims mit TIEFE bezahlt (m=64 ⇒ ~1,6 Sims je Kandidat in Phase 1), ein H0 bei m=64 ist daher kein Beweis gegen Breite |
+| **G: c_scale-Nachmessung** | deskriptiv, ~10 min: Task #18 lief auf `v18_best` (Vor-WDL), der WDL-Kopf hat die Q-Skala geaendert -- Aera-Regel verlangt die Wiederholung am Champion. Kein Regler-Wechsel (sigma-Familie per Prereg geschlossen) |
+
+Telemetrie-Antwort auf die externe Frage: Q-Skalierungs-Varianz JA
+(`tools/gumbel_scale_calibration.py`), **Ueberlebensrate im Sequential
+Halving NEIN** -- protokolliert sind `root_child_q`,
+`root_num_actions(_considered)` und `max_depth`, aber nicht, welcher
+Kandidat welche Halbierungsphase uebersteht. Bewusst nicht
+nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
+
+### LAUFENDE QUEUE (Stand 2026-08-09 mittags, Server-Game beendet)
+
+| Bahn | laeuft jetzt | danach |
+|---|---|---|
+| **GPU** | Task D Arm `t_d_vw04` (Epoche 10, Fenster verifiziert 2.945 Dateien = v21-Fenster) | `t_d_vw08` (0,8), dann `t_d_pw025` (0,25); je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
+| **CPU** | Task A Floor-Shaping `W=0,3` vs `W=0,0`, 2x400 @400 Sims, Seed 20260825 | E3b Stufe 1 (Feuerrate, 200 Spiele, Abbruch <5%), dann ISMCTS-k (3x400 @600) |
+| **offline** | Task E Prior-Blindfleck (CPU-Inferenz, Agent) | Task G c_scale-Nachmessung; Task F nur bei E-Gate >=5% |
+
+Zu Task A: der Floor-W-Sweep lief bereits mit 0,3/0,15/0,6 (Kontrolle
+0,3, n=200, v20-Champion) und ergab **beide H0** (p=0,31 / p=0,36) --
+**W=0 wurde dabei nie gefahren**. Genau das ist Task A; H0 wuerde die
+Handheuristik ersatzlos streichen (Default `FLOOR_SHAPING_WEIGHT = 0.3`,
+`engine/src/net_mcts.rs:390`).
 
 1. **E3b** (Denial-Tie-Break mit Besuchs-Gate + Zwei-Anteils-SE statt
    roher Q-Differenz): Stufe 1 = Feuerraten-Messung, Abbruch bei <5%;
