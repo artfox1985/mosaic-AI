@@ -70,7 +70,7 @@ belegt, CPU frei). Kommando + Regeln: UEBERGABE §5a,
 |---|---|
 | **A: Floor-Shaping W=0 vs 0,3** | die nie gefahrene Kontrolle des WDL-Sweeps; der +14pp-Beleg ist Alt-Aera -> H0 wuerde eine Handheuristik ersatzlos streichen. 2x400 |
 | **D: GEWICHTS-SWEEP (erweitert)** | Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
-| **B: Zerlegungs-Diagnose** | zweistufige (Slot,Rotation)-Wahl vs flache Enumeration auf Frozen-Zustaenden; billig, KEINE Arena. Praemisse "PUCT verzerrt" trifft nicht (Gumbel), Kern aber ungemessen |
+| ~~B: Zerlegungs-Diagnose~~ | **GESCHLOSSEN 2026-08-09**: within-tree-Messung (gleiches Budget/Breite) ergibt mittlere Q-Differenz 0,00015 -- 66x unter der Schwelle; faktorierte Policy bleibt ungebaut. Rotations-Ebene nur mit Engine-Eingriff messbar, Proxy zeigt geringe Groessenordnung. Erst-Instrument war budget-konfundiert (0,0138) |
 | ~~C: c_visit-Sweep~~ | **ZURUECKGEZOGEN**: `PREREG_ownership_gumbel.md` B1 hat die sigma-Familie regelkonform geschlossen, nachdem c_scale sich als folgenlos erwies (Task #18) -- ein Sweep waere ein Test gegen die eigene Vorregistrierung |
 
 Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
