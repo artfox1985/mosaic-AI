@@ -311,33 +311,43 @@ dem heutigen; sie sind nicht falsch, aber ihre Uebertragbarkeit hat ein
 Ablaufdatum.
 
 ---
-### NACHTRAG 2026-08-09 (aus der Nummern-Registratur): eine ZWEITE Abschneide-Stufe
+### NACHTRAG 2026-08-09: behauptete "zweite Abschneide-Stufe" -- ZURUECKGEZOGEN
 
-Beim Aufarbeiten des `#68`-Merkpostens gefunden: die Wurzel-Kandidatenmenge
-wird **vor** der Gumbel-Top-m-Ziehung noch ein zweites Mal beschnitten.
-`POLICY_MASS_CUTOFF = 0.95` (`net_mcts.rs:54`) wirkt in
-`build_untried_actions` (`net_mcts.rs:1275`): Kandidaten werden nur bis zu
-95% kumulierter Prior-Masse aufgenommen, "der Rest (Long Tail) wird
-verworfen". Der `#68`-Merkposten fuehrt diesen Regler als "ENTFERNT statt
-getunt" -- das ist **falsch**, er lebt (13 Fundstellen; `MAX_ACTIONS` 15,
-`WIDEN_FACTOR` 8).
+**Erst behauptet, dann auf Nutzer-Einwand im Code geprueft und widerlegt.
+Die Task-E-Zahl 1,21% steht OHNE Einschraenkung.**
 
-**Konsequenz fuer die Task-E-Zahl, offen benannt**: meine Entscheidungs-
-metrik hat die Gumbel-Ziehung ueber die VOLLE legale Aktionsmenge
-simuliert. Die Engine zieht aber aus der bereits bei 95% Masse
-abgeschnittenen Menge -- fuer einen Long-Tail-Zug ist die
-Aufnahmechance dort **exakt Null**, nicht klein-aber-positiv. Meine
-Messung war damit **grosszuegiger als die Engine**, die echte Miss-Rate
-kann also HOEHER liegen als 1,21%.
+Der Verdacht lautete: `POLICY_MASS_CUTOFF = 0.95` (`net_mcts.rs:54`)
+beschneide in `build_untried_actions` die Kandidatenmenge auf 95%
+kumulierte Prior-Masse, BEVOR Gumbel-Top-m zieht -- dann waere meine
+Messung ueber die volle legale Aktionsmenge zu grosszuegig gewesen. Der
+Nutzer hielt dagegen ("eigentlich sollte es keinen beschnitt mehr
+geben"). Nachpruefung im Aufrufpfad, nicht nur an der Konstante:
 
-Warum das Verdikt trotzdem voraussichtlich haelt: die beiden Gatter
-ueberlappen stark. Ein Zug, der in den letzten 5% der Prior-Masse liegt,
-hat einen so niedrigen Prior-Rang, dass ihn meine Messung ohnehin als
-Miss gezaehlt haette. Und 1,21% liegt vierfach unter der 5%-Schwelle.
-**Das ist eine Plausibilitaets-Ueberlegung, kein Nachweis.** Die
-Nachpruefung ist billig (die 95%-Maske vor der Gumbel-Ziehung anwenden,
-gleiche 930 Zustaende) und sollte gemacht werden, bevor die 1,21% in
-einer Entscheidung ausserhalb dieses Preregs zitiert werden.
+1. **`net_mcts.rs:1651`: `let skip_cutoff = parent.is_none() || USE_GUMBEL_SEARCH;`**
+   -- der Cutoff wird also nicht bloss an der Wurzel ausgesetzt, sondern
+   bei aktiver Gumbel-Suche an JEDEM Knoten. `USE_GUMBEL_SEARCH` ist
+   `true` (Engine-Konfig). `build_untried_actions` kehrt in Zeile 1268
+   vor der Truncation zurueck.
+2. **Der Progressive-Widening-Cap (`MAX_ACTIONS + WIDEN_FACTOR·√N`)
+   liegt im TOTEN Zweig**: `build_net_tree` springt in Zeile 3387 bei
+   `USE_GUMBEL_SEARCH` per `return build_gumbel_tree(...)` heraus; der
+   Widening-Code steht erst in Zeile 3447, also dahinter und
+   unerreichbar. (In `crate::mcts` sind die beiden Konstanten weiter
+   live -- das ist die HEURISTIK-Suche, unser Arena-Gegner, nicht der
+   Netzpfad.)
+
+**Der `#68`-Merkposten hatte also sachlich recht** ("ENTFERNT statt
+getunt"): die Konstanten existieren noch, sind im Netzpfad aber inert --
+dasselbe Muster wie `MOSAIC_VALUE_CAL_A/B`. Meine gegenteilige
+Behauptung beruhte auf zwei Fundstellen (Konstante + `if cum >= ...`)
+ohne Pruefung, ob der Zweig ueberhaupt erreicht wird.
+
+**Lehre, die den Aufwand wert war**: Regler-Existenz ist nicht
+Regler-Wirksamkeit. Bei einer Konstante immer den AUFRUFPFAD pruefen
+(wer setzt das Flag, welcher Zweig kehrt vorher zurueck), nicht nur
+`grep` auf den Namen. Dieselbe Klasse Fehler wie die Wheel-Blockade von
+heute morgen -- dort war der Regler im Quelltext, aber nicht im
+installierten Modul.
 
 ## Telemetrie-Antwort (externe Frage)
 
