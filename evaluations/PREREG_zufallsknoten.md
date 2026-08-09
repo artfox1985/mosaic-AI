@@ -173,3 +173,49 @@ C (Diagnose, Minuten, keine Maschine) -> A1 (Korrektheit, klein) -> B1
 (Kostengate, offline, billig) -> B2 nur bei bestandenem Gate. Alles nach dem laufenden Gewichts-Sweep und dem
 Plattenkopf, weil beide bereits eingetaktet sind und Engine-Aenderungen
 ein freies Fenster fuer Wheel-Installation brauchen.
+
+---
+### ERGEBNIS Teil C (2026-08-09): die Interaktion IST gelernt, spezifisch fuer Platte 6
+
+10 Sockel-Dateien `selfplay_v20wdl_*` (Policy aktiv), 4.581 Zustaende mit
+legalem Zieh-Zug. Kennzahl: Anteil der Policy-Masse auf
+`dome_stack_peek`.
+
+| Aktive Platte | n akt | Mittel akt | >50% akt | Mittel inakt | >50% inakt | Diff |
+|---|---|---|---|---|---|---|
+| **6 Spezialfelder -3** | 2.057 | **0,2158** | **21,5%** | 0,1364 | 13,2% | **+0,0794** |
+| 2 Diagonalen | 1.644 | 0,1881 | 18,4% | 0,1631 | 16,1% | +0,0250 |
+| 4 Aeussere Felder | 1.865 | 0,1789 | 17,7% | 0,1674 | 16,3% | +0,0116 |
+| 0 Horizontale | 1.701 | 0,1755 | 17,0% | 0,1700 | 16,8% | +0,0055 |
+
+Platte 6 wirkt **3x staerker** als die naechstgroesste und 14x staerker
+als die schwaechste. **Die erste Verzweigung der Regel greift: die
+Interaktion ist gelernt**, die Nutzer-Beobachtung ist im Netz abgebildet.
+
+**Methoden-Korrektur waehrend der Messung**: mein erster Kontroll-Ansatz
+nahm Platte 3 -- die AUSSCHLUSS-PARTNERIN von Platte 6. "3 aktiv" heisst
+damit fast dasselbe wie "6 inaktiv", und das Spiegelbild (-0,0817) war
+keine unabhaengige Bestaetigung, sondern dieselbe Zahl mit umgekehrtem
+Vorzeichen. Ersetzt durch Kontrollen aus ANDEREN Paaren (2/5, 4/1, 0/7).
+Dieselbe Ausschluss-Struktur, die schon den Plattenkopf-Entwurf korrigiert
+hat.
+
+**Verteilungs-Hinweis**: die Mediane liegen bei ~0,0000-0,0001 -- in den
+meisten Stellungen zieht das Netz gar nicht, der Mittelwert wird von einer
+Minderheit entschiedener Ziehzuege getragen. Deshalb ist die
+">50%"-Spalte die aussagekraeftigere: entschiedene Ziehzuege steigen von
+13,2% auf 21,5%.
+
+### Folge fuer den Plattenkopf -- Erwartung daempfen
+
+Die Nutzer-Partie verlor 19 Punkte auf Diagonalen (10:0) und
+Spezialfeldern (-3 gegen -12). Fuer den Spezialfeld-Teil ist jetzt belegt:
+**das Netz weiss, dass Ziehen bei aktiver Platte 6 wertvoller ist.** Die
+Erklaerung "es kennt die Interaktion nicht" ist damit ausgeschlossen. Was
+offen bleibt, ist die GROESSE -- ob 21,5% entschiedene Ziehzuege genug
+sind -- und das ist aus Policy-Masse allein nicht beantwortbar.
+
+Der Plattenkopf (`PREREG_plattenkopf.md`) bleibt sinnvoll, aber seine
+Begruendung verschiebt sich: nicht "die Platten sind unbekannt", sondern
+"die Dosierung und die anderen Kriterien". Fuer die Diagonalen ist Ziehen
+ohnehin nicht der Hebel -- dort entscheidet die Platzierung.
