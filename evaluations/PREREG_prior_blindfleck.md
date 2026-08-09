@@ -310,6 +310,35 @@ dokumentiert, dass die H0-Befunde der Wurzel-Regler-Familie
 dem heutigen; sie sind nicht falsch, aber ihre Uebertragbarkeit hat ein
 Ablaufdatum.
 
+---
+### NACHTRAG 2026-08-09 (aus der Nummern-Registratur): eine ZWEITE Abschneide-Stufe
+
+Beim Aufarbeiten des `#68`-Merkpostens gefunden: die Wurzel-Kandidatenmenge
+wird **vor** der Gumbel-Top-m-Ziehung noch ein zweites Mal beschnitten.
+`POLICY_MASS_CUTOFF = 0.95` (`net_mcts.rs:54`) wirkt in
+`build_untried_actions` (`net_mcts.rs:1275`): Kandidaten werden nur bis zu
+95% kumulierter Prior-Masse aufgenommen, "der Rest (Long Tail) wird
+verworfen". Der `#68`-Merkposten fuehrt diesen Regler als "ENTFERNT statt
+getunt" -- das ist **falsch**, er lebt (13 Fundstellen; `MAX_ACTIONS` 15,
+`WIDEN_FACTOR` 8).
+
+**Konsequenz fuer die Task-E-Zahl, offen benannt**: meine Entscheidungs-
+metrik hat die Gumbel-Ziehung ueber die VOLLE legale Aktionsmenge
+simuliert. Die Engine zieht aber aus der bereits bei 95% Masse
+abgeschnittenen Menge -- fuer einen Long-Tail-Zug ist die
+Aufnahmechance dort **exakt Null**, nicht klein-aber-positiv. Meine
+Messung war damit **grosszuegiger als die Engine**, die echte Miss-Rate
+kann also HOEHER liegen als 1,21%.
+
+Warum das Verdikt trotzdem voraussichtlich haelt: die beiden Gatter
+ueberlappen stark. Ein Zug, der in den letzten 5% der Prior-Masse liegt,
+hat einen so niedrigen Prior-Rang, dass ihn meine Messung ohnehin als
+Miss gezaehlt haette. Und 1,21% liegt vierfach unter der 5%-Schwelle.
+**Das ist eine Plausibilitaets-Ueberlegung, kein Nachweis.** Die
+Nachpruefung ist billig (die 95%-Maske vor der Gumbel-Ziehung anwenden,
+gleiche 930 Zustaende) und sollte gemacht werden, bevor die 1,21% in
+einer Entscheidung ausserhalb dieses Preregs zitiert werden.
+
 ## Telemetrie-Antwort (externe Frage)
 
 - **Varianz der Q-Skalierung: JA**, `tools/gumbel_scale_calibration.py`
