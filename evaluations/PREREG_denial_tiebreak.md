@@ -166,6 +166,46 @@ dass E3b wie E3 SCHADET. Entschieden wird das trotzdem erst durch die
 GEPAARTE Stufe 2 (identische Seeds), weil hier zwei ungepaarte Laeufe
 mit verschiedenen Seeds verglichen werden.
 
+### ERGEBNIS Stufe 2 (2026-08-09): WACHE NICHT BESTANDEN -- E3b BLEIBT AUS
+
+`tools/paired_arena_env_ab.py`, ein Faktor (`MOSAIC_DENIAL_UNCERT_Z`
+0 vs 1,0, `_MIN_VISIT_FRAC=0,5` in BEIDEN Armen), Champion@400 vs
+Heuristik@150dyn, 2x400 Partien, Basis-Seed 20260827. Belegstelle
+`evaluations/paired_arena_env_e3b_stufe2.json`.
+
+| Arm | Netz-Siege | Quote |
+|---|---|---|
+| **z=0 (aus, Kontrolle)** | **308/400** | **77,0%** |
+| z=1,0 (E3b an) | 289/400 | 72,2% |
+
+Differenz **-4,75pp** gegen E3b. Gepaarter exakter McNemar
+**p=0,1042** (b=52 / c=71). Block-Ebene (Pflichtregel): 9 von 16
+Bloecken fuer AUS, 4 fuer AN, 3 gleich; mittlere Block-Differenz +1,19
+Siege je 25 Partien fuer AUS, Block-SE 0,67, **t=+1,78** (p~0,10).
+
+**Entscheid nach Prereg: die Siegquoten-Wache ist das Gate, und sie ist
+NICHT bestanden.** Die Nutzer-Philosophie lautet "rein, wenn es nicht
+schadet" -- die Beweislast liegt also auf Schadensfreiheit, und die ist
+mit einem Punktschaetzer von -4,75pp nicht erbracht. `z` bleibt auf 0,
+E3b wird NICHT Preset und NICHT ins Self-Play uebernommen; der
+Sekundaerpunkt z=2,0 entfaellt (er war "bei Bestehen" vorgesehen).
+
+**Sauber formuliert**: p=0,10 ist KEIN Schadensnachweis. Der Befund ist
+"Wirksamkeit nicht gezeigt, Richtung negativ", nicht "signifikant
+schaedlich". Fuer den Entscheid genuegt das, weil die Wache Bestehen
+verlangt und nicht Widerlegung.
+
+**Damit ist die Denial-Tie-Break-Familie zweimal gemessen und
+geschlossen**: E3 (rohes ε-Fenster) -13,75pp, E3b
+(Besuchs-Gate + Zwei-Anteils-SE) -4,75pp. Die Neufassung der
+Aequivalenz-Definition hat den Schaden verkleinert, aber keinen Gewinn
+erzeugt. Die Aussagekraft ist hoch, nicht grenzwertig: bei einer
+Feuerrate von 36,52% (Stufe 1) veraendert der Mechanismus mehr als ein
+Drittel aller Wurzelentscheidungen -- ein Nullergebnis bei dieser
+Eingriffstiefe ist gut gemessen, nicht untermotorisiert.
+Wiedereroeffnung nur mit einem NEUEN Mechanismus, nicht mit einer
+weiteren Dosis-Variante.
+
 ## Stufe 2 (nur bei ausreichender Feuerrate)
 
 Zwei Arme a 400 Spiele, Champion@400 vs Heuristik@150dyn, identische

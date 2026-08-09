@@ -130,6 +130,49 @@ die Kandidaten in **NIVEAU** (Mittelwert) und **ZENTRIERT**
   Niveau oder Differenzierung sind -- eine offene Frage, die diese
   Messung gratis mitbeantwortet.
 
+## KANDIDAT fuer den Fall von Regel 2b (Nutzer-Befund 2026-08-09)
+
+Nutzer: *"das ist aber erst gültig nach spielende. ich mein du kannst
+dir eine wahrscheinlichkeit ausrechnen dass diese wertungsplatte aktiv
+sein wird."* -- gemeint ist nicht die Platten-IDENTITAET (die ist ab
+Runde 1 gezogen und steckt als One-hot in der Eingabe), sondern ob die
+Platte am Ende ZUBEISST. Am Code bestaetigt und praezisiert:
+
+`scoring.rs::wertung_progress` rechnet fuer Platte 6
+`-3.0 * sf.special_empty` (Zeile 178), und `special_empty` zaehlt
+**jedes nicht belegte Spezialfeld, auch die GESPERRTEN**
+(`special.iter().filter(|sp| !sp.is_filled())`, Zeile 407). Spezialfelder
+starten gesperrt und leer ⇒ der Term meldet ab dem ersten Zug die
+MAXIMALE Strafe und kann sich nur verbessern. Der Kommentar bei Zeile
+156 begruendet das ausdruecklich damit, die additiven Platten 4 und 6
+braeuchten "keinen Fortschritts-Ersatz" -- fuer Platte 4 richtig (jede
+Randfliese ist gebucht, monoton steigend), fuer Platte 6 falsch.
+
+Die Folge ist keine Verzerrung (bei `plate_shaping_delta` kuerzt sich
+ein symmetrischer Sockel weg), sondern **Blindheit fuer den
+entscheidenden Zwischenschritt**: der Term bewegt sich erst, wenn eine
+weisse Fliese tatsaechlich liegt. Dass man die drei anderen Felder einer
+Kuppelplatte fuellt und das Spezialfeld damit ueberhaupt FREISCHALTET
+(`dome.rs::try_unlock_special`), ist im Signal nichts wert -- obwohl das
+die Handlung ist, die ueber die -12 in der Nutzer-Partie entschieden hat.
+Fuer Reihen/Spalten/Diagonalen macht dieselbe Funktion es laengst
+richtig (quadrierte Fuellgrade), nur bei Platte 6 fehlt es.
+
+Reichweite: `wertung_progress` haengt NICHT im Leerlauf -- es steckt in
+`mcts.rs:82`, also in der Blattbewertung der HEURISTIK, gegen die alle
+Arena-Messungen laufen (im Netzpfad nur ueber das abgeschaltete
+Plate-Shaping).
+
+**Reihenfolge, bewusst so:** Dieser Kandidat wird NICHT gebaut, solange
+Stufe 2 offen ist. Zeigt Stufe 2 fuer den Punkte-Kopf eine
+Zug-Differenzierung (Regel 2a), braucht es kein handgebautes Merkmal --
+dann ist der Hebel, dem Kopf Gewicht zu geben. Erst bei Regel 2b wird
+eine Erwartungs-Formel fuer Platte 6 der richtige Weg, und dann mit
+eigener Vorregistrierung (Aenderung an der Heuristik-Blattbewertung
+verschiebt den Arena-MASSSTAB -- das muss vorher bedacht und
+dokumentiert werden, sonst sind Vor- und Nach-Messungen nicht
+vergleichbar).
+
 ## Was NICHT Teil dieses Tasks ist
 
 - Kein Plate-Shaping-Wiederaufguss (2026-07-27 gemessen, folgenlos, und
