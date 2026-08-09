@@ -37,7 +37,7 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 | Task | Kurz |
 |---|---|
 | ~~A: Floor-Shaping W=0 vs 0,3~~ | **ENTSCHIEDEN 2026-08-09: FEATURE BESTAETIGT, W=0,3 BLEIBT.** Abschalten KOSTET signifikant Staerke: W=0,3 322/400 vs W=0,0 277/400 (80,5% vs 69,3%, **-11,25pp**), gepaarter exakter McNemar **p=0,0001** (b=43 / c=88), Champion@400 vs Heuristik@150dyn, Seed 20260825. Block-Ebene bestaetigt (Pflichtregel): **13 von 16 Bloecken** fuer W=0,3, mittlere Block-Differenz +2,81 Siege je 25 Partien, Block-SE 0,71, **t=3,94** -- auch mit der konservativen Block-SE klar signifikant. Der Alt-Aera-Beleg (+14pp) ist damit in der WDL-/2D-Aera repliziert (+11,25pp). **Strukturbefund: Floor-Shaping ist ein SCHALTER, kein Regler** -- ob es an ist, macht ~11pp; welchen Wert es zwischen 0,15 und 0,6 hat, macht nichts (Sweep 0,15/0,6 vs 0,3 beide H0, p=0,31/0,36). Keine Frisch-Seed-Replikation noetig, weil KEINE Aenderung folgt; wer die Effektgroesse selbst zitieren will, braucht sie. `evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json` |
-| **D: GEWICHTS-SWEEP (erweitert)** | Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
+| **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
 Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
 zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
@@ -70,7 +70,7 @@ nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
 | **GPU** | Task D Arm `t_d_vw08` (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
-| **CPU** | **FREI GEHALTEN fuer das Nutzer-Server-Game** (E3b Stufe 1 fertig) | E3b **Stufe 2** (2x400, gepaart, z=1,0 vs aus), dann ISMCTS-k (3x400 @600) -- Tool `tools/paired_arena_ismcts.py` existiert bereits |
+| **CPU** | **E3b Stufe 2 laeuft** (2x400 gepaart, Basis-Seed 20260827, ein Faktor: `MOSAIC_DENIAL_UNCERT_Z` 0 vs 1,0 bei `_MIN_VISIT_FRAC=0,5` in BEIDEN Armen) | ISMCTS-k (3x400 @600, Tool `tools/paired_arena_ismcts.py` existiert), dann die Task-D-Gatings (sequenziell, gleiche Bahn) |
 | **offline** | frei | — |
 
 **Wheel-Stand**: neu gebaut und installiert 2026-08-09 13:1x, 311 Tests
