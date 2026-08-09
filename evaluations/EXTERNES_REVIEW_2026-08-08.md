@@ -320,3 +320,45 @@ Zustand die Zahl der Slots mit >=1 bewerteter Rotation (Abdeckung).
 Der alte Modus bleibt als `--mode isolated-vs-root` erhalten, aber
 ausdruecklich als Budget-/Breiten-Diagnose deklariert, nicht als
 Zerlegungs-Test.
+
+## TASK B -- ERGEBNIS (2026-08-09): Slot-Ebene GESCHLOSSEN, Rotations-Ebene NICHT MESSBAR
+
+`--mode within-tree` (beide Lesarten aus DEMSELBEN isolierten
+Ein-Kachel-Baum, identisches Budget und identische Breite):
+
+| Aggregation | n | suboptimal | mittlere Δq | max Δq |
+|---|---|---|---|---|
+| je Kachel | 66 | 4 (6,1%) | **0,00015** | 0,0041 |
+| je Zustand (kachel-uebergreifend) | 30 | 2 (6,7%) | **0,00013** | 0,0038 |
+
+Die mittlere Q-Differenz liegt **66-77x unter der vorregistrierten
+Schwelle (0,01)** -- die OR-Regel schliesst damit, auch wenn der Anteil
+bei diesem kleinen n knapp ueber 5% liegt (4 bzw. 2 Faelle). Und sie ist
+30-90x KLEINER als im konfundierten Erst-Instrument (0,0138), was die
+Budget-/Breiten-Diagnose als Ursache jener Zahl bestaetigt.
+
+**TAUTOLOGIE-FUND des Agents (wichtig, betrifft MEIN korrigiertes
+Design)**: `best_rotation` waehlt net_mcts.rs per **max VISITS**, nicht
+per Q. Beide Lesarten greifen auf dasselbe Feld zu -- eine
+"rotation-only"-Abweichung ist unter dieser Metrik daher MATHEMATISCH
+UNMOEGLICH. Die 0/66 bzw. 0/30 sind also KEIN Befund, sondern eine
+Rechenfolge; die entsprechende Zeile im Amendment oben ist damit
+entwertet. Die Rotations-Haelfte der Zerlegungsfrage bleibt mit den
+heutigen Engine-Ausgaben UNBEANTWORTBAR (es braeuchte die Q-Werte ALLER
+Rotationskinder je Slot, die `net_search_state_json` nicht ausgibt).
+
+**Proxy fuer die Relevanz der Rotationswahl** (Koordinator, aus
+denselben Daten): Abstand zwischen dem Q der meistbesuchten Rotation und
+dem marginalen Slot-Q (Median 0,00196, Mittel 0,00310, Max 0,0177;
+>0,01 in 3,0% der gewaehlten Slots). Die Rotationen eines Slots sind
+also wertmaessig ueberwiegend nahe beieinander -- eine falsche
+Rotationswahl kann strukturell nur wenig kosten. Das ist ein INDIZ,
+kein Beweis.
+
+**VERDIKT**: Punkt 3 des Reviews ist auf der Slot-Ebene mit Beleg
+GESCHLOSSEN -- die zweistufige Zerlegung kostet dort nichts Messbares
+(0,00015 auf der [0,1]-Gewinnwahrscheinlichkeitsskala). Eine faktorierte
+Policy / Action-Attention bleibt damit UNGEBAUT. Die Rotations-Ebene ist
+formal offen, aber (a) nur mit einem Engine-Eingriff messbar und (b) laut
+Proxy von geringer Groessenordnung -- Wiederaufnahme nur, wenn ein
+konkreter Verdacht auftaucht, nicht auf Vorrat.

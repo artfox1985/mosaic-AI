@@ -1,0 +1,2569 @@
+{
+  "manifest": {
+    "mode": "within-tree",
+    "frozen_set": "evaluations/frozen_eval_set_v2.pkl",
+    "model_path": "models/alphazero_v21_2d_brierbest.onnx",
+    "sims": 400,
+    "c_puct": 1.5,
+    "limit": 30,
+    "elapsed_seconds": 89.99360227584839,
+    "git_commit": "e03ea58c019f0eed62855925643630e255a63c1a",
+    "seed_scheme": "SHA-256(json.dumps(state, sort_keys=True))[:8 bytes], big-endian, & 0x7FFFFFFFFFFFFFFF (tools/build_frozen_oracle_labels.py-Muster); derselbe Seed treibt alle kachel-isolierten Aufrufe desselben Zustands.",
+    "scan_stats": {
+      "n_frozen_records_total": 1800,
+      "n_non_drafting_skipped": 24,
+      "n_start_adjacent_skipped": 3,
+      "n_no_dome_move_skipped": 58,
+      "frozen_version": "frozen_v2"
+    },
+    "n_selected_states": 30,
+    "n_states_by_status": {
+      "ok": 30
+    },
+    "n_tiles_total": 66,
+    "n_tiles_by_status": {
+      "ok": 66
+    },
+    "mean_tile_coverage_ratio": 1.0,
+    "per_tile_datapoint_stats": {
+      "n": 66,
+      "n_suboptimal": 4,
+      "share_suboptimal": 0.06060606060606061,
+      "mean_q_diff": 0.0001506773925744979,
+      "max_q_diff": 0.004063811247376259,
+      "n_rotation_only": 0,
+      "n_slot": 4
+    },
+    "cross_tile_stats": {
+      "n": 30,
+      "n_suboptimal": 2,
+      "share_suboptimal": 0.06666666666666667,
+      "mean_q_diff": 0.00013103690608388304,
+      "max_q_diff": 0.0037958252712533835,
+      "n_rotation_only": 0,
+      "n_slot": 2
+    },
+    "reading_thresholds": {
+      "share_threshold": 0.05,
+      "mean_diff_threshold": 0.01
+    },
+    "reading_per_tile": "Anteil < 5% ODER mittlere Q-Differenz < 0,01 erfuellt -> laut Prereg kostet die Zerlegung nichts Messbares. NUR Bericht, keine Selbst-Entscheidung.",
+    "reading_cross_tile": "Anteil < 5% ODER mittlere Q-Differenz < 0,01 erfuellt -> laut Prereg kostet die Zerlegung nichts Messbares. NUR Bericht, keine Selbst-Entscheidung."
+  },
+  "results": [
+    {
+      "record_index": 3,
+      "round": 1,
+      "seed": 8335498557009335038,
+      "n_legal_dome_slot_actions": 16,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.46156525071501436,
+            "marginal_q": 0.4611275594878322
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.46156525071501436
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.4814749930476545,
+            "marginal_q": 0.4787066842202832
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.4814749930476545
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 12,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 12,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.4814749930476545,
+          "marginal_q": 0.4787066842202832
+        },
+        "flat_tile_id": 12,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.4814749930476545
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 6,
+      "round": 1,
+      "seed": 3442946009572633382,
+      "n_legal_dome_slot_actions": 21,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5582450112781009,
+            "marginal_q": 0.5576206040382385
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5582450112781009
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 0,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        },
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5522693411438866,
+            "marginal_q": 0.5511798717207828
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5522693411438866
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        },
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5597081396314832,
+            "marginal_q": 0.5586491703987122
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5597081396314832
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 7,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5597081396314832,
+          "marginal_q": 0.5586491703987122
+        },
+        "flat_tile_id": 7,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5597081396314832
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 12,
+      "round": 1,
+      "seed": 6886808667627546889,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.512534587039161,
+            "marginal_q": 0.5125099501627333
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.512534587039161
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.5429226870890017,
+            "marginal_q": 0.5422912612013573
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.5429226870890017
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 12,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5417001108477887,
+            "marginal_q": 0.5407379291513387
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5417001108477887
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 12,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.5429226870890017,
+          "marginal_q": 0.5422912612013573
+        },
+        "flat_tile_id": 12,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.5429226870890017
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 14,
+      "round": 1,
+      "seed": 8965596004889975377,
+      "n_legal_dome_slot_actions": 7,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.6264287440673165,
+            "marginal_q": 0.6251745319972604
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.6264287440673165
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 10,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 10,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 2,
+          "rotation": 90,
+          "q": 0.6264287440673165,
+          "marginal_q": 0.6251745319972604
+        },
+        "flat_tile_id": 10,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 2,
+          "rotation": 90,
+          "q": 0.6264287440673165
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 22,
+      "round": 1,
+      "seed": 6569765506757407897,
+      "n_legal_dome_slot_actions": 14,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5409074499383952,
+            "marginal_q": 0.539325433559249
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5409074499383952
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 10,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        },
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5375964119211226,
+            "marginal_q": 0.5318326781300297
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5375964119211226
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 15,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 10,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5409074499383952,
+          "marginal_q": 0.539325433559249
+        },
+        "flat_tile_id": 10,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5409074499383952
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 26,
+      "round": 1,
+      "seed": 2298210368106126061,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.6307357371743045,
+            "marginal_q": 0.6287901727822576
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.6307357371743045
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.6033091914297929,
+            "marginal_q": 0.6019904234983625
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.6033091914297929
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.6205932052047164,
+            "marginal_q": 0.6193549798352875
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.6205932052047164
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 12,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 8,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.6307357371743045,
+          "marginal_q": 0.6287901727822576
+        },
+        "flat_tile_id": 8,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.6307357371743045
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 27,
+      "round": 1,
+      "seed": 6830682419015514775,
+      "n_legal_dome_slot_actions": 16,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5502764724549793,
+            "marginal_q": 0.5459485484494103
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5502764724549793
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5529920198384998,
+            "marginal_q": 0.5518036384652131
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5529920198384998
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 10,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 10,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5529920198384998,
+          "marginal_q": 0.5518036384652131
+        },
+        "flat_tile_id": 10,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5529920198384998
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 29,
+      "round": 1,
+      "seed": 8386761982045946323,
+      "n_legal_dome_slot_actions": 16,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 0,
+            "q": 0.5323028157230552,
+            "marginal_q": 0.5296279587884889
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 0,
+            "q": 0.5323028157230552
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 270,
+            "q": 0.534615420085147,
+            "marginal_q": 0.5332618888248416
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 270,
+            "q": 0.534615420085147
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 12,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 12,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 2,
+          "rotation": 270,
+          "q": 0.534615420085147,
+          "marginal_q": 0.5332618888248416
+        },
+        "flat_tile_id": 12,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 2,
+          "rotation": 270,
+          "q": 0.534615420085147
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 31,
+      "round": 1,
+      "seed": 7813053992831396135,
+      "n_legal_dome_slot_actions": 16,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.49816032216466705,
+            "marginal_q": 0.4972870676186833
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5022241334120433
+          },
+          "q_diff": 0.004063811247376259,
+          "is_suboptimal": true,
+          "divergence_kind": "slot",
+          "tile_id": 16,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 2,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.5037572532892227,
+            "marginal_q": 0.49782785231416876
+          },
+          "flat_best": {
+            "slot_row": 2,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.5037572532892227
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 4,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 4,
+        "twostage_combo": {
+          "slot_row": 2,
+          "slot_col": 2,
+          "rotation": 90,
+          "q": 0.5037572532892227,
+          "marginal_q": 0.49782785231416876
+        },
+        "flat_tile_id": 4,
+        "flat_best_combo": {
+          "slot_row": 2,
+          "slot_col": 2,
+          "rotation": 90,
+          "q": 0.5037572532892227
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 36,
+      "round": 1,
+      "seed": 194784009642292617,
+      "n_legal_dome_slot_actions": 7,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5851747938948868,
+            "marginal_q": 0.584260850431468
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5851747938948868
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 10,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 10,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5851747938948868,
+          "marginal_q": 0.584260850431468
+        },
+        "flat_tile_id": 10,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5851747938948868
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 37,
+      "round": 1,
+      "seed": 8704548024518396890,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.539540353589333,
+            "marginal_q": 0.5341742663052831
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.539540353589333
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 0,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5283618569374084,
+            "marginal_q": 0.5219989500262521
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5283618569374084
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 17,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.566863995434633,
+            "marginal_q": 0.5657719934943819
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.566863995434633
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 12,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 12,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.566863995434633,
+          "marginal_q": 0.5657719934943819
+        },
+        "flat_tile_id": 12,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.566863995434633
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 43,
+      "round": 1,
+      "seed": 1337041476769835075,
+      "n_legal_dome_slot_actions": 7,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5488555374352828,
+            "marginal_q": 0.5466796605331955
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5488555374352828
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 8,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5488555374352828,
+          "marginal_q": 0.5466796605331955
+        },
+        "flat_tile_id": 8,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5488555374352828
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 44,
+      "round": 1,
+      "seed": 8852178439216044873,
+      "n_legal_dome_slot_actions": 16,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5711899728917363,
+            "marginal_q": 0.5697930422577545
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5711899728917363
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 4,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5782078660246152,
+            "marginal_q": 0.5767937709380241
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5782078660246152
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 8,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5782078660246152,
+          "marginal_q": 0.5767937709380241
+        },
+        "flat_tile_id": 8,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5782078660246152
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 50,
+      "round": 1,
+      "seed": 2671491318852419804,
+      "n_legal_dome_slot_actions": 14,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5180343684942826,
+            "marginal_q": 0.5162302260681734
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5180343684942826
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        },
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.49828847787446445,
+            "marginal_q": 0.48986054502301296
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.49828847787446445
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 8,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5180343684942826,
+          "marginal_q": 0.5162302260681734
+        },
+        "flat_tile_id": 8,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5180343684942826
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 51,
+      "round": 1,
+      "seed": 7001453189369875829,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5124407399417763,
+            "marginal_q": 0.5118678451022681
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5124407399417763
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 17,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5238209856090261,
+            "marginal_q": 0.5230061231303389
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5238209856090261
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5359956204001584,
+            "marginal_q": 0.5346118422755359
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5359956204001584
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 4,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 4,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5359956204001584,
+          "marginal_q": 0.5346118422755359
+        },
+        "flat_tile_id": 4,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5359956204001584
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 55,
+      "round": 1,
+      "seed": 5303195133229172903,
+      "n_legal_dome_slot_actions": 7,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.46101011908971345,
+            "marginal_q": 0.45592101477086544
+          },
+          "flat_best": {
+            "slot_row": 2,
+            "slot_col": 0,
+            "rotation": 90,
+            "q": 0.46114540100097656
+          },
+          "q_diff": 0.00013528191126310762,
+          "is_suboptimal": true,
+          "divergence_kind": "slot",
+          "tile_id": 7,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 7,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.46101011908971345,
+          "marginal_q": 0.45592101477086544
+        },
+        "flat_tile_id": 7,
+        "flat_best_combo": {
+          "slot_row": 2,
+          "slot_col": 0,
+          "rotation": 90,
+          "q": 0.46114540100097656
+        },
+        "q_diff": 0.00013528191126310762,
+        "is_suboptimal": true,
+        "divergence_kind": "slot"
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 60,
+      "round": 1,
+      "seed": 4942223442011689203,
+      "n_legal_dome_slot_actions": 14,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5143454670906067,
+            "marginal_q": 0.511201304146799
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5143454670906067
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 0,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        },
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.4727885127067566,
+            "marginal_q": 0.4715335661172867
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.4727885127067566
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 0,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 180,
+          "q": 0.5143454670906067,
+          "marginal_q": 0.511201304146799
+        },
+        "flat_tile_id": 0,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 180,
+          "q": 0.5143454670906067
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 71,
+      "round": 1,
+      "seed": 1497812129006740422,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5717363659437601,
+            "marginal_q": 0.5683471221123299
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5717363659437601
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 2,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 2,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5662921865781149,
+            "marginal_q": 0.555374947461215
+          },
+          "flat_best": {
+            "slot_row": 2,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5662921865781149
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5557638704776764,
+            "marginal_q": 0.5458230105313387
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5557638704776764
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 4,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 2,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 180,
+          "q": 0.5717363659437601,
+          "marginal_q": 0.5683471221123299
+        },
+        "flat_tile_id": 2,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 180,
+          "q": 0.5717363659437601
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 73,
+      "round": 1,
+      "seed": 8958471752955622717,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.4479714347557588,
+            "marginal_q": 0.4453988658154712
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.4479714347557588
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 0,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.4804353660611964,
+            "marginal_q": 0.4793462779400122
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.4804353660611964
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.4694344428869394,
+            "marginal_q": 0.46755480657528786
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.4694344428869394
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 15,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 8,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.4804353660611964,
+          "marginal_q": 0.4793462779400122
+        },
+        "flat_tile_id": 8,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.4804353660611964
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 75,
+      "round": 1,
+      "seed": 8813414419096727298,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5828858600623572,
+            "marginal_q": 0.5810260011331878
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5828858600623572
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5598980953444296,
+            "marginal_q": 0.5585956649623648
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5598980953444296
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5927388125391149,
+            "marginal_q": 0.5914388081453142
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5927388125391149
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 11,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 11,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5927388125391149,
+          "marginal_q": 0.5914388081453142
+        },
+        "flat_tile_id": 11,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 0,
+          "q": 0.5927388125391149
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 77,
+      "round": 1,
+      "seed": 7548540925549193872,
+      "n_legal_dome_slot_actions": 14,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.5825114237501267,
+            "marginal_q": 0.579759156703949
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.5825114237501267
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 0,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        },
+        {
+          "status": "ok",
+          "n_legal": 7,
+          "n_scored": 7,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5784271055079521,
+            "marginal_q": 0.5758681964874267
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 0,
+            "q": 0.5784271055079521
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 8,
+          "iso_num_actions": 8,
+          "iso_num_actions_considered": 8
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 0,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 2,
+          "rotation": 90,
+          "q": 0.5825114237501267,
+          "marginal_q": 0.579759156703949
+        },
+        "flat_tile_id": 0,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 2,
+          "rotation": 90,
+          "q": 0.5825114237501267
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 83,
+      "round": 1,
+      "seed": 6449942720566239516,
+      "n_legal_dome_slot_actions": 24,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5760687813981972,
+            "marginal_q": 0.5740799667624868
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5760687813981972
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 17,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.6146662333764565,
+            "marginal_q": 0.6137483041927254
+          },
+          "flat_best": {
+            "slot_row": 0,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.6146662333764565
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        },
+        {
+          "status": "ok",
+          "n_legal": 8,
+          "n_scored": 8,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.5973547226016332,
+            "marginal_q": 0.5944420617235537
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.5973547226016332
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 10,
+          "iso_num_actions": 9,
+          "iso_num_actions_considered": 9
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 6,
+        "twostage_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 180,
+          "q": 0.6146662333764565,
+          "marginal_q": 0.6137483041927254
+        },
+        "flat_tile_id": 6,
+        "flat_best_combo": {
+          "slot_row": 0,
+          "slot_col": 1,
+          "rotation": 180,
+          "q": 0.6146662333764565
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 93,
+      "round": 2,
+      "seed": 8781544276337785221,
+      "n_legal_dome_slot_actions": 18,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5703471040441876,
+            "marginal_q": 0.5679563189928348
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 180,
+            "q": 0.5703471040441876
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 9,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 270,
+            "q": 0.5852894354611635,
+            "marginal_q": 0.58330748463405
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 270,
+            "q": 0.5852894354611635
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 13,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5047141060990802,
+            "marginal_q": 0.5021035217103504
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 180,
+            "q": 0.5047141060990802
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 15,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 13,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 270,
+          "q": 0.5852894354611635,
+          "marginal_q": 0.58330748463405
+        },
+        "flat_tile_id": 13,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 270,
+          "q": 0.5852894354611635
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 94,
+      "round": 2,
+      "seed": 2994753455491790080,
+      "n_legal_dome_slot_actions": 18,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.425609804464109,
+            "marginal_q": 0.4158112004635826
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.425609804464109
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 17,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.441252665086226,
+            "marginal_q": 0.43791044072100993
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 90,
+            "q": 0.441252665086226
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 0,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 0,
+            "q": 0.44668004512786863,
+            "marginal_q": 0.42898783401439067
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 2,
+            "rotation": 0,
+            "q": 0.44668004512786863
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 4,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 4,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 2,
+          "rotation": 0,
+          "q": 0.44668004512786863,
+          "marginal_q": 0.42898783401439067
+        },
+        "flat_tile_id": 4,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 2,
+          "rotation": 0,
+          "q": 0.44668004512786863
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 96,
+      "round": 2,
+      "seed": 2938668502635247878,
+      "n_legal_dome_slot_actions": 18,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 90,
+            "q": 0.5183247651240622,
+            "marginal_q": 0.5160557429754097
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5202745546040863
+          },
+          "q_diff": 0.0019497894800241111,
+          "is_suboptimal": true,
+          "divergence_kind": "slot",
+          "tile_id": 2,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 2,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5236825945396577,
+            "marginal_q": 0.5165673983461074
+          },
+          "flat_best": {
+            "slot_row": 2,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5236825945396577
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 15,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5284279397153478,
+            "marginal_q": 0.524798075052408
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5284279397153478
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 14,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 14,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5284279397153478,
+          "marginal_q": 0.524798075052408
+        },
+        "flat_tile_id": 14,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5284279397153478
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 97,
+      "round": 2,
+      "seed": 9125217666349136264,
+      "n_legal_dome_slot_actions": 18,
+      "n_dome_display_tiles": 3,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 0,
+            "q": 0.7657156436462101,
+            "marginal_q": 0.7639384310979109
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 0,
+            "q": 0.7657156436462101
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 180,
+            "q": 0.7759427986745759,
+            "marginal_q": 0.7742416094277651
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 180,
+            "q": 0.7759427986745759
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 4,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        },
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 2,
+            "slot_col": 2,
+            "rotation": 0,
+            "q": 0.7540831665198008,
+            "marginal_q": 0.7492670133000329
+          },
+          "flat_best": {
+            "slot_row": 2,
+            "slot_col": 2,
+            "rotation": 0,
+            "q": 0.7540831665198008
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 17,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 4,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 180,
+          "q": 0.7759427986745759,
+          "marginal_q": 0.7742416094277651
+        },
+        "flat_tile_id": 4,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 180,
+          "q": 0.7759427986745759
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 100,
+      "round": 2,
+      "seed": 523987665248547107,
+      "n_legal_dome_slot_actions": 5,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 5,
+          "n_scored": 5,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 270,
+            "q": 0.6447200201677553,
+            "marginal_q": 0.6423075317002055
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 270,
+            "q": 0.6447200201677553
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 13,
+          "iso_num_actions": 6,
+          "iso_num_actions_considered": 6
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 13,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 270,
+          "q": 0.6447200201677553,
+          "marginal_q": 0.6423075317002055
+        },
+        "flat_tile_id": 13,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 270,
+          "q": 0.6447200201677553
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 109,
+      "round": 2,
+      "seed": 108100315829064569,
+      "n_legal_dome_slot_actions": 5,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 5,
+          "n_scored": 5,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 0,
+            "rotation": 270,
+            "q": 0.3984428179077465,
+            "marginal_q": 0.3969428091541284
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.4022386431789999
+          },
+          "q_diff": 0.0037958252712533835,
+          "is_suboptimal": true,
+          "divergence_kind": "slot",
+          "tile_id": 16,
+          "iso_num_actions": 6,
+          "iso_num_actions_considered": 6
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 16,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 0,
+          "rotation": 270,
+          "q": 0.3984428179077465,
+          "marginal_q": 0.3969428091541284
+        },
+        "flat_tile_id": 16,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 270,
+          "q": 0.4022386431789999
+        },
+        "q_diff": 0.0037958252712533835,
+        "is_suboptimal": true,
+        "divergence_kind": "slot"
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 113,
+      "round": 2,
+      "seed": 4330329892719905519,
+      "n_legal_dome_slot_actions": 6,
+      "n_dome_display_tiles": 1,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 6,
+          "n_scored": 6,
+          "twostage": {
+            "slot_row": 2,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.4118749350309372,
+            "marginal_q": 0.4039845341130307
+          },
+          "flat_best": {
+            "slot_row": 2,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.4118749350309372
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 7,
+          "iso_num_actions_considered": 7
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 6,
+        "twostage_combo": {
+          "slot_row": 2,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.4118749350309372,
+          "marginal_q": 0.4039845341130307
+        },
+        "flat_tile_id": 6,
+        "flat_best_combo": {
+          "slot_row": 2,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.4118749350309372
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    },
+    {
+      "record_index": 114,
+      "round": 2,
+      "seed": 8133306195596391832,
+      "n_legal_dome_slot_actions": 10,
+      "n_dome_display_tiles": 2,
+      "tile_results": [
+        {
+          "status": "ok",
+          "n_legal": 5,
+          "n_scored": 5,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.5791513535284227,
+            "marginal_q": 0.5735818608038461
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 270,
+            "q": 0.5791513535284227
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 6,
+          "iso_num_actions": 6,
+          "iso_num_actions_considered": 6
+        },
+        {
+          "status": "ok",
+          "n_legal": 5,
+          "n_scored": 5,
+          "twostage": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5812797011837126,
+            "marginal_q": 0.576904959643065
+          },
+          "flat_best": {
+            "slot_row": 1,
+            "slot_col": 1,
+            "rotation": 90,
+            "q": 0.5812797011837126
+          },
+          "q_diff": 0.0,
+          "is_suboptimal": false,
+          "divergence_kind": null,
+          "tile_id": 7,
+          "iso_num_actions": 6,
+          "iso_num_actions_considered": 6
+        }
+      ],
+      "cross_tile": {
+        "status": "ok",
+        "twostage_tile_id": 7,
+        "twostage_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5812797011837126,
+          "marginal_q": 0.576904959643065
+        },
+        "flat_tile_id": 7,
+        "flat_best_combo": {
+          "slot_row": 1,
+          "slot_col": 1,
+          "rotation": 90,
+          "q": 0.5812797011837126
+        },
+        "q_diff": 0.0,
+        "is_suboptimal": false,
+        "divergence_kind": null
+      },
+      "status": "ok"
+    }
+  ]
+}
