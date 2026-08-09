@@ -49,3 +49,6 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-08-08,t3ann_s2_brierbest,400,v20_2d_opp_brierbest,400,112,118,230,"Messung 3 (tau-Annealing-Korpus-A/B): SPRT-H0 nach 115 Paaren, p=0.78 -- kein Annealing-Vorteil, tau=1 bleibt fuer den v21-Sockel"
 2026-08-09,v21_2d_brierbest,400,v20_2d_opp_brierbest,400,75,45,120,"Champion-Gating v21-Zyklus: SPRT-H1 nach 60 Paaren, p=0.0059 -- Erstlauf"
 2026-08-09,v21_2d_brierbest,400,v20_2d_opp_brierbest,400,97,63,160,"Frisch-Seed-Replikation (Regel Fruehstopp <150 Paare): SPRT-H1 nach 80 Paaren, p=0.0095 -- v21_2d_brierbest NEUER CHAMPION"
+2026-08-09,v21_2d_brierbest,400,Heuristik@150,150,113,37,150,"v21-Zyklus Elo-Verankerung (Promotions-Checkliste Punkt 3): festes n=150 ohne Fruehstopp, 75% Netzsiege, Score 51,1/37,5, Floor 10,0/15,5"
+2026-08-09,v20_2d_opp_brierbest,400,v19_best,400,114,76,190,"Kader-Nachtrag (Promotions-Checkliste Punkt 4, bei v20 zunaechst versaeumt): Champion-2-Kante v20 vs v19_best, SPRT-H1 nach 95 Paaren, p=0.0043"
+2026-08-09,v21_2d_brierbest,400,v19_2d_best,400,53,27,80,"Kader-Kante Champion-2 (Promotions-Checkliste Punkt 4): v21 vs v19_2d_best, SPRT-H1 nach 40 Paaren, p=0.0072 -- KEIN Promotions-Gating, reine Kader-Verankerung"
