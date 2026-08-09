@@ -494,6 +494,73 @@ fn onnx_eval(
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
+/// A2 (Laufzeit-Vertragsstempel, `evaluations/DESIGN_konventionen_als_
+/// pruefungen.md` Abschnitt "A2"): die kanonische Zeichenkette, aus der
+/// [`contract_hash`] gebildet wird. ÖFFENTLICH als eigener Schritt (statt
+/// direkt in `contract_hash` verdrahtet), damit ein Rust-Test die Herleitung
+/// unabhängig von der Hash-Funktion selbst belegen kann.
+///
+/// Enthält exakt die Vertragsgrößen, die ein warm gestartetes/geladenes Netz
+/// betreffen: `INPUT_SIZE` (`features.rs`), `NUM_PLANES_CHANNELS`
+/// (`features.rs`), `NUM_ACTIONS` (`net_mcts.rs`, = Policy-Kopf-Breite) und
+/// die ONNX-Kopf-Reihenfolge, WIE `net.rs` SIE INTERPRETIERT -- nicht wie sie
+/// in `export_onnx.py` benannt sein könnte: die ersten vier Outputs liest
+/// `net.rs` (`eval`/`eval_ex`/`eval_pair`/`eval_batch`, siehe dortige
+/// `out[0]..out[3]`-Zeilen) REIN POSITIONELL (Index 0=policy, 1=value,
+/// 2=moon, 3=points, Namen werden dabei nicht geprüft), der optionale fünfte
+/// Kopf wird dagegen NAMENTLICH gesucht (`"opp_points"`, siehe
+/// `net.rs::detect_opp_head`/`output_opp_head_index`). Deshalb hier als feste
+/// Liste `["policy","value","moon","points","opp_points"]` nachgebildet --
+/// ändert sich diese Interpretation in `net.rs` (andere Positionsreihenfolge,
+/// ein weiterer positionell gelesener Kopf, ein anderer Name), MUSS diese
+/// Liste mitgeändert werden, sonst zeigt der Hash einen Vertrag an, den
+/// `net.rs` tatsächlich nicht mehr einhält.
+fn contract_canonical_string() -> String {
+    let heads = ["policy", "value", "moon", "points", "opp_points"];
+    format!(
+        "INPUT_SIZE={};NUM_PLANES_CHANNELS={};NUM_ACTIONS={};HEADS={}",
+        crate::features::INPUT_SIZE,
+        crate::features::NUM_PLANES_CHANNELS,
+        crate::net_mcts::NUM_ACTIONS,
+        heads.join(",")
+    )
+}
+
+/// FNV-1a (64-bit) über einen ASCII/UTF-8-String -- öffentlich dokumentierter
+/// Drei-Zeilen-Algorithmus (Offset-Basis + Primzahl, keine Bibliothek nötig),
+/// bewusst NICHT `std::collections::hash_map::DefaultHasher` (SipHash):
+/// dessen konkreter Algorithmus ist laut Standardbibliotheks-Doku "nicht
+/// festgelegt" und darf sich zwischen Rust-Versionen ändern -- unbrauchbar
+/// für einen Vertragsstempel, den ein EXTERNES Werkzeug (z.B. ein Python-
+/// Skript, das nur die Quellkonstanten liest, ohne die Rust-DLL zu laden)
+/// unabhängig nachrechnen soll. FNV-1a ist dagegen in beiden Sprachen mit
+/// derselben Konstantenfolge trivial identisch nachbaubar. `pub(crate)`, weil
+/// A3 (`features.rs`s Feature-Golden-Hash-Test) denselben Algorithmus
+/// wiederverwendet, statt einen zweiten zu bauen (gleiche Begründung: kein
+/// bitgenauer/instabiler Hash für einen Golden-Test).
+pub(crate) fn fnv1a_64(s: &str) -> u64 {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let mut hash = FNV_OFFSET_BASIS;
+    for byte in s.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
+/// A2-Vertragsstempel: FNV-1a-64-Hash (siehe [`fnv1a_64`]) über
+/// [`contract_canonical_string`], als 16-stelliger Hex-String -- so über
+/// `engine_config_json()`s Feld `contract_hash` exponiert. Ein Werkzeug kann
+/// damit das INSTALLIERTE Binary fragen, welchen Eingabe-/Kopf-Vertrag es
+/// tatsächlich implementiert, statt sich auf einen `grep` über den
+/// Quellstand zu verlassen (der ein älteres installiertes Wheel nicht sehen
+/// würde -- genau der Ist-Betrieb-Vorfall, der A2 motiviert, siehe
+/// Design-Dokument Abschnitt "A2").
+pub(crate) fn contract_hash() -> String {
+    format!("{:016x}", fnv1a_64(&contract_canonical_string()))
+}
+
 /// Snapshot der aktiv wirksamen Rust-Suchkonstanten als JSON -- für
 /// `self_play.py`s Lauf-Manifest (#64 Teil 1, Phase 2a, 2026-07-22): ein
 /// Self-Play-Lauf soll rückwirkend rekonstruierbar sein (welche Engine-
@@ -501,7 +568,11 @@ fn onnx_eval(
 /// jeweiligen Commit-Stand extra auschecken zu müssen. Reines Auslesen
 /// bestehender `pub`/`pub(crate)`-Konstanten aus `net_mcts.rs`/
 /// `round_transition.rs`/`round_transition_deep.rs` -- kein Spielzustand
-/// nötig, keine neue Suchlogik.
+/// nötig, keine neue Suchlogik. A2-Ergänzung (`DESIGN_konventionen_als_
+/// pruefungen.md`): `input_size`/`num_planes_channels`/`contract_hash` --
+/// alle drei rein additiv (bestehende Schlüssel unverändert), betreffen NUR
+/// dieses `engine_config_json()`, nicht `net_search_state_json`/`_trace`
+/// (die Paritäts-Probe hasht ausschließlich Letztere, bleibt also unberührt).
 #[pyfunction]
 fn engine_config_json() -> String {
     use crate::net_mcts::{
@@ -517,6 +588,10 @@ fn engine_config_json() -> String {
     };
     json!({
         "engine_version": env!("CARGO_PKG_VERSION"),
+        // A2 (siehe Funktions-Doku oben): Laufzeit-Vertragsstempel.
+        "input_size": crate::features::INPUT_SIZE,
+        "num_planes_channels": crate::features::NUM_PLANES_CHANNELS,
+        "contract_hash": contract_hash(),
         "num_actions": NUM_ACTIONS,
         "active_leaf": active_leaf,
         "use_gumbel_search": USE_GUMBEL_SEARCH,
@@ -1029,4 +1104,58 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod contract_stamp_tests {
+    use super::*;
+
+    /// A2-Golden-Waechter (`evaluations/DESIGN_konventionen_als_pruefungen.md`
+    /// Abschnitt "A2"): haelt den HEUTIGEN Vertragshash als Literal fest.
+    /// Aendert sich `INPUT_SIZE`, `NUM_PLANES_CHANNELS`, `NUM_ACTIONS` ODER
+    /// die in `contract_canonical_string` nachgebildete ONNX-Kopf-
+    /// Interpretation von `net.rs`, wird dieser Test ROT --
+    /// KONSEQUENZ: Bestandschampions (bereits trainierte/gegatete .onnx-
+    /// Checkpoints) bekommen dann andere Eingaben/Kopf-Zuordnungen als die,
+    /// mit denen sie trainiert/gegatet wurden -- vor einem bewussten Update
+    /// dieses Literals pruefen, ob genau das beabsichtigt ist (neue
+    /// Modellgeneration) oder ein Versehen (siehe Design-Dokument Abschnitt
+    /// "A2" fuer die zwei realen Vorfaelle, die diesen Waechter motivieren).
+    #[test]
+    fn contract_hash_matches_pinned_literal() {
+        assert_eq!(
+            contract_hash(),
+            "a169ebf0a4451e08",
+            "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
+             andere Eingaben (siehe Testdoku)"
+        );
+    }
+
+    /// Gegenprobe-Beleg (nicht Teil der eigentlichen Pruefung, sondern
+    /// Dokumentation): der Hash haengt tatsaechlich von den Vertragsgroessen
+    /// ab -- ein anderer `NUM_ACTIONS`-Wert aendert die kanonische
+    /// Zeichenkette (und damit den Hash) nachweislich.
+    #[test]
+    fn contract_canonical_string_reflects_current_constants() {
+        let s = contract_canonical_string();
+        assert!(s.contains(&format!("INPUT_SIZE={}", crate::features::INPUT_SIZE)));
+        assert!(s.contains(&format!("NUM_PLANES_CHANNELS={}", crate::features::NUM_PLANES_CHANNELS)));
+        assert!(s.contains(&format!("NUM_ACTIONS={}", crate::net_mcts::NUM_ACTIONS)));
+        assert!(s.contains("HEADS=policy,value,moon,points,opp_points"));
+    }
+
+    /// `engine_config_json()` muss den IDENTISCHEN Hash exponieren, den
+    /// [`contract_hash`] direkt liefert -- die JSON-Extraktion ist reines
+    /// Auslesen, keine zweite Berechnung.
+    #[test]
+    fn engine_config_json_exposes_matching_contract_hash() {
+        let json_str = engine_config_json();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).expect("gueltiges JSON");
+        assert_eq!(parsed["contract_hash"].as_str(), Some(contract_hash().as_str()));
+        assert_eq!(parsed["input_size"].as_u64(), Some(crate::features::INPUT_SIZE as u64));
+        assert_eq!(
+            parsed["num_planes_channels"].as_u64(),
+            Some(crate::features::NUM_PLANES_CHANNELS as u64)
+        );
+    }
 }
