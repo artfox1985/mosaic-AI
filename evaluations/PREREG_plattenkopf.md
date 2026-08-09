@@ -255,3 +255,66 @@ vorhersagbar und NICHT disqualifizierend -- Uebereinstimmung ist zu
 erwarten, weil dieselbe Information zugrunde liegt. Disqualifizierend
 waere nur, wenn die Zerlegung nicht KALIBRIERT ist, denn ohne
 Kalibrierung ist `P x Punktwert` kein Erwartungswert.
+
+## Atom-Zuschnitt je Wertungsplatte (aus dem Code verifiziert, 2026-08-10)
+
+Nutzer-Vorgabe: die Auflösung ist die **adressierbare geometrische
+Einheit**, nicht die Platte -- *"wie hoch ist die wahrscheinlichkeit fuer
+diagonale 1 / diagonale 2 ... fuer spalte 1, 2, 3 usw. ... fuer slot 1,1;
+1,3; 3,1; 3,3"*. Ein Ausgabewert je Atom, Punktwert bekannt und konstant
+multipliziert.
+
+| ID | Kriterium | Atom | Anzahl | Punktwert je Atom | Quelle |
+|----|-----------|------|--------|-------------------|--------|
+| 0 | Horizontale Reihen | Reihe r vollstaendig (6 Fliesen) | 6 | +3 | `score_horizontal_rows` |
+| 1 | Vertikale Reihen | Spalte c vollstaendig | 6 | +7 | `score_vertical_rows` |
+| 2 | Diagonale Reihen | Diagonale d vollstaendig | 2 | +10 | `score_diagonal_rows` |
+| 3 | Mehrfarbige Felder | ALLE Wild-Felder belegt (Konjunktion) | 1 | 2 x wild_total | `scoring.rs:210` |
+| 4 | Aeussere Felder | Randfeld (r,c) belegt | 20 | +1 | `scoring.rs:222` |
+| 5 | Eckplatten | Eckslot alle 4 Felder belegt | 4 | +3/+3/**+8/+8** | `scoring.rs:235` |
+| 6 | Spezialfelder | Spezialfeld am Ende LEER | 9 (je Kuppelslot) | -3 | `scoring.rs:255` |
+| 7 | Farbenreiche Reihen | Reihe r hat >=5 Farben | 6 | +4 | `score_colorful_rows` |
+
+**54 Ausgaben je Spieler, 108 gesamt**, maskiert auf die aktiven
+Kriterien (typisch 30-40 aktive Atome je Zustand).
+
+Eckslot-Reihenfolge = `corner_fill`: (0,0), (0,2), (2,0), (2,2)
+(`scoring.rs:242`) -- die UNTEREN beiden (Slot-Reihe 2) tragen 8 Punkte.
+
+Spezialfelder: **hoechstens ein Special-Space je Kuppelplatte**
+(`dome.rs:135` und `round_end.rs:301` suchen per `.position(...)` genau
+EINEN) -- damit ist die feste Ausgabezuordnung sauber die 3x3-Slot-Position.
+
+### Korrektur: Kriterium 4 gehoert HINEIN
+
+Der Ausschluss von Kriterium 4 in der Revision oben (*"KEINE
+Wahrscheinlichkeit -- additive Zaehlung"*) war ein **Auflösungsfehler**,
+keine Eigenschaft der Platte. Pro Randfeld ist es ein Bernoulli mit Wert 1,
+und `Sum P(Feld belegt)` IST der Erwartungswert -- exakt, nicht
+schoengerechnet. Der Ausschluss war zudem in sich widersprüchlich, weil
+Kriterium 6 ebenso additiv ist und dort pro Feld formuliert wurde. **4 ist
+mit 20 Atomen aufgenommen.**
+
+### Der echte Ausreisser ist Kriterium 3
+
+Ein einziges Konjunktionsereignis, und sein Punktwert `2 x wild_total` ist
+zum Vorhersagezeitpunkt selbst noch **unsicher** -- Wild-Felder kommen mit
+spaeter platzierten Kuppelplatten hinzu. `P x Punktwert` hat hier einen
+zweiten unbekannten Faktor. OFFEN (Nutzer-Entscheidung): entweder
+`P(alle belegt)` mal dem AKTUELLEN `wild_total` (nach unten verzerrt,
+solange Platten fehlen), oder ein zweiter Ausgabewert fuer `E[wild_total]`,
+oder fuer dieses eine Kriterium eine Regression auf den Erwartungswert
+`2 x E[wild_total * 1{alle belegt}]` -- letzteres exakt, aber die einzige
+Nicht-Wahrscheinlichkeit im Kopf.
+
+### Interaktion 5 x 6 -- von keinem Ausschluss abgefangen
+
+5 und 6 liegen in VERSCHIEDENEN Paaren ((2,5) und (6,3)), koennen also
+**gleichzeitig aktiv** sein. Eine Spezialkuppel im unteren Eckslot ist dann
+8 (Ecke) + 5 oder 6 (Spezialfliese reihenabhaengig, `round_end.rs:327`)
++ 3 (vermiedene Strafe) wert -- und das sind genau die Slots, die der Nutzer
+laut seiner Taktik meidet ("in reihe 3 der slots will ich keine
+spezialkuppeln"). Das ist der dokumentierte Fall, in dem die Taktik sich
+umkehren muss, und die erste Stelle, an der der Kopf einen echten
+Mehrwert gegenueber der Erfahrungsregel liefern kann. Als deskriptive
+Auswertung in Stufe A vorgemerkt.
