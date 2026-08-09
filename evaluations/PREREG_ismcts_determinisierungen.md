@@ -89,3 +89,58 @@ Messung aus dem Vor-WDL-/Vor-Gumbel-Regime, die damals verworfen wurde
 -- keine Antwort auf die hier reaktivierte 600-Sims-Messung. Belegstelle:
 evaluations/STATUS.md, Abschnitt "NACH-v21-QUEUE (Nutzer-Go 2026-08-08)",
 Punkt 2 ("ISMCTS-k"); kein Ergebnis in archive/history.md.
+
+---
+## ERGEBNIS (2026-08-09): H0 nach Regel 2 -- k=1 BLEIBT, Punkt GESCHLOSSEN
+
+`tools/paired_arena_env_ab.py`, `MOSAIC_NUM_DETERMINIZATIONS` 1/2/4,
+Champion@**600** Sims vs Heuristik@150dyn, 3x400 Partien, identische
+Basis-Seeds (20260820). Belegstelle
+`evaluations/paired_arena_env_ismcts_k.json`.
+
+| Arm | Netz-Siege | Quote | vs k=1 | McNemar | Block-Ebene |
+|---|---|---|---|---|---|
+| **k=1 (Kontrolle)** | **304/400** | **76,0%** | — | — | — |
+| k=2 | 309/400 | 77,25% | +1,25pp | p=0,7228 | t=-0,41 (5:8 Bloecke) |
+| k=4 | 280/400 | 70,0% | **-6,00pp** | p=0,0465 | t=+1,63 (11:4 Bloecke) |
+
+**Entscheid: Regel 2 greift -- kein Arm zeigt einen Vorteil, k=1 bleibt
+Standard.** Die Einzel-Determinisierung gilt damit als ausreichend
+belegt; die Imperfect-Information-Frage auf SUCHEBENE ist geschlossen,
+die ISMCTS-Maschinerie bleibt als inerter Pfad erhalten. Regel 1
+(Default-Wechsel) kam nie in Reichweite: sie haette einen signifikanten
+VORTEIL plus Frisch-Seed-Replikation verlangt.
+
+**Zur k=4-Zahl, sauber eingeordnet -- sie ist NICHT signifikant**,
+obwohl der rohe McNemar mit p=0,0465 knapp darunter liegt:
+1. **Block-Ebene** (Pflichtregel, weil Paar-SEs massiv unterschaetzen):
+   mittlere Block-Differenz +1,50 Siege je 25 Partien fuer k=1, Block-SE
+   0,92, **t=+1,63** ⇒ p~0,12. Der Befund haelt der konservativen
+   Rechnung nicht stand.
+2. **Mehrfachtestung**: zwei Vergleiche gegen dieselbe Kontrolle. Die
+   Bonferroni-Schwelle liegt bei 0,05/2 = 0,025, p=0,0465 liegt
+   darueber. (Diese Korrektur war im Prereg nicht vorgesehen -- ein
+   Mangel des Designs, der hier festgehalten wird; bei einem
+   Mehr-Arm-Test gegen eine gemeinsame Kontrolle gehoert sie vorab
+   festgelegt.)
+Korrekte Formulierung also: **k=4 zeigt keinen Vorteil und tendiert zum
+Schaden (-6pp, 11 von 16 Bloecken), ist aber kein Schadensnachweis.**
+Fuer den Entscheid ist das gleichgueltig -- Regel 2 haengt am fehlenden
+Vorteil, nicht am Schaden.
+
+**Mechanistische Lesart** (deskriptiv): bei festen 600 Sims teilt k=4 das
+Budget auf 4 Welten a 150 Sims. Die Wurzelbreite ist dabei laut
+Prereg-Tabelle nicht der Treiber (k=4 landet auf m=9, und m=9 vs m=16
+war bei 150 Sims neutral gemessen) -- es bleibt die Budget-Zersplitterung
+je Welt. k=2 haelt m=16 und kostet nichts, bringt aber auch nichts:
+zwei Welten mitteln die verdeckte Information offenbar nicht besser als
+eine, jedenfalls nicht messbar bei n=400.
+
+**Zweite Widerlegung derselben Idee**: die Alt-Messung (`#65`,
+2026-07-22) verwarf Mehrfach-Determinisierung im Vor-WDL-/Vor-Gumbel-
+Regime. Die Reaktivierung war regelkonform (neues Regime, 600 Sims,
+Confound entschaerft) und kommt zum selben Ergebnis. Wiedereroeffnung
+daher nur mit einem NEUEN Mechanismus, nicht mit einer weiteren
+k-Stufe -- und Regel 4 (Policy-Ziel-Qualitaet im Self-Play) entfaellt
+per Prereg, weil sie eine positiv beantwortete Staerke-Frage
+voraussetzte.
