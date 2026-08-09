@@ -16,18 +16,19 @@ NICHT aufgefuehrt und wurde nicht angefasst.
 
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT.
 
-## OFFEN (3)
+## OFFEN (2)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
-| `PREREG_lambda_wdl_arm.md` | Traegt λ=0,7-Mix in der WDL-Aera (Zielfeld `values_wdl`) Arena-Staerke gegen den Champion `v20_2d_opp_brierbest`? | `lam07_wdl2_s2` gueltig trainiert, Arena-Gating steht aus -- kein Ergebnis in `archive/history.md` oder JSON auffindbar; `evaluations/STATUS.md`, Abschnitt "OFFENES GATING (v20-Aera, hat Vorrang)" |
 | `PREREG_ismcts_determinisierungen.md` | Verbessert Mehrfach-Determinisierung (k=1/2/4, rechen-neutral via Sims-Split) bei 600 Netz-Sims die Spielstaerke gegen die PIMC-Strategy-Fusion? | Knopf vorbereitet, Messung steht in der "NACH-v21-QUEUE" (Nutzer-Go 2026-08-08), noch nicht gelaufen; `evaluations/STATUS.md`, Abschnitt "NACH-v21-QUEUE", Punkt 2 |
-| `PREREG_v21_fenster.md` | Fenster-/Korpus-Zuschnitt fuer die v21-Generation (Zwei-Klassen, Rotation) sowie τ-Annealing-Entscheid fuer den Sockel | Fenster-Zuschnitt selbst fix entschieden; τ-Teilfrage GESCHLOSSEN (H0, τ=1 bleibt); die eigentliche Fenster-Befuellung/Training/Gating vom Nutzer 2026-08-08 zurueckgestellt; `evaluations/STATUS.md`, Zeile 15-16 |
+| `PREREG_prior_blindfleck.md` | Verpasst die fixe Gumbel-Wurzelmenge (m=16 bei Median 50 legalen Aktionen) gute Zuege, und hilft eine groessere Wurzelbreite? | **Design auf Halde, NICHT eingetaktet** (2026-08-09, aus externem Review R2). Task E offline als Gate, F nur bei Miss-Rate >=5%; Abdeckungszahlen aus `evaluations/dome_split_diagnose.json` |
 
-## ENTSCHIEDEN (25)
+## ENTSCHIEDEN (27)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_lambda_wdl_arm.md` | Traegt λ=0,7-Mix in der WDL-Aera (Zielfeld `values_wdl`) Arena-Staerke gegen den Champion? | **H0** -- Ein-Faktor-Gating 63:77 (p=0,21) gegen `v20_2d_opp_brierbest`; Brier 0,18937 vs 0,18749 (schlechter). Befund aera-gebunden; `evaluations/STATUS.md` + Statusfussnote in der Prereg-Datei |
+| `PREREG_v21_fenster.md` | Fenster-/Korpus-Zuschnitt fuer die v21-Generation (Zwei-Klassen, Rotation) sowie τ-Annealing-Entscheid | **AUSGEFUEHRT** -- Fenster 29.450 Partien realisiert, `v21_2d_brierbest` ist seit 2026-08-08 Champion (Gating 75:45 p=0,0059 + Frisch-Seed 97:63 p=0,0095, Elo 1358); τ-Teilfrage H0 (τ=1 bleibt). Fenster per Nutzer-Entscheid fix ("das fenster bleibt nun so") |
 | `PREREG_aggression_stilmessung.md` | Hebt der Aggressions-Blend (w/λ) die eigene Punktzahl/Gegner-Floor bei gleicher Siegquote, auch gegen einen starken Gegner? | Eigener Ergebnis-Abschnitt in der Datei ("STARK-GEGNER-ERGEBNIS", "E1-/E2-ERGEBNIS"): keine Uebernahme, Blend inert |
 | `PREREG_denial_tiebreak.md` | Verbessert ein Denial-Tie-Break an der Wurzel (ε-Fenster, niedrigste Gegner-Punktprognose) das Spiel ohne Schaden? | Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS ... E3 GESCHEITERT") |
 | `PREREG_platten_intervention.md` | Hebt ein Endgame-/Wertungsplatten-Aux-Kopf die R5-Plattenkalibrierung, und schlaegt er den Champion in der Arena? | Eigener Ergebnis-Abschnitt in der Datei ("ARENA-ERGEBNIS: H0"); Kopf wird Trainings-Upgrade, Champion unveraendert |
