@@ -140,3 +140,26 @@ einen Arm auf dem v21-Fenster.** Entscheidungsregel daher praezisiert:
 H1 -> λ ist ein starker Rezept-Kandidat (er schlaegt trotz kleinerem
 Fenster); H0 -> KEIN λ-Verdikt, sondern "unentschieden, konfundiert",
 und die Frage wandert als v21-Fenster-Arm in die Task-D-Familie.
+
+## ERGEBNIS (2026-08-09): H0 -- λ in der WDL-AERA GESCHLOSSEN
+
+Ein-Faktor-Gating gegen `v20_2d_opp_brierbest` (identisches Fenster,
+Rezept, Warm-Start, Seed -- nur λ=0,7 vs 1,0): **63:77**, SPRT-H0 nach
+70 Paaren, p=0,21, gepaarte Differenz -0,20 [-0,47, +0,07]. Die
+Richtung zeigt sogar leicht GEGEN λ.
+
+Weil der Vergleich sauber ist (ein Faktor), ist das ein echtes Verdikt
+und nicht bloss ein Unentschieden: **λ=0,7 hilft im WDL-Ziel nicht.**
+Der Alt-Befund (λ=0,7 gewinnt 227:173 im v18only-Regime, tanh-Aera) ist
+damit als AERA-GEBUNDEN bestaetigt -- genau die Nutzer-Warnung vom
+2026-08-08 ("das kannst so nicht mehr vergleichen, wir haben jetzt einen
+binaeren value head"). λ wird NICHT ins Rezept aufgenommen, ein
+v21-Fenster-Arm entfaellt.
+
+Bemerkenswert bleibt der Kalibrierungs-Nebenbefund: der λ-Arm hatte
+**Platt-B 0,9966** (Champion 0,930), also praktisch perfekte
+Kalibrierung -- ohne Staerkegewinn. Das trennt die beiden Dinge klar:
+Kalibrierung ist nicht Spielstaerke. Als eigenstaendiger Hebel bleibt
+das notiert (etwa fuer #31-Schwierigkeitsstufen, wo kalibrierte
+Gewinnwahrscheinlichkeiten fuer die Praesentation wertvoller sind als
+Staerke), NICHT als Champion-Kandidat.
