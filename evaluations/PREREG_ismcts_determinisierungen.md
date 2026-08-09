@@ -491,3 +491,50 @@ abgehandelt**, und zwar mechanismusweise statt pauschal:
 | unaufgedeckte Bonuschips | Wurzel-Determinisierung, k-Regler | schmaler Kanal; k=1/2/4 dreimal H0 |
 | Peek/Reveal in-tree | `SHUFFLE_STACK_PEEK_IN_SEARCH` | aus, gemessen SCHAEDLICH |
 | **Fabrik-Neubefuellung** | **TD-Bootstrap-Label** | **behandelt -- ueber den Korpus gemittelt, nicht zur Laufzeit** |
+
+### NACHTRAG: der Zieh-Zug ist in 45% der Entscheidungen verfuegbar -- Verduennung erklaert das H0 NICHT
+
+Nutzer-Argument: die Wurzel-Determinisierung des Kuppelstapels kann nur
+dort wirken, wo Ziehen ein legaler Zug ist; unsere Messung mittelte aber
+ueber ALLE Stellungen. Dazu zwei Praezisierungen.
+
+**Erstens traegt der alte "Kuppelstapel irrelevant"-Befund hier nicht.**
+Er stuetzte sich darauf, dass der Value-Kopf `pending_stack_draw`
+architektonisch nie sieht -- das gilt fuer den ANSTEHENDEN Zug. Ist
+gezogen, liegt die Fliese im beobachtbaren Zustand und wirkt nach unten
+weiter. Vier Welten heissen also vier verschiedene gezogene Kuppeln, und
+die restlichen Sims schauen tiefer in genau diese Unterschiede. Der alte
+Befund war fuer die IN-TREE-Neumischung formuliert, nicht fuer die
+Wurzel-Determinisierung.
+
+**Zweitens ist die Verfuegbarkeit gemessen, nicht geschaetzt** (frozen_v2,
+`valid_actions` enthaelt den Aktionstyp `dome_stack_peek`):
+
+| Netz-Entscheidungen (Drafting) | mit Zieh-Zug |
+|---|---|
+| Runde 1: 302 | 134 = **44,4%** |
+| Runde 2: 270 | 116 = **43,0%** |
+| Runde 3: 256 | 113 = **44,1%** |
+| Runde 4: 241 | 122 = **50,6%** |
+| **R1-R4 gesamt: 1.069** | **485 = 45,4%** |
+| Runde 5: 218 | **0** (dort entscheidet der exakte Loeser) |
+
+Die Nutzer-Regel ("Runde 1-4") ist damit exakt bestaetigt.
+
+**Folge fuer die Lesart des H0**: bei 45% Verfuegbarkeit ist der
+Verduennungsfaktor ~2, nicht ~10. Unsere Aufloesung liegt bei ~4,4pp
+(2 x Block-SE 2,2pp), ein echter Effekt auf den berechtigten Stellungen
+muesste also ueber ~10pp liegen, um gesamt sichtbar zu werden. Der
+Vorbehalt hat damit **Zaehne fuer kleine Effekte** -- ein wahrer Effekt von
+5pp auf berechtigten Stellungen waere unsichtbar geblieben. Er rettet die
+Hypothese aber nicht: beobachtet wurde ein NEGATIVER Punktschaetzer
+(-4,75pp bei k=2, gleiche Tiefe), nicht ein zu kleiner positiver.
+
+**Verfuegbares Instrument fuer eine schaerfere Messung** (nicht gebaut,
+aber ohne Neubau moeglich): dasselbe Muster wie
+`tools/plate_rank_invariance.py` -- auf FESTEN Zustaenden die tatsaechlich
+gewaehlte Aktion unter k=1 gegen k=4 vergleichen und nach
+Peek-Verfuegbarkeit bedingen. Das misst die Kipprate auf
+Entscheidungsebene statt Partie-Ergebnisse und braucht keine Arena. Wer
+das k-Thema noch einmal aufnimmt, sollte dort anfangen und nicht bei
+einem weiteren Arena-Arm.
