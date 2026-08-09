@@ -135,7 +135,7 @@ Teilen als A/B benannt.
 | 79 | VALUE_WEIGHT/POINTS_WEIGHT-Sweep-Infrastruktur (v12d) | entschieden -- `--value-weight`/`--points-weight` gebaut und genutzt | `train.py:2056` |
 | 80 | Self-Play-Kostenprofil (Gumbel-Suche vs. rtv vs. Bootstrap) | entschieden -- gemessen: rtv ~81% der Self-Play-Kosten | `archive/history.md:2142` |
 | 81 | Amdahl-Split fuer den geplanten GPU-Umbau (Netz-Eval-Anteil je Kostenkategorie) | entschieden -- gemessen | `archive/history.md:2291` |
-| 82 | Zentraler GPU-Inferenz-Batcher (RTX 3060) | **UNKLAR -- siehe Abschnitt unten.** | `archive/history.md:2293` |
+| 82 | Zentraler GPU-Inferenz-Batcher (RTX 3060) | **AUFGEGRIFFEN 2026-08-09**: Machbarkeitsprobe vorregistriert (`PREREG_gpu_inferenz_batcher.md`), damit kein UNKLAR mehr. Anlass: der Inferenz-Anteil ist mit 62-81% der Self-Play-Zeit HOEHER als die Registratur-Vermutung annahm | `archive/history.md:2293` |
 | 84 | rtv-Ablation Phase 1 (traegt `round_transition_value` ueberhaupt Staerke bei?) | entschieden -- abgeschlossen, Grundlage fuer #85 | `archive/history.md:2735` |
 | 85 | rtv-Ablation Phase 2 (rtv default abschalten) | entschieden -- rtv seither standardmaessig AUS, `v13_nortv_best` wurde Champion | `archive/history.md:2940` |
 | 86 | Gepaartes Gating `v13_best` vs. `v12b_lr_best` | entschieden -- SPRT harter Deckel ohne Entscheid (p=0,2615), kein Champion-Wechsel | `archive/history.md:2595`, `archive/history.md:2703` |
@@ -249,5 +249,13 @@ Self-Play deutlich beschleunigte, ist denkbar, dass der GPU-Batcher
 dadurch an Dringlichkeit verlor und informell fallengelassen wurde --
 das ist aber eine Vermutung, keine belegte Aussage. Status daher **unklar**
 statt "zurueckgezogen".
+
+**NACHTRAG 2026-08-09**: aufgeklaert und eingetaktet. Die Vermutung
+"durch die rtv-Abschaltung an Dringlichkeit verloren" ist WIDERLEGT --
+der Inferenz-Anteil liegt in der aktuellen Aera bei ~81% der
+Self-Play-Zeit (`PREREG_v20_kampagne.md:71`), gegen 62% in der
+frueheren Profilmessung. Machbarkeitsprobe vorregistriert in
+`PREREG_gpu_inferenz_batcher.md`; entscheidende Frage ist nicht der
+GPU-Spitzendurchsatz, sondern der real erreichbare Batch.
 
 Alle anderen 64 Nummern liessen sich eindeutig einem Thema zuordnen.
