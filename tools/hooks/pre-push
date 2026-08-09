@@ -1,0 +1,58 @@
+#!/bin/sh
+# tools/hooks/pre-push -- Golden-Waechter (A1-A4, `cargo test --release`), aber
+# NUR wenn im zu pushenden Bereich engine/src/ geaendert wurde. Andernfalls
+# sofortiger Durchlass (Zeile "sonst durchlassen" im Design-Dok).
+#
+# Aktivierung (einmalig, siehe tools/hooks/README.md):
+#   git config core.hooksPath tools/hooks
+#
+# Budget: < 90 s (siehe evaluations/DESIGN_konventionen_als_pruefungen.md,
+# Abschnitt "Entscheid: LOKALER GIT-HOOK").
+#
+# Fehlalarm? git push --no-verify
+#
+# Git ruft pre-push mit ($1=Remote-Name, $2=Remote-URL) auf und liefert auf
+# stdin eine Zeile je zu aktualisierender Ref: "<local ref> <local sha>
+# <remote ref> <remote sha>".
+
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+cd "$REPO_ROOT" || exit 1
+
+ZERO_SHA="0000000000000000000000000000000000000000"
+ENGINE_SRC_CHANGED=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "$local_sha" ] && continue
+    if [ "$local_sha" = "$ZERO_SHA" ]; then
+        continue  # Ref wird geloescht -- nichts zu pruefen
+    fi
+    if [ "$remote_sha" = "$ZERO_SHA" ]; then
+        RANGE="$local_sha"  # neuer Remote-Branch: kompletten Branch pruefen
+    else
+        RANGE="$remote_sha..$local_sha"
+    fi
+    if [ -n "$(git diff --name-only "$RANGE" -- engine/src/ 2>/dev/null)" ]; then
+        ENGINE_SRC_CHANGED="yes"
+    fi
+done
+
+if [ -z "$ENGINE_SRC_CHANGED" ]; then
+    exit 0  # engine/src/ nicht betroffen -- sofort durchlassen
+fi
+
+echo "pre-push: engine/src/ im Push geaendert -- cargo test --release laeuft (Budget < 90 s)." >&2
+
+# Python-DLL im PATH voranstellen, sonst STATUS_DLL_NOT_FOUND (siehe MEMORY
+# "cargo test braucht Python-DLL im PATH").
+export PATH="/c/Users/Patrick/AppData/Local/Python/pythoncore-3.14-64:$PATH"
+
+(cd engine && cargo test --release)
+STATUS=$?
+
+if [ "$STATUS" -ne 0 ]; then
+    echo "" >&2
+    echo "pre-push: cargo test --release rot -- Push abgebrochen." >&2
+    echo "Ausweg: Test fixen, oder falls es ein Fehlalarm ist: git push --no-verify" >&2
+fi
+
+exit "$STATUS"

@@ -446,3 +446,48 @@ verlangte eine "Val-R²-Verbesserung im Trainingsziel-Pfad", also an einem
 Mechanismus, der inzwischen ABGESCHALTET ist (`nortv` in jedem aktuellen
 Training). Die Bedingung ist damit unerfuellbar geworden, ohne dass es
 jemand bemerkt hat -- sie wird durch die Verzerrungsmessung ersetzt.
+
+### VERZERRUNGSMESSUNG: nicht ausfuehrbar -- und der TD-Bootstrap erklaert warum sie sich eruebrigt
+
+Nutzer-Hinweis, der die Sache entscheidet: *"eigentlich haben wir eine
+stark zufällige komponente im rundenübergang -> die befüllung der
+fabriken. die machen wir über die td-bootstrap labels."*
+
+**Das ist das Argument, das gefehlt hat.** Der TD-Bootstrap nimmt am
+Rundenuebergang den Netzwert des TATSAECHLICH eingetretenen
+Nachfolgezustands als Label. Ueber viele Partien folgen auf dieselbe
+Vor-Uebergangs-Situation verschiedene Befuellungen -- der gelernte Wert
+konvergiert also gegen den ERWARTUNGSWERT ueber Befuellungen. Sampling in
+der Suche wuerde zur Laufzeit nachrechnen, was das Netz aus dem Korpus
+schon gelernt hat. Das erklaert zugleich das rtv-Verdikt: explizites
+Chance-Node-Averaging als LABEL trug nichts bei, weil der Bootstrap die
+Mittelung ohnehin leistet -- bei 81% der Self-Play-Kosten.
+
+**Versuchte Messung, Ergebnis: nicht ausfuehrbar** (Belege aus dem Lauf):
+- Die Nachfolgezustaende aus `autoplay_to_round5_and_resample_json` sind
+  Runde-5-Zustaende. Dort liefert `net_search_state_json_trace`
+  `root_value = None` und KEIN `value_debug` -- Runde 5 umgeht das Netz
+  vollstaendig (exakter Alpha-Beta-Loeser).
+- Der Vor-Uebergangs-Zustand (`r4_end_state`, Runde 4, Phase Tiling) hat
+  ebenfalls kein `value_debug` -- die Tiling-Phase laeuft ueber den
+  Tiling-Loeser.
+- **Keine der beiden Seiten des Vergleichs existiert als Netzwert.** Ein
+  Resample-Einstieg fuer die Uebergaenge R1->R2 / R2->R3 / R3->R4, wo
+  beide Seiten netzbewertet waeren, ist nicht exponiert.
+
+**Entscheid: der Punkt wird geschlossen, ohne die Bindung zu bauen.**
+Begruendung, nicht Resignation: wir wuerden ein Instrument bauen, um
+einen Hebel zu rechtfertigen, dessen Praemisse durch das TD-Argument
+bereits erklaert ist -- und dessen Schaetzer in Phase 1 als schwach
+gemessen wurde (Ausgangskorrelation 0,215 gegen 0,445). Eine Messung,
+deren erwartete Antwort "das Netz mittelt bereits" lautet, ist die
+Bindung nicht wert.
+
+**Damit ist die Imperfect-Information-Frage auf Suchebene vollstaendig
+abgehandelt**, und zwar mechanismusweise statt pauschal:
+| Quelle verdeckter Information | Behandlung | Status |
+|---|---|---|
+| Kuppelstapel | Wurzel-Determinisierung | bewiesen irrelevant (Value-Kopf sieht `pending_stack_draw` nie) |
+| unaufgedeckte Bonuschips | Wurzel-Determinisierung, k-Regler | schmaler Kanal; k=1/2/4 dreimal H0 |
+| Peek/Reveal in-tree | `SHUFFLE_STACK_PEEK_IN_SEARCH` | aus, gemessen SCHAEDLICH |
+| **Fabrik-Neubefuellung** | **TD-Bootstrap-Label** | **behandelt -- ueber den Korpus gemittelt, nicht zur Laufzeit** |
