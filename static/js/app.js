@@ -694,7 +694,12 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
   } else {
     // Nutzer-Feedback 2026-08-07: gesperrtes Spezialfeld zeigt den gelben
     // Stern der Spezial-Rueckseite (⭐, s. stackTopTypeIcon) statt 🔒.
-    bg = 'background:#E7E5E4;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '⭐' : '◎';
+    // Nutzer 2026-08-09: unbelegtes Spezialfeld = WEISSER Hintergrund (die
+    // Spezialfliese ist weiss, `dome.rs::special()` -- "Special-Space
+    // (weiss)"), voll sichtbar. ACHTUNG: dieser Inline-Style ueberstimmt
+    // `.ds.S` im CSS -- beide Stellen muessen zusammen geaendert werden,
+    // sonst zeigt die Datei eine Farbe und die Seite eine andere.
+    bg = 'background:#fff;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '⭐' : '◎';
   }
   
   if(tiling && si >= 0) {

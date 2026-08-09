@@ -224,8 +224,16 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .ds.N::after{content:'';position:absolute;inset:0;
   background:var(--sym) center/12px no-repeat}
 .ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
-.ds.S{background:var(--special);border-style:dashed;border-color:#aaa}
-.ds.S.locked{opacity:.25}
+/* Nutzer 2026-08-09: unbelegtes Spezialfeld weiss und VOLL sichtbar -- in
+   beiden Sperrzustaenden. Das fruehere `.ds.S.locked{opacity:.25}` ist
+   ersatzlos weg: gedimmt wird nur noch das BELEGTE Feld (ueber
+   `.ds.filled` = .6), gleiche Logik wie bei den normalen Kuppelfeldern.
+   Den Hintergrund setzt zusaetzlich ein Inline-Style in
+   `app.js::spaceHTML` (der gewinnt) -- beide Stellen synchron halten.
+   Folge, bewusst in Kauf genommen: gesperrt und freigeschaltet
+   unterscheiden sich jetzt nur noch am Symbol (⭐ gesperrt / ◎ frei),
+   nicht mehr an der Helligkeit. */
+.ds.S{background:#fff;border-style:dashed;border-color:#aaa}
 /* Belegt = erledigt, tritt zurueck (Gegenstueck zur Umkehrung oben).
    Bewusst nur "etwas weniger sichtbar" (.6, nicht die alten .35 der
    unbelegten Felder): die gelegte Farbe muss zum Abgleich mit den
