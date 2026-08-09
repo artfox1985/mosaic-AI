@@ -402,3 +402,47 @@ ist die vollstaendige Erklaerung fuer alle drei k-Messungen (rechen-neutral,
 gleiche Tiefe k=2, gleiche Tiefe k=4) -- und zugleich die Bestaetigung,
 dass die Unsauberkeit woanders sitzt: beim Beutel, also am
 Rundenuebergang.
+
+### KORREKTUR am Nachfolger (Nutzer-Frage "ist das das rtv?" -- ja)
+
+Es ist **dieselbe Maschinerie**: `sample_round_transition_value` wird
+aus `self_play.rs:2121/2131` mit `N_SAMPLES_TRAIN=24` fuer die LABELS
+gerufen (Phase 1) und aus `net_mcts.rs:1734` mit `N_SAMPLES_SEARCH=8`
+fuer die SUCHE (Phase 2, "noch nicht aktiviert").
+
+**Das senkt den Vorwissens-Wert des Vorschlags erheblich.** Phase 1 ist
+gemessen und verworfen: rtv trug keine messbare Spielstaerke bei, kostete
+~81% der Self-Play-Zeit, und die Labels korrelierten mit dem Ausgang nur
+0,215 gegen 0,445 beim Bootstrap (`v13_nortv` wurde deshalb Champion).
+Das ist eine Aussage ueber die QUALITAET DES SCHAETZERS, nicht nur ueber
+Label-Oekonomie -- und derselbe Schaetzer soll in Phase 2 die
+Blattbewertung tragen.
+
+Was sachlich anders bleibt: als Label konkurrierte rtv gegen den besser
+korrelierten Bootstrap und verlor. In der Suche gibt es am
+Uebergangsblatt KEINEN konkurrierenden Schaetzer -- dort steht heute ein
+einzelner deterministischer Wert, und 8 Stichproben senken dessen
+Varianz. Aber ein praeziser schwacher Schaetzer bleibt schwach.
+
+**Geaenderte Reihenfolge -- Offline-Verzerrungsmessung VOR jedem
+Arena-Arm** (Minuten, kein Arena-Budget):
+
+Auf einer Menge von Vor-Uebergangs-Zustaenden beides berechnen und
+vergleichen: (a) den heutigen einzelnen deterministischen Blattwert,
+(b) das 8-Stichproben-Mittel aus `sample_round_transition_value`.
+
+- **Systematische Abweichung** (Median-Differenz deutlich ueber dem
+  Seed-Rauschboden derselben Groesse) ⇒ echte Verzerrung, der Arena-Arm
+  ist gerechtfertigt.
+- **Uebereinstimmung** ⇒ das Netz mittelt bereits selbst ueber
+  Neubefuellungen (der Beutel steckt als aggregierter Zaehler in den
+  Merkmalen), das Sampling korrigiert nichts, und der Punkt ist ohne
+  Arena-Kosten zu. Dann waere die Unsauberkeit zwar formal vorhanden,
+  aber ohne Wirkung auf die Bewertung -- dieselbe Lage wie beim
+  Kuppelstapel.
+
+Damit ist auch die alte Freigabebedingung im Code aufgeloest: sie
+verlangte eine "Val-R²-Verbesserung im Trainingsziel-Pfad", also an einem
+Mechanismus, der inzwischen ABGESCHALTET ist (`nortv` in jedem aktuellen
+Training). Die Bedingung ist damit unerfuellbar geworden, ohne dass es
+jemand bemerkt hat -- sie wird durch die Verzerrungsmessung ersetzt.
