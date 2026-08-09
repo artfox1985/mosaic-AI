@@ -90,7 +90,14 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
 
 ## GELTENDE REGELN (kompakt)
 
-- **Champion**: `v20_2d_opp_brierbest` (Elo 1349, seit 2026-08-07).
+- **Champion**: `v21_2d_brierbest` seit 2026-08-09, **Elo 1416**
+  [1325, 1510] (Vorgaenger `v20_2d_opp_brierbest` 1336). Gating 75:45
+  (SPRT-H1 nach 60 Paaren, p=0,0059) UND Frisch-Seed-Replikation 97:63
+  (H1 nach 80 Paaren, p=0,0095) -- die Fruehstopp-Regel ist damit
+  erfuellt. Alt-Messset-Brier 0,18636 vs 0,18749. **Erster Champion aus
+  reiner Korpus-Skalierung**: identisches Rezept, +40% Fenster
+  (29.450 Partien) von einem staerkeren Generator, plus
+  `--endgame-head`. champion.txt gesetzt (wirkt nach Server-Neustart).
   Generator-Naming: Dateien/Laeufe IMMER nach dem GENERATOR benennen;
   eine Ziel-Generation existiert erst mit trainiertem Modell.
 - **Fenster-Pinning**: Trainings waehrend laufender Generierung IMMER
