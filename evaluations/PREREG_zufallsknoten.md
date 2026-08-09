@@ -312,3 +312,61 @@ Reihenfolge-Empfehlung: Teil D (Groesse des R5-Lecks messen) VOR Teil B,
 weil Teil D den Baustein an der kleinsten Verzweigung (<=5 Farben, 4
 Manufakturen) testet, bevor er an der breitesten (Stapel, Runde 1)
 gebraucht wird.
+
+### KORREKTUR des R5-Befunds (Nutzer 2026-08-10)
+
+*"nein. 16 chips sind bereits in den runden 1-4 genommen worden und
+bekannt. somit kann auf die 4 chips zurueckgeschlossen werden die noch in
+runde 5 im spiel sind. was nicht bekannt ist, ist die exakte position auf
+welcher fabrik sie sind."*
+
+Richtig, und mein "Orakelwissen" war zu breit. Der Restsatz ist
+**strukturell garantiert oeffentlich**: `check_drafting_complete`
+(`game.rs:499`) laesst die Runde nicht enden, solange ein aufgedeckter Chip
+noch verfuegbar ist (`chips_available` -> `return false`), und verlangt
+zusaetzlich alle Manufakturen leer bei aufgedecktem Chip. Jeder Chip wird
+also in seiner eigenen Runde aufgedeckt UND genommen -> nach Runde 4 sind
+exakt 16 gesehen, die 4 restlichen stehen fest. Die Ableitung haengt nicht
+am Gedaechtnis, sie folgt aus der Rundenendbedingung.
+
+Das Leck ist damit die **ZUORDNUNG**, nicht die Identitaet: hoechstens
+4! = 24 Belegungen, weniger bei farbgleichen Chips (der Pool enthaelt
+Duplikate; fuer die Suche zaehlen nur die Farben, nicht `chip_id`).
+
+**Zweiter Defekt, umgekehrtes Vorzeichen:** das Netz kann die Ableitung
+NICHT machen. Verbrauchte Chips werden vom Spielerbrett entfernt
+(`round_end.rs:576` `bonus_chips.remove(i)`), und die Merkmale kodieren nur
+die AKTUELL GEHALTENEN als 5 Farbzaehler (`features.rs:597`). Die Historie
+ist weg.
+
+| | Restsatz (welche 4) | Position (welche Fabrik) |
+|---|---------------------|--------------------------|
+| Mensch | **bekannt**, garantiert | unbekannt |
+| Netz (Merkmale) | **unbekannt** | unbekannt |
+| R5-Alpha-Beta | bekannt | **bekannt** <- Leck |
+
+Dem Netz fehlt Information, die ein legitimer Spieler hat; der R5-Suche
+steht Information zur Verfuegung, die keiner hat. Zwei getrennte Aufgaben:
+
+- **Merkmal (Defizit)**: gesehener/verbrauchter Chipsatz als additives
+  Merkmal. Braucht Schema-Bump + Cache-Neubau -> **zusammen mit dem
+  Plattenkopf fahren**, dann wird der Neubau einmal bezahlt.
+- **Zufallsknoten (Leck)**: R5-Zuordnung als aufgezaehlter Knoten
+  (<=24 Belegungen) statt wahrheitsgemaesser Lesung.
+
+### Das tragende Prinzip: Menge oeffentlich, Reihenfolge verdeckt
+
+Beide verdeckten Quellen haben dieselbe Struktur -- die MENGE ist
+oeffentlich, die REIHENFOLGE bzw. POSITION ist verdeckt:
+
+- **Kuppelstapel**: `dome_pool_mask` (`serialize.rs:47`) liefert die
+  Restmenge EXAKT, weil jedes der 18 Designs genau einmal existiert
+  (`mask[tile_id] = 1`, Test `pools_have_expected_sizes`). Mengenteil
+  richtig, Reihenfolgeteil gewuerfelt statt gewichtet.
+- **Bonuschips**: Mengenteil fehlt im Merkmal, Positionsteil in R5
+  gelesen. Beides falsch, in verschiedene Richtungen.
+
+Das ist die Begruendung dafuer, warum der Shuffle (eine
+Reihenfolge-Stichprobe) das falsche Werkzeug ist und die Maske (ein
+Mengen-Aggregat) das richtige: die Unsicherheit ist eine PERMUTATION ueber
+bekannter Menge, und die ist aufzaehlbar.
