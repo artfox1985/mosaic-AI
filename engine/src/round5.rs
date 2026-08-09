@@ -76,6 +76,190 @@ pub fn applies(state: &GameState) -> bool {
     state.round_number >= 5 && state.phase == Phase::Drafting
 }
 
+// ── Zufallsknoten fuer die verdeckten Bonuschips ────────────────────────────────
+//
+// BEFUND (2026-08-10, `evaluations/PREREG_zufallsknoten.md`): der Modulkopf
+// oben nennt Runde 5 ein "Full-Information-Endspiel" und begruendet das damit,
+// dass alle Zufaelligkeit in `setup_new_round` ablaeuft. Das verwechselt
+// AUFGELOEST mit SICHTBAR. Der Chip-Pool geht mit 20 Chips exakt fuer 5 Runden
+// auf (`dome.rs::build_bonus_chip_pool`, 4 kleine Manufakturen), Runde 5
+// bekommt also 4 FRISCHE verdeckte Chips (`state.rs::setup_new_round` setzt
+// `bonus_chip_revealed = false`), und genommen werden darf ein Chip erst nach
+// dem Aufdecken (`game.rs::validate_take_bonus_chip`), das seinerseits erst
+// beim Leerwerden der Manufaktur passiert (`execution.rs::reveal_chip_if_empty`).
+//
+// WAS LEGITIM BEKANNT IST: der RESTSATZ. `check_drafting_complete` laesst die
+// Runde nicht enden, solange ein aufgedeckter Chip noch zu haben ist -- jeder
+// Chip wird also in seiner eigenen Runde aufgedeckt UND genommen, nach Runde 4
+// sind exakt 16 gesehen. Verdeckt ist allein die ZUORDNUNG zu den Manufakturen
+// (Nutzer-Praezisierung 2026-08-10).
+//
+// WARUM AUFZAEHLEN UND NICHT WELTEN ZIEHEN: 24 Belegungen an der WURZEL
+// aufzuzaehlen, jede mit vollem Wissen exakt zu loesen und zu mitteln, waere
+// die Determinisierung mit k = alle -- die Streuung verschwindet, der Bias
+// bleibt (Strategy Fusion: der Loeser darf je Welt eine andere Strategie
+// spielen, obwohl er die Welten nicht unterscheiden kann). Der Knoten gehoert
+// deshalb an die Stelle des AUFDECKENS. Weil das Aufdecken oeffentlich und
+// gleichzeitig fuer beide Spieler passiert (es gibt keine private Information),
+// ist der Baum ein gewoehnlicher Perfect-Recall-Baum mit oeffentlichen
+// Zufallsknoten -- Expectiminimax, kein ISMCTS.
+//
+// LECKKANAELE, die dafuer zu schliessen waren -- genau zwei, weil die
+// BLATTBEWERTUNG die Manufakturen nachweislich nie liest (Code-Audit
+// `tiling_solver.rs`: "lesen NACHWEISLICH ausschliesslich `state.players[pi]`"):
+//   1. der Aufdeck-Uebergang selbst -> `action_outcomes`
+//   2. die ZUGSORTIERUNG in `ordered_children` -- unter Knotenbudget
+//      entscheidet die Reihenfolge mit, welche Zuege ueberhaupt durchsucht
+//      werden, mit dem wahren Chip zu sortieren waere also ein echtes Leck
+//
+// Default AUS: `MOSAIC_R5_CHANCE_NODES` unset reproduziert das vorherige
+// Verhalten Zustand fuer Zustand (`action_outcomes` liefert dann genau einen
+// Ausgang mit Gewicht 1, und `child_value` ruft `negamax` mit demselben
+// (alpha,beta)-Fenster wie vorher).
+fn chance_nodes_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_R5_CHANCE_NODES")
+            .map(|v| !v.is_empty() && v != "0")
+            .unwrap_or(false)
+    })
+}
+
+/// Knotenbudget je Entscheidung, Default [`NODE_BUDGET`].
+///
+/// Eigener Knopf, weil Zufallsknoten den Teilbaum unter jedem Aufdecken
+/// vervielfachen und sich bei FESTEM Budget als reiner TIEFENVERLUST
+/// niederschlagen wuerden. Eine Anker-Kante gegen den Status quo waere dann
+/// nicht interpretierbar -- sie mischte "ehrlich" mit "flacher". Damit die
+/// beiden Ursachen trennbar bleiben, ist das Budget separat stellbar.
+fn node_budget() -> u64 {
+    static CELL: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_R5_NODE_BUDGET")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&n| n > 0)
+            .unwrap_or(NODE_BUDGET)
+    })
+}
+
+/// Kleine Manufakturen mit noch verdecktem Bonuschip.
+fn hidden_chip_factories(state: &GameState) -> Vec<usize> {
+    state
+        .factories
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.bonus_chip.is_some() && !f.bonus_chip_revealed)
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// Die Manufaktur, deren Chip beim Uebergang `parent` → `child` NEU aufgedeckt
+/// wurde. `None`, wenn keine -- und ebenso bei mehr als einer: eine Drafting-
+/// Aktion raeumt genau eine Manufaktur leer, mehrere gleichzeitig waeren ein
+/// unerwarteter Zustand, und der wird lieber unbehandelt gelassen als still
+/// falsch modelliert.
+fn newly_revealed(parent: &GameState, child: &GameState) -> Option<usize> {
+    let n = parent.factories.len().min(child.factories.len());
+    let mut found: Option<usize> = None;
+    for i in 0..n {
+        let was_hidden = parent.factories[i].bonus_chip.is_some() && !parent.factories[i].bonus_chip_revealed;
+        if was_hidden && child.factories[i].bonus_chip_revealed {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(i);
+        }
+    }
+    found
+}
+
+/// Nachfolge-Zustaende einer Aktion mit ihren Wahrscheinlichkeiten
+/// (Gewichtssumme 1). Ohne Knopf, ohne Aufdeckung oder bei nur noch EINEM
+/// verdeckten Chip genau ein Ausgang mit Gewicht 1.
+///
+/// Bei einem Aufdecken an Manufaktur `f` wird aufgezaehlt, WELCHER der noch
+/// verdeckten Chips dort liegt: je Kandidat wird er im Elternzustand nach `f`
+/// getauscht und die Aktion neu angewendet. Getauscht wird nur zwischen
+/// verdeckten Manufakturen, die Belegung ist also a priori gleichverteilt und
+/// das Gewicht ist die Vielfachheit. Nach dem Aufdecken halten die uebrigen
+/// verdeckten Manufakturen genau den Restsatz -- die Invariante "verdeckte
+/// Manufakturen tragen den Restsatz in beliebiger Reihenfolge" bleibt erhalten,
+/// weshalb der Glaube gar nicht getrennt mitgefuehrt werden muss.
+///
+/// Gruppiert wird nach `.colors`: laut Code-Audit in `tiling_solver.rs` fliesst
+/// NUR `.colors` je in eine Wertung, `chip_id` nie. Farbgleiche Chips sind fuer
+/// die Suche also derselbe Ausgang und fallen zusammen -- aus 4! = 24
+/// Belegungen werden dadurch in der Praxis deutlich weniger Zweige.
+///
+/// Bei genau EINEM verdeckten Chip ist seine Identitaet aus dem Restsatz
+/// eindeutig ableitbar. Ihn dann zu lesen ist kein Leck, sondern legitim --
+/// das ist keine Abkuerzung, sondern der korrekte Grenzfall.
+fn action_outcomes(parent: &GameState, a: &Action, child: GameState, chance: bool) -> Vec<(f64, GameState)> {
+    if !chance {
+        return vec![(1.0, child)];
+    }
+    let f = match newly_revealed(parent, &child) {
+        Some(f) => f,
+        None => return vec![(1.0, child)],
+    };
+    let hidden = hidden_chip_factories(parent);
+    if hidden.len() <= 1 {
+        return vec![(1.0, child)];
+    }
+
+    // (Farben, Vielfachheit, ein Quell-Index mit diesen Farben)
+    let mut groups: Vec<(Vec<crate::tile::TileColor>, usize, usize)> = Vec::new();
+    for &i in &hidden {
+        let colors = match parent.factories[i].bonus_chip.as_ref() {
+            Some(c) => c.colors.clone(),
+            None => continue,
+        };
+        match groups.iter_mut().find(|(c, _, _)| *c == colors) {
+            Some((_, count, _)) => *count += 1,
+            None => groups.push((colors, 1, i)),
+        }
+    }
+
+    let total = hidden.len() as f64;
+    let mut out: Vec<(f64, GameState)> = Vec::with_capacity(groups.len());
+    for (_, count, src) in &groups {
+        let mut p = parent.clone();
+        if *src != f {
+            let at_f = p.factories[f].bonus_chip.take();
+            let at_src = p.factories[*src].bonus_chip.take();
+            p.factories[f].bonus_chip = at_src;
+            p.factories[*src].bonus_chip = at_f;
+        }
+        let mut g = Game { state: p };
+        if g.apply_drafting(a).is_ok() {
+            out.push((*count as f64 / total, g.state));
+        }
+    }
+
+    if out.is_empty() {
+        return vec![(1.0, child)];
+    }
+    // Renormieren, falls eine Variante unerwartet illegal war -- die
+    // Gewichtssumme muss 1 bleiben, sonst waere der Erwartungswert skaliert
+    // und mit den Werten anderer Zweige nicht mehr vergleichbar.
+    let sum: f64 = out.iter().map(|(w, _)| *w).sum();
+    if (sum - 1.0).abs() > 1e-12 && sum > 0.0 {
+        for (w, _) in out.iter_mut() {
+            *w /= sum;
+        }
+    }
+    out
+}
+
+/// Ein Wurzel-/Kindkandidat: Sortierwert, Aktion und ihre gewichteten
+/// Ausgaenge (genau einer, solange die Zufallsknoten aus sind).
+struct Child {
+    order_value: f64,
+    action: Action,
+    outcomes: Vec<(f64, GameState)>,
+}
+
 /// Exakter Endwert eines Spielers: exakter Rundenscore (Tiling-Solver) plus
 /// exakte Wertungsplatten-Endwertung (NICHT die Fortschritts-Heuristik --
 /// siehe Modul-Kommentar) plus projizierte Strafleisten-Punkte.
@@ -118,20 +302,72 @@ fn leaf_value(state: &GameState, perspective: usize) -> f64 {
 /// absteigend sortiert. Wird sowohl für die Zugsortierung in `negamax` als
 /// auch an der Wurzel (`choose_action`) genutzt, um doppeltes Anwenden
 /// derselben Aktion zu vermeiden.
-fn ordered_children(state: &GameState, perspective: usize) -> Vec<(f64, Action, GameState)> {
-    let mut scored: Vec<(f64, Action, GameState)> = drafting_actions(state)
+fn ordered_children(state: &GameState, perspective: usize, chance: bool) -> Vec<Child> {
+    let mut scored: Vec<Child> = drafting_actions(state)
         .into_iter()
         .filter_map(|a| {
             let mut g = Game { state: state.clone() };
             if g.apply_drafting(&a).is_err() {
                 return None;
             }
-            let v = leaf_value(&g.state, perspective);
-            Some((v, a, g.state))
+            let outcomes = action_outcomes(state, &a, g.state, chance);
+            // Sortierwert = ERWARTUNGSWERT ueber die Ausgaenge. Mit dem
+            // konkreten (wahren) Chip zu sortieren waere ein Leck: unter
+            // Knotenbudget entscheidet die Reihenfolge mit, welche Zuege
+            // ueberhaupt durchsucht werden (siehe Leckkanal 2 im
+            // Abschnittskopf). Mit ausgeschalteten Zufallsknoten ist die Summe
+            // ueber genau einen Ausgang mit Gewicht 1 identisch zu vorher.
+            let v: f64 = outcomes.iter().map(|(w, s)| w * leaf_value(s, perspective)).sum();
+            Some(Child { order_value: v, action: a, outcomes })
         })
         .collect();
-    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| b.order_value.partial_cmp(&a.order_value).unwrap_or(std::cmp::Ordering::Equal));
     scored
+}
+
+/// Wert EINES Kandidaten: bei einem Ausgang direkt [`negamax`] mit
+/// unveraendertem `(alpha,beta)`-Fenster, bei mehreren der gewichtete
+/// Mittelwert (Zufallsknoten).
+///
+/// Innerhalb eines Zufallsknotens wird NICHT beschnitten: ein Cutoff auf einer
+/// Teilsumme waere nur mit Wertgrenzen je Ausgang korrekt (Star1/Star2). Bei
+/// hoechstens vier Ausgaengen und einem Budget in der Groessenordnung von 200
+/// Knoten ist der Verzicht billiger als die Buchhaltung -- und vor allem
+/// nachweisbar korrekt. Das aeussere Fenster des ELTERN-Knotens bleibt davon
+/// unberuehrt, dort wird weiter normal beschnitten.
+#[allow(clippy::too_many_arguments)]
+fn child_value(
+    child: &Child,
+    depth_remaining: u32,
+    alpha: f64,
+    beta: f64,
+    perspective: usize,
+    node_count: &mut u64,
+    node_budget: u64,
+    deadline: Instant,
+    chance: bool,
+) -> f64 {
+    if child.outcomes.len() == 1 {
+        return negamax(
+            &child.outcomes[0].1, depth_remaining, alpha, beta, perspective, node_count, node_budget, deadline, chance,
+        );
+    }
+    let mut acc = 0.0;
+    for (w, s) in &child.outcomes {
+        acc += w
+            * negamax(
+                s,
+                depth_remaining,
+                f64::NEG_INFINITY,
+                f64::INFINITY,
+                perspective,
+                node_count,
+                node_budget,
+                deadline,
+                chance,
+            );
+    }
+    acc
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -144,6 +380,7 @@ fn negamax(
     node_count: &mut u64,
     node_budget: u64,
     deadline: Instant,
+    chance: bool,
 ) -> f64 {
     *node_count += 1;
     if state.phase != Phase::Drafting
@@ -153,7 +390,7 @@ fn negamax(
     {
         return leaf_value(state, perspective);
     }
-    let children = ordered_children(state, perspective);
+    let children = ordered_children(state, perspective, chance);
     if children.is_empty() {
         return leaf_value(state, perspective);
     }
@@ -162,12 +399,12 @@ fn negamax(
     let mut alpha = alpha_in;
     let mut beta = beta_in;
     let mut best = if maximizing { f64::NEG_INFINITY } else { f64::INFINITY };
-    for (_, _a, next_state) in children {
+    for child in &children {
         if *node_count >= node_budget || Instant::now() >= deadline {
             break;
         }
-        let val = negamax(
-            &next_state, depth_remaining - 1, alpha, beta, perspective, node_count, node_budget, deadline,
+        let val = child_value(
+            child, depth_remaining - 1, alpha, beta, perspective, node_count, node_budget, deadline, chance,
         );
         if maximizing {
             if val > best {
@@ -229,37 +466,47 @@ pub(crate) fn exact_round5_outcome(state: &GameState) -> [f64; 2] {
 /// greift (`NODE_BUDGET` ist der bindende Cutoff).
 fn outcome_diff(state: &GameState, deadline: Instant) -> f64 {
     let mut node_count: u64 = 0;
-    negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, NODE_BUDGET, deadline)
+    negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, node_budget(), deadline, chance_nodes_enabled())
 }
 
 /// Wählt EINE Drafting-Aktion für `state` per exakter Alpha-Beta-Suche.
 /// `None` außerhalb der Drafting-Phase oder ohne Legalzüge.
 pub fn choose_action(state: &GameState) -> Option<Action> {
+    choose_action_inner(state, chance_nodes_enabled())
+}
+
+/// Kern von [`choose_action`] mit explizit uebergebener Zufallsknoten-Flagge --
+/// ausgelagert, damit die Tests unten beide Betriebsarten im SELBEN Prozess
+/// pruefen koennen. Ueber `chance_nodes_enabled()` (OnceLock + Env) waere das
+/// nicht moeglich: der Wert wird je Prozess genau einmal gelesen, und
+/// `cargo test` laesst Tests parallel im selben Prozess laufen.
+fn choose_action_inner(state: &GameState, chance: bool) -> Option<Action> {
     let perspective = state.current_player;
-    let children = ordered_children(state, perspective);
+    let children = ordered_children(state, perspective, chance);
     if children.is_empty() {
         return None;
     }
     if children.len() == 1 {
-        return Some(children[0].1.clone());
+        return Some(children[0].action.clone());
     }
 
+    let budget = node_budget();
     let deadline = Instant::now() + TIME_BUDGET;
     let mut node_count: u64 = 0;
-    let mut best_action = children[0].1.clone();
+    let mut best_action = children[0].action.clone();
     let mut best_val = f64::NEG_INFINITY;
     let mut alpha = f64::NEG_INFINITY;
     let beta = f64::INFINITY;
-    for (_, a, next_state) in children {
-        if node_count >= NODE_BUDGET || Instant::now() >= deadline {
+    for child in &children {
+        if node_count >= budget || Instant::now() >= deadline {
             break;
         }
-        let val = negamax(
-            &next_state, MAX_DEPTH.saturating_sub(1), alpha, beta, perspective, &mut node_count, NODE_BUDGET, deadline,
+        let val = child_value(
+            child, MAX_DEPTH.saturating_sub(1), alpha, beta, perspective, &mut node_count, budget, deadline, chance,
         );
         if val > best_val {
             best_val = val;
-            best_action = a;
+            best_action = child.action.clone();
         }
         if val > alpha {
             alpha = val;
@@ -279,12 +526,14 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
     // instrumentieren zu müssen. `return` innerhalb dieser Closure verlässt
     // NUR die Closure (= die bisherige Funktionslogik unverändert).
     crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::Round5Alphabeta, || {
+    let chance = chance_nodes_enabled();
     let perspective = state.current_player;
-    let children = ordered_children(state, perspective);
+    let children = ordered_children(state, perspective, chance);
     if children.is_empty() {
         return (None, Value::Null);
     }
 
+    let budget = node_budget();
     let deadline = Instant::now() + TIME_BUDGET;
     let mut node_count: u64 = 0;
     let mut alpha = f64::NEG_INFINITY;
@@ -292,12 +541,15 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
     let mut best_idx = 0usize;
     let mut best_val = f64::NEG_INFINITY;
     let mut values: Vec<f64> = Vec::with_capacity(children.len());
-    for (i, (_, _a, next_state)) in children.iter().enumerate() {
-        let val = if node_count >= NODE_BUDGET || Instant::now() >= deadline {
-            leaf_value(next_state, perspective)
+    for (i, child) in children.iter().enumerate() {
+        let val = if node_count >= budget || Instant::now() >= deadline {
+            // Notfallpfad ohne Suche: Erwartungswert der 1-Zug-Vorschau ueber
+            // die Ausgaenge (bei einem Ausgang identisch zu `leaf_value` von
+            // vorher, also byte-gleich mit Zufallsknoten aus).
+            child.outcomes.iter().map(|(w, s)| w * leaf_value(s, perspective)).sum()
         } else {
-            negamax(
-                next_state, MAX_DEPTH.saturating_sub(1), alpha, beta, perspective, &mut node_count, NODE_BUDGET, deadline,
+            child_value(
+                child, MAX_DEPTH.saturating_sub(1), alpha, beta, perspective, &mut node_count, budget, deadline, chance,
             )
         };
         values.push(val);
@@ -314,7 +566,8 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
         .iter()
         .zip(values.iter())
         .enumerate()
-        .map(|(i, ((_, a, _), &val))| {
+        .map(|(i, (child, &val))| {
+            let a = &child.action;
             let sm = SearchMove::Draft(a.clone());
             let (typ, desc, cat, _mv) = label_search_move(&sm, Some(state));
             // `val` ist eine rohe Punkte-Margin (own_total - opp_total, siehe
@@ -365,7 +618,7 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
         "node_visits": node_count,
     });
 
-    (Some(children[best_idx].1.clone()), analysis)
+    (Some(children[best_idx].action.clone()), analysis)
     })
 }
 
@@ -385,6 +638,191 @@ mod tests {
             p.start_tile_pending = false;
         }
         s
+    }
+
+    // ── Zufallsknoten fuer die verdeckten Bonuschips ─────────────────────────
+
+    /// Runde-5-Zustand, in dem EIN Zug eine Manufaktur leerraeumt (und damit
+    /// ihren Chip aufdeckt): Manufaktur 0 haelt genau eine Sonnenfliese und
+    /// keinen Mondstapel. Die vier Chips werden auf unterscheidbare Farben
+    /// gesetzt, sonst waere eine Permutation ein No-Op.
+    fn round5_state_with_imminent_reveal(seed: u64) -> GameState {
+        use crate::dome::BonusChip;
+        use crate::tile::TileColor::*;
+        let mut s = round5_state(seed);
+        s.factories[0].sun_tiles = vec![Rot];
+        s.factories[0].moon_stacks.clear();
+        let colors = [vec![Rot], vec![Blau], vec![Gelb], vec![Schwarz]];
+        for (i, c) in colors.iter().enumerate() {
+            if i < s.factories.len() {
+                s.factories[i].bonus_chip = Some(BonusChip { chip_id: i, colors: c.clone() });
+                s.factories[i].bonus_chip_revealed = false;
+            }
+        }
+        s
+    }
+
+    #[test]
+    fn chance_off_keeps_exactly_one_outcome_per_child() {
+        // Parität: ohne Knopf muss jeder Kandidat genau einen Ausgang mit
+        // Gewicht 1 tragen -- dann ist `child_value` bitgleich zum alten
+        // `negamax`-Aufruf und `ordered_children`s Sortierwert bitgleich zum
+        // alten `leaf_value`.
+        let s = round5_state_with_imminent_reveal(11);
+        let children = ordered_children(&s, s.current_player, false);
+        assert!(!children.is_empty());
+        for c in &children {
+            assert_eq!(c.outcomes.len(), 1, "ohne Knopf darf kein Zufallsknoten entstehen");
+            assert_eq!(c.outcomes[0].0, 1.0);
+        }
+    }
+
+    #[test]
+    fn chance_on_branches_at_a_reveal_with_weights_summing_to_one() {
+        // Gegenprobe zur Invarianz unten: der Zufallsknoten muss ueberhaupt
+        // feuern, sonst waere jene Prüfung leer.
+        let s = round5_state_with_imminent_reveal(12);
+        let children = ordered_children(&s, s.current_player, true);
+        assert!(!children.is_empty());
+        let branched: Vec<&Child> = children.iter().filter(|c| c.outcomes.len() > 1).collect();
+        assert!(
+            !branched.is_empty(),
+            "kein Zufallsknoten entstanden -- Aufdeckung nicht erreichbar, Test waere wertlos"
+        );
+        for c in &children {
+            let sum: f64 = c.outcomes.iter().map(|(w, _)| *w).sum();
+            assert!((sum - 1.0).abs() < 1e-12, "Gewichtssumme {sum} != 1");
+            // 4 verdeckte Chips mit 4 verschiedenen Farben -> hoechstens 4 Zweige
+            assert!(c.outcomes.len() <= 4, "mehr Zweige als verdeckte Chips");
+        }
+    }
+
+    #[test]
+    fn equal_colored_chips_collapse_into_one_branch() {
+        // `chip_id` fliesst laut Code-Audit (tiling_solver.rs) NIE in eine
+        // Wertung, nur `.colors`. Farbgleiche Chips sind fuer die Suche also
+        // derselbe Ausgang -- sonst waere die Verzweigung unnoetig teuer.
+        use crate::dome::BonusChip;
+        use crate::tile::TileColor::Rot;
+        let mut s = round5_state_with_imminent_reveal(13);
+        for i in 0..s.factories.len() {
+            s.factories[i].bonus_chip = Some(BonusChip { chip_id: i, colors: vec![Rot] });
+            s.factories[i].bonus_chip_revealed = false;
+        }
+        let children = ordered_children(&s, s.current_player, true);
+        for c in &children {
+            assert_eq!(
+                c.outcomes.len(),
+                1,
+                "vier farbgleiche Chips muessen zu EINEM Ausgang zusammenfallen"
+            );
+        }
+    }
+
+    #[test]
+    fn chosen_action_is_invariant_under_hidden_chip_permutation() {
+        // DIE Korrektheitseigenschaft von Weg A: die Zugwahl darf nicht davon
+        // abhaengen, WELCHER der verdeckten Chips auf welcher Manufaktur liegt
+        // -- diese Zuordnung ist verdeckt, der Restsatz ist es nicht.
+        //
+        // WICHTIG, damit dieser Test nicht ueberschaetzt wird: er DISKRIMINIERT
+        // NICHT. Die Teil-D-Sonde unten hat auf 8 realistischen Partien
+        // (137 Entscheidungen, 103 mit >=2 verdeckten Chips) gemessen, dass
+        // AUCH DER ALTE, lesende Modus permutationsinvariant ist -- 0/247 in
+        // beiden Betriebsarten. Der Grund ist das Knotenbudget: bis die
+        // Chipfarbe wirkt, muesste die Suche eine Manufaktur leerraeumen,
+        // aufdecken, den Chip NEHMEN und ihn im Tiling verwerten, und dafuer
+        // reichen 200 Knoten nie. Dieser Test sichert also die EIGENSCHAFT ab
+        // (auch fuer kuenftig groessere Budgets, wo sie zu greifen beginnt) --
+        // er belegt NICHT, dass ein wirksamer Defekt behoben wurde.
+        for seed in [21u64, 22, 23, 24] {
+            let base = round5_state_with_imminent_reveal(seed);
+            let hidden = hidden_chip_factories(&base);
+            assert!(hidden.len() >= 2, "Testaufbau: mindestens zwei verdeckte Chips");
+
+            let reference = choose_action_inner(&base, true).expect("Aktion");
+            // Alle zyklischen Verschiebungen der Belegung durchprobieren.
+            for shift in 1..hidden.len() {
+                let mut permuted = base.clone();
+                let chips: Vec<_> = hidden
+                    .iter()
+                    .map(|&i| base.factories[i].bonus_chip.clone())
+                    .collect();
+                for (k, &i) in hidden.iter().enumerate() {
+                    permuted.factories[i].bonus_chip = chips[(k + shift) % chips.len()].clone();
+                }
+                let got = choose_action_inner(&permuted, true).expect("Aktion");
+                assert_eq!(
+                    got, reference,
+                    "Seed {seed}, Verschiebung {shift}: die Zugwahl haengt an der verdeckten Zuordnung"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn node_budget_knob_defaults_to_the_constant() {
+        // Der Budget-Knopf existiert, damit "ehrlich" und "flacher" in einer
+        // Anker-Kante trennbar bleiben -- ohne gesetzte Variable darf er das
+        // Verhalten nicht veraendern.
+        assert_eq!(node_budget(), NODE_BUDGET);
+    }
+
+    /// TEIL D der Zufallsknoten-Vorregistrierung: wie oft haengt die
+    /// Runde-5-Zugwahl an der VERDECKTEN Belegung der Bonuschips? Gemessen auf
+    /// REALISTISCHEN Zustaenden (`drive_to_round_start(seed, 5)`, dieselbe
+    /// Quelle wie die Knoten-Kalibrierung oben) und ueber JEDE Entscheidung der
+    /// Runde, nicht nur die erste. Als `#[ignore]` markiert: Messung, kein
+    /// Urteil -- laeuft auf Abruf per `cargo test --release -- --ignored`.
+    #[test]
+    #[ignore]
+    fn teil_d_permutation_sensitivity_probe() {
+        use crate::round_transition::drive_to_round_start;
+        for &chance in &[false, true] {
+            let mut decisions = 0usize;
+            let mut comparisons = 0usize;
+            let mut flipped = 0usize;
+            let mut with_hidden = 0usize;
+            for seed in [101u64, 202, 303, 404, 505, 606, 707, 808] {
+                let mut state = drive_to_round_start(seed, 5);
+                let mut guard = 0u32;
+                while state.phase == Phase::Drafting && guard < 200 {
+                    guard += 1;
+                    let reference = match choose_action_inner(&state, chance) {
+                        Some(a) => a,
+                        None => break,
+                    };
+                    decisions += 1;
+                    let hidden = hidden_chip_factories(&state);
+                    if hidden.len() >= 2 {
+                        with_hidden += 1;
+                        let chips: Vec<_> =
+                            hidden.iter().map(|&i| state.factories[i].bonus_chip.clone()).collect();
+                        for shift in 1..hidden.len() {
+                            let mut permuted = state.clone();
+                            for (k, &i) in hidden.iter().enumerate() {
+                                permuted.factories[i].bonus_chip = chips[(k + shift) % chips.len()].clone();
+                            }
+                            if let Some(got) = choose_action_inner(&permuted, chance) {
+                                comparisons += 1;
+                                if got != reference {
+                                    flipped += 1;
+                                }
+                            }
+                        }
+                    }
+                    let mut g = Game { state };
+                    if g.apply_drafting(&reference).is_err() {
+                        break;
+                    }
+                    state = g.state;
+                }
+            }
+            let pct = if comparisons > 0 { 100.0 * flipped as f64 / comparisons as f64 } else { 0.0 };
+            println!(
+                "TEIL D chance={chance}: {flipped}/{comparisons} Permutationen kippen die Wahl ({pct:.1}%)                  | Entscheidungen {decisions}, davon mit >=2 verdeckten Chips {with_hidden}"
+            );
+        }
     }
 
     #[test]
@@ -415,8 +853,8 @@ mod tests {
         // zwischen Maximierer/Minimierer waeren ein klassischer Bug hier).
         let s = round5_state(3);
         let perspective = s.current_player;
-        let children = ordered_children(&s, perspective);
-        let naive_best = children.first().map(|(v, _, _)| *v).unwrap_or(f64::NEG_INFINITY);
+        let children = ordered_children(&s, perspective, false);
+        let naive_best = children.first().map(|c| c.order_value).unwrap_or(f64::NEG_INFINITY);
         let chosen = choose_action(&s).expect("Aktion");
         let mut g = Game { state: s.clone() };
         g.apply_drafting(&chosen).expect("legal");
@@ -538,7 +976,7 @@ mod tests {
             let mut state = drive_to_round_start(seed, 5);
             let mut step = 0u32;
             while state.phase == Phase::Drafting {
-                let children = ordered_children(&state, state.current_player);
+                let children = ordered_children(&state, state.current_player, false);
                 if children.is_empty() {
                     break;
                 }
@@ -555,6 +993,7 @@ mod tests {
                         &mut nodes,
                         u64::MAX,
                         deadline,
+                        false,
                     );
                     let elapsed = t0.elapsed();
                     let deadline_hit = elapsed >= probe_budget;

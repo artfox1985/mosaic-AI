@@ -607,3 +607,73 @@ bleiben; (2) das Bauteil ist zur Abloesung vorgesehen
 (`MOSAIC_STACK_DRAW_RESEARCH`); (3) der Ersatz laeuft auf der
 Heuristikseite bereits. Der direkte Weg ist der Forschungsknopf fuers Netz,
 und der braucht nur den Korpus mit Zwischenzustaenden.
+
+## WEG A IMPLEMENTIERT + TEIL D GEMESSEN (2026-08-10)
+
+Nutzer-Entscheidung: *"mach A. ist der saubere weg."*
+
+### Implementierung (`engine/src/round5.rs`, 321 Tests gruen)
+
+- `MOSAIC_R5_CHANCE_NODES` (Default AUS) schaltet die Zufallsknoten.
+- `MOSAIC_R5_NODE_BUDGET` (Default `NODE_BUDGET` = 200) trennt "ehrlich"
+  von "flacher": Zufallsknoten vervielfachen den Teilbaum unter jedem
+  Aufdecken, bei festem Budget waere eine Anker-Kante nicht interpretierbar.
+- `action_outcomes` zaehlt am AUFDECKEN auf, nicht an der Wurzel -- Tausch
+  des Kandidatenchips nur zwischen VERDECKTEN Manufakturen, Gewicht =
+  Vielfachheit. Die Invariante "verdeckte Manufakturen tragen den Restsatz"
+  bleibt erhalten, der Glaube braucht keine eigene Buchhaltung.
+- Gruppierung nach `.colors` (nie `chip_id`, Code-Audit `tiling_solver.rs`)
+  -- farbgleiche Chips fallen zu EINEM Zweig zusammen.
+- Bei nur noch EINEM verdeckten Chip ist er aus dem Restsatz eindeutig
+  ableitbar; ihn dann zu lesen ist legitim, nicht abgekuerzt.
+- Zweiter Leckkanal geschlossen: die ZUGSORTIERUNG sortiert nach dem
+  Erwartungswert, nicht nach dem wahren Chip -- unter Knotenbudget
+  entscheidet die Reihenfolge mit, welche Zuege ueberhaupt gesucht werden.
+- Innerhalb eines Zufallsknotens wird NICHT beschnitten (Cutoff auf
+  Teilsummen braeuchte Star1/Star2-Wertgrenzen). Bei <=4 Ausgaengen billiger
+  als die Buchhaltung -- und nachweisbar korrekt.
+- Flagge als PARAMETER durchgereicht, nicht als Prozess-Global gelesen:
+  `chance_nodes_enabled()` ist ein OnceLock, `cargo test` laeuft parallel im
+  selben Prozess, beide Betriebsarten waeren sonst nicht testbar.
+
+### TEIL D -- Ergebnis: das Leck ist wirkungslos
+
+`teil_d_permutation_sensitivity_probe` (`#[ignore]`, auf Abruf), 8
+realistische Partien via `drive_to_round_start(seed, 5)`, JEDE Entscheidung
+der Runde, Belegung der verdeckten Chips zyklisch permutiert:
+
+| Modus | Permutationen, die die Zugwahl kippen | Entscheidungen | davon >=2 verdeckte Chips |
+|-------|----------------------------------------|----------------|---------------------------|
+| chance=false (Status quo) | **0 / 247** | 137 | 103 |
+| chance=true (Weg A) | **0 / 248** | 138 | 104 |
+
+**Die vorab notierte mechanistische Vorhersage trifft zu**: 200 Knoten
+reichen nie bis dorthin, wo die Chipfarbe wirkt. Dafuer muesste die Suche
+eine Manufaktur leerraeumen, aufdecken, den Chip NEHMEN (eigene Aktion,
+`game.rs:315` erlaubt es erst nach dem Aufdecken) und ihn im Tiling
+verwerten -- die Blattbewertung sieht Chips nur ueber
+`player.bonus_chips`.
+
+Damit ist das Orakel-Leck **strukturell echt und messbar wirkungslos**.
+
+### Zwei Folgerungen, die das aendert
+
+1. **Weg B waere ausreichend gewesen.** Die Verzerrung der
+   Eingabemittelung haette nie gegriffen. A ist trotzdem gebaut, kostet
+   nichts messbar und ist exakt -- kein Grund zur Umkehr, aber der Grund
+   ist jetzt Prinzip, nicht Wirkung.
+2. **Die Anker-Kante ist NICHT trivial null.** Die Entscheidungszahl
+   unterscheidet sich (137 vs 138), die beiden Modi spielen also nicht
+   identisch -- die Mittelung verschiebt Werte und damit gelegentlich das
+   Argmax, OHNE dass die verdeckte Belegung eine Rolle spielt. Die
+   Aequivalenzpruefung bleibt noetig, ihr Ausgang durfte aber innerhalb der
+   +-4,4pp-Marge erwartet werden.
+
+### Ehrlichkeitsnotiz zum Invarianz-Test
+
+`chosen_action_is_invariant_under_hidden_chip_permutation` sichert die
+EIGENSCHAFT ab, **diskriminiert aber nicht**: der alte Modus ist ebenso
+invariant (0/247). Der Test belegt also nicht, dass ein wirksamer Defekt
+behoben wurde -- er schuetzt die Eigenschaft fuer kuenftig groessere
+Budgets, wo sie zu greifen beginnt. Als Kommentar im Test festgehalten,
+damit er spaeter nicht ueberschaetzt wird.
