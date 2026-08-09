@@ -64,7 +64,7 @@ Eskalations-Preregs laengst belegt waren.
 
 
 
-## OFFEN (3)
+## OFFEN (4)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -76,6 +76,7 @@ Eskalations-Preregs laengst belegt waren.
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_punktekopf_platten.md` | Traegt der Punkte-/Gegner-Punkte-Kopf Platten-Information, und differenziert er die ZUEGE danach (Niveau vs Rangfolge)? | **OFFEN**: Stufe 1 gelaufen, Gate war fehlkonstruiert (Rauschboden strukturell 0) und ist als ungueltig erklaert; Stufe 2 ist alleiniger Entscheidungspunkt, Instrument gebaut und installiert, Messung steht aus |
 | `PREREG_ismcts_determinisierungen.md` | Verbessert Mehrfach-Determinisierung (k=1/2/4, rechen-neutral via Sims-Split) bei 600 Netz-Sims die Spielstaerke gegen die PIMC-Strategy-Fusion? | **H0 2026-08-09**: k=1 304/400 (76,0%), k=2 309/400 (p=0,72), k=4 280/400 (-6pp, roher McNemar p=0,0465 haelt aber weder der Block-SE t=1,63 noch der Bonferroni-Schwelle 0,025 stand) -> Regel 2, k=1 bleibt, Punkt geschlossen. `evaluations/paired_arena_env_ismcts_k.json` |
 | `PREREG_prior_blindfleck.md` | Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/t_e_prior_blindfleck.json`, `evaluations/t_g_gumbel_scale_v21.json` |
 | `PREREG_lambda_wdl_arm.md` | Traegt λ=0,7-Mix in der WDL-Aera (Zielfeld `values_wdl`) Arena-Staerke gegen den Champion? | **H0** -- Ein-Faktor-Gating 63:77 (p=0,21) gegen `v20_2d_opp_brierbest`; Brier 0,18937 vs 0,18749 (schlechter). Befund aera-gebunden; `evaluations/STATUS.md` + Statusfussnote in der Prereg-Datei |
