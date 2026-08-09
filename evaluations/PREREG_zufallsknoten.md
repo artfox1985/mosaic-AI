@@ -219,3 +219,96 @@ Der Plattenkopf (`PREREG_plattenkopf.md`) bleibt sinnvoll, aber seine
 Begruendung verschiebt sich: nicht "die Platten sind unbekannt", sondern
 "die Dosierung und die anderen Kriterien". Fuer die Diagonalen ist Ziehen
 ohnehin nicht der Hebel -- dort entscheidet die Platzierung.
+
+## Architektur-Festlegung (Nutzer 2026-08-10)
+
+*"und dann bauen wir langsam die anderen parameter auch auf
+wahrscheinlichkeiten um -> sondern ein Spiel mit perfekter Information und
+Zufallsknoten. Backgammon ... innerhalb der runde ist der stapel und die
+bonuschips nicht bekannt. groesste unsicherheit in runde 1. laesst sich
+vermutlich ueber wahrscheinlichkeiten sauber abdecken. und wir koennen den
+k wert und den shuffle rausnehmen. beim rundenuebergang dann bootstrap.
+runde 5 ist alles bekannt."*
+
+Dreiteilung der Unsicherheit, je ein Werkzeug:
+
+| Ebene | Unsicherheit | Werkzeug | Stand |
+|-------|--------------|----------|-------|
+| Innerhalb der Runde | Kuppelstapel, Bonuschips | **aufgezaehlter Zufallsknoten** (exakte Erwartung) | ZU BAUEN (Teil B) |
+| Rundenuebergang | Fabrik-Befuellung aus dem Beutel | **TD-Bootstrap** | ERLEDIGT |
+| Runde 5 | -- (Annahme: keine) | exakte Alpha-Beta | **BEFUND, siehe unten** |
+
+Damit entfallen `MOSAIC_NUM_DETERMINIZATIONS` (k) und
+`determinize_hidden_information` (Shuffle) ersatzlos.
+
+### Der eigentliche Gewinn ist Determinismus, nicht Spielstaerke
+
+Ohne Shuffle ist die Netzsuche bei gegebenem Zustand **deterministisch**.
+Damit faellt eine Rauschkomponente aus JEDER kuenftigen Arena. Das
+Messproblem des Projekts ist Seed-Rauschen (5,75pp bei n=400 fuer
+identische Konfiguration, `project_training_seed_variance`) -- dieser
+Effekt ist vermutlich groesser als jeder Elo-Gewinn, den k je haette
+liefern koennen. Als Hauptbegruendung des Umbaus vorgemerkt, NICHT die
+Spielstaerke.
+
+### k=4 ist damit kein Gate mehr
+
+Beide Ausgaenge stuetzen den Umbau: H0 heisst, Welten bringen nichts und
+Wahrscheinlichkeiten sind der Ersatz; ein Sieg heisst, die verdeckte
+Information IST suchrelevant -- und dann ist die exakte Erwartung ueber die
+Verteilung dem Mittel aus 4 Stichproben ueberlegen. Der Lauf wird zu Ende
+gefuehrt und als Informativitaets-Messung ausgewertet, nicht als
+Entscheidung.
+
+### Verzweigungsbreite (fuer das Kostentor, Teil B)
+
+- Kuppelstapel: `NUM_DOME_TILE_DESIGNS = 18`, aber der STAPEL haelt zu
+  Rundenbeginn 13 und leert sich 13 -> 8 -> 4 -> 0 (gemessen). Die
+  Verzweigung ist `min(Reststapel, verschiedene Designs)`, gewichtet nach
+  Restanzahl; nach einem Zug aendert sich die Verteilung (Ziehen ohne
+  Zuruecklegen), die Kinder tragen also verschiedene Posteriors -- exakt,
+  aber Buchhaltung.
+- Bonuschips: 5 Farben, 20 Chips im Pool -> trivial.
+- Runde 1 ist gleichzeitig groesste Unsicherheit UND breiteste
+  Verzweigung. Das Kostentor MUSS dort gemessen werden, nicht im Mittel
+  ueber alle Runden.
+
+### BEFUND: Runde 5 ist nicht vollstaendig bekannt (Orakel-Leck)
+
+Belegt, nicht vermutet:
+
+1. `build_bonus_chip_pool()` liefert **20** Chips (`dome.rs:243`, im Test
+   `pools_have_expected_sizes` auf 20 festgenagelt).
+2. 4 kleine Manufakturen. Aufbau verbraucht 4 (`state.rs:262`), die Runden
+   2-5 je 4 -> 4 + 16 = **20, exakt aufgehend**. Runde 5 bekommt also 4
+   frische Chips, und `setup_new_round` setzt
+   `bonus_chip_revealed = false` (`state.rs:222`).
+3. `round5::applies` = `round_number >= 5 && phase == Drafting`
+   (`round5.rs:75`) -- **keine** Bedingung an die Chips.
+4. Der Ruecksprung in die R5-Suche liegt an `net_mcts.rs:3573` und `:3619`
+   (ebenso `mcts.rs:742/773/792`) und damit **VOR**
+   `determinize_hidden_information` (`net_mcts.rs:2977` / `:3394`).
+5. Ein legitimer Spieler darf einen Chip erst nehmen, wenn er aufgedeckt
+   ist (`game.rs:315`), und aufgedeckt wird er erst beim Leerwerden der
+   Manufaktur (`execution.rs:66`).
+
+Folge: die exakte Alpha-Beta-Suche liest in Runde 5 die **wahren**
+Chipfarben und kann steuern, welche Manufaktur sie zuerst leerraeumt, um
+den passenden Chip zu bekommen. Die R5-Bahn ist damit die EINZIGE Suchbahn
+ohne jede Behandlung verdeckter Information -- die Netzbahn nimmt Welten,
+R5 nimmt die Wahrheit.
+
+Der Modulkommentar behauptet das Gegenteil ("Ab Rundenbeginn ist Runde 5
+also ein Full-Information-Endspiel") und begruendet es damit, dass alle
+Zufaelligkeit in `setup_new_round` ablaeuft. Das verwechselt
+**aufgeloest** mit **sichtbar**.
+
+**Groesse ungemessen.** Belegt ist nur die Struktur. Vor einem Eingriff
+gehoert eine Messung dazu, wie oft die R5-Wahl von der Chipidentitaet
+abhaengt (Teil D, neu). Der Fix ist derselbe Baustein wie Teil B: 4
+verdeckte Chips sind ein aufzaehlbarer Zufallsknoten.
+
+Reihenfolge-Empfehlung: Teil D (Groesse des R5-Lecks messen) VOR Teil B,
+weil Teil D den Baustein an der kleinsten Verzweigung (<=5 Farben, 4
+Manufakturen) testet, bevor er an der breitesten (Stapel, Runde 1)
+gebraucht wird.
