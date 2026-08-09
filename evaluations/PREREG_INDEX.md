@@ -16,11 +16,12 @@ NICHT aufgefuehrt und wurde nicht angefasst.
 
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT.
 
-## OFFEN (2)
+## OFFEN (3)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_task_d_gewichte.md` | Traegt ein hoeheres value_weight (0,4/0,8) oder ein hoeheres points_weight (0,25) Arena-Staerke gegen die Kontrolle `v21_2d` -- und der Sieger gegen den Champion? | **OFFEN, nachgezogen 2026-08-09 VOR jedem Gating** (Regeln standen bisher nur in einer STATUS-Zeile). vw04 trainiert, vw08 laeuft, pw025 offen; Arena entscheidet, Brier/Orakel deskriptiv |
+| `PREREG_plattenkopf.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) |
 | `PREREG_ismcts_determinisierungen.md` | Verbessert Mehrfach-Determinisierung (k=1/2/4, rechen-neutral via Sims-Split) bei 600 Netz-Sims die Spielstaerke gegen die PIMC-Strategy-Fusion? | Knopf vorbereitet, Messung steht in der "NACH-v21-QUEUE" (Nutzer-Go 2026-08-08), noch nicht gelaufen; `evaluations/STATUS.md`, Abschnitt "NACH-v21-QUEUE", Punkt 2 |
 
 ## ENTSCHIEDEN (28)
