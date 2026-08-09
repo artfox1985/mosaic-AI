@@ -370,3 +370,48 @@ Das ist die Begruendung dafuer, warum der Shuffle (eine
 Reihenfolge-Stichprobe) das falsche Werkzeug ist und die Maske (ein
 Mengen-Aggregat) das richtige: die Unsicherheit ist eine PERMUTATION ueber
 bekannter Menge, und die ist aufzaehlbar.
+
+### KORREKTUR meiner Architektur-Notiz: die STELLE des Knotens entscheidet
+
+Oben steht "aufgezaehlter Zufallsknoten (exakte Erwartung)" ohne Angabe,
+WO der Knoten sitzt. Das ist unvollstaendig bis falsch, aufgedeckt durch
+die Nutzerfrage *"koennen wir dann ueberhaupt alpha beta solver machen fuer
+runde 5?"*:
+
+Zaehlt man die <=24 Belegungen an der **Wurzel** auf, loest jede mit vollem
+Wissen exakt und mittelt, dann ist das **kein Fix, sondern die
+Determinisierung mit k = alle**. Die Stichprobenstreuung verschwindet, der
+**Bias bleibt**: der Loeser darf in jeder Welt eine andere Strategie
+spielen, obwohl er die Welten nicht unterscheiden kann (Strategy Fusion,
+der bekannte Konstruktionsfehler von PIMC). Vollstaendige Aufzaehlung an
+der falschen Stelle ist k->unendlich desselben schiefen Schaetzers.
+
+**Korrekte Konstruktion**: der Zufallsknoten sitzt dort, wo die Information
+**aufgedeckt** wird -- beim Leerwerden der Manufaktur (`execution.rs:66`),
+und zwar gleichzeitig fuer beide Spieler, weil es keine private Information
+gibt. Damit ist Runde 5 ein Baum mit OEFFENTLICHEN Zufallsknoten, also
+**Expectiminimax statt Minimax**; Alpha-Beta verallgemeinert sich dorthin
+(Star1/Star2-Pruning). Verzweigung <=4 beim ersten Aufdecken, dann <=3, <=2,
+1 -- schlimmstenfalls Faktor 24 auf den Teilbaeumen darunter, weniger sobald
+zwei Restchips dieselben Farben tragen.
+
+Dasselbe gilt fuer den Kuppelstapel: der Knoten gehoert an den ZUG, der die
+Platte aufdeckt, nicht an die Wurzel.
+
+### Drei Wege fuer Runde 5 (Nutzer-Entscheidung offen)
+
+| Weg | exakt | legitim | Kosten |
+|-----|-------|---------|--------|
+| A: Expectiminimax, Knoten am Aufdecken | ja | ja | bis 24x |
+| B: unaufgedeckte Chips marginalisieren (vor dem Loeser verbergen) | **nein** | ja | ~0 |
+| C: Status quo (wahre Chips lesen) | ja | **nein** | 0 |
+
+Weg B nimmt dem Modul genau die Eigenschaft, aus der es seine Existenz
+begruendet (exaktes Endspiel) -- aber exakt-und-unrechtmaessig ist
+schlechter als naeherungsweise-und-ehrlich.
+
+**Reihenfolge**: erst Teil D messen (wie oft haengt die R5-Wahl an der
+Belegung). Klein -> Weg B vertretbar. Gross -> die 24x sind gerechtfertigt.
+Die k=4-Evidenz (`PREREG_ismcts_determinisierungen.md`: rechenneutral
+monoton fallend, -8,75pp bei k=4) mahnt dabei zum Kostentor: Baum-
+Vervielfachung hat sich in diesem Projekt schon einmal nicht bezahlt.
