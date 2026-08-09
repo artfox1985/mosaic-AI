@@ -45,9 +45,31 @@ Instrument: frozen_v2 + die 1.148 Orakel-Labels (bereits gebaut,
 (`v21_2d_brierbest`) berechnen, absteigend sortieren, pruefen ob der
 Orakel-Top-1 innerhalb der ersten m=16 liegt.
 
+**AMENDMENT 2026-08-09, VOR dem Lauf auf dem Champion.** Bei der
+Werkzeug-Sichtung zeigte sich, dass `tools/oracle_metrics.py` die
+rauschfreie Variante bereits als `prior_recall_at_16` berechnet
+(Zeile 233/280) -- Task E ist damit ueberwiegend Auswertung, kein
+Neubau. Dabei waren die Werte der v14/v15-Aera auf frozen_v1 sichtbar
+(recall@16 ~0,97-0,98, also Miss-Rate 2-3%). Das ist offengelegt,
+weil danach amendiert wird; die 5%-Schwelle bleibt UNVERAENDERT, es
+wird nur eine STRENGERE, engine-treue Metrik ergaenzt:
+
+Die Engine waehlt nicht die Prior-Top-m, sondern **Gumbel-Top-m auf
+logit+Gumbel(0,1)** -- mathematisch eine Ziehung ohne
+Zuruecklegen aus der Prior-Verteilung. Selbst ein Zug auf Prior-Rang 1
+hat damit KEINE garantierte Aufnahme, und ein Zug auf Rang 20 hat eine
+echte Chance. Die rauschfreie Recall-Zahl ist deshalb weder obere noch
+untere Schranke, sondern eine andere Groesse. Entscheidungsmetrik ist
+ab hier die rausch-treue Variante.
+
 Metriken (alle deskriptiv ausser der Entscheidungsmetrik):
-- **Entscheidungsmetrik: `miss_rate_top16`** = Anteil der Zustaende,
-  in denen der Orakel-Top-1 NICHT in den Prior-Top-16 liegt.
+- **Entscheidungsmetrik: `miss_rate_gumbel_m16`** = 1 - erwartete
+  Aufnahme-Rate des Orakel-Top-1 unter dem ECHTEN Verfahren
+  (logit + Gumbel(0,1), Top-16), Monte-Carlo mit >=200 Ziehungen je
+  Zustand, fester Seed, ueber die volle legale Aktionsmenge.
+- Deskriptiv daneben: `miss_rate_top16` (rauschfrei) = Anteil der
+  Zustaende, in denen der Orakel-Top-1 NICHT in den Prior-Top-16
+  liegt -- Vergleichbarkeit zur v14/v15-Reihe.
 - Zusatz deskriptiv: dieselbe Rate fuer Top-8/Top-32/Top-64;
   Rangverteilung des Orakel-Top-1 im Prior; Aufschluesselung nach
   Runde und nach Anzahl legaler Aktionen (der 10%-Abdeckungs-Fall ist
@@ -56,11 +78,16 @@ Metriken (alle deskriptiv ausser der Entscheidungsmetrik):
   Seed) -- die Rate ist eine Eigenschaft von Netz+Orakel-Set.
 
 **Entscheidungsregeln (vorab):**
-1. `miss_rate_top16 < 5%` **und** Top-32 bringt keine relevante
+1. `miss_rate_gumbel_m16 < 5%` **und** m=32 bringt keine relevante
    Verbesserung ⇒ Punkt GESCHLOSSEN, **kein Arena-Budget**. Externe
    Kritik dokumentiert als "gemessen, Effektgroesse zu klein".
-2. `miss_rate_top16 >= 5%` ⇒ Task F wird eingetaktet, mit der
+2. `miss_rate_gumbel_m16 >= 5%` ⇒ Task F wird eingetaktet, mit der
    gemessenen Rate als Erwartungsgroesse.
+2b. Klafft rauschfrei und rausch-treu weit auseinander (rauschfrei
+   <5%, rausch-treu >=5%), ist der Befund NICHT "Breite zu klein",
+   sondern "**Gumbel-Rauschen wirft gute Zuege raus**". Dann ist der
+   erste Arm nicht m=32, sondern die Rausch-Temperatur an der Wurzel
+   -- eigener Prereg, kein stiller Wechsel der Task-F-Arme.
 3. Faellt die Rate stark mit m (z.B. 12% @16 → 2% @32), ist m=32 der
    primaere F-Arm; bleibt sie flach, ist der Prior selbst das Problem
    und nicht die Breite -- dann KEIN Breiten-Task, sondern
