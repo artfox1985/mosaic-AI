@@ -513,3 +513,64 @@ genau der Fehler, gegen den `feedback_preregister_decision_metric` steht.
 
 Erwarteter Ausgang nach der NODE_BUDGET-Vorhersage oben: Versatz nicht
 nachweisbar, Anker tauschbar.
+
+### Spezialfeld-Bug in den neuen Anker buendeln (Nutzer 2026-08-10)
+
+*"bei der aktualisierten heuristik kannst den spezialfeld bug auch gleich
+beheben"*
+
+Lokalisiert -- und mit einer Wendung, die Arbeit spart.
+
+**Beide Fundstellen der flachen 3 liegen im Aufloeser**, nicht in der
+Suche: `best_eval_for_tile` (`self_play.rs:460`) und
+`avg_remaining_type_value` (`self_play.rs:485`) werden AUSSCHLIESSLICH aus
+`resolve_and_apply_stack_draw` gerufen (Zeilen 519, 525, 538). Die echte
+Wertung ist reihenabhaengig 1..6 (`round_end.rs:327`:
+`pattern_row = slot_row*2 + sp_idx/2`, `bonus = pattern_row+1`).
+
+`wertung_progress` ist fuer Kriterium 6 dagegen **exakt**
+(`-3.0 * special_empty`, `scoring.rs:178`, deckungsgleich mit
+`score_empty_special_fields`) -- dort ist kein Bug.
+
+#### Fix und Forschungsmodus sind ALTERNATIVEN, nicht Ergaenzungen
+
+`MOSAIC_STACK_DRAW_RESEARCH=1` umgeht genau diesen Aufloeser. Traegt der
+neue Anker den Forschungsmodus, ist der Spezialfeld-Bug bauartbedingt weg,
+weil der Code nicht mehr laeuft (der Kommentar an `self_play.rs:605` sagt
+es selbst: die Suche rechnet die Strafpunkte, "statt dass
+`best_eval_for_tile` sie per `cost_so_far` von Hand gegenrechnet").
+
+**Und fuer die HEURISTIK ist der Forschungsmodus sofort verfuegbar**: die
+Trainingsvoraussetzung (0 von 16.322 Korpus-Datensaetzen enthalten
+Zwischenzustaende -> erst Self-Play, dann Training, dann Gating) gilt nur
+fuer das NETZ. Eine Heuristik braucht keinen Korpus.
+
+Fuer den Netzpfad bleibt der Aufloeser bis zum Korpus in Betrieb -- dort
+behaelt der Fix der flachen 3 seinen Wert. Also machen, aber nicht
+erwarten, dass er den neuen Anker beruehrt.
+
+#### Zwei Nebenbefunde
+
+1. **`bonus_points` traegt doppelte Last**: es ist auch der
+   Typ-Unterscheider (`is_special_type()` = `bonus_points > 0`,
+   `dome.rs:128`). Das Feld darf NICHT auf den reihenabhaengigen Wert
+   umgestellt werden -- die Platte kennt ihren Slot nicht, der Wert
+   entsteht erst bei der Platzierung. Der Fix rechnet am Platzierungsort
+   und laesst das Feld als Typ-Marke stehen.
+2. **`PlayerBoard::place_special_tile` (`board.rs:172`) hat keinen
+   Aufrufer** -- toter Code, gibt ebenfalls die flache Zahl zurueck. NUR
+   NOTIERT, nicht geloescht (Loeschungen brauchen pfadgenaue Freigabe).
+
+#### Preis der Buendelung
+
+Die Anker-Kante misst dann den **Summeneffekt** aus R5-Chips und
+Stapelzug-Umstellung. Der Versatz waere hinterher nicht auf die beiden
+Ursachen aufteilbar. Fuer einen Anker ist die Zahl genug, die Zerlegung
+nicht noetig -- wer sie will, braucht zwei Gatings statt einem.
+
+**Inhalt des neuen Ankers (Vorschlag, Stand jetzt):**
+- R5: unaufgedeckte Chips vor dem Loeser verbergen (Weg B) ODER
+  Expectiminimax am Aufdecken (Weg A) -- Entscheidung nach Teil D
+- Stapelzug: `MOSAIC_STACK_DRAW_RESEARCH=1` (subsumiert den
+  Spezialfeld-Bug)
+- danach eingefroren
