@@ -18,18 +18,37 @@ Design-Dokument als einzige Quelle fuer die Umsetzung.
 | CI vorhanden | **nein**, aber Remote `artfox1985/mosaic-AI` existiert ⇒ Actions moeglich |
 | `version()` / `engine_config_json()` als Vertragsstempel | **untauglich**: `version()` liefert statisch `0.1.0` (nie erhoeht), `engine_config_json()` hat 20 Schluessel, aber weder `input_size` noch `num_planes_channels` noch eine Vertragsversion |
 
-## Die Grenze, die den Zuschnitt bestimmt
+## Entscheid: LOKALER GIT-HOOK statt GitHub Actions (Nutzer 2026-08-09)
 
-`models/` und `data/` sind **gitignored** und liegen nur auf dem Rechner
-des Nutzers. CI kann daher **nichts** pruefen, was ein Netz, einen
-Korpus oder eine GPU braucht: keine Arena, kein Training, keine
-Paritaets-Probe, keinen Alt-Set-Brier.
+*"lokaler githook würde schon reichen denk ich"* -- richtig fuer dieses
+Repo, und in einem Punkt sogar BESSER: ein lokaler Hook sieht `models/`
+und `data/` (beide gitignored), Actions koennte das nie. Die im ersten
+Entwurf noetige Trennung "CI kann nur textnahe Regeln" entfaellt damit.
 
-Was CI kann, ist genau das, was auf Spielzustaenden und Quelltext
-arbeitet -- und das deckt die appellativen Regeln erstaunlich gut ab,
-weil die Heuristik netzfrei ist.
+**Die neue harte Grenze ist LAUFZEIT.** Ein Hook, der bei jedem Commit
+eine halbe Minute kostet, wird mit `--no-verify` umgangen -- dasselbe
+Versagensmuster wie ein Waechter, der ohne Grund bellt. Daher ein
+Zeitbudget als Entwurfsvorgabe:
 
-## Stufe A -- CI (GitHub Actions, laeuft bei jedem Push)
+| Haken | Budget | Inhalt |
+|---|---|---|
+| `pre-commit` | **< 3 s** | nur textnahe Pruefungen (A5). Keine Compilierung, kein Netz, keine Daten |
+| `pre-push` | < 90 s | `cargo test --release` inkl. der Golden-Waechter (A1-A4), und NUR wenn `engine/src` im Push geaendert wurde |
+| manuell | beliebig | Paritaets-Probe vor jeder Wheel-Installation (B1). Bleibt bewusst manuell: sie braucht `models/` UND das INSTALLIERTE Wheel, gehoert also an den Installationsschritt, nicht an einen Commit |
+
+**Versionierung der Hooks**: `.git/hooks/` ist nicht versioniert. Die
+Skripte liegen daher in `tools/hooks/` und werden per
+`git config core.hooksPath tools/hooks` aktiviert -- ein Befehl, keine
+Kopiererei, und der Hook-Inhalt ist reviewbar wie normaler Code. Der
+Installationsbefehl gehoert in README und Uebergabe.
+
+**Was ein Hook NICHT leisten kann und was daraus folgt**: er laeuft nur
+auf diesem Rechner und ist mit `--no-verify` abschaltbar. Er ist damit
+ein Werkzeug gegen VERSEHEN, nicht gegen Absicht -- das genuegt hier,
+weil genau die heutigen Vorfaelle Versehen waren (vergessene
+Umgebungsvariable, veraltetes Wheel, Regler im toten Zweig).
+
+## Stufe A -- Golden-Waechter (im `pre-push`-Haken, s.o.)
 
 **A1 `cargo test --release`** -- Bestand (311 Tests) als Regressionsnetz.
 
@@ -71,8 +90,9 @@ Kriterium-6-Term (`scoring.rs:178`) bleibt im Anker stehen. Ein Massstab
 wird nicht verbessert, sonst entwertet er die Leiter. Die
 Plattenschwaeche gehoert auf die Netzseite (`PREREG_plattenkopf.md`).
 
-**A5 Konventions-Linter** (`tools/check_conventions.py`), je Regel eine
-eigene Pruefung mit sprechender Fehlermeldung:
+**A5 Konventions-Linter** (`tools/check_conventions.py`, laeuft im
+`pre-commit`-Haken, Budget < 3 s), je Regel eine eigene Pruefung mit
+sprechender Fehlermeldung:
 - **Datei-Groessen-RATSCHE**, nicht Obergrenze. Aktuelle Groessen als
   Basislinie einchecken; rot wird nur das WACHSTUM einer bereits zu
   grossen Datei. Begruendung: eine harte Grenze waere am ersten Tag auf
@@ -87,7 +107,7 @@ eigene Pruefung mit sprechender Fehlermeldung:
   `PREREG_INDEX.md` und umgekehrt; Zaehler in den Abschnitts-
   Ueberschriften stimmen mit der Zeilenzahl.
 
-## Stufe B -- lokale Gatter (brauchen models/ oder data/)
+## Stufe B -- manuelle Gatter (an den Installationsschritt gebunden)
 
 **B1 Paritaets-Probe ins Repo holen und reparieren.** Sie liegt heute in
 `C:\...\Temp\claude\...\c9453d70-...\scratchpad\paritaet_probe.py`, also
@@ -125,8 +145,11 @@ zitiert.** Anlass ist der Ist-Fall: 1358 klingt praezise, das CI
 
 ## Reihenfolge
 
-A2 zuerst (billigster Schritt gegen die real eingetretene Fehlerklasse),
-dann A3/A4 (die Golden-Waechter), dann A5 + A1 als Workflow, dann B1,
-dann B2. A und B sind unabhaengig und koennen parallel laufen: A
-beruehrt `engine/src` + `.github`, B beruehrt `tools/` +
-`evaluations/`.
+**A5 + Haken-Gerüst zuerst** -- der Konventions-Linter ist reiner Text,
+braucht keinen Wheel-Neubau und ist damit sofort und ohne freies
+Maschinen-Fenster lieferbar; er deckt zugleich die meisten heute nur
+appellativen Regeln ab. Danach A2 (Vertragsstempel, billigster Schritt
+gegen die real eingetretene Fehlerklasse), dann A3/A4 (Golden-Waechter,
+brauchen einen Wheel-Neubau und damit ein freies Fenster), dann B1, dann
+B2. A5/B2 beruehren nur `tools/` + `evaluations/`, A2-A4 nur
+`engine/src` -- die beiden Straenge koennen parallel laufen.
