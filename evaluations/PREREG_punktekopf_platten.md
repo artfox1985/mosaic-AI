@@ -95,7 +95,63 @@ Ein positives Stufe-1-Ergebnis darf NICHT als "Punkte-Kopf
 beruecksichtigt die Platten" berichtet werden, sondern nur als
 "Punkte-Kopf traegt Platten-Information an der Wurzel".
 
-## Stufe 2 (nur bei Regel 1a): NIVEAU oder ZUG-DIFFERENZIERUNG?
+---
+### ERGEBNIS Stufe 1 (2026-08-09): GATE WAR FEHLKONSTRUIERT -- Zahlen nur deskriptiv
+
+Lauf: Champion, 400 Sims, Seed 1000 (Rauschboden-Seed 2000), 16 Zustaende
+x 8 Kombinationen. Belegstelle `evaluations/punktekopf_platten_stufe1.json`.
+Kipprate im selben Lauf unveraendert reproduziert (36/124 = 29,03%),
+Altverhalten also intakt.
+
+| Groesse | Median Platten-Spannweite | Median Seed-Rauschboden |
+|---|---|---|
+| `points_forecast` | 0,208 | **0,0 exakt** |
+| `opp_points_forecast` | 0,182 | **0,0 exakt** |
+| `raw_value` (Referenz) | 0,134 | **0,0 exakt** |
+
+**Mein Fehler, klar benannt**: Ich habe den Rauschboden aus dem
+`root_value`-Protokoll uebernommen ("dieselbe Kombination, zwei Seeds"),
+ohne zu pruefen, ob er auf die neue Zielgroesse ueberhaupt anwendbar ist.
+Er ist es NICHT. `root_value` ist eine SUCHBAUM-Statistik und haengt
+ueber simulierte Zukunfts-Ziehungen echt am Seed. Die `value_debug`-
+Felder stammen dagegen aus `compute_root_value_debug`, einem EINZELNEN
+deterministischen Netz-Forward-Pass auf dem Wurzelzustand -- und
+`features_for_net` kodiert die verdeckte Information als aggregierte
+Zaehler/Masken (`features.rs` ~101-147), nicht als geordnete Liste. Die
+seed-getriebene Neumischung aendert die Netz-EINGABE damit ueberhaupt
+nicht. Der Nenner ist strukturell Null, das Verhaeltnis rechnerisch
+unendlich, und **Regel 1a ist damit trivial fuer ALLE drei Groessen
+erfuellt, auch fuer `raw_value`** -- ein Gate, das nichts trennt, ist
+kein Gate. Es wird hiermit als ungueltig erklaert und nicht als
+bestanden berichtet.
+
+**Was trotzdem verwertbar ist** (deskriptiv): alle drei Spannweiten sind
+klar von Null verschieden, beide Punkte-Koepfe tragen also
+Platten-Information an der Wurzel -- und zwar nicht weniger als der
+Value-Kopf. Vorbehalt gegen einen direkten Groessenvergleich: die drei
+Koepfe haben unterschiedliche Zielskalen (`raw_value` = tanh der Marge,
+`points_forecast` = tanh(own) - ε·tanh(opp)), die Spannweiten sind also
+nicht dimensionsgleich. "0,208 > 0,134" heisst NICHT "der Punkte-Kopf
+reagiert staerker".
+
+**Kein Widerspruch zur 4,7x-Zahl von heute**: die stammt aus
+`scoring_tile_sensitivity.py` und misst `root_value` (Suchstatistik,
+echter Seed-Rauschboden 0,0147). Hier wird `value_debug.raw_value`
+gemessen (Forward-Pass, Rauschboden 0). Zwei verschiedene Groessen,
+beide Messungen korrekt.
+
+**Konsequenz fuer den Ablauf**: Die Screening-Funktion von Stufe 1
+entfaellt -- sie sollte entscheiden, ob Stufe 2 lohnt, kann das aber
+nicht leisten. Da alle drei Groessen Platten-Information tragen, ist
+Stufe 2 ohnehin die einzige Messung, die die eigentliche Frage
+beantwortet. **Stufe 2 ist ab hier der ALLEINIGE Entscheidungspunkt**;
+die Regeln 2a/2b bleiben unveraendert gueltig (sie waren nie an Stufe 1
+kalibriert). Wer spaeter einen echten Rauschboden fuer eine
+Forward-Pass-Groesse braucht: der Seed taugt dafuer nicht, es braeuchte
+eine andere Stoerung (z.B. Vergleich ueber Plattenkombinationen, die in
+den aktiven Kriterien aequivalent sind).
+
+## Stufe 2 (ALLEINIGER Entscheidungspunkt): NIVEAU oder ZUG-DIFFERENZIERUNG?
 
 Braucht eine **additive** Rust-Ergaenzung: die je Kandidat vom Netz
 berechneten Kopf-Ausgaben (`value` / `points` / `opp_points` am
