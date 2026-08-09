@@ -30,7 +30,7 @@ being generated (see *The Generation Cycle* below). Full history, all
 measurements and the standing methodology rules:
 [`evaluations/STATUS.md`](evaluations/STATUS.md); rendered process diagrams:
 [`evaluations/diagrams.txt`](evaluations/diagrams.txt) (`spielablauf`,
-`netz_suche`, `value_ziel`, `fenster_v21`, `selfplay_training` — render via
+`netz_suche`, `value_ziel`, `fenster_generation`, `selfplay_training` — render via
 `python evaluations/render_diagrams.py`).
 
 ## Engine Core in Brief
