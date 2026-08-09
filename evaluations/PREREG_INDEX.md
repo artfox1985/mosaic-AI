@@ -72,7 +72,7 @@ Eskalations-Preregs laengst belegt waren.
 | `PREREG_plattenkopf.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) |
 | `PREREG_gpu_inferenz_batcher.md` | Schlaegt die GPU bei dem Batch, der in unserer Architektur real erreichbar ist (~11-16), den heutigen CPU-Aggregatdurchsatz -- lohnt ein zentraler Inferenz-Batcher (Alt-Nummer #82)? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Machbarkeitsprobe ohne Implementierung; Inferenz-Anteil 62-81% der Self-Play-Zeit => Amdahl-Deckel 1,7x (s=2) bis 5,3x. Erstes freies GPU-Fenster nach dem Gewichts-Sweep |
 
-## ENTSCHIEDEN (29)
+## ENTSCHIEDEN (30)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
