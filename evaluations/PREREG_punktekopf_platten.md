@@ -153,6 +153,35 @@ den aktiven Kriterien aequivalent sind).
 
 ## Stufe 2 (ALLEINIGER Entscheidungspunkt): NIVEAU oder ZUG-DIFFERENZIERUNG?
 
+### AMENDMENT vor dem Stufe-2-Lauf: das Nebenkriterium war wieder degeneriert
+
+Stufe 2 nennt als zweites Kriterium "zentrierte Spannweite >= 3x
+Rauschboden". Derselbe Fehler wie in Stufe 1: die Kopf-Ausgaben stammen
+aus einem deterministischen Forward-Pass, ihr Seed-Rauschboden ist
+strukturell **Null**, das Verhaeltnis also unendlich und das Kriterium
+wertlos. Wird hiermit ersetzt -- VOR dem Lauf, es ist nichts gemessen.
+
+**Ersatz: skalenfrei gegen den KANDIDATEN-Abstand messen**, nicht gegen
+ein Rauschen. Je Zustand und Kombinationspaar:
+`mean_i |zentriert_A(i) - zentriert_B(i)| / std_i(zentriert_A(i))` --
+also: wie stark verschiebt ein Plattenwechsel die Kandidaten
+GEGENEINANDER, verglichen damit, wie weit die Kandidaten ohnehin
+auseinanderliegen? Ein Wert von 0,02 heisst irrelevant, 0,5 heisst
+entscheidend. Diese Groesse braucht keinen Rauschboden.
+
+**Primaere Entscheidungsmetrik bleibt der Kendall-Tau** der
+Kandidaten-Reihenfolge (Median ueber Zustaende) -- er ist von sich aus
+skalenfrei und war vom Nebenkriterium nie abhaengig. Regeln 2a/2b gelten
+unveraendert, nur mit der neuen Nebengroesse:
+- **2a**: Tau-Median < 0,9 UND relative Verschiebung >= 0,2
+- **2b**: Tau-Median >= 0,9 ODER relative Verschiebung < 0,2
+
+Die 0,2-Schwelle ist gesetzt, nicht abgeleitet -- sie sagt "ein
+Plattenwechsel muss die Kandidaten um mindestens ein Fuenftel ihres
+eigenen Abstands verschieben, um als zug-differenzierend zu gelten".
+Vorab festgelegt, damit sie nicht nach Ergebnissicht gewaehlt wird.
+
+
 Braucht eine **additive** Rust-Ergaenzung: die je Kandidat vom Netz
 berechneten Kopf-Ausgaben (`value` / `points` / `opp_points` am
 KINDzustand) im `gumbel_trace` mitprotokollieren. Der Suchlauf
