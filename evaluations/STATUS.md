@@ -69,9 +69,19 @@ nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
-| **GPU** | Task D Arm `t_d_vw04` (Epoche 10, Fenster verifiziert 2.945 Dateien = v21-Fenster) | `t_d_vw08` (0,8), dann `t_d_pw025` (0,25); je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
-| **CPU** | **BLOCKIERT auf die Wheel-Installation** (Task A fertig, s.u.) | E3b Stufe 1 (Feuerrate, 200 Spiele, Abbruch <5%), dann ISMCTS-k (3x400 @600) |
-| **offline** | Task E Prior-Blindfleck (CPU-Inferenz, Agent) | Task G c_scale-Nachmessung; Task F nur bei E-Gate >=5% |
+| **GPU** | Task D Arm `t_d_vw08` (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
+| **CPU** | E3b Stufe 1 laeuft (Feuerrate stabil ~36,5% ueber 6 Bloecke) | ISMCTS-k (3x400 @600) -- Tool `tools/paired_arena_ismcts.py` existiert bereits |
+| **offline** | frei | — |
+
+**Wheel-Stand**: neu gebaut und installiert 2026-08-09 13:1x, 311 Tests
+gruen, **Paritaets-Hash exakt getroffen**
+(`8c6684ffba06...`) -- Defaults byte-identisch, die Task-D-Arme bleiben
+ueber den Wheel-Wechsel hinweg vergleichbar. E3b-Zaehler und
+`MOSAIC_NUM_DETERMINIZATIONS` sind jetzt verfuegbar.
+
+**`t_d_vw04` fertig**: brierbest = Epoche 4, `val_brier` 0,1863;
+Early Stopping nach Epoche 15 (Policy- UND Value-Plateau ab Epoche 10).
+Arena-Gating steht aus (Brier ist per Prereg nur deskriptiv).
 
 **WHEEL-BLOCKADE (erkannt 2026-08-09): beide restlichen CPU-Tasks
 haengen daran.** Das installierte Wheel ist vom **2026-08-07 04:49**,
@@ -122,9 +132,37 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
   `--endgame-head`. champion.txt gesetzt (wirkt nach Server-Neustart).
   Generator-Naming: Dateien/Laeufe IMMER nach dem GENERATOR benennen;
   eine Ziel-Generation existiert erst mit trainiertem Modell.
-- **Fenster-Pinning**: Trainings waehrend laufender Generierung IMMER
-  mit `MOSAIC_DATA_EXCLUDE` pinnen (Split+Cache-Key haengen an der
-  Dateiliste). Verifikation: "Lade HDF5-Cache"-Zeile.
+- **Fenster-Pinning -- ZWEI Variablen, nicht eine (verschaerft
+  2026-08-09 nach einem Beinahe-Fehler)**: Ein Trainingsstart im
+  v21-Fenster braucht BEIDE:
+  ```
+  export MOSAIC_DATA_EXCLUDE="$(cat evaluations/v21_exclude_regex.txt)"
+  export MOSAIC_CARRIER_MANIFEST="policy_carrier_manifest_v21.json"
+  ```
+  `MOSAIC_CARRIER_MANIFEST` wurde beim `t_d_vw08`-Start VERGESSEN. Der
+  Default ist `policy_carrier_manifest_v20.json`, also ein ANDERER
+  Traeger-Satz: der Arm haette mit einer anderen Policy-Maske als
+  `t_d_vw04` und als `v21_2d` trainiert und waere als Sweep-Arm wertlos
+  gewesen -- ohne Fehlermeldung, nur mit plausiblen Zahlen. Der Lauf
+  wurde gestoppt und korrekt neu gestartet; ein angefangener
+  Falsch-Cache war noch nicht auf der Platte.
+  **Verifikation ist Pflicht und zwar VOR dem Weggehen**: die
+  Cache-Zeile muss `📦 Lade HDF5-Cache (2651 Dateien)` lauten.
+  Steht dort `Lade Daten aus 2651 Dateien...`, ist der Cache-Schluessel
+  anders -- Lauf sofort stoppen und die Ursache klaeren, NICHT einen
+  Neubau durchlaufen lassen (er zementiert das falsche Fenster).
+  Beweisweg fuer die Ursache (bei Bedarf wiederholbar): Cache-Key aus
+  `str(files)+INPUT_SIZE+NUM_ACTIONS+VALUE_SCHEMA_VERSION+...+carriers`
+  nachrechnen und mit den `data/.cache_*.h5`-Namen vergleichen -- die
+  v21-Caches sind `26e304f5d2c7` (train, 2.651 Dateien) und
+  `8a04a7143bbe` (val, 294). Merke: der **Cache-Key ist der einzige
+  Waechter** ueber die Traeger-Wahl, das Lauf-Manifest protokolliert
+  `MOSAIC_CARRIER_MANIFEST` NICHT (`engine_config`/`python_constants`
+  waren zwischen richtigem und falschem Lauf identisch).
+  Harmlos dagegen: die 55 archivierten v18-Dateien sind seit 10:16 aus
+  `data/` heraus, `MOSAIC_DATA_EXCLUDE` schliesst nun 0 statt 55
+  Dateien aus -- Split und Dateiliste sind trotzdem BEWEISBAR identisch
+  (rekonstruiert und verglichen: 2.651/294 in beiden Faellen gleich).
 - **NACHSCHUB BEI GATING-FEHLSCHLAG -- KORRIGIERTE FASSUNG
   (Nutzer 2026-08-09)**: Die Streichung des Nachschub-Ventils vom
   2026-08-07 war **generationsspezifisch** (v20-Zyklus, weil dort eine
