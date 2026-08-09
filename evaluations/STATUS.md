@@ -167,6 +167,11 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
      CI +-90 Punkte).
   5. Pflicht-Diagnostiken am Sieger (Platt, R5, Alt-Set-Brier, R4b) +
      Eintrag in die #29-Buchfuehrung.
+  5b. **Anzeige-Kalibrierung nachziehen**: die Platt-Parameter A/B des
+     NEUEN Champions in `server.py` (`_DISPLAY_CAL_A/_B`) eintragen --
+     sie sind modellspezifisch. Quelle: `tools/platt_fit.py --models
+     models/alphazero_<neu>.pth`. Ohne das zeigt die GUI die
+     Gewinnwahrscheinlichkeit mit der Kurve des VORGAENGERS an.
   6. STATUS-Champion-Zeile + history-Kapitel.
   Nachtrag-Schuld: v20 fehlt die Kante zu `v19_best` (Champion-2 seiner
   Generation) -- billig nachholbar, Nutzer-Entscheid.

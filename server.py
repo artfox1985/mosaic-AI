@@ -401,7 +401,8 @@ def _teacher_compute_analysis(sims: int) -> dict | None:
         return None
     try:
         if _ai_model is not None:
-            return _json.loads(_rust.ai_debug_net_json(sims, _ai_c_puct))
+            return _calibrate_display_win_prob(
+                _json.loads(_rust.ai_debug_net_json(sims, _ai_c_puct)))
         return _json.loads(_rust.ai_debug_json(sims))
     except Exception:
         return None
@@ -1383,13 +1384,65 @@ def ai_start_tile():
     return jsonify(response)
 
 
+# ── Anzeige-Kalibrierung der Gewinnwahrscheinlichkeit (Weg A, Nutzer 2026-08-09)
+# Auftrag: "ehrlichere Gewinnwahrscheinlichkeit" im Spiel. Der Value-Kopf ist
+# leicht UEBERKONFIDENT -- gemessener Platt-Fit des amtierenden Champions
+# `v21_2d_brierbest` auf dem eingefrorenen Eval-Set (1440 Records, Runden 1-4,
+# tools/platt_fit.py -> evaluations/platt_fit_v21.json): B=0,9060, A=-0,0033.
+# B<1 heisst: die Ausschlaege sind zu gross. Die Korrektur
+#     p_anzeige = sigmoid(A + B * logit(p_roh))
+# schrumpft sie auf das gemessene Mass zurueck.
+#
+# BEWUSST NUR IM ANZEIGEPFAD, NICHT IN DER SUCHE: die Engine hat fuer den
+# Suchpfad eigene Knoepfe (MOSAIC_VALUE_CAL_A/B, Task #30) -- die bleiben
+# INERT (A=0/B=1), weil Task #30 fuer die Suchseite H0 gemessen hat und eine
+# Aenderung dort die Blattwerte und damit die Spielstaerke verschieben wuerde.
+# Hier wird ausschliesslich die ANGEZEIGTE Zahl korrigiert; das Rohsignal
+# bleibt als `win_prob_raw` erhalten, damit nichts verloren geht.
+#
+# WICHTIG: A/B sind MODELLSPEZIFISCH. Bei jedem Champion-Wechsel neu messen
+# (`python tools/platt_fit.py --models models/alphazero_<neu>.pth`) und hier
+# eintragen -- steht als Punkt in der Promotions-Checkliste (STATUS.md).
+# Abschalten: MOSAIC_DISPLAY_CAL=0. Ueberschreiben: MOSAIC_DISPLAY_CAL_A/_B.
+_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0033"))
+_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.9060"))
+_DISPLAY_CAL_ON = os.environ.get("MOSAIC_DISPLAY_CAL", "1") != "0"
+
+
+def _calibrate_display_win_prob(analysis):
+    """Ersetzt `value_debug.win_prob` durch die kalibrierte Wahrscheinlichkeit
+    und legt das Rohsignal unter `win_prob_raw` ab. Reine Anzeige-Transformation
+    (idempotent-sicher: wenn `win_prob_raw` schon existiert, wird nichts
+    nochmals transformiert). Fehlt das Feld oder ist die Kalibrierung aus,
+    bleibt `analysis` unveraendert."""
+    if not _DISPLAY_CAL_ON or not isinstance(analysis, dict):
+        return analysis
+    vd = analysis.get("value_debug")
+    if not isinstance(vd, dict) or vd.get("win_prob") is None or "win_prob_raw" in vd:
+        return analysis
+    try:
+        p = float(vd["win_prob"])
+    except (TypeError, ValueError):
+        return analysis
+    eps = 1e-6
+    p = min(max(p, eps), 1.0 - eps)
+    z = _math.log(p / (1.0 - p))
+    p_cal = 1.0 / (1.0 + _math.exp(-(_DISPLAY_CAL_A + _DISPLAY_CAL_B * z)))
+    vd["win_prob_raw"] = float(vd["win_prob"])
+    vd["win_prob"] = p_cal
+    vd["win_prob_calibrated"] = True
+    vd["win_prob_cal_ab"] = [_DISPLAY_CAL_A, _DISPLAY_CAL_B]
+    return analysis
+
+
 @app.route('/api/ai/debug', methods=['GET'])
 def ai_debug():
     """Analyse der AKTUELLEN Stellung (ohne Zug auszuführen), aus der Rust-KI."""
     if (e := _require_game()) is not None:
         return e
     if _ai_model is not None:
-        analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct))
+        analysis = _calibrate_display_win_prob(
+            _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct)))
     else:
         analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
     if not isinstance(analysis, dict):
