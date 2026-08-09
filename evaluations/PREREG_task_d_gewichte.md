@@ -74,6 +74,31 @@ der Value-Seite.
    Champion-Kante, die Kombination ist allenfalls ein spaeterer eigener
    Task.
 
+### KLARSTELLUNG vor dem ersten Gating (2026-08-09) -- Zweideutigkeit in meinem eigenen Zuschnitt
+
+Beim Ansetzen des ersten Gatings faellt auf, dass "Kontrolle = `v21_2d`
+selbst" nicht eindeutig ist: es gibt drei v21-Checkpoints
+(`v21_2d` = letzte Epoche, `v21_2d_best` = val_combined-bester,
+`v21_2d_brierbest` = Brier-bester). Die ARME werden alle nach
+`_brierbest` ausgewaehlt. Gegen `v21_2d` (letzte Epoche) zu gaten wuerde
+die Gewichtsaenderung mit der CHECKPOINT-AUSWAHLREGEL konfundieren --
+zwei Faktoren statt einem.
+
+**Festlegung: Kontrolle ist `v21_2d_brierbest`** -- identische
+Auswahlregel auf beiden Seiten, damit bleibt es ein Ein-Faktor-Vergleich.
+
+**Folge: Regel 4 ist damit gegenstandslos und wird gestrichen.** Sie
+verlangte, ein Sieger trete "zusaetzlich gegen den Champion
+(`v21_2d_brierbest`)" an -- das ist derselbe Gegner. Ein Sieg gegen die
+Kontrolle IST damit ein Sieg gegen den amtierenden Champion, also der
+strengste moegliche Test; ein zweiter Schritt entfaellt. Das macht den
+Sweep strenger, nicht laxer: es gibt keine Zwischenstufe mehr, gegen die
+ein Arm "gewinnen" koennte, ohne den Champion zu schlagen.
+
+Die uebrigen Regeln (Standard-SPRT, Fruehstopp-Replikation,
+Block-Ebene, alle-H0-Lesart, keine Kombination zweier Sieger) bleiben
+unveraendert. Diese Klarstellung erfolgt VOR jedem gefahrenen Gating.
+
 ## Deskriptiv mitgefuehrt (KEINE Entscheidungsmetrik)
 
 Je Arm, fuer die #29-Buchfuehrung (Offline-Praediktor braucht
