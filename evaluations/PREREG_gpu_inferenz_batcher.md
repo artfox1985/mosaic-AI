@@ -92,6 +92,42 @@ Grenze) oder blatt-parallele Auswertung innerhalb einer Suche
    je Batchgroesse (falls 256 am VRAM scheitert, ist die 203k-Zahl aus
    `#81` ohnehin unerreichbar).
 
+## KOPPLUNG an die Determinisierungs-Frage (Nutzer-Hinweis 2026-08-09)
+
+Nutzer: *"wenn wir mehr k>1 verwenden spielt uns das auch eventuell fuer
+den gpu inferenz batcher hinein."* -- trifft zu, mit einer Bedingung.
+
+**Bedingung**: `build_determinized_forest` (`net_mcts.rs:751`) durchlaeuft
+die Welten SEQUENZIELL (`.map(...)` ueber `build_net_tree`; wegen
+`rng: &mut R` auch nicht ohne Umbau parallelisierbar). k>1 erhoeht die
+gleichzeitig offenen Auswertungen heute also NICHT -- jede Welt wird
+fertig gesucht, bevor die naechste beginnt.
+
+**Warum der Hinweis trotzdem der wichtigste Beitrag zu dieser Probe ist**:
+die k Welten sind ECHT unabhaengig -- kein gemeinsamer Baumzustand, keine
+Virtual-Loss-Buchfuehrung, kein Korrektheitsrisiko innerhalb einer Welt.
+Sie zu VERSCHRAENKEN statt zu serialisieren ist erheblich einfacher als
+Blatt-Parallelitaet in einem Baum, und sie multipliziert den erreichbaren
+Batch von ~11 (Threadzahl) auf **~11·k**. Damit ist der erreichbare Batch
+KEINE feste Groesse mehr, sondern ein Entwurfsparameter.
+
+**Konsequenz fuer Teil 1 (vorab festgelegt, noch nichts gemessen)**: die
+Durchsatzkennlinie wird nicht nur bei Batch ~11 ausgewertet, sondern
+ausdruecklich auch bei **22 (k=2) und 44 (k=4)** -- den Batches, die mit
+Verschraenkung ohne Such-Umbau erreichbar waeren. Die Entscheidungsregeln
+1-3 gelten dann gegen den BESTEN dieser erreichbaren Punkte, nicht gegen
+Batch 11 allein. Regel 1 wird entsprechend praezisiert: geschlossen wird
+`#82` nur, wenn die GPU auch bei 44 den CPU-Aggregatdurchsatz nicht
+schlaegt.
+
+**Umgekehrte Richtung**: existierte der Batcher, kostete k>1 fast keine
+Wandzeit mehr, weil die k Welten in EINEM Batch ausgewertet wuerden --
+dann muesste man das Sim-Budget nicht mehr aufteilen und bekaeme
+k-fache Vielfalt zu ~1x Kosten. Genau dieses Regime testet die gerade
+laufende Trenn-Messung in `PREREG_ismcts_determinisierungen.md`
+(k=2 bei ungeteilter Tiefe). Faellt sie positiv aus, hat der Batcher
+nicht nur ein Durchsatz-, sondern ein STAERKE-Motiv.
+
 ## Ausdruecklich NICHT Teil dieser Probe
 
 - Keine Implementierung, kein Prototyp, keine Aenderung an
