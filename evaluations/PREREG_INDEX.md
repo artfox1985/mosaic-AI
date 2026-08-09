@@ -38,6 +38,11 @@ ueberschrieben hat.
    braucht, schreibt die Prereg (Task D hatte bis 2026-08-09 keine,
    obwohl er ein mehrarmiges Arena-Experiment ist -- genau der Fall, den
    Regel 1 verhindert).
+5. Fuer Nachschlagen im Alt-Bestand (welches Thema steckt hinter `#NN`,
+   ist eine Nummer schon vergeben, gibt es Kollisionen): siehe
+   `evaluations/TASK_NUMMERN_REGISTRATUR.md` (angelegt 2026-08-09, reine
+   Bestandsaufnahme der bisherigen `#NN`-Serie, vergibt selbst keine
+   neuen Nummern).
 
 ### Zuordnung der Alt-Buchstaben (damit Chat und Commits auffindbar bleiben)
 
