@@ -472,7 +472,7 @@ fn outcome_diff(state: &GameState, deadline: Instant) -> f64 {
 /// Wählt EINE Drafting-Aktion für `state` per exakter Alpha-Beta-Suche.
 /// `None` außerhalb der Drafting-Phase oder ohne Legalzüge.
 pub fn choose_action(state: &GameState) -> Option<Action> {
-    choose_action_inner(state, chance_nodes_enabled())
+    choose_action_inner(state, chance_nodes_enabled(), node_budget())
 }
 
 /// Kern von [`choose_action`] mit explizit uebergebener Zufallsknoten-Flagge --
@@ -480,7 +480,7 @@ pub fn choose_action(state: &GameState) -> Option<Action> {
 /// pruefen koennen. Ueber `chance_nodes_enabled()` (OnceLock + Env) waere das
 /// nicht moeglich: der Wert wird je Prozess genau einmal gelesen, und
 /// `cargo test` laesst Tests parallel im selben Prozess laufen.
-fn choose_action_inner(state: &GameState, chance: bool) -> Option<Action> {
+fn choose_action_inner(state: &GameState, chance: bool, budget: u64) -> Option<Action> {
     let perspective = state.current_player;
     let children = ordered_children(state, perspective, chance);
     if children.is_empty() {
@@ -490,7 +490,6 @@ fn choose_action_inner(state: &GameState, chance: bool) -> Option<Action> {
         return Some(children[0].action.clone());
     }
 
-    let budget = node_budget();
     let deadline = Instant::now() + TIME_BUDGET;
     let mut node_count: u64 = 0;
     let mut best_action = children[0].action.clone();
@@ -740,7 +739,7 @@ mod tests {
             let hidden = hidden_chip_factories(&base);
             assert!(hidden.len() >= 2, "Testaufbau: mindestens zwei verdeckte Chips");
 
-            let reference = choose_action_inner(&base, true).expect("Aktion");
+            let reference = choose_action_inner(&base, true, NODE_BUDGET).expect("Aktion");
             // Alle zyklischen Verschiebungen der Belegung durchprobieren.
             for shift in 1..hidden.len() {
                 let mut permuted = base.clone();
@@ -751,7 +750,7 @@ mod tests {
                 for (k, &i) in hidden.iter().enumerate() {
                     permuted.factories[i].bonus_chip = chips[(k + shift) % chips.len()].clone();
                 }
-                let got = choose_action_inner(&permuted, true).expect("Aktion");
+                let got = choose_action_inner(&permuted, true, NODE_BUDGET).expect("Aktion");
                 assert_eq!(
                     got, reference,
                     "Seed {seed}, Verschiebung {shift}: die Zugwahl haengt an der verdeckten Zuordnung"
@@ -788,7 +787,7 @@ mod tests {
                 let mut guard = 0u32;
                 while state.phase == Phase::Drafting && guard < 200 {
                     guard += 1;
-                    let reference = match choose_action_inner(&state, chance) {
+                    let reference = match choose_action_inner(&state, chance, NODE_BUDGET) {
                         Some(a) => a,
                         None => break,
                     };
@@ -803,7 +802,7 @@ mod tests {
                             for (k, &i) in hidden.iter().enumerate() {
                                 permuted.factories[i].bonus_chip = chips[(k + shift) % chips.len()].clone();
                             }
-                            if let Some(got) = choose_action_inner(&permuted, chance) {
+                            if let Some(got) = choose_action_inner(&permuted, chance, NODE_BUDGET) {
                                 comparisons += 1;
                                 if got != reference {
                                     flipped += 1;
@@ -821,6 +820,52 @@ mod tests {
             let pct = if comparisons > 0 { 100.0 * flipped as f64 / comparisons as f64 } else { 0.0 };
             println!(
                 "TEIL D chance={chance}: {flipped}/{comparisons} Permutationen kippen die Wahl ({pct:.1}%)                  | Entscheidungen {decisions}, davon mit >=2 verdeckten Chips {with_hidden}"
+            );
+        }
+    }
+
+    /// Ist `NODE_BUDGET` = 200 ueberhaupt ausreichend? (Nutzer-Frage
+    /// 2026-08-10.) Die 200 sind laut Kalibrierungs-Kommentar oben das p75
+    /// dessen, was der alte 150ms-Deckel ERREICHTE -- eine Tragbarkeitszahl
+    /// fuers Self-Play, keine Suffizienzzahl. Direkte Pruefung: wie oft aendert
+    /// ein hoeheres Budget die Zugwahl? Aendert sich nichts, war 200 genug;
+    /// aendert sich viel, sucht der "exakte Loeser" zu flach.
+    #[test]
+    #[ignore]
+    fn node_budget_sufficiency_probe() {
+        use crate::round_transition::drive_to_round_start;
+        let seeds = [101u64, 202, 303, 404, 505, 606, 707, 808];
+        for &budget in &[400u64, 1000, 4000] {
+            let mut total = 0usize;
+            let mut changed = 0usize;
+            let mut nodes_hint = 0usize;
+            for &seed in &seeds {
+                let mut state = drive_to_round_start(seed, 5);
+                let mut guard = 0u32;
+                while state.phase == Phase::Drafting && guard < 200 {
+                    guard += 1;
+                    let base = match choose_action_inner(&state, false, NODE_BUDGET) {
+                        Some(a) => a,
+                        None => break,
+                    };
+                    if let Some(big) = choose_action_inner(&state, false, budget) {
+                        total += 1;
+                        if big != base {
+                            changed += 1;
+                        }
+                    }
+                    nodes_hint += drafting_actions(&state).len();
+                    let mut g = Game { state };
+                    if g.apply_drafting(&base).is_err() {
+                        break;
+                    }
+                    state = g.state;
+                }
+            }
+            let pct = if total > 0 { 100.0 * changed as f64 / total as f64 } else { 0.0 };
+            let avg_branch = if total > 0 { nodes_hint as f64 / total as f64 } else { 0.0 };
+            println!(
+                "BUDGET {budget} vs {NODE_BUDGET}: {changed}/{total} Zugwahlen aendern sich ({pct:.1}%)                  | mittlere Verzweigung an der Wurzel {avg_branch:.1}"
             );
         }
     }
