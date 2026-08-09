@@ -46,7 +46,7 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
 | **GPU** | Task D Arm `t_d_vw08`, Epoche 5-6 (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (points_weight 0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion. `PREREG_task_d_gewichte.md` |
-| **CPU** | frei -- **ISMCTS-k GESCHLOSSEN** (H0, k=1 bleibt; s.u.) | die Gewichts-Sweep-Gatings, sequenziell auf derselben Bahn |
+| **CPU** | frei -- **ISMCTS endgueltig geschlossen** (auch bei gleicher Tiefe negativ, s.u.) | die Gewichts-Sweep-Gatings, sequenziell auf derselben Bahn |
 | **offline** | frei | Punkte-Kopf **Stufe 2** -- WARTET auf die Wheel-Installation (s.u.) |
 
 **BLOCKIERT: Wheel-Installation.** Das Stufe-2-Instrument ist gebaut
@@ -105,6 +105,17 @@ Knoepfe (MOSAIC_DENIAL_UNCERT_Z / _MIN_VISIT_FRAC /
 MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
 
 ## GELTENDE REGELN (kompakt)
+
+- **Seed-Skala der Arena bei n=400 (gemessen 2026-08-09)**: dieselbe
+  Konfiguration (k=1, Champion@600 vs Heuristik@150dyn) ergab **76,0%**
+  mit Basis-Seed 20260820 und **81,75%** mit 20260828 -- **5,75
+  Prozentpunkte allein durch den Seed**. Das ist groesser als die
+  meisten Effekte, die wir messen (λ, k=2, Denial-Varianten liegen alle
+  darunter). Folge: **ungepaarte Vergleiche zwischen zwei Laeufen sind
+  wertlos**, auch wenn beide n=400 haben. Jeder A/B braucht identische
+  Basis-Seeds im SELBEN Instrument; wo zwei getrennte Laeufe noetig sind
+  (unterschiedliche Sim-Budgets), muss der Basis-Seed gleich gesetzt und
+  die Paarung ueber den Spielindex selbst gerechnet werden.
 
 - **Champion**: `v21_2d_brierbest` seit 2026-08-09, **Elo 1358**
   [1292, 1434] (Vorgaenger `v20_2d_opp_brierbest` 1295). Die

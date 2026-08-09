@@ -124,9 +124,20 @@ schlaegt.
 Wandzeit mehr, weil die k Welten in EINEM Batch ausgewertet wuerden --
 dann muesste man das Sim-Budget nicht mehr aufteilen und bekaeme
 k-fache Vielfalt zu ~1x Kosten. Genau dieses Regime testet die gerade
-laufende Trenn-Messung in `PREREG_ismcts_determinisierungen.md`
-(k=2 bei ungeteilter Tiefe). Faellt sie positiv aus, hat der Batcher
-nicht nur ein Durchsatz-, sondern ein STAERKE-Motiv.
+Trenn-Messung in `PREREG_ismcts_determinisierungen.md`
+(k=2 bei ungeteilter Tiefe).
+
+**ERGEBNIS 2026-08-09: das Staerke-Motiv materialisiert sich NICHT.**
+k=2 mit 600 Sims JE WELT verlor gegen k=1@600 mit -4,75pp (327 vs
+308/400, Block-t -2,16) -- bei doppeltem Aufwand. Der Batcher bleibt
+damit eine REINE DURCHSATZFRAGE. Die Verschraenkung der Welten bleibt
+als Mittel zum Batch-Fuellen technisch interessant, aber sie hat keinen
+Staerke-Nutzen mehr als Begruendung -- und wenn k>1 die Staerke drueckt,
+ist ein auf k>1 gestuetzter Batch nur dann sinnvoll, wenn der
+Durchsatzgewinn den Staerkeverlust ueberkompensiert. Das ist eine
+schlechtere Ausgangslage als vor der Messung; Regel 1-3 gelten
+unveraendert, aber die Batch-Punkte 22/44 sind jetzt nur noch mit
+diesem Vorbehalt lesbar.
 
 ## Ausdruecklich NICHT Teil dieser Probe
 
