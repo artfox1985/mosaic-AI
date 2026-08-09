@@ -103,6 +103,21 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
 - **Fenster-Pinning**: Trainings waehrend laufender Generierung IMMER
   mit `MOSAIC_DATA_EXCLUDE` pinnen (Split+Cache-Key haengen an der
   Dateiliste). Verifikation: "Lade HDF5-Cache"-Zeile.
+- **FENSTERGROESSE IST FIXIERT (Nutzer-Entscheid 2026-08-09: "das
+  Fenster bleibt nun so")**: 29.450 Partien / 2.945 Dateien / ~4,8 Mio.
+  Zustaende bleiben die stehende Groesse. Die Rotation haelt sie
+  konstant -- pro Windung 12.000 NEUE Partien (4.000 Sockel @600 +
+  8.000 Schwarm @150), gleich viel altes Material rotiert raus. Folgen:
+  (a) Kosten pro Generation KONSTANT (~18h Self-Play + ~3h Cache +
+  ~3,5h Training), kein Anwachsen; (b) das Fenster wird mit jeder
+  Windung FRISCHER statt groesser; (c) RAM/Cache-Budget stabil
+  (~13 GB im Training, ~1 GB auf Platte).
+  **Nicht neu aufrollen**: der Dosis-Befund ("Volumen half 6/6") ist
+  eine stehende Versuchung, das Fenster wieder zu vergroessern -- die
+  Entscheidung dagegen ist bewusst gefallen (planbare Kosten,
+  stationaeres Design ab v22). Eine Vergroesserung braucht einen
+  ausdruecklichen neuen Nutzer-Entscheid, keine Ableitung aus dem
+  Dosis-Befund.
 - **Backup-/Alt-Regel-Korpora**: kommen NIE wieder ins Training.
 - **PROMOTIONS-CHECKLISTE (Nutzer-Hinweis 2026-08-09: die Kader-Praxis
   wurde bis dato nicht konsequent umgesetzt)** -- bei JEDEM
