@@ -1,4 +1,4 @@
-# Stand 2026-08-08 (WDL-Aera, Champion v20_2d_opp_brierbest, Elo 1349).
+# Stand 2026-08-09 (WDL-Aera, Champion v21_2d_brierbest, Elo 1358).
 # Rendern: python evaluations/render_diagrams.py [name] [--format png]
 # Farbcode: blau = Netz/Modell, gruen = exakt/verifiziert, orange = Suche/
 # Daten-Pipeline, violett = Ergebnis/Artefakt, grau = Regelwerk.
@@ -76,38 +76,76 @@ digraph ValueZiel {
     H -> AUX [style=invis];
 }
 
-# ==fenster_v21==
-digraph FensterV21 {
+# ==fenster_generation==
+digraph FensterGeneration {
     rankdir=LR;
     fontname="Helvetica";
-    label="Replay-Fenster v21: Zwei-Klassen-Design mit Generations-Rotation (29.450 Partien)";
+    label="Replay-Fenster je Generation: Zwei-Klassen-Design mit stationaerer Rotation (29.450 Partien)
+G = amtierender Champion als Generator, G-1/G-2 = Vorgaenger-Generationen";
     labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, margin="0.16,0.10"];
     edge [fontname="Helvetica", fontsize=9];
 
     subgraph cluster_p {
-        label="POLICY-KLASSE (5.800 Partien, teuer: 600 Sims)\nvolle Suche -> completed-Q-Policy-Ziele";
+        label="POLICY-KLASSE (5.800 Partien, teuer: 600 Sims)
+volle Suche -> completed-Q-Policy-Ziele";
         style=filled; fillcolor="#eef4ff"; fontsize=10;
-        P1 [label="4.000 NEU\nselfplay_v20wdl_*\n(Champion-Generator)", fillcolor="#cfe2ff"];
-        P2 [label="1.350 ALT\n135 v19wdl-Dateien\n(Manifest)", fillcolor="#cfe2ff"];
-        P3 [label="450 AELTER\n45 v18-Dateien\n(Manifest)", fillcolor="#cfe2ff"];
+        P1 [label="4.000 NEU
+Sockel von G
+(Champion-Generator)", fillcolor="#cfe2ff"];
+        P2 [label="1.350 aus G-1
+135 Sockel-Dateien
+(Manifest, seed-bestimmt)", fillcolor="#cfe2ff"];
+        P3 [label="450 aus G-2
+45 Sockel-Dateien
+(Manifest)", fillcolor="#cfe2ff"];
     }
     subgraph cluster_v {
-        label="VALUE-KLASSE (23.650 Partien, billig: 150 Sims, --value-only)\nPolicy maskiert (pol_w=0), nur Value-/Bootstrap-Ziele";
+        label="VALUE-KLASSE (23.650 Partien, billig: 150 Sims, --value-only)
+Policy maskiert (pol_w=0), nur Value-/Bootstrap-Ziele";
         style=filled; fillcolor="#fff6e6"; fontsize=10;
-        V1 [label="8.000 NEU\nv20wdlsw_*", fillcolor="#ffe5b4"];
-        V2 [label="8.000 v19wdlsw", fillcolor="#ffe5b4"];
-        V3 [label="2.650 v19wdl-Rest", fillcolor="#ffe5b4"];
-        V4 [label="5.000 v18", fillcolor="#ffe5b4"];
+        V1 [label="8.000 NEU
+Schwarm von G", fillcolor="#ffe5b4"];
+        V2 [label="8.000
+Schwarm G-1 (komplett)", fillcolor="#ffe5b4"];
+        V3 [label="2.650
+Sockel-Rest G-1
+(Nicht-Traeger)", fillcolor="#ffe5b4"];
+        V4 [label="3.550
+Sockel-Rest G-2
+(vollstaendig)", fillcolor="#ffe5b4"];
+        V5 [label="1.450
+Schwarm G-2
+(Auffuellung auf 23.650)", fillcolor="#ffe5b4"];
     }
-    MAN [label="policy_carrier_manifest_v21.json\nTraeger-Dateiliste + carrier_prefixes\n-> steckt im Cache-Key\n(Fix 2026-08-08: kein Praefix-Kurzschluss mehr)", shape=note, fillcolor="#d9f2d9", fontsize=9];
-    OUT [label="Cache (bitgepackt)\n~4,8 Mio. Zustaende, ~13 GB\nplanes/masks 1 Bit/Feld", fillcolor="#e2d9f3"];
-    ROT [label="Rotation je Generation:\nv16/v17 raus | v18 uebernimmt die 450er-Traegerrolle |\nv19wdl die 1.350er | Backup-Korpora NIE zurueck", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    MAN [label="policy_carrier_manifest_<Ziel>.json
+Traeger-Dateiliste + carrier_prefixes
+-> steckt im Cache-Key
+(kein Praefix-Kurzschluss: sonst tragen ALLE
+Dateien des Generators Policy)", shape=note, fillcolor="#d9f2d9", fontsize=9];
+    OUT [label="Cache (bitgepackt)
+~4,8 Mio. Zustaende, ~13 GB
+planes/masks 1 Bit/Feld
+Schluessel = Dateiliste + Schema + Manifest-Inhalt", fillcolor="#e2d9f3"];
+    ROT [label="Stationaere Rotation (ab v22 selbstaehnlich):
+G-3 und aelter rotieren VOLLSTAENDIG aus |
+Sockel-Traegerrollen wandern eine Stufe weiter |
+Backup-/Alt-Regel-Korpora kehren NIE zurueck |
+Fenstergroesse bleibt fix bei 29.450 (Nutzer-Entscheid)", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    PIN [label="Fenster-Pinning beim Training ZWEI Variablen:
+MOSAIC_DATA_EXCLUDE (Regex, frisch aus dem Ist-Bestand)
+UND MOSAIC_CARRIER_MANIFEST
+Verifikation: Zeile \"Lade HDF5-Cache\" (nicht \"Lade Daten aus\")", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    UEB [label="Uebergangs-Ausnahme v21: die aelteste Stufe (v18) war noch
+KEIN Zwei-Klassen-Korpus und lieferte ihre 5.000 daher als
+EINEN Block statt als 3.550 + 1.450. Ab v22 gilt die Form links.", shape=note, fillcolor="#fdf0d5", fontsize=9];
 
     P1 -> OUT; P2 -> OUT; P3 -> OUT;
-    V1 -> OUT; V2 -> OUT; V3 -> OUT; V4 -> OUT;
+    V1 -> OUT; V2 -> OUT; V3 -> OUT; V4 -> OUT; V5 -> OUT;
     MAN -> P2 [style=dashed, label="waehlt Traeger"];
-    ROT -> V4 [style=invis];
+    PIN -> OUT [style=dashed, label="pinnt die Dateiliste"];
+    ROT -> V5 [style=invis];
+    UEB -> V4 [style=invis];
 }
 
 # ==selfplay_training==
@@ -120,7 +158,7 @@ digraph SelfplayTraining {
     edge [fontname="Helvetica", fontsize=9];
 
     S1 [label="Self-Play\nChampion gegen sich selbst,\nzwei Klassen (Sockel 600 / Schwarm 150 Sims)", fillcolor="#cfe2ff"];
-    S2 [label="Replay-Fenster\nzwei Klassen + Generations-Rotation\n(siehe Diagramm fenster_v21)", fillcolor="#ffe5b4"];
+    S2 [label="Replay-Fenster\nzwei Klassen + Generations-Rotation\n(siehe Diagramm fenster_generation)", fillcolor="#ffe5b4"];
     S3 [label="Cache\nPolicy = completed-Q (nur Traeger)\nValue = WDL-TD-Blend (siehe value_ziel)\nSchema im Cache-Key (Reproduzierbarkeit)", fillcolor="#ffe5b4"];
     S4 [label="Training\nwarm vom Champion, lr 5e-5 cosine,\nEarly Stop bei Policy- UND Value-Plateau\nCheckpoint = bester Brier (arena-re-validiert)", fillcolor="#cfe2ff"];
     S5 [label="Offline-Diagnose\nOrakel-Metriken auf eingefrorenem Set\n(Prior-Masse Top-3, Kendall-Tau):\nEINZIGE arena-validierten Praediktoren (7/7)", fillcolor="#d9f2d9"];

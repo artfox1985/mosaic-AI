@@ -8,8 +8,8 @@
  viewBox="0.00 0.00 540.00 973.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 969.02)">
 <title>SelfplayTraining</title>
-<polygon fill="white" stroke="none" points="-4,4 -4,-969.02 535.95,-969.02 535.95,4 -4,4"/>
-<text xml:space="preserve" text-anchor="middle" x="265.97" y="-948.67" font-family="Helvetica,sans-Serif" font-size="13.00">Verbesserungs&#45;Zyklus mit Entscheidungs&#45;Gates</text>
+<polygon fill="white" stroke="none" points="-4,4 -4,-969.02 536.06,-969.02 536.06,4 -4,4"/>
+<text xml:space="preserve" text-anchor="middle" x="266.03" y="-948.67" font-family="Helvetica,sans-Serif" font-size="13.00">Verbesserungs&#45;Zyklus mit Entscheidungs&#45;Gates</text>
 <!-- S1 -->
 <g id="node1" class="node">
 <title>S1</title>
@@ -21,10 +21,10 @@
 <!-- S2 -->
 <g id="node2" class="node">
 <title>S2</title>
-<path fill="#ffe5b4" stroke="black" d="M274.92,-847.24C274.92,-847.24 94.5,-847.24 94.5,-847.24 88.5,-847.24 82.5,-841.24 82.5,-835.24 82.5,-835.24 82.5,-801.46 82.5,-801.46 82.5,-795.46 88.5,-789.46 94.5,-789.46 94.5,-789.46 274.92,-789.46 274.92,-789.46 280.92,-789.46 286.92,-795.46 286.92,-801.46 286.92,-801.46 286.92,-835.24 286.92,-835.24 286.92,-841.24 280.92,-847.24 274.92,-847.24"/>
+<path fill="#ffe5b4" stroke="black" d="M275.29,-847.24C275.29,-847.24 94.13,-847.24 94.13,-847.24 88.13,-847.24 82.13,-841.24 82.13,-835.24 82.13,-835.24 82.13,-801.46 82.13,-801.46 82.13,-795.46 88.13,-789.46 94.13,-789.46 94.13,-789.46 275.29,-789.46 275.29,-789.46 281.29,-789.46 287.29,-795.46 287.29,-801.46 287.29,-801.46 287.29,-835.24 287.29,-835.24 287.29,-841.24 281.29,-847.24 275.29,-847.24"/>
 <text xml:space="preserve" text-anchor="middle" x="184.71" y="-828.15" font-family="Helvetica,sans-Serif" font-size="11.00">Replay&#45;Fenster</text>
 <text xml:space="preserve" text-anchor="middle" x="184.71" y="-814.65" font-family="Helvetica,sans-Serif" font-size="11.00">zwei Klassen + Generations&#45;Rotation</text>
-<text xml:space="preserve" text-anchor="middle" x="184.71" y="-801.15" font-family="Helvetica,sans-Serif" font-size="11.00">(siehe Diagramm fenster_v21)</text>
+<text xml:space="preserve" text-anchor="middle" x="184.71" y="-801.15" font-family="Helvetica,sans-Serif" font-size="11.00">(siehe Diagramm fenster_generation)</text>
 </g>
 <!-- S1&#45;&gt;S2 -->
 <g id="edge1" class="edge">
@@ -142,9 +142,9 @@
 <!-- S8&#45;&gt;S1 -->
 <g id="edge10" class="edge">
 <title>S8&#45;&gt;S1</title>
-<path fill="none" stroke="black" stroke-dasharray="5,2" d="M248.89,-199.46C265.42,-210.05 282.53,-222.5 296.71,-236.06 378.68,-314.43 409.44,-336.52 443.71,-444.62 501.32,-626.36 422.98,-705.29 295.71,-847.24 285.06,-859.12 271.69,-869.43 257.97,-878.12"/>
-<polygon fill="black" stroke="black" points="256.49,-874.92 249.73,-883.09 260.1,-880.92 256.49,-874.92"/>
-<text xml:space="preserve" text-anchor="middle" x="497.45" y="-541.1" font-family="Helvetica,sans-Serif" font-size="9.00">naechster Zyklus</text>
+<path fill="none" stroke="black" stroke-dasharray="5,2" d="M248.89,-199.46C265.42,-210.05 282.53,-222.5 296.71,-236.06 378.68,-314.43 409.44,-336.52 443.71,-444.62 501.27,-626.21 423.98,-705.49 296.71,-847.24 286.04,-859.13 272.65,-869.42 258.89,-878.08"/>
+<polygon fill="black" stroke="black" points="257.4,-874.89 250.63,-883.04 261,-880.89 257.4,-874.89"/>
+<text xml:space="preserve" text-anchor="middle" x="497.56" y="-541.1" font-family="Helvetica,sans-Serif" font-size="9.00">naechster Zyklus</text>
 </g>
 <!-- REG -->
 <g id="node9" class="node">
