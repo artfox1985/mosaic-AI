@@ -96,3 +96,19 @@ das Gating bleibt aber der offene, ausstehende Schritt. Belegstelle:
 evaluations/STATUS.md, Abschnitt "OFFENES GATING (v20-Aera, hat
 Vorrang)" ("λ-Arm `lam07_wdl2_s2`: ... Gating steht aus") und Zeile 20
 ("λ ... UMGESTUFT").
+
+## Gegner-Nachtrag (2026-08-09)
+
+Champion-Wechsel vor dem Gating: der Arm tritt jetzt gegen
+`v21_2d_brierbest` an (Elo 1416), nicht mehr gegen
+`v20_2d_opp_brierbest`. Die Prereg-Formulierung ("gegen den amtierenden
+Champion") bleibt damit unveraendert gueltig, die Latte liegt aber
+hoeher. Zu beachten bei der Auswertung: der λ-Arm wurde auf dem
+v20-FENSTER trainiert, der neue Champion auf dem v21-Fenster (+40%
+Volumen) -- ein H0 waere daher NICHT als λ-Verdikt lesbar, sondern als
+Fenster-Effekt. **Konsequenz: das λ-Gating misst nur noch, ob λ den
+Fenster-Rueckstand ueberkompensiert; ein saubereres λ-Verdikt braeuchte
+einen Arm auf dem v21-Fenster.** Entscheidungsregel daher praezisiert:
+H1 -> λ ist ein starker Rezept-Kandidat (er schlaegt trotz kleinerem
+Fenster); H0 -> KEIN λ-Verdikt, sondern "unentschieden, konfundiert",
+und die Frage wandert als v21-Fenster-Arm in die Task-D-Familie.
