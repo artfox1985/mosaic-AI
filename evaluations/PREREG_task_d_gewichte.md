@@ -85,6 +85,26 @@ werden VOR dem jeweiligen Gating erhoben und protokolliert, damit die
 #29-Validierung eine echte Vorhersage pruefen kann und keine
 Nachher-Erzaehlung.
 
+### Erhobene deskriptive Werte (protokolliert VOR dem jeweiligen Gating)
+
+| Arm | Alt-Messset-Brier (90-Dateien-Snapshot, 146.187 Zustaende / 900 Partien) |
+|---|---|
+| Kontrolle `v21_2d_brierbest` | **0,18636** |
+| `t_d_vw04_brierbest` | **0,18488** (−0,00148, also besser) |
+
+Gueltigkeits-Nachweis der Messung: der Kontrollwert 0,18636 reproduziert
+EXAKT den bei der Champion-Promotion protokollierten Alt-Set-Brier --
+Snapshot, Werkzeug und Pfad sind also unveraendert.
+
+Einordnung, ausdruecklich OHNE Entscheidungscharakter: die Seed-Skala
+dieser Kennzahl liegt bei ~0,0006 (aus dem v20-Kontroll-Seed-Paar), der
+Abstand ist damit rund 2,5 Seed-Sigma. Das ist ein deskriptiver Hinweis
+zugunsten von `value_weight=0,4`, **kein Verdikt** -- die Offline-Metrik
+hat unterhalb von ~0,015 Value-R² 0/4 richtig vorhergesagt, und genau
+deshalb entscheidet hier die Arena (Punkt 1-4 oben). Der Wert ist
+festgehalten, damit die #29-Buchfuehrung spaeter eine echte VORHERSAGE
+pruefen kann: Brier sagt vw04 vorn -- stimmt das Gating zu?
+
 ## Kosten
 
 3 Trainings a ~3,5h GPU (davon 1 fertig, 1 laeuft) + bis zu 3 Gatings a
