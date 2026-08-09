@@ -1,0 +1,18 @@
+# Heuristik-Anker-Verhaltenstest-Fixture v1 (A4, evaluations/DESIGN_konventionen_als_pruefungen.md)
+# rustc: rustc 1.96.0 (ac68faa20 2026-05-25)
+# Datum: 2026-08-09
+# Begruendung: EINFRIEREN, NICHT REPARIEREN -- haelt fest, was die Heuristik HEUTE
+# tatsaechlich waehlt, nicht was optimal waere. Der grobe Kriterium-6-Term in
+# scoring.rs::wertung_progress (`6 => -3.0 * sf.special_empty`, Zeile ~178) BLEIBT im
+# Anker stehen, auch wenn er suboptimal ist -- Verbesserung wuerde den Massstab selbst
+# mitziehen und die Elo-Leiter ueber Generationen hinweg entwerten. Deckt mcts.rs
+# (Baumsuche/Selektion), scoring.rs::wertung_progress und tiling_solver.rs (beide via
+# player_total) gemeinsam ab; netzfrei, laeuft komplett in cargo test.
+# Korpus: drafting_state(state_seed) fuer state_seed in {11,22,33,44,55}, je eigener
+# Such-RNG-Seed (state_seed+1000-artig, siehe a4_anchor_corpus), simulations=200, c=DEFAULT_C.
+# Format je Zeile: <label>	<action_to_dict(gewaehlte Aktion) als kompaktes JSON>
+state11	{"color":"blau","factory_id":4,"moon_order":["schwarz","rot","rot"],"row":1,"source":"SMALL_FACTORY_SUN","type":"stone"}
+state22	{"color":"rot","factory_id":4,"moon_order":["türkis","schwarz","schwarz"],"row":0,"source":"SMALL_FACTORY_SUN","type":"stone"}
+state33	{"color":"schwarz","factory_id":3,"moon_order":["rot"],"row":4,"source":"SMALL_FACTORY_SUN","type":"stone"}
+state44	{"color":"schwarz","factory_id":4,"moon_order":["gelb"],"row":2,"source":"SMALL_FACTORY_SUN","type":"stone"}
+state55	{"color":"gelb","factory_id":3,"moon_order":["türkis","türkis","rot"],"row":5,"source":"SMALL_FACTORY_SUN","type":"stone"}

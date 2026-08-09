@@ -1,0 +1,145 @@
+# Feature-Golden-Hash-Fixture v1 (A3, evaluations/DESIGN_konventionen_als_pruefungen.md)
+# INPUT_SIZE=708
+# NUM_PLANES_CHANNELS=76
+# rustc: rustc 1.96.0 (ac68faa20 2026-05-25)
+# Datum: 2026-08-09
+# Begruendung: Werte QUANTISIERT auf ~1e-6 (skaliert*1e6, gerundet, als i64 gehasht),
+# NICHT bitgenau (f32::to_bits) -- ein rustc-/LLVM-Wechsel oder anderes target-cpu kann
+# die letzten Bits einer Gleitkomma-Berechnung verschieben, ohne dass sich die Semantik
+# der Features aendert; ein bitgenauer Hash wuerde dann ohne Grund bellen und wird
+# ignoriert (exakt so ist die bestehende JSON-Paritaets-Probe schon einmal an drei rein
+# additiven Feldern gebrochen). Ein Toolchain-Wechsel ist ein legitimes Neu-Basislegen
+# (Fixture neu erzeugen, rustc-Zeile oben aktualisieren), kein Vertragsbruch.
+# Format je Zeile: <label>	<fnv1a64_hex(quantisierte state_to_features_direct ++ state_to_planes_direct)>
+# Korpus: random_drafting_states(seed, 25) fuer seed in 0..5, je Seed zusaetzlich der
+# letzte Schritt mit Phase manuell auf Tiling umgeschaltet (Tiling-Feature-Zweig).
+seed0_step0	514b84b82660ffd5
+seed0_step1	28eb512b3c620d5d
+seed0_step2	5ceb942b6c672504
+seed0_step3	5ceb942b6c672504
+seed0_step4	4f57034348b4e899
+seed0_step5	71e8a63cc711b83e
+seed0_step6	b014dd12c337014a
+seed0_step7	5fefbf7c0f5b0e9c
+seed0_step8	5fefbf7c0f5b0e9c
+seed0_step9	d753a24089057b86
+seed0_step10	1048dd9076e7a0ee
+seed0_step11	b4948e087d9d69be
+seed0_step12	dd88887992e87c8e
+seed0_step13	165ebcb90e66df3a
+seed0_step14	dc383796996bdf48
+seed0_step15	e42c317737ee9f97
+seed0_step16	e42c317737ee9f97
+seed0_step17	697a6538638d1f20
+seed0_step18	71bd98f3518edd6f
+seed0_step19	c0a9f079eaa962b7
+seed0_step20	2a8e8f1da241a957
+seed0_step21	7eaf9850825cfa3c
+seed0_step22	1e49a870c85dd6ca
+seed0_step23	d7ba6a8d23ad0e88
+seed0_step24	e7340df040d23a9f
+seed0_tiling	df208b5c44185623
+seed1_step0	cb4d3d696622bda1
+seed1_step1	af0a04440dc2fa80
+seed1_step2	392c3ee74817feb1
+seed1_step3	392c3ee74817feb1
+seed1_step4	8ef1a547e82a60db
+seed1_step5	8ef1a547e82a60db
+seed1_step6	27f36efe141a9a21
+seed1_step7	018524fae05f3705
+seed1_step8	ed8017d3f982d91d
+seed1_step9	00288198dce532bc
+seed1_step10	f07d7e1734ef2c53
+seed1_step11	903d6a4535a0c31b
+seed1_step12	903d6a4535a0c31b
+seed1_step13	4897006de2dcbe05
+seed1_step14	deb74f1be1d2ebda
+seed1_step15	c44a793d021cda69
+seed1_step16	bb50bcf4e53975bb
+seed1_step17	341971014471e4d7
+seed1_step18	996c6b1050003a6d
+seed1_step19	25af2099fcec241d
+seed1_step20	a9837d1789a5431e
+seed1_step21	ed5c4e7aed0b0a45
+seed1_step22	8c342aa0c2432c31
+seed1_step23	d547f9c579d1fe42
+seed1_step24	0741c83c07e0383e
+seed1_tiling	9488f052696a5ce2
+seed2_step0	192e8b8e468e191b
+seed2_step1	8fa0a4516a9ffc75
+seed2_step2	0cf656113abb4e19
+seed2_step3	cfe4b4b77ab44127
+seed2_step4	98eb74dd2aaa9548
+seed2_step5	824c3128e7ba83e1
+seed2_step6	824c3128e7ba83e1
+seed2_step7	934c8b8e377e0375
+seed2_step8	934c8b8e377e0375
+seed2_step9	d18ce3dce787ff65
+seed2_step10	772f66a3b12b56d7
+seed2_step11	51f11997611dd367
+seed2_step12	51f11997611dd367
+seed2_step13	e917d5edc0f0e8e8
+seed2_step14	6037f6080c10cb3b
+seed2_step15	c2ebb7ee7f4e0995
+seed2_step16	8dd5e96063dd81ea
+seed2_step17	6e65d9386852c400
+seed2_step18	cb8f27a41d5952df
+seed2_step19	cb8f27a41d5952df
+seed2_step20	a66496f42e9a51ba
+seed2_step21	f2e1bbe750366bff
+seed2_step22	b765985615320082
+seed2_step23	adb732f9675ae4e7
+seed2_step24	5bfd4578880ed40c
+seed2_tiling	74fea0cbea687460
+seed3_step0	ff86099df8f00842
+seed3_step1	4c27e7a54dde0e35
+seed3_step2	c342026ec6ec393a
+seed3_step3	5b3cf016818b8c0d
+seed3_step4	5b3cf016818b8c0d
+seed3_step5	840718071a0d5783
+seed3_step6	23e8d46455bdbf23
+seed3_step7	23e8d46455bdbf23
+seed3_step8	e3066647a2eae49e
+seed3_step9	e7ffdf28caeb6d8e
+seed3_step10	88dfe7f89837aa6c
+seed3_step11	7d963cd9f007b37e
+seed3_step12	eb3ae49ef3c84bc2
+seed3_step13	eb3ae49ef3c84bc2
+seed3_step14	cf4256c0ad202f4c
+seed3_step15	148e5f6ff51990b5
+seed3_step16	731267ea7aa9023f
+seed3_step17	29333315364329f6
+seed3_step18	019a19b50e24032d
+seed3_step19	019a19b50e24032d
+seed3_step20	7677ea49a0c8a33e
+seed3_step21	e9d7f33c4d765339
+seed3_step22	b183a601f2ffa6bb
+seed3_step23	4ba656e43aae961b
+seed3_step24	edc29b6c91f75cde
+seed3_tiling	f1ba89154c29f8c2
+seed4_step0	8ff351e3e8b43233
+seed4_step1	8ff351e3e8b43233
+seed4_step2	7410d9ee94cafbf5
+seed4_step3	065bc7c2fe534dea
+seed4_step4	065bc7c2fe534dea
+seed4_step5	abfeef1b963bbd09
+seed4_step6	908767bbcc36734e
+seed4_step7	7745b7e15d32e749
+seed4_step8	f2b30e349fd8b122
+seed4_step9	6d94e7467aa0f1f0
+seed4_step10	6d94e7467aa0f1f0
+seed4_step11	354c7e7245437636
+seed4_step12	ba98605d3aeb29e8
+seed4_step13	b714750dee281fa5
+seed4_step14	88ca3197a4d3c8d6
+seed4_step15	e9345935416fbe10
+seed4_step16	fbb2323256785f9e
+seed4_step17	49e40a7e336058a9
+seed4_step18	1f054a9108d2c5a5
+seed4_step19	799e480b45c30814
+seed4_step20	bc0e72de6eba0583
+seed4_step21	7098f6160e5e34a6
+seed4_step22	99050fb7540a26a8
+seed4_step23	f282017a35406673
+seed4_step24	f282017a35406673
+seed4_tiling	4560883291bea597

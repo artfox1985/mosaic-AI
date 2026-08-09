@@ -1286,4 +1286,119 @@ mod tests {
         let layout = crate::net::InputLayout::Planes { c: NUM_PLANES_CHANNELS, h: 6, w: 6 };
         let _ = features_for_layout(layout, &s);
     }
+
+    // ── A3 Feature-Golden-Hash (`evaluations/DESIGN_konventionen_als_
+    // pruefungen.md`, Abschnitt "A3") ───────────────────────────────────────
+    //
+    // QUANTISIERT (~1e-6), NICHT bitgenau (`f32::to_bits`): ein rustc-/LLVM-
+    // Wechsel oder ein anderes `target-cpu` kann die letzten Bits einer
+    // Gleitkomma-Berechnung verschieben, OHNE dass sich die Semantik der
+    // Features aendert -- exakt das Muster, an dem die bestehende JSON-
+    // Paritaets-Probe schon einmal unbegruendet gebellt hat (sie hasht die
+    // volle Antwort und brach an drei rein additiven Feldern, siehe Design-
+    // Dokument). Ein bitgenauer Hash wuerde bei jedem Toolchain-Wechsel rot
+    // werden und dadurch abgeschaltet/ignoriert -- Runden auf ~1e-6 vor dem
+    // Hashen toleriert genau dieses Rauschen, waehrend eine ECHTE Aenderung
+    // eines Feature-Werts (die Groessenordnungen ueber 1e-6 liegt) weiterhin
+    // auffliegt. Ein Toolchain-Wechsel ist damit ein legitimes Neu-Basislegen
+    // (Fixture neu erzeugen + `rustc --version` im Kopf aktualisieren), kein
+    // Vertragsbruch.
+
+    /// Skaliert auf ~1e-6 und rundet auf eine ganze Zahl -- vermeidet Float-
+    /// Repraesentationsfallen im Hash-Eingabestrom (z.B. `-0.0` vs `0.0`,
+    /// plattformabhaengige `to_string`-Rundung).
+    fn quantize_for_hash(v: &[f32]) -> Vec<i64> {
+        v.iter().map(|&x| (f64::from(x) * 1_000_000.0).round() as i64).collect()
+    }
+
+    /// Fester Zustands-Korpus fuer den A3-Golden-Hash -- WIEDERVERWENDET
+    /// `random_drafting_states` (oben, s. dortige Doku) mit eigenen, hier
+    /// fest deklarierten Seeds statt neuer Zustandserzeugung. Deckt frisches
+    /// Drafting UND (je Seed der letzte gesammelte Schritt, Phase manuell
+    /// umgeschaltet wie in `direct_matches_json_path_in_tiling_phase`) die
+    /// Tiling-Feature-Verzweigung ab.
+    fn a3_golden_hash_corpus() -> Vec<(String, crate::state::GameState)> {
+        let mut out = Vec::new();
+        for seed in 0..5u64 {
+            let states = random_drafting_states(seed, 25);
+            for (i, s) in states.iter().enumerate() {
+                out.push((format!("seed{seed}_step{i}"), s.clone()));
+            }
+            if let Some(last) = states.last() {
+                let mut tiling = last.clone();
+                tiling.phase = crate::state::Phase::Tiling;
+                out.push((format!("seed{seed}_tiling"), tiling));
+            }
+        }
+        out
+    }
+
+    /// `state_to_features_direct` UND `state_to_planes_direct` ZUSAMMEN in
+    /// EINEN Hash (Auftrag: "je Zustand ... in einen Hash geben") -- ein
+    /// gemeinsamer Hash deckt beide Pfade ab, ohne die Fixture-Zeilenzahl zu
+    /// verdoppeln.
+    fn hash_state_features(state: &crate::state::GameState) -> u64 {
+        let flat = quantize_for_hash(&state_to_features_direct(state));
+        let planes = quantize_for_hash(&state_to_planes_direct(state));
+        let mut buf = String::new();
+        for v in flat.iter().chain(planes.iter()) {
+            buf.push_str(&v.to_string());
+            buf.push(',');
+        }
+        crate::fnv1a_64(&buf)
+    }
+
+    /// Parst die Fixture-Datei: Kommentarzeilen (`#`) und Leerzeilen
+    /// ignoriert, sonst je Zeile `<label>\t<hash_hex>`.
+    fn parse_hash_fixture(text: &str) -> std::collections::HashMap<String, u64> {
+        text.lines()
+            .map(str::trim_end)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(|l| {
+                let (label, hash_hex) = l
+                    .split_once('\t')
+                    .unwrap_or_else(|| panic!("Fixture-Zeile ohne Tab-Trenner: {l:?}"));
+                let hash = u64::from_str_radix(hash_hex, 16)
+                    .unwrap_or_else(|e| panic!("Fixture-Zeile {l:?}: ungueltiger Hash: {e}"));
+                (label.to_string(), hash)
+            })
+            .collect()
+    }
+
+    /// **Pflicht-Golden-Test.** Bricht, wenn sich `state_to_features_direct`
+    /// ODER `state_to_planes_direct` fuer irgendeinen Zustand des festen
+    /// Korpus um mehr als ~1e-6 veraendert. Gegenprobe-Pflicht (Design-
+    /// Dokument, Abschnitt "A3"): eine Feature-Zeile testweise aendern MUSS
+    /// diesen Test rot machen -- ein Waechter, von dem niemand gesehen hat,
+    /// dass er fehlschlagen kann, ist wertlos.
+    #[test]
+    fn feature_golden_hash_matches_fixture() {
+        let fixture = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/feature_contract_v1.txt"
+        ));
+        let expected = parse_hash_fixture(fixture);
+        let corpus = a3_golden_hash_corpus();
+        assert_eq!(
+            corpus.len(),
+            expected.len(),
+            "A3-Korpusgroesse ({}) != Fixture-Zeilenzahl ({}) -- Fixture regenerieren",
+            corpus.len(),
+            expected.len()
+        );
+        for (label, state) in &corpus {
+            let got = hash_state_features(state);
+            let want = *expected
+                .get(label)
+                .unwrap_or_else(|| panic!("A3-Fixture hat keine Zeile fuer '{label}'"));
+            assert_eq!(
+                got, want,
+                "A3 Feature-Golden-Hash weicht ab bei {label} (got={got:016x} want={want:016x}): \
+                 state_to_features_direct/state_to_planes_direct haben sich um mehr als ~1e-6 \
+                 veraendert -- KEIN reiner Toolchain-Rauscheffekt (der waere durch die Rundung \
+                 abgefangen). Bei einem gewollten Toolchain-Wechsel: Fixture neu erzeugen und \
+                 `rustc --version` im Fixture-Kopf aktualisieren."
+            );
+        }
+    }
 }

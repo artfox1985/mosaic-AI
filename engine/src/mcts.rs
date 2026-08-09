@@ -1263,4 +1263,108 @@ mod tests {
         // Bei genug Sims wird auch selektiert (Abstieg).
         assert!(log.contains("SELECT"));
     }
+
+    // ── A4 Heuristik-Anker-Verhaltenstest (`evaluations/DESIGN_konventionen_
+    // als_pruefungen.md`, Abschnitt "A4") ───────────────────────────────────
+    //
+    // EINFRIEREN, NICHT REPARIEREN: dieser Test haelt fest, was die Heuristik
+    // HEUTE tatsaechlich waehlt -- er bewertet nicht, ob das die beste
+    // Entscheidung ist. Der grobe Kriterium-6-Term in
+    // `scoring.rs::wertung_progress` (`6 => -3.0 * sf.special_empty as f64`,
+    // Zeile ~178) bleibt ABSICHTLICH im Anker stehen, auch wenn er
+    // suboptimal ist -- die Plattenschwaeche gehoert auf die Netzseite
+    // (`PREREG_plattenkopf.md`), nicht in eine Reparatur dieses Ankers. Ein
+    // Massstab, der bei jeder vermeintlichen Verbesserung mitgezogen wird,
+    // ist kein Massstab mehr -- er wuerde die Elo-Leiter selbst entwerten.
+    // Deckt `mcts.rs` (Baumsuche/Selektion, dieses Modul), `scoring.rs::
+    // wertung_progress` und `tiling_solver.rs` (beide via `player_total`
+    // oben) GEMEINSAM ab -- netzfrei (`ACTIVE_LEAF` spielt hier keine Rolle,
+    // dieser Pfad braucht kein Netz), laeuft komplett in `cargo test`.
+
+    /// Fester Zustands-/Suche-Korpus: `drafting_state(seed)` (oben, bereits
+    /// fuer andere Tests dieses Moduls verwendet) fuer den SPIELZUSTAND, PLUS
+    /// per `scoring::sample_valid_scoring_ids` (WIEDERVERWENDET, wie im
+    /// echten Spiel via `Game::start`) zugeteilte `scoring_tile_ids` -- ohne
+    /// diesen Schritt bleibt `state.scoring_tile_ids` beim rohen
+    /// `setup_new_game`-Pfad LEER (nur `Game::start` befuellt es sofort beim
+    /// Anlegen), `wertung_progress` liefert dann fuer JEDEN Korpus-Zustand
+    /// konstant 0.0 und der Test deckt `scoring.rs::wertung_progress`
+    /// tatsaechlich NICHT ab, trotz der Behauptung in der Modul-Doku oben
+    /// (per Gegenprobe verifiziert: ein 10x-Faktor auf `wertung_progress`s
+    /// Rueckgabe aenderte ohne diese Zuteilung KEINEN gewaehlten Zug). Eigener
+    /// dritter Seed je Zustand fuer die Wertungsplatten-Auswahl UND ein
+    /// eigener zweiter Seed fuer die MCTS-internen Zufallsentscheidungen
+    /// (Progressive-Widening-Reihenfolge, Sim-RNG) -- alle drei Seeds
+    /// getrennt gehalten, wie ueberall sonst in diesem Testmodul.
+    fn a4_anchor_corpus() -> Vec<(&'static str, GameState, u64)> {
+        let assign_tiles = |mut s: GameState, tile_seed: u64| -> GameState {
+            let mut rng = StdRng::seed_from_u64(tile_seed);
+            s.scoring_tile_ids = crate::scoring::sample_valid_scoring_ids(3, &mut rng);
+            s
+        };
+        vec![
+            ("state11", assign_tiles(drafting_state(11), 9011), 101),
+            ("state22", assign_tiles(drafting_state(22), 9022), 202),
+            ("state33", assign_tiles(drafting_state(33), 9033), 303),
+            ("state44", assign_tiles(drafting_state(44), 9044), 404),
+            ("state55", assign_tiles(drafting_state(55), 9055), 505),
+        ]
+    }
+
+    /// Simulationszahl fuer den Anker -- fest wie der Rest des Korpus (Teil
+    /// des eingefrorenen Vertrags: eine andere Sim-Zahl darf einen anderen
+    /// Zug waehlen, ohne dass sich die Heuristik selbst geaendert hat).
+    const A4_ANCHOR_SIMULATIONS: u32 = 200;
+
+    fn parse_anchor_fixture(text: &str) -> std::collections::HashMap<String, String> {
+        text.lines()
+            .map(str::trim_end)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(|l| {
+                let (label, action_json) = l
+                    .split_once('\t')
+                    .unwrap_or_else(|| panic!("Fixture-Zeile ohne Tab-Trenner: {l:?}"));
+                (label.to_string(), action_json.to_string())
+            })
+            .collect()
+    }
+
+    /// **Pflicht-Golden-Test.** Bricht, wenn die Heuristik fuer irgendeinen
+    /// Zustand des festen Korpus einen ANDEREN Zug waehlt als im Fixture
+    /// festgehalten. Gegenprobe-Pflicht (Design-Dokument, Abschnitt "A4"):
+    /// ein Heuristik-Parameter testweise aendern MUSS diesen Test rot
+    /// machen.
+    #[test]
+    fn heuristic_anchor_choices_match_fixture() {
+        let fixture = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/anchor_behaviour_v1.txt"
+        ));
+        let expected = parse_anchor_fixture(fixture);
+        let corpus = a4_anchor_corpus();
+        assert_eq!(
+            corpus.len(),
+            expected.len(),
+            "A4-Korpusgroesse ({}) != Fixture-Zeilenzahl ({}) -- Fixture regenerieren",
+            corpus.len(),
+            expected.len()
+        );
+        for (label, state, search_seed) in corpus {
+            let mut rng = StdRng::seed_from_u64(search_seed);
+            let chosen = search_drafting_action(&state, A4_ANCHOR_SIMULATIONS, DEFAULT_C, &mut rng)
+                .unwrap_or_else(|| panic!("{label}: Heuristik lieferte keinen Zug"));
+            let got = action_to_dict(&chosen).to_string();
+            let want = expected
+                .get(label)
+                .unwrap_or_else(|| panic!("A4-Fixture hat keine Zeile fuer '{label}'"));
+            assert_eq!(
+                &got, want,
+                "A4 Heuristik-Anker-Test weicht ab bei {label}: got={got} want={want} -- \
+                 dieser Anker definiert die Elo-Leiter (Vergleichbarkeit ueber Generationen \
+                 hinweg); eine Aenderung entwertet fruehere Elo-Messungen. Falls dies eine \
+                 BEABSICHTIGTE Heuristik-Aenderung ist: Fixture bewusst neu erzeugen und im \
+                 Commit begruenden -- NICHT stillschweigend aktualisieren."
+            );
+        }
+    }
 }
