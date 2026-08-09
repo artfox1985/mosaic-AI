@@ -97,7 +97,35 @@ evaluations/STATUS.md, Abschnitt "OFFENES GATING (v20-Aera, hat
 Vorrang)" ("λ-Arm `lam07_wdl2_s2`: ... Gating steht aus") und Zeile 20
 ("λ ... UMGESTUFT").
 
-## Gegner-Nachtrag (2026-08-09)
+## Gegner-Festlegung KORRIGIERT (2026-08-09, nach Nutzer-Rueckfrage
+## "auf welches Fenster wurde der lambda arm trainiert?")
+
+Erster Nachtrag von heute (Gegner = neuer Champion v21) war FALSCH
+gedacht und ist hiermit zurueckgezogen. Manifest-Befund
+(`models/manifest_train_lam07_wdl2_s2_20260808_154809.json`):
+
+| | λ-Arm `lam07_wdl2_s2` | `v20_2d_opp` (Champion bis 2026-08-09) | `v21_2d` (neuer Champion) |
+|---|---|---|---|
+| Fenster | v20-Fenster, 21.000 Partien | **identisch** | v21-Fenster, 29.450 |
+| Warm-Start | v19_2d_opp_best | **identisch** | v20_2d_opp_brierbest |
+| Seed / VW / Koepfe | 2 / 0,2 / ohne endgame | **identisch** | 2 / 0,2 / MIT endgame |
+| λ | **0,7** | 1,0 | 1,0 |
+
+Gegen `v20_2d_opp_brierbest` ist es damit ein **EIN-FAKTOR-Vergleich**
+(nur λ), gegen `v21_2d_brierbest` waeren es DREI gleichzeitig
+veraenderte Faktoren (λ + Fenster +40% + Endgame-Kopf) -- daraus
+liesse sich nichts ueber λ lernen.
+
+**Gegner ist daher `v20_2d_opp_brierbest`** (no-promote; ein Gating
+gegen einen Nicht-mehr-Champion ist zulaessig, weil hier eine
+REZEPT-Frage entschieden wird, keine Champion-Frage).
+
+**Entscheidungsregeln (praezisiert)**: H1 -> λ=0,7 hilft im WDL-Ziel,
+λ wird Rezept-Kandidat; die Promotion-Frage braucht dann einen
+EIGENEN λ-Arm auf dem v21-Fenster (dann Ein-Faktor gegen v21).
+H0 -> λ ist in der WDL-Aera GESCHLOSSEN, und diesmal ist das ein
+echtes Verdikt, weil der Vergleich sauber ist.
+## (zurueckgezogener erster Nachtrag, 2026-08-09 -- Dokumentation)
 
 Champion-Wechsel vor dem Gating: der Arm tritt jetzt gegen
 `v21_2d_brierbest` an (Elo 1416), nicht mehr gegen
