@@ -10393,3 +10393,68 @@ Zeile "λ (Value-Target-Mix)" oben.)
 
 - ~~B: Zerlegungs-Diagnose~~ | **GESCHLOSSEN 2026-08-09**: within-tree-Messung (gleiches Budget/Breite) ergibt mittlere Q-Differenz 0,00015 -- 66x unter der Schwelle; faktorierte Policy bleibt ungebaut. Rotations-Ebene nur mit Engine-Eingriff messbar, Proxy zeigt geringe Groessenordnung. Erst-Instrument war budget-konfundiert (0,0138)
 - ~~C: c_visit-Sweep~~ | **ZURUECKGEZOGEN**: `PREREG_ownership_gumbel.md` B1 hat die sigma-Familie regelkonform geschlossen, nachdem c_scale sich als folgenlos erwies (Task #18) -- ein Sweep waere ein Test gegen die eigene Vorregistrierung
+
+---
+
+## AUSGELAGERT aus STATUS.md (2026-08-09, zweite Runde): abgeschlossene Bloecke
+
+Sechs Eintraege ausgelagert: die TASK-INDEX-Zeile "Messset-Snapshot +
+v16/v17-Freigabe" (jetzt vollstaendig erledigt, nicht nur der
+Snapshot-Teil wie bei der ersten Runde heute), Task A samt der
+"Abgelehnt/erledigt"-Sammelnotiz aus der Review-Tabelle 2026-08-08, der
+komplette Abschnitt "AUS EXTERNEM REVIEW R2 2026-08-09" (Tasks E/F/G
+plus Kopf/Intro) sowie Punkt 1 der NACH-v21-QUEUE (E3b). Der
+Telemetrie-Absatz aus dem R2-Abschnitt wurde NICHT ausgelagert, sondern
+nach STATUS.md/GELTENDE REGELN verschoben (gilt als Feststellung
+weiter). Task D (Review 2026-08-08) und Punkt 2 der NACH-v21-QUEUE
+(ISMCTS-k) bleiben in STATUS.md, da laufend.
+
+### Original-Zeile aus TASK-INDEX (verbatim, mit Erledigt-Vermerk)
+
+- **Messset-Snapshot + v16/v17-Freigabe** | v16/v17-Backup-Freigabe: NUR noch der τ-Arm-B-Cache-Bau steht davor -- **ERLEDIGT (Nutzer-Auskunft 2026-08-09): v16/v17 sind vom Nutzer selbst laengst archiviert; der hier genannte Blocker (τ-Arm-B-Cache-Bau) ist seit dem τ-Verdikt vom 2026-08-08 ("τ=1 bleibt, v21-Sockel OHNE Annealing") ohnehin gegenstandslos. Keine offene Nutzer-Entscheidung mehr, kein Rest in STATUS.md.**
+
+### Eine Zeile + ein Absatz aus der Review-Tabelle "AUS EXTERNEM REVIEW 2026-08-08" (verbatim; Task D bleibt in STATUS.md, da laufend)
+
+- ~~A: Floor-Shaping W=0 vs 0,3~~ | **ENTSCHIEDEN 2026-08-09: FEATURE BESTAETIGT, W=0,3 BLEIBT.** Abschalten KOSTET signifikant Staerke: W=0,3 322/400 vs W=0,0 277/400 (80,5% vs 69,3%, **-11,25pp**), gepaarter exakter McNemar **p=0,0001** (b=43 / c=88), Champion@400 vs Heuristik@150dyn, Seed 20260825. Block-Ebene bestaetigt (Pflichtregel): **13 von 16 Bloecken** fuer W=0,3, mittlere Block-Differenz +2,81 Siege je 25 Partien, Block-SE 0,71, **t=3,94** -- auch mit der konservativen Block-SE klar signifikant. Der Alt-Aera-Beleg (+14pp) ist damit in der WDL-/2D-Aera repliziert (+11,25pp). **Strukturbefund: Floor-Shaping ist ein SCHALTER, kein Regler** -- ob es an ist, macht ~11pp; welchen Wert es zwischen 0,15 und 0,6 hat, macht nichts (Sweep 0,15/0,6 vs 0,3 beide H0, p=0,31/0,36). Keine Frisch-Seed-Replikation noetig, weil KEINE Aenderung folgt; wer die Effektgroesse selbst zitieren will, braucht sie. `evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json`
+
+Abgelehnt/erledigt aus dem Review: Solver-Aux-Loss (Punkt 1) ist bereits
+zweifach umgesetzt (R4-Bootstrap + endgame_margin-Kopf); faktorierte
+Policy erst nach Task B; tau-Wiederaufnahme ohne neuen Mechanismus nein.
+
+### Original-Abschnitt "AUS EXTERNEM REVIEW R2 2026-08-09" (verbatim; Telemetrie-Absatz danach ist NICHT ausgelagert, siehe STATUS.md/GELTENDE REGELN)
+
+### AUS EXTERNEM REVIEW R2 2026-08-09 (Gumbel-spezifisch) -- `PREREG_prior_blindfleck.md`
+
+Von drei behaupteten Engpaessen tragen zwei nicht: die Q-Skalierung ist
+in Task #18 gemessen (Verhaeltnis sigma/Prior 1,23 -- keine Dominanz,
+und der behauptete Varianztreiber Aggressions-Blend steht ueberall auf
+w=0), und "zu wenig Tiefe fuer taktische Linien" verfehlt die
+Architektur (Runde 5 laeuft ueber den exakten Alpha-Beta-Loeser, nicht
+ueber Gumbel). Der dritte Punkt trifft eine echte Luecke:
+
+- ~~E: Prior-Blindfleck-Rate~~ | **GESCHLOSSEN 2026-08-09, Regel 1**: `miss_rate_gumbel_m16` = **1,21%** (n=930, Champion, frozen_v2) -- weit unter der 5%-Schwelle. Trotz nur 32% Medianabdeckung nimmt die Gumbel-Ziehung den Orakel-Top-1 fast immer mit, weil die Prior-Masse konzentriert ist. Einordnung: der bereits als Wash gemessene Sprung m=8 vs m=16 entspricht **9,6pp** Miss-Rate, der von m=32 noch erreichbare Rest nur **1,2pp** -- ~8x kleiner als ein folgenloser Unterschied. Buckets/Rundenverlauf NICHT auswertbar (Unterschiede = 2-3 Einzelzustaende). `evaluations/t_e_prior_blindfleck.json`
+- ~~F: Wurzelbreite m=16/32/64~~ | **NICHT EINGETAKTET** -- E-Gate nicht erreicht, damit per Prereg kein Arena-Budget. Wiedereroeffnung nur nach Aera-Wechsel oder wenn E in einer spaeteren Generation >=5% zeigt. Lehrsatz: geringe ABDECKUNG ist kein Blindfleck, solange der Prior scharf ist -- Hebel bleibt die Prior-QUALITAET (validierte Orakel-Metriken)
+- ~~G: c_scale-Nachmessung~~ | **ERLEDIGT 2026-08-09 -- AERA-EFFEKT BESTAETIGT, keine Wiedereroeffnung.** sigma/Prior-Verhaeltnis **1,232 (v18) -> 2,287 (v21)**; Ursache eindeutig: `delta_q` verdoppelt (0,0073 -> 0,0143), `delta_ln(prior)` unveraendert (1,110 -> 1,114) -- der WDL-Kopf nutzt fast den vollen [0,1]-Bereich statt einer gestauchten tanh-Marge. Je Runde R1 1,91 / R2 2,82 / **R3 2,97** / R4 2,53. Die Prereg-Schwelle (>3) ist NICHT erreicht, c_visit/c_scale bleiben -- keine nachtraegliche Schwellenverschiebung (das war der Grund fuer den Rueckzug von Task C). **Die externe Q-Skalierungs-Kritik ist damit teilweise bestaetigt: Richtung richtig, Dominanz-Schwelle noch nicht erreicht.** Folge: Pflicht-Diagnostik je Champion (Checkliste 5c), Wiedereroeffnung dann per Regel. `evaluations/t_g_gumbel_scale_v21.json`
+
+(Der anschliessende Telemetrie-Absatz -- "Q-Skalierungs-Varianz JA /
+Ueberlebensrate im Sequential Halving NEIN" -- ist eine geltende
+Feststellung und steht jetzt in STATUS.md unter GELTENDE REGELN, nicht
+hier.)
+
+### Punkt 1 der "NACH-v21-QUEUE" (verbatim; Punkt 2 ISMCTS-k bleibt in STATUS.md, da laufend)
+
+1. ~~**E3b**~~ **GESCHLOSSEN 2026-08-09: Siegquoten-Wache NICHT
+   bestanden.** Stufe 1 Feuerrate 36,52% (weit ueber dem 5%-Gate, die
+   Prereg-Erwartung eines ausbremsenden Besuchs-Gates war falsch),
+   Stufe 2 dann 308/400 (77,0%) mit z=0 gegen 289/400 (72,2%) mit
+   z=1,0 -- **-4,75pp**, McNemar p=0,1042, Block-Ebene 9:4 fuer AUS
+   (t=1,78). Kein Schadensnachweis, aber die Wache verlangt
+   Schadensfreiheit ("rein, wenn es nicht schadet") und die ist nicht
+   erbracht ⇒ `z` bleibt 0, keine Preset-/Self-Play-Uebernahme, der
+   Dosis-Punkt z=2,0 entfaellt. **Die Denial-Tie-Break-Familie ist
+   damit zweimal gemessen und zu**: E3 -13,75pp, E3b -4,75pp -- die
+   neue Aequivalenz-Definition verkleinerte den Schaden, erzeugte aber
+   keinen Gewinn. Aussagekraeftig statt grenzwertig, weil der
+   Mechanismus bei 36,5% Feuerrate ueber ein Drittel aller
+   Wurzelentscheidungen aendert. Wiedereroeffnung nur mit NEUEM
+   Mechanismus. `PREREG_denial_tiebreak.md`
