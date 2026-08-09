@@ -259,10 +259,31 @@ pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> 
     }
     // Rest in der vom Spieler gewählten Reihenfolge zurück unter den Stapel
     // (Regelwerk: "in beliebiger Reihenfolge zurücklegen", siehe DrawFromStackMove).
+    //
+    // Nutzer-Praezisierung 2026-08-09 (das Regelwerk laesst die Sichtbarkeit
+    // offen, daher hier festgelegt): der Gegner sieht die Platzierung UND
+    // welche Kuppelplatten in welcher Reihenfolge in den Stapel zurueckgehen.
+    // Diese Information war bisher nirgends protokolliert -- beim Zuschauen
+    // eines KI-Zuges mit mehreren Ziehungen war also nicht nachvollziehbar,
+    // was zurueckwanderte. Genau das wird hier nachgetragen; die Reihenfolge
+    // des Logs entspricht der Rueckleg-Reihenfolge.
+    let mut returned: Vec<String> = Vec::new();
     for id in &m.return_order {
         if let Some(t) = rest.remove(id) {
+            returned.push(format!(
+                "#{} ({})",
+                t.tile_id,
+                if t.is_special_type() { "Special" } else { "Wild" }
+            ));
             state.dome_tile_pool.push(t);
         }
+    }
+    if !returned.is_empty() {
+        let n = returned.len();
+        let liste = returned.join(", ");
+        state.log_event(format!(
+            "↩️ {n} Kuppelplatte(n) zurueck unter den Stapel (Reihenfolge): {liste}"
+        ));
     }
     let mut chosen = chosen.ok_or("gewählte Kachel nicht gezogen")?;
     chosen.apply_rotation(m.rotation)?;
