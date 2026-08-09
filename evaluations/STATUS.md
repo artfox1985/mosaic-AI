@@ -56,7 +56,7 @@ ueber Gumbel). Der dritte Punkt trifft eine echte Luecke:
 |---|---|
 | ~~E: Prior-Blindfleck-Rate~~ | **GESCHLOSSEN 2026-08-09, Regel 1**: `miss_rate_gumbel_m16` = **1,21%** (n=930, Champion, frozen_v2) -- weit unter der 5%-Schwelle. Trotz nur 32% Medianabdeckung nimmt die Gumbel-Ziehung den Orakel-Top-1 fast immer mit, weil die Prior-Masse konzentriert ist. Einordnung: der bereits als Wash gemessene Sprung m=8 vs m=16 entspricht **9,6pp** Miss-Rate, der von m=32 noch erreichbare Rest nur **1,2pp** -- ~8x kleiner als ein folgenloser Unterschied. Buckets/Rundenverlauf NICHT auswertbar (Unterschiede = 2-3 Einzelzustaende). `evaluations/t_e_prior_blindfleck.json` |
 | ~~F: Wurzelbreite m=16/32/64~~ | **NICHT EINGETAKTET** -- E-Gate nicht erreicht, damit per Prereg kein Arena-Budget. Wiedereroeffnung nur nach Aera-Wechsel oder wenn E in einer spaeteren Generation >=5% zeigt. Lehrsatz: geringe ABDECKUNG ist kein Blindfleck, solange der Prior scharf ist -- Hebel bleibt die Prior-QUALITAET (validierte Orakel-Metriken) |
-| **G: c_scale-Nachmessung** | **LAEUFT 2026-08-09** (`t_g_gumbel_scale_v21.json`, 300 Zustaende @400 Sims): Task #18 lief auf `v18_best` (Vor-WDL), der WDL-Kopf hat die Q-Skala geaendert -- Aera-Regel verlangt die Wiederholung am Champion. Rein deskriptiv, kein Regler-Wechsel (sigma-Familie per Prereg geschlossen); Wiedereroeffnung nur bei Verhaeltnis >~3 oder <~0,3 |
+| ~~G: c_scale-Nachmessung~~ | **ERLEDIGT 2026-08-09 -- AERA-EFFEKT BESTAETIGT, keine Wiedereroeffnung.** sigma/Prior-Verhaeltnis **1,232 (v18) -> 2,287 (v21)**; Ursache eindeutig: `delta_q` verdoppelt (0,0073 -> 0,0143), `delta_ln(prior)` unveraendert (1,110 -> 1,114) -- der WDL-Kopf nutzt fast den vollen [0,1]-Bereich statt einer gestauchten tanh-Marge. Je Runde R1 1,91 / R2 2,82 / **R3 2,97** / R4 2,53. Die Prereg-Schwelle (>3) ist NICHT erreicht, c_visit/c_scale bleiben -- keine nachtraegliche Schwellenverschiebung (das war der Grund fuer den Rueckzug von Task C). **Die externe Q-Skalierungs-Kritik ist damit teilweise bestaetigt: Richtung richtig, Dominanz-Schwelle noch nicht erreicht.** Folge: Pflicht-Diagnostik je Champion (Checkliste 5c), Wiedereroeffnung dann per Regel. `evaluations/t_g_gumbel_scale_v21.json` |
 
 Telemetrie-Antwort auf die externe Frage: Q-Skalierungs-Varianz JA
 (`tools/gumbel_scale_calibration.py`), **Ueberlebensrate im Sequential
@@ -172,6 +172,16 @@ MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
      sie sind modellspezifisch. Quelle: `tools/platt_fit.py --models
      models/alphazero_<neu>.pth`. Ohne das zeigt die GUI die
      Gewinnwahrscheinlichkeit mit der Kurve des VORGAENGERS an.
+  5c. **sigma/Prior-Balance messen** (neu 2026-08-09, aus Task G):
+     `tools/gumbel_scale_calibration.py --model <neu> --sims 400
+     --n-states 300`, ~10 min. Der Aera-Wechsel v18->v21 hat das
+     Verhaeltnis von 1,232 auf **2,287** verschoben (delta_q verdoppelt,
+     delta_ln(prior) unveraendert) -- R3 liegt mit 2,972 praktisch auf
+     der Wiedereroeffnungs-Schwelle. **Ueberschreitet die
+     Gesamt-Kennzahl 3, oeffnet sich die c_visit/c_scale-Familie per
+     REGEL wieder** (kein Ermessen). Zugleich Verfallsdatum-Waechter
+     fuer die H0-Befunde der Wurzel-Regler-Familie: die wurden in einem
+     anderen Balance-Regime gemessen.
   6. STATUS-Champion-Zeile + history-Kapitel.
   Nachtrag-Schuld: v20 fehlt die Kante zu `v19_best` (Champion-2 seiner
   Generation) -- billig nachholbar, Nutzer-Entscheid.

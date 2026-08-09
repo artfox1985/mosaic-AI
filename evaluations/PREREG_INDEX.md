@@ -16,17 +16,17 @@ NICHT aufgefuehrt und wurde nicht angefasst.
 
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT.
 
-## OFFEN (2)
+## OFFEN (1)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_ismcts_determinisierungen.md` | Verbessert Mehrfach-Determinisierung (k=1/2/4, rechen-neutral via Sims-Split) bei 600 Netz-Sims die Spielstaerke gegen die PIMC-Strategy-Fusion? | Knopf vorbereitet, Messung steht in der "NACH-v21-QUEUE" (Nutzer-Go 2026-08-08), noch nicht gelaufen; `evaluations/STATUS.md`, Abschnitt "NACH-v21-QUEUE", Punkt 2 |
-| `PREREG_prior_blindfleck.md` | Verpasst die fixe Gumbel-Wurzelmenge (m=16 bei Median 50 legalen Aktionen) gute Zuege, und hilft eine groessere Wurzelbreite? | **Task E ENTSCHIEDEN (Regel 1)**: Miss-Rate 1,21% ⇒ Task F nicht eingetaktet. Task G (c_scale-Aera-Nachmessung) laeuft noch. `evaluations/t_e_prior_blindfleck.json`, Ergebnis-Abschnitt in der Prereg-Datei |
 
-## ENTSCHIEDEN (27)
+## ENTSCHIEDEN (28)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_prior_blindfleck.md` | Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/t_e_prior_blindfleck.json`, `evaluations/t_g_gumbel_scale_v21.json` |
 | `PREREG_lambda_wdl_arm.md` | Traegt λ=0,7-Mix in der WDL-Aera (Zielfeld `values_wdl`) Arena-Staerke gegen den Champion? | **H0** -- Ein-Faktor-Gating 63:77 (p=0,21) gegen `v20_2d_opp_brierbest`; Brier 0,18937 vs 0,18749 (schlechter). Befund aera-gebunden; `evaluations/STATUS.md` + Statusfussnote in der Prereg-Datei |
 | `PREREG_v21_fenster.md` | Fenster-/Korpus-Zuschnitt fuer die v21-Generation (Zwei-Klassen, Rotation) sowie τ-Annealing-Entscheid | **AUSGEFUEHRT** -- Fenster 29.450 Partien realisiert, `v21_2d_brierbest` ist seit 2026-08-08 Champion (Gating 75:45 p=0,0059 + Frisch-Seed 97:63 p=0,0095, Elo 1358); τ-Teilfrage H0 (τ=1 bleibt). Fenster per Nutzer-Entscheid fix ("das fenster bleibt nun so") |
 | `PREREG_aggression_stilmessung.md` | Hebt der Aggressions-Blend (w/λ) die eigene Punktzahl/Gegner-Floor bei gleicher Siegquote, auch gegen einen starken Gegner? | Eigener Ergebnis-Abschnitt in der Datei ("STARK-GEGNER-ERGEBNIS", "E1-/E2-ERGEBNIS"): keine Uebernahme, Blend inert |
