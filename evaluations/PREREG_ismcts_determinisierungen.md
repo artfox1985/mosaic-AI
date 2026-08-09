@@ -224,3 +224,57 @@ Faellt sie positiv aus, ist das zugleich das Staerke-Motiv fuer den
 Batcher (bisher hat er nur ein Durchsatz-Motiv). Faellt sie H0 aus,
 bleibt der Batcher eine reine Durchsatzfrage und die
 Verschraenkung nur ein Mittel zum Batch-Fuellen, kein Staerke-Hebel.
+
+### ERGEBNIS der Trenn-Messung (2026-08-09): Regel 3 -- Vielfalt hilft AUCH bei gleicher Tiefe nicht
+
+Zwei gepaarte Laeufe, identischer Basis-Seed 20260828, je 400 Partien,
+Champion vs Heuristik@150dyn. Belegstellen
+`evaluations/paired_arena_env_ismcts_tiefe_k1.json` /
+`..._tiefe_k2.json`.
+
+| Arm | Budget | Netz-Siege | Quote |
+|---|---|---|---|
+| **A: k=1** | 600 Sims, 1 Welt | **327/400** | **81,75%** |
+| B: k=2 | 1200 Sims = 600 **je Welt** | 308/400 | 77,00% |
+
+**Differenz -4,75pp gegen k=2**, und zwar bei DOPPELTEM Rechenaufwand.
+Gepaart: diskordant 46 (nur B) / 65 (nur A), exakter McNemar
+**p=0,0871**. Block-Ebene: **10 von 16 Bloecken** fuer k=1, mittlere
+Block-Differenz -1,19 Siege je 25 Partien, Block-SE 0,55, **t=-2,16**
+(p~0,047).
+
+**Bemerkenswert: hier ist die BLOCK-Ebene signifikanter als der gepaarte
+McNemar** -- umgekehrt zur ueblichen Richtung. Grund: McNemar zaehlt nur
+diskordante Paare, der Block-Test nutzt die HOEHE der Differenzen. Bei
+einem konsistent gerichteten, pro Paar aber moderaten Effekt ist der
+Block-Test staerker. Es wird ausdruecklich NICHT der guenstigere der
+beiden Tests herausgegriffen: die faire Zusammenfassung ist "Richtung
+klar negativ, ein Test knapp signifikant, einer nicht".
+
+**Entscheid**: Regel 1 (Vorteil) ist definitiv verfehlt -- sie haette
+p<0,05 UND Block-t>+2 in die ANDERE Richtung verlangt. Es greift Regel 3
+(bzw. mindestens Regel 2): **der Punkt ist zu.** Die
+Vielfalts-Hypothese traegt in diesem Spiel nicht, und zwar unabhaengig
+von der Budget-Teilung -- genau der Confound, den der Nutzer-Einwand
+zurecht benannt hatte, ist hier ENTFERNT, und das Ergebnis bleibt
+negativ. Ein Umbau auf einen gemeinsamen Informationsmengen-Baum ist
+damit NICHT durch Messung gedeckt.
+
+**Was das ueber den Mechanismus sagt -- als Lesart, nicht als Nachweis**:
+zwei unabhaengige 600-Sim-Suchen zu mitteln muesste die Varianz SENKEN.
+Dass es die Staerke drueckt, deutet darauf, dass die Mittelung der
+completed-Q-Politiken eine in der gezogenen Welt scharfe Praeferenz
+verwischt (Strategy-Fusion-Mittelung), statt Fehlurteile auszubuegeln.
+Passend dazu die strukturelle Beobachtung: die verdeckte Information
+(Beutel/Turm/Stapel) steckt in der Netz-Eingabe nur als AGGREGIERTE
+Zaehler, nicht als geordnete Liste -- deshalb war auch der
+Seed-Rauschboden der Forward-Pass-Groessen strukturell exakt Null. Wo
+das Netz die Reihenfolge nicht sieht, fuegt eine zweite Ziehung
+derselben Zaehler kaum Signal hinzu, aber Mittelungs-Unschaerfe schon.
+
+**Seed-Skala als Nebenbefund (wichtig fuer alle kuenftigen Vergleiche)**:
+dieselbe Konfiguration k=1@600 ergab 304/400 (76,0%) mit Seed 20260820
+und 327/400 (81,75%) mit Seed 20260828 -- **5,75pp allein durch den
+Seed** bei n=400. Groesser als die meisten Effekte, die wir diskutieren.
+Ungepaarte Vergleiche zwischen Laeufen sind damit wertlos; A und B lagen
+deshalb auf demselben Basis-Seed.
