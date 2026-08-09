@@ -278,3 +278,52 @@ und 327/400 (81,75%) mit Seed 20260828 -- **5,75pp allein durch den
 Seed** bei n=400. Groesser als die meisten Effekte, die wir diskutieren.
 Ungepaarte Vergleiche zwischen Laeufen sind damit wertlos; A und B lagen
 deshalb auf demselben Basis-Seed.
+
+---
+## ZWEITE WIEDEREROEFFNUNG 2026-08-09: k=2 ist keine faire Vertretung der Hypothese
+
+Nutzer: *"k=2 ist für mich keine valide überprüfung. zwei welten sind
+kein mittelwert bei unserem seed rauschen."* -- **trifft zu, und mein
+"endgueltig geschlossen" war voreilig.**
+
+Rechnung dazu: eine Mittelung ueber k Welten senkt die
+Determinisierungs-Varianz auf 1/k. k=2 entfernt also die Haelfte, k=4
+drei Viertel. Gleichzeitig loest unser Instrument nur grob auf: aus der
+Trenn-Messung ergibt sich eine Block-SE von 0,55 Siegen je 25 Partien,
+also **~2,2pp Standardfehler auf der Quote** und damit eine
+Nachweisgrenze von etwa 4,4pp bei 2 SE. Ein Mechanismus, der die halbe
+Determinisierungs-Varianz wegnimmt, muss diese Schwelle nicht
+ueberschreiten -- die Messung war also nicht falsch, aber sie hat die
+Hypothese in ihrer schwaechsten Form getestet.
+
+### Letzte Eskalation: k=4 bei VOLLER Tiefe je Welt
+
+`split_sims_across_worlds(2400, 4)` = [600,600,600,600] ⇒ jede Welt hat
+600 Sims und m=16, exakt wie die Kontrolle. Vierfache Rechenzeit, das
+ist der Preis fuer die dreiviertel Varianzreduktion.
+
+- Arm A (bereits gemessen, wird wiederverwendet): k=1, 600 Sims,
+  Basis-Seed 20260828 ⇒ **327/400**.
+- Arm C (neu): k=4, `--net-sims 2400`, IDENTISCHER Basis-Seed 20260828,
+  400 Partien. Auswertung gepaart ueber den Spielindex + Block-Ebene.
+
+**Entscheidungsregeln (vorab, VOR dem Lauf):**
+1. **Arm C schlaegt Arm A** (gepaarter McNemar p<0,05 UND Block-t < -2)
+   ⇒ die Mittelung traegt, sobald sie ueberhaupt eine Mittelung ist.
+   Dann ist der gemeinsame Informationsmengen-Baum gerechtfertigt (er
+   liefert das zu ~1x Kosten) und bekommt eine eigene Vorregistrierung.
+2. **H0 oder schlechter** ⇒ der Punkt ist **endgueltig** zu, und diesmal
+   traegt das Wort: bei drei Vierteln entfernter Varianz und voller
+   Tiefe je Welt gibt es kein k mehr, das wir bezahlen koennten und das
+   mehr Mittelung liefert. k=8 waere 8x Kosten und koennte selbst bei
+   Erfolg nie Preset werden.
+3. **Arm C wird in KEINEM Fall Preset** (4x Rechenzeit ist im Self-Play
+   nicht bezahlbar). Die Messung ist rein diagnostisch: sie entscheidet
+   nur, ob der Umbau auf einen gemeinsamen Baum durch Messung gedeckt
+   ist.
+4. Deskriptiv: Blockzeiten als Beleg, dass Arm C wirklich ~4x kostet und
+   die Tiefe nicht heimlich anders liegt.
+
+**Das vorige H0 bleibt gueltig fuer seine Frage** (k=2, gleiche Tiefe:
+-4,75pp) und ebenso das rechen-neutrale H0 (k=1 bleibt Default). Neu ist
+nur, dass die Hypothese in ihrer STARKEN Form noch offen war.
