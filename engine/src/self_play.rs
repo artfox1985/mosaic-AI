@@ -581,9 +581,40 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
 /// `validate_draw_from_stack`-Kommentar zur Kuppel-Rundenkappe) -- ein
 /// stilles `let _ =` würde dem Aufrufer dann `applied: true` für einen nie
 /// angewendeten Zug vortäuschen und Server-/Trainingszustand entsynchronisieren.
+/// `MOSAIC_STACK_DRAW_RESEARCH` (2026-08-10, Nutzer-Auftrag): schaltet die
+/// Sammelauflösung des Stapelzugs ab. Default `false` = bit-identisches
+/// Bestandsverhalten.
+///
+/// WARUM: die Suche ZERLEGT den Stapelzug bereits -- `DrawStackPeek` wird in
+/// der Expansion über `apply_drafting` angewandt, und die Folgeentscheidungen
+/// sind eigene Aktionen mit eigenen Kindern (`ChooseDrawStackSlot`,
+/// `ChooseDomeRotation`, siehe `net_mcts.rs`-Kommentare). Die Wurzelaktion
+/// `DrawStackPeek` ist EIN Peek -- genau das, was das Netz sanktioniert hat.
+/// `resolve_and_apply_stack_draw` zieht danach in eigener Schleife bis zu
+/// 20-mal weiter (je −1 Pkt) und wählt Platte, Slot und Rotation selbst. Die
+/// Suche hat damit eine Fortsetzung bewertet, die nicht ausgeführt wird --
+/// KOSTEN und ERGEBNIS weichen beide vom Bewerteten ab, und dadurch ist auch
+/// der Vergleich der Wurzelaktion "Ziehen" gegen die anderen Wurzelzüge auf
+/// falscher Grundlage getroffen.
+///
+/// Mit Knopf AN wird nur der eine Peek angewandt; der Aufrufer sucht danach
+/// neu (die Aufruf-Schleifen tun das ohnehin je Aktion, und bei nicht-leerem
+/// `pending_stack_draw` sind laut `game.rs` NUR Stapel-Folgeaktionen legal).
+/// Nebeneffekt, bewusst: die −1 Pkt stehen dann schon im Score, wenn die
+/// nächste Suche läuft -- das Netz sieht die Kosten in seinen eigenen Köpfen,
+/// statt dass `best_eval_for_tile` sie per `cost_so_far` von Hand gegenrechnet.
+fn stack_draw_research() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_STACK_DRAW_RESEARCH")
+            .map(|v| !v.is_empty() && v != "0")
+            .unwrap_or(false)
+    })
+}
+
 pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Result<Action, String> {
     match a {
-        Action::DrawStackPeek => resolve_and_apply_stack_draw(game),
+        Action::DrawStackPeek if !stack_draw_research() => resolve_and_apply_stack_draw(game),
         other => {
             game.apply_drafting(&other)?;
             Ok(other)
