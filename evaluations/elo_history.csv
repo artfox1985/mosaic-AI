@@ -47,3 +47,5 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment
 2026-08-07,v20_2d_opp_e15,400,v20_2d_opp_brierbest,400,44,56,100,"E15-vs-E5-Checkpoint-Gating (Ein-Faktor, no-promote): SPRT-H0 nach 50 Paaren, p=0.3269 -- brierbest-Politik arena-seitig re-validiert"
 2026-08-07,pi_endgame_s2_brierbest,400,v20_2d_opp_brierbest,400,97,103,200,"Platten-Interventions-Gating: SPRT-H0 nach 100 Paaren, p=0.7608 -- Paritaet; endgame_head wird Trainings-Upgrade der naechsten Generation (Offline: R5-Steigung 0,457, Alt-Brier -0,0016)"
 2026-08-08,t3ann_s2_brierbest,400,v20_2d_opp_brierbest,400,112,118,230,"Messung 3 (tau-Annealing-Korpus-A/B): SPRT-H0 nach 115 Paaren, p=0.78 -- kein Annealing-Vorteil, tau=1 bleibt fuer den v21-Sockel"
+2026-08-09,v21_2d_brierbest,400,v20_2d_opp_brierbest,400,75,45,120,"Champion-Gating v21-Zyklus: SPRT-H1 nach 60 Paaren, p=0.0059 -- Erstlauf"
+2026-08-09,v21_2d_brierbest,400,v20_2d_opp_brierbest,400,97,63,160,"Frisch-Seed-Replikation (Regel Fruehstopp <150 Paare): SPRT-H1 nach 80 Paaren, p=0.0095 -- v21_2d_brierbest NEUER CHAMPION"
