@@ -209,18 +209,28 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    Rahmen, Sollfarbe als VERKLEINERTE Kachel in der Mitte (aus --slot, per
    Gradient-Trick, damit die Beschriftung darueber lesbar bleibt) -- belegte
    Felder (.filled) bleiben volldeckend mit durchgezogenem Rahmen. */
+/* UMKEHRUNG 2026-08-09 (Nutzer-Entscheid, ersetzt die Vorgabe vom
+   2026-08-07 "Soll-Farben abgedunkelt, damit GELEGTE Fliesen klar
+   dominieren"): Die Betonung liegt jetzt auf dem, was NOCH GELEGT WERDEN
+   KANN -- "ziel ist es dass auf einen blick klar ist, was noch gelegt
+   werden kann". Also: UNBELEGTE Felder voll sichtbar, BELEGTE leicht
+   zurueckgenommen. Bitte nicht auf den 08-07-Stand zurueckdrehen; die
+   Prioritaet hat sich bewusst geaendert, das ist kein Regressions-Bug.
+   Konsistent bleibt `.ds.S.locked` gedimmt: gesperrt = NICHT belegbar,
+   gehoert also aus demselben Grund in den Hintergrund. */
 .ds.N{border-style:dashed;border-color:rgba(0,0,0,.4);
-  background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/62% 62% no-repeat,#FAFAF9;
-  /* Nutzer 2026-08-07: Soll-Farben abgedunkelt (aehnlich dem gesperrten
-     Spezialfeld-Stern), damit GELEGTE Fliesen klar dominieren. */
-  opacity:.35}
+  background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/62% 62% no-repeat,#FAFAF9}
 /* Symbol der Soll-Farbe: Farbklasse liefert --sym (siehe v3-Block oben). */
 .ds.N::after{content:'';position:absolute;inset:0;
   background:var(--sym) center/12px no-repeat}
 .ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
 .ds.S{background:var(--special);border-style:dashed;border-color:#aaa}
 .ds.S.locked{opacity:.25}
-.ds.filled{border-style:solid;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+/* Belegt = erledigt, tritt zurueck (Gegenstueck zur Umkehrung oben).
+   Bewusst nur "etwas weniger sichtbar" (.6, nicht die alten .35 der
+   unbelegten Felder): die gelegte Farbe muss zum Abgleich mit den
+   Wertungsplatten weiter klar erkennbar bleiben. */
+.ds.filled{border-style:solid;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);opacity:.6}
 .ds.filled.blau{background:var(--blau);color:#fff}
 .ds.filled.gelb{background:var(--gelb);color:#fff}
 .ds.filled.rot{background:var(--rot);color:#fff}
@@ -297,7 +307,11 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   margin-bottom: 3px;
   align-items: center;
 }
-.ftiles{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+/* Nutzer-Feedback 2026-08-09: seit die Sonnen-/Mondpool-Gruppen ihre
+   Fliesen N-mal ausrendern (statt "xN"), muss der Abstand ZWISCHEN den
+   Farbgruppen deutlich groesser sein als der 2px-Abstand INNERHALB einer
+   Gruppe -- sonst ist nicht erkennbar, was ein Klick-Ziel ist. */
+.ftiles{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 /* Nutzer-Feedback: Sonnen- vs. Mondbereich je Fabrik visuell klarer trennen. */
 .sun-area{background:#FEF9C3;border-radius:5px;padding:3px 5px;margin-bottom:3px;min-height:22px}
 .moon-area{background:#DBEAFE;border-radius:5px;padding:3px 5px;margin-top:4px}

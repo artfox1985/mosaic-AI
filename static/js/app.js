@@ -1216,6 +1216,21 @@ function renderCenter() {
     </div>`;
   }).join('');
 
+  // Nutzer-Feedback 2026-08-09: im Sonnenbereich der Fabriken (und im
+  // Mondpool der Grossfabrik) NICHT eine Beispielfliese mit "xN" daneben
+  // zeigen, sondern die Fliesen TATSAECHLICH N-mal nebeneinander rendern --
+  // die Auslage soll aussehen wie das Brett, nicht wie eine Stueckliste.
+  // Klick-Ziel bleibt die ganze `.cgroup` (Delegation via
+  // `e.target.closest('[data-src]')`, und der KI-Debugger markiert
+  // `.cgroup[data-color]`) -- darum tragen ALLE Fliesen der Gruppe die
+  // `click`/`sel`-Klasse, damit Hover und Auswahl die Gruppe als EINE
+  // Einheit zeigen. Die Zahl bleibt als `title`-Tooltip erhalten.
+  const tileGroupHTML = ({src, fid, color, count, selected}) => {
+    const cls = `tile ${normColor(color)} click${selected ? ' sel' : ''}`;
+    const tiles = Array.from({length: count}, () => `<div class="${cls}"></div>`).join('');
+    return `<div class="cgroup" data-src="${src}" data-fid="${fid}" data-color="${color}" title="${count}× ${color}">${tiles}</div>`;
+  };
+
   const facsHTML = S.factories.map(f=>{
     const sunColors = [...new Set(f.sun)];
     const moonTops  = [...new Set(f.moon.map(s=>s[s.length-1]).filter(Boolean))];
@@ -1237,13 +1252,11 @@ function renderCenter() {
       ? `<span data-chip-fid="${f.id}" style="cursor:${f.chip_revealed?'pointer':'default'}" onclick="${f.chip_revealed?`bonusChipMove(${f.id})`:''}" title="Bonusplättchen">${chipContent}</span>`
       : '';
       
-    const sunTiles = sunColors.map(c=>{
-      const cnt = f.sun.filter(x=>x===c).length;
-      return `<div class="cgroup" data-src="SMALL_FACTORY_SUN" data-fid="${f.id}" data-color="${c}">
-        <div class="tile ${normColor(c)} click ${sel?.color===c&&sel?.factory_id===f.id?'sel':''}"></div>
-        <span class="cnt">×${cnt}</span>
-      </div>`;
-    }).join('');
+    const sunTiles = sunColors.map(c => tileGroupHTML({
+      src: 'SMALL_FACTORY_SUN', fid: f.id, color: c,
+      count: f.sun.filter(x=>x===c).length,
+      selected: sel?.color===c && sel?.factory_id===f.id,
+    })).join('');
     
     // Task (Nutzer-Feedback): ALLE Fliesen jedes Mond-Stapels in korrekter
     // Reihenfolge zeigen (nicht nur die oberste) -- state_json liefert je
@@ -1271,18 +1284,16 @@ function renderCenter() {
   }).join('');
 
   const lf = S.large_factory;
-  const lSun = [...new Set(lf.sun)].map(c=>{
-    const cnt=lf.sun.filter(x=>x===c).length;
-    return `<div class="cgroup" data-src="LARGE_FACTORY_SUN" data-fid="null" data-color="${c}">
-      <div class="tile ${normColor(c)} click ${sel?.source==='LARGE_FACTORY_SUN'&&sel?.color===c?'sel':''}"></div><span class="cnt">×${cnt}</span>
-    </div>`;
-  }).join('');
-  const lMoon = [...new Set(lf.moon)].map(c=>{
-    const cnt=lf.moon.filter(x=>x===c).length;
-    return `<div class="cgroup" data-src="LARGE_FACTORY_MOON" data-fid="null" data-color="${c}">
-      <div class="tile ${normColor(c)} click ${sel?.source==='LARGE_FACTORY_MOON'&&sel?.color===c?'sel':''}"></div><span class="cnt">×${cnt}</span>
-    </div>`;
-  }).join('');
+  const lSun = [...new Set(lf.sun)].map(c => tileGroupHTML({
+    src: 'LARGE_FACTORY_SUN', fid: 'null', color: c,
+    count: lf.sun.filter(x=>x===c).length,
+    selected: sel?.source==='LARGE_FACTORY_SUN' && sel?.color===c,
+  })).join('');
+  const lMoon = [...new Set(lf.moon)].map(c => tileGroupHTML({
+    src: 'LARGE_FACTORY_MOON', fid: 'null', color: c,
+    count: lf.moon.filter(x=>x===c).length,
+    selected: sel?.source==='LARGE_FACTORY_MOON' && sel?.color===c,
+  })).join('');
 
   const moonTopCounts = S.moon_top_counts || {};
   const moonTopEntries = Object.entries(moonTopCounts);
