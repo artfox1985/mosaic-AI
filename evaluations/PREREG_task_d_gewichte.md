@@ -174,3 +174,44 @@ Punktschaetzer sichtbar ist, waere genau die nachtraegliche
 Regelanpassung, gegen die Vorregistrierungen da sind. Ob die
 Verlaengerung zur STEHENDEN Regel wird, ist eine Grundsatzfrage fuer
 kuenftige Gatings und wird nicht an diesem Arm entschieden.
+
+## ERGEBNIS Arm `t_d_vw08` (value_weight 0,8) -- 2026-08-09: H0 (SPRT-Entscheid)
+
+Gleicher Aufbau, Basis-Seed 20260831. Belegstelle
+`evaluations/paired_gating_t_d_vw08_vs_v21.json`.
+
+| Groesse | Wert |
+|---|---|
+| Ergebnis | **92:108** (46,0%) aus 200 Spielen / 100 Paaren |
+| SPRT | **H0 angenommen** nach 100 Paaren (LLR -4,740 <= untere Schranke -2,944) |
+| Exakter Paar-Vorzeichentest | p=0,3123 |
+| Gepaarte Differenz je Paar | -0,160, 95%-KI [-0,431, +0,111] |
+
+Saubererer Ausgang als bei vw04: hier hat der SPRT wirklich entschieden
+statt am Deckel zu verhungern. Zur Lesart: "H0 angenommen" heisst **kein
+Beleg, dass vw08 besser ist** -- nicht "vw08 ist schlechter". Das KI
+schliesst die Null ein, auch wenn der Punktschaetzer negativ liegt.
+
+**Fruehstopp-Replikation nicht erforderlich**: Regel 2 verlangt sie fuer
+eine **H1**-Entscheidung unter 150 Paaren, weil dort die
+Falsch-Positiven teuer sind (Lehre t12). Ein H0-Stopp behauptet keinen
+Champion-Wechsel und traegt dieses Risiko nicht.
+
+**Block-Ebene hier nicht auswertbar**: der Fruehstopp nach 100 Paaren
+laesst nur 4 Bloecke a 25 -- zu wenig fuer eine belastbare Block-SE. Das
+wird so festgehalten statt eine Scheinzahl zu rechnen; die
+Stopp-Entscheidung ist ohnehin der vorregistrierte SPRT.
+
+### Zwischenstand des Sweeps (2 von 3 Armen)
+
+| Arm | value/points | Quote gegen Champion | Verdikt |
+|---|---|---|---|
+| `t_d_vw04` | vw 0,4 | 52,0% (208:192) | H0, Deckel |
+| `t_d_vw08` | vw 0,8 | 46,0% (92:108) | H0, SPRT |
+| `t_d_pw025` | pw 0,25 | trainiert noch | offen |
+
+Bild bisher **monoton und in sich konsistent**: 0,2 (Kontrolle) ist nicht
+schlechter als 0,4, und 0,8 liegt darunter. Das stuetzt die Lesart von
+Regel 5 -- der aus der MSE-Aera geerbte Wert 0,2 ist im WDL-Regime nicht
+bloss unschaedlich, sondern liegt offenbar nahe am Optimum. Endgueltig
+erst nach `pw025`.
