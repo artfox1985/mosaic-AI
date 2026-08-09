@@ -230,3 +230,28 @@ P_Kriterium x Punktwert_Kriterium`, mit dem reihenabhaengigen Punktwert
 bei Kriterium 6 (1..6 je Reihe, `round_end.rs`) statt einer Konstante.
 Bedingungen unveraendert: Knopf Default 0, Paritaets-Hash, Arena-Entscheid,
 Platt-B als Waechter, Heuristik unangetastet.
+
+### Praezisierung des Rechtfertigungsgrunds (Nutzer 2026-08-10)
+
+*"das ist dann eine neue info -- bzw. eine konkretere"*. Die zweite
+Formulierung ist die richtige, und der Unterschied ist der eigentliche
+Grund fuer diesen Kopf:
+
+Die Information ist nicht NEU -- der Ausgang steckt im Value-Ziel, das Netz
+weiss implizit etwas darueber, ob die Spezialfelder am Ende leer bleiben.
+Sie ist **KONKRET**: punktweise adressierbar und damit mit dem bekannten
+Punktwert multiplizierbar. Aus einer Gewinnwahrscheinlichkeit laesst sich
+nicht herausrechnen, welcher Anteil auf die -3 eines BESTIMMTEN Feldes
+entfaellt; aus `P(Feld leer)` und dem reihenabhaengigen Punktwert schon.
+
+Der Rechtfertigungsgrund lautet damit nicht "das Netz weiss es nicht",
+sondern **"das Netz kann es nicht beziffern, wo es gebraucht wird"** --
+genau die Luecke, in die der Stapel-Aufloeser mit seiner bedingungslosen 3
+gefallen ist. Er brauchte `P x Punktwert` und hatte eine Konstante.
+
+Konsequenz fuer Stufe A: die Konsistenz-Pruefung gegen den Punkte-Kopf
+(Punkt 4 oben) bleibt der Redundanz-Test, aber ihr Ausgang ist jetzt
+vorhersagbar und NICHT disqualifizierend -- Uebereinstimmung ist zu
+erwarten, weil dieselbe Information zugrunde liegt. Disqualifizierend
+waere nur, wenn die Zerlegung nicht KALIBRIERT ist, denn ohne
+Kalibrierung ist `P x Punktwert` kein Erwartungswert.
