@@ -135,3 +135,42 @@ pruefen kann: Brier sagt vw04 vorn -- stimmt das Gating zu?
 3 Trainings a ~3,5h GPU (davon 1 fertig, 1 laeuft) + bis zu 3 Gatings a
 ~1,5h CPU + ggf. 1 Champion-Kante. Die Gatings konkurrieren mit
 E3b Stufe 2 und ISMCTS-k um die CPU-Bahn und laufen daher sequenziell.
+
+---
+## ERGEBNIS Arm `t_d_vw04` (value_weight 0,4) -- 2026-08-09: H0
+
+Gepaartes Gating gegen die Kontrolle/den Champion `v21_2d_brierbest`,
+400 Sims beidseitig, Basis-Seed 20260830, Standard-SPRT.
+Belegstelle `evaluations/paired_gating_t_d_vw04_vs_v21.json`.
+
+| Groesse | Wert |
+|---|---|
+| Ergebnis | **208:192** (52,0%) aus 400 Spielen / 200 Paaren |
+| SPRT | **kein Entscheid**, harter Deckel erreicht (LLR -1,862, Schranken ±2,944) |
+| Exakter Paar-Vorzeichentest | p=0,4657 |
+| Gepaarte Differenz je Paar | +0,080, 95%-KI **[-0,108, +0,268]** |
+
+**Entscheid: H0 fuer diesen Arm** -- `value_weight=0,4` zeigt keinen
+Staerkevorteil. Der Punktschaetzer liegt zwar in seine Richtung (52%),
+das KI schliesst die Null aber klar ein.
+
+**Und damit ist die Brier-Vorhersage geprueft und NICHT bestaetigt.**
+Der Alt-Set-Brier hatte vw04 mit 0,18488 gegen 0,18636 vorn gesehen,
+rund 2,5 Seed-Sigma. Die Arena bestaetigt das nicht. Zur Fairness: sie
+WIDERLEGT es auch nicht -- die Richtung stimmt, nur die Groesse ist
+weit von Signifikanz entfernt. Fuer die #29-Buchfuehrung heisst das:
+dieses Paar ist **UNENTSCHIEDEN** und zaehlt damit NICHT als
+arena-entschiedenes Paar. Die Prereg-Erwartung, Task D liefere "bis zu
+drei" solcher Paare, ist damit in Frage gestellt: kommen alle drei Arme
+unentschieden zurueck, liefert der Sweep KEINES -- ein Planungsmangel,
+der hier festgehalten wird, weil #29 seit Wochen auf Power wartet.
+
+**Keine Verlaengerung auf 400 Paare.** Eine solche Regel existiert, aber
+sie wurde ausdruecklich NUR fuer das v21-Champion-Gating vorab
+festgelegt ("bei UNDECIDED_CAP mit positiver Punktschaetzung
+Verlaengerung auf 400 Paare am selben Basis-Seed"). Task D hat keine
+Verlaengerungsregel. Sie jetzt einzufuehren, NACHDEM der positive
+Punktschaetzer sichtbar ist, waere genau die nachtraegliche
+Regelanpassung, gegen die Vorregistrierungen da sind. Ob die
+Verlaengerung zur STEHENDEN Regel wird, ist eine Grundsatzfrage fuer
+kuenftige Gatings und wird nicht an diesem Arm entschieden.
