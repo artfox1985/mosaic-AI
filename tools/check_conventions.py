@@ -398,17 +398,27 @@ def main() -> int:
         return 0
 
     staged_files: set[str] = set()
+    staged_mode = args.staged
     if args.staged:
         staged_files = set(get_staged_files())
         if not staged_files:
-            print("Keine gestagten Dateien -- nichts zu pruefen.")
-            return 0
+            # KEIN stiller Durchlauf (Fund 2026-08-09 beim Rauchtest des
+            # Hakens): bei einem pfadgebundenen Commit (`git commit -- <pfade>`)
+            # baut Git einen temporaeren Index, `git diff --cached` ist leer --
+            # der Waechter haette JEDEN solchen Commit ungeprueft durchgelassen
+            # und dabei "nichts zu pruefen" gemeldet, also gesund ausgesehen.
+            # Genau die Fehlerklasse, gegen die er gebaut wurde. Statt Exit 0
+            # daher Rueckfall auf den vollen Repo-Lauf: kostet ~1 s mehr,
+            # prueft aber wirklich.
+            print("Keine gestagten Dateien -- Rueckfall auf den vollen "
+                  "Repo-Lauf (bei pfadgebundenem Commit der Normalfall).")
+            staged_mode = False
 
     violations: list[str] = []
-    violations += check_file_size_ratchet(args.staged, staged_files)
-    violations += check_doc_language(args.staged, staged_files)
-    violations += check_no_new_task_numbers(args.staged, staged_files)
-    violations += check_prereg_index_consistency(args.staged, staged_files)
+    violations += check_file_size_ratchet(staged_mode, staged_files)
+    violations += check_doc_language(staged_mode, staged_files)
+    violations += check_no_new_task_numbers(staged_mode, staged_files)
+    violations += check_prereg_index_consistency(staged_mode, staged_files)
 
     if violations:
         print(f"\n{len(violations)} Konventions-Verstoss/Verstoesse:\n", file=sys.stderr)
