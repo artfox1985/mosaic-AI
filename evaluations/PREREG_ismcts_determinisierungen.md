@@ -376,3 +376,29 @@ rechen-neutral vergleichbar.
 Reihenfolge: k=4-Ergebnis abwarten (laeuft), dann diese Kostenmessung,
 dann der Arena-Arm. Bei einem k=4-SIEG gilt weiter Regel 1 oben (dann
 zuerst der gemeinsame Informationsmengen-Baum).
+
+### WORUEBER k eigentlich mittelt (Nutzer-Frage 2026-08-09, im Code geklaert)
+
+`determinize_hidden_information` (`net_mcts.rs:614`) mischt **genau zwei**
+Dinge: `dome_tile_pool` (Kuppelstapel) und die noch UNAUFGEDECKTEN
+Bonuschip-Werte (Fabrik-Chips mit `!bonus_chip_revealed` +
+`bonus_chip_pool`). Aufgedeckte Chips bleiben unangetastet -- oeffentliches
+Wissen. **Der Beutel ist NICHT dabei.**
+
+Damit ist das H0 erklaerbar, und zwar nicht als Aussage ueber Mittelung,
+sondern ueber den Gegenstand:
+- **Kuppelstapel: bewiesen irrelevant** fuer die Bewertung -- der
+  Value-Kopf sieht `pending_stack_draw` architektonisch nie
+  (Bindungs-Check, dokumentiert am
+  `DETERMINIZE_ROOT_HIDDEN_INFO`-Kommentar).
+- **Unaufgedeckte Chips**: als Merkmal existiert nur
+  `bonus_chip_revealed`; ein unaufgedeckter Chip erreicht die Bewertung
+  erst, wenn innerhalb der Suche eine Aufdeckung passiert -- ein
+  schmaler Kanal entlang weniger Linien.
+
+**k mittelt also ueber verdeckte Information, die die Bewertung
+strukturell fast nicht erreicht.** Es war kaum etwas zu mitteln da. Das
+ist die vollstaendige Erklaerung fuer alle drei k-Messungen (rechen-neutral,
+gleiche Tiefe k=2, gleiche Tiefe k=4) -- und zugleich die Bestaetigung,
+dass die Unsauberkeit woanders sitzt: beim Beutel, also am
+Rundenuebergang.
