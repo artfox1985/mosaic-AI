@@ -163,6 +163,40 @@ Reichweite: `wertung_progress` haengt NICHT im Leerlauf -- es steckt in
 Arena-Messungen laufen (im Netzpfad nur ueber das abgeschaltete
 Plate-Shaping).
 
+### Zuschnitt des Kandidaten (Nutzer-Praezisierung 2026-08-09)
+
+*"das passt gut für die heuristik denk ich. für unseren net agent
+brauchen wir vermutlich wirklich eine wahrscheinlichkeit die wir dann in
+die blattbewertung miteinbauen können."*
+
+Diese Trennung hat eine wichtige Nebenwirkung, die FUER sie spricht:
+bleibt `wertung_progress` (und damit die Heuristik-Blattbewertung in
+`mcts.rs:82`) UNVERAENDERT und bekommt nur der NETZPFAD den neuen Term,
+dann bleibt der **Arena-Massstab fix** -- alle bisherigen Arena-Zahlen
+bleiben vergleichbar. Das loest den Vorbehalt aus dem Abschnitt oben.
+
+Definition der Wahrscheinlichkeit -- **empirisch kalibrieren, nicht
+handtunen**: gesucht ist P(Spezialfeld am SPIELENDE noch leer), bedingt
+auf beobachtbare Groessen (Runde, Anzahl fehlender Felder auf der
+zugehoerigen Kuppelplatte, Sperrzustand). Diese Wahrscheinlichkeit ist
+NICHT zu schaetzen, sondern **auszuzaehlen**: das v21-Fenster enthaelt
+29.450 Partien mit Endzustaenden. Eine Haeufigkeitstabelle ueber
+(Runde, fehlende Felder) liefert die Kurve datengetrieben, rein offline,
+ohne Arena- oder GPU-Budget. Damit ist es kein geratener Ersatzterm wie
+die quadrierten Fuellgrade, sondern eine gemessene Groesse -- und die
+Auszaehlung ist zugleich der billigste Vorab-Test, ob es ueberhaupt
+etwas zu holen gibt: ist P(leer) schon in Runde 2 nahe 0 oder nahe 1,
+traegt das Merkmal keine Information.
+
+Einbau dann nach dem Standardmuster des Projekts: `MOSAIC_*`-Knopf mit
+**Default 0 = byte-identisches Bestandsverhalten**, Paritaets-Hash haelt,
+Arena-A/B mit eigener Vorregistrierung. Ausdruecklich mitzudenken:
+**Doppelzaehlungs-Risiko** -- der Value-Kopf ist auf plattenhaltige
+Ergebnisse trainiert und reagiert messbar (4,7x Rauschboden). Ein
+zusaetzlicher expliziter Plattenterm kann die Gewinnwahrscheinlichkeit
+verzerren (Platt-B als Waechter mitmessen), weshalb der Gewichts-Knopf
+und nicht ein fest verdrahteter Term der richtige Weg ist.
+
 **Reihenfolge, bewusst so:** Dieser Kandidat wird NICHT gebaut, solange
 Stufe 2 offen ist. Zeigt Stufe 2 fuer den Punkte-Kopf eine
 Zug-Differenzierung (Regel 2a), braucht es kein handgebautes Merkmal --
