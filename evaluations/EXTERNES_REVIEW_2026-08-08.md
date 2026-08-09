@@ -272,3 +272,51 @@ vollstaendig abgeschlossen.
 | 5 | C c_visit | Arena | ~1,5h | letzter unverifizierter Gumbel-Parameter |
 | 6 | E3b Stufe 2 | Arena | ~1h | nur falls Feuerrate >= 5% |
 | 7 | D POINTS_WEIGHT | GPU | ~10h + Gating | laeuft parallel zu 1-6 auf der GPU |
+
+# ==================================================================
+# TASK B: INSTRUMENT-AMENDMENT (2026-08-09, VOR dem Voll-Lauf)
+# ==================================================================
+
+Das gebaute Werkzeug (`tools/dome_split_diagnose.py`) kann die
+Task-B-Frage in dieser Form NICHT beantworten. Befund aus dem
+Selbsttest-Datensatz (`evaluations/dome_split_diagnose.json`, Feld
+`root_num_actions_considered` vs `per_tile_debug`):
+
+| Arm | Wurzel-Kandidaten | betrachtet | Sims-Budget |
+|---|---|---|---|
+| zweistufig | 87 (alle Zugarten) | **16** (Gumbel-m) | 400 gesamt |
+| "flach" | 9 (eine Kachel isoliert) | **9** (alle) | 400 **je Kachel** |
+
+Der Vergleich misst damit drei ueberlagerte Effekte -- Zerlegung,
+Wurzelbreite (16 von 87) und Budget-Konzentration (bis 3x Gesamtbudget) --
+und attribuiert alles der Zerlegung. Die Selbsttest-Zahlen (55%
+"suboptimal", mittlere Q-Differenz 0,0138) sind daher KEIN Beleg gegen
+die Zerlegung; die vorregistrierte Schliessungs-Schwelle darf auf sie
+nicht angewendet werden. **Das Argument ist strukturell und richtungs-
+unabhaengig** (es haette auch ein 0%-Ergebnis entwertet) -- keine
+nachtraegliche Ausrede fuer ein unbequemes Resultat.
+
+Bemerkenswert ist der Nebenbefund: **0 von 11 Abweichungen sind
+Rotations-Abweichungen**, alle 11 betreffen Kachel/Slot -- also gerade
+NICHT die Grenze (Slot -> Rotation), um die es in Task B geht. Das ist
+schwaches Indiz FUER "Zerlegung kostet nichts".
+
+## Korrigiertes Design (Vergleich INNERHALB eines Suchbaums)
+
+Beide Arme muessen aus DERSELBEN Suche kommen, damit Budget und Breite
+identisch sind. Im isolierten Ein-Kachel-Zustand sind die Wurzelkinder
+die Slot-Wahlen, die Rotation liegt auf Tiefe 1 -- die Zerlegung ist
+dort also unveraendert vorhanden:
+- **zweistufig** = `argmax_slot(root_child_q)` -> dann die beste
+  Rotation dieses Slots (`best_rotation.q` desselben Kindes)
+- **flach** = `argmax` ueber ALLE (Slot, Rotation)-Paare desselben Baums
+Sie divergieren genau dann, wenn ein Slot mit niedrigerem marginalem Q
+die insgesamt beste Rotation enthaelt -- das IST die Zerlegungsfrage.
+Ein Lauf je Zustand, identisches Budget, identische Breite.
+
+Kennzahlen und Schliessungs-Schwellen bleiben unveraendert (Anteil <5%
+ODER mittlere Differenz <0,01). Zusaetzlich zu protokollieren: je
+Zustand die Zahl der Slots mit >=1 bewerteter Rotation (Abdeckung).
+Der alte Modus bleibt als `--mode isolated-vs-root` erhalten, aber
+ausdruecklich als Budget-/Breiten-Diagnose deklariert, nicht als
+Zerlegungs-Test.
