@@ -208,3 +208,19 @@ Spielindex, PLUS Block-Ebene (Pflichtregel).
    korrekte Linie).
 4. Deskriptiv: Zeit je Partie beider Arme (Beleg, dass B wirklich ~2x
    kostet und die Tiefe nicht heimlich anders liegt).
+
+### Kopplung an den GPU-Inferenz-Batcher (2026-08-09)
+
+Die Trenn-Messung hat einen zweiten Adressaten. Waeren die k Welten
+VERSCHRAENKT statt sequenziell gesucht (`build_determinized_forest` tut
+heute letzteres), lieferten sie ~11·k gleichzeitig offene
+Blattauswertungen statt ~11 -- genau den Batch, an dessen Erreichbarkeit
+`PREREG_gpu_inferenz_batcher.md` haengt. Und existierte der Batcher,
+kostete k>1 kaum Wandzeit, weil die k Welten in EINEM Batch liefen; das
+Sim-Budget muesste dann nicht mehr geteilt werden -- also genau das
+Regime, das diese Trenn-Messung vorwegnimmt.
+
+Faellt sie positiv aus, ist das zugleich das Staerke-Motiv fuer den
+Batcher (bisher hat er nur ein Durchsatz-Motiv). Faellt sie H0 aus,
+bleibt der Batcher eine reine Durchsatzfrage und die
+Verschraenkung nur ein Mittel zum Batch-Fuellen, kein Staerke-Hebel.
