@@ -61,6 +61,20 @@ Bahnen leer sind:
 3. Dann Stufe-2-Messung (Kendall-Tau der Zug-Reihenfolge ueber
    Plattenkombinationen, plus Pflicht-Beigabe `raw_value`).
 
+**EINGETAKTET: Golden-Waechter A2-A4** (`DESIGN_konventionen_als_pruefungen.md`,
+Nutzer-Go 2026-08-09). Reihenfolge: **A2 Vertragsstempel** (Hash ueber
+`INPUT_SIZE`/`NUM_PLANES_CHANNELS`/`NUM_ACTIONS`/Kopf-Reihenfolge, ueber
+`engine_config_json()` exponiert -- damit ist erstmals das INSTALLIERTE
+Binary befragbar, welchen Vertrag es implementiert), dann **A3
+Feature-Golden-Hash** (quantisiert, nicht bitgenau), dann **A4
+Heuristik-Anker-Verhaltenstest** (netzfrei, macht "NICHT ANFASSEN" aus
+einer STATUS-Zeile zu einer Pruefung). Alles verhaltensneutral.
+**Ablauf-Bedingung**: Bauen und `cargo test` gehen jederzeit, die
+Wheel-INSTALLATION braucht eine freie DLL -- also erst wenn keine Arena
+und kein Training laeuft. Danach Paritaets-Probe; sie hasht nur die
+`net_search_state_json`-Antwort, `engine_config_json` liegt ausserhalb
+ihrer Pruefflaeche, ein Feld dort bricht sie also NICHT.
+
 **Danach eingetaktet**: Plattenkopf (`PREREG_plattenkopf.md`) -- erst
 NACH Abschluss von Task D, weil der Schema-Bump den gemeinsamen Cache
 invalidiert und `pw025` sonst auf einem anderen Korpus trainierte.
