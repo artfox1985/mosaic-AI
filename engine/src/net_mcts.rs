@@ -1171,6 +1171,16 @@ struct Node {
     /// des an DIESEM Knoten ziehenden Spielers, nicht zwingend der Wurzel-
     /// Gegner, siehe `opp_points_forecast_from_root_perspective`).
     opp_points_forecast: Option<f32>,
+    /// PREREG_punktekopf_platten.md (Stufe 2): roher `value_head`-Tanh-
+    /// Output dieses Knotens (ego-perspektivisch bzgl. `state.current_player`,
+    /// VOR jeder Blend-/Shrink-/Floor-/Plate-Shaping-Korrektur) -- exakt
+    /// derselbe Rohwert, der in `node_from_net_outputs` ohnehin für
+    /// `blended_leaf_win_prob` berechnet wird, hier zusätzlich GESPEICHERT
+    /// statt verworfen (kein zusätzlicher Netz-Forward-Pass), analog zu
+    /// [`Node::points_forecast`]/[`Node::opp_points_forecast`] oben. `None`
+    /// nur, wenn der Netz-Aufruf selbst keinen Value zurückgab (Fallback-Pfad
+    /// bei Eval-Fehler).
+    raw_value: Option<f32>,
 }
 
 impl crate::search_common::SearchNode for Node {
@@ -1760,6 +1770,11 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         // hier zusaetzlich abgelegt statt verworfen (kein Zusatz-Forward-Pass).
         points_forecast: points.first().copied(),
         opp_points_forecast: opp_points.first().copied(),
+        // PREREG_punktekopf_platten.md (Stufe 2): `value` wurde oben bereits
+        // für `blended_leaf_win_prob` gelesen (siehe `leaf_value`-Berechnung) --
+        // hier zusätzlich abgelegt statt verworfen, exakt dasselbe Muster wie
+        // `points_forecast`/`opp_points_forecast` (kein Zusatz-Forward-Pass).
+        raw_value: value.first().copied(),
     }
 }
 
@@ -2676,6 +2691,17 @@ pub struct GumbelPhaseCandidate {
     pub sigma_q: f64,
     pub score: f64,
     pub eliminated: bool,
+    /// PREREG_punktekopf_platten.md (Stufe 2): Netz-Kopf-Ausgaben AM
+    /// KINDZUSTAND dieses Kandidaten (`Node::raw_value`/`points_forecast`/
+    /// `opp_points_forecast`) -- der Suchlauf hat diesen Knoten an dieser
+    /// Stelle bereits mindestens einmal besucht/expandiert (Sequential-
+    /// Halving-Invariante: jeder `current`-Kandidat bekommt vor der Rangfolge
+    /// mind. 1 Sim), reiner Lesezugriff, kein Zusatz-Netz-Aufruf. `None` nur
+    /// bei wiederholt fehlgeschlagener Expansion (`apply_drafting`-Fehler,
+    /// siehe `visit_candidate!`-Kommentar) oder fehlendem Kopf am Netz.
+    pub raw_value: Option<f32>,
+    pub points_forecast: Option<f32>,
+    pub opp_points_forecast: Option<f32>,
 }
 
 impl GumbelPhaseCandidate {
@@ -2687,6 +2713,9 @@ impl GumbelPhaseCandidate {
             "sigma_q": self.sigma_q,
             "score": self.score,
             "eliminated": self.eliminated,
+            "raw_value": self.raw_value,
+            "points_forecast": self.points_forecast,
+            "opp_points_forecast": self.opp_points_forecast,
         })
     }
 }
@@ -2717,6 +2746,14 @@ pub struct GumbelFinalist {
     pub ln_prior: f64,
     pub sigma_q: f64,
     pub score: f64,
+    /// PREREG_punktekopf_platten.md (Stufe 2): wie
+    /// `GumbelPhaseCandidate::raw_value`/`points_forecast`/
+    /// `opp_points_forecast`, hier für den bereits expandierten
+    /// Wurzelkind-Knoten (`nodes[cid]`) dieses Finalisten -- reiner
+    /// Lesezugriff, kein Zusatz-Netz-Aufruf.
+    pub raw_value: Option<f32>,
+    pub points_forecast: Option<f32>,
+    pub opp_points_forecast: Option<f32>,
 }
 
 impl GumbelFinalist {
@@ -2727,6 +2764,9 @@ impl GumbelFinalist {
             "ln_prior": self.ln_prior,
             "sigma_q": self.sigma_q,
             "score": self.score,
+            "raw_value": self.raw_value,
+            "points_forecast": self.points_forecast,
+            "opp_points_forecast": self.opp_points_forecast,
         })
     }
 }
@@ -3230,6 +3270,16 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     let score = g + (*prior as f64).max(1e-9).ln() + sigma_q;
                     let description =
                         label_search_move(&SearchMove::Draft(act.clone()), Some(&nodes[0].state)).1;
+                    // PREREG_punktekopf_platten.md (Stufe 2): Netz-Kopf-
+                    // Ausgaben am bereits expandierten Kindzustand -- `None`
+                    // nur bei wiederholt fehlgeschlagener Expansion (siehe
+                    // `GumbelPhaseCandidate::raw_value`-Kommentar).
+                    let (raw_value, points_forecast, opp_points_forecast) = match candidate_node[ci] {
+                        Some(cid) => {
+                            (nodes[cid].raw_value, nodes[cid].points_forecast, nodes[cid].opp_points_forecast)
+                        }
+                        None => (None, None, None),
+                    };
                     phase_candidates.push(GumbelPhaseCandidate {
                         description,
                         visits,
@@ -3237,6 +3287,9 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                         sigma_q,
                         score,
                         eliminated: rank >= keep,
+                        raw_value,
+                        points_forecast,
+                        opp_points_forecast,
                     });
                 }
                 t.phases.push(GumbelPhase { phase: phase_num, sims_per_survivor: extra, candidates: phase_candidates });
@@ -3280,6 +3333,11 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     ln_prior,
                     sigma_q,
                     score: ln_prior + sigma_q,
+                    // PREREG_punktekopf_platten.md (Stufe 2): reiner
+                    // Lesezugriff auf den bereits expandierten Knoten.
+                    raw_value: nodes[cid].raw_value,
+                    points_forecast: nodes[cid].points_forecast,
+                    opp_points_forecast: nodes[cid].opp_points_forecast,
                 });
             }
         }
@@ -3952,6 +4010,17 @@ fn net_search_with_tree_from_nodes(
                 // Zugs, VOR jeder weiteren Suchvertiefung -- Divergenz zu
                 // `mcts_q` zeigt, wo die Suche vom Netz abweicht.
                 "net_leaf_value": node.leaf_value[node.player_who_acted],
+                // PREREG_punktekopf_platten.md (Stufe 2): rohe Netz-Kopf-
+                // Ausgaben AM KINDZUSTAND `node` (dieselbe Ego-Perspektive
+                // wie `net_leaf_value` oben) -- `points_forecast`/
+                // `opp_points_forecast` waren bereits als `Node`-Felder da
+                // (Denial-Tiebreak, Task E3), `raw_value` ist additiv NEU
+                // (siehe `Node::raw_value`-Kommentar). Reiner Lesezugriff,
+                // kein Zusatz-Netz-Aufruf, `None` bei Netzen ohne den
+                // jeweiligen Kopf.
+                "net_raw_value": node.raw_value,
+                "net_points_forecast": node.points_forecast,
+                "net_opp_points_forecast": node.opp_points_forecast,
                 "max_depth": subtree_depth(nodes, cid),
                 "chosen": is_chosen,
                 // Task #97: besuchsstärkste Rotationswahl (Kind-Knoten) für
@@ -4056,6 +4125,31 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
             .find(|&&c| nodes0[c].action.as_ref() == Some(a))
             .map(|&c| nodes0[c].leaf_value[nodes0[c].player_who_acted])
     };
+    // PREREG_punktekopf_platten.md (Stufe 2): wie `leaf_value_of` -- rohe
+    // Netz-Kopf-Ausgaben repräsentativ aus Welt 0, nur zur Schema-Parität mit
+    // `net_search_with_tree_from_nodes` ergänzt (siehe `best_rotation_of`-
+    // Kommentar, derselbe praktisch-unerreicht-Vorbehalt).
+    let raw_value_of = |a: &Action| -> Option<f32> {
+        nodes0[0]
+            .children
+            .iter()
+            .find(|&&c| nodes0[c].action.as_ref() == Some(a))
+            .and_then(|&c| nodes0[c].raw_value)
+    };
+    let points_forecast_of = |a: &Action| -> Option<f32> {
+        nodes0[0]
+            .children
+            .iter()
+            .find(|&&c| nodes0[c].action.as_ref() == Some(a))
+            .and_then(|&c| nodes0[c].points_forecast)
+    };
+    let opp_points_forecast_of = |a: &Action| -> Option<f32> {
+        nodes0[0]
+            .children
+            .iter()
+            .find(|&&c| nodes0[c].action.as_ref() == Some(a))
+            .and_then(|&c| nodes0[c].opp_points_forecast)
+    };
     // Task #97: wie `leaf_value_of` -- repräsentativ aus Welt 0, besuchsstärkste
     // `ChooseDomeRotation`-KIND unter dem Wurzelkandidaten `a` (siehe ausführlicher
     // Kommentar in `net_search_with_tree_from_nodes`). `None`, wenn `a` in Welt 0
@@ -4111,6 +4205,9 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
                 "mcts_q": *q,
                 "mcts_win_pct": *q * 100.0,
                 "net_leaf_value": leaf_value_of(act),
+                "net_raw_value": raw_value_of(act),
+                "net_points_forecast": points_forecast_of(act),
+                "net_opp_points_forecast": opp_points_forecast_of(act),
                 "max_depth": Value::Null,
                 "chosen": is_chosen,
                 "best_rotation": best_rotation_of(act),
@@ -4539,6 +4636,7 @@ mod tests {
             n_actions: 0,
             points_forecast: None,
             opp_points_forecast: None,
+            raw_value: None,
         }
     }
 
