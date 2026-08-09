@@ -201,15 +201,34 @@ Zum zweiten, im Prereg nicht numerisch definierten Kriterium von Regel 1
 ("m=32 bringt keine relevante Verbesserung"): m=32 senkt die Miss-Rate um
 **1,2 Prozentpunkte** (1,21% -> 0,007%). Diese Groesse ist einordbar,
 weil die Arena die Staerke-Empfindlichkeit der Miss-Rate schon einmal
-abgesteckt hat: **m=8 gegen m=16 bei 400 Sims war ein Wash**, und
+abgesteckt hat: **m=8 gegen m=16 bei 400 Sims war ein Wash** (Task #10,
+2026-07-28, `v17_best` vs `v16_best`, 100 Paare, exakter McNemar
+**p=1,0000** -- bei einer Diskordanz von 49 von 100 Paaren, d.h. m=8
+aendert das Spiel massiv und ist trotzdem exakt gleich stark), und
 zwischen diesen beiden liegen laut Tabelle **9,6 Prozentpunkte**
 Miss-Rate (10,78% vs 1,21%). Ein bereits als folgenlos gemessener
 Unterschied ist also ~8x groesser als der maximal noch erreichbare.
-Einschraenkung, damit das nicht als Beweis gelesen wird: bei festen Sims
-kauft m=8 zugleich mehr Tiefe je Kandidat, der Wash ist ein NETTO-Effekt
-und isoliert den Abdeckungs-Term nicht. Es waere ein Zufall, wenn sich
-ein grosser Abdeckungsschaden und ein grosser Tiefengewinn exakt
-aufhoben -- ausgeschlossen ist es nicht.
+
+Zwei Einschraenkungen, damit der Anker nicht ueberdehnt wird:
+1. Bei festen Sims kauft m=8 zugleich mehr Tiefe je Kandidat, der Wash
+   ist ein NETTO-Effekt und isoliert den Abdeckungs-Term nicht.
+2. **Task #10 stammt aus der v16/v17-Aera** (vor WDL, vor 2D) -- nach
+   unserer eigenen Aera-Regel ist er damit nur noch ein Indiz, kein
+   Beleg fuer heute. Das ist keine Kleinigkeit: Task G hat am selben Tag
+   gezeigt, dass der Aera-Wechsel die sigma/Prior-Balance um 86%
+   verschoben hat. Der aera-korrekte Anker ist die schwaechere Messung
+   2 (m=9 vs m=16 **@150 Sims**, v20-Champion, p=0,54).
+   **Die Schliessung haengt aber nicht am Anker**: die
+   Entscheidungsmetrik selbst ist am AKTUELLEN Champion gemessen und
+   liegt mit 1,21% vierfach unter der Schwelle. Der Anker ordnet nur
+   die Restgroesse ein.
+
+Abgrenzung zu Task G (wichtig, weil beide externen Punkte auf
+verschiedene Stufen zielen): die Wurzel-Kandidatenmenge entsteht
+ausschliesslich aus `logit + Gumbel(0,1)` -- **sigma(q) geht dort nicht
+ein**. sigma wirkt erst beim Halbieren/Cullen und in der
+Tiefe->=1-Auswahlregel. Task G kann die Task-E-Zahl daher nicht
+entwerten, und umgekehrt.
 
 **Die Aufschluesselung ist NICHT auswertbar** und wird bewusst nicht
 interpretiert: der hoechste Bucket-Wert (33-64 Aktionen, 4,15% bei
@@ -237,6 +256,59 @@ Platte liegen (Vorzustand, siehe NUM_ACTIONS-Orphaning). Ersatzweise --
 und starker -- Pre-Edit- gegen Post-Edit-Modul auf `v18_2d`:
 **bitgleich** ueber alle 952 Zeilen, `prior_recall_at_16` 0,9863445...
 in beiden.
+
+---
+## ERGEBNIS Task G (2026-08-09): AERA-EFFEKT BESTAETIGT, KEINE WIEDEREROEFFNUNG
+
+`tools/gumbel_scale_calibration.py --model v21_2d_brierbest --sims 400
+--n-states 300`; Belegstelle `evaluations/t_g_gumbel_scale_v21.json`.
+Identische Zustandsmenge wie Task #18 (n_used 233, n_skipped 67,
+max_N-Median 96 in beiden -- die Halbierungs-Verteilung haengt am Budget,
+nicht am Netz).
+
+| Groesse | v18_best (#18) | v21 (G) |
+|---|---|---|
+| delta_q Median | 0,00734 | **0,01425** |
+| delta_ln(prior) Median | 1,11036 | 1,11375 |
+| **Verhaeltnis sigma/Prior** | **1,232** | **2,287** |
+| c_scale fuer Gleichgewicht | 0,811 | 0,437 |
+
+| Verhaeltnis je Runde | R1 | R2 | R3 | R4 |
+|---|---|---|---|---|
+| v18_best | 1,011 | 1,075 | 1,557 | 1,436 |
+| **v21** | **1,908** | **2,818** | **2,972** | **2,527** |
+
+**Der Mechanismus ist eindeutig**: `delta_ln(prior)` ist praktisch
+unveraendert (1,110 -> 1,114), `delta_q` hat sich **verdoppelt**. Der
+WDL-Kopf gibt P(Sieg) ueber den fast vollen [0,1]-Bereich aus, wo der
+alte Kopf eine gestauchte tanh-Marge lieferte -- die
+Geschwister-Q-Spreizung waechst entsprechend, und ueber
+sigma(q) = (c_visit + max_N)·c_scale·q schlaegt das voll durch.
+
+**Entscheid nach Prereg: KEINE Wiedereroeffnung.** Die vorab
+festgelegte Schwelle war Verhaeltnis >~3 oder <~0,3 auf der
+Gesamt-Kennzahl; 2,287 liegt darunter, c_visit/c_scale bleiben
+unangetastet. Das wird ausdruecklich NICHT umgedeutet -- eine
+nachtraegliche Schwellenverschiebung waere genau der Fehler, wegen dem
+Task C zurueckgezogen wurde.
+
+**Aber der Befund ist knapp und die Richtung eindeutig**, und das wird
+hier festgehalten statt beschoenigt: R2 (2,818) und R3 (**2,972**)
+liegen praktisch AUF der Schwelle, und ein weiterer Aera-Schritt von der
+Groesse dieses einen (+86%) reisst auch die Gesamt-Kennzahl darueber.
+Damit ist die externe Kritik an der Q-Skalierung **teilweise
+bestaetigt**: in der v18-Aera wogen Q und Prior gleich schwer, heute
+wiegt Q gut das Doppelte. Der Reviewer hatte die RICHTUNG richtig, die
+Dominanz-Schwelle ist noch nicht erreicht.
+
+**Folge (rein regelbasiert, kein neuer Task)**: Diese Messung wird
+Pflicht-Diagnostik je Champion (Promotions-Checkliste 5c, ~10 min).
+Ueberschreitet die Gesamt-Kennzahl 3, oeffnet sich die sigma-Familie
+per Regel wieder -- ohne Ermessensentscheid. Zweitens ist damit
+dokumentiert, dass die H0-Befunde der Wurzel-Regler-Familie
+(m-Formel, c_scale) in einem ANDEREN Balance-Regime gemessen wurden als
+dem heutigen; sie sind nicht falsch, aber ihre Uebertragbarkeit hat ein
+Ablaufdatum.
 
 ## Telemetrie-Antwort (externe Frage)
 
