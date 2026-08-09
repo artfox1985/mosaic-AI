@@ -168,3 +168,65 @@ Cache-Neubau nach dem Schema-Bump ~1h (2.945 Dateien), Training ~3,5h
 GPU je Arm, Stufe A braucht ein Kontroll-Training NICHT neu (die
 Kontrolle ist `v21_2d` bzw. der jeweils aktuelle Stand mit Kopf-Gewicht
 0). Stufe B zusaetzlich ~1,5h CPU je Arena-Arm.
+
+---
+## REVISION 2026-08-10: WAHRSCHEINLICHKEITEN statt Punktwerte (Nutzer-Entscheid)
+
+*"dann machen wir den plattenkopf mit wahrscheinlichkeiten"*.
+
+### Warum das die staerkere Fassung ist
+
+Der Punktwert-Entwurf war angreifbar, und der Nutzer hat den Angriff selbst
+geliefert: Punkte je Kriterium sind ein ZERLEGTER ABLESEKOPF auf etwas,
+das die bestehenden Koepfe schon tragen -- ihr Ziel ist der Endpunktestand,
+in dem die Kriterien enthalten sind. Dazu kam der Befund vom 2026-08-10,
+dass fuer Kriterium 6 auch die REPRAESENTATION vollstaendig ist: die
+Brettkanaele fuehren `+14` SPECIAL-Feld, `+15` gesperrt, `+6` belegt --
+raeumlich, die Reihe steckt in der Geometrie. Neue Information haette ein
+Punktwert-Kopf also nicht gebracht.
+
+**Eine Wahrscheinlichkeit ist dagegen eine andere Groesse als alles, was wir
+heute haben**: der Glaube ueber ein zukuenftiges binaeres Ereignis. Genau
+das fehlt einer Blattbewertung mitten im Spiel, und genau daran ist der
+Stapel-Aufloeser gescheitert -- er verbuchte die 3 Bonuspunkte
+BEDINGUNGSLOS, obwohl sie nur anfallen, wenn das Feld am Ende belegt ist.
+Mit `P(Feld am Ende leer)` waere der erwartete Beitrag `P · (-3)` statt
+einer festen Zahl.
+
+### Zielgroessen (Labels weiter gratis und exakt aus dem Endbrett)
+
+| Kriterium | natuerliche Groesse |
+|---|---|
+| **6 Spezialfelder** | **P(Feld am Spielende noch leer)**, je der 9 Spezialfelder -- der Fall, um den es die ganze Untersuchung ging |
+| 0/1/2/7 Reihen, Spalten, Diagonalen, Farbenreiche | P(Bedingung am Ende erfuellt), je Linie |
+| 5 Eckplatten | P(Eckplatte am Ende voll), je Ecke |
+| 3 Mehrfarbige Felder | P(alle Wildcard-Felder belegt) |
+| 4 Aeussere Felder | **KEINE Wahrscheinlichkeit** -- additive Zaehlung (+1 je Randfliese). Bleibt als erwartete Anzahl, normiert. Ehrlich vermerkt: hier passt die Wahrscheinlichkeits-Fassung nicht, und das wird nicht schoengerechnet. |
+
+Beide Seiten (eigene und Gegner) wie bisher, Verlust weiter **maskiert auf
+die aktiven Kriterien** (Korrektur vom 2026-08-09 gilt unveraendert: die
+vier Ausschluss-Paare machen unmaskiertes Training zur
+Train/Inferenz-Fehlanpassung).
+
+Labels: alles aus dem Endbrett ableitbar, also weiter gratis. Neu ist nur,
+dass das Label ein **Indikator** (0/1) statt eines Punktwerts ist -- und
+damit ein Wahrscheinlichkeits-Ziel mit Kreuzentropie, wie beim WDL-Kopf.
+
+### Was sich an den Entscheidungsregeln aendert
+
+Stufe A bleibt der Aufbau, aber die Pflicht-Metrik wird eine
+**Kalibrierungs**-Metrik statt eines Regressionsmasses: Brier je Kriterium
+gegen eine Konstanten-Basislinie (Korpus-Grundrate desselben Kriteriums).
+Kriterium 6 bleibt PFLICHT.
+
+Neu und wichtig: **Kalibrierung ist hier die Entscheidungsgroesse, nicht
+Trefferquote.** Der Nutzen entsteht nur, wenn `P · Punktwert` ein
+brauchbarer Erwartungswert ist -- ein schiefer, aber gut trennender Kopf
+waere fuer diesen Zweck wertlos. Platt-Steigung je Kriterium mitfuehren.
+
+Stufe B (Einbau in die Blattbewertung) wird dadurch praeziser
+formulierbar als vorher: der Beitrag ist `Summe ueber aktive Kriterien von
+P_Kriterium x Punktwert_Kriterium`, mit dem reihenabhaengigen Punktwert
+bei Kriterium 6 (1..6 je Reihe, `round_end.rs`) statt einer Konstante.
+Bedingungen unveraendert: Knopf Default 0, Paritaets-Hash, Arena-Entscheid,
+Platt-B als Waechter, Heuristik unangetastet.
