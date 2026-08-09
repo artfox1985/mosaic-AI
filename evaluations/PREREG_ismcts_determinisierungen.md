@@ -538,3 +538,38 @@ Peek-Verfuegbarkeit bedingen. Das misst die Kipprate auf
 Entscheidungsebene statt Partie-Ergebnisse und braucht keine Arena. Wer
 das k-Thema noch einmal aufnimmt, sollte dort anfangen und nicht bei
 einem weiteren Arena-Arm.
+
+## ERGEBNIS k=4 (2026-08-10) -- Familie geschlossen
+
+Rechnerisch gleiche Gesamtsims (k Welten x 600 Sims), Basis-Seed 20260828,
+n=400, gepaart je Spielindex, Champion `v21_2d_brierbest` vs
+Heuristik@150dyn:
+
+| Arm | Quote | Block-Delta vs k=1 | Block-t | exakter McNemar |
+|-----|-------|--------------------|---------|-----------------|
+| k=1 @600 | **327/400 = 81,75%** | -- | -- | -- |
+| k=2 @1200 | 308/400 = 77,00% | -4,75pp | -2,16 | p=0,0871 |
+| k=4 @2400 | 292/400 = 73,00% | **-8,75pp** | **-3,73** | **p=0,00262** |
+
+k=4 vs k=2: -4,00pp, t=-1,35, p=0,195 (Trend, nicht signifikant).
+
+**Monoton fallend.** k=4 ist in BEIDEN Pflichtinstrumenten signifikant und
+uebersteht die Bonferroni-Korrektur fuer 3 Familienvergleiche
+(alpha' = 0,0167). Damit ist der Einwand des Nutzers gegen k=2 ("zwei
+Welten sind kein Mittelwert bei unserem Seed-Rauschen") beantwortet, ohne
+dass die Schliessung auf dem schwachen Arm ruht.
+
+### Die Lesart ist NICHT "verdeckte Information ist irrelevant"
+
+Die Messung ist rechenneutral. Sie sagt: **Baum-Vervielfachung kostet mehr,
+als die Information einbringt** -- k Welten a 600 Sims verlieren gegen eine
+Welt a 600 Sims mit demselben Budget... praeziser: gegen k=1 bei 600, wobei
+k=2/k=4 dasselbe GESAMT-Budget auf mehrere Baeume verteilen und damit je
+Baum flacher suchen. Der Verlust ist also ein Tiefenverlust, nicht ein
+Beweis fuer Irrelevanz der verdeckten Information.
+
+**Konsequenz fuer den Nachfolger (`PREREG_zufallsknoten.md`)**: diese
+Evidenz mahnt zum Kostentor auch beim AUFGEZAEHLTEN Knoten. Sein Vorteil
+ist, dass er nur den Teilbaum unter einem Aufdecken vervielfacht statt
+mehrere volle Wurzelbaeume -- aber die Richtung der Evidenz ist eine
+Warnung, keine Ermutigung.
