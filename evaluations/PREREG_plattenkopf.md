@@ -318,3 +318,46 @@ spezialkuppeln"). Das ist der dokumentierte Fall, in dem die Taktik sich
 umkehren muss, und die erste Stelle, an der der Kopf einen echten
 Mehrwert gegenueber der Erfahrungsregel liefern kann. Als deskriptive
 Auswertung in Stufe A vorgemerkt.
+
+### Kriterium 3 IST eine Wahrscheinlichkeit -- Regression zurueckgezogen (Nutzer 2026-08-10)
+
+*"sollt ich eigentlich auch mit wahrscheinlichkeiten abbilden koennen. 9
+platten mit dem joker gibt es und dann schau ich mir wieviel bei mir liegen,
+wieviel platten ich noch bekommen kann und ob ich die jokerfliesen schliessen
+kann."*
+
+Richtig, und meine Regressions-Empfehlung ist damit zurueckgezogen. Der
+Denkfehler: ein **Zaehler ist eine Summe von Indikatoren**, `E[N] = Sum P(..)`.
+Eine Anzahl ist also nie ein Grund, die Wahrscheinlichkeitsfassung zu
+verlassen -- sie heisst nur, dass die Atome falsch gewaehlt waren.
+
+**Poolstruktur (verifiziert, `dome.rs:208`)**: 18 Platten mit je 4 Feldern,
+davon **9 mit genau einem Spezialfeld** (`s()`, bonus_points=3) und **9 mit
+genau einem Jokerfeld** (`w()`, bonus_points=0). Nie beides auf derselben
+Platte. Die Nutzer-Angabe "9 platten mit dem joker" steht woertlich im Pool.
+
+Kriterium 3 ist damit der **Spiegel von Kriterium 6**, kein Ausreisser:
+
+| ID | Atom | Anzahl | Wert |
+|----|------|--------|------|
+| 6 | Slot s traegt am Ende eine Spezialplatte, deren Spezialfeld LEER ist | 9 | -3 |
+| 3 | Slot s traegt am Ende eine Jokerplatte, deren Jokerfeld BELEGT ist **UND** alle Jokerfelder des Bretts sind belegt | 9 | +2 |
+
+**Die Summe ist EXAKT der Erwartungswert.** Sei C = "alle Jokerfelder belegt"
+und A_s das Atom von Slot s. Tritt C ein, hat jede Jokerplatte ihr Feld
+belegt, also `Sum_s A_s = N_wild`; tritt C nicht ein, sind alle A_s null.
+Also `Sum_s A_s = N_wild * 1{C}` und `E[Auszahlung] = 2 * Sum_s P(A_s)` --
+ohne Multiplikator, ohne `E[wild_total]`, ohne Regression.
+
+Die Konjunktion im Atom ist unbedenklich: sie ist eine binaere Aussage ueber
+das Endbrett und ihr Label bleibt gratis und exakt.
+
+**Nebengewinn -- harte Pruefgroesse**: jedes der 9 Atome muss `<= P(C)` sein.
+Das ist eine Ungleichung, die in der Kalibrierungspruefung getestet wird,
+statt gehofft zu werden. (Verletzung = der Kopf hat die Konjunktion nicht
+gelernt, unabhaengig vom Brier.)
+
+**Atomzahl aktualisiert**: 0:6, 1:6, 2:2, **3:9** (statt 1), 4:20, 5:4, 6:9,
+7:6 = **62 je Spieler, 124 gesamt**. Kein Kriterium mehr ausserhalb der
+Wahrscheinlichkeitsfassung -- die Tabelle oben und die "Ausreisser"-Notiz zu
+Kriterium 3 sind damit ueberholt.
