@@ -481,6 +481,13 @@ pub fn choose_action(state: &GameState) -> Option<Action> {
 /// nicht moeglich: der Wert wird je Prozess genau einmal gelesen, und
 /// `cargo test` laesst Tests parallel im selben Prozess laufen.
 fn choose_action_inner(state: &GameState, chance: bool, budget: u64) -> Option<Action> {
+    choose_action_deadlined(state, chance, budget, Instant::now() + TIME_BUDGET)
+}
+
+/// Wie [`choose_action_inner`], mit injizierbarer Not-Deckel-Deadline -- die
+/// Orakel-Referenz in Teil E braucht mehr als `TIME_BUDGET`, sonst waere sie
+/// deadline- und damit lastgebunden statt knotengebunden.
+fn choose_action_deadlined(state: &GameState, chance: bool, budget: u64, deadline: Instant) -> Option<Action> {
     let perspective = state.current_player;
     let children = ordered_children(state, perspective, chance);
     if children.is_empty() {
@@ -490,7 +497,6 @@ fn choose_action_inner(state: &GameState, chance: bool, budget: u64) -> Option<A
         return Some(children[0].action.clone());
     }
 
-    let deadline = Instant::now() + TIME_BUDGET;
     let mut node_count: u64 = 0;
     let mut best_action = children[0].action.clone();
     let mut best_val = f64::NEG_INFINITY;
@@ -867,6 +873,64 @@ mod tests {
             println!(
                 "BUDGET {budget} vs {NODE_BUDGET}: {changed}/{total} Zugwahlen aendern sich ({pct:.1}%)                  | mittlere Verzweigung an der Wurzel {avg_branch:.1}"
             );
+        }
+    }
+
+    /// TEIL E (Loeser-Haelfte): Orakel-Uebereinstimmung. Eine tiefe
+    /// Referenzsuche liefert die Vergleichswahl, dann der Anteil, in dem ein
+    /// kleineres Budget sie trifft. Beantwortet "was kostet uns 200" auf einer
+    /// Skala, die spaeter auch fuer das NETZ gilt -- ohne Arena, also ohne den
+    /// Symmetrie-Fallstrick (der Loeser sitzt in beiden Bahnen).
+    #[test]
+    #[ignore]
+    fn teil_e_oracle_agreement_probe() {
+        use crate::round_transition::drive_to_round_start;
+        const ORACLE: u64 = 20_000;
+        let seeds = [101u64, 202, 303, 404, 505, 606, 707, 808];
+        let budgets = [200u64, 400, 1000, 4000];
+        let mut agree = [0usize; 4];
+        let mut total = 0usize;
+        let mut oracle_deadline_hits = 0usize;
+        for &seed in &seeds {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut guard = 0u32;
+            while state.phase == Phase::Drafting && guard < 200 {
+                guard += 1;
+                // Orakel mit grosszuegiger Deadline, damit KNOTEN binden.
+                let t0 = Instant::now();
+                let oracle = match choose_action_deadlined(
+                    &state,
+                    false,
+                    ORACLE,
+                    Instant::now() + Duration::from_secs(120),
+                ) {
+                    Some(a) => a,
+                    None => break,
+                };
+                if t0.elapsed() >= Duration::from_secs(120) {
+                    oracle_deadline_hits += 1;
+                }
+                total += 1;
+                for (k, &b) in budgets.iter().enumerate() {
+                    if let Some(got) = choose_action_inner(&state, false, b) {
+                        if got == oracle {
+                            agree[k] += 1;
+                        }
+                    }
+                }
+                // Weitergespielt wird mit der ORAKEL-Wahl: so bleibt die
+                // Stellungsfolge fuer alle Kandidaten dieselbe.
+                let mut g = Game { state };
+                if g.apply_drafting(&oracle).is_err() {
+                    break;
+                }
+                state = g.state;
+            }
+        }
+        println!("TEIL E: Orakel = {ORACLE} Knoten, {total} Entscheidungen, Deadline griff {oracle_deadline_hits}x");
+        for (k, &b) in budgets.iter().enumerate() {
+            let pct = if total > 0 { 100.0 * agree[k] as f64 / total as f64 } else { 0.0 };
+            println!("  Budget {b:>5}: {}/{total} Uebereinstimmung ({pct:.1}%)", agree[k]);
         }
     }
 
