@@ -746,3 +746,54 @@ Umgekehrt duerfte der Loeser bei der DRAFTING-Dynamik verlieren, und die
 kostet Tiefe; bei ~3 Halbzuegen koennte das Netz dort vorne liegen. Ein
 Sieg des Netzes waere also kein Widerspruch, sondern ein Hinweis, dass die
 Drafting-Interaktion mehr wiegt als die exakte Endabrechnung.
+
+## TEIL E, Loeser-Haelfte gemessen: Tiefe ist fast wirkungslos
+
+`teil_e_oracle_agreement_probe` (`#[ignore]`), Orakel = 20.000 Knoten mit
+120s-Deadline (griff **0x**, also knotengebunden), 145 Entscheidungen aus 8
+realistischen Partien, weitergespielt jeweils mit der ORAKEL-Wahl damit die
+Stellungsfolge fuer alle Kandidaten identisch bleibt:
+
+| Budget | Uebereinstimmung mit dem Orakel |
+|--------|--------------------------------|
+| 200 | **81,4 %** (118/145) |
+| 400 | 82,8 % (120/145) |
+| 1000 | 84,1 % (122/145) |
+| 4000 | 84,8 % (123/145) |
+
+### KORREKTUR der Implikation des vorigen Befunds
+
+Die 13,1 % geaenderten Zugwahlen (4000 gegen 200) bleiben richtig, bedeuten
+aber NICHT "13 % falsch bei 200". Von den 18 geaenderten Entscheidungen
+wandern nur ~5 zum Orakel hin, der Rest wechselt zwischen annaehernd
+gleichwertigen Zuegen. **Das Zwanzigfache an Knoten kauft 3,4
+Prozentpunkte.** Meine Formulierung "jede achte Entscheidung fiele tiefer
+anders aus" war zahlenrichtig und in ihrer Suggestion falsch.
+
+**Die tragende Folgerung**: Tiefe ist in dieser Stellungsklasse fast
+wirkungslos, also traegt die BLATTBEWERTUNG die Entscheidung, nicht die
+Suche. Das stuetzt die vorab notierte Vermutung -- der Wert des Loesers
+liegt in `solve_round_final_score_endaware` + `calculate_end_scoring`, nicht
+im Alpha-Beta darum herum.
+
+### Praktische Antwort auf die Budget-Frage: 200 bleibt
+
+Nicht konvergiert, aber das Anheben ist schlechtes Geschaeft: ~x1,8
+Gesamtkosten (R5 = 4,3 % des Self-Play, Commit 6af37ca) fuer 3,4 Punkte
+Uebereinstimmung. `MOSAIC_R5_NODE_BUDGET` bleibt eingebaut und ungenutzt --
+er hat seine Frage beantwortet, statt eine Einstellung zu werden.
+
+### Loeser bleibt fuer die HEURISTIK (Nutzer 2026-08-10)
+
+*"fuer die heuristik der alpha beta solver sicher bleiben schaetz ich mal"*
+-- ja, und die Messung liefert den Grund. Die Alternative waere die
+heuristische Suche mit `wertung_progress`, einer FORTSCHRITTS-Naeherung. Der
+Loeser bringt an derselben Stelle die exakte Rechnung. Sein Vorteil liegt
+also genau in dem Teil, der laut Teil E fast alles entscheidet. Zweiter,
+unabhaengiger Grund: der Anker muss ohnehin eingefroren bleiben.
+
+**Damit verengt sich die offene Frage auf den NETZPFAD**: dort steht ein
+GELERNTER Blattwert gegen den exakten. Nur diese Haelfte von Teil E kann
+noch etwas entscheiden, und sie braucht den Knopf, der `round5::applies`
+fuer den Netzpfad ausschaltet (existiert noch nicht) plus die
+Orakel-Referenz von oben als gemeinsame Skala.
