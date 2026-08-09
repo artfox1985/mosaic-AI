@@ -70,7 +70,7 @@ nachgeruestet: erst muss Task E zeigen, ob die MENGE stimmt.
 | Bahn | laeuft jetzt | danach |
 |---|---|---|
 | **GPU** | Task D Arm `t_d_vw08` (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion |
-| **CPU** | **E3b Stufe 2 laeuft** (2x400 gepaart, Basis-Seed 20260827, ein Faktor: `MOSAIC_DENIAL_UNCERT_Z` 0 vs 1,0 bei `_MIN_VISIT_FRAC=0,5` in BEIDEN Armen) | ISMCTS-k (3x400 @600, Tool `tools/paired_arena_ismcts.py` existiert), dann die Task-D-Gatings (sequenziell, gleiche Bahn) |
+| **CPU** | frei -- **E3b GESCHLOSSEN** (s.u.) | ISMCTS-k (3x400 @600, Tool `tools/paired_arena_ismcts.py` existiert), dann die Task-D-Gatings (sequenziell, gleiche Bahn) |
 | **offline** | frei | — |
 
 **Wheel-Stand**: neu gebaut und installiert 2026-08-09 13:1x, 311 Tests
@@ -106,9 +106,21 @@ Alt-Wheel schon lebt -- empirisch bewiesen dadurch, dass die Arme
 deutlich verschiedene Ergebnisse liefern (322 vs 277); ein inerter
 Regler haette identische Zahlen ergeben.
 
-1. **E3b** (Denial-Tie-Break mit Besuchs-Gate + Zwei-Anteils-SE statt
-   roher Q-Differenz): Stufe 1 = Feuerraten-Messung, Abbruch bei <5%;
-   Stufe 2 = 2x400 Arena. `PREREG_denial_tiebreak.md`
+1. ~~**E3b**~~ **GESCHLOSSEN 2026-08-09: Siegquoten-Wache NICHT
+   bestanden.** Stufe 1 Feuerrate 36,52% (weit ueber dem 5%-Gate, die
+   Prereg-Erwartung eines ausbremsenden Besuchs-Gates war falsch),
+   Stufe 2 dann 308/400 (77,0%) mit z=0 gegen 289/400 (72,2%) mit
+   z=1,0 -- **-4,75pp**, McNemar p=0,1042, Block-Ebene 9:4 fuer AUS
+   (t=1,78). Kein Schadensnachweis, aber die Wache verlangt
+   Schadensfreiheit ("rein, wenn es nicht schadet") und die ist nicht
+   erbracht ⇒ `z` bleibt 0, keine Preset-/Self-Play-Uebernahme, der
+   Dosis-Punkt z=2,0 entfaellt. **Die Denial-Tie-Break-Familie ist
+   damit zweimal gemessen und zu**: E3 -13,75pp, E3b -4,75pp -- die
+   neue Aequivalenz-Definition verkleinerte den Schaden, erzeugte aber
+   keinen Gewinn. Aussagekraeftig statt grenzwertig, weil der
+   Mechanismus bei 36,5% Feuerrate ueber ein Drittel aller
+   Wurzelentscheidungen aendert. Wiedereroeffnung nur mit NEUEM
+   Mechanismus. `PREREG_denial_tiebreak.md`
 2. **ISMCTS-k** (Mehrfach-Determinisierung, k=1/2/4, rechen-neutral --
    Sims-Split; greift die PIMC-Strategy-Fusion an):
    `PREREG_ismcts_determinisierungen.md`
