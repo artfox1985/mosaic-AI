@@ -197,6 +197,56 @@ Die Plattenluecke (Heuristik 1,99 Plattenpunkte je Partie gegen 1,10 beim
 Champion) bleibt bestehen -- die Erklaerung ist aber nicht "Term fehlt",
 sondern "Term liegt in einer Form vor, die den Stand nicht bewertet".
 
+#### DREI STUFEN UND DAS ABSCHALTKRITERIUM (Nutzer-Diktat 2026-08-10/11)
+
+Nutzer-Fassung: *"wir muessen nun der suche die realisierte groesse injizieren
+damit ueberhaupt einmal die zuege in richtung der wertungsplatten angesteuert
+werden. irgendwann mal lernt der ownership head, wird weitsichtiger und nimmt
+einfluss auf das netz. dann koennen wir die (kurzblickende) injektion wieder
+abschalten"* -- im Kern richtig, mit zwei Praezisierungen unten.
+
+**Stufe 1 -- INJEKTION (die realisierte Groesse, nicht die Vorhersage).**
+Die Suche maximiert Belegung, die im BRETT steht: `wertung_progress_alpha`
+(Commit `40eb39b`, `MOSAIC_WERTUNG_SHAPING_W`) plus der gestufte
+Spezialfeld-Freischaltterm (`MOSAIC_UNLOCK_SHAPING_W`), beide Default 0,
+absolut und ego-only. **Kein Kopf beteiligt** -- die 36 Ownership-Labels sind
+Brettfakten, exakt berechenbar. Das ist die Leiter aus dem Bootstrap-Kreis:
+Suche realisiert -> Partien enthalten gefuellte Felder -> die Labels variieren
+ueberhaupt erst -> der Kopf kann sie lernen.
+
+**Stufe 2 -- DESTILLATION, und hier sitzt die Abschaltbarkeit.** NICHT der
+Ownership-Kopf macht die Injektion entbehrlich, sondern der **POLICY-Kopf**:
+sein Ziel ist die Besuchsverteilung, und die hat die Injektion verschoben. Er
+lernt also, die Freischaltzuege von sich aus vorzuschlagen. Das funktioniert
+sogar bei margen-blindem Value-Ziel -- der Policy-Kanal kopiert die Suche und
+braucht das Siegsignal nicht.
+
+**Stufe 3 -- OWNERSHIP-KOPF als HORIZONT-VERLAENGERUNG (Arm B).**
+**Praezisierung**: dass der Kopf lernt, nimmt von sich aus KEINEN Einfluss --
+er ist ein Ausgang. Seine Ausgabe muss im Blatt GELESEN werden, und das ist ein
+eigener Bauschritt (heute liest die Blattbewertung `policy/value/moon/points/
+opp_points`, fuer `ownership` gibt es keinen Konsumenten). Die Injektion sieht
+nur so weit wie die Suche; die Marginalen reichen darueber hinaus -- das ist der
+eigentliche Beitrag des Kopfes, nicht das Ansteuern selbst. Er ist damit die
+zweite Stufe des Ausbaus, nicht das tragende Teil.
+
+**ABSCHALTKRITERIUM (messbar, nicht nach Gefuehl):**
+1. Steigt die **Prior-Masse des Netzes auf den Freischaltzuegen** von
+   Generation zu Generation?
+2. **Haelt die Freischaltrate, wenn das Gewicht gesenkt wird?**
+Beides ja -> die Injektion ist destilliert und kann runter. Bricht die Rate mit
+dem Gewicht zusammen -> das Verhalten haengt noch am Geruest, es bleibt stehen.
+
+**MESSMITTEL, nicht die Arena-Siegquote gegen ein Geschwisternetz.** Beide
+vorliegenden Null-Ergebnisse zu Platten-Interventionen sind gegen Netze mit
+DEMSELBEN blinden Fleck gemessen -- Task #93 bei p=0,71 und das Gating in
+`elo_history.csv` Zeile 48 bei 97:103, p=0,76. Gegen Gegner, die die
+Spezialfelder ebenfalls liegen lassen, kann die Arena 9 Punkte je Partie nicht
+sehen. Direkt zu messen sind deshalb **Freischaltrate und Spezialpunkte je
+Partie** (Zielwerte aus der Watchlist: Nutzer 3,1 Freischaltungen und 10,3
+Spezialpunkte, KI heute 0,6 und 1,3); als Arena-Kante taugt die **Heuristik**,
+die mit `-3 * special_empty` wenigstens einen Spezialfeld-Term hat.
+
 `wertung_progress` **NICHT ANFASSEN** -- es haengt am Elo-Anker. Das variable
 alpha gehoert in eine eigene Funktion daneben (Schutz durch Konstruktion,
 nicht durch eine Bedingung; `.powi(2)` und `.powf(2.0)` sind nicht garantiert
