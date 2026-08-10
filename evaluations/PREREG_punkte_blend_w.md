@@ -86,3 +86,48 @@ Aufwand verdoppelt sich, die Frage wird aber erst dadurch entscheidbar.
 2x400 Partien @400 Sims, CPU-Bahn, ~50-60 min; Replikation bei Erfolg
 noch einmal so viel. Einplanung: nach dem dritten Gewichts-Gating
 (`pw025`), damit die CPU-Bahn nicht dreifach belegt ist.
+
+## ERGEBNIS 2026-08-10: REGEL 2 -- w bleibt 0, und zwar deutlicher als H0
+
+`tools/paired_arena_env_ab.py`, Mehr-Var-Modus
+(`MOSAIC_POINTS_UTILITY_W,MOSAIC_AGGR_LAMBDA`), Champion
+`v21_2d_brierbest`@400 vs Heuristik@150dyn, Basis-Seed 20260902, je 400
+Partien, identische Seeds ueber die Arme, 16 Bloecke a 25.
+
+| Arm | Netz-Siege | Quote |
+|-----|-----------|-------|
+| Kontrolle `w=0, lambda=2.0` | 321/400 | **80,25 %** |
+| Arm `w=0.1, lambda=2.0` | 300/400 | **75,00 %** |
+
+- **Block-Delta -5,25pp, SE 1,96pp, t = -2,68** (Pflichtinstrument)
+- exakter McNemar **p = 0,0527**, diskordant 43 (nur Arm) / 64 (nur Kontrolle)
+
+### Lesart
+
+Regel 1 (Gewinner) verlangt p<0,05 UND Block-t>2 UND Frisch-Seed-Replikation
+-- der Arm ist kein Gewinner. **Regel 2 greift: w bleibt 0.**
+
+Es ist aber MEHR als H0: beide Instrumente zeigen in dieselbe Richtung, und
+das Block-Instrument ist mit t=-2,68 signifikant. Die Vorregistrierung hatte
+diesen Zweig nicht vorgesehen (nur "Gewinner" und "H0"), deshalb hier
+ausdruecklich: **w=0,1 schadet vermutlich**, und ein einzelner Lauf ohne
+Replikation traegt diese Aussage nur als Richtung, nicht als Befund. Die
+ENTSCHEIDUNG ist in beiden Lesarten dieselbe.
+
+Bemerkenswert: die deskriptive Richtung der Aggressions-Neukartierung
+(+6pp fuer genau diesen Arm, p=0,169) ist damit **nicht reproduziert, sondern
+umgekehrt**. Das ist ein Lehrstueck zur Seed-Skala: ein +6pp-Befund bei
+n=200 und ~2,2pp Block-SE war nie belastbar, und die doppelte Stichprobe
+dreht das Vorzeichen. Wer aus solchen Zwischenstaenden Rezepte baut, baut auf
+Rauschen.
+
+### Vorregistrierte Konsequenz, unveraendert uebernommen
+
+"Dann ist der Blend als Weg fuer Plattenwirkung erledigt, und der Hebel muss
+**plattenselektiv** werden (Plattenkopf) oder trainingsseitig." Genau das
+laeuft: `PREREG_plattenkopf.md`, Kriterium 6 als 9 Atome, Rauchtest mit
+Skill +0,574 bestanden.
+
+Der Punkt gilt damit als **zweifach gemessen** -- einmal auf der
+Punkte-Marge (Aggressions-Neukartierung), einmal mit Mechanismus-Begruendung
+und doppelter Stichprobe. Der Blend wird nicht wieder aufgerollt.
