@@ -566,3 +566,63 @@ die Endlabels stempelt.
    Arena-Gating vs Champion (~1-1,5h CPU) UND Brier-Skill-Score je Kriterium.
    Ein Nullergebnis in der Arena ohne die Kalibrierung liesse offen, ob der
    Kopf nichts gelernt hat oder es gelernt hat und nicht hilft.
+
+## RAUCHTEST 2026-08-10: c6 traegt, c3 NICHT -- Bauzuschnitt geaendert
+
+Instrument: `tools/plattenkopf_smoketest.py` (neu). Zweck war ausdruecklich,
+die Nachtschicht zu schuetzen: sind die Atome aus den vorhandenen Merkmalen
+lernbar, BEVOR Schema-Bump, Cache-Neubau (~3 h) und Training (~3,5 h)
+bezahlt werden. Kleines MLP direkt auf `state_to_tensor` + `state_to_planes`
+(also OHNE gelernten Rumpf -- die schwierigere und damit konservative
+Variante), 80.000 Zustaende aus 677 Partien, Schnitt NACH PARTIE,
+Fruehstopp auf dem mittleren Val-Skill.
+
+| Kriterium | Grundrate | Brier | Brier(Grundrate) | **Skill** | Wachhund |
+|-----------|-----------|-------|------------------|-----------|----------|
+| **c6** Spezialfelder | 0,441 | 0,105 | 0,247 | **+0,574** | +0,000 |
+| **c3** Jokerfelder | 0,199 | 0,165 | 0,159 | **-0,036** | +0,000 |
+
+c3 verschlechtert sich zudem monoton mit dem Training (Epoche 1 bis 4:
+-0,036 / -0,113 / -0,173 / -0,189). Der Trivialitaets-Wachhund liefert beide
+Male exakt 0 -- die Metrik ist korrekt geeicht.
+
+### Warum c6 lokal und c3 global ist
+
+c6 ist eine **lokale** Vorhersage: ob ein Slot sein Spezialfeld fuellt, haengt
+fast nur am Zustand dieses Slots (sind die anderen drei Felder gefuellt?), und
+der steht in den Brettkanaelen. Deshalb tragen die 9 Atome 9-mal Signal.
+
+c3 ist ein **globales Bit**: alle 9 Atome haengen ueber dieselbe Bedingung
+"alle Jokerfelder am Ende belegt" zusammen, der Slot-Teil ist ohnehin sichtbar.
+Die effektive Stichprobe sind also 542 Partien mal EIN Bit, nicht mal neun.
+Das ist zu wenig Signal -- und es entlarvt die Grundraten-Betrachtung von
+oben als unzureichend: eine gesunde Grundrate (42 %) sagt nichts darueber, ob
+genug UNABHAENGIGE Beobachtungen dahinterstehen.
+
+### Bauzuschnitt (Regel-Anwendung)
+
+Die vorregistrierte Regel lautet "nur EIN Kriterium schlaegt die Grundrate ⇒
+das andere gehoert vor dem Bau geklaert". Angewandt:
+
+- **c6 wird gebaut**: 9 Ausgaben, Verlust maskiert auf Partien mit aktiver
+  Platte 6.
+- **c3 wird NICHT mitgebaut.** Ein toter Block kostet Kapazitaet und
+  Gradientenanteil, ohne etwas zu tragen -- genau der Fehler, den der
+  Ownership-Kopf schon einmal gemacht hat (inert, Gewicht 0, seit 2026-07-28
+  geschlossen).
+- **c3 bleibt offen**, nicht verworfen. Denkbare Wiedervorlage: EIN Ausgang
+  fuer `P(alle Jokerfelder belegt)` statt neun korrelierter, und erst wenn ein
+  groesseres Fenster mehr unabhaengige Partien liefert. Die
+  Exaktheits-Identitaet (`2 x Summe der Atome` = Auszahlung) bleibt dabei
+  gueltig, sie war nie das Problem.
+
+### Was der Rauchtest gekostet und gespart hat
+
+Gekostet: ~20 Minuten GPU. Gespart: ein Nachtlauf, der einen Kopf mit einem
+toten Block trainiert haette -- und dessen Arena-Nullergebnis nicht
+interpretierbar gewesen waere ("Kopf lernt nichts" vs "lernt es, hilft
+nicht"). Zwei Fehlwege im Test selbst sind protokolliert: Schnitt nach INDEX
+statt nach Partie (alle Zustaende einer Partie tragen dasselbe Label, das
+Modell lernt die Partie) und fehlender Fruehstopp (der Endstand misst dann
+das Ueberlernen statt der Lernbarkeit; c3 sah dadurch mit -0,494 viel
+schlechter aus als mit -0,036).
