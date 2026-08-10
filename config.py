@@ -99,13 +99,23 @@ OWNERSHIP_WEIGHT  = 0.0
 # `CONJUNCTION_HEAD=False` behaelt `ownership_head` exakt seine
 # `OWNERSHIP_TARGETS`-Breite, Bestandscheckpoints laden unveraendert und der
 # ONNX-Ausgabevertrag bleibt gleich.
-# Bewusst KEIN eigenes Gewicht: die Konjunktionen haengen am selben Kopf und
+# Bewusst KEIN eigenes Gewicht: die Zusatzziele haengen am selben Kopf und
 # damit am selben Verlustterm wie der Randlayer, gesteuert von
 # OWNERSHIP_WEIGHT. Der Loss mittelt elementweise ueber die unmaskierten
-# Spalten, die 50 Konjunktionen bekommen also ~41% des Gradientenanteils
-# (50 von 122) -- keine Verdraengung, aber auch keine Bevorzugung.
-CONJUNCTIONS_PER_PLAYER = 25
-CONJUNCTION_TARGETS     = CONJUNCTIONS_PER_PLAYER * 2   # 50
+# Spalten, die 68 Zusatzziele bekommen also ~49% des Gradientenanteils
+# (68 von 140) -- keine Verdraengung, aber auch keine Bevorzugung.
+#
+# 25..33 SIND KEINE KONJUNKTIONEN, sondern LAYOUT (2026-08-10, Nutzer-Auftrag
+# "mach das"): `P(Slot s traegt am Ende eine Jokerplatte)`. Sie schliessen die
+# EINZIGE Abdeckungsluecke -- Kriterium 3 ist das einzige mit einem
+# ZUSTANDSABHAENGIGEN Punktwert (`2 x wild_total`), alle anderen sind konstant
+# oder positionsfest. Ueber `E[wild_total] = Summe P(Slot s wild)` wird der
+# Multiplikator schaetzbar, also ein Zaehler als Summe von Indikatoren --
+# dieselbe Zerlegung, mit der Kriterium 3 ueberhaupt in die
+# Wahrscheinlichkeitsfassung kam. Gemessene Spanne 1..8 Jokerfelder je Brett;
+# mit dem AKTUELLEN wild_total zu multiplizieren verzerrt frueh nach unten.
+CONJUNCTIONS_PER_PLAYER = 34
+CONJUNCTION_TARGETS     = CONJUNCTIONS_PER_PLAYER * 2   # 68
 
 # Task #12: Distributionaler Punkte-Kopf. 0 = AUS (Skalar-Regression wie bisher),
 # >0 = Anzahl der Bins, ueber die der `points_head` eine VERTEILUNG der

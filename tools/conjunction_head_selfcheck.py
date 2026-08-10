@@ -44,6 +44,9 @@ def expect(name, got, want):
 
 # ── Suite 1: Labels ────────────────────────────────────────────────────────
 IDX_ROW, IDX_COL, IDX_DIAG, IDX_CORNER, IDX_WILD, IDX_COLORFUL = 0, 6, 12, 14, 18, 19
+# 25..33 ist LAYOUT, keine Konjunktion: traegt Slot s eine Jokerplatte?
+# Schliesst den Multiplikator von Kriterium 3 (`2 x wild_total`).
+IDX_WILDSLOT, N_CONJ = 25, 34
 
 
 def _empty_grid():
@@ -58,8 +61,8 @@ def _cell(grid, r, c):
 
 def check_labels(conj) -> None:
     g = _empty_grid()
-    expect("leeres Brett", conj(g), [0] * 25)
-    expect("Laenge", len(conj(g)), 25)
+    expect("leeres Brett", conj(g), [0] * N_CONJ)
+    expect("Laenge", len(conj(g)), N_CONJ)
 
     g = _empty_grid()
     for r in range(6):
@@ -111,6 +114,35 @@ def check_labels(conj) -> None:
     expect("Wild: eines belegt", conj(g)[IDX_WILD], 0)
     _cell(g, 4, 5)["filled"] = "rot"
     expect("Wild: beide belegt", conj(g)[IDX_WILD], 1)
+
+    # --- Layout-Block 25..33: traegt Slot s eine Jokerplatte?
+    g = _empty_grid()
+    expect("Layout: kein Wild irgendwo", conj(g)[IDX_WILDSLOT:IDX_WILDSLOT + 9], [0] * 9)
+
+    # Ein WILD-Space in Slot (1,2) -- slot_row-major heisst Index 1*3+2 = 5.
+    g = _empty_grid()
+    g[1][2]["spaces"][0]["type"] = "WILD"
+    want = [0] * 9
+    want[5] = 1
+    expect("Layout: nur Slot (1,2)", conj(g)[IDX_WILDSLOT:IDX_WILDSLOT + 9], want)
+
+    # Unbelegt zaehlt trotzdem: das Label ist LAYOUT, nicht Fuellung.
+    expect("Layout: zaehlt unbelegt", conj(g)[IDX_WILDSLOT + 5], 1)
+    expect("Layout: Fuellungs-Label bleibt 0", conj(g)[IDX_WILD], 0)
+
+    # Summe = wild_total, der gesuchte Multiplikator.
+    g = _empty_grid()
+    for sr, sc in ((0, 0), (0, 1), (2, 2)):
+        g[sr][sc]["spaces"][3]["type"] = "WILD"
+    expect("Layout: Summe ist wild_total", sum(conj(g)[IDX_WILDSLOT:IDX_WILDSLOT + 9]), 3)
+
+    # Zwei WILD-Spaces in EINEM Slot zaehlen als EINS (Slot-Indikator, nicht
+    # Feldzaehler) -- im echten Pool kommt das nicht vor (je Platte hoechstens
+    # ein Wild), der Test haelt die Semantik trotzdem fest.
+    g = _empty_grid()
+    g[0][0]["spaces"][0]["type"] = "WILD"
+    g[0][0]["spaces"][1]["type"] = "WILD"
+    expect("Layout: zwei Wild in einem Slot = 1", conj(g)[IDX_WILDSLOT], 1)
 
     g = _empty_grid()
     for c, col in enumerate(["blau", "rot", "gelb", "gruen", "tuerkis", "blau"]):
