@@ -1131,3 +1131,68 @@ Punkten. Klein, aber gerichtet -- und jetzt beziffert statt vermutet.
 `2 x Summe P` exakt, Identitaet 44.068/0 verifiziert. Sie hatten im Rauchtest
 aber keinen Skill (-0,036), weil alle neun an einem globalen Bit haengen.
 Deshalb der Weg ueber Layout + Bedingung, mit dem bezifferten Fehler.
+
+## ATOM-PRUEFUNG mit Waechter (2026-08-10): 16 von 34 Zielen sind konstant
+
+Instrument: `tools/atom_skill_check.py` (neu). Labels aus dem AUTORITATIVEN
+Bauer `_conjunctions_from_dome`, 150.000 Zustaende aus 1.268 Partien, Schnitt
+nach Partie, Fruehstopp, **Waechter** gegen entartete Grundraten
+(`min(rate,1-rate) < 1 %`, `Brier(Grundrate) < 1e-4`, `n < 200`).
+Log: `logs/atom_skill_check.log`.
+
+### Ergebnis: 11 Atome mit Skill > +0,02, 2 negativ, **16 entartet**
+
+**Entartet (Grundrate praktisch 0 oder 1) -- und es sind die teuren:**
+
+| Atom | Grundrate | Punktwert |
+|------|-----------|-----------|
+| Reihe 3/4/5/6 vollstaendig | **0,000** | +3 je |
+| Diagonale H / N | 0,002 / **0,000** | **+10 je** |
+| Ecke (2,0) / (2,2) | 0,002 / 0,004 | **+8 je** |
+| farbenreiche Reihe 3/4/5/6 | **0,000** | +4 je |
+| Spalte 1/3/5/6 | 0,002-0,006 | **+7 je** |
+
+**Konjunktionen tragen fast kein Signal.** Bester Nicht-Layout-Wert: Ecke
+(0,0) mit **+0,102**. Danach Ecke (0,2) +0,032, "alle Jokerfelder" +0,012,
+Reihe 2 +0,016; Reihe 1 und farbenreiche Reihe 1 sind NEGATIV (-0,040 /
+-0,043).
+
+**Die 9 Layout-Ausgaenge sind das Starkste im Kopf**: +0,278 bis **+0,972**
+(Slot 0 0,972, Slot 1 0,878, Slot 2 0,852, dann fallend bis Slot 8 0,278).
+
+### Vorbehalt zum Layout-Signal -- DASSELBE MUSTER ZUM DRITTEN MAL
+
+Ein Skill von 0,97 heisst hier vermutlich: der Kopf schreibt die **schon
+sichtbare** Platzierung fort. Ist die Platte gelegt, ist die Antwort bekannt
+und im Zustand ablesbar. Das ist zum dritten Mal derselbe Konfundierungstyp:
+
+1. c6 unbedingt -> mischte ANWESENHEIT des Spezialfelds hinein (+0,637 -> nach
+   Bedingung +0,400)
+2. c6 gepoolt -> aggregierter Skill aus SLOT-IDENTITAET (jeder Slot einzeln war
+   negativ)
+3. Layout -> schon ENTSCHIEDENE Platzierungen
+
+**Regel daraus**: jedes Ziel, das teilweise schon aus dem sichtbaren Zustand
+folgt, blaeht den Skill auf, solange man nicht auf den noch UNENTSCHIEDENEN
+Teil bedingt. Fuer das Layout heisst das: nur Slots auswerten, die im
+jeweiligen Zustand noch unbelegt sind. **Offen.**
+
+### Der grosse Befund liegt nicht beim Kopf
+
+Von den acht Wertungsplatten erreicht der Champion die **teuersten nie**:
+Diagonalen (10 Pkt) nie, Spalten (7 Pkt) unter 1 %, untere Ecken (8 Pkt) nie,
+Reihen 3-6 nie. Faktisch gespielt werden nur Randfelder (Kriterium 4),
+Spezialfeld-Vermeidung (6), die schnellen Reihen 1-2 und die obere linke Ecke.
+
+Das ist eine **Strategie-Luecke, kein Vorhersage-Problem** -- und ein Kopf, der
+Konstanten vorhersagt, schliesst sie nicht. Ob die Luecke strukturell ist,
+entscheidet die policy-unabhaengige Verfuegbarkeitsrechnung
+(`tools/musterreihen_verfuegbarkeit.py`), nicht der Korpus: dessen Grundraten
+sind mit genau dem Defekt kontaminiert, den sie messen sollen.
+
+### Konsequenz fuer `OWNERSHIP_WEIGHT > 0`
+
+Beim jetzigen Stand wuerden **16 von 34 Zusatzzielen Konstanten lernen** und
+Gradientenanteil verbrauchen. Vor einem Hochdrehen des Gewichts gehoert
+entschieden, ob der Kopf auf die tragenden Atome beschnitten wird -- Kandidaten
+sind die 9 Layout-Ausgaenge (nach der bedingten Nachpruefung) und Ecke (0,0).
