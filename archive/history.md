@@ -10488,3 +10488,88 @@ dokumentierten Struktur-Rueckstand der KI.
 
 Material fuer eine etwaige v21-Fortschreibung liegt bereits vor (6 gewertete
 Partien gegen `v21_2d_brierbest`), ist aber KEIN eingeplanter Task.
+
+## UEBERGABE_v21_spirale.md ARCHIVIERT (Nutzer-Auftrag 2026-08-10: "dann raus")
+
+Die Datei war seit 2026-08-08 inhaltlich veraltet und am 2026-08-10 als
+Protokoll markiert worden. Der Nutzer hat die Loeschung angeordnet.
+
+**Vor dem Loeschen geprueft** (Regel: Ziel ansehen, Ergebnis berichten, dann
+ausfuehren): 245 Zeilen. Zwei Inhalte waren NIRGENDS sonst vorhanden und sind
+unten wortgetreu gesichert:
+
+1. **Der Generator des v21-Traegermanifests** samt Seed `20260815`. Die
+   Manifest-DATEI (`data/policy_carrier_manifest_v21.json`) existiert weiter --
+   ohne diesen Block waere aber ihre HERLEITUNG verloren, also welche Dateien
+   mit welcher Stichprobenlogik Traeger wurden. Meine frueher notierte
+   Behauptung, die noch gueltigen Teile seien "in STATUS.md gespiegelt", war
+   fuer diesen Abschnitt FALSCH.
+2. **Die R5-Plattensteigungs-Reihe** `0,086/0,273/0,349/0,457` samt Seed-Skala
+   `~0,05` -- der Verlauf ueber die Generationen stand nur hier.
+
+Alles Uebrige war Dubletten: die stehenden Regeln (Langform in STATUS.md), die
+Kommando-Muster fuer Self-Play/Training/Gating, der Platt-Referenzwert 1,9269
+(auch in `PREREG_task34_erosion_arms.md`, `PREREG_v20_kampagne.md`, STATUS) und
+abgearbeitete Queue-Abschnitte.
+
+### Gesichert: v21-Manifest + Fenster-Pin (wortgetreu)
+
+## 2. v21-MANIFEST + FENSTER-PIN (einmalig, VOR dem Training)
+
+```bash
+python - <<'PY'
+import glob, json, os, random, re
+rng = random.Random(20260815)  # v21-Traeger-Seed, hiermit festgelegt
+v19wdl = sorted(os.path.basename(f) for f in glob.glob("data/selfplay_v19wdl_*.pkl")); assert len(v19wdl)==400
+v18    = sorted(os.path.basename(f) for f in glob.glob("data/selfplay_v18_*.pkl"));    assert len(v18)==600
+tr_v19 = sorted(rng.sample(v19wdl, 135))          # 1.350 Traeger-Partien
+rest18 = v18[:]
+tr_v18 = sorted(rng.sample(rest18, 45))           # 450 Traeger-Partien
+uebrig = [f for f in rest18 if f not in tr_v18]
+maskiert_v18 = sorted(rng.sample(uebrig, 500))    # 5.000 maskierte Partien
+raus_v18 = sorted(set(uebrig) - set(maskiert_v18)); assert len(raus_v18)==55
+json.dump({"seed": 20260815, "policy_carrier_files": tr_v19 + tr_v18,
+           "carrier_prefixes": ["selfplay_v20wdl_"],
+           "hinweis": "v21: Traeger = 135 v19wdl + 45 v18 (gelistet) + ALLE selfplay_v20wdl_*-Sockeldateien (carrier_prefixes, Unterstrich-Grenze -> selfplay_v20wdlsw_* matcht NICHT); 55 v18-Dateien komplett raus (raus_v18)",
+           "raus_v18": raus_v18},
+          open("data/policy_carrier_manifest_v21.json","w",encoding="utf-8"), indent=1)
+alt = "|".join(re.escape(b) for b in raus_v18)
+open("evaluations/v21_exclude_regex.txt","w").write(f"selfplay_v16_|selfplay_v17_|selfplay_v19wdlann_|(?:{alt})")
+print("Manifest + Exclude-Regex geschrieben")
+PY
+```
+**Geltende Traeger-Regel (Fix 2026-08-08, `_is_policy_carrier` in
+neural_net.py)**: das v21-Manifest setzt das additive Feld
+`carrier_prefixes: ["selfplay_v20wdl_"]`. Ist dieses Feld VORHANDEN,
+gilt NUR NOCH `basename in policy_carrier_files ODER
+basename.startswith(carrier_prefixes)` -- der alte
+`bootstrap_native`-Kurzschluss (der frueher JEDE `v19wdl*`/`v20wdl*`-
+Datei automatisch zum Traeger gemacht haette, egal ob gelistet) greift
+dann NICHT mehr. Damit tragen genau: die 135 gelisteten `v19wdl`- +
+45 gelisteten `v18`-Dateien + ALLE `selfplay_v20wdl_*`-Sockeldateien
+(Praefix-Match, Unterstrich ist Teil des Praefixes -> `v20wdlsw_*`
+matcht nicht). Fehlt `carrier_prefixes` im Manifest (v20-Altbestand),
+bleibt die alte Logik inkl. Kurzschluss unveraendert (Rueckwaerts-
+Kompatibilitaet, bit-identische v20-Caches). Am ersten Cache-Log
+("Policy-Traeger"-Zaehlung bzw. pol_w-Statistik) verifizieren, dass
+GENAU 5.800 Partien Policy tragen (1.350 + 450 + 4.000).
+
+### Gesichert: Auswertungs-Paket mit den Referenzwerten (wortgetreu)
+
+## 4. AUSWERTUNGS-PAKET (nach dem Gating, Reihenfolge egal)
+
+```bash
+# Saettigungs-/Aera-Punkt (Snapshot-Messset, split-unabhaengig):
+python -u tools/t36_curve_eval.py --models v21_2d_brierbest v21_2d --snapshot-dir data/altmess_90files --validate-games-json evaluations/t36_curve_eval.json --out evaluations/t36_curve_eval_v21.json
+# Platt-Kalibrierung (Referenzen: v19 1,9269 / v20 0,930):
+python -u tools/platt_fit.py --models models/alphazero_v21_2d_brierbest.pth --out evaluations/platt_fit_v21.json
+# R5-Plattensteigung (Verlauf 0,086/0,273/0,349/0,457; Seed-Skala ~0,05):
+python -u tools/r5_value_calibration.py --models models/alphazero_v21_2d_brierbest.pth --model-path-for-api models/alphazero_v19_2d_best.onnx --out evaluations/r5_value_calibration_v21.json
+# Policy-Wacht (Orakel-Metriken; fuer frozen_v2 die Pfade anpassen, s. Abschnitt 0):
+python -u tools/offline_diagnose.py --frozen --model v21_2d_brierbest v20_2d_opp_brierbest
+```
+**#29-Buchfuehrung**: je Gating-Paar Brier(Alt-Set)+R5-Steigung
+notieren; Verdikt erst ab >=6 arena-ENTSCHIEDENEN Paaren (Stand: ~3).
+Struktur-Watchlist: bei ~10+ frischen Nutzer-Partien vs neuen Champion
+Log-Analyse wie evaluations/watchlist_v20_zwischenlese.md (Agent,
+--no-oracle-Stil; Chip-Zaehlung ist nach dem Logging-Fix jetzt direkt).
