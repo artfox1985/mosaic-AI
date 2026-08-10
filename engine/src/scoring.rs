@@ -679,6 +679,7 @@ pub fn player_line_features(player: &PlayerBoard) -> LineFeatures {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::board::DomeGrid;
     use crate::dome::{build_dome_tile_pool, DomeTile};
     use crate::tile::TileColor::*;
     use rand::rngs::StdRng;
@@ -791,6 +792,262 @@ mod tests {
             special_empty_counts.iter().min(),
             special_empty_counts.iter().max()
         );
+    }
+
+    // ── 34-Konjunktions-Label-Spezifikation gegen die Engine ─────────────────
+    //
+    // `engine/py/neural_net.py::_conjunctions_from_dome` (Docstring dort,
+    // Stand 2026-08-10) definiert 34 Binaerlabels je Spielerbrett; dieser
+    // Test reimplementiert dieselbe Definition HIER IN RUST -- unabhaengig
+    // von der Python-Seite, direkt gegen die echten `score_*`-Funktionen
+    // dieser Datei -- und prueft auf KONSTRUIERTEN Brettern (nicht auf
+    // Selfplay-Endstaenden): `evaluations/PREREG_plattenkopf.md` misst 16 der
+    // 34 Labels auf dem Champion-Korpus als praktisch konstant 0 (Diagonalen,
+    // Spalte 1, Reihen 5/6, untere Eckplatten) -- eine Pruefung auf echten
+    // Partien liefe also gerade dort leer, wo ein Fehler am ehesten
+    // unentdeckt bliebe. Konstruierte Bretter garantieren, dass jedes der 34
+    // Labels sowohl feuert als auch nicht feuert (Coverage-Assertion am Ende).
+    //
+    // WICHTIG -- SCOPE, ausdruecklich vermerkt (keine stille Luecke): dieser
+    // Test verifiziert die SPEZIFIKATION gegen die Rust-Wertung. Er verifiziert
+    // NICHT `_conjunctions_from_dome` selbst -- die Labels laufen in Python auf
+    // der Dome-JSON-Struktur, die Wertung hier auf `PlayerBoard`, zwei
+    // getrennte Implementierungen ueber eine Sprachgrenze. Die dafuer
+    // zustaendige, ERSCHOEPFENDE Pruefung (echte Python-Funktion gegen den
+    // echten kompilierten Rust-Kern, ueber `mosaic_rust.end_scoring_from_state_json`
+    // -- denselben PyO3-Pfad, den `serialize.rs::end_scoring_from_state`
+    // "Space-fuer-Space EXAKT" fuer `dome_grid` dokumentiert) liegt in
+    // `tools/conjunction_head_selfcheck.py` (Suite "ENGINE").
+    // Nicht `#[ignore]`: braucht keinen Korpus, keine Zufalls-Partie, nur
+    // konstruierte Boards -- laeuft in der normalen `cargo test`-Suite.
+
+    /// Baut ein `DomeGrid` aus einem 6x6-Plan: `plan[r][c] = Some((typ, farbe,
+    /// special_markiert))`, `None` = unberuehrt (leeres NORMAL-Feld). Nur
+    /// beruehrte Slots bekommen eine Platte -- unberuehrte Slots bleiben
+    /// `None`, was fuer die Wertung aequivalent zu "Slot vorhanden, aber leer"
+    /// ist (`build_grid`/`collect_spaces` pruefen nur `is_filled()`/Typ, nie
+    /// Slot-Anwesenheit direkt).
+    fn grid_from_plan(plan: &[[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6]) -> DomeGrid {
+        let mut grid = DomeGrid::default();
+        for sr in 0..3 {
+            for sc in 0..3 {
+                let mut spaces = Vec::with_capacity(4);
+                let mut touched = false;
+                for si in 0..4 {
+                    let (r, c) = (sr * 2 + si / 2, sc * 2 + si % 2);
+                    let (space_type, color, special) = plan[r][c].unwrap_or((SpaceType::Normal, None, false));
+                    if plan[r][c].is_some() {
+                        touched = true;
+                    }
+                    spaces.push(DomeSpace {
+                        space_type,
+                        required_color: None,
+                        placed_color: color,
+                        placed_special: special,
+                        is_locked: false,
+                    });
+                }
+                if touched {
+                    grid.place_dome_tile(DomeTile::new(sr * 3 + sc, spaces, 0), sr, sc).unwrap();
+                }
+            }
+        }
+        grid
+    }
+
+    fn player_with_grid(grid: DomeGrid) -> PlayerBoard {
+        let mut p = PlayerBoard::new(0, "T");
+        p.dome_grid = grid;
+        p
+    }
+
+    /// Die 34 Atome, unabhaengig aus `PlayerBoard::dome_grid` reimplementiert
+    /// (siehe Scope-Hinweis oben) -- Index/Reihenfolge exakt wie der Docstring
+    /// von `_conjunctions_from_dome`.
+    fn conjunction_atoms_spec(player: &PlayerBoard) -> [i32; 34] {
+        let mut filled = [[false; 6]; 6];
+        let mut colors: [[Option<crate::tile::TileColor>; 6]; 6] = [[None; 6]; 6];
+        for sr in 0..3 {
+            for sc in 0..3 {
+                if let Some(slot) = &player.dome_grid.dome_slots[sr][sc] {
+                    for (si, sp) in slot.spaces.iter().enumerate() {
+                        let (r, c) = (sr * 2 + si / 2, sc * 2 + si % 2);
+                        if sp.is_filled() {
+                            filled[r][c] = true;
+                            if !sp.placed_special {
+                                colors[r][c] = sp.placed_color;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut out = [0i32; 34];
+        for r in 0..6 {
+            out[r] = (0..6).all(|c| filled[r][c]) as i32;
+        }
+        for c in 0..6 {
+            out[6 + c] = (0..6).all(|r| filled[r][c]) as i32;
+        }
+        out[12] = (0..6).all(|i| filled[i][i]) as i32;
+        out[13] = (0..6).all(|i| filled[i][5 - i]) as i32;
+        for (k, &(sr, sc)) in [(0usize, 0usize), (0, 2), (2, 0), (2, 2)].iter().enumerate() {
+            let (r0, c0) = (sr * 2, sc * 2);
+            out[14 + k] = (0..2).all(|dr| (0..2).all(|dc| filled[r0 + dr][c0 + dc])) as i32;
+        }
+        let wild = collect_spaces(player, SpaceType::Wild);
+        out[18] = (!wild.is_empty() && wild.iter().all(|sp| sp.is_filled())) as i32;
+        for r in 0..6 {
+            let mut seen: Vec<crate::tile::TileColor> = Vec::new();
+            for c in 0..6 {
+                if let Some(col) = colors[r][c] {
+                    if !seen.contains(&col) {
+                        seen.push(col);
+                    }
+                }
+            }
+            out[19 + r] = (seen.len() >= 5) as i32;
+        }
+        for sr in 0..3 {
+            for sc in 0..3 {
+                let has_wild = player.dome_grid.dome_slots[sr][sc].as_ref().is_some_and(|t| {
+                    t.spaces.iter().any(|sp| sp.space_type == SpaceType::Wild)
+                });
+                out[25 + sr * 3 + sc] = has_wild as i32;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn plattenkopf_conjunction_atoms_match_spec() {
+        const N: usize = 34;
+        let corner_weights = [3, 3, 8, 8];
+        let colors5 = [Blau, Gelb, Rot, Schwarz, Tuerkis];
+        let mut coverage_true = [false; N];
+        let mut coverage_false = [false; N];
+
+        let mut check = |name: &str, grid: DomeGrid| {
+            let player = player_with_grid(grid);
+            let atoms = conjunction_atoms_spec(&player);
+            for (i, &a) in atoms.iter().enumerate() {
+                if a == 1 {
+                    coverage_true[i] = true;
+                } else {
+                    coverage_false[i] = true;
+                }
+            }
+            let rows: i32 = atoms[0..6].iter().sum();
+            assert_eq!(3 * rows, score_horizontal_rows(&player), "{name}: Reihen");
+            let cols: i32 = atoms[6..12].iter().sum();
+            assert_eq!(7 * cols, score_vertical_rows(&player), "{name}: Spalten");
+            let diags: i32 = atoms[12..14].iter().sum();
+            assert_eq!(10 * diags, score_diagonal_rows(&player), "{name}: Diagonalen");
+            let corner_sum: i32 = (0..4).map(|k| atoms[14 + k] * corner_weights[k]).sum();
+            assert_eq!(corner_sum, score_corner_tiles(&player), "{name}: Eckplatten");
+            let colorful: i32 = atoms[19..25].iter().sum();
+            assert_eq!(4 * colorful, score_colorful_rows(&player), "{name}: Farbenreiche Reihen");
+            let layout_sum: i32 = atoms[25..34].iter().sum();
+            if atoms[18] == 1 {
+                assert_eq!(score_wild_fields(&player), 2 * layout_sum, "{name}: Jokerfelder (Bedingung wahr)");
+            } else {
+                assert_eq!(score_wild_fields(&player), 0, "{name}: Jokerfelder (Bedingung falsch)");
+            }
+        };
+
+        // EMPTY: alles 0.
+        check("EMPTY", grid_from_plan(&[[None; 6]; 6]));
+
+        // FULL: gesamtes Raster gefuellt, 3 Felder WILD (Slots (0,0),(1,1),(2,2)
+        // -- Layout-Label 25, 29, 33), Farbmuster (r+c)%5 liefert genau 5
+        // verschiedene Farben je Reihe.
+        let mut plan_full: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for r in 0..6 {
+            for c in 0..6 {
+                plan_full[r][c] = Some((SpaceType::Normal, Some(colors5[(r + c) % 5]), false));
+            }
+        }
+        for &(r, c) in &[(0usize, 0usize), (2, 2), (4, 4)] {
+            let (_, color, _) = plan_full[r][c].unwrap();
+            plan_full[r][c] = Some((SpaceType::Wild, color, false));
+        }
+        check("FULL", grid_from_plan(&plan_full));
+
+        // LAYOUT_OTHER: Jokerfelder in den 6 Slots, die FULL nicht abdeckt.
+        let mut plan_layout: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for &(r, c) in &[(0usize, 2usize), (0, 4), (2, 0), (2, 4), (4, 0), (4, 2)] {
+            plan_layout[r][c] = Some((SpaceType::Wild, Some(Blau), false));
+        }
+        check("LAYOUT_OTHER", grid_from_plan(&plan_layout));
+
+        // ROW3: eine volle Reihe, nur 2 Farben (nicht farbenreich).
+        let mut plan_row3: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for c in 0..6 {
+            plan_row3[3][c] = Some((SpaceType::Normal, Some(if c % 2 == 0 { Blau } else { Gelb }), false));
+        }
+        check("ROW3", grid_from_plan(&plan_row3));
+
+        // COL5: eine volle Spalte.
+        let mut plan_col5: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for r in 0..6 {
+            plan_col5[r][5] = Some((SpaceType::Normal, Some(if r % 2 == 0 { Blau } else { Gelb }), false));
+        }
+        check("COL5", grid_from_plan(&plan_col5));
+
+        // Vier isolierte Eckplatten -- einzeln, damit eine Gewichts-Vertauschung
+        // nicht durch die Summenkonstanz {3,3,8,8} der FULL-Pruefung verdeckt wird.
+        for &(sr, sc) in &[(0usize, 0usize), (0, 2), (2, 0), (2, 2)] {
+            let mut plan: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+                [[None; 6]; 6];
+            let (r0, c0) = (sr * 2, sc * 2);
+            for dr in 0..2 {
+                for dc in 0..2 {
+                    plan[r0 + dr][c0 + dc] = Some((SpaceType::Normal, Some(Blau), false));
+                }
+            }
+            check(&format!("CORNER_{sr}{sc}"), grid_from_plan(&plan));
+        }
+
+        // Diagonalen einzeln (6x6 ist geradzahlig, keine Ueberschneidung).
+        let mut plan_diag_main: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for i in 0..6 {
+            plan_diag_main[i][i] = Some((SpaceType::Normal, Some(colors5[i % 5]), false));
+        }
+        check("DIAG_MAIN", grid_from_plan(&plan_diag_main));
+
+        let mut plan_diag_anti: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for i in 0..6 {
+            plan_diag_anti[i][5 - i] = Some((SpaceType::Normal, Some(colors5[i % 5]), false));
+        }
+        check("DIAG_ANTI", grid_from_plan(&plan_diag_anti));
+
+        // Farbenreich OHNE volle Reihe (5 von 6 Zellen).
+        let mut plan_colorful_partial: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for c in 0..5 {
+            plan_colorful_partial[2][c] = Some((SpaceType::Normal, Some(colors5[c]), false));
+        }
+        check("COLORFUL_PARTIAL", grid_from_plan(&plan_colorful_partial));
+
+        // Jokerfelder vorhanden, aber NICHT alle belegt (Bedingung falsch) --
+        // und Layout bleibt unabhaengig vom Fuellstand wahr.
+        let mut plan_wild_partial: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        plan_wild_partial[0][0] = Some((SpaceType::Wild, Some(Blau), false));
+        plan_wild_partial[2][3] = Some((SpaceType::Wild, None, false)); // bleibt leer
+        check("WILD_PARTIAL", grid_from_plan(&plan_wild_partial));
+
+        let missing: Vec<usize> = (0..N)
+            .filter(|&i| !(coverage_true[i] && coverage_false[i]))
+            .collect();
+        assert!(missing.is_empty(), "Labels ohne beide Zustaende (feuert/feuert nicht): {missing:?}");
     }
 
     // ── Referenzlaeufe: Boden (Zufall) und Mittelwert (Heuristik) ────────────
