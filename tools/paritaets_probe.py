@@ -23,8 +23,23 @@ Beleg fuer die Byte-Identitaet ein Wegwerf-Skript in einem Temp-Verzeichnis.
 PRUEFFLAECHE (bewusst eng): gehasht wird nur die Antwort von
 `net_search_state_json`. `engine_config_json()` liegt AUSSERHALB -- ein
 zusaetzliches Feld dort bricht die Sonde also nicht (so entschieden beim
-A2-Vertragsstempel). Umgekehrt heisst das: die Sonde belegt Suchparitaet,
-nicht Vertragsparitaet.
+A2-Vertragsstempel, verifiziert 2026-08-10: die Suchantwort enthaelt
+`contract_hash`/`input_size`/`num_planes_channels` nicht). Umgekehrt heisst
+das: die Sonde belegt Suchparitaet, nicht Vertragsparitaet.
+
+DIAGNOSE-FELDER WERDEN AUSGEBLENDET (`EXCLUDED_FIELDS`). Grund, und es ist
+eine Lehre aus zwei Fehlalarmen derselben Art: der Soll-Hash wurde auf einer
+Ausgabe OHNE die Stufe-2-Diagnosefelder gebildet. Wer die rohe Ausgabe
+hasht, bekommt garantiert eine Abweichung, sobald irgendwann ein additives
+Diagnosefeld hinzukam -- und muss dann jedes Mal von Hand nachweisen, dass
+das Verhalten trotzdem gleich ist (beim zweiten Mal am 2026-08-10: 156
+Vorkommen entfernt, `8c6684ff...` exakt reproduziert).
+
+Die Liste ist bewusst eine ERLAUBNISLISTE mit festen Namen, kein Muster: ein
+NEUES Feld bricht die Sonde weiterhin, und das ist gewollt -- dann soll ein
+Mensch entscheiden, ob es Diagnose oder Verhalten ist. Wird ein Feld hier
+aufgenommen, ist die Sonde fuer dessen Inhalt blind; das ist nur fuer reine
+Diagnose zulaessig, die keine Zugwahl beeinflusst.
 """
 from __future__ import annotations
 
@@ -32,6 +47,7 @@ import argparse
 import hashlib
 import json
 import pickle
+import re
 import sys
 from pathlib import Path
 
@@ -48,6 +64,20 @@ MODEL = REPO / "models" / "alphazero_v20_2d_opp_brierbest.onnx"
 FROZEN = REPO / "evaluations" / "frozen_eval_set.pkl"
 SIMS = (150, 400)
 ROUNDS = (1, 2, 3)  # Netzpfad aktiv; Runde 5 waere der round5.rs-Kurzschluss
+
+# Additive DIAGNOSE-Felder, die nicht in den Hash eingehen (siehe Modul-Doku).
+# `net_raw_value`/`net_points_forecast`/`net_opp_points_forecast` kamen mit dem
+# Stufe-2-Instrument (`PREREG_punktekopf_platten.md`) hinzu und beeinflussen die
+# Zugwahl nicht -- sie werden je Wurzelkandidat nur mitgeschrieben.
+EXCLUDED_FIELDS = ("net_raw_value", "net_points_forecast", "net_opp_points_forecast")
+_EXCLUDE_RE = re.compile(
+    r',"(?:' + "|".join(EXCLUDED_FIELDS) + r')":(?:-?[0-9.eE+]+|null)'
+)
+
+
+def strip_diagnostics(payload: str) -> tuple[str, int]:
+    """Entfernt die Diagnose-Felder; gibt (bereinigt, Anzahl) zurueck."""
+    return _EXCLUDE_RE.subn("", payload)
 
 
 def pick_states() -> list[dict]:
@@ -89,14 +119,17 @@ def main() -> int:
     import mosaic_rust
 
     digest = hashlib.sha256()
+    stripped = 0
     for i, state in enumerate(pick_states()):
         for sims in SIMS:
             out = mosaic_rust.net_search_state_json(
                 json.dumps(state), str(MODEL), sims, 1.5, 4242 + i
             )
-            digest.update(out.encode("utf-8"))
+            reduced, removed = strip_diagnostics(out)
+            stripped += removed
+            digest.update(reduced.encode("utf-8"))
     got = digest.hexdigest()
-    print(f"PARITAETS-HASH: {got}")
+    print(f"PARITAETS-HASH: {got}  (ausgeblendete Diagnose-Vorkommen: {stripped})")
 
     if args.print_only:
         return 0

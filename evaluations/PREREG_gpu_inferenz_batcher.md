@@ -155,3 +155,28 @@ Teil 1: ~15 min bei freier GPU. Teil 2: Dokumentation, kein Rechenbedarf.
 (`PREREG_task_d_gewichte.md`) -- eine Messung zwischen zwei Sweep-Armen
 waere zwar zeitlich moeglich, verschiebt aber den Sweep und liefert bei
 konkurrierender Last ohnehin keine gueltige Zahl.
+
+## KOPPLUNG AN DEN BOOTSTRAP-HORIZONT (Nutzer 2026-08-10)
+
+*"vielleicht in kombination mit dem bootstraping relevant"* -- richtig, und
+es aendert die REIHENFOLGE.
+
+`PREREG_bootstrap_horizont.md` haengt an einem Kostentor: Horizont 3 statt 2
+braucht einen zweiten Rollout je Rundenuebergang und darf die Self-Play-Zeit
+um maximal +25% erhoehen. Dieser Rollout ist fast reine INFERENZ -- also
+genau die Groesse, die ein zentraler Batcher billiger macht (Inferenzanteil
+62-81% der Self-Play-Zeit, Amdahl-Deckel 1,7x bis 5,3x).
+
+**Folge**: das Kostentor des Bootstrap-Horizonts ist keine feste Groesse,
+sondern haengt vom Batcher-Ergebnis ab. Ein Horizont, der heute durchfaellt,
+kann mit Batcher bestehen.
+
+**Reihenfolge damit festgelegt**: diese Machbarkeitsprobe LAEUFT VOR dem
+Bootstrap-Kostentor. Andernfalls wuerde der Horizont gegen eine
+Kostenschaetzung gemessen, die der Batcher gerade veraltet -- und ein
+"durchgefallen" waere nicht haltbar.
+
+Umgekehrt liefert die Kopplung dem Batcher ein zweites
+Rechtfertigungsargument: er zahlt sich nicht nur in Self-Play-Durchsatz aus,
+sondern kann eine Ziel-Verbesserung erst bezahlbar machen, die sonst am
+Kostentor scheitert.
