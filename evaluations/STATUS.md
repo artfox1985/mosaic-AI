@@ -16,7 +16,6 @@ NACH-v21-QUEUE Punkt 1/E3b).
 
 | Task | Status |
 |---|---|
-| **Struktur-Watchlist** | wartet auf ~10-15 bewertete Nutzer-Partien vs v20 (Stand: 6); Abgleich gegen das Strategie-Dossier (history) |
 | **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen. `PREREG_nach34_paket.md` |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
@@ -41,82 +40,48 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 |---|---|
 | **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
-### LAUFENDE QUEUE (Stand 2026-08-09 mittags, Server-Game beendet)
+### LAUFENDE QUEUE (Stand 2026-08-10)
 
-| Bahn | laeuft jetzt | danach |
+| Bahn | laeuft jetzt | naechstes |
 |---|---|---|
-| **GPU** | Task D Arm `t_d_vw08`, Epoche 5-6 (Cache-Treffer verifiziert, 4.323.218 Zuege = identisch zu vw04) | `t_d_pw025` (points_weight 0,25); dann je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion. `PREREG_task_d_gewichte.md` |
-| **CPU** | frei -- **ISMCTS endgueltig geschlossen** (auch bei gleicher Tiefe negativ, s.u.) | die Gewichts-Sweep-Gatings, sequenziell auf derselben Bahn |
-| **offline** | frei | Punkte-Kopf **Stufe 2** -- WARTET auf die Wheel-Installation (s.u.) |
+| **GPU** | frei | GPU-Inferenz-Batcher-Sonde (#82, `PREREG_gpu_inferenz_batcher.md`); danach Plattenkopf-Cache-Neubau |
+| **CPU** | frei | Punkte-Blend `w>0` (`PREREG_punkte_blend_w.md`, 2x400, Basis-Seed 20260902) |
+| **offline** | frei | Grundraten-Messung Kriterium 6 auf Champion-Partien (vor dem Plattenkopf-Bau) |
 
-**BLOCKIERT: Wheel-Installation.** Das Stufe-2-Instrument ist gebaut
-(je Wurzelkandidat `moves[].net_raw_value` / `net_points_forecast` /
-`net_opp_points_forecast`; 311 Tests gruen, Paritaetstest
-`gumbel_trace_collection_does_not_change_search` ok), aber **nicht
-installiert** -- Windows sperrt die DLL, und sowohl das Training (ueber
-den Encoder) als auch die Arena halten sie. Abfolge, sobald BEIDE
-Bahnen leer sind:
+**Task D (Gewichts-Sweep) ABGESCHLOSSEN 2026-08-10: alle drei Arme H0.**
+`vw04` 208:192 (52,0%), `vw08` 92:108 (46,0%), `pw025` 68:82 (45,3%,
+SPRT-H0 nach 75 Paaren). Damit greift **Regel 5** der Vorregistrierung:
+`VALUE_WEIGHT = 0,2` und der Punkte-Default bleiben, der Punkt gilt fuer
+die WDL-/2D-Aera als geschlossen. Bild monoton und konsistent -- 0,4 nicht
+besser, 0,8 schlechter. Champion bleibt `v21_2d_brierbest`.
+
+**ISMCTS-k ABGESCHLOSSEN 2026-08-10**: k=1/2/4 rechenneutral 81,75% /
+77,00% / 73,00%; k=4 in BEIDEN Pflichtinstrumenten signifikant negativ
+(Block-t -3,73, exakter McNemar p=0,0026, Bonferroni inklusive). Der
+Nutzer-Einwand gegen k=2 ist damit beantwortet, ohne dass die Schliessung
+auf dem schwachen Arm ruht.
+
+**WHEEL: gebaut+getestet, NICHT installiert.** Alle Engine-Aenderungen vom
+2026-08-10 sind mit ausgeschalteten Knoepfen verhaltensneutral, 327 Tests
+gruen -- aber die Python-Seite laeuft noch auf der Engine vom 2026-08-09.
+Beide Bahnen und der Server sind frei, die Bedingung ist also erfuellt:
 1. `python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`
 2. Paritaets-Probe MUSS `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` liefern.
-3. Dann Stufe-2-Messung (Kendall-Tau der Zug-Reihenfolge ueber
-   Plattenkombinationen, plus Pflicht-Beigabe `raw_value`).
+3. Danach Golden-Waechter A2-A4 (bereits im Code, `DESIGN_konventionen_als_pruefungen.md`).
 
-**EINGETAKTET: Golden-Waechter A2-A4** (`DESIGN_konventionen_als_pruefungen.md`,
-Nutzer-Go 2026-08-09). Reihenfolge: **A2 Vertragsstempel** (Hash ueber
-`INPUT_SIZE`/`NUM_PLANES_CHANNELS`/`NUM_ACTIONS`/Kopf-Reihenfolge, ueber
-`engine_config_json()` exponiert -- damit ist erstmals das INSTALLIERTE
-Binary befragbar, welchen Vertrag es implementiert), dann **A3
-Feature-Golden-Hash** (quantisiert, nicht bitgenau), dann **A4
-Heuristik-Anker-Verhaltenstest** (netzfrei, macht "NICHT ANFASSEN" aus
-einer STATUS-Zeile zu einer Pruefung). Alles verhaltensneutral.
-**Ablauf-Bedingung**: Bauen und `cargo test` gehen jederzeit, die
-Wheel-INSTALLATION braucht eine freie DLL -- also erst wenn keine Arena
-und kein Training laeuft. Danach Paritaets-Probe; sie hasht nur die
-`net_search_state_json`-Antwort, `engine_config_json` liegt ausserhalb
-ihrer Pruefflaeche, ein Feld dort bricht sie also NICHT.
+**NEU OFFEN aus dem 2026-08-10-Block (`PREREG_zufallsknoten.md`):**
 
-**Danach eingetaktet**: Plattenkopf (`PREREG_plattenkopf.md`) -- erst
-NACH Abschluss von Task D, weil der Schema-Bump den gemeinsamen Cache
-invalidiert und `pw025` sonst auf einem anderen Korpus trainierte.
+| Punkt | Stand |
+|---|---|
+| R5-Zufallsknoten (Weg A) | **gebaut**, `MOSAIC_R5_CHANCE_NODES` Default AUS. Scharfschalten braucht eine Anker-KANTE als Aequivalenzpruefung -- Nutzer-Entscheid offen, da das Leck nachweislich keine Zugwahl aendert (0/247) |
+| Teil E, Rest | "weicht ab" in "kostet Punkte" umrechnen; das Orakel teilt die Bewertungsfunktion des Loesers, 81,4 % gegen 51,7 % ist deshalb kein neutraler Vergleich |
+| Zufallsknoten INNERHALB der Runde | der eigentliche Architektur-Punkt: Kuppelstapel als aufgezaehlter Knoten am Aufdecken, Kostentor in Runde 1, Teil A1 fällt mit ab. Danach kann der Shuffle raus (Determinismus-Gewinn) |
+| Stapelzug fuers NETZ | braucht Self-Play mit `MOSAIC_STACK_DRAW_RESEARCH=1`, dann Training, dann Gating -- eine ganze Generierung, laut Nutzer-Entscheid hinter der v21-Queue |
 
-**Wheel-Stand**: neu gebaut und installiert 2026-08-09 13:1x, 311 Tests
-gruen, **Paritaets-Hash exakt getroffen**
-(`8c6684ffba06...`) -- Defaults byte-identisch, die Task-D-Arme bleiben
-ueber den Wheel-Wechsel hinweg vergleichbar. E3b-Zaehler und
-`MOSAIC_NUM_DETERMINIZATIONS` sind jetzt verfuegbar.
-
-**`t_d_vw04` fertig**: brierbest = Epoche 4, `val_brier` 0,1863;
-Early Stopping nach Epoche 15 (Policy- UND Value-Plateau ab Epoche 10).
-Arena-Gating steht aus (Brier ist per Prereg nur deskriptiv).
-
-**WHEEL-BLOCKADE (erkannt 2026-08-09): beide restlichen CPU-Tasks
-haengen daran.** Das installierte Wheel ist vom **2026-08-07 04:49**,
-`engine/src/net_mcts.rs` aber vom **2026-08-08 20:38** -- die E3b-Knoepfe
-(`MOSAIC_DENIAL_UNCERT_Z`, `_MIN_VISIT_FRAC`), `MOSAIC_NUM_DETERMINIZATIONS`
-und der Chip-Logging-Fix sind NICHT installiert (verifiziert: kein
-`denial_tiebreak_stats` im importierten Modul -- und E3b Stufe 1 misst
-genau diesen Zaehler). Das gebaute Wheel (2026-08-08 00:44) war
-ebenfalls zu alt, wird daher neu gebaut. Reihenfolge:
-1. Wheel bauen (laeuft, braucht die DLL NICHT frei).
-2. `pip install --force-reinstall --no-deps` erst wenn WEDER Server NOCH
-   Training laeuft (Windows-Dateisperre; train.py haelt `mosaic_rust`
-   ueber den Encoder). Aktuell blockiert durch `t_d_vw04`.
-3. Paritaets-Probe MUSS
-   `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`
-   liefern -- sonst sind die Defaults nicht byte-identisch und der
-   laufende Task-D-Sweep waere ueber die Arme hinweg nicht vergleichbar.
-4. Danach parallel: `t_d_vw08` (GPU) + E3b Stufe 1 (CPU).
-
-Nicht betroffen: Task A hat `MOSAIC_FLOOR_SHAPING_W` benutzt, das im
-Alt-Wheel schon lebt -- empirisch bewiesen dadurch, dass die Arme
-deutlich verschiedene Ergebnisse liefern (322 vs 277); ein inerter
-Regler haette identische Zahlen ergeben.
-
-1. **ISMCTS-k** (Mehrfach-Determinisierung, k=1/2/4, rechen-neutral --
-   Sims-Split; greift die PIMC-Strategy-Fusion an):
-   `PREREG_ismcts_determinisierungen.md`
-Knoepfe (MOSAIC_DENIAL_UNCERT_Z / _MIN_VISIT_FRAC /
-MOSAIC_NUM_DETERMINIZATIONS) werden vorab gebaut, Default aus.
+**Instrument-Schulden**: Paritaets-Probe liegt noch im Scratchpad einer
+alten Sitzung statt in `tools/`; `elo_history.csv` fehlen CI-Spalten und
+`contract`; `UEBERGABE_v21_spirale.md` ist vom 2026-08-08; v20 fehlt die
+Elo-Kante zu `v19_best` (Champion-2 seiner Generation).
 
 ## GELTENDE REGELN (kompakt)
 
