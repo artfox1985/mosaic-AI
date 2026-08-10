@@ -2182,13 +2182,10 @@ def points_dist_bins_from_state(state: dict) -> int:
     return 0 if n <= 1 else n
 
 
-PLATE_HEAD_SLOTS = 9  # 3x3 Kuppelslots, hoechstens ein Spezialfeld je Platte
-
-
 def conjunction_head_present(state: dict) -> bool:
     """Traegt der Checkpoint die Konjunktions-Erweiterung des Ownership-Kopfs?
 
-    Anders als `plate_head_present`/`endgame_head_present` gibt es hier KEIN
+    Anders als `endgame_head_present` gibt es hier KEIN
     eigenes Modul, dessen Existenz man abfragen koennte -- die Konjunktionen
     haengen an derselben letzten Linear-Schicht wie der Randlayer. Erkannt wird
     daher an deren AUSGABEBREITE: `OWNERSHIP_TARGETS` = alt,
@@ -2198,11 +2195,6 @@ def conjunction_head_present(state: dict) -> bool:
     if w is None:
         return False
     return int(w.shape[0]) == OWNERSHIP_TARGETS + CONJUNCTION_TARGETS
-
-
-def plate_head_present(state: dict) -> bool:
-    """`plate_head` im Checkpoint? (Muster `endgame_head_present`.)"""
-    return "plate_head.0.weight" in state
 
 
 def endgame_head_present(state: dict) -> bool:
@@ -2251,7 +2243,7 @@ def encoder_from_state_dict(state: dict) -> str:
 class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64,
-                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False, endgame_head=False, plate_head=False,
+                 points_dist_bins=POINTS_DIST_BINS, opp_points_head=False, endgame_head=False,
                  conjunction_head=False,
                  value_head_variant="tanh"):
         super(MosaicNet, self).__init__()
@@ -2415,18 +2407,6 @@ class MosaicNet(nn.Module):
                 nn.Tanh(),
             )
 
-        # plate_head: 9 Logits, je Kuppelslot "Spezialfeld am Ende LEER"
-        # (Kriterium 6). Additiv, Default AUS, Muster endgame_head.
-        # NUR c6 -- c3 hat im Rauchtest keinen Skill (globales Bit).
-        # Logits ohne Sigmoid: BCEWithLogits, Platt-Korrektur danach.
-        # Begruendung und Messwerte: evaluations/PREREG_plattenkopf.md
-        self.has_plate_head = bool(plate_head)
-        if self.has_plate_head:
-            self.plate_head = nn.Sequential(
-                nn.Linear(hidden_size, value_hidden),
-                nn.ReLU(),
-                nn.Linear(value_hidden, PLATE_HEAD_SLOTS),
-            )
 
 
     def forward(self, x):
@@ -2484,9 +2464,6 @@ class MosaicNet(nn.Module):
         # per NAME bzw. ignoriert unbekannte Outputs -- Indizes 0..3 stabil).
         if self.has_endgame_head:
             out = out + (self.endgame_head(shared),)
-        # ZULETZT -- positionsbasierte Leser bleiben unberuehrt.
-        if self.has_plate_head:
-            out = out + (self.plate_head(shared),)
         return out
 
     @torch.no_grad()
@@ -2559,7 +2536,7 @@ class Mosaic2DNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64, points_dist_bins=POINTS_DIST_BINS,
                  planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2,
-                 opp_points_head=False, endgame_head=False, plate_head=False,
+                 opp_points_head=False, endgame_head=False,
                  conjunction_head=False,
                  value_head_variant="tanh"):
         super().__init__()
@@ -2694,18 +2671,6 @@ class Mosaic2DNet(nn.Module):
                 nn.Tanh(),
             )
 
-        # plate_head: 9 Logits, je Kuppelslot "Spezialfeld am Ende LEER"
-        # (Kriterium 6). Additiv, Default AUS, Muster endgame_head.
-        # NUR c6 -- c3 hat im Rauchtest keinen Skill (globales Bit).
-        # Logits ohne Sigmoid: BCEWithLogits, Platt-Korrektur danach.
-        # Begruendung und Messwerte: evaluations/PREREG_plattenkopf.md
-        self.has_plate_head = bool(plate_head)
-        if self.has_plate_head:
-            self.plate_head = nn.Sequential(
-                nn.Linear(hidden_size, value_hidden),
-                nn.ReLU(),
-                nn.Linear(value_hidden, PLATE_HEAD_SLOTS),
-            )
 
     def forward(self, x_planes, x_flat=None):
         if x_flat is None:
@@ -2754,10 +2719,6 @@ class Mosaic2DNet(nn.Module):
         # per NAME bzw. ignoriert unbekannte Outputs -- Indizes 0..3 stabil).
         if self.has_endgame_head:
             out = out + (self.endgame_head(shared),)
-        # plate_head ZULETZT: bestehende Leser indexieren positionsbasiert,
-        # ein Anhaengen am Ende laesst sie unberuehrt.
-        if self.has_plate_head:
-            out = out + (self.plate_head(shared),)
         return out
 
 
@@ -2784,7 +2745,6 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     # ladbar/exportierbar wie bisher.
     opp_head = opp_points_head_present(state)
     eg_head = endgame_head_present(state)
-    pl_head = plate_head_present(state)  # dito, siehe PREREG_plattenkopf.md
     # Konjunktions-Erweiterung des Ownership-Kopfs: an der AUSGABEBREITE der
     # letzten Linear-Schicht erkannt (kein eigenes Modul, siehe
     # `conjunction_head_present`). Alt-Checkpoints -> False -> Breite bleibt
@@ -2799,7 +2759,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
                             policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
-                            endgame_head=eg_head, plate_head=pl_head,
+                            endgame_head=eg_head,
                             conjunction_head=cj_head,
                             value_head_variant=value_head_variant)
     else:
@@ -2807,7 +2767,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
         model = MosaicNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
                           policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
-                          endgame_head=eg_head, plate_head=pl_head,
+                          endgame_head=eg_head,
                           conjunction_head=cj_head,
                           value_head_variant=value_head_variant)
     model.load_state_dict(state, strict=False)
