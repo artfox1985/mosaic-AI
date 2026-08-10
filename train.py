@@ -705,7 +705,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Ownership-W   : {effective_ownership_weight}"          f"{'  (Kopf aus)' if effective_ownership_weight <= 0.0 else ''}")
     if conjunction_head:
         print(f"   Konjunktionen : AN -- Ownership-Kopf traegt zusaetzlich "
-              f"{CONJUNCTION_TARGETS} konjunktive Ziele (Cache-Key '+conj_v1')"
+              f"{CONJUNCTION_TARGETS} Zusatzziele: 25 Konjunktionen + 9 Layout (Cache-Key '+conj_v2')"
               + ("  ⚠️  wirkungslos bei Ownership-W 0.0" if effective_ownership_weight <= 0.0 else ""))
     print(f"   Batch Size    : {BATCH_SIZE}")
     print(f"   Value Weight  : {effective_value_weight}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)"

@@ -1061,3 +1061,73 @@ Identitaets-Pruefung 44.068/0 und der neuen Existenz-Maske),
 `tools/plattenkopf_smoketest.py` und die Messungen. Die Labels sind fuer die
 Ownership-Route dieselben, und die Identitaets-Pruefung bleibt die Verbindung
 zwischen Atom-Definition und Engine-Wertung.
+
+## GEBAUT: 9 Layout-Ausgaenge schliessen den Multiplikator von Kriterium 3
+
+Nutzer-Auftrag 2026-08-10: *"mach das"*, nach dem Befund, dass Kriterium 3 der
+einzige **zustandsabhaengige Punktwert** unter allen acht ist.
+
+### Warum es die einzige Abdeckungsluecke war
+
+| Kriterium | Punktwert | Bestimmt durch |
+|-----------|-----------|----------------|
+| 0/1/2/7 | +3 / +7 / +10 / +4 | konstant |
+| 4 | +1 je Zelle | konstant |
+| 5 | 3/3/8/8 | POSITION (feste Ecke) |
+| 6 | -3 je Zelle | konstant |
+| **3** | **2 x wild_total** | **Brettzustand am ENDE** |
+
+`wild_total` waechst bis Runde 5, weil Platten weiter gelegt werden. Mit dem
+AKTUELLEN Wert zu multiplizieren verzerrt frueh nach unten, und die gemessene
+Spanne ist 1..8 Jokerfelder je Brett.
+
+### Umsetzung
+
+`CONJUNCTIONS_PER_PLAYER` 25 → **34**, `CONJUNCTION_TARGETS` 50 → **68**,
+Kopfbreite 122 → **140**. Indizes **25..33**: `P(Slot s traegt am Ende eine
+Jokerplatte)`, slot_row-major wie ueberall. **Das sind KEINE Konjunktionen,
+sondern LAYOUT** -- im Code und in der Doku so benannt, damit der Block nicht
+falsch gelesen wird.
+
+Damit ist `E[wild_total] = Summe der neun Wahrscheinlichkeiten` -- ein Zaehler
+als Summe von Indikatoren, dieselbe Zerlegung, mit der Kriterium 3 ueberhaupt
+in die Wahrscheinlichkeitsfassung kam.
+
+- Kein Checkpoint traegt den Konjunktions-Kopf (geprueft: 0 von allen `.pth`
+  mit abweichender Breite), die Breitenaenderung bricht also nichts. Erkennung
+  bleibt eine einzige Zahl.
+- Cache-Key `+conj_v1` → **`+conj_v2`**: ein 122-breiter Alt-Cache darf nicht
+  still wiederverwendet werden, sonst waere der Layout-Block vollstaendig
+  maskiert und lernte nichts -- ohne Fehlermeldung. Dieselbe Begruendung wie
+  beim ersten Suffix.
+- Kein `VALUE_SCHEMA_VERSION`-Bump (der Suffix reicht), kein eigener
+  Verlustterm. Gradientenanteil 68 von 140 (~49%).
+- Selbsttest `tools/conjunction_head_selfcheck.py` um fuenf Faelle erweitert:
+  Layout leer, genau ein Slot (Positionsabbildung 1*3+2=5), unbelegt zaehlt
+  trotzdem (Layout, nicht Fuellung), Summe = `wild_total`, und zwei Wild-Spaces
+  in EINEM Slot zaehlen als eins. Beide Suiten gruen.
+
+### BEZIFFERTER Vorbehalt: das Produkt ueberschaetzt um 8,8 %
+
+Die Auszahlung ist `2 x E[N x 1{C}]`, und `E[N] x P(C)` ist das nur bei
+Unabhaengigkeit. Mehr Jokerfelder heisst schwerer, alle zu schliessen -- die
+Korrelation ist negativ, das Produkt ueberschaetzt also. Gemessen auf 1.600
+Endbrettern:
+
+| Groesse | Wert |
+|---------|------|
+| `E[N_wild]` | 4,500 |
+| `P(alle belegt)` | 0,413 |
+| `E[N] x P(C)` (Naeherung) | 1,859 |
+| `E[N x 1{C}]` (exakt) | **1,709** |
+| Fehler | **+8,8 %**, Kovarianz -0,150 |
+| in Punkten (x2) | 3,72 gegen exakt 3,42 |
+
+Also 0,30 Punkte systematische Ueberschaetzung auf ein Kriterium von ~3,4
+Punkten. Klein, aber gerichtet -- und jetzt beziffert statt vermutet.
+
+**Die exakte Alternative liegt bereit**: die neun Verbund-Atome von gestern
+(`Slot s hat ein belegtes Jokerfeld UND alle sind belegt`) geben
+`2 x Summe P` exakt, Identitaet 44.068/0 verifiziert. Sie hatten im Rauchtest
+aber keinen Skill (-0,036), weil alle neun an einem globalen Bit haengen.
+Deshalb der Weg ueber Layout + Bedingung, mit dem bezifferten Fehler.

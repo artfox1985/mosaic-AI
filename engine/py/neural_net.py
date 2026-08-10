@@ -949,6 +949,7 @@ def _conjunctions_from_dome(dome_grid) -> list[int]:
                 (Slots (0,0),(0,2),(2,0),(2,2))
         18      ALLE Jokerfelder belegt        2 x wild_total score_wild_fields
         19..24  Reihe r hat >=5 Farben               +4       score_colorful_rows
+        25..33  Slot s traegt eine Jokerplatte    (Layout)      -> E[wild_total]
 
     Kriterium 7 (farbenreiche Reihen) kann NICHT aus `ownership` kommen: das
     Ziel dort ist belegt/leer ohne Farbe.
@@ -982,6 +983,17 @@ def _conjunctions_from_dome(dome_grid) -> list[int]:
 
     out += [int(len({colors[r][c] for c in range(6) if colors[r][c] is not None}) >= 5)
             for r in range(6)]
+
+    # 25..33 -- LAYOUT, keine Konjunktion: traegt Slot s am Ende eine Platte mit
+    # Jokerfeld? Liefert ueber `E[wild_total] = Summe dieser Wahrscheinlichkeiten`
+    # den Multiplikator von Kriterium 3 (`2 x wild_total`), das einzige Kriterium
+    # mit zustandsabhaengigem Punktwert. Reihenfolge slot_row-major wie ueberall.
+    for sr in range(3):
+        row = dome_grid[sr] if sr < len(dome_grid) else []
+        for sc in range(3):
+            slot = row[sc] if sc < len(row) else None
+            spaces = (slot or {}).get("spaces", []) if slot else []
+            out.append(int(any(sp.get("type") == "WILD" for sp in spaces)))
 
     return out
 
@@ -1260,7 +1272,7 @@ class MosaicDataset(Dataset):
         # dann vollstaendig maskiert und der Kopf lernte nichts -- ohne
         # Fehlermeldung).
         if conjunction_head:
-            cache_key_material += "+conj_v1"
+            cache_key_material += "+conj_v2"
         # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
         # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
         # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
