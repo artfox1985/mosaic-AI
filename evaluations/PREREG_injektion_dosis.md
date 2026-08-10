@@ -118,3 +118,90 @@ Fehler, den ich bei #93 und bei Zeile 48 schon gemacht habe.
   gesenktem Gewicht).
 - Nicht Arm B des Ownership-Kopfs (Marginalen im Blatt) -- der ist nicht gebaut
   und steht hinter Stufe 1 und 2.
+
+---
+
+# AMENDMENT 2026-08-11: Design korrigiert, drei Befunde aus der Code-Pruefung
+
+Nutzer: *"damit kannst eigentlich jetzt schon loslegen"*. Alle drei Punkte sind
+GEPRUEFT mit Fundstelle (Regel 0), nicht geschlossen.
+
+## Befund 1 -- die Knoepfe sind PROZESSWEIT. Abschnitt 1 war nicht durchfuehrbar.
+
+`tools/paired_arena_env_ab.py`, Modulkopf Zeilen 6-13, woertlich:
+
+> je Arm ein EIGENER Worker-Prozess mit gesetzter Env-Var (**die Knoepfe sind
+> prozessweit, OnceLock**), Champion-Netz vs Heuristik@150(dyn) via
+> `tools/paired_arena_arm_worker.py` ... **Die Heuristik liest keinen der
+> Knoepfe** -- die Arm-Differenz attribuiert sauber auf die Netz-Seite.
+
+Damit ist mein Entwurf "DERSELBE Champion, Knopf an gegen aus, beide Seiten im
+selben Spiel" **unmoeglich**: beide Bretter bekaemen die Injektion. Vorbedingung
+3 der Erstfassung ist damit beantwortet -- und negativ.
+
+## Befund 2 -- zwei etablierte Designs, mit gegensaetzlichen Schwaechen
+
+**(A) `paired_arena_env_ab.py`: Netz+Knopf gegen HEURISTIK.** Asymmetrisch, weil
+die Heuristik keinen Knopf liest -- die Zurechnung ist sauber. Schwaeche: der
+Champion gewinnt dort ~76-82 % (STATUS, Seed-Skala-Beispiel), also
+Deckenkompression.
+*Meine Herleitung, ungemessen*: McNemar rechnet nur auf den DISKORDANTEN
+Paaren, nicht auf dem Niveau -- bei 80 % bleibt genug Diskordanz, die Decke ist
+also ein Sensitivitaets-, kein Gueltigkeitsproblem.
+
+**(B) `paired_arena_plate_ab.py`: `net_vs_net_arena_match`, naher Gegner,
+sequenziell mit Rebuild zwischen den Armen.** Identische Seeds, Paarung ueber
+den Spielindex, McNemar auf diskordanten Paaren. Sensitiver Gegner (dort
+v15_best gegen v14b_best, ~68 Elo Abstand).
+**Schwaeche, und das ist ein FUND**: `PLATE_SHAPING_ENABLED` ist eine
+Compile-Zeit-Konstante, steckt also im Binary -- in Arm ON bekommen **BEIDE**
+Bretter das Shaping. Gemessen wurde "beide geformt gegen beide ungeformt".
+*Meine Herleitung aus dem Toggle-Typ, ungemessen*: hilft die Formung beiden
+gleich, hebt sich der Effekt auf. Das ist eine **dritte** moegliche Erklaerung
+fuer das p=0,71 von Task #93 -- diesmal das Symmetrie-Argument korrekt
+angewendet (nicht "Geschwisternetze teilen den blinden Fleck", sondern "beide
+Spieler des Arms haben denselben Eingriff bekommen").
+
+**Entscheidung: Weg A.** Nur er erzeugt die ASYMMETRIE, auf die es ankommt --
+die Frage ist "hilft die Injektion dem, der sie hat", nicht "was passiert, wenn
+beide sie haben". Weg B wuerde denselben Fehler wiederholen, an dem #93
+vermutlich gescheitert ist.
+
+**Korrigierte Arme** (Instrument `paired_arena_env_ab.py`, ein Prozess je Arm):
+
+    --env-name MOSAIC_UNLOCK_SHAPING_W --arms 0.0 0.3 1.0 --control 0.0
+    --net-sims 400 --n-games 200 --seed <fix> --out-prefix unlockw
+
+Gegner Heuristik@150(dyn) in ALLEN Armen, identischer Basis-Seed, Paarung ueber
+den Spielindex, exakter zweiseitiger McNemar auf den diskordanten Paaren.
+
+## Befund 3 -- die Freischaltrate liefert das Instrument NICHT
+
+`tools/paired_arena_arm_worker.py` Zeile 8: je Partie wird
+`{scores, winner, steps, total_floor, floor_per_round}` zurueckgegeben. **Keine
+Partie-Logs, keine Spezialfeld-Daten.** Die Pflicht-Nebenmessung aus Abschnitt 4
+ist damit aus dem Arena-Lauf allein NICHT zu gewinnen.
+
+`tools/analyze_game_log.py` kann sie lesen (`[Special freigeschaltet!]`
+Zeile 112, `SPECIAL_BONUS`-Regex Zeile 136), ist aber auf
+`static/log/game_*.log` gebaut -- die schreibt der Server, nicht die Arena.
+**KEIN zweites Werkzeug bauen.**
+
+Zwei Wege, Entscheidung offen (Nutzer-Vorlage):
+
+**(i)** Das Arena-Ergebnis-Array um Spezialfeld-Zahlen erweitern. Sauber am
+Ort der Messung, kostet aber eine Aenderung auf der RUST-Seite
+(`net_arena_match`) plus Python -- und damit einen Wheel-Neubau mit
+Paritaetspruefung.
+**(ii)** Verhalten aus den ENDBRETTERN eines kurzen Self-Play-Laufs MIT
+gesetztem Knopf zaehlen. Die Daten liegen dort bereits: `_ownership_from_dome`
+liest `dome_grid` aus den `.pkl`-Dateien, und `tools/plattenkopf_labels.py` /
+`tools/atom_skill_check.py` werten Endbretter schon aus. Kein Rust-Eingriff,
+vorhandene Werkzeuge. Nachteil: Self-Play statt Arena, also ein anderes Regime
+als die Siegquote.
+
+**Vorschlag: (ii)**, weil es ohne Wheel-Neubau auskommt und die
+Verhaltensfrage ("steuert der Term die Freischaltung ueberhaupt an?") kein
+Arena-Regime braucht. Die Siegquote kommt aus Weg A, das Verhalten aus (ii);
+die Drei-Faelle-Tabelle aus Abschnitt 4 bleibt anwendbar, weil sie die zwei
+Groessen nur nebeneinander liest und nicht aus demselben Lauf verlangt.
