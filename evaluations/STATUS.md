@@ -222,9 +222,22 @@ Watchlist konsistent gelesen: Nutzer 10,3 Punkte auf 3,1 Freischaltungen =
 **3,3 je Freischaltung**, KI 1,3 auf 0,6 = **2,2**. Eine Rechnung
 "Freischaltungen x 3" ist falsch.
 
-**Der einzige lebende flache Wert ist `-3.0 * sf.special_empty` in
-`wertung_progress`** -- deshalb verschluckt es genau diese Rangfolge. NICHT
-anfassen (Elo-Anker); der neue Unlock-Term gewichtet mit `(reihe + 1)`.
+**ZWEI GETRENNTE PUNKTQUELLEN -- nicht verwechseln (ich habe es getan,
+Nutzer-Ruege 2026-08-11):**
+
+1. **⭐ Kuppel-Bonus = GRUNDWERTUNG**, `check_special_trigger`, Wert
+   **1..6 je Rasterreihe**, zahlt IMMER unabhaengig von den aktiven Platten.
+2. **Wertungsplatte 7 (Code-Index 6) = ENDWERTUNG**, Handbuch woertlich:
+   *"⭐ Spezialfelder: -3 Pkt. je leer gebliebenem Spezialfeld"* -- **FLACH,
+   Reihe egal**, zahlt nur wenn die Platte liegt.
+
+`6 => -3.0 * sf.special_empty` in `wertung_progress` ist damit **KORREKT und
+kein Fehler** -- ich hatte es als eingeebneten Wert bezeichnet, das war falsch.
+`wertung_progress` bleibt unangetastet, weil es der Elo-Anker ist UND weil es
+richtig rechnet.
+
+Der neue Unlock-Term gewichtet entsprechend **zweigeteilt**: Bonus-Anteil
+ungegatet mit `(reihe + 1)`, Kriterium-6-Anteil gegatet und flach 3.
 Der Tiling-Solver rechnet korrekt (Test
 `solver_counts_special_bonus_and_neighbor`: "Special-Bonus = Reihennummer").
 
