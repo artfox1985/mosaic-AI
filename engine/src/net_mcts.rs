@@ -1017,6 +1017,113 @@ fn plate_shaping_marginal(state: &GameState, parent_state: Option<&GameState>) -
     }
 }
 
+// ── Wertungsplatten-EGO-Shaping (Nutzer-Auftrag 2026-08-10) ─────────────────
+// Eigenstaendiges, VOM Task-#93-Plattenshaping oben UNABHAENGIGES Additiv --
+// nicht zu verwechseln, drei Unterschiede:
+//   1. Formel: `wertung_progress_alpha` (parametrisierter Exponent, eigene
+//      Funktion in `scoring.rs`) statt `wertung_progress` (fest `alpha=2`,
+//      der Heuristik-Anker -- bleibt unangetastet, siehe dortige Doku).
+//   2. Perspektive: NUR das EIGENE Brett je Spieler (`state.players[i]`
+//      einzeln), KEINE mine-minus-theirs-Differenz wie `plate_shaping_delta`
+//      -- Spieler 0 und Spieler 1 bekommen unabhaengige Shifts aus ihren
+//      jeweils EIGENEN Wertungsplatten-Fortschritten, das Gegnerbrett fliesst
+//      nirgends ein (Nutzer-Vorgabe: Gegnerbrett-Kopplung ist eine separate,
+//      nicht beauftragte Frage).
+//   3. Absolut statt marginal: kein Eltern-Delta wie `plate_shaping_marginal`
+//      (dessen Baseline-Trick loest ein Gumbel-Geschwistervergleichsproblem,
+//      das hier nicht Gegenstand des Auftrags war).
+//   4. Runtime-Knopf-Muster: zwei einfache `MOSAIC_*`-Env-Vars (Gewicht +
+//      Exponent), analog `floor_shaping_weight`/`floor_shaping_opp_bias`
+//      (OnceLock<f64>, EINMAL gelesen), statt eines Compile-Konstante-Togges
+//      wie `PLATE_SHAPING_ENABLED`.
+// Beide Additive sind unabhaengig voneinander AN/AUS-schaltbar und komponieren
+// rein additiv, falls beide je aktiviert wuerden (hier: Anwendungsreihenfolge
+// NACH dem Plattenshaping oben, siehe Aufrufstellen in `make_node`/
+// `net_leaf_eval`).
+
+/// Skala fuer das Wertungsplatten-EGO-Shaping, gleiche Groessenordnung wie
+/// `FLOOR_SHAPING_SCALE`/`PLATE_SHAPING_SCALE` (beide 50.0) -- macht die
+/// Korrektur direkt vergleichbar mit dem own-minus-opp-Score-Margin, das
+/// `value`/`points_forecast` schon als Trainingsziel verwenden (`VALUE_SCALE`
+/// in `neural_net.py`, ebenfalls 50.0). Eigene Konstante statt Wiederverwendung
+/// von `PLATE_SHAPING_SCALE` -- unabhaengig nachkalibrierbar, ohne das andere
+/// (unabhaengige) Additiv zu beeinflussen.
+const WERTUNG_SHAPING_SCALE: f64 = 50.0;
+
+/// Default-Gewicht des Wertungsplatten-EGO-Shaping-Additivs -- `0.0` = AUS,
+/// exakt Bestandsverhalten (kein Netz-Blattwert je durch dieses Additiv
+/// veraendert, solange `MOSAIC_WERTUNG_SHAPING_W` ungesetzt bleibt).
+pub const WERTUNG_SHAPING_WEIGHT: f64 = 0.0;
+
+/// Default-Exponent `alpha` fuer `wertung_progress_alpha` -- `2.0` reproduziert
+/// exakt den Exponenten, den der Heuristik-Anker (`wertung_progress`,
+/// `.powi(2)`) fest verwendet; nur bei `alpha != 2.0` weicht die Formung von
+/// der Heuristik ab.
+pub const WERTUNG_SHAPING_ALPHA: f64 = 2.0;
+
+/// Laufzeit-Wert von `MOSAIC_WERTUNG_SHAPING_W` -- gleiches OnceLock-Muster
+/// wie `floor_shaping_weight` (einmalig gelesen, kein GUI-Live-Regler
+/// vorgesehen, anders als `points_utility_w`s `AtomicU64`-Zelle -- dafuer gibt
+/// es hier keinen Anwendungsfall). Ohne gesetzte Env-Var byte-identisches
+/// Bestandsverhalten (Default `WERTUNG_SHAPING_WEIGHT` = 0.0).
+pub fn wertung_shaping_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_SHAPING_W", WERTUNG_SHAPING_WEIGHT))
+}
+
+/// Laufzeit-Wert von `MOSAIC_WERTUNG_ALPHA` -- gleiches Muster wie
+/// `wertung_shaping_weight`. Ohne gesetzte Env-Var byte-identisches
+/// Bestandsverhalten (Default `WERTUNG_SHAPING_ALPHA` = 2.0).
+pub fn wertung_shaping_alpha() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ALPHA", WERTUNG_SHAPING_ALPHA))
+}
+
+/// Reine Formel hinter [`apply_wertung_shaping`], OHNE Env-Var-Zugriff --
+/// `w`/`alpha` als Parameter statt aus dem OnceLock-Cache gelesen, gleiches
+/// Trennungsmuster wie `blended_leaf_win_prob`/`_with` (siehe dortige Doku:
+/// ein Test, der den Env-Var-Cache nach dem ersten Zugriff umstellen will,
+/// kaeme nie an sein Ziel).
+///
+/// Fruehausstieg bei `w == 0.0`: gibt `value` UNVERAENDERT zurueck -- kein
+/// `wertung_progress_alpha`-Aufruf, kein `tanh`, keine Rundung, also
+/// GARANTIERT numerisch identisch zum Vor-Additiv-Bestand (exakt das Muster,
+/// das `blended_leaf_win_prob_with`s bestehender `w == 0.0`-Kurzschluss schon
+/// fuer sein eigenes Gewicht vorgibt).
+///
+/// Skalierung: `wertung_progress_alpha` liefert PUNKTE, `value` sind
+/// Gewinnwahrscheinlichkeiten -- Normierung ueber `tanh(punkte /
+/// WERTUNG_SHAPING_SCALE)` (siehe dortige Doku), gleiche Konvention wie
+/// `floor_shaping_delta`/`plate_shaping_delta`. JEDER Spieler bekommt seinen
+/// EIGENEN, unabhaengigen Shift aus seinem EIGENEN Brett (`state.players[i]`)
+/// -- keine mine-minus-theirs-Kopplung wie beim Plattenshaping oben, siehe
+/// Modul-Kommentar. Ergebnis wird wie die bestehende Floor-/Platten-Additiv-
+/// Logik auf `[0,1]` geklemmt.
+fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha: f64) -> [f64; 2] {
+    if w == 0.0 {
+        return value;
+    }
+    let mut out = value;
+    for i in 0..2 {
+        let pts = crate::scoring::wertung_progress_alpha(&state.players[i], &state.scoring_tile_ids, alpha);
+        let shift = w * (pts / WERTUNG_SHAPING_SCALE).tanh();
+        out[i] = (value[i] + shift).clamp(0.0, 1.0);
+    }
+    out
+}
+
+/// Laufzeit-Wrapper von [`apply_wertung_shaping_with`], liest `w`/`alpha` aus
+/// den Prozess-weiten OnceLock-Caches (`wertung_shaping_weight()`/
+/// `wertung_shaping_alpha()`) -- gleiches Trennungsmuster wie
+/// `blended_leaf_win_prob`/`_with`. Aufrufstellen: `net_leaf_eval` (deckt
+/// damit auch alle DESSEN Aufrufer ab -- `round_transition_deep.rs`,
+/// `self_play.rs`, den Chance-Node-Zweig in `make_node` selbst) und
+/// `make_node`s eigener `LeafEval::Net`-Zweig (der Haupt-Suchpfad, der NICHT
+/// ueber `net_leaf_eval` laeuft, siehe dortige Duplizierung der Blend-Logik).
+fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
+    apply_wertung_shaping_with(value, state, wertung_shaping_weight(), wertung_shaping_alpha())
+}
+
 // ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
 //
 // Der Perspektiven-Mirror-Fix (`MIRROR_OTHER_VAL`) wurde arena-getestet und
@@ -1434,9 +1541,17 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     }
     let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
     // Task #78 (v12c Shrinkage) -- NACH blended_leaf_win_prob; `net_leaf_eval`
-    // kennt keine Floor-Shaping-Korrektur (die lebt nur in `make_node`), also
-    // gibt es hier keine "vor/nach"-Reihenfolge zu wahren.
-    apply_value_shrink(raw, state.round_number)
+    // kennt weder die Floor- noch die Plattenshaping-Korrektur (die leben nur
+    // in `make_node`), also gibt es hier dazu keine "vor/nach"-Reihenfolge zu
+    // wahren. Das Wertungsplatten-EGO-Shaping (siehe dortiger Modul-Kommentar)
+    // ist bewusst HIER zusaetzlich verdrahtet (nicht nur in `make_node`) --
+    // es ist eine reine State-Funktion ohne Baum-/Elternknoten-Bezug, gilt
+    // also unveraendert fuer jeden `net_leaf_eval`-Aufrufer (Chance-Node-
+    // Sampling in `round_transition_deep.rs`/`self_play.rs` eingeschlossen),
+    // NACH der Shrinkage (analog zur Floor-/Platten-Reihenfolge in
+    // `make_node`: Shrinkage daempft nur den rohen Netzwert, die danach
+    // angewendeten State-Korrekturen bleiben ungedaempft).
+    apply_wertung_shaping(apply_value_shrink(raw, state.round_number), state)
 }
 
 /// Netz-Policy-Priors für `state`: EIN Forward-Pass, wiederverwendet
@@ -1726,6 +1841,14 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // `apply_plate_shaping`-Kommentar). Bei `PLATE_SHAPING_ENABLED=false`
             // (Standard) exakte Identität -- der Block wird gar nicht ausgeführt.
             today_value = apply_plate_shaping(today_value, &state, parent_state);
+
+            // Wertungsplatten-EGO-Shaping (Nutzer-Auftrag 2026-08-10, siehe
+            // Modul-Kommentar bei `apply_wertung_shaping`) -- NACH dem
+            // Task-#93-Plattenshaping (koexistieren additiv, unabhaengig
+            // schaltbar). Bei `MOSAIC_WERTUNG_SHAPING_W` ungesetzt (Default
+            // 0.0) exakte Identitaet -- der Fruehausstieg in
+            // `apply_wertung_shaping_with` ueberspringt jede Rechnung.
+            today_value = apply_wertung_shaping(today_value, &state);
 
             // Rundenübergang (Phase wechselt von Drafting weg) per Chance-Node-
             // Sampling statt Einzelwert bewerten -- siehe round_transition.rs
@@ -6258,6 +6381,186 @@ mod tests {
             checked += 1;
         }
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Wertungsplatten-EGO-Shaping (Nutzer-Auftrag 2026-08-10, siehe
+    // Modul-Kommentar bei `apply_wertung_shaping` oben) -- eigener Block,
+    // getrennt vom Task-#93-Plattenshaping-Block oben (andere Formel/
+    // Perspektive/Verdrahtung, siehe dortiger Unterschieds-Kommentar).
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn wertung_shaping_defaults_reproduce_existing_behavior() {
+        // Grundvoraussetzung fuer JEDEN Neutralitaets-Nachweis unten: die
+        // Compile-Konstanten UND die (in dieser Test-Umgebung ungesetzten)
+        // Env-Var-Getter muessen exakt den "Additiv aus"-Zustand liefern.
+        assert_eq!(WERTUNG_SHAPING_WEIGHT, 0.0);
+        assert_eq!(WERTUNG_SHAPING_ALPHA, 2.0);
+        assert_eq!(
+            wertung_shaping_weight(),
+            0.0,
+            "Test-Voraussetzung: MOSAIC_WERTUNG_SHAPING_W darf hier nicht gesetzt sein"
+        );
+        assert_eq!(
+            wertung_shaping_alpha(),
+            2.0,
+            "Test-Voraussetzung: MOSAIC_WERTUNG_ALPHA darf hier nicht gesetzt sein"
+        );
+    }
+
+    #[test]
+    fn apply_wertung_shaping_with_zero_weight_is_exact_identity() {
+        // Kern-Neutralitaetsnachweis auf reiner Formel-Ebene (Ersatz fuer die
+        // Python-Paritaetsprobe, die hier nicht laufen darf -- sie prueft das
+        // INSTALLIERTE Wheel, Installieren ist waehrend des laufenden
+        // Cache-Neubaus/Trainings gesperrt): bei `w=0.0` MUSS `value`
+        // unveraendert zurueckkommen -- kein `wertung_progress_alpha`-Aufruf,
+        // kein `tanh`, keine Rundung. Ueber mehrere reale Stellungen UND
+        // synthetische Extremwerte, gleiches Muster wie
+        // `plate_shaping_disabled_is_exact_identity`.
+        let mut rng = StdRng::seed_from_u64(8110);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
+            for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
+                let out = apply_wertung_shaping_with(v, &state, 0.0, 2.0);
+                assert_eq!(out, v, "Spiel {gi}: w=0.0 muss byte-identisch zur Eingabe bleiben (v={v:?})");
+                // Auch bei einem exotischen `alpha` darf `w=0.0` NICHTS
+                // veraendern -- der Fruehausstieg greift VOR jedem
+                // `alpha`-Gebrauch.
+                let out2 = apply_wertung_shaping_with(v, &state, 0.0, 7.0);
+                assert_eq!(out2, v);
+            }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn wertung_shaping_disabled_by_default_is_exact_identity() {
+        // Gleicher Nachweis wie oben, aber ueber den tatsaechlichen
+        // Env-Var-lesenden Wrapper `apply_wertung_shaping` (genau die
+        // Funktion, die `net_leaf_eval`/`make_node` aufrufen) -- in dieser
+        // Test-Umgebung ist `MOSAIC_WERTUNG_SHAPING_W` ungesetzt, also muss
+        // dies exakt dem Default-Pfad entsprechen.
+        let mut rng = StdRng::seed_from_u64(8111);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
+            for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
+                assert_eq!(apply_wertung_shaping(v, &state), v);
+            }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn net_leaf_eval_matches_pre_wertung_shaping_path_when_weight_is_zero() {
+        // Staerkster verfuegbarer Neutralitaets-Nachweis: rekonstruiert den
+        // `net_leaf_eval`-Rechenweg exakt bis VOR den neuen
+        // `apply_wertung_shaping`-Aufruf (Mover-/Gegner-Forward-Pass +
+        // `blended_leaf_win_prob` + `apply_value_shrink`, alles unveraendert)
+        // und vergleicht bit-genau gegen den TATSAECHLICHEN
+        // `net_leaf_eval`-Output. Gleiches Muster wie
+        // `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero`
+        // (Task #28) fuer den `blended_leaf_win_prob`-Blend.
+        let Some(net) = load_test_net() else { return };
+        assert_eq!(
+            wertung_shaping_weight(),
+            0.0,
+            "Test-Voraussetzung: MOSAIC_WERTUNG_SHAPING_W darf hier nicht gesetzt sein"
+        );
+
+        let mut rng = StdRng::seed_from_u64(8100);
+        let mut checked = 0;
+        for gi in 0..10u64 {
+            let Some(state) = random_drafting_state(gi, 14, &mut rng) else { continue };
+            let actual = net_leaf_eval(&net, &state);
+
+            // Alt-Pfad (Stand VOR diesem Additiv): identische Vorstufe, aber
+            // OHNE den anschliessenden `apply_wertung_shaping`-Aufruf.
+            let feats = crate::features::features_for_net(&net, &state);
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = crate::features::features_for_net(&net, &flipped);
+            let ((_l, value, _m, points, opp_points), (_ol, o_value, _om, o_points, o_opp_points)) =
+                net.eval_pair_ex(&feats, &other_feats).expect("eval_pair_ex (Alt-Pfad)");
+            let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
+            let other_val = blended_leaf_win_prob(&o_value, &o_points, &o_opp_points);
+            let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+            let expected = apply_value_shrink(raw, state.round_number);
+
+            assert_eq!(actual, expected, "Spiel {gi}: net_leaf_eval weicht bei w=0 vom Alt-Pfad ab");
+            checked += 1;
+        }
+        assert!(checked >= 6, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn apply_wertung_shaping_with_matches_formula_and_is_ego_only() {
+        // Beweist zwei Eigenschaften in einem Test:
+        //   1. die EXAKTE Formel je Spieler-Index `i`:
+        //      `clamp(value[i] + w * tanh(wertung_progress_alpha(players[i],
+        //      scoring_tile_ids, alpha) / WERTUNG_SHAPING_SCALE), 0, 1)`.
+        //   2. EGO-only: Index `i` haengt AUSSCHLIESSLICH von `players[i]`
+        //      ab -- das JEWEILS ANDERE Brett fliesst nicht ein (Nutzer-
+        //      Vorgabe, siehe Modul-Kommentar). Nachweis: `players[1]` wird
+        //      zwischen zwei sonst unabhaengigen Stellungen ausgetauscht --
+        //      Index 0 des Outputs darf sich dadurch NICHT aendern.
+        let w = 0.4;
+        let alpha = 1.5;
+        let mut rng = StdRng::seed_from_u64(5551);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state_a) = random_drafting_state(gi, 12, &mut rng) else { continue };
+            let Some(state_b) = random_drafting_state(gi + 500, 13, &mut rng) else { continue };
+            let mut hybrid = state_a.clone();
+            hybrid.players[1] = state_b.players[1].clone();
+
+            for s in [&state_a, &hybrid] {
+                let v = [0.5, 0.5];
+                let out = apply_wertung_shaping_with(v, s, w, alpha);
+                for i in 0..2 {
+                    let pts = crate::scoring::wertung_progress_alpha(&s.players[i], &s.scoring_tile_ids, alpha);
+                    let expected = (v[i] + w * (pts / WERTUNG_SHAPING_SCALE).tanh()).clamp(0.0, 1.0);
+                    assert!(
+                        (out[i] - expected).abs() < 1e-12,
+                        "Spiel {gi}: Index {i} weicht von der Formel ab (out={out:?})"
+                    );
+                }
+            }
+
+            // EGO-only-Nachweis: `players[0]` ist zwischen `state_a` und
+            // `hybrid` UNVERAENDERT -- Index 0 darf sich also trotz des
+            // ausgetauschten GEGNERBRETTS (`players[1]`) nicht aendern.
+            let out_a = apply_wertung_shaping_with([0.5, 0.5], &state_a, w, alpha);
+            let out_hybrid = apply_wertung_shaping_with([0.5, 0.5], &hybrid, w, alpha);
+            assert_eq!(
+                out_a[0], out_hybrid[0],
+                "Spiel {gi}: Index 0 haengt faelschlich vom GEGNERBRETT ab"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    #[test]
+    fn apply_wertung_shaping_with_clamps_extreme_shifts_to_unit_interval() {
+        // `tanh` allein haelt den Shift schon in `(-w, w)`, aber bei grossem
+        // `w` (> 0.5) kann `value[i] + shift` trotzdem ausserhalb `[0,1]`
+        // rutschen -- muss wie die bestehende Floor-/Platten-Additiv-Logik
+        // geklemmt werden.
+        let mut rng = StdRng::seed_from_u64(8112);
+        let Some(state) = random_drafting_state(0, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        let out_hi = apply_wertung_shaping_with([0.95, 0.05], &state, 5.0, 2.0);
+        let out_lo = apply_wertung_shaping_with([0.05, 0.95], &state, 5.0, 2.0);
+        for v in out_hi.iter().chain(out_lo.iter()) {
+            assert!((0.0..=1.0).contains(v), "Shift muss auf [0,1] geklemmt sein, war {v}");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -183,6 +183,60 @@ pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
     total
 }
 
+/// Parametrisierte Schwester von [`wertung_progress`] -- ABSICHTLICH eine
+/// EIGENE Funktion, nicht `wertung_progress` selbst um einen `alpha`-
+/// Parameter erweitert. `wertung_progress` haengt an `mcts.rs::player_total`,
+/// dem Heuristik-Blattwert, der den Elo-Anker der gesamten Projekt-Historie
+/// bildet -- jede Aenderung an dessen Zahlenwert (auch nur eine Verzweigung,
+/// die bei `alpha=2.0` bitgleich dasselbe Ergebnis liefern SOLLTE) wuerde die
+/// Elo-Historie entwerten, weil sie nicht mehr beweisbar an derselben Formel
+/// haengt. Der Anker-Schutz entsteht hier daher durch KONSTRUKTION (zwei
+/// getrennte Funktionen, `wertung_progress` unveraendert) statt durch eine
+/// Bedingung innerhalb einer gemeinsamen Funktion -- und selbst wenn man eine
+/// solche Bedingung wollte: `f.powi(2)` und `f.powf(2.0)` sind NICHT
+/// garantiert bitgleich (verschiedene Implementierungen, siehe Rust-Doku zu
+/// `powf`/`powi`), ein `if alpha == 2.0 { powi } else { powf }`-Zweig waere
+/// also selbst schon eine (wenn auch winzige) Verhaltensaenderung gegenueber
+/// dem Bestand.
+///
+/// Inhaltlich identische Struktur zu `wertung_progress`, aber `.powf(alpha)`
+/// statt `.powi(2)` fuer die KONJUNKTIVEN Geometrien (0 Reihen, 1 Spalten,
+/// 2 Diagonalen, 3 Mehrfarbige Felder, 5 Eckplatten, 7 Farbenreiche Reihen).
+/// `alpha > 1` verstaerkt die Praemie fuer EINE fast vollstaendige Linie/Ecke
+/// gegenueber vielen halbfertigen (Buendelung), `alpha = 1` macht die
+/// Formel linear in der Fuellung (keine Buendelungs-Praemie mehr), siehe
+/// Test `wertung_progress_alpha_rewards_bundling_when_alpha_above_one`.
+///
+/// Kriterium 4 (`border_fill`) und 6 (`-3 * special_empty`) bleiben LINEAR
+/// (kein Exponent) -- das ist keine Wahl, sondern exakt: beide zahlen PRO
+/// FELD, nicht pro vollstaendigem Satz, es gibt also gar keine "Teilerfuellung
+/// eines Satzes", die ein Exponent ueberhaupt modulieren koennte.
+pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f64) -> f64 {
+    let sf = player_scoring_features(player);
+    let mut total = 0.0;
+    for &id in tile_ids {
+        total += match id {
+            0 => sf.row_fill.iter().map(|&f| (f as f64 / 6.0).powf(alpha)).sum::<f64>() * 3.0,
+            1 => sf.col_fill.iter().map(|&f| (f as f64 / 6.0).powf(alpha)).sum::<f64>() * 7.0,
+            2 => sf.diag_fill.iter().map(|&f| (f as f64 / 6.0).powf(alpha)).sum::<f64>() * 10.0,
+            3 => (sf.wild_filled as f64 / sf.wild_total.max(1) as f64).powf(alpha)
+                * 2.0
+                * sf.wild_total as f64,
+            4 => sf.border_fill as f64,
+            5 => {
+                (sf.corner_fill[0] as f64 / 4.0).powf(alpha) * 3.0
+                    + (sf.corner_fill[1] as f64 / 4.0).powf(alpha) * 3.0
+                    + (sf.corner_fill[2] as f64 / 4.0).powf(alpha) * 8.0
+                    + (sf.corner_fill[3] as f64 / 4.0).powf(alpha) * 8.0
+            }
+            6 => -3.0 * sf.special_empty as f64,
+            7 => sf.row_colors.iter().map(|&c| (c as f64 / 5.0).powf(alpha)).sum::<f64>() * 4.0,
+            _ => 0.0,
+        };
+    }
+    total
+}
+
 // ── Einzelne Wertungen ──────────────────────────────────────────────────────────
 
 fn score_horizontal_rows(player: &PlayerBoard) -> i32 {
@@ -1001,6 +1055,112 @@ mod tests {
         assert!(progress > 0.0 && progress < 3.0, "Teil-Bonus erwartet, war {progress}");
         // (2/4)^2 * 3 = 0.75
         assert!((progress - 0.75).abs() < 1e-9, "war {progress}");
+    }
+
+    #[test]
+    fn wertung_progress_alpha_matches_wertung_progress_at_alpha_two() {
+        // Neutralitaets-Nachweis: `alpha=2.0` muss `wertung_progress` fuer
+        // mehrere nichttriviale Bretter reproduzieren (Toleranz 1e-9, NICHT
+        // Bit-Gleichheit -- `powf(2.0)` vs `powi(2)` duerfen im letzten Bit
+        // abweichen, exakt deshalb ist `wertung_progress_alpha` eine eigene
+        // Funktion statt eines Zweigs in `wertung_progress`).
+        let boards = [fully_filled_board(), {
+            // Teilgefuelltes Brett (wie im Teil-Bonus-Test oben), damit auch
+            // die Nicht-0/Nicht-1-Zwischenwerte der konjunktiven Kriterien
+            // geprueft werden, nicht nur die Randfaelle leer/voll.
+            let mut p = PlayerBoard::new(0, "P");
+            let mut tile = build_dome_tile_pool()[0].clone();
+            for sp in tile.spaces.iter_mut().take(2) {
+                match sp.space_type {
+                    SpaceType::Special => sp.placed_special = true,
+                    SpaceType::Wild => sp.placed_color = Some(Rot),
+                    SpaceType::Normal => sp.placed_color = sp.required_color,
+                }
+            }
+            p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+            p
+        }];
+        for p in &boards {
+            for id in 0usize..8 {
+                let exact = wertung_progress(p, &[id]);
+                let via_alpha = wertung_progress_alpha(p, &[id], 2.0);
+                assert!(
+                    (exact - via_alpha).abs() < 1e-9,
+                    "Platte {id}: wertung_progress={exact} vs wertung_progress_alpha(alpha=2.0)={via_alpha}"
+                );
+            }
+            // Und ueber alle Platten gemeinsam (deckt Summierungs-Reihenfolge ab).
+            let exact_all = wertung_progress(p, &[0, 1, 2, 3, 4, 5, 6, 7]);
+            let via_alpha_all = wertung_progress_alpha(p, &[0, 1, 2, 3, 4, 5, 6, 7], 2.0);
+            assert!((exact_all - via_alpha_all).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn wertung_progress_alpha_rewards_bundling_when_alpha_above_one() {
+        // Kriterium 1 (Vertikale Reihen, 7 Pkt/volle Spalte): sechs gefuellte
+        // Felder gebuendelt in EINER Spalte muessen bei `alpha>1` mehr wert
+        // sein als sechs Felder verteilt als drei-plus-drei auf zwei Spalten
+        // -- bei `alpha=1` (linear in der Fuellung) sind beide gleich, das
+        // ist die alpha-Schwelle, ab der ueberhaupt eine Buendelungs-Praemie
+        // entsteht.
+        //
+        // Aufbau ueber die 3 Kuppelplaetze der Spalte `sc=0`
+        // (dome_slots[0][0]/[1][0]/[2][0]): jeder Slot hat 4 Spaces, Index
+        // `si` -> (Zeilen-Offset, Spalten-Offset) = (si/2, si%2) innerhalb
+        // des Slots (siehe `build_grid`).
+        //   - "gebuendelt": si in {0,2} gefuellt (Spalten-Offset 0) in allen
+        //     3 Slots -> volle 6x6-Spalte 0 (col_fill[0]=6, col_fill[1]=0).
+        //   - "verteilt": si in {0,1} gefuellt (beide Spalten-Offsets, aber
+        //     nur die JEWEILS ERSTE Zeile jedes Slots) in allen 3 Slots ->
+        //     Spalte 0 UND Spalte 1 je zur Haelfte gefuellt
+        //     (col_fill[0]=3, col_fill[1]=3). Gleiche Gesamtzahl gefuellter
+        //     Felder (6) wie beim gebuendelten Brett -- fairer Vergleich.
+        fn board_with_slot_spaces(sis: &[usize; 2]) -> PlayerBoard {
+            let mut p = PlayerBoard::new(0, "P");
+            let pool = build_dome_tile_pool();
+            for sr in 0..3usize {
+                let mut t = pool[sr * 3].clone(); // sc=0 => Pool-Index sr*3+0
+                for (si, sp) in t.spaces.iter_mut().enumerate() {
+                    if sis.contains(&si) {
+                        match sp.space_type {
+                            SpaceType::Special => {
+                                sp.is_locked = false;
+                                sp.placed_special = true;
+                            }
+                            SpaceType::Wild => sp.placed_color = Some(Rot),
+                            SpaceType::Normal => sp.placed_color = sp.required_color,
+                        }
+                    }
+                }
+                p.dome_grid.place_dome_tile(t, sr, 0).unwrap();
+            }
+            p
+        }
+
+        let bundled = board_with_slot_spaces(&[0, 2]);
+        let spread = board_with_slot_spaces(&[0, 1]);
+
+        let sf_bundled = player_scoring_features(&bundled);
+        let sf_spread = player_scoring_features(&spread);
+        assert_eq!(sf_bundled.col_fill, [6, 0, 0, 0, 0, 0], "Vorbedingung gebuendelt");
+        assert_eq!(sf_spread.col_fill, [3, 3, 0, 0, 0, 0], "Vorbedingung verteilt");
+
+        // alpha=1: linear in der Fuellung -> beide Anordnungen gleichwertig.
+        let bundled_a1 = wertung_progress_alpha(&bundled, &[1], 1.0);
+        let spread_a1 = wertung_progress_alpha(&spread, &[1], 1.0);
+        assert!((bundled_a1 - spread_a1).abs() < 1e-9, "bei alpha=1 gleichwertig: {bundled_a1} vs {spread_a1}");
+
+        // alpha=2: Buendelung wird praemiert.
+        let bundled_a2 = wertung_progress_alpha(&bundled, &[1], 2.0);
+        let spread_a2 = wertung_progress_alpha(&spread, &[1], 2.0);
+        assert!(
+            bundled_a2 > spread_a2,
+            "gebuendelt sollte bei alpha=2 mehr wert sein: {bundled_a2} vs {spread_a2}"
+        );
+        // Exakte Werte zur Gegenprobe: (6/6)^2*7=7 vs 2*(3/6)^2*7=3.5.
+        assert!((bundled_a2 - 7.0).abs() < 1e-9);
+        assert!((spread_a2 - 3.5).abs() < 1e-9);
     }
 
     #[test]
