@@ -958,6 +958,43 @@ mod tests {
         }
     }
 
+    /// Wie stark unterscheidet sich die Zugwahl MIT von der OHNE Zufallsknoten?
+    /// Das bemisst, was eine Anker-Kante ueberhaupt finden koennte: aendert
+    /// sich fast nie ein Zug, ist der Elo-Versatz sicher innerhalb der
+    /// +-4,4pp-Marge und die Kante braucht kein grosses n.
+    #[test]
+    #[ignore]
+    fn chance_node_behaviour_divergence_probe() {
+        use crate::round_transition::drive_to_round_start;
+        let mut r5_decisions = 0usize;
+        let mut diverged = 0usize;
+        for seed in [101u64, 202, 303, 404, 505, 606, 707, 808] {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut guard = 0u32;
+            while state.phase == Phase::Drafting && guard < 200 {
+                guard += 1;
+                let off = match choose_action_inner(&state, false, NODE_BUDGET) {
+                    Some(a) => a,
+                    None => break,
+                };
+                let on = choose_action_inner(&state, true, NODE_BUDGET);
+                r5_decisions += 1;
+                if on.as_ref() != Some(&off) {
+                    diverged += 1;
+                }
+                let mut g = Game { state };
+                if g.apply_drafting(&off).is_err() {
+                    break;
+                }
+                state = g.state;
+            }
+        }
+        let pct = 100.0 * diverged as f64 / r5_decisions.max(1) as f64;
+        println!(
+            "DIVERGENZ Zufallsknoten an/aus: {diverged}/{r5_decisions} Runde-5-Zugwahlen ({pct:.1}%)"
+        );
+    }
+
     #[test]
     fn applies_only_in_round5_drafting() {
         let mut s = round5_state(1);

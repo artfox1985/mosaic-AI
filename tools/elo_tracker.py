@@ -94,7 +94,19 @@ except ImportError:  # pragma: no cover
 # Datendatei bleibt in evaluations/ (Reorg 2026-07-23: Skript nach tools/
 # verschoben, Ergebnisdaten bleiben repo-Konvention nach in evaluations/).
 CSV_PATH = str(Path(__file__).resolve().parent.parent / "evaluations" / "elo_history.csv")
-HEADER = ["date", "player_a", "sims_a", "player_b", "sims_b", "wins_a", "wins_b", "n", "comment"]
+# `contract` und `knobs` sind ADDITIV (2026-08-10, Nutzer-Auftrag
+# "aktualisieren bzw. archivieren"): Altzeilen ohne diese Spalten bleiben
+# lesbar, weil `load_rows` sie ueber `.get()` mit Default holt.
+# Motivation: eine Elo-Leiter ist nur so gut wie ihre Rueckverfolgbarkeit.
+#   `contract` = A2-Vertragsstempel des Binaries (`engine_config_json()`,
+#                Hash ueber INPUT_SIZE/NUM_PLANES_CHANNELS/NUM_ACTIONS/Koepfe)
+#                -- traegt die I/O-Form, NICHT das Verhalten.
+#   `knobs`    = die zum Match aktiven NICHT-Default-`MOSAIC_*`-Variablen
+#                -- genau die Spalte, die das Verhalten traegt. Ohne sie waere
+#                ein Anker-Wechsel wie das Scharfschalten der
+#                Runde-5-Zufallsknoten in der Leiter unsichtbar.
+HEADER = ["date", "player_a", "sims_a", "player_b", "sims_b", "wins_a", "wins_b", "n",
+          "comment", "contract", "knobs"]
 
 ANCHOR_NAME = "Heuristik"
 # Korrigendum 2026-07-25: Anker lief faktisch IMMER mit HEUR_SIMS=150
@@ -134,13 +146,43 @@ def load_rows():
                 "wins_a": int(r["wins_a"]),
                 "wins_b": int(r["wins_b"]),
                 "n": int(r["n"]),
-                "comment": r.get("comment", ""),
+                "comment": r.get("comment", "") or "",
+                "contract": r.get("contract", "") or "",
+                "knobs": r.get("knobs", "") or "",
             })
     return rows
 
 
+def engine_contract() -> str:
+    """A2-Vertragsstempel des INSTALLIERTEN Binaries, "" wenn nicht ermittelbar.
+
+    Bewusst best-effort: die Buchhaltung darf nie daran scheitern, dass das
+    Wheel gerade nicht importierbar ist."""
+    try:
+        import json as _json
+
+        import mosaic_rust  # type: ignore
+
+        cfg = _json.loads(mosaic_rust.engine_config_json())
+        return str(cfg.get("contract", "") or cfg.get("contract_hash", ""))
+    except Exception:
+        return ""
+
+
+def active_knobs() -> str:
+    """Aktive NICHT-Default `MOSAIC_*`-Variablen als `k=v;k=v`.
+
+    Was hier steht, ist die Verhaltens-Signatur des Matches. Leer = alles auf
+    Default, also Bestandsverhalten."""
+    items = sorted(
+        (k, v) for k, v in os.environ.items()
+        if k.startswith("MOSAIC_") and v not in ("", "0")
+    )
+    return ";".join(f"{k}={v}" for k, v in items)
+
+
 def add_result(player_a, sims_a, player_b, sims_b, wins_a, wins_b, n,
-               date=None, comment=""):
+               date=None, comment="", contract=None, knobs=None):
     """Traegt EIN Match-Ergebnis (aggregiert ueber n Spiele) in die CSV ein.
     wins_a + wins_b muss n ergeben (kein Draw-Feld -- Unentschieden werden im
     Regelwerk per Marker-Tie-Break immer aufgeloest, siehe tools/arena.py `winner`)."""
@@ -152,7 +194,9 @@ def add_result(player_a, sims_a, player_b, sims_b, wins_a, wins_b, n,
     ensure_csv()
     with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
         csv.writer(f).writerow([date, player_a, sims_a, player_b, sims_b,
-                                 wins_a, wins_b, n, comment])
+                                 wins_a, wins_b, n, comment,
+                                 engine_contract() if contract is None else contract,
+                                 active_knobs() if knobs is None else knobs])
     print(f"Eingetragen: {node_key(player_a, sims_a)} {wins_a}:{wins_b} "
           f"{node_key(player_b, sims_b)} (n={n}, {date})")
 
