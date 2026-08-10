@@ -229,7 +229,24 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
                     + (sf.corner_fill[2] as f64 / 4.0).powf(alpha) * 8.0
                     + (sf.corner_fill[3] as f64 / 4.0).powf(alpha) * 8.0
             }
-            6 => -3.0 * sf.special_empty as f64,
+            // Kriterium 6 BEWUSST 0 hier -- es wird von `unlock_progress_beta`
+            // gehalten (Nutzer-Spezifikation 2026-08-11: "wenn die
+            // wertungsplatte aktiv ist -3 fuer nicht belegte felder ... fuer
+            // belegte Spezialfliesen 1..6 in abhaengigkeit der Reihe.
+            // Beruecksichtigung von gestuftem Freischaltterm").
+            //
+            // WARUM NICHT BEIDE: waeren `MOSAIC_WERTUNG_SHAPING_W` und
+            // `MOSAIC_UNLOCK_SHAPING_W` gleichzeitig > 0, wuerde der
+            // Spezialfeld-Abzug DOPPELT in den Blattwert eingehen -- einmal
+            // hier und einmal dort. Der Fehler war eingebaut und ist beim
+            // Beantworten der Nutzer-Frage "hast du das fuer alle
+            // wertungsplatten beruecksichtigt" aufgefallen.
+            //
+            // Der ANKER `wertung_progress` (oben, Zeile ~178) behaelt seinen
+            // Kriterium-6-Term unveraendert -- er ist eine andere Funktion mit
+            // anderem Aufrufer (`mcts.rs:82`, Heuristik) und darf sich nicht
+            // bewegen.
+            6 => 0.0,
             7 => sf.row_colors.iter().map(|&c| (c as f64 / 5.0).powf(alpha)).sum::<f64>() * 4.0,
             _ => 0.0,
         };
@@ -1424,8 +1441,15 @@ mod tests {
             p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
             p
         }];
+        // KRITERIUM 6 IST AUSGENOMMEN, und zwar ABSICHTLICH (Nutzer-Spezifikation
+        // 2026-08-11): den Spezialfeld-Abzug haelt `unlock_progress_beta`, nicht
+        // `wertung_progress_alpha` -- sonst zaehlt er doppelt, wenn beide
+        // Shaping-Knoepfe gesetzt sind. Der ANKER `wertung_progress` behaelt ihn.
+        // Die Divergenz wird unten ausdruecklich GEPRUEFT statt stillschweigend
+        // uebergangen.
+        const OHNE_K6: [usize; 7] = [0, 1, 2, 3, 4, 5, 7];
         for p in &boards {
-            for id in 0usize..8 {
+            for id in OHNE_K6 {
                 let exact = wertung_progress(p, &[id]);
                 let via_alpha = wertung_progress_alpha(p, &[id], 2.0);
                 assert!(
@@ -1434,9 +1458,22 @@ mod tests {
                 );
             }
             // Und ueber alle Platten gemeinsam (deckt Summierungs-Reihenfolge ab).
-            let exact_all = wertung_progress(p, &[0, 1, 2, 3, 4, 5, 6, 7]);
-            let via_alpha_all = wertung_progress_alpha(p, &[0, 1, 2, 3, 4, 5, 6, 7], 2.0);
+            let exact_all = wertung_progress(p, &OHNE_K6);
+            let via_alpha_all = wertung_progress_alpha(p, &OHNE_K6, 2.0);
             assert!((exact_all - via_alpha_all).abs() < 1e-9);
+
+            // Die BEABSICHTIGTE Divergenz: die Schwester liefert fuer Kriterium 6
+            // immer 0, der Anker liefert -3 je leerem Spezialfeld.
+            assert_eq!(
+                wertung_progress_alpha(p, &[6], 2.0),
+                0.0,
+                "Kriterium 6 muss in wertung_progress_alpha 0 sein (haelt unlock_progress_beta)"
+            );
+            let sf = player_scoring_features(p);
+            assert!(
+                (wertung_progress(p, &[6]) - (-3.0 * sf.special_empty as f64)).abs() < 1e-9,
+                "Anker wertung_progress muss Kriterium 6 unveraendert behalten"
+            );
         }
     }
 
