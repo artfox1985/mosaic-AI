@@ -122,7 +122,7 @@ Fortschrittsmesser**: Grundrate 0,000 heisst "kommt in diesem Korpus nicht
 vor". Steigt sie, hat sich das Verhalten geaendert -- arena-unabhaengig, ohne
 Training, je neuem Korpus einmal auslesen.
 
-#### DER EIGENTLICHE BEFUND: der Formungsterm existiert und das Netz hat ihn nie bekommen
+#### DER FORMUNGSTERM EXISTIERT -- und das Netz hatte ihn, in unwirksamer Form
 
 `scoring.rs:160` `wertung_progress` ist der vollstaendige
 Wertungsplatten-Formungsterm: gegatet auf die AKTIVEN Platten, je Geometrie
