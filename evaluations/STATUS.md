@@ -19,7 +19,7 @@ NACH-v21-QUEUE Punkt 1/E3b).
 | **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen. `PREREG_nach34_paket.md` |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
 
-**UEBERGABE-DOKUMENT (2026-08-08): `evaluations/UEBERGABE_v21_spirale.md`** -- vollstaendige Kommandos + Regeln fuer die v21-Spirale, geschrieben fuer den naechsten Koordinator; dort zuerst lesen.
+**UEBERGABE_v21_spirale.md GELOESCHT 2026-08-10** (Nutzer-Auftrag). Zwei einmalige Inhalte sind vorher wortgetreu nach `archive/history.md` gesichert: der Generator des v21-Traegermanifests samt Seed 20260815 (die Manifest-DATEI in `data/` bleibt, ohne den Block waere nur die HERLEITUNG verloren) und die R5-Plattensteigungs-Reihe 0,086/0,273/0,349/0,457. Alles Uebrige war Dublette zu STATUS bzw. abgearbeitete Queue.
 
 ### v22-FENSTER -- DESIGN AUF HALDE, NICHT EINGEPLANT
 **Nutzer-Entscheid 2026-08-08: keine v22-Self-Plays; erst die
