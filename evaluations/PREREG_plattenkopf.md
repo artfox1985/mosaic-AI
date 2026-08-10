@@ -692,3 +692,41 @@ seltenes Ereignis, und der Kopf trifft es nicht. Vor Stufe B zu klaeren, ob
 das an der Seltenheit liegt oder an etwas Strukturellem (Slot 1 ist
 oben-mitte; kein offensichtlicher Sonderstatus). Kein Ausschlussgrund, aber
 eine offene Stelle.
+
+## MODELLSEITE GEBAUT (2026-08-10 nachts) -- Rest der Kette noch offen
+
+`engine/py/neural_net.py`, additiv nach dem `endgame_head`-Muster:
+
+- `PLATE_HEAD_SLOTS = 9` (3x3 Kuppelslots; hoechstens EIN Spezialfeld je
+  Platte, `dome.rs:135` / `round_end.rs:301` suchen genau eines).
+- Konstruktor-Flag `plate_head=False` in **beiden** Klassen (`MosaicNet`,
+  `Mosaic2DNet`); Kopf = `Linear(hidden, value_hidden) -> ReLU ->
+  Linear(value_hidden, 9)`, **Logits ohne Sigmoid** (BCEWithLogits im
+  Training, Platt-Korrektur nachtraeglich -- die gemessenen Steigungen lagen
+  bei 0,44-0,81).
+- Ausgabe **ZULETZT** im Tupel angehaengt -- bestehende Leser indexieren
+  positionsbasiert und bleiben unberuehrt.
+- `plate_head_present(state)` erkennt den Kopf AUS DEM CHECKPOINT,
+  `build_model_from_checkpoint` reicht das durch (Muster
+  `endgame_head_present`).
+
+**Verifiziert**: beide Klassen liefern ohne Flag unveraendert viele Ausgaben,
+mit Flag eine mehr der Form `(N, 9)`; Rundlauf Speichern/Laden erkennt den
+Kopf; und der **Champion laedt unveraendert** (`plate_head: False`, 8
+Ausgaben wie zuvor).
+
+### Was noch fehlt -- ausdruecklich NICHT gebaut
+
+1. **Labels in den Cache**: `tools/plattenkopf_labels.py` liefert die Atome,
+   der Einbau in `MosaicDataset` fehlt.
+2. **Cache-Key**: Suffix `+plate_v1` NUR bei gesetztem Flag anhaengen (Muster
+   `+enc2d_v1`, Zeile ~1142). **KEIN `VALUE_SCHEMA_VERSION`-Bump** -- der
+   wuerde den vorhandenen v21-Cache entwerten, und das ist unnoetig, weil die
+   Plattenlabels ein eigenes, optionales Feld sind.
+3. **train.py**: Verlustterm mit Maskierung auf Partien mit aktiver Platte 6,
+   plus ein `--plate-head`-Flag.
+4. **Integrationsprobe**: Mini-Cache auf ~10 Dateien + 1 Epoche, BEVOR der
+   volle Lauf startet.
+
+Bewusst in dieser Reihenfolge: Punkt 4 ist der Schutz gegen einen verlorenen
+Nachtlauf, und die Modellseite ist der Teil, der isoliert verifizierbar war.
