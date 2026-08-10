@@ -214,3 +214,25 @@ Verhaltensfrage ("steuert der Term die Freischaltung ueberhaupt an?") kein
 Arena-Regime braucht. Die Siegquote kommt aus Weg A, das Verhalten aus (ii);
 die Drei-Faelle-Tabelle aus Abschnitt 4 bleibt anwendbar, weil sie die zwei
 Groessen nur nebeneinander liest und nicht aus demselben Lauf verlangt.
+
+## Nachtrag zu Befund 3: Weg (ii) ist gedeckt, kein neues Werkzeug
+
+GEPRUEFT an `tools/plattenkopf_labels.py`:
+
+- `atoms_criterion6` (Zeile 71): je Slot "hat ein Spezialfeld, das am Ende LEER
+  ist", 1/0.
+- `existence_criterion6` (Zeile 85): je Slot "traegt am Ende UEBERHAUPT ein
+  Spezialfeld", 1/0 -- die Maske, die es ohnehin schon gibt.
+- Gelesen wird `player["dome_grid"]` aus den Korpus-Dateien (Zeile 60).
+
+**Freischaltungen je Partie = Summe(existenz) - Summe(leer)** -- direkt aus den
+Endbrettern, mit dem vorhandenen Werkzeug, ohne Rust-Eingriff.
+
+Was fehlt, ist nur die REIHENGEWICHTETE Punktsumme (Kriterium 6 ist flach, die
+Spezialpunkte sind es nicht). Das Werkzeug iteriert Slots und Spaces, die
+Rasterreihe ist daraus `slot_row * 2 + space_index / 2`; also eine kleine
+ERGAENZUNG an `plattenkopf_labels.py`, **kein zweites Werkzeug**.
+
+`paired_arena_env_ab.py` braucht keine Aenderung: `--env-name` ist generisch
+(Nutzungsbeispiele im Modulkopf zeigen `MOSAIC_FLOOR_SHAPING_W` und
+`MOSAIC_GUMBEL_TOP_M`).
