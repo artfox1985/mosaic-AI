@@ -1,0 +1,29 @@
+{
+  "sims": 400,
+  "node_visits": [
+    400,
+    400,
+    400
+  ],
+  "memory_per_search_bytes": 1593344,
+  "memory_per_search_mib": 1.51953125,
+  "ram_total_gib": 31.916744232177734,
+  "ram_free_gib": 20.275188446044922,
+  "memory_ceiling_gib": 16.0,
+  "n_max": 10782,
+  "duty_band": [
+    0.62,
+    0.81
+  ],
+  "memory_for_batch_gib": {
+    "128": 0.18994140625,
+    "256": 0.3798828125,
+    "512": 0.759765625,
+    "1024": 1.51953125
+  },
+  "amdahl_ceiling": [
+    2.6315789473684212,
+    5.263157894736843
+  ],
+  "verdict": "REGEL 1: Speicher ist KEIN Engpass -- Batch 128-512 passt muehelos (0.19-0.76 GiB) => Weg V (Verschraenkung) wird gebaut. Der verbleibende Deckel ist Amdahl (2,6-5,3x), NICHT der Batch; neuer Engpass wird die CPU-seitige Baumarbeit, und die ist als naechstes zu messen."
+}
