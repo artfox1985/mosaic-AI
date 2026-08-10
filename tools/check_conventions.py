@@ -94,6 +94,21 @@ def update_size_baseline() -> None:
     print(f"Basislinie neu geschrieben: {SIZE_BASELINE_PATH} ({len(baseline)} Dateien).")
 
 
+def _size_in_head(rel: str) -> int | None:
+    """Groesse der Datei im letzten Commit, oder None wenn nicht ermittelbar.
+
+    Gebraucht fuer die Reduktions-Ausnahme unten: die Basislinie allein kann
+    nicht sehen, ob eine Aenderung eine Datei VERKLEINERT.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "cat-file", "-s", f"HEAD:{rel}"],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+        )
+        return int(out.stdout.strip()) if out.returncode == 0 else None
+    except Exception:
+        return None
+
 def check_file_size_ratchet(staged_only: bool, staged_files: set[str]) -> list[str]:
     if not SIZE_BASELINE_PATH.exists():
         return [
@@ -112,6 +127,17 @@ def check_file_size_ratchet(staged_only: bool, staged_files: set[str]) -> list[s
             continue  # neue Datei ohne Basislinie -- Ratsche greift erst nach dem naechsten --update-size-baseline
         base_bytes = baseline[rel]
         cur_bytes = p.stat().st_size
+        # REDUKTIONS-AUSNAHME (2026-08-10, aus einem echten Vorfall): die Ratsche
+        # blockierte einen Commit, der `engine/py/neural_net.py` VERKLEINERT hat --
+        # die Datei lag nur deshalb ueber der Basislinie, weil ein FRUEHERER Commit
+        # sie hatte wachsen lassen, ohne die Basislinie nachzuziehen. Eine Ratsche
+        # soll Wachstum bremsen, nicht Aufraeumen bestrafen. Wer die Datei
+        # gegenueber HEAD kleiner macht, kommt durch; die Basislinie bleibt
+        # unveraendert stehen, die Ratsche greift also beim naechsten Wachstum
+        # weiter gegen den alten Wert.
+        head_bytes = _size_in_head(rel)
+        if head_bytes is not None and cur_bytes <= head_bytes:
+            continue
         if base_bytes > SIZE_THRESHOLD_BYTES and cur_bytes > base_bytes * SIZE_GROWTH_TOLERANCE:
             growth_pct = (cur_bytes / base_bytes - 1) * 100
             violations.append(
