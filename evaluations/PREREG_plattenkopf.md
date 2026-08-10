@@ -1462,3 +1462,207 @@ unabhaengiger Referenzpunkt: `wertung_progress` enthaelt fuer Kriterium 1
 woertlich `(col_fill/6)^2 * 7`, sie wird also ausdruecklich zu Spalten
 hingeschoben (Nutzer-Hinweis). Der Befund "Heuristik schlaegt Champion auf jedem
 Atom" heisst also: handkodierte Plattenformung schlaegt KEINE Plattenformung.
+
+## BEDINGTE NACHPRUEFUNG des Layout-Signals (2026-08-10): ~90 % war ABLESEN
+
+Der oben als **offen** notierte Vorbehalt ist gemessen. `tools/atom_skill_check.py`
+kennt dafuer `--conditional-layout` (Bestandsverhalten bleibt Default) und
+wertet die 9 Layout-Ausgaenge nur noch auf Slots aus, die im JEWEILIGEN Zustand
+noch keine Platte tragen -- **Grundrate und Brier-Referenz eingeschlossen**,
+sonst waere die Referenz falsch. Logs: `logs/atom_skill_check_conditional.log`
+(Erstlauf), `logs/atom_skill_check_ownership.log` (Wiederholung mit der
+endgueltigen Fassung), `logs/atom_skill_check_masked.log` (bester Versuch).
+
+### Der Konfundierer ist zuerst BELEGT, nicht vermutet
+
+* Eine gelegte Platte wird nie bewegt: 13.219 belegte Slot-Beobachtungen,
+  **0 Abweichung** von Platten-Id und WILD-Eigenschaft des Endzustands.
+* Der Raumtyp einer gelegten Platte steht in der Eingabe (`state_to_tensor`:
+  `TYPE_MAP` mit WILD=0,5; `state_to_planes`: `_SPACE_TYPE_IDX`).
+
+Fuer einen belegten Slot ist das Label damit **trivial ablesbar**. Und weil die
+Slots frueh und in fester Reihenfolge belegt werden (Runde 1: 0 Slots, Runde 4:
+alle 9), ist der Ablese-Anteil je Slot verschieden gross -- **genau die Achse,
+entlang der die unbedingten Skills abfielen**.
+
+### Unbedingt gegen bedingt, beide aus DEMSELBEN Modell
+
+| Slot | Ablese% | Skill unbedingt | n bedingt | Partien | Skill bedingt | 95 %-KI (Partie-Bootstrap) | Delta |
+|------|---------|-----------------|-----------|---------|---------------|----------------------------|-------|
+| 0 | **98,3 %** | +0,976 | 506 | 253 | **+0,101** | [+0,038; +0,151] | **-0,875** |
+| 1 | 87,7 % | +0,879 | 3.687 | 253 | +0,042 | [-0,038; +0,113] | -0,837 |
+| 2 | 84,3 % | +0,844 | 4.680 | 253 | +0,069 | [-0,028; +0,153] | -0,774 |
+| 3 | 69,2 % | +0,651 | 9.210 | 253 | -0,098 | [-0,176; -0,027] | -0,749 |
+| 4 | 59,2 % | +0,542 | 12.198 | 253 | -0,091 | [-0,153; -0,034] | -0,633 |
+| 5 | 50,9 % | +0,460 | 14.694 | 253 | -0,078 | [-0,153; -0,011] | -0,539 |
+| 6 | 34,2 % | +0,341 | 19.666 | 253 | +0,012 | [-0,067; +0,079] | -0,329 |
+| 7 | 36,5 % | +0,266 | 18.982 | 253 | -0,121 | [-0,243; -0,015] | -0,388 |
+| 8 | 37,2 % | +0,340 | 18.787 | 253 | -0,006 | [-0,120; +0,084] | -0,346 |
+
+Der Ablese-Anteil erklaert die unbedingte Rangfolge fast vollstaendig: Slot 0
+war zu 98,3 % abgelesen und stand mit +0,976 an der Spitze. **Nach der Bedingung
+verschwindet die Rangfolge.** Das Konfidenzband kommt aus einem Bootstrap ueber
+PARTIEN, nicht ueber Zustaende -- das Label ist je Partie konstant, ein
+Zustands-Bootstrap haette die Streuung massiv unterschaetzt (dieselbe Lektion
+wie bei der Arena-Block-Korrelation). Effektive Stichprobe: **253 Partien**, egal
+ob n = 506 oder n = 19.666.
+
+### Entartung und bester Versuch
+
+**0 von 9** Layout-Atomen entarten unter der Bedingung -- selbst Slot 0 behaelt
+n = 506 (> `MIN_OBS` = 200) und eine Grundrate von 0,715. Der Waechter greift
+hier also nicht; das Ergebnis ist eine echte Null, keine Messluecke.
+
+Damit die Zahl nicht am Probe haengt, hat `--mask-train-decided` die abgelesenen
+Zellen zusaetzlich aus dem TRAININGSverlust genommen -- der Kopf bekommt die
+reine Vorhersageaufgabe, ohne Gradientenanteil fuer das Abschreiben:
+
+| Slot | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|------|---|---|---|---|---|---|---|---|---|
+| Skill bedingt, Training maskiert | -0,009 | +0,040 | **+0,110** | -0,014 | -0,016 | +0,012 | +0,020 | **+0,117** | +0,067 |
+
+Signifikant positiv sind dabei nur Slot 2 ([+0,050; +0,161]) und Slot 7
+([+0,055; +0,174]) -- und Slot 7 war im unmaskierten Lauf -0,121. **Die
+Vorzeichen einzelner Slots sind Rauschen** (Muster Trainings-Seed-Varianz), die
+belastbare Aussage ist der Betrag.
+
+### Aussage
+
+Vom Layout-Signal bleibt nach der Bedingung **hoechstens +0,12** uebrig, im
+Schnitt praktisch **null**; verloren gehen 0,33 bis 0,88 Skill-Punkte je Slot.
+Rund **90 % des gemessenen Layout-Skills war Fortschreiben der sichtbaren
+Platzierung.** Der Rest liegt in derselben Groessenordnung wie Ecke (0,0)
+(+0,124) -- also im Mittelband der uebrigen Atome und **nicht** auf dem Niveau,
+das einen eigenen Kopf-Block rechtfertigt. Der Vorbehalt von oben ist damit
+**geschlossen, zu Lasten des Layout-Signals**; die 9 Ausgaenge bleiben als
+Multiplikator-Abdeckung fuer Kriterium 3 berechtigt, aber sie sind nicht "das
+Starkste im Kopf".
+
+Damit ist derselbe Konfundierungstyp zum **vierten** Mal derselbe: Anwesenheit
+des Spezialfelds, Slot-Identitaet durch Poolung, entschiedene Platzierung -- und
+jetzt (siehe unten) die schon belegte Ownership-Zelle. Die Regel gilt
+ausnahmslos: **auf den noch UNENTSCHIEDENEN Teil bedingen, Referenz inbegriffen.**
+
+## OWNERSHIP-ZELLEN GEMESSEN (2026-08-10): 0 von 36 entartet
+
+Anlass ist die Richtung, den Ownership-Kopf in der Blattbewertung zu
+MAXIMIEREN. Die Konjunktionen sind dafuer untauglich -- 16 von 34 sind konstant,
+"Diagonale vollstaendig" hat Grundrate 0,000, ein Kopf, der "nie" sagt, liefert
+keinen Gradienten. Die Idee ist deshalb die konvexe Aggregation der
+RANDwahrscheinlichkeiten je Zelle, `(Summe P ueber die Zellen eines Kriteriums /
+n)^2 x Punktwert` nach dem Muster `wertung_progress`. Voraussetzung: die
+einzelnen Zellen muessen Signal tragen, auch wo die Vollendung nie eintritt.
+
+Instrument: `tools/atom_skill_check.py --target ownership` (bzw. `--target both`,
+ein Korpuslauf fuer beide Ziele), Labels aus dem AUTORITATIVEN
+`_ownership_from_dome`, gleicher Waechter, gleiche Partie-Trennung,
+150.000 Zustaende aus 1.268 Partien, Schnitt 1.015 / 253 Partien.
+
+### Der Konfundierer gilt auch hier -- drei Strata, getrennt ausgewiesen
+
+Auch eine belegte Zelle ist trivial ablesbar: 11.104 belegte Zellen geprueft,
+**0** davon im Endzustand nicht belegt. Deshalb trennt die Messung je Zelle und
+Zustand:
+
+| Stratum | Bedeutung | Zell-Beobachtungen (Stichprobe) |
+|---------|-----------|---------------------------------|
+| Zelle belegt | Endlabel trivial 1 -> ABLESEN | 11.104 |
+| Platte liegt, Zelle leer | Vorhersage INNERHALB der gelegten Platte | 41.772 |
+| Slot ohne Platte | Vorhersage einschliesslich der Plattenwahl | 31.220 |
+
+### BEFUND 1: die Zellen sind nirgends konstant -- auch nicht bei den teuren Kriterien
+
+**0 von 36 Zellen entarten**, auch unter der Bedingung. Genau dort, wo die
+Konjunktion tot ist, lebt die Zelle (bedingte Grundraten, Mittel je Geometrie):
+
+| Kriterium | Konjunktion (Grundrate) | Zellen des Kriteriums (bedingte Grundrate) |
+|-----------|-------------------------|--------------------------------------------|
+| K2 Diagonale H (+10) | **0,000 / 0,002** | **0,428** |
+| K2 Diagonale N (+10) | **0,000** | **0,321** |
+| K5 Eckslot (2,0) (+8) | 0,002 | **0,102** |
+| K5 Eckslot (2,2) (+8) | 0,004 | **0,085** |
+| K0 Reihe 5 (+3) | **0,000** | **0,115** |
+| K0 Reihe 6 (+3) | **0,000** | **0,081** |
+| K1 Spalte 1 (+7) | 0,004 | **0,421** |
+| K4 Randzellen (+1) | -- | 0,383 |
+
+Caveat wie oben in der Liste "Was NICHT belegt ist" (Punkt 5): diese Grundraten
+sind ZUSTANDS-, nicht brettgewichtet, lange Partien wiegen schwerer. Fuer die
+Frage "konstant oder nicht" aendert das nichts -- 0,08 gegen 0,000 ist kein
+Gewichtungseffekt --, fuer die exakte Hoehe schon.
+
+Das ist die entscheidende Vorbedingung, und sie **haelt**: die konvexe
+Aggregation bekommt ein lebendes, nicht gesaettigtes Ziel und einen echten
+Gradienten in genau den Kriterien, in denen die Konjunktion nichts liefert. Die
+niedrigste Einzel-Grundrate im ganzen Feld ist 0,072 -- weit ueber der
+Entartungsschwelle von 1 %.
+
+### BEFUND 2: das Vorhersage-Signal ist klein, und das PROBE ist die Grenze
+
+Zur Vorsicht gegen die Lesart "das Netz kann es nicht, also traegt die Zelle
+nichts" laeuft eine probe-freie Untergrenze mit: eine geglaettete
+5-Parameter-Tabelle `P(Label | Runde)`, auf den TRAININGSpartien gefittet,
+bedingt ausgewertet. Das MLP hat 1.015 unabhaengige Partien, aber 120.000 fast
+identische Zustaende -- es kann partiespezifisch memorieren und dabei unter die
+Grundrate fallen. Die Tabelle kann das nicht.
+
+| Mass | Wert |
+|------|------|
+| Rundentabelle, Schnitt ueber alle 36 Zellen | **+0,025** (positiv bei **36 von 36**) |
+| Rundentabelle, bester Wert | +0,072 (Zellen des Eckslots (0,0)) |
+| MLP mit maskiertem Training, Schnitt | **-0,027** |
+| MLP, bester Einzelwert | +0,202, KI [+0,071; +0,305] (Slot(0,0) F1) |
+
+**Jede** Zelle traegt also Signal ueber ihre eigene Grundrate hinaus -- aber das
+MLP-Probe faellt auf den meisten Zellen UNTER die triviale Tabelle. Die
+negativen MLP-Zahlen sind darum **keine** Aussage "kein Signal", sondern die
+Grenze dieses Probes. Die Groessenordnung des Zell-Signals liegt bei
+**+0,02 bis +0,07**, im besten Einzelfall +0,20.
+
+### BEFUND 3: vorhersagbar ist die Vollendung der LIEGENDEN Platte, nicht die Plattenwahl
+
+Mittlere bedingte Skills je Geometrie, getrennt nach den beiden
+unentschiedenen Strata (Training maskiert):
+
+| Gruppe | Grundrate | Skill bedingt | Tabelle | leer auf LIEGENDER Platte | Slot ohne Platte |
+|--------|-----------|---------------|---------|---------------------------|------------------|
+| K4 Randzellen (+1) | 0,383 | -0,018 | +0,023 | **+0,003** | -0,064 |
+| K4 Innenzellen | 0,396 | -0,038 | +0,027 | -0,013 | -0,083 |
+| K0 Reihe 1 (+3) | 0,750 | +0,037 | +0,036 | **+0,043** | -0,045 |
+| K0 Reihe 3 (+3) | 0,397 | -0,037 | +0,033 | +0,006 | -0,114 |
+| K0 Reihe 6 (+3) | 0,081 | -0,046 | +0,005 | -0,011 | -0,064 |
+| K1 Spalte 2 (+7) | 0,452 | +0,035 | +0,043 | **+0,060** | -0,049 |
+| K2 Diagonale H (+10) | 0,428 | +0,010 | +0,034 | **+0,040** | -0,043 |
+| K2 Diagonale N (+10) | 0,321 | -0,033 | +0,017 | -0,008 | -0,084 |
+| K5 Eckslot (0,0) (+3) | 0,844 | +0,083 | +0,070 | **+0,084** | -0,004 |
+| K5 Eckslot (2,0) (+8) | 0,102 | -0,073 | +0,008 | -0,057 | -0,083 |
+| K5 Eckslot (2,2) (+8) | 0,085 | -0,033 | +0,006 | +0,017 | -0,057 |
+
+Das Stratum "Slot ohne Platte" ist **durchgaengig negativ** (-0,004 bis -0,114),
+das Stratum "leere Zelle auf liegender Platte" traegt das gesamte positive
+Signal. Lesart: vorhersagbar ist, ob eine schon gelegte Platte fertig befuellt
+wird -- **nicht, welche Platte gewaehlt wird**. Und die teuren unteren Eckslots
+sind in beiden Strata signifikant unter der Grundrate (Eckslot (2,0):
+-0,068 bis -0,085, Konfidenzband vollstaendig negativ).
+
+### Urteil zur konvexen Aggregation
+
+1. **Die Voraussetzung haelt.** Anders als bei den Konjunktionen ist keine
+   einzige Zelle konstant, und die Zellen der teuren Kriterien (Diagonalen 0,43
+   / 0,32, untere Eckslots 0,10 / 0,09, Reihen 5-6 0,12 / 0,08) liefern
+   lebendige Grundraten. Ein `wertung_progress`-artiger Aggregat hat dort einen
+   Gradienten, wo die Konjunktion "nie" sagt. Das ist der belastbare Teil des
+   Befunds und spricht **fuer** die Aggregation als Trageform.
+2. **Das Signal ist klein, aber echt.** +0,02 bis +0,07 (probe-frei, 36/36
+   positiv) statt der 16 toten Ziele. Die Konjunktionen sind fuer ein
+   MAXIMIERTES Gewicht der falsche Traeger, die Zellen der richtige.
+3. **Unbewiesen bleibt der Nutzen in der Blattbewertung.** Der vorhersagbare
+   Anteil sitzt im Stratum "Platte liegt schon", und die Rundentabelle allein
+   holt fast alles davon -- ein rein rundenabhaengiger Anteil ordnet
+   Geschwisterblaetter derselben Runde ueberhaupt nicht. Ob das Aggregat BRETTER
+   unterscheidet, entscheidet dieses Offline-Mass nicht.
+4. **Konsequenz.** Vor einem hochgedrehten `OWNERSHIP_WEIGHT` gehoert die
+   Aggregation an das Instrument, das im Projekt schon zweimal die richtige
+   Antwort gab: Geschwister-Rangfolge / Arena, nicht der Offline-Skill. Die
+   bekannte Aufloesungsgrenze der Offline-Masse (~0,015 gegenueber der Arena)
+   liegt zu nah an den gemessenen +0,02 bis +0,07, um die Entscheidung zu tragen.
