@@ -3567,10 +3567,12 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return None;
     }
-    // Runde 5: informationsfreies Endspiel, siehe round5.rs -- exakte
-    // Alpha-Beta-Wahl statt Netz-PUCT (kein Netz noetig, kein
-    // Naeherungsfehler in der Wertungsplatten-Endwertung).
-    if crate::round5::applies(state) {
+    // Runde 5: exakte Alpha-Beta-Wahl statt Netz-PUCT -- die BLATTBEWERTUNG
+    // dort ist exakt (optimales Tiling + Endwertung des erreichten Bretts),
+    // was das Netz nur schaetzen kann. Dass das die bessere Wahl IST, war nie
+    // gegatet: siehe `round5::net_solver_enabled` fuer den Knopf und
+    // `PREREG_zufallsknoten.md` Teil E fuer die offene Gegenprobe.
+    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action(state);
     }
     // PREREG_ismcts_determinisierungen.md: Getter statt Konstante (siehe
@@ -3616,7 +3618,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return None;
     }
-    if crate::round5::applies(state) {
+    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action(state);
     }
     let k = num_determinizations();
@@ -3657,7 +3659,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     // Gewicht 1.0 (statt leer) macht `net_drafting_policy`s Zufalls-
     // Fallback (bei leerer Stats-Liste) nicht faelschlich fuer die
     // Aktionswahl zustaendig.
-    if crate::round5::applies(state) {
+    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action(state)
             .into_iter()
             .map(|a| (a, 1, 1.0))
@@ -3722,7 +3724,7 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return (Vec::new(), Vec::new(), None, Vec::new());
     }
-    if crate::round5::applies(state) {
+    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         let stats: Vec<(Action, u32, f64)> =
             crate::round5::choose_action(state).into_iter().map(|a| (a, 1, 1.0)).collect();
         let n = stats.len().max(1);
@@ -3902,7 +3904,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
     }
-    if crate::round5::applies(state) {
+    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action_with_analysis(state);
     }
     let k = num_determinizations();
@@ -4327,6 +4329,89 @@ mod tests {
 
     fn names() -> [String; 2] {
         ["P1".into(), "P2".into()]
+    }
+
+    /// TEIL E, NETZ-Haelfte (`PREREG_zufallsknoten.md`): schlaegt der GELERNTE
+    /// Blattwert den EXAKTEN in Runde 5? Dieselbe Skala wie die Loeser-Haelfte
+    /// -- Uebereinstimmung mit einer tiefen Referenzsuche (20.000 Knoten), auf
+    /// identischen Stellungen, weitergespielt mit der Orakel-Wahl.
+    ///
+    /// KEINE Arena: der Loeser sitzt in BEIDEN Bahnen, ein Wechsel hebt sonst
+    /// beide Seiten und die Siegquote bleibt blind (Symmetrie-Fallstrick, im
+    /// PREREG vermerkt).
+    ///
+    /// Der Netz-Zug wird ueber `build_net_tree` + `select_final_root_child`
+    /// geholt -- genau der Rumpf, den `net_search_drafting_action` bei k=1
+    /// (Default) ausfuehrt, also der Produktionspfad ohne den Runde-5-
+    /// Ruecksprung. Ueber `MOSAIC_R5_NET_SOLVER` waere das nicht testbar
+    /// (OnceLock, ein Wert je Prozess).
+    #[test]
+    #[ignore]
+    fn teil_e_net_half_oracle_agreement_probe() {
+        use crate::round_transition::drive_to_round_start;
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+        use std::time::{Duration, Instant};
+
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let net = match Net::load_auto(path.to_str().unwrap()) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Sonde uebersprungen.");
+                return;
+            }
+        };
+        const ORACLE: u64 = 20_000;
+        const SIMS: u32 = 400;
+        const C_PUCT: f64 = 1.5;
+
+        let mut rng = StdRng::seed_from_u64(20260810);
+        let mut total = 0usize;
+        let mut solver_agree = 0usize;
+        let mut net_agree = 0usize;
+        let mut both_same = 0usize;
+        for seed in [101u64, 202, 303, 404, 505, 606, 707, 808] {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut guard = 0u32;
+            while state.phase == Phase::Drafting && guard < 200 {
+                guard += 1;
+                let oracle = match crate::round5::choose_action_deadlined(
+                    &state,
+                    false,
+                    ORACLE,
+                    Instant::now() + Duration::from_secs(120),
+                ) {
+                    Some(a) => a,
+                    None => break,
+                };
+                let solver = crate::round5::choose_action(&state);
+                let nodes = build_net_tree(&net, None, &state, SIMS, C_PUCT, false, &mut rng, None, None);
+                let net_choice = select_final_root_child(&nodes).and_then(|b| nodes[b].action.clone());
+
+                total += 1;
+                if solver.as_ref() == Some(&oracle) {
+                    solver_agree += 1;
+                }
+                if net_choice.as_ref() == Some(&oracle) {
+                    net_agree += 1;
+                }
+                if solver.is_some() && solver == net_choice {
+                    both_same += 1;
+                }
+
+                let mut g = Game { state };
+                if g.apply_drafting(&oracle).is_err() {
+                    break;
+                }
+                state = g.state;
+            }
+        }
+        let pc = |x: usize| if total > 0 { 100.0 * x as f64 / total as f64 } else { 0.0 };
+        println!("TEIL E NETZ-HAELFTE: Orakel = {ORACLE} Knoten, {total} Entscheidungen");
+        println!("  Loeser@200  : {solver_agree}/{total} = {:.1}%", pc(solver_agree));
+        println!("  Netz@{SIMS}   : {net_agree}/{total} = {:.1}%", pc(net_agree));
+        println!("  beide gleich: {both_same}/{total} = {:.1}%", pc(both_same));
     }
 
     #[test]
