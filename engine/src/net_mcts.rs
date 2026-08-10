@@ -6653,7 +6653,34 @@ mod tests {
             checked += 1;
         }
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
-        assert!(index1_changed >= 1, "kein einziges Spielpaar mit unterschiedlichem Gegnerfortschritt gefunden");
+
+        // Teil 3 DETERMINISTISCH, nicht aus Zufallsstellungen (Aenderung
+        // 2026-08-11): seit Kriterium 6 aus `wertung_progress_alpha` heraus ist
+        // (es haelt `unlock_progress_beta`, sonst Doppelzaehlung), liefert die
+        // Funktion auf FRUEHEN Drafting-Stellungen fuer beide Seiten 0 -- alle
+        // konjunktiven Kriterien brauchen Kuppelfuellung, und die gibt es dort
+        // noch nicht. Der Zufallsaufbau konnte die Eigenschaft damit nicht mehr
+        // belegen (`index1_changed` blieb 0, der Waechter des Tests hat das
+        // korrekt gemeldet statt still durchzulaufen). Statt den Waechter
+        // aufzuweichen: dieselbe Aussage deterministisch, Muster wie im
+        // Nachbartest `..._both_sides_gain_no_antisymmetry`.
+        let mut rng2 = StdRng::seed_from_u64(70012);
+        let mut det = setup_new_game(names(), 0, &mut rng2);
+        det.scoring_tile_ids = vec![4]; // linear, positiv fuer jedes n>0
+        det.players[0] = board_with_border_fill(3);
+        det.players[1] = board_with_border_fill(2);
+        let mut det_swapped = det.clone();
+        det_swapped.players[1] = board_with_border_fill(5); // NUR Gegnerbrett anders
+
+        let o1 = apply_wertung_shaping_with([0.5, 0.5], &det, w, alpha);
+        let o2 = apply_wertung_shaping_with([0.5, 0.5], &det_swapped, w, alpha);
+        assert_eq!(o1[0], o2[0], "Index 0 darf nicht vom Gegnerbrett abhaengen");
+        assert_ne!(
+            o1[1], o2[1],
+            "Index 1 MUSS auf den Gegnerbrett-Tausch reagieren (per-Spieler-absolut, nicht ego-only)"
+        );
+        assert!(o2[1] > o1[1], "mehr Gegnerfortschritt muss Index 1 ERHOEHEN, nicht senken");
+        let _ = index1_changed;
     }
 
     #[test]
