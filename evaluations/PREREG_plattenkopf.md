@@ -1779,20 +1779,27 @@ Term: frueh "fang etwas an", spaet "mach fertig".
 
     alpha(r) = alpha_0 + k * (r - 1)      zwei Zahlen statt einer
 
-### PARITAETS-VORBEHALT (nicht optional)
+### DIE HEURISTIK WIRD NICHT ANGEFASST (Nutzer-Rueckfrage 2026-08-10)
 
 `wertung_progress` haengt an `mcts.rs:82` und damit an der HEURISTIK -- dem
-**Elo-Anker**. Bewegt sich dort der Default, verschiebt sich der Anker und die
+**Elo-Anker**. Bewegt sich dort irgendetwas, verschiebt sich der Anker und die
 gesamte Elo-Historie wird unvergleichbar.
 
-`.powi(2)` und `.powf(2.0)` sind NICHT garantiert bitgleich (`powi(2)` wird
-ueblicherweise zu `x*x` uebersetzt, `powf` geht durch den allgemeinen
-pow-Pfad). Bei fixem Paritaets-Hash ist das kein Detail. Also verzweigen:
+**`wertung_progress` bleibt unveraendert -- kein Zeichen.** Das Vorhaben ist ein
+ZWEITER AUFRUFER aus dem Netz-Pfad, keine Aenderung der Funktion.
 
-    if alpha == 2.0 { x.powi(2) } else { x.powf(alpha) }
+Ich hatte zuerst eine Verzweigung IN der Funktion vorgeschlagen
+(`if alpha == 2.0 { x.powi(2) } else { x.powf(alpha) }`), weil `.powi(2)` und
+`.powf(2.0)` nicht garantiert bitgleich sind (`powi(2)` wird ueblicherweise zu
+`x*x` uebersetzt, `powf` geht durch den allgemeinen pow-Pfad). Das ist
+zurueckgezogen: es haette die Anker-Funktion angefasst, um sie anschliessend per
+Argument zu schuetzen.
 
-Dann trifft die Paritaetsprobe `8c6684ff...` weiter und der Regler wirkt
-ausschliesslich dort, wo er gesetzt wird.
+**Stattdessen eine eigene Funktion daneben**, nur vom Netz-Pfad benutzt, mit
+alpha und den Kopf-Marginalen als Parametern. Der Anker ist dann durch
+KONSTRUKTION geschuetzt, nicht durch eine Bedingung: kein `powf` in seinem Pfad,
+kein Hash-Risiko. Die paar Zeilen Doppelung sind Absicht und werden als solche
+kommentiert.
 
 **Und der entscheidende Befund**: der Term haengt an `mcts.rs:82`, dem
 HEURISTIK-Pfad. Das Netz hat ihn nie bekommen. Genau deshalb baut die Heuristik
@@ -1861,3 +1868,43 @@ Vorhersagbar ist die **Vollendung einer liegenden Platte** (Gruppenmittel bis
 -0,004 bis -0,114). Der Term sagt also "mach fertig, was du angefangen hast" --
 das ist der Commitment-Druck, der dem Champion fehlt -- aber er kann nicht sagen
 "fang das Richtige an".
+
+---
+
+## Reihenfolge UMGEKEHRT + tote Konjunktionen sind ein Instrument (2026-08-10)
+
+Nutzer: *"wir nehmen die konjuktionsspalten natuerlich nicht raus. die werden
+sich fuellen mit der zeit"*
+
+**1. Die 16 entarteten Konjunktionsspalten bleiben.** Sie kosten nichts
+(gesaettigte BCE-Spalten liefern keinen Gradienten, der Anteil verschiebt sich
+von selbst auf die lebenden), ein Ausbau wuerde Kopfbreite und ONNX-Vertrag
+aendern und waere nicht billig rueckgaengig zu machen.
+
+**2. Sie sind ein FORTSCHRITTSMESSER, nicht bloss schlafende Kapazitaet.**
+Grundrate 0,000 heisst "kommt in diesem Korpus nicht vor" -- Diagonale, Spalte 1,
+Reihen 5/6, Eckplatten 0,002/0,004. Steigen sie, hat sich das VERHALTEN
+geaendert. Kostenlos, arena-unabhaengig, ohne Training: je neuem Self-Play-Korpus
+die Grundraten auslesen. Werkzeug existiert (`plattenkopf_labels.py stats`,
+`atom_skill_check.py` berichtet sie mit) -- KEIN neues bauen.
+
+**3. Meine Reihenfolge war umgekehrt falsch.** Ich hatte den Kopf als
+Voraussetzung des Formungsterms geplant. Der Formungsterm braucht den Kopf NICHT
+-- er lebt von den GEZAEHLTEN Feldern (Nutzer: *"aber er sagt zumindest fang
+etwas an"*). Also: Formungsterm aendert das Verhalten -> Konjunktionen fuellen
+sich -> ERST DANN kann der Kopf die Korrelation zwischen den sechs Feldern einer
+Linie tragen, die die Produktnaeherung ueber Marginalen nicht abbildet.
+
+Drei Vorhaben, keines wartet auf ein anderes:
+
+  (a) HILFSZIEL  `--ownership-weight 0.2`, faehrt auf dem faelligen
+      Cache-Neubau mit, KEIN Engine-Eingriff. Prueft die urspruengliche
+      Begruendung aus `config.py` (72-140 Gradienten je Position statt einem
+      Skalar; beste Checkpoints lagen bei v15/v16/v17 stets in Epoche 1-3).
+      Ein Wert, kein Sweep (Task-D-Praezedenz: alle Arme H0), >=6 gepaarte
+      Seeds, entschieden an Prior-Masse Top-3 + Kendall-Tau (7/7), nicht
+      val_brier.
+  (b) FORMUNGSTERM  zweiter Aufrufer aus dem Netz-Pfad, `wertung_progress`
+      unangetastet. DER EINZIGE der drei, der das Verhalten aendern kann.
+  (c) AUSLESE ueber die Marginalen -- ZULETZT, weil sie erst nach (b) eine
+      beantwortbare Frage ist.
