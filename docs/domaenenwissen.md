@@ -210,6 +210,30 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
   der Farb-Score ist positions- und rotationsunabhängig, der Eckbonus für alle
   vier Ecken identisch → immer Ecke (0,0), immer 0°. Position und Rotation sind
   tote Freiheitsgrade; nur die Platten-WAHL variiert.
+- **Zufalls-Boden gemessen** (`plattenkopf_referenzlauf_zufall`, 400 Partien,
+  uniformes Drafting): **8,35 von 36** Feldern belegt, Reihen/Spalten/Diagonalen
+  vollständig in **0,000–0,001** der Bretter, Spezialfeld-Freischaltungen
+  **0,10** je Brett (4,397 von 4,500 vorhandenen bleiben leer). Der Champion mit
+  15,72 belegten Feldern ist also klar besser als blindes Ziehen — der Abstand
+  nach oben ist trotzdem groß.
+- **Das Defizit ist ein PLATZIERUNGS-, kein Mengenproblem.** Innerhalb
+  derselben Watchlist-Partien: KI **17,2** Kuppel-Legungen, Mensch **17,5** —
+  praktisch gleich viel. Freischaltungen **0,6 gegen 3,1**. Die KI legt genauso
+  viele Steine, nur dorthin, wo sie keine Platte vollenden.
+- **Der Engpass ist das DRAFTING, nicht das Tiling** (aus
+  `archive/history.md:10112-10140`, v19-Ära; von mir dort gelesen, die
+  Ursprungsmessungen nicht nachgeprüft): der Tiling-Solver KANN chippen
+  (`TilingStep::Chips`), und „chip-abschließbar" ist **bereits ein expliziter
+  Netz-Input** (Chip-Farbzähler + Abschließbarkeits-Flag je Musterreihe in
+  `state_to_tensor`). Es fehlt also weder Ausführung noch Information. Was fehlt,
+  sind **tiefe Reihen**: R5+R6-Nahmen Mensch 37 %, KI 22 % (v19) bzw. 40,4 % zu
+  22,7 % (v20, Watchlist) — **über zwei Ären stabil**, die Drafting-Seite
+  derselben Sache, die der Musterreihen-Durchsatz von der Ergebnisseite zeigt.
+  Ebenfalls dort protokolliert und wichtig, weil es eine naheliegende Erklärung
+  ausschließt: die These einer „selbstverstärkenden Schleife" wurde
+  ZURÜCKGEZOGEN — der Korpus ist voll mit Chip-Abschlüssen (4,92 je Partie im
+  v18-Korpus, 4,85 in frischen v19wdl-Sockeln). Die KI chippt im Self-Play
+  routiniert.
 - **Mensch gegen Champion** (10 gewertete Partien, `watchlist_v20_zwischenlese.md`):
   Mensch 7:3, Ø +14,5 Punkte. Größter Einzelposten sind die Spezialpunkte —
   **10,3 gegen 1,3 je Partie**, also 9,0 der 14,5 Punkte Differenz. Die KI
