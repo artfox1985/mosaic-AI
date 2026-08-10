@@ -1,3 +1,23 @@
+> **UEBERHOLT -- NICHT MEHR ALS ARBEITSANWEISUNG LESEN (Stand 2026-08-10).**
+>
+> Die v21-Spirale ist durchlaufen: Champion `v21_2d_brierbest` (Elo 1358),
+> Task D (Gewichts-Sweep) mit allen drei Armen H0 abgeschlossen, ISMCTS-k
+> geschlossen. Dieses Dokument bleibt als PROTOKOLL des ausgefuehrten Plans
+> erhalten -- die darin genannten Kommandos sind Vorlagen, aber die
+> Reihenfolge und die "laeuft noch"-Abschnitte stimmen nicht mehr.
+>
+> **Aktueller Fahrplan: `evaluations/STATUS.md`.**
+>
+> Was hier noch gilt und weiterverwendet werden soll: die Kommando-Muster
+> fuer Self-Play/Cache/Training/Gating, das Fenster-Pinning mit BEIDEN
+> Variablen (`MOSAIC_DATA_EXCLUDE` + `MOSAIC_CARRIER_MANIFEST`) und die
+> Verifikationspflicht an der Cache-Zeile. Diese Punkte sind in STATUS.md
+> unter GELTENDE REGELN gespiegelt.
+>
+> Nicht geloescht, weil ein durchgefuehrter Plan der beste Beleg dafuer ist,
+> WIE eine Generation tatsaechlich gebaut wurde -- fuer den naechsten
+> Zyklus die genauere Vorlage als eine neu geschriebene Anleitung.
+
 # UEBERGABE: v21-Spirale (Self-Play -> Training -> Gating -> Auswertung)
 
 **Stand 2026-08-08 vormittags.** Dieses Dokument ist die vollstaendige
