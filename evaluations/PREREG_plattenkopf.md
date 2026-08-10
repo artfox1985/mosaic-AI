@@ -781,3 +781,57 @@ Ereignis (Grundrate ~0,10). Vermerk erledigt.
 - Kalibrierung durchweg uebermuetig (Steigungen < 1) ⇒ Platt-Parameter je
   Slot sind Pflicht fuer Stufe B, nicht optional.
 - Der Slot-Gradient ist der inhaltliche Kern und generationsstabil.
+
+## VERDRAHTUNG: Weg 1 entfaellt, das Vorbild heisst `ownership`
+
+Befund 2026-08-10 nachts, entscheidet die offene Frage:
+
+**Der HDF5-Cache fuehrt `game_id` NICHT mit.** Er schreibt 19 Datasets
+(`states`, `policies`, `values`, ..., `ranking_mask`, `neural_net.py:1328ff`),
+die Partie-Kennung existiert nur WAEHREND des Baus. Eine Seitendatei
+(`data/plate_labels_v1.json`) laesst sich beim Training also nicht anbinden --
+es fehlt der Schluessel. **Weg 1 entfaellt.**
+
+Der Dump behaelt damit nur noch die Rolle eines **unabhaengigen
+Gegenpruef-Artefakts**: die im Cache gerechneten Labels lassen sich dagegen
+halten. Das war nicht seine geplante Rolle, und das gehoert so gesagt.
+
+### Das Vorbild ist `ownership` -- exakt dasselbe Muster
+
+`_final_ownership_by_game` (`neural_net.py:890`) baut `game_id -> Labels aus
+dem LETZTEN Record` und verteilt sie im Datensatz-Durchlauf
+(`neural_net.py:1690`). Genau das brauchen die Plattenlabels. Die
+Implementierung ist damit kein Neubau, sondern das Spiegeln eines laufenden
+Mechanismus.
+
+### Zwei Details, die das Vorbild offenlegt -- und die mein Rauchtest FALSCH macht
+
+1. **Unvollstaendige Partien.** `_final_ownership_by_game` prueft
+   `last.get("completed")` und setzt sonst `None`; im Datensatz wird daraus
+   `-1` als Maskierungsmarke, im Loss maskiert. Mein Rauchtest UND der
+   Label-Dump nehmen den letzten Datensatz **ungeprueft** -- bei abgebrochenen
+   Partien waeren die Labels frei erfunden. Fuer die Lernbarkeitsfrage
+   unerheblich (der Anteil ist klein), fuer den Trainingslauf nicht.
+2. **Perspektive.** Das Ownership-Ziel ordnet nach `current_player` um, sodass
+   "ich" immer zuerst steht (`c = step["state"]["current_player"]`, dann
+   `first, second`). Der Plattenkopf MUSS dieselbe Konvention tragen, sonst
+   lernt er die Slots des falschen Spielers. Mein Rauchtest hat
+   `rec["player"]` benutzt -- vermutlich identisch, aber das gehoert geprueft,
+   nicht vermutet.
+
+### Rezept fuer die Implementierung (abgeleitet, nicht erfunden)
+
+1. `_final_plate_c6_by_game(game_data)` nach dem Muster von
+   `_final_ownership_by_game`, inklusive `completed`-Pruefung.
+2. Im Datensatz-Durchlauf je Record: Labels des Spielers `current_player`
+   holen, `-1` bei fehlenden.
+3. Zwei Datasets: `plate_c6` (9 int8) und `plate_c6_mask` (1 int8, gesetzt
+   wenn Platte 6 in `scoring_tile_ids` UND die Partie `completed` ist).
+4. Cache-Key: Suffix `+plate_v1` NUR bei gesetztem Flag (Muster `+enc2d_v1`,
+   `neural_net.py:1142`). **KEIN `VALUE_SCHEMA_VERSION`-Bump.**
+5. `train.py`: `--plate-head`, BCEWithLogits auf die 9 Logits, maskiert.
+6. **Integrationsprobe** auf ~10 Dateien + 1 Epoche, DANN der volle Lauf.
+
+Damit ist die Verdrahtung vollstaendig spezifiziert und an einem
+funktionierenden Vorbild belegt -- der Teil, der die Nacht gekostet haette,
+wenn man ihn im Nachtlauf entdeckt.
