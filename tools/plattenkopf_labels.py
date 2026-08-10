@@ -203,6 +203,48 @@ def cmd_stats(args) -> int:
     return 0
 
 
+def cmd_dump(args) -> int:
+    """Schreibt die Labels als eigenstaendige Datei: Partie -> 9 Atome je Spieler.
+
+    Bewusst als SEITENDATEI und nicht in den HDF5-Cache: der Cache-Bau ist der
+    gemeinsame Pfad aller Trainings, und die Labels lassen sich jederzeit
+    deterministisch neu erzeugen. Wer sie in den Cache zieht, braucht dort
+    zusaetzlich den Key-Suffix `+plate_v1` (Muster `+enc2d_v1`), damit der
+    vorhandene v21-Cache NICHT entwertet wird -- ein
+    `VALUE_SCHEMA_VERSION`-Bump waere dafuer das falsche Werkzeug.
+
+    Nur Kriterium 6 (c6): c3 hat im Rauchtest keinen Skill, siehe
+    `evaluations/PREREG_plattenkopf.md`.
+    """
+    import json
+
+    out = {}
+    files_done = 0
+    for path, records in iter_corpus(args.pattern, args.files):
+        files_done += 1
+        for gid, recs in group_games(records).items():
+            last = recs[-1]["state"]
+            active = sorted(last.get("scoring_tile_ids") or [])
+            per_player = [atoms_criterion6(p) for p in last["players"]]
+            out[gid] = {"c6": per_player, "active": active}
+        if files_done % 200 == 0:
+            print(f"  {files_done} Dateien, {len(out)} Partien ...", flush=True)
+
+    dest = REPO / args.out
+    dest.write_text(json.dumps({
+        "version": "plate_v1",
+        "criterion": 6,
+        "slots": NUM_SLOTS,
+        "note": ("Atome je Kuppelslot: 1 = Spezialfeld am Ende LEER. Labels aus dem "
+                 "LETZTEN Tiling-Schritt, nicht dem Zustand nach Spielende -- exakte "
+                 "Endlabels liegen im Bestandskorpus nicht vor (siehe PREREG)."),
+        "games": out,
+    }), encoding="utf-8")
+    print(f"{len(out)} Partien aus {files_done} Dateien -> {dest}")
+    print(f"Groesse: {dest.stat().st_size/2**20:.1f} MiB")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pattern", default="selfplay_v20wdl_*.pkl",
@@ -211,10 +253,14 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("check")
     sub.add_parser("stats")
+    d = sub.add_parser("dump")
+    d.add_argument("--out", default="data/plate_labels_v1.json")
     args = ap.parse_args()
     args.files = args.files or None
     if args.cmd == "stats":
         return cmd_stats(args)
+    if args.cmd == "dump":
+        return cmd_dump(args)
     return cmd_check(args)
 
 

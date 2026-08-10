@@ -53,7 +53,48 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 | **Runde 5** | Zufallsknoten SCHARF -- die Suche ist jetzt Expectiminimax. Versatz null gemessen (-0,47 Pkt, SE 0,66, t=-0,71 ueber 43 Abweichungen). |
 | **Plattenkopf-Rauchtest** | **c6 traegt (Skill +0,574), c3 NICHT (-0,036 und fallend)**. Gebaut wird nur c6; c3 bleibt offen, nicht verworfen. |
 
-**Laeuft jetzt (GPU):** Stufe A des Plattenkopfs im grossen Zuschnitt --
+**PLATTENKOPF STUFE A ABGESCHLOSSEN UND REPLIZIERT.** c6-Skill **+0,637**
+(v20-Korpus, 2.537 Partien) und **+0,655** (v19-Korpus, 2.530 Partien);
+c3 bei +0,004 / -0,008, also ohne Skill ⇒ **c3 bleibt draussen**. Der
+inhaltliche Kern ist der **Slot-Gradient**: ein Spezialfeld bleibt in der
+unteren Slot-Reihe in ~84 % der Partien leer, in der oberen in ~13 % --
+monoton, und ueber zwei Generator-Aeren praktisch deckungsgleich, also
+Spielstruktur statt Champion-Verhalten. Das bestaetigt die Nutzer-Taktik
+("keine Spezialkuppeln in Slot-Reihe 3") quantitativ und begruendet die
+Slot-weise Fassung: ein Aggregat wuerde den Gradienten verschlucken, genau
+wie die Heuristik mit ihrem pauschalen `-3 * special_empty`.
+Vorbehalt: alle Platt-Steigungen liegen unter 1 (0,44-0,81), der Kopf ist
+uebermuetig ⇒ Platt-Parameter je Slot sind fuer Stufe B PFLICHT.
+Logs: `logs/plattenkopf_stufeA.log`, `logs/plattenkopf_stufeA_v19.log`.
+
+**MODELLSEITE GEBAUT**: `plate_head` (9 Logits) in beiden Modellklassen,
+additiv, Default aus, Ausgabe zuletzt im Tupel, Praesenz aus dem Checkpoint.
+Champion laedt unveraendert. Der Groessen-Ratschen-Waechter hat den ersten
+Versuch abgelehnt -- Antwort war Kuerzung statt neuer Basislinie, die Datei
+ist jetzt netto kleiner als vorher.
+
+**Laeuft jetzt (CPU):** Label-Dump ueber den GESAMTEN Korpus nach
+`data/plate_labels_v1.json` (Partie -> 9 Atome je Spieler + aktive Platten).
+Log: `logs/plattenkopf_labels_dump.log`. Die Labels braucht JEDE
+Verdrahtungsvariante, deshalb zuerst.
+
+**ENTSCHEIDUNG FUER DEN MORGEN -- zwei Wege fuer die Verdrahtung:**
+1. **Seitendatei** (laeuft gerade): `train.py` liest `plate_labels_v1.json`
+   und verbindet ueber `game_id`. Beruehrt den gemeinsamen Cache-Pfad NICHT.
+   Haken: der HDF5-Cache fuehrt `game_id` moeglicherweise nicht mit -- das
+   ist VOR dem Bau zu pruefen.
+2. **In den Cache**, mit Key-Suffix `+plate_v1` nur bei gesetztem Flag
+   (Muster `+enc2d_v1`). Sauberer im Datenfluss, aber eine Aenderung am
+   gemeinsamen Cache-Bau. **KEIN `VALUE_SCHEMA_VERSION`-Bump** -- der wuerde
+   den vorhandenen v21-Cache entwerten, ohne Not.
+
+Ich habe Weg 2 heute Nacht bewusst NICHT begonnen: `MosaicDataset` ist die
+delikateste verbleibende Stelle, und ein Fehler dort haette eine
+Cache-Neubau-Nacht gekostet. Danach in beiden Faellen: Verlustterm in
+`train.py` mit Maskierung auf Partien mit aktiver Platte 6, dann
+Integrationsprobe auf ~10 Dateien und 1 Epoche, DANN der volle Lauf.
+
+**Frueherer Stand (Stufe A lief noch):** Stufe A des Plattenkopfs --
 400 Dateien, bis 300.000 Zustaende, Schnitt nach Partie, Fruehstopp, plus
 **Kalibrierung je Slot** (Platt-Steigung), die die Vorregistrierung als
 Entscheidungsgroesse verlangt. Log: `logs/plattenkopf_stufeA.log`.
