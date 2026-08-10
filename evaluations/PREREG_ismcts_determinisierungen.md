@@ -559,17 +559,41 @@ uebersteht die Bonferroni-Korrektur fuer 3 Familienvergleiche
 Welten sind kein Mittelwert bei unserem Seed-Rauschen") beantwortet, ohne
 dass die Schliessung auf dem schwachen Arm ruht.
 
-### Die Lesart ist NICHT "verdeckte Information ist irrelevant"
+### KORREKTUR meiner Lesart (noch am 2026-08-10, beim Index-Nachziehen)
 
-Die Messung ist rechenneutral. Sie sagt: **Baum-Vervielfachung kostet mehr,
-als die Information einbringt** -- k Welten a 600 Sims verlieren gegen eine
-Welt a 600 Sims mit demselben Budget... praeziser: gegen k=1 bei 600, wobei
-k=2/k=4 dasselbe GESAMT-Budget auf mehrere Baeume verteilen und damit je
-Baum flacher suchen. Der Verlust ist also ein Tiefenverlust, nicht ein
-Beweis fuer Irrelevanz der verdeckten Information.
+Ich hatte oben geschrieben, die Messung sei "rechenneutral" und der Verlust
+ein **Tiefenverlust**, weil dasselbe Gesamtbudget auf mehrere Baeume
+verteilt werde. **Das ist falsch.** Die Laeufe heissen
+`paired_arena_env_ismcts_tiefe_k*` -- "tiefe" = GLEICHE TIEFE JE WELT: die
+Arena-Koepfe sagen `@600` (k=1), `@1200` (k=2), `@2400` (k=4). Jede Welt
+bekam 600 Sims, das GESAMTBUDGET wuchs mit k.
 
-**Konsequenz fuer den Nachfolger (`PREREG_zufallsknoten.md`)**: diese
-Evidenz mahnt zum Kostentor auch beim AUFGEZAEHLTEN Knoten. Sein Vorteil
-ist, dass er nur den Teilbaum unter einem Aufdecken vervielfacht statt
-mehrere volle Wurzelbaeume -- aber die Richtung der Evidenz ist eine
-Warnung, keine Ermutigung.
+k=4 hatte also das **Vierfache an Rechenzeit** und verlor trotzdem
+signifikant (-8,75pp, Block-t -3,73, McNemar p=0,00262). Das ist der
+STAERKERE Befund: kein Tiefenverlust, sondern **das Mitteln ueber gezogene
+Welten schadet aktiv**. Plausibler Mechanismus: die gemittelte
+completed-Q-Politik (`average_completed_q_policy`) mischt Plaene, die je
+Welt kohaerent sind, zu einem der in keiner Welt gut ist -- genau die
+Strategy Fusion, gegen die k antreten sollte.
+
+Damit stuetzen sich beide Versuchsanordnungen gegenseitig:
+
+| Anordnung | k=1 | k=2 | k=4 |
+|-----------|-----|-----|-----|
+| Sims-Split (Gesamtbudget FIX, `..._ismcts_k.json`) | 304/400 = 76,0% | 309/400 = 77,3% | 280/400 = 70,0% |
+| Gleiche Tiefe je Welt (Budget WAECHST, `..._tiefe_k*.json`) | 327/400 = 81,75% | 308/400 = 77,0% | 292/400 = 73,0% |
+
+Unter beiden Anordnungen faellt k=4 ab -- einmal mit gleichem, einmal mit
+vierfachem Budget. Die Familie ist damit nicht nur "nicht besser", sondern
+in der oberen Dosis nachweislich schlechter.
+
+### Konsequenz fuer den Nachfolger
+
+Die Warnung an `PREREG_zufallsknoten.md` bleibt bestehen, wird aber
+praeziser: gefaehrlich ist nicht die Baum-Vervielfachung als Kostenfaktor,
+sondern das **Mitteln ueber Stichproben eines unbekannten Zustands**. Der
+aufgezaehlte Zufallsknoten am AUFDECK-Punkt ist davon strukturell
+verschieden -- er mittelt Ausgaenge, die danach oeffentlich sind, statt
+Plaene aus nicht unterscheidbaren Welten. Genau dieser Unterschied ist der
+Grund, warum der Knoten an die Aufdeck-Stelle gehoert und nicht an die
+Wurzel.
