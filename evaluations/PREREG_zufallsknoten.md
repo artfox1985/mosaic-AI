@@ -797,3 +797,67 @@ GELERNTER Blattwert gegen den exakten. Nur diese Haelfte von Teil E kann
 noch etwas entscheiden, und sie braucht den Knopf, der `round5::applies`
 fuer den Netzpfad ausschaltet (existiert noch nicht) plus die
 Orakel-Referenz von oben als gemeinsame Skala.
+
+## SCHARFGESCHALTET 2026-08-10 -- und die Suche heisst jetzt anders
+
+Nutzer-Entscheid: *"ja gehen scharf"*, danach *"haben wir jetzt eigentlich
+ein derivat von einem alpha beta solver? weil wir haben ja
+wahrscheinlichkeiten wegen den bonuschips"*.
+
+**Ja -- die Suche ist jetzt Expectiminimax**, nicht mehr Minimax mit
+Alpha-Beta: Max-/Min-Knoten mit Cutoffs plus **Zufallsknoten** an den
+Aufdeck-Stellen (Ballards *-Minimax-Familie; klassische Anwendung
+Backgammon, und genau diese Struktur hat das Spiel). Der Modulkopf von
+`round5.rs` ist entsprechend neu geschrieben -- er behauptete "exakte
+Alpha-Beta-Suche" und "Full-Information-Endspiel", und beides ist in dieser
+Sitzung widerlegt worden.
+
+### Grundlage des Scharfschaltens
+
+`r5_chance_arming_sign_probe`, 80 Seeds:
+
+| | Wert |
+|---|---|
+| Entscheidungen | 1371 |
+| Abweichungen an-vs-aus | 43 (3,1 %) |
+| Delta (Punkte, Sicht des Ziehenden) | **-0,47** |
+| SE / t | 0,66 / **-0,71** |
+| Median | **+0,00** |
+| Spanne, davon negativ | -10 .. +16, 13/43 |
+
+**H0 -- Versatz null, gemessen statt behauptet.** Auflösung ca. +-1,3 Pkt je
+abweichender Entscheidung, bei ~0,5 Abweichungen je Partie also ~+-0,02 Pkt
+je Partie.
+
+**Wichtig fuer die Protokolltreue**: ein Zwischenstand mit nur 4
+Abweichungen zeigte -2,75 Pkt und haette zum gegenteiligen Schluss gefuehrt;
+das trug ein einzelner -13-Fall. Ausgeloest wurde die richtige Messung durch
+eine Nutzer-Korrektur -- ich hatte den Versatz mit "die Abweichungen liegen
+in der Runde mit der geringsten Hebelwirkung" begruenden wollen, und Runde 5
+hat die GROESSTE Hebelwirkung (der Zahltag), nur die geringste FREIHEIT (das
+Kuppelraster ist fix). Das falsche Argument haette ein richtiges Ergebnis
+gestuetzt -- der unangenehmste Fehlertyp.
+
+### Anker-Behandlung
+
+Der Loeser sitzt in BEIDEN Bahnen, das Scharfschalten verschiebt also den
+Anker mit. Behandlung:
+
+- **Versatz null**, begruendet aus der Messung oben, NICHT aus einer
+  Anker-Kante. Die geplante Aequivalenz-Arena haette den Effekt nicht
+  aufloesen koennen (Auflösung +-4,4pp gegen ~0,02 Pkt/Partie) und waere
+  eine erschlichene Freigabe gewesen.
+- `MOSAIC_R5_CHANCE_NODES=0` stellt das alte Verhalten her -- gebraucht, um
+  eine Alt-Elo-Kante zu reproduzieren.
+- Die Paritaets-Sonde ist NICHT betroffen: sie hasht Runde-1-bis-3-Zustaende
+  (`tools/paritaets_probe.py`), Runde 5 liegt ausserhalb ihrer Pruefflaeche.
+- Elo-Zeilen ab heute tragen die neue Anker-Definition. Die `knobs`-Spalte
+  in `elo_history.csv` erfasst nur ENV-Ueberschreibungen, ein Default-Wechsel
+  steht also nicht darin -- Datum und dieser Eintrag sind die Grenze.
+
+### Was bewusst NICHT gebaut ist
+
+Star1/Star2-Pruning innerhalb der Zufallsknoten. Braucht Wertgrenzen je
+Ausgang; bei <=4 Ausgaengen und 200 Knoten ist der Verzicht billiger als die
+Buchhaltung -- und nachweisbar korrekt, waehrend ein falsch begruendeter
+Cutoff auf Teilsummen still verzerren wuerde.

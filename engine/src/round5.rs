@@ -1,23 +1,52 @@
-//! Exakte Alpha-Beta-Suche für Runde 5.
+//! Runde-5-Endspielsuche: **Expectiminimax** mit Alpha-Beta auf den
+//! Entscheidungsknoten.
 //!
-//! Ab Runde 5 wird keine Kuppelplatte mehr gelegt (`board.rs`,
-//! `can_place_dome_tile`) und kein Kuppelstapel-Zug mehr angeboten
-//! (`game.rs`, `validate_draw_stack_peek`). Sämtliche Zufälligkeit einer
-//! Runde (Fabrik-Befüllung aus dem Beutel, Bonuschip-Zuteilung) läuft
-//! synchron und vollständig in `setup_new_round` ab, BEVOR die
-//! Drafting-Phase extern erreichbar wird (siehe `state.rs::setup_new_round`,
-//! `game.rs::next_round`) -- `moon_order` ist reine Spielerwahl, keine
-//! Zufallskomponente. Ab Rundenbeginn ist Runde 5 also ein Full-
-//! Information-Endspiel: PUCT/Netz-Approximation (Stufe 1/2) wird hier
-//! durch exakte Minimax-Suche mit Alpha-Beta-Pruning ersetzt.
+//! ## Was diese Suche IST
 //!
-//! Zusätzlicher Vorteil gegenüber Stufe 1/2 in dieser Runde: das
-//! Kuppelraster ändert sich nicht mehr, daher ist die Wertungsplatten-
-//! ENDWERTUNG (`calculate_end_scoring`, exakt) über den GESAMTEN
-//! Suchbaum ein fixer Wert je Spieler -- im Unterschied zu
-//! `wertung_progress` (stetige Fortschritts-Heuristik, in früheren Runden
-//! nötig, weil sich das Kuppelraster dort noch ändert) führt die exakte
-//! Endwertung hier zu keinem Näherungsfehler.
+//! Max-/Min-Knoten mit Alpha-Beta-Cutoffs, dazu **Zufallsknoten** an den
+//! Stellen, an denen verdeckte Information oeffentlich wird (Ballards
+//! *-Minimax-Familie; die klassische Anwendung ist Backgammon, und genau
+//! diese Struktur hat das Spiel: perfekte Information plus Zufallsknoten,
+//! keine private Information). Der Blattwert ist der EXAKTE Endwert des
+//! erreichten Bretts: optimales Tiling (`solve_round_final_score_endaware`)
+//! plus Wertungsplatten-Endwertung -- moeglich, weil sich das Kuppelraster ab
+//! Runde 5 nicht mehr aendert (keine Kuppelplatte wird mehr gelegt,
+//! `board.rs::can_place_dome_tile`, und kein Stapelzug mehr angeboten,
+//! `game.rs::validate_draw_stack_peek`).
+//!
+//! ## Was sie NICHT ist -- drei Korrekturen (Nutzer-Befunde 2026-08-10)
+//!
+//! Der frueherer Modulkopf behauptete "exakte Alpha-Beta-Suche" und "ab
+//! Rundenbeginn ist Runde 5 ein Full-Information-Endspiel". Beides war falsch:
+//!
+//! 1. **Kein Loeser.** `NODE_BUDGET = 200` bei einer Wurzelverzweigung von
+//!    ~20 reicht fuer effektiv ~3 Halbzuege. Die 200 sind das p75 dessen, was
+//!    der alte 150ms-Wanduhr-Deckel ERREICHTE -- eine Tragbarkeitszahl fuers
+//!    Self-Play, keine Suffizienzzahl. Gemessen
+//!    (`node_budget_sufficiency_probe`): 5,8 / 9,5 / 13,1 % der Zugwahlen
+//!    aendern sich bei 400 / 1000 / 4000 Knoten. EXAKT ist die
+//!    Blattbewertung, nicht die Suche.
+//! 2. **Keine volle Information.** Runde 5 bekommt 4 FRISCHE verdeckte
+//!    Bonuschips (der Pool geht mit 20 Chips exakt fuer 5 Runden auf). Der
+//!    alte Kopf begruendete das Gegenteil damit, dass alle Zufaelligkeit in
+//!    `setup_new_round` ablaeuft -- das verwechselt AUFGELOEST mit SICHTBAR.
+//!    Oeffentlich ist der RESTSATZ (jeder Chip wird in seiner Runde
+//!    aufgedeckt und genommen, sonst endet die Runde nicht,
+//!    `game.rs::check_drafting_complete`); verdeckt ist die ZUORDNUNG zu den
+//!    Manufakturen. Dafuer stehen die Zufallsknoten unten.
+//! 3. **Tiefe traegt hier kaum.** Gegen ein 20.000-Knoten-Orakel trifft
+//!    Budget 200 in 81,4 % der Faelle dieselbe Wahl, das Zwanzigfache kommt
+//!    auf 84,8 % (`teil_e_oracle_agreement_probe`). Was den Wert dieser
+//!    Suche traegt, ist die exakte Blattrechnung -- nicht das Alpha-Beta
+//!    darum herum. Zum Vergleich: das Netz@400 trifft die Orakel-Wahl nur in
+//!    51,7 %, obwohl es in Runde 5 auf genau diese Loeser-Zuege destilliert
+//!    wird (One-Hot-Policy-Ziel, `net_mcts::net_root_child_stats_and_policy`).
+//!
+//! Belegkette und Messwerte: `evaluations/PREREG_zufallsknoten.md`.
+//!
+//! Innerhalb eines Zufallsknotens wird NICHT beschnitten (siehe
+//! `child_value`) -- Star1/Star2 waere der Standardweg, braucht aber
+//! Wertgrenzen je Ausgang und lohnt bei <=4 Ausgaengen nicht.
 
 use std::time::{Duration, Instant};
 
@@ -119,9 +148,17 @@ pub fn applies(state: &GameState) -> bool {
 fn chance_nodes_enabled() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
+        // SCHARF seit 2026-08-10 (Nutzer-Entscheid "ja gehen scharf"), nachdem
+        // die Vorzeichen-Messung vorlag: `r5_chance_arming_sign_probe` fand
+        // ueber 1371 Entscheidungen 43 Abweichungen mit Delta -0,47 Pkt bei
+        // SE 0,66 (t = -0,71, Median exakt 0) -- Versatz null BELEGT, nicht
+        // behauptet. Ein frueherer Zwischenstand mit nur 4 Abweichungen hatte
+        // -2,75 Pkt gezeigt; das trug ein einzelner -13-Fall.
+        // `MOSAIC_R5_CHANCE_NODES=0` stellt das alte Verhalten wieder her --
+        // gebraucht, wenn eine Alt-Elo-Kante reproduziert werden soll.
         std::env::var("MOSAIC_R5_CHANCE_NODES")
-            .map(|v| !v.is_empty() && v != "0")
-            .unwrap_or(false)
+            .map(|v| v.is_empty() || v != "0")
+            .unwrap_or(true)
     })
 }
 
