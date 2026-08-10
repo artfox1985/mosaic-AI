@@ -1023,12 +1023,19 @@ fn plate_shaping_marginal(state: &GameState, parent_state: Option<&GameState>) -
 //   1. Formel: `wertung_progress_alpha` (parametrisierter Exponent, eigene
 //      Funktion in `scoring.rs`) statt `wertung_progress` (fest `alpha=2`,
 //      der Heuristik-Anker -- bleibt unangetastet, siehe dortige Doku).
-//   2. Perspektive: NUR das EIGENE Brett je Spieler (`state.players[i]`
-//      einzeln), KEINE mine-minus-theirs-Differenz wie `plate_shaping_delta`
-//      -- Spieler 0 und Spieler 1 bekommen unabhaengige Shifts aus ihren
-//      jeweils EIGENEN Wertungsplatten-Fortschritten, das Gegnerbrett fliesst
-//      nirgends ein (Nutzer-Vorgabe: Gegnerbrett-Kopplung ist eine separate,
-//      nicht beauftragte Frage).
+//   2. Perspektive: JE SPIELER ABSOLUT, NICHT ego-only (Nutzer-Korrektur
+//      2026-08-11 -- "ego-only" war eine falsche Lesart der urspruenglichen
+//      Formulierung: BEIDE Spieler bekommen unabhaengig einen Shift aus
+//      ihrem EIGENEN Brett, `value[i] += w*tanh(f(players[i])/scale)` fuer
+//      i in {0,1} getrennt -- sonst wuerde die Suche annehmen, der GEGNER
+//      ignoriere die Wertungsplatten, exakt die Self-Play-Blindheit nur
+//      innerhalb der Suche. "NUR das eigene Brett" heisst NUR: kein
+//      Cross-Term zwischen den Spielern (Index i haengt nicht von
+//      `players[1-i]` ab) -- NICHT, dass der Gegner-Fortschritt ignoriert
+//      wird. KEINE mine-minus-theirs-Differenz wie `plate_shaping_delta`
+//      (stehende, unabhaengig begruendete Anforderung: eine Differenzform
+//      macht 55:50 schlechter als 30:15, siehe Test `apply_wertung_shaping_
+//      with_rejects_difference_form_same_margin_different_level`).
 //   3. Absolut statt marginal: kein Eltern-Delta wie `plate_shaping_marginal`
 //      (dessen Baseline-Trick loest ein Gumbel-Geschwistervergleichsproblem,
 //      das hier nicht Gegenstand des Auftrags war).
@@ -1132,9 +1139,11 @@ fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
 // `plate_shaping_marginal` -- eine Differenzform waere potentialbasiert und
 // liesse die Zugwahl strukturell unberuehrt, das ist hier explizit NICHT
 // gewollt: der Term soll echte Praeferenz fuer Freischalt-Fortschritt in die
-// Suche tragen, nicht nur eine neutrale Reparametrisierung sein). Ego-only
-// wie das Wertungsplatten-EGO-Shaping oben (jeder Spieler nur ueber sein
-// EIGENES Brett), gleiche Skala (`tanh(x/50.0)`).
+// Suche tragen, nicht nur eine neutrale Reparametrisierung sein). Je Spieler
+// ABSOLUT wie das Wertungsplatten-Shaping oben (siehe dortiger Kommentar,
+// Nutzer-Korrektur 2026-08-11) -- BEIDE Spieler unabhaengig ueber ihr
+// EIGENES Brett, kein Cross-Term, keine mine-minus-theirs-Differenz. Gleiche
+// Skala (`tanh(x/50.0)`).
 
 /// Skala fuer das Freischalt-Shaping, gleiche Konvention wie
 /// `WERTUNG_SHAPING_SCALE`/`FLOOR_SHAPING_SCALE`/`PLATE_SHAPING_SCALE`
@@ -6577,20 +6586,31 @@ mod tests {
     }
 
     #[test]
-    fn apply_wertung_shaping_with_matches_formula_and_is_ego_only() {
-        // Beweist zwei Eigenschaften in einem Test:
+    fn apply_wertung_shaping_with_is_per_player_absolute_not_ego_only() {
+        // Nutzer-Korrektur 2026-08-11: "ego-only" (nur der ziehende Spieler
+        // bekommt einen Zuschlag) war eine FALSCHE Lesart der urspruenglichen
+        // Vorgabe -- beide Spieler bekommen unabhaengig je einen Zuschlag aus
+        // ihrem EIGENEN Brett (`state.players[i]`), sonst wuerde die Suche
+        // annehmen, der GEGNER ignoriere die Wertungsplatten (dieselbe
+        // Self-Play-Blindheit wie ausserhalb der Suche). Beweist drei
+        // Eigenschaften in einem Test:
         //   1. die EXAKTE Formel je Spieler-Index `i`:
         //      `clamp(value[i] + w * tanh(wertung_progress_alpha(players[i],
         //      scoring_tile_ids, alpha) / WERTUNG_SHAPING_SCALE), 0, 1)`.
-        //   2. EGO-only: Index `i` haengt AUSSCHLIESSLICH von `players[i]`
-        //      ab -- das JEWEILS ANDERE Brett fliesst nicht ein (Nutzer-
-        //      Vorgabe, siehe Modul-Kommentar). Nachweis: `players[1]` wird
-        //      zwischen zwei sonst unabhaengigen Stellungen ausgetauscht --
-        //      Index 0 des Outputs darf sich dadurch NICHT aendern.
+        //   2. Index 0 haengt AUSSCHLIESSLICH von `players[0]` ab -- ein
+        //      Tausch von `players[1]` (Gegnerbrett) darf Index 0 NICHT
+        //      veraendern (kein Cross-Term zwischen den Spielern).
+        //   3. UMKEHRUNG (das war die vom Nutzer explizit verlangte
+        //      Ergaenzung): derselbe Tausch MUSS Index 1 veraendern, sofern
+        //      sich `wertung_progress_alpha` fuer `players[1]` tatsaechlich
+        //      unterscheidet -- der Gegner-Fortschritt fliesst also SEHR
+        //      wohl in den Blattwert ein, nur eben ausschliesslich ueber
+        //      SEINEN EIGENEN Index, nicht in Index 0.
         let w = 0.4;
         let alpha = 1.5;
         let mut rng = StdRng::seed_from_u64(5551);
         let mut checked = 0;
+        let mut index1_changed = 0;
         for gi in 0..8u64 {
             let Some(state_a) = random_drafting_state(gi, 12, &mut rng) else { continue };
             let Some(state_b) = random_drafting_state(gi + 500, 13, &mut rng) else { continue };
@@ -6610,18 +6630,131 @@ mod tests {
                 }
             }
 
-            // EGO-only-Nachweis: `players[0]` ist zwischen `state_a` und
-            // `hybrid` UNVERAENDERT -- Index 0 darf sich also trotz des
-            // ausgetauschten GEGNERBRETTS (`players[1]`) nicht aendern.
             let out_a = apply_wertung_shaping_with([0.5, 0.5], &state_a, w, alpha);
             let out_hybrid = apply_wertung_shaping_with([0.5, 0.5], &hybrid, w, alpha);
+            // (2) Index 0 unveraendert -- `players[0]` ist zwischen `state_a`
+            // und `hybrid` identisch geblieben.
             assert_eq!(
                 out_a[0], out_hybrid[0],
                 "Spiel {gi}: Index 0 haengt faelschlich vom GEGNERBRETT ab"
             );
+            // (3) Index 1 reagiert -- nur zaehlen/pruefen, wenn die beiden
+            // Bretter tatsaechlich unterschiedlichen Fortschritt haben
+            // (sonst waere eine Gleichheit kein Gegenbeweis, nur Zufall).
+            let pts_a1 = crate::scoring::wertung_progress_alpha(&state_a.players[1], &state_a.scoring_tile_ids, alpha);
+            let pts_b1 = crate::scoring::wertung_progress_alpha(&hybrid.players[1], &hybrid.scoring_tile_ids, alpha);
+            if (pts_a1 - pts_b1).abs() > 1e-9 {
+                assert_ne!(
+                    out_a[1], out_hybrid[1],
+                    "Spiel {gi}: Index 1 MUSS auf den Brett-Tausch reagieren (per-Spieler-absolut, nicht ego-only)"
+                );
+                index1_changed += 1;
+            }
             checked += 1;
         }
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+        assert!(index1_changed >= 1, "kein einziges Spielpaar mit unterschiedlichem Gegnerfortschritt gefunden");
+    }
+
+    #[test]
+    fn apply_wertung_shaping_with_both_sides_gain_no_antisymmetry() {
+        // Waechter gegen eine Rueckkehr zur `apply_plate_shaping`-Form
+        // (`[+shift, -shift]`): wenn BEIDE Spieler Wertungsplatten-
+        // Fortschritt haben, muessen BEIDE Indizes STEIGEN (nicht einer rauf,
+        // der andere runter) -- die Zuschlaege sind unabhaengig und typisch
+        // beide positiv, nicht komplementaer. Deterministischer Aufbau (statt
+        // zufaellig gesuchter Stellungen, die haeufig nur auf EINER Seite
+        // Fortschritt haben) ueber `board_with_border_fill` -- Kriterium 4
+        // ist linear, aber positiv fuer JEDES `n>0`, das reicht hier.
+        let mut rng = StdRng::seed_from_u64(70011);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        state.players[0] = board_with_border_fill(3);
+        state.players[1] = board_with_border_fill(2);
+        state.scoring_tile_ids = vec![4];
+
+        let p0 = crate::scoring::wertung_progress_alpha(&state.players[0], &state.scoring_tile_ids, 2.0);
+        let p1 = crate::scoring::wertung_progress_alpha(&state.players[1], &state.scoring_tile_ids, 2.0);
+        assert!(p0 > 0.0 && p1 > 0.0, "Testaufbau: beide Seiten brauchen echten Fortschritt (p0={p0}, p1={p1})");
+
+        let out = apply_wertung_shaping_with([0.5, 0.5], &state, 0.5, 2.0);
+        assert!(out[0] > 0.5, "Index 0 sollte steigen (p0={p0}), war {}", out[0]);
+        assert!(out[1] > 0.5, "Index 1 sollte steigen (p1={p1}), war {}", out[1]);
+    }
+
+    /// Baut ein `PlayerBoard` mit EXAKT `n` gefuellten Zellen in der 6x6-
+    /// Zeile 0 (`n` in 0..=6) -- Zeile 0 ist zur Gaenze Rand (`r==0`), also
+    /// liefert Kriterium 4 (`border_fill`, LINEAR/kein Exponent in
+    /// `wertung_progress_alpha`) fuer dieses Brett exakt `n` zurueck. Nutzt
+    /// bis zu 3 Slots (`sr=0`, `sc=0..2`, je 2 Zellen ueber `si` in
+    /// `{0,1}` -- siehe `build_grid`s Index-Mapping).
+    fn board_with_border_fill(n: usize) -> crate::board::PlayerBoard {
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        let pool = crate::dome::build_dome_tile_pool();
+        let mut remaining = n;
+        for sc in 0..3usize {
+            if remaining == 0 {
+                break;
+            }
+            let mut t = pool[sc].clone();
+            for (si, sp) in t.spaces.iter_mut().enumerate() {
+                if si / 2 != 0 || remaining == 0 {
+                    continue;
+                }
+                match sp.space_type {
+                    crate::dome::SpaceType::Special => {
+                        sp.is_locked = false;
+                        sp.placed_special = true;
+                    }
+                    crate::dome::SpaceType::Wild => sp.placed_color = Some(TileColor::Rot),
+                    crate::dome::SpaceType::Normal => sp.placed_color = sp.required_color,
+                }
+                remaining -= 1;
+            }
+            p.dome_grid.place_dome_tile(t, 0, sc).unwrap();
+        }
+        assert_eq!(remaining, 0, "Testaufbau: nicht genug Platz fuer n={n} (max. 6)");
+        p
+    }
+
+    #[test]
+    fn apply_wertung_shaping_with_rejects_difference_form_same_margin_different_level() {
+        // Waechter gegen die AUSDRUECKLICH VERBOTENE `mine-minus-theirs`-Form
+        // (stehende Nutzer-Anforderung: "ohne Differenzrechnung ... sonst ist
+        // 55 vs. 50 schlechter als 30 vs. 15"). Kriterium 4 (`border_fill`)
+        // ist LINEAR -- ideal, um einen EXAKTEN Vorsprung zu konstruieren:
+        // Paar "low" hat Vorsprung 1-0=1, Paar "high" hat Vorsprung 5-4=1 --
+        // GLEICHER Vorsprung, aber unterschiedliches Niveau. Eine
+        // `mine-minus-theirs`-Formel waere fuer beide Paare IDENTISCH (der
+        // Vorsprung ist ja gleich); die tatsaechliche (absolute, je Spieler
+        // unabhaengige) Formel muss UNTERSCHIEDLICHE Werte liefern.
+        let mut rng = StdRng::seed_from_u64(70012);
+        let mut low = setup_new_game(names(), 0, &mut rng);
+        low.players[0] = board_with_border_fill(1);
+        low.players[1] = board_with_border_fill(0);
+        low.scoring_tile_ids = vec![4];
+
+        let mut high = setup_new_game(names(), 0, &mut rng);
+        high.players[0] = board_with_border_fill(5);
+        high.players[1] = board_with_border_fill(4);
+        high.scoring_tile_ids = vec![4];
+
+        // Vorbedingung: gleicher Vorsprung in beiden Paaren.
+        let margin_low = crate::scoring::wertung_progress_alpha(&low.players[0], &low.scoring_tile_ids, 2.0)
+            - crate::scoring::wertung_progress_alpha(&low.players[1], &low.scoring_tile_ids, 2.0);
+        let margin_high = crate::scoring::wertung_progress_alpha(&high.players[0], &high.scoring_tile_ids, 2.0)
+            - crate::scoring::wertung_progress_alpha(&high.players[1], &high.scoring_tile_ids, 2.0);
+        assert!(
+            (margin_low - margin_high).abs() < 1e-9,
+            "Testaufbau: Vorsprung sollte in beiden Faellen 1 sein (low={margin_low}, high={margin_high})"
+        );
+
+        let out_low = apply_wertung_shaping_with([0.5, 0.5], &low, 0.5, 2.0);
+        let out_high = apply_wertung_shaping_with([0.5, 0.5], &high, 0.5, 2.0);
+        assert!(
+            (out_low[0] - out_high[0]).abs() > 1e-6,
+            "gleicher Vorsprung, unterschiedliches Niveau MUSS unterschiedliche Werte liefern \
+             (Differenzform-Verdacht): low={out_low:?} high={out_high:?}"
+        );
     }
 
     #[test]
@@ -6733,14 +6866,16 @@ mod tests {
     }
 
     #[test]
-    fn apply_unlock_shaping_with_matches_formula_and_is_ego_only() {
-        // Gleicher Nachweis wie fuer das Wertungsplatten-EGO-Shaping: exakte
-        // Formel je Spieler-Index UND Ego-only (Gegnerbrett wird
-        // ausgetauscht, Index 0 darf sich nicht aendern).
+    fn apply_unlock_shaping_with_is_per_player_absolute_not_ego_only() {
+        // Nutzer-Korrektur 2026-08-11 (siehe `apply_wertung_shaping_with_is_
+        // per_player_absolute_not_ego_only`, identische Begruendung): beide
+        // Spieler bekommen unabhaengig je einen Zuschlag aus ihrem EIGENEN
+        // Brett. Beweist Formel + Index-0-Invarianz + Index-1-Reaktion.
         let w = 0.4;
         let beta = 1.5;
         let mut rng = StdRng::seed_from_u64(6651);
         let mut checked = 0;
+        let mut index1_changed = 0;
         for gi in 0..8u64 {
             let Some(state_a) = random_drafting_state(gi, 12, &mut rng) else { continue };
             let Some(state_b) = random_drafting_state(gi + 500, 13, &mut rng) else { continue };
@@ -6766,9 +6901,101 @@ mod tests {
                 out_a[0], out_hybrid[0],
                 "Spiel {gi}: Index 0 haengt faelschlich vom GEGNERBRETT ab"
             );
+            let pts_a1 = crate::scoring::unlock_progress_beta(&state_a.players[1], &state_a.scoring_tile_ids, beta);
+            let pts_b1 = crate::scoring::unlock_progress_beta(&hybrid.players[1], &hybrid.scoring_tile_ids, beta);
+            if (pts_a1 - pts_b1).abs() > 1e-9 {
+                assert_ne!(
+                    out_a[1], out_hybrid[1],
+                    "Spiel {gi}: Index 1 MUSS auf den Brett-Tausch reagieren (per-Spieler-absolut, nicht ego-only)"
+                );
+                index1_changed += 1;
+            }
             checked += 1;
         }
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+        assert!(index1_changed >= 1, "kein einziges Spielpaar mit unterschiedlichem Gegnerfortschritt gefunden");
+    }
+
+    /// Baut ein `PlayerBoard` mit `n` (0..=3) VOLLSTAENDIG freigeschalteten
+    /// Special-Slots, alle mit Rasterreihe 0 (`wert=1` je Slot, siehe
+    /// `unlock_progress_beta`-Kommentar) -- Designs `4`/`6`/`10` haben alle
+    /// `sp_idx` in `{0,1}` (obere Haelfte ihres Slots), bei `slot_row=0`
+    /// also alle Rasterreihe `0*2+0=0`. Linear steuerbar (jeder Slot traegt
+    /// exakt `1.0` bei, keine Exponent-Interaktion zwischen VERSCHIEDENEN
+    /// Slots) -- max. 3, weil eine Slot-Reihe nur 3 Spalten hat.
+    fn board_with_n_unlocked_special_slots(n: usize) -> crate::board::PlayerBoard {
+        assert!(n <= 3, "Testaufbau: max. 3 gleichwertige Slots (eine Slot-Reihe)");
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        let pool = crate::dome::build_dome_tile_pool();
+        let designs = [4usize, 6, 10];
+        for &design in designs.iter().take(n) {
+            let mut t = pool[design].clone();
+            for sp in t.spaces.iter_mut() {
+                match sp.space_type {
+                    crate::dome::SpaceType::Special => {
+                        sp.is_locked = false;
+                        sp.placed_special = true;
+                    }
+                    crate::dome::SpaceType::Wild => sp.placed_color = Some(TileColor::Rot),
+                    crate::dome::SpaceType::Normal => sp.placed_color = sp.required_color,
+                }
+            }
+            let sc = designs.iter().position(|&d| d == design).unwrap();
+            p.dome_grid.place_dome_tile(t, 0, sc).unwrap();
+        }
+        p
+    }
+
+    #[test]
+    fn apply_unlock_shaping_with_both_sides_gain_no_antisymmetry() {
+        // Gleicher Waechter wie fuer das Wertungsplatten-EGO-Shaping: beide
+        // Spieler mit Freischalt-Fortschritt -> BEIDE Indizes steigen.
+        let mut rng = StdRng::seed_from_u64(70021);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        state.players[0] = board_with_n_unlocked_special_slots(2);
+        state.players[1] = board_with_n_unlocked_special_slots(1);
+
+        let p0 = crate::scoring::unlock_progress_beta(&state.players[0], &state.scoring_tile_ids, 2.0);
+        let p1 = crate::scoring::unlock_progress_beta(&state.players[1], &state.scoring_tile_ids, 2.0);
+        assert!(p0 > 0.0 && p1 > 0.0, "Testaufbau: beide Seiten brauchen echten Fortschritt (p0={p0}, p1={p1})");
+
+        let out = apply_unlock_shaping_with([0.5, 0.5], &state, 0.5, 2.0);
+        assert!(out[0] > 0.5, "Index 0 sollte steigen (p0={p0}), war {}", out[0]);
+        assert!(out[1] > 0.5, "Index 1 sollte steigen (p1={p1}), war {}", out[1]);
+    }
+
+    #[test]
+    fn apply_unlock_shaping_with_rejects_difference_form_same_margin_different_level() {
+        // Gleicher Waechter wie fuer das Wertungsplatten-EGO-Shaping, hier
+        // fuer den Freischalt-Term: Paar "low" hat Vorsprung 1-0=1, Paar
+        // "high" hat Vorsprung 3-2=1 -- GLEICHER Vorsprung, unterschiedliches
+        // Niveau. Eine `mine-minus-theirs`-Formel waere fuer beide Paare
+        // IDENTISCH.
+        let mut rng = StdRng::seed_from_u64(70022);
+        let mut low = setup_new_game(names(), 0, &mut rng);
+        low.players[0] = board_with_n_unlocked_special_slots(1);
+        low.players[1] = board_with_n_unlocked_special_slots(0);
+
+        let mut high = setup_new_game(names(), 0, &mut rng);
+        high.players[0] = board_with_n_unlocked_special_slots(3);
+        high.players[1] = board_with_n_unlocked_special_slots(2);
+
+        let margin_low = crate::scoring::unlock_progress_beta(&low.players[0], &low.scoring_tile_ids, 2.0)
+            - crate::scoring::unlock_progress_beta(&low.players[1], &low.scoring_tile_ids, 2.0);
+        let margin_high = crate::scoring::unlock_progress_beta(&high.players[0], &high.scoring_tile_ids, 2.0)
+            - crate::scoring::unlock_progress_beta(&high.players[1], &high.scoring_tile_ids, 2.0);
+        assert!(
+            (margin_low - margin_high).abs() < 1e-9,
+            "Testaufbau: Vorsprung sollte in beiden Faellen 1 sein (low={margin_low}, high={margin_high})"
+        );
+
+        let out_low = apply_unlock_shaping_with([0.5, 0.5], &low, 0.5, 2.0);
+        let out_high = apply_unlock_shaping_with([0.5, 0.5], &high, 0.5, 2.0);
+        assert!(
+            (out_low[0] - out_high[0]).abs() > 1e-6,
+            "gleicher Vorsprung, unterschiedliches Niveau MUSS unterschiedliche Werte liefern \
+             (Differenzform-Verdacht): low={out_low:?} high={out_high:?}"
+        );
     }
 
     #[test]
