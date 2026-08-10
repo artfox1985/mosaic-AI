@@ -472,3 +472,37 @@ Skill 0 herauskommen -- das ist der Trivialitaets-Wachhund.
 gefuellt" ist daraus ableitbar (`features.rs::write_board_channels_direct`).
 Der Kopf kann also lernen, wie weit eine Platte vom Freischalten entfernt
 ist -- die eigentlich informative Groesse.
+
+### Unabhaengige Bestaetigung der erwarteten Grundrate -- VOR der Messung notiert
+
+Die oben vorregistrierte Grundraten-Messung fuer Kriterium 6 hat eine
+unabhaengige Vorab-Evidenz, die mir beim Aufschreiben nicht praesent war:
+`watchlist_v20_zwischenlese.md` (10 Mensch-vs-Champion-Partien, Commit
+11dd012) hat genau diese Groesse schon gemessen, unter CHAMPION-Spiel:
+
+| | Mensch | KI (`v20_2d_opp_brierbest@400`) |
+|---|--------|--------------------------------|
+| Special-Unlock in Runde 2 | **9 / 10** Partien | **0 / 10** |
+| Special-Unlock ueberhaupt nie | 1 / 10 | **6 / 10** |
+
+Die KI schaltet in 6 von 10 Partien NIE ein Spezialfeld frei und nie vor
+Runde 4. Der erwartete Ausgang der Messung (">90 % leer", also der Fall,
+der eine Klassen-Gewichtung erzwingt) ist damit **bestaetigt, bevor sie
+laeuft** -- die Messung bleibt trotzdem noetig, weil sie die Rate BEZIFFERT
+und je Slot aufloest, was die Watchlist nicht tut.
+
+**Und das dreht das Argument fuer Kriterium 6 ins Positive.** Eine fast
+konstante Zielgroesse ist ein Problem fuer den Brier, aber die dahinter
+liegende Schwaeche ist der bestbelegte Struktur-Rueckstand der KI gegen
+den Nutzer -- ueber die v19- UND v20-Aera hinweg, und exakt der
+Dossier-Punkt "Spezial-Kuppeln in die ERSTEN (schnellen) Reihen".
+Kriterium 6 zielt also nicht auf ein Randphaenomen.
+
+**Folge fuer die Entscheidungsregel oben**: der ">90 %"-Zweig ist damit der
+ERWARTETE, nicht der Ausnahmefall. Er lautet also nicht mehr "Kriterium 6
+streichen ODER Klassen-Gewichtung", sondern: **Klassen-Gewichtung, und
+Streichen nur, wenn die Trennleistung auf der Minderheitsklasse
+nachweislich bei Null liegt** (Brier-Skill-Score <= 0 gegen die Grundrate).
+Ein Kriterium wegen Klassenschieflage zu streichen, das die dokumentierte
+Hauptschwaeche adressiert, waere der falsche Schluss aus einer richtigen
+Metrik-Beobachtung.
