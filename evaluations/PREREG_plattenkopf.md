@@ -1391,3 +1391,74 @@ Vorhersage-Problem") ist **zu weit gefasst**. Aufgeteilt:
   Kopf-Thema, sondern eins der Zielauswahl bzw. der Blattbewertung.
 * **Offen**: Ecke (2,0) (8 Pkt, Hinweis auf ein kleines Defizit, n zu klein),
   Kriterien 4 und 6 (keine Champion-Referenz).
+
+## KORREKTUR + ABLEITUNG: die Diagonale ist NICHT strukturell unmoeglich
+
+Nutzer 2026-08-10: *"warum sollte sie strukturell unmoeglich sein. du musst nur
+einmal alle musterreihen voll bekommen"* -- richtig, und die
+Referenzlauf-Einordnung ist an dieser Stelle falsch. Ich habe sie ungeprueft
+uebernommen.
+
+Eine Diagonale sind sechs Zellen `(r,r)`, also **eine je Rasterzeile** -- genau
+ein Abschluss jeder Musterreihe, IDENTISCH zur Spalte. Das
+Mechanismus-Argument, das fuer Spalten korrekt "im Budget" ergab, gilt fuer die
+Diagonale unveraendert. Die Einordnung "strukturell" beruhte allein darauf, dass
+BEIDE KIs bei ~0 liegen -- derselbe Fehlschluss, gegen den
+`feedback_skill_confound_already_determined` steht, und den der Nutzer selbst
+widerlegt (er erreicht Diagonalen "wenn es gut laeuft").
+
+**Fuer die Reihen 3-6 traegt das Argument dagegen unabhaengig**: sie brauchen
+FUENF Abschluesse DERSELBEN Musterreihe (Reihe 3: ~1,4 Runden je Abschluss = 7
+von 5 Runden). Dort ist "strukturell" korrekt.
+
+### Die Strategie ist ableitbar, nicht bloss beobachtet
+
+**Budget.** Ein Durchgang durch alle sechs Musterreihen kostet 1+2+..+6 = **21**
+Steine. Aufnahme je Spieler: 21 Sonnenfliesen/Runde, geteilt, 5 Runden = **52,5**.
+
+| Durchgaenge | Steine | Anteil der Aufnahme | |
+|---|---|---|---|
+| 1 | 21 | 40 % | passt |
+| **2** | **42** | **80 %** | **passt** |
+| 3 | 63 | 120 % | passt nicht |
+
+Deckt die Nutzer-Angabe *"das geht sich beim clever spielen auch zweimal aus"*
+und erklaert, warum es normalerweise ZWEI sind.
+
+**Wert je Durchgang -- entscheidet die LINIENFORM, nicht der Plattenwert.**
+`score_placed_tile` (`round_end.rs:349`) zahlt waagerechte plus senkrechte
+Laufweite, je nur wenn > 1:
+
+| | Platzierung | Platte | Summe |
+|---|---|---|---|
+| **Spalte** | 1+2+3+4+5+6 = **21** | 7 | **28** |
+| Diagonale | 6 x 1 = **6** | 10 | **16** |
+
+Die Diagonalzellen sind untereinander **keine orthogonalen Nachbarn** -- jede
+bleibt alleinstehend. Bei identischem Musterreihen-Aufwand: 2 Spalten = 56 Pkt,
+Spalte + Diagonale = 44, 2 Diagonalen = 32.
+
+**Damit ist die Dossier-Rangfolge des Nutzers hergeleitet** ("vertikal immer
+gerne; DIAGONALE zwiegespalten -- widerspricht dem orthogonalen Aufbau";
+`archive/history.md`): die Diagonale zahlt den hoechsten Plattenwert und ist die
+einzige Linie, die den 93-%-Term NICHT mitnimmt. Die Horizontale kommt aus
+Reihe 1 oder 2 fast nebenbei (Kapazitaet 1-2).
+
+### Der Champion-Defekt, praezise
+
+Nicht "bewertet Wertungsplatten falsch", sondern: **er committet sich nie auf
+einen Durchgang.** Bei 1,2-3,6 % Spaltenrate schliesst er praktisch nie alle
+sechs Musterreihen so, dass sie in EINER Spalte landen -- er verteilt seine ~52
+Steine statt zwei Bahnen zu ziehen.
+
+Nutzer-Maszstab gegen Messung, dieselben drei Platten (vertikal/horizontal/diagonal):
+
+| | Nutzer | Heuristik | Champion |
+|---|---|---|---|
+| Plattenpunkte | **17** (mit Diagonale 27) | 1,99 | **1,10** |
+
+Faktor **15** zum Champion, 8,5 zur Heuristik. Und die Heuristik ist KEIN
+unabhaengiger Referenzpunkt: `wertung_progress` enthaelt fuer Kriterium 1
+woertlich `(col_fill/6)^2 * 7`, sie wird also ausdruecklich zu Spalten
+hingeschoben (Nutzer-Hinweis). Der Befund "Heuristik schlaegt Champion auf jedem
+Atom" heisst also: handkodierte Plattenformung schlaegt KEINE Plattenformung.
