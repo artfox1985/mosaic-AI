@@ -40,13 +40,47 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 |---|---|
 | **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
-### LAUFENDE QUEUE (Stand 2026-08-10)
+### LAUFENDE QUEUE (Stand 2026-08-10 nachts)
 
-| Bahn | laeuft jetzt | naechstes |
+| Bahn | laeuft jetzt | danach |
 |---|---|---|
-| **GPU** | frei | GPU-Inferenz-Batcher-Sonde (#82, `PREREG_gpu_inferenz_batcher.md`); danach Plattenkopf-Cache-Neubau |
-| **CPU** | frei | Punkte-Blend `w>0` (`PREREG_punkte_blend_w.md`, 2x400, Basis-Seed 20260902) |
-| **offline** | frei | Grundraten-Messung Kriterium 6 auf Champion-Partien (vor dem Plattenkopf-Bau) |
+| **CPU** | **Punkte-Blend `w>0`** (`PREREG_punkte_blend_w.md`, 2x400 @400, Basis-Seed 20260902, Arme `0,2.0` / `0.1,2.0`) | Plattenkopf-Gating |
+| **GPU** | frei (Batcher-Probe erledigt) | Plattenkopf: Cache-Neubau (~3h) + Training (~3,5h) |
+| **offline** | Plattenkopf-Code: Kopf in `neural_net.py`, Label-Einbau ueber `tools/plattenkopf_labels.py`, Schema-Bump | -- |
+
+**PLATTENKOPF EINGETAKTET** (Nutzer 2026-08-10, "danach eintakten"), Reihenfolge:
+1. Kopf + Labels + Schema-Bump schreiben -- **kostet keine Maschinenzeit**, laeuft
+   parallel zum Blend-Gating.
+2. Cache-Neubau, sobald die CPU-Bahn frei ist (der Bump invalidiert den gemeinsamen
+   Cache; die Sperre dafuer war Task D und ist gefallen).
+3. Training, Rezept wie der Champion (warm-start, lr 5e-5, cosine,
+   `--value-head wdl --select-by-brier`).
+4. **BEIDE** Auswertungen: Arena-Gating vs Champion UND Brier-Skill-Score je
+   Kriterium. Eine allein ist nicht interpretierbar -- ein Arena-Null liesse offen,
+   ob der Kopf nichts gelernt hat oder es gelernt hat und nicht hilft.
+
+Grundraten liegen vor (800 Endbretter, Champion-Partien): Kriterium 6 bei 83,3 %
+leeren Spezialfeldern (Mittelband ⇒ tragfaehig), Kriterium 3 bei 42,0 %,
+Jokerfelder 1..8. Labels sind minimal veraltet (letzter Datensatz = letzter
+Tiling-Schritt) -- tragbar fuer die Probe, nicht fuer einen Champion-Kandidaten.
+
+**WHEEL: installiert 2026-08-10, Paritaet BEWIESEN.** Neubau aus den heutigen
+Quellen, `tools/paritaets_probe.py` liefert `8c6684ff...` (156 Diagnose-Vorkommen
+ausgeblendet, Begruendung im Skript). A2 ist damit erstmals am INSTALLIERTEN Binary
+befragbar: `contract_hash = a169ebf0a4451e08`, wie festgenagelt; der Elo-Tracker
+schreibt ihn ab jetzt je Zeile mit. A3/A4 laufen in `cargo test` (321 gruen).
+
+**#82 GPU-Batcher GESCHLOSSEN 2026-08-10** (Regel 1): erreichbare Batches 11/22/44
+liefern 2.581/6.197/14.060 Evals/s, alle unter der unteren CPU-Schranke 17.600;
+Break-even erst bei ~64-128. Die GPU ist nicht langsam, sondern ausgehungert --
+lohnt nur mit blatt-paralleler Auswertung. **Folge**: das Kostentor des
+Bootstrap-Horizonts bekommt keine Entlastung, +25 % gelten unveraendert.
+
+**RUNDE 5 IST JETZT EXPECTIMINIMAX** (scharf seit 2026-08-10): Zufallsknoten an den
+Aufdeck-Stellen der verdeckten Chip-Zuordnung. Versatz null ist GEMESSEN
+(-0,47 Pkt, SE 0,66, t=-0,71 ueber 43 Abweichungen aus 1371 Entscheidungen), nicht
+per Anker-Kante behauptet -- eine Arena mit +-4,4pp Auflösung kann 0,02 Pkt/Partie
+nicht entscheiden. `MOSAIC_R5_CHANCE_NODES=0` stellt das Altverhalten her.
 
 **Task D (Gewichts-Sweep) ABGESCHLOSSEN 2026-08-10: alle drei Arme H0.**
 `vw04` 208:192 (52,0%), `vw08` 92:108 (46,0%), `pw025` 68:82 (45,3%,
