@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
+                    CONJUNCTION_TARGETS, CONJUNCTIONS_PER_PLAYER,
                     POINTS_DIST_BINS)
 
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
@@ -896,12 +897,105 @@ def _ownership_from_dome(dome_grid) -> list[int]:
     return out
 
 
+def _dome_grids_from_dome(dome_grid):
+    """(filled, colors) als je 6x6-Raster fuer EIN Spielerbrett.
+
+    Positionsabbildung EXAKT wie `scoring.rs::build_grid` (Zeile 271):
+    `grid[sr*2 + si//2][sc*2 + si%2]` -- die Kuppelplaettchen sind 2x2
+    (`dome.rs`), 3x3 Slots x 4 Spaces = das 6x6-Gitter.
+
+    `filled[r][c]`  = True, wenn das Feld belegt ist (Farbe ODER Spezialstein).
+    `colors[r][c]`  = Farbstring, oder None bei leer/Spezialstein -- genau die
+                      Regel aus `scoring.rs::row_unique_colors` (Zeile 302),
+                      die `placed_special` ueberspringt und nur `placed_color`
+                      zaehlt.
+    """
+    filled = [[False] * 6 for _ in range(6)]
+    colors: list[list[str | None]] = [[None] * 6 for _ in range(6)]
+    for sr in range(3):
+        row = dome_grid[sr] if sr < len(dome_grid) else []
+        for sc in range(3):
+            slot = row[sc] if sc < len(row) else None
+            if not slot:
+                continue
+            for si, sp in enumerate(slot.get("spaces", [])[:4]):
+                val = sp.get("filled")
+                if val is None:
+                    continue
+                r, c = sr * 2 + si // 2, sc * 2 + si % 2
+                filled[r][c] = True
+                if val != "special":
+                    colors[r][c] = val
+    return filled, colors
+
+
+def _conjunctions_from_dome(dome_grid) -> list[int]:
+    """25 Binaerlabels je Spielerbrett -- die KONJUNKTIVEN Wertungskriterien,
+    die sich NICHT aus Feld-Randwahrscheinlichkeiten ableiten lassen
+    (`P(alle 6 Felder)` ist nicht das Produkt der Einzelwahrscheinlichkeiten).
+
+    Ergaenzt `_ownership_from_dome`, das mit seinen 36 Feldlabels bereits den
+    Randlayer stellt -- und damit die ADDITIVEN Kriterien 4 (Randfelder, +1 je
+    Feld) und 6 (Spezialfelder, -3 je leerem Feld) exakt abdeckt.
+
+    Feste Reihenfolge (== Ausgabereihenfolge im erweiterten `ownership_head`):
+
+        Index   Kriterium                        Punktwert   Quelle (scoring.rs)
+         0.. 5  Reihe r vollstaendig                 +3      score_horizontal_rows
+         6..11  Spalte c vollstaendig                +7      score_vertical_rows
+        12..13  Diagonale d vollstaendig            +10      score_diagonal_rows
+                (d=0: (i,i), d=1: (i,5-i))
+        14..17  Eckplatte voll (alle 4 Spaces)   +3/+3/+8/+8  score_corner_tiles
+                (Slots (0,0),(0,2),(2,0),(2,2))
+        18      ALLE Jokerfelder belegt        2 x wild_total score_wild_fields
+        19..24  Reihe r hat >=5 Farben               +4       score_colorful_rows
+
+    Kriterium 7 (farbenreiche Reihen) kann NICHT aus `ownership` kommen: das
+    Ziel dort ist belegt/leer ohne Farbe.
+
+    Nicht existierende Slots zaehlen als unbelegt -- im ENDZUSTAND, aus dem
+    das Ziel gebildet wird, sind empirisch alle Slots belegt (siehe
+    `_ownership_from_dome`).
+    """
+    filled, colors = _dome_grids_from_dome(dome_grid)
+    out: list[int] = []
+
+    out += [int(all(filled[r][c] for c in range(6))) for r in range(6)]
+    out += [int(all(filled[r][c] for r in range(6))) for c in range(6)]
+    out.append(int(all(filled[i][i] for i in range(6))))
+    out.append(int(all(filled[i][5 - i] for i in range(6))))
+
+    # Eckplatten: alle 4 Spaces des Eckslots belegt -- im 6x6-Raster sind das
+    # die 2x2-Bloecke bei (sr*2, sc*2). Reihenfolge wie `corner_fill`.
+    for sr, sc in ((0, 0), (0, 2), (2, 0), (2, 2)):
+        r0, c0 = sr * 2, sc * 2
+        out.append(int(all(filled[r0 + dr][c0 + dc] for dr in (0, 1) for dc in (0, 1))))
+
+    # Jokerfelder: Konjunktion ueber ALLE vorhandenen Wild-Spaces. Leere Menge
+    # zahlt nicht aus (`score_wild_fields` gibt dann 0) -> Label 0.
+    wild = [sp
+            for sr in range(3) for sc in range(3)
+            for sp in (((dome_grid[sr][sc] if sr < len(dome_grid) and sc < len(dome_grid[sr]) else None) or {})
+                       .get("spaces", []))
+            if sp.get("type") == "WILD"]
+    out.append(int(bool(wild) and all(sp.get("filled") is not None for sp in wild)))
+
+    out += [int(len({colors[r][c] for c in range(6) if colors[r][c] is not None}) >= 5)
+            for r in range(6)]
+
+    return out
+
+
 def _final_ownership_by_game(game_data) -> dict:
-    """game_id -> (ownership_p0, ownership_p1) aus dem LETZTEN Record des
+    """game_id -> (own_p0, own_p1, conj_p0, conj_p1) aus dem LETZTEN Record des
     Spiels. Das `dome_grid` aendert sich nach Abschluss der Tiling-Phase nicht
     mehr (Nachweis siehe tools/scoring_tile_impact.py), der letzte Record
     traegt also den finalen Kuppelzustand. Unvollstaendige Spiele -> None
-    (Ziel wird dann als -1 markiert und im Loss maskiert)."""
+    (Ziel wird dann als -1 markiert und im Loss maskiert).
+
+    Die Konjunktionen (`_conjunctions_from_dome`) kommen aus demselben
+    Endbrett und derselben `completed`-Pruefung -- sie werden IMMER berechnet;
+    ob sie ins Ziel wandern, entscheidet `MosaicDataset.own_targets`."""
     last_by_gid = {}
     for step in game_data:
         last_by_gid[step["game_id"]] = step
@@ -912,7 +1006,9 @@ def _final_ownership_by_game(game_data) -> dict:
             continue
         players = last["state"]["players"]
         out[gid] = (_ownership_from_dome(players[0]["dome_grid"]),
-                    _ownership_from_dome(players[1]["dome_grid"]))
+                    _ownership_from_dome(players[1]["dome_grid"]),
+                    _conjunctions_from_dome(players[0]["dome_grid"]),
+                    _conjunctions_from_dome(players[1]["dome_grid"]))
     return out
 
 
@@ -1000,7 +1096,8 @@ def _resolve_planes_h5_path(cache_path_h5: str) -> str:
 
 
 class MosaicDataset(Dataset):
-    def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat"):
+    def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat",
+                 conjunction_head=False):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
         Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
         `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
@@ -1048,6 +1145,12 @@ class MosaicDataset(Dataset):
         if encoder not in ("flat", "2d"):
             raise ValueError(f"Unbekannter encoder={encoder!r} -- erlaubt: 'flat', '2d'")
         self.encoder = encoder
+        # Zielbreite des `ownership`-Vektors: Randlayer, optional erweitert um
+        # die konjunktiven Kriterien (siehe `_conjunctions_from_dome`). Ueberall
+        # unten statt der nackten Konstante benutzt, damit beide Faelle
+        # denselben Codepfad nehmen.
+        self.conjunction_head = bool(conjunction_head)
+        self.own_targets = OWNERSHIP_TARGETS + (CONJUNCTION_TARGETS if conjunction_head else 0)
         # Planes-Ladeverhalten (Task #11 Phase 2, Historie 2026-07-31):
         # STANDARD ist seit 2026-07-31 wieder komplett ins RAM (`_planes_eager_tensor`,
         # siehe `_maybe_load_planes_eager`) -- ein 30s-Vergleichsmesswert auf dem
@@ -1147,6 +1250,17 @@ class MosaicDataset(Dataset):
             cache_key_material += "+carrier_prefixes:" + ",".join(sorted(carrier_prefixes))
         if encoder == "2d":
             cache_key_material += "+enc2d_v1"
+        # Konjunktions-Erweiterung (2026-08-10): die 25 Zusatzlabels je Spieler
+        # haengen HINTEN an den `ownership`-Vektor. Eigener Suffix, NUR wenn
+        # aktiv -- Muster "+enc2d_v1". Bewusst KEIN VALUE_SCHEMA_VERSION-Bump:
+        # die Konjunktionen sind ein optionales Zusatzfeld, ein Bump wuerde den
+        # vorhandenen v21-Cache ohne Not entwerten. Der Suffix verhindert
+        # zugleich das stille Wiederverwenden eines Alt-Caches, dessen
+        # `ownership`-Dataset nur OWNERSHIP_TARGETS breit ist (das Ziel waere
+        # dann vollstaendig maskiert und der Kopf lernte nichts -- ohne
+        # Fehlermeldung).
+        if conjunction_head:
+            cache_key_material += "+conj_v1"
         # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
         # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
         # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
@@ -1199,7 +1313,7 @@ class MosaicDataset(Dataset):
                 if 'ownership' in hf:
                     self.ownership = torch.from_numpy(hf['ownership'][:])
                 else:
-                    self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
+                    self.ownership = torch.full((len(self.states), self.own_targets), -1, dtype=torch.int8)
                 if 'root_q' in hf:
                     self.root_q = torch.from_numpy(hf['root_q'][:])
                     self.root_q_mask = torch.from_numpy(hf['root_q_mask'][:])
@@ -1308,7 +1422,7 @@ class MosaicDataset(Dataset):
             self.policy_weights = torch.ones(len(self.states), dtype=torch.float32)  # Legacy → 1.0
             self.points_forecast = torch.zeros_like(self.values)  # Legacy .pt kennt kein Aux-Ziel
             self.rounds = torch.zeros(len(self.states), dtype=torch.int8)  # Legacy .pt kennt keine Runden
-            self.ownership = torch.full((len(self.states), OWNERSHIP_TARGETS), -1, dtype=torch.int8)
+            self.ownership = torch.full((len(self.states), self.own_targets), -1, dtype=torch.int8)
             # Legacy .pt stammt aus einer Aera lange vor root_q (Commit
             # 2718b9a) -- Maske komplett 0, siehe ROOT_Q_CACHE_FIELDS-Kommentar.
             self.root_q = torch.zeros(len(self.states), dtype=torch.float32)
@@ -1699,11 +1813,19 @@ class MosaicDataset(Dataset):
                         # alle Schritte dieser Partie.
                         fo = final_own.get(step["game_id"])
                         if fo is None:
-                            own_l.append(np.full(OWNERSHIP_TARGETS, -1, dtype=np.int8))
+                            own_l.append(np.full(self.own_targets, -1, dtype=np.int8))
                         else:
                             c = step["state"].get("current_player", 0)
                             first, second = (fo[0], fo[1]) if c == 0 else (fo[1], fo[0])
-                            own_l.append(np.array(first + second, dtype=np.int8))
+                            vec = first + second
+                            if self.conjunction_head:
+                                # Gleiche Ego-Reihenfolge wie oben, HINTEN
+                                # angehaengt -> Layout des erweiterten Kopfs:
+                                # [0:36] Rand ich, [36:72] Rand Gegner,
+                                # [72:97] Konj. ich, [97:122] Konj. Gegner.
+                                cj_first, cj_second = (fo[2], fo[3]) if c == 0 else (fo[3], fo[2])
+                                vec = vec + cj_first + cj_second
+                            own_l.append(np.array(vec, dtype=np.int8))
 
             # RAM-Fix (2026-07-31): jede *_l-Liste wird SOFORT nach ihrer
             # *_np-Konvertierung freigegeben (statt alle Listen bis nach der
@@ -2063,6 +2185,21 @@ def points_dist_bins_from_state(state: dict) -> int:
 PLATE_HEAD_SLOTS = 9  # 3x3 Kuppelslots, hoechstens ein Spezialfeld je Platte
 
 
+def conjunction_head_present(state: dict) -> bool:
+    """Traegt der Checkpoint die Konjunktions-Erweiterung des Ownership-Kopfs?
+
+    Anders als `plate_head_present`/`endgame_head_present` gibt es hier KEIN
+    eigenes Modul, dessen Existenz man abfragen koennte -- die Konjunktionen
+    haengen an derselben letzten Linear-Schicht wie der Randlayer. Erkannt wird
+    daher an deren AUSGABEBREITE: `OWNERSHIP_TARGETS` = alt,
+    `OWNERSHIP_TARGETS + CONJUNCTION_TARGETS` = erweitert.
+    """
+    w = state.get("ownership_head.2.weight")
+    if w is None:
+        return False
+    return int(w.shape[0]) == OWNERSHIP_TARGETS + CONJUNCTION_TARGETS
+
+
 def plate_head_present(state: dict) -> bool:
     """`plate_head` im Checkpoint? (Muster `endgame_head_present`.)"""
     return "plate_head.0.weight" in state
@@ -2115,6 +2252,7 @@ class MosaicNet(nn.Module):
     def __init__(self, input_size, num_actions=NUM_ACTIONS, hidden_size=HIDDEN_SIZE,
                  policy_hidden=256, value_hidden=64,
                  points_dist_bins=POINTS_DIST_BINS, opp_points_head=False, endgame_head=False, plate_head=False,
+                 conjunction_head=False,
                  value_head_variant="tanh"):
         super(MosaicNet, self).__init__()
         if value_head_variant not in VALUE_HEAD_VARIANTS:
@@ -2228,10 +2366,19 @@ class MosaicNet(nn.Module):
         # BEWUSST ZULETZT deklariert: dadurch bleibt die Initialisierungs-
         # reihenfolge aller uebrigen Module unveraendert, ein Lauf mit
         # OWNERSHIP_WEIGHT=0.0 ist also byte-identisch zum Stand ohne Kopf.
+        #
+        # Konjunktions-Erweiterung (2026-08-10): die 25 konjunktiven Ziele je
+        # Spieler haengen HINTEN an denselben Kopf an -- sie teilen sich die
+        # 128er-Zwischenschicht mit dem Randlayer, weil die Konjunktion "alle 6
+        # Felder dieser Reihe" auf genau den Feldern beruht, die der Randlayer
+        # ohnehin schaetzt. Bei `conjunction_head=False` bleibt die Ausgabe-
+        # breite exakt `OWNERSHIP_TARGETS`, also Bestandsverhalten und
+        # unveraenderter ONNX-Vertrag.
+        self.conjunction_head = bool(conjunction_head)
         self.ownership_head = nn.Sequential(
             nn.Linear(hidden_size, 128),
             nn.ReLU(),
-            nn.Linear(128, OWNERSHIP_TARGETS),
+            nn.Linear(128, OWNERSHIP_TARGETS + (CONJUNCTION_TARGETS if conjunction_head else 0)),
         )
         # opp_points_head (Task #28, PREREG_task28_aggression.md "Minimal-
         # invasiver Zuschnitt" Punkt 2): reine GEGNER-Punkteprognose, additiv,
@@ -2413,6 +2560,7 @@ class Mosaic2DNet(nn.Module):
                  policy_hidden=256, value_hidden=64, points_dist_bins=POINTS_DIST_BINS,
                  planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2,
                  opp_points_head=False, endgame_head=False, plate_head=False,
+                 conjunction_head=False,
                  value_head_variant="tanh"):
         super().__init__()
         if value_head_variant not in VALUE_HEAD_VARIANTS:
@@ -2511,11 +2659,14 @@ class Mosaic2DNet(nn.Module):
             )
 
         # Ownership-Head (72 Ausgaben, ego-perspektivisch) -- bewusst ZULETZT
-        # deklariert, gleiches Muster wie `MosaicNet`.
+        # deklariert, gleiches Muster wie `MosaicNet`. Konjunktions-Erweiterung
+        # ebenfalls identisch: +CONJUNCTION_TARGETS hinten angehaengt, nur bei
+        # gesetztem Flag (siehe `MosaicNet`-Kommentar fuer die Begruendung).
+        self.conjunction_head = bool(conjunction_head)
         self.ownership_head = nn.Sequential(
             nn.Linear(hidden_size, 128),
             nn.ReLU(),
-            nn.Linear(128, OWNERSHIP_TARGETS),
+            nn.Linear(128, OWNERSHIP_TARGETS + (CONJUNCTION_TARGETS if conjunction_head else 0)),
         )
 
         # opp_points_head (Task #28) -- BYTE-IDENTISCHE Architektur/Begruendung
@@ -2634,6 +2785,11 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     opp_head = opp_points_head_present(state)
     eg_head = endgame_head_present(state)
     pl_head = plate_head_present(state)  # dito, siehe PREREG_plattenkopf.md
+    # Konjunktions-Erweiterung des Ownership-Kopfs: an der AUSGABEBREITE der
+    # letzten Linear-Schicht erkannt (kein eigenes Modul, siehe
+    # `conjunction_head_present`). Alt-Checkpoints -> False -> Breite bleibt
+    # `OWNERSHIP_TARGETS`, unveraendert ladbar/exportierbar.
+    cj_head = conjunction_head_present(state)
     # Task #34: 'tanh' oder 'wdl' AUS DEM CHECKPOINT ableiten (gleiches Muster) --
     # ein Alt-Checkpoint (kein `value_head.2.weight` mit Breite 2) baut den
     # klassischen Tanh-Kopf, bleibt also unveraendert ladbar/exportierbar.
@@ -2644,6 +2800,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
         model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
                             policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
                             endgame_head=eg_head, plate_head=pl_head,
+                            conjunction_head=cj_head,
                             value_head_variant=value_head_variant)
     else:
         in_size = input_size if input_size is not None else state["body.0.weight"].shape[1]
@@ -2651,6 +2808,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
         model = MosaicNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
                           policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
                           endgame_head=eg_head, plate_head=pl_head,
+                          conjunction_head=cj_head,
                           value_head_variant=value_head_variant)
     model.load_state_dict(state, strict=False)
     return model, encoder

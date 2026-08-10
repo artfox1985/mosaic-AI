@@ -875,3 +875,168 @@ kann also hoechstens eine aktiv sein).
 Damit ist die Rechengrundlage des Kopfes **erschoepfend** belegt, nicht
 stichprobenweise -- inklusive Kriterium 3, dessen Identitaet nie das Problem
 war (es fehlt die Lernbarkeit, nicht die Korrektheit).
+
+## REVISION 2026-08-10 (abends): der Kopf ist der OWNERSHIP-KOPF, c6 bekommt keinen eigenen
+
+Nutzer-Entscheide dieser Sitzung, in der Reihenfolge, in der sie fielen.
+
+### Prinzip
+
+Der Kopf sagt den **unsicheren** Teil vorher, **bedingt auf den beobachtbaren**
+(Existenz, Geometrie, aktive Platten). Auszahlungs-Identitaeten liegen
+AUSSERHALB des Kopfes und werden aus Kopfausgaben x ablesbaren Multiplikatoren
+rekonstruiert. Zielgroesse je Atom ist `P(Bedingung am Ende erfuellt)` -- wie
+der Value-Kopf, nur punktweise adressierbar; bei Kriterium 6 invertiert.
+
+### BEFUND: der Randlayer existiert seit Task #9 -- es ist der Ownership-Kopf
+
+`_ownership_from_dome` (`neural_net.py:875`) erzeugt exakt 36 Binaerlabels
+"Feld am Ende belegt" je Spielerbrett, mit Cache-Dataset, Kopf in beiden
+Modellklassen und ONNX-Ausgang (72-dim, beide Seiten). Deckung:
+
+| Kriterium | aus Ownership? |
+|---|---|
+| 4 Randfelder (additiv, +1) | **vollstaendig** -- `Summe P(Feld)` IST der Erwartungswert |
+| 6 Spezialfelder (additiv, -3) | **vollstaendig** -- die 9 Specials sind unter den 36, `P(leer) = 1 - P(belegt)` |
+| 0/1/2/3/5 | nur der Randlayer, die **Konjunktion fehlt** |
+| 7 farbenreiche Reihen | **gar nicht** -- Ownership ist belegt/leer OHNE Farbe |
+
+Folgen:
+1. **c6 bekommt KEINEN eigenen Kopf** (Nutzer-Entscheid). Verwendung zur
+   Laufzeit: `-3 x Summe(1 - P(belegt))` ueber die Spezialpositionen, gegatet
+   auf aktive Platte 6. Die am 2026-08-10 nachts gebaute Modellseite
+   (`plate_head`, `PLATE_HEAD_SLOTS=9`) wird dafuer nicht gebraucht.
+2. **Eigenstaendig sind nur die Konjunktionen** -- und die sind jetzt gebaut.
+
+`OWNERSHIP_WEIGHT = 0.0` beruht auf `+0,0017`, **5:1 bei n=6**, p=0,2188 --
+gemessen am ALTEN Value-Ziel vor der WDL-Aera (`archive/history.md`). Nach den
+stehenden Regeln (Fruehstopps <150 Paare nur mit Replikation; Effekte <8pp =
+Seed-Rauschen) ist das kein Beleg fuer Wirkungslosigkeit, sondern gar keiner.
+Die Reaktivierung ist eine EIGENE Frage mit eigener Vorregistrierung.
+
+### Label-Fehler im bisherigen c6-Ziel (Schuld, noch offen)
+
+`atoms_criterion6` ist UNBEDINGT und wirft "kein Special in diesem Slot" mit
+"Special gefuellt" in dieselbe 0. Rechnerischer Beleg: das Mittel der neun
+Slot-Grundraten ist 0,442 -- exakt die berichtete c6-Grundrate --, waehrend die
+BEDINGTE Rate je Brett 0,833 betraegt; `0,833 x 4,50/9 = 0,417`. Die
+Stufe-A-Zahlen (+0,637 / +0,655) trennen deshalb NICHT zwischen
+Risikovorhersage und blossem Ablesen der Anwesenheit aus den Brettkanaelen.
+**Offen: Stufe A bedingt neu auswerten.**
+
+### c3 wird 9+1 (Nutzer: ein Bit ist holprig)
+
+- 9 Ausgaenge `P(Jokerfeld in Slot i belegt)`, maskiert auf Existenz -- Signal,
+  zeigt den Engpass.
+- 1 Ausgang `P(alle Jokerfelder belegt)` -- das Auszahlungsereignis.
+- Die gemeinsame Zerlegung bleibt Pruefgroesse AUSSERHALB des Kopfes
+  (`plattenkopf_labels.py check`, Identitaet 44.068/0 unberuehrt), dazu die
+  Konsistenzpruefung `P(alle) x 2 x wild_total` gegen die rekonstruierte Summe.
+- Groessenordnung: 1 Bit = ~5.060 Beobachtungen (2.530 Partien x 2 Bretter),
+  Slot-Ebene ~22.800. Dieselbe Verduennung wie bei c6: Rauchtest-Grundrate der
+  c3-Atome 0,199 gegen Konjunktion 0,420, `0,420 x 4,50/9 = 0,21`.
+- Der schwere Ausgang muss EINZELN kalibriert/bewertet werden, sonst geht er im
+  Gradienten der neun leichten unter.
+
+### "Es gibt keine toten Koepfe" (Nutzer-Korrektur)
+
+c3 ist eine real gewertete Groesse; gescheitert war die AUFLOESUNG (9
+korrelierte Ausgaenge fuer 1 Bit), nicht das Atom. Die Rauchtest-Regel muesste
+danach ueber *wie fein* entscheiden statt ueber *ob* -- gestrichen wird nur,
+was bei KEINER Aufloesung traegt. **Diese Umstellung der vorregistrierten Regel
+ist angestossen, aber NICHT foermlich entschieden.**
+
+### GEBAUT: Konjunktionen im Ownership-Kopf
+
+Nutzer-Auftrag: *"bau in den ownership head die konjunktionen ein"*.
+
+- `_conjunctions_from_dome` (`neural_net.py`): 25 Binaerlabels je Spieler --
+  6 Reihen + 6 Spalten + 2 Diagonalen + 4 Eckplatten + 1 Jokerfeld-Konjunktion
+  + 6 farbenreiche Reihen. Positionsabbildung `grid[sr*2+si//2][sc*2+si%2]`
+  exakt wie `scoring.rs::build_grid`.
+- `ownership_head` in BEIDEN Klassen auf `OWNERSHIP_TARGETS +
+  CONJUNCTION_TARGETS` (72 -> 122) verbreitert, per Flag `conjunction_head`,
+  Default AUS. Erkennung aus dem Checkpoint an der Ausgabebreite
+  (`conjunction_head_present`) -- es gibt kein eigenes Modul, an dem man die
+  Praesenz ablesen koennte.
+- Cache: die 25+25 Labels haengen HINTEN an den `ownership`-Vektor,
+  Ego-Reihenfolge wie der Randlayer. Cache-Key-Suffix `+conj_v1` NUR bei
+  gesetztem Flag. **KEIN `VALUE_SCHEMA_VERSION`-Bump** -- der wuerde den
+  v21-Cache ohne Not entwerten; der Suffix verhindert zugleich das stille
+  Wiederverwenden eines 72-breiten Alt-Caches (das Ziel waere sonst
+  vollstaendig maskiert und der Kopf lernte nichts, ohne Fehlermeldung).
+- Kein eigener Verlustterm und kein eigenes Gewicht: die Konjunktionen haengen
+  am selben BCE wie der Randlayer (`-1`-Maskierung greift unveraendert),
+  gesteuert von `OWNERSHIP_WEIGHT`. Anteil am Gradienten 50 von 122 (~41%).
+- `train.py --conjunction-head`; `export_onnx.py` zieht das Flag mit -- ohne das
+  haette der Export einen 72-breiten Kopf gebaut und der Shape-Mismatch-Zweig
+  haette den Kopf STILL zufaellig initialisiert exportiert.
+
+**Verifiziert** (`tools/conjunction_head_selfcheck.py`, ohne Korpus/GPU):
+Flag AUS ist bit-identisch zum Stand davor (state_dict-Formen und Ausgaben
+beider Klassen, gleicher Seed); Flag AN ergibt +50 Ausgaben; Erkennung und
+`build_model_from_checkpoint`-Rundlauf in beiden Klassen; 9 synthetische
+Label-Faelle inkl. der Positionsabbildung.
+**Nicht verifiziert:** die Identitaet gegen die Engine-Wertung auf echtem
+Korpus -- `data/` liegt nicht im Repo. Vor dem ersten Trainingslauf gehoert
+`python tools/plattenkopf_labels.py check` (um die Konjunktionen erweitert)
+auf die Maschine mit den Daten.
+
+### Maskierung der NICHT AKTIVEN Wertungsplatten (Nutzer)
+
+*"Der head muss halt die ausgaenge der nicht aktiven wertungsplatten maskieren
+im self play oder Arena. Sonst zieht er in die falsche Richtung."* -- gilt und
+ist Pflicht fuer Stufe B: im Blattwert darf ein Kriterium, das in dieser Partie
+nicht aktiv ist, exakt 0 beitragen.
+
+Gegatet wird der PUNKTWERT, nicht die Vorhersage. Begruendung:
+1. Alle 25 Konjunktionen sind reine BRETTFAKTEN ("Reihe 3 vollstaendig") --
+   wohldefiniert unabhaengig davon, welche Platten ausliegen. Genau wie das
+   Ownership-Ziel, das ebenfalls ohne Kriterien-Maske auskommt.
+2. Die aktiven Platten stehen IN DER EINGABE: 8er-One-Hot im Flach-Vektor
+   (`features.rs:522`) und als gegatete Plane-Kanaele (`features.rs:862`). Der
+   Kopf kann also konditionieren und beide Regime lernen, statt Daten zu
+   verlieren.
+
+Damit entfaellt die Ziel-Maskierung auf aktive Kriterien, die fuer den
+urspruenglichen Plattenkopf vorgesehen war. **Das ist eine Design-Entscheidung,
+keine Messung** -- die alte Regel war mit den Ausschluss-Paaren begruendet
+(Train/Inferenz-Fehlanpassung). Pruefbar waere sie durch einen Vergleich
+maskiert gegen unmaskiert auf dem kriterienweisen Brier; als offener Punkt
+notiert.
+
+### Kuppel-Bonus: Korrektur einer Zuordnung in dieser Datei
+
+Der Stufe-B-Satz oben, `"mit dem reihenabhaengigen Punktwert bei Kriterium 6
+(1..6 je Reihe, round_end.rs)"`, ist FALSCH ZUGEORDNET. 1..6 ist der
+Kuppel-Bonus fuers FUELLEN (`round_end.rs::check_special_trigger`,
+`bonus = pattern_row + 1`) -- ein von den Wertungsplatten UNABHAENGIGER
+Mechanismus, der immer greift. Kriterium 6 selbst ist glatt:
+`score_empty_special_fields` = `-3 * empty`, ohne Reihenabhaengigkeit.
+
+Ebenfalls festgehalten, weil in dieser Sitzung zunaechst behauptet und dann
+widerlegt: der Kuppel-Bonus fehlt NICHT in der Bewertung.
+`tiling_solver.rs:174` ruft `execute_full_tiling`, das `check_special_trigger`
+ausfuehrt -- innerhalb der Runde ist er exakt gerechnet. Was fehlt, ist
+allenfalls die Vorausschau ueber den Solver-Horizont hinaus, und die ist
+Aufgabe des Value-Kopfs wie bei allem anderen auch.
+
+Reicht die Netz-Eingabe, um den Bonus zu lernen? Ja, in beiden Zweigen: der
+Flach-Vektor fuehrt je Slot 4 Spaces mit `space_type` an FESTEN Positionen
+(`features.rs:615`), die Planes schreiben auf die echte 6x6-Geometrie
+(`features.rs:809`), und die Position ueberlebt den Conv-Zweig, weil
+`conv_flat_size = conv_channels * 6 * 6` flach in die Fusions-Linear geht.
+Gelernt werden MUSS der Bonus ohnehin nicht -- er ist eine exakte Funktion
+einer ablesbaren Position, genau wie die -3 ein bekannter Multiplikator ist.
+
+### Offen
+
+- Stufe A bedingt neu auswerten (Risiko vs. Anwesenheit trennen).
+- Umstellung der Rauchtest-Regel foermlich entscheiden.
+- Rauchtest fuer 0/1/2/5/7 -- nie gemessen; c3s Scheitergrund (EINE Konjunktion,
+  ein Bit je Partie) trifft sie nicht, sie liegen bei 2 bis 6 Bits je Brett.
+  Die Diagonalen mit 2 Bits sind der duennste Fall.
+- Interaktion 2 x 6: ein unfuellbares Spezialfeld auf einer Diagonale blockiert
+  `diag_fill` (`scoring.rs:167`, quadriert x 10). Analog zur schon notierten
+  5 x 6, von keinem Ausschlusspaar abgefangen.
+- Stufe B (Verwendung im Blattwert) unveraendert OFFEN, eigene Vorregistrierung.
