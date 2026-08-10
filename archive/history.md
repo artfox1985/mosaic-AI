@@ -10458,3 +10458,33 @@ hier.)
    Mechanismus bei 36,5% Feuerrate ueber ein Drittel aller
    Wurzelentscheidungen aendert. Wiedereroeffnung nur mit NEUEM
    Mechanismus. `PREREG_denial_tiebreak.md`
+
+## Struktur-Watchlist v20 ABGESCHLOSSEN (aus STATUS ausgelagert 2026-08-10)
+
+Die STATUS-Zeile ("wartet auf ~10-15 bewertete Nutzer-Partien vs v20,
+Stand: 6") war **doppelt veraltet** -- Nutzer-Hinweis 2026-08-10: *"das ist
+schon lange passiert. hat aber keiner aus dem status genommen."* Richtig:
+die Partien lagen vor (10, nicht 6) UND die Auswertung war gelaufen und
+committet (`evaluations/watchlist_v20_zwischenlese.md`, Commit 11dd012).
+
+Kernbefunde von dort, hier nur als Verweis-Anker:
+- Bilanz Mensch 7:3 gegen `v20_2d_opp_brierbest@400` (v19-Aera war 8:1).
+- **Special-Unlock-Luecke NICHT geschlossen**: der Mensch schaltet in
+  **9/10** Partien schon in Runde 2 ein Spezialfeld frei, die KI in nur
+  4/10 ueberhaupt, **nie vor Runde 4**, in 6/10 gar nicht.
+- Chip-"Duerre" der KI war zum Teil ein LOGGING-Artefakt (korrigiert
+  ~2,0/Partie gegen 2,3 beim Menschen); Effizienz-Gap geschlossen.
+- Zwei Parserfehler in `tools/analyze_game_log.py` dabei gefunden
+  (Marker-Emoji, negative Endwertung).
+
+**Anschluss 2026-08-10**: die Special-Unlock-Luecke ist derselbe Faden wie
+Kriterium 6 des Plattenkopfs. Strukturell begruendet (`dome.rs:140`: ein
+Spezialfeld schaltet erst frei, wenn die anderen DREI Felder der Platte
+gefuellt sind, und die verlangen bestimmte Farben) und in
+`PREREG_plattenkopf.md` zur Auswertungsregel verarbeitet. Die Watchlist
+bestaetigt damit unabhaengig die dort erwartete hohe Grundrate -- und
+zeigt, dass Kriterium 6 nicht auf ein Randphaenomen zielt, sondern auf den
+dokumentierten Struktur-Rueckstand der KI.
+
+Material fuer eine etwaige v21-Fortschreibung liegt bereits vor (6 gewertete
+Partien gegen `v21_2d_brierbest`), ist aber KEIN eingeplanter Task.
