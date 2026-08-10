@@ -6,6 +6,13 @@ champion?"* / *"ja, so vorregistrieren"*.
 
 ## 1. Warum die Arena hier das RICHTIGE Instrument ist
 
+> **UEBERHOLT durch das AMENDMENT unten (Befund 1): der Entwurf "derselbe
+> Champion gegen sich selbst" ist NICHT durchfuehrbar**, weil die `MOSAIC_*`-
+> Knoepfe prozessweit sind (OnceLock) -- beide Bretter bekaemen die Injektion.
+> Gueltig ist Weg A des Amendments: Netz+Knopf gegen HEURISTIK, ein Prozess je
+> Arm. Der Absatz bleibt stehen, weil seine BEGRUENDUNG (keine
+> Trainings-Seed-Varianz) unveraendert gilt -- nur die Umsetzung war falsch.
+
 Gemessen wird **derselbe Champion gegen sich selbst, einmal mit und einmal ohne
 Knopf**. Kein Training, kein neuer Checkpoint. Damit faellt die groesste
 Rauschquelle des Projekts weg: der Trainings-Seed bewegt Metriken 4-6x staerker
@@ -101,8 +108,10 @@ Fehler, den ich bei #93 und bei Zeile 48 schon gemacht habe.
    `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`
    liefern** -- sonst ist die Kontrolle nicht das Bestandsverhalten und der
    ganze Sweep ist wertlos.
-3. **ZU VERIFIZIEREN, NICHT ANNEHMEN**: ist der Knopf **je Spieler** setzbar
-   oder nur je Prozess? Umgebungsvariablen sind prozessweit -- laufen beide
+3. **BEANTWORTET 2026-08-11, negativ** (siehe Amendment Befund 1): der Knopf
+   ist NUR je Prozess setzbar (OnceLock). Deshalb Weg A mit der Heuristik als
+   festem Gegner und einem Prozess je Arm. Ursprungsfrage zur Nachvollziehbarkeit:
+   ist der Knopf **je Spieler** setzbar oder nur je Prozess? Umgebungsvariablen sind prozessweit -- laufen beide
    Spieler im selben Prozess, bekaeme die Kontrolle die Injektion mit und der
    Kontrast waere null. Praezedenz spricht dafuer, dass es geht (der
    `w>0`-Sweep fuhr Arme als `0,2.0` / `0.1,2.0`, also seitenweise), aber das
