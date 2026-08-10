@@ -78,6 +78,35 @@ POINTS_WEIGHT = 0.5
 OWNERSHIP_TARGETS = 72
 OWNERSHIP_WEIGHT  = 0.0
 
+# Konjunktions-Erweiterung des Ownership-Kopfs (2026-08-10, Nutzer-Auftrag
+# "bau in den ownership head die konjunktionen ein").
+#
+# Der Ownership-Kopf ist der RANDLAYER: 36 Felder je Spieler, "am Ende belegt".
+# Damit sind die ADDITIVEN Wertungskriterien exakt abgedeckt -- Kriterium 4
+# (Randfelder, +1 je Feld) und Kriterium 6 (Spezialfelder, -3 je leerem Feld),
+# denn dort ist `Summe P(Feld)` der Erwartungswert. Die KONJUNKTIVEN Kriterien
+# lassen sich daraus NICHT ableiten: `P(alle 6 Felder belegt)` ist nicht das
+# Produkt der Einzelwahrscheinlichkeiten. Sie brauchen je einen eigenen
+# Ausgang -- das sind diese 25 je Spieler (Reihenfolge siehe
+# `neural_net.py::_conjunctions_from_dome`):
+#   6 Reihen + 6 Spalten + 2 Diagonalen + 4 Eckplatten + 1 Jokerfeld-Konjunktion
+#   + 6 farbenreiche Reihen  = 25,  x 2 Spieler = 50.
+#
+# Kriterium 7 (farbenreiche Reihen) kann prinzipiell NICHT aus `ownership`
+# kommen: das dortige Ziel ist belegt/leer OHNE Farbe.
+#
+# Die Erweiterung ist additiv und standardmaessig AUS: bei
+# `CONJUNCTION_HEAD=False` behaelt `ownership_head` exakt seine
+# `OWNERSHIP_TARGETS`-Breite, Bestandscheckpoints laden unveraendert und der
+# ONNX-Ausgabevertrag bleibt gleich.
+# Bewusst KEIN eigenes Gewicht: die Konjunktionen haengen am selben Kopf und
+# damit am selben Verlustterm wie der Randlayer, gesteuert von
+# OWNERSHIP_WEIGHT. Der Loss mittelt elementweise ueber die unmaskierten
+# Spalten, die 50 Konjunktionen bekommen also ~41% des Gradientenanteils
+# (50 von 122) -- keine Verdraengung, aber auch keine Bevorzugung.
+CONJUNCTIONS_PER_PLAYER = 25
+CONJUNCTION_TARGETS     = CONJUNCTIONS_PER_PLAYER * 2   # 50
+
 # Task #12: Distributionaler Punkte-Kopf. 0 = AUS (Skalar-Regression wie bisher),
 # >0 = Anzahl der Bins, ueber die der `points_head` eine VERTEILUNG der
 # tanh-gestauchten Punktedifferenz vorhersagt statt eines Punktschaetzers.

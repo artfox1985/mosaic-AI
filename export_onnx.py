@@ -54,7 +54,8 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (MosaicNet, Mosaic2DNet, points_dist_bins_from_state,  # noqa: E402
                         encoder_from_state_dict, opp_points_head_present,
-                        endgame_head_present, value_head_variant_from_state)
+                        endgame_head_present, conjunction_head_present,
+                        value_head_variant_from_state)
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
 
@@ -87,9 +88,16 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     # additiv, nur wenn im Checkpoint vorhanden (Muster opp_head).
     eg_head = endgame_head_present(state)
 
+    # Konjunktions-Erweiterung des Ownership-Kopfs: MUSS mitgezogen werden --
+    # sonst baut der Export einen 72-breiten Kopf, der Checkpoint traegt 122,
+    # und der Shape-Mismatch-Zweig unten wuerde den Kopf STILL zufaellig
+    # initialisiert exportieren.
+    cj_head = conjunction_head_present(state)
+
     model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
                       points_dist_bins=points_dist_bins_from_state(state), opp_points_head=opp_head,
-                      endgame_head=eg_head, value_head_variant=value_head_variant)
+                      endgame_head=eg_head, conjunction_head=cj_head,
+                      value_head_variant=value_head_variant)
     new_state = model.state_dict()
     # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
     # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads
@@ -193,7 +201,8 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
                         points_dist_bins=points_dist_bins_from_state(state),
                         planes_channels=planes_channels, conv_channels=conv_channels,
                         conv_layers=max(conv_layers, 1), opp_points_head=opp_head,
-                        endgame_head=eg_head, value_head_variant=value_head_variant)
+                        endgame_head=eg_head, conjunction_head=conjunction_head_present(state),
+                        value_head_variant=value_head_variant)
     new_state = model.state_dict()
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
     if skipped:

@@ -145,7 +145,8 @@ def plackett_luce_moon_loss(pred_moon, moon_targets):
 
 # Unsere dynamischen Pfade aus der Config laden
 from config import (MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT,
-                    POINTS_WEIGHT, OWNERSHIP_WEIGHT, POINTS_DIST_BINS, POINTS_DIST_SIGMA)
+                    POINTS_WEIGHT, OWNERSHIP_WEIGHT, CONJUNCTION_TARGETS,
+                    POINTS_DIST_BINS, POINTS_DIST_SIGMA)
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
@@ -462,7 +463,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
-          ranking_loss_weight=0.0):
+          ranking_loss_weight=0.0, conjunction_head=False):
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -570,6 +571,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
         "exclude_round5": exclude_round5, "ownership_weight": ownership_weight,
+        "conjunction_head": conjunction_head,
         "seed": seed, "snapshot": snapshot,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant, "encoder": encoder,
@@ -609,7 +611,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"🧩 Encoder: '2d' (Task #11 Phase 2, Mosaic2DNet -- Conv-Zweig auf state_to_planes "
               f"+ Flach-Zweig auf state_to_tensor)")
     dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant,
-                            encoder=encoder)
+                            encoder=encoder, conjunction_head=conjunction_head)
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
@@ -640,7 +642,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     val_dataset = None
     if val_files:
         val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant,
-                                    encoder=encoder)
+                                    encoder=encoder, conjunction_head=conjunction_head)
         val_root_q_frac = val_dataset.apply_value_target_lambda(value_target_lambda, wdl=_lambda_mix_wdl)
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
@@ -701,6 +703,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     print(f"   Learning Rate : {effective_lr}" + (f"  (Default {LEARNING_RATE})" if lr is not None else ""))
     print(f"   LR-Schedule   : {lr_schedule}")
     print(f"   Ownership-W   : {effective_ownership_weight}"          f"{'  (Kopf aus)' if effective_ownership_weight <= 0.0 else ''}")
+    if conjunction_head:
+        print(f"   Konjunktionen : AN -- Ownership-Kopf traegt zusaetzlich "
+              f"{CONJUNCTION_TARGETS} konjunktive Ziele (Cache-Key '+conj_v1')"
+              + ("  ⚠️  wirkungslos bei Ownership-W 0.0" if effective_ownership_weight <= 0.0 else ""))
     print(f"   Batch Size    : {BATCH_SIZE}")
     print(f"   Value Weight  : {effective_value_weight}  (Sieg/Niederlage, Aux-Signal fuer den Trunk)"
           + (f"  (Default {VALUE_WEIGHT})" if value_weight is not None else ""))
@@ -729,11 +735,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if encoder == "2d":
         model = Mosaic2DNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
                             points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
-                            endgame_head=endgame_head, value_head_variant=value_head)
+                            endgame_head=endgame_head, conjunction_head=conjunction_head,
+                            value_head_variant=value_head)
     else:
         model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
                           points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
-                          endgame_head=endgame_head, value_head_variant=value_head)
+                          endgame_head=endgame_head, conjunction_head=conjunction_head,
+                          value_head_variant=value_head)
 
     # Warm Start? (Existenz von load_path wurde oben bereits hart validiert)
     if load_version:
@@ -2031,6 +2039,17 @@ if __name__ == "__main__":
                              "Ziel trainiert; nach aussen wird weiterhin der ERWARTUNGSWERT als "
                              "Skalar ausgegeben, die ONNX-Schnittstelle out[0..3] bleibt also "
                              "unveraendert. ACHTUNG: warm-gestartete points_head-Gewichte passen dann nicht mehr (Shape-Mismatch) und starten frisch -- die Warnung dazu ist erwuenscht.")
+    parser.add_argument("--conjunction-head", action="store_true",
+                        help="Erweitert den Ownership-Kopf um die KONJUNKTIVEN Wertungskriterien "
+                             "(25 je Spieler, 50 gesamt): 6 Reihen + 6 Spalten + 2 Diagonalen + "
+                             "4 Eckplatten + 1 Jokerfeld-Konjunktion + 6 farbenreiche Reihen. "
+                             "Der Ownership-Randlayer deckt die ADDITIVEN Kriterien 4 und 6 "
+                             "bereits exakt ab (Summe der Feldwahrscheinlichkeiten = Erwartungswert); "
+                             "die konjunktiven lassen sich daraus NICHT ableiten und brauchen je "
+                             "einen eigenen Ausgang. Labels sind gratis aus dem Endbrett. "
+                             "Eigener Cache-Key-Suffix '+conj_v1' (kein VALUE_SCHEMA_VERSION-Bump). "
+                             "Wirkt nur zusammen mit --ownership-weight > 0 -- die Konjunktionen "
+                             "haengen am selben Verlustterm.")
     parser.add_argument("--ownership-weight", type=float, default=None,
                         help="Task #9: Gewicht des Ownership-Hilfsziels (72 Binaerlabels je "
                              "Position: wird dieses Kuppelfeld am SPIELENDE belegt sein?). "
@@ -2164,6 +2183,7 @@ if __name__ == "__main__":
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
+          conjunction_head=args.conjunction_head,
           seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant, encoder=args.encoder,
