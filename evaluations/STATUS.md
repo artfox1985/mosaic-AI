@@ -40,6 +40,49 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 |---|---|
 | **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
+### GRUNDSATZBEFUND 2026-08-10: Wertungsplatten sind 7 % des Ergebnisses
+
+Gemessen auf 1.200 Self-Play-Endbrettern (`selfplay_v20wdl_*`, gestempelte
+`scores` gegen die Summe der AKTIVEN `scoring_tile_points`):
+
+| Groesse | Mittel je Brett |
+|---------|-----------------|
+| Endstand | 23,39 |
+| davon **Wertungsplatten** | **1,71 -- 7 %** |
+| Rest (Platzierung minus Strafen) | **21,68 -- 93 %** |
+
+**Der ganze Plattenkopf-Strang zielt damit auf ein Dreizehntel des Ergebnisses.**
+Der Hauptterm ist `score_placed_tile` (`round_end.rs:340`): eine gelegte Fliese
+bringt die Laenge ihrer zusammenhaengenden Waagerechten plus der Senkrechten,
+je nur wenn > 1, sonst 1. Maximal **6 + 6 = 12** je Fliese -- und
+REIHENFOLGEABHAENGIG: die letzte Fliese einer vollen Reihe holt 6, die erste 1.
+Die Diagonale gibt dagegen 10 fuer sechs Zellen, also 1,67 je Zelle.
+
+**Umdeutung des Atom-Befunds**: dass der Champion Reihen 3-6, Spalten und
+Diagonalen nie schliesst, kostet ihn NICHT primaer die 3/7/10 Plattenpunkte,
+sondern die PLATZIERUNGSPUNKTE langer Linien.
+
+**Vorbehalte.** Die Zahl kommt aus Self-Play MIT Wurzelrauschen (bewusst
+schwaecheres Spiel); Mittel 23,39 gegen ~61, die der Champion gegen den Nutzer
+erreicht. Bei starkerem Spiel wachsen beide Terme. Die Richtung ist aber
+unabhaengig bestaetigt: `watchlist_v20_zwischenlese.md` zaehlte fuer die KI
+25,9 vertikale und 30,4 horizontale Bonuspunkte je Partie bei ~61 Gesamt.
+
+**Nutzer-Einordnung**: *"ja das gilt es abzuwaegen -- willkommen in der
+taktischen welt"*. Kein Vorrang, sondern eine Abwaegung, weil die Terme meist
+in DIESELBE Richtung zeigen: eine geschlossene Spalte bringt 7 Plattenpunkte
+UND die lange Senkrechte. Die Platten wirken damit als STICHENTSCHEID zwischen
+gleich guten Linien, nicht als eigenes Ziel. Echt gegenlaeufig ist fast nur
+Kriterium 6 (drei Normalfelder fuellen, damit das Spezialfeld aufgeht -- ggf.
+an schlechten Linienpositionen).
+
+**Warum keine Formel reicht**: der Platzierungspunkt haengt am Bestand, dieselbe
+Zelle ist 1 oder 12 wert je nach Zeitpunkt. Das Optimum ist eine SEQUENZ, keine
+Zellmenge -- eine zeitlose Potenzialkarte gibt eine Richtung, nicht das Optimum.
+Der Tiling-Solver rechnet genau das am Rundenende exakt; in Runde 5 nutzt die
+Suche es exakt. **Was fehlt, ist die rundenuebergreifende Version -- dort sitzt
+der Rueckstand, nicht bei den Wertungsplatten.**
+
 ### STAND 2026-08-10 ABEND -- was heute entschieden wurde
 
 **Champion unveraendert: `v21_2d_brierbest`, Elo 1358.** Kein Wechsel heute.
