@@ -81,6 +81,29 @@ def atoms_criterion6(player: dict) -> list[int]:
     return out
 
 
+def existence_criterion6(player: dict) -> list[int]:
+    """Traegt Slot i am Ende UEBERHAUPT ein Spezialfeld? (1/0 je Slot.)
+
+    Gebraucht, weil `atoms_criterion6` UNBEDINGT ist: es wirft "kein Special in
+    diesem Slot" und "Special gefuellt" in dieselbe 0. Ohne diese Maske
+    vermischt jede Auswertung Risikovorhersage mit dem bloßen Ablesen der
+    ANWESENHEIT -- und die steht direkt in den Brettkanaelen, ist also eine
+    Nachschlagefrage. Rechnerischer Beleg fuer die Vermischung: Mittel der neun
+    Slot-Grundraten 0,442 (= die berichtete c6-Grundrate), bedingte Rate je
+    Brett 0,833, und 0,833 x 4,50/9 = 0,417.
+    """
+    out = []
+    for slot in _slots_flat(player):
+        hit = 0
+        if slot:
+            for sp in _spaces(slot):
+                if sp.get("type") == T_SPECIAL:
+                    hit = 1
+                    break
+        out.append(hit)
+    return out
+
+
 def atoms_criterion3(player: dict) -> list[int]:
     """Slot hat ein BELEGTES Jokerfeld UND alle Jokerfelder sind belegt."""
     wild = [sp for slot in _slots_flat(player) if slot
@@ -99,7 +122,13 @@ def atoms_criterion3(player: dict) -> list[int]:
 
 
 def labels_for_board(player: dict) -> dict[str, list[int]]:
-    return {"c6": atoms_criterion6(player), "c3": atoms_criterion3(player)}
+    return {
+        "c6": atoms_criterion6(player),
+        "c3": atoms_criterion3(player),
+        # Existenz-Maske je Slot -- ohne sie ist jede c6-Auswertung mit dem
+        # Ablesen der Anwesenheit vermischt (siehe `existence_criterion6`).
+        "c6_exists": existence_criterion6(player),
+    }
 
 
 def group_games(records: list[dict]) -> dict[str, list[dict]]:
