@@ -116,16 +116,21 @@ pub const POINTS_UTILITY_WEIGHT: f64 = 0.0;
 // gewichtet mit `lambda_aggr`. Siehe PREREG Abschnitt "Minimal-invasiver
 // Zuschnitt" Punkt 4 fuer die volle Herleitung.
 
-/// Gewicht des `points_head`-Ziels beim TRAINING (nicht Laufzeit!) fuer den
-/// Gegner-Anteil im BESTEHENDEN `points_head` -- der aktuelle `points_head`
-/// ist NICHT rein auf Eigenpunkte trainiert, sondern auf
-/// `tanh(own_total + VALUE_OPP_EPSILON*opp_total)` (`neural_net.py:583`).
-/// Damit steckt im rohen `points`-Output ein kleiner (0.1-gewichteter)
-/// Gegner-Anteil, den `opp_aware_points_utility` algebraisch wieder
-/// herausrechnet: `own_pts = pts_raw + VALUE_OPP_EPSILON*opp_raw` (siehe
-/// PREREG Punkt 2, "algebraische Rueckgewinnung" -- gilt EXAKT nur, wenn
-/// `opp_points_head` mit derselben Blending-Struktur trainiert wurde).
-pub(crate) const VALUE_OPP_EPSILON: f64 = 0.1;
+/// **0 seit Schema 20 (Nutzer-Entscheid 2026-08-10).** GESCHICHTE: der
+/// `points_head` war NICHT rein auf Eigenpunkte trainiert, sondern auf
+/// `tanh(own/SCALE) - 0.1*tanh(opp/SCALE)`. Dieser Gegner-Anteil liess sich
+/// nur ueber `opp_aware_points_utility` algebraisch herausrechnen
+/// (`own_pts = pts_raw + VALUE_OPP_EPSILON*opp_raw`) -- und dieser Pfad liegt
+/// hinter dem `w == 0.0`-Kurzschluss in `blended_leaf_win_prob_with`, war also
+/// toter Code. Das Ziel ist jetzt rein own, der Term entfaellt.
+///
+/// Die Konstante bleibt auf 0.0 stehen, statt die Formel umzuschreiben: dann
+/// degeneriert die Rueckgewinnung automatisch korrekt zu `own_pts = pts_raw`,
+/// UND `engine_config_json` zeigt die Aenderung an (dieselbe Praxis wie
+/// `POINTS_UTILITY_WEIGHT = 0.0` darueber). Ein Modell, das VOR Schema 20
+/// trainiert wurde, traegt den Anteil weiter im Kopf -- fuer solche Modelle
+/// waere 0.1 der richtige Wert, weshalb die Geschichte hier stehenbleibt.
+pub(crate) const VALUE_OPP_EPSILON: f64 = 0.0;
 
 /// Laufzeit-Zelle fuer `MOSAIC_POINTS_UTILITY_W` -- `OnceLock` initialisiert
 /// EINMALIG aus der Env-Var (Prozessstart-Default, siehe `read_f64_env`),
@@ -6384,10 +6389,14 @@ mod tests {
 
     #[test]
     fn opp_aware_points_utility_matches_hand_calculation() {
-        // own_pts = 0.4 + 0.1*0.2 = 0.42; combined = 0.42 - 0.5*0.2 = 0.32;
-        // u = (0.32+1)*0.5 = 0.66.
+        // Schema 20 (VALUE_OPP_EPSILON = 0, Nutzer-Entscheid 2026-08-10):
+        // own_pts = 0.4 + 0.0*0.2 = 0.4; combined = 0.4 - 0.5*0.2 = 0.30;
+        // u = (0.30+1)*0.5 = 0.65.
+        // VORHER (eps=0.1): own_pts 0.42 -> combined 0.32 -> u 0.66. Die
+        // Differenz IST die entfernte Verunreinigung -- der Test haelt sie
+        // sichtbar, statt sie stillschweigend nachzuziehen.
         let u = opp_aware_points_utility(0.4, 0.2, 0.5);
-        assert!((u - 0.66).abs() < 1e-12, "u={u}, erwartet 0.66");
+        assert!((u - 0.65).abs() < 1e-12, "u={u}, erwartet 0.65");
     }
 
     /// End-zu-Ende der VOLLEN `w>0`+opp-vorhanden-Blend-Formel ueber
@@ -6396,8 +6405,8 @@ mod tests {
     #[test]
     fn blended_leaf_win_prob_with_full_blend_matches_hand_calculation() {
         // wr = value_to_win_prob([0.0]) = 0.5. points=[0.4], opp=[0.2],
-        // lambda_aggr=0.5 -> u_pts=0.66 (siehe Test oben). w=0.5 ->
-        // 0.5*0.5 + 0.5*0.66 = 0.58.
+        // lambda_aggr=0.5 -> u_pts=0.65 (siehe Test oben, Schema 20). w=0.5 ->
+        // 0.5*0.5 + 0.5*0.65 = 0.575. (Vor Schema 20: 0.58.)
         let value = vec![0.0f32];
         let points = vec![0.4f32];
         let opp_points = vec![0.2f32];
@@ -6405,7 +6414,7 @@ mod tests {
         // Toleranz 1e-6 statt 1e-12 -- `value`/`points` sind `f32`-Vektoren
         // (wie reale ONNX-Outputs), die Konvertierung nach `f64` fuer die
         // Blend-Arithmetik ist nicht bit-exakt zur reinen `f64`-Handrechnung.
-        assert!((u - 0.58).abs() < 1e-6, "u={u}, erwartet 0.58");
+        assert!((u - 0.575).abs() < 1e-6, "u={u}, erwartet 0.575");
     }
 
     // ── Env-Var-Parsing (`read_f64_env`) -- eindeutige, synthetische
@@ -6750,6 +6759,9 @@ mod tests {
         let points = vec![0.4f32];
         let opp_points = vec![0.2f32];
         let u = blended_leaf_win_prob_with(&value, &points, &opp_points, 0.5, 0.5, 0.0, 1.0);
-        assert!((u - 0.58).abs() < 1e-6, "u={u}, erwartet 0.58 (identisch zum Vor-Task-#30-Ergebnis)");
+        // Schema 20: 0.575 statt 0.58 -- die Aenderung liegt im Epsilon, NICHT
+        // in der Task-#30-Kalibrierung, die dieser Test absichert (A=0/B=1
+        // bleibt die Identitaet).
+        assert!((u - 0.575).abs() < 1e-6, "u={u}, erwartet 0.575 (Kalibrierung A=0/B=1 = Identitaet)");
     }
 }

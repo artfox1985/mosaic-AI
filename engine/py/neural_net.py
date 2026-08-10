@@ -474,7 +474,12 @@ def action_to_id(action: dict) -> int:
 # own_total = step["scores"][eigener Spieler]  (bereits inkl. Wertungsplatten,
 #             von apply_end_scoring() in Rust eingerechnet)
 # opp_total = step["scores"][Gegner]
-# value = tanh(own_total/VALUE_SCALE) − VALUE_OPP_EPSILON · tanh(opp_total/VALUE_SCALE)
+# value = tanh(own_total/VALUE_SCALE)
+# (Schema 20, Nutzer-Entscheid 2026-08-10: der frueher abgezogene
+#  VALUE_OPP_EPSILON·tanh(opp_total/VALUE_SCALE)-Term ist ENTFALLEN. Begruendung
+#  in evaluations/PREREG_punktekopf_epsilon.md -- kurz: der Term war im
+#  Suchpfad nur ueber `opp_aware_points_utility` rueckgewinnbar, und der liegt
+#  hinter dem `w == 0.0`-Kurzschluss, ist also toter Code.)
 #
 # Getrennt gesättigt statt Differenzbildung VOR dem tanh (wie zuvor
 # `own − 0.5·opp`, dann erst tanh): eine Differenz sättigt bei großem Abstand
@@ -485,12 +490,11 @@ def action_to_id(action: dict) -> int:
 # durch rein absolute Pro-Spieler-Bewertung behoben hat — konsistent dazu
 # bekommt jetzt auch das Value-Head-Ziel einen eigenen, unabhängig sättigenden
 # own-Term (volle Differenzierung über den ganzen Bereich).
-# Der Gegner-Term bildet Priorität 2 ("wenn möglich dem Gegner schaden") ab,
-# aber additiv NACH der Sättigung statt als Abzug davor: er kann den
-# Gesamtwert nur um max. ±VALUE_OPP_EPSILON verschieben, niemals das
-# Eigenpunkte-Signal überstimmen — ein Zug, der dem Gegner schadet OHNE die
-# eigene Punktzahl zu beeinflussen, bekommt einen kleinen Bonus, kann aber nie
-# eine eigene Einbuße aufwiegen.
+# HISTORISCH (bis Schema 19): ein Gegner-Term bildete Priorität 2 ("wenn
+# möglich dem Gegner schaden") additiv NACH der Sättigung ab und konnte den
+# Gesamtwert um max. ±VALUE_OPP_EPSILON verschieben. Ab Schema 20 ENTFALLEN --
+# Priorität 2 gehört, wenn überhaupt, in einen eigenen Kopf mit eigenem
+# Gewicht, nicht als Verunreinigung in ein Eigenpunkte-Ziel.
 # VALUE_SCALE-Kalibrierung: NICHT aus aktuellen Spieldaten abgeleitet (Heuristik
 # und Netz spielen beide noch schwach — jede aus dieser Verteilung abgeleitete
 # Skala würde nur die aktuelle Schwäche festschreiben, nicht das echte
@@ -653,7 +657,7 @@ def action_to_id(action: dict) -> int:
 # Cache-Bau). v16/v17/Ein-Aktion-Zuege und Zuege mit `pol_w==0` (Tiling/
 # Start-Schritte ODER `policy_target_valid=False`, siehe pol_w-Kommentar im
 # Baucode unten) tragen Maske 0.
-VALUE_SCHEMA_VERSION = 19
+VALUE_SCHEMA_VERSION = 20
 # Namenskonvention: Dateien heissen nach dem GENERATOR (v19-Aera-Modell
 # t34_wdldestretch_brierbest -> "v19wdl"), NICHT nach der Ziel-Generation
 # (Koordinator-Fehler #2 mit dieser Konvention, vom Nutzer 2026-08-06
@@ -700,7 +704,7 @@ def _is_policy_carrier(basename, carrier_set, carrier_prefixes, bootstrap_native
     return basename in carrier_set or basename.startswith(tuple(carrier_prefixes))
 
 
-VALUE_OPP_EPSILON = 0.1
+VALUE_OPP_EPSILON = 0.0  # inert seit Schema 20, siehe Kommentar oben
 VALUE_SCALE = 50.0
 # Mischgewicht fuer `bootstrap_value` (Punkt 6) -- 0.0 = nur bisheriges Ziel
 # (Endergebnis bzw. rtv-Override), 1.0 = nur der kurze Bootstrap-Horizont.
@@ -752,7 +756,10 @@ ROOT_Q_CACHE_FIELDS = ("root_q", "root_q_mask")
 # konstruiert (Basis tanh(opp_total/VALUE_SCALE), rtv-Zweig opp_rtv,
 # TD-Bootstrap-Blend mit opp_bootstrap) -- NUR dadurch gilt die algebraische
 # Rueckgewinnung `own_pts = points_pred + VALUE_OPP_EPSILON*opp_pred` exakt
-# (siehe Kommentar an der Baustelle unten).
+# galt -- ab Schema 20 ist sie GEGENSTANDSLOS, weil `points_forecast` rein own
+# ist (VALUE_OPP_EPSILON = 0). Die Spiegelung der Blending-Struktur bleibt
+# trotzdem richtig: sie macht `opp_points_forecast` mit `points_forecast`
+# vergleichbar.
 OPP_POINTS_CACHE_FIELDS = ("opp_points_forecast", "opp_points_mask")
 
 # Task #34 (STATUS.md "Sieg/Niederlage-Ziel wiederherstellen"): additive
@@ -1483,8 +1490,11 @@ class MosaicDataset(Dataset):
                             val = math.tanh((own_total - opp_total) / VALUE_SCALE)
                             # Punktestand-Formel bleibt als separates Aux-Ziel
                             # erhalten (bereits inkl. Wertungsplatten).
-                            points_val = (math.tanh(own_total / VALUE_SCALE)
-                                          - VALUE_OPP_EPSILON * math.tanh(opp_total / VALUE_SCALE))
+                            # Schema 20 (Nutzer 2026-08-10): REIN own, kein
+                            # Gegner-Anteil mehr. Der 0,1-Term war nur ueber
+                            # `opp_aware_points_utility` rueckgewinnbar, und der
+                            # Pfad ist hinter `w == 0.0` toter Code.
+                            points_val = math.tanh(own_total / VALUE_SCALE)
                             # Task #28 (PREREG_task28_aggression.md, "Minimal-
                             # invasiver Zuschnitt" Punkt 2): eigenstaendiger
                             # Aux-Ziel-Track fuer den additiven
@@ -1541,7 +1551,7 @@ class MosaicDataset(Dataset):
                                 own_rtv = float(rtv[p]) * 2.0 - 1.0
                                 opp_rtv = float(rtv[1 - p]) * 2.0 - 1.0
                                 val = own_rtv
-                                points_val = own_rtv - VALUE_OPP_EPSILON * opp_rtv
+                                points_val = own_rtv  # Schema 20: rein own
                                 opp_points_val = opp_rtv  # Task #28: spiegelt own_rtv-Override
                             # Punkt 6 (VALUE_SCHEMA_VERSION=15): TD-Bootstrap-
                             # Blend, siehe Kommentar oben -- mischt HINEIN
@@ -1552,7 +1562,7 @@ class MosaicDataset(Dataset):
                             if bv is not None:
                                 own_bootstrap = float(bv[p]) * 2.0 - 1.0
                                 opp_bootstrap = float(bv[1 - p]) * 2.0 - 1.0
-                                points_bootstrap = own_bootstrap - VALUE_OPP_EPSILON * opp_bootstrap
+                                points_bootstrap = own_bootstrap  # Schema 20: rein own
                                 val = TD_LAMBDA * own_bootstrap + (1.0 - TD_LAMBDA) * val
                                 points_val = TD_LAMBDA * points_bootstrap + (1.0 - TD_LAMBDA) * points_val
                                 # Task #28: identischer TD-Blend, opp-Seite
