@@ -426,3 +426,49 @@ HDF5-Dateien). Entscheidungsregel vorab:
 
 Ohne diese Messung waere ein Kopf gebaut worden, dessen Pflicht-Kriterium
 eine Konstante vorhersagt.
+
+### Die 96 % sind STRUKTURELL, nicht naiv-spiel-bedingt (Nutzer 2026-08-10)
+
+*"das spezialfeld zu fuellen ist auch schwieriger. dafuer muessen die 3
+anderen felder der kuppelplatte erst gefuellt werden. die jokerfelder koennen
+direkt belegt werden"*
+
+Woertlich im Code bestaetigt:
+
+- `DomeSpace::special()` startet mit `is_locked: true` (`dome.rs:44`).
+- `try_unlock_special` (`dome.rs:140`): "Schaltet den SPECIAL-Space frei,
+  sobald die anderen 3 gefuellt sind" -- und die anderen drei sind `Normal`
+  mit `required_color`, also drei BESTIMMTE Farben auf derselben Platte.
+- `accepts_special` verlangt `!is_locked` (`dome.rs:75`), `check_special_trigger`
+  feuert erst dann (`round_end.rs:307`).
+- Ein Jokerfeld dagegen: `accepts(color) -> true` fuer JEDE Farbe
+  (`dome.rs:68`), ohne Vorbedingung.
+
+**Kosten je Feld**: Spezialfeld = 4 Platzierungen mit 3 Farbauflagen,
+Jokerfeld = 1 Platzierung ohne Auflage.
+
+**Folge fuer den Vorbehalt oben**: die 4,04-von-4,21-Leerrate ist damit KEIN
+Artefakt des naiven Draftings, sondern strukturell. Die Champion-Messung
+wird die Zahl senken, nicht aufloesen. Die vorregistrierten Schwellen
+bleiben gueltig, aber der erwartete Ausgang ist ">90 %", also der Fall, der
+eine Klassen-Gewichtung erzwingt.
+
+**Und das dreht die Aufgabe, statt sie zu erledigen.** Uninformativ ist nur
+die GRUNDRATE, nicht das Kriterium: Wert entsteht, wenn der Kopf die
+seltenen ~4 % UNTERSCHEIDET, und dort steckt viel Wert, weil eine gefuellte
+Spezialfliese reihenabhaengig 1..6 Punkte traegt (`round_end.rs:327`) -- in
+den unteren Slots (Musterreihen 5/6) die teuersten UND schwersten zugleich.
+Genau die Preisfrage, die der Nutzer beim Slot-Zuschnitt von Hand macht
+("in reihe 3 der slots will ich keine spezialkuppeln").
+
+**Auswertung entsprechend anpassen**: Entscheidungsgroesse fuer Kriterium 6
+ist nicht der rohe Brier (der wird bei Grundrate 0,96 trivial gut), sondern
+der **Brier-Skill-Score gegen die Grundrate** plus die Trennleistung auf der
+Minderheitsklasse. Ein Kopf, der konstant 0,96 ausgibt, muss dabei mit
+Skill 0 herauskommen -- das ist der Trivialitaets-Wachhund.
+
+**Repraesentation ist ausreichend**: die Brettkanaele tragen `+15 locked`,
+`+6 placed_special` und den Fuellstand der Normalfelder, "drei andere
+gefuellt" ist daraus ableitbar (`features.rs::write_board_channels_direct`).
+Der Kopf kann also lernen, wie weit eine Platte vom Freischalten entfernt
+ist -- die eigentlich informative Groesse.
