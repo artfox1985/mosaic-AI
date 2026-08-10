@@ -40,6 +40,48 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 |---|---|
 | **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
+### NACHTPROTOKOLL 2026-08-10 (Nutzer schlaeft, Auftrag "keinen Leerlauf")
+
+**Fertig geworden, mit Verdikt:**
+
+| Punkt | Ergebnis |
+|-------|----------|
+| **Punkte-Blend `w>0`** | **REGEL 2, GESCHLOSSEN**: Kontrolle 321/400 (80,25 %) gegen Arm 300/400 (75,00 %), Block-Delta -5,25pp bei t=-2,68, McNemar p=0,0527. w bleibt 0, Richtung eher schaedlich. Die +6pp der Aggressions-Neukartierung sind mit doppelter Stichprobe UMGEKEHRT -- Lehrstueck zur Seed-Skala. |
+| **#82 GPU-Batcher** | **REGEL 1, GESCHLOSSEN**: erreichbare Batches 11/22/44 liefern 2.581/6.197/14.060 Evals/s, alle unter der unteren CPU-Schranke 17.600. Die GPU ist nicht langsam, sondern ausgehungert (Break-even ~64-128). |
+| **GPU-Verlagerung** (neu vorregistriert) | Teil 1+2 geschlossen: Speicher ist kein Engpass (1,5 MiB je Suche), erreichbarer Batch analytisch **140-590** ⇒ Gewinnzone. Weg V (Verschraenkung, suchneutral) statt Virtual Loss. Startwert N=256. |
+| **Wheel + Golden-Waechter** | installiert, Paritaet BEWIESEN (`8c6684ff...`), A2-Vertragsstempel `a169ebf0a4451e08` erstmals am installierten Binary befragbar. |
+| **Runde 5** | Zufallsknoten SCHARF -- die Suche ist jetzt Expectiminimax. Versatz null gemessen (-0,47 Pkt, SE 0,66, t=-0,71 ueber 43 Abweichungen). |
+| **Plattenkopf-Rauchtest** | **c6 traegt (Skill +0,574), c3 NICHT (-0,036 und fallend)**. Gebaut wird nur c6; c3 bleibt offen, nicht verworfen. |
+
+**Laeuft jetzt (GPU):** Stufe A des Plattenkopfs im grossen Zuschnitt --
+400 Dateien, bis 300.000 Zustaende, Schnitt nach Partie, Fruehstopp, plus
+**Kalibrierung je Slot** (Platt-Steigung), die die Vorregistrierung als
+Entscheidungsgroesse verlangt. Log: `logs/plattenkopf_stufeA.log`.
+
+**BEWUSST NICHT gestartet: der volle Plattenkopf-Nachtlauf.** Er haette
+verlangt, `neural_net.py` und `train.py` unbeaufsichtigt umzubauen und danach
+6,5 h Maschinenzeit auf ungetesteten Integrationscode zu setzen. Ein
+subtiler Fehler dort haette die Nacht UND den Trainingspfad gekostet.
+Stattdessen laeuft die Messung, die der Vorregistrierung ohnehin fehlt und
+die das Integrationsrisiko fast auf null senkt: traegt der Rumpf c6, ist der
+Rest Verdrahtung.
+
+**Fuer den Morgen vorbereitet, noch nicht ausgefuehrt:**
+1. Kopf `plate_c6` (9 Ausgaben) in `neural_net.py`, additiv hinter einem
+   Flag, Default aus -- Bestandspfad byte-identisch.
+2. Labels ueber `tools/plattenkopf_labels.py` in den Cache-Bau; Cache-Key
+   bekommt `+plate_v1` NUR bei gesetztem Flag, damit der vorhandene
+   v21-Cache NICHT entwertet wird (kein `VALUE_SCHEMA_VERSION`-Bump).
+3. Erst Mini-Cache auf ~10 Dateien + 1 Epoche als Integrationsprobe, dann
+   der volle Lauf.
+
+**Fehler dieser Nacht, protokolliert:** Hintergrundlauf durch `tail`
+geleitet (puffert bis Prozessende -- die Arena sah tot aus, lief aber);
+Handzerlegung der Blatt-Erzeugungsrate ergab 120 % Inferenzanteil und war
+ungueltig; ein Null-Evaluator waere der falsche Ersatz gewesen (degenerierte
+Suche), und `profiling.rs` hatte die Zahl seit Task #32 laengst -- zweimal an
+einem vorhandenen Werkzeug vorbeigebaut.
+
 ### LAUFENDE QUEUE (Stand 2026-08-10 nachts)
 
 | Bahn | laeuft jetzt | danach |
