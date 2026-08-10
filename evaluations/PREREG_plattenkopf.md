@@ -856,3 +856,22 @@ Folgen:
 Wichtiger Punkt zur Rolle des Artefakts: ein Gegenpruef-Artefakt, das
 denselben Fehler wie die zu pruefende Rechnung traegt, pruefte nichts -- es
 bestaetigte. Deshalb diese Messung, statt das Artefakt einfach zu benutzen.
+
+### Identitaeten auf dem GESAMTEN Korpus verifiziert
+
+`tools/plattenkopf_labels.py check` ueber alle **2.945 Dateien / 29.450
+Partien**: **44.068 bestaetigt, 0 abweichend, 0 uebersprungen**
+(`logs/plattenkopf_identitaet_voll.log`).
+
+Geprueft wurde je Endbrett und je in der Partie AKTIVER Platte:
+
+    -3 * Summe(c6-Atome) == score_empty_special_fields   (Engine)
+     2 * Summe(c3-Atome) == score_wild_fields            (Engine)
+
+44.068 ist plausibel: 29.450 Partien x 2 Spieler = 58.900 Bretter, davon
+tragen ~3/4 eine der beiden Platten (6 und 3 sind ein Ausschluss-Paar, es
+kann also hoechstens eine aktiv sein).
+
+Damit ist die Rechengrundlage des Kopfes **erschoepfend** belegt, nicht
+stichprobenweise -- inklusive Kriterium 3, dessen Identitaet nie das Problem
+war (es fehlt die Lernbarkeit, nicht die Korrektheit).
