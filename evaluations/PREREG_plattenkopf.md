@@ -1040,3 +1040,24 @@ einer ablesbaren Position, genau wie die -3 ein bekannter Multiplikator ist.
   `diag_fill` (`scoring.rs:167`, quadriert x 10). Analog zur schon notierten
   5 x 6, von keinem Ausschlusspaar abgefangen.
 - Stufe B (Verwendung im Blattwert) unveraendert OFFEN, eigene Vorregistrierung.
+
+### AUFGERAEUMT: `plate_head` entfernt (2026-08-10, Nutzer-Auftrag)
+
+Die am 2026-08-10 nachts gebaute Modellseite (`plate_head`,
+`PLATE_HEAD_SLOTS = 9`, `plate_head_present`, Signatur-Flag in beiden Klassen,
+Lader-Durchreichung, Ausgabe-Anhang) ist **entfernt**. Sie war toter Code: 22
+Verweise in `neural_net.py`, und **nichts** setzte das Flag je auf `True` --
+die Revision oben hat c6 dem Ownership-Kopf zugeschlagen, bevor der eigene Kopf
+je benutzt wurde.
+
+Verifiziert nach der Entfernung: beide Modellklassen liefern wieder 5
+Ausgaben im Default, der Champion laedt unveraendert mit 8, und
+`conjunction_head_present` funktioniert weiter (die eine Kommentarzeile, die
+auf `plate_head_present` verwies, ist mitgezogen). `neural_net.py` schrumpft
+von 160,3 auf 158,3 KB.
+
+**Was NICHT entfernt ist**: `tools/plattenkopf_labels.py` (Label-Rechnung samt
+Identitaets-Pruefung 44.068/0 und der neuen Existenz-Maske),
+`tools/plattenkopf_smoketest.py` und die Messungen. Die Labels sind fuer die
+Ownership-Route dieselben, und die Identitaets-Pruefung bleibt die Verbindung
+zwischen Atom-Definition und Engine-Wertung.
