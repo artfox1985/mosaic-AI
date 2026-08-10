@@ -506,3 +506,63 @@ nachweislich bei Null liegt** (Brier-Skill-Score <= 0 gegen die Grundrate).
 Ein Kriterium wegen Klassenschieflage zu streichen, das die dokumentierte
 Hauptschwaeche adressiert, waere der falsche Schluss aus einer richtigen
 Metrik-Beobachtung.
+
+## GRUNDRATEN GEMESSEN auf Champion-Partien -- Mittelband, Bau freigegeben (2026-08-10)
+
+Nutzer-Auftrag: *"kannst du auf den bestehenden korpus ein modell mit dem
+platten head trainieren und gegen den champ laufen lassen"*. Erste Stufe
+davon -- die vorregistrierte Grundraten-Messung -- ist gelaufen.
+Instrument: `tools/plattenkopf_labels.py` (neu), 800 Endbretter aus 40
+`selfplay_v20wdl_*`-Dateien.
+
+| Groesse | Messwert |
+|---------|----------|
+| Kriterium 6: Anteil LEERER Spezialfelder je Brett | **83,3 %** |
+| Spezialfelder je Brett | 4,50 |
+| Kriterium 3: Grundrate "alle Jokerfelder belegt" | **42,0 %** |
+| Jokerfelder je Brett | 4,50, Spanne **1 .. 8** |
+| Identitaeten gegen `scoring_tile_points` | **94/94 bestaetigt** |
+
+### Verdikt nach der vorab festgelegten Regel
+
+83,3 % liegt im Band **60-90 %** ⇒ **tragfaehig**, Auswertung mit
+ungleichgewichts-bewusster Kalibrierung (Brier-Skill-Score gegen die
+Grundrate). NICHT der Zwangsfall ">90 %", der eine Klassen-Gewichtung
+erzwungen haette.
+
+**Meine Vorhersage war falsch und das ist folgenreich.** Ich hatte ">90 %"
+als "erwarteten Ausgang" notiert, gestuetzt auf die naive-Spiel-Messung
+(4,04 von 4,21 leer = 96 %) und das Struktur-Argument. Champion-Spiel fuellt
+mehr Spezialfelder als naives -- die 96 % waren also zum TEIL doch ein
+Spielweise-Artefakt, nicht rein strukturell. Weil die Schwelle vorab stand,
+aendert das den Zweig der Entscheidungsregel, nicht bloss eine Fussnote.
+
+Kriterium 3 bestaetigt sich (42,0 % gegen 45,8 % auf den synthetischen
+Brettern). Die Spanne **1 bis 8** Jokerfelder ist weiter als die dort
+gemessene 2..5 -- ohne die Zerlegung in 9 Atome laege der Multiplikator um
+bis zu sieben Felder falsch.
+
+### Label-Beschraenkung des Bestandskorpus (bleibt bestehen)
+
+Der letzte Datensatz einer Partie ist der letzte TILING-SCHRITT, nicht der
+Zustand nach Spielende -- exakte Endlabels liegen NICHT vor. Gemessen:
+Kriterium 6 ist in 101/120 Brettern schon 6 Datensaetze vor Schluss final,
+Kriterium 3 in 109/120; der Restfehler ist klein und unterzaehlt
+Fuellungen systematisch. Tragbar fuer die Machbarkeits-/Staerkeprobe,
+NICHT fuer einen Champion-Kandidaten -- der braucht eine Generierung, die
+die Endlabels stempelt.
+
+### Restliche Abfolge fuer die Probe
+
+1. Kopf in `engine/py/neural_net.py` (18 Ausgaben: 9 Atome je Kriterium 3/6),
+   Verlust maskiert auf die in der Partie AKTIVEN Kriterien.
+2. Labels in den Cache -> Schema-Bump -> Cache-Neubau (~3h). Der Bump war
+   bis zum Abschluss von Task D gesperrt, damit `pw025` nicht auf einem
+   anderen Korpus trainiert -- Task D ist seit heute geschlossen, die Sperre
+   ist weg.
+3. Training (~3,5h GPU), Rezept wie der Champion (warm-start, lr 5e-5,
+   cosine, `--value-head wdl --select-by-brier`).
+4. **Beide** Auswertungen, weil eine allein nicht interpretierbar ist:
+   Arena-Gating vs Champion (~1-1,5h CPU) UND Brier-Skill-Score je Kriterium.
+   Ein Nullergebnis in der Arena ohne die Kalibrierung liesse offen, ob der
+   Kopf nichts gelernt hat oder es gelernt hat und nicht hilft.

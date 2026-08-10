@@ -995,6 +995,171 @@ mod tests {
         );
     }
 
+    /// Rechnet "weicht ab" in "kostet Punkte" um -- die Teil-E-Restarbeit.
+    ///
+    /// Anlass (Nutzer-Korrektur 2026-08-10): meine Begruendung "die
+    /// Abweichungen liegen in der Runde mit der geringsten Hebelwirkung" war
+    /// FALSCH. Runde 5 ist der Zahltag; gering ist die FREIHEIT (das
+    /// Kuppelraster ist ab Runde 5 fix), nicht der Hebel. Ein Freispruch fuer
+    /// den Anker-Versatz braucht also den Punktpreis, nicht ein Argument ueber
+    /// die Wichtigkeit der Runde.
+    ///
+    /// Bewertet wird mit der Orakel-Tiefe aus der Perspektive des ZIEHENDEN:
+    /// `leaf_value` ist eine Punkte-Differenz, das Delta ist damit direkt in
+    /// Punkten lesbar.
+    #[test]
+    #[ignore]
+    fn teil_e_value_cost_of_divergence_probe() {
+        use crate::round_transition::drive_to_round_start;
+        const ORACLE: u64 = 20_000;
+        let long = || Instant::now() + Duration::from_secs(120);
+
+        let deep = |st: &GameState, persp: usize| -> f64 {
+            let mut nodes: u64 = 0;
+            negamax(st, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY,
+                    persp, &mut nodes, ORACLE, long(), false)
+        };
+        let after = |st: &GameState, a: &Action| -> Option<GameState> {
+            let mut g = Game { state: st.clone() };
+            g.apply_drafting(a).ok()?;
+            Some(g.state)
+        };
+
+        let mut chance_deltas: Vec<f64> = Vec::new();
+        let mut solver_losses: Vec<f64> = Vec::new();
+        let mut decisions = 0usize;
+        for seed in [101u64, 202, 303, 404, 505, 606, 707, 808] {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut guard = 0u32;
+            while state.phase == Phase::Drafting && guard < 200 {
+                guard += 1;
+                let mover = state.current_player;
+                let off = match choose_action_inner(&state, false, NODE_BUDGET) {
+                    Some(a) => a,
+                    None => break,
+                };
+                decisions += 1;
+
+                // (a) Zufallsknoten an/aus -- nur wo die Wahl abweicht
+                if let Some(on) = choose_action_inner(&state, true, NODE_BUDGET) {
+                    if on != off {
+                        if let (Some(s_on), Some(s_off)) = (after(&state, &on), after(&state, &off)) {
+                            chance_deltas.push(deep(&s_on, mover) - deep(&s_off, mover));
+                        }
+                    }
+                }
+                // (b) Loeser@200 gegen die Orakel-Wahl -- Verlust in Punkten
+                if let Some(oracle) = choose_action_deadlined(&state, false, ORACLE, long()) {
+                    if oracle != off {
+                        if let (Some(s_or), Some(s_off)) = (after(&state, &oracle), after(&state, &off)) {
+                            solver_losses.push(deep(&s_or, mover) - deep(&s_off, mover));
+                        }
+                    } else {
+                        solver_losses.push(0.0);
+                    }
+                }
+
+                match after(&state, &off) {
+                    Some(next) => state = next,
+                    None => break,
+                }
+            }
+        }
+        let stat = |v: &Vec<f64>| {
+            if v.is_empty() {
+                return (0.0, 0.0, 0.0);
+            }
+            let n = v.len() as f64;
+            let mean = v.iter().sum::<f64>() / n;
+            let worst = v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let best = v.iter().cloned().fold(f64::INFINITY, f64::min);
+            (mean, best, worst)
+        };
+        let (cm, cb, cw) = stat(&chance_deltas);
+        println!("PUNKTPREIS, {decisions} Runde-5-Entscheidungen");
+        println!(
+            "  Zufallsknoten an-vs-aus, nur abweichende ({}): Delta Mittel {cm:+.2} Pkt, Spanne {cb:+.2} .. {cw:+.2}",
+            chance_deltas.len()
+        );
+        let nonzero: Vec<f64> = solver_losses.iter().cloned().filter(|d| d.abs() > 1e-9).collect();
+        let (sm, sb, sw) = stat(&nonzero);
+        let all_mean = solver_losses.iter().sum::<f64>() / solver_losses.len().max(1) as f64;
+        println!(
+            "  Loeser@200 vs Orakel: Mittel ueber ALLE {all_mean:+.3} Pkt; nur abweichende ({}): Mittel {sm:+.2}, Spanne {sb:+.2} .. {sw:+.2}",
+            nonzero.len()
+        );
+    }
+
+    /// Vorzeichen-Messung fuer das Scharfschalten der Runde-5-Zufallsknoten.
+    ///
+    /// `teil_e_value_cost_of_divergence_probe` fand nur 4 abweichende
+    /// Entscheidungen -- ein Mittel von -2,75 Pkt, das ein einzelner
+    /// -13-Fall dominierte. Vier Datenpunkte tragen kein Vorzeichen. Diese
+    /// Sonde sammelt ueber viele Seeds, bewertet aber NUR die abweichenden
+    /// Stellungen tief (die Orakel-Bewertung je Entscheidung ist der teure
+    /// Teil und fuer die Vorzeichenfrage unnoetig).
+    #[test]
+    #[ignore]
+    fn r5_chance_arming_sign_probe() {
+        use crate::round_transition::drive_to_round_start;
+        const ORACLE: u64 = 20_000;
+
+        let mut deltas: Vec<f64> = Vec::new();
+        let mut decisions = 0usize;
+        for seed in 1u64..=80 {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut guard = 0u32;
+            while state.phase == Phase::Drafting && guard < 200 {
+                guard += 1;
+                let mover = state.current_player;
+                let off = match choose_action_inner(&state, false, NODE_BUDGET) {
+                    Some(a) => a,
+                    None => break,
+                };
+                decisions += 1;
+                if let Some(on) = choose_action_inner(&state, true, NODE_BUDGET) {
+                    if on != off {
+                        let mut deep = |a: &Action| -> Option<f64> {
+                            let mut g = Game { state: state.clone() };
+                            g.apply_drafting(a).ok()?;
+                            let mut nodes: u64 = 0;
+                            Some(negamax(
+                                &g.state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY,
+                                f64::INFINITY, mover, &mut nodes, ORACLE,
+                                Instant::now() + Duration::from_secs(120), false,
+                            ))
+                        };
+                        if let (Some(v_on), Some(v_off)) = (deep(&on), deep(&off)) {
+                            deltas.push(v_on - v_off);
+                        }
+                    }
+                }
+                let mut g = Game { state };
+                if g.apply_drafting(&off).is_err() {
+                    break;
+                }
+                state = g.state;
+            }
+        }
+        let n = deltas.len();
+        if n == 0 {
+            println!("VORZEICHEN: keine Abweichungen in {decisions} Entscheidungen");
+            return;
+        }
+        let mean = deltas.iter().sum::<f64>() / n as f64;
+        let var = deltas.iter().map(|d| (d - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
+        let se = (var / n as f64).sqrt();
+        let mut sorted = deltas.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let median = sorted[n / 2];
+        let neg = deltas.iter().filter(|d| **d < 0.0).count();
+        println!("VORZEICHEN Zufallsknoten an-vs-aus, {decisions} Entscheidungen, {n} Abweichungen ({:.1}%)",
+                 100.0 * n as f64 / decisions as f64);
+        println!("  Delta Mittel {mean:+.2} Pkt, SE {se:.2}, t={:+.2}", mean / se.max(1e-9));
+        println!("  Median {median:+.2}, Spanne {:+.2} .. {:+.2}, davon negativ {neg}/{n}",
+                 sorted[0], sorted[n - 1]);
+    }
+
     #[test]
     fn applies_only_in_round5_drafting() {
         let mut s = round5_state(1);
