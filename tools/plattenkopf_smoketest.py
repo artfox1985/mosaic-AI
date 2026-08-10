@@ -85,10 +85,20 @@ def load_dataset(pattern: str, n_files: int, max_states: int):
                 tgt, msk = [], []
                 for key, crit_id in CRITERIA.items():
                     on = 1.0 if crit_id in active else 0.0
-                    for v in lab[key]:
+                    # BEDINGTE Auswertung (Korrektur 2026-08-10 abends): fuer c6
+                    # zaehlen nur Slots, die am Ende UEBERHAUPT ein Spezialfeld
+                    # tragen. Ohne diese Maske vermischt der Skill die
+                    # Risikovorhersage mit dem Ablesen der ANWESENHEIT, und die
+                    # steht in den Brettkanaelen -- eine Nachschlagefrage.
+                    # Gemessen: 50,0 % der Slots tragen ein Special, bedingte
+                    # Leerrate 0,831, und 0,831 x 0,50 = 0,416 ~ die zuvor
+                    # berichtete "Grundrate" 0,442.
+                    exists = lab.get("c6_exists") if key == "c6" else None
+                    for i, v in enumerate(lab[key]):
+                        m = on * (float(exists[i]) if exists is not None else 1.0)
                         tgt.append(float(v))
-                        msk.append(on)
-                        if on:
+                        msk.append(m)
+                        if m:
                             per_criterion_total[key] += 1
                             per_criterion_positives[key] += v
                 st = rec["state"]
