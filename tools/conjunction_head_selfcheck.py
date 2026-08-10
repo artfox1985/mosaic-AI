@@ -213,8 +213,12 @@ def check_head() -> bool:
         return mod
 
     new = load(REPO / "engine" / "py" / "neural_net.py", "nn_new")
+    # encoding explizit: `text=True` allein dekodiert unter Windows mit
+    # locale.getpreferredencoding() (cp1252) -- neural_net.py ist UTF-8 mit
+    # Umlauten ("tuerkis"), das crasht im Reader-Thread und liefert stdout=None.
     old_src = subprocess.run(["git", "-C", str(REPO), "show", "HEAD:engine/py/neural_net.py"],
-                             capture_output=True, text=True, check=True).stdout
+                             capture_output=True, text=True, encoding="utf-8",
+                             check=True).stdout
     tmp = Path(tempfile.mkdtemp()) / "neural_net_old.py"
     tmp.write_text(old_src, encoding="utf-8")
     old = load(tmp, "nn_old")

@@ -128,7 +128,8 @@ def run_arm(python_exe: str, seed: int, n_games: int, label: str,
         [python_exe, str(WORKER_SCRIPT),
          "--model", MODEL_PATH, "--net-sims", str(net_sims), "--heur-sims", str(heur_sims),
          "--n-games", str(n_games), "--seed", str(seed), "--threads", str(threads)],
-        capture_output=True, text=True, timeout=ARM_TIMEOUT_SECS,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=ARM_TIMEOUT_SECS,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"Arm {label} (Seed {seed}, n={n_games}) fehlgeschlagen "

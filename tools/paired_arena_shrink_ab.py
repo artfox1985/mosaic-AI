@@ -112,7 +112,8 @@ def run_arm(arm: str, seed: int, n_games: int, block_size: int, threads: int) ->
              "--model-champion", MODEL_CHAMPION, "--model-opponent", MODEL_OPPONENT,
              "--sims", str(SIMS), "--n-games", str(n), "--seed", str(block_seed),
              "--threads", str(threads), "--c-puct", str(C_PUCT)],
-            capture_output=True, text=True, timeout=ARM_TIMEOUT_SECS,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=ARM_TIMEOUT_SECS,
         )
         if proc.returncode != 0:
             raise RuntimeError(f"Arm {label} Block {block_idx} (Seed={block_seed}, n={n}) "
