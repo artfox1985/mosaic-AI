@@ -1,5 +1,31 @@
 # Projekt-Richtlinien für Claude
 
+## REGEL 0: Geprüft oder markiert. Kein Drittes. (Nutzer-Anweisung 2026-08-11)
+
+Jede Sachaussage über Code, Regeln, Zahlen oder Messungen ist entweder
+
+- **geprüft in dieser Sitzung**, mit genannter Prüfstelle (`datei:zeile`,
+  Handbuch-Abschnitt, Log-Zeile), oder
+- **ausdrücklich als ungeprüft / Annahme / Herleitung markiert.**
+
+Eine unmarkierte Behauptung ist ein Regelbruch. Diese Regel entstand nach sieben
+Flüchtigkeitsfehlern an einem Tag, die jeweils ein einziger Grep verhindert
+hätte — einer davon hätte zu einer "Reparatur" am Elo-Anker geführt.
+
+Die vier Auslöser, an denen es jedes Mal schiefging:
+
+1. **Verhalten von Code**: erst lesen, dann sagen. Nicht aus dem Gedächtnis,
+   nicht aus `STATUS.md`, nicht aus einer Vorregistrierung.
+2. **Agenten-Befunde sind Behauptungen**, keine Fakten. Die tragende Zahl selbst
+   nachprüfen, bevor sie weitergegeben oder verrechnet wird.
+3. **Spielregeln**: in `docs/engine_manual.md` oder in den Code schauen, nie
+   ableiten.
+4. **Zahlen**: eine ungeprüfte Zahl geht in keine Rechnung. Eine Rechnung, die
+   "ungefähr passt", ist kein Beleg, sondern ein Zufall.
+
+Zusatz: **Plan und Zustand nie in derselben Zeitform** — "würde addieren" für
+Geplantes, "addiert" nur für Gebautes-und-Aktives.
+
 ## Token-Optimierung & Kommunikations-Regeln
 
 - **Kein Boilerplate** Wiederhole niemals den gesamten Dateikontent. Gib nur den geänderten Funktionsblock oder die spezifischen Zeilen aus.
