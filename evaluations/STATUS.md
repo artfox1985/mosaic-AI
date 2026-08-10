@@ -197,6 +197,45 @@ Die Plattenluecke (Heuristik 1,99 Plattenpunkte je Partie gegen 1,10 beim
 Champion) bleibt bestehen -- die Erklaerung ist aber nicht "Term fehlt",
 sondern "Term liegt in einer Form vor, die den Stand nicht bewertet".
 
+#### SPEZIALPUNKTE SIND REIHENABHAENGIG (1..6), NICHT 3 -- Nutzer-Ruege 2026-08-11
+
+*"die spezialpunkte richten sich nach der reihe in der sie aktiviert werden.
+notier dir das irgendwo fett. das hat schon so oft zu missverstaendnissen
+gefuehrt."*
+
+`round_end.rs::check_special_trigger`:
+
+    let pattern_row = slot_row * 2 + sp_idx / 2;
+    let bonus = (pattern_row + 1) as i32;      // 1..6, NICHT 3
+
+Handbuch Abschnitt 5 bestaetigt es. **`bonus_points = 3` in `dome.rs` ist NUR
+der Typ-Diskriminator** Special (`>0`) gegen Wild (`=0`) -- kein Punktwert, und
+laut `PREREG_zufallsknoten.md` darf das Feld auch NICHT umgestellt werden (die
+Platte kennt ihren Slot nicht, der Wert entsteht erst bei der Platzierung).
+`board.rs::place_special_tile` gibt die flache 3 zurueck und ist dort schon als
+**toter Code ohne Aufrufer** notiert.
+
+**Strategisch ist das der Kern**: untere Slot-Reihe = Rasterreihen 5/6 = **5
+und 6 Punkte**, obere = 1 und 2 Punkte. Das Spezialfeld bleibt unten in ~84 %
+der Partien leer, oben in ~13 % -- **die KI laesst die teuersten liegen.**
+Watchlist konsistent gelesen: Nutzer 10,3 Punkte auf 3,1 Freischaltungen =
+**3,3 je Freischaltung**, KI 1,3 auf 0,6 = **2,2**. Eine Rechnung
+"Freischaltungen x 3" ist falsch.
+
+**Der einzige lebende flache Wert ist `-3.0 * sf.special_empty` in
+`wertung_progress`** -- deshalb verschluckt es genau diese Rangfolge. NICHT
+anfassen (Elo-Anker); der neue Unlock-Term gewichtet mit `(reihe + 1)`.
+Der Tiling-Solver rechnet korrekt (Test
+`solver_counts_special_bonus_and_neighbor`: "Special-Bonus = Reihennummer").
+
+#### OWNERSHIP-KOPF: KOMMT, offen ist nur der FAKTOR (Nutzer 2026-08-11)
+
+*"wichtig der ownership head kommt so oder so. die frage ist nur mit welchem
+faktor."* -- Die Existenzfrage ist damit entschieden und nicht wieder
+aufzurollen. `OWNERSHIP_WEIGHT` ist die offene Groesse; laeuft derzeit mit 0,2.
+Das ist eine EIGENE Sweep-Frage, getrennt von der Injektions-Dosis
+(`PREREG_injektion_dosis.md`).
+
 #### DREI STUFEN UND DAS ABSCHALTKRITERIUM (Nutzer-Diktat 2026-08-10/11)
 
 Nutzer-Fassung: *"wir muessen nun der suche die realisierte groesse injizieren
