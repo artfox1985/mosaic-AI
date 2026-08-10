@@ -243,28 +243,49 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
 /// Endpunkte-Luecke). Verifiziert am Code (nicht angenommen), drei Fragen:
 ///
 /// 1. Feldtyp: `SpaceType::Special` (`dome.rs`), eigenes Flag `placed_special`
-///    -- getrennt von `SpaceType::Wild` (das hat `bonus_points=0`, siehe
-///    `build_dome_tile_pool`, `is_special_type`-Kommentar dort).
+///    -- getrennt von `SpaceType::Wild`.
 /// 2. Freischaltbedingung: `DomeTile::try_unlock_special` -- exakt "alle 3
 ///    ANDEREN Spaces DESSELBEN Slots gefuellt" (`other_filled`-Check dort,
 ///    `i == sp_idx || s.is_filled()` fuer alle 4 Indizes). Kein Slot-
 ///    uebergreifender Bezug.
-/// 3. Punktwert: `DomeTile::bonus_points` -- `board.rs::place_special_tile`
-///    gibt genau diesen Wert zurueck, wenn der weisse Stein gelegt wird.
-///    ALLE Special-Typ-Platten im Pool tragen `bonus_points=3` (siehe die
-///    9 `s()`-Eintraege in `build_dome_tile_pool`) -- die echte Konstante
-///    wird hier aus der jeweiligen Platte gelesen, nicht auf 3 fest
-///    verdrahtet (falls sich das je aendert).
+/// 3. Punktwert -- KORRIGIERT (erster Versuch war falsch, siehe unten):
+///    ZWEI unabhaengige Punktquellen, nicht eine.
 ///
-/// Ergebnis: die beschriebene Regel stimmt exakt mit dem Code ueberein, keine
-/// Abweichung zu berichten.
+/// ## Zwei unabhaengige Punktquellen (Nutzer-Korrektur 2026-08-11)
+///
+/// Erster Versuch las `DomeTile::bonus_points` als Punktwert. Falsch: laut
+/// Kommentar an derselben Stelle in `dome.rs` ist `bonus_points` NUR der
+/// Special(&gt;0)-gegen-Wild(=0)-Diskriminator (`is_special_type`), kein
+/// Punkt-Award -- fiel nicht auf, weil alle 9 Special-Platten `bonus_points=3`
+/// tragen.
+///
+/// - **Kuppel-Bonus (GRUNDWERTUNG, live beim Legen des weissen Steins)**:
+///   `round_end.rs::check_special_trigger` -- `pattern_row = slot_row*2 +
+///   sp_idx/2`, `bonus = pattern_row + 1`, also **1..6 je Rasterreihe**
+///   (`docs/engine_manual.md` Abschnitt 5: "bringt sofort Punkte entsprechend
+///   der Reihe (1 bis 6)"). Zahlt IMMER, unabhaengig von `scoring_tile_ids`.
+///   Das ist die Quelle fuer den `n_s`-Fortschrittsteil unten.
+/// - **Wertungsplatte 6 (ENDWERTUNG, `wertung_progress`/`wertung_progress_
+///   alpha`)**: FLACH `-3` je leerem Spezialfeld, KEIN Rasterreihen-Bezug
+///   (`docs/engine_manual.md`, Platte Nr. 7 der 8 Wertungsplatten: "-3 Pkt.
+///   je leer gebliebenem Spezialfeld") -- zahlt NUR, wenn `6` in `tile_ids`
+///   liegt. Bleibt UNVERAENDERT flach, siehe Test
+///   `unlock_progress_beta_criterion6_addend_is_row_independent`.
+///
+/// Nebenbefund (separat berichtet, hier NICHT behoben): `board.rs::
+/// PlayerBoard::place_special_tile` gibt `dome.bonus_points` (=3) zurueck --
+/// inkonsistent zum echten Live-Pfad oben. Hat aber KEINEN Aufrufer im
+/// gesamten Crate (kein PyO3-Binding, kein interner Call) -- toter Code,
+/// kein aktiver Regelfehler.
 ///
 /// Formel, JE SLOT EINZELN gebucht (nicht ueber das Brett gepoolt -- ein
 /// Slot mit 2 von 3 vorbereitenden Feldern ist bei `beta>1` mehr wert als
 /// zwei Slots mit je 1, siehe Test `unlock_progress_beta_is_booked_per_slot_
 /// not_pooled`): fuer jeden Slot mit einem Special-Space --
-///   - bereits gefuellt   -> volle Gutschrift `bonus_points`.
-///   - sonst              -> `bonus_points * (n_s/3)^beta`, `n_s` = Zahl der
+///   - `wert_s = (slot_row*2 + sp_idx/2) + 1` (1..6, die Rasterreihe, exakt
+///     wie `check_special_trigger`).
+///   - bereits gefuellt   -> volle Gutschrift `wert_s`.
+///   - sonst              -> `wert_s * (n_s/3)^beta`, `n_s` = Zahl der
 ///     gefuellten NICHT-Special-Spaces dieses Slots (0..3).
 /// UNGEGATET (kein `tile_ids`-Check fuer diesen Teil) -- der Kuppel-Bonus
 /// zahlt beim Legen des weissen Steins IMMER, unabhaengig von den am
@@ -272,16 +293,19 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
 /// Wertungsplatte). Kriterium 6 (`-3 * special_empty`, dieselbe Definition
 /// wie in `wertung_progress`/`wertung_progress_alpha`) kommt ZUSAETZLICH
 /// dazu, aber NUR wenn `6` in `tile_ids` liegt -- das ist die tatsaechliche
-/// Wertungsplatte und bleibt an ihre Auswahl gebunden.
+/// Wertungsplatte und bleibt an ihre Auswahl gebunden, UND bleibt flach
+/// (keine Rasterreihen-Gewichtung -- das ist eine andere Regel als der
+/// Bonus-Anteil, siehe oben).
 pub fn unlock_progress_beta(player: &PlayerBoard, tile_ids: &[usize], beta: f64) -> f64 {
     let mut total = 0.0;
     for sr in 0..3 {
         for sc in 0..3 {
             let Some(tile) = &player.dome_grid.dome_slots[sr][sc] else { continue };
             let Some(sp_idx) = tile.special_space_idx() else { continue };
-            let bonus = tile.bonus_points as f64;
+            let rasterreihe = sr * 2 + sp_idx / 2; // 0..5, wie check_special_trigger
+            let wert = (rasterreihe + 1) as f64; // 1..6
             if tile.spaces[sp_idx].is_filled() {
-                total += bonus;
+                total += wert;
             } else {
                 let n_s = tile
                     .spaces
@@ -289,7 +313,7 @@ pub fn unlock_progress_beta(player: &PlayerBoard, tile_ids: &[usize], beta: f64)
                     .enumerate()
                     .filter(|&(i, sp)| i != sp_idx && sp.is_filled())
                     .count() as f64;
-                total += bonus * (n_s / 3.0).powf(beta);
+                total += wert * (n_s / 3.0).powf(beta);
             }
         }
     }
@@ -1302,7 +1326,10 @@ mod tests {
         let mut p_unfilled = PlayerBoard::new(0, "P");
         place_special_type_tile_at(&mut p_unfilled, 0, 0, 0, 3, false);
         assert!((unlock_progress_beta(&p_unfilled, &[], beta) - vals[3]).abs() < 1e-12);
-        assert!((vals[3] - 3.0).abs() < 1e-9, "bonus_points der Special-Platten ist 3");
+        // pool[0] hat sp_idx=3 (Special an Position 3) -> Rasterreihe
+        // 0*2 + 3/2 = 1 -> wert = 2 (NICHT `bonus_points`, siehe Funktions-
+        // Kommentar/Nutzer-Korrektur 2026-08-11).
+        assert!((vals[3] - 2.0).abs() < 1e-9, "Rasterreihe 1 -> wert 2, war {}", vals[3]);
 
         // Gegenprobe beta=1: linear in der Fuellung -> alle Schritte gleich.
         let vals_lin: Vec<f64> = (0..=3usize)
@@ -1326,13 +1353,18 @@ mod tests {
         // Zweite Kernanforderung: zwei Slots mit je 1 von 3 gefuellten Feldern
         // muessen bei `beta>1` WENIGER liefern als EIN Slot mit 2 von 3 --
         // sonst waere der Term ueber das Brett gepoolt statt je Slot gebucht.
+        // pool[4] (sp_idx=1) und pool[6] (sp_idx=0) liegen BEIDE in der
+        // oberen Haelfte ihres Slots (sp_idx/2==0) -- bei slot_row=0 also
+        // BEIDE Rasterreihe 0 -> wert=1 fuer beide, damit die Rasterreihen-
+        // Gewichtung (siehe Funktionskommentar) den Vergleich nicht
+        // verfaelscht.
         let beta = 2.0;
         let mut distributed = PlayerBoard::new(0, "P");
-        place_special_type_tile_at(&mut distributed, 0, 0, 0, 1, false);
-        place_special_type_tile_at(&mut distributed, 0, 1, 4, 1, false); // pool[4]: ebenfalls Special-Typ
+        place_special_type_tile_at(&mut distributed, 0, 0, 4, 1, false);
+        place_special_type_tile_at(&mut distributed, 0, 1, 6, 1, false); // pool[6]: ebenfalls Special-Typ, sp_idx=0
 
         let mut concentrated = PlayerBoard::new(0, "P");
-        place_special_type_tile_at(&mut concentrated, 0, 0, 0, 2, false);
+        place_special_type_tile_at(&mut concentrated, 0, 0, 4, 2, false);
 
         let distributed_val = unlock_progress_beta(&distributed, &[], beta);
         let concentrated_val = unlock_progress_beta(&concentrated, &[], beta);
@@ -1340,14 +1372,79 @@ mod tests {
             concentrated_val > distributed_val,
             "konzentriert ({concentrated_val}) sollte bei beta=2 mehr sein als verteilt ({distributed_val})"
         );
-        // Exakte Gegenprobe: verteilt = 2 * 3*(1/3)^2 = 2/3; konzentriert = 3*(2/3)^2 = 4/3.
-        assert!((distributed_val - 2.0 / 3.0).abs() < 1e-9, "war {distributed_val}");
-        assert!((concentrated_val - 4.0 / 3.0).abs() < 1e-9, "war {concentrated_val}");
+        // Exakte Gegenprobe (wert=1 je Slot): verteilt = 2 * 1*(1/3)^2 = 2/9; konzentriert = 1*(2/3)^2 = 4/9.
+        assert!((distributed_val - 2.0 / 9.0).abs() < 1e-9, "war {distributed_val}");
+        assert!((concentrated_val - 4.0 / 9.0).abs() < 1e-9, "war {concentrated_val}");
 
         // Gegenprobe beta=1: linear -> Verteilung ist irrelevant, beide gleich.
         let distributed_lin = unlock_progress_beta(&distributed, &[], 1.0);
         let concentrated_lin = unlock_progress_beta(&concentrated, &[], 1.0);
         assert!((distributed_lin - concentrated_lin).abs() < 1e-9);
+    }
+
+    #[test]
+    fn unlock_progress_beta_weights_by_grid_row_lower_slots_worth_more() {
+        // Nutzer-Korrektur 2026-08-11: der Bonus-Anteil ist NICHT flach
+        // (`bonus_points`), sondern nach der Rasterreihe gewichtet (1..6,
+        // exakt `round_end.rs::check_special_trigger`) -- hoehere Rasterreihe
+        // = mehr Punkte, die UNTERE Slot-Reihe (sr=2, Rasterreihen 4/5,
+        // wert 5/6) ist also die WERTVOLLERE, nicht die obere (sr=0,
+        // Rasterreihen 0/1, wert 1/2). Gleicher Fuellstand (n=1), gleiche
+        // sp_idx-Unterposition (0, "obere Haelfte" des jeweiligen Slots) --
+        // NUR `slot_row` unterscheidet sich. Muss den Faktor 5/1 liefern
+        // (wert 5 unten vs. wert 1 oben). Sanity-Check-Bezug (Auftrag):
+        // gemessen bleibt ein Special in der unteren Slot-Reihe in ~84% der
+        // Partien leer, in der oberen nur ~13% -- die KI laesst also
+        // tatsaechlich die TEUERSTEN Felder liegen, ein flach gewichteter
+        // Term wuerde diese Rangfolge (und damit den Trainingsanreiz) NICHT
+        // abbilden.
+        let beta = 2.0;
+        let mut upper = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut upper, 0, 0, 15, 1, false); // pool[15]: sp_idx=0
+        let mut lower = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut lower, 2, 0, 15, 1, false);
+
+        let val_upper = unlock_progress_beta(&upper, &[], beta);
+        let val_lower = unlock_progress_beta(&lower, &[], beta);
+        assert!(
+            val_lower > val_upper,
+            "untere Slot-Reihe (Rasterreihe 4, wert 5) sollte mehr wert sein als obere \
+             (Rasterreihe 0, wert 1): {val_lower} vs {val_upper}"
+        );
+        assert!(
+            (val_lower / val_upper - 5.0).abs() < 1e-9,
+            "Faktor sollte exakt 5 sein (wert 5 vs wert 1), war {}",
+            val_lower / val_upper
+        );
+        // Exakte Werte: 1*(1/3)^2 vs 5*(1/3)^2.
+        assert!((val_upper - (1.0f64 / 3.0).powi(2)).abs() < 1e-9);
+        assert!((val_lower - 5.0 * (1.0f64 / 3.0).powi(2)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn unlock_progress_beta_criterion6_addend_is_row_independent() {
+        // Gegenprobe zur Rasterreihen-Gewichtung: die gilt NUR fuer den
+        // Bonus-Anteil. Kriterium 6 (Handbuch Nr. 7, Code-Index 6) bleibt
+        // FLACH -3 je leerem Spezialfeld, unabhaengig von der Rasterreihe
+        // (Nutzer-Korrektur 2026-08-11 -- zwei unabhaengige Regeln, nicht
+        // eine). Nachweis: der Zuschlag von Platte 6 ist bei gleichem
+        // Fuellstand identisch, ob das leere Spezialfeld in der oberen oder
+        // unteren Slot-Reihe liegt (obwohl der Bonus-Anteil selbst dort um
+        // Faktor 5 differiert, siehe voriger Test).
+        let beta = 2.0;
+        let mut upper = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut upper, 0, 0, 15, 1, false);
+        let mut lower = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut lower, 2, 0, 15, 1, false);
+
+        let delta_upper = unlock_progress_beta(&upper, &[6], beta) - unlock_progress_beta(&upper, &[], beta);
+        let delta_lower = unlock_progress_beta(&lower, &[6], beta) - unlock_progress_beta(&lower, &[], beta);
+        assert!((delta_upper - (-3.0)).abs() < 1e-9, "war {delta_upper}");
+        assert!((delta_lower - (-3.0)).abs() < 1e-9, "war {delta_lower}");
+        assert!(
+            (delta_upper - delta_lower).abs() < 1e-12,
+            "Kriterium-6-Zuschlag sollte reihenunabhaengig identisch sein: {delta_upper} vs {delta_lower}"
+        );
     }
 
     #[test]
