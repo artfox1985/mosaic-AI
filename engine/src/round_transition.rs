@@ -35,7 +35,7 @@ use std::time::{Duration, Instant};
 
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use rand::SeedableRng;
 
 use crate::game::{Game, TilingMove};
@@ -375,6 +375,63 @@ pub(crate) fn drive_to_game_end(seed: u64) -> Option<GameState> {
     game.apply_tiling(&TilingMove::EndTiling { player: pre.pending_end_tiling_player }, &mut rng)
         .ok()?;
     Some(game.state)
+}
+
+/// Wie [`drive_drafting_to_leaf_naive`], aber mit UNIFORM ZUFAELLIGER Zugwahl
+/// statt `actions[0]`. Eigener Treiber, weil der naive seine Determiniertheit
+/// behalten muss (`drive_to_round_start` und die Kalibrierungstests bauen
+/// darauf) -- und weil "erste legale Aktion" KEIN Zufall ist, sondern die
+/// Reihenfolge des Aktionsgenerators systematisch bevorzugt.
+#[cfg(test)]
+fn drive_drafting_to_leaf_random(mut state: GameState, rng: &mut rand::rngs::StdRng) -> GameState {
+    let mut guard = 0u32;
+    while state.phase == Phase::Drafting {
+        guard += 1;
+        assert!(guard < 2000, "Drafting endet nicht");
+        let actions = crate::game::drafting_actions(&state);
+        if actions.is_empty() {
+            break;
+        }
+        // `random_range` kommt aus `RngExt`, nicht aus `Rng` -- das Modul
+        // importierte nur `Rng` (mcts.rs importiert beide).
+        let idx = rng.random_range(0..actions.len());
+        let pick = actions[idx].clone();
+        let mut game = Game { state };
+        game.apply_drafting(&pick).expect("valider Zug");
+        state = game.state;
+    }
+    state
+}
+
+/// Spielt eine Partie mit UNIFORM ZUFAELLIGEM Drafting bis zum Ende durch --
+/// der BODEN-Referenzlauf (Nutzer-Auftrag 2026-08-10): was ohne jede Absicht
+/// erreicht wird. Gegenstueck zum Champion-Korpus (IST).
+#[cfg(test)]
+pub(crate) fn drive_to_game_end_random(seed: u64) -> Option<GameState> {
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed ^ 0x5EED);
+    let mut state = drive_to_first_round_end(seed);
+    let mut guard = 0u32;
+    loop {
+        guard += 1;
+        if guard > 12 {
+            return None;
+        }
+        let pre = resolve_to_pre_chance(&state)?;
+        let mut game = Game { state: pre.state.clone() };
+        game.state.bag.tiles.shuffle(&mut rng);
+        game.state.bonus_chip_pool.shuffle(&mut rng);
+        game.apply_tiling(&TilingMove::EndTiling { player: pre.pending_end_tiling_player }, &mut rng)
+            .ok()?;
+        state = game.state;
+        if state.phase != Phase::Drafting {
+            return Some(state);   // Spielende erreicht
+        }
+        state = drive_drafting_to_leaf_random(state, &mut rng);
+    }
 }
 
 #[cfg(test)]
