@@ -4,7 +4,7 @@ tools/conjunction_head_selfcheck.py -- Selbsttest der Konjunktions-Erweiterung
 des Ownership-Kopfs (2026-08-10, Nutzer-Auftrag "bau in den ownership head die
 konjunktionen ein").
 
-Zwei Suiten, beide ohne Korpus und ohne GPU lauffaehig:
+Drei Suiten, alle ohne Korpus und ohne GPU lauffaehig:
 
   LABELS  synthetische Kuppelraster, ueber die INVERSE Positionsabbildung
           (sr=r//2, sc=c//2, si=(r%2)*2+(c%2)) gebaut -- damit wird die
@@ -19,12 +19,41 @@ Zwei Suiten, beide ohne Korpus und ohne GPU lauffaehig:
           Rundlauf in BEIDEN Modellklassen.
           Wird uebersprungen, wenn torch fehlt.
 
-Die ERSCHOEPFENDE Pruefung bleibt die Identitaet gegen die Engine-Wertung auf
-echtem Korpus-Material -- die laeuft ueber `tools/plattenkopf_labels.py check`
-und braucht `data/`, liegt also nicht in diesem Selbsttest.
+  ENGINE  (neu, 2026-08-11) die ERSCHOEPFENDE Pruefung: dieselbe Funktion
+          `_conjunctions_from_dome`, die das laufende Training als Ziel liest,
+          gegen den ECHTEN kompilierten Rust-Kern (`mosaic_rust`), nicht gegen
+          eine Rust-Reimplementierung der Spezifikation. Weg: konstruierte
+          Kuppelraster als vollstaendiges `state_json` (Skelett von einem
+          frischen `PyGame`, NUR `dome_grid` ersetzt) an
+          `mosaic_rust.end_scoring_from_state_json` -- exakt derselbe
+          PyO3-Pfad, den `serialize.rs::end_scoring_from_state` fuer
+          `dome_grid` als "Space-fuer-Space EXAKT" dokumentiert (Test
+          `end_scoring_from_state_is_exact_after_roundtrip`). Kein Korpus
+          noetig, weil die 34 Labels auf dem Champion-/Self-Play-Korpus laut
+          `PREREG_plattenkopf.md` fuer viele Atome praktisch konstant 0 sind
+          (Diagonalen, Spalte 1, Reihen 5/6, untere Eckslots) -- eine Pruefung
+          dort liefe genau an den Stellen leer, an denen ein Fehler am
+          ehesten unentdeckt bliebe. Die Bretter hier sind darum von Hand so
+          gebaut, dass jedes der 34 Label sowohl feuert als auch nicht
+          feuert (Coverage-Assertion am Ende der Suite). NICHT uebersprungen,
+          `mosaic_rust` ist Kernabhaengigkeit dieses Projekts.
+
+          Was diese Suite NICHT prueft: die reine Rust-Spezifikation (ob
+          `score_*` selbst den Docstring korrekt umsetzt) traegt zusaetzlich
+          `engine/src/scoring.rs::plattenkopf_conjunction_atoms_match_spec`
+          (nicht `#[ignore]`, cargo-test-Suite) -- eine Reimplementierung der
+          34 Atome IN Rust gegen dieselben `score_*`-Funktionen. Diese
+          Rust-Pruefung verifiziert die SPEZIFIKATION, NICHT
+          `neural_net.py::_conjunctions_from_dome` selbst (die Labels laufen
+          in Python auf der Dome-JSON-Struktur, die Wertung dort in Rust auf
+          `PlayerBoard` -- zwei getrennte Implementierungen). Beide Suiten
+          zusammen schliessen die Luecke: ENGINE deckt die echte
+          Python-Implementierung ab, die Rust-Suite deckt die Engine-Seite
+          als schneller Regressionstest ohne Python/PyO3-Umweg.
 
 Aufruf:  python tools/conjunction_head_selfcheck.py
 """
+import json
 import subprocess
 import sys
 import tempfile
@@ -33,6 +62,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "engine" / "py"))
+
+import mosaic_rust  # noqa: E402 -- Kernabhaengigkeit, Suite 3 (ENGINE) unten
+                     # prueft explizit gegen den echten kompilierten Kern und
+                     # wird darum NICHT weich uebersprungen wie z.B. torch.
 
 FAILS: list[str] = []
 
@@ -47,6 +80,14 @@ IDX_ROW, IDX_COL, IDX_DIAG, IDX_CORNER, IDX_WILD, IDX_COLORFUL = 0, 6, 12, 14, 1
 # 25..33 ist LAYOUT, keine Konjunktion: traegt Slot s eine Jokerplatte?
 # Schliesst den Multiplikator von Kriterium 3 (`2 x wild_total`).
 IDX_WILDSLOT, N_CONJ = 25, 34
+
+# Eckslot-Reihenfolge und Punktwerte wie `_conjunctions_from_dome` (Zeile 971)
+# UND `scoring.rs::score_corner_tiles` (obere Ecken +3, untere +8) -- fuer
+# Suite 3 (ENGINE) unten, dort gegen den echten Rust-Wert geprueft statt aus
+# dieser Liste uebernommen.
+CORNER_SLOTS = ((0, 0), (0, 2), (2, 0), (2, 2))
+CORNER_WEIGHTS = (3, 3, 8, 8)
+ENGINE_COLORS = ("blau", "gelb", "rot", "schwarz", "türkis")
 
 
 def _empty_grid():
@@ -218,21 +259,200 @@ def check_head() -> bool:
     return True
 
 
+# ── Suite 3: Engine (die echten Labels gegen den echten Rust-Kern) ─────────
+#
+# `mosaic_rust.end_scoring_from_state_json(state_json, tile_ids, seed)` ist
+# eine bestehende, additive PyO3-Lesefunktion (`engine/src/lib.rs`, Aufruf
+# `serialize::end_scoring_from_state`) fuer genau diesen Zweck: Endwertung
+# eines EXTERN gespeicherten Zustands, ohne Suche/Produktion zu beruehren.
+# `dome_grid` wird laut deren Doku-Kommentar "Space-fuer-Space EXAKT"
+# rekonstruiert (`serialize.rs` Zeile 954), bewiesen durch den bestehenden
+# Rust-Test `end_scoring_from_state_is_exact_after_roundtrip`. Ein frisches
+# `PyGame` liefert das restliche Zustands-Skelett (Beutel/Fabriken/Log/...),
+# das fuer die Wertung irrelevant ist -- ausschliesslich `dome_grid` wird pro
+# Testbrett ersetzt.
+
+def _engine_empty_grid():
+    """3x3-Kuppelraster, JSON-Schema wie `serialize_dome_tile`/`serialize_space`
+    (`serialize.rs` Zeile 81-106): jeder Slot ist eine vorhandene, aber leere
+    Platte (id/bonus beliebig, hier slot-eindeutig) -- fuer die Wertung
+    aequivalent zu einem fehlenden Slot (`None`), aber ohne Sonderfall-Code."""
+    return [[{"id": sr * 3 + sc, "bonus": 0,
+              "spaces": [{"type": "NORMAL", "color": None, "filled": None, "locked": False}
+                         for _ in range(4)]}
+             for sc in range(3)] for sr in range(3)]
+
+
+def _engine_cell(grid, r, c):
+    """6x6-Zelle -> Space-Dict, dieselbe Abbildung wie `_cell` oben und
+    `DomeGrid::cell_to_dome_space` (`board.rs` Zeile 98)."""
+    return grid[r // 2][c // 2]["spaces"][(r % 2) * 2 + (c % 2)]
+
+
+def _engine_scores(base_state, dome_grid_p0):
+    """Endwertung von Spieler 0 fuer alle 6 Kriterien, die `_conjunctions_from_dome`
+    abdeckt (0,1,2,3,5,7 -- 4 und 6 NICHT, die deckt `_ownership_from_dome`,
+    siehe Docstring dort). `{id: score}`."""
+    import copy
+    st = copy.deepcopy(base_state)
+    st["players"][0]["dome_grid"] = dome_grid_p0
+    st["players"][1]["dome_grid"] = _engine_empty_grid()
+    raw = mosaic_rust.end_scoring_from_state_json(json.dumps(st), [0, 1, 2, 3, 5, 7], 0)
+    result = json.loads(raw)
+    return {d["id"]: d["score"] for d in result["player_0"]["details"]}
+
+
+def _check_engine_board(name, base_state, grid, coverage):
+    """Eine Identitaetspruefung: Python-Labels (`_conjunctions_from_dome`, die
+    ECHTE, im Training verwendete Funktion) gegen den ECHTEN kompilierten
+    Rust-Kern auf demselben konstruierten Brett. `coverage` wird je Label mit
+    (gesehen True, gesehen False) aktualisiert -- Grundlage der
+    Coverage-Assertion am Ende von `check_engine`."""
+    from neural_net import _conjunctions_from_dome
+
+    labels = _conjunctions_from_dome(grid)
+    if len(labels) != N_CONJ:
+        FAILS.append(f"ENGINE {name}: {len(labels)} Labels statt {N_CONJ}")
+        return
+    for i, v in enumerate(labels):
+        seen_true, seen_false = coverage[i]
+        coverage[i] = (seen_true or v == 1, seen_false or v == 0)
+
+    scores = _engine_scores(base_state, grid)
+    expect(f"ENGINE {name}: Reihen (3 x Label == score_horizontal_rows)",
+           3 * sum(labels[IDX_ROW:IDX_ROW + 6]), scores[0])
+    expect(f"ENGINE {name}: Spalten (7 x Label == score_vertical_rows)",
+           7 * sum(labels[IDX_COL:IDX_COL + 6]), scores[1])
+    expect(f"ENGINE {name}: Diagonalen (10 x Label == score_diagonal_rows)",
+           10 * sum(labels[IDX_DIAG:IDX_DIAG + 2]), scores[2])
+    expect(f"ENGINE {name}: Eckplatten (3/3/8/8 x Label == score_corner_tiles)",
+           sum(labels[IDX_CORNER + i] * CORNER_WEIGHTS[i] for i in range(4)), scores[5])
+    expect(f"ENGINE {name}: Farbenreiche Reihen (4 x Label == score_colorful_rows)",
+           4 * sum(labels[IDX_COLORFUL:IDX_COLORFUL + 6]), scores[7])
+    # Jokerfelder: Label 18 ist "ALLE Jokerfelder belegt". Wenn wahr, muss
+    # `score_wild_fields` (id 3) `2 * wild_total` sein -- und `wild_total`
+    # ist unabhaengig durch die Engine bestimmt (nicht aus den Testbrettern
+    # abgeschrieben): aufgeloest aus `score_wild_fields = 2 * wild_total`
+    # dividiert durch das bekannte Label 18. Die Layout-Summe (25..33) muss
+    # mit GENAU diesem engine-abgeleiteten `wild_total` uebereinstimmen --
+    # das ist die im PREREG geforderte Konsistenzpruefung "Layout vs.
+    # wild_total DER ENGINE", nicht nur gegen die eigene Testbrett-Buchhaltung.
+    layout_sum = sum(labels[IDX_WILDSLOT:IDX_WILDSLOT + 9])
+    if labels[IDX_WILD] == 1:
+        expect(f"ENGINE {name}: Jokerfelder (score_wild_fields == 2 x Label18-Summe)",
+               scores[3], 2 * layout_sum)
+    else:
+        expect(f"ENGINE {name}: Jokerfelder (Bedingung falsch -> score_wild_fields == 0)",
+               scores[3], 0)
+
+
+def check_engine() -> None:
+    """Suite 3: konstruierte Bretter, jedes der 34 Labels feuert und feuert
+    NICHT mindestens einmal (PREREG-Vorgabe: auf echtem Korpus sind 16 der 34
+    praktisch konstant 0, eine Pruefung dort waere dort gegenstandslos, wo sie
+    gebraucht wird)."""
+    g = mosaic_rust.PyGame(("h", "h"), 0, 42)
+    base_state = json.loads(g.state_json())
+    coverage = [(False, False)] * N_CONJ  # (gesehen True, gesehen False) je Label
+
+    _check_engine_board("EMPTY", base_state, _engine_empty_grid(), coverage)
+
+    # FULL: gesamtes 6x6-Raster gefuellt, 3 Felder davon WILD (Slots (0,0),
+    # (1,1), (2,2) -- Layout-Label 25, 29, 33) -- deckt Reihen/Spalten/
+    # Diagonalen/Eckplatten/Jokerfelder/Farbreihen komplett als "feuert" ab.
+    g_full = _engine_empty_grid()
+    for r in range(6):
+        for c in range(6):
+            _engine_cell(g_full, r, c)["filled"] = ENGINE_COLORS[(r + c) % 5]
+    for (r, c) in ((0, 0), (2, 2), (4, 4)):
+        _engine_cell(g_full, r, c)["type"] = "WILD"
+    _check_engine_board("FULL", base_state, g_full, coverage)
+
+    # LAYOUT_OTHER: Jokerfelder in den 6 Slots, die FULL nicht abdeckt (Label
+    # 26,27,28,30,31,32) -- schliesst die Layout-Coverage.
+    g_layout = _engine_empty_grid()
+    for (r, c) in ((0, 2), (0, 4), (2, 0), (2, 4), (4, 0), (4, 2)):
+        _engine_cell(g_layout, r, c)["type"] = "WILD"
+        _engine_cell(g_layout, r, c)["filled"] = "blau"
+    _check_engine_board("LAYOUT_OTHER", base_state, g_layout, coverage)
+
+    # ROW3: genau eine volle Reihe, nur 2 Farben (nicht farbenreich) -- trennt
+    # "Reihe voll" von "Reihe farbenreich".
+    g_row3 = _engine_empty_grid()
+    for c in range(6):
+        _engine_cell(g_row3, 3, c)["filled"] = ENGINE_COLORS[c % 2]
+    _check_engine_board("ROW3", base_state, g_row3, coverage)
+
+    # COL5: genau eine volle Spalte.
+    g_col5 = _engine_empty_grid()
+    for r in range(6):
+        _engine_cell(g_col5, r, 5)["filled"] = ENGINE_COLORS[r % 2]
+    _check_engine_board("COL5", base_state, g_col5, coverage)
+
+    # Vier isolierte Eckplatten -- EINZELN, damit eine Gewichts-Vertauschung
+    # (z.B. (2,0) faelschlich mit +3 statt +8) nicht durch die Summenkonstanz
+    # {3,3,8,8} der FULL-Pruefung verdeckt wird.
+    for (sr, sc), weight in zip(CORNER_SLOTS, CORNER_WEIGHTS):
+        gg = _engine_empty_grid()
+        r0, c0 = sr * 2, sc * 2
+        for dr in (0, 1):
+            for dc in (0, 1):
+                _engine_cell(gg, r0 + dr, c0 + dc)["filled"] = "blau"
+        _check_engine_board(f"CORNER_{sr}{sc}", base_state, gg, coverage)
+
+    # Diagonalen einzeln (6x6 ist geradzahlig -- Haupt- und Nebendiagonale
+    # ueberschneiden sich nirgends, echte Trennung moeglich).
+    g_diag_main = _engine_empty_grid()
+    for i in range(6):
+        _engine_cell(g_diag_main, i, i)["filled"] = ENGINE_COLORS[i % 5]
+    _check_engine_board("DIAG_MAIN", base_state, g_diag_main, coverage)
+
+    g_diag_anti = _engine_empty_grid()
+    for i in range(6):
+        _engine_cell(g_diag_anti, i, 5 - i)["filled"] = ENGINE_COLORS[i % 5]
+    _check_engine_board("DIAG_ANTI", base_state, g_diag_anti, coverage)
+
+    # Farbenreich OHNE volle Reihe (5 von 6 Zellen) -- die beiden Kriterien
+    # sind unabhaengig lesbar, `row_unique_colors` verlangt keine Vollzeile.
+    g_colorful_partial = _engine_empty_grid()
+    for c in range(5):
+        _engine_cell(g_colorful_partial, 2, c)["filled"] = ENGINE_COLORS[c]
+    _check_engine_board("COLORFUL_PARTIAL", base_state, g_colorful_partial, coverage)
+
+    # Jokerfelder vorhanden, aber NICHT alle belegt (Bedingung falsch) --
+    # unterscheidet "Label 18 = 0 mangels Bedingung" von "= 0 mangels
+    # Jokerfeldern" UND zeigt, dass Layout (25..33) unabhaengig vom
+    # Fuellstand ist (ein Slot zaehlt, auch wenn sein Jokerfeld leer ist).
+    g_wild_partial = _engine_empty_grid()
+    _engine_cell(g_wild_partial, 0, 0)["type"] = "WILD"
+    _engine_cell(g_wild_partial, 0, 0)["filled"] = "blau"
+    _engine_cell(g_wild_partial, 2, 3)["type"] = "WILD"  # bleibt leer
+    _check_engine_board("WILD_PARTIAL", base_state, g_wild_partial, coverage)
+
+    missing = [i for i, (t, f) in enumerate(coverage) if not (t and f)]
+    if missing:
+        FAILS.append(f"ENGINE Coverage: Label-Indizes ohne beide Zustaende (feuert/feuert nicht): {missing}")
+    else:
+        print(f"ENGINE: alle {N_CONJ} Labels feuern UND feuern nicht mindestens einmal ueber die Testbretter.")
+
+
 def main() -> int:
     from neural_net import _conjunctions_from_dome
     print("LABELS ...")
     check_labels(_conjunctions_from_dome)
     print("KOPF ...")
     head_ran = check_head()
+    print("ENGINE ...")
+    check_engine()
 
     if FAILS:
         print("\nFEHLGESCHLAGEN:")
         for f in FAILS:
             print("  -", f)
         return 1
-    print(f"\nOK -- Labels bestanden{' und Kopf bestanden' if head_ran else ''}.")
-    print("Erschoepfende Identitaetspruefung auf echtem Korpus: "
-          "python tools/plattenkopf_labels.py check")
+    print(f"\nOK -- Labels, ENGINE{' und Kopf' if head_ran else ''} bestanden.")
+    print("(c3/c6-9-Atom-Schema, Vorlaeufer dieses 34-Label-Kopfs: "
+          "python tools/plattenkopf_labels.py check)")
     return 0
 
 
