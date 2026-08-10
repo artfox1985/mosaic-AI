@@ -261,7 +261,23 @@ abschalten"* -- im Kern richtig, mit zwei Praezisierungen unten.
 Die Suche maximiert Belegung, die im BRETT steht: `wertung_progress_alpha`
 (Commit `40eb39b`, `MOSAIC_WERTUNG_SHAPING_W`) plus der gestufte
 Spezialfeld-Freischaltterm (`MOSAIC_UNLOCK_SHAPING_W`), beide Default 0,
-absolut und ego-only. **Kein Kopf beteiligt** -- die 36 Ownership-Labels sind
+absolut und **JE SPIELER** (nicht ego-only -- Nutzer-Korrektur 2026-08-11:
+*"du betrachtest bitte den ownership label vom gegner mit. die gumbal suche soll
+ruhig auch die halbzuege des gegners sauber mit den ownership labels
+betrachten."*).
+GEPRUEFT an `net_mcts.rs:1188-1191`: `for i in 0..2` mit `state.players[i]`,
+`out[i] = value[i] + shift` -- jeder Index aus dem EIGENEN Brett, kein
+Cross-Term, keine Antisymmetrie. Ego-only wuerde der Suche unterstellen, der
+GEGNER ignoriere die Platten -- die Self-Play-Blindheit innerhalb der Suche.
+Ausdruecklich NICHT `mine - theirs`: eine Differenz verliert das Niveau (55:50
+waere schlechter als 30:15) und war die Form von Task #93.
+Freischaltwert GEPRUEFT an `scoring.rs:305-306`: `(sr*2 + sp_idx/2) + 1`, also
+**1..6**; Kriterium-6-Anteil (`scoring.rs:320-322`) gegatet auf Platte 6 und
+flach -3. `wertung_progress` bitgenau unberuehrt (`git diff 40eb39b..HEAD` auf
+`scoring.rs` zeigt nur `+`-Zeilen). Commit `63a2eb0` + Folgecommit des Agenten;
+Testzahl 344 gruen ist SEINE Angabe, von mir noch nicht nachgeprueft (laeuft vor
+dem Wheel-Install).
+**Kein Kopf beteiligt** -- die 36 Ownership-Labels sind
 Brettfakten, exakt berechenbar. Das ist die Leiter aus dem Bootstrap-Kreis:
 Suche realisiert -> Partien enthalten gefuellte Felder -> die Labels variieren
 ueberhaupt erst -> der Kopf kann sie lernen.
