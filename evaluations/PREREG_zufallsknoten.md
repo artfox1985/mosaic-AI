@@ -861,3 +861,74 @@ Star1/Star2-Pruning innerhalb der Zufallsknoten. Braucht Wertgrenzen je
 Ausgang; bei <=4 Ausgaengen und 200 Knoten ist der Verzicht billiger als die
 Buchhaltung -- und nachweisbar korrekt, waehrend ein falsch begruendeter
 Cutoff auf Teilsummen still verzerren wuerde.
+
+## TEIL B1 EINGETAKTET: Ein-Schritt-Erwartung an der Peek-Aktion (Nutzer 2026-08-10)
+
+Nutzer-Auftrag: *"eintakten"*, nach der Klaerung, dass der Stapelzug aus
+zwei trennbaren Stuecken besteht.
+
+### Was schon existiert und was fehlt
+
+| Stueck | Stand |
+|--------|-------|
+| **Kontrollfluss** -- Peek als echter Zug, danach neue Suche | **GEBAUT**: `MOSAIC_STACK_DRAW_RESEARCH` (self_play.rs). Erzeugt zugleich die Korpus-Datensaetze fuer die Unterentscheidungen |
+| **Bewertung** -- "lohnt sich ein Peek ueberhaupt" | **FEHLT** = dieser Task |
+
+### Konstruktion
+
+Weil der Peek die Platte UNMITTELBAR aufdeckt und danach frisch gesucht
+wird, muss die Suche NICHT ueber den Peek hinausplanen. Sie muss ihn nur
+richtig bewerten. Das ist eine **Ein-Schritt-Erwartung an der Expansion**:
+statt den einen (determinisierten) Nachzustand zu bewerten, alle moeglichen
+bewerten und mit ihren Wahrscheinlichkeiten mitteln.
+
+- Verteilung: gleichverteilt ueber die Restmenge, gruppiert nach Platten-
+  DESIGN. Die Menge ist oeffentlich (`dome_pool_mask`, jedes der 18 Designs
+  genau einmal), die Oberseite ist Index 0 (`dome_tile_pool.remove(0)`,
+  `game.rs:183`), zurueckgelegte Platten haengen per `push` HINTEN an.
+- **Teil A1 faellt hier mit ab**: das bekannte Segment am Ende darf nicht in
+  die Verteilung eingehen. Das braucht einen Zaehler im Zustand
+  ("wie viele Platten am Ende sind oeffentlich bekannt") -- additive
+  Zustands-/Serialisierungs-Aenderung, als eigener Schritt gefuehrt. OHNE
+  ihn ist die Verteilung konservativ falsch (behandelt Bekanntes als
+  unbekannt), also ein tragbarer erster Stand.
+- Kosten: |verschiedene Restplatten| Netz-Bewertungen statt einer, an einer
+  seltenen Aktion (~3 Peeks je Partie). `Net::eval_pair` existiert fuer
+  Batchung.
+
+### Was BEWUSST NICHT gebaut wird
+
+Ein echter Zufallsknoten IM Baum. Der braeuchte eine eigene Knotenart mit
+wahrscheinlichkeits-proportionaler Auswahl -- sonst maximiert die Suche
+ueber das Glueck statt zu mitteln -- und muesste mit Gumbel und completed-Q
+zusammenspielen. Grosse Operation in einer 6.000-Zeilen-Suche, und unter dem
+Nutzer-Kontrollfluss NICHT noetig. Die k=4-Evidenz mahnt zusaetzlich: das
+Mitteln ueber Stichproben eines unbekannten Zustands hat in diesem Projekt
+schon einmal geschadet.
+
+### Entscheidungsregeln (vorab)
+
+1. **Knopf** `MOSAIC_STACK_DRAW_CHANCE`, Default AUS, Paritaets-Sonde muss
+   `8c6684ff...` weiter treffen.
+2. **Vorzeichen zuerst, Arena spaeter** -- wie bei den R5-Knoten: erst
+   messen, in wie vielen Entscheidungen sich die Zugwahl aendert und was das
+   in Punkten kostet (Instrument-Muster `r5_chance_arming_sign_probe`). Eine
+   Arena, die ~0,02 Pkt/Partie aufloesen soll, ist eine erschlichene
+   Freigabe.
+3. **Nicht mit dem Kontrollfluss vermischen**: `MOSAIC_STACK_DRAW_RESEARCH`
+   und dieser Knopf werden GETRENNT gemessen. Zusammen eingeschaltet waeren
+   zwei Aenderungen in einem Gating, und der Netz-Pfad braucht fuer den
+   Kontrollfluss ohnehin erst einen Korpus.
+4. **Reihenfolge zur Generierung**: der Kontrollfluss-Knopf gehoert in das
+   naechste Self-Play (sonst fehlen die Zwischenzustaende eine weitere
+   Generation, Nutzer-Hinweis). Die Bewertung kann danach kommen, weil sie
+   ohne Trainingsvoraussetzung wirkt.
+
+### Erwartung vorab
+
+Die Priors fuer Slot und Rotation sind ungelernt (0 von 16.322 Datensaetzen
+im Bestandskorpus). Gumbel zieht aber m=16 Kandidaten und korrigiert per
+completed-Q; bei <=9 Slots x 4 Rotationen ist der Unterraum damit praktisch
+abgedeckt. Generation eins sucht dort also ohne Vorsortierung, aber nicht
+blind -- ein Zwei-Generationen-Vorlauf, der vorher notiert ist, damit er
+hinterher nicht als Fehlschlag gelesen wird.
