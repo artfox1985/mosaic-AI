@@ -730,3 +730,54 @@ Ausgaben wie zuvor).
 
 Bewusst in dieser Reihenfolge: Punkt 4 ist der Schutz gegen einen verlorenen
 Nachtlauf, und die Modellseite ist der Teil, der isoliert verifizierbar war.
+
+## REPLIKATION auf der v19-Generation: der Slot-Gradient ist Spielstruktur
+
+Gleicher Zuschnitt auf `selfplay_v19wdl*` (400 Dateien, 300.000 Zustaende aus
+**2.530 Partien**), also einer ANDEREN Generator-Aera.
+Log: `logs/plattenkopf_stufeA_v19.log`.
+
+| Groesse | v20-Korpus | v19-Korpus |
+|---------|-----------|-----------|
+| c6-Skill | +0,637 | **+0,655** |
+| c3-Skill | +0,004 | **-0,008** |
+| Platt-Steigungen | 0,44-0,81 | 0,50-0,75 |
+
+### Grundraten je Slot -- praktisch deckungsgleich
+
+| Slot | v20 | v19 |
+|------|-----|-----|
+| 0 | 0,062 | 0,050 |
+| 1 | 0,101 | 0,093 |
+| 2 | 0,229 | 0,278 |
+| 3 | 0,256 | 0,229 |
+| 4 | 0,303 | 0,317 |
+| 5 | 0,494 | 0,537 |
+| 6 | 0,777 | 0,787 |
+| 7 | 0,856 | 0,834 |
+| 8 | 0,898 | 0,907 |
+
+**Der Gradient ist damit generationsunabhaengig -- Spielstruktur, nicht
+Champion-Verhalten.** Das ist der Beleg, der aus einem Befund eine
+belastbare Groesse macht: er folgt aus der Freischaltmechanik
+(`dome.rs:140`, drei Felder zuerst) und der Traegheit der unteren
+Musterreihen, nicht aus der Spielweise einer Generation.
+
+Innerhalb des Mittelbandes tauschen Slot 2 und 3 die Reihenfolge (0,229/0,256
+gegen 0,278/0,229) -- die DREI-REIHEN-Bandung ist stabil, die Feinordnung
+innerhalb eines Bandes nicht. Fuer den Kopf unerheblich, er lernt je Slot.
+
+### Offene Stelle GESCHLOSSEN: Slot 1 war Rauschen
+
+Im v20-Lauf hatte Slot 1 als einziger negativen Skill (-0,022) und war als
+"vor Stufe B zu klaeren" vermerkt. Im v19-Lauf steht dort **+0,114**. Kein
+struktureller Sonderfall, sondern Stichprobenrauschen bei einem seltenen
+Ereignis (Grundrate ~0,10). Vermerk erledigt.
+
+### Damit ist Stufe A abgeschlossen
+
+- c6 lernbar und **repliziert** (+0,637 / +0,655).
+- c3 ohne Skill und **repliziert** (+0,004 / -0,008) ⇒ bleibt draussen.
+- Kalibrierung durchweg uebermuetig (Steigungen < 1) ⇒ Platt-Parameter je
+  Slot sind Pflicht fuer Stufe B, nicht optional.
+- Der Slot-Gradient ist der inhaltliche Kern und generationsstabil.
