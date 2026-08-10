@@ -5375,6 +5375,98 @@ mod tests {
     /// selbst (statt zu failen), falls die Datei lokal fehlt -- `models/`
     /// ist per `.gitignore` nicht Teil des Checkouts, ein frischer Klon
     /// haette also sonst einen harten Testfehler ohne jeden eigenen Fehler.
+    /// Teil-2-Sonde zu `evaluations/PREREG_gpu_verlagerung.md`: **wie viele
+    /// Blaetter je Sekunde kann die CPU erzeugen, wenn die Inferenz nichts
+    /// mehr kostet?** Diese Zahl setzt den erreichbaren Batch (Little:
+    /// Batch = Erzeugungsrate x GPU-Latenz) und war bisher ungemessen --
+    /// ohne sie waere die Batchgroesse beim Bau geraten.
+    ///
+    /// KEIN Eingriff in die Suche. Statt eines Null-Evaluators im Suchpfad
+    /// werden zwei getrennt messbare Groessen verrechnet:
+    ///   Baumzeit = Gesamtzeit einer Suche - (Zahl der Evals x Zeit je Eval)
+    /// Der Umbau eines Suchpfads fuer eine MESSUNG waere das schlechtere
+    /// Werkzeug: er koennte still etwas anderes messen als das Original.
+    ///
+    /// VORBEHALT, der ins Protokoll gehoert: laeuft parallel eine Arena, sind
+    /// beide Absolutwerte durch Kernkonkurrenz nach unten verzerrt. Das
+    /// VERHAELTNIS Baum/Inferenz ist robuster, weil beide Seiten gleich
+    /// betroffen sind. Vor dem Bau auf leerer Maschine wiederholen.
+    #[test]
+    #[ignore]
+    fn teil2_leaf_generation_rate_probe() {
+        use std::time::Instant;
+        // Eigener Lader: `load_test_net()` zeigt auf `v10_best`, das es nicht
+        // mehr gibt (NUM_ACTIONS-Wechsel hat Alt-Checkpoints entwertet). Hier
+        // wird der aktuelle Champion gebraucht, weil die Messung seine
+        // Eval-Kosten betrifft.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let Ok(net) = Net::load_auto(path.to_str().unwrap()) else {
+            eprintln!("  Champion-Modell nicht ladbar -- Sonde uebersprungen.");
+            return;
+        };
+        let mut seed_rng = StdRng::seed_from_u64(7);
+        let state = match random_drafting_state(7, 12, &mut seed_rng) {
+            Some(s) => s,
+            None => return,
+        };
+
+        // (1) Zeit je Eval, einzeln und als Paar (der Suchpfad nutzt beides).
+        // Dispatch PRO NETZ -- der Champion ist 2D und braucht den
+        // kombinierten Planes+Flat-Puffer, nicht den 708er-Flachvektor.
+        let feats = crate::features::features_for_net(&net, &state);
+        for _ in 0..20 {
+            let _ = net.eval(&feats);
+        }
+        let reps = 200;
+        let t0 = Instant::now();
+        for _ in 0..reps {
+            let _ = net.eval(&feats);
+        }
+        let per_eval_single = t0.elapsed().as_secs_f64() / reps as f64;
+
+        let t0 = Instant::now();
+        for _ in 0..reps {
+            let _ = net.eval_pair(&feats, &feats);
+        }
+        let per_eval_pair = t0.elapsed().as_secs_f64() / (2 * reps) as f64;
+
+        // (2) Gesamtzeit einer vollen Suche und ihre Eval-Zahl.
+        let sims = 400u32;
+        let mut rng = StdRng::seed_from_u64(4242);
+        let t0 = Instant::now();
+        let nodes = build_net_tree(&net, None, &state, sims, 1.5, false, &mut rng, None, None);
+        let total = t0.elapsed().as_secs_f64();
+        let n_nodes = nodes.len() as f64;
+
+        let infer = n_nodes * per_eval_single;
+        let tree = (total - infer).max(1e-9);
+        let leaves_per_s_now = n_nodes / total;
+        let leaves_per_s_free = n_nodes / tree;
+
+        println!("TEIL 2 -- Blatt-Erzeugungsrate");
+        println!("  Zeit je Eval: einzeln {:.3} ms, im Paar {:.3} ms",
+                 per_eval_single * 1e3, per_eval_pair * 1e3);
+        println!("  Suche {sims} Sims: {n_nodes:.0} Knoten in {:.3} s", total);
+        println!("  davon Inferenz {:.3} s ({:.0} %), Baumarbeit {:.3} s ({:.0} %)",
+                 infer, 100.0 * infer / total, tree, 100.0 * tree / total);
+        println!("  Blaetter/s HEUTE (1 Thread):            {leaves_per_s_now:>9.0}");
+        println!("  Blaetter/s bei KOSTENLOSER Inferenz:    {leaves_per_s_free:>9.0}");
+        for threads in [11usize, 12] {
+            let demand = leaves_per_s_free * threads as f64;
+            println!("  -> {threads} Threads: Nachfrage {demand:>9.0} Evals/s");
+        }
+        // Little: erreichbarer Batch = Erzeugungsrate x GPU-Latenz.
+        // GPU-Latenz bei Batch B = B / Evals_pro_s(B); gemessene Kennlinie:
+        // Batch 128 -> 41.959/s (3,05 ms), 512 -> 162.635/s (3,15 ms).
+        for (b, rate) in [(128.0, 41_959.0), (512.0, 162_635.0)] {
+            let latency = b / rate;
+            let inflight = leaves_per_s_free * 11.0 * latency;
+            println!("  -> bei Batch {b:.0} (Latenz {:.2} ms): {inflight:.0} Blaetter gleichzeitig unterwegs",
+                     latency * 1e3);
+        }
+    }
+
     fn load_test_net() -> Option<Net> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
         match Net::load_auto(path.to_str().unwrap()) {

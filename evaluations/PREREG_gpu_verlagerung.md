@@ -159,13 +159,54 @@ nur eine Ja/Nein-Frage: reicht er fuer die Gewinnzone? Er reicht.
 Die Sonde ist entsprechend umgebaut und traegt die Korrektur im Code, damit
 sie nicht wieder als "effektiver Batch" fehlgelesen wird.
 
-### Naechste Messung, VOR dem Bau
+### Teil 2: ERLEDIGT, ohne neue Messung -- die Zahl lag schon vor
 
-Der neue Engpass ist benannt, aber nicht gemessen: **wie viele Blaetter je
-Sekunde kann die CPU erzeugen, wenn die Inferenz nichts mehr kostet?** Das
-ist die Groesse, die den erreichbaren Batch wirklich setzt (Little: Batch =
-Erzeugungsrate x GPU-Latenz). Messbar, indem man den Netz-Aufruf durch einen
-Null-Evaluator ersetzt und den Suchdurchsatz misst -- eine kleine,
-verhaltensneutrale Sonde, kein Umbau.
+Ich hatte hier eine "naechste Messung vor dem Bau" notiert (Blatt-Erzeugungsrate
+via Null-Evaluator). **Die war ueberfluessig**, und der Weg dorthin ist zweimal
+falsch abgebogen:
 
-Ohne diese Zahl waere die Batchgroesse beim Bau geraten.
+1. Erst habe ich die Zerlegung von Hand versucht (Gesamtzeit einer Suche minus
+   Zahl der Evals x isoliert gemessener Eval-Preis). Ergebnis: Inferenz kaeme auf
+   **120 %** der Gesamtzeit, Baumarbeit also negativ. Ungueltig, weil die Suche
+   `eval_pair` nutzt (0,82 ms je Eval statt 0,97 einzeln) und von Cache-Effekten
+   profitiert -- ein isoliert gemessener Preis ist nicht abziehbar.
+2. Dann wollte ich einen Null-Evaluator bauen. Der hat einen ECHTEN
+   methodischen Haken, der ueber meine erste Begruendung hinausgeht: mit
+   konstantem Blattwert wird die Suche **degeneriert** (entartetes completed-Q,
+   andere Baumform, andere Knotenzahl) -- gemessen wuerde die Baumarbeit eines
+   ANDEREN Baums.
+3. **Das Instrument existiert seit Task #32**: `profiling.rs` trennt
+   `SelfplayCat::NetInference` von `TotalSelfplay`, dazu
+   `GUMBEL_NET_EVAL_NANOS/_CALLS/_INSTANCES` (Instanzen unterscheiden `eval`
+   von `eval_pair`). Hinter `MOSAIC_PROFILE_SELFPLAY`, Default aus. Und die
+   Messung ist GELAUFEN: Commit 6af37ca, **Netz 62 %, Tiling 27 %, Runde 5
+   4,3 %**.
+
+Damit ist die Baumarbeit der Rest (38 %), die Erzeugungsrate bei kostenloser
+Inferenz also `1/0,38 = 2,6x` der heutigen -- **derselbe Amdahl-Faktor, der
+oben schon steht**. Es gab nichts Neues zu messen.
+
+### Erreichbarer Batch, analytisch (Little)
+
+    Batch = Erzeugungsrate x GPU-Latenz
+
+| Groesse | Wert |
+|---------|------|
+| Nachfrage (2,6-5,3x heutiges Aggregat 17.600-35.200) | 46.000-186.000 Evals/s |
+| GPU-Latenz bei Batch 128 / 512 | 3,05 / 3,15 ms |
+| **Erreichbarer Batch** | **~140 bis ~590** |
+
+Das liegt vollstaendig in der Gewinnzone (Batch 128 = 1,19-2,38x, Batch 512 =
+4,62-9,24x). **Teil 2 ist damit geschlossen, Weg V ist rechnerisch gedeckt.**
+
+Der Zielwert fuer die Implementierung ist entsprechend **N = 256 als
+Startpunkt** (0,38 GiB Speicher, mittig im erreichbaren Band), nicht 512 --
+bei 512 waere die Annahme, die CPU erreiche das obere Ende ihres
+Nachfragebandes, und das ist die optimistischere der beiden Kanten.
+
+### Lehre, die ins Gedaechtnis gehoert
+
+Zweimal an einem vorhandenen Werkzeug vorbeigebaut (nach `arena.py` jetzt
+`profiling.rs`). Die Regel steht in CLAUDE.md und im Projekt-Gedaechtnis. Vor
+jeder neuen Sonde: erst `profiling.rs`, `tools/` und die Kategorien-Enums
+lesen.
