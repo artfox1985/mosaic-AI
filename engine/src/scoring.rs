@@ -237,6 +237,69 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
     total
 }
 
+/// Gestufter Freischalt-Fortschritt fuer den Kuppel-Bonus (Nutzer-Auftrag
+/// 2026-08-10, Messlage `evaluations/watchlist_v20_zwischenlese.md` Abschnitt
+/// 2: Mensch 10,3 Spezialpunkte/Partie gegen KI 1,3 -- ~62 % der gesamten
+/// Endpunkte-Luecke). Verifiziert am Code (nicht angenommen), drei Fragen:
+///
+/// 1. Feldtyp: `SpaceType::Special` (`dome.rs`), eigenes Flag `placed_special`
+///    -- getrennt von `SpaceType::Wild` (das hat `bonus_points=0`, siehe
+///    `build_dome_tile_pool`, `is_special_type`-Kommentar dort).
+/// 2. Freischaltbedingung: `DomeTile::try_unlock_special` -- exakt "alle 3
+///    ANDEREN Spaces DESSELBEN Slots gefuellt" (`other_filled`-Check dort,
+///    `i == sp_idx || s.is_filled()` fuer alle 4 Indizes). Kein Slot-
+///    uebergreifender Bezug.
+/// 3. Punktwert: `DomeTile::bonus_points` -- `board.rs::place_special_tile`
+///    gibt genau diesen Wert zurueck, wenn der weisse Stein gelegt wird.
+///    ALLE Special-Typ-Platten im Pool tragen `bonus_points=3` (siehe die
+///    9 `s()`-Eintraege in `build_dome_tile_pool`) -- die echte Konstante
+///    wird hier aus der jeweiligen Platte gelesen, nicht auf 3 fest
+///    verdrahtet (falls sich das je aendert).
+///
+/// Ergebnis: die beschriebene Regel stimmt exakt mit dem Code ueberein, keine
+/// Abweichung zu berichten.
+///
+/// Formel, JE SLOT EINZELN gebucht (nicht ueber das Brett gepoolt -- ein
+/// Slot mit 2 von 3 vorbereitenden Feldern ist bei `beta>1` mehr wert als
+/// zwei Slots mit je 1, siehe Test `unlock_progress_beta_is_booked_per_slot_
+/// not_pooled`): fuer jeden Slot mit einem Special-Space --
+///   - bereits gefuellt   -> volle Gutschrift `bonus_points`.
+///   - sonst              -> `bonus_points * (n_s/3)^beta`, `n_s` = Zahl der
+///     gefuellten NICHT-Special-Spaces dieses Slots (0..3).
+/// UNGEGATET (kein `tile_ids`-Check fuer diesen Teil) -- der Kuppel-Bonus
+/// zahlt beim Legen des weissen Steins IMMER, unabhaengig von den am
+/// Spielstart gezogenen Wertungsplatten (das ist ein Spielzug-Bonus, keine
+/// Wertungsplatte). Kriterium 6 (`-3 * special_empty`, dieselbe Definition
+/// wie in `wertung_progress`/`wertung_progress_alpha`) kommt ZUSAETZLICH
+/// dazu, aber NUR wenn `6` in `tile_ids` liegt -- das ist die tatsaechliche
+/// Wertungsplatte und bleibt an ihre Auswahl gebunden.
+pub fn unlock_progress_beta(player: &PlayerBoard, tile_ids: &[usize], beta: f64) -> f64 {
+    let mut total = 0.0;
+    for sr in 0..3 {
+        for sc in 0..3 {
+            let Some(tile) = &player.dome_grid.dome_slots[sr][sc] else { continue };
+            let Some(sp_idx) = tile.special_space_idx() else { continue };
+            let bonus = tile.bonus_points as f64;
+            if tile.spaces[sp_idx].is_filled() {
+                total += bonus;
+            } else {
+                let n_s = tile
+                    .spaces
+                    .iter()
+                    .enumerate()
+                    .filter(|&(i, sp)| i != sp_idx && sp.is_filled())
+                    .count() as f64;
+                total += bonus * (n_s / 3.0).powf(beta);
+            }
+        }
+    }
+    if tile_ids.contains(&6) {
+        let sf = player_scoring_features(player);
+        total += -3.0 * sf.special_empty as f64;
+    }
+    total
+}
+
 // ── Einzelne Wertungen ──────────────────────────────────────────────────────────
 
 fn score_horizontal_rows(player: &PlayerBoard) -> i32 {
@@ -1161,6 +1224,155 @@ mod tests {
         // Exakte Werte zur Gegenprobe: (6/6)^2*7=7 vs 2*(3/6)^2*7=3.5.
         assert!((bundled_a2 - 7.0).abs() < 1e-9);
         assert!((spread_a2 - 3.5).abs() < 1e-9);
+    }
+
+    /// Platziert eine SPECIAL-Typ-Platte (`pool_idx` MUSS `is_special_type()`
+    /// sein) an Slot `(sr, sc)`: `filled_normal` (0..=3) ihrer NICHT-Special-
+    /// Spaces werden befuellt, `fill_special` steuert das Special-Space
+    /// selbst (unabhaengig von `filled_normal` -- fuer die Formel-Tests
+    /// unten reicht direkte Manipulation, kein Umweg ueber
+    /// `try_unlock_special`/echten Spielablauf).
+    fn place_special_type_tile_at(
+        p: &mut PlayerBoard,
+        sr: usize,
+        sc: usize,
+        pool_idx: usize,
+        filled_normal: usize,
+        fill_special: bool,
+    ) {
+        let mut t = build_dome_tile_pool()[pool_idx].clone();
+        assert!(t.is_special_type(), "Pool-Index {pool_idx} muss eine Special-Typ-Platte sein");
+        let sp_idx = t.special_space_idx().unwrap();
+        let mut filled = 0usize;
+        for (i, sp) in t.spaces.iter_mut().enumerate() {
+            if i == sp_idx {
+                if fill_special {
+                    sp.is_locked = false;
+                    sp.placed_special = true;
+                }
+                continue;
+            }
+            if filled < filled_normal {
+                match sp.space_type {
+                    SpaceType::Wild => sp.placed_color = Some(Rot),
+                    SpaceType::Normal => sp.placed_color = sp.required_color,
+                    SpaceType::Special => unreachable!("sp_idx deckt das einzige Special-Space ab"),
+                }
+                filled += 1;
+            }
+        }
+        p.dome_grid.place_dome_tile(t, sr, sc).unwrap();
+    }
+
+    #[test]
+    fn unlock_progress_beta_is_strictly_increasing_and_convex_when_beta_above_one() {
+        // Kernanforderung (Nutzer-Auftrag 2026-08-10): 2 von 3 vorbereitenden
+        // Feldern muss MEHR liefern als 1 von 3, und bei `beta>1` muss der
+        // Schritt 2->3 schwerer wiegen als 0->1 (Konvexitaet -- das ist genau
+        // der Anreiz, den letzten Schritt zur Freischaltung zu gehen statt
+        // bei "fast fertig" stehenzubleiben).
+        let beta = 2.0;
+        let vals: Vec<f64> = (0..=3usize)
+            .map(|n| {
+                let mut p = PlayerBoard::new(0, "P");
+                place_special_type_tile_at(&mut p, 0, 0, 0, n, n == 3);
+                unlock_progress_beta(&p, &[], beta)
+            })
+            .collect();
+        for i in 0..3 {
+            assert!(
+                vals[i + 1] > vals[i],
+                "n={} -> n={}: {} -> {} ist nicht steigend",
+                i,
+                i + 1,
+                vals[i],
+                vals[i + 1]
+            );
+        }
+        let step_0_1 = vals[1] - vals[0];
+        let step_2_3 = vals[3] - vals[2];
+        assert!(
+            step_2_3 > step_0_1,
+            "Schritt 2->3 ({step_2_3}) sollte bei beta=2 schwerer wiegen als 0->1 ({step_0_1})"
+        );
+        // Randbedingung: bei n=3 muss "schon gefuellt" (volle Gutschrift) und
+        // "alle 3 anderen gefuellt, Special selbst noch offen" denselben Wert
+        // liefern -- (3/3)^beta == 1, die beiden Zweige der Formel stossen
+        // dort stetig aneinander.
+        let mut p_unfilled = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut p_unfilled, 0, 0, 0, 3, false);
+        assert!((unlock_progress_beta(&p_unfilled, &[], beta) - vals[3]).abs() < 1e-12);
+        assert!((vals[3] - 3.0).abs() < 1e-9, "bonus_points der Special-Platten ist 3");
+
+        // Gegenprobe beta=1: linear in der Fuellung -> alle Schritte gleich.
+        let vals_lin: Vec<f64> = (0..=3usize)
+            .map(|n| {
+                let mut p = PlayerBoard::new(0, "P");
+                place_special_type_tile_at(&mut p, 0, 0, 0, n, n == 3);
+                unlock_progress_beta(&p, &[], 1.0)
+            })
+            .collect();
+        let s01 = vals_lin[1] - vals_lin[0];
+        let s12 = vals_lin[2] - vals_lin[1];
+        let s23 = vals_lin[3] - vals_lin[2];
+        assert!(
+            (s01 - s12).abs() < 1e-9 && (s12 - s23).abs() < 1e-9,
+            "bei beta=1 sollten alle Schritte gleich schwer sein: {s01} {s12} {s23}"
+        );
+    }
+
+    #[test]
+    fn unlock_progress_beta_is_booked_per_slot_not_pooled() {
+        // Zweite Kernanforderung: zwei Slots mit je 1 von 3 gefuellten Feldern
+        // muessen bei `beta>1` WENIGER liefern als EIN Slot mit 2 von 3 --
+        // sonst waere der Term ueber das Brett gepoolt statt je Slot gebucht.
+        let beta = 2.0;
+        let mut distributed = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut distributed, 0, 0, 0, 1, false);
+        place_special_type_tile_at(&mut distributed, 0, 1, 4, 1, false); // pool[4]: ebenfalls Special-Typ
+
+        let mut concentrated = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut concentrated, 0, 0, 0, 2, false);
+
+        let distributed_val = unlock_progress_beta(&distributed, &[], beta);
+        let concentrated_val = unlock_progress_beta(&concentrated, &[], beta);
+        assert!(
+            concentrated_val > distributed_val,
+            "konzentriert ({concentrated_val}) sollte bei beta=2 mehr sein als verteilt ({distributed_val})"
+        );
+        // Exakte Gegenprobe: verteilt = 2 * 3*(1/3)^2 = 2/3; konzentriert = 3*(2/3)^2 = 4/3.
+        assert!((distributed_val - 2.0 / 3.0).abs() < 1e-9, "war {distributed_val}");
+        assert!((concentrated_val - 4.0 / 3.0).abs() < 1e-9, "war {concentrated_val}");
+
+        // Gegenprobe beta=1: linear -> Verteilung ist irrelevant, beide gleich.
+        let distributed_lin = unlock_progress_beta(&distributed, &[], 1.0);
+        let concentrated_lin = unlock_progress_beta(&concentrated, &[], 1.0);
+        assert!((distributed_lin - concentrated_lin).abs() < 1e-9);
+    }
+
+    #[test]
+    fn unlock_progress_beta_pays_regardless_of_scoring_tile_ids() {
+        // UNGEGATET: der Kuppel-Bonus-Anteil muss auch OHNE Platte 6 in
+        // `tile_ids` zahlen (er ist ein Spielzug-Bonus, keine Wertungsplatte).
+        let mut p = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut p, 0, 0, 0, 2, false);
+        let without_6 = unlock_progress_beta(&p, &[0, 1, 2], 2.0);
+        assert!(without_6 > 0.0, "Kuppel-Bonus-Anteil muss unabhaengig von scoring_tile_ids zahlen");
+        // Und identisch, ob tile_ids leer ist oder andere (Nicht-6-)Platten enthaelt.
+        let empty_ids = unlock_progress_beta(&p, &[], 2.0);
+        assert!((without_6 - empty_ids).abs() < 1e-12);
+
+        // Kriterium 6 kommt NUR zusaetzlich dazu, wenn 6 explizit gewaehlt ist
+        // -- exakt -3 je leerem Special-Feld (dieselbe Definition wie in
+        // `wertung_progress`).
+        let mut q = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut q, 0, 0, 0, 0, false); // 1 Special-Slot, nichts gefuellt
+        let with_6 = unlock_progress_beta(&q, &[6], 2.0);
+        let no_6 = unlock_progress_beta(&q, &[], 2.0);
+        assert!(
+            (with_6 - no_6 - (-3.0)).abs() < 1e-9,
+            "Kriterium 6 sollte exakt -3 pro leerem Special zusaetzlich beitragen (with_6={with_6}, no_6={no_6})"
+        );
     }
 
     #[test]
