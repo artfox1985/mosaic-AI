@@ -10573,3 +10573,88 @@ notieren; Verdikt erst ab >=6 arena-ENTSCHIEDENEN Paaren (Stand: ~3).
 Struktur-Watchlist: bei ~10+ frischen Nutzer-Partien vs neuen Champion
 Log-Analyse wie evaluations/watchlist_v20_zwischenlese.md (Agent,
 --no-oracle-Stil; Chip-Zaehlung ist nach dem Logging-Fix jetzt direkt).
+
+---
+
+# Kapitel 2026-08-10 -- ausgelagert aus STATUS.md am 2026-08-10 nachts
+
+Dritte Auslagerungsrunde. Ausgelagert: Nachtprotokoll, LAUFENDE QUEUE,
+LAUFENDE AGENTEN, der komplette Plattenkopf-Strang (Stufe A + `plate_head`),
+die Wheel-Doppelzeile, die Instrument-Schulden (alle drei bezahlt) und die
+vier veralteten Architektur-Angaben.
+
+## GESCHLOSSEN 2026-08-10 (Verdikte, die bleiben)
+
+| Punkt | Verdikt |
+|---|---|
+| Task D (Gewichts-Sweep) | alle drei Arme H0 => Regel 5, `VALUE_WEIGHT=0,2` bleibt. `vw04` 208:192 (52,0%), `vw08` 92:108 (46,0%), `pw025` 68:82 (45,3%, SPRT-H0 nach 75 Paaren). Bild monoton: 0,4 nicht besser, 0,8 schlechter. Gilt fuer die WDL-/2D-Aera als geschlossen. |
+| ISMCTS-k | k=1/2/4 rechenneutral 81,75 / 77,00 / 73,00 %; k=4 in BEIDEN Pflichtinstrumenten signifikant negativ (Block-t -3,73, exakter McNemar p=0,0026, Bonferroni inklusive). Korrigierte Lesart: **Mitteln ueber gezogene Welten SCHADET** -- es ist kein Tiefenverlust, denn die "Tiefe"-Reihe gab k=4 das vierfache Budget. |
+| Punkte-Blend `w>0` | Regel 2. Kontrolle 321/400 (80,25 %) gegen Arm 300/400 (75,00 %), Block-Delta -5,25pp bei t=-2,68, McNemar p=0,0527. w bleibt 0, Richtung eher schaedlich. Die +6pp der Aggressions-Neukartierung sind mit doppelter Stichprobe UMGEKEHRT -- Lehrstueck zur Seed-Skala. |
+| #82 GPU-Batcher | Regel 1. Erreichbare Batches 11/22/44 liefern 2.581/6.197/14.060 Evals/s, alle unter der unteren CPU-Schranke 17.600; Break-even erst ~64-128. Die GPU ist nicht langsam, sondern **ausgehungert**. Folge: das Kostentor des Bootstrap-Horizonts bekommt keine Entlastung, +25 % gelten unveraendert. |
+| GPU-Verlagerung Teil 1+2 | Speicher ist kein Engpass (1,5 MiB je Suche); erreichbarer Batch analytisch **140-590** => Gewinnzone. Weg V (Verschraenkung, suchneutral) statt Virtual Loss. Startwert N=256. Eigener Fehler dabei protokolliert: Speicher zuerst als bindende Schranke behandelt, ergab absurde Batchgroessen 6.600-12.300; bindend ist die CPU-seitige Baumarbeit. |
+| R5-Chip-Leck | Weg A gebaut und SCHARF. Die Suche ist seit 2026-08-10 **Expectiminimax** (Zufallsknoten an den Aufdeck-Stellen der verdeckten Chip-Zuordnung, kein Pruning in Zufallsknoten -- Star1/Star2 bewusst weggelassen). Versatz null GEMESSEN: -0,47 Pkt, SE 0,66, t=-0,71 ueber 43 Abweichungen aus 1371 Entscheidungen. Das Leck ist strukturell real, aber inert (0/247 Permutationen aendern die Zugwahl). `MOSAIC_R5_CHANCE_NODES=0` stellt Altverhalten her. |
+| Punkte-Ziel | Gegner-Anteil ENTFERNT, **Schema 20**: `points_val = tanh(own/VALUE_SCALE)` statt `... - 0,1*tanh(opp/...)`, an allen drei Bildungsstellen. `VALUE_OPP_EPSILON = 0,0` (nicht entfernt, damit die Rueckgewinnung in `opp_aware_points_utility` korrekt degeneriert und `engine_config_json` die Aenderung zeigt). |
+| `plate_head` als eigener Kopf | **ENTWERTET und entfernt**. Der Ownership-Kopf ist der Randlayer und deckt die additiven Kriterien exakt ab. |
+| Kriterium 3 Multiplikator | 9 Layout-Ausgaenge (`P(Slot s traegt am Ende eine Jokerplatte)`), Kopfbreite 122 -> **140**, Cache-Suffix **`+conj_v2`**. Schliesst die einzige Abdeckungsluecke: Kriterium 3 ist das einzige mit ZUSTANDSABHAENGIGEM Punktwert (`2 x wild_total`). |
+| Wheel + Golden-Waechter | installiert, Paritaet BEWIESEN (`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`), A2-Vertragsstempel `a169ebf0a4451e08` erstmals am INSTALLIERTEN Binary befragbar; der Elo-Tracker schreibt `contract`/`knobs` ab jetzt je Zeile mit. A3/A4 in `cargo test`. |
+
+## PLATTENKOPF-STRANG -- vollstaendig ueberholt, hier nur die tragenden Befunde
+
+Stufe A war abgeschlossen und ueber zwei Generator-Aeren repliziert (c6-Skill
++0,637 auf v20-Korpus / 2.537 Partien, +0,655 auf v19-Korpus / 2.530 Partien;
+c3 bei +0,004/-0,008 => c3 blieb draussen). Der inhaltliche Kern war der
+**Slot-Gradient**: ein Spezialfeld bleibt in der unteren Slot-Reihe in ~84 %
+der Partien leer, in der oberen in ~13 % -- monoton und ueber beide Aeren
+deckungsgleich, also Spielstruktur statt Champion-Verhalten. Das bestaetigt
+die Nutzer-Taktik ("keine Spezialkuppeln in Slot-Reihe 3") quantitativ.
+
+**Dann ueberholt durch die Konfundierungs-Korrektur** (s.u.): `atoms_criterion6`
+war UNBEDINGT und warf "kein Spezialfeld in diesem Slot" mit "Spezialfeld
+gefuellt" in dieselbe 0. Bedingt auf existierende Felder bleiben +0,400
+aggregiert -- aber **je Slot ist jeder Wert negativ**. Der aggregierte Wert war
+ein Simpson-Effekt gegen die GEPOOLTE Grundrate.
+
+`plate_head` (9 Logits, beide Modellklassen) wurde gebaut und im selben Zug
+wieder entfernt, als der Ownership-Kopf als Randlayer erkannt war.
+
+## KONFUNDIERUNGS-MUSTER, dreimal an einem Tag
+
+Jedes Endzustands-Ziel, das teilweise schon aus dem SICHTBAREN Zustand folgt,
+blaeht den Brier-Skill auf: (1) Anwesenheit des Spezialfelds, (2)
+Slot-Identitaet durch Poolung, (3) schon entschiedene Platzierung (die 9
+Layout-Ausgaenge kamen unbedingt auf +0,28 bis +0,97; bedingt bleiben -0,12 bis
++0,10, weil eine gelegte Platte nie bewegt wird -- 13.219 Beobachtungen, 0
+Abweichungen -- und der Raumtyp in der Eingabe steht).
+Regel im Projekt-Gedaechtnis: `feedback_skill_confound_already_determined`.
+
+## INSTRUMENT-SCHULDEN -- alle drei bezahlt
+
+- Paritaets-Probe aus dem Scratchpad nach `tools/paritaets_probe.py` geholt
+  (mit benannter Allowlist fuer Diagnosefelder -- die erste Fassung hashte
+  rohe gegen gestrippte Ausgabe und schlug falschen Alarm).
+- `elo_history.csv` hat jetzt `contract`- und `knobs`-Spalten (additiv,
+  Header migriert, `engine_contract()`/`active_knobs()` in `tools/elo_tracker.py`).
+- **v20 gegen `v19_best` war LAENGST gelaufen** (2026-08-09, 114:76 ueber 190
+  Partien, SPRT-H1 nach 95 Paaren, p=0,0043, `paired_gating_v20_vs_v19best_nachtrag.json`).
+  Die STATUS-Zeile "Nachtrag-Schuld" war veraltet und hat mich zweimal dazu
+  verleitet, die Messung erneut vorzuschlagen -- Nutzer-Ruege 2026-08-10.
+  **Lehre: Elo-Fragen am Primaerregister `elo_history.csv` pruefen, nicht an
+  der Planungsdatei.**
+
+## GITHOOK erweitert
+
+Die Groessen-Ratsche blockierte einen Commit, der eine Datei VERKLEINERT hat
+(sie lag nur wegen fremden fruehen Wachstums ueber der Basislinie). Neu: wer
+gegenueber HEAD kleiner wird, kommt durch; die Basislinie bleibt stehen, damit
+der Rueckstand nicht festgeschrieben wird. Beide Richtungen geprueft.
+
+## Weitere protokollierte Eigenfehler des Tages
+
+Hintergrundlauf durch `tail` geleitet (puffert bis Prozessende -- die Arena sah
+tot aus, lief aber). Handzerlegung der Blatt-Erzeugungsrate ergab 120 %
+Inferenzanteil und war ungueltig; ein Null-Evaluator waere der falsche Ersatz
+gewesen (degenerierte Suche), und `profiling.rs` hatte die Zahl seit Task #32
+laengst. Verfuegbarkeitsrechnung zweimal falsch (Mondfliesen sind DIESELBEN
+Steine, nur umsortiert -- der Vorbehalt zeigte in die falsche Richtung; und es
+gibt KEINE reihenuebergreifende Farbeinschraenkung, `can_accept` prueft nur
+"Reihe voll?" und "eigene Farbe passt?").
