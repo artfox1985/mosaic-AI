@@ -235,6 +235,35 @@ def main() -> int:
               f"| Wachhund {watchdog:+.3f}")
         verdicts.append((k, skill))
 
+    # Stufe-A-Groesse aus dem PREREG: Kalibrierung, nicht nur Trennleistung.
+    # Nutzen entsteht erst, wenn P x Punktwert ein brauchbarer Erwartungswert
+    # ist -- eine Steigung weit von 1 heisst systematisch falsch skaliert.
+    print("--- Kalibrierung c6 je Slot (Platt-Steigung auf dem Logit) ---")
+    with torch.no_grad():
+        logits = model(Xva)
+    for slot in range(NUM_SLOTS):
+        m = Mva[:, slot]
+        if m.sum() < 50:
+            print(f"  Slot {slot}: zu wenige aktive Beobachtungen ({int(m.sum())})")
+            continue
+        z = logits[:, slot][m > 0].double()
+        y = Yva[:, slot][m > 0].double()
+        # 1-Parameter-Platt: y ~ sigmoid(a*z), a per Newton auf der BCE
+        a = torch.tensor(1.0, dtype=torch.float64, device=z.device, requires_grad=True)
+        optp = torch.optim.LBFGS([a], max_iter=60)
+        def closure():
+            optp.zero_grad()
+            l = torch.nn.functional.binary_cross_entropy_with_logits(a * z, y)
+            l.backward()
+            return l
+        optp.step(closure)
+        pr = torch.sigmoid(z)
+        brier = ((pr - y) ** 2).mean().item()
+        rate = y.mean().item()
+        bb = ((rate - y) ** 2).mean().item()
+        skill = 1.0 - brier / bb if bb > 0 else float("nan")
+        print(f"  Slot {slot}: n={int(m.sum()):>6} Grundrate {rate:.3f} "
+              f"Brier {brier:.4f} Skill {skill:+.3f} Platt-Steigung {a.item():.3f}")
     print()
     if all(sk > 0.02 for _, sk in verdicts) and verdicts:
         print("VERDIKT: beide Kriterien schlagen die Grundrate ⇒ die Atome sind aus den")
