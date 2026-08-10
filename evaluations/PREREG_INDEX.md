@@ -64,7 +64,7 @@ Eskalations-Preregs laengst belegt waren.
 
 
 
-## OFFEN (5)
+## OFFEN (4)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -72,12 +72,12 @@ Eskalations-Preregs laengst belegt waren.
 | `PREREG_zufallsknoten.md` | Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Frage). Grundlage: es gibt keine private Information, also Zufallsknoten statt ISMCTS. Teil A = Korrektheit (bekannter Unterbau), Teil B = Zufallsknoten mit Kostengate, Teil C = Diagnose der Platte-6-Interaktion |
 | `PREREG_punkte_blend_w.md` | Traegt w>0 im Punkte-Blend Arena-Staerke -- jetzt mechanistisch begruendet, weil beide Punkte-Koepfe die Zuege plattenabhaengig umsortieren und dabei Gewicht Null haben? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Ein Faktor (w=0,1 bei λ=2,0 gegen w=0), 2x400 statt 2x200 -- die Neukartierung blieb bei +6pp/p=0,169 haengen, was bei ~2,2pp Block-SE genau der untermotorisierte Bereich ist |
 | `PREREG_bootstrap_horizont.md` | Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = zwei Arme auf identischen Partien via doppelt geschriebener Labels |
-| `PREREG_gpu_inferenz_batcher.md` | Schlaegt die GPU bei dem Batch, der in unserer Architektur real erreichbar ist (~11-16), den heutigen CPU-Aggregatdurchsatz -- lohnt ein zentraler Inferenz-Batcher (Alt-Nummer #82)? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Machbarkeitsprobe ohne Implementierung; Inferenz-Anteil 62-81% der Self-Play-Zeit => Amdahl-Deckel 1,7x (s=2) bis 5,3x. Erstes freies GPU-Fenster nach dem Gewichts-Sweep |
 
-## ENTSCHIEDEN (31)
+## ENTSCHIEDEN (32)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_gpu_inferenz_batcher.md` | Schlaegt die GPU bei dem Batch, der real erreichbar ist (~11-44), den CPU-Aggregatdurchsatz -- lohnt ein zentraler Inferenz-Batcher (Alt-Nummer #82)? | **REGEL 1, GESCHLOSSEN 2026-08-10**: erreichbare Punkte 11/22/44 liefern 2.581/6.197/14.060 Evals/s, alle unter der UNTEREN CPU-Schranke von 17.600 -- Verdikt robust gegen die Bandbreite. Break-even erst bei ~64-128. Vermerk: 'nur zusammen mit blatt-paralleler Auswertung sinnvoll'; die GPU ist nicht langsam, sondern ausgehungert. `evaluations/gpu_batch_throughput.json` |
 | `PREREG_task_d_gewichte.md` | Traegt ein hoeheres value_weight (0,4/0,8) oder ein hoeheres points_weight (0,25) Arena-Staerke gegen die Kontrolle `v21_2d`? | **H0 2026-08-10, alle drei Arme** ⇒ Regel 5: `VALUE_WEIGHT=0,2` und der Punkte-Default bleiben, Punkt fuer die WDL-/2D-Aera geschlossen. vw04 208:192 (52,0%), vw08 92:108 (46,0%), pw025 68:82 (45,3%, SPRT-H0 nach 75 Paaren). Bild monoton: 0,4 nicht besser, 0,8 schlechter -- der aus der MSE-Aera geerbte Wert liegt offenbar nahe am Optimum. `evaluations/paired_gating_t_d_{vw04,vw08,pw025}_vs_v21.json` |
 | `PREREG_punktekopf_platten.md` | Traegt der Punkte-/Gegner-Punkte-Kopf Platten-Information, und differenziert er die ZUEGE danach? | **ENTSCHIEDEN (Stufe 2)**: beide Koepfe sortieren die Wurzelkandidaten plattenabhaengig UM -- `net_points_forecast` Tau-Median 0,792, `net_opp_points_forecast` 0,640, `net_raw_value` 0,778 ⇒ alle Regel 2a (Zug-Differenzierung). Stufe-1-Gate war fehlkonstruiert und ist als ungueltig erklaert. Motiviert `PREREG_punkte_blend_w.md`. `evaluations/punktekopf_platten_stufe2.json` |
 | `PREREG_ismcts_determinisierungen.md` | Verbessert Mehrfach-Determinisierung (k=1/2/4) die Spielstaerke gegen die PIMC-Strategy-Fusion? | **GESCHLOSSEN 2026-08-10 unter ZWEI Anordnungen**: Sims-Split (Budget fix) 76,0/77,3/70,0%; gleiche Tiefe je Welt (Budget waechst mit k) 81,75/77,0/73,0% -- k=4 faellt in beiden ab, im zweiten Fall mit VIERFACHEM Budget und in beiden Pflichtinstrumenten signifikant (Block-t -3,73, McNemar p=0,00262, Bonferroni inklusive). Nicht ein Tiefenverlust, sondern: das Mitteln ueber gezogene Welten schadet aktiv. `evaluations/paired_arena_env_ismcts_k.json`, `..._tiefe_k{1,2,4}.json` |

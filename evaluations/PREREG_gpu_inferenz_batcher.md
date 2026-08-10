@@ -180,3 +180,53 @@ Umgekehrt liefert die Kopplung dem Batcher ein zweites
 Rechtfertigungsargument: er zahlt sich nicht nur in Self-Play-Durchsatz aus,
 sondern kann eine Ziel-Verbesserung erst bezahlbar machen, die sonst am
 Kostentor scheitert.
+
+## ERGEBNIS 2026-08-10: REGEL 1 GREIFT -- #82 GESCHLOSSEN
+
+Instrument: `tools/gpu_batch_throughput.py` (neu; kein vorhandenes Werkzeug
+deckte das ab). RTX 3060, Champion-Checkpoint `v21_2d_brierbest` (2D-Encoder,
+input_size 708), Modell ueber den gemeinsamen Lader
+`neural_net.build_model_from_checkpoint`, 10 Aufwaermlaeufe, Median ueber 30
+Wiederholungen, `torch.cuda.synchronize()` vor JEDER Zeitnahme.
+
+| Batch | Evals/s | vs. CPU-Aggregat (17.600-35.200) |
+|-------|---------|----------------------------------|
+| 1 | 126 | 0,00-0,01x |
+| 8 | 1.585 | 0,05-0,09x |
+| **11** (Threadzahl) | **2.581** | **0,07-0,15x** |
+| 16 | 4.539 | 0,13-0,26x |
+| **22** (k=2) | **6.197** | **0,18-0,35x** |
+| 32 | 8.407 | 0,24-0,48x |
+| **44** (k=4) | **14.060** | **0,40-0,80x** |
+| 64 | 20.863 | 0,59-1,19x |
+| 128 | 41.959 | 1,19-2,38x |
+| 256 | 78.896 | 2,24-4,48x |
+| 512 | 162.635 | 4,62-9,24x |
+
+**Verdikt**: an allen drei erreichbaren Punkten liegt die GPU unter dem
+CPU-Aggregat. Bei Batch 44 mit 14.060 sogar unter der UNTEREN Schranke von
+17.600 -- das Verdikt ist damit **robust gegen die Breite des
+Referenzbandes**, und der vorgesehene "unentschieden"-Zweig (GPU im Band ->
+CPU-Referenz nachmessen) greift nicht. Ein Nachmessen der CPU-Seite ist
+also nicht noetig.
+
+⇒ **Regel 1: `#82` GESCHLOSSEN** mit dem Vermerk "nur zusammen mit
+blatt-paralleler Auswertung sinnvoll".
+
+### Was der Befund NICHT sagt
+
+Nicht "die GPU ist zu langsam", sondern **sie ist ausgehungert**: ab Batch
+128 liegt sie beim 1,2- bis 2,4-Fachen, bei 512 beim 4,6- bis 9,2-Fachen.
+Der Engpass ist der ERREICHBARE Batch, und der ist von der Sucharchitektur
+begrenzt (ein Blatt je Thread). Der Amdahl-Deckel von 1,7x-5,3x waere also
+erreichbar -- aber erst hinter einem Such-Umbau auf blatt-parallele
+Auswertung, und der ist ein eigenes, ungemessenes Vorhaben.
+
+### Konsequenz fuer die Bootstrap-Kopplung
+
+Die oben festgehaltene Kopplung ist damit aufgeloest, und zwar zu Lasten des
+Horizonts: das Kostentor von `PREREG_bootstrap_horizont.md` bekommt **keine
+Entlastung**. Die +25%-Schwelle gilt unveraendert gegen den heutigen
+CPU-Durchsatz. Die vorgesehene Reihenfolge (Batcher VOR dem Kostentor) war
+richtig -- sie hat verhindert, dass der Horizont gegen eine Kostenannahme
+gemessen wird, die noch offen war.
