@@ -1196,3 +1196,198 @@ Beim jetzigen Stand wuerden **16 von 34 Zusatzzielen Konstanten lernen** und
 Gradientenanteil verbrauchen. Vor einem Hochdrehen des Gewichts gehoert
 entschieden, ob der Kopf auf die tragenden Atome beschnitten wird -- Kandidaten
 sind die 9 Layout-Ausgaenge (nach der bedingten Nachpruefung) und Ecke (0,0).
+
+---
+
+## NACHTRAG 2026-08-10: Zwei Referenzlaeufe -- BODEN (Zufall) und MITTELWERT (Heuristik)
+
+Nutzer-Auftrag: den Champion-Korpus gegen einen **policy-freien Boden** und
+einen **kompetenten Mittelwert** abgrenzen, um die offene Frage des vorigen
+Abschnitts zu entscheiden -- sind die 16 entarteten Atome *strukturell
+unerreichbar* oder ein *Strategiedefizit*?
+
+### Instrumente (neu, `#[ignore]`)
+
+| Baustein | Ort |
+|----------|-----|
+| `ReferenzPolitik` (`Zufall` / `Heuristik(sims)`) | `engine/src/round_transition.rs` |
+| `drive_to_game_end_reference(seed, politik)` | `engine/src/round_transition.rs` |
+| `plattenkopf_referenzlauf_zufall` (1000 Partien) | `engine/src/scoring.rs` |
+| `plattenkopf_referenzlauf_heuristik` (400 Partien, 150 Sims, `DEFAULT_C`) | `engine/src/scoring.rs` |
+| `plattenkopf_referenzlauf_zufall_ohne_startplatte` (Kontrolle) | `engine/src/scoring.rs` |
+
+Partienzahl und Sims sind per Umgebungsvariable uebersteuerbar
+(`MOSAIC_PLATTENKOPF_GAMES`, `MOSAIC_PLATTENKOPF_SIMS`).
+Rohausgabe: `logs/plattenkopf_referenzlaeufe.log` (Laufzeit 4,1 s Zufall,
+130,9 s Heuristik).
+
+### Zuerst ein Treiber-Fehler, der die Messung gekippt haette
+
+`drive_to_game_end_random` (und `drive_to_game_end`) setzen ueber
+`drive_to_first_round_end` `start_tile_pending = false` und **ueberspringen die
+kostenlose Startkuppel-Platzierung**. Nach `docs/engine_manual.md` legt jeder
+Spieler 1 Startplatte plus in den Runden 1-4 je genau 2 (Runde 5: keine) = 9
+Platten, also alle `MAX_DOME_SLOTS`. Ohne Startplatte bleiben es **8,000/9** --
+gemessen, nicht vermutet (Kontroll-Lauf). Ein 2x2-Block des 6x6-Rasters fehlt
+dann STRUKTURELL, womit 2 Reihen, 2 Spalten und mindestens eine Diagonale per
+Konstruktion unerreichbar sind: genau die Groessen, um die es hier geht.
+
+Der neue Treiber legt die Startplatte mit `self_play::choose_start_placement`
+-- derselben fixen Heuristik, die auch der Champion-Korpus benutzt (Self-Play
+waehlt die Startplatte NICHT per Netz). Belegt an drei unabhaengigen Groessen,
+dass die Plattenverteilung damit deckungsgleich ist:
+
+| Groesse | neuer Treiber (Zufall) | Champion-Log |
+|---------|------------------------|--------------|
+| belegte Kuppelslots | 9,000/9 | (9 vorausgesetzt) |
+| E[Jokerfelder] | 4,500 | 4,496 (Summe Atome 25-33) |
+| Layout Slot 0 traegt Joker | 0,821 | 0,788 |
+
+**Nebenfolge:** die Grundraten, die
+`plattenkopf_atom_identities_hold_on_real_end_boards` mitausgibt (Jokerfelder je
+Brett, Spezialfelder, "alle Jokerfelder belegt"), stehen auf 8-Platten-Brettern
+und sind entsprechend verzerrt. Die dort geprueften IDENTITAETEN sind davon
+nicht betroffen -- die gelten je Brett algebraisch, unabhaengig von der
+Plattenzahl.
+
+### Tabelle: Zufall | Heuristik | Champion
+
+Zufall n = 1000 Partien / 2000 Bretter, Heuristik n = 400 / 800, Champion aus
+`logs/atom_skill_check.log` (1268 Partien). Format: `Mittel-Pkt / Anteil != 0`.
+Die Champion-Spalte ist aus den Atom-Grundraten ABGELEITET (Rechnung darunter).
+
+| ID | Kriterium | Zufall | Heuristik | Champion | Einordnung |
+|----|-----------|--------|-----------|----------|------------|
+| 0 | Horizontale Reihen | 0,004 / 0,1 % | 0,994 / 27,1 % | 0,825 / 14,8-27,5 % | gleichauf |
+| 1 | Vertikale Reihen | 0,004 / 0,1 % | **0,945 / 13,1 %** | 0,252 / 1,2-3,6 % | **STRATEGIEDEFIZIT** |
+| 2 | Diagonale Reihen | 0,000 / 0,0 % | 0,050 / 0,5 % | 0,020 / 0,2 % | strukturell |
+| 3 | Mehrfarbige Felder | 1,212 / 16,2 % | 3,632 / 43,0 % | ~3,2 / 38,7 % | gleichauf |
+| 4 | Aeussere Felder | 4,766 / 99,7 % | 9,650 / 100 % | -- (nicht im Log) | offen |
+| 5 | Eckplatten | 0,442 / 14,4 % | 3,498 / 97,9 % | 3,237 / >= 80,9 % | gleichauf |
+| 6 | Spezialfelder | -13,245 / 100 % | -11,029 / 100 % | -- (nicht im Log) | offen |
+| 7 | Farbenreiche Reihen | 0,006 / 0,1 % | 0,385 / 9,0 % | 0,244 / 3,6-6,1 % | gleichauf |
+
+Kriterium 6, mittlere Zahl LEERER Spezialfelder je Brett (Auftragspunkt):
+**Zufall 4,415 von 4,500 -- Heuristik 3,676 von 4,500**. Die Heuristik raeumt
+also 18 % der Spezialfelder ab, der Zufall 2 %.
+
+Kontext (mittlere Brettfuellung): Zufall 8,418/36 Felder, Heuristik 17,515/36.
+
+Champion-Ableitung aus den Atom-Grundraten: Kriterium 0 = 3 x Summe(Reihen),
+1 = 7 x Summe(Spalten), 2 = 10 x Summe(Diagonalen), 5 = 3 x (E00+E02) +
+8 x (E20+E22), 7 = 4 x Summe(farbenreiche Reihen). Der Anteil != 0 ist aus
+Marginalraten nur eingrenzbar (max(einzeln) <= Anteil <= Summe), deshalb als
+Spanne. Kriterium 3 ist NICHT exakt ableitbar (der Punktwert `2 x wild_total`
+ist zustandsabhaengig); ~3,2 unterstellt `E[wild_total | alle belegt] ~ 4,2`
+wie im Heuristik-Arm gemessen. Kriterien 4 und 6 haben im Log **keine**
+Entsprechung -- sie sind additiv und werden vom 36-Feld-`ownership`-Layer
+abgedeckt, nicht von den 34 Konjunktionen.
+
+### Atom-Ebene: welches der 16 entarteten Atome ist was
+
+Wilson-95-%-Intervalle konservativ auf der PARTIE-Zahl (400 bzw. 1268), nicht
+auf der Brettzahl -- die beiden Bretter einer Partie teilen Versorgung und
+Denial und sind nicht unabhaengig (`feedback_arena_block_correlation`).
+
+| Atom | Zufall | Heuristik | Champion | Befund |
+|------|--------|-----------|----------|--------|
+| Reihe 3/4/5/6 vollst. | 0,000 | 0,001 / 0,001 / 0,000 / 0,000 | 0,000 | **strukturell** |
+| Diagonale H / N | 0,000 / 0,000 | 0,003 / 0,003 | 0,002 / 0,000 | **strukturell** |
+| farbenreiche Reihe 3-6 | 0,000 | 0,001 / 0,000 / 0,000 / 0,000 | 0,000 | **strukturell** |
+| Ecke (2,2) | 0,000 | 0,004 | 0,004 | **strukturell** |
+| Ecke (2,0) | 0,001 | 0,013 [0,006-0,030] | 0,002 [0,001-0,006] | Hinweis auf Defizit, klein |
+| Spalte 1 | 0,001 | 0,035 | 0,004 | **Strategiedefizit** |
+| Spalte 2 | 0,000 | 0,046 | 0,010 | **Strategiedefizit** |
+| Spalte 3 | 0,000 | 0,029 | 0,006 | **Strategiedefizit** |
+| Spalte 4 | 0,000 | 0,009 | 0,012 | gleichauf |
+| Spalte 5 | 0,000 | 0,014 | 0,002 | Hinweis auf Defizit |
+| Spalte 6 | 0,000 | 0,003 | 0,002 | gleichauf |
+| Summe Spalten | 0,002 | **0,136 [0,106-0,173]** | **0,036 [0,027-0,048]** | **3,8x, Intervalle disjunkt** |
+
+Nicht-entartete Atome zur Kalibrierung: Reihe 1 Heuristik 0,189
+[0,154-0,230] gegen Champion 0,127 [0,110-0,146] (Heuristik leicht besser);
+Reihe 2 0,140 gegen 0,148 (gleich); "alle Jokerfelder belegt" 0,430
+[0,382-0,479] gegen 0,387 [0,361-0,414] (ueberlappend); Ecke (0,0) 0,866
+[0,829-0,896] gegen 0,809 [0,786-0,830]; Ecke (0,2) 0,256 gegen 0,254 (gleich).
+Anders gesagt: eine 150-Sim-Heuristik ohne Netz erreicht auf JEDEM dieser
+Konjunktions-Atome mindestens das Champion-Niveau.
+
+### Warum Reihen strukturell sind, Spalten aber nicht -- der Mechanismus
+
+Am Code geprueft, nicht vermutet (`round_end.rs::generate_tiling_actions`
+Zeile 598: `dome_row = row_idx / 2; space_row = row_idx % 2`, und
+`execute_tiling_action` Zeile 218: `row.tiles.clear()`):
+
+1. Musterreihe *r* speist **genau** Kuppel-Rasterzeile *r* (1:1, keine
+   Nachbarzeile).
+2. Je Tiling-Phase wandert aus einer fertigen Musterreihe **genau 1 Stein** auf
+   die Kuppel, die Reihe wird geleert. Ueber 5 Runden also **hoechstens 5
+   Steine je Rasterzeile** aus dem Tiling.
+3. Eine Rasterzeile hat 6 Felder. Der 6. kann nur ein **Spezialfeld** sein (das
+   wird automatisch belegt, sobald die anderen 3 Felder seiner Platte voll sind,
+   `engine_manual.md` Abschnitt 5). Auch Jokerfelder verbrauchen einen Transfer.
+
+Daraus folgt die Asymmetrie:
+
+* **Zeile *r* vollstaendig** = Musterreihe *r* muss in **jeder** der 5 Runden
+  geschlossen werden. Laut `tools/musterreihen_verfuegbarkeit.py` braucht
+  Musterreihe 3 ~1,4 Runden je Abschluss, Reihe 6 ~2,9 -- fuenf Abschluesse
+  brauchen ~7 bzw. ~14,5 Runden von 5. **Unmoeglich.** Nur die Reihen 1-2
+  (~0,5 / ~1,0 Runden je Abschluss) liegen im Budget, und genau die sind die
+  einzigen mit positiver Grundrate, in ALLEN drei Armen.
+* **Spalte *c* vollstaendig** = **jede** der 6 Musterreihen muss **einmal** in
+  Spalte *c* liefern. Das liegt im Budget (jede Reihe ist mindestens einmal
+  schliessbar). Spalten sind also erreichbar -- und die Heuristik erreicht sie
+  auch, auf 13,1 % der Bretter gegen maximal 3,6 % beim Champion.
+* **Diagonale** verlangt zusaetzlich, dass jeder dieser 6 Transfers eine
+  bestimmte, mit der Zeile wandernde Spalte trifft. Beide Referenzen bei 0,3 %.
+
+### Was NICHT belegt ist
+
+1. **Kriterium 4 (Aeussere Felder) und 6 (Spezialfelder) haben keine
+   Champion-Spalte.** Sie stehen nicht im Atom-Log (additiv, im
+   `ownership`-Layer). Der Zufall/Heuristik-Vergleich steht, der Abstand zum
+   Champion ist offen. Waere ueber den Korpus nachzurechnen -- nicht Teil dieses
+   Auftrags.
+2. **Die Heuristik ist selbst schwach.** 150 Sims, kein Netz, statische
+   Blattbewertung; in der Elo-Kaderaufstellung ist Heuristik@200 der ANKER am
+   unteren Ende. Sie ist eine untere Schranke fuer "was ein kompetenter Spieler
+   erreicht", kein Deckel. Wo sie den Champion schlaegt, ist das Defizit
+   deshalb eher UNTERschaetzt; wo beide bei 0 liegen, bleibt die Moeglichkeit,
+   dass ein dritter, ganz anderer Spielstil es doch erreicht -- die
+   Struktur-Einordnung stuetzt sich daher auf den Mechanismus oben, nicht auf
+   die Nullrate allein.
+3. **Stichprobengroesse.** Heuristik 400 Partien / 800 Bretter, Zufall 1000 /
+   2000. Fuer Atome mit Rate < 1 % traegt das nicht: Ecke (2,0) beruht auf ~10
+   Ereignissen, die Diagonalen auf 2-3. Diese Zeilen sind als "beide ~0"
+   belastbar, nicht als Rangordnung. Fuer die Spalten-Aussage (13,1 % gegen
+   <= 3,6 %, disjunkte Intervalle) traegt sie.
+4. **Der Champion-Korpus ist EXPLORATIVES Self-Play**, mit
+   Dirichlet-Wurzel-Noise (`net_mcts.rs::build_net_tree`, `add_root_noise`). Er
+   zeigt nicht das beste Spiel des Champions. Ein Teil des Spalten-Abstands kann
+   Explorationsrauschen sein. Sauber waere ein Referenzlauf mit
+   `add_root_noise = false` -- nicht gemessen.
+5. **Die Champion-Grundraten sind ZUSTANDS-, nicht brettgewichtet** (150 000
+   Zustaende aus 1268 Partien; das Konjunktions-Label kommt aus dem Endbrett und
+   wiederholt sich ueber alle Zustaende einer Partie). Lange Partien wiegen
+   schwerer. Die Referenzlaeufe zaehlen je Brett genau einmal.
+6. **Die Arme unterscheiden sich nicht NUR in der Politik**: der Champion spielt
+   gegen den Champion, die Heuristik gegen die Heuristik. Denial-Druck und damit
+   die Versorgung einer gezielt gesammelten Farbe sind nicht dieselben. Ein
+   Heuristik-gegen-Champion-Lauf wuerde das trennen -- nicht gemessen.
+
+### Konsequenz
+
+Die Aussage des vorigen Abschnitts ("Strategie-Luecke, kein
+Vorhersage-Problem") ist **zu weit gefasst**. Aufgeteilt:
+
+* **Strukturell und damit als Kopf-Ausgang wertlos** (kein Spielstil erreicht
+  sie): Reihen 3-6, beide Diagonalen, farbenreiche Reihen 3-6, Ecke (2,2) --
+  10 der 16 entarteten Atome. Diese Ziele gehoeren aus dem Kopf entfernt, und
+  zwar unabhaengig von jedem `OWNERSHIP_WEIGHT`.
+* **Echtes Strategiedefizit**: die **Spalten** (Kriterium 1, 7 Pkt je Spalte).
+  Die Heuristik holt hier 3,8x so viel wie der Champion. Das ist der einzige
+  Punkt der Liste, an dem ein Eingriff Punkte verspricht -- und er ist kein
+  Kopf-Thema, sondern eins der Zielauswahl bzw. der Blattbewertung.
+* **Offen**: Ecke (2,0) (8 Pkt, Hinweis auf ein kleines Defizit, n zu klein),
+  Kriterien 4 und 6 (keine Champion-Referenz).

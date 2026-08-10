@@ -434,6 +434,118 @@ pub(crate) fn drive_to_game_end_random(seed: u64) -> Option<GameState> {
     }
 }
 
+/// Drafting-Politik der Referenzlaeufe ([`drive_to_game_end_reference`]).
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ReferenzPolitik {
+    /// Uniform zufaellige Wahl aus `drafting_actions` -- policy-freier BODEN.
+    Zufall,
+    /// Heuristik-MCTS (`mcts::search_drafting_action`, kein Netz) mit `sims`
+    /// Simulationen und `DEFAULT_C` -- kompetenter MITTELWERT.
+    Heuristik(u32),
+}
+
+/// Ein Drafting-Zug nach der gewaehlten Politik. Fallback auf `actions[0]`,
+/// wenn die Suche nichts liefert -- genau wie der Produktions-Self-Play-Pfad
+/// (`self_play.rs`), damit ein Referenzlauf nicht an einem Suchabbruch haengt.
+#[cfg(test)]
+fn drive_drafting_to_leaf_policy(
+    mut state: GameState,
+    politik: ReferenzPolitik,
+    rng: &mut rand::rngs::StdRng,
+) -> GameState {
+    let mut guard = 0u32;
+    while state.phase == Phase::Drafting {
+        guard += 1;
+        assert!(guard < 2000, "Drafting endet nicht");
+        let actions = crate::game::drafting_actions(&state);
+        if actions.is_empty() {
+            break;
+        }
+        let pick = match politik {
+            ReferenzPolitik::Zufall => actions[rng.random_range(0..actions.len())].clone(),
+            ReferenzPolitik::Heuristik(sims) => {
+                crate::mcts::search_drafting_action(&state, sims, crate::mcts::DEFAULT_C, rng)
+                    .unwrap_or_else(|| actions[0].clone())
+            }
+        };
+        let mut game = Game { state };
+        game.apply_drafting(&pick).expect("valider Zug");
+        state = game.state;
+    }
+    state
+}
+
+/// Spielt eine VOLLSTAENDIGE Partie nach `politik` durch und liefert den
+/// Endzustand -- die beiden Referenzlaeufe des Plattenkopf-Auftrags
+/// (2026-08-10, Auswertung in `evaluations/PREREG_plattenkopf.md`).
+///
+/// WARUM ein eigener Treiber neben [`drive_to_game_end_random`]: jener setzt
+/// (ueber `drive_to_first_round_end`) `start_tile_pending = false` und
+/// UEBERSPRINGT damit die kostenlose Startkuppel-Platzierung. Nach
+/// `docs/engine_manual.md` legt jeder Spieler 1 Startplatte plus in den Runden
+/// 1-4 je genau 2 Platten (Runde 5: keine) = 9 Platten, also alle
+/// `MAX_DOME_SLOTS`. Ohne Startplatte bleiben es 8 -- ein 2x2-Block des
+/// 6x6-Rasters fehlt STRUKTURELL, womit 2 Reihen, 2 Spalten und mindestens
+/// eine Diagonale unerreichbar sind. Genau diese Groessen sollen hier gemessen
+/// werden; der Treiber muss die Startplatte deshalb legen.
+///
+/// Die Startplatte waehlt `self_play::choose_start_placement` -- dieselbe fixe
+/// Heuristik, die auch der Champion-Korpus benutzt (Self-Play waehlt sie NICHT
+/// per Netz, siehe `self_play::start_placement_step`). Damit ist die
+/// Startplatten-Verteilung in beiden Referenzlaeufen und im Champion-Korpus
+/// identisch und die einzige Differenz ist die DRAFTING-Politik.
+#[cfg(test)]
+pub(crate) fn drive_to_game_end_reference(seed: u64, politik: ReferenzPolitik) -> Option<GameState> {
+    use crate::game::apply_start_placement;
+    use crate::scoring::sample_valid_scoring_ids;
+    use crate::self_play::choose_start_placement;
+    use crate::state::setup_new_game;
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
+
+    // Aufbau-RNG EXAKT wie `drive_to_first_round_end(seed)` (gleicher Seed,
+    // gleiche Aufrufreihenfolge) -- damit traegt derselbe `seed` in BEIDEN
+    // Referenzlaeufen dieselben Wertungsplatten und dieselbe Startaufstellung,
+    // der Vergleich ist gepaart. Zugwahl/Rundenuebergaenge laufen auf einem
+    // getrennten RNG.
+    let mut setup_rng = StdRng::seed_from_u64(seed);
+    let ids = sample_valid_scoring_ids(3, &mut setup_rng);
+    let mut state = setup_new_game(["P1".into(), "P2".into()], 0, &mut setup_rng);
+    let mut rng = StdRng::seed_from_u64(seed ^ 0xBEEF);
+    state.scoring_tile_ids = ids;
+
+    // Startkuppel: Nicht-Startspieler zuerst (die Engine erzwingt die
+    // Reihenfolge, siehe `apply_start_placement`).
+    let first = state.current_player;
+    for pi in [1 - first, first] {
+        let (tid, r, c, rot) = choose_start_placement(&state, pi)?;
+        apply_start_placement(&mut state, pi, tid, r, c, rot).ok()?;
+    }
+
+    state = drive_drafting_to_leaf_policy(state, politik, &mut rng);
+
+    let mut guard = 0u32;
+    loop {
+        guard += 1;
+        if guard > 12 {
+            return None;
+        }
+        let pre = resolve_to_pre_chance(&state)?;
+        let mut game = Game { state: pre.state.clone() };
+        game.state.bag.tiles.shuffle(&mut rng);
+        game.state.bonus_chip_pool.shuffle(&mut rng);
+        game.apply_tiling(&TilingMove::EndTiling { player: pre.pending_end_tiling_player }, &mut rng)
+            .ok()?;
+        state = game.state;
+        if state.phase != Phase::Drafting {
+            return Some(state); // Spielende erreicht
+        }
+        state = drive_drafting_to_leaf_policy(state, politik, &mut rng);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -652,6 +652,196 @@ mod tests {
         );
     }
 
+    // ── Referenzlaeufe: Boden (Zufall) und Mittelwert (Heuristik) ────────────
+    //
+    // Nutzer-Auftrag 2026-08-10: `logs/atom_skill_check.log` zeigt 16 von 34
+    // Plattenkopf-Zusatzzielen als praktisch konstant auf dem CHAMPION-Korpus
+    // (Reihen 3-6 nie vollstaendig, Diagonalen ~0, untere Eckplatten ~0,
+    // farbenreiche Reihen 3-6 nie). Offen ist, ob das STRUKTUR ist (auf diesem
+    // Brett nicht erreichbar) oder ein STRATEGIEDEFIZIT des Champions. Zwei
+    // Referenzlaeufe grenzen das ein:
+    //
+    //   Zufall    (`drive_to_game_end_random`)     -- policy-freier Boden
+    //   Heuristik (`drive_to_game_end_heuristik`)  -- kompetenter Mittelwert
+    //
+    // Lesart: liegt ein Kriterium AUCH bei der Heuristik ~0, ist die Groesse
+    // strukturell (Kombinatorik des Bretts/der Platten), nicht gelernt. Liegt
+    // die Heuristik deutlich UEBER dem Champion, ist es ein Strategiedefizit.
+    //
+    // Beide Tests sind `#[ignore]` (Messungen, keine Zusicherungen) und lesen
+    // die Partienzahl aus `MOSAIC_PLATTENKOPF_GAMES` (Heuristik-Sims aus
+    // `MOSAIC_PLATTENKOPF_SIMS`), damit ein Probelauf mit kleinem N moeglich
+    // ist, ohne den Test anzufassen.
+
+    fn probe_usize(var: &str, default: usize) -> usize {
+        std::env::var(var).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+    }
+
+    /// Atom-Grundraten in der Reihenfolge von `_conjunctions_from_dome`
+    /// (`engine/py/neural_net.py`) bzw. `logs/atom_skill_check.log` -- damit die
+    /// Referenzlauf-Spalten direkt neben die Champion-Spalte gestellt werden
+    /// koennen, ohne die Reihenfolge im Kopf umzusortieren.
+    fn atom_labels_and_bits(player: &PlayerBoard) -> Vec<(String, bool)> {
+        let sf = player_scoring_features(player);
+        let mut out: Vec<(String, bool)> = Vec::new();
+        for r in 0..6 {
+            out.push((format!("Reihe {} vollst.", r + 1), sf.row_fill[r] == 6));
+        }
+        for c in 0..6 {
+            out.push((format!("Spalte {} vollst.", c + 1), sf.col_fill[c] == 6));
+        }
+        out.push(("Diagonale H".to_string(), sf.diag_fill[0] == 6));
+        out.push(("Diagonale N".to_string(), sf.diag_fill[1] == 6));
+        for (k, name) in ["Ecke (0,0)", "Ecke (0,2)", "Ecke (2,0)", "Ecke (2,2)"].iter().enumerate() {
+            out.push((name.to_string(), sf.corner_fill[k] == 4));
+        }
+        out.push((
+            "ALLE Jokerfelder belegt".to_string(),
+            sf.wild_total > 0 && sf.wild_filled == sf.wild_total,
+        ));
+        for r in 0..6 {
+            out.push((format!("Reihe {} >=5 Farben", r + 1), sf.row_colors[r] >= 5));
+        }
+        for sr in 0..3 {
+            for sc in 0..3 {
+                let hit = player.dome_grid.dome_slots[sr][sc]
+                    .as_ref()
+                    .is_some_and(|t| t.spaces.iter().any(|sp| sp.space_type == SpaceType::Wild));
+                out.push((format!("Layout: Slot {} traegt Joker", sr * 3 + sc), hit));
+            }
+        }
+        out
+    }
+
+    /// Gemeinsamer Bericht beider Referenzlaeufe -- je Kriterium 0..7 Mittelwert
+    /// der Punkte und Anteil der Bretter mit Punkten != 0, dazu die 34
+    /// Atom-Grundraten fuer den direkten Vergleich mit dem Champion-Log.
+    fn report_reference_run(label: &str, games: usize, boards: &[PlayerBoard]) {
+        assert!(!boards.is_empty(), "{label}: keine Endbretter erzeugt");
+        let n = boards.len() as f64;
+        println!("\n=== REFERENZLAUF {label} ===");
+        println!("{} Partien -> {} Endbretter", games, boards.len());
+        println!("  ID  Kriterium                      Mittel-Pkt   Anteil !=0");
+        for tile in ALL_SCORING_TILES.iter() {
+            let pts: Vec<i32> = boards.iter().map(|b| tile.score(b)).collect();
+            let mean = pts.iter().sum::<i32>() as f64 / n;
+            let share = pts.iter().filter(|&&p| p != 0).count() as f64 / n;
+            println!(
+                "  {:>2}  {:<28} {:>10.3}   {:>8.1}%",
+                tile.id,
+                tile.name,
+                mean,
+                100.0 * share
+            );
+        }
+        let feats: Vec<ScoringFeatures> = boards.iter().map(player_scoring_features).collect();
+        let mean_u32 = |f: &dyn Fn(&ScoringFeatures) -> u32| -> f64 {
+            feats.iter().map(|s| f(s) as f64).sum::<f64>() / n
+        };
+        println!(
+            "  Kriterium 6 extra: LEERE Spezialfelder je Brett Mittel {:.3} (von {:.3} vorhandenen)",
+            mean_u32(&|s| s.special_empty),
+            mean_u32(&|s| s.special_total)
+        );
+        // Belegte Kuppelslots: Plausibilitaets-Anker. Waeren am Spielende nicht
+        // (nahezu) alle 9 Slots belegt, waere der ganze Vergleich hinfaellig --
+        // dann waeren die Nullraten eine Folge fehlender Platten, nicht der
+        // Steinverteilung (`neural_net.py::_conjunctions_from_dome` setzt "im
+        // Endzustand sind empirisch alle Slots belegt" voraus).
+        let slots: f64 = boards
+            .iter()
+            .map(|b| {
+                b.dome_grid
+                    .dome_slots
+                    .iter()
+                    .flat_map(|r| r.iter())
+                    .filter(|s| s.is_some())
+                    .count() as f64
+            })
+            .sum::<f64>()
+            / n;
+        println!(
+            "  Kontext: belegte Kuppelslots {:.3}/9 | Jokerfelder {:.3} | Spezialfelder {:.3} | gefuellte Felder {:.3}/36",
+            slots,
+            mean_u32(&|s| s.wild_total),
+            mean_u32(&|s| s.special_total),
+            mean_u32(&|s| s.row_fill.iter().sum::<u32>())
+        );
+
+        println!("  -- Atom-Grundraten (Reihenfolge wie logs/atom_skill_check.log) --");
+        let names: Vec<String> = atom_labels_and_bits(&boards[0]).into_iter().map(|(l, _)| l).collect();
+        let mut hits = vec![0usize; names.len()];
+        for b in boards.iter() {
+            for (i, (_, bit)) in atom_labels_and_bits(b).into_iter().enumerate() {
+                if bit {
+                    hits[i] += 1;
+                }
+            }
+        }
+        for (name, h) in names.iter().zip(hits.iter()) {
+            println!("  {:<32} {:.3}", name, *h as f64 / n);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn plattenkopf_referenzlauf_zufall() {
+        use crate::round_transition::{drive_to_game_end_reference, ReferenzPolitik};
+        use rayon::prelude::*;
+
+        let games = probe_usize("MOSAIC_PLATTENKOPF_GAMES", 1000);
+        let t0 = std::time::Instant::now();
+        let boards: Vec<PlayerBoard> = (0..games)
+            .into_par_iter()
+            .filter_map(|i| drive_to_game_end_reference(1000 + i as u64, ReferenzPolitik::Zufall))
+            .flat_map(|st| st.players)
+            .collect();
+        report_reference_run("ZUFALL (uniformes Drafting, 9 Platten)", games, &boards);
+        println!("  Laufzeit {:.1}s", t0.elapsed().as_secs_f64());
+    }
+
+    #[test]
+    #[ignore]
+    fn plattenkopf_referenzlauf_heuristik() {
+        use crate::round_transition::{drive_to_game_end_reference, ReferenzPolitik};
+        use rayon::prelude::*;
+
+        let games = probe_usize("MOSAIC_PLATTENKOPF_GAMES", 400);
+        let sims = probe_usize("MOSAIC_PLATTENKOPF_SIMS", 150) as u32;
+        let t0 = std::time::Instant::now();
+        let boards: Vec<PlayerBoard> = (0..games)
+            .into_par_iter()
+            .filter_map(|i| {
+                drive_to_game_end_reference(1000 + i as u64, ReferenzPolitik::Heuristik(sims))
+            })
+            .flat_map(|st| st.players)
+            .collect();
+        report_reference_run(&format!("HEURISTIK ({sims} Sims, DEFAULT_C)"), games, &boards);
+        println!("  Laufzeit {:.1}s", t0.elapsed().as_secs_f64());
+    }
+
+    /// Belegt den Grund, warum die Referenzlaeufe einen EIGENEN Treiber
+    /// brauchen: `drive_to_game_end_random` ueberspringt die Startkuppel
+    /// (`start_tile_pending = false`), es landen nur 8 der 9 Platten auf dem
+    /// Brett. Der Bericht zeigt "belegte Kuppelslots 8.000/9" -- damit sind 2
+    /// Reihen, 2 Spalten und mindestens eine Diagonale per Konstruktion
+    /// unerreichbar, die Nullraten waeren ein Artefakt des Treibers und kein
+    /// Befund ueber das Spiel. NUR als Kontrolle gedacht, nicht als Boden.
+    #[test]
+    #[ignore]
+    fn plattenkopf_referenzlauf_zufall_ohne_startplatte() {
+        use crate::round_transition::drive_to_game_end_random;
+        use rayon::prelude::*;
+
+        let games = probe_usize("MOSAIC_PLATTENKOPF_GAMES", 400);
+        let boards: Vec<PlayerBoard> = (0..games)
+            .into_par_iter()
+            .filter_map(|i| drive_to_game_end_random(1000 + i as u64))
+            .flat_map(|st| st.players)
+            .collect();
+        report_reference_run("KONTROLLE: ZUFALL OHNE Startplatte (8 Platten)", games, &boards);
+    }
+
     /// Hilfsbrett: füllt das komplette 6×6-Raster mit Platten und allen Steinen.
     fn fully_filled_board() -> PlayerBoard {
         let mut p = PlayerBoard::new(0, "P");
