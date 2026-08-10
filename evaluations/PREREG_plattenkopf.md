@@ -1722,11 +1722,100 @@ konzentrationsblind: 3 Felder in Spalte 1 + 3 in Spalte 2 ergeben 0,5 + 0,5 =
 kein Commitment-Druck. Bezahlt werden aber nur VOLLSTAENDIGE Spalten, also muss
 die Abbildung konvex sein.
 
-Beide Enden sind ausrechenbar, nicht geraten:
-  alpha = 1   Signal kraeftig, Konzentration irrelevant (falsche Form)
-  alpha = 6   korrekte Produktform, aber 0,42^6 = 0,0055; x7 = 0,04 Punkte,
-              Geschwister-Differenzen verschwinden (falsche Groesse)
-Der brauchbare Bereich liegt dazwischen. Sweep ueber alpha UND Gewicht.
+**KORREKTUR meiner ersten Fassung**: dort stand, bei alpha = 6 "verschwinden
+die Geschwister-Differenzen". Das ist zu grob. Ausgerechnet bei sechs Zellen
+einer Spalte, unbesetzte Felder auf der gemessenen Marginale 0,42
+(`fortschritt(k) = (k + (6-k)*0,42)/6`, `term = 7 * fortschritt^alpha`):
+
+  alpha | 1. Schritt (0->1) | letzter Schritt (5->6) | Wert bei leerer Spalte
+    1   |       0,68        |         0,68           |        2,94
+    2   |       0,63        |         1,29           |        1,24
+    3   |       0,45        |         1,84           |        0,52
+    4   |       0,28        |         2,34           |        0,22
+    6   |       0,10        |         3,20           |        0,04
+
+Die Differenzen verschwinden also nur am ANFANG einer Linie; nahe der
+Vollendung werden sie GROESSER. alpha steuert damit nicht, wie stark der Term
+zieht, sondern WANN: hohe alpha belohnen Fertigmachen und bestrafen Anfangen.
+
+Fuer dieses Projekt ist das die falsche Richtung -- das Defizit des Champions
+ist, dass er eine Bahn nie ANFAENGT (Spaltenrate 1,2-3,6 %). Bei alpha = 6
+kostet der erste Stein 0,10 Punkte, das startet nichts.
+
+## 3b. ALLES OBEN STEHENDE EXISTIERT BEREITS -- `scoring.rs:160`
+
+`wertung_progress(player, tile_ids)` ist die hier hergeleitete Spezifikation,
+Zeile fuer Zeile, und war die ganze Zeit im Code:
+
+  - `for &id in tile_ids` -> nur die AKTIVEN Platten, gegatet
+  - `row_fill.iter().map(|&f| (f/6.0).powi(2)).sum() * 3.0` -> je Geometrie
+    einzeln summiert, NICHT gepoolt, konvex mit **alpha = 2**
+  - Punktwerte kalibriert: Reihen x3, Spalten x7, Diagonalen x10,
+    Ecken 3/3/8/8, Kriterium 3 ueber `wild_filled/wild_total`
+  - `4 => sf.border_fill as f64` und `6 => -3.0 * sf.special_empty as f64`
+    -> LINEAR, genau die Ausnahme fuer die additiven Kriterien
+
+(Bestaetigt nebenbei die Nutzer-Zahl "2 vertikale + 1 horizontale = ~17":
+7 + 7 + 3 = 17, exakt.)
+
+**Vierter Fall in einer Sitzung, in dem ich an einem vorhandenen Werkzeug
+vorbeigebaut habe** -- vgl. `feedback_check_existing_tools_first`.
+
+### alpha bleibt variabel (Nutzer 2026-08-10: *"du kannst alpha auch variabel machen"*)
+
+Ich hatte den Exponenten fuer "durch Praezedenz erledigt" erklaert. Bleibt
+Regler, in zwei Stufen:
+
+**Stufe 1 -- Knopf.** `MOSAIC_WERTUNG_ALPHA`, Default **exakt 2**.
+
+**Stufe 2 -- Fahrplan ueber die Runde, und der ist HERGELEITET, nicht frei.**
+alpha steuert, WANN der Zug sitzt (Tabelle oben). Wie steil die wahre Funktion
+`P(Linie am Ende vollstaendig)` ist, haengt am Horizont: in Runde 1 glatt (fast
+jede Linie noch erreichbar), in Runde 5 fast eine Stufe (eine Kachelphase Rest,
+hoechstens ein Stein je Musterreihe -> Linie bei 2/6 ist tot, bei 5/6 lebt sie).
+Ein mit der Runde STEIGENDES alpha ist damit die Annaeherung an eine Funktion,
+die mit kuerzerem Horizont steiler wird -- und loest den Zielkonflikt in einem
+Term: frueh "fang etwas an", spaet "mach fertig".
+
+    alpha(r) = alpha_0 + k * (r - 1)      zwei Zahlen statt einer
+
+### PARITAETS-VORBEHALT (nicht optional)
+
+`wertung_progress` haengt an `mcts.rs:82` und damit an der HEURISTIK -- dem
+**Elo-Anker**. Bewegt sich dort der Default, verschiebt sich der Anker und die
+gesamte Elo-Historie wird unvergleichbar.
+
+`.powi(2)` und `.powf(2.0)` sind NICHT garantiert bitgleich (`powi(2)` wird
+ueblicherweise zu `x*x` uebersetzt, `powf` geht durch den allgemeinen
+pow-Pfad). Bei fixem Paritaets-Hash ist das kein Detail. Also verzweigen:
+
+    if alpha == 2.0 { x.powi(2) } else { x.powf(alpha) }
+
+Dann trifft die Paritaetsprobe `8c6684ff...` weiter und der Regler wirkt
+ausschliesslich dort, wo er gesetzt wird.
+
+**Und der entscheidende Befund**: der Term haengt an `mcts.rs:82`, dem
+HEURISTIK-Pfad. Das Netz hat ihn nie bekommen. Genau deshalb baut die Heuristik
+Spalten (1,99 Plattenpunkte) und der Champion nicht (1,10).
+
+Damit unterscheiden sich die beiden Arme in EINER Zeile:
+  Arm A  `wertung_progress` unveraendert, in die Blattbewertung des Netzes
+         verdrahtet -- Zaehler = Zahl der belegten Felder (Zustand, exakt)
+  Arm B  derselbe Term, Zaehler = belegte Felder PLUS Summe der
+         Kopf-Marginalen ueber die noch OFFENEN Felder derselben Geometrie
+Der Ownership-Kopf hat damit genau eine Sache zu beweisen: tragen die
+Marginalen auf den offenen Feldern etwas ueber die gezaehlten hinaus bei.
+Gesweept wird nur noch das GEWICHT.
+
+## 3c. Historische Notiz zum verworfenen Sweep-Startwert
+
+**Startwert alpha = 2, zweiter Arm alpha = 3.** Bei 2 bleibt der erste Schritt
+praktisch auf Linearniveau (0,63 gegen 0,68), der letzte ist schon doppelt so
+schwer. Praezedenzfall, nicht geraten: `wertung_progress` benutzt
+`(col_fill/6)^2 * 7`, und die Heuristik ist der einzige Akteur im System, der
+tatsaechlich Spalten baut (1,99 Plattenpunkte gegen 1,10 beim Champion) -- dort
+ist der Exponent 2 handgeschliffen und funktioniert. Gewicht bleibt die zweite,
+davon unabhaengige Sweep-Achse: alpha setzt die FORM, das Gewicht die GROESSE.
 
 ## 4. Zwei Kriterien sind ausgenommen -- dort ist alpha = 1 exakt
 
