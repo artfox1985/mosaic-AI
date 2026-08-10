@@ -34,20 +34,44 @@ Drei Referenzpunkte gehoeren zusammen:
 
 ## Was die Rechnung NICHT beruecksichtigt -- die Richtung ist wichtig
 
-1. **Mondfliesen fehlen** (`moon_stacks`/`moon_pool`). Sie ERHOEHEN die
-   Verfuegbarkeit, die Zahlen hier sind also eine UNTERGRENZE der
-   Verfuegbarkeit und damit eine KONSERVATIVE Decke. Fuer die Diagnose ist das
-   die sichere Richtung: liegt der Champion unter der konservativen Decke, ist
-   das Defizit echt.
+1. **KORREKTUR 2026-08-10 (Nutzer): Mondfliesen sind KEINE zusaetzliche
+   Versorgung.** Beim Rundenaufbau wird die Mondseite geleert
+   (`state.rs:221`) und nur `sun_tiles` gezogen. Was auf den Mond kommt, ist
+   der REST eines Sonnen-Zugriffs (`take_sun` -> `place_on_moon`), also
+   dieselben Steine. Die 21 sind die vollstaendige Rundenversorgung -- mein
+   frueherer Vorbehalt ("Untergrenze, weil Mond fehlt") zeigte in die FALSCHE
+   Richtung.
 2. **Exakt nur fuer Runde 1.** Ab Runde 2 ist der Beutel abgereichert (Steine
    auf der Kuppel verlassen den Kreislauf dauerhaft) und der Turm speist zurueck
    -- die Zusammensetzung ist dann nicht mehr 13-je-Farbe.
-3. **Kein Wettbewerb modelliert.** Die Spalte "1 Spieler" nimmt an, ein Spieler
-   koennte alles nehmen; "geteilt" halbiert. Beides sind Naeherungen, die
-   echte Aufteilung haengt an der Zugreihenfolge.
+3. **Die Spalte "geteilt" ist FALSCH KONSTRUIERT, nicht bloss ungenau
+   (Nutzer-Korrektur 2026-08-10).** Sie halbiert die Versorgung, als wuerde der
+   Gegner Steine ENTFERNEN. Er entfernt sie nicht: wer von der Sonnenseite
+   nimmt, nimmt alle Steine EINER Farbe, und der Rest wandert als geordneter
+   Stapel auf die Mondseite derselben Fabrik -- in einer Reihenfolge, die der
+   NEHMENDE bestimmt (`execution.rs:121`, `moon_order`). Vom Mond darf man dann
+   nur den OBERSTEN Stein je Stapel nehmen (`take_from_moon`).
+   Nichts verschwindet, es wird UMSORTIERT -- und das Umsortieren ist eine
+   Entscheidung (und damit ein Denial-Hebel). Ein auf eine Farbe zielender
+   Spieler kann deshalb deutlich MEHR als die Haelfte bekommen, solange der
+   Gegner sie nicht vergraebt. Die "geteilt"-Spalte ist damit eine harte
+   UNTERGRENZE, keine Schaetzung.
 4. **Die Regel "alle Steine EINER Farbe aus EINER Fabrik"** begrenzt einen
    einzelnen Zug, nicht die Runde -- ueber mehrere Zuege ist Ansammeln moeglich.
    Deshalb rechnet dies mit der RUNDEN-Verfuegbarkeit, nicht mit der pro Zug.
+5. **ES GIBT KEINE reihenuebergreifende Farbeinschraenkung** (Nutzer-Korrektur
+   2026-08-10, an `board.rs::can_accept` geprueft: geprueft wird nur "Reihe
+   voll?" und "eigene Farbe passt?"). Theoretisch koennen ALLE sechs Reihen
+   dieselbe Farbe tragen; eine Farbe reicht mit 13 Steinen nur nicht fuer alle
+   sechs (1+2+..+6 = 21). Eine fruehere Fassung dieser Datei behauptete "jede
+   Reihe braucht eine EIGENE Farbe" -- das war erfunden.
+
+**FOLGE FUER DIE BRAUCHBARKEIT DIESER RECHNUNG**: wegen Punkt 3 kann sie die
+Frage "wie oft ist Reihe r schliessbar" NICHT entscheiden -- die Verfuegbarkeit
+haengt an Sortier-Entscheidungen beider Spieler. Sie liefert die
+Rundenversorgung exakt und damit eine harte Untergrenze; die eigentliche
+Referenz muss aus Zufalls-Drafting kommen (Nutzer-Vorschlag,
+`round_transition::drive_drafting_to_leaf_naive`).
 
 Aufruf:  python tools/musterreihen_verfuegbarkeit.py
 """
@@ -120,16 +144,19 @@ def main() -> int:
     # FARBUEBEREINSTIMMUNG je Reihe, nicht die Menge. Das modelliert diese
     # Rechnung nicht, also macht sie dazu bewusst keine Aussage.
     print("")
-    print("BEWUSST KEINE Angabe zu Abschluessen je Partie: sechs Reihen konkurrieren")
-    print("um dieselbe Aufnahme, jede mit EIGENER Farbe. Bindend ist die Farb-")
-    print("uebereinstimmung, nicht die Menge -- 5 Runden x ~10,5 = ~52 Steine stehen")
-    print("gegen 21 fuer alle sechs Reihen einmal.")
+    print("BEWUSST KEINE Angabe zu Abschluessen je Partie: die Verfuegbarkeit haengt")
+    print("an den Sortier-Entscheidungen beider Spieler (moon_order), nicht an einer")
+    print("Aufteilung der Menge. Nichts verschwindet aus der Runde -- es wird umsortiert.")
     print("")
-    print("\nLESART: das ist die DECKE der Verfuegbarkeit, nicht des Koennens --")
-    print("sie sagt, was die Versorgung zulaesst, nicht was eine Strategie erreicht.")
-    print("Der BODEN kommt aus Zufalls-Drafting, das IST aus dem Champion-Korpus.")
-    print("Erst der Abstand IST-zu-DECKE ist ein Defizit; ein niedriger BODEN")
-    print("beweist nur, dass Zufall schlecht spielt.")
+    print("")
+    print("LESART: die 21 Steine sind die EXAKTE Rundenversorgung, nicht eine Untergrenze")
+    print("(Mondfliesen sind dieselben Steine, nur umsortiert). Die Spalte 'geteilt' ist")
+    print("dagegen eine harte UNTERGRENZE: der Gegner ENTFERNT keine Steine, er sortiert")
+    print("sie um (moon_order) -- ein gezielter Sammler kann mehr als die Haelfte holen.")
+    print("")
+    print("Diese Rechnung kann deshalb NICHT entscheiden, wie oft Reihe r schliessbar ist.")
+    print("Die Referenz dafuer muss aus Zufalls-Drafting kommen (drive_drafting_to_leaf_naive);")
+    print("das IST kommt aus dem Champion-Korpus, und erst der Abstand ist ein Defizit.")
     return 0
 
 
