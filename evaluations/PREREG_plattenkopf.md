@@ -835,3 +835,24 @@ Mechanismus.
 Damit ist die Verdrahtung vollstaendig spezifiziert und an einem
 funktionierenden Vorbild belegt -- der Teil, der die Nacht gekostet haette,
 wenn man ihn im Nachtlauf entdeckt.
+
+### Nachtrag: die `completed`-Falle greift in diesem Korpus nicht
+
+Gemessen an 600 Partien aus 60 zufaellig gezogenen Dateien: **0 %
+unvollstaendig**, und alle letzten Datensaetze stehen in `phase=tiling`.
+
+Folgen:
+- Das erzeugte Artefakt `data/plate_labels_v1.json` (29.450 Partien aus 2.945
+  Dateien -- exakt die v21-Fenstergroesse, huebscher Konsistenz-Beleg; 3,5 MiB)
+  ist **gueltig**, obwohl der Dump die `completed`-Pruefung nicht macht.
+- Die Pruefung bleibt in der IMPLEMENTIERUNG trotzdem Pflicht: sie ist
+  defensiv, und ein kuenftiger Korpus (abgebrochene Laeufe, Server-Partien)
+  kann anders aussehen. Das Vorbild `_final_ownership_by_game` macht sie
+  ebenfalls, obwohl sie heute nie greift.
+- Dass alle letzten Datensaetze `tiling` sind, bestaetigt den
+  Label-Vorbehalt erneut: ein Zustand NACH Spielende wird nirgends
+  aufgezeichnet.
+
+Wichtiger Punkt zur Rolle des Artefakts: ein Gegenpruef-Artefakt, das
+denselben Fehler wie die zu pruefende Rechnung traegt, pruefte nichts -- es
+bestaetigte. Deshalb diese Messung, statt das Artefakt einfach zu benutzen.
