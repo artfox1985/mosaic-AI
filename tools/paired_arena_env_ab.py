@@ -88,7 +88,8 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
              "--net-sims", str(net_sims), "--heur-sims", str(heur_sims),
              "--n-games", str(n), "--seed", str(block_seed),
              "--threads", str(threads)],
-            capture_output=True, text=True, timeout=ARM_TIMEOUT_SECS, env=env,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=ARM_TIMEOUT_SECS, env=env,
         )
         if proc.returncode != 0:
             raise RuntimeError(f"Arm {value} Block {block_idx} (Seed={block_seed}) "
