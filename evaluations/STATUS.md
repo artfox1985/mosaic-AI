@@ -1,7 +1,7 @@
 # Mosaic-AI — Status & Fahrplan
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
-**`../archive/history.md`** (ausgelagert 2026-08-09, erste Runde:
+**`../archive/history.md`** (ausgelagert 2026-08-09; dritte Runde 2026-08-10, siehe Kapitel dort. Erste Runde:
 TASK-INDEX-Zeilen Platten-Intervention/τ-Annealing/v21-Fenster-Altstand/
 Messset-Snapshot-Teil/#35b/λ/#37/frozen-Set-Neubau, Abschnitt NAECHSTE
 SCHRITTE, Abschnitt OFFENES GATING (λ-Arm), Review-Punkte B+C; zweite
@@ -12,7 +12,7 @@ NACH-v21-QUEUE Punkt 1/E3b).
 
 ---
 
-## TASK-INDEX (nur OFFEN/LAUFEND, Stand 2026-08-09)
+## TASK-INDEX (nur OFFEN/LAUFEND, Stand 2026-08-10)
 
 | Task | Status |
 |---|---|
@@ -34,11 +34,6 @@ steigen. **Ab v22 ist die Rotationsregel stationaer** (v21 war die
 letzte Uebergangsgeneration). Vorbehalt fuer v21-Gating-H0: neuer
 Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 
-### AUS EXTERNEM REVIEW 2026-08-08 (`EXTERNES_REVIEW_2026-08-08.md`)
-
-| Task | Kurz |
-|---|---|
-| **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
 ### GRUNDSATZBEFUND 2026-08-10: Wertungsplatten sind 7 % des Ergebnisses
 
@@ -83,233 +78,131 @@ Der Tiling-Solver rechnet genau das am Rundenende exakt; in Runde 5 nutzt die
 Suche es exakt. **Was fehlt, ist die rundenuebergreifende Version -- dort sitzt
 der Rueckstand, nicht bei den Wertungsplatten.**
 
-### STAND 2026-08-10 ABEND -- was heute entschieden wurde
+### STAND 2026-08-10 NACHTS
 
-**Champion unveraendert: `v21_2d_brierbest`, Elo 1358.** Kein Wechsel heute.
+**Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434].
+Verdikte des Tages liegen in `../archive/history.md`, Kapitel 2026-08-10
+(Task D, ISMCTS-k, Punkte-Blend `w>0`, #82, GPU-Verlagerung T1+T2,
+R5-Chip-Leck, Schema 20, `plate_head` entfernt, Kriterium-3-Multiplikator,
+Wheel+Golden-Waechter, Plattenkopf-Strang, Konfundierungs-Muster).
 
-#### GESCHLOSSEN
+#### LAEUFT JETZT
 
-| Punkt | Verdikt |
-|---|---|
-| Task D (Gewichts-Sweep) | alle drei Arme H0 ⇒ Regel 5, `VALUE_WEIGHT=0,2` bleibt |
-| ISMCTS-k | k=4 signifikant negativ unter ZWEI Anordnungen; Mitteln ueber gezogene Welten schadet |
-| Punkte-Blend `w>0` | 321:300, Block-t -2,68 ⇒ w bleibt 0, Richtung eher schaedlich |
-| #82 GPU-Batcher | Regel 1; GPU ist ausgehungert, nicht langsam (Break-even ~64-128) |
-| GPU-Verlagerung T1+T2 | Speicher kein Engpass; erreichbarer Batch **140-590** analytisch ⇒ Weg V gedeckt, Startwert N=256 |
-| R5-Chip-Leck | Weg A gebaut und SCHARF; Suche ist jetzt **Expectiminimax**, Versatz null gemessen |
-| Punkte-Ziel | Gegner-Anteil ENTFERNT, **Schema 20**; `VALUE_OPP_EPSILON = 0` |
-| Plattenkopf als eigener Kopf | **entwertet** -- der Ownership-Kopf ist der Randlayer; `plate_head` entfernt |
-| Kriterium 3 Multiplikator | 9 Layout-Ausgaenge, Kopfbreite 122 → **140**, Cache-Key **`+conj_v2`** |
-
-#### ZWEI CACHE-INVALIDIERUNGEN -- BUENDELN
-
-`VALUE_SCHEMA_VERSION` 19 → **20** (Punkte-Ziel) UND Cache-Suffix
-`+conj_v1` → **`+conj_v2`** (Kopfbreite). **Beides zusammen fahren**, sonst
-wird der ~3h-Neubau zweimal bezahlt. Ein Trainingsstart ohne Neubau rechnet
-still auf dem alten Ziel.
-
-#### DER GROSSE BEFUND: der Champion erreicht die teuren Kriterien NIE
-
-`tools/atom_skill_check.py` (neu, mit Waechter gegen entartete Grundraten):
-**16 von 34 Zusatzzielen sind praktisch konstant** -- Kuppel-Reihen 3-6
-(0,000), beide Diagonalen (10 Pkt!), die unteren Eckplatten (8 Pkt!),
-farbenreiche Reihen 3-6; Spalten (7 Pkt) bei 0,2-1,2 %.
-
-Die Konjunktionen tragen fast kein Signal (bester Wert: Ecke (0,0) +0,102).
-Die 9 Layout-Ausgaenge sind mit +0,278 bis +0,972 das Staerkste, aber
-vermutlich durch schon sichtbare Platzierungen aufgeblaeht.
-
-**Das ist eine Strategie-Luecke, kein Vorhersageproblem.** Ein Kopf, der
-Konstanten vorhersagt, schliesst sie nicht. Vor `OWNERSHIP_WEIGHT > 0` gehoert
-entschieden, ob der Kopf auf die tragenden Atome beschnitten wird.
-
-#### KONFUNDIERUNGS-MUSTER, dreimal an einem Tag
-
-Jedes Endzustands-Ziel, das teilweise schon aus dem sichtbaren Zustand folgt,
-blaeht den Skill auf: (1) Anwesenheit des Spezialfelds, (2) Slot-Identitaet
-durch Poolung, (3) schon entschiedene Platzierung. Regel im Projekt-Gedaechtnis
-(`feedback_skill_confound_already_determined`): auf den noch UNENTSCHIEDENEN
-Teil bedingen, Referenz je Atom, Waechter gegen Grundrate 0/1.
-
-Folge: die Stufe-A-Zahlen (+0,637 / +0,655) sind ueberholt. Bedingt auf
-existierende Spezialfelder bleiben +0,400 aggregiert, aber **je Slot ist jeder
-Wert negativ**.
-
-#### GITHOOK erweitert
-
-Die Groessen-Ratsche blockierte einen Commit, der eine Datei VERKLEINERT hat
-(sie lag nur wegen eines fremden fruehen Wachstums ueber der Basislinie). Neu:
-wer gegenueber HEAD kleiner wird, kommt durch; die Basislinie bleibt stehen,
-damit der Rueckstand nicht festgeschrieben wird. Beide Richtungen geprueft.
-
-#### LAUFENDE AGENTEN (2026-08-10 abend)
-
-1. **Referenzlaeufe**: Zufalls-Drafting (neuer Treiber
-   `drive_to_game_end_random`, weil der naive immer `actions[0]` nimmt und
-   damit KEIN Zufall ist) und Heuristik@150, je Kriterium gegen den Champion.
-   Trennt "strukturell unerreichbar" von "Strategiedefizit".
-2. **Layout-Signal bedingt**: Skill nur auf Slots, die im Zustand noch keine
-   Platte tragen.
-
-### NACHTPROTOKOLL 2026-08-10 (Nutzer schlaeft, Auftrag "keinen Leerlauf")
-
-**Fertig geworden, mit Verdikt:**
-
-| Punkt | Ergebnis |
-|-------|----------|
-| **Punkte-Blend `w>0`** | **REGEL 2, GESCHLOSSEN**: Kontrolle 321/400 (80,25 %) gegen Arm 300/400 (75,00 %), Block-Delta -5,25pp bei t=-2,68, McNemar p=0,0527. w bleibt 0, Richtung eher schaedlich. Die +6pp der Aggressions-Neukartierung sind mit doppelter Stichprobe UMGEKEHRT -- Lehrstueck zur Seed-Skala. |
-| **#82 GPU-Batcher** | **REGEL 1, GESCHLOSSEN**: erreichbare Batches 11/22/44 liefern 2.581/6.197/14.060 Evals/s, alle unter der unteren CPU-Schranke 17.600. Die GPU ist nicht langsam, sondern ausgehungert (Break-even ~64-128). |
-| **GPU-Verlagerung** (neu vorregistriert) | Teil 1+2 geschlossen: Speicher ist kein Engpass (1,5 MiB je Suche), erreichbarer Batch analytisch **140-590** ⇒ Gewinnzone. Weg V (Verschraenkung, suchneutral) statt Virtual Loss. Startwert N=256. |
-| **Wheel + Golden-Waechter** | installiert, Paritaet BEWIESEN (`8c6684ff...`), A2-Vertragsstempel `a169ebf0a4451e08` erstmals am installierten Binary befragbar. |
-| **Runde 5** | Zufallsknoten SCHARF -- die Suche ist jetzt Expectiminimax. Versatz null gemessen (-0,47 Pkt, SE 0,66, t=-0,71 ueber 43 Abweichungen). |
-| **Plattenkopf-Rauchtest** | **c6 traegt (Skill +0,574), c3 NICHT (-0,036 und fallend)**. Gebaut wird nur c6; c3 bleibt offen, nicht verworfen. |
-
-**PLATTENKOPF STUFE A ABGESCHLOSSEN UND REPLIZIERT.** c6-Skill **+0,637**
-(v20-Korpus, 2.537 Partien) und **+0,655** (v19-Korpus, 2.530 Partien);
-c3 bei +0,004 / -0,008, also ohne Skill ⇒ **c3 bleibt draussen**. Der
-inhaltliche Kern ist der **Slot-Gradient**: ein Spezialfeld bleibt in der
-unteren Slot-Reihe in ~84 % der Partien leer, in der oberen in ~13 % --
-monoton, und ueber zwei Generator-Aeren praktisch deckungsgleich, also
-Spielstruktur statt Champion-Verhalten. Das bestaetigt die Nutzer-Taktik
-("keine Spezialkuppeln in Slot-Reihe 3") quantitativ und begruendet die
-Slot-weise Fassung: ein Aggregat wuerde den Gradienten verschlucken, genau
-wie die Heuristik mit ihrem pauschalen `-3 * special_empty`.
-Vorbehalt: alle Platt-Steigungen liegen unter 1 (0,44-0,81), der Kopf ist
-uebermuetig ⇒ Platt-Parameter je Slot sind fuer Stufe B PFLICHT.
-Logs: `logs/plattenkopf_stufeA.log`, `logs/plattenkopf_stufeA_v19.log`.
-
-**MODELLSEITE GEBAUT**: `plate_head` (9 Logits) in beiden Modellklassen,
-additiv, Default aus, Ausgabe zuletzt im Tupel, Praesenz aus dem Checkpoint.
-Champion laedt unveraendert. Der Groessen-Ratschen-Waechter hat den ersten
-Versuch abgelehnt -- Antwort war Kuerzung statt neuer Basislinie, die Datei
-ist jetzt netto kleiner als vorher.
-
-**Laeuft jetzt (CPU):** Label-Dump ueber den GESAMTEN Korpus nach
-`data/plate_labels_v1.json` (Partie -> 9 Atome je Spieler + aktive Platten).
-Log: `logs/plattenkopf_labels_dump.log`. Die Labels braucht JEDE
-Verdrahtungsvariante, deshalb zuerst.
-
-**ENTSCHEIDUNG FUER DEN MORGEN -- zwei Wege fuer die Verdrahtung:**
-1. **Seitendatei** (laeuft gerade): `train.py` liest `plate_labels_v1.json`
-   und verbindet ueber `game_id`. Beruehrt den gemeinsamen Cache-Pfad NICHT.
-   Haken: der HDF5-Cache fuehrt `game_id` moeglicherweise nicht mit -- das
-   ist VOR dem Bau zu pruefen.
-2. **In den Cache**, mit Key-Suffix `+plate_v1` nur bei gesetztem Flag
-   (Muster `+enc2d_v1`). Sauberer im Datenfluss, aber eine Aenderung am
-   gemeinsamen Cache-Bau. **KEIN `VALUE_SCHEMA_VERSION`-Bump** -- der wuerde
-   den vorhandenen v21-Cache entwerten, ohne Not.
-
-Ich habe Weg 2 heute Nacht bewusst NICHT begonnen: `MosaicDataset` ist die
-delikateste verbleibende Stelle, und ein Fehler dort haette eine
-Cache-Neubau-Nacht gekostet. Danach in beiden Faellen: Verlustterm in
-`train.py` mit Maskierung auf Partien mit aktiver Platte 6, dann
-Integrationsprobe auf ~10 Dateien und 1 Epoche, DANN der volle Lauf.
-
-**Frueherer Stand (Stufe A lief noch):** Stufe A des Plattenkopfs --
-400 Dateien, bis 300.000 Zustaende, Schnitt nach Partie, Fruehstopp, plus
-**Kalibrierung je Slot** (Platt-Steigung), die die Vorregistrierung als
-Entscheidungsgroesse verlangt. Log: `logs/plattenkopf_stufeA.log`.
-
-**BEWUSST NICHT gestartet: der volle Plattenkopf-Nachtlauf.** Er haette
-verlangt, `neural_net.py` und `train.py` unbeaufsichtigt umzubauen und danach
-6,5 h Maschinenzeit auf ungetesteten Integrationscode zu setzen. Ein
-subtiler Fehler dort haette die Nacht UND den Trainingspfad gekostet.
-Stattdessen laeuft die Messung, die der Vorregistrierung ohnehin fehlt und
-die das Integrationsrisiko fast auf null senkt: traegt der Rumpf c6, ist der
-Rest Verdrahtung.
-
-**Fuer den Morgen vorbereitet, noch nicht ausgefuehrt:**
-1. Kopf `plate_c6` (9 Ausgaben) in `neural_net.py`, additiv hinter einem
-   Flag, Default aus -- Bestandspfad byte-identisch.
-2. Labels ueber `tools/plattenkopf_labels.py` in den Cache-Bau; Cache-Key
-   bekommt `+plate_v1` NUR bei gesetztem Flag, damit der vorhandene
-   v21-Cache NICHT entwertet wird (kein `VALUE_SCHEMA_VERSION`-Bump).
-3. Erst Mini-Cache auf ~10 Dateien + 1 Epoche als Integrationsprobe, dann
-   der volle Lauf.
-
-**Fehler dieser Nacht, protokolliert:** Hintergrundlauf durch `tail`
-geleitet (puffert bis Prozessende -- die Arena sah tot aus, lief aber);
-Handzerlegung der Blatt-Erzeugungsrate ergab 120 % Inferenzanteil und war
-ungueltig; ein Null-Evaluator waere der falsche Ersatz gewesen (degenerierte
-Suche), und `profiling.rs` hatte die Zahl seit Task #32 laengst -- zweimal an
-einem vorhandenen Werkzeug vorbeigebaut.
-
-### LAUFENDE QUEUE (Stand 2026-08-10 nachts)
-
-| Bahn | laeuft jetzt | danach |
+| Bahn | Was | Dauer |
 |---|---|---|
-| **CPU** | **Punkte-Blend `w>0`** (`PREREG_punkte_blend_w.md`, 2x400 @400, Basis-Seed 20260902, Arme `0,2.0` / `0.1,2.0`) | Plattenkopf-Gating |
-| **GPU** | frei (Batcher-Probe erledigt) | Plattenkopf: Cache-Neubau (~3h) + Training (~3,5h) |
-| **offline** | Plattenkopf-Code: Kopf in `neural_net.py`, Label-Einbau ueber `tools/plattenkopf_labels.py`, Schema-Bump | -- |
+| **CPU+GPU** | `train.py --name v21_2d_own02 --load v21_2d_brierbest --encoder 2d --value-head wdl --select-by-brier --conjunction-head --ownership-weight 0.2 --lr 5e-5 --lr-schedule cosine --seed 20260910`, mit `MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v21.json` | Cache-Neubau ~3 h (Schema 20 + `+conj_v2` gebuendelt), dann Training ~3,5 h |
+| **offline** | Agent: Formungsterm in den Netz-Pfad (eigene Funktion neben `wertung_progress`, Knopf `MOSAIC_WERTUNG_SHAPING_W` Default 0) | -- |
 
-**PLATTENKOPF EINGETAKTET** (Nutzer 2026-08-10, "danach eintakten"), Reihenfolge:
-1. Kopf + Labels + Schema-Bump schreiben -- **kostet keine Maschinenzeit**, laeuft
-   parallel zum Blend-Gating.
-2. Cache-Neubau, sobald die CPU-Bahn frei ist (der Bump invalidiert den gemeinsamen
-   Cache; die Sperre dafuer war Task D und ist gefallen).
-3. Training, Rezept wie der Champion (warm-start, lr 5e-5, cosine,
-   `--value-head wdl --select-by-brier`).
-4. **BEIDE** Auswertungen: Arena-Gating vs Champion UND Brier-Skill-Score je
-   Kriterium. Eine allein ist nicht interpretierbar -- ein Arena-Null liesse offen,
-   ob der Kopf nichts gelernt hat oder es gelernt hat und nicht hilft.
+**Fenster verifiziert**: 2.945 Dateien in `data/` = der vorregistrierte
+v21-Zuschnitt dateigenau (545 v18, 400 v19wdl, 400 v20wdl, 800 v19wdlsw,
+800 v20wdlsw), davon 2.651 Train / 294 Val. **Anzeigefehler beachten**: die
+Spielzahl im Log wird aus dem `_g<N>`-Zaehler im DATEINAMEN geschaetzt und
+meldet fuer v18 6.000 statt der vorregistrierten 5.450 -- Gesamtsumme im Log
+30.000 statt 29.450. Keine Fensterdrift, die Dateizahl passt exakt.
 
-Grundraten liegen vor (800 Endbretter, Champion-Partien): Kriterium 6 bei 83,3 %
-leeren Spezialfeldern (Mittelband ⇒ tragfaehig), Kriterium 3 bei 42,0 %,
-Jokerfelder 1..8. Labels sind minimal veraltet (letzter Datensatz = letzter
-Tiling-Schritt) -- tragbar fuer die Probe, nicht fuer einen Champion-Kandidaten.
+#### OWNERSHIP-KOPF -- Zuschnitt vollstaendig entschieden (Nutzer 2026-08-10)
 
-**WHEEL: installiert 2026-08-10, Paritaet BEWIESEN.** Neubau aus den heutigen
-Quellen, `tools/paritaets_probe.py` liefert `8c6684ff...` (156 Diagnose-Vorkommen
-ausgeblendet, Begruendung im Skript). A2 ist damit erstmals am INSTALLIERTEN Binary
-befragbar: `contract_hash = a169ebf0a4451e08`, wie festgenagelt; der Elo-Tracker
-schreibt ihn ab jetzt je Zeile mit. A3/A4 laufen in `cargo test` (321 gruen).
+Der Kopf hat **zwei unabhaengige Verwendungen**, und die erste stand von
+Anfang an in `config.py`, wurde aber nie gemessen:
 
-**#82 GPU-Batcher GESCHLOSSEN 2026-08-10** (Regel 1): erreichbare Batches 11/22/44
-liefern 2.581/6.197/14.060 Evals/s, alle unter der unteren CPU-Schranke 17.600;
-Break-even erst bei ~64-128. Die GPU ist nicht langsam, sondern ausgehungert --
-lohnt nur mit blatt-paralleler Auswertung. **Folge**: das Kostentor des
-Bootstrap-Horizonts bekommt keine Entlastung, +25 % gelten unveraendert.
+1. **HILFSZIEL** (Original-Begruendung): die besten Checkpoints lagen bei
+   v15/v16/v17 stets in Epoche 1-3 -- es fehlt lernbares SIGNAL je Sample,
+   nicht Sample-Anzahl. Der Kopf liefert 140 Gradienten je Position statt
+   eines Skalars. **Laeuft jetzt** mit Gewicht 0,2. Kein Sweep
+   (Task-D-Praezedenz: alle Arme H0); Aufwand gehoert in >=6 gepaarte Seeds.
+   Entschieden an Prior-Masse Top-3 + Kendall-Tau (7/7), nicht `val_brier`.
+2. **AUSLESE fuer die Blattbewertung** -- Spezifikation in
+   `PREREG_plattenkopf.md`. **Zuletzt**, weil erst nach einer
+   Verhaltensaenderung beantwortbar (s.u.).
 
-**RUNDE 5 IST JETZT EXPECTIMINIMAX** (scharf seit 2026-08-10): Zufallsknoten an den
-Aufdeck-Stellen der verdeckten Chip-Zuordnung. Versatz null ist GEMESSEN
-(-0,47 Pkt, SE 0,66, t=-0,71 ueber 43 Abweichungen aus 1371 Entscheidungen), nicht
-per Anker-Kante behauptet -- eine Arena mit +-4,4pp Auflösung kann 0,02 Pkt/Partie
-nicht entscheiden. `MOSAIC_R5_CHANCE_NODES=0` stellt das Altverhalten her.
+**Aufbau** (`neural_net.py`, `_ownership_from_dome` + `_conjunctions_from_dome`):
+ein gemeinsamer Kopf `Linear(hidden,128) -> ReLU -> Linear(128,140)`, rohe
+Logits, `BCEWithLogits`, **elementweises Mittel ueber die unmaskierten
+Spalten** (-1 = maskiert), kein eigenes Gewicht fuer die Zusatzziele.
+Bewusst ZULETZT deklariert -> Gewicht 0 ist byte-identisch zum Stand ohne Kopf.
 
-**Task D (Gewichts-Sweep) ABGESCHLOSSEN 2026-08-10: alle drei Arme H0.**
-`vw04` 208:192 (52,0%), `vw08` 92:108 (46,0%), `pw025` 68:82 (45,3%,
-SPRT-H0 nach 75 Paaren). Damit greift **Regel 5** der Vorregistrierung:
-`VALUE_WEIGHT = 0,2` und der Punkte-Default bleiben, der Punkt gilt fuer
-die WDL-/2D-Aera als geschlossen. Bild monoton und konsistent -- 0,4 nicht
-besser, 0,8 schlechter. Champion bleibt `v21_2d_brierbest`.
+- **Block 1, 72 Feldlabels** (36 je Spieler): "Feld am Ende belegt",
+  slot_row-major dann space_index, ego-perspektivisch. Rasterabbildung
+  `grid[sr*2 + si//2][sc*2 + si%2]` wie `scoring.rs::build_grid`. Deckt die
+  ADDITIVEN Kriterien 4 (+1 je Randfeld) und 6 (-3 je leerem Spezialfeld)
+  exakt ab, weil dort `Summe P(Feld)` der Erwartungswert ist.
+- **Block 2, 68 Zusatzziele** (34 je Spieler): 0-5 Reihe voll (+3), 6-11
+  Spalte voll (+7), 12-13 Diagonale voll (+10), 14-17 Eckplatte voll
+  (+3/+3/+8/+8), 18 alle Jokerfelder (2 x wild_total), 19-24 Reihe mit >=5
+  Farben (+4), **25-33 Layout** (Slot traegt Jokerplatte -> E[wild_total]).
+  Damit sind alle acht Kriterien abgedeckt.
 
-**ISMCTS-k ABGESCHLOSSEN 2026-08-10**: k=1/2/4 rechenneutral 81,75% /
-77,00% / 73,00%; k=4 in BEIDEN Pflichtinstrumenten signifikant negativ
-(Block-t -3,73, exakter McNemar p=0,0026, Bonferroni inklusive). Der
-Nutzer-Einwand gegen k=2 ist damit beantwortet, ohne dass die Schliessung
-auf dem schwachen Arm ruht.
+**Gemessener Zustand** (`tools/atom_skill_check.py`, bedingt gerechnet):
+Block 1 ist gesund -- **0 von 36 Feldern entartet**, niedrigste Grundrate
+0,072. Block 2 ist zur Haelfte tot -- 16 von 34 konstant, und zwar genau die
+teuren: Diagonalen 0,000, Spalte 1 0,004, Reihen 5/6 0,000, untere Eckslots
+0,002/0,004. Wo die Konjunktion tot ist, LEBT die Zelle: Diagonale 0,428/0,321,
+Spalte 1 0,421. **Traeger sind die Zellen, nicht die Konjunktionen.**
 
-**WHEEL: gebaut+getestet, NICHT installiert.** Alle Engine-Aenderungen vom
-2026-08-10 sind mit ausgeschalteten Knoepfen verhaltensneutral, 327 Tests
-gruen -- aber die Python-Seite laeuft noch auf der Engine vom 2026-08-09.
-Beide Bahnen und der Server sind frei, die Bedingung ist also erfuellt:
-1. `python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`
-2. Paritaets-Probe MUSS `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` liefern.
-3. Danach Golden-Waechter A2-A4 (bereits im Code, `DESIGN_konventionen_als_pruefungen.md`).
+**Die toten Spalten bleiben drin** (Nutzer-Entscheid) -- sie kosten nichts
+(gesaettigte BCE-Spalten liefern keinen Gradienten), ein Ausbau wuerde
+Kopfbreite und ONNX-Vertrag aendern, und sie sind ein **kostenloser
+Fortschrittsmesser**: Grundrate 0,000 heisst "kommt in diesem Korpus nicht
+vor". Steigt sie, hat sich das Verhalten geaendert -- arena-unabhaengig, ohne
+Training, je neuem Korpus einmal auslesen.
 
-**NEU OFFEN aus dem 2026-08-10-Block (`PREREG_zufallsknoten.md`):**
+#### DER EIGENTLICHE BEFUND: der Formungsterm existiert und das Netz hat ihn nie bekommen
+
+`scoring.rs:160` `wertung_progress` ist der vollstaendige
+Wertungsplatten-Formungsterm: gegatet auf die AKTIVEN Platten, je Geometrie
+einzeln summiert, konvex mit Exponent 2, additive Kriterien linear. Er haengt
+**ausschliesslich an `mcts.rs:82`, dem HEURISTIK-Pfad**. Deshalb erreicht die
+Heuristik 1,99 Plattenpunkte je Partie und der Netz-Champion nur 1,10 --
+**kein Lernproblem, ein fehlender Term.**
+
+`wertung_progress` **NICHT ANFASSEN** -- es haengt am Elo-Anker. Das variable
+alpha gehoert in eine eigene Funktion daneben (Schutz durch Konstruktion,
+nicht durch eine Bedingung; `.powi(2)` und `.powf(2.0)` sind nicht garantiert
+bitgleich).
+
+**Reihenfolge** (umgekehrt zur naheliegenden): der Formungsterm braucht den
+Kopf NICHT -- er lebt von den GEZAEHLTEN Feldern, `(k + (6-k)*p)/6` steigt mit
+k fuer jedes p < 1. Also aendert er das Verhalten, dadurch fuellen sich die
+Konjunktionen, und ERST DANN ist die Auslese ueber die Marginalen eine
+beantwortbare Frage.
+
+#### WARUM DAS NETZ NICHT PUNKTOPTIMIERT SPIELT (Nutzer-Frage 2026-08-10)
+
+Nicht ein fehlender Kopf, sondern **das Ziel kennt die Marge nicht**. Das
+Value-Ziel ist `values_wdl`/`wdl_outcome`, also Gewinnwahrscheinlichkeit: ein
+Sieg mit einem Punkt zaehlt wie einer mit vierzig. Dazu die Selbstspiel-Falle
+-- lassen beide Seiten die Platten liegen, kostet Liegenlassen keine
+Gewinnwahrscheinlichkeit. Und `POINTS_UTILITY_WEIGHT = 0` samt `w = 0`
+verwerfen BEIDE Punkte-Koepfe in der Blattbewertung: die Information wird
+berechnet und weggeworfen.
+
+Die Leiter kann das nicht sehen -- Heuristik-Anker und Vorgaenger-Champions
+lassen die Platten ebenfalls liegen. Der Einzige, der es bestraft, ist der
+Nutzer (7:3 gegen einen Champion mit Elo 1358).
+
+Historische Ironie: VOR Schema 17 war das Ziel `tanh((own-opp)/SCALE)`, also
+eine Marge. Der WDL-Wechsel hat v20 zum ersten WDL-Champion gemacht, war im
+Gating also besser -- besser im Gewinnen gegen Gegner, die die Marge ebenfalls
+ignorieren. Zurueck zur Marge ist deshalb der falsche Schluss; sie muss
+DANEBEN stehen, nicht dagegen. Einziger Kanal dafuer:
+`MOSAIC_POINTS_UTILITY_W` mit lambda <= 0,5 -- **nie gemessen**, alle
+getesteten Arme lagen bei lambda >= 1,0 und damit jenseits des Kipppunkts, ab
+dem die Formel 30:15 gegenueber 55:50 bevorzugt.
+
+#### OFFEN
 
 | Punkt | Stand |
 |---|---|
-| R5-Zufallsknoten (Weg A) | **gebaut**, `MOSAIC_R5_CHANCE_NODES` Default AUS. Scharfschalten braucht eine Anker-KANTE als Aequivalenzpruefung -- Nutzer-Entscheid offen, da das Leck nachweislich keine Zugwahl aendert (0/247) |
-| Teil E, Rest | "weicht ab" in "kostet Punkte" umrechnen; das Orakel teilt die Bewertungsfunktion des Loesers, 81,4 % gegen 51,7 % ist deshalb kein neutraler Vergleich |
-| Zufallsknoten INNERHALB der Runde | der eigentliche Architektur-Punkt: Kuppelstapel als aufgezaehlter Knoten am Aufdecken, Kostentor in Runde 1, Teil A1 fällt mit ab. Danach kann der Shuffle raus (Determinismus-Gewinn) |
-| Stapelzug fuers NETZ | braucht Self-Play mit `MOSAIC_STACK_DRAW_RESEARCH=1`, dann Training, dann Gating -- eine ganze Generierung, laut Nutzer-Entscheid hinter der v21-Queue |
+| **lambda-Arm** `MOSAIC_POINTS_UTILITY_W=0.1` + `MOSAIC_AGGR_LAMBDA=0.1` | nie gemessen, braucht den opp-Kopf; Arena, deshalb NICHT parallel zum Cache-Neubau |
+| **Formungsterm Arm A/B** | Arm A = `wertung_progress` ins Netz-Blatt (Zaehler = belegte Felder). Arm B = derselbe Term, Zaehler + Ownership-Marginalen der OFFENEN Felder. Eine Zeile Unterschied; der Kontrast isoliert den Kopf-Beitrag. Kontrolle auf dem aktuellen Brett ist PFLICHT, sonst ist ein Sieg nicht interpretierbar (Task #5 hat Formung auf dem aktuellen Brett als folgenlos gemessen). |
+| **Wheel + Paritaetsprobe** | nach dem Agenten-Commit faellig; **nicht** waehrend des laufenden Trainings installieren. Probe muss `8c6684ff...` liefern. |
+| Zufallsknoten INNERHALB der Runde | Kuppelstapel als aufgezaehlter Knoten am Aufdecken, Kostentor in Runde 1. Danach kann der Shuffle raus (Determinismus-Gewinn). `MOSAIC_STACK_DRAW_CHANCE`, Default aus -- gehoert ins naechste Self-Play. |
+| Stapelzug fuers NETZ | braucht Self-Play mit den Infos; laut Nutzer-Entscheid hinter der v21-Queue. Wird jetzt ueber die Wahrscheinlichkeit geloest, nicht als eigener Task. |
+| Bootstrap-Horizont | gegatet auf Generierungsstart, keine Batcher-Entlastung (+25 % gelten unveraendert) |
+| GPU-Verlagerung Weg V | Umsetzung offen, Startwert N=256 |
+| `player_profiles.json.bak` | untracked, gemeldet, NICHT angefasst |
 
-**Instrument-Schulden**: Paritaets-Probe liegt noch im Scratchpad einer
-alten Sitzung statt in `tools/`; `elo_history.csv` fehlen CI-Spalten und
-`contract`; `UEBERGABE_v21_spirale.md` ist vom 2026-08-08; v20 fehlt die
-Elo-Kante zu `v19_best` (Champion-2 seiner Generation).
+(#29 und #31/#38/#39 stehen im TASK-INDEX oben bzw. unten im Detail.)
 
 ## GELTENDE REGELN (kompakt)
 
@@ -445,8 +338,13 @@ Elo-Kante zu `v19_best` (Champion-2 seiner Generation).
      fuer die H0-Befunde der Wurzel-Regler-Familie: die wurden in einem
      anderen Balance-Regime gemessen.
   6. STATUS-Champion-Zeile + history-Kapitel.
-  Nachtrag-Schuld: v20 fehlt die Kante zu `v19_best` (Champion-2 seiner
-  Generation) -- billig nachholbar, Nutzer-Entscheid.
+  **Nachtrag-Schuld ERLEDIGT** (Klarstellung 2026-08-10): die v20-Kante zu
+  `v19_best` lief am 2026-08-09 -- 114:76 ueber 190 Partien, SPRT-H1 nach 95
+  Paaren, p=0,0043 (`elo_history.csv` Zeile 53,
+  `paired_gating_v20_vs_v19best_nachtrag.json`). Die alte "fehlt"-Zeile hier
+  hat mich zweimal dazu verleitet, die Messung erneut vorzuschlagen.
+  **Elo-Fragen am Primaerregister `elo_history.csv` pruefen, nicht an dieser
+  Datei.**
 - **LOESCHEN NUR MIT EXPLIZITER RUECKFRAGE (Nutzer-Regel 2026-08-08,
   dritter Vorfall dieser Klasse -- "inakzeptabel")**: Kein Loeschen,
   Verschieben oder Ueberschreiben von Dateien, Ordnern oder Worktrees
@@ -524,34 +422,58 @@ Elo-Kante zu `v19_best` (Champion-2 seiner Generation).
 - `VALUE_SHRINK_ENABLED = false`; `round_transition_sampling = false`;
   `bootstrap_horizon_rounds = 2`.
 - Runde 5 wird NICHT vom Netz gespielt: `round5.rs` uebernimmt ab
-  `round_number>=5 && phase==Drafting` mit exaktem Alpha-Beta
-  (`NODE_BUDGET=200`), Blattwert = exakter Endscore inkl. Wertungsplatten.
+  `round_number>=5 && phase==Drafting`, Blattwert = exakter Endscore inkl.
+  Wertungsplatten. **Seit 2026-08-10 EXPECTIMINIMAX, nicht mehr reines
+  Alpha-Beta**: Zufallsknoten an den Aufdeck-Stellen der verdeckten
+  Chip-Zuordnung (16 der 20 Chips sind aus R1-4 bekannt, unbekannt ist nur
+  die Fabrik-Position der restlichen 4). Kein Pruning in Zufallsknoten
+  (Star1/Star2 bewusst weggelassen). `NODE_BUDGET=200` ist eine
+  Bezahlbarkeits-, keine Hinreichenszahl.
 - Laufzeit-Knoepfe (alle Default = Bestandsverhalten):
   `MOSAIC_POINTS_UTILITY_W`/`MOSAIC_AGGR_LAMBDA` (Task #28, Default 0),
   `MOSAIC_VALUE_CAL_A`/`_B` (Task #30, Default 0/1),
   `MOSAIC_TILING_CACHE` (**Default AN** seit 2026-08-05),
-  `MOSAIC_PROFILE_SELFPLAY` (Task #32, Default aus).
+  `MOSAIC_PROFILE_SELFPLAY` (Task #32, Default aus),
+  `MOSAIC_R5_CHANCE_NODES` (**Default AN** seit 2026-08-10, `=0` stellt das
+  Altverhalten her), `MOSAIC_R5_NODE_BUDGET`, `MOSAIC_R5_NET_SOLVER`
+  (Default an).
 
 **Netz-/Trainingsseite** (`config.py`, `engine/py/neural_net.py`):
 - `INPUT_SIZE = 708`, `NUM_ACTIONS = 406`.
 - Champion-Encoder ist **2D** (`Mosaic2DNet`: Conv-Zweig auf
   `state_to_planes` + Flach-Zweig auf `state_to_tensor`); der flache
   `MosaicNet` bleibt Parallel-/Messarm.
-- Koepfe: `policy`, `value`, `moon_order`, `points`, `ownership`
-  (inert, Gewicht 0), seit Task #28 zusaetzlich `opp_points` (nur in
-  Modellen, die damit trainiert wurden -- Engine erkennt ihn per
-  Output-NAME und faellt sonst auf Bestandsverhalten zurueck).
+- Koepfe: `policy`, `value`, `moon_order`, `points`, `ownership`, seit
+  Task #28 zusaetzlich `opp_points` (nur in Modellen, die damit trainiert
+  wurden -- Engine erkennt ihn per Output-NAME und faellt sonst auf
+  Bestandsverhalten zurueck). **`plate_head` wurde am 2026-08-10 gebaut und
+  wieder ENTFERNT** -- der Ownership-Kopf ist der Randlayer.
+  `ownership` ist seit 2026-08-10 **140 breit** (72 Feldlabels + 68
+  Zusatzziele, Cache-Suffix `+conj_v2`); `OWNERSHIP_WEIGHT` steht in
+  `config.py` weiter auf 0, der erste Lauf MIT Gewicht (0,2) laeuft seit
+  2026-08-10 nachts. Aufbau und gemessener Zustand oben im Abschnitt STAND.
 - `VALUE_WEIGHT = 0,2`, `POINTS_WEIGHT = 0,5`, `VALUE_SCALE = 50`,
-  `VALUE_OPP_EPSILON = 0,1`, `TD_LAMBDA = 0,5`.
-- **Value-ZIEL (#34-Verdikt, Schema 17)**: `values_wdl` = TD-Blend aus
-  Bootstrap-Gewinnwahrscheinlichkeit und hartem Ausgang; Alt-Datei-
-  Bootstraps werden beim Cache-Bau Platt-entstaucht (A=0,0051/B=1,9269),
-  `selfplay_v19wdl*`-Bootstraps (WDL-Generator) bleiben roh. Training:
-  `--value-head wdl --select-by-brier` (KEIN destretch-Flag mehr noetig).
-  Policy-Traeger-Manifest `data/policy_carrier_manifest_v20.json`
-  maskiert Alt-Dateien ausser 135 v18 + 45 v17 (im Cache-Key).
+  `TD_LAMBDA = 0,5`, **`VALUE_OPP_EPSILON = 0,0`** (war 0,1 bis Schema 19).
+- **Punkte-ZIEL (Schema 20, 2026-08-10)**:
+  `points_val = tanh(own_total/VALUE_SCALE)` -- der Gegner-Anteil ist
+  ENTFERNT. Fuer VOR Schema 20 trainierte Modelle bedeutet ihr
+  `points`-Ausgang weiter `own - 0,1*opp`; fuer die Spielstaerke belanglos,
+  weil die Ausgabe im Suchpfad ohnehin verworfen wird
+  (`POINTS_UTILITY_WEIGHT = 0` und `w = 0`).
+- **Value-ZIEL (#34-Verdikt, Schema 17 unveraendert gueltig)**: `values_wdl`
+  = TD-Blend aus Bootstrap-Gewinnwahrscheinlichkeit und hartem Ausgang;
+  Alt-Datei-Bootstraps werden beim Cache-Bau Platt-entstaucht
+  (A=0,0051/B=1,9269), `selfplay_v19wdl*`-Bootstraps (WDL-Generator) bleiben
+  roh. Training: `--value-head wdl --select-by-brier` (KEIN destretch-Flag
+  mehr noetig). **Das Ziel ist margen-BLIND** -- siehe Abschnitt STAND,
+  "warum das Netz nicht punktoptimiert spielt".
+  Policy-Traeger-Manifest **`data/policy_carrier_manifest_v21.json`**
+  (Default in `neural_net.py` ist noch die v20-Datei -- ein Trainingsstart
+  im v21-Fenster MUSS `MOSAIC_CARRIER_MANIFEST` setzen, s. Fenster-Pinning
+  oben), maskiert Alt-Dateien ausser 135 v19wdl + 45 v18, plus
+  `carrier_prefixes: ["selfplay_v20wdl_"]`; alles im Cache-Key.
   Checkpoints: `_best` (val_combined), `_brierbest` (Value-Peak).
-- Champion: `models/champion.txt` -> `v19_2d_best`.
+- Champion: `models/champion.txt` -> **`v21_2d_brierbest`**.
 
 ---
 
