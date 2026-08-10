@@ -1666,3 +1666,109 @@ sind in beiden Strata signifikant unter der Grundrate (Eckslot (2,0):
    Antwort gab: Geschwister-Rangfolge / Arena, nicht der Offline-Skill. Die
    bekannte Aufloesungsgrenze der Offline-Masse (~0,015 gegenueber der Arena)
    liegt zu nah an den gemessenen +0,02 bis +0,07, um die Entscheidung zu tragen.
+
+---
+
+# Auslese-Spezifikation Ownership-Kopf (Nutzer-Diktat 2026-08-10)
+
+Nutzer-Wortlaut: *"ziel fuer den ownership head waere es wenn zb die spalten
+wertungsplatte aktiv ist dass alle 36 fliesenfelder auf der kuppel eine
+wahrscheinlichkeit tragen. wird zb fliesenfeld 1,1 befuellt bekommt sie auf
+diese wertungsplatte eine hoehere wahrscheinlichkeit (zb 1/6). wird dann
+fliesenfeld 2,1 befuellt erhoeht sich nochmal die wahrscheinlichkeit fuer 7
+punkte (zb 2/6). Wird dann fliesenfeld 1,2 befuellt faengt offiziell eine neue
+spalte an und die wahrscheinlichkeit fuer zusaetzliche 7 punkte zu spalte 1
+liegt erst bei 1/6"*
+
+und zuvor: *"im ownership head haben wir nur die wertungsplatten abgebildet"*
+sowie *"beim self play wirklich schauen dass nur die aktiven wertungsplatten pro
+spiel maximiert werden. die gewichtung muessten wir uns im sweep anschauen"*.
+
+## 1. Kein Zielwechsel -- die 36 Labels sind bereits der Traeger
+
+`_ownership_from_dome` liefert je Spielerbrett 36 Binaerlabels "Feld am Ende
+belegt". Diese sind geometrie-AGNOSTISCH; das Plattenspezifische ist reine
+Laufzeit-Arithmetik: die 36 Marginalen nach der Geometrie der **aktiven** Platte
+gruppieren. Bei aktiver Spaltenplatte sechs Gruppen von je sechs Feldern.
+Deshalb braucht der Kopf KEINE plattenspezifischen Ausgaenge -- er braucht gute
+Feld-Marginalen.
+
+**Aus den Zellen, nicht aus den Konjunktionen.** Gemessen (Agent-Bericht
+2026-08-10): die Konjunktionsausgaenge sind fuer genau die interessanten
+Kriterien entartet -- Diagonale 0,000, Spalte 1 0,004, Reihen 5/6 0,000,
+Eckslots 0,002/0,004. Die ZELLEN derselben Geometrien leben: Diagonale 0,428
+und 0,321, Spalte 1 0,421, Reihen 5/6 0,115 und 0,081, Eckslots 0,102 und
+0,085; **0 von 36 Zellen entartet**, niedrigste Grundrate 0,072. Ein Gewicht auf
+die Konjunktionen waere ein Gradient auf Konstanten.
+
+## 2. Buchfuehrung je Geometrie-Instanz, niemals gepoolt
+
+Der dritte Nutzer-Satz legt das fest: nach (1,1), (2,1), (1,2) steht Spalte 1
+bei 2/6 und Spalte 2 bei 1/6 -- NICHT "3 von 36 Feldern belegt". Ein Aggregat
+ueber alle 36 ist damit ausgeschlossen. Fuellungen in einer anderen Spalte
+tragen zu Spalte 1 nichts bei.
+
+## 3. Der Exponent ist der eigentliche Sweep-Parameter
+
+Je aktivem Kriterium c mit Zellmenge S_c und Punktwert v_c:
+
+    fortschritt_c = ( SUM_{i in S_c} p_i ) / |S_c|
+    term_c        = v_c * fortschritt_c ^ alpha
+    formung       = SUM_{c aktiv} term_c
+
+Die Nutzer-Beispielzahlen (1/6, 2/6) sind LINEAR. Linear ist der Term
+konzentrationsblind: 3 Felder in Spalte 1 + 3 in Spalte 2 ergeben 0,5 + 0,5 =
+1,0, sechs Felder in Spalte 1 ergeben 1,0 + 0,0 = 1,0 -- derselbe Wert, also
+kein Commitment-Druck. Bezahlt werden aber nur VOLLSTAENDIGE Spalten, also muss
+die Abbildung konvex sein.
+
+Beide Enden sind ausrechenbar, nicht geraten:
+  alpha = 1   Signal kraeftig, Konzentration irrelevant (falsche Form)
+  alpha = 6   korrekte Produktform, aber 0,42^6 = 0,0055; x7 = 0,04 Punkte,
+              Geschwister-Differenzen verschwinden (falsche Groesse)
+Der brauchbare Bereich liegt dazwischen. Sweep ueber alpha UND Gewicht.
+
+## 4. Zwei Kriterien sind ausgenommen -- dort ist alpha = 1 exakt
+
+Kriterium 4 zahlt +1 **je Randfeld**, Kriterium 6 -3 **je leerem Spezialfeld**.
+Additive Kriterien zahlen pro Feld, nicht pro vollstaendigem Satz -- dort IST
+die Summe der Feldwahrscheinlichkeiten der Erwartungswert (vgl. Kopf dieser
+Datei). Der Exponent gilt ausschliesslich fuer die konjunktiven Geometrien:
+Reihen, Spalten, Diagonalen, Eckslots.
+
+## 5. Kanal-Trennung (Nutzer-Korrektur)
+
+Ein frueherer Vorschlag von mir liess einen UNGEGATETEN Linienterm
+(Platzierungspunkte, 93 % des Scores) aus denselben Marginalen mitlaufen. Der
+Nutzer hat das zurueckgewiesen: der Ownership-Kopf bildet die Wertungsplatten
+ab, der Platzierungspunkt ist die Aufgabe des **Punkte-Kopfes**. Zwei Kanaele,
+zwei Gewichte:
+  Ownership-Kopf -> aktive Wertungsplatten (dieser Term)
+  Punkte-Kopf    -> Basis/Platzierung = `MOSAIC_POINTS_UTILITY_W`,
+                    Regler auf 0, Bereich lambda <= 0,5 nie gemessen
+Das entspricht der Nutzer-Strategie: Basis sind die orthogonalen Nachbarn, die
+Platten werden mitgenommen und entscheiden knappe Partien.
+
+## 6. Reihenfolge -- die Inertheits-Pruefung kommt VOR dem Sweep
+
+Der Agent hat eine probe-freie Untergrenze mitgemessen: eine geglaettete Tabelle
+`P(Label|Runde)` ist auf **36 von 36 Zellen positiv** (Schnitt +0,025, best
++0,072), sein MLP im Schnitt **-0,027**, also schlechter als die Rundentabelle.
+Bleibt das nach richtigem Training bestehen, ist die Kopfausgabe eine Funktion
+der RUNDENNUMMER, der Term ist ueber alle Geschwister derselben Runde konstant
+und ordnet nichts -- nicht schwach, sondern **inert**.
+
+  1. Cache-Neubau (ohnehin faellig: Schema 20 + `+conj_v2`)
+  2. Trainingsarm mit `OWNERSHIP_WEIGHT > 0`
+  3. Pruefung der Kopfausgabe gegen die RUNDENTABELLE auf gehaltenen Partien
+     (nicht gegen eine unbedingte Grundrate -- siehe
+     `feedback_skill_confound_already_determined`)
+  4. erst danach Blattterm + Sweep, mit der Rundenkonstante als KONTROLLARM
+
+## 7. Strata-Vorbehalt
+
+Vorhersagbar ist die **Vollendung einer liegenden Platte** (Gruppenmittel bis
++0,084), nicht die Plattenwahl (Stratum "Slot ohne Platte" durchgaengig negativ,
+-0,004 bis -0,114). Der Term sagt also "mach fertig, was du angefangen hast" --
+das ist der Commitment-Druck, der dem Champion fehlt -- aber er kann nicht sagen
+"fang das Richtige an".
