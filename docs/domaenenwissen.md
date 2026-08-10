@@ -64,6 +64,37 @@ Aufteilung je Runde (Mittel je Partie, CI 95 %):
    davon unabhängige Hürde, und sie ist Platzierungswahl, nicht Versorgung.
    Beides zusammen erklärt die gemessene Spaltenrate von 0,4–1,2 %.
 
+### Replikation über zwei Suchbudgets — Reihe 5/6 hängt NICHT am Budget
+
+Dieselbe Messung auf `selfplay_v20wdlsw_*` (**derselbe Generator, 150 statt 600
+Sims**), ebenfalls 60 Dateien / 600 Partien:
+
+| Reihe | 600 Sims | 150 Sims | Differenz |
+|---|---|---|---|
+| 1 | 4,80 ± 0,04 | 4,91 ± 0,04 | +0,11 |
+| 2 | 4,77 ± 0,04 | 4,89 ± 0,04 | +0,12 |
+| 3 | 2,84 ± 0,05 | 2,86 ± 0,05 | +0,02 |
+| 4 | 1,89 ± 0,05 | 2,04 ± 0,05 | +0,15 |
+| 5 | **0,84 ± 0,04** | **0,83 ± 0,04** | −0,01 |
+| 6 | **0,58 ± 0,03** | **0,54 ± 0,03** | −0,04 |
+
+Rest in der Musterreihe, Reihe 6: 1,62 gegen **1,71**.
+
+**Das schließt eine Erklärungsklasse aus.** Vierfaches Suchbudget bewegt die
+Reihen 5 und 6 um −0,01 und −0,04, beides im Rauschen. Es ist also kein „die
+Suche findet es mit genug Tiefe schon" — mehr Tiefe findet es nicht, weil nicht
+danach gesucht wird. Das stützt die ZIEL-Erklärung (das WDL-Ziel kennt die Marge
+nicht) und nicht die Aufwands-Erklärung.
+
+Gegen-Befund, klein aber signifikant: die **billigen** Reihen 1, 2 und 4
+schließen bei WENIGER Suche öfter ab (CIs überlappen nicht). Tiefere Suche
+verteilt die Fliesen anders. *Deutung (ungemessen): plausibel zugunsten der
+Platzierungspunkte langer Linien.*
+
+**Was die Replikation NICHT leistet**: es ist derselbe Generator bei zwei
+Budgets, also Budget- und keine Policy-Robustheit. Für letztere wäre
+`selfplay_v19wdl_*` der Test (anderer Generator, andere Ära) — offen.
+
 ### Grenzen der Messung — nicht überlesen
 
 - **Gesamtzahlen sind leicht UNTERSCHÄTZT**: der letzte Datensatz einer Partie
