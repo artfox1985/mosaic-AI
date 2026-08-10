@@ -64,12 +64,13 @@ Eskalations-Preregs laengst belegt waren.
 
 
 
-## OFFEN (4)
+## OFFEN (5)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_gpu_verlagerung.md` | Laesst sich die Inferenz von der CPU auf die GPU verlagern -- erreicht Verschraenkung vieler gleichzeitiger Partien den Batch, an dem die GPU gewinnt? | **OFFEN, vorregistriert 2026-08-10** (Nutzer-Richtung "weg von der cpu und hin zur gpu"). Teil 1 GEMESSEN: Speicher ist kein Engpass (1,5 MiB je Suche, Batch 512 = 0,76 GiB) ⇒ Regel 1, Weg V (Verschraenkung, suchneutral) statt Weg B (Virtual Loss, gating-pflichtig). Offen ist die Blatt-Erzeugungsrate der CPU -- sie setzt den erreichbaren Batch. Deckel Amdahl 2,6-5,3x. `evaluations/interleave_batch_probe.json` |
 | `PREREG_plattenkopf.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) |
+| `PREREG_injektion_dosis.md` | Wie hoch muss die Wertungsplatten-Injektion in der Suche dosiert werden, damit die Spezialfeld-Freischaltung ueberhaupt angesteuert wird -- und rechnet sich das in Siege? | **OFFEN, vorregistriert 2026-08-11** (Nutzer-Auftrag "wie viel wir injizieren muessen wir an einem arena spiel verifizieren"). Sauberster Kontrast im Projekt: DERSELBE Champion, Knopf an gegen aus, kein Training ⇒ keine Trainings-Seed-Varianz. Gegenstand nur `MOSAIC_UNLOCK_SHAPING_W` (0 / 0,3 / 1,0); Freischaltrate ist PFLICHT-Nebenmessung, weil ein blockierender Prior sonst als "Term wirkungslos" fehlgelesen wird. Enthaelt die Ruecknahme meiner Blindheits-Aussage zu Task #93. |
 | `PREREG_zufallsknoten.md` | Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Frage). Grundlage: es gibt keine private Information, also Zufallsknoten statt ISMCTS. Teil A = Korrektheit (bekannter Unterbau), Teil B = Zufallsknoten mit Kostengate, Teil C = Diagnose der Platte-6-Interaktion |
 | `PREREG_bootstrap_horizont.md` | Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = zwei Arme auf identischen Partien via doppelt geschriebener Labels |
 
