@@ -626,3 +626,69 @@ statt nach Partie (alle Zustaende einer Partie tragen dasselbe Label, das
 Modell lernt die Partie) und fehlender Fruehstopp (der Endstand misst dann
 das Ueberlernen statt der Lernbarkeit; c3 sah dadurch mit -0,494 viel
 schlechter aus als mit -0,036).
+
+## STUFE A im grossen Zuschnitt (2026-08-10 nachts): c6 bestaetigt, Slot-Gradient entdeckt
+
+400 Dateien, **300.000 Zustaende aus 2.537 Partien**, Schnitt nach Partie
+(2.030 / 507), Fruehstopp auf dem mittleren Val-Skill.
+Log: `logs/plattenkopf_stufeA.log`.
+
+| Kriterium | Grundrate | Brier | Brier(Grundrate) | **Skill** |
+|-----------|-----------|-------|------------------|-----------|
+| **c6** | 0,442 | 0,0895 | 0,2466 | **+0,637** |
+| c3 | 0,201 | 0,1599 | 0,1604 | **+0,004** |
+
+c6 verbessert sich mit der Stichprobe (+0,574 bei 677 Partien -> **+0,637**
+bei 2.537). **c3 bleibt bei null und faellt mit jeder weiteren Epoche**
+(+0,004 / -0,123 / -0,185 / -0,232) -- auf zehnfacher Stichprobe bestaetigt:
+kein Signal. Der Ausschluss von c3 steht.
+
+### DER BEFUND: monotoner Slot-Gradient -- die Nutzer-Taktik, gemessen
+
+| Slot | Grundrate "am Ende LEER" | Brier | Skill | Platt-Steigung |
+|------|--------------------------|-------|-------|----------------|
+| 0 (oben links) | **0,062** | 0,0455 | +0,219 | 0,502 |
+| 1 | 0,101 | 0,0932 | **-0,022** | 0,436 |
+| 2 | 0,229 | 0,0874 | +0,505 | 0,570 |
+| 3 | 0,256 | 0,0780 | +0,590 | 0,753 |
+| 4 | 0,303 | 0,1021 | +0,516 | 0,627 |
+| 5 | 0,494 | 0,1288 | +0,485 | 0,651 |
+| 6 | 0,777 | 0,1113 | +0,358 | 0,498 |
+| 7 | 0,856 | 0,0786 | +0,364 | 0,806 |
+| 8 (unten rechts) | **0,898** | 0,0807 | +0,120 | 0,801 |
+
+**Monoton von oben nach unten**, und die Spannweite ist enorm: ein
+Spezialfeld in der UNTEREN Slot-Reihe bleibt in ~84 % der Partien leer, in
+der OBEREN nur in ~13 %.
+
+Das ist die Nutzer-Aussage vom 2026-08-10 woertlich bestaetigt: *"die kuppel
+hat 3x3 slots. in der reihe 3 der slots (also musterreihe 5 & 6) ist es sehr
+schwer/langwierig ueberhaupt eine spezialkuppel abzuschliessen. sprich ich
+will in diesen unteren slots keine spezialkuppeln haben."* Der Korpus sagt
+dasselbe in Zahlen, und der Mechanismus stand schon fest (`dome.rs:140`:
+Freischaltung erst, wenn die anderen drei Felder gefuellt sind -- und die
+unteren Musterreihen sind die traegsten).
+
+**Damit ist die Slot-weise Fassung nicht Kosmetik, sondern der Kern.** Ein
+Aggregat ueber alle Spezialfelder wuerde diesen Gradienten vollstaendig
+verschlucken -- genau der Fehler, den die Heuristik mit ihrem
+`-3 * special_empty` macht.
+
+### Kalibrierung: der Kopf ist systematisch UEBERMUETIG
+
+Alle Platt-Steigungen liegen zwischen **0,44 und 0,81**, also unter 1 --
+die Logits sind zu extrem. Fuer die Stufe-A-Entscheidung heisst das:
+Trennleistung ja, Erwartungswert-Taugllichkeit **erst nach Platt-Korrektur**.
+`P x Punktwert` mit den Rohausgaben waere systematisch verzerrt.
+
+Konsequenz fuer Stufe B (Einbau in die Blattbewertung): die Platt-Parameter
+je Slot muessen mitgefuehrt werden, analog zur Anzeige-Kalibrierung des
+Champions in `server.py` (`_DISPLAY_CAL_A/_B`). Als Pflichtpunkt vorgemerkt.
+
+### Ausnahme, die auffaellt
+
+**Slot 1 hat Skill -0,022** -- der einzige negative. Grundrate 0,101, also
+seltenes Ereignis, und der Kopf trifft es nicht. Vor Stufe B zu klaeren, ob
+das an der Seltenheit liegt oder an etwas Strukturellem (Slot 1 ist
+oben-mitte; kein offensichtlicher Sonderstatus). Kein Ausschlussgrund, aber
+eine offene Stelle.
