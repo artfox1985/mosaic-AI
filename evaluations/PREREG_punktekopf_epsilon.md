@@ -119,3 +119,40 @@ Ihr `points_head` bedeutet aber weiter `own − 0,1·opp`, ein nach Schema 20
 trainierter bedeutet `own`. Für Vergleiche der `points`-Ausgabe ÜBER diesen
 Schnitt hinweg ist das zu beachten; für die Spielstärke nicht, weil die
 Ausgabe im Suchpfad ohnehin verworfen wird.
+
+## Nachtrag: Moon-Order ist KEIN Denial-Blindfleck (Nutzer-Korrektur 2026-08-10)
+
+Ich hatte behauptet, `moon_order` sei der eingebaute Denial-Hebel und werde auf
+ein Ziel trainiert, das den Gegner nicht kennt -- "Denial kommt im
+Trainingssignal ueberhaupt nicht vor". Der Nutzer hat widersprochen
+(*"das glaub ich nicht. dafuer haben wir einen eigenen moon order head"*), und
+die Pruefung AM CODE (nicht an STATUS, wo ich es hergeholt hatte) gibt ihm
+recht.
+
+**Was stimmt**: das LABEL ist selbstbezogen.
+`self_play.rs::moon_order_target` waehlt die Permutation mit
+`solve_round_final_score(&g.state, pi)`, `pi` = ziehender Spieler -- der Gegner
+wird bei der Label-Bildung nie bewertet.
+
+**Was ich uebersehen hatte**: `net_mcts.rs:1241` spannt die Reihenfolgen als
+eigene KINDER auf (`unique_moon_orders`), jede Variante bekommt ihren Q-Wert
+ueber den Value-Kopf, und der bewertet den Partieausgang -- also gegnerbewusst.
+Das Label formt nur den PRIOR, die Entscheidung trifft completed-Q.
+
+**Und es ist praktisch folgenlos**: bei <=3 Restfliesen liefert
+`unique_moon_orders` <=6 Varianten (Test `unique_moon_orders_dedups_repeated_colors`),
+`GUMBEL_TOP_M` ist 16. Alle Reihenfolgen werden also ohnehin gezogen; der
+selbstbezogene Prior hat kaum Raum, eine gute Variante zu verhindern.
+
+**Korrigierte Aussage**: die SORTIERREIHENFOLGE der Kandidaten ist
+selbstbezogen gelernt, ihre BEWERTUNG nicht. Moon-Order faellt damit als Hebel
+fuer die Nutzer-Frage ("eigene Punkte maximieren UND Gegnerpunkte minimieren,
+ohne Differenz") aus. Uebrig bleibt der eine nie gemessene Arm: **lambda <= 0,5**
+in `opp_aware_points_utility` -- alle je getesteten Arme lagen bei lambda >= 1,0
+und damit jenseits des Kipppunkts, ab dem die Formel 30:15 gegenueber 55:50
+bevorzugt.
+
+**Methodische Lehre, zum wiederholten Mal**: ich habe eine Verhaltensaussage
+aus STATUS zitiert statt aus dem Code. Die Regel dagegen steht im
+Projekt-Gedaechtnis (`feedback_verify_code_not_history`), und sie hat hier
+erneut gegriffen -- nur weil der Nutzer widersprochen hat.
