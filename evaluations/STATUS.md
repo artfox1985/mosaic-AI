@@ -40,6 +40,74 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 |---|---|
 | **D: GEWICHTS-SWEEP (erweitert)** | **Vorregistrierung nachgezogen 2026-08-09 VOR jedem Gating: `PREREG_task_d_gewichte.md`** (Regeln standen bisher nur in dieser Tabellenzeile -- fuer ein mehrarmiges Arena-Experiment zu wenig). Loss-Anteile gemessen: Policy 90,1%, **Value nur 6,5%** -- obwohl die Hybrid-Attribution die Staerke dem VALUE-Kopf zuschreibt; VALUE_WEIGHT=0,2 stammt aus der MSE-Aera und wurde beim BCE-Wechsel nie nachgezogen, nach OBEN ist ungemessen. 4 Arme: Kontrolle, vw04, vw08, pw025. **ARENA entscheidet** (Nutzer: Gating ~1,5h CPU < Training ~3,5h GPU und das einzige validierte Instrument): je Arm Gating vs Kontrolle `v21_2d`, Sieger zusaetzlich vs Champion; Brier/Orakel nur deskriptiv -- liefert zugleich die #29 fehlenden entschiedenen Paare |
 
+### STAND 2026-08-10 ABEND -- was heute entschieden wurde
+
+**Champion unveraendert: `v21_2d_brierbest`, Elo 1358.** Kein Wechsel heute.
+
+#### GESCHLOSSEN
+
+| Punkt | Verdikt |
+|---|---|
+| Task D (Gewichts-Sweep) | alle drei Arme H0 ⇒ Regel 5, `VALUE_WEIGHT=0,2` bleibt |
+| ISMCTS-k | k=4 signifikant negativ unter ZWEI Anordnungen; Mitteln ueber gezogene Welten schadet |
+| Punkte-Blend `w>0` | 321:300, Block-t -2,68 ⇒ w bleibt 0, Richtung eher schaedlich |
+| #82 GPU-Batcher | Regel 1; GPU ist ausgehungert, nicht langsam (Break-even ~64-128) |
+| GPU-Verlagerung T1+T2 | Speicher kein Engpass; erreichbarer Batch **140-590** analytisch ⇒ Weg V gedeckt, Startwert N=256 |
+| R5-Chip-Leck | Weg A gebaut und SCHARF; Suche ist jetzt **Expectiminimax**, Versatz null gemessen |
+| Punkte-Ziel | Gegner-Anteil ENTFERNT, **Schema 20**; `VALUE_OPP_EPSILON = 0` |
+| Plattenkopf als eigener Kopf | **entwertet** -- der Ownership-Kopf ist der Randlayer; `plate_head` entfernt |
+| Kriterium 3 Multiplikator | 9 Layout-Ausgaenge, Kopfbreite 122 → **140**, Cache-Key **`+conj_v2`** |
+
+#### ZWEI CACHE-INVALIDIERUNGEN -- BUENDELN
+
+`VALUE_SCHEMA_VERSION` 19 → **20** (Punkte-Ziel) UND Cache-Suffix
+`+conj_v1` → **`+conj_v2`** (Kopfbreite). **Beides zusammen fahren**, sonst
+wird der ~3h-Neubau zweimal bezahlt. Ein Trainingsstart ohne Neubau rechnet
+still auf dem alten Ziel.
+
+#### DER GROSSE BEFUND: der Champion erreicht die teuren Kriterien NIE
+
+`tools/atom_skill_check.py` (neu, mit Waechter gegen entartete Grundraten):
+**16 von 34 Zusatzzielen sind praktisch konstant** -- Kuppel-Reihen 3-6
+(0,000), beide Diagonalen (10 Pkt!), die unteren Eckplatten (8 Pkt!),
+farbenreiche Reihen 3-6; Spalten (7 Pkt) bei 0,2-1,2 %.
+
+Die Konjunktionen tragen fast kein Signal (bester Wert: Ecke (0,0) +0,102).
+Die 9 Layout-Ausgaenge sind mit +0,278 bis +0,972 das Staerkste, aber
+vermutlich durch schon sichtbare Platzierungen aufgeblaeht.
+
+**Das ist eine Strategie-Luecke, kein Vorhersageproblem.** Ein Kopf, der
+Konstanten vorhersagt, schliesst sie nicht. Vor `OWNERSHIP_WEIGHT > 0` gehoert
+entschieden, ob der Kopf auf die tragenden Atome beschnitten wird.
+
+#### KONFUNDIERUNGS-MUSTER, dreimal an einem Tag
+
+Jedes Endzustands-Ziel, das teilweise schon aus dem sichtbaren Zustand folgt,
+blaeht den Skill auf: (1) Anwesenheit des Spezialfelds, (2) Slot-Identitaet
+durch Poolung, (3) schon entschiedene Platzierung. Regel im Projekt-Gedaechtnis
+(`feedback_skill_confound_already_determined`): auf den noch UNENTSCHIEDENEN
+Teil bedingen, Referenz je Atom, Waechter gegen Grundrate 0/1.
+
+Folge: die Stufe-A-Zahlen (+0,637 / +0,655) sind ueberholt. Bedingt auf
+existierende Spezialfelder bleiben +0,400 aggregiert, aber **je Slot ist jeder
+Wert negativ**.
+
+#### GITHOOK erweitert
+
+Die Groessen-Ratsche blockierte einen Commit, der eine Datei VERKLEINERT hat
+(sie lag nur wegen eines fremden fruehen Wachstums ueber der Basislinie). Neu:
+wer gegenueber HEAD kleiner wird, kommt durch; die Basislinie bleibt stehen,
+damit der Rueckstand nicht festgeschrieben wird. Beide Richtungen geprueft.
+
+#### LAUFENDE AGENTEN (2026-08-10 abend)
+
+1. **Referenzlaeufe**: Zufalls-Drafting (neuer Treiber
+   `drive_to_game_end_random`, weil der naive immer `actions[0]` nimmt und
+   damit KEIN Zufall ist) und Heuristik@150, je Kriterium gegen den Champion.
+   Trennt "strukturell unerreichbar" von "Strategiedefizit".
+2. **Layout-Signal bedingt**: Skill nur auf Slots, die im Zustand noch keine
+   Platte tragen.
+
 ### NACHTPROTOKOLL 2026-08-10 (Nutzer schlaeft, Auftrag "keinen Leerlauf")
 
 **Fertig geworden, mit Verdikt:**
