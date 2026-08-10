@@ -543,6 +543,115 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
+    // ── Validierung des Plattenkopf-Atomzuschnitts ───────────────────────────
+    //
+    // `evaluations/PREREG_plattenkopf.md` behauptet zwei Identitaeten auf dem
+    // ENDBRETT, aus denen die Wahrscheinlichkeitsfassung ihre Exaktheit zieht.
+    // Nutzer-Frage 2026-08-10: "hast du das auf ein paar spielsituationen
+    // validiert oder einfach mal blind gebaut?" -- hier wird es geprueft,
+    // statt behauptet.
+    //
+    //   Kriterium 6:  -3 * Sum_s A6_s  ==  score_empty_special_fields
+    //                 A6_s = Slot s hat ein Spezialfeld, das LEER ist
+    //   Kriterium 3:  +2 * Sum_s A3_s  ==  score_wild_fields
+    //                 A3_s = Slot s hat ein BELEGTES Jokerfeld
+    //                        UND alle Jokerfelder des Bretts sind belegt
+
+    /// Atome von Kriterium 6 je Kuppelslot (hoechstens ein Spezialfeld je Platte).
+    fn atoms_criterion6(player: &PlayerBoard) -> Vec<bool> {
+        let mut out = Vec::new();
+        for row in player.dome_grid.dome_slots.iter() {
+            for slot in row.iter() {
+                let hit = slot.as_ref().is_some_and(|t| {
+                    t.spaces.iter().any(|sp| sp.space_type == SpaceType::Special && !sp.is_filled())
+                });
+                out.push(hit);
+            }
+        }
+        out
+    }
+
+    /// Atome von Kriterium 3 je Kuppelslot -- die Konjunktion mit der
+    /// Gesamtbedingung steckt IM Atom, daher der `all_filled`-Faktor.
+    fn atoms_criterion3(player: &PlayerBoard) -> Vec<bool> {
+        let wild = collect_spaces(player, SpaceType::Wild);
+        let all_filled = !wild.is_empty() && wild.iter().all(|sp| sp.is_filled());
+        let mut out = Vec::new();
+        for row in player.dome_grid.dome_slots.iter() {
+            for slot in row.iter() {
+                let hit = all_filled
+                    && slot.as_ref().is_some_and(|t| {
+                        t.spaces.iter().any(|sp| sp.space_type == SpaceType::Wild && sp.is_filled())
+                    });
+                out.push(hit);
+            }
+        }
+        out
+    }
+
+    #[test]
+    #[ignore]
+    fn plattenkopf_atom_identities_hold_on_real_end_boards() {
+        use crate::round_transition::drive_to_game_end;
+
+        let mut boards = 0usize;
+        let mut c_true = 0usize;
+        let mut wild_totals = Vec::new();
+        let mut special_totals = Vec::new();
+        let mut special_empty_counts = Vec::new();
+        for seed in [11u64, 22, 33, 44, 55, 66, 77, 88, 99, 111, 222, 333] {
+            let end_state = match drive_to_game_end(seed) {
+                Some(s) => s,
+                None => continue,
+            };
+            for player in end_state.players.iter() {
+                boards += 1;
+                // Identitaet Kriterium 6
+                let a6 = atoms_criterion6(player);
+                let lhs6 = -3 * a6.iter().filter(|&&b| b).count() as i32;
+                let rhs6 = score_empty_special_fields(player);
+                assert_eq!(lhs6, rhs6, "Seed {seed}: Kriterium-6-Identitaet verletzt");
+                assert_eq!(a6.len(), 9, "9 Kuppelslots erwartet");
+                // Identitaet Kriterium 3
+                let a3 = atoms_criterion3(player);
+                let lhs3 = 2 * a3.iter().filter(|&&b| b).count() as i32;
+                let rhs3 = score_wild_fields(player);
+                assert_eq!(lhs3, rhs3, "Seed {seed}: Kriterium-3-Identitaet verletzt");
+                // Ungleichung aus dem PREREG: jedes Atom <= Gesamtbedingung
+                let wild = collect_spaces(player, SpaceType::Wild);
+                let cond = !wild.is_empty() && wild.iter().all(|sp| sp.is_filled());
+                assert!(!a3.iter().any(|&b| b) || cond, "Atom wahr ohne Gesamtbedingung");
+                if cond {
+                    c_true += 1;
+                }
+                wild_totals.push(wild.len());
+                let sp = collect_spaces(player, SpaceType::Special);
+                special_totals.push(sp.len());
+                special_empty_counts.push(sp.iter().filter(|s| !s.is_filled()).count());
+            }
+        }
+        assert!(boards >= 8, "zu wenige Endbretter erzeugt ({boards})");
+        let mean = |v: &Vec<usize>| v.iter().sum::<usize>() as f64 / v.len().max(1) as f64;
+        println!("PLATTENKOPF-VALIDIERUNG: {boards} Endbretter, beide Identitaeten halten");
+        println!(
+            "  Grundrate 'alle Jokerfelder belegt' (Bedingung von Kriterium 3): {c_true}/{boards} = {:.1}%",
+            100.0 * c_true as f64 / boards as f64
+        );
+        println!(
+            "  Jokerfelder je Brett: Mittel {:.2}, min {:?}, max {:?}",
+            mean(&wild_totals),
+            wild_totals.iter().min(),
+            wild_totals.iter().max()
+        );
+        println!(
+            "  Spezialfelder je Brett: Mittel {:.2} | davon LEER: Mittel {:.2}, min {:?}, max {:?}",
+            mean(&special_totals),
+            mean(&special_empty_counts),
+            special_empty_counts.iter().min(),
+            special_empty_counts.iter().max()
+        );
+    }
+
     /// Hilfsbrett: füllt das komplette 6×6-Raster mit Platten und allen Steinen.
     fn fully_filled_board() -> PlayerBoard {
         let mut p = PlayerBoard::new(0, "P");

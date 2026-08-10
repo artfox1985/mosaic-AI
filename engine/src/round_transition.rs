@@ -352,6 +352,31 @@ pub(crate) fn drive_to_round_tiling_leaf(seed: u64, target_round: u32) -> GameSt
     drive_drafting_to_leaf_naive(drive_to_round_start(seed, target_round))
 }
 
+/// Spielt eine Partie bis zum ENDE durch und liefert den Endzustand (beide
+/// Bretter final) -- dritter Treiber neben [`drive_to_round_start`] und
+/// [`drive_to_round_tiling_leaf`], gebraucht von der Plattenkopf-Validierung in
+/// `scoring.rs` (Identitaeten und Grundraten gelten auf dem ENDBRETT).
+///
+/// Drafting laeuft naiv (`drive_drafting_to_leaf_naive`) wie in den anderen
+/// Treibern -- fuer die IDENTITAETEN irrelevant, weil sie fuer jedes Brett
+/// gelten; fuer GRUNDRATEN ein Vorbehalt, der an der Auswertung vermerkt ist.
+#[cfg(test)]
+pub(crate) fn drive_to_game_end(seed: u64) -> Option<GameState> {
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed.wrapping_add(0xE11D));
+    let leaf = drive_to_round_tiling_leaf(seed, 5);
+    let pre = resolve_to_pre_chance(&leaf)?;
+    let mut game = Game { state: pre.state.clone() };
+    game.state.bag.tiles.shuffle(&mut rng);
+    game.state.bonus_chip_pool.shuffle(&mut rng);
+    game.apply_tiling(&TilingMove::EndTiling { player: pre.pending_end_tiling_player }, &mut rng)
+        .ok()?;
+    Some(game.state)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

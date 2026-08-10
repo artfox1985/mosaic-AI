@@ -361,3 +361,68 @@ gelernt, unabhaengig vom Brier.)
 7:6 = **62 je Spieler, 124 gesamt**. Kein Kriterium mehr ausserhalb der
 Wahrscheinlichkeitsfassung -- die Tabelle oben und die "Ausreisser"-Notiz zu
 Kriterium 3 sind damit ueberholt.
+
+## VALIDIERUNG auf echten Endbrettern (2026-08-10) -- ein Kriterium wackelt
+
+Nutzer-Frage: *"hast du das auf ein paar spielsituationen validiert oder
+einfach mal blind gebaut?"* -- zu Recht gestellt. Validiert war NICHTS, nur
+die Code-STRUKTUR (9 Joker-/9 Spezialplatten, Auszahlungsformeln). Jetzt
+geprueft: `scoring.rs::plattenkopf_atom_identities_hold_on_real_end_boards`
+(`#[ignore]`), 24 Endbretter aus 12 Partien via neuem Treiber
+`round_transition::drive_to_game_end`.
+
+### Was haelt: die Identitaeten
+
+| Behauptung | Ergebnis |
+|-----------|----------|
+| `-3 * Sum_s A6_s == score_empty_special_fields` | **haelt, 24/24** |
+| `2 * Sum_s A3_s == score_wild_fields` | **haelt, 24/24** |
+| jedes A3-Atom `<=` Gesamtbedingung C | **haelt, 24/24** |
+| 9 Atome je Kriterium (= 9 Kuppelslots) | bestaetigt |
+
+Diese Pruefung ist **spielweise-unabhaengig** -- die Identitaeten gelten fuer
+jedes Brett, unabhaengig davon, wie es entstand.
+
+### Was traegt: Kriterium 3
+
+- Grundrate der Bedingung "alle Jokerfelder belegt": **11/24 = 45,8 %**.
+  Weit von 0 und 1 -- fast ideal fuer einen Wahrscheinlichkeitskopf.
+- Jokerfelder je Brett: Mittel **3,79**, Spanne **2 bis 5**. Der
+  Multiplikator schwankt also wirklich. Die Nutzer-Zerlegung in 9 Atome war
+  damit nicht nur eleganter als mein `P x aktuelles wild_total`, sondern
+  noetig: ein fester Multiplikator haette um bis zu ~1,5 Felder danebengelegen.
+
+### Was NICHT traegt: Kriterium 6 (Grundrate fast degeneriert)
+
+- Spezialfelder je Brett: Mittel **4,21**
+- davon LEER: Mittel **4,04** (Spanne 2 bis 6)
+
+Das Atom ist also in **~96 %** der Faelle wahr. Eine fast konstante
+Zielgroesse: der Kopf lernt "leer", erreicht einen praechtigen Brier von
+~0,04 und unterscheidet nichts. Und das ist ausgerechnet das Kriterium, um
+das die ganze Begruendung dieses Kopfes gebaut ist (die -3-Strafe, die
+Stapelzug-Taktik des Nutzers, der bedingungslose Bonus im Aufloeser).
+
+**VORBEHALT, der das entscheidet**: diese Partien spielen das Drafting NAIV
+(`drive_drafting_to_leaf_naive`). Ein Spezialfeld zu fuellen erfordert
+absichtliches Spiel -- genau die Nutzer-Taktik. Die 4,04 sind damit eine
+UNTERGRENZE fuers Leerbleiben. Ausserdem sind 24 Bretter wenig (45,8 % hat
+ca. +-10pp).
+
+### Konsequenz fuer die Reihenfolge
+
+**Vor dem Bau** gehoert die Grundraten-Messung auf CHAMPION-Partien
+(vorhandener Korpus, kein neuer Lauf noetig -- die Endbretter liegen in den
+HDF5-Dateien). Entscheidungsregel vorab:
+
+- Grundrate "Spezialfeld leer" unter Champion-Spiel **> 90 %** ⇒ Kriterium 6
+  ist als Wahrscheinlichkeit fast wertlos; der Kopf braucht dann entweder
+  eine Klassen-Gewichtung, die die seltenen Fuellungen hervorhebt, ODER
+  Kriterium 6 wird als Atom gestrichen und der Kopf traegt nur die anderen.
+- Grundrate zwischen **60 und 90 %** ⇒ tragfaehig, Kalibrierung mit
+  Klassenungleichgewicht auswerten (Brier gegen die Grundrate, nicht gegen
+  0,25).
+- Unter **60 %** ⇒ unproblematisch, Bau wie vorregistriert.
+
+Ohne diese Messung waere ein Kopf gebaut worden, dessen Pflicht-Kriterium
+eine Konstante vorhersagt.

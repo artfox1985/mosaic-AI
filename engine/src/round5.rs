@@ -125,6 +125,30 @@ fn chance_nodes_enabled() -> bool {
     })
 }
 
+/// Soll der NETZPFAD in Runde 5 diesen Loeser benutzen? Default JA (=
+/// byte-identisch zu vorher). Die HEURISTIK-Bahn ist bewusst NICHT betroffen:
+/// dort bleibt der Loeser gesetzt, weil ihre Alternative eine
+/// Fortschritts-Naeherung (`wertung_progress`) waere, und weil der Anker
+/// eingefroren bleiben muss.
+///
+/// Hintergrund (`PREREG_zufallsknoten.md`, Teil E): dass der Loeser das Netz
+/// in Runde 5 ersetzt, wurde NIE gegatet -- `round5.rs` kam in 98dffa3
+/// gebuendelt herein, gerechtfertigt allein durch das Argument, die Runde sei
+/// exakt loesbar. Das Argument ist zweifach entkraeftet: die Runde ist nicht
+/// vollinformiert (verdeckte Chip-ZUORDNUNG, siehe oben) und die Suche ist
+/// keine Loesung, sondern ~3 Halbzuege (Orakel-Uebereinstimmung 81,4 % bei 200
+/// Knoten, 84,8 % bei 4000 -- Tiefe kauft fast nichts, die BLATTBEWERTUNG
+/// traegt). Offen ist damit nur noch, ob der exakte Blattwert den GELERNTEN
+/// schlaegt. Dieser Knopf macht die Gegenprobe ueberhaupt moeglich.
+pub(crate) fn net_solver_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_R5_NET_SOLVER")
+            .map(|v| v.is_empty() || v != "0")
+            .unwrap_or(true)
+    })
+}
+
 /// Knotenbudget je Entscheidung, Default [`NODE_BUDGET`].
 ///
 /// Eigener Knopf, weil Zufallsknoten den Teilbaum unter jedem Aufdecken
@@ -487,7 +511,7 @@ fn choose_action_inner(state: &GameState, chance: bool, budget: u64) -> Option<A
 /// Wie [`choose_action_inner`], mit injizierbarer Not-Deckel-Deadline -- die
 /// Orakel-Referenz in Teil E braucht mehr als `TIME_BUDGET`, sonst waere sie
 /// deadline- und damit lastgebunden statt knotengebunden.
-fn choose_action_deadlined(state: &GameState, chance: bool, budget: u64, deadline: Instant) -> Option<Action> {
+pub(crate) fn choose_action_deadlined(state: &GameState, chance: bool, budget: u64, deadline: Instant) -> Option<Action> {
     let perspective = state.current_player;
     let children = ordered_children(state, perspective, chance);
     if children.is_empty() {
