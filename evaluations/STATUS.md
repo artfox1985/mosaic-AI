@@ -35,68 +35,24 @@ letzte Uebergangsgeneration). Vorbehalt fuer v21-Gating-H0: neuer
 Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 
 
-### GRUNDSATZBEFUND 2026-08-10: Wertungsplatten sind 7 % des Ergebnisses
+### WERTUNGSPLATTEN-ANTEIL -- Domaenenwissen ausgelagert 2026-08-11
 
-Gemessen auf 1.200 Self-Play-Endbrettern (`selfplay_v20wdl_*`, gestempelte
-`scores` gegen die Summe der AKTIVEN `scoring_tile_points`):
+**Der Inhalt dieses Abschnitts steht jetzt in `../docs/domaenenwissen.md`**
+(Nutzer-Entscheid: STATUS traegt "nur AKTUELLES und OFFENES" und wird
+regelmaessig in die History geleert -- Domaenenwissen dort wird mitarchiviert).
+Dort: Punktquellen und ihre Verwechslungsfalle, Plattenwerte samt
+Index-Verschiebung Handbuch/Code, Versorgungszahlen, Musterreihen-Durchsatz,
+Slot-Gradient, Mensch-gegen-Champion-Posten.
 
-| Groesse | Mittel je Brett |
-|---------|-----------------|
-| Endstand | 23,39 |
-| davon **Wertungsplatten** | **1,71 -- 7 %** |
-| Rest (Platzierung minus Strafen) | **21,68 -- 93 %** |
-
-**DIESE EINORDNUNG WAR FALSCH -- Nutzer-Korrektur 2026-08-10, mit meinen
-eigenen Zahlen belegt.** Ich hatte daraus "der Plattenstrang zielt auf ein
-Dreizehntel" gemacht. Zwei Fehler:
-
-1. **Falsche Population.** Die 7 % sind der MITTELWERT ueber Self-Play mit
-   Wurzelrauschen (23,39 Punkte, schwaches Spiel, kaum etwas wird fertig).
-   Im selben Datensatz steigt der Plattenanteil monoton auf **24,7 % im
-   obersten Fuenftel** (r = +0,695) und ist in den unteren zwei Fuenfteln
-   negativ. Nutzer-Zahl: ~17 Plattenpunkte bei ~61 gesamt = **28 %** --
-   deckt sich mit dem obersten Fuenftel, nicht mit dem Mittel.
-2. **Etikett statt Wirkung bewertet.** Die Platten sind kein getrennter Topf:
-   eine geschlossene Spalte bringt **21 Platzierungspunkte PLUS 7
-   Plattenpunkte**. Ein Term, der auf Spaltenabschluss zieht, kassiert beide
-   Waehrungen; "Platte" haengt nur an einem Viertel davon.
-
-**Folge fuer die Prioritaet**: der Plattenterm ist KEIN kleinerer Hebel neben
-der rundenuebergreifenden Planung -- er IST deren einzige verfuegbare
-Umsetzung, das Einzige im System, das Fortschritt auf eine mehrrundige
-Struktur belohnt. Praktisch heisst das: `w` ist eine echte Sweep-Frage, und
-der Term gehoert nach dem Training ins GATING, nicht auf eine Halde.
-
-Der Hauptterm ist `score_placed_tile` (`round_end.rs:340`): eine gelegte Fliese
-bringt die Laenge ihrer zusammenhaengenden Waagerechten plus der Senkrechten,
-je nur wenn > 1, sonst 1. Maximal **6 + 6 = 12** je Fliese -- und
-REIHENFOLGEABHAENGIG: die letzte Fliese einer vollen Reihe holt 6, die erste 1.
-Die Diagonale gibt dagegen 10 fuer sechs Zellen, also 1,67 je Zelle.
-
-**Umdeutung des Atom-Befunds**: dass der Champion Reihen 3-6, Spalten und
-Diagonalen nie schliesst, kostet ihn NICHT primaer die 3/7/10 Plattenpunkte,
-sondern die PLATZIERUNGSPUNKTE langer Linien.
-
-**Vorbehalte.** Die Zahl kommt aus Self-Play MIT Wurzelrauschen (bewusst
-schwaecheres Spiel); Mittel 23,39 gegen ~61, die der Champion gegen den Nutzer
-erreicht. Bei starkerem Spiel wachsen beide Terme. Die Richtung ist aber
-unabhaengig bestaetigt: `watchlist_v20_zwischenlese.md` zaehlte fuer die KI
-25,9 vertikale und 30,4 horizontale Bonuspunkte je Partie bei ~61 Gesamt.
-
-**Nutzer-Einordnung**: *"ja das gilt es abzuwaegen -- willkommen in der
-taktischen welt"*. Kein Vorrang, sondern eine Abwaegung, weil die Terme meist
-in DIESELBE Richtung zeigen: eine geschlossene Spalte bringt 7 Plattenpunkte
-UND die lange Senkrechte. Die Platten wirken damit als STICHENTSCHEID zwischen
-gleich guten Linien, nicht als eigenes Ziel. Echt gegenlaeufig ist fast nur
-Kriterium 6 (drei Normalfelder fuellen, damit das Spezialfeld aufgeht -- ggf.
-an schlechten Linienpositionen).
-
-**Warum keine Formel reicht**: der Platzierungspunkt haengt am Bestand, dieselbe
-Zelle ist 1 oder 12 wert je nach Zeitpunkt. Das Optimum ist eine SEQUENZ, keine
-Zellmenge -- eine zeitlose Potenzialkarte gibt eine Richtung, nicht das Optimum.
-Der Tiling-Solver rechnet genau das am Rundenende exakt; in Runde 5 nutzt die
-Suche es exakt. **Was fehlt, ist die rundenuebergreifende Version -- dort sitzt
-der Rueckstand, nicht bei den Wertungsplatten.**
+**Was hier bleibt, ist die ENTSCHEIDUNGSRELEVANTE Folge**: die 7-%-Zahl war ein
+Mittelwert ueber schwaches Self-Play und hat mich zu einer falschen Priorisierung
+gebracht. Im obersten Fuenftel sind es 24,7 %, beim Nutzer 28 %; der Mittelwert
+ist klein, WEIL das Defizit im Self-Play symmetrisch ist. Und die Platten sind
+kein getrennter Topf -- eine geschlossene Spalte bringt 21 Platzierungspunkte
+PLUS 7 Plattenpunkte. Der Plattenterm ist deshalb **kein kleinerer Hebel neben**
+der rundenuebergreifenden Planung, sondern deren einzige verfuegbare Umsetzung:
+`w` ist eine echte Sweep-Frage, und der Term gehoert nach dem Training ins
+GATING.
 
 ### STAND 2026-08-10 NACHTS
 
