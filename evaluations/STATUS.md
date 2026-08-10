@@ -46,7 +46,27 @@ Gemessen auf 1.200 Self-Play-Endbrettern (`selfplay_v20wdl_*`, gestempelte
 | davon **Wertungsplatten** | **1,71 -- 7 %** |
 | Rest (Platzierung minus Strafen) | **21,68 -- 93 %** |
 
-**Der ganze Plattenkopf-Strang zielt damit auf ein Dreizehntel des Ergebnisses.**
+**DIESE EINORDNUNG WAR FALSCH -- Nutzer-Korrektur 2026-08-10, mit meinen
+eigenen Zahlen belegt.** Ich hatte daraus "der Plattenstrang zielt auf ein
+Dreizehntel" gemacht. Zwei Fehler:
+
+1. **Falsche Population.** Die 7 % sind der MITTELWERT ueber Self-Play mit
+   Wurzelrauschen (23,39 Punkte, schwaches Spiel, kaum etwas wird fertig).
+   Im selben Datensatz steigt der Plattenanteil monoton auf **24,7 % im
+   obersten Fuenftel** (r = +0,695) und ist in den unteren zwei Fuenfteln
+   negativ. Nutzer-Zahl: ~17 Plattenpunkte bei ~61 gesamt = **28 %** --
+   deckt sich mit dem obersten Fuenftel, nicht mit dem Mittel.
+2. **Etikett statt Wirkung bewertet.** Die Platten sind kein getrennter Topf:
+   eine geschlossene Spalte bringt **21 Platzierungspunkte PLUS 7
+   Plattenpunkte**. Ein Term, der auf Spaltenabschluss zieht, kassiert beide
+   Waehrungen; "Platte" haengt nur an einem Viertel davon.
+
+**Folge fuer die Prioritaet**: der Plattenterm ist KEIN kleinerer Hebel neben
+der rundenuebergreifenden Planung -- er IST deren einzige verfuegbare
+Umsetzung, das Einzige im System, das Fortschritt auf eine mehrrundige
+Struktur belohnt. Praktisch heisst das: `w` ist eine echte Sweep-Frage, und
+der Term gehoert nach dem Training ins GATING, nicht auf eine Halde.
+
 Der Hauptterm ist `score_placed_tile` (`round_end.rs:340`): eine gelegte Fliese
 bringt die Laenge ihrer zusammenhaengenden Waagerechten plus der Senkrechten,
 je nur wenn > 1, sonst 1. Maximal **6 + 6 = 12** je Fliese -- und
@@ -150,10 +170,32 @@ Training, je neuem Korpus einmal auslesen.
 
 `scoring.rs:160` `wertung_progress` ist der vollstaendige
 Wertungsplatten-Formungsterm: gegatet auf die AKTIVEN Platten, je Geometrie
-einzeln summiert, konvex mit Exponent 2, additive Kriterien linear. Er haengt
-**ausschliesslich an `mcts.rs:82`, dem HEURISTIK-Pfad**. Deshalb erreicht die
-Heuristik 1,99 Plattenpunkte je Partie und der Netz-Champion nur 1,10 --
-**kein Lernproblem, ein fehlender Term.**
+einzeln summiert, konvex mit Exponent 2, additive Kriterien linear.
+
+**KORREKTUR 2026-08-10 (Agent-Fund, selbst am Code geprueft): das Netz hat
+ihn NICHT "nie bekommen".** Ich hatte "haengt ausschliesslich an `mcts.rs:82`,
+dem Heuristik-Pfad" behauptet -- falsch. Es gibt **Task #93 "Plattenshaping"**
+in `net_mcts.rs`: `PLATE_SHAPING_ENABLED = false` (Kompilierzeit),
+`PLATE_SHAPING_WEIGHT = 0.3`, A/B nicht signifikant (p=0,71), deshalb aus.
+
+Zwei Gruende, warum dieses p=0,71 die EGO-Fassung nicht vorwegnimmt:
+
+1. **#93 ist MARGINAL, nicht absolut.** `plate_shaping_marginal =
+   plate_shaping_delta(kind) - plate_shaping_delta(eltern)` -- es verschiebt
+   den Knotenwert um den Zuwachs GENAU DES LETZTEN ZUGS. Ein Blatt tief im
+   Baum bekommt keine Gutschrift fuer den angesammelten Fortschritt seines
+   Pfades. Eine Stellungsbewertung braucht aber den GESAMTSTAND ("diese Spalte
+   steht bei 5/6"), nicht den letzten Schritt. Differenzformen sind
+   potentialbasiert und lassen die optimale Politik strukturell unberuehrt --
+   #93 konnte in dieser Form gar nicht wirken. (Herleitung, nicht gemessen.)
+2. **#93 ist `mine - theirs`, gegatet, mit dem pauschalen
+   `-3 * special_empty`** -- genau die drei Eigenschaften, die das
+   Spezialfeld-Loch verfehlen. Und gemessen wurde gegen ein Geschwisternetz
+   mit demselben blinden Fleck (wie das 97:103 in `elo_history.csv` Zeile 48).
+
+Die Plattenluecke (Heuristik 1,99 Plattenpunkte je Partie gegen 1,10 beim
+Champion) bleibt bestehen -- die Erklaerung ist aber nicht "Term fehlt",
+sondern "Term liegt in einer Form vor, die den Stand nicht bewertet".
 
 `wertung_progress` **NICHT ANFASSEN** -- es haengt am Elo-Anker. Das variable
 alpha gehoert in eine eigene Funktion daneben (Schutz durch Konstruktion,
