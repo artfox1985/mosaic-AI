@@ -798,8 +798,13 @@ def build_report(header: dict, log_path: Path, rep: "Replayer", divergence: str 
     P(f"Erzeugt von `tools/analyze_game_log.py` (Commit `{_git_commit_short()}`), "
       f"Laufzeit {elapsed_s:.0f}s.")
     P("")
+    # Partien ohne KI (Mensch vs. Mensch bzw. KI abgeschaltet) haben ai_player=None
+    # im Header -- players[None] wuerde den ganzen Report-Lauf mit TypeError killen.
+    ai_idx = header.get("ai_player")
+    ki_desc = ("keine (Mensch vs. Mensch)" if ai_idx is None else
+               f"{players[ai_idx]} ({header.get('ai_model')}, {header.get('ai_sims')} Sims)")
     P(f"- Seed: {header['seed']}, Startspieler: {players[header['first_player']]}, "
-      f"KI-Spieler: {players[header['ai_player']]} ({header.get('ai_model')}, {header.get('ai_sims')} Sims)")
+      f"KI-Spieler: {ki_desc}")
     timeline = extract_full_score_timeline(all_lines, players)
     if divergence:
         P("")
