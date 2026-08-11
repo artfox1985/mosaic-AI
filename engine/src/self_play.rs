@@ -1472,6 +1472,14 @@ fn play_net_game<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
+    // Auftrag 2026-08-11 (Log-Parität zu server.py/analyze_game_log.py):
+    // `game_seed` ist der Seed, mit dem DIESE Partie ihre `rng` erzeugt hat
+    // (siehe Aufrufer) -- reine Metadaten fuer den optionalen Log-Export,
+    // beeinflusst nichts an der Suche. `log_games=false` (Default) haelt den
+    // Rueckgabewert exakt wie zuvor (kein neuer Key, keine geklonte
+    // Log-Vec, kein Zusatzaufwand).
+    game_seed: u64,
+    log_games: bool,
 ) -> Value {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
@@ -1575,7 +1583,7 @@ fn play_net_game<R: Rng + ?Sized>(
     }
     let p0 = &game.state.players[0];
     let p1 = &game.state.players[1];
-    json!({
+    let mut result = json!({
         "scores": [p0.score, p1.score],
         "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
@@ -1586,7 +1594,25 @@ fn play_net_game<R: Rng + ?Sized>(
         // Siehe Kommentar in den Schwester-Funktionen: Platten-Konfiguration
         // je Spiel, fuer die Aufschluesselung von Arena-A/Bs.
         "scoring_tile_ids": game.state.scoring_tile_ids,
-    })
+    });
+    // Auftrag 2026-08-11: opt-in Log-Export (Default AUS haelt bestehende
+    // Aufrufer unveraendert). `game_seed`/`names`/`first_player` sind noetig,
+    // damit `analyze_game_log.py`s Replay (`PyGame((n0,n1), first_player,
+    // seed)`) exakt denselben RNG-Strom wie diese Partie erzeugt (siehe
+    // `PyGame::new`, py.rs: identische Reihenfolge `sample_valid_scoring_ids`
+    // -> `Game::start`).
+    if log_games {
+        if let Value::Object(map) = &mut result {
+            map.insert("game_seed".into(), json!(game_seed));
+            map.insert("first_player".into(), json!(first_player));
+            map.insert(
+                "names".into(),
+                json!([game.state.players[0].name.clone(), game.state.players[1].name.clone()]),
+            );
+            map.insert("log".into(), json!(game.state.log));
+        }
+    }
+    result
 }
 
 /// `n_games` Spiele Netz vs. Heuristik (Netz auf Brett 0, Startspieler alternierend).
@@ -1601,17 +1627,20 @@ pub fn run_net_arena_match(
     num_threads: usize,
     c: f64,
     c_puct: f64,
+    log_games: bool,
 ) -> Result<String, String> {
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
 
     let play = |i: usize| -> Value {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["Netz".to_string(), "Heuristik".to_string()];
-        play_net_game(&net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng)
+        play_net_game(
+            &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
+        )
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -1641,6 +1670,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
+    // Siehe Kommentar an `play_net_game`s gleichnamigen Parametern.
+    game_seed: u64,
+    log_games: bool,
 ) -> Value {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
@@ -1722,7 +1754,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     }
     let p0 = &game.state.players[0];
     let p1 = &game.state.players[1];
-    json!({
+    let mut result = json!({
         "scores": [p0.score, p1.score],
         "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
@@ -1734,12 +1766,26 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
         // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
         "scoring_tile_ids": game.state.scoring_tile_ids,
-    })
+    });
+    // Siehe Kommentar in `play_net_game`.
+    if log_games {
+        if let Value::Object(map) = &mut result {
+            map.insert("game_seed".into(), json!(game_seed));
+            map.insert("first_player".into(), json!(first_player));
+            map.insert(
+                "names".into(),
+                json!([game.state.players[0].name.clone(), game.state.players[1].name.clone()]),
+            );
+            map.insert("log".into(), json!(game.state.log));
+        }
+    }
+    result
 }
 
 /// `n_games` Spiele Netz A (Brett 0) vs. Netz B (Brett 1), Startspieler
 /// alternierend. Lädt beide ONNX-Netze einmal. Gibt JSON-Array
 /// `[{scores:[A,B], winner, …}]`.
+#[allow(clippy::too_many_arguments)]
 pub fn run_net_vs_net_arena(
     model_a: &str,
     model_b: &str,
@@ -1750,17 +1796,21 @@ pub fn run_net_vs_net_arena(
     num_threads: usize,
     c_puct_a: f64,
     c_puct_b: f64,
+    log_games: bool,
 ) -> Result<String, String> {
     let net_a = std::sync::Arc::new(Net::load_auto(model_a).map_err(|e| e.to_string())?);
     let net_b = std::sync::Arc::new(Net::load_auto(model_b).map_err(|e| e.to_string())?);
 
     let play = |i: usize| -> Value {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
-        play_net_vs_net_game(&net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng)
+        play_net_vs_net_game(
+            &net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng, game_seed,
+            log_games,
+        )
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -4416,9 +4466,9 @@ pub(crate) mod tests {
 
         let seed = 13_579u64;
         let n_games = 3usize;
-        let raw_a = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT)
+        let raw_a = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false)
             .expect("Arena-Lauf A sollte gelingen (Checkpoint existiert laut Vorab-Check)");
-        let raw_b = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT)
+        let raw_b = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false)
             .expect("Arena-Lauf B sollte gelingen");
         assert_eq!(
             raw_a, raw_b,
@@ -4430,7 +4480,7 @@ pub(crate) mod tests {
         // (indirekter Beleg -- ein einzelnes Spiel bei n_games=1 mit Seed S
         // muss IDENTISCH zum ersten Spiel eines n_games=3-Laufs mit Basis-Seed
         // S sein, weil beide `i=0` denselben abgeleiteten Seed ergeben).
-        let raw_single = run_net_vs_net_arena(model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT)
+        let raw_single = run_net_vs_net_arena(model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false)
             .expect("Einzelspiel-Lauf sollte gelingen");
         let games_a: Vec<Value> = serde_json::from_str(&raw_a).unwrap();
         let games_single: Vec<Value> = serde_json::from_str(&raw_single).unwrap();
@@ -4464,7 +4514,7 @@ pub(crate) mod tests {
         let n_games = 3usize;
         let plain = run_net_vs_net_arena(
             model_path, model_path, 8, 8, n_games, seed, 1,
-            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT,
+            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false,
         )
         .expect("Plain-Arena-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let hybrid = run_net_vs_net_arena_hybrid(

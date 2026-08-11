@@ -209,8 +209,15 @@ fn value_noise_floor_diagnostic(
 /// Arena-Match Netz vs. Heuristik-MCTS (Netz auf Brett 0). Lädt das ONNX-Netz
 /// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
+/// `log_games` (Default `false`, 2026-08-11): haengt je Partie `game_seed`/
+/// `first_player`/`names`/`log` an -- `log` ist die vollstaendige
+/// `GameState::log`-Zeilenliste (identischer Wortlaut wie die Server-Logs
+/// `static/log/game_*.log`, siehe `state.rs::log_event`/`execution.rs`/
+/// `game.rs`/`round_end.rs` -- dieselben Funktionen erzeugen beide). Reine
+/// Zusatzausgabe (kein neuer Suchpfad, kein RNG-Verbrauch): bei `false`
+/// bleibt das Ergebnis wie zuvor.
 #[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5))]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false))]
 #[allow(clippy::too_many_arguments)]
 fn net_arena_match(
     py: Python<'_>,
@@ -222,11 +229,12 @@ fn net_arena_match(
     num_threads: usize,
     c: f64,
     c_puct: f64,
+    log_games: bool,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_arena_match(
-            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct,
+            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -235,8 +243,10 @@ fn net_arena_match(
 /// Arena-Match Netz A (Brett 0) vs. Netz B (Brett 1). Lädt beide ONNX-Netze,
 /// spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[A,B], winner, steps, total_floor, floor_per_round}]` zurück.
+/// `log_games` (Default `false`, 2026-08-11): siehe `net_arena_match`-
+/// Dokumentation -- identisches Zusatzfeld-Set, derselbe Spielpfad-Typ.
 #[pyfunction]
-#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5))]
+#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, log_games=false))]
 #[allow(clippy::too_many_arguments)]
 fn net_vs_net_arena_match(
     py: Python<'_>,
@@ -249,11 +259,12 @@ fn net_vs_net_arena_match(
     num_threads: usize,
     c_puct_a: f64,
     c_puct_b: f64,
+    log_games: bool,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_vs_net_arena(
-            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b,
+            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, log_games,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
