@@ -211,6 +211,86 @@ pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
 /// (kein Exponent) -- das ist keine Wahl, sondern exakt: beide zahlen PRO
 /// FELD, nicht pro vollstaendigem Satz, es gibt also gar keine "Teilerfuellung
 /// eines Satzes", die ein Exponent ueberhaupt modulieren koennte.
+/// KALIBRIERTE Exponenten je Kriterium, GEMESSEN am 2026-08-11 an der
+/// Heuristik-Referenz (`plattenkopf_referenzlauf_heuristik`, 200 Partien,
+/// `logs/referenz_kalibrierung.log`) -- also an einem Spieler, der die
+/// Abschluesse ANSPIELT. Der Champion-Korpus ist als Referenz untauglich, weil
+/// dort die Rate sein Defizit misst und nicht die Erreichbarkeit
+/// (Nutzer-Einwand: *"der v20wdl-Korpus ist keine gute referenz"*).
+///
+/// Gemessen `(fill/kap)^2` gegen realisierte Abschlussrate:
+///   Eckplatten 0,389 vs 0,286 ->   1,4x  ->  kalibriertes alpha ~ 2,6
+///   Reihen     0,328 vs 0,060 ->   5,5x  ->  ~ 5,0
+///   Spalten    0,287 vs 0,021 ->  13,5x  ->  ~ 6,3
+///   Diagonalen 0,246 vs 0,0013-> 196,5x  ->  ~ 9,5
+///
+/// Der einheitliche Exponent 2 ueberschaetzt also alle konjunktiven Kriterien,
+/// und zwar UNGLEICHMAESSIG ueber einen Faktor 140 -- ausgerechnet die
+/// Diagonale (teuerstes und unerreichbarstes Kriterium) am stärksten. Ein
+/// gemeinsames Gewicht kann das nicht korrigieren.
+///
+/// **Fuer eine 6-Zellen-Konjunktion landet der kalibrierte Exponent bei ~6,
+/// also beim PRODUKT unabhaengiger Zellen.** Das ist die Wahrscheinlichkeit,
+/// nach der die Nutzer-Frage von Anfang an gezielt hat.
+///
+/// GRENZE, nicht ueberlesen: grob aufgeloest ueber den MITTLEREN Fuellstand,
+/// und `E[x^2] != (E[x])^2` -- ein exakter Fit braucht die Einzelbeobachtungen.
+/// Ausserdem ist die Rate am ENDZUSTAND gemessen, nicht als
+/// `P(vollstaendig | fill, runde)`. Letzteres waere das eigentlich richtige
+/// Objekt und wuerde die ganze alpha-Konstruktion ersetzen.
+const ALPHA_KALIBRIERT: [f64; 8] = [
+    5.0, // 0 Reihen
+    6.3, // 1 Spalten
+    9.5, // 2 Diagonalen
+    6.3, // 3 Jokerfelder -- keine eigene Messung, wie Spalten behandelt (ungeprueft)
+    1.0, // 4 Randfelder -- ADDITIV, kein Exponent
+    2.6, // 5 Eckplatten
+    1.0, // 6 Spezialfelder -- ADDITIV (und hier ohnehin 0, s.u.)
+    6.3, // 7 Farbreihen -- keine eigene Messung, wie Spalten behandelt (ungeprueft)
+];
+
+/// Rundenabhaengiger Exponent je Kriterium (Nutzer-Vorgabe: *"wir haben gesagt
+/// wir verändern alpha über die runden"*, festgehalten in
+/// `PREREG_plattenkopf.md`).
+///
+/// Runde 1 = `alpha_start` (flach, LENKT: der erste Stein einer Bahn ist etwas
+/// wert), Runde 5 = kalibrierter Wert (SCHAETZT: nur noch Erreichbares zaehlt).
+/// Damit sind Schaetzer und Lenker nicht zwei Entwuerfe, sondern zwei Enden
+/// desselben Fahrplans -- die wahre Funktion `P(Linie vollstaendig)` wird mit
+/// kuerzerem Horizont steiler.
+///
+/// Die LINEARE Interpolation ist eine Annahme, keine Messung.
+pub fn alpha_fuer_runde(kriterium: usize, round_number: u32, alpha_start: f64) -> f64 {
+    let ziel = ALPHA_KALIBRIERT[kriterium.min(7)];
+    if ziel <= 1.0 {
+        return 1.0; // additive Kriterien: nie ein Exponent
+    }
+    let t = ((round_number.clamp(1, 5) - 1) as f64) / 4.0;
+    alpha_start + (ziel - alpha_start) * t
+}
+
+/// [`wertung_progress_alpha`] mit RUNDENABHAENGIGEM Exponenten JE KRITERIUM.
+/// Das ist die korrigierte Fassung: der einheitliche Exponent 2 ueberschaetzt
+/// die konjunktiven Kriterien ungleichmaessig (Faktor 1,4 bis 196,5, s.
+/// [`ALPHA_KALIBRIERT`]), und ein gemeinsames Gewicht kann das nicht heilen.
+///
+/// Bewusst als DUENNE Huelle ueber `wertung_progress_alpha` gebaut, je Kriterium
+/// einzeln aufgerufen -- so kann die Formel nicht auseinanderlaufen. Preis:
+/// `player_scoring_features` laeuft einmal je aktivem Kriterium statt einmal
+/// (bei 3 Platten im Spiel also 3x). Das ist ein Gang ueber 36 Felder gegen
+/// einen Netz-Vorwaertslauf im selben Blatt, also vertretbar.
+pub fn wertung_progress_runde(
+    player: &PlayerBoard,
+    tile_ids: &[usize],
+    round_number: u32,
+    alpha_start: f64,
+) -> f64 {
+    tile_ids
+        .iter()
+        .map(|&id| wertung_progress_alpha(player, &[id], alpha_fuer_runde(id, round_number, alpha_start)))
+        .sum()
+}
+
 pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f64) -> f64 {
     let sf = player_scoring_features(player);
     let mut total = 0.0;
@@ -1183,6 +1263,43 @@ mod tests {
             mean_u32(&|s| s.row_fill.iter().sum::<u32>())
         );
 
+        // KALIBRIERUNG des Fortschritts-Proxys (2026-08-11, Nutzer-Auftrag).
+        // Frage: ist `(fill/6)^2` -- die Wahrscheinlichkeitsschaetzung in
+        // `wertung_progress`/`wertung_progress_alpha` -- gut kalibriert?
+        //
+        // WARUM NICHT AM CHAMPION-KORPUS: dort liegt die realisierte
+        // Abschlussrate bei 0,56 % (Spalten), weil der Champion Spalten nicht
+        // ANSPIELT. Der Vergleich messe dann sein Defizit, nicht die Guete der
+        // Formel -- Nutzer-Einwand 2026-08-11 ("der v20wdl-Korpus ist keine
+        // gute referenz, da er die abschluesse nicht sauber spielt"). Die
+        // Heuristik spielt sie an (`wertung_progress` haengt an `mcts.rs:82`),
+        // ist also die brauchbare Referenz.
+        println!("  -- Kalibrierung (fill/6)^2 gegen realisierte Abschlussrate --");
+        let mean_f = |f: &dyn Fn(&ScoringFeatures) -> Vec<u32>, k: f64| -> (f64, f64) {
+            let (mut sp, mut sr, mut n2) = (0.0, 0.0, 0.0);
+            for s in feats.iter() {
+                for v in f(s) {
+                    sp += (v as f64 / k).powi(2);
+                    sr += if v as f64 >= k { 1.0 } else { 0.0 };
+                    n2 += 1.0;
+                }
+            }
+            (sp / n2, sr / n2)
+        };
+        for (name, get, kap) in [
+            ("Reihen", (&|s: &ScoringFeatures| s.row_fill.to_vec()) as &dyn Fn(&ScoringFeatures) -> Vec<u32>, 6.0),
+            ("Spalten", &|s: &ScoringFeatures| s.col_fill.to_vec(), 6.0),
+            ("Diagonalen", &|s: &ScoringFeatures| s.diag_fill.to_vec(), 6.0),
+            ("Eckplatten", &|s: &ScoringFeatures| s.corner_fill.to_vec(), 4.0),
+        ] {
+            let (proxy, rate) = mean_f(get, kap);
+            let faktor = if rate > 1e-9 { proxy / rate } else { f64::INFINITY };
+            println!(
+                "  {:<12} (fill/kap)^2 Mittel {:.4} | Abschlussrate {:.4} | Faktor {:>8.1}x",
+                name, proxy, rate, faktor
+            );
+        }
+
         println!("  -- Atom-Grundraten (Reihenfolge wie logs/atom_skill_check.log) --");
         let names: Vec<String> = atom_labels_and_bits(&boards[0]).into_iter().map(|(l, _)| l).collect();
         let mut hits = vec![0usize; names.len()];
@@ -1416,6 +1533,44 @@ mod tests {
         assert!(progress > 0.0 && progress < 3.0, "Teil-Bonus erwartet, war {progress}");
         // (2/4)^2 * 3 = 0.75
         assert!((progress - 0.75).abs() < 1e-9, "war {progress}");
+    }
+
+    #[test]
+    fn alpha_fuer_runde_steigt_und_ist_in_runde_1_der_startwert() {
+        // Waechter fuer den Rundenfahrplan (2026-08-11). Die uebrigen
+        // Shaping-Tests laufen ALLE auf Runde-1-Zustaenden -- dort ist
+        // alpha_c(1) == alpha_start, das neue Verhalten waere dort also
+        // unsichtbar. Dieser Test prueft genau die Rundenabhaengigkeit.
+        let start = 2.0;
+        for krit in [0usize, 1, 2, 5] {
+            let r1 = alpha_fuer_runde(krit, 1, start);
+            let r5 = alpha_fuer_runde(krit, 5, start);
+            assert!((r1 - start).abs() < 1e-12,
+                    "Kriterium {krit}: Runde 1 muss der Startwert sein, war {r1}");
+            assert!(r5 > r1,
+                    "Kriterium {krit}: alpha muss ueber die Runden STEIGEN ({r1} -> {r5})");
+            assert!((r5 - ALPHA_KALIBRIERT[krit]).abs() < 1e-12,
+                    "Kriterium {krit}: Runde 5 muss den kalibrierten Wert treffen");
+            // Monotonie ueber alle Runden
+            let mut prev = r1;
+            for r in 2..=5u32 {
+                let a = alpha_fuer_runde(krit, r, start);
+                assert!(a >= prev - 1e-12, "Kriterium {krit}: Runde {r} fiel ab");
+                prev = a;
+            }
+        }
+        // Die ADDITIVEN Kriterien bekommen NIE einen Exponenten -- 4 (Randfelder,
+        // +1 je Feld) und 6 (Spezialfelder, hier ohnehin 0).
+        for krit in [4usize, 6] {
+            for r in 1..=5u32 {
+                assert!((alpha_fuer_runde(krit, r, start) - 1.0).abs() < 1e-12,
+                        "Kriterium {krit} ist additiv, alpha muss 1 bleiben (Runde {r})");
+            }
+        }
+        // Die Diagonale ist das steilste Kriterium (196,5x ueberschaetzt bei
+        // alpha=2) und muss in Runde 5 ueber der Spalte liegen.
+        assert!(alpha_fuer_runde(2, 5, start) > alpha_fuer_runde(1, 5, start),
+                "Diagonale muss in Runde 5 steiler sein als die Spalte");
     }
 
     #[test]
