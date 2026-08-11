@@ -116,3 +116,42 @@ KI-/Arena-Pfad ruft es, und in allen 64 Logs 0 Treffer.
 **Niedrige Priorität, und bewusst nicht "auf Verdacht" gefixt**: es gibt keine
 echte Zeile, an der die Replay-Behandlung zu verifizieren wäre. Sinnvoll erst,
 wenn eine Partie über diesen Endpunkt gespielt und aufgezeichnet wurde.
+
+---
+
+## 8. NUTZER-ENTSCHEIDUNGEN 2026-08-11 -- beide Blocker sind weg
+
+### (b) Elo-Leiter: **Sprung wird nur vermerkt**
+
+Nutzer-Wortlaut: *"sprung wird nur vermerkt."* Also KEIN Neuverankern, keine
+neuen Anker-Kanten. Stattdessen eine Zeile in `elo_history.csv`, die den Schnitt
+markiert -- dieselbe Behandlung wie bei der Engine-Aera-Aktivierung (dort Zeile
+24). Messungen ueber den Schnitt hinweg bleiben damit ausdruecklich nur
+eingeschraenkt vergleichbar, und das steht dann dort, wo es gelesen wird.
+
+Ersparnis gegenueber dem Neuverankern: die Anker-Kanten haetten je n=150 ohne
+Fruehstopp gebraucht.
+
+### (a) Paritaets-Basislinie: folgt zwingend, nicht separat entschieden
+
+Das war keine echte Wahl. Der Hash MUSS brechen (Abschnitt 4a), also gibt es nur
+"Basislinie neu setzen und begruenden" oder "den Umbau gar nicht machen". Da die
+Elo-Frage entschieden ist, ist der Umbau gewollt -- damit wird die Basislinie neu
+gesetzt, mit Begruendung im Commit und dem alten Hash
+`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` daneben
+festgehalten, damit der Uebergang nachvollziehbar bleibt. **Widerspruch des
+Nutzers hierzu geht vor.**
+
+### ZEITPUNKT: nach der Koeffizientensuche, nicht jetzt
+
+Abschnitt 6 dieser Datei sagt es selbst: der Umbau *"sollte NICHT parallel zu
+einem laufenden Messvorhaben stattfinden, weil er die Vergleichsgrundlage
+verschiebt."* Die Koeffizientensuche fuer die vertikalen Wertungsplatten
+(`PREREG_injektion_wertungsplatten.md` N7) ist genau so ein Vorhaben -- Zellen vor
+und nach dem Schnitt waeren nicht mehr gegeneinander lesbar, und der Nullpunkt
+(53,30 Endstand, 0,70 vertikale Punkte) muesste neu gemessen werden.
+
+Reihenfolge also: Koeffizientensuche abschliessen, dann schneiden. Danach werden
+die endbrettbasierten Groessen verfuegbar (`row_fill` je Rasterreihe, ~6.300
+Beobachtungen bei 200 Paaren statt ~120 Abschlussereignissen) -- und genau die
+sind der dichte Detektor fuer alles, was in dieser Injektions-Reihe noch kommt.
