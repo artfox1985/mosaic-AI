@@ -414,3 +414,73 @@ Vorbehalt anmelden muss: Rasterreihe *r* wird nur von Musterreihe *r* gefuettert
 (`round_end.rs:20-22`), also hoechstens eine Fliese pro Runde. >= 2 Punkte im
 Mittel (2/3 einer Reihe a +3) bleibt damit erreichbar, eine ganze Reihe waere es
 ohne Spezialfeld nicht.
+
+---
+
+## N6. KORREKTUR DES ORAKELS — meine Umrechnung war falsch (2026-08-11)
+
+Nutzer-Praezisierung: *"nicht zusammenrechnen. es geht um die einzelabschaetzung
+je variation von alpha. dann sollten zwei reihen moeglich sein (2 spezialfliesen
+im obersten raster und dann sollte es gehen wenn fokus drauf gelegt wird) und
+eine diagonale."*
+
+**Zwei Zielwerte in N5 waren ANZAHLEN von Linien, nicht Punkte.** Ich hatte sie
+als Punkte gelesen und daraus Bruchteile abgeleitet ("2/3 einer Reihe", "jede 10.
+Partie eine Diagonale") -- beides falsch in der Sache. In Punkten werden die Ziele
+damit **haerter**:
+
+| k | Kriterium | Nullpunkt | N5 (falsch) | **GUELTIG** | Faktor | Rechnung |
+| - | --------- | --------: | ----------: | ----------: | -----: | -------- |
+| 1 | Vertikale Reihen | 0,70 | >= 14 | **>= 14** | 20x | 2 Spalten a 7 |
+| 2 | Diagonale Reihen | 0,43 | ~~>= 1~~ | **>= 10** | 23x | 1 Diagonale a 10 |
+| 5 | Eckplatten | 3,14 | >= 11 | **>= 11** | 3,5x | 3 + 8 |
+| 3 | Mehrfarbige Felder | 5,40 | >= 8 | **>= 8** | 1,5x | -- |
+| 0 | Horizontale Reihen | 0,78 | ~~>= 2~~ | **>= 6** | 7,7x | 2 Reihen a 3 |
+
+Punktwerte geprueft an `scoring.rs:165-179`: Reihe 3, Spalte 7, Diagonale 10,
+Eckplatten 3/3/8/8, Spezialfelder -3 je leerem Feld.
+
+**"Einzelabschaetzung je Variation von alpha"**: jeder Zielwert gilt fuer SEIN
+Kriterium in SEINEM Sweep-Satz, bei mindestens einem der vier alpha-Werte. Nicht
+summieren, nicht gegeneinander aufrechnen.
+
+### MEIN STRUKTUR-VORBEHALT ZU DEN HORIZONTALEN REIHEN IST WIDERLEGT
+
+Ich hatte in N5 notiert, eine ganze horizontale Reihe sei ohne Spezialfeld nicht
+schliessbar, weil Rasterreihe *r* nur von Musterreihe *r* gespeist wird
+(hoechstens eine Fliese je Runde, also 5 von 6 Feldern in 5 Runden). Der Nutzer
+hat den Weg genannt, und er ist am Code belegt -- `dome.rs:54-59`:
+
+    pub fn is_filled(&self) -> bool {
+        match self.space_type {
+            SpaceType::Special => self.placed_special,
+            _ => self.placed_color.is_some(),
+        }
+    }
+
+**Ein ausgeloestes Spezialfeld FUELLT die Rasterzelle.** `check_special_trigger`
+(`round_end.rs:322-324`) setzt `placed_special = true`, und `is_filled` zaehlt das
+fuer Special-Felder als belegt -- also auch in `row_fill`. Mit zwei Spezialfeldern
+in der obersten Rasterreihe braucht diese nur noch vier Lieferungen aus
+Musterreihe 0, und die hat Kapazitaet 1 (`board.rs:31-33`), wird also in jeder
+Runde fertig. Zwei horizontale Reihen sind damit erreichbar.
+
+Die ANZAHL Spezialfelder je Rasterreihe ist layoutabhaengig: jede der 9
+Kuppelplatten traegt genau ein Special-Feld (`round_end.rs:318-319`: "exakt 9
+Kuppelplatten tragen einen Special-Slot und es gibt exakt 9 Special-Fliesen"), und
+ob es in der oberen oder unteren Haelfte der Platte sitzt, entscheidet, in welche
+der beiden Rasterreihen es faellt. Bis zu drei je Rasterreihe sind moeglich.
+
+**Folge fuer die Auswertung**: der horizontale Zielwert bekommt KEINEN Vorbehalt
+mehr angehaengt. Verfehlt er, ist das ein Befund und keine Struktureigenschaft.
+
+### HERKUNFT DER LAEUFE, damit die Akten stimmen
+
+Nutzer-Frage *"wer hat diesen test beauftragt?"* zum `MOSAIC_ENDAWARE_W`-Term:
+**ich, unbeauftragt.** Die Nutzer-Aeusserung war eine Korrektur an meinem
+Vorgehen ("brauchst nicht immer das rad neu erfinden"), kein Messauftrag. Daraus
+habe ich einen Knopf gebaut und drei Laeufe gestartet (`ea01`, `ea03`, `mr01`),
+die Kerne belegten, WAEHREND der beauftragte isolierte Sweep noch nicht gefahren
+war. Beauftragt waren: die Strafleisten-Gegenprobe (*"aber ja probier es aus"*),
+der isolierte Sweep (N4) und der lambda-Sweep. Nutzer-Entscheid auf die Frage, ob
+abgebrochen wird: *"nein lass nur laufen."*
