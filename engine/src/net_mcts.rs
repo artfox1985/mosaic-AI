@@ -175,7 +175,7 @@ static WARNED_NO_OPP_HEAD: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 /// lassen). Selbes Muster wie die bestehenden Python-seitigen `MOSAIC_*`-Env-
 /// Var-Leser (z.B. `config.py::MOSAIC_DATA_DIR`, `player_profiles.py::
 /// MOSAIC_PROFILES_PATH`) -- hier auf Rusts `std::env::var` uebertragen.
-fn read_f64_env(name: &str, default: f64) -> f64 {
+pub(crate) fn read_f64_env(name: &str, default: f64) -> f64 {
     match std::env::var(name) {
         Ok(s) => match s.trim().parse::<f64>() {
             Ok(v) => v,

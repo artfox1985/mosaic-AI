@@ -903,6 +903,130 @@ fn select_best_tiling_candidate(
     best.map(|(_, step)| step)
 }
 
+// ── Task #100: plattenbewusste Tiling-Zugwahl in Runden 1-4 ─────────────────
+//
+// `MOSAIC_TILING_PLATTEN_W` (Default `0.0` = aus). Bei Wert != 0 wird zu den
+// Platzierungspunkten eines Tiling-Abschlusses `w * calculate_end_scoring(Brett
+// NACH dem vollstaendigen Abschluss, state.scoring_tile_ids).total` addiert,
+// und nach dieser SUMME gewaehlt -- siehe `best_first_step_platten_valued`.
+//
+// UNTERSCHIED zu `NET_TILING_TIEBREAK_ENABLED` (oben): dieser Zweig deckt
+// Runde 1 MIT ab (Rundenfenster 1..=4, siehe `best_first_step_exact_or_valued`
+// unten). Der bestehende Runde-1-Ausschluss des Netz-Stichentscheids ist gegen
+// einen GELERNTEN Proxy begruendet (Value-Head-RMSE, siehe dessen Doku) --
+// `calculate_end_scoring` ist dagegen eine BERECHNETE Formel ohne Schaetzfehler,
+// dieser Ausschlussgrund entfaellt hier.
+//
+// NAEHERUNG in Runden 1-4 (bewusst, siehe `best_first_step_platten_valued`):
+// das Kuppelraster aendert sich zwischen jetzt und Rundenende noch durch
+// spaetere Drafting-Zuege -- `calculate_end_scoring` bewertet dort also ein
+// Zwischenbrett, nicht das tatsaechliche Endbrett. Fuer eine Rangfolge unter
+// den JETZT verfuegbaren Tiling-Abschluessen reicht die Richtung (welcher
+// Abschluss bringt das Brett den aktivierten Wertungsplatten naeher); ein
+// Schaetzfehler in der absoluten Hoehe schadet nur, wenn er die Rangfolge
+// selbst verzerrt. In Runde 5 ist das Kuppelraster dagegen final -- dort gilt
+// stattdessen der EXAKTE Pfad `best_first_step_round5`/`ROUND5_ENDSCORING_ENABLED`
+// (Task #21), dieser Zweig bleibt per Rundenfenster aussen vor.
+
+/// Liest `MOSAIC_TILING_PLATTEN_W` einmalig als `f64`. Gleiches Muster wie
+/// `net_mcts::read_f64_env` -- hier LOKAL dupliziert statt dessen Sichtbarkeit
+/// zu aendern: `read_f64_env` ist dort privat (`fn`, kein `pub`), und
+/// `net_mcts.rs` ist laut Auftrag aktiv von parallelen Messjobs betroffen --
+/// eine Sichtbarkeitsaenderung an einer im Hot-Path liegenden Datei fuer einen
+/// tiling_solver-internen Bedarf haette ein groesseres Risiko (Rebuild/Merge-
+/// Konflikt jener Jobs) als eine kleine Dopplung. Fehlend/leer -> Default
+/// (kein Fehler), nicht parsbar -> Default + einmalige stderr-Warnung, kein
+/// Panic (Laufzeit-Konfiguration darf einen Self-Play-Prozess nie abstuerzen
+/// lassen).
+fn read_f64_env_local(name: &str, default: f64) -> f64 {
+    match std::env::var(name) {
+        Ok(s) => match s.trim().parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!("⚠️  {name}={s:?} nicht als Zahl lesbar -- verwende Default {default}");
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
+thread_local! {
+    /// Test-Override fuer [`tiling_platten_weight`] -- thread-lokal, gleiches
+    /// Muster wie `STATS_OVERRIDE`/`CACHE_OVERRIDE` oben: erlaubt Tests, den
+    /// Wert gezielt zu setzen, OHNE die prozessweite `OnceLock`-gecachte
+    /// Env-Var fuer alle parallel laufenden `cargo test`-Threads zu bestimmen.
+    static PLATTEN_WEIGHT_OVERRIDE: std::cell::Cell<Option<f64>> = std::cell::Cell::new(None);
+}
+
+fn tiling_platten_weight_env() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env_local("MOSAIC_TILING_PLATTEN_W", 0.0))
+}
+
+/// Laufzeitgewicht `w` fuer [`best_first_step_platten_valued`]. Default `0.0`
+/// = aus -- `best_first_step_exact_or_valued` faellt dann exakt auf das
+/// Bestandsverhalten zurueck (siehe dort).
+fn tiling_platten_weight() -> f64 {
+    PLATTEN_WEIGHT_OVERRIDE.with(|c| c.get()).unwrap_or_else(tiling_platten_weight_env)
+}
+
+#[cfg(test)]
+pub(crate) fn set_platten_weight_override_for_test(v: Option<f64>) {
+    PLATTEN_WEIGHT_OVERRIDE.with(|c| c.set(v));
+}
+
+/// Task #100: reiner Auswahlkern OHNE Env-Zugriff -- `w` als Parameter, direkt
+/// mit konstruierten Stellungen testbar (gleiches Muster wie
+/// `select_best_tiling_candidate`s `mode`-Parameter, Task #37).
+///
+/// Wert je Kandidat:
+///
+/// ```text
+/// punkte(Abschluss) + w * calculate_end_scoring(Brett NACH dem Abschluss, state.scoring_tile_ids).total
+/// ```
+///
+/// ADDITIV, nicht multiplikativ wie beim Netz-Stichentscheid
+/// (`select_best_tiling_candidate`, Modus 0: `punkte * P(Sieg)`): der
+/// Plattenwert soll Platzierungspunkte UEBERSTIMMEN koennen (Auftrag), eine
+/// Multiplikation mit einem moeglicherweise kleinen oder negativen Punktestand
+/// waere dafuer strukturell ungeeignet (ein 0-Punkte-Abschluss wuerde JEDEN
+/// Plattenwert auf 0 ziehen).
+///
+/// VOR jeder Top-K-Beschraenkung: `top_k_tilings(.., MAX_TILING_LEAVES)` --
+/// `MAX_TILING_LEAVES` ist die tatsaechliche Erschoepfungsgrenze von
+/// `collect_tilings` selbst (siehe dessen Doku), nach dem Dedup kann `uniq`
+/// dort also NIE mehr als `MAX_TILING_LEAVES` Eintraege haben -- die
+/// `uniq.len() >= k`-Bremse in `top_k_tilings` greift folglich nie, und die
+/// dortige punkte-sortierte Zwischenreihung bleibt fuer die Auswahl HIER
+/// folgenlos: unten steht ein eigener Argmax ueber die Summe, nicht ueber die
+/// von `top_k_tilings` bereits nach Punkten sortierte Reihenfolge. Dasselbe
+/// "K weiten" nutzt bereits `best_first_step_round5` fuer denselben Zweck.
+///
+/// Tie-Break bei exaktem Wertegleichstand: der ERSTE Kandidat gewinnt (`>`
+/// statt `>=`), deterministisch, kein Zufall -- gleiche Konvention wie
+/// `select_best_tiling_candidate`.
+fn best_first_step_platten_valued(state: &GameState, pi: usize, w: f64) -> Option<TilingStep> {
+    let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
+    let mut best: Option<(f64, TilingStep)> = None;
+    for c in cands {
+        let end = crate::scoring::calculate_end_scoring(
+            &c.final_state.players[pi],
+            &c.final_state.scoring_tile_ids,
+        )
+        .total;
+        let val = f64::from(c.points) + w * f64::from(end);
+        let better = match &best {
+            Some((best_val, _)) => val > *best_val,
+            None => true,
+        };
+        if better {
+            best = Some((val, c.first_step));
+        }
+    }
+    best.map(|(_, step)| step)
+}
+
 /// Task #20: waehlt unter den bis zu `NET_TILING_TOPK` vollstaendigen
 /// Tiling-Abschluessen den nach `select_best_tiling_candidate`
 /// (`MOSAIC_TILING_SELECT`, Default-Modus `0` = Bestand) besten und liefert
@@ -934,27 +1058,61 @@ pub fn best_first_step_valued(
 /// `py.rs::ai_tiling_step` sie nicht redundant duplizieren (und nie
 /// auseinanderlaufen koennen).
 ///
-/// `evaluator: None` (Heuristik-Spieler, kein Netz geladen) oder Runde
-/// ausserhalb [2,4] oder Toggle aus → EXAKT `best_first_step_exact`, byte-
-/// identisch zum Vor-Task-#20-Verhalten. Andernfalls `best_first_step_valued`;
-/// liefert dieses `None` (keine Kandidaten, siehe dort), faellt ebenfalls auf
-/// `best_first_step_exact` zurueck.
+/// REIHENFOLGE der Zweige (Task #100 NEU an erster Stelle). Sobald ein Zweig
+/// einen Zug liefert, wird sofort `return`et -- kein Doppelweg, die folgenden
+/// Zweige entscheiden diesen Zug dann nie mehr:
 ///
-/// Runde 1 bewusst ausgeschlossen: das Value-Head ist dort blind (RMSE 0,2531
-/// ~ Zielstreuung 0,2538, siehe Projekt-Notizen zu Task #20) -- eine
-/// Multiplikation mit im Wesentlichen Rauschen waere reiner Schaden. Runde
-/// >= 5 bewusst ausgeschlossen: dort gilt stattdessen Task #21
-/// (`ROUND5_ENDSCORING_ENABLED`/`best_first_step_round5`) -- die dort exakt
-/// berechenbare Endwertung schlaegt einen gelernten Proxy strukturell, siehe
-/// dessen Doku oben. `best_first_step_exact` deckt diesen Fall bereits selbst
-/// ab (eigene `ROUND5_ENDSCORING_ENABLED`-Verzweigung) -- hier also nichts
-/// zusaetzlich zu tun, nur nicht versehentlich mit dem Value-Stichentscheid
-/// ueberschreiben.
+/// 1. `MOSAIC_TILING_PLATTEN_W != 0` UND Runde in `1..=4` ->
+///    `best_first_step_platten_valued` (Task #100, additive Endwertungs-Summe,
+///    KEIN Netz noetig). Liefert das `Some`, ist der Zug entschieden.
+/// 2. Sonst: `NET_TILING_TIEBREAK_ENABLED` UND Runde in `2..=4` UND ein
+///    Evaluator vorhanden -> `best_first_step_valued` (Task #20, Netz-
+///    Stichentscheid `punkte * P(Sieg)` bzw. `P(Sieg)`).
+/// 3. Sonst: `best_first_step_exact` -- deckt Runde >= 5 selbst ab
+///    (`ROUND5_ENDSCORING_ENABLED`/`best_first_step_round5`, Task #21) und ist
+///    andernfalls die reine Punktemaximierung, byte-identisch zum Vor-
+///    Task-#20-Verhalten.
+///
+/// `evaluator: None` (Heuristik-Spieler, kein Netz geladen) oder Runde
+/// ausserhalb [2,4] oder Toggle aus → Zweig 2 entfaellt. Ist zusaetzlich
+/// `MOSAIC_TILING_PLATTEN_W` unveraendert `0.0` (Default, siehe
+/// `tiling_platten_weight`) oder die Runde ausserhalb [1,4], entfaellt auch
+/// Zweig 1 -- dann EXAKT `best_first_step_exact`, byte-identisch zum
+/// Vor-Task-#20-Verhalten.
+///
+/// Runde 1 in Zweig 2 bewusst ausgeschlossen: das Value-Head ist dort blind
+/// (RMSE 0,2531 ~ Zielstreuung 0,2538, siehe Projekt-Notizen zu Task #20) --
+/// eine Multiplikation mit im Wesentlichen Rauschen waere reiner Schaden.
+/// Zweig 1 (Task #100) schliesst Runde 1 dagegen bewusst EIN, siehe dessen
+/// Modul-Kommentar oben -- `calculate_end_scoring` ist dort eine berechnete
+/// Formel ohne Schaetzfehler, der Ausschlussgrund von Zweig 2 greift nicht.
+///
+/// Runde >= 5 in Zweig 1 UND Zweig 2 bewusst ausgeschlossen: dort gilt
+/// stattdessen Task #21 (`ROUND5_ENDSCORING_ENABLED`/`best_first_step_round5`)
+/// -- die dort exakt berechenbare Endwertung (Kuppelraster final, kein
+/// Naeherungsfehler mehr) schlaegt sowohl einen gelernten Proxy als auch die
+/// in Runden 1-4 nur naeherungsweise gueltige `calculate_end_scoring`
+/// strukturell, siehe dessen Doku oben. `best_first_step_exact` deckt diesen
+/// Fall bereits selbst ab (eigene `ROUND5_ENDSCORING_ENABLED`-Verzweigung) --
+/// hier also nichts zusaetzlich zu tun, nur nicht versehentlich mit einem der
+/// beiden Stichentscheide ueberschreiben.
 pub fn best_first_step_exact_or_valued(
     state: &GameState,
     pi: usize,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
 ) -> TilingStep {
+    // Zweig 1 (Task #100): additive Endwertungs-Summe, Runden 1-4, kein Netz
+    // noetig. VOR Zweig 2 geprueft -- entscheidet er, wird Zweig 2 fuer diesen
+    // Zug gar nicht mehr aufgerufen (kein Doppelweg, siehe Doku oben).
+    if (1..=4).contains(&state.round_number) {
+        let w = tiling_platten_weight();
+        if w != 0.0 {
+            if let Some(step) = best_first_step_platten_valued(state, pi, w) {
+                return step;
+            }
+        }
+    }
+    // Zweig 2 (Task #20): Netz-Stichentscheid, Runden 2-4.
     if NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
         if let Some(eval) = evaluator {
             if let Some(step) = best_first_step_valued(state, pi, eval) {
@@ -962,6 +1120,7 @@ pub fn best_first_step_exact_or_valued(
             }
         }
     }
+    // Zweig 3: reine Punktemaximierung (deckt Runde >= 5 selbst ab).
     best_first_step_exact(state, pi)
 }
 
@@ -1677,6 +1836,257 @@ mod tests {
                 "Modus {mode}: bei Gleichstand muss der erste Kandidat gewinnen"
             );
         }
+    }
+
+    // ── Task #100: plattenbewusste Tiling-Zugwahl (MOSAIC_TILING_PLATTEN_W) ──
+
+    /// Baut einen echten Tiling-FORK fuer Musterreihe 0 (Kapazitaet 1, ein
+    /// einzelner Rot-Stein): zwei Ziel-Slots in Dome-Reihe 0 bieten je einen
+    /// offenen, Rot-annehmenden Space.
+    ///
+    /// Slot (0,0): si0 ist das EINZIGE Wildcard-Feld auf dem gesamten Brett,
+    /// isoliert (si1/si2/si3 unbelegt -> keine Linie beim Legen,
+    /// "alleinstehend" = 1 Punkt via `score_placed_tile`). si1 traegt bewusst
+    /// Blau statt Rot: sonst waere si1 (unbelegt, `valid_si=[0,1]` fuer
+    /// Musterreihe 0) selbst ein DRITTER gueltiger Rot-Zug und der Fork keine
+    /// echte Zwei-Wege-Entscheidung mehr. Legen bei si0 komplettiert
+    /// Kriterium 3 ("Mehrfarbige Felder"): 2 * wild_total(=1) = 2
+    /// Endwertungspunkte.
+    /// Slot (0,2): si0 offen (Rot), si1 VORBEFUELLT (Rot) -> horizontale
+    /// 2er-Linie = 2 Punkte via `score_placed_tile`. Kein Wildcard-Feld ->
+    /// Kriterium 3 bleibt dort unerfuellt (0).
+    ///
+    /// `scoring_tile_ids = vec![3]` isoliert den Effekt auf genau dieses eine
+    /// Kriterium -- keine der beiden Platzierungen beeinflusst versehentlich
+    /// ein anderes (nicht aktives) Kriterium.
+    ///
+    /// `round` wird nur gesetzt, NICHT in der Geometrie selbst genutzt -- die
+    /// Rundenabhaengigkeit lebt ausschliesslich im Aufrufer
+    /// (`best_first_step_exact_or_valued`s Rundenfenster).
+    fn platten_fork_state(round: u32) -> GameState {
+        use crate::dome::{DomeSpace, DomeTile};
+        let mut s = tiling_state(7);
+        s.round_number = round;
+        s.scoring_tile_ids = vec![3];
+        s.dome_display.clear();
+
+        let slot_a = DomeTile::new(
+            100,
+            vec![DomeSpace::wild(), DomeSpace::normal(Blau), DomeSpace::normal(Rot), DomeSpace::normal(Rot)],
+            0,
+        );
+        s.players[0].dome_grid.place_dome_tile(slot_a, 0, 0).unwrap();
+
+        let mut slot_b = DomeTile::new(
+            101,
+            vec![DomeSpace::normal(Rot), DomeSpace::normal(Rot), DomeSpace::normal(Tuerkis), DomeSpace::normal(Tuerkis)],
+            0,
+        );
+        slot_b.spaces[1].placed_color = Some(Rot);
+        s.players[0].dome_grid.place_dome_tile(slot_b, 0, 2).unwrap();
+
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+        s
+    }
+
+    /// Der punktereichere Zug im Fork (2 Punkte, keine Plattenvollendung).
+    const PLATTEN_FORK_POINTS_MOVE: TilingAction =
+        TilingAction { pattern_row: 0, slot_row: 0, slot_col: 2, space_index: 0 };
+    /// Der plattenvollendende Zug im Fork (1 Punkt, +2 Endwertung bei aktivem Gewicht).
+    const PLATTEN_FORK_PLATTE_MOVE: TilingAction =
+        TilingAction { pattern_row: 0, slot_row: 0, slot_col: 0, space_index: 0 };
+
+    /// Vorab-Beleg der Handrechnung im Doc-Kommentar von `platten_fork_state`:
+    /// die beiden Zuege muessen tatsaechlich 1 bzw. 2 Punkte bringen und sich
+    /// im Endwertungs-Delta (0 vs. 2) unterscheiden -- sonst waere der Fork
+    /// kein echter Fork fuer die folgenden Tests.
+    #[test]
+    fn platten_fork_state_matches_hand_computed_points_and_end_scoring() {
+        let s = platten_fork_state(2);
+        let actions = generate_tiling_actions(&s, 0);
+        assert_eq!(actions.len(), 2, "erwarte genau 2 Ziel-Slots als Fork: {actions:?}");
+
+        let cands = top_k_tilings(&s, 0, MAX_TILING_LEAVES);
+        assert_eq!(cands.len(), 2, "erwarte genau 2 ueberlebende Tiling-Abschluesse");
+
+        let points_cand = cands
+            .iter()
+            .find(|c| c.first_step == TilingStep::Place(PLATTEN_FORK_POINTS_MOVE))
+            .expect("Punkte-Zug muss unter den Kandidaten sein");
+        let platte_cand = cands
+            .iter()
+            .find(|c| c.first_step == TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE))
+            .expect("Platten-Zug muss unter den Kandidaten sein");
+
+        assert_eq!(points_cand.points, 2, "Punkte-Zug sollte 2 Punkte bringen (2 horizontal)");
+        assert_eq!(platte_cand.points, 1, "Platten-Zug sollte 1 Punkt bringen (alleinstehend)");
+
+        let end_points = crate::scoring::calculate_end_scoring(
+            &points_cand.final_state.players[0],
+            &points_cand.final_state.scoring_tile_ids,
+        )
+        .total;
+        let end_platte = crate::scoring::calculate_end_scoring(
+            &platte_cand.final_state.players[0],
+            &platte_cand.final_state.scoring_tile_ids,
+        )
+        .total;
+        assert_eq!(end_points, 0, "Punkte-Zug darf Kriterium 3 nicht vollenden");
+        assert_eq!(end_platte, 2, "Platten-Zug muss Kriterium 3 vollenden (2*wild_total=2*1)");
+    }
+
+    /// (1) Default-Neutralitaet: ungesetzter Knopf (`MOSAIC_TILING_PLATTEN_W`
+    /// nicht gesetzt, kein Test-Override aktiv) -> Default `0.0` ->
+    /// `best_first_step_exact_or_valued` muss in Runden 1-4 exakt
+    /// `best_first_step_exact` liefern. Praezedenz:
+    /// `exact_or_valued_without_evaluator_matches_exact` oben, hier gezielt auf
+    /// den neuen Plattenwert-Zweig zugeschnitten (engeres Rundenfenster 1..=4).
+    #[test]
+    fn platten_weight_default_off_matches_exact_rounds_1_to_4() {
+        assert_eq!(
+            tiling_platten_weight(),
+            0.0,
+            "Testumgebung darf MOSAIC_TILING_PLATTEN_W nicht gesetzt haben"
+        );
+        let mut checked = 0;
+        for seed in 1u64..=60 {
+            for round in [1u32, 2, 3, 4] {
+                let mut s = rich_state(seed);
+                s.round_number = round;
+                if legal_steps(&s, 0, true).is_empty() {
+                    continue;
+                }
+                checked += 1;
+                assert_eq!(
+                    best_first_step_exact_or_valued(&s, 0, None),
+                    best_first_step_exact(&s, 0),
+                    "Seed {seed} Runde {round}: MOSAIC_TILING_PLATTEN_W=0 (Default) weicht ab"
+                );
+            }
+        }
+        assert!(checked >= 20, "nur {checked} Stellungen geprueft");
+    }
+
+    /// (2) Der Plattenwert ueberstimmt Platzierungspunkte -- Runden 2-4: bei
+    /// `w=0` gewinnt der punktereichere Zug (2 > 1), bei hinreichend grossem
+    /// `w=5` (Plattenbonus 2*5=10 uebersteigt den 1-Punkt-Vorsprung) gewinnt
+    /// der plattenvollendende Zug.
+    #[test]
+    fn platten_weight_overrides_points_rounds_2_to_4() {
+        for round in [2u32, 3, 4] {
+            let s = platten_fork_state(round);
+
+            set_platten_weight_override_for_test(Some(0.0));
+            let off = best_first_step_exact_or_valued(&s, 0, None);
+            set_platten_weight_override_for_test(None);
+            assert_eq!(
+                off,
+                TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
+                "Runde {round}: w=0 sollte die punktereichere Platzierung waehlen"
+            );
+
+            set_platten_weight_override_for_test(Some(5.0));
+            let on = best_first_step_exact_or_valued(&s, 0, None);
+            set_platten_weight_override_for_test(None);
+            assert_eq!(
+                on,
+                TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
+                "Runde {round}: w=5 sollte die plattenvollendende Platzierung waehlen"
+            );
+        }
+    }
+
+    /// (3) Runde 1 wirkt: derselbe Nachweis wie oben, aber in Runde 1 -- dort
+    /// ist der BESTEHENDE Pfad (`best_first_step_exact` -> `best_first_step_inner`)
+    /// plattenblind (kein `NET_TILING_TIEBREAK_ENABLED`-Zweig, der ist auf
+    /// Runden 2-4 begrenzt). Der neue Zweig muss trotzdem greifen.
+    #[test]
+    fn platten_weight_overrides_points_in_round_1() {
+        let s = platten_fork_state(1);
+
+        set_platten_weight_override_for_test(Some(0.0));
+        let off = best_first_step_exact_or_valued(&s, 0, None);
+        set_platten_weight_override_for_test(None);
+        assert_eq!(
+            off,
+            TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
+            "Runde 1, w=0: sollte die punktereichere Platzierung waehlen (Bestandsverhalten)"
+        );
+        // Gegenprobe: w=0 ist tatsaechlich identisch zum bestehenden, plattenblinden Pfad.
+        assert_eq!(off, best_first_step_exact(&s, 0));
+
+        set_platten_weight_override_for_test(Some(5.0));
+        let on = best_first_step_exact_or_valued(&s, 0, None);
+        set_platten_weight_override_for_test(None);
+        assert_eq!(
+            on,
+            TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
+            "Runde 1, w=5: der neue Zweig muss die plattenvollendende Platzierung erzwingen, \
+             obwohl der bestehende Runde-1-Pfad plattenblind ist"
+        );
+    }
+
+    /// (4) Runde 5 unangetastet: eigener Fork mit GROESSEREM Punktevorsprung
+    /// (4 statt 2) fuer den Punkte-Zug, damit der Test tatsaechlich
+    /// diskriminiert: `best_first_step_round5` (Task #21) addiert die
+    /// Endwertung selbst schon UNGEWICHTET (effektiv `w=1`) und wuerde bei nur
+    /// 1-2 Punkten Vorsprung ohnehin denselben (Platten-)Zug waehlen wie ein
+    /// (hypothetisch) faelschlich aktiver Task-#100-Zweig mit `w=5` -- ein
+    /// Test, der dann "gleich" bliebe, koennte eine kaputte Rundenfenster-
+    /// Bremse nicht von einem Zufallstreffer unterscheiden. Mit 4 Punkten
+    /// Vorsprung waehlt `best_first_step_round5` (effektives Gewicht 1:
+    /// 4+0=4 > 1+2=3) den PUNKTE-Zug; ein faelschlich aktiver Task-#100-Zweig
+    /// mit `w=5` wuerde dagegen den PLATTEN-Zug waehlen (1+5*2=11 > 4+0=4) --
+    /// beide Ergebnisse sind unterscheidbar, der Test kann also tatsaechlich
+    /// eine kaputte Bremse aufdecken statt nur zufaellig gruen zu sein.
+    #[test]
+    fn platten_weight_round5_unaffected() {
+        use crate::dome::{DomeSpace, DomeTile};
+        let mut s = tiling_state(7);
+        s.round_number = 5;
+        s.scoring_tile_ids = vec![3];
+        s.dome_display.clear();
+
+        // si1 traegt Blau statt Rot -- sonst waere si1 (unbelegt, `valid_si=[0,1]`)
+        // selbst ein dritter gueltiger Rot-Zug, siehe `platten_fork_state`-Doku.
+        let slot_a = DomeTile::new(
+            100,
+            vec![DomeSpace::wild(), DomeSpace::normal(Blau), DomeSpace::normal(Rot), DomeSpace::normal(Rot)],
+            0,
+        );
+        s.players[0].dome_grid.place_dome_tile(slot_a, 0, 0).unwrap();
+
+        // si0 offen (Rot), si1 UND si2 vorbefuellt (Rot) -> horizontale UND
+        // vertikale 2er-Linie = 2+2 = 4 Punkte (statt 2 im kleinen Fork oben).
+        let mut slot_b = DomeTile::new(
+            102,
+            vec![DomeSpace::normal(Rot), DomeSpace::normal(Rot), DomeSpace::normal(Rot), DomeSpace::normal(Tuerkis)],
+            0,
+        );
+        slot_b.spaces[1].placed_color = Some(Rot);
+        slot_b.spaces[2].placed_color = Some(Rot);
+        s.players[0].dome_grid.place_dome_tile(slot_b, 0, 2).unwrap();
+
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+
+        let baseline = best_first_step_exact_or_valued(&s, 0, None); // Default 0.0, kein Override
+
+        set_platten_weight_override_for_test(Some(5.0));
+        let with_weight = best_first_step_exact_or_valued(&s, 0, None);
+        set_platten_weight_override_for_test(None);
+
+        assert_eq!(
+            with_weight, baseline,
+            "Runde 5 darf sich durch MOSAIC_TILING_PLATTEN_W nicht aendern"
+        );
+        // Gegenprobe, dass der Test wirklich etwas beweist: die Baseline muss
+        // der PUNKTE-Zug sein (Runde-5-Endwertung mit Gewicht 1 waehlt ihn,
+        // siehe Doc oben) -- sonst waere die Konstruktion kein Diskriminator.
+        assert_eq!(
+            baseline,
+            TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
+            "Testkonstruktion: Runde-5-Baseline sollte der Punkte-Zug sein (Diskriminierungspruefung)"
+        );
     }
 
     // ── Task #99 (vormals #33): Transpositions-Memoisierung ──────────────────
