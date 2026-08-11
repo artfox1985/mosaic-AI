@@ -214,7 +214,27 @@ Kontrolle ist `w = 0` (Term aus), damit die untere Schwelle einen Nullpunkt hat.
 | Nahmen-Anteil Musterreihen 5+6 | Log | Mensch 40,4 % / KI 22,7 % |
 | Siegquote | `winner` | -- |
 
-## EINSCHRAENKUNG, die im Verdikt stehen muss
+## EINSCHRAENKUNG -- ein POWER-Problem, kein Gueltigkeitsproblem
+
+**Nutzer-Korrektur 2026-08-11: *"mag sein, aber es ist die selbe
+ausgangsbasis"*.** Meine erste Fassung unten klang wie ein Validitaetsmangel.
+Sie ist es nicht:
+
+- Die **Ausgangsbasis ist identisch** -- gleicher Seed, gleiche Fabriken,
+  gleiche Auslage, gleiche Wertungsplatten. Alles, was danach abweicht, ist
+  WIRKUNG des Eingriffs und nicht Stoerung. Genau das will ein gepaarter
+  Versuch.
+- Der verschobene RNG-Strom ist **unkorreliert mit der Spielqualitaet** -- kein
+  Arm wird dadurch systematisch besser bedient. Das kostet PRAEZISION (die
+  Paarung ist weniger eng als gemeinsame Zufallszahlen), nicht Gueltigkeit.
+- `determinize_hidden_information` arbeitet auf der SUCH-Kopie des Zustands
+  (`&mut GameState` des Suchbaums), nicht auf der laufenden Partie. Die Suche
+  mischt also nicht das echte Material, sie verbraucht nur Ziehungen.
+
+Die technische Beschreibung bleibt stehen, weil sie fuer das REPLAY entscheidend
+ist -- dort ist sie ein hartes Hindernis, nicht bloss Varianz.
+
+## Technischer Hintergrund
 
 "Gepaart mit selbem Seed" ist schwaecher als es klingt: Suche und Spielzustand
 teilen dasselbe RNG (`self_play.rs:1523`, `net_mcts.rs:620`,
