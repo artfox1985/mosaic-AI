@@ -22,8 +22,13 @@ ein Messplan-Fehler.**
 
 ## 1. Gegenstand
 
-`MOSAIC_WERTUNG_SHAPING_W` (Gewicht), `MOSAIC_WERTUNG_ALPHA` (Exponent,
-Default 2,0 — **nicht** Gegenstand, Präzedenz `wertung_progress`).
+`MOSAIC_WERTUNG_SHAPING_W` (Gewicht), `MOSAIC_WERTUNG_ALPHA` (Exponent).
+
+> **GEÄNDERT durch die KALIBRIERUNGS-METHODE unten (Nutzer-Vorgabe 2026-08-11):**
+> hier stand "Exponent Default 2,0, **nicht** Gegenstand". Jetzt ist es
+> umgekehrt: **α ist der Sweep-Gegenstand**, `w` wird bei 1,0 FESTGEHALTEN.
+> Grund: α entscheidet, ob der Term überhaupt lenkt, und `w` hat mit
+> `dP(Sieg)/dPunkt = 0,0242` eine abgeleitete Größe, α nicht.
 
 Der Term, je Spieler absolut aus dem eigenen Brett
 (`net_mcts.rs`, `apply_wertung_shaping_with`):
@@ -49,7 +54,13 @@ und `wertung_progress_alpha` deckt, **gegatet auf `scoring_tile_ids`**:
 `MOSAIC_UNLOCK_SHAPING_W` bleibt in diesem Sweep auf **0**, damit die beiden
 Kanäle nicht konfundieren.
 
-## 2. Arme — und sie sind KLEINER als beim Freischalt-Term
+## 2. Arme — ÜBERHOLT, siehe Kalibrierungs-Methode unten
+
+> Die w-Arme 0,1 / 0,3 unten sind durch den α-Sweep ERSETZT. Die Rechnung dazu
+> bleibt gültig und ist der Grund, warum `w` überhaupt eine ableitbare Größe hat
+> — nur ist `w` jetzt fest und α wandert.
+
+### (überholter Abschnitt, Rechnung weiter gültig)
 
 **Gerechnet, nicht übernommen** *(meine Ableitung aus den Durchsatz-Zahlen in
 `docs/domaenenwissen.md`, ungemessen)*: bei ~15,7 belegten Feldern je Brett
@@ -137,7 +148,9 @@ zu zeigen.
 - Keinen Champion-Wechsel (kein neuer Checkpoint).
 - Nicht `MOSAIC_UNLOCK_SHAPING_W` (`PREREG_injektion_dosis.md`, danach).
 - Nicht den Punkte-Kanal (`PREREG_punkte_lambda_unter_kipppunkt.md`).
-- Nicht den Exponenten α (Default 2,0, Präzedenz `wertung_progress`).
+- ~~Nicht den Exponenten α~~ — **überholt**: α IST der Gegenstand, siehe
+  Kalibrierungs-Methode. Nicht entschieden werden dagegen die kalibrierten
+  ENDPUNKTE (`ALPHA_KALIBRIERT`), die aus der Heuristik-Referenz gemessen sind.
 
 ---
 
