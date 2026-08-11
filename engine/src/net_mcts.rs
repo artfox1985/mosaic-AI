@@ -1237,9 +1237,11 @@ fn tiling_vorausschau(state: &GameState, pi: usize) -> f64 {
 /// den die Heuristik benutzt. `mcts.rs::player_total` besteht aus DREI
 /// Summanden, und der erste ist der, der die Musterreihen sieht:
 ///
-///     solve_round_final_score(state, pi)                  <- dieser hier
-///       + wertung_progress(..)                            <- MOSAIC_WERTUNG_SHAPING_W
-///       + projected_unplaceable_penalty(..)               <- MOSAIC_WERTUNG_FLOOR_W
+/// ```text
+/// solve_round_final_score(state, pi)                  <- dieser hier
+///   + wertung_progress(..)                            <- MOSAIC_WERTUNG_SHAPING_W
+///   + projected_unplaceable_penalty(..)               <- MOSAIC_WERTUNG_FLOOR_W
+/// ```
 ///
 /// Warum meine beiden Eigenbauten weg sind: gemessen taten sie nichts.
 /// `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte (t=-0,07), bei w=0,3 -2,16
