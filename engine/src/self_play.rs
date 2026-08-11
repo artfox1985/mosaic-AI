@@ -976,12 +976,70 @@ pub(crate) fn net_tiling_tiebreak_value(net: &Net, final_state: &GameState, pi: 
         "final_state.current_player sollte strukturell immer pi sein, siehe Doku"
     );
     let feats = crate::features::features_for_net(net, final_state);
-    let (_logits, value, _moon, _points) = net
+    let (_logits, value, _moon, points) = net
         .eval(&feats)
         .unwrap_or_else(|_| (Vec::new(), vec![0.0], Vec::new(), Vec::new()));
     let v = value.first().copied().unwrap_or(0.0) as f64;
     let wp = (v + 1.0) / 2.0;
-    if final_state.current_player == pi { wp } else { 1.0 - wp }
+
+    // PUNKTE-KOPF im Tiling-Stichentscheid (Nutzer 2026-08-12: *"der point head
+    // sollte hier eigentlich nochmal helfen"*). Default 0,0 = Bestandsverhalten.
+    //
+    // Vorher wurde `points` hier destrukturiert und WEGGEWORFEN (`_points`) --
+    // der Kopf lag an dieser Stelle bereits vor und blieb ungenutzt.
+    //
+    // WARUM ER HIER PASST, anders als in der Drafting-Blattbewertung: dort ist
+    // die Frage "wer gewinnt", und der WDL-Value-Kopf ist deren DIREKTES Ziel --
+    // eine Margen-Vorhersage ist dort nur ein Stellvertreter, und gemessen war
+    // sie staerkeneutral (372 von 400 Partien anders, Siegquote gleich). Hier
+    // lautet die Frage "welche Platzierung bringt mehr ENDPUNKTE", und genau das
+    // prognostiziert `points_forecast` (`neural_net.py:525`:
+    // `tanh(eigen/SCALE) - EPSILON*tanh(gegner/SCALE)`, also der Endpunktestand).
+    // Der Kopf ist zur Frage passend statt Stellvertreter.
+    //
+    // Skala: `points` ist wie `value` ein tanh-Ausgang in [-1,1], also dieselbe
+    // `(x+1)/2`-Abbildung und damit dimensional mischbar.
+    let w = tiling_punkte_weight();
+    let roh = if w != 0.0 {
+        match points.first().copied() {
+            Some(p) => {
+                let pp = (p as f64 + 1.0) / 2.0;
+                (1.0 - w) * wp + w * pp
+            }
+            // Alt-Checkpoint ohne Punkte-Kopf: stillschweigend auf reines
+            // `value` zurueckfallen waere ein blinder Fleck, deshalb einmalig
+            // laut. Gleiches Muster wie `warn_missing_opp_head_once` in
+            // `net_mcts.rs`.
+            None => {
+                warne_fehlenden_punkte_kopf_einmal();
+                wp
+            }
+        }
+    } else {
+        wp
+    };
+    if final_state.current_player == pi { roh } else { 1.0 - roh }
+}
+
+/// Gewicht des Punkte-Kopfes im Tiling-Stichentscheid. Default **0,0** = aus,
+/// dann ist der Ausdruck exakt der Bestand (reines `value`).
+///
+/// Bewusst ein BLEND und kein Ersatz: der Value-Kopf traegt nachgewiesen die
+/// Staerke (2x2-Zuordnung, 57,5 % gegen 49,2 %), er soll also nicht verdraengt
+/// werden. Gesucht ist der Anteil, mit dem die Punkte-Vorhersage die WAHL
+/// zwischen Platzierungen verschiebt, ohne die Bewertung zu ersetzen.
+pub(crate) fn tiling_punkte_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| crate::net_mcts::read_f64_env("MOSAIC_TILING_PUNKTE_W", 0.0))
+}
+
+fn warne_fehlenden_punkte_kopf_einmal() {
+    static EINMAL: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    EINMAL.get_or_init(|| {
+        eprintln!(
+            "WARNUNG: MOSAIC_TILING_PUNKTE_W ist gesetzt, aber dieses Modell hat              keinen points-Kopf -- der Tiling-Stichentscheid laeuft auf reinem              value weiter (Bestandsverhalten)."
+        );
+    });
 }
 
 /// Optimaler Tiling-Schritt. Standardpfad: reiner exakter DFS-Solver
