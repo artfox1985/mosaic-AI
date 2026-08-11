@@ -45,7 +45,15 @@ TASK_REGISTRY_PATH = REPO_ROOT / "evaluations" / "TASK_NUMMERN_REGISTRATUR.md"
 PREREG_INDEX_PATH = REPO_ROOT / "evaluations" / "PREREG_INDEX.md"
 PREREG_DIR = REPO_ROOT / "evaluations"
 
-SIZE_THRESHOLD_BYTES = 40 * 1024  # 40-KB-Ratschen-Schwelle (Design-Dok A5)
+# Ab welcher Groesse eine Datei ueberhaupt geratscht wird -- unterhalb darf sie
+# frei wachsen. Der Wert ist GESETZT, nicht hergeleitet: das Design-Dok begruendet
+# die RATSCHE (statt einer Obergrenze, die "am ersten Tag auf vier Dateien rot"
+# waere), nennt aber keine 40 KB. Fuer eine Ratsche ist das vertretbar, weil die
+# Schwelle nur bestimmt, ab wann Wachstum beobachtet wird -- nicht, was erlaubt
+# ist. Stand 2026-08-11 liegen SECHS Dateien darueber (neural_net.py 161 KB,
+# train.py 134, server.py 74, analyze_game_log.py 55, dome_split_diagnose.py 45,
+# self_play.py 41), die im Dok genannten "vier" stimmen also nicht mehr.
+SIZE_THRESHOLD_BYTES = 40 * 1024
 SIZE_GROWTH_TOLERANCE = 1.02  # +2% Rauschtoleranz -- blosses Reformatieren darf nicht rot werden
 
 

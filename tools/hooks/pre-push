@@ -33,6 +33,21 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     fi
     if [ -n "$(git diff --name-only "$RANGE" -- engine/src/ 2>/dev/null)" ]; then
         ENGINE_SRC_CHANGED="yes"
+        # Nutzer-Wunsch 2026-08-11: "bei aenderungen im logtext brauch ich keinen
+        # engine cargo build check". Nicht ganz weglassen, sondern von TESTEN auf
+        # KOMPILIEREN herabsetzen -- ein Logtext kann die Kompilierung sehr wohl
+        # brechen (`format!("{name}")` mit fehlender Variable ist ein Fehler,
+        # keine Warnung).
+        #
+        # KONSERVATIV: nur wenn JEDE geaenderte Zeile in engine/src/ eine
+        # `log_event`-Zeile oder ein Kommentar ist. Bei jedem Zweifel bleibt es
+        # beim vollen Test -- die Erkennung darf nie zu wenig pruefen.
+        NICHT_LOG=$(git diff -U0 "$RANGE" -- engine/src/ 2>/dev/null             | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)'             | grep -vE '^[+-][[:space:]]*(//|log_event|.*log_event\()'             | grep -vE '^[+-][[:space:]]*"' | head -1)
+        if [ -z "$NICHT_LOG" ]; then
+            NUR_LOGTEXT="yes"
+        else
+            NUR_LOGTEXT=""
+        fi
     fi
 done
 
@@ -40,19 +55,30 @@ if [ -z "$ENGINE_SRC_CHANGED" ]; then
     exit 0  # engine/src/ nicht betroffen -- sofort durchlassen
 fi
 
-echo "pre-push: engine/src/ im Push geaendert -- cargo test --release laeuft (Budget < 90 s)." >&2
-
 # Python-DLL im PATH voranstellen, sonst STATUS_DLL_NOT_FOUND (siehe MEMORY
 # "cargo test braucht Python-DLL im PATH").
 export PATH="/c/Users/Patrick/AppData/Local/Python/pythoncore-3.14-64:$PATH"
 
-(cd engine && cargo test --release)
-STATUS=$?
+if [ -n "$NUR_LOGTEXT" ]; then
+    echo "pre-push: engine/src/ nur in LOGTEXT/Kommentaren geaendert -- nur" >&2
+    echo "          cargo build statt cargo test (Nutzer-Entscheid 2026-08-11)." >&2
+    echo "          ACHTUNG: Logtexte sind hier NICHT harmlos -- die Regexes von" >&2
+    echo "          tools/analyze_game_log.py haengen am Wortlaut. Wer eine" >&2
+    echo "          log_event-Zeichenkette aendert, muss den Parser mitziehen." >&2
+    (cd engine && cargo build --release --lib)
+    STATUS=$?
+    WAS="cargo build --release"
+else
+    echo "pre-push: engine/src/ im Push geaendert -- cargo test --release laeuft (Budget < 90 s)." >&2
+    (cd engine && cargo test --release)
+    STATUS=$?
+    WAS="cargo test --release"
+fi
 
 if [ "$STATUS" -ne 0 ]; then
     echo "" >&2
-    echo "pre-push: cargo test --release rot -- Push abgebrochen." >&2
-    echo "Ausweg: Test fixen, oder falls es ein Fehlalarm ist: git push --no-verify" >&2
+    echo "pre-push: $WAS rot -- Push abgebrochen." >&2
+    echo "Ausweg: Fehler fixen, oder falls es ein Fehlalarm ist: git push --no-verify" >&2
 fi
 
 exit "$STATUS"
