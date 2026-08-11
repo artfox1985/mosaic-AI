@@ -138,3 +138,75 @@ zu zeigen.
 - Nicht `MOSAIC_UNLOCK_SHAPING_W` (`PREREG_injektion_dosis.md`, danach).
 - Nicht den Punkte-Kanal (`PREREG_punkte_lambda_unter_kipppunkt.md`).
 - Nicht den Exponenten α (Default 2,0, Präzedenz `wertung_progress`).
+
+---
+
+# KALIBRIERUNGS-METHODE fuer alpha (Nutzer-Vorgabe 2026-08-11)
+
+*"für alpha kalibrieren würd ich empfehlen gepaart mit selben seed gegen die
+heuristik spielen und dort dann schauen ab wann wertungsplatten gebaut werden
+und ab wann die punkte wieder kippen."*
+
+## Warum das die statistische Kalibrierung ERSETZT, nicht ergaenzt
+
+Die Messung in `3dcb154` hat alpha so bestimmt, dass `(fill/kap)^alpha` die
+realisierte Abschlussrate trifft -- also den Proxy als SCHAETZER kalibriert.
+Die Aufgabe des Terms ist aber nicht, ein guter Schaetzer zu sein, sondern gutes
+SPIEL zu erzeugen. Beides faellt nur zusammen, wenn der Blattwert sonst perfekt
+ist. Die Nutzer-Methode misst direkt die Zielgroesse.
+
+**Und sie liefert zwei Schwellen aus denselben Laeufen:**
+
+1. **Untere Schwelle -- "ab wann werden Wertungsplatten gebaut".** Zu steiles
+   alpha (hoher Exponent) macht den ersten Stein einer Bahn wertlos: `0,5^6 =
+   0,016`. Der Term lenkt dann nicht. Beobachtungsgroesse: Plattenabschluesse
+   bzw. Plattenpunkte je Partie.
+2. **Obere Schwelle -- "ab wann kippen die Punkte".** Zu flaches alpha (bzw. zu
+   grosses `w`) laesst die Suche Platten jagen und dabei die BASIS zerstoeren --
+   die orthogonalen Nachbarn, die 93 % des Ergebnisses tragen. Beobachtungsgroesse:
+   mittlerer Endstand je Partie. Dass es einen INNEREN Optimum-Punkt geben muss,
+   folgt aus der Nutzer-Strategie: *"die basis sind die orthogonalen nachbarn,
+   die wertungsplatten nehmen wir so gut es geht mit"*.
+
+Eine Siegquote allein kann diese beiden Faelle nicht trennen -- deshalb sind
+BEIDE Groessen Pflicht.
+
+## Zuschnitt
+
+Gesweept wird der **Startwert** `alpha_0` (Runde 1), nicht die Endpunkte: die
+sind gemessen (`ALPHA_KALIBRIERT`), der Startwert ist die freie Groesse und
+zugleich die, die das Lenken bestimmt. Niedriger Startwert = mehr Frühlenkung.
+
+| Arm | `MOSAIC_WERTUNG_ALPHA` | Rolle |
+|---|---|---|
+| A | **1,0** | linear im Fuellstand -- maximale Fruehlenkung |
+| B | **2,0** | jetziger Stand |
+| C | **3,0** | steiler, weniger Fruehlenkung |
+
+`MOSAIC_WERTUNG_SHAPING_W` bleibt in diesem Sweep **fest**, sonst ist der
+Kontrast konfundiert. Wert: **1,0**, begruendet aus der Messung
+`dP(Sieg)/dPunkt = 0,0242` (Endmarge-SD 16,50 ueber 400 Partien) -> aequivalentes
+`w = 50 x 0,0242 = 1,21`, also die Groessenordnung, in der der Term den echten
+Siegwert der Punkte traegt statt ihn zu daempfen.
+
+Kontrolle ist `w = 0` (Term aus), damit die untere Schwelle einen Nullpunkt hat.
+
+## Beobachtungsgroessen je Arm
+
+| Groesse | Quelle | Referenz |
+|---|---|---|
+| Plattenpunkte je Partie | Log (`log_games`) | Heuristik 1,99 / Champion 1,10 |
+| Abschluesse Spalten/Reihen/Diagonalen | Log | Champion 0,4-1,2 % Spalten |
+| **mittlerer Endstand je Partie** | `scores` -- **schon im Arena-Ergebnis, kein Log noetig** | Champion-Korpus 23,35 |
+| Nahmen-Anteil Musterreihen 5+6 | Log | Mensch 40,4 % / KI 22,7 % |
+| Siegquote | `winner` | -- |
+
+## EINSCHRAENKUNG, die im Verdikt stehen muss
+
+"Gepaart mit selbem Seed" ist schwaecher als es klingt: Suche und Spielzustand
+teilen dasselbe RNG (`self_play.rs:1523`, `net_mcts.rs:620`,
+`supply.rs:43`). Sobald ein Arm anders spielt, verschiebt sich der RNG-Strom und
+damit die FLIESENVERSORGUNG -- die Arme spielen dann unterschiedliches Material,
+nicht nur unterschiedliche Zuege. Der gleiche Seed bleibt eine Varianzreduktion,
+ist aber KEINE gemeinsame Zufallszahlenfolge. Gilt fuer alle Sweeps dieses
+Instruments.
