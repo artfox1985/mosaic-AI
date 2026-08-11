@@ -32,6 +32,16 @@ def main() -> None:
     p.add_argument("--threads", type=int, default=0)
     p.add_argument("--c", type=float, default=0.3)
     p.add_argument("--c-puct", type=float, default=1.5)
+    # 2026-08-11: durchgereicht an `net_arena_match`s `log_games` (Commit
+    # 9dfeb16). AUS = Bestandsverhalten, das Ergebnis-JSON ist dann exakt wie
+    # vorher. AN = je Partie kommen `game_seed`, `first_player`, `names` und
+    # `log` (volle GameState::log-Zeilenliste im Server-Wortlaut) dazu, damit
+    # `tools/analyze_game_log.py` die VERHALTENS-Zahlen aus denselben Partien
+    # ziehen kann wie die Siegquote. Ohne das liefert ein Sweep nur Siegquoten
+    # und die Verhaltensmessung braeuchte einen zweiten Lauf ueber dieselben
+    # Stunden (siehe PREREG_injektion_wertungsplatten.md, Vorbedingung 2).
+    p.add_argument("--log-games", action="store_true",
+                   help="Partie-Logs im Ergebnis-JSON mitfuehren (Default aus)")
     args = p.parse_args()
 
     import mosaic_rust as mr  # bewusst hier importiert: welches Wheel geladen wird,
@@ -41,7 +51,7 @@ def main() -> None:
     raw = mr.net_arena_match(
         args.model, net_sims=args.net_sims, heur_sims=args.heur_sims,
         n_games=args.n_games, seed=args.seed, num_threads=args.threads,
-        c=args.c, c_puct=args.c_puct,
+        c=args.c, c_puct=args.c_puct, log_games=args.log_games,
     )
     # NUR das rohe JSON auf stdout -- der Orchestrator parsed es 1:1.
     sys.stdout.write(raw)
