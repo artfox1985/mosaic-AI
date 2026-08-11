@@ -1078,6 +1078,39 @@ pub fn wertung_shaping_weight() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_SHAPING_W", WERTUNG_SHAPING_WEIGHT))
 }
 
+/// `MOSAIC_WERTUNG_SHAPING_W` als **acht Werte, einer JE KRITERIUM** -- gleiches
+/// Format und gleiche Haerte wie `wertung_shaping_alphas` (1 Wert gilt fuer alle;
+/// falsche Laenge wird VERWORFEN, nicht teilgelesen).
+///
+/// WARUM ein Gewicht je Kriterium und nicht nur ein alpha je Kriterium
+/// (Nutzer-Aufbau 2026-08-11): der Versuch will *"20 Spiele in denen die
+/// vertikalen Wertungsplatten aktiv sind, NUR mit alpha variation der vertikalen
+/// platten"*. Dafuer muessen die anderen Kriterien AUS sein, sonst laeuft jede
+/// Messung gegen einen Hintergrund aus sieben weiteren Shaping-Termen und der
+/// Effekt ist nicht mehr zurechenbar.
+///
+/// **Und alpha kann das nicht leisten**: ein Kriterium abzuschalten geht ueber den
+/// Exponenten nicht -- ein hohes alpha drueckt den Teilfortschritt nur
+/// asymptotisch gegen 0, `(1.0)^alpha` bleibt 1. Nur ein Gewicht 0 schaltet
+/// wirklich ab. "Nur die Vertikale" heisst damit `0,1,0,0,0,0,0,0`.
+pub fn wertung_shaping_weights() -> [f64; 8] {
+    static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let mut out = [WERTUNG_SHAPING_WEIGHT; 8];
+        let Ok(raw) = std::env::var("MOSAIC_WERTUNG_SHAPING_W") else { return out };
+        let parts: Vec<&str> = raw.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+        let vals: Option<Vec<f64>> = parts.iter().map(|p| p.parse::<f64>().ok()).collect();
+        match vals.as_deref() {
+            Some([one]) => out = [*one; 8],
+            Some(v) if v.len() == 8 => out.copy_from_slice(v),
+            _ => eprintln!(
+                "MOSAIC_WERTUNG_SHAPING_W={raw:?} ignoriert -- erwartet 1 oder 8 Zahlen, Default {WERTUNG_SHAPING_WEIGHT} gilt"
+            ),
+        }
+        out
+    })
+}
+
 /// Laufzeit-Wert von `MOSAIC_WERTUNG_ALPHA` -- **acht Werte, einer JE KRITERIUM**
 /// (Nutzer-Vorgabe 2026-08-11: *"wir wollen ja alpha pro wertungsplatte seperat
 /// festlegen"*). Format: kommagetrennt in Kriterien-Reihenfolge 0..7, z.B.
@@ -1157,7 +1190,16 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
 fn apply_wertung_shaping_with_alphas(
     value: [f64; 2], state: &GameState, w: f64, alphas: &[f64; 8], round_gain: f64,
 ) -> [f64; 2] {
-    if w == 0.0 {
+    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain)
+}
+
+/// Volle Form: Gewicht UND Exponent je Kriterium. Ein Gewicht 0 schaltet das
+/// Kriterium vollstaendig ab -- das ist die Voraussetzung fuer den
+/// Nutzer-Versuchsaufbau (je Satz nur EIN Kriterium injiziert).
+fn apply_wertung_shaping_full(
+    value: [f64; 2], state: &GameState, ws: &[f64; 8], alphas: &[f64; 8], round_gain: f64,
+) -> [f64; 2] {
+    if ws.iter().all(|w| *w == 0.0) {
         return value;
     }
     let mut out = value;
@@ -1179,15 +1221,36 @@ fn apply_wertung_shaping_with_alphas(
         // statt 6. Damit deckt die achtstellige alpha-Liste tatsaechlich alle
         // acht Platten -- die Form, die der Versuchsplan "je Platte 20 Partien,
         // nur deren alpha" braucht.
-        let gegatet = crate::scoring::wertung_progress_per_kriterium(
-            &state.players[i], &state.scoring_tile_ids, alphas, state.round_number, round_gain,
-        );
+        // Je Kriterium EINZELN gewichtet: `ws[k] == 0` laesst Kriterium k
+        // vollstaendig weg. Deshalb je Kriterium ein eigener Aufruf mit
+        // einelementiger tile_ids-Liste statt einem Sammelaufruf.
+        // `w` muss AUSSEN am tanh bleiben, sonst ist es nicht mehr die
+        // Obergrenze der Verschiebung: `tanh(w*P/50)` saettigt gegen 1
+        // unabhaengig von w, `w*tanh(P/50)` gegen w. Bei Gewichten je Kriterium
+        // gibt es kein einzelnes w -- also das GROESSTE aussen und innen darauf
+        // normieren. Gleichmaessiger Fall: reproduziert `w*tanh(SUM pts/50)`
+        // exakt. Isolierung (eins auf 1, Rest 0): `1*tanh(pts_k/50)`.
+        let w_aussen = ws.iter().cloned().fold(0.0f64, f64::max);
         let t = ((state.round_number.clamp(1, 5) - 1) as f64) / 4.0;
-        let beta6 = alphas[6] * (1.0 + round_gain * t);
-        let spezial = crate::scoring::unlock_progress_beta(
-            &state.players[i], &state.scoring_tile_ids, beta6,
-        );
-        let shift = w * ((gegatet + spezial) / WERTUNG_SHAPING_SCALE).tanh();
+        let mut pts = 0.0;
+        for &id in state.scoring_tile_ids.iter() {
+            let k = (id as usize).min(7);
+            if ws[k] == 0.0 {
+                continue;
+            }
+            pts += (ws[k] / w_aussen) * crate::scoring::wertung_progress_per_kriterium(
+                &state.players[i], &[id], alphas, state.round_number, round_gain,
+            );
+        }
+        // Spezialfelder: der Bonus-Anteil zahlt UNGEGATET, also unabhaengig von
+        // `scoring_tile_ids` -- er haengt an `ws[6]`, nicht am Liegen der Platte.
+        if ws[6] != 0.0 {
+            let beta6 = alphas[6] * (1.0 + round_gain * t);
+            pts += (ws[6] / w_aussen) * crate::scoring::unlock_progress_beta(
+                &state.players[i], &state.scoring_tile_ids, beta6,
+            );
+        }
+        let shift = w_aussen * (pts / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
     out
@@ -1202,7 +1265,7 @@ fn apply_wertung_shaping_with_alphas(
 /// `make_node`s eigener `LeafEval::Net`-Zweig (der Haupt-Suchpfad, der NICHT
 /// ueber `net_leaf_eval` laeuft, siehe dortige Duplizierung der Blend-Logik).
 fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
-    apply_wertung_shaping_with_alphas(value, state, wertung_shaping_weight(), &wertung_shaping_alphas(), wertung_round_gain())
+    apply_wertung_shaping_full(value, state, &wertung_shaping_weights(), &wertung_shaping_alphas(), wertung_round_gain())
 }
 
 // ── Freischalt-Shaping (Nutzer-Auftrag 2026-08-10, Messlage watchlist_v20_
