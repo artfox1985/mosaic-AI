@@ -1617,6 +1617,19 @@ fn play_net_game<R: Rng + ?Sized>(
 
 /// `n_games` Spiele Netz vs. Heuristik (Netz auf Brett 0, Startspieler alternierend).
 /// Lädt das ONNX-Netz einmal. Gibt JSON-Array `[{scores:[netz,heur], winner, …}]`.
+///
+/// `seeds` (Plattenkopf-Versuch, `PREREG_plattenkopf.md`, 2026-08-11): optionale
+/// EXPLIZITE Pro-Partie-Seed-Liste. Gesetzt -> Partie `i` bekommt `seeds[i]`
+/// STATT der abgeleiteten Formel `seed.wrapping_add(i * 0x9E37...)`, und
+/// `n_games` folgt der Listenlänge (EINE Quelle der Wahrheit statt zwei
+/// Zahlen -- `n_games` und `seeds.len()` --, die auseinanderlaufen könnten;
+/// der `n_games`-Parameter wird dann ignoriert). `None` (Default) -> exakt
+/// das bisherige Verhalten, byte-identisch (siehe
+/// `run_net_vs_net_arena_seeds_deterministically_like_run_net_arena_match`).
+/// Der Zweck: die aktiven `scoring_tile_ids` einer Partie sind vollständig
+/// durch `game_seed` bestimmt (`sample_valid_scoring_ids` wird als erstes aus
+/// genau diesem Seed gezogen) -- mit einer expliziten Liste lassen sich also
+/// vorausgewählte Seeds spielen, deren Platten-Kombination man schon kennt.
 #[allow(clippy::too_many_arguments)]
 pub fn run_net_arena_match(
     model_path: &str,
@@ -1628,12 +1641,17 @@ pub fn run_net_arena_match(
     c: f64,
     c_puct: f64,
     log_games: bool,
+    seeds: Option<Vec<u64>>,
 ) -> Result<String, String> {
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
+    let n_games = seeds.as_ref().map(|s| s.len()).unwrap_or(n_games);
 
     let play = |i: usize| -> Value {
-        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let game_seed = match &seeds {
+            Some(s) => s[i],
+            None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+        };
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -1785,6 +1803,10 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
 /// `n_games` Spiele Netz A (Brett 0) vs. Netz B (Brett 1), Startspieler
 /// alternierend. Lädt beide ONNX-Netze einmal. Gibt JSON-Array
 /// `[{scores:[A,B], winner, …}]`.
+///
+/// `seeds`: siehe `run_net_arena_match`-Dokumentation -- identisches Muster
+/// (explizite Pro-Partie-Liste ersetzt die abgeleitete Formel, `n_games`
+/// folgt der Listenlänge, `None` = Bestandsverhalten byte-identisch).
 #[allow(clippy::too_many_arguments)]
 pub fn run_net_vs_net_arena(
     model_a: &str,
@@ -1797,12 +1819,17 @@ pub fn run_net_vs_net_arena(
     c_puct_a: f64,
     c_puct_b: f64,
     log_games: bool,
+    seeds: Option<Vec<u64>>,
 ) -> Result<String, String> {
     let net_a = std::sync::Arc::new(Net::load_auto(model_a).map_err(|e| e.to_string())?);
     let net_b = std::sync::Arc::new(Net::load_auto(model_b).map_err(|e| e.to_string())?);
+    let n_games = seeds.as_ref().map(|s| s.len()).unwrap_or(n_games);
 
     let play = |i: usize| -> Value {
-        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let game_seed = match &seeds {
+            Some(s) => s[i],
+            None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+        };
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -4466,9 +4493,9 @@ pub(crate) mod tests {
 
         let seed = 13_579u64;
         let n_games = 3usize;
-        let raw_a = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false)
+        let raw_a = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None)
             .expect("Arena-Lauf A sollte gelingen (Checkpoint existiert laut Vorab-Check)");
-        let raw_b = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false)
+        let raw_b = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None)
             .expect("Arena-Lauf B sollte gelingen");
         assert_eq!(
             raw_a, raw_b,
@@ -4480,7 +4507,7 @@ pub(crate) mod tests {
         // (indirekter Beleg -- ein einzelnes Spiel bei n_games=1 mit Seed S
         // muss IDENTISCH zum ersten Spiel eines n_games=3-Laufs mit Basis-Seed
         // S sein, weil beide `i=0` denselben abgeleiteten Seed ergeben).
-        let raw_single = run_net_vs_net_arena(model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false)
+        let raw_single = run_net_vs_net_arena(model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None)
             .expect("Einzelspiel-Lauf sollte gelingen");
         let games_a: Vec<Value> = serde_json::from_str(&raw_a).unwrap();
         let games_single: Vec<Value> = serde_json::from_str(&raw_single).unwrap();
@@ -4488,6 +4515,90 @@ pub(crate) mod tests {
             games_a[0], games_single[0],
             "Spiel i=0 muss unabhaengig von n_games identisch sein (reine Funktion von seed+i)"
         );
+    }
+
+    /// Plattenkopf-Versuch (`PREREG_plattenkopf.md`, 2026-08-11) -- der
+    /// eigentliche Zweck des `seeds`-Arguments: mit einer EXPLIZITEN
+    /// Seed-Liste muss Partie `i` (a) exakt `seeds[i]` als `game_seed`
+    /// benutzen und (b) folglich die `scoring_tile_ids` tragen, die man aus
+    /// `StdRng::seed_from_u64(seeds[i])` -> `sample_valid_scoring_ids(3, ..)`
+    /// vorhersagt -- unabhaengig vom (hier absichtlich falschen) `n_games`-
+    /// Parameter, der bei gesetzter Liste ignoriert werden muss.
+    #[test]
+    fn run_net_arena_match_with_explicit_seeds_predicts_scoring_tiles() {
+        // Nutzt bewusst NICHT `load_test_net_for_gating` (haengt an
+        // `alphazero_v10_best.onnx`, das im aktuellen Modell-Bestand nicht
+        // mehr vorhanden ist, siehe `pcr_full_prob_gates_...`-Test weiter
+        // unten fuer denselben Workaround) -- `champion.txt` verweist lokal
+        // auf `alphazero_v21_2d_brierbest.onnx`, das existiert.
+        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let model_path = model_path.to_str().unwrap();
+        if Net::load_auto(model_path).is_err() {
+            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
+            return;
+        }
+
+        // Seeds, die absichtlich NICHT in einer i*const-Formel zueinander
+        // stehen -- genau der Fall, den die Plattenkopf-Auswahl braucht
+        // (vorausgewaehlte, nicht-fortlaufende Seeds).
+        let seeds: Vec<u64> = vec![7, 4242, 999_999, 13];
+        let expected_ids: Vec<Vec<usize>> = seeds
+            .iter()
+            .map(|&s| {
+                let mut rng = StdRng::seed_from_u64(s);
+                sample_valid_scoring_ids(3, &mut rng)
+            })
+            .collect();
+
+        // n_games=99 ist absichtlich falsch und muss ignoriert werden.
+        let raw = run_net_arena_match(
+            model_path, 8, 8, 99, 0, 1, crate::mcts::DEFAULT_C,
+            crate::net_mcts::DEFAULT_C_PUCT, false, Some(seeds.clone()),
+        )
+        .expect("Arena-Lauf mit expliziter Seed-Liste sollte gelingen");
+        let games: Vec<Value> = serde_json::from_str(&raw).unwrap();
+
+        assert_eq!(
+            games.len(),
+            seeds.len(),
+            "n_games muss aus der Seed-Listenlaenge folgen, nicht aus dem n_games-Parameter"
+        );
+        for (i, g) in games.iter().enumerate() {
+            let ids: Vec<usize> = g["scoring_tile_ids"]
+                .as_array()
+                .unwrap_or_else(|| panic!("Partie {i}: scoring_tile_ids fehlt"))
+                .iter()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect();
+            assert_eq!(
+                ids, expected_ids[i],
+                "Partie {i} (Seed {}): scoring_tile_ids muessen die aus dem \
+                 expliziten Seed vorhergesagten Platten tragen",
+                seeds[i]
+            );
+        }
+
+        // Und dieselbe Liste ueber run_net_vs_net_arena (denselben Pfad
+        // benutzt run_net_vs_net_arena_match auf der Python-Seite) -- gleiche
+        // Erwartung, damit AUFTRAG 1 fuer beide Arena-Funktionen belegt ist.
+        let raw_vs = run_net_vs_net_arena(
+            model_path, model_path, 8, 8, 99, 0, 1,
+            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false,
+            Some(seeds.clone()),
+        )
+        .expect("Netz-vs-Netz-Lauf mit expliziter Seed-Liste sollte gelingen");
+        let games_vs: Vec<Value> = serde_json::from_str(&raw_vs).unwrap();
+        assert_eq!(games_vs.len(), seeds.len());
+        for (i, g) in games_vs.iter().enumerate() {
+            let ids: Vec<usize> = g["scoring_tile_ids"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect();
+            assert_eq!(ids, expected_ids[i], "run_net_vs_net_arena, Partie {i}");
+        }
     }
 
     /// Task #88 (Hybrid-Suche, kausaler Kopf-Test) -- End-zu-End-Paritaetstest
@@ -4514,7 +4625,7 @@ pub(crate) mod tests {
         let n_games = 3usize;
         let plain = run_net_vs_net_arena(
             model_path, model_path, 8, 8, n_games, seed, 1,
-            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false,
+            crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None,
         )
         .expect("Plain-Arena-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let hybrid = run_net_vs_net_arena_hybrid(

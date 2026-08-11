@@ -43,6 +43,14 @@ WORKER = Path(__file__).resolve().parent / "paired_arena_arm_worker.py"
 EVAL_DIR = BASE_DIR / "evaluations"
 ARM_TIMEOUT_SECS = 6 * 3600
 
+# Selbe Parse-Regel wie der Worker -- EIN Import statt eines zweiten,
+# potenziell abweichenden Parsers (Orchestrator schneidet die Liste
+# blockweise, der Worker parst sie am Ende wieder; beide muessen dieselbe
+# Regel anwenden). Der Import loest KEIN mosaic_rust aus (das passiert im
+# Worker erst innerhalb von `main()`).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paired_arena_arm_worker import parse_seeds  # noqa: E402
+
 
 def mcnemar_exact_p(b: int, c: int) -> float:
     """Exakter zweiseitiger McNemar -- identisch zu paired_gating.py."""
@@ -65,10 +73,20 @@ def champion_model() -> str:
 
 def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int,
             n_games: int, seed: int, block_size: int, threads: int,
-            log_games: bool = False) -> list[dict]:
+            log_games: bool = False, seeds: list[int] | None = None) -> list[dict]:
     """`env_name` darf mehrere komma-getrennte Var-Namen tragen; `value`
     dann entsprechend viele komma-getrennte Werte (Aggressions-
-    Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt)."""
+    Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt).
+
+    `seeds` (Plattenkopf-Versuch, `PREREG_plattenkopf.md`, 2026-08-11):
+    explizite Pro-Partie-Seed-Liste -- ERSETZT die `block_seed = seed +
+    block_idx * 1_000_000`-Ableitung. Mit einer expliziten Liste muss der
+    Orchestrator sie BLOCKWEISE aufteilen (statt je Block einen neuen
+    Basis-Seed zu bilden), sonst bekaeme der Worker in jedem Block wieder
+    `seeds[0:block_size]` (falsch verschoben, keine Kontrolle mehr darueber,
+    welche Partie welchen Seed bekommt). `n_games` folgt dann `len(seeds)`
+    (mit Warnung, falls `--n-games` abweicht) -- dieselbe "eine Quelle der
+    Wahrheit"-Regel wie engine-seitig (`net_arena_match`)."""
     env = os.environ.copy()
     names = [n.strip() for n in env_name.split(",")]
     vals = [v.strip() for v in value.split(",")]
@@ -76,36 +94,57 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
         raise SystemExit(f"Arm {value!r}: {len(vals)} Werte fuer {len(names)} Env-Vars")
     for n, v in zip(names, vals):
         env[n] = v
+
+    if seeds is not None:
+        if n_games != len(seeds):
+            print(f"WARNUNG: --n-games {n_games} weicht von --seeds-Laenge "
+                  f"{len(seeds)} ab -- die Listenlaenge gewinnt.", flush=True)
+        n_games = len(seeds)
+
     games: list[dict] = []
     done, block_idx = 0, 0
     print(f"Arm {env_name}={value}: {os.path.basename(model)}@{net_sims} vs "
-          f"Heuristik@{heur_sims}(dyn), Basis-Seed={seed}, n={n_games}", flush=True)
+          f"Heuristik@{heur_sims}(dyn), "
+          + (f"{len(seeds)} explizite Seeds" if seeds is not None else f"Basis-Seed={seed}")
+          + f", n={n_games}", flush=True)
     while done < n_games:
         n = min(block_size, n_games - done)
-        block_seed = seed + block_idx * 1_000_000
-        t0 = time.time()
-        proc = subprocess.run(
-            [sys.executable, str(WORKER), "--model", model,
-             "--net-sims", str(net_sims), "--heur-sims", str(heur_sims),
-             "--n-games", str(n), "--seed", str(block_seed),
-             "--threads", str(threads)]
+        cmd = [sys.executable, str(WORKER), "--model", model,
+               "--net-sims", str(net_sims), "--heur-sims", str(heur_sims),
+               "--n-games", str(n), "--threads", str(threads)]
+        if seeds is not None:
+            # BLOCKWEISE Teilliste, nicht ein neu abgeleiteter Basis-Seed --
+            # das ist die delikate Stelle: mit einer expliziten Liste gibt es
+            # keine Formel mehr, aus der ein Block-Seed sinnvoll folgen
+            # koennte, also muss der Orchestrator die ECHTEN Seeds weitergeben.
+            block_seeds = seeds[done:done + n]
+            cmd += ["--seeds", ",".join(str(s) for s in block_seeds)]
+            block_label = f"Seeds={block_seeds[0]}..{block_seeds[-1]}"
+        else:
+            block_seed = seed + block_idx * 1_000_000
+            cmd += ["--seed", str(block_seed)]
+            block_label = f"Seed={block_seed}"
+        if log_games:
             # 2026-08-11: Partie-Logs mitfuehren, damit die VERHALTENS-Zahlen
             # (Nahmen-Anteil tiefe Reihen, Freischaltungen, Zellen je Reihe)
             # aus DENSELBEN Partien kommen wie die Siegquote. Ohne das braeuchte
             # die Verhaltensmessung einen zweiten Lauf ueber dieselben Stunden.
-            + (["--log-games"] if log_games else []),
+            cmd += ["--log-games"]
+        t0 = time.time()
+        proc = subprocess.run(
+            cmd,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=ARM_TIMEOUT_SECS, env=env,
         )
         if proc.returncode != 0:
-            raise RuntimeError(f"Arm {value} Block {block_idx} (Seed={block_seed}) "
+            raise RuntimeError(f"Arm {value} Block {block_idx} ({block_label}) "
                                f"rc={proc.returncode}: {proc.stderr[-2000:]}")
         block = json.loads(proc.stdout)
         games.extend(block)
         done += n
         block_idx += 1
         wins = sum(1 for g in games if g["winner"] == 0)
-        print(f"  [{value}] Block {block_idx} (Seed={block_seed}, n={n}, "
+        print(f"  [{value}] Block {block_idx} ({block_label}, n={n}, "
               f"{time.time()-t0:.1f}s): Netz kumulativ {wins}/{done}", flush=True)
     return games
 
@@ -120,8 +159,20 @@ def main() -> None:
     ap.add_argument("--model", default=None, help="Default: models/champion.txt")
     ap.add_argument("--net-sims", type=int, default=400)
     ap.add_argument("--heur-sims", type=int, default=150)
-    ap.add_argument("--n-games", type=int, default=200)
-    ap.add_argument("--seed", type=int, required=True)
+    ap.add_argument("--n-games", type=int, default=200,
+                    help="Ignoriert (mit Warnung), wenn --seeds gesetzt ist -- "
+                         "dann gilt die Seed-Listenlaenge")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="Basis-Seed (Pflicht, ausser --seeds ist gesetzt)")
+    # 2026-08-11 (Plattenkopf-Versuch, PREREG_plattenkopf.md): explizite
+    # Pro-Partie-Seeds statt der `seed + block_idx*1_000_000`-Ableitung --
+    # siehe `run_arm`-Docstring fuer die Blockaufteilungs-Regel. Format wie
+    # beim Worker: kommagetrennt ODER Datei-Pfad (eine Zahl je Zeile), z.B.
+    # das Ausgabeformat von `tools/seed_auswahl_platten.py`.
+    ap.add_argument("--seeds", type=str, default=None,
+                    help="Explizite Pro-Partie-Seeds, kommagetrennt ODER "
+                         "Datei-Pfad (eine Zahl je Zeile) -- ersetzt --seed "
+                         "UND --n-games")
     ap.add_argument("--block-size", type=int, default=25)
     ap.add_argument("--threads", type=int, default=10)
     ap.add_argument("--out-prefix", required=True)
@@ -137,17 +188,23 @@ def main() -> None:
         raise SystemExit("--control muss in --arms enthalten sein")
     model = args.model or champion_model()
 
+    seeds = parse_seeds(args.seeds) if args.seeds else None
+    if seeds is None and args.seed is None:
+        raise SystemExit("--seed oder --seeds ist erforderlich")
+    n_games = len(seeds) if seeds is not None else args.n_games
+
     results: dict[str, list[dict]] = {}
     for v in args.arms:
         results[v] = run_arm(args.env_name, v, model, args.net_sims,
                              args.heur_sims, args.n_games, args.seed,
                              args.block_size, args.threads,
-                             log_games=args.log_games)
+                             log_games=args.log_games, seeds=seeds)
 
     out = {
         "env_name": args.env_name, "arms": args.arms, "control": args.control,
         "model": model, "net_sims": args.net_sims, "heur_sims": args.heur_sims,
-        "n_games": args.n_games, "base_seed": args.seed,
+        "n_games": n_games, "base_seed": args.seed,
+        "seeds": seeds,
         "arm_wins": {}, "comparisons": {},
         "games": {v: results[v] for v in args.arms},
     }
@@ -156,12 +213,12 @@ def main() -> None:
     for v in args.arms:
         wins = sum(1 for g in results[v] if g["winner"] == 0)
         out["arm_wins"][v] = wins
-        print(f"Arm {args.env_name}={v}: Netz {wins}/{args.n_games}")
+        print(f"Arm {args.env_name}={v}: Netz {wins}/{n_games}")
     for v in args.arms:
         if v == args.control:
             continue
         b = c = 0
-        for i in range(args.n_games):
+        for i in range(n_games):
             ctrl_won = ctrl[i]["winner"] == 0
             test_won = results[v][i]["winner"] == 0
             if test_won and not ctrl_won:

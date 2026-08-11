@@ -216,8 +216,12 @@ fn value_noise_floor_diagnostic(
 /// `game.rs`/`round_end.rs` -- dieselben Funktionen erzeugen beide). Reine
 /// Zusatzausgabe (kein neuer Suchpfad, kein RNG-Verbrauch): bei `false`
 /// bleibt das Ergebnis wie zuvor.
+/// `seeds` (Plattenkopf-Versuch, `PREREG_plattenkopf.md`, 2026-08-11): siehe
+/// `self_play::run_net_arena_match`-Dokumentation -- gesetzt, spielt Partie
+/// `i` exakt `seeds[i]` (statt der abgeleiteten Formel) und `n_games` folgt
+/// der Listenlänge. `None` (Default) = Bestandsverhalten, byte-identisch.
 #[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false))]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_arena_match(
     py: Python<'_>,
@@ -230,11 +234,12 @@ fn net_arena_match(
     c: f64,
     c_puct: f64,
     log_games: bool,
+    seeds: Option<Vec<u64>>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_arena_match(
-            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games,
+            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games, seeds,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -245,8 +250,11 @@ fn net_arena_match(
 /// `[{scores:[A,B], winner, steps, total_floor, floor_per_round}]` zurück.
 /// `log_games` (Default `false`, 2026-08-11): siehe `net_arena_match`-
 /// Dokumentation -- identisches Zusatzfeld-Set, derselbe Spielpfad-Typ.
+/// `seeds`: siehe `net_arena_match`-Dokumentation, identisches Muster (nutzt
+/// denselben Seed-Ableitungspfad wie dort, siehe
+/// `self_play::run_net_vs_net_arena`-Dokumentation).
 #[pyfunction]
-#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, log_games=false))]
+#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, log_games=false, seeds=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_vs_net_arena_match(
     py: Python<'_>,
@@ -260,11 +268,12 @@ fn net_vs_net_arena_match(
     c_puct_a: f64,
     c_puct_b: f64,
     log_games: bool,
+    seeds: Option<Vec<u64>>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     py.detach(move || {
         crate::self_play::run_net_vs_net_arena(
-            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, log_games,
+            &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, log_games, seeds,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
