@@ -1112,7 +1112,17 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
     }
     let mut out = value;
     for i in 0..2 {
-        let pts = crate::scoring::wertung_progress_alpha(&state.players[i], &state.scoring_tile_ids, alpha);
+        // RUNDENABHAENGIGER Exponent je Kriterium (Nutzer-Vorgabe "wir haben
+        // gesagt wir verändern alpha über die runden", Endpunkte GEMESSEN an der
+        // Heuristik-Referenz -- siehe `scoring::ALPHA_KALIBRIERT`). `alpha` ist
+        // jetzt der STARTWERT in Runde 1 (flach, lenkend); bis Runde 5 waechst
+        // er je Kriterium auf seinen kalibrierten Wert (steil, schaetzend).
+        // Der frueher hier stehende einheitliche Exponent ueberschaetzte die
+        // konjunktiven Kriterien um Faktor 1,4 bis 196,5 -- ungleichmaessig,
+        // also durch kein gemeinsames `w` korrigierbar.
+        let pts = crate::scoring::wertung_progress_runde(
+            &state.players[i], &state.scoring_tile_ids, state.round_number, alpha,
+        );
         let shift = w * (pts / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
