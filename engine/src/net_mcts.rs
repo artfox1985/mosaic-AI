@@ -1155,9 +1155,96 @@ pub fn wertung_shaping_alphas() -> [f64; 8] {
 /// Rundenabhaengigkeit. Ersetzt die frueheren, einkompilierten kalibrierten
 /// Zielwerte je Kriterium -- die waren nicht begruendbar, weil
 /// `Mittel(x^alpha) > Rate` fuer JEDES alpha gilt (siehe `scoring.rs`-Doku).
+/// Gewicht fuer den Strafleisten-Gegenterm im Wertungsplatten-Shaping.
+/// Default **0,0** = aus, Bestandsverhalten.
+///
+/// WARUM (Nutzer: *"aber ja probier es aus"*, 2026-08-11): die HEURISTIK benutzt
+/// `wertung_progress` nie allein, sondern als Mittelterm von
+/// `player_total` (`mcts.rs:80-84`) -- daneben stehen der Tiling-Solver-Score UND
+/// `projected_unplaceable_penalty`. Meine Injektion hatte nur den Mittelteil.
+///
+/// Zwei Gruende, es zu messen statt zu argumentieren:
+///  1. GEMESSEN: die Injektion treibt die Strafleiste monoton hoch (+2,42 Pkt bei
+///     w=1,0, t=+2,42) -- genau die Buesse, die dieser Term einpreist.
+///  2. `projected_unplaceable_penalty` liest `player.pattern_lines`
+///     (`round_end.rs:116-120`) und ist damit das EINZIGE verfuegbare Stueck des
+///     Shapings, das die Musterreihen sieht. `wertung_progress` liest nur das
+///     Kuppelraster und ist deshalb innerhalb einer Runde fuer JEDEN
+///     Drafting-Zug gleich -- es kann die Wahl gar nicht lenken, dieser Term
+///     kann es.
+///
+/// Gegenargument, das die Messung entscheiden soll: der Value-Kopf ist auf
+/// AUSGAENGE trainiert, Strafpunkte gehen in den Ausgang ein -- er preist sie
+/// also schon ein, und der Term koennte doppelt zaehlen.
+///
+/// STAND 2026-08-11: Punkt 2 gilt nicht mehr uneingeschraenkt -- seit
+/// `musterreihen_weight()` (unten) gibt es ein ZWEITES Stueck des Shapings,
+/// das `player.pattern_lines` liest (`crate::scoring::musterreihen_fortschritt`).
+pub fn wertung_floor_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_FLOOR_W", 0.0))
+}
+
+/// Gewicht fuer den **Tiling-Vorausschau**-Term. Default **0,0** = aus.
+///
+/// WARUM DIESER TERM (Nutzer 2026-08-11: *"du kannst auch bei der heuristik
+/// reinschauen wie es gemacht wurde. brauchst nicht immer das rad neu
+/// erfinden"*): das Projekt hat die Musterreihen-Vorausschau schon, exakt und
+/// getestet. `tiling_solver.rs:556` `solve_round_final_score_endaware` rollt
+/// ueber `legal_steps` die Musterreihen auf die Kuppel und maximiert am Blatt
+/// **Platzierungspunkte + `calculate_end_scoring`** (`solve_rec_endaware`,
+/// `tiling_solver.rs:519-546`) -- und `calculate_end_scoring` enthaelt die
+/// Wertungsplatten.
+///
+/// Gegenueber der nachgebauten Bereitschaft (`MOSAIC_MUSTERREIHEN_W`) ist das
+/// exakt statt geschaetzt: Farb-, Sperr- und Slot-Bedingungen kommen aus dem
+/// echten Tiling, und die Ein-Fliese-pro-Musterreihe-Schranke ergibt sich von
+/// selbst, weil ein echter Durchlauf sie nicht verletzen KANN. Ein `alpha`
+/// braucht es hier nicht -- der Fortschritt ist realisiert, nicht hochgerechnet.
+///
+/// Der Doku-Vorbehalt dort ("nur fuer Runde 5 sinnvoll") sticht beim Shaping
+/// nicht: in Runden 1-4 ist `calculate_end_scoring` eine NAEHERUNG, und eine
+/// Injektion braucht Richtung, keine Exaktheit. Offen ist allein der Preis pro
+/// Blatt -- deshalb Default 0,0 und eine Messung, keine Schaetzung.
+pub fn endaware_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_ENDAWARE_W", 0.0))
+}
+
+/// Der Vorausschau-Term selbst: **was die Endwertungs-Kenntnis hier wert ist**.
+///
+/// `endaware - plain` und nicht `endaware` allein, weil `endaware` den
+/// AKTUELLEN Punktestand mittraegt (~50 Punkte spaet im Spiel). Der wuerde das
+/// `tanh` saettigen und traegt zur Zugwahl nichts bei, da er fuer alle
+/// Geschwister gleich ist. Die Differenz isoliert genau den Teil, um den es
+/// geht: um wieviel sich Abweichen von der reinen Platzierungs-Maximierung
+/// lohnt, wenn man die Wertungsplatten mitrechnet. Sie ist klein, sie ist in
+/// Punkten, und sie haengt an den Musterreihen -- eine Fliese mehr in einer
+/// Reihe, die eine Spalte schliesst, hebt sie.
+///
+/// Beide Aufrufe sind gecacht (`cached_plain` / `cached_endaware`), der
+/// Doppelaufruf kostet also nicht zwingend doppelt.
+fn tiling_vorausschau(state: &GameState, pi: usize) -> f64 {
+    let mit = crate::tiling_solver::solve_round_final_score_endaware(state, pi);
+    let ohne = crate::tiling_solver::solve_round_final_score(state, pi);
+    (mit - ohne) as f64
+}
+
 pub fn wertung_round_gain() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ROUND_GAIN", 0.0))
+}
+
+/// Laufzeit-Gewicht von `MOSAIC_MUSTERREIHEN_W` -- gleiches `OnceLock`-Muster
+/// wie `wertung_floor_weight` (einmalig gelesen, Default `0.0` = AUS, exakt
+/// Bestandsverhalten ohne gesetzte Env-Var). Skaliert
+/// `crate::scoring::musterreihen_fortschritt` (Musterreihen-Fortschritt,
+/// siehe dortige Modul-Doku) als weiteren Summanden auf `pts` in
+/// `apply_wertung_shaping_full`, VOR dem `tanh`, in derselben Punkte-Einheit
+/// wie der Strafleisten-Term (`floor_w`).
+pub fn musterreihen_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_MUSTERREIHEN_W", 0.0))
 }
 
 /// Reine Formel hinter [`apply_wertung_shaping`], OHNE Env-Var-Zugriff --
@@ -1190,16 +1277,21 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
 fn apply_wertung_shaping_with_alphas(
     value: [f64; 2], state: &GameState, w: f64, alphas: &[f64; 8], round_gain: f64,
 ) -> [f64; 2] {
-    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain)
+    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain, 0.0, 0.0, 0.0)
 }
 
-/// Volle Form: Gewicht UND Exponent je Kriterium. Ein Gewicht 0 schaltet das
-/// Kriterium vollstaendig ab -- das ist die Voraussetzung fuer den
-/// Nutzer-Versuchsaufbau (je Satz nur EIN Kriterium injiziert).
+/// Volle Form: Gewicht UND Exponent je Kriterium, plus die zwei absoluten
+/// Gegenterme (Strafleiste `floor_w`, Musterreihen-Fortschritt
+/// `musterreihen_w`). Ein Gewicht 0 schaltet das jeweilige Kriterium/Additiv
+/// vollstaendig ab -- das ist die Voraussetzung fuer den Nutzer-Versuchsaufbau
+/// (je Satz nur EIN Kriterium injiziert).
 fn apply_wertung_shaping_full(
     value: [f64; 2], state: &GameState, ws: &[f64; 8], alphas: &[f64; 8], round_gain: f64,
+    floor_w: f64, musterreihen_w: f64, endaware_w: f64,
 ) -> [f64; 2] {
-    if ws.iter().all(|w| *w == 0.0) {
+    if ws.iter().all(|w| *w == 0.0) && floor_w == 0.0 && musterreihen_w == 0.0
+        && endaware_w == 0.0
+    {
         return value;
     }
     let mut out = value;
@@ -1231,6 +1323,7 @@ fn apply_wertung_shaping_full(
         // normieren. Gleichmaessiger Fall: reproduziert `w*tanh(SUM pts/50)`
         // exakt. Isolierung (eins auf 1, Rest 0): `1*tanh(pts_k/50)`.
         let w_aussen = ws.iter().cloned().fold(0.0f64, f64::max);
+        let norm = if w_aussen > 0.0 { w_aussen } else { 1.0 };
         let t = ((state.round_number.clamp(1, 5) - 1) as f64) / 4.0;
         let mut pts = 0.0;
         for &id in state.scoring_tile_ids.iter() {
@@ -1238,7 +1331,7 @@ fn apply_wertung_shaping_full(
             if ws[k] == 0.0 {
                 continue;
             }
-            pts += (ws[k] / w_aussen) * crate::scoring::wertung_progress_per_kriterium(
+            pts += (ws[k] / norm) * crate::scoring::wertung_progress_per_kriterium(
                 &state.players[i], &[id], alphas, state.round_number, round_gain,
             );
         }
@@ -1246,11 +1339,43 @@ fn apply_wertung_shaping_full(
         // `scoring_tile_ids` -- er haengt an `ws[6]`, nicht am Liegen der Platte.
         if ws[6] != 0.0 {
             let beta6 = alphas[6] * (1.0 + round_gain * t);
-            pts += (ws[6] / w_aussen) * crate::scoring::unlock_progress_beta(
+            pts += (ws[6] / norm) * crate::scoring::unlock_progress_beta(
                 &state.players[i], &state.scoring_tile_ids, beta6,
             );
         }
-        let shift = w_aussen * (pts / WERTUNG_SHAPING_SCALE).tanh();
+        // Strafleisten-Gegenterm: NEGATIV (Summe der BROKEN_PENALTIES), liest
+        // die Musterreihen. Vor dem tanh addiert, damit er in derselben
+        // Punkte-Einheit wirkt wie der Plattenterm.
+        if floor_w != 0.0 {
+            pts += floor_w
+                * crate::round_end::projected_unplaceable_penalty(&state.players[i]) as f64;
+        }
+        // Musterreihen-Fortschritt: sieht `player.pattern_lines` (siehe
+        // `crate::scoring::musterreihen_fortschritt`-Doku) -- anders als der
+        // Plattenterm oben, der nur das Kuppelraster sieht und deshalb
+        // innerhalb einer Runde fuer jeden Drafting-Zug gleich ist. Nur ueber
+        // die tatsaechlich aktiven Wertungsplatten (`state.scoring_tile_ids`),
+        // gleiche Logik wie der Plattenterm oben.
+        if musterreihen_w != 0.0 {
+            pts += musterreihen_w * crate::scoring::musterreihen_fortschritt(
+                &state.players[i], &state.scoring_tile_ids, alphas,
+            );
+        }
+        // `skala` normiert den fertigen `tanh`-Shift zurueck auf die Groessen-
+        // ordnung des staerksten aktiven Gewichts -- Erweiterung des
+        // Bestandsmusters (`w_aussen` oder `floor_w`) um `musterreihen_w`,
+        // sonst waere das Additiv bei `w_aussen==0 && floor_w==0` trotz
+        // `musterreihen_w!=0` wirkungslos (`skala` waere 0).
+        // Tiling-Vorausschau: exakter Musterreihen-Bezug ueber den bestehenden
+        // Solver. Vor dem tanh, in Punkten, wie die Nachbarterme.
+        if endaware_w != 0.0 {
+            pts += endaware_w * tiling_vorausschau(state, i);
+        }
+        let skala = w_aussen
+            .max(floor_w.abs())
+            .max(musterreihen_w.abs())
+            .max(endaware_w.abs());
+        let shift = skala * (pts / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
     out
@@ -1265,7 +1390,10 @@ fn apply_wertung_shaping_full(
 /// `make_node`s eigener `LeafEval::Net`-Zweig (der Haupt-Suchpfad, der NICHT
 /// ueber `net_leaf_eval` laeuft, siehe dortige Duplizierung der Blend-Logik).
 fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
-    apply_wertung_shaping_full(value, state, &wertung_shaping_weights(), &wertung_shaping_alphas(), wertung_round_gain())
+    apply_wertung_shaping_full(
+        value, state, &wertung_shaping_weights(), &wertung_shaping_alphas(), wertung_round_gain(),
+        wertung_floor_weight(), musterreihen_weight(), endaware_weight(),
+    )
 }
 
 // ── Freischalt-Shaping (Nutzer-Auftrag 2026-08-10, Messlage watchlist_v20_
@@ -6618,6 +6746,34 @@ mod tests {
             0.0,
             "Test-Voraussetzung: MOSAIC_WERTUNG_ROUND_GAIN darf hier nicht gesetzt sein"
         );
+    }
+
+    #[test]
+    fn musterreihen_weight_defaults_to_zero_and_leaves_leaf_value_unchanged() {
+        // Default-Neutralitaet des neuen Musterreihen-Additivs: bei
+        // `MOSAIC_MUSTERREIHEN_W` ungesetzt (Default 0.0) muss der reale,
+        // Env-Var-lesende Wrapper `apply_wertung_shaping` `value`
+        // byte-identisch zurueckgeben -- gleiches Muster wie
+        // `wertung_shaping_disabled_by_default_is_exact_identity`.
+        assert_eq!(
+            musterreihen_weight(),
+            0.0,
+            "Test-Voraussetzung: MOSAIC_MUSTERREIHEN_W darf hier nicht gesetzt sein"
+        );
+        let mut rng = StdRng::seed_from_u64(9200);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
+            for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
+                assert_eq!(
+                    apply_wertung_shaping(v, &state), v,
+                    "Spiel {gi}: MOSAIC_MUSTERREIHEN_W=0 (Default) muss die Blattbewertung \
+                     unveraendert lassen (v={v:?})"
+                );
+            }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
     }
 
     #[test]
