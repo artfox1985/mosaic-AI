@@ -66,3 +66,15 @@ logs/
 !dist/README_SPIEL.txt
 docs/DE_AzulDuel_Rulebook_compressed2.pdf
 data/altmess_90files/
+
+# Roh-Arena-Ergebnisse mit Partie-Logs (Nutzer-Entscheid 2026-08-12).
+# ANLASS: eine Nacht Rasterlaeufe erzeugte 57 Dateien / 43,7 MB, davon 27,2 MB
+# schon in der Historie -- bei einer verwertbaren Fraktion von 1,8 %.
+# `--log-games` bleibt noetig WAEHREND eines Laufs (die Plattenpunkte je
+# Kriterium stehen nur im Log), aber danach genuegt die eingedampfte Form:
+#   python -X utf8 tools/arena_kompakt.py --muster "<praefix>_*"
+#   -> evaluations/arena_kompakt.jsonl (versioniert, ~200 Byte je Partie)
+# Entscheidende Laeufe, die eine Vorregistrierung ausdruecklich als Beleg
+# benennt, koennen weiter mit `git add -f` einzeln aufgenommen werden.
+evaluations/paired_arena_env_*.json
+!evaluations/arena_kompakt.jsonl
