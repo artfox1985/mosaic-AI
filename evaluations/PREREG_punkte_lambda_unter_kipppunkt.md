@@ -239,3 +239,50 @@ Vorregistrierung, BEVOR gemessen wird -- nicht die Metrik, die am naechsten lieg
 Dieselbe Familie wie `feedback_preregister_decision_metric`, nur eine Ebene
 hoeher: dort ging es um die richtige Metrik fuer eine gegebene Frage, hier um die
 richtige FRAGE.
+
+---
+
+## FORTSETZUNG (Nutzer-Auftrag 2026-08-12): λ=0,2 und Replikation
+
+*"ich wuerd noch einen lambda term 0.2 einfuehren. anschliessend dann mit dem
+vielversprechendsten noch eine replikation auf frischen seeds fahren"*
+
+### Stufe 1 -- λ=0,2 auf DENSELBEN Seeds
+
+`--env-name MOSAIC_POINTS_UTILITY_W,MOSAIC_AGGR_LAMBDA --arms 0.1,0.2
+--control 0,0.1 --seed 20260902 --n-games 400`. Gleicher Basis-Seed wie die drei
+vorhandenen Arme, damit gepaart gegen dieselbe Kontrolle gerechnet werden kann.
+
+**Eingebaute Kontrollprobe**: die neu mitgefahrene Kontrolle MUSS die vorhandene
+reproduzieren. Tut sie es nicht, hat die zwischenzeitliche Shaping-Formel-Aenderung
+den λ-Pfad beruehrt (sie sollte nicht -- alle Shaping-Gewichte stehen auf 0, die
+Abkuerzung greift, und der Paritaets-Hash ist unveraendert). Das ist derselbe
+Test, der heute den Wheel-Fehler und den Formelfehler gefunden hat.
+
+Erwartung, vorab festgehalten: λ=0,2 liegt zwischen λ=0,1 (Marge +1,99) und λ=0,4
+(+0,36). Faellt es AUSSERHALB dieser Spanne, ist die Dosis-Wirkung nicht monoton
+und die Lesart "starke Denial-Gewichte kosten mehr als sie nehmen" traegt nicht.
+
+### Stufe 2 -- Replikation auf FRISCHEN Seeds
+
+- **Arm**: der beste der vier nach der unten benannten Metrik. Falls zwei
+  gleichauf liegen, der mit dem kleineren λ (weniger Eingriff bei gleichem
+  Ertrag).
+- **Basis-Seed 20260812**, klar getrennt von 20260902. n=400.
+- **METRIK, VORAB und allein entscheidend: die MARGE** (eigene minus Gegnerpunkte),
+  auf Block-Ebene ueber 16 Bloecke a 25, gepaart gegen die im selben Lauf
+  mitgefahrene Kontrolle `0 / 0,1`.
+- Mitberichtet, aber NICHT entscheidend: eigene Punkte, Gegnerpunkte, Siegquote.
+  Sie stehen dabei, damit sichtbar bleibt, WOHER die Marge kommt -- eine Marge,
+  die nur aus gedrueckten Gegnerpunkten bei fallenden eigenen entsteht, ist etwas
+  anderes als eine aus beidem.
+- **Erfolgskriterium**: gleiche Richtung wie im ersten Lauf UND t >= 2 auf der
+  Marge. Gleiche Richtung ohne Signifikanz heisst "weiter unentschieden, mehr
+  Power noetig", nicht "bestaetigt". Gegenlaeufige Richtung heisst, der erste Lauf
+  war Rauschen.
+
+Warum nur n=400 und nicht die aus der Power-Rechnung folgenden ~800: die
+Replikation soll zuerst die RICHTUNG auf unabhaengigen Seeds pruefen. Ein
+Richtungswechsel bei n=400 erledigt die Frage billiger als ein n=800-Lauf, der
+dieselbe Antwort teurer gibt. Haelt die Richtung, ist n=800 die naechste Stufe --
+das steht dann als eigene Entscheidung an, nicht automatisch.
