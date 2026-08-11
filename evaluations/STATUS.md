@@ -69,11 +69,18 @@ Wheel+Golden-Waechter, Plattenkopf-Strang, Konfundierungs-Muster).
   gegen 0,33110, beide **+0,0025**, rundenweise 3 von 4 (R1 praktisch gleich).
   `value_pearson_r` dagegen leicht SCHLECHTER (0,9080 gegen 0,9151, in Runde 1
   0,784 gegen 0,802). **Lesart: schadet nicht, ist auf den Entscheidungsmassen
-  minimal besser, traegt aber keine Staerkeaussage.** +0,0025 liegt weit unter
-  jedem Betrag, den dieses Projekt je als arena-relevant gemessen hat; nach der
-  geltenden Regel ("Arena, wenn die Aufloesung nicht reicht") entscheidet ein
-  gepaarter Lauf gegen `v21_2d_brierbest`, nicht das Offline-Mass. NOCH NICHT
-  GEFAHREN.
+  minimal besser, traegt aber keine Staerkeaussage** — +0,0025 liegt weit unter
+  jedem Betrag, den dieses Projekt je als arena-relevant gemessen hat.
+
+  **KEINE ARENA DAFUER (Nutzer-Entscheid 2026-08-11: *"da brauch ich keine
+  arena. der ownership kopf kommt so oder so."*, bestaetigt den frueheren Satz
+  *"der ownership head kommt so oder so. die frage ist nur mit welchem
+  faktor."*).** Der Kopf ist gesetzt, nicht zu rechtfertigen; die offene Frage
+  ist allein das GEWICHT. Damit ist 0,2 der laufende Stand, und ein
+  Gewichts-Sweep gehoert — wenn ueberhaupt — in >=6 gepaarte Seeds
+  (Task-D-Praezedenz: alle Arme H0). Der Nutzen des Kopfes liegt ohnehin
+  ueberwiegend in seiner ZWEITEN Verwendung (Auslese fuer die Blattbewertung),
+  und die ist erst nach einer Verhaltensaenderung messbar.
 - Der Formungsterm im Netz-Pfad ist gebaut (Knopf `MOSAIC_WERTUNG_SHAPING_W`)
   und **gemessen** -- Ergebnis unten.
 
