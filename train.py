@@ -147,6 +147,7 @@ def plackett_luce_moon_loss(pred_moon, moon_targets):
 from config import (MODELS_DIR, DATA_DIR, NUM_ACTIONS, BATCH_SIZE, LEARNING_RATE, VALUE_WEIGHT,
                     POINTS_WEIGHT, OWNERSHIP_WEIGHT, CONJUNCTION_TARGETS,
                     POINTS_DIST_BINS, POINTS_DIST_SIGMA)
+from head_warmstart import apply_head_warmstart
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
@@ -463,7 +464,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
-          ranking_loss_weight=0.0, conjunction_head=False):
+          ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True):
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -768,6 +769,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             print(f"   ↻ points_head wird NEU initialisiert ({len(drop)} Tensoren) "
                   f"-- fairer Kontrollarm zu --points-dist-bins")
             old_state = {k: v for k, v in old_state.items() if k not in drop}
+
+        old_state = apply_head_warmstart(old_state, new_state, head_warmstart)
         skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
         if skipped:
             print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")
@@ -2130,6 +2133,13 @@ if __name__ == "__main__":
                              "--load von einem Alt-Checkpoint OHNE diesen Kopf funktioniert "
                              "(fehlende Keys -> frisch initialisiert, Rest warm, gleiches Muster "
                              "wie --opp-points-head).")
+    parser.add_argument("--no-head-warmstart", action="store_true",
+                        help="Nutzer-Auftrag 2026-08-11: deaktiviert die gezielte Teiluebernahme "
+                             "formabweichender Koepfe beim Warm-Start (Standard: AN, siehe "
+                             "head_warmstart.py::apply_head_warmstart() fuer beide Faelle/Details). "
+                             "Mit diesem Flag: Bestandsverhalten (formabweichende Tensoren werden "
+                             "immer zufaellig neu gewuerfelt) -- fuer den A/B 'Warmstart gegen "
+                             "Zufall'.")
     parser.add_argument("--encoder", type=str, default="flat", choices=["flat", "2d"],
                         help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
                              "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
@@ -2190,4 +2200,5 @@ if __name__ == "__main__":
           value_target_lambda=args.value_target_lambda, opp_points_head=args.opp_points_head,
           endgame_head=args.endgame_head,
           value_head=args.value_head,
-          ranking_loss_weight=args.ranking_loss_weight)
+          ranking_loss_weight=args.ranking_loss_weight,
+          head_warmstart=not args.no_head_warmstart)
