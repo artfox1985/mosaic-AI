@@ -484,3 +484,88 @@ die Kerne belegten, WAEHREND der beauftragte isolierte Sweep noch nicht gefahren
 war. Beauftragt waren: die Strafleisten-Gegenprobe (*"aber ja probier es aus"*),
 der isolierte Sweep (N4) und der lambda-Sweep. Nutzer-Entscheid auf die Frage, ob
 abgebrochen wird: *"nein lass nur laufen."*
+
+---
+
+## N7. ARBEITSAUFTRAG: Koeffizienten fuer 14 Punkte auf den vertikalen Platten (2026-08-11)
+
+**Nutzer-Auftrag**: *"Optimiere die injektion bis wir bei den vertikalen
+wertungsplatten koeffizenten gefunden haben um die 14 sonderpunkte zu erreichen.
+sollte nicht so schwer sein."*
+
+**Zuschnitt (Nutzer-Praezisierung)**: *"von den koeffizienten darfst w und alpha
+angreifen. vom coder der blattbewertung her sollte nicht mehr allzu viel fehlen.
+da ist die strafleiste und musterreihe ja schon drinnen."*
+
+Also: gesucht wird ueber `w[1]` und `alpha[1]`. `MOSAIC_WERTUNG_FLOOR_W` und
+`MOSAIC_TILING_W` stehen FEST auf 1,0 -- sie sind Bestandteil der Blattbewertung,
+keine Stellschrauben, und 1,0 ist genau ihre Gewichtung in `mcts.rs::player_total`
+(alle drei Summanden mit Koeffizient 1).
+
+### Der Musterreihen-Traeger ist jetzt der der Heuristik
+
+Nutzer-Entscheid *"nichts davon"* zu meinen zwei Eigenbauten, und die Messung gab
+ihm recht: `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte (t=-0,07), bei w=0,3
+-2,16 (t=-1,21); `MOSAIC_MUSTERREIHEN_W` bei w=0,1 -0,84 (t=-0,69). Keiner hob die
+Plattenpunkte. Traeger ist stattdessen `MOSAIC_TILING_W` mit
+
+    solve_round_final_score(state, pi) - state.players[pi].score
+
+also die aus den heutigen Musterreihen erreichbaren Platzierungspunkte plus feste
+Strafen -- die unveraenderte Projektfunktion. Punktestand abgezogen (Nutzer-Wahl
+"nur der Tiling-Anteil"), weil er fuer alle Geschwisterzuege gleich ist und
+`tanh(pts/50)` saettigen wuerde. Die Differenz ist keine Erfindung:
+`tiling_solver.rs:1069` prueft genau sie.
+
+### ZWEI EIGENE FEHLER, die dieser Abschnitt festhaelt
+
+**1. Ungepruefte Zahl in einer Rechnung (REGEL-0-Bruch).** Ich hatte behauptet,
+Kriterium 1 liefere "typisch 2 bis 6 Punkte", und daraus die `w`-Spanne
+abgeleitet. Nutzer-Rueckfrage *"wie kommst darauf. sie liefert ohne
+wahrscheinlichkeit 7 punkte je vollständiger reihe"*. Gemessen an den 57
+Endbrettern des Nullpunkts (Spalten aus den Platzierungszeilen rekonstruiert):
+
+| Groesse | Wert |
+| ------- | ---: |
+| Median  | **12,25** |
+| Mittel  | 12,27 |
+| 10 %-Quantil | 9,53 |
+| 90 %-Quantil | 15,36 |
+| Min / Max | 7,39 / 16,72 |
+
+**Untergrenze**, nicht exakt: Spezialfelder fuellen Zellen mit
+(`dome.rs:54-59`), das Log nennt aber nur die REIHE des Bonus (+N Punkte = Reihe
+N), nicht die Spalte. Der echte Wert liegt hoeher.
+
+Folge: `tanh(w * P / 50)` saettigt bei **w ~ 10** allein aus diesem Term. Die
+Spanne, mit der ich gestartet war ({1, 3, 10, 20}), lag mit ihren oberen zwei
+Werten in der Saettigung. Der informative Bereich liegt **unter 1**.
+
+**2. Verwechslung der beiden Wertungsfunktionen.** `calculate_end_scoring` ist
+ALLES-ODER-NICHTS (`tile.score(player)`, `scoring.rs:136`); `wertung_progress` ist
+der stetige Ersatz mit quadratischer Teilgutschrift, ausdruecklich "NICHT fuer die
+echte Endwertung" (Doku `scoring.rs:150-158`). Die gemessenen 0,70 sind damit
+ECHTE Punkte -- 0,1 Spalten je Partie, eine Spalte in jeder zehnten. Der
+Nutzer-Zielwert 14 = 2 Spalten ist dieselbe Einheit. Die 12,25 oben sind dagegen
+die Groesse des SHAPING-Terms und mit den 0,70 nicht vergleichbar.
+
+### Aufbau: vollstaendiges Raster statt Tastsuche
+
+Erst war eine dreiphasige Tastsuche geplant (klammern, Exponent, verfeinern).
+Verworfen, weil eine Zelle auf der freien Maschine **1,1 min** kostet statt der
+angenommenen 5: bei diesem Preis ist ein vollstaendiges Raster billiger als die
+Absicherung gegen eine Greedy-Suche, die im lokalen Optimum haengenbleibt -- und
+es liefert die ganze Antwortflaeche statt eines Pfades.
+
+- `w[1]` in {0,03 / 0,1 / 0,3 / 1 / 3}
+- `alpha[1]` in {0,25 / 0,5 / 1 / 2 / 4}
+- 25 Zellen, je 20 Partien (die Seeds mit aktiver vertikaler Platte), 400 gegen
+  150 Sims, gepaart ueber den Seed
+- Metrik: Plattenpunkte des Kriteriums 1 aus der Log-Aufschluesselung. Ziel >= 14.
+- Mitberichtet je Zelle: Endstand, Gesamt-Plattenpunkte, Strafleiste, Siegquote --
+  damit nicht nur "erreicht" dasteht, sondern auch, was es gekostet hat.
+
+**Erste zwei Zellen liegen schon vor** (aus der abgebrochenen Tastsuche, Dateien
+bleiben erhalten): w=1/alpha=2 und w=3/alpha=2 geben beide **vertikal 0,70**, also
+exakt den Nullpunkt, bei Endstaenden von 48,90 und 46,45 gegen 53,30. Beide kosten
+Punkte, ohne eine einzige Spalte zu bewegen.

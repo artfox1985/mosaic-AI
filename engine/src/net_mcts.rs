@@ -1230,6 +1230,49 @@ fn tiling_vorausschau(state: &GameState, pi: usize) -> f64 {
     (mit - ohne) as f64
 }
 
+/// Gewicht fuer den **Tiling-Potenzial**-Term. Default **0,0** = aus.
+///
+/// HERKUNFT (Nutzer-Entscheid 2026-08-11, nach *"nichts davon"* zu meinen zwei
+/// selbst erfundenen Musterreihen-Termen): NICHT nachbauen, sondern den nehmen,
+/// den die Heuristik benutzt. `mcts.rs::player_total` besteht aus DREI
+/// Summanden, und der erste ist der, der die Musterreihen sieht:
+///
+///     solve_round_final_score(state, pi)                  <- dieser hier
+///       + wertung_progress(..)                            <- MOSAIC_WERTUNG_SHAPING_W
+///       + projected_unplaceable_penalty(..)               <- MOSAIC_WERTUNG_FLOOR_W
+///
+/// Warum meine beiden Eigenbauten weg sind: gemessen taten sie nichts.
+/// `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte (t=-0,07), bei w=0,3 -2,16
+/// (t=-1,21) ohne jeden Plattengewinn; `MOSAIC_MUSTERREIHEN_W` bei w=0,1 -0,84
+/// (t=-0,69). Die Knoepfe bleiben stehen, aber dieser hier ist der Traeger.
+pub fn tiling_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_TILING_W", 0.0))
+}
+
+/// Aus den HEUTIGEN Musterreihen erreichbare Platzierungspunkte.
+///
+/// `solve_round_final_score` liefert *aktueller Punktestand + max. Tiling-Punkte
+/// + feste Boden-/Marker-Strafen* (`tiling_solver.rs:398`: `p.score + penalty +
+/// solve_max_tiling_points`). Der Punktestand wird ABGEZOGEN -- Nutzer-Entscheid
+/// "nur der Tiling-Anteil". Zwei Gruende, und beide zaehlen:
+///  1. Er ist fuer alle Geschwisterzuege GLEICH und traegt zur Zugwahl nichts bei.
+///  2. Er liegt bei ~50 Punkten und wuerde `tanh(pts/50)` saettigen, womit auch
+///     der variable Rest keine Wirkung mehr haette.
+///
+/// Die Differenz ist keine Erfindung: `tiling_solver.rs:1069` prueft genau sie
+/// (`solve_round_final_score(&s,0) - s.players[0].score == 3`). Uebrig bleiben
+/// Tiling-Punkte + feste Strafen, beides drafting-abhaengig, und beides in
+/// Punkten -- dieselbe Einheit wie die Nachbarterme.
+///
+/// Ueberschneidung mit `projected_unplaceable_penalty` ist gewollt und spiegelt
+/// die Heuristik: `penalty` sind die Strafen der SCHON gebrochenen Fliesen, der
+/// andere Term preist die Fliesen in Reihen, die sich nicht mehr platzieren
+/// lassen -- der Solver sieht dort nur "0 Punkte", nicht die Busse.
+fn tiling_potenzial(state: &GameState, pi: usize) -> f64 {
+    (crate::tiling_solver::solve_round_final_score(state, pi) - state.players[pi].score) as f64
+}
+
 pub fn wertung_round_gain() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ROUND_GAIN", 0.0))
@@ -1277,7 +1320,7 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
 fn apply_wertung_shaping_with_alphas(
     value: [f64; 2], state: &GameState, w: f64, alphas: &[f64; 8], round_gain: f64,
 ) -> [f64; 2] {
-    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain, 0.0, 0.0, 0.0)
+    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain, 0.0, 0.0, 0.0, 0.0)
 }
 
 /// Volle Form: Gewicht UND Exponent je Kriterium, plus die zwei absoluten
@@ -1287,10 +1330,10 @@ fn apply_wertung_shaping_with_alphas(
 /// (je Satz nur EIN Kriterium injiziert).
 fn apply_wertung_shaping_full(
     value: [f64; 2], state: &GameState, ws: &[f64; 8], alphas: &[f64; 8], round_gain: f64,
-    floor_w: f64, musterreihen_w: f64, endaware_w: f64,
+    floor_w: f64, musterreihen_w: f64, endaware_w: f64, tiling_w: f64,
 ) -> [f64; 2] {
     if ws.iter().all(|w| *w == 0.0) && floor_w == 0.0 && musterreihen_w == 0.0
-        && endaware_w == 0.0
+        && endaware_w == 0.0 && tiling_w == 0.0
     {
         return value;
     }
@@ -1371,10 +1414,16 @@ fn apply_wertung_shaping_full(
         if endaware_w != 0.0 {
             pts += endaware_w * tiling_vorausschau(state, i);
         }
+        // Tiling-Potenzial: der Musterreihen-Traeger, aus der Heuristik
+        // uebernommen statt nachgebaut (siehe tiling_weight-Doku).
+        if tiling_w != 0.0 {
+            pts += tiling_w * tiling_potenzial(state, i);
+        }
         let skala = w_aussen
             .max(floor_w.abs())
             .max(musterreihen_w.abs())
-            .max(endaware_w.abs());
+            .max(endaware_w.abs())
+            .max(tiling_w.abs());
         let shift = skala * (pts / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
@@ -1393,6 +1442,7 @@ fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
     apply_wertung_shaping_full(
         value, state, &wertung_shaping_weights(), &wertung_shaping_alphas(), wertung_round_gain(),
         wertung_floor_weight(), musterreihen_weight(), endaware_weight(),
+        tiling_weight(),
     )
 }
 
