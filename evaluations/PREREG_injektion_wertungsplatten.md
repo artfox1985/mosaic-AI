@@ -243,3 +243,66 @@ damit die FLIESENVERSORGUNG -- die Arme spielen dann unterschiedliches Material,
 nicht nur unterschiedliche Zuege. Der gleiche Seed bleibt eine Varianzreduktion,
 ist aber KEINE gemeinsame Zufallszahlenfolge. Gilt fuer alle Sweeps dieses
 Instruments.
+
+---
+
+## Nachtrag 2026-08-11 (abends): drei Punkte, einer davon eine Prozess-Schuld
+
+### N1. Der kriterienweise Aufbau — NACHTRÄGLICH registriert, und das ist ein Mangel
+
+Der Versuchsaufbau nach Nutzer-Plan (*"20 ausgesuchte spiele in denen die
+vertikalen wertungsplatten aktiv sind nur mit alpha variation der vertikalen
+platten"*) wurde **gefahren, bevor er hier stand**. Ich halte das ausdrücklich
+als Mangel fest, statt es zu glätten: die Konfigurationen `k0`..`k7` (je
+`alpha[k]=1`, Rest 2, w=1,0) und die Dosis-Reihe `w0/w003/w01/w03/uni` sind
+damit **exploratorisch**, nicht konfirmatorisch. Was daraus folgt: die dort
+gefundenen Effekte begründen Hypothesen, sie bestätigen keine. Eine Bestätigung
+braucht frische Seeds.
+
+Festgehalten ist der Aufbau trotzdem, weil er weiterläuft: 57 Seeds aus
+`seed_auswahl_platten.json`, gepaart über den Seed, 400 Netz-Sims gegen
+150 Heuristik-Sims, Kriterium 4 als Null-Kontrolle (alpha dort additiv
+wirkungslos).
+
+### N2. Self-Play: das Shaping-Gewicht JE PARTIE streuen (Nutzer-Auftrag)
+
+> *"nimm als hinweis fürs self play mit, dass wir je spiel auch das gewicht des
+> wertungsplattenshapings anpassen sollten. dann bekommt der ownership head
+> ordentlich was zu sehen"* / *"dann ziehen die spiele mal mehr und mal weniger
+> richtung wertungsplatten"*
+
+Warum das sauber ist und nicht die Labels verdirbt: die Ownership-**Ziele** sind
+die realisierten Endzustands-Feldlabels der 36 Kuppelfelder. Die sind bei
+**jedem** `w` korrekt — variiert wird allein die Zustandsverteilung, aus der
+gelernt wird, nicht die Beschriftung. Ein fester Wert erzeugt einen Korpus mit
+genau einem Platten-Affinitätsniveau; der Kopf sähe nie, wie ein Brett aussieht,
+das stark auf Platten spielt, und nie, wie eines aussieht, das sie ignoriert.
+
+Umsetzung (noch nicht gebaut): `w` je Partie aus dem Partie-Seed ableiten, damit
+es reproduzierbar bleibt, über einen Bereich, der von "aus" bis "deutlich
+ziehend" reicht. Die Grenzen setzt die Dosis-Kurve, sobald sie einen brauchbaren
+Bereich zeigt — heute zeigt sie noch keinen (siehe N3).
+
+### N3. Der bessere Term war schon da (Nutzer-Hinweis, und er trifft)
+
+> *"du kannst auch bei der heuristik reinschauen wie es gemacht wurde. brauchst
+> nicht immer das rad neu erfinden"*
+
+GEPRÜFT: `tiling_solver.rs:556` `solve_round_final_score_endaware` mit
+`solve_rec_endaware` (`tiling_solver.rs:519-546`) rollt über `legal_steps` die
+Musterreihen auf die Kuppel und maximiert am Blatt **Platzierungspunkte +
+`calculate_end_scoring`** — Letzteres enthält die Wertungsplatten. Damit ist der
+Musterreihen-Bezug exakt statt geschätzt: Farb-, Sperr- und Slot-Bedingungen
+kommen aus dem echten Tiling, und die Ein-Fliese-pro-Musterreihe-Schranke ergibt
+sich von selbst. `alpha` wird dort gegenstandslos, weil der Fortschritt
+realisiert und nicht hochgerechnet wird.
+
+Der Doku-Vorbehalt "nur für Runde 5 sinnvoll" sticht beim Shaping nicht: dort
+ist `calculate_end_scoring` exakt, in Runden 1-4 eine Näherung — und eine
+Injektion braucht Richtung, nicht Exaktheit. Offene Frage ist allein der PREIS
+pro Blatt; das ist zu messen, nicht zu schätzen.
+
+**Damit stehen zwei Kandidaten für denselben Zweck**, und die Messung entscheidet:
+- `MOSAIC_MUSTERREIHEN_W` — nachgebaute Bereitschaft je Zelle (geschätzt, billig)
+- ein noch zu bauender Knopf auf Basis von `solve_round_final_score_endaware`
+  (exakt, Preis unbekannt)
