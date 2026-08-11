@@ -5,14 +5,25 @@ dorthin kommen. wiegesagt das ist die leichteste aufgabe da sie mit dem
 basispiel aufbau gut harmoniert"*, nachdem ich 14 Punkte mit `w`/`alpha` allein
 für unwahrscheinlich erklärt hatte.
 
-## 1. Der Nutzer hat den Denkfehler benannt, und er war meiner
+## 1. BEIDE Haelften, nicht die eine statt der anderen
+
+**Nutzer-Korrektur 2026-08-12**: *"es war nicht die falsche haelfte. du brauchst
+beide haelften."* Aufgenommen. Die Draftingseite ist notwendig und allein nicht
+ausreichend: sie holt die richtigen Fliesen in die Musterreihen, die Platzierung
+bringt sie in dieselbe Spalte. Ohne die erste hat die zweite nichts zu verteilen,
+ohne die zweite wird die erste verstreut.
+
+Folge fuer die Messung, und sie ist bindend: der Platzierungsknopf wird MIT
+aktiver Draftingseite gemessen (bestes Rasterpaar `w`/`alpha`), nicht als deren
+Ersatz. Ein Arm mit Platzierung allein gehoert nur als Zerlegung dazu, nicht als
+Kandidat.
 
 Spaltenbau harmoniert mit dem Basisspiel: `score_placed_tile` zählt orthogonal
 verbundene Linien, eine wachsende Spalte zahlt bei JEDER Fliese, zusammen
 1+2+3+4+5+6 = 21 Platzierungspunkte plus 7 Plattenpunkte. Das Spiel belohnt es
 von sich aus. Wenn es trotzdem nicht passiert, blockiert etwas anderes.
 
-Ich habe ausschließlich die **Draftingseite** injiziert. Die zweite Hälfte ist
+Gebaut hatte ich bisher nur die **Draftingseite**. Die fehlende zweite Hälfte ist
 die **Platzierung**: welche Spalte eine fertige Musterreihe bekommt.
 
 ## 2. GEPRÜFT: wer die Platzierung entscheidet
