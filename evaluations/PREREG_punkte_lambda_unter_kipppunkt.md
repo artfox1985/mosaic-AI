@@ -150,3 +150,49 @@ Familie nach dem Punkte-Blend (`403a516`) und dem PCR-A/B.
 die AGGRESSIONS-Groesse allein; hier geht es um das Oeffnen des Punkte-Kanals
 (`POINTS_UTILITY_W`) bei kleinem Lambda. Zwei verschiedene Fragen, und nur die
 erste hat je ein positives Ergebnis geliefert.
+
+### KORREKTUR desselben Tages: "wirkungslos" war falsch -- er ist WIRKSAM und NEUTRAL
+
+Nutzer-Einwand: *"dann gibt es einen fehler in der implementierung oder an einer
+anderen stelle im code. kann nicht sein dass es keinen unterschied macht ob ich
+den point/opp head beruecksichtige oder nicht."*
+
+Der Einwand war berechtigt, und er hat einen Formulierungsfehler von mir
+aufgedeckt. Geprueft wurde in dieser Reihenfolge:
+
+1. **Ist der Knopf verdrahtet?** Ja -- `MOSAIC_POINTS_UTILITY_W` ->
+   `points_utility_w()` (`net_mcts.rs:157`), und `blended_leaf_win_prob` wird von
+   allen Blattpfaden aufgerufen, auch dem Haupt-Suchpfad (11 Aufrufstellen).
+2. **Hat der Champion den `opp_points`-Kopf?** Ja -- sonst waere der Pfad
+   `opp_points.is_empty()` -> `legacy_blended` gelaufen, und das ist numerisch
+   `wr`, also exakt die Kontrolle. Das WAERE der Fehler gewesen, den der Nutzer
+   vermutet hat. `alphazero_v21_2d_brierbest.onnx` traegt den Ausgang.
+3. **Spielen die Arme ueberhaupt verschieden?** Der entscheidende Test, und er
+   braucht keine neue Rechnung -- beide Arme liefen auf denselben Seeds:
+
+| Arm | identische Partien | verschiedene | Ø abs. Δ Endstand |
+| --- | -----------------: | -----------: | ----------------: |
+| `0,1 / 0,1` | 28 | **372 von 400** | **12,10** |
+| `0,1 / 0,4` | 34 | 366 von 400 | 10,79 |
+
+(Vergleich ueber Endstaende UND Zuganzahl -- identisch in beiden heisst dieselbe
+Partie.)
+
+**Also: 93 % der Partien laufen anders, und einzelne Endstaende verschieben sich
+im Mittel um 12,10 Punkte bei einem Niveau von ~52.** Der Knopf greift massiv in
+die Zugwahl ein. Was unveraendert bleibt, ist allein die STAERKE (321 gegen 323
+von 400).
+
+Der Befund lautet damit nicht "wirkungslos" oder "toter Hebel", sondern: **der
+Punkte-Kanal ist wirksam und staerkeneutral -- die Suche findet eine ANDERE, gleich
+gute Politik.** Die Entscheidung (`POINTS_UTILITY_WEIGHT` bleibt 0) aendert sich
+dadurch nicht, die Begruendung schon: nicht "er tut nichts", sondern "er tut viel,
+ohne dass es besser wird". Wer ihn spaeter wieder aufgreift, sucht damit nicht
+nach einem fehlenden Signal, sondern nach einer Richtung, in der die Umverteilung
+etwas eintraegt.
+
+**Methodische Lehre, dieselbe wie beim Wheel-Vorfall des Tages**: bei einem
+H0-Befund IMMER erst pruefen, ob die Behandlung ueberhaupt angekommen ist --
+Partie-Gleichheit ist der billigste und schaerfste Test dafuer. Beim Wheel war die
+Antwort "nein" (bit-identisch), hier "ja" (372 von 400 verschieden). Ohne diesen
+Test sehen beide Faelle im Ergebnis gleich aus.
