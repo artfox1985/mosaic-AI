@@ -196,3 +196,46 @@ H0-Befund IMMER erst pruefen, ob die Behandlung ueberhaupt angekommen ist --
 Partie-Gleichheit ist der billigste und schaerfste Test dafuer. Beim Wheel war die
 Antwort "nein" (bit-identisch), hier "ja" (372 von 400 verschieden). Ohne diesen
 Test sehen beide Faelle im Ergebnis gleich aus.
+
+### ZWEITE KORREKTUR: das Verdikt war gegen die FALSCHE Zielgroesse gemessen
+
+Nutzer-Praezisierung 2026-08-12: *"die zielgroesse ist sieg mit vielen punkten und
+den gegner so gut es geht stoeren."*
+
+Ich hatte auf die SIEGQUOTE gemessen und daraus "H0, Knopf bleibt 0" geschlossen.
+Das war eine Entscheidung gegen ein Kriterium, das der Nutzer nicht gesetzt hat.
+Dieselben Daten, gegen die genannte Zielgroesse ausgewertet (Block-Ebene, 16
+Bloecke a 25):
+
+| Arm | Δ eigen | t | Δ Gegner | t | **Δ Marge** | t | Δ Siegquote |
+| --- | ------: | -: | -------: | -: | ----------: | -: | ----------: |
+| `w=0,1 / λ=0,1` | +0,85 | 0,79 | **-1,14** | -1,42 | **+1,99** | **1,42** | +0,5 pp |
+| `w=0,1 / λ=0,4` | -0,40 | -0,41 | -0,76 | -0,82 | +0,36 | 0,26 | -0,5 pp |
+
+Kontrolle `0 / 0,1`: eigen 51,88, Gegner 37,12, Marge +14,76.
+
+**Bei λ=0,1 zeigen alle drei Komponenten der Zielgroesse in die richtige
+Richtung.** Der Stoerungsanteil wirkt: der Gegner verliert 1,14 Punkte.
+
+Vorbehalte, ohne Beschoenigung:
+
+1. **Nicht signifikant.** t=1,42, zweiseitig ~p=0,16. Die Konsistenz ueber drei
+   Groessen ist KEIN zusaetzlicher Beleg -- Marge ist eigen minus Gegner, es ist
+   derselbe Effekt dreimal betrachtet.
+2. **Power.** +1,99 bei SE 1,40 braucht etwa die doppelte Blockzahl fuer t=2,
+   also n~800 oder eine Replikation auf frischen Seeds.
+3. **Mehr Denial ist nicht besser.** λ=0,4 ist auf allen Groessen schlechter als
+   λ=0,1 und drueckt die Gegnerpunkte sogar WENIGER (-0,76 gegen -1,14). Lesart
+   (Herleitung, nicht gemessen): starke Denial-Gewichte kosten die eigene
+   Entwicklung mehr, als sie dem Gegner nehmen.
+
+**Revidiertes Verdikt**: der Punkte-Kanal ist kein erledigter Hebel, sondern ein
+UNENTSCHIEDENER mit positiver Richtung auf der tatsaechlichen Zielgroesse. Die
+naheliegende Fortsetzung ist eine Replikation von `w=0,1 / λ=0,1` auf frischen
+Seeds mit n~800, Metrik VORAB die Marge, nicht die Siegquote.
+
+**Lehre fuer kuenftige Vorregistrierungen**: die Zielgroesse gehoert in die
+Vorregistrierung, BEVOR gemessen wird -- nicht die Metrik, die am naechsten liegt.
+Dieselbe Familie wie `feedback_preregister_decision_metric`, nur eine Ebene
+hoeher: dort ging es um die richtige Metrik fuer eine gegebene Frage, hier um die
+richtige FRAGE.
