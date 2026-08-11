@@ -57,8 +57,25 @@ Wheel+Golden-Waechter, Plattenkopf-Strang, Konfundierungs-Muster).
 
 | Bahn        | Was                                                                                                                                                                                                                                                             | Dauer                                                                       |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **CPU+GPU** | `train.py --name v21_2d_own02 --load v21_2d_brierbest --encoder 2d --value-head wdl --select-by-brier --conjunction-head --ownership-weight 0.2 --lr 5e-5 --lr-schedule cosine --seed 20260910`, mit `MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v21.json` | Cache-Neubau ~3 h (Schema 20 + `+conj_v2` gebuendelt), dann Training ~3,5 h |
-| **offline** | Agent: Formungsterm in den Netz-Pfad (eigene Funktion neben `wertung_progress`, Knopf `MOSAIC_WERTUNG_SHAPING_W` Default 0)                                                                                                                                     | --                                                                          |
+| **CPU** | λ-Sweep unter dem Kipppunkt: `MOSAIC_POINTS_UTILITY_W,MOSAIC_AGGR_LAMBDA`, Arme `0,0.1` / `0.1,0.1` / `0.1,0.4`, n=400, seit 21:37 | laeuft |
+| **CPU** | Kandidaten-Terme der Injektion gegen die 57 Platten-Seeds (`fg10b`, `ea01`, `ea03`, `mr01`), je 57 Partien @400 Sims | ~8-12 min je Konfiguration |
+
+**ERLEDIGT, aber Verdikt noch offen** (2026-08-11 abends nachgetragen):
+
+- `train.py --name v21_2d_own02 ... --ownership-weight 0.2` ist **durch**;
+  Modelle liegen in `models/alphazero_v21_2d_own02*`, Orakel-Metriken in
+  `oracle_v21_own02.json`. Auf den VORREGISTRIERTEN Massen minimal besser als
+  der Champion -- Prior-Masse Top-3 0,69458 gegen 0,69204, Kendall-Tau 0,33355
+  gegen 0,33110, beide **+0,0025**, rundenweise 3 von 4 (R1 praktisch gleich).
+  `value_pearson_r` dagegen leicht SCHLECHTER (0,9080 gegen 0,9151, in Runde 1
+  0,784 gegen 0,802). **Lesart: schadet nicht, ist auf den Entscheidungsmassen
+  minimal besser, traegt aber keine Staerkeaussage.** +0,0025 liegt weit unter
+  jedem Betrag, den dieses Projekt je als arena-relevant gemessen hat; nach der
+  geltenden Regel ("Arena, wenn die Aufloesung nicht reicht") entscheidet ein
+  gepaarter Lauf gegen `v21_2d_brierbest`, nicht das Offline-Mass. NOCH NICHT
+  GEFAHREN.
+- Der Formungsterm im Netz-Pfad ist gebaut (Knopf `MOSAIC_WERTUNG_SHAPING_W`)
+  und **gemessen** -- Ergebnis unten.
 
 **Fenster verifiziert**: 2.945 Dateien in `data/` = der vorregistrierte
 v21-Zuschnitt dateigenau (545 v18, 400 v19wdl, 400 v20wdl, 800 v19wdlsw,
@@ -112,6 +129,102 @@ Kopfbreite und ONNX-Vertrag aendern, und sie sind ein **kostenloser
 Fortschrittsmesser**: Grundrate 0,000 heisst "kommt in diesem Korpus nicht
 vor". Steigt sie, hat sich das Verhalten geaendert -- arena-unabhaengig, ohne
 Training, je neuem Korpus einmal auslesen.
+
+#### INJEKTION GEMESSEN 2026-08-11 -- die Dosis ist nicht das Problem, die RICHTUNG ist es
+
+57 Seeds, gepaart, 400 Netz-Sims gegen 150 Heuristik-Sims, alpha=2 einheitlich.
+Auswertung mit `tools/plattenpunkte_aus_arena.py` (nutzt die Logtext-Ausdruecke
+von `analyze_game_log.py`, kein zweiter Parser).
+
+| w    | Punkte | ΔPunkte |     t | Plattenpkt. | Strafleiste |    Δ |
+| ---- | -----: | ------: | ----: | ----------: | ----------: | ---: |
+| 0    |  53,30 |       — |     — |        3,19 |        9,35 |    — |
+| 0,03 |  52,02 |   -1,28 | -1,26 |        2,61 |        9,42 | +0,07 |
+| 0,1  |  50,21 |   -3,09 | -2,33 |        2,82 |       10,19 | +0,84 |
+| 0,3  |  49,77 |   -3,53 | -2,23 |        2,11 |       10,32 | +0,96 |
+| 1,0  |  48,26 |   -5,04 | -2,63 |        2,82 |       11,77 | +2,42 |
+
+**Kein Fenster**: was sanft genug ist, um nicht zu schaden (w=0,03, t=-1,26),
+ist auch zu sanft, um zu helfen (Plattenpunkte 2,61 gegen 3,19 im Nullpunkt).
+Die Plattenpunkte STEIGEN bei keiner Dosis.
+
+**Die Aufschluesselung je Platte erklaert, warum der Mittelwert 3,19 irrefuehrt**
+(Mittel ueber die Partien, in denen die Platte aktiv war; w=0 gegen w=1,0):
+
+| Platte              |    w=0 |  w=1,0 | aktiv |
+| ------------------- | -----: | -----: | ----: |
+| Aeussere Felder     | **+9,45** | +9,55 |    20 |
+| Mehrfarbige Felder  |  +5,40 |  +3,20 |    20 |
+| Eckplatten          |  +3,14 |  +3,27 |    22 |
+| Horizontale Reihen  |  +0,78 |  +0,91 |    23 |
+| **Vertikale Reihen** | **+0,70** | **+1,05** | 20 |
+| Diagonale Reihen    |  +0,43 |   0,00 |    23 |
+| Farbenreiche Reihen |  +0,35 |  +0,35 |    23 |
+| **Spezialfelder**   | **-11,70** | -10,80 | 20 |
+
+Drei Folgerungen:
+
+1. **Spezialfelder sind der groesste Einzelposten im Endstand**, groesser als
+   jede geometrische Platte: -11,70 = 3,9 offene Spezialkuppeln a -3. Die
+   Injektion holt davon 0,9 Punkte zurueck.
+2. **Nutzer-Zielwert geprueft und die Luecke gemessen**: erwartet waren bei
+   aktiven vertikalen Platten 14 bzw. 21 Punkte, gemessen sind **0,70** -- rund
+   ein Zehntel einer Spalte. Die Injektion bringt das auf 1,05.
+3. **Horizontale Reihen (0,78) sind strukturell, nicht Verhalten**: Rasterreihe
+   *r* wird nur von Musterreihe *r* gefuettert (`round_end.rs:20-22`), also
+   hoechstens eine Fliese pro Runde, in fuenf Runden maximal fuenf von sechs
+   Feldern. Ohne Spezialfeld ist eine horizontale Reihe nicht schliessbar.
+
+**Null-Kontrolle haelt exakt**: `k4` (alpha[4]=1) ist zahlengleich zu `uni` --
+Kriterium 4 ist additiv, alpha dort wirkungslos. Die Messkette ist sauber.
+
+**URSACHE, am Code geprueft**: `player_scoring_features` liest ausschliesslich
+`build_grid(player)` und hat **null** Bezuege auf `pattern_lines`. Der Term ist
+damit innerhalb einer Runde fuer JEDEN Drafting-Zug identisch -- er kann die
+Zugwahl gar nicht lenken, nur ueber die Rundengrenze wirken. Die Heuristik
+benutzt denselben Term nie allein: `mcts.rs:80-84` flankiert ihn mit dem
+Tiling-Solver-Score UND `projected_unplaceable_penalty`.
+
+**ZWEI MESSFEHLER, beide dokumentiert statt geglaettet**:
+
+- Die erste Gegenprobe mit dem Strafleisten-Term lief auf dem ALTEN Wheel
+  (`cargo test` gebaut, `maturin`/`pip` vergessen) und war gegenstandslos. Der
+  Beweis liegt in der Zahlengleichheit zu den Laeufen ohne den Term. Belegstuecke
+  `platten_fg01`/`platten_fg10` bleiben erhalten, der Wiederholungslauf heisst
+  `fg10b`. **Regel daraus: nach jeder Engine-Aenderung Wheel neu bauen UND
+  installieren, sonst messen die Knoepfe nichts.**
+- Der kriterienweise Aufbau (`k0`..`k7`) und die Dosis-Reihe wurden gefahren,
+  BEVOR sie vorregistriert waren. Nachgetragen als Mangel in
+  `PREREG_injektion_wertungsplatten.md` Abschnitt N1: die Ergebnisse sind
+  exploratorisch, nicht konfirmatorisch.
+
+**DREI KANDIDATEN-TERME gebaut, alle Default 0, Paritaets-Hash unveraendert**
+(`8c6684ff...`, auf dem neuen Wheel zweimal geprueft):
+
+| Knopf | Was | Herkunft |
+| --- | --- | --- |
+| `MOSAIC_WERTUNG_FLOOR_W` | `projected_unplaceable_penalty` als Gegenterm | Nutzer: *"aber ja probier es aus"* |
+| `MOSAIC_ENDAWARE_W` | `solve_round_final_score_endaware - solve_round_final_score` | Nutzer: *"brauchst nicht immer das rad neu erfinden"* |
+| `MOSAIC_MUSTERREIHEN_W` | nachgebaute Bereitschaft je Zelle, Schranke 1 Fliese/Musterreihe | Agent, als billigere Alternative |
+
+Der Vorausschau-Term ist der aussichtsreichste: `solve_rec_endaware`
+(`tiling_solver.rs:519-546`) rollt die Musterreihen ueber `legal_steps` auf die
+Kuppel und maximiert Platzierungspunkte + `calculate_end_scoring` -- Letzteres
+enthaelt die Platten. Farb-, Sperr- und Slot-Bedingungen und die
+Ein-Fliese-pro-Reihe-Schranke ergeben sich dort von selbst statt geschaetzt, und
+`alpha` wird gegenstandslos (realisiert statt hochgerechnet). Differenz und
+nicht Absolutwert, weil `endaware` den aktuellen Punktestand mittraegt (~50) und
+damit das `tanh` saettigen wuerde. Der Doku-Vorbehalt "nur fuer Runde 5
+sinnvoll" sticht beim Shaping nicht -- eine Injektion braucht Richtung, keine
+Exaktheit. Offen ist allein der Preis pro Blatt; die Laufzeit der
+Kandidaten-Messung IST diese Messung (Bezug: 7,3 min fuer 57 Partien @6 Threads).
+
+**SELF-PLAY-AUFTRAG (Nutzer 2026-08-11)**: sobald ein Term taugt, das Gewicht
+**je Partie streuen**, damit der Ownership-Kopf Vielfalt sieht -- *"dann ziehen
+die spiele mal mehr und mal weniger richtung wertungsplatten"*. Sauber, weil die
+Ownership-ZIELE die realisierten Endzustands-Feldlabels sind: die sind bei jedem
+`w` korrekt, variiert wird nur die Zustandsverteilung. Details in
+`PREREG_injektion_wertungsplatten.md` N2.
 
 #### DER FORMUNGSTERM EXISTIERT -- und das Netz hatte ihn, in unwirksamer Form
 
