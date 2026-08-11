@@ -306,3 +306,63 @@ pro Blatt; das ist zu messen, nicht zu schätzen.
 - `MOSAIC_MUSTERREIHEN_W` — nachgebaute Bereitschaft je Zelle (geschätzt, billig)
 - ein noch zu bauender Knopf auf Basis von `solve_round_final_score_endaware`
   (exakt, Preis unbekannt)
+
+---
+
+## N4. DER ISOLIERTE AUFBAU DES NUTZERS — vorregistriert VOR dem Lauf (2026-08-11, 23:5x)
+
+**Anlass**: Nutzer-Rueckfrage *"bist jetzt schon mal meinen sweep gefahren wo nur
+ein alpha pro wertungsplatte variiert wird und die anderen gewichte auf w=0"* —
+**nein, war er nicht.** Die Laeufe `k0`..`k7` variierten nur den Exponenten,
+das GEWICHT stand dabei auf 1,0 fuer alle acht Kriterien gleichzeitig
+(`net_mcts.rs:1104`: ein einzelner Wert in `MOSAIC_WERTUNG_SHAPING_W` verteilt
+sich auf alle acht Stellen). Damit war jede Platte injiziert und die Kriterien
+konfundiert. Zweiter Vorfall desselben Musters an einem Tag (vgl. *"das war aber
+nicht mein testsetup"*).
+
+### Aufbau
+
+Je Kriterium k in 0..7 **ein** Satz Partien, und zwar nur die, in denen diese
+Platte AKTIV ist (`scoring_tile_ids` enthaelt k) — 20 bis 23 Seeds, Listen in
+`evaluations/seeds_je_kriterium/k<k>.txt`, abgeleitet aus `platten_w0`.
+
+- `MOSAIC_WERTUNG_SHAPING_W` = Achterform, **0 ueberall ausser Stelle k = 1,0**
+- `MOSAIC_WERTUNG_ALPHA` = Achterform, Stelle k variiert, Rest 2 (wirkungslos,
+  weil Gewicht 0)
+- alpha[k] in **{0,5 / 1 / 2 / 4}**. Begruendung der Spanne: fuer x<1 sinkt
+  x^alpha mit steigendem alpha. alpha<1 (konkav) verteilt Gutschrift breit, schon
+  eine Fliese in einer Linie zaehlt viel; alpha>1 (konvex) zahlt fast nur an
+  BEINAHE fertige Linien. Die Frage *"ab welchem Wert zieht das Spiel mehr in
+  diese Richtung"* braucht also Punkte auf beiden Seiten von 1.
+- 400 Netz-Sims gegen 150 Heuristik-Sims, gepaart ueber den Seed.
+- **Nullpunkt** ist keine eigene Bahn: `platten_w0` auf dieselben Seeds gefiltert.
+- **OHNE** den Strafleisten-Gegenterm. Nicht aus Nachlaessigkeit: er ist ein
+  zweiter Faktor mit eigener, inzwischen gemessener Wirkung (+2,77 Punkte,
+  t=2,21) und wuerde die alpha-Ablesung konfundieren. Der Aufbau des Nutzers hat
+  ihn nicht enthalten.
+
+### Zwei Schwellen, und beide sind vorab benannt (Nutzer-Wortlaut *"ab wann wertungsplatten gebaut werden und ab wann die punkte wieder kippen"*)
+
+1. **Zieht es?** Punkte DER PLATTE k selbst, aus der Log-Aufschluesselung
+   (`tools/plattenpunkte_aus_arena.py`), gegen den Nullpunkt auf denselben Seeds.
+2. **Kippt es?** Endstand gegen den Nullpunkt auf denselben Seeds.
+
+Der gesuchte Bereich ist der, in dem (1) steigt, bevor (2) faellt. **Vorab
+festgehalten: es kann sein, dass es ihn nicht gibt** — die Dosis-Kurve mit
+uniformem Gewicht hatte keinen (was sanft genug war, um nicht zu schaden, war zu
+sanft, um zu helfen). Dieser Aufbau kann das nur pro Kriterium anders
+entscheiden, nicht die Ursache beheben: `player_scoring_features` liest die
+Musterreihen nicht.
+
+### Kriterium 4 ist die NULL-KONTROLLE
+
+Kriterium 4 (Aeussere Felder) ist additiv und linear, alpha wirkt dort nicht.
+Eine flache Reihe ueber alle vier alpha-Werte ist die Bestaetigung, dass die
+Messkette sauber ist; eine nicht-flache waere ein Fehler in der Kette.
+
+### n ist klein und das wird nicht weggeredet
+
+20 bis 23 Partien je Zelle, 32 Zellen. Bei einer Seed-Skala von 5,75pp bei n=400
+ist das explorativ: der Aufbau taugt, eine RICHTUNG und eine Groessenordnung zu
+zeigen, und ein gefundenes Fenster muss auf frischen Seeds wiederholt werden,
+bevor es in eine Entscheidung eingeht.
