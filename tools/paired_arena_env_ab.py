@@ -64,7 +64,8 @@ def champion_model() -> str:
 
 
 def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int,
-            n_games: int, seed: int, block_size: int, threads: int) -> list[dict]:
+            n_games: int, seed: int, block_size: int, threads: int,
+            log_games: bool = False) -> list[dict]:
     """`env_name` darf mehrere komma-getrennte Var-Namen tragen; `value`
     dann entsprechend viele komma-getrennte Werte (Aggressions-
     Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt)."""
@@ -87,7 +88,12 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
             [sys.executable, str(WORKER), "--model", model,
              "--net-sims", str(net_sims), "--heur-sims", str(heur_sims),
              "--n-games", str(n), "--seed", str(block_seed),
-             "--threads", str(threads)],
+             "--threads", str(threads)]
+            # 2026-08-11: Partie-Logs mitfuehren, damit die VERHALTENS-Zahlen
+            # (Nahmen-Anteil tiefe Reihen, Freischaltungen, Zellen je Reihe)
+            # aus DENSELBEN Partien kommen wie die Siegquote. Ohne das braeuchte
+            # die Verhaltensmessung einen zweiten Lauf ueber dieselben Stunden.
+            + (["--log-games"] if log_games else []),
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=ARM_TIMEOUT_SECS, env=env,
         )
@@ -119,6 +125,12 @@ def main() -> None:
     ap.add_argument("--block-size", type=int, default=25)
     ap.add_argument("--threads", type=int, default=10)
     ap.add_argument("--out-prefix", required=True)
+    # 2026-08-11: Partie-Logs je Arm mitfuehren (reicht `--log-games` an den
+    # Worker und damit an `net_arena_match`s `log_games` weiter, Commit
+    # 9dfeb16). Default AUS = Bestandsverhalten, Ergebnis-JSON exakt wie bisher.
+    ap.add_argument("--log-games", action="store_true",
+                    help="Partie-Logs mitschreiben, damit die Verhaltenszahlen "
+                         "aus DENSELBEN Partien kommen wie die Siegquote")
     args = ap.parse_args()
 
     if args.control not in args.arms:
@@ -129,7 +141,8 @@ def main() -> None:
     for v in args.arms:
         results[v] = run_arm(args.env_name, v, model, args.net_sims,
                              args.heur_sims, args.n_games, args.seed,
-                             args.block_size, args.threads)
+                             args.block_size, args.threads,
+                             log_games=args.log_games)
 
     out = {
         "env_name": args.env_name, "arms": args.arms, "control": args.control,
