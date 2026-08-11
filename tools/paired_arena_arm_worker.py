@@ -21,6 +21,17 @@ import sys
 import json
 import argparse
 
+# 2026-08-11: PFLICHT, seit `--log-games` existiert. Das rohe JSON traegt dann
+# die Partie-Logs, und die enthalten Pfeile und Emoji ("→", "⭐", "🏆").
+# Windows-Default fuer stdout ist cp1252 -> `sys.stdout.write(raw)` stirbt mit
+# `UnicodeEncodeError: 'charmap' codec can't encode character '→'`.
+# Dritter Vorfall derselben Familie an einem Tag (vgl. Commit 2a6abee: dort war
+# die LESE-Seite betroffen, hier ist es die SCHREIB-Seite).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Ein Arm des gepaarten Speed-Buendel-A/B")
