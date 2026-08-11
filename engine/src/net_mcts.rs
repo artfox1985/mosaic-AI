@@ -1078,12 +1078,42 @@ pub fn wertung_shaping_weight() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_SHAPING_W", WERTUNG_SHAPING_WEIGHT))
 }
 
-/// Laufzeit-Wert von `MOSAIC_WERTUNG_ALPHA` -- gleiches Muster wie
-/// `wertung_shaping_weight`. Ohne gesetzte Env-Var byte-identisches
-/// Bestandsverhalten (Default `WERTUNG_SHAPING_ALPHA` = 2.0).
-pub fn wertung_shaping_alpha() -> f64 {
+/// Laufzeit-Wert von `MOSAIC_WERTUNG_ALPHA` -- **acht Werte, einer JE KRITERIUM**
+/// (Nutzer-Vorgabe 2026-08-11: *"wir wollen ja alpha pro wertungsplatte seperat
+/// festlegen"*). Format: kommagetrennt in Kriterien-Reihenfolge 0..7, z.B.
+/// `2,6,9,2,2,2.6,2,2`. **Ein einzelner Wert gilt fuer alle** (Rueckwaerts-
+/// kompatibilitaet und bequem fuer globale A/Bs). Ungesetzt = alle
+/// `WERTUNG_SHAPING_ALPHA` (2.0), also byte-identisches Bestandsverhalten.
+///
+/// Fehlerhafte oder unvollstaendige Listen fallen HART auf den Default zurueck --
+/// kein stilles Teil-Parsen, sonst waere ein Tippfehler ein unbemerkt anderer
+/// Versuch (vgl. `train.py --load`-Footgun).
+pub fn wertung_shaping_alphas() -> [f64; 8] {
+    static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let mut out = [WERTUNG_SHAPING_ALPHA; 8];
+        let Ok(raw) = std::env::var("MOSAIC_WERTUNG_ALPHA") else { return out };
+        let parts: Vec<&str> = raw.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+        let vals: Option<Vec<f64>> = parts.iter().map(|p| p.parse::<f64>().ok()).collect();
+        match vals.as_deref() {
+            Some([one]) => out = [*one; 8],
+            Some(v) if v.len() == 8 => out.copy_from_slice(v),
+            _ => eprintln!(
+                "MOSAIC_WERTUNG_ALPHA={raw:?} ignoriert -- erwartet 1 oder 8 Zahlen, Default {WERTUNG_SHAPING_ALPHA} gilt"
+            ),
+        }
+        out
+    })
+}
+
+/// Laufzeit-Wert von `MOSAIC_WERTUNG_ROUND_GAIN` -- hebt ALLE Exponenten ueber die
+/// Runden an: `alpha_c(r) = alpha_c * (1 + gain * (r-1)/4)`. Default **0,0** = keine
+/// Rundenabhaengigkeit. Ersetzt die frueheren, einkompilierten kalibrierten
+/// Zielwerte je Kriterium -- die waren nicht begruendbar, weil
+/// `Mittel(x^alpha) > Rate` fuer JEDES alpha gilt (siehe `scoring.rs`-Doku).
+pub fn wertung_round_gain() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ALPHA", WERTUNG_SHAPING_ALPHA))
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ROUND_GAIN", 0.0))
 }
 
 /// Reine Formel hinter [`apply_wertung_shaping`], OHNE Env-Var-Zugriff --
@@ -1106,7 +1136,16 @@ pub fn wertung_shaping_alpha() -> f64 {
 /// -- keine mine-minus-theirs-Kopplung wie beim Plattenshaping oben, siehe
 /// Modul-Kommentar. Ergebnis wird wie die bestehende Floor-/Platten-Additiv-
 /// Logik auf `[0,1]` geklemmt.
+/// Bequemlichkeits-Huelle: EIN alpha fuer alle Kriterien, ohne Runden-Gain.
+/// Haelt die Bestandstests unveraendert lesbar; die volle Form ist
+/// [`apply_wertung_shaping_with_alphas`].
 fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha: f64) -> [f64; 2] {
+    apply_wertung_shaping_with_alphas(value, state, w, &[alpha; 8], 0.0)
+}
+
+fn apply_wertung_shaping_with_alphas(
+    value: [f64; 2], state: &GameState, w: f64, alphas: &[f64; 8], round_gain: f64,
+) -> [f64; 2] {
     if w == 0.0 {
         return value;
     }
@@ -1120,8 +1159,8 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
         // Der frueher hier stehende einheitliche Exponent ueberschaetzte die
         // konjunktiven Kriterien um Faktor 1,4 bis 196,5 -- ungleichmaessig,
         // also durch kein gemeinsames `w` korrigierbar.
-        let pts = crate::scoring::wertung_progress_runde(
-            &state.players[i], &state.scoring_tile_ids, state.round_number, alpha,
+        let pts = crate::scoring::wertung_progress_per_kriterium(
+            &state.players[i], &state.scoring_tile_ids, alphas, state.round_number, round_gain,
         );
         let shift = w * (pts / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
@@ -1138,7 +1177,7 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
 /// `make_node`s eigener `LeafEval::Net`-Zweig (der Haupt-Suchpfad, der NICHT
 /// ueber `net_leaf_eval` laeuft, siehe dortige Duplizierung der Blend-Logik).
 fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
-    apply_wertung_shaping_with(value, state, wertung_shaping_weight(), wertung_shaping_alpha())
+    apply_wertung_shaping_with_alphas(value, state, wertung_shaping_weight(), &wertung_shaping_alphas(), wertung_round_gain())
 }
 
 // ── Freischalt-Shaping (Nutzer-Auftrag 2026-08-10, Messlage watchlist_v20_
@@ -6500,9 +6539,16 @@ mod tests {
             "Test-Voraussetzung: MOSAIC_WERTUNG_SHAPING_W darf hier nicht gesetzt sein"
         );
         assert_eq!(
-            wertung_shaping_alpha(),
-            2.0,
+            wertung_shaping_alphas(),
+            [2.0; 8],
             "Test-Voraussetzung: MOSAIC_WERTUNG_ALPHA darf hier nicht gesetzt sein"
+        );
+        // Runden-Verstaerkung ist standardmaessig AUS -- sonst waere der
+        // Blattwert rundenabhaengig, ohne dass jemand einen Knopf gedreht hat.
+        assert_eq!(
+            wertung_round_gain(),
+            0.0,
+            "Test-Voraussetzung: MOSAIC_WERTUNG_ROUND_GAIN darf hier nicht gesetzt sein"
         );
     }
 
