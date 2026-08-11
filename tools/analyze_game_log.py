@@ -127,6 +127,15 @@ PATTERNS: dict[str, re.Pattern] = {
     # GUI-Symbol seit 2026-08-06: ❖ statt 🏁 (beide akzeptieren --
     # Alt-Logs bleiben parsebar; Watchlist-Fund 2026-08-07).
     "MARKER": re.compile(r"^[🏁❖]\s*(?P<name>.+?): Startspielerstein genommen"),
+    # Arena-Log-Fund 2026-08-11: Quelle engine/src/game.rs::execute_draw_
+    # from_stack (~Zeile 284) -- Spieler zieht >=2 Kuppelplatten, legt >=1
+    # zurueck. 0 Treffer in den 64 Nutzer-Logs (latent), aber jede Arena-
+    # Partie (net_arena_match(log_games=True)) kann sie erzeugen. Geht der
+    # DOME_PLACE-Zeile immer unmittelbar voraus (ein log_event-Aufruf) --
+    # wie MARKER per SECONDARY_LINE_CATEGORIES uebersprungen.
+    "DOME_RETURN_TO_STACK": re.compile(
+        r"^↩️\s*(?P<n>\d+) Kuppelplatte\(n\) zurueck unter den Stapel \(Reihenfolge\): (?P<liste>.+)$"
+    ),
     "MOON_STACK_INFO": re.compile(r"^🌙 F(?P<fid>\d+) Mond-Stapel(?: nach Entnahme)?: (?P<desc>.+)$"),
     "MOON_POOL_INFO": re.compile(r"^🌙 GF Moon-Pool: (?P<desc>.+)$"),
     "CHIP_REVEAL": re.compile(r"^🎴 F(?P<fid>\d+): Bonusplättchen aufgedeckt!$"),
@@ -145,6 +154,12 @@ PRIMARY_CATEGORIES = {
 }
 
 ROUND_PREFIX = re.compile(r"^\[R(\d+)\] (.*)$")
+
+# Zeilen, die einer primaeren Aktionszeile IMMER unmittelbar vorausgehen (Teil
+# desselben log_event-Aufrufblocks) und daher fuer die Dispatch-Klassifikation
+# uebersprungen werden -- die Textvalidierung (siehe apply()/_call_and_check)
+# bekommt sie trotzdem zu sehen, da `li` (Blockanfang) unveraendert bleibt.
+SECONDARY_LINE_CATEGORIES = {"MARKER", "DOME_RETURN_TO_STACK"}
 
 
 def classify(text: str):
@@ -627,10 +642,10 @@ def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines:
         # als Teil derselben erzeugten Log-Zeilenfolge mitvalidiert.
         li_disp = li
         cat, m = classify(lines[li_disp].body)
-        while cat == "MARKER":
+        while cat in SECONDARY_LINE_CATEGORIES:
             li_disp += 1
             if li_disp >= n_lines:
-                raise ReplayDivergence(f"Zeile {li}: 🏁-Marker ohne folgende Aktionszeile.")
+                raise ReplayDivergence(f"Zeile {li}: {cat}-Zeile ohne folgende Aktionszeile.")
             cat, m = classify(lines[li_disp].body)
         cur = lines[li_disp]
         if cat is None or cat not in PRIMARY_CATEGORIES:
