@@ -1092,6 +1092,17 @@ pub fn wertung_shaping_alphas() -> [f64; 8] {
     static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         let mut out = [WERTUNG_SHAPING_ALPHA; 8];
+        // Die alten Spezialfeld-Knoepfe sind seit der Zusammenfuehrung 2026-08-11
+        // WIRKUNGSLOS (ein Gewicht, alphas[6] als Exponent). Ein still
+        // wirkungsloser Regler ist gefaehrlicher als ein fehlender: jemand
+        // setzt ihn, liest ein H0 und schliesst auf den Term. Deshalb laut.
+        for alt_var in ["MOSAIC_UNLOCK_SHAPING_W", "MOSAIC_UNLOCK_BETA"] {
+            if std::env::var(alt_var).is_ok() {
+                eprintln!(
+                    "{alt_var} ist WIRKUNGSLOS (seit 2026-08-11 zusammengefuehrt) --                      nutze MOSAIC_WERTUNG_SHAPING_W fuer das Gewicht und die 7. Stelle                      von MOSAIC_WERTUNG_ALPHA fuer den Spezialfeld-Exponenten."
+                );
+            }
+        }
         let Ok(raw) = std::env::var("MOSAIC_WERTUNG_ALPHA") else { return out };
         let parts: Vec<&str> = raw.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
         let vals: Option<Vec<f64>> = parts.iter().map(|p| p.parse::<f64>().ok()).collect();
@@ -1151,18 +1162,32 @@ fn apply_wertung_shaping_with_alphas(
     }
     let mut out = value;
     for i in 0..2 {
-        // RUNDENABHAENGIGER Exponent je Kriterium (Nutzer-Vorgabe "wir haben
-        // gesagt wir verändern alpha über die runden", Endpunkte GEMESSEN an der
-        // Heuristik-Referenz -- siehe `scoring::ALPHA_KALIBRIERT`). `alpha` ist
-        // jetzt der STARTWERT in Runde 1 (flach, lenkend); bis Runde 5 waechst
-        // er je Kriterium auf seinen kalibrierten Wert (steil, schaetzend).
-        // Der frueher hier stehende einheitliche Exponent ueberschaetzte die
-        // konjunktiven Kriterien um Faktor 1,4 bis 196,5 -- ungleichmaessig,
-        // also durch kein gemeinsames `w` korrigierbar.
-        let pts = crate::scoring::wertung_progress_per_kriterium(
+        // ALLE ACHT Kriterien in EINEM Term, EIN Gewicht (Nutzer-Korrektur
+        // 2026-08-11: *"ich dachte das haengt zusammen"*).
+        //
+        // WARUM es zusammenhaengt: Kriterium 6 (Spezialfelder) IST eine der acht
+        // Wertungsplatten. Es steckt aus Doppelzaehlungs-Gruenden nicht in
+        // `wertung_progress_per_kriterium` (dort liefert es 0), sondern in
+        // `unlock_progress_beta` -- weil sein ⭐-Anteil UNGEGATET zahlt
+        // (Grundwertung, Rasterreihe 1..6) und nur der -3-Anteil an der aktiven
+        // Platte haengt. Vorher hingen die beiden an ZWEI Gewichten, und eine
+        // Vorregistrierung von mir hat eines davon auf 0 gesetzt -- damit war
+        // "alle Wertungsplatten injizieren" auf sieben verkuerzt.
+        //
+        // `alphas[6]` ist jetzt auch der Exponent des Freischalt-Terms: dieselbe
+        // Bedeutung (wie steil zaehlt Teilfortschritt), nur mit Kapazitaet 3
+        // statt 6. Damit deckt die achtstellige alpha-Liste tatsaechlich alle
+        // acht Platten -- die Form, die der Versuchsplan "je Platte 20 Partien,
+        // nur deren alpha" braucht.
+        let gegatet = crate::scoring::wertung_progress_per_kriterium(
             &state.players[i], &state.scoring_tile_ids, alphas, state.round_number, round_gain,
         );
-        let shift = w * (pts / WERTUNG_SHAPING_SCALE).tanh();
+        let t = ((state.round_number.clamp(1, 5) - 1) as f64) / 4.0;
+        let beta6 = alphas[6] * (1.0 + round_gain * t);
+        let spezial = crate::scoring::unlock_progress_beta(
+            &state.players[i], &state.scoring_tile_ids, beta6,
+        );
+        let shift = w * ((gegatet + spezial) / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
     out
@@ -1209,20 +1234,6 @@ pub const UNLOCK_SHAPING_WEIGHT: f64 = 0.0;
 /// Default hinaus).
 pub const UNLOCK_SHAPING_BETA: f64 = 2.0;
 
-/// Laufzeit-Wert von `MOSAIC_UNLOCK_SHAPING_W`, gleiches OnceLock-Muster wie
-/// `wertung_shaping_weight`.
-pub fn unlock_shaping_weight() -> f64 {
-    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| read_f64_env("MOSAIC_UNLOCK_SHAPING_W", UNLOCK_SHAPING_WEIGHT))
-}
-
-/// Laufzeit-Wert von `MOSAIC_UNLOCK_BETA`, gleiches Muster wie
-/// `unlock_shaping_weight`.
-pub fn unlock_shaping_beta() -> f64 {
-    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| read_f64_env("MOSAIC_UNLOCK_BETA", UNLOCK_SHAPING_BETA))
-}
-
 /// Reine Formel hinter [`apply_unlock_shaping`], OHNE Env-Var-Zugriff --
 /// gleiches Trennungsmuster wie `apply_wertung_shaping_with`. Fruehausstieg
 /// bei `w==0.0`: `value` UNVERAENDERT (kein `unlock_progress_beta`-Aufruf,
@@ -1240,15 +1251,6 @@ fn apply_unlock_shaping_with(value: [f64; 2], state: &GameState, w: f64, beta: f
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
     out
-}
-
-/// Laufzeit-Wrapper von [`apply_unlock_shaping_with`], liest `w`/`beta` aus
-/// den Prozess-weiten OnceLock-Caches. Gleiche Aufrufstellen wie
-/// `apply_wertung_shaping` (`net_leaf_eval`, `make_node`s `LeafEval::Net`-
-/// Zweig) -- NACH dem Wertungsplatten-EGO-Shaping angewendet (beide additiv,
-/// unabhaengig schaltbar).
-fn apply_unlock_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
-    apply_unlock_shaping_with(value, state, unlock_shaping_weight(), unlock_shaping_beta())
 }
 
 // ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
@@ -1680,7 +1682,10 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     // angewendeten State-Korrekturen bleiben ungedaempft). Freischalt-Shaping
     // (siehe dortiger Modul-Kommentar) NACH dem Wertungsplatten-EGO-Shaping,
     // gleiche Begruendung.
-    apply_unlock_shaping(apply_wertung_shaping(apply_value_shrink(raw, state.round_number), state), state)
+    // `apply_unlock_shaping` NICHT mehr hier: der Spezialfeld-Anteil steckt seit
+    // 2026-08-11 IM `apply_wertung_shaping`-Term (ein Gewicht fuer alle acht
+    // Kriterien). Ein zweiter Aufruf wuerde ihn doppelt zaehlen.
+    apply_wertung_shaping(apply_value_shrink(raw, state.round_number), state)
 }
 
 /// Netz-Policy-Priors für `state`: EIN Forward-Pass, wiederverwendet
@@ -1979,12 +1984,12 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // `apply_wertung_shaping_with` ueberspringt jede Rechnung.
             today_value = apply_wertung_shaping(today_value, &state);
 
-            // Freischalt-Shaping (Nutzer-Auftrag 2026-08-10, siehe
-            // Modul-Kommentar bei `apply_unlock_shaping`) -- NACH dem
-            // Wertungsplatten-EGO-Shaping (koexistieren additiv, unabhaengig
-            // schaltbar). Bei `MOSAIC_UNLOCK_SHAPING_W` ungesetzt (Default
-            // 0.0) exakte Identitaet.
-            today_value = apply_unlock_shaping(today_value, &state);
+            // KEIN separates Freischalt-Shaping mehr (2026-08-11): der
+            // Spezialfeld-Anteil (Kriterium 6 samt ungegatetem ⭐-Bonus) steckt
+            // seit der Zusammenfuehrung IM `apply_wertung_shaping`-Term, mit
+            // `alphas[6]` als Exponent und demselben Gewicht. Ein zweiter
+            // Aufruf wuerde ihn doppelt zaehlen -- genau die Falle, die vorher
+            // schon bei Kriterium 6 in beiden Funktionen bestand.
 
             // Rundenübergang (Phase wechselt von Drafting weg) per Chance-Node-
             // Sampling statt Einzelwert bewerten -- siehe round_transition.rs
@@ -6677,7 +6682,17 @@ mod tests {
                 let v = [0.5, 0.5];
                 let out = apply_wertung_shaping_with(v, s, w, alpha);
                 for i in 0..2 {
-                    let pts = crate::scoring::wertung_progress_alpha(&s.players[i], &s.scoring_tile_ids, alpha);
+                    // Seit der Zusammenfuehrung (2026-08-11) traegt der Term ALLE
+                    // acht Kriterien: die gegateten sieben plus den
+                    // Spezialfeld-Anteil mit `alphas[6]` als Exponent. Die
+                    // Erwartung muss beides spiegeln, sonst prueft der Test eine
+                    // Formel, die es nicht mehr gibt.
+                    let alphas = [alpha; 8];
+                    let pts = crate::scoring::wertung_progress_per_kriterium(
+                        &s.players[i], &s.scoring_tile_ids, &alphas, s.round_number, 0.0,
+                    ) + crate::scoring::unlock_progress_beta(
+                        &s.players[i], &s.scoring_tile_ids, alpha,
+                    );
                     let expected = (v[i] + w * (pts / WERTUNG_SHAPING_SCALE).tanh()).clamp(0.0, 1.0);
                     assert!(
                         (out[i] - expected).abs() < 1e-12,
@@ -6697,8 +6712,14 @@ mod tests {
             // (3) Index 1 reagiert -- nur zaehlen/pruefen, wenn die beiden
             // Bretter tatsaechlich unterschiedlichen Fortschritt haben
             // (sonst waere eine Gleichheit kein Gegenbeweis, nur Zufall).
-            let pts_a1 = crate::scoring::wertung_progress_alpha(&state_a.players[1], &state_a.scoring_tile_ids, alpha);
-            let pts_b1 = crate::scoring::wertung_progress_alpha(&hybrid.players[1], &hybrid.scoring_tile_ids, alpha);
+            let ges = |st: &GameState| {
+                let a = [alpha; 8];
+                crate::scoring::wertung_progress_per_kriterium(
+                    &st.players[1], &st.scoring_tile_ids, &a, st.round_number, 0.0)
+                + crate::scoring::unlock_progress_beta(&st.players[1], &st.scoring_tile_ids, alpha)
+            };
+            let pts_a1 = ges(&state_a);
+            let pts_b1 = ges(&hybrid);
             if (pts_a1 - pts_b1).abs() > 1e-9 {
                 assert_ne!(
                     out_a[1], out_hybrid[1],
@@ -6865,19 +6886,23 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    fn unlock_shaping_defaults_reproduce_existing_behavior() {
+    fn alte_unlock_knoepfe_sind_zurueckgebaut() {
+        // Seit der Zusammenfuehrung 2026-08-11 gibt es NUR NOCH ein Gewicht
+        // (`MOSAIC_WERTUNG_SHAPING_W`) und alpha[6] als Spezialfeld-Exponent.
+        // Die alten Getter sind entfernt -- ein still wirkungsloser Regler ist
+        // gefaehrlicher als ein fehlender, weil jemand ihn setzt, ein H0 liest
+        // und auf den Term schliesst. Wer die alten Variablen setzt, bekommt
+        // jetzt eine Meldung auf stderr (siehe `wertung_shaping_alphas`).
+        //
+        // Die Compile-Konstanten bleiben als Dokumentation der Default-Werte.
         assert_eq!(UNLOCK_SHAPING_WEIGHT, 0.0);
         assert_eq!(UNLOCK_SHAPING_BETA, 2.0);
-        assert_eq!(
-            unlock_shaping_weight(),
-            0.0,
-            "Test-Voraussetzung: MOSAIC_UNLOCK_SHAPING_W darf hier nicht gesetzt sein"
-        );
-        assert_eq!(
-            unlock_shaping_beta(),
-            2.0,
-            "Test-Voraussetzung: MOSAIC_UNLOCK_BETA darf hier nicht gesetzt sein"
-        );
+        // Und der zusammengefuehrte Term ist bei Default-Gewicht inert:
+        let mut rng = StdRng::seed_from_u64(4711);
+        let state = setup_new_game(names(), 0, &mut rng);
+        let v = [0.42, 0.58];
+        assert_eq!(apply_wertung_shaping(v, &state), v,
+                   "bei MOSAIC_WERTUNG_SHAPING_W=0 muss der Blattwert unveraendert bleiben");
     }
 
     #[test]
@@ -6898,13 +6923,16 @@ mod tests {
     }
 
     #[test]
-    fn unlock_shaping_disabled_by_default_is_exact_identity() {
+    fn zusammengefuehrtes_shaping_ist_bei_default_exakte_identitaet() {
         let mut rng = StdRng::seed_from_u64(9111);
         let mut checked = 0;
         for gi in 0..8u64 {
             let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
             for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
-                assert_eq!(apply_unlock_shaping(v, &state), v);
+                // Nach der Zusammenfuehrung 2026-08-11 gibt es keinen eigenen
+                // Unlock-Aufruf mehr -- geprueft wird der EINE Term, der jetzt
+                // alle acht Kriterien traegt.
+                assert_eq!(apply_wertung_shaping(v, &state), v);
             }
             checked += 1;
         }
@@ -6919,11 +6947,6 @@ mod tests {
         // EGO-Shaping, aber OHNE den neuen `apply_unlock_shaping`-Aufruf, und
         // vergleicht bit-genau gegen den tatsaechlichen Output.
         let Some(net) = load_test_net() else { return };
-        assert_eq!(
-            unlock_shaping_weight(),
-            0.0,
-            "Test-Voraussetzung: MOSAIC_UNLOCK_SHAPING_W darf hier nicht gesetzt sein"
-        );
 
         let mut rng = StdRng::seed_from_u64(9100);
         let mut checked = 0;
