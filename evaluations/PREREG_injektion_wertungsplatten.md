@@ -366,3 +366,51 @@ Messkette sauber ist; eine nicht-flache waere ein Fehler in der Kette.
 ist das explorativ: der Aufbau taugt, eine RICHTUNG und eine Groessenordnung zu
 zeigen, und ein gefundenes Fenster muss auf frischen Seeds wiederholt werden,
 bevor es in eine Entscheidung eingeht.
+
+---
+
+## N5. NUTZER-ORAKEL — Zielwerte VOR den Zahlen festgelegt (2026-08-11)
+
+**Wortlaut**: *"ich mach uns nun das orakel: wenn der exponent gut gewählt ist,
+sollten wir bei den vertikalen wertungsplatten >= 14 punkte schaffen. bei den
+eckplatten >= 11. bei den diagonalen >= 1. bei den mehrfarbigen >= 8. bei den
+horizontalen >= 2."*
+
+Geprueft und festgehalten: zum Zeitpunkt dieser Eintragung existierte **keine
+einzige** `paired_arena_env_iso_*.json`. Die Vorhersage ist damit echt vorab.
+
+Groesse ist dieselbe wie in der Messtabelle: **Plattenpunkte des Netz-Spielers,
+Mittel ueber die Partien, in denen diese Platte aktiv ist**, gezogen aus der
+Log-Aufschluesselung durch `tools/plattenpunkte_aus_arena.py`.
+
+| k | Kriterium | Nullpunkt (w=0, gemessen) | **Nutzer-Ziel** | Faktor | entspricht etwa |
+| - | --------- | ------------------------: | --------------: | -----: | --------------- |
+| 1 | Vertikale Reihen | 0,70 | **>= 14** | 20x | 2 geschlossene Spalten (je +7) |
+| 5 | Eckplatten | 3,14 | **>= 11** | 3,5x | eine kleine + eine grosse Eckplatte (3+8) |
+| 3 | Mehrfarbige Felder | 5,40 | **>= 8** | 1,5x | -- |
+| 0 | Horizontale Reihen | 0,78 | **>= 2** | 2,6x | 2/3 einer Reihe (je +3) |
+| 2 | Diagonale Reihen | 0,43 | **>= 1** | 2,3x | jede 10. Partie eine Diagonale (+10) |
+
+Nicht benannt und damit ohne Zielwert: Farbenreiche Reihen (7), Aeussere Felder
+(4, Null-Kontrolle), Spezialfelder (6).
+
+### Was ein Fehlschlag BEDEUTET, auch vorab festgelegt
+
+Diese Zielwerte sind mit dem Plattenterm ALLEIN vermutlich nicht erreichbar, und
+das ist der Wert des Orakels: `player_scoring_features` liest ausschliesslich das
+Kuppelraster und hat null Bezuege auf `pattern_lines` (geprueft). Der Term ist
+damit innerhalb einer Runde fuer jeden Drafting-Zug identisch. Verfehlt der Sweep
+die Ziele bei JEDEM alpha, ist das ein **Falsifikationsbefund gegen den Term**,
+nicht gegen die Zielwerte -- und die Begruendung, den Musterreihen-Bezug
+(`MOSAIC_ENDAWARE_W`) als Traeger zu nehmen. Trifft er sie, war meine
+Struktur-Diagnose zu eng und der Exponent der fehlende Freiheitsgrad.
+
+**Ausdruecklich kein Hintertuerchen**: >= 14 heisst >= 14, nicht "deutlich
+gestiegen". Ein Teilerfolg (z.B. 3 statt 0,70 bei den vertikalen Reihen) wird als
+VERFEHLT berichtet und die Steigerung getrennt genannt.
+
+Der horizontale Zielwert ist der einzige, bei dem ich einen strukturellen
+Vorbehalt anmelden muss: Rasterreihe *r* wird nur von Musterreihe *r* gefuettert
+(`round_end.rs:20-22`), also hoechstens eine Fliese pro Runde. >= 2 Punkte im
+Mittel (2/3 einer Reihe a +3) bleibt damit erreichbar, eine ganze Reihe waere es
+ohne Spezialfeld nicht.
