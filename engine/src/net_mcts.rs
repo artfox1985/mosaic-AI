@@ -1365,66 +1365,78 @@ fn apply_wertung_shaping_full(
         // gibt es kein einzelnes w -- also das GROESSTE aussen und innen darauf
         // normieren. Gleichmaessiger Fall: reproduziert `w*tanh(SUM pts/50)`
         // exakt. Isolierung (eins auf 1, Rest 0): `1*tanh(pts_k/50)`.
-        let w_aussen = ws.iter().cloned().fold(0.0f64, f64::max);
-        let norm = if w_aussen > 0.0 { w_aussen } else { 1.0 };
+        // SUMME JE TERM, jeder mit EIGENEM Gewicht in EIGENER Schranke:
+        //
+        //     shift = SUM_term  w_term * tanh(P_term / SCALE)
+        //
+        // FEHLER, DER DAMIT BEHOBEN IST (2026-08-12, vom Nutzer an
+        // bit-identischen Zellen erkannt): vorher gab es EIN gemeinsames
+        // `pts` und davor ein `skala = max(alle Gewichte)`, innen normiert auf
+        // `ws[k] / max(ws)`. Bei genau EINEM Null-verschiedenen
+        // Kriteriumsgewicht `w` kuerzte sich `w` dadurch ZWEIMAL heraus --
+        // innen als `w/w = 1`, aussen weil `max(w, floor_w, tiling_w)` bei
+        // floor_w=tiling_w=1 immer 1 ergab. `w` war in der isolierten
+        // Injektion wirkungslos, und nur `alpha` wirkte.
+        //
+        // Beide Bausteine waren einzeln begruendet: die Normierung, damit der
+        // gleichmaessige Fall `w*tanh(SUM P/50)` exakt reproduziert; das `max`,
+        // damit ein allein gesetzter Zusatzknopf nicht wirkungslos ist.
+        // Zusammen hoben sie sich auf.
+        //
+        // Warum das Gewicht AUSSEN am jeweiligen tanh bleibt: `tanh(w*P/50)`
+        // saettigt gegen 1 unabhaengig von w, `w*tanh(P/50)` gegen w -- nur die
+        // zweite Form macht das Gewicht zur echten Obergrenze der Verschiebung.
+        // Je Term ein eigenes tanh statt eines gemeinsamen, damit kein Term die
+        // Schranke eines anderen mitbenutzt.
+        //
+        // NICHT rueckwaertskompatibel zum gleichmaessigen Fall: dort liefert die
+        // neue Form `SUM_k w*tanh(P_k/50)` statt `w*tanh(SUM_k P_k/50)`. Gleiche
+        // Richtung und Monotonie, andere Zahlen. Die Dosis-Kurve vom 11.08.
+        // (w=0,03/0,1/0,3/1,0 gleichmaessig) ist damit unter der ALTEN Formel
+        // gemessen und nicht mit neuen Zahlen vergleichbar.
         let t = ((state.round_number.clamp(1, 5) - 1) as f64) / 4.0;
-        let mut pts = 0.0;
+        let bei = |x: f64| (x / WERTUNG_SHAPING_SCALE).tanh();
+        let mut shift = 0.0;
+
+        // Wertungsplatten, je Kriterium einzeln gewichtet und einzeln begrenzt.
+        // `ws[k] == 0` laesst Kriterium k vollstaendig weg -- die Voraussetzung
+        // fuer den Nutzer-Versuchsaufbau (je Satz nur EIN Kriterium injiziert).
         for &id in state.scoring_tile_ids.iter() {
             let k = (id as usize).min(7);
             if ws[k] == 0.0 {
                 continue;
             }
-            pts += (ws[k] / norm) * crate::scoring::wertung_progress_per_kriterium(
+            shift += ws[k] * bei(crate::scoring::wertung_progress_per_kriterium(
                 &state.players[i], &[id], alphas, state.round_number, round_gain,
-            );
+            ));
         }
         // Spezialfelder: der Bonus-Anteil zahlt UNGEGATET, also unabhaengig von
         // `scoring_tile_ids` -- er haengt an `ws[6]`, nicht am Liegen der Platte.
         if ws[6] != 0.0 {
             let beta6 = alphas[6] * (1.0 + round_gain * t);
-            pts += (ws[6] / norm) * crate::scoring::unlock_progress_beta(
+            shift += ws[6] * bei(crate::scoring::unlock_progress_beta(
                 &state.players[i], &state.scoring_tile_ids, beta6,
-            );
+            ));
         }
-        // Strafleisten-Gegenterm: NEGATIV (Summe der BROKEN_PENALTIES), liest
-        // die Musterreihen. Vor dem tanh addiert, damit er in derselben
-        // Punkte-Einheit wirkt wie der Plattenterm.
+        // Strafleisten-Gegenterm: NEGATIV (Summe der BROKEN_PENALTIES).
         if floor_w != 0.0 {
-            pts += floor_w
-                * crate::round_end::projected_unplaceable_penalty(&state.players[i]) as f64;
+            shift += floor_w * bei(
+                crate::round_end::projected_unplaceable_penalty(&state.players[i]) as f64);
         }
-        // Musterreihen-Fortschritt: sieht `player.pattern_lines` (siehe
-        // `crate::scoring::musterreihen_fortschritt`-Doku) -- anders als der
-        // Plattenterm oben, der nur das Kuppelraster sieht und deshalb
-        // innerhalb einer Runde fuer jeden Drafting-Zug gleich ist. Nur ueber
-        // die tatsaechlich aktiven Wertungsplatten (`state.scoring_tile_ids`),
-        // gleiche Logik wie der Plattenterm oben.
+        // Musterreihen-Fortschritt (nachgebaute Bereitschaft).
         if musterreihen_w != 0.0 {
-            pts += musterreihen_w * crate::scoring::musterreihen_fortschritt(
+            shift += musterreihen_w * bei(crate::scoring::musterreihen_fortschritt(
                 &state.players[i], &state.scoring_tile_ids, alphas,
-            );
+            ));
         }
-        // `skala` normiert den fertigen `tanh`-Shift zurueck auf die Groessen-
-        // ordnung des staerksten aktiven Gewichts -- Erweiterung des
-        // Bestandsmusters (`w_aussen` oder `floor_w`) um `musterreihen_w`,
-        // sonst waere das Additiv bei `w_aussen==0 && floor_w==0` trotz
-        // `musterreihen_w!=0` wirkungslos (`skala` waere 0).
-        // Tiling-Vorausschau: exakter Musterreihen-Bezug ueber den bestehenden
-        // Solver. Vor dem tanh, in Punkten, wie die Nachbarterme.
+        // Tiling-Vorausschau (endaware minus plain).
         if endaware_w != 0.0 {
-            pts += endaware_w * tiling_vorausschau(state, i);
+            shift += endaware_w * bei(tiling_vorausschau(state, i));
         }
-        // Tiling-Potenzial: der Musterreihen-Traeger, aus der Heuristik
-        // uebernommen statt nachgebaut (siehe tiling_weight-Doku).
+        // Tiling-Potenzial: der Musterreihen-Traeger aus der Heuristik.
         if tiling_w != 0.0 {
-            pts += tiling_w * tiling_potenzial(state, i);
+            shift += tiling_w * bei(tiling_potenzial(state, i));
         }
-        let skala = w_aussen
-            .max(floor_w.abs())
-            .max(musterreihen_w.abs())
-            .max(endaware_w.abs())
-            .max(tiling_w.abs());
-        let shift = skala * (pts / WERTUNG_SHAPING_SCALE).tanh();
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
     out
