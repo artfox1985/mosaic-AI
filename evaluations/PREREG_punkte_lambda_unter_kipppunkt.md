@@ -120,3 +120,33 @@ gleichzeitig zu drehen wäre nicht interpretierbar.
   verbessert (`PREREG_punktekopf_epsilon.md`, nie gemessen) — hier wird nur
   seine Laufzeit-Verwendung geprüft.
 - Nicht `VALUE_OPP_EPSILON`: bleibt 0 (Schema 20).
+
+---
+
+## VERDIKT 2026-08-11: H0, der Kanal bleibt zu
+
+n=400 je Arm, gepaart je Spielindex, Kontrolle `MOSAIC_POINTS_UTILITY_W=0,
+MOSAIC_AGGR_LAMBDA=0.1`.
+
+| Arm | Netz | McNemar | Δ Endstand (Block) | SE | t | p~ | Δ Siegquote |
+| --- | ---: | ------: | -----------------: | -: | -: | -: | ----------: |
+| `0 / 0,1` (Kontrolle) | 321/400 | -- | -- | -- | -- | -- | -- |
+| `0,1 / 0,1` | 323/400 | p=0,922 | **+0,85** | 1,08 | 0,79 | 0,43 | +0,5 pp |
+| `0,1 / 0,4` | 319/400 | p=0,923 | **-0,40** | 0,97 | -0,41 | 0,68 | -0,5 pp |
+
+Block-Ebene ueber 16 Bloecke a 25 Partien, wie es die stehende Regel verlangt
+(Paar-SEs unterschaetzen die Streuung; vgl. `feedback_arena_block_correlation`).
+Beide Tests sagen dasselbe, und diesmal in dieselbe Richtung wie McNemar -- kein
+Fall wie bei der ISMCTS-Trennmessung, wo die beiden Ebenen auseinanderliefen.
+
+**Entscheidung: `POINTS_UTILITY_WEIGHT` bleibt 0.** Die Vorregistrierung fragte,
+ob der Punkte-Kanal UNTER dem Kipppunkt etwas beitraegt, wo er oberhalb schadete.
+Antwort: nein, er ist dort einfach wirkungslos. Der Kanal ist damit nicht "falsch
+dosiert", sondern als Hebel erledigt -- drittes negatives Ergebnis derselben
+Familie nach dem Punkte-Blend (`403a516`) und dem PCR-A/B.
+
+**Nicht verwechseln** mit dem Lambda-Ergebnis vom 09.08.: dort war
+`MOSAIC_AGGR_LAMBDA=0,7` auf dem v18only-Mix arena-signifikant (227:173). Das war
+die AGGRESSIONS-Groesse allein; hier geht es um das Oeffnen des Punkte-Kanals
+(`POINTS_UTILITY_W`) bei kleinem Lambda. Zwei verschiedene Fragen, und nur die
+erste hat je ein positives Ergebnis geliefert.
