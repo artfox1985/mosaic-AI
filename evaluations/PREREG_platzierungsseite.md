@@ -272,3 +272,66 @@ quadratischer Teilgutschrift bewertet den Unterschied zwischen 5/6 und 6/6 mit
 (6/6)^2 - (5/6)^2 = 0,306 mal dem Plattenwert 7 = **2,14 Punkte** -- gross genug,
 um einen einzelnen Platzierungspunkt zu ueberstimmen, und er faellt bei JEDER
 Kandidatenwahl an, nicht nur bei den drei Abschluessen.
+
+---
+
+## 10. FALLS die Platzierung es nicht ist: Deckenprobe auf die VERSORGUNG
+
+**Nutzer-Aufbau 2026-08-12**: *"dann musst in der versorgung eventuell einen dummy
+test fahren. etwas in der art alle steine verfuegbar, kein gegner. was macht das
+netz und der solver dann."*
+
+Das ist eine Deckenprobe: nimmt man die Versorgungsschranke weg und es entstehen
+trotzdem keine Spalten, liegt es nicht an der Versorgung. Der Zusatz "und der
+Solver" trennt zusaetzlich, ob die BEWERTUNG es nicht sieht oder die
+ENTSCHEIDUNGSMASCHINERIE es nicht umsetzt.
+
+### Zuschnitt: ein Eingriff statt eines Umbaus
+
+GEPRUEFT: `NUM_PLAYERS = 2` ist eine Kompilierzeit-Konstante (`state.rs:14`) --
+einen Solo-Modus gibt es nicht, und ihn einzufuehren waere ein Eingriff in den
+Spielerbegriff, also teuer und risikoreich. Versorgungs-Knoepfe existieren keine
+(grep ueber `MOSAIC_*`: kein Treffer fuer Supply/Factory/Bag).
+
+**Nicht noetig**: traegt JEDE Fabrik ALLE Farben, ist der Gegner fuer die
+VERFUEGBARKEIT gegenstandslos. Er zieht weiter Steine, aber dem Netz fehlt nie
+eine Farbe. Damit ist "alle Steine verfuegbar, kein Gegner" mit einem Eingriff an
+genau einer Stelle abgedeckt -- `fill_factories` (`state.rs:203`) -- statt mit
+einem Umbau am Spielerbegriff.
+
+Knopf `MOSAIC_VOLLE_VERSORGUNG` (Default aus, Paritaet unberuehrt): bei 1 wird
+jede Fabrik mit allen Farben befuellt statt aus dem Beutel gezogen.
+
+### Zwei Arme, und der zweite ist der aufschlussreichere
+
+1. **Netz** @400 Sims gegen Heuristik @150, volle Versorgung.
+2. **Nur Solver** (Heuristik auf beiden Seiten, `net: None`), volle Versorgung.
+
+Arm 2 ist der Bezug, an dem sich Arm 1 messen muss: der Solver maximiert
+Platzierungspunkte exakt und ist plattenblind ausserhalb Runde 5. Baut ER unter
+voller Versorgung Spalten, entstehen sie als NEBENPRODUKT der
+Platzierungsmaximierung -- dann braucht es gar keine Injektion, sondern nur
+Versorgung. Baut er keine und das Netz auch nicht, ist die Ursache die Bewertung.
+
+### Vier Ausgaenge, alle vorab gedeutet
+
+| Netz | Solver | Deutung |
+| ---- | ------ | ------- |
+| viele Spalten | viele Spalten | **Versorgung war die Blockade.** Spaltenbau folgt aus der Platzierungsmaximierung, sobald die Farben da sind. |
+| viele Spalten | wenige | Die Bewertung des Netzes kann es, der Solver nicht -- die Injektion greift, ihr fehlte nur das Material. |
+| wenige | viele | Das Netz VERHINDERT, was der Solver von sich aus tut. Dann liegt es an der Blattbewertung, nicht an Versorgung oder Platzierung. |
+| wenige | wenige | Weder Versorgung noch Platzierung. Dann bleibt der DURCHSATZ: 21 Fliesen fuer alle sechs Musterreihen einmal, 42 fuer zwei Spalten -- und die Frage, ob das in fuenf Runden ueberhaupt draftbar ist. |
+
+**Der vierte Fall ist der, den ich fuer wahrscheinlich halte**, und er waere kein
+Fehlschlag: er wuerde den Zielwert 14 als Durchsatzfrage entlarven statt als
+Bewertungsfrage, und das ist eine andere Baustelle (Musterreihen-Kapazitaet,
+Rundenzahl) als alles, was diese Nacht gemessen wurde. **Ausdruecklich als
+Erwartung markiert, nicht als Befund** -- die Messung entscheidet.
+
+### Messgroesse
+
+Dieselbe wie durchgehend: Plattenpunkte des Kriteriums 1, plus die Verteilung des
+hoechsten Spaltenstands. Letztere ist hier die wichtigere -- im Nullpunkt stehen
+36 von 57 Partien bei 5 von 6 Feldern (Abschnitt 9). Unter voller Versorgung muss
+sich diese Verteilung verschieben, wenn Versorgung die Ursache war; bleibt sie bei
+5/6 stehen, ist sie es nicht.

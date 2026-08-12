@@ -1035,13 +1035,46 @@ fn platten_gewichte() -> [f64; 8] {
     })
 }
 
-/// Plattenwert eines Bretts, je Kriterium gewichtet. Nur die AKTIVEN Platten
-/// (`scoring_tile_ids`), wie die echte Endwertung.
-fn platten_wert(player: &crate::board::PlayerBoard, ids: &[usize], gew: &[f64; 8]) -> f64 {
-    let e = crate::scoring::calculate_end_scoring(player, ids);
-    e.details
-        .iter()
-        .map(|d| gew[d.id.min(7)] * f64::from(d.score))
+/// Plattenwert eines Bretts, je Kriterium gewichtet, in der STETIGEN Form.
+/// Nur die AKTIVEN Platten (`scoring_tile_ids`), wie die echte Endwertung.
+///
+/// WARUM STETIG und nicht `calculate_end_scoring` (gemessen 2026-08-12): die
+/// echte Endwertung ist ALLES-ODER-NICHTS (`scoring.rs:43`: "7 Pkt je
+/// vollstaendige vertikale Reihe"). Abschluss-EREIGNISSE sind selten -- drei in
+/// 57 Partien --, und ein Reihungsmass, das bei JEDER Tiling-Entscheidung
+/// ausgewertet wird, sieht die Differenz deshalb fast immer als 0. Eine 0 gibt
+/// keine Richtung; genau das war die Ursache dafuer, dass acht Zellen mit
+/// verschiedenen Gewichten bit-identisch blieben.
+///
+/// `wertung_progress_per_kriterium` gibt bei Teilfuellung eine quadratisch
+/// skalierte Teilgutschrift und faellt bei voller Fuellung exakt auf den echten
+/// Punktwert zurueck (`scoring.rs:150-158`). DAS ist der Gradient. Die Messung
+/// sagt auch, wie gross er ausfaellt, wo es zaehlt: in 36 von 57 Partien steht
+/// eine Spalte bei 5 von 6 Feldern, und der Schritt auf 6/6 ist
+/// `(6/6)^2 - (5/6)^2 = 0,306` mal 7 = **2,14 Punkte** -- genug, um einen
+/// einzelnen Platzierungspunkt zu ueberstimmen.
+///
+/// Die `alphas` kommen aus derselben Quelle wie die Draftingseite
+/// (`MOSAIC_WERTUNG_ALPHA`), damit beide Haelften EINEN Exponenten teilen und
+/// nicht zwei widersprechende Kurven verwenden.
+fn platten_wert(
+    player: &crate::board::PlayerBoard,
+    ids: &[usize],
+    gew: &[f64; 8],
+    runde: u32,
+) -> f64 {
+    let alphas = crate::net_mcts::wertung_shaping_alphas();
+    let gain = crate::net_mcts::wertung_round_gain();
+    ids.iter()
+        .map(|&id| {
+            let k = id.min(7);
+            if gew[k] == 0.0 {
+                return 0.0;
+            }
+            gew[k] * crate::scoring::wertung_progress_per_kriterium(
+                player, &[id], &alphas, runde, gain,
+            )
+        })
         .sum()
 }
 
@@ -1053,13 +1086,15 @@ fn best_first_step_platten_valued(state: &GameState, pi: usize, w: f64) -> Optio
     // nur einen konstanten Sockel bei -- in `.total`-Form war das ein grosser
     // negativer Brocken aus den leeren Spezialfeldern, der die Rangfolge
     // verzerrte. Interessant ist allein, was die Platzierung AENDERT.
-    let vorher = platten_wert(&state.players[pi], &state.scoring_tile_ids, &gew);
+    let vorher = platten_wert(&state.players[pi], &state.scoring_tile_ids, &gew,
+                              state.round_number);
     let mut best: Option<(f64, TilingStep)> = None;
     for c in cands {
         let nachher = platten_wert(
             &c.final_state.players[pi],
             &c.final_state.scoring_tile_ids,
             &gew,
+            c.final_state.round_number,
         );
         let val = f64::from(c.points) + w * (nachher - vorher);
         let better = match &best {
