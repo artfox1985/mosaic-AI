@@ -1093,7 +1093,60 @@ pub fn wertung_shaping_weight() -> f64 {
 /// Exponenten nicht -- ein hohes alpha drueckt den Teilfortschritt nur
 /// asymptotisch gegen 0, `(1.0)^alpha` bleibt 1. Nur ein Gewicht 0 schaltet
 /// wirklich ab. "Nur die Vertikale" heisst damit `0,1,0,0,0,0,0,0`.
+thread_local! {
+    /// Plattengewicht der AKTUELLEN Partie in DIESEM Thread. `None` = der
+    /// prozessweite Env-Wert gilt (Bestandsverhalten).
+    static PARTIE_GEWICHT: std::cell::Cell<Option<f64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Setzt das Wertungsplatten-Gewicht fuer die aktuelle Partie in DIESEM Thread.
+///
+/// WARUM THREAD-LOKAL und nicht prozessweit (Nutzer-Auftrag 2026-08-11: *"nimm als
+/// hinweis fuers self play mit, dass wir je spiel auch das gewicht des
+/// wertungsplattenshapings anpassen sollten. dann bekommt der ownership head
+/// ordentlich was zu sehen"*): Self-Play spielt mehrere Partien GLEICHZEITIG in
+/// Threads. Ein prozessweiter Wert -- wie ihn `MOSAIC_WERTUNG_SHAPING_W` ueber
+/// `OnceLock` liefert -- waere fuer alle laufenden Partien derselbe, und die
+/// Streuung entstuende gar nicht. Muster uebernommen von `STATS_OVERRIDE` in
+/// `tiling_solver.rs`.
+///
+/// `None` stellt das Bestandsverhalten wieder her. Aufrufer MUSS am Partieende
+/// zuruecksetzen, sonst leckt der Wert in die naechste Partie desselben Threads.
+pub fn set_partie_shaping_weight(w: Option<f64>) {
+    PARTIE_GEWICHT.with(|c| c.set(w));
+}
+
+/// Streubreite fuer das partieweise Gewicht, `MOSAIC_WERTUNG_STREUUNG_MAX`.
+/// Default **0,0 = aus**, dann gilt ausschliesslich der prozessweite Env-Wert.
+/// Bei `> 0` leitet [`partie_gewicht_aus_seed`] je Partie einen Wert in
+/// `[0, max]` ab.
+pub fn wertung_streuung_max() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_STREUUNG_MAX", 0.0))
+}
+
+/// Deterministische Ableitung des Partiegewichts aus dem Partie-Seed.
+///
+/// Reproduzierbar (kein Zufall zur Laufzeit -- dieselbe Partie ergibt dasselbe
+/// Gewicht), gleichverteilt in `[0, max]`. Die Mischung ist der
+/// SplitMix64-Finalizer; er wird gebraucht, weil aufeinanderfolgende Partie-Seeds
+/// im Self-Play sich oft nur in den unteren Bits unterscheiden und eine rohe
+/// Modulo-Bildung dann eine Treppe statt einer Streuung ergaebe.
+pub fn partie_gewicht_aus_seed(seed: u64, max: f64) -> f64 {
+    let mut z = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    max * ((z % 1_000_000) as f64 / 999_999.0)
+}
+
 pub fn wertung_shaping_weights() -> [f64; 8] {
+    // Partieweiser Wert schlaegt den prozessweiten -- siehe
+    // `set_partie_shaping_weight`.
+    if let Some(w) = PARTIE_GEWICHT.with(|c| c.get()) {
+        return [w; 8];
+    }
+
     static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         let mut out = [WERTUNG_SHAPING_WEIGHT; 8];
