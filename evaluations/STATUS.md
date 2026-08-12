@@ -158,11 +158,30 @@ eine vorhandene Zahl neu messen sollte.
 
 `tools/arena_kompakt.py` dampft Arena-Rohlogs auf **1,8 %** ein
 (`evaluations/arena_kompakt.jsonl`, versioniert). `.gitignore` sperrt
-`evaluations/paired_arena_env_*.json`. **OFFEN und vom Nutzer freigegeben**: die
-~70 Rohdateien dieser Nacht entfernen und die getrackten aus dem Index nehmen
-(Historie wird auf Nutzer-Entscheid NICHT umgeschrieben). Ein Nebenprodukt
-`evaluations/_smoketest_ipc.json` ist überflüssig und wartet ebenfalls auf
-Freigabe.
+`evaluations/paired_arena_env_*.json`. Historie wird auf Nutzer-Entscheid NICHT
+umgeschrieben.
+
+**ERLEDIGT 2026-08-12 nach Nutzer-Freigabe**: 100 Rohdateien entfernt (**64,2 MB**
+frei), davon 16 zuvor mit `git rm --cached` aus dem Index genommen. Der
+IPC-Probelauf `_smoketest_ipc.json` ist ebenfalls weg. `evaluations/` von 113 auf
+**79,8 MB**.
+
+**14 Dateien ABSICHTLICH BEHALTEN** — die Deckungsprobe vor dem Löschen hat
+Lücken gefunden, und die Freigabe beruhte auf der Aussage, alles sei gesichert:
+
+- `lambda02`, `lambda_replik`, `lambda_unter_kipppunkt`: **keine**
+  Endwertungs-Aufschlüsselung, weil ich diese drei Läufe ohne `--log-games`
+  gestartet habe. Ihre Siegquoten und Endstände sind in `arena_kompakt.jsonl`, die
+  Plattenpunkte je Kriterium NICHT rekonstruierbar.
+- `vext_w{30,100}_*` und `vgrid2_w3_*`: Teil-Lücken (4 bis 10 von 20 Partien). Das
+  sind die Extremdosen, in denen die Bewertung kollabierte — die Ursache der Lücke
+  ist NICHT untersucht und wäre einen Blick wert, falls die Logtexte dort
+  abweichen.
+
+**Lehre**: die Deckungsprobe gehört VOR jedes Löschen, und "der Dateiname steht im
+Archiv" ist keine Deckung — die Aufschlüsselung muss drin sein. Ohne diese Prüfung
+wären drei λ-Läufe und zehn Rasterzellen verhaltensseitig unwiederbringlich
+gewesen.
 
 ---
 

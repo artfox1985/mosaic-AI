@@ -1,0 +1,71 @@
+[
+  {
+    "kuerzel": "netz_normal",
+    "zweck": "Netz, normale Versorgung",
+    "sims": 400,
+    "n": 20,
+    "vertikal": 1.05,
+    "spalten": 3,
+    "punkte": 47.8,
+    "boden": 9.1,
+    "siege": 15,
+    "verteilung": {
+      "4": 6,
+      "5": 12,
+      "6": 2
+    },
+    "dauer": 1.0556291580200194
+  },
+  {
+    "kuerzel": "netz_voll",
+    "zweck": "Netz, VOLLE Versorgung",
+    "sims": 400,
+    "n": 20,
+    "vertikal": 0.7,
+    "spalten": 2,
+    "punkte": 46.2,
+    "boden": 10.65,
+    "siege": 18,
+    "verteilung": {
+      "3": 1,
+      "4": 5,
+      "5": 14
+    },
+    "dauer": 1.0942421078681945
+  },
+  {
+    "kuerzel": "solver_normal",
+    "zweck": "Solver (1 Sim), normale Versorgung",
+    "sims": 1,
+    "n": 20,
+    "vertikal": 0.0,
+    "spalten": 0,
+    "punkte": 8.3,
+    "boden": 31.35,
+    "siege": 0,
+    "verteilung": {
+      "2": 1,
+      "3": 4,
+      "4": 14,
+      "5": 1
+    },
+    "dauer": 0.15094317197799684
+  },
+  {
+    "kuerzel": "solver_voll",
+    "zweck": "Solver (1 Sim), VOLLE Versorgung",
+    "sims": 1,
+    "n": 20,
+    "vertikal": 0.0,
+    "spalten": 0,
+    "punkte": 8.5,
+    "boden": 33.5,
+    "siege": 0,
+    "verteilung": {
+      "3": 8,
+      "4": 11,
+      "5": 1
+    },
+    "dauer": 0.15583833853403728
+  }
+]
