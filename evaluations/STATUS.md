@@ -5,6 +5,167 @@
 
 ---
 
+## ÜBERGABE 2026-08-12 — Stand nach der Wertungsplatten-Nacht
+
+**Champion unverändert: `v21_2d_brierbest`.** Kein Gating gelaufen, kein Modell
+gewechselt. Alles Gebaute steht auf Default AUS, der Paritäts-Hash
+`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` hält
+(mehrfach nach jedem Wheel-Neubau geprüft).
+
+### Der Strang: eine geschlossene Spalte provozieren
+
+**Nutzer-Ziel, kalibriert**: *eine* Spalte je Partie wäre gut, zwei ein solides
+Ergebnis — eine Spalte sind **21 Platzierungs- plus 7 Plattenpunkte = 28**, also
+rund ein Fünftel eines guten Endstands. In der Messgröße "vertikale
+Plattenpunkte": Ziel **7,00**, heute **1,05**.
+
+**FÜNF Erklärungen sind gemessen ausgeschlossen** — Details je Punkt in
+`PREREG_platzierungsseite.md` §7-14:
+
+| ausgeschlossen | Beleg |
+| -------------- | ----- |
+| Drafting-Dosis | Decke 2,10 bei w=1/alpha=1; ab w>=10 Kollaps auf 0,00-0,50 |
+| Platzierung | kein Zugewinn (beste Fassung 1,75 gegen 2,10) |
+| Versorgung | volle Farbverfügbarkeit → 0 von 20 Abschlüssen, Verteilung sammelt sich noch stärker bei 5/6 |
+| Durchsatz | Nutzer: Menschen tun es routinemäßig; meine 42-Fliesen-Rechnung ignorierte Spezialfelder und die billigen Musterreihen |
+| Sichtweite | 16x Suchbudget (400→6400) → **-0,35**, Endstand fällt 47,80→44,15 |
+
+**Die tragende Zahl für alles Weitere**: in **36 von 57 Partien** bleibt eine
+Spalte bei **5 von 6 Feldern** stehen. Das Netz baut auf und schliesst nicht.
+
+**Referenz, die zeigt dass es geht**: die **Heuristik** macht 1,40 vertikale
+Plattenpunkte gegen 0,70 des Netzes — **10 Abschlüsse in 57 Partien gegen 4**. Die
+Fähigkeit steckt in der Suchfamilie; die gelernte Politik steuert davon weg.
+
+**Ursache, eingegrenzt**: `dome.rs:61-70` — jede normale Kuppelzelle verlangt GENAU
+EINE Farbe, eine Musterreihe trägt nur eine. Eine Spalte sind sechs festgelegte
+Farben in sechs Musterreihen. Das ist eine **Absicht über Runden**, und keine
+Stellungsbewertung kann sie darstellen.
+
+### Was daraus gebaut wurde (alles Default AUS)
+
+| Knopf | Was | Stand |
+| ----- | --- | ----- |
+| `MOSAIC_PROVOKATION_SPALTE` | **Beschneidung der Aktionsmenge** auf eine Ziel-Spalte (`provokation.rs`, Einhängung `validation.rs:237`) | **GEBAUT, NOCH NICHT GEMESSEN** ← der nächste Schritt |
+| `MOSAIC_WERTUNG_STREUUNG_MAX` | Shaping-Gewicht je Partie aus dem Seed, thread-lokal | gebaut, bewusst unbenutzt (Stufe 2) |
+| `MOSAIC_WERTUNG_FLOOR_W` | `projected_unplaceable_penalty` im Shaping | gemessen, +2,77 Pkt (t=2,21) auf ALTER Formel |
+| `MOSAIC_TILING_W` | `solve_round_final_score` minus Punktestand | Teil der besten Konfiguration |
+| `MOSAIC_TILING_PLATTEN_W` / `_GEW` | Plattenwert in der Tiling-Wahl, stetig, je Kriterium | gemessen, kein Zugewinn |
+| `MOSAIC_TILING_PUNKTE_W` | Punkte-Kopf im Tiling-Stichentscheid | gemessen, wirkungslos (Produktform) |
+| `MOSAIC_ENDAWARE_W` / `MOSAIC_MUSTERREIHEN_W` | zwei eigene Musterreihen-Terme | gemessen, wirkungslos — Nutzer: *"nichts davon"* |
+| `MOSAIC_VOLLE_VERSORGUNG` | Diagnose: alle Farben immer verfügbar | Deckenprobe gefahren |
+
+**Diagnose-Knöpfe** (`MOSAIC_VOLLE_VERSORGUNG`, `MOSAIC_PROVOKATION_SPALTE`)
+dürfen **nie in ein Gating**. In einen Trainingskorpus dürfen sie — die
+Ownership-Ziele sind realisierte Endzustands-Feldlabels und bei jeder Steuerung
+korrekt.
+
+### NÄCHSTER SCHRITT, eng umrissen
+
+`PREREG_provokation.md` §5: die Beschneidung auf den 20 k1-Seeds messen.
+**Abnahme bei >= 7,00** vertikalen Plattenpunkten. Eine halbe Stunde. Darunter ist
+die Frage nicht "welcher Term", sondern ob das Ziel überhaupt einseitig erzwingbar
+ist — Nutzer sagt ja (*"1 spalte geht immer, selbst wenn der gegner auch spalten
+baut"*), also wäre ein Fehlschlag ein echtes Negativergebnis.
+
+**Erst danach** Stufe 2: Streuung ins Self-Play, dann Training mit
+Ownership-Kopf, dann prüfen ob die Spalten OHNE Injektion entstehen.
+
+### GPU: Weg A ist gedeckt, aber nur über Shared Memory
+
+`PREREG_gpu_inferenzpfad.md` (neu) hält die übersprungene Architekturfrage fest.
+Befund: `engine/Cargo.toml` hat als einzige Inferenz-Abhängigkeit `tract-onnx`,
+tract ist **CPU-only** — die Rust-Engine hatte nie einen Weg zu der GPU, deren
+Kennlinie den Batch-Startwert 256 begründet.
+
+Gemessen (`evaluations/gpu_inferenzpfad_ipc_roundtrip.json`), Schwelle = ein
+Drittel der GPU-Zeit für Batch 256 = **1,0816 ms**:
+
+| Kanal | Rundlauf Batch 256 (Median) | Urteil |
+| ----- | --------------------------: | ------ |
+| TCP-Socket | 2,1881 ms | **nicht gedeckt** (2,0x drüber) |
+| **Shared Memory** | **0,2867 ms** | **gedeckt** (3,8x Luft) |
+
+Nutzlast geprüft: Anfrage 3444 float32 je Position (76x6x6 Ebenen + 708 flach) =
+3,4 MiB je Batch 256; Antwort 413 je Position = 413 KiB.
+
+**Ebenfalls festgehalten, und es ist grundsätzlich**: der Paritäts-Hash kann einen
+GPU-Umbau NICHT überleben — jeder Wechsel der Inferenz-Maschinerie ändert die
+Zahlen. "Suchneutral" bei Weg V bezog sich auf das Nebenläufigkeitsmodell, nicht
+auf die Inferenz. Abnahme ist ein Toleranz- und Stärkenachweis (`net.rs:840` hält
+für den bestehenden Batch-Pfad schon 1e-5 statt Bit-Gleichheit fest), **kein
+Golden-Hash**.
+
+Offen: die Verschränkungs-Mechanik bauen, jetzt mit entschiedenem Kanal.
+
+### λ / Punkte-Kanal: unentschieden, Denial repliziert NICHT
+
+`PREREG_punkte_lambda_unter_kipppunkt.md`, Verdikt-Abschnitte. Metrik war vorab
+die **Marge** (Nutzer: *"sieg mit vielen punkten und den gegner so gut es geht
+stören"*), nicht die Siegquote — mein erstes Verdikt war gegen die falsche
+Zielgröße gemessen.
+
+| Arm | Δ eigen | Δ Gegner | Δ Marge | t |
+| --- | ------: | -------: | ------: | -: |
+| λ=0,1 | +0,85 | -1,14 | +1,99 | 1,42 |
+| λ=0,2 | -0,07 | -1,44 | +1,37 | 1,19 |
+| λ=0,4 | -0,40 | -0,76 | +0,36 | 0,26 |
+| **Replikation λ=0,1** (frische Seeds) | +1,36 | **+0,81** | +0,55 | **0,53** |
+
+Richtung hält, t=0,53 gegen vorregistriertes t>=2 → **nicht bestätigt**. Die
+eigenen Punkte sind in beiden Läufen positiv, die **Gegnerpunkte wechseln das
+Vorzeichen** — der Denial-Anteil, für den λ der Regler IST, repliziert nicht.
+`POINTS_UTILITY_WEIGHT` bleibt 0. Wer ihn aufgreift, braucht n>=800 UND eine
+Erklärung für den Vorzeichenwechsel.
+
+### Such-RNG-Trennung: entscheidungsreif, NICHT gebaut
+
+`PREREG_such_rng_trennen.md` §8. Nutzer-Entscheide liegen vor: **Elo-Sprung wird
+nur vermerkt** (kein Neuverankern), Paritäts-Basislinie wird neu gesetzt und der
+alte Hash daneben dokumentiert. Umsetzung ausdrücklich NACH den laufenden
+Messvorhaben, weil sie die Vergleichsgrundlage verschiebt.
+
+### METHODISCHE LEHRE der Nacht — sie hat mehr gekostet als jede Messung
+
+**Vier Formfehler, alle als Null- oder Negativbefund getarnt, keiner eine
+Dosisfrage:**
+
+1. `w` kürzte sich zweimal heraus (Normierung `ws[k]/max(ws)` plus
+   `skala=max(alle)`) → bit-identische Rasterzellen
+2. multiplikativ statt additiv (`punkte * p_win`, `tiling_solver.rs:893`) →
+   bit-identische Punkte-Kopf-Zellen
+3. alles-oder-nichts statt stetig (`calculate_end_scoring` statt
+   `wertung_progress`) → acht Zellen exakt 0,35
+4. Vorrang statt Ergänzung (meine Auftragsformulierung "kein Doppelweg") → 0,70
+   statt 2,10
+
+**DIE REGEL DARAUS**: bei jedem Null-Befund ZUERST prüfen, ob die Behandlung
+überhaupt angekommen ist, und ZUERST die FORM des Eingriffs, nicht die Dosis. Der
+billigste und schärfste Test ist **Zahlengleichheit bei gleichen Seeds** — sie ist
+ein ALARM, kein Befund. Sie hat in einer Nacht viermal zugeschlagen: einmal ein
+nicht neu gebautes Wheel, dreimal eine falsche Termform.
+
+**Zweite Regel**: nach jeder Engine-Änderung Wheel bauen UND installieren, bevor
+gemessen wird (`maturin build --release` + `pip install --force-reinstall
+--no-deps`). Eine Gegenprobe lief 16 Minuten auf dem alten Wheel.
+
+**Dritte Regel**: ein veralteter Index kostet Arbeit, nicht nur Klarheit. Die
+GPU-Zeile in `PREREG_INDEX.md` stand noch auf "offen ist die Blatt-Erzeugungsrate",
+obwohl das seit `e1bce64` geschlossen war — daraus wurde ein Agenten-Auftrag, der
+eine vorhandene Zahl neu messen sollte.
+
+### Datenhaltung
+
+`tools/arena_kompakt.py` dampft Arena-Rohlogs auf **1,8 %** ein
+(`evaluations/arena_kompakt.jsonl`, versioniert). `.gitignore` sperrt
+`evaluations/paired_arena_env_*.json`. **OFFEN und vom Nutzer freigegeben**: die
+~70 Rohdateien dieser Nacht entfernen und die getrackten aus dem Index nehmen
+(Historie wird auf Nutzer-Entscheid NICHT umgeschrieben). Ein Nebenprodukt
+`evaluations/_smoketest_ipc.json` ist überflüssig und wartet ebenfalls auf
+Freigabe.
+
+---
+
 ## TASK-INDEX (nur OFFEN/LAUFEND, Stand 2026-08-10)
 
 | Task                                          | Status                                                                                                                                                                                                                                                                                                                                                                            |

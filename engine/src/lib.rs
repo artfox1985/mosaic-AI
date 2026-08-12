@@ -18,6 +18,7 @@ pub mod moves;
 pub mod net;
 pub mod net_mcts;
 pub mod profiling;
+pub mod provokation;
 pub mod py;
 pub mod round5;
 pub mod round_end;

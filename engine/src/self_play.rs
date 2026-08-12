@@ -5107,4 +5107,138 @@ pub(crate) mod tests {
             );
         }
     }
+
+    /// Provokations-Pflichttest 1 (`evaluations/PREREG_provokation.md`,
+    /// Abschnitt TESTS Punkt 1): ungesetzter Knopf (`Modus::Aus`) darf die
+    /// Aktionsmenge nie veraendern. Geprueft ueber ECHTE Spielverlaeufe
+    /// (mehrere Seeds, mehrere Runden) als Ergaenzung zu den adversarialen
+    /// Unit-Tests in `provokation.rs` (die exakte Identitaet auf
+    /// handgebauten Kandidatenlisten zeigen): `beschneide_moves` filtert nur
+    /// weg, fuegt nie hinzu (siehe dortige Doku) -- ein `Fest`-Lauf auf
+    /// GENAU DEMSELBEN, unveraenderten Zustand muss deshalb IMMER eine
+    /// Teilmenge des `Aus`-Laufs sein. Waere "Aus" faelschlich NICHT
+    /// identisch zum Bestand, wuerde diese Teilmengen-Eigenschaft irgendwann
+    /// verletzt.
+    #[test]
+    fn provokation_default_aus_ist_stets_obermenge_ueber_mehrere_seeds_und_runden() {
+        use crate::validation::generate_valid_moves;
+        for seed in [101u64, 202, 303, 404, 505] {
+            let spalte = (seed % 6) as usize;
+            let mut rng = StdRng::seed_from_u64(seed);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let mut game =
+                Game::start([format!("A{seed}"), format!("B{seed}")], (seed % 2) as usize, ids, &mut rng);
+            let start_round = game.state.round_number;
+            let mut guard = 0u32;
+            loop {
+                guard += 1;
+                if guard > 4000 || game.state.round_number > start_round + 2 {
+                    break; // mehrere Rundenuebergaenge abgedeckt, dann Testlaufzeit begrenzen.
+                }
+                crate::provokation::set_modus_override_for_test(Some(crate::provokation::Modus::Aus));
+                match game.state.phase {
+                    Phase::StartPlacement | Phase::Drafting => {
+                        if game.state.players.iter().any(|p| p.start_tile_pending) {
+                            if start_placement_step(&mut game, &mut rng).is_none() {
+                                break;
+                            }
+                        } else if game.state.phase == Phase::Drafting {
+                            let aus = generate_valid_moves(&game.state);
+                            crate::provokation::set_modus_override_for_test(Some(
+                                crate::provokation::Modus::Fest(spalte),
+                            ));
+                            let fest = generate_valid_moves(&game.state);
+                            assert!(
+                                fest.iter().all(|m| aus.contains(m)),
+                                "Seed {seed}, Runde {}: Fest-Ergebnis (Spalte {spalte}) muss Teilmenge \
+                                 des Aus-Ergebnisses sein -- sonst hat 'Aus' faelschlich mitbeschnitten",
+                                game.state.round_number
+                            );
+                            crate::provokation::set_modus_override_for_test(Some(
+                                crate::provokation::Modus::Aus,
+                            ));
+                            let actions = drafting_actions(&game.state);
+                            if actions.is_empty() {
+                                break;
+                            }
+                            let a = actions.choose(&mut rng).cloned().unwrap_or(Action::Pass);
+                            game.apply_drafting(&a).expect("apply_drafting sollte hier erfolgreich sein");
+                        } else {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        tiling_step(&mut game, None, &mut rng);
+                    }
+                    _ => break,
+                }
+            }
+        }
+        crate::provokation::set_modus_override_for_test(None);
+    }
+
+    /// Provokations-Pflichttest 4 (`evaluations/PREREG_provokation.md`,
+    /// Abschnitt TESTS Punkt 4): eine vollstaendige Partie mit AKTIVER
+    /// Spalten-Provokation (hier `Modus::Fest`, ueber die GESAMTE Partie
+    /// gesetzt) muss `Phase::Final` erreichen -- kein Deadlock, keine Panik.
+    /// Reiner Heuristik-Zufallsrollout, gleiches Grundmuster wie
+    /// `tile_color_accounting_invariant_holds_throughout_random_games` oben.
+    #[test]
+    fn provokation_mit_gesetztem_knopf_erreicht_phase_final_ohne_deadlock() {
+        for (seed, spalte) in [(61u64, 0usize), (62, 2), (63, 5)] {
+            crate::provokation::set_modus_override_for_test(Some(crate::provokation::Modus::Fest(spalte)));
+            let mut rng = StdRng::seed_from_u64(seed);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let mut game =
+                Game::start([format!("A{seed}"), format!("B{seed}")], (seed % 2) as usize, ids, &mut rng);
+            let mut guard = 0u32;
+            loop {
+                if game.state.phase == Phase::Final {
+                    break;
+                }
+                guard += 1;
+                if guard > 6000 {
+                    break;
+                }
+                match game.state.phase {
+                    Phase::StartPlacement | Phase::Drafting => {
+                        if game.state.players.iter().any(|p| p.start_tile_pending) {
+                            if start_placement_step(&mut game, &mut rng).is_none() {
+                                break;
+                            }
+                        } else if game.state.phase == Phase::Drafting {
+                            let actions = drafting_actions(&game.state);
+                            if actions.is_empty() {
+                                break;
+                            }
+                            let a = actions.choose(&mut rng).cloned().unwrap_or(Action::Pass);
+                            game.apply_drafting(&a).expect("apply_drafting sollte hier erfolgreich sein");
+                        } else {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        tiling_step(&mut game, None, &mut rng);
+                    }
+                    // `Phase::End` ist ein Zwischenhalt -- die Endwertung ist
+                    // ein separater expliziter Aufruf (`game.rs::
+                    // apply_end_scoring`, setzt danach `Phase::Final`), kein
+                    // Teil von Drafting/Tiling. Gleiches Muster wie
+                    // `play_one_game` und alle anderen Arena-Schleifen in
+                    // dieser Datei (`let _ = game.apply_end_scoring();`).
+                    Phase::End => {
+                        let _ = game.apply_end_scoring();
+                    }
+                    _ => break,
+                }
+            }
+            assert_eq!(
+                game.state.phase,
+                Phase::Final,
+                "Seed {seed}, Spalte {spalte}: Partie mit aktiver Provokation muss Phase::Final \
+                 erreichen (kein Deadlock, guard={guard})"
+            );
+            crate::provokation::set_modus_override_for_test(None);
+        }
+    }
 }
