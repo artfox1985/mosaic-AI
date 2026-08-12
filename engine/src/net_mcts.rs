@@ -8475,6 +8475,716 @@ mod tests {
         }
     }
 
+    /// Wie [`gumbel_topm_set`], aber gibt die VOLLSTAENDIGE (nicht auf
+    /// `m_prime` gekuerzte) nach Score absteigend sortierte Liste zurueck --
+    /// gleiche RNG-Verbrauchsreihenfolge (dieselbe `.enumerate()`-Iteration
+    /// ueber `acts`), also fuer denselben Seed bit-identisch zu den ersten
+    /// `m_prime` Eintraegen, die `gumbel_topm_set` liefern wuerde. Gebraucht
+    /// fuer die Rang-/Abstands-Diagnose unten (PREREG §14, Nutzer-Auftrag
+    /// 2026-08-12): `gumbel_topm_set` selbst gibt nur die MENGE zurueck, keine
+    /// Raenge/Scores.
+    /// PREREG §15 (Nutzer-Auftrag 2026-08-12, Zuordnungs-Hypothese): Rueckgabe
+    /// jetzt `(score, g, idx)` statt `(score, idx)` -- EXAKT dasselbe Tupel-
+    /// Layout wie das echte Produktions-`scored` in
+    /// `build_gumbel_tree_inner` (net_mcts.rs:3719 `Vec<(f64, f64, usize)>`),
+    /// damit sich `g` (der rohe Gumbel-Zug) UND `ln(prior)` (aus `score - g`
+    /// rekonstruierbar) je Kandidat einzeln berichten lassen -- fuer die
+    /// Frage "bekommen zwei tauschende Kandidaten unterschiedliche
+    /// Zufallszahlen" reicht die reine Score-Summe nicht.
+    fn gumbel_scored_sorted<R: Rng + ?Sized>(acts: &[(Action, f32)], rng: &mut R) -> Vec<(f64, f64, usize)> {
+        let mut scored: Vec<(f64, f64, usize)> = acts
+            .iter()
+            .enumerate()
+            .map(|(i, &(_, p))| {
+                let g = sample_gumbel(rng);
+                (g + (p as f64).max(1e-9).ln(), g, i)
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored
+    }
+
+    /// PREREG §14 (Nutzer-Auftrag 2026-08-12): NUR der eine abweichende
+    /// Zustand aus §13 (1/1148 bei ausgeschaltetem TF32) -- welcher, an
+    /// welcher Rangstelle die Mengen auseinandergehen, der Score-Abstand am
+    /// Schnitt in BEIDEN Backends, und zum Vergleich dieselbe Abstandsgroesse
+    /// ueber die 1147 NICHT abweichenden Zustaende (Median, 10%-Quantil).
+    /// KEINE Deutung hier -- nur die vier angeforderten Zahlen, `println!`.
+    ///
+    /// `#[cfg(feature = "ort_cuda_probe")]` + `#[ignore]`: gleiche
+    /// Voraussetzungen wie `ort_cuda_matches_tract_gumbel_root_selection`
+    /// (`ort`-Feature, ORT-CUDA-Provider-/Torch-CUDA-12-DLLs neben dem
+    /// Testbinary, `MOSAIC_FROZEN_STATES_JSON`).
+    /// Aufruf: `cargo test --release --lib --features ort_cuda_probe -- --ignored net_mcts::tests::ort_cuda_single_deviation_gap_diagnostic --nocapture`
+    #[cfg(feature = "ort_cuda_probe")]
+    #[test]
+    #[ignore]
+    fn ort_cuda_single_deviation_gap_diagnostic() {
+        use crate::net::Net;
+
+        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
+            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(&states_path) else {
+            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
+            return;
+        };
+        let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
+        assert!(!records.is_empty());
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
+        if !onnx_path.exists() {
+            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
+            return;
+        }
+        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
+                return;
+            }
+        };
+
+        let m_for_400_sims = gumbel_top_m_for_budget(400);
+
+        // Je Zustand mit echtem Schnitt (0 < m_prime < n_root): der
+        // Rang-m_prime/m_prime+1-Score-Abstand in TRACTS eigener Rangfolge
+        // (Referenzgroesse fuer die Populationsverteilung, Punkt 4) UND ob
+        // die Top-m_prime-MENGE zwischen den Backends abweicht.
+        struct Rec {
+            record_index: usize,
+            round: u32,
+            n_root: usize,
+            m_prime: usize,
+            gap_tract: f64,
+            gap_ort: f64,
+            deviates: bool,
+        }
+        let mut recs: Vec<Rec> = Vec::new();
+        let mut n_no_real_cutoff = 0usize;
+
+        let chunk_size = crate::net::EVAL_BATCH_MAX_N;
+        for chunk in records.chunks(chunk_size) {
+            let mut states: Vec<GameState> = Vec::with_capacity(chunk.len());
+            let mut record_indices: Vec<usize> = Vec::with_capacity(chunk.len());
+            for entry in chunk {
+                let record_index = entry["record_index"].as_u64().unwrap() as usize;
+                let mut rng = StdRng::seed_from_u64(record_index as u64);
+                match crate::serialize::json_to_state(&entry["state"], &mut rng) {
+                    Ok(s) => {
+                        states.push(s);
+                        record_indices.push(record_index);
+                    }
+                    Err(e) => eprintln!("  ⚠️  record #{record_index}: json_to_state fehlgeschlagen ({e}) -- ausgelassen."),
+                }
+            }
+            if states.is_empty() {
+                continue;
+            }
+            let feats: Vec<Vec<f32>> = states.iter().map(|s| crate::features::features_for_net(&net, s)).collect();
+            let refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
+
+            let tract_out = net.eval_batch(&refs).expect("tract eval_batch");
+            let ort_out = crate::net_ort::eval_batch_via_ort_cuda(&net, &refs)
+                .expect("ORT-CUDA-Rundlauf (CUDA-Session muss aufbaubar sein)");
+
+            for i in 0..states.len() {
+                let state = &states[i];
+                let record_index = record_indices[i];
+                let (policy_t, _v_t, moon_t, _pt_t) = &tract_out[i];
+                let (policy_o, _v_o, moon_o, _pt_o) = &ort_out[i];
+
+                let mut moon_arr_t = [0f32; 5];
+                for (j, s) in moon_t.iter().take(5).enumerate() {
+                    moon_arr_t[j] = *s;
+                }
+                let mut moon_arr_o = [0f32; 5];
+                for (j, s) in moon_o.iter().take(5).enumerate() {
+                    moon_arr_o[j] = *s;
+                }
+                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true);
+                let (acts_o, _) = build_untried_actions(state, policy_o, &moon_arr_o, true);
+                assert_eq!(acts_t.len(), acts_o.len(), "record #{record_index}: unterschiedliche Kandidatenzahl nach Moon-Expansion?!");
+                let n_root = acts_t.len();
+                let m_prime = m_for_400_sims.min(n_root);
+                if m_prime == 0 || m_prime >= n_root {
+                    // Kein echter Schnitt moeglich (alle Kandidaten passen
+                    // sowieso hinein) -- keine "16./17. Stelle" zu berichten,
+                    // ausgelassen fuer die Abstandsmessung.
+                    n_no_real_cutoff += 1;
+                    continue;
+                }
+
+                let seed = 900_000_000u64 + record_index as u64;
+                let mut rng_t = StdRng::seed_from_u64(seed);
+                let mut rng_o = StdRng::seed_from_u64(seed);
+                let sorted_t = gumbel_scored_sorted(&acts_t, &mut rng_t);
+                let sorted_o = gumbel_scored_sorted(&acts_o, &mut rng_o);
+
+                let top_t: Vec<Action> = sorted_t[..m_prime].iter().map(|&(_, _, idx)| acts_t[idx].0.clone()).collect();
+                let top_o: Vec<Action> = sorted_o[..m_prime].iter().map(|&(_, _, idx)| acts_o[idx].0.clone()).collect();
+                let deviates = !(top_t.len() == top_o.len() && top_t.iter().all(|a| top_o.contains(a)));
+
+                let gap_tract = sorted_t[m_prime - 1].0 - sorted_t[m_prime].0;
+                let gap_ort = sorted_o[m_prime - 1].0 - sorted_o[m_prime].0;
+
+                if deviates {
+                    // ── Punkt 1+2: welcher Zustand, an welcher Rangstelle ──
+                    let extra_t: Vec<&Action> = top_t.iter().filter(|a| !top_o.contains(a)).collect();
+                    let extra_o: Vec<&Action> = top_o.iter().filter(|a| !top_t.contains(a)).collect();
+                    println!("\n=== EINZIGER ABWEICHENDER ZUSTAND ===");
+                    println!("record_index: {record_index}");
+                    println!("Runde: {}", state.round_number);
+                    println!("Kandidaten nach Moon-Expansion (n_root): {n_root}");
+                    println!("m_prime (Schnitt bei 400 Sims): {m_prime}");
+                    // PREREG §15 (Zuordnungs-Hypothese, Nutzer-Auftrag
+                    // 2026-08-12): fuer JEDE tauschende Aktion zusaetzlich (a)
+                    // ihre POSITION in `acts_t`/`acts_o` (= der `.enumerate()`-
+                    // Index, an dem `net_mcts.rs:3722-3726` den Gumbel-Zug
+                    // zieht) und (b) den ROHEN gezogenen Gumbel-Wert `g` (nicht
+                    // nur die Score-Summe) -- direkte Antwort auf "gleiche
+                    // Aufzaehlungsreihenfolge? gleiche Zufallszahl?".
+                    let pos_in = |acts: &[(Action, f32)], target: &Action| -> Option<usize> {
+                        acts.iter().position(|(a, _)| a == target)
+                    };
+                    let rank_score_g = |sorted: &[(f64, f64, usize)], acts: &[(Action, f32)], target: &Action| -> Option<(usize, f64, f64)> {
+                        sorted
+                            .iter()
+                            .position(|&(_, _, idx)| &acts[idx].0 == target)
+                            .map(|p| (p + 1, sorted[p].0, sorted[p].1))
+                    };
+                    println!("Nur in tracts Top-{m_prime} (faellt bei ORT heraus):");
+                    for a in &extra_t {
+                        let idx_t = pos_in(&acts_t, a);
+                        let idx_o = pos_in(&acts_o, a);
+                        let (rank_t, score_t, g_t) = rank_score_g(&sorted_t, &acts_t, a).unwrap();
+                        let (rank_o, score_o, g_o) = rank_score_g(&sorted_o, &acts_o, a).unwrap();
+                        println!("  {a:?}");
+                        println!("    Position in acts_t (0-idx): {idx_t:?}   Position in acts_o (0-idx): {idx_o:?}");
+                        println!("    tract:    Rang={rank_t} Score={score_t:.6} g={g_t:.6} ln(prior)={:.6}", score_t - g_t);
+                        println!("    ORT-CUDA: Rang={rank_o} Score={score_o:.6} g={g_o:.6} ln(prior)={:.6}", score_o - g_o);
+                    }
+                    println!("Nur in ORT-CUDAs Top-{m_prime} (kommt neu herein):");
+                    for a in &extra_o {
+                        let idx_t = pos_in(&acts_t, a);
+                        let idx_o = pos_in(&acts_o, a);
+                        let (rank_t, score_t, g_t) = rank_score_g(&sorted_t, &acts_t, a).unwrap();
+                        let (rank_o, score_o, g_o) = rank_score_g(&sorted_o, &acts_o, a).unwrap();
+                        println!("  {a:?}");
+                        println!("    Position in acts_t (0-idx): {idx_t:?}   Position in acts_o (0-idx): {idx_o:?}");
+                        println!("    tract:    Rang={rank_t} Score={score_t:.6} g={g_t:.6} ln(prior)={:.6}", score_t - g_t);
+                        println!("    ORT-CUDA: Rang={rank_o} Score={score_o:.6} g={g_o:.6} ln(prior)={:.6}", score_o - g_o);
+                    }
+                    // ── Punkt 3 (urspruenglicher Auftrag): die gumbel-
+                    // perturbierten SCORES der beiden konkurrierenden
+                    // Kandidaten an der Schnittstelle (Rang m_prime und
+                    // m_prime+1), in BEIDEN Backends, plus deren Abstand. ──
+                    println!(
+                        "tract:    Rang{m_prime}-Score={:.6}  Rang{}-Score={:.6}  Abstand={:.6}",
+                        sorted_t[m_prime - 1].0,
+                        m_prime + 1,
+                        sorted_t[m_prime].0,
+                        gap_tract
+                    );
+                    println!(
+                        "ORT-CUDA: Rang{m_prime}-Score={:.6}  Rang{}-Score={:.6}  Abstand={:.6}",
+                        sorted_o[m_prime - 1].0,
+                        m_prime + 1,
+                        sorted_o[m_prime].0,
+                        gap_ort
+                    );
+                }
+
+                recs.push(Rec { record_index, round: state.round_number, n_root, m_prime, gap_tract, gap_ort, deviates });
+            }
+        }
+
+        let n_total = recs.len();
+        let n_deviating = recs.iter().filter(|r| r.deviates).count();
+        println!("\n=== ZUSAMMENFASSUNG ===");
+        println!("Zustaende mit echtem Schnitt (0 < m_prime < n_root): {n_total} (ausgelassen ohne echten Schnitt: {n_no_real_cutoff})");
+        println!("davon abweichend: {n_deviating}");
+
+        // ── Punkt 4: Verteilung des Rang-m_prime/m_prime+1-Abstands ueber
+        // die NICHT abweichenden Zustaende (tracts eigene Rangfolge als
+        // durchgehende Referenzgroesse) -- Median und 10%-Quantil. ──
+        let mut gaps_non_deviating: Vec<f64> = recs.iter().filter(|r| !r.deviates).map(|r| r.gap_tract).collect();
+        gaps_non_deviating.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let quantile = |sorted: &[f64], q: f64| -> f64 {
+            if sorted.is_empty() {
+                return f64::NAN;
+            }
+            let pos = q * (sorted.len() - 1) as f64;
+            let lo = pos.floor() as usize;
+            let hi = pos.ceil() as usize;
+            if lo == hi {
+                sorted[lo]
+            } else {
+                sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo as f64)
+            }
+        };
+        let median_non_dev = quantile(&gaps_non_deviating, 0.5);
+        let p10_non_dev = quantile(&gaps_non_deviating, 0.1);
+        println!(
+            "Rang-Schnitt-Abstand (tract) ueber {} NICHT abweichende Zustaende: Median={:.6}  10%-Quantil={:.6}",
+            gaps_non_deviating.len(),
+            median_non_dev,
+            p10_non_dev
+        );
+
+        for r in recs.iter().filter(|r| r.deviates) {
+            println!(
+                "\nAbweichender Zustand record#{}: Runde={} n_root={} m_prime={} gap_tract={:.6} gap_ort={:.6}",
+                r.record_index, r.round, r.n_root, r.m_prime, r.gap_tract, r.gap_ort
+            );
+        }
+    }
+
+    /// PREREG §16 (Nutzer-Auftrag 2026-08-12): Verteilungsvergleich statt
+    /// Punktvergleich, MIT SELBSTKONTROLLE. §15 zeigte: Punktgleichheit ist
+    /// fuer keinen Backend-Wechsel erreichbar (die Gumbel-Zuordnung haengt an
+    /// der prior-abhaengigen Aufzaehlungsreihenfolge, eine Stoerung ab ~1e-6
+    /// kann benachbarte Kandidaten tauschen). Gumbel-Top-m ist aber ohnehin
+    /// eine STOCHASTISCHE Auswahl -- die Frage ist, ob ein Backend-Wechsel
+    /// wie ein Seed-Wechsel wirkt (Menge aus derselben Verteilung) oder wie
+    /// etwas anderes.
+    ///
+    /// ## Stichprobe (Auswahl OHNE Rosinen) -- GEAENDERT nach Pilotlauf
+    ///
+    /// Nur Zustaende mit einem ECHTEN Schnitt (`m_prime < n_root`, wie in §14
+    /// definiert) tragen ueberhaupt stochastische Information (bei
+    /// `m_prime >= n_root` ist die Top-m-Menge IMMER die volle
+    /// Kandidatenmenge, unabhaengig vom Seed) -- ein STRUKTURELLER, nicht
+    /// ergebnisabhaengiger Filter (455 von 1148 in dieser Sitzung GEPRUEFT).
+    ///
+    /// URSPRUENGLICHER Plan: eine Zufallsstichprobe von `N_STATES=60` aus
+    /// diesen 455 (fester Seed `SAMPLE_SEED`, `rand::seq::index::sample` ohne
+    /// Zuruecklegen) -- am unteren Rand des im Auftrag genannten Rahmens
+    /// (50-100). Ein Pilotlauf damit ergab bei ALLEN DREI Vergleichen EXAKT
+    /// dieselbe Zahl (0,2100 max / 0,0117 Mittel, `n=7571`) -- kein
+    /// Messfehler: bei einer Basisrate von 1/455 (~0,22%, §14) liegt der
+    /// Erwartungswert an Treffern bei `N=60` bei nur ~0,13, die Stichprobe
+    /// verfehlt das seltene Vertauschungs-Ereignis mit sehr hoher
+    /// Wahrscheinlichkeit komplett -- und dann sind alle Kandidatenlisten-
+    /// Reihenfolgen ueber alle Arme hinweg identisch (§15), Vergleich 1/2
+    /// werden numerisch zur Selbstkontrolle.
+    ///
+    /// DESHALB (eigene Entscheidung, nicht vorgegeben): die VOLLE Menge der
+    /// 455 Real-Schnitt-Zustaende verwendet, KEINE Stichprobe mehr --
+    /// deterministisch, keine Stichproben-Glücksfrage, und mit `K=200`/
+    /// Zustand immer noch schnell (Pilotlauf bei `N=60`: 3,7s).
+    ///
+    /// ## K und die Seed-Aufteilung
+    ///
+    /// `K=200` (wie im Auftrag vorgeschlagen), aber ALLE DREI Vergleiche
+    /// nutzen dieselbe Aufloesung: `K/2=100` DISJUNKTE Seeds je Seite (Seeds
+    /// 0..99 vs. 100..199 je Zustand) -- nicht `K` gegen `K`. Begruendung:
+    /// die Selbstkontrolle (Vergleich 3) braucht zwei disjunkte Stichproben
+    /// AUS DERSELBEN Verteilung, um die reine Stichproben-Rauschgrenze BEI
+    /// GEGEBENER Seitengroesse zu bestimmen -- fuer einen fairen Vergleich
+    /// ("dieselbe Aufloesung", Auftragstext) muessen die Vergleiche 1/2
+    /// GENAU DIESELBE Seitengroesse (100) und denselben Aufbau (disjunkte
+    /// Seed-Haelften) verwenden, sonst waere die Rauschgrenze fuer eine
+    /// andere Aufloesung gemessen als die Vergleiche selbst. Seite A ist in
+    /// ALLEN DREI Vergleichen dieselbe Berechnung (tract/synchron, Seeds
+    /// 0..99) -- Seite B unterscheidet sich: ORT-CUDA (Vgl. 1), verschraenkt
+    /// (Vgl. 2), tract/synchron erneut mit den ANDEREN 100 Seeds (Vgl. 3,
+    /// Selbstkontrolle).
+    ///
+    /// ## Die drei Vergleiche (je Zustand, je Kandidat: Haeufigkeit ueber die
+    /// jeweilige 100er-Seed-Haelfte, dann `|Differenz|`, ueber ALLE
+    /// Zustand-Kandidat-Paare der Stichprobe zu Max/Mittel aggregiert)
+    ///
+    /// 1. tract (Seeds 0..99) gegen ORT-CUDA (Seeds 100..199).
+    /// 2. synchron/tract (Seeds 0..99) gegen verschraenkt/tract via
+    ///    `net_batcher.rs` (Seeds 100..199).
+    /// 3. SELBSTKONTROLLE: tract (Seeds 0..99) gegen tract (Seeds 100..199)
+    ///    -- DIESELBE Policy-Ausgabe, nur disjunkte Seeds. Reine
+    ///    Stichproben-Rauschgrenze, ohne jede Backend-/Pfad-Differenz.
+    ///
+    /// KEINE Deutung hier, ob innerhalb/ausserhalb der Selbstkontrolle
+    /// akzeptabel ist -- nur die drei Masse und die Grenze selbst, `println!`.
+    ///
+    /// `#[cfg(feature = "ort_cuda_probe")]` + `#[ignore]`: gleiche
+    /// Voraussetzungen wie die anderen ORT-CUDA-Tests (Feature, DLLs neben
+    /// dem Testbinary, `MOSAIC_FROZEN_STATES_JSON`).
+    /// Aufruf: `cargo test --release --lib --features ort_cuda_probe -- --ignored net_mcts::tests::ort_cuda_topm_distribution_vs_selfcontrol --nocapture`
+    #[cfg(feature = "ort_cuda_probe")]
+    #[test]
+    #[ignore]
+    fn ort_cuda_topm_distribution_vs_selfcontrol() {
+        use crate::net::Net;
+        use std::collections::VecDeque;
+        use std::sync::{Arc, Mutex};
+
+        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
+            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(&states_path) else {
+            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
+            return;
+        };
+        let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
+        assert!(!records.is_empty());
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
+        if !onnx_path.exists() {
+            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
+            return;
+        }
+        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
+            Ok(n) => Arc::new(n),
+            Err(e) => {
+                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
+                return;
+            }
+        };
+
+        // EIGENE ENTSCHEIDUNG, NACHTRAEGLICH GEAENDERT (siehe Bericht): ein
+        // Pilotlauf mit `N_STATES=60` (Zufallsstichprobe, Seed `SAMPLE_SEED`)
+        // ergab bei allen drei Vergleichen EXAKT dieselbe Zahl (0,2100 max /
+        // 0,0117 Mittel) -- kein Messfehler, sondern die erwartete Folge der
+        // in §14 gemessenen Basisrate: NUR 1 von 455 Zustaenden zeigt je
+        // ueberhaupt eine Rang-Vertauschung (~0,22%), der Erwartungswert bei
+        // N=60 liegt bei ~0,13 Treffern -- eine Stichprobe verfehlt das
+        // seltene Ereignis mit sehr hoher Wahrscheinlichkeit komplett, und
+        // dann sind Vergleich 1/2 numerisch nichts anderes als die
+        // Selbstkontrolle (dieselben Aktionslisten-Reihenfolgen in allen
+        // Armen, siehe §15). Deshalb HIER die VOLLE Menge der 455
+        // Real-Schnitt-Zustaende verwendet, NICHT eine Stichprobe daraus --
+        // deterministisch, keine Stichproben-Glücksfrage mehr, und mit
+        // K=200/Zustand immer noch schnell (Pilotlauf: 3,7s bei N=60, siehe
+        // Bericht). `N_STATES=60` bleibt unten als Konstante zur
+        // Nachvollziehbarkeit des Pilotlaufs stehen, wird aber NICHT mehr
+        // fuer die Stichprobenziehung verwendet (`eligible.len()` bestimmt
+        // jetzt die tatsaechliche Menge).
+        #[allow(dead_code)]
+        const N_STATES_PILOT: usize = 60; // Pilotlauf-Dokumentation, siehe Kommentar oben.
+        const K_HALF: usize = 100; // 100 gegen 100 = K=200 gesamt, siehe Funktionskommentar.
+
+        let m_for_400_sims = gumbel_top_m_for_budget(400);
+
+        // ── Schritt 1: tract-Screening ueber ALLE Zustaende -- n_root/m_prime
+        // sind backend-unabhaengig (haengen nur am Zustand, siehe §14/§15),
+        // ein Backend reicht zur Bestimmung, welche Zustaende einen echten
+        // Schnitt haben. ──
+        let mut all_states: Vec<GameState> = Vec::with_capacity(records.len());
+        let mut all_record_indices: Vec<usize> = Vec::with_capacity(records.len());
+        for entry in &records {
+            let record_index = entry["record_index"].as_u64().unwrap() as usize;
+            let mut rng = StdRng::seed_from_u64(record_index as u64);
+            match crate::serialize::json_to_state(&entry["state"], &mut rng) {
+                Ok(s) => {
+                    all_states.push(s);
+                    all_record_indices.push(record_index);
+                }
+                Err(e) => eprintln!("  ⚠️  record #{record_index}: json_to_state fehlgeschlagen ({e}) -- ausgelassen."),
+            }
+        }
+        let all_feats: Vec<Vec<f32>> =
+            all_states.iter().map(|s| crate::features::features_for_net(&net, s)).collect();
+
+        let mut eligible: Vec<usize> = Vec::new();
+        let chunk_size = crate::net::EVAL_BATCH_MAX_N;
+        let mut offset = 0usize;
+        for chunk in all_feats.chunks(chunk_size) {
+            let refs: Vec<&[f32]> = chunk.iter().map(|v| v.as_slice()).collect();
+            let out = net.eval_batch(&refs).expect("tract-Screening eval_batch");
+            for (j, (policy, _v, moon, _pt)) in out.iter().enumerate() {
+                let i = offset + j;
+                let state = &all_states[i];
+                let mut moon_arr = [0f32; 5];
+                for (k, s) in moon.iter().take(5).enumerate() {
+                    moon_arr[k] = *s;
+                }
+                let (acts, _) = build_untried_actions(state, policy, &moon_arr, true);
+                let n_root = acts.len();
+                let m_prime = m_for_400_sims.min(n_root);
+                if m_prime < n_root {
+                    eligible.push(i);
+                }
+            }
+            offset += chunk.len();
+        }
+        println!("Zustaende mit echtem Schnitt (Screening): {}/{}", eligible.len(), all_states.len());
+        if eligible.is_empty() {
+            eprintln!("  ⚠️  keine Zustaende mit echtem Schnitt gefunden -- Test uebersprungen.");
+            return;
+        }
+
+        // ── Schritt 2: VOLLE eligible Menge (siehe Entscheidung oben, statt
+        // einer Zufalls-Teilmenge) -- `sample_all_idx` ist die GESAMTE
+        // `eligible`-Menge, sortiert nach Original-Index. ──
+        let mut sample_all_idx: Vec<usize> = eligible.clone();
+        sample_all_idx.sort_unstable();
+
+        let states: Vec<GameState> = sample_all_idx.iter().map(|&i| all_states[i].clone()).collect();
+        let record_indices: Vec<usize> = sample_all_idx.iter().map(|&i| all_record_indices[i]).collect();
+        let feats: Vec<Vec<f32>> = sample_all_idx.iter().map(|&i| all_feats[i].clone()).collect();
+        println!(
+            "Volle Real-Schnitt-Menge (keine Stichprobe mehr, siehe Entscheidung): {} Zustaende (erste 5 record_indices: {:?})",
+            states.len(),
+            &record_indices[..5.min(record_indices.len())]
+        );
+
+        // ── Schritt 3: die vier Arme, NUR fuer die Stichprobe. ──
+        // Arm "tract"/"synchron" (Batch=1 je Zustand -- dieselbe Berechnung
+        // dient als Seite A in ALLEN DREI Vergleichen, siehe Funktions-
+        // Kommentar).
+        let mut tract_policy: Vec<Vec<f32>> = Vec::with_capacity(states.len());
+        let mut tract_moon: Vec<Vec<f32>> = Vec::with_capacity(states.len());
+        for f in &feats {
+            let (p, _v, m, _pt) = net.eval_batch(&[f.as_slice()]).expect("eval_batch(1)").remove(0);
+            tract_policy.push(p);
+            tract_moon.push(m);
+        }
+
+        // Arm "ORT-CUDA".
+        let refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
+        let ort_out = crate::net_ort::eval_batch_via_ort_cuda(&net, &refs)
+            .expect("ORT-CUDA-Rundlauf (CUDA-Session muss aufbaubar sein)");
+
+        // Arm "verschraenkt" (Sammel-Faden, N_THREADS gleichzeitige Aufrufer)
+        // -- exakt dasselbe Muster wie
+        // `interleaved_matches_synchronous_gumbel_root_selection`.
+        std::env::set_var("MOSAIC_INTERLEAVE_ENABLED", "1");
+        std::env::set_var("MOSAIC_INTERLEAVE_BATCH_MAX", crate::net::EVAL_BATCH_MAX_N.to_string());
+        std::env::set_var("MOSAIC_INTERLEAVE_FILL_TIMEOUT_US", "200");
+        crate::net_batcher::ensure_batcher_for(&net);
+        let batcher = crate::net_batcher::lookup(&net).expect("Sammel-Faden sollte registriert sein");
+
+        const N_THREADS: usize = 32;
+        let idx_queue: Arc<Mutex<VecDeque<usize>>> = Arc::new(Mutex::new((0..states.len()).collect()));
+        let inter_results: Arc<Mutex<Vec<Option<(Vec<f32>, Vec<f32>)>>>> =
+            Arc::new(Mutex::new(vec![None; states.len()]));
+        let feats_arc = Arc::new(feats.clone());
+        let mut handles = Vec::new();
+        for _ in 0..N_THREADS {
+            let idx_queue = Arc::clone(&idx_queue);
+            let inter_results = Arc::clone(&inter_results);
+            let batcher = Arc::clone(&batcher);
+            let feats_arc = Arc::clone(&feats_arc);
+            handles.push(std::thread::spawn(move || loop {
+                let idx = idx_queue.lock().unwrap().pop_front();
+                let Some(idx) = idx else { break };
+                let row = batcher.eval_rows(&[feats_arc[idx].as_slice()]).expect("eval_rows");
+                let (p, _v, m, _pt) = row.into_iter().next().unwrap();
+                inter_results.lock().unwrap()[idx] = Some((p, m));
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let inter_results = Arc::try_unwrap(inter_results).unwrap().into_inner().unwrap();
+        println!(
+            "Sammel-Faden: {} Batches, {} Zeilen, mittlerer Batch = {:.2}",
+            batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed),
+            batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed),
+            batcher.stats.mean_batch()
+        );
+
+        // ── Schritt 4: je Zustand die Kandidatenlisten je Arm + m_prime,
+        // dann je Vergleich die Haeufigkeitsdifferenz ueber die Stichprobe. ──
+        struct DiffAgg {
+            max: f64,
+            sum: f64,
+            n: usize,
+        }
+        impl DiffAgg {
+            fn new() -> Self {
+                DiffAgg { max: 0.0, sum: 0.0, n: 0 }
+            }
+            fn push(&mut self, d: f64) {
+                if d > self.max {
+                    self.max = d;
+                }
+                self.sum += d;
+                self.n += 1;
+            }
+            fn mean(&self) -> f64 {
+                if self.n == 0 {
+                    f64::NAN
+                } else {
+                    self.sum / self.n as f64
+                }
+            }
+        }
+
+        /// Haeufigkeit je Aktion (in `canon`-Reihenfolge) ueber die Seeds in
+        /// `seed_range` (relativ zu `base_seed`, absolute Seeds =
+        /// `base_seed + s`).
+        fn freqs_over_seeds(
+            acts: &[(Action, f32)],
+            m_prime: usize,
+            canon: &[Action],
+            base_seed: u64,
+            seed_range: std::ops::Range<u64>,
+        ) -> Vec<f64> {
+            let k = seed_range.end - seed_range.start;
+            let mut counts = vec![0u32; canon.len()];
+            for s in seed_range {
+                let mut rng = StdRng::seed_from_u64(base_seed + s);
+                let set = gumbel_topm_set(acts, m_prime, &mut rng);
+                for a in &set {
+                    if let Some(pos) = canon.iter().position(|c| c == a) {
+                        counts[pos] += 1;
+                    }
+                }
+            }
+            counts.into_iter().map(|c| c as f64 / k as f64).collect()
+        }
+
+        let mut agg_tract_vs_ort = DiffAgg::new();
+        let mut agg_sync_vs_inter = DiffAgg::new();
+        let mut agg_selfcontrol = DiffAgg::new();
+        // Zusatz-Transparenz: ueber wie viele der Zustaende unterscheidet
+        // sich die Kandidatenlisten-REIHENFOLGE (die eigentliche Ursache
+        // laut §15) zwischen den Armen UEBERHAUPT, in DIESER Batch-
+        // Zusammensetzung (455 Zustaende in EINEM ORT-Aufruf, ~30er-Batches
+        // beim Sammel-Faden)? Beantwortet, ob das Aggregat unten
+        // "Reihenfolge nie verschieden" widerspiegelt oder "Reihenfolge oft
+        // verschieden, aber die Frequenz-Differenz trotzdem klein".
+        let mut n_states_order_diff_ort = 0usize;
+        let mut n_states_order_diff_inter = 0usize;
+
+        for i in 0..states.len() {
+            let state = &states[i];
+            let record_index = record_indices[i];
+
+            let mut moon_arr_tract = [0f32; 5];
+            for (j, s) in tract_moon[i].iter().take(5).enumerate() {
+                moon_arr_tract[j] = *s;
+            }
+            let (o_policy, _o_v, o_moon, _o_pt) = &ort_out[i];
+            let mut moon_arr_ort = [0f32; 5];
+            for (j, s) in o_moon.iter().take(5).enumerate() {
+                moon_arr_ort[j] = *s;
+            }
+            let (inter_policy, inter_moon) = inter_results[i].clone().expect("jede Zeile beantwortet");
+            let mut moon_arr_inter = [0f32; 5];
+            for (j, s) in inter_moon.iter().take(5).enumerate() {
+                moon_arr_inter[j] = *s;
+            }
+
+            let (acts_tract, _) = build_untried_actions(state, &tract_policy[i], &moon_arr_tract, true);
+            let (acts_ort, _) = build_untried_actions(state, o_policy, &moon_arr_ort, true);
+            let (acts_inter, _) = build_untried_actions(state, &inter_policy, &moon_arr_inter, true);
+            let n_root = acts_tract.len();
+            assert_eq!(acts_ort.len(), n_root, "record #{record_index}: ORT-Kandidatenzahl weicht ab?!");
+            assert_eq!(acts_inter.len(), n_root, "record #{record_index}: verschraenkte Kandidatenzahl weicht ab?!");
+            let m_prime = m_for_400_sims.min(n_root);
+            assert!(
+                m_prime < n_root,
+                "record #{record_index}: Screening sagte echten Schnitt zu, jetzt keiner mehr -- Bug"
+            );
+
+            let order_diff_ort: usize = (0..n_root).filter(|&k| acts_tract[k].0 != acts_ort[k].0).count();
+            let order_diff_inter: usize = (0..n_root).filter(|&k| acts_tract[k].0 != acts_inter[k].0).count();
+            if order_diff_ort > 0 {
+                n_states_order_diff_ort += 1;
+            }
+            if order_diff_inter > 0 {
+                n_states_order_diff_inter += 1;
+            }
+            if record_index == 320 {
+                println!(
+                    "record#320 (bekannt aus §14/§15): n_root={n_root} order_diff(tract,ort)={order_diff_ort} order_diff(tract,inter)={order_diff_inter} -- in DIESER Batch-Zusammensetzung"
+                );
+            }
+            let canon: Vec<Action> = acts_tract.iter().map(|(a, _)| a.clone()).collect();
+            let base_seed = 900_000_000u64 + record_index as u64 * 1_000_000u64;
+
+            let f_tract_a = freqs_over_seeds(&acts_tract, m_prime, &canon, base_seed, 0..K_HALF as u64);
+            let f_tract_b =
+                freqs_over_seeds(&acts_tract, m_prime, &canon, base_seed, K_HALF as u64..2 * K_HALF as u64);
+            let f_ort_b = freqs_over_seeds(&acts_ort, m_prime, &canon, base_seed, K_HALF as u64..2 * K_HALF as u64);
+            let f_inter_b =
+                freqs_over_seeds(&acts_inter, m_prime, &canon, base_seed, K_HALF as u64..2 * K_HALF as u64);
+
+            for j in 0..canon.len() {
+                agg_tract_vs_ort.push((f_tract_a[j] - f_ort_b[j]).abs());
+                agg_sync_vs_inter.push((f_tract_a[j] - f_inter_b[j]).abs());
+                agg_selfcontrol.push((f_tract_a[j] - f_tract_b[j]).abs());
+            }
+
+            // Zusatz-Transparenz (nicht im Auftrag verlangt, aber ohne sie
+            // waere der einzige BEKANNTE Einzelfall aus §14/§15 im Aggregat
+            // unsichtbar): den EINEN bekannten Vertauschungs-Zustand
+            // `record_index=320` NAMENTLICH mit seinen eigenen Werten
+            // ausweisen, statt ihn im Pool aus 50000+ Paaren verschwinden zu
+            // lassen. KEINE Deutung -- nur die Zahlen fuer genau diese zwei
+            // Aktionen.
+            if record_index == 320 {
+                println!("\n--- Zusatz (nicht aggregiert): bekannter Zustand record_index=320 einzeln ---");
+                for j in 0..canon.len() {
+                    let d_ort = (f_tract_a[j] - f_ort_b[j]).abs();
+                    let d_inter = (f_tract_a[j] - f_inter_b[j]).abs();
+                    let d_self = (f_tract_a[j] - f_tract_b[j]).abs();
+                    if d_ort > 0.01 || d_inter > 0.01 || d_self > 0.01 {
+                        println!(
+                            "  {:?}: f_tract_a={:.4} f_tract_b={:.4} f_ort_b={:.4} f_inter_b={:.4}  |diff tract/ort|={:.4} |diff sync/inter|={:.4} |diff selfcontrol|={:.4}",
+                            canon[j], f_tract_a[j], f_tract_b[j], f_ort_b[j], f_inter_b[j], d_ort, d_inter, d_self
+                        );
+                    }
+                }
+            }
+        }
+
+        println!(
+            "\nKandidatenlisten-REIHENFOLGE unterschiedlich (tract vs. ORT): {n_states_order_diff_ort}/{} Zustaende",
+            states.len()
+        );
+        println!(
+            "Kandidatenlisten-REIHENFOLGE unterschiedlich (tract vs. verschraenkt): {n_states_order_diff_inter}/{} Zustaende",
+            states.len()
+        );
+        println!(
+            "\n=== VERTEILUNGSVERGLEICH (N={} Zustaende, K/2={K_HALF} Seeds je Seite) ===",
+            states.len()
+        );
+        println!("{:<38} {:>10} {:>12} {:>8}", "Vergleich", "max|diff|", "mittel|diff|", "n Paare");
+        println!(
+            "{:<38} {:>10.4} {:>12.4} {:>8}",
+            "tract vs. ORT-CUDA", agg_tract_vs_ort.max, agg_tract_vs_ort.mean(), agg_tract_vs_ort.n
+        );
+        println!(
+            "{:<38} {:>10.4} {:>12.4} {:>8}",
+            "synchron vs. verschraenkt (tract)", agg_sync_vs_inter.max, agg_sync_vs_inter.mean(), agg_sync_vs_inter.n
+        );
+        println!(
+            "{:<38} {:>10.4} {:>12.4} {:>8}",
+            "SELBSTKONTROLLE (tract vs. tract)", agg_selfcontrol.max, agg_selfcontrol.mean(), agg_selfcontrol.n
+        );
+        println!(
+            "\ntract-vs-ORT max innerhalb Selbstkontrolle-max? {} ({:.4} vs. {:.4})",
+            agg_tract_vs_ort.max <= agg_selfcontrol.max,
+            agg_tract_vs_ort.max,
+            agg_selfcontrol.max
+        );
+        println!(
+            "synchron-vs-verschraenkt max innerhalb Selbstkontrolle-max? {} ({:.4} vs. {:.4})",
+            agg_sync_vs_inter.max <= agg_selfcontrol.max,
+            agg_sync_vs_inter.max,
+            agg_selfcontrol.max
+        );
+        println!(
+            "tract-vs-ORT Mittel innerhalb Selbstkontrolle-Mittel? {} ({:.4} vs. {:.4})",
+            agg_tract_vs_ort.mean() <= agg_selfcontrol.mean(),
+            agg_tract_vs_ort.mean(),
+            agg_selfcontrol.mean()
+        );
+        println!(
+            "synchron-vs-verschraenkt Mittel innerhalb Selbstkontrolle-Mittel? {} ({:.4} vs. {:.4})",
+            agg_sync_vs_inter.mean() <= agg_selfcontrol.mean(),
+            agg_sync_vs_inter.mean(),
+            agg_selfcontrol.mean()
+        );
+    }
+
     // ── Weg V (Verschraenkung, `net_batcher.rs`), Nutzer-Auftrag 2026-08-12
     // "dann leg los" -- ABNAHME Punkte 2+3. Wiederverwendet die Helfer aus dem
     // Policy-Tor-Block oben (`legal_logits_sorted`, `gumbel_topm_set`,
