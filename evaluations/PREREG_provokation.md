@@ -102,3 +102,72 @@ Eine halbe Stunde auf denselben 20 k1-Seeds, Metrik wie durchgehend.
 Stufe 1 (diese Datei) VOR Stufe 2 (Streuung ins Self-Play). Das Werkzeug für
 Stufe 2 ist gebaut und bleibt unbenutzt, bis Stufe 1 ihre Zahl hat. Genau diese
 Reihenfolge hatte ich verwechselt.
+
+
+---
+
+## 7. ABNAHME VERFEHLT (2026-08-12) — und zwar weil die Beschneidung ZU STARK ist
+
+Sechs Zellen, je Ziel-Spalte einzeln, 20 k1-Seeds, ohne Injektion.
+
+| Ziel-Spalte | vertikal | Abschlüsse/20 | Endstand | Strafleiste |
+| ----------: | -------: | ------------: | -------: | ----------: |
+| 0 | 1,05 | 3 | **6,25** | **23,00** |
+| 1 | 1,40 | 4 | 8,30 | 22,65 |
+| 2 | 1,05 | 3 | 7,45 | 22,85 |
+| 3 | 1,05 | 3 | 11,15 | 21,05 |
+| 4 | 1,05 | 3 | 15,30 | 16,85 |
+| 5 | 0,70 | 2 | 7,60 | 22,60 |
+| **Bezug ohne Provokation** | **1,05** | **3** | **47,80** | **9,35** |
+
+Ziel war >= 7,00. Höchstwert 1,40, also verfehlt um Faktor 5.
+
+### Die Diagnose ist NICHT "zu schwach"
+
+Mein Messskript hat "die Beschneidung ist zu schwach" ausgegeben. **Das ist
+falsch**, und die Zahlen sagen das Gegenteil: der Endstand bricht von 47,80 auf
+6-15 ein, die Strafleiste steigt von 9,35 auf **bis zu 23**. Das Netz nimmt
+permanent Fliesen, die es nicht platzieren kann — weil ihm alles andere verboten
+ist. Die Beschneidung ist **zu stark**, nicht zu schwach.
+
+Die Spaltenabschlüsse selbst bewegen sich dabei kaum (3 statt 3, einmal 4). Die
+Beschneidung erzwingt also die Absicht, ohne das Ziel zu erreichen, und zerstört
+das Spiel dabei.
+
+### Der Konstruktionsfehler, und er ist derselbe wie vorher
+
+Ich habe die Beschneidung auf **alle sechs Musterreihen** und die **ganze Partie**
+gelegt. Ein Mensch, der eine Spalte baut, legt nicht fünf Runden lang sechs Reihen
+auf je eine Farbe fest — er bindet sich **opportunistisch**, wenn die passende
+Farbe erscheint, und spielt sonst normal. Meine Fassung erzwingt die Absicht so
+total, dass kein Spiel übrig bleibt.
+
+Zweitens kann eine Beschneidung das **Erscheinen** der Fliesen nicht erzwingen.
+Die Deckenprobe (`PREREG_platzierungsseite.md` §14) hat gezeigt, dass volle
+Verfügbarkeit allein nicht hilft; hier zeigt sich die andere Seite: eine Bindung
+an eine Farbe, die nicht kommt, kostet Strafpunkte statt Fortschritt.
+
+### Was daraus folgt — die naheliegende Verfeinerung, NICHT gemessen
+
+Drei Lockerungen, jede einzeln prüfbar:
+
+1. **Weniger Reihen binden.** Nur die billigen (Musterreihe 0-3 kosten 1+2+3+4 = 10
+   Fliesen) statt aller sechs; die teuren bleiben frei. Die fehlenden Zellen
+   müssten dann aus Spezialfeldern kommen — und die füllen Zellen ohne Fliese
+   (`dome.rs:54-59`).
+2. **Nur binden, wenn ein Alternativzug existiert.** Die Beschneidung greift nur,
+   solange ein Nicht-Bodenzug übrig bleibt. Heute ist der Fallback erst bei
+   VOLLSTÄNDIG leerer Menge aktiv, und Bodenzüge zählen als Alternative — genau
+   deshalb steigt die Strafleiste auf 23.
+3. **Erst ab Runde 2 oder 3 binden.** In Runde 1 steht die Farbverteilung noch
+   nicht, eine frühe Bindung ist die teuerste.
+
+**Punkt 2 ist der aussichtsreichste** und erklärt die Zahlen am direktesten: die
+Strafleiste ist der Preis dafür, dass Bodenzüge als gültige Alternative gelten und
+die Beschneidung deshalb fast nie in ihren Fallback läuft.
+
+### Stufe 2 bleibt gesperrt
+
+Bis eine Fassung >= 7,00 erreicht, geht kein Korpus ins Self-Play. Ein Korpus aus
+Partien mit Endstand 8 und Strafleiste 22 wäre schädlicher als keiner — er würde
+dem Netz beibringen, dass Spaltenbau mit Zusammenbruch einhergeht.

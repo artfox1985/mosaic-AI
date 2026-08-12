@@ -1,0 +1,96 @@
+[
+  {
+    "spalte": 0,
+    "n": 20,
+    "vertikal": 1.05,
+    "abschluesse": 3,
+    "punkte": 6.25,
+    "boden": 23.0,
+    "siege": 10,
+    "verteilung": {
+      "3": 4,
+      "4": 8,
+      "5": 5,
+      "6": 3
+    },
+    "dauer": 0.9245638807614645
+  },
+  {
+    "spalte": 1,
+    "n": 20,
+    "vertikal": 1.4,
+    "abschluesse": 4,
+    "punkte": 8.3,
+    "boden": 22.65,
+    "siege": 9,
+    "verteilung": {
+      "3": 1,
+      "4": 5,
+      "5": 10,
+      "6": 4
+    },
+    "dauer": 0.9058885892232259
+  },
+  {
+    "spalte": 2,
+    "n": 20,
+    "vertikal": 1.05,
+    "abschluesse": 3,
+    "punkte": 7.45,
+    "boden": 22.85,
+    "siege": 9,
+    "verteilung": {
+      "4": 11,
+      "5": 6,
+      "6": 3
+    },
+    "dauer": 0.843319304784139
+  },
+  {
+    "spalte": 3,
+    "n": 20,
+    "vertikal": 1.05,
+    "abschluesse": 3,
+    "punkte": 11.15,
+    "boden": 21.05,
+    "siege": 7,
+    "verteilung": {
+      "3": 2,
+      "4": 9,
+      "5": 6,
+      "6": 3
+    },
+    "dauer": 0.8796782294909159
+  },
+  {
+    "spalte": 4,
+    "n": 20,
+    "vertikal": 1.05,
+    "abschluesse": 3,
+    "punkte": 15.3,
+    "boden": 16.85,
+    "siege": 9,
+    "verteilung": {
+      "4": 9,
+      "5": 8,
+      "6": 3
+    },
+    "dauer": 0.861711859703064
+  },
+  {
+    "spalte": 5,
+    "n": 20,
+    "vertikal": 0.7,
+    "abschluesse": 2,
+    "punkte": 7.6,
+    "boden": 22.6,
+    "siege": 8,
+    "verteilung": {
+      "3": 4,
+      "4": 8,
+      "5": 6,
+      "6": 2
+    },
+    "dauer": 0.8850042780240377
+  }
+]
