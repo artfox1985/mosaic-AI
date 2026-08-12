@@ -189,8 +189,22 @@ pub(crate) fn beschneide_moves(state: &GameState, moves: Vec<Move>) -> Vec<Move>
         })
         .cloned()
         .collect();
-    if pruned.is_empty() {
-        moves // Fallback: NIE eine leere Aktionsmenge erzeugen.
+    // VERFEINERUNG (PREREG_provokation.md §7 Punkt 2, gemessen begruendet):
+    // die erste Fassung liess Bodenzuege immer durch und band alles andere --
+    // blieb nach der Beschneidung nur noch die Strafleiste als Ziel, galt die
+    // Menge trotzdem als "nicht leer" und der Fallback griff nie. Ergebnis war
+    // eine Strafleiste von bis zu 23 (gegen 9,35 im Bezug) bei unveraenderten
+    // 3-4 Spaltenabschluessen: die Bindung erzwang unplatzierbare Fliesen,
+    // statt die Spalte zu schliessen.
+    //
+    // Jetzt gilt: gebunden wird nur, solange nach der Beschneidung ein
+    // NICHT-Bodenzug uebrig bleibt. Gibt es die geforderte Farbe gerade nicht
+    // als echte Platzierung, laesst die Bindung fuer DIESE Entscheidung los
+    // (volle Menge) und greift bei der naechsten wieder -- opportunistisches
+    // Binden statt totalem Zwang, wie es menschliche Spieler tun.
+    let hat_echten_zug = pruned.iter().any(|m| m.place.row_index != -1);
+    if pruned.is_empty() || !hat_echten_zug {
+        moves // Fallback: nie leer, und nie NUR Strafleiste.
     } else {
         pruned
     }
@@ -401,4 +415,97 @@ mod tests {
         set_ziel_spalte_seed(None); // Aufraeumen (Leck-Warnung in der Doku oben)
         set_modus_override_for_test(None);
     }
+}
+
+// ── Vorzugszug: Praeferenz statt Verbot ─────────────────────────────────────
+//
+// Nutzer-Leiter nach dem gemessenen Ende der Beschneidung (24 Zellen, beide
+// Spieler zerstoert, max 0,20 Spalten/Partie): *"kannst fast schon eine
+// heuristik bauen dafuer."* Der Unterschied zu ALLEM Gemessenen: die
+// Praeferenz erzwingt nie einen schlechten Zug. Existiert in der Stellung ein
+// konstruktiver Spaltenzug -- geforderte Farbe nehmbar UND legal in die
+// passende Musterreihe legbar --, wird er gespielt; sonst spielt der normale
+// Spieler. Kein Verbot, keine Blattwert-Verschiebung.
+
+/// Ziel-Spalte des Vorzugsmodus, `MOSAIC_VORZUG_SPALTE` = 0..5.
+/// Default aus. BEWUSST getrennt vom Beschneidungs-Knopf -- die beiden Modi
+/// sind Alternativen und sollen nicht versehentlich kombiniert laufen.
+pub(crate) fn vorzug_spalte() -> Option<usize> {
+    static CELL: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_VORZUG_SPALTE") {
+        Ok(v) => match v.trim().parse::<usize>() {
+            Ok(c) if c <= 5 => Some(c),
+            _ => {
+                eprintln!("MOSAIC_VORZUG_SPALTE={v:?} ignoriert -- erwartet 0..5");
+                None
+            }
+        },
+        Err(_) => None,
+    })
+}
+
+/// Der Vorzugszug selbst, oder `None` wenn keiner existiert / Modus aus.
+///
+/// Aufrufstellen: VOR der Netz-Suche in `run_net_arena_match`,
+/// `run_net_vs_net_arena`, `run_net_self_play` (self_play.rs). Nur Runden
+/// 1..=4 -- in Runde 5 entscheidet dort `round5::choose_action` exakt, und
+/// der Vorzug darf die exakte Endrunden-Wahl nicht verdraengen.
+///
+/// Auswahl unter mehreren Kandidaten, deterministisch:
+///  1. minimaler Ueberlauf auf die Strafleiste (der Zug soll bauen, nicht
+///     bezahlen),
+///  2. dann die am weitesten gefuellte Musterreihe (naechste Lieferung
+///     zuerst fertig),
+///  3. dann kleinste Reihe (billig vor teuer), dann stabile Reihenfolge.
+///
+/// Zwei Bedingungen je Kandidat, beide aus dem Brett ablesbar:
+///  - Zelle `(r, spalte)` fordert GENAU `m.take.color` (`geforderte_farbe`)
+///    und ist noch nicht gefuellt -- eine gefuellte Zelle braucht keine
+///    Lieferung mehr.
+///  - Die Platzierung ist ohnehin legal (`generate_valid_moves` liefert nur
+///    legale Zuege; Farb-/Kapazitaetsregeln der Musterreihe stecken dort).
+pub(crate) fn vorzugszug(state: &GameState) -> Option<crate::moves::Action> {
+    let spalte = vorzug_spalte()?;
+    if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
+        return None;
+    }
+    let player = &state.players[state.current_player];
+    let moves = crate::validation::generate_valid_moves(state);
+    let mut best: Option<(usize, i32, i32, crate::moves::Move)> = None;
+    for m in moves {
+        let r = m.place.row_index;
+        if !(0..=5).contains(&r) {
+            continue;
+        }
+        let r = r as usize;
+        match geforderte_farbe(player, r, spalte) {
+            Some(x) if x == m.take.color => {}
+            _ => continue,
+        }
+        // Zelle schon gefuellt -> diese Lieferung baut die Spalte nicht.
+        if player
+            .dome_grid
+            .get_space(r, spalte)
+            .map_or(true, |sp| sp.is_filled())
+        {
+            continue;
+        }
+        // KEIN Ueberlauf-Kriterium: `TakeAction` traegt keine Stueckzahl
+        // (die haengt am Fabrikinhalt), und sie hier nachzuzaehlen hiesse
+        // Quell-Logik zu duplizieren. Erste Messung ohne; zeigt die
+        // Strafleiste einen Anstieg, ist das der naechste Verfeinerungspunkt.
+        let zeile = &player.pattern_lines[r];
+        let fuellung = zeile.tiles.len() as i32;
+        let kandidat = (0usize, -fuellung, r as i32, m);
+        let besser = match &best {
+            None => true,
+            Some((u, f, rr, _)) => {
+                (kandidat.0, kandidat.1, kandidat.2) < (*u, *f, *rr)
+            }
+        };
+        if besser {
+            best = Some(kandidat);
+        }
+    }
+    best.map(|(_, _, _, m)| crate::moves::Action::Stone(m))
 }

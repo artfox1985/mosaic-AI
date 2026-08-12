@@ -1610,7 +1610,8 @@ fn play_net_game<R: Rng + ?Sized>(
                         actions[0].clone()
                     } else if pi == net_board {
                         let s = net_effective_sims(net_sims, actions.len());
-                        net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
+                        crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = dynamic_sims(heur_sims, actions.len());
@@ -1830,7 +1831,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                             (net_b, sims_b, c_puct_b)
                         };
                         let s = net_effective_sims(base, actions.len());
-                        net_search_drafting_action(net, &game.state, s, cp, false, rng)
+                        crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| net_search_drafting_action(net, &game.state, s, cp, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     apply_chosen_action(&mut game, chosen)
@@ -2024,7 +2026,8 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                         .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = net_effective_sims(sims_plain, actions.len());
-                        net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng)
+                        crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     apply_chosen_action(&mut game, chosen)
@@ -3363,7 +3366,8 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         )
                     } else {
                         let s = net_effective_sims(sims1, actions.len());
-                        net_search_drafting_action(net, &game.state, s, c_puct, false, rng)
+                        crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     apply_chosen_action(&mut game, chosen)

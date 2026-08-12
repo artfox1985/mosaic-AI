@@ -228,3 +228,35 @@ den identifizierten Engpass adressiert.
 (Konjunktions-Rate 0,0167 → 0,0500, Faktor 12 über der Totgrenze 0,004, siehe
 `STATUS.md` Übergabe-Block). Die Provokation ist das Werkzeug, mit dem man
 herausfindet, welche Schraube man in Stufe 2 dreht.
+
+
+---
+
+## 9. VIER MECHANISMEN, EINE DECKE: 0,30 Spalten je Partie
+
+| Generator | beste Zelle | Endstand | Spiel |
+| --- | ---: | ---: | --- |
+| Injektion (Belohnung) | 2,10 | 45,30 | intakt |
+| Beschneidung (Zwang), beide Fassungen | 1,40 | 8-24 | zerstoert |
+| Vorzug Drafting (Praeferenz) | 2,10 | 43-46 | intakt |
+| Vorzug Drafting + Tiling-Routing | 2,10 | 39-44 | intakt |
+
+Alle Protokolle: `generator_matrix_protokoll.json`. Die 5/6-Mauer bleibt in jeder
+Fassung (9-13 von 20 Partien).
+
+**Blocker-Klassifikation der 6. Zelle** (18 Mauer-Partien): 10x "Reihe lieferte,
+Tiling legte anderswo hin", 8x "Reihe kam nie zusammen". ABER: die Klassifikation
+prueft nicht, ob die gelieferte FARBE der geforderten entsprach -- eine Reihe voll
+Blau kann eine Rot-Zelle nie bedienen, das Tiling weicht dann korrekt aus. Der
+Tiling-Vorzug (gebaut, `tiling_solver.rs::vorzug_tiling_step`) konvertierte die
+B-Faelle NICHT -- das stuetzt den Verdacht, dass ein Teil davon in Wahrheit
+Farb-Faelle sind. **Naechster Diagnoseschritt: die B-Faelle nach gelieferter
+gegen geforderter Farbe aufschluesseln.**
+
+**Die offene Grundsatzfrage an den Nutzer**: vier Mechanismen enden bei 0,30 je
+Partie mit intaktem Spiel. Das Stufe-1-Kriterium (Labels variieren) war schon bei
+der Injektion allein erfuellt (Rate 0,0500 = 12x ueber der Totgrenze). Entweder
+(a) den 0,30-Generator akzeptieren und den Korpus-Pilot fahren -- der Kopf braucht
+Ereignisse, nicht Perfektion --, oder (b) weiter am Generator arbeiten (Farb-
+Diagnose, dann ggf. echter Spaltenbau-Spieler). Der 1,0-Anspruch stammt aus der
+Erwartung an das FERTIGE Netz; ob der GENERATOR ihn braucht, ist nicht belegt.

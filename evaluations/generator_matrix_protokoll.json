@@ -1,0 +1,187 @@
+[
+  {
+    "arm": "Vorzug allein",
+    "spalte": 0,
+    "n": 20,
+    "vertikal": 2.1,
+    "abschl": 6,
+    "punkte": 40.75,
+    "boden": 11.55,
+    "verteilung": {
+      "4": 5,
+      "5": 9,
+      "6": 6
+    },
+    "dauer": 0.8057436347007751
+  },
+  {
+    "arm": "Vorzug allein",
+    "spalte": 1,
+    "n": 20,
+    "vertikal": 1.4,
+    "abschl": 4,
+    "punkte": 43.3,
+    "boden": 11.4,
+    "verteilung": {
+      "4": 7,
+      "5": 9,
+      "6": 4
+    },
+    "dauer": 0.75852898756663
+  },
+  {
+    "arm": "Vorzug allein",
+    "spalte": 2,
+    "n": 20,
+    "vertikal": 1.4,
+    "abschl": 4,
+    "punkte": 42.95,
+    "boden": 10.5,
+    "verteilung": {
+      "4": 5,
+      "5": 12,
+      "6": 3
+    },
+    "dauer": 0.8441197077433268
+  },
+  {
+    "arm": "Vorzug allein",
+    "spalte": 3,
+    "n": 20,
+    "vertikal": 1.05,
+    "abschl": 3,
+    "punkte": 43.8,
+    "boden": 9.85,
+    "verteilung": {
+      "3": 1,
+      "4": 6,
+      "5": 10,
+      "6": 3
+    },
+    "dauer": 0.7971448977788289
+  },
+  {
+    "arm": "Vorzug allein",
+    "spalte": 4,
+    "n": 20,
+    "vertikal": 1.4,
+    "abschl": 4,
+    "punkte": 41.3,
+    "boden": 13.0,
+    "verteilung": {
+      "3": 2,
+      "4": 5,
+      "5": 10,
+      "6": 3
+    },
+    "dauer": 0.8443612178166707
+  },
+  {
+    "arm": "Vorzug allein",
+    "spalte": 5,
+    "n": 20,
+    "vertikal": 1.75,
+    "abschl": 5,
+    "punkte": 38.9,
+    "boden": 9.7,
+    "verteilung": {
+      "3": 1,
+      "4": 5,
+      "5": 10,
+      "6": 4
+    },
+    "dauer": 0.8011091351509094
+  },
+  {
+    "arm": "Vorzug + Injektion",
+    "spalte": 0,
+    "n": 20,
+    "vertikal": 0.35,
+    "abschl": 1,
+    "punkte": 38.8,
+    "boden": 10.65,
+    "verteilung": {
+      "4": 8,
+      "5": 11,
+      "6": 1
+    },
+    "dauer": 0.809194537003835
+  },
+  {
+    "arm": "Vorzug + Injektion",
+    "spalte": 1,
+    "n": 20,
+    "vertikal": 1.75,
+    "abschl": 5,
+    "punkte": 44.1,
+    "boden": 11.65,
+    "verteilung": {
+      "3": 1,
+      "4": 2,
+      "5": 12,
+      "6": 5
+    },
+    "dauer": 0.8444063981374105
+  },
+  {
+    "arm": "Vorzug + Injektion",
+    "spalte": 2,
+    "n": 20,
+    "vertikal": 1.4,
+    "abschl": 4,
+    "punkte": 44.25,
+    "boden": 12.5,
+    "verteilung": {
+      "4": 10,
+      "5": 6,
+      "6": 4
+    },
+    "dauer": 0.8441971778869629
+  },
+  {
+    "arm": "Vorzug + Injektion",
+    "spalte": 3,
+    "n": 20,
+    "vertikal": 0.7,
+    "abschl": 2,
+    "punkte": 42.45,
+    "boden": 12.2,
+    "verteilung": {
+      "3": 2,
+      "4": 6,
+      "5": 11,
+      "6": 1
+    },
+    "dauer": 0.8235416452089945
+  },
+  {
+    "arm": "Vorzug + Injektion",
+    "spalte": 4,
+    "n": 20,
+    "vertikal": 1.05,
+    "abschl": 3,
+    "punkte": 42.85,
+    "boden": 9.5,
+    "verteilung": {
+      "4": 6,
+      "5": 11,
+      "6": 3
+    },
+    "dauer": 0.8648237903912862
+  },
+  {
+    "arm": "Vorzug + Injektion",
+    "spalte": 5,
+    "n": 20,
+    "vertikal": 0.35,
+    "abschl": 1,
+    "punkte": 36.9,
+    "boden": 9.9,
+    "verteilung": {
+      "4": 11,
+      "5": 8,
+      "6": 1
+    },
+    "dauer": 0.858011253674825
+  }
+]
