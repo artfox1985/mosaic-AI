@@ -22,11 +22,19 @@ tract-onnx = "0.21"
 # Abhängigkeit erhoben, kein neuer Abhängigkeitsbaum.
 memmap2 = "0.9"
 # pyo3-Version wird via `cargo add` auf die neueste 3.14-kompatible gesetzt.
+# Weg B (PREREG_gpu_inferenzpfad.md §6 Schritt 2, NUR Kennlinien-Messung, keine
+# Verdrahtung): ort-Crate mit CUDA-Execution-Provider fuer den Kennlinien-Probe
+# `examples/ort_cuda_batch_probe.rs`. Optional + `required-features` am Example
+# (siehe unten), damit `cargo build`/`cargo test --lib` ohne `--features
+# ort_cuda_probe` UNVERAENDERT bleiben -- kein neuer Zweig im Produktionscode.
+ort = { version = "=2.0.0-rc.13", optional = true, features = ["cuda"] }
 
 [features]
 # Zaehlt GameState-Klone im Such-Hot-Path (mcts.rs/net_mcts.rs) via AtomicUsize.
 # Nur fuers Profiling gedacht -- im Normalbetrieb aus (Zero-Cost, da wegkompiliert).
 clone_profiling = []
+# Schaltet die optionale ort-Abhaengigkeit frei (siehe Kommentar oben).
+ort_cuda_probe = ["dep:ort"]
 
 [dev-dependencies]
 criterion = "0.5"
@@ -34,3 +42,7 @@ criterion = "0.5"
 [[bench]]
 name = "clone_cost"
 harness = false
+
+[[example]]
+name = "ort_cuda_batch_probe"
+required-features = ["ort_cuda_probe"]
