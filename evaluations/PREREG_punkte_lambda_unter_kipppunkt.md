@@ -286,3 +286,65 @@ Replikation soll zuerst die RICHTUNG auf unabhaengigen Seeds pruefen. Ein
 Richtungswechsel bei n=400 erledigt die Frage billiger als ein n=800-Lauf, der
 dieselbe Antwort teurer gibt. Haelt die Richtung, ist n=800 die naechste Stufe --
 das steht dann als eigene Entscheidung an, nicht automatisch.
+
+---
+
+## VERDIKT DER FORTSETZUNG (2026-08-12): unentschieden, und der DENIAL-Anteil repliziert NICHT
+
+### Stufe 1 -- λ=0,2, Erwartung vorab getroffen
+
+Kontrollprobe: **400/400 Partien identisch** zur alten Kontrolle -- die
+Shaping-Formel-Aenderungen des Abends beruehren den λ-Pfad nicht.
+
+| Arm | Siege | Δ eigen | Δ Gegner | Δ MARGE | t |
+| --- | ----: | ------: | -------: | ------: | -: |
+| λ=0,1 | 323/400 | +0,85 | -1,14 | **+1,99** | 1,42 |
+| λ=0,2 | 321/400 | -0,07 | **-1,44** | +1,37 | 1,19 |
+| λ=0,4 | 319/400 | -0,40 | -0,76 | +0,36 | 0,26 |
+
+λ=0,2 liegt zwischen den bekannten Werten -- die vorab notierte Erwartung ist
+getroffen, die Dosis-Wirkung ist monoton fallend. Der Zielkonflikt ist sauber
+sichtbar: von 0,1 auf 0,2 wird der Gegner STAERKER gedrueckt (-1,14 -> -1,44),
+aber die eigenen Punkte gehen mit (+0,85 -> -0,07), sodass die Marge faellt. Bei
+0,4 drueckt es den Gegner nicht einmal mehr gut.
+
+Bester Arm nach der vorab benannten Metrik: **λ=0,1**.
+
+### Stufe 2 -- Replikation auf frischen Seeds (20260812, n=400)
+
+Seed-Probe: **0/400** Kontrollpartien gleich zum Erstlauf -- die Seeds sind
+unabhaengig.
+
+| Lauf | Δ eigen | Δ Gegner | Δ MARGE | SE | t |
+| ---- | ------: | -------: | ------: | -: | -: |
+| Erstlauf (20260902) | +0,85 | **-1,14** | +1,99 | 1,40 | 1,42 |
+| Replikation (20260812) | +1,36 | **+0,81** | +0,55 | 1,04 | **0,53** |
+
+**Erfolgskriterium war "gleiche Richtung UND t >= 2".** Die Richtung haelt, t=0,53
+nicht. Damit gilt das vorab festgeschriebene Urteil: **weiter unentschieden, mehr
+Power noetig -- NICHT bestaetigt.** Gepoolt liegt die Marge bei ~+1,27 mit t~1,45;
+auch n=800 reicht nicht.
+
+### Der wichtigere Befund steckt in der Zerlegung
+
+- **Eigene Punkte: in beiden Laeufen positiv** (+0,85 / +1,36). Konsistent.
+- **Gegnerpunkte: -1,14, dann +0,81.** VORZEICHENWECHSEL.
+
+Der Margengewinn der Replikation kommt vollstaendig aus den eigenen Punkten, nicht
+aus dem Druecken des Gegners. **Der Denial-Anteil, fuer den λ der Regler IST,
+repliziert nicht.** Fuer die Nutzer-Zielgroesse ("sieg mit vielen punkten und den
+gegner so gut es geht stoeren") heisst das: die erste Haelfte ist plausibel, die
+zweite ist durch zwei Laeufe nicht belegt.
+
+Das relativiert auch meine Lesart aus Stufe 1 ("starkes Denial kostet mehr als es
+nimmt"). Sie beschrieb eine monotone Reihe, die im Erstlauf existierte; wenn das
+Vorzeichen des Gegner-Effekts zwischen Laeufen kippt, war die Monotonie
+womoeglich Rauschen mit Struktur. **Als Herleitung markiert, nicht als Befund.**
+
+### Was daraus folgt
+
+`POINTS_UTILITY_WEIGHT` bleibt 0. Nicht weil der Kanal nichts tut -- er aendert
+372 von 400 Partien --, sondern weil zwei Laeufe mit n=400 die Richtung nicht
+sichern und der Mechanismus, der ihn begruenden wuerde, nicht repliziert. Wer ihn
+wieder aufgreift, braucht n>=800 auf frischen Seeds UND eine Erklaerung, warum der
+Gegner-Effekt zwischen Laeufen das Vorzeichen wechselt.
