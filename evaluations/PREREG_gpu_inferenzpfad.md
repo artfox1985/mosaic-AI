@@ -102,3 +102,79 @@ vorher, weil erst der Pfad den Batch-Startwert begründet.
 Begründung: Weg A braucht **keine neue Abhängigkeit** und seine Messung ist ein
 IPC-Rundlauf, also billig. Weg B verlangt einen neuen Abhängigkeitsbaum, bevor
 überhaupt eine Zahl vorliegt.
+
+
+---
+
+## 7. WEG A GEBAUT (2026-08-12) — Kanal steht, Abnahme NICHT bestanden
+
+`MOSAIC_TORCH_IPC_ENABLED=1` (Default aus): Rust schickt die Blatt-Merkmale über
+eine dateigestützte `mmap` an `tools/torch_ipc_server.py` (torch), Signalisierung
+über TCP-Loopback. Neu: `engine/src/net_ipc.rs`, eingehängt in
+`net.rs:357-375` (`Net::eval_batch`), `memmap2` als Abhängigkeit.
+
+`cargo test --lib` **375 bestanden / 15 ignoriert** (Baseline 366/14, also +9 neue
+Unit-Tests und +1 ignorierter Toleranztest, keine Regression).
+
+### Paritätsprobe: hält — SELBST GEPRÜFT nach Wheel-Neubau
+
+Der Agent konnte das nicht zeigen (er durfte kein Wheel bauen, die installierte
+`.pyd` war älter als seine Änderungen). Nach meinem Neubau und Install:
+
+    PARITAETS-HASH: 8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423
+    OK -- Defaults sind byte-identisch zum Bestand.
+
+Bei ausgeschaltetem Knopf ist der Bestand also unberührt, wie §2 es verlangt.
+
+### Der TOLERANZ-Vergleich: drei von vier Köpfen bestehen, der POLICY-Kopf NICHT
+
+Gemessen vom Agenten (Batches 1/2/5/16, CPU, `v20_2d_opp_brierbest`), Toleranz
+1e-5 nach dem Präzedenzfall `net.rs:820/830/864/875`:
+
+| Kopf | max. Abweichung tract gegen torch | gegen 1e-5 |
+| ---- | --------------------------------: | ---------- |
+| value | 0,00000048 | bestanden |
+| moon | 0,00000131 | bestanden |
+| points | 0,00000051 | bestanden |
+| **policy** | **0,00003433** | **VERFEHLT, Faktor 3,4** |
+
+**Der Agent hat die Testzusicherung NICHT aufgeweicht** -- der Test schlägt beim
+`--ignored`-Aufruf ehrlich fehl. Das ist die richtige Entscheidung: eine
+angepasste Toleranz hätte den Befund verschwinden lassen, statt ihn zu zeigen.
+
+### Was der Policy-Befund bedeutet, und was NICHT
+
+**Ungeprüfte Erklärung des Agenten**, hier als solche markiert: Policy sind 406
+unbeschränkte rohe Logits ohne Tanh, während die drei bestehenden Köpfe
+tanh-begrenzt sind -- größere absolute Werte häufen über ONNX/tract gegen
+Eager-Torch mehr Gleitkomma-Drift an.
+
+Das ist plausibel und es ist **nicht dasselbe wie harmlos**. Der Policy-Kopf setzt
+die Priors der Gumbel-Wurzelauswahl. Ob eine Abweichung von 3,4e-5 auf Logits die
+Auswahl je kippt, ist eine EIGENE Frage, und sie ist offen. Zwei Wege, sie zu
+beantworten, keiner davon gefahren:
+
+1. **Auf die Auswahl messen statt auf die Zahl**: dieselbe Wurzelstellung mit
+   beiden Pfaden, und zählen, wie oft die Gumbel-Top-m-Menge und der gewählte Zug
+   abweichen. Das ist die Größe, die zählt -- eine Logit-Differenz, die die
+   Rangfolge nicht ändert, ist gleichgültig.
+2. **Toleranz begründet neu setzen**: 1e-5 stammt aus dem tract-gegen-tract-
+   Vergleich verschiedener Batch-Pläne. Für tract-gegen-torch ist sie
+   möglicherweise die falsche Marke -- aber eine neue Marke braucht eine
+   Begründung aus der Wirkung, nicht aus dem Wunsch, den Test grün zu sehen.
+
+**Weg A ist damit gebaut und nicht abgenommen.** Der Kanal funktioniert, die
+Parität bei Default hält, und die offene Frage ist präzise: kippt die
+Policy-Abweichung die Zugwahl?
+
+### Zuschnitt-Vorbehalte (Agenten-Entscheidungen, nachträglich bewertet)
+
+- Batch-Deckel **16**, nicht 256: `eval_batch` deckelt heute bei
+  `EVAL_BATCH_MAX_N`. Damit ist der gemessene Durchsatzvorteil (Batch 140-590)
+  mit diesem Stand **noch nicht abrufbar** -- er kommt erst mit der Verschränkung,
+  die §5 ausdrücklich ausschliesst. Der Kanal ist Vorarbeit, kein Gewinn.
+- `eval_batch` hatte vor dem Umbau **keinen Produktions-Aufrufer** (nur Tests).
+  Der Knopf berührt den heutigen Suchpfad also gar nicht -- das erklärt die
+  gehaltene Parität und begrenzt gleichzeitig die Aussagekraft des Umbaus.
+- Kein Retry nach einmal erkannter Nichterreichbarkeit: ein später gestarteter
+  Server wird erst nach Rust-Neustart gesehen.
