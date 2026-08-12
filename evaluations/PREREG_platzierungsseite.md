@@ -446,3 +446,58 @@ Musterreihen einmal, 42 fuer zwei Spalten, in fuenf Runden).
 Die Schwelle fuer "Versorgung hilft" ist vorab auf **+0,70 vertikale Punkte**
 gesetzt (= zwei Spalten mehr in 20 Partien); alles darunter ist bei der auf 0,35
 gequantelten Metrik nicht unterscheidbar.
+
+---
+
+## 13. DURCHSATZ-ERWARTUNG ZURUECKGEZOGEN (Nutzer, 2026-08-12)
+
+*"ist möglich und wird regelmäßig von menschlichen spielern so gemacht"* -- zu zwei
+geschlossenen Spalten (14 Punkte) in einer Partie.
+
+Ich hatte in Abschnitt 10 notiert, ich hielte den DURCHSATZ fuer die
+wahrscheinlichste Ursache, und das mit "21 Fliesen fuer alle sechs Musterreihen
+einmal, 42 fuer zwei Spalten" begruendet. **Die Rechnung war falsch, in zwei
+Punkten, und beide haette ich wissen muessen:**
+
+1. **Spezialfelder fuellen Zellen OHNE Fliese.** `dome.rs:54-59`: `is_filled()`
+   liefert fuer `SpaceType::Special` den Wert `placed_special`. Ich habe das in
+   Abschnitt 9 selbst belegt und in der Oekonomie-Rechnung dann nicht angewandt.
+   Mit zwei Spezialfeldern in einer Spalte braucht sie VIER Lieferungen, nicht
+   sechs.
+2. **Die billigen Musterreihen sind waehlbar.** Reihe 0 kostet 1 Fliese, Reihe 5
+   kostet 6 (`board.rs:31-33`: `capacity = row_index + 1`). Vier billige Reihen
+   sind 1+2+3+4 = **10 Fliesen**, nicht 21 -- und ueber fuenf Runden liefert jede
+   Reihe mehrfach. Meine Rechnung hat die TEUERSTE mögliche Route angesetzt und
+   sie dann fuer die einzige gehalten.
+
+**Folge**: der Zielwert 14 ist erreichbar, und zwar nach Nutzer-Auskunft aus dem
+tatsaechlichen Spiel routinemaessig. Damit ist die Durchsatz-Erklaerung
+gestrichen, bevor sie gemessen wurde -- und mit ihr meine letzte oekonomische
+Ausrede.
+
+### Was nach Drafting, Platzierung und Durchsatz noch bleibt
+
+Die Deckenprobe (§12) laeuft und klaert die Versorgung. Faellt auch die weg, bleibt
+die Ursache im Lernen und in der Sichtweite, nicht im Spiel:
+
+1. **Die Suchtiefe reicht ueber Rundengrenzen nicht.** Eine Spalte zu bauen ist
+   eine Absicht ueber drei bis fuenf Runden. Das ist genau die
+   "Rundenvorausschau", die im Projekt als HARTE Anforderung gilt (siehe
+   `feedback_dfs_leaf_ruled_out`: rundenuebergreifende Weitsicht ist nicht
+   verhandelbar). 400 Simulationen mit Rundenuebergangs-Sampling sehen eine
+   Absicht ueber vier Runden womoeglich nicht.
+2. **Das Netz hat solches Spiel nie gesehen.** Der Korpus stammt aus Self-Play
+   eines Champions, der keine Spalten baut -- die Politik kann nicht bewerten, was
+   in ihrer eigenen Erfahrung nicht vorkommt. Das ist ein
+   Verteilungs-Henne-Ei-Problem, und es ist GENAU das, wofuer der Nutzer-Plan die
+   Injektion vorgesehen hat: injizieren, damit die Zuege ueberhaupt vorkommen,
+   daraus Self-Play mit gestreutem Gewicht erzeugen
+   (`PREREG_injektion_wertungsplatten.md` N2), den Ownership-Kopf daran lernen
+   lassen, dann die Injektion abschalten.
+
+**Punkt 2 ist die Lesart, die zu allen Messungen dieser Nacht passt**: die
+Injektion HAT das Verhalten bewegt (1,05 -> 2,10, also verdoppelt), aber sie kann
+in einer einzigen Arena-Partie nur die Zugwahl verschieben, nicht die Bewertung
+neu lernen. Der Sprung auf 14 waere dann kein Injektions-Ergebnis, sondern ein
+TRAININGS-Ergebnis -- und die Injektion nur das Werkzeug, das den Korpus dafuer
+erzeugt. **Als Lesart markiert, nicht gemessen.**
