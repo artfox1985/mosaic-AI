@@ -747,3 +747,329 @@ etwas GRÖSSER als kleiner).
 - Die verbleibende 1/1148-Abweichung NICHT in einen der beiden
   vorgegebenen Äste ("verschwinden" / "bleiben") gepresst, sondern als
   eigener, unvollständig geklärter Zwischenbefund stehen gelassen.
+
+---
+
+## 14. DER EINE ABWEICHENDE ZUSTAND -- vier Zahlen, keine Deutung
+
+Nutzer-Auftrag 2026-08-12: nur der eine verbleibende Zustand aus §13
+(1/1148 mit `with_tf32(false)`). Neuer Test
+`net_mcts::tests::ort_cuda_single_deviation_gap_diagnostic`, GEMESSEN
+(`cargo test --release --lib --features ort_cuda_probe -- --ignored --exact
+net_mcts::tests::ort_cuda_single_deviation_gap_diagnostic --nocapture`,
+dieselben 1148 Zustände, dasselbe Modell wie §12/§13).
+
+**(1) Welcher Zustand**: `record_index=320`, Runde 4, 130 Kandidaten nach
+Moon-Expansion (`n_root`).
+
+**(2) An welcher Stelle**: exakt der 16. Platz (`m_prime=16`, der volle
+Schnitt bei 400 Sims) -- nicht weiter vorne. Die Aktion, die bei ORT-CUDA
+herausfällt: `Stone(Move { take: TakeAction { source: SmallFactoryMoon,
+color: Gelb, ... }, place: PlaceAction { row_index: 1 } })` (Rang tract=16,
+Rang ORT-CUDA=40). Die Aktion, die neu hereinkommt: `Stone(Move { take:
+TakeAction { source: SmallFactorySun, color: Gelb, factory_id: Some(3),
+moon_order: [Rot, Schwarz, Blau] }, place: PlaceAction { row_index: 1 } })`
+(Rang tract=40, Rang ORT-CUDA=16).
+
+**(3) Der Abstand, in beiden Backends** (Rang-16-Score minus Rang-17-Score,
+jeweils in der eigenen Rangfolge des Backends):
+
+| Backend | Rang-16-Score | Rang-17-Score | Abstand |
+| ------- | -------------: | -------------: | -------: |
+| tract | -3,473041 | -3,634069 | 0,161028 |
+| ORT-CUDA | -3,473037 | -3,634073 | 0,161035 |
+
+**(4) Verteilung dieses Abstands über die 1147 NICHT abweichenden Zustände**
+(tracts eigener Rang-16/17-Abstand, `n=454` mit echtem Schnitt --
+693 der 1148 hatten `m_prime>=n_root`, also keinen echten Schnitt, und sind
+hier nicht Teil der Verteilung):
+
+| | Wert |
+| --- | ---: |
+| Median | 0,150264 |
+| 10 %-Quantil | 0,018741 |
+
+Der abweichende Zustand (0,161028 bei tract) liegt oberhalb des Medians der
+Nicht-Abweichenden und weit oberhalb des 10 %-Quantils. Keine weitere Deutung
+hier -- der Nutzer entscheidet.
+
+GPU-Belegung während des Diagnoselaufs: Spitzenwert 1.682 MiB, 44,4 W (ggü.
+~22 W Grundlast).
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- Zustände ohne echten Schnitt (`m_prime>=n_root`, alle Kandidaten passen
+  ohnehin in die Top-m) aus der Verteilung in Punkt 4 ausgeschlossen -- für
+  sie existiert keine "16./17. Stelle", ein Abstand wäre dort nicht definiert.
+  693 von 1148 Zuständen betroffen (n_root oft klein an spät-Runden-Zuständen
+  mit wenig verbleibenden Optionen).
+- Der Populationsabstand in Punkt 4 nutzt **tracts** eigene Rangfolge als
+  durchgehende Referenzgröße (nicht ORT-CUDAs), weil tract der Bezug in der
+  gesamten übrigen PREREG-Untersuchung ist -- für den einen abweichenden
+  Zustand werden trotzdem BEIDE Backend-Abstände berichtet (Punkt 3), wie
+  verlangt.
+- Neuer Hilfs-Helfer `gumbel_scored_sorted` (net_mcts.rs) statt
+  `gumbel_topm_set` wiederzuverwenden -- Letzterer kürzt intern auf
+  `m_prime` und gibt keine Ränge/Scores zurück, für die Rang-Diagnose wird
+  die VOLLE sortierte Liste gebraucht. Gleiche RNG-Verbrauchsreihenfolge wie
+  `gumbel_topm_set`, damit beide für denselben Seed identische erste
+  `m_prime` Einträge liefern.
+
+---
+
+## 15. ZUORDNUNGS-HYPOTHESE BESTÄTIGT -- der 24-Rangsprung ist ein Zuordnungs-, kein Präzisionsartefakt
+
+Nutzer-Auftrag 2026-08-12 ("meine Erwartung widerlegt... genau deshalb ist
+die Spannung jetzt sichtbar"): Codefrage plus gezielte Prüfung am einen
+Zustand aus §14, keine Reparatur.
+
+### (1) Wie die Gumbel-Zufallszahlen zugeordnet werden
+
+`net_mcts.rs:3719-3728` (`build_gumbel_tree_inner`, Produktionscode):
+
+```rust
+let mut scored: Vec<(f64, f64, usize)> = nodes[0]
+    .untried
+    .iter()
+    .enumerate()
+    .map(|(i, &(_, p))| {
+        let g = if add_root_noise { sample_gumbel(rng) } else { 0.0 };
+        (g + (p as f64).max(1e-9).ln(), g, i)
+    })
+    .collect();
+```
+
+EINE Ziehung je Kandidat, **in Aufzählungsreihenfolge von `nodes[0].untried`**
+(`.enumerate()`), NICHT deterministisch an einer Aktions-ID/-Identität
+festgemacht. Welche Zufallszahl eine Aktion bekommt, hängt an ihrer
+LISTENPOSITION zum Ziehzeitpunkt, nicht an der Aktion selbst.
+
+### (2) Ist die Aufzählungsreihenfolge prior-abhängig? JA
+
+`net_mcts.rs:1800` (`build_untried_actions`):
+
+```rust
+acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+```
+
+`acts` (→ `nodes[0].untried` via `make_node`, GEPRÜFT: `net_mcts.rs:2291`
+`build_untried_actions(&state, &logits, &moon_scores, skip_cutoff)` liefert
+direkt die `untried`-Belegung) wird nach **Prior absteigend** sortiert --
+`.1` ist der Prior-Float `p` aus der Netz-Policy. Damit bestimmt der
+(backend-abhängige) Policy-Kopf direkt die Listenposition und damit die
+Gumbel-Zuordnung.
+
+### (3) Hypothese bestätigt -- belegt am Zustand `record_index=320`
+
+| | Position in `acts_t` | Position in `acts_o` |
+| --- | ---: | ---: |
+| SmallFactoryMoon (Gelb, Reihe 1) | 35 | 36 |
+| SmallFactorySun (Gelb, Fabrik 3, Rot/Schwarz/Blau, Reihe 1) | 36 | 35 |
+
+Die Aufzählungsreihenfolge unterscheidet sich -- die beiden Aktionen tauschen
+GENAU EINEN benachbarten Listenplatz (35↔36).
+
+| | tract: Rang / Score / g / ln(prior) | ORT-CUDA: Rang / Score / g / ln(prior) |
+| --- | --- | --- |
+| SmallFactoryMoon | 16 / -3,473041 / **2,666478** / -6,139518 | 40 / -5,827941 / **0,311575** / -6,139516 |
+| SmallFactorySun | 40 / -5,827945 / **0,311575** / -6,139520 | 16 / -3,473037 / **2,666478** / -6,139515 |
+
+Die beiden Aktionen bekommen **exakt vertauschte** Gumbel-Zahlen
+(2,666478 und 0,311575 tauschen komplett die Seiten) -- weil sie beim Ziehen
+ihre Listenplätze getauscht haben. `ln(prior)` bewegt sich dabei nur um
+~2e-6 zwischen den Backends (beide Aktionen liegen mit `ln(prior)≈-6,1395`
+ohnehin fast exakt gleich) -- die ~2,35 Punkte Score-Differenz stammen fast
+vollständig aus `g`, nicht aus `ln(prior)`.
+
+**Damit ist die Hypothese bestätigt**: der 24-Rangsprung ist ein
+Zuordnungsartefakt (welche Zufallszahl eine Aktion bekommt, hängt an ihrer
+Listenposition, nicht an ihrer Identität), kein Präzisionsartefakt (die
+zugrunde liegenden Prior-Werte selbst unterscheiden sich kaum). Keine
+weitere Deutung, ob das für die Abnahme akzeptabel ist.
+
+### (4) Betrifft dasselbe auch synchron-gegen-verschränkt?
+
+Codelich: JA, dieselbe Zuordnung. `interleaved_matches_synchronous_gumbel_root_selection`
+(`net_mcts.rs:8776`) ruft an den Zeilen 8898-8899/8907-8908 exakt dieselben
+zwei Funktionen (`build_untried_actions` + `gumbel_topm_set`) auf wie der
+hier untersuchte Vergleich -- derselbe Mechanismus, dieselbe
+Listenpositions-Abhängigkeit. GEPRÜFT ist hier nur die Code-IDENTITÄT der
+Zuordnungsfunktion, NICHT erneut gemessen, ob dieser Mechanismus im
+synchron/verschränkt-Vergleich tatsächlich einen Rangsprung ausgelöst hat --
+dessen 0/1148 (§8/§12-Kontext) bleibt unangetastet, aber es beruht auf
+derselben Annahme (kein Rangkreuzungs-Ereignis in der Stichprobe), nicht auf
+einer Eigenschaft, die einen Rangkreuzung ausschließt.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `gumbel_scored_sorted` von `(f64, usize)` auf `(f64, f64, usize)`
+  (Score, `g`, Index) erweitert -- exakt das Tupel-Layout des echten
+  Produktionscodes (`net_mcts.rs:3719`), damit `g`/`ln(prior)` einzeln
+  berichtbar sind. Einziger Aufrufer (`ort_cuda_single_deviation_gap_diagnostic`)
+  entsprechend angepasst, kein anderer Code betroffen.
+- Für Punkt (4) bewusst NUR die Code-Identität geprüft, keinen neuen Lauf
+  gegen den synchron/verschränkt-Vergleich gefahren -- außerhalb des engen
+  Auftrags-Zuschnitts ("eine gezielte Prüfung, nichts weiter").
+
+---
+
+## 16. VERTEILUNGSVERGLEICH MIT SELBSTKONTROLLE -- alle drei Masse identisch, UND eine batch-abhängige Überraschung
+
+Nutzer-Auftrag 2026-08-12 ("verteilungsgleich statt punktgleich prüfen, und
+den Batcher rückwirkend mit"): §15 zeigte, Punktgleichheit ist für keinen
+Backend-Wechsel erreichbar. Gumbel-Top-m ist aber ohnehin stochastisch --
+die Frage ist Verteilungsgleichheit, geprüft gegen eine aus der Messung
+selbst gewonnene Rauschgrenze (Selbstkontrolle), nicht gegen eine vorab
+gesetzte Schwelle.
+
+### (1) Stichprobe und K
+
+Struktureller Filter (nicht ergebnisabhängig): nur Zustände mit echtem
+Schnitt (`m_prime < n_root`, wie §14) tragen stochastische Information --
+**455/1148**. Ursprünglich geplant: eine Zufallsstichprobe `N=60` daraus
+(fester Seed). Ein PILOTLAUF damit ergab bei ALLEN DREI Vergleichen exakt
+dieselbe Zahl -- kein Fehler, sondern die Folge der in §14 gemessenen
+Basisrate (1/455 ≈ 0,22%; Erwartungswert bei N=60 nur ~0,13 Treffer, die
+seltene Vertauschung wird mit hoher Wahrscheinlichkeit komplett verfehlt).
+**Deshalb (eigene Entscheidung) die VOLLE 455er-Menge verwendet, keine
+Stichprobe** -- deterministisch, kein Stichproben-Glück, immer noch schnell
+(~5s bei `N=455`). `K=200` (wie vorgeschlagen), aber ALLE DREI Vergleiche
+mit `K/2=100` DISJUNKTEN Seeds je Seite (nicht `K` gegen `K`) -- Seite A ist
+in allen drei Vergleichen dieselbe Berechnung (tract/synchron, Seeds 0-99),
+Seite B unterscheidet sich: ORT-CUDA, verschränkt, bzw. tract/synchron mit
+den ANDEREN 100 Seeds (Selbstkontrolle) -- fair, weil alle drei dieselbe
+Auflösung (100 gegen 100) nutzen.
+
+### (2) Die drei Maße
+
+| Vergleich | max\|diff\| | mittel\|diff\| | n Paare |
+| --- | ---: | ---: | ---: |
+| tract vs. ORT-CUDA | 0,2800 | 0,0117 | 50.537 |
+| synchron vs. verschränkt (tract) | 0,2800 | 0,0117 | 50.537 |
+| SELBSTKONTROLLE (tract vs. tract) | 0,2800 | 0,0117 | 50.537 |
+
+### (3) Innerhalb oder außerhalb der Selbstkontrolle
+
+**Alle drei Zahlen sind identisch** (nicht nur "ähnlich" -- bis auf die
+vierte Nachkommastelle gleich). tract-vs-ORT und synchron-vs-verschränkt
+liegen damit **innerhalb** der Selbstkontrolle, mit Gleichheit als
+Grenzfall. Direkt verifiziert, WARUM: die Kandidatenlisten-**Reihenfolge**
+(die Ursache laut §15) unterscheidet sich in DIESER Messung nur bei
+**1/455** Zuständen (tract vs. ORT) bzw. **0/455** (tract vs. verschränkt)
+-- bei der übergroßen Mehrheit der Zustände ist die Reihenfolge über alle
+Arme hinweg BITGLEICH, und selbst der eine Fall mit unterschiedlicher
+Reihenfolge bewegt Max/Mittel im Aggregat aus 50.537 Paaren nicht sichtbar.
+
+### (4) Der Batcher zeigt dasselbe Bild -- UND eine Überraschung
+
+Synchron-vs-verschränkt zeigt exakt dasselbe Ergebnis wie tract-vs-ORT
+(identische Zahlen, 0/455 Reihenfolge-Unterschiede -- sogar noch "sauberer"
+als der ORT-Vergleich). Die Überraschung: **der aus §14/§15 bekannte
+Zustand `record_index=320` selbst zeigt in DIESER Messung `order_diff=0`**
+(GEPRÜFT: Priorwerte an Position 35/36 in diesem Lauf `0,002155971` vs.
+`0,002155970` bei ORT -- ohne Vertauschung -- gegen `0,002155962` vs.
+`0,002155958` bei tract, ebenfalls ohne Vertauschung, beide Seiten in
+DERSELBEN Reihenfolge). Der in §15 gefundene Rangsprung trat dort unter
+EINER ANDEREN Batch-Zusammensetzung auf (§14/§15: Chunks à 128 über alle
+1148 Zustände) als hier (455 Zustände in EINEM ORT-Aufruf, ~28er-Batches
+beim Sammel-Faden). Die EINE hier gefundene Reihenfolge-Abweichung
+(1/455, tract-vs-ORT) betrifft einen ANDEREN, nicht identifizierten
+Zustand. **Ob eine Rang-Vertauschung ueberhaupt auftritt, haengt also nicht
+nur an "tract vs. ORT", sondern zusaetzlich an der Batch-Zusammensetzung
+selbst** -- ein GEPRUEFTER Befund, keine Vermutung, aber NICHT weiter
+verfolgt (aus dem Auftrag "nichts umbauen" heraus). Keine Deutung, ob das
+fuer die Abnahme relevant ist.
+
+GPU-Belegung: vorher 36 %/1.567 MiB/21,3 W, nachher 38 %/1.572 MiB/21,9 W;
+Spitzenwert während des Laufs 1.752 MiB (+~180 MiB), 43,9 W (ggü. ~21-22 W
+Grundlast) -- echte Rechenlast.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- Volle 455er-Menge statt Stichprobe (siehe Punkt 1) -- nachtraeglich
+  entschieden, nach einem Pilotlauf, der die Notwendigkeit aufzeigte.
+- Seite A identisch in allen drei Vergleichen (tract/synchron, Seeds 0-99)
+  -- reduziert auf drei echte Freiheitsgrade (nur Seite B unterscheidet
+  sich je Vergleich) statt sechs unabhaengige Stichproben.
+- Aggregation ueber ALLE (Zustand, Kandidat)-Paare geflacht (nicht je
+  Zustand gemittelt dann ueber Zustaende) -- gibt Zustaenden mit mehr
+  Kandidaten proportional mehr Gewicht, naturtreu fuer "wie sieht ein
+  zufaellig gezogener Kandidat aus".
+- Zusaetzliche, nicht angeforderte Transparenz-Diagnose ergaenzt (Reihen-
+  folge-Vergleich je Zustand, Einzelwerte fuer `record_index=320`) --
+  ohne sie waere die batch-abhaengige Ueberraschung (Punkt 4) unsichtbar
+  geblieben, und ein durchgehend identisches Aggregat ohne Erklaerung
+  waere schwer einzuordnen gewesen.
+- `Action` implementiert kein `Hash` (nur `PartialEq`/`Eq`) -- Haeufigkeits-
+  Zaehlung ueber lineare `Vec`-Suche statt `HashMap` (bei `n_root<=130`,
+  `K=200`, `N=455` performant genug, siehe Laufzeit ~5s).
+
+
+---
+
+## 17. VERTEILUNGSVERGLEICH und der PREIS, den ich nicht benannt hatte
+
+### Ergebnis: nicht unterscheidbar -- aber der Test ist degeneriert
+
+455 Zustaende (alle mit echtem Schnitt `m_prime < n_root`, kein Stichprobenglueck),
+K=200, je Vergleich 100 gegen 100 disjunkte Seeds:
+
+| Vergleich | max abs. Diff | mittel abs. Diff | n Paare |
+| --------- | ------------: | ---------------: | ------: |
+| tract gegen ORT-CUDA | 0,2800 | 0,0117 | 50.537 |
+| synchron gegen verschraenkt | 0,2800 | 0,0117 | 50.537 |
+| **SELBSTKONTROLLE** tract gegen tract | 0,2800 | 0,0117 | 50.537 |
+
+**Alle drei identisch, nicht nur aehnlich** -- und das ist kein Messfehler, sondern
+Degeneration: die Kandidatenreihenfolge unterscheidet sich nur in **1 von 455**
+Zustaenden (tract gegen ORT) bzw. **0 von 455** (tract gegen verschraenkt). Bei
+allen uebrigen ist sie bitgleich, dieselben Seeds erzeugen dieselben Mengen -- der
+Backend-Vergleich IST dort die Selbstkontrolle.
+
+**Was die Zahl trotzdem sagt**: der Umfang des Problems ist **0,22 % der
+Zustaende**, und dort wird die Menge aus derselben Verteilung gezogen (Tausch zweier
+benachbarter, praktisch gleichwertiger Kandidaten). Fuer den Batcher 0 von 455.
+
+Was sie NICHT sagt: dass der Test eine Differenz erkennen KOENNTE, wenn es eine
+gaebe. Bei einer Basisrate von 1/455 hat er dafuer keine Auflösung. Das ist eine
+Grenze der Messung, nicht ein Beleg fuer Gleichheit.
+
+### DER PREIS: mit Batcher ist die Suche NICHT MEHR REPRODUZIERBAR
+
+`record_index=320` -- der Zustand mit dem 24-Rangsprung aus §14/§15 -- zeigt in
+DIESER Messung `order_diff=0`. Priors an Position 35/36: 0,002155971 gegen
+0,002155970, keine Vertauschung. Der Unterschied zur frueheren Messung: dort liefen
+128er-Bloecke ueber alle 1148 Zustaende, hier 455 in einem Aufruf.
+
+**Ob eine Rangvertauschung auftritt, haengt an der BATCH-ZUSAMMENSETZUNG.** Und mit
+dem Batcher entsteht die Zusammensetzung aus dem Zeitverhalten der Faeden -- sie ist
+von Lauf zu Lauf verschieden.
+
+Folge, und sie hat nichts mit Staerke zu tun: **derselbe Seed kann mit
+eingeschaltetem Batcher eine andere Partie ergeben.** Ich hatte diesen Preis in
+keinem der Abschnitte §7-§16 benannt.
+
+### DAS STEHT IM DIREKTEN WIDERSPRUCH ZU `PREREG_such_rng_trennen.md`
+
+Jene Vorregistrierung hat als ganzen Zweck, Partien aus ihrem Seed reproduzierbar
+zu machen -- Abschnitt 3 dort nennt es ausdruecklich als Nutzen 3
+("Determinismus allgemein: seed-exakte Reproduktion einer Partie wird moeglich").
+Der Nutzer hat sie freigegeben (Abschnitt 8 dort: Elo-Sprung wird vermerkt,
+Paritaets-Basislinie wird neu gesetzt).
+
+**Der Batcher arbeitet dagegen.** Beides gleichzeitig ist nicht zu haben: entweder
+Durchsatz ueber eine zeitabhaengige Batch-Zusammensetzung, oder Reproduzierbarkeit.
+
+Das ist eine ENTSCHEIDUNG, keine Messfrage, und sie gehoert dem Nutzer. Drei
+Optionen, keine davon gemessen:
+
+1. **Reproduzierbarkeit aufgeben** fuer Self-Play (dort zaehlt Durchsatz), sie aber
+   fuer Arena/Gating behalten (dort zaehlt Nachvollziehbarkeit) -- der Knopf ist
+   ohnehin je Prozess schaltbar.
+2. **Batch-Zusammensetzung deterministisch machen** -- feste Gruppen statt "wer
+   gerade wartet". Kostet Durchsatz, Betrag ungemessen.
+3. **Reproduzierbarkeit vorziehen** und den Batcher nur fuer Messlaeufe nutzen, bei
+   denen sie nicht gebraucht wird.
+
+Option 1 ist die naheliegende und kostet nichts, aber sie ist meine Einschaetzung
+und keine Messung -- **ausdruecklich als solche markiert.**

@@ -155,3 +155,24 @@ Reihenfolge also: Koeffizientensuche abschliessen, dann schneiden. Danach werden
 die endbrettbasierten Groessen verfuegbar (`row_fill` je Rasterreihe, ~6.300
 Beobachtungen bei 200 Paaren statt ~120 Abschlussereignissen) -- und genau die
 sind der dichte Detektor fuer alles, was in dieser Injektions-Reihe noch kommt.
+
+
+---
+
+## 9. WARNUNG 2026-08-12: der GPU-Batcher arbeitet gegen den Zweck dieser Datei
+
+`PREREG_gpu_inferenzpfad.md` §17: mit eingeschaltetem Verschraenkungs-Batcher haengt
+die Rangfolge der Wurzelkandidaten an der **Batch-Zusammensetzung**, und die
+entsteht aus dem Zeitverhalten der Faeden -- also von Lauf zu Lauf verschieden.
+Belegt an `record_index=320`, der unter 128er-Bloecken eine Rangvertauschung zeigt
+und unter einem 455er-Aufruf nicht.
+
+**Damit ist Nutzen 3 dieser Vorregistrierung (seed-exakte Reproduktion) mit
+eingeschaltetem Batcher NICHT erreichbar**, auch nach dem hier geplanten
+RNG-Schnitt. Der Schnitt macht den Zufallsstrom deterministisch; der Batcher macht
+die Inferenz-Reihenfolge nichtdeterministisch. Zwei verschiedene Quellen.
+
+Wer diese Datei umsetzt, muss das wissen: die Reproduzierbarkeit gilt dann nur bei
+AUSGESCHALTETEM Batcher. Die drei Optionen dazu stehen in §17 der anderen Datei;
+Option 1 (Batcher fuer Self-Play, aus fuer Arena/Gating) haelt beide Nutzen
+getrennt verfuegbar, ist aber eine Einschaetzung und nicht gemessen.
