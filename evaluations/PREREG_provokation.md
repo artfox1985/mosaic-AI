@@ -171,3 +171,60 @@ die Beschneidung deshalb fast nie in ihren Fallback läuft.
 Bis eine Fassung >= 7,00 erreicht, geht kein Korpus ins Self-Play. Ein Korpus aus
 Partien mit Endstand 8 und Strafleiste 22 wäre schädlicher als keiner — er würde
 dem Netz beibringen, dass Spaltenbau mit Zusammenbruch einhergeht.
+
+
+---
+
+## 8. NEUEINORDNUNG (Nutzer, 2026-08-12): die Provokation ist ein DIAGNOSEINSTRUMENT
+
+*"die provokation an sich ist schon in ordnung damit wir wissen welche
+stellschrauben zu drehen sind"*
+
+Ich hatte sie nach der verfehlten Abnahme als eigenen Irrweg abgetan ("meine
+Erfindung, nicht der Plan"). Das war falsch: ihr Wert liegt nicht darin, Spalten zu
+PRODUZIEREN, sondern darin zu zeigen, WAS bricht, wenn man die Absicht erzwingt.
+Und sie hat geliefert.
+
+### Was sie zeigt
+
+Erzwingt man die Farbbindung, bricht **nicht** der Spaltenbau -- der bleibt bei 3-4
+Abschlüssen wie ohne Provokation. Es bricht die **PLATZIERBARKEIT**:
+
+| Größe | ohne Provokation | mit Provokation |
+| ----- | ---------------: | --------------: |
+| Strafleiste | 9,35 | **16,85 - 23,00** |
+| Endstand | 47,80 | **6,25 - 15,30** |
+| Spaltenabschlüsse | 3 | 3 - 4 |
+
+Der Spieler nimmt die richtige Farbe und **kann sie nicht loswerden**.
+
+### Und das ist dieselbe Stellschraube wie das einzige signifikante Ergebnis
+
+`MOSAIC_WERTUNG_FLOOR_W` (der `projected_unplaceable_penalty`-Gegenterm) war der
+EINZIGE Eingriff dieser Session mit einem signifikanten Effekt: **+2,77 Punkte
+(t=2,21)** und **+1,37 Plattenpunkte (t=2,19)** gepaart gegen dieselbe Dosis ohne
+ihn (`PREREG_injektion_wertungsplatten.md`).
+
+**Zwei völlig verschiedene Versuche benennen denselben Engpass**: einer über
+Belohnung (der Gegenterm hilft, weil er unplatzierbare Züge bestraft), einer über
+Zwang (die Provokation scheitert, weil sie unplatzierbare Züge erzwingt). Der
+begrenzende Faktor beim Plattenbau ist die **Platzierbarkeit**, nicht die
+Plattenbewertung.
+
+Das ist ein Befund über die Stellschraube, nicht über die Provokation -- und er
+war ohne sie nicht zu sehen. Die Injektionsversuche allein zeigten nur, dass die
+Strafleiste mit der Dosis steigt (9,35 → 11,77); erst der Zwang macht sichtbar,
+dass sie der bindende Engpass IST und nicht eine Nebenwirkung.
+
+### Folge für die Reihenfolge
+
+Die Provokation bleibt als Instrument stehen (Knopf, Default aus). Die
+Verfeinerungen aus §7 sind damit keine Rettungsversuche eines gescheiterten
+Ansatzes, sondern Varianten eines Messmittels -- und die aussichtsreichste (§7
+Punkt 2: nur binden, solange ein Nicht-BODENzug übrig bleibt) ist genau die, die
+den identifizierten Engpass adressiert.
+
+**Für Stufe 1 ist sie nicht nötig** -- die Injektion hat ihr Kriterium erfüllt
+(Konjunktions-Rate 0,0167 → 0,0500, Faktor 12 über der Totgrenze 0,004, siehe
+`STATUS.md` Übergabe-Block). Die Provokation ist das Werkzeug, mit dem man
+herausfindet, welche Schraube man in Stufe 2 dreht.
