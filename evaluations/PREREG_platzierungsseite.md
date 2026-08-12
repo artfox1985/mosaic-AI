@@ -219,3 +219,56 @@ haben drei FORMFEHLER aufgedeckt und die Frage nicht beantwortet:
 
 Bemerkenswert daran: keiner der drei war eine Frage der DOSIS. Alle drei waren
 Fragen der FORM, und jede sah in den Zahlen wie ein Null-Befund aus.
+
+---
+
+## 9. KORREKTUR (Nutzer, 2026-08-12): "in Runden 1-4 praktisch nie" war falsch
+
+Ich hatte behauptet, in den Runden 1-4 werde praktisch nie eine Spalte vollendet,
+und das als Erklaerung fuer den Null-Befund benutzt -- ungepruefte Zahl in einer
+Schlussfolgerung, also ein REGEL-0-Bruch. Nutzer: *"das ist nicht korrekt."*
+
+Gemessen an den 57 Nullpunkt-Partien (Spalten aus den Platzierungszeilen
+rekonstruiert; UNTERGRENZE, weil das Log fuer Spezialfelder die Spalte nicht
+nennt):
+
+| Runde | Spaltenabschluesse |
+| ----: | -----------------: |
+| 3 | 1 |
+| 4 | 2 |
+| 5 | 2 |
+
+**Drei von fuenf Abschluessen fallen in die Runden 1-4, also 60 %.** "Praktisch
+nie" ist widerlegt.
+
+### Der eigentliche Fund: das Potenzial liegt bereit
+
+Hoechster erreichter Spaltenstand je Partie:
+
+| Stand | Partien |
+| ----: | ------: |
+| 3 von 6 | 1 |
+| 4 von 6 | 16 |
+| **5 von 6** | **36** |
+| 6 von 6 | 4 |
+
+**In 36 von 57 Partien fehlt EINE Fliese zur vollen Spalte.** Das Netz kommt fast
+immer bis an den Rand und schliesst nicht. Der Nutzer-Zielwert ist damit sehr viel
+naeher, als 0,70 Plattenpunkte suggerieren -- es fehlt nicht an Aufbau, sondern am
+letzten Schritt.
+
+### Was von meiner Schlussfolgerung bleibt
+
+Der Teil "kein Gradient" haelt, aber aus einem PRAEZISEREN Grund als dem, den ich
+genannt habe: nicht weil Abschluesse in Runden 1-4 nicht vorkommen, sondern weil
+ABSCHLUSSEREIGNISSE als solche selten sind (drei in 57 Partien). Ein Reihungsmass,
+das bei JEDER Tiling-Entscheidung ausgewertet wird, sieht die Differenz also in
+der ueberwiegenden Mehrheit der Kandidatenvergleiche als 0 -- und eine 0 gibt
+keine Richtung.
+
+**Genau deshalb ist die stetige Form der richtige Eingriff, und die Messung**
+**oben sagt, wo sie ansetzen muss**: 36 Partien bei 5 von 6. Ein Term mit
+quadratischer Teilgutschrift bewertet den Unterschied zwischen 5/6 und 6/6 mit
+(6/6)^2 - (5/6)^2 = 0,306 mal dem Plattenwert 7 = **2,14 Punkte** -- gross genug,
+um einen einzelnen Platzierungspunkt zu ueberstimmen, und er faellt bei JEDER
+Kandidatenwahl an, nicht nur bei den drei Abschluessen.
