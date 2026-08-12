@@ -28,6 +28,47 @@ use tract_onnx::prelude::*;
 use tract_onnx::tract_hir::infer::Factoid;
 use tract_onnx::tract_hir::internal::DimLike;
 
+/// Bindeglied zu `net_ort.rs` (Weg B) fuer `eval_batch` -- ZWEI Varianten je
+/// nach `ort_cuda_probe`-Feature, damit `net.rs` UNBEDINGT `try_eval_batch`
+/// aufrufen kann, ohne selbst zu wissen, ob `ort` ueberhaupt im
+/// Abhaengigkeitsbaum ist (`ort` bleibt optional, siehe `Cargo.toml`). Bei
+/// aktivem Feature: Knopf pruefen, ORT-CUDA versuchen, bei Fehler EINMAL
+/// warnen und `None` liefern (Aufrufer faellt weiter auf Torch/IPC/tract
+/// zurueck). Bei fehlendem Feature: `net_ort` existiert nicht einmal als
+/// Modul (siehe `lib.rs`), diese Funktion ist dann ein reiner
+/// Kompilierzeit-No-Op (wird zu einem `None`-Literal weginlined).
+#[cfg(feature = "ort_cuda_probe")]
+mod ort_cuda_hook {
+    use super::Net;
+
+    pub(super) fn try_eval_batch(
+        net: &Net,
+        feats: &[&[f32]],
+    ) -> Option<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        if !crate::net_ort::ort_cuda_enabled() {
+            return None;
+        }
+        match crate::net_ort::eval_batch_via_ort_cuda(net, feats) {
+            Ok(rows) => Some(rows),
+            Err(e) => {
+                crate::net_ort::warn_ort_cuda_fallback_once(&e);
+                None
+            }
+        }
+    }
+}
+#[cfg(not(feature = "ort_cuda_probe"))]
+mod ort_cuda_hook {
+    use super::Net;
+
+    pub(super) fn try_eval_batch(
+        _net: &Net,
+        _feats: &[&[f32]],
+    ) -> Option<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        None
+    }
+}
+
 type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 /// Roh geparster (noch nicht Shape-fixierter) Graph, wie ihn `model_for_path`
 /// liefert -- Basis für `with_input_fact`, egal ob Flat- oder Planes-Pfad.
@@ -168,6 +209,12 @@ pub struct Net {
     /// DIESEN Index -- vorher wurde positionsbasiert `out[4]` gelesen, das
     /// ist aber der `ownership`-Head (opp_points liegt real auf Index 5).
     opp_head_index: Option<usize>,
+    /// Dateipfad, unter dem dieses Netz geladen wurde (Weg B, `net_ort.rs`
+    /// braucht ihn, um AUSSERHALB von tract eine eigene ORT-CUDA-Session auf
+    /// derselben `.onnx`-Datei aufzubauen -- tract selbst haelt den Pfad
+    /// nirgends vor, nur den geparsten Graphen). Rein additiv: kein
+    /// bestehender Aufrufer liest dieses Feld.
+    onnx_path: String,
 }
 
 impl Net {
@@ -195,6 +242,13 @@ impl Net {
         self.input_size
     }
 
+    /// Dateipfad, unter dem dieses Netz geladen wurde (siehe `onnx_path`-
+    /// Feld-Doku). `pub(crate)` -- nur `net_ort.rs` braucht das ausserhalb
+    /// dieser Datei, kein Grund, es weiter als das nach aussen zu tragen.
+    pub(crate) fn onnx_path(&self) -> &str {
+        &self.onnx_path
+    }
+
     /// Lädt ein ONNX-Netz; `input_size` muss zur Feature-Länge passen
     /// (siehe `features::INPUT_SIZE` — dort übergeben, nicht hier hardcoden).
     /// Baut aus derselben geparsten Graph-Struktur ZWEI unabhängig optimierte
@@ -212,7 +266,7 @@ impl Net {
     /// abweichender Codepfad.
     pub fn load(path: &str, input_size: usize) -> TractResult<Net> {
         let base: RawModel = tract_onnx::onnx().model_for_path(path)?;
-        Net::build_from_layout(base, InputLayout::Flat(input_size))
+        Net::build_from_layout(base, InputLayout::Flat(input_size), path)
     }
 
     /// Neuer Konstruktor (Task #11 Phase 1): liest die deklarierte Input-Form
@@ -226,14 +280,17 @@ impl Net {
     pub fn load_auto(path: &str) -> TractResult<Net> {
         let base: RawModel = tract_onnx::onnx().model_for_path(path)?;
         let layout = detect_layout(&base)?;
-        Net::build_from_layout(base, layout)
+        Net::build_from_layout(base, layout, path)
     }
 
     /// Gemeinsamer Bauschritt für `load`/`load_auto`: fixiert die Input-Fact
     /// auf Batch=1 (für `model`) bzw. Batch=2 (für `model_pair`) gemäß
     /// `layout`, dann `into_optimized().into_runnable()` -- exakt dieselbe
     /// Operationsfolge, die `load` vor Task #11 direkt (unfaktoriert) ausführte.
-    fn build_from_layout(base: RawModel, layout: InputLayout) -> TractResult<Net> {
+    /// `path` NEU (Weg B): nur fuer das `onnx_path`-Feld durchgereicht, sonst
+    /// unveraendert -- tract selbst braucht den Pfad hier nicht mehr, `base`
+    /// ist schon der geparste Graph.
+    fn build_from_layout(base: RawModel, layout: InputLayout, path: &str) -> TractResult<Net> {
         // Task #28: NUR am rohen, noch nicht optimierten Graph zuverlaessig
         // lesbar (`into_optimized()` kann Outlet-Reihenfolge/-Labels
         // veraendern) -- analog zu `detect_layout`, das aus demselben Grund
@@ -264,7 +321,15 @@ impl Net {
         // wird danach nicht mehr gebraucht).
         let plan = layout.apply_input_facts(base, EVAL_BATCH_MAX_N)?.into_optimized()?.into_runnable()?;
         model_batch.insert(EVAL_BATCH_MAX_N, plan);
-        Ok(Net { model, model_pair, model_batch, input_size: layout.flat_len(), layout, opp_head_index })
+        Ok(Net {
+            model,
+            model_pair,
+            model_batch,
+            input_size: layout.flat_len(),
+            layout,
+            opp_head_index,
+            onnx_path: path.to_string(),
+        })
     }
 
     /// Baut die ONNX-Eingabe-Tensor(en) für `samples.len()` Positionen --
@@ -387,15 +452,23 @@ impl Net {
         &self,
         feats: &[&[f32]],
     ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
-        // Weg A (`evaluations/PREREG_gpu_inferenzpfad.md`): optionaler
-        // Torch/CUDA-IPC-Kanal statt tract, NUR fuer diese Funktion (siehe
-        // `net_ipc.rs`-Modul-Kommentar). Default AUS (`ipc_enabled()==false`)
-        // -- dann wird `net_ipc` nicht einmal betreten, der Code unten laeuft
-        // BYTE-IDENTISCH wie vor Weg A. Bei EIN und einem funktionierenden
-        // Kanal wird der tract-Aufruf unten uebersprungen; jeder Fehler im
-        // Kanal (Server nicht erreichbar, Rundlauf schlaegt fehl) faellt auf
-        // den bestehenden tract-Pfad zurueck (Warnung nur einmal je Prozess),
-        // eine Partie darf durch ein Durchsatz-Feature nie abbrechen.
+        // Rangfolge der drei Backends (festgelegt in `net_ort.rs`-
+        // Modulkommentar, Nutzer-Auftrag "fang an" 2026-08-12):
+        //   1) Weg B: ORT-CUDA (`net_ort.rs`) -- ZUERST geprueft.
+        //   2) Weg A: Torch/IPC (`net_ipc.rs`) -- NUR falls (1) keinen
+        //      Erfolg hatte. Bleibt als Knopf stehen (ausgemessen, PREREG
+        //      §9: 0,30x/0,55x, NICHT gedeckt), darf aber Weg B nicht
+        //      verdecken -- deshalb hier an zweiter, nicht erster Stelle.
+        //   3) tract (Bestandsverhalten) -- IMMER als letzter Fallback.
+        // Bei (1) UND (2) aus (Default) wird WEDER `net_ort` NOCH `net_ipc`
+        // ueberhaupt betreten -- der Code unten laeuft dann BYTE-IDENTISCH
+        // wie vor Weg A/B. `ort_cuda_hook::try_eval_batch` ist bei fehlendem
+        // `ort_cuda_probe`-Feature ein Kompilierzeit-No-Op (siehe dortige
+        // Definition unten) -- `ort` bleibt eine optionale Abhaengigkeit,
+        // ein Bau ohne das Feature zieht sie nicht herein.
+        if let Some(rows) = ort_cuda_hook::try_eval_batch(self, feats) {
+            return Ok(rows);
+        }
         if crate::net_ipc::ipc_enabled() {
             match crate::net_ipc::eval_batch_via_ipc(feats) {
                 Ok(result) => return Ok(result),
@@ -701,7 +774,10 @@ fn split_batch2(flat: Vec<f32>) -> (Vec<f32>, Vec<f32>) {
 /// Puffer (Standard-ONNX-Ausgabelayout, Batch als fuehrende Achse), `n`
 /// muss `flat.len()` gerade teilen (garantiert: jede der vier Kopf-
 /// Ausgaben hat fuer alle `n` Zeilen dieselbe Breite).
-fn split_batch_n(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
+// `pub(crate)`: Weg B (`net_ort.rs`) braucht denselben Zeilen-Split fuer
+// ORT-Ausgaben wie der tract-Pfad hier -- keine zweite Implementierung, die
+// gegen diese hier je auseinanderlaufen koennte.
+pub(crate) fn split_batch_n(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
     if n == 0 {
         return Vec::new();
     }
@@ -730,7 +806,9 @@ fn split_batch_n_or_empty_rows(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
 /// major mit Batch als führender Achse (Standard-ONNX-Layout). Reine
 /// Arithmetik ohne tract-Aufruf, daher direkt testbar (`tests::split_planes_flat_*`)
 /// -- von `Net::build_inputs` für den eigentlichen Tensor-Bau genutzt.
-fn split_planes_flat_batch(samples: &[&[f32]], planes_len: usize, flat_len: usize) -> (Vec<f32>, Vec<f32>) {
+// `pub(crate)`: Weg B (`net_ort.rs::build_ort_inputs`) braucht denselben
+// Puffer-Split fuer `InputLayout::PlanesPlusFlat` wie `build_inputs` hier.
+pub(crate) fn split_planes_flat_batch(samples: &[&[f32]], planes_len: usize, flat_len: usize) -> (Vec<f32>, Vec<f32>) {
     let batch = samples.len();
     let mut planes_buf = Vec::with_capacity(batch * planes_len);
     let mut flat_buf = Vec::with_capacity(batch * flat_len);

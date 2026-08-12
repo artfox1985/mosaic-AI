@@ -367,3 +367,383 @@ der Test schreibt keine. **Nachzuziehen, wenn der Test das nächste Mal läuft.*
 Dieselbe Lehre wie beim veralteten Index (`STATUS.md`, Übergabe-Block): eine
 tragende Zahl, die nur in einem Bericht steht, ist für den Nachfolger nicht
 vorhanden.
+
+---
+
+## 11. WEG B: MESSBAR MIT VERSIONS-PIN -- Kennlinie liegt vor
+
+### Der Versions-Pin, mit Quelle
+
+`ort` v2.0.0-rc.13 bündelt ONNX Runtime 1.28.0 und bietet für
+`x86_64-pc-windows-msvc` nur noch einen `cuda13`-Build (CUDA-13-Laufzeit) --
+GEPRÜFT: `ort-sys`s eingebettete `build/download/dist.tsv`, aus dem
+crates.io-Tarball extrahiert. **`ort` v2.0.0-rc.12** bündelt ONNX Runtime
+1.24.2 und bietet dort noch einen **`cu12`**-Build (Quelle:
+`ort-sys-2.0.0-rc.12/build/download/dist.txt`, Zeile 2:
+`cu12	x86_64-pc-windows-msvc	https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/...+cu12.tar.lzma2`).
+rc.12 ist die NEUESTE `ort`-Version mit einem Windows-cu12-Build -- rc.11
+(ONNX Runtime 1.23.2) hat ihn auch noch, rc.13 nicht mehr. Auf `=2.0.0-rc.12`
+gepinnt, zusätzlich `ORT_CUDA_VERSION=12` gesetzt (statt der
+Auto-Erkennung zu vertrauen, die laut `resolve.rs` ohnehin auf `cu12`
+zurückfällt, wenn kein `CUDA_HOME`/`nvcc` gefunden wird).
+
+Torch-DLLs aus
+`C:\Users\Patrick\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\torch\lib`
+(cudart64_12, cublas64_12, cublasLt64_12, cudnn64_9 + 5 weitere cudnn-Teile,
+cufft64_11, curand64_10, nvJitLink_120_0, nvrtc64_120_0 -- 19 Dateien) neben
+die Beispiel-`.exe` kopiert, dieselbe Technik wie schon für die
+Provider-DLLs (`copy-dylibs` erreicht `target/.../examples/` ohne
+Windows-Entwicklermodus nicht, siehe §10). **Kein Systemeingriff, keine
+Repo-Änderung** -- reine Dateikopie in den Scratch-Zielordner.
+
+Ergebnis: **CUDA-Execution-Provider registriert sich, Modell lädt, volle
+Kennlinie gemessen.** `error_on_failure()` blieb gesetzt; es gab diesmal
+keinen Fehler, auf den er hätte reagieren müssen.
+
+### Die Kennlinie -- VOLLE Zeit je Batch (Merkmalspuffer -> Tensor -> `run` -> `Vec<f32>`)
+
+Zwei Läufe (derselbe Build, dieselben DLLs) zur Streubreiten-Einordnung:
+Lauf 2 ist der in `evaluations/ort_cuda_batch_throughput.json` persistierte
+(korrekte Versions-Metadaten; Lauf 1 hatte einen Anzeige-Fehler -- Quelltext
+sagte fälschlich "rc.13"/"1.28", behoben vor Lauf 2).
+
+| Batch | Lauf 1 (Evals/s) | Lauf 2 (Evals/s, persistiert) | Torch/CUDA (`gpu_batch_throughput.json`) |
+| ----: | ---------------: | -----------------------------: | ----------------------------------------: |
+|     1 |             760,4 |                          901,7 |                                     125,7 |
+|     2 |             735,2 |                        1.358,1 |                                     275,7 |
+|     4 |           2.564,2 |                        2.701,2 |                                     672,1 |
+|     8 |           5.327,1 |                        5.029,6 |                                   1.585,4 |
+|    11 |           8.580,0 |                        6.851,5 |                                   2.581,2 |
+|    16 |           9.228,9 |                       12.851,0 |                                   4.538,6 |
+|    22 |          14.183,6 |                       13.283,8 |                                   6.196,9 |
+|    32 |          21.184,9 |                       19.069,3 |                                   8.407,4 |
+|    44 |          29.432,1 |                       16.008,6 |                                  14.059,7 |
+|    64 |          41.926,2 |                       36.625,7 |                                  20.863,3 |
+|   128 |          51.292,8 |                       61.396,8 |                                  41.959,3 |
+|   256 |          74.565,5 |                       77.770,4 |                                  78.896,5 |
+|   512 |          79.336,0 |                       82.030,9 |                                 162.635,3 |
+
+Streubreite zwischen Lauf 1/2 bei kleinen/mittleren Batches teils groß (z.B.
+Batch 44: 29.432 vs. 16.008, -46 %) -- ungeklärt, ob GPU-Zustand
+(Desktop-Compositing, Thermik) oder ORT-interne Heuristik-Neubewertung
+(`ConvAlgorithmSearch::Exhaustive` ist Default). NICHT weiter zerlegt in
+dieser Sitzung. Bei Batch 128/256/512 ist die Differenz deutlich kleiner
+(±20 % bzw. ±4 % bzw. ±3 %).
+
+### Regel 2 (§4) -- ORT-CUDA gegen Torch bei Batch 140-590
+
+Kein gemessener Punkt liegt exakt in [140, 590]; 256 liegt darin, 128 und 512
+grenzen das Fenster ein (dieselbe Wahl wie in `gpu_batch_throughput.json`
+selbst dokumentiert):
+
+| Batch | ORT-CUDA (Lauf 2) | Torch/CUDA | Verhältnis ORT/Torch |
+| ----: | -----------------: | ---------: | --------------------: |
+|   128 |            61.396,8 |   41.959,3 |                 1,464 |
+|   256 |            77.770,4 |   78.896,5 |                 0,986 |
+|   512 |            82.030,9 |  162.635,3 |                 0,504 |
+
+Am einzigen Punkt INNERHALB des Fensters (256) liegt ORT-CUDA knapp unter
+Torch (-1,4 %, in Lauf 1 -5,5 %) -- in beiden Läufen unter, nicht über
+Torch, also kein Rauschartefakt in eine zufällige Richtung. Am unteren
+Rand (128) liegt ORT-CUDA klar vorn; am oberen Rand (512, knapp außerhalb)
+fällt ORT-CUDA auf gut die Hälfte von Torch zurück -- die ORT-CUDA-Kurve
+flacht zwischen 256 und 512 fast ab, während Torch zwischen denselben
+Punkten noch einmal mehr als verdoppelt. Kein Urteil hier: die Zahlen liegen
+vor, Regel 2 wendet der Nutzer an.
+
+### Regel 3 (§4) -- Faktor gegen den tract-CPU-Bezug
+
+Bezug: §9/§10 "synchron" (4.424,7 Evals/s bei N=11, 5.261,3 bei N=128) --
+Etikett vom Nutzer als tract-CPU (`net.eval`) bestätigt (§10). Diese Zahl ist
+laut §10 in KEINER JSON persistiert und wurde in dieser Sitzung nicht durch
+eine eigene Dateiquelle nachgeprüft, sondern als geprüfte Aussage des Nutzers
+übernommen -- markiert, nicht selbst verifiziert.
+
+| ORT-CUDA-Punkt | Faktor gg. N=11 (4.424,7) | Faktor gg. N=128 (5.261,3) |
+| -------------: | -------------------------: | ---------------------------: |
+|      128 (61.396,8) |                      13,9x |                        11,7x |
+|      256 (77.770,4) |                      17,6x |                        14,8x |
+|      512 (82.030,9) |                      18,5x |                        15,6x |
+
+Alle sechs Kombinationen liegen weit über der 2,0x-Schwelle -- robust gegen
+die Wahl des Bezugs (N=11 vs. N=128) UND gegen die Streubreite zwischen
+Lauf 1/2. Regel 3 ist unter jeder vertretbaren Bezugswahl klar erfüllt.
+
+### GPU-Belegung
+
+Vorher (Lauf 2): 28 %, 1.520 MiB, 21,6 W. Nachher: 40 %, 1.526 MiB, 22,0 W.
+Fortlaufend mitgeschnitten (`nvidia-smi -l 1`): Spitzenwert während des Laufs
+1.703 MiB Speicher (+~180 MiB ggü. Grundlast) und 56,1 W (ggü. ~22 W
+Grundlast) -- echte GPU-Rechenlast, kein Leerlauf-Artefakt. Kein anderer
+Compute-Prozess auf der GPU (`nvidia-smi --query-compute-apps` vorher/nachher
+geprüft, nur Desktop-/Shell-Prozesse ohne Speicherbelegung).
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- rc.12 statt rc.11 gewählt (beide bieten `cu12`): rc.12 ist neuer/näher an
+  rc.13s API, kein Unterschied in den `Session`/`ep::CUDA`-Signaturen beim
+  Umstieg nötig gewesen.
+- `ORT_CUDA_VERSION=12` explizit gesetzt statt auf die Auto-Erkennung zu
+  vertrauen (auch wenn diese hier ohnehin `cu12` geraten hätte).
+- Torch-DLL-Liste um 8 Dateien über die vom Nutzer genannten hinaus erweitert
+  (`cudnn_engines_runtime_compiled64_9.dll`, `cudnn_graph64_9.dll`,
+  `cudnn_heuristic64_9.dll`, `cudnn_ops64_9.dll`, `nvJitLink_120_0.dll`,
+  `nvToolsExt64_1.dll`, `nvrtc-builtins64_126.dll`, `nvrtc64_120_0(.alt).dll`)
+  -- Vorsicht gegen eine zweite Kette fehlender Abhängigkeiten wie beim
+  `cublasLt`-Fund in §10.
+- Nach dem Fund des Anzeige-Fehlers (Quelltext nannte nach dem Versionswechsel
+  weiter "rc.13"/"1.28") den Lauf wiederholt, statt die persistierte JSON mit
+  falschen Metadaten stehen zu lassen.
+
+---
+
+## 12. VERDRAHTUNG (Schritt 1) UND ENTSCHEIDUNGSGLEICHHEIT DRITTES BACKEND (Schritt 2)
+
+Nutzer-Auftrag "fang an" (2026-08-12): Regel 3 gilt als erfüllt (7,0x-18,5x,
+vom Nutzer selbst nachgeprüft). Die ersten zwei Bauschritte, nicht mehr.
+
+### Schritt 1: ORT-CUDA in `Net::eval_batch` eingehängt
+
+Neues Modul `engine/src/net_ort.rs` (`#![cfg(feature = "ort_cuda_probe")]`,
+`mod net_ort;` in `lib.rs` ebenso gated), eingehängt in `net.rs::eval_batch`
+GENAU an der Stelle, an der schon der Torch/IPC-Knopf hängt. Rangfolge, im
+Modulkommentar von `net_ort.rs` UND als Inline-Kommentar in `net.rs::eval_batch`
+festgehalten:
+
+1. **ORT-CUDA** (`MOSAIC_ORT_CUDA_ENABLED=1`, nur wirksam mit
+   `--features ort_cuda_probe` gebaut) -- ZUERST geprüft.
+2. **Torch/IPC** (`MOSAIC_TORCH_IPC_ENABLED=1`, `net_ipc.rs`) -- NUR falls (1)
+   erfolglos. Bleibt stehen (nicht entfernt), verdeckt Weg B aber nicht, weil
+   im Code NACH ihm geprüft.
+3. **tract** -- immer letzter Fallback, nie abschaltbar.
+
+Bei (1)/(2) aus (Default): byte-identisches Bestandsverhalten, `net_ort` wird
+nicht einmal betreten.
+
+**Session/Umgebung**: EINE `ort::session::Session` je `Net`-Instanz, in einer
+nach Zeiger-Identität schlüsselnden Registry (`net_ort::SESSIONS`) -- exakt
+dasselbe Muster wie `net_batcher::REGISTRY`/`ensure_batcher_for` (dortige
+Begründung "sicher, weil dieselbe `Net`-Instanz für die gesamte Laufzeit lebt"
+gilt hier unverändert). ONNX Runtime braucht (anders als tracts feste
+Batch=N-Pläne) KEINE Pläne je Batchgröße -- eine Session bedient jede
+Batchgröße symbolisch (schon in `ort_cuda_batch_probe.rs` so genutzt, Batch
+1..512 mit EINER Session). Thread-Sicherheit: `Session::run` verlangt in der
+`ort`-Rust-API `&mut self` (obwohl `Session` selbst `unsafe impl Send + Sync`
+ist, GEPRÜFT in `ort-2.0.0-rc.12/src/session/mod.rs:675-676`) -- deshalb
+`Mutex<Session>` je Slot. Der äußere Registry-Mutex wird nur für die
+Kartensuche/den Erstaufbau gehalten, nicht während `run()` -- verschiedene
+`Net`-Instanzen blockieren sich beim Inferieren nicht gegenseitig.
+
+**Fallback**: jeder Fehler (Session-Aufbau, Tensor-Bau, `run`, Extraktion)
+liefert `Err(String)`, NIE Panic -- Aufrufer fällt weiter auf Schritt 2/3
+zurück, Warnung einmal je Prozess (`warn_ort_cuda_fallback_once`).
+`error_on_failure()` beim CUDA-Provider bleibt ABSICHTLICH gesetzt: ohne sie
+würde `ort` bei nicht registrierbarem CUDA-Provider intern still auf seinen
+EIGENEN CPU-Provider zurückfallen -- ein zweiter, nutzloser CPU-Pfad, der sich
+als "ORT-CUDA" ausgibt. Mit ihr entscheidet UNSER Code, dass tract der
+richtige Fallback ist.
+
+`Net` bekam ein additives Feld `onnx_path: String` (Weg B braucht den Pfad
+außerhalb von tract, das ihn nirgends vorhält) -- `load`/`load_auto` reichen
+ihn durch, kein bestehender Aufrufer betroffen. `split_batch_n`/
+`split_planes_flat_batch` von `net.rs` auf `pub(crate)` angehoben (Weg B
+nutzt dieselbe Zeilen-Split-Logik wie der tract-Pfad, keine zweite
+Implementierung).
+
+`cargo test --lib --release --features ort_cuda_probe`: **380 bestanden / 20
+ignoriert** (378+2 neue Unit-Tests, 18+1 neuer `#[ignore]`-Test). Ohne das
+Feature: unverändert **378 bestanden / 18 ignoriert**.
+
+### Schritt 2: Entscheidungsgleichheit tract<->ORT-CUDA (DRITTES Backend)
+
+Neuer Test `net_mcts::tests::ort_cuda_matches_tract_gumbel_root_selection`
+(`#[cfg(feature = "ort_cuda_probe")]` + `#[ignore]`), dieselbe Messkette wie
+`policy_head_deviation_effect_on_gumbel_root_selection` (tract<->torch) und
+`interleaved_matches_synchronous_gumbel_root_selection` (synchron<->
+verschränkt) -- dieselben 1148 Zustände, dasselbe Modell
+`alphazero_v20_2d_opp_brierbest.onnx`, PLUS max. Rohwert-Abweichung je Kopf
+(wie `net_ipc`s Toleranztest).
+
+**GEMESSEN (`cargo test --release --lib --features ort_cuda_probe -- --ignored
+--exact net_mcts::tests::ort_cuda_matches_tract_gumbel_root_selection
+--nocapture`, `MOSAIC_FROZEN_STATES_JSON` aus
+`tools/export_frozen_drafting_states.py --set evaluations/frozen_eval_set_v2.pkl`,
+Gegenprobe 1148 bestanden):**
+
+| Metrik | Abweichungen | Rate |
+| ------ | -----------: | ---: |
+| Argmax (rauschfrei) | 0 / 1148 | 0,00 % |
+| **Gumbel-Top-16-Menge** | **16 / 1148** | **1,39 %** |
+
+Zum Vergleich tract<->torch (§8): Argmax 0/1148, Top-16 0/1148 -- ORT-CUDA
+weicht dort ab, wo torch es nicht tat. **NICHT toleranzangepasst, NICHT
+weginterpretiert -- das ist der Befund.** Plausible, aber UNGEPRÜFTE
+Erklärung: ORT-CUDA ist sowohl ein anderer Graph-Optimierer (ORT statt tract
+ODER torch) ALS AUCH eine andere Hardware-Klasse (GPU statt CPU) ggü. BEIDEN
+Vergleichspartnern -- zwei Abweichungsquellen statt einer.
+
+Max. Rohwert-Abweichung je Kopf (tract vs. ORT-CUDA), zum Vergleich tract vs.
+torch (§7) danebengestellt:
+
+| Kopf | tract<->ORT-CUDA | tract<->torch (§7) |
+| ---- | ---------------: | ------------------: |
+| policy | 0,01745224 | 0,00003433 |
+| value | 0,00153267 | 0,00000048 |
+| moon | 0,00084567 | 0,00000131 |
+| points | 0,00048220 | 0,00000051 |
+
+ALLE vier Köpfe weichen bei ORT-CUDA um 2-3 Größenordnungen mehr ab als bei
+torch -- konsistent mit der Zwei-Abweichungsquellen-Erklärung oben, aber das
+ist eine HERLEITUNG, keine Messung der Ursache selbst.
+
+GPU-Belegung waehrend des Tests: Spitzenwert 1.720 MiB (+~150-190 MiB ggü.
+Grundlast), 43,7 W (ggü. ~21-22 W Grundlast) -- echte Rechenlast, kein
+Leerlauf-Artefakt.
+
+### Was das NICHT bedeutet -- und der nächste Schritt (Nutzer-Entscheidung)
+
+Die 1,39 % Top-16-Abweichung ist eine WIRKUNGSMESSUNG auf der
+Kandidatenmengen-Ebene, KEINE Aussage über die Suchstärke selbst -- ob eine
+andere Top-16-Menge an der Wurzel die tatsächliche Zugwahl/Elo bewegt, ist
+Schritt 3/4 (Selfplay-Durchsatz, Arena), ausdrücklich NICHT Teil dieses
+Auftrags. Kein Urteil hier -- die Zahl liegt vor.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `InputLayout::Planes` (reiner Rang-4-Einzel-Input) im ORT-Pfad NICHT
+  unterstützt (klarer `Err` statt Vermutung über einen ungeprüften
+  Eingabenamen) -- kein `export_onnx.py`-Zweig erzeugt dieses Layout,
+  GEPRÜFT (nur zwei `input_names`-Stellen dort).
+- Ausgaben per INDEX (`outputs[0..3]`) statt per Name gelesen -- gleiche
+  Annahme wie der tract-Pfad, für identische Verträge zwischen den Backends.
+- Registry-Erstaufbau haelt den äußeren Mutex ueber die GESAMTE
+  Session-Konstruktion (kein Doppel-Check-Locking) -- einfacher, für den
+  seltenen Fall (Aufbau einmal je `Net`-Instanz) ausreichend, exakt das
+  Muster von `net_batcher::ensure_batcher_for`.
+- Device-ID fest auf 0 (keine eigene Env-Var) -- einzige GPU auf der
+  Zielumgebung, außerhalb des engen Auftrags-Zuschnitts.
+- Für den Test-Lauf dieselbe Handkopie-Technik (Provider- + Torch-CUDA-12-
+  DLLs neben das Testbinary, `target/.../release/deps/`) wie beim
+  Kennlinien-Beispiel -- keine neue Lösung erfunden.
+
+---
+
+## 13. TF32-VERDACHT: BESTÄTIGT ALS HAUPTURSACHE, ABER NICHT VOLLSTÄNDIG -- Kennlinie fast unverändert
+
+Nutzer-Auftrag 2026-08-12, vor dem Arena-Lauf geprüft: die 500-fache
+Policy-Abweichung (§12: 0,01745 gg. 0,00003 bei torch) sei zu groß für
+gewöhnliche Graph-Optimierer-Unterschiede und passe zu TF32 auf Ampere.
+
+### (1) Die Option, mit Fundstelle
+
+`ort::ep::CUDA::with_tf32(bool)`, Provider-Option `use_tf32` -- GEPRÜFT:
+`ort-2.0.0-rc.12/src/ep/cuda.rs:276-297`. Dokumentierter Default: **"This
+option is disabled by default."** (Zeile 281). Das ist die Behauptung der
+`ort`-Rust-Bindung selbst (Doc-Kommentar im Quelltext dieser Version), NICHT
+unabhängig gegen den ONNX-Runtime-C++-Quelltext (der hier nicht vorliegt)
+geprüft -- diese Einschränkung ausdrücklich markiert, nicht verschwiegen.
+Bis Schritt 1 (§12) hatte `net_ort.rs::build_session` `with_tf32` nie
+aufgerufen, lief also auf diesem (laut Doku bereits ausgeschalteten) Default.
+
+### (2) Entscheidungsgleichheit mit `with_tf32(false)` explizit gesetzt
+
+`net_ort.rs::build_session`: `CUDA::default().with_device_id(0).with_tf32(false)...`
+-- doppelte Absicherung statt sich auf den dokumentierten Default zu
+verlassen. Derselbe Test wie in §12
+(`net_mcts::tests::ort_cuda_matches_tract_gumbel_root_selection`, 1148
+Zustände, `alphazero_v20_2d_opp_brierbest.onnx`), erneut gefahren:
+
+| Metrik | vorher (§12, TF32 auf ORT-Default) | jetzt (`with_tf32(false)`) |
+| ------ | ----------------------------------: | ---------------------------: |
+| Argmax | 0 / 1148 (0,00 %) | 0 / 1148 (0,00 %) |
+| **Gumbel-Top-16-Menge** | **16 / 1148 (1,39 %)** | **1 / 1148 (0,09 %)** |
+
+Max. Rohwert-Abweichung je Kopf:
+
+| Kopf | vorher (§12) | jetzt | Faktor | tract<->torch (§7, Referenz) |
+| ---- | ------------: | ----: | -----: | -----------------------------: |
+| policy | 0,01745224 | 0,00003815 | 457x kleiner | 0,00003433 |
+| value | 0,00153267 | 0,00000232 | 660x kleiner | 0,00000048 |
+| moon | 0,00084567 | 0,00000125 | 677x kleiner | 0,00000131 |
+| points | 0,00048220 | 0,00000077 | 626x kleiner | 0,00000077 |
+
+GPU-Belegung: Spitzenwert 1.721 MiB (+~150 MiB), 44,3 W (ggü. ~22 W
+Grundlast) -- echte Rechenlast.
+
+### DER BEFUND, UNGESCHÖNT: TF32 ist die Hauptursache, aber NICHT die
+### vollständige Erklärung
+
+Alle vier Köpfe fallen auf tract<->torch-Größenordnung zurück (moon/points
+sogar auf dieselbe Zahl) -- das bestätigt den Verdacht klar UND deutlich.
+**Aber die Gumbel-Top-16-Abweichung geht auf 1/1148 zurück, NICHT auf 0/1148.**
+Weder auf 0 gerundet noch als "im Rauschen" verworfen -- eine einzelne
+Zustands-Abweichung bleibt, mit ausgeschaltetem TF32, ungeklärt. NICHT weiter
+untersucht (welcher der 1148 Zustände, wieso genau dieser) -- außerhalb des
+Auftrags-Zuschnitts ("nicht weiter suchen" galt für den Fall "bleiben
+unverändert"; dieser Fall hier -- 16→1 -- ist keiner der beiden vorab
+entschiedenen Äste, deshalb hier so stehen gelassen statt in einen der beiden
+gepresst).
+
+### (3) Kennlinie neu gemessen mit `with_tf32(false)`
+
+Gleiches Modell/gleiche Batch-Punkte wie §11, JSON
+`evaluations/ort_cuda_batch_throughput_tf32off.json` (§11s Datei bleibt
+unangetastet):
+
+| Batch | TF32 aus (Evals/s) | TF32 auf ORT-Default (§11, Lauf 2) | Torch/CUDA |
+| ----: | -------------------: | -----------------------------------: | -----------: |
+|   128 |             54.926,2 |                             61.396,8 |     41.959,3 |
+|   256 |             76.305,3 |                             77.770,4 |     78.896,5 |
+|   512 |             92.892,6 |                             82.030,9 |    162.635,3 |
+
+**Kaum verändert** -- die Differenzen liegen in derselben Größenordnung wie
+die bereits in §11 dokumentierte Lauf-zu-Lauf-Streuung (dort z.B. Batch 44:
+-46 % zwischen zwei Läufen desselben Zustands). Bei 512 ist der TF32-aus-Lauf
+sogar SCHNELLER als der TF32-Default-Lauf -- kein Hinweis auf einen
+systematischen Verlangsamungs-Trend durch das Abschalten, für DIESES kleine
+Modell bei diesen Batchgrößen. GPU-Belegung: Spitzenwert 1.720 MiB, 62,0 W
+(höher als beim TF32-Default-Lauf in §11 -- passt zur Erwartung "mehr
+Rechenaufwand ohne TF32-Abkürzung", auch wenn sich das hier nicht in
+niedrigerem Durchsatz niederschlägt).
+
+### Regel 2 (§4), neu mit `with_tf32(false)`
+
+| Batch | ORT-CUDA (TF32 aus) | Torch/CUDA | Verhältnis |
+| ----: | --------------------: | -----------: | ----------: |
+|   128 |             54.926,2 |     41.959,3 |       1,309 |
+|   256 |             76.305,3 |     78.896,5 |       0,967 |
+|   512 |             92.892,6 |    162.635,3 |       0,571 |
+
+Gleiches Muster wie in §11: am unteren Rand (128) vorn, am einzigen Punkt
+INNERHALB des Fensters (256) knapp darunter, am oberen Rand (512) deutlich
+darunter. Kein Urteil hier.
+
+### Regel 3 (§4), neu mit `with_tf32(false)`
+
+Bezug 5.261,3 Evals/s (N=128, §9/§10, Etikett vom Nutzer bestätigt) bzw.
+4.424,7 (N=11):
+
+| ORT-CUDA-Punkt (TF32 aus) | Faktor gg. N=128 (5.261,3) | Faktor gg. N=11 (4.424,7) |
+| --------------------------: | ---------------------------: | ---------------------------: |
+|          128 (54.926,2) |                       10,4x |                       12,4x |
+|          256 (76.305,3) |                       14,5x |                       17,2x |
+|          512 (92.892,6) |                       17,7x |                       21,0x |
+
+Weiterhin weit über der 2,0x-Schwelle bei jeder Bezugswahl -- die
+"Luft" (7,0x-15,6x in §12) bleibt praktisch erhalten (jetzt 10,4x-21,0x, eher
+etwas GRÖSSER als kleiner).
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `with_tf32(false)` fest in `net_ort.rs::build_session` verdrahtet (kein
+  eigener Knopf) -- Ergebnisgleichheit mit tract ist der Zweck dieses
+  Backends, nicht der letzte Prozentpunkt Durchsatz.
+- Dieselbe Änderung auch im Kennlinien-Beispiel (`ort_cuda_batch_probe.rs`)
+  nachgezogen, damit Produktionscode und Messwerkzeug denselben Zustand
+  messen -- sonst wäre die Kennlinie für den jetzt verdrahteten Code nicht
+  mehr repräsentativ.
+- Neue JSON-Datei statt Überschreiben der §11-Datei -- beide Messpunkte
+  bleiben nachvollziehbar nebeneinander.
+- Die verbleibende 1/1148-Abweichung NICHT in einen der beiden
+  vorgegebenen Äste ("verschwinden" / "bleiben") gepresst, sondern als
+  eigener, unvollständig geklärter Zwischenbefund stehen gelassen.

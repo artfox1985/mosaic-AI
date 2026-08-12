@@ -19,6 +19,12 @@ pub mod net;
 pub mod net_batcher;
 pub mod net_ipc;
 pub mod net_mcts;
+// Weg B (PREREG_gpu_inferenzpfad.md §11, `net.rs::eval_batch`-Rangfolge):
+// nur compiliert, wenn `ort` als optionale Abhaengigkeit ueber dieses
+// Feature aktiv ist (siehe `Cargo.toml`) -- ein Bau ohne das Feature (jeder
+// heutige Wheel-Bau) sieht dieses Modul ueberhaupt nicht.
+#[cfg(feature = "ort_cuda_probe")]
+pub mod net_ort;
 pub mod profiling;
 pub mod provokation;
 pub mod py;

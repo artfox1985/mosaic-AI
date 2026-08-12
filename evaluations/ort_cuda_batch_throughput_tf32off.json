@@ -1,0 +1,40 @@
+{
+  "backend": "ort-cuda",
+  "batches": [
+    1,
+    2,
+    4,
+    8,
+    11,
+    16,
+    22,
+    32,
+    44,
+    64,
+    128,
+    256,
+    512
+  ],
+  "evals_per_s_full_roundtrip": {
+    "1": 916.5515954751255,
+    "11": 9652.81528804783,
+    "128": 54926.19292825266,
+    "16": 12009.262865636045,
+    "2": 1604.9436617958754,
+    "22": 16374.684531361889,
+    "256": 76305.31398790661,
+    "32": 18996.179937340825,
+    "4": 3254.2576134474757,
+    "44": 29742.792476603427,
+    "512": 92892.64067987283,
+    "64": 39105.0580694704,
+    "8": 7281.676543971096
+  },
+  "model": "D:/OneDrive/Documents/Projekte/mosaic-AI/models/alphazero_v21_2d_brierbest.onnx",
+  "note_de": "Volle Zeit je Batch: Merkmalspuffer -> ORT-Eingabetensoren -> session.run -> Vec<f32>-Extraktion. session.run blockiert synchron (kein separates CUDA-synchronize noetig).",
+  "onnxruntime_version": "1.24.2",
+  "onnxruntime_windows_build_tag": "cu12",
+  "ort_version": "2.0.0-rc.12",
+  "reps": 30,
+  "warmup": 10
+}
