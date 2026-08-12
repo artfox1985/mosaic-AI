@@ -335,3 +335,58 @@ hoechsten Spaltenstands. Letztere ist hier die wichtigere -- im Nullpunkt stehen
 36 von 57 Partien bei 5 von 6 Feldern (Abschnitt 9). Unter voller Versorgung muss
 sich diese Verteilung verschieben, wenn Versorgung die Ursache war; bleibt sie bei
 5/6 stehen, ist sie es nicht.
+
+---
+
+## 11. VERDIKT: die Platzierungsseite ist NICHT die Blockade
+
+Korrigierte Fassung (Plattenterm ADDITIV in Punkten, stetige Form, je Kriterium
+gewichtbar, Netz-Stichentscheid als Faktor daneben statt verdraengt).
+Draftingseite in allen Zellen auf w=1 / alpha=1.
+
+| Konfiguration | vertikal | Spalten/20 | Endstand |
+| ------------- | -------: | ---------: | -------: |
+| **Draftingseite allein (Bezug)** | **2,10** | **6** | 45,30 |
+| GEO (nur Kriterium 1), w=0,3-10 | 1,75 | 5 | 45,75 |
+| ALLE, w=0,3 / 1 | 1,40 | 4 | 41,80 / 43,10 |
+| ALLE, w=3 / 10 | 1,05 | 3 | 42,65 / 43,30 |
+
+**Kein Zugewinn.** Die beste Fassung liegt bei 1,75 gegen 2,10 -- eine Spalte
+Unterschied bei n=20, also Rauschen, und um Groessenordnungen entfernt von dem
+Faktor 8, der zum Zielwert fehlt. Die in Abschnitt 5 vorab gesetzte
+Falsifikationsschwelle ("bleiben die vertikalen Punkte unter 3") ist erreicht.
+
+Bemerkenswert: GEO ist auf dem ENDSTAND leicht besser als der Bezug (45,75 gegen
+45,30) bei einer Spalte weniger. Der Term schadet also nicht, er traegt nur nichts
+zum Spaltenbau bei.
+
+### Was diese Vorregistrierung geleistet hat, und was nicht
+
+Die Hypothese ist WIDERLEGT, und das ist ein Ergebnis. Der Weg dorthin brauchte
+aber vier Anlaeufe, weil jeder eine andere FORM des Terms falsch hatte -- keine
+davon eine Dosisfrage, und jede sah in den Zahlen wie ein Sachbefund aus:
+
+| # | Fehler | Symptom |
+| - | ------ | ------- |
+| 1 | `w` kuerzte sich zweimal heraus (Normierung + `max`) | bit-identische Rasterzellen |
+| 2 | multiplikativ statt additiv (`punkte * p_win`) | bit-identische Punkte-Kopf-Zellen |
+| 3 | alles-oder-nichts statt stetig | acht Zellen exakt 0,35 |
+| 4 | Vorrang statt Ergaenzung (meine Auftragsformulierung) | 0,70 statt 2,10 |
+
+**Drei der vier hat der Nutzer aufgedeckt, nicht meine Messung.** Die Lehre ist
+nicht "mehr Zellen fahren", sondern: bei einem Null-Befund zuerst die FORM des
+Eingriffs pruefen, nicht die Dosis. Der billigste Test dafuer bleibt die
+Zahlengleichheit bei gleichen Seeds.
+
+### Naechster Schritt: die Versorgungs-Deckenprobe (Abschnitt 10)
+
+Damit sind Drafting UND Platzierung als Blockade ausgeschlossen. Was bleibt, ist
+die in Abschnitt 10 vorregistrierte Deckenprobe -- und die dort notierte Erwartung
+(weder Versorgung noch Platzierung, sondern DURCHSATZ) hat nach diesem Ergebnis
+mehr Gewicht, bleibt aber eine Erwartung.
+
+Die tragende Zahl fuer den Durchsatz-Verdacht steht in Abschnitt 9: **36 von 57
+Partien erreichen 5 von 6 Feldern.** Das Netz baut auf und schliesst nicht -- und
+weder eine bessere Draftinglenkung noch eine plattenbewusste Platzierung aendert
+das. Genau dieses Muster erwartet man, wenn die letzte Fliese schlicht nicht
+verfuegbar ist.

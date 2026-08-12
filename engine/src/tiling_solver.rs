@@ -1078,7 +1078,25 @@ fn platten_wert(
         .sum()
 }
 
-fn best_first_step_platten_valued(state: &GameState, pi: usize, w: f64) -> Option<TilingStep> {
+/// KORREKTUR 2026-08-12: der Plattenterm ERSETZT den Netz-Stichentscheid nicht
+/// mehr, sondern ergaenzt ihn. Vorher lief dieser Zweig VOR dem Task-#20-Zweig
+/// und verdraengte ihn -- gemessen war das Ergebnis dann 0,70 gegen 2,10 im
+/// Bezug, also schlechter, weil der Vergleich faktisch "Bezug MINUS
+/// Netz-Stichentscheid PLUS Plattenterm" war. Der Fehler steckte in meiner
+/// Auftragsformulierung ("kein Doppelweg"), nicht in der Umsetzung.
+///
+/// Jetzt: `(punkte + w * plattendelta) * p_win` -- der Plattenterm addiert in
+/// PUNKTEN (kann Platzierungspunkte also ueberstimmen), der Netzwert bleibt der
+/// multiplikative Faktor des Bestands. In Runde 1 OHNE den Faktor, weil das
+/// Value-Head dort belegt blind ist (`tiling_solver.rs`-Doku zu Task #20:
+/// RMSE 0,2531 ~ Zielstreuung 0,2538) -- der berechnete Plattenterm wirkt dort
+/// aber trotzdem, er hat keinen Schaetzfehler.
+fn best_first_step_platten_valued(
+    state: &GameState,
+    pi: usize,
+    w: f64,
+    evaluator: Option<&dyn Fn(&GameState) -> f64>,
+) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
     let gew = platten_gewichte();
     // DIFFERENZ, nicht Absolutwert (gemessen 2026-08-12): der Plattenstand VOR
@@ -1096,7 +1114,12 @@ fn best_first_step_platten_valued(state: &GameState, pi: usize, w: f64) -> Optio
             &gew,
             c.final_state.round_number,
         );
-        let val = f64::from(c.points) + w * (nachher - vorher);
+        let basis = f64::from(c.points) + w * (nachher - vorher);
+        // Netzfaktor nur in Runden 2-4, wie im Bestand (Runde 1: Value-Head blind).
+        let val = match evaluator {
+            Some(e) if (2..=4).contains(&state.round_number) => basis * e(&c.final_state),
+            _ => basis,
+        };
         let better = match &best {
             Some((best_val, _)) => val > *best_val,
             None => true,
@@ -1182,13 +1205,22 @@ pub fn best_first_step_exact_or_valued(
     pi: usize,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
 ) -> TilingStep {
-    // Zweig 1 (Task #100): additive Endwertungs-Summe, Runden 1-4, kein Netz
-    // noetig. VOR Zweig 2 geprueft -- entscheidet er, wird Zweig 2 fuer diesen
-    // Zug gar nicht mehr aufgerufen (kein Doppelweg, siehe Doku oben).
+    // Zweig 1 (Task #100), KORRIGIERT 2026-08-12: der Plattenterm ERGAENZT den
+    // Netz-Stichentscheid, statt ihn zu verdraengen. Vorher stand hier "kein
+    // Doppelweg" -- meine eigene Auftragsformulierung -- und dieser Zweig kehrte
+    // frueh zurueck, womit der Netzwert an der Tiling-Wahl gar nicht mehr
+    // teilnahm. Gemessen war das Ergebnis dann 0,70 vertikale Plattenpunkte
+    // gegen 2,10 im Bezug: der Vergleich war faktisch "Bezug MINUS
+    // Netz-Stichentscheid PLUS Plattenterm", also kein Test des Plattenterms.
+    //
+    // Jetzt bekommt `best_first_step_platten_valued` den Evaluator selbst und
+    // bildet `(punkte + w * plattendelta) * p_win` -- die Bestandsform mit dem
+    // Plattenterm in den Punkten. Zweig 2 bleibt fuer den Fall `w == 0`
+    // unveraendert zustaendig.
     if (1..=4).contains(&state.round_number) {
         let w = tiling_platten_weight();
         if w != 0.0 {
-            if let Some(step) = best_first_step_platten_valued(state, pi, w) {
+            if let Some(step) = best_first_step_platten_valued(state, pi, w, evaluator) {
                 return step;
             }
         }
