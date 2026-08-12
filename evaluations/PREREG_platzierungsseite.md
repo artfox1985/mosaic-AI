@@ -390,3 +390,59 @@ Partien erreichen 5 von 6 Feldern.** Das Netz baut auf und schliesst nicht -- un
 weder eine bessere Draftinglenkung noch eine plattenbewusste Platzierung aendert
 das. Genau dieses Muster erwartet man, wenn die letzte Fliese schlicht nicht
 verfuegbar ist.
+
+---
+
+## 12. Deckenprobe GEBAUT und GEFAHREN (2026-08-12, Nutzer-Auftrag "mach das und halte es im prereg auch fest")
+
+### Der Eingriff
+
+`MOSAIC_VOLLE_VERSORGUNG=1` in `state.rs::fill_factories` (Default aus, Paritaet
+geprueft unveraendert): die Fabriken werden deterministisch aus dem vollen
+Farbkreis befuellt statt aus Beutel und Turm. Jede kleine Fabrik traegt 4 Fliesen
+(`TILES_PER_SMALL_FACTORY`) bei 5 Farben -- "alle verfuegbar" gilt also UEBER die
+Fabriken hinweg: jede bekommt einen um ihren Index versetzten Ausschnitt, sodass
+jede Farbe in jeder Runde mehrfach vorkommt. Beutel und Turm werden umgangen, es
+erschoepft also nichts.
+
+**Damit ist der Gegner fuer die VERFUEGBARKEIT gegenstandslos** -- er zieht weiter
+Steine, aber dem Netz fehlt nie eine Farbe. Das ersetzt den vom Nutzer genannten
+"kein Gegner"-Teil, ohne `NUM_PLAYERS` anzutasten (Kompilierzeit-Konstante,
+`state.rs:14`).
+
+**Ausdruecklich ein DIAGNOSE-Knopf**: eine Partie damit ist nicht regelkonform und
+darf nie in ein Gating oder einen Trainingskorpus geraten. Der Kommentar an der
+Codestelle sagt das ebenfalls.
+
+### Die vier Arme
+
+| Arm | Sims | Versorgung | Frage |
+| --- | ---: | ---------- | ----- |
+| `netz_normal` | 400 | normal | der bekannte Bezug |
+| `netz_voll` | 400 | **voll** | hilft Versorgung dem Netz? |
+| `solver_normal` | 1 | normal | was tut der Solver ohnehin? |
+| `solver_voll` | 1 | **voll** | hilft Versorgung dem Solver? |
+
+Der Solver-Arm ist der aussagekraeftigere: er maximiert Platzierungspunkte exakt
+und ist ausserhalb Runde 5 plattenblind. Baut ER unter voller Versorgung Spalten,
+entstehen sie als NEBENPRODUKT der Platzierungsmaximierung -- dann braucht es gar
+keine Injektion, nur Versorgung.
+
+`--net-sims 1` als Solver-Naeherung, nicht als reiner Heuristik-Arm: bei einer
+Simulation entscheidet praktisch der Solver/die Priors, und der Messpfad bleibt
+derselbe (dieselben Seeds, dieselbe Auswertung). **Als Naeherung markiert** -- ein
+echter Heuristik-gegen-Heuristik-Arm liefe ueber einen anderen Einstiegspunkt und
+waere nicht seedgepaart mit den Netz-Armen.
+
+### Messgroesse: die VERTEILUNG, nicht der Mittelwert
+
+Entscheidend ist der hoechste erreichte Spaltenstand je Partie, nicht der
+Plattenpunkt-Mittelwert. Grund steht in Abschnitt 9: im Nullpunkt stehen **36 von
+57 Partien bei 5 von 6 Feldern**. War die Versorgung die Ursache, MUSS sich diese
+Verteilung nach rechts verschieben. Bleibt sie bei 5/6 stehen, ist sie es nicht --
+und dann bleibt der Durchsatz als letzte Erklaerung (21 Fliesen fuer alle sechs
+Musterreihen einmal, 42 fuer zwei Spalten, in fuenf Runden).
+
+Die Schwelle fuer "Versorgung hilft" ist vorab auf **+0,70 vertikale Punkte**
+gesetzt (= zwei Spalten mehr in 20 Partien); alles darunter ist bei der auf 0,35
+gequantelten Metrik nicht unterscheidbar.
