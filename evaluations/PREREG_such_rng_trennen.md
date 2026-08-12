@@ -176,3 +176,18 @@ Wer diese Datei umsetzt, muss das wissen: die Reproduzierbarkeit gilt dann nur b
 AUSGESCHALTETEM Batcher. Die drei Optionen dazu stehen in §17 der anderen Datei;
 Option 1 (Batcher fuer Self-Play, aus fuer Arena/Gating) haelt beide Nutzen
 getrennt verfuegbar, ist aber eine Einschaetzung und nicht gemessen.
+
+---
+
+## 10. ENTSCHÄRFT durch Nutzer-Entscheid 2026-08-12
+
+*"batcher für self play an, arena und gating aus"* (`PREREG_gpu_inferenzpfad.md` §18).
+
+Der Widerspruch aus §9 ist damit aufgelöst, nicht weggeredet: die seed-exakte
+Reproduktion, die diese Vorregistrierung herstellen soll, gilt für **Arena und
+Gating** -- und dort ist der Batcher aus. Im Self-Play ist er an, dort sind die
+Partien Stichproben und die Reproduktion einzelner Partien wird nicht gebraucht.
+
+Der RNG-Schnitt bleibt damit sinnvoll und uneingeschränkt umsetzbar. Wer ihn
+umsetzt, muss nur wissen, dass die Reproduzierbarkeit im Self-Play nicht gilt,
+solange der Batcher dort läuft.
