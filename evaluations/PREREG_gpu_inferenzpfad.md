@@ -307,3 +307,63 @@ anderen Ende taugt nicht. Ein ORT-CUDA-Pfad wuerde an derselben Stelle
   nicht instrumentiert. Welcher der vier Python-Posten wieviel beitraegt, ist offen.
 - Der mittlere Batch 125,90 gilt unter GLEICHFOERMIGER synthetischer Last
   (Gleichschritt-Saettigung), nicht fuer heterogenes echtes Self-Play.
+
+
+---
+
+## 10. WEG B: NICHT MESSBAR -- fehlende CUDA-13-Laufzeit, Nutzer-Entscheidung nötig
+
+### Befund
+
+`ort` v2.0.0-rc.13 (ONNX Runtime 1.28) wurde als OPTIONALE Abhängigkeit
+hinzugefügt (`engine/Cargo.toml`, Feature `ort_cuda_probe`, `required-features` am
+neuen Beispiel `engine/examples/ort_cuda_batch_probe.rs`). `cargo test --lib` ohne
+das Feature: **378 bestanden / 18 ignoriert**, keine Regression.
+
+Der CUDA-Execution-Provider liess sich **nicht registrieren**:
+`onnxruntime_providers_cuda.dll` verlangt `cublasLt64_13.dll`, also die
+**CUDA-13-Laufzeit**. Auf dem Rechner ist kein CUDA-Toolkit installiert (kein
+`CUDA_PATH`, kein `nvcc`, kein Toolkit-Ordner -- geprüft in `System32`, allen
+`PATH`-Ordnern und `Program Files`). Das mitgelieferte `torch 2.12.0+cu126` bringt
+CUDA-**12**-Bibliotheken, deren Namensschema nicht passt; das Python-`onnxruntime`
+(1.27.0) hat nur den CPU-Provider.
+
+**Kein Ersatzlauf auf dem CPU-Provider** -- `error_on_failure()` wurde explizit
+gesetzt, damit der stille ORT-Fallback nicht greift, und das Programm bricht ab.
+Es gibt keine Zahl und keine JSON. Das ist genau richtig: eine ORT-CPU-Kennlinie
+wäre so wertlos wie der Torch-CPU-Lauf, an dem Weg A zuerst scheinbar scheiterte
+(§9).
+
+### Regel 2 und Regel 3 sind nicht anwendbar
+
+Kein Zähler vorhanden. Der Vergleich ORT-CUDA gegen torch bei Batch 140-590
+(41.959 / 78.896 Evals/s laut `gpu_batch_throughput.json`) kann nicht gezogen
+werden.
+
+### NUTZER-ENTSCHEIDUNG
+
+Was fehlt, ist eine **Systeminstallation**, keine Repo-Änderung: CUDA-13-Toolkit-
+Laufzeit (`cudart64_13.dll`, `cublas64_13.dll`, `cublasLt64_13.dll`) plus passendes
+cuDNN. Alternativ ein `ort`-Build gegen CUDA 12, falls es einen gibt -- nicht
+geprüft.
+
+Ohne diese Installation ist Weg B nicht messbar und damit auch nicht
+entscheidbar. **Beide Wege zur GPU sind damit blockiert**: Weg A gemessen
+ungedeckt (§9), Weg B nicht messbar (hier).
+
+### DOKUMENTATIONSLÜCKE in §9 -- vom Agenten aufgedeckt
+
+Die dort genannten Durchsatzzahlen (synchron 4.424,7 bzw. 5.261,3 Evals/s;
+Faktoren 0,30x und 0,55x) stammen aus der **stdout-Ausgabe** des Tests
+`interleaved_throughput_vs_synchronous` und sind **in keiner Datei persistiert** --
+`grep` über `evaluations/*.json` findet sie nicht. Sie sind damit nicht
+nachprüfbar, ohne den Test erneut zu fahren.
+
+Zuordnung geklärt: der "synchrone" Arm läuft bei ausgeschaltetem Knopf über
+`net.eval` und damit über **tract-CPU** -- das Etikett in §9 ist korrekt, der
+Zweifel des Agenten daran ist ausgeräumt. Aber die Zahl gehört in eine JSON, und
+der Test schreibt keine. **Nachzuziehen, wenn der Test das nächste Mal läuft.**
+
+Dieselbe Lehre wie beim veralteten Index (`STATUS.md`, Übergabe-Block): eine
+tragende Zahl, die nur in einem Bericht steht, ist für den Nachfolger nicht
+vorhanden.
