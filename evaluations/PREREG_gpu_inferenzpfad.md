@@ -1073,3 +1073,26 @@ Optionen, keine davon gemessen:
 
 Option 1 ist die naheliegende und kostet nichts, aber sie ist meine Einschaetzung
 und keine Messung -- **ausdruecklich als solche markiert.**
+
+---
+
+## 18. NUTZER-ENTSCHEID 2026-08-12: Option 1
+
+*"batcher für self play an, arena und gating aus"*
+
+Damit ist der Konflikt aus §17 entschieden, und beide Nutzen bleiben verfügbar:
+
+| Kontext | Batcher | Begründung |
+| ------- | ------- | ---------- |
+| **Self-Play** | **AN** | dort zählt Durchsatz; Reproduzierbarkeit einzelner Partien wird nicht gebraucht, die Partien sind Stichproben |
+| **Arena / Gating** | **AUS** | dort zählt Nachvollziehbarkeit; gepaarte Vergleiche und seed-exakte Reproduktion bleiben erhalten |
+
+Umsetzung: der Knopf ist prozessweise schaltbar, also setzt der jeweilige
+Einsprungpunkt ihn -- kein neuer Mechanismus nötig. **Zu beachten**: die
+Self-Play-Treiber müssen ihn AKTIV setzen und die Arena/Gating-Treiber ihn
+AKTIV NICHT setzen; ein Default-aus genügt, aber wer später einen gemeinsamen
+Treiber baut, muss die Trennung mitnehmen.
+
+Folge für die Paritätsprobe: sie prüft Defaults, läuft also weiter über den
+tract-Pfad und bleibt gültig. Der Golden-Hash bleibt der Wächter für Arena und
+Gating -- genau dort, wo er gebraucht wird.
