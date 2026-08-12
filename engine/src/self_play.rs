@@ -1284,7 +1284,23 @@ pub fn run_self_play(
     );
 
     let play = |i: usize| -> Vec<Value> {
-        let mut rng = StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        // Plattengewicht JE PARTIE streuen (Nutzer-Auftrag: *"dann ziehen die
+        // spiele mal mehr und mal weniger richtung wertungsplatten"*). Aus dem
+        // Partie-Seed abgeleitet, also reproduzierbar; thread-lokal gesetzt, weil
+        // mehrere Partien gleichzeitig laufen. `MOSAIC_WERTUNG_STREUUNG_MAX=0`
+        // (Default) laesst es aus und das Bestandsverhalten unberuehrt.
+        //
+        // Sauber fuer die Labels: die Ownership-ZIELE sind die realisierten
+        // Endzustands-Feldlabels -- die sind bei JEDEM Gewicht korrekt. Variiert
+        // wird allein die Zustandsverteilung, aus der gelernt wird.
+        let streuung_max = crate::net_mcts::wertung_streuung_max();
+        crate::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
+            Some(crate::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
+        } else {
+            None
+        });
+        let mut rng = StdRng::seed_from_u64(partie_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
@@ -1348,7 +1364,23 @@ pub fn run_self_play_with_net_labels(
     );
 
     let play = |i: usize| -> Vec<Value> {
-        let mut rng = StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        // Plattengewicht JE PARTIE streuen (Nutzer-Auftrag: *"dann ziehen die
+        // spiele mal mehr und mal weniger richtung wertungsplatten"*). Aus dem
+        // Partie-Seed abgeleitet, also reproduzierbar; thread-lokal gesetzt, weil
+        // mehrere Partien gleichzeitig laufen. `MOSAIC_WERTUNG_STREUUNG_MAX=0`
+        // (Default) laesst es aus und das Bestandsverhalten unberuehrt.
+        //
+        // Sauber fuer die Labels: die Ownership-ZIELE sind die realisierten
+        // Endzustands-Feldlabels -- die sind bei JEDEM Gewicht korrekt. Variiert
+        // wird allein die Zustandsverteilung, aus der gelernt wird.
+        let streuung_max = crate::net_mcts::wertung_streuung_max();
+        crate::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
+            Some(crate::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
+        } else {
+            None
+        });
+        let mut rng = StdRng::seed_from_u64(partie_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = rng.random_range(0..2usize);
         let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
