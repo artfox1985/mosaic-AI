@@ -16,6 +16,7 @@ pub mod game;
 pub mod mcts;
 pub mod moves;
 pub mod net;
+pub mod net_batcher;
 pub mod net_ipc;
 pub mod net_mcts;
 pub mod profiling;

@@ -1735,6 +1735,10 @@ pub fn run_net_arena_match(
 ) -> Result<String, String> {
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
+    // Weg V (Verschraenkung, `net_batcher.rs`): siehe Kommentar in
+    // `run_net_self_play` -- No-Op, wenn `MOSAIC_INTERLEAVE_ENABLED` nicht
+    // gesetzt ist.
+    crate::net_batcher::ensure_batcher_for(&net);
     let n_games = seeds.as_ref().map(|s| s.len()).unwrap_or(n_games);
 
     let play = |i: usize| -> Value {
@@ -2829,6 +2833,11 @@ pub fn run_net_self_play(
     pcr_cheap_sims: u32,
 ) -> Result<String, String> {
     let net = std::sync::Arc::new(Net::load_auto(model_path).map_err(|e| e.to_string())?);
+    // Weg V (Verschraenkung, `net_batcher.rs`): registriert EINMAL je Lauf
+    // einen Sammel-Faden fuer dieses `Arc<Net>`, FALLS
+    // `MOSAIC_INTERLEAVE_ENABLED=1` gesetzt ist -- No-Op sonst (Default),
+    // `net_leaf_eval`/`make_node` bleiben dann unveraendert synchron.
+    crate::net_batcher::ensure_batcher_for(&net);
     let progress_file = open_progress_file(progress_path);
     let move_counter = Arc::new(AtomicU64::new(0));
     let games_counter = Arc::new(AtomicU64::new(0));

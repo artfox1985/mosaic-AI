@@ -1918,6 +1918,57 @@ fn blended_leaf_win_prob_with(
     (1.0 - w) * wr + w * u_pts
 }
 
+/// Verschraenkung (Weg V, `net_batcher.rs`): versucht `feats`s EINZELNE Zeile
+/// ueber den fuer `net` registrierten Sammel-Faden auszuwerten (4-Tupel,
+/// gleicher Vertrag wie `Net::eval`) statt ueber `Net::eval` direkt. `None`
+/// faellt auf den bestehenden synchronen Pfad zurueck (kein registrierter
+/// Sammel-Faden fuer dieses Netz -- Knopf aus ODER `ensure_batcher_for` nie
+/// aufgerufen -- oder ein Fehler im Rundlauf). Braucht keinen
+/// `points_utility_w()`-Wächter wie [`try_batched_pair_ex`] unten: `Net::eval`
+/// kennt `opp_points` von vornherein nicht, der Vertrag ist also IMMER
+/// deckungsgleich mit dem, was der Sammel-Faden liefert.
+fn try_batched_single_eval(
+    net: &Net,
+    feats: &[f32],
+) -> Option<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+    let batcher = crate::net_batcher::lookup(net)?;
+    let mut rows = batcher.eval_rows(&[feats]).ok()?;
+    Some(rows.remove(0))
+}
+
+/// Verschraenkung (Weg V, `net_batcher.rs`): versucht `feats_a`/`feats_b`
+/// (Mover-/geflippte Perspektive) ueber den fuer `net` registrierten
+/// Sammel-Faden auszuwerten (zwei Zeilen desselben logischen Aufrufs, siehe
+/// `Batcher::eval_rows`) statt ueber `Net::eval_pair_ex` direkt -- NUR
+/// sicher, wenn der `opp_points`-Kopf ohnehin unbeobachtet bleibt
+/// (`points_utility_w()==0.0`, Task #28 Default), weil der Sammel-Faden
+/// intern `Net::eval_batch` aufruft (4-Tupel, KEIN `opp_points`). Liefert in
+/// diesem Fall `opp_points`/`o_opp_points` als LEERE Vecs zurueck -- exakt
+/// die etablierte "kein Kopf"-Konvention (`eval_ex`-Doku), mit der
+/// `blended_leaf_win_prob` bei `w==0.0` ohnehin nie in Beruehrung kommt
+/// (frueher Ausstieg VOR jedem `opp_points`-Zugriff, siehe dortiger Code).
+/// `None` (Knopf aus, `w>0`, kein registrierter Sammel-Faden, oder ein
+/// Fehler im Rundlauf) faellt auf den bestehenden synchronen Pfad zurueck --
+/// der Aufrufer bleibt dadurch UNVERAENDERT lauffaehig, egal was hier passiert.
+#[allow(clippy::type_complexity)]
+fn try_batched_pair_ex(
+    net: &Net,
+    feats_a: &[f32],
+    feats_b: &[f32],
+) -> Option<(
+    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+)> {
+    if points_utility_w() != 0.0 {
+        return None;
+    }
+    let batcher = crate::net_batcher::lookup(net)?;
+    let rows = batcher.eval_rows(&[feats_a, feats_b]).ok()?;
+    let (pa, va, ma, pta) = rows[0].clone();
+    let (pb, vb, mb, ptb) = rows[1].clone();
+    Some(((pa, va, ma, pta, Vec::new()), (pb, vb, mb, ptb, Vec::new())))
+}
+
 /// Netz-Blattwert für `state`: unabhängige Pro-Spieler-Werte. Das Netz liefert
 /// einen EGO-perspektivischen Wert (die Input-Features hängen von
 /// `state.current_player` ab, siehe features.rs/state_to_tensor) — für den
@@ -1958,16 +2009,23 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         flipped.current_player = 1 - state.current_player;
         let other_feats = crate::features::features_for_net(net, &flipped);
         // Task #81: Batch=2 (`eval_pair` buendelt Mover+Gegner-Pass). Task #28:
-        // `eval_pair_ex` (siehe Kommentar oben zu `eval_ex`).
+        // `eval_pair_ex` (siehe Kommentar oben zu `eval_ex`). Weg V
+        // (Verschraenkung, `net_batcher.rs`): `try_batched_pair_ex` versucht
+        // ZUERST den registrierten Sammel-Faden -- `None` (Knopf aus ist der
+        // Default) faellt byte-identisch auf den bisherigen synchronen
+        // `eval_pair_ex`-Aufruf zurueck.
         let ((_logits, value, _moon, points, opp_points), (_o_logits, o_value, _o_moon, o_points, o_opp_points)) =
-            crate::profiling::timed_net_eval(2, || {
-                net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
-                    (
-                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                    )
-                })
-            });
+            match try_batched_pair_ex(net, &feats, &other_feats) {
+                Some(pair) => pair,
+                None => crate::profiling::timed_net_eval(2, || {
+                    net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
+                        (
+                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        )
+                    })
+                }),
+            };
         (
             blended_leaf_win_prob(&value, &points, &opp_points),
             blended_leaf_win_prob(&o_value, &o_points, &o_opp_points),
@@ -2012,13 +2070,18 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
         crate::features::features_for_net(net, state)
     });
-    // Task #81: Batch=1.
-    let (logits, _value, moon, _points) =
-        crate::profiling::timed_net_eval(1, || {
+    // Task #81: Batch=1. Weg V (Verschraenkung, `net_batcher.rs`):
+    // `try_batched_single_eval` versucht ZUERST den registrierten
+    // Sammel-Faden -- `None` (Knopf aus ist der Default) faellt
+    // byte-identisch auf den bisherigen synchronen `eval`-Aufruf zurueck.
+    let (logits, _value, moon, _points) = match try_batched_single_eval(net, &feats) {
+        Some(row) => row,
+        None => crate::profiling::timed_net_eval(1, || {
             net.eval(&feats).unwrap_or_else(|_| {
                 (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
-        });
+        }),
+    };
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
         moon_scores[i] = *s;
@@ -2087,18 +2150,29 @@ fn make_node<R: Rng + ?Sized>(
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let other_feats = crate::features::features_for_net(net, &flipped);
-            // Task #81: Batch=2 (`eval_pair`).
+            // Task #81: Batch=2 (`eval_pair`). Weg V (Verschraenkung,
+            // `net_batcher.rs`): `try_batched_pair_ex` versucht ZUERST den
+            // registrierten Sammel-Faden -- `None` (Knopf aus ist der
+            // Default) faellt byte-identisch auf den bisherigen synchronen
+            // `eval_pair_ex`-Aufruf zurueck. Dies ist der DOMINANTE
+            // Netz-Aufrufpfad (`same_net=true`, `need_other_pass=true` bei
+            // `USE_GUMBEL_SEARCH=true`/`MIRROR_OTHER_VAL=false`, dem heutigen
+            // Produktions-Stand) -- die eigentliche Ziel-Stelle der
+            // Verschraenkung.
             let (
                 (logits, value, moon, points, opp_points),
                 (_o_logits, o_value, _o_moon, o_points, o_opp_points),
-            ) = crate::profiling::timed_net_eval(2, || {
-                net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
-                    (
-                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                    )
-                })
-            });
+            ) = match try_batched_pair_ex(net, &feats, &other_feats) {
+                Some(pair) => pair,
+                None => crate::profiling::timed_net_eval(2, || {
+                    net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
+                        (
+                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        )
+                    })
+                }),
+            };
             (logits, value, moon, points, opp_points, Some((o_value, o_points, o_opp_points)))
         } else {
             // Task #81: Batch=1.
@@ -8218,5 +8292,413 @@ mod tests {
                 println!("  record #{idx}: tract={gap_t:.6}  torch={gap_p:.6}");
             }
         }
+    }
+
+    // ── Weg V (Verschraenkung, `net_batcher.rs`), Nutzer-Auftrag 2026-08-12
+    // "dann leg los" -- ABNAHME Punkte 2+3. Wiederverwendet die Helfer aus dem
+    // Policy-Tor-Block oben (`legal_logits_sorted`, `gumbel_topm_set`,
+    // `ChildGuard`) statt sie neu zu bauen.
+
+    /// ABNAHME Punkt 2: ENTSCHEIDUNGSGLEICHHEIT synchron<->verschraenkt, mit
+    /// derselben Messkette wie
+    /// `policy_head_deviation_effect_on_gumbel_root_selection` (Argmax +
+    /// Gumbel-Top-m auf denselben 1148 Zustaenden), aber "synchron" (EIN
+    /// `Net::eval_batch(&[feats])`-Aufruf je Zustand, heutiges Verhalten)
+    /// gegen "verschraenkt" (derselbe `eval_batch`-Vertrag, aber ueber den
+    /// registrierten Sammel-Faden UND mit `N_THREADS` GLEICHZEITIGEN
+    /// Aufrufern, die ihre Zeilen tatsaechlich miteinander mischen koennen).
+    /// Gleiches Backend (tract) auf beiden Seiten -- der einzige Unterschied
+    /// ist die Batch-KOMPOSITION, nicht die Inferenz-Maschinerie (anders als
+    /// beim tract<->torch-Vergleich oben also KEIN Cross-Framework-Vorbehalt
+    /// noetig, nur der schon existierende "tract ist ueber verschiedene
+    /// Batch-Plaene nicht bitgleich"-Praezedenzfall, `net.rs:840`).
+    ///
+    /// Berichtet nebenbei den TATSAECHLICH erreichten mittleren Batch
+    /// (`Batcher::stats`) -- ABNAHME Punkt 3s zweite Haelfte, hier OHNE
+    /// synthetische Baumarbeit zwischen zwei Anfragen (`N_THREADS` Faeden
+    /// senden so schnell wie moeglich hintereinander) -- das ist also der
+    /// MECHANISCH ERREICHBARE Batch bei Sattelung, NICHT die realistische
+    /// Zahl unter echter Baumarbeit (die liefert
+    /// `interleaved_throughput_vs_synchronous_realistic_duty` unten).
+    ///
+    /// `#[ignore]`: braucht das lokale ONNX UND die exportierte JSON-Datei.
+    /// KEIN Python/Torch noetig (reiner tract-Vergleich, kein IPC-Kanal).
+    #[test]
+    #[ignore]
+    fn interleaved_matches_synchronous_gumbel_root_selection() {
+        use crate::net::Net;
+        use std::collections::VecDeque;
+        use std::sync::{Arc, Mutex};
+
+        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
+            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(&states_path) else {
+            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
+            return;
+        };
+        let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
+        assert!(!records.is_empty());
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
+        if !onnx_path.exists() {
+            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
+            return;
+        }
+        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
+            Ok(n) => Arc::new(n),
+            Err(e) => {
+                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
+                return;
+            }
+        };
+
+        let mut states: Vec<GameState> = Vec::with_capacity(records.len());
+        let mut record_indices: Vec<usize> = Vec::with_capacity(records.len());
+        for entry in &records {
+            let record_index = entry["record_index"].as_u64().unwrap() as usize;
+            let mut rng = StdRng::seed_from_u64(record_index as u64);
+            match crate::serialize::json_to_state(&entry["state"], &mut rng) {
+                Ok(s) => {
+                    states.push(s);
+                    record_indices.push(record_index);
+                }
+                Err(e) => eprintln!("  ⚠️  record #{record_index}: json_to_state fehlgeschlagen ({e}) -- ausgelassen."),
+            }
+        }
+        let feats: Vec<Vec<f32>> = states.iter().map(|s| crate::features::features_for_net(&net, s)).collect();
+
+        // ── ARM 1: synchron (heutiges Verhalten, Batch=1 je Zustand) ──
+        let mut sync_policy: Vec<Vec<f32>> = Vec::with_capacity(states.len());
+        let mut sync_moon: Vec<Vec<f32>> = Vec::with_capacity(states.len());
+        for f in &feats {
+            let (p, _v, m, _pt) = net.eval_batch(&[f.as_slice()]).expect("eval_batch(1)").remove(0);
+            sync_policy.push(p);
+            sync_moon.push(m);
+        }
+
+        // ── ARM 2: verschraenkt (Sammel-Faden, N_THREADS gleichzeitige Aufrufer) ──
+        std::env::set_var("MOSAIC_INTERLEAVE_ENABLED", "1");
+        std::env::set_var("MOSAIC_INTERLEAVE_BATCH_MAX", crate::net::EVAL_BATCH_MAX_N.to_string());
+        std::env::set_var("MOSAIC_INTERLEAVE_FILL_TIMEOUT_US", "200");
+        crate::net_batcher::ensure_batcher_for(&net);
+        let batcher = crate::net_batcher::lookup(&net).expect("Sammel-Faden sollte registriert sein");
+
+        const N_THREADS: usize = 32;
+        let idx_queue: Arc<Mutex<VecDeque<usize>>> = Arc::new(Mutex::new((0..states.len()).collect()));
+        let inter_results: Arc<Mutex<Vec<Option<(Vec<f32>, Vec<f32>)>>>> =
+            Arc::new(Mutex::new(vec![None; states.len()]));
+        let feats_arc = Arc::new(feats);
+
+        let mut handles = Vec::new();
+        for _ in 0..N_THREADS {
+            let idx_queue = Arc::clone(&idx_queue);
+            let inter_results = Arc::clone(&inter_results);
+            let batcher = Arc::clone(&batcher);
+            let feats_arc = Arc::clone(&feats_arc);
+            handles.push(std::thread::spawn(move || loop {
+                let idx = idx_queue.lock().unwrap().pop_front();
+                let Some(idx) = idx else { break };
+                let row = batcher.eval_rows(&[feats_arc[idx].as_slice()]).expect("eval_rows");
+                let (p, _v, m, _pt) = row.into_iter().next().unwrap();
+                inter_results.lock().unwrap()[idx] = Some((p, m));
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let inter_results = Arc::try_unwrap(inter_results).unwrap().into_inner().unwrap();
+
+        println!(
+            "Sammel-Faden (Saettigung, keine Baumarbeit zwischen Anfragen): {} Batches, {} Zeilen, mittlerer Batch = {:.2}",
+            batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed),
+            batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed),
+            batcher.stats.mean_batch()
+        );
+
+        // ── Vergleich: Argmax + Gumbel-Top-m, wie im Policy-Tor-Test ──
+        let m_for_400_sims = gumbel_top_m_for_budget(400);
+        let mut n_total = 0usize;
+        let mut n_argmax_mismatch = 0usize;
+        let mut n_topm_mismatch = 0usize;
+
+        for i in 0..states.len() {
+            let state = &states[i];
+            let (inter_policy, inter_moon) = inter_results[i].clone().expect("jede Zeile sollte beantwortet sein");
+
+            let sorted_sync = legal_logits_sorted(state, &sync_policy[i]);
+            let sorted_inter = legal_logits_sorted(state, &inter_policy);
+            assert_eq!(sorted_sync.len(), sorted_inter.len(), "record #{}: unterschiedliche Legal-ID-Menge?!", record_indices[i]);
+            if sorted_sync.is_empty() {
+                continue;
+            }
+            n_total += 1;
+            if sorted_sync[0].0 != sorted_inter[0].0 {
+                n_argmax_mismatch += 1;
+            }
+
+            let mut moon_arr_sync = [0f32; 5];
+            for (j, s) in sync_moon[i].iter().take(5).enumerate() {
+                moon_arr_sync[j] = *s;
+            }
+            let mut moon_arr_inter = [0f32; 5];
+            for (j, s) in inter_moon.iter().take(5).enumerate() {
+                moon_arr_inter[j] = *s;
+            }
+            let (acts_sync, _) = build_untried_actions(state, &sync_policy[i], &moon_arr_sync, true);
+            let (acts_inter, _) = build_untried_actions(state, &inter_policy, &moon_arr_inter, true);
+            assert_eq!(acts_sync.len(), acts_inter.len(), "record #{}: unterschiedliche Kandidatenzahl?!", record_indices[i]);
+            let n_root = acts_sync.len();
+            let m_prime = m_for_400_sims.min(n_root);
+
+            let seed = 900_000_000u64 + record_indices[i] as u64;
+            let mut rng_a = StdRng::seed_from_u64(seed);
+            let mut rng_b = StdRng::seed_from_u64(seed);
+            let set_sync = gumbel_topm_set(&acts_sync, m_prime, &mut rng_a);
+            let set_inter = gumbel_topm_set(&acts_inter, m_prime, &mut rng_b);
+            let matches = set_sync.len() == set_inter.len() && set_sync.iter().all(|a| set_inter.contains(a));
+            if !matches {
+                n_topm_mismatch += 1;
+            }
+        }
+
+        println!("\n=== Entscheidungsgleichheit synchron<->verschraenkt (Weg V) ===");
+        println!("Stellungen verarbeitet: {n_total}");
+        println!(
+            "Argmax-Abweichung:      {n_argmax_mismatch}/{n_total} ({:.4}%)",
+            n_argmax_mismatch as f64 / n_total as f64 * 100.0
+        );
+        println!(
+            "Top-{m_for_400_sims}-Mengen-Abweichung: {n_topm_mismatch}/{n_total} ({:.4}%)",
+            n_topm_mismatch as f64 / n_total as f64 * 100.0
+        );
+    }
+
+    /// Realistische "Baumarbeit" zwischen zwei Blattanfragen EINES Fadens --
+    /// HERGELEITET (NICHT frisch gemessen fuer dieses Modell/diese Maschine),
+    /// aus `evaluations/selfplay_time_profile.json`: Netz-Anteil 61,96% der
+    /// Gesamtzeit (4845457676500ns) ueber 1.314.962 Netz-Aufrufe ->
+    /// `(1-0.6196)*4845457676500/1314962 ≈ 1.401.723ns ≈ 1,40ms` "Rest" je
+    /// Netz-Aufruf (Tiling+Bootstrap+R5+Rest-Kategorien zusammen). Diese
+    /// Herleitung selbst ist in dieser Sitzung NICHT nachgemessen worden
+    /// (andere Maschine/anderes Modell als hier) -- als Naeherung markiert.
+    const SYNTHETIC_TREE_WORK: std::time::Duration = std::time::Duration::from_micros(1402);
+
+    /// Busy-Spin (bewusst KEIN `thread::sleep`) fuer ungefaehr `dur`: reale
+    /// Baumarbeit (Tiling-Solver, Board-Updates) ist CPU-gebunden und
+    /// konkurriert dadurch mit ANDEREN Faeden um Kerne -- ein `sleep` wuerde
+    /// den Kern freigeben und damit die Kernkonkurrenz-Dynamik verfaelschen,
+    /// die genau hier nachgebildet werden soll. Kalibrierung ist grob
+    /// (Wall-Clock-Polling), fuer den Zweck (Duty-Verhaeltnis nachbilden,
+    /// nicht Zyklen zaehlen) ausreichend.
+    fn busy_spin(dur: std::time::Duration) {
+        let t0 = std::time::Instant::now();
+        let mut x: u64 = 0xDEAD_BEEF;
+        while t0.elapsed() < dur {
+            x = x.wrapping_add(1).wrapping_mul(2654435761);
+        }
+        std::hint::black_box(x);
+    }
+
+    /// ABNAHME Punkt 3: Evals/s verschraenkt gegen synchron, bei einer
+    /// realistischen Fadenzahl -- UND der tatsaechlich erreichte mittlere
+    /// Batch UNTER ECHTER (synthetischer, aber kalibrierter) Baumarbeit
+    /// zwischen den Anfragen (`SYNTHETIC_TREE_WORK`) -- das ist die Zahl, die
+    /// `interleave_concurrency_probe.rs` offenlassen musste (dortige Faeden
+    /// taten zwischen zwei Anfragen NICHTS, Bestfall fuer die Fuellung).
+    ///
+    /// DREI Arme, gleiche Zustaende/Merkmale, gleiche Fadenzahl:
+    /// 1. **Synchron** (heutiges Verhalten): `Net::eval_batch(&[feats])`
+    ///    direkt, kein Sammel-Faden.
+    /// 2. **Verschraenkt, tract**: derselbe Aufruf ueber den Sammel-Faden,
+    ///    IPC-Knopf AUS -- isoliert die Wirkung der Buendel-MECHANIK allein.
+    /// 3. **Verschraenkt, Torch/CUDA-IPC**: wie 2, aber `net_ipc.rs`s Kanal
+    ///    zusaetzlich eingeschaltet (`tools/torch_ipc_server.py`, `--device
+    ///    cpu` -- SIEHE DORTIGE EINSCHRAENKUNG: CPU, nicht GPU, dieselbe
+    ///    Baustelle wie beim Policy-Tor-Toleranztest, kein neuer Vorbehalt).
+    ///
+    /// `#[ignore]`: braucht das lokale ONNX+`.pth`-Paar; Arm 3 zusaetzlich
+    /// `python`+torch (spawnt den Server selbst, `ChildGuard`).
+    #[test]
+    #[ignore]
+    fn interleaved_throughput_vs_synchronous() {
+        use crate::net::Net;
+        use std::sync::Arc;
+        use std::time::{Duration, Instant};
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
+        let pth_path = repo.join("models/alphazero_v20_2d_opp_brierbest.pth");
+        if !onnx_path.exists() {
+            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
+            return;
+        }
+        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
+            Ok(n) => Arc::new(n),
+            Err(e) => {
+                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
+                return;
+            }
+        };
+
+        // Ein paar echte Drafting-Zustaende (kein frozen-Set noetig hier --
+        // reiner Durchsatz-/Batch-Test, keine Entscheidungs-Analyse).
+        let mut rng = StdRng::seed_from_u64(20260812);
+        let mut pool: Vec<Vec<f32>> = Vec::new();
+        for tag in 0..64u64 {
+            if let Some(s) = random_drafting_state(tag, 5 + (tag % 7) as u32, &mut rng) {
+                pool.push(crate::features::features_for_net(&net, &s));
+            }
+        }
+        if pool.is_empty() {
+            eprintln!("  ⚠️  keine Drafting-Zustaende erzeugbar -- Test uebersprungen.");
+            return;
+        }
+        let pool = Arc::new(pool);
+
+        const N_THREADS: usize = 11; // heutige Selfplay-Konvention (siehe Bericht).
+        const ITERS_PER_THREAD: usize = 60;
+
+        // ── Arm 1: synchron ──
+        let t0 = Instant::now();
+        let handles: Vec<_> = (0..N_THREADS)
+            .map(|tid| {
+                let net = Arc::clone(&net);
+                let pool = Arc::clone(&pool);
+                std::thread::spawn(move || {
+                    for it in 0..ITERS_PER_THREAD {
+                        let f = &pool[(tid * 7 + it) % pool.len()];
+                        let _ = net.eval_batch(&[f.as_slice()]).expect("eval_batch(1)");
+                        busy_spin(SYNTHETIC_TREE_WORK);
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        let sync_elapsed = t0.elapsed();
+        let total_evals = (N_THREADS * ITERS_PER_THREAD) as f64;
+        let sync_rate = total_evals / sync_elapsed.as_secs_f64();
+
+        // ── Arm 2: verschraenkt, tract (IPC-Knopf AUS) ──
+        std::env::set_var("MOSAIC_INTERLEAVE_ENABLED", "1");
+        std::env::set_var("MOSAIC_INTERLEAVE_BATCH_MAX", crate::net::EVAL_BATCH_MAX_N.to_string());
+        std::env::set_var("MOSAIC_INTERLEAVE_FILL_TIMEOUT_US", "200");
+        crate::net_batcher::ensure_batcher_for(&net);
+        let batcher = crate::net_batcher::lookup(&net).expect("Sammel-Faden sollte registriert sein");
+        let batches_before = batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed);
+        let rows_before = batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed);
+
+        let t1 = Instant::now();
+        let handles: Vec<_> = (0..N_THREADS)
+            .map(|tid| {
+                let batcher = Arc::clone(&batcher);
+                let pool = Arc::clone(&pool);
+                std::thread::spawn(move || {
+                    for it in 0..ITERS_PER_THREAD {
+                        let f = &pool[(tid * 7 + it) % pool.len()];
+                        let _ = batcher.eval_rows(&[f.as_slice()]).expect("eval_rows");
+                        busy_spin(SYNTHETIC_TREE_WORK);
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        let inter_tract_elapsed = t1.elapsed();
+        let inter_tract_rate = total_evals / inter_tract_elapsed.as_secs_f64();
+        let batches_delta = batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed) - batches_before;
+        let rows_delta = batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed) - rows_before;
+        let mean_batch_tract = if batches_delta > 0 { rows_delta as f64 / batches_delta as f64 } else { 0.0 };
+
+        println!("\n=== Durchsatz verschraenkt<->synchron (Weg V), N={N_THREADS} Faeden, {ITERS_PER_THREAD} Iters/Faden ===");
+        println!("Synchron            : {sync_rate:.1} Evals/s ({sync_elapsed:?})");
+        println!(
+            "Verschraenkt (tract) : {inter_tract_rate:.1} Evals/s ({inter_tract_elapsed:?}), mittlerer Batch = {mean_batch_tract:.2} ({batches_delta} Batches, {rows_delta} Zeilen)"
+        );
+
+        // ── Arm 3: verschraenkt + Torch/CUDA-IPC ──
+        struct ChildGuard(std::process::Child);
+        impl Drop for ChildGuard {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        if !pth_path.exists() {
+            eprintln!("  ⚠️  {pth_path:?} fehlt -- Arm 3 (Torch-IPC) uebersprungen.");
+            return;
+        }
+        let port: u16 = 18850;
+        let shm_dir = std::env::temp_dir().join("mosaic_torch_ipc_test_throughput");
+        std::env::set_var("MOSAIC_TORCH_IPC_PORT", port.to_string());
+        std::env::set_var("MOSAIC_TORCH_IPC_SHM_DIR", shm_dir.to_str().unwrap());
+        std::env::set_var("MOSAIC_TORCH_IPC_ENABLED", "1");
+
+        let server_script = repo.join("tools/torch_ipc_server.py");
+        let _child = match std::process::Command::new("python")
+            .arg(&server_script)
+            .arg("--model")
+            .arg(&pth_path)
+            .arg("--port")
+            .arg(port.to_string())
+            .arg("--shm-dir")
+            .arg(&shm_dir)
+            .arg("--device")
+            .arg("cuda") // Nutzer-Auftrag 2026-08-12: DER Punkt, auf den Weg V hinauslaeuft -- CPU-Torch-Arm kann strukturell nicht gewinnen (siehe Bericht).
+            .spawn()
+        {
+            Ok(c) => ChildGuard(c),
+            Err(e) => {
+                eprintln!("  ⚠️  Python-Server nicht startbar ({e}) -- Arm 3 uebersprungen.");
+                return;
+            }
+        };
+        let addr: std::net::SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+        let mut ready = false;
+        for _ in 0..300 {
+            if std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok() {
+                ready = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        if !ready {
+            eprintln!("  ⚠️  Python-Server nach 60s nicht erreichbar -- Arm 3 uebersprungen.");
+            return;
+        }
+
+        let batches_before = batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed);
+        let rows_before = batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed);
+        let t2 = Instant::now();
+        let handles: Vec<_> = (0..N_THREADS)
+            .map(|tid| {
+                let batcher = Arc::clone(&batcher);
+                let pool = Arc::clone(&pool);
+                std::thread::spawn(move || {
+                    for it in 0..ITERS_PER_THREAD {
+                        let f = &pool[(tid * 7 + it) % pool.len()];
+                        let _ = batcher.eval_rows(&[f.as_slice()]).expect("eval_rows");
+                        busy_spin(SYNTHETIC_TREE_WORK);
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        let inter_torch_elapsed = t2.elapsed();
+        let inter_torch_rate = total_evals / inter_torch_elapsed.as_secs_f64();
+        let batches_delta2 = batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed) - batches_before;
+        let rows_delta2 = batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed) - rows_before;
+        let mean_batch_torch = if batches_delta2 > 0 { rows_delta2 as f64 / batches_delta2 as f64 } else { 0.0 };
+
+        println!(
+            "Verschraenkt (torch) : {inter_torch_rate:.1} Evals/s ({inter_torch_elapsed:?}), mittlerer Batch = {mean_batch_torch:.2} ({batches_delta2} Batches, {rows_delta2} Zeilen)"
+        );
     }
 }
