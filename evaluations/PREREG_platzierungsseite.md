@@ -501,3 +501,87 @@ in einer einzigen Arena-Partie nur die Zugwahl verschieben, nicht die Bewertung
 neu lernen. Der Sprung auf 14 waere dann kein Injektions-Ergebnis, sondern ein
 TRAININGS-Ergebnis -- und die Injektion nur das Werkzeug, das den Korpus dafuer
 erzeugt. **Als Lesart markiert, nicht gemessen.**
+
+---
+
+## 14. ERGEBNIS DER DECKENPROBE + die Farbschranke (2026-08-12)
+
+### Versorgung ist NICHT die Blockade -- gemessen
+
+| Arm | vertikal | Verteilung hoechster Spaltenstand | 6/6 | Endstand |
+| --- | -------: | --------------------------------- | --: | -------: |
+| Netz, normal | 1,05 | 4->6, **5->12**, 6->2 | 2/20 | 47,80 |
+| Netz, **volle Versorgung** | 0,70 | 3->1, 4->5, **5->14** | **0/20** | 46,20 |
+
+Die Verteilung verschiebt sich NICHT nach rechts -- sie sammelt sich noch staerker
+bei 5 von 6. Die vorab gesetzte Schwelle (+0,70) ist klar verfehlt.
+
+### Der Solver-Arm ist GESCHEITERT, nicht nur ungenau
+
+`--net-sims 1` lieferte Endstand **8,30** bei 0 von 20 Siegen -- das ist kein
+Solver, sondern ein Spieler ohne Suche. Der vom Nutzer gewuenschte Vergleich
+("was macht das netz UND der solver dann") hat damit **nicht stattgefunden**. Ich
+hatte es als "Naeherung" markiert; das war zu milde. Ein echter Solver-Arm braucht
+den Heuristik-Einstiegspunkt, nicht ein kastriertes Netz.
+
+Ein Nebenbefund aus genau diesem kaputten Arm ist aber verwertbar: selbst er
+erreicht in 14 von 20 Partien 4 von 6 Feldern. **Bis 4/6 kommt man fast von
+allein; die letzten ein bis zwei Felder kommen nie.**
+
+### DIE FARBSCHRANKE -- was ich die ganze Nacht nicht geprueft habe
+
+`dome.rs:61-70`:
+
+```text
+match self.space_type {
+    SpaceType::Normal => Some(color) == self.required_color,
+    SpaceType::Wild   => true,
+    SpaceType::Special => false,
+}
+```
+
+**Jede normale Kuppelzelle verlangt GENAU EINE Farbe.** Eine Spalte zu schliessen
+heisst damit: fuer jede ihrer sechs Zellen muss die zuliefernde Musterreihe mit
+exakt der Farbe gefuellt sein, die diese Zelle fordert -- und eine Musterreihe
+traegt nur EINE Farbe (`board.rs`, `PatternLine::color`). Sechs Zellen, sechs
+festgelegte Farben, je eine Musterreihe, deren Kapazitaet r+1 Fliesen dieser
+einen Farbe verlangt.
+
+### Die Kette schliesst sich, und die Ursache ist keine Bewertungsfrage
+
+**Volle Versorgung hat die Farbschranke aufgehoben** -- jede Farbe war jederzeit
+draftbar. Es half NICHT. Das Material war da, der Plan nicht.
+
+Eine Spalte verlangt eine **Farbfestlegung je Musterreihe, auf eine bestimmte
+Spalte gerichtet, ueber mehrere Runden gehalten**. Das ist eine ABSICHT, keine
+Stellungsbewertung -- und deshalb war sie mit keiner der vier Termformen dieser
+Nacht erreichbar. Alle vier bewerten einen Zustand; keine kann eine mehrrundige
+Farbzusage darstellen.
+
+### Was daraus folgt -- und es ist der Nutzer-Plan von Anfang an
+
+Ausgeschlossen sind jetzt, jeweils gemessen: Drafting-Dosis (Decke 2,10),
+Platzierung (kein Zugewinn), Versorgung (kein Zugewinn), Durchsatz
+(Nutzer-Auskunft: Menschen tun es routinemaessig, und meine Rechnung war falsch,
+§13).
+
+Was bleibt, ist die **rundenuebergreifende Absicht** -- und die ist im Projekt als
+harte Anforderung bekannt (`feedback_dfs_leaf_ruled_out`). Zwei Wege, und der
+zweite ist der vom Nutzer geplante:
+
+1. **Sichtweite**: 400 Simulationen mit Rundenuebergangs-Sampling sehen eine
+   Absicht ueber vier Runden womoeglich nicht. Pruefbar ueber einen Sim-Sweep
+   (400 / 1600 / 6400) auf denselben Seeds -- steigen die Spaltenabschluesse mit
+   dem Budget, ist es Sichtweite.
+2. **Lernen**: der Korpus stammt aus Self-Play eines Champions, der keine Spalten
+   baut. Die Politik kann nicht bewerten, was in ihrer Erfahrung nicht vorkommt.
+   Genau dafuer ist die Injektion im Nutzer-Plan gedacht: sie erzeugt Partien, in
+   denen die Zuege VORKOMMEN, das gestreute Gewicht je Partie sorgt fuer Vielfalt
+   (`PREREG_injektion_wertungsplatten.md` N2), der Ownership-Kopf lernt daran, und
+   danach kann die Injektion abgeschaltet werden.
+
+**Der Sprung auf 14 waere demnach kein Injektions-Ergebnis, sondern ein
+TRAININGS-Ergebnis** -- und die Injektion nur das Werkzeug, das den Korpus dafuer
+erzeugt. Dass sie das Verhalten messbar bewegt (1,05 -> 2,10, also verdoppelt),
+ist unter dieser Lesart genau ihre Aufgabe und kein Fehlschlag. **Als Lesart
+markiert; Weg 1 ist der billigere Test und sollte zuerst laufen.**
