@@ -178,3 +178,67 @@ Policy-Abweichung die Zugwahl?
   gehaltene Parität und begrenzt gleichzeitig die Aussagekraft des Umbaus.
 - Kein Retry nach einmal erkannter Nichterreichbarkeit: ein später gestarteter
   Server wird erst nach Rust-Neustart gesehen.
+
+
+---
+
+## 8. POLICY-TOR: WIRKUNGSLOS -- Weg A auf der Inferenz-Achse abgenommen
+
+Die Toleranzueberschreitung aus §7 (Policy 3,4e-5 gegen 1e-5) wurde auf ihre
+WIRKUNG gemessen statt auf die Zahl. Grund: der Policy-Kopf setzt die Priors der
+Gumbel-Wurzelauswahl, und eine Logit-Differenz, die die RANGFOLGE nicht aendert,
+ist gleichgueltig.
+
+Alle **1148** Drafting-Zustaende aus `frozen_eval_set_v2.pkl`, nur legale Aktionen:
+
+| Metrik | Abweichungen | Rate |
+| ------ | -----------: | ---: |
+| **Argmax** (hoechster Logit unter den legalen Aktionen) | **0 / 1148** | **0,00 %** |
+| **Gumbel-Top-16-Menge** (echte Wurzel-Kandidatenziehung, gleicher Seed je Backend) | **0 / 1148** | **0,00 %** |
+
+Logit-Abstaende in Abweichungsfaellen: keine, weil es keine gab.
+
+### Damit ist die vorab festgelegte Deutung eingetreten
+
+Der 0-%-Fall war vorab so festgeschrieben: *"die Toleranzueberschreitung ist
+wirkungslos, die 1e-5-Marke ist fuer tract-gegen-torch die falsche Marke, und das
+ist dann mit der Wirkung begruendet statt mit dem Wunsch."*
+
+**Die 1e-5-Marke stammt aus dem tract-gegen-tract-Vergleich verschiedener
+Batch-Plaene** (`net.rs:820/830/864/875`). Fuer einen Vergleich zweier
+verschiedener Inferenz-Maschinerien ist sie nicht die passende Groesse -- die
+passende ist die Entscheidungsgleichheit, und die ist 1148 von 1148 gegeben.
+
+**Weg A ist auf der Inferenz-Achse abgenommen.** Nicht abgenommen ist der
+Durchsatz -- siehe unten.
+
+### Was GEPRUEFT ist und was RELAYED
+
+Selbst nachgeprueft: die 1148 stimmen mit einer UNABHAENGIGEN Quelle ueberein
+(`oracle_v21_own02.json` nennt `n_labeled: 1148`); die m-Formel
+(`net_mcts.rs:2456-2461`) gibt fuer 400 Sims tatsaechlich 16. Die 0/1148 selbst ist
+die Messung des Agenten, von mir nicht wiederholt.
+
+**Vorbehalt, vom Agenten selbst benannt**: EIN Gumbel-Seed je Zustand, nicht
+mehrere. Ueber 1148 Zustaende sind das 1148 unabhaengige Ziehungen, also breite
+Abdeckung -- ein Wiederholungslauf je Zustand waere strenger und ist der
+naheliegende Nachschlag, falls jemand daran zweifelt.
+
+### Der Durchsatz ist damit NICHT abgenommen -- und das ist der naechste Schritt
+
+Der Kanal deckelt bei **Batch 16** (`EVAL_BATCH_MAX_N`), die gemessene Gewinnzone
+beginnt bei **Batch 128**. Ein Test bei 16 wuerde eine garantierte Niederlage
+liefern und nichts ueber Weg A aussagen, sondern nur ueber den Deckel: die CPU
+macht 1.600-3.200 Evals/s je Faden bei elf Faeden, eine GPU bei Batch 16
+amortisiert ihren Kernel-Aufwand ueber zu wenige Elemente.
+
+**Reihenfolge fuer den naechsten Bauschritt**:
+
+1. **Verschraenkung** (§5, bisher ausgeschlossen) -- sie ist das einzige Stueck,
+   das Batch 256 erzeugt und damit den gemessenen Vorteil (2,6-5,3x) abruft.
+2. **Dann** der Durchsatz-Nachweis: Evals/s ueber den Kanal gegen den tract-Pfad,
+   bei dem Batch, den die Verschraenkung tatsaechlich erreicht.
+3. **Dann** der Staerke-Nachweis in der Arena, gepaart -- weil der Golden-Hash bei
+   eingeschaltetem Kanal strukturell nicht halten kann (§2). Das Kriterium lautet
+   gleiche Staerke bei entscheidungsgleicher Inferenz, und die zweite Haelfte davon
+   ist mit diesem Abschnitt belegt.
