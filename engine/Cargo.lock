@@ -700,6 +700,7 @@ name = "mosaic_rust"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "memmap2",
  "pyo3",
  "rand 0.10.1",
  "rayon",

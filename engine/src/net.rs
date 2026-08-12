@@ -156,6 +156,16 @@ impl Net {
         self.layout
     }
 
+    /// Gesamtlaenge des `&[f32]`-Merkmalspuffers je Position, den
+    /// `eval`/`eval_pair`/`eval_batch` erwarten (= `layout().flat_len()`,
+    /// hier nur oeffentlich gemacht -- Weg A / `net_ipc.rs` braucht diese
+    /// Groesse aussserhalb von `net.rs`, ohne `InputLayout::flat_len` selbst
+    /// oeffentlich machen zu muessen). Rein additiv, keine bestehende
+    /// Aufrufstelle betroffen.
+    pub fn input_size(&self) -> usize {
+        self.input_size
+    }
+
     /// Lädt ein ONNX-Netz; `input_size` muss zur Feature-Länge passen
     /// (siehe `features::INPUT_SIZE` — dort übergeben, nicht hier hardcoden).
     /// Baut aus derselben geparsten Graph-Struktur ZWEI unabhängig optimierte
@@ -348,6 +358,21 @@ impl Net {
         &self,
         feats: &[&[f32]],
     ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        // Weg A (`evaluations/PREREG_gpu_inferenzpfad.md`): optionaler
+        // Torch/CUDA-IPC-Kanal statt tract, NUR fuer diese Funktion (siehe
+        // `net_ipc.rs`-Modul-Kommentar). Default AUS (`ipc_enabled()==false`)
+        // -- dann wird `net_ipc` nicht einmal betreten, der Code unten laeuft
+        // BYTE-IDENTISCH wie vor Weg A. Bei EIN und einem funktionierenden
+        // Kanal wird der tract-Aufruf unten uebersprungen; jeder Fehler im
+        // Kanal (Server nicht erreichbar, Rundlauf schlaegt fehl) faellt auf
+        // den bestehenden tract-Pfad zurueck (Warnung nur einmal je Prozess),
+        // eine Partie darf durch ein Durchsatz-Feature nie abbrechen.
+        if crate::net_ipc::ipc_enabled() {
+            match crate::net_ipc::eval_batch_via_ipc(feats) {
+                Ok(result) => return Ok(result),
+                Err(e) => crate::net_ipc::warn_ipc_fallback_once(&e),
+            }
+        }
         // Task #32: siehe `eval`-Kommentar oben.
         crate::profiling::selfplay_profile::timed(
             crate::profiling::selfplay_profile::SelfplayCat::NetInference,
