@@ -242,3 +242,68 @@ amortisiert ihren Kernel-Aufwand ueber zu wenige Elemente.
    eingeschaltetem Kanal strukturell nicht halten kann (§2). Das Kriterium lautet
    gleiche Staerke bei entscheidungsgleicher Inferenz, und die zweite Haelfte davon
    ist mit diesem Abschnitt belegt.
+
+
+---
+
+## 9. VERDIKT: Weg A ist NICHT gedeckt -- und meine Regel 1 mass die falsche Groesse
+
+### Die Zahlen (Torch-Arm auf CUDA, RTX 3060 geprueft ansprechbar)
+
+| N Faeden | synchron (Evals/s) | verschraenkt + Torch/CUDA | Faktor |
+| -------: | -----------------: | ------------------------: | -----: |
+| 11 | 4.424,7 | 1.343,5 | **0,30x** |
+| 128 | 5.261,3 | 2.874,7 | **0,55x** |
+
+Beide unter 1,0 -- langsamer als synchron. **Regel 3 (§4) verlangt >= 2,0x. Weg A
+ist damit nicht gedeckt.**
+
+Der Mechanismus selbst ist einwandfrei: Entscheidungsgleichheit **0 von 1148** in
+Argmax und Gumbel-Top-16 (synchron gegen verschraenkt), Paritaets-Hash haelt bei
+ausgeschaltetem Knopf, mittlerer Batch 125,90 bei N=128. Er ist nur nichts wert.
+
+### MEIN MESSPLAN-FEHLER, und er ist der eigentliche Befund
+
+Die "sonstige" Zeit je Sammelrunde betraegt bei N=128 **42,39 ms** -- das
+**148-fache** des gemessenen IPC-Rundlaufs von 0,287 ms.
+
+**Der Shared-Memory-Kanal ist also nicht der Engpass.** Was dominiert, ist der
+Python-seitige Aufwand JE ANFRAGE: Tensor-Bau aus dem mmap-Puffer,
+`.to(device)`-Transfer, `torch.cuda.synchronize()`, Socket-Marshalling.
+
+**Regel 1 (§4) fragte, ob der BYTE-Rundlauf unter einem Drittel der GPU-Zeit
+liegt.** Genau das wurde gemessen (0,287 ms gegen Schwelle 1,0816 ms, Faktor 3,8),
+und daraus habe ich "Weg A ist gedeckt" geschlossen. Die relevante Groesse waere
+der GESAMTE Aufwand je Batch gewesen -- Bytes plus Tensor-Bau plus Transfer plus
+Synchronisation. Die 3,8x Luft lagen auf der falschen Groesse, und die richtige
+liegt bei 148x DANEBEN.
+
+Das ist derselbe Fehlertyp wie die vier Formfehler im Wertungsplatten-Strang: die
+Messung war korrekt ausgefuehrt und beantwortete die falsche Frage. Zahlengleichheit
+war dort der Alarm; hier waere es die Frage gewesen, ob die gemessene Groesse die
+ENTSCHEIDUNGSrelevante ist.
+
+### Was daraus folgt -- der Befund staerkt Weg B
+
+Die drei Kostenposten, die Weg A erledigt haben, existieren bei **Weg B**
+(`ort`-Crate mit CUDA-Provider, §3) **nicht**: kein IPC, kein Python, kein
+Tensor-Bau aus einem Puffer, keine Prozessgrenze. Der Transfer zur GPU bleibt,
+alles andere entfaellt.
+
+Nach §6 Schritt 2 ist Weg B jetzt an der Reihe, und seine Vorbedingung steht dort
+schon: **die Kennlinie gilt nicht** -- sie wurde an PyTorch gemessen, nicht an
+ORT-CUDA, und muss neu gemessen werden, bevor ein Batch-Startwert begruendet ist.
+
+**Die Verschraenkung bleibt brauchbar und muss nicht neu gebaut werden.** Sie ist
+entscheidungsneutral nachgewiesen und liefert den Batch; nur der Verbraucher am
+anderen Ende taugt nicht. Ein ORT-CUDA-Pfad wuerde an derselben Stelle
+(`Net::eval_batch`) angeschlossen.
+
+### Was NICHT geprueft ist
+
+- Die GPU-Auslastung wurde nur VOR dem Lauf geschnappt (34 %, Desktop-Compositing),
+  nicht fortlaufend. Der Agent hat das als Luecke benannt statt sie zu verschweigen.
+- Die 148x-Zerlegung ist HERGELEITET (Rundenzeit minus synthetischer Baumarbeit),
+  nicht instrumentiert. Welcher der vier Python-Posten wieviel beitraegt, ist offen.
+- Der mittlere Batch 125,90 gilt unter GLEICHFOERMIGER synthetischer Last
+  (Gleichschritt-Saettigung), nicht fuer heterogenes echtes Self-Play.

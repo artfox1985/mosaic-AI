@@ -91,17 +91,46 @@ impl InputLayout {
 
 /// Oberste Batchgroesse, fuer die `eval_batch` einen fest optimierten Plan
 /// vorhaelt (Perf-Auftrag, 2026-08-02: Gumbel-Wurzel-Kandidaten-Buendelung).
-/// Mirrort `net_mcts::GUMBEL_TOP_M` (die Ober-Grenze der Top-m-Kandidatenzahl
-/// an der Gumbel-Wurzel, s. dortige Doku) -- ABSICHTLICH als eigene lokale
-/// Konstante dupliziert statt importiert: `net.rs` ist die tiefere Schicht
-/// (net_mcts.rs haengt von net.rs ab, nicht umgekehrt), ein Re-Import wuerde
-/// diese Schichtung umkehren. Bleibt die Konstante hier hinter `net_mcts`s
-/// zurueck (z.B. weil `GUMBEL_TOP_M` spaeter erhoeht wird), faellt
-/// `eval_batch` fuer N > `EVAL_BATCH_MAX_N` einfach auf einen klaren Fehler
-/// zurueck (kein stiller Bug) -- Aufrufer mit N im gueltigen Bereich (heute:
-/// jedes `net_mcts`-`m_prime` per Konstruktion `<= GUMBEL_TOP_M`) sind
-/// unbetroffen.
-pub const EVAL_BATCH_MAX_N: usize = 16;
+/// URSPRUENGLICH exakt `net_mcts::GUMBEL_TOP_M` (16) gespiegelt, weil das
+/// damals der EINZIGE Aufrufer mit N>2 war (`m_prime <= GUMBEL_TOP_M`).
+///
+/// Angehoben auf **128** (Verschraenkungs-Auftrag "dann leg los",
+/// 2026-08-12, `net_batcher.rs`): der Sammel-Faden buendelt jetzt Zeilen
+/// VIELER GLEICHZEITIGER Suchen zu einem `eval_batch`-Aufruf, dessen
+/// Ober-Grenze nicht mehr an `GUMBEL_TOP_M` haengt, sondern an der
+/// tatsaechlich erreichbaren Fadenzahl. Begruendung fuer GENAU 128, nicht
+/// mehr, nicht weniger:
+/// - `evaluations/interleave_batch_probe.json::verdict` nennt 128 explizit
+///   als den Punkt, an dem die (separat zu bewertende) GPU-Gewinnzone
+///   beginnt -- der natuerliche Ziel-Deckel fuer DIESEN Kanal.
+/// - Ladezeit-Kosten GEMESSEN (nicht geschaetzt), `examples/
+///   net_load_time_probe.rs`, Modell `alphazero_v20_2d_opp_brierbest.onnx`:
+///   16 Plaene -> 0,293s, 128 Plaene -> 1,927s (+1,634s einmalig beim
+///   Laden). Gegen eine Selfplay-Laufzeit von Minuten bis Stunden (siehe
+///   `evaluations/selfplay_time_profile.json`: 500,6s fuer nur 30 Partien)
+///   ist das vernachlässigbar.
+/// - `eval_batch(128)` selbst (EIN Aufruf, tract/CPU): 30,167ms GEMESSEN --
+///   skaliert nahezu LINEAR mit der Batchgroesse (128/16=8x Groesse,
+///   30,167/3,333=9,05x Zeit) -- CPU-Batching bringt (anders als GPU) keinen
+///   Sub-Linear-Gewinn; das rechtfertigt, den Deckel nicht ÜBER die
+///   tatsaechlich angepeilte Ziel-Batchgroesse hinaus aufzublasen, nur weil
+///   es ginge.
+/// - Speicherkosten der zusaetzlichen Plaene NICHT einzeln gemessen
+///   (ungeprueft) -- das Modell selbst ist klein (9MB ONNX), und der
+///   RAM-Spielraum fuer die parallele Suche ist grosszuegig (`interleave_
+///   batch_probe.json`: 16 GiB Deckel fuer bis zu 10782 gleichzeitige
+///   Suchbaeume), Indiz fuer geringes Risiko, kein Beleg.
+///
+/// ABSICHTLICH als eigene lokale Konstante dupliziert statt aus
+/// `net_mcts::GUMBEL_TOP_M` importiert (unveraendert bei 16): `net.rs` ist
+/// die tiefere Schicht (net_mcts.rs haengt von net.rs/net_batcher.rs ab,
+/// nicht umgekehrt), ein Re-Import wuerde diese Schichtung umkehren. Jedes
+/// `net_mcts`-`m_prime` bleibt per Konstruktion `<= GUMBEL_TOP_M=16 <=
+/// EVAL_BATCH_MAX_N` -- unbetroffen von der Anhebung. `eval_batch`/der
+/// Sammel-Faden (`net_batcher.rs::configured_batch_max`) fallen fuer
+/// N > `EVAL_BATCH_MAX_N` weiterhin auf einen klaren Fehler zurueck (kein
+/// stiller Bug).
+pub const EVAL_BATCH_MAX_N: usize = 128;
 
 /// Geladenes, optimiertes Netz (thread-safe → über rayon teilbar).
 pub struct Net {
