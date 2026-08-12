@@ -102,14 +102,27 @@ fn main() -> ort::Result<()> {
         .unwrap_or_else(|| "evaluations/ort_cuda_batch_throughput.json".to_string());
 
     println!("Modell: {model_path}");
-    println!("ort-Version (Crate): 2.0.0-rc.13, ONNX Runtime 1.28 (siehe Cargo.toml-Kommentar)");
+    // VERSIONS-PIN (Cargo.toml-Kommentar): ort 2.0.0-rc.12 buendelt ONNX
+    // Runtime 1.24.2 mit einem Windows-"cu12"-Build -- GEPRUEFT gegen
+    // `ort-sys` 2.0.0-rc.12s eingebettete `build/download/dist.txt` (aus dem
+    // crates.io-Tarball extrahiert). rc.13 (ONNX Runtime 1.28.0) hat den
+    // Windows-cu12-Eintrag gestrichen und passt NICHT zu Torchs CUDA-12-DLLs.
+    println!("ort-Version (Crate): 2.0.0-rc.12, ONNX Runtime 1.24.2, Windows-Build \"cu12\" (siehe Cargo.toml-Kommentar)");
 
     // KEIN Fallback auf CPU: `.error_on_failure()` erzwingt einen harten
     // Fehler, wenn der CUDA-Provider nicht registriert werden kann, statt
     // ihn (ort-Standardverhalten) leise auf CPU zurueckfallen zu lassen.
     // Das ist die Stelle, an der PREREGs "wenn nicht eingerichtet werden
     // kann: sag das" gilt.
-    let cuda_ep = CUDA::default().with_device_id(0).build().error_on_failure();
+    //
+    // `with_tf32(false)`: TF32-Verdacht (Nutzer-Auftrag 2026-08-12, PREREG §13)
+    // GEPRUEFT UND BESTAETIGT als Hauptursache der 500-fach ueberhoehten
+    // Policy-Abweichung -- diese Kennlinie misst deshalb den Zustand, den
+    // `net_ort.rs` (Produktions-Hook) jetzt auch fest verdrahtet, NICHT den
+    // Zustand des allerersten Laufs (§11, TF32 auf ORTs eigenem, dokumentiert
+    // "disabled by default"-Wert belassen -- siehe cuda.rs-Fundstelle im
+    // Bericht). Die §11-Zahlen bleiben unangetastet in ihrer eigenen JSON.
+    let cuda_ep = CUDA::default().with_device_id(0).with_tf32(false).build().error_on_failure();
 
     let session_result: ort::Result<Session> = Session::builder().and_then(|b| {
         b.with_execution_providers([cuda_ep])
@@ -168,8 +181,9 @@ fn main() -> ort::Result<()> {
 
     let out = serde_json::json!({
         "backend": "ort-cuda",
-        "ort_version": "2.0.0-rc.13",
-        "onnxruntime_version": "1.28",
+        "ort_version": "2.0.0-rc.12",
+        "onnxruntime_version": "1.24.2",
+        "onnxruntime_windows_build_tag": "cu12",
         "model": model_path,
         "reps": REPS,
         "warmup": WARMUP,

@@ -27,7 +27,15 @@ memmap2 = "0.9"
 # `examples/ort_cuda_batch_probe.rs`. Optional + `required-features` am Example
 # (siehe unten), damit `cargo build`/`cargo test --lib` ohne `--features
 # ort_cuda_probe` UNVERAENDERT bleiben -- kein neuer Zweig im Produktionscode.
-ort = { version = "=2.0.0-rc.13", optional = true, features = ["cuda"] }
+# VERSIONS-PIN 2.0.0-rc.12 (NICHT rc.13): GEPRUEFT ueber die in `ort-sys`
+# eingebettete Distributionstabelle (`build/download/dist.txt` je Version, aus
+# den crates.io-Tarballs extrahiert) -- rc.12 buendelt ONNX Runtime 1.24.2 und
+# bietet fuer x86_64-pc-windows-msvc einen "cu12"-Build; rc.13 (ONNX Runtime
+# 1.28.0) hat den Windows-cu12-Eintrag ersatzlos gestrichen und bietet dort
+# nur noch "cuda13". Torch bringt CUDA-12-DLLs mit (cu126), nicht CUDA 13 --
+# rc.12 ist die NEUESTE `ort`-Version, deren Windows-CUDA-Build noch zu den
+# vorhandenen Torch-DLLs passt.
+ort = { version = "=2.0.0-rc.12", optional = true, features = ["cuda"] }
 
 [features]
 # Zaehlt GameState-Klone im Such-Hot-Path (mcts.rs/net_mcts.rs) via AtomicUsize.

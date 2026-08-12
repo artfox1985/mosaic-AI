@@ -8294,6 +8294,187 @@ mod tests {
         }
     }
 
+    // ── Weg B (`evaluations/PREREG_gpu_inferenzpfad.md` §11), Nutzer-Auftrag
+    // "fang an" 2026-08-12, Schritt 2 -- ausdruecklich verlangt, weil leicht
+    // uebersehen: die 0-von-1148 oben (tract<->torch) und weiter unten
+    // (synchron<->verschraenkt, beide tract) decken KEIN drittes Backend ab.
+    // ORT-CUDA ist ein DRITTER Inferenz-Mechanismus (eigener Graph-Optimierer,
+    // eigene CUDA-Kernels) und braucht seinen EIGENEN Nachweis. Wiederverwendet
+    // dieselben Helfer (`legal_logits_sorted`, `gumbel_topm_set`) wie oben.
+
+    /// Entscheidungsgleichheit tract<->ORT-CUDA, gleiche Messkette wie
+    /// `policy_head_deviation_effect_on_gumbel_root_selection` (Argmax +
+    /// Gumbel-Top-m auf denselben 1148 Zustaenden, dasselbe Modell
+    /// `alphazero_v20_2d_opp_brierbest.onnx`), ZUSAETZLICH die maximale
+    /// Rohwert-Abweichung je Kopf (wie
+    /// `net_ipc::eval_batch_via_ipc_matches_tract_within_tolerance`), damit
+    /// die beiden Cross-Backend-Vergleiche (tract<->torch, tract<->ORT-CUDA)
+    /// nebeneinander lesbar sind.
+    ///
+    /// KEIN Urteil hier -- nur Zahlen. Weicht die Entscheidung ab: BERICHTEN,
+    /// NICHT die Toleranz anpassen (Auftragstext) -- bei ORT ist eine
+    /// Abweichung plausibler als bei torch (anderer Graph-Optimierer als
+    /// tract UND als PyTorch), also keine Erwartung von exakt 0 vorwegnehmen,
+    /// nur ehrlich zaehlen.
+    ///
+    /// `#[cfg(feature = "ort_cuda_probe")]` + `#[ignore]`: braucht die
+    /// optionale `ort`-Abhaengigkeit UND die ORT-CUDA-Provider-/Torch-CUDA-12-
+    /// Laufzeit-DLLs neben dem Testbinary (Handkopie, siehe
+    /// `evaluations/PREREG_gpu_inferenzpfad.md` §11) -- kein regulaerer
+    /// `cargo test`-Lauf erfuellt das automatisch, deshalb zusaetzlich
+    /// `#[ignore]` obwohl das Feature schon gate-haelt (das Feature gate haelt
+    /// nur das KOMPILIEREN ab, nicht die Laufzeit-DLL-Verfuegbarkeit).
+    /// Aufruf: `cargo test --release --lib --features ort_cuda_probe -- --ignored net_mcts::tests::ort_cuda_matches_tract_gumbel_root_selection --nocapture`
+    #[cfg(feature = "ort_cuda_probe")]
+    #[test]
+    #[ignore]
+    fn ort_cuda_matches_tract_gumbel_root_selection() {
+        use crate::net::Net;
+
+        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
+            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(&states_path) else {
+            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
+            return;
+        };
+        let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
+        assert!(!records.is_empty(), "leere Zustandsliste -- Export fehlgeschlagen?");
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
+        if !onnx_path.exists() {
+            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
+            return;
+        }
+        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("  ⚠️  ONNX-Modell nicht ladbar ({e}) -- Test uebersprungen.");
+                return;
+            }
+        };
+
+        let m_for_400_sims = gumbel_top_m_for_budget(400);
+        println!("gumbel_top_m_for_budget(400) = {m_for_400_sims}");
+
+        let mut n_total = 0usize;
+        let mut n_argmax_mismatch = 0usize;
+        let mut n_topm_mismatch = 0usize;
+        let mut argmax_mismatch_gaps: Vec<(usize, f32, f32)> = Vec::new();
+        let mut max_abs = [0f32; 4]; // policy, value, moon, points -- gleiche Reihenfolge wie net_ipc.rs
+
+        let chunk_size = crate::net::EVAL_BATCH_MAX_N;
+        for chunk in records.chunks(chunk_size) {
+            let mut states: Vec<GameState> = Vec::with_capacity(chunk.len());
+            let mut record_indices: Vec<usize> = Vec::with_capacity(chunk.len());
+            for entry in chunk {
+                let record_index = entry["record_index"].as_u64().unwrap() as usize;
+                let mut rng = StdRng::seed_from_u64(record_index as u64);
+                match crate::serialize::json_to_state(&entry["state"], &mut rng) {
+                    Ok(s) => {
+                        states.push(s);
+                        record_indices.push(record_index);
+                    }
+                    Err(e) => eprintln!("  ⚠️  record #{record_index}: json_to_state fehlgeschlagen ({e}) -- ausgelassen."),
+                }
+            }
+            if states.is_empty() {
+                continue;
+            }
+            let feats: Vec<Vec<f32>> = states.iter().map(|s| crate::features::features_for_net(&net, s)).collect();
+            let refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
+
+            let tract_out = net.eval_batch(&refs).expect("tract eval_batch");
+            let ort_out = crate::net_ort::eval_batch_via_ort_cuda(&net, &refs)
+                .expect("ORT-CUDA-Rundlauf (CUDA-Session muss aufbaubar sein -- siehe PREREG §11 fuer die DLL-Handkopie)");
+            assert_eq!(tract_out.len(), states.len());
+            assert_eq!(ort_out.len(), states.len());
+
+            for i in 0..states.len() {
+                let state = &states[i];
+                let record_index = record_indices[i];
+                let (policy_t, value_t, moon_t, points_t) = &tract_out[i];
+                let (policy_o, value_o, moon_o, points_o) = &ort_out[i];
+
+                // ── Max. Rohwert-Abweichung je Kopf ──
+                for (idx, (a, b)) in [(policy_t, policy_o), (value_t, value_o), (moon_t, moon_o), (points_t, points_o)]
+                    .iter()
+                    .enumerate()
+                {
+                    for (x, y) in a.iter().zip(b.iter()) {
+                        let d = (x - y).abs();
+                        if d > max_abs[idx] {
+                            max_abs[idx] = d;
+                        }
+                    }
+                }
+
+                // ── Metrik 1: Argmax (rauschfrei) ──
+                let sorted_t = legal_logits_sorted(state, policy_t);
+                let sorted_o = legal_logits_sorted(state, policy_o);
+                assert_eq!(sorted_t.len(), sorted_o.len(), "record #{record_index}: unterschiedliche Legal-ID-Menge?!");
+                assert!(!sorted_t.is_empty(), "record #{record_index}: keine legalen Aktionen an einer Drafting-Wurzel?!");
+                n_total += 1;
+                if sorted_t[0].0 != sorted_o[0].0 {
+                    n_argmax_mismatch += 1;
+                    let gap_t = if sorted_t.len() > 1 { sorted_t[0].1 - sorted_t[1].1 } else { f32::INFINITY };
+                    let gap_o = if sorted_o.len() > 1 { sorted_o[0].1 - sorted_o[1].1 } else { f32::INFINITY };
+                    argmax_mismatch_gaps.push((record_index, gap_t, gap_o));
+                }
+
+                // ── Metrik 2: Gumbel-Top-m-Menge ──
+                let mut moon_arr_t = [0f32; 5];
+                for (j, s) in moon_t.iter().take(5).enumerate() {
+                    moon_arr_t[j] = *s;
+                }
+                let mut moon_arr_o = [0f32; 5];
+                for (j, s) in moon_o.iter().take(5).enumerate() {
+                    moon_arr_o[j] = *s;
+                }
+                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true);
+                let (acts_o, _) = build_untried_actions(state, policy_o, &moon_arr_o, true);
+                assert_eq!(
+                    acts_t.len(),
+                    acts_o.len(),
+                    "record #{record_index}: unterschiedliche Kandidatenzahl nach Moon-Expansion?!"
+                );
+                let n_root = acts_t.len();
+                let m_prime = m_for_400_sims.min(n_root);
+
+                let seed = 900_000_000u64 + record_index as u64;
+                let mut rng_t = StdRng::seed_from_u64(seed);
+                let mut rng_o = StdRng::seed_from_u64(seed);
+                let set_t = gumbel_topm_set(&acts_t, m_prime, &mut rng_t);
+                let set_o = gumbel_topm_set(&acts_o, m_prime, &mut rng_o);
+                let sets_match = set_t.len() == set_o.len() && set_t.iter().all(|a| set_o.contains(a));
+                if !sets_match {
+                    n_topm_mismatch += 1;
+                }
+            }
+        }
+
+        let argmax_rate = n_argmax_mismatch as f64 / n_total as f64;
+        let topm_rate = n_topm_mismatch as f64 / n_total as f64;
+        println!("\n=== Entscheidungsgleichheit tract<->ORT-CUDA (Weg B) ===");
+        println!("Stellungen verarbeitet: {n_total}");
+        println!("Argmax-Abweichung:      {n_argmax_mismatch}/{n_total} ({:.4}%)", argmax_rate * 100.0);
+        println!("Top-{m_for_400_sims}-Mengen-Abweichung: {n_topm_mismatch}/{n_total} ({:.4}%)", topm_rate * 100.0);
+        if argmax_mismatch_gaps.is_empty() {
+            println!("Keine Argmax-Abweichungen -- keine Logit-Abstaende zu berichten.");
+        } else {
+            println!("Logit-Abstaende (Platz1-Platz2) in den Argmax-Abweichungsfaellen (tract | ORT-CUDA):");
+            for (idx, gap_t, gap_o) in &argmax_mismatch_gaps {
+                println!("  record #{idx}: tract={gap_t:.6}  ort_cuda={gap_o:.6}");
+            }
+        }
+        println!("\nMax. Rohwert-Abweichung je Kopf (tract vs. ORT-CUDA):");
+        for (name, m) in ["policy", "value", "moon", "points"].iter().zip(max_abs.iter()) {
+            println!("  {name}: {m:.8}");
+        }
+    }
+
     // ── Weg V (Verschraenkung, `net_batcher.rs`), Nutzer-Auftrag 2026-08-12
     // "dann leg los" -- ABNAHME Punkte 2+3. Wiederverwendet die Helfer aus dem
     // Policy-Tor-Block oben (`legal_logits_sorted`, `gumbel_topm_set`,

@@ -71,7 +71,55 @@ baut"*), also wäre ein Fehlschlag ein echtes Negativergebnis.
 **Erst danach** Stufe 2: Streuung ins Self-Play, dann Training mit
 Ownership-Kopf, dann prüfen ob die Spalten OHNE Injektion entstehen.
 
-### GPU: Weg A ist gedeckt, aber nur über Shared Memory
+### GPU: Weg A ist ERLEDIGT, Weg B ist der Weg (ORT-CUDA, 10,4x bis 21,0x)
+
+**Stand nach der vollständigen Messreihe** (Details `PREREG_gpu_inferenzpfad.md`
+§7-§13):
+
+| Vorhaben | Status | Zahl |
+| -------- | ------ | ---- |
+| **Weg A** (IPC zu Python/torch) | **ungedeckt, erledigt** | 0,30x / 0,55x gegen Regel 3 (>= 2,0x) |
+| **Weg B** (ORT-CUDA im Prozess) | **gedeckt** | **10,4x bis 21,0x** gegen tract-CPU |
+| Verschränkung (Batcher) | **abgenommen** | Entscheidungsgleichheit 0/1148, Batch füllt bis 126/128, Parität hält bei Knopf aus |
+| ORT-Entscheidungsgleichheit | **1 von 1148 offen** | Argmax 0/1148; Top-16-Menge 1/1148 nach TF32-Abschaltung |
+| Verpackung | **OFFEN** | CUDA-12-DLLs kommen aus `torch/lib` per Handkopie |
+
+**Der lehrreichste Punkt: mein Messplan war falsch, nicht Weg A.** Regel 1 fragte,
+ob der IPC-**Byte**-Rundlauf unter einem Drittel der GPU-Zeit liegt -- 0,287 ms
+gegen 1,0816 ms, Faktor 3,8, "gedeckt". Der tatsächliche Aufwand je Batch beträgt
+**42,39 ms**, also das **148-fache** des gemessenen Rundlaufs; es dominiert der
+Python-seitige Aufwand je Anfrage (Tensor-Bau, `.to(device)`,
+`cuda.synchronize()`, Marshalling). Die 3,8x Luft lagen auf der falschen Groesse.
+Weg B hat genau diese Posten nicht.
+
+**TF32 war eine echte Falle**: ORT lieferte zunaechst 16 von 1148 abweichende
+Top-16-Mengen und eine 500-fach groessere Rohabweichung als torch (0,01745 gegen
+0,00003). Ursache war reduzierte Praezision auf der Ampere-Karte. Mit
+`with_tf32(false)` fallen die Abweichungen auf 1/1148 und die Rohabweichung auf
+Torch-Niveau -- **und der Durchsatz kostet es nichts**, bei Batch 512 ist es ohne
+TF32 sogar schneller.
+
+**Regel 2 ist gegenstandslos geworden.** Sie sagte: erreicht ORT-CUDA bei Batch
+140-590 nicht den torch-Durchsatz, ist "Weg A trotz IPC der bessere". Bei Batch 256
+liegt ORT mit 0,99x knapp darunter -- aber Weg A ist mit 0,30x/0,55x schlechter als
+Nichtstun. Die Voraussetzung der Regel ist mit §9 entfallen; sie mechanisch
+anzuwenden wuerde einen messbar verlierenden Weg bevorzugen. **Regel 3 ist die
+operative Regel.**
+
+**Kurvenform, wichtig fuer den Startwert**: ORT flacht zwischen Batch 256 und 512
+ab (77.770 -> 82.031, nur +5 %), waehrend torch dort verdoppelt. ORTs Suessbereich
+ist **128 bis 256**. Schon **Batch 64 zahlt 7,0x** -- nach dem Auslastungsband
+braucht das nur ~80-103 Faeden, nicht 256.
+
+**Naechste Schritte, in dieser Reihenfolge**: (1) den einen offenen
+Abweichungsfall einordnen -- laeuft, geprueft wird der Abstand der beiden
+konkurrierenden Kandidaten gegen die Verteilung ueber die 1147 uebrigen Zustaende;
+(2) echten Self-Play-Durchsatz messen samt tatsaechlich erreichtem Batch; (3)
+gepaarter Staerkelauf; (4) Verpackung der DLLs. Ein Arena-Lauf fuer den einen
+Abweichungsfall waere konstruktionsbedingt uninformativ -- 0,09 % in der 16.
+Kandidatenstelle liegt weit unter der Seed-Skala von 5,75 Prozentpunkten bei n=400.
+
+### ÜBERHOLT -- Weg A ist gedeckt, aber nur über Shared Memory
 
 `PREREG_gpu_inferenzpfad.md` (neu) hält die übersprungene Architekturfrage fest.
 Befund: `engine/Cargo.toml` hat als einzige Inferenz-Abhängigkeit `tract-onnx`,
