@@ -1006,16 +1006,62 @@ pub(crate) fn set_platten_weight_override_for_test(v: Option<f64>) {
 /// Tie-Break bei exaktem Wertegleichstand: der ERSTE Kandidat gewinnt (`>`
 /// statt `>=`), deterministisch, kein Zufall -- gleiche Konvention wie
 /// `select_best_tiling_candidate`.
+/// Gewicht JE KRITERIUM fuer den Plattenwert der Tiling-Wahl,
+/// `MOSAIC_TILING_PLATTEN_GEW` -- acht Werte in Kriterien-Reihenfolge 0..7, ein
+/// einzelner gilt fuer alle. Default **alle 1,0** (jedes aktive Kriterium zaehlt
+/// voll). Format wie `MOSAIC_WERTUNG_SHAPING_W`; falsche Laenge wird VERWORFEN
+/// mit Meldung, statt stillschweigend etwas anderes zu tun.
+///
+/// WARUM ES DAS BRAUCHT (gemessen 2026-08-12): mit `.total` ueber alle Kriterien
+/// fiel der vertikale Plattenwert auf 0,35 gegen 2,10 im Bezug. Ursache ist die
+/// Groessenordnung des Spezialfeld-Postens -- im Mittel **-11,70** (3,9 leere
+/// Spezialkuppeln a -3). Er ueberdeckt jede Geometrie. Mit einem Gewicht je
+/// Kriterium laesst sich die Geometrie isolieren, ohne den Term zu verbiegen.
+fn platten_gewichte() -> [f64; 8] {
+    static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let mut out = [1.0f64; 8];
+        let Ok(raw) = std::env::var("MOSAIC_TILING_PLATTEN_GEW") else { return out };
+        let teile: Vec<&str> = raw.split(',').map(|x| x.trim()).filter(|x| !x.is_empty()).collect();
+        let werte: Option<Vec<f64>> = teile.iter().map(|x| x.parse::<f64>().ok()).collect();
+        match werte.as_deref() {
+            Some([eins]) => out = [*eins; 8],
+            Some(v) if v.len() == 8 => out.copy_from_slice(v),
+            _ => eprintln!(
+                "MOSAIC_TILING_PLATTEN_GEW={raw:?} ignoriert -- erwartet 1 oder 8 Zahlen,                  Default 1,0 je Kriterium gilt"
+            ),
+        }
+        out
+    })
+}
+
+/// Plattenwert eines Bretts, je Kriterium gewichtet. Nur die AKTIVEN Platten
+/// (`scoring_tile_ids`), wie die echte Endwertung.
+fn platten_wert(player: &crate::board::PlayerBoard, ids: &[usize], gew: &[f64; 8]) -> f64 {
+    let e = crate::scoring::calculate_end_scoring(player, ids);
+    e.details
+        .iter()
+        .map(|d| gew[d.id.min(7)] * f64::from(d.score))
+        .sum()
+}
+
 fn best_first_step_platten_valued(state: &GameState, pi: usize, w: f64) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
+    let gew = platten_gewichte();
+    // DIFFERENZ, nicht Absolutwert (gemessen 2026-08-12): der Plattenstand VOR
+    // dem Tiling ist fuer alle Kandidaten desselben Zuges identisch und traegt
+    // nur einen konstanten Sockel bei -- in `.total`-Form war das ein grosser
+    // negativer Brocken aus den leeren Spezialfeldern, der die Rangfolge
+    // verzerrte. Interessant ist allein, was die Platzierung AENDERT.
+    let vorher = platten_wert(&state.players[pi], &state.scoring_tile_ids, &gew);
     let mut best: Option<(f64, TilingStep)> = None;
     for c in cands {
-        let end = crate::scoring::calculate_end_scoring(
+        let nachher = platten_wert(
             &c.final_state.players[pi],
             &c.final_state.scoring_tile_ids,
-        )
-        .total;
-        let val = f64::from(c.points) + w * f64::from(end);
+            &gew,
+        );
+        let val = f64::from(c.points) + w * (nachher - vorher);
         let better = match &best {
             Some((best_val, _)) => val > *best_val,
             None => true,

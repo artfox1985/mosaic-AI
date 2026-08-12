@@ -166,3 +166,56 @@ Der Term muss (a) additiv in Punkten sein -- das ist er jetzt --, (b) die
 sein, damit der Spezialfeld-Posten nicht die Geometrie ueberdeckt. Erst dann ist
 gemessen, ob die Platzierungsseite die Blockade war; die bisherigen zwei Stufen
 haben das NICHT beantwortet, sie haben zwei Formfehler aufgedeckt.
+
+---
+
+## 8. Stufe 3 (Differenz + Gewicht je Kriterium): ALLES-ODER-NICHTS hat keinen Gradienten
+
+Acht Zellen, Draftingseite in jeder auf w=1 / alpha=1 (Bezug 2,10 vertikal =
+6 Spalten in 20 Partien, Endstand 45,30):
+
+| Gewichtsvariante | Plattengewicht | vertikal | Spalten/20 | Endstand |
+| ---------------- | -------------: | -------: | ---------: | -------: |
+| ALLE | 0,3 | 0,35 | 1 | 44,65 |
+| ALLE | 1 / 3 / 10 | 0,35 | 1 | 43,70 |
+| GEO (nur Kriterium 1) | 0,3 / 1 / 3 / 10 | 0,35 | 1 | 44,55 |
+
+**Alle acht Zellen exakt 0,35, und die GEO-Variante bit-identisch ueber vier
+Gewichte.** Vierter Zahlengleichheits-Alarm des Abends, und wieder ein echter
+Mechanismus.
+
+### Zwei Hypothesen geprueft, eine widerlegt
+
+**Widerlegt**: "der neue Zweig faellt auf eine GREEDY-Chip-Politik zurueck".
+`top_k_tilings` ruft `collect_tilings`, und das nutzt `legal_steps(.., true)`
+(`tiling_solver.rs:690`) -- die exakte Chip-Allokation ist drin.
+
+**Bestaetigt, und es ist die Ursache**: `calculate_end_scoring` ist
+**ALLES-ODER-NICHTS** (`scoring.rs:43`: "7 Pkt je vollstaendige vertikale Reihe
+(6 Fliesen)"). In den Runden 1-4 wird praktisch nie eine Spalte VOLLENDET, also
+ist die Differenz `nachher - vorher` fuer fast jeden Kandidaten **exakt 0** -- und
+dann ist jedes Gewicht gleichgueltig. Der Term hat keinen GRADIENTEN, an dem eine
+Platzierung "naeher an einer Spalte" erkennbar waere.
+
+Das ist derselbe Fehler, den `wertung_progress` auf der Draftingseite bereits
+loest: sein Modulkommentar (`scoring.rs:150-158`) sagt es woertlich -- *"die
+Alles-oder-nichts-Platten geben bei Teilfuellung einen quadratisch skalierten
+Teil-Bonus statt hartem 0"*. Ich habe auf der Draftingseite die stetige Form
+benutzt und auf der Platzierungsseite die harte. Der Fehler ist meiner, nicht der
+des Agenten -- die Spezifikation, die ich ihm gegeben habe, nannte
+`calculate_end_scoring`.
+
+### Naechster Schritt, klar umrissen
+
+Im Platzierungsterm `calculate_end_scoring` durch
+`wertung_progress_per_kriterium` ersetzen (dieselbe stetige Form, dieselben
+alphas, dieselbe Gewichtung je Kriterium). Erst dann ist die Frage "ist die
+Platzierung die Blockade" tatsaechlich gestellt -- die drei bisherigen Stufen
+haben drei FORMFEHLER aufgedeckt und die Frage nicht beantwortet:
+
+1. multiplikativ statt additiv (Produktform, Nutzer-Hinweis)
+2. Absolutwert statt Differenz, und `.total` statt je Kriterium
+3. alles-oder-nichts statt stetig -- kein Gradient
+
+Bemerkenswert daran: keiner der drei war eine Frage der DOSIS. Alle drei waren
+Fragen der FORM, und jede sah in den Zahlen wie ein Null-Befund aus.
