@@ -1200,11 +1200,62 @@ pub fn best_first_step_valued(
 /// Fall bereits selbst ab (eigene `ROUND5_ENDSCORING_ENABLED`-Verzweigung) --
 /// hier also nichts zusaetzlich zu tun, nur nicht versehentlich mit einem der
 /// beiden Stichentscheide ueberschreiben.
+/// Tiling-Haelfte des Vorzugsmodus (`MOSAIC_VORZUG_SPALTE`, gleicher Knopf
+/// wie die Drafting-Haelfte in `provokation.rs::vorzugszug`).
+///
+/// GEMESSEN BEGRUENDET (generator_matrix, 18 Partien an der 5/6-Mauer): in 10
+/// von 18 Faellen hat die Musterreihe geliefert und das TILING die Fliese in
+/// eine andere Zelle derselben Rasterreihe gelegt -- der groessere Blocker sass
+/// hier, nicht im Drafting. Alle drei bisherigen Mechanismen (Belohnung,
+/// Zwang, Praeferenz) wirkten nur auf das Drafting.
+///
+/// Gleiches Prinzip wie die Drafting-Haelfte: PRAEFERENZ, kein Zwang. Unter
+/// den vollstaendigen Tiling-Abschluessen wird der gewaehlt, der die meisten
+/// Ziel-Spalten-Zellen fuellt; bei Gleichstand entscheidet wie bisher die
+/// Punktzahl. Fuellt kein Kandidat mehr Ziel-Zellen als jeder andere, faellt
+/// die Wahl auf den Bestandspfad zurueck -- der Vorzug verschenkt dann nichts.
+/// Nur Runden 1..=4; Runde 5 gehoert dem exakten Endwertungs-Loeser.
+fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingStep> {
+    let spalte = crate::provokation::vorzug_spalte()?;
+    if !(1..=4).contains(&state.round_number) {
+        return None;
+    }
+    let ziel_zellen = |s: &GameState| -> usize {
+        (0..6usize)
+            .filter(|&r| {
+                s.players[pi]
+                    .dome_grid
+                    .get_space(r, spalte)
+                    .map_or(false, |sp| sp.is_filled())
+            })
+            .count()
+    };
+    let vorher = ziel_zellen(state);
+    let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
+    let best = cands
+        .into_iter()
+        .map(|c| {
+            let z = ziel_zellen(&c.final_state);
+            (z, c.points, c.first_step)
+        })
+        .max_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)))?;
+    // Nur eingreifen, wenn der Vorzug tatsaechlich MEHR Ziel-Zellen fuellt als
+    // der Ausgangszustand hat -- sonst Bestandsverhalten (None).
+    if best.0 > vorher {
+        Some(best.2)
+    } else {
+        None
+    }
+}
+
 pub fn best_first_step_exact_or_valued(
     state: &GameState,
     pi: usize,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
 ) -> TilingStep {
+    if let Some(step) = vorzug_tiling_step(state, pi) {
+        return step;
+    }
     // Zweig 1 (Task #100), KORRIGIERT 2026-08-12: der Plattenterm ERGAENZT den
     // Netz-Stichentscheid, statt ihn zu verdraengen. Vorher stand hier "kein
     // Doppelweg" -- meine eigene Auftragsformulierung -- und dieser Zweig kehrte
