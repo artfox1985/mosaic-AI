@@ -200,6 +200,17 @@ fn fill_large_factory<R: Rng + ?Sized>(
     }
 }
 
+/// Diagnose-Knopf fuer die Versorgungs-Deckenprobe, Default **aus**.
+/// Siehe `evaluations/PREREG_platzierungsseite.md` Abschnitt 10.
+fn volle_versorgung() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_VOLLE_VERSORGUNG")
+            .map(|v| v.trim() == "1" || v.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
+    })
+}
+
 fn fill_factories<R: Rng + ?Sized>(
     factories: &mut [Factory],
     large_factory: &mut LargeFactory,
@@ -215,6 +226,40 @@ fn fill_factories<R: Rng + ?Sized>(
     // erreichbar, weil Kuppel-Fliesen den Kreislauf dauerhaft verlassen):
     // jetzt bekommt die grosse Fabrik garantiert ihre 5 Fliesen und die
     // kleinen laufen leer, nicht umgekehrt.
+    // DECKENPROBE (Nutzer-Aufbau 2026-08-12: *"etwas in der art alle steine
+    // verfuegbar, kein gegner. was macht das netz und der solver dann"*).
+    // `MOSAIC_VOLLE_VERSORGUNG=1` befuellt die Fabriken deterministisch aus dem
+    // vollen Farbkreis statt aus Beutel und Turm -- damit fehlt dem Netz NIE eine
+    // Farbe, und der Gegner wird fuer die VERFUEGBARKEIT gegenstandslos (er zieht
+    // weiter Steine, aber nichts erschoepft). Das ersetzt einen echten
+    // Solo-Modus, der `NUM_PLAYERS` (Kompilierzeit-Konstante) antasten muesste.
+    //
+    // Eine kleine Fabrik traegt 4 Fliesen (`TILES_PER_SMALL_FACTORY`), es gibt
+    // aber 5 Farben -- "alle verfuegbar" gilt also UEBER die Fabriken hinweg:
+    // jede bekommt einen um ihren Index versetzten Ausschnitt des Farbkreises,
+    // sodass in jeder Runde jede Farbe mehrfach vorkommt.
+    //
+    // KEIN Messpfad im Bestand: Default aus, dann laeuft der Originalcode
+    // unveraendert. Dies ist ein DIAGNOSE-Knopf, kein Spielparameter -- eine
+    // Partie damit ist nicht regelkonform und darf nie in ein Gating oder einen
+    // Trainingskorpus geraten.
+    if volle_versorgung() {
+        let farben = crate::tile::TileColor::NORMAL;
+        large_factory.sun_tiles = (0..TILES_PER_LARGE_FACTORY)
+            .map(|i| farben[i % farben.len()])
+            .collect();
+        for (fi, factory) in factories.iter_mut().enumerate() {
+            factory.sun_tiles = (0..TILES_PER_SMALL_FACTORY)
+                .map(|i| farben[(fi + i) % farben.len()])
+                .collect();
+            factory.moon_stacks.clear();
+            factory.bonus_chip_revealed = false;
+            if let Some(pool) = bonus_pool.as_deref_mut() {
+                factory.bonus_chip = pool.pop();
+            }
+        }
+        return;
+    }
     fill_large_factory(large_factory, bag, tower, rng);
     for factory in factories.iter_mut() {
         factory.sun_tiles.clear();
