@@ -14,7 +14,6 @@
 # Spielerprofile / Elo-Ratings (Nutzer-Feature 2026-08-02, player_profiles.py):
 # lokaler Laufzeit-Zustand des Server-Games, kein Trainings-/Code-Artefakt --
 # nicht versionieren (persoenliche Ratings je Installation).
-/player_profiles.json
 /player_profiles.json.corrupt
 
 # 2. Python Cache
