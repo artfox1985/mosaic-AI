@@ -8,7 +8,7 @@ kein Python/Rust installiert).
 Ablauf:
   1. Alten dist/build-Output für "Mosaic-AI" entfernen.
   2. `pyinstaller mosaic_release.spec` ausführen.
-  3. README_SPIEL.txt + docs/engine_manual.md ins Bundle kopieren.
+  3. README_GAME.txt + docs/engine_manual.md ins Bundle kopieren.
   4. dist/Mosaic-AI/ zu Mosaic-AI_v16_<datum>.zip (Projektroot) packen.
 
 Aufruf (im Projekt-Root, mit aktivierter Python-Umgebung, in der
@@ -53,8 +53,8 @@ def run_pyinstaller() -> None:
 
 
 def copy_docs() -> None:
-    print("[3/4] Kopiere README_SPIEL.txt + Anleitung ins Bundle ...")
-    shutil.copy2(PROJECT_ROOT / "dist" / "README_SPIEL.txt", DIST_DIR / "README_SPIEL.txt")
+    print("[3/4] Kopiere README_GAME.txt + Anleitung ins Bundle ...")
+    shutil.copy2(PROJECT_ROOT / "dist" / "README_GAME.txt", DIST_DIR / "README_GAME.txt")
     manual_src = PROJECT_ROOT / "docs" / "engine_manual.md"
     if manual_src.exists():
         shutil.copy2(manual_src, DIST_DIR / "engine_manual.md")

@@ -110,22 +110,22 @@ erledigt einstufen.
 ### AKTUALISIERUNG 2026-08-13: Zwei-Pole-Architektur ist der geltende Rahmen
 
 **ENTSCHIEDEN 2026-08-13 (Nutzer)**: k0/k7 bekommen KEINEN eigenen Bauer --
-Spieloekonomie, nicht Fehlschlag (`docs/domaenenwissen.md` Abschnitt 7; deckt
+Spieloekonomie, nicht Fehlschlag (`docs/domain_knowledge.md` Abschnitt 7; deckt
 sich mit §13: k7 Stopp-Regel, k0 negativ). Beilaeufige Korpus-Abdeckung wird
 im Piloten per Grundraten-Gate geprueft.
 
 **OFFEN, Nutzer-Auftrag 2026-08-13**: Plattenbauer k6 (Spezialfelder) Runde 2 als
-KUPPELDRAFT-Strategie (`docs/domaenenwissen.md` Abschnitt 8: Joker horten und nach
+KUPPELDRAFT-Strategie (`docs/domain_knowledge.md` Abschnitt 8: Joker horten und nach
 unten, erzwungene Spezialkuppeln nach oben, Joker-Priorisierung als Stoerkanal).
 
 **OFFEN, Nutzer-Auftrag 2026-08-13**: Plattenbauer k2 (Diagonalen) und k5 (Ecken)
-Runde 2 mit der Nutzer-Taktik aus `docs/domaenenwissen.md` Abschnitte 5-6
+Runde 2 mit der Nutzer-Taktik aus `docs/domain_knowledge.md` Abschnitte 5-6
 (Spezial-/Joker-Kuppelwahl als Kern statt Farbenjagd; k2 muss zusaetzlich den
 Sieg-Verlust aus §13 beheben). Nach Spalten-Runde 4.
 
 **OFFEN, Nutzer-Auftrag 2026-08-13**: Gegner-Stoerung ueber die Farbzaehlung als
 Plattenbauer-Baustein NACH Runde 4 (Spezifikation + Belegstand:
-`docs/domaenenwissen.md`, Abschnitt "Spielstrategie aus Nutzer-Praxis" Punkt 4).
+`docs/domain_knowledge.md`, Abschnitt "Spielstrategie aus Nutzer-Praxis" Punkt 4).
 
 
 Die vorausgehende Provokations-Messung ist UEBERHOLT und liegt jetzt in
@@ -178,7 +178,7 @@ Batch desselben Generators braucht ein Suffix (`v20wdlb`).
 
 ### WERTUNGSPLATTEN-ANTEIL -- Domaenenwissen ausgelagert 2026-08-11
 
-**Der Inhalt dieses Abschnitts steht jetzt in `../docs/domaenenwissen.md`**
+**Der Inhalt dieses Abschnitts steht jetzt in `../docs/domain_knowledge.md`**
 (Nutzer-Entscheid: STATUS traegt "nur AKTUELLES und OFFENES" und wird
 regelmaessig in die History geleert -- Domaenenwissen dort wird mitarchiviert).
 Dort: Punktquellen und ihre Verwechslungsfalle, Plattenwerte samt
