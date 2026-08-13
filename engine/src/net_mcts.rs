@@ -1229,58 +1229,9 @@ pub fn wertung_shaping_alphas() -> [f64; 8] {
 /// Gegenargument, das die Messung entscheiden soll: der Value-Kopf ist auf
 /// AUSGAENGE trainiert, Strafpunkte gehen in den Ausgang ein -- er preist sie
 /// also schon ein, und der Term koennte doppelt zaehlen.
-///
-/// STAND 2026-08-11: Punkt 2 gilt nicht mehr uneingeschraenkt -- seit
-/// `musterreihen_weight()` (unten) gibt es ein ZWEITES Stueck des Shapings,
-/// das `player.pattern_lines` liest (`crate::scoring::musterreihen_fortschritt`).
 pub fn wertung_floor_weight() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_FLOOR_W", 0.0))
-}
-
-/// Gewicht fuer den **Tiling-Vorausschau**-Term. Default **0,0** = aus.
-///
-/// WARUM DIESER TERM (Nutzer 2026-08-11: *"du kannst auch bei der heuristik
-/// reinschauen wie es gemacht wurde. brauchst nicht immer das rad neu
-/// erfinden"*): das Projekt hat die Musterreihen-Vorausschau schon, exakt und
-/// getestet. `tiling_solver.rs:556` `solve_round_final_score_endaware` rollt
-/// ueber `legal_steps` die Musterreihen auf die Kuppel und maximiert am Blatt
-/// **Platzierungspunkte + `calculate_end_scoring`** (`solve_rec_endaware`,
-/// `tiling_solver.rs:519-546`) -- und `calculate_end_scoring` enthaelt die
-/// Wertungsplatten.
-///
-/// Gegenueber der nachgebauten Bereitschaft (`MOSAIC_MUSTERREIHEN_W`) ist das
-/// exakt statt geschaetzt: Farb-, Sperr- und Slot-Bedingungen kommen aus dem
-/// echten Tiling, und die Ein-Fliese-pro-Musterreihe-Schranke ergibt sich von
-/// selbst, weil ein echter Durchlauf sie nicht verletzen KANN. Ein `alpha`
-/// braucht es hier nicht -- der Fortschritt ist realisiert, nicht hochgerechnet.
-///
-/// Der Doku-Vorbehalt dort ("nur fuer Runde 5 sinnvoll") sticht beim Shaping
-/// nicht: in Runden 1-4 ist `calculate_end_scoring` eine NAEHERUNG, und eine
-/// Injektion braucht Richtung, keine Exaktheit. Offen ist allein der Preis pro
-/// Blatt -- deshalb Default 0,0 und eine Messung, keine Schaetzung.
-pub fn endaware_weight() -> f64 {
-    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| read_f64_env("MOSAIC_ENDAWARE_W", 0.0))
-}
-
-/// Der Vorausschau-Term selbst: **was die Endwertungs-Kenntnis hier wert ist**.
-///
-/// `endaware - plain` und nicht `endaware` allein, weil `endaware` den
-/// AKTUELLEN Punktestand mittraegt (~50 Punkte spaet im Spiel). Der wuerde das
-/// `tanh` saettigen und traegt zur Zugwahl nichts bei, da er fuer alle
-/// Geschwister gleich ist. Die Differenz isoliert genau den Teil, um den es
-/// geht: um wieviel sich Abweichen von der reinen Platzierungs-Maximierung
-/// lohnt, wenn man die Wertungsplatten mitrechnet. Sie ist klein, sie ist in
-/// Punkten, und sie haengt an den Musterreihen -- eine Fliese mehr in einer
-/// Reihe, die eine Spalte schliesst, hebt sie.
-///
-/// Beide Aufrufe sind gecacht (`cached_plain` / `cached_endaware`), der
-/// Doppelaufruf kostet also nicht zwingend doppelt.
-fn tiling_vorausschau(state: &GameState, pi: usize) -> f64 {
-    let mit = crate::tiling_solver::solve_round_final_score_endaware(state, pi);
-    let ohne = crate::tiling_solver::solve_round_final_score(state, pi);
-    (mit - ohne) as f64
 }
 
 /// Gewicht fuer den **Tiling-Potenzial**-Term. Default **0,0** = aus.
@@ -1296,10 +1247,14 @@ fn tiling_vorausschau(state: &GameState, pi: usize) -> f64 {
 ///   + projected_unplaceable_penalty(..)               <- MOSAIC_WERTUNG_FLOOR_W
 /// ```
 ///
-/// Warum meine beiden Eigenbauten weg sind: gemessen taten sie nichts.
-/// `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte (t=-0,07), bei w=0,3 -2,16
-/// (t=-1,21) ohne jeden Plattengewinn; `MOSAIC_MUSTERREIHEN_W` bei w=0,1 -0,84
-/// (t=-0,69). Die Knoepfe bleiben stehen, aber dieser hier ist der Traeger.
+/// Warum meine beiden Eigenbauten (`MOSAIC_ENDAWARE_W`/`tiling_vorausschau`,
+/// `MOSAIC_MUSTERREIHEN_W`/`crate::scoring::musterreihen_fortschritt`) INZWISCHEN
+/// entfernt sind (2026-08-13, PREREG_injektion_wertungsplatten.md Abschnitt N7):
+/// gemessen taten sie nichts. `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte
+/// (t=-0,07), bei w=0,3 -2,16 (t=-1,21) ohne jeden Plattengewinn;
+/// `MOSAIC_MUSTERREIHEN_W` bei w=0,1 -0,84 (t=-0,69). Dieser Traeger hier blieb
+/// unangetastet -- er ist der aus der Heuristik uebernommene, nicht selbst
+/// erfundene Term.
 pub fn tiling_weight() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| read_f64_env("MOSAIC_TILING_W", 0.0))
@@ -1333,18 +1288,6 @@ pub fn wertung_round_gain() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ROUND_GAIN", 0.0))
 }
 
-/// Laufzeit-Gewicht von `MOSAIC_MUSTERREIHEN_W` -- gleiches `OnceLock`-Muster
-/// wie `wertung_floor_weight` (einmalig gelesen, Default `0.0` = AUS, exakt
-/// Bestandsverhalten ohne gesetzte Env-Var). Skaliert
-/// `crate::scoring::musterreihen_fortschritt` (Musterreihen-Fortschritt,
-/// siehe dortige Modul-Doku) als weiteren Summanden auf `pts` in
-/// `apply_wertung_shaping_full`, VOR dem `tanh`, in derselben Punkte-Einheit
-/// wie der Strafleisten-Term (`floor_w`).
-pub fn musterreihen_weight() -> f64 {
-    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| read_f64_env("MOSAIC_MUSTERREIHEN_W", 0.0))
-}
-
 /// Reine Formel hinter [`apply_wertung_shaping`], OHNE Env-Var-Zugriff --
 /// `w`/`alpha` als Parameter statt aus dem OnceLock-Cache gelesen, gleiches
 /// Trennungsmuster wie `blended_leaf_win_prob`/`_with` (siehe dortige Doku:
@@ -1375,21 +1318,18 @@ fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha:
 fn apply_wertung_shaping_with_alphas(
     value: [f64; 2], state: &GameState, w: f64, alphas: &[f64; 8], round_gain: f64,
 ) -> [f64; 2] {
-    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain, 0.0, 0.0, 0.0, 0.0)
+    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain, 0.0, 0.0)
 }
 
-/// Volle Form: Gewicht UND Exponent je Kriterium, plus die zwei absoluten
-/// Gegenterme (Strafleiste `floor_w`, Musterreihen-Fortschritt
-/// `musterreihen_w`). Ein Gewicht 0 schaltet das jeweilige Kriterium/Additiv
-/// vollstaendig ab -- das ist die Voraussetzung fuer den Nutzer-Versuchsaufbau
-/// (je Satz nur EIN Kriterium injiziert).
+/// Volle Form: Gewicht UND Exponent je Kriterium, plus den absoluten
+/// Gegenterm (Strafleiste `floor_w`). Ein Gewicht 0 schaltet das jeweilige
+/// Kriterium/Additiv vollstaendig ab -- das ist die Voraussetzung fuer den
+/// Nutzer-Versuchsaufbau (je Satz nur EIN Kriterium injiziert).
 fn apply_wertung_shaping_full(
     value: [f64; 2], state: &GameState, ws: &[f64; 8], alphas: &[f64; 8], round_gain: f64,
-    floor_w: f64, musterreihen_w: f64, endaware_w: f64, tiling_w: f64,
+    floor_w: f64, tiling_w: f64,
 ) -> [f64; 2] {
-    if ws.iter().all(|w| *w == 0.0) && floor_w == 0.0 && musterreihen_w == 0.0
-        && endaware_w == 0.0 && tiling_w == 0.0
-    {
+    if ws.iter().all(|w| *w == 0.0) && floor_w == 0.0 && tiling_w == 0.0 {
         return value;
     }
     let mut out = value;
@@ -1478,16 +1418,6 @@ fn apply_wertung_shaping_full(
             shift += floor_w * bei(
                 crate::round_end::projected_unplaceable_penalty(&state.players[i]) as f64);
         }
-        // Musterreihen-Fortschritt (nachgebaute Bereitschaft).
-        if musterreihen_w != 0.0 {
-            shift += musterreihen_w * bei(crate::scoring::musterreihen_fortschritt(
-                &state.players[i], &state.scoring_tile_ids, alphas,
-            ));
-        }
-        // Tiling-Vorausschau (endaware minus plain).
-        if endaware_w != 0.0 {
-            shift += endaware_w * bei(tiling_vorausschau(state, i));
-        }
         // Tiling-Potenzial: der Musterreihen-Traeger aus der Heuristik.
         if tiling_w != 0.0 {
             shift += tiling_w * bei(tiling_potenzial(state, i));
@@ -1508,8 +1438,7 @@ fn apply_wertung_shaping_full(
 fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
     apply_wertung_shaping_full(
         value, state, &wertung_shaping_weights(), &wertung_shaping_alphas(), wertung_round_gain(),
-        wertung_floor_weight(), musterreihen_weight(), endaware_weight(),
-        tiling_weight(),
+        wertung_floor_weight(), tiling_weight(),
     )
 }
 
@@ -6937,34 +6866,6 @@ mod tests {
             0.0,
             "Test-Voraussetzung: MOSAIC_WERTUNG_ROUND_GAIN darf hier nicht gesetzt sein"
         );
-    }
-
-    #[test]
-    fn musterreihen_weight_defaults_to_zero_and_leaves_leaf_value_unchanged() {
-        // Default-Neutralitaet des neuen Musterreihen-Additivs: bei
-        // `MOSAIC_MUSTERREIHEN_W` ungesetzt (Default 0.0) muss der reale,
-        // Env-Var-lesende Wrapper `apply_wertung_shaping` `value`
-        // byte-identisch zurueckgeben -- gleiches Muster wie
-        // `wertung_shaping_disabled_by_default_is_exact_identity`.
-        assert_eq!(
-            musterreihen_weight(),
-            0.0,
-            "Test-Voraussetzung: MOSAIC_MUSTERREIHEN_W darf hier nicht gesetzt sein"
-        );
-        let mut rng = StdRng::seed_from_u64(9200);
-        let mut checked = 0;
-        for gi in 0..8u64 {
-            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
-            for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
-                assert_eq!(
-                    apply_wertung_shaping(v, &state), v,
-                    "Spiel {gi}: MOSAIC_MUSTERREIHEN_W=0 (Default) muss die Blattbewertung \
-                     unveraendert lassen (v={v:?})"
-                );
-            }
-            checked += 1;
-        }
-        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
     }
 
     #[test]
