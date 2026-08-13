@@ -260,32 +260,14 @@ pub(crate) fn tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> 
 
 // ── Generische Zellen-Mechanik (Kriterien 0/1/2/5, Portierung aus spaltenbau.rs) ──
 
-/// Kosten EINER Zelle -- Portierung von `spaltenbau::spalten_kosten`s
-/// Match-Body, hier fuer beliebige `(row, col)` statt nur `(r, spalte)`.
-/// Verifiziert aequivalent per Test unten
+/// Kosten EINER Zelle -- delegiert vollstaendig an `spaltenbau::zelle_kosten`
+/// (§16: dieselbe Formel, jetzt auch fuer die Special-Zellen-Slot-Nachbarn
+/// gebraucht, deshalb dort `pub(crate)` und hier keine eigene Kopie mehr,
+/// siehe CLAUDE.md "Bestehendes wiederverwenden"). Verifiziert aequivalent
+/// per Test unten
 /// (`zellen_kosten_stimmt_mit_spalten_kosten_fuer_spaltengeometrie_ueberein`).
-fn zelle_kosten(player: &PlayerBoard, row: usize, col: usize, verbleibend: &[i64; 5]) -> f64 {
-    match player.dome_grid.get_space(row, col) {
-        None => 1.0,
-        Some(sp) if sp.is_filled() => 0.0,
-        Some(sp) => match sp.space_type {
-            SpaceType::Wild => 0.2,
-            SpaceType::Special => crate::spaltenbau::special_kosten(player, row, col),
-            SpaceType::Normal => {
-                let need = sp.required_color;
-                match (player.pattern_lines[row].color, need) {
-                    (None, Some(x)) => 1.0 + crate::spaltenbau::engpass_aufschlag(verbleibend, x),
-                    (None, None) => 1.0,
-                    (Some(c), Some(x)) if c == x => 0.3,
-                    _ => 2.0,
-                }
-            }
-        },
-    }
-}
-
 fn zellen_kosten(player: &PlayerBoard, zellen: &[(usize, usize)], verbleibend: &[i64; 5]) -> f64 {
-    zellen.iter().map(|&(r, c)| zelle_kosten(player, r, c, verbleibend)).sum()
+    zellen.iter().map(|&(r, c)| crate::spaltenbau::zelle_kosten(player, r, c, verbleibend)).sum()
 }
 
 /// Toleranzband, identische Kalibrierung wie `spaltenbau::SPALTEN_TOLERANZ`

@@ -1109,3 +1109,195 @@ per Vorab-Regel entfaellt dieser Schritt in dieser Sitzung.
   Bestand" bleibt fuer beide Knoepfe ueber die Zeit hinweg konsistent
   (vorher war "Bestand" = §14/v5, jetzt ist "Bestand" = Runde 3 -- die
   Knopf-BEDEUTUNG "1=eingeschaltet" aendert sich nicht, nur ihr Default).
+
+### (6) NACHTRAG (Koordinator, 2026-08-13): Ursache der Sitzungs-Drift eingegrenzt -- HERLEITUNG, keine eigene Neumessung
+
+**Als Herleitung markiert** (Konsistenzargument aus geprueften Zeitstempeln,
+keine eigene Kausal-Messung dieser Sitzung): der RNG-Schnitt
+(`fe1e306`, GEPRUEFT `git log`: 2026-08-13 14:24:52) liegt zeitlich ZWISCHEN
+der §13-Messreihe (`a191cd7`, GEPRUEFT: 2026-08-13 12:54:26) und allen
+Laeufen dieser Sitzung (§14/§15, nach `fe1e306`). `elo_history.csv` vermerkt
+den Schnitt bereits als Aera-Grenze (`6b4fbd3`, GEPRUEFT: 2026-08-13 14:25:20,
+Nutzer-Entscheid, Zeile: *"Messungen ueber diesen Schnitt hinweg sind nur
+eingeschraenkt vergleichbar, da auch der Heuristik-Anker selbst aus einem
+anderen Strom sucht"*).
+
+`fe1e306`s Commit-Text (GEPRUEFT per `git show`): vor dem Schnitt teilten sich
+Suche (MCTS/Heuristik) und echte Spielereignisse (Beutel-Nachfuellungen)
+DENSELBEN RNG -- wie viel die Suche "verbrauchte", verschob dadurch, welche
+Fliesen wann in welche Fabrik kamen, unabhaengig vom eigentlichen Suchergebnis.
+Nach dem Schnitt hat die Suche einen eigenen, deterministisch aus (game_seed,
+move_index) abgeleiteten RNG (`derive_search_seed`).
+
+**Konsequenz fuer §15s Arm A**: Arm A ist im SPALTENBAU-CODE byte-identisch zu
+Runde 3, aber NICHT in der GESAMT-Ausfuehrungsumgebung -- Runde 3 (§12, vor
+`fe1e306`) lief mit dem geteilten RNG, Arm A (nach `fe1e306`) mit dem
+getrennten. Selbst bei identischer Spaltenbau-Logik fuehrt das zu
+UNTERSCHIEDLICHEN Beutel-Nachfuellungen im Partieverlauf (das Kachel-Setup
+selbst -- welche 3 Wertungsplatten aktiv sind -- bleibt dabei GEPRUEFT gleich,
+da es Teil des unveraenderten Anfangs des Partie-Streams ist, siehe
+`konfund_AC`/`r4d`: Vertikale Reihen ist in 20/20 Partien beider Dateien
+aktiv). **Damit ist 5,95 ein ALT-AERA-Wert und kein gueltiger Anker mehr** --
+der Nutzer hat den Schnitt bereits fuer den Elo-Anker als Aera-Grenze
+verfuegt (`6b4fbd3`); dieselbe Logik gilt fuer Generator-Benchmarks wie diesen.
+**Neuer, sitzungsinterner Anker fuer alle folgenden Abschnitte: A = 3,15**
+(zweimal bit-identisch repliziert, siehe (2)).
+
+Nicht eingegrenzt (und in dieser Sitzung nicht weiter verfolgt): ob der
+RNG-Schnitt die GESAMTE Differenz erklaert oder nur einen Teil -- die
+Herleitung ist konsistent mit allen Beobachtungen (Zeitstempel-Reihenfolge,
+Commit-Inhalt, identisches Kachel-Setup, Nutzer-Entscheid am Elo-Anker), aber
+keine Ursachen-Messung dieser Sitzung selbst hat das GEZIELT isoliert (z.B.
+per Nachbau des Alt-RNG-Pfads).
+
+
+---
+
+## 16. SPECIAL-ZELLEN-BAUSTEIN (2026-08-13): +1,05 gg. A, NICHT signifikant (p=0,083); Jackpot-Replikation auf frischen Seeds widerlegt den Trend
+
+Koordinator-Auftrag im Anschluss an §15(6): der mit 50 % groesste Blocker
+(Special-Zellen, §14 Teil 1) wird in die Spaltenbau-Logik eingebaut, gemessen
+gegen den neuen sitzungsinternen Anker A=3,15 (nicht mehr 5,95). Zusaetzlich:
+Jackpot-Replikation auf 20 FRISCHEN Seeds.
+
+### (1) Was gebaut wurde
+
+Dritter Diagnose-Knopf `MOSAIC_SPALTENBAU_SPECIAL` (Default AUS, gleiches
+Muster wie §15), drei Teile:
+
+1. **Kosten-Funktion**: `special_kosten(r, spalte, verbleibend)` summiert jetzt
+   die ECHTEN [`zelle_kosten`] ihrer 3 Slot-Nachbarn (die Nachbarn SIND der
+   Weg zur Special-Zelle, Koordinator-Vorgabe), statt der ALT-Formel
+   `0,3 + 0,8*n` (n = Zahl offener Nachbarn, farbblind). `spalten_kosten`
+   selbst wurde zu `(0..6).map(|r| zelle_kosten(r, spalte)).sum()`
+   vereinfacht -- `zelle_kosten` ist die neue, wiederverwendbare
+   Ein-Zellen-Formel (auch von `plattenbauer.rs`s generischer Mechanik
+   genutzt, die ihre eigene Kopie dieser Formel dafuer verloren hat --
+   CLAUDE.md "Bestehendes wiederverwenden").
+   
+   **Nutzer-Taktik (`docs/domain_knowledge.md` §8: "erzwungene Spezialkuppeln
+   nach OBEN ... obere Slots haengen an billigen Musterreihen") entsteht
+   AUTOMATISCH aus der bestehenden Formel**, ohne eigene Sonderregel: ein
+   Nachbar in Zeile 0/1 (oberer Slot) braucht laut [`zelle_kosten`]s
+   Normal-Zweig nur 1-2 Kopien, einer in Zeile 4/5 (unterer Slot) 5-6 -- die
+   Reihen-Tiefe ist bereits Teil der Kostenformel.
+2. **Vollendbarkeits-Erweiterung**: `ist_spalte_vollendbar` behandelt eine
+   offene Special-Zelle jetzt als vollendbar, wenn es ihre 3 Slot-Nachbarn
+   sind (neue Hilfsfunktion `ist_zelle_vollendbar`, dieselbe Logik wie der
+   Normal-Zweig, aber fuer eine beliebige `(r,c)`). Nur wirksam in
+   Kombination mit dem §15-Sicherheitsnetz (das ist Default AUS).
+3. **Vorzugs-Erweiterung**: zweite Drafting- und Tiling-Vorzugsstufe
+   (`special_nachbar_zellen`), die bei fehlendem zielspaltenspezifischem
+   Kandidaten die Slot-Nachbarn ALLER offenen Special-Zellen der Zielspalte
+   als Zellen-Liste an `plattenbauer::vorzugszug_fuer_zellen`/`tiling_vorzug_
+   fuer_zellen` durchreicht -- WIEDERVERWENDUNG der generischen
+   Zellen-Mechanik (Kriterien 0/2/5/7) statt einer eigenen Kopie. Bewusst
+   KEINE Dome-Wahl-Erweiterung: die Nachbarzellen-Farbforderung wird von
+   DERSELBEN Kachel-Platzierung fixiert, die die Special-Zelle ueberhaupt
+   erst erzeugt -- es gibt keinen SPAETEREN Dome-Entscheid mehr, der sie
+   betreffen koennte (siehe Bericht fuer die Begruendung).
+
+`cargo test --lib`: 416 bestanden (0 fehlgeschlagen, 20 ignoriert), 5 neue
+Tests fuer §16 (`special_kosten_par16_nutzt_echte_nachbarkosten`,
+`ist_spalte_vollendbar_par16_prueft_special_nachbarn`,
+`ist_spalte_vollendbar_default_ignoriert_special_wie_par14`,
+`special_nachbar_zellen_liefert_die_drei_slot_nachbarn_nur_wenn_aktiv`,
+`vorzugszug_bedient_special_nachbarn_wenn_zielspalte_selbst_nichts_findet`).
+Wheel neu gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...`
+haelt (Default unveraendert, der Knopf ist unset).
+
+### (2) Special-Zellen-Messung: 20 k1-Seeds gegen A
+
+Aufbau: `--env-name MOSAIC_SPALTENBAU_SPECIAL --arms 0 1 --control 0`,
+`MOSAIC_SPALTENBAU=1` per Export fix, dieselben 20 k1-Seeds, gleiches Modell.
+Ergebnis: `evaluations/paired_arena_env_special_r16_k1.json`.
+
+| Groesse | A (Special aus) | Special AN |
+| --- | ---: | ---: |
+| Vertikale Plattenpunkte Ø | 3,15 | **4,20** |
+| Endstand Ø | 40,95 | 44,00 |
+| Strafleiste Ø | 9,90 | 9,70 |
+| Siege | 15/20 | 16/20 |
+
+Gepaartes Delta **+1,05**, t=1,831, **p=0,083** (exakte zweiseitige
+Student-t-Verteilung, df=19, per Inkomplette-Beta-Funktion nachgerechnet --
+NICHT unter 0,05, verfehlt die Vorab-Regel "signifikant positiv"). Siege
+NICHT schlechter (16/20 gg. 15/20, sogar leicht besser) -- der zweite Teil der
+Vorab-Regel ist erfuellt, der erste nicht.
+
+**Blocker-Aufspaltung auf dem Special-AN-Arm** (15 Mauer-Zellen ueber 12 von
+20 Partien, gleiche Methode wie §14 Teil 1):
+
+| Kategorie | ohne Special-Baustein (§14, kombiniert) | MIT Special-Baustein |
+| --- | ---: | ---: |
+| special_zelle_offen | 50,0 % | **13,3 %** |
+| c_vorzug_griff_nicht | 42,9 % | 80,0 % |
+| b_reihe_falsch_gebunden | 0 % | 6,7 % |
+| wild_ohne_farbzwang | 7,1 % | 0 % |
+
+Der Special-Blocker-Anteil bricht genau in die Richtung ein, die der
+Mechanismus vorhersagt (50 % -> 13,3 %) -- eine INDIREKTE, aber konsistente
+Bestaetigung, dass die Kosten-/Vorzugserweiterung tatsaechlich greift, auch
+wenn der Gesamteffekt (+1,05) bei n=20 nicht signifikant ist.
+
+### (3) Jackpot-Replikation: 20 FRISCHE Seeds (70-89)
+
+Eigene Wahl (markiert): die 20 auf den k1-Bereich `[2..69]` unmittelbar
+folgenden Ganzzahlen 70-89 -- keine Auswahl nach Ergebnis, transparent
+nachvollziehbar. Gleicher Aufbau (`--env-name MOSAIC_SPALTENBAU_JACKPOT
+--arms 0 1 --control 0`). Ergebnis:
+`evaluations/paired_arena_env_jackpot_replik_fresh.json`.
+
+| Groesse | Jackpot aus | Jackpot AN |
+| --- | ---: | ---: |
+| Vertikale Plattenpunkte Ø | 2,10 | **2,10** |
+| Endstand Ø | 39,65 | 39,90 |
+| Strafleiste Ø | 13,05 | 12,00 |
+| Siege | 9/20 | 8/20 |
+
+**Gepaartes Delta 0,00 (t=0,00) -- alle 20 Partien liefern per Seed EXAKT
+denselben Vertikale-Reihen-Wert mit und ohne Jackpot.** Der in §15 gemessene
+Trend (+0,70 auf den k1-Seeds) repliziert NICHT.
+
+**Gepoolt ueber beide Seed-Saetze** (k1-Deltas aus §15 + die 20 frischen
+Null-Deltas, n=40): Mittel **+0,35**, t=0,813, **p=0,421** (exakt
+nachgerechnet) -- weit von jeder Signifikanz entfernt. Die Vorab-Regel
+("Jackpot wird uebernommen, wenn die Replikation die Richtung signifikant
+bestaetigt, gepoolt") ist klar NICHT erfuellt -- genau die λ-Sweep-Lehre
+("Richtung hielt, Replikation entschied") zeigt hier das GEGENTEIL-Ergebnis:
+die Richtung hielt NICHT.
+
+### (4) Entscheidung nach der Vorab-Regel
+
+- **Special-Baustein: NICHT uebernommen** (p=0,083 verfehlt "signifikant
+  positiv", trotz erfuellter Sieg-Bedingung und einer inhaltlich
+  konsistenten Blocker-Verschiebung). `MOSAIC_SPALTENBAU_SPECIAL` bleibt
+  Default AUS, Code bleibt im Repo (per `=1` einschaltbar).
+- **Jackpot: weiterhin NICHT uebernommen** -- durch die Replikation zusaetzlich
+  bestaetigt (nicht nur unentschieden wie in §15, jetzt mit einer zweiten,
+  unabhaengigen Messung, die den Effekt auf exakt Null gedrueckt hat).
+  `MOSAIC_SPALTENBAU_JACKPOT` bleibt Default AUS.
+- **Der aktive Stand bleibt die reine Runde-3-Konfiguration** (A=3,15) --
+  keine der beiden §14/§16-Erweiterungen hat die Vorab-Regel ueberstanden.
+  Das Nutzer-Ziel 7,00 bleibt unerreicht; der naechste Hebel ist weiterhin
+  `c_vorzug_griff_nicht` (jetzt 80 % des verbleibenden Restblockers auf dem
+  Special-Arm, siehe (2)) -- das war schon in §14 der zweitgroesste Posten und
+  ist jetzt, nach Special, praktisch der EINZIGE.
+
+### (5) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Special-Baustein bewusst NICHT nachgemessen/repliziert** trotz der
+  vielversprechenden Richtung (anders als Jackpot war das nicht explizit
+  beauftragt) -- Zeitbudget; die p=0,083-Zahl bleibt eine EINZELNE Messung,
+  keine bestaetigte.
+- **Keine Dome-Wahl-Erweiterung fuer Special-Nachbarn gebaut** -- begruendet
+  in (1): die Nachbarn-Farbforderung wird atomar mit der Special-Zelle selbst
+  durch dieselbe Kachel-Platzierung fixiert, ein SPAETERER Dome-Entscheid, der
+  sie noch beeinflussen koennte, existiert nicht. Kein Kompromiss, sondern
+  eine spielmechanische Tatsache.
+- **`plattenbauer.rs`s eigene Kopie von `zelle_kosten` entfernt**, ruft jetzt
+  `spaltenbau::zelle_kosten` direkt -- kleinerer Diff als zwei Formeln
+  synchron zu halten, verifiziert weiterhin durch den bestehenden
+  Aequivalenztest.
+- **Frische Seeds 70-89 statt einer Zufallsziehung** -- einfachste
+  nachvollziehbare Wahl ohne jede Optimierungsmoeglichkeit nach Ergebnis.
