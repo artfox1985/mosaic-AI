@@ -153,7 +153,7 @@ fn ziel_spalte() -> Option<usize> {
 /// Musterreihe `row_idx` speist Rasterreihe `row_idx` 1:1 (geprueft
 /// scoring.rs:416-422, deckungsgleich mit `round_end::
 /// row_has_open_matching_slot`s `dome_row=r/2,space_row=r%2`).
-fn geforderte_farbe(player: &PlayerBoard, row_idx: usize, spalte: usize) -> Option<TileColor> {
+pub(crate) fn geforderte_farbe(player: &PlayerBoard, row_idx: usize, spalte: usize) -> Option<TileColor> {
     player.dome_grid.get_space(row_idx, spalte).and_then(|s| s.required_color)
 }
 
@@ -466,6 +466,17 @@ pub(crate) fn vorzug_spalte() -> Option<usize> {
 ///    legale Zuege; Farb-/Kapazitaetsregeln der Musterreihe stecken dort).
 pub(crate) fn vorzugszug(state: &GameState) -> Option<crate::moves::Action> {
     let spalte = vorzug_spalte()?;
+    vorzugszug_fuer_spalte(state, spalte)
+}
+
+/// Kern von [`vorzugszug`], mit EXPLIZITER Ziel-Spalte statt des Env-Knopfs
+/// -- ausgelagert (2026-08-13, Spaltenbau-Auftrag), damit `spaltenbau.rs` die
+/// IDENTISCHE Praeferenzlogik mit einer je Entscheid dynamisch bestimmten
+/// Spalte wiederverwenden kann, statt sie zu duplizieren (CLAUDE.md:
+/// "vorhandene scripts/Funktionen wiederverwenden"). Reiner Parameter-
+/// Extrakt, keine Verhaltensaenderung -- `vorzugszug` selbst bleibt
+/// byte-identisch.
+pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option<crate::moves::Action> {
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }

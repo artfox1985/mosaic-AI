@@ -1217,6 +1217,20 @@ pub fn best_first_step_valued(
 /// Nur Runden 1..=4; Runde 5 gehoert dem exakten Endwertungs-Loeser.
 fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingStep> {
     let spalte = crate::provokation::vorzug_spalte()?;
+    vorzug_tiling_step_fuer_spalte(state, pi, spalte)
+}
+
+/// Kern von [`vorzug_tiling_step`], mit EXPLIZITER Ziel-Spalte statt des
+/// Env-Knopfs -- ausgelagert (2026-08-13, Spaltenbau-Auftrag) aus demselben
+/// Grund wie `provokation::vorzugszug_fuer_spalte`: `spaltenbau.rs` braucht
+/// dieselbe Routing-Praeferenz fuer eine je Entscheid dynamisch bestimmte
+/// Spalte. Reiner Parameter-Extrakt, `vorzug_tiling_step` bleibt
+/// byte-identisch.
+pub(crate) fn vorzug_tiling_step_fuer_spalte(
+    state: &GameState,
+    pi: usize,
+    spalte: usize,
+) -> Option<TilingStep> {
     if !(1..=4).contains(&state.round_number) {
         return None;
     }
@@ -1253,6 +1267,16 @@ pub fn best_first_step_exact_or_valued(
     pi: usize,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
 ) -> TilingStep {
+    // Spaltenbau (MOSAIC_SPALTENBAU, eigene Entscheidung siehe spaltenbau.rs-
+    // Moduldoku): PRUEFT ZUERST, damit das dynamisch gewaehlte Ziel der
+    // Drafting-Seite (spaltenbau::ziel_spalte) auch beim Tiling-Routing
+    // ankommt -- ohne das wuerde eine im Drafting korrekt gelieferte Farbe
+    // beim Tiling trotzdem in eine andere Rasterzelle wandern (der in
+    // `vorzug_tiling_step`s Doku genannte 10-von-18-Blocker). Default aus ->
+    // No-Op, faellt sofort durch zum bestehenden `vorzug_tiling_step`.
+    if let Some(step) = crate::spaltenbau::vorzug_tiling_step(state, pi) {
+        return step;
+    }
     if let Some(step) = vorzug_tiling_step(state, pi) {
         return step;
     }
