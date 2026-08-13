@@ -239,3 +239,58 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
   **10,3 gegen 1,3 je Partie**, also 9,0 der 14,5 Punkte Differenz. Die KI
   schaltet in **6 von 10** Partien kein einziges Spezialfeld frei, der Mensch in
   9 von 10 schon in Runde 2.
+
+
+## Spielstrategie aus Nutzer-Praxis (2026-08-13, woertlich aufgenommen)
+
+Diese Punkte stammen aus der Spielerfahrung des Nutzers und haben in der
+Plattenbauer-Entwicklung jeweils direkt eine Konstruktionsaenderung ausgeloest --
+sie sind Domaenenwissen, kein Messergebnis.
+
+### 1. Die Kuppel ist formbar -- Forderungen entstehen, sie bestehen nicht
+
+*"das spielfeld/kuppel laesst sich mehr oder weniger frei an die eigenen
+anforderungen anpassen."* Solange ein Slot keine Platte traegt, fordert seine
+Zelle nichts (`geforderte_farbe = None`). Die Farbforderungen sind eine
+ENTSCHEIDUNG (Kachelwahl + Rotation), keine Vorgabe. Folge fuer jede Strategie:
+nicht Farben jagen, die eine frueh festgelegte Platte fordert, sondern
+**Material zuerst sichern und die Forderungen hinterher passend waehlen**.
+
+### 2. Die Reihenfolge des Menschen: unten anfangen, Kuppel spaeter
+
+*"ich nehm ueberpraesente farben aus der fabrik und platziere sie in den unteren
+reihen. erst dann waehl ich die passende kuppel aus."* Untere Musterreihen
+brauchen 4-6 Kopien und die laengste Anlaufzeit -- dort zaehlt Ueberfluss am
+meisten, und die Kuppelwahl bleibt flexibel, bis das Material liegt.
+
+### 3. Die einzige echte Unbekannte ist die Fabrik-Befuellung
+
+*"die einzige wirklich unbekannte ist welche farben auf die fabrik kommen mit
+jeder runde. dann heisst es plan anpassen/optimieren, schadensbegrenzung
+betreiben und den gegner stoeren."* Seit dem RNG-Schnitt (2026-08-13) ist diese
+Unbekannte auch technisch der einzige Zufallsstrom des Spiels.
+
+Die Dreiheit, mit Belegstand:
+- **Plan anpassen**: Vollendbarkeits-Buchhaltung + Zielwechsel (Plattenbauer
+  Runde 4). Eine Spalte ist laut Nutzer *"praktisch immer erreichbar wenn
+  vernuenftig darauf hingespielt wird"* -- festhalten an einem toten Ziel ist ein
+  Planungsfehler, kein Naturgesetz.
+- **Schadensbegrenzung**: der am besten belegte Pfeiler -- der Strafleisten-Term
+  war der einzige Eingriff der Injektions-Messreihe mit signifikant positivem
+  Effekt; die Beschneidungs-Provokation scheiterte exakt daran, dass sie
+  Schadensbegrenzung verbot.
+- **Gegner stoeren**: der schwaechste Pfeiler; der einzige gemessene Versuch
+  (λ-Denial) replizierte nicht. Siehe naechster Abschnitt.
+
+### 4. BAUSTEIN (Nutzer-Auftrag): Gegner-Stoerung ueber die Farbzaehlung
+
+Dieselbe oeffentliche Zaehlung (`verbleibende_farben`), die die eigene
+Vollendbarkeit prueft, verraet auch, welche knappe Farbe der GEGNER fuer seine
+Struktur braucht: seine Musterreihen-Farben und Kuppelplatten-Forderungen sind
+sichtbar. Ein Bauer, der bei ~gleichwertigen eigenen Zuegen die Fliese nimmt,
+die dem Gegner ausgeht, stoert aus reiner Buchhaltung -- kein Kopf, keine
+Vorhersage. **Eingeplant als Plattenbauer-Baustein NACH Runde 4** (erst die
+eigene Vollendung, dann die Stoerung; beides nutzt dieselbe Zaehlung).
+Messgroesse dann: Gegner-Plattenpunkte und Gegner-Endstand gepaart, nicht nur
+die eigenen -- die λ-Lehre (Vorzeichenwechsel zwischen Laeufen) mahnt zur
+Replikation auf frischen Seeds, bevor daraus ein Befund wird.
