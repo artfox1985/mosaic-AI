@@ -65,6 +65,16 @@ getrennt) — die Basisraten-Falle aus der Skill-Konfundierungs-Lehre.
 5. **GPU-Verdikt §22**: Bei ≥2× Durchsatz die Arme A–C über den Async+ORT-Pfad
    fahren; sonst klassisch 8 Threads. Der Plan hängt davon NICHT ab, nur die
    Laufzeit.
+6. **Leckt das Streuungs-Shaping in die Value-Labels?** (Nutzer-Auftrag
+   2026-08-14; exhumiert aus der ausgemusterten P-Liste, dort nie
+   beantwortet.) Arm A läuft mit MOSAIC_WERTUNG_STREUUNG_MAX > 0; das
+   Shaping verschiebt die BLATTBEWERTUNGEN der Suche. Zu klären am Code:
+   entstehen `bootstrap_value`/`round_transition_value` aus denselben
+   (geshifteten) Netz-Blattbewertungen (round_transition_deep.rs::
+   net_leaf_eval-Pfad, thread-lokales Partie-Gewicht!) — dann tragen die
+   Arm-A-Records verzerrte Value-Ziele und das Shaping muss für die
+   LABEL-Rechnung neutralisiert werden (oder der Befund lautet belegt
+   "kein Leck"). Vor dem Start beantworten, mit datei:zeile.
 
 ### Nachträge (2026-08-14, Prüf-/Kleinbau-Sitzung — reine Prüfung + ein additiver Schalter, KEINE Generierung/Training gestartet)
 
