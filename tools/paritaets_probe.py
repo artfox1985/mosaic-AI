@@ -84,6 +84,22 @@ sys.path.insert(0, str(REPO / "engine" / "py"))
 # Erwarteter Hash der Default-Konfiguration. Aendert sich NUR, wenn das
 # Bestandsverhalten absichtlich geaendert wird -- dann gehoert der neue Wert
 # mit Begruendung in den Commit, nicht stillschweigend hierher.
+#
+# GEPRUEFT 2026-08-13 (PREREG_such_rng_trennen.md, RNG-Schnitt Suche/Partie):
+# der Hash haelt UNVERAENDERT, ENTGEGEN der Prereg-Erwartung in §4a ("Hash
+# MUSS brechen"). Grund, am Code nachgeprueft: diese Sonde haengt AUSSCHLIESSLICH
+# an `net_search_state_json` (lib.rs) -> `net_search_with_tree`, und DIESER
+# Aufruf war nie Teil des Schnitts -- er baut sich pro Aufruf einen FRISCHEN,
+# eigenen `rng` (aus dem `seed`-Parameter) und gibt ihn NIE an eine
+# fortlaufende Partie-Schleife weiter, die zusaetzlich echte Zustands-
+# Ereignisse (Beutel-Refills) aus demselben Strom zoege -- exakt das
+# Praezedenzmuster, das `tools/analyze_game_log.py::deterministic_seed()`
+# fuer sein Orakel schon nutzt. Der reparierte Fehler (Suche verschiebt den
+# GETEILTEN Partie-RNG in self_play.rs/py.rs) tritt hier also strukturell
+# nicht auf; der Schnitt betraf `self_play.rs`s Spielschleifen und
+# `py.rs::PyGame::ai_drafting_step`/`ai_drafting_net_step` (Live-KI-Zuege),
+# NICHT diesen Einzelaufruf-Pfad. Die Prereg-Prognose war insofern falsch;
+# die Basislinie bleibt deshalb UNVERAENDERT (kein neuer Hash noetig).
 EXPECTED = "8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423"
 
 MODEL = REPO / "models" / "alphazero_v20_2d_opp_brierbest.onnx"
