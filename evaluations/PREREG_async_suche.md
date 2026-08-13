@@ -783,3 +783,145 @@ geworden.
   bestehenden Gate-B-Kern-Test integriert statt eines separaten Tests --
   hält den direkten Vergleich (voll vs. Spielgeschehen) an derselben
   Partiemenge sichtbar.
+
+---
+
+## 12. GATE B, FINAL: nach dem RNG-Schnitt gemessen -- Spielgeschehen bit-identisch, Trainingsziel-Felder NICHT (Befund, nicht wegtoleriert)
+
+Der RNG-Schnitt (`fe1e306`, `PREREG_such_rng_trennen.md`) ist im Hauptbaum
+gelandet und gepusht: die Suche erhält einen eigenen, aus `(game_seed,
+move_index)` deterministisch abgeleiteten RNG (`net_mcts::derive_search_seed`)
+statt des mit dem echten Spiel geteilten Stroms. Nutzer-Auftrag: Gate B
+final messen.
+
+### Rebase: Worktree `scratchpad/wt_async2` (neu, `wt_async` bleibt Archiv)
+
+Neuer `git worktree add --detach` auf aktuellem Hauptbaum-HEAD (`7e5a243`).
+GEPRÜFTE Umgebungshürde, nicht Teil der Async-Arbeit: `player_profiles.json`
+ist inzwischen `git-crypt`-verschlüsselt versioniert, der Schlüssel ist in
+dieser Umgebung nicht entsperrt -- `git worktree add`/`cherry-pick` schlugen
+mit `git-crypt: Unable to open key file` fehl, bis der Smudge/Clean-Filter
+für den jeweiligen Git-Aufruf per `-c filter.git-crypt.*=cat` deaktiviert
+wurde (nur für den einzelnen Prozessaufruf, keine persistente Config-
+Änderung, kein Effekt auf Hauptbaum/`wt_async`).
+
+**Cherry-Pick der drei Worktree-Commits (`1c5169e`, `dd7b229`, `98ea99f`)
+ergab KEINEN Textkonflikt** -- git meldete "Auto-merging" für alle
+betroffenen Dateien, keine `<<<<<<<`-Marker. Das ist KEIN Beleg für
+semantische Vertäglichkeit: die Async-Zwillinge leben in eigenen
+Funktionen (`play_net_self_play_game_async` u.a.), textuell getrennt von den
+Stellen, an denen der RNG-Schnitt `game_seed`/`search_rng` einführte -- git
+hatte deshalb nichts zum Kollidieren, aber auch nichts zum automatischen
+Nachziehen. **Manuell nachgezogen**: `play_net_self_play_game_async` bekam
+den neuen `game_seed: u64`-Parameter, und die Drafting-Entscheidung leitet
+jetzt `search_rng` exakt wie das synchrone Original ab (`derive_search_seed(
+game_seed, move_number)`), statt weiterhin den geteilten `rng` an
+`net_drafting_policy_async`/`pcr_decide_full`/`moon_order_target` zu
+reichen. GEPRÜFT unverändert (wie im synchronen Original): die Aufrufe von
+`sample_round_transition_for_round_async`/`bootstrap_value_after_rounds_async`
+und `tiling_step_async` nutzen weiterhin den GETEILTEN `rng` -- der
+RNG-Schnitt hat diese Stellen laut Commit `fe1e306` bewusst nicht
+umgestellt ("läuft auf einem Zustands-Klon, beeinflusst nie den gespielten
+Zug"). Alle Test-Aufrufstellen (Gate-B-Tests, Sync-Wiederholbarkeits-Diagnose)
+ebenfalls um `game_seed` ergänzt (Konvention: `game_seed` = derselbe Wert,
+mit dem `rng` selbst geseedet wurde, wie in `run_net_self_play`).
+
+`cargo test --lib`: **406 bestanden / 0 fehlgeschlagen / 31 ignoriert**
+(Hauptbaum-Basis 402/0/20 + eigene Stufe-1/2-Testzusätze). Committet als
+`89c0a6b` im Worktree.
+
+### Gate B (a): volle Partien OHNE Sammel-Faden, 8 Seeds, ZWEI Läufe
+
+| Lauf | Abweichungen (voll, inkl. Trainingsziele) | Abweichungen (nur Spielgeschehen) |
+| --- | ---: | ---: |
+| 1 | 1/8 (Seed 7, Record-Index 107) | **0/8** |
+| 2 | 3/8 (Seeds 0, 5, 6 -- Seed 6 bereits Record-Index 0) | **0/8** |
+
+**Das Spielgeschehen (Zustände, Policy, gewählte Züge, `root_q`/
+`root_child_q`, Endstände) ist über BEIDE Läufe und alle 16 Partie-
+Vergleiche hinweg bit-identisch (0/16).** Die Abweichungen beschränken sich
+auf `bootstrap_value`/`round_transition_value` -- additive Trainingsziel-
+Felder ohne Rückwirkung auf den gespielten Zug (bestätigt die Einordnung aus
+Abschnitt 11 und den Kommentar in Commit `fe1e306`).
+
+**GEPRÜFTE Gegenprobe, jetzt auf denselben 8 Seeds**:
+`play_net_self_play_game_sync_only_repeatability` (REIN SYNCHRON, KEIN
+Async-Code) zeigt **0/8 Abweichungen** -- die vorbestehende Sync-gegen-
+Sync-Instabilität aus Abschnitt 11 ist durch den RNG-Schnitt tatsächlich
+behoben, wie vom Nutzer berichtet.
+
+**Das ist der eigentliche Befund dieses Auftrags, NICHT wegtoleriert**: Gate
+B (a) ist damit **NICHT bit-identisch inklusive Trainingsziel-Felder** --
+die Erwartung aus dem Auftrag trifft nicht zu, obwohl Sync-gegen-Sync jetzt
+perfekt reproduzierbar ist. Die naheliegende Erklärung (nicht weiter
+verifiziert, siehe "Was NICHT geprüft ist"): `bootstrap_value_after_rounds`/
+`sample_round_transition_for_round` nutzen weiterhin den GETEILTEN `rng`
+UND `round_transition_deep.rs`s Wall-Clock-Not-Deckel (Task #71, siehe
+Abschnitt 10). Sync-gegen-Sync ist reproduzierbar, WEIL zwei Läufe
+DESSELBEN Codes ungefähr dieselbe Wall-Clock-Zeit für dieselbe Arbeit
+brauchen. Sync und Async sind aber KONSTRUKTIONSBEDINGT unterschiedlich
+schnell (Future-Overhead je Unterbrechungspunkt, über eine ganze Partie mit
+hunderten Entscheidungen aufsummiert) -- genug, um einen der grosszügigen,
+aber nicht unendlichen Not-Deckel (`ROUND_SIM_TIME_BUDGET=15s`,
+`POLICY_TIME_BUDGET_PER_DECISION=200ms` u.a.) in EINEM der beiden Pfade
+binden zu lassen, im anderen nicht -- unterschiedliche Wall-Clock-
+Geschwindigkeit reicht dafür aus, auch OHNE jede externe Nebenlast. Die
+schwankende Rate (1/8, dann 3/8, mit identischen Seeds) stützt diese
+Deutung: ein deterministischer Logikfehler würde nicht zwischen Läufen
+variieren.
+
+### Gate B (b): MIT Sammel-Faden, 4 Partien gleichzeitig
+
+Vor dem RNG-Schnitt (Abschnitt 11): 3/4 Zugfolge-Abweichungen,
+KONFUNDIERT durch die damalige Sync-gegen-Sync-Instabilität. **Nach dem
+RNG-Schnitt**: **1/4 Zugfolge-Abweichungen, 1/4 Endstand-Abweichungen** --
+die abweichende Partie hat sogar eine ANDERE Zuganzahl (165 gg. 160). Diese
+eine Partie ist NICHT mehr durch die (jetzt behobene) Sync-Instabilität
+erklärbar -- die naheliegende, mit Stufe 1 bereits ETABLIERTE Ursache ist
+tracts fehlende Bit-Gleichheit über verschiedene Batch-Pläne (`net.rs:927-
+982`, Toleranz `1e-5`; `PREREG_gpu_inferenzpfad.md` §14-§17 hatte dieselbe
+Quelle bereits als seltenes, listenpositionsabhängiges Rangvertauschungs-
+Ereignis charakterisiert, ~0,22 % der Zustände). Über eine volle Partie mit
+~160 Entscheidungen summiert sich selbst eine kleine Pro-Zug-Wahrscheinlichkeit:
+bei 0,22 % je Zug wäre die Wahrscheinlichkeit auf mindestens EINE Abweichung
+irgendwo in der Partie `1-(1-0,0022)^160 ≈ 30 %` -- **derselbe
+Größenordnungsbereich wie die gemessenen 25 % (1/4)**, eine grobe, aber
+plausible Übereinstimmung mit einer bereits VOR dieser Sitzung bekannten,
+dokumentierten Toleranzquelle, keine neue.
+
+### VERDIKT
+
+- **Spielgeschehen (Gate B im Kern -- welcher Zug wird gespielt, wie endet
+  die Partie): bit-identisch ohne Sammel-Faden (0/16 über zwei Läufe), und
+  konsistent mit der bereits etablierten, kleinen Batch-Plan-Toleranz mit
+  Sammel-Faden.** Kein Grundsatzproblem der Verschränkungsarchitektur.
+- **Trainingsziel-Felder (`bootstrap_value`/`round_transition_value`) sind
+  NICHT bit-identisch zwischen sync und async**, auch nach dem RNG-Schnitt
+  -- ein Befund über verbleibende, in `round_transition_deep.rs` liegende
+  Wall-Clock-Nichtdeterminismus-Quellen (Task #71), die durch
+  UNTERSCHIEDLICHE Ausführungsgeschwindigkeit von sync und async sichtbar
+  werden, nicht durch fehlende Reproduzierbarkeit an sich. Dies BLOCKIERT
+  Gate B im ursprünglich verlangten Wortlaut (Bit-Identität INKLUSIVE
+  Trainingsziele) -- wird hier als offener Befund stehen gelassen, nicht
+  wegtoleriert.
+
+### Was NICHT geprüft ist
+
+- Ob die Trainingsziel-Divergenz sich beheben ließe, indem
+  `bootstrap_value_after_rounds`/`sample_round_transition_for_round` (Sync
+  UND Async) ebenfalls einen eigenen, von `game_seed` abgeleiteten RNG
+  bekämen (analog zum Suchpfad) -- das würde die Wall-Clock-Empfindlichkeit
+  selbst nicht beheben, aber verhindern, dass eine Abweichung dort in den
+  geteilten Strom zurückwirkt. NICHT gebaut, nicht Teil dieses Auftrags
+  (Änderung am synchronen Original, nicht nur am Async-Zwilling).
+  - Die genaue Kausalkette (welcher Not-Deckel bindet, um wie viel
+  Wall-Clock-Zeit sync und async sich für dieselbe Arbeit tatsächlich
+  unterscheiden) wurde NICHT instrumentiert -- die Deutung stützt sich auf
+  die 0/8-Sync-Gegenprobe plus die bekannte Existenz der Not-Deckel, nicht
+  auf eine direkte Zeitmessung.
+- Ob ein dritter/vierter Lauf von Gate B (a) eine andere Rate als 1/8 bzw.
+  3/8 zeigen würde -- zwei Datenpunkte belegen Varianz, nicht die genaue
+  Verteilung.
+- Gate B (b)s 0,22-%-Bezugsrate ist aus §14-§17 übernommen (dieselbe
+  Toleranzquelle), NICHT für DIESES Modell/diese Partien neu gemessen --
+  die 30-%-Rechnung ist eine Plausibilitätsschätzung, kein Beweis.
