@@ -11193,3 +11193,97 @@ dem die Formel 30:15 gegenueber 55:50 bevorzugt.
   deckt sich mit der Wiedereroeffnungsbedingung der geschlossenen
   Aggressions-/Denial-Regel ("nur mit messbar schaerferem opp-Kopf") und ist
   damit kein eigener offener Punkt mehr, sondern derselbe wie dort.
+
+---
+
+## 2026-08-13 -- Dateinamen-Migration Welle 1 (deutsch -> englisch)
+
+Nutzer-Anweisung 2026-08-13 (CLAUDE.md, Abschnitt "Dateinamen-Konvention"):
+neue Dateien immer englisch, Alt-Bestand wird migriert. Welle 1 hat alle
+deutsch benannten Dateien AUSSER den von zwei parallel laufenden Agenten
+aktiv beschriebenen (Welle 2) per `git mv` umbenannt und die aufloesenden
+Referenzen mitgezogen. Historische Erwaehnungen alter Namen in DIESER Datei
+sowie die INHALTE der Mess-JSONs/-CSVs bleiben unveraendert -- fuer das
+Nachschlagen gilt die folgende Tabelle.
+
+| alt | neu |
+|---|---|
+| tools/arena_kompakt.py | tools/arena_compact.py |
+| tools/dome_split_diagnose.py | tools/dome_split_diagnosis.py |
+| tools/musterreihen_durchsatz.py | tools/pattern_row_throughput.py |
+| tools/musterreihen_verfuegbarkeit.py | tools/pattern_row_availability.py |
+| tools/offline_diagnose.py | tools/offline_diagnosis.py |
+| tools/plattenkopf_labels.py | tools/plate_head_labels.py |
+| tools/plattenkopf_smoketest.py | tools/plate_head_smoketest.py |
+| tools/punktekopf_stufe2.py | tools/points_head_stage2.py |
+| docs/domaenenwissen.md | docs/domain_knowledge.md |
+| dist/README_SPIEL.txt | dist/README_GAME.txt |
+| evaluations/DESIGN_konventionen_als_pruefungen.md | evaluations/DESIGN_conventions_as_checks.md |
+| evaluations/EXTERNES_REVIEW_2026-08-08.md | evaluations/EXTERNAL_REVIEW_2026-08-08.md |
+| evaluations/RESEARCH_alphazero_verbesserungen_2026-08-01.md | evaluations/RESEARCH_alphazero_improvements_2026-08-01.md |
+| evaluations/TASK_NUMMERN_REGISTRATUR.md | evaluations/TASK_NUMBER_REGISTRY.md |
+| evaluations/watchlist_v20_zwischenlese.md | evaluations/watchlist_v20_interim_review.md |
+| evaluations/PREREG_aggression_stilmessung.md | evaluations/PREREG_aggression_style_measurement.md |
+| evaluations/PREREG_aggressions_neukartierung.md | evaluations/PREREG_aggression_remapping.md |
+| evaluations/PREREG_async_suche.md | evaluations/PREREG_async_search.md |
+| evaluations/PREREG_bootstrap_horizont.md | evaluations/PREREG_bootstrap_horizon.md |
+| evaluations/PREREG_gpu_inferenz_batcher.md | evaluations/PREREG_gpu_inference_batcher.md |
+| evaluations/PREREG_gpu_verlagerung.md | evaluations/PREREG_gpu_offloading.md |
+| evaluations/PREREG_injektion_dosis.md | evaluations/PREREG_injection_dose.md |
+| evaluations/PREREG_injektion_wertungsplatten.md | evaluations/PREREG_scoring_plate_injection.md |
+| evaluations/PREREG_ismcts_determinisierungen.md | evaluations/PREREG_ismcts_determinizations.md |
+| evaluations/PREREG_nach34_paket.md | evaluations/PREREG_post34_package.md |
+| evaluations/PREREG_ownership_verbraucher.md | evaluations/PREREG_ownership_consumer.md |
+| evaluations/PREREG_platten_intervention.md | evaluations/PREREG_plate_intervention.md |
+| evaluations/PREREG_plattenkopf.md | evaluations/PREREG_plate_head.md |
+| evaluations/PREREG_platzierungsseite.md | evaluations/PREREG_placement_side.md |
+| evaluations/PREREG_prior_blindfleck.md | evaluations/PREREG_prior_blind_spot.md |
+| evaluations/PREREG_punkte_blend_w.md | evaluations/PREREG_points_blend_w.md |
+| evaluations/PREREG_punkte_lambda_unter_kipppunkt.md | evaluations/PREREG_points_lambda_below_tipping_point.md |
+| evaluations/PREREG_punktekopf_epsilon.md | evaluations/PREREG_points_head_epsilon.md |
+| evaluations/PREREG_punktekopf_platten.md | evaluations/PREREG_points_head_plates.md |
+| evaluations/PREREG_such_rng_trennen.md | evaluations/PREREG_search_rng_split.md |
+| evaluations/PREREG_suchpfad_nachmessungen.md | evaluations/PREREG_search_path_remeasurements.md |
+| evaluations/PREREG_t37_tiling_kriterium.md | evaluations/PREREG_t37_tiling_criterion.md |
+| evaluations/PREREG_task_d_gewichte.md | evaluations/PREREG_task_d_weights.md |
+| evaluations/PREREG_v20_kampagne.md | evaluations/PREREG_v20_campaign.md |
+| evaluations/PREREG_v21_fenster.md | evaluations/PREREG_v21_window.md |
+| evaluations/PREREG_v22_fenster.md | evaluations/PREREG_v22_window.md |
+| evaluations/PREREG_zufallsknoten.md | evaluations/PREREG_chance_nodes.md |
+| evaluations/arena_kompakt.jsonl | evaluations/arena_compact.jsonl |
+| evaluations/dome_split_diagnose.json/.md (+_withintree) | evaluations/dome_split_diagnosis.json/.md (+_withintree) |
+| evaluations/offline_diagnose_*.json (6 Dateien) | evaluations/offline_diagnosis_*.json |
+| evaluations/fenster_generation.svg | evaluations/window_generation.svg |
+| evaluations/generator_matrix_protokoll.json | evaluations/generator_matrix_protocol.json |
+| evaluations/netz_suche.png/.svg | evaluations/net_search.png/.svg |
+| evaluations/paired_arena_env_aggr_e1_lambdahoch.json | evaluations/paired_arena_env_aggr_e1_lambdahigh.json |
+| evaluations/paired_arena_env_aggr_neukartierung.json | evaluations/paired_arena_env_aggr_remapping.json |
+| evaluations/paired_arena_env_aggr_stil_bestaetigung.json | evaluations/paired_arena_env_aggr_style_confirmation.json |
+| evaluations/paired_arena_env_ismcts_tiefe_k{1,2,4}.json | evaluations/paired_arena_env_ismcts_depth_k{1,2,4}.json |
+| evaluations/paired_arena_env_lambda_unter_kipppunkt.json | evaluations/paired_arena_env_lambda_below_tipping_point.json |
+| evaluations/paired_arena_env_punkte_blend_w.json | evaluations/paired_arena_env_points_blend_w.json |
+| evaluations/paired_gating_blend_starkgegner.json | evaluations/paired_gating_blend_strong_opponent.json |
+| evaluations/paired_gating_v21_replikation.json | evaluations/paired_gating_v21_replication.json |
+| evaluations/platzierung_korrigiert_protokoll.json | evaluations/placement_corrected_protocol.json |
+| evaluations/platzierung_stufen_protokoll.json | evaluations/placement_stages_protocol.json |
+| evaluations/punktekopf_platten_stufe{1,2}.json | evaluations/points_head_plates_stage{1,2}.json |
+| evaluations/rastererweiterung_protokoll.json | evaluations/grid_expansion_protocol.json |
+| evaluations/seeds_plattenversuch.txt | evaluations/seeds_plate_experiment.txt |
+| evaluations/simsweep_protokoll.json | evaluations/simsweep_protocol.json |
+| evaluations/suche_vertikal_protokoll.json | evaluations/vertical_search_protocol.json |
+| evaluations/t36_snapshot_validierung.json | evaluations/t36_snapshot_validation.json |
+| evaluations/t_e_prior_blindfleck.json | evaluations/t_e_prior_blind_spot.json |
+| evaluations/value_ziel.png/.svg | evaluations/value_target.png/.svg |
+| evaluations/versorgung_decke_protokoll.json | evaluations/supply_ceiling_protocol.json |
+| evaluations/spielablauf.png/.svg | evaluations/game_flow.png/.svg |
+| evaluations/game_analysis_rng_schnitt_probe_*.md (5, ungetrackt) | evaluations/game_analysis_rng_split_probe_*.md |
+
+AUSGELASSEN in Welle 1: docs/Spielanleitung_GUI.pptx (Datei aktuell gesperrt,
+Permission denied -> geplant: docs/game_manual_GUI.pptx). ZURUECKGESTELLT auf
+Welle 2 (laufende Agenten rufen sie auf bzw. laden sie): tools/paritaets_probe.py,
+tools/seed_auswahl_platten.py, evaluations/seed_auswahl_platten.json,
+evaluations/provokation_abnahme.json, tools/gpu_inferenzpfad_ipc_roundtrip.py
+sowie die Welle-2-Liste selbst (engine/src/spaltenbau.rs, plattenbauer.rs,
+provokation.rs, tools/spaltenbau_trace.py, tools/plattenpunkte_aus_arena.py,
+evaluations/PREREG_provokation.md, PREREG_gpu_inferenzpfad.md,
+seeds_je_kriterium/, evaluations/gpu_*).
