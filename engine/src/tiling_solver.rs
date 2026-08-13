@@ -619,7 +619,7 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
 /// Entartete Reihenfolgen (dieselben Steine, andere Reihenfolge) fuehren auf
 /// dasselbe Brett; dedupliziert wird ueber die Belegungssignatur, sonst
 /// erschiene die Value-Spreizung kuenstlich klein.
-const MAX_TILING_LEAVES: usize = 400;
+pub(crate) const MAX_TILING_LEAVES: usize = 400;
 
 /// Kanonische Signatur eines Tiling-ABSCHLUSSES: Kuppelfuellung UND
 /// verbleibender Bonuschip-Bestand.

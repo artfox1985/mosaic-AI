@@ -1596,8 +1596,8 @@ fn play_net_game<R: Rng + ?Sized>(
                     let actions = drafting_actions(&game.state);
                     let vorzug_kandidat = if pi == net_board && actions.len() > 1 {
                         crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
-                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
+                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
+                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
                     } else {
                         None
                     };
@@ -1679,7 +1679,7 @@ fn play_net_game<R: Rng + ?Sized>(
                 // (`tiling_solver::best_first_step_exact_or_valued`), gibt das
                 // aber nach aussen nicht zurueck.
                 let vorzug_kandidat_tiling = if pi == net_board {
-                    crate::spaltenbau::vorzug_tiling_step(&game.state, pi)
+                    crate::plattenbauer::tiling_vorzug(&game.state, pi)
                 } else {
                     None
                 };
@@ -1796,7 +1796,7 @@ pub fn run_net_arena_match(
         // richtigen Thread. Reset danach, damit ein rayon-recycelter Thread
         // nicht den Seed der VORHERIGEN Partie fuer die naechste `spaltenbau`-
         // Anfrage ausserhalb dieser Funktion mitschleppt.
-        crate::spaltenbau::set_partie_seed(Some(game_seed));
+        crate::plattenbauer::set_partie_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -1804,7 +1804,7 @@ pub fn run_net_arena_match(
         let result = play_net_game(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
         );
-        crate::spaltenbau::set_partie_seed(None);
+        crate::plattenbauer::set_partie_seed(None);
         result
     };
 
@@ -1884,8 +1884,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                         };
                         let s = net_effective_sims(base, actions.len());
                         crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
-                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
+                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
+                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
                             .or_else(|| net_search_drafting_action(net, &game.state, s, cp, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -1981,7 +1981,7 @@ pub fn run_net_vs_net_arena(
             None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
         };
         // Siehe Kommentar in `run_net_arena_match`s `play`-Closure.
-        crate::spaltenbau::set_partie_seed(Some(game_seed));
+        crate::plattenbauer::set_partie_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -1990,7 +1990,7 @@ pub fn run_net_vs_net_arena(
             &net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng, game_seed,
             log_games,
         );
-        crate::spaltenbau::set_partie_seed(None);
+        crate::plattenbauer::set_partie_seed(None);
         result
     };
 
@@ -2085,8 +2085,8 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                     } else {
                         let s = net_effective_sims(sims_plain, actions.len());
                         crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
-                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
+                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
+                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
                             .or_else(|| net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -3462,8 +3462,8 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                     } else {
                         let s = net_effective_sims(sims1, actions.len());
                         crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
-                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
+                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
+                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
                             .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
