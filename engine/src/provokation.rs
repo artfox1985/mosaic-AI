@@ -632,6 +632,59 @@ pub(crate) fn verbleibende_farben(state: &GameState) -> [i64; 5] {
     std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - verbaut[i])
 }
 
+/// Runde 4, Baustein 1 (Nutzer-Auftrag `PREREG_provokation.md` §14): fuer
+/// [`crate::spaltenbau::ist_spalte_vollendbar`] ist [`verbleibende_farben`]
+/// die FALSCHE Zahl -- die zaehlt Fabrik-/Mond-Kacheln als "verbaut", obwohl
+/// sie JETZT noch nehmbar sind (sie misst "im Beutel/Turm versteckt", nicht
+/// "noch erreichbar"). Eine tiefe Reihe (braucht bis zu 6 Kopien) erschien
+/// dadurch systematisch unvollendbar, sobald ein Teil ihrer Farbe gerade in
+/// den Fabriken lag statt im Beutel -- GEFUNDEN ueber die erste volle
+/// Runde-4-Messung: 3-5 Zielwechsel je Partie, vertikale Punkte auf 0,70
+/// statt 5,95 eingebrochen (schlechter als ohne Spaltenbauer).
+///
+/// "Noch erreichbar" = Gesamtvorrat (13) minus nur das, was TATSAECHLICH
+/// nicht mehr zurueckkommt: beider Spieler Strafleiste und platzierte
+/// Kuppelzellen, PLUS die Musterreihen-Fliesen des GEGNERS (der haelt sie
+/// bereits, sie sind fuer uns weg). Die eigenen Musterreihen NICHT
+/// abgezogen -- das eigene Material fuer eine ANDERE Zeile ist bei einem
+/// spaeteren Rundenende potenziell wieder frei (siehe `ist_spalte_
+/// vollendbar`s "transiente Falschbindung"-Kommentar), es zusaetzlich
+/// abzuziehen waere erneut zu pessimistisch. Fabrik-/Mond-/Beutel-/Turm-
+/// Kacheln bleiben unangetastet -- sie sind (irgendwann) erreichbar.
+pub(crate) fn noch_erreichbare_farben(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
+    let mut verloren = [0i64; 5];
+    let mut zaehle = |c: TileColor| {
+        if let Some(i) = farben_index(c) {
+            verloren[i] += 1;
+        }
+    };
+    for p in &state.players {
+        for &c in &p.broken_tiles {
+            zaehle(c);
+        }
+        for row in &p.dome_grid.dome_slots {
+            for slot in row {
+                if let Some(tile) = slot {
+                    for space in &tile.spaces {
+                        if let Some(c) = space.placed_color {
+                            zaehle(c);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let gegner = 1 - aktueller_spieler;
+    if let Some(p) = state.players.get(gegner) {
+        for line in &p.pattern_lines {
+            for &c in &line.tiles {
+                zaehle(c);
+            }
+        }
+    }
+    std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - verloren[i])
+}
+
 /// Index 0..=4 von `color` in `TileColor::NORMAL` -- `None` fuer `Wild`
 /// (kein ziehbarer Stein, siehe `tile.rs`-Doku "kein ziehbarer Stein").
 pub(crate) fn farben_index(color: TileColor) -> Option<usize> {
@@ -825,5 +878,48 @@ mod vorzugszug_tests {
         // deterministisch leer -- muss exakt beim vollen Vorrat stehen.
         let bi = farben_index(Blau).unwrap();
         assert_eq!(verbleibend[bi], crate::tile::TILES_PER_COLOR as i64);
+    }
+
+    /// Runde 4, Baustein 1: `noch_erreichbare_farben` darf FABRIK-Kacheln
+    /// NICHT abziehen (die sind jetzt noch nehmbar) -- anders als
+    /// `verbleibende_farben` im Test oben. Abgezogen werden nur beider
+    /// Spieler Strafleiste/verbaute Kuppelzellen UND die Musterreihen des
+    /// GEGNERS (der haelt sie schon); die EIGENEN Musterreihen bleiben
+    /// unangetastet.
+    #[test]
+    fn noch_erreichbare_farben_zaehlt_fabrikkacheln_nicht_als_verloren() {
+        let mut game = drafting_game(105);
+        let pi = game.state.current_player;
+        let gegner = 1 - pi;
+
+        for f in game.state.factories.iter_mut() {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
+
+        // 2 Rot in der Fabrik -- muss NICHT abgezogen werden (noch nehmbar).
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        // 1 Rot auf der Strafleiste des Gegners -- muss abgezogen werden.
+        game.state.players[gegner].broken_tiles = vec![Rot];
+        // 1 Rot in einer Musterreihe des AKTIVEN Spielers -- bleibt
+        // erreichbar (eigenes Material, kann bei Rundenende wieder frei
+        // werden), wird NICHT abgezogen.
+        game.state.players[pi].pattern_lines[2].color = Some(Rot);
+        game.state.players[pi].pattern_lines[2].tiles.push(Rot);
+        // 1 Rot in einer Musterreihe des GEGNERS -- der haelt es schon,
+        // muss abgezogen werden.
+        game.state.players[gegner].pattern_lines[1].color = Some(Rot);
+        game.state.players[gegner].pattern_lines[1].tiles.push(Rot);
+
+        let erreichbar = noch_erreichbare_farben(&game.state, pi);
+        let i = farben_index(Rot).unwrap();
+        // 13 - 1 (Strafleiste Gegner) - 1 (Musterreihe Gegner) = 11.
+        assert_eq!(
+            erreichbar[i],
+            crate::tile::TILES_PER_COLOR as i64 - 2,
+            "Fabrik-Rot und die eigene Musterreihe duerfen nicht abgezogen werden: {erreichbar:?}"
+        );
     }
 }

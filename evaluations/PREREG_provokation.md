@@ -777,3 +777,335 @@ unveraendert.
   weiter aufgeloest** -- markiert als offene Beobachtung statt als Befund,
   weil die Ursache (Lauf-zu-Lauf-Inferenz-Jitter vs. Aufrufumgebung) in
   dieser Sitzung nicht eingegrenzt wurde.
+
+
+---
+
+## 14. RUNDE 4 (2026-08-13): 77-%-Blocker aufgespalten -- 0 % strukturell, Vollendbarkeits-Sicherheitsnetz gebaut, +2,45 gg. AUS aber < Runde 3
+
+Koordinator-Auftrag im Anschluss an §12/§13: den dominanten "Farbe nicht im
+Angebot"-Blocker AUFSPALTEN statt pauschal als strukturell zu werten, dann den
+groessten behebbaren Anteil bauen. Waehrend der Sitzung kamen zwei
+Nutzer-Korrekturen dazu: (1) Vollendbarkeits-Check mit Ziel-Spalten-Wechsel ist
+PFLICHT, nicht optional; (2) eine zweite Stufe "Material zuerst" (ueberpraesente
+Farbe in tiefe Reihen, Kuppelwahl matcht aufs bereits liegende Material).
+
+### (1) Aufspaltung a/b/c/d -- GEPRUEFT an der exakten Kachel-Geometrie
+
+Methode: `dome.rs:201-233` (18-Platten-Katalog, `tile_id` 0..18 fortlaufend,
+Farblayout FEST) + `rotation_indices` (`dome.rs:89-97`) liefern die geforderte
+Farbe JEDER Zelle deterministisch aus den `Kachel X -> Slot (r,c) rot=d`-
+Logzeilen -- robuster als `kein_vorzug_grund`s Text, der nur die ERSTE
+blockierende Zeile nennt und die eigentlich interessierende Zelle oft verdeckt.
+Werkzeug: `scratchpad/blocker_split_abcd.py` (Scratch, nicht im Repo), liest die
+--log-games-Rohdaten aus Runde 2/3 (`evaluations/paired_arena_env_spaltenbau_
+r{2,3}.json`, bereits vorhanden).
+
+"Mauer-Zelle": eine Spalte mit GENAU 1 offener Zelle unter 6 belegten Slots --
+ALLE 6 Spalten je Partie gescannt, nicht nur die zuletzt verfolgte Zielspalte.
+Fuer die eine offene Normal-Zelle X = ihre (aus der Kachel-Geometrie bekannte)
+geforderte Farbe. Klassifikation ueber ALLE Drafting-Entscheidungen der Partie
+(chronologisch, nicht nur mit passender Zielspalte -- Musterreihen sind
+spielerweit geteilt):
+
+| Kategorie | Runde 2 (6 Zellen) | Runde 3 (8 Zellen) | Kombiniert (14 Zellen) |
+| --- | ---: | ---: | ---: |
+| (a) Farbe nie verfuegbar, waehrend Zeile offen | 0 (0%) | 0 (0%) | **0 (0%)** |
+| (b) verfuegbar, aber Zeile falsch gebunden | 0 (0%) | 0 (0%) | **0 (0%)** |
+| (c) verfuegbar, Zeile offen, Vorzug griff trotzdem nicht | 4 (66,7%) | 2 (25%) | **6 (42,9%)** |
+| special_zelle_offen (Slot-Nachbarn unvollstaendig) | 2 (33,3%) | 5 (62,5%) | **7 (50,0%)** |
+| wild_ohne_farbzwang (Wild nie erreicht) | 0 | 1 (12,5%) | **1 (7,1%)** |
+
+**Kernbefund: 0 von 14 persistenten Mauer-Zellen sind "strukturell" im Sinne
+der vorab festgelegten Stopp-Regel.** Die 74-77-%-Kennzahl aus §11/§12 misst
+etwas ANDERES -- sie summiert ALLE (meist transienten, spaeter geloesten)
+Blockmomente ueber die GANZE Partie; auf die tatsaechlich bis zum Schluss
+offene Zelle bezogen ist "Farbe nie verfuegbar" nicht ein einziges Mal die
+Ursache. Verifiziert per Stichprobe (Seed 3/Runde 3, Special-Zelle (2,4)): ihre
+Slot-Nachbarn (2,5)/(3,5) sind selbst offen (Gelb/Rot) -- eine ECHTE
+Cross-Slot/Cross-Spalten-Abhaengigkeit, kein Farbversorgungsproblem dieser
+Spalte. Und Seed 13/Runde 3 (c_vorzug_griff_nicht): Tuerkis war im Angebot,
+Zeile 5 (braucht Tuerkis) war offen, aber die Praeferenz nahm Tuerkis fuer
+Zeile 1 einer damals ANDEREN Zielspalte -- die "vollste Reihe"-Tie-Break-Regel
+aus §12 bevorzugt flache/fast-volle Reihen ueber tiefe, exakt der Befund, den
+Baustein 3 (Material zuerst) adressieren sollte.
+
+Damit ist die Stopp-Regel des urspruenglichen Auftrags ("(a) dominiert mit
+>60% -> nicht bauen, Decke ist strukturell") NICHT ausgeloest -- im Gegenteil,
+sie ist mit 0% so weit wie moeglich vom Schwellenwert entfernt. Genau das
+deckt sich mit der Nutzer-Korrektur ("eine Spalte laesst sich praktisch immer
+erreichen, wenn vernuenftig gespielt wird"): Baustein 1 wurde gebaut.
+
+### (2) Was gebaut wurde
+
+**Baustein 1 (Pflicht): Vollendbarkeits-Sicherheitsnetz + Zielwechsel.**
+`ist_spalte_vollendbar(player, spalte, verbleibend)` (`spaltenbau.rs`): jede
+offene Normal-Zelle braucht `verbleibend[Farbe] >= (r+1) - schon_gesammelt`
+UND darf nicht an eine ANDERE Farbe gebunden sein, DIE NICHT MEHR AUFLOeSBAR
+IST (siehe Korrektur unten). `waehle_beste_vollendbare_spalte` waehlt unter
+allen vollendbaren Spalten die mit den meisten bereits gefuellten Zellen
+(Tie-Break: Kosten). `ziel_spalte_fuer_player` bleibt die GEWOHNTE, bei jedem
+Aufruf frisch berechnete Kostenwahl aus Runde 1-3 (`waehle_spalte`) -- das
+Sicherheitsnetz greift NUR als Filter DARueBER: ist der natuerliche
+Kosten-Kandidat unvollendbar, wird auf die beste vollendbare Alternative
+ausgewichen, vermerkt als "Wechsel=alt->neu Grund=unvollendbar" im [SB]-Trace.
+
+*Zwei echte Bugs unterwegs gefunden und behoben (siehe (3)):* (i) eine
+transient falsch gebundene Zeile darf NICHT sofort als unvollendbar gelten
+(sie loest sich beim naechsten Rundenende automatisch); (ii)
+`verbleibende_farben` zaehlt Fabrik-Kacheln faelschlich als "verbaut" -- fuer
+die Vollendbarkeit gibt es jetzt die eigene Zahl `noch_erreichbare_farben`
+(`provokation.rs`), die nur beider Spieler Strafleiste/verbaute Kuppelzellen
+und die Musterreihen des GEGNERS abzieht.
+
+**Baustein 3a (aktiv): Kuppel-Jackpot.** `zellen_wert` bewertet eine Zelle, die
+exakt die Farbe fordert, die ihre Musterreihe schon fuehrt, jetzt mit
+`JACKPOT_WERT = 4,0` -- DOMINANT ueber Wild (3,0), wie von der Nutzer-Vorgabe
+gefordert. Trace: "Jackpot=ja" additiv auf Dome-Entscheidungen.
+
+**Baustein 3b (gebaut, gemessen, NICHT verdrahtet): `ueberpraesenz_vorzug`.**
+Eine zweite Drafting-Vorzugsstufe, die bei fehlendem zielspalten-spezifischem
+Kandidaten die JETZT ueberpraesenteste Farbe (hoechster `verbleibende_farben`-
+Wert) in die TIEFSTE legale Musterreihe nimmt. Erste volle 20-Seed-Messung MIT
+dieser Stufe im `vorzugszug`-Pfad: Netz-Siege 2/20 statt 15-16/20 Referenz
+(McNemar p=0,0001). Per 6-Seed-Sonde OHNE diese Stufe isoliert: 5/6 (normale
+Groessenordnung) -- Ursache eindeutig zugeordnet. Grund: greift auf einem
+GROSSEN Teil aller Fruehphasen-Drafting-Entscheidungen (immer, wenn die
+zielspalten-spezifische Praeferenz nichts findet -- das ist frueh im Spiel der
+Normalfall) und ersetzt dort die Netz-Suche komplett durch eine
+Ein-Kriterium-Heuristik, die Strafleiste/Gegner/andere Kriterien ignoriert --
+dasselbe Muster wie §7 (Beschneidung zu stark), nur ueber die Vorzugs- statt
+die Aktionsmengen-Seite. Bleibt als getestete, unverdrahtete Funktion im Code
+fuer eine spaetere, enger gefasste Fassung (z.B. als zusaetzliches Suchsignal
+statt als suche-ersetzender Vorzug).
+
+### (3) Der Weg zur finalen Fassung -- drei echte Regressionen, drei Diagnosen
+
+Baustein 1 ging durch VIER volle 20-Seed-Messungen, bevor eine Fassung ohne
+Nettoverlust stand -- jede Regression wurde isoliert und ursaechlich behoben,
+keine wurde weggemessen oder ignoriert:
+
+| Fassung | Netz-Siege | Vertikale Punkte (AN) | Befund |
+| --- | ---: | ---: | --- |
+| v1: Baustein1 (Zielspalte persistent gebunden) + `ueberpraesenz_vorzug` verdrahtet | 2/20 (p=0,0001) | nicht ausgewertet (Lauf haette verworfen werden muessen) | `ueberpraesenz_vorzug` ersetzt die Suche zu oft -- isoliert per 6-Seed-Sonde |
+| v2: wie v1, `ueberpraesenz_vorzug` NICHT verkettet | 10/20 (p=0,146) | 2,45 | Zielspalte wechselte 5,25x/Partie -- jede transiente Falschbindung loeste einen Wechsel aus |
+| v3: transiente Falschbindung nicht mehr Sofort-Trigger | 10/20 (p=0,070) | 0,70 (SCHLECHTER als AUS=1,05) | `verbleibende_farben` zaehlt Fabrik-Kacheln als verbaut -- tiefe Reihen erschienen systematisch unvollendbar |
+| v4: `noch_erreichbare_farben` statt `verbleibende_farben`, Zielspalte bleibt PERSISTENT gebunden | 8/20 (p=0,039) | 1,05 (=AUS, kein Gewinn) | Persistente Bindung nahm der Kosten-Formel die Reaktionsfaehigkeit aus Runde 1-3 |
+| **v5 (final): Zielspalte WIEDER frisch pro Entscheid, Vollendbarkeit nur als Sicherheitsnetz DARueBER** | **15/20 (p=1,000)** | **3,50** | siehe (4) |
+
+Der entscheidende Design-Fehler ueber v1-v4: eine Zielspalte ueber mehrere
+Entscheidungen PERSISTENT festzuhalten nahm der bereits in Runde 1-3
+validierten Kosten-Formel genau die Reaktionsfaehigkeit, die sie brauchte, um
+selbst schon "wegzuwechseln" -- Runde 3 hatte nie eine gespeicherte
+Zielspalte, sondern waehlte bei JEDEM Aufruf frisch die (versorgungsgewichtet)
+billigste. v5 stellt das wieder her und legt das Vollendbarkeits-Sicherheitsnetz
+nur als FILTER darueber, der ausschliesslich dann greift, wenn selbst die
+frische Kostenwahl auf eine nachweislich unvollendbare Spalte faellt.
+
+### (4) Finale Abnahme (v5), 20 k1-Seeds
+
+Aufbau IDENTISCH zu Runde 2/3: `alphazero_v21_2d_brierbest.onnx@400` vs
+Heuristik@150(dyn), Seeds `[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,
+59,69]`, `MOSAIC_SPALTENBAU_TRACE=1` beide Arme. Ergebnis:
+`evaluations/paired_arena_env_spaltenbau_r4d.json`.
+
+| Groesse | AUS (Kontrolle) | AN (v5) |
+| --- | ---: | ---: |
+| Vertikale Plattenpunkte (Ø, n=20) | 1,05 | **3,50** |
+| Endstand (Ø) | 50,25 | 39,45 |
+| Strafleiste (Ø) | 10,90 | 9,50 |
+| Siege Netz | 16/20 | 15/20 |
+
+Gepaartes Delta +2,45 Plattenpunkte, t=2,33 (n=20, GEPRUEFT signifikant auf
+demselben Niveau wie Runde 3s +5,25/t=3,94). Sieg-Differenz NICHT signifikant
+(McNemar p=1,0, b=3/c=4) -- der Spaltenbauer kostet in dieser Fassung KEINE
+belegbare Staerke, bei GUENSTIGERER Strafleiste (9,50 vs. 10,90). 10 von 20
+Partien schliessen mindestens eine Spalte (7 Punkte), 0 von 20 zwei Spalten.
+
+**ABNAHME gegen das urspruengliche Kriterium (>=7,00) VERFEHLT**, und
+zusaetzlich: **3,50 liegt UNTER Runde 3s 5,95** auf denselben 20 Seeds mit
+demselben Modell. Das ist NICHT das erhoffte "Baustein 1 verbessert Runde 3";
+es ist ein Gewinn gegenueber "gar kein Spaltenbauer" (1,05), aber ein
+(unaufgeloester) Verlust gegenueber dem Runde-3-Stand. Zwei Aenderungen
+liegen zwischen den Messungen (Vollendbarkeits-Sicherheitsnetz + Jackpot-
+Gewichtung), und diese Sitzung hat NICHT gemessen, welche der beiden fuer die
+Differenz zu Runde 3 verantwortlich ist -- das ist eine offene Beobachtung,
+keine ausgeschlossene Ursache (naechster Schritt: dieselbe Messung mit
+`JACKPOT_WERT` zurueck auf 2,5, Sicherheitsnetz aktiv, um die beiden
+Beitraege zu trennen).
+
+**Blocker-Aufspaltung auf den v5-Traces** (12 Mauer-Zellen, 8 von 20 Partien):
+special_zelle_offen 5 (41,7%), c_vorzug_griff_nicht 6 (50,0%), wild 1 (8,3%),
+a/b weiterhin 0 (0%) -- DECKUNGSGLEICH mit Runde 2/3s Befund. Das bestaetigt
+die Erwartung aus (1): Baustein 1 adressiert eine Ursache (reine
+Farbknappheit), die in den PERSISTENTEN Blockern nie die Mehrheit war,
+deshalb bewegt sich diese Verteilung kaum.
+
+**Wechsel-Statistik**: 32 Wechsel-Ereignisse ueber 20 Partien (Ø 1,6/Partie,
+Spanne 0-7) -- WEIT unter v3s 5,25/Partie. Auffaellig: Partien mit VIELEN
+Wechseln (Seeds 20, 29, 6: 6, 7, 5 Wechsel) enden ALLE mit 0 vertikalen
+Punkten, waehrend die 10 erfolgreichen Partien ueberwiegend 0-3 Wechsel
+zeigen. Das Sicherheitsnetz greift also bevorzugt in Partien, die SOWIESO
+schon schlecht laufen (mehrfache Versorgungs-Engpaesse), OHNE sie zuverlaessig
+zu retten -- ein Wechsel ist ein Symptom von Schwierigkeit, kein verlaesslicher
+Hebel zum Erfolg. Deckt sich mit dem 0-%-Befund aus (1): reine
+Farbknappheits-Rettung war nie der dominante Hebel.
+
+**Jackpot-Statistik**: 76 von 266 Dome-Entscheidungen (28,6%) trafen einen
+"Jackpot"-Kandidaten.
+
+### (5) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **`ueberpraesenz_vorzug` deaktiviert statt reparaturversucht** -- Zeitbudget
+  UND Prinzip "gemessen und abgelehnt ist ein Befund, keine halbe Arbeit"
+  (gleiche Haltung wie §7). Eine enger gefasste Fassung (z.B. nur als
+  Zusatzsignal fuer die Suche statt als Suche-Ersatz) ist nicht ausprobiert.
+- **Die Jackpot/Sicherheitsnetz-Konfundierung in (4) wurde NICHT aufgeloest**
+  -- nach vier Regressions-Zyklen war fuer eine fuenfte Messung (nur zur
+  Ursachentrennung) kein Budget mehr; markiert als offene Frage statt als
+  Behauptung in irgendeine Richtung.
+- **Special-Zellen bewusst NICHT in `ist_spalte_vollendbar` aufgenommen** --
+  ihre Trigger-Bedingung ist von der eigenen Spalte unabhaengig (Slot-
+  Nachbarn koennen in einer ANDEREN Spalte liegen); eine Vollendbarkeits-
+  Pruefung, die nur EINE Spalte betrachtet, kann das grundsaetzlich nicht
+  entscheiden, ohne die Nachbarspalte mitzudenken -- nicht gebaut, mit 41,7%
+  aber der GROESSTE einzelne Posten der verbleibenden Blocker.
+- **`kombination_hat_jackpot` per Gleichheitsvergleich auf `JACKPOT_WERT`**
+  statt einem eigenen Rueckgabewert -- kleinerer Diff, sicher, weil
+  `zellen_wert` nur Literale liefert (kein Rundungsrisiko).
+- **`scratchpad/blocker_split_abcd.py` bleibt Scratch**, nicht Teil des Repos
+  -- Diagnosewerkzeug fuer diese Sitzung, nicht auf Dauerbetrieb ausgelegt
+  (haerteste Annahme: exakter Kachel-Katalog aus `dome.rs` von Hand
+  uebernommen, bricht stumm bei einer Katalog-Aenderung dort).
+
+
+---
+
+## 15. ENTKONFUNDIERUNG (2026-08-13): 2x2 auf denselben 20 k1-Seeds -- kein Arm > 5,95, Runde-3-Konfiguration bleibt aktiver Stand
+
+Koordinator-Auftrag im Anschluss an §14: die Konfundierung zwischen Baustein 1
+(Vollendbarkeits-Sicherheitsnetz) und Baustein 3a (Kuppel-Jackpot) auflösen,
+mit derselben 20-Seed-Kette. Zwei neue Diagnose-Knoepfe nachgeruestet
+(`MOSAIC_SPALTENBAU_SICHERHEITSNETZ`, `MOSAIC_SPALTENBAU_JACKPOT`), damit
+beide Bausteine unabhaengig schaltbar sind -- keiner davon im Gating.
+
+### (1) Aufbau
+
+`tools/paired_arena_env_ab.py` zweimal aufgerufen, `MOSAIC_SPALTENBAU=1`
+gemeinsam per Shell-Export gesetzt, je EIN Baustein-Knopf ueber `--arms 0 1`
+variiert, der ANDERE per Export fixiert:
+
+- Lauf 1 (`evaluations/paired_arena_env_konfund_AB.json`):
+  `MOSAIC_SPALTENBAU_JACKPOT=0` fix, `--env-name MOSAIC_SPALTENBAU_
+  SICHERHEITSNETZ --arms 0 1` -> liefert Arm A (beide aus) und Arm B (nur
+  Sicherheitsnetz).
+- Lauf 2 (`evaluations/paired_arena_env_konfund_AC.json`):
+  `MOSAIC_SPALTENBAU_SICHERHEITSNETZ=0` fix, `--env-name MOSAIC_SPALTENBAU_
+  JACKPOT --arms 0 1` -> liefert Arm A (erneut, zur Reproduzierbarkeits-
+  Kontrolle) und Arm C (nur Jackpot).
+- Arm D (beide an) wird NICHT neu gefahren -- Vorgabe des Koordinators;
+  identisch mit dem AN-Arm aus `evaluations/paired_arena_env_spaltenbau_
+  r4d.json` (§14).
+
+Gleiche 20 k1-Seeds, gleiches Modell (`alphazero_v21_2d_brierbest.onnx@400`
+vs. Heuristik@150(dyn)) wie §11-§14 durchgehend.
+
+### (2) KRITISCHER NEBENBEFUND: Arm A reproduziert die Runde-3-Konfiguration NICHT auf 5,95, sondern auf 3,15
+
+Arm A (beide Bausteine aus) ist im Code IDENTISCH zu Runde 3s Pfad (gepruefte
+Codepfad-Analyse: `sicherheitsnetz_aktiv()==false` liefert exakt `waehle_
+spalte(kosten)`, `jackpot_aktiv()==false` liefert exakt den alten Wert 2,5 --
+beides byte-fuer-byte der Runde-3-Stand). Trotzdem: **3,15 vertikale
+Plattenpunkte in dieser Sitzung, nicht 5,95 wie in §12 archiviert, auf
+DENSELBEN 20 Seeds mit demselben Modell.**
+
+Innerhalb dieser Sitzung ist Arm A REPRODUZIERBAR (zwei unabhaengige
+Prozess-Laeufe, Lauf 1 und Lauf 2, liefern die exakt gleiche Punktereihe je
+Seed: `[0,7,0,7,7,7,0,0,0,7,0,14,0,0,0,0,0,7,0,7]`, GEPRUEFT identisch) -- die
+Abweichung ist also KEIN Zufallsrauschen innerhalb der Sitzung, sondern eine
+SYSTEMATISCHE Differenz zwischen dieser Sitzung und der §12-Sitzung (Ursache
+nicht eingegrenzt: Wheel-Frische, Thread-Anzahl, tract/ONNX-Laufzeitversion
+oder Systemlast sind Kandidaten, keiner geprueft). Das ist dieselbe Art von
+Beobachtung, die §13(1) bereits fuer den Kontroll-Arm vermerkt hat ("Lauf-zu-
+Lauf-Inferenz-Jitter vs. Aufrufumgebung"), hier aber deutlich groesser (2,8
+Punkte statt 0,35) und erstmals auch fuer den AKTIVEN Arm nachgewiesen.
+
+**Folge fuer die Interpretation**: der in §14 berichtete Vergleich "v5=3,50
+< Runde 3=5,95" vergleicht zwei VERSCHIEDENE Sitzungen und ist dadurch
+vermutlich groesstenteils (oder vollstaendig) durch dieses Sitzungs-Artefakt
+erklaert, NICHT durch einen echten Effekt der Runde-4-Bausteine -- der
+sitzungsinterne Vergleich unten (A=3,15 vs. D=3,50, beide im selben
+Groessenbereich) stuetzt das. **§14s Wortlaut "v5 unterperformt Runde 3" wird
+hiermit relativiert**: die Grundlage dafuer war ein Cross-Sitzungs-Vergleich,
+den diese Sitzung als nicht belastbar entlarvt hat.
+
+### (3) 2x2-Tabelle (gepaart, n=20 je Zelle)
+
+| Arm | Sicherheitsnetz | Jackpot | Vertikale Punkte Ø | Endstand Ø | Strafleiste Ø | Siege |
+| --- | :-: | :-: | ---: | ---: | ---: | ---: |
+| A | aus | aus | 3,15 | 40,95 / 40,90* | 9,90 | 15/20 |
+| B | AN | aus | 3,15 | 40,90 | 9,90 | 15/20 |
+| C | aus | AN | 3,85 | 39,85 | 9,75 | 15/20 |
+| D (§14, ANDERE Sitzung) | AN | AN | 3,50 | 39,45 | 9,50 | 15/20 |
+
+*A wurde zweimal gemessen (Lauf 1 und Lauf 2), beide Werte angegeben --
+identisch bis auf Rundung, siehe (2).
+
+**Effekt Sicherheitsnetz (B-A, sitzungsintern)**: +0,00 Plattenpunkte
+(t=0,00) -- 0 diskordante Paare, JEDES der 20 Spiele identisch mit und ohne
+Sicherheitsnetz. Auf diesen 20 Seeds hat Baustein 1 in Kombination mit
+Jackpot=aus KEINEN messbaren Effekt (deckt sich mit §14s Wechsel-Statistik:
+nur 1,6 Wechsel/Partie im Schnitt, und die betroffenen Partien aendern
+laut (4) dort ohnehin selten das Endergebnis).
+
+**Effekt Jackpot (C-A, sitzungsintern)**: +0,70 Plattenpunkte (t=0,81,
+NICHT signifikant bei n=20) -- Richtung positiv, aber statistisch nicht von
+Null zu unterscheiden.
+
+**Bester Arm: C mit 3,85.** Weit unter der Runde-3-Referenz 5,95 (egal ob man
+die archivierte Zahl oder Arm A dieser Sitzung als Bezug nimmt).
+
+### (4) Entscheidung nach der Vorab-Regel
+
+*"Kein Arm > 5,95: Runde-3-Konfiguration bleibt der aktive Stand (Code der
+Bausteine bleibt, Knoepfe default AUS)."*
+
+Kein Arm (A=3,15, B=3,15, C=3,85, D=3,50) uebertrifft 5,95. **Entscheidung:
+Runde-3-Konfiguration bleibt der aktive Stand.** Umgesetzt:
+
+- `MOSAIC_SPALTENBAU_SICHERHEITSNETZ` und `MOSAIC_SPALTENBAU_JACKPOT` beide
+  auf **Default AUS umgestellt** (vorher, seit §14, Default AN) -- unset
+  liefert jetzt wieder GENAU den Runde-3-Pfad (`ziel_spalte` = reine
+  Kostenwahl ohne Vollendbarkeits-Filter, `zellen_wert` = 2,5 statt
+  `JACKPOT_WERT` fuer den Jackpot-Fall).
+- Beider Bausteine CODE bleibt im Repo (`ist_spalte_vollendbar`,
+  `waehle_beste_vollendbare_spalte`, `zellen_wert`s Jackpot-Zweig,
+  `ueberpraesenz_vorzug`) -- ueber `=1` weiter einschaltbar fuer eine
+  spaetere Fassung, aber nicht mehr Default-Verhalten. `cargo test --lib`:
+  411 bestanden (0 fehlgeschlagen, 20 ignoriert) nach der Umstellung. Wheel
+  neu gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...`
+  haelt (der Umschwung betrifft nur den `MOSAIC_SPALTENBAU=1`-Pfad, die
+  Defaults ohne den Knopf sind davon nicht beruehrt).
+
+**Special-Zellen-Erweiterung (Auftrag 2, bedingt auf "bester Arm >= 5,95"):
+NICHT gebaut.** Die Bedingung ist nicht erfuellt (bester Arm 3,85 < 5,95) --
+per Vorab-Regel entfaellt dieser Schritt in dieser Sitzung.
+
+### (5) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Arm D wurde NICHT neu gefahren** (Koordinator-Vorgabe), obwohl (2) einen
+  Sitzungs-Effekt nachweist, der D (andere Sitzung) potenziell verzerrt --
+  fuer die Entscheidung in (4) macht das keinen Unterschied (D=3,50 liegt
+  ohnehin weit unter 5,95, egal wie verzerrt), wird aber hier ausdruecklich
+  als Einschraenkung der D-Zahl vermerkt statt verschwiegen.
+- **Die Sitzungs-Drift-Ursache aus (2) wurde NICHT eingegrenzt** (Wheel-Alter,
+  Thread-Zahl, ONNX-Laufzeit, Systemlast alle als Kandidaten unbewiesen) --
+  das ist ein potenziell wichtiger Befund fuer KUENFTIGE Messungen dieser
+  Metrik (die 5,95-/7,00-Referenzwerte selbst sind moeglicherweise
+  sitzungsabhaengig streuend, nicht nur code-abhaengig), aber ausserhalb des
+  Zeitbudgets dieser Sitzung aufzulösen.
+- **Polaritaet der Knoepfe umgedreht statt neue Knoepfe mit anderem Namen
+  angelegt** -- kleinerer Diff, und die Semantik "unset = aktueller
+  Bestand" bleibt fuer beide Knoepfe ueber die Zeit hinweg konsistent
+  (vorher war "Bestand" = §14/v5, jetzt ist "Bestand" = Runde 3 -- die
+  Knopf-BEDEUTUNG "1=eingeschaltet" aendert sich nicht, nur ihr Default).
