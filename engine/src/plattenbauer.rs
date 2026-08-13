@@ -773,6 +773,17 @@ impl Plattenbauer for Spezialbauer {
         vorzugszug_fuer_zellen(state, &z)
     }
     fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
+        // §19: `kuppeldraft_vorzug_k6` (Joker-Kuppeln auf untere Slots,
+        // erzwungene Special-Kuppeln nach oben, domain_knowledge.md §8)
+        // wurde GEBAUT UND GEMESSEN, aber NICHT verkettet -- die Messung auf
+        // 20 frischen k6-Seeds zeigte eine LEICHT SCHLECHTERE eigene
+        // Spezialfeld-Punktzahl (-10,5 statt -9,75, t=-0,84, p=0,41, falsches
+        // Vorzeichen fuer eine Uebernahme) UND einen unerwuenschten Gegner-
+        // Effekt (Gegner-Spezialfelder wurden BESSER statt schlechter,
+        // -6,6 statt -11,1 -- das Gegenteil des beabsichtigten Stoerkanals)
+        // UND einen (nicht signifikanten, aber deutlichen) Sieg-Ruecksgang
+        // (5/20 statt 9/20). Bleibt als getestete, unverdrahtete Funktion
+        // stehen (siehe PREREG_provokation.md §19).
         let z = self.zellen(&state.players[state.current_player]);
         dome_vorzug_fuer_zellen(state, &z)
     }
@@ -780,6 +791,75 @@ impl Plattenbauer for Spezialbauer {
         let z = self.zellen(&state.players[pi]);
         tiling_vorzug_fuer_zellen(state, pi, &z)
     }
+}
+
+/// §19 (Spezialfelder-Baustein k6, Nutzer-Strategie `docs/domain_knowledge.md`
+/// §8, woertlich: *"einerseits viele jokerkuppeln nehmen (und auf die
+/// unteren slots legen) und wenn eine spezialkuppel dennoch platziert werden
+/// muss, dann die unteren slots vermeiden"*): Kuppeldraft-Vorzug fuer Stufe 1
+/// (Kachel+Slot-Wahl, `PendingDomeChoice` noch nicht gesetzt) -- KEIN
+/// Fliesendraft-Eingriff, die Strategie lebt laut Nutzer-Vorgabe primaer in
+/// der Kuppelwahl. Bewertung je (Kachel, freier Slot)-Kombination:
+///
+///  - Joker-Kuppel (kein Special, `is_special_type()==false`) in einen
+///    UNTEREN Slot (Slot-Reihe 2, Rasterzeilen 4-5): 3,0 -- die teuerste
+///    Slot-Reihe wird praeventiv mit einer Kachel besetzt, die NIE ein
+///    Spezialfeld-Risiko traegt.
+///  - Joker-Kuppel in eine andere Slot-Reihe: 2,0.
+///  - Special-Kuppel (unvermeidlich, kein Joker mehr im Display/Slot frei)
+///    in einen OBEREN Slot (Slot-Reihe 0, Rasterzeilen 0-1): 1,5 -- der
+///    Trigger braucht dort nur 1-2 Kopien je Nachbarzelle (kuerzeste
+///    Musterreihen).
+///  - Special-Kuppel in die mittlere Slot-Reihe: 1,0.
+///  - Special-Kuppel in einen UNTEREN Slot: 0,5 -- die laut Nutzer-Vorgabe
+///    ausdruecklich zu VERMEIDENDE Kombination, bleibt aber waehlbar, wenn
+///    kein anderer Slot mehr frei ist (Praeferenz, kein Verbot).
+///
+/// Rotation bleibt bei 0 (Platzhalter wie bei den anderen Bauern) -- Stufe 2
+/// entscheidet die tatsaechliche Rotation ueber die bestehende Special-
+/// Nachbar-Mechanik (siehe Aufrufstelle).
+// Absichtlich NICHT verkettet (siehe `Spezialbauer::dome_vorzug`-Kommentar):
+// gemessen und mit falschem Vorzeichen abgelehnt (§19).
+#[allow(dead_code)]
+fn kuppeldraft_vorzug_k6(state: &GameState) -> Option<Action> {
+    let player = &state.players[state.current_player];
+    if state.pending_dome_choice.is_some() {
+        return None;
+    }
+    if !state.pending_stack_draw.is_empty() {
+        return None;
+    }
+    if !player.can_place_dome_tile(state.round_number) || player.has_unplaced_start_tile() {
+        return None;
+    }
+    let score_kombination = |tile: &crate::dome::DomeTile, slot_row: usize| -> f64 {
+        if tile.is_special_type() {
+            match slot_row {
+                0 => 1.5,
+                1 => 1.0,
+                _ => 0.5,
+            }
+        } else {
+            match slot_row {
+                2 => 3.0,
+                _ => 2.0,
+            }
+        }
+    };
+    let mut best: Option<(f64, usize, usize, usize)> = None; // (score, tile_id, slot_row, slot_col)
+    for tile in &state.dome_display {
+        for &(sr, sc) in &player.dome_grid.empty_slots() {
+            let m = PlaceDomeTileMove { dome_tile_id: tile.tile_id, slot_row: sr, slot_col: sc, rotation: 0 };
+            if crate::game::validate_dome_move(state, &m).is_some() {
+                continue;
+            }
+            let score = score_kombination(tile, sr);
+            if best.as_ref().map_or(true, |(bs, _, _, _)| score > *bs) {
+                best = Some((score, tile.tile_id, sr, sc));
+            }
+        }
+    }
+    best.map(|(_, tid, sr, sc)| Action::ChooseDomeSlot(PlaceDomeTileMove { dome_tile_id: tid, slot_row: sr, slot_col: sc, rotation: 0 }))
 }
 
 // ── Kriterium 7: Farbenreiche Reihen (4 Pkt je Reihe mit >=5 Farben) ─────────

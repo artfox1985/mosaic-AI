@@ -1464,6 +1464,14 @@ stammt vermutlich aus einer ANDEREN Messreihe (z.B. reinem Self-Play-Korpus
 statt Netz-vs-Heuristik-Arena) -- **fuer diese Sitzung gilt die selbst
 gemessene, GEPRUEFTE Zahl 3,04 als Anker**, nicht die Koordinator-Angabe.
 
+**NACHTRAG (Koordinator, aufgeloest, kein offener Punkt mehr)**: die 0,00-Zahl
+stammte aus den SPALTENBAU-Laeufen (k1-Spieler, Diagonale nur als Beifang auf
+k1-/frischen Seeds -- z.B. `evaluations/paired_arena_env_spaltenbau_r4d.json`),
+waehrend 3,04 der k2-PLATTENBAUER selbst auf den k2-Seeds ist
+(`evaluations/paired_arena_env_k2_baseline_fresh.json`) -- zwei verschiedene
+Generatoren auf verschiedenen Partien, keine Drift, beide Zahlen korrekt fuer
+das, was sie je maßen.
+
 ### (2) Was gebaut wurde: Special-Zellen-Baustein fuer die Diagonalen-Geometrie
 
 Nutzer-Taktik (`docs/domain_knowledge.md`, Diagonalen-Abschnitt) auf
@@ -1573,3 +1581,104 @@ Wert verrechnen).
   vermerkt (ein Versuch waere angesichts des bereits verbrauchten
   Zeitbudgets ein Risiko fuer einen halbfertigen, schlecht geprueften
   Zustand gewesen).
+
+
+---
+
+## 19. SPEZIALFELDER-BAUSTEIN k6 (2026-08-13): Kuppeldraft gebaut und gemessen -- NICHT uebernommen (falsches Vorzeichen)
+
+Nutzer-Freigabe (ueber Koordinator, Fortsetzung von §18): k6 (Spezialfelder)
+nach `docs/domain_knowledge.md` §8 -- Kuppeldraft-Strategie (Joker horten und
+auf untere Slots, erzwungene Special-Kuppeln nach oben, Joker-Prioritaet als
+Stoerkanal). Eingriff primaer in der Kuppelwahl, nicht im Fliesendraft.
+
+### (1) Frischer Aera-Anker: 20 k6-Seeds, Aktivitaet 20/20 GEPRUEFT
+
+`evaluations/seeds_je_kriterium/k6.txt` (20 Seeds) gegen `MOSAIC_PLATTENBAU=0`
+vs `=6` (bestehender `Spezialbauer` aus §13, Nachbarzellen-Fuellung, VOR dem
+Kuppeldraft-Zusatz dieser Sitzung). "Spezialfelder"-Kriterium GEPRUEFT in
+20/20 Partien beider Arme aktiv (`scoring_tile_ids`). Ergebnis:
+`evaluations/paired_arena_env_k6_baseline_fresh.json`.
+
+| Groesse | Bezug (kein Plattenbauer) | k6 VOR §19 (bestehender Spezialbauer) |
+| --- | ---: | ---: |
+| Eigene Spezialfelder-Punkte Ø | -15,00 | **-9,75** |
+| Gegner-Spezialfelder-Punkte Ø | -7,95 | -11,10 |
+| Siege | 6/20 | 9/20 |
+
+Der bestehende Spezialbauer verbessert die eigene Zahl bereits deutlich
+gegenueber dem Bezug -- **-9,75 ist der fuer diese Sitzung gueltige Anker**,
+nicht die vom Koordinator genannte Erwartung "≈-12" (die vermutlich, wie bei
+k2, aus einer archivierten/anderen Messreihe stammt -- hier nicht weiter
+verfolgt, da unten ohnehin gegen die frische Zahl entschieden wird).
+
+### (2) Was gebaut wurde: `kuppeldraft_vorzug_k6`
+
+Neue Kuppelwahl-Vorzugsstufe (Stufe 1: Kachel+Slot-Wahl, VOR
+`Spezialbauer`s bestehender Nachbarzellen-Mechanik, die nur noch Stufe 2/
+Rotation bedient -- Rotation aendert die Slot-REIHE einer Kachel nicht,
+bleibt fuer diese Taktik irrelevant). Bewertung je (Kachel, freier Slot):
+
+| Kachel-Typ | Obere Slot-Reihe | Mittlere | Untere Slot-Reihe |
+| --- | ---: | ---: | ---: |
+| Joker (kein Special) | 2,0 | 2,0 | **3,0** (bevorzugt) |
+| Special-tragend | **1,5** (bevorzugt) | 1,0 | 0,5 |
+
+Direkte Umsetzung der Nutzer-Vorgabe (Joker in untere Slots, erzwungene
+Specials in obere).
+
+### (3) Messung: 20 k6-Seeds, Kuppeldraft gegen den §19(1)-Anker
+
+`cargo test --lib`: 416/0/20 (unveraendert). Wheel neu gebaut+installiert vor
+UND nach dem Revert in (4), Paritaetsprobe haelt beide Male (`8c6684ff...`).
+Ergebnis: `evaluations/paired_arena_env_k6_kuppeldraft_k6seeds.json`.
+
+| Groesse | Anker (bestehender Spezialbauer) | Kuppeldraft AN |
+| --- | ---: | ---: |
+| Eigene Spezialfelder-Punkte Ø | -9,75 | **-10,50** |
+| Gegner-Spezialfelder-Punkte Ø | -11,10 | **-6,60** |
+| Siege | 9/20 | 5/20 |
+
+Gepaartes Delta (eigen) **-0,75** (t=-0,839, p=0,412 -- FALSCHES Vorzeichen
+fuer eine Uebernahme, die Kuppeldraft-Vorzugsstufe macht die eigene Zahl
+tendenziell SCHLECHTER statt besser). McNemar auf den Siegen: b=8/c=4,
+p=0,388 -- nicht signifikant, aber ein deutlicher, unerwuenschter Rueckgang
+(9/20 -> 5/20). **Der Stoerkanal wirkt GEGENTEILIG**: die Gegner-Spezialfelder-
+Punkte werden BESSER (-11,10 -> -6,60) statt schlechter -- das Joker-Horten
+scheint dem Gegner (Heuristik) eher zu nuetzen als zu schaden, moeglicherweise
+weil das Verdraengen von Jokern aus dem Display die verbleibenden
+Special-Kacheln GLEICHMAESSIGER statt asymmetrisch verteilt.
+
+### (4) Entscheidung: NICHT uebernommen -- Code bleibt unverdrahtet
+
+**Beide Haelften der Vorab-Regel verfehlt** (kein signifikant positives Delta;
+Sieg-Bedingung technisch "nicht signifikant schlechter", aber der Trend ist
+eindeutig negativ und die eigene Zielgroesse selbst verschlechtert sich).
+`kuppeldraft_vorzug_k6` bleibt als GETESTETE, aber NICHT verkettete Funktion
+im Code (`#[allow(dead_code)]`, matching das Muster von `ueberpraesenz_
+vorzug` in §14) -- `Spezialbauer::dome_vorzug` ruft wieder ausschliesslich die
+bestehende Nachbarzellen-Mechanik (`dome_vorzug_fuer_zellen`) auf, GENAU wie
+vor dieser Sitzung. `MOSAIC_PLATTENBAU=6` bleibt unveraendert bei -9,75
+(dem §19(1)-Anker).
+
+### (5) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Kein Diagnose-Knopf fuer den Kuppeldraft-Versuch angelegt** -- da das
+  Ergebnis klar ablehnend ausfiel, waere ein Schalter fuer eine Fassung, die
+  niemand einschalten sollte, reiner Mehraufwand; das Muster aus §14
+  (`ueberpraesenz_vorzug`: gebaut, gemessen, unverdrahtet, kein Knopf) passt
+  direkt.
+- **Ursache des Gegenteil-Effekts (Gegner-Kanal) nicht weiter untersucht** --
+  eine plausible Erklaerung steht in (3), aber sie ist eine Vermutung, keine
+  Messung; eine Nachverfolgung (z.B. Kachel-Pool-Zusammensetzung ueber die
+  Partie hinweg tracen) haette den k6-Umfang gesprengt.
+- **Koordinator-Erwartung "≈-12" nicht weiter verglichen** -- da die Messung
+  ohnehin ablehnend endet, war eine Klaerung der Diskrepanz (wie in §18)
+  fuer die Entscheidung selbst nicht mehr entscheidungsrelevant.
+- **Keine neuen Unit-Tests** -- Zeitbudget; das Integrations-Ergebnis (3) ist
+  der einzige Beleg fuer `kuppeldraft_vorzug_k6`s Verhalten.
+
+**Damit ist die Nutzer-Freigabe "k2 und k6 umsetzen" fuer diese Sitzung
+abgeschlossen**: k2 uebernommen (§18), k6 gebaut, gemessen, und mit
+begruendetem Befund abgelehnt (§19) -- kein halbfertiger Zustand in beiden
+Faellen.
