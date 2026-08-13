@@ -109,6 +109,11 @@ erledigt einstufen.
 
 ### AKTUALISIERUNG 2026-08-13: Zwei-Pole-Architektur ist der geltende Rahmen
 
+**OFFEN, Nutzer-Auftrag 2026-08-13**: Gegner-Stoerung ueber die Farbzaehlung als
+Plattenbauer-Baustein NACH Runde 4 (Spezifikation + Belegstand:
+`docs/domaenenwissen.md`, Abschnitt "Spielstrategie aus Nutzer-Praxis" Punkt 4).
+
+
 Die vorausgehende Provokations-Messung ist UEBERHOLT und liegt jetzt in
 `../archive/history.md`, Kapitel "2026-08-11/13: Wertungsplatten-Nacht,
 GPU-Weg-B, Zwei-Pole". Stand von dort, `PREREG_provokation.md` §9-§10:
