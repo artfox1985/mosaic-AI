@@ -525,7 +525,11 @@ fn zellen_diagonale_neben() -> Vec<(usize, usize)> {
 
 /// Die vier Eckslots aus `scoring::score_corner_tiles`: `(0,0)`/`(0,2)` (obere
 /// Ecken, 3 Pkt) und `(2,0)`/`(2,2)` (untere Ecken, 8 Pkt) -- Slot-Koordinaten
-/// im 3x3-Dome-Raster, je in die 4 Rasterzellen aufgeloest.
+/// im 3x3-Dome-Raster, je in die 4 Rasterzellen aufgeloest. Seit §20 nicht
+/// mehr von `Eckenbauer` selbst genutzt (Spaltenpaar-Ziel ersetzt die
+/// isolierten Eck-Slots, siehe dortige Doku) -- bleibt fuer den eigenen
+/// Geometrietest stehen.
+#[allow(dead_code)]
 fn zellen_ecke(idx: usize) -> Vec<(usize, usize)> {
     let (sr, sc) = [(0usize, 0usize), (0, 2), (2, 0), (2, 2)][idx];
     let mut v = Vec::with_capacity(4);
@@ -630,25 +634,76 @@ impl Plattenbauer for Diagonalenbauer {
 
 // ── Kriterium 5: Ecken (2x2-Slots, 3/8 Pkt) ─────────────────────────────────
 
+// §20 (Eckplatten-Neubau, Nutzer-Entwurf "kannst ihn fast schon kombinieren
+// k1 und zwei spalten", PREREG_provokation.md §20): statt vier isolierter
+// Eck-Slots ein AEUSSERES Spaltenpaar (Rasterspalten 0+1 oder 4+5) als Ziel
+// -- das Paar schliesst BEIDE Ecken derselben Seite (8+3=11 Punkte, das
+// Nutzer-Orakel fuer k5) und liefert bei aktivem Kriterium 1 zwei volle
+// Spalten obendrauf (scoring.rs:60-64: k5 und k1 sind NICHT wechselseitig
+// ausgeschlossen, nur k5<->k2). Prioritaet innerhalb des Paars: untere Ecke
+// (8 Pkt, Rasterzeilen 4-5) vor oberer (3 Pkt, Zeilen 0-1) vor dem Rest des
+// Paars (Zeilen 2-3, reine Spalten-Fuellung ohne Eck-Bonus) -- als
+// dreistufige `.or_else`-Kette, gleiches Muster wie die Special-Nachbar-
+// Kette in §16/§18.
+
+fn zellen_spaltenpaar(c0: usize) -> Vec<(usize, usize)> {
+    let mut v = Vec::with_capacity(12);
+    for r in 0..6usize {
+        v.push((r, c0));
+        v.push((r, c0 + 1));
+    }
+    v
+}
+
+fn zellen_untere_ecke_paar(c0: usize) -> Vec<(usize, usize)> {
+    let mut v = Vec::with_capacity(4);
+    for r in 4..6usize {
+        v.push((r, c0));
+        v.push((r, c0 + 1));
+    }
+    v
+}
+
+fn zellen_obere_ecke_paar(c0: usize) -> Vec<(usize, usize)> {
+    let mut v = Vec::with_capacity(4);
+    for r in 0..2usize {
+        v.push((r, c0));
+        v.push((r, c0 + 1));
+    }
+    v
+}
+
 struct Eckenbauer;
 impl Eckenbauer {
-    fn zellen(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
-        let kand: Vec<_> = (0..4).map(zellen_ecke).collect();
-        ziel_zellen_generisch(state, pi, &kand)
+    /// Waehlt zwischen den beiden AEUSSEREN Spaltenpaaren (0+1 / 4+5) --
+    /// `ziel_zellen_generisch_smart` (§18) fuer die echte Special-Nachbar-
+    /// Kostenrechnung, dieselbe Seed-Streuung/Zielwechsel-Logik wie alle
+    /// anderen generischen Bauern (§14-Lehre: keine sture Bindung). Liefert
+    /// die KLEINERE der beiden Spaltennummern des gewaehlten Paars.
+    fn spalte0(&self, state: &GameState, pi: usize) -> Option<usize> {
+        let kand = vec![zellen_spaltenpaar(0), zellen_spaltenpaar(4)];
+        let z = ziel_zellen_generisch_smart(state, pi, &kand)?;
+        z.iter().map(|&(_, c)| c).min()
     }
 }
 impl Plattenbauer for Eckenbauer {
     fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
-        let z = self.zellen(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &z)
+        let c0 = self.spalte0(state, state.current_player)?;
+        vorzugszug_fuer_zellen(state, &zellen_untere_ecke_paar(c0))
+            .or_else(|| vorzugszug_fuer_zellen(state, &zellen_obere_ecke_paar(c0)))
+            .or_else(|| vorzugszug_fuer_zellen(state, &zellen_spaltenpaar(c0)))
     }
     fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
-        let z = self.zellen(state, state.current_player)?;
-        dome_vorzug_fuer_zellen(state, &z)
+        let c0 = self.spalte0(state, state.current_player)?;
+        dome_vorzug_fuer_zellen(state, &zellen_untere_ecke_paar(c0))
+            .or_else(|| dome_vorzug_fuer_zellen(state, &zellen_obere_ecke_paar(c0)))
+            .or_else(|| dome_vorzug_fuer_zellen(state, &zellen_spaltenpaar(c0)))
     }
     fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
-        let z = self.zellen(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        let c0 = self.spalte0(state, pi)?;
+        tiling_vorzug_fuer_zellen(state, pi, &zellen_untere_ecke_paar(c0))
+            .or_else(|| tiling_vorzug_fuer_zellen(state, pi, &zellen_obere_ecke_paar(c0)))
+            .or_else(|| tiling_vorzug_fuer_zellen(state, pi, &zellen_spaltenpaar(c0)))
     }
 }
 
