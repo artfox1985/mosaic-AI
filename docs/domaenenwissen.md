@@ -294,3 +294,38 @@ eigene Vollendung, dann die Stoerung; beides nutzt dieselbe Zaehlung).
 Messgroesse dann: Gegner-Plattenpunkte und Gegner-Endstand gepaart, nicht nur
 die eigenen -- die λ-Lehre (Vorzeichenwechsel zwischen Laeufen) mahnt zur
 Replikation auf frischen Seeds, bevor daraus ein Befund wird.
+
+
+### 5. Diagonalen-Taktik (Nutzer 2026-08-13; Koordinaten 1-basiert [Zeile,Spalte], Code 0-basiert)
+
+Fuer die Gegendiagonale [6,1]-[5,2]-[4,3]-[3,4]-[2,5]-[1,6] (Code: (5,0)...(0,5)):
+
+- **Unteres Ende ueber die Spezialplatte in Slotreihe 3**: [5,2] und [6,1] muss
+  man fuer die Diagonale ohnehin legen -- damit sind zwei der drei Nachbarzellen
+  des Slots (5,0..6,1) schon gefuellt, und das Spezialfeld auf **[6,2] loest
+  praktisch von selbst aus und bringt beim Abschluss 6 Bonuspunkte** (Kuppelbonus
+  = Rasterreihe, hier 6). Nur [5,1] kommt als Zusatzaufwand dazu.
+- **Mittelzellen [4,3]/[3,4]**: Joker- wie Spezialplatte liegen dort sauber;
+  Nutzer-Tendenz **Jokerplatte** -- dann ist die Farbe frei waehlbar
+  (Formbarkeits-Prinzip aus Abschnitt 1).
+- **Oberes Ende [2,5]/[1,6]**: normalerweise einfach zu bedienen. Ist die
+  ECKPLATTEN-Wertungskarte aktiv, gern die Spezialfliese hinzunehmen.
+- Gilt spiegelbildlich fuer die Hauptdiagonale mit entsprechenden Indizes.
+
+Messbezug: der Diagonal-Bauer (k2) erreichte 2,61 bei signifikantem
+Sieg-Verlust (p=0,039, §13) -- diese Taktik ist der designierte Inhalt seiner
+Runde 2: Spezial-/Joker-Slots als Diagonalzellen WAEHLEN statt Farben jagen.
+
+### 6. Eckplatten-Taktik (Nutzer 2026-08-13)
+
+*"beim vorhandensein der eckplatten wertungskarte wirklich nur spezialkuppeln in
+die ecken legen. schneller fertig und bonuspunkt fuer die spezialfliesen,
+insbesondere in kuppelslot [3,1] oder [3,3]."*
+
+Logik: Spezialzellen fuellen sich per Trigger ohne Fliesenlieferung -- eine Ecke
+mit Spezialplatte ist schneller komplett, und der Trigger zahlt den
+reihenabhaengigen Kuppelbonus obendrauf. Die unteren Eck-Slots [3,1]/[3,3]
+(Code slot (2,0)/(2,2)) sind die wertvollen: ihre Eckplatten zahlen je 8 Punkte
+(gegen 3 oben), und ihre Spezialtrigger liegen in den hohen Rasterreihen 5-6
+(Bonus 5-6). Messbezug: der Ecken-Bauer (k5) hatte in §13 das beste
+Kosten-Nutzen-Verhaeltnis (4,73, Orakel 11) -- diese Taktik ist seine Runde 2.

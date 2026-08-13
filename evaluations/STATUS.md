@@ -109,6 +109,11 @@ erledigt einstufen.
 
 ### AKTUALISIERUNG 2026-08-13: Zwei-Pole-Architektur ist der geltende Rahmen
 
+**OFFEN, Nutzer-Auftrag 2026-08-13**: Plattenbauer k2 (Diagonalen) und k5 (Ecken)
+Runde 2 mit der Nutzer-Taktik aus `docs/domaenenwissen.md` Abschnitte 5-6
+(Spezial-/Joker-Kuppelwahl als Kern statt Farbenjagd; k2 muss zusaetzlich den
+Sieg-Verlust aus §13 beheben). Nach Spalten-Runde 4.
+
 **OFFEN, Nutzer-Auftrag 2026-08-13**: Gegner-Stoerung ueber die Farbzaehlung als
 Plattenbauer-Baustein NACH Runde 4 (Spezifikation + Belegstand:
 `docs/domaenenwissen.md`, Abschnitt "Spielstrategie aus Nutzer-Praxis" Punkt 4).
