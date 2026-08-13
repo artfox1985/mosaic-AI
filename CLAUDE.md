@@ -33,6 +33,14 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - **Direktes Schreiben** Wenn du eine Datei bearbeitest, schreibe die Änderung direkt in die Datei. Verzichte auf die Anzeige des vollständigen Codes im Chat.
 - **Kontext-Fokus** Antworte direkt auf die Aufgabe. Erkläre nur kurz die Logik, wenn es für das Verständnis der Änderung notwendig ist.
 
+## Dateinamen-Konvention (Nutzer-Anweisung 2026-08-13)
+
+- **Neue Dateien und Verzeichnisse werden IMMER englisch benannt** (Code,
+  Tools, Docs, Preregs, Messprotokolle). Der Alt-Bestand deutscher Namen
+  wird auf Englisch migriert.
+- Die Sprachregel für INHALTE bleibt unberührt: README englisch; STATUS,
+  Commits, Kommentare, Chat deutsch.
+
 ## Entwicklungs-Standards (Brettspiel-Logik)
 
 - **Modularität** Halte Spiellogik, KI-Entscheidungen und Spielzustand strikt getrennt.
