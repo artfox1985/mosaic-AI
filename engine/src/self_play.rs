@@ -1285,21 +1285,6 @@ pub fn run_self_play(
 
     let play = |i: usize| -> Vec<Value> {
         let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-        // Plattengewicht JE PARTIE streuen (Nutzer-Auftrag: *"dann ziehen die
-        // spiele mal mehr und mal weniger richtung wertungsplatten"*). Aus dem
-        // Partie-Seed abgeleitet, also reproduzierbar; thread-lokal gesetzt, weil
-        // mehrere Partien gleichzeitig laufen. `MOSAIC_WERTUNG_STREUUNG_MAX=0`
-        // (Default) laesst es aus und das Bestandsverhalten unberuehrt.
-        //
-        // Sauber fuer die Labels: die Ownership-ZIELE sind die realisierten
-        // Endzustands-Feldlabels -- die sind bei JEDEM Gewicht korrekt. Variiert
-        // wird allein die Zustandsverteilung, aus der gelernt wird.
-        let streuung_max = crate::net_mcts::wertung_streuung_max();
-        crate::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
-            Some(crate::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
-        } else {
-            None
-        });
         let mut rng = StdRng::seed_from_u64(partie_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = rng.random_range(0..2usize);
@@ -1307,6 +1292,11 @@ pub fn run_self_play(
         let gid = format!("{prefix}_g{}", i + 1);
         // `net: None` -- rtv wird hier ohnehin nie berechnet (siehe `play_one_game`s
         // `net`-Gate), `record_rtv` daher irrelevant, aber als Parameter Pflicht.
+        // Keine `set_partie_shaping_weight`-Streuung hier: `net` ist `None`,
+        // also liest NICHTS in diesem Pfad `apply_wertung_shaping`/`net_leaf_eval`
+        // -- die Streuung waere in dieser Funktion tote Verdrahtung (verschoben
+        // nach `run_net_self_play`, wo sie tatsaechlich einen Netz-Blattwert
+        // erreicht).
         let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter));
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
@@ -1365,21 +1355,19 @@ pub fn run_self_play_with_net_labels(
 
     let play = |i: usize| -> Vec<Value> {
         let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-        // Plattengewicht JE PARTIE streuen (Nutzer-Auftrag: *"dann ziehen die
-        // spiele mal mehr und mal weniger richtung wertungsplatten"*). Aus dem
-        // Partie-Seed abgeleitet, also reproduzierbar; thread-lokal gesetzt, weil
-        // mehrere Partien gleichzeitig laufen. `MOSAIC_WERTUNG_STREUUNG_MAX=0`
-        // (Default) laesst es aus und das Bestandsverhalten unberuehrt.
-        //
-        // Sauber fuer die Labels: die Ownership-ZIELE sind die realisierten
-        // Endzustands-Feldlabels -- die sind bei JEDEM Gewicht korrekt. Variiert
-        // wird allein die Zustandsverteilung, aus der gelernt wird.
-        let streuung_max = crate::net_mcts::wertung_streuung_max();
-        crate::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
-            Some(crate::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
-        } else {
-            None
-        });
+        // Keine `set_partie_shaping_weight`-Streuung hier (verschoben nach
+        // `run_net_self_play`, siehe dortiger Kommentar). Bei DEFAULT
+        // (`MOSAIC_WERTUNG_STREUUNG_MAX=0`) exakt aequivalent. HINWEIS: anders
+        // als bei `run_self_play` ist das hier kein reiner No-Op-Fund -- die
+        // Drafting-Entscheidungen bleiben heuristisch, aber die Rundenuebergaenge
+        // werden per `round_transition_deep.rs` ueber `net_leaf_eval` bewertet
+        // (`round_transition_deep.rs:496/577/606/635/719`), und `net_leaf_eval`
+        // liest `wertung_shaping_weights()` -> `PARTIE_GEWICHT`. Bei gesetztem
+        // `MOSAIC_WERTUNG_STREUUNG_MAX>0` haette die Streuung hier also die
+        // aufgezeichneten `round_transition_value`-Labels beeinflusst, nicht nur
+        // die Zugwahl. Entfernt trotzdem wie beauftragt (Heuristik-Generator,
+        // Drafting/Spielverlauf unberuehrt); der Nicht-Default-Fall ist nicht
+        // Teil der aktuellen Self-Play-Pipeline (die nutzt `run_net_self_play`).
         let mut rng = StdRng::seed_from_u64(partie_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = rng.random_range(0..2usize);
@@ -2870,8 +2858,8 @@ pub fn run_net_self_play(
         net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS + WATCHDOG_MARGIN_SECS,
     );
     let play = |i: usize| -> Vec<Value> {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(partie_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = rng.random_range(0..2usize);
         let names = ["Netz".to_string(), "Netz".to_string()];
@@ -2880,6 +2868,27 @@ pub fn run_net_self_play(
         let gid_thread = gid.clone();
         let move_counter_thread = Arc::clone(&move_counter);
         let result = run_with_watchdog(watchdog_deadline, move || {
+            // Plattengewicht JE PARTIE streuen (Nutzer-Auftrag: *"dann ziehen
+            // die spiele mal mehr und mal weniger richtung wertungsplatten"*).
+            // Aus dem Partie-Seed abgeleitet, also reproduzierbar. MUSS hier
+            // gesetzt werden, NICHT in der aeusseren `play`-Closure: `run_with_
+            // watchdog` spawnt einen NEUEN Thread (`std::thread::spawn`, siehe
+            // dortige Definition) fuer genau diese Closure -- `PARTIE_GEWICHT`
+            // ist thread-lokal, ein Setzen im Rayon-Thread der aeusseren
+            // Closure wuerde auf dem falschen Thread landen und nie gelesen.
+            // `MOSAIC_WERTUNG_STREUUNG_MAX=0` (Default) laesst es aus und das
+            // Bestandsverhalten unberuehrt. Verschoben aus `run_self_play`/
+            // `run_self_play_with_net_labels` (dort war es tote bzw.
+            // fehlplatzierte Verdrahtung, siehe deren Kommentare) -- hier ist
+            // `net_leaf_eval` der tatsaechliche Blattbewerter dieses gesamten
+            // Suchpfads (Drafting UND Rundenuebergaenge), die Streuung erreicht
+            // ihn also wirklich.
+            let streuung_max = crate::net_mcts::wertung_streuung_max();
+            crate::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
+                Some(crate::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
+            } else {
+                None
+            });
             // Task #32 (`profiling.rs`-Modulkopf "Task #32"): "total_selfplay"
             // -- die GANZE Spielschleife dieser einen Partie (einziger
             // Aufrufer von `play_net_self_play_game`).
