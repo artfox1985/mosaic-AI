@@ -1102,6 +1102,49 @@ pub fn set_partie_shaping_weight(w: Option<f64>) {
     PARTIE_GEWICHT.with(|c| c.set(w));
 }
 
+/// PREREG_ownership_corpus.md §3 Punkt 6: Fuehrt `f` mit AUSGESETZTER
+/// Partie-STREUUNG aus (`PARTIE_GEWICHT` auf DIESEM Thread kurzzeitig
+/// `None`) -- fuer Label-Rollouts (`round_transition_deep.rs`s
+/// `bootstrap_value_after_rounds`/`continue_through_round{2,3,4}`), NICHT
+/// fuer die eigentliche Suche/Zugwahl.
+///
+/// WARUM: `bootstrap_value`/`round_transition_value` sollen den
+/// tatsaechlich erwartbaren Spielausgang moeglichst rauscharm schaetzen.
+/// `PARTIE_GEWICHT` ist aber ein je Partie ZUFAELLIG aus dem Partie-Seed
+/// abgeleiteter Wert (`partie_gewicht_aus_seed`, `MOSAIC_WERTUNG_STREUUNG_MAX`)
+/// -- ohne diese Aussetzung wuerde derselbe Zustand im Trainingsziel rein
+/// durch den Wuerfelwurf DIESER Partie anders bewertet, ohne jeden Bezug zum
+/// echten Ausgang (die Suche/Zugwahl DARF diese Streuung weiterhin sehen --
+/// das ist ihr eigentlicher Zweck, siehe `set_partie_shaping_weight`-Doku:
+/// mehr Vielfalt fuers Self-Play/den Ownership-Kopf; nur die LABEL-Rechnung
+/// nicht).
+///
+/// Der PROZESSWEITE Basiswert (`MOSAIC_WERTUNG_SHAPING_W`, konstant ueber
+/// alle Partien, seit laenger bestehend) bleibt bewusst WIRKSAM: faellt
+/// `PARTIE_GEWICHT` auf `None` zurueck, liest `wertung_shaping_weights()`
+/// wieder den Env-Wert (siehe dortiger Code) -- das ist die bestehende,
+/// in `net_leaf_eval`s eigener Doku ausdruecklich gewollte Kopplung
+/// ("gilt unveraendert fuer JEDEN net_leaf_eval-Aufrufer ... eingeschlossen"),
+/// nicht Gegenstand dieser Frage und hier nicht angetastet.
+///
+/// RAII statt eines manuellen "danach zuruecksetzen": Rust fuehrt `Drop`
+/// beim Stack-Unwinding auch bei einem Panic MITTEN in `f` aus -- ein
+/// Fehlschlag tief in der rekursiven Simulation wuerde die Streuung sonst
+/// fuer den Rest der Partie auf demselben (wiederverwendeten) Thread
+/// verschlucken.
+pub(crate) fn with_partie_streuung_suspended<T>(f: impl FnOnce() -> T) -> T {
+    let prev = PARTIE_GEWICHT.with(|c| c.get());
+    struct Restore(Option<f64>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            PARTIE_GEWICHT.with(|c| c.set(self.0));
+        }
+    }
+    let _restore = Restore(prev);
+    PARTIE_GEWICHT.with(|c| c.set(None));
+    f()
+}
+
 /// Streubreite fuer das partieweise Gewicht, `MOSAIC_WERTUNG_STREUUNG_MAX`.
 /// Default **0,0 = aus**, dann gilt ausschliesslich der prozessweite Env-Wert.
 /// Bei `> 0` leitet [`partie_gewicht_aus_seed`] je Partie einen Wert in
