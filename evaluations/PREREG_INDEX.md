@@ -7,12 +7,19 @@ das Ergebnis ausschliesslich anderswo (meist `archive/history.md`, teils
 `evaluations/STATUS.md`, ein Git-Commit oder eine `evaluations/*.json`-Datei) --
 ein neuer Leser konnte OFFEN nicht von ENTSCHIEDEN unterscheiden. Diese 23
 Dateien haben seit 2026-08-08 eine angehaengte Statusfussnote am Dateiende
-(reine Ergaenzung, der urspruengliche Prereg-Text ist unveraendert). Diese
-Tabelle fasst den Stand aller 29 Dateien zusammen. **Hinweis**: eine 30.
-Datei, `PREREG_v22_fenster.md`, ist waehrend dieser Arbeit (2026-08-08, durch
-den parallel laufenden Self-Play-/Koordinator-Prozess) neu hinzugekommen und
-war NICHT Teil des urspruenglichen 29er-Bestands -- sie ist hier bewusst
-NICHT aufgefuehrt und wurde nicht angefasst.
+(reine Ergaenzung, der urspruengliche Prereg-Text ist unveraendert).
+**Stand 2026-08-13** (gepruefte Zaehlung der Tabellen-Zeilen unten: 12 OFFEN +
+34 ENTSCHIEDEN + 1 UEBERHOLT): die Tabelle fasst inzwischen 47 Dateien
+zusammen, nicht mehr die urspruenglichen 29 -- seit dem 2026-08-08-Anlass sind
+weitere Preregs hinzugekommen (u.a. `PREREG_gpu_inferenzpfad.md`,
+`PREREG_gpu_verlagerung.md`, `PREREG_plattenkopf.md`, `PREREG_such_rng_
+trennen.md`, `PREREG_async_suche.md`) und mehrere der urspruenglich 23
+unbelegten Dateien sind seither ENTSCHIEDEN worden (siehe Tabellen-
+Belegstellen). **Hinweis**: eine 48. Datei, `PREREG_v22_fenster.md`, ist
+waehrend der urspruenglichen Arbeit (2026-08-08, durch den parallel
+laufenden Self-Play-/Koordinator-Prozess) neu hinzugekommen und war NICHT
+Teil des urspruenglichen 29er-Bestands -- sie ist hier bewusst NICHT
+aufgefuehrt und wurde nicht angefasst.
 
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT.
 
@@ -64,10 +71,11 @@ Eskalations-Preregs laengst belegt waren.
 
 
 
-## OFFEN (11)
+## OFFEN (12)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_async_suche.md` | Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inferenzpfad.md`) strukturell scheitert? | **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag). Stufe 1 (Drafting-Suche als Zustandsautomat, `async`/`await`, additiv in `net_mcts.rs`/`net_batcher.rs`, `MOSAIC_ASYNC_SUCHE`) GEBAUT und Gate A BESTANDEN: 0/1148 Abweichungen sowohl ohne Sammel-Faden (bit-identisch) als auch MIT Sammel-Faden + 16-facher Nebenlaeufigkeit (finale Zugwahl). `cargo test --lib` im isolierten Worktree 387/0/20 (keine Regression). Stufe 2 (Rundenuebergaenge) und Stufe 3 (Durchsatz, Gate C >= 2,0x) OFFEN. |
 | `PREREG_gpu_inferenzpfad.md` | Ueber WELCHEN Pfad erreicht die Rust-Engine die GPU -- Cross-Language-Queue zu Python/torch oder ein CUDA-faehiger Rust-Pfad? | **OFFEN, vorregistriert 2026-08-12** (Nutzer-Entscheid "erst Architektur entscheiden"). GEPRUEFTER Befund: `engine/Cargo.toml` hat als einzige Inferenz-Abhaengigkeit `tract-onnx`, tract ist CPU-only -- die Rust-Engine hat KEINEN Weg zu der GPU, deren Kennlinie (aus dem Python-Benchmark `gpu_batch_throughput.py`) den Batch-Startwert 256 begruendet. `PREREG_gpu_inferenz_batcher.md` Regel 2 hatte diese Vorregistrierung verlangt, `PREREG_gpu_verlagerung.md` hat sie uebersprungen. Haelt ausserdem fest, dass der Paritaets-Hash einen GPU-Umbau NICHT ueberleben kann -- jeder Wechsel der Inferenz-Maschinerie aendert die Zahlen; Abnahme ist ein Toleranz- und Staerkenachweis, kein Golden-Hash. |
 | `PREREG_gpu_verlagerung.md` | Laesst sich die Inferenz von der CPU auf die GPU verlagern -- erreicht Verschraenkung vieler gleichzeitiger Partien den Batch, an dem die GPU gewinnt? | **OFFEN, vorregistriert 2026-08-10** (Nutzer-Richtung "weg von der cpu und hin zur gpu"). Teil 1 GEMESSEN: Speicher ist kein Engpass (1,5 MiB je Suche, Batch 512 = 0,76 GiB) ⇒ Regel 1, Weg V (Verschraenkung, suchneutral) statt Weg B (Virtual Loss, gating-pflichtig). Teil 2 GESCHLOSSEN (Commit `e1bce64`, ohne neue Messung): die Blatt-Erzeugungsrate wurde ANALYTISCH aus der vorhandenen Task-#32-Messung (`selfplay_time_profile.json`, Netz 62 % / Tiling 27 %) plus Little's Law hergeleitet -- ein eigener Null-Evaluator haette die Baumform degeneriert. Erreichbarer Batch **~140 bis ~590**, Startwert **N=256**, damit in der Gewinnzone der GPU-Kennlinie. Deckel Amdahl 2,6-5,3x. **OFFEN ist jetzt allein die UMSETZUNG von Weg V.** STALE-FALLE 2026-08-12: diese Zeile trug bis hierher noch "offen ist die Blatt-Erzeugungsrate" und hat genau dadurch einen Agenten-Auftrag ausgeloest, der die Zahl neu messen sollte -- sie lag seit `e1bce64` vor. Ein veralteter Index kostet Arbeit, nicht nur Klarheit. `evaluations/interleave_batch_probe.json` (nur Teil-1-Daten) |
 | `PREREG_plattenkopf.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) |
