@@ -329,3 +329,28 @@ reihenabhaengigen Kuppelbonus obendrauf. Die unteren Eck-Slots [3,1]/[3,3]
 (gegen 3 oben), und ihre Spezialtrigger liegen in den hohen Rasterreihen 5-6
 (Bonus 5-6). Messbezug: der Ecken-Bauer (k5) hatte in §13 das beste
 Kosten-Nutzen-Verhaeltnis (4,73, Orakel 11) -- diese Taktik ist seine Runde 2.
+
+
+### 7. Welche Platten das Hinspielen wert sind (Nutzer-Oekonomie 2026-08-13)
+
+*"farbenreiche reihen (>= 5 farben) sind meiner meinung den aufwand nicht wert.
+auch die horizontalen reihen find ich von den bonuspunkten sehr gering. aber das
+ist ein spielarchitektur problem."*
+
+Die Messung (§13 der Provokations-Prereg) bestaetigt beides unabhaengig:
+- **k7 Farbenreiche Reihen** (4 Pkt): Bauer brachte +0,52 Punkte bei
+  Sieg-Einbruch 17/23 -> 7/23 -- Stopp-Regel ausgeloest, deaktiviert.
+- **k0 Horizontale Reihen** (3 Pkt): Bauer lag mit -0,39 UNTER dem Bezug --
+  das Normalspiel holt die Reihe fast im Vorbeigehen (Bezug 1,04), gezieltes
+  Hinspielen kostet mehr als der Bonus wert ist.
+
+**Konsequenz fuer die Bauer-Familie**: k0 und k7 bleiben OHNE eigenen Bauer --
+nicht als Fehlschlag, sondern als Spieloekonomie-Entscheid. Ihr Beitrag zum
+Korpus (Label-Ereignisse fuer den Ownership-Kopf) kommt beilaeufig aus dem
+Normalspiel und den anderen Bauern (Zeilen fuellen sich als Nebenprodukt von
+Spalten-/Diagonal-/Eckenbau); ob die beilaeufige Rate reicht, prueft das
+Korpus-Gate im Piloten (Grundraten je Konjunktionsziel).
+
+Der Nutzer ordnet die niedrigen Boni als **Spielarchitektur-Problem** ein --
+also eine Eigenschaft des Spiels, nicht der KI. Fuer die KI heisst das nur:
+diese Platten VERTEIDIGEN (Punkte mitnehmen, wenn sie anfallen), nie ANSTEUERN.
