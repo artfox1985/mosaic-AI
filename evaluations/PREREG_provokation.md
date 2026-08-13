@@ -410,3 +410,150 @@ Fabrikbefuellung erzwingen. Ohne Nutzer-Entscheidung KEINE weitere
 Verschaerfung (naechster denkbarer Schritt waere z.B. eine
 Versorgungs-bewusste Zielspalten-Wahl, die auf ANGEBOT-WAHRSCHEINLICHKEIT
 statt nur Brettzustand reagiert -- das ist neue Mechanik, kein Tuning mehr).
+
+
+---
+
+## 12. RUNDE 3 GEMESSEN (2026-08-13): 5,95 statt 5,60 -- Ziel 7,00 weiterhin verfehlt, Blocker-Anteil UNVERAENDERT
+
+### (1) Was ist zaehlbar? -- belegt am Code
+
+`engine/src/provokation.rs::verbleibende_farben` (neu, `pub(crate)`) rechnet
+je Farbe: Gesamtvorrat (`tile.rs:52`, `TILES_PER_COLOR = 13`) minus jede
+SICHTBARE Fundstelle:
+
+- `state.factories[*].sun_tiles` + `.moon_stacks` (`factory.rs:8-14`),
+- `state.large_factory.sun_tiles` + `.moon_pool` (`factory.rs:117-126`),
+- je Spieler: `pattern_lines[*].tiles`, `broken_tiles` (Strafleiste,
+  `board.rs:249`), `dome_grid.dome_slots[*][*]`s `spaces[*].placed_color`
+  (`board.rs:85`, `dome.rs:17`).
+
+NICHT gelesen: `state.bag`/`state.tower` (`supply.rs:12-58`) -- deren exakte
+FARBZUSAMMENSETZUNG sieht kein menschlicher Spieler, nur ihre Groesse
+(`Bag::count`/`Tower::count`). Die Differenz aus den obigen oeffentlichen
+Feldern liefert exakt dieselbe Zahl (Beutel+Turm zusammen), wie ein Mensch
+sie mit einer Strichliste ebenfalls bekaeme. Getestet in
+`provokation.rs::verbleibende_farben_zaehlt_jede_sichtbare_fundstelle`
+(6 kuenstlich verteilte Rot-Kopien ueber alle 5 Fundstellen-Kategorien,
+exakte Gegenrechnung `13 - 6`).
+
+### (2) Die drei Bausteine, je ein Commit
+
+| Baustein | Commit | Was |
+| --- | --- | --- |
+| 1 (Versorgung zaehlen) + 3 (Vorzug bevorzugt Knappheit) | `a10202f` | `verbleibende_farben`/`farben_index` (`provokation.rs`); `vorzugszug_fuer_spalte` sortiert Kandidaten jetzt primaer nach Knappheit der genommenen Farbe, "vollste Reihe" bleibt Tie-Break |
+| 2 (Zielwahl versorgungsgewichtet) | `d18e523` | `engpass_aufschlag` (0 bei voller, bis 2,5 bei restlos verbrauchter Versorgung); `spalten_kosten` bekommt die vorberechnete Versorgungslage als Parameter, alle 3 Aufrufstellen umgestellt |
+
+Baustein 1+3 liegen technisch in einem Commit (beide in
+`provokation.rs`, `vorzugszug_fuer_spalte` selbst braucht
+`verbleibende_farben` direkt in seinem Kandidaten-Ranking -- eine
+Hunk-Trennung haette das Diff riskanter gemacht als der Gewinn an
+Granularitaet wert war; explizit KEIN Automatismus wie `git add -A`,
+beide Commits enthalten ausschliesslich die genannten Engine-Dateien).
+
+`cargo test --lib`: 388 bestanden, 0 fehlgeschlagen (ein Bestandstest,
+`vorzugszug_reicht_dynamische_spalte_an_provokation_kern_durch`, nahm
+implizit an, Spalte 0 bleibe bei echtem Zufalls-Fabrikinhalt die
+guenstigste -- das haengt seit Baustein 2 vom Versorgungsstand ab; im Test
+die Tischmitte deterministisch geleert, siehe Kommentar dort). Wheel
+gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...` haelt,
+Default-Verhalten byte-identisch.
+
+### (3) Abnahmezahl, Verteilung, neue Blocker-Verteilung
+
+Aufbau IDENTISCH zu Runde 2 (§11): `alphazero_v21_2d_brierbest.onnx`@400 vs
+Heuristik@150(dyn), dieselben 20 k1-Seeds
+(`[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,59,69]`), gepaart gegen
+`MOSAIC_SPALTENBAU=0`, `MOSAIC_SPALTENBAU_TRACE=1` fuer beide Arme.
+Ergebnis: `evaluations/paired_arena_env_spaltenbau_r3.json`.
+
+| Groesse | Spaltenbau AUS (Kontrolle) | Spaltenbau AN |
+| --- | ---: | ---: |
+| Vertikale Plattenpunkte (Ø, n=20) | 0,70 | **5,95** |
+| Endstand (Ø) | 48,30 | 46,95 |
+| Strafleiste (Ø) | 8,50 | 8,35 |
+| Siege Netz | 15/20 | 15/20 |
+
+**ABNAHME VERFEHLT** (Ziel >= 7,00), aber 5,60 → 5,95 ist ein weiterer,
+GEPRUEFT signifikanter Schritt: gepaartes Delta +5,25 Plattenpunkte,
+t = 3,94, n = 20 (Rechnung: `auswerten()`s `je_kriterium["Vertikale
+Reihen"]` je Seed aus beiden Einzel-Arm-Dateien, `t_wert()` aus
+`plattenpunkte_aus_arena.py`). Sieg-Differenz NULL (15/20 beide Arme,
+McNemar b=4/c=4, p=1,0, aus dem Rohergebnis-JSON) -- der Spaltenbauer
+kostet in dieser Runde nicht messbar Staerke, weniger noch als Runde 2
+(dort p=0,73, Endstand-Differenz -7,2; hier nur -1,35, Strafleiste sogar
+minimal GUENSTIGER statt teurer). Verteilung der 20 AN-Partien: 15/20 mit
+mindestens einer geschlossenen Spalte (7 Punkte), davon 2/20 mit ZWEI
+Spalten (14 Punkte) -- eine deutlich dichtere Verteilung als Runde 2s
+Einzelwerte suggerieren.
+
+**Verteilungs-Gate**: bestanden, alle 6 Spalten mit Ereignissen (Spalte
+0=15, 1=27, 2=5, 3=14, 4=15, 5=24, aus `spaltenbau_trace.py`).
+
+**Blocker-Klassifikation** (82 distinkte Blocker-Ketten ueber 20 Partien,
+gleiche Zaehlweise wie Runde 2 -- je (Zeile, Grund)-Kombination EINMAL je
+Partie, unabhaengig von der Wiederholungszahl):
+
+| Kategorie | Runde 2 | Runde 3 |
+| --- | ---: | ---: |
+| Geforderte Farbe nicht im Angebot | 74,1 % | **76,8 %** |
+| Musterreihe an eine ANDERE Farbe gebunden | 16,0 % | **6,1 %** |
+| Sonstiges (v.a. Wild-Zelle ohne jede Farbe im Angebot) | 9,9 % | **17,1 %** |
+
+### (4) Deutung nach der VORAB festgelegten Regel (§ Auftrag)
+
+Die Regel war: sinkt der "nicht im Angebot"-Anteil deutlich UND steigt die
+Spaltenzahl, war Versorgung der Hebel; bleibt der Anteil ~74 % trotz
+versorgungsgewichteter Zielwahl, ist die Knappheit STRUKTURELL.
+
+**Der Anteil ist NICHT gesunken -- er ist von 74,1 % auf 76,8 % leicht
+GESTIEGEN.** Nach der vorab festgelegten Regel ist das der zweite Fall:
+die Versorgungsknappheit fuer die GEFORDERTE Farbe zur GEFORDERTEN Zeit
+ist in diesem Generator **strukturell** -- sie kommt aus dem Verbrauch
+durch zwei Spieler auf einem Vorrat von 13 Kopien je Farbe, nicht aus
+einer schlecht gewaehlten Zielspalte oder einem unaufmerksamen
+Vorzugszug. Eine versorgungsgewichtete Zielwahl kann eine Farbe nicht
+haeufiger ins Angebot bringen, als der gemeinsame Verbrauch es zulaesst --
+sie kann nur vermeiden, sich an eine Farbe zu binden, die gerade knapp
+IST, und knappe Farben eher zu ergreifen, wenn sie kurz auftauchen. Genau
+DAS zeigt der zweite Kategorie-Wert: "Musterreihe an andere Farbe
+gebunden" fiel von 16,0 % auf 6,1 % -- die Bausteine wirken exakt an der
+Stelle, an der sie wirken KOENNEN (selbstverschuldetes Fehlbinden), nicht
+an der Stelle, an der die Nutzer-Wette lag (Versorgung insgesamt).
+
+Der Anstieg von 5,60 auf 5,95 (GEPRUEFT signifikant, t=3,94) ist also
+NICHT der erhoffte grosse Sprung durch "Versorgungs-Bewusstsein", sondern
+die Summe zweier kleinerer, plausibler Effekte: weniger Fehlbindung
+(Baustein 2+3) und eine dichtere Verteilung ueber mehr Partien mit
+mindestens einer Spalte (15/20 statt vermutlich weniger in Runde 2, nicht
+neu nachgemessen). **5,60-5,95 ist nach dieser Messung die ehrliche Decke
+des JETZIGEN Generator-Ansatzes** (Zielwahl + Vorzug, beide reagieren nur
+auf den AKTUELLEN Brett-/Angebotszustand) -- ein weiterer Dreh an
+Zielwahl-Gewichten oder Vorzug-Reihenfolge wuerde laut dieser Deutung
+keinen groesseren Sprung mehr bringen, weil der dominante Blocker nicht
+an dieser Stelle sitzt.
+
+### (5) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- `ENGPASS_MAX = 2,5` und der lineare Verlauf zwischen 0 und
+  `TILES_PER_COLOR` sind meine Kalibrierung, keine Nutzer-Zahl -- Vorgabe
+  war nur die Richtung ("teuer, auch wenn die Reihe frei ist") und die
+  Bedingung, dass der Aufschlag eine falsch gebundene Zeile (Basis 2,0)
+  im Extremfall uebersteigen muss; beides erfuellt, aber die genaue Kurve
+  (linear statt z.B. quadratisch) ist ungeprueft gegen Alternativen.
+- Ich habe den Bestandstest
+  `vorzugszug_reicht_dynamische_spalte_an_provokation_kern_durch`
+  angepasst (Tischmitte deterministisch geleert), statt seine
+  Kern-Annahme ("Spalte 0 bleibt billigste") stehen zu lassen und beim
+  ersten fehlschlagenden Seed erneut zu reparieren.
+- Ich habe NICHT versucht, den 74%-Blocker durch eine aggressivere
+  Zielwahl (z.B. groesseres `ENGPASS_MAX`, kleineres `SPALTEN_TOLERANZ`)
+  wegzudruecken, nachdem die erste Messung ihn unveraendert zeigte --
+  das waere angesichts der eigenen Deutung (strukturell) eine
+  Schoenrechnung durch Uebertuning gewesen, kein echter Befund.
+- Empfehlung (keine Entscheidung): ohne eine Mechanik, die zukuenftige
+  Fabrikbefuellung selbst beeinflusst -- was regelkonform nicht geht, das
+  Ziehen ist zufaellig -- ist der naechste sinnvolle Schritt eher die vom
+  Nutzer selbst skizzierte Zwei-Pole-Architektur (§10: Kopf lernt aus
+  REALISIERTEN Partien statt aus einer handgerechneten Zielwahl) als eine
+  vierte Nachbesserung an `spaltenbau.rs`.
