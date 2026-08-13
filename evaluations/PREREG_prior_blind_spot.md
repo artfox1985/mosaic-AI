@@ -183,7 +183,7 @@ d.h. echter Dominanz einer Seite). Kosten ~10 min.
 
 Lauf am Champion `v21_2d_brierbest` gegen `frozen_v2_oracle_labels.json`,
 n=930 (Runden 1-4; Runde 5 per Altcode ausgeschlossen, dort exakter
-Loeser). Belegstelle `evaluations/t_e_prior_blindfleck.json`.
+Loeser). Belegstelle `evaluations/t_e_prior_blind_spot.json`.
 
 | m | rauschfrei `prior_recall_at_m` | rausch-treu `gumbel_recall_at_m` |
 |---|---|---|

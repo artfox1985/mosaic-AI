@@ -15,7 +15,7 @@ zeigen:
 1. **Stufe 2 (heute)**: beide Punkte-Koepfe sortieren die Wurzelkandidaten
    plattenabhaengig UM -- `net_points_forecast` Tau-Median 0,792,
    `net_opp_points_forecast` **0,640** (Regel 2a,
-   `punktekopf_platten_stufe2.json`). Der Tau ist hier eindeutig, weil der
+   `points_head_plates_stage2.json`). Der Tau ist hier eindeutig, weil der
    Forward-Pass deterministisch ist: die Null waere exakt 1,0. Beide
    Koepfe haben in der Suche aber **Gewicht Null** -- das Signal wird
    berechnet und verworfen.

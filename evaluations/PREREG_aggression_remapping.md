@@ -63,5 +63,5 @@ Kontrolle (0,0: 149/200 vs Heuristik): (0.1,1.0) 154/200, p=0,59;
 Staerkegewinn -> w bleibt ueberall 0, der Punkt gilt als geschlossen bis
 zur naechsten Kopf-Generation; die (0,1;2,0)-Richtung ist deskriptiv
 (+6pp) fuer kuenftige Kopf-Generationen vermerkt, keine
-Style-Interpretation. Belegstelle: evaluations/paired_arena_env_aggr_neukartierung.json
+Style-Interpretation. Belegstelle: evaluations/paired_arena_env_aggr_remapping.json
 (Felder `arm_wins`, `comparisons`); Commit b5123df.

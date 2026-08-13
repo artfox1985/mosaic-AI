@@ -11,7 +11,7 @@ Format der Eingabedatei (siehe diagrams.txt):
 
 Verwendung:
     python render_diagrams.py                    # rendert alle Diagramme als SVG
-    python render_diagrams.py spielablauf         # nur dieses eine Diagramm
+    python render_diagrams.py game_flow         # nur dieses eine Diagramm
     python render_diagrams.py --format png        # als PNG statt SVG
     python render_diagrams.py --input pfad.txt    # andere Eingabedatei
     python render_diagrams.py --open              # zusaetzlich automatisch oeffnen
