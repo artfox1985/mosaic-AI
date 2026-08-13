@@ -116,7 +116,7 @@ signifikant schaedlich (-13,75pp bei ε=0,03), Floor-Opp-Bias flach
 (w=0, λ=0, ε=0, bias=1). **Wiedervorlage-Bedingung**: neuer Anlauf
 (Startkandidat (0,1;2,0)) erst, wenn eine kuenftige Kopf-Generation
 den opp-/Punkte-Kopf messbar schaerft (z.B. via Endgame-Aux-Kopf,
-PREREG_platten_intervention) -- Praediktor: opp-Kopf-R² deutlich
+PREREG_plate_intervention) -- Praediktor: opp-Kopf-R² deutlich
 ueber den heutigen ~0,48.
 
 ## STARK-GEGNER-NACHTEST (Nutzer-Hypothese 2026-08-07/08, PREREG vor dem Lauf)

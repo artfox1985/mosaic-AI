@@ -717,7 +717,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"   Opp-Punkte-Kopf: AN (Task #28, PREREG_task28_aggression.md) -- "
               f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NICHT Teil von val_combined")
     if endgame_head:
-        print(f"   Endgame-Kopf  : AN (Schema 18, PREREG_platten_intervention.md) -- "
+        print(f"   Endgame-Kopf  : AN (Schema 18, PREREG_plate_intervention.md) -- "
               f"Gewicht={effective_points_weight} (=POINTS_WEIGHT-Override), NUR R5-Drafting-Zone "
               f"maskiert, NICHT Teil von val_combined")
     if ranking_loss_weight > 0.0:
@@ -814,7 +814,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # informatives Logging/Checkpoint-Feld, NICHT Teil der Checkpoint-
     # Auswahl (siehe Kommentar an der `current_metric`-Stelle unten).
     opp_points_history = []
-    # Schema 18 (PREREG_platten_intervention.md): nur befuellt, wenn
+    # Schema 18 (PREREG_plate_intervention.md): nur befuellt, wenn
     # --endgame-head aktiv ist -- gleiches Muster wie opp_points_history.
     endgame_history = []
     # Task #35b: nur befuellt, wenn ranking_loss_weight>0 ist -- gleiches
@@ -837,7 +837,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Schema 18: maskiertes Val-MSE des endgame_head, nur relevant wenn aktiv
     # (Muster val_opp_pointsloss_history, aber kein R² -- root_q-Ziel ist auf
     # der R5-Zone stark einseitig verteilt, R² waere hier keine sinnvolle
-    # Zusatzkennzahl, siehe PREREG_platten_intervention.md).
+    # Zusatzkennzahl, siehe PREREG_plate_intervention.md).
     val_endgame_mse_history = []
     # Task #35b: deskriptive paarweise Ranking-Accuracy auf dem Val-Split
     # (STATUS.md-Vorgabe) -- nur befuellt, wenn ranking_loss_weight>0.
@@ -1153,7 +1153,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 opp_denom = opp_w.sum().clamp(min=1e-6)
                 opp_loss = (((pred_opp_points - targets_opp_points) ** 2) * opp_w).sum() / opp_denom
 
-            # Schema 18 (PREREG_platten_intervention.md): Endgame-Aux-Loss,
+            # Schema 18 (PREREG_plate_intervention.md): Endgame-Aux-Loss,
             # NUR bei aktivem Kopf. MSE gegen den exakten R5-Wurzelwert
             # (Cache [0,1] -> Remap auf die Tanh-Skala [-1,1]), maskiert mit
             # `s_endgame_mask` (nur R5-Drafting mit root_q). Gewicht =
@@ -1628,7 +1628,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Task #34: Brier-Score separat ausgewiesen (arm-uebergreifend
         # vergleichbar, siehe Kommentar an der Berechnungsstelle).
         val_brier_str = f" | Value-Brier={epoch_val_brier:.4f}" if epoch_val_brier is not None else ""
-        # Schema 18 (PREREG_platten_intervention.md): kompakte Zusatz-Zeile
+        # Schema 18 (PREREG_plate_intervention.md): kompakte Zusatz-Zeile
         # NUR bei aktivem Kopf, sonst bleibt die Ausgabe unveraendert (Muster
         # der uebrigen optionalen Koepfe hier, z.B. val_brier_str).
         endgame_str = ""
@@ -2120,7 +2120,7 @@ if __name__ == "__main__":
                              "--load von einem Alt-Checkpoint OHNE diesen Kopf funktioniert "
                              "(fehlende Keys -> frisch initialisiert, Rest warm).")
     parser.add_argument("--endgame-head", action="store_true",
-                        help="Schema 18 (evaluations/PREREG_platten_intervention.md): additiven "
+                        help="Schema 18 (evaluations/PREREG_plate_intervention.md): additiven "
                              "endgame_head aktivieren -- MLP auf `shared`, Ziel = exakter R5-"
                              "Wurzelwert (root_q der R5-Drafting-Records, [0,1]-Skala im Cache -> "
                              "Tanh-Remap [-1,1] im Loss), MSE, Gewicht=POINTS_WEIGHT, maskiert mit "

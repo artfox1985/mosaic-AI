@@ -7,7 +7,7 @@ Die Trennung ist Absicht: sonst liest irgendwann jemand eine Messung als Regel.
 **Warum es diese Datei gibt** (angelegt 2026-08-11, Nutzer-Frage *"wo hast das
 domänenwissen bisher gespeichert?"*): es war verstreut — Versorgungsrechnung als
 Docstring in `tools/pattern_row_availability.py`, Strategie-Herleitung in
-`evaluations/PREREG_plattenkopf.md`, Plattenanteil in `evaluations/STATUS.md`.
+`evaluations/PREREG_plate_head.md`, Plattenanteil in `evaluations/STATUS.md`.
 Letzteres ist der eigentliche Fehler: STATUS trägt laut eigenem Kopf „nur
 AKTUELLES und OFFENES" und wird regelmäßig in `archive/history.md` geleert —
 Domänenwissen dort wird also mitarchiviert. Vorregistrierungen sind je
@@ -108,7 +108,7 @@ Budgets, also Budget- und keine Policy-Robustheit. Für letztere wäre
 - **Regime**: Self-Play MIT Wurzelrauschen, also bewusst schwächeres Spiel als
   der Champion in der Arena. Das IST dieses Regimes, keine Könnens-Obergrenze.
 - **Gegencheck zur Größenordnung**: Summe über alle Reihen = **15,72 Fliesen je
-  Brett**; `evaluations/watchlist_v20_zwischenlese.md` zählte für die KI 17,2
+  Brett**; `evaluations/watchlist_v20_interim_review.md` zählte für die KI 17,2
   Kuppel-Legungen je Partie. Die Differenz zeigt in die Richtung des
   Unterschätzungs-Vorbehalts.
 
@@ -234,7 +234,7 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
   ZURÜCKGEZOGEN — der Korpus ist voll mit Chip-Abschlüssen (4,92 je Partie im
   v18-Korpus, 4,85 in frischen v19wdl-Sockeln). Die KI chippt im Self-Play
   routiniert.
-- **Mensch gegen Champion** (10 gewertete Partien, `watchlist_v20_zwischenlese.md`):
+- **Mensch gegen Champion** (10 gewertete Partien, `watchlist_v20_interim_review.md`):
   Mensch 7:3, Ø +14,5 Punkte. Größter Einzelposten sind die Spezialpunkte —
   **10,3 gegen 1,3 je Partie**, also 9,0 der 14,5 Punkte Differenz. Die KI
   schaltet in **6 von 10** Partien kein einziges Spezialfeld frei, der Mensch in

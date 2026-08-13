@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """tools/seed_auswahl_platten.py -- Seed-Auswahl fuer den Plattenkopf-Versuch
-(`evaluations/PREREG_plattenkopf.md`, 2026-08-11).
+(`evaluations/PREREG_plate_head.md`, 2026-08-11).
 
 Hintergrund: `MOSAIC_WERTUNG_ALPHA` nimmt acht kommagetrennte Werte, einen je
 Wertungsplatten-Kriterium (`net_mcts.rs::wertung_shaping_alphas`). Um den

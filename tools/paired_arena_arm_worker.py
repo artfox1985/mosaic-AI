@@ -36,7 +36,7 @@ except Exception:
 
 def parse_seeds(value: str) -> list[int]:
     """Explizite Pro-Partie-Seed-Liste fuer `--seeds` (Plattenkopf-Versuch,
-    `PREREG_plattenkopf.md`, 2026-08-11): entweder KOMMAGETRENNT ODER ein Pfad
+    `PREREG_plate_head.md`, 2026-08-11): entweder KOMMAGETRENNT ODER ein Pfad
     zu einer Datei mit einer Zahl je Zeile (Leerzeilen und `#`-Kommentare
     ignoriert -- passend zum `tools/seed_auswahl_platten.py`-Ausgabeformat).
     Datei-Form gewaehlt fuer den grossen Fall (60 Seeds waeren als ein
@@ -76,7 +76,7 @@ def main() -> None:
     # `tools/analyze_game_log.py` die VERHALTENS-Zahlen aus denselben Partien
     # ziehen kann wie die Siegquote. Ohne das liefert ein Sweep nur Siegquoten
     # und die Verhaltensmessung braeuchte einen zweiten Lauf ueber dieselben
-    # Stunden (siehe PREREG_injektion_wertungsplatten.md, Vorbedingung 2).
+    # Stunden (siehe PREREG_scoring_plate_injection.md, Vorbedingung 2).
     p.add_argument("--log-games", action="store_true",
                    help="Partie-Logs im Ergebnis-JSON mitfuehren (Default aus)")
     args = p.parse_args()

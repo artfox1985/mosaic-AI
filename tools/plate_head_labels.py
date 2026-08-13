@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Label-Extraktor fuer den Plattenkopf (`evaluations/PREREG_plattenkopf.md`).
+"""Label-Extraktor fuer den Plattenkopf (`evaluations/PREREG_plate_head.md`).
 
 Rechnet aus dem ENDBRETT einer Self-Play-Partie die Atome je Wertungsplatte und
 stempelt sie -- wie `scores` -- auf ALLE Datensaetze derselben Partie: der Kopf
@@ -228,7 +228,7 @@ def cmd_stats(args) -> int:
           dict(sorted(active_counter.items())))
     print("\nLesart: eine Grundrate nahe 0 oder 1 macht den Brier trivial gut und")
     print("die Trennleistung wertlos -- dann entscheidet der Brier-SKILL-Score")
-    print("gegen die Grundrate, nicht der rohe Brier (PREREG_plattenkopf.md).")
+    print("gegen die Grundrate, nicht der rohe Brier (PREREG_plate_head.md).")
     return 0
 
 
@@ -243,7 +243,7 @@ def cmd_dump(args) -> int:
     `VALUE_SCHEMA_VERSION`-Bump waere dafuer das falsche Werkzeug.
 
     Nur Kriterium 6 (c6): c3 hat im Rauchtest keinen Skill, siehe
-    `evaluations/PREREG_plattenkopf.md`.
+    `evaluations/PREREG_plate_head.md`.
     """
     import json
 

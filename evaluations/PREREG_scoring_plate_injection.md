@@ -4,7 +4,7 @@
 wollen die wertungsplatten injizieren. nicht nur die spezialplatten."*
 
 Diese Vorregistrierung ist der **Haupt-Sweep**.
-`PREREG_injektion_dosis.md` (Spezialfelder, `MOSAIC_UNLOCK_SHAPING_W`) wird
+`PREREG_injection_dose.md` (Spezialfelder, `MOSAIC_UNLOCK_SHAPING_W`) wird
 damit zum **Sonderfall danach**, nicht zum ersten Lauf.
 
 ## 0. Was falsch war, damit es nicht wiederkehrt
@@ -79,7 +79,7 @@ Platten im Spiel), wird es größer.
 | A | **0,1** | ~0,016 | spürbar, klar untergeordnet gegenüber Q |
 | B | **0,3** | ~0,047 | Hauswert der bestehenden Shaping-Gewichte, obere Kante |
 
-**Kein Arm bei 1,0** — anders als in `PREREG_injektion_dosis.md`, wo der Term
+**Kein Arm bei 1,0** — anders als in `PREREG_injection_dose.md`, wo der Term
 eine Größenordnung kleiner ist. Zwei Arme, Task-D-Präzedenz.
 
 ## 3. Instrument und Statistik
@@ -146,8 +146,8 @@ zu zeigen.
 ## 6. Was dieser Sweep NICHT entscheidet
 
 - Keinen Champion-Wechsel (kein neuer Checkpoint).
-- Nicht `MOSAIC_UNLOCK_SHAPING_W` (`PREREG_injektion_dosis.md`, danach).
-- Nicht den Punkte-Kanal (`PREREG_punkte_lambda_unter_kipppunkt.md`).
+- Nicht `MOSAIC_UNLOCK_SHAPING_W` (`PREREG_injection_dose.md`, danach).
+- Nicht den Punkte-Kanal (`PREREG_points_lambda_below_tipping_point.md`).
 - ~~Nicht den Exponenten α~~ — **überholt**: α IST der Gegenstand, siehe
   Kalibrierungs-Methode. Nicht entschieden werden dagegen die kalibrierten
   ENDPUNKTE (`ALPHA_KALIBRIERT`), die aus der Heuristik-Referenz gemessen sind.

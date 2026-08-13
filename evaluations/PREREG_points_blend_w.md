@@ -37,7 +37,7 @@ Skalars, verstaerkt w>0 ueberwiegend Inhalt, der bereits als H0 gemessen
 wurde. Dieser Task ist damit ein Test des VORHANDENEN Knopfes unter einer
 neuen Begruendung -- kein plattenselektiver Eingriff. Ein plattenspezifischer
 Zuschnitt (z.B. nur die aktiven Kriterien gewichten) waere ein eigener
-Task und braeuchte den Plattenkopf (`PREREG_plattenkopf.md`).
+Task und braeuchte den Plattenkopf (`PREREG_plate_head.md`).
 
 ## Design
 
@@ -125,7 +125,7 @@ Rauschen.
 
 "Dann ist der Blend als Weg fuer Plattenwirkung erledigt, und der Hebel muss
 **plattenselektiv** werden (Plattenkopf) oder trainingsseitig." Genau das
-laeuft: `PREREG_plattenkopf.md`, Kriterium 6 als 9 Atome, Rauchtest mit
+laeuft: `PREREG_plate_head.md`, Kriterium 6 als 9 Atome, Rauchtest mit
 Skill +0,574 bestanden.
 
 Der Punkt gilt damit als **zweifach gemessen** -- einmal auf der

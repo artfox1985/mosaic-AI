@@ -1264,8 +1264,8 @@ mod tests {
         assert!(log.contains("SELECT"));
     }
 
-    // ── A4 Heuristik-Anker-Verhaltenstest (`evaluations/DESIGN_konventionen_
-    // als_pruefungen.md`, Abschnitt "A4") ───────────────────────────────────
+    // ── A4 Heuristik-Anker-Verhaltenstest (`evaluations/DESIGN_conventions_
+    // as_checks.md`, Abschnitt "A4") ───────────────────────────────────
     //
     // EINFRIEREN, NICHT REPARIEREN: dieser Test haelt fest, was die Heuristik
     // HEUTE tatsaechlich waehlt -- er bewertet nicht, ob das die beste
@@ -1273,7 +1273,7 @@ mod tests {
     // `scoring.rs::wertung_progress` (`6 => -3.0 * sf.special_empty as f64`,
     // Zeile ~178) bleibt ABSICHTLICH im Anker stehen, auch wenn er
     // suboptimal ist -- die Plattenschwaeche gehoert auf die Netzseite
-    // (`PREREG_plattenkopf.md`), nicht in eine Reparatur dieses Ankers. Ein
+    // (`PREREG_plate_head.md`), nicht in eine Reparatur dieses Ankers. Ein
     // Massstab, der bei jeder vermeintlichen Verbesserung mitgezogen wird,
     // ist kein Massstab mehr -- er wuerde die Elo-Leiter selbst entwerten.
     // Deckt `mcts.rs` (Baumsuche/Selektion, dieses Modul), `scoring.rs::

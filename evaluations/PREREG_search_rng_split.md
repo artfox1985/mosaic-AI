@@ -147,7 +147,7 @@ Nutzers hierzu geht vor.**
 Abschnitt 6 dieser Datei sagt es selbst: der Umbau *"sollte NICHT parallel zu
 einem laufenden Messvorhaben stattfinden, weil er die Vergleichsgrundlage
 verschiebt."* Die Koeffizientensuche fuer die vertikalen Wertungsplatten
-(`PREREG_injektion_wertungsplatten.md` N7) ist genau so ein Vorhaben -- Zellen vor
+(`PREREG_scoring_plate_injection.md` N7) ist genau so ein Vorhaben -- Zellen vor
 und nach dem Schnitt waeren nicht mehr gegeneinander lesbar, und der Nullpunkt
 (53,30 Endstand, 0,70 vertikale Punkte) muesste neu gemessen werden.
 

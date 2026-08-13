@@ -52,7 +52,7 @@ Batch 128-256 wird ohne 128-256 OS-Fäden erreichbar.
 
 ## 3. Abgrenzung: KEIN Virtual Loss
 
-Das ist NICHT Weg B im Sinne von `PREREG_gpu_verlagerung.md` (Virtual Loss --
+Das ist NICHT Weg B im Sinne von `PREREG_gpu_offloading.md` (Virtual Loss --
 Parallelität INNERHALB einer Suche, verändert die Suchergebnisse selbst,
 gating-pflichtig, dort bereits verworfen). Async über PARTIEN hinweg lässt
 jede einzelne Suche logisch unverändert -- es ändert sich nur, WER den
@@ -788,7 +788,7 @@ geworden.
 
 ## 12. GATE B, FINAL: nach dem RNG-Schnitt gemessen -- Spielgeschehen bit-identisch, Trainingsziel-Felder NICHT (Befund, nicht wegtoleriert)
 
-Der RNG-Schnitt (`fe1e306`, `PREREG_such_rng_trennen.md`) ist im Hauptbaum
+Der RNG-Schnitt (`fe1e306`, `PREREG_search_rng_split.md`) ist im Hauptbaum
 gelandet und gepusht: die Suche erhält einen eigenen, aus `(game_seed,
 move_index)` deterministisch abgeleiteten RNG (`net_mcts::derive_search_seed`)
 statt des mit dem echten Spiel geteilten Stroms. Nutzer-Auftrag: Gate B

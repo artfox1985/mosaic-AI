@@ -145,7 +145,7 @@ def per_candidate_final_score(analysis):
 
 
 # ---------------------------------------------------------------------------
-# Vorregistrierung Stufe 1 (evaluations/PREREG_punktekopf_platten.md,
+# Vorregistrierung Stufe 1 (evaluations/PREREG_points_head_plates.md,
 # 2026-08-09): traegt der PUNKTE-Kopf (und der opp_points_head, sowie -- als
 # Referenz -- der rohe raw_value) Wertungsplatten-Information an der WURZEL?
 # Rein additiv zum obigen Gumbel-Rang-Invarianz-Test: nutzt denselben Trace
@@ -180,7 +180,7 @@ def main():
     ap.add_argument("--n-combos", type=int, default=8)
     ap.add_argument("--seed", type=int, default=1000)
     ap.add_argument("--seed2", type=int, default=None,
-                     help="PREREG_punktekopf_platten.md Stufe 1 (c): zweiter Seed fuer den "
+                     help="PREREG_points_head_plates.md Stufe 1 (c): zweiter Seed fuer den "
                           "Rauschboden (dieselbe Original-Kombination, zwei Seeds -- 1:1 aus "
                           "scoring_tile_sensitivity.py's baseline_*_two_seeds gespiegelt). "
                           "Default (None) = --seed + 1000, reproduziert dort die dortigen "
@@ -211,7 +211,7 @@ def main():
     all_actual_decision_tracked = 0
     n_skipped_single_candidate = 0
     n_skipped_no_finalphase = 0
-    # -- Stufe 1 (PREREG_punktekopf_platten.md) --
+    # -- Stufe 1 (PREREG_points_head_plates.md) --
     all_plate_spread = {f: [] for f in HEAD_FIELDS}
     all_seed_noise = {f: [] for f in HEAD_FIELDS}
     heads_missing_states = {f: [] for f in HEAD_FIELDS}
@@ -363,7 +363,7 @@ def main():
             "top2_flips_of_8": top2_flips,
             "actual_decision_flips": state_decision_flips,
             "actual_decision_tracked": state_decision_tracked,
-            # -- Stufe 1 (PREREG_punktekopf_platten.md), additiv --
+            # -- Stufe 1 (PREREG_points_head_plates.md), additiv --
             "head_debug_by_combo": head_debug_by_combo,
             "head_debug_seed_b_original_combo": head_debug_seed_b,
             "points_forecast_plate_spread": head_plate_spread["points_forecast"],
@@ -444,7 +444,7 @@ def main():
     if gap_summary and top2_spread_summary and top2_spread_summary["median"] > 0:
         summary["factor_gap_median_over_top2_margin_spread_median"] = gap_summary["median"] / top2_spread_summary["median"]
 
-    # -- Stufe 1 (PREREG_punktekopf_platten.md), additiv: Kennzahl je Kopf
+    # -- Stufe 1 (PREREG_points_head_plates.md), additiv: Kennzahl je Kopf
     # (und raw_value als Pflicht-Referenz) = Median(Platten-Spannweite) /
     # Median(Seed-Rauschboden), plus Mittelwerte/n (Punkt (d) im Auftrag).
     summary["seed2"] = seed2
@@ -463,7 +463,7 @@ def main():
             "states_with_head_missing": heads_missing_states[f],
         }
     summary["punktekopf_platten_stufe1"] = {
-        "prereg": "evaluations/PREREG_punktekopf_platten.md (Stufe 1)",
+        "prereg": "evaluations/PREREG_points_head_plates.md (Stufe 1)",
         "seed_a": args.seed,
         "seed_b": seed2,
         "heads": heads_summary,

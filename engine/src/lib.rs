@@ -227,7 +227,7 @@ fn value_noise_floor_diagnostic(
 /// `game.rs`/`round_end.rs` -- dieselben Funktionen erzeugen beide). Reine
 /// Zusatzausgabe (kein neuer Suchpfad, kein RNG-Verbrauch): bei `false`
 /// bleibt das Ergebnis wie zuvor.
-/// `seeds` (Plattenkopf-Versuch, `PREREG_plattenkopf.md`, 2026-08-11): siehe
+/// `seeds` (Plattenkopf-Versuch, `PREREG_plate_head.md`, 2026-08-11): siehe
 /// `self_play::run_net_arena_match`-Dokumentation -- gesetzt, spielt Partie
 /// `i` exakt `seeds[i]` (statt der abgeleiteten Formel) und `n_games` folgt
 /// der Listenlänge. `None` (Default) = Bestandsverhalten, byte-identisch.
@@ -525,8 +525,8 @@ fn onnx_eval(
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
-/// A2 (Laufzeit-Vertragsstempel, `evaluations/DESIGN_konventionen_als_
-/// pruefungen.md` Abschnitt "A2"): die kanonische Zeichenkette, aus der
+/// A2 (Laufzeit-Vertragsstempel, `evaluations/DESIGN_conventions_as_
+/// checks.md` Abschnitt "A2"): die kanonische Zeichenkette, aus der
 /// [`contract_hash`] gebildet wird. ÖFFENTLICH als eigener Schritt (statt
 /// direkt in `contract_hash` verdrahtet), damit ein Rust-Test die Herleitung
 /// unabhängig von der Hash-Funktion selbst belegen kann.
@@ -599,8 +599,8 @@ pub(crate) fn contract_hash() -> String {
 /// jeweiligen Commit-Stand extra auschecken zu müssen. Reines Auslesen
 /// bestehender `pub`/`pub(crate)`-Konstanten aus `net_mcts.rs`/
 /// `round_transition.rs`/`round_transition_deep.rs` -- kein Spielzustand
-/// nötig, keine neue Suchlogik. A2-Ergänzung (`DESIGN_konventionen_als_
-/// pruefungen.md`): `input_size`/`num_planes_channels`/`contract_hash` --
+/// nötig, keine neue Suchlogik. A2-Ergänzung (`DESIGN_conventions_as_
+/// checks.md`): `input_size`/`num_planes_channels`/`contract_hash` --
 /// alle drei rein additiv (bestehende Schlüssel unverändert), betreffen NUR
 /// dieses `engine_config_json()`, nicht `net_search_state_json`/`_trace`
 /// (die Paritäts-Probe hasht ausschließlich Letztere, bleibt also unberührt).
@@ -1141,7 +1141,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod contract_stamp_tests {
     use super::*;
 
-    /// A2-Golden-Waechter (`evaluations/DESIGN_konventionen_als_pruefungen.md`
+    /// A2-Golden-Waechter (`evaluations/DESIGN_conventions_as_checks.md`
     /// Abschnitt "A2"): haelt den HEUTIGEN Vertragshash als Literal fest.
     /// Aendert sich `INPUT_SIZE`, `NUM_PLANES_CHANNELS`, `NUM_ACTIONS` ODER
     /// die in `contract_canonical_string` nachgebildete ONNX-Kopf-

@@ -68,7 +68,7 @@ freischaltvorbereitenden Zuege fast keine Masse, kommen sie nicht in den
 Kandidatensatz.
 
 Deshalb je Arm zusaetzlich zu protokollieren, aus den Partie-Logs (Methode wie
-`watchlist_v20_zwischenlese.md` Abschnitt 2):
+`watchlist_v20_interim_review.md` Abschnitt 2):
 
 - **Freischaltungen je Partie** (Zielwert Nutzer 3,1; KI heute 0,6)
 - **Spezialpunkte je Partie** (Zielwert Nutzer 10,3; KI heute 1,3)

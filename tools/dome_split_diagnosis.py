@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 tools/dome_split_diagnosis.py -- TASK B "Zerlegungs-Diagnose" (Nutzer-Auftrag
-2026-08-09, AMENDMENT 2026-08-09). Prereg: evaluations/EXTERNES_REVIEW_2026-
+2026-08-09, AMENDMENT 2026-08-09). Prereg: evaluations/EXTERNAL_REVIEW_2026-
 08-08.md, Abschnitte "TASK B -- Zerlegungs-Diagnose" (Punkt 3, urspruengliches
 Design) und "TASK B: INSTRUMENT-AMENDMENT" (korrigiertes Design, bindend fuer
 den Default-Modus). Beide sind Pflichtlektuere fuer Aenderungen an dieser
@@ -263,7 +263,7 @@ OUT_JSON_LEGACY = ROOT / "evaluations" / "dome_split_diagnosis.json"
 OUT_MD_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnosis_withintree.md"
 OUT_JSON_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnosis_withintree.json"
 
-# Lesart-Schwellen woertlich aus der Prereg (EXTERNES_REVIEW_2026-08-08.md,
+# Lesart-Schwellen woertlich aus der Prereg (EXTERNAL_REVIEW_2026-08-08.md,
 # TASK B, unveraendert durch das Amendment): Anteil <5% ODER mittlere
 # Q-Differenz <0,01 -> Zerlegung kostet nichts Messbares. NUR zum Berichten,
 # nicht zum Selbst-Entscheiden. Im Legacy-Modus NICHT auf die Task-B-Frage
@@ -748,7 +748,7 @@ def build_report_within_tree(results: list[dict], scan_stats: dict, meta: dict) 
     md = _md_header(
         meta, scan_stats, n_total,
         "Zerlegungs-Diagnose: within-tree (TASK B, korrigiertes Design)",
-        "Prereg: `evaluations/EXTERNES_REVIEW_2026-08-08.md`, Abschnitt "
+        "Prereg: `evaluations/EXTERNAL_REVIEW_2026-08-08.md`, Abschnitt "
         '"TASK B: INSTRUMENT-AMENDMENT". Beide Lesarten (zweistufig/flach) '
         "kommen aus DEMSELBEN kachel-isolierten Suchbaum -- Budget und "
         "Wurzelbreite sind identisch, siehe Moduldoku von "
@@ -837,7 +837,7 @@ def build_report_isolated_vs_root(results: list[dict], scan_stats: dict, meta: d
         "kachel-isolierten Aufruf (alle Kandidaten betrachtet, volles Budget NUR fuer "
         "diese Kachel). Der Vergleich ueberlagert Zerlegung, Wurzelbreite UND Budget-"
         "Konzentration und attribuiert alles der Zerlegung -- siehe "
-        '`evaluations/EXTERNES_REVIEW_2026-08-08.md`, Abschnitt "TASK B: INSTRUMENT-'
+        '`evaluations/EXTERNAL_REVIEW_2026-08-08.md`, Abschnitt "TASK B: INSTRUMENT-'
         'AMENDMENT". Fuer die eigentliche Zerlegungsfrage `--mode within-tree` (Default) '
         "verwenden.",
     )

@@ -76,4 +76,4 @@ Validierung wartet weiterhin auf arena-differenzierte Paare nach dem
 Frozen-Set-Neubau. Paket-Fazit: kein Aux-Kopf-Hebel am neuen #34-Ziel;
 einziger belegter Hebel bleibt die Spielzahl (#36). Belegstelle:
 archive/history.md, Abschnitt "Nach-#34-Paket ERGEBNISSE (2026-08-06,
-PREREG_nach34_paket.md)", Zeile ~10005-10039.
+PREREG_post34_package.md)", Zeile ~10005-10039.

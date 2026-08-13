@@ -1287,8 +1287,8 @@ mod tests {
         let _ = features_for_layout(layout, &s);
     }
 
-    // ── A3 Feature-Golden-Hash (`evaluations/DESIGN_konventionen_als_
-    // pruefungen.md`, Abschnitt "A3") ───────────────────────────────────────
+    // ── A3 Feature-Golden-Hash (`evaluations/DESIGN_conventions_as_
+    // checks.md`, Abschnitt "A3") ───────────────────────────────────────
     //
     // QUANTISIERT (~1e-6), NICHT bitgenau (`f32::to_bits`): ein rustc-/LLVM-
     // Wechsel oder ein anderes `target-cpu` kann die letzten Bits einer

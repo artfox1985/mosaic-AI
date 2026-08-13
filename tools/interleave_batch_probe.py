@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Teil-1-Probe zu `evaluations/PREREG_gpu_verlagerung.md`: ist ein
+"""Teil-1-Probe zu `evaluations/PREREG_gpu_offloading.md`: ist ein
 effektiver Inferenz-Batch von >= 128 durch VERSCHRAENKUNG erreichbar?
 
 Hintergrund: die GPU schlaegt den CPU-Aggregatdurchsatz erst ab Batch ~128

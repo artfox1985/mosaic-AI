@@ -480,7 +480,7 @@ fn drive_drafting_to_leaf_policy(
 
 /// Spielt eine VOLLSTAENDIGE Partie nach `politik` durch und liefert den
 /// Endzustand -- die beiden Referenzlaeufe des Plattenkopf-Auftrags
-/// (2026-08-10, Auswertung in `evaluations/PREREG_plattenkopf.md`).
+/// (2026-08-10, Auswertung in `evaluations/PREREG_plate_head.md`).
 ///
 /// WARUM ein eigener Treiber neben [`drive_to_game_end_random`]: jener setzt
 /// (ueber `drive_to_first_round_end`) `start_tile_pending = false` und

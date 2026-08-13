@@ -478,7 +478,7 @@ def action_to_id(action: dict) -> int:
 # value = tanh(own_total/VALUE_SCALE)
 # (Schema 20, Nutzer-Entscheid 2026-08-10: der frueher abgezogene
 #  VALUE_OPP_EPSILON·tanh(opp_total/VALUE_SCALE)-Term ist ENTFALLEN. Begruendung
-#  in evaluations/PREREG_punktekopf_epsilon.md -- kurz: der Term war im
+#  in evaluations/PREREG_points_head_epsilon.md -- kurz: der Term war im
 #  Suchpfad nur ueber `opp_aware_points_utility` rueckgewinnbar, und der liegt
 #  hinter dem `w == 0.0`-Kurzschluss, ist also toter Code.)
 #
@@ -640,7 +640,7 @@ def action_to_id(action: dict) -> int:
 # train.py's `--wdl-bootstrap-destretch` ist damit fuer Schema>=17-Caches
 # UEBERFLUESSIG und darf NICHT zusaetzlich gesetzt werden (doppelte
 # Streckung); der Flag bleibt nur fuer Alt-Experimente auf Schema-16.
-# Schema 18 (2026-08-07, PREREG_platten_intervention.md): additive Felder
+# Schema 18 (2026-08-07, PREREG_plate_intervention.md): additive Felder
 # `endgame_margin`/`endgame_mask` (ENDGAME_CACHE_FIELDS unten) -- exakter
 # R5-Minimax-Wurzelwert aus den Records (root_q der R5-Drafting-Schritte,
 # [0,1]-tanh-Normierung, net_mcts.rs-R5-Zweig). Labels sind GRATIS (kein
@@ -770,7 +770,7 @@ OPP_POINTS_CACHE_FIELDS = ("opp_points_forecast", "opp_points_mask")
 # gebaut wird, egal ob POINTS_WEIGHT>0).
 WDL_CACHE_FIELDS = ("values_wdl", "wdl_outcome")
 
-# Schema 18 (PREREG_platten_intervention.md): exakte R5-Zonen-Ziele fuer den
+# Schema 18 (PREREG_plate_intervention.md): exakte R5-Zonen-Ziele fuer den
 # additiven `endgame_head` -- immer mitgebaut (Muster points_forecast/WDL).
 ENDGAME_CACHE_FIELDS = ("endgame_margin", "endgame_mask")
 
@@ -814,7 +814,7 @@ ENDGAME_CACHE_FIELDS = ("endgame_margin", "endgame_mask")
 # Verzweigung ueberwiegend nahezu identische Q-Werte treffen (kein Signal).
 #
 # SPEICHERBUDGET je Zustand (additiv, Bitpacking-Aera, siehe
-# PREREG_v21_fenster.md "~2,6 KB/Zustand"): 8*int16 (16 B) + 8*float16
+# PREREG_v21_window.md "~2,6 KB/Zustand"): 8*int16 (16 B) + 8*float16
 # (16 B) + 1*float32 (4 B) = 36 Byte/Zustand -- << 2% des bestehenden
 # Gesamtbudgets, kein RAM-Vorbehalt.
 #
@@ -1025,7 +1025,7 @@ def _final_ownership_by_game(game_data) -> dict:
 
 
 # ── Bitpacking planes/masks (RAM-Optimierung v21, 2026-08-07) ──────────────
-# PREREG_v21_fenster.md, Abschnitt "RAM-Voraussetzung": das ~4,8-Mio-Zustaende-
+# PREREG_v21_window.md, Abschnitt "RAM-Voraussetzung": das ~4,8-Mio-Zustaende-
 # Fenster passt im heutigen Cache-Format (planes uint8 [76,6,6]=2.736 B,
 # masks uint8 [406]=406 B) nicht mehr komfortabel in 32 GB RAM. Beide Felder
 # sind STRIKT binaer (nur 0/1, siehe state_to_planes/mask-Bau oben) --
@@ -1135,7 +1135,7 @@ class MosaicDataset(Dataset):
         binaer (One-Hot-Belegung + 0/1-Geometriemasken, siehe
         design_2d_encoder.md Abschnitt 3/4).
 
-        BITPACKING (RAM-Optimierung v21, 2026-08-07, PREREG_v21_fenster.md
+        BITPACKING (RAM-Optimierung v21, 2026-08-07, PREREG_v21_window.md
         "RAM-Voraussetzung"): sowohl `masks` (406 Bit/Sample) als auch
         `planes` (2.736 Bit/Sample, NUR "2d") sind STANDARDMAESSIG bitgepackt
         im Cache (siehe `_pack_bits`-Kommentar oben fuer das exakte Layout;
@@ -1273,7 +1273,7 @@ class MosaicDataset(Dataset):
         # Fehlermeldung).
         if conjunction_head:
             cache_key_material += "+conj_v2"
-        # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
+        # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
         # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
         # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
         # eigener Suffix erzwingt einen Rebuild ALLER Alt-Caches (flat UND
@@ -1887,7 +1887,7 @@ class MosaicDataset(Dataset):
                 planes_np = np.array(planes_l, dtype=np.uint8)
                 del planes_l
 
-            # Bitpacking (RAM-Optimierung v21, PREREG_v21_fenster.md "RAM-
+            # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
             # Voraussetzung"): masks/planes sind striktes 0/1 -- `_pack_bits`
             # packt verlustfrei auf 1/8 der Byte-Groesse (masks 406->51 B,
             # planes 2736->342 B je Sample, exaktes Layout siehe
@@ -2155,7 +2155,7 @@ class MosaicDataset(Dataset):
                 # + `wdl_outcome` (roher, ungeblendeter Ausgang fuer den
                 # arm-uebergreifend vergleichbaren Brier-Score, siehe train.py).
                 self.values_wdl[idx], self.wdl_outcome[idx],
-                # Schema 18 (PREREG_platten_intervention.md): additiv ANS
+                # Schema 18 (PREREG_plate_intervention.md): additiv ANS
                 # ENDE, gleiches Muster -- exakter R5-Wurzelwert + Maske.
                 self.endgame_margin[idx], self.endgame_mask[idx],
                 # Schema 19 (Task #35b, RANKING_CACHE_FIELDS): additiv ANS
@@ -2404,7 +2404,7 @@ class MosaicNet(nn.Module):
                 nn.Linear(value_hidden, 1),
                 nn.Tanh(),
             )
-        # endgame_head (PREREG_platten_intervention.md, Schema 18): exaktes
+        # endgame_head (PREREG_plate_intervention.md, Schema 18): exaktes
         # R5-Zonen-Ziel (Minimax-Wurzelwert), additiv/standardmaessig AUS --
         # gleiches "zuletzt deklariert"-Muster und gleiche Architektur wie
         # opp_points_head. Tanh-Ausgang [-1,1]; das [0,1]-Cache-Ziel wird in
@@ -2668,7 +2668,7 @@ class Mosaic2DNet(nn.Module):
                 nn.Linear(value_hidden, 1),
                 nn.Tanh(),
             )
-        # endgame_head (PREREG_platten_intervention.md, Schema 18): exaktes
+        # endgame_head (PREREG_plate_intervention.md, Schema 18): exaktes
         # R5-Zonen-Ziel (Minimax-Wurzelwert), additiv/standardmaessig AUS --
         # gleiches "zuletzt deklariert"-Muster und gleiche Architektur wie
         # opp_points_head. Tanh-Ausgang [-1,1]; das [0,1]-Cache-Ziel wird in

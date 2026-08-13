@@ -15,7 +15,7 @@ zu glaetten.
 `round5::exact_round5_outcome`, das Value-Ziel der letzten Netz-Runde
 haengt also schon am exakten Endspiel.
 (b) Genau der vorgeschlagene Aux-Loss existiert seit 2026-08-08 als
-`endgame_margin`-Kopf (PREREG_platten_intervention.md): Ziel ist der
+`endgame_margin`-Kopf (PREREG_plate_intervention.md): Ziel ist der
 EXAKTE R5-Minimax-Wurzelwert (tanh-normierte Punktedifferenz, also
 "genaue Punktedifferenzen statt nur Win/Loss" -- exakt die Empfehlung).
 Ergebnis: R5-Plattensteigung 0,349 -> 0,457, Alt-Set-Brier -0,0016,

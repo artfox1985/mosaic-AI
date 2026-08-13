@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Teil 1 der GPU-Inferenz-Batcher-Machbarkeitsprobe
-(`evaluations/PREREG_gpu_inferenz_batcher.md`, Alt-Nummer #82).
+(`evaluations/PREREG_gpu_inference_batcher.md`, Alt-Nummer #82).
 
 Messgroesse: **Evals/s des Vorwaerts-Passes** bei wachsender Batchgroesse,
 auf der GPU. Die Frage ist NICHT "ist die GPU schneller als ein CPU-Kern"

@@ -61,7 +61,7 @@ pub struct PyGame {
     net: Option<Net>,
     /// Pfad des zuletzt geladenen Netzes — verhindert Neu-Laden bei jedem Zug.
     net_path: Option<String>,
-    /// PREREG_such_rng_trennen.md: fortlaufender Zaehler ECHTER KI-Such-
+    /// PREREG_search_rng_split.md: fortlaufender Zaehler ECHTER KI-Such-
     /// Entscheide (`ai_drafting_step`/`ai_drafting_net_step`), NICHT der
     /// reinen Debug-Endpunkte (`debug_rng` oben ist dafuer schon vom
     /// Partie-RNG entkoppelt, siehe dortiger Kommentar). Zusammen mit
@@ -561,7 +561,7 @@ impl PyGame {
         } else {
             let sims = dynamic_sims(simulations, actions.len());
             let logger = if log { Some(&mut lines) } else { None };
-            // PREREG_such_rng_trennen.md: eigener, aus (seed, move_seq)
+            // PREREG_search_rng_split.md: eigener, aus (seed, move_seq)
             // abgeleiteter RNG statt `self.rng` -- siehe Feld-Kommentar an
             // `PyGame::move_seq`. `self.rng` bleibt dadurch nur noch durch
             // echte Zustands-Ereignisse belegt, unabhaengig von `simulations`.
@@ -652,7 +652,7 @@ impl PyGame {
         let sims = net_mcts::net_effective_sims(simulations, actions.len());
         let mut lines: Vec<String> = Vec::new();
         let logger = if log { Some(&mut lines) } else { None };
-        // PREREG_such_rng_trennen.md: siehe `ai_drafting_step`-Kommentar --
+        // PREREG_search_rng_split.md: siehe `ai_drafting_step`-Kommentar --
         // eigener RNG statt `self.rng`.
         self.move_seq += 1;
         let mut search_rng = StdRng::seed_from_u64(net_mcts::derive_search_seed(self.seed, self.move_seq));
@@ -894,7 +894,7 @@ mod tests {
         assert!(refill_seen, "keine Beutel-Neumischung im Testspiel — Seed anpassen");
     }
 
-    /// Watchlist-Messartefakt (2026-08-07, evaluations/watchlist_v20_zwischenlese.md):
+    /// Watchlist-Messartefakt (2026-08-07, evaluations/watchlist_v20_interim_review.md):
     /// der KI-Pfad `ai_tiling_step` (Solver-Schritt `TilingStep::Chips`) loggte
     /// Reihen-Komplettierungen per Bonuschip bisher NICHT, obwohl der Menschen-Pfad
     /// `apply_tiling_chips` (oben) das immer tat -- Log-Analysen unterschaetzten

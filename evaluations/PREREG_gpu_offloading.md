@@ -26,7 +26,7 @@ gebaut ist.
 
 ## Warum das die #82-Schließung nicht widerlegt, sondern ihre Bedingung einlöst
 
-`PREREG_gpu_inferenz_batcher.md` ist am 2026-08-10 nach Regel 1 geschlossen
+`PREREG_gpu_inference_batcher.md` ist am 2026-08-10 nach Regel 1 geschlossen
 worden: an den erreichbaren Batches 11/22/44 liefert die RTX 3060
 2.581/6.197/14.060 Evals/s und bleibt damit unter der unteren CPU-Schranke
 von 17.600. Der Vermerk dazu lautet aber ausdrücklich **"nur zusammen mit
@@ -71,7 +71,7 @@ Eine Suche holt 8-16 Blätter gleichzeitig; mit 11 Threads ergibt das 88-176.
   abgewertete Geschwister) ⇒ Gating zwingend.
 - Die k=4-Erfahrung desselben Tages mahnt: Eingriffe in die Suchsemantik
   haben in diesem Projekt schon einmal geschadet
-  (`PREREG_ismcts_determinisierungen.md`: Mitteln über Stichproben eines
+  (`PREREG_ismcts_determinizations.md`: Mitteln über Stichproben eines
   unbekannten Zustands, -8,75pp bei vierfachem Budget).
 
 Weg V zuerst, Weg B nur, wenn V den nötigen Batch nicht erreicht.

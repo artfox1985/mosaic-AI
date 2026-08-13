@@ -215,7 +215,7 @@ Die Trenn-Messung hat einen zweiten Adressaten. Waeren die k Welten
 VERSCHRAENKT statt sequenziell gesucht (`build_determinized_forest` tut
 heute letzteres), lieferten sie ~11·k gleichzeitig offene
 Blattauswertungen statt ~11 -- genau den Batch, an dessen Erreichbarkeit
-`PREREG_gpu_inferenz_batcher.md` haengt. Und existierte der Batcher,
+`PREREG_gpu_inference_batcher.md` haengt. Und existierte der Batcher,
 kostete k>1 kaum Wandzeit, weil die k Welten in EINEM Batch liefen; das
 Sim-Budget muesste dann nicht mehr geteilt werden -- also genau das
 Regime, das diese Trenn-Messung vorwegnimmt.
@@ -589,7 +589,7 @@ in der oberen Dosis nachweislich schlechter.
 
 ### Konsequenz fuer den Nachfolger
 
-Die Warnung an `PREREG_zufallsknoten.md` bleibt bestehen, wird aber
+Die Warnung an `PREREG_chance_nodes.md` bleibt bestehen, wird aber
 praeziser: gefaehrlich ist nicht die Baum-Vervielfachung als Kostenfaktor,
 sondern das **Mitteln ueber Stichproben eines unbekannten Zustands**. Der
 aufgezaehlte Zufallsknoten am AUFDECK-Punkt ist davon strukturell

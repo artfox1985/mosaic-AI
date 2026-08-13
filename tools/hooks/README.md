@@ -5,7 +5,7 @@ versioniert. Diese Skripte liegen deshalb in `tools/hooks/` (reviewbar wie
 normaler Code) und werden per `core.hooksPath` aktiviert.
 
 Herleitung, Zeitbudgets und die Abgrenzung zu den (noch nicht gebauten)
-Golden-Waechtern A1-A4: `evaluations/DESIGN_konventionen_als_pruefungen.md`,
+Golden-Waechtern A1-A4: `evaluations/DESIGN_conventions_as_checks.md`,
 Abschnitt "Entscheid: LOKALER GIT-HOOK".
 
 ## Aktivierung
@@ -26,7 +26,7 @@ bei Exit != 0 ab. Prueft nur die gestagten Dateien:
 
 1. Datei-Groessen-Ratsche (`tools/size_baseline.json`, Schwelle 40 KB)
 2. Doku-Sprachkonvention (README.md englisch, STATUS.md/history.md deutsch)
-3. Keine neuen `#NN`-Task-Nummern (gegen `evaluations/TASK_NUMMERN_REGISTRATUR.md`)
+3. Keine neuen `#NN`-Task-Nummern (gegen `evaluations/TASK_NUMBER_REGISTRY.md`)
 4. Prereg-Index-Konsistenz (`evaluations/PREREG_*.md` <-> `PREREG_INDEX.md`)
 
 **Budget: < 3 s.** Keine Compilierung, kein Netz, keine Korpus-/Modelldateien.

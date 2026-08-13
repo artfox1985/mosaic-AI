@@ -6,7 +6,7 @@
 # Aktivierung (einmalig, siehe tools/hooks/README.md):
 #   git config core.hooksPath tools/hooks
 #
-# Budget: < 90 s (siehe evaluations/DESIGN_konventionen_als_pruefungen.md,
+# Budget: < 90 s (siehe evaluations/DESIGN_conventions_as_checks.md,
 # Abschnitt "Entscheid: LOKALER GIT-HOOK").
 #
 # Fehlalarm? git push --no-verify

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """tools/paired_arena_env_ab.py -- generischer gepaarter Zwei-Arm-A/B fuer
-LAUFZEIT-Env-Knoepfe (PREREG_suchpfad_nachmessungen.md, Amendment
+LAUFZEIT-Env-Knoepfe (PREREG_search_path_remeasurements.md, Amendment
 2026-08-07).
 
 Instrument (#30-Muster): je Arm ein EIGENER Worker-Prozess mit gesetzter
@@ -78,7 +78,7 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
     dann entsprechend viele komma-getrennte Werte (Aggressions-
     Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt).
 
-    `seeds` (Plattenkopf-Versuch, `PREREG_plattenkopf.md`, 2026-08-11):
+    `seeds` (Plattenkopf-Versuch, `PREREG_plate_head.md`, 2026-08-11):
     explizite Pro-Partie-Seed-Liste -- ERSETZT die `block_seed = seed +
     block_idx * 1_000_000`-Ableitung. Mit einer expliziten Liste muss der
     Orchestrator sie BLOCKWEISE aufteilen (statt je Block einen neuen
@@ -164,7 +164,7 @@ def main() -> None:
                          "dann gilt die Seed-Listenlaenge")
     ap.add_argument("--seed", type=int, default=None,
                     help="Basis-Seed (Pflicht, ausser --seeds ist gesetzt)")
-    # 2026-08-11 (Plattenkopf-Versuch, PREREG_plattenkopf.md): explizite
+    # 2026-08-11 (Plattenkopf-Versuch, PREREG_plate_head.md): explizite
     # Pro-Partie-Seeds statt der `seed + block_idx*1_000_000`-Ableitung --
     # siehe `run_arm`-Docstring fuer die Blockaufteilungs-Regel. Format wie
     # beim Worker: kommagetrennt ODER Datei-Pfad (eine Zahl je Zeile), z.B.

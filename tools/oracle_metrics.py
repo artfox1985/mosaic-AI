@@ -31,7 +31,7 @@ Vier Metriken je Netz, GESAMT + je Runde:
 Reine Auswertung/Lesezugriffe -- evaluations/frozen_v1_oracle_labels.json
 sowie frozen_eval_set.pkl werden nur GELESEN.
 
-ADDITIV ERWEITERT 2026-08-09 (Task E, evaluations/PREREG_prior_blindfleck.md):
+ADDITIV ERWEITERT 2026-08-09 (Task E, evaluations/PREREG_prior_blind_spot.md):
 zusaetzliche Recall-Breiten (8/16/32/64, rauschfrei), eine rausch-treue
 Gumbel-Top-m-Aufnahmerate (Monte Carlo auf logit+Gumbel(0,1), das ECHTE
 Wurzelverfahren der Engine), Rangverteilung des Orakel-Top-1 im Prior sowie
@@ -195,7 +195,7 @@ def masked_softmax(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# Task E (PREREG_prior_blindfleck.md) -- additive Erweiterung, aendert keine
+# Task E (PREREG_prior_blind_spot.md) -- additive Erweiterung, aendert keine
 # der obigen Funktionen/Konstanten.
 # ---------------------------------------------------------------------------
 DEFAULT_RECALL_WIDTHS = (8, 16, 32, 64)
@@ -424,7 +424,7 @@ def _task_e_block(rows: list[dict], recall_widths=DEFAULT_RECALL_WIDTHS) -> dict
 
 def aggregate_task_e(per_state: list[dict], recall_widths=DEFAULT_RECALL_WIDTHS,
                       rounds=range(1, 5)) -> dict:
-    """Task E (PREREG_prior_blindfleck.md) -- Aggregation der Zusatzfelder aus
+    """Task E (PREREG_prior_blind_spot.md) -- Aggregation der Zusatzfelder aus
     compute_for_model(..., extra_metrics=True). Runde >=5 ist in per_state
     bereits nicht enthalten (Alpha-Beta-Ausschluss oben, unveraendert), daher
     `rounds` hier nur 1-4."""
@@ -526,7 +526,7 @@ def main() -> None:
                     help="Override fuer OUT_JSON (Default unveraendert: "
                          f"{OUT_JSON.name})")
     ap.add_argument("--extra-metrics", action="store_true",
-                    help="Task E (PREREG_prior_blindfleck.md): zusaetzliche "
+                    help="Task E (PREREG_prior_blind_spot.md): zusaetzliche "
                          "Recall-Breiten, rausch-treue Gumbel-Top-m-"
                          "Aufnahmerate, Rangverteilung, Aufschluesselung nach "
                          "Aktionsanzahl/Runde. Default AUS -- ohne dieses "

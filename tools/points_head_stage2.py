@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Mosaic-AI -- PREREG_punktekopf_platten.md, Stufe 2 (ALLEINIGER Entscheidungspunkt,
+Mosaic-AI -- PREREG_points_head_plates.md, Stufe 2 (ALLEINIGER Entscheidungspunkt,
 2026-08-09)
 ============================================================================
 
-Fragestellung (siehe evaluations/PREREG_punktekopf_platten.md, Abschnitt
+Fragestellung (siehe evaluations/PREREG_points_head_plates.md, Abschnitt
 "Stufe 2" + das direkt darunter stehende, VERBINDLICHE Amendment): reagieren
 `net_points_forecast`, `net_opp_points_forecast` und (Pflicht-Referenz)
 `net_raw_value` auf einen Wertungsplatten-Wechsel im NIVEAU (alle Wurzel-
@@ -330,7 +330,7 @@ def main():
         }
 
     summary = {
-        "prereg": "evaluations/PREREG_punktekopf_platten.md (Stufe 2, mit Amendment)",
+        "prereg": "evaluations/PREREG_points_head_plates.md (Stufe 2, mit Amendment)",
         "model": args.model,
         "sims": args.sims,
         "c_puct": args.c_puct,
