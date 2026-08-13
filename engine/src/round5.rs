@@ -1156,7 +1156,7 @@ mod tests {
                 decisions += 1;
                 if let Some(on) = choose_action_inner(&state, true, NODE_BUDGET) {
                     if on != off {
-                        let mut deep = |a: &Action| -> Option<f64> {
+                        let deep = |a: &Action| -> Option<f64> {
                             let mut g = Game { state: state.clone() };
                             g.apply_drafting(a).ok()?;
                             let mut nodes: u64 = 0;

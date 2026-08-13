@@ -214,6 +214,9 @@ pub struct Net {
     /// derselben `.onnx`-Datei aufzubauen -- tract selbst haelt den Pfad
     /// nirgends vor, nur den geparsten Graphen). Rein additiv: kein
     /// bestehender Aufrufer liest dieses Feld.
+    // Nur der ort_cuda_probe-Pfad liest dieses Feld -- ohne das Feature ist
+    // es bewusst tot statt hinter cfg versteckt (Struktur-Layout stabil).
+    #[cfg_attr(not(feature = "ort_cuda_probe"), allow(dead_code))]
     onnx_path: String,
 }
 
@@ -245,6 +248,7 @@ impl Net {
     /// Dateipfad, unter dem dieses Netz geladen wurde (siehe `onnx_path`-
     /// Feld-Doku). `pub(crate)` -- nur `net_ort.rs` braucht das ausserhalb
     /// dieser Datei, kein Grund, es weiter als das nach aussen zu tragen.
+    #[cfg_attr(not(feature = "ort_cuda_probe"), allow(dead_code))]
     pub(crate) fn onnx_path(&self) -> &str {
         &self.onnx_path
     }

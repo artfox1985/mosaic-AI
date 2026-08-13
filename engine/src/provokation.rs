@@ -119,6 +119,9 @@ thread_local! {
 ///
 /// Aufrufer MUSS am Partieende mit `None` zuruecksetzen, sonst leckt der Wert
 /// in die naechste Partie desselben Threads.
+// Bewusst unverdrahtete Stufe-2-API (PREREG_provokation §6: bleibt unbenutzt,
+// bis Stufe 1 ihre Zahl hat) -- kein toter Rest, sondern vorbereiteter Baustein.
+#[allow(dead_code)]
 pub(crate) fn set_ziel_spalte_seed(seed: Option<u64>) {
     AUTO_SPALTE.with(|c| c.set(seed.map(spalte_aus_seed)));
 }
@@ -128,6 +131,7 @@ pub(crate) fn set_ziel_spalte_seed(seed: Option<u64>) {
 /// kontinuierlich in `[0,max]`, hier ein Index; siehe dortige Begruendung,
 /// warum die Mischung noetig ist: aufeinanderfolgende Partie-Seeds im
 /// Self-Play unterscheiden sich oft nur in den unteren Bits).
+#[allow(dead_code)]
 fn spalte_aus_seed(seed: u64) -> usize {
     let mut z = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);

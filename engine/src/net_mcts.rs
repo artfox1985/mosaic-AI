@@ -8297,6 +8297,9 @@ mod tests {
     /// rekonstruierbar) je Kandidat einzeln berichten lassen -- fuer die
     /// Frage "bekommen zwei tauschende Kandidaten unterschiedliche
     /// Zufallszahlen" reicht die reine Score-Summe nicht.
+    // Diagnose-Helfer der Rangfolge-Messkette (PREREG_gpu_inferenzpfad §15/§16);
+    // nur von #[ignore]-/Feature-Tests gerufen, im Normallauf bewusst ungenutzt.
+    #[allow(dead_code)]
     fn gumbel_scored_sorted<R: Rng + ?Sized>(acts: &[(Action, f32)], rng: &mut R) -> Vec<(f64, f64, usize)> {
         let mut scored: Vec<(f64, f64, usize)> = acts
             .iter()
