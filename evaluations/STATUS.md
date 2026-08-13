@@ -109,6 +109,11 @@ erledigt einstufen.
 
 ### AKTUALISIERUNG 2026-08-13: Zwei-Pole-Architektur ist der geltende Rahmen
 
+**ENTSCHIEDEN 2026-08-13 (Nutzer)**: k0/k7 bekommen KEINEN eigenen Bauer --
+Spieloekonomie, nicht Fehlschlag (`docs/domaenenwissen.md` Abschnitt 7; deckt
+sich mit §13: k7 Stopp-Regel, k0 negativ). Beilaeufige Korpus-Abdeckung wird
+im Piloten per Grundraten-Gate geprueft.
+
 **OFFEN, Nutzer-Auftrag 2026-08-13**: Plattenbauer k2 (Diagonalen) und k5 (Ecken)
 Runde 2 mit der Nutzer-Taktik aus `docs/domaenenwissen.md` Abschnitte 5-6
 (Spezial-/Joker-Kuppelwahl als Kern statt Farbenjagd; k2 muss zusaetzlich den
