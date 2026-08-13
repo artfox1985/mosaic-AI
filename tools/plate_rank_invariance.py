@@ -462,7 +462,7 @@ def main():
             "n_states_with_head_missing_in_at_least_one_combo": len(heads_missing_states[f]),
             "states_with_head_missing": heads_missing_states[f],
         }
-    summary["punktekopf_platten_stufe1"] = {
+    summary["points_head_plates_stage1"] = {
         "prereg": "evaluations/PREREG_points_head_plates.md (Stufe 1)",
         "seed_a": args.seed,
         "seed_b": seed2,
