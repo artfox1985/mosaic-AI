@@ -165,6 +165,9 @@ fn index_aus_seed(seed: u64, n: usize) -> usize {
 /// gezogenen 3 Platten (`scoring.rs`-Doku: "zu Spielbeginn werden 3 ...
 /// gewaehlt"), nicht ueber alle 8 -- ein Kriterium ohne Platte auf dem Tisch
 /// waere ein wirkungsloser Vorzug.
+// Noch UNVERDRAHTET: gedacht fuer die auto-Zielwahl ueber die aktiven Platten;
+// die heutige auto-Streuung waehlt direkt. Bleibt als vorbereiteter Baustein.
+#[allow(dead_code)]
 fn aktives_kriterium(state: &GameState) -> Option<usize> {
     if crate::spaltenbau::ist_aktiv() {
         return Some(1);

@@ -1281,7 +1281,7 @@ mod tests {
             }
             (rate, p2, hits, 0.5 * (lo + hi))
         };
-        let mut zeile = |name: &str, obs: &[(f64, bool)]| {
+        let zeile = |name: &str, obs: &[(f64, bool)]| {
             let (rate, p2, hits, a) = fit(obs);
             println!("  {:<14} {:>5} {:>8.4} {:>7} {:>7.4} {:>7.2}",
                      name, obs.len(), rate, hits, p2, a);
