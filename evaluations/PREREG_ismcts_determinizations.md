@@ -229,7 +229,7 @@ Verschraenkung nur ein Mittel zum Batch-Fuellen, kein Staerke-Hebel.
 
 Zwei gepaarte Laeufe, identischer Basis-Seed 20260828, je 400 Partien,
 Champion vs Heuristik@150dyn. Belegstellen
-`evaluations/paired_arena_env_ismcts_tiefe_k1.json` /
+`evaluations/paired_arena_env_ismcts_depth_k1.json` /
 `..._tiefe_k2.json`.
 
 | Arm | Budget | Netz-Siege | Quote |
@@ -564,7 +564,8 @@ dass die Schliessung auf dem schwachen Arm ruht.
 Ich hatte oben geschrieben, die Messung sei "rechenneutral" und der Verlust
 ein **Tiefenverlust**, weil dasselbe Gesamtbudget auf mehrere Baeume
 verteilt werde. **Das ist falsch.** Die Laeufe heissen
-`paired_arena_env_ismcts_tiefe_k*` -- "tiefe" = GLEICHE TIEFE JE WELT: die
+`paired_arena_env_ismcts_depth_k*` (bis zur Umbenennung 2026-08-13:
+`..._ismcts_tiefe_k*`) -- "depth"/"tiefe" = GLEICHE TIEFE JE WELT: die
 Arena-Koepfe sagen `@600` (k=1), `@1200` (k=2), `@2400` (k=4). Jede Welt
 bekam 600 Sims, das GESAMTBUDGET wuchs mit k.
 

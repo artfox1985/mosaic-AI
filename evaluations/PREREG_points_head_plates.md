@@ -99,7 +99,7 @@ beruecksichtigt die Platten" berichtet werden, sondern nur als
 ### ERGEBNIS Stufe 1 (2026-08-09): GATE WAR FEHLKONSTRUIERT -- Zahlen nur deskriptiv
 
 Lauf: Champion, 400 Sims, Seed 1000 (Rauschboden-Seed 2000), 16 Zustaende
-x 8 Kombinationen. Belegstelle `evaluations/punktekopf_platten_stufe1.json`.
+x 8 Kombinationen. Belegstelle `evaluations/points_head_plates_stage1.json`.
 Kipprate im selben Lauf unveraendert reproduziert (36/124 = 29,03%),
 Altverhalten also intakt.
 
@@ -310,7 +310,7 @@ vergleichbar).
 
 `tools/points_head_stage2.py`, Champion, 400 Sims, Seed 1000, 16 Zustaende
 x 8 feste Kombinationen; 12 nutzbar (3x Runde 5 ohne Netz, 1x nur ein
-Kandidat). Belegstelle `evaluations/punktekopf_platten_stufe2.json`.
+Kandidat). Belegstelle `evaluations/points_head_plates_stage2.json`.
 
 | Groesse | Tau-Median | Relative Verschiebung | Regel |
 |---|---|---|---|

@@ -3,7 +3,7 @@
 # Farbcode: blau = Netz/Modell, gruen = exakt/verifiziert, orange = Suche/
 # Daten-Pipeline, violett = Ergebnis/Artefakt, grau = Regelwerk.
 
-# ==spielablauf==
+# ==game_flow==
 digraph Spielablauf {
     rankdir=TB;
     fontname="Helvetica";
@@ -25,7 +25,7 @@ digraph Spielablauf {
     R5 -> T5 -> E;
 }
 
-# ==netz_suche==
+# ==net_search==
 digraph NetzSuche {
     rankdir=TB;
     fontname="Helvetica";
@@ -51,7 +51,7 @@ digraph NetzSuche {
     N9 -> OFF [style=invis];
 }
 
-# ==value_ziel==
+# ==value_target==
 digraph ValueZiel {
     rankdir=TB;
     fontname="Helvetica";
@@ -76,7 +76,7 @@ digraph ValueZiel {
     H -> AUX [style=invis];
 }
 
-# ==fenster_generation==
+# ==window_generation==
 digraph FensterGeneration {
     rankdir=LR;
     fontname="Helvetica";
@@ -158,8 +158,8 @@ digraph SelfplayTraining {
     edge [fontname="Helvetica", fontsize=9];
 
     S1 [label="Self-Play\nChampion gegen sich selbst,\nzwei Klassen (Sockel 600 / Schwarm 150 Sims)", fillcolor="#cfe2ff"];
-    S2 [label="Replay-Fenster\nzwei Klassen + Generations-Rotation\n(siehe Diagramm fenster_generation)", fillcolor="#ffe5b4"];
-    S3 [label="Cache\nPolicy = completed-Q (nur Traeger)\nValue = WDL-TD-Blend (siehe value_ziel)\nSchema im Cache-Key (Reproduzierbarkeit)", fillcolor="#ffe5b4"];
+    S2 [label="Replay-Fenster\nzwei Klassen + Generations-Rotation\n(siehe Diagramm window_generation)", fillcolor="#ffe5b4"];
+    S3 [label="Cache\nPolicy = completed-Q (nur Traeger)\nValue = WDL-TD-Blend (siehe value_target)\nSchema im Cache-Key (Reproduzierbarkeit)", fillcolor="#ffe5b4"];
     S4 [label="Training\nwarm vom Champion, lr 5e-5 cosine,\nEarly Stop bei Policy- UND Value-Plateau\nCheckpoint = bester Brier (arena-re-validiert)", fillcolor="#cfe2ff"];
     S5 [label="Offline-Diagnose\nOrakel-Metriken auf eingefrorenem Set\n(Prior-Masse Top-3, Kendall-Tau):\nEINZIGE arena-validierten Praediktoren (7/7)", fillcolor="#d9f2d9"];
     S6 [label="Arena-Gating\ngepaarte Seeds, SPRT (H0 50% / H1 65%),\nbis 200 Paare, Kandidat vs Champion", fillcolor="#ffe5b4"];
