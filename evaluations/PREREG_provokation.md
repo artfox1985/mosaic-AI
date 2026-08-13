@@ -1682,3 +1682,105 @@ vor dieser Sitzung. `MOSAIC_PLATTENBAU=6` bleibt unveraendert bei -9,75
 abgeschlossen**: k2 uebernommen (§18), k6 gebaut, gemessen, und mit
 begruendetem Befund abgelehnt (§19) -- kein halbfertiger Zustand in beiden
 Faellen.
+
+
+---
+
+## 20. ECKPLATTEN-NEUBAU k5 (2026-08-14): Spaltenpaar-Ziel, +4,86 Plattenpunkte, p<0,0001 -- UEBERNOMMEN
+
+Fortsetzung der Nutzer-Freigabe (Generator-Sortiment komplettieren, nach k2/
+k6). Nutzer-Entwurf: statt vier isolierter Eck-Slots ein AEUSSERES
+Spaltenpaar (Rasterspalten 0+1 oder 4+5) als Ziel -- schliesst BEIDE Ecken
+derselben Seite (8+3=11 Punkte) und kombiniert nebenbei mit Kriterium 1
+(zwei volle Spalten). Vorab GEPRUEFT (`scoring.rs:60`-64,
+`score_corner_tiles` `scoring.rs:449`-467): k5 und k1 sind NICHT
+wechselseitig ausgeschlossen (nur k5↔k2), obere Ecken 3 Pkt, untere 8 Pkt.
+
+### (1) Frischer Anker: 22 k5-Seeds, Aktivitaet 22/22 GEPRUEFT
+
+Nach der k2-Lehre (§18) NICHT die archivierte §13-Zahl (4,73) uebernommen,
+sondern frisch nachgemessen: `MOSAIC_PLATTENBAU=0` vs `=5` (ALTER,
+unveraendert isolierter Eckenbauer aus §13) auf `seeds_je_kriterium/k5.txt`
+(22 Seeds). "Eckplatten"-Kriterium GEPRUEFT in 22/22 Partien beider Arme
+aktiv. Ergebnis: `evaluations/paired_arena_env_k5_baseline_fresh.json`.
+
+| Groesse | Bezug (kein Plattenbauer) | k5 VOR §20 (alter Eckenbauer) |
+| --- | ---: | ---: |
+| Eckplatten Ø | 3,68 | **3,68** |
+| Siege | 13/22 | 11/22 |
+
+Der alte, isolierte Eckenbauer zeigt in dieser frischen Messung KEINEN
+messbaren Unterschied zum Bezug (identischer Mittelwert, andere Verteilung)
+-- **3,68 ist der fuer diese Sitzung gueltige Anker**, nicht die
+archivierte §13-Zahl.
+
+### (2) Was gebaut wurde: Spaltenpaar-Ziel statt vier isolierter Eck-Slots
+
+`Eckenbauer` (plattenbauer.rs) komplett neu: Kandidaten sind die zwei
+AEUSSEREN Spaltenpaare `zellen_spaltenpaar(0)` (Spalten 0+1) und
+`zellen_spaltenpaar(4)` (Spalten 4+5), je 12 Zellen (beide volle Spalten),
+gewaehlt ueber `ziel_zellen_generisch_smart` (§18: echte Special-Nachbar-
+Kosten, Seed-Streuung, keine sture Bindung -- §14-Lehre). Innerhalb des
+gewaehlten Paars eine DREISTUFIGE Prioritaets-Kette (`.or_else`, gleiches
+Muster wie die Special-Nachbar-Ketten in §16/§18) fuer Drafting, Kuppelwahl
+UND Tiling:
+
+1. Untere Ecke (Rasterzeilen 4-5, 8 Punkte) -- teuerster, wertvollster Slot.
+2. Obere Ecke (Rasterzeilen 0-1, 3 Punkte).
+3. Rest des Spaltenpaars (Rasterzeilen 2-3, reine Spalten-Fuellung ohne
+   eigenen Eck-Bonus).
+
+Kein separater Diagnose-Knopf (§18-Lehre: unbedingte Variante) -- die neue
+Logik ist die EINZIGE Implementierung von `Eckenbauer`, erreichbar wie
+bisher nur ueber `MOSAIC_PLATTENBAU=5`/`auto`.
+
+`cargo test --lib`: 417/0/20 (unveraendert in der Fehlerzahl, keine neuen
+Tests fuer §20 -- Zeitbudget, wie schon in §18/§19 vermerkt). Wheel neu
+gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...` haelt.
+
+### (3) Messung: 22 k5-Seeds, Spaltenpaar-Ziel gegen den §20(1)-Anker
+
+Ergebnis: `evaluations/paired_arena_env_k5_spaltenpaar_k5seeds.json`.
+
+| Groesse | Anker (alter Eckenbauer, 3,68) | Spaltenpaar-Ziel |
+| --- | ---: | ---: |
+| Eckplatten Ø | 3,68 | **8,55** |
+| Endstand Ø | 43,32 | 42,64 |
+| Strafleiste Ø | 11,64 | **9,77** |
+| Siege | 11/22 | 11/22 |
+
+Gepaartes Delta **+4,86**, t=4,789, **p=0,0001** (exakte zweiseitige
+Student-t-Verteilung, df=21, per Inkomplette-Beta-Funktion nachgerechnet --
+WEIT unter 0,05). McNemar auf den Siegen: b=6/c=6, **p=1,000** (keine
+Sieg-Aenderung, sogar guenstigere Strafleiste). **Beide Haelften der
+Vorab-Regel klar erfuellt.**
+
+13 von 22 Partien (59 %) schliessen BEIDE Ecken derselben Seite ab
+(≥11 Punkte); Kombinations-Beifang mit Kriterium 1 GEPRUEFT sichtbar (eine
+Partie erreicht 14 vertikale Punkte = zwei volle Spalten zusaetzlich zu den
+Eckplatten, exakt der Nutzer-Entwurf "kannst ihn fast schon kombinieren mit
+k1 und zwei Spalten").
+
+### (4) Entscheidung: UEBERNOMMEN
+
+Bester Wert dieser gesamten Provokations-/Plattenbauer-Kampagne (§14-§20)
+relativ zu seinem Orakel: 8,55 von Orakel 11,00 (78 %), mit KEINEM
+Staerke- oder Strafleisten-Preis. `Eckenbauer` ist bereits unbedingt (kein
+Knopf-Umbau noetig, siehe (2)) -- die Uebernahme ist mit dem Commit dieser
+Sitzung bereits wirksam.
+
+### (5) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Keine bespoke Kuppelwahl-Gewichtung fuer "Special in Ecken bevorzugen"
+  gebaut** (anders als bei k6 explizit erwogen) -- die bestehende
+  `zellen_wert`-Formel bewertet Special (2,0) bereits hoeher als eine offene
+  farbgebundene Normalzelle (1,5), das reicht in Kombination mit der
+  Prioritaets-Kette (untere Ecke zuerst) aus, um den Nutzer-Wunsch
+  ("insbesondere untere Ecken") ueber die ZELLENAUSWAHL statt eine neue
+  Sonderformel abzudecken -- durch die Messung in (3) bestaetigt, keine
+  weitere Verfeinerung noetig.
+- **Keine neuen Unit-Tests** -- Zeitbudget, wie bei §18/§19 vermerkt; die
+  Integrationsmessung in (3) ist der Beleg.
+- **`zellen_ecke` (alte Geometrie-Funktion) nicht geloescht**, nur
+  `#[allow(dead_code)]` markiert -- sie traegt weiterhin ihren eigenen
+  Geometrietest, Loeschung war nicht beauftragt (LOESCHVERBOT).
