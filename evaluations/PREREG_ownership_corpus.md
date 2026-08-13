@@ -65,6 +65,92 @@ getrennt) — die Basisraten-Falle aus der Skill-Konfundierungs-Lehre.
    fahren; sonst klassisch 8 Threads. Der Plan hängt davon NICHT ab, nur die
    Laufzeit.
 
+### Nachträge (2026-08-14, Prüf-/Kleinbau-Sitzung — reine Prüfung + ein additiver Schalter, KEINE Generierung/Training gestartet)
+
+**3.1 Policy-Ziele unter Vorzug — GEPRÜFT, Befund aendert die Aufgabenstellung.**
+`run_net_self_play` (`engine/src/self_play.rs:2943`) ruft je Partie
+`play_net_self_play_game` (`self_play.rs:2567`-2941) auf. Deren Drafting-Block
+bestimmt `chosen` AUSSCHLIESSLICH ueber `net_drafting_policy(...)`
+(Such-Policy) — GEPRUEFT per Volltext-Suche nach "vorzug"/"plattenbauer"/
+"spaltenbau" ueber die GESAMTE Funktion (`self_play.rs:2567`-2941), ueber
+`net_drafting_policy` selbst (`self_play.rs:2277`-2567) und ueber
+`apply_chosen_action` (`self_play.rs:615`-~700): **null Treffer**. Der
+Bauer-Vorzug (`provokation::vorzugszug`/`plattenbauer::drafting_vorzug`/
+`dome_vorzug`) ist in DIESEM Pfad **gar nicht verdrahtet** — es gibt also
+aktuell KEINE Uebersteuerung, die aufgezeichnet werden koennte.
+
+**Konsequenz fuer §2 (blockierend, nicht nur informativ):** Arm B/C sind als
+"wie A + MOSAIC_SPALTENBAU" / "wie A + MOSAIC_PLATTENBAU=2" beschrieben, wobei
+"A" = `run_net_self_play` ist (§1: "Streuung ... ist in run_net_self_play
+verdrahtet"). Da dieser Pfad die Knoepfe gar nicht liest, haetten Arm B/C
+in der jetzigen Codebasis **keinerlei Effekt** — sie waeren ununterscheidbar
+von Arm A. Die Vorzug-Verdrahtung muss ERST in `play_net_self_play_game`
+nachgezogen werden, bevor Arm B/C gestartet werden koennen. Kein Umbau in
+dieser Sitzung (Auftrag: "nur Wissen").
+
+**3.2 Beidseitigkeit — GEPRÜFT, und uneinheitlich zwischen den bestehenden Pfaden.**
+Da 3.1 zeigt, dass `run_net_self_play` den Knopf ueberhaupt nicht liest, ist
+die woertliche Antwort: **aktuell wirkt er auf KEINEN der beiden Spieler**
+(die Frage "einer oder beide" hat noch keinen Code-Gegenstand). Als Kontext
+fuer die noetige Nachruestung (3.1) — die BEIDEN bestehenden Vorzug-Pfade im
+Code widersprechen sich in der Seitigkeit:
+- `play_net_game` (Arena, `self_play.rs:1572`-1863): Gate `if pi == net_board
+  && actions.len() > 1` bei `self_play.rs:1627` — **einseitig**, nur die
+  Netz-Seite eines Netz-vs-Heuristik-Matches.
+- `play_net_vs_net_game` (`self_play.rs:1863`-2277): der Vorzug-Aufruf bei
+  `self_play.rs:1927`-1929 steht OHNE `pi`-Gate im selben Codepfad, der fuer
+  JEDEN aktuellen Spieler durchlaufen wird — **beidseitig**, unabhaengig
+  davon, ob `pi==0` oder `pi==1`.
+Fuer die Nachruestung in `play_net_self_play_game` ist `play_net_vs_net_
+game`s ungegateter Aufruf (`self_play.rs:1927`-1929) das passende Vorbild,
+nicht `play_net_game`s einseitiges Gate — Auftrag §2 will explizit
+beidseitiges Steuern in Arm B/C.
+
+**3.3 Konjunktions-Breite — GEPRÜFT und korrigiert: config.py hat recht, der neural_net.py-Kommentar war veraltet.**
+`config.py:117`-118 (`CONJUNCTIONS_PER_PLAYER = 34`, `CONJUNCTION_TARGETS =
+68`) ist die Zahl, die TATSAECHLICH fuer die Tensor-/Ausgabeschicht-Groesse
+verwendet wird (`neural_net.py:1169` `self.own_targets = OWNERSHIP_TARGETS +
+CONJUNCTION_TARGETS`, ebenso die Layer-Definitionen an den `nn.Linear(128,
+OWNERSHIP_TARGETS + CONJUNCTION_TARGETS)`-Stellen). Der eigentliche
+Label-Bauer `_conjunctions_from_dome` (`neural_net.py:932`) liefert bei
+Nachzaehlen der eigenen Index-Liste im Docstring (0..5, 6..11, 12..13,
+14..17, 18, 19..24, 25..33) **34 Eintraege** (6+6+2+4+1+6+9=34) — DECKUNGS-
+GLEICH mit config.py, NICHT mit "25". **Zwei veraltete Stellen korrigiert**
+(beide zitierten faelschlich 25 je Spieler / Slice [72:97]/[97:122]):
+- `_conjunctions_from_dome`s eigener Docstring (`neural_net.py:932`-937):
+  "25 Binaerlabels" → "34 Binaerlabels", mit Verweis auf config.py:117 und
+  diesen §3.3-Nachtrag.
+- Der Label-Layout-Kommentar im Assemblierungs-Loop (vormals bei
+  `neural_net.py` Zeile ~1836-1837): "[72:97] Konj. ich, [97:122] Konj.
+  Gegner" → "[72:106] Konj. ich, [106:140] Konj. Gegner" (34 je Spieler,
+  Gesamtbreite `own_targets` = 72+68 = 140).
+`python -m py_compile engine/py/neural_net.py`: OK.
+
+**3.4 --extra-data-dir — GEBAUT, additiv, geprüft.** `train.py`:
+- Neuer Schalter `--extra-data-dir PATH` (Default `None`), hart validiert
+  (`Path(extra_data_dir).is_dir()`, sonst `sys.exit` VOR jedem Datenladen —
+  gleiches Muster wie die bestehende `--value-target-lambda`-Validierung).
+- Datei-Sammlung additiv NACH `MOSAIC_DATA_EXCLUDE` (das bleibt fuers
+  wachsende Standard-Fenster reserviert, siehe Kommentar an der Stelle):
+  `all_files = sorted(all_files + sorted(glob.glob(str(Path(extra_data_dir) /
+  "*.pkl"))))`, NICHT rekursiv, gleiche `*.pkl`-Konvention wie `DATA_DIR`.
+  Leer/`None` (Default) laesst `all_files` unveraendert — byte-identisch
+  zum Bestand (Task-#28-Muster).
+- `_cli_args`-Manifest-Dict um `"extra_data_dir": extra_data_dir` ergaenzt —
+  der Zusatzpfad landet im Trainings-Manifest.
+- **Beleg (isolierte Nachbildung der eingefuegten Logik mit den ECHTEN
+  Modul-Konstanten `train.DATA_DIR`/`train.Path`, KEIN echter `train()`-Aufruf
+  — "kein Training starten" bleibt gewahrt)**: ohne Zusatzpfad 2945 Dateien
+  (`DATA_DIR` unveraendert); mit einem temporaeren Zusatzverzeichnis (1
+  Dummy-`.pkl`) 2946 Dateien, exakt die eine zusaetzliche Datei, Basisliste
+  dabei nachweislich unveraendert. Validierung separat GEPRUEFT: `python
+  train.py --name test_validation_only_delete_me --extra-data-dir
+  D:/nicht/vorhanden` bricht sofort mit Fehlermeldung ab, VOR jedem
+  Manifest-/Datei-Schreibvorgang (keine Datei mit diesem Versionsnamen
+  entstanden). `python train.py --help` zeigt den neuen Schalter korrekt,
+  `python -m py_compile train.py`: OK.
+   Laufzeit.
+
 ## §4 Training + Abnahme (Tor A aus PREREG_ownership_consumer.md)
 
 - Warm-Start vom Champion (v21_2d_brierbest), Standard-Rezept (lr 5e-5,

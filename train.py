@@ -464,7 +464,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
-          ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True):
+          ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True, extra_data_dir=None):
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -479,6 +479,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             f"❌ --value-target-lambda {value_target_lambda!r} ausserhalb [0,1] -- Abbruch. "
             f"1.0 = Bestandsverhalten (kein Mix), 0.0 = ausschliesslich root_q."
         )
+    # PREREG_ownership_corpus.md §3.4: additiver Datei-Zugang, hart validiert
+    # WIE die anderen CLI-Args oben -- ein Tippfehler im Pfad soll sofort
+    # abbrechen, nicht still 0 zusaetzliche Dateien finden.
+    if extra_data_dir is not None and not Path(extra_data_dir).is_dir():
+        sys.exit(f"❌ --extra-data-dir {extra_data_dir!r} ist kein vorhandenes Verzeichnis -- Abbruch.")
     # Warm-Start-Checkpoint sofort validieren (vor dem teuren Daten-Laden).
     # --load hängt selbst "alphazero_" an; wer versehentlich den vollen
     # Dateinamen übergibt, landet bei alphazero_alphazero_*.pth. Das doppelte
@@ -564,6 +569,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         all_files = [f for f in all_files if not _re.search(_excl, _os.path.basename(f))]
         print(f"🔒 MOSAIC_DATA_EXCLUDE={_excl!r}: {_n0 - len(all_files)} von {_n0} Dateien ausgeschlossen (vor Split).")
 
+    # PREREG_ownership_corpus.md §3.4: additiver Datei-Zugang -- NACH dem
+    # MOSAIC_DATA_EXCLUDE-Filter (der ist fuer das waehrend laufender
+    # Generierung wachsende Standard-Fenster gedacht, siehe Kommentar oben;
+    # ein --extra-data-dir ist ein bewusst hinzugefuegtes, separates Korpus
+    # und bleibt davon unberuehrt). Leer/None (Default) -> `all_files`
+    # unveraendert, byte-identisch zum Bestand (Task-#28-Muster). NICHT
+    # rekursiv, gleiche `*.pkl`-Konvention wie DATA_DIR (§1: Unterordner sind
+    # strukturell getrennt, dieses Flag ist genau die vorgesehene Bruecke).
+    if extra_data_dir:
+        extra_files = sorted(glob.glob(str(Path(extra_data_dir) / "*.pkl")))
+        print(f"➕ --extra-data-dir {extra_data_dir!r}: {len(extra_files)} zusaetzliche Datei(en) gefunden.")
+        all_files = sorted(all_files + extra_files)
+
     # Lauf-Manifest + Korpus-Log (#64 Teil 2) -- siehe Funktionskommentare
     # oben. Additiv, rührt die train_file_limit-Logik unten nicht an.
     _run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -580,6 +598,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "endgame_head": endgame_head,
         "value_head": value_head,
         "ranking_loss_weight": ranking_loss_weight,
+        "extra_data_dir": extra_data_dir,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -2011,6 +2030,13 @@ if __name__ == "__main__":
                         help="Begrenzt die TRAININGS-Dateien (nach Abzug des Val-Splits) auf N "
                              "(Daten-Skalierungs-Ablation, Task #69). Val-Split bleibt unveraendert "
                              "identisch zu einem Lauf ohne dieses Flag.")
+    parser.add_argument("--extra-data-dir", type=str, default=None,
+                        help="Zusaetzliches Datenverzeichnis, ADDITIV zu DATA_DIR (*.pkl, NICHT "
+                             "rekursiv, gleiche Lade-Konvention wie das Standard-Fenster) -- fuer "
+                             "Korpora ausserhalb von data/ (z.B. data/ownership_corpus/, siehe "
+                             "PREREG_ownership_corpus.md §1: das Standard-Fenster laedt "
+                             "Unterordner nicht). Default leer = byte-identisches Bestandsverhalten "
+                             "(Task-#28-Muster).")
     parser.add_argument("--lr", type=float, default=None,
                         help="Start-Learning-Rate fuer Adam (Standard: LEARNING_RATE aus config.py, "
                              "aktuell 0.0004). Task #77 (v12b_lr): Warm-Start-Feintuning-Kontrolle "
@@ -2201,4 +2227,4 @@ if __name__ == "__main__":
           endgame_head=args.endgame_head,
           value_head=args.value_head,
           ranking_loss_weight=args.ranking_loss_weight,
-          head_warmstart=not args.no_head_warmstart)
+          head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir)
