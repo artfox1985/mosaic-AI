@@ -622,7 +622,7 @@ def main() -> None:
             except ValueError:
                 return str(p)
 
-        out["task_e_prior_blindfleck"] = per_model_task_e
+        out["task_e_prior_blind_spot"] = per_model_task_e
         out["task_e_manifest"] = {
             "models": args.models,
             "oracle_label_file": _rel(oracle_json),
