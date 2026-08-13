@@ -1429,3 +1429,147 @@ gueltig.
   bereits vorhandener [SB]-Felder (`Ziel=`, `Vorzug=`) -- wie beauftragt
   ("KEINE Umbauten ins Blaue", hier gelesen als "keine neue Messung, bevor
   die Ursache steht").
+
+
+---
+
+## 18. DIAGONALEN-BAUSTEIN k2 (2026-08-13): +2,61 Plattenpunkte, p=0,011 -- UEBERNOMMEN als aktiver Default
+
+Nutzer-Freigabe (ueber Koordinator): k2 (Diagonale) und k6 (Spezialfelder) im
+Plattenbauer umsetzen, damit das Generator-Sortiment fuers Ownership-Kopf-
+Training vollstaendig wird. Methodik exakt wie beim Spaltenbau (§14-§17):
+frischer Aera-Anker, Diagnose-Knopf, gepaarte Messung, Uebernahme-Regel
+p<0,05 + McNemar. **Nur k2 in dieser Sitzung geschafft** (Budget, vom
+Koordinator ausdruecklich als Prioritaet vorgegeben: "k2 fertig vor k6 halb")
+-- k6 ist NICHT begonnen.
+
+### (1) Frischer Aera-Anker: Diskrepanz zur Koordinator-Ausgangslage GEPRUEFT und benannt
+
+Die vom Koordinator genannte Ausgangslage ("0,00 Punkte in allen 18 aktiven
+Partien") wurde vor dieser Messung NICHT bestaetigt -- eine frische
+Referenzmessung (`evaluations/paired_arena_env_k2_baseline_fresh.json`,
+`MOSAIC_PLATTENBAU=0` vs `=2`, die 23 Seeds aus `seeds_je_kriterium/k2.txt`,
+GEPRUEFT: Kriterium "Diagonale Reihen" in 23/23 Partien BEIDER Arme aktiv --
+Seed-Satz nach dem RNG-Schnitt weiterhin gueltig) ergab:
+
+| Groesse | Bezug (kein Plattenbauer) | k2 VOR §18 (bestehender Diagonalenbauer) |
+| --- | ---: | ---: |
+| Diagonale Reihen Ø | 0,00 | **3,04** |
+| Siege | 10/23 | 15/23 |
+
+Der bestehende `Diagonalenbauer` (aus §13, unveraendert) erreichte in DIESER
+frischen Messung bereits 3,04 (7 von 23 Partien mit voller Diagonale), nicht
+0,00. Als offene Diskrepanz vermerkt (nicht aufgeloest): die Koordinator-Zahl
+stammt vermutlich aus einer ANDEREN Messreihe (z.B. reinem Self-Play-Korpus
+statt Netz-vs-Heuristik-Arena) -- **fuer diese Sitzung gilt die selbst
+gemessene, GEPRUEFTE Zahl 3,04 als Anker**, nicht die Koordinator-Angabe.
+
+### (2) Was gebaut wurde: Special-Zellen-Baustein fuer die Diagonalen-Geometrie
+
+Nutzer-Taktik (`docs/domain_knowledge.md`, Diagonalen-Abschnitt) auf
+Kachel-Geometrie uebersetzt: die Gegendiagonale [(5,0)...(0,5)] laeuft durch
+Slot (2,0), der GENAU 2 Diagonalzellen ((5,0), (4,1)) und potenziell eine
+Special-Zelle unter den 2 uebrigen Slot-Zellen enthaelt -- exakt der Fall, den
+§16 (Spaltenbau, Kriterium 1) schon geloest hat, hier aber fuer eine
+GEOMETRIE-UNABHAENGIGE Zellen-Liste statt einer Spalte gebraucht.
+
+1. **`spaltenbau::special_nachbar_zellen_fuer_liste`** verallgemeinert
+   `special_nachbar_zellen` (spalten-spezifisch) auf eine beliebige
+   `&[(usize,usize)]`-Liste -- findet offene Special-Zellen INNERHALB der
+   Liste, liefert ihre 3 Slot-Nachbarn (koennen ausserhalb der Liste liegen).
+2. **`Diagonalenbauer::drafting_vorzug`/`tiling_vorzug`** (plattenbauer.rs)
+   bekommen eine zweite Vorzugsstufe: findet `vorzugszug_fuer_zellen`/
+   `tiling_vorzug_fuer_zellen` fuer die Diagonale selbst nichts, wird dieselbe
+   generische Mechanik auf die Special-Nachbarzellen angewandt.
+3. **Kosten-Seite**: `spaltenbau::zelle_kosten_smart`/`special_kosten`s
+   Nachbar-Summenformel (aus §16) fliesst in die Diagonalen-Kandidatenwahl
+   (Haupt- vs. Gegendiagonale) ein.
+
+**Architektur-Entscheidung (wichtig, siehe (4)): eigener Uebernahme-Status
+statt geteiltem Schalter.** Erste Fassung nutzte den bestehenden
+`MOSAIC_SPALTENBAU_SPECIAL`-Knopf (§16) wieder -- das haette den k1-Legacy-
+Pfad (§17: final NEIN) und k2 (siehe (3): JA) an DIESELBE Umschaltung
+gekoppelt. Nach der positiven Messung (3) wurde deshalb umgebaut: 
+`zelle_kosten_smart`/`special_nachbar_zellen_immer` sind UNBEDINGTE
+Varianten ohne Schalter, die `Diagonalenbauer` direkt nutzt -- `MOSAIC_
+SPALTENBAU_SPECIAL` bleibt unangetastet fuer den k1-Pfad (Default AUS, §17
+gilt weiter unveraendert). Nachgemessen (4): die unbedingte Fassung liefert
+BYTE-IDENTISCHE Werte zur ersten (geschalteten) Messung.
+
+`cargo test --lib`: 416 bestanden (0 fehlgeschlagen, 20 ignoriert,
+unveraendert -- keine neuen Tests in dieser Runde, Zeitbudget). Wheel neu
+gebaut+installiert (zweimal, vor und nach dem Schalter-Umbau), `tools/
+paritaets_probe.py`: Hash `8c6684ff...` haelt beide Male (der Default-Pfad
+ohne `MOSAIC_PLATTENBAU` bleibt unberuehrt, `Diagonalenbauer` wird nur bei
+gesetztem Knopf ueberhaupt erreicht).
+
+### (3) Messung: 23 k2-Seeds, Special-Erweiterung gegen den §18(1)-Anker
+
+Aufbau: `MOSAIC_PLATTENBAU=2` fix, `--env-name MOSAIC_SPALTENBAU_SPECIAL
+--arms 0 1 --control 0` (erste, geschaltete Fassung -- siehe (2) fuer den
+Umbau danach). Ergebnis: `evaluations/paired_arena_env_k2_special_k2seeds.json`.
+
+| Groesse | Bezug (Special aus, =§18(1)s 3,04) | Special-Erweiterung AN |
+| --- | ---: | ---: |
+| Diagonale Reihen Ø | 3,04 | **5,65** |
+| Endstand Ø | 40,04 | 42,74 |
+| Strafleiste Ø | 10,17 | 9,22 |
+| Siege | 15/23 | 15/23 |
+
+Gepaartes Delta **+2,61**, t=2,787, **p=0,0108** (exakte zweiseitige
+Student-t-Verteilung, df=22, per Inkomplette-Beta-Funktion nachgerechnet --
+UNTER 0,05). McNemar auf den Siegen: b=5/c=5, **p=1,000** (kein Sieg-
+Verlust, sogar leicht guenstigere Strafleiste UND Endstand). **Beide Haelften
+der Vorab-Regel erfuellt.**
+
+11 von 23 Partien schliessen eine volle Diagonale (10 Punkte) ab, davon KEINE
+mit beiden Diagonalen gleichzeitig (max. beobachtet 10, nicht 20).
+
+### (4) Entscheidung: UEBERNOMMEN als aktiver Default fuer k2
+
+`Diagonalenbauer` nutzt die Special-Zellen-Erweiterung ab sofort UNBEDINGT
+(kein Diagnose-Knopf mehr noetig fuer k2 selbst -- die Erweiterung IST jetzt
+der validierte Diagonalen-Bauer). Erreichbar wie bisher nur ueber
+`MOSAIC_PLATTENBAU=2` (oder `auto`), selbst weiterhin ein reiner Diagnose-/
+Korpus-Knopf, Default AUS, nie im Gating -- die Uebernahme-Entscheidung
+betrifft NUR das Verhalten INNERHALB des k2-Pfads, nicht seine Aktivierung.
+Nachweis der Aequivalenz nach dem Umbau: `evaluations/paired_arena_env_
+k2_confirm_default.json` (`MOSAIC_PLATTENBAU=2`, kein `MOSAIC_SPALTENBAU_
+SPECIAL` gesetzt) liefert Diagonale-Reihen-Werte PUNKTGENAU identisch zur
+geschalteten Messung in (3) (`[10,10,10,10,10,0,10,10,0,0,10,0,10,0,0,0,10,
+10,0,0,0,10,10]`, Ø 5,6522).
+
+### (5) k6 (Spezialfelder): NICHT begonnen
+
+Budget-Entscheidung nach expliziter Koordinator-Vorgabe ("k2 fertig vor k6
+halb"). Kein Code, keine Messung, keine Seed-Verifikation fuer k6 in dieser
+Sitzung. Naechste Schritte fuer eine Folge-Sitzung: (a) `seeds_je_kriterium/
+k6.txt` (20 Seeds, ungeprueft ob RNG-Schnitt-gueltig) auf Aktivitaetsrate
+pruefen, (b) frischen Aera-Anker fuer k6 messen (Bezug ~-12, siehe
+Koordinator-Angabe -- nach der k2-Erfahrung in (1) NICHT ungeprueft
+uebernehmen), (c) `Spezialbauer`s Kuppeldraft-Logik (Joker horten/unten,
+erzwungene Specials nach oben) bauen, (d) Gegner-Spezialfeld-Punkte gepaart
+UND getrennt ausweisen (Nutzer-Vorgabe: Stoerkanal nicht mit dem eigenen
+Wert verrechnen).
+
+### (6) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Koordinator-Ausgangslage (0,00) nicht uebernommen, sondern selbst
+  nachgemessen** -- REGEL 0 ("Agenten-Befunde sind Behauptungen"); gilt auch
+  fuer Koordinator-Angaben, die selbst wieder von einer anderen Messreihe
+  stammen koennten. Die Diskrepanz wurde benannt, nicht stillschweigend
+  uebernommen oder verworfen.
+- **Kein eigener Diagnose-Knopf fuer den k2-Special-Zweig** -- nach der
+  positiven Messung ist die "unbedingt"-Fassung direkter als ein weiterer
+  Schalter, der ohnehin sofort auf "immer an" stehen wuerde; `MOSAIC_
+  PLATTENBAU=2` selbst bleibt der eigentliche Diagnose-Knopf (Default AUS,
+  nie im Gating).
+- **Keine neuen Unit-Tests fuer §18** -- Zeitbudget; die Aequivalenzpruefung
+  in (4) (Vorher/Nachher byte-identisch) ist ein Integrationsnachweis, kein
+  Ersatz fuer fehlende Unit-Abdeckung der neuen Funktionen. Nachtrag fuer
+  eine Folge-Sitzung vermerkt.
+- **k6 bewusst NICHT im selben Zyklus begonnen** -- explizit von der
+  Koordinator-Vorgabe gedeckt, hier trotzdem als eigene Entscheidung
+  vermerkt (ein Versuch waere angesichts des bereits verbrauchten
+  Zeitbudgets ein Risiko fuer einen halbfertigen, schlecht geprueften
+  Zustand gewesen).

@@ -370,6 +370,52 @@ pub(crate) fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize, verb
     slot_nachbarn(r, spalte).iter().map(|&(rr, cc)| zelle_kosten(player, rr, cc, verbleibend)).sum()
 }
 
+/// §18 (Diagonalen-Baustein, Koordinator-Auftrag 2026-08-13): wie
+/// [`special_kosten`]s "smart"-Zweig (echte Nachbar-Kosten statt der ALT-
+/// Schaetzung), aber OHNE den §16/§17-Schalter [`special_aktiv`] -- der
+/// gilt nur fuer den spaltenbau-EIGENEN (Kriterium 1) Pfad, dessen
+/// Uebernahme-Entscheidung in §17 final NEIN war. Andere Bauern
+/// (`plattenbauer.rs`) mit einer EIGENEN, unabhaengig gemessenen und
+/// signifikant positiven Entscheidung (z.B. `Diagonalenbauer`, §18: +2,61
+/// Plattenpunkte, t=2,79, p=0,011) rufen diese Funktion UNBEDINGT auf --
+/// jeder Bauer hat seinen eigenen Uebernahme-Status, das globale
+/// `MOSAIC_SPALTENBAU_SPECIAL` bleibt reserviert fuer den k1-Legacy-Pfad.
+pub(crate) fn zelle_kosten_smart(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> f64 {
+    match player.dome_grid.get_space(r, c) {
+        None => 1.0,
+        Some(sp) if sp.is_filled() => 0.0,
+        Some(sp) => match sp.space_type {
+            SpaceType::Wild => 0.2,
+            SpaceType::Special => slot_nachbarn(r, c).iter().map(|&(rr, cc)| zelle_kosten_smart(player, rr, cc, verbleibend)).sum(),
+            SpaceType::Normal => {
+                let need = sp.required_color;
+                match (player.pattern_lines[r].color, need) {
+                    (None, Some(x)) => 1.0 + engpass_aufschlag(verbleibend, x),
+                    (None, None) => 1.0,
+                    (Some(c2), Some(x)) if c2 == x => 0.3,
+                    _ => 2.0,
+                }
+            }
+        },
+    }
+}
+
+/// Wie [`special_nachbar_zellen_fuer_liste`], aber UNBEDINGT (kein
+/// `special_aktiv`-Schalter) -- siehe [`zelle_kosten_smart`]-Doku fuer die
+/// Begruendung (jeder generische Bauer hat seinen eigenen, unabhaengigen
+/// Uebernahme-Status).
+pub(crate) fn special_nachbar_zellen_immer(player: &PlayerBoard, zellen: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    let mut v = Vec::new();
+    for &(r, c) in zellen {
+        let Some(sp) = player.dome_grid.get_space(r, c) else { continue };
+        if sp.is_filled() || sp.space_type != SpaceType::Special {
+            continue;
+        }
+        v.extend_from_slice(&slot_nachbarn(r, c));
+    }
+    v
+}
+
 /// Toleranzband um das Kosten-Minimum, innerhalb dessen eine Spalte als
 /// "nahe am Minimum" gilt (Task 7c). Kalibriert auf die Kosten-Skala oben:
 /// deckt bis zu zwei Zeilen roher Geschmacksunterschiede ab (Wild 0,2 vs.
@@ -688,18 +734,33 @@ pub(crate) fn vorzugszug(state: &GameState) -> Option<Action> {
 /// `plattenbauer.rs` durch (`vorzugszug_fuer_zellen`/`tiling_vorzug_fuer_
 /// zellen`), statt eine eigene Praeferenzlogik zu duplizieren.
 fn special_nachbar_zellen(player: &PlayerBoard, spalte: usize) -> Vec<(usize, usize)> {
+    special_nachbar_zellen_fuer_liste(player, &zellen_spalte_liste(spalte))
+}
+
+/// §18 (Diagonalen-Baustein, Koordinator-Auftrag 2026-08-13): Generalisierung
+/// von [`special_nachbar_zellen`] auf eine BELIEBIGE Zielzellen-Liste, nicht
+/// nur eine Spalte -- fuer `plattenbauer.rs`s generische Kriterien
+/// (Diagonalen, Ecken, Zeilen, ...), die keine `spalte: usize` haben,
+/// sondern eine `&[(usize, usize)]`-Liste. Findet alle offenen Special-Zellen
+/// INNERHALB der Liste und liefert ihre Slot-Nachbarn (koennen ausserhalb der
+/// Liste liegen, z.B. in einer Nachbar-Spalte -- das ist der Punkt).
+pub(crate) fn special_nachbar_zellen_fuer_liste(player: &PlayerBoard, zellen: &[(usize, usize)]) -> Vec<(usize, usize)> {
     let mut v = Vec::new();
     if !special_aktiv() {
         return v;
     }
-    for r in 0..6usize {
-        let Some(sp) = player.dome_grid.get_space(r, spalte) else { continue };
+    for &(r, c) in zellen {
+        let Some(sp) = player.dome_grid.get_space(r, c) else { continue };
         if sp.is_filled() || sp.space_type != SpaceType::Special {
             continue;
         }
-        v.extend_from_slice(&slot_nachbarn(r, spalte));
+        v.extend_from_slice(&slot_nachbarn(r, c));
     }
     v
+}
+
+fn zellen_spalte_liste(spalte: usize) -> [(usize, usize); 6] {
+    std::array::from_fn(|r| (r, spalte))
 }
 
 /// Runde 4, Baustein 3 (zweite Nutzer-Korrektur 2026-08-13): "ich nehm
