@@ -138,11 +138,16 @@ Eskalations-Preregs laengst belegt waren.
 ## Faelle ohne auffindbares Ergebnis
 
 Bei **keiner** der 23 neu befussnoteten Dateien war die Lage "kein Ergebnis
-auffindbar" im Sinne von "spurlos verschwunden" -- die 3 als OFFEN markierten
+auffindbar" im Sinne von "spurlos verschwunden".
+
+**STALE-KORREKTUR 2026-08-13**: dieser Abschnitt behauptete bis hierher, 3
 Dateien (`PREREG_lambda_wdl_arm.md`, `PREREG_ismcts_determinisierungen.md`,
-`PREREG_v21_fenster.md`) sind durchgehend GENUIN offen: das jeweilige
-Trainings-/Arena-Ergebnis wurde nachweislich noch nicht erhoben (bestaetigt
-durch `evaluations/STATUS.md`, das sie explizit als laufend/ausstehend
-fuehrt), nicht weil eine Spur verloren ging. Das sind fuer den Koordinator die
-interessanten Faelle: bei `lambda_wdl_arm` und `v21_fenster` ist das trainierte
-Modell bzw. der Fenster-Zuschnitt bereits vorhanden, nur das Gating fehlt noch.
+`PREREG_v21_fenster.md`) seien "durchgehend GENUIN offen" -- das war zum
+Anlass 2026-08-08 zutreffend, widerspricht aber der TABELLE OBEN, die alle
+drei laengst unter ENTSCHIEDEN fuehrt (Zeilen `PREREG_ismcts_
+determinisierungen.md`: GESCHLOSSEN 2026-08-10; `PREREG_lambda_wdl_arm.md`:
+H0; `PREREG_v21_fenster.md`: AUSGEFUEHRT, Champion seit 2026-08-08). Genau
+die Lage, die REGEL 0 verbietet: eine unmarkierte Behauptung, die durch die
+eigene Tabelle direkt widerlegt wird. Fuer alle drei gilt seither: das
+Trainings-/Arena-Ergebnis WURDE erhoben, siehe Belegstelle in der jeweiligen
+Tabellenzeile oben statt an dieser Stelle.
