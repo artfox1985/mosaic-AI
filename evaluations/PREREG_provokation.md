@@ -260,3 +260,50 @@ der Injektion allein erfuellt (Rate 0,0500 = 12x ueber der Totgrenze). Entweder
 Ereignisse, nicht Perfektion --, oder (b) weiter am Generator arbeiten (Farb-
 Diagnose, dann ggf. echter Spaltenbau-Spieler). Der 1,0-Anspruch stammt aus der
 Erwartung an das FERTIGE Netz; ob der GENERATOR ihn braucht, ist nicht belegt.
+
+
+---
+
+## 10. ZWEI-POLE-ARCHITEKTUR (Nutzer-Idee 2026-08-13) -- der geltende Rahmen
+
+*"wir haben dann zwei extreme. einmal das netz was momentan noch auf die
+wertungsplatten pfeift und dann die heuristik die nur auf die wertungsplatten
+spielt. mit der staerke des ownership heads koennen wir dann recht gut steuern
+wie stark die wertungsplatten beruecksichtigt werden"*
+
+### Die Architektur
+
+| Pol | Spieler | Rolle |
+| --- | ------- | ----- |
+| A | **Netz (Champion)** -- spielt die Basis stark, Platten ~0,15 Spalten/Partie | Basisspiel-Extrem |
+| B | **Wertungsheuristik** (je Platte, Prototyp = Spaltenbau-Spieler) | Platten-Extrem |
+
+1. **Korpus aus beiden Polen** (plus Zwischenstufen via `MOSAIC_WERTUNG_STREUUNG_MAX`):
+   der Ownership-Kopf sieht das ganze Spektrum, nicht einen Betriebspunkt.
+2. **Kopf-Basistraining** auf diesem Korpus -- Nutzer-Vorschlag: NUR den Kopf
+   (Trunk eingefroren, kein Gating-Risiko). Vorbehalt, messbar: der eingefrorene
+   Trunk koennte die Decke sein -- Kopf-allein gegen Trunk-mitlernen auf demselben
+   Korpus vergleichen (Skill je Atom).
+3. **Der Regler ist das KONSUMENTEN-Gewicht** (P4, zu bauen): wie stark die
+   erwarteten Plattenpunkte aus dem Kopf dem Blattwert zugeschlagen werden.
+   w=0 = reines Netz, w gross = Richtung Platten-Pol. NICHT zu verwechseln mit dem
+   Trainingsgewicht (0,2) -- das formt nur den Trunk beim Lernen.
+4. **Der Regler ist zur Laufzeit sweepbar, ohne Neutraining** -- ein Arena-Sweep
+   ueber w findet den Betriebspunkt mit derselben Messmaschinerie, die die
+   Injektions-Sweeps benutzt haben, nur mit gelerntem statt gerechnetem Term.
+
+### Warum das den 0,30-Deckel brechen koennte (offene Wette, nicht Beleg)
+
+Die Hand-Injektion rechnet kurzsichtig aus dem Brett und deckelt gemessen bei 0,30
+Spalten/Partie (§9, vier Mechanismen). Der Kopf lernt aus REALISIERTEN
+Plattenpartien -- wie Spalten ueber Runden, mit Farblogik, tatsaechlich zustande
+kommen. Das ist die erste Fassung des Vorhabens, die nicht schon strukturell
+verloren ist. Garantie gibt es keine; die Gates (Korpusraten, Atom-Skill,
+w-Sweep) sind so gebaut, dass jede Stufe billig scheitern kann.
+
+### Moegliche Folge (Nutzer): je Wertungsplatte eine eigene Heuristik
+
+Der Spaltenbau-Spieler ist der Prototyp. Traegt er, wird er PARAMETRISIERT
+(Ziel = Kriterium statt fest Spalte) statt achtmal neu gebaut; ob einzelne
+Platten eigene Logik brauchen (Spezialfelder sind Trigger-, keine Lieferlogik),
+entscheidet sich je Platte.
