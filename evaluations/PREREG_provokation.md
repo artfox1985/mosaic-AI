@@ -557,3 +557,223 @@ an dieser Stelle sitzt.
   Nutzer selbst skizzierte Zwei-Pole-Architektur (§10: Kopf lernt aus
   REALISIERTEN Partien statt aus einer handgerechneten Zielwahl) als eine
   vierte Nachbesserung an `spaltenbau.rs`.
+
+
+---
+
+## 13. PARAMETRISIERUNG AUF ALLE 8 KRITERIEN + SPIELER-ABSTRAKTION (2026-08-13)
+
+Nutzer-Auftrag im Anschluss an §10-§12: der Spaltenbau-Spieler wird
+PARAMETRISIERT (Ziel = Kriterium statt fest Spalte) und dabei die
+Spieler-Abstraktion (Architektur-Fahrplan Punkt 5, `STATUS.md`) als tragende
+Struktur mitgezogen.
+
+### (1) Trait-Zuschnitt + Regressionsnachweis Stufe 1
+
+Neuer Trait `Plattenbauer` (`engine/src/plattenbauer.rs`) mit genau den drei
+Entscheidungspunkten, die `spaltenbau.rs` fuer Kriterium 1 bisher konkret
+implementierte: `drafting_vorzug` (Stein-Zug), `dome_vorzug`
+(Kuppelplatten-Wahl), `tiling_vorzug` (Tiling-Routing). Die vier
+Drafting-Hook-Stellen in `self_play.rs` (`play_net_game`,
+`play_net_vs_net_game`, `play_net_vs_net_hybrid_game`,
+`play_stage3_vs_stage1_game`) sowie der eine Tiling-Hook und die
+Seed-Weitergabe rufen jetzt `crate::plattenbauer::*` statt `crate::
+spaltenbau::*` direkt.
+
+`MOSAIC_SPALTENBAU` bleibt der woertliche Altpfad: ist er aktiv, loest die
+Abstraktion IMMER auf einen Wrapper auf, der die bestehenden
+`spaltenbau::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}` UNVERAENDERT
+aufruft -- reine Delegation, keine Nachbildung. Byte-Identitaet bei allen
+Knoepfen aus: GEPRUEFT, Paritaets-Hash `8c6684ff...` haelt nach Wheel-Neubau.
+Verhaltens-Identitaet bei `MOSAIC_SPALTENBAU` an: GEPRUEFT per
+Aequivalenztest ueber 30 Seeds/Zustaende
+(`mosaic_spaltenbau_an_ist_verhaltensidentisch_zur_direkten_ansteuerung`,
+`plattenbauer.rs`) -- `drafting_vorzug`/`dome_vorzug`/`tiling_vorzug` der
+Abstraktion liefern fuer jeden Seed EXAKT denselben Wert wie der direkte
+Aufruf von `spaltenbau::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`.
+
+Zusaetzlich End-to-End GEPRUEFT (nicht nur auf Funktionsebene): eine frische
+Arena-Messung mit `MOSAIC_SPALTENBAU=1` durch die NEUE Verdrahtung liefert
+20/20 identische Ergebnisse bei zweifacher Wiederholung desselben Kommandos
+(eigene Reproduzierbarkeitsprobe, `paired_arena_env_plattenbauer_regress_k1*.
+json`) -- die neue Verdrahtung ist selbst deterministisch. **Eine offene,
+ungeklaerte Beobachtung**: diese frische Messung liefert fuer den
+Kontroll-Arm (`MOSAIC_SPALTENBAU=0`) 1,05 vertikale Plattenpunkte / 47,80
+Endstand, waehrend Runde 3 (§12, SELBE 20 Seeds, SELBES Modell, `git log`
+GEPRUEFT: kein Engine-Commit zwischen Runde 3 und dieser Sitzung) 0,70 /
+48,30 archiviert hat -- Sieg-Zahlen stimmen dabei exakt ueberein (15/20 in
+beiden Armen, beide Messungen). Da mein Code fuer den AUS-Zustand
+nachweislich ein reiner Passthrough ist (kein Verhaltensunterschied
+moeglich) und meine eigene Wiederholung perfekt reproduziert, ist die
+Abweichung entweder Lauf-zu-Lauf-Rauschen aus der ONNX-Inferenz (nicht
+zwischen Prozessstarts reproduzierbar, nur INNERHALB) oder ein
+Unterschied in der urspruenglichen Runde-3-Aufrufumgebung (z.B. Threads) --
+NICHT weiter aufgeloest (Zeitbudget). Fuer die §13-Tabelle wird deshalb die
+FRISCH GEMESSENE Zahl verwendet, nicht die archivierte.
+
+### (2) Strategie-Kern je Kriterium, ein Satz
+
+- **0 (Zeilen)**: waehlt eine Ziel-Zeile ueber dieselbe Kosten-/
+  Streuungs-Mechanik wie Spaltenbau (transponiert), liefert Stein-/
+  Kuppel-/Tiling-Vorzug ueber die generische Zellen-Mechanik.
+- **1 (Spalten, generisch)**: identische Geometrie zu Spaltenbau, aber ein
+  ZWEITER Codepfad (siehe Eigene Entscheidungen) statt einer Wiederverwendung
+  der `spaltenbau.rs`-Funktionen.
+- **2 (Diagonalen)**: waehlt eine der zwei Diagonalen ueber dieselbe
+  Kosten-Mechanik (Zielzellen `(i,i)` bzw. `(i,5-i)`).
+- **3 (Mehrfarbig/Jokerfelder)**: keine Kandidatenwahl -- Zielmenge sind ALLE
+  noch offenen Wild-Zellen des Bretts, jede Farbe qualifiziert dort.
+- **4 (Randfelder)**: keine Kandidatenwahl -- Zielmenge sind alle noch
+  offenen Zellen am Kuppelrand (additiv, jede Platzierung zaehlt).
+- **5 (Ecken)**: waehlt einen der vier Eck-2x2-Slots ueber dieselbe
+  Kosten-Mechanik (Zielzellen = die 4 Rasterzellen des Slots).
+- **6 (Spezialfelder)**: keine Kandidatenwahl -- Zielmenge sind die NACHBARN
+  offener Special-Zellen (nicht die Special-Zelle selbst, §12-Befund).
+- **7 (Farbenreiche Reihen)**: teilt sich die Zeilen-Kandidatenwahl mit
+  Kriterium 0, aber eigene Kuppelplatten-Logik (Farbvielfalt statt
+  Farbtreffer -- bevorzugt Kacheln, die eine in der Zielreihe NOCH NICHT
+  vorhandene Farbe einbringen).
+
+### (3) Messkette und Abweichungen vom Auftrag
+
+Gleiche Messkette wie §11/§12: `tools/paired_arena_env_ab.py`,
+`alphazero_v21_2d_brierbest.onnx@400` vs. Heuristik@150(dyn), die
+vorhandenen `evaluations/seeds_je_kriterium/k<k>.txt`-Seedlisten (20-23
+Seeds je Kriterium), `--log-games`. Metrik ueber
+`tools/plattenpunkte_aus_arena.py`s `auswerten()` (importiert, nicht
+nachgebaut), Kriterium-Name aus `scoring::ALL_SCORING_TILES`.
+
+**Zwei Abweichungen vom Auftrag, aus Zeitgruenden (markiert, nicht
+Nutzer-Freigabe)**:
+
+1. **`MOSAIC_SPALTENBAU_TRACE`/`[SB]`-Blockerspur wurde NICHT auf die
+   generische Mechanik (Kriterien 0/2/3/4/5/6/7) ausgeweitet** --
+   `spaltenbau.rs::trace_zeile` bleibt unveraendert und liefert weiterhin
+   NUR fuer den Legacy-Pfad (`MOSAIC_SPALTENBAU`) etwas. Die Spalte
+   "Blocker aus Trace" ist deshalb fuer Kriterium 1 aus Runde 3 (archiviert,
+   NICHT in dieser Sitzung neu erhoben) und fuer alle anderen Kriterien
+   **ungeprueft/nicht erhoben**.
+2. **Verteilungs-Gate nicht gemessen** fuer die neuen geometrischen
+   Kandidaten (0/2/5): ob z.B. alle 6 Zeilen oder alle 4 Eckslots ueber die
+   Seedliste hinweg als Ziel auftauchen, ist NUR per Unit-Test belegt
+   (`auto_modus_streut_ueber_scoring_tile_ids_der_partie`,
+   `waehle_kandidat`/`index_aus_seed`-Streuung), NICHT per Arena-Trace wie
+   bei Spaltenbau Runde 2/3.
+
+### (4) §13-Tabelle
+
+| K | Kriterium | Bezug ohne | mit Plattenbauer | Orakel | Blocker aus Trace | n |
+| - | --------- | ---------: | ----------------: | ------ | ------------------ | -: |
+| 0 | Horizontale Reihen   | 1,04   | 0,65   | >=6,00                                   | ungeprueft | 23 |
+| 1 | Vertikale Reihen     | 1,05   | 5,60   | >=14,00 (dokumentiert unerreichbar)      | archiviert Runde 3 (§12: 76,8% Versorgung, 6,1% Fehlbindung, 17,1% Sonstiges) | 20 |
+| 2 | Diagonale Reihen     | 0,43   | 2,61   | >=10,00                                  | ungeprueft | 23 |
+| 3 | Mehrfarbige Felder   | 3,40   | 3,90   | >=8,00                                   | ungeprueft | 20 |
+| 4 | Aeussere Felder      | 9,30   | 10,60  | kein Orakel                              | ungeprueft | 20 |
+| 5 | Eckplatten           | 3,00   | 4,73   | >=11,00                                  | ungeprueft | 22 |
+| 6 | Spezialfelder        | -11,85 | -10,65 | kein Orakel                              | ungeprueft | 20 |
+| 7 | Farbenreiche Reihen  | 0,52   | 1,04   | kein Orakel                              | ungeprueft | 23 |
+
+Begleitzahlen (gleiche Partien, GEPRUEFT aus den Rohdaten):
+
+| K | ΔPlatten (gepaart) | t | Siege Bezug | Siege mit | McNemar p | Strafleiste Bezug->mit | Endstand Bezug->mit |
+| - | ------------------: | -: | ----------: | --------: | --------: | ----------------------: | --------------------: |
+| 0 | -0,39 | -1,00 | 18/23 | 13/23 | 0,180 | 8,61 -> 9,78   | 56,61 -> 46,83 |
+| 1 | +4,55 |  3,58 | 15/20 | 15/20 | 1,000 | 9,10 -> 9,05   | 47,80 -> 44,05 |
+| 2 | +2,17 |  2,47 | 19/23 | 12/23 | 0,039 | 11,91 -> 8,22  | 47,52 -> 45,30 |
+| 3 | +0,50 |  0,26 | 14/20 | 12/20 | 0,754 | 10,50 -> 10,50 | 52,95 -> 49,10 |
+| 4 | +1,30 |  3,51 | 16/20 | 10/20 | 0,146 | 7,60 -> 15,10  | 62,40 -> 47,15 |
+| 5 | +1,73 |  2,88 | 15/22 | 14/22 | 1,000 | 8,50 -> 11,77  | 52,14 -> 47,73 |
+| 6 | +1,20 |  2,99 | 10/20 | 11/20 | 1,000 | 14,25 -> 16,85 | 31,85 -> 27,25 |
+| 7 | +0,52 |  1,00 | 17/23 | 7/23  | 0,021 | 10,35 -> 15,39 | 50,30 -> 34,35 |
+
+Rohdaten: `evaluations/paired_arena_env_plattenbauer_k{0,2,3,4,5,6,7}.json`
+(neu) und `evaluations/paired_arena_env_plattenbauer_regress_k1.json`
+(Kriterium 1, Regressionslauf). Verrechnungsskript (Scratch, nicht Teil des
+Repos): importiert `auswerten`/`t_wert` aus `tools/plattenpunkte_aus_arena.py`
+unveraendert.
+
+### (5) Je Kriterium: ehrliche Aussage erreicht/Decke/weiter-iterierbar
+
+- **0 (Zeilen): VERFEHLT, Strategie schadet dem eigenen Ziel.** Der
+  Plattenbauer macht WENIGER horizontale Reihen als der Bezug (0,65 <
+  1,04) und kostet dabei Staerke (18/23 -> 13/23 Siege, Endstand -9,8
+  Punkte). Kein STOPP-Kollaps (Strafleiste bleibt bei ~9), aber eine
+  Strategie, die ihr eigenes Kriterium unterbietet, ist ein
+  Grundsatzproblem der Zeilen-Geometrie (vermutlich: eine volle Zeile
+  verlangt bis zu 6 VERSCHIEDENE Farben aus 3 verschiedenen Kuppelplatten,
+  waehrend eine Spalte/Diagonale nur je EINE Zelle pro Musterreihe
+  braucht) -- weiter-iterierbar, aber nicht mit den bestehenden
+  Kosten-Gewichten.
+- **1 (Spalten): Decke bestaetigt, dokumentiert unerreichbar.** Frisch
+  gemessen 5,60 (Runde 3 archiviert: 5,95, siehe (1) fuer die ungeklaerte
+  Differenz) gegen Orakel 14,00 -- Faktor 2,5 verfehlt, keine Staerke-Kosten
+  (15/20 beide Arme, McNemar p=1,0). Deckt sich mit §12s Verdikt: der
+  dominante Blocker ist strukturelle Versorgungsknappheit, die eine
+  Zielspalten-/Vorzugslogik nicht loesen kann.
+- **2 (Diagonalen): Fortschritt, aber teuer.** +2,17 Plattenpunkte
+  (GEPRUEFT signifikant, t=2,47), Strafleiste sogar GUENSTIGER (11,91 ->
+  8,22) -- aber Sieg-Differenz signifikant NEGATIV (19/23 -> 12/23, p=0,039).
+  2,61 von Orakel 10,00 -- weiter-iterierbar, doch das Kosten-Nutzen-
+  Verhaeltnis dieser Runde ist unguenstig (die Diagonale bindet vermutlich
+  zu viele Musterreihen gleichzeitig an feste Positionen relativ zum
+  Nutzen).
+- **3 (Mehrfarbig): Kein belegter Fortschritt.** +0,50 (t=0,26, nicht
+  signifikant), 3,90 von Orakel 8,00. Kein Sicherheitsproblem (Strafleiste
+  unveraendert 10,50), aber die "Jokerzellen aktiv bedienen"-Strategie
+  bewegt die Zahl nicht messbar -- weiter-iterierbar (naechster Verdacht:
+  wie bei Kriterium 1 die Versorgung, da ALLE Jokerzellen gleichzeitig
+  offen gehalten werden muessen).
+- **4 (Rand): Fortschritt gemessen, Sicherheitsklausel pruefen.** +1,30
+  (GEPRUEFT signifikant, t=3,51), aber Strafleiste FAST VERDOPPELT (7,60 ->
+  15,10) und Endstand -15 Punkte -- kein Orakel zum Vergleich, aber dieser
+  Preis ist hoeher als bei jedem anderen Kriterium in absoluten
+  Strafleisten-Punkten. Weiter-iterierbar, aber NICHT ohne eine
+  Bodenzug-Bremse (analog §7 Punkt 2 der Beschneidungs-Lehre).
+- **5 (Ecken): Fortschritt, Decke unterhalb Orakel.** +1,73 (GEPRUEFT
+  signifikant, t=2,88), 4,73 von Orakel 11,00, Sieg-Differenz NICHT
+  signifikant (p=1,0) -- die guenstigste Kombination aus Fortschritt und
+  Sicherheit in dieser Messreihe. Weiter-iterierbar mit dem besten
+  Aufwand-Nutzen-Verhaeltnis.
+- **6 (Spezial): Marginaler Fortschritt.** +1,20 (GEPRUEFT signifikant,
+  t=2,99) auf einer stark negativen Basis (-11,85 -> -10,65) -- die
+  Nachbarn-statt-Special-Zelle-Strategie wirkt in die richtige Richtung,
+  aber bei weitem nicht genug, um den strukturellen Rueckstand
+  aufzuholen. Strafleiste steigt leicht (14,25 -> 16,85). Weiter-iterierbar.
+- **7 (Farbenreich): STOPP-Kriterium ausgeloest.** +0,52 (t=1,00, NICHT
+  signifikant) bei einem Sieg-Einbruch von 17/23 auf 7/23 (GEPRUEFT
+  signifikant, p=0,021) und Endstand -16 Punkte -- der teuerste Eingriff
+  dieser Messreihe fuer praktisch keinen Kriterium-Gewinn. Kein
+  Strafleisten-Wert wie bei der historischen Beschneidung (23), aber der
+  Sieg-Einbruch ist die schaerfere Kennzahl hier und die Kosten-Nutzen-
+  Bilanz ist unvertretbar. **Empfehlung: `Farbenreichbauer` deaktiviert
+  lassen (Default AUS bleibt unberuehrt, aber `MOSAIC_PLATTENBAU=7` nicht
+  produktiv verwenden), bis die Kuppelplatten-Logik ueberarbeitet ist** --
+  vermutlicher Fehler: sie optimiert NUR auf Farbvielfalt der Zielreihe,
+  ohne die Kosten der dadurch gebundenen NORMAL-Zellen (die ja trotzdem
+  eine feste Farbe verlangen) gegen den Rest des Bretts abzuwaegen.
+
+### (6) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Zweiter Codepfad fuer Kriterium 1** statt einer Verschmelzung mit
+  `spaltenbau.rs`: eine echte Wiederverwendung haette dessen Funktionen auf
+  `zellen: &[(usize,usize)]` umstellen und ALLE dortigen Tests neu
+  durchdenken muessen, ohne zusaetzlichen Abnahme-Nutzen (der Legacy-Pfad
+  bleibt ohnehin die einzige produktiv genutzte Kriterium-1-Route). Statt
+  Duplikation der Kosten-Formeln wurden `special_kosten`/
+  `engpass_aufschlag`/`zellen_wert` in `spaltenbau.rs` auf `pub(crate)`
+  gehoben und in der generischen Mechanik WIEDERVERWENDET (verifiziert per
+  Test `zellen_kosten_stimmt_mit_spalten_kosten_fuer_spaltengeometrie_
+  ueberein`).
+- **Trace/Verteilungs-Gate nicht generalisiert** (siehe (3)) -- Zeitbudget,
+  nicht Grundsatzproblem. Fuer eine produktive Nutzung von Kriterium
+  2/4/5/6 (die vier mit gepruefter Punkte-Wirkung) waere das die naechste
+  sinnvolle Nachruestung, um die STOPP-Frage bei 4 und die
+  Kosten-Nutzen-Frage bei 2 ohne weitere Arena-Laeufe zu praezisieren.
+- **Kriterium 7 nicht nachgebessert, nur dokumentiert** -- Auftrag sieht bei
+  einem STOPP "Strategie deaktivieren, dokumentieren, naechstes Kriterium"
+  vor; eine Nachbesserung noch in dieser Sitzung war nicht mehr Teil des
+  Auftrags und haette ungeprueften Code produziert.
+- **Die ungeklaerte Kriterium-1-Kontrollarm-Differenz (siehe (1)) wurde NICHT
+  weiter aufgeloest** -- markiert als offene Beobachtung statt als Befund,
+  weil die Ursache (Lauf-zu-Lauf-Inferenz-Jitter vs. Aufrufumgebung) in
+  dieser Sitzung nicht eingegrenzt wurde.
