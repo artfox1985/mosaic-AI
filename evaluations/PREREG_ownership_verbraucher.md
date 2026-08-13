@@ -64,7 +64,7 @@ Feldern, deren Geometrien das Netz für vollendbar hält.
 ## §4 Gegner-Hälfte → Störungs-Baustein
 
 `[36:72]` liefert E_k^gegner gratis. Der Störungs-Baustein (Farbzählung,
-domaenenwissen.md §4) bekäme damit ein gelerntes Komplement: Drafting-Malus
+domain_knowledge.md §4) bekäme damit ein gelerntes Komplement: Drafting-Malus
 proportional zum marginalen Feldwert des GEGNERS für die gezogene Farbe.
 Eigenes Gewicht, eigener Arm — nicht mit der Eigen-Hälfte verrechnen.
 

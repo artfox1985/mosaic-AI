@@ -63,7 +63,7 @@ Kanäle nicht konfundieren.
 ### (überholter Abschnitt, Rechnung weiter gültig)
 
 **Gerechnet, nicht übernommen** *(meine Ableitung aus den Durchsatz-Zahlen in
-`docs/domaenenwissen.md`, ungemessen)*: bei ~15,7 belegten Feldern je Brett
+`docs/domain_knowledge.md`, ungemessen)*: bei ~15,7 belegten Feldern je Brett
 liegt die mittlere Spaltenfüllung bei ~2,6. Mit α = 2 gibt Kriterium 1 allein
 
     (2,6/6)² × 7 × 6 Spalten ≈ 7,9 Punkte   ->   tanh(7,9/50) = 0,156
@@ -109,7 +109,7 @@ wirkungslos" ODER „Prior blockiert" heißen — ohne Verhaltenszahl nicht
 unterscheidbar. Deshalb `log_games=True` (Commit `9dfeb16`) und Auswertung über
 `tools/analyze_game_log.py`.
 
-Zielgrößen mit ihren Referenzwerten aus `docs/domaenenwissen.md`:
+Zielgrößen mit ihren Referenzwerten aus `docs/domain_knowledge.md`:
 
 | Größe | Mensch | KI heute |
 |---|---|---|

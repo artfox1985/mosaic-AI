@@ -2,7 +2,7 @@
 # Mosaic-AI — PyInstaller-Spec für das verteilbare Release-Bundle (Task #96).
 #
 # Bewusst onedir (nicht onefile): Antivirus-freundlicher (kein selbst-
-# entpackendes Archiv) und deutlich schnellerer Start. README_SPIEL.txt und
+# entpackendes Archiv) und deutlich schnellerer Start. README_GAME.txt und
 # docs/engine_manual.md werden NICHT hier eingebunden, sondern von
 # tools/build_release.py nach dem PyInstaller-Lauf ins dist-Verzeichnis
 # kopiert (einfacher als Datei-Umbenennung über Analysis-datas).

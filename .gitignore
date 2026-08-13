@@ -62,7 +62,7 @@ logs/
 # Getrackte Build-Quellen in dist/ bleiben trotz Ordner-Ignore versioniert:
 !dist/mosaic_release.spec
 !dist/run_mosaic.py
-!dist/README_SPIEL.txt
+!dist/README_GAME.txt
 docs/DE_AzulDuel_Rulebook_compressed2.pdf
 data/altmess_90files/
 
