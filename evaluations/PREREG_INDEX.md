@@ -8,8 +8,8 @@ das Ergebnis ausschliesslich anderswo (meist `archive/history.md`, teils
 ein neuer Leser konnte OFFEN nicht von ENTSCHIEDEN unterscheiden. Diese 23
 Dateien haben seit 2026-08-08 eine angehaengte Statusfussnote am Dateiende
 (reine Ergaenzung, der urspruengliche Prereg-Text ist unveraendert).
-**Stand 2026-08-13** (gepruefte Zaehlung der Tabellen-Zeilen unten: 14 OFFEN +
-34 ENTSCHIEDEN + 1 UEBERHOLT): die Tabelle fasst inzwischen 49 Dateien
+**Stand 2026-08-13** (gepruefte Zaehlung der Tabellen-Zeilen unten: 16 OFFEN +
+34 ENTSCHIEDEN + 1 UEBERHOLT): die Tabelle fasst inzwischen 51 Dateien
 zusammen, nicht mehr die urspruenglichen 29 -- seit dem 2026-08-08-Anlass sind
 weitere Preregs hinzugekommen (u.a. `PREREG_gpu_inferenzpfad.md`,
 `PREREG_gpu_offloading.md`, `PREREG_plate_head.md`,
@@ -71,10 +71,12 @@ Eskalations-Preregs laengst belegt waren.
 
 
 
-## OFFEN (14)
+## OFFEN (16)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_unified_game_loop.md` | Lassen sich die vier kopierten Spielschleifen in self_play.rs hinter EINER parametrisierten Schleife mit Spieler-Abstraktion vereinheitlichen — bit-identisch je Pfad? | **OFFEN, vorregistriert 2026-08-14** (Nutzer-Auftrag "räum die vier spielschleifen auf solang die generierung noch nicht läuft"). Motivierende Fehlerklasse aktenkundig (Korpus-§3.1: Vorzug in zwei Pfaden verdrahtet, im Produktionspfad gar nicht). Abnahme: Golden-Records je Pfad VOR dem Umbau, danach 0 Bit Abweichung (Gate-B-Methodik, seit RNG-Schnitt möglich); Paritäts-Hash; die Korpus-Generierung wartet auf diese Abnahme. |
+| `PREREG_deterministic_labels.md` | Werden die Trainingsziel-Felder (bootstrap/round_transition) maschinenlast-unabhängig, wenn die Task-#71-Not-Deckel bei Feuern auf deterministischen Fallback degradieren statt still zu kappen? | **OFFEN, vorregistriert 2026-08-14** (Nutzer-Go "häng es als 2b an"). Stufe 1 = Feuerraten-Messung (~50 Partien), Stufe 2 = Fallback-auf-Spielausgang + Deckel auf Ausnahme-Niveau (~10×), bewusst OHNE Schema-Bump (HDF5-Cache). Abnahme inkl. Gate-B-Retest der sync↔async-Divergenz aus PREREG_async_search.md. Läuft nach der Schleifen-Vereinheitlichung, vor der Korpus-Generierung. |
 | `PREREG_ownership_corpus.md` | Wie wird der Zwei-Pole-Korpus für das Ownership-Kopf-Training generiert — welche Arme, Quoten, Ablage, Prüfpunkte und welches Kopfgüte-Tor? | **OFFEN, vorregistriert 2026-08-14** (Nutzer-Auftrag "mach schon mal den generierungsplan"). Vier Arme (Netz+Streuung 50 %, k1-Bauer, k2-Bauer, Heuristik), 6000 Partien nach `data/ownership_corpus/` (nicht-rekursiver Fenster-Glob geprüft, train.py:552); fünf Prüfpunkte vor Start (u.a. Policy-Ziele unter Vorzug, Konjunktions-Breite 68 vs. 25); Abnahme = Tor A aus PREREG_ownership_consumer.md, nicht Arena. |
 | `PREREG_ownership_consumer.md` | Wie kommt der Ownership-Kopf als VERBRAUCHER in Drafting (Blatt-Shift ueber erwartete Plattenpunkte E_k) und Tiling (marginale Feldwerte einmal je Zug) -- und ab welcher Kopfguete darf er steuern? | **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag "ueberleg dir schon mal wie wir den ownership head ins drafting und tiling miteinbeziehen"). ENTWURF, nichts gebaut. Geprueft: Kopf im Champion untrainiert (`ownership_weight` 0,0, Manifest v21_2d), kein Engine-Verbraucher (ONNX-Ausgang 4 ungelesen). Zwei-Pole-Regler `MOSAIC_OWNERSHIP_W`, Default 0 = byte-identisch (Task-#28-Muster). Reihenfolge: Generator -> Kopf-Training (+Konjunktionen) -> Tor A Kopfguete VOR Verbraucher-Bau. |
 | `PREREG_async_search.md` | Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inferenzpfad.md`) strukturell scheitert? | **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag). Stufe 1 (Drafting-Suche als Zustandsautomat, `async`/`await`, additiv in `net_mcts.rs`/`net_batcher.rs`, `MOSAIC_ASYNC_SUCHE`) GEBAUT und Gate A BESTANDEN: 0/1148 Abweichungen sowohl ohne Sammel-Faden (bit-identisch) als auch MIT Sammel-Faden + 16-facher Nebenlaeufigkeit (finale Zugwahl). `cargo test --lib` im isolierten Worktree 387/0/20 (keine Regression). Stufe 2 (Rundenuebergaenge) und Stufe 3 (Durchsatz, Gate C >= 2,0x) OFFEN. |
