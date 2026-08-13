@@ -126,15 +126,25 @@ diesen Zuschnitt als DESIGN-UMGESETZT; ein separater A/B-Arm nur auf
 expliziten Nutzer-Wunsch.
 
 ---
-**STATUS (Stand 2026-08-08): OFFEN** -- der Fenster-/Korpus-Zuschnitt
-selbst ist fix entschieden (kein offenes Veto mehr, siehe Datei). Die
-eine bereits gelaufene Teilfrage (τ-Annealing fuer den Sockel) ist
-GESCHLOSSEN: Messung 3 ergab H0 (112:118, p=0,78) -> τ=1 bleibt, der
-v21-Sockel wird ohne Annealing generiert. Die eigentliche Fenster-
-Befuellung/Training/Gating wurde vom Nutzer am 2026-08-08 ausdruecklich
-ZURUECKGESTELLT ("nicht so auf die self plays stuerzen"); 2.090 bereits
-generierte Schwarm-Partien liegen in `data/`, die Generierung startet
-erst nach Abarbeitung der offenen Task-Liste. Kein Trainings- oder
-Gating-Ergebnis fuer v21 existiert bislang. Belegstelle:
-evaluations/STATUS.md, Zeile 15 ("τ-Annealing ... GESCHLOSSEN
-2026-08-08") und Zeile 16 ("v21-Fenster fuellen | ZURUECKGESTELLT ...").
+**STATUS-UPDATE (2026-08-13): AUSGEFUEHRT.** Die Zurueckstellung unten (Stand
+2026-08-08) ist ueberholt -- der Fenster-/Korpus-Zuschnitt wurde seither
+befuellt, trainiert und gegated: `v21_2d_brierbest` ist seit 2026-08-08
+Champion (Gating 75:45, p=0,0059, plus Frisch-Seed-Replikation 97:63,
+p=0,0095; Elo 1358), GEPRUEFT an `models/champion.txt` (Inhalt
+`v21_2d_brierbest`) und an der Tabellenzeile dieser Datei in
+`evaluations/PREREG_INDEX.md` ("AUSGEFUEHRT"). Belegstelle bewusst NICHT
+mehr `evaluations/STATUS.md` mit Zeilennummer -- diese Datei wird zum
+Zeitpunkt dieser Korrektur parallel umgebaut, Zeilennummern darin sind
+instabil. Der urspruengliche Text unten (Stand 2026-08-08) bleibt als
+historisches Protokoll unveraendert stehen.
+
+---
+**STATUS (Stand 2026-08-08, HISTORISCH -- siehe Update oben): OFFEN** -- der
+Fenster-/Korpus-Zuschnitt selbst ist fix entschieden (kein offenes Veto
+mehr, siehe Datei). Die eine bereits gelaufene Teilfrage (τ-Annealing fuer
+den Sockel) ist GESCHLOSSEN: Messung 3 ergab H0 (112:118, p=0,78) -> τ=1
+bleibt, der v21-Sockel wird ohne Annealing generiert. Die eigentliche
+Fenster-Befuellung/Training/Gating wurde vom Nutzer am 2026-08-08
+ausdruecklich ZURUECKGESTELLT ("nicht so auf die self plays stuerzen");
+2.090 bereits generierte Schwarm-Partien lagen in `data/`, die Generierung
+startete erst nach Abarbeitung der damals offenen Task-Liste.
