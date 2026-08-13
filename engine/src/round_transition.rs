@@ -35,7 +35,9 @@ use std::time::{Duration, Instant};
 
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
-use rand::{Rng, RngExt};
+use rand::Rng;
+#[cfg(test)]
+use rand::RngExt;
 use rand::SeedableRng;
 
 use crate::game::{Game, TilingMove};
