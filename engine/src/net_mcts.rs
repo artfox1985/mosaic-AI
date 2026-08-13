@@ -26,6 +26,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, RngExt};
 use serde_json::{json, Value};
 
+#[cfg(test)]
 use crate::features::action_to_id;
 use crate::game::{drafting_actions, Game};
 use crate::mcts::{label_search_move, SearchMove};
@@ -1078,21 +1079,6 @@ pub fn wertung_shaping_weight() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_SHAPING_W", WERTUNG_SHAPING_WEIGHT))
 }
 
-/// `MOSAIC_WERTUNG_SHAPING_W` als **acht Werte, einer JE KRITERIUM** -- gleiches
-/// Format und gleiche Haerte wie `wertung_shaping_alphas` (1 Wert gilt fuer alle;
-/// falsche Laenge wird VERWORFEN, nicht teilgelesen).
-///
-/// WARUM ein Gewicht je Kriterium und nicht nur ein alpha je Kriterium
-/// (Nutzer-Aufbau 2026-08-11): der Versuch will *"20 Spiele in denen die
-/// vertikalen Wertungsplatten aktiv sind, NUR mit alpha variation der vertikalen
-/// platten"*. Dafuer muessen die anderen Kriterien AUS sein, sonst laeuft jede
-/// Messung gegen einen Hintergrund aus sieben weiteren Shaping-Termen und der
-/// Effekt ist nicht mehr zurechenbar.
-///
-/// **Und alpha kann das nicht leisten**: ein Kriterium abzuschalten geht ueber den
-/// Exponenten nicht -- ein hohes alpha drueckt den Teilfortschritt nur
-/// asymptotisch gegen 0, `(1.0)^alpha` bleibt 1. Nur ein Gewicht 0 schaltet
-/// wirklich ab. "Nur die Vertikale" heisst damit `0,1,0,0,0,0,0,0`.
 thread_local! {
     /// Plattengewicht der AKTUELLEN Partie in DIESEM Thread. `None` = der
     /// prozessweite Env-Wert gilt (Bestandsverhalten).
@@ -1140,6 +1126,21 @@ pub fn partie_gewicht_aus_seed(seed: u64, max: f64) -> f64 {
     max * ((z % 1_000_000) as f64 / 999_999.0)
 }
 
+/// `MOSAIC_WERTUNG_SHAPING_W` als **acht Werte, einer JE KRITERIUM** -- gleiches
+/// Format und gleiche Haerte wie `wertung_shaping_alphas` (1 Wert gilt fuer alle;
+/// falsche Laenge wird VERWORFEN, nicht teilgelesen).
+///
+/// WARUM ein Gewicht je Kriterium und nicht nur ein alpha je Kriterium
+/// (Nutzer-Aufbau 2026-08-11): der Versuch will *"20 Spiele in denen die
+/// vertikalen Wertungsplatten aktiv sind, NUR mit alpha variation der vertikalen
+/// platten"*. Dafuer muessen die anderen Kriterien AUS sein, sonst laeuft jede
+/// Messung gegen einen Hintergrund aus sieben weiteren Shaping-Termen und der
+/// Effekt ist nicht mehr zurechenbar.
+///
+/// **Und alpha kann das nicht leisten**: ein Kriterium abzuschalten geht ueber den
+/// Exponenten nicht -- ein hohes alpha drueckt den Teilfortschritt nur
+/// asymptotisch gegen 0, `(1.0)^alpha` bleibt 1. Nur ein Gewicht 0 schaltet
+/// wirklich ab. "Nur die Vertikale" heisst damit `0,1,0,0,0,0,0,0`.
 pub fn wertung_shaping_weights() -> [f64; 8] {
     // Partieweiser Wert schlaegt den prozessweiten -- siehe
     // `set_partie_shaping_weight`.
@@ -1289,16 +1290,19 @@ pub fn wertung_round_gain() -> f64 {
 }
 
 /// Reine Formel hinter [`apply_wertung_shaping`], OHNE Env-Var-Zugriff --
-/// `w`/`alpha` als Parameter statt aus dem OnceLock-Cache gelesen, gleiches
-/// Trennungsmuster wie `blended_leaf_win_prob`/`_with` (siehe dortige Doku:
-/// ein Test, der den Env-Var-Cache nach dem ersten Zugriff umstellen will,
-/// kaeme nie an sein Ziel).
+/// Gewichte/Exponenten als Parameter statt aus dem OnceLock-Cache gelesen,
+/// gleiches Trennungsmuster wie `blended_leaf_win_prob`/`_with` (siehe
+/// dortige Doku: ein Test, der den Env-Var-Cache nach dem ersten Zugriff
+/// umstellen will, kaeme nie an sein Ziel). Frueher ueber zwei Test-Huellen
+/// `apply_wertung_shaping_with`/`_with_alphas` aufgerufen (ausserhalb von
+/// Tests nie gebraucht, deshalb entfernt -- Tests rufen diese Funktion jetzt
+/// direkt mit `&[w; 8]`/`&[alpha; 8]` und den Gegenterm-Defaults `0.0`).
 ///
-/// Fruehausstieg bei `w == 0.0`: gibt `value` UNVERAENDERT zurueck -- kein
-/// `wertung_progress_alpha`-Aufruf, kein `tanh`, keine Rundung, also
-/// GARANTIERT numerisch identisch zum Vor-Additiv-Bestand (exakt das Muster,
-/// das `blended_leaf_win_prob_with`s bestehender `w == 0.0`-Kurzschluss schon
-/// fuer sein eigenes Gewicht vorgibt).
+/// Fruehausstieg bei ALLEN Gewichten `== 0.0`: gibt `value` UNVERAENDERT
+/// zurueck -- kein `wertung_progress_alpha`-Aufruf, kein `tanh`, keine
+/// Rundung, also GARANTIERT numerisch identisch zum Vor-Additiv-Bestand
+/// (exakt das Muster, das `blended_leaf_win_prob_with`s bestehender
+/// `w == 0.0`-Kurzschluss schon fuer sein eigenes Gewicht vorgibt).
 ///
 /// Skalierung: `wertung_progress_alpha` liefert PUNKTE, `value` sind
 /// Gewinnwahrscheinlichkeiten -- Normierung ueber `tanh(punkte /
@@ -1308,19 +1312,7 @@ pub fn wertung_round_gain() -> f64 {
 /// -- keine mine-minus-theirs-Kopplung wie beim Plattenshaping oben, siehe
 /// Modul-Kommentar. Ergebnis wird wie die bestehende Floor-/Platten-Additiv-
 /// Logik auf `[0,1]` geklemmt.
-/// Bequemlichkeits-Huelle: EIN alpha fuer alle Kriterien, ohne Runden-Gain.
-/// Haelt die Bestandstests unveraendert lesbar; die volle Form ist
-/// [`apply_wertung_shaping_with_alphas`].
-fn apply_wertung_shaping_with(value: [f64; 2], state: &GameState, w: f64, alpha: f64) -> [f64; 2] {
-    apply_wertung_shaping_with_alphas(value, state, w, &[alpha; 8], 0.0)
-}
-
-fn apply_wertung_shaping_with_alphas(
-    value: [f64; 2], state: &GameState, w: f64, alphas: &[f64; 8], round_gain: f64,
-) -> [f64; 2] {
-    apply_wertung_shaping_full(value, state, &[w; 8], alphas, round_gain, 0.0, 0.0)
-}
-
+///
 /// Volle Form: Gewicht UND Exponent je Kriterium, plus den absoluten
 /// Gegenterm (Strafleiste `floor_w`). Ein Gewicht 0 schaltet das jeweilige
 /// Kriterium/Additiv vollstaendig ab -- das ist die Voraussetzung fuer den
@@ -1456,12 +1448,6 @@ fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
 // EIGENES Brett, kein Cross-Term, keine mine-minus-theirs-Differenz. Gleiche
 // Skala (`tanh(x/50.0)`).
 
-/// Skala fuer das Freischalt-Shaping, gleiche Konvention wie
-/// `WERTUNG_SHAPING_SCALE`/`FLOOR_SHAPING_SCALE`/`PLATE_SHAPING_SCALE`
-/// (alle 50.0, siehe dortige Doku) -- eigene Konstante fuer unabhaengige
-/// Nachkalibrierbarkeit.
-const UNLOCK_SHAPING_SCALE: f64 = 50.0;
-
 /// Default-Gewicht des Freischalt-Shaping-Additivs -- `0.0` = AUS, exakt
 /// Bestandsverhalten ohne gesetzte `MOSAIC_UNLOCK_SHAPING_W`.
 pub const UNLOCK_SHAPING_WEIGHT: f64 = 0.0;
@@ -1470,25 +1456,6 @@ pub const UNLOCK_SHAPING_WEIGHT: f64 = 0.0;
 /// analog `WERTUNG_SHAPING_ALPHA`, keine eigene Kalibrierung ueber diesen
 /// Default hinaus).
 pub const UNLOCK_SHAPING_BETA: f64 = 2.0;
-
-/// Reine Formel hinter [`apply_unlock_shaping`], OHNE Env-Var-Zugriff --
-/// gleiches Trennungsmuster wie `apply_wertung_shaping_with`. Fruehausstieg
-/// bei `w==0.0`: `value` UNVERAENDERT (kein `unlock_progress_beta`-Aufruf,
-/// kein `tanh`) -- garantiert numerisch identisch zum Vor-Additiv-Bestand.
-/// Jeder Spieler bekommt seinen EIGENEN Shift aus `unlock_progress_beta`
-/// seines EIGENEN Bretts (`state.players[i]`) -- keine Gegner-Kopplung.
-fn apply_unlock_shaping_with(value: [f64; 2], state: &GameState, w: f64, beta: f64) -> [f64; 2] {
-    if w == 0.0 {
-        return value;
-    }
-    let mut out = value;
-    for i in 0..2 {
-        let pts = crate::scoring::unlock_progress_beta(&state.players[i], &state.scoring_tile_ids, beta);
-        let shift = w * (pts / UNLOCK_SHAPING_SCALE).tanh();
-        out[i] = (value[i] + shift).clamp(0.0, 1.0);
-    }
-    out
-}
 
 // ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
 //
@@ -2292,7 +2259,7 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // Task-#93-Plattenshaping (koexistieren additiv, unabhaengig
             // schaltbar). Bei `MOSAIC_WERTUNG_SHAPING_W` ungesetzt (Default
             // 0.0) exakte Identitaet -- der Fruehausstieg in
-            // `apply_wertung_shaping_with` ueberspringt jede Rechnung.
+            // `apply_wertung_shaping_full` ueberspringt jede Rechnung.
             today_value = apply_wertung_shaping(today_value, &state);
 
             // KEIN separates Freischalt-Shaping mehr (2026-08-11): der
@@ -6883,12 +6850,12 @@ mod tests {
         for gi in 0..8u64 {
             let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
             for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
-                let out = apply_wertung_shaping_with(v, &state, 0.0, 2.0);
+                let out = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[2.0; 8], 0.0, 0.0, 0.0);
                 assert_eq!(out, v, "Spiel {gi}: w=0.0 muss byte-identisch zur Eingabe bleiben (v={v:?})");
                 // Auch bei einem exotischen `alpha` darf `w=0.0` NICHTS
                 // veraendern -- der Fruehausstieg greift VOR jedem
                 // `alpha`-Gebrauch.
-                let out2 = apply_wertung_shaping_with(v, &state, 0.0, 7.0);
+                let out2 = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[7.0; 8], 0.0, 0.0, 0.0);
                 assert_eq!(out2, v);
             }
             checked += 1;
@@ -6991,7 +6958,7 @@ mod tests {
 
             for s in [&state_a, &hybrid] {
                 let v = [0.5, 0.5];
-                let out = apply_wertung_shaping_with(v, s, w, alpha);
+                let out = apply_wertung_shaping_full(v, s, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
                 for i in 0..2 {
                     // Seit der Zusammenfuehrung (2026-08-11) traegt der Term ALLE
                     // acht Kriterien: die gegateten sieben plus den
@@ -7012,8 +6979,8 @@ mod tests {
                 }
             }
 
-            let out_a = apply_wertung_shaping_with([0.5, 0.5], &state_a, w, alpha);
-            let out_hybrid = apply_wertung_shaping_with([0.5, 0.5], &hybrid, w, alpha);
+            let out_a = apply_wertung_shaping_full([0.5, 0.5], &state_a, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
+            let out_hybrid = apply_wertung_shaping_full([0.5, 0.5], &hybrid, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
             // (2) Index 0 unveraendert -- `players[0]` ist zwischen `state_a`
             // und `hybrid` identisch geblieben.
             assert_eq!(
@@ -7060,8 +7027,8 @@ mod tests {
         let mut det_swapped = det.clone();
         det_swapped.players[1] = board_with_border_fill(5); // NUR Gegnerbrett anders
 
-        let o1 = apply_wertung_shaping_with([0.5, 0.5], &det, w, alpha);
-        let o2 = apply_wertung_shaping_with([0.5, 0.5], &det_swapped, w, alpha);
+        let o1 = apply_wertung_shaping_full([0.5, 0.5], &det, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
+        let o2 = apply_wertung_shaping_full([0.5, 0.5], &det_swapped, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
         assert_eq!(o1[0], o2[0], "Index 0 darf nicht vom Gegnerbrett abhaengen");
         assert_ne!(
             o1[1], o2[1],
@@ -7091,7 +7058,7 @@ mod tests {
         let p1 = crate::scoring::wertung_progress_alpha(&state.players[1], &state.scoring_tile_ids, 2.0);
         assert!(p0 > 0.0 && p1 > 0.0, "Testaufbau: beide Seiten brauchen echten Fortschritt (p0={p0}, p1={p1})");
 
-        let out = apply_wertung_shaping_with([0.5, 0.5], &state, 0.5, 2.0);
+        let out = apply_wertung_shaping_full([0.5, 0.5], &state, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0);
         assert!(out[0] > 0.5, "Index 0 sollte steigen (p0={p0}), war {}", out[0]);
         assert!(out[1] > 0.5, "Index 1 sollte steigen (p1={p1}), war {}", out[1]);
     }
@@ -7163,8 +7130,8 @@ mod tests {
             "Testaufbau: Vorsprung sollte in beiden Faellen 1 sein (low={margin_low}, high={margin_high})"
         );
 
-        let out_low = apply_wertung_shaping_with([0.5, 0.5], &low, 0.5, 2.0);
-        let out_high = apply_wertung_shaping_with([0.5, 0.5], &high, 0.5, 2.0);
+        let out_low = apply_wertung_shaping_full([0.5, 0.5], &low, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0);
+        let out_high = apply_wertung_shaping_full([0.5, 0.5], &high, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0);
         assert!(
             (out_low[0] - out_high[0]).abs() > 1e-6,
             "gleicher Vorsprung, unterschiedliches Niveau MUSS unterschiedliche Werte liefern \
@@ -7182,8 +7149,8 @@ mod tests {
         let Some(state) = random_drafting_state(0, 16, &mut rng) else {
             panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
         };
-        let out_hi = apply_wertung_shaping_with([0.95, 0.05], &state, 5.0, 2.0);
-        let out_lo = apply_wertung_shaping_with([0.05, 0.95], &state, 5.0, 2.0);
+        let out_hi = apply_wertung_shaping_full([0.95, 0.05], &state, &[5.0; 8], &[2.0; 8], 0.0, 0.0, 0.0);
+        let out_lo = apply_wertung_shaping_full([0.05, 0.95], &state, &[5.0; 8], &[2.0; 8], 0.0, 0.0, 0.0);
         for v in out_hi.iter().chain(out_lo.iter()) {
             assert!((0.0..=1.0).contains(v), "Shift muss auf [0,1] geklemmt sein, war {v}");
         }
@@ -7214,23 +7181,6 @@ mod tests {
         let v = [0.42, 0.58];
         assert_eq!(apply_wertung_shaping(v, &state), v,
                    "bei MOSAIC_WERTUNG_SHAPING_W=0 muss der Blattwert unveraendert bleiben");
-    }
-
-    #[test]
-    fn apply_unlock_shaping_with_zero_weight_is_exact_identity() {
-        let mut rng = StdRng::seed_from_u64(9110);
-        let mut checked = 0;
-        for gi in 0..8u64 {
-            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
-            for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
-                let out = apply_unlock_shaping_with(v, &state, 0.0, 2.0);
-                assert_eq!(out, v, "Spiel {gi}: w=0.0 muss byte-identisch zur Eingabe bleiben (v={v:?})");
-                let out2 = apply_unlock_shaping_with(v, &state, 0.0, 5.0);
-                assert_eq!(out2, v);
-            }
-            checked += 1;
-        }
-        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
     }
 
     #[test]
@@ -7280,152 +7230,6 @@ mod tests {
             checked += 1;
         }
         assert!(checked >= 6, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
-    }
-
-    #[test]
-    fn apply_unlock_shaping_with_is_per_player_absolute_not_ego_only() {
-        // Nutzer-Korrektur 2026-08-11 (siehe `apply_wertung_shaping_with_is_
-        // per_player_absolute_not_ego_only`, identische Begruendung): beide
-        // Spieler bekommen unabhaengig je einen Zuschlag aus ihrem EIGENEN
-        // Brett. Beweist Formel + Index-0-Invarianz + Index-1-Reaktion.
-        let w = 0.4;
-        let beta = 1.5;
-        let mut rng = StdRng::seed_from_u64(6651);
-        let mut checked = 0;
-        let mut index1_changed = 0;
-        for gi in 0..8u64 {
-            let Some(state_a) = random_drafting_state(gi, 12, &mut rng) else { continue };
-            let Some(state_b) = random_drafting_state(gi + 500, 13, &mut rng) else { continue };
-            let mut hybrid = state_a.clone();
-            hybrid.players[1] = state_b.players[1].clone();
-
-            for s in [&state_a, &hybrid] {
-                let v = [0.5, 0.5];
-                let out = apply_unlock_shaping_with(v, s, w, beta);
-                for i in 0..2 {
-                    let pts = crate::scoring::unlock_progress_beta(&s.players[i], &s.scoring_tile_ids, beta);
-                    let expected = (v[i] + w * (pts / UNLOCK_SHAPING_SCALE).tanh()).clamp(0.0, 1.0);
-                    assert!(
-                        (out[i] - expected).abs() < 1e-12,
-                        "Spiel {gi}: Index {i} weicht von der Formel ab (out={out:?})"
-                    );
-                }
-            }
-
-            let out_a = apply_unlock_shaping_with([0.5, 0.5], &state_a, w, beta);
-            let out_hybrid = apply_unlock_shaping_with([0.5, 0.5], &hybrid, w, beta);
-            assert_eq!(
-                out_a[0], out_hybrid[0],
-                "Spiel {gi}: Index 0 haengt faelschlich vom GEGNERBRETT ab"
-            );
-            let pts_a1 = crate::scoring::unlock_progress_beta(&state_a.players[1], &state_a.scoring_tile_ids, beta);
-            let pts_b1 = crate::scoring::unlock_progress_beta(&hybrid.players[1], &hybrid.scoring_tile_ids, beta);
-            if (pts_a1 - pts_b1).abs() > 1e-9 {
-                assert_ne!(
-                    out_a[1], out_hybrid[1],
-                    "Spiel {gi}: Index 1 MUSS auf den Brett-Tausch reagieren (per-Spieler-absolut, nicht ego-only)"
-                );
-                index1_changed += 1;
-            }
-            checked += 1;
-        }
-        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
-        assert!(index1_changed >= 1, "kein einziges Spielpaar mit unterschiedlichem Gegnerfortschritt gefunden");
-    }
-
-    /// Baut ein `PlayerBoard` mit `n` (0..=3) VOLLSTAENDIG freigeschalteten
-    /// Special-Slots, alle mit Rasterreihe 0 (`wert=1` je Slot, siehe
-    /// `unlock_progress_beta`-Kommentar) -- Designs `4`/`6`/`10` haben alle
-    /// `sp_idx` in `{0,1}` (obere Haelfte ihres Slots), bei `slot_row=0`
-    /// also alle Rasterreihe `0*2+0=0`. Linear steuerbar (jeder Slot traegt
-    /// exakt `1.0` bei, keine Exponent-Interaktion zwischen VERSCHIEDENEN
-    /// Slots) -- max. 3, weil eine Slot-Reihe nur 3 Spalten hat.
-    fn board_with_n_unlocked_special_slots(n: usize) -> crate::board::PlayerBoard {
-        assert!(n <= 3, "Testaufbau: max. 3 gleichwertige Slots (eine Slot-Reihe)");
-        let mut p = crate::board::PlayerBoard::new(0, "P");
-        let pool = crate::dome::build_dome_tile_pool();
-        let designs = [4usize, 6, 10];
-        for &design in designs.iter().take(n) {
-            let mut t = pool[design].clone();
-            for sp in t.spaces.iter_mut() {
-                match sp.space_type {
-                    crate::dome::SpaceType::Special => {
-                        sp.is_locked = false;
-                        sp.placed_special = true;
-                    }
-                    crate::dome::SpaceType::Wild => sp.placed_color = Some(TileColor::Rot),
-                    crate::dome::SpaceType::Normal => sp.placed_color = sp.required_color,
-                }
-            }
-            let sc = designs.iter().position(|&d| d == design).unwrap();
-            p.dome_grid.place_dome_tile(t, 0, sc).unwrap();
-        }
-        p
-    }
-
-    #[test]
-    fn apply_unlock_shaping_with_both_sides_gain_no_antisymmetry() {
-        // Gleicher Waechter wie fuer das Wertungsplatten-EGO-Shaping: beide
-        // Spieler mit Freischalt-Fortschritt -> BEIDE Indizes steigen.
-        let mut rng = StdRng::seed_from_u64(70021);
-        let mut state = setup_new_game(names(), 0, &mut rng);
-        state.players[0] = board_with_n_unlocked_special_slots(2);
-        state.players[1] = board_with_n_unlocked_special_slots(1);
-
-        let p0 = crate::scoring::unlock_progress_beta(&state.players[0], &state.scoring_tile_ids, 2.0);
-        let p1 = crate::scoring::unlock_progress_beta(&state.players[1], &state.scoring_tile_ids, 2.0);
-        assert!(p0 > 0.0 && p1 > 0.0, "Testaufbau: beide Seiten brauchen echten Fortschritt (p0={p0}, p1={p1})");
-
-        let out = apply_unlock_shaping_with([0.5, 0.5], &state, 0.5, 2.0);
-        assert!(out[0] > 0.5, "Index 0 sollte steigen (p0={p0}), war {}", out[0]);
-        assert!(out[1] > 0.5, "Index 1 sollte steigen (p1={p1}), war {}", out[1]);
-    }
-
-    #[test]
-    fn apply_unlock_shaping_with_rejects_difference_form_same_margin_different_level() {
-        // Gleicher Waechter wie fuer das Wertungsplatten-EGO-Shaping, hier
-        // fuer den Freischalt-Term: Paar "low" hat Vorsprung 1-0=1, Paar
-        // "high" hat Vorsprung 3-2=1 -- GLEICHER Vorsprung, unterschiedliches
-        // Niveau. Eine `mine-minus-theirs`-Formel waere fuer beide Paare
-        // IDENTISCH.
-        let mut rng = StdRng::seed_from_u64(70022);
-        let mut low = setup_new_game(names(), 0, &mut rng);
-        low.players[0] = board_with_n_unlocked_special_slots(1);
-        low.players[1] = board_with_n_unlocked_special_slots(0);
-
-        let mut high = setup_new_game(names(), 0, &mut rng);
-        high.players[0] = board_with_n_unlocked_special_slots(3);
-        high.players[1] = board_with_n_unlocked_special_slots(2);
-
-        let margin_low = crate::scoring::unlock_progress_beta(&low.players[0], &low.scoring_tile_ids, 2.0)
-            - crate::scoring::unlock_progress_beta(&low.players[1], &low.scoring_tile_ids, 2.0);
-        let margin_high = crate::scoring::unlock_progress_beta(&high.players[0], &high.scoring_tile_ids, 2.0)
-            - crate::scoring::unlock_progress_beta(&high.players[1], &high.scoring_tile_ids, 2.0);
-        assert!(
-            (margin_low - margin_high).abs() < 1e-9,
-            "Testaufbau: Vorsprung sollte in beiden Faellen 1 sein (low={margin_low}, high={margin_high})"
-        );
-
-        let out_low = apply_unlock_shaping_with([0.5, 0.5], &low, 0.5, 2.0);
-        let out_high = apply_unlock_shaping_with([0.5, 0.5], &high, 0.5, 2.0);
-        assert!(
-            (out_low[0] - out_high[0]).abs() > 1e-6,
-            "gleicher Vorsprung, unterschiedliches Niveau MUSS unterschiedliche Werte liefern \
-             (Differenzform-Verdacht): low={out_low:?} high={out_high:?}"
-        );
-    }
-
-    #[test]
-    fn apply_unlock_shaping_with_clamps_extreme_shifts_to_unit_interval() {
-        let mut rng = StdRng::seed_from_u64(9112);
-        let Some(state) = random_drafting_state(0, 16, &mut rng) else {
-            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
-        };
-        let out_hi = apply_unlock_shaping_with([0.95, 0.05], &state, 5.0, 2.0);
-        let out_lo = apply_unlock_shaping_with([0.05, 0.95], &state, 5.0, 2.0);
-        for v in out_hi.iter().chain(out_lo.iter()) {
-            assert!((0.0..=1.0).contains(v), "Shift muss auf [0,1] geklemmt sein, war {v}");
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════

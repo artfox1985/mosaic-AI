@@ -16,7 +16,9 @@ use crate::mcts::{dynamic_sims, search_log_header, search_log_text, search_move_
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction, TakeBonusChipMove, TakeSource};
 use crate::net::Net;
 use crate::net_mcts::{self, net_search_with_tree};
-use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, generate_tiling_actions, TilingAction};
+use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, TilingAction};
+#[cfg(test)]
+use crate::round_end::generate_tiling_actions;
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
 use crate::tiling_solver::{best_first_step_exact_or_valued, solve_round_final_score, TilingStep};
