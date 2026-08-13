@@ -482,8 +482,13 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         return None;
     }
     let player = &state.players[state.current_player];
+    // Runde 3 (Nutzer-Auftrag 2026-08-13, PREREG_provokation.md §11/§12):
+    // einmal je Entscheid berechnet, nicht je Kandidat -- `verbleibende_
+    // farben` iteriert den ganzen sichtbaren Zustand (siehe Doku dort), das
+    // in der Kandidatenschleife zu wiederholen waere O(n^2) ohne Nutzen.
+    let verbleibend = verbleibende_farben(state);
     let moves = crate::validation::generate_valid_moves(state);
-    let mut best: Option<(usize, i32, i32, crate::moves::Move)> = None;
+    let mut best: Option<(usize, i64, i32, i32, crate::moves::Move)> = None;
     for m in moves {
         let r = m.place.row_index;
         if !(0..=5).contains(&r) {
@@ -518,18 +523,115 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         // Strafleiste einen Anstieg, ist das der naechste Verfeinerungspunkt.
         let zeile = &player.pattern_lines[r];
         let fuellung = zeile.tiles.len() as i32;
-        let kandidat = (0usize, -fuellung, r as i32, m);
+        // Task 3 (Runde 3, Nutzer-Auftrag 2026-08-13): unter mehreren
+        // Kandidaten gewinnt jetzt die KNAPPSTE Farbe zuerst (PRIMAeR),
+        // "vollste Reihe zuerst" bleibt nur noch der Tie-Break darunter --
+        // was knapp ist und JETZT angeboten wird, kommt vielleicht nie
+        // wieder (PREREG_provokation.md §11: 74,1% Blocker "Farbe nicht im
+        // Angebot"). Kleinerer `knappheit`-Wert (wenig verbleibend) gewinnt,
+        // weil `besser` auf Tupel-`<` sortiert.
+        let knappheit = farben_index(m.take.color)
+            .map(|i| verbleibend[i])
+            .unwrap_or(i64::MAX); // TakeAction liefert nie Wild (kein ziehbarer Stein, tile.rs); defensiv.
+        let kandidat = (0usize, knappheit, -fuellung, r as i32, m);
         let besser = match &best {
             None => true,
-            Some((u, f, rr, _)) => {
-                (kandidat.0, kandidat.1, kandidat.2) < (*u, *f, *rr)
+            Some((u, k, f, rr, _)) => {
+                (kandidat.0, kandidat.1, kandidat.2, kandidat.3) < (*u, *k, *f, *rr)
             }
         };
         if besser {
             best = Some(kandidat);
         }
     }
-    best.map(|(_, _, _, m)| crate::moves::Action::Stone(m))
+    best.map(|(_, _, _, _, m)| crate::moves::Action::Stone(m))
+}
+
+// ── Runde 3: zaehlbare Versorgung (Nutzer-Auftrag 2026-08-13) ───────────────
+//
+// PREREG_provokation.md §11 letzter Satz: dominanter Blocker (74,1%) ist
+// nicht mehr Farblogik, sondern die VERSORGUNG -- die fuer die Zielspalte
+// geforderte Farbe war schlicht nirgends im Angebot. `verbleibende_farben`
+// beantwortet die dafuer nötige Frage "wie viel von Farbe X ist ueberhaupt
+// noch NICHT verbraucht", aus rein OEFFENTLICHER Information.
+
+/// Anzahl normaler Farbsteine je Farbe, die JETZT weder auf einem der beiden
+/// Spielerbretter verbaut noch in einer Fabrik/der Grossen Fabrik sichtbar
+/// ausliegen -- also (noch ungezogen) im Beutel ODER (schon verworfen, wird
+/// wieder eingemischt) im Ablageturm liegen. Rechnung: Gesamtvorrat
+/// (`TILES_PER_COLOR`, Regelbuch-Konstante) minus jede sichtbar VERBAUTE oder
+/// AUSLIEGENDE Kachel dieser Farbe.
+///
+/// BEWUSST NICHT `state.bag`/`state.tower` direkt gelesen -- das waere die
+/// exakte Beutel-/Turm-ZUSAMMENSETZUNG, die kein menschlicher Spieler je
+/// sieht (nur ihre Groesse, `supply.rs::Bag::count`/`Tower::count`, nicht die
+/// Farbverteilung). Die Differenz aus oeffentlicher Information liefert
+/// exakt dieselbe Zahl -- ein Mensch kaeme mit einer Strichliste ebenso
+/// darauf: er zaehlt ab, was er auf beiden Brettern und in der Tischmitte
+/// SIEHT, der Rest muss im Beutel oder Turm sein.
+///
+/// Gezaehlt (alles oeffentlich sichtbar, GameState-Felder):
+///  - `state.factories[*].sun_tiles` + `.moon_stacks` (`factory.rs`),
+///  - `state.large_factory.sun_tiles` + `.moon_pool` (`factory.rs`),
+///  - je Spieler: `pattern_lines[*].tiles`, `broken_tiles` (Strafleiste),
+///    `dome_grid.dome_slots[*][*]`s `spaces[*].placed_color` (`board.rs`,
+///    `dome.rs`).
+///
+/// Ergebnis in der Reihenfolge von `TileColor::NORMAL`, siehe
+/// [`farben_index`]. `i64` statt `usize`: eine Inkonsistenz soll als
+/// sichtbar NEGATIVE Zahl auffallen statt in einem Unsigned-Underflow zu
+/// verschwinden (defensiv, kein Panic) -- Aufrufer clampen selbst auf 0.
+pub(crate) fn verbleibende_farben(state: &GameState) -> [i64; 5] {
+    let mut verbaut = [0i64; 5];
+    let mut zaehle = |c: TileColor| {
+        if let Some(i) = farben_index(c) {
+            verbaut[i] += 1;
+        }
+    };
+    for f in &state.factories {
+        for &c in &f.sun_tiles {
+            zaehle(c);
+        }
+        for stack in &f.moon_stacks {
+            for &c in stack {
+                zaehle(c);
+            }
+        }
+    }
+    for &c in &state.large_factory.sun_tiles {
+        zaehle(c);
+    }
+    for &c in &state.large_factory.moon_pool {
+        zaehle(c);
+    }
+    for p in &state.players {
+        for line in &p.pattern_lines {
+            for &c in &line.tiles {
+                zaehle(c);
+            }
+        }
+        for &c in &p.broken_tiles {
+            zaehle(c);
+        }
+        for row in &p.dome_grid.dome_slots {
+            for slot in row {
+                if let Some(tile) = slot {
+                    for space in &tile.spaces {
+                        if let Some(c) = space.placed_color {
+                            zaehle(c);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - verbaut[i])
+}
+
+/// Index 0..=4 von `color` in `TileColor::NORMAL` -- `None` fuer `Wild`
+/// (kein ziehbarer Stein, siehe `tile.rs`-Doku "kein ziehbarer Stein").
+pub(crate) fn farben_index(color: TileColor) -> Option<usize> {
+    TileColor::NORMAL.iter().position(|&c| c == color)
 }
 
 #[cfg(test)]
@@ -590,6 +692,53 @@ mod vorzugszug_tests {
     /// `drafting_game` deckt zufaellig zusaetzliche Fabriken/Farben aus dem
     /// Beutel auf, die ueber ANDERE Zeilen der Spalte einen Kandidaten
     /// liefern koennten und die Aussage damit verwaessern wuerden).
+    /// Task 3 (Runde 3, Nutzer-Auftrag 2026-08-13): unter mehreren
+    /// Kandidaten muss die KNAPPSTE Farbe gewinnen, nicht mehr nur die
+    /// vollste Reihe. Aufbau: Zeile 0 fordert Rot (leer, Fuellung 0), Zeile 1
+    /// fordert Gelb (schon 1 Fliese, Fuellung 1 -- unter der ALTEN Regel
+    /// waere Gelb der Sieger). Rot wird bis auf das aktuelle Angebot restlos
+    /// verbraucht (11 weitere Kopien sichtbar im Mondbereich der Grossen
+    /// Fabrik + 2 angebotene = 13 von 13, Rest 0), Gelb bleibt reichlich
+    /// (nur 3 von 13 sichtbar verbraucht).
+    #[test]
+    fn vorzugszug_fuer_spalte_bevorzugt_knappe_farbe_vor_vollerer_reihe() {
+        let mut game = drafting_game(103);
+        let pi = game.state.current_player;
+        // Slot (0,0), Rotation 0: si=0 -> (Zeile0,Spalte0)=Rot,
+        // si=2 -> (Zeile1,Spalte0)=Gelb (dieselbe Geometrie wie
+        // `vorzugszug_fuer_spalte_akzeptiert_jede_farbe_an_einer_wild_zelle`).
+        let tile = DomeTile::new(
+            52,
+            vec![
+                DomeSpace::normal(Rot),
+                DomeSpace::normal(Blau),
+                DomeSpace::normal(Gelb),
+                DomeSpace::normal(Schwarz),
+            ],
+            0,
+        );
+        game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
+        game.state.players[pi].pattern_lines[1].color = Some(Gelb);
+        game.state.players[pi].pattern_lines[1].tiles.push(Gelb);
+
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        game.state.factories[1].sun_tiles = vec![Gelb, Gelb];
+        game.state.large_factory.moon_pool = vec![Rot; 11];
+
+        let ergebnis =
+            vorzugszug_fuer_spalte(&game.state, 0).expect("es muss einen Kandidaten geben (Rot ODER Gelb)");
+        match ergebnis {
+            Action::Stone(m) => {
+                assert_eq!(
+                    m.place.row_index, 0,
+                    "die KNAPPE Farbe (Rot, Zeile 0) muss gewinnen, nicht die vollere Zeile 1 (Gelb)"
+                );
+                assert_eq!(m.take.color, Rot);
+            }
+            other => panic!("erwartet Action::Stone, bekam {other:?}"),
+        }
+    }
+
     #[test]
     fn vorzugszug_fuer_spalte_ignoriert_special_zellen() {
         let mut game = drafting_game(102);
@@ -611,5 +760,66 @@ mod vorzugszug_tests {
                 "die Special-Zelle (Zeile 0) darf NIE als Ziel gewaehlt werden, Zug war {m:?}"
             );
         }
+    }
+
+    #[test]
+    fn farben_index_deckt_alle_fuenf_normalfarben_ab_und_verwirft_wild() {
+        let mut gesehen = std::collections::HashSet::new();
+        for c in crate::tile::TileColor::NORMAL {
+            let i = farben_index(c).expect("jede Normalfarbe muss einen Index haben");
+            assert!(i < 5);
+            gesehen.insert(i);
+        }
+        assert_eq!(gesehen.len(), 5, "alle 5 Indizes muessen verschieden sein");
+        assert_eq!(farben_index(crate::tile::TileColor::Wild), None, "Wild ist kein ziehbarer Stein");
+    }
+
+    /// Task 1 (Runde 3): `verbleibende_farben` muss Gesamtvorrat minus JEDE
+    /// sichtbare Fundstelle liefern -- Fabrik, Grosse Fabrik (Sonne+Mond),
+    /// beide Spielerbretter (Musterreihen, Strafleiste, verbaute Kuppelzellen).
+    /// NICHT gezaehlt: `state.bag`/`state.tower` selbst (die Differenz IST
+    /// das Ergebnis).
+    #[test]
+    fn verbleibende_farben_zaehlt_jede_sichtbare_fundstelle() {
+        let mut game = drafting_game(104);
+        let pi = game.state.current_player;
+        let gegner = 1 - pi;
+
+        // Tischmitte deterministisch leeren -- `drafting_game` fuellt beim
+        // Partiestart ALLE Fabriken/die Grosse Fabrik aus dem echten
+        // (zufaelligen) Beutel; ohne dieses Leeren koennten dort zufaellig
+        // WEITERE Rot-Kopien liegen und die exakte Zaehlung unten verwaessern.
+        for f in game.state.factories.iter_mut() {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
+
+        // 2 Rot in Fabrik 0, 1 Rot im Mond der Grossen Fabrik.
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        game.state.large_factory.moon_pool = vec![Rot];
+        // 1 Rot auf der Strafleiste des Gegners.
+        game.state.players[gegner].broken_tiles = vec![Rot];
+        // 1 Rot in einer Musterreihe des aktiven Spielers.
+        game.state.players[pi].pattern_lines[2].color = Some(Rot);
+        game.state.players[pi].pattern_lines[2].tiles.push(Rot);
+        // 1 Rot als VERBAUTE (platzierte) Kuppelzelle beim Gegner.
+        let tile = DomeTile::new(53, vec![DomeSpace::normal(Rot), DomeSpace::normal(Blau), DomeSpace::normal(Gelb), DomeSpace::normal(Schwarz)], 0);
+        game.state.players[gegner].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
+        game.state.players[gegner].dome_grid.dome_slots[0][0].as_mut().unwrap().spaces[0].placed_color = Some(Rot);
+
+        let verbleibend = verbleibende_farben(&game.state);
+        let i = farben_index(Rot).unwrap();
+        // 2 (Fabrik) + 1 (Mond GF) + 1 (Strafleiste) + 1 (Musterreihe) + 1 (verbaut) = 6 sichtbare Rot.
+        assert_eq!(
+            verbleibend[i],
+            crate::tile::TILES_PER_COLOR as i64 - 6,
+            "muss 13 minus alle 6 sichtbaren Rot-Fundstellen sein: {verbleibend:?}"
+        );
+        // Blau wurde in diesem Test nirgends platziert und die Tischmitte ist
+        // deterministisch leer -- muss exakt beim vollen Vorrat stehen.
+        let bi = farben_index(Blau).unwrap();
+        assert_eq!(verbleibend[bi], crate::tile::TILES_PER_COLOR as i64);
     }
 }
