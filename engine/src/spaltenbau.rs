@@ -72,7 +72,7 @@ pub(crate) fn set_aktiv_override_for_test(v: Option<bool>) {
     AKTIV_OVERRIDE.with(|c| c.set(v));
 }
 
-fn ist_aktiv() -> bool {
+pub(crate) fn ist_aktiv() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = AKTIV_OVERRIDE.with(|c| c.get()) {
@@ -115,7 +115,7 @@ fn ist_aktiv() -> bool {
 /// je Entscheid vorberechnet, siehe [`crate::provokation::verbleibende_farben`])
 /// -- keine Suche, kein Blick in Beutel/Turm selbst -- daher weiterhin O(6) je
 /// Spalte (die Special-Nachbarpruefung ist selbst O(1), feste 2x2-Slot-Geometrie).
-fn spalten_kosten(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
+pub(crate) fn spalten_kosten(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
     let mut kosten = 0.0;
     for r in 0..6usize {
         kosten += match player.dome_grid.get_space(r, spalte) {
@@ -150,7 +150,7 @@ fn spalten_kosten(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -
 /// frei ist" (wortgleiche Nutzer-Vorgabe) gilt damit selbst im Extremfall.
 const ENGPASS_MAX: f64 = 2.5;
 
-fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
+pub(crate) fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
     let Some(i) = crate::provokation::farben_index(farbe) else {
         return 0.0; // Wild ist keine ziehbare Farbe, kommt hier nie vor; defensiv.
     };
@@ -167,7 +167,7 @@ fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
 /// nicht ihre Farbe. Fehlt ein Nachbar-Slot ganz (kein `DomeSpace`, sollte bei
 /// einer bereits platzierten Kachel nicht vorkommen), zaehlt er als GEFUELLT
 /// (konservativ: kein Nachbar heisst hier kein zusaetzlicher Blocker).
-fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize) -> f64 {
+pub(crate) fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize) -> f64 {
     let slot_row = r / 2;
     let slot_col = spalte / 2;
     let mut offene_nachbarn = 0u32;
@@ -310,7 +310,7 @@ pub(crate) fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingS
 /// gut (keine Farbbindung noetig); eine Normal-Farbe ist gut, wenn die
 /// Musterreihe `r` schon leer ist oder GENAU diese Farbe fuehrt, und
 /// ungeeignet (0), wenn die Reihe an eine andere Farbe gebunden ist.
-fn zellen_wert(player: &PlayerBoard, r: usize, space: &DomeSpace) -> f64 {
+pub(crate) fn zellen_wert(player: &PlayerBoard, r: usize, space: &DomeSpace) -> f64 {
     match space.space_type {
         SpaceType::Wild => 3.0,
         SpaceType::Special => 2.0,
