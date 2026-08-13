@@ -36,6 +36,7 @@ Ablage: `data/ownership_corpus/` (strukturell außerhalb des Standard-Fensters,
 | C | wie A + MOSAIC_PLATTENBAU=2 | 1000 | k2-Positivbeispiele (>50 % volle Diagonalen) |
 | D | Heuristik-Self-Play (150 Sims) | 1000 | k6-Demonstrationen + generelle Plattenbewirtschaftung (wertung_progress); billigster Arm |
 | E | wie A + k5-Bauer (MOSAIC_PLATTENBAU=5, wird gebaut) | 1000 | k5-Positivbeispiele. Nutzer-Entwurf: Spalten-PAAR-Ziel (äußeres Paar 0+1 oder 4+5) — schließt beide Ecken der Seite (8+3 = 11 = Orakel) und harmoniert mit k1 (laut scoring.rs:60-64 nicht wechselseitig ausgeschlossen); Spezialkuppeln in die unteren Ecken ((2,0)/(2,2), 8-Punkte-Seite, Nutzer-Taktik) |
+| F | wie A + k6-Spezialbauer (MOSAIC_PLATTENBAU=6, Bestand) | 1000 | k6 vom Netz-Pol (Nutzer-Entscheid 2026-08-14): der bestehende Spezialbauer spielt −9,75 gegen −15,00 des nackten Netzes (§19-Anker, nachgerechnet). Zusammen mit Arm D deckt der Korpus k6 damit von BEIDEN Polen — Netz-Seite über den Bauer, Heuristik-Seite über wertung_progress (−6,60 bis −11,10) |
 
 Bewusst KEINE nachträgliche Selektion in v1: Die Arm-Quoten ERSETZEN die
 Selektion (gezielte Anreicherung statt Verzerrung der Basisrate). Eine
@@ -169,9 +170,9 @@ GLEICH mit config.py, NICHT mit "25". **Zwei veraltete Stellen korrigiert**
 
 ## §5 Umfang und Kosten (Herleitung, keine Messung)
 
-7000 Partien gesamt (Arm E per Nutzer-Entscheid 2026-08-14 gleich mit
-eingeplant statt über den Deckungs-Bericht nachzuziehen; Voraussetzung:
-k5-Bauer besteht seine eigene Abnahme in PREREG_provokation.md §20).
+8000 Partien gesamt (Arm E und Arm F per Nutzer-Entscheid 2026-08-14 gleich
+mit eingeplant; k5-Bauer hat seine Abnahme in PREREG_provokation.md §20
+bestanden — 3,68 → 8,55, t=4,56; der k6-Spezialbauer ist Bestand).
 Bezug: Arena-Durchsatz 248,5 Spiele/h (8 Threads, §20);
 Self-Play mit Labels liegt darunter, Heuristik-Arm weit darüber. Grobschätzung
 20–30 h CPU für A–C, Arm D <2 h; mit GPU-2× entsprechend die Hälfte. Läuft
