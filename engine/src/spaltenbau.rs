@@ -42,6 +42,7 @@ use crate::board::PlayerBoard;
 use crate::dome::{rotation_indices, DomeSpace, DomeTile, SpaceType};
 use crate::moves::{Action, PendingDomeChoice, PlaceDomeTileMove};
 use crate::state::GameState;
+use crate::tile::TileColor;
 use crate::tiling_solver::TilingStep;
 
 /// Liest `MOSAIC_SPALTENBAU` einmalig (Prozess-Cache, gleiches Muster wie
@@ -87,14 +88,24 @@ fn ist_aktiv() -> bool {
 /// (kleiner = leichter). Je Zeile 0..=5 der Spalte:
 ///  - kein Slot dort -- neutral (unbekannt, weder Fortschritt noch Blockade).
 ///  - Zelle schon gefuellt -- Fortschritt, kostet nichts mehr.
-///  - Wild/Special -- keine Farbbindung, billig.
+///  - Wild -- keine Farbbindung, billig.
+///  - Special -- TEUER, GEMESSENE Umbepreisung (Task 7b, Nutzer-Auftrag
+///    2026-08-13, Abnahmelauf `fd2d15e`): eine Special-Zelle fuellt sich erst
+///    automatisch, wenn ihre 3 Slot-Nachbarzellen komplett sind
+///    (`round_end::check_special_trigger`) -- 10 von 12 Blockern der letzten
+///    Runde 2-Messung waren genau solche Zellen. Die Kosten SKALIEREN mit der
+///    Zahl der noch offenen Nachbarn (0 offen -> 0,3, so billig wie eine
+///    passende Normal-Zelle; 3 offen -> 2,7, teurer als eine falsch gebundene
+///    Normal-Zelle) statt eines fixen Werts -- das bildet "braucht 3
+///    Slot-Nachbarzellen" direkt ab, nicht nur "ist irgendwie schwieriger".
 ///  - Normal, ungefuellt: billig, wenn die Musterreihe leer ist (offen) oder
 ///    schon GENAU die geforderte Farbe fuehrt; teuer, wenn sie an eine ANDERE
 ///    Farbe gebunden ist (diese Runde fuer diese Zeile blockiert -- Nutzer-
 ///    Vorgabe "schon gefuellte Zellen"/"Farbforderungen" einbeziehen).
 ///
 /// Rein additiv aus dem Brett ablesbar (`dome_grid`/`pattern_lines`), keine
-/// Suche, kein Blick in Fabriken/Beutel -- daher in O(6) je Spalte.
+/// Suche, kein Blick in Fabriken/Beutel -- daher in O(6) je Spalte (die
+/// Special-Nachbarpruefung ist selbst O(1), feste 2x2-Slot-Geometrie).
 fn spalten_kosten(player: &PlayerBoard, spalte: usize) -> f64 {
     let mut kosten = 0.0;
     for r in 0..6usize {
@@ -103,7 +114,7 @@ fn spalten_kosten(player: &PlayerBoard, spalte: usize) -> f64 {
             Some(sp) if sp.is_filled() => 0.0,
             Some(sp) => match sp.space_type {
                 SpaceType::Wild => 0.2,
-                SpaceType::Special => 0.3,
+                SpaceType::Special => special_kosten(player, r, spalte),
                 SpaceType::Normal => {
                     let need = sp.required_color;
                     match (player.pattern_lines[r].color, need) {
@@ -118,31 +129,116 @@ fn spalten_kosten(player: &PlayerBoard, spalte: usize) -> f64 {
     kosten
 }
 
-/// Leichteste Spalte fuer den AKTIVEN Spieler -- frisch aus `state`
-/// berechnet, KEIN gespeicherter Zustand. Genau dadurch "erlaubt" die
-/// Funktion einen Wechsel, wenn die bisherige Ziel-Spalte unbedienbar wird
-/// (Nutzer-Vorgabe): der naechste Aufruf sieht den neuen Brettzustand und
-/// kann eine andere Spalte liefern, ohne dass irgendwo ein Flag geloescht
-/// werden muesste (kein Leck-Risiko wie bei
-/// `provokation::AUTO_SPALTE`/`set_ziel_spalte_seed`).
+/// Kosten einer noch unbefuellten Special-Zelle `(r, spalte)`: `0,3 + 0,8 *
+/// n`, `n` = Zahl der noch NICHT gefuellten der 3 anderen Zellen im selben
+/// 2x2-Dome-Slot. Geometrie wie `slot_score` (Slot `(r/2, spalte/2)` deckt
+/// Rasterzeilen `2*(r/2)`/`2*(r/2)+1` und -spalten `2*(spalte/2)`/
+/// `2*(spalte/2)+1` ab) -- hier reicht die Zeilen-/Spaltenrechnung direkt,
+/// ohne Rotation/`tile.spaces`, weil nur der FUELLSTAND der Nachbarn zaehlt,
+/// nicht ihre Farbe. Fehlt ein Nachbar-Slot ganz (kein `DomeSpace`, sollte bei
+/// einer bereits platzierten Kachel nicht vorkommen), zaehlt er als GEFUELLT
+/// (konservativ: kein Nachbar heisst hier kein zusaetzlicher Blocker).
+fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize) -> f64 {
+    let slot_row = r / 2;
+    let slot_col = spalte / 2;
+    let mut offene_nachbarn = 0u32;
+    for dr in 0..2usize {
+        for dc in 0..2usize {
+            let rr = slot_row * 2 + dr;
+            let cc = slot_col * 2 + dc;
+            if rr == r && cc == spalte {
+                continue; // die Special-Zelle selbst ist kein eigener Nachbar.
+            }
+            let gefuellt = player.dome_grid.get_space(rr, cc).map_or(true, |s| s.is_filled());
+            if !gefuellt {
+                offene_nachbarn += 1;
+            }
+        }
+    }
+    0.3 + 0.8 * offene_nachbarn as f64
+}
+
+/// Toleranzband um das Kosten-Minimum, innerhalb dessen eine Spalte als
+/// "nahe am Minimum" gilt (Task 7c). Kalibriert auf die Kosten-Skala oben:
+/// deckt bis zu zwei Zeilen roher Geschmacksunterschiede ab (Wild 0,2 vs.
+/// offene/passende Normal-Zelle 0,3, macht 0,1 je Zeile), schliesst aber
+/// jede einzelne echte Blockade-Zeile aus (kleinster Blockade-Sprung: offene
+/// Musterreihe 1,0 -> falsch gebundene Normal-Zelle 2,0, ein Sprung von 1,0).
+const SPALTEN_TOLERANZ: f64 = 0.5;
+
+/// Waehlt EINE Spalte aus den Kosten aller 6 Spalten: die guenstigste ODER --
+/// bei gesetztem Partie-Seed (Task 7c, Nutzer-Auftrag 2026-08-13) -- eine
+/// deterministisch GESTREUTE Wahl unter allen Spalten, deren Kosten
+/// hoechstens `SPALTEN_TOLERANZ` ueber dem Minimum liegen. Ohne Seed
+/// (Bestandsverhalten, auch in allen bisherigen Tests) gewinnt bei
+/// Gleichstand/Naehe weiterhin die KLEINSTE Spaltennummer -- stabil,
+/// deterministisch, `<` statt `<=` beim Minimum-Vergleich.
 ///
-/// Bei Gleichstand gewinnt die KLEINERE Spaltennummer (stabile, deterministische
-/// Wahl -- `<` statt `<=` beim Vergleich).
+/// WARUM Streuung ueberhaupt noetig ist: ohne jede Platte sind alle 6 Spalten
+/// exakt gleich teuer (6,0) -- ohne Streuung waere die Zielspalte damit fuer
+/// JEDE Partie zu Beginn IMMER Spalte 0, und ein frueher Wechsel weg von
+/// Spalte 0 braeuchte einen Kostenunterschied, der sich oft erst spaet
+/// einstellt. Das Verteilungs-Gate (Nutzer-Ergaenzung) prueft genau das:
+/// Ereignisse muessen auf allen sechs Spalten auftauchen, nicht nur auf 0.
+fn waehle_spalte(kosten: [f64; 6]) -> usize {
+    let min_kosten = kosten.iter().cloned().fold(f64::INFINITY, f64::min);
+    let kandidaten: Vec<usize> = (0..6usize).filter(|&c| kosten[c] - min_kosten <= SPALTEN_TOLERANZ).collect();
+    if kandidaten.len() <= 1 {
+        return kandidaten.first().copied().unwrap_or(0);
+    }
+    match PARTIE_SEED.with(|c| c.get()) {
+        None => kandidaten[0],
+        Some(seed) => kandidaten[index_aus_seed(seed, kandidaten.len())],
+    }
+}
+
+thread_local! {
+    /// Partie-Seed fuer die Kosten-Streuung in [`waehle_spalte`] (Task 7c).
+    /// `None` = kein Seed gesetzt -- Bestandsverhalten (kleinste
+    /// Spaltennummer bei Gleichstand/Naehe).
+    static PARTIE_SEED: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Setzt (oder loescht mit `None`) den Partie-Seed fuer DIESEN Thread --
+/// gleiches Muster wie `net_mcts::set_partie_shaping_weight`/
+/// `provokation::set_ziel_spalte_seed`. Aufrufer MUSS am Partieende (oder vor
+/// der naechsten Partie desselben Threads) mit `None`/dem neuen Seed
+/// ueberschreiben, sonst leckt der Wert in die naechste Partie.
+pub(crate) fn set_partie_seed(seed: Option<u64>) {
+    PARTIE_SEED.with(|c| c.set(seed));
+}
+
+/// Deterministische Mischung Seed -> Index `0..n` -- identisches SplitMix64-
+/// Muster wie `net_mcts::partie_gewicht_aus_seed`/`provokation::spalte_aus_
+/// seed` (aufeinanderfolgende Partie-Seeds unterscheiden sich im Self-Play
+/// oft nur in den unteren Bits, eine rohe Modulo-Bildung ergaebe eine Treppe
+/// statt einer Streuung). `n == 0` kommt hier nie vor (Aufrufer filtert immer
+/// mindestens den Minimum-Eintrag selbst ein), degradiert defensiv auf 0.
+fn index_aus_seed(seed: u64, n: usize) -> usize {
+    if n == 0 {
+        return 0;
+    }
+    let mut z = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z % n as u64) as usize
+}
+
+/// Ziel-Spalte fuer den AKTIVEN Spieler -- frisch aus `state` berechnet, KEIN
+/// gespeicherter Zustand. Genau dadurch "erlaubt" die Funktion einen Wechsel,
+/// wenn die bisherige Ziel-Spalte unbedienbar wird (Nutzer-Vorgabe): der
+/// naechste Aufruf sieht den neuen Brettzustand und kann eine andere Spalte
+/// liefern, ohne dass irgendwo ein Flag geloescht werden muesste (kein
+/// Leck-Risiko wie bei `provokation::AUTO_SPALTE`/`set_ziel_spalte_seed`).
+/// Auswahl unter den guenstigsten Kandidaten: siehe [`waehle_spalte`].
 pub(crate) fn ziel_spalte(state: &GameState) -> Option<usize> {
     if !ist_aktiv() {
         return None;
     }
     let player = &state.players[state.current_player];
-    let mut best: Option<(f64, usize)> = None;
-    for c in 0..6usize {
-        let k = spalten_kosten(player, c);
-        best = match best {
-            None => Some((k, c)),
-            Some((bk, _)) if k < bk => Some((k, c)),
-            other => other,
-        };
-    }
-    best.map(|(_, c)| c)
+    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c));
+    Some(waehle_spalte(kosten))
 }
 
 // ── Wiederverwendung: Stein-Zug- und Tiling-Praeferenz mit dynamischer Spalte ──
@@ -165,19 +261,14 @@ pub(crate) fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingS
     if !ist_aktiv() {
         return None;
     }
-    let spalte = {
-        let player = &state.players[pi];
-        let mut best: Option<(f64, usize)> = None;
-        for c in 0..6usize {
-            let k = spalten_kosten(player, c);
-            best = match best {
-                None => Some((k, c)),
-                Some((bk, _)) if k < bk => Some((k, c)),
-                other => other,
-            };
-        }
-        best.map(|(_, c)| c)
-    }?;
+    // `pi` bewusst NICHT durch `state.current_player` ersetzt und stattdessen
+    // `ziel_spalte(state)` aufgerufen -- die beiden sind an dieser Aufrufstelle
+    // in der Praxis identisch (siehe self_play.rs, `Phase::Tiling`-Arm), aber
+    // die Signatur haelt die Unterscheidung bewusst offen, gleiche Auswahl-
+    // Logik wie `ziel_spalte` ueber [`waehle_spalte`].
+    let player = &state.players[pi];
+    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c));
+    let spalte = waehle_spalte(kosten);
     crate::tiling_solver::vorzug_tiling_step_fuer_spalte(state, pi, spalte)
 }
 
@@ -334,6 +425,177 @@ pub(crate) fn vorzug_dome_wahl(state: &GameState) -> Option<Action> {
     })
 }
 
+// ── Entscheidungs-Spur (Nutzer-Ergaenzung 2026-08-13, VOR der Runde-2- ──────
+// Abnahme angefordert): "damit die Iteration sieht, WIE die Entscheidungen
+// fallen, nicht nur die Aggregate". `MOSAIC_SPALTENBAU_TRACE=1` (Default
+// AUS, Paritaet unberuehrt) schreibt je Entscheidung EINE zusaetzliche
+// Logzeile mit Praefix `[SB]` ueber den bestehenden `log_event`-Strom --
+// ADDITIV, keine bestehende Logzeile aendert sich (der pre-push-Hook und
+// `analyze_game_log.py`s Regexes haengen am Wortlaut der ALTEN Zeilen, siehe
+// dortige Muster). `log_event` selbst haengt bereits `[R{runde}] ` vor jede
+// Zeile -- die Zeilen hier tragen deshalb nur noch das `[SB]`-Praefix.
+
+/// Liest `MOSAIC_SPALTENBAU_TRACE` einmalig (Prozess-Cache, gleiches Muster
+/// wie `aktiv_env`).
+fn trace_env() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_SPALTENBAU_TRACE") {
+        Err(_) => false,
+        Ok(raw) => {
+            let v = raw.trim();
+            !v.is_empty() && v != "0"
+        }
+    })
+}
+
+#[cfg(test)]
+thread_local! {
+    static TRACE_OVERRIDE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn set_trace_override_for_test(v: Option<bool>) {
+    TRACE_OVERRIDE.with(|c| c.set(v));
+}
+
+fn ist_trace_aktiv() -> bool {
+    #[cfg(test)]
+    {
+        if let Some(v) = TRACE_OVERRIDE.with(|c| c.get()) {
+            return v;
+        }
+    }
+    trace_env()
+}
+
+/// Alle Farben, die JETZT irgendwo nehmbar sind (Fabriken, grosse Fabrik,
+/// Mond, Stapel) -- direkt aus `validation::generate_valid_moves` extrahiert
+/// statt Quellen einzeln nachzubauen (CLAUDE.md: Bestehendes wiederverwenden).
+/// Gruppiert nach Quelle fuer die Log-Lesbarkeit ("welche Farben in welchen
+/// Quellen verfuegbar" -- Nutzer-Vorgabe).
+fn angebot_zusammenfassung(state: &GameState) -> String {
+    let mut nach_quelle: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+        std::collections::BTreeMap::new();
+    for m in crate::validation::generate_valid_moves(state) {
+        let quelle = match m.take.source {
+            crate::moves::TakeSource::SmallFactorySun => {
+                format!("F{}s", m.take.factory_id.unwrap_or(0))
+            }
+            crate::moves::TakeSource::SmallFactoryMoon => match m.take.factory_id {
+                Some(id) => format!("F{id}m"),
+                None => "Mond".to_string(),
+            },
+            crate::moves::TakeSource::LargeFactorySun => "GFs".to_string(),
+            crate::moves::TakeSource::LargeFactoryMoon => "GFm".to_string(),
+        };
+        nach_quelle.entry(quelle).or_default().insert(format!("{:?}", m.take.color));
+    }
+    if nach_quelle.is_empty() {
+        return "keine_zuege".to_string();
+    }
+    nach_quelle
+        .into_iter()
+        .map(|(q, farben)| format!("{q}:{}", farben.into_iter().collect::<Vec<_>>().join("+")))
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+/// Warum existierte KEIN Vorzugs-Kandidat fuer `spalte`? Erste Zeile in
+/// `spalte` mit einem konkreten, benennbaren Blockade-Grund (Nutzer-Vorgabe:
+/// "geforderte Farbe nicht im Angebot? Reihe blockiert mit anderer Farbe?
+/// Zelle schon voll? Slot fehlt?"). Special-Zeilen werden uebersprungen (sie
+/// nehmen nie eine Farbe entgegen, sind also kein Vorzugs-Blocker in diesem
+/// Sinn); Wild-Zeilen nur, wenn ueberhaupt keine Farbe im Angebot ist (jede
+/// Farbe qualifiziert dort, siehe `provokation::vorzugszug_fuer_spalte`).
+fn kein_vorzug_grund(state: &GameState, player: &PlayerBoard, spalte: usize) -> String {
+    let angebot: std::collections::HashSet<TileColor> = crate::validation::generate_valid_moves(state)
+        .into_iter()
+        .map(|m| m.take.color)
+        .collect();
+    for r in 0..6usize {
+        let Some(sp) = player.dome_grid.get_space(r, spalte) else {
+            continue; // "Slot fehlt" -- kein benennbarer Blocker in DIESER Zeile.
+        };
+        if sp.is_filled() {
+            continue; // "Zelle schon voll" -- ebenfalls kein aktueller Blocker.
+        }
+        match sp.space_type {
+            SpaceType::Special => continue,
+            SpaceType::Wild => {
+                if angebot.is_empty() {
+                    return format!("Zeile{r}:keine_farbe_im_angebot(Wild)");
+                }
+            }
+            SpaceType::Normal => {
+                let Some(need) = sp.required_color else { continue };
+                if let Some(gebunden) = player.pattern_lines[r].color {
+                    if gebunden != need {
+                        return format!("Zeile{r}:reihe_gebunden_an_{gebunden:?}_statt_{need:?}");
+                    }
+                }
+                if !angebot.contains(&need) {
+                    return format!("Zeile{r}:farbe_{need:?}_nicht_im_angebot");
+                }
+            }
+        }
+    }
+    "keine_offene_zeile_in_zielspalte".to_string()
+}
+
+/// Baut (bei aktivem Trace-Knopf UND aktivem Spaltenbau) eine `[SB]`-Logzeile
+/// fuer EINE Entscheidung, sonst `None`. Rein lesend (`&GameState`) -- der
+/// Aufrufer schreibt die Zeile per `state.log_event(..)` NACH der
+/// Entscheidung (dort ist wieder `&mut GameState` verfuegbar).
+///
+/// `entscheidungstyp`: "Drafting" | "Dome" | "Tiling".
+/// `vorzug_kandidat`: die vom AUFRUFER schon ermittelte Praeferenz-Aktion
+/// (`spaltenbau`/`provokation`, VOR dem Fallback auf die Netz-Suche) -- bei
+/// `None` haelt diese Funktion selbst fest, WARUM keine existierte.
+pub(crate) fn trace_zeile(
+    state: &GameState,
+    pi: usize,
+    entscheidungstyp: &str,
+    vorzug_kandidat: Option<&dyn std::fmt::Debug>,
+    gespielte_aktion: &dyn std::fmt::Debug,
+) -> Option<String> {
+    if !ist_trace_aktiv() || !ist_aktiv() {
+        return None;
+    }
+    let player = &state.players[pi];
+    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c));
+    let ziel = waehle_spalte(kosten);
+    let mut sortiert: Vec<(usize, f64)> = (0..6usize).map(|c| (c, kosten[c])).collect();
+    sortiert.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    let top2 = sortiert
+        .iter()
+        .take(2)
+        .map(|(c, k)| format!("{c}:{k:.2}"))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let vorzug = match vorzug_kandidat {
+        // "VorzugAktion" bewusst NICHT "Aktion" (Namenskollision mit dem
+        // AEUSSEREN `Aktion=`-Feld der Zeile weiter unten, das die
+        // tatsaechlich GESPIELTE Aktion trägt -- zwei Felder mit demselben
+        // Namen waeren fuer `tools/spaltenbau_trace.py`s Parser nicht mehr
+        // eindeutig trennbar, weil beide Rust-Debug-Text mit Leerzeichen
+        // enthalten koennen).
+        Some(a) => format!("ja VorzugAktion={a:?}"),
+        None => format!("nein Grund={}", kein_vorzug_grund(state, player, ziel)),
+    };
+
+    let angebot_teil = if entscheidungstyp == "Drafting" {
+        format!(" Angebot={}", angebot_zusammenfassung(state))
+    } else {
+        String::new()
+    };
+
+    Some(format!(
+        "[SB] Spieler={pi} Typ={entscheidungstyp} Ziel={ziel} Top2=[{top2}] \
+         Vorzug={vorzug} Aktion={gespielte_aktion:?}{angebot_teil}"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,6 +632,73 @@ mod tests {
         set_aktiv_override_for_test(None);
     }
 
+    /// Nutzer-Ergaenzung 2026-08-13 (Trace-Knopf): ohne `MOSAIC_SPALTENBAU_
+    /// TRACE` (auch bei aktivem Spaltenbau) darf `trace_zeile` NIE etwas
+    /// liefern -- additiv heisst additiv, keine ungewollte Log-Flut.
+    #[test]
+    fn trace_zeile_ist_ohne_trace_knopf_immer_none() {
+        set_aktiv_override_for_test(Some(true));
+        set_trace_override_for_test(Some(false));
+        let game = drafting_game(60);
+        let pi = game.state.current_player;
+        let aktion = Action::Pass;
+        assert_eq!(
+            trace_zeile(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug),
+            None,
+            "ohne MOSAIC_SPALTENBAU_TRACE darf nie eine Zeile entstehen"
+        );
+        set_trace_override_for_test(None);
+        set_aktiv_override_for_test(None);
+    }
+
+    /// Bei aktivem Trace-Knopf muss die Zeile das `[SB]`-Praefix tragen und
+    /// die Kernfelder enthalten -- UND ohne Spaltenbau selbst (`ist_aktiv`
+    /// aus) trotzdem `None` bleiben (der Trace-Knopf allein schaltet nichts
+    /// frei, er ist additiv ZUM Spaltenbauer, kein Ersatz).
+    #[test]
+    fn trace_zeile_hat_sb_praefix_und_kernfelder_bei_aktivem_knopf() {
+        set_aktiv_override_for_test(Some(false));
+        set_trace_override_for_test(Some(true));
+        let game = drafting_game(61);
+        let pi = game.state.current_player;
+        let aktion = Action::Pass;
+        assert_eq!(
+            trace_zeile(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug),
+            None,
+            "Trace ohne aktiven Spaltenbauer muss weiterhin None liefern"
+        );
+
+        set_aktiv_override_for_test(Some(true));
+        let zeile = trace_zeile(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug)
+            .expect("bei beiden Knoepfen aktiv muss eine Zeile entstehen");
+        assert!(zeile.starts_with("[SB] "), "Zeile muss mit [SB] beginnen: {zeile:?}");
+        assert!(zeile.contains(&format!("Spieler={pi}")), "muss den Spieler tragen: {zeile:?}");
+        assert!(zeile.contains("Typ=Drafting"), "muss den Entscheidungstyp tragen: {zeile:?}");
+        assert!(zeile.contains("Ziel="), "muss die Zielspalte tragen: {zeile:?}");
+        assert!(zeile.contains("Top2=["), "muss die zwei guenstigsten Spalten tragen: {zeile:?}");
+        assert!(zeile.contains("Vorzug=nein"), "ohne Kandidat muss Vorzug=nein stehen: {zeile:?}");
+        assert!(zeile.contains("Angebot="), "Drafting-Zeilen muessen das Angebot tragen: {zeile:?}");
+
+        set_trace_override_for_test(None);
+        set_aktiv_override_for_test(None);
+    }
+
+    /// Fuer Tiling-Zeilen darf KEIN `Angebot=`-Feld auftauchen (Nutzer-Vorgabe:
+    /// nur Drafting braucht das aktuelle Angebot).
+    #[test]
+    fn trace_zeile_traegt_kein_angebot_bei_tiling() {
+        set_aktiv_override_for_test(Some(true));
+        set_trace_override_for_test(Some(true));
+        let game = drafting_game(62);
+        let pi = game.state.current_player;
+        let aktion = Action::Pass;
+        let zeile = trace_zeile(&game.state, pi, "Tiling", None, &aktion as &dyn std::fmt::Debug)
+            .expect("Tiling-Zeile muss entstehen");
+        assert!(!zeile.contains("Angebot="), "Tiling-Zeilen duerfen kein Angebot tragen: {zeile:?}");
+        set_trace_override_for_test(None);
+        set_aktiv_override_for_test(None);
+    }
+
     #[test]
     fn spalten_kosten_bevorzugt_wild_und_bestehende_farbe() {
         // Spalte 0 (leerer Slot ueberall) vs. Spalte 1 mit einer Wild-Zelle
@@ -397,6 +726,105 @@ mod tests {
             "Spalte mit Wild-Zelle (0) muss billiger sein als Spalte mit gebundener Normal-Zelle (1): {k_wild_spalte} vs {k_normal_spalte}"
         );
         set_aktiv_override_for_test(None);
+    }
+
+    /// Task 7b: eine Special-Zelle MUSS teurer werden, je mehr ihrer 3
+    /// Slot-Nachbarn noch offen sind -- 0 offene Nachbarn (alle gefuellt)
+    /// muss so billig sein wie eine passende Normal-Zelle (0,3); 3 offene
+    /// Nachbarn (keiner gefuellt) muss teurer sein als eine falsch gebundene
+    /// Normal-Zelle (2,0).
+    #[test]
+    fn special_kosten_skaliert_mit_offenen_slot_nachbarn() {
+        set_aktiv_override_for_test(Some(true));
+        let mut game = drafting_game(50);
+        let pi = game.state.current_player;
+        // Slot (0,0): si=0->(Zeile0,Spalte0)=Special, si=1->(Zeile0,Spalte1),
+        // si=2->(Zeile1,Spalte0), si=3->(Zeile1,Spalte1) -- alle drei
+        // Nachbarn zunaechst NORMAL und ungefuellt (kein `placed_color`).
+        let tile = DomeTile::new(
+            60,
+            vec![
+                DomeSpace::special(),
+                DomeSpace::normal(Rot),
+                DomeSpace::normal(Blau),
+                DomeSpace::normal(Gelb),
+            ],
+            0,
+        );
+        game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
+        let k_alle_offen = spalten_kosten(&game.state.players[pi], 0);
+
+        // Alle drei Nachbarn direkt als gefuellt markieren (Farbe + Special-
+        // Zelle selbst bleibt ungefuellt) -- die Special-Zelle muss jetzt
+        // deutlich billiger sein.
+        {
+            let slot = game.state.players[pi].dome_grid.dome_slots[0][0].as_mut().unwrap();
+            slot.spaces[1].placed_color = Some(Rot);
+            slot.spaces[2].placed_color = Some(Blau);
+            slot.spaces[3].placed_color = Some(Gelb);
+        }
+        let k_alle_gefuellt = spalten_kosten(&game.state.players[pi], 0);
+
+        assert!(
+            k_alle_gefuellt < k_alle_offen,
+            "mehr gefuellte Nachbarn muss die Spalte billiger machen: offen={k_alle_offen} gefuellt={k_alle_gefuellt}"
+        );
+        // Untere Schranke: bei 0 offenen Nachbarn traegt die Special-Zelle
+        // (Zeile 0) exakt 0,3 zu den Kosten bei; Zeile 1 ist der SIBLING
+        // si=2 (Zeile1/Spalte0, siehe Slot-Geometrie oben) -- jetzt gefuellt,
+        // traegt 0,0 bei; Zeilen 2-5 haben in Spalte 0 keinen Slot (1,0 je
+        // Zeile, 4 Zeilen).
+        assert!(
+            (k_alle_gefuellt - (0.3 + 0.0 + 4.0)).abs() < 1e-9,
+            "bei 0 offenen Nachbarn: 0,3 (Special) + 0,0 (Zeile1 gefuellt) + 4,0 (4 leere Zeilen): war {k_alle_gefuellt}"
+        );
+        // Obere Schranke: bei 3 offenen Nachbarn (0,3 + 0,8*3 = 2,7 fuer die
+        // Special-Zelle) muss die Spalte teurer sein als dieselbe Spalte mit
+        // einer falsch gebundenen NORMAL-Zelle (2,0) an derselben Stelle.
+        assert!(
+            k_alle_offen > 2.0 + 0.0 + 4.0,
+            "bei 3 offenen Nachbarn muss Special (2,7+Rest) teurer sein als eine falsch gebundene Normal-Zelle (2,0+Rest): war {k_alle_offen}"
+        );
+        set_aktiv_override_for_test(None);
+    }
+
+    /// Task 7c: bei gesetztem Partie-Seed wird unter mehreren gleich guten
+    /// Spalten GESTREUT statt immer Spalte 0 zu waehlen -- UND die Wahl ist
+    /// fuer denselben Seed reproduzierbar. Ohne Seed bleibt Spalte 0
+    /// (Bestandsverhalten, siehe `ziel_spalte_wechselt_wenn_bisherige_spalte_
+    /// teurer_wird`).
+    #[test]
+    fn waehle_spalte_streut_unter_seed_und_bleibt_ohne_seed_stabil() {
+        let kosten = [6.0; 6]; // wie beim leeren Brett: alle Spalten gleich teuer.
+        assert_eq!(waehle_spalte(kosten), 0, "ohne Seed muss die kleinste Spaltennummer gewinnen");
+
+        let mut gesehen = std::collections::HashSet::new();
+        for seed in 0u64..40 {
+            set_partie_seed(Some(seed));
+            let c = waehle_spalte(kosten);
+            assert!(c < 6, "Spalte muss in 0..6 liegen, war {c}");
+            gesehen.insert(c);
+            // Reproduzierbarkeit: derselbe Seed liefert immer dieselbe Spalte.
+            assert_eq!(waehle_spalte(kosten), c, "Seed {seed} muss reproduzierbar dieselbe Spalte liefern");
+        }
+        set_partie_seed(None);
+        assert!(
+            gesehen.len() >= 3,
+            "40 verschiedene Seeds sollten mehr als 1-2 Spalten treffen, gesehen: {gesehen:?}"
+        );
+
+        // Ausserhalb der Toleranz (Spalte 5 deutlich teurer) darf die
+        // Streuung sie NIE waehlen, unabhaengig vom Seed.
+        let mut kosten_schief = [1.0; 6];
+        kosten_schief[5] = 10.0;
+        for seed in 0u64..20 {
+            set_partie_seed(Some(seed));
+            assert_ne!(
+                waehle_spalte(kosten_schief), 5,
+                "Seed {seed}: eine Spalte weit ausserhalb der Toleranz darf nie gewaehlt werden"
+            );
+        }
+        set_partie_seed(None);
     }
 
     #[test]
