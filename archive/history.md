@@ -11287,3 +11287,100 @@ sowie die Welle-2-Liste selbst (engine/src/spaltenbau.rs, plattenbauer.rs,
 provokation.rs, tools/spaltenbau_trace.py, tools/plattenpunkte_aus_arena.py,
 evaluations/PREREG_provokation.md, PREREG_gpu_inferenzpfad.md,
 seeds_je_kriterium/, evaluations/gpu_*).
+
+## 2026-08-13/14: Generator-Kampagne abgeschlossen, GPU-Rundlauf geloest, Korpus-Plan
+
+Vollstaendige Zahlen und Vorab-Regeln in den Preregs; hier die Verdikte und
+Querverweise. Champion unveraendert v21_2d_brierbest.
+
+### Spaltenbau/Plattenbauer: die 5,95-Decke und die Aera-Grenze
+
+- **Runde 4** (PREREG_provokation.md par.14): Vollendbarkeits-Sicherheitsnetz +
+  Kuppel-Jackpot gebaut, 3,50 gegen Ziel 7,00; Ueberpraesenz-Vorzug brach die
+  Staerke ein (2/20, McNemar p=0,0001) -- gemessen-und-deaktiviert.
+- **2x2-Entkonfundierung** (par.15, Commit 0e84d07): Sicherheitsnetz EXAKT
+  wirkungslos (B-A=0,00, bit-identische Partien), Jackpot +0,70 n.s.; beide
+  Knoepfe default AUS, Runde-3-Pfad wieder aktiv.
+- **AERA-GRENZE ENTDECKT**: Runde-3-Bezug 5,95 reproduziert nicht mehr (A=3,15,
+  zweimal bit-identisch). Ursache eingegrenzt: RNG-Schnitt fe1e306 liegt
+  zwischen par.13-Messung und Folgelaeufen; Plattenkarten identisch (Setup =
+  Stream-Anfang, 20/20 vertikal aktiv), Partie-Verlaeufe divergieren
+  (Nachfuellungen auf neuem Strom). **Alt-Aera-Generatorwerte sind keine
+  gueltigen Anker mehr** -- die vom Nutzer verfuegte Aera-Grenze gilt auch
+  fuer Generator-Benchmarks.
+- **par.16 Special-Zellen**: +1,05 (p=0,083) auf k1-Seeds, Blocker-Verschiebung
+  50%->13,3%; **par.17 Replikation**: frische Seeds +0,35, gepoolt n=40 p=0,103
+  -- NICHT uebernommen (Diagnose-Knopf). Jackpot-Replikation exakt +0,00 ->
+  tot. (c)-Trace-Diagnose: Restblocker = Runde-1-Zielwahl (c1 66,7%/c3 33,3%),
+  strukturell die dreifach gescheiterte Zielbindung -- kein vierter Anlauf.
+- **par.18 k2 Diagonalen**: Special-Erweiterung verallgemeinert -- 3,04->5,65,
+  t=2,79, p=0,011, 13/23 volle Diagonalen. ERSTE UEBERNAHME (unbedingte
+  k2-Variante, ab76c71). Anker-Diskrepanz aufgeklaert (0,00 war Beifang des
+  k1-Spielers, 3,04 der k2-Bauer selbst).
+- **par.19 k6 Kuppeldraft**: falsches Vorzeichen (-9,75->-10,50), Stoerkanal
+  invers, Siege 9->5 -- NICHT uebernommen (0d5543c). Befund am Rande: die
+  HEURISTIK ist der beste k6-Spieler im Projekt (-6,60 bis -11,10 gegen
+  -9,75..-15,00 aller Netz-Seiten; wertung_progress ist der Grund).
+- **par.20 k5 Spaltenpaar** (Nutzer-Entwurf "kombinieren k1 und zwei spalten"):
+  3,68->8,55, t=4,56, p=0,0001, Verteilung 0/3/6 -> 13/22 Partien >=11 (die
+  8er-Ecken erstmals erschlossen), Strafleiste besser. STAERKSTE UEBERNAHME
+  der Kampagne (3506fff).
+
+### GPU/Async (PREREG_gpu_inferenzpfad.md par.20-22, PREREG_async_search.md)
+
+- **Gate B final**: Spielgeschehen sync<->async 0/16 bit-identisch (8 Seeds x2),
+  Sync-Selbstkontrolle 0/8 nach RNG-Schnitt. Trainingsziel-Felder divergieren
+  -> Task-#71-Notdeckel, jetzt eigene Prereg (unten).
+- **par.20 Stufe 3**: Regel 3 verfehlt (0,053x), ABER Batch-Fuellung exzellent
+  (99,7% bei N=128). Rundlauf 15,66 ms/Sammelrunde als Engpass isoliert.
+- **par.21 Condvar-Fix**: Taeter war recv_timeout im Sammel-Faden
+  (net_batcher.rs:318), NICHT der Windows-Timer (timeBeginPeriod-These
+  empirisch widerlegt, 411 vs 412s). Nach Park/Wake: N=1 0,946x (vorher
+  0,053x), N=16 0,979x, alle Partien komplett. tract schlaegt ORT bei kleinem
+  Batch (Gewinnzone ab 128). 0/N-Anomalie aufgeklaert: 435s-Notdeckel
+  (self_play.rs:3177) unter Flotten-Last, kein Deadlock.
+- **par.22 laeuft**: concurrency-bewusster Deckel + N=64/128 tract/ORT.
+
+### Ownership-Strang: drei neue Preregs
+
+- **PREREG_ownership_consumer.md** (d1ca3e7): Verbraucher-Entwurf -- E_k aus
+  der Ownership-Karte, Blatt-Shift (Zwei-Pole-Regler MOSAIC_OWNERSHIP_W,
+  Default 0) + marginale Feldwerte einmal je Zug im Tiling-Solver; Tor A
+  Kopfguete VOR Verbraucher-Bau. Kriterienzuordnung k0-k7 an scoring.rs:42-49
+  verifiziert; k7 aus Ownership prinzipiell nicht lernbar (neural_net.py:954).
+- **PREREG_ownership_corpus.md** (8ed88ef + 4a376cf/ebc0eb0/04b3f9a): 6 Arme,
+  8000 Partien nach data/ownership_corpus/ (nicht-rekursiver Fenster-Glob
+  geprueft); Quoten statt Selektion; Deckungs-Bericht vor Training;
+  Lebenszyklus par.5b (Archivierung erst nach geschlossenem Kreislauf).
+  Pruefpunkte fanden BLOCKER: run_net_self_play liest die Bauer-Knoepfe gar
+  nicht (Vorzug nur in Arena-Pfaden verdrahtet, einmal einseitig, einmal
+  beidseitig) -- Verdrahtung + 5x30-Wirkungsprobe beauftragt.
+  Konjunktions-Breite aufgeloest (68 korrekt, Kommentare korrigiert);
+  --extra-data-dir gebaut (66ce87a). Nutzer-GO fuer die Generierung, bedingt
+  auf Probe + GPU-Verdikt + Schleifen-Refactor.
+- **PREREG_unified_game_loop.md + PREREG_deterministic_labels.md** (862af18):
+  Schleifen-Vereinheitlichung mit Golden-Record-Abnahme (bit-identisch je
+  Pfad); danach Task-#71-Notdeckel ehrlich machen (Feuern -> deterministischer
+  Fallback, kein Schema-Bump). Beides VOR der Generierung.
+
+### Lambda-Frage final beantwortet (Nutzer-Nachfrage)
+
+Kopf drin (opp_points_head v20/v21), Term nirgends wirksam: Suche-Regler 0
+(Unter-Kipppunkt-Replikation gescheitert, Denial-Vorzeichenwechsel),
+value_target_lambda 1,0 (WDL-Aera-Verdikt 63:77). Kalibrier-Nebenbefund ist
+laengst produktiv: Anzeige-Kalibrierung via Platt-Fit des Champions
+(server.py:1387, B=0,9060) -- nicht via Lambda-Netz.
+
+### Infrastruktur des Tages
+
+- Dateinamen-Migration Welle 1 (Tabelle oben) + CLAUDE.md-Regel "neue Dateien
+  englisch" (75d4d1c); Welle 2 (spaltenbau.rs, provokation.rs,
+  PREREG_provokation.md, gpu_inferenzpfad, seeds_je_kriterium/, paritaets_probe)
+  wartet auf Agenten-Ende.
+- git-crypt-Worktree-Stolperfalle dokumentiert (CLAUDE.md, fe4feb4) --
+  Task-Chip-Session scheiterte am Smudge-Filter.
+- Tiling-UI: Reihen-Fokus 60% + pulsierende legale Zielfelder nach
+  Engine-Regel (3611fe9); dabei Server-Validierungsluecke gefunden und
+  geschlossen: validate_tiling_action erzwingt jetzt die Reihen-Zuordnung
+  (f8c38ce, vorher nahm die API farblich passende Zuege in falsche
+  (Teil-)Reihen an).
