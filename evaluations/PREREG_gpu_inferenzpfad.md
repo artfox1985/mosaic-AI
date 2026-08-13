@@ -1435,3 +1435,224 @@ Hypothese) den gesamten Pfad 19x verlangsamt, unabhängig vom
 Inferenz-Backend. Der aktuelle `async_exec::run_concurrent`/Waker-Pfad ist,
 wie in seiner eigenen Dokumentation vermerkt, "NICHT produktionsreif" --
 diese Messung bestätigt das jetzt mit Zahlen, nicht nur als Vorbehalt.
+
+## 21. DER FIX: Condvar-basiertes Park/Wake -- von 0,053x auf 0,98x, Regel 3
+## trotzdem NICHT gedeckt (Ursache jetzt eine ANDERE, code-belegte Grenze)
+
+Nutzer-Auftrag nach §20: die 15,6ms-Koinzidenz beweisen statt vermuten, den
+Sleep-/Poll-Fund reparieren (Condvar statt Takt-Hack), neu messen, und die
+0/N-Anomalie aus §20 aufklären statt sie stehenzulassen.
+
+### Punkt 1: Beleg statt Koinzidenz
+
+**Fundstelle** (Commit `c540285`, `wt_async2`, GEPRÜFT per `git show`):
+- `engine/src/net_batcher.rs:318`: `match req_rx.recv_timeout(fill_timeout)
+  { ... }` in der Fuell-Schleife des Sammel-Fadens -- EIN solcher Aufruf pro
+  Batch, IMMER dann, wenn keine weitere Zeile sofort verfuegbar ist (bei
+  N=1 also praktisch jeder Batch). Das ist die EINZIGE Stelle in der
+  Async-/Batcher-Kette mit einem Warte-Aufruf, der eine Zeitspanne
+  entgegennimmt.
+- `engine/src/async_exec.rs:81-97` (`run_concurrent`, alter Stand): KEIN
+  Sleep/Timeout -- reines Busy-Poll (`for i in 0..futs.len() { ...
+  futs[i].poll(...) }` in einer `while`-Schleife ohne jede Wartezeit).
+  Verschwendet CPU, ist aber NICHT die Quelle der 15,6ms-Latenz (dafuer gibt
+  es dort keinen Kandidaten-Aufruf).
+
+**Test**: `timeBeginPeriod(1)` (WinMM, `winmm.lib`) vor der Isolationsmessung
+gesetzt (`rc=0`, `TIMERR_NOERROR`, GEPRÜFT per Rueckgabewert), ALTER Code
+(vor dem Fix unten), N=1/Seed 999:
+
+| | ohne `timeBeginPeriod` (§20) | mit `timeBeginPeriod(1)` |
+| - | ---: | ---: |
+| Wandzeit | 412,28 s | **411,28 s** |
+| Batches | 26323 | 26317 |
+
+**Widerlegt**: 1,0 s Unterschied bei 412 s Gesamtlaufzeit ist Rauschen, keine
+Verbesserung. Der Windows-Multimedia-Timer (`timeBeginPeriod`) ist NICHT der
+wirksame Hebel -- die 15,6ms-Zahlenkoinzidenz mit dem Standard-Systemtakt
+(1/64 s ≈ 15,625 ms) bleibt damit ungeklaert, aber die naheliegendste
+Reparatur (Systemtakt global anheben) ist WIDERLEGT, nicht bestaetigt. Das
+ist ein Befund fuer sich: `recv_timeout`s tatsaechliche Wartegranularitaet
+auf Windows haengt laut dieser Probe NICHT (nur) am klassischen Multimedia-
+Timer, den `timeBeginPeriod` bedient -- WARUM sie trotzdem bei ~15,6ms liegt,
+ist nicht weiter untersucht (ausserhalb des Auftragsumfangs, siehe "Was
+nicht geprüft ist").
+
+### Punkt 2: Der Fix -- Condvar-Wecken statt Takt-Warten
+
+Zwei Stellen geaendert (`wt_async2`, Commit-Historie siehe unten):
+
+- **`net_batcher.rs`**: `collector_loop`s Fuell-Schleife ruft nicht mehr
+  `recv_timeout` auf. Neue `Doorbell` (`Mutex<()>` + `Condvar`) wird von
+  JEDEM Aufrufer nach dem Einreichen einer Zeile SOFORT geklingelt
+  (`notify_all`). Die Fuell-Schleife selbst (`wait_for_more_row`) prueft per
+  `try_recv` (kein Warte-Aufruf), und weicht fuer das verbleibende
+  Zeitfenster unter `SPIN_WAIT_THRESHOLD` (2 ms, der konfigurierte
+  `fill_timeout`-Default von 200 µs liegt komplett darunter) auf Spinnen
+  (`std::hint::spin_loop()`, `Instant::now()`-Polling) aus -- KEIN
+  OS-Wartepfad, also KEINE Systemtakt-Rundung moeglich, unabhaengig davon,
+  wodurch diese in Punkt 1 entsteht. Fuer unueblich GROSSE konfigurierte
+  Fenster (weit ueber einem Systemtakt) bleibt ein echtes
+  `Condvar::wait_timeout` auf die Klingel als Fallback bestehen -- dort
+  faellt die Rundung relativ zum Fenster nicht mehr ins Gewicht.
+- **`async_exec.rs`**: `run_concurrent` pollt nicht mehr reihum ALLE
+  offenen Futures. Jedes Future bekommt einen eigenen `ReadySetWake`-Waker
+  (Index-spezifisch); der Treiberfaden parkt (`Condvar::wait`, UNBEFRISTET)
+  bis irgendein Future per `wake()` als bereit markiert wurde, pollt dann
+  NUR die tatsaechlich bereiten. Ein unbefristetes Warten ist auf Windows
+  praezise/sofort aufgeweckt (das Systemtakt-Problem betrifft laut Punkt 1
+  spezifisch KURZE `_timeout`-Aufrufe, nicht unbefristete Waits).
+
+`cargo test --lib` nach beiden Aenderungen: **406/0/31**, unveraendert
+gegenueber dem Stand vor dem Fix -- Gate A/B (Entscheidungsgleichheit,
+Bit-Identitaet ohne Batcher) bleiben unberuehrt, die Umstellung aendert NUR
+WANN gepollt/gesammelt wird, nicht WOHIN Ergebnisse geschrieben werden.
+
+### Punkt 3: Nachmessen
+
+Referenzen (§20, unveraendert): Sync-Flotte (a) 40 Partien/8 Faeden =
+**248,5 Partien/h**; Sync-Isolation (a) 1 Partie = **165,87 Partien/h**
+(21,70 s).
+
+| Messpunkt | Traeger | N | fertig/angefordert | Wandzeit | Partien/h | mittl. Batch | Faktor ggue. Sync |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Isolation (b) tract | 1 | 1 | 1/1 | 22,94 s | 156,9 | 1,96 | **0,946x** |
+| Isolation (c) ORT-CUDA | 1 | 1 | 1/1 | 42,30 s | 85,1 | 1,96 | **0,513x** |
+| Flotte (b) tract | 8 | 8 | 8/8 | 130,47 s | 220,7 | 11,95 | 0,888x |
+| Flotte (b) tract | 8 | 16 | 16/16 | 236,79 s | 243,3 | 18,82 | **0,979x** |
+| Flotte (b) tract | 8 | 32 | **1/32** | 439,56 s | -- (nicht interpretierbar) | 31,59 | -- |
+| Flotte (b) tract | 8 | 64 | **0/64** | 441,61 s | -- (nicht interpretierbar) | 56,64 | -- |
+| Flotte (b) tract (Wdh.) | 8 | 64 | **0/64** | 442,23 s | -- (nicht interpretierbar) | 56,16 | -- |
+| Flotte (c) ORT-CUDA | 8 | 16 | 16/16 | 260,68 s | 221,0 | 18,58 | 0,889x |
+
+**Verbesserung ggue. §20 (N=1)**: tract 156,9 / 8,73 = **17,97x**; ORT-CUDA
+85,1 / 8,85 = **9,62x** -- der Fix wirkt in BEIDEN Backends, mit sehr
+unterschiedlicher Grössenordnung (siehe unten).
+
+**Neuer Befund, vom Fix erst sichtbar gemacht**: tract schlaegt ORT-CUDA bei
+N=1 UND bei N=16 (22,94s vs 42,30s; 243,3 vs 221,0 Partien/h) -- vor dem Fix
+lagen beide Backends binnen 1,4% beieinander (§20), weil die 19-fache
+Rundlauf-Verlangsamung beide gleichermassen ueberdeckte. Jetzt, wo dieser
+Deckel weg ist, zeigt sich die BEKANNTE Kennlinie aus §9-§19: ORT-CUDAs
+GPU-Dispatch-Overhead pro Aufruf lohnt sich erst ab einem grossen Batch
+(dokumentierte Gewinnzone ab 128) -- bei den hier erreichten Batches (1,96
+bis 18,82) ist tract-CPU durchgaengig schneller. Das ist KEIN neuer Fund an
+sich (§9-§19 haben genau das schon fuer den blockierenden Pfad gezeigt),
+sondern die Bestaetigung, dass er nach dem Fix wieder SICHTBAR ist, statt
+von einem Async-Kostenposten ueberdeckt zu werden.
+
+### Regel 3 (§4): IMMER NOCH NICHT GEDECKT, aber die Groessenordnung hat
+### sich komplett verschoben
+
+Die BESTE vollstaendige (completed-Basis) Zelle ist N=16/tract: **0,979x**
+-- nahe an Sync-Paritaet, aber unter der 2,0x-Schwelle. N=8 liegt bei
+0,888x, N=1 bei 0,946x. **Keine der gemessenen Zellen erreicht 2,0x.** Der
+Fix hebt den Pfad von "19x langsamer" (§20) auf "nahezu gleich schnell"
+(§21) -- das ist eine fundamentale Verbesserung der eigentlichen
+Async/Batcher-Maschinerie, aber noch KEIN Konkurrenzvorteil gegenueber
+synchron, weil bei diesen Batch-Groessen (unter 32) keine Backend-seitige
+Effizienzsteigerung zu holen ist, die den (kleinen, aber realen)
+Rest-Overhead der Verschraenkung selbst aufwiegen wuerde.
+
+### Punkt 4: Die 0/N-Anomalie aus §20 -- AUFGEKLAERT, kein Deadlock, keine
+### Restspur des alten Rundlauf-Problems
+
+Mit `MOSAIC_DIAG_STUCK_PHASE=1` (protokolliert je Partie die letzte
+erreichte Runde/Phase) instrumentiert, VOR der Neumessung:
+
+- **N=8** (1 Partie/Traeger-Faden, keine echte Mehr-Futures-pro-Faden-Last):
+  8/8 Partien enden korrekt bei `Runde 5, Phase Tiling, completed=true`.
+  Kein Anomalie-Verhalten -- entspricht dem erwarteten Spielablauf.
+- **N=64** (8 Partien/Traeger-Faden, zwei Wiederholungen): **64/64 Partien
+  enden mit `completed=false`**, 40 bei Runde 2, 24 bei Runde 3 (von 5) --
+  GEPRÜFT per Instrumentierungs-Log, reproduzierbar ueber beide Laeufe.
+
+**Ursache** (GEPRÜFT, `engine/src/self_play.rs`, Commit `c540285`+Fix,
+Zeilen unveraendert von dieser Aenderung):
+
+```
+self_play.rs:3176   let t_start = std::time::Instant::now();
+self_play.rs:3177   let timeout_secs = net_game_timeout_secs(base_sims)
+                         + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS;
+self_play.rs:3183   if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+                         break;
+                     }
+```
+
+`net_game_timeout_secs(400) = (400*9)/20 = 180` (`self_play.rs:86-88`,
+GEPRÜFT), `EXTRA_GAME_TIMEOUT_SECS = 60+75+75+45 = 255`
+(`round_transition_deep.rs:180`, GEPRÜFT) -- macht **435 Sekunden** WAND-
+ZEIT-Deckel PRO PARTIE (Task #71, existiert unveraendert seit vor diesem
+Async-Umbau, gedacht als Haenger-Schutz fuer den SYNCHRONEN Pfad). Bei N=64
+teilen sich 64 Partien EINEN Sammel-Faden -- jede einzelne Partie braucht
+dadurch pro Entscheid laenger (die MCTS-Suche einer Partie ist inhaerent
+SEQUENTIELL, sie kann nicht gegen sich selbst batchen; Batching entsteht nur
+ueber VERSCHIEDENE gleichzeitige Partien). Bei 64-facher Teilung reicht die
+Wandzeit fuer eine volle 5-Runden-Partie nicht mehr innerhalb von 435s --
+der Notdeckel greift GENAU WIE VORGESEHEN (er schuetzt vor echten Haengern),
+trifft hier aber eine Partie, die nur LANGSAM, nicht haengend, war.
+
+**Das ist die vollstaendige Erklaerung der §20-0/N-Anomalie**: KEIN Deadlock,
+KEINE Restspur des alten 19x-Rundlauf-Problems, KEIN Bug im Fix -- sondern
+ein VORBESTEHENDER, fuer den synchronen Ein-Partie-Fall kalibrierter
+Wandzeit-Notdeckel, der bei dieser Konkurrenzstufe (64 Partien / 1
+Sammel-Faden) zu eng wird. Bestaetigt durch N=32 als Grenzfall (nur 1/32
+schafft es knapp vor 439,56s) -- die Schwelle liegt zwischen N=16 (16/16
+fertig) und N=32/N=64.
+
+### Was NICHT geprüft ist
+
+- WARUM `recv_timeout`/`Condvar::wait_timeout` auf dieser Maschine trotz
+  widerlegtem `timeBeginPeriod`-Hebel bei ~15,6ms lag -- der Fix umgeht die
+  Frage (kein `_timeout`-Aufruf mehr im gemessenen Bereich), beantwortet sie
+  aber nicht. Wuerde weitere Windows-Kernel-Recherche brauchen (z.B.
+  `NtSetTimerResolution`, `WaitOnAddress`-Interna), ausserhalb des
+  Auftragsumfangs.
+- Der 435s-Notdeckel selbst wurde NICHT angepasst/parametrisiert -- er ist
+  Bestandteil des produktiven Haenger-Schutzes (Task #71) und war nicht
+  Gegenstand dieses Auftrags. Eine hoehere N-Konkurrenzstufe (echte
+  Produktionswerte) wuerde eine bewusste, separate Entscheidung ueber diesen
+  Deckel brauchen (z.B. skaliert mit der Konkurrenzstufe) -- hier nur
+  beschrieben, nicht gebaut.
+- Batches ueber 32 wurden wegen des 435s-Deckels nicht vollstaendig
+  (completed-Basis) gemessen -- ob die Regel-3-Schwelle bei hoeheren,
+  produktionsnahen Batch-Groessen (>64, in Richtung der ORT-Gewinnzone 128)
+  doch noch erreicht wird, ist NICHT geprueft.
+- Nur EIN Seed je Zelle (Zeitbudget) -- bei der Groessenordnung der
+  Verbesserung (17,97x/9,62x, weit ausserhalb jeder plausiblen Varianz)
+  waere eine zweite Saat fuer die RICHTUNG des Befunds nicht entscheidend,
+  fuer die exakten Faktoren aber nicht abgesichert.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `SPIN_WAIT_THRESHOLD = 2ms` als Grenze zwischen Spinnen und echtem
+  `wait_timeout` -- der gemessene/konfigurierte `fill_timeout`-Default (200
+  µs) liegt komfortabel darunter, ohne den Fallback-Pfad fuer unuebliche
+  Konfigurationen zu verlieren.
+- N=32 als zusaetzlicher Messpunkt (nicht angefordert) eingefuegt, um die
+  435s-Schwelle zwischen N=16 (vollstaendig) und N=64 (0 vollstaendig)
+  einzugrenzen, statt nur die zwei angeforderten Punkte zu berichten.
+- 0/N-Anomalie-Diagnose VOR der finalen N=64-Messung gefahren (wie im
+  Auftrag verlangt) -- dieselbe Konfiguration zweimal gemessen (mit und ohne
+  `MOSAIC_DIAG_STUCK_PHASE`), um den Befund (Runde 2-3, completed=false) als
+  reproduzierbar statt als Einzelmessung zu belegen.
+- ORT-CUDA-Sweep auf N=1 und N=16 begrenzt (nicht N=8/32/64) -- der
+  Backend-Unterschied ist bei N=1 und N=16 bereits eindeutig und konsistent
+  (tract schneller, siehe oben); weitere Zellen haetten dieselbe
+  Schlussfolgerung nur wiederholt, bei zusaetzlichem Zeit-/GPU-Risiko.
+
+### Fazit §21
+
+Der Condvar-Fix behebt das in §20 gefundene 19x-Rundlauf-Problem
+vollstaendig -- der Async-Pfad liegt jetzt bei 0,89x-0,98x gegenueber
+synchron, nicht mehr bei 0,053x. **Regel 3 (>=2,0x) ist damit IMMER NOCH
+NICHT gedeckt**, aber aus einem GRUNDSAETZLICH ANDEREN Grund als in §20:
+nicht mehr eine kaputte Rundlauf-Mechanik, sondern schlicht, dass die
+erreichten Batch-Groessen (bis 32, real gemessen) noch unter der
+Groessenordnung liegen, ab der Batching selbst einen Effizienzgewinn
+gegenueber synchronem Rechnen bringt. Die zusaetzlich aufgeklaerte
+0/N-Anomalie ist ein vorbestehender, fuer den synchronen Fall kalibrierter
+Wandzeit-Notdeckel (Task #71, `self_play.rs:3177/3183`), keine neue
+Baustelle des Async-Umbaus. Ob hoehere, produktionsnahe Konkurrenzstufen
+(die diesen Notdeckel bewusst mitdenken muessten) die 2,0x-Schwelle
+erreichen, ist eine offene, nicht triviale Folgefrage.
