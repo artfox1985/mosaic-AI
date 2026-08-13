@@ -591,3 +591,195 @@ geprüfter, aber unvollständiger Fortschritt, kein Gate-B-Ergebnis.
 - Test NICHT `#[ignore]`t (anders als Stufe 1s grosse 1148er-Tests) --
   braucht nur das lokale Modell, keine `MOSAIC_FROZEN_STATES_JSON`, und
   läuft schnell genug (~30s) für den normalen `cargo test --lib`-Lauf.
+
+---
+
+## 11. STUFE 2, BAUSTEINE 2-4 + GATE B: alle Bausteine grün, GATE-B-KERNBEFUND ist ein vorbestehendes, nicht async-verursachtes Problem
+
+Fortsetzung nach der Diagnose (Abschnitt 9, positiv) und Baustein 1
+(Abschnitt 10). Jeder Baustein wurde EINZELN grün getestet und im Worktree
+committet, bevor der nächste begann (Nutzer-Auftrag). Korrektur zur eigenen
+früheren Kostenangabe: "~81-83 % der Self-Play-Kosten" (Abschnitt 10) bezog
+sich auf die inzwischen abgeschafften rtv-**Labels** (Task #80/#81, vor
+Task #85s Ablation) -- ob das Rundenübergangs-**Sampling** selbst denselben
+Anteil hat, ist NICHT belegt und wird hier nicht mehr als Begründung
+verwendet. Ungeprüft/nicht gemessen in dieser Sitzung (`MOSAIC_PROFILE_SELFPLAY`
+wäre das richtige Werkzeug dafür).
+
+### Baustein 2: rekursives Mehrrunden-Sampling (`round_transition_deep.rs`)
+
+Additiv: `net_mcts::drafting_action_priors_async`,
+`round_transition_deep::{ordered_children_pruned_async, round_end_eval_async,
+choose_drafting_action_pruned_async, simulate_one_round_async,
+continue_through_round{2,3,4}_async, bootstrap_value_after_rounds_async}`.
+GEPRÜFT unverändert synchron: `negamax_progress` (KEIN Netzaufruf --
+Gamma-Pruning, der einzige Netzbezug dieser Zugwahl, greift laut
+Modul-Kommentar NUR an der Wurzel, nicht in `negamax_progress`s eigener
+Tiefensuche) sowie `continue_through_round4_async`s Runde-5-Übergang
+(`round5::exact_round5_outcome`, kein Netzbezug).
+
+**Getestet in Isolation**: `continue_through_round4` (0/6),
+`continue_through_round3` (0/4), `bootstrap_value_after_rounds` (0/8,
+Horizont 1+2) -- alle `<1e-9`-Toleranz, ohne Sammel-Faden.
+
+**WICHTIGER FUND, unabhängig von der Async-Umformung**: unter schwerer
+`cargo test --lib`-Nebenlast (voller Testlauf, viele gleichzeitige teure
+Tests) zeigte `continue_through_round4_sync_only_repeatability_under_load`
+(rein SYNCHRON, KEIN Async-Code, derselbe Aufruf zweimal mit demselben Seed)
+1/6 Abweichungen -- **dieselbe Wall-Clock-Nichtdeterminismus-Klasse, die
+Task #71 (siehe `round_transition_deep.rs`-Modulkommentar) ADRESSIERT, aber
+laut dessen eigenem Kommentar NICHT vollständig behoben hat** ("NUR NOCH
+Not-Deckel" an mehreren Stellen). Alle vier neuen Vergleichstests deshalb
+`#[ignore]`t (0/6, 0/4, 0/8 GEPRÜFT in Isolation, siehe Bericht) --
+irreführendes Rot unter Last waere kein Fund über die Async-Umformung.
+
+`cargo test --lib`: 388/0/26 (bestätigt zweimal stabil ohne die
+`#[ignore]`ten Tests).
+
+### Baustein 3: Tiling-Stichentscheid (`tiling_solver.rs`/`self_play.rs`)
+
+Additiv: `self_play::net_tiling_tiebreak_value_async`,
+`tiling_solver::{select_best_tiling_candidate_async,
+best_first_step_valued_async, best_first_step_platten_valued_async,
+best_first_step_exact_or_valued_async}`. `NET_TILING_TIEBREAK_ENABLED=true`
+(Produktions-Default) -- kein Env-Toggle nötig, Runden 2-4 durchlaufen den
+echten Pfad. GEPRÜFTE Abweichung vom sonstigen Verengungsmuster:
+`best_first_step_platten_valued_async` behält `net: Option<&Net>` (nicht
+verengt auf `&Net`) -- das Original liefert auch bei `evaluator: None` einen
+Zug (reiner additiver Plattenterm ohne Netzfaktor); eine Verengung hätte den
+gesamten Zweig 1 (Task #100) für Heuristik-Spieler mit
+`MOSAIC_TILING_PLATTEN_W != 0` STILL übersprungen -- ein Verhaltens-
+unterschied, kein reiner Interruptibility-Umbau.
+
+**Getestet** (echte Tiling-Zustände Runde 2-4, 8 Seeds): **0/24
+Abweichungen**, ohne Sammel-Faden. KEIN Wall-Clock-Timing beteiligt (reine
+Kandidaten-Schleifen, kein Zeitbudget) -- **robust unter Last**, zweimal
+389/0/26 bestätigt, NICHT `#[ignore]`t.
+
+### Baustein 4: `play_net_self_play_game` als async fn
+
+Additiv: `net_mcts::net_root_child_stats_and_policy_async`,
+`self_play::{net_drafting_policy_async, sample_round_transition_for_round_async,
+resolve_tiling_step_async, tiling_step_async, play_net_self_play_game_async}`.
+
+GEPRÜFTE Zweige, bewusst NICHT konvertiert (mit Begründung, nicht nur
+Auslassung):
+- **Runde 5** (`round5::choose_action`/`_with_analysis`): exakter
+  Alpha-Beta-Solver ohne Netzbezug -- anders als in Bausteinen 1-3 KEIN
+  seltener Fallback, sondern ein Zweig, den JEDE vollständige Partie
+  tatsächlich durchläuft; deshalb vollständig (nicht nur als toter Code)
+  nachgebaut, nur eben synchron.
+- **`k > 1`** (ISMCTS-Mehrfachdeterminisierung, `NUM_DETERMINIZATIONS=1`
+  Default): laut `PREREG_ismcts_determinizations.md` GESCHLOSSEN ("k=1
+  bleibt") -- der Async-Zwilling fällt für diesen Fall auf den
+  VOLLSTÄNDIGEN synchronen Original-Aufruf zurück (korrekt für jedes `k`,
+  nur blockierend), statt einen ungetesteten Pfad für einen abgelehnten
+  Suchmodus zu bauen.
+- `crate::profiling::with_category`/`timed`-Umhüllungen: GEPRÜFT
+  (`profiling.rs:134-146,198-211`) vollständig hinter dem
+  `clone_profiling`-CARGO-FEATURE (nicht einem Laufzeit-Toggle) --
+  kompilieren ohne dieses Feature (jeder Testlauf dieser Sitzung) zu `f()`,
+  reinem Durchreichen. Weglassen im Async-Zwilling ist unter dieser
+  Build-Konfiguration GARANTIERT folgenlos für den Rückgabewert.
+
+`cargo test --lib`: 389/0/29.
+
+### GATE B: Kernbefund ist ein VORBESTEHENDES, NICHT async-verursachtes Problem
+
+**Auftrag**: vollständige Partie-Gleichheit synchron gegen async (mehrere
+Seeds, komplette Partien bis `Phase::End`, Endstände + Zugfolgen identisch
+ohne Sammel-Faden; mit Sammel-Faden Zugwahl-Gleichheit).
+
+**Gemessen** (`gate_b_full_game_equality_without_batcher`, 4 Seeds,
+`base_sims=16`, `record_rtv=false`, volle JSON-Records inkl. Zustände/
+Policy/`root_q`/`root_child_q`/Endstände):
+
+| Lauf | Abweichungen (voll) | Partien |
+| --- | ---: | ---: |
+| 1 | 2/4 (Seeds 1, 3) | 162/173 Records, gleiche Länge |
+| 2 (Wiederholung, identische Seeds) | 4/4 | -- |
+| 3 (nach Test-Erweiterung neu gebaut) | 0/4 | -- |
+| 4 (Wiederholung) | 0/4 | -- |
+
+**Die Mismatch-Rate variiert zwischen Läufen mit IDENTISCHEN Seeds und
+IDENTISCHEM Code** -- das ist selbst der Befund: kein deterministischer
+Logikfehler (der würde bei gleichem Seed immer gleich ausfallen), sondern
+Zeitabhängigkeit.
+
+**Entscheidende Gegenprobe** (`play_net_self_play_game_sync_only_repeatability`,
+REIN SYNCHRON, KEIN Async-Code, `play_net_self_play_game` zweimal mit
+demselben Seed): **1/4 Abweichungen**, erster abweichender Record bereits
+Index 0 (rückwirkend gestempeltes `bootstrap_value` für Runde 1). **Sync
+weicht von sich selbst ab, unter denselben Bedingungen wie der Sync/Async-
+Vergleich.** Damit ist belegt: die beobachteten Gate-B-Abweichungen sind
+NICHT durch die Async-Umformung verursacht, sondern durch eine
+VORBESTEHENDE Eigenschaft von `round_transition_deep.rs` (Task #71s
+Wall-Clock-Not-Deckel binden gelegentlich doch, siehe Baustein 2) **PLUS**
+den bereits in `evaluations/STATUS.md` dokumentierten geteilten RNG-Strom
+zwischen Suche/Simulation und dem echten Spiel (`self_play.rs:1523`-
+Fundstelle, "Gepaarte Arena-Vergleiche sind schwächer als angenommen") --
+verschiebt die interne Simulation den RNG-Verbrauch, verschieben sich ALLE
+nachfolgenden echten Spielentscheidungen mit.
+
+**Zielgerichtete Zerlegung** (dieselben Läufe, `bootstrap_value`/
+`round_transition_value` -- reine additive Trainingsziele ohne Rückwirkung
+auf den gespielten Zug -- vor dem Vergleich entfernt): **0/4 Abweichungen
+im Spielgeschehen** in beiden Läufen, in denen auch der volle Vergleich 0/4
+war. Für die beiden Läufe mit vollen Abweichungen (2/4, 4/4) wurde die
+zielgerichtete Zerlegung NICHT nachträglich auf dieselben Läufe angewendet
+(Code-Erweiterung kam danach) -- **UNGEPRÜFT, ob die Spielgeschehen-Teilmenge
+auch DORT 0 gewesen wäre**, nur plausibel angenommen aus der Mechanik
+(Trainingsziele beeinflussen `game`/`chosen` nicht direkt) und den zwei
+späteren Nachläufen.
+
+**Sammel-Faden-Smoke** (`gate_b_full_game_move_choice_equality_with_batcher`,
+4 Partien GLEICHZEITIG verschränkt): 3/4 Zugfolge-Abweichungen, davon eine
+mit UNTERSCHIEDLICHER Partielänge (164 vs. 165 Züge) -- **KONFUNDIERT**
+durch dieselbe vorbestehende Zeitempfindlichkeit, jetzt durch 4-fache
+Nebenläufigkeit zusätzlich verschärft (mehr geteilte CPU-Zeit, mehr
+Gelegenheiten für einen bindenden Wall-Clock-Deckel). Dieser Lauf taugt NICHT
+als reiner Befund über den Sammel-Faden -- eine saubere Messung bräuchte
+entweder `record_rtv=false` UND `bootstrap_value_after_rounds` deaktiviert/
+gemockt, oder das vorbestehende Problem selbst behoben, keines von beiden
+Teil dieses Auftrags.
+
+### VERDIKT: kein Grundsatzproblem der Async-Architektur -- aber Gate B wie spezifiziert nicht sauber messbar
+
+Alle VIER Bausteine sind einzeln, in Isolation, korrekt (0-Abweichungen
+gegen die Synchron-Referenz, innerhalb der jeweils erreichbaren Toleranz).
+Die Gate-B-Abweichungen häufen sich exakt an der Stelle, die bereits VOR
+diesem Auftrag als fragil bekannt war (`round_transition_deep.rs`s
+Wall-Clock-Reste, geteilter RNG-Strom) -- und treten NACHWEISLICH auch ohne
+jede Async-Beteiligung auf. **Das ist ein Befund über round_transition_deep.rs,
+nicht über die Verschränkungsarchitektur.** Ob Gate B im ursprünglichen
+Wortlaut (Bit-Identität ganzer Partien) mit der heutigen Codebasis überhaupt
+erreichbar ist -- unabhängig von Sync/Async --, ist damit selbst fraglich
+geworden.
+
+### Was NICHT geprüft ist
+
+- Die zielgerichtete Zerlegung (Trainingsziele entfernt) wurde nur für 2 von
+  4 beobachteten Voll-Abweichungs-Läufen tatsächlich gemessen (siehe oben).
+- Die GENAUE Kausalkette (welcher Wall-Clock-Deckel bindet, wie viele
+  RNG-Ziehungen das verschiebt) wurde NICHT weiter zerlegt -- die Diagnose
+  stützt sich auf die Sync-gegen-sich-selbst-Gegenprobe, nicht auf eine
+  Line-by-Line-Ursachenanalyse.
+- Ob die Batcher-Smoke-Abweichung (3/4) bei `record_rtv=false` UND
+  deaktiviertem `bootstrap_value_after_rounds` (also ohne jede
+  Wall-Clock-Beteiligung) verschwindet -- NICHT gebaut/gemessen.
+- `MOSAIC_PROFILE_SELFPLAY`-Instrumentierung wurde NICHT genutzt, um den
+  tatsächlichen Kostenanteil des Rundenübergangs-Samplings zu messen (siehe
+  Korrektur oben zur "~81-83%"-Zahl).
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `net_root_child_stats_and_policy_async`s `k>1`-Rückfall ruft den
+  VOLLSTÄNDIGEN synchronen Original-Code (nicht nur einen Teil davon) --
+  korrekt für jeden Wert, kein Sonderfall-Risiko.
+- Gate-B-Tests (`gate_b_*`, `play_net_self_play_game_sync_only_repeatability`)
+  als `#[ignore]` markiert -- teuer (volle Partien) UND nachweislich
+  zeitempfindlich, ein Rot unter `cargo test --lib`-Last wäre irreführend.
+- Zielgerichtete Zerlegung (Trainingsziel-Felder entfernen) direkt in den
+  bestehenden Gate-B-Kern-Test integriert statt eines separaten Tests --
+  hält den direkten Vergleich (voll vs. Spielgeschehen) an derselben
+  Partiemenge sichtbar.
