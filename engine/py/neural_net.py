@@ -930,7 +930,11 @@ def _dome_grids_from_dome(dome_grid):
 
 
 def _conjunctions_from_dome(dome_grid) -> list[int]:
-    """25 Binaerlabels je Spielerbrett -- die KONJUNKTIVEN Wertungskriterien,
+    """34 Binaerlabels je Spielerbrett (GEPRUEFT gegen config.py:117
+    CONJUNCTIONS_PER_PLAYER=34 UND die Index-Liste unten, die bis 25..33
+    laeuft = 34 Eintraege; die fruehere Fassung dieses Docstrings sagte
+    faelschlich 25 -- siehe PREREG_ownership_corpus.md §3.3) -- die
+    KONJUNKTIVEN Wertungskriterien,
     die sich NICHT aus Feld-Randwahrscheinlichkeiten ableiten lassen
     (`P(alle 6 Felder)` ist nicht das Produkt der Einzelwahrscheinlichkeiten).
 
@@ -1834,7 +1838,11 @@ class MosaicDataset(Dataset):
                                 # Gleiche Ego-Reihenfolge wie oben, HINTEN
                                 # angehaengt -> Layout des erweiterten Kopfs:
                                 # [0:36] Rand ich, [36:72] Rand Gegner,
-                                # [72:97] Konj. ich, [97:122] Konj. Gegner.
+                                # [72:106] Konj. ich, [106:140] Konj. Gegner
+                                # (34 je Spieler, GEPRUEFT gegen config.py:117
+                                # CONJUNCTIONS_PER_PLAYER=34 -- diese Zeile
+                                # sagte frueher faelschlich [72:97]/[97:122]
+                                # = 25, siehe PREREG_ownership_corpus.md §3.3).
                                 cj_first, cj_second = (fo[2], fo[3]) if c == 0 else (fo[3], fo[2])
                                 vec = vec + cj_first + cj_second
                             own_l.append(np.array(vec, dtype=np.int8))
