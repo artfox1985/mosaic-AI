@@ -114,6 +114,10 @@ Spieloekonomie, nicht Fehlschlag (`docs/domaenenwissen.md` Abschnitt 7; deckt
 sich mit §13: k7 Stopp-Regel, k0 negativ). Beilaeufige Korpus-Abdeckung wird
 im Piloten per Grundraten-Gate geprueft.
 
+**OFFEN, Nutzer-Auftrag 2026-08-13**: Plattenbauer k6 (Spezialfelder) Runde 2 als
+KUPPELDRAFT-Strategie (`docs/domaenenwissen.md` Abschnitt 8: Joker horten und nach
+unten, erzwungene Spezialkuppeln nach oben, Joker-Priorisierung als Stoerkanal).
+
 **OFFEN, Nutzer-Auftrag 2026-08-13**: Plattenbauer k2 (Diagonalen) und k5 (Ecken)
 Runde 2 mit der Nutzer-Taktik aus `docs/domaenenwissen.md` Abschnitte 5-6
 (Spezial-/Joker-Kuppelwahl als Kern statt Farbenjagd; k2 muss zusaetzlich den
