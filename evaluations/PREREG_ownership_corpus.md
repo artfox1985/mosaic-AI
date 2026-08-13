@@ -179,7 +179,21 @@ Self-Play mit Labels liegt darunter, Heuristik-Arm weit darüber. Grobschätzung
 unbeaufsichtigt in Etappen (Watchdog vorhanden); Umfang ist ein Regler, kein
 Fixum — die Deckungszahlen aus §2 entscheiden, ob nachproduziert wird.
 
-## §6 Was dieser Korpus NICHT ist
+## §5b Lebenszyklus des Korpus (Nutzer-Entscheid 2026-08-14)
+
+Der Korpus ist ein LEHR-Korpus, kein Dauerbestand. Archivierung (Backup-Script
+deckt, lokale Kopie weg) erst, wenn BEIDE Bedingungen erfüllt sind:
+
+1. **Tor A bestanden** — vorher kann ein Fehlschlag Nachproduktion oder den
+   v2-Selektions-Hebel nötig machen (§2).
+2. **Der Kreislauf ist geschlossen**: der Ownership-Verbraucher ist aktiv
+   (w_own > 0 nach Regler-Sweep) UND die erste Self-Play-Generation aus
+   plattenbewusstem Spiel liegt vor. Ab dann erzeugt das Spiel selbst
+   plattenreiche Labels, und künftige Trainings brauchen den Lehr-Korpus
+   nicht mehr — vorher würde ein Weitertrainieren des Kopfes ohne den Korpus
+   die Platten-Verteilung wieder verlieren.
+
+Lokale Löschung dann wie immer nur mit pfadgenauer Freigabe (Löschverbot).
 
 Kein Stärke-Training: kein Gating, kein Champion-Anspruch, keine
 Elo-Interpretation der beteiligten Konfigurationen. Die Bauer-Knöpfe bleiben
