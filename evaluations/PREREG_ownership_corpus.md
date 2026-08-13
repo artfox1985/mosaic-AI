@@ -35,6 +35,7 @@ Ablage: `data/ownership_corpus/` (strukturell außerhalb des Standard-Fensters,
 | B | wie A + MOSAIC_SPALTENBAU (R3-Pfad) | 1000 | k1-Positivbeispiele (~0,45 Spalten/Partie) |
 | C | wie A + MOSAIC_PLATTENBAU=2 | 1000 | k2-Positivbeispiele (>50 % volle Diagonalen) |
 | D | Heuristik-Self-Play (150 Sims) | 1000 | k6-Demonstrationen + generelle Plattenbewirtschaftung (wertung_progress); billigster Arm |
+| E | wie A + k5-Bauer (MOSAIC_PLATTENBAU=5, wird gebaut) | 1000 | k5-Positivbeispiele. Nutzer-Entwurf: Spalten-PAAR-Ziel (äußeres Paar 0+1 oder 4+5) — schließt beide Ecken der Seite (8+3 = 11 = Orakel) und harmoniert mit k1 (laut scoring.rs:60-64 nicht wechselseitig ausgeschlossen); Spezialkuppeln in die unteren Ecken ((2,0)/(2,2), 8-Punkte-Seite, Nutzer-Taktik) |
 
 Bewusst KEINE nachträgliche Selektion in v1: Die Arm-Quoten ERSETZEN die
 Selektion (gezielte Anreicherung statt Verzerrung der Basisrate). Eine
@@ -82,7 +83,10 @@ getrennt) — die Basisraten-Falle aus der Skill-Konfundierungs-Lehre.
 
 ## §5 Umfang und Kosten (Herleitung, keine Messung)
 
-6000 Partien gesamt. Bezug: Arena-Durchsatz 248,5 Spiele/h (8 Threads, §20);
+7000 Partien gesamt (Arm E per Nutzer-Entscheid 2026-08-14 gleich mit
+eingeplant statt über den Deckungs-Bericht nachzuziehen; Voraussetzung:
+k5-Bauer besteht seine eigene Abnahme in PREREG_provokation.md §20).
+Bezug: Arena-Durchsatz 248,5 Spiele/h (8 Threads, §20);
 Self-Play mit Labels liegt darunter, Heuristik-Arm weit darüber. Grobschätzung
 20–30 h CPU für A–C, Arm D <2 h; mit GPU-2× entsprechend die Hälfte. Läuft
 unbeaufsichtigt in Etappen (Watchdog vorhanden); Umfang ist ein Regler, kein
