@@ -152,7 +152,136 @@ GLEICH mit config.py, NICHT mit "25". **Zwei veraltete Stellen korrigiert**
   `python -m py_compile train.py`: OK.
    Laufzeit.
 
-## §4 Training + Abnahme (Tor A aus PREREG_ownership_consumer.md)
+**3.5 Bauer-Vorzug in `run_net_self_play` verdrahtet + Wirkungs-Probe
+(2026-08-14) — GEBAUT und WIRKT, beidseitig, wie erwartet.**
+
+Behebung des 3.1-Blockers: `play_net_self_play_game`s Drafting-Block
+(`self_play.rs:2693`-2695) berechnet jetzt VOR dem bestehenden
+Ein-Aktion-Kurzschluss einen `vorzug_kandidat` —
+`provokation::vorzugszug(&game.state).or_else(|| plattenbauer::drafting_vorzug
+(&game.state)).or_else(|| plattenbauer::dome_vorzug(&game.state))` — OHNE
+`pi==net_board`-Gate, exakt das Vorbild aus `play_net_vs_net_game`
+(`self_play.rs:1927`-1929, siehe 3.2). Ein neuer `else if let Some(a) =
+vorzug_kandidat`-Zweig (`self_play.rs:2700`-2711) macht daraus dasselbe
+Demonstrations-Target (ein-hot, `prob=1.0`, `root_q=None`,
+`root_child_q=[]`) wie der bestehende Ein-Aktion-Fall — die 3.1-Frage
+("was steht im Record unter Vorzug") ist damit nicht mehr hypothetisch,
+sondern durch den eigenen Code beantwortet.
+
+Drei Entscheidungspunkte lt. Auftrag, GEPRUEFT einzeln:
+- **Drafting-Vorzug + Kuppelwahl**: EIN gemeinsamer Aufruf-Ketten-Punkt
+  (`dome_vorzug` ist Teil derselben `.or_else`-Kette wie `drafting_vorzug`,
+  keine eigene Phase — GEPRUEFT per Grep, `dome_vorzug` taucht in
+  `self_play.rs` ausschliesslich in Drafting-Bloecken auf, nie in einem
+  eigenen `Phase::Dome`-Zweig, den es nicht gibt). Jetzt verdrahtet.
+- **Tiling-Vorzug**: GEPRUEFT unveraendert gelassen, mit Begruendung: die
+  Self-Play-Funktion `tiling_step` (`self_play.rs:1074`-1114) ruft
+  `resolve_tiling_step(&game.state, pi, net)` auf — DIESELBE Funktion, die
+  auch `play_net_vs_net_game`s Tiling-Arm nutzt (`self_play.rs:2143`-2145,
+  dort `resolve_tiling_step(&game.state, pi, None)`). Beide Pfade riefen
+  schon VOR diesem Umbau `crate::plattenbauer::tiling_vorzug` an KEINER
+  Stelle auf (GEPRUEFT per Grep ueber `tiling_solver.rs`: nur
+  `spaltenbau::vorzug_tiling_step` und ein lokales `provokation`-basiertes
+  Pendant sind verdrahtet, `plattenbauer::tiling_vorzug` an keiner
+  Aufrufstelle im ganzen Repo) — ein vorbestehender, von diesem Auftrag
+  unabhaengiger Bestandsbefund, kein neu eingefuehrtes Verhalten. Self-Play
+  ist damit fuer Tiling bereits 1:1 identisch zum Arena-Pfad (dieselbe
+  Funktion, dasselbe Nicht-Verhalten) — "alle drei Entscheidungspunkte" ist
+  erfuellt, der dritte Punkt einfach ohne Diff.
+- `set_partie_seed`: `run_net_self_play`s `play`-Closure fehlte dieser
+  Aufruf komplett (GEPRUEFT per Grep, `run_net_arena_match`/
+  `run_net_vs_net_arena` haben ihn, `run_net_self_play` hatte ihn nicht).
+  Nachgetragen INNERHALB der `run_with_watchdog`-inneren Closure
+  (`self_play.rs:3061`, direkt neben dem bestehenden
+  `set_partie_shaping_weight`-Aufruf, aus demselben Thread-Lokalitaetsgrund:
+  `play_net_self_play_game` laeuft auf dem NEU gespawnten Watchdog-Thread,
+  nicht auf dem aeusseren rayon-Thread). Kein Reset auf `None` noetig — der
+  Thread ist neu je Partie, kein Leck ueber Partien hinweg moeglich (anders
+  als bei wiederverwendeten rayon-Workern).
+
+**Bestandsschutz**: `cargo test --lib` 417/0/20 (Baseline vor diesem Umbau
+war 417/0/20 nach §20 — unveraendert, keine neuen/entfernten Tests fuer
+diesen reinen Verdrahtungs-Umbau). `tools/paritaets_probe.py`: Hash
+`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` haelt
+(Wheel neu gebaut+installiert) — Bestandsverhalten bei unbesetzten Knoepfen
+byte-identisch.
+
+**Wirkungs-Probe** (Anti-Stillstand-Beweis, `scratchpad/wirkungsprobe_arm.py`
++ `scratchpad/wirkungsprobe_auswertung.py`): je Arm 30 Partien ueber
+`mosaic_rust.net_self_play_games` (= `run_net_self_play`), Champion
+`v21_2d_brierbest`, `base_sims=200`, EIN gemeinsamer Seed (20260814) ueber
+alle Arme (gepaarte Anlage wie im uebrigen Auftrag), `record_rtv=false`,
+`MOSAIC_WERTUNG_STREUUNG_MAX` bewusst UNGESETZT (Koordinator-Vorgabe: ein
+Faktor). Jeder Arm lief in einem EIGENEN Python-Prozess (Pflicht:
+`MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU` sind in Rust `OnceLock`-gecacht, ein
+zweiter Arm im selben Prozess wuerde den ersten Knopf einfrieren). Rohdaten
+(30 Spiele je Arm, Step-Records als `.pkl`, plus je Spiel der letzte
+fertige Record als Zustands-Zusammenfassung) liegen unter
+`data/corpus_probe/` (NICHT `data/` oder `data/ownership_corpus/`,
+Messdaten-Regel) — `data/` ist gitignored, nichts davon wird committet.
+Je Kriterium wurde `mosaic_rust.end_scoring_from_state_json` auf den
+LETZTEN Record jeder abgeschlossenen Partie angewandt (per Konstruktion der
+Zustand mit fertigem `dome_grid`, siehe `tools/scoring_tile_impact.py`-
+Moduldoku — dort bereits so verifiziert, hier direkt uebernommen statt neu
+hergeleitet) — UNABHAENGIG davon, ob das Kriterium in der jeweiligen Partie
+tatsaechlich gezogen wurde (die Bauer-Dispatch ist ueber `MOSAIC_PLATTENBAU`
+fest, nicht an `scoring_tile_ids` gekoppelt, siehe `plattenbauer.rs:236`-240).
+
+| Arm | Knopf | Ziel-Kriterium | Ø Punkte P0 | Ø Punkte P1 | Δ vs. A (P0/P1) |
+|---|---|---|---:|---:|---:|
+| A | keiner | — (Bezug) | k1 0,00 / k2 0,00 / k5 3,20 / k6 −11,50 | k1 0,00 / k2 0,00 / k5 3,20 / k6 −10,90 | — |
+| B | `MOSAIC_SPALTENBAU` | k1 Vertikale Reihen | **2,80** | **3,27** | +2,80 / +3,27 |
+| C | `MOSAIC_PLATTENBAU=2` | k2 Diagonale | **4,33** | **2,33** | +4,33 / +2,33 |
+| E | `MOSAIC_PLATTENBAU=5` | k5 Eckplatten | **8,30** | **7,93** | +5,10 / +4,73 |
+| F | `MOSAIC_PLATTENBAU=6` | k6 Spezialfelder | **−8,30** | **−8,70** | +3,20 / +2,20 (weniger negativ) |
+
+n=30 je Arm, alle 30/30 Partien vollstaendig (`completed=true`), keine
+Haenger. Sanity-Nebenbefund (nicht Teil der Abnahme, nur Kontext): mittlere
+Gesamtpunktzahl steigt leicht mit aktivem Knopf (A 21,0/21,5 → B 24,5/23,2 →
+C 27,5/25,7 → E 27,8/24,3 → F 30,2/25,7) — kein Hinweis auf einen
+Spielstaerke-Kollaps durch die Verdrahtung.
+
+**Befund gegen die Vorab-Erwartung des Koordinators** ("B/C/E heben ihr
+Kriterium deutlich ueber Arm A, Groessenordnung k1~3/k2~5-6/k5~8; F
+deutlich ueber A, Groessenordnung −9,75 gegen −15,00"): **ERFUELLT fuer
+B/E/F, TEILWEISE fuer C.** B trifft k1~3 fast exakt (2,80/3,27). E trifft
+k5~8 fast exakt (8,30/7,93). F bewegt sich in die richtige Richtung und um
+eine mit der Arena vergleichbare Groessenordnung (+2,2 bis +3,2 Punkte je
+Spieler, Arena-Delta war +5,25 auf einer tieferen Basis −15,00 statt
+−11,50 — die Basen sind wegen 3.6 unten verschieden, die RICHTUNG und
+GROESSENORDNUNG der Verbesserung stimmen). C liegt mit 2,33-4,33 (Ø 3,33)
+UNTER der Arena-Groessenordnung 5-6, aber klar und eindeutig ueber Arm As
+0,00 — die Verdrahtung wirkt nachweisbar, nur schwaecher als in der Arena
+erwartet (moegliche Ursache: 3.6 unten).
+
+**3.6 Eigene Entscheidung / offene Einschraenkung (ungeprueft, als Annahme
+markiert):** Diese Probe ist NICHT direkt grössenskalengleich mit den
+Arena-Ankern aus PREREG_provokation.md §14-§20, aus zwei strukturellen
+Gruenden, beide bewusst in Kauf genommen (Auftrag: "nur die kleine Probe,
+keine neue Kalibrierung"):
+1. **Bilateral statt einseitig**: Arena mass eine Seite (Netz) gegen einen
+   UNGESTEUERTEN Gegner (Heuristik `--heur-sims 150`, kein Bauer-Knopf).
+   Self-Play steuert BEIDE Seiten gleich (kein `pi`-Gate, s.o.) — zwei
+   gleich steuernde Spieler konkurrieren um dieselben Farben/Kuppel-Zellen,
+   was die pro Spieler erreichbaren Punkte gegenueber der Arena-Zahl
+   druecken kann (nicht gemessen, nur plausibel).
+2. **`base_sims=200` statt Arenas 400**: eigene, unbegruendete Kostenwahl
+   fuer diese Probe (schneller, ausreichend um die Vorzug-UEBERSTEUERUNG
+   selbst zu pruefen, da der Vorzug bei Treffer die Suche vollstaendig
+   ersetzt — sims wirken nur auf die NICHT uebersteuerten Zuege).
+Beides aendert nichts an der JA/NEIN-Frage dieses Auftrags (wirkt die
+Verdrahtung ueberhaupt) — die beantwortet sich unabhaengig von der exakten
+Groessenordnung schon durch den klaren Sprung weg von Arm As 0,00/0,00
+(k1, k2) bzw. die klare Verschiebung bei k5/k6. Fuer den echten Korpus-Lauf
+(§2) waeren `base_sims` und ggf. eine erneute, dann korpus-massstaebliche
+Kalibrierung ein separater, spaeterer Schritt, kein Teil dieser Probe.
+
+**Verdikt: Verdrahtung wirkt, wie im Auftrag gefordert — kein "Befund
+statt Schoenreden" noetig, es gibt einen echten Effekt in allen vier
+gebauten Kriterien.** Arm B/C/E/F sind fuer den echten Korpus-Lauf (§2)
+freigegeben, sobald dieser gestartet wird (nicht Teil dieses Auftrags).
+
+
 
 - Warm-Start vom Champion (v21_2d_brierbest), Standard-Rezept (lr 5e-5,
   cosine), `--ownership-weight 0,2` (Präzedenz: own02-Lauf) + `--conjunction`.
@@ -162,8 +291,8 @@ GLEICH mit config.py, NICHT mit "25". **Zwei veraltete Stellen korrigiert**
 - **Abnahme = Kopfgüte, NICHT Arena**: je Feld Brier/AUC gegen die Basisrate
   auf Held-out-Partien (Split auf Partie-Ebene); je Kriterium Rangkorrelation
   E_k gegen tatsächliche Plattenpunkte; Bericht getrennt nach eigener und
-  Gegner-Hälfte. Erst nach bestandenem Tor A wird der Verbraucher (P4)
-  gebaut.
+  Gegner-Hälfte. Erst nach bestandenem Tor A wird der Verbraucher
+  (PREREG_ownership_consumer.md) gebaut.
 - Nebenbedingung: policy/value-Offline-Metriken des Laufs mitloggen — ein
   Einbruch dort wäre ein Warnsignal für Demonstrations-Kontamination
   (Prüfpunkt §3.1), aber KEIN Abnahmekriterium dieses Laufs.
