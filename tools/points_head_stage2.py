@@ -151,11 +151,11 @@ def main():
         data = pickle.load(f)
     records = data["records"]
     states = select_states(records, args.n_states)
-    print(f"[punktekopf_stufe2] {len(states)} Zustaende gewaehlt "
+    print(f"[points_head_stage2] {len(states)} Zustaende gewaehlt "
           f"(Runden: {sorted(set(r['state']['round'] for _, r in states))})")
 
     combos = pick_representative_combos(args.n_combos)
-    print(f"[punktekopf_stufe2] {len(combos)} Kombinationen (fest, je Zustand identisch): {combos}")
+    print(f"[points_head_stage2] {len(combos)} Kombinationen (fest, je Zustand identisch): {combos}")
 
     per_state_results = []
     tau_per_state = {f: [] for f in HEAD_FIELDS}

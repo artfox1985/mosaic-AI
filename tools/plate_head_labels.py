@@ -26,8 +26,8 @@ exakte Labels aus einer Generierung, die sie stempelt.
 
 Aufruf:
 
-    python tools/plattenkopf_labels.py --check          # Identitaets-Pruefung
-    python tools/plattenkopf_labels.py --stats          # Grundraten je Kriterium
+    python tools/plate_head_labels.py --check          # Identitaets-Pruefung
+    python tools/plate_head_labels.py --stats          # Grundraten je Kriterium
 """
 from __future__ import annotations
 

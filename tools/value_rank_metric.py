@@ -45,7 +45,7 @@ import json
 import sys
 from pathlib import Path
 
-# Windows-Konsolen (cp1252) -- gleiches Muster wie offline_diagnose.py/train.py.
+# Windows-Konsolen (cp1252) -- gleiches Muster wie offline_diagnosis.py/train.py.
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:

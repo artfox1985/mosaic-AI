@@ -183,7 +183,7 @@ def load_model(name: str):
 
 def masked_softmax(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """Softmax nur ueber legale Aktionen (mask==1), Rest 0 -- identisches
-    Muster zu offline_diagnose.py::diagnose (masked_logits = logits + (mask-1)*1e9)."""
+    Muster zu offline_diagnosis.py::diagnose (masked_logits = logits + (mask-1)*1e9)."""
     masked = logits + (mask - 1.0) * 1e9
     m = masked.max()
     e = np.exp(masked - m)
@@ -222,7 +222,7 @@ def masked_logits(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
 def action_count_bucket(n_legal: int) -> str:
     """Bucket fuer die Miss-Rate-Aufschluesselung nach Wurzelbreite (Task E,
     Teil c). Prereg-Erwartung: der Fall mit vielen legalen Aktionen ist der
-    interessante (Abdeckung dort laut dome_split_diagnose.json nur ~10%)."""
+    interessante (Abdeckung dort laut dome_split_diagnosis.json nur ~10%)."""
     if n_legal <= 16:
         return "<=16"
     if n_legal <= 32:

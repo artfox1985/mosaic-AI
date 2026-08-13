@@ -99,7 +99,7 @@ Teilen als A/B benannt.
 | 15 (A/B) | Entscheidungsmetrik-Wahl (A: globale Metrik ohne Runde-5-Ausschluss) / Runde-5-Ausschluss im Loss (B) | entschieden -- Metrik A sofort bewaehrt und uebernommen; Teil B ("Wash", nicht interpretierbar wegen Dedup-Konfundierung) | `archive/history.md:5617`, `archive/history.md:5716` |
 | 16 | Tiling-Solver-Endwertungs-Shaping (Endwertungsbewusstsein in der Tiling-Zugwahl) | entschieden -- verworfen (1600 Spiele, p=0,5404) | `archive/history.md:6055`, `engine/src/tiling_solver.rs:47` |
 | 18 | Gumbel `c_scale`-Kalibrierung | entschieden -- bleibt 1,0 trotz hoeherer Siegquote bei 0,3 (Score-Einbruch beidseits) | `archive/history.md:6133` |
-| 19 | Orakel-Metriken in `offline_diagnose.py` integriert, Orakel-Quelle = v18 | entschieden -- umgesetzt, harte Regel "Quelle darf kein Kandidat sein" seither in Kraft | `archive/history.md:6291` |
+| 19 | Orakel-Metriken in `offline_diagnosis.py` integriert, Orakel-Quelle = v18 | entschieden -- umgesetzt, harte Regel "Quelle darf kein Kandidat sein" seither in Kraft | `archive/history.md:6291` |
 | 20 | Tiling-Zugwahl Runden 2-4: netzgefuehrter Stichentscheid (`punkte * value`) | entschieden -- validiert und aktiviert | `archive/history.md:6405`, `engine/src/tiling_solver.rs:596` |
 | 21 | Tiling-Zugwahl Runde 5: exakte Endwertung statt Naeherung | entschieden -- validiert und aktiviert (gemeinsam mit #20) | `archive/history.md:6405`, `engine/src/tiling_solver.rs:100` |
 | 27 | Runde-5-Value-Kalibrierung (reagiert der Kopf proportional auf Wertungsplatten-Aenderungen?) | entschieden -- Unterkalibrierung bestaetigt (Steigung 0,06-0,09 statt ~1) | `archive/history.md:7065` |

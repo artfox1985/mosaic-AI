@@ -51,7 +51,7 @@ PREREG_DIR = REPO_ROOT / "evaluations"
 # waere), nennt aber keine 40 KB. Fuer eine Ratsche ist das vertretbar, weil die
 # Schwelle nur bestimmt, ab wann Wachstum beobachtet wird -- nicht, was erlaubt
 # ist. Stand 2026-08-11 liegen SECHS Dateien darueber (neural_net.py 161 KB,
-# train.py 134, server.py 74, analyze_game_log.py 55, dome_split_diagnose.py 45,
+# train.py 134, server.py 74, analyze_game_log.py 55, dome_split_diagnosis.py 45,
 # self_play.py 41), die im Dok genannten "vier" stimmen also nicht mehr.
 SIZE_THRESHOLD_BYTES = 40 * 1024
 SIZE_GROWTH_TOLERANCE = 1.02  # +2% Rauschtoleranz -- blosses Reformatieren darf nicht rot werden

@@ -15,7 +15,7 @@ damit ein konservativer Test: was hier lernbar ist, ist es dort auch.
 
 ## Entscheidungsgroesse: Brier-SKILL-Score, nicht roher Brier
 
-Kriterium 6 hat eine Grundrate von ~83 % (`tools/plattenkopf_labels.py stats`).
+Kriterium 6 hat eine Grundrate von ~83 % (`tools/plate_head_labels.py stats`).
 Ein Kopf, der konstant 0,83 ausgibt, erreicht einen praechtigen Brier und
 unterscheidet nichts. Deshalb:
 
@@ -33,7 +33,7 @@ Lernbarkeit), fuer einen Champion-Kandidaten nicht.
 
 Aufruf:
 
-    python tools/plattenkopf_smoketest.py --files 30 --epochs 12
+    python tools/plate_head_smoketest.py --files 30 --epochs 12
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def load_dataset(pattern: str, n_files: int, max_states: int):
     """Zustaende + 18 Atome + Aktiv-Maske. Labels je Partie einmal, dann
     auf alle Datensaetze derselben Partie gestempelt -- wie `scores`."""
     import neural_net as nn_mod
-    from plattenkopf_labels import group_games, labels_for_board
+    from plate_head_labels import group_games, labels_for_board
 
     files = sorted(glob.glob(str(REPO / "data" / pattern)))[:n_files]
     if not files:

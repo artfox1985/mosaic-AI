@@ -20,9 +20,9 @@ Was es NICHT tut: Rohdateien loeschen. Das entscheidet der Nutzer pfadgenau
 indem es das Verwertbare vorher sichert.
 
 Aufruf:
-    python -X utf8 tools/arena_kompakt.py                      # alle
-    python -X utf8 tools/arena_kompakt.py --muster "vgrid2_*"  # Teilmenge
-    python -X utf8 tools/arena_kompakt.py --pruefen            # nur vergleichen
+    python -X utf8 tools/arena_compact.py                      # alle
+    python -X utf8 tools/arena_compact.py --muster "vgrid2_*"  # Teilmenge
+    python -X utf8 tools/arena_compact.py --pruefen            # nur vergleichen
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ sys.path.insert(0, str(BASIS / "tools"))
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plattenpunkte_aus_arena import KRITERIUM, partien  # noqa: E402
 
-ZIEL = BASIS / "evaluations" / "arena_kompakt.jsonl"
+ZIEL = BASIS / "evaluations" / "arena_compact.jsonl"
 
 
 def kompakt(sp: dict, quelle: str) -> dict:

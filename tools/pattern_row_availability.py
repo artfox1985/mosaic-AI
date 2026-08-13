@@ -73,7 +73,7 @@ Rundenversorgung exakt und damit eine harte Untergrenze; die eigentliche
 Referenz muss aus Zufalls-Drafting kommen (Nutzer-Vorschlag,
 `round_transition::drive_drafting_to_leaf_naive`).
 
-Aufruf:  python tools/musterreihen_verfuegbarkeit.py
+Aufruf:  python tools/pattern_row_availability.py
 """
 from __future__ import annotations
 

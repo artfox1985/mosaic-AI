@@ -165,13 +165,13 @@ kann (p = 2·(1/2)⁶ = 0,03125 bei einheitlicher Richtung).
 ### Primär (trägt die Dosis-Wirkungs-Hypothese)
 
 Die zwei einzigen gegen die Arena VALIDIERTEN Prädiktoren (Memory
-`project_oracle_metrics_validated`, `tools/offline_diagnose.py::ORACLE_KEYS`,
+`project_oracle_metrics_validated`, `tools/offline_diagnosis.py::ORACLE_KEYS`,
 7/7 auf entschiedenen Gating-Paaren, Binomial p=0,0156):
 
 - `prior_mass_on_oracle_top3`
 - `kendall_tau_policy_vs_oracle_q`
 
-Berechnet mit `tools/offline_diagnose.py --frozen --model <12 Checkpoints>`
+Berechnet mit `tools/offline_diagnosis.py --frozen --model <12 Checkpoints>`
 (Oracle-Referenz: `v16_best`, unverändert — keiner der 12 Checkpoints ist die
 Oracle-Quelle, kein Selbstbezugs-Vorteil). Je Arm+Seed der **beste
 Checkpoint** (`*_best.pth`, per `val_combined`-Auswahl innerhalb des Laufs —
@@ -285,9 +285,9 @@ Trajektorienqualitäts-Frage (B2) offen bleibt.
    siehe "Technische Umsetzung"). `--no-snapshot` (Ablationslauf, kein
    Champion), `--no-plot`. Nach allen 12 Läufen werden beide Sandboxen
    inkl. HDF5-Caches entfernt, `data/` bleibt unangetastet.
-4. Nach allen 12 Läufen: `tools/offline_diagnose.py --frozen --model
+4. Nach allen 12 Läufen: `tools/offline_diagnosis.py --frozen --model
    voll_s1_best halb_s1_best ... --out
-   evaluations/offline_diagnose_corpus_dose_frozen.json`.
+   evaluations/offline_diagnosis_corpus_dose_frozen.json`.
 5. Gepaarte Auswertung (`tools/train_corpus_dose.py` schreibt sie direkt mit,
    kein separates Skript) — Tabelle je Seed + Zusammenfassung (Ø-Differenz,
    t-Test, Vorzeichentest) für beide Orakel-Metriken, Ergebnis-JSON nach

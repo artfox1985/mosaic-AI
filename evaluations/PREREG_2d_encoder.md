@@ -80,13 +80,13 @@ Mindestzahl, ab der der exakte Vorzeichentest überhaupt p<0,05 erreichen kann
 ### Primär (traegt die Struktur-Hypothese)
 
 Die zwei einzigen gegen die Arena VALIDIERTEN Prädiktoren (Memory
-`project_oracle_metrics_validated`, `tools/offline_diagnose.py::ORACLE_KEYS`,
+`project_oracle_metrics_validated`, `tools/offline_diagnosis.py::ORACLE_KEYS`,
 7/7 auf entschiedenen Gating-Paaren, Binomial p=0,0156):
 
 - `prior_mass_on_oracle_top3`
 - `kendall_tau_policy_vs_oracle_q`
 
-Berechnet mit `tools/offline_diagnose.py --frozen --model <12 Checkpoints>`
+Berechnet mit `tools/offline_diagnosis.py --frozen --model <12 Checkpoints>`
 (Oracle-Referenz: v16_best, unverändert — die 2D-Checkpoints sind NICHT die
 Oracle-Quelle, kein Selbstbezugs-Vorteil). Je Arm+Seed der **beste Checkpoint**
 (`*_best.pth`, per `val_combined`-Auswahl innerhalb des Laufs — train.pys
@@ -159,9 +159,9 @@ dann hohe Priorität.
    ein Paar (`fs_flat_s<n>` dann `fs_2d_s<n>`), damit ein Zwischenstand nach
    jedem fertigen Paar sinnvoll ist. `--no-snapshot` (Ablationslauf, kein
    Champion) `--no-plot` (kein Display nötig).
-2. Nach allen 12 Läufen: `tools/offline_diagnose.py --frozen --model
+2. Nach allen 12 Läufen: `tools/offline_diagnosis.py --frozen --model
    fs_flat_s1_best fs_2d_s1_best ... --out
-   evaluations/offline_diagnose_2d_vs_flat_fs_frozen.json` (Orakel-Metriken
+   evaluations/offline_diagnosis_2d_vs_flat_fs_frozen.json` (Orakel-Metriken
    AKTIV, `--no-oracle` NICHT gesetzt).
 3. Gepaarte Auswertung (`tools/train_2d_vs_flat_fs.py` schreibt sie direkt
    mit, kein separates Skript nötig) — Tabelle je Seed + Zusammenfassung

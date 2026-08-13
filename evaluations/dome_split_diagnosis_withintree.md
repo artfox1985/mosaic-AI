@@ -1,6 +1,6 @@
 # Zerlegungs-Diagnose: within-tree (TASK B, korrigiertes Design)
 
-Prereg: `evaluations/EXTERNES_REVIEW_2026-08-08.md`, Abschnitt "TASK B: INSTRUMENT-AMENDMENT". Beide Lesarten (zweistufig/flach) kommen aus DEMSELBEN kachel-isolierten Suchbaum -- Budget und Wurzelbreite sind identisch, siehe Moduldoku von `tools/dome_split_diagnose.py`.
+Prereg: `evaluations/EXTERNES_REVIEW_2026-08-08.md`, Abschnitt "TASK B: INSTRUMENT-AMENDMENT". Beide Lesarten (zweistufig/flach) kommen aus DEMSELBEN kachel-isolierten Suchbaum -- Budget und Wurzelbreite sind identisch, siehe Moduldoku von `tools/dome_split_diagnosis.py`.
 
 ## Lauf-Parameter
 

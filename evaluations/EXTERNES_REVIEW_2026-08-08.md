@@ -238,7 +238,7 @@ dieses Sweeps).
 
 ## TASK B -- Zerlegungs-Diagnose (kein Arena-Slot, laeuft jederzeit)
 
-Neues Werkzeug `tools/dome_split_diagnose.py`: auf allen
+Neues Werkzeug `tools/dome_split_diagnosis.py`: auf allen
 Frozen-Set-Zustaenden (frozen_v2), in denen ein Kuppelplatten-Zug legal
 ist, (1) die von der zweistufigen Suche gewaehlte (Slot, Rotation)
 ermitteln, (2) ALLE legalen (Slot, Rotation)-Kombinationen flach
@@ -277,9 +277,9 @@ vollstaendig abgeschlossen.
 # TASK B: INSTRUMENT-AMENDMENT (2026-08-09, VOR dem Voll-Lauf)
 # ==================================================================
 
-Das gebaute Werkzeug (`tools/dome_split_diagnose.py`) kann die
+Das gebaute Werkzeug (`tools/dome_split_diagnosis.py`) kann die
 Task-B-Frage in dieser Form NICHT beantworten. Befund aus dem
-Selbsttest-Datensatz (`evaluations/dome_split_diagnose.json`, Feld
+Selbsttest-Datensatz (`evaluations/dome_split_diagnosis.json`, Feld
 `root_num_actions_considered` vs `per_tile_debug`):
 
 | Arm | Wurzel-Kandidaten | betrachtet | Sims-Budget |

@@ -864,7 +864,7 @@ VALUE_HEAD_VARIANTS = ("tanh", "wdl")
 #                ersparnis -- Runde 1 ist der teuerste rtv-Fall, siehe #80),
 #                Runden 2-5 verhalten sich wie "default". Rundenzuordnung je
 #                Record: `step["state"]["round"]`, dieselbe Quelle wie
-#                `tools/offline_diagnose.py::load_val_samples`.
+#                `tools/offline_diagnosis.py::load_val_samples`.
 VALUE_TARGET_VARIANTS = ("default", "nortv", "nortv_r1")
 
 # Policy-Ziel-Schärfung (Experiment, 2026-07-19): die rohen MCTS-Visit-Anteile
@@ -1666,7 +1666,7 @@ class MosaicDataset(Dataset):
                             # den Override komplett ("nortv") oder nur fuer
                             # Runde-1-Zustaende ("nortv_r1") unterdruecken --
                             # Rundenzuordnung identisch zu
-                            # offline_diagnose.py::load_val_samples
+                            # offline_diagnosis.py::load_val_samples
                             # (`step["state"]["round"]`).
                             if rtv is not None and value_target_variant == "nortv":
                                 rtv = None
@@ -2738,7 +2738,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
                                 hidden_override: int | None = None):
     """Baut ein `MosaicNet` ODER `Mosaic2DNet` passend zu `ckpt` (ein bereits
     geladenes `.pth`-Dict) und lädt die Gewichte -- gemeinsame Stelle für
-    `export_onnx.py`/`tools/offline_diagnose.py`/`tools/oracle_metrics.py`,
+    `export_onnx.py`/`tools/offline_diagnosis.py`/`tools/oracle_metrics.py`,
     die vorher alle denselben `MosaicNet`-Konstruktionscode dupliziert hatten
     (Task #11 Phase 2, M2.1). `encoder` wird aus dem `state_dict` abgeleitet
     (`encoder_from_state_dict`), NICHT aus dem optionalen `ckpt["encoder"]` --

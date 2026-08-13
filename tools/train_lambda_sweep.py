@@ -6,7 +6,7 @@ vollstaendige Vorregistrierung.
 Faehrt die 24 vorregistrierten FROM-SCRATCH-Traininglaeufe (6 gepaarte Seeds
 je Arm, 4 Arme `lam10`/`lam07`/`lam05`/`lam03` = `--value-target-lambda`
 1.0/0.7/0.5/0.3, IDENTISCHES Rezept bis auf `--value-target-lambda`/`--seed`),
-dann `tools/offline_diagnose.py --frozen` ueber alle 24 besten Checkpoints,
+dann `tools/offline_diagnosis.py --frozen` ueber alle 24 besten Checkpoints,
 dann die vorregistrierte gepaarte Auswertung (t-Test + Vorzeichentest) --
 JEDER Nicht-Baseline-Arm (`lam07`/`lam05`/`lam03`) einzeln gegen den
 Baseline-Arm (`lam10`, λ=1.0) -- auf der Primaermetrik `value_r2_rounds_1_4`
@@ -455,7 +455,7 @@ def run_diagnose_and_eval(seeds: list[int], diag_out: Path, result_out: Path,
     dann JEDEN Nicht-Baseline-Arm EINZELN gepaart gegen `lam10` aus (je
     (PRIMARY_KEY + ORACLE_KEYS)). `arm_lambdas` default None -> das volle
     4-Arm-`ARM_LAMBDAS` (echter Sweep) -- der Rauchtest uebergibt seine
-    eigene, kleinere 2-Arm-Teilmenge, damit `offline_diagnose.py` nicht nach
+    eigene, kleinere 2-Arm-Teilmenge, damit `offline_diagnosis.py` nicht nach
     im Rauchtest nie erzeugten `lam07`/`lam03`-Checkpoints sucht."""
     if arm_lambdas is None:
         arm_lambdas = ARM_LAMBDAS
@@ -483,11 +483,11 @@ def run_diagnose_and_eval(seeds: list[int], diag_out: Path, result_out: Path,
     else:
         print(f"\n[diag] Diagnose (frozen, Orakel-Metriken + value_r2) ueber {len(resolved)} "
               f"Checkpoints...", flush=True)
-        r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
+        r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnosis.py"),
                             "--model", *resolved, "--frozen", "--out", str(diag_out)],
                            cwd=str(BASE_DIR))
         if r.returncode != 0:
-            raise SystemExit("offline_diagnose fehlgeschlagen -- siehe Ausgabe oben.")
+            raise SystemExit("offline_diagnosis fehlgeschlagen -- siehe Ausgabe oben.")
 
     blob = json.loads(diag_out.read_text(encoding="utf-8"))
     by_name = {e["model"]: e for e in blob["results"]}
@@ -687,7 +687,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5, 6])
     ap.add_argument("--out", default="evaluations/train_lambda_sweep_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnose_lambda_target_frozen.json")
+    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_lambda_target_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints.")
     ap.add_argument("--smoke", action="store_true",
@@ -715,7 +715,7 @@ def main() -> None:
         if args.out == ap.get_default("out"):
             args.out = "evaluations/train_lambda_sweep_v18only_result.json"
         if args.diag_out == ap.get_default("diag_out"):
-            args.diag_out = "evaluations/offline_diagnose_lambda_v18only_frozen.json"
+            args.diag_out = "evaluations/offline_diagnosis_lambda_v18only_frozen.json"
 
     if args.smoke:
         run_smoke()

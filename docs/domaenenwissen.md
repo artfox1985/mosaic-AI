@@ -6,7 +6,7 @@ Die Trennung ist Absicht: sonst liest irgendwann jemand eine Messung als Regel.
 
 **Warum es diese Datei gibt** (angelegt 2026-08-11, Nutzer-Frage *"wo hast das
 domänenwissen bisher gespeichert?"*): es war verstreut — Versorgungsrechnung als
-Docstring in `tools/musterreihen_verfuegbarkeit.py`, Strategie-Herleitung in
+Docstring in `tools/pattern_row_availability.py`, Strategie-Herleitung in
 `evaluations/PREREG_plattenkopf.md`, Plattenanteil in `evaluations/STATUS.md`.
 Letzteres ist der eigentliche Fehler: STATUS trägt laut eigenem Kopf „nur
 AKTUELLES und OFFENES" und wird regelmäßig in `archive/history.md` geleert —
@@ -17,7 +17,7 @@ Experiment, ein Tool-Docstring hängt an seinem Tool.
 
 ## 1. Musterreihen-Durchsatz: was tatsächlich auf der Kuppel landet
 
-**Gemessen** mit `tools/musterreihen_durchsatz.py`, 60 Dateien = **600 Partien**
+**Gemessen** mit `tools/pattern_row_throughput.py`, 60 Dateien = **600 Partien**
 des `selfplay_v20wdl_*`-Korpus, Einheit der Auswertung = **Partie** (über beide
 Bretter gemittelt), CI 95 %.
 
@@ -116,9 +116,9 @@ Budgets, also Budget- und keine Policy-Robustheit. Für letztere wäre
 
 | Punkt | Quelle | Was er sagt |
 |---|---|---|
-| **DECKE** | `tools/musterreihen_verfuegbarkeit.py` | wie oft *r* gleichfarbige Steine überhaupt verfügbar sind — policy-unabhängig, reine Versorgung |
+| **DECKE** | `tools/pattern_row_availability.py` | wie oft *r* gleichfarbige Steine überhaupt verfügbar sind — policy-unabhängig, reine Versorgung |
 | **BODEN** | Zufalls-Drafting | was ohne Absicht passiert |
-| **IST** | `tools/musterreihen_durchsatz.py` (dieser Abschnitt) | was der Champion-Korpus tatsächlich schafft |
+| **IST** | `tools/pattern_row_throughput.py` (dieser Abschnitt) | was der Champion-Korpus tatsächlich schafft |
 
 ---
 

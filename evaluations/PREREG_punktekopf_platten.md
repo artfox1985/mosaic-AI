@@ -308,7 +308,7 @@ vergleichbar).
 ---
 ## ERGEBNIS Stufe 2 (2026-08-09): REGEL 2a fuer ALLE DREI Groessen -- zug-differenzierend
 
-`tools/punktekopf_stufe2.py`, Champion, 400 Sims, Seed 1000, 16 Zustaende
+`tools/points_head_stage2.py`, Champion, 400 Sims, Seed 1000, 16 Zustaende
 x 8 feste Kombinationen; 12 nutzbar (3x Runde 5 ohne Netz, 1x nur ein
 Kandidat). Belegstelle `evaluations/punktekopf_platten_stufe2.json`.
 

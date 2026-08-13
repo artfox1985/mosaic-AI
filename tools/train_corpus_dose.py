@@ -7,7 +7,7 @@ Faehrt die 12 vorregistrierten FROM-SCRATCH-Traininglaeufe (6 gepaarte
 Seeds, `voll` [voller Korpus, 900 Dateien] vs. `halb` [stratifizierte
 Haelfte, 450 Dateien, Zusammensetzungsverhaeltnis je Versions-Praefix
 erhalten], IDENTISCHES Rezept bis auf Korpusgroesse/`--seed`), dann
-`tools/offline_diagnose.py --frozen` ueber alle 12 besten Checkpoints, dann
+`tools/offline_diagnosis.py --frozen` ueber alle 12 besten Checkpoints, dann
 die vorregistrierte gepaarte Auswertung (t-Test + Vorzeichentest) auf den
 beiden arena-validierten Orakel-Metriken.
 
@@ -463,11 +463,11 @@ def run_diagnose_and_eval(model_pairs: list[tuple[str, str]], diag_out: Path, re
     models = voll_models + halb_models
 
     print(f"\n[diag] Diagnose (frozen, Orakel-Metriken) ueber {len(models)} Checkpoints...", flush=True)
-    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
+    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnosis.py"),
                         "--model", *models, "--frozen", "--out", str(diag_out)],
                        cwd=str(BASE_DIR))
     if r.returncode != 0:
-        raise SystemExit("offline_diagnose fehlgeschlagen -- siehe Ausgabe oben.")
+        raise SystemExit("offline_diagnosis fehlgeschlagen -- siehe Ausgabe oben.")
 
     blob = json.loads(diag_out.read_text(encoding="utf-8"))
     by_name = {e["model"]: e for e in blob["results"]}
@@ -651,7 +651,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5, 6])
     ap.add_argument("--out", default="evaluations/train_corpus_dose_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnose_corpus_dose_frozen.json")
+    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_corpus_dose_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints "
                          "(Sandboxes werden dafuer nicht gebraucht/geprueft).")

@@ -1,5 +1,5 @@
 """
-tools/offline_diagnose.py — Offline-Diagnose eines trainierten Checkpoints:
+tools/offline_diagnosis.py — Offline-Diagnose eines trainierten Checkpoints:
 Value-Val-R² gesamt + pro Runde (1-5), Policy Top-1/Top-3 (nur echte
 Drafting-Schritte, pol_w=1) -- auf demselben Val-DATEI-Split wie train.py
 (Datei-Ebene-Split, Seed 20260707, val_frac=0.1), damit die Zahlen 1:1 gegen
@@ -22,9 +22,9 @@ kopiert (inkl. Selbstkonsistenz-Fix: gespielte Policy-Aktionen immer in die
 Maske aufnehmen).
 
 Verwendung:
-    python tools/offline_diagnose.py --model v12_best
-    python tools/offline_diagnose.py --model v12b_lr_best v12b_scratch_best v12_best
-    python tools/offline_diagnose.py --model v12b_lr_best --out evaluations/offline_diagnose_v12b.json
+    python tools/offline_diagnosis.py --model v12_best
+    python tools/offline_diagnosis.py --model v12b_lr_best v12b_scratch_best v12_best
+    python tools/offline_diagnosis.py --model v12b_lr_best --out evaluations/offline_diagnosis_v12b.json
 
 Task #87 (--frozen): rechnet dieselben Metriken stattdessen auf dem
 eingefrorenen, generationsuebergreifenden Set `evaluations/
@@ -36,7 +36,7 @@ raus). Das frozen Set ist fix (mehrere Korpora, stratifiziert nach Runde)
 und macht Netz-Vergleiche ueber Generationen hinweg moeglich. Bestehendes
 Verhalten (ohne --frozen) bleibt vollstaendig unveraendert.
 
-    python tools/offline_diagnose.py --frozen --model v10_best v12_best v12b_lr_best
+    python tools/offline_diagnosis.py --frozen --model v10_best v12_best v12b_lr_best
 """
 import argparse
 import glob
@@ -577,7 +577,7 @@ def main() -> None:
     p.add_argument("--hidden", type=int, default=None, help="Hidden-Size-Override (Standard: aus Checkpoint)")
     p.add_argument("--batch-size", type=int, default=4096)
     p.add_argument("--out", type=str, default=None,
-                    help="Ziel-JSON-Pfad (Standard: evaluations/offline_diagnose_<model1>_vs_....json)")
+                    help="Ziel-JSON-Pfad (Standard: evaluations/offline_diagnosis_<model1>_vs_....json)")
     p.add_argument("--frozen", action="store_true",
                     help="Task #87: statt val_files() das eingefrorene, generationsuebergreifende "
                          "Set evaluations/frozen_eval_set.pkl verwenden (Default AUS, "
@@ -652,7 +652,7 @@ def main() -> None:
     if out_path is None:
         base = Path(__file__).resolve().parent.parent / "evaluations"
         suffix = "_frozen" if args.frozen else ""
-        out_path = str(base / f"offline_diagnose_{'_vs_'.join(args.model)}{suffix}.json")
+        out_path = str(base / f"offline_diagnosis_{'_vs_'.join(args.model)}{suffix}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({
             **frozen_meta,

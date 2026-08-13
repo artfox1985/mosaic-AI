@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-tools/dome_split_diagnose.py -- TASK B "Zerlegungs-Diagnose" (Nutzer-Auftrag
+tools/dome_split_diagnosis.py -- TASK B "Zerlegungs-Diagnose" (Nutzer-Auftrag
 2026-08-09, AMENDMENT 2026-08-09). Prereg: evaluations/EXTERNES_REVIEW_2026-
 08-08.md, Abschnitte "TASK B -- Zerlegungs-Diagnose" (Punkt 3, urspruengliches
 Design) und "TASK B: INSTRUMENT-AMENDMENT" (korrigiertes Design, bindend fuer
@@ -25,7 +25,7 @@ Wurzel-Suchaufruf (Wurzel sieht ALLE Zugarten, Gumbel-Top-m schneidet auf
 z.B. 16 von 87 Kandidaten) gegen den FLACHEN Zug aus einem kachel-
 isolierten Aufruf (Wurzel sieht NUR die Slots dieser einen Kachel, alle
 9 von 9 Kandidaten betrachtet, volles Sims-Budget NUR fuer diese Kachel).
-Koordinator-Befund (Selbsttest-Daten, `evaluations/dome_split_diagnose.
+Koordinator-Befund (Selbsttest-Daten, `evaluations/dome_split_diagnosis.
 json`, Felder `root_num_actions_considered` vs `per_tile_debug`):
 
 | Arm       | Wurzel-Kandidaten | betrachtet | Sims-Budget      |
@@ -223,9 +223,9 @@ Ein-Thread-Nutzung (kein Multiprocessing/Threading in diesem Skript).
 
 Nutzung
 -------
-    python tools/dome_split_diagnose.py --limit 30                       # within-tree (Default)
-    python tools/dome_split_diagnose.py --mode within-tree --limit 200
-    python tools/dome_split_diagnose.py --mode isolated-vs-root --limit 200
+    python tools/dome_split_diagnosis.py --limit 30                       # within-tree (Default)
+    python tools/dome_split_diagnosis.py --mode within-tree --limit 200
+    python tools/dome_split_diagnosis.py --mode isolated-vs-root --limit 200
 """
 from __future__ import annotations
 
@@ -258,10 +258,10 @@ DEFAULT_MODE = "within-tree"
 # unveraenderter Default-Pfad). Der within-tree-Modus schreibt unter einem
 # ANDEREN Namen (Koordinator-Vorgabe 2026-08-09: alte Datei ist als
 # Budget-/Breiten-Diagnose committet, nicht ueberschreiben).
-OUT_MD_LEGACY = ROOT / "evaluations" / "dome_split_diagnose.md"
-OUT_JSON_LEGACY = ROOT / "evaluations" / "dome_split_diagnose.json"
-OUT_MD_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnose_withintree.md"
-OUT_JSON_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnose_withintree.json"
+OUT_MD_LEGACY = ROOT / "evaluations" / "dome_split_diagnosis.md"
+OUT_JSON_LEGACY = ROOT / "evaluations" / "dome_split_diagnosis.json"
+OUT_MD_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnosis_withintree.md"
+OUT_JSON_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnosis_withintree.json"
 
 # Lesart-Schwellen woertlich aus der Prereg (EXTERNES_REVIEW_2026-08-08.md,
 # TASK B, unveraendert durch das Amendment): Anteil <5% ODER mittlere
@@ -752,7 +752,7 @@ def build_report_within_tree(results: list[dict], scan_stats: dict, meta: dict) 
         '"TASK B: INSTRUMENT-AMENDMENT". Beide Lesarten (zweistufig/flach) '
         "kommen aus DEMSELBEN kachel-isolierten Suchbaum -- Budget und "
         "Wurzelbreite sind identisch, siehe Moduldoku von "
-        "`tools/dome_split_diagnose.py`.",
+        "`tools/dome_split_diagnosis.py`.",
     )
 
     md.append("## Kachel-Status-Verteilung\n")

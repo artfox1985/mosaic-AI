@@ -131,7 +131,7 @@ verschoben/umbenannt (Memory `project_onedrive_file_disappearance`).
 
 ### Primär (trägt die Varianzreduktions-Hypothese)
 
-`value_r2_rounds_1_4` (klassische Metrik, `tools/offline_diagnose.py --frozen`)
+`value_r2_rounds_1_4` (klassische Metrik, `tools/offline_diagnosis.py --frozen`)
 — **gepaart je Seed, `lam07`/`lam05`/`lam03` je EINZELN gegen `lam10`
 (Baseline)**, 3 separate gepaarte Auswertungen (t-Test + Vorzeichentest,
 identischer Code wie `train_corpus_dose.py`).
@@ -153,7 +153,7 @@ die POLICY-Seite, die vom λ-Mix nicht direkt berührt wird (siehe unten).
 ### Sekundär (Sanity-Check, KEIN erwarteter Effekt)
 
 Die zwei arena-validierten Orakel-Metriken (Memory
-`project_oracle_metrics_validated`, `tools/offline_diagnose.py::ORACLE_KEYS`):
+`project_oracle_metrics_validated`, `tools/offline_diagnosis.py::ORACLE_KEYS`):
 
 - `prior_mass_on_oracle_top3`
 - `kendall_tau_policy_vs_oracle_q`
@@ -171,7 +171,7 @@ weitere Empfehlung ausgesprochen wird.
 
 **Kein automatisches Champion-Gating als Teil des Sweeps.** Ablauf:
 
-1. Alle 24 Läufe + `offline_diagnose --frozen` + die 3 gepaarten
+1. Alle 24 Läufe + `offline_diagnosis --frozen` + die 3 gepaarten
    Primär-/Sekundär-Auswertungen fertigstellen.
 2. **Bester λ-Arm** = der Arm unter `{lam07, lam05, lam03}` mit der größten
    POSITIVEN gepaarten Ø-Differenz auf `value_r2_rounds_1_4` gegen `lam10`
@@ -266,8 +266,8 @@ weitere Empfehlung ausgesprochen wird.
 2. 24 Läufe sequenziell (`tools/train_lambda_sweep.py`, Vorbild
    `train_corpus_dose.py`, aber EINE Sandbox + `--value-target-lambda` statt
    zwei Sandboxes je Korpusgröße).
-3. `tools/offline_diagnose.py --frozen --model lam10_s1_best ... lam03_s6_best
-   --out evaluations/offline_diagnose_lambda_target_frozen.json`.
+3. `tools/offline_diagnosis.py --frozen --model lam10_s1_best ... lam03_s6_best
+   --out evaluations/offline_diagnosis_lambda_target_frozen.json`.
 4. Gepaarte Auswertung (`tools/train_lambda_sweep.py` schreibt sie direkt
    mit) — 3 Vergleiche (`lam07`/`lam05`/`lam03` je vs. `lam10`) auf
    `value_r2_rounds_1_4` (primär) + den 2 Orakel-Metriken (sekundär),

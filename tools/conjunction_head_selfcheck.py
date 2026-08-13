@@ -456,7 +456,7 @@ def main() -> int:
         return 1
     print(f"\nOK -- Labels, ENGINE{' und Kopf' if head_ran else ''} bestanden.")
     print("(c3/c6-9-Atom-Schema, Vorlaeufer dieses 34-Label-Kopfs: "
-          "python tools/plattenkopf_labels.py check)")
+          "python tools/plate_head_labels.py check)")
     return 0
 
 

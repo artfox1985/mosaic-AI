@@ -125,7 +125,7 @@ def main() -> None:
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--lr", type=float, default=5e-5)
     p.add_argument("--metric", default="value_r2_rounds_1_4",
-                   help="Feld aus offline_diagnose, das verglichen wird (Default: die "
+                   help="Feld aus offline_diagnosis, das verglichen wird (Default: die "
                         "Entscheidungsmetrik aus Task #15 A -- Runde 5 ausgeschlossen, weil das "
                         "Netz dort nie konsultiert wird).")
     p.add_argument("--out", default="evaluations/train_seed_sweep.json")
@@ -156,13 +156,13 @@ def main() -> None:
                 raise SystemExit(f"Arm {arm}, Seed {seed} fehlgeschlagen -- Sweep abgebrochen.")
 
     models = [f"{arm}_s{seed}_best" for arm, _ in arms for seed in args.seeds]
-    diag_out = BASE_DIR / "evaluations" / "offline_diagnose_seed_sweep.json"
+    diag_out = BASE_DIR / "evaluations" / "offline_diagnosis_seed_sweep.json"
     print(f"\n[sweep] Diagnose ueber {len(models)} Checkpoints (frozen set)...")
-    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
+    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnosis.py"),
                         "--model", *models, "--frozen", "--out", str(diag_out)],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
-        raise SystemExit(f"offline_diagnose fehlgeschlagen:\n{r.stderr[-2000:]}")
+        raise SystemExit(f"offline_diagnosis fehlgeschlagen:\n{r.stderr[-2000:]}")
 
     blob = json.loads(diag_out.read_text(encoding="utf-8"))
     entries = blob if isinstance(blob, list) else blob.get("models", blob.get("results", []))

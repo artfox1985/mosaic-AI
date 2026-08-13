@@ -204,7 +204,7 @@ Ort der Messung, kostet aber eine Aenderung auf der RUST-Seite
 Paritaetspruefung.
 **(ii)** Verhalten aus den ENDBRETTERN eines kurzen Self-Play-Laufs MIT
 gesetztem Knopf zaehlen. Die Daten liegen dort bereits: `_ownership_from_dome`
-liest `dome_grid` aus den `.pkl`-Dateien, und `tools/plattenkopf_labels.py` /
+liest `dome_grid` aus den `.pkl`-Dateien, und `tools/plate_head_labels.py` /
 `tools/atom_skill_check.py` werten Endbretter schon aus. Kein Rust-Eingriff,
 vorhandene Werkzeuge. Nachteil: Self-Play statt Arena, also ein anderes Regime
 als die Siegquote.
@@ -217,7 +217,7 @@ Groessen nur nebeneinander liest und nicht aus demselben Lauf verlangt.
 
 ## Nachtrag zu Befund 3: Weg (ii) ist gedeckt, kein neues Werkzeug
 
-GEPRUEFT an `tools/plattenkopf_labels.py`:
+GEPRUEFT an `tools/plate_head_labels.py`:
 
 - `atoms_criterion6` (Zeile 71): je Slot "hat ein Spezialfeld, das am Ende LEER
   ist", 1/0.
@@ -231,7 +231,7 @@ Endbrettern, mit dem vorhandenen Werkzeug, ohne Rust-Eingriff.
 Was fehlt, ist nur die REIHENGEWICHTETE Punktsumme (Kriterium 6 ist flach, die
 Spezialpunkte sind es nicht). Das Werkzeug iteriert Slots und Spaces, die
 Rasterreihe ist daraus `slot_row * 2 + space_index / 2`; also eine kleine
-ERGAENZUNG an `plattenkopf_labels.py`, **kein zweites Werkzeug**.
+ERGAENZUNG an `plate_head_labels.py`, **kein zweites Werkzeug**.
 
 `paired_arena_env_ab.py` braucht keine Aenderung: `--env-name` ist generisch
 (Nutzungsbeispiele im Modulkopf zeigen `MOSAIC_FLOOR_SHAPING_W` und

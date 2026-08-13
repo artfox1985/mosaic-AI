@@ -71,12 +71,12 @@ data/altmess_90files/
 # schon in der Historie -- bei einer verwertbaren Fraktion von 1,8 %.
 # `--log-games` bleibt noetig WAEHREND eines Laufs (die Plattenpunkte je
 # Kriterium stehen nur im Log), aber danach genuegt die eingedampfte Form:
-#   python -X utf8 tools/arena_kompakt.py --muster "<praefix>_*"
-#   -> evaluations/arena_kompakt.jsonl (versioniert, ~200 Byte je Partie)
+#   python -X utf8 tools/arena_compact.py --muster "<praefix>_*"
+#   -> evaluations/arena_compact.jsonl (versioniert, ~200 Byte je Partie)
 # Entscheidende Laeufe, die eine Vorregistrierung ausdruecklich als Beleg
 # benennt, koennen weiter mit `git add -f` einzeln aufgenommen werden.
 evaluations/paired_arena_env_*.json
-!evaluations/arena_kompakt.jsonl
+!evaluations/arena_compact.jsonl
 
 # git-crypt-Schluessel: bewusst UNGETRACKT im Repo (Nutzer 2026-08-13).
 # Ohne diese Datei ist player_profiles.json nach frischem Klon unlesbar.
