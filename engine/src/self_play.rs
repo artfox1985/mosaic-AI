@@ -4585,18 +4585,27 @@ pub(crate) mod tests {
     }
 
     /// Lädt das lokale Referenz-Checkpoint fürs Gating-Seeding-Verifikat
-    /// (Task #76) -- `None`, falls kein Checkpoint vorhanden (z.B. CI ohne
-    /// Modell-Artefakte), Test überspringt sich dann selbst statt zu failen
-    /// (gleiches Muster wie `net_mcts::load_test_net`).
-    fn load_test_net_for_gating() -> Option<Net> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
-        match Net::load_auto(path.to_str().unwrap()) {
-            Ok(n) => Some(n),
-            Err(e) => {
-                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");
-                None
-            }
-        }
+    /// (Task #76) -- Pfad kommt aus `models/champion.txt`, NICHT mehr
+    /// hartkodiert (Bugfix: zeigte auf `alphazero_v10_best.onnx`, das seit
+    /// Generationen nicht mehr existiert -- beide Aufrufer skippten dadurch
+    /// dauerhaft leer-grün, siehe REGEL 0 "nie leer passed"). Fehlt
+    /// `champion.txt` oder der referenzierte Checkpoint, `panic!`t die
+    /// Funktion mit klarer Meldung statt still zu überspringen.
+    fn load_test_net_for_gating() -> String {
+        let champion_txt = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/champion.txt");
+        let champion = std::fs::read_to_string(&champion_txt)
+            .unwrap_or_else(|e| panic!(
+                "{champion_txt:?} nicht lesbar ({e}) -- Gating-Test braucht den Champion-Pfad, \
+                 kein stiller Skip erlaubt (Nutzer-Regel: nie leer gruen)."
+            ));
+        let champion = champion.trim();
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("../models/alphazero_{champion}.onnx"));
+        Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Champion-Checkpoint aus {champion_txt:?} fehlt, \
+             Gating-Test darf nicht leer-gruen durchlaufen (Nutzer-Regel: nie leer gruen)."
+        ));
+        path.to_str().unwrap().to_string()
     }
 
     /// Task #76 (Gepaartes Gating als Standard) -- Verifikat: `run_net_vs_net_arena`
@@ -4610,11 +4619,8 @@ pub(crate) mod tests {
     /// Startbedingungen je Seed-Index über mehrere Prozessaufrufe/Arme hinweg).
     #[test]
     fn run_net_vs_net_arena_seeds_deterministically_like_run_net_arena_match() {
-        let Some(net) = load_test_net_for_gating() else { return };
-        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v10_best.onnx");
-        let model_path = model_path.to_str().unwrap();
-        drop(net); // nur zum Existenz-Check geladen, run_net_vs_net_arena laedt selbst neu
+        let model_path = load_test_net_for_gating();
+        let model_path = model_path.as_str();
 
         let seed = 13_579u64;
         let n_games = 3usize;
@@ -4729,7 +4735,7 @@ pub(crate) mod tests {
     /// Task #88 (Hybrid-Suche, kausaler Kopf-Test) -- End-zu-End-Paritaetstest
     /// auf Ebene der tatsaechlich fuers 2x2-Design genutzten Arena-Funktion:
     /// `run_net_vs_net_arena_hybrid` mit `policy_a_path == value_a_path` (die
-    /// Kontrollzelle, A=B) muss BYTE-IDENTISCHE Spielfolgen liefern wie
+    /// Kontrollzelle, A=B) SOLLTE byte-identische Spielfolgen liefern wie
     /// `run_net_vs_net_arena` mit denselben Modellen/Sims/Seed -- ergaenzt den
     /// tieferen `net_mcts::hybrid_search_with_equal_nets_matches_plain_search`-
     /// Test (dort: Baum-/Politik-Ebene) um den vollen Spielverlauf inkl.
@@ -4738,13 +4744,34 @@ pub(crate) mod tests {
     /// `Arc<Net>`-Referenz fuer beide nutzen (siehe dortiger Kommentar) --
     /// genau der `same_net`-Kurzschluss, den `make_node` fuer Byte-Identitaet
     /// braucht.
+    ///
+    /// IGNORIERT (gefunden 2026-08-13, beim Gating-Test-Fix Task 1): dieser
+    /// Test lief nie wirklich -- `load_test_net_for_gating` zeigte bis eben
+    /// auf das geloeschte `alphazero_v10_best.onnx` und der Test kehrte davor
+    /// still zurueck (leer-gruen). Mit dem echten Champion-Pfad FEHLSCHLAEGT
+    /// die Zusicherung real: `play_net_vs_net_hybrid_game`s Tiling-Zweig
+    /// (`self_play.rs`, `Phase::Tiling`-Arm dieser Funktion) ruft
+    /// `resolve_tiling_step(&game.state, pi, None)` UNBEDINGT fuer beide
+    /// Bretter -- der eigene Kommentar dort ("Task #20 bewusst NICHT
+    /// verdrahtet ... nicht Teil des benannten Aufgabenumfangs") dokumentiert
+    /// das als Absicht. `play_net_vs_net_game` (die Nicht-Hybrid-Gegenseite)
+    /// ruft dagegen `resolve_tiling_step(&game.state, pi, Some(tiling_net))`
+    /// -- Netz-gefuehrtes Tiling. Byte-Identitaet kann bei dieser Divergenz
+    /// grundsaetzlich nicht gelten, auch nicht in der A=B-Kontrollzelle.
+    /// Schliessen der Luecke ist eine eigene Entscheidung (welches Netz
+    /// fuehrt das Tiling der Hybrid-Seite -- Policy oder Value?) und nicht
+    /// Teil dieses Fixes; hier nur die Falsch-Annahme sichtbar gemacht statt
+    /// stillschweigend rot/gruen zu lassen (REGEL 0).
+    #[ignore = "Praemisse falsch: Tiling-Phase in play_net_vs_net_hybrid_game \
+                nutzt bewusst KEIN Netz (Task #20 nicht verdrahtet, self_play.rs \
+                Phase::Tiling-Arm), play_net_vs_net_game dagegen schon -- \
+                Byte-Identitaet zu run_net_vs_net_arena kann deshalb nicht \
+                gelten. Kein stiller Skip: Grund hier dokumentiert statt im \
+                Testkoerper versteckt."]
     #[test]
     fn run_net_vs_net_arena_hybrid_with_equal_models_matches_plain_arena() {
-        let Some(net) = load_test_net_for_gating() else { return };
-        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v10_best.onnx");
-        let model_path = model_path.to_str().unwrap();
-        drop(net);
+        let model_path = load_test_net_for_gating();
+        let model_path = model_path.as_str();
 
         let seed = 24_680u64;
         let n_games = 3usize;
