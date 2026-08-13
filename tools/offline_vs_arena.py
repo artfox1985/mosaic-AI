@@ -13,7 +13,7 @@ taugen.
 
 Wir haben die Daten, um das zu pruefen: ueber v14..v18 liegen gepaarte
 Gating-Ergebnisse (`paired_gating_result_*.json`) UND Frozen-Set-Diagnosen
-(`offline_diagnose_*.json`) vor. Jedes Gating-Paar (A vs B), fuer das beide
+(`offline_diagnosis_*.json`) vor. Jedes Gating-Paar (A vs B), fuer das beide
 Modelle eine Diagnose haben, liefert einen Datenpunkt:
 
     x = Metrik(A) - Metrik(B)      (offline)
@@ -126,8 +126,8 @@ def load_offline() -> tuple[dict, dict]:
     # damaligen Kennzahlen sind damit die einzige verbliebene Quelle -- neu
     # rechnen (und damit value_r2_rounds_1_4 oder die Orakel-Metriken ergaenzen)
     # ist fuer sie unmoeglich. evaluations/ hat Vorrang bei Namensgleichheit.
-    sources = (sorted(glob.glob(str(BASE_DIR / "evaluations" / "offline_diagnose_*.json")))
-               + sorted(glob.glob(str(BASE_DIR / "archive" / "offline_diagnose_*.json"))))
+    sources = (sorted(glob.glob(str(BASE_DIR / "evaluations" / "offline_diagnosis_*.json")))
+               + sorted(glob.glob(str(BASE_DIR / "archive" / "offline_diagnosis_*.json"))))
     for f in sources:
         try:
             d = json.load(open(f, encoding="utf-8"))

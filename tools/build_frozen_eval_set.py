@@ -1,8 +1,8 @@
 """
 tools/build_frozen_eval_set.py — Task #87: eingefrorenes, generationsuebergreifendes
-Eval-Set fuer offline_diagnose.py.
+Eval-Set fuer offline_diagnosis.py.
 
-Motivation: offline_diagnose.py::val_files() zieht den Val-Split aus dem
+Motivation: offline_diagnosis.py::val_files() zieht den Val-Split aus dem
 JEWEILS AKTUELLEN data/-Inhalt (glob + Seed-Shuffle). Dadurch sind
 Diagnose-Zahlen zwischen Generationen NICHT vergleichbar, sobald sich der
 data/-Ordner aendert (altes Korpus rotiert raus, neues rein) -- Verdacht:
@@ -177,7 +177,7 @@ def _candidate_files(name: str) -> list[str]:
 
 def _eligible_steps(file_path: str):
     """Liest eine .pkl-Datei read-only und liefert alle Steps, die
-    offline_diagnose.py::load_val_samples ebenfalls verwenden wuerde
+    offline_diagnosis.py::load_val_samples ebenfalls verwenden wuerde
     (Filter: 'scores' und 'winner' vorhanden)."""
     with open(file_path, "rb") as fh:
         game_data = pickle.load(fh)

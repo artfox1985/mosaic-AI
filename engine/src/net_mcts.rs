@@ -451,7 +451,7 @@ pub const VALUE_SHRINK_ENABLED: bool = false;
 /// Rückspiel-Test + geclampter v10/v9b-Modell-R²-Näherung beruhten, siehe
 /// Git-Historie dieser Konstante).
 ///
-/// Quelle der Zahlen: `tools/offline_diagnose.py`-Lauf auf dem AMTIERENDEN
+/// Quelle der Zahlen: `tools/offline_diagnosis.py`-Lauf auf dem AMTIERENDEN
 /// Champion `v12b_lr_best` (2026-07-23, `evaluations/STATUS.md` Abschnitt
 /// "v12b: LR-Schedule + From-Scratch-Kontrolle"), echter Val-Split
 /// (n=32.392 Val-Züge). Für v12b_lr existiert KEIN separater Noise-Floor-

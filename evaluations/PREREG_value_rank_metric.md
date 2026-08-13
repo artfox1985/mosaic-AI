@@ -204,7 +204,7 @@ laufenden/kommenden Zyklus.
 
 Auf denselben Paaren wird zusaetzlich (informativ) berichtet, wie oft/mit
 welchem p `value_r2_rounds_1_4` (aus den vorhandenen
-`offline_diagnose_*_frozen.json`, ueber `offline_vs_arena.load_offline()`
+`offline_diagnosis_*_frozen.json`, ueber `offline_vs_arena.load_offline()`
 eingelesen) dieselben Paare richtig vorhersagt -- die eigentliche Frage
 hinter Task #29 ("schlaegt die Rangmetrik den globalen R²?"), aber laut
 Aufgabenstellung NICHT das Erfolgskriterium.

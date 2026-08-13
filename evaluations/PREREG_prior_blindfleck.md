@@ -16,7 +16,7 @@ Punkt, der eine echte, nie gemessene Luecke trifft.
 Die Wurzel-Kandidatenmenge wird EINMAL vor der ersten Simulation
 fixiert (Gumbel-Top-m auf logit+Noise); Sequential Halving kann sie
 nur verkleinern, nie erweitern. Gemessene Abdeckung
-(`evaluations/dome_split_diagnose.json`, n=50 Stellungen, 400 Sims):
+(`evaluations/dome_split_diagnosis.json`, n=50 Stellungen, 400 Sims):
 
 | Groesse | Median | Min | Max |
 |---|---|---|---|

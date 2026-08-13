@@ -4,7 +4,7 @@ evaluations/PREREG_2d_encoder.md fuer die vollstaendige Vorregistrierung.
 
 Faehrt die 12 vorregistrierten FROM-SCRATCH-Traininglaeufe (6 gepaarte Seeds,
 `fs_flat` vs `fs_2d`, IDENTISCHES Rezept bis auf `--encoder`/`--seed`, siehe
-RECIPE unten), dann `tools/offline_diagnose.py --frozen` ueber alle 12 besten
+RECIPE unten), dann `tools/offline_diagnosis.py --frozen` ueber alle 12 besten
 Checkpoints, dann die vorregistrierte gepaarte Auswertung (t-Test +
 Vorzeichentest) auf den beiden arena-validierten Orakel-Metriken
 (`prior_mass_on_oracle_top3`, `kendall_tau_policy_vs_oracle_q`).
@@ -178,7 +178,7 @@ def main() -> None:
     ap.add_argument("--allow-selfplay", action="store_true",
                     help="Sicherheitsabfrage uebergehen (NICHT empfohlen -- siehe Moduldoku).")
     ap.add_argument("--out", default="evaluations/train_2d_vs_flat_fs_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnose_2d_vs_flat_fs_frozen.json")
+    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_2d_vs_flat_fs_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints.")
     args = ap.parse_args()
@@ -210,11 +210,11 @@ def main() -> None:
     models = [f"fs_flat_s{s}_best" for s in args.seeds] + [f"fs_2d_s{s}_best" for s in args.seeds]
     diag_out = BASE_DIR / args.diag_out
     print(f"[sweep] Diagnose (frozen, Orakel-Metriken) ueber {len(models)} Checkpoints...", flush=True)
-    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnose.py"),
+    r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnosis.py"),
                         "--model", *models, "--frozen", "--out", str(diag_out)],
                        cwd=str(BASE_DIR))
     if r.returncode != 0:
-        raise SystemExit("offline_diagnose fehlgeschlagen -- siehe Ausgabe oben.")
+        raise SystemExit("offline_diagnosis fehlgeschlagen -- siehe Ausgabe oben.")
 
     blob = json.loads(diag_out.read_text(encoding="utf-8"))
     entries = blob["results"]

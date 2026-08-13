@@ -11,7 +11,7 @@ Zwischenergebnissen nicht mehr geändert werden (Präzedenzfälle
 Den Value-Head **an den maximal möglichen R² heranführen** — ab Runde 2 ist
 da "noch ordentlich Luft nach oben" (gemeint: der gemessene Value-R² je
 Runde, vgl. `value_r2_rounds_1_4`/die Runden-Spalten von
-`offline_diagnose.py`, liegt deutlich unter dem, was angesichts des
+`offline_diagnosis.py`, liegt deutlich unter dem, was angesichts des
 Restzufalls überhaupt erreichbar wäre). Der maximal mögliche R² ist wegen
 der Chance-Knoten (Rundenübergänge, in R2/R3 zusätzlich verdeckte
 Kuppelplatten) STRIKT kleiner als 1 — selbst ein perfekter Schätzer von

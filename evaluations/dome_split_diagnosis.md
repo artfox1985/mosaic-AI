@@ -1,6 +1,6 @@
 # Zerlegungs-Diagnose: ChooseDomeSlot / ChooseDomeRotation (TASK B)
 
-Prereg: `evaluations/EXTERNES_REVIEW_2026-08-08.md`, Abschnitt "TASK B -- Zerlegungs-Diagnose" (Punkt 3). Werkzeug: `tools/dome_split_diagnose.py`.
+Prereg: `evaluations/EXTERNES_REVIEW_2026-08-08.md`, Abschnitt "TASK B -- Zerlegungs-Diagnose" (Punkt 3). Werkzeug: `tools/dome_split_diagnosis.py`.
 
 ## Lauf-Parameter
 

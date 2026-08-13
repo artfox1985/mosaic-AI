@@ -147,12 +147,12 @@ Self-Play-Korpus; die Sandbox-/Hardlink-/`MOSAIC_DATA_DIR`-Mechanik aus
 ### Primaer
 
 Die zwei validierten Praediktoren (Memory `project_oracle_metrics_validated`,
-`tools/offline_diagnose.py::ORACLE_KEYS`):
+`tools/offline_diagnosis.py::ORACLE_KEYS`):
 
 - `prior_mass_on_oracle_top3`
 - `kendall_tau_policy_vs_oracle_q`
 
-Berechnet mit `tools/offline_diagnose.py --frozen --model <12 Checkpoints>`.
+Berechnet mit `tools/offline_diagnosis.py --frozen --model <12 Checkpoints>`.
 **Orakel-Referenz: die seit dem v19-Zyklus aktuellen `frozen_v1_oracle_labels_v18.json`**
 (STATUS.md, v19-Abschnitt: Umstellung von der fruehereren v16-Quelle auf
 v18-Labels) -- nicht `v16_best` wie in den beiden aelteren PREREG-Dokumenten,
@@ -292,8 +292,8 @@ Engine-Code, reine Prozess-/Dateibenennungsregel:
    Praefix-Konvention).
 4. 6 gepaarte Flach-Encoder-Seeds je Korpus (`tools/train_pcr_dose.py`, noch
    zu schreiben, Vorbild `tools/train_corpus_dose.py`).
-5. `tools/offline_diagnose.py --frozen --model pcrkontrolle_s1_best
-   pcrpcr_s1_best ... --out evaluations/offline_diagnose_pcr_dose_frozen.json`.
+5. `tools/offline_diagnosis.py --frozen --model pcrkontrolle_s1_best
+   pcrpcr_s1_best ... --out evaluations/offline_diagnosis_pcr_dose_frozen.json`.
 6. Gepaarte Auswertung (t-Test + Vorzeichentest fuer beide Orakel-Metriken),
    Ergebnis-JSON nach `evaluations/train_pcr_dose_result.json`.
 7. Bei positivem Ergebnis (siehe Abbruch-/Fortsetzungsregel): Arena-Gating

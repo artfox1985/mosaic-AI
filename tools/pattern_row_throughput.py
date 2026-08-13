@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """Wieviele Fliesen landen je RASTERREIHE und RUNDE tatsaechlich auf der Kuppel?
 
-Das **IST** zur Decke aus `tools/musterreihen_verfuegbarkeit.py`. Deren
+Das **IST** zur Decke aus `tools/pattern_row_availability.py`. Deren
 Modulkopf nennt die drei Referenzpunkte und laesst diesen ausdruecklich offen:
 
-    DECKE   musterreihen_verfuegbarkeit.py -- wie oft sind r gleichfarbige
+    DECKE   pattern_row_availability.py -- wie oft sind r gleichfarbige
             Steine ueberhaupt verfuegbar (policy-unabhaengig, reine Versorgung)
     BODEN   Zufalls-Drafting
     IST     Champion-Korpus   <-- DIESES SKRIPT
@@ -48,8 +48,8 @@ voll geworden".
    Regimes, keine Obergrenze des Koennens.
 
 Aufruf:
-    python tools/musterreihen_durchsatz.py --files 60
-    python tools/musterreihen_durchsatz.py --glob "data/selfplay_v19wdl_*.pkl"
+    python tools/pattern_row_throughput.py --files 60
+    python tools/pattern_row_throughput.py --glob "data/selfplay_v19wdl_*.pkl"
 """
 from __future__ import annotations
 

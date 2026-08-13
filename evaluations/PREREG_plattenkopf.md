@@ -512,7 +512,7 @@ Metrik-Beobachtung.
 Nutzer-Auftrag: *"kannst du auf den bestehenden korpus ein modell mit dem
 platten head trainieren und gegen den champ laufen lassen"*. Erste Stufe
 davon -- die vorregistrierte Grundraten-Messung -- ist gelaufen.
-Instrument: `tools/plattenkopf_labels.py` (neu), 800 Endbretter aus 40
+Instrument: `tools/plate_head_labels.py` (neu), 800 Endbretter aus 40
 `selfplay_v20wdl_*`-Dateien.
 
 | Groesse | Messwert |
@@ -569,7 +569,7 @@ die Endlabels stempelt.
 
 ## RAUCHTEST 2026-08-10: c6 traegt, c3 NICHT -- Bauzuschnitt geaendert
 
-Instrument: `tools/plattenkopf_smoketest.py` (neu). Zweck war ausdruecklich,
+Instrument: `tools/plate_head_smoketest.py` (neu). Zweck war ausdruecklich,
 die Nachtschicht zu schuetzen: sind die Atome aus den vorhandenen Merkmalen
 lernbar, BEVOR Schema-Bump, Cache-Neubau (~3 h) und Training (~3,5 h)
 bezahlt werden. Kleines MLP direkt auf `state_to_tensor` + `state_to_planes`
@@ -717,7 +717,7 @@ Ausgaben wie zuvor).
 
 ### Was noch fehlt -- ausdruecklich NICHT gebaut
 
-1. **Labels in den Cache**: `tools/plattenkopf_labels.py` liefert die Atome,
+1. **Labels in den Cache**: `tools/plate_head_labels.py` liefert die Atome,
    der Einbau in `MosaicDataset` fehlt.
 2. **Cache-Key**: Suffix `+plate_v1` NUR bei gesetztem Flag anhaengen (Muster
    `+enc2d_v1`, Zeile ~1142). **KEIN `VALUE_SCHEMA_VERSION`-Bump** -- der
@@ -859,7 +859,7 @@ bestaetigte. Deshalb diese Messung, statt das Artefakt einfach zu benutzen.
 
 ### Identitaeten auf dem GESAMTEN Korpus verifiziert
 
-`tools/plattenkopf_labels.py check` ueber alle **2.945 Dateien / 29.450
+`tools/plate_head_labels.py check` ueber alle **2.945 Dateien / 29.450
 Partien**: **44.068 bestaetigt, 0 abweichend, 0 uebersprungen**
 (`logs/plattenkopf_identitaet_voll.log`).
 
@@ -930,7 +930,7 @@ Risikovorhersage und blossem Ablesen der Anwesenheit aus den Brettkanaelen.
   zeigt den Engpass.
 - 1 Ausgang `P(alle Jokerfelder belegt)` -- das Auszahlungsereignis.
 - Die gemeinsame Zerlegung bleibt Pruefgroesse AUSSERHALB des Kopfes
-  (`plattenkopf_labels.py check`, Identitaet 44.068/0 unberuehrt), dazu die
+  (`plate_head_labels.py check`, Identitaet 44.068/0 unberuehrt), dazu die
   Konsistenzpruefung `P(alle) x 2 x wild_total` gegen die rekonstruierte Summe.
 - Groessenordnung: 1 Bit = ~5.060 Beobachtungen (2.530 Partien x 2 Bretter),
   Slot-Ebene ~22.800. Dieselbe Verduennung wie bei c6: Rauchtest-Grundrate der
@@ -979,7 +979,7 @@ beider Klassen, gleicher Seed); Flag AN ergibt +50 Ausgaben; Erkennung und
 Label-Faelle inkl. der Positionsabbildung.
 **Nicht verifiziert:** die Identitaet gegen die Engine-Wertung auf echtem
 Korpus -- `data/` liegt nicht im Repo. Vor dem ersten Trainingslauf gehoert
-`python tools/plattenkopf_labels.py check` (um die Konjunktionen erweitert)
+`python tools/plate_head_labels.py check` (um die Konjunktionen erweitert)
 auf die Maschine mit den Daten.
 
 ### Maskierung der NICHT AKTIVEN Wertungsplatten (Nutzer)
@@ -1056,9 +1056,9 @@ Ausgaben im Default, der Champion laedt unveraendert mit 8, und
 auf `plate_head_present` verwies, ist mitgezogen). `neural_net.py` schrumpft
 von 160,3 auf 158,3 KB.
 
-**Was NICHT entfernt ist**: `tools/plattenkopf_labels.py` (Label-Rechnung samt
+**Was NICHT entfernt ist**: `tools/plate_head_labels.py` (Label-Rechnung samt
 Identitaets-Pruefung 44.068/0 und der neuen Existenz-Maske),
-`tools/plattenkopf_smoketest.py` und die Messungen. Die Labels sind fuer die
+`tools/plate_head_smoketest.py` und die Messungen. Die Labels sind fuer die
 Ownership-Route dieselben, und die Identitaets-Pruefung bleibt die Verbindung
 zwischen Atom-Definition und Engine-Wertung.
 
@@ -1187,7 +1187,7 @@ Spezialfeld-Vermeidung (6), die schnellen Reihen 1-2 und die obere linke Ecke.
 Das ist eine **Strategie-Luecke, kein Vorhersage-Problem** -- und ein Kopf, der
 Konstanten vorhersagt, schliesst sie nicht. Ob die Luecke strukturell ist,
 entscheidet die policy-unabhaengige Verfuegbarkeitsrechnung
-(`tools/musterreihen_verfuegbarkeit.py`), nicht der Korpus: dessen Grundraten
+(`tools/pattern_row_availability.py`), nicht der Korpus: dessen Grundraten
 sind mit genau dem Defekt kontaminiert, den sie messen sollen.
 
 ### Konsequenz fuer `OWNERSHIP_WEIGHT > 0`
@@ -1330,7 +1330,7 @@ Zeile 598: `dome_row = row_idx / 2; space_row = row_idx % 2`, und
 Daraus folgt die Asymmetrie:
 
 * **Zeile *r* vollstaendig** = Musterreihe *r* muss in **jeder** der 5 Runden
-  geschlossen werden. Laut `tools/musterreihen_verfuegbarkeit.py` braucht
+  geschlossen werden. Laut `tools/pattern_row_availability.py` braucht
   Musterreihe 3 ~1,4 Runden je Abschluss, Reihe 6 ~2,9 -- fuenf Abschluesse
   brauchen ~7 bzw. ~14,5 Runden von 5. **Unmoeglich.** Nur die Reihen 1-2
   (~0,5 / ~1,0 Runden je Abschluss) liegen im Budget, und genau die sind die
@@ -1885,7 +1885,7 @@ aendern und waere nicht billig rueckgaengig zu machen.
 Grundrate 0,000 heisst "kommt in diesem Korpus nicht vor" -- Diagonale, Spalte 1,
 Reihen 5/6, Eckplatten 0,002/0,004. Steigen sie, hat sich das VERHALTEN
 geaendert. Kostenlos, arena-unabhaengig, ohne Training: je neuem Self-Play-Korpus
-die Grundraten auslesen. Werkzeug existiert (`plattenkopf_labels.py stats`,
+die Grundraten auslesen. Werkzeug existiert (`plate_head_labels.py stats`,
 `atom_skill_check.py` berichtet sie mit) -- KEIN neues bauen.
 
 **3. Meine Reihenfolge war umgekehrt falsch.** Ich hatte den Kopf als
