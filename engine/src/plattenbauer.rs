@@ -290,6 +290,25 @@ fn waehle_kandidat(kosten: &[f64], seed: Option<u64>) -> usize {
     }
 }
 
+/// §18 (Diagonalen-Baustein): wie [`ziel_zellen_generisch`], aber mit
+/// `spaltenbau::zelle_kosten_smart` statt der geteilten (§16/§17-Schalter-
+/// abhaengigen) [`zellen_kosten`] -- fuer Bauern mit einer EIGENEN,
+/// unabhaengig validierten Special-Zellen-Uebernahme (siehe dortige Doku).
+fn ziel_zellen_generisch_smart(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
+    if kandidaten.is_empty() {
+        return None;
+    }
+    let player = &state.players[pi];
+    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let kosten: Vec<f64> = kandidaten
+        .iter()
+        .map(|z| z.iter().map(|&(r, c)| crate::spaltenbau::zelle_kosten_smart(player, r, c, &verbleibend)).sum())
+        .collect();
+    let seed = PARTIE_SEED.with(|c| c.get());
+    let idx = waehle_kandidat(&kosten, seed);
+    Some(kandidaten[idx].clone())
+}
+
 /// Loest die aktive Zielzellen-Menge aus einer Kandidatenliste auf --
 /// Generalisierung von `spaltenbau::ziel_spalte` auf beliebige Geometrien.
 fn ziel_zellen_generisch(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
@@ -570,15 +589,30 @@ impl Plattenbauer for SpaltenbauerGenerisch {
 
 struct Diagonalenbauer;
 impl Diagonalenbauer {
+    /// §18: nutzt `ziel_zellen_generisch_smart` (immer die echten Special-
+    /// Nachbar-Kosten, siehe dortige Doku) statt der geteilten, §16/§17-
+    /// Schalter-abhaengigen `ziel_zellen_generisch` -- die Diagonalen-
+    /// Special-Erweiterung ist eine EIGENE, in §18 validierte Entscheidung
+    /// (+2,61 Plattenpunkte, t=2,79, p=0,011, kein Sieg-Verlust), unabhaengig
+    /// vom k1-Legacy-Befund (§17: final NEIN).
     fn zellen(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
         let kand = vec![zellen_diagonale_haupt(), zellen_diagonale_neben()];
-        ziel_zellen_generisch(state, pi, &kand)
+        ziel_zellen_generisch_smart(state, pi, &kand)
     }
 }
 impl Plattenbauer for Diagonalenbauer {
     fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &z)
+        vorzugszug_fuer_zellen(state, &z).or_else(|| {
+            // §18 (Diagonalen-Baustein, Nutzer-Taktik domain_knowledge.md
+            // §5): eine offene Special-Zelle in der Diagonalen-Slot-Reihe 3
+            // braucht ihre Slot-Nachbarn, die oft NICHT selbst Diagonal-
+            // zellen sind. UNBEDINGT (siehe `special_nachbar_zellen_immer`-
+            // Doku) -- §18 hat diese Erweiterung EIGENSTAeNDIG validiert.
+            let player = &state.players[state.current_player];
+            let nz = crate::spaltenbau::special_nachbar_zellen_immer(player, &z);
+            if nz.is_empty() { None } else { vorzugszug_fuer_zellen(state, &nz) }
+        })
     }
     fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
@@ -586,7 +620,11 @@ impl Plattenbauer for Diagonalenbauer {
     }
     fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_vorzug_fuer_zellen(state, pi, &z).or_else(|| {
+            let player = &state.players[pi];
+            let nz = crate::spaltenbau::special_nachbar_zellen_immer(player, &z);
+            if nz.is_empty() { None } else { tiling_vorzug_fuer_zellen(state, pi, &nz) }
+        })
     }
 }
 
