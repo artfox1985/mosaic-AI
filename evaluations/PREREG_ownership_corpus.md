@@ -281,7 +281,7 @@ statt Schoenreden" noetig, es gibt einen echten Effekt in allen vier
 gebauten Kriterien.** Arm B/C/E/F sind fuer den echten Korpus-Lauf (§2)
 freigegeben, sobald dieser gestartet wird (nicht Teil dieses Auftrags).
 
-
+## §4 Training + Abnahme (Tor A aus PREREG_ownership_consumer.md)
 
 - Warm-Start vom Champion (v21_2d_brierbest), Standard-Rezept (lr 5e-5,
   cosine), `--ownership-weight 0,2` (Präzedenz: own02-Lauf) + `--conjunction`.

@@ -2678,8 +2678,35 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         Some(false) => pcr_cheap_sims,
                         _ => base_sims,
                     };
+                    // PREREG_ownership_corpus.md §3.1: Bauer-Vorzug (Spaltenbau/
+                    // Plattenbauer) uebersteuert die Suche -- BEIDSEITIG, KEIN
+                    // `pi==net_board`-Gate (Vorbild `play_net_vs_net_game`,
+                    // self_play.rs:1927-1929 -- `play_net_game`s Gate dort ist
+                    // fuer die Arena-Asymmetrie Netz-vs-Heuristik gedacht,
+                    // Self-Play kennt dieses Konzept nicht, beide Seiten SIND
+                    // das Netz). Bei unbesetzten Knoepfen (`MOSAIC_SPALTENBAU`/
+                    // `MOSAIC_PLATTENBAU` unset) liefern alle drei Aufrufe
+                    // `None` (bestehendes No-Op-Verhalten dieser Funktionen,
+                    // siehe deren eigene Doku) -- der `else`-Zweig unten laeuft
+                    // dann UNVERAENDERT wie vor diesem Umbau (Bestandsschutz,
+                    // per Paritaetsprobe geprueft).
+                    let vorzug_kandidat = crate::provokation::vorzugszug(&game.state)
+                        .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
+                        .or_else(|| crate::plattenbauer::dome_vorzug(&game.state));
                     let (chosen, policy, root_q, root_child_q) = if actions.len() == 1 {
                         let a = actions[0].clone();
+                        let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
+                        (a, vec![e], None, Vec::new())
+                    } else if let Some(a) = vorzug_kandidat {
+                        // §3.1-Befund (PREREG_ownership_corpus.md): das Policy-
+                        // Ziel unter Vorzug ist ein DEMONSTRATIONS-Target --
+                        // ein-hot auf die uebersteuernde Aktion (prob=1.0),
+                        // EXAKT dieselbe Konvention wie der bestehende
+                        // Ein-Aktion-Kurzschluss oben. `root_q`/`root_child_q`
+                        // bleiben leer (keine echte Suche gelaufen fuer diesen
+                        // Entscheid) -- beide Felder sind bereits als optional
+                        // dokumentiert (siehe deren Einfuege-Kommentare unten,
+                        // "Konsumenten muessen das Fehlen tolerieren").
                         let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
                         (a, vec![e], None, Vec::new())
                     } else {
@@ -3016,6 +3043,22 @@ pub fn run_net_self_play(
             } else {
                 None
             });
+            // PREREG_ownership_corpus.md §3.1-Nachruestung: `plattenbauer::
+            // PARTIE_SEED` ist wie `PARTIE_GEWICHT` oben thread-lokal -- MUSS
+            // HIER gesetzt werden (nicht in der aeusseren `play`-Closure),
+            // aus demselben Grund (`run_with_watchdog` spawnt einen NEUEN OS-
+            // Thread fuer genau diese Closure). Kein Reset auf `None` noetig:
+            // dieser Thread ist NEU (ein frischer `std::thread::spawn` je
+            // Partie, siehe `run_with_watchdog`-Doku), es gibt keine
+            // Folge-Partie, die ihn wiederverwenden koennte -- anders als bei
+            // rayon-Worker-Threads (siehe die ausfuehrlichen Leck-Warnungen in
+            // spaltenbau.rs) ist ein "vorher"-Zustand hier strukturell
+            // ausgeschlossen. Ohne diesen Aufruf bliebe `PARTIE_SEED` auf
+            // `None` -- `spaltenbau::waehle_spalte`s/`plattenbauer::waehle_
+            // kandidat`s Seed-Streuung wuerde dann nie greifen (Bestands-
+            // verhalten des jeweiligen "kein Seed"-Zweigs: stabil kleinste
+            // Spalte/kleinster Index statt gestreut).
+            crate::plattenbauer::set_partie_seed(Some(partie_seed));
             // Task #32 (`profiling.rs`-Modulkopf "Task #32"): "total_selfplay"
             // -- die GANZE Spielschleife dieser einen Partie (einziger
             // Aufrufer von `play_net_self_play_game`).
