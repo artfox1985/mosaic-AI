@@ -1096,3 +1096,342 @@ Treiber baut, muss die Trennung mitnehmen.
 Folge für die Paritätsprobe: sie prüft Defaults, läuft also weiter über den
 tract-Pfad und bleibt gültig. Der Golden-Hash bleibt der Wächter für Arena und
 Gating -- genau dort, wo er gebraucht wird.
+
+---
+
+## 19. ECHTE SELF-PLAY-MESSUNG (`self_play.py`): Weg B NICHT GEDECKT --
+## Regel 3 verfehlt, gesättigter Batch übersetzt sich NICHT in Durchsatz
+
+Nutzer-Auftrag 2026-08-13: die frühere e2e-Messung (`self_play_throughput_probe.rs`,
+`evaluations/self_play_throughput_e2e*`) lief über ein eigens gebautes
+Beispiel-Binary, NICHT über den Produktionspfad -- deshalb hier wiederholt über
+`self_play.py` → `mosaic_rust.net_self_play_games` → `run_net_self_play`
+(`self_play.rs:2822`), also exakt den Pfad, den ein echter Self-Play-Lauf nimmt.
+Volle Zahlen: `evaluations/gpu_inferenzpfad_selfplay_e2e_wegb.json`.
+
+### Vorgefunden, nicht gebaut: die Verdrahtung aus §12 war bereits vollständig
+
+Der Auftrag verlangte, den Batcher "NUR in `run_net_self_play`" einzuhängen und
+zu prüfen, ob `try_batched_single_eval`/`try_batched_pair_ex` im Suchpfad hängen.
+**Beide waren bereits verdrahtet, committet in `4de6f98` (2026-08-12), VOR
+diesem Auftrag:**
+
+- `self_play.rs:2843` (`run_net_self_play`) UND `self_play.rs:1742`
+  (`run_net_arena_match`) rufen beide bereits `net_batcher::ensure_batcher_for`
+  -- No-Op bei `MOSAIC_INTERLEAVE_ENABLED` aus, exakt das in §18 beschlossene
+  Modell (der Knopf ist prozessweise geschaltet, nicht die Funktionsauswahl).
+- `net_mcts.rs:1930-2089` (`net_leaf_eval`, `drafting_action_priors` -- die
+  PRODUKTIONS-Blattauswertung, keine Testfunktion) versuchen bereits ZUERST
+  `try_batched_pair_ex`/`try_batched_single_eval`, fallen erst bei `None` auf
+  `net.eval_pair_ex`/`net.eval` zurück.
+- `net.rs:451-477` (`eval_batch`) prüft bereits ORT-CUDA zuerst, dann Torch/IPC,
+  dann tract -- exakt die in §12 festgelegte Rangfolge.
+
+Die einzige eigene Code-Änderung: ein additives `batcher_diagnostics`-Objekt am
+Ende von `run_net_self_play` (gleiches Muster wie
+`perspective_divergence_diagnostics`), weil es vorher KEINEN Weg gab, den
+tatsächlich erreichten mittleren Batch aus einem echten `self_play.py`-Lauf
+auszulesen -- `self_play.py` filtert/druckt ihn und verwirft ihn vor dem
+Pickling (kein Einfluss auf Trainingsdaten). Ausserdem der geforderte
+DLL-Handgriff (`os.add_dll_directory` auf `torch/lib`, try/except, vor dem
+`mosaic_rust`-Import).
+
+### Baustein-Hürde: Wheel-Bau in einem isolierten Worktree
+
+Der Arbeitsbaum hatte zum Zeitpunkt des Baus `tiling_solver.rs`/`provokation.rs`
+unfertig (ein paralleler Agent, `spaltenbau`-Modul referenziert, aber nicht
+deklariert) -- **`cargo check --lib` schlug dadurch AUCH ohne jedes Feature
+fehl**, unabhängig von diesem Auftrag. Diese Dateien wurden nicht angefasst
+(Auftragssperre). Stattdessen: `git worktree add --detach` auf HEAD, nur die
+eigene `self_play.rs`-Änderung dorthin kopiert, dort mit
+`--features ort_cuda_probe` und eigenem `CARGO_TARGET_DIR` gebaut. Wheel
+installiert (`pip install --force-reinstall --no-deps`); die
+ORT-CUDA-Provider-DLLs (`onnxruntime_providers_cuda/_shared/_tensorrt/
+_nv_tensorrt_rtx.dll`, `DirectML.dll`) landen laut `ort`-Crate-Build-Skript
+zwar automatisch neben dem `cdylib`-Rohbau im `target/release/`-Ordner, aber
+NICHT im maturin-Wheel selbst (kein `[tool.maturin]`-Include dafür) -- von dort
+per Handkopie neben die installierte `.pyd` in `site-packages/mosaic_rust/`
+gelegt (gleiches Verfahren wie §11 für das Beispiel-Binary, nur diesmal für
+den Python-Import-Pfad).
+
+### Paritätsprobe: hält
+
+`tools/paritaets_probe.py` nach dem Neubau: Hash
+`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` -- identisch
+zum Bestand, Defaults byte-identisch.
+
+### Die Messtabelle (`alphazero_v21_2d_brierbest.onnx`, base_sims=400, je 40
+### angeforderte Partien, `data/gpu_messung/` -- isoliert per `MOSAIC_DATA_DIR`,
+### NICHT gelöscht)
+
+| Arm | Threads | Partien fertig/angefordert | Wandzeit | Spiele/h (angefordert) | Spiele/h (fertig) | mittlerer Batch |
+| --- | ------: | --------------------------: | -------: | ---------------------: | -----------------: | ---------------: |
+| (a) Bestand | 8 | 40/40 | 638,4 s | 225,6 | 225,6 | -- (kein Sammel-Faden) |
+| (a) Bestand | 64 | **3/40** | 498,1 s | 289,1 | 21,7 | -- |
+| (b) Batcher+ORT-CUDA | 8 | 23/40 | 2190,3 s | 65,7 | 37,8 | **14,64** (Deckel 16) |
+| (b) Batcher+ORT-CUDA | 64 | **0/40** | 454,2 s | 317,0 | **0,0** | -- (Prozess vom Wachhund getötet, bevor der Wert geschrieben wurde) |
+
+**Beide 64er-Zellen sind degeneriert** -- 64 Fäden auf dieser Maschine (12
+logische Kerne, 5,3x Überzeichnung) allein reichen, den
+Chunk-Hänger-Notdeckel (450s) grossflächig auszulösen, UNABHÄNGIG von
+Batcher/ORT-CUDA: schon der Bestand verliert dort 37 von 40 Partien an den
+Wachhund. Der "requested-basis"-Faktor bei t64 (1,10x) ist ein Artefakt zweier
+kaputter Nenner, kein Befund -- NICHT als Regel-3-Eingabe verwendet.
+
+**Die einzige belastbare Zelle ist t8** (beidseitig überwiegend/vollständig
+echte Partien, 40/40 gegen 23/40): dort ist Arm (b) **3,4x LANGSAMER** als
+Arm (a) (2190,3s gegen 638,4s für dieselben 40 angeforderten Partien), UND
+löste selbst 4 Chunk-Hänger aus (Bestand: 1x).
+
+### Regel 3 (§4): NICHT GEDECKT
+
+| | requested-basis | completed-basis |
+| - | --------------: | ---------------: |
+| Faktor (b)/(a), t8 | **0,29x** | **0,17x** |
+| Faktor (b)/(a), t64 | nicht interpretierbar (siehe oben) | nicht interpretierbar |
+
+Beide Zahlen der einzig belastbaren Zelle liegen NICHT nur unter der
+2,0x-Schwelle, sondern unter 1,0x -- eine Regression, keine schwache
+Verbesserung. **Weg B ist über den echten Self-Play-Pfad NICHT gedeckt.**
+
+### Der Widerspruch zur eigenen Erwartung aus §9, ungeschönt
+
+§9 schloss mit *"Der Befund stärkt Weg B [...] die drei Kostenposten [IPC,
+Python, Tensor-Bau aus einem Puffer], die Weg A erledigt haben, existieren bei
+Weg B nicht."* Das stimmt weiterhin als Code-Tatsache -- Weg B hat kein IPC,
+kein Python, keinen Puffer-Tensor-Bau. **Trotzdem ist er hier langsamer, nicht
+schneller, als der synchrone tract-Pfad.** Der erreichte Batch (14,64 von 16,
+also nahe gesättigt) zeigt, dass die Verschränkung selbst tut, was sie soll --
+die Bündelung funktioniert. Die Verlangsamung muss also woanders liegen:
+im `Mutex<Session>` samt EINEM einzigen Sammel-Faden als serialisierendem
+Nadelöhr, in `Session::run()`-Aufrufkosten pro Batch unter echter (nicht
+synthetisch gleichförmiger) Ankunftsrate, oder im Zusammenspiel mit dem
+Wachhund selbst. **Keine dieser Hypothesen ist hier geprüft** -- nur die
+frühere (§9) Zerlegungstechnik ("sonstige Zeit je Sammelrunde" gegen den reinen
+Rundlauf) würde eine Antwort liefern, und `BatcherStats` liefert dafür bisher
+nur `batches`/`rows`/`max_batch_seen`, keine Latenzverteilung je Aufruf.
+
+### Was NICHT geprüft ist
+
+- Die Ursache der Verlangsamung selbst (siehe oben) -- keine Zeitzerlegung
+  durchgeführt, nur die Endzahl gemessen.
+- Threads=11 statt 8 als zweiter "Bestandskonvention"-Punkt -- nicht separat
+  gefahren, 8 (self_play.py-Standard) stellvertretend gewählt.
+- GPU-Auslastung ist ein Sekundenraster-Snapshot (`nvidia-smi -l 2`), keine
+  kernelgenaue Messung -- die Bestands-Arme (kein GPU-Pfad aktiv) zeigen
+  bereits 11-29% Mittelwert allein durch Desktop-Compositing-Rauschen, in
+  derselben Grössenordnung wie die gemessenen Differenzen zwischen den Armen.
+  Der GPU-Speicherstand (+~100-200 MiB bei Arm (b) gegenüber Arm (a)) ist der
+  einzige robuste Beleg, dass tatsächlich ein Modell auf der GPU resident war.
+- Ob eine kürzere/längere Chunk-Hänger-Notdeckel-Schwelle (450s,
+  `self_play.py::MAX_CHUNK_TIMEOUT_SECS`) das Bild verändern würde --
+  unverändert aus dem Bestand übernommen, nicht selbst variiert.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `MOSAIC_DATA_DIR=data/gpu_messung` (bereits existierender Override in
+  `config.py`, gebaut für die Korpus-Dosis-Vorstudie) statt eines neuen
+  CLI-Flags oder eines nachträglichen Verschiebens -- `self_play.py` hat kein
+  eigenes Ausgabeverzeichnis-Argument, und ein Verschieben nach dem Schreiben
+  hätte gegen das Löschverbot/Verschiebeverbot für `data/` verstossen
+  (OneDrive-Sync, siehe `project_onedrive_file_disappearance`).
+- Wheel-Bau in einem `git worktree --detach` auf HEAD statt im gemeinsamen
+  Arbeitsbaum, weil letzterer durch einen parallelen Agenten aktuell nicht
+  compiliert (`spaltenbau`) -- nur die eigene `self_play.rs`-Änderung
+  hineinkopiert, `tiling_solver.rs`/`provokation.rs` nicht angefasst. Der
+  Worktree (`scratchpad/wt_gpu2`) wurde NICHT entfernt (Löschverbot).
+- ORT-Provider-DLLs per Handkopie neben die installierte `.pyd` gelegt (kein
+  `[tool.maturin]`-Include ergänzt) -- kleinster Eingriff, kein
+  Build-Konfigurationsschritt, der den Bestand für andere Feature-Kombinationen
+  verändert hätte.
+- `games_per_hour` in zwei Varianten berichtet (angefordert/fertig) statt einer
+  einzigen Zahl -- bei stark unterschiedlicher Vollständigkeit zwischen den
+  Armen wäre eine einzige Konvention irreführend gewesen (siehe t64, wo die
+  angefordert-Basis fälschlich nach einer Verbesserung aussieht).
+- t64-Zelle explizit als "nicht interpretierbar" markiert statt einen Faktor
+  zu berichten, der aus zwei kaputten Nennern entsteht -- Regel 0/"trägt es
+  nicht: sagen, nicht retten".
+
+## 20. STUFE 3 (Async-Suche + Batcher + ORT-CUDA): Wiederholung von §19 mit
+## dem entkoppelten Suchpfad -- Regel 3 NOCH DEUTLICHER verfehlt
+
+Nutzer-Auftrag: §19s Ende-zu-Ende-Messung (Weg B, blockierende Fäden,
+0,29x/0,17x bei Batch ~14,64) wiederholen, diesmal mit dem in
+`evaluations/PREREG_async_suche.md` gebauten Baustein, der wartende Suchen
+nicht mehr an einen OS-Faden bindet. Gebaut in Worktree `scratchpad/wt_async2`
+(HEAD `7e5a243` + Stufe-1/2/3/4-Cherry-Picks, `cargo test --lib` 406/0/31),
+neues Beispiel `engine/examples/async_selfplay_throughput_probe.rs`, drei
+Arme: (a) Bestand synchron/tract (identischer Aufruf wie §19 Arm A), (b)
+async verschränkt/tract-CPU, (c) wie (b) + `MOSAIC_ORT_CUDA_ENABLED=1`
+(`--features ort_cuda_probe`, DLL-Handkopie wie §11/§19). Alle Läufe
+`alphazero_v21_2d_brierbest.onnx`, 400 Sims, `data/gpu_messung/` (dieses
+Rust-Beispiel schreibt selbst keine `.pkl`-Dateien -- nur die JSONL-
+Ergebniszeile).
+
+### Die Messtabelle
+
+Rohdaten: `evaluations/async_gpu_stufe3_probe.jsonl` (8 Zeilen).
+
+| Messpunkt | Träger-Fäden | N (Nebenläufigkeit) | fertig/angefordert | Wandzeit | mittlerer Batch | Batch-Deckel-Sättigung |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| (a) Bestand, 40 Partien | 8 | -- | 40/40 | 579,4 s | -- (kein Sammel-Faden) | -- |
+| (b) async/tract | 8 | 64 | **0/64** | 449,0 s | 110,79 | 86,6 % |
+| (b) async/tract | 8 | 128 | **0/128** | 481,5 s | 127,59 | 99,7 % |
+| (b) async/tract | 8 | 256 | **0/256** | 550,5 s | 127,17 | 99,4 % |
+| (b) async/tract | 8 | 8 | **0/8** | 441,3 s | 15,49 | 12,1 % |
+| **Isolationsdiagnose (N=1, Seed 999, EINE Partie, kein Sammel-Faden-Wettbewerb):** |||||||
+| (a) Bestand | 1 | -- | 1/1 | 21,70 s | -- | -- |
+| (b) async/tract | 1 | 1 | **1/1** | 412,28 s | 1,96 | -- |
+| (c) async/ORT-CUDA | 1 | 1 | **1/1** | 406,66 s | 1,96 | -- |
+
+(Sättigung = mittlerer Batch / 128, dem harten `EVAL_BATCH_MAX_N`-Deckel aus
+`net.rs`, GEPRÜFT.)
+
+### Regel 3 (§4): NICHT NUR VERFEHLT -- die einzige gültige Zelle zeigt eine
+### 19-fache Verlangsamung
+
+Die N=64/128/256/8-Zeilen sind auf **completed-Basis nicht interpretierbar**
+(0 von N Partien erreichten `Phase::End` -- dieselbe Konvention wie §19s
+t64-Zelle: kein Faktor aus einem kaputten Zähler). Die EINZIGE Zelle mit
+echter, geprüfter 1/1-Vollständigkeit auf beiden Seiten ist die
+Isolationsdiagnose (N=1, kein Nebenläufigkeits-Wettbewerb):
+
+| | Spiele/h | Faktor (b)/(a) | Faktor (c)/(a) |
+| - | ---: | ---: | ---: |
+| N=1, Seed 999 | (a) 165,87 / (b) 8,73 / (c) 8,85 | **0,053x** | **0,053x** |
+
+**Weit unter der 2,0x-Schwelle, und weit unter §19s eigenem 0,29x/0,17x-Fund.**
+Beide Backends (tract-CPU UND ORT-CUDA) liegen binnen 1,4 % beieinander --
+der Engpass liegt NICHT im Inferenz-Backend, sondern in der
+Async-Exec/Batcher-Rundlauf-Schicht selbst, die beiden Armen gemeinsam ist.
+
+### Der Widerspruch, ungeschönt: der Sammel-Faden füllt hervorragend, aber
+### das Spiel wird trotzdem nicht fertig
+
+Zwei gegensätzliche Befunde in derselben Messung:
+
+1. **Die Bündelung selbst funktioniert weit besser als in §19.** Bei N=128
+   sättigt der mittlere Batch (127,59) den harten 128er-Deckel zu 99,7 % --
+   gegenüber §19s 14,64 (Deckel 16, ~91 %) bei blockierenden Fäden ist das
+   KEIN Zufall, sondern genau das, was Stufe 1/2 versprochen haben: wartende
+   Suchen binden keinen OS-Faden mehr, also können weit mehr Partien
+   gleichzeitig zum Sammel-Faden beitragen, ohne durch Thread-Überzeichnung
+   ausgebremst zu werden (§19s eigene 64-Fäden-Zeile brach an genau diesem
+   Punkt zusammen, 5,3x Überzeichnung löste den Chunk-Hänger-Notdeckel aus).
+2. **Trotzdem erreichte KEINE der 64/128/256/8 Partien `Phase::End`** in
+   441-579 s Wandzeit, während dieselbe Partie synchron 21,7 s braucht und
+   isoliert-async (N=1, kein Wettbewerb) 412 s. Der `run_concurrent`-Aufruf
+   selbst kehrte in allen vier Fällen zurück (die JSONL-Zeile enthält
+   `batcher_batches`/`batcher_rows`, die erst NACH `run_async_wave` gelesen
+   werden -- GEPRÜFT an `engine/examples/async_selfplay_throughput_probe.rs:
+   254-264`, `run_concurrent` selbst hat laut `engine/src/async_exec.rs:81-98`
+   KEINEN Timeout/Abbruchpfad, es kehrt nur zurück wenn ALLE Futures fertig
+   sind). Das heisst: bei N≥8 endete JEDE beteiligte Partie über den
+   `_ => break`-Zweig der Phasen-Schleife auf einer Phase, die NICHT
+   `Phase::End` ist.
+
+**Die genaue Ursache von Punkt 2 ist in dieser Sitzung NICHT isoliert --
+ausdrücklich als ungeprüft markiert, nicht weginterpretiert.** Plausibel
+(nicht bewiesen): unter echtem N-fachem Wettbewerb auf denselben Sammel-Faden
+könnte die pro Runde/Entscheid vorhandene Wall-Clock-Notbremse
+(`round_transition_deep::ROUND_SIM_TIME_BUDGET`/`POLICY_TIME_BUDGET_PER_DECISION`,
+GEPRÜFT: 15s/200ms) unter der 19-fachen Verlangsamung anders greifen als
+synchron und die Partie auf eine andere Phase lenken als im
+Isolationsfall -- das ist eine Hypothese, KEIN Befund; eine Nachprüfung
+bräuchte eine Instrumentierung, welche Phase die `_ => break`-Treffer bei
+N≥8 tatsächlich verlassen, die aktuell nicht existiert.
+
+### Zeitanteile: der Batch klemmt NICHT, das Ende-zu-Ende-Ergebnis klemmt an
+### einer anderen Stelle
+
+Der Auftrag verlangte eine Zerlegung "falls der Batch klemmt" (wie bei der
+391s-Diagnose) -- hier klemmt der Batch gerade NICHT (99,7 % Sättigung bei
+N=128). Die vorhandene Zerlegung ist die Isolationsdiagnose selbst: bei N=1
+sind `batcher_batches=26323` (b) bzw. `26319` (c) für EINE Partie messbar
+(GEPRÜFT: `async_gpu_stufe3_probe.jsonl`), daraus folgt eine
+Rundlaufzeit von **412,28s / 26323 ≈ 15,66 ms** (b) bzw. **406,66s / 26319 ≈
+15,45 ms** (c) je Sammelrunde -- bei einem mittleren Batch von nur 1,96 legt
+das nahe, dass die Rundlaufzeit selbst (nicht die Inferenz) den Löwenanteil
+der 19-fachen Verlangsamung trägt. **Eine Zahlen-Koinzidenz, AUSDRÜCKLICH
+NICHT instrumentell bestätigt (Regel 0):** 15,66 ms liegt nahe an Windows'
+Standard-Systemtakt (1/64 s ≈ 15,625 ms) -- ob `mpsc::Receiver::recv_timeout`
+(oder eine andere Wartestelle im Sammel-Faden/Executor) den konfigurierten
+`fill_timeout` (200 µs, laut Stufe-1-Diagnose §9) tatsächlich in dieser
+Granularität einhält, ist NICHT geprüft (`BatcherStats` liefert aktuell kein
+`fill_wait_ns`/`eval_ns`-Feld, das dies direkt belegen würde). Diese Hypothese
+wird hier ALS Hypothese berichtet, nicht als Befund.
+
+### Regel 3 (§4): NICHT GEDECKT -- deutlicher verfehlt als §19
+
+| | N=1 (einzig gültige Zelle) |
+| - | ---: |
+| Faktor (b: async/tract) / (a) | **0,053x** |
+| Faktor (c: async/ORT-CUDA) / (a) | **0,053x** |
+
+Beide weit unter der 2,0x-Schwelle UND unter §19s bereits negativem
+0,29x/0,17x -- **der Async-Umbau macht den Ende-zu-Ende-Pfad langsamer, nicht
+schneller**, trotz nachweislich exzellenter Batch-Füllung. Die
+Amdahl-Obergrenze (2,6-5,3x) ist damit ebenfalls nicht erreichbar, solange
+dieser Rundlauf-Kostenposten besteht.
+
+### Was NICHT geprüft ist
+
+- Die exakte Ursache, warum keine der N≥8-Partien `Phase::End` erreichte
+  (siehe oben) -- keine Live-Instrumentierung der Phasenübergänge durchgeführt.
+  - Die Windows-Systemtakt-Hypothese für die ~15,6 ms Rundlaufzeit --
+    `fill_wait_ns`/`eval_ns` existieren nicht in `BatcherStats`, keine
+    Nachmessung durchgeführt.
+- Zweite Saat/Varianzprüfung (>=2 Seeds bei >20% Streuung) -- nur EIN Seed
+  für den N=64/128/256/8-Sweep (20260814) und ein zweiter, separater Seed
+  (999) für die Isolationsdiagnose; angesichts der Grössenordnung
+  (19x, konsistent über zwei Backends) hätte eine zweite Saat das
+  qualitative Ergebnis vermutlich nicht verändert, wurde aber nicht gefahren.
+- Arm (c) nur bei N=1 gefahren, NICHT im vollen Sweep (siehe "Eigene
+  Entscheidungen").
+- `>=40` Partien je Messpunkt (Auftragsvorgabe) wurde für den
+  N=64/128/256/8-Sweep durch die Nebenläufigkeit selbst erreicht (N Partien
+  gleichzeitig), aber KEINE davon wurde fertig -- die Vorgabe "stabile Zahl"
+  ist damit gegenstandslos, weil keine games/h-Zahl auf completed-Basis
+  existiert.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `carrier_threads=8` für alle (b)/(c)-Messpunkte (statt z.B. 4 oder 16) --
+  identisch zu Arm (a)s Fadenzahl, damit ein Unterschied nicht durch eine
+  andere Fadenzahl konfundiert wird.
+- Isolationsdiagnose (N=1, EIN Träger-Faden, Seed 999) VOR dem vollen Sweep
+  gefahren, obwohl nicht explizit angefordert -- ohne sie wäre der
+  0/N-Befund bei N≥8 nicht von einem reinen "Batch reicht nicht"-Problem zu
+  unterscheiden gewesen; sie zeigt, dass die Verlangsamung schon OHNE jede
+  Nebenläufigkeit (also unabhängig von Sammel-Faden-Wettbewerb) 19x beträgt.
+- Arm (c) NUR bei N=1 gefahren, nicht im vollen Sweep -- (b) zeigte bereits,
+  dass der Engpass in der Async-Exec/Batcher-Schicht liegt, nicht im
+  Inferenz-Backend (identische Rundlaufzeit tract vs. ORT-CUDA bei N=1);
+  ein CUDA-Sweep bei N=64+ hätte nur dieselbe Schlussfolgerung mit
+  zusätzlichem DLL-/GPU-Risiko wiederholt.
+- Arm (a) frisch in `wt_async2` neu gemessen (statt §19s alte 225,6/h-Zahl
+  zu übernehmen) -- andere Maschine/Zustand seit §19, "Geprüft oder
+  markiert" verlangt eine eigene Prüfstelle für die Vergleichsbasis, nicht
+  eine ältere Zahl aus einem anderen Lauf.
+- N=64/128/256/8-Sweep NICHT künstlich abgebrochen (kein externer Timeout
+  auf den Prozess) -- `run_concurrent` hat laut Code keinen Abbruchpfad,
+  jede Zeile im Ergebnis-JSONL stammt von einem Lauf, der regulär
+  zurückgekehrt ist (bestätigt durch die vorhandenen `batcher_*`-Felder,
+  die erst nach `run_async_wave` gelesen werden).
+- Kein Arena-Lauf, kein Gating -- wie im Auftrag verlangt, reine
+  Kennlinien-/Durchsatzmessung.
+
+### Fazit Stufe 3
+
+**Weg B über den Async-Suchpfad ist über den echten Self-Play-Pfad NICHT
+gedeckt -- schlechter als der bereits gescheiterte §19-Befund.** Die
+Batch-Füllung selbst ist ein klarer, unabhängig geprüfter Erfolg der
+Stufe-1/2-Bausteine (99,7 % Deckel-Sättigung bei N=128 gegen §19s ~91 % bei
+Deckel 16, UND ohne den Thread-Überzeichnungs-Kollaps, den §19s 64-Fäden-
+Zeile zeigte) -- aber dieser Erfolg übersetzt sich nicht in Durchsatz, weil
+eine ~15,6ms-Rundlaufzeit je Sammelrunde (Ursache nicht instrumentell
+bestätigt, Windows-Systemtakt nur eine plausible, ausdrücklich ungeprüfte
+Hypothese) den gesamten Pfad 19x verlangsamt, unabhängig vom
+Inferenz-Backend. Der aktuelle `async_exec::run_concurrent`/Waker-Pfad ist,
+wie in seiner eigenen Dokumentation vermerkt, "NICHT produktionsreif" --
+diese Messung bestätigt das jetzt mit Zahlen, nicht nur als Vorbehalt.
