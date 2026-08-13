@@ -307,3 +307,106 @@ Der Spaltenbau-Spieler ist der Prototyp. Traegt er, wird er PARAMETRISIERT
 (Ziel = Kriterium statt fest Spalte) statt achtmal neu gebaut; ob einzelne
 Platten eigene Logik brauchen (Spezialfelder sind Trigger-, keine Lieferlogik),
 entscheidet sich je Platte.
+
+## 11. RUNDE 2 GEMESSEN (2026-08-13): 5,60 statt 1,40 -- Ziel 7,00 weiterhin verfehlt
+
+Drei Nachbesserungen an `spaltenbau.rs`/`provokation.rs` gegenueber dem
+Stand aus Commit `fd2d15e` (1,40 vertikale Punkte, Blocker zu 10/12 auf
+SPEZIAL-Zellen):
+
+1. **Wild-Zellen aktiv bedient**: `provokation::vorzugszug_fuer_spalte` liess
+   Wild-Zellen bisher NIE als Ziel gelten (`geforderte_farbe` liefert dort
+   `None`, das alte `Some(x) if x==farbe`-Muster verwarf jede Farbe) -- jetzt
+   qualifiziert an einer Wild-Zelle JEDE Farbe.
+2. **Spezial-Zellen umbepreist**: `spalten_kosten` bewertete SPEZIAL bisher
+   als billig (0,3, wie Wild) -- jetzt `special_kosten`, skaliert mit der
+   Zahl der noch offenen der 3 Slot-Nachbarn (0,3 bei 0 offenen bis 2,7 bei
+   3 offenen), weil eine Spezial-Zelle sich erst automatisch fuellt, wenn
+   diese drei komplett sind (die Ursache des 10/12-Befunds).
+3. **Zielspalte seed-gestreut**: `waehle_spalte` waehlt bei mehreren nahe am
+   Minimum liegenden Spalten (Toleranz 0,5) deterministisch per SplitMix64
+   aus dem Partie-Seed statt immer die kleinste Nummer -- ohne das war die
+   Zielspalte bei leerem Brett (alle 6 Spalten exakt gleich teuer) fuer JEDE
+   Partie Spalte 0.
+
+### Aufbau (identisch zur letzten Messung, PLUS Trace)
+
+`net_arena_match`, Champion (`v21_2d_brierbest`) @400 vs Heuristik@150, 20
+k1-Seeds (`evaluations/seed_auswahl_platten.json`, GEPRUEFT:
+`[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,59,69]`), gepaart gegen
+`MOSAIC_SPALTENBAU=0` als Kontrolle, `MOSAIC_SPALTENBAU_TRACE=1` fuer beide
+Arme (No-Op ohne aktiven Spaltenbauer). Werkzeug: `tools/paired_arena_env_ab.py
+--env-name MOSAIC_SPALTENBAU --arms 0 1 --control 0 --net-sims 400
+--heur-sims 150 --seeds <k1> --log-games`, Ergebnis in
+`evaluations/paired_arena_env_spaltenbau_r2.json`. Metrik ueber
+`tools/plattenpunkte_aus_arena.py`s `auswerten()`, Kriterium "Vertikale
+Reihen"; Verteilung/Blocker ueber das NEU gebaute `tools/spaltenbau_trace.py`
+(liest die `[SB]`-Zeilen).
+
+### ABNAHME: 5,60 -- Ziel 7,00 verfehlt, aber 4x ueber der letzten Messung
+
+| Groesse | Spaltenbau AUS (Kontrolle) | Spaltenbau AN |
+| --- | ---: | ---: |
+| Vertikale Plattenpunkte (Ø, n=20) | 0,70 | **5,60** |
+| Endstand (Ø) | 48,30 | 41,10 |
+| Strafleiste (Ø) | 8,50 | 9,20 |
+| Siege Netz | 15/20 | 13/20 |
+
+Sieg-Differenz NICHT signifikant (McNemar b=3/c=5, p=0,73) -- der
+Spaltenbauer kostet keine belegbare Staerke, nur ~7 Punkte Endstand und
+~0,7 Punkte Strafleiste im Schnitt (dieselbe Kategorie "Bauen kostet ein
+bisschen", die schon §7/§9 zeigten).
+
+### Verteilungs-Gate (NEU, Nutzer-Ergaenzung): bestanden -- alle 6 Spalten
+
+Zielspalten-Ereignisse ueber alle Runden/Partien (Spaltenbau-Arm, aus dem
+Trace): Spalte 0=35, 1=13, 2=15, 3=12, 4=10, 5=15. **Keine Spalte bei 0** --
+Spalte 0 bleibt haeufiger (die Tie-Break-Spalte bei einem echten Gleichstand
+inklusive des leeren Startbretts trifft sie am oeftesten), aber die
+Seed-Streuung erreicht sichtbar alle sechs, nicht nur Spalte 0 wie vor
+Nachbesserung 3.
+
+### Blocker-Klassifikation (81 distinkte Blocker-Ketten ueber 20 Partien, aus dem Trace)
+
+| Kategorie | Anteil |
+| --- | ---: |
+| Geforderte Farbe nicht im Angebot (Faktoren/Mond/GF) | 74,1 % |
+| Musterreihe an eine ANDERE Farbe gebunden | 16,0 % |
+| Sonstiges (v.a. Wild-Zelle ohne jede Farbe im Angebot) | 9,9 % |
+
+Der dominante Blocker ist nach den drei Nachbesserungen **NICHT mehr
+Farblogik/Spezialfelder, sondern die VERSORGUNG**: in drei von vier Faellen
+war die fuer die Zielspalte geforderte Farbe schlicht in KEINER Fabrik/im
+Mond verfuegbar, als der Zug gebraucht wurde. Konkrete Kette, Seed 59,
+Zeile 5 (`[SB]`-Zeilen des Arms): `reihe_gebunden_an_Gelb_statt_Tuerkis`
+blockierte 40 von den insgesamt 83 Entscheidungen dieser Partie, Runden 2
+bis 4 durchgehend -- die Musterreihe hatte sich frueh an Gelb gebunden,
+Tuerkis (die fuer die Zielspalte in dieser Zeile geforderte Farbe) kam in
+diesen drei Runden nicht zusammen. Das bestaetigt die in
+`PREREG_platzierungsseite.md` §5 vorab formulierte Vermutung ("dann ist der
+naechste Verdacht die Versorgung") DIREKT und mit Kette, nicht nur als
+Ausschluss.
+
+`Vorzug existiert/genutzt` je Runde (ueber alle Partien, alle drei
+Entscheidungstypen): sobald ein Kandidat existierte, wurde er in JEDER
+Runde zu 100 % auch gespielt (R1 164/164, R2 208/208, R3 162/162, R4
+26/26, R5 0/0) -- ERWARTUNGSGEMAESS, keine neue Erkenntnis: die
+`.or_else(...)`-Kette waehlt einen existierenden Vorzugs-Kandidaten immer
+VOR der Netz-Suche, "existiert" und "genutzt" koennen sich in dieser
+Architektur gar nicht unterscheiden. Informativ ist die FALLENDE
+Kandidatenrate ueber die Runden (308→333→353→348→290 Entscheidungen,
+Kandidaten 164→208→162→26→0) -- Runde 4 ist fast schon dicht (nur 26 von
+348), Runde 5 hat strukturell keinen (Vorzugszug ist auf Runde ≤4 begrenzt,
+Runde 5 laeuft ueber `round5.rs`).
+
+### VERDIKT: Fortschritt belegt, Ziel weiterhin offen -- naechster Hebel ist Versorgung, nicht Farblogik
+
+1,40 → 5,60 ist eine Vervierfachung, aber 5,60 < 7,00. Die drei
+Nachbesserungen haben ihre eigene Diagnose (10/12 Spezial-Blocker) sauber
+adressiert; der NEUE dominante Blocker (Versorgung, 74 %) ist ein ANDERER
+Mechanismus und keiner, den `spaltenbau.rs` selbst loesen kann -- es waehlt
+nur unter dem, was JETZT angeboten wird, es kann keine zukuenftige
+Fabrikbefuellung erzwingen. Ohne Nutzer-Entscheidung KEINE weitere
+Verschaerfung (naechster denkbarer Schritt waere z.B. eine
+Versorgungs-bewusste Zielspalten-Wahl, die auf ANGEBOT-WAHRSCHEINLICHKEIT
+statt nur Brettzustand reagiert -- das ist neue Mechanik, kein Tuning mehr).

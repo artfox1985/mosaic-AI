@@ -1594,19 +1594,45 @@ fn play_net_game<R: Rng + ?Sized>(
                 } else if game.state.phase == Phase::Drafting {
                     let pi = game.state.current_player;
                     let actions = drafting_actions(&game.state);
+                    let vorzug_kandidat = if pi == net_board && actions.len() > 1 {
+                        crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
+                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
+                    } else {
+                        None
+                    };
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else if pi == net_board {
                         let s = net_effective_sims(net_sims, actions.len());
-                        crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
-                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
+                        vorzug_kandidat
+                            .clone()
                             .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = dynamic_sims(heur_sims, actions.len());
                         search_drafting_action(&game.state, s, c, rng)
                             .unwrap_or_else(|| actions[0].clone())
+                    };
+                    // Spaltenbau-Trace (Nutzer-Ergaenzung 2026-08-13, VOR der
+                    // Runde-2-Abnahme): `[SB]`-Zeile additiv ueber `log_event`,
+                    // No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
+                    // Muss VOR `apply_chosen_action`/`apply_drafting` gebaut
+                    // werden (liest noch den Vor-Zustand), aber NACH deren
+                    // mutablem Zugriff geschrieben werden (dort ist `&mut
+                    // game.state` wieder frei).
+                    let trace = if pi == net_board {
+                        let typ = match &chosen {
+                            Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => "Dome",
+                            _ => "Drafting",
+                        };
+                        crate::spaltenbau::trace_zeile(
+                            &game.state, pi, typ,
+                            vorzug_kandidat.as_ref().map(|a| a as &dyn std::fmt::Debug),
+                            &chosen as &dyn std::fmt::Debug,
+                        )
+                    } else {
+                        None
                     };
                     // Sequenzielle Stapel-Zieh-Aufloesung nur fuer den Netz-Spieler
                     // (siehe apply_chosen_action) -- die Heuristik-Seite braucht das
@@ -1623,6 +1649,9 @@ fn play_net_game<R: Rng + ?Sized>(
                         // `drafting_actions`, ein `Err` waere ein Engine-Bug.
                         game.apply_drafting(&chosen)
                             .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
+                    }
+                    if let Some(line) = trace {
+                        game.state.log_event(line);
                     }
                     steps += 1;
                 } else {
@@ -1643,7 +1672,28 @@ fn play_net_game<R: Rng + ?Sized>(
             Phase::Tiling => {
                 let pi = game.state.current_player;
                 let tiling_net = if pi == net_board { Some(net) } else { None };
-                match resolve_tiling_step(&game.state, pi, tiling_net) {
+                // Spaltenbau-Trace fuer Tiling: `vorzug_tiling_step` separat
+                // (rein lesend, keine Nebenwirkung) aufgerufen, NUR um fuer
+                // die Log-Zeile zu wissen, ob ein Vorzugs-Kandidat existierte
+                // -- `resolve_tiling_step` selbst prueft ihn intern schon
+                // (`tiling_solver::best_first_step_exact_or_valued`), gibt das
+                // aber nach aussen nicht zurueck.
+                let vorzug_kandidat_tiling = if pi == net_board {
+                    crate::spaltenbau::vorzug_tiling_step(&game.state, pi)
+                } else {
+                    None
+                };
+                let step = resolve_tiling_step(&game.state, pi, tiling_net);
+                let trace = if pi == net_board {
+                    crate::spaltenbau::trace_zeile(
+                        &game.state, pi, "Tiling",
+                        vorzug_kandidat_tiling.as_ref().map(|a| a as &dyn std::fmt::Debug),
+                        &step as &dyn std::fmt::Debug,
+                    )
+                } else {
+                    None
+                };
+                match step {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -1653,6 +1703,9 @@ fn play_net_game<R: Rng + ?Sized>(
                     TilingStep::End => {
                         let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
                     }
+                }
+                if let Some(line) = trace {
+                    game.state.log_event(line);
                 }
                 steps += 1;
             }
@@ -1737,13 +1790,22 @@ pub fn run_net_arena_match(
             Some(s) => s[i],
             None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
         };
+        // Task 7c (Spaltenbau-Kosten-Streuung): dieser Closure laeuft direkt
+        // im Rayon-Worker-Thread (kein separat gespawnter Thread wie bei
+        // `run_net_self_play`s Watchdog), ein Setzen hier landet also auf dem
+        // richtigen Thread. Reset danach, damit ein rayon-recycelter Thread
+        // nicht den Seed der VORHERIGEN Partie fuer die naechste `spaltenbau`-
+        // Anfrage ausserhalb dieser Funktion mitschleppt.
+        crate::spaltenbau::set_partie_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["Netz".to_string(), "Heuristik".to_string()];
-        play_net_game(
+        let result = play_net_game(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
-        )
+        );
+        crate::spaltenbau::set_partie_seed(None);
+        result
     };
 
     let all: Vec<Value> = if num_threads <= 1 {
@@ -1918,14 +1980,18 @@ pub fn run_net_vs_net_arena(
             Some(s) => s[i],
             None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
         };
+        // Siehe Kommentar in `run_net_arena_match`s `play`-Closure.
+        crate::spaltenbau::set_partie_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
-        play_net_vs_net_game(
+        let result = play_net_vs_net_game(
             &net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng, game_seed,
             log_games,
-        )
+        );
+        crate::spaltenbau::set_partie_seed(None);
+        result
     };
 
     let all: Vec<Value> = if num_threads <= 1 {

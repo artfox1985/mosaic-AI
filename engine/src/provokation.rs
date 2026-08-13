@@ -21,6 +21,7 @@
 //! `net_mcts::set_partie_shaping_weight`/`MOSAIC_WERTUNG_STREUUNG_MAX`).
 
 use crate::board::PlayerBoard;
+use crate::dome::SpaceType;
 use crate::moves::Move;
 use crate::state::GameState;
 use crate::tile::TileColor;
@@ -489,16 +490,26 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
             continue;
         }
         let r = r as usize;
-        match geforderte_farbe(player, r, spalte) {
-            Some(x) if x == m.take.color => {}
-            _ => continue,
+        // Task 7a (Spaltenbau Runde 2, Nutzer-Auftrag 2026-08-13): Wild-Zellen
+        // aktiv bedienen -- `geforderte_farbe` liefert fuer Wild `None`
+        // (`dome.rs`, `required_color: None`), das alte `Some(x) if x ==
+        // m.take.color`-Muster liess Wild-Zellen also NIE als Ziel gelten,
+        // obwohl JEDE Farbe sie fuellen darf. Special bleibt ausgeschlossen
+        // -- eine Special-Zelle nimmt gar keine Farbe per Stein-Zug entgegen,
+        // sie fuellt sich erst automatisch, wenn ihre 3 Slot-Nachbarn
+        // komplett sind (`round_end::check_special_trigger`).
+        let Some(sp) = player.dome_grid.get_space(r, spalte) else {
+            continue; // kein Slot an dieser Zelle -- kein Ziel.
+        };
+        if sp.is_filled() {
+            continue; // Zelle schon gefuellt -> diese Lieferung baut die Spalte nicht.
         }
-        // Zelle schon gefuellt -> diese Lieferung baut die Spalte nicht.
-        if player
-            .dome_grid
-            .get_space(r, spalte)
-            .map_or(true, |sp| sp.is_filled())
-        {
+        let qualifiziert = match sp.space_type {
+            SpaceType::Wild => true,
+            SpaceType::Normal => sp.required_color == Some(m.take.color),
+            SpaceType::Special => false,
+        };
+        if !qualifiziert {
             continue;
         }
         // KEIN Ueberlauf-Kriterium: `TakeAction` traegt keine Stueckzahl
@@ -519,4 +530,86 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         }
     }
     best.map(|(_, _, _, m)| crate::moves::Action::Stone(m))
+}
+
+#[cfg(test)]
+mod vorzugszug_tests {
+    use super::*;
+    use crate::dome::{DomeSpace, DomeTile};
+    use crate::moves::Action;
+    use crate::tile::TileColor::*;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn names() -> [String; 2] {
+        ["P1".into(), "P2".into()]
+    }
+
+    fn drafting_game(seed: u64) -> crate::game::Game {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = crate::game::Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game
+    }
+
+    /// Task 7a (Spaltenbau Runde 2): eine Wild-Zelle in der Ziel-Spalte MUSS
+    /// jetzt als Ziel gelten, unabhaengig von der genommenen Farbe -- vor dem
+    /// Fix lieferte `geforderte_farbe` fuer Wild `None` und das
+    /// `Some(x) if x == m.take.color`-Muster verwarf JEDE Farbe.
+    #[test]
+    fn vorzugszug_fuer_spalte_akzeptiert_jede_farbe_an_einer_wild_zelle() {
+        let mut game = drafting_game(101);
+        let pi = game.state.current_player;
+        // Slot (0,0): si=0 -> (Zeile0,Spalte0)=Wild, restliche normal.
+        let tile = DomeTile::new(
+            50,
+            vec![DomeSpace::wild(), DomeSpace::normal(Blau), DomeSpace::normal(Gelb), DomeSpace::normal(Schwarz)],
+            0,
+        );
+        game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
+        // Fabrik bietet nur eine Farbe an, die an KEINER Normal-Zelle der
+        // Spalte 0 gefordert ist (Schwarz sitzt an (1,0), nicht (0,0)) --
+        // waere die Wild-Zelle (0,0) nicht qualifiziert, gaebe es hier gar
+        // keinen Kandidaten fuer Spalte 0.
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        let ergebnis = vorzugszug_fuer_spalte(&game.state, 0);
+        match ergebnis.expect("Wild-Zelle muss JEDE Farbe als Kandidat zulassen") {
+            Action::Stone(m) => {
+                assert_eq!(m.place.row_index, 0, "muss Musterreihe 0 (die Wild-Zelle) treffen");
+                assert_eq!(m.take.color, Rot, "muss die tatsaechlich angebotene Farbe nehmen");
+            }
+            other => panic!("erwartet Action::Stone, bekam {other:?}"),
+        }
+    }
+
+    /// Gegenprobe: eine Special-Zelle darf weiterhin NICHT als Farb-Ziel
+    /// gelten (sie nimmt gar keine Farbe entgegen). Direkter Aufruf der
+    /// Qualifikations-Regel statt eines vollen Spiel-Setups (ein volles
+    /// `drafting_game` deckt zufaellig zusaetzliche Fabriken/Farben aus dem
+    /// Beutel auf, die ueber ANDERE Zeilen der Spalte einen Kandidaten
+    /// liefern koennten und die Aussage damit verwaessern wuerden).
+    #[test]
+    fn vorzugszug_fuer_spalte_ignoriert_special_zellen() {
+        let mut game = drafting_game(102);
+        let pi = game.state.current_player;
+        // Slot (0,0), Rotation 0: si=0 -> (Zeile0,Spalte0)=Special,
+        // si=2 -> (Zeile1,Spalte0)=Schwarz (siehe `slot_score`-Doku fuer die
+        // Indexformel). Beide Zeilen dieser Spalte sind damit entweder
+        // Special oder eine FESTE, hier nicht angebotene Farbe.
+        let tile = DomeTile::new(
+            51,
+            vec![DomeSpace::special(), DomeSpace::normal(Blau), DomeSpace::normal(Schwarz), DomeSpace::normal(Gelb)],
+            0,
+        );
+        game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
+        let ergebnis = vorzugszug_fuer_spalte(&game.state, 0);
+        if let Some(Action::Stone(m)) = &ergebnis {
+            assert_ne!(
+                m.place.row_index, 0,
+                "die Special-Zelle (Zeile 0) darf NIE als Ziel gewaehlt werden, Zug war {m:?}"
+            );
+        }
+    }
 }
