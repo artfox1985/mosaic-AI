@@ -101,12 +101,21 @@ fn ist_aktiv() -> bool {
 ///  - Normal, ungefuellt: billig, wenn die Musterreihe leer ist (offen) oder
 ///    schon GENAU die geforderte Farbe fuehrt; teuer, wenn sie an eine ANDERE
 ///    Farbe gebunden ist (diese Runde fuer diese Zeile blockiert -- Nutzer-
-///    Vorgabe "schon gefuellte Zellen"/"Farbforderungen" einbeziehen).
+///    Vorgabe "schon gefuellte Zellen"/"Farbforderungen" einbeziehen). Eine
+///    OFFENE Zeile bekommt zusaetzlich den Versorgungs-Aufschlag
+///    [`engpass_aufschlag`] (Runde 3, Task 2, Nutzer-Auftrag 2026-08-13):
+///    je knapper die geforderte Farbe oeffentlich noch verfuegbar ist, desto
+///    teurer -- "eine Zelle, deren Farbe fast aufgebraucht ist, ist teuer,
+///    auch wenn die Reihe frei ist" (wortgleiche Vorgabe). Der falsch-
+///    gebundene Fall (`c != x`) bekommt KEINEN Aufschlag -- die Zeile ist
+///    ohnehin schon blockiert, unabhaengig von der Versorgungslage von `x`.
 ///
-/// Rein additiv aus dem Brett ablesbar (`dome_grid`/`pattern_lines`), keine
-/// Suche, kein Blick in Fabriken/Beutel -- daher in O(6) je Spalte (die
-/// Special-Nachbarpruefung ist selbst O(1), feste 2x2-Slot-Geometrie).
-fn spalten_kosten(player: &PlayerBoard, spalte: usize) -> f64 {
+/// Additiv aus dem Brett UND (seit Runde 3) der oeffentlichen Versorgungslage
+/// ablesbar (`dome_grid`/`pattern_lines` + `verbleibend`, vom Aufrufer EINMAL
+/// je Entscheid vorberechnet, siehe [`crate::provokation::verbleibende_farben`])
+/// -- keine Suche, kein Blick in Beutel/Turm selbst -- daher weiterhin O(6) je
+/// Spalte (die Special-Nachbarpruefung ist selbst O(1), feste 2x2-Slot-Geometrie).
+fn spalten_kosten(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
     let mut kosten = 0.0;
     for r in 0..6usize {
         kosten += match player.dome_grid.get_space(r, spalte) {
@@ -118,7 +127,8 @@ fn spalten_kosten(player: &PlayerBoard, spalte: usize) -> f64 {
                 SpaceType::Normal => {
                     let need = sp.required_color;
                     match (player.pattern_lines[r].color, need) {
-                        (None, _) => 1.0,
+                        (None, Some(x)) => 1.0 + engpass_aufschlag(verbleibend, x),
+                        (None, None) => 1.0, // Normal hat laut dome.rs immer required_color=Some(..); defensiv.
                         (Some(c), Some(x)) if c == x => 0.3,
                         _ => 2.0,
                     }
@@ -127,6 +137,25 @@ fn spalten_kosten(player: &PlayerBoard, spalte: usize) -> f64 {
         };
     }
     kosten
+}
+
+/// Versorgungs-Aufschlag fuer eine noch OFFENE Musterreihe, die `farbe`
+/// fordert (Runde 3, Task 2). 0, solange nichts von `farbe` oeffentlich
+/// verbraucht ist (`verbleibend == TILES_PER_COLOR`); steigt LINEAR bis
+/// `ENGPASS_MAX`, wenn nichts mehr uebrig ist (`verbleibend <= 0`).
+///
+/// `ENGPASS_MAX = 2.5` ist so gewaehlt, dass eine RESTLOS aufgebrauchte
+/// Farbe eine offene Zeile (Basis 1,0) teurer macht als eine an eine ANDERE
+/// Farbe gebundene Zeile (2,0): 1,0 + 2,5 = 3,5 > 2,0 -- "auch wenn die Reihe
+/// frei ist" (wortgleiche Nutzer-Vorgabe) gilt damit selbst im Extremfall.
+const ENGPASS_MAX: f64 = 2.5;
+
+fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
+    let Some(i) = crate::provokation::farben_index(farbe) else {
+        return 0.0; // Wild ist keine ziehbare Farbe, kommt hier nie vor; defensiv.
+    };
+    let frac = (verbleibend[i].max(0) as f64 / crate::tile::TILES_PER_COLOR as f64).min(1.0);
+    ENGPASS_MAX * (1.0 - frac)
 }
 
 /// Kosten einer noch unbefuellten Special-Zelle `(r, spalte)`: `0,3 + 0,8 *
@@ -237,7 +266,8 @@ pub(crate) fn ziel_spalte(state: &GameState) -> Option<usize> {
         return None;
     }
     let player = &state.players[state.current_player];
-    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c));
+    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
     Some(waehle_spalte(kosten))
 }
 
@@ -267,7 +297,8 @@ pub(crate) fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingS
     // die Signatur haelt die Unterscheidung bewusst offen, gleiche Auswahl-
     // Logik wie `ziel_spalte` ueber [`waehle_spalte`].
     let player = &state.players[pi];
-    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c));
+    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
     let spalte = waehle_spalte(kosten);
     crate::tiling_solver::vorzug_tiling_step_fuer_spalte(state, pi, spalte)
 }
@@ -562,7 +593,8 @@ pub(crate) fn trace_zeile(
         return None;
     }
     let player = &state.players[pi];
-    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c));
+    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
     let ziel = waehle_spalte(kosten);
     let mut sortiert: Vec<(usize, f64)> = (0..6usize).map(|c| (c, kosten[c])).collect();
     sortiert.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
@@ -699,6 +731,61 @@ mod tests {
         set_aktiv_override_for_test(None);
     }
 
+    /// Runde 3, Task 2: `engpass_aufschlag` muss 0 sein, solange nichts von
+    /// der Farbe verbraucht ist, linear bis `ENGPASS_MAX` bei restlosem
+    /// Verbrauch steigen, und dazwischen (halbe Versorgung) einen Wert
+    /// STRIKT zwischen 0 und `ENGPASS_MAX` liefern.
+    #[test]
+    fn engpass_aufschlag_ist_linear_zwischen_voll_und_leer() {
+        let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
+        let leer = [0i64; 5];
+        let i = crate::provokation::farben_index(Rot).unwrap();
+        assert_eq!(engpass_aufschlag(&voll, Rot), 0.0, "reichliche Farbe darf keinen Aufschlag tragen");
+        assert!(
+            (engpass_aufschlag(&leer, Rot) - ENGPASS_MAX).abs() < 1e-9,
+            "restlos verbrauchte Farbe muss den vollen Aufschlag ENGPASS_MAX tragen"
+        );
+        let mut halb = voll;
+        halb[i] = crate::tile::TILES_PER_COLOR as i64 / 2;
+        let a_halb = engpass_aufschlag(&halb, Rot);
+        assert!(
+            a_halb > 0.0 && a_halb < ENGPASS_MAX,
+            "bei halber Versorgung muss der Aufschlag strikt zwischen 0 und ENGPASS_MAX liegen: {a_halb}"
+        );
+    }
+
+    /// Runde 3, Task 2 (Kernabnahme): eine OFFENE Musterreihe muss teurer
+    /// werden, wenn ihre geforderte Farbe restlos verbraucht ist -- UND zwar
+    /// so teuer, dass sie sogar eine FALSCH GEBUNDENE Zeile (Basis 2,0)
+    /// uebersteigt ("auch wenn die Reihe frei ist", wortgleiche
+    /// Nutzer-Vorgabe; ENGPASS_MAX-Kalibrierung: 1,0 + 2,5 = 3,5 > 2,0).
+    #[test]
+    fn spalten_kosten_offene_zeile_wird_teurer_bei_knapper_farbe() {
+        set_aktiv_override_for_test(Some(true));
+        let mut game = drafting_game(70);
+        let pi = game.state.current_player;
+        // Slot (0,0): si=0 -> (Zeile0,Spalte0) fordert Rot.
+        let tile = normal_tile(70, [Rot, Blau, Gelb, Schwarz]);
+        game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
+
+        let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
+        let mut leer_rot = voll;
+        leer_rot[crate::provokation::farben_index(Rot).unwrap()] = 0;
+
+        let k_voll = spalten_kosten(&game.state.players[pi], 0, &voll);
+        let k_knapp = spalten_kosten(&game.state.players[pi], 0, &leer_rot);
+        assert!(
+            k_knapp > k_voll,
+            "restlos verbrauchtes Rot muss Spalte 0 teurer machen: voll={k_voll} knapp={k_knapp}"
+        );
+        assert!(
+            k_knapp - k_voll > 2.0,
+            "Aufschlag bei Vollverbrauch muss > 2,0 sein (uebersteigt die falsch-gebundene Basis 2,0): {}",
+            k_knapp - k_voll
+        );
+        set_aktiv_override_for_test(None);
+    }
+
     #[test]
     fn spalten_kosten_bevorzugt_wild_und_bestehende_farbe() {
         // Spalte 0 (leerer Slot ueberall) vs. Spalte 1 mit einer Wild-Zelle
@@ -719,8 +806,12 @@ mod tests {
         // Slot (0,0) deckt Spalten 0/1 ab; si=0 -> (Zeile0,Spalte0)=Wild,
         // si=1 -> (Zeile0,Spalte1)=Rot.
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
-        let k_wild_spalte = spalten_kosten(&game.state.players[pi], 0);
-        let k_normal_spalte = spalten_kosten(&game.state.players[pi], 1);
+        // Ueberall reichlich Versorgung (Runde 3): dieser Test prueft
+        // Wild-vs-Normal, nicht Versorgung -- der Engpass-Aufschlag soll hier
+        // 0 bleiben (siehe `engpass_aufschlag`-Kalibrierung).
+        let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
+        let k_wild_spalte = spalten_kosten(&game.state.players[pi], 0, &voll);
+        let k_normal_spalte = spalten_kosten(&game.state.players[pi], 1, &voll);
         assert!(
             k_wild_spalte < k_normal_spalte,
             "Spalte mit Wild-Zelle (0) muss billiger sein als Spalte mit gebundener Normal-Zelle (1): {k_wild_spalte} vs {k_normal_spalte}"
@@ -752,7 +843,10 @@ mod tests {
             0,
         );
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
-        let k_alle_offen = spalten_kosten(&game.state.players[pi], 0);
+        // Reichlich Versorgung (Runde 3): dieser Test prueft Special-Skalierung,
+        // nicht Versorgung -- Aufschlag soll hier 0 bleiben.
+        let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
+        let k_alle_offen = spalten_kosten(&game.state.players[pi], 0, &voll);
 
         // Alle drei Nachbarn direkt als gefuellt markieren (Farbe + Special-
         // Zelle selbst bleibt ungefuellt) -- die Special-Zelle muss jetzt
@@ -763,7 +857,7 @@ mod tests {
             slot.spaces[2].placed_color = Some(Blau);
             slot.spaces[3].placed_color = Some(Gelb);
         }
-        let k_alle_gefuellt = spalten_kosten(&game.state.players[pi], 0);
+        let k_alle_gefuellt = spalten_kosten(&game.state.players[pi], 0, &voll);
 
         assert!(
             k_alle_gefuellt < k_alle_offen,
@@ -940,6 +1034,19 @@ mod tests {
         let pi = game.state.current_player;
         let tile = normal_tile(40, [Rot, Blau, Gelb, Schwarz]);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
+        // Tischmitte deterministisch leeren (Runde 3): seit die Zielspalten-
+        // Kosten die oeffentliche Versorgungslage einbeziehen
+        // (`spalten_kosten`/`engpass_aufschlag`), wuerde der echte
+        // Zufalls-Fabrikinhalt beim Partiestart die Kosten je Farbe VERZERREN
+        // -- ohne dieses Leeren waere Spalte 0 nicht mehr zuverlaessig die
+        // guenstigste, die Testvoraussetzung ("Spalte 0 ist Ziel") wuerde vom
+        // Seed abhaengen statt vom hier explizit gebauten Zustand.
+        for f in game.state.factories.iter_mut() {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
         let erwartet = crate::provokation::vorzugszug_fuer_spalte(&game.state, 0);
         assert_eq!(vorzugszug(&game.state), erwartet);
