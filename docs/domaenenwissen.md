@@ -354,3 +354,34 @@ Korpus-Gate im Piloten (Grundraten je Konjunktionsziel).
 Der Nutzer ordnet die niedrigen Boni als **Spielarchitektur-Problem** ein --
 also eine Eigenschaft des Spiels, nicht der KI. Fuer die KI heisst das nur:
 diese Platten VERTEIDIGEN (Punkte mitnehmen, wenn sie anfallen), nie ANSTEUERN.
+
+
+### 8. Spezialfelder-Wertungsplatte: eine KUPPELDRAFT-Strategie (Nutzer 2026-08-13)
+
+*"einerseits viele jokerkuppeln nehmen (und auf die unteren slots legen) und wenn
+eine spezialkuppel dennoch platziert werden muss, dann die unteren slots
+vermeiden. dann normaler spielaufbau um die strafpunkte auszugleichen. aber wenn
+die nahme der kuppelplatten priorisiert wird dann gibt es mehr strafpunkte beim
+gegner."*
+
+Kriterium 6 (-3 je offenem Spezialfeld) wird also nicht ueber Fliesen gespielt,
+sondern ueber die KUPPELWAHL -- drei Hebel:
+
+1. **Joker horten, nach unten legen**: Jokerkuppeln tragen keine Spezialfelder,
+   erzeugen also keine -3-Risiken -- und auf den unteren Slots ersetzen sie
+   genau die Plaetze, wo ein Spezialfeld am teuersten waere.
+2. **Erzwungene Spezialkuppeln nach OBEN**: der Trigger braucht die drei
+   Nachbarzellen des Slots, und obere Slots haengen an den billigen Musterreihen
+   (1-2 Kopien) -- oben schliesst ein Spezialfeld fast von selbst, unten (Reihen
+   5-6, 5-6 Kopien) bleibt es offen und kostet.
+3. **Kuppeldraft als Stoerung**: wer die Jokerkuppeln priorisiert wegnimmt,
+   laesst dem Gegner die spezial-lastigen Platten -- dessen offene Spezialfelder
+   werden zu SEINEN Strafpunkten. Zweiter Stoerkanal neben der Farbzaehlung
+   (Abschnitt 4), und er braucht nur Platten-Zaehlung, keine Farb-Buchhaltung.
+
+Dazu normaler Spielaufbau als Ausgleich der verbleibenden Strafpunkte --
+Kriterium 6 ist Schadensbegrenzung plus Draft-Kontrolle, kein Aufbauziel.
+
+Messbezug: k6-Bauer stand in §13 bei -10,65 gegen Bezug -11,85 (+1,20) -- diese
+Strategie ist seine Runde 2, und sie ist die erste, die primaer im KUPPELDRAFT
+lebt statt im Fliesendraft.
