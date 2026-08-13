@@ -7200,6 +7200,61 @@ mod tests {
         assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
     }
 
+    /// Punkt 5 (Verdrahtung der Partie-Streuung, verschoben nach
+    /// `run_net_self_play`): `set_partie_shaping_weight`/`partie_gewicht_
+    /// aus_seed` haengen an KEINEM env-var-OnceLock (anders als
+    /// `wertung_streuung_max()` selbst) -- hier direkt pruefbar, ohne die
+    /// uebliche Cache-nach-erstem-Zugriff-Falle.
+    #[test]
+    fn set_partie_shaping_weight_overrides_default_but_only_on_the_setting_thread() {
+        // (1) Gesetzt auf DIESEM Thread veraendert apply_wertung_shaping die
+        // sonst bei Default (alle acht Gewichte 0) unveraenderte Blattbewertung.
+        let mut rng = StdRng::seed_from_u64(55001);
+        let mut changed = 0;
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
+            if state.scoring_tile_ids.is_empty() {
+                continue;
+            }
+            let v = [0.5, 0.5];
+            set_partie_shaping_weight(None);
+            let baseline = apply_wertung_shaping(v, &state);
+            set_partie_shaping_weight(Some(0.7));
+            let overridden = apply_wertung_shaping(v, &state);
+            set_partie_shaping_weight(None); // aufraeumen, sonst leckt's in Folgetests auf diesem Thread
+            if overridden != baseline {
+                changed += 1;
+            }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+        assert!(changed >= 1, "PARTIE_GEWICHT-Override veraenderte in keinem Fall die Blattbewertung");
+
+        // (2) Thread-Lokalitaet: gesetzt auf einem ANDEREN (Watchdog-artigen)
+        // Thread bleibt der AUFRUFENDE Thread unberuehrt -- exakt die
+        // Voraussetzung, unter der `run_net_self_play` die Streuung INNERHALB
+        // der `run_with_watchdog`-Closure setzen muss (self_play.rs, dortiger
+        // Kommentar), nicht in der aeusseren Rayon-Closure: ein Setzen auf dem
+        // falschen Thread waere unbemerkt wirkungslos.
+        let mut rng2 = StdRng::seed_from_u64(55002);
+        let Some(state2) = random_drafting_state(0, 16, &mut rng2) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        set_partie_shaping_weight(None);
+        let before = apply_wertung_shaping([0.5, 0.5], &state2);
+        std::thread::spawn(|| {
+            set_partie_shaping_weight(Some(0.9));
+        })
+        .join()
+        .unwrap();
+        let after = apply_wertung_shaping([0.5, 0.5], &state2);
+        assert_eq!(
+            before, after,
+            "PARTIE_GEWICHT eines FREMDEN Threads darf den aufrufenden Thread nicht beeinflussen"
+        );
+    }
+
     #[test]
     fn net_leaf_eval_matches_pre_unlock_shaping_path_when_weight_is_zero() {
         // Gleiches Muster wie `net_leaf_eval_matches_pre_wertung_shaping_
