@@ -706,6 +706,19 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     tdata += ` data-tiling="${pi},${sr},${sc},${si}"`;
     cls += ' click';
     bg += 'cursor:pointer;';
+    // Nutzer-Auftrag 2026-08-13: nach dem Reihen-Klick pulsieren die LEGALEN
+    // Zielfelder (Halo-Sprache wie die Lehrermodus-Tipps). Regel exakt aus
+    // round_end.rs::row_has_open_matching_slot: Musterreihe ri gehoert zu
+    // Slot-Reihe ri/2 und Zellen-Teilreihe ri%2 (si = 2*(ri%2) oder +1);
+    // die Zelle muss leer/entsperrt sein und die Reihenfarbe akzeptieren
+    // (Normal = exakte Farbe, Wild = immer, Special = nie, dome.rs::accepts).
+    if (tilingRow !== null && sr === Math.floor(tilingRow/2) && Math.floor(si/2) === tilingRow % 2) {
+      const rowColor = normColor(S.players[tilingPi].pattern_lines[tilingRow].color || '');
+      const isNormal = sp.type === 'N' || !sp.type || sp.type === 'NORMAL';
+      const legal = !sp.filled && !sp.locked
+        && (sp.type === 'WILD' || (isNormal && nc !== '' && nc === rowColor));
+      if (legal) cls += ' legal-target';
+    }
   }
   
   return `<div class="${cls}" style="${bg}"${tdata}>${lbl}</div>`;
@@ -839,8 +852,14 @@ function renderBoard(pi) {
     // UND chip-komplettierbare Reihen hinweg), keine separate earlier-Prüfung
     // hier mehr noetig.
     const isPlaceable = playerPlaceableRis.includes(ri);
+    // Nutzer-Auftrag 2026-08-13: waehrend des Tilings traegt die aktuelle Reihe
+    // die blaue Hervorhebung (100 %), ALLE anderen Reihen dimmen auf 60 %
+    // (.dim) -- auch nach dem Anklicken der Reihe (tilingRow gesetzt), damit
+    // der Fokus bis zur Platzierung auf der gewaehlten Reihe bleibt. Das
+    // fruehere .nodrop (35 %, nur volle Reihen) entfaellt in dieser Phase.
     if(isTiling && tilingRow===null && row.tiles.length===row.capacity && ri===currentTilingRi && isPlaceable) cls='drop';
-    else if(isTiling && tilingRow===null && row.tiles.length===row.capacity) cls='nodrop';
+    else if(isTiling && tilingRow===null && currentTilingRi!==null) cls='dim';
+    else if(isTiling && tilingPi===pi && tilingRow!==null) cls = (ri===tilingRow) ? 'drop' : 'dim';
     const onclick = cls==='drop'
       ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
       : '';

@@ -144,6 +144,10 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 }
 .prow.drop{background:#DBEAFE;cursor:pointer}.prow.drop:hover{background:#BFDBFE}
 .prow.nodrop{opacity:.35}
+/* Tiling-Fokus (Nutzer-Auftrag 2026-08-13): alle nicht-aktuellen Reihen auf
+   60 %, waehrend die aktuelle/gewaehlte Reihe die volle .drop-Hervorhebung
+   traegt -- gilt vor UND nach dem Reihen-Klick (app.js renderBoard). */
+.prow.dim{opacity:.6}
 /* Nutzer-Feedback (2026-07-29): dezente Markierung der aktuellen Reihe, wenn
    sie nur per Bonuschips (nicht direkt) komplettierbar ist -- kein cursor:
    pointer, die Reihe selbst ist nicht klickbar, nur der Bonuschips-Kasten
@@ -428,6 +432,14 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .hint-mark.hint-2{outline-color:#94A3B8;box-shadow:0 0 0 3px rgba(148,163,184,.22)}
 .hint-mark.hint-3,.hint-mark.hint-4,.hint-mark.hint-5{outline-color:#B45309;box-shadow:0 0 0 3px rgba(180,83,9,.18)}
 @keyframes hint-pulse{0%,100%{outline-offset:1px}50%{outline-offset:3px}}
+/* Legale Tiling-Zielfelder (Nutzer-Auftrag 2026-08-13): dieselbe Halo-Sprache
+   wie die Lehrermodus-Tipps, aber als Box-Shadow-Puls statt Outline-Offset --
+   die 2x2-Kuppelzellen sitzen zu eng fuer wandernde Outlines, und Box-Shadow
+   verursacht keinen Layout-Sprung (Lehre vom blauen Punkt, 2026-08-02). */
+.ds.legal-target{outline:2px solid var(--blau);z-index:1;
+  animation:legal-pulse 1.2s ease-in-out infinite}
+@keyframes legal-pulse{0%,100%{box-shadow:0 0 0 2px rgba(37,99,235,.25)}
+  50%{box-shadow:0 0 0 5px rgba(37,99,235,.5)}}
 .hint-badge{position:absolute;top:-9px;right:-9px;color:#fff;font-size:9px;font-weight:700;
   padding:1px 5px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.25);pointer-events:none;z-index:5;
   white-space:nowrap}
