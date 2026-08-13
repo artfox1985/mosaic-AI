@@ -937,6 +937,15 @@ mod tests {
     fn mosaic_spaltenbau_an_ist_verhaltensidentisch_zur_direkten_ansteuerung() {
         crate::spaltenbau::set_aktiv_override_for_test(Some(true));
         for seed in 0u64..30 {
+            // Runde 4: `spaltenbau::ziel_spalte` merkt sich jetzt die zuletzt
+            // gewaehlte Spalte je Partie (Vollendbarkeits-Buchhaltung, siehe
+            // dortige Doku) -- ohne Reset hier wuerde die Spalte des VORIGEN
+            // Seeds in dieses (voellig andere) Brett hineinlecken, exakt das
+            // Leck, vor dem `set_partie_seed`s Doku schon immer warnt. Echte
+            // Partien (self_play.rs) rufen `set_partie_seed` ohnehin schon
+            // pro Partie auf -- dieser Test muss es fuer sein eigenes
+            // Pro-Seed-"Partie"-Modell jetzt auch tun.
+            crate::spaltenbau::set_partie_seed(None);
             let mut game = drafting_game(seed);
             let pi = game.state.current_player;
             let tile = normal_tile(100 + seed as usize, [Rot, Blau, Gelb, Schwarz]);
