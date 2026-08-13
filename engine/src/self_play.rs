@@ -1135,6 +1135,7 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, net: Option<&Net>, rng: &mut R)
 /// gemessene Kostenkategorie, nicht Teil dieser Ablation) -- wirkt nur,
 /// wenn `net` ohnehin `Some` ist (bei `net: None` war rtv schon vorher nie
 /// aktiv).
+#[allow(clippy::too_many_arguments)]
 pub fn play_one_game<R: Rng + ?Sized>(
     base_sims: u32,
     c: f64,
@@ -1146,9 +1147,23 @@ pub fn play_one_game<R: Rng + ?Sized>(
     net: Option<&Net>,
     record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
+    // PREREG_such_rng_trennen.md: der Seed, mit dem DIESER Aufrufer `rng`
+    // erzeugt hat (siehe dortige Formel `seed.wrapping_add(i*0x9E37...)`).
+    // Zusammen mit einem lokalen Zugindex (`move_idx` unten) baut
+    // `drafting_step`s Suche daraus einen EIGENEN RNG
+    // (`net_mcts::derive_search_seed`) statt weiterhin `rng` selbst zu
+    // verbrauchen -- die Suche verschiebt den echten Partie-RNG-Strom damit
+    // nicht mehr (siehe Prereg §2/§5). `rng` bleibt NUR fuer echte
+    // Spielzustands-Ereignisse (`Game::start` hier, `apply_tiling`s
+    // `EndTiling` in `tiling_step`) zustaendig.
+    game_seed: u64,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
+    // Zugindex NUR fuer echte Drafting-Entscheide (siehe `game_seed`-
+    // Kommentar oben) -- gleiche Zaehl-Konvention wie `move_number` in
+    // `play_net_self_play_game` (1-basiert, erster Entscheid = 1).
+    let mut move_idx: u64 = 0;
     let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
     // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
     // zusätzlich zum vollen `round_transition_value` (das bis zum echten
@@ -1181,7 +1196,10 @@ pub fn play_one_game<R: Rng + ?Sized>(
                     }
                 } else if game.state.phase == Phase::Drafting {
                     let round_before = game.state.round_number;
-                    records.push(drafting_step(&mut game, base_sims, c, rng));
+                    move_idx += 1;
+                    let mut search_rng =
+                        StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed, move_idx));
+                    records.push(drafting_step(&mut game, base_sims, c, &mut search_rng));
                     if let Some(net) = net {
                         if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
                             // Gleiche Rundenende-vs-Spielende-Unterscheidung wie
@@ -1297,7 +1315,9 @@ pub fn run_self_play(
         // -- die Streuung waere in dieser Funktion tote Verdrahtung (verschoben
         // nach `run_net_self_play`, wo sie tatsaechlich einen Netz-Blattwert
         // erreicht).
-        let steps = play_one_game(base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter));
+        let steps = play_one_game(
+            base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter), partie_seed,
+        );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
             append_game_progress(&progress_file, &steps);
@@ -1375,6 +1395,7 @@ pub fn run_self_play_with_net_labels(
         let gid = format!("{prefix}_g{}", i + 1);
         let steps = play_one_game(
             base_sims, c, ids, names, first, &gid, &mut rng, Some(&net), record_rtv, Some(&move_counter),
+            partie_seed,
         );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
@@ -1411,6 +1432,9 @@ fn play_arena_game<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
+    // PREREG_such_rng_trennen.md: siehe `play_one_game`s gleichnamiger
+    // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat.
+    game_seed: u64,
 ) -> Value {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
@@ -1451,7 +1475,13 @@ fn play_arena_game<R: Rng + ?Sized>(
                         actions[0].clone()
                     } else {
                         let s = dynamic_sims(sims[pi], actions.len());
-                        search_drafting_action(&game.state, s, c, rng)
+                        // PREREG_such_rng_trennen.md: eigener, aus
+                        // (game_seed, steps) abgeleiteter RNG statt des
+                        // Partie-`rng` -- siehe `play_one_game`-Kommentar.
+                        let mut search_rng = StdRng::seed_from_u64(
+                            crate::net_mcts::derive_search_seed(game_seed, steps as u64),
+                        );
+                        search_drafting_action(&game.state, s, c, &mut search_rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     // Siehe `drafting_step`-Kommentar: `chosen` stammt aus
@@ -1515,12 +1545,12 @@ pub fn run_arena_match(
     c: f64,
 ) -> String {
     let play = |i: usize| -> Value {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["A".to_string(), "B".to_string()];
-        play_arena_game([sims_a, sims_b], c, ids, names, first, &mut rng)
+        play_arena_game([sims_a, sims_b], c, ids, names, first, &mut rng, game_seed)
     };
 
     let all: Vec<Value> = if num_threads == 0 {
@@ -1601,17 +1631,23 @@ fn play_net_game<R: Rng + ?Sized>(
                     } else {
                         None
                     };
+                    // PREREG_such_rng_trennen.md: eigener, aus (game_seed,
+                    // steps) abgeleiteter RNG statt des Partie-`rng` fuer BEIDE
+                    // Such-Seiten -- siehe `play_one_game`-Kommentar. `game_seed`
+                    // ist hier schon Parameter (Log-Paritaet, Auftrag 2026-08-11).
+                    let mut search_rng =
+                        StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed, steps as u64));
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else if pi == net_board {
                         let s = net_effective_sims(net_sims, actions.len());
                         vorzug_kandidat
                             .clone()
-                            .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
+                            .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, &mut search_rng))
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = dynamic_sims(heur_sims, actions.len());
-                        search_drafting_action(&game.state, s, c, rng)
+                        search_drafting_action(&game.state, s, c, &mut search_rng)
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     // Spaltenbau-Trace (Nutzer-Ergaenzung 2026-08-13, VOR der
@@ -1883,10 +1919,15 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                             (net_b, sims_b, c_puct_b)
                         };
                         let s = net_effective_sims(base, actions.len());
+                        // PREREG_such_rng_trennen.md: siehe `play_net_game`-
+                        // Kommentar -- `game_seed` ist hier schon Parameter.
+                        let mut search_rng = StdRng::seed_from_u64(
+                            crate::net_mcts::derive_search_seed(game_seed, steps as u64),
+                        );
                         crate::provokation::vorzugszug(&game.state)
                             .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
                             .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
-                            .or_else(|| net_search_drafting_action(net, &game.state, s, cp, false, rng))
+                            .or_else(|| net_search_drafting_action(net, &game.state, s, cp, false, &mut search_rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     apply_chosen_action(&mut game, chosen)
@@ -2538,6 +2579,13 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     move_heartbeat: Option<&AtomicU64>,
     pcr_full_prob: Option<f64>,
     pcr_cheap_sims: u32,
+    // PREREG_such_rng_trennen.md: siehe `play_one_game`s gleichnamiger
+    // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat
+    // (`run_net_self_play`s `partie_seed`). Zusammen mit `move_number`
+    // (bereits vorhandener 1-basierter Halbzug-Zaehler, siehe dessen
+    // Deklaration unten) baut jeder echte Drafting-Entscheid daraus einen
+    // EIGENEN Such-RNG statt weiterhin den Partie-`rng` zu verbrauchen.
+    game_seed: u64,
 ) -> Vec<Value> {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut records: Vec<Map<String, Value>> = Vec::new();
@@ -2599,12 +2647,24 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     let actions = drafting_actions(&game.state);
                     let valid_actions: Vec<Value> =
                         actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
+                    // PREREG_such_rng_trennen.md: EIN eigener, aus (game_seed,
+                    // move_number) abgeleiteter RNG fuer den GESAMTEN Entscheid
+                    // dieses Halbzugs -- PCR-Muenzwurf, Suche UND
+                    // `moon_order_target` (Label-Sampling) haengen jetzt an
+                    // diesem, NICHT mehr am Partie-`rng`. Der Partie-`rng`
+                    // verschiebt sich dadurch nur noch durch echte
+                    // Zustands-Ereignisse (`Game::start`/`EndTiling`), deren
+                    // Anzahl NICHT von `base_sims`/PCR abhaengt (Prereg §2/§5).
+                    let mut search_rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+                        game_seed,
+                        move_number,
+                    ));
                     // Task #14 (PCR): pro echtem Entscheid (>1 legale Aktion)
-                    // EIN Muenzwurf aus dem partie-eigenen `rng`-Strom -- nur
-                    // gezogen, wenn PCR ueberhaupt aktiv ist (`pcr_full_prob`
-                    // gesetzt), damit der RNG-Verbrauch bei `pcr_full_prob=None`
-                    // identisch zum Vor-PCR-Verhalten bleibt (kein zusaetzlicher
-                    // `rng`-Aufruf, keine Verschiebung nachfolgender Ziehungen wie
+                    // EIN Muenzwurf aus `search_rng` -- nur gezogen, wenn PCR
+                    // ueberhaupt aktiv ist (`pcr_full_prob` gesetzt), damit der
+                    // RNG-Verbrauch bei `pcr_full_prob=None` identisch zum
+                    // Vor-PCR-Verhalten bleibt (kein zusaetzlicher Aufruf, keine
+                    // Verschiebung nachfolgender Ziehungen wie
                     // `moon_order_target`/`weighted_index`). Ausgelagert in
                     // `pcr_decide_full`, damit dieser Entscheid isoliert
                     // (unit-testbar OHNE volles Self-Play-Spiel) geprueft werden
@@ -2612,7 +2672,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     // deadline-basierten `round_transition_deep`-Stichproben
                     // (siehe dortige `Instant::now() + BUDGET`-Schleifen) NICHT
                     // lauflaengen-deterministisch, unabhaengig von PCR.
-                    let pcr_is_full: Option<bool> = pcr_decide_full(pcr_full_prob, actions.len(), rng);
+                    let pcr_is_full: Option<bool> =
+                        pcr_decide_full(pcr_full_prob, actions.len(), &mut search_rng);
                     let effective_sims = match pcr_is_full {
                         Some(false) => pcr_cheap_sims,
                         _ => base_sims,
@@ -2638,13 +2699,13 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                         crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
                             crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
                                 net_drafting_policy(
-                                    net, &game.state, &actions, effective_sims, c_puct, rng, add_root_noise,
-                                    deterministic, move_number,
+                                    net, &game.state, &actions, effective_sims, c_puct, &mut search_rng,
+                                    add_root_noise, deterministic, move_number,
                                 )
                             })
                         })
                     };
-                    let moon_t = moon_order_target(&game.state, &chosen, player, rng);
+                    let moon_t = moon_order_target(&game.state, &chosen, player, &mut search_rng);
                     let state_json = state_to_json(&game.state, true);
                     let round_before = game.state.round_number;
                     apply_chosen_action(&mut game, chosen)
@@ -2964,6 +3025,7 @@ pub fn run_net_self_play(
                     play_net_self_play_game(
                         &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
                         deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
+                        partie_seed,
                     )
                 },
             )
@@ -4469,6 +4531,7 @@ pub(crate) mod tests {
             None,
             false,
             None,
+            123,
         );
         assert!(!recs.is_empty(), "Spiel muss Records erzeugen");
         for r in &recs {
@@ -4596,6 +4659,7 @@ pub(crate) mod tests {
                 None,
                 false,
                 None,
+                seed,
             );
             assert!(
                 recs.len() < 3000,
@@ -4805,6 +4869,241 @@ pub(crate) mod tests {
                 .collect();
             assert_eq!(ids, expected_ids[i], "run_net_vs_net_arena, Partie {i}");
         }
+    }
+
+    /// PREREG_such_rng_trennen.md §5, DER entscheidende Test: Suchvolumen darf
+    /// den Versorgungsstrom nicht mehr beruehren.
+    ///
+    /// WICHTIG, zwei Korrekturen gegenueber der ersten Fassung (REGEL 0 --
+    /// Analyse statt Basislinie verschoben, beide empirisch am Code geprueft):
+    ///
+    /// 1) "dieselbe Partie mit sims=1 und sims=400 spielen" kann NICHT
+    ///    heissen, dass beide Laeufe auch dieselbe ZUGWAHL treffen -- eine
+    ///    staerkere Suche trifft im Allgemeinen ANDERE Entscheidungen, und
+    ///    unterschiedliche Zuege fuehren -- unabhaengig von jedem RNG-Bug --
+    ///    zu unterschiedlichen Strafleisten-/Turm-Inhalten und damit zu einer
+    ///    ECHT unterschiedlichen Beutel-Zusammensetzung nach der naechsten
+    ///    Neumischung. Das waere kein RNG-Fund, nur Spiel-Varianz. Deshalb
+    ///    sind die ECHTEN Zuege hier bewusst sims-UNABHAENGIG fixiert
+    ///    (`actions[0]`) -- die Spielbahn ist dadurch per Konstruktion
+    ///    IDENTISCH zwischen beiden Laeufen. Eine "Schatten-Suche" laeuft
+    ///    ZUSAETZLICH an jeder echten Mehr-Aktionen-Entscheidung, ihr Ergebnis
+    ///    wird VERWORFEN -- sie beeinflusst also nie die Zugwahl, sondern uebt
+    ///    exakt den RNG-verbrauchenden Code-Pfad aus.
+    ///
+    /// 2) Die Schatten-Suche muss die HEURISTIK sein (`mcts::search_drafting_action`),
+    ///    NICHT die Netz-Gumbel-Suche: am Code nachgeprueft
+    ///    (`net_mcts.rs::sample_gumbel`, root-einmalig ueber die Aktionsmenge;
+    ///    `determinize_hidden_information`, ebenfalls einmalig pro Suche) zieht
+    ///    die Gumbel-Suche eine von `sims` UNABHAENGIGE, feste Anzahl RNG-Werte
+    ///    -- ein erster Testlauf mit der Netz-Suche als Schatten zeigte deshalb
+    ///    KEINE Abweichung, selbst wenn die Schatten-Suche bewusst wieder den
+    ///    GETEILTEN Partie-RNG bekam (Gegenprobe, siehe Commit-Historie) --
+    ///    kein Fund, nur die falsche Sonde. `mcts.rs`s Heuristik-MCTS dagegen
+    ///    zieht PRO SIMULATION mindestens einen `rng.random_range`-Aufruf
+    ///    (Widening-Tie-Break, `expand_and_backprop`) plus `rank_actions_cheap`s
+    ///    `moves.shuffle(rng)` je neu erzeugtem Tiefe->1-Knoten -- ECHT
+    ///    proportional zu `sims`, exakt der in Prereg §1 beschriebene
+    ///    Mechanismus. Gegenprobe unten (`#[ignore]`-freier Vorlauf beim Bau
+    ///    dieses Tests, nicht dauerhaft verankert): mit dem GETEILTEN
+    ///    Partie-RNG statt `search_rng` schlägt dieser Test fehl.
+    ///
+    /// Bei wirksamem Schnitt muss die -- durch die fixierten Zuege bereits
+    /// garantiert gleiche -- Fabrikfolge exakt gleich bleiben, GLEICH WELCHES
+    /// `sims` die heuristische Schatten-Suche bekommt.
+    #[test]
+    fn shadow_search_volume_does_not_shift_factory_supply_stream() {
+        // Snapshot je Runden-Uebergang: (round_number, alle sun_tiles der
+        // kleinen Fabriken + der grossen Fabrik) -- die "Fabrikinhalte je
+        // Runde" aus Prereg §5.
+        fn drive_and_capture(shadow_sims: u32, game_seed: u64) -> Vec<(u32, Vec<Vec<TileColor>>)> {
+            let mut rng = StdRng::seed_from_u64(game_seed);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let names = ["A".to_string(), "B".to_string()];
+            let mut game = Game::start(names, 0, ids, &mut rng);
+            let mut snapshots: Vec<(u32, Vec<Vec<TileColor>>)> = Vec::new();
+            let mut last_captured_round: Option<u32> = None;
+            let mut steps: u32 = 0;
+            let mut guard = 0u32;
+            loop {
+                guard += 1;
+                if guard > 20_000 {
+                    break;
+                }
+                match game.state.phase {
+                    Phase::StartPlacement | Phase::Drafting => {
+                        if game.state.players.iter().any(|p| p.start_tile_pending) {
+                            let first = game.state.current_player;
+                            let non_starter = 1 - first;
+                            let pi = if game.state.players[non_starter].start_tile_pending {
+                                non_starter
+                            } else if game.state.players[first].start_tile_pending {
+                                first
+                            } else {
+                                break;
+                            };
+                            match choose_start_placement(&game.state, pi) {
+                                Some((tid, r, c2, rot)) => {
+                                    let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                                }
+                                None => break,
+                            }
+                            steps += 1;
+                        } else if game.state.phase == Phase::Drafting {
+                            if last_captured_round != Some(game.state.round_number) {
+                                let mut snap: Vec<Vec<TileColor>> =
+                                    game.state.factories.iter().map(|f| f.sun_tiles.clone()).collect();
+                                snap.push(game.state.large_factory.sun_tiles.clone());
+                                snapshots.push((game.state.round_number, snap));
+                                last_captured_round = Some(game.state.round_number);
+                            }
+                            let actions = drafting_actions(&game.state);
+                            // Schatten-Suche: Ergebnis wird VERWORFEN, nur der
+                            // RNG-Verbrauch des Suchpfads wird hier geprueft --
+                            // exakt derselbe isolierte Such-RNG wie in der
+                            // Produktion (`derive_search_seed`), siehe
+                            // Funktionskommentar oben.
+                            if actions.len() > 1 {
+                                let mut search_rng = StdRng::seed_from_u64(
+                                    crate::net_mcts::derive_search_seed(game_seed, steps as u64),
+                                );
+                                let s = dynamic_sims(shadow_sims, actions.len());
+                                let _ = search_drafting_action(&game.state, s, SELF_PLAY_C, &mut search_rng);
+                            }
+                            // Echter Zug: FIX, sims-unabhaengig -- garantiert
+                            // identische Spielbahn zwischen beiden Laeufen.
+                            let chosen = actions[0].clone();
+                            game.apply_drafting(&chosen)
+                                .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
+                            steps += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        let pi = game.state.current_player;
+                        match resolve_tiling_step(&game.state, pi, None) {
+                            TilingStep::Place(ta) => {
+                                let _ = game.apply_single_tiling(pi, &ta);
+                            }
+                            TilingStep::Chips { row, chips } => {
+                                apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                            }
+                            TilingStep::End => {
+                                let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng);
+                            }
+                        }
+                        steps += 1;
+                    }
+                    _ => break,
+                }
+            }
+            snapshots
+        }
+
+        let game_seed = 20260813u64;
+        let snaps_1 = drive_and_capture(1, game_seed);
+        let snaps_400 = drive_and_capture(400, game_seed);
+
+        assert!(!snaps_1.is_empty(), "kein einziger Rundenwechsel erfasst -- Test taugt so nichts");
+        assert_eq!(
+            snaps_1.len(),
+            snaps_400.len(),
+            "unterschiedliche Anzahl Rundenwechsel zwischen Schatten-sims=1 und =400"
+        );
+        for (a, b) in snaps_1.iter().zip(snaps_400.iter()) {
+            assert_eq!(
+                a, b,
+                "Fabrikinhalte weichen zwischen Schatten-sims=1 und =400 ab -- \
+                 der Such-RNG-Schnitt (PREREG_such_rng_trennen.md) ist nicht wirksam"
+            );
+        }
+    }
+
+    /// PREREG_such_rng_trennen.md Punkt 7 (Async-Gate-B-Nachprobe):
+    /// Nachstellung des `wt_async`-Befunds `play_net_self_play_game_sync_only_
+    /// repeatability` HIER im Hauptbaum (jener Test existiert nur im
+    /// Worktree, siehe `PREREG_async_suche.md` Abschnitt 10 -- Zitat: "Sync
+    /// weicht von sich selbst ab" wegen des GETEILTEN RNG-Stroms
+    /// zwischen Suche/Simulation und dem echten Spiel, PLUS separat einer
+    /// Wall-Clock-Komponente in `round_transition_deep.rs` (Task #71), die
+    /// dieser Schnitt NICHT behebt und nicht soll).
+    ///
+    /// `play_net_self_play_game` zweimal REIN SYNCHRON (kein Async-Code, kein
+    /// Sammel-Faden) mit IDENTISCHEM Seed/Config aufgerufen. Zwei Vergleiche,
+    /// genau wie im Worktree-Befund:
+    /// - VOLL (alle Felder inkl. `round_transition_value`/`bootstrap_value`):
+    ///   kann weiterhin abweichen -- das waere die separate, bekannte
+    ///   Wall-Clock-Komponente (Task #71), NICHT dieser Schnitt.
+    /// - SPIELGESCHEHEN (dieselben Records, `round_transition_value`/
+    ///   `bootstrap_value` vor dem Vergleich entfernt): MUSS nach diesem
+    /// Schnitt 0 Abweichungen zeigen -- genau das war die im Worktree-Befund
+    /// benannte Erwartung, sofern der geteilte RNG-Strom die Ursache war.
+    ///
+    /// `#[ignore]`: teuer (volle Partien, `record_rtv=true` -- die teuerste
+    /// Self-Play-Konfiguration) UND haengt an einem lokalen Modell-Checkpoint
+    /// -- gleiche Praezedenz wie die `gate_b_*`-Tests im Worktree.
+    #[test]
+    #[ignore]
+    fn sync_only_repeatability_after_rng_split() {
+        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let model_path = model_path.to_str().unwrap();
+        let Ok(net) = Net::load_auto(model_path) else {
+            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
+            return;
+        };
+
+        fn play(net: &Net, seed: u64) -> Vec<Value> {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let names = ["Netz".to_string(), "Netz".to_string()];
+            play_net_self_play_game(
+                net, 60, crate::net_mcts::DEFAULT_C_PUCT, ids, names, 0, "gate_b_repro", &mut rng,
+                true, false, true, None, None, 0, seed,
+            )
+        }
+
+        // Spielgeschehen-Teilmenge: additive Trainingsziele ohne Rueckwirkung
+        // auf den gespielten Zug entfernt (siehe Funktionskommentar).
+        fn strip_labels(records: &[Value]) -> Vec<Value> {
+            records
+                .iter()
+                .map(|r| {
+                    let mut m = r.as_object().cloned().unwrap_or_default();
+                    m.remove("round_transition_value");
+                    m.remove("bootstrap_value");
+                    Value::Object(m)
+                })
+                .collect()
+        }
+
+        let n_repeats = 4usize;
+        let seed = 424242u64;
+        let mut full_mismatches = 0usize;
+        let mut spielgeschehen_mismatches = 0usize;
+        for i in 0..n_repeats {
+            let a = play(&net, seed);
+            let b = play(&net, seed);
+            if a != b {
+                full_mismatches += 1;
+            }
+            if strip_labels(&a) != strip_labels(&b) {
+                spielgeschehen_mismatches += 1;
+                eprintln!("  Wiederholung {i}: SPIELGESCHEHEN weicht ab (nicht nur Label-Felder)");
+            }
+        }
+        eprintln!(
+            "sync_only_repeatability_after_rng_split: {spielgeschehen_mismatches}/{n_repeats} \
+             Spielgeschehen-Abweichungen, {full_mismatches}/{n_repeats} volle Abweichungen \
+             (letztere duerfen an der bekannten Wall-Clock-Komponente/Task #71 haengen)."
+        );
+        assert_eq!(
+            spielgeschehen_mismatches, 0,
+            "Sync-gegen-sich-selbst weicht im SPIELGESCHEHEN ab -- der Such-RNG-Schnitt \
+             (PREREG_such_rng_trennen.md) behebt die im wt_async-Befund dokumentierte \
+             Instabilitaet nicht (oder nicht vollstaendig)"
+        );
     }
 
     /// Task #88 (Hybrid-Suche, kausaler Kopf-Test) -- End-zu-End-Paritaetstest

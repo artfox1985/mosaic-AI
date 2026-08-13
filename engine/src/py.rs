@@ -61,6 +61,16 @@ pub struct PyGame {
     net: Option<Net>,
     /// Pfad des zuletzt geladenen Netzes — verhindert Neu-Laden bei jedem Zug.
     net_path: Option<String>,
+    /// PREREG_such_rng_trennen.md: fortlaufender Zaehler ECHTER KI-Such-
+    /// Entscheide (`ai_drafting_step`/`ai_drafting_net_step`), NICHT der
+    /// reinen Debug-Endpunkte (`debug_rng` oben ist dafuer schon vom
+    /// Partie-RNG entkoppelt, siehe dortiger Kommentar). Zusammen mit
+    /// `seed` baut jeder echte Such-Zug daraus einen EIGENEN RNG
+    /// (`net_mcts::derive_search_seed`) statt `self.rng` zu verbrauchen --
+    /// `self.rng` verschiebt sich dann nur noch durch echte
+    /// Zustands-Ereignisse (`PyGame::new`, `end_tiling`/`ai_tiling_step`s
+    /// `EndTiling`), unabhaengig von `simulations`.
+    move_seq: u64,
 }
 
 #[pymethods]
@@ -80,7 +90,7 @@ impl PyGame {
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
         PyGame {
             game, rng, seed, first_player, scoring_confirmed: false,
-            net: None, net_path: None,
+            net: None, net_path: None, move_seq: 0,
         }
     }
 
@@ -551,11 +561,17 @@ impl PyGame {
         } else {
             let sims = dynamic_sims(simulations, actions.len());
             let logger = if log { Some(&mut lines) } else { None };
+            // PREREG_such_rng_trennen.md: eigener, aus (seed, move_seq)
+            // abgeleiteter RNG statt `self.rng` -- siehe Feld-Kommentar an
+            // `PyGame::move_seq`. `self.rng` bleibt dadurch nur noch durch
+            // echte Zustands-Ereignisse belegt, unabhaengig von `simulations`.
+            self.move_seq += 1;
+            let mut search_rng = StdRng::seed_from_u64(net_mcts::derive_search_seed(self.seed, self.move_seq));
             let (chosen, a) = search_with_tree(
                 &self.game.state,
                 sims,
                 AI_C,
-                &mut self.rng,
+                &mut search_rng,
                 AI_TREE_DEPTH,
                 AI_TREE_TOPK,
                 logger,
@@ -636,8 +652,12 @@ impl PyGame {
         let sims = net_mcts::net_effective_sims(simulations, actions.len());
         let mut lines: Vec<String> = Vec::new();
         let logger = if log { Some(&mut lines) } else { None };
+        // PREREG_such_rng_trennen.md: siehe `ai_drafting_step`-Kommentar --
+        // eigener RNG statt `self.rng`.
+        self.move_seq += 1;
+        let mut search_rng = StdRng::seed_from_u64(net_mcts::derive_search_seed(self.seed, self.move_seq));
         let (chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut self.rng, logger, true);
+            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut search_rng, logger, true);
         let a = match chosen {
             Some(a) => a,
             None => {

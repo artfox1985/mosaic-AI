@@ -1126,6 +1126,34 @@ pub fn partie_gewicht_aus_seed(seed: u64, max: f64) -> f64 {
     max * ((z % 1_000_000) as f64 / 999_999.0)
 }
 
+/// PREREG_such_rng_trennen.md: Such-RNG von der Partie trennen. Leitet einen
+/// EIGENEN, deterministischen Seed fuer EINE Such-/Entscheidungs-Episode aus
+/// `(game_seed, move_index)` ab -- Praezedenz `partie_gewicht_aus_seed` oben
+/// (gleicher SplitMix64-Finalizer), hier zweistufig, weil ZWEI Eingaben statt
+/// einer gemischt werden muessen: erst `game_seed` durch den Finalizer, dann
+/// `move_index` addiert und NOCHMAL durch den Finalizer -- eine simple
+/// Summe/XOR beider Werte waere bei benachbarten `move_index`-Werten
+/// (0,1,2,...) nur eine Treppe in den unteren Bits, keine echte Streuung.
+///
+/// Aufrufer (self_play.rs/py.rs, siehe dortige Kommentare) bauen daraus
+/// `StdRng::seed_from_u64(derive_search_seed(...))` und geben DIESE Instanz
+/// an die Suche/Entscheidungs-Sampling weiter -- NICHT mehr den echten
+/// Partie-RNG. Der Partie-RNG selbst wird dadurch nur noch durch ECHTE
+/// Spielzustands-Ereignisse (`Game::start`, `Bag::refill_from_tower` über
+/// `apply_tiling`s `EndTiling`) verbraucht, deren Haeufigkeit NICHT von der
+/// Suchtiefe (sims) abhaengt -- das ist der Kern des Schnitts (Prereg §2/§5).
+pub fn derive_search_seed(game_seed: u64, move_index: u64) -> u64 {
+    let mut z = game_seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    z = z.wrapping_add(move_index.wrapping_add(0x9E37_79B9_7F4A_7C15));
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    z
+}
+
 /// `MOSAIC_WERTUNG_SHAPING_W` als **acht Werte, einer JE KRITERIUM** -- gleiches
 /// Format und gleiche Haerte wie `wertung_shaping_alphas` (1 Wert gilt fuer alle;
 /// falsche Laenge wird VERWORFEN, nicht teilgelesen).
@@ -4876,6 +4904,24 @@ mod tests {
 
     fn names() -> [String; 2] {
         ["P1".into(), "P2".into()]
+    }
+
+    /// PREREG_such_rng_trennen.md §5-Vorlauf: `derive_search_seed` selbst muss
+    /// (a) deterministisch sein (gleiche Eingaben -> gleicher Seed) und (b)
+    /// unterschiedliche `move_index`-Werte auf unterschiedliche Seeds
+    /// streuen (keine Treppe in den unteren Bits, siehe Funktionskommentar).
+    #[test]
+    fn derive_search_seed_is_deterministic_and_spreads_move_index() {
+        assert_eq!(derive_search_seed(42, 0), derive_search_seed(42, 0));
+        assert_eq!(derive_search_seed(42, 7), derive_search_seed(42, 7));
+        let s0 = derive_search_seed(42, 0);
+        let s1 = derive_search_seed(42, 1);
+        let s2 = derive_search_seed(42, 2);
+        assert_ne!(s0, s1);
+        assert_ne!(s1, s2);
+        assert_ne!(s0, s2);
+        // Verschiedene game_seed bei gleichem move_index ebenfalls verschieden.
+        assert_ne!(derive_search_seed(42, 3), derive_search_seed(43, 3));
     }
 
     /// TEIL E, NETZ-Haelfte (`PREREG_zufallsknoten.md`): schlaegt der GELERNTE
