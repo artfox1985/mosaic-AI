@@ -1301,3 +1301,131 @@ die Richtung hielt NICHT.
   Aequivalenztest.
 - **Frische Seeds 70-89 statt einer Zufallsziehung** -- einfachste
   nachvollziehbare Wahl ohne jede Optimierungsmoeglichkeit nach Ergebnis.
+
+
+---
+
+## 17. SPECIAL-REPLIKATION (FINAL) + (c)-BLOCKER-URSACHEN-DIAGNOSE (2026-08-13)
+
+Koordinator-Auftrag im Anschluss an §16: (1) den Special-Befund (p=0,083,
+n=20) NICHT als Nullbefund verwerfen, sondern auf 20 unabhaengigen frischen
+Seeds replizieren und gepoolt (n=40) final entscheiden; (2) den jetzt
+groessten Restblocker (c_vorzug_griff_nicht, 80 % auf dem Special-Arm)
+ursachen-klassifizieren, ERST danach ggf. gezielt eingreifen.
+
+### (1) Special-Replikation: 20 FRISCHE Seeds (90-109, unabhaengig von 70-89)
+
+Eigene Wahl (markiert): naechster unbenutzter Block nach den Jackpot-Replik-
+Seeds (70-89) -- wieder ohne Auswahl nach Ergebnis. Aufbau identisch zu §16(2).
+Ergebnis: `evaluations/paired_arena_env_special_r17_fresh.json` (GEPRUEFT
+vollstaendig: n=20 auf beiden Seiten, kein Teillauf).
+
+| Groesse | A (Special aus) | Special AN |
+| --- | ---: | ---: |
+| Vertikale Plattenpunkte Ø | 1,40 | 1,75 |
+| Siege | 15/20 | 14/20 |
+
+Gepaartes Delta auf den frischen Seeds: **+0,35** (t=0,567, einzeln nicht
+signifikant). Richtung bleibt POSITIV (wie in §16), aber kleiner als auf den
+k1-Seeds (+1,05).
+
+**Gepoolt ueber beide Seed-Saetze** (k1 aus §16 + frisch, n=40, exakt
+nachgerechnet per Inkomplette-Beta-Funktion):
+
+| Groesse | Wert |
+| --- | ---: |
+| Gepaartes Delta (Mittel) | **+0,70** |
+| t (df=39) | 1,669 |
+| **p (zweiseitig)** | **0,103** |
+| Siege gesamt (A / Special, von 40) | 30 / 30 |
+| McNemar (gepoolt, exakt) | b=4, c=4, p=1,000 |
+
+**Entscheidung (final, nach Vorab-Regel): Special-Baustein wird NICHT
+uebernommen.** p=0,103 liegt oberhalb der 0,05-Schwelle -- die Richtung ist in
+BEIDEN Seed-Saetzen positiv (+1,05 und +0,35), aber die Staerke reicht bei
+n=40 nicht fuer Signifikanz. Die Sieg-Bedingung ist erfuellt (30/40 beide,
+kein Verlust), aendert an der ersten Bedingung aber nichts. `MOSAIC_
+SPALTENBAU_SPECIAL` bleibt Default AUS, Code bleibt als Diagnose-Knopf im
+Repo. **Das ist jetzt der finale Befund** -- keine weitere Replikation
+vorgesehen (Vorab-Regel war zweistufig, nicht mehrstufig).
+
+### (2) (c)-Blocker-Ursachen-Diagnose: [SB]-Trace-Auswertung, kein Umbau ins Blaue
+
+Bester Arm = Special AN (höchster Mittelwert trotz (1), 20 k1-Seeds,
+`evaluations/paired_arena_env_special_r16_k1.json`). Methode: `blocker_split_
+abcd.py` (Scratch) erweitert -- fuer jeden bereits klassifizierten
+`c_vorzug_griff_nicht`-Fall (den FRUeHESTEN Moment, an dem die geforderte
+Farbe X verfuegbar UND die Zeile offen war, aber die tatsaechliche Aktion
+nicht (X, Zeile) traf) wird zusaetzlich aus der SELBEN [SB]-Zeile gelesen,
+welche Zielspalte zu dem Zeitpunkt aktiv war (`Ziel=`) und ob `vorzugszug_
+fuer_spalte` selbst einen Kandidaten hatte (`Vorzug=ja/nein`) -- KEINE neue
+Instrumentierung, nur genauer gelesen, wie beauftragt.
+
+Klassifikation je Fall:
+- **c1 (Zielwahl war eine ANDERE Spalte)**: `Ziel=` an dieser Stelle
+  entspricht NICHT der spaeter tatsaechlich zur Mauer gewordenen Spalte --
+  die Kostenfunktion verfolgte zu diesem Zeitpunkt ein anderes Ziel.
+- **c3 (Vorzug wählte eine andere Zeile derselben Spalte)**: `Ziel=` WAR schon
+  die Mauer-Spalte und `vorzugszug_fuer_spalte` hatte einen Kandidaten
+  (`Vorzug=ja`), aber fuer eine ANDERE Zeile derselben Spalte (die interne
+  Knappheits-/Vollste-Reihe-Rangfolge aus §12 bevorzugte eine andere Zeile).
+- (c2/c4 aus dem Auftrag -- Netz-Prior ueberstimmt den Vorzug bzw. kein
+  Kandidat trotz Verfuegbarkeit -- **0 Faelle**, siehe (3).)
+
+| Ursache | Anzahl | Anteil |
+| --- | ---: | ---: |
+| c1: Zielwahl war eine andere Spalte | 8 | **66,7 %** |
+| c3: Vorzug waehlte andere Zeile derselben Spalte | 4 | **33,3 %** |
+| c2: Vorzug empfahl r_open, Aktion widersprach trotzdem | 0 | 0 % |
+| c4: kein Vorzugskandidat trotz Verfuegbarkeit | 0 | 0 % |
+
+n=12 (c_vorzug_griff_nicht-Faelle ueber 20 Partien). **Auffaellig: ALLE 12
+Faelle liegen in Runde 1.** Wortlaut-Beispiel (Seed 6, Zeile 3 der Spalte 4):
+Tuerkis war in Runde 1 im Angebot und Zeile 3 offen, aber `Ziel=0` (nicht 4)
+zu diesem Zeitpunkt -- die Partie zielte da noch auf Spalte 0.
+
+### (3) Deutung -- und warum HIER kein Eingriff gebaut wird
+
+c1 dominiert (66,7 %), und ALLE Faelle (c1 wie c3) liegen ausschliesslich in
+Runde 1: Frueh im Spiel, wenn Kosten zwischen Spalten noch fast identisch
+sind (leeres/kaum belegtes Brett), wechselt das Ziel zwischen Entscheidungen
+haeufig, WEIL es das per Konstruktion darf (`waehle_spalte` ist bei jedem
+Aufruf frisch, keine Bindung -- siehe §14/§15). Genau diese Reaktions-
+faehigkeit war es aber, die §14s SPERRIGE Zielspalten-Bindung ("halte an der
+gewaehlten Spalte fest") in VIER vollen Messzyklen nachweislich verschlechtert
+hat (0,70-2,45 statt 5,95 vertikale Punkte, siehe §14(3)). Ein Eingriff gegen
+c1/c3 waere strukturell dieselbe Idee (Runde-1-Ziel fruehe stabilisieren/
+festhalten) mit demselben Risiko -- OHNE eine qualitativ neue Idee, die dieses
+Risiko vermeidet, waere ein weiterer Bau ein Umbau ins Blaue trotz stehender
+Ursache, nicht wegen fehlender Ursache.
+
+Zusaetzlich: n=12 ist klein (eine Partie kann mehrere Faelle liefern, aber
+nur 8 von 20 Partien hatten ueberhaupt eine Mauer-Spalte in diesem Arm) --
+selbst eine ueberzeugende Idee wuerde eine 20-Seed-Messung mit betraechtlichem
+Rauschen treffen (siehe §16/§17(1)s eigene p-Werte als Kalibrierung: n=20-40
+loest Effekte dieser Groessenordnung nicht zuverlaessig auf).
+
+**Entscheidung (gedeckt durch die Koordinator-Vorgabe "budget eng ->
+Diagnose-Tabelle ohne Eingriff"): Teil 2 liefert die Ursachen-Tabelle in (2),
+KEIN Eingriff gebaut.** Kein Diagnose-Knopf, kein Rust-Code-Aenderung, keine
+neue Messung in diesem Abschnitt noetig -- `git status` zeigt `engine/`
+unveraendert seit Commit `3b0c89d`, Wheel/Parity/`cargo test` aus §16 bleiben
+gueltig.
+
+### (4) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
+
+- **Kein Eingriff fuer c1/c3 gebaut** -- explizit durch die Koordinator-Vorgabe
+  gedeckte Wahl bei knappem Budget, zusaetzlich in (3) inhaltlich begruendet
+  (dieselbe Risikoklasse wie die gescheiterte §14-Stur-Bindung).
+  Empfehlung fuer eine SPAeTERE Sitzung mit mehr Budget: falls eine
+  qualitativ neue Idee entsteht (z.B. eine Bindung, die NUR in Runde 1 UND
+  NUR bei echtem Kosten-Gleichstand greift, statt bei jedem Kostenunterschied
+  wie §14s Fassungen), waere das der naechste testbare Kandidat -- ungeprueft,
+  nur als Hinweis vermerkt.
+- **c2/c4 mit 0 Faellen nicht weiter untersucht** -- bei n=12 ist das kein
+  Beleg fuer "kommt nie vor", nur dafuer, dass es in DIESER Stichprobe nicht
+  auftrat.
+- **Sub-Klassifikation ohne neue Rust-Instrumentierung**, nur per Nachlesen
+  bereits vorhandener [SB]-Felder (`Ziel=`, `Vorzug=`) -- wie beauftragt
+  ("KEINE Umbauten ins Blaue", hier gelesen als "keine neue Messung, bevor
+  die Ursache steht").
