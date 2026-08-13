@@ -1,7 +1,7 @@
 """
 tools/check_conventions.py -- Konventions-Linter (Baustein A5).
 
-Siehe evaluations/DESIGN_konventionen_als_pruefungen.md, Abschnitt
+Siehe evaluations/DESIGN_conventions_as_checks.md, Abschnitt
 "A5 Konventions-Linter" fuer die Herleitung. Laeuft im `pre-commit`-Haken
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
@@ -13,7 +13,7 @@ Vier Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg):
   2. Doku-Sprachkonvention    -- README.md englisch, STATUS.md/history.md
                                   deutsch (Stopwort-Mehrheit, grosszuegig).
   3. Keine neuen `#NN`        -- jede `Task #NN` muss in
-                                  evaluations/TASK_NUMMERN_REGISTRATUR.md
+                                  evaluations/TASK_NUMBER_REGISTRY.md
                                   als bekannte Nummer stehen (Serie ist seit
                                   2026-08-09 geschlossen, siehe dort).
   4. Prereg-Index-Konsistenz  -- evaluations/PREREG_*.md <-> PREREG_INDEX.md
@@ -41,7 +41,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SIZE_BASELINE_PATH = REPO_ROOT / "tools" / "size_baseline.json"
-TASK_REGISTRY_PATH = REPO_ROOT / "evaluations" / "TASK_NUMMERN_REGISTRATUR.md"
+TASK_REGISTRY_PATH = REPO_ROOT / "evaluations" / "TASK_NUMBER_REGISTRY.md"
 PREREG_INDEX_PATH = REPO_ROOT / "evaluations" / "PREREG_INDEX.md"
 PREREG_DIR = REPO_ROOT / "evaluations"
 
@@ -253,7 +253,7 @@ def check_doc_language(staged_only: bool, staged_files: set[str]) -> list[str]:
 # Kandidat. Das ist bewusst ENGER als der blosse Fund von "#\d+[a-z]?" irgendwo im Text --
 # genau dieses engere Muster ist es, das echte Task-Referenzen im Bestand von Farbcodes
 # (#003366), Markdown-Anker-Links ([...](#42-abschnitt)) und blossen Zahlen in Kommentaren/
-# Partie-Logs unterscheidet (siehe TASK_NUMMERN_REGISTRATUR.md, Abschnitt "Filter-Verfahren" /
+# Partie-Logs unterscheidet (siehe TASK_NUMBER_REGISTRY.md, Abschnitt "Filter-Verfahren" /
 # "Verworfen"). Zusaetzlich auf 1-2 Ziffern begrenzt: alle bisher vergebenen Nummern liegen
 # zwischen 5 und 99 -- das schliesst nebenbei auch lange externe Referenzen (GitHub-Issues wie
 # #1480) und rein numerische Hex-Farben (#123456) aus. Bei mehr als 99 Nummern muesste diese
@@ -277,7 +277,7 @@ WHOLE_REPO_SCAN_GLOBS = [
     "tools/*.py",
 ]
 
-# #99 ist dokumentiert (TASK_NUMMERN_REGISTRATUR.md, Abschnitt "REPARATUR 2026-08-09": der
+# #99 ist dokumentiert (TASK_NUMBER_REGISTRY.md, Abschnitt "REPARATUR 2026-08-09": der
 # Rust-Block in engine/src/tiling_solver.rs wurde dorthin umnummeriert), steht aber nicht als
 # eigene Zeile in der Hauptregistratur-Tabelle. Bei weiteren Reparaturen dieser Art hier ergaenzen.
 KNOWN_TASK_NUMBERS_OUTSIDE_TABLE = {"99"}
@@ -314,7 +314,7 @@ def check_no_new_task_numbers(staged_only: bool, staged_files: set[str]) -> list
 
     violations = []
     for rel in targets:
-        if rel == "evaluations/TASK_NUMMERN_REGISTRATUR.md":
+        if rel == "evaluations/TASK_NUMBER_REGISTRY.md":
             continue  # die Registratur selbst dokumentiert Alt-Nummern -- kein Fund, keine Pruefung
         if staged_only:
             text = get_staged_content(rel)
@@ -332,7 +332,7 @@ def check_no_new_task_numbers(staged_only: bool, staged_files: set[str]) -> list
             line_no = text.count("\n", 0, m.start()) + 1
             violations.append(
                 f"REGEL 3 (Keine neuen #NN): {rel}:{line_no} verwendet `Task #{token}`, das in "
-                "evaluations/TASK_NUMMERN_REGISTRATUR.md nicht als bekannte Nummer vorkommt.\n"
+                "evaluations/TASK_NUMBER_REGISTRY.md nicht als bekannte Nummer vorkommt.\n"
                 "  Konsequenz: die #NN-Serie ist seit 2026-08-09 geschlossen (siehe Registratur-Kopf / "
                 "PREREG_INDEX.md Abschnitt NAMENSKONVENTION) -- eine neue Nummer hier kann eine Luecke "
                 "belegen, die absichtlich frei ist, oder eine Doppelbelegung wie den historischen "
@@ -382,7 +382,7 @@ def check_prereg_index_consistency(staged_only: bool, staged_files: set[str]) ->
             "genau das Problem, das der Index laut seinem eigenen Kopf beheben sollte.\n"
             "  Ausweg: pro Datei eine Zeile in OFFEN/ENTSCHIEDEN/UEBERHOLT ergaenzen (Frage + "
             "Belegstelle) und den Zaehler in der jeweiligen Abschnitts-Ueberschrift um 1 erhoehen. Ist "
-            "eine Datei absichtlich (noch) ausgenommen (wie aktuell PREREG_v22_fenster.md laut "
+            "eine Datei absichtlich (noch) ausgenommen (wie aktuell PREREG_v22_window.md laut "
             "Kopf-Hinweis in PREREG_INDEX.md), dies im Kopf der Index-Datei explizit vermerken statt "
             "sie kommentarlos wegzulassen."
         )
@@ -418,7 +418,7 @@ def check_prereg_index_consistency(staged_only: bool, staged_files: set[str]) ->
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Konventions-Linter (A5) -- siehe evaluations/DESIGN_konventionen_als_pruefungen.md"
+        description="Konventions-Linter (A5) -- siehe evaluations/DESIGN_conventions_as_checks.md"
     )
     parser.add_argument("--staged", action="store_true", help="nur gestagte Dateien pruefen (Hook-Modus)")
     parser.add_argument(

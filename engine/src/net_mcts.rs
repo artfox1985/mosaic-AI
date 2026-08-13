@@ -406,7 +406,7 @@ pub fn floor_shaping_weight() -> f64 {
 }
 
 /// Default der Gegner-Gewichtung fuer das Floor-Shaping (Eskalationsstufe
-/// E2, `evaluations/PREREG_aggression_stilmessung.md`) -- `1.0` = der
+/// E2, `evaluations/PREREG_aggression_style_measurement.md`) -- `1.0` = der
 /// GEGNER-Anteil (`opp`) fliesst genauso stark ein wie der EIGENE Anteil
 /// (`own`), exakt das bisherige, arena-verifizierte Verhalten.
 pub const FLOOR_SHAPING_OPP_BIAS: f64 = 1.0;
@@ -710,7 +710,7 @@ fn determinize_hidden_information<R: Rng + ?Sized>(state: &mut GameState, rng: &
 pub const NUM_DETERMINIZATIONS: usize = 1;
 
 /// Laufzeit-Wert der ISMCTS-Mehrfach-Determinisierung `k`
-/// (PREREG_ismcts_determinisierungen.md) via `MOSAIC_NUM_DETERMINIZATIONS` --
+/// (PREREG_ismcts_determinizations.md) via `MOSAIC_NUM_DETERMINIZATIONS` --
 /// ueberschreibt die Konstante [`NUM_DETERMINIZATIONS`] oben (bleibt als
 /// Default-Quelle stehen, siehe deren GETESTET-Absatz: `k=1` ist der
 /// arena-belegte Standard). Einmalig gelesen (OnceLock, #30-Muster wie
@@ -894,7 +894,7 @@ fn floor_penalties(state: &GameState) -> (f64, f64) {
     (mine, theirs)
 }
 
-/// Eskalationsstufe E2 (`evaluations/PREREG_aggression_stilmessung.md`,
+/// Eskalationsstufe E2 (`evaluations/PREREG_aggression_style_measurement.md`,
 /// `MOSAIC_FLOOR_SHAPING_OPP_BIAS`): verallgemeinert `floor_shaping_delta`
 /// von der festen Spieler0-minus-Spieler1-Differenz auf eine EGO-
 /// perspektivische, asymmetrisch gewichtete Fassung:
@@ -1126,7 +1126,7 @@ pub fn partie_gewicht_aus_seed(seed: u64, max: f64) -> f64 {
     max * ((z % 1_000_000) as f64 / 999_999.0)
 }
 
-/// PREREG_such_rng_trennen.md: Such-RNG von der Partie trennen. Leitet einen
+/// PREREG_search_rng_split.md: Such-RNG von der Partie trennen. Leitet einen
 /// EIGENEN, deterministischen Seed fuer EINE Such-/Entscheidungs-Episode aus
 /// `(game_seed, move_index)` ab -- Praezedenz `partie_gewicht_aus_seed` oben
 /// (gleicher SplitMix64-Finalizer), hier zweistufig, weil ZWEI Eingaben statt
@@ -1278,7 +1278,7 @@ pub fn wertung_floor_weight() -> f64 {
 ///
 /// Warum meine beiden Eigenbauten (`MOSAIC_ENDAWARE_W`/`tiling_vorausschau`,
 /// `MOSAIC_MUSTERREIHEN_W`/`crate::scoring::musterreihen_fortschritt`) INZWISCHEN
-/// entfernt sind (2026-08-13, PREREG_injektion_wertungsplatten.md Abschnitt N7):
+/// entfernt sind (2026-08-13, PREREG_scoring_plate_injection.md Abschnitt N7):
 /// gemessen taten sie nichts. `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte
 /// (t=-0,07), bei w=0,3 -2,16 (t=-1,21) ohne jeden Plattengewinn;
 /// `MOSAIC_MUSTERREIHEN_W` bei w=0,1 -0,84 (t=-0,69). Dieser Traeger hier blieb
@@ -1644,7 +1644,7 @@ struct Node {
     /// des an DIESEM Knoten ziehenden Spielers, nicht zwingend der Wurzel-
     /// Gegner, siehe `opp_points_forecast_from_root_perspective`).
     opp_points_forecast: Option<f32>,
-    /// PREREG_punktekopf_platten.md (Stufe 2): roher `value_head`-Tanh-
+    /// PREREG_points_head_plates.md (Stufe 2): roher `value_head`-Tanh-
     /// Output dieses Knotens (ego-perspektivisch bzgl. `state.current_player`,
     /// VOR jeder Blend-/Shrink-/Floor-/Plate-Shaping-Korrektur) -- exakt
     /// derselbe Rohwert, der in `node_from_net_outputs` ohnehin für
@@ -2345,7 +2345,7 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         // hier zusaetzlich abgelegt statt verworfen (kein Zusatz-Forward-Pass).
         points_forecast: points.first().copied(),
         opp_points_forecast: opp_points.first().copied(),
-        // PREREG_punktekopf_platten.md (Stufe 2): `value` wurde oben bereits
+        // PREREG_points_head_plates.md (Stufe 2): `value` wurde oben bereits
         // für `blended_leaf_win_prob` gelesen (siehe `leaf_value`-Berechnung) --
         // hier zusätzlich abgelegt statt verworfen, exakt dasselbe Muster wie
         // `points_forecast`/`opp_points_forecast` (kein Zusatz-Forward-Pass).
@@ -2474,7 +2474,7 @@ fn gumbel_top_m_override() -> Option<usize> {
 }
 
 /// τ-Annealing-Schwelle fuer den SELF-PLAY-Zugwahl-Pfad via
-/// `MOSAIC_TAU_ARGMAX_FROM_MOVE` (`evaluations/PREREG_suchpfad_nachmessungen.md`,
+/// `MOSAIC_TAU_ARGMAX_FROM_MOVE` (`evaluations/PREREG_search_path_remeasurements.md`,
 /// Messung 3 -- "fruehe Zuege τ=1 (Sampling, Bestandsverhalten), ab einem
 /// Schwellen-Zug argmax"). `0`/nicht gesetzt/nicht parsbar = `None` = AUS
 /// (Bestandsverhalten: die GANZE Partie wird weiterhin proportional zur
@@ -3266,7 +3266,7 @@ pub struct GumbelPhaseCandidate {
     pub sigma_q: f64,
     pub score: f64,
     pub eliminated: bool,
-    /// PREREG_punktekopf_platten.md (Stufe 2): Netz-Kopf-Ausgaben AM
+    /// PREREG_points_head_plates.md (Stufe 2): Netz-Kopf-Ausgaben AM
     /// KINDZUSTAND dieses Kandidaten (`Node::raw_value`/`points_forecast`/
     /// `opp_points_forecast`) -- der Suchlauf hat diesen Knoten an dieser
     /// Stelle bereits mindestens einmal besucht/expandiert (Sequential-
@@ -3321,7 +3321,7 @@ pub struct GumbelFinalist {
     pub ln_prior: f64,
     pub sigma_q: f64,
     pub score: f64,
-    /// PREREG_punktekopf_platten.md (Stufe 2): wie
+    /// PREREG_points_head_plates.md (Stufe 2): wie
     /// `GumbelPhaseCandidate::raw_value`/`points_forecast`/
     /// `opp_points_forecast`, hier für den bereits expandierten
     /// Wurzelkind-Knoten (`nodes[cid]`) dieses Finalisten -- reiner
@@ -3845,7 +3845,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     let score = g + (*prior as f64).max(1e-9).ln() + sigma_q;
                     let description =
                         label_search_move(&SearchMove::Draft(act.clone()), Some(&nodes[0].state)).1;
-                    // PREREG_punktekopf_platten.md (Stufe 2): Netz-Kopf-
+                    // PREREG_points_head_plates.md (Stufe 2): Netz-Kopf-
                     // Ausgaben am bereits expandierten Kindzustand -- `None`
                     // nur bei wiederholt fehlgeschlagener Expansion (siehe
                     // `GumbelPhaseCandidate::raw_value`-Kommentar).
@@ -3908,7 +3908,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     ln_prior,
                     sigma_q,
                     score: ln_prior + sigma_q,
-                    // PREREG_punktekopf_platten.md (Stufe 2): reiner
+                    // PREREG_points_head_plates.md (Stufe 2): reiner
                     // Lesezugriff auf den bereits expandierten Knoten.
                     raw_value: nodes[cid].raw_value,
                     points_forecast: nodes[cid].points_forecast,
@@ -4146,11 +4146,11 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // dort ist exakt (optimales Tiling + Endwertung des erreichten Bretts),
     // was das Netz nur schaetzen kann. Dass das die bessere Wahl IST, war nie
     // gegatet: siehe `round5::net_solver_enabled` fuer den Knopf und
-    // `PREREG_zufallsknoten.md` Teil E fuer die offene Gegenprobe.
+    // `PREREG_chance_nodes.md` Teil E fuer die offene Gegenprobe.
     if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action(state);
     }
-    // PREREG_ismcts_determinisierungen.md: Getter statt Konstante (siehe
+    // PREREG_ismcts_determinizations.md: Getter statt Konstante (siehe
     // `num_determinizations`-Doku) -- der `<= 1`-Kurzschluss bleibt exakt
     // erhalten, `k=1` (Default) ist weiterhin byte-identisch.
     let k = num_determinizations();
@@ -4587,7 +4587,7 @@ fn net_search_with_tree_from_nodes(
                 // Zugs, VOR jeder weiteren Suchvertiefung -- Divergenz zu
                 // `mcts_q` zeigt, wo die Suche vom Netz abweicht.
                 "net_leaf_value": node.leaf_value[node.player_who_acted],
-                // PREREG_punktekopf_platten.md (Stufe 2): rohe Netz-Kopf-
+                // PREREG_points_head_plates.md (Stufe 2): rohe Netz-Kopf-
                 // Ausgaben AM KINDZUSTAND `node` (dieselbe Ego-Perspektive
                 // wie `net_leaf_value` oben) -- `points_forecast`/
                 // `opp_points_forecast` waren bereits als `Node`-Felder da
@@ -4702,7 +4702,7 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
             .find(|&&c| nodes0[c].action.as_ref() == Some(a))
             .map(|&c| nodes0[c].leaf_value[nodes0[c].player_who_acted])
     };
-    // PREREG_punktekopf_platten.md (Stufe 2): wie `leaf_value_of` -- rohe
+    // PREREG_points_head_plates.md (Stufe 2): wie `leaf_value_of` -- rohe
     // Netz-Kopf-Ausgaben repräsentativ aus Welt 0, nur zur Schema-Parität mit
     // `net_search_with_tree_from_nodes` ergänzt (siehe `best_rotation_of`-
     // Kommentar, derselbe praktisch-unerreicht-Vorbehalt).
@@ -4810,7 +4810,7 @@ fn net_search_with_tree_from_forest(state: &GameState, sims: u32, forest: &[Vec<
         "gumbel_trace": Value::Null,
         "has_net": true,
         "simulations": sims,
-        // PREREG_ismcts_determinisierungen.md: `forest.len()` statt der
+        // PREREG_ismcts_determinizations.md: `forest.len()` statt der
         // Konstante/des Getters -- `build_determinized_forest` erzeugt IMMER
         // genau `forest.len()` Welten (siehe `split_sims_across_worlds`,
         // Laenge = `n.max(1)`), das ist hier die tatsaechlich verwendete
@@ -4906,7 +4906,7 @@ mod tests {
         ["P1".into(), "P2".into()]
     }
 
-    /// PREREG_such_rng_trennen.md §5-Vorlauf: `derive_search_seed` selbst muss
+    /// PREREG_search_rng_split.md §5-Vorlauf: `derive_search_seed` selbst muss
     /// (a) deterministisch sein (gleiche Eingaben -> gleicher Seed) und (b)
     /// unterschiedliche `move_index`-Werte auf unterschiedliche Seeds
     /// streuen (keine Treppe in den unteren Bits, siehe Funktionskommentar).
@@ -4924,7 +4924,7 @@ mod tests {
         assert_ne!(derive_search_seed(42, 3), derive_search_seed(43, 3));
     }
 
-    /// TEIL E, NETZ-Haelfte (`PREREG_zufallsknoten.md`): schlaegt der GELERNTE
+    /// TEIL E, NETZ-Haelfte (`PREREG_chance_nodes.md`): schlaegt der GELERNTE
     /// Blattwert den EXAKTEN in Runde 5? Dieselbe Skala wie die Loeser-Haelfte
     /// -- Uebereinstimmung mit einer tiefen Referenzsuche (20.000 Knoten), auf
     /// identischen Stellungen, weitergespielt mit der Orakel-Wahl.
@@ -5039,12 +5039,12 @@ mod tests {
 
     #[test]
     fn env_knoepfe_defaults_sind_bestandsverhalten() {
-        // PREREG_suchpfad_nachmessungen: ohne gesetzte Env-Vars muessen
+        // PREREG_search_path_remeasurements: ohne gesetzte Env-Vars muessen
         // beide Laufzeit-Knoepfe exakt die bisherigen Konstanten liefern
         // (Paritaets-Bedingung; die Env-Vars sind in der Testumgebung
         // nicht gesetzt, OnceLock cached den Default).
         assert_eq!(floor_shaping_weight(), FLOOR_SHAPING_WEIGHT);
-        // E2 (PREREG_aggression_stilmessung.md, MOSAIC_FLOOR_SHAPING_OPP_BIAS):
+        // E2 (PREREG_aggression_style_measurement.md, MOSAIC_FLOOR_SHAPING_OPP_BIAS):
         // ungesetzt -> 1.0 -> alle Aufrufstellen nehmen den `opp_bias==1.0`-
         // Zweig, byte-identisch zum Bestand vor E2.
         assert_eq!(floor_shaping_opp_bias(), FLOOR_SHAPING_OPP_BIAS);
@@ -5064,7 +5064,7 @@ mod tests {
         // MIN_VISIT_FRAC` liefert den PREREG-Default 0.5 (nur wirksam, wenn z>0).
         assert_eq!(denial_uncert_z(), 0.0);
         assert_eq!(denial_min_visit_frac(), 0.5);
-        // ISMCTS-k (PREREG_ismcts_determinisierungen.md, MOSAIC_NUM_
+        // ISMCTS-k (PREREG_ismcts_determinizations.md, MOSAIC_NUM_
         // DETERMINIZATIONS): ungesetzt -> liefert exakt die Konstante
         // `NUM_DETERMINIZATIONS` (heute 1) -- alle vier Sucheinstiege bleiben
         // im `<= 1`-Einzelbaum-Codepfad, byte-identisch zum Bestand.
@@ -5968,7 +5968,7 @@ mod tests {
     /// selbst (statt zu failen), falls die Datei lokal fehlt -- `models/`
     /// ist per `.gitignore` nicht Teil des Checkouts, ein frischer Klon
     /// haette also sonst einen harten Testfehler ohne jeden eigenen Fehler.
-    /// Teil-2-Sonde zu `evaluations/PREREG_gpu_verlagerung.md`: **wie viele
+    /// Teil-2-Sonde zu `evaluations/PREREG_gpu_offloading.md`: **wie viele
     /// Blaetter je Sekunde kann die CPU erzeugen, wenn die Inferenz nichts
     /// mehr kostet?** Diese Zahl setzt den erreichbaren Batch (Little:
     /// Batch = Erzeugungsrate x GPU-Latenz) und war bisher ungemessen --

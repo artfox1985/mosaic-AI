@@ -17,7 +17,7 @@ Spezialpunkte-Korrektur, methodische Lehren) liegt in `../archive/history.md`,
 Kapitel "2026-08-11/13: Wertungsplatten-Nacht, GPU-Weg-B, Zwei-Pole". Verdikte
 vom 2026-08-10 selbst: Kapitel "2026-08-10" davor im selben Dokument.
 
-### NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie umgesetzt (PREREG_such_rng_trennen.md)
+### NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie umgesetzt (PREREG_search_rng_split.md)
 
 Vollstaendig umgesetzt, freigegeben durch Nutzer-Entscheidungen §8 der Prereg
 (Elo-Sprung wird nur vermerkt, Basislinie neu gesetzt sobald der Hash bricht).
@@ -148,7 +148,7 @@ steht beim Nutzer aus (Ursachenzerlegung oder Weg B als erledigt einstufen).
 
 ### Such-RNG-Trennung: entscheidungsreif, NICHT gebaut
 
-`PREREG_such_rng_trennen.md` §8. Nutzer-Entscheide liegen vor: **Elo-Sprung wird
+`PREREG_search_rng_split.md` §8. Nutzer-Entscheide liegen vor: **Elo-Sprung wird
 nur vermerkt** (kein Neuverankern), Paritäts-Basislinie wird neu gesetzt und der
 alte Hash daneben dokumentiert. Umsetzung ausdrücklich NACH den laufenden
 Messvorhaben, weil sie die Vergleichsgrundlage verschiebt.
@@ -159,7 +159,7 @@ Messvorhaben, weil sie die Vergleichsgrundlage verschiebt.
 
 | Task                                          | Status                                                                                                                                                                                                                                                                                                                                                                            |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen. `PREREG_nach34_paket.md` |
+| **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: Validierung braucht arena-ENTSCHIEDENE Paare; die WDL-Aera hat bisher nur ~3 (v20>v19, E3-Arme signifikant schlechter) -- unter dem 6-Paar-Standard der Policy-Orakel-Validierung. Kandidaten-Metriken (Brier auf frozen_v2, R5-Steigung) werden ab jetzt je Gating MITGEFUEHRT; Verdikt, sobald >=6 entschiedene Paare vorliegen. `PREREG_post34_package.md` |
 | #31 / #38 / #39                               | geparkt (Arbeitskreis "Spaeter", Details unten)                                                                                                                                                                                                                                                                                                                                   |
 
 ### v22-FENSTER -- DESIGN AUF HALDE, NICHT EINGEPLANT
@@ -168,7 +168,7 @@ Messvorhaben, weil sie die Vergleichsgrundlage verschiebt.
 v21-Task-Queue abarbeiten.** Der Zuschnitt ist nur festgehalten, damit
 er spaeter nicht neu diskutiert werden muss.
 
-`PREREG_v22_fenster.md`: gleiche Form wie v21 (5.800 Policy / 23.650
+`PREREG_v22_window.md`: gleiche Form wie v21 (5.800 Policy / 23.650
 Value / 29.450 gesamt), alles altert eine Stufe. Juengster Value-Posten
 = **3.550 v19wdl-Rest (@600, vollstaendig) + 1.450 v19wdlsw** statt
 5.000 Schwarm -> Schwarm-Anteil bleibt bei 74% statt auf 89% zu
@@ -417,7 +417,7 @@ unveraendert:**
   2026-08-07 war **generationsspezifisch** (v20-Zyklus, weil dort eine
   lange Nebentask-Liste offen war) und **KEINE stehende Anweisung** --
   ich hatte sie faelschlich verallgemeinert (auch in
-  PREREG_v21_fenster.md, dort korrigiert).
+  PREREG_v21_window.md, dort korrigiert).
   **ERSETZUNG (frischer Batch desselben Generators + Rausrotieren einer
   Alt-Generation) ist VERWORFEN** -- Nutzer-Argument, und es ist
   richtig: das ist indirekt mehr Volumen vom SELBEN Champion, waehrend
@@ -552,7 +552,7 @@ unveraendert:**
 - **Aggressions-/Denial-Programm GESCHLOSSEN** (2026-08-07): alle
   Knoepfe auf Default (w=0, λ=0, ε=0, bias=1); "gate what you ship";
   Wiedervorlage nur mit messbar schaerferem opp-Kopf
-  (PREREG_aggression_stilmessung/PREREG_denial_tiebreak).
+  (PREREG_aggression_style_measurement/PREREG_denial_tiebreak).
 
 - **Heuristik-Anker-Parameterpaket: NICHT ANFASSEN** (definiert den
   Elo-Anker@200; jede Aenderung entwertet die Leiter).
@@ -566,7 +566,7 @@ unveraendert:**
   E15-Alt-Set-Vorsprung uebersetzt nicht in Staerke).
 
 - **Telemetrie-Stand Q-Skalierung/Sequential-Halving** (externes Review
-  R2 2026-08-09, `PREREG_prior_blindfleck.md`, Tasks E/F/G dazu
+  R2 2026-08-09, `PREREG_prior_blind_spot.md`, Tasks E/F/G dazu
   geschlossen -> history): Q-Skalierungs-Varianz ist JA protokolliert
   (`tools/gumbel_scale_calibration.py`), **Ueberlebensrate im
   Sequential Halving NEIN** -- vorhanden sind `root_child_q`,

@@ -201,7 +201,7 @@ fn fill_large_factory<R: Rng + ?Sized>(
 }
 
 /// Diagnose-Knopf fuer die Versorgungs-Deckenprobe, Default **aus**.
-/// Siehe `evaluations/PREREG_platzierungsseite.md` Abschnitt 10.
+/// Siehe `evaluations/PREREG_placement_side.md` Abschnitt 10.
 fn volle_versorgung() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {

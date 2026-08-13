@@ -8,7 +8,7 @@ dann einbauen gilt es noch anzusehen."*
 
 Der Kopf ERSETZT den zuvor diskutierten handgebauten
 Wahrscheinlichkeits-Term fuer Platte 6
-(`PREREG_punktekopf_platten.md`, Abschnitt "KANDIDAT"). Begruendung:
+(`PREREG_points_head_plates.md`, Abschnitt "KANDIDAT"). Begruendung:
 dieselbe Groesse wird gelernt statt geschaetzt, und ein Kopf erfasst
 Abhaengigkeiten, die eine Haeufigkeitstabelle ueber zwei
 Bedingungsgroessen nicht erfassen kann. Der handgebaute Term bleibt nur
@@ -477,7 +477,7 @@ ist -- die eigentlich informative Groesse.
 
 Die oben vorregistrierte Grundraten-Messung fuer Kriterium 6 hat eine
 unabhaengige Vorab-Evidenz, die mir beim Aufschreiben nicht praesent war:
-`watchlist_v20_zwischenlese.md` (10 Mensch-vs-Champion-Partien, Commit
+`watchlist_v20_interim_review.md` (10 Mensch-vs-Champion-Partien, Commit
 11dd012) hat genau diese Groesse schon gemessen, unter CHAMPION-Spiel:
 
 | | Mensch | KI (`v20_2d_opp_brierbest@400`) |

@@ -97,5 +97,5 @@ Block-Ebene, Fruehstopp-Replikationsregel).
   einen weiteren Rollout je Uebergang.
 - Keine Aenderung an `TD_LAMBDA` (entschieden: Sweep empfahl 0,7, die
   Arena verwarf es 30:70, λ=0,5 bleibt).
-- Keine Aenderung am v22-Fenster-Zuschnitt selbst (`PREREG_v22_fenster.md`
+- Keine Aenderung am v22-Fenster-Zuschnitt selbst (`PREREG_v22_window.md`
   bleibt gueltig; dieses Dokument ergaenzt nur eine Label-Option).

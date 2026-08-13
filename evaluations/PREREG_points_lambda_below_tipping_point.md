@@ -9,7 +9,7 @@ weil sonst ist 55 vs. 50 schlechter als 30 vs 15)"*.
 
 ## 1. Warum ein geschlossener Punkt wieder aufgeht
 
-`PREREG_punkte_blend_w.md` schloss `w>0` mit **Regel 2**: Kontrolle 321/400
+`PREREG_points_blend_w.md` schloss `w>0` mit **Regel 2**: Kontrolle 321/400
 (80,25 %) gegen Arm 300/400 (75,00 %), Block-Delta −5,25pp, t = −2,68.
 
 **Beide Arme liefen bei λ = 2,0** (dort dokumentiert: Kontrolle
@@ -105,7 +105,7 @@ den Gegner drückt. Deshalb je Arm zusätzlich:
 Drei getrennte Kanäle, drei getrennte Vorregistrierungen, **keine gemeinsamen
 Läufe**:
 
-- `MOSAIC_UNLOCK_SHAPING_W` — Spezialfelder (`PREREG_injektion_dosis.md`)
+- `MOSAIC_UNLOCK_SHAPING_W` — Spezialfelder (`PREREG_injection_dose.md`)
 - `MOSAIC_WERTUNG_SHAPING_W` — Wertungsplatten-Kriterien (eigene Prereg offen)
 - `MOSAIC_POINTS_UTILITY_W`/`AGGR_LAMBDA` — Basis/Platzierung, **diese Datei**
 
@@ -117,7 +117,7 @@ gleichzeitig zu drehen wäre nicht interpretierbar.
 
 - Keinen Champion-Wechsel (kein neuer Checkpoint).
 - Nicht die Frage, ob der `opp_points`-Kopf als **Hilfsziel** den Rumpf
-  verbessert (`PREREG_punktekopf_epsilon.md`, nie gemessen) — hier wird nur
+  verbessert (`PREREG_points_head_epsilon.md`, nie gemessen) — hier wird nur
   seine Laufzeit-Verwendung geprüft.
 - Nicht `VALUE_OPP_EPSILON`: bleibt 0 (Schema 20).
 

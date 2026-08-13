@@ -74,7 +74,7 @@ if opp_points.is_empty() { ... }              // <- wird nie erreicht
 
 **Beide Punkte-Köpfe werden berechnet und verworfen.** `w = 0` ist zweifach
 geschlossen: Aggressions-Neukartierung (alle Arme H0) und
-`PREREG_punkte_blend_w.md` heute (Kontrolle 321/400 gegen Arm 300/400,
+`PREREG_points_blend_w.md` heute (Kontrolle 321/400 gegen Arm 300/400,
 Block-Delta −5,25pp, t = −2,68).
 
 ### 4. Diese Änderung nimmt die letzte strukturelle Rolle
@@ -100,7 +100,7 @@ verglichen an `val_brier` und den arena-validierten Orakel-Metriken
 (Prior-Masse Top-3, Kendall-Tau). Bei H0 folgt er `ownership`.
 
 Nicht vergessen: der Kopf ist zugleich das **Instrument** aus
-`PREREG_punktekopf_platten.md` Stufe 2 (Tau-Median 0,640, stärker
+`PREREG_points_head_plates.md` Stufe 2 (Tau-Median 0,640, stärker
 plattendifferenzierend als der eigene Punkte-Kopf mit 0,792). Als
 Diagnose-Werkzeug hat er sich bezahlt — das ist aber kein Argument dafür, ihn
 in jedem Champion mitzuschleppen.

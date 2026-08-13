@@ -30,7 +30,7 @@ Drei Suiten, alle ohne Korpus und ohne GPU lauffaehig:
           `dome_grid` als "Space-fuer-Space EXAKT" dokumentiert (Test
           `end_scoring_from_state_is_exact_after_roundtrip`). Kein Korpus
           noetig, weil die 34 Labels auf dem Champion-/Self-Play-Korpus laut
-          `PREREG_plattenkopf.md` fuer viele Atome praktisch konstant 0 sind
+          `PREREG_plate_head.md` fuer viele Atome praktisch konstant 0 sind
           (Diagonalen, Spalte 1, Reihen 5/6, untere Eckslots) -- eine Pruefung
           dort liefe genau an den Stellen leer, an denen ein Fehler am
           ehesten unentdeckt bliebe. Die Bretter hier sind darum von Hand so

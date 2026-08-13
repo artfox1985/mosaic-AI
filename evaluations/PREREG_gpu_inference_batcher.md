@@ -18,7 +18,7 @@ Gegenteil:
 | Groesse | Wert | Quelle |
 |---|---|---|
 | Netz-Inferenz-Anteil an der Self-Play-Zeit | **62,0%** (3002 s, 1.314.962 Evals) | `archive/history.md:7427` |
-| dito, aktuelle Aera (v20-Kampagne, nach rtv-Abschaltung) | **~81%** | `PREREG_v20_kampagne.md:71` |
+| dito, aktuelle Aera (v20-Kampagne, nach rtv-Abschaltung) | **~81%** | `PREREG_v20_campaign.md:71` |
 | CPU-Durchsatz heute | ~1.600-3.200 Evals/s **je Thread** | `#81`, `archive/history.md:2293` |
 | GPU-Behauptung (torch-Benchmark, RTX 3060) | ~203.000 Evals/s **bei Batch 256** | ebenda |
 
@@ -124,7 +124,7 @@ schlaegt.
 Wandzeit mehr, weil die k Welten in EINEM Batch ausgewertet wuerden --
 dann muesste man das Sim-Budget nicht mehr aufteilen und bekaeme
 k-fache Vielfalt zu ~1x Kosten. Genau dieses Regime testet die gerade
-Trenn-Messung in `PREREG_ismcts_determinisierungen.md`
+Trenn-Messung in `PREREG_ismcts_determinizations.md`
 (k=2 bei ungeteilter Tiefe).
 
 **ERGEBNIS 2026-08-09: das Staerke-Motiv materialisiert sich NICHT.**
@@ -152,7 +152,7 @@ diesem Vorbehalt lesbar.
 
 Teil 1: ~15 min bei freier GPU. Teil 2: Dokumentation, kein Rechenbedarf.
 **Einplanung: im ersten freien GPU-Fenster nach dem Gewichts-Sweep**
-(`PREREG_task_d_gewichte.md`) -- eine Messung zwischen zwei Sweep-Armen
+(`PREREG_task_d_weights.md`) -- eine Messung zwischen zwei Sweep-Armen
 waere zwar zeitlich moeglich, verschiebt aber den Sweep und liefert bei
 konkurrierender Last ohnehin keine gueltige Zahl.
 
@@ -161,7 +161,7 @@ konkurrierender Last ohnehin keine gueltige Zahl.
 *"vielleicht in kombination mit dem bootstraping relevant"* -- richtig, und
 es aendert die REIHENFOLGE.
 
-`PREREG_bootstrap_horizont.md` haengt an einem Kostentor: Horizont 3 statt 2
+`PREREG_bootstrap_horizon.md` haengt an einem Kostentor: Horizont 3 statt 2
 braucht einen zweiten Rollout je Rundenuebergang und darf die Self-Play-Zeit
 um maximal +25% erhoehen. Dieser Rollout ist fast reine INFERENZ -- also
 genau die Groesse, die ein zentraler Batcher billiger macht (Inferenzanteil
@@ -225,7 +225,7 @@ Auswertung, und der ist ein eigenes, ungemessenes Vorhaben.
 ### Konsequenz fuer die Bootstrap-Kopplung
 
 Die oben festgehaltene Kopplung ist damit aufgeloest, und zwar zu Lasten des
-Horizonts: das Kostentor von `PREREG_bootstrap_horizont.md` bekommt **keine
+Horizonts: das Kostentor von `PREREG_bootstrap_horizon.md` bekommt **keine
 Entlastung**. Die +25%-Schwelle gilt unveraendert gegen den heutigen
 CPU-Durchsatz. Die vorgesehene Reihenfolge (Batcher VOR dem Kostentor) war
 richtig -- sie hat verhindert, dass der Horizont gegen eine Kostenannahme

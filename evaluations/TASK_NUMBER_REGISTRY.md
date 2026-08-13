@@ -47,7 +47,7 @@ Abschnitts-Header `## Task #NN: ...`).
 - `#0`, `#1`, `#9` in `evaluations/reference_game.md:11` ("Kuppelplatten
   im Display: #9, #0, #1") -- physische Spielplatten-IDs in einem
   Partie-Log, keine Task-Bezuege.
-- `#5`, `#6`, `#10` in `evaluations/watchlist_v20_zwischenlese.md:91`
+- `#5`, `#6`, `#10` in `evaluations/watchlist_v20_interim_review.md:91`
   ("...in 3 von 10 Partien aktiv (#5, #6, #10)") -- Partienummern
   innerhalb eines 10er-Testsets, keine Tasks.
 - `#1`, `#2` in `engine/src/net_mcts.rs:4707-4708` (Testkommentare
@@ -113,16 +113,16 @@ Teilen als A/B benannt.
 | 35 | Ranking-Loss-Vorlauf: `root_child_q`-Logging im Suchbaum (Engine-Seite) | entschieden -- Engine-Logging erledigt (Default AN) | `archive/history.md:9772`, `engine/src/self_play.rs:1959` |
 | 35b | Ranking-Loss-Trainingsarm auf Geschwister-Q (WDL-Aera) | entschieden -- GESCHLOSSEN 2026-08-08, Orakel-Vorpruefung negativ (Top-3-Masse 0,688 vs 0,710), kein Gating gefahren | `evaluations/PREREG_t35b_ranking.md:1`, `archive/history.md:10351` |
 | 36 | Saettigt der Value-Kopf über die Spielzahl (analog zur Policy)? | entschieden -- "spielhungrig" bestaetigt, monotone Verbesserung 202/405/810 Dateien, kein Saettigungs-Deckel | `archive/history.md:9554`, `archive/history.md:9965` |
-| 37 | Tiling-Auswahlkriterium: reines P(Sieg) statt `punkte * P(Sieg)`? | entschieden -- H0, GESCHLOSSEN (284 vs 292, p=0,33), Bestandskriterium bleibt | `archive/history.md:10218`, `evaluations/PREREG_t37_tiling_kriterium.md:31` |
+| 37 | Tiling-Auswahlkriterium: reines P(Sieg) statt `punkte * P(Sieg)`? | entschieden -- H0, GESCHLOSSEN (284 vs 292, p=0,33), Bestandskriterium bleibt | `archive/history.md:10218`, `evaluations/PREREG_t37_tiling_criterion.md:31` |
 | 38 | Moon-Head-Feinschliff (Loss-Gewicht des `moon_nll`-Terms, Label-Horizont) | offen -- geparkt (Arbeitskreis "Spaeter" mit #31), kein akuter Bedarf | `evaluations/STATUS.md:340` |
 | 39 | Startkuppel-Platzierung (Positions-/Rotations-Monotonie) | offen -- geparkt (Arbeitskreis "Spaeter" mit #31/#38); Kernbefund bereits erklaert (Position/Rotation sind tote Freiheitsgrade), Verbesserungsoptionen unentschieden | `evaluations/STATUS.md:363` |
 | 62 | Elo-Tracking-Infrastruktur (`tools/elo_tracker.py`) | entschieden -- Infrastruktur fertiggestellt, spaeter durch gepaartes Gating (#76) als Standardpraxis abgeloest | `tools/elo_tracker.py:2`, `archive/history.md:1409` |
 | 63 | Inferenz-Batching (`Net::eval_pair`, beide Blatt-Perspektiven in einem Forward-Pass) | entschieden -- umgesetzt, Teil des validierten Speedbundles | `tools/paired_arena_arm_worker.py:2`, `tools/paired_arena_speedbundle.py:2` |
 | 63a | Inferenz-Batching, konkrete Implementierungs-Notiz zu #63 | entschieden -- siehe #63 (dieselbe Massnahme, keine eigenstaendige Frage) | `archive/history.md:1305` |
 | 64 | Lauf-Manifest + Korpus-Log (Trainingsstart protokolliert Datenzusammensetzung) | entschieden -- Infrastruktur fertiggestellt | `archive/history.md:1322`, `engine/src/lib.rs:498` |
-| 65 | ISMCTS-Mehrfach-Determinisierung | entschieden im Vor-WDL-/Vor-Gumbel-Regime (2026-07-22, arena-widerlegt); 2026-08-08 unter neuem Namen/Regime REAKTIVIERT und laut `PREREG_ismcts_determinisierungen.md` aktuell **OFFEN** (Messung steht in der NACH-v21-QUEUE aus) | `archive/history.md:1456`, `evaluations/PREREG_ismcts_determinisierungen.md:83` |
+| 65 | ISMCTS-Mehrfach-Determinisierung | entschieden im Vor-WDL-/Vor-Gumbel-Regime (2026-07-22, arena-widerlegt); 2026-08-08 unter neuem Namen/Regime REAKTIVIERT und laut `PREREG_ismcts_determinizations.md` aktuell **OFFEN** (Messung steht in der NACH-v21-QUEUE aus) | `archive/history.md:1456`, `evaluations/PREREG_ismcts_determinizations.md:83` |
 | 67 | Self-Play-Diversitaets-Monitoring | entschieden -- fertig, Urteil "GESUND, kein Kollaps" | `tools/selfplay_diversity_report.py:2`, `archive/history.md:1400` |
-| 68 | Gumbel-Suche Tiefe >=1 mctx-treu (`gumbel_select_child`) | entschieden -- umgesetzt, Teil des Speedbundles. Der Merkposten "Validierung Phase 2" ist am 2026-08-09 aufgearbeitet: GUMBEL_TOP_M 16 vs 32 durch `PREREG_prior_blindfleck.md` beantwortet (Miss-Rate 1,21%); NET_SIMS 400 vs 800 durch das Zwei-Klassen-Design faktisch entschieden (600 Sockel / 150 Schwarm); und die Aussage "MAX_ACTIONS/WIDEN_FACTOR/POLICY_MASS_CUTOFF ENTFERNT statt getunt" ist im Netzpfad KORREKT -- im Code nachgeprueft: `skip_cutoff = parent.is_none() || USE_GUMBEL_SEARCH` (net_mcts.rs:1651) setzt den Cutoff ueberall aus, und der Widening-Cap (Zeile 3447) liegt hinter dem Gumbel-Early-Return (Zeile 3387), also im toten PUCT-Zweig. In `crate::mcts` (Heuristik) bleiben die Konstanten live. Merkposten damit GESCHLOSSEN | `archive/history.md:1309`, `archive/history.md:1425` |
+| 68 | Gumbel-Suche Tiefe >=1 mctx-treu (`gumbel_select_child`) | entschieden -- umgesetzt, Teil des Speedbundles. Der Merkposten "Validierung Phase 2" ist am 2026-08-09 aufgearbeitet: GUMBEL_TOP_M 16 vs 32 durch `PREREG_prior_blind_spot.md` beantwortet (Miss-Rate 1,21%); NET_SIMS 400 vs 800 durch das Zwei-Klassen-Design faktisch entschieden (600 Sockel / 150 Schwarm); und die Aussage "MAX_ACTIONS/WIDEN_FACTOR/POLICY_MASS_CUTOFF ENTFERNT statt getunt" ist im Netzpfad KORREKT -- im Code nachgeprueft: `skip_cutoff = parent.is_none() || USE_GUMBEL_SEARCH` (net_mcts.rs:1651) setzt den Cutoff ueberall aus, und der Widening-Cap (Zeile 3447) liegt hinter dem Gumbel-Early-Return (Zeile 3387), also im toten PUCT-Zweig. In `crate::mcts` (Heuristik) bleiben die Konstanten live. Merkposten damit GESCHLOSSEN | `archive/history.md:1309`, `archive/history.md:1425` |
 | 69 | Daten-Skalierungs-Ablation (`--train-file-limit`) | entschieden -- fertig, differenziertes Ergebnis | `archive/history.md:1327` |
 | 70 | R6-Nachtrag Peek-Kosten-Fix (`PlayerBoard::apply_paid_cost`) | entschieden -- umgesetzt | `archive/history.md:1315` |
 | 71 | Knoten-Budgets statt Zeitbudgets, Einzelspiel-Flush, Heartbeat (Determinismus-Fix) | entschieden -- umgesetzt, seither vielfach als Regressionsschutz-Muster referenziert | `archive/history.md:1435`, `engine/src/round_transition_deep.rs:64` |
@@ -136,7 +136,7 @@ Teilen als A/B benannt.
 | 80 | Self-Play-Kostenprofil (Gumbel-Suche vs. rtv vs. Bootstrap) | entschieden -- gemessen: rtv ~81% der Self-Play-Kosten | `archive/history.md:2142` |
 | 80b | **Fehlbezeichnung, keine eigene Nummer** -- gemeint war das Gating `v13_nortv_best` vs `v12b_lr_best` (171:129), inhaltlich **#85** (rtv-Ablation Phase 2, dort wurde `v13_nortv_best` Champion). #80 ist das Self-Play-Kostenprofil und hat damit nichts zu tun. | erfasst 2026-08-10 -- der historische Kommentar bleibt UNVERAENDERT stehen (ein Protokolleintrag von damals soll nicht nachtraeglich stimmen), die Registratur fuehrt die Nummer als bekannte Fehlbezeichnung | `evaluations/elo_history.csv:7`, Sache siehe #85 |
 | 81 | Amdahl-Split fuer den geplanten GPU-Umbau (Netz-Eval-Anteil je Kostenkategorie) | entschieden -- gemessen | `archive/history.md:2291` |
-| 82 | Zentraler GPU-Inferenz-Batcher (RTX 3060) | **AUFGEGRIFFEN 2026-08-09**: Machbarkeitsprobe vorregistriert (`PREREG_gpu_inferenz_batcher.md`), damit kein UNKLAR mehr. Anlass: der Inferenz-Anteil ist mit 62-81% der Self-Play-Zeit HOEHER als die Registratur-Vermutung annahm | `archive/history.md:2293` |
+| 82 | Zentraler GPU-Inferenz-Batcher (RTX 3060) | **AUFGEGRIFFEN 2026-08-09**: Machbarkeitsprobe vorregistriert (`PREREG_gpu_inference_batcher.md`), damit kein UNKLAR mehr. Anlass: der Inferenz-Anteil ist mit 62-81% der Self-Play-Zeit HOEHER als die Registratur-Vermutung annahm | `archive/history.md:2293` |
 | 84 | rtv-Ablation Phase 1 (traegt `round_transition_value` ueberhaupt Staerke bei?) | entschieden -- abgeschlossen, Grundlage fuer #85 | `archive/history.md:2735` |
 | 85 | rtv-Ablation Phase 2 (rtv default abschalten) | entschieden -- rtv seither standardmaessig AUS, `v13_nortv_best` wurde Champion | `archive/history.md:2940` |
 | 86 | Gepaartes Gating `v13_best` vs. `v12b_lr_best` | entschieden -- SPRT harter Deckel ohne Entscheid (p=0,2615), kein Champion-Wechsel | `archive/history.md:2595`, `archive/history.md:2703` |
@@ -254,9 +254,9 @@ statt "zurueckgezogen".
 **NACHTRAG 2026-08-09**: aufgeklaert und eingetaktet. Die Vermutung
 "durch die rtv-Abschaltung an Dringlichkeit verloren" ist WIDERLEGT --
 der Inferenz-Anteil liegt in der aktuellen Aera bei ~81% der
-Self-Play-Zeit (`PREREG_v20_kampagne.md:71`), gegen 62% in der
+Self-Play-Zeit (`PREREG_v20_campaign.md:71`), gegen 62% in der
 frueheren Profilmessung. Machbarkeitsprobe vorregistriert in
-`PREREG_gpu_inferenz_batcher.md`; entscheidende Frage ist nicht der
+`PREREG_gpu_inference_batcher.md`; entscheidende Frage ist nicht der
 GPU-Spitzendurchsatz, sondern der real erreichbare Batch.
 
 Alle anderen 64 Nummern liessen sich eindeutig einem Thema zuordnen.

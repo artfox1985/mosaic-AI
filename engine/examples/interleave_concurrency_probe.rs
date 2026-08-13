@@ -29,7 +29,7 @@ const FEATURE_LEN: usize = 3444;
 /// GPU-Ersatz: feste Arbeit pro Batch, UNABHAENGIG von der tatsaechlichen
 /// Batch-Groesse -- laut Auftrag die gemessene GPU-Zeit fuer Batch 256.
 /// Diese 3ms selbst sind in DIESER Sitzung NICHT nachgeprueft (ich habe
-/// PREREG_gpu_verlagerung.md nicht geoeffnet) -- als Vorgabe des Auftrags
+/// PREREG_gpu_offloading.md nicht geoeffnet) -- als Vorgabe des Auftrags
 /// uebernommen, nicht selbst nachgemessen. Als UNGEPRUEFT markiert.
 const GPU_SLEEP: Duration = Duration::from_millis(3);
 

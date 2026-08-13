@@ -3,7 +3,7 @@
 **Angelegt 2026-08-07, VOR Implementierung und Messung.** Nutzer-Go am
 selben Tag ("takten den test ein"), UNABHAENGIG vom Ausgang der
 w/λ-Stilmessung (E3 war urspruenglich Stufe 3 der Eskalationsleiter in
-PREREG_aggression_stilmessung.md).
+PREREG_aggression_style_measurement.md).
 
 ## Mechanismus
 

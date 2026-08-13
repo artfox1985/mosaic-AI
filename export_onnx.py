@@ -38,7 +38,7 @@ Engine-Seite (`net_mcts.rs::value_to_win_prob`) liest ihn unveraendert,
 Rust-Suche nicht konsumiert. Alt-Modelle (Tanh-Kopf) exportieren
 byte-identisch wie zuvor.
 
-Schema 18 (evaluations/PREREG_platten_intervention.md): optionaler LETZTER
+Schema 18 (evaluations/PREREG_plate_intervention.md): optionaler LETZTER
 Output `endgame_margin` -- exakter R5-Wurzelwert-Aux-Kopf, NUR wenn der
 Checkpoint den additiven `endgame_head` traegt
 (`neural_net.py::endgame_head_present`), haengt HINTER `opp_points` (falls
@@ -84,7 +84,7 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     # Task #34: 'tanh' oder 'wdl' AUS DEM CHECKPOINT -- Alt-Modelle (kein
     # `value_head.2.weight` mit Breite 2) exportieren byte-identisch.
     value_head_variant = value_head_variant_from_state(state)
-    # Schema 18 (PREREG_platten_intervention.md): siehe Modul-Kommentar --
+    # Schema 18 (PREREG_plate_intervention.md): siehe Modul-Kommentar --
     # additiv, nur wenn im Checkpoint vorhanden (Muster opp_head).
     eg_head = endgame_head_present(state)
 

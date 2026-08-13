@@ -92,7 +92,7 @@ erklaert, fuehrt zur Ruecknahme.
 ### A2 -- die Reihenfolge dem NETZ geben: zurueckgestellt
 
 Waere ein Encoder-Eingriff (`INPUT_SIZE`), also ein Vertragsbruch mit
-allem, was `DESIGN_konventionen_als_pruefungen.md` dafuer verlangt
+allem, was `DESIGN_conventions_as_checks.md` dafuer verlangt
 (FeatureVersion, Manifest, Anker-Neumessung). Nicht Teil dieses Tasks.
 
 ---
@@ -160,7 +160,7 @@ Interaktion GELERNT hat, ist nie geprueft worden.
 - **Kein Unterschied** ⇒ die KI ignoriert eine Interaktion, die ein
   menschlicher Spieler aktiv ausnutzt. Das ist ein eigenstaendiger
   Befund und ein starkes Argument fuer den Plattenkopf
-  (`PREREG_plattenkopf.md`), weil es zeigt, dass die Platten-Information
+  (`PREREG_plate_head.md`), weil es zeigt, dass die Platten-Information
   vorhanden ist, aber nicht handlungsleitend wird.
 
 Deskriptiv mitzufuehren: dieselbe Auszaehlung fuer Platte 3
@@ -215,7 +215,7 @@ Erklaerung "es kennt die Interaktion nicht" ist damit ausgeschlossen. Was
 offen bleibt, ist die GROESSE -- ob 21,5% entschiedene Ziehzuege genug
 sind -- und das ist aus Policy-Masse allein nicht beantwortbar.
 
-Der Plattenkopf (`PREREG_plattenkopf.md`) bleibt sinnvoll, aber seine
+Der Plattenkopf (`PREREG_plate_head.md`) bleibt sinnvoll, aber seine
 Begruendung verschiebt sich: nicht "die Platten sind unbekannt", sondern
 "die Dosierung und die anderen Kriterien". Fuer die Diagonalen ist Ziehen
 ohnehin nicht der Hebel -- dort entscheidet die Platzierung.
@@ -412,7 +412,7 @@ schlechter als naeherungsweise-und-ehrlich.
 
 **Reihenfolge**: erst Teil D messen (wie oft haengt die R5-Wahl an der
 Belegung). Klein -> Weg B vertretbar. Gross -> die 24x sind gerechtfertigt.
-Die k=4-Evidenz (`PREREG_ismcts_determinisierungen.md`: rechenneutral
+Die k=4-Evidenz (`PREREG_ismcts_determinizations.md`: rechenneutral
 monoton fallend, -8,75pp bei k=4) mahnt dabei zum Kostentor: Baum-
 Vervielfachung hat sich in diesem Projekt schon einmal nicht bezahlt.
 
@@ -479,7 +479,7 @@ unvergleichbar. Die Anker-Kante misst genau diesen Faktor:
 Der Knopf bleibt als BAUTEIL: er ist die Art, wie die zweite Heuristik ohne
 Code-Fork entsteht. Knopf implementiert die Variante, Gating misst die
 Kante, der Anker erbt den Versatz. (Etablierte Praxis im Projekt, vgl.
-Regel 3 in `PREREG_punkte_blend_w.md`: "braucht erst eine eigene
+Regel 3 in `PREREG_points_blend_w.md`: "braucht erst eine eigene
 Anker-Kante, damit bewertete Partien Elo-regelkonform bleiben".)
 
 #### Vorab: H0 ist hier das ERWUENSCHTE Ergebnis

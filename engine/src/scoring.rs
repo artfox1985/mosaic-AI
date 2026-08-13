@@ -312,7 +312,7 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
 }
 
 /// Gestufter Freischalt-Fortschritt fuer den Kuppel-Bonus (Nutzer-Auftrag
-/// 2026-08-10, Messlage `evaluations/watchlist_v20_zwischenlese.md` Abschnitt
+/// 2026-08-10, Messlage `evaluations/watchlist_v20_interim_review.md` Abschnitt
 /// 2: Mensch 10,3 Spezialpunkte/Partie gegen KI 1,3 -- ~62 % der gesamten
 /// Endpunkte-Luecke). Verifiziert am Code (nicht angenommen), drei Fragen:
 ///
@@ -761,7 +761,7 @@ mod tests {
 
     // ── Validierung des Plattenkopf-Atomzuschnitts ───────────────────────────
     //
-    // `evaluations/PREREG_plattenkopf.md` behauptet zwei Identitaeten auf dem
+    // `evaluations/PREREG_plate_head.md` behauptet zwei Identitaeten auf dem
     // ENDBRETT, aus denen die Wahrscheinlichkeitsfassung ihre Exaktheit zieht.
     // Nutzer-Frage 2026-08-10: "hast du das auf ein paar spielsituationen
     // validiert oder einfach mal blind gebaut?" -- hier wird es geprueft,
@@ -875,7 +875,7 @@ mod tests {
     // Test reimplementiert dieselbe Definition HIER IN RUST -- unabhaengig
     // von der Python-Seite, direkt gegen die echten `score_*`-Funktionen
     // dieser Datei -- und prueft auf KONSTRUIERTEN Brettern (nicht auf
-    // Selfplay-Endstaenden): `evaluations/PREREG_plattenkopf.md` misst 16 der
+    // Selfplay-Endstaenden): `evaluations/PREREG_plate_head.md` misst 16 der
     // 34 Labels auf dem Champion-Korpus als praktisch konstant 0 (Diagonalen,
     // Spalte 1, Reihen 5/6, untere Eckplatten) -- eine Pruefung auf echten
     // Partien liefe also gerade dort leer, wo ein Fehler am ehesten

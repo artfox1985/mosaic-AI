@@ -387,7 +387,7 @@ fn weighted_index<R: Rng + ?Sized>(weights: &[f64], total: f64, rng: &mut R) -> 
 }
 
 /// Deterministisches Gegenstueck zu [`weighted_index`] (τ-Annealing,
-/// `evaluations/PREREG_suchpfad_nachmessungen.md` Messung 3): liefert den
+/// `evaluations/PREREG_search_path_remeasurements.md` Messung 3): liefert den
 /// Index des GROESSTEN Eintrags in `weights` -- bei Gleichstand den ERSTEN
 /// (stabil, reproduzierbar, kein RNG-Verbrauch). Reine Funktion ohne Netz-/
 /// Env-/RNG-Zugriff, direkt ohne Suchbaum testbar. Leeres `weights` gibt `0`
@@ -1147,7 +1147,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     net: Option<&Net>,
     record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
-    // PREREG_such_rng_trennen.md: der Seed, mit dem DIESER Aufrufer `rng`
+    // PREREG_search_rng_split.md: der Seed, mit dem DIESER Aufrufer `rng`
     // erzeugt hat (siehe dortige Formel `seed.wrapping_add(i*0x9E37...)`).
     // Zusammen mit einem lokalen Zugindex (`move_idx` unten) baut
     // `drafting_step`s Suche daraus einen EIGENEN RNG
@@ -1432,7 +1432,7 @@ fn play_arena_game<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
-    // PREREG_such_rng_trennen.md: siehe `play_one_game`s gleichnamiger
+    // PREREG_search_rng_split.md: siehe `play_one_game`s gleichnamiger
     // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat.
     game_seed: u64,
 ) -> Value {
@@ -1475,7 +1475,7 @@ fn play_arena_game<R: Rng + ?Sized>(
                         actions[0].clone()
                     } else {
                         let s = dynamic_sims(sims[pi], actions.len());
-                        // PREREG_such_rng_trennen.md: eigener, aus
+                        // PREREG_search_rng_split.md: eigener, aus
                         // (game_seed, steps) abgeleiteter RNG statt des
                         // Partie-`rng` -- siehe `play_one_game`-Kommentar.
                         let mut search_rng = StdRng::seed_from_u64(
@@ -1631,7 +1631,7 @@ fn play_net_game<R: Rng + ?Sized>(
                     } else {
                         None
                     };
-                    // PREREG_such_rng_trennen.md: eigener, aus (game_seed,
+                    // PREREG_search_rng_split.md: eigener, aus (game_seed,
                     // steps) abgeleiteter RNG statt des Partie-`rng` fuer BEIDE
                     // Such-Seiten -- siehe `play_one_game`-Kommentar. `game_seed`
                     // ist hier schon Parameter (Log-Paritaet, Auftrag 2026-08-11).
@@ -1788,7 +1788,7 @@ fn play_net_game<R: Rng + ?Sized>(
 /// `n_games` Spiele Netz vs. Heuristik (Netz auf Brett 0, Startspieler alternierend).
 /// Lädt das ONNX-Netz einmal. Gibt JSON-Array `[{scores:[netz,heur], winner, …}]`.
 ///
-/// `seeds` (Plattenkopf-Versuch, `PREREG_plattenkopf.md`, 2026-08-11): optionale
+/// `seeds` (Plattenkopf-Versuch, `PREREG_plate_head.md`, 2026-08-11): optionale
 /// EXPLIZITE Pro-Partie-Seed-Liste. Gesetzt -> Partie `i` bekommt `seeds[i]`
 /// STATT der abgeleiteten Formel `seed.wrapping_add(i * 0x9E37...)`, und
 /// `n_games` folgt der Listenlänge (EINE Quelle der Wahrheit statt zwei
@@ -1919,7 +1919,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                             (net_b, sims_b, c_puct_b)
                         };
                         let s = net_effective_sims(base, actions.len());
-                        // PREREG_such_rng_trennen.md: siehe `play_net_game`-
+                        // PREREG_search_rng_split.md: siehe `play_net_game`-
                         // Kommentar -- `game_seed` ist hier schon Parameter.
                         let mut search_rng = StdRng::seed_from_u64(
                             crate::net_mcts::derive_search_seed(game_seed, steps as u64),
@@ -2364,7 +2364,7 @@ fn net_drafting_policy<R: Rng + ?Sized>(
             .map(|(i, _)| i)
             .unwrap_or(0)
     } else if crate::net_mcts::tau_argmax_from_move().is_some_and(|n| move_number as usize >= n) {
-        // τ-Annealing (PREREG_suchpfad_nachmessungen.md, Messung 3):
+        // τ-Annealing (PREREG_search_path_remeasurements.md, Messung 3):
         // `MOSAIC_TAU_ARGMAX_FROM_MOVE=N` gesetzt UND dieser Halbzug (>=N) --
         // ab hier wird der argmax der Besuchsverteilung gespielt statt
         // gesampelt. NUR die Zugwahl aendert sich: `policy`/`root_q`/
@@ -2579,7 +2579,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     move_heartbeat: Option<&AtomicU64>,
     pcr_full_prob: Option<f64>,
     pcr_cheap_sims: u32,
-    // PREREG_such_rng_trennen.md: siehe `play_one_game`s gleichnamiger
+    // PREREG_search_rng_split.md: siehe `play_one_game`s gleichnamiger
     // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat
     // (`run_net_self_play`s `partie_seed`). Zusammen mit `move_number`
     // (bereits vorhandener 1-basierter Halbzug-Zaehler, siehe dessen
@@ -2647,7 +2647,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
                     let actions = drafting_actions(&game.state);
                     let valid_actions: Vec<Value> =
                         actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
-                    // PREREG_such_rng_trennen.md: EIN eigener, aus (game_seed,
+                    // PREREG_search_rng_split.md: EIN eigener, aus (game_seed,
                     // move_number) abgeleiteter RNG fuer den GESAMTEN Entscheid
                     // dieses Halbzugs -- PCR-Muenzwurf, Suche UND
                     // `moon_order_target` (Label-Sampling) haengen jetzt an
@@ -4787,7 +4787,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// Plattenkopf-Versuch (`PREREG_plattenkopf.md`, 2026-08-11) -- der
+    /// Plattenkopf-Versuch (`PREREG_plate_head.md`, 2026-08-11) -- der
     /// eigentliche Zweck des `seeds`-Arguments: mit einer EXPLIZITEN
     /// Seed-Liste muss Partie `i` (a) exakt `seeds[i]` als `game_seed`
     /// benutzen und (b) folglich die `scoring_tile_ids` tragen, die man aus
@@ -4871,7 +4871,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// PREREG_such_rng_trennen.md §5, DER entscheidende Test: Suchvolumen darf
+    /// PREREG_search_rng_split.md §5, DER entscheidende Test: Suchvolumen darf
     /// den Versorgungsstrom nicht mehr beruehren.
     ///
     /// WICHTIG, zwei Korrekturen gegenueber der ersten Fassung (REGEL 0 --
@@ -5015,15 +5015,15 @@ pub(crate) mod tests {
             assert_eq!(
                 a, b,
                 "Fabrikinhalte weichen zwischen Schatten-sims=1 und =400 ab -- \
-                 der Such-RNG-Schnitt (PREREG_such_rng_trennen.md) ist nicht wirksam"
+                 der Such-RNG-Schnitt (PREREG_search_rng_split.md) ist nicht wirksam"
             );
         }
     }
 
-    /// PREREG_such_rng_trennen.md Punkt 7 (Async-Gate-B-Nachprobe):
+    /// PREREG_search_rng_split.md Punkt 7 (Async-Gate-B-Nachprobe):
     /// Nachstellung des `wt_async`-Befunds `play_net_self_play_game_sync_only_
     /// repeatability` HIER im Hauptbaum (jener Test existiert nur im
-    /// Worktree, siehe `PREREG_async_suche.md` Abschnitt 10 -- Zitat: "Sync
+    /// Worktree, siehe `PREREG_async_search.md` Abschnitt 10 -- Zitat: "Sync
     /// weicht von sich selbst ab" wegen des GETEILTEN RNG-Stroms
     /// zwischen Suche/Simulation und dem echten Spiel, PLUS separat einer
     /// Wall-Clock-Komponente in `round_transition_deep.rs` (Task #71), die
@@ -5101,7 +5101,7 @@ pub(crate) mod tests {
         assert_eq!(
             spielgeschehen_mismatches, 0,
             "Sync-gegen-sich-selbst weicht im SPIELGESCHEHEN ab -- der Such-RNG-Schnitt \
-             (PREREG_such_rng_trennen.md) behebt die im wt_async-Befund dokumentierte \
+             (PREREG_search_rng_split.md) behebt die im wt_async-Befund dokumentierte \
              Instabilitaet nicht (oder nicht vollstaendig)"
         );
     }
@@ -5496,7 +5496,7 @@ pub(crate) mod tests {
         );
     }
 
-    // ── τ-Annealing (PREREG_suchpfad_nachmessungen.md, Messung 3) ───────────
+    // ── τ-Annealing (PREREG_search_path_remeasurements.md, Messung 3) ───────────
 
     /// Isolierter Test von [`argmax_index`] selbst (KEIN Suchbaum/Self-Play-
     /// Spiel noetig -- reine Funktion): gegebene Verteilung -> deterministisch

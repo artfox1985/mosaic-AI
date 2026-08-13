@@ -42,7 +42,7 @@
 //!    51,7 %, obwohl es in Runde 5 auf genau diese Loeser-Zuege destilliert
 //!    wird (One-Hot-Policy-Ziel, `net_mcts::net_root_child_stats_and_policy`).
 //!
-//! Belegkette und Messwerte: `evaluations/PREREG_zufallsknoten.md`.
+//! Belegkette und Messwerte: `evaluations/PREREG_chance_nodes.md`.
 //!
 //! Innerhalb eines Zufallsknotens wird NICHT beschnitten (siehe
 //! `child_value`) -- Star1/Star2 waere der Standardweg, braucht aber
@@ -107,7 +107,7 @@ pub fn applies(state: &GameState) -> bool {
 
 // ── Zufallsknoten fuer die verdeckten Bonuschips ────────────────────────────────
 //
-// BEFUND (2026-08-10, `evaluations/PREREG_zufallsknoten.md`): der Modulkopf
+// BEFUND (2026-08-10, `evaluations/PREREG_chance_nodes.md`): der Modulkopf
 // oben nennt Runde 5 ein "Full-Information-Endspiel" und begruendet das damit,
 // dass alle Zufaelligkeit in `setup_new_round` ablaeuft. Das verwechselt
 // AUFGELOEST mit SICHTBAR. Der Chip-Pool geht mit 20 Chips exakt fuer 5 Runden
@@ -168,7 +168,7 @@ fn chance_nodes_enabled() -> bool {
 /// Fortschritts-Naeherung (`wertung_progress`) waere, und weil der Anker
 /// eingefroren bleiben muss.
 ///
-/// Hintergrund (`PREREG_zufallsknoten.md`, Teil E): dass der Loeser das Netz
+/// Hintergrund (`PREREG_chance_nodes.md`, Teil E): dass der Loeser das Netz
 /// in Runde 5 ersetzt, wurde NIE gegatet -- `round5.rs` kam in 98dffa3
 /// gebuendelt herein, gerechtfertigt allein durch das Argument, die Runde sei
 /// exakt loesbar. Das Argument ist zweifach entkraeftet: die Runde ist nicht

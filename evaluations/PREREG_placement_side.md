@@ -151,7 +151,7 @@ wirkt -- und schadet. Zwei Fehler in der GROESSE, nicht in der Form:
 
 1. **`.total` summiert ALLE aktiven Kriterien**, und darin dominiert der
    Spezialfeld-Posten: gemessen **-11,70** im Mittel (3,9 leere Spezialkuppeln a
-   -3, siehe `PREREG_injektion_wertungsplatten.md`). In den Runden 1-4 sind fast
+   -3, siehe `PREREG_scoring_plate_injection.md`). In den Runden 1-4 sind fast
    alle Spezialfelder leer, der Term ist also ein grosser negativer Brocken, der
    die Wahl in Richtung "Spezialfelder fuellen" zieht statt Spalten zu bauen.
 2. **Absolutwert statt Differenz.** Interessant ist, was die Platzierung am
@@ -492,7 +492,7 @@ die Ursache im Lernen und in der Sichtweite, nicht im Spiel:
    Verteilungs-Henne-Ei-Problem, und es ist GENAU das, wofuer der Nutzer-Plan die
    Injektion vorgesehen hat: injizieren, damit die Zuege ueberhaupt vorkommen,
    daraus Self-Play mit gestreutem Gewicht erzeugen
-   (`PREREG_injektion_wertungsplatten.md` N2), den Ownership-Kopf daran lernen
+   (`PREREG_scoring_plate_injection.md` N2), den Ownership-Kopf daran lernen
    lassen, dann die Injektion abschalten.
 
 **Punkt 2 ist die Lesart, die zu allen Messungen dieser Nacht passt**: die
@@ -577,7 +577,7 @@ zweite ist der vom Nutzer geplante:
    baut. Die Politik kann nicht bewerten, was in ihrer Erfahrung nicht vorkommt.
    Genau dafuer ist die Injektion im Nutzer-Plan gedacht: sie erzeugt Partien, in
    denen die Zuege VORKOMMEN, das gestreute Gewicht je Partie sorgt fuer Vielfalt
-   (`PREREG_injektion_wertungsplatten.md` N2), der Ownership-Kopf lernt daran, und
+   (`PREREG_scoring_plate_injection.md` N2), der Ownership-Kopf lernt daran, und
    danach kann die Injektion abgeschaltet werden.
 
 **Der Sprung auf 14 waere demnach kein Injektions-Ergebnis, sondern ein

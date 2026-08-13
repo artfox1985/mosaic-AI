@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Rauchtest fuer den Plattenkopf (`evaluations/PREREG_plattenkopf.md`).
+"""Rauchtest fuer den Plattenkopf (`evaluations/PREREG_plate_head.md`).
 
 ## Was hier geprueft wird -- und was NICHT
 

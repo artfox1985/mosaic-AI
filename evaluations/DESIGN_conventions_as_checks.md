@@ -88,7 +88,7 @@ koennte.
 **Ausdruecklich Einfrieren, nicht Reparieren**: der grobe
 Kriterium-6-Term (`scoring.rs:178`) bleibt im Anker stehen. Ein Massstab
 wird nicht verbessert, sonst entwertet er die Leiter. Die
-Plattenschwaeche gehoert auf die Netzseite (`PREREG_plattenkopf.md`).
+Plattenschwaeche gehoert auf die Netzseite (`PREREG_plate_head.md`).
 
 **A5 Konventions-Linter** (`tools/check_conventions.py`, laeuft im
 `pre-commit`-Haken, Budget < 3 s), je Regel eine eigene Pruefung mit
@@ -102,7 +102,7 @@ sprechender Fehlermeldung:
 - **Doku-Sprachkonvention**: README.md englisch, STATUS.md/history.md
   deutsch (Heuristik ueber Stopwort-Anteil, Schwelle grosszuegig).
 - **Keine neuen `#NN`**: jede `#NN` in geaendertem Code/Doku muss in
-  `evaluations/TASK_NUMMERN_REGISTRATUR.md` stehen.
+  `evaluations/TASK_NUMBER_REGISTRY.md` stehen.
 - **Prereg-Index-Konsistenz**: jede `PREREG_*.md` steht im
   `PREREG_INDEX.md` und umgekehrt; Zaehler in den Abschnitts-
   Ueberschriften stimmen mit der Zeilenzahl.

@@ -237,7 +237,7 @@ pub fn solve_max_tiling_points_exact(state: &GameState, pi: usize) -> i32 {
 // #99 statt einer der freien Luecken (40-61 usw.): Luecken koennen im Chat
 // vergeben worden sein, ohne Spur in den Dateien -- oberhalb des bisherigen
 // Maximums #98 ist eine Neu-Kollision ausgeschlossen.
-// Registratur: evaluations/TASK_NUMMERN_REGISTRATUR.md
+// Registratur: evaluations/TASK_NUMBER_REGISTRY.md
 // HERLEITUNG DES CACHE-SCHLÜSSELS (Auftrag Schritt 1a, Code gelesen 2026-08-04):
 // `solve_round_final_score`/`solve_max_tiling_points` (und transitiv `solve_rec`,
 // `legal_steps`, `chippable_rows`, `apply_step` -> `execute_full_tiling`,

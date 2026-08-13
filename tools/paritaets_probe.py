@@ -30,7 +30,7 @@ das: die Sonde belegt Suchparitaet, nicht Vertragsparitaet.
 # WHEEL-FRISCHE-CHECK (Nutzer-Auftrag 2026-08-13): die teuerste Fehlerklasse
 # dieser Woche war eine Messung auf einem veralteten Wheel -- cargo test gruen,
 # aber maturin/pip vergessen, 16 Minuten Messzeit auf totem Code (Beleg:
-# PREREG_injektion_wertungsplatten.md, "bit-identische Gegenprobe"). Diese
+# PREREG_scoring_plate_injection.md, "bit-identische Gegenprobe"). Diese
 # Probe laeuft vor jeder Messkampagne, also ist sie der richtige Waechter:
 # ist eine Engine-Quelle JUENGER als die installierte .pyd, ist jede Messung
 # mit dem installierten Wheel verdaechtig.
@@ -85,7 +85,7 @@ sys.path.insert(0, str(REPO / "engine" / "py"))
 # Bestandsverhalten absichtlich geaendert wird -- dann gehoert der neue Wert
 # mit Begruendung in den Commit, nicht stillschweigend hierher.
 #
-# GEPRUEFT 2026-08-13 (PREREG_such_rng_trennen.md, RNG-Schnitt Suche/Partie):
+# GEPRUEFT 2026-08-13 (PREREG_search_rng_split.md, RNG-Schnitt Suche/Partie):
 # der Hash haelt UNVERAENDERT, ENTGEGEN der Prereg-Erwartung in §4a ("Hash
 # MUSS brechen"). Grund, am Code nachgeprueft: diese Sonde haengt AUSSCHLIESSLICH
 # an `net_search_state_json` (lib.rs) -> `net_search_with_tree`, und DIESER
@@ -109,7 +109,7 @@ ROUNDS = (1, 2, 3)  # Netzpfad aktiv; Runde 5 waere der round5.rs-Kurzschluss
 
 # Additive DIAGNOSE-Felder, die nicht in den Hash eingehen (siehe Modul-Doku).
 # `net_raw_value`/`net_points_forecast`/`net_opp_points_forecast` kamen mit dem
-# Stufe-2-Instrument (`PREREG_punktekopf_platten.md`) hinzu und beeinflussen die
+# Stufe-2-Instrument (`PREREG_points_head_plates.md`) hinzu und beeinflussen die
 # Zugwahl nicht -- sie werden je Wurzelkandidat nur mitgeschrieben.
 EXCLUDED_FIELDS = ("net_raw_value", "net_points_forecast", "net_opp_points_forecast")
 _EXCLUDE_RE = re.compile(
