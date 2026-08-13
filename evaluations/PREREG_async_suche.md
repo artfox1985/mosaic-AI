@@ -456,3 +456,138 @@ Diagnose ist POSITIV. Stufe 2 kann beginnen.
   Nebenläufigkeit, Faktor-unter-2x-Frage) nicht der limitierende Faktor
   ist; ein Umbau ohne gemessenen Nutzen wäre Vorratsarbeit ausserhalb des
   engen Diagnoseauftrags.
+
+---
+
+## 10. STUFE 2 BEGONNEN: Baustein 1 (Rundenübergangs-Sampling) gebaut und geprüft -- Gate B NICHT erreicht, begründeter Stopp
+
+Diagnose war POSITIV (Abschnitt 9) -- Auftrag laut Stufenplan: Stufe 2
+beginnen. Einstiegspunkt war der eigene Stufe-1-Fund: `node_from_net_outputs`
+hat bei `ROUND_TRANSITION_SAMPLING=true` (Default aus) einen zweiten,
+inerten Netz-Aufrufpunkt über `sample_round_transition_value` ->
+`net_leaf_eval`. **Wichtiger, GEPRÜFTER Befund dabei**: diese Funktion ist
+NICHT nur ein hypothetischer Stufe-2-Kandidat, sondern bereits AKTIV im
+Produktionspfad -- `self_play.rs::play_net_self_play_game` (Zeilen
+~2623-2650+) ruft sie bei JEDEM echten Rundenübergang auf, um das
+Trainingsziel `round_transition_values` zu bilden. Deckt sich mit einer
+bestehenden Projekt-Erkenntnis (`project_selfplay_cost_profile`): dieses
+"rtv"-Sampling ist **~81-83 % der Self-Play-Kosten** -- der eigentlich
+grössere Hebel für Verschränkung liegt hier, nicht in der Wurzelsuche
+(Stufe 1).
+
+### Baustein 1: async Rundenübergangs-Sampling, GEBAUT und GEPRÜFT
+
+Additiv, gleiches Muster wie Stufe 1:
+
+- `net_mcts.rs::net_leaf_eval_async` -- Async-Zwilling von `net_leaf_eval`
+  (nur der `MIRROR_OTHER_VAL==false`-Produktionszweig unterbrechbar, exakt
+  derselbe Zuschnitt wie `make_node_async`).
+- `round_transition.rs::sample_round_transition_value_async` -- Async-
+  Zwilling von `sample_round_transition_value`. **Bewusste Verengung**:
+  nimmt `net: &Net` statt eines generischen `evaluator`-Closures (das
+  Original ist absichtlich pluggable für `round5`/die rekursiven
+  `round_transition_deep.rs`-Bewerter) -- ein async-fähiges generisches
+  Closure bräuchte `AsyncFnMut`-Bindungen, eine zusätzliche Frage, die
+  dieser schmale Anfang nicht braucht: die einzige heute lebende UND die
+  einzige geplante Netz-Aufrufstelle nutzen ohnehin immer
+  `net_leaf_eval_async`.
+
+**Geprüft** (`round_transition::tests::async_round_transition_sampling_matches_synchronous`,
+NICHT `#[ignore]`, läuft in `cargo test --lib`): reale Runde-1..3-Übergänge
+(`drive_to_round_tiling_leaf`, 12 Seeds -- Runde 4 ausgelassen, siehe unten),
+`N_SAMPLES_TRAIN=24` Samples je Fall, OHNE Sammel-Faden (bit-identisch
+erwartet, `<1e-9`-Toleranz statt Gleichheit wegen Fliesskomma-Summation in
+anderer Reihenfolge -- selbst das ist in 24/24 Fällen erfüllt):
+
+| Metrik | Ergebnis |
+| --- | ---: |
+| Fälle verarbeitet | 24 |
+| Abweichungen | **0/24** |
+
+`cargo test --lib`: **388 bestanden / 0 fehlgeschlagen / 22 ignoriert**
+(387→388, weil dieser Test NICHT ignoriert ist und erfolgreich lief; 22
+ignorierte unverändert seit Abschnitt 9s Diagnosetests).
+
+**Runde 4 ausgelassen** (nicht Teil des Ergebnisses, sondern eine
+GEPRÜFTE Einschränkung der TEST-Fahrhilfe): `drive_to_round_tiling_leaf`
+(ein `#[cfg(test)]`-Werkzeug, nicht Produktionscode) treibt Partien über
+eine naive `actions[0]`-Politik -- bei mehreren Seeds erreicht diese Politik
+VOR Runde 4 bereits `Phase::End` (`drive_to_round_start`s eigene Assertion
+schlägt fehl: "erwartet Tiling, bekommen End"). Per `catch_unwind`
+abgefangen und ausgelassen, NICHT als Abweichung gezählt -- ein Artefakt der
+Testfahrhilfe, keine Eigenschaft der geprüften Async-Logik.
+
+### GATE B NICHT erreicht -- begründeter Stopp, mit Schnitt und Aufwandsschätzung
+
+Gate B verlangt **vollständige Partie-Gleichheit synchron gegen async**,
+also die GESAMTE `play_net_self_play_game`-Schleife (`self_play.rs:2472ff`,
+>300 Zeilen direkt in der Funktion, weit mehr über Hilfsfunktionen) als EINEN
+durchgehenden Zustandsautomaten. Am Code geprüft, was das zusätzlich
+verlangt -- Baustein 1 deckt nur EINEN von mindestens VIER Netz-
+Integrationspunkten ab:
+
+1. **Wurzelsuche** (Drafting-Entscheid, `net_drafting_policy`) -- Stufe 1,
+   GEDECKT (`build_gumbel_tree_inner_async`).
+2. **Rundenübergangs-Sampling** (`sample_round_transition_value`) -- Baustein
+   1, GEDECKT für den EINFACHEN (net-only) Bewerter.
+3. **Rekursives Mehrrunden-Sampling** (`round_transition_deep.rs`,
+   `simulate_one_round`/`N_SAMPLES_TRAIN_ROUND{1,2,3}`) -- NICHT geprüft,
+   NICHT konvertiert. Der Modul-Name selbst deutet auf verschachtelte
+   `sample_round_transition_value`-Aufrufe je Rekursionsebene -- vermutlich
+   ähnlich tractabel wie Baustein 1 (derselbe Evaluator-Musterl), aber NICHT
+   nachgesehen in dieser Sitzung; eigener Prüfschritt nötig.
+4. **Tiling-Stichentscheid** (`self_play.rs::resolve_tiling_step` ->
+   `net_tiling_tiebreak_value`, `self_play.rs:973`/`1060`) -- GEPRÜFT
+   vorhanden (ein DRITTER, bisher unbeachteter Netz-Aufrufpunkt, exakt der
+   "Tiling-Stichentscheid" aus dem ursprünglichen Auftrag), NICHT
+   konvertiert.
+
+**Und selbst mit allen vier Bausteinen fertig**: `play_net_self_play_game`
+selbst (die äussere `loop { match game.state.phase { ... } }`-Schleife, die
+alle vier Punkte verwebt, plus `apply_chosen_action`, `moon_order_target`,
+Start-Placement, End-Phase, Runde-5-Sonderbehandlung über `round5.rs`) müsste
+SELBST zu einer `async fn` werden, damit ein Aufrufer sie unterbrechbar
+treiben kann -- eine mechanische, aber grossflächige Umformung einer
+Funktion mit weit über 300 Zeilen und vielen Hilfsaufrufen, von denen jeder
+einzeln auf weitere Netz-/RNG-Abhängigkeiten geprüft werden müsste (nach dem
+Muster dieser Sitzung: Baustein 1 allein -- ZWEI neue Funktionen plus ein
+Testfall -- hat trotz seiner Einfachheit einen vollen Analyse-/Bau-/
+Prüfzyklus gebraucht).
+
+**Aufwandsschätzung** (grobe Grössenordnung, KEINE Messung): Punkte 3+4
+zusammen vermutlich vergleichbar zu Baustein 1 (je ein halber bis ganzer
+Arbeitszyklus wie dieser), die äussere Schleifen-Konvertierung selbst
+(Punkt 5) grösser als alle vier Bausteine zusammen, weil sie die Korrektheit
+des GESAMTEN Zusammenspiels (nicht nur einzelner Bausteine) beweisen muss --
+Gate B verlangt genau das. Insgesamt eher Tage als Stunden. **Diese Sitzung
+STOPPT hier** (Auftrag: "berichte den tatsächlichen Schnitt mit
+Aufwandsschätzung statt halbfertig umzubauen") -- Baustein 1 ist ein
+geprüfter, aber unvollständiger Fortschritt, kein Gate-B-Ergebnis.
+
+### Was NICHT geprüft ist
+
+- `round_transition_deep.rs` wurde NICHT gelesen (nur namentlich referenziert
+  über bestehende Kommentare in `round_transition.rs`) -- Punkt 3 oben ist
+  eine Einschätzung, keine Codeanalyse.
+- `net_tiling_tiebreak_value`s Aufrufhäufigkeit je Tiling-Phase (wie oft
+  `best_first_step_exact_or_valued` den Evaluator pro Zug aufruft) wurde
+  NICHT gemessen -- Punkt 4s tatsächliches Gewicht am Self-Play-Budget ist
+  unbekannt.
+- Ob `add_root_noise=true`/Produktions-`N_SAMPLES_TRAIN=24` unter
+  ECHTER Sammel-Faden-Last (nicht nur ohne Sammel-Faden wie in Baustein 1s
+  Test) ebenfalls Gleichheit hält -- nur der bit-identische Fall (kein
+  Sammel-Faden) wurde geprüft, analog zu Stufe 1s eigenem Kern-Test.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `sample_round_transition_value_async` verengt auf `net: &Net` statt
+  generischem Evaluator (siehe oben) -- bewusster Tausch: weniger allgemein
+  als das Original, aber kein Bedarf an `AsyncFnMut`-Bindungen für den
+  heute relevanten Fall.
+- Runde 4 aus dem Testlauf ausgelassen (Testfahrhilfe-Limitierung, siehe
+  oben) statt die Fahrhilfe selbst zu reparieren -- ausserhalb des engen
+  Baustein-1-Zuschnitts, Runden 1-3 reichen für den Nachweis der
+  MECHANISCHEN Aequivalenz.
+- Test NICHT `#[ignore]`t (anders als Stufe 1s grosse 1148er-Tests) --
+  braucht nur das lokale Modell, keine `MOSAIC_FROZEN_STATES_JSON`, und
+  läuft schnell genug (~30s) für den normalen `cargo test --lib`-Lauf.
