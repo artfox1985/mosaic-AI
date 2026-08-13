@@ -319,3 +319,140 @@ kompiliert.
   eine reine Dateikopie hat kein Löschungs-/Junction-Risiko (siehe
   `feedback_worktree_junction_hazard`), eine einzelne `.onnx`-Datei ist
   klein genug für eine Kopie statt eines Verweises.
+
+---
+
+## 9. DIAGNOSE (Nutzer-Auftrag): 391s gegen 55s zerlegt -- URSACHE GEFUNDEN, KONSTRUKTIONSDETAIL, BEHOBEN
+
+Auftrag: vor Stufe 2 pruefen, ob der Faktor ~7x (391s Sammel-Faden-Test
+gegen 55s Kern-Test, beide 1148 Zustaende) ein Grundsatzproblem des Ansatzes
+ist oder ein behebbares Konstruktionsdetail. Erfolgskriterium: der
+16-fach-Test faellt unter 2x, oder die Begruendung steht, warum nicht.
+
+### Instrumentierung (additiv, GEPRÜFT durch `cargo test --lib`-Gruen)
+
+- `net_batcher.rs::BatcherStats`: `fill_wait_ns`/`eval_ns` (Nanosekunden-
+  Summen, trennt "Sammel-Faden wartet auf weitere Zeilen" von "Sammel-Faden
+  ruft `net.eval_batch` auf") + `batch_size_hist` (Haeufigkeit je
+  tatsaechlicher Batch-Groesse).
+- `async_exec.rs::run_concurrent_diag`: Zwilling von `run_concurrent`,
+  zaehlt zusaetzlich JEDEN `poll()`-Versuch (macht das Ausmass des Busy-Poll
+  sichtbar).
+- Zwei neue `#[ignore]`-Diagnosetests in `net_mcts.rs`:
+  `async_batcher_time_breakdown_diagnostic` (Sammel-Faden EINMAL registriert)
+  und `..._recreate_per_chunk` (Sammel-Faden JE CHUNK neu registriert, wie
+  im ORIGINALEN Smoke-Test) -- direkter A/B-Vergleich bei identischer
+  Zustandsmenge.
+
+### DER FUND: kein Grundsatzproblem, sondern ein TESTAUFBAU-FEHLER im Smoke-Test selbst
+
+`async_drafting_search_with_batcher_concurrent_vs_synchronous` (der Test,
+der die 391s lieferte) berechnete die "synchrone" Referenz JE CHUNK **INNERHALB
+derselben Schleife, VOR** `clear_registry_for_test`/`ensure_batcher_for`
+**FUER DIESEN Chunk** -- der Sammel-Faden des VORHERIGEN Chunks blieb bis
+dahin registriert (er wurde erst DANACH neu aufgespannt). GEPRÜFT am Code:
+`make_node`/`build_gumbel_tree` prüfen selbst zuerst
+`net_batcher::lookup` (`net_mcts.rs:2165`, Bestandscode, nicht Teil dieser
+Vorregistrierung) -- ab Chunk 2 fand die "synchrone" Referenz also den
+Alt-Sammel-Faden aus Chunk 1 und lief über dessen `eval_rows()` (Kanal-
+Rundlauf + `fill_timeout=2000µs`), NICHT über den direkten
+`net.eval_pair_ex`-Aufruf. Weil die sequentielle Referenz zu diesem
+Zeitpunkt der EINZIGE Erzeuger war, wartete der (verwaiste) Sammel-Faden bei
+JEDER Zeile die vollen 2ms Füll-Timeout aus, bevor er den Ein-Zeilen-"Batch"
+abschickte -- eine versteckte Zusatzlatenz von ~2ms JE Netz-Aufruf, NUR in
+der vermeintlich "reinen" Referenz, für 71 von 72 Chunks.
+
+**Das ist ein Fehler in MEINEM Testaufbau, keine Eigenschaft der
+Verschränkung selbst** -- `net_batcher.rs`s eigener Modulkommentar schreibt
+bereits vor: *"`self_play.rs` registriert den Sammel-Faden EINMAL pro
+Lauf"* (nicht je Chunk). Der Smoke-Test hat sich nicht an seine eigene
+Bauanleitung gehalten.
+
+### Zerlegung, GEMESSEN (alle 1148 Zustände, sims=32, release-Build)
+
+| Messung | Zeit | Faktor gg. Referenz |
+| --- | ---: | ---: |
+| Referenz (rein synchron, sequentiell, KEIN Sammel-Faden registriert) | ~27-28s (siehe Zeilen unten) | 1,00x |
+| **create-once** (Sammel-Faden EINMAL registriert) | 27,91s verschränkt | **1,08x** |
+| **Original-Muster, aber BEREINIGT** (Sammel-Faden je Chunk neu, Referenz VOR jeder Registrierung berechnet) | 26,92s Referenz / 37,07s verschränkt | **1,38x** |
+| **Original-Muster, isoliert** (Sammel-Faden je Chunk neu, KEINE Referenz-Kontamination in diesem Diagnoselauf) | 37,75s verschränkt | 1,35x gg. create-once (27,91s) |
+
+**Ursachenanteile, damit auseinandergerechnet:**
+
+1. **Dominant: die Referenz-Kontamination selbst** -- erklärt den Sprung von
+   ~1,1-1,4x (bereinigt gemessen) auf die ursprünglich berichteten 391s
+   (die alte Zahl war kein gültiger Vergleich synchron-gegen-async, sondern
+   grösstenteils "kontaminierte Pseudo-Referenz mit 2ms-Strafe je Aufruf"
+   gegen "async mit derselben Strafe zusätzlich"). Die GENAUE alte
+   391s-Zahl wird hier NICHT nachgerechnet (der Fehler ist behoben, nicht
+   reproduziert) -- die neue, bereinigte Messung ersetzt sie.
+2. **Klein, aber real: Sammel-Faden je Chunk neu aufspannen statt einmal**
+   -- 27,91s (create-once) gegen 37,75s (Original-Muster, isoliert) =
+   **1,35x Aufschlag**, NICHT die 6-7x, die die ursprüngliche Zahl nahelegte.
+   Bleibt ein legitimer, aber SEKUNDÄRER Befund: Stufe 3 sollte den
+   Sammel-Faden analog zu `net_batcher.rs`s eigener Vorgabe EINMAL je Lauf
+   registrieren, nicht je Partiegruppe.
+3. **Busy-Poll-Churn ist REAL, aber NICHT der Haupttreiber bei dieser
+   Größenordnung**: 300.000-450.000 `poll()`-Versuche je Future (100 % davon
+   nach der groben Metrik "Pending, kein Fortschritt") -- objektiv
+   verschwenderisch (siehe `async_exec.rs`s eigener Kommentar: "kein
+   Park/Unpark ... fuer Produktionsdurchsatz waere ein Wecker-Executor die
+   richtige Wahl"), aber die WALL-CLOCK-Zahlen (0,97x bis 1,55x über
+   mehrere unabhängige Stichproben, siehe Abschnitt darüber) zeigen, dass
+   dieser Zusatz-CPU-Verbrauch bei 16-facher Nebenläufigkeit NICHT
+   dominiert. Für Stufe 3 (echte Produktionslast, mehr Nebenläufigkeit,
+   geteilte Kerne mit anderen Fäden) bleibt ein Park/Unpark-Wecker-Executor
+   die richtige Wahl -- **nicht behoben in dieser Sitzung**, weil er den
+   gemessenen Faktor hier nicht senken würde und damit ausserhalb des engen
+   Diagnose-Auftrags liegt.
+4. **Fill-Wartezeit vs. Eval-Zeit im Sammel-Faden selbst** (bereinigt, ohne
+   Kontamination): 13,2s Füll-Warten gegen 14,1s reine Eval-Zeit (create-
+   once, 1148 Zustände) -- etwa hälftig, kein Hinweis auf einen
+   pathologisch langen Timeout (Batch-Histogramm zeigt die Masse bei
+   24-32 Zeilen, nahe dem Deckel 32, nicht bei kleinen Rest-Batches).
+
+### Behoben (Konstruktionsdetail, KEIN Grundsatzproblem)
+
+`async_drafting_search_with_batcher_concurrent_vs_synchronous` umgebaut:
+die komplette Referenzberechnung läuft jetzt VOR jeder
+Sammel-Faden-Registrierung (garantiert unkontaminiert), der Sammel-Faden
+wird EINMAL registriert statt je Chunk. Ergebnis nach dem Fix (siehe
+Tabelle oben, Zeile 2): **1,38x**, klar unter der 2x-Schwelle. Gate A selbst
+bleibt unverändert bestanden (0/1148).
+
+### VERDIKT: Erfolgskriterium erfüllt -- Konstruktionsdetail, nicht Grundsatzproblem
+
+Der 16-fach-Test fällt nach der Bereinigung in die Nähe des Kern-Tests
+(1,08x-1,38x über drei unabhängige Messungen, statt 7,1x) -- die
+Diagnose ist POSITIV. Stufe 2 kann beginnen.
+
+### Was NICHT geprüft ist
+
+- Die GENAUE Ursache dafür, warum "Original-Muster isoliert" (37,75s) und
+  "Original-Muster bereinigt, mit Referenz" (37,07s verschränkter Anteil)
+  praktisch identisch sind, aber beide ca. 35% über create-once liegen --
+  plausibelste Erklärung ist der Thread-Spawn/Teardown-Overhead des
+  Sammel-Fadens selbst (72x statt 1x), NICHT weiter zerlegt (z.B. per
+  eigenständiger Zeitmessung um `spawn_batcher` herum).
+- Ob ein Park/Unpark-Wecker-Executor (statt Busy-Poll) den Faktor bei
+  HÖHERER Nebenläufigkeit (Stufe 3, Dutzende/Hunderte Partien statt 16)
+  ebenfalls unter 2x hielte -- dieser Diagnoseauftrag deckt nur 16-fache
+  Nebenläufigkeit ab, das ist Stufe 3s eigene Messfrage.
+- `MOSAIC_INTERLEAVE_FILL_TIMEOUT_US=2000` wurde NICHT gegen kleinere Werte
+  (z.B. 200µs, der Produktionswert aus `PREREG_gpu_inferenzpfad.md`)
+  gegengemessen -- 2000µs war eine eigene, unbegründete Wahl der Vorsitzung.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- Fund zuerst durch Code-Lesen bestätigt (Registrierungsreihenfolge im
+  Smoke-Test), NICHT nur durch Zahlen-Korrelation vermutet -- REGEL 0.
+- Drei unabhängige Messungen (create-once, Original-Muster bereinigt,
+  Original-Muster isoliert) statt einer einzigen -- eine einzelne Zahl
+  hätte die Frage "liegt es am Neu-Aufspannen ODER an der Kontamination"
+  nicht getrennt beantworten können.
+- Busy-Poll NICHT durch einen Park/Unpark-Executor ersetzt, obwohl
+  `async_exec.rs`s eigener Kommentar das für Produktionslast empfiehlt --
+  die Messung zeigt, dass er beim gegebenen Auftrag (16-fache
+  Nebenläufigkeit, Faktor-unter-2x-Frage) nicht der limitierende Faktor
+  ist; ein Umbau ohne gemessenen Nutzen wäre Vorratsarbeit ausserhalb des
+  engen Diagnoseauftrags.
