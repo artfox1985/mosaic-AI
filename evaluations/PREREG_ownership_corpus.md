@@ -291,6 +291,74 @@ statt Schoenreden" noetig, es gibt einen echten Effekt in allen vier
 gebauten Kriterien.** Arm B/C/E/F sind fuer den echten Korpus-Lauf (§2)
 freigegeben, sobald dieser gestartet wird (nicht Teil dieses Auftrags).
 
+**3.7 Streuungs-Shaping leckte in die Value-Labels — GEPRUEFT, JA, und
+BEHOBEN (§3 Punkt 6, 2026-08-14).** Reine Code-Pruefung wie beauftragt,
+Befund vor Umbau:
+
+- **Kette, GEPRUEFT datei:zeile (Zeilen VOR diesem Fix, siehe naechster
+  Punkt fuer die Fix-Stellen)**: `run_net_self_play`s Watchdog-Closure
+  setzt `set_partie_shaping_weight(Some(partie_gewicht_aus_seed(...)))`
+  thread-lokal (`self_play.rs::run_net_self_play`s Watchdog-Closure, Zeile
+  zum Pruefzeitpunkt 3038, zum Zeitpunkt dieses Nachtrags bereits nach 3542
+  verschoben — ein anderer Agent refaktoriert self_play.rs parallel
+  [Golden-Record-Harness], Zeilenangaben dort daher bewusst nur als
+  Funktions-/Aufrufname zitiert, nicht als Zeilennummer; self_play.rs selbst
+  WURDE FUER DIESEN FIX NICHT ANGEFASST). `wertung_shaping_weights()`
+  (`net_mcts.rs:1172`-1177 vor diesem Fix) liest DIESEN Thread-Wert VOR dem
+  prozessweiten Env-Cache, `apply_wertung_shaping` (`net_mcts.rs:1458`-1463
+  vor diesem Fix) nutzt ihn, `net_leaf_eval` (`net_mcts.rs:1905` vor diesem
+  Fix) wendet es ueber den Kommentar bei `net_mcts.rs:2009`-2012 ("gilt
+  also unveraendert fuer jeden `net_leaf_eval`-Aufrufer (Chance-Node-
+  Sampling in `round_transition_deep.rs`/`self_play.rs` eingeschlossen)")
+  bedingungslos an. `round_transition_deep.rs::bootstrap_value_after_rounds`
+  (Zeile 719 vor dem Fix) und `continue_through_round{2,3,4}` (vormals
+  Zeilen 577/606/635, `make_round_end_eval` eingeschlossen) riefen
+  `net_leaf_eval` OHNE Zwischenschritt auf — alles auf DEMSELBEN Thread wie
+  die Partie selbst (kein `thread::spawn`/`rayon::spawn` in
+  `round_transition_deep.rs`/`round_transition.rs`, GEPRUEFT per Grep), also
+  erbte die Label-Rechnung den vollen Thread-Zustand. (Alle vier
+  Zeilenangaben sind Vor-Fix-Stand; der Fix selbst verschiebt sie um die
+  neu eingefuegte Funktion, siehe Repo fuer den aktuellen Stand.)
+- **Gemessen, nicht nur hergeleitet**: mit `MOSAIC_TAU`-neutralem Testaufbau
+  (`round_transition_deep.rs::bootstrap_value_after_rounds_ignores_partie_
+  streuung`, Modell `alphazero_v10_best.onnx`, Seed 51/4242) lieferte
+  `bootstrap_value_after_rounds` VOR dem Fix `[0,5109; 0,4213]` ohne und
+  `[0,5583; 0,4860]` MIT `set_partie_shaping_weight(Some(1.0))` — derselbe
+  Zustand, derselbe RNG-Seed, ein Unterschied von +0,047/+0,065 Value-Punkten
+  einzig durch den Partie-Wuerfelwurf. Provisorisch mit einem lokal
+  vorhandenen Modell verifiziert (`alphazero_v10_best.onnx` selbst fehlt in
+  diesem Checkout, `.gitignore`), Testdatei zitiert wieder das Standard-
+  Modell wie der bestehende Determinismus-Test daneben (self-skip ohne
+  `models/`, dokumentiertes Bestandsmuster).
+- **Fix (`net_mcts.rs` + `round_transition_deep.rs`, KEIN self_play.rs-
+  Antasten)**: neue Funktion `net_mcts::with_partie_streuung_suspended`
+  (RAII-Guard, setzt `PARTIE_GEWICHT` fuer die Dauer von `f` auf `None` und
+  restauriert danach, auch bei Panic) — angewandt als Wrapper um den
+  GESAMTEN Funktionskoerper von `bootstrap_value_after_rounds` und
+  `continue_through_round{2,3,4}` (vier Stellen, `round_transition_deep.rs`).
+  Der PROZESSWEITE Basiswert (`MOSAIC_WERTUNG_SHAPING_W`, konstant ueber
+  alle Partien) bleibt bewusst UNVERAENDERT wirksam — das ist die
+  bestehende, in `net_leaf_eval`s eigener Doku ausdruecklich gewollte
+  Kopplung, nicht Gegenstand von Punkt 6 und hier nicht angetastet; nur die
+  ZUFAELLIGE Partie-zu-Partie-Streuung wird fuer die Label-Rechnung
+  neutralisiert. Kein Baustein aus round_transition_deep.rs' Task-#71-Deckel
+  (Zeit-/Knoten-Budgets) beruehrt.
+- **Test, GEPRUEFT dass er etwas pruefte** (nicht vacuous): Fix testweise
+  entfernt (Wrapper durch eine sofort aufgerufene Passthrough-Closure
+  ersetzt) → derselbe neue Test schlaegt fehl, exakt mit den zwei oben
+  zitierten Werten. Fix restauriert → Test gruen. `cargo test --lib`:
+  418/0/20 (417 Bestand + 1 neuer Test). `tools/paritaets_probe.py`: Hash
+  `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` haelt
+  (Wheel neu gebaut+installiert) — Bestandsverhalten bei unbesetzten
+  Knoepfen unveraendert, der Fix wirkt nur, wenn `PARTIE_GEWICHT` ueberhaupt
+  `Some` ist.
+- **Tragweite fuer den Korpus**: betrifft Arm A/B/C/E/F (alle laufen mit
+  Streuung, §1/§2), NICHT Arm D (Heuristik-Self-Play, kein Netz-Leaf-Eval).
+  `round_transition_value` (rtv, nur bei `record_rtv=true` aufgezeichnet)
+  war GLEICHERMASSEN betroffen (`sample_round_transition_for_round`,
+  `self_play.rs`, ruft dieselben `continue_through_round{2,3,4}` auf) und
+  ist mit demselben Fix mitbehoben, ohne self_play.rs anzufassen.
+
 ## §4 Training + Abnahme (Tor A aus PREREG_ownership_consumer.md)
 
 - Warm-Start vom Champion (v21_2d_brierbest), Standard-Rezept (lr 5e-5,

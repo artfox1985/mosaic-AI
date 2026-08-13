@@ -554,6 +554,9 @@ pub(crate) fn continue_through_round4<R: Rng + ?Sized>(
     round4_start: &GameState,
     rng: &mut R,
 ) -> [f64; 2] {
+    // PREREG_ownership_corpus.md §3 Punkt 6: Label-Rollout, keine
+    // Partie-Streuung (siehe `with_partie_streuung_suspended`-Doku).
+    crate::net_mcts::with_partie_streuung_suspended(|| {
     let overall = Instant::now() + ROUND_SIM_TIME_BUDGET;
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
@@ -576,6 +579,7 @@ pub(crate) fn continue_through_round4<R: Rng + ?Sized>(
         // einzelner Netz-Blattwert statt kompletter Ausfall.
         None => crate::net_mcts::net_leaf_eval(net, round4_start),
     }
+    })
 }
 
 /// Simuliert Runde 3, sampelt den 3→4-Übergang EINMAL, rekursiert in
@@ -585,6 +589,9 @@ pub(crate) fn continue_through_round3<R: Rng + ?Sized>(
     round3_start: &GameState,
     rng: &mut R,
 ) -> [f64; 2] {
+    // PREREG_ownership_corpus.md §3 Punkt 6: Label-Rollout, keine
+    // Partie-Streuung (siehe `with_partie_streuung_suspended`-Doku).
+    crate::net_mcts::with_partie_streuung_suspended(|| {
     let overall = Instant::now() + ROUND_SIM_TIME_BUDGET;
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
@@ -605,6 +612,7 @@ pub(crate) fn continue_through_round3<R: Rng + ?Sized>(
         }
         None => crate::net_mcts::net_leaf_eval(net, round3_start),
     }
+    })
 }
 
 /// Simuliert Runde 2, sampelt den 2→3-Übergang EINMAL, rekursiert in
@@ -614,6 +622,9 @@ pub(crate) fn continue_through_round2<R: Rng + ?Sized>(
     round2_start: &GameState,
     rng: &mut R,
 ) -> [f64; 2] {
+    // PREREG_ownership_corpus.md §3 Punkt 6: Label-Rollout, keine
+    // Partie-Streuung (siehe `with_partie_streuung_suspended`-Doku).
+    crate::net_mcts::with_partie_streuung_suspended(|| {
     let overall = Instant::now() + ROUND_SIM_TIME_BUDGET;
     match simulate_one_round(
         |s| crate::net_mcts::drafting_action_priors(net, s),
@@ -634,6 +645,7 @@ pub(crate) fn continue_through_round2<R: Rng + ?Sized>(
         }
         None => crate::net_mcts::net_leaf_eval(net, round2_start),
     }
+    })
 }
 
 /// TD-Bootstrap-Ziel (`evaluations/value head tests.txt`, Punkt 6): anders
@@ -670,6 +682,9 @@ pub(crate) fn bootstrap_value_after_rounds<R: Rng + ?Sized>(
     // Verschachtelung mit "net_inference" wird dort ueber
     // `net_inference_inside_bootstrap_ns` getrennt ausgewiesen.
     crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::BootstrapValue, || {
+    // PREREG_ownership_corpus.md §3 Punkt 6: Label-Rollout, keine
+    // Partie-Streuung (siehe `with_partie_streuung_suspended`-Doku).
+    crate::net_mcts::with_partie_streuung_suspended(|| {
     let mut captured: Option<GameState> = None;
     let deadline0 = Instant::now() + INNER_SAMPLE_TIME_BUDGET;
     round_transition::sample_round_transition_value(
@@ -717,6 +732,7 @@ pub(crate) fn bootstrap_value_after_rounds<R: Rng + ?Sized>(
         }
     }
     crate::net_mcts::net_leaf_eval(net, &state)
+    })
     })
 }
 
@@ -939,6 +955,57 @@ mod tests {
             val_a, val_b,
             "gleicher Seed + gleiche Stellung lieferten unterschiedliche bootstrap_value_after_rounds-Werte \
              ({val_a:?} vs {val_b:?}) -- Determinismus-Fix (Task #71) nicht wirksam"
+        );
+    }
+
+    /// PREREG_ownership_corpus.md §3 Punkt 6: `bootstrap_value_after_rounds`
+    /// (und mit ihr, ueber denselben `net_leaf_eval`-Pfad, `continue_through_
+    /// round{2,3,4}`/`round_transition_value`) darf sich NICHT aendern, je
+    /// nachdem, ob auf dem aufrufenden Thread eine Partie-Streuung
+    /// (`set_partie_shaping_weight`, `MOSAIC_WERTUNG_STREUUNG_MAX`) aktiv ist
+    /// -- sonst variiert das Trainingsziel rein durch den Partie-Seed-
+    /// Wuerfelwurf, ohne Bezug zum Spielausgang (der Befund von Punkt 6:
+    /// das Streuungs-Shaping der Suche lief ohne diesen Fix UNGEBREMST in
+    /// `net_leaf_eval` und damit in jeden `bootstrap_value`/`round_transition_
+    /// value`-Aufrufer, siehe `with_partie_streuung_suspended`-Doku in
+    /// `net_mcts.rs`). Gleicher Seed, gleiche Ausgangsstellung, EINMAL mit
+    /// `Some(1.0)` (maximale Streuung), EINMAL mit `None` (keine) -- muss
+    /// bit-identisch sein.
+    #[test]
+    fn bootstrap_value_after_rounds_ignores_partie_streuung() {
+        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v10_best.onnx");
+        let net = match Net::load_auto(model_path) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!(
+                    "bootstrap_value_after_rounds_ignores_partie_streuung uebersprungen \
+                     (Modell nicht geladen: {e})"
+                );
+                return;
+            }
+        };
+        let leaf = crate::round_transition::drive_to_first_round_end(51);
+        let pre = round_transition::resolve_to_pre_chance(&leaf).expect("aufloesbar");
+        assert!(
+            !leaf.scoring_tile_ids.is_empty(),
+            "Testaufbau: Ausgangsstellung ohne Wertungsplatten -- Shaping haette gar keinen Ansatzpunkt"
+        );
+
+        crate::net_mcts::set_partie_shaping_weight(None);
+        let mut rng_off = StdRng::seed_from_u64(4242);
+        let val_streuung_aus =
+            bootstrap_value_after_rounds(&pre, &net, BOOTSTRAP_HORIZON_ROUNDS, &mut rng_off);
+
+        crate::net_mcts::set_partie_shaping_weight(Some(1.0));
+        let mut rng_on = StdRng::seed_from_u64(4242);
+        let val_streuung_an =
+            bootstrap_value_after_rounds(&pre, &net, BOOTSTRAP_HORIZON_ROUNDS, &mut rng_on);
+        crate::net_mcts::set_partie_shaping_weight(None); // aufraeumen, sonst leckt's in Folgetests
+
+        assert_eq!(
+            val_streuung_aus, val_streuung_an,
+            "bootstrap_value_after_rounds aenderte sich mit aktiver Partie-Streuung \
+             ({val_streuung_aus:?} ohne vs. {val_streuung_an:?} mit) -- Leck aus Punkt 6 nicht behoben"
         );
     }
 }
