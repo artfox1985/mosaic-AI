@@ -37,6 +37,7 @@ pub mod scoring;
 pub mod search_common;
 pub mod self_play;
 pub mod serialize;
+pub mod spaltenbau;
 pub mod state;
 pub mod supply;
 pub mod tiling_solver;

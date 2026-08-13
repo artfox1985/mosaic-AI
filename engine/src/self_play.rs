@@ -1611,6 +1611,8 @@ fn play_net_game<R: Rng + ?Sized>(
                     } else if pi == net_board {
                         let s = net_effective_sims(net_sims, actions.len());
                         crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
+                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
                             .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     } else {
@@ -1832,6 +1834,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                         };
                         let s = net_effective_sims(base, actions.len());
                         crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
+                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
                             .or_else(|| net_search_drafting_action(net, &game.state, s, cp, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -2027,6 +2031,8 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                     } else {
                         let s = net_effective_sims(sims_plain, actions.len());
                         crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
+                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
                             .or_else(|| net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -2925,6 +2931,20 @@ pub fn run_net_self_play(
         "perspective_divergence_diagnostics": true,
         "by_round": crate::net_mcts::perspective_divergence_snapshot(),
     }));
+    // Verschraenkungs-Messung (PREREG_gpu_inferenzpfad.md §19): "berichte den
+    // TATSAECHLICH erreichten mittleren Batch" -- Knopf aus (Default) heisst
+    // `lookup` findet nichts, dieses Objekt wird dann gar nicht angehaengt
+    // (kein Einfluss auf Bestandsverhalten/Trainingsdaten-Auswertung, gleiche
+    // additive Konvention wie `perspective_divergence_diagnostics` oben).
+    if let Some(batcher) = crate::net_batcher::lookup(&net) {
+        flat.push(json!({
+            "batcher_diagnostics": true,
+            "batches": batcher.stats.batches.load(Ordering::Relaxed),
+            "rows": batcher.stats.rows.load(Ordering::Relaxed),
+            "mean_batch": batcher.stats.mean_batch(),
+            "max_batch_seen": batcher.stats.max_batch_seen.load(Ordering::Relaxed),
+        }));
+    }
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
@@ -3367,6 +3387,8 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                     } else {
                         let s = net_effective_sims(sims1, actions.len());
                         crate::provokation::vorzugszug(&game.state)
+                            .or_else(|| crate::spaltenbau::vorzugszug(&game.state))
+                            .or_else(|| crate::spaltenbau::vorzug_dome_wahl(&game.state))
                             .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
