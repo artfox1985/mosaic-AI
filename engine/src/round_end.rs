@@ -141,6 +141,27 @@ pub fn validate_tiling_action(
         return Some(format!("Musterreihe {} ist nicht voll.", action.pattern_row + 1));
     }
 
+    // Reihen-Zuordnung (Regel, bisher NUR im Zugerzeuger unten und teilweise im
+    // Web-Client erzwungen): Musterreihe ri gehoert zu Kuppel-Slot-Reihe ri/2
+    // und dort zur Zellen-Teilreihe ri%2 (Space-Indizes 2*(ri%2) und +1, Layout
+    // [0][1]/[2][3], dome.rs::rotation_indices). Ohne diesen Check nahm der
+    // Server ueber die API einen farblich passenden Zug in die falsche
+    // (Teil-)Reihe an -- der Zugerzeuger (get_tiling_actions, unten) erzeugte
+    // solche Aktionen nie, verwundbar war nur der externe Pfad (py.rs).
+    let soll_slot_row = action.pattern_row / 2;
+    let soll_si = [(action.pattern_row % 2) * 2, (action.pattern_row % 2) * 2 + 1];
+    if action.slot_row != soll_slot_row || !soll_si.contains(&action.space_index) {
+        return Some(format!(
+            "Musterreihe {} gehört zu Kuppel-Reihe {} (Space {} oder {}), nicht zu Slot-Reihe {} Space {}.",
+            action.pattern_row + 1,
+            soll_slot_row,
+            soll_si[0],
+            soll_si[1],
+            action.slot_row,
+            action.space_index
+        ));
+    }
+
     // Regelwerk S.7: Reihen von oben nach unten — aber nur, wenn die frühere Reihe
     // tatsächlich platzierbar ist (passende Kuppelplatte vorhanden).
     let grid = &player.dome_grid;
@@ -717,6 +738,37 @@ mod tests {
         let mut p = PlayerBoard::new(0, "P");
         p.pattern_lines[0].add_tiles(&[Rot]);
         assert_eq!(projected_unplaceable_penalty(&p), 0);
+    }
+
+    #[test]
+    fn tiling_rejects_wrong_row_assignment() {
+        // Reihen-Zuordnungs-Check in validate_tiling_action: ein farblich
+        // passender Zug in die falsche Teilreihe (oder Slot-Reihe) muss
+        // serverseitig abgelehnt werden -- bisher blockte das nur der
+        // Web-Client, und auch der nur auf Slot-Reihen-Ebene.
+        let mut s = game();
+        let tile = build_dome_tile_pool()[2].clone(); // [Tuerkis, Rot, Blau, Wild]
+        s.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+
+        // Reihe 0 gehoert zu Slot-Reihe 0, Teilreihe 0 (si 0/1): si 3 (Wild,
+        // wuerde jede Farbe akzeptieren) liegt in Teilreihe 1 -> ablehnen.
+        let falsche_teilreihe = TilingAction {
+            pattern_row: 0, slot_row: 0, slot_col: 0, space_index: 3,
+        };
+        assert!(validate_tiling_action(&s, 0, &falsche_teilreihe).is_some());
+
+        // Reihe 0 in Slot-Reihe 1 -> ablehnen (unabhaengig von der Zelle).
+        let falsche_slot_reihe = TilingAction {
+            pattern_row: 0, slot_row: 1, slot_col: 0, space_index: 1,
+        };
+        assert!(validate_tiling_action(&s, 0, &falsche_slot_reihe).is_some());
+
+        // Gegenprobe: der regelkonforme Zug (si 1 = Rot) bleibt gueltig.
+        let konform = TilingAction {
+            pattern_row: 0, slot_row: 0, slot_col: 0, space_index: 1,
+        };
+        assert!(validate_tiling_action(&s, 0, &konform).is_none());
     }
 
     #[test]
