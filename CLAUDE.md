@@ -48,6 +48,19 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - **Fehlerbehandlung** Implementiere defensive Programmierung für alle Benutzer- und KI-Eingaben.
 - **KI-Gegner** Priorisiere Lesbarkeit und Wartbarkeit der Heuristiken gegenüber komplexen, schwer debugbaren Optimierungen.
 
+## Worktrees & git-crypt (Stolperfalle)
+
+`git worktree add` scheitert in diesem Repo am git-crypt-Smudge-Filter
+(git-crypt findet seinen Schlüssel unter `.git/worktrees/<name>/` nicht).
+Workaround — Worktree mit umgangenem Filter anlegen:
+
+```
+git -c filter.git-crypt.smudge=cat -c filter.git-crypt.clean=cat -c filter.git-crypt.required=false worktree add <pfad> <branch>
+```
+
+Im Worktree enthält `player_profiles.json` dann Ciphertext — für Engine-/
+Tool-Arbeit egal, aber die Datei dort NIE bearbeiten oder committen.
+
 ## Workflow-Präferenzen
 
 - Bevor du große Refactorings durchführst, skizziere kurz den Plan (1-2 Sätze).
