@@ -60,7 +60,23 @@ dürfen **nie in ein Gating**. In einen Trainingskorpus dürfen sie — die
 Ownership-Ziele sind realisierte Endzustands-Feldlabels und bei jeder Steuerung
 korrekt.
 
-### NÄCHSTER SCHRITT, eng umrissen
+### AKTUALISIERUNG 2026-08-13: Zwei-Pole-Architektur ist der geltende Rahmen
+
+Der Abschnitt unten (Provokations-Messung) ist UEBERHOLT. Stand jetzt in
+`PREREG_provokation.md` §9-§10: **vier Generator-Mechanismen enden alle bei 0,30
+Spalten/Partie** (Injektion, Beschneidung, Vorzug, Vorzug beide Haelften); die
+Beschneidung zerstoert das Spiel, die Vorzuege nicht. Nutzer-Entscheid: der
+**Spaltenbau-Spieler** wird gebaut (Agent laeuft) -- Pol B der Zwei-Pole-
+Architektur (Netz = Basispol, Wertungsheuristik = Plattenpol, Regler = kuenftiges
+Konsumenten-Gewicht des Ownership-Kopfs, zur Laufzeit sweepbar). Moegliche Folge:
+je Platte eine eigene Heuristik, parametrisiert statt achtfach gebaut.
+
+GPU dazu: Weg B gedeckt (10,4-21,0x Inferenz), Verdrahtung von Batcher+ORT in
+`run_net_self_play` samt ECHTER Produktionsmessung laeuft beim zweiten Agenten
+(§19 folgt); Mess-Partien gehen nach `data/gpu_messung/` (Nutzer-Anweisung,
+Unterordner = kein Trainingsfenster).
+
+### ÜBERHOLT -- NÄCHSTER SCHRITT, eng umrissen
 
 `PREREG_provokation.md` §5: die Beschneidung auf den 20 k1-Seeds messen.
 **Abnahme bei >= 7,00** vertikalen Plattenpunkten. Eine halbe Stunde. Darunter ist
