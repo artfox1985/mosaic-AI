@@ -73,7 +73,7 @@ Trainingsziel-Divergenz -> Schritt 3 der Startsequenz.
 | **Bootstrap-Horizont / Zufallsknoten / Stapelzug** | **ENTSCHIEDEN 2026-08-14 (Nutzer: "beibehalten")**: der Korpus-Start laeuft mit Horizont 2 und allen Defaults -- keine Zusatzvariablen im Lehr-Korpus. Die Preregs (bootstrap_horizon, chance_nodes) bleiben fuer einen KUENFTIGEN Fenster-Generierungsstart (v22) geparkt, nicht geschlossen |
 | **Kopf-Warmstart Index-Abbildung** | fuer den Korpus-Trainingslauf pruefen: Champion-Checkpoint traegt den 140er-Kopf (untrainiert) -- Warm-Start formgleich, Abbildungsfrage stellt sich nur bei Alt-Checkpoints (122er). Kurzcheck vor dem Training |
 | **Formungsterm Arm A/B** | Kontrast (gezaehlte Felder vs. Ownership-Marginale) geht im Consumer-Tor-C-Sweep auf -- kein eigener Task mehr |
-| **"P0-P6"-Bezeichnung** | Nutzer-Nomenklatur fuer die Ownership-Kette, nie aufgeloest; bei naechster Gelegenheit klaeren, ob sie mehr enthaelt als Korpus->Training->Tor A->Verbraucher->Sweep |
+| ~~"P0-P6"-Bezeichnung~~ | **AUSGEMUSTERT 2026-08-14** (Nutzer: obsolet; die Zuschreibung "Nutzer-Nomenklatur" war zudem falsch -- es war Koordinator-Nummerierung, nie verschriftlicht). Die Kette ist vollstaendig durch die Preregs abgedeckt (corpus/consumer + Abschaltkriterium oben). Verstreute "P4"-Erwaehnungen in alten Preregs meinen den Verbraucher-Bau |
 
 ---
 

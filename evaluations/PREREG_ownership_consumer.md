@@ -19,7 +19,9 @@ Ownership-Verbraucher ist der RUNTIME-REGLER dazwischen.
   (models/manifest_train_v21_2d_20260809_004805.json; train.py:2059).
   Die Gewichte des Kopfes sind untrainiert.
 - **Kein Verbraucher**: ONNX-Ausgang 4 (ownership) wird engine-seitig nirgends
-  gelesen (Befund der Architektur-Durchsicht, STATUS.md P4).
+  gelesen (Befund der Architektur-Durchsicht; die fruehere "P4"-Nummerierung
+  ist ausgemustert, Nutzer-Entscheid 2026-08-14 -- gemeint ist der
+  Verbraucher-Bau dieser Prereg).
 - **Vorbild-Muster**: Task #28 (`blended_leaf_win_prob`, net_mcts.rs:1775-1780) —
   Regler-Default 0 → Early-Out, byte-identisches Bestandsverhalten; Test
   net_mcts.rs:7545 sichert den Default.
@@ -84,8 +86,8 @@ Eigenes Gewicht, eigener Arm — nicht mit der Eigen-Hälfte verrechnen.
 5. **Tor C — Regler-Sweep**: w_own-Raster in der Arena, Messgrößen
    Plattenpunkte je Kriterium + Endstand-Marge (die Nutzer-Zielgröße),
    Block-Ebene, Orakel-Schwellen aus PREREG_provokation.md.
-6. Verdrahtung (net.rs Ausgang 4 durch tract/ORT/Batcher reichen) kann als
-   P4 VOR dem Training gebaut werden — Verbraucher tot bei Default 0.
+6. Verdrahtung (net.rs Ausgang 4 durch tract/ORT/Batcher reichen) kann
+   VOR dem Training gebaut werden — Verbraucher tot bei Default 0.
 
 ## §6 Offene Punkte
 
