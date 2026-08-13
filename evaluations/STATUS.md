@@ -5,182 +5,61 @@
 
 ---
 
-## ÜBERGABE 2026-08-12 — Stand nach der Wertungsplatten-Nacht
+## STAND 2026-08-13
 
-**Champion unverändert: `v21_2d_brierbest`.** Kein Gating gelaufen, kein Modell
-gewechselt. Alles Gebaute steht auf Default AUS, der Paritäts-Hash
-`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` hält
-(mehrfach nach jedem Wheel-Neubau geprüft).
+**Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434]. Kein
+Gating gelaufen, kein Modell gewechselt. Paritaets-Hash
+`8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` haelt
+(mehrfach nach jedem Wheel-Neubau geprueft). Die vollstaendige Nacht-Herleitung
+(Provokations-Messung Spaltenbau, GPU-Weg-A/B-Messreihe, λ/Punkte-Kanal,
+Injektions-Messung der Wertungsplatten, Ownership-Kopf-Zuschnitt,
+Spezialpunkte-Korrektur, methodische Lehren) liegt in `../archive/history.md`,
+Kapitel "2026-08-11/13: Wertungsplatten-Nacht, GPU-Weg-B, Zwei-Pole". Verdikte
+vom 2026-08-10 selbst: Kapitel "2026-08-10" davor im selben Dokument.
 
-### Der Strang: eine geschlossene Spalte provozieren
+**Was NICHT ins Archiv gehoert, weil es heute (2026-08-13) neu und noch offen
+ist**: die Produktionsmessung von GPU-Weg-B (NACHTRAG direkt unten) und die
+Zwei-Pole-Architektur als geltender Plan (danach).
 
-**Nutzer-Ziel, kalibriert**: *eine* Spalte je Partie wäre gut, zwei ein solides
-Ergebnis — eine Spalte sind **21 Platzierungs- plus 7 Plattenpunkte = 28**, also
-rund ein Fünftel eines guten Endstands. In der Messgröße "vertikale
-Plattenpunkte": Ziel **7,00**, heute **1,05**.
+### NACHTRAG 2026-08-13: Weg B (ORT-CUDA) über den ECHTEN Self-Play-Pfad NICHT GEDECKT
 
-**FÜNF Erklärungen sind gemessen ausgeschlossen** — Details je Punkt in
-`PREREG_platzierungsseite.md` §7-14:
-
-| ausgeschlossen | Beleg |
-| -------------- | ----- |
-| Drafting-Dosis | Decke 2,10 bei w=1/alpha=1; ab w>=10 Kollaps auf 0,00-0,50 |
-| Platzierung | kein Zugewinn (beste Fassung 1,75 gegen 2,10) |
-| Versorgung | volle Farbverfügbarkeit → 0 von 20 Abschlüssen, Verteilung sammelt sich noch stärker bei 5/6 |
-| Durchsatz | Nutzer: Menschen tun es routinemäßig; meine 42-Fliesen-Rechnung ignorierte Spezialfelder und die billigen Musterreihen |
-| Sichtweite | 16x Suchbudget (400→6400) → **-0,35**, Endstand fällt 47,80→44,15 |
-
-**Die tragende Zahl für alles Weitere**: in **36 von 57 Partien** bleibt eine
-Spalte bei **5 von 6 Feldern** stehen. Das Netz baut auf und schliesst nicht.
-
-**Referenz, die zeigt dass es geht**: die **Heuristik** macht 1,40 vertikale
-Plattenpunkte gegen 0,70 des Netzes — **10 Abschlüsse in 57 Partien gegen 4**. Die
-Fähigkeit steckt in der Suchfamilie; die gelernte Politik steuert davon weg.
-
-**Ursache, eingegrenzt**: `dome.rs:61-70` — jede normale Kuppelzelle verlangt GENAU
-EINE Farbe, eine Musterreihe trägt nur eine. Eine Spalte sind sechs festgelegte
-Farben in sechs Musterreihen. Das ist eine **Absicht über Runden**, und keine
-Stellungsbewertung kann sie darstellen.
-
-### Was daraus gebaut wurde (alles Default AUS)
-
-| Knopf | Was | Stand |
-| ----- | --- | ----- |
-| `MOSAIC_PROVOKATION_SPALTE` | **Beschneidung der Aktionsmenge** auf eine Ziel-Spalte (`provokation.rs`, Einhängung `validation.rs:237`) | **GEBAUT, NOCH NICHT GEMESSEN** ← der nächste Schritt |
-| `MOSAIC_WERTUNG_STREUUNG_MAX` | Shaping-Gewicht je Partie aus dem Seed, thread-lokal | gebaut, bewusst unbenutzt (Stufe 2) |
-| `MOSAIC_WERTUNG_FLOOR_W` | `projected_unplaceable_penalty` im Shaping | gemessen, +2,77 Pkt (t=2,21) auf ALTER Formel |
-| `MOSAIC_TILING_W` | `solve_round_final_score` minus Punktestand | Teil der besten Konfiguration |
-| `MOSAIC_TILING_PLATTEN_W` / `_GEW` | Plattenwert in der Tiling-Wahl, stetig, je Kriterium | gemessen, kein Zugewinn |
-| `MOSAIC_TILING_PUNKTE_W` | Punkte-Kopf im Tiling-Stichentscheid | gemessen, wirkungslos (Produktform) |
-| `MOSAIC_ENDAWARE_W` / `MOSAIC_MUSTERREIHEN_W` | zwei eigene Musterreihen-Terme | gemessen, wirkungslos — Nutzer: *"nichts davon"* |
-| `MOSAIC_VOLLE_VERSORGUNG` | Diagnose: alle Farben immer verfügbar | Deckenprobe gefahren |
-
-**Diagnose-Knöpfe** (`MOSAIC_VOLLE_VERSORGUNG`, `MOSAIC_PROVOKATION_SPALTE`)
-dürfen **nie in ein Gating**. In einen Trainingskorpus dürfen sie — die
-Ownership-Ziele sind realisierte Endzustands-Feldlabels und bei jeder Steuerung
-korrekt.
+`PREREG_gpu_inferenzpfad.md` §19 (volle Zahlen:
+`evaluations/gpu_inferenzpfad_selfplay_e2e_wegb.json`). Erste Messung über den
+Produktionspfad selbst (`self_play.py`, nicht ein Beispiel-Binary): Batcher+
+ORT-CUDA bei 8 Threads (die einzige beidseitig belastbare Zelle, 40/40 gegen
+23/40 echte Partien) ist **3,4x LANGSAMER** als der Bestand (2190,3s gg. 638,4s
+für dieselben 40 Partien) -- Regel-3-Faktor 0,29x/0,17x, klar unter 1,0x, weit
+unter der 2,0x-Schwelle. Das trotz nahezu gesättigtem Batch (14,64 von 16) --
+die §9-Erwartung ("Weg B hat die Kostenposten von Weg A nicht, sollte also
+gewinnen") trägt hier NICHT, Ursache ungeklärt (Kandidaten: `Mutex<Session>`
+als serialisierendes Nadelöhr, `Session::run()`-Kosten unter echter statt
+synthetischer Ankunftsrate). Bei 64 Threads sind BEIDE Arme durch den
+Chunk-Hänger-Notdeckel degeneriert (3/40 bzw. 0/40 echte Partien) --
+diese Zelle liefert keinen verwertbaren Faktor. Verdrahtung selbst (Batcher im
+Suchpfad, ORT-CUDA-Rangfolge) war bereits vollständig vorhanden, nicht neu
+gebaut. Nächster Schritt liegt beim Nutzer: Ursachenzerlegung (BatcherStats
+hat bisher keine Latenzverteilung je `eval_batch`-Aufruf) oder Weg B als
+erledigt einstufen.
 
 ### AKTUALISIERUNG 2026-08-13: Zwei-Pole-Architektur ist der geltende Rahmen
 
-Der Abschnitt unten (Provokations-Messung) ist UEBERHOLT. Stand jetzt in
-`PREREG_provokation.md` §9-§10: **vier Generator-Mechanismen enden alle bei 0,30
-Spalten/Partie** (Injektion, Beschneidung, Vorzug, Vorzug beide Haelften); die
+Die vorausgehende Provokations-Messung ist UEBERHOLT und liegt jetzt in
+`../archive/history.md`, Kapitel "2026-08-11/13: Wertungsplatten-Nacht,
+GPU-Weg-B, Zwei-Pole". Stand von dort, `PREREG_provokation.md` §9-§10:
+**vier Generator-Mechanismen enden alle bei 0,30 Spalten/Partie** (Injektion, Beschneidung, Vorzug, Vorzug beide Haelften); die
 Beschneidung zerstoert das Spiel, die Vorzuege nicht. Nutzer-Entscheid: der
 **Spaltenbau-Spieler** wird gebaut (Agent laeuft) -- Pol B der Zwei-Pole-
 Architektur (Netz = Basispol, Wertungsheuristik = Plattenpol, Regler = kuenftiges
 Konsumenten-Gewicht des Ownership-Kopfs, zur Laufzeit sweepbar). Moegliche Folge:
 je Platte eine eigene Heuristik, parametrisiert statt achtfach gebaut.
 
-GPU dazu: Weg B gedeckt (10,4-21,0x Inferenz), Verdrahtung von Batcher+ORT in
-`run_net_self_play` samt ECHTER Produktionsmessung laeuft beim zweiten Agenten
-(§19 folgt); Mess-Partien gehen nach `data/gpu_messung/` (Nutzer-Anweisung,
-Unterordner = kein Trainingsfenster).
-
-### ÜBERHOLT -- NÄCHSTER SCHRITT, eng umrissen
-
-`PREREG_provokation.md` §5: die Beschneidung auf den 20 k1-Seeds messen.
-**Abnahme bei >= 7,00** vertikalen Plattenpunkten. Eine halbe Stunde. Darunter ist
-die Frage nicht "welcher Term", sondern ob das Ziel überhaupt einseitig erzwingbar
-ist — Nutzer sagt ja (*"1 spalte geht immer, selbst wenn der gegner auch spalten
-baut"*), also wäre ein Fehlschlag ein echtes Negativergebnis.
-
-**Erst danach** Stufe 2: Streuung ins Self-Play, dann Training mit
-Ownership-Kopf, dann prüfen ob die Spalten OHNE Injektion entstehen.
-
-### GPU: Weg A ist ERLEDIGT, Weg B ist der Weg (ORT-CUDA, 10,4x bis 21,0x)
-
-**Stand nach der vollständigen Messreihe** (Details `PREREG_gpu_inferenzpfad.md`
-§7-§13):
-
-| Vorhaben | Status | Zahl |
-| -------- | ------ | ---- |
-| **Weg A** (IPC zu Python/torch) | **ungedeckt, erledigt** | 0,30x / 0,55x gegen Regel 3 (>= 2,0x) |
-| **Weg B** (ORT-CUDA im Prozess) | **gedeckt** | **10,4x bis 21,0x** gegen tract-CPU |
-| Verschränkung (Batcher) | **abgenommen** | Entscheidungsgleichheit 0/1148, Batch füllt bis 126/128, Parität hält bei Knopf aus |
-| ORT-Entscheidungsgleichheit | **1 von 1148 offen** | Argmax 0/1148; Top-16-Menge 1/1148 nach TF32-Abschaltung |
-| Verpackung | **OFFEN** | CUDA-12-DLLs kommen aus `torch/lib` per Handkopie |
-
-**Der lehrreichste Punkt: mein Messplan war falsch, nicht Weg A.** Regel 1 fragte,
-ob der IPC-**Byte**-Rundlauf unter einem Drittel der GPU-Zeit liegt -- 0,287 ms
-gegen 1,0816 ms, Faktor 3,8, "gedeckt". Der tatsächliche Aufwand je Batch beträgt
-**42,39 ms**, also das **148-fache** des gemessenen Rundlaufs; es dominiert der
-Python-seitige Aufwand je Anfrage (Tensor-Bau, `.to(device)`,
-`cuda.synchronize()`, Marshalling). Die 3,8x Luft lagen auf der falschen Groesse.
-Weg B hat genau diese Posten nicht.
-
-**TF32 war eine echte Falle**: ORT lieferte zunaechst 16 von 1148 abweichende
-Top-16-Mengen und eine 500-fach groessere Rohabweichung als torch (0,01745 gegen
-0,00003). Ursache war reduzierte Praezision auf der Ampere-Karte. Mit
-`with_tf32(false)` fallen die Abweichungen auf 1/1148 und die Rohabweichung auf
-Torch-Niveau -- **und der Durchsatz kostet es nichts**, bei Batch 512 ist es ohne
-TF32 sogar schneller.
-
-**Regel 2 ist gegenstandslos geworden.** Sie sagte: erreicht ORT-CUDA bei Batch
-140-590 nicht den torch-Durchsatz, ist "Weg A trotz IPC der bessere". Bei Batch 256
-liegt ORT mit 0,99x knapp darunter -- aber Weg A ist mit 0,30x/0,55x schlechter als
-Nichtstun. Die Voraussetzung der Regel ist mit §9 entfallen; sie mechanisch
-anzuwenden wuerde einen messbar verlierenden Weg bevorzugen. **Regel 3 ist die
-operative Regel.**
-
-**Kurvenform, wichtig fuer den Startwert**: ORT flacht zwischen Batch 256 und 512
-ab (77.770 -> 82.031, nur +5 %), waehrend torch dort verdoppelt. ORTs Suessbereich
-ist **128 bis 256**. Schon **Batch 64 zahlt 7,0x** -- nach dem Auslastungsband
-braucht das nur ~80-103 Faeden, nicht 256.
-
-**Naechste Schritte, in dieser Reihenfolge**: (1) den einen offenen
-Abweichungsfall einordnen -- laeuft, geprueft wird der Abstand der beiden
-konkurrierenden Kandidaten gegen die Verteilung ueber die 1147 uebrigen Zustaende;
-(2) echten Self-Play-Durchsatz messen samt tatsaechlich erreichtem Batch; (3)
-gepaarter Staerkelauf; (4) Verpackung der DLLs. Ein Arena-Lauf fuer den einen
-Abweichungsfall waere konstruktionsbedingt uninformativ -- 0,09 % in der 16.
-Kandidatenstelle liegt weit unter der Seed-Skala von 5,75 Prozentpunkten bei n=400.
-
-### ÜBERHOLT -- Weg A ist gedeckt, aber nur über Shared Memory
-
-`PREREG_gpu_inferenzpfad.md` (neu) hält die übersprungene Architekturfrage fest.
-Befund: `engine/Cargo.toml` hat als einzige Inferenz-Abhängigkeit `tract-onnx`,
-tract ist **CPU-only** — die Rust-Engine hatte nie einen Weg zu der GPU, deren
-Kennlinie den Batch-Startwert 256 begründet.
-
-Gemessen (`evaluations/gpu_inferenzpfad_ipc_roundtrip.json`), Schwelle = ein
-Drittel der GPU-Zeit für Batch 256 = **1,0816 ms**:
-
-| Kanal | Rundlauf Batch 256 (Median) | Urteil |
-| ----- | --------------------------: | ------ |
-| TCP-Socket | 2,1881 ms | **nicht gedeckt** (2,0x drüber) |
-| **Shared Memory** | **0,2867 ms** | **gedeckt** (3,8x Luft) |
-
-Nutzlast geprüft: Anfrage 3444 float32 je Position (76x6x6 Ebenen + 708 flach) =
-3,4 MiB je Batch 256; Antwort 413 je Position = 413 KiB.
-
-**Ebenfalls festgehalten, und es ist grundsätzlich**: der Paritäts-Hash kann einen
-GPU-Umbau NICHT überleben — jeder Wechsel der Inferenz-Maschinerie ändert die
-Zahlen. "Suchneutral" bei Weg V bezog sich auf das Nebenläufigkeitsmodell, nicht
-auf die Inferenz. Abnahme ist ein Toleranz- und Stärkenachweis (`net.rs:840` hält
-für den bestehenden Batch-Pfad schon 1e-5 statt Bit-Gleichheit fest), **kein
-Golden-Hash**.
-
-Offen: die Verschränkungs-Mechanik bauen, jetzt mit entschiedenem Kanal.
-
-### λ / Punkte-Kanal: unentschieden, Denial repliziert NICHT
-
-`PREREG_punkte_lambda_unter_kipppunkt.md`, Verdikt-Abschnitte. Metrik war vorab
-die **Marge** (Nutzer: *"sieg mit vielen punkten und den gegner so gut es geht
-stören"*), nicht die Siegquote — mein erstes Verdikt war gegen die falsche
-Zielgröße gemessen.
-
-| Arm | Δ eigen | Δ Gegner | Δ Marge | t |
-| --- | ------: | -------: | ------: | -: |
-| λ=0,1 | +0,85 | -1,14 | +1,99 | 1,42 |
-| λ=0,2 | -0,07 | -1,44 | +1,37 | 1,19 |
-| λ=0,4 | -0,40 | -0,76 | +0,36 | 0,26 |
-| **Replikation λ=0,1** (frische Seeds) | +1,36 | **+0,81** | +0,55 | **0,53** |
-
-Richtung hält, t=0,53 gegen vorregistriertes t>=2 → **nicht bestätigt**. Die
-eigenen Punkte sind in beiden Läufen positiv, die **Gegnerpunkte wechseln das
-Vorzeichen** — der Denial-Anteil, für den λ der Regler IST, repliziert nicht.
-`POINTS_UTILITY_WEIGHT` bleibt 0. Wer ihn aufgreift, braucht n>=800 UND eine
-Erklärung für den Vorzeichenwechsel.
+GPU dazu: Weg B gedeckt (10,4-21,0x Inferenz auf dem synthetischen Pfad),
+Verdrahtung von Batcher+ORT in `run_net_self_play` war schon vorhanden; Mess-
+Partien gehen nach `data/gpu_messung/` (Nutzer-Anweisung, Unterordner = kein
+Trainingsfenster). **UEBERHOLT durch den NACHTRAG oben**: §19 ist inzwischen
+gelaufen (echter Self-Play-Pfad statt Beispiel-Binary) und zeigt 3,4x
+LANGSAMER, Regel-3 NICHT erfuellt -- Entscheidung ueber das weitere Vorgehen
+steht beim Nutzer aus (Ursachenzerlegung oder Weg B als erledigt einstufen).
 
 ### Such-RNG-Trennung: entscheidungsreif, NICHT gebaut
 
@@ -188,64 +67,6 @@ Erklärung für den Vorzeichenwechsel.
 nur vermerkt** (kein Neuverankern), Paritäts-Basislinie wird neu gesetzt und der
 alte Hash daneben dokumentiert. Umsetzung ausdrücklich NACH den laufenden
 Messvorhaben, weil sie die Vergleichsgrundlage verschiebt.
-
-### METHODISCHE LEHRE der Nacht — sie hat mehr gekostet als jede Messung
-
-**Vier Formfehler, alle als Null- oder Negativbefund getarnt, keiner eine
-Dosisfrage:**
-
-1. `w` kürzte sich zweimal heraus (Normierung `ws[k]/max(ws)` plus
-   `skala=max(alle)`) → bit-identische Rasterzellen
-2. multiplikativ statt additiv (`punkte * p_win`, `tiling_solver.rs:893`) →
-   bit-identische Punkte-Kopf-Zellen
-3. alles-oder-nichts statt stetig (`calculate_end_scoring` statt
-   `wertung_progress`) → acht Zellen exakt 0,35
-4. Vorrang statt Ergänzung (meine Auftragsformulierung "kein Doppelweg") → 0,70
-   statt 2,10
-
-**DIE REGEL DARAUS**: bei jedem Null-Befund ZUERST prüfen, ob die Behandlung
-überhaupt angekommen ist, und ZUERST die FORM des Eingriffs, nicht die Dosis. Der
-billigste und schärfste Test ist **Zahlengleichheit bei gleichen Seeds** — sie ist
-ein ALARM, kein Befund. Sie hat in einer Nacht viermal zugeschlagen: einmal ein
-nicht neu gebautes Wheel, dreimal eine falsche Termform.
-
-**Zweite Regel**: nach jeder Engine-Änderung Wheel bauen UND installieren, bevor
-gemessen wird (`maturin build --release` + `pip install --force-reinstall
---no-deps`). Eine Gegenprobe lief 16 Minuten auf dem alten Wheel.
-
-**Dritte Regel**: ein veralteter Index kostet Arbeit, nicht nur Klarheit. Die
-GPU-Zeile in `PREREG_INDEX.md` stand noch auf "offen ist die Blatt-Erzeugungsrate",
-obwohl das seit `e1bce64` geschlossen war — daraus wurde ein Agenten-Auftrag, der
-eine vorhandene Zahl neu messen sollte.
-
-### Datenhaltung
-
-`tools/arena_kompakt.py` dampft Arena-Rohlogs auf **1,8 %** ein
-(`evaluations/arena_kompakt.jsonl`, versioniert). `.gitignore` sperrt
-`evaluations/paired_arena_env_*.json`. Historie wird auf Nutzer-Entscheid NICHT
-umgeschrieben.
-
-**ERLEDIGT 2026-08-12 nach Nutzer-Freigabe**: 100 Rohdateien entfernt (**64,2 MB**
-frei), davon 16 zuvor mit `git rm --cached` aus dem Index genommen. Der
-IPC-Probelauf `_smoketest_ipc.json` ist ebenfalls weg. `evaluations/` von 113 auf
-**79,8 MB**.
-
-**14 Dateien ABSICHTLICH BEHALTEN** — die Deckungsprobe vor dem Löschen hat
-Lücken gefunden, und die Freigabe beruhte auf der Aussage, alles sei gesichert:
-
-- `lambda02`, `lambda_replik`, `lambda_unter_kipppunkt`: **keine**
-  Endwertungs-Aufschlüsselung, weil ich diese drei Läufe ohne `--log-games`
-  gestartet habe. Ihre Siegquoten und Endstände sind in `arena_kompakt.jsonl`, die
-  Plattenpunkte je Kriterium NICHT rekonstruierbar.
-- `vext_w{30,100}_*` und `vgrid2_w3_*`: Teil-Lücken (4 bis 10 von 20 Partien). Das
-  sind die Extremdosen, in denen die Bewertung kollabierte — die Ursache der Lücke
-  ist NICHT untersucht und wäre einen Blick wert, falls die Logtexte dort
-  abweichen.
-
-**Lehre**: die Deckungsprobe gehört VOR jedes Löschen, und "der Dateiname steht im
-Archiv" ist keine Deckung — die Aufschlüsselung muss drin sein. Ohne diese Prüfung
-wären drei λ-Läufe und zehn Rasterzellen verhaltensseitig unwiederbringlich
-gewesen.
 
 ---
 
@@ -289,276 +110,15 @@ der rundenuebergreifenden Planung, sondern deren einzige verfuegbare Umsetzung:
 `w` ist eine echte Sweep-Frage, und der Term gehoert nach dem Training ins
 GATING.
 
-### STAND 2026-08-10 NACHTS
+---
 
-**Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434].
-Verdikte des Tages liegen in `../archive/history.md`, Kapitel 2026-08-10
-(Task D, ISMCTS-k, Punkte-Blend `w>0`, #82, GPU-Verlagerung T1+T2,
-R5-Chip-Leck, Schema 20, `plate_head` entfernt, Kriterium-3-Multiplikator,
-Wheel+Golden-Waechter, Plattenkopf-Strang, Konfundierungs-Muster).
-
-#### LAEUFT JETZT
-
-| Bahn        | Was                                                                                                                                                                                                                                                             | Dauer                                                                       |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **CPU** | λ-Sweep unter dem Kipppunkt: `MOSAIC_POINTS_UTILITY_W,MOSAIC_AGGR_LAMBDA`, Arme `0,0.1` / `0.1,0.1` / `0.1,0.4`, n=400, seit 21:37 | laeuft |
-| **CPU** | Kandidaten-Terme der Injektion gegen die 57 Platten-Seeds (`fg10b`, `ea01`, `ea03`, `mr01`), je 57 Partien @400 Sims | ~8-12 min je Konfiguration |
-
-**ERLEDIGT, aber Verdikt noch offen** (2026-08-11 abends nachgetragen):
-
-- `train.py --name v21_2d_own02 ... --ownership-weight 0.2` ist **durch**;
-  Modelle liegen in `models/alphazero_v21_2d_own02*`, Orakel-Metriken in
-  `oracle_v21_own02.json`. Auf den VORREGISTRIERTEN Massen minimal besser als
-  der Champion -- Prior-Masse Top-3 0,69458 gegen 0,69204, Kendall-Tau 0,33355
-  gegen 0,33110, beide **+0,0025**, rundenweise 3 von 4 (R1 praktisch gleich).
-  `value_pearson_r` dagegen leicht SCHLECHTER (0,9080 gegen 0,9151, in Runde 1
-  0,784 gegen 0,802). **Lesart: schadet nicht, ist auf den Entscheidungsmassen
-  minimal besser, traegt aber keine Staerkeaussage** — +0,0025 liegt weit unter
-  jedem Betrag, den dieses Projekt je als arena-relevant gemessen hat.
-
-  **KEINE ARENA DAFUER (Nutzer-Entscheid 2026-08-11: *"da brauch ich keine
-  arena. der ownership kopf kommt so oder so."*, bestaetigt den frueheren Satz
-  *"der ownership head kommt so oder so. die frage ist nur mit welchem
-  faktor."*).** Der Kopf ist gesetzt, nicht zu rechtfertigen; die offene Frage
-  ist allein das GEWICHT. Damit ist 0,2 der laufende Stand, und ein
-  Gewichts-Sweep gehoert — wenn ueberhaupt — in >=6 gepaarte Seeds
-  (Task-D-Praezedenz: alle Arme H0). Der Nutzen des Kopfes liegt ohnehin
-  ueberwiegend in seiner ZWEITEN Verwendung (Auslese fuer die Blattbewertung),
-  und die ist erst nach einer Verhaltensaenderung messbar.
-- Der Formungsterm im Netz-Pfad ist gebaut (Knopf `MOSAIC_WERTUNG_SHAPING_W`)
-  und **gemessen** -- Ergebnis unten.
-
-**Fenster verifiziert**: 2.945 Dateien in `data/` = der vorregistrierte
-v21-Zuschnitt dateigenau (545 v18, 400 v19wdl, 400 v20wdl, 800 v19wdlsw,
-800 v20wdlsw), davon 2.651 Train / 294 Val. **Anzeigefehler beachten**: die
-Spielzahl im Log wird aus dem `_g<N>`-Zaehler im DATEINAMEN geschaetzt und
-meldet fuer v18 6.000 statt der vorregistrierten 5.450 -- Gesamtsumme im Log
-30.000 statt 29.450. Keine Fensterdrift, die Dateizahl passt exakt.
-
-#### OWNERSHIP-KOPF -- Zuschnitt vollstaendig entschieden (Nutzer 2026-08-10)
-
-Der Kopf hat **zwei unabhaengige Verwendungen**, und die erste stand von
-Anfang an in `config.py`, wurde aber nie gemessen:
-
-1. **HILFSZIEL** (Original-Begruendung): die besten Checkpoints lagen bei
-   v15/v16/v17 stets in Epoche 1-3 -- es fehlt lernbares SIGNAL je Sample,
-   nicht Sample-Anzahl. Der Kopf liefert 140 Gradienten je Position statt
-   eines Skalars. **Laeuft jetzt** mit Gewicht 0,2. Kein Sweep
-   (Task-D-Praezedenz: alle Arme H0); Aufwand gehoert in >=6 gepaarte Seeds.
-   Entschieden an Prior-Masse Top-3 + Kendall-Tau (7/7), nicht `val_brier`.
-2. **AUSLESE fuer die Blattbewertung** -- Spezifikation in
-   `PREREG_plattenkopf.md`. **Zuletzt**, weil erst nach einer
-   Verhaltensaenderung beantwortbar (s.u.).
-
-**Aufbau** (`neural_net.py`, `_ownership_from_dome` + `_conjunctions_from_dome`):
-ein gemeinsamer Kopf `Linear(hidden,128) -> ReLU -> Linear(128,140)`, rohe
-Logits, `BCEWithLogits`, **elementweises Mittel ueber die unmaskierten
-Spalten** (-1 = maskiert), kein eigenes Gewicht fuer die Zusatzziele.
-Bewusst ZULETZT deklariert -> Gewicht 0 ist byte-identisch zum Stand ohne Kopf.
-
-- **Block 1, 72 Feldlabels** (36 je Spieler): "Feld am Ende belegt",
-  slot_row-major dann space_index, ego-perspektivisch. Rasterabbildung
-  `grid[sr*2 + si//2][sc*2 + si%2]` wie `scoring.rs::build_grid`. Deckt die
-  ADDITIVEN Kriterien 4 (+1 je Randfeld) und 6 (-3 je leerem Spezialfeld)
-  exakt ab, weil dort `Summe P(Feld)` der Erwartungswert ist.
-- **Block 2, 68 Zusatzziele** (34 je Spieler): 0-5 Reihe voll (+3), 6-11
-  Spalte voll (+7), 12-13 Diagonale voll (+10), 14-17 Eckplatte voll
-  (+3/+3/+8/+8), 18 alle Jokerfelder (2 x wild_total), 19-24 Reihe mit >=5
-  Farben (+4), **25-33 Layout** (Slot traegt Jokerplatte -> E[wild_total]).
-  Damit sind alle acht Kriterien abgedeckt.
-
-**Gemessener Zustand** (`tools/atom_skill_check.py`, bedingt gerechnet):
-Block 1 ist gesund -- **0 von 36 Feldern entartet**, niedrigste Grundrate
-0,072. Block 2 ist zur Haelfte tot -- 16 von 34 konstant, und zwar genau die
-teuren: Diagonalen 0,000, Spalte 1 0,004, Reihen 5/6 0,000, untere Eckslots
-0,002/0,004. Wo die Konjunktion tot ist, LEBT die Zelle: Diagonale 0,428/0,321,
-Spalte 1 0,421. **Traeger sind die Zellen, nicht die Konjunktionen.**
-
-**Die toten Spalten bleiben drin** (Nutzer-Entscheid) -- sie kosten nichts
-(gesaettigte BCE-Spalten liefern keinen Gradienten), ein Ausbau wuerde
-Kopfbreite und ONNX-Vertrag aendern, und sie sind ein **kostenloser
-Fortschrittsmesser**: Grundrate 0,000 heisst "kommt in diesem Korpus nicht
-vor". Steigt sie, hat sich das Verhalten geaendert -- arena-unabhaengig, ohne
-Training, je neuem Korpus einmal auslesen.
-
-#### INJEKTION GEMESSEN 2026-08-11 -- die Dosis ist nicht das Problem, die RICHTUNG ist es
-
-57 Seeds, gepaart, 400 Netz-Sims gegen 150 Heuristik-Sims, alpha=2 einheitlich.
-Auswertung mit `tools/plattenpunkte_aus_arena.py` (nutzt die Logtext-Ausdruecke
-von `analyze_game_log.py`, kein zweiter Parser).
-
-| w    | Punkte | ΔPunkte |     t | Plattenpkt. | Strafleiste |    Δ |
-| ---- | -----: | ------: | ----: | ----------: | ----------: | ---: |
-| 0    |  53,30 |       — |     — |        3,19 |        9,35 |    — |
-| 0,03 |  52,02 |   -1,28 | -1,26 |        2,61 |        9,42 | +0,07 |
-| 0,1  |  50,21 |   -3,09 | -2,33 |        2,82 |       10,19 | +0,84 |
-| 0,3  |  49,77 |   -3,53 | -2,23 |        2,11 |       10,32 | +0,96 |
-| 1,0  |  48,26 |   -5,04 | -2,63 |        2,82 |       11,77 | +2,42 |
-
-**Kein Fenster**: was sanft genug ist, um nicht zu schaden (w=0,03, t=-1,26),
-ist auch zu sanft, um zu helfen (Plattenpunkte 2,61 gegen 3,19 im Nullpunkt).
-Die Plattenpunkte STEIGEN bei keiner Dosis.
-
-**Die Aufschluesselung je Platte erklaert, warum der Mittelwert 3,19 irrefuehrt**
-(Mittel ueber die Partien, in denen die Platte aktiv war; w=0 gegen w=1,0):
-
-| Platte              |    w=0 |  w=1,0 | aktiv |
-| ------------------- | -----: | -----: | ----: |
-| Aeussere Felder     | **+9,45** | +9,55 |    20 |
-| Mehrfarbige Felder  |  +5,40 |  +3,20 |    20 |
-| Eckplatten          |  +3,14 |  +3,27 |    22 |
-| Horizontale Reihen  |  +0,78 |  +0,91 |    23 |
-| **Vertikale Reihen** | **+0,70** | **+1,05** | 20 |
-| Diagonale Reihen    |  +0,43 |   0,00 |    23 |
-| Farbenreiche Reihen |  +0,35 |  +0,35 |    23 |
-| **Spezialfelder**   | **-11,70** | -10,80 | 20 |
-
-Drei Folgerungen:
-
-1. **Spezialfelder sind der groesste Einzelposten im Endstand**, groesser als
-   jede geometrische Platte: -11,70 = 3,9 offene Spezialkuppeln a -3. Die
-   Injektion holt davon 0,9 Punkte zurueck.
-2. **Nutzer-Zielwert geprueft und die Luecke gemessen**: erwartet waren bei
-   aktiven vertikalen Platten 14 bzw. 21 Punkte, gemessen sind **0,70** -- rund
-   ein Zehntel einer Spalte. Die Injektion bringt das auf 1,05.
-3. **Horizontale Reihen (0,78) sind strukturell, nicht Verhalten**: Rasterreihe
-   *r* wird nur von Musterreihe *r* gefuettert (`round_end.rs:20-22`), also
-   hoechstens eine Fliese pro Runde, in fuenf Runden maximal fuenf von sechs
-   Feldern. Ohne Spezialfeld ist eine horizontale Reihe nicht schliessbar.
-
-**Null-Kontrolle haelt exakt**: `k4` (alpha[4]=1) ist zahlengleich zu `uni` --
-Kriterium 4 ist additiv, alpha dort wirkungslos. Die Messkette ist sauber.
-
-**URSACHE, am Code geprueft**: `player_scoring_features` liest ausschliesslich
-`build_grid(player)` und hat **null** Bezuege auf `pattern_lines`. Der Term ist
-damit innerhalb einer Runde fuer JEDEN Drafting-Zug identisch -- er kann die
-Zugwahl gar nicht lenken, nur ueber die Rundengrenze wirken. Die Heuristik
-benutzt denselben Term nie allein: `mcts.rs:80-84` flankiert ihn mit dem
-Tiling-Solver-Score UND `projected_unplaceable_penalty`.
-
-**ZWEI MESSFEHLER, beide dokumentiert statt geglaettet**:
-
-- Die erste Gegenprobe mit dem Strafleisten-Term lief auf dem ALTEN Wheel
-  (`cargo test` gebaut, `maturin`/`pip` vergessen) und war gegenstandslos. Der
-  Beweis liegt in der Zahlengleichheit zu den Laeufen ohne den Term. Belegstuecke
-  `platten_fg01`/`platten_fg10` bleiben erhalten, der Wiederholungslauf heisst
-  `fg10b`. **Regel daraus: nach jeder Engine-Aenderung Wheel neu bauen UND
-  installieren, sonst messen die Knoepfe nichts.**
-- Der kriterienweise Aufbau (`k0`..`k7`) und die Dosis-Reihe wurden gefahren,
-  BEVOR sie vorregistriert waren. Nachgetragen als Mangel in
-  `PREREG_injektion_wertungsplatten.md` Abschnitt N1: die Ergebnisse sind
-  exploratorisch, nicht konfirmatorisch.
-
-**DREI KANDIDATEN-TERME gebaut, alle Default 0, Paritaets-Hash unveraendert**
-(`8c6684ff...`, auf dem neuen Wheel zweimal geprueft):
-
-| Knopf | Was | Herkunft |
-| --- | --- | --- |
-| `MOSAIC_WERTUNG_FLOOR_W` | `projected_unplaceable_penalty` als Gegenterm | Nutzer: *"aber ja probier es aus"* |
-| `MOSAIC_ENDAWARE_W` | `solve_round_final_score_endaware - solve_round_final_score` | Nutzer: *"brauchst nicht immer das rad neu erfinden"* |
-| `MOSAIC_MUSTERREIHEN_W` | nachgebaute Bereitschaft je Zelle, Schranke 1 Fliese/Musterreihe | Agent, als billigere Alternative |
-
-Der Vorausschau-Term ist der aussichtsreichste: `solve_rec_endaware`
-(`tiling_solver.rs:519-546`) rollt die Musterreihen ueber `legal_steps` auf die
-Kuppel und maximiert Platzierungspunkte + `calculate_end_scoring` -- Letzteres
-enthaelt die Platten. Farb-, Sperr- und Slot-Bedingungen und die
-Ein-Fliese-pro-Reihe-Schranke ergeben sich dort von selbst statt geschaetzt, und
-`alpha` wird gegenstandslos (realisiert statt hochgerechnet). Differenz und
-nicht Absolutwert, weil `endaware` den aktuellen Punktestand mittraegt (~50) und
-damit das `tanh` saettigen wuerde. Der Doku-Vorbehalt "nur fuer Runde 5
-sinnvoll" sticht beim Shaping nicht -- eine Injektion braucht Richtung, keine
-Exaktheit. Offen ist allein der Preis pro Blatt; die Laufzeit der
-Kandidaten-Messung IST diese Messung (Bezug: 7,3 min fuer 57 Partien @6 Threads).
-
-**SELF-PLAY-AUFTRAG (Nutzer 2026-08-11)**: sobald ein Term taugt, das Gewicht
-**je Partie streuen**, damit der Ownership-Kopf Vielfalt sieht -- *"dann ziehen
-die spiele mal mehr und mal weniger richtung wertungsplatten"*. Sauber, weil die
-Ownership-ZIELE die realisierten Endzustands-Feldlabels sind: die sind bei jedem
-`w` korrekt, variiert wird nur die Zustandsverteilung. Details in
-`PREREG_injektion_wertungsplatten.md` N2.
-
-#### DER FORMUNGSTERM EXISTIERT -- und das Netz hatte ihn, in unwirksamer Form
-
-`scoring.rs:160` `wertung_progress` ist der vollstaendige
-Wertungsplatten-Formungsterm: gegatet auf die AKTIVEN Platten, je Geometrie
-einzeln summiert, konvex mit Exponent 2, additive Kriterien linear.
-
-**KORREKTUR 2026-08-10 (Agent-Fund, selbst am Code geprueft): das Netz hat
-ihn NICHT "nie bekommen".** Ich hatte "haengt ausschliesslich an `mcts.rs:82`,
-dem Heuristik-Pfad" behauptet -- falsch. Es gibt **Task #93 "Plattenshaping"**
-in `net_mcts.rs`: `PLATE_SHAPING_ENABLED = false` (Kompilierzeit),
-`PLATE_SHAPING_WEIGHT = 0.3`, A/B nicht signifikant (p=0,71), deshalb aus.
-
-Zwei Gruende, warum dieses p=0,71 die EGO-Fassung nicht vorwegnimmt:
-
-1. **#93 ist MARGINAL, nicht absolut.** `plate_shaping_marginal =
-   plate_shaping_delta(kind) - plate_shaping_delta(eltern)` -- es verschiebt
-   den Knotenwert um den Zuwachs GENAU DES LETZTEN ZUGS. Ein Blatt tief im
-   Baum bekommt keine Gutschrift fuer den angesammelten Fortschritt seines
-   Pfades. Eine Stellungsbewertung braucht aber den GESAMTSTAND ("diese Spalte
-   steht bei 5/6"), nicht den letzten Schritt. Differenzformen sind
-   potentialbasiert und lassen die optimale Politik strukturell unberuehrt --
-   #93 konnte in dieser Form gar nicht wirken. (Herleitung, nicht gemessen.)
-2. **#93 ist `mine - theirs`, gegatet, mit dem pauschalen
-   `-3 * special_empty`** -- genau die drei Eigenschaften, die das
-   Spezialfeld-Loch verfehlen. Und gemessen wurde gegen ein Geschwisternetz
-   mit demselben blinden Fleck (wie das 97:103 in `elo_history.csv` Zeile 48).
-
-Die Plattenluecke (Heuristik 1,99 Plattenpunkte je Partie gegen 1,10 beim
-Champion) bleibt bestehen -- die Erklaerung ist aber nicht "Term fehlt",
-sondern "Term liegt in einer Form vor, die den Stand nicht bewertet".
-
-#### SPEZIALPUNKTE SIND REIHENABHAENGIG (1..6), NICHT 3 -- Nutzer-Ruege 2026-08-11
-
-*"die spezialpunkte richten sich nach der reihe in der sie aktiviert werden.
-notier dir das irgendwo fett. das hat schon so oft zu missverstaendnissen
-gefuehrt."*
-
-`round_end.rs::check_special_trigger`:
-
-    let pattern_row = slot_row * 2 + sp_idx / 2;
-    let bonus = (pattern_row + 1) as i32;      // 1..6, NICHT 3
-
-Handbuch Abschnitt 5 bestaetigt es. **`bonus_points = 3` in `dome.rs` ist NUR
-der Typ-Diskriminator** Special (`>0`) gegen Wild (`=0`) -- kein Punktwert, und
-laut `PREREG_zufallsknoten.md` darf das Feld auch NICHT umgestellt werden (die
-Platte kennt ihren Slot nicht, der Wert entsteht erst bei der Platzierung).
-`board.rs::place_special_tile` gibt die flache 3 zurueck und ist dort schon als
-**toter Code ohne Aufrufer** notiert.
-
-**Strategisch ist das der Kern**: untere Slot-Reihe = Rasterreihen 5/6 = **5
-und 6 Punkte**, obere = 1 und 2 Punkte. Das Spezialfeld bleibt unten in ~84 %
-der Partien leer, oben in ~13 % -- **die KI laesst die teuersten liegen.**
-Watchlist konsistent gelesen: Nutzer 10,3 Punkte auf 3,1 Freischaltungen =
-**3,3 je Freischaltung**, KI 1,3 auf 0,6 = **2,2**. Eine Rechnung
-"Freischaltungen x 3" ist falsch.
-
-**ZWEI GETRENNTE PUNKTQUELLEN -- nicht verwechseln (ich habe es getan,
-Nutzer-Ruege 2026-08-11):**
-
-1. **⭐ Kuppel-Bonus = GRUNDWERTUNG**, `check_special_trigger`, Wert
-   **1..6 je Rasterreihe**, zahlt IMMER unabhaengig von den aktiven Platten.
-2. **Wertungsplatte 7 (Code-Index 6) = ENDWERTUNG**, Handbuch woertlich:
-   *"⭐ Spezialfelder: -3 Pkt. je leer gebliebenem Spezialfeld"* -- **FLACH,
-   Reihe egal**, zahlt nur wenn die Platte liegt.
-
-`6 => -3.0 * sf.special_empty` in `wertung_progress` ist damit **KORREKT und
-kein Fehler** -- ich hatte es als eingeebneten Wert bezeichnet, das war falsch.
-`wertung_progress` bleibt unangetastet, weil es der Elo-Anker ist UND weil es
-richtig rechnet.
-
-Der neue Unlock-Term gewichtet entsprechend **zweigeteilt**: Bonus-Anteil
-ungegatet mit `(reihe + 1)`, Kriterium-6-Anteil gegatet und flach 3.
-Der Tiling-Solver rechnet korrekt (Test
-`solver_counts_special_bonus_and_neighbor`: "Special-Bonus = Reihennummer").
-
-#### OWNERSHIP-KOPF: KOMMT, offen ist nur der FAKTOR (Nutzer 2026-08-11)
-
-*"wichtig der ownership head kommt so oder so. die frage ist nur mit welchem
-faktor."* -- Die Existenzfrage ist damit entschieden und nicht wieder
-aufzurollen. `OWNERSHIP_WEIGHT` ist die offene Groesse; laeuft derzeit mit 0,2.
-Das ist eine EIGENE Sweep-Frage, getrennt von der Injektions-Dosis
-(`PREREG_injektion_dosis.md`).
+**Verschraenkung mit der Zwei-Pole-Architektur (Praezisierung 2026-08-13)**:
+Stufe 1 (Injektion) und Stufe 2 (Destillation) unten sind der Weg zum
+**Basispol** (Netz); Stufe 3 (Ownership-Kopf als Konsument im Blatt) ist genau
+das **Regler**-Stueck der Zwei-Pole-Architektur oben -- derselbe
+"Konsumenten-Gewicht des Ownership-Kopfs, zur Laufzeit sweepbar". Der
+**Plattenpol** (Wertungsheuristik, Spaltenbau-Spieler) laeuft parallel und
+unabhaengig von diesen drei Stufen.
 
 #### DREI STUFEN UND DAS ABSCHALTKRITERIUM (Nutzer-Diktat 2026-08-10/11)
 
@@ -638,45 +198,70 @@ k fuer jedes p < 1. Also aendert er das Verhalten, dadurch fuellen sich die
 Konjunktionen, und ERST DANN ist die Auslese ueber die Marginalen eine
 beantwortbare Frage.
 
-#### WARUM DAS NETZ NICHT PUNKTOPTIMIERT SPIELT (Nutzer-Frage 2026-08-10)
-
-Nicht ein fehlender Kopf, sondern **das Ziel kennt die Marge nicht**. Das
-Value-Ziel ist `values_wdl`/`wdl_outcome`, also Gewinnwahrscheinlichkeit: ein
-Sieg mit einem Punkt zaehlt wie einer mit vierzig. Dazu die Selbstspiel-Falle
--- lassen beide Seiten die Platten liegen, kostet Liegenlassen keine
-Gewinnwahrscheinlichkeit. Und `POINTS_UTILITY_WEIGHT = 0` samt `w = 0`
-verwerfen BEIDE Punkte-Koepfe in der Blattbewertung: die Information wird
-berechnet und weggeworfen.
-
-Die Leiter kann das nicht sehen -- Heuristik-Anker und Vorgaenger-Champions
-lassen die Platten ebenfalls liegen. Der Einzige, der es bestraft, ist der
-Nutzer (7:3 gegen einen Champion mit Elo 1358).
-
-Historische Ironie: VOR Schema 17 war das Ziel `tanh((own-opp)/SCALE)`, also
-eine Marge. Der WDL-Wechsel hat v20 zum ersten WDL-Champion gemacht, war im
-Gating also besser -- besser im Gewinnen gegen Gegner, die die Marge ebenfalls
-ignorieren. Zurueck zur Marge ist deshalb der falsche Schluss; sie muss
-DANEBEN stehen, nicht dagegen. Einziger Kanal dafuer:
-`MOSAIC_POINTS_UTILITY_W` mit lambda <= 0,5 -- **nie gemessen**, alle
-getesteten Arme lagen bei lambda >= 1,0 und damit jenseits des Kipppunkts, ab
-dem die Formel 30:15 gegenueber 55:50 bevorzugt.
-
 #### OFFEN
 
+**Die folgenden drei Zeilen (Spaltenbau, Ownership-Kette, Aufraeumliste) sind
+Nutzer-Diktat vom 2026-08-13 (dieser Auftrag). Ich habe sie in dieser Sitzung
+NICHT gegen Code oder Log verifiziert -- Stand markiert als ungeprueft, keine
+Fundstelle belegt, vor Weiterarbeit am Original pruefen (REGEL 0). Die
+GPU-Zeile dagegen IST in dieser Sitzung geprueft -- siehe NACHTRAG oben.**
+
+| Punkt | Stand |
+| ----- | ----- |
+| **Spaltenbau-Spieler, Runde 2** | Pol B der Zwei-Pole-Architektur (s.o.), zweite Bauschleife mit drei beschlossenen Aenderungen: Wild-Farben aktiv bedienen, Spezialfelder umbepreisen, Zielspalte je Seed streuen + ein Verteilungs-Gate. *Ungeprueft/Nutzer-Diktat.* |
+| **GPU-Produktionsmessung** | **Gelaufen, negativ** (geprueft am NACHTRAG-Abschnitt oben, `PREREG_gpu_inferenzpfad.md` §19): Batcher+ORT-CUDA ist bei 8 Threads 3,4x LANGSAMER als der Bestand ueber den echten Self-Play-Pfad (2190,3s gg. 638,4s / 40 Partien), Regel-3-Faktor 0,29x/0,17x, weit unter der 2,0x-Schwelle. 64 Threads liefert wegen des Chunk-Haenger-Notdeckels keinen verwertbaren Wert. Entscheidung offen: Ursachenzerlegung (`Mutex<Session>`? `Session::run()` unter echter Ankunftsrate?) oder Weg B als erledigt einstufen -- Nutzer-Entscheid ausstehend. |
+| **Ownership-Kette P0-P6** | Nutzer-Bezeichnung fuer die Phasenkette des Ownership-Kopfs. In diesem Dokument bisher als Drei-Stufen-Rahmen gefuehrt (Injektion -> Destillation -> Kopf-Konsum im Blatt, Abschnitt oben). Ob P0-P6 dieselbe Kette feiner unterteilt oder zusaetzliche Phasen meint: *ungeprueft, in dieser Sitzung nicht aufgeloest.* |
+| **Aufraeumliste, eingetaktet** | Gating-Test-Fix; `PREREG_INDEX.md`-Konsistenz (Praezedenzfall in `../archive/history.md` Kapitel 2026-08-11/13 -- ein veralteter Index hatte dort bereits einen unnoetigen Agenten-Auftrag ausgeloest); 8 Compiler-Warnungen; Mess-JSON-Eindampfung; tote Knoepfe entfernen (`MOSAIC_ENDAWARE_W`/`MOSAIC_MUSTERREIHEN_W`, gemessen wirkungslos, s. Archiv-Kapitel; Torch-IPC-Reste von GPU-Weg-A, verworfen, s. Archiv-Kapitel); tote Streuungs-Verdrahtung entfernen. Die ersten beiden Punkte sind jetzt Teil 1+2 des ARCHITEKTUR-FAHRPLANS unten, nicht mehr getrennt zu verfolgen. |
+
+**Such-RNG-Trennung**: entscheidungsreif, NICHT gebaut -- eigener Abschnitt
+oben.
+
+#### ARCHITEKTUR-FAHRPLAN (Nutzer-Freigabe 2026-08-13)
+
+**Nutzer-Diktat, in dieser Sitzung NICHT gegen Code verifiziert (REGEL 0) --
+Prioritaet ist Schaden-pro-Aufwand, absteigend:**
+
+1. **PREREG_INDEX generieren statt von Hand fuehren** -- maschinenlesbarer
+   Status-Kopf in den PREREG-Dateien, Index wird per Skript erzeugt,
+   Konventions-Checker prueft Status-Parsing (klein; verhindert
+   Fehl-Auftraege wie die veraltete GPU-Zeile, s. METHODISCHE-LEHRE-Kapitel
+   in `../archive/history.md`, 2026-08-11/13).
+2. **Stille Test-Skips verbieten** -- Tests mit fehlender Voraussetzung
+   muessen failen oder `#[ignore]` mit Grund tragen, nie leer "passed"
+   (klein; Anlassfall `load_test_net_for_gating`, dessen Fix ohnehin
+   eingetaktet ist).
+3. **MOSAIC_\*-Knopf-Registratur** (`knoepfe.rs`: Name/Default/Status/
+   Prereg-Verweis; Doku und Paritaetsprobe generieren daraus) (mittel).
+4. **Gemeinsame Partieschleife** statt sechs Kopien (`run_self_play`/
+   `with_net_labels`/`net_self_play`/`arena_match`/`net_arena_match`/
+   `net_vs_net`) -- Wurzel beider Verdrahtungsfehler dieser Woche (gross).
+5. **Spieler-Abstraktion** (Drafting-Entscheidung -> Kuppelwahl -> Tiling
+   als komponierbare Schicht statt Hakenketten) (gross).
+
+**Wichtig**: Punkte 4 und 5 werden NICHT vorsorglich gebaut, sondern als
+TRAGENDE STRUKTUR des naechsten grossen Bauschritts -- der parametrisierten
+Wertungsplatten-Heuristiken (Zwei-Pole-Architektur, Abschnitt oben) -- gleich
+mitgezogen.
+
+**Zusaetzlicher offener Punkt: Vorregistrierung Async-Suchumbau.**
+Nutzer-Begruendung: Self-Play-Durchsatz IST der Engpass. Stufenplan mit
+Entscheidungsgleichheits-Gate und Regel-3-Gate (>= 2,0x gegen 225,6 Spiele/h);
+Arena-Boost nur fuer Messlaeufe, Gating bleibt reproduzierbar -- §18-Spannung
+vermerkt, Nutzer-Veto vorbehalten.
+
+**Die folgenden Zeilen standen schon vor dieser Entruempelung offen und sind
+unveraendert:**
+
 | Punkt                                                                   | Stand                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **lambda-Arm** `MOSAIC_POINTS_UTILITY_W=0.1` + `MOSAIC_AGGR_LAMBDA=0.1` | nie gemessen, braucht den opp-Kopf; Arena, deshalb NICHT parallel zum Cache-Neubau                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Formungsterm Arm A/B**                                                | Arm A = `wertung_progress` ins Netz-Blatt (Zaehler = belegte Felder). Arm B = derselbe Term, Zaehler + Ownership-Marginalen der OFFENEN Felder. Eine Zeile Unterschied; der Kontrast isoliert den Kopf-Beitrag. Kontrolle auf dem aktuellen Brett ist PFLICHT, sonst ist ein Sieg nicht interpretierbar (Task #5 hat Formung auf dem aktuellen Brett als folgenlos gemessen).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Wheel + Paritaetsprobe**                                              | nach dem Agenten-Commit faellig; **nicht** waehrend des laufenden Trainings installieren. Probe muss `8c6684ff...` liefern.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Zufallsknoten INNERHALB der Runde                                       | Kuppelstapel als aufgezaehlter Knoten am Aufdecken, Kostentor in Runde 1. Danach kann der Shuffle raus (Determinismus-Gewinn). `MOSAIC_STACK_DRAW_CHANCE`, Default aus -- gehoert ins naechste Self-Play.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Stapelzug fuers NETZ                                                    | braucht Self-Play mit den Infos; laut Nutzer-Entscheid hinter der v21-Queue. Wird jetzt ueber die Wahrscheinlichkeit geloest, nicht als eigener Task.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Bootstrap-Horizont                                                      | gegatet auf Generierungsstart, keine Batcher-Entlastung (+25 % gelten unveraendert)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| GPU-Verlagerung Weg V                                                   | Umsetzung offen, Startwert N=256                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Kopf-Warmstart statt Zufall** (Nutzer-Idee 2026-08-11)                | Bei neuen/verbreiterten Koepfen wirft `train.py:771` formabweichende Tensoren weg (`skipped = ...shape != ...shape`) -> sie starten ZUFAELLIG. Zwei Faelle: (a) **`opp_points_head` aus `points_head` initialisieren** -- gleiche Form, direktes Kopieren; der Kopf muss dann nur lernen, den Gegner-Teil der Repraesentation zu lesen statt den Ich-Teil, statt bei Null anzufangen. (b) **verbreiterten `ownership_head` teilweise uebernehmen** -- heute wurden ALLE 140 Zeilen neu gewuerfelt, auch die 122 mit unveraenderter Bedeutung. **ACHTUNG, Trunkierung waere FALSCH**: der Vektor ist `[72 Ownership][34 conj_p0][34 conj_p1]` (vorher `[72][25][25]`), also muessen die alten Indizes 97-121 auf **106-130** abgebildet werden, nicht auf 97-121 -- ein abgeschnittenes Kopieren verdrahtet Spieler 1 falsch und sieht dabei plausibel aus. Braucht eine Index-Abbildung. Verkettungsreihenfolge vor der Umsetzung PRUEFEN (aus `neural_net.py:1020-1023` abgeleitet, nicht gelesen). `--reinit-points-head` macht das GEGENTEIL (Task #12, fairer Kontrollarm) und ist kein Vorbild. Blockiert nichts Laufendes -- Arbeit fuer die naechste Generation. |
 | **ALPHA je Kriterium -- was noch offen ist** (Nutzer: *"da werden wir noch ein wenig feintuning brauchen"*) | **RICHTIGGESTELLT 2026-08-11**: der Eintrag nannte fuenf Provisorien zu kalibrierten Zielwerten -- die sind mit `d658a23` AUSGEBAUT, drei der fuenf sind damit gegenstandslos. (1) "Endpunkte grob aufgeloest" ist durch einen haerteren Befund ersetzt: der Fit ist UNMOEGLICH, nicht ungenau -- `Mittel(x^alpha) > Rate` gilt fuer JEDES alpha, weil eine abgeschlossene Linie x=1 hat und `1^alpha = 1` bleibt. (2) Jokerfelder und Farbreihen sind inzwischen GEMESSEN (Rate 0,430 / 344 Ereignisse bzw. 0,016 / 77). (5) betraf die Endpunkte, die es nicht mehr gibt. **OFFEN bleiben zwei**: die Rundenanhebung (`MOSAIC_WERTUNG_ROUND_GAIN`, Default 0) ist LINEAR angenommen, nicht gemessen; und `P(vollstaendig | fuellstand, runde)` bleibt das Objekt, das alpha ersetzen wuerde -- laut Nutzer-Entscheid Aufgabe des OWNERSHIP-KOPFS (Schaetzer), nicht der Injektion (Lenker). Die alpha-Werte werden jetzt je Kriterium von Hand gesetzt; welche taugen, bestimmt der 20er-Versuch empirisch. Messbasis fuer den Kopf-Vergleich: `logs/kalibrierung_alle_kriterien.log`. |
 | **Gepaarte Arena-Vergleiche sind schwaecher als angenommen** | `self_play.rs:1523` gibt DASSELBE `rng` an die Suche wie an den Spielzustand; `determinize_hidden_information` (`net_mcts.rs:620`) verbraucht es, `Bag::refill_from_tower` (`supply.rs:43`) ebenso. Aendert ein Knopf das Spiel, aendert sich die Zahl der Suchen -> der RNG-Strom -> die **Fliesenversorgung**. "Gleicher Spielindex, gleiche Startbedingungen" gilt nur bis zur ersten Suche. Entwertet die geschlossenen Befunde (Floor-Shaping, `w>0`, `GUMBEL_TOP_M`) nicht, gehoert aber in die Bewertung JEDES kuenftigen Sweeps. Derselbe Mechanismus macht Arena-/Self-Play-Partien **nicht replaybar** (am Code belegt: Replay bricht in Runde 4 ab, auch bei `net_sims=1`). Folge: ereignisbasierte Log-Zahlen sind brauchbar (so arbeitete die Watchlist), endbrettbasierte nicht. Fix waere ein eigener, deterministisch geseedeter Such-RNG -- Architekturaenderung ueber vier Dateien, NICHT gebaut. |
-| `player_profiles.json.bak`                                              | untracked, gemeldet, NICHT angefasst                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-
+| `player_profiles.json.bak`                                              | **STAND KORRIGIERT 2026-08-13, waehrend dieser Sitzung**: war zu Sitzungsbeginn untracked auf der Platte (`git log` zeigt Tracking bis Commit `4f6df6d`); jetzt, waehrend dieser Bearbeitung, ist die Datei von der Platte VERSCHWUNDEN (verifiziert: `ls` findet sie nicht mehr). Nicht durch mich geloescht. Wer/was sie entfernt hat, ist in dieser Sitzung NICHT geklaert -- der parallele Agent arbeitet an `self_play.py`/Engine-Dateien, ein Zusammenhang ist nicht belegt. Meldung an den Nutzer gehoert hierher, nicht Stillschweigen (Loeschregel 2026-08-08). |
 (#29 und #31/#38/#39 stehen im TASK-INDEX oben bzw. unten im Detail.)
 
 ## GELTENDE REGELN (kompakt)
