@@ -17,6 +17,72 @@ Spezialpunkte-Korrektur, methodische Lehren) liegt in `../archive/history.md`,
 Kapitel "2026-08-11/13: Wertungsplatten-Nacht, GPU-Weg-B, Zwei-Pole". Verdikte
 vom 2026-08-10 selbst: Kapitel "2026-08-10" davor im selben Dokument.
 
+### NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie umgesetzt (PREREG_such_rng_trennen.md)
+
+Vollstaendig umgesetzt, freigegeben durch Nutzer-Entscheidungen §8 der Prereg
+(Elo-Sprung wird nur vermerkt, Basislinie neu gesetzt sobald der Hash bricht).
+Kern: `net_mcts::derive_search_seed(game_seed, move_index)` (SplitMix64,
+zweistufig gemischt) liefert je Such-/Entscheidungsschritt einen EIGENEN,
+deterministischen RNG -- Aufruf-Verdrahtung in `self_play.rs` (7 Spielschleifen:
+`play_one_game`, `play_arena_game`, `play_net_game`, `play_net_vs_net_game`,
+`play_net_self_play_game`, jeweils inkl. PCR-Muenzwurf/`moon_order_target`) und
+`py.rs::PyGame` (`ai_drafting_step`/`ai_drafting_net_step`, neues Feld
+`move_seq`). `mcts.rs`/`net_mcts.rs` selbst UNVERAENDERT (nur Verdrahtung an
+den Aufrufstellen) -- der Heuristik-Bewertungspfad (`player_total`/
+`wertung_progress`) ist nicht angefasst.
+
+**Befund unterwegs (REGEL 0, Analyse statt Basislinie verschoben)**: der
+tatsaechliche sims-proportionale RNG-Verbrauch sitzt in `mcts.rs`s
+Heuristik-MCTS (`expand_and_backprop`s Widening-Tie-Break,
+`rank_actions_cheap`s Shuffle -- ECHT pro Simulation), NICHT in der
+Netz-Gumbel-Suche (`net_mcts.rs::sample_gumbel`/`determinize_hidden_information`
+sind root-einmalig, unabhaengig von `sims`). Der §5-Test musste deshalb
+umgebaut werden (Details unten) -- betrifft nur die Testkonstruktion, der
+Schnitt selbst deckt beide Suchpfade gleich.
+
+**§5-Test** (`shadow_search_volume_does_not_shift_factory_supply_stream`,
+self_play.rs): echte Zuege sims-unabhaengig auf `actions[0]` fixiert (sonst
+waere Entscheidungsvarianz mit dem RNG-Befund verwechselt worden -- erste
+Testfassung schlug deshalb fehl, siehe Commit-Historie), eine verworfene
+"Schatten"-Heuristiksuche mit sims=1 bzw. 400 daneben. VOR dem Fix (Gegenprobe,
+geteilter RNG statt `search_rng`): Fabrikinhalte weichen exakt in Runde 4 ab.
+NACH dem Fix: 0 Abweichungen ueber alle Rundenwechsel.
+
+**Paritaetshash haelt UNVERAENDERT** (`8c6684ff...`, s.o.) -- ENTGEGEN der
+Prereg-§4a-Erwartung ("Hash MUSS brechen"). Geprueft: die Sonde haengt
+ausschliesslich an `net_search_state_json` (lib.rs), einem Einzelaufruf-Pfad
+mit eigenem frischen `rng` pro Aufruf, der nie Teil einer fortlaufenden
+Partie-Schleife war -- der behobene Fehler trat dort strukturell nicht auf.
+Kommentar dazu in `tools/paritaets_probe.py` ergaenzt; keine neue Basislinie
+noetig, weil sich nichts geaendert hat.
+
+**Replay-Kreuzvalidierung**: 5 frische `--log-games`-Arena-Partien
+(`net_arena_match`, net_sims=40 vs. heur_sims=40) -> `tools/analyze_game_log.py
+--no-oracle`: **5/5 Exit 0**, keine Divergenz, kein Runde-4-Abbruch mehr
+(vorher 5/5 Arena-Partien betroffen). Elo-Sprung-Vermerk in
+`evaluations/elo_history.csv` (Zeile nach dem Muster der Engine-Aera-Zeile 24)
+traegt exakt diese 5 Partien (3:2), ausdruecklich als duenne
+Kreuzvalidierungs-Charge markiert, keine Staerkeaussage.
+
+**Async-Gate-B-Nachprobe** (`sync_only_repeatability_after_rng_split`,
+`#[ignore]`, self_play.rs -- Nachstellung des `wt_async`-Befunds im
+Hauptbaum): `play_net_self_play_game` viermal gegen sich selbst, identischer
+Seed, `record_rtv=true`. Ergebnis: **0/4 Spielgeschehen-Abweichungen, 0/4
+volle Abweichungen** (letztere schliessen `round_transition_value`/
+`bootstrap_value` mit ein und duerften an der separaten Wall-Clock-Komponente
+aus Task #71 haengen -- traten hier aber gar nicht auf). Die im
+`wt_async`-Befund dokumentierte Instabilitaet ("Sync weicht von sich selbst
+ab") ist damit, soweit sie am geteilten RNG hing, behoben.
+
+**Bewusst NICHT umgestellt** (bewusste Entscheidung, ausserhalb des
+vorregistrierten Kerns, dokumentiert statt stillschweigend liegen gelassen):
+`play_net_vs_net_hybrid_game`, `play_stage3_vs_stage1_game`,
+`sibling_ranking_diagnostic` (alle drei reine Diagnose-/Forschungswerkzeuge,
+kein Self-Play-/Gating-Pfad) sowie `round_transition.rs`/
+`round_transition_deep.rs`s Rundenuebergangs-/Bootstrap-Sampling (additive
+Trainingsziele auf einem Zustands-Klon, beeinflussen nie den gespielten Zug
+oder die echte Fabrikversorgung, siehe §5-Testkommentar).
+
 **Was NICHT ins Archiv gehoert, weil es heute (2026-08-13) neu und noch offen
 ist**: die Produktionsmessung von GPU-Weg-B (NACHTRAG direkt unten) und die
 Zwei-Pole-Architektur als geltender Plan (danach).

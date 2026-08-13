@@ -191,3 +191,58 @@ Partien Stichproben und die Reproduktion einzelner Partien wird nicht gebraucht.
 Der RNG-Schnitt bleibt damit sinnvoll und uneingeschränkt umsetzbar. Wer ihn
 umsetzt, muss nur wissen, dass die Reproduzierbarkeit im Self-Play nicht gilt,
 solange der Batcher dort läuft.
+
+---
+
+## 11. VERDIKT 2026-08-13: umgesetzt, Kern bestätigt, zwei Prognosen widerlegt
+
+**Umsetzung**: `net_mcts::derive_search_seed(game_seed, move_index)` (SplitMix64,
+zweistufig) + Aufruf-Verdrahtung in `self_play.rs` (`play_one_game`,
+`play_arena_game`, `play_net_game`, `play_net_vs_net_game`,
+`play_net_self_play_game`) und `py.rs::PyGame` (`ai_drafting_step`,
+`ai_drafting_net_step`). `mcts.rs`/`net_mcts.rs` selbst unverändert (reine
+Verdrahtung, wie in §6 vorgesehen) -- der Heuristik-Bewertungspfad
+(`player_total`/`wertung_progress`) blieb unberührt. Details, Testergebnisse
+und die vollständige Liste bewusst nicht umgestellter Diagnosepfade stehen in
+`STATUS.md`, Kapitel "NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie
+umgesetzt".
+
+**Zwei Prognosen dieser Datei waren FALSCH, am Code/empirisch korrigiert:**
+
+1. **§1 "es ist nicht die Menge, sondern jede Suche überhaupt"** -- am Code
+   nachgeprüft: der tatsächliche sims-proportionale RNG-Verbrauch sitzt in
+   `mcts.rs`s Heuristik-MCTS (`expand_and_backprop`/`rank_actions_cheap`,
+   echt pro Simulation), NICHT in der Netz-Gumbel-Suche
+   (`sample_gumbel`/`determinize_hidden_information` sind root-einmalig,
+   unabhängig von `sims`). Der ursprüngliche §5-Test (Netz-Schattensuche,
+   sims=1 vs. 400) zeigte deshalb selbst OHNE Isolations-Fix keine Abweichung
+   -- kein Fund, nur die falsche Sonde. Mit der Heuristik-Suche als Sonde:
+   Gegenprobe (geteilter RNG) bricht exakt in Runde 4, wie hier behauptet;
+   nach dem Fix 0 Abweichungen.
+2. **§4a "der Hash MUSS brechen"** -- der Paritätshash
+   (`tools/paritaets_probe.py`) hält NACH dem Schnitt UNVERÄNDERT. Grund:
+   die Sonde hängt ausschließlich an `net_search_state_json` (lib.rs), einem
+   Einzelaufruf-Pfad mit eigenem frischen `rng` pro Aufruf, der nie an eine
+   fortlaufende Partie-Schleife weitergegeben wird -- der behobene Fehler
+   trat dort strukturell nie auf. Keine neue Basislinie nötig; Kommentar mit
+   Datum/Begründung in `paritaets_probe.py` ergänzt statt den Hash zu ändern.
+
+**Bestätigt, wie erwartet:**
+
+- Nutzen 1 (Replay funktioniert): 5/5 frische `--log-games`-Partien laufen
+  durch `tools/analyze_game_log.py` ohne Divergenz (vorher: Runde-4-Abbruch
+  in 5/5).
+- §7 (Async-Gate-B): die im `wt_async`-Befund dokumentierte Sync-gegen-sich-
+  selbst-Instabilität ist behoben, soweit sie am geteilten RNG hing (0/4
+  Abweichungen im Nachbau `sync_only_repeatability_after_rng_split`,
+  inklusive der Trainingsziel-Felder -- die separate Wall-Clock-Komponente
+  aus Task #71 trat in dieser Stichprobe gar nicht auf).
+- §8 (Elo-Sprung nur vermerkt, keine Anker-Kanten neu gefahren): umgesetzt,
+  Zeile in `elo_history.csv` nach dem Engine-Ära-Muster.
+
+**Nicht umgesetzt, bewusst außerhalb des Kerns** (§6 nennt `self_play.rs`
+generisch, nicht jede Funktion einzeln): `play_net_vs_net_hybrid_game`,
+`play_stage3_vs_stage1_game`, `sibling_ranking_diagnostic` (reine Diagnose-/
+Forschungswerkzeuge) sowie `round_transition.rs`/`round_transition_deep.rs`s
+additives Rundenübergangs-/Bootstrap-Sampling (läuft auf einem Zustands-Klon,
+beeinflusst nie den gespielten Zug oder die echte Fabrikversorgung).
