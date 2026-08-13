@@ -27,6 +27,32 @@ A2-Vertragsstempel, verifiziert 2026-08-10: die Suchantwort enthaelt
 `contract_hash`/`input_size`/`num_planes_channels` nicht). Umgekehrt heisst
 das: die Sonde belegt Suchparitaet, nicht Vertragsparitaet.
 
+# WHEEL-FRISCHE-CHECK (Nutzer-Auftrag 2026-08-13): die teuerste Fehlerklasse
+# dieser Woche war eine Messung auf einem veralteten Wheel -- cargo test gruen,
+# aber maturin/pip vergessen, 16 Minuten Messzeit auf totem Code (Beleg:
+# PREREG_injektion_wertungsplatten.md, "bit-identische Gegenprobe"). Diese
+# Probe laeuft vor jeder Messkampagne, also ist sie der richtige Waechter:
+# ist eine Engine-Quelle JUENGER als die installierte .pyd, ist jede Messung
+# mit dem installierten Wheel verdaechtig.
+import importlib.util as _ilu
+from pathlib import Path as _P
+def _wheel_frische_warnung() -> None:
+    try:
+        spec = _ilu.find_spec("mosaic_rust")
+        pyd = max(_P(spec.origin).parent.glob("*.pyd"), key=lambda f: f.stat().st_mtime)
+        pyd_zeit = pyd.stat().st_mtime
+        quellen = list((_P(__file__).resolve().parent.parent / "engine" / "src").glob("*.rs"))
+        neuere = [q.name for q in quellen if q.stat().st_mtime > pyd_zeit]
+        if neuere:
+            print(f"WARNUNG WHEEL-FRISCHE: {len(neuere)} Engine-Quelle(n) sind JUENGER "
+                  f"als die installierte Erweiterung ({pyd.name}): "
+                  f"{', '.join(sorted(neuere)[:5])}{' ...' if len(neuere) > 5 else ''}")
+            print("  -> maturin build --release && pip install --force-reinstall --no-deps, "
+                  "sonst misst der naechste Lauf totes Verhalten.")
+    except Exception as e:  # Frische-Check darf die Probe nie brechen
+        print(f"(Wheel-Frische-Check uebersprungen: {e})")
+_wheel_frische_warnung()
+
 DIAGNOSE-FELDER WERDEN AUSGEBLENDET (`EXCLUDED_FIELDS`). Grund, und es ist
 eine Lehre aus zwei Fehlalarmen derselben Art: der Soll-Hash wurde auf einer
 Ausgabe OHNE die Stufe-2-Diagnosefelder gebildet. Wer die rohe Ausgabe
