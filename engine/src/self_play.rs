@@ -2376,120 +2376,40 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     game_seed: u64,
     log_games: bool,
 ) -> Value {
-    let mut game = Game::start(names, first_player, scoring_ids, rng);
-    let mut steps = 0u32;
-    let mut guard = 0u32;
-    let t_start = std::time::Instant::now();
-    let timeout_secs = net_game_timeout_secs(sims_a.max(sims_b));
-    loop {
-        guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
-        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
-        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
-            break;
-        }
-        match game.state.phase {
-            Phase::StartPlacement | Phase::Drafting => {
-                if game.state.players.iter().any(|p| p.start_tile_pending) {
-                    let first = game.state.current_player;
-                    let non_starter = 1 - first;
-                    let pi = if game.state.players[non_starter].start_tile_pending {
-                        non_starter
-                    } else if game.state.players[first].start_tile_pending {
-                        first
-                    } else {
-                        break;
-                    };
-                    match choose_start_placement(&game.state, pi) {
-                        Some((tid, r, c2, rot)) => {
-                            let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
-                        }
-                        None => break,
-                    }
-                    steps += 1;
-                } else if game.state.phase == Phase::Drafting {
-                    let pi = game.state.current_player;
-                    let actions = drafting_actions(&game.state);
-                    let chosen = if actions.len() == 1 {
-                        actions[0].clone()
-                    } else {
-                        let (net, base, cp) = if pi == 0 {
-                            (net_a, sims_a, c_puct_a)
-                        } else {
-                            (net_b, sims_b, c_puct_b)
-                        };
-                        let s = net_effective_sims(base, actions.len());
-                        // PREREG_search_rng_split.md: siehe `play_net_game`-
-                        // Kommentar -- `game_seed` ist hier schon Parameter.
-                        let mut search_rng = StdRng::seed_from_u64(
-                            crate::net_mcts::derive_search_seed(game_seed, steps as u64),
-                        );
-                        crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
-                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
-                            .or_else(|| net_search_drafting_action(net, &game.state, s, cp, false, &mut search_rng))
-                            .unwrap_or_else(|| actions[0].clone())
-                    };
-                    apply_chosen_action(&mut game, chosen)
-                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
-                    steps += 1;
-                } else {
-                    break;
-                }
-            }
-            // Task #20: beide Spieler haben ein Netz -- Board 0 = `net_a`,
-            // Board 1 = `net_b` (dieselbe Zuordnung wie beim Drafting oben).
-            Phase::Tiling => {
-                let pi = game.state.current_player;
-                let tiling_net = if pi == 0 { net_a } else { net_b };
-                match resolve_tiling_step(&game.state, pi, Some(tiling_net)) {
-                    TilingStep::Place(ta) => {
-                        let _ = game.apply_single_tiling(pi, &ta);
-                    }
-                    TilingStep::Chips { row, chips } => {
-                        apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
-                    }
-                    TilingStep::End => {
-                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
-                    }
-                }
-                steps += 1;
-            }
-            _ => break,
-        }
+    // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
+    // BEIDE Seiten `NetArenaAgent` MIT Vorzug (BEIDSEITIG -- Prereg §3.4,
+    // explizite Seitigkeits-Konfiguration statt Pfad-Zufall), Tiling-Netz je
+    // Brett (Task #20: Board 0 = `net_a`, Board 1 = `net_b`, dieselbe
+    // Zuordnung wie beim Drafting), sequenzielle Stapel-Zieh-Aufloesung
+    // (`apply_chosen_action`) beidseitig, kein Spaltenbau-Trace (Bestand).
+    let agent_a = NetArenaAgent { net: net_a, base_sims: sims_a, c_puct: c_puct_a, vorzug: true };
+    let agent_b = NetArenaAgent { net: net_b, base_sims: sims_b, c_puct: c_puct_b, vorzug: true };
+    let cfg = GameLoopConfig {
+        timeout_secs: net_game_timeout_secs(sims_a.max(sims_b)),
+        seed_from_steps: true,
+        game_seed,
+        move_heartbeat: None,
+        labels: None,
+        mode: LoopMode::Summary { log_games },
+        players: [
+            PlayerLoopConfig {
+                agent: &agent_a,
+                tiling_net: Some(net_a),
+                apply_via_chosen_action: true,
+                spaltenbau_trace: false,
+            },
+            PlayerLoopConfig {
+                agent: &agent_b,
+                tiling_net: Some(net_b),
+                apply_via_chosen_action: true,
+                spaltenbau_trace: false,
+            },
+        ],
+    };
+    match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
+        LoopOutput::Summary(v) => v,
+        LoopOutput::Records(_) => unreachable!("Summary-Modus konfiguriert"),
     }
-    if game.state.phase == Phase::End {
-        let _ = game.apply_end_scoring();
-    }
-    let p0 = &game.state.players[0];
-    let p1 = &game.state.players[1];
-    let mut result = json!({
-        "scores": [p0.score, p1.score],
-        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
-        "winner": determine_winner(&game.state),
-        "steps": steps,
-        "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
-        "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
-        // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
-        // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
-        // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
-        // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
-        "scoring_tile_ids": game.state.scoring_tile_ids,
-    });
-    // Siehe Kommentar in `play_net_game`.
-    if log_games {
-        if let Value::Object(map) = &mut result {
-            map.insert("game_seed".into(), json!(game_seed));
-            map.insert("first_player".into(), json!(first_player));
-            map.insert(
-                "names".into(),
-                json!([game.state.players[0].name.clone(), game.state.players[1].name.clone()]),
-            );
-            map.insert("log".into(), json!(game.state.log));
-        }
-    }
-    result
 }
 
 /// `n_games` Spiele Netz A (Brett 0) vs. Netz B (Brett 1), Startspieler
