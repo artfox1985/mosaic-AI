@@ -1,4 +1,4 @@
-//! Weg-B-Kennlinien-Probe (`evaluations/PREREG_gpu_inferenzpfad.md` §6 Schritt 2,
+//! Weg-B-Kennlinien-Probe (`evaluations/PREREG_gpu_inference_path.md` §6 Schritt 2,
 //! §3 Weg B). Misst Evals/s fuer `ort`-Crate + ONNX-Runtime-CUDA-Provider auf
 //! demselben `.onnx`-Modell und denselben Batch-Punkten wie
 //! `tools/gpu_batch_throughput.py` (dortige Torch-Messung) -- NUR damit sind

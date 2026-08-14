@@ -116,7 +116,7 @@ Nach Schritt 4 (ALLE vier Pfade umgestellt), Replay vs. Golden-A:
   20 ignored; nach Schritt 4 warnungsfrei.
 - Wheel neu gebaut (`maturin build --release`) und installiert
   (`pip install --force-reinstall --no-deps`).
-- `tools/paritaets_probe.py` auf dem installierten Wheel:
+- `tools/parity_probe.py` auf dem installierten Wheel:
   `PARITAETS-HASH: 8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`
   — „OK -- Defaults sind byte-identisch zum Bestand."
 

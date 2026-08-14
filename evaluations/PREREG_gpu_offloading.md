@@ -57,7 +57,7 @@ Statt 11 Partien laufen N gleichzeitig; ihre Suchen wechseln sich ab, sodass
 zu jedem Zeitpunkt bis zu N Blätter auf Bewertung warten. **Jede einzelne
 Suche bleibt bitgleich** -- sie wartet nur länger auf ihre Antwort.
 
-- Kein Gating nötig, keine Stärkefrage, Parität über `tools/paritaets_probe.py`
+- Kein Gating nötig, keine Stärkefrage, Parität über `tools/parity_probe.py`
   beweisbar.
 - Kosten: Speicher für N Spielzustände samt Suchbäumen; Umbau der
   Self-Play-Schleife von "Partie fertig spielen" auf eine Zustandsmaschine

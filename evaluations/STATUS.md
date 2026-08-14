@@ -39,7 +39,7 @@ sweepbar). Die Kette:
 | 1 | Vorzug-Verdrahtung (beidseitig) + 5x30-Wirkungsprobe je Arm | **ERLEDIGT** (5992f38; Probe: k1 2,80 / k5 8,30 nahe Arena-Niveau, Korpus-Prereg §3.5) |
 | 2 | `PREREG_unified_game_loop.md` -- vier Schleifen vereinheitlicht | **ERLEDIGT** (307caa4..d9c49e6; Golden-Records 0 Bit alle Pfade, §5-Protokoll) |
 | 3 | `PREREG_deterministic_labels.md` ("2b") -- Not-Deckel ehrlich | **ERLEDIGT** (3fcfed1; unter 12x CPU-Stress 0/1956 byte-identisch, §4; sync<->async-Gate-B-Retest offen bis wt_async2 frei) |
-| 4 | GPU-Verdikt `PREREG_gpu_inferenzpfad.md` par.22 (N=64/128 tract/ORT) | **AGENT LAEUFT** (N=128-Zelle nach Detached-Prozess-Tod neu gestartet); bestimmt nur den Pfad (>=2,0x -> Async+ORT, sonst 8 Threads) |
+| 4 | GPU-Verdikt `PREREG_gpu_inference_path.md` par.22 (N=64/128 tract/ORT) | **AGENT LAEUFT** (N=128-Zelle nach Detached-Prozess-Tod neu gestartet); bestimmt nur den Pfad (>=2,0x -> Async+ORT, sonst 8 Threads) |
 | 5 | Generierung 8000 -> Deckungs-Bericht -> (eigener Startknopf) Training warm-start, `--ownership-weight 0,2 --conjunction --extra-data-dir` -> Tor A | **WARTET NUR NOCH auf 4** -- auch Arm D (pfadunabhaengig) zurueckgehalten, um die laufenden Partien/h-Zellen nicht zu verfaelschen. Ablage via MOSAIC_DATA_DIR=data/ownership_corpus (config.py:28) |
 
 ### Generator-Sortiment (aktuelle Aera, alle Zahlen nachgerechnet)
@@ -66,7 +66,7 @@ Trainingsziel-Divergenz -> Schritt 3 der Startsequenz.
 
 | Punkt | Stand |
 |---|---|
-| **Dateinamen Welle 2** | TEILMENGE 1 ERLEDIGT 2026-08-14 (Tabelle am Ende von archive/history.md): column_build.rs, plate_builder.rs, provocation.rs, PREREG_provocation.md, seeds_per_criterion/, seed_selection_plates.*, provocation_acceptance.json, column_build_trace.py, plate_points_from_arena.py, game_manual_GUI.pptx (Lock war weg). OFFEN Teilmenge 2 (bis GPU-Agent fertig): PREREG_gpu_inferenzpfad->PREREG_gpu_inference_path, gpu_*-Dateien, async_gpu_stufe3_probe.jsonl (stufe->stage), paritaets_probe.py->parity_probe.py, gpu_inferenzpfad_ipc_roundtrip.py, data/gpu_messung/ |
+| **Dateinamen Welle 2** | TEILMENGE 1 ERLEDIGT 2026-08-14 (Tabelle am Ende von archive/history.md): column_build.rs, plate_builder.rs, provocation.rs, PREREG_provocation.md, seeds_per_criterion/, seed_selection_plates.*, provocation_acceptance.json, column_build_trace.py, plate_points_from_arena.py, game_manual_GUI.pptx (Lock war weg). TEILMENGE 2 ERLEDIGT 2026-08-14 (GPU-Agent fertig, par.22 committet): PREREG_gpu_inference_path.md, gpu_inference_path_ipc_roundtrip.{py,json}, gpu_inference_path_selfplay_e2e_route_b.json, async_gpu_stage3_probe.jsonl, parity_probe.py, data/gpu_measurement/ (NICHT leer: 5 Manifeste + 5 pkl-Messkorpora ~254 MB, unangetastet). MIGRATION KOMPLETT -- kein deutscher Dateiname mehr im Hauptbaum |
 | **Stoerungs-Baustein Farbzaehlung** | Nutzer-Auftrag steht (domain_knowledge.md Punkt 4); Messgroesse Gegner-Plattenpunkte gepaart + Frisch-Seed-Replikation; sinnvoll NACH dem Schleifen-Refactor (ein Einbauort statt vier) |
 | **Architektur-Fahrplan Rest** | (1) PREREG_INDEX generieren statt von Hand (der A5-Hook prueft nur Konsistenz), (2) stille Test-Skips verbieten, (3) MOSAIC_*-Knopf-Registratur. Punkte 4+5 sind jetzt PREREG_unified_game_loop.md (Startsequenz Schritt 2) |
 | **Torch-IPC-Reste (Weg A)** | Entfernung freigegeben, war wegen Datei-Konflikt uebersprungen -- nach dem Refactor nachholen |

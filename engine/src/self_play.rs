@@ -3120,7 +3120,7 @@ pub fn run_net_self_play(
         "perspective_divergence_diagnostics": true,
         "by_round": crate::net_mcts::perspective_divergence_snapshot(),
     }));
-    // Verschraenkungs-Messung (PREREG_gpu_inferenzpfad.md §19): "berichte den
+    // Verschraenkungs-Messung (PREREG_gpu_inference_path.md §19): "berichte den
     // TATSAECHLICH erreichten mittleren Batch" -- Knopf aus (Default) heisst
     // `lookup` findet nichts, dieses Objekt wird dann gar nicht angehaengt
     // (kein Einfluss auf Bestandsverhalten/Trainingsdaten-Auswertung, gleiche

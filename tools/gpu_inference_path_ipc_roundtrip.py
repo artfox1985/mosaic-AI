@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Schritt 1 (Weg A) aus `evaluations/PREREG_gpu_inferenzpfad.md` Abschnitt 6.
+"""Schritt 1 (Weg A) aus `evaluations/PREREG_gpu_inference_path.md` Abschnitt 6.
 
 Anlass: Abschnitt 3 (Weg A, Cross-Language-Queue Rust -> Python/torch) und
 Abschnitt 4 (Entscheidungsregel 1) verlangen VOR jeder Architekturentscheidung
@@ -57,7 +57,7 @@ ein Rust-Client nicht haette. UNGEPRUEFT (nicht in Rust nachgemessen): die
 hier gemessene Zahl ist eher ein oberes Limit als eine Unterschaetzung.
 
 Aufruf:
-    python tools/gpu_inferenzpfad_ipc_roundtrip.py
+    python tools/gpu_inference_path_ipc_roundtrip.py
 """
 from __future__ import annotations
 
@@ -309,7 +309,7 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--reps", type=int, default=200)
     ap.add_argument("--warmup", type=int, default=20)
-    ap.add_argument("--out", default="evaluations/gpu_inferenzpfad_ipc_roundtrip.json")
+    ap.add_argument("--out", default="evaluations/gpu_inference_path_ipc_roundtrip.json")
     args = ap.parse_args()
 
     fsize = feature_size_report(args.batch)

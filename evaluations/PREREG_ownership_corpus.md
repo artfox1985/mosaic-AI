@@ -211,7 +211,7 @@ Drei Entscheidungspunkte lt. Auftrag, GEPRUEFT einzeln:
 
 **Bestandsschutz**: `cargo test --lib` 417/0/20 (Baseline vor diesem Umbau
 war 417/0/20 nach §20 — unveraendert, keine neuen/entfernten Tests fuer
-diesen reinen Verdrahtungs-Umbau). `tools/paritaets_probe.py`: Hash
+diesen reinen Verdrahtungs-Umbau). `tools/parity_probe.py`: Hash
 `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` haelt
 (Wheel neu gebaut+installiert) — Bestandsverhalten bei unbesetzten Knoepfen
 byte-identisch.
@@ -347,7 +347,7 @@ Befund vor Umbau:
   entfernt (Wrapper durch eine sofort aufgerufene Passthrough-Closure
   ersetzt) → derselbe neue Test schlaegt fehl, exakt mit den zwei oben
   zitierten Werten. Fix restauriert → Test gruen. `cargo test --lib`:
-  418/0/20 (417 Bestand + 1 neuer Test). `tools/paritaets_probe.py`: Hash
+  418/0/20 (417 Bestand + 1 neuer Test). `tools/parity_probe.py`: Hash
   `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` haelt
   (Wheel neu gebaut+installiert) — Bestandsverhalten bei unbesetzten
   Knoepfen unveraendert, der Fix wirkt nur, wenn `PARTIE_GEWICHT` ueberhaupt

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Weg A (`evaluations/PREREG_gpu_inferenzpfad.md` Abschnitt 3): Server-Seite
+"""Weg A (`evaluations/PREREG_gpu_inference_path.md` Abschnitt 3): Server-Seite
 des optionalen Torch/CUDA-IPC-Kanals. Gegenstueck zu `engine/src/net_ipc.rs`
 (Rust-Client) -- dort auch die vollstaendige Architektur-Begruendung
 (Nutzlast in einer speicherabgebildeten Datei, Signalisierung ueber einen
 TCP-Loopback-Socket).
 
-Nutzlast-Vertrag (siehe `evaluations/gpu_inferenzpfad_ipc_roundtrip.json`,
+Nutzlast-Vertrag (siehe `evaluations/gpu_inference_path_ipc_roundtrip.json`,
 Feld "feature_size" -- Quellen dort aufgelistet):
     Anfrage  = Planes[76,6,6] (2736 Elemente) + Flat[708]     = 3444 Elemente/Pos.
     Antwort  = Policy[406] + Value[1] + Moon[5] + Points[1]   =  413 Elemente/Pos.

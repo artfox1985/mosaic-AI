@@ -50,7 +50,7 @@ so (`deterministic_seed()`).
 
 ### (a) Die Paritätsprobe MUSS brechen
 
-`tools/paritaets_probe.py` prüft, dass Defaults byte-identisch zum Bestand sind
+`tools/parity_probe.py` prüft, dass Defaults byte-identisch zum Bestand sind
 (Hash `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`). Eine
 Änderung der Such-Zufallsquelle ändert die Determinisierungen und damit die
 Suchergebnisse — **byte-identisch ist unmöglich**.
@@ -161,7 +161,7 @@ sind der dichte Detektor fuer alles, was in dieser Injektions-Reihe noch kommt.
 
 ## 9. WARNUNG 2026-08-12: der GPU-Batcher arbeitet gegen den Zweck dieser Datei
 
-`PREREG_gpu_inferenzpfad.md` §17: mit eingeschaltetem Verschraenkungs-Batcher haengt
+`PREREG_gpu_inference_path.md` §17: mit eingeschaltetem Verschraenkungs-Batcher haengt
 die Rangfolge der Wurzelkandidaten an der **Batch-Zusammensetzung**, und die
 entsteht aus dem Zeitverhalten der Faeden -- also von Lauf zu Lauf verschieden.
 Belegt an `record_index=320`, der unter 128er-Bloecken eine Rangvertauschung zeigt
@@ -181,7 +181,7 @@ getrennt verfuegbar, ist aber eine Einschaetzung und nicht gemessen.
 
 ## 10. ENTSCHÄRFT durch Nutzer-Entscheid 2026-08-12
 
-*"batcher für self play an, arena und gating aus"* (`PREREG_gpu_inferenzpfad.md` §18).
+*"batcher für self play an, arena und gating aus"* (`PREREG_gpu_inference_path.md` §18).
 
 Der Widerspruch aus §9 ist damit aufgelöst, nicht weggeredet: die seed-exakte
 Reproduktion, die diese Vorregistrierung herstellen soll, gilt für **Arena und
@@ -220,12 +220,12 @@ umgesetzt".
    Gegenprobe (geteilter RNG) bricht exakt in Runde 4, wie hier behauptet;
    nach dem Fix 0 Abweichungen.
 2. **§4a "der Hash MUSS brechen"** -- der Paritätshash
-   (`tools/paritaets_probe.py`) hält NACH dem Schnitt UNVERÄNDERT. Grund:
+   (`tools/parity_probe.py`) hält NACH dem Schnitt UNVERÄNDERT. Grund:
    die Sonde hängt ausschließlich an `net_search_state_json` (lib.rs), einem
    Einzelaufruf-Pfad mit eigenem frischen `rng` pro Aufruf, der nie an eine
    fortlaufende Partie-Schleife weitergegeben wird -- der behobene Fehler
    trat dort strukturell nie auf. Keine neue Basislinie nötig; Kommentar mit
-   Datum/Begründung in `paritaets_probe.py` ergänzt statt den Hash zu ändern.
+   Datum/Begründung in `parity_probe.py` ergänzt statt den Hash zu ändern.
 
 **Bestätigt, wie erwartet:**
 
