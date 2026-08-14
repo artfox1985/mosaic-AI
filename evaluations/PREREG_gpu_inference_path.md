@@ -1842,6 +1842,153 @@ Regel 3 bei produktionsnahem Batch") mit **Nein** zu beantworten, auf
 Basis GEMESSENER, nicht extrapolierter Zahlen fuer die entscheidenden
 ORT-Zellen.
 
+## 23. TRAEGER-SKALIERUNG, DER FAIRE SYNC-VERGLEICH -- UND DAS ENDVERDIKT
+
+Nutzer-Auftrag: die Maschine ist frei (Korpus-Generierung abgeschlossen,
+keine parallelen Agenten-Lasten). Drei Zellen: (1) N=128 ORT-CUDA mit 11
+statt 8 Traegern (6C/12T Ryzen 3600X, GEPRÜFT per
+`Get-CimInstance Win32_Processor`: 6 Kerne/12 logische Prozessoren -- 11
+Traeger + 1 Sammel-Faden = volle Breite), (2) Sync FRISCH mit 11 UND 12
+Faeden (40 Partien, wie der bisherige Bezug), staerkerer Arm wird ab jetzt
+der Regel-3-Nenner, (3) Bonus: zwei gleichzeitige Async+ORT-Prozesse
+(je 5-6 Traeger, je N=64) gegen den besten Einzelprozess.
+
+### Zelle 2 zuerst: der Sync-Nenner aendert sich DRASTISCH
+
+| Faeden | fertig | Wandzeit | Partien/h |
+| --- | ---: | ---: | ---: |
+| 8 (§20-22, alter Bezug) | 40/40 | 579,36 s | 248,5 |
+| **11** | 40/40 | 272,46 s | **528,5** |
+| 12 | 40/40 | 388,28 s | 370,9 |
+
+**11 Faeden schlaegt 12** (528,5 gegen 370,9/h) -- bei 6 physischen Kernen/12
+logischen Prozessoren laesst 11 einen logischen Prozessor fuer OS/Rayon-
+Koordination frei, waehrend 12 die Maschine voll saettigt und dadurch
+LANGSAMER wird, nicht schneller. **11 Faeden mit 528,5 Partien/h ist ab
+sofort der Regel-3-Nenner.** Der Sprung gegenueber dem alten 248,5er-Bezug
+(2,126x) ist NICHT durch mehr Faeden allein erklaerbar (nur 8->11, +37,5%)
+-- er zeigt, dass die §20-22-Messungen unter spuerbarer Maschinenlast
+(parallele Agenten/Sitzungen zu dieser Zeit) liefen, waehrend diese Messung
+auf einer freien Maschine lief. **Alle Regel-3-Faktoren aus §20-22 waren
+dadurch zu GUENSTIG fuer Weg B** (der Nenner war kuenstlich niedrig) --
+dieser Abschnitt korrigiert das.
+
+### Zelle 1: Traeger-Skalierung bestaetigt sich, reicht aber nicht
+
+| Traeger | Partien/h | mittl. Batch | Faktor ggue. NEUEM Nenner (528,5) | Faktor ggue. ALTEM Nenner (248,5) |
+| --- | ---: | ---: | ---: | ---: |
+| 8 (§22) | 365,5 | 81,70 | 0,692x | 1,471x |
+| **11** | **475,2** | 87,29 | **0,899x** | 1,912x |
+
+Traeger-Skalierung wirkt wie vorab erwartet: 11/8=1,375x mehr Traeger ->
+475,2/365,5=1,300x mehr Durchsatz, ohne den Batch zu verschlechtern (87,29
+gegen 81,70, beide erreichen den 128er-Deckel). **Gegen den ALTEN Bezug
+waere das mit 1,912x knapp UNTER Regel 3 gelandet -- gegen den korrekten,
+frischen Nenner sind es nur 0,899x, UNTER Paritaet.** Genau dieser
+Unterschied ist der Grund, warum Zelle 2 zuerst gemessen werden musste.
+
+### Zelle 3 (Bonus): zwei kleine CUDA-Kontexte schlagen einen grossen
+
+Zwei gleichzeitige, VOLLSTAENDIG unabhaengige Prozesse (eigener `Net::
+load_auto`, eigene ORT-CUDA-Session, eigener Sammel-Faden) -- Traeger und
+Gesamt-Partienzahl exakt auf die Zelle-1-Bestwerte aufgeteilt (6+5=11
+Traeger, 2x64=128 Partien):
+
+| Prozess | Traeger | Partien/h | Wandzeit |
+| --- | ---: | ---: | ---: |
+| A | 6 | 373,1 | 617,54 s |
+| B | 5 | 331,5 | 694,96 s |
+| **Aggregat** (128 Partien / laengere Wandzeit) | 11 (gesamt) | **663,0** | 694,96 s |
+
+**Aggregat schlaegt den besten Einzelprozess** (663,0 gegen 475,2/h,
+**1,395x**) -- bei IDENTISCHER Gesamt-Traeger- und Gesamt-Partienzahl. Die
+im Auftrag vorab formulierte Deutungsregel ("ein Gewinn muss aus der
+GPU-Entlastung kommen; scheitert die Zelle an CUDA-Kontext-Kosten, ist das
+der Befund") faellt damit auf die POSITIVE Seite: **kein Scheitern an
+CUDA-Kontext-Kosten** -- im Gegenteil, zwei kleinere, unabhaengige
+Sammel-Faeden/CUDA-Kontexte sind effizienter als einer, der 128
+gleichzeitige Partien buendeln muss. Plausible (NICHT gepruefte, siehe
+unten) Erklaerung: der EINE Sammel-Faden bei N=128 muss VIEL mehr
+gleichzeitig eintreffende Anfragen sequenziell abarbeiten und serialisiert
+dadurch staerker, als zwei Sammel-Faeden, die je nur 64 Anfragen-Quellen
+bedienen -- die Aufteilung selbst reduziert Kontention, unabhaengig von der
+GPU. Gegen den NEUEN Sync-Nenner: **663,0/528,5 = 1,255x** -- die beste
+Zelle in §20-23, aber immer noch UNTER 2,0x.
+
+### Regel-3-Endverdikt (Massstab: >=2,0x gegen den STAERKSTEN Sync-Arm,
+### 528,5 Partien/h)
+
+| Zelle | Partien/h | Faktor |
+| --- | ---: | ---: |
+| N=1 ORT-CUDA (§21) | 85,1 | 0,161x |
+| N=16 ORT-CUDA (§21) | 221,0 | 0,418x |
+| N=64 ORT-CUDA, 8 Traeger (§22) | 383,8 | 0,726x |
+| N=128 ORT-CUDA, 8 Traeger (§22) | 365,5 | 0,692x |
+| N=128 ORT-CUDA, 11 Traeger (§23) | 475,2 | 0,899x |
+| **Doppel-Prozess-Aggregat, 6+5 Traeger (§23)** | **663,0** | **1,255x (bester Wert)** |
+
+**Keine Zelle erreicht 2,0x.** Die beste bisher gemessene Konfiguration
+(zwei unabhaengige Prozesse) liegt bei 1,255x gegen den korrekten,
+frisch gemessenen Sync-Nenner -- deutlich besser als jede
+Einzelprozess-Zelle, aber weniger als die Haelfte der Deckungsschwelle.
+
+**Verdikt gemaess der vorab festgelegten Regel: Weg B (GPU-Inferenzpfad)
+wird NICHT Standard fuer v22+ -- geschlossen bis zum groesseren Netz.**
+
+### Was NICHT geprüft ist
+
+- Die genaue Ursache, WARUM zwei kleinere Sammel-Faeden effizienter sind
+  als einer grosser (Zelle 3) -- keine Zeitzerlegung (`fill_wait_ns`/
+  `eval_ns`) fuer diesen spezifischen Vergleich durchgefuehrt, nur die
+  Endzahlen. Plausible Hypothese (Kontention im geteilten Sammel-Faden
+  bei N=128) NICHT instrumentell bestaetigt.
+  - Ob mehr als zwei Prozesse (3, 4...) den Trend fortsetzen oder an
+    einer anderen Grenze (GPU-Speicher, PCIe-Bandbreite, CUDA-Kontext-
+    Limit) gaeben wuerden -- nicht gefahren.
+- Ob ein groesseres Netz (wie im Verdikt referenziert) die Kennlinie
+  verschieben wuerde -- ausserhalb des Auftragsumfangs dieser Messreihe,
+  reine Forward-Reference auf die Verdikt-Regel selbst.
+- N=128 tract mit 11 Traegern -- nicht gefahren, da tract bereits bei 8
+  Traegern (§22) nicht innerhalb der Mess-Infrastruktur-Grenzen
+  abschliessbar war; ein Versuch mit MEHR Traegern (potenziell noch
+  laengere Wandzeit durch mehr Nebenlaeufigkeit auf demselben
+  Sammel-Faden) haette dasselbe Problem wahrscheinlich verschaerft, nicht
+  geloest.
+- Nur EIN Seed je Zelle (Zeitbudget, wie in §20-22).
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- Zelle 2 (Sync-Nenner) VOR Zelle 1 gefahren, obwohl im Auftrag als "1."
+  und "2." nummeriert -- der neue Nenner war fuer die EINORDNUNG jeder
+  weiteren Zelle noetig, nicht erst am Ende.
+- Traeger-Aufteilung 6+5 (nicht 5+6 oder 5,5+5,5) fuer Zelle 3 -- addiert
+  sich exakt auf die Zelle-1-Traegerzahl (11) fuer einen sauberen
+  Gesamt-Ressourcen-Vergleich; Reihenfolge (welcher Prozess 6 bekommt)
+  beliebig.
+- Verschiedene `--seed`-Werte fuer die beiden Zelle-3-Prozesse (20260814
+  bzw. 314159265) -- vermeidet identische Partie-Sequenzen zwischen den
+  beiden Prozessen, ohne die Wandzeit-Messung zu beeinflussen.
+- Aggregat-Partien/h in Zelle 3 als `(Partien A + Partien B) /
+  max(Wandzeit A, Wandzeit B)` definiert, nicht als Summe der
+  Einzel-Partien/h -- letzteres wuerde einen Prozess, der frueher fertig
+  wird, faelschlich so behandeln, als liefe er in der "toten" Zeit nach
+  seinem Ende weiter mit.
+- N=256 (aus §22 bereits per Bedingung "nur falls 128 nicht saettigt"
+  uebersprungen) hier NICHT erneut aufgegriffen -- die Traeger-Skalierung
+  (Zelle 1) und die Doppel-Prozess-Zelle (Zelle 3) beantworten die
+  Kernfrage bereits eindeutig, ohne weitere Batch-Eskalation.
+
+### Fazit §23
+
+Die Maschinenlast-Korrektur (Zelle 2) ist der wichtigste Einzelbefund
+dieses Abschnitts: sie zeigt, dass JEDER Regel-3-Faktor aus §20-22 gegen
+einen kuenstlich niedrigen Nenner gemessen wurde. Nach der Korrektur bleibt
+Weg B trotz aller Verbesserungen (Condvar-Fix §21, Traeger-Skalierung UND
+der ueberraschende Doppel-Prozess-Gewinn hier) bei **maximal 1,255x** --
+weniger als zwei Drittel der 2,0x-Schwelle. Verdikt gemaess vorab
+festgelegter Regel: **Weg B (GPU-Inferenzpfad) bleibt geschlossen, bis ein
+groesseres Netz die Kennlinie veraendert.**
+
 ## §23 PLAN: Die letzten drei Hebel (vorregistriert 2026-08-14, Nutzer-Auftrag)
 
 Befund-Basis §22: die GPU laeuft bei ~10 % (5.950 Evals/s gemessen gegen
