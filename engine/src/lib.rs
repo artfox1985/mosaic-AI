@@ -896,6 +896,25 @@ fn scoring_tiles_json() -> String {
     json!({ "tiles": tiles, "exclusive_pairs": pairs }).to_string()
 }
 
+/// PREREG_deterministic_labels.md §2 Stufe 1 (Feuerraten-Messung, reine
+/// Diagnose): Rohzahlen der Not-Deckel-Zaehler aus `round_transition.rs`/
+/// `round_transition_deep.rs` seit dem letzten `reset_not_deckel_diagnostics`
+/// (oder Prozessstart), Muster wie `net_batcher.rs`s `BatcherStats`. Global
+/// ueber den GANZEN Prozess (alle rayon-Self-Play-Worker), da diese
+/// Zaehler prozessweite `static`s sind -- fuer eine saubere Messung VOR dem
+/// eigentlichen Probe-Lauf zuruecksetzen.
+#[pyfunction]
+fn not_deckel_diagnostics_json() -> String {
+    crate::round_transition::NOT_DECKEL_STATS.snapshot_json().to_string()
+}
+
+/// Setzt alle Stufe-1-Not-Deckel-Zaehler auf 0 -- rein additiv, betrifft
+/// keinen Suchpfad (siehe `not_deckel_diagnostics_json`-Doku).
+#[pyfunction]
+fn reset_not_deckel_diagnostics() {
+    crate::round_transition::NOT_DECKEL_STATS.reset();
+}
+
 /// Python-Modul `mosaic_rust`.
 /// Task #20: bis zu `k` VOLLSTAENDIGE Tiling-Abschluesse eines Zustands, je mit
 /// Rundenpunkten und dem resultierenden Zustand als JSON.
@@ -1108,6 +1127,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(self_play_games_with_net_labels, m)?)?;
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
+    m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(sibling_ranking_diagnostic, m)?)?;

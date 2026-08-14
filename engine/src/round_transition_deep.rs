@@ -140,9 +140,24 @@ pub const N_SAMPLES_TRAIN_ROUND3: u32 = 16;
 /// vereinzelt real ausgeschöpft; Runde 3 (16 Samples): Median 24,71s,
 /// Maximum 29,44s -- ebenfalls dicht am alten 30s-Budget (kaum Marge). Neu:
 /// grosszügig auf ca. das 3-fache des jeweiligen Medians aufgerundet.
-pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(45);
-pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(75);
-pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(75);
+// PREREG_deterministic_labels.md §2 Stufe 2 (2026-08-14): Stufe-1-Messung
+// (~50 Partien, normale Last, `scratchpad/not_deckel_feuerraten.py`) fand
+// echte, wenn auch kleine Feuerraten (`negamax_progress`: 0,047%/0,030%
+// der Knoten-Pruefungen) -- die Mechanik ist damit bestaetigt, auch wenn
+// DIESE konkreten Sample-/Kandidaten-Deckel in der Stichprobe nie feuerten.
+// Alle Wall-Clock-NOT-DECKEL (nicht die PRIMAEREN deterministischen Budgets
+// wie POLICY_NODE_BUDGET/POLICY_DEPTH/N_SAMPLES_TRAIN_ROUND*/N_MIN_/
+// N_FULL_ROUND_END/der guard=300 in `simulate_one_round` -- die bleiben
+// UNVERAENDERT) werden ~10x angehoben ("Ausnahme-Niveau", Auftrag):
+// reine Haenger-Versicherung, der aeussere `run_with_watchdog`-Mechanismus
+// (self_play.rs) bleibt zusaetzlich bestehen. Bei normaler bis schwerer
+// Last soll der Not-Deckel praktisch NIE mehr vor dem jeweiligen primaeren
+// Deckel binden -- das war schon vor dieser Anhebung der Median-/p90-Befund
+// (siehe Kalibrierungs-Kommentare oben), nur die p99/Ausreisser-Faelle
+// unter Last banden zu frueh.
+pub const TIME_BUDGET_TRAIN_ROUND1: Duration = Duration::from_secs(450);
+pub const TIME_BUDGET_TRAIN_ROUND2: Duration = Duration::from_secs(750);
+pub const TIME_BUDGET_TRAIN_ROUND3: Duration = Duration::from_secs(750);
 
 /// Horizont (in Runden) für `bootstrap_value_after_rounds` (Punkt 6,
 /// `evaluations/value head tests.txt`) -- wie viele Runden vorausgeschaut
@@ -177,7 +192,7 @@ pub const BOOTSTRAP_HORIZON_ROUNDS: u32 = 2;
 /// Kalibrierung beschreibt ("scores/winner sind dann kein echtes
 /// Endergebnis"), jetzt durch dieses Moduls zusätzliche synchrone
 /// Sampling-Zeit reproduziert.
-pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 60 + 75 + 75 + 45; // Runde4+3+2+1, Worst-Case-Summe (Runde-4-Anteil mit round5-Knoten-primär-Umstellung nachgezogen, siehe TIME_BUDGET_TRAIN_ROUND4)
+pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 600 + 750 + 750 + 450; // Runde4+3+2+1, Worst-Case-Summe -- Stufe-2-Anhebung (~10x) nachgezogen, siehe Nachtrag oben
 
 /// Suchtiefe/-budget der Zwischenrunden-Zugwahl (`choose_drafting_action_pruned`)
 /// je Einzelentscheidung -- bewusst deutlich billiger als ein voller
@@ -200,14 +215,18 @@ pub const EXTRA_GAME_TIMEOUT_SECS: u64 = 60 + 75 + 75 + 45; // Runde4+3+2+1, Wor
 /// Gamma-Pruning-Samples ab.
 pub const POLICY_DEPTH: u32 = 4;
 pub const POLICY_NODE_BUDGET: u64 = 40;
-pub const POLICY_TIME_BUDGET_PER_DECISION: Duration = Duration::from_millis(200);
+// Stufe-2-Anhebung (~10x, siehe Nachtrag oben) -- DIESER Not-Deckel war der
+// in der Stufe-1-Messung tatsaechlich (wenn auch selten) feuernde
+// (`negamax_entry`/`negamax_loop`, ueber `heuristic_deadline` unten
+// durchgereicht).
+pub const POLICY_TIME_BUDGET_PER_DECISION: Duration = Duration::from_millis(2000);
 /// Gesamt-Zeitbudget für EINEN `choose_drafting_action_pruned`-Aufruf
 /// (alle Geschwister-Kandidaten inkl. Gamma-Pruning-Samples für
 /// rundenendende) -- NUR NOCH Not-Deckel (Task #71). Kalibrierung
 /// (2026-07-22, dieselben 9189 Aufrufe): Gesamt-Laufzeit je Aufruf --
 /// Median 25,9ms, p90 54,3ms, Maximum 2,46s (Ausreißer mit aktivem
 /// Gamma-Pruning-Zweig). Neu: grosszügig auf ca. 6x Maximum aufgerundet.
-pub const POLICY_OVERALL_TIME_BUDGET_PER_DECISION: Duration = Duration::from_secs(15);
+pub const POLICY_OVERALL_TIME_BUDGET_PER_DECISION: Duration = Duration::from_secs(150);
 
 /// Gesamt-Wall-Clock-Sicherheitsnetz für EINE simulierte Runde
 /// (~15-20 Entscheidungen, davon typischerweise nur die letzten 1-3 mit
@@ -219,7 +238,7 @@ pub const POLICY_OVERALL_TIME_BUDGET_PER_DECISION: Duration = Duration::from_sec
 /// Entscheidungen je simulierter Runde -- eine normale Runde hat naturgemäß
 /// ~15-40 Halbzüge). Gemessene Gesamtlaufzeit je simulierter Runde: Median
 /// 977ms, p90 2,21s, Maximum 4,41s. Neu: ca. 3x Maximum aufgerundet.
-pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_secs(15);
+pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_secs(150);
 
 /// Zeitbudget für den EINEN verschachtelten Chance-Node-Sample-Aufruf
 /// (`n_samples = 1`) nach einer simulierten Zwischenrunde. Task #71-Befund:
@@ -233,7 +252,7 @@ pub const ROUND_SIM_TIME_BUDGET: Duration = Duration::from_secs(15);
 /// kalibriert. Neu: ehrlicher Not-Deckel, ca. 4x Maximum aufgerundet (rein
 /// defensiv -- die eigentliche Begrenzung kommt jetzt aus den
 /// Knoten-Deckeln der rekursiven Evaluatoren selbst, s.o.).
-pub const INNER_SAMPLE_TIME_BUDGET: Duration = Duration::from_secs(20);
+pub const INNER_SAMPLE_TIME_BUDGET: Duration = Duration::from_secs(200);
 
 // ── Gamma-Pruning für rundenendende Geschwister-Kandidaten ──────────────────
 
@@ -262,7 +281,7 @@ pub const GAMMA_MARGIN: f64 = 10.0;
 /// unbegründet gewählte Zahl stehen. Neu: 500ms (immer noch >100x
 /// gemessenes Maximum, aber jetzt als bewusster, dokumentierter Not-Deckel
 /// statt einer Zufallszahl).
-pub const GAMMA_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(500);
+pub const GAMMA_SAMPLE_TIME_BUDGET: Duration = Duration::from_millis(5000);
 
 // ── Zwischenrunden-Zugwahl ───────────────────────────────────────────────────
 
@@ -328,12 +347,24 @@ fn negamax_progress(
     deadline: Instant,
 ) -> f64 {
     *node_count += 1;
-    if state.phase != Phase::Drafting
-        || depth_remaining == 0
-        || *node_count >= node_budget
-        || Instant::now() >= deadline
+    // PREREG_deterministic_labels.md §2 Stufe 1: Feuerraten-Diagnose, reine
+    // Beobachtung. Isoliert die Deadline von den deterministischen
+    // Mit-Bedingungen (terminal/Tiefe/node_budget) -- nur wenn die Deadline
+    // die ALLEIN entscheidende Ursache war, zaehlt sie als "Not-Deckel"-Feuer.
     {
-        return leaf_value_progress(state, perspective);
+        use std::sync::atomic::Ordering;
+        let terminal = state.phase != Phase::Drafting || depth_remaining == 0;
+        let budget_hit = *node_count >= node_budget;
+        let deadline_hit = Instant::now() >= deadline;
+        crate::round_transition::NOT_DECKEL_STATS.negamax_entry_checks.fetch_add(1, Ordering::Relaxed);
+        if deadline_hit && !terminal && !budget_hit {
+            crate::round_transition::NOT_DECKEL_STATS
+                .negamax_entry_deadline_fires
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        if terminal || budget_hit || deadline_hit {
+            return leaf_value_progress(state, perspective);
+        }
     }
     let children = ordered_children_pruned(priors, state, perspective);
     if children.is_empty() {
@@ -344,7 +375,16 @@ fn negamax_progress(
     let mut beta = beta_in;
     let mut best = if maximizing { f64::NEG_INFINITY } else { f64::INFINITY };
     for (_, _a, next_state) in children {
-        if *node_count >= node_budget || Instant::now() >= deadline {
+        use std::sync::atomic::Ordering;
+        let budget_hit = *node_count >= node_budget;
+        let deadline_hit = Instant::now() >= deadline;
+        crate::round_transition::NOT_DECKEL_STATS.negamax_loop_checks.fetch_add(1, Ordering::Relaxed);
+        if deadline_hit && !budget_hit {
+            crate::round_transition::NOT_DECKEL_STATS
+                .negamax_loop_deadline_fires
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        if budget_hit || deadline_hit {
             break;
         }
         let val = negamax_progress(
@@ -416,14 +456,39 @@ pub(crate) fn choose_drafting_action_pruned<R: Rng + ?Sized>(
     // mit der Kandidatenzahl multipliziert statt sie zu deckeln, exakt der
     // Bug, der beim ersten Testlauf auffiel).
     let heuristic_deadline = std::cmp::min(Instant::now() + heuristic_time_budget, overall_deadline);
+    // PREREG_deterministic_labels.md §2 Stufe 2 ("ehrliche Deckel"): der
+    // erste (Netz-Policy-)Kandidat ist bereits per `ordered_children_pruned`
+    // nach der billigen `leaf_value_progress`-Heuristik sortiert -- schnell,
+    // ohne eigenes Wall-Clock-Risiko. Feuert `overall_deadline` (nicht
+    // `node_budget`) und bricht die Kandidatenschleife vorzeitig ab, faellt
+    // die Wahl auf GENAU DIESEN Kandidaten zurueck, statt das load-abhaengige
+    // "bislang beste unter den zufaellig noch geschafften Kandidaten"-
+    // Ergebnis zu behalten -- derselbe Not-Deckel liefert dann IMMER
+    // denselben, schnellen, deterministischen Zug.
+    let default_action = children[0].1.clone();
     let mut node_count: u64 = 0;
-    let mut best_action = children[0].1.clone();
+    let mut best_action = default_action.clone();
     let mut best_val = f64::NEG_INFINITY;
     let mut alpha = f64::NEG_INFINITY;
     let beta = f64::INFINITY;
+    let mut deadline_fired = false;
     for (_, a, next_state) in children {
-        if node_count >= node_budget || Instant::now() >= overall_deadline {
-            break;
+        // PREREG_deterministic_labels.md §2 Stufe 1: Diagnose, siehe
+        // `negamax_progress`-Kommentar fuer die Isolations-Begruendung.
+        {
+            use std::sync::atomic::Ordering;
+            let budget_hit = node_count >= node_budget;
+            let deadline_hit = Instant::now() >= overall_deadline;
+            crate::round_transition::NOT_DECKEL_STATS.drafting_loop_checks.fetch_add(1, Ordering::Relaxed);
+            if deadline_hit && !budget_hit {
+                crate::round_transition::NOT_DECKEL_STATS
+                    .drafting_loop_deadline_fires
+                    .fetch_add(1, Ordering::Relaxed);
+                deadline_fired = true;
+            }
+            if budget_hit || deadline_hit {
+                break;
+            }
         }
         let val = if next_state.phase != Phase::Drafting {
             // Gamma-Pruning: echtes (aber knapp gehaltenes) Rundenübergangs-
@@ -433,7 +498,18 @@ pub(crate) fn choose_drafting_action_pruned<R: Rng + ?Sized>(
             // zusätzlich durch `overall_deadline` gedeckelt.
             let quick_p = round_end_eval(&next_state, N_MIN_ROUND_END, rng)[perspective];
             let quick = denormalize_score(quick_p);
-            if quick < best_val - GAMMA_MARGIN || Instant::now() >= overall_deadline {
+            let margin_hit = quick < best_val - GAMMA_MARGIN;
+            let deadline_hit = Instant::now() >= overall_deadline;
+            {
+                use std::sync::atomic::Ordering;
+                crate::round_transition::NOT_DECKEL_STATS.gamma_full_checks.fetch_add(1, Ordering::Relaxed);
+                if deadline_hit && !margin_hit {
+                    crate::round_transition::NOT_DECKEL_STATS
+                        .gamma_full_deadline_fires
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+            }
+            if margin_hit || deadline_hit {
                 quick
             } else {
                 let full_p = round_end_eval(&next_state, N_FULL_ROUND_END, rng)[perspective];
@@ -452,6 +528,9 @@ pub(crate) fn choose_drafting_action_pruned<R: Rng + ?Sized>(
         if val > alpha {
             alpha = val;
         }
+    }
+    if deadline_fired {
+        return Some(default_action);
     }
     Some(best_action)
 }
@@ -526,6 +605,26 @@ pub(crate) fn simulate_one_round<R: Rng + ?Sized>(
     let mut guard = 0u32;
     while game.state.phase == Phase::Drafting {
         guard += 1;
+        // PREREG_deterministic_labels.md §2 Stufe 1: Diagnose. `guard`
+        // ist der deterministische Iterationsdeckel (Kontext-Zahl, KEIN
+        // Not-Deckel) -- separat gezaehlt, damit die Deadline-Feuerrate
+        // nicht durch einen (in der Praxis nie erreichten, siehe Modul-
+        // Kommentar) Guard-Treffer verwaessert wird.
+        {
+            use std::sync::atomic::Ordering;
+            let guard_hit = guard > 300;
+            let deadline_hit = Instant::now() >= overall_deadline;
+            crate::round_transition::NOT_DECKEL_STATS.simulate_round_checks.fetch_add(1, Ordering::Relaxed);
+            if guard_hit {
+                crate::round_transition::NOT_DECKEL_STATS
+                    .simulate_round_guard_fires
+                    .fetch_add(1, Ordering::Relaxed);
+            } else if deadline_hit {
+                crate::round_transition::NOT_DECKEL_STATS
+                    .simulate_round_deadline_fires
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+        }
         if guard > 300 || Instant::now() >= overall_deadline {
             return None;
         }
