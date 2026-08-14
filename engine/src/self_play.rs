@@ -1113,6 +1113,656 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, net: Option<&Net>, rng: &mut R)
     m
 }
 
+// ── Unified game loop (PREREG_unified_game_loop.md) ──────────────────────────
+//
+// EINE parametrisierte Schleife + Spieler-Abstraktion hinter den vier
+// bisherigen Kopien (`play_one_game`, `play_net_game`, `play_net_vs_net_game`,
+// `play_net_self_play_game`). Motivierende Fehlerklasse (Prereg §1): der
+// Bauer-Vorzug war in zwei Kopien verdrahtet (einmal einseitig, einmal
+// beidseitig) und im Produktionspfad zunaechst gar nicht -- Divergenz
+// zwischen Kopien derselben Schleife ist die Grundeigenschaft von Kopien.
+// Die oeffentlichen Einstiege bleiben duenne Wrapper (API-Kompatibilitaet zu
+// py.rs/lib.rs und allen Tools). Abnahme: Golden-Records (Gate-B-Methodik)
+// je Pfad bit-identisch -- jede Abweichung ist ein Refactor-Fehler, siehe
+// Prereg §3 und das Abnahme-Protokoll dort.
+
+/// Bauer-Vorzugskette (Provokation/Spaltenbau/Plattenbauer) -- die EINE
+/// kanonische Reihenfolge fuer alle Vorzugs-Stellen. Bei unbesetzten
+/// Knoepfen (`MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU` unset) liefern alle
+/// drei Glieder `None` (dokumentiertes No-Op-Verhalten der Module selbst).
+fn bauer_drafting_vorzug(state: &GameState) -> Option<Action> {
+    crate::provokation::vorzugszug(state)
+        .or_else(|| crate::plattenbauer::drafting_vorzug(state))
+        .or_else(|| crate::plattenbauer::dome_vorzug(state))
+}
+
+/// Ergebnis eines Drafting-Entscheids eines [`DraftingAgent`].
+struct DraftingDecision {
+    chosen: Action,
+    /// Policy-Target fuer den Trainings-Record -- `Some` NUR bei
+    /// aufzeichnenden Zugquellen (Self-Play-Pfade), `None` in Arena-Pfaden
+    /// (dort wird nichts aufgezeichnet).
+    policy: Option<Vec<Value>>,
+    /// Wurzel-Q der Netz-Suche (nur `NetSelfPlayAgent`, sonst `None`).
+    root_q: Option<f64>,
+    /// completed-Q je Wurzelkandidat (nur `NetSelfPlayAgent`, sonst leer).
+    root_child_q: Vec<f64>,
+    /// PCR-Muenzwurf-Ergebnis (nur `NetSelfPlayAgent` mit aktivem PCR).
+    pcr_is_full: Option<bool>,
+    /// Vorzugs-Kandidat der Bauer-Kette, falls einer existierte -- fuer den
+    /// Spaltenbau-Trace des Arena-Pfads (`spaltenbau_trace`).
+    vorzug: Option<Action>,
+}
+
+impl DraftingDecision {
+    /// Arena-Entscheid ohne Aufzeichnungs-Nebenprodukte.
+    fn plain(chosen: Action) -> Self {
+        DraftingDecision {
+            chosen,
+            policy: None,
+            root_q: None,
+            root_child_q: Vec::new(),
+            pcr_is_full: None,
+            vorzug: None,
+        }
+    }
+}
+
+/// Zugquelle EINES Spielers fuer die Drafting-Phase der vereinheitlichten
+/// Schleife (Prereg §2: Heuristik-MCTS / Netz-Suche / Netz-Suche+Vorzug als
+/// Trait-Objekt). Die Schleife reicht den bereits abgeleiteten Such-RNG
+/// (`derive_search_seed`, PREREG_search_rng_split.md) und den 1-basierten
+/// Halbzug-Zaehler (`move_number`, nur fuer τ-Annealing relevant) herein.
+trait DraftingAgent {
+    fn decide(
+        &self,
+        state: &GameState,
+        actions: &[Action],
+        search_rng: &mut StdRng,
+        move_number: u64,
+    ) -> DraftingDecision;
+}
+
+/// Heuristik-MCTS mit aktionsabhaengiger Temperatur + Policy-Aufzeichnung
+/// (Port self_play.py:172) -- die Zugquelle von `play_one_game`.
+struct HeuristicSelfPlayAgent {
+    base_sims: u32,
+    c: f64,
+}
+
+impl DraftingAgent for HeuristicSelfPlayAgent {
+    fn decide(
+        &self,
+        state: &GameState,
+        actions: &[Action],
+        search_rng: &mut StdRng,
+        _move_number: u64,
+    ) -> DraftingDecision {
+        let n = actions.len();
+        // Aktionsabhängige Temperatur (Port self_play.py:172).
+        let temp = if n > 50 { 0.7 } else if n > 15 { 0.4 } else { 0.15 };
+        let (chosen, policy) = if n == 1 {
+            let a = actions[0].clone();
+            let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
+            (a, vec![entry])
+        } else {
+            drafting_policy(state, actions, self.base_sims, self.c, temp, search_rng)
+        };
+        DraftingDecision { policy: Some(policy), ..DraftingDecision::plain(chosen) }
+    }
+}
+
+/// Heuristik-MCTS-Arena-Gegner (argmax, keine Aufzeichnung, KEIN Vorzug --
+/// die Heuristik-Seite von `play_net_game` kennt die Bauer-Knoepfe nicht).
+struct HeuristicArenaAgent {
+    base_sims: u32,
+    c: f64,
+}
+
+impl DraftingAgent for HeuristicArenaAgent {
+    fn decide(
+        &self,
+        state: &GameState,
+        actions: &[Action],
+        search_rng: &mut StdRng,
+        _move_number: u64,
+    ) -> DraftingDecision {
+        let chosen = if actions.len() == 1 {
+            actions[0].clone()
+        } else {
+            let s = dynamic_sims(self.base_sims, actions.len());
+            search_drafting_action(state, s, self.c, search_rng)
+                .unwrap_or_else(|| actions[0].clone())
+        };
+        DraftingDecision::plain(chosen)
+    }
+}
+
+/// Netz-Gumbel-Suche fuer Arena-Partien (argmax, keine Aufzeichnung).
+/// `vorzug` ist die EXPLIZITE Seitigkeits-Konfiguration des Bauer-Vorzugs
+/// (Prereg §3.4): `play_net_game` setzt ihn NUR auf der Netz-Seite
+/// (einseitig -- die Heuristik-Gegenseite ist ohnehin ein anderer Agent),
+/// `play_net_vs_net_game` auf BEIDEN Seiten (beidseitig). Kein Pfad-Zufall
+/// mehr, sondern Konstruktor-Argument.
+struct NetArenaAgent<'n> {
+    net: &'n Net,
+    base_sims: u32,
+    c_puct: f64,
+    vorzug: bool,
+}
+
+impl DraftingAgent for NetArenaAgent<'_> {
+    fn decide(
+        &self,
+        state: &GameState,
+        actions: &[Action],
+        search_rng: &mut StdRng,
+        _move_number: u64,
+    ) -> DraftingDecision {
+        if actions.len() == 1 {
+            return DraftingDecision::plain(actions[0].clone());
+        }
+        let vorzug_kandidat = if self.vorzug { bauer_drafting_vorzug(state) } else { None };
+        let s = net_effective_sims(self.base_sims, actions.len());
+        let chosen = vorzug_kandidat
+            .clone()
+            .or_else(|| net_search_drafting_action(self.net, state, s, self.c_puct, false, search_rng))
+            .unwrap_or_else(|| actions[0].clone());
+        DraftingDecision { vorzug: vorzug_kandidat, ..DraftingDecision::plain(chosen) }
+    }
+}
+
+/// Netz-Suche des Produktions-Self-Plays: Policy-Targets (Gumbel completed-Q),
+/// Root-Q-/root_child_q-Logging, PCR-Muenzwurf, τ-Annealing UND Bauer-Vorzug.
+/// `vorzug` explizit wie bei [`NetArenaAgent`] -- `play_net_self_play_game`
+/// setzt ihn beidseitig (beide Seiten SIND das Netz, PREREG_ownership_corpus.md
+/// §3.1). Der Vorzugs-Kandidat wird BEWUSST VOR dem Ein-Aktion-Kurzschluss
+/// berechnet (Bestandsreihenfolge seit 5992f38 -- die Bauer-Module fuehren
+/// thread-lokalen Entscheidungs-Zustand, die Aufruf-Reihenfolge bleibt
+/// deshalb exakt erhalten). Bei Uebersteuerung ist das Policy-Ziel ein
+/// DEMONSTRATIONS-Target: ein-hot auf die uebersteuernde Aktion (prob=1.0),
+/// exakt dieselbe Konvention wie der Ein-Aktion-Kurzschluss; `root_q`/
+/// `root_child_q` bleiben leer (keine echte Suche gelaufen), beide Felder
+/// sind als optional dokumentiert.
+struct NetSelfPlayAgent<'n> {
+    net: &'n Net,
+    base_sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    deterministic: bool,
+    pcr_full_prob: Option<f64>,
+    pcr_cheap_sims: u32,
+    vorzug: bool,
+}
+
+impl DraftingAgent for NetSelfPlayAgent<'_> {
+    fn decide(
+        &self,
+        state: &GameState,
+        actions: &[Action],
+        search_rng: &mut StdRng,
+        move_number: u64,
+    ) -> DraftingDecision {
+        // Task #14 (PCR): pro echtem Entscheid (>1 legale Aktion) EIN
+        // Muenzwurf aus `search_rng` -- nur gezogen, wenn PCR aktiv ist
+        // (siehe `pcr_decide_full`-Doku; `None` laesst den RNG unberuehrt).
+        let pcr_is_full: Option<bool> = pcr_decide_full(self.pcr_full_prob, actions.len(), search_rng);
+        let effective_sims = match pcr_is_full {
+            Some(false) => self.pcr_cheap_sims,
+            _ => self.base_sims,
+        };
+        let vorzug_kandidat = if self.vorzug { bauer_drafting_vorzug(state) } else { None };
+        let (chosen, policy, root_q, root_child_q) = if actions.len() == 1 {
+            let a = actions[0].clone();
+            let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
+            (a, vec![e], None, Vec::new())
+        } else if let Some(a) = vorzug_kandidat.clone() {
+            let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
+            (a, vec![e], None, Vec::new())
+        } else {
+            // Task #80/#81: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
+            // tatsaechlich gespielten Zuege; `timed()` ist ohne
+            // `clone_profiling`-Feature ein No-Op (siehe profiling.rs).
+            crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
+                crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
+                    net_drafting_policy(
+                        self.net, state, actions, effective_sims, self.c_puct, search_rng,
+                        self.add_root_noise, self.deterministic, move_number,
+                    )
+                })
+            })
+        };
+        DraftingDecision {
+            chosen,
+            policy: Some(policy),
+            root_q,
+            root_child_q,
+            pcr_is_full,
+            vorzug: vorzug_kandidat,
+        }
+    }
+}
+
+/// Rundenuebergangs-Label-Konfiguration (rtv/bootstrap) der vereinheitlichten
+/// Schleife -- `Some` NUR in den Self-Play-Pfaden mit Netz (`play_one_game`
+/// mit `net: Some(..)`, `play_net_self_play_game`). `profiled` schaltet die
+/// Task-#80/#81-Kostenkategorien zu (nur der Produktionspfad hatte sie).
+struct LabelSamplingConfig<'n> {
+    net: &'n Net,
+    record_rtv: bool,
+    profiled: bool,
+}
+
+/// Ausgabe-Modus der Schleife.
+enum LoopMode<'a> {
+    /// Trainings-Records je Schritt inkl. Endergebnis-Stempel
+    /// (`play_one_game`, `play_net_self_play_game`).
+    Records { game_id: &'a str },
+    /// EIN Summary-JSON je Partie (`play_net_game`, `play_net_vs_net_game`);
+    /// `log_games=true` haengt `game_seed`/`first_player`/`names`/`log` an
+    /// (Log-Paritaet zu server.py/analyze_game_log.py, Auftrag 2026-08-11).
+    Summary { log_games: bool },
+}
+
+/// Konfiguration EINES Spielers (Brett-Index = Array-Index in
+/// [`GameLoopConfig::players`]).
+#[derive(Clone, Copy)]
+struct PlayerLoopConfig<'a> {
+    agent: &'a dyn DraftingAgent,
+    /// Netz fuer die Tiling-Phase (`resolve_tiling_step`) -- `None` = reiner
+    /// DFS-Solver. Task #20: in `play_net_game` NUR die Netz-Seite, in
+    /// `play_net_vs_net_game`/`play_net_self_play_game` beide, in
+    /// `play_one_game` keine (dessen Zuege bleiben komplett Heuristik).
+    tiling_net: Option<&'a Net>,
+    /// `true` -> `apply_chosen_action` (sequenzielle Stapel-Zieh-Aufloesung,
+    /// Netz-Spielpfade), `false` -> `game.apply_drafting` (Heuristik-Seiten;
+    /// dort reicht die Einzelaktion, Folge-Entscheidungen kommen ueber den
+    /// naechsten Schleifendurchlauf -- Nutzer-Vorgabe, siehe Historie in
+    /// `play_net_game`).
+    apply_via_chosen_action: bool,
+    /// `[SB]`-Trace-Zeilen ins Spiel-Log (Nutzer-Ergaenzung 2026-08-13) --
+    /// bisher NUR die Netz-Seite von `play_net_game`; `trace_zeile` selbst
+    /// ist No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
+    spaltenbau_trace: bool,
+}
+
+/// Gesamt-Konfiguration der vereinheitlichten Schleife.
+struct GameLoopConfig<'a> {
+    /// Haenger-Schutz: Wall-Clock-Deckel je Partie (Schritt-Limit 100_000
+    /// ist fest). Die Wrapper berechnen ihn wie ihre Vorgaenger-Kopien
+    /// (`heuristic_game_timeout_secs`/`net_game_timeout_secs`, ggf. +
+    /// `EXTRA_GAME_TIMEOUT_SECS` bei Label-Sampling).
+    timeout_secs: u64,
+    /// Such-Seed-Zaehler-Konvention (PREREG_search_rng_split.md):
+    /// `true` -> Alle-Schritte-Zaehler `steps` (StartPlacement+Drafting+
+    /// Tiling, Arena-Pfade), `false` -> 1-basierter Nur-Drafting-Zaehler
+    /// `move_number` (Self-Play-Pfade). Historisch gewachsene Differenz --
+    /// hier als explizite Konfiguration getragen, damit die Golden-Records
+    /// beider Familien bit-identisch bleiben.
+    seed_from_steps: bool,
+    /// Seed, mit dem der Aufrufer den Partie-`rng` erzeugt hat (Basis der
+    /// `derive_search_seed`-Ableitung; im Summary-Modus zusaetzlich
+    /// Log-Metadatum).
+    game_seed: u64,
+    /// Task #71: Zug-Heartbeat (nur Self-Play-Pfade, sonst `None`).
+    move_heartbeat: Option<&'a AtomicU64>,
+    /// Rundenuebergangs-Labels (rtv/bootstrap), siehe [`LabelSamplingConfig`].
+    labels: Option<LabelSamplingConfig<'a>>,
+    mode: LoopMode<'a>,
+    players: [PlayerLoopConfig<'a>; 2],
+}
+
+/// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
+enum LoopOutput {
+    Records(Vec<Value>),
+    Summary(Value),
+}
+
+/// DIE eine Spielschleife hinter den vier oeffentlichen Einstiegen.
+/// Struktur je Phase identisch zu den vorherigen vier Kopien; alle
+/// pfadspezifischen Unterschiede kommen als [`GameLoopConfig`] herein.
+/// `rng` bleibt NUR fuer echte Spielzustands-Ereignisse zustaendig
+/// (`Game::start`, `EndTiling`-Refill, Label-Sampling) -- die Suche zieht
+/// aus dem je Entscheid abgeleiteten Such-RNG (PREREG_search_rng_split.md).
+fn unified_game_loop<R: Rng + ?Sized>(
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+    cfg: GameLoopConfig<'_>,
+) -> LoopOutput {
+    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut records: Vec<Map<String, Value>> = Vec::new();
+    // Rundenübergangs-Trainingsziel (siehe round_transition.rs): je Runde N
+    // ein per Chance-Node-Sampling gemitteltes Blattwert-Paar, gespeichert
+    // unter der Rundennummer VOR dem Übergang. Ergänzt `scores`/`winner`
+    // additiv (Stempel-Schleife unten), KEIN Ersatz dafür.
+    let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> =
+        std::collections::HashMap::new();
+    // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
+    // zusätzlich zum vollen `round_transition_value`.
+    let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> =
+        std::collections::HashMap::new();
+    // τ-Annealing (`net_mcts::tau_argmax_from_move`): fortlaufender
+    // 1-BASIERTER Halbzug-Zaehler NUR echter Drafting-Entscheide (beide
+    // Spieler zusammen; StartPlacement/Tiling erhoehen ihn nicht) -- Seed-
+    // Zaehler der Self-Play-Pfade.
+    let mut move_number: u64 = 0;
+    // Alle-Schritte-Zaehler der Arena-Pfade (StartPlacement+Drafting+Tiling);
+    // im Summary-Modus zugleich das `steps`-Ausgabefeld.
+    let mut steps = 0u32;
+    let mut guard = 0u32;
+    let t_start = std::time::Instant::now();
+    let recording = matches!(cfg.mode, LoopMode::Records { .. });
+    loop {
+        guard += 1;
+        if let Some(hb) = cfg.move_heartbeat {
+            hb.fetch_add(1, Ordering::Relaxed);
+        }
+        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je
+        // Partie. Bricht pathologische Nicht-Terminierungen ab, statt den
+        // ganzen Lauf zu blockieren.
+        if guard > 100_000 || t_start.elapsed().as_secs() >= cfg.timeout_secs {
+            break;
+        }
+        match game.state.phase {
+            Phase::StartPlacement | Phase::Drafting => {
+                if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    if recording {
+                        // Self-Play-Pfade: Startplatzierung MIT Trainings-Record.
+                        match start_placement_step(&mut game, rng) {
+                            Some(rec) => records.push(rec),
+                            None => break,
+                        }
+                    } else {
+                        // Arena-Pfade: Startplatzierung ohne Aufzeichnung
+                        // (inkl. der historisch abweichenden Abbruch-Kanten:
+                        // `let _ = apply_start_placement` statt `.ok()?`).
+                        let first = game.state.current_player;
+                        let non_starter = 1 - first;
+                        let pi = if game.state.players[non_starter].start_tile_pending {
+                            non_starter
+                        } else if game.state.players[first].start_tile_pending {
+                            first
+                        } else {
+                            break;
+                        };
+                        match choose_start_placement(&game.state, pi) {
+                            Some((tid, r, c2, rot)) => {
+                                let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
+                            }
+                            None => break,
+                        }
+                    }
+                    steps += 1;
+                } else if game.state.phase == Phase::Drafting {
+                    // ZUERST erhoehen, dann verwenden -> der erste Entscheid
+                    // dieser Partie ist Zug 1 (1-basiert, Konvention aus
+                    // `evaluations/actions_per_round.md`).
+                    move_number += 1;
+                    let player = game.state.current_player;
+                    let pcfg = &cfg.players[player];
+                    let actions = drafting_actions(&game.state);
+                    // PREREG_search_rng_split.md: EIN eigener, aus (game_seed,
+                    // Zaehler) abgeleiteter RNG fuer den GESAMTEN Entscheid
+                    // dieses Halbzugs -- Zaehler-Konvention je Pfad-Familie,
+                    // siehe `seed_from_steps`-Doku.
+                    let seed_ctr = if cfg.seed_from_steps { steps as u64 } else { move_number };
+                    let mut search_rng = StdRng::seed_from_u64(
+                        crate::net_mcts::derive_search_seed(cfg.game_seed, seed_ctr),
+                    );
+                    let valid_actions: Option<Vec<Value>> = if recording {
+                        Some(actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect())
+                    } else {
+                        None
+                    };
+                    let d = pcfg.agent.decide(&game.state, &actions, &mut search_rng, move_number);
+                    // Record-Vorbereitung VOR dem Apply (moon_order_target
+                    // zieht aus dem Such-RNG, `state_to_json` liest den
+                    // Vor-Zustand) -- exakt die Bestandsreihenfolge.
+                    let (moon_t, state_json) = if recording {
+                        let mt = moon_order_target(&game.state, &d.chosen, player, &mut search_rng);
+                        (mt, Some(state_to_json(&game.state, true)))
+                    } else {
+                        (None, None)
+                    };
+                    // Spaltenbau-Trace (Nutzer-Ergaenzung 2026-08-13): `[SB]`-
+                    // Zeile additiv ueber `log_event`. Muss VOR dem Apply
+                    // gebaut (liest den Vor-Zustand), aber NACH dem mutablen
+                    // Zugriff geschrieben werden.
+                    let trace = if pcfg.spaltenbau_trace {
+                        let typ = match &d.chosen {
+                            Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => "Dome",
+                            _ => "Drafting",
+                        };
+                        crate::spaltenbau::trace_zeile(
+                            &game.state, player, typ,
+                            d.vorzug.as_ref().map(|a| a as &dyn std::fmt::Debug),
+                            &d.chosen as &dyn std::fmt::Debug,
+                        )
+                    } else {
+                        None
+                    };
+                    let round_before = game.state.round_number;
+                    if pcfg.apply_via_chosen_action {
+                        // Sequenzielle Stapel-Zieh-Aufloesung (Netz-Spielpfade,
+                        // siehe apply_chosen_action).
+                        apply_chosen_action(&mut game, d.chosen)
+                            .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
+                    } else {
+                        // Heuristik-Seiten: dieselbe Fehler-Maskierungs-Familie
+                        // wie 80f3698 -- `chosen` stammt aus `drafting_actions`,
+                        // ein `Err` waere ein Engine-Bug.
+                        game.apply_drafting(&d.chosen)
+                            .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
+                    }
+                    // Rundenübergangs-Labels (rtv/bootstrap) -- nur Self-Play-
+                    // Pfade mit Netz. `round_before < NUM_ROUNDS` ist BUGFIX,
+                    // nicht Optimierung (Runde-5-EndTiling ist deterministisch,
+                    // ein Sample dort waere bedeutungslos -- Historie siehe
+                    // Prereg/`round_transition.rs`).
+                    if let Some(lbl) = &cfg.labels {
+                        if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
+                            if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
+                                // Task #85: `record_rtv` gated NUR das teure
+                                // rtv-Sampling (~81% der Self-Play-Kosten,
+                                // Task #80/#81); `bootstrap_value` laeuft
+                                // unabhaengig davon immer mit.
+                                if lbl.record_rtv {
+                                    let v = if lbl.profiled {
+                                        crate::profiling::with_category(crate::profiling::Category::Rtv, || {
+                                            crate::profiling::timed(crate::profiling::note_rtv_ns, || {
+                                                sample_round_transition_for_round(round_before, &pre, lbl.net, rng)
+                                            })
+                                        })
+                                    } else {
+                                        sample_round_transition_for_round(round_before, &pre, lbl.net, rng)
+                                    };
+                                    round_transition_values.insert(round_before, v);
+                                }
+                                let bv = if lbl.profiled {
+                                    crate::profiling::with_category(crate::profiling::Category::Bootstrap, || {
+                                        crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
+                                            crate::round_transition_deep::bootstrap_value_after_rounds(
+                                                &pre, lbl.net,
+                                                crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                                                rng,
+                                            )
+                                        })
+                                    })
+                                } else {
+                                    crate::round_transition_deep::bootstrap_value_after_rounds(
+                                        &pre, lbl.net,
+                                        crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                                        rng,
+                                    )
+                                };
+                                bootstrap_values.insert(round_before, bv);
+                            }
+                        }
+                    }
+                    if recording {
+                        let mut m = Map::new();
+                        m.insert("state".into(), state_json.expect("recording setzt state_json"));
+                        m.insert("policy".into(), Value::Array(d.policy.unwrap_or_default()));
+                        m.insert(
+                            "valid_actions".into(),
+                            Value::Array(valid_actions.expect("recording setzt valid_actions")),
+                        );
+                        m.insert(
+                            "moon_order_target".into(),
+                            moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
+                        );
+                        m.insert("player".into(), json!(player));
+                        // Root-Q-Logging (v19-Vorbereitung): additiv, NUR bei
+                        // echter Suche vorhanden -- Konsumenten tolerieren das
+                        // Fehlen (siehe `net_drafting_policy`-Doku).
+                        if let Some(rq) = d.root_q {
+                            m.insert("root_q".into(), json!(rq));
+                        }
+                        // Task #35: completed-Q je Wurzelkandidat, Gating in
+                        // `root_child_q_field` (siehe dortige Doku).
+                        if let Some(v) = root_child_q_field(&d.root_child_q) {
+                            m.insert("root_child_q".into(), v);
+                        }
+                        // Task #14 (PCR): additiv, NUR bei aktivem PCR.
+                        if let Some(is_full) = d.pcr_is_full {
+                            m.insert("policy_target_valid".into(), json!(is_full));
+                        }
+                        records.push(m);
+                    }
+                    if let Some(line) = trace {
+                        game.state.log_event(line);
+                    }
+                    steps += 1;
+                } else {
+                    break;
+                }
+            }
+            Phase::Tiling => {
+                let pi = game.state.current_player;
+                let pcfg = &cfg.players[pi];
+                if recording {
+                    // Self-Play-Pfade: Tiling MIT Trainings-Record; `tiling_net`
+                    // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
+                    records.push(tiling_step(&mut game, pcfg.tiling_net, rng));
+                } else {
+                    // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
+                    // `tiling_vorzug` separat (rein lesend) NUR fuer die
+                    // Log-Zeile aufgerufen -- `resolve_tiling_step` prueft ihn
+                    // intern schon, gibt das aber nicht zurueck.
+                    let vorzug_kandidat_tiling = if pcfg.spaltenbau_trace {
+                        crate::plattenbauer::tiling_vorzug(&game.state, pi)
+                    } else {
+                        None
+                    };
+                    let step = resolve_tiling_step(&game.state, pi, pcfg.tiling_net);
+                    let trace = if pcfg.spaltenbau_trace {
+                        crate::spaltenbau::trace_zeile(
+                            &game.state, pi, "Tiling",
+                            vorzug_kandidat_tiling.as_ref().map(|a| a as &dyn std::fmt::Debug),
+                            &step as &dyn std::fmt::Debug,
+                        )
+                    } else {
+                        None
+                    };
+                    match step {
+                        TilingStep::Place(ta) => {
+                            let _ = game.apply_single_tiling(pi, &ta);
+                        }
+                        TilingStep::Chips { row, chips } => {
+                            apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
+                        }
+                        TilingStep::End => {
+                            let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
+                        }
+                    }
+                    if let Some(line) = trace {
+                        game.state.log_event(line);
+                    }
+                }
+                steps += 1;
+            }
+            _ => break, // Scoring/End/Final → Partie vorbei
+        }
+    }
+
+    // Endwertung anwenden, damit Scores die Wertungsplatten enthalten.
+    let completed = game.state.phase == Phase::End;
+    if completed {
+        let _ = game.apply_end_scoring();
+    }
+    match cfg.mode {
+        LoopMode::Records { game_id } => {
+            let scores = [game.state.players[0].score, game.state.players[1].score];
+            // Fund 7 (B1, Vollaudit 2026-07-21): auch ungeklemmte Scores
+            // backfillen.
+            let scores_unclamped = [
+                game.state.players[0].score_unclamped,
+                game.state.players[1].score_unclamped,
+            ];
+            let winner = determine_winner(&game.state);
+            LoopOutput::Records(
+                records
+                    .into_iter()
+                    .map(|mut m| {
+                        m.insert("game_id".into(), json!(game_id));
+                        m.insert("scores".into(), json!(scores));
+                        m.insert("scores_unclamped".into(), json!(scores_unclamped));
+                        m.insert("winner".into(), json!(winner));
+                        // Erreicht die Partie regulär Phase::End? Nur dann sind
+                        // scores/winner ein echtes Endergebnis (inkl.
+                        // Wertungsplatten). Downstream (self_play.py) prüft das.
+                        m.insert("completed".into(), json!(completed));
+                        // Labels additiv, nur fuer Runden mit echtem Übergang --
+                        // Python-Seite muss das Fehlen tolerieren.
+                        let round =
+                            m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
+                        if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
+                            m.insert("round_transition_value".into(), json!(v));
+                        }
+                        if let Some(v) = round.and_then(|r| bootstrap_values.get(&(r as u32))) {
+                            m.insert("bootstrap_value".into(), json!(v));
+                        }
+                        Value::Object(m)
+                    })
+                    .collect(),
+            )
+        }
+        LoopMode::Summary { log_games } => {
+            let p0 = &game.state.players[0];
+            let p1 = &game.state.players[1];
+            let mut result = json!({
+                "scores": [p0.score, p1.score],
+                "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
+                "winner": determine_winner(&game.state),
+                "steps": steps,
+                "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
+                "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+                // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie
+                // liess sich bei keinem Arena-A/B pruefen, ob ein Effekt an
+                // der Platten-Konfiguration haengt.
+                "scoring_tile_ids": game.state.scoring_tile_ids,
+            });
+            // Auftrag 2026-08-11: opt-in Log-Export (Default AUS haelt
+            // bestehende Aufrufer unveraendert) -- `game_seed`/`names`/
+            // `first_player` fuer das exakte Replay in analyze_game_log.py.
+            if log_games {
+                if let Value::Object(map) = &mut result {
+                    map.insert("game_seed".into(), json!(cfg.game_seed));
+                    map.insert("first_player".into(), json!(first_player));
+                    map.insert(
+                        "names".into(),
+                        json!([game.state.players[0].name.clone(), game.state.players[1].name.clone()]),
+                    );
+                    map.insert("log".into(), json!(game.state.log));
+                }
+            }
+            LoopOutput::Summary(result)
+        }
+    }
+}
+
 // ── Spiel-Loop ────────────────────────────────────────────────────────────────
 
 /// Spielt EINE komplette Partie und gibt die Trainings-Records zurück.
@@ -1589,198 +2239,49 @@ fn play_net_game<R: Rng + ?Sized>(
     game_seed: u64,
     log_games: bool,
 ) -> Value {
-    let mut game = Game::start(names, first_player, scoring_ids, rng);
-    let mut steps = 0u32;
-    let mut guard = 0u32;
-    let t_start = std::time::Instant::now();
-    let timeout_secs = net_game_timeout_secs(net_sims.max(heur_sims));
-    loop {
-        guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
-        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
-        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
-            break;
-        }
-        match game.state.phase {
-            Phase::StartPlacement | Phase::Drafting => {
-                if game.state.players.iter().any(|p| p.start_tile_pending) {
-                    let first = game.state.current_player;
-                    let non_starter = 1 - first;
-                    let pi = if game.state.players[non_starter].start_tile_pending {
-                        non_starter
-                    } else if game.state.players[first].start_tile_pending {
-                        first
-                    } else {
-                        break;
-                    };
-                    match choose_start_placement(&game.state, pi) {
-                        Some((tid, r, c2, rot)) => {
-                            let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
-                        }
-                        None => break,
-                    }
-                    steps += 1;
-                } else if game.state.phase == Phase::Drafting {
-                    let pi = game.state.current_player;
-                    let actions = drafting_actions(&game.state);
-                    let vorzug_kandidat = if pi == net_board && actions.len() > 1 {
-                        crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
-                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
-                    } else {
-                        None
-                    };
-                    // PREREG_search_rng_split.md: eigener, aus (game_seed,
-                    // steps) abgeleiteter RNG statt des Partie-`rng` fuer BEIDE
-                    // Such-Seiten -- siehe `play_one_game`-Kommentar. `game_seed`
-                    // ist hier schon Parameter (Log-Paritaet, Auftrag 2026-08-11).
-                    let mut search_rng =
-                        StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed, steps as u64));
-                    let chosen = if actions.len() == 1 {
-                        actions[0].clone()
-                    } else if pi == net_board {
-                        let s = net_effective_sims(net_sims, actions.len());
-                        vorzug_kandidat
-                            .clone()
-                            .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, &mut search_rng))
-                            .unwrap_or_else(|| actions[0].clone())
-                    } else {
-                        let s = dynamic_sims(heur_sims, actions.len());
-                        search_drafting_action(&game.state, s, c, &mut search_rng)
-                            .unwrap_or_else(|| actions[0].clone())
-                    };
-                    // Spaltenbau-Trace (Nutzer-Ergaenzung 2026-08-13, VOR der
-                    // Runde-2-Abnahme): `[SB]`-Zeile additiv ueber `log_event`,
-                    // No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
-                    // Muss VOR `apply_chosen_action`/`apply_drafting` gebaut
-                    // werden (liest noch den Vor-Zustand), aber NACH deren
-                    // mutablem Zugriff geschrieben werden (dort ist `&mut
-                    // game.state` wieder frei).
-                    let trace = if pi == net_board {
-                        let typ = match &chosen {
-                            Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => "Dome",
-                            _ => "Drafting",
-                        };
-                        crate::spaltenbau::trace_zeile(
-                            &game.state, pi, typ,
-                            vorzug_kandidat.as_ref().map(|a| a as &dyn std::fmt::Debug),
-                            &chosen as &dyn std::fmt::Debug,
-                        )
-                    } else {
-                        None
-                    };
-                    // Sequenzielle Stapel-Zieh-Aufloesung nur fuer den Netz-Spieler
-                    // (siehe apply_chosen_action) -- die Heuristik-Seite braucht das
-                    // laut Nutzer-Vorgabe nicht, dort reicht die normale Einzelaktion,
-                    // Folge-Entscheidungen (weiterziehen/waehlen) kommen automatisch
-                    // ueber den naechsten Schleifendurchlauf.
-                    if pi == net_board {
-                        apply_chosen_action(&mut game, chosen)
-                            .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
-                    } else {
-                        // Heuristik-Seite braucht `apply_chosen_action` nicht
-                        // (siehe Kommentar oben), aber dieselbe Fehler-
-                        // maskierungs-Familie wie 80f3698: `chosen` stammt aus
-                        // `drafting_actions`, ein `Err` waere ein Engine-Bug.
-                        game.apply_drafting(&chosen)
-                            .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
-                    }
-                    if let Some(line) = trace {
-                        game.state.log_event(line);
-                    }
-                    steps += 1;
-                } else {
-                    break;
-                }
-            }
-            // Task #20 (Folgeauftrag, Koordinator 2026-07-29): NUR die Netz-
-            // Seite (`pi == net_board`) bekommt `Some(net)` -- die Heuristik-
-            // Seite bleibt `None`. Begruendung: `play_net_game` ist der Pfad
-            // hinter `arena.py::run_net_arena -> net_arena_match ->
-            // play_net_game`, also der Elo-Verankerungs-/Gating-Lauf. Der
-            // "Netz-Spieler" muss dort IDENTISCH definiert sein wie in
-            // Self-Play (`play_net_self_play_game`) und der reinen Netz-
-            // Arena (`play_net_vs_net_game`) -- sonst misst diese Arena einen
-            // ANDEREN Spieler als den, der tatsaechlich gated/trainiert wird.
-            // Die Heuristik-Seite bleibt bewusst unveraendert (kein Netz
-            // vorhanden, `None` ist dort ohnehin die einzig sinnvolle Wahl).
-            Phase::Tiling => {
-                let pi = game.state.current_player;
-                let tiling_net = if pi == net_board { Some(net) } else { None };
-                // Spaltenbau-Trace fuer Tiling: `vorzug_tiling_step` separat
-                // (rein lesend, keine Nebenwirkung) aufgerufen, NUR um fuer
-                // die Log-Zeile zu wissen, ob ein Vorzugs-Kandidat existierte
-                // -- `resolve_tiling_step` selbst prueft ihn intern schon
-                // (`tiling_solver::best_first_step_exact_or_valued`), gibt das
-                // aber nach aussen nicht zurueck.
-                let vorzug_kandidat_tiling = if pi == net_board {
-                    crate::plattenbauer::tiling_vorzug(&game.state, pi)
-                } else {
-                    None
-                };
-                let step = resolve_tiling_step(&game.state, pi, tiling_net);
-                let trace = if pi == net_board {
-                    crate::spaltenbau::trace_zeile(
-                        &game.state, pi, "Tiling",
-                        vorzug_kandidat_tiling.as_ref().map(|a| a as &dyn std::fmt::Debug),
-                        &step as &dyn std::fmt::Debug,
-                    )
-                } else {
-                    None
-                };
-                match step {
-                    TilingStep::Place(ta) => {
-                        let _ = game.apply_single_tiling(pi, &ta);
-                    }
-                    TilingStep::Chips { row, chips } => {
-                        apply_bonus_chips_with(&mut game.state.players[pi], row, &chips);
-                    }
-                    TilingStep::End => {
-                        let _ = game.apply_tiling(&TilingMove::EndTiling { player: pi }, rng);
-                    }
-                }
-                if let Some(line) = trace {
-                    game.state.log_event(line);
-                }
-                steps += 1;
-            }
-            _ => break,
-        }
-    }
-    if game.state.phase == Phase::End {
-        let _ = game.apply_end_scoring();
-    }
-    let p0 = &game.state.players[0];
-    let p1 = &game.state.players[1];
-    let mut result = json!({
-        "scores": [p0.score, p1.score],
-        "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
-        "winner": determine_winner(&game.state),
-        "steps": steps,
-        "net_board": net_board,
-        "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
-        "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
-        // Siehe Kommentar in den Schwester-Funktionen: Platten-Konfiguration
-        // je Spiel, fuer die Aufschluesselung von Arena-A/Bs.
-        "scoring_tile_ids": game.state.scoring_tile_ids,
-    });
-    // Auftrag 2026-08-11: opt-in Log-Export (Default AUS haelt bestehende
-    // Aufrufer unveraendert). `game_seed`/`names`/`first_player` sind noetig,
-    // damit `analyze_game_log.py`s Replay (`PyGame((n0,n1), first_player,
-    // seed)`) exakt denselben RNG-Strom wie diese Partie erzeugt (siehe
-    // `PyGame::new`, py.rs: identische Reihenfolge `sample_valid_scoring_ids`
-    // -> `Game::start`).
-    if log_games {
-        if let Value::Object(map) = &mut result {
-            map.insert("game_seed".into(), json!(game_seed));
-            map.insert("first_player".into(), json!(first_player));
-            map.insert(
-                "names".into(),
-                json!([game.state.players[0].name.clone(), game.state.players[1].name.clone()]),
-            );
-            map.insert("log".into(), json!(game.state.log));
-        }
+    // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
+    // Netz-Seite = `NetArenaAgent` MIT Vorzug (EINSEITIG -- die Heuristik-
+    // Gegenseite ist ein eigener Agent ohne Bauer-Kette, Prereg §3.4:
+    // Seitigkeit ist explizite Konfiguration, kein Pfad-Zufall). Tiling-Netz
+    // NUR auf der Netz-Seite (Task #20: der "Netz-Spieler" muss IDENTISCH
+    // definiert sein wie in Self-Play (`play_net_self_play_game`) und der
+    // reinen Netz-Arena (`play_net_vs_net_game`) -- sonst misst dieser
+    // Elo-Verankerungs-/Gating-Pfad einen ANDEREN Spieler als den, der
+    // tatsaechlich gated/trainiert wird; die Heuristik-Seite bleibt bewusst
+    // ohne Netz). Spaltenbau-Trace nur Netz-Seite (Nutzer 2026-08-13).
+    let net_agent = NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true };
+    let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c };
+    let net_player = PlayerLoopConfig {
+        agent: &net_agent,
+        tiling_net: Some(net),
+        apply_via_chosen_action: true,
+        spaltenbau_trace: true,
+    };
+    let heur_player = PlayerLoopConfig {
+        agent: &heur_agent,
+        tiling_net: None,
+        apply_via_chosen_action: false,
+        spaltenbau_trace: false,
+    };
+    // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
+    let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
+    let cfg = GameLoopConfig {
+        timeout_secs: net_game_timeout_secs(net_sims.max(heur_sims)),
+        seed_from_steps: true,
+        game_seed,
+        move_heartbeat: None,
+        labels: None,
+        mode: LoopMode::Summary { log_games },
+        players,
+    };
+    let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
+        LoopOutput::Summary(v) => v,
+        LoopOutput::Records(_) => unreachable!("Summary-Modus konfiguriert"),
+    };
+    // Zusatzfeld dieses Pfads; serde_jsons Map ist ein BTreeMap (sortierte
+    // Schluessel), nachtraegliches Einfuegen ist byte-identisch zum Bestand.
+    if let Value::Object(map) = &mut result {
+        map.insert("net_board".into(), json!(net_board));
     }
     result
 }
