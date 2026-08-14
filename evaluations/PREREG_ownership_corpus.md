@@ -464,3 +464,37 @@ jetzt mit >1200 Einheiten vertreten.
 der v2-Selektions-Hebel (§2) wird NICHT gebraucht. Der Korpus ist bereit;
 das Training (warm-start, --ownership-weight 0,2 --conjunction
 --extra-data-dir) ist der naechste NUTZER-Startknopf.**
+
+## §9 TRAININGS-SWEEP ownership_weight (Nutzer-Auftrag 2026-08-14, vorab festgelegt)
+
+Statt des Einzellaufs (0,2) ein Vier-Arm-Sweep, alle auf identischem Fenster
+(v21-Standard + --extra-data-dir data/ownership_corpus), identischem Rezept
+(v21: warm-start v21_2d_brierbest, lr 5e-5 cosine, WDL, 2D, nortv,
+opp/endgame-Kopf, --select-by-brier), identischem Seed (2) und geteiltem
+Cache:
+
+| Arm | ownership_weight | Zweck |
+|---|---|---|
+| w0 | 0,0 | KONTROLLE: isoliert den Fenster-Effekt (neue 8000 Partien) vom Ownership-Loss-Effekt auf Policy/Value |
+| w01 | 0,1 + --conjunction-head | leichte Dosis |
+| w02 | 0,2 + --conjunction-head | Praezedenz-Dosis (own02-Lauf) |
+| w05 | 0,5 + --conjunction-head | hohe Dosis |
+
+**Entscheidungsregel (vorab)**: (1) Waechter: Arme, deren Policy-/Value-
+Offline-Metriken (val_policy, Brier) gegen den w0-Arm NICHT wesentlich
+abfallen, bleiben im Rennen (der w0-Arm ist der Vergleich, NICHT der alte
+Champion -- das Fenster hat sich geaendert). (2) Unter den verbliebenen
+entscheidet die KOPFGUETE nach Tor A (PREREG_ownership_consumer.md):
+Brier/AUC je Feld gegen Basisrate + Rangkorrelation E_k je Kriterium auf
+dem gemeinsamen Held-out. (3) Seed-Varianz-Vorbehalt (stehende Lehre:
+Einzel-Seed-A/Bs sind fuer STAERKE-Aussagen uninterpretierbar): dieser
+Sweep waehlt das Gewicht fuer den ERSTEN Tor-A-Anlauf, er ist KEIN
+Staerke-Verdikt und KEIN Champion-Gating -- Staerke kommt erst mit dem
+Verbraucher-Sweep (Tor C) und dann mit Arena-Disziplin.
+
+Reihenfolge: nach den §23-GPU-Zellen (GPU-Konkurrenz), Arme sequentiell
+w0 -> w01 -> w02 -> w05 (der w0-Arm baut den Cache). Pinning je Arm:
+MOSAIC_DATA_EXCLUDE=v21_exclude_regex + MOSAIC_CARRIER_MANIFEST=v21;
+Cache-NEUBAU ist beim ersten Arm ERWARTET (neue Dateimenge), danach
+muessen die Arme "Lade HDF5-Cache" zeigen -- ein zweiter Neubau waere
+der Alarm.
