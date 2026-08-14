@@ -36,11 +36,11 @@ sweepbar). Die Kette:
 
 | # | Schritt | Stand |
 |---|---|---|
-| 1 | Vorzug-Verdrahtung in `play_net_self_play_game` (beidseitig, Vorbild self_play.rs:1927) + 5x30-Wirkungsprobe je Arm | **AGENT LAEUFT** |
-| 2 | `PREREG_unified_game_loop.md` -- vier Schleifen vereinheitlichen, Golden-Record-Abnahme (0 Bit je Pfad) | wartet auf 1 |
-| 3 | `PREREG_deterministic_labels.md` ("2b") -- Task-#71-Notdeckel: Feuerrate messen, Feuern -> deterministischer Fallback | nach 2 |
-| 4 | GPU-Verdikt `PREREG_gpu_inferenzpfad.md` par.22 (N=64/128 tract/ORT, concurrency-bewusster Deckel) | **AGENT LAEUFT**; bestimmt nur den Pfad (>=2,0x -> Async+ORT, sonst 8 Threads) |
-| 5 | Generierung 8000 -> Deckungs-Bericht -> (eigener Startknopf) Training warm-start, `--ownership-weight 0,2 --conjunction --extra-data-dir` -> Tor A | nach 1-3 (4 parallel ok) |
+| 1 | Vorzug-Verdrahtung (beidseitig) + 5x30-Wirkungsprobe je Arm | **ERLEDIGT** (5992f38; Probe: k1 2,80 / k5 8,30 nahe Arena-Niveau, Korpus-Prereg §3.5) |
+| 2 | `PREREG_unified_game_loop.md` -- vier Schleifen vereinheitlicht | **ERLEDIGT** (307caa4..d9c49e6; Golden-Records 0 Bit alle Pfade, §5-Protokoll) |
+| 3 | `PREREG_deterministic_labels.md` ("2b") -- Not-Deckel ehrlich | **ERLEDIGT** (3fcfed1; unter 12x CPU-Stress 0/1956 byte-identisch, §4; sync<->async-Gate-B-Retest offen bis wt_async2 frei) |
+| 4 | GPU-Verdikt `PREREG_gpu_inferenzpfad.md` par.22 (N=64/128 tract/ORT) | **AGENT LAEUFT** (N=128-Zelle nach Detached-Prozess-Tod neu gestartet); bestimmt nur den Pfad (>=2,0x -> Async+ORT, sonst 8 Threads) |
+| 5 | Generierung 8000 -> Deckungs-Bericht -> (eigener Startknopf) Training warm-start, `--ownership-weight 0,2 --conjunction --extra-data-dir` -> Tor A | **WARTET NUR NOCH auf 4** -- auch Arm D (pfadunabhaengig) zurueckgehalten, um die laufenden Partien/h-Zellen nicht zu verfaelschen. Ablage via MOSAIC_DATA_DIR=data/ownership_corpus (config.py:28) |
 
 ### Generator-Sortiment (aktuelle Aera, alle Zahlen nachgerechnet)
 
