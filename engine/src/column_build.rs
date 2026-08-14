@@ -1,13 +1,13 @@
 //! Spaltenbau-Spieler (Diagnose-/Korpus-Knopf `MOSAIC_SPALTENBAU`) --
 //! Entscheidungsschicht UEBER dem Netzspieler, die gezielt EINE
 //! Wertungsplatten-Spalte je Partie schliessen soll (Nutzer-Auftrag
-//! 2026-08-13, siehe `evaluations/PREREG_provokation.md` §9 fuer die
+//! 2026-08-13, siehe `evaluations/PREREG_provocation.md` §9 fuer die
 //! Vorgeschichte: vier Mechanismen -- Injektion, Beschneidung, Vorzug-
 //! Drafting, Vorzug-Drafting+Tiling -- enden alle bei 0,30 Spalten/Partie,
 //! die 5/6-Mauer haelt in 9-13 von 20 Partien).
 //!
 //! Baut auf der EINZIGEN Linie, die dabei das Spiel intakt liess --
-//! `provokation.rs`s "Vorzugszug: Praeferenz statt Verbot" -- und erweitert
+//! `provocation.rs`s "Vorzugszug: Praeferenz statt Verbot" -- und erweitert
 //! sie um zwei Stellen, die dort noch NICHTS steuert:
 //!
 //!  1. [`vorzug_dome_wahl`]: die Kuppelplatten-Wahl (welche Platte, welcher
@@ -28,7 +28,7 @@
 //!     (0,70-2,45 statt 5,95 vertikale Punkte, siehe §14).
 //!
 //! [`vorzugszug`] (Stein-Zuege) ist eine duenne Huelle um
-//! `provokation::vorzugszug_fuer_spalte` mit der dynamischen Spalte statt
+//! `provocation::vorzugszug_fuer_spalte` mit der dynamischen Spalte statt
 //! des Env-Knopfs `MOSAIC_VORZUG_SPALTE` -- IDENTISCHE Praeferenzlogik,
 //! wiederverwendet statt dupliziert (CLAUDE.md-Vorgabe). Ebenso
 //! [`vorzug_tiling_step`] fuer `tiling_solver::vorzug_tiling_step_fuer_spalte`.
@@ -42,7 +42,7 @@
 //! Bericht fuer die Begruendung und die ersatzweise gelieferte
 //! Blocker-Klassifikation MIT Farbabgleich.
 //!
-//! RUNDE 4 (PREREG_provokation.md §14) fuegt zwei weitere Bausteine hinzu:
+//! RUNDE 4 (PREREG_provocation.md §14) fuegt zwei weitere Bausteine hinzu:
 //! [`ist_spalte_vollendbar`]/[`waehle_beste_vollendbare_spalte`] (Vollendbar-
 //! keits-Sicherheitsnetz mit Zielwechsel) und [`ueberpraesenz_vorzug`]
 //! (Material-zuerst-Drafting, GEBAUT+GEMESSEN, aber NICHT verkettet -- brach
@@ -61,7 +61,7 @@
 //!
 //! DEFAULT AUS -> jede Funktion hier ist ein No-Op; alle Aufrufstellen
 //! bleiben `.or_else(...)`-verkettet, byte-identisch zum Bestand ohne den
-//! Knopf (gleiches Muster wie `provokation.rs`/`MOSAIC_VORZUG_SPALTE`).
+//! Knopf (gleiches Muster wie `provocation.rs`/`MOSAIC_VORZUG_SPALTE`).
 
 use crate::board::PlayerBoard;
 use crate::dome::{rotation_indices, DomeSpace, DomeTile, SpaceType};
@@ -71,7 +71,7 @@ use crate::tile::TileColor;
 use crate::tiling_solver::TilingStep;
 
 /// Liest `MOSAIC_SPALTENBAU` einmalig (Prozess-Cache, gleiches Muster wie
-/// `provokation::modus_env`). Jeder nicht-leere Wert ausser `"0"` schaltet
+/// `provocation::modus_env`). Jeder nicht-leere Wert ausser `"0"` schaltet
 /// den Spaltenbauer ein.
 fn aktiv_env() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -84,7 +84,7 @@ fn aktiv_env() -> bool {
     })
 }
 
-// Test-Override -- gleiches Muster wie `provokation::MODUS_OVERRIDE`: ein
+// Test-Override -- gleiches Muster wie `provocation::MODUS_OVERRIDE`: ein
 // `OnceLock` waere sonst prozessweit fuer ALLE parallelen `cargo test`-
 // Threads fixiert, sobald der erste Test ihn liest.
 #[cfg(test)]
@@ -128,7 +128,7 @@ pub(crate) fn ist_aktiv() -> bool {
 /// Filter in [`ziel_spalte_fuer_player`]) EIN -- Default (unset) ist seit §15
 /// AUS: die Zielspalte ist dann die reine Kostenwahl aus Runde 1-3, ohne jede
 /// Vollendbarkeits-Pruefung (§15-Messung: 3,15 vs. 3,15 mit Filter -- kein
-/// messbarer Unterschied auf den 20 k1-Seeds, siehe PREREG_provokation.md §15).
+/// messbarer Unterschied auf den 20 k1-Seeds, siehe PREREG_provocation.md §15).
 fn sicherheitsnetz_env() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_SPALTENBAU_SICHERHEITSNETZ") {
@@ -260,7 +260,7 @@ fn special_aktiv() -> bool {
 ///
 /// Additiv aus dem Brett UND (seit Runde 3) der oeffentlichen Versorgungslage
 /// ablesbar (`dome_grid`/`pattern_lines` + `verbleibend`, vom Aufrufer EINMAL
-/// je Entscheid vorberechnet, siehe [`crate::provokation::verbleibende_farben`])
+/// je Entscheid vorberechnet, siehe [`crate::provocation::verbleibende_farben`])
 /// -- keine Suche, kein Blick in Beutel/Turm selbst -- daher weiterhin O(6) je
 /// Spalte (die Special-Nachbarpruefung ist selbst O(1), feste 2x2-Slot-Geometrie).
 pub(crate) fn spalten_kosten(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
@@ -328,7 +328,7 @@ fn slot_nachbarn(r: usize, c: usize) -> [(usize, usize); 3] {
 const ENGPASS_MAX: f64 = 2.5;
 
 pub(crate) fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
-    let Some(i) = crate::provokation::farben_index(farbe) else {
+    let Some(i) = crate::provocation::farben_index(farbe) else {
         return 0.0; // Wild ist keine ziehbare Farbe, kommt hier nie vor; defensiv.
     };
     let frac = (verbleibend[i].max(0) as f64 / crate::tile::TILES_PER_COLOR as f64).min(1.0);
@@ -373,9 +373,9 @@ pub(crate) fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize, verb
 /// §18 (Diagonalen-Baustein, Koordinator-Auftrag 2026-08-13): wie
 /// [`special_kosten`]s "smart"-Zweig (echte Nachbar-Kosten statt der ALT-
 /// Schaetzung), aber OHNE den §16/§17-Schalter [`special_aktiv`] -- der
-/// gilt nur fuer den spaltenbau-EIGENEN (Kriterium 1) Pfad, dessen
+/// gilt nur fuer den column_build-EIGENEN (Kriterium 1) Pfad, dessen
 /// Uebernahme-Entscheidung in §17 final NEIN war. Andere Bauern
-/// (`plattenbauer.rs`) mit einer EIGENEN, unabhaengig gemessenen und
+/// (`plate_builder.rs`) mit einer EIGENEN, unabhaengig gemessenen und
 /// signifikant positiven Entscheidung (z.B. `Diagonalenbauer`, §18: +2,61
 /// Plattenpunkte, t=2,79, p=0,011) rufen diese Funktion UNBEDINGT auf --
 /// jeder Bauer hat seinen eigenen Uebernahme-Status, das globale
@@ -478,7 +478,7 @@ thread_local! {
 
 /// Setzt (oder loescht mit `None`) den Partie-Seed fuer DIESEN Thread --
 /// gleiches Muster wie `net_mcts::set_partie_shaping_weight`/
-/// `provokation::set_ziel_spalte_seed`. Aufrufer MUSS am Partieende (oder vor
+/// `provocation::set_ziel_spalte_seed`. Aufrufer MUSS am Partieende (oder vor
 /// der naechsten Partie desselben Threads) mit `None`/dem neuen Seed
 /// ueberschreiben, sonst leckt der Wert in die naechste Partie.
 pub(crate) fn set_partie_seed(seed: Option<u64>) {
@@ -543,7 +543,7 @@ pub(crate) fn ist_spalte_vollendbar(player: &PlayerBoard, spalte: usize, verblei
                 // Zeile (0 Fortschritt fuer `need`, volle r+1 Kopien noetig)
                 // statt als Sofort-Blocker.
                 let schon = if zeile.color == Some(need) { zeile.tiles.len() as i64 } else { 0 };
-                let Some(i) = crate::provokation::farben_index(need) else { continue };
+                let Some(i) = crate::provocation::farben_index(need) else { continue };
                 let benoetigt = (r as i64 + 1) - schon;
                 if verbleibend[i] < benoetigt {
                     return false;
@@ -571,7 +571,7 @@ fn ist_zelle_vollendbar(player: &PlayerBoard, r: usize, c: usize, verbleibend: &
             let Some(need) = sp.required_color else { return true };
             let zeile = &player.pattern_lines[r];
             let schon = if zeile.color == Some(need) { zeile.tiles.len() as i64 } else { 0 };
-            let Some(i) = crate::provokation::farben_index(need) else { return true };
+            let Some(i) = crate::provocation::farben_index(need) else { return true };
             let benoetigt = (r as i64 + 1) - schon;
             verbleibend[i] >= benoetigt
         }
@@ -611,7 +611,7 @@ fn waehle_beste_vollendbare_spalte(player: &PlayerBoard, verbleibend: &[i64; 5],
 /// vermerkt das in [`LETZTER_WECHSEL`] fuer den naechsten Trace-Aufruf.
 fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
     let player = &state.players[pi];
-    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::verbleibende_farben(state);
     let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
     // FRISCH bei jedem Aufruf, wie in Runde 1-3 -- KEIN gespeichertes
     // "bisheriges Ziel" mehr (fruehere Fassung dieser Funktion hielt eine
@@ -623,7 +623,7 @@ fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
     // Gegenwert (Teil 1 der Blocker-Aufspaltung zeigt 0 von 14 Mauer-Zellen
     // in Kategorie "Farbe nie verfuegbar" -- das Problem, das die Bindung
     // loesen sollte, war empirisch gar nicht die dominante Ursache). Siehe
-    // PREREG_provokation.md §14 fuer die volle Messreihe.
+    // PREREG_provocation.md §14 fuer die volle Messreihe.
     let kandidat = waehle_spalte(kosten);
 
     // §15-Entscheidung: Default (unset) ist AUS -- kein Arm der
@@ -640,7 +640,7 @@ fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
     // eine offene Zeile objektiv erschoepft), wird auf die beste VOLLENDBARE
     // Alternative ausgewichen. `noch_erreichbare_farben` (nicht `verbleibend`)
     // ist hier die richtige Zahl -- siehe dortige Doku.
-    let erreichbar = crate::provokation::noch_erreichbare_farben(state, pi);
+    let erreichbar = crate::provocation::noch_erreichbare_farben(state, pi);
     if ist_spalte_vollendbar(player, kandidat, &erreichbar) {
         return kandidat;
     }
@@ -652,7 +652,7 @@ fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
 }
 
 /// Deterministische Mischung Seed -> Index `0..n` -- identisches SplitMix64-
-/// Muster wie `net_mcts::partie_gewicht_aus_seed`/`provokation::spalte_aus_
+/// Muster wie `net_mcts::partie_gewicht_aus_seed`/`provocation::spalte_aus_
 /// seed` (aufeinanderfolgende Partie-Seeds unterscheiden sich im Self-Play
 /// oft nur in den unteren Bits, eine rohe Modulo-Bildung ergaebe eine Treppe
 /// statt einer Streuung). `n == 0` kommt hier nie vor (Aufrufer filtert immer
@@ -673,7 +673,7 @@ fn index_aus_seed(seed: u64, n: usize) -> usize {
 /// wenn die bisherige Ziel-Spalte unbedienbar wird (Nutzer-Vorgabe): der
 /// naechste Aufruf sieht den neuen Brettzustand und kann eine andere Spalte
 /// liefern, ohne dass irgendwo ein Flag geloescht werden muesste (kein
-/// Leck-Risiko wie bei `provokation::AUTO_SPALTE`/`set_ziel_spalte_seed`).
+/// Leck-Risiko wie bei `provocation::AUTO_SPALTE`/`set_ziel_spalte_seed`).
 /// Auswahl unter den guenstigsten Kandidaten: siehe [`waehle_spalte`].
 pub(crate) fn ziel_spalte(state: &GameState) -> Option<usize> {
     if !ist_aktiv() {
@@ -684,14 +684,14 @@ pub(crate) fn ziel_spalte(state: &GameState) -> Option<usize> {
 
 // ── Wiederverwendung: Stein-Zug- und Tiling-Praeferenz mit dynamischer Spalte ──
 
-/// Stein-Zug-Praeferenz, IDENTISCHE Logik zu `provokation::vorzugszug`, aber
+/// Stein-Zug-Praeferenz, IDENTISCHE Logik zu `provocation::vorzugszug`, aber
 /// mit der je Entscheid dynamisch bestimmten Spalte statt `MOSAIC_VORZUG_SPALTE`.
 /// [`ueberpraesenz_vorzug`] als zweite Vorzugsstufe wurde GEBAUT und GEMESSEN,
 /// ist aber NICHT verkettet -- siehe der lange Kommentar im Funktionskoerper
 /// fuer den gemessenen Grund (2/20 statt 15-16/20 Netz-Siege).
 pub(crate) fn vorzugszug(state: &GameState) -> Option<Action> {
     let spalte = ziel_spalte(state)?;
-    crate::provokation::vorzugszug_fuer_spalte(state, spalte)
+    crate::provocation::vorzugszug_fuer_spalte(state, spalte)
         // §16 (Special-Zellen-Baustein): `vorzugszug_fuer_spalte` sieht nur
         // die Zielspalte selbst -- eine offene Special-Zelle braucht aber
         // ihre 3 Slot-Nachbarn, die oft in der NACHBAR-Spalte liegen. Zweite
@@ -706,7 +706,7 @@ pub(crate) fn vorzugszug(state: &GameState) -> Option<Action> {
             if zellen.is_empty() {
                 None
             } else {
-                crate::plattenbauer::vorzugszug_fuer_zellen(state, &zellen)
+                crate::plate_builder::vorzugszug_fuer_zellen(state, &zellen)
             }
         })
     // [`ueberpraesenz_vorzug`] BEWUSST NICHT verkettet: die erste volle
@@ -731,7 +731,7 @@ pub(crate) fn vorzugszug(state: &GameState) -> Option<Action> {
 /// leere Liste, wenn Baustein AUS oder keine offene Special-Zelle vorliegt.
 /// Geteilt zwischen [`vorzugszug`] (Drafting) und [`vorzug_tiling_step`]
 /// (Tiling) -- beide reichen die Liste an die generische Zellen-Mechanik aus
-/// `plattenbauer.rs` durch (`vorzugszug_fuer_zellen`/`tiling_vorzug_fuer_
+/// `plate_builder.rs` durch (`vorzugszug_fuer_zellen`/`tiling_vorzug_fuer_
 /// zellen`), statt eine eigene Praeferenzlogik zu duplizieren.
 fn special_nachbar_zellen(player: &PlayerBoard, spalte: usize) -> Vec<(usize, usize)> {
     special_nachbar_zellen_fuer_liste(player, &zellen_spalte_liste(spalte))
@@ -739,7 +739,7 @@ fn special_nachbar_zellen(player: &PlayerBoard, spalte: usize) -> Vec<(usize, us
 
 /// §18 (Diagonalen-Baustein, Koordinator-Auftrag 2026-08-13): Generalisierung
 /// von [`special_nachbar_zellen`] auf eine BELIEBIGE Zielzellen-Liste, nicht
-/// nur eine Spalte -- fuer `plattenbauer.rs`s generische Kriterien
+/// nur eine Spalte -- fuer `plate_builder.rs`s generische Kriterien
 /// (Diagonalen, Ecken, Zeilen, ...), die keine `spalte: usize` haben,
 /// sondern eine `&[(usize, usize)]`-Liste. Findet alle offenen Special-Zellen
 /// INNERHALB der Liste und liefert ihre Slot-Nachbarn (koennen ausserhalb der
@@ -794,14 +794,14 @@ pub(crate) fn ueberpraesenz_vorzug(state: &GameState) -> Option<Action> {
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }
-    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::verbleibende_farben(state);
     let moves = crate::validation::generate_valid_moves(state);
 
     // Feste Farbreihenfolge (`TileColor::NORMAL`) statt eines HashSets --
     // dessen Iterationsreihenfolge ist PRO INSTANZ zufaellig (Rust
     // `RandomState`), zwei Aufrufe fuer DENSELBEN Zustand koennten bei einem
     // Gleichstand in `verbleibend` sonst unterschiedliche Farben liefern.
-    // Gefunden ueber `plattenbauer::mosaic_spaltenbau_an_ist_verhaltens
+    // Gefunden ueber `plate_builder::mosaic_spaltenbau_an_ist_verhaltens
     // identisch_zur_direkten_ansteuerung`, die genau das prueft.
     let mut bestes: Option<(i64, TileColor)> = None;
     for &farbe in TileColor::NORMAL.iter() {
@@ -809,7 +809,7 @@ pub(crate) fn ueberpraesenz_vorzug(state: &GameState) -> Option<Action> {
         if !im_angebot {
             continue;
         }
-        let Some(i) = crate::provokation::farben_index(farbe) else { continue };
+        let Some(i) = crate::provocation::farben_index(farbe) else { continue };
         let wert = verbleibend[i];
         if bestes.map_or(true, |(bw, _)| wert > bw) {
             bestes = Some((wert, farbe));
@@ -851,7 +851,7 @@ pub(crate) fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingS
         if zellen.is_empty() {
             None
         } else {
-            crate::plattenbauer::tiling_vorzug_fuer_zellen(state, pi, &zellen)
+            crate::plate_builder::tiling_vorzug_fuer_zellen(state, pi, &zellen)
         }
     })
 }
@@ -935,7 +935,7 @@ fn slot_score(
 /// Kuppelplatten-Praeferenz: steuert BEIDE Stufen des zweistufigen
 /// Kuppel-Suchknotens (`moves.rs::PendingDomeChoice`/`Action::ChooseDomeSlot`/
 /// `Action::ChooseDomeRotation`) auf die dynamische Ziel-Spalte, PRAEFERENZ
-/// wie `provokation::vorzugszug` -- greift nur, wenn ein Kandidat echten
+/// wie `provocation::vorzugszug` -- greift nur, wenn ein Kandidat echten
 /// Nutzen zeigt (`score > 0`), sonst `None` und das Netz entscheidet frei.
 ///
 /// Aufrufstelle: dieselben Drafting-Entscheidpunkte wie `vorzugszug`
@@ -1145,7 +1145,7 @@ fn angebot_zusammenfassung(state: &GameState) -> String {
 /// Zelle schon voll? Slot fehlt?"). Special-Zeilen werden uebersprungen (sie
 /// nehmen nie eine Farbe entgegen, sind also kein Vorzugs-Blocker in diesem
 /// Sinn); Wild-Zeilen nur, wenn ueberhaupt keine Farbe im Angebot ist (jede
-/// Farbe qualifiziert dort, siehe `provokation::vorzugszug_fuer_spalte`).
+/// Farbe qualifiziert dort, siehe `provocation::vorzugszug_fuer_spalte`).
 fn kein_vorzug_grund(state: &GameState, player: &PlayerBoard, spalte: usize) -> String {
     let angebot: std::collections::HashSet<TileColor> = crate::validation::generate_valid_moves(state)
         .into_iter()
@@ -1188,7 +1188,7 @@ fn kein_vorzug_grund(state: &GameState, player: &PlayerBoard, spalte: usize) -> 
 ///
 /// `entscheidungstyp`: "Drafting" | "Dome" | "Tiling".
 /// `vorzug_kandidat`: die vom AUFRUFER schon ermittelte Praeferenz-Aktion
-/// (`spaltenbau`/`provokation`, VOR dem Fallback auf die Netz-Suche) -- bei
+/// (`column_build`/`provocation`, VOR dem Fallback auf die Netz-Suche) -- bei
 /// `None` haelt diese Funktion selbst fest, WARUM keine existierte.
 pub(crate) fn trace_zeile(
     state: &GameState,
@@ -1201,7 +1201,7 @@ pub(crate) fn trace_zeile(
         return None;
     }
     let player = &state.players[pi];
-    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::verbleibende_farben(state);
     let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
     // Runde 4: dieselbe Vollendbarkeits-/Wechsel-Buchhaltung wie die
     // eigentlichen Vorzugsfunktionen -- der Aufrufer hat sie fuer DIESE
@@ -1227,7 +1227,7 @@ pub(crate) fn trace_zeile(
         // "VorzugAktion" bewusst NICHT "Aktion" (Namenskollision mit dem
         // AEUSSEREN `Aktion=`-Feld der Zeile weiter unten, das die
         // tatsaechlich GESPIELTE Aktion trägt -- zwei Felder mit demselben
-        // Namen waeren fuer `tools/spaltenbau_trace.py`s Parser nicht mehr
+        // Namen waeren fuer `tools/column_build_trace.py`s Parser nicht mehr
         // eindeutig trennbar, weil beide Rust-Debug-Text mit Leerzeichen
         // enthalten koennen).
         Some(a) => format!("ja VorzugAktion={a:?}"),
@@ -1242,7 +1242,7 @@ pub(crate) fn trace_zeile(
     // Runde 4: Zielwechsel und Kuppel-Jackpot als eigene, additive Felder --
     // beide bewusst NUR gesetzt, wenn sie diese Entscheidung betreffen (kein
     // "Wechsel=nein"/"Jackpot=nein"-Rauschen in jeder Zeile, das Parsen in
-    // `tools/spaltenbau_trace.py` bleibt einfach: Feld da -> Ereignis war da).
+    // `tools/column_build_trace.py` bleibt einfach: Feld da -> Ereignis war da).
     let wechsel_teil = match wechsel {
         Some((alt, neu)) => format!(" Wechsel={alt}->{neu} Grund=unvollendbar"),
         None => String::new(),
@@ -1366,7 +1366,7 @@ mod tests {
     fn engpass_aufschlag_ist_linear_zwischen_voll_und_leer() {
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         let leer = [0i64; 5];
-        let i = crate::provokation::farben_index(Rot).unwrap();
+        let i = crate::provocation::farben_index(Rot).unwrap();
         assert_eq!(engpass_aufschlag(&voll, Rot), 0.0, "reichliche Farbe darf keinen Aufschlag tragen");
         assert!(
             (engpass_aufschlag(&leer, Rot) - ENGPASS_MAX).abs() < 1e-9,
@@ -1397,7 +1397,7 @@ mod tests {
 
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         let mut leer_rot = voll;
-        leer_rot[crate::provokation::farben_index(Rot).unwrap()] = 0;
+        leer_rot[crate::provocation::farben_index(Rot).unwrap()] = 0;
 
         let k_voll = spalten_kosten(&game.state.players[pi], 0, &voll);
         let k_knapp = spalten_kosten(&game.state.players[pi], 0, &leer_rot);
@@ -1658,9 +1658,9 @@ mod tests {
 
     #[test]
     fn vorzugszug_reicht_dynamische_spalte_an_provokation_kern_durch() {
-        // Direkter Vergleich: `spaltenbau::vorzugszug` muss fuer eine
+        // Direkter Vergleich: `column_build::vorzugszug` muss fuer eine
         // Stellung, in der Spalte 0 Ziel ist, denselben Zug liefern wie
-        // `provokation::vorzugszug_fuer_spalte(state, 0)`.
+        // `provocation::vorzugszug_fuer_spalte(state, 0)`.
         set_aktiv_override_for_test(Some(true));
         let mut game = drafting_game(7);
         let pi = game.state.current_player;
@@ -1680,7 +1680,7 @@ mod tests {
         game.state.large_factory.sun_tiles.clear();
         game.state.large_factory.moon_pool.clear();
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let erwartet = crate::provokation::vorzugszug_fuer_spalte(&game.state, 0);
+        let erwartet = crate::provocation::vorzugszug_fuer_spalte(&game.state, 0);
         assert_eq!(vorzugszug(&game.state), erwartet);
         assert!(erwartet.is_some(), "Testvoraussetzung: es sollte ueberhaupt einen Kandidaten geben");
         set_aktiv_override_for_test(None);
@@ -1702,7 +1702,7 @@ mod tests {
         );
 
         let mut knapp = voll;
-        let i = crate::provokation::farben_index(Rot).unwrap();
+        let i = crate::provocation::farben_index(Rot).unwrap();
         knapp[i] = 5; // Zeile 5 braucht r+1=6 Kopien -- 5 reicht nicht mehr.
         assert!(
             !ist_spalte_vollendbar(&game.state.players[pi], 4, &knapp),
@@ -1933,7 +1933,7 @@ mod tests {
         );
 
         let mut leer_rot = voll;
-        leer_rot[crate::provokation::farben_index(Rot).unwrap()] = 0;
+        leer_rot[crate::provocation::farben_index(Rot).unwrap()] = 0;
         assert!(
             !ist_spalte_vollendbar(&game.state.players[pi], 0, &leer_rot),
             "Rot komplett verbraucht -- der Special-Nachbar (Zeile0,Spalte1) braucht 1 Kopie, die nicht mehr da ist"
@@ -1948,7 +1948,7 @@ mod tests {
         let tile = DomeTile::new(62, vec![DomeSpace::special(), DomeSpace::normal(Rot), DomeSpace::wild(), DomeSpace::wild()], 0);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         let mut leer_rot = [crate::tile::TILES_PER_COLOR as i64; 5];
-        leer_rot[crate::provokation::farben_index(Rot).unwrap()] = 0;
+        leer_rot[crate::provocation::farben_index(Rot).unwrap()] = 0;
         assert!(
             ist_spalte_vollendbar(&game.state.players[pi], 0, &leer_rot),
             "Default AUS: Special-Zeilen bleiben unberuecksichtigt, auch wenn ihr Nachbar Rot ausgeschoepft ist"
@@ -2001,7 +2001,7 @@ mod tests {
 
         assert_eq!(ziel_spalte(&game.state), Some(0), "Testvoraussetzung: Spalte 0 muss Ziel sein");
         assert!(
-            crate::provokation::vorzugszug_fuer_spalte(&game.state, 0).is_none(),
+            crate::provocation::vorzugszug_fuer_spalte(&game.state, 0).is_none(),
             "Testvoraussetzung: die Zielspalte selbst darf keinen Kandidaten liefern (Special qualifiziert nie)"
         );
 

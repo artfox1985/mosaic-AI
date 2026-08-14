@@ -1,11 +1,11 @@
 //! Spalten-Provokation (Diagnose-Knopf `MOSAIC_PROVOKATION_SPALTE`) --
 //! Beschneidung der Drafting-Aktionsmenge auf eine Ziel-Spalte, damit die
 //! Suche ein Spiel plant, das gezielt auf eine geschlossene Wertungsplatten-
-//! Spalte hinarbeitet. Siehe `evaluations/PREREG_provokation.md` §4 (der
+//! Spalte hinarbeitet. Siehe `evaluations/PREREG_provocation.md` §4 (der
 //! Eingriff) fuer die volle Begruendung, warum das ueber eine
 //! Aktionsmengen-Beschneidung geht und NICHT ueber einen neuen Bewerter
-//! (fuenf Anlaeufe gescheitert: `PREREG_platzierungsseite.md` §7-14,
-//! `PREREG_injektion_wertungsplatten.md`).
+//! (fuenf Anlaeufe gescheitert: `PREREG_placement_side.md` §7-14,
+//! `PREREG_scoring_plate_injection.md`).
 //!
 //! DIAGNOSE-KNOPF, KEIN SPIELPARAMETER (Muster: `MOSAIC_VOLLE_VERSORGUNG`,
 //! `state.rs::volle_versorgung`). Default AUS -> [`beschneide_moves`] ist ein
@@ -114,12 +114,12 @@ thread_local! {
 ///
 /// STUFE-1/STUFE-2-HINWEIS: diese Funktion ist gebaut und getestet, aber
 /// bewusst NIRGENDS aus einem Self-Play-Einstieg heraus aufgerufen --
-/// `PREREG_provokation.md` §6 haelt Stufe 1 (diese Datei) ausdruecklich VOR
+/// `PREREG_provocation.md` §6 haelt Stufe 1 (diese Datei) ausdruecklich VOR
 /// Stufe 2 (Verdrahtung ins Self-Play), bis Stufe 1 ihre Abnahmezahl hat.
 ///
 /// Aufrufer MUSS am Partieende mit `None` zuruecksetzen, sonst leckt der Wert
 /// in die naechste Partie desselben Threads.
-// Bewusst unverdrahtete Stufe-2-API (PREREG_provokation §6: bleibt unbenutzt,
+// Bewusst unverdrahtete Stufe-2-API (PREREG_provocation §6: bleibt unbenutzt,
 // bis Stufe 1 ihre Zahl hat) -- kein toter Rest, sondern vorbereiteter Baustein.
 #[allow(dead_code)]
 pub(crate) fn set_ziel_spalte_seed(seed: Option<u64>) {
@@ -194,7 +194,7 @@ pub(crate) fn beschneide_moves(state: &GameState, moves: Vec<Move>) -> Vec<Move>
         })
         .cloned()
         .collect();
-    // VERFEINERUNG (PREREG_provokation.md §7 Punkt 2, gemessen begruendet):
+    // VERFEINERUNG (PREREG_provocation.md §7 Punkt 2, gemessen begruendet):
     // die erste Fassung liess Bodenzuege immer durch und band alles andere --
     // blieb nach der Beschneidung nur noch die Strafleiste als Ziel, galt die
     // Menge trotzdem als "nicht leer" und der Fallback griff nie. Ergebnis war
@@ -475,7 +475,7 @@ pub(crate) fn vorzugszug(state: &GameState) -> Option<crate::moves::Action> {
 }
 
 /// Kern von [`vorzugszug`], mit EXPLIZITER Ziel-Spalte statt des Env-Knopfs
-/// -- ausgelagert (2026-08-13, Spaltenbau-Auftrag), damit `spaltenbau.rs` die
+/// -- ausgelagert (2026-08-13, Spaltenbau-Auftrag), damit `column_build.rs` die
 /// IDENTISCHE Praeferenzlogik mit einer je Entscheid dynamisch bestimmten
 /// Spalte wiederverwenden kann, statt sie zu duplizieren (CLAUDE.md:
 /// "vorhandene scripts/Funktionen wiederverwenden"). Reiner Parameter-
@@ -486,7 +486,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         return None;
     }
     let player = &state.players[state.current_player];
-    // Runde 3 (Nutzer-Auftrag 2026-08-13, PREREG_provokation.md §11/§12):
+    // Runde 3 (Nutzer-Auftrag 2026-08-13, PREREG_provocation.md §11/§12):
     // einmal je Entscheid berechnet, nicht je Kandidat -- `verbleibende_
     // farben` iteriert den ganzen sichtbaren Zustand (siehe Doku dort), das
     // in der Kandidatenschleife zu wiederholen waere O(n^2) ohne Nutzen.
@@ -531,7 +531,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         // Kandidaten gewinnt jetzt die KNAPPSTE Farbe zuerst (PRIMAeR),
         // "vollste Reihe zuerst" bleibt nur noch der Tie-Break darunter --
         // was knapp ist und JETZT angeboten wird, kommt vielleicht nie
-        // wieder (PREREG_provokation.md §11: 74,1% Blocker "Farbe nicht im
+        // wieder (PREREG_provocation.md §11: 74,1% Blocker "Farbe nicht im
         // Angebot"). Kleinerer `knappheit`-Wert (wenig verbleibend) gewinnt,
         // weil `besser` auf Tupel-`<` sortiert.
         let knappheit = farben_index(m.take.color)
@@ -553,7 +553,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
 
 // ── Runde 3: zaehlbare Versorgung (Nutzer-Auftrag 2026-08-13) ───────────────
 //
-// PREREG_provokation.md §11 letzter Satz: dominanter Blocker (74,1%) ist
+// PREREG_provocation.md §11 letzter Satz: dominanter Blocker (74,1%) ist
 // nicht mehr Farblogik, sondern die VERSORGUNG -- die fuer die Zielspalte
 // geforderte Farbe war schlicht nirgends im Angebot. `verbleibende_farben`
 // beantwortet die dafuer nötige Frage "wie viel von Farbe X ist ueberhaupt
@@ -632,8 +632,8 @@ pub(crate) fn verbleibende_farben(state: &GameState) -> [i64; 5] {
     std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - verbaut[i])
 }
 
-/// Runde 4, Baustein 1 (Nutzer-Auftrag `PREREG_provokation.md` §14): fuer
-/// [`crate::spaltenbau::ist_spalte_vollendbar`] ist [`verbleibende_farben`]
+/// Runde 4, Baustein 1 (Nutzer-Auftrag `PREREG_provocation.md` §14): fuer
+/// [`crate::column_build::ist_spalte_vollendbar`] ist [`verbleibende_farben`]
 /// die FALSCHE Zahl -- die zaehlt Fabrik-/Mond-Kacheln als "verbaut", obwohl
 /// sie JETZT noch nehmbar sind (sie misst "im Beutel/Turm versteckt", nicht
 /// "noch erreichbar"). Eine tiefe Reihe (braucht bis zu 6 Kopien) erschien
