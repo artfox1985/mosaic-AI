@@ -3008,322 +3008,45 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // EIGENEN Such-RNG statt weiterhin den Partie-`rng` zu verbrauchen.
     game_seed: u64,
 ) -> Vec<Value> {
-    let mut game = Game::start(names, first_player, scoring_ids, rng);
-    let mut records: Vec<Map<String, Value>> = Vec::new();
-    // Rundenübergangs-Trainingsziel (siehe round_transition.rs): je Runde N
-    // ein per Chance-Node-Sampling gemitteltes Blattwert-Paar, gespeichert
-    // unter der Rundennummer VOR dem Übergang (state.round zu dem Zeitpunkt,
-    // wenn die Drafting-Phase endet). Ergänzt `scores`/`winner` additiv, siehe
-    // Stamping-Schleife unten -- KEIN Ersatz dafür.
-    let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
-    // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
-    // zusätzlich zum vollen `round_transition_value`, siehe
-    // `bootstrap_value_after_rounds`-Doku (round_transition_deep.rs).
-    let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
-    // τ-Annealing (`net_mcts::tau_argmax_from_move`, PREREG Messung 3):
-    // fortlaufender 1-BASIERTER Halbzug-Zaehler DIESER Partie -- beide
-    // Spieler zusammen gezaehlt (der erste ECHTE Drafting-Entscheid, egal ob
-    // Ein- oder Mehr-Aktionen-Fall, egal welcher Spieler, ist Zug 1), gleiche
-    // "Zug"-Konvention wie `evaluations/actions_per_round.md` ("Zug 1 -> 195
-    // Aktionen"). Zaehlt NUR echte Drafting-Entscheide -- StartPlacement-
-    // Schritte (Startfliesen legen) und Tiling-Schritte erhoehen ihn NICHT,
-    // da nur `net_drafting_policy`s Sampling/argmax-Wahl von diesem Zaehler
-    // abhaengt und dort nie durchlaeuft.
-    let mut move_number: u64 = 0;
-    let mut guard = 0u32;
-    let t_start = std::time::Instant::now();
-    // `+ EXTRA_GAME_TIMEOUT_SECS`: BUGFIX, live gefunden. `net_game_timeout_secs`
-    // wurde kalibriert, bevor `round_transition_deep` existierte -- ohne diesen
-    // Zuschlag schnitt ein erster Smoke-Test (60 Sims, Timeout 30s) die Partie
-    // VOR Rundenende 5 ab (0 Runde-5-Schritte trotz vollständigem Runde-1-4-
-    // Sampling), exakt der corrupted-scores-Fehlermodus, den
-    // `net_game_timeout_secs`s eigener Kommentar beschreibt -- siehe
-    // round_transition_deep.rs::EXTRA_GAME_TIMEOUT_SECS.
-    let timeout_secs = net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS;
-    loop {
-        guard += 1;
-        if let Some(hb) = move_heartbeat {
-            hb.fetch_add(1, Ordering::Relaxed);
-        }
-        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
-        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
-        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
-            break;
-        }
-        match game.state.phase {
-            Phase::StartPlacement | Phase::Drafting => {
-                if game.state.players.iter().any(|p| p.start_tile_pending) {
-                    match start_placement_step(&mut game, rng) {
-                        Some(rec) => records.push(rec),
-                        None => break,
-                    }
-                } else if game.state.phase == Phase::Drafting {
-                    // τ-Annealing-Zaehler (siehe Deklaration oben): ZUERST
-                    // erhoehen, dann verwenden -> der erste Entscheid dieser
-                    // Partie ist Zug 1 (1-basiert), passend zu
-                    // `evaluations/actions_per_round.md`s "Zug 1"-Konvention.
-                    move_number += 1;
-                    let player = game.state.current_player;
-                    let actions = drafting_actions(&game.state);
-                    let valid_actions: Vec<Value> =
-                        actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
-                    // PREREG_search_rng_split.md: EIN eigener, aus (game_seed,
-                    // move_number) abgeleiteter RNG fuer den GESAMTEN Entscheid
-                    // dieses Halbzugs -- PCR-Muenzwurf, Suche UND
-                    // `moon_order_target` (Label-Sampling) haengen jetzt an
-                    // diesem, NICHT mehr am Partie-`rng`. Der Partie-`rng`
-                    // verschiebt sich dadurch nur noch durch echte
-                    // Zustands-Ereignisse (`Game::start`/`EndTiling`), deren
-                    // Anzahl NICHT von `base_sims`/PCR abhaengt (Prereg §2/§5).
-                    let mut search_rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
-                        game_seed,
-                        move_number,
-                    ));
-                    // Task #14 (PCR): pro echtem Entscheid (>1 legale Aktion)
-                    // EIN Muenzwurf aus `search_rng` -- nur gezogen, wenn PCR
-                    // ueberhaupt aktiv ist (`pcr_full_prob` gesetzt), damit der
-                    // RNG-Verbrauch bei `pcr_full_prob=None` identisch zum
-                    // Vor-PCR-Verhalten bleibt (kein zusaetzlicher Aufruf, keine
-                    // Verschiebung nachfolgender Ziehungen wie
-                    // `moon_order_target`/`weighted_index`). Ausgelagert in
-                    // `pcr_decide_full`, damit dieser Entscheid isoliert
-                    // (unit-testbar OHNE volles Self-Play-Spiel) geprueft werden
-                    // kann -- ein komplettes Spiel ist wegen der wall-clock-
-                    // deadline-basierten `round_transition_deep`-Stichproben
-                    // (siehe dortige `Instant::now() + BUDGET`-Schleifen) NICHT
-                    // lauflaengen-deterministisch, unabhaengig von PCR.
-                    let pcr_is_full: Option<bool> =
-                        pcr_decide_full(pcr_full_prob, actions.len(), &mut search_rng);
-                    let effective_sims = match pcr_is_full {
-                        Some(false) => pcr_cheap_sims,
-                        _ => base_sims,
-                    };
-                    // PREREG_ownership_corpus.md §3.1: Bauer-Vorzug (Spaltenbau/
-                    // Plattenbauer) uebersteuert die Suche -- BEIDSEITIG, KEIN
-                    // `pi==net_board`-Gate (Vorbild `play_net_vs_net_game`,
-                    // self_play.rs:1927-1929 -- `play_net_game`s Gate dort ist
-                    // fuer die Arena-Asymmetrie Netz-vs-Heuristik gedacht,
-                    // Self-Play kennt dieses Konzept nicht, beide Seiten SIND
-                    // das Netz). Bei unbesetzten Knoepfen (`MOSAIC_SPALTENBAU`/
-                    // `MOSAIC_PLATTENBAU` unset) liefern alle drei Aufrufe
-                    // `None` (bestehendes No-Op-Verhalten dieser Funktionen,
-                    // siehe deren eigene Doku) -- der `else`-Zweig unten laeuft
-                    // dann UNVERAENDERT wie vor diesem Umbau (Bestandsschutz,
-                    // per Paritaetsprobe geprueft).
-                    let vorzug_kandidat = crate::provokation::vorzugszug(&game.state)
-                        .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
-                        .or_else(|| crate::plattenbauer::dome_vorzug(&game.state));
-                    let (chosen, policy, root_q, root_child_q) = if actions.len() == 1 {
-                        let a = actions[0].clone();
-                        let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
-                        (a, vec![e], None, Vec::new())
-                    } else if let Some(a) = vorzug_kandidat {
-                        // §3.1-Befund (PREREG_ownership_corpus.md): das Policy-
-                        // Ziel unter Vorzug ist ein DEMONSTRATIONS-Target --
-                        // ein-hot auf die uebersteuernde Aktion (prob=1.0),
-                        // EXAKT dieselbe Konvention wie der bestehende
-                        // Ein-Aktion-Kurzschluss oben. `root_q`/`root_child_q`
-                        // bleiben leer (keine echte Suche gelaufen fuer diesen
-                        // Entscheid) -- beide Felder sind bereits als optional
-                        // dokumentiert (siehe deren Einfuege-Kommentare unten,
-                        // "Konsumenten muessen das Fehlen tolerieren").
-                        let e = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
-                        (a, vec![e], None, Vec::new())
-                    } else {
-                        // Task #80: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
-                        // tatsaechlich gespielten Zuege. `timed()` ist ohne
-                        // `clone_profiling`-Feature ein No-Op (siehe profiling.rs).
-                        // Task #81: `with_category` markiert zusaetzlich alle
-                        // Netz-Evals INNERHALB dieses Blocks als "Gumbel" fuer den
-                        // Eval-vs-Logik-Split (Amdahl-Grenze GPU-Umbau).
-                        //
-                        // Task #14 (PCR): `effective_sims` ist bei aktivem PCR und
-                        // Cheap-Zweig `pcr_cheap_sims` statt `base_sims`, sonst
-                        // (PCR aus ODER Voll-Zweig) unveraendert `base_sims` --
-                        // `net_drafting_policy` selbst kennt PCR nicht, sieht nur
-                        // eine andere Sims-Zahl (dieselbe Funktion, die auch ohne
-                        // PCR jede Voll-Suche ausfuehrt).
-                        crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
-                            crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
-                                net_drafting_policy(
-                                    net, &game.state, &actions, effective_sims, c_puct, &mut search_rng,
-                                    add_root_noise, deterministic, move_number,
-                                )
-                            })
-                        })
-                    };
-                    let moon_t = moon_order_target(&game.state, &chosen, player, &mut search_rng);
-                    let state_json = state_to_json(&game.state, true);
-                    let round_before = game.state.round_number;
-                    apply_chosen_action(&mut game, chosen)
-                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
-                    if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
-                        // Rundenübergang gerade erreicht -- Chance-Node-
-                        // Sampling für ein rauschärmeres Trainingsziel (siehe
-                        // round_transition.rs). Läuft nur ~4x je Partie
-                        // (einmal je echtem Rundenwechsel), Budget daher
-                        // grosszügiger als in der (noch inaktiven)
-                        // Live-Suche. Defensiv best-effort: schlägt der
-                        // Sampling-Versuch fehl (sollte durch die
-                        // Phase-Prüfung nicht vorkommen), bleibt einfach
-                        // kein Eintrag für diese Runde -- Python-Seite fällt
-                        // dann auf die literalen `scores` zurück.
-                        //
-                        // `round_before < NUM_ROUNDS` (nicht Runde 5) ist
-                        // BUGFIX, nicht nur Optimierung: nach Runde 5s
-                        // Tiling endet `execute_end_tiling` in `Phase::End`
-                        // statt `next_round` aufzurufen (`is_over()` greift)
-                        // -- ohne diese Prüfung sampelte
-                        // `resolve_to_pre_chance`/`sample_round_transition_value`
-                        // hier trotzdem "etwas" (den EndTiling-Übergang ins
-                        // Spielende), aber ohne jede echte Zufallskomponente
-                        // (kein Refill, `apply_tiling` liefert deterministisch
-                        // denselben Endzustand) -- ein bedeutungsloser,
-                        // irreführender Wert statt eines Rundenübergangs-
-                        // Samples. Live gefunden: `round_transition_value`
-                        // tauchte faelschlich auch in Runde-5-Records auf.
-                        if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
-                            // Task #80: Kostenprofil-Kategorien (b)+(c) -- die teure
-                            // rekursive round_transition_value-Simulation (inkl. der
-                            // #71-Policy-Node-Budget-Suche in
-                            // `choose_drafting_action_pruned`) getrennt von (e) dem
-                            // TD-Bootstrap-Ziel gemessen, um die rtv/Bootstrap-
-                            // Redundanzfrage kostenseitig zu beantworten.
-                            // Task #81: `with_category` markiert die Netz-Evals
-                            // dieses Blocks als "Rtv" (Eval-vs-Logik-Split).
-                            // Task #85 (rtv-Ablation Phase 2): `record_rtv` gated
-                            // NUR diesen Block -- rtv ist laut #80 ~81% der
-                            // Self-Play-Kosten, korreliert aber laut #80s
-                            // Redundanzanalyse schwaecher mit dem echten
-                            // Spielausgang als `bootstrap_value` und traegt laut
-                            // der #84/#85-Gating-Evidenz (siehe
-                            // `evaluations/STATUS.md`, `v13_nortv_best` schlaegt
-                            // Champion `v12b_lr_best` 171:129) keine messbare
-                            // Staerke bei. Bei `record_rtv=false` bleiben die
-                            // #80/#81-Profiling-Kategorien fuer "Rtv" einfach bei
-                            // 0 (kein separater Zaehler noetig).
-                            if record_rtv {
-                                let v = crate::profiling::with_category(crate::profiling::Category::Rtv, || {
-                                    crate::profiling::timed(crate::profiling::note_rtv_ns, || {
-                                        sample_round_transition_for_round(round_before, &pre, net, rng)
-                                    })
-                                });
-                                round_transition_values.insert(round_before, v);
-                            }
-                            // Task #81: dito, Kategorie "Bootstrap". UNABHAENGIG
-                            // von `record_rtv` -- eigene, separat gemessene
-                            // Kostenkategorie, nicht Teil dieser Ablation.
-                            let bv = crate::profiling::with_category(crate::profiling::Category::Bootstrap, || {
-                                crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
-                                    crate::round_transition_deep::bootstrap_value_after_rounds(
-                                        &pre,
-                                        net,
-                                        crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-                                        rng,
-                                    )
-                                })
-                            });
-                            bootstrap_values.insert(round_before, bv);
-                        }
-                    }
-                    let mut m = Map::new();
-                    m.insert("state".into(), state_json);
-                    m.insert("policy".into(), Value::Array(policy));
-                    m.insert("valid_actions".into(), Value::Array(valid_actions));
-                    m.insert(
-                        "moon_order_target".into(),
-                        moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
-                    );
-                    m.insert("player".into(), json!(player));
-                    // v19-Vorbereitung (Root-Q-Logging, Recherche Fund 1):
-                    // additiv, NUR vorhanden wenn eine echte Suche/Analyse
-                    // stattfand (`actions.len()>1`, siehe `net_drafting_policy`/
-                    // `net_mcts::net_root_child_stats_and_policy`). Feld fehlt
-                    // bei der Ein-Aktion-Kurzschluss-Zeile oben UND bei
-                    // fehlgeschlagener Suche -- Konsumenten müssen das Fehlen
-                    // tolerieren (train.py reicht es vorerst nur durch/ignoriert
-                    // es, kein Konsument liest es aktuell).
-                    if let Some(rq) = root_q {
-                        m.insert("root_q".into(), json!(rq));
-                    }
-                    // Task #35 (Ranking-Loss-Vorlauf, siehe STATUS.md
-                    // "Ranking-Loss auf Geschwister-Q"/Research-Report Idee
-                    // 7.1): additiv, NUR vorhanden bei echten Mehr-Aktionen-
-                    // Entscheiden mit erfolgreicher Suche (`!root_child_q.is_empty()`
-                    // -- fehlt bei Ein-Aktion-Kurzschluss UND beim leeren-Stats-
-                    // Fallback in `net_drafting_policy`, exakt wie `root_q` dort
-                    // fehlen kann, siehe dessen Kommentar) UND wenn das Logging
-                    // per Env-Var eingeschaltet ist (Default AN, siehe
-                    // `net_mcts::root_child_q_logging_enabled` --
-                    // `MOSAIC_ROOT_CHILD_Q=0` schaltet ab, JSON dann byte-
-                    // identisch zum Vor-#35-Format). `Vec<f64>`, Reihenfolge/
-                    // Länge deckungsgleich mit `policy` (siehe
-                    // `net_drafting_policy`-Kommentar) -- Python kann Paare
-                    // rein positionsbasiert bilden, ohne Aktionen zu matchen.
-                    // Gating ausgelagert in `root_child_q_field` (siehe dortige
-                    // Doku) -- isoliert unit-testbar OHNE ein komplettes,
-                    // wall-clock-nichtdeterministisches Self-Play-Spiel.
-                    if let Some(v) = root_child_q_field(&root_child_q) {
-                        m.insert("root_child_q".into(), v);
-                    }
-                    // Task #14 (PCR): additiv, NUR vorhanden wenn PCR aktiv ist
-                    // (`pcr_full_prob.is_some()`) -- bei PCR AUS fehlt das Feld
-                    // komplett (Byte-Identitaet zum Vor-PCR-JSON-Format). Bei PCR
-                    // AN ist es in JEDEM Drafting-Record vorhanden (auch beim
-                    // Ein-Aktion-Kurzschluss, dort immer `true`: das einzige
-                    // legale Ziel ist exakt, unabhaengig von Suchqualitaet).
-                    if let Some(is_full) = pcr_is_full {
-                        m.insert("policy_target_valid".into(), json!(is_full));
-                    }
-                    records.push(m);
-                } else {
-                    break;
-                }
-            }
-            // Task #20: einer der beiden echten Netz-Spielpfade -- `net` wird
-            // durchgereicht, `resolve_tiling_step`/`best_first_step_exact_or_valued`
-            // entscheiden anhand von `NET_TILING_TIEBREAK_ENABLED` + Rundenfenster,
-            // ob er tatsaechlich wirkt (Toggle steht auf `false`, siehe dort).
-            Phase::Tiling => records.push(tiling_step(&mut game, Some(net), rng)),
-            _ => break,
-        }
+    // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
+    // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
+    // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
+    // explizite Konfiguration statt Pfad-Zufall), Tiling-Netz beidseitig
+    // (Task #20, Wirkung haengt an `NET_TILING_TIEBREAK_ENABLED` +
+    // Rundenfenster in `best_first_step_exact_or_valued`), Labels
+    // (rtv/bootstrap) MIT Task-#80/#81-Profiling-Kategorien (`profiled`),
+    // Timeout mit `EXTRA_GAME_TIMEOUT_SECS`-Zuschlag (Bugfix-Historie siehe
+    // round_transition_deep.rs).
+    let agent = NetSelfPlayAgent {
+        net,
+        base_sims,
+        c_puct,
+        add_root_noise,
+        deterministic,
+        pcr_full_prob,
+        pcr_cheap_sims,
+        vorzug: true,
+    };
+    let player = PlayerLoopConfig {
+        agent: &agent,
+        tiling_net: Some(net),
+        apply_via_chosen_action: true,
+        spaltenbau_trace: false,
+    };
+    let cfg = GameLoopConfig {
+        timeout_secs: net_game_timeout_secs(base_sims)
+            + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS,
+        seed_from_steps: false,
+        game_seed,
+        move_heartbeat,
+        labels: Some(LabelSamplingConfig { net, record_rtv, profiled: true }),
+        mode: LoopMode::Records { game_id },
+        players: [player, player],
+    };
+    match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
+        LoopOutput::Records(r) => r,
+        LoopOutput::Summary(_) => unreachable!("Records-Modus konfiguriert"),
     }
-    let completed = game.state.phase == Phase::End;
-    if completed {
-        let _ = game.apply_end_scoring();
-    }
-    let scores = [game.state.players[0].score, game.state.players[1].score];
-    // Fund 7 (B1, Vollaudit 2026-07-21): auch der netzgeführte Pfad muss die
-    // ungeklemmten Scores backfillen -- gleiches Muster wie in play_one_game.
-    let scores_unclamped = [
-        game.state.players[0].score_unclamped,
-        game.state.players[1].score_unclamped,
-    ];
-    let winner = determine_winner(&game.state);
-    records
-        .into_iter()
-        .map(|mut m| {
-            m.insert("game_id".into(), json!(game_id));
-            m.insert("scores".into(), json!(scores));
-            m.insert("scores_unclamped".into(), json!(scores_unclamped));
-            m.insert("winner".into(), json!(winner));
-            m.insert("completed".into(), json!(completed));
-            // Zusätzliches, rauschärmeres Trainingsziel für den Rundenübergang
-            // (siehe round_transition.rs) -- additiv, ERSETZT `scores`/`winner`
-            // NICHT. Nur vorhanden für Runden, die tatsächlich einen
-            // Übergang erreicht haben (nicht Runde 5, keine abgebrochenen
-            // Partien) -- Python-Seite muss das Fehlen tolerieren.
-            let round = m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
-            if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
-                m.insert("round_transition_value".into(), json!(v));
-            }
-            if let Some(v) = round.and_then(|r| bootstrap_values.get(&(r as u32))) {
-                m.insert("bootstrap_value".into(), json!(v));
-            }
-            Value::Object(m)
-        })
-        .collect()
 }
 
 /// Zusätzliche Sicherheitsmarge (über `net_game_timeout_secs +
