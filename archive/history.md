@@ -11413,3 +11413,24 @@ sind IDENTIFIKATOREN und bleiben unveraendert. WEITER GESPERRT (Teilmenge 2,
 nach GPU-Agent-Ende): PREREG_gpu_inferenzpfad.md, evaluations/gpu_*,
 async_gpu_stufe3_probe.jsonl, tools/paritaets_probe.py,
 tools/gpu_inferenzpfad_ipc_roundtrip.py, data/gpu_messung/.
+
+### Nachtrag 2026-08-14 -- Dateinamen-Migration Welle 2, Teilmenge 2 (GPU) -- ABSCHLUSS
+
+GPU-Agent fertig (par.22 committet), letzte Sperre aufgehoben. Damit ist die
+Migration deutsch -> englisch im Hauptbaum KOMPLETT.
+
+| alt | neu |
+|---|---|
+| evaluations/PREREG_gpu_inferenzpfad.md | evaluations/PREREG_gpu_inference_path.md |
+| evaluations/gpu_inferenzpfad_ipc_roundtrip.json | evaluations/gpu_inference_path_ipc_roundtrip.json |
+| evaluations/gpu_inferenzpfad_selfplay_e2e_wegb.json | evaluations/gpu_inference_path_selfplay_e2e_route_b.json |
+| evaluations/async_gpu_stufe3_probe.jsonl | evaluations/async_gpu_stage3_probe.jsonl |
+| tools/paritaets_probe.py | tools/parity_probe.py |
+| tools/gpu_inferenzpfad_ipc_roundtrip.py | tools/gpu_inference_path_ipc_roundtrip.py |
+| data/gpu_messung/ | data/gpu_measurement/ |
+
+Befund entgegen Vorab-Meldung "leer": data/gpu_measurement/ enthaelt 5
+Manifeste + 5 pkl-Messkorpora (~254 MB) der par.22-Arme; nur das Verzeichnis
+wurde umbenannt, kein Inhalt angefasst. Die data/gpu_messung-Pfade IN den
+Mess-Records (z.B. gpu_inference_path_selfplay_e2e_route_b.json) bleiben als
+Historie stehen. Der wt_async2-Worktree wurde nicht angefasst.
