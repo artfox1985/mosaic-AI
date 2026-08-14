@@ -407,3 +407,31 @@ Elo-Interpretation der beteiligten Konfigurationen. Die Bauer-Knöpfe bleiben
 Diagnose-Werkzeuge (nie im Gating); ihre Partien tragen Brett-Fakten-Labels
 (Nutzer-Entscheid: Ownership-Labels sind Brett-Fakten, Trainingskorpus
 erlaubt).
+
+## §7 STARTVOLLZUG (2026-08-14, Nutzer-GO vom Vortag, Bedingungen erfuellt)
+
+Bedingungen bei Start: Wirkungsprobe bestanden (§3.5), Schleifen-Refactor
+abgenommen (PREREG_unified_game_loop.md §5), 2b abgenommen
+(PREREG_deterministic_labels.md §4), GPU-Verdikt §22 gefallen: **Regel 3
+verfehlt** (beste Zelle N=64 ORT-CUDA 1,545x, N=128 ORT 1,47x -- die reale
+Ankunftsverteilung haelt die synthetischen Voll-Batches nicht; Zellen von mir
+am JSONL nachgerechnet) -> **Pfad: klassisch 8 Threads** (Vorab-Regel §3.5).
+Das liegengelassene 1,5x ist dokumentiert, die Vorab-Regel gilt.
+
+Start-Konfiguration (Entscheidungen beim Vollzug, hier festgeschrieben):
+
+- **Sims 200 fuer die Netz-Arme A/B/C/E/F** -- exakt die Stufe, auf der die
+  Wirkungsprobe die Bauer-Niveaus VERIFIZIERT hat (k1 2,80 / k5 8,30, §3.5);
+  400er-Arena-Niveaus waren vergleichbar, 200 halbiert die Kosten. Arm D
+  (Heuristik) 150 Sims wie vorregistriert.
+- **Streuung**: MOSAIC_WERTUNG_STREUUNG_MAX=1,0 in den Netz-Armen -- volle
+  Spanne vom Netz-Pol (Gewicht 0) bis zur vollen Injektion (1,0), das
+  Zwei-Pole-Spektrum je Partie-Wuerfelwurf. Label-Seite ist seit 1b61f9c
+  gegen das Streuungs-Shaping abgeschirmt (Pruefpunkt 6).
+- **Reihenfolge**: D (Pipeline-Probe, billigster Arm) -> A -> B -> C -> E ->
+  F, je Arm sequentiell auf 8 Threads. rtv bleibt AUS (Standard seit v13).
+- **Ablage**: MOSAIC_DATA_DIR=data/ownership_corpus (config.py:28),
+  Basis-Seed 20260814, 10 Partien je Datei, Versionsnamen heur_own /
+  v21_own_a / v21_own_k1 / v21_own_k2 / v21_own_k5 / v21_own_k6.
+- Danach: Deckungs-Bericht (§2) VOR jedem Training; Training ist ein
+  eigener Nutzer-Startknopf.
