@@ -171,7 +171,7 @@ mit verschiedenen Seeds verglichen werden.
 `tools/paired_arena_env_ab.py`, ein Faktor (`MOSAIC_DENIAL_UNCERT_Z`
 0 vs 1,0, `_MIN_VISIT_FRAC=0,5` in BEIDEN Armen), Champion@400 vs
 Heuristik@150dyn, 2x400 Partien, Basis-Seed 20260827. Belegstelle
-`evaluations/paired_arena_env_e3b_stufe2.json`.
+`evaluations/paired_arena_env_e3b_stage2.json`.
 
 | Arm | Netz-Siege | Quote |
 |---|---|---|
