@@ -850,54 +850,6 @@ fn start_placement_step<R: Rng + ?Sized>(game: &mut Game, _rng: &mut R) -> Optio
     Some(m)
 }
 
-/// Drafting-Zug per MCTS-Policy. Nimmt den Record auf und wendet den Zug an.
-fn drafting_step<R: Rng + ?Sized>(
-    game: &mut Game,
-    base_sims: u32,
-    c: f64,
-    rng: &mut R,
-) -> Map<String, Value> {
-    let player = game.state.current_player;
-    let actions = drafting_actions(&game.state);
-    let n = actions.len();
-
-    // Aktionsabhängige Temperatur (Port self_play.py:172).
-    let temp = if n > 50 { 0.7 } else if n > 15 { 0.4 } else { 0.15 };
-
-    let valid_actions: Vec<Value> =
-        actions.iter().map(|a| action_to_env_dict(&game.state, a)).collect();
-
-    let (chosen, policy) = if n == 1 {
-        let a = actions[0].clone();
-        let entry = json!({ "action": action_to_env_dict(&game.state, &a), "prob": 1.0 });
-        (a, vec![entry])
-    } else {
-        drafting_policy(&game.state, &actions, base_sims, c, temp, rng)
-    };
-
-    let moon_t = moon_order_target(&game.state, &chosen, player, rng);
-    let state_json = state_to_json(&game.state, true);
-
-    // Zug anwenden -- `chosen` stammt aus `drafting_actions`/`drafting_policy`
-    // (also zum Wahlzeitpunkt "legal"). Ein `Err` hier waere ein Engine-Bug
-    // (Zustandsinkonsistenz zwischen Angebot und Ausfuehrung, analog Commit
-    // 80f3698/apply_chosen_action) -- laut verschlucken wuerde den
-    // Trainings-Record mit einem NICHT angewendeten Zug beschriften.
-    game.apply_drafting(&chosen)
-        .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
-
-    let mut m = Map::new();
-    m.insert("state".into(), state_json);
-    m.insert("policy".into(), Value::Array(policy));
-    m.insert("valid_actions".into(), Value::Array(valid_actions));
-    m.insert(
-        "moon_order_target".into(),
-        moon_t.map(|v| json!(v)).unwrap_or(Value::Null),
-    );
-    m.insert("player".into(), json!(player));
-    m
-}
-
 /// Legale Tiling-Aktionen im agent_env-Schema (für `valid_actions` = Trainings-
 /// maske): ALLE platzierbaren Steine (jede pending Reihe) + optionale `use_chips`
 /// + `end_tiling`. WICHTIG: NICHT auf die oberste Reihe filtern — der DFS-Solver
@@ -1808,122 +1760,35 @@ pub fn play_one_game<R: Rng + ?Sized>(
     // `EndTiling` in `tiling_step`) zustaendig.
     game_seed: u64,
 ) -> Vec<Value> {
-    let mut game = Game::start(names, first_player, scoring_ids, rng);
-    let mut records: Vec<Map<String, Value>> = Vec::new();
-    // Zugindex NUR fuer echte Drafting-Entscheide (siehe `game_seed`-
-    // Kommentar oben) -- gleiche Zaehl-Konvention wie `move_number` in
-    // `play_net_self_play_game` (1-basiert, erster Entscheid = 1).
-    let mut move_idx: u64 = 0;
-    let mut round_transition_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
-    // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
-    // zusätzlich zum vollen `round_transition_value` (das bis zum echten
-    // Spielende rekursiert und damit dieselbe niedrige Runde-1-Decke hat
-    // wie das Endergebnis, siehe Noise-Floor-Befund).
-    let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> = std::collections::HashMap::new();
-
-    let mut guard = 0u32;
-    let t_start = std::time::Instant::now();
-    // `+ EXTRA_GAME_TIMEOUT_SECS` nur wenn `net` aktiv ist -- dieselbe
-    // Bugfix-Logik wie in `play_net_self_play_game` (siehe dortiger
-    // Kommentar): ohne den Zuschlag schneidet der Hänger-Schutz Partien vor
-    // Rundenende ab, sobald das zusätzliche Sampling nennenswert Zeit kostet.
-    let timeout_secs = heuristic_game_timeout_secs(base_sims)
-        + if net.is_some() { crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS } else { 0 };
-    loop {
-        guard += 1;
-        if let Some(hb) = move_heartbeat {
-            hb.fetch_add(1, Ordering::Relaxed);
-        }
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
-            break; // defensive Endlosschleifen-Sicherung
-        }
-        match game.state.phase {
-            Phase::StartPlacement | Phase::Drafting => {
-                if game.state.players.iter().any(|p| p.start_tile_pending) {
-                    match start_placement_step(&mut game, rng) {
-                        Some(rec) => records.push(rec),
-                        None => break,
-                    }
-                } else if game.state.phase == Phase::Drafting {
-                    let round_before = game.state.round_number;
-                    move_idx += 1;
-                    let mut search_rng =
-                        StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed, move_idx));
-                    records.push(drafting_step(&mut game, base_sims, c, &mut search_rng));
-                    if let Some(net) = net {
-                        if game.state.phase == Phase::Tiling && round_before < crate::state::NUM_ROUNDS {
-                            // Gleiche Rundenende-vs-Spielende-Unterscheidung wie
-                            // in `play_net_self_play_game` (siehe dortiger
-                            // Kommentar) -- `round_before < NUM_ROUNDS` filtert
-                            // den bedeutungslosen Runde-5-Fall.
-                            if let Some(pre) = crate::round_transition::resolve_to_pre_chance(&game.state) {
-                                // Task #85: `record_rtv` gated NUR das teure
-                                // rtv-Sampling -- `bootstrap_value` unten laeuft
-                                // unveraendert immer mit (eigene Kostenkategorie).
-                                if record_rtv {
-                                    let v = sample_round_transition_for_round(round_before, &pre, net, rng);
-                                    round_transition_values.insert(round_before, v);
-                                }
-                                let bv = crate::round_transition_deep::bootstrap_value_after_rounds(
-                                    &pre,
-                                    net,
-                                    crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-                                    rng,
-                                );
-                                bootstrap_values.insert(round_before, bv);
-                            }
-                        }
-                    }
-                } else {
-                    break;
-                }
-            }
-            // Task #20: `net` ist hier bewusst NICHT durchgereicht, obwohl es
-            // (fuer Runde-Uebergangs-Label-Sampling oben) ggf. `Some` ist --
-            // `play_one_game`s Zuege bleiben Heuristik-gesteuert
-            // (`drafting_step`/`search_drafting_action`), der Netz-Stichentscheid
-            // gilt nur fuer ECHTE Netz-Spielpfade (siehe `resolve_tiling_step`-Doku).
-            Phase::Tiling => records.push(tiling_step(&mut game, None, rng)),
-            _ => break, // Scoring/End/Final → Partie vorbei
-        }
+    // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
+    // HeuristicSelfPlayAgent beidseitig (Temperatur-Sampling + Policy-
+    // Record), KEIN Tiling-Netz (Task #20: die Zuege bleiben auch bei
+    // `net: Some(..)` komplett Heuristik-gesteuert -- das Netz labelt NUR
+    // die Rundenuebergaenge, ohne Profiling-Kategorien), `apply_drafting`
+    // statt `apply_chosen_action` (Bestand dieses Pfads), Timeout mit
+    // EXTRA-Zuschlag nur bei aktivem Label-Sampling (Bugfix-Historie siehe
+    // urspruenglicher Kommentar in round_transition_deep.rs).
+    let agent = HeuristicSelfPlayAgent { base_sims, c };
+    let player = PlayerLoopConfig {
+        agent: &agent,
+        tiling_net: None,
+        apply_via_chosen_action: false,
+        spaltenbau_trace: false,
+    };
+    let cfg = GameLoopConfig {
+        timeout_secs: heuristic_game_timeout_secs(base_sims)
+            + if net.is_some() { crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS } else { 0 },
+        seed_from_steps: false,
+        game_seed,
+        move_heartbeat,
+        labels: net.map(|n| LabelSamplingConfig { net: n, record_rtv, profiled: false }),
+        mode: LoopMode::Records { game_id },
+        players: [player, player],
+    };
+    match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
+        LoopOutput::Records(r) => r,
+        LoopOutput::Summary(_) => unreachable!("Records-Modus konfiguriert"),
     }
-
-    // Endwertung anwenden, damit Scores die Wertungsplatten enthalten.
-    let completed = game.state.phase == Phase::End;
-    if completed {
-        let _ = game.apply_end_scoring();
-    }
-    let scores = [game.state.players[0].score, game.state.players[1].score];
-    let scores_unclamped = [
-        game.state.players[0].score_unclamped,
-        game.state.players[1].score_unclamped,
-    ];
-    let winner = determine_winner(&game.state);
-
-    records
-        .into_iter()
-        .map(|mut m| {
-            m.insert("game_id".into(), json!(game_id));
-            m.insert("scores".into(), json!(scores));
-            m.insert("scores_unclamped".into(), json!(scores_unclamped));
-            m.insert("winner".into(), json!(winner));
-            // Erreicht die Partie regulär Phase::End (nicht durch Haenger-Schutz
-            // abgebrochen)? Nur dann sind scores/winner ein echtes Endergebnis
-            // (inkl. Wertungsplatten). Downstream (self_play.py) prüft das je Datei.
-            m.insert("completed".into(), json!(completed));
-            // Nur vorhanden, wenn `net` übergeben wurde UND dieser Schritts
-            // Runde tatsächlich einen Übergang erreicht hat -- siehe
-            // `play_net_self_play_game`s identisches Stempel-Muster.
-            let round = m.get("state").and_then(|s| s.get("round")).and_then(|r| r.as_u64());
-            if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
-                m.insert("round_transition_value".into(), json!(v));
-            }
-            if let Some(v) = round.and_then(|r| bootstrap_values.get(&(r as u32))) {
-                m.insert("bootstrap_value".into(), json!(v));
-            }
-            Value::Object(m)
-        })
-        .collect()
 }
 
 /// Spielt `n_games` Partien (rayon-parallel) und gibt ALLE Step-Records flach als
