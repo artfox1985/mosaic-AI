@@ -168,7 +168,7 @@ def main() -> None:
     # Pro-Partie-Seeds statt der `seed + block_idx*1_000_000`-Ableitung --
     # siehe `run_arm`-Docstring fuer die Blockaufteilungs-Regel. Format wie
     # beim Worker: kommagetrennt ODER Datei-Pfad (eine Zahl je Zeile), z.B.
-    # das Ausgabeformat von `tools/seed_auswahl_platten.py`.
+    # das Ausgabeformat von `tools/seed_selection_plates.py`.
     ap.add_argument("--seeds", type=str, default=None,
                     help="Explizite Pro-Partie-Seeds, kommagetrennt ODER "
                          "Datei-Pfad (eine Zahl je Zeile) -- ersetzt --seed "

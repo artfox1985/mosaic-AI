@@ -38,7 +38,7 @@ def parse_seeds(value: str) -> list[int]:
     """Explizite Pro-Partie-Seed-Liste fuer `--seeds` (Plattenkopf-Versuch,
     `PREREG_plate_head.md`, 2026-08-11): entweder KOMMAGETRENNT ODER ein Pfad
     zu einer Datei mit einer Zahl je Zeile (Leerzeilen und `#`-Kommentare
-    ignoriert -- passend zum `tools/seed_auswahl_platten.py`-Ausgabeformat).
+    ignoriert -- passend zum `tools/seed_selection_plates.py`-Ausgabeformat).
     Datei-Form gewaehlt fuer den grossen Fall (60 Seeds waeren als ein
     CLI-Argument unhandlich); komma-Form fuer den kleinen Funktionstest.
     `tools/paired_arena_env_ab.py` importiert dieselbe Funktion (kein

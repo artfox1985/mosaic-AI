@@ -1,7 +1,7 @@
 # Vorregistrierung: Async-Suche (Drafting-Suche als Zustandsautomat)
 
 **Angelegt 2026-08-13, Nutzer-Auftrag.** Parallel arbeitet ein Agent an
-`net_mcts.rs`/`self_play.rs`/`spaltenbau.rs` (Aufräum-Queue) -- diese
+`net_mcts.rs`/`self_play.rs`/`column_build.rs` (Aufräum-Queue) -- diese
 Vorregistrierung UND der zugehörige Stufe-1-Prototyp entstehen deshalb in
 einem eigenen `git worktree --detach` (`scratchpad/wt_async`, Präzedenzfall:
 derselbe Kunstgriff wie in `PREREG_gpu_inferenzpfad.md` §19 für den

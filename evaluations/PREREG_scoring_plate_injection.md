@@ -260,7 +260,7 @@ gefundenen Effekte begründen Hypothesen, sie bestätigen keine. Eine Bestätigu
 braucht frische Seeds.
 
 Festgehalten ist der Aufbau trotzdem, weil er weiterläuft: 57 Seeds aus
-`seed_auswahl_platten.json`, gepaart über den Seed, 400 Netz-Sims gegen
+`seed_selection_plates.json`, gepaart über den Seed, 400 Netz-Sims gegen
 150 Heuristik-Sims, Kriterium 4 als Null-Kontrolle (alpha dort additiv
 wirkungslos).
 
@@ -324,7 +324,7 @@ nicht mein testsetup"*).
 
 Je Kriterium k in 0..7 **ein** Satz Partien, und zwar nur die, in denen diese
 Platte AKTIV ist (`scoring_tile_ids` enthaelt k) — 20 bis 23 Seeds, Listen in
-`evaluations/seeds_je_kriterium/k<k>.txt`, abgeleitet aus `platten_w0`.
+`evaluations/seeds_per_criterion/k<k>.txt`, abgeleitet aus `platten_w0`.
 
 - `MOSAIC_WERTUNG_SHAPING_W` = Achterform, **0 ueberall ausser Stelle k = 1,0**
 - `MOSAIC_WERTUNG_ALPHA` = Achterform, Stelle k variiert, Rest 2 (wirkungslos,
@@ -344,7 +344,7 @@ Platte AKTIV ist (`scoring_tile_ids` enthaelt k) — 20 bis 23 Seeds, Listen in
 ### Zwei Schwellen, und beide sind vorab benannt (Nutzer-Wortlaut *"ab wann wertungsplatten gebaut werden und ab wann die punkte wieder kippen"*)
 
 1. **Zieht es?** Punkte DER PLATTE k selbst, aus der Log-Aufschluesselung
-   (`tools/plattenpunkte_aus_arena.py`), gegen den Nullpunkt auf denselben Seeds.
+   (`tools/plate_points_from_arena.py`), gegen den Nullpunkt auf denselben Seeds.
 2. **Kippt es?** Endstand gegen den Nullpunkt auf denselben Seeds.
 
 Der gesuchte Bereich ist der, in dem (1) steigt, bevor (2) faellt. **Vorab
@@ -381,7 +381,7 @@ einzige** `paired_arena_env_iso_*.json`. Die Vorhersage ist damit echt vorab.
 
 Groesse ist dieselbe wie in der Messtabelle: **Plattenpunkte des Netz-Spielers,
 Mittel ueber die Partien, in denen diese Platte aktiv ist**, gezogen aus der
-Log-Aufschluesselung durch `tools/plattenpunkte_aus_arena.py`.
+Log-Aufschluesselung durch `tools/plate_points_from_arena.py`.
 
 | k | Kriterium | Nullpunkt (w=0, gemessen) | **Nutzer-Ziel** | Faktor | entspricht etwa |
 | - | --------- | ------------------------: | --------------: | -----: | --------------- |
