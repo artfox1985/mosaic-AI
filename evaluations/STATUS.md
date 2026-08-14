@@ -39,8 +39,8 @@ sweepbar). Die Kette:
 | 1 | Vorzug-Verdrahtung (beidseitig) + 5x30-Wirkungsprobe je Arm | **ERLEDIGT** (5992f38; Probe: k1 2,80 / k5 8,30 nahe Arena-Niveau, Korpus-Prereg §3.5) |
 | 2 | `PREREG_unified_game_loop.md` -- vier Schleifen vereinheitlicht | **ERLEDIGT** (307caa4..d9c49e6; Golden-Records 0 Bit alle Pfade, §5-Protokoll) |
 | 3 | `PREREG_deterministic_labels.md` ("2b") -- Not-Deckel ehrlich | **ERLEDIGT** (3fcfed1; unter 12x CPU-Stress 0/1956 byte-identisch, §4; sync<->async-Gate-B-Retest offen bis wt_async2 frei) |
-| 4 | GPU-Verdikt `PREREG_gpu_inference_path.md` par.22 (N=64/128 tract/ORT) | **AGENT LAEUFT** (N=128-Zelle nach Detached-Prozess-Tod neu gestartet); bestimmt nur den Pfad (>=2,0x -> Async+ORT, sonst 8 Threads) |
-| 5 | Generierung 8000 -> Deckungs-Bericht -> (eigener Startknopf) Training warm-start, `--ownership-weight 0,2 --conjunction --extra-data-dir` -> Tor A | **WARTET NUR NOCH auf 4** -- auch Arm D (pfadunabhaengig) zurueckgehalten, um die laufenden Partien/h-Zellen nicht zu verfaelschen. Ablage via MOSAIC_DATA_DIR=data/ownership_corpus (config.py:28) |
+| 4 | GPU-Verdikt `PREREG_gpu_inference_path.md` par.22 | **GEFALLEN 2026-08-14: Regel 3 verfehlt** -- beste Zelle N=64 ORT 1,545x, N=128 ORT 1,47x (mehr Nebenlaeufigkeit hilft ORT nicht: reale Ankunftsverteilung haelt keine Voll-Batches; Erwartung widerlegt). Pfad: klassisch 8 Threads |
+| 5 | Generierung 8000 -> Deckungs-Bericht -> (eigener Startknopf) Training | **LAEUFT seit 2026-08-14** (Startvollzug Korpus-Prereg par.7): Arm D zuerst, dann A->B->C->E->F; Sims 200 (Wirkungsproben-Stufe), Streuung max 1,0, Ablage MOSAIC_DATA_DIR=data/ownership_corpus. Deckungs-Bericht VOR Training; Training bleibt Nutzer-Startknopf |
 
 ### Generator-Sortiment (aktuelle Aera, alle Zahlen nachgerechnet)
 
@@ -58,9 +58,10 @@ sweepbar). Die Kette:
 Rundlauf-Engpass GELOEST (Condvar-Park/Wake statt recv_timeout,
 net_batcher.rs:318; par.21: N=1 0,946x, N=16 0,979x -- vorher 0,053x).
 Batch-Fuellung war nie das Problem (99,7 % bei N=128). Async-Architektur:
-Gate A+B bestanden (Spielgeschehen bit-identisch). Offen: par.22
-(Entscheidungszelle N=128 ORT gegen Regel 3 >=2,0x) und die
-Trainingsziel-Divergenz -> Schritt 3 der Startsequenz.
+Gate A+B bestanden (Spielgeschehen bit-identisch). par.22 ENTSCHIEDEN
+(s. Startsequenz Zeile 4). Offen bleibt nur der sync<->async-Gate-B-Retest
+der Trainingsziel-Felder nach 2b (wt_async2 jetzt frei) -- niedrige
+Prioritaet, kein Blocker.
 
 ### Offene Punkte ausserhalb der Startsequenz
 
