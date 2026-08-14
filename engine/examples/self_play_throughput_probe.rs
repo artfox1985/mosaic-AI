@@ -1,5 +1,5 @@
 //! ENDE-ZU-ENDE-SELF-PLAY-DURCHSATZ (Auftrag 2026-08-12,
-//! `evaluations/PREREG_gpu_inferenzpfad.md` -- v.a. §9 Messplan-Fehler, §13
+//! `evaluations/PREREG_gpu_inference_path.md` -- v.a. §9 Messplan-Fehler, §13
 //! TF32, §18 Nutzer-Entscheid "Batcher fuer Self-Play an, Arena/Gating aus").
 //!
 //! Ruft `self_play::run_self_play_with_net_labels` DIREKT auf (der Auftrag

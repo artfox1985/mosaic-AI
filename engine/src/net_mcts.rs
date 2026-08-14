@@ -7881,7 +7881,7 @@ mod tests {
         assert!((u - 0.575).abs() < 1e-6, "u={u}, erwartet 0.575 (Kalibrierung A=0/B=1 = Identitaet)");
     }
 
-    // ── Weg A (`evaluations/PREREG_gpu_inferenzpfad.md`): WIRKUNGSMESSUNG ──
+    // ── Weg A (`evaluations/PREREG_gpu_inference_path.md`): WIRKUNGSMESSUNG ──
     // Nutzer-Nachfrage 2026-08-12: der Policy-Kopf zeigt 3,4e-5 max. Abweichung
     // tract<->torch (siehe `net_ipc.rs`-Toleranztest,
     // `eval_batch_via_ipc_matches_tract_within_tolerance`) -- das entscheidet
@@ -8143,7 +8143,7 @@ mod tests {
         }
     }
 
-    // ── Weg B (`evaluations/PREREG_gpu_inferenzpfad.md` §11), Nutzer-Auftrag
+    // ── Weg B (`evaluations/PREREG_gpu_inference_path.md` §11), Nutzer-Auftrag
     // "fang an" 2026-08-12, Schritt 2 -- ausdruecklich verlangt, weil leicht
     // uebersehen: die 0-von-1148 oben (tract<->torch) und weiter unten
     // (synchron<->verschraenkt, beide tract) decken KEIN drittes Backend ab.
@@ -8169,7 +8169,7 @@ mod tests {
     /// `#[cfg(feature = "ort_cuda_probe")]` + `#[ignore]`: braucht die
     /// optionale `ort`-Abhaengigkeit UND die ORT-CUDA-Provider-/Torch-CUDA-12-
     /// Laufzeit-DLLs neben dem Testbinary (Handkopie, siehe
-    /// `evaluations/PREREG_gpu_inferenzpfad.md` §11) -- kein regulaerer
+    /// `evaluations/PREREG_gpu_inference_path.md` §11) -- kein regulaerer
     /// `cargo test`-Lauf erfuellt das automatisch, deshalb zusaetzlich
     /// `#[ignore]` obwohl das Feature schon gate-haelt (das Feature gate haelt
     /// nur das KOMPILIEREN ab, nicht die Laufzeit-DLL-Verfuegbarkeit).
@@ -8340,7 +8340,7 @@ mod tests {
     /// rekonstruierbar) je Kandidat einzeln berichten lassen -- fuer die
     /// Frage "bekommen zwei tauschende Kandidaten unterschiedliche
     /// Zufallszahlen" reicht die reine Score-Summe nicht.
-    // Diagnose-Helfer der Rangfolge-Messkette (PREREG_gpu_inferenzpfad §15/§16);
+    // Diagnose-Helfer der Rangfolge-Messkette (PREREG_gpu_inference_path §15/§16);
     // nur von #[ignore]-/Feature-Tests gerufen, im Normallauf bewusst ungenutzt.
     #[allow(dead_code)]
     fn gumbel_scored_sorted<R: Rng + ?Sized>(acts: &[(Action, f32)], rng: &mut R) -> Vec<(f64, f64, usize)> {

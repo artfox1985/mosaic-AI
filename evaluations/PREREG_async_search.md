@@ -4,33 +4,33 @@
 `net_mcts.rs`/`self_play.rs`/`column_build.rs` (Aufräum-Queue) -- diese
 Vorregistrierung UND der zugehörige Stufe-1-Prototyp entstehen deshalb in
 einem eigenen `git worktree --detach` (`scratchpad/wt_async`, Präzedenzfall:
-derselbe Kunstgriff wie in `PREREG_gpu_inferenzpfad.md` §19 für den
+derselbe Kunstgriff wie in `PREREG_gpu_inference_path.md` §19 für den
 GPU-Wheel-Bau), nicht im Hauptbaum. Diese Datei ist die einzige Datei, die
 im Hauptbaum committet wird (plus die zugehörige `PREREG_INDEX.md`-Zeile).
 
 ## 1. Anlass (GEPRÜFT)
 
 Weg V (Verschränkung über blockierende Fäden, `net_batcher.rs`, gebaut und
-vermessen in `PREREG_gpu_inferenzpfad.md` §7-§19) kann die GPU-Gewinnzone
+vermessen in `PREREG_gpu_inference_path.md` §7-§19) kann die GPU-Gewinnzone
 **strukturell nicht erreichen**:
 
 - Gemessener mittlerer Batch **~14,64** bei Deckel **16** (`EVAL_BATCH_MAX_N`)
-  -- GEPRÜFT: `evaluations/gpu_inferenzpfad_selfplay_e2e_wegb.json`,
+  -- GEPRÜFT: `evaluations/gpu_inference_path_selfplay_e2e_route_b.json`,
   `laeufe.armB_t8.batcher_mean_batch = 14.64`, `batcher_max_batch_seen = 16`.
 - Die gemessene GPU-Gewinnzone beginnt erst bei Batch **128** (ORT-CUDA-
-  Kennlinie, `PREREG_gpu_inferenzpfad.md` §8/§11).
+  Kennlinie, `PREREG_gpu_inference_path.md` §8/§11).
 - Ende-zu-Ende ist Weg B über den ECHTEN Self-Play-Pfad (`self_play.py`,
   nicht ein Beispiel-Binary) **0,29x** (angeforderte Basis) / **0,17x**
   (fertiggestellte Basis) gegen den Bestand -- GEPRÜFT:
-  `gpu_inferenzpfad_selfplay_e2e_wegb.json`,
+  `gpu_inference_path_selfplay_e2e_route_b.json`,
   `regel3_faktor_b_gg_a.t8 = {requested_basis: 0.2915, completed_basis:
   0.1676}`. Trotz nahezu gesättigtem Batch (14,64 von 16) ist der Kanal
   langsamer, nicht schneller, als der synchrone tract-Pfad -- Ursache laut
-  `PREREG_gpu_inferenzpfad.md` §19 ungeklärt (Kandidaten: `Mutex<Session>`
+  `PREREG_gpu_inference_path.md` §19 ungeklärt (Kandidaten: `Mutex<Session>`
   als serialisierendes Nadelöhr, `Session::run()`-Kosten unter echter statt
   synthetischer Ankunftsrate).
 - **64 Fäden auf 12 logischen Kernen kollabieren am Wachhund**, unabhängig
-  vom Batcher: GEPRÜFT, `gpu_inferenzpfad_selfplay_e2e_wegb.json`,
+  vom Batcher: GEPRÜFT, `gpu_inference_path_selfplay_e2e_route_b.json`,
   `laeufe.armA_t64.hang_note`: *"64 Faeden auf 12 logischen Kernen (6.7x
   Ueberzeichnung) allein reicht, den Wachhund grossflaechig auszuloesen,
   UNABHAENGIG von Batcher/ORT-CUDA"* (nur 3/40 bzw. 0/40 Partien erreichten
@@ -67,10 +67,10 @@ dieser Vorregistrierung**: die Vorgabe nannte "~1e-6, `net.rs:840`". Beides
 ist bei Nachprüfung falsch. GEPRÜFT am aktuellen `engine/src/net.rs`: Zeile
 840 ist im heutigen Stand nur eine Abschnitts-Kommentarzeile im Testmodul
 (`// ── Task #11 Phase 2: ...`), keine Toleranzaussage -- die Datei hat sich
-seit `PREREG_gpu_inferenzpfad.md` §2 (2026-08-12) verschoben. Die tatsächliche
+seit `PREREG_gpu_inference_path.md` §2 (2026-08-12) verschoben. Die tatsächliche
 Toleranz steht an vier Stellen in `net.rs` (927, 937, 971, 982, Tests
 `eval_pair_matches_two_single_evals` u.a.): **`1e-5`**, nicht `1e-6`. Der
-`PREREG_gpu_inferenzpfad.md`-Text selbst (§2, dort korrekt) zitiert ebenfalls
+`PREREG_gpu_inference_path.md`-Text selbst (§2, dort korrekt) zitiert ebenfalls
 `1e-5`. Die Rangfolge-Zuordnungs-Befunde §15-§17 dort (der 24-Rangsprung ist
 ein Listenpositions-Zuordnungsartefakt, kein Präzisionsartefakt; die
 Verteilungsgleichheit hält, aber ein einzelner Zustand kann je nach
@@ -98,7 +98,7 @@ kein Fehlschlag.
   in Produktion (self_play.rs-Integration, echter Executor statt
   Prototyp-Treiber). **Gate C = Regel 3: >= 2,0x Ende-zu-Ende** gegen
   225,6 Spiele/h (8 Threads, 400 Sims, gemessen in
-  `gpu_inferenzpfad_selfplay_e2e_wegb.json`, `laeufe.armA_t8.
+  `gpu_inference_path_selfplay_e2e_route_b.json`, `laeufe.armA_t8.
   games_per_hour_completed_basis`).
 
 ## 6. §18-Zuschnitt (unverändert gültig)
@@ -228,7 +228,7 @@ Kontrolllogik). Geprüfte Alternativen und warum sie verworfen wurden:
 
 Modell `alphazero_v20_2d_opp_brierbest.onnx`, alle **1148** Zustände aus
 `frozen_eval_set_v2.pkl` (Export als `frozen_states_v2.json`, dieselbe Quelle
-wie `PREREG_gpu_inferenzpfad.md` §12/§13/§16), `sims=32` (deutlich unter dem
+wie `PREREG_gpu_inference_path.md` §12/§13/§16), `sims=32` (deutlich unter dem
 Produktionsbudget 400 -- Gate A prüft die MECHANIK der Umformung, nicht die
 Produktionsstärke; bei `sims=32` durchläuft die Sequential-Halving-Schleife
 bei den meisten Zuständen trotzdem mehrere Phasen, da `n_root` dort
@@ -267,7 +267,7 @@ Hier ist Bit-Gleichheit NICHT zu erwarten (der Sammel-Faden ruft
 nur Toleranz 1e-5, siehe Abschnitt 4) -- gemessen wird deshalb die
 End-zu-Ende-Abweichung der TATSÄCHLICHEN Zugwahl über die volle
 Mehrfach-Sim-Suche, nicht nur ein einzelner Wurzel-Eval wie in
-`PREREG_gpu_inferenzpfad.md` §14-§17. Laufzeit: 390,98s (ungewöhnlich
+`PREREG_gpu_inference_path.md` §14-§17. Laufzeit: 390,98s (ungewöhnlich
 langsam für einen Busy-Poll-Executor mit nur 16-facher Nebenläufigkeit --
 NICHT weiter zerlegt in dieser Sitzung, siehe "Was NICHT geprüft ist"). Das
 belegt zugleich, dass die eigentliche Stufe-1-Behauptung ("mehrere Partien
@@ -439,7 +439,7 @@ Diagnose ist POSITIV. Stufe 2 kann beginnen.
   ebenfalls unter 2x hielte -- dieser Diagnoseauftrag deckt nur 16-fache
   Nebenläufigkeit ab, das ist Stufe 3s eigene Messfrage.
 - `MOSAIC_INTERLEAVE_FILL_TIMEOUT_US=2000` wurde NICHT gegen kleinere Werte
-  (z.B. 200µs, der Produktionswert aus `PREREG_gpu_inferenzpfad.md`)
+  (z.B. 200µs, der Produktionswert aus `PREREG_gpu_inference_path.md`)
   gegengemessen -- 2000µs war eine eigene, unbegründete Wahl der Vorsitzung.
 
 ### Eigene Entscheidungen (nicht vorgegeben)
@@ -879,7 +879,7 @@ die abweichende Partie hat sogar eine ANDERE Zuganzahl (165 gg. 160). Diese
 eine Partie ist NICHT mehr durch die (jetzt behobene) Sync-Instabilität
 erklärbar -- die naheliegende, mit Stufe 1 bereits ETABLIERTE Ursache ist
 tracts fehlende Bit-Gleichheit über verschiedene Batch-Pläne (`net.rs:927-
-982`, Toleranz `1e-5`; `PREREG_gpu_inferenzpfad.md` §14-§17 hatte dieselbe
+982`, Toleranz `1e-5`; `PREREG_gpu_inference_path.md` §14-§17 hatte dieselbe
 Quelle bereits als seltenes, listenpositionsabhängiges Rangvertauschungs-
 Ereignis charakterisiert, ~0,22 % der Zustände). Über eine volle Partie mit
 ~160 Entscheidungen summiert sich selbst eine kleine Pro-Zug-Wahrscheinlichkeit:

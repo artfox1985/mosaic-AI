@@ -456,7 +456,7 @@ beide Commits enthalten ausschliesslich die genannten Engine-Dateien).
 implizit an, Spalte 0 bleibe bei echtem Zufalls-Fabrikinhalt die
 guenstigste -- das haengt seit Baustein 2 vom Versorgungsstand ab; im Test
 die Tischmitte deterministisch geleert, siehe Kommentar dort). Wheel
-gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...` haelt,
+gebaut+installiert, `tools/parity_probe.py`: Hash `8c6684ff...` haelt,
 Default-Verhalten byte-identisch.
 
 ### (3) Abnahmezahl, Verteilung, neue Blocker-Verteilung
@@ -1083,7 +1083,7 @@ Runde-3-Konfiguration bleibt der aktive Stand.** Umgesetzt:
   `ueberpraesenz_vorzug`) -- ueber `=1` weiter einschaltbar fuer eine
   spaetere Fassung, aber nicht mehr Default-Verhalten. `cargo test --lib`:
   411 bestanden (0 fehlgeschlagen, 20 ignoriert) nach der Umstellung. Wheel
-  neu gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...`
+  neu gebaut+installiert, `tools/parity_probe.py`: Hash `8c6684ff...`
   haelt (der Umschwung betrifft nur den `MOSAIC_SPALTENBAU=1`-Pfad, die
   Defaults ohne den Knopf sind davon nicht beruehrt).
 
@@ -1203,7 +1203,7 @@ Tests fuer §16 (`special_kosten_par16_nutzt_echte_nachbarkosten`,
 `ist_spalte_vollendbar_default_ignoriert_special_wie_par14`,
 `special_nachbar_zellen_liefert_die_drei_slot_nachbarn_nur_wenn_aktiv`,
 `vorzugszug_bedient_special_nachbarn_wenn_zielspalte_selbst_nichts_findet`).
-Wheel neu gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...`
+Wheel neu gebaut+installiert, `tools/parity_probe.py`: Hash `8c6684ff...`
 haelt (Default unveraendert, der Knopf ist unset).
 
 ### (2) Special-Zellen-Messung: 20 k1-Seeds gegen A
@@ -1507,7 +1507,7 @@ BYTE-IDENTISCHE Werte zur ersten (geschalteten) Messung.
 `cargo test --lib`: 416 bestanden (0 fehlgeschlagen, 20 ignoriert,
 unveraendert -- keine neuen Tests in dieser Runde, Zeitbudget). Wheel neu
 gebaut+installiert (zweimal, vor und nach dem Schalter-Umbau), `tools/
-paritaets_probe.py`: Hash `8c6684ff...` haelt beide Male (der Default-Pfad
+parity_probe.py`: Hash `8c6684ff...` haelt beide Male (der Default-Pfad
 ohne `MOSAIC_PLATTENBAU` bleibt unberuehrt, `Diagonalenbauer` wird nur bei
 gesetztem Knopf ueberhaupt erreicht).
 
@@ -1736,7 +1736,7 @@ bisher nur ueber `MOSAIC_PLATTENBAU=5`/`auto`.
 
 `cargo test --lib`: 417/0/20 (unveraendert in der Fehlerzahl, keine neuen
 Tests fuer §20 -- Zeitbudget, wie schon in §18/§19 vermerkt). Wheel neu
-gebaut+installiert, `tools/paritaets_probe.py`: Hash `8c6684ff...` haelt.
+gebaut+installiert, `tools/parity_probe.py`: Hash `8c6684ff...` haelt.
 
 ### (3) Messung: 22 k5-Seeds, Spaltenpaar-Ziel gegen den §20(1)-Anker
 

@@ -1,10 +1,10 @@
-//! Weg A (`evaluations/PREREG_gpu_inferenzpfad.md` Abschnitt 3): optionaler
+//! Weg A (`evaluations/PREREG_gpu_inference_path.md` Abschnitt 3): optionaler
 //! Shared-Memory-IPC-Kanal von der Rust-Engine zu einem Python-Prozess mit
 //! torch/CUDA, als Ersatz-Backend für `net.rs::Net::eval_batch` (NUR diese
 //! Funktion -- `eval`/`eval_pair`/`eval_ex`/`eval_pair_ex` bleiben unberührt,
 //! siehe dortiger Verdrahtungs-Kommentar).
 //!
-//! GEDECKT durch `evaluations/gpu_inferenzpfad_ipc_roundtrip.json`
+//! GEDECKT durch `evaluations/gpu_inference_path_ipc_roundtrip.json`
 //! (Batch 256, Kanal "shm": 0,2867 ms Median-Rundlauf gegen eine Schwelle von
 //! 1,0816 ms -- Faktor 3,77 unter der Schwelle). Diese Messung nutzte
 //! `multiprocessing.shared_memory` + `Pipe`-Doorbell zwischen ZWEI
@@ -62,7 +62,7 @@ use std::time::Duration;
 use memmap2::MmapMut;
 
 // ── Feste Kopf-Breiten, gleiche Quelle wie
-// `evaluations/gpu_inferenzpfad_ipc_roundtrip.json::feature_size.response`
+// `evaluations/gpu_inference_path_ipc_roundtrip.json::feature_size.response`
 // (net.rs:286-289 `eval()`: out[0..3] = policy,value,moon,points -- exakt
 // die 4, die `eval_batch` liest). ABSICHTLICH lokal dupliziert statt aus
 // `net_mcts::NUM_ACTIONS` importiert -- gleiches Schichtungs-Argument wie
@@ -159,7 +159,7 @@ pub(crate) fn warn_ipc_fallback_once(reason: &str) {
     WARNED_IPC_FALLBACK.get_or_init(|| {
         eprintln!(
             "⚠️  MOSAIC_TORCH_IPC_ENABLED=1 gesetzt, aber der Torch-IPC-Kanal ist nicht \
-             nutzbar ({reason}) -- falle auf tract zurueck (siehe PREREG_gpu_inferenzpfad.md). \
+             nutzbar ({reason}) -- falle auf tract zurueck (siehe PREREG_gpu_inference_path.md). \
              Diese Meldung erscheint nur einmal je Prozess."
         );
     });
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn resp_width_matches_measured_payload_contract() {
-        // Fixpunkt gegen `evaluations/gpu_inferenzpfad_ipc_roundtrip.json`
+        // Fixpunkt gegen `evaluations/gpu_inference_path_ipc_roundtrip.json`
         // ("response.elements_per_position": 413) -- ein Abweichen hier waere
         // ein Vertragsbruch mit der gemessenen/gedeckten Kennzahl.
         assert_eq!(RESP_WIDTH, 413);

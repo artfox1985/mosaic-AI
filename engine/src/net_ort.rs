@@ -1,4 +1,4 @@
-//! Weg B (`evaluations/PREREG_gpu_inferenzpfad.md` §3/§6/§11, Nutzer-Auftrag
+//! Weg B (`evaluations/PREREG_gpu_inference_path.md` §3/§6/§11, Nutzer-Auftrag
 //! "fang an" 2026-08-12): optionaler ONNX-Runtime-CUDA-Kanal statt tract,
 //! NUR fuer [`crate::net::Net::eval_batch`] -- gleiche Idee wie Weg A
 //! (`net_ipc.rs`), aber ohne Prozessgrenze: kein Python, kein IPC-Rundlauf,
@@ -94,7 +94,7 @@
 //! - Keine Aenderung an `EVAL_BATCH_MAX_N` oder der Batch-Groesse-Logik.
 //! - Keine DLL-Verpackungs-/Wheel-Loesung. Fuer einen Wheel-Bau mit diesem
 //!   Feature muessten die ORT-CUDA-Provider-DLLs UND die Torch-CUDA-12-
-//!   Laufzeit-DLLs (siehe `evaluations/PREREG_gpu_inferenzpfad.md` §11) neben
+//!   Laufzeit-DLLs (siehe `evaluations/PREREG_gpu_inference_path.md` §11) neben
 //!   die `.pyd` gelangen -- die Handkopie, die fuer die Kennlinien-Messung
 //!   reichte, ist dafuer NICHT die Loesung. Offene Frage, nicht Teil dieses
 //!   Schritts.
@@ -146,7 +146,7 @@ pub(crate) fn warn_ort_cuda_fallback_once(reason: &str) {
         eprintln!(
             "⚠️  MOSAIC_ORT_CUDA_ENABLED=1 gesetzt, aber der ORT-CUDA-Kanal ist nicht \
              nutzbar ({reason}) -- falle auf Torch/IPC (falls dessen Knopf an ist) oder \
-             tract zurueck (siehe PREREG_gpu_inferenzpfad.md §11). Diese Meldung erscheint \
+             tract zurueck (siehe PREREG_gpu_inference_path.md §11). Diese Meldung erscheint \
              nur einmal je Prozess."
         );
     });
@@ -181,7 +181,7 @@ fn build_session(onnx_path: &str) -> Result<Session, String> {
     // "This option is disabled by default." Explizit auf `false` gesetzt statt
     // sich auf diesen dokumentierten Default zu verlassen -- doppelte
     // Absicherung, und macht den Zustand fuer den folgenden Entscheidungs-
-    // gleichheitstest UNZWEIDEUTIG (siehe PREREG_gpu_inferenzpfad.md §13 fuer
+    // gleichheitstest UNZWEIDEUTIG (siehe PREREG_gpu_inference_path.md §13 fuer
     // das Messergebnis: die dortige Tabelle entscheidet, ob TF32 die Ursache
     // war -- nicht diese Zeile allein).
     let cuda_ep = CUDA::default().with_device_id(0).with_tf32(false).build().error_on_failure();
@@ -325,7 +325,7 @@ mod tests {
     /// Voller Rundlauf-/Entscheidungsgleichheitstest gegen ein echtes CUDA-
     /// Setup: `#[ignore]`, weil er die ORT-CUDA-Provider-DLLs UND die
     /// Torch-CUDA-12-Laufzeit-DLLs neben dem Testbinary braucht (siehe
-    /// `evaluations/PREREG_gpu_inferenzpfad.md` §11) -- kein `cargo test`-
+    /// `evaluations/PREREG_gpu_inference_path.md` §11) -- kein `cargo test`-
     /// Lauf ohne diese Handkopie erfuellt das. Der eigentliche
     /// Entscheidungsgleichheitsnachweis (Argmax/Gumbel-Top-16 ueber 1148
     /// Zustaende) laeuft separat, siehe Bericht.

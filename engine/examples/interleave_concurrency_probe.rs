@@ -1,4 +1,4 @@
-//! PROBELAUF (PREREG_gpu_inferenzpfad.md §5-Vorbedingung, Auftrag 2026-08-12):
+//! PROBELAUF (PREREG_gpu_inference_path.md §5-Vorbedingung, Auftrag 2026-08-12):
 //! testet NUR die Nebenlaeufigkeits-MECHANIK der geplanten Verschraenkung --
 //! N Faeden legen Dummy-Anfragen in eine gemeinsame Warteschlange und
 //! blockieren auf einem Antwort-Kanal, ein Sammel-Faden holt bis zu
@@ -353,7 +353,7 @@ fn main() {
         .collect();
 
     let out = serde_json::json!({
-        "beschreibung": "Probelauf Nebenlaeufigkeits-Mechanik fuer die geplante GPU-Verschraenkung (PREREG_gpu_inferenzpfad.md), OHNE Suche/Netz/IPC -- reine Warteschlangen-Mechanik.",
+        "beschreibung": "Probelauf Nebenlaeufigkeits-Mechanik fuer die geplante GPU-Verschraenkung (PREREG_gpu_inference_path.md), OHNE Suche/Netz/IPC -- reine Warteschlangen-Mechanik.",
         "parameter": {
             "feature_len": FEATURE_LEN,
             "gpu_sleep_ms": GPU_SLEEP.as_secs_f64() * 1000.0,

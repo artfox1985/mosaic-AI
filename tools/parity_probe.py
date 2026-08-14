@@ -10,7 +10,7 @@ fixe Seeds, SHA256 ueber die Suchantworten.
 
 Aufruf nach JEDER Wheel-Installation:
 
-    python tools/paritaets_probe.py
+    python tools/parity_probe.py
 
 Exit-Code 0 = Hash getroffen, 1 = Abweichung (dann sind die Defaults NICHT
 byte-identisch und die Ursache gehoert geklaert, BEVOR irgendeine Messung

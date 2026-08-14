@@ -850,7 +850,7 @@ Anker mit. Behandlung:
 - `MOSAIC_R5_CHANCE_NODES=0` stellt das alte Verhalten her -- gebraucht, um
   eine Alt-Elo-Kante zu reproduzieren.
 - Die Paritaets-Sonde ist NICHT betroffen: sie hasht Runde-1-bis-3-Zustaende
-  (`tools/paritaets_probe.py`), Runde 5 liegt ausserhalb ihrer Pruefflaeche.
+  (`tools/parity_probe.py`), Runde 5 liegt ausserhalb ihrer Pruefflaeche.
 - Elo-Zeilen ab heute tragen die neue Anker-Definition. Die `knobs`-Spalte
   in `elo_history.csv` erfasst nur ENV-Ueberschreibungen, ein Default-Wechsel
   steht also nicht darin -- Datum und dieser Eintrag sind die Grenze.

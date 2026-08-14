@@ -1107,7 +1107,7 @@ Nutzer-Auftrag 2026-08-13: die frühere e2e-Messung (`self_play_throughput_probe
 Beispiel-Binary, NICHT über den Produktionspfad -- deshalb hier wiederholt über
 `self_play.py` → `mosaic_rust.net_self_play_games` → `run_net_self_play`
 (`self_play.rs:2822`), also exakt den Pfad, den ein echter Self-Play-Lauf nimmt.
-Volle Zahlen: `evaluations/gpu_inferenzpfad_selfplay_e2e_wegb.json`.
+Volle Zahlen: `evaluations/gpu_inference_path_selfplay_e2e_route_b.json`.
 
 ### Vorgefunden, nicht gebaut: die Verdrahtung aus §12 war bereits vollständig
 
@@ -1156,12 +1156,12 @@ den Python-Import-Pfad).
 
 ### Paritätsprobe: hält
 
-`tools/paritaets_probe.py` nach dem Neubau: Hash
+`tools/parity_probe.py` nach dem Neubau: Hash
 `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423` -- identisch
 zum Bestand, Defaults byte-identisch.
 
 ### Die Messtabelle (`alphazero_v21_2d_brierbest.onnx`, base_sims=400, je 40
-### angeforderte Partien, `data/gpu_messung/` -- isoliert per `MOSAIC_DATA_DIR`,
+### angeforderte Partien, `data/gpu_measurement/` -- isoliert per `MOSAIC_DATA_DIR`,
 ### NICHT gelöscht)
 
 | Arm | Threads | Partien fertig/angefordert | Wandzeit | Spiele/h (angefordert) | Spiele/h (fertig) | mittlerer Batch |
@@ -1229,7 +1229,7 @@ nur `batches`/`rows`/`max_batch_seen`, keine Latenzverteilung je Aufruf.
 
 ### Eigene Entscheidungen (nicht vorgegeben)
 
-- `MOSAIC_DATA_DIR=data/gpu_messung` (bereits existierender Override in
+- `MOSAIC_DATA_DIR=data/gpu_measurement` (bereits existierender Override in
   `config.py`, gebaut für die Korpus-Dosis-Vorstudie) statt eines neuen
   CLI-Flags oder eines nachträglichen Verschiebens -- `self_play.py` hat kein
   eigenes Ausgabeverzeichnis-Argument, und ein Verschieben nach dem Schreiben
@@ -1264,13 +1264,13 @@ neues Beispiel `engine/examples/async_selfplay_throughput_probe.rs`, drei
 Arme: (a) Bestand synchron/tract (identischer Aufruf wie §19 Arm A), (b)
 async verschränkt/tract-CPU, (c) wie (b) + `MOSAIC_ORT_CUDA_ENABLED=1`
 (`--features ort_cuda_probe`, DLL-Handkopie wie §11/§19). Alle Läufe
-`alphazero_v21_2d_brierbest.onnx`, 400 Sims, `data/gpu_messung/` (dieses
+`alphazero_v21_2d_brierbest.onnx`, 400 Sims, `data/gpu_measurement/` (dieses
 Rust-Beispiel schreibt selbst keine `.pkl`-Dateien -- nur die JSONL-
 Ergebniszeile).
 
 ### Die Messtabelle
 
-Rohdaten: `evaluations/async_gpu_stufe3_probe.jsonl` (8 Zeilen).
+Rohdaten: `evaluations/async_gpu_stage3_probe.jsonl` (8 Zeilen).
 
 | Messpunkt | Träger-Fäden | N (Nebenläufigkeit) | fertig/angefordert | Wandzeit | mittlerer Batch | Batch-Deckel-Sättigung |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -1348,7 +1348,7 @@ Der Auftrag verlangte eine Zerlegung "falls der Batch klemmt" (wie bei der
 391s-Diagnose) -- hier klemmt der Batch gerade NICHT (99,7 % Sättigung bei
 N=128). Die vorhandene Zerlegung ist die Isolationsdiagnose selbst: bei N=1
 sind `batcher_batches=26323` (b) bzw. `26319` (c) für EINE Partie messbar
-(GEPRÜFT: `async_gpu_stufe3_probe.jsonl`), daraus folgt eine
+(GEPRÜFT: `async_gpu_stage3_probe.jsonl`), daraus folgt eine
 Rundlaufzeit von **412,28s / 26323 ≈ 15,66 ms** (b) bzw. **406,66s / 26319 ≈
 15,45 ms** (c) je Sammelrunde -- bei einem mittleren Batch von nur 1,96 legt
 das nahe, dass die Rundlaufzeit selbst (nicht die Inferenz) den Löwenanteil
