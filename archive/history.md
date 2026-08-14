@@ -11447,3 +11447,5 @@ Testfunktions-Namen (z.B. `provokation_kern_durch...`,
 `spaltenbau_an_ist_verhaltensidentisch...`) und Env-Knoepfe sind
 IDENTIFIKATOREN und bleiben; ebenso die historischen Zustandsnotizen in
 PREREG_gpu_inference_path.md par.20 ("provokation.rs zum Zeitpunkt des Baus").
+
+Nachtrag 3: in Welle 1 uebersehen -- evaluations/paired_arena_env_e3b_stufe2.json -> paired_arena_env_e3b_stage2.json (Belegstelle in PREREG_denial_tiebreak.md mitgezogen).
