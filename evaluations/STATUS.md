@@ -59,9 +59,12 @@ Rundlauf-Engpass GELOEST (Condvar-Park/Wake statt recv_timeout,
 net_batcher.rs:318; par.21: N=1 0,946x, N=16 0,979x -- vorher 0,053x).
 Batch-Fuellung war nie das Problem (99,7 % bei N=128). Async-Architektur:
 Gate A+B bestanden (Spielgeschehen bit-identisch). par.22 ENTSCHIEDEN
-(s. Startsequenz Zeile 4). Offen bleibt nur der sync<->async-Gate-B-Retest
-der Trainingsziel-Felder nach 2b (wt_async2 jetzt frei) -- niedrige
-Prioritaet, kein Blocker.
+(s. Startsequenz Zeile 4). EINGETAKTET fuer NACH der Generierung:
+**par.23** (PREREG_gpu_inference_path.md) -- Traeger-Skalierung (GPU laeuft
+bei 10 %, Deckel ist die CPU-Blatt-Erzeugung), fairer Endvergleich bei
+vollen Kernen (Regel 3 kuenftig gegen den staerksten Sync-Arm) und die
+Nutzer-Bonus-Zelle zwei Flotten teilen die GPU. Ausserdem offen: der
+sync<->async-Gate-B-Retest nach 2b -- niedrige Prioritaet, kein Blocker.
 
 ### Offene Punkte ausserhalb der Startsequenz
 
