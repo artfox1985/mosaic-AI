@@ -1656,3 +1656,188 @@ Wandzeit-Notdeckel (Task #71, `self_play.rs:3177/3183`), keine neue
 Baustelle des Async-Umbaus. Ob hoehere, produktionsnahe Konkurrenzstufen
 (die diesen Notdeckel bewusst mitdenken muessten) die 2,0x-Schwelle
 erreichen, ist eine offene, nicht triviale Folgefrage.
+
+## 22. DIE ORT-GEWINNZONE BEI BATCH>=128 -- GEMESSEN, UND DIE VORAB
+## DOKUMENTIERTE ERWARTUNG NICHT BESTAETIGT
+
+Nutzer-Auftrag nach §21: den 435s-Notdeckel messtauglich machen (Task-#28-
+Muster, additiv, Default unveraendert) statt ihn produktiv umzubauen, dann
+N=64/128 (und N=256 ORT nur falls 128 nicht saettigt) je tract UND ORT-CUDA
+fahren -- das ist die Zelle, in der laut Kennlinie (§9-§19) die ORT-
+Gewinnzone (ab Batch 128) endlich mitspielen sollte, statt wie in §21 durch
+zu kleine Batches (<=32) unerreichbar zu bleiben.
+
+### Der Deckel-Knopf (Punkt 1 des Auftrags)
+
+`self_play.rs`: `net_self_play_game_timeout_secs(base_sims)` extrahiert die
+bisherige `net_game_timeout_secs(base_sims) + EXTRA_GAME_TIMEOUT_SECS`-Summe
+unveraendert und skaliert sie mit `game_timeout_scale()`
+(`MOSAIC_GAME_TIMEOUT_SCALE`, Default **1,0** = byte-identisch zum
+Bestand, Task-#28-Muster) an BEIDEN Aufrufstellen (sync + async). `cargo
+test --lib` danach unveraendert **406/0/31**. Das Mess-Beispiel setzt den
+Knopf fuer Arm b/c automatisch auf `concurrency` (~N-skaliert, siehe
+`set_arm_env`) und ersetzt den damit funktionslos gemachten Pro-Partie-
+Deckel durch eine GLOBALE Ende-zu-Ende-Deadline
+(`--global-timeout-secs`, Default 1800s, in dieser Messreihe auf 3600-5400s
+angehoben) -- die einzige noch aktive Haenger-Absicherung fuer diese
+Messung.
+
+### Die Messtabelle
+
+Sync-Bezug (§20/§21, unveraendert): **248,5 Partien/h** (40 Partien, 8
+Faeden).
+
+| Messpunkt | N | fertig/angefordert | Wandzeit | Partien/h | mittl. Batch | Faktor ggue. Sync | Zeilen/s (Aggregat) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| tract | 64 | 64/64 | 1349,70 s | 170,7 | 50,27 | 0,687x | 2624,4 |
+| ORT-CUDA | 64 | 64/64 | 600,30 s | **383,8** | 48,19 | **1,545x** | 5955,6 |
+| tract | 128 | **nicht abgeschlossen** (siehe unten) | -- | -- | -- | -- | -- |
+| ORT-CUDA | 128 | 128/128 | 1260,73 s | 365,5 | 81,70 (Deckel 128 erreicht) | 1,471x | 5648,9 |
+
+### Regel 3 (§4): WEITERHIN NICHT GEDECKT -- und ORT-CUDA wird bei N=128
+### NICHT besser, sondern leicht SCHLECHTER als bei N=64
+
+Die beste gemessene Zelle ueberhaupt (ueber §20-§22 hinweg) ist **N=64
+ORT-CUDA mit 1,545x** -- unter der 2,0x-Schwelle, aber der bisher
+naechste Punkt daran. **Die vorab im Auftrag dokumentierte Erwartung
+("ORT muss bei Batch>=128 laut Kennlinie deutlich abheben") trifft NICHT
+ein**: obwohl der mittlere Batch von N=64 auf N=128 deutlich steigt (48,19
+auf 81,70, `max_batch_seen` erreicht bei BEIDEN den harten 128er-Deckel),
+FAELLT sowohl der Faktor (1,545x auf 1,471x) als auch der reine
+Zeilen-Aggregatdurchsatz (5955,6 auf 5648,9 Zeilen/s, -5,2%). Mehr
+Nebenlaeufigkeit bringt hier also NICHT mehr Durchsatz, sondern
+tendenziell weniger -- das Gegenteil der Kennlinien-Erwartung, die aus
+einer SYNTHETISCHEN, gleichfoermigen Batch-Fuellung stammt (`net.rs`-
+Mikrobenchmark, siehe §9), waehrend die reale Ankunftsrate hier durch 128
+unabhaengige, ungleichmaessig fortschreitende Partien UND einen einzigen
+Sammel-Faden bestimmt wird, der selbst bei Batch 81,70 im Mittel weit
+unter der synthetischen Kennlinien-Bedingung (durchgehend volle 128er-
+Batches) bleibt. **Dieser Befund wird so berichtet, nicht wegerklaert.**
+
+### tract N=128: DREI Versuche, KEIN abgeschlossenes Ergebnis --
+### Ursachendiagnose (Punkt 4 des Auftrags: nicht still neu starten)
+
+Drei Läufe (`--global-timeout-secs 5400`, harness-getrackt per
+`run_in_background`, jeweils frisch gestartet nach Bestaetigung, dass kein
+Restprozess mehr lief), ALLE mit demselben Muster: stetiges, NICHT
+stockendes Wachstum (Fortschritts-Herzschlag alle 30s, `batches`/`rows`
+steigen durchgehend, kein Plateau, kein Fehler/Panik im stderr-Log) bis
+zum Abbruch bei **t≈3450-3570s (57,5-59,5 Minuten)**, dort jeweils
+5,6-5,8 Mio. Zeilen erreicht (von geschaetzt ~7,08 Mio. gesamt, extrapoliert
+aus dem 2-fachen von N=64s 3,54 Mio.) -- **80-82% des erwarteten Volumens,
+keine Stagnation.** Alle drei Abbrueche erfolgten NICHT durch die
+watchdog-Deadline (5400s, nie erreicht) und NICHT durch einen Absturz
+(kein Panik-Log, kein OOM-Hinweis im stderr) -- sondern jeweils als "was
+stopped"-Ereignis der Mess-Umgebung selbst (Sitzungslimit-Interrupt der
+Agenten-Sitzung, die den Hintergrundprozess getrackt hat), reproduzierbar
+am (fast) selben Wandzeit-Punkt ueber alle drei Versuche hinweg.
+
+**Kausalitaet daher wie folgt eingeordnet**: die MESSUNG selbst zeigt
+KEIN Anzeichen eines Haengers oder einer Regression -- lineare
+Extrapolation der letzten gemessenen Rate (~770-860 Zeilen/s in den
+letzten Intervallen vor jedem Abbruch) auf das geschaetzte Gesamtvolumen
+ergibt eine erwartete Gesamtlaufzeit von **~85-90 Minuten**, ausdruecklich
+als HERLEITUNG markiert, NICHT gemessen. Der Abbruch selbst ist ein
+Befund ueber die MESSUMGEBUNG (Sitzungslimit liegt unter der fuer diese
+Zelle benoetigten Wandzeit), NICHT ueber den Async-Pfad oder den
+skalierten Notdeckel -- beide taten in allen drei Laeufen genau das, was
+sie sollten (kein vorzeitiger Abbruch durch `net_self_play_game_timeout_secs`,
+kein Hänger).
+
+### Task-#71-Notdeckel: JETZT DREIFACH als Stoerer aktenkundig
+
+1. Gate-B-Trainingsziel-Divergenz (`PREREG_async_suche.md` §12): sync/async
+   unterschiedliche Wandzeit-Geschwindigkeit fuer aequivalente Arbeit lenkt
+   den Notdeckel unterschiedlich, divergente `bootstrap_value`/
+   `round_transition_value`-Felder trotz bit-identischer Zuege.
+2. Flotten-Kappung (§20/§21): bei N=64 kappte der UNSKALIERTE Notdeckel
+   ALLE 64 Partien vor Rundenende (0/64 completed), obwohl keine haengte --
+   reine Kalibrierungslücke fuer Nebenlaeufigkeit.
+3. (NEU, §22) Selbst nach der Skalierung bleibt die REALE Wandzeit pro
+   Partie bei hoher Nebenlaeufigkeit so gross (~85-90 Min. bei N=128
+   tract, extrapoliert), dass eine VOLLSTAENDIGE Messung an der
+   Mess-INFRASTRUKTUR (Sitzungs-/Prozesslaufzeitgrenzen), nicht mehr am
+   Notdeckel selbst, scheitern kann -- ein Symptom, dass der aktuelle
+   Ein-Sammel-Faden-Entwurf bei sehr hoher Konkurrenz strukturell lange
+   Einzelpartie-Laufzeiten erzeugt, unabhaengig vom Notdeckel.
+
+**Umbau-Empfehlung (offener Punkt, NICHT jetzt umgesetzt)**: perspektivisch
+waere ein deckelfreies Trainings-Label-Schema (Task-#71-Zeitbudgets NUR
+als Haenger-Schutz, niemals einflussreich auf das aufgezeichnete Ergebnis)
+oder eine concurrency-bewusste Kalibrierung (Notdeckel als Funktion der
+AKTUELLEN Sammel-Faden-Auslastung statt eines statischen Faktors) die
+sauberere Loesung fuer alle drei Symptome gleichzeitig. Ausserhalb des
+Auftragsumfangs dieser Messreihe -- hier nur als wiederholt aktenkundiger,
+offener Befund vermerkt.
+
+### Was NICHT geprüft ist
+
+- N=128 tract: kein abgeschlossenes Ergebnis (siehe oben) -- die
+  berichteten ~85-90 Minuten sind eine Extrapolation aus drei
+  uebereinstimmenden Teil-Laeufen, KEINE Messung.
+- N=256 ORT-CUDA: NICHT gefahren -- der Auftrag sah dies nur vor, "falls
+  128 nicht saettigt"; `max_batch_seen=128` bei N=128 (der harte
+  `EVAL_BATCH_MAX_N`-Deckel) UND ein FALLENDER, nicht steigender
+  Aggregatdurchsatz von N=64 auf N=128 sprechen gegen einen Gewinn bei
+  noch mehr Konkurrenz -- als eigene Entscheidung nicht gefahren (siehe
+  unten), nicht weil die Bedingung unklar war.
+- Die genaue Ursache des GPU-seitigen Nicht-Abhebens (Mutex-serialisierter
+  Sammel-Faden? `Session::run()`-Aufrufkosten bei ungleichmaessiger
+  Ankunftsrate? Speicher-/Cache-Effekte bei 128 gleichzeitigen
+  Baumzustaenden?) -- keine Zeitzerlegung des `eval_ns`/`fill_wait_ns`-Paars
+  fuer diese Zellen durchgefuehrt (waere der naechste Schritt, analog zur
+  391s- und 15,6ms-Diagnose).
+- GPU-Auslastung nur als Vorher/Nachher-Schnappschuss (wie §20/§21) UND ein
+  kurzer, vorzeitig abgebrochener kontinuierlicher Log-Ausschnitt (13-31%,
+  8 Samples über ~16s, siehe "Eigene Entscheidungen") -- kein vollstaendiger
+  kontinuierlicher Verlauf ueber eine ganze Zelle.
+- Nur EIN Seed je Zelle.
+
+### Eigene Entscheidungen (nicht vorgegeben)
+
+- `SPIN_WAIT_THRESHOLD`/Doorbell-Architektur aus §21 unveraendert
+  uebernommen -- kein erneuter Eingriff in den bereits gefixten Rundlauf
+  noetig fuer diesen Auftrag.
+- `MOSAIC_GAME_TIMEOUT_SCALE` als Multiplikator (nicht als absolute
+  Sekundenzahl) gewaehlt UND im Beispiel automatisch auf `concurrency`
+  gesetzt -- vermeidet einen weiteren manuellen Parameter je Messpunkt,
+  ohne den Bestand (Default 1,0) zu beruehren.
+- 30s-Fortschritts-Herzschlag (`batches`/`rows`/`mean_batch` aus dem
+  Sammel-Faden) additiv ergaenzt, NACHDEM der erste N=128-tract-Versuch
+  ohne jede Diagnosedaten starb (Auftrag Punkt 4: Ursache diagnostizieren
+  statt still neu starten) -- ohne ihn waere die "kein Haenger, nur zu
+  langsam"-Einordnung oben nicht moeglich gewesen.
+- Kontinuierliches GPU-Logging (`nvidia-smi -l N`) nach einem ersten
+  fehlgeschlagenen Versuch (verschachteltes `&` in einem Hintergrund-
+  Aufruf, siehe `feedback_agent_background_process_discipline`-Lektion,
+  Prozess starb nach ~16s mit) NICHT wiederholt -- angesichts der ohnehin
+  wiederholten Sitzungsunterbrechungen bei den Hauptmessungen war das
+  Risiko eines weiteren verlorenen Nebenprozesses gegenueber dem
+  Diagnosewert (GPU-Auslastung ist bei tract ohnehin 0%, bei CUDA laut
+  Schnappschuss 22-30%) nicht gerechtfertigt.
+- N=128 tract nach dem DRITTEN uebereinstimmenden Abbruch NICHT ein
+  viertes Mal versucht -- alle drei Versuche brachen am (fast) selben
+  Wandzeit-Punkt (57,5-59,5 Min.) mit identischem, nicht-stockendem Muster
+  ab; ein vierter Versuch haette voraussichtlich dasselbe wiederholt
+  (Mess-Infrastruktur-Grenze, kein Zufallsartefakt) -- die Zeit floss
+  stattdessen in die bereits abgeschlossene, ENTSCHEIDENDE Zellenreihe
+  (ORT-CUDA N=64/128, die die Auftrags-Kernfrage beantwortet).
+- N=128 ORT-CUDA VOR dem dritten tract-Versuch priorisiert, nachdem N=64
+  ORT-CUDA in nur 600s (gegen tracts 1349,7s) fertig wurde -- die
+  wahrscheinlichere schnell abschliessbare UND fachlich entscheidendere
+  Zelle zuerst.
+
+### Fazit §22
+
+**Regel 3 (>=2,0x) bleibt ueber alle gemessenen Zellen unerreicht.** Die
+beste Zelle ist N=64 ORT-CUDA (1,545x) -- UNTER, nicht ueber der Schwelle,
+und die vorab dokumentierte Erwartung ("ORT hebt bei Batch>=128 deutlich
+ab") ist durch die N=128-ORT-CUDA-Messung explizit WIDERLEGT, nicht nur
+unbestaetigt: Faktor UND Aggregatdurchsatz fallen leicht von N=64 auf
+N=128, trotz gestiegenem mittlerem Batch und trotz erreichtem
+128er-Ceiling. tract N=128 bleibt unentschieden (Mess-Infrastruktur-
+Grenze, keine Code-Ursache) -- die vorliegenden Zellen genuegen aber
+bereits, um die Auftrags-Kernfrage ("erreicht Weg B/Async+Batcher+ORT-CUDA
+Regel 3 bei produktionsnahem Batch") mit **Nein** zu beantworten, auf
+Basis GEMESSENER, nicht extrapolierter Zahlen fuer die entscheidenden
+ORT-Zellen.
