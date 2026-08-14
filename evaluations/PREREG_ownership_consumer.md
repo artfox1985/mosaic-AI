@@ -3,7 +3,7 @@
 Stand 2026-08-13, ENTWURF (nichts hiervon ist gebaut — durchgehend Plan-Zeitform).
 Nutzer-Auftrag: *"überleg dir dann auch schon mal wie wir den ownership head ins
 drafting und tiling miteinbeziehen"*. Kontext: Zwei-Pole-Architektur
-(PREREG_provokation.md) — Netz-Pol und Platten-Heuristik-Pol, der
+(PREREG_provocation.md) — Netz-Pol und Platten-Heuristik-Pol, der
 Ownership-Verbraucher ist der RUNTIME-REGLER dazwischen.
 
 ## §1 Geprüfter Ist-Stand
@@ -85,7 +85,7 @@ Eigenes Gewicht, eigener Arm — nicht mit der Eigen-Hälfte verrechnen.
    net_mcts.rs:7545); Heuristik-Anker unberührt.
 5. **Tor C — Regler-Sweep**: w_own-Raster in der Arena, Messgrößen
    Plattenpunkte je Kriterium + Endstand-Marge (die Nutzer-Zielgröße),
-   Block-Ebene, Orakel-Schwellen aus PREREG_provokation.md.
+   Block-Ebene, Orakel-Schwellen aus PREREG_provocation.md.
 6. Verdrahtung (net.rs Ausgang 4 durch tract/ORT/Batcher reichen) kann
    VOR dem Training gebaut werden — Verbraucher tot bei Default 0.
 

@@ -4,7 +4,7 @@ Stand 2026-08-14, PLAN (nichts gestartet — durchgehend Plan-Zeitform).
 Nutzer-Auftrag: *"dann mach schon mal den generierungsplan für den ownership
 korpus"*. Aufsetzend auf PREREG_ownership_consumer.md (Verbraucher-Entwurf,
 Tor A: Kopfgüte VOR Verbraucher-Bau) und der abgeschlossenen
-Generator-Kampagne (PREREG_provocation… noch PREREG_provokation.md §13–§19).
+Generator-Kampagne (PREREG_provocation… noch PREREG_provocation.md §13–§19).
 
 ## §1 Geprüfter Ist-Stand (Generator-Sortiment, aktuelle Ära)
 
@@ -82,11 +82,11 @@ getrennt) — die Basisraten-Falle aus der Skill-Konfundierungs-Lehre.
 `run_net_self_play` (`engine/src/self_play.rs:2943`) ruft je Partie
 `play_net_self_play_game` (`self_play.rs:2567`-2941) auf. Deren Drafting-Block
 bestimmt `chosen` AUSSCHLIESSLICH ueber `net_drafting_policy(...)`
-(Such-Policy) — GEPRUEFT per Volltext-Suche nach "vorzug"/"plattenbauer"/
-"spaltenbau" ueber die GESAMTE Funktion (`self_play.rs:2567`-2941), ueber
+(Such-Policy) — GEPRUEFT per Volltext-Suche nach "vorzug"/"plate_builder"/
+"column_build" ueber die GESAMTE Funktion (`self_play.rs:2567`-2941), ueber
 `net_drafting_policy` selbst (`self_play.rs:2277`-2567) und ueber
 `apply_chosen_action` (`self_play.rs:615`-~700): **null Treffer**. Der
-Bauer-Vorzug (`provokation::vorzugszug`/`plattenbauer::drafting_vorzug`/
+Bauer-Vorzug (`provocation::vorzugszug`/`plate_builder::drafting_vorzug`/
 `dome_vorzug`) ist in DIESEM Pfad **gar nicht verdrahtet** — es gibt also
 aktuell KEINE Uebersteuerung, die aufgezeichnet werden koennte.
 
@@ -168,8 +168,8 @@ GLEICH mit config.py, NICHT mit "25". **Zwei veraltete Stellen korrigiert**
 Behebung des 3.1-Blockers: `play_net_self_play_game`s Drafting-Block
 (`self_play.rs:2693`-2695) berechnet jetzt VOR dem bestehenden
 Ein-Aktion-Kurzschluss einen `vorzug_kandidat` —
-`provokation::vorzugszug(&game.state).or_else(|| plattenbauer::drafting_vorzug
-(&game.state)).or_else(|| plattenbauer::dome_vorzug(&game.state))` — OHNE
+`provocation::vorzugszug(&game.state).or_else(|| plate_builder::drafting_vorzug
+(&game.state)).or_else(|| plate_builder::dome_vorzug(&game.state))` — OHNE
 `pi==net_board`-Gate, exakt das Vorbild aus `play_net_vs_net_game`
 (`self_play.rs:1927`-1929, siehe 3.2). Ein neuer `else if let Some(a) =
 vorzug_kandidat`-Zweig (`self_play.rs:2700`-2711) macht daraus dasselbe
@@ -189,10 +189,10 @@ Drei Entscheidungspunkte lt. Auftrag, GEPRUEFT einzeln:
   `resolve_tiling_step(&game.state, pi, net)` auf — DIESELBE Funktion, die
   auch `play_net_vs_net_game`s Tiling-Arm nutzt (`self_play.rs:2143`-2145,
   dort `resolve_tiling_step(&game.state, pi, None)`). Beide Pfade riefen
-  schon VOR diesem Umbau `crate::plattenbauer::tiling_vorzug` an KEINER
+  schon VOR diesem Umbau `crate::plate_builder::tiling_vorzug` an KEINER
   Stelle auf (GEPRUEFT per Grep ueber `tiling_solver.rs`: nur
-  `spaltenbau::vorzug_tiling_step` und ein lokales `provokation`-basiertes
-  Pendant sind verdrahtet, `plattenbauer::tiling_vorzug` an keiner
+  `column_build::vorzug_tiling_step` und ein lokales `provocation`-basiertes
+  Pendant sind verdrahtet, `plate_builder::tiling_vorzug` an keiner
   Aufrufstelle im ganzen Repo) — ein vorbestehender, von diesem Auftrag
   unabhaengiger Bestandsbefund, kein neu eingefuehrtes Verhalten. Self-Play
   ist damit fuer Tiling bereits 1:1 identisch zum Arena-Pfad (dieselbe
@@ -235,7 +235,7 @@ Zustand mit fertigem `dome_grid`, siehe `tools/scoring_tile_impact.py`-
 Moduldoku — dort bereits so verifiziert, hier direkt uebernommen statt neu
 hergeleitet) — UNABHAENGIG davon, ob das Kriterium in der jeweiligen Partie
 tatsaechlich gezogen wurde (die Bauer-Dispatch ist ueber `MOSAIC_PLATTENBAU`
-fest, nicht an `scoring_tile_ids` gekoppelt, siehe `plattenbauer.rs:236`-240).
+fest, nicht an `scoring_tile_ids` gekoppelt, siehe `plate_builder.rs:236`-240).
 
 | Arm | Knopf | Ziel-Kriterium | Ø Punkte P0 | Ø Punkte P1 | Δ vs. A (P0/P1) |
 |---|---|---|---:|---:|---:|
@@ -266,7 +266,7 @@ erwartet (moegliche Ursache: 3.6 unten).
 
 **3.6 Eigene Entscheidung / offene Einschraenkung (ungeprueft, als Annahme
 markiert):** Diese Probe ist NICHT direkt grössenskalengleich mit den
-Arena-Ankern aus PREREG_provokation.md §14-§20, aus zwei strukturellen
+Arena-Ankern aus PREREG_provocation.md §14-§20, aus zwei strukturellen
 Gruenden, beide bewusst in Kauf genommen (Auftrag: "nur die kleine Probe,
 keine neue Kalibrierung"):
 1. **Bilateral statt einseitig**: Arena mass eine Seite (Netz) gegen einen
@@ -378,7 +378,7 @@ Befund vor Umbau:
 ## §5 Umfang und Kosten (Herleitung, keine Messung)
 
 8000 Partien gesamt (Arm E und Arm F per Nutzer-Entscheid 2026-08-14 gleich
-mit eingeplant; k5-Bauer hat seine Abnahme in PREREG_provokation.md §20
+mit eingeplant; k5-Bauer hat seine Abnahme in PREREG_provocation.md §20
 bestanden — 3,68 → 8,55, t=4,56; der k6-Spezialbauer ist Bestand).
 Bezug: Arena-Durchsatz 248,5 Spiele/h (8 Threads, §20);
 Self-Play mit Labels liegt darunter, Heuristik-Arm weit darüber. Grobschätzung

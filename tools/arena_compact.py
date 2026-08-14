@@ -34,7 +34,7 @@ from pathlib import Path
 BASIS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASIS / "tools"))
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plattenpunkte_aus_arena import KRITERIUM, partien  # noqa: E402
+from plate_points_from_arena import KRITERIUM, partien  # noqa: E402
 
 ZIEL = BASIS / "evaluations" / "arena_compact.jsonl"
 

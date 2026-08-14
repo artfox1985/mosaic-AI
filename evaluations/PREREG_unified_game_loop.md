@@ -128,7 +128,7 @@ Implementierungen (`HeuristicSelfPlayAgent`, `HeuristicArenaAgent`,
 `GameLoopConfig { timeout_secs, seed_from_steps, game_seed,
 move_heartbeat, labels: Option<LabelSamplingConfig{net, record_rtv,
 profiled}>, mode: Records|Summary, players: [PlayerLoopConfig{agent,
-tiling_net, apply_via_chosen_action, spaltenbau_trace}; 2] }`.
+tiling_net, apply_via_chosen_action, column_build_trace}; 2] }`.
 
 - Seitigkeit des Vorzugs = explizites `vorzug`-Feld der Netz-Agenten
   (§3.4 erfüllt): `play_net_game` nur Netz-Seite (einseitig),

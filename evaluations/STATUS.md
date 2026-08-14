@@ -66,7 +66,7 @@ Trainingsziel-Divergenz -> Schritt 3 der Startsequenz.
 
 | Punkt | Stand |
 |---|---|
-| **Dateinamen Welle 2** | nach Agenten-Ende: spaltenbau.rs->column_build.rs, plattenbauer.rs->plate_builder.rs, provokation.rs->provocation.rs, PREREG_provokation->PREREG_provocation, PREREG_gpu_inferenzpfad->PREREG_gpu_inference_path, seeds_je_kriterium/->seeds_per_criterion/, paritaets_probe.py->parity_probe.py, gpu_*/stufe->stage; dazu docs/Spielanleitung_GUI.pptx (Office-Lock) -> game_manual_GUI.pptx |
+| **Dateinamen Welle 2** | TEILMENGE 1 ERLEDIGT 2026-08-14 (Tabelle am Ende von archive/history.md): column_build.rs, plate_builder.rs, provocation.rs, PREREG_provocation.md, seeds_per_criterion/, seed_selection_plates.*, provocation_acceptance.json, column_build_trace.py, plate_points_from_arena.py, game_manual_GUI.pptx (Lock war weg). OFFEN Teilmenge 2 (bis GPU-Agent fertig): PREREG_gpu_inferenzpfad->PREREG_gpu_inference_path, gpu_*-Dateien, async_gpu_stufe3_probe.jsonl (stufe->stage), paritaets_probe.py->parity_probe.py, gpu_inferenzpfad_ipc_roundtrip.py, data/gpu_messung/ |
 | **Stoerungs-Baustein Farbzaehlung** | Nutzer-Auftrag steht (domain_knowledge.md Punkt 4); Messgroesse Gegner-Plattenpunkte gepaart + Frisch-Seed-Replikation; sinnvoll NACH dem Schleifen-Refactor (ein Einbauort statt vier) |
 | **Architektur-Fahrplan Rest** | (1) PREREG_INDEX generieren statt von Hand (der A5-Hook prueft nur Konsistenz), (2) stille Test-Skips verbieten, (3) MOSAIC_*-Knopf-Registratur. Punkte 4+5 sind jetzt PREREG_unified_game_loop.md (Startsequenz Schritt 2) |
 | **Torch-IPC-Reste (Weg A)** | Entfernung freigegeben, war wegen Datei-Konflikt uebersprungen -- nach dem Refactor nachholen |
