@@ -19,7 +19,7 @@ Zeilen NACH einer Endwertungs-Zeile begrenzt, damit sie nichts anderes
 einsammelt.
 
 Aufruf:
-    python -X utf8 tools/plattenpunkte_aus_arena.py w0 w01 uni --bezug w0
+    python -X utf8 tools/plate_points_from_arena.py w0 w01 uni --bezug w0
 """
 from __future__ import annotations
 

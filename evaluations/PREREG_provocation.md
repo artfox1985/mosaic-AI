@@ -51,7 +51,7 @@ Provokation, sondern wieder eine Nuance. Bei der auf 0,35 gequantelten Metrik
 ## 3. Warum es NICHT über die Bewertung gehen kann
 
 Fünf Anläufe über die Blatt- bzw. Platzierungsbewertung sind gescheitert
-(`PREREG_platzierungsseite.md` §7–14, `PREREG_injektion_wertungsplatten.md`).
+(`PREREG_placement_side.md` §7–14, `PREREG_scoring_plate_injection.md`).
 Der gemeinsame Grund: eine Spalte verlangt eine **Farbfestlegung je Musterreihe,
 auf eine bestimmte Spalte gerichtet, über mehrere Runden gehalten**. Das ist eine
 ABSICHT. Eine Stellungsbewertung kann sie nicht darstellen, und mehr Suchbudget
@@ -143,7 +143,7 @@ Farbe erscheint, und spielt sonst normal. Meine Fassung erzwingt die Absicht so
 total, dass kein Spiel übrig bleibt.
 
 Zweitens kann eine Beschneidung das **Erscheinen** der Fliesen nicht erzwingen.
-Die Deckenprobe (`PREREG_platzierungsseite.md` §14) hat gezeigt, dass volle
+Die Deckenprobe (`PREREG_placement_side.md` §14) hat gezeigt, dass volle
 Verfügbarkeit allein nicht hilft; hier zeigt sich die andere Seite: eine Bindung
 an eine Farbe, die nicht kommt, kostet Strafpunkte statt Fortschritt.
 
@@ -177,7 +177,7 @@ dem Netz beibringen, dass Spaltenbau mit Zusammenbruch einhergeht.
 
 ## 8. NEUEINORDNUNG (Nutzer, 2026-08-12): die Provokation ist ein DIAGNOSEINSTRUMENT
 
-*"die provokation an sich ist schon in ordnung damit wir wissen welche
+*"die provocation an sich ist schon in ordnung damit wir wissen welche
 stellschrauben zu drehen sind"*
 
 Ich hatte sie nach der verfehlten Abnahme als eigenen Irrweg abgetan ("meine
@@ -203,7 +203,7 @@ Der Spieler nimmt die richtige Farbe und **kann sie nicht loswerden**.
 `MOSAIC_WERTUNG_FLOOR_W` (der `projected_unplaceable_penalty`-Gegenterm) war der
 EINZIGE Eingriff dieser Session mit einem signifikanten Effekt: **+2,77 Punkte
 (t=2,21)** und **+1,37 Plattenpunkte (t=2,19)** gepaart gegen dieselbe Dosis ohne
-ihn (`PREREG_injektion_wertungsplatten.md`).
+ihn (`PREREG_scoring_plate_injection.md`).
 
 **Zwei völlig verschiedene Versuche benennen denselben Engpass**: einer über
 Belohnung (der Gegenterm hilft, weil er unplatzierbare Züge bestraft), einer über
@@ -241,7 +241,7 @@ herausfindet, welche Schraube man in Stufe 2 dreht.
 | Vorzug Drafting (Praeferenz) | 2,10 | 43-46 | intakt |
 | Vorzug Drafting + Tiling-Routing | 2,10 | 39-44 | intakt |
 
-Alle Protokolle: `generator_matrix_protokoll.json`. Die 5/6-Mauer bleibt in jeder
+Alle Protokolle: `generator_matrix_protocol.json`. Die 5/6-Mauer bleibt in jeder
 Fassung (9-13 von 20 Partien).
 
 **Blocker-Klassifikation der 6. Zelle** (18 Mauer-Partien): 10x "Reihe lieferte,
@@ -310,11 +310,11 @@ entscheidet sich je Platte.
 
 ## 11. RUNDE 2 GEMESSEN (2026-08-13): 5,60 statt 1,40 -- Ziel 7,00 weiterhin verfehlt
 
-Drei Nachbesserungen an `spaltenbau.rs`/`provokation.rs` gegenueber dem
+Drei Nachbesserungen an `column_build.rs`/`provocation.rs` gegenueber dem
 Stand aus Commit `fd2d15e` (1,40 vertikale Punkte, Blocker zu 10/12 auf
 SPEZIAL-Zellen):
 
-1. **Wild-Zellen aktiv bedient**: `provokation::vorzugszug_fuer_spalte` liess
+1. **Wild-Zellen aktiv bedient**: `provocation::vorzugszug_fuer_spalte` liess
    Wild-Zellen bisher NIE als Ziel gelten (`geforderte_farbe` liefert dort
    `None`, das alte `Some(x) if x==farbe`-Muster verwarf jede Farbe) -- jetzt
    qualifiziert an einer Wild-Zelle JEDE Farbe.
@@ -332,15 +332,15 @@ SPEZIAL-Zellen):
 ### Aufbau (identisch zur letzten Messung, PLUS Trace)
 
 `net_arena_match`, Champion (`v21_2d_brierbest`) @400 vs Heuristik@150, 20
-k1-Seeds (`evaluations/seed_auswahl_platten.json`, GEPRUEFT:
+k1-Seeds (`evaluations/seed_selection_plates.json`, GEPRUEFT:
 `[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,59,69]`), gepaart gegen
 `MOSAIC_SPALTENBAU=0` als Kontrolle, `MOSAIC_SPALTENBAU_TRACE=1` fuer beide
 Arme (No-Op ohne aktiven Spaltenbauer). Werkzeug: `tools/paired_arena_env_ab.py
 --env-name MOSAIC_SPALTENBAU --arms 0 1 --control 0 --net-sims 400
 --heur-sims 150 --seeds <k1> --log-games`, Ergebnis in
 `evaluations/paired_arena_env_spaltenbau_r2.json`. Metrik ueber
-`tools/plattenpunkte_aus_arena.py`s `auswerten()`, Kriterium "Vertikale
-Reihen"; Verteilung/Blocker ueber das NEU gebaute `tools/spaltenbau_trace.py`
+`tools/plate_points_from_arena.py`s `auswerten()`, Kriterium "Vertikale
+Reihen"; Verteilung/Blocker ueber das NEU gebaute `tools/column_build_trace.py`
 (liest die `[SB]`-Zeilen).
 
 ### ABNAHME: 5,60 -- Ziel 7,00 verfehlt, aber 4x ueber der letzten Messung
@@ -383,7 +383,7 @@ blockierte 40 von den insgesamt 83 Entscheidungen dieser Partie, Runden 2
 bis 4 durchgehend -- die Musterreihe hatte sich frueh an Gelb gebunden,
 Tuerkis (die fuer die Zielspalte in dieser Zeile geforderte Farbe) kam in
 diesen drei Runden nicht zusammen. Das bestaetigt die in
-`PREREG_platzierungsseite.md` §5 vorab formulierte Vermutung ("dann ist der
+`PREREG_placement_side.md` §5 vorab formulierte Vermutung ("dann ist der
 naechste Verdacht die Versorgung") DIREKT und mit Kette, nicht nur als
 Ausschluss.
 
@@ -404,7 +404,7 @@ Runde 5 laeuft ueber `round5.rs`).
 1,40 → 5,60 ist eine Vervierfachung, aber 5,60 < 7,00. Die drei
 Nachbesserungen haben ihre eigene Diagnose (10/12 Spezial-Blocker) sauber
 adressiert; der NEUE dominante Blocker (Versorgung, 74 %) ist ein ANDERER
-Mechanismus und keiner, den `spaltenbau.rs` selbst loesen kann -- es waehlt
+Mechanismus und keiner, den `column_build.rs` selbst loesen kann -- es waehlt
 nur unter dem, was JETZT angeboten wird, es kann keine zukuenftige
 Fabrikbefuellung erzwingen. Ohne Nutzer-Entscheidung KEINE weitere
 Verschaerfung (naechster denkbarer Schritt waere z.B. eine
@@ -418,7 +418,7 @@ statt nur Brettzustand reagiert -- das ist neue Mechanik, kein Tuning mehr).
 
 ### (1) Was ist zaehlbar? -- belegt am Code
 
-`engine/src/provokation.rs::verbleibende_farben` (neu, `pub(crate)`) rechnet
+`engine/src/provocation.rs::verbleibende_farben` (neu, `pub(crate)`) rechnet
 je Farbe: Gesamtvorrat (`tile.rs:52`, `TILES_PER_COLOR = 13`) minus jede
 SICHTBARE Fundstelle:
 
@@ -433,7 +433,7 @@ FARBZUSAMMENSETZUNG sieht kein menschlicher Spieler, nur ihre Groesse
 (`Bag::count`/`Tower::count`). Die Differenz aus den obigen oeffentlichen
 Feldern liefert exakt dieselbe Zahl (Beutel+Turm zusammen), wie ein Mensch
 sie mit einer Strichliste ebenfalls bekaeme. Getestet in
-`provokation.rs::verbleibende_farben_zaehlt_jede_sichtbare_fundstelle`
+`provocation.rs::verbleibende_farben_zaehlt_jede_sichtbare_fundstelle`
 (6 kuenstlich verteilte Rot-Kopien ueber alle 5 Fundstellen-Kategorien,
 exakte Gegenrechnung `13 - 6`).
 
@@ -441,11 +441,11 @@ exakte Gegenrechnung `13 - 6`).
 
 | Baustein | Commit | Was |
 | --- | --- | --- |
-| 1 (Versorgung zaehlen) + 3 (Vorzug bevorzugt Knappheit) | `a10202f` | `verbleibende_farben`/`farben_index` (`provokation.rs`); `vorzugszug_fuer_spalte` sortiert Kandidaten jetzt primaer nach Knappheit der genommenen Farbe, "vollste Reihe" bleibt Tie-Break |
+| 1 (Versorgung zaehlen) + 3 (Vorzug bevorzugt Knappheit) | `a10202f` | `verbleibende_farben`/`farben_index` (`provocation.rs`); `vorzugszug_fuer_spalte` sortiert Kandidaten jetzt primaer nach Knappheit der genommenen Farbe, "vollste Reihe" bleibt Tie-Break |
 | 2 (Zielwahl versorgungsgewichtet) | `d18e523` | `engpass_aufschlag` (0 bei voller, bis 2,5 bei restlos verbrauchter Versorgung); `spalten_kosten` bekommt die vorberechnete Versorgungslage als Parameter, alle 3 Aufrufstellen umgestellt |
 
 Baustein 1+3 liegen technisch in einem Commit (beide in
-`provokation.rs`, `vorzugszug_fuer_spalte` selbst braucht
+`provocation.rs`, `vorzugszug_fuer_spalte` selbst braucht
 `verbleibende_farben` direkt in seinem Kandidaten-Ranking -- eine
 Hunk-Trennung haette das Diff riskanter gemacht als der Gewinn an
 Granularitaet wert war; explizit KEIN Automatismus wie `git add -A`,
@@ -478,7 +478,7 @@ Ergebnis: `evaluations/paired_arena_env_spaltenbau_r3.json`.
 GEPRUEFT signifikanter Schritt: gepaartes Delta +5,25 Plattenpunkte,
 t = 3,94, n = 20 (Rechnung: `auswerten()`s `je_kriterium["Vertikale
 Reihen"]` je Seed aus beiden Einzel-Arm-Dateien, `t_wert()` aus
-`plattenpunkte_aus_arena.py`). Sieg-Differenz NULL (15/20 beide Arme,
+`plate_points_from_arena.py`). Sieg-Differenz NULL (15/20 beide Arme,
 McNemar b=4/c=4, p=1,0, aus dem Rohergebnis-JSON) -- der Spaltenbauer
 kostet in dieser Runde nicht messbar Staerke, weniger noch als Runde 2
 (dort p=0,73, Endstand-Differenz -7,2; hier nur -1,35, Strafleiste sogar
@@ -488,7 +488,7 @@ Spalten (14 Punkte) -- eine deutlich dichtere Verteilung als Runde 2s
 Einzelwerte suggerieren.
 
 **Verteilungs-Gate**: bestanden, alle 6 Spalten mit Ereignissen (Spalte
-0=15, 1=27, 2=5, 3=14, 4=15, 5=24, aus `spaltenbau_trace.py`).
+0=15, 1=27, 2=5, 3=14, 4=15, 5=24, aus `column_build_trace.py`).
 
 **Blocker-Klassifikation** (82 distinkte Blocker-Ketten ueber 20 Partien,
 gleiche Zaehlweise wie Runde 2 -- je (Zeile, Grund)-Kombination EINMAL je
@@ -556,7 +556,7 @@ an dieser Stelle sitzt.
   Ziehen ist zufaellig -- ist der naechste sinnvolle Schritt eher die vom
   Nutzer selbst skizzierte Zwei-Pole-Architektur (§10: Kopf lernt aus
   REALISIERTEN Partien statt aus einer handgerechneten Zielwahl) als eine
-  vierte Nachbesserung an `spaltenbau.rs`.
+  vierte Nachbesserung an `column_build.rs`.
 
 
 ---
@@ -570,27 +570,27 @@ Struktur mitgezogen.
 
 ### (1) Trait-Zuschnitt + Regressionsnachweis Stufe 1
 
-Neuer Trait `Plattenbauer` (`engine/src/plattenbauer.rs`) mit genau den drei
-Entscheidungspunkten, die `spaltenbau.rs` fuer Kriterium 1 bisher konkret
+Neuer Trait `Plattenbauer` (`engine/src/plate_builder.rs`) mit genau den drei
+Entscheidungspunkten, die `column_build.rs` fuer Kriterium 1 bisher konkret
 implementierte: `drafting_vorzug` (Stein-Zug), `dome_vorzug`
 (Kuppelplatten-Wahl), `tiling_vorzug` (Tiling-Routing). Die vier
 Drafting-Hook-Stellen in `self_play.rs` (`play_net_game`,
 `play_net_vs_net_game`, `play_net_vs_net_hybrid_game`,
 `play_stage3_vs_stage1_game`) sowie der eine Tiling-Hook und die
-Seed-Weitergabe rufen jetzt `crate::plattenbauer::*` statt `crate::
-spaltenbau::*` direkt.
+Seed-Weitergabe rufen jetzt `crate::plate_builder::*` statt `crate::
+column_build::*` direkt.
 
 `MOSAIC_SPALTENBAU` bleibt der woertliche Altpfad: ist er aktiv, loest die
 Abstraktion IMMER auf einen Wrapper auf, der die bestehenden
-`spaltenbau::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}` UNVERAENDERT
+`column_build::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}` UNVERAENDERT
 aufruft -- reine Delegation, keine Nachbildung. Byte-Identitaet bei allen
 Knoepfen aus: GEPRUEFT, Paritaets-Hash `8c6684ff...` haelt nach Wheel-Neubau.
 Verhaltens-Identitaet bei `MOSAIC_SPALTENBAU` an: GEPRUEFT per
 Aequivalenztest ueber 30 Seeds/Zustaende
 (`mosaic_spaltenbau_an_ist_verhaltensidentisch_zur_direkten_ansteuerung`,
-`plattenbauer.rs`) -- `drafting_vorzug`/`dome_vorzug`/`tiling_vorzug` der
+`plate_builder.rs`) -- `drafting_vorzug`/`dome_vorzug`/`tiling_vorzug` der
 Abstraktion liefern fuer jeden Seed EXAKT denselben Wert wie der direkte
-Aufruf von `spaltenbau::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`.
+Aufruf von `column_build::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`.
 
 Zusaetzlich End-to-End GEPRUEFT (nicht nur auf Funktionsebene): eine frische
 Arena-Messung mit `MOSAIC_SPALTENBAU=1` durch die NEUE Verdrahtung liefert
@@ -618,7 +618,7 @@ FRISCH GEMESSENE Zahl verwendet, nicht die archivierte.
   Kuppel-/Tiling-Vorzug ueber die generische Zellen-Mechanik.
 - **1 (Spalten, generisch)**: identische Geometrie zu Spaltenbau, aber ein
   ZWEITER Codepfad (siehe Eigene Entscheidungen) statt einer Wiederverwendung
-  der `spaltenbau.rs`-Funktionen.
+  der `column_build.rs`-Funktionen.
 - **2 (Diagonalen)**: waehlt eine der zwei Diagonalen ueber dieselbe
   Kosten-Mechanik (Zielzellen `(i,i)` bzw. `(i,5-i)`).
 - **3 (Mehrfarbig/Jokerfelder)**: keine Kandidatenwahl -- Zielmenge sind ALLE
@@ -638,9 +638,9 @@ FRISCH GEMESSENE Zahl verwendet, nicht die archivierte.
 
 Gleiche Messkette wie §11/§12: `tools/paired_arena_env_ab.py`,
 `alphazero_v21_2d_brierbest.onnx@400` vs. Heuristik@150(dyn), die
-vorhandenen `evaluations/seeds_je_kriterium/k<k>.txt`-Seedlisten (20-23
+vorhandenen `evaluations/seeds_per_criterion/k<k>.txt`-Seedlisten (20-23
 Seeds je Kriterium), `--log-games`. Metrik ueber
-`tools/plattenpunkte_aus_arena.py`s `auswerten()` (importiert, nicht
+`tools/plate_points_from_arena.py`s `auswerten()` (importiert, nicht
 nachgebaut), Kriterium-Name aus `scoring::ALL_SCORING_TILES`.
 
 **Zwei Abweichungen vom Auftrag, aus Zeitgruenden (markiert, nicht
@@ -648,7 +648,7 @@ Nutzer-Freigabe)**:
 
 1. **`MOSAIC_SPALTENBAU_TRACE`/`[SB]`-Blockerspur wurde NICHT auf die
    generische Mechanik (Kriterien 0/2/3/4/5/6/7) ausgeweitet** --
-   `spaltenbau.rs::trace_zeile` bleibt unveraendert und liefert weiterhin
+   `column_build.rs::trace_zeile` bleibt unveraendert und liefert weiterhin
    NUR fuer den Legacy-Pfad (`MOSAIC_SPALTENBAU`) etwas. Die Spalte
    "Blocker aus Trace" ist deshalb fuer Kriterium 1 aus Runde 3 (archiviert,
    NICHT in dieser Sitzung neu erhoben) und fuer alle anderen Kriterien
@@ -689,7 +689,7 @@ Begleitzahlen (gleiche Partien, GEPRUEFT aus den Rohdaten):
 Rohdaten: `evaluations/paired_arena_env_plattenbauer_k{0,2,3,4,5,6,7}.json`
 (neu) und `evaluations/paired_arena_env_plattenbauer_regress_k1.json`
 (Kriterium 1, Regressionslauf). Verrechnungsskript (Scratch, nicht Teil des
-Repos): importiert `auswerten`/`t_wert` aus `tools/plattenpunkte_aus_arena.py`
+Repos): importiert `auswerten`/`t_wert` aus `tools/plate_points_from_arena.py`
 unveraendert.
 
 ### (5) Je Kriterium: ehrliche Aussage erreicht/Decke/weiter-iterierbar
@@ -755,12 +755,12 @@ unveraendert.
 ### (6) Eigene Entscheidungen (markiert, nicht Nutzer-Vorgabe)
 
 - **Zweiter Codepfad fuer Kriterium 1** statt einer Verschmelzung mit
-  `spaltenbau.rs`: eine echte Wiederverwendung haette dessen Funktionen auf
+  `column_build.rs`: eine echte Wiederverwendung haette dessen Funktionen auf
   `zellen: &[(usize,usize)]` umstellen und ALLE dortigen Tests neu
   durchdenken muessen, ohne zusaetzlichen Abnahme-Nutzen (der Legacy-Pfad
   bleibt ohnehin die einzige produktiv genutzte Kriterium-1-Route). Statt
   Duplikation der Kosten-Formeln wurden `special_kosten`/
-  `engpass_aufschlag`/`zellen_wert` in `spaltenbau.rs` auf `pub(crate)`
+  `engpass_aufschlag`/`zellen_wert` in `column_build.rs` auf `pub(crate)`
   gehoben und in der generischen Mechanik WIEDERVERWENDET (verifiziert per
   Test `zellen_kosten_stimmt_mit_spalten_kosten_fuer_spaltengeometrie_
   ueberein`).
@@ -839,7 +839,7 @@ erreichen, wenn vernuenftig gespielt wird"): Baustein 1 wurde gebaut.
 ### (2) Was gebaut wurde
 
 **Baustein 1 (Pflicht): Vollendbarkeits-Sicherheitsnetz + Zielwechsel.**
-`ist_spalte_vollendbar(player, spalte, verbleibend)` (`spaltenbau.rs`): jede
+`ist_spalte_vollendbar(player, spalte, verbleibend)` (`column_build.rs`): jede
 offene Normal-Zelle braucht `verbleibend[Farbe] >= (r+1) - schon_gesammelt`
 UND darf nicht an eine ANDERE Farbe gebunden sein, DIE NICHT MEHR AUFLOeSBAR
 IST (siehe Korrektur unten). `waehle_beste_vollendbare_spalte` waehlt unter
@@ -855,7 +855,7 @@ transient falsch gebundene Zeile darf NICHT sofort als unvollendbar gelten
 (sie loest sich beim naechsten Rundenende automatisch); (ii)
 `verbleibende_farben` zaehlt Fabrik-Kacheln faelschlich als "verbaut" -- fuer
 die Vollendbarkeit gibt es jetzt die eigene Zahl `noch_erreichbare_farben`
-(`provokation.rs`), die nur beider Spieler Strafleiste/verbaute Kuppelzellen
+(`provocation.rs`), die nur beider Spieler Strafleiste/verbaute Kuppelzellen
 und die Musterreihen des GEGNERS abzieht.
 
 **Baustein 3a (aktiv): Kuppel-Jackpot.** `zellen_wert` bewertet eine Zelle, die
@@ -1171,7 +1171,7 @@ Muster wie §15), drei Teile:
    `0,3 + 0,8*n` (n = Zahl offener Nachbarn, farbblind). `spalten_kosten`
    selbst wurde zu `(0..6).map(|r| zelle_kosten(r, spalte)).sum()`
    vereinfacht -- `zelle_kosten` ist die neue, wiederverwendbare
-   Ein-Zellen-Formel (auch von `plattenbauer.rs`s generischer Mechanik
+   Ein-Zellen-Formel (auch von `plate_builder.rs`s generischer Mechanik
    genutzt, die ihre eigene Kopie dieser Formel dafuer verloren hat --
    CLAUDE.md "Bestehendes wiederverwenden").
    
@@ -1189,7 +1189,7 @@ Muster wie §15), drei Teile:
 3. **Vorzugs-Erweiterung**: zweite Drafting- und Tiling-Vorzugsstufe
    (`special_nachbar_zellen`), die bei fehlendem zielspaltenspezifischem
    Kandidaten die Slot-Nachbarn ALLER offenen Special-Zellen der Zielspalte
-   als Zellen-Liste an `plattenbauer::vorzugszug_fuer_zellen`/`tiling_vorzug_
+   als Zellen-Liste an `plate_builder::vorzugszug_fuer_zellen`/`tiling_vorzug_
    fuer_zellen` durchreicht -- WIEDERVERWENDUNG der generischen
    Zellen-Mechanik (Kriterien 0/2/5/7) statt einer eigenen Kopie. Bewusst
    KEINE Dome-Wahl-Erweiterung: die Nachbarzellen-Farbforderung wird von
@@ -1295,8 +1295,8 @@ die Richtung hielt NICHT.
   durch dieselbe Kachel-Platzierung fixiert, ein SPAETERER Dome-Entscheid, der
   sie noch beeinflussen koennte, existiert nicht. Kein Kompromiss, sondern
   eine spielmechanische Tatsache.
-- **`plattenbauer.rs`s eigene Kopie von `zelle_kosten` entfernt**, ruft jetzt
-  `spaltenbau::zelle_kosten` direkt -- kleinerer Diff als zwei Formeln
+- **`plate_builder.rs`s eigene Kopie von `zelle_kosten` entfernt**, ruft jetzt
+  `column_build::zelle_kosten` direkt -- kleinerer Diff als zwei Formeln
   synchron zu halten, verifiziert weiterhin durch den bestehenden
   Aequivalenztest.
 - **Frische Seeds 70-89 statt einer Zufallsziehung** -- einfachste
@@ -1448,7 +1448,7 @@ Koordinator ausdruecklich als Prioritaet vorgegeben: "k2 fertig vor k6 halb")
 Die vom Koordinator genannte Ausgangslage ("0,00 Punkte in allen 18 aktiven
 Partien") wurde vor dieser Messung NICHT bestaetigt -- eine frische
 Referenzmessung (`evaluations/paired_arena_env_k2_baseline_fresh.json`,
-`MOSAIC_PLATTENBAU=0` vs `=2`, die 23 Seeds aus `seeds_je_kriterium/k2.txt`,
+`MOSAIC_PLATTENBAU=0` vs `=2`, die 23 Seeds aus `seeds_per_criterion/k2.txt`,
 GEPRUEFT: Kriterium "Diagonale Reihen" in 23/23 Partien BEIDER Arme aktiv --
 Seed-Satz nach dem RNG-Schnitt weiterhin gueltig) ergab:
 
@@ -1481,15 +1481,15 @@ Special-Zelle unter den 2 uebrigen Slot-Zellen enthaelt -- exakt der Fall, den
 §16 (Spaltenbau, Kriterium 1) schon geloest hat, hier aber fuer eine
 GEOMETRIE-UNABHAENGIGE Zellen-Liste statt einer Spalte gebraucht.
 
-1. **`spaltenbau::special_nachbar_zellen_fuer_liste`** verallgemeinert
+1. **`column_build::special_nachbar_zellen_fuer_liste`** verallgemeinert
    `special_nachbar_zellen` (spalten-spezifisch) auf eine beliebige
    `&[(usize,usize)]`-Liste -- findet offene Special-Zellen INNERHALB der
    Liste, liefert ihre 3 Slot-Nachbarn (koennen ausserhalb der Liste liegen).
-2. **`Diagonalenbauer::drafting_vorzug`/`tiling_vorzug`** (plattenbauer.rs)
+2. **`Diagonalenbauer::drafting_vorzug`/`tiling_vorzug`** (plate_builder.rs)
    bekommen eine zweite Vorzugsstufe: findet `vorzugszug_fuer_zellen`/
    `tiling_vorzug_fuer_zellen` fuer die Diagonale selbst nichts, wird dieselbe
    generische Mechanik auf die Special-Nachbarzellen angewandt.
-3. **Kosten-Seite**: `spaltenbau::zelle_kosten_smart`/`special_kosten`s
+3. **Kosten-Seite**: `column_build::zelle_kosten_smart`/`special_kosten`s
    Nachbar-Summenformel (aus §16) fliesst in die Diagonalen-Kandidatenwahl
    (Haupt- vs. Gegendiagonale) ein.
 
@@ -1551,7 +1551,7 @@ geschalteten Messung in (3) (`[10,10,10,10,10,0,10,10,0,0,10,0,10,0,0,0,10,
 
 Budget-Entscheidung nach expliziter Koordinator-Vorgabe ("k2 fertig vor k6
 halb"). Kein Code, keine Messung, keine Seed-Verifikation fuer k6 in dieser
-Sitzung. Naechste Schritte fuer eine Folge-Sitzung: (a) `seeds_je_kriterium/
+Sitzung. Naechste Schritte fuer eine Folge-Sitzung: (a) `seeds_per_criterion/
 k6.txt` (20 Seeds, ungeprueft ob RNG-Schnitt-gueltig) auf Aktivitaetsrate
 pruefen, (b) frischen Aera-Anker fuer k6 messen (Bezug ~-12, siehe
 Koordinator-Angabe -- nach der k2-Erfahrung in (1) NICHT ungeprueft
@@ -1594,7 +1594,7 @@ Stoerkanal). Eingriff primaer in der Kuppelwahl, nicht im Fliesendraft.
 
 ### (1) Frischer Aera-Anker: 20 k6-Seeds, Aktivitaet 20/20 GEPRUEFT
 
-`evaluations/seeds_je_kriterium/k6.txt` (20 Seeds) gegen `MOSAIC_PLATTENBAU=0`
+`evaluations/seeds_per_criterion/k6.txt` (20 Seeds) gegen `MOSAIC_PLATTENBAU=0`
 vs `=6` (bestehender `Spezialbauer` aus §13, Nachbarzellen-Fuellung, VOR dem
 Kuppeldraft-Zusatz dieser Sitzung). "Spezialfelder"-Kriterium GEPRUEFT in
 20/20 Partien beider Arme aktiv (`scoring_tile_ids`). Ergebnis:
@@ -1700,7 +1700,7 @@ wechselseitig ausgeschlossen (nur k5↔k2), obere Ecken 3 Pkt, untere 8 Pkt.
 
 Nach der k2-Lehre (§18) NICHT die archivierte §13-Zahl (4,73) uebernommen,
 sondern frisch nachgemessen: `MOSAIC_PLATTENBAU=0` vs `=5` (ALTER,
-unveraendert isolierter Eckenbauer aus §13) auf `seeds_je_kriterium/k5.txt`
+unveraendert isolierter Eckenbauer aus §13) auf `seeds_per_criterion/k5.txt`
 (22 Seeds). "Eckplatten"-Kriterium GEPRUEFT in 22/22 Partien beider Arme
 aktiv. Ergebnis: `evaluations/paired_arena_env_k5_baseline_fresh.json`.
 
@@ -1716,7 +1716,7 @@ archivierte §13-Zahl.
 
 ### (2) Was gebaut wurde: Spaltenpaar-Ziel statt vier isolierter Eck-Slots
 
-`Eckenbauer` (plattenbauer.rs) komplett neu: Kandidaten sind die zwei
+`Eckenbauer` (plate_builder.rs) komplett neu: Kandidaten sind die zwei
 AEUSSEREN Spaltenpaare `zellen_spaltenpaar(0)` (Spalten 0+1) und
 `zellen_spaltenpaar(4)` (Spalten 4+5), je 12 Zellen (beide volle Spalten),
 gewaehlt ueber `ziel_zellen_generisch_smart` (§18: echte Special-Nachbar-

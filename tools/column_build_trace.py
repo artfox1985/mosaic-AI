@@ -2,20 +2,20 @@
 """Entscheidungs-Spur des Spaltenbauers auswerten (`[SB]`-Logzeilen).
 
 ANLASS (Nutzer-Ergaenzung 2026-08-13, VOR der Runde-2-Abnahme fuer
-`engine/src/spaltenbau.rs` angefordert): "damit die Iteration sieht, WIE die
+`engine/src/column_build.rs` angefordert): "damit die Iteration sieht, WIE die
 Entscheidungen fallen, nicht nur die Aggregate". Die Engine schreibt bei
 `MOSAIC_SPALTENBAU=1 MOSAIC_SPALTENBAU_TRACE=1` je Entscheidung eine
 zusaetzliche Logzeile mit Praefix `[SB]` ueber den bestehenden
-`log_event`-Strom (additiv, siehe `spaltenbau.rs::trace_zeile`-Doku) --
+`log_event`-Strom (additiv, siehe `column_build.rs::trace_zeile`-Doku) --
 dieses Werkzeug liest sie aus einem Arena-JSON (`--log-games`) und baut je
 Partie eine Entscheidungs-Zusammenfassung.
 
 WARUM KEIN EIGENER PARSER FUER DAS DRUMHERUM: `tools/analyze_game_log.py`
-(ROUND_PREFIX) und `tools/plattenpunkte_aus_arena.py` (`partien()`, liest
+(ROUND_PREFIX) und `tools/plate_points_from_arena.py` (`partien()`, liest
 Ein- oder Mehrarm-JSON) werden importiert statt nachgebaut (CLAUDE.md:
 Bestehendes wiederverwenden). Nur der `[SB]`-Zeileninhalt selbst ist neu.
 
-Zeilenformat (siehe `spaltenbau.rs::trace_zeile`):
+Zeilenformat (siehe `column_build.rs::trace_zeile`):
     [SB] Spieler=<pi> Typ=<Drafting|Dome|Tiling> Ziel=<spalte>
          Top2=[<spalte>:<kosten>,<spalte>:<kosten>]
          Vorzug=<ja VorzugAktion=<debug>|nein Grund=<wort>>
@@ -24,8 +24,8 @@ Zeilenformat (siehe `spaltenbau.rs::trace_zeile`):
 mit dem AEUSSEREN Aktion-Feld waere fuer den Parser nicht mehr trennbar).
 
 Aufruf:
-    python -X utf8 tools/spaltenbau_trace.py evaluations/paired_arena_env_spaltenbau_r2.json
-    python -X utf8 tools/spaltenbau_trace.py DATEI.json --json out.json
+    python -X utf8 tools/column_build_trace.py evaluations/paired_arena_env_spaltenbau_r2.json
+    python -X utf8 tools/column_build_trace.py DATEI.json --json out.json
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ BASIS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASIS / "tools"))
 
 from analyze_game_log import ROUND_PREFIX  # noqa: E402
-from plattenpunkte_aus_arena import partien  # noqa: E402
+from plate_points_from_arena import partien  # noqa: E402
 
 # Nicht-gierig fuer `vorzug`, weil sein Wert bei `ja` selbst ein
 # `VorzugAktion=...`-Feld mit Leerzeichen enthaelt -- der Regex-Motor
@@ -75,7 +75,7 @@ def parse_sb_zeilen(log: list[str]) -> list[Entscheidung]:
     """Alle `[SB]`-Zeilen EINER Partie -> geordnete Liste von Entscheidungen.
     Zeilen, die nicht passen (sollte bei unveraendertem Format nicht
     vorkommen), werden STILL uebersprungen -- dieses Werkzeug ist Diagnose,
-    kein Korrektheitsnachweis der Engine (der liegt in `spaltenbau.rs`s
+    kein Korrektheitsnachweis der Engine (der liegt in `column_build.rs`s
     eigenen Rust-Tests)."""
     out: list[Entscheidung] = []
     for roh in log or []:

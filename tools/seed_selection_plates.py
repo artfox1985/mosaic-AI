@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""tools/seed_auswahl_platten.py -- Seed-Auswahl fuer den Plattenkopf-Versuch
+"""tools/seed_selection_plates.py -- Seed-Auswahl fuer den Plattenkopf-Versuch
 (`evaluations/PREREG_plate_head.md`, 2026-08-11).
 
 Hintergrund: `MOSAIC_WERTUNG_ALPHA` nimmt acht kommagetrennte Werte, einen je
@@ -27,8 +27,8 @@ Startet KEIN Self-Play, KEINE Arena, KEIN Training -- nur `PyGame`-Konstruktion
 (Setup, kein Zug) je durchsuchtem Seed.
 
 Nutzung:
-    python tools/seed_auswahl_platten.py --seed-start 0 --seed-count 600 \
-        --pro-kriterium 20 --out evaluations/seed_auswahl_platten.json
+    python tools/seed_selection_plates.py --seed-start 0 --seed-count 600 \
+        --pro-kriterium 20 --out evaluations/seed_selection_plates.json
 """
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ def main() -> int:
     ap.add_argument("--kriterien", default=None,
                      help="Kommagetrennte Kriterien-IDs (Default: alle 8, 0-7)")
     ap.add_argument("--out", default=None,
-                     help="Default: evaluations/seed_auswahl_platten.json")
+                     help="Default: evaluations/seed_selection_plates.json")
     args = ap.parse_args()
 
     criteria = ALL_CRITERIA
@@ -191,7 +191,7 @@ def main() -> int:
         },
         "criteria_under_target": under_target,
     }
-    out_path = Path(args.out) if args.out else (BASE_DIR / "evaluations" / "seed_auswahl_platten.json")
+    out_path = Path(args.out) if args.out else (BASE_DIR / "evaluations" / "seed_selection_plates.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nAuswahl geschrieben nach {out_path}")
