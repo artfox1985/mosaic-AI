@@ -1874,3 +1874,15 @@ Sync-Arm (Zelle 2 definiert ihn), wird der GPU-Pfad fuer KUENFTIGE
 Generierungslaeufe (v22+) der Standard; sonst ist Weg B geschlossen, bis ein
 groesseres Netz den Amdahl-Anteil der Inferenz verschiebt (der ORT-Vorsprung
 je Batch, 10-21x, bleibt dann die stehende Vorleistung).
+
+**Hardware-Nachtrag zu §23 (gemessen 2026-08-14, Nutzer-Nachfrage)**: CPU ist
+ein AMD Ryzen 5 3600X — **6 physische Kerne / 12 logische Prozessoren**
+(Win32_Processor, os.cpu_count()=12). Die 8-Thread-Konvention lief also schon
+immer ueber der physischen Kernzahl (SMT); der 8->11-Praezedenzfall (1,39x)
+ist damit als SMT-Gewinn eingeordnet, nicht als Kern-Skalierung. Fuer
+Zelle 1/2 gilt: 11 Traeger + 1 Sammel-Faden = 12 = volle logische Breite,
+mehr ist strukturell sinnlos; der staerkste Sync-Arm ist entsprechend
+11-12 Threads. Fuer Zelle 3 (zwei Flotten) teilen sich die Prozesse dieselben
+12 logischen Prozessoren -- der Aggregat-Gewinn muss also aus der GPU-
+Entlastung kommen, nicht aus mehr CPU (vorab notiert, damit ein Nullergebnis
+richtig gelesen wird).
