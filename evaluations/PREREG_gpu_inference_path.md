@@ -1841,3 +1841,36 @@ bereits, um die Auftrags-Kernfrage ("erreicht Weg B/Async+Batcher+ORT-CUDA
 Regel 3 bei produktionsnahem Batch") mit **Nein** zu beantworten, auf
 Basis GEMESSENER, nicht extrapolierter Zahlen fuer die entscheidenden
 ORT-Zellen.
+
+## §23 PLAN: Die letzten drei Hebel (vorregistriert 2026-08-14, Nutzer-Auftrag)
+
+Befund-Basis §22: die GPU laeuft bei ~10 % (5.950 Evals/s gemessen gegen
+~61.000 der Kennlinie bei Batch 128) -- der Deckel ist die CPU-seitige
+Blatt-Erzeugung der 8 Traeger-Threads, nicht die Karte. Drei Zellen, LAUFEN
+ERST NACH ABSCHLUSS der Korpus-Generierung (Kern-Konkurrenz wuerde beide
+Messungen verderben):
+
+1. **Traeger-Skalierung**: N=128 ORT mit 11-12 Traegern statt 8
+   (Praezedenz Threads 8->11 = 1,39x, stabil). Erwartung vorab: Blatt-
+   Erzeugung und damit Partien/h steigen etwa mit dem Traeger-Faktor,
+   solange die GPU Luft hat (sie hat 10x).
+2. **Fairer Endvergleich bei vollen Kernen**: Sync 11-12 Threads (frisch
+   messen -- rechnerisch ~345/h) GEGEN Async+ORT 11-12 Traeger x N=128.
+   DAS ist die eigentliche Entscheidungszelle: Regel 3 (>=2,0x) gilt ab
+   jetzt gegen den STAERKSTEN Sync-Arm, nicht gegen den 8-Thread-Bezug --
+   alles andere waere ein geschoenter Nenner.
+3. **Bonus, zwei Flotten teilen die GPU** (Nutzer: "takte auch die bonus
+   idee ein"): zwei unabhaengige Async+ORT-Prozesse (je halbe Traeger,
+   je N=64-128) gleichzeitig; Messgroesse ist der AGGREGAT-Durchsatz
+   beider gegen den besten Einzelprozess. Vorab-Risiko benannt: die
+   9x-Verlangsamung aus der GPU-Teilung mit einem SPIEL (2D-Encoder-
+   Phase-2-Befund) betraf Rendering-Konkurrenz -- ob zwei reine
+   CUDA-Compute-Prozesse sich vertragen, ist UNGEMESSEN; genau das
+   klaert die Zelle. Scheitert sie an Kontext-Switch-Kosten, ist das ein
+   Befund, kein Fehlschlag der Messung.
+
+Verdikt-Regel vorab: Gewinnt eine Konfiguration >=2,0x gegen den staerksten
+Sync-Arm (Zelle 2 definiert ihn), wird der GPU-Pfad fuer KUENFTIGE
+Generierungslaeufe (v22+) der Standard; sonst ist Weg B geschlossen, bis ein
+groesseres Netz den Amdahl-Anteil der Inferenz verschiebt (der ORT-Vorsprung
+je Batch, 10-21x, bleibt dann die stehende Vorleistung).
