@@ -11384,3 +11384,32 @@ laengst produktiv: Anzeige-Kalibrierung via Platt-Fit des Champions
   geschlossen: validate_tiling_action erzwingt jetzt die Reihen-Zuordnung
   (f8c38ce, vorher nahm die API farblich passende Zuege in falsche
   (Teil-)Reihen an).
+
+### Nachtrag 2026-08-14 -- Dateinamen-Migration Welle 2, Teilmenge 1
+
+Die beiden Sperr-Agenten sind fertig; nur die GPU-nahen Dateien bleiben
+gesperrt (dort misst noch ein Agent). Umbenannt wie in Welle 1 (git mv,
+Referenzen repo-weit, Historie unangetastet):
+
+| alt | neu |
+|---|---|
+| engine/src/spaltenbau.rs | engine/src/column_build.rs |
+| engine/src/plattenbauer.rs | engine/src/plate_builder.rs |
+| engine/src/provokation.rs | engine/src/provocation.rs |
+| tools/spaltenbau_trace.py | tools/column_build_trace.py |
+| tools/plattenpunkte_aus_arena.py | tools/plate_points_from_arena.py |
+| tools/seed_auswahl_platten.py | tools/seed_selection_plates.py |
+| evaluations/seed_auswahl_platten.json | evaluations/seed_selection_plates.json |
+| evaluations/provokation_abnahme.json | evaluations/provocation_acceptance.json |
+| evaluations/PREREG_provokation.md | evaluations/PREREG_provocation.md |
+| evaluations/seeds_je_kriterium/ | evaluations/seeds_per_criterion/ |
+| docs/Spielanleitung_GUI.pptx | docs/game_manual_GUI.pptx (Lock war weg) |
+
+Rust-Modulpfade (`spaltenbau::`/`plattenbauer::`/`provokation::` ->
+`column_build::`/`plate_builder::`/`provocation::`) samt lib.rs-Deklarationen
+mitgezogen; Env-Knoepfe (`MOSAIC_SPALTENBAU*`, `MOSAIC_PROVOKATION_SPALTE`)
+und Datenfelder in Mess-Records (z.B. "spaltenbau" in arena_compact.jsonl)
+sind IDENTIFIKATOREN und bleiben unveraendert. WEITER GESPERRT (Teilmenge 2,
+nach GPU-Agent-Ende): PREREG_gpu_inferenzpfad.md, evaluations/gpu_*,
+async_gpu_stufe3_probe.jsonl, tools/paritaets_probe.py,
+tools/gpu_inferenzpfad_ipc_roundtrip.py, data/gpu_messung/.
