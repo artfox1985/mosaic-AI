@@ -24,7 +24,7 @@ Zeilenformat (siehe `column_build.rs::trace_zeile`):
 mit dem AEUSSEREN Aktion-Feld waere fuer den Parser nicht mehr trennbar).
 
 Aufruf:
-    python -X utf8 tools/column_build_trace.py evaluations/paired_arena_env_spaltenbau_r2.json
+    python -X utf8 tools/column_build_trace.py evaluations/paired_arena_env_column_build_r2.json
     python -X utf8 tools/column_build_trace.py DATEI.json --json out.json
 """
 from __future__ import annotations
