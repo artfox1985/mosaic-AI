@@ -338,7 +338,7 @@ k1-Seeds (`evaluations/seed_selection_plates.json`, GEPRUEFT:
 Arme (No-Op ohne aktiven Spaltenbauer). Werkzeug: `tools/paired_arena_env_ab.py
 --env-name MOSAIC_SPALTENBAU --arms 0 1 --control 0 --net-sims 400
 --heur-sims 150 --seeds <k1> --log-games`, Ergebnis in
-`evaluations/paired_arena_env_spaltenbau_r2.json`. Metrik ueber
+`evaluations/paired_arena_env_column_build_r2.json`. Metrik ueber
 `tools/plate_points_from_arena.py`s `auswerten()`, Kriterium "Vertikale
 Reihen"; Verteilung/Blocker ueber das NEU gebaute `tools/column_build_trace.py`
 (liest die `[SB]`-Zeilen).
@@ -465,7 +465,7 @@ Aufbau IDENTISCH zu Runde 2 (§11): `alphazero_v21_2d_brierbest.onnx`@400 vs
 Heuristik@150(dyn), dieselben 20 k1-Seeds
 (`[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,59,69]`), gepaart gegen
 `MOSAIC_SPALTENBAU=0`, `MOSAIC_SPALTENBAU_TRACE=1` fuer beide Arme.
-Ergebnis: `evaluations/paired_arena_env_spaltenbau_r3.json`.
+Ergebnis: `evaluations/paired_arena_env_column_build_r3.json`.
 
 | Groesse | Spaltenbau AUS (Kontrolle) | Spaltenbau AN |
 | --- | ---: | ---: |
@@ -595,7 +595,7 @@ Aufruf von `column_build::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`.
 Zusaetzlich End-to-End GEPRUEFT (nicht nur auf Funktionsebene): eine frische
 Arena-Messung mit `MOSAIC_SPALTENBAU=1` durch die NEUE Verdrahtung liefert
 20/20 identische Ergebnisse bei zweifacher Wiederholung desselben Kommandos
-(eigene Reproduzierbarkeitsprobe, `paired_arena_env_plattenbauer_regress_k1*.
+(eigene Reproduzierbarkeitsprobe, `paired_arena_env_plate_builder_regress_k1*.
 json`) -- die neue Verdrahtung ist selbst deterministisch. **Eine offene,
 ungeklaerte Beobachtung**: diese frische Messung liefert fuer den
 Kontroll-Arm (`MOSAIC_SPALTENBAU=0`) 1,05 vertikale Plattenpunkte / 47,80
@@ -686,8 +686,8 @@ Begleitzahlen (gleiche Partien, GEPRUEFT aus den Rohdaten):
 | 6 | +1,20 |  2,99 | 10/20 | 11/20 | 1,000 | 14,25 -> 16,85 | 31,85 -> 27,25 |
 | 7 | +0,52 |  1,00 | 17/23 | 7/23  | 0,021 | 10,35 -> 15,39 | 50,30 -> 34,35 |
 
-Rohdaten: `evaluations/paired_arena_env_plattenbauer_k{0,2,3,4,5,6,7}.json`
-(neu) und `evaluations/paired_arena_env_plattenbauer_regress_k1.json`
+Rohdaten: `evaluations/paired_arena_env_plate_builder_k{0,2,3,4,5,6,7}.json`
+(neu) und `evaluations/paired_arena_env_plate_builder_regress_k1.json`
 (Kriterium 1, Regressionslauf). Verrechnungsskript (Scratch, nicht Teil des
 Repos): importiert `auswerten`/`t_wert` aus `tools/plate_points_from_arena.py`
 unveraendert.
@@ -798,7 +798,7 @@ Farbe JEDER Zelle deterministisch aus den `Kachel X -> Slot (r,c) rot=d`-
 Logzeilen -- robuster als `kein_vorzug_grund`s Text, der nur die ERSTE
 blockierende Zeile nennt und die eigentlich interessierende Zelle oft verdeckt.
 Werkzeug: `scratchpad/blocker_split_abcd.py` (Scratch, nicht im Repo), liest die
---log-games-Rohdaten aus Runde 2/3 (`evaluations/paired_arena_env_spaltenbau_
+--log-games-Rohdaten aus Runde 2/3 (`evaluations/paired_arena_env_column_build_
 r{2,3}.json`, bereits vorhanden).
 
 "Mauer-Zelle": eine Spalte mit GENAU 1 offener Zelle unter 6 belegten Slots --
@@ -907,7 +907,7 @@ frische Kostenwahl auf eine nachweislich unvollendbare Spalte faellt.
 Aufbau IDENTISCH zu Runde 2/3: `alphazero_v21_2d_brierbest.onnx@400` vs
 Heuristik@150(dyn), Seeds `[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,
 59,69]`, `MOSAIC_SPALTENBAU_TRACE=1` beide Arme. Ergebnis:
-`evaluations/paired_arena_env_spaltenbau_r4d.json`.
+`evaluations/paired_arena_env_column_build_r4d.json`.
 
 | Groesse | AUS (Kontrolle) | AN (v5) |
 | --- | ---: | ---: |
@@ -1004,7 +1004,7 @@ variiert, der ANDERE per Export fixiert:
   JACKPOT --arms 0 1` -> liefert Arm A (erneut, zur Reproduzierbarkeits-
   Kontrolle) und Arm C (nur Jackpot).
 - Arm D (beide an) wird NICHT neu gefahren -- Vorgabe des Koordinators;
-  identisch mit dem AN-Arm aus `evaluations/paired_arena_env_spaltenbau_
+  identisch mit dem AN-Arm aus `evaluations/paired_arena_env_column_build_
   r4d.json` (§14).
 
 Gleiche 20 k1-Seeds, gleiches Modell (`alphazero_v21_2d_brierbest.onnx@400`
@@ -1466,7 +1466,7 @@ gemessene, GEPRUEFTE Zahl 3,04 als Anker**, nicht die Koordinator-Angabe.
 
 **NACHTRAG (Koordinator, aufgeloest, kein offener Punkt mehr)**: die 0,00-Zahl
 stammte aus den SPALTENBAU-Laeufen (k1-Spieler, Diagonale nur als Beifang auf
-k1-/frischen Seeds -- z.B. `evaluations/paired_arena_env_spaltenbau_r4d.json`),
+k1-/frischen Seeds -- z.B. `evaluations/paired_arena_env_column_build_r4d.json`),
 waehrend 3,04 der k2-PLATTENBAUER selbst auf den k2-Seeds ist
 (`evaluations/paired_arena_env_k2_baseline_fresh.json`) -- zwei verschiedene
 Generatoren auf verschiedenen Partien, keine Drift, beide Zahlen korrekt fuer

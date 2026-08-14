@@ -11434,3 +11434,16 @@ Manifeste + 5 pkl-Messkorpora (~254 MB) der par.22-Arme; nur das Verzeichnis
 wurde umbenannt, kein Inhalt angefasst. Die data/gpu_messung-Pfade IN den
 Mess-Records (z.B. gpu_inference_path_selfplay_e2e_route_b.json) bleiben als
 Historie stehen. Der wt_async2-Worktree wurde nicht angefasst.
+
+### Nachtrag 2 zum 2026-08-14 -- Nachzuegler der Sperr-Agenten
+
+Waehrend der Migration haben die Welle-2-Agenten 17 neue, ungetrackte
+Mess-JSONs mit deutschen Slugs angelegt; per mv nachgezogen (Records-Inhalte
+unangetastet): `paired_arena_env_spaltenbau_r{2,3,4,4b,4c,4d}.json` ->
+`..._column_build_r*.json`, `paired_arena_env_diag_spaltenbau_r4{,c}.json` ->
+`..._diag_column_build_r4{,c}.json`, `paired_arena_env_plattenbauer_k{0,2..7}
+.json` + `..._plattenbauer_regress_k1{,_rerun}.json` -> `..._plate_builder_*`.
+Testfunktions-Namen (z.B. `provokation_kern_durch...`,
+`spaltenbau_an_ist_verhaltensidentisch...`) und Env-Knoepfe sind
+IDENTIFIKATOREN und bleiben; ebenso die historischen Zustandsnotizen in
+PREREG_gpu_inference_path.md par.20 ("provokation.rs zum Zeitpunkt des Baus").
