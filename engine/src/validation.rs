@@ -229,10 +229,10 @@ pub fn generate_valid_moves(state: &GameState) -> Vec<Move> {
         }
     }
 
-    // Spalten-Provokation (Diagnose-Knopf, `evaluations/PREREG_provokation.md`):
+    // Spalten-Provokation (Diagnose-Knopf, `evaluations/PREREG_provocation.md`):
     // Default aus -> No-Op, byte-identisch zum Bestand. Einbaustelle bewusst
     // HIER (im Generator selbst, "Single Source of Truth" fuer Suche/GUI/
     // Rundenabschluss-Check `game::current_player_can_move`), nicht am
     // gespielten Zug -- sonst plant die Suche an der Beschraenkung vorbei.
-    crate::provokation::beschneide_moves(state, moves)
+    crate::provocation::beschneide_moves(state, moves)
 }

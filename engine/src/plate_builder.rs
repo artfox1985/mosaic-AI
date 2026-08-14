@@ -4,17 +4,17 @@
 //! Ein `Plattenbauer` ist eine Entscheidungsschicht UEBER dem Netz-/
 //! Heuristik-Spieler mit genau drei Entscheidungspunkten -- Drafting-Vorzug
 //! (Stein-Zug), Kuppelplatten-Wahl-Vorzug, Tiling-Routing-Vorzug --, so wie
-//! `spaltenbau.rs` sie fuer EIN Kriterium (Kriterium 1, Vertikale Reihen)
+//! `column_build.rs` sie fuer EIN Kriterium (Kriterium 1, Vertikale Reihen)
 //! bereits konkret implementiert. Diese Datei zieht das Muster als Trait
 //! nach und macht es UEBER `MOSAIC_PLATTENBAU=<0..7|auto>` fuer alle 8
 //! Wertungskriterien nutzbar (`scoring.rs::ALL_SCORING_TILES`), ohne
-//! `spaltenbau.rs` selbst zu aendern.
+//! `column_build.rs` selbst zu aendern.
 //!
 //! ## Verhaeltnis zum Bestandsknopf `MOSAIC_SPALTENBAU`
 //!
 //! `MOSAIC_SPALTENBAU` bleibt der WOERTLICHE Altpfad: ist er aktiv, loest
 //! [`aktiver_bauer`] IMMER auf den Spaltenbauer-Wrapper auf, der die
-//! bestehenden `spaltenbau::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`
+//! bestehenden `column_build::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`
 //! UNVERAENDERT aufruft -- Verhaltens-Identitaet ist damit durch reine
 //! Delegation garantiert, nicht durch eine Nachbildung (siehe
 //! `plattenbauer_regression_test.rs`-Aequivalenztests unten). `MOSAIC_
@@ -22,7 +22,7 @@
 //! stattdessen die HIER neu gebaute generische Zellen-Mechanik mit
 //! Spalten-Geometrie -- ein zweiter Codepfad fuer dasselbe Kriterium, bewusst
 //! in Kauf genommen (siehe Bericht, "eigene Entscheidungen"): eine
-//! Verschmelzung haette `spaltenbau.rs`s Signaturen aendern und alle dortigen
+//! Verschmelzung haette `column_build.rs`s Signaturen aendern und alle dortigen
 //! Tests neu durchdenken muessen, ohne zusaetzlichen Nutzen fuer die
 //! Abnahme.
 //!
@@ -31,10 +31,10 @@
 //! Vier der acht Kriterien sind reine GEOMETRIE-Varianten derselben Aufgabe
 //! "liefere die richtige Farbe an eine Menge von Zellen, die zusammen
 //! gewertet werden": Zeilen (0, Zeilenzellen), Spalten (1, Spaltenzellen,
-//! analog `spaltenbau.rs`), Diagonalen (2, zwei Diagonalen), Ecken (5, vier
+//! analog `column_build.rs`), Diagonalen (2, zwei Diagonalen), Ecken (5, vier
 //! 2x2-Slots). Fuer sie reicht EINE generische Kosten-/Vorzugs-Mechanik
 //! ueber eine explizite Zellenliste `&[(row, col)]` -- portiert aus
-//! `spaltenbau.rs`s Kosten-/Auswahlformeln (`special_kosten`,
+//! `column_build.rs`s Kosten-/Auswahlformeln (`special_kosten`,
 //! `engpass_aufschlag`, `zellen_wert`, Toleranzband + Seed-Streuung), die
 //! dafuer sichtbar gemacht wurden (`pub(crate)`). Die drei uebrigen
 //! Kriterien -- Mehrfarbig (3, Jokerfelder), Rand (4, additiv-farbfrei),
@@ -54,10 +54,10 @@ use crate::tiling_solver::TilingStep;
 // ── Der Trait: drei Entscheidungspunkte ─────────────────────────────────────
 
 /// Spieler-Abstraktion ueber den drei Entscheidungspunkten, die
-/// `spaltenbau.rs` fuer Kriterium 1 konkret implementiert (Modul-Doku dort).
+/// `column_build.rs` fuer Kriterium 1 konkret implementiert (Modul-Doku dort).
 /// Jede Methode ist ein reiner PRAEFERENZ-Vorschlag (kein Verbot, keine
 /// Blattwert-Verschiebung) -- `None` bedeutet "kein Vorschlag, Netz/Heuristik
-/// entscheidet frei", genau wie bei `spaltenbau.rs` und `provokation.rs`.
+/// entscheidet frei", genau wie bei `column_build.rs` und `provocation.rs`.
 pub(crate) trait Plattenbauer {
     /// Drafting-Vorzug: ein Stein-Zug (`Action::Stone`), der ein Zielfeld
     /// dieses Kriteriums bedient.
@@ -127,24 +127,24 @@ fn modus() -> Modus {
 thread_local! {
     /// Partie-Seed fuer die generische Kandidatenwahl (Auto-Kriterium +
     /// Kandidaten-Streuung bei Kosten-Gleichstand) -- gleiches Muster wie
-    /// `spaltenbau::PARTIE_SEED`. [`set_partie_seed`] versorgt BEIDE (siehe
+    /// `column_build::PARTIE_SEED`. [`set_partie_seed`] versorgt BEIDE (siehe
     /// dort), damit self_play.rs nur noch EINE Stelle aufrufen muss.
     static PARTIE_SEED: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 }
 
 /// Setzt (oder loescht mit `None`) den Partie-Seed fuer DIESEN Thread -- fuer
-/// die generische Mechanik HIER und (Kaskade) fuer `spaltenbau::PARTIE_SEED`,
+/// die generische Mechanik HIER und (Kaskade) fuer `column_build::PARTIE_SEED`,
 /// damit self_play.rs an den vier Hook-Stellen nur noch die Abstraktion
 /// aufrufen muss, statt zwei Module einzeln zu versorgen. Aufrufer MUSS am
 /// Partieende (oder vor der naechsten Partie desselben Threads) mit `None`
-/// ueberschreiben (Leck-Warnung wie bei `spaltenbau::set_partie_seed`).
+/// ueberschreiben (Leck-Warnung wie bei `column_build::set_partie_seed`).
 pub(crate) fn set_partie_seed(seed: Option<u64>) {
     PARTIE_SEED.with(|c| c.set(seed));
-    crate::spaltenbau::set_partie_seed(seed);
+    crate::column_build::set_partie_seed(seed);
 }
 
 /// Deterministische Mischung Seed -> Index `0..n` -- identisches SplitMix64-
-/// Muster wie `spaltenbau::index_aus_seed`/`provokation::spalte_aus_seed`
+/// Muster wie `column_build::index_aus_seed`/`provocation::spalte_aus_seed`
 /// (Projekt-Konvention: diese kleine Mischfunktion wird je Modul dupliziert
 /// statt geteilt, siehe dortige Kommentare).
 fn index_aus_seed(seed: u64, n: usize) -> usize {
@@ -169,7 +169,7 @@ fn index_aus_seed(seed: u64, n: usize) -> usize {
 // die heutige auto-Streuung waehlt direkt. Bleibt als vorbereiteter Baustein.
 #[allow(dead_code)]
 fn aktives_kriterium(state: &GameState) -> Option<usize> {
-    if crate::spaltenbau::ist_aktiv() {
+    if crate::column_build::ist_aktiv() {
         return Some(1);
     }
     match modus() {
@@ -195,13 +195,13 @@ fn auto_kriterium(state: &GameState) -> Option<usize> {
 struct SpaltenbauerLegacy;
 impl Plattenbauer for SpaltenbauerLegacy {
     fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
-        crate::spaltenbau::vorzugszug(state)
+        crate::column_build::vorzugszug(state)
     }
     fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
-        crate::spaltenbau::vorzug_dome_wahl(state)
+        crate::column_build::vorzug_dome_wahl(state)
     }
     fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
-        crate::spaltenbau::vorzug_tiling_step(state, pi)
+        crate::column_build::vorzug_tiling_step(state, pi)
     }
 }
 
@@ -230,7 +230,7 @@ fn bauer_fuer(kriterium: usize) -> &'static dyn Plattenbauer {
 }
 
 fn aktiver_bauer(state: &GameState) -> Option<&'static dyn Plattenbauer> {
-    if crate::spaltenbau::ist_aktiv() {
+    if crate::column_build::ist_aktiv() {
         return Some(&SPALTENBAUER_LEGACY);
     }
     match modus() {
@@ -241,43 +241,43 @@ fn aktiver_bauer(state: &GameState) -> Option<&'static dyn Plattenbauer> {
 }
 
 /// Aufrufstellen: die vier Drafting-Hook-Stellen in `self_play.rs`, ersetzt
-/// `crate::spaltenbau::vorzugszug(&game.state)` in der `.or_else(...)`-Kette.
+/// `crate::column_build::vorzugszug(&game.state)` in der `.or_else(...)`-Kette.
 pub(crate) fn drafting_vorzug(state: &GameState) -> Option<Action> {
     aktiver_bauer(state).and_then(|b| b.drafting_vorzug(state))
 }
 
 /// Aufrufstellen: dieselben vier Hook-Stellen, ersetzt
-/// `crate::spaltenbau::vorzug_dome_wahl(&game.state)`.
+/// `crate::column_build::vorzug_dome_wahl(&game.state)`.
 pub(crate) fn dome_vorzug(state: &GameState) -> Option<Action> {
     aktiver_bauer(state).and_then(|b| b.dome_vorzug(state))
 }
 
 /// Aufrufstelle: der Tiling-Hook in `self_play.rs`, ersetzt
-/// `crate::spaltenbau::vorzug_tiling_step(&game.state, pi)`.
+/// `crate::column_build::vorzug_tiling_step(&game.state, pi)`.
 pub(crate) fn tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> {
     aktiver_bauer(state).and_then(|b| b.tiling_vorzug(state, pi))
 }
 
-// ── Generische Zellen-Mechanik (Kriterien 0/1/2/5, Portierung aus spaltenbau.rs) ──
+// ── Generische Zellen-Mechanik (Kriterien 0/1/2/5, Portierung aus column_build.rs) ──
 
-/// Kosten EINER Zelle -- delegiert vollstaendig an `spaltenbau::zelle_kosten`
+/// Kosten EINER Zelle -- delegiert vollstaendig an `column_build::zelle_kosten`
 /// (§16: dieselbe Formel, jetzt auch fuer die Special-Zellen-Slot-Nachbarn
 /// gebraucht, deshalb dort `pub(crate)` und hier keine eigene Kopie mehr,
 /// siehe CLAUDE.md "Bestehendes wiederverwenden"). Verifiziert aequivalent
 /// per Test unten
 /// (`zellen_kosten_stimmt_mit_spalten_kosten_fuer_spaltengeometrie_ueberein`).
 fn zellen_kosten(player: &PlayerBoard, zellen: &[(usize, usize)], verbleibend: &[i64; 5]) -> f64 {
-    zellen.iter().map(|&(r, c)| crate::spaltenbau::zelle_kosten(player, r, c, verbleibend)).sum()
+    zellen.iter().map(|&(r, c)| crate::column_build::zelle_kosten(player, r, c, verbleibend)).sum()
 }
 
-/// Toleranzband, identische Kalibrierung wie `spaltenbau::SPALTEN_TOLERANZ`
+/// Toleranzband, identische Kalibrierung wie `column_build::SPALTEN_TOLERANZ`
 /// (dieselbe Kosten-Skala, siehe dortige Begruendung).
 const ZIEL_TOLERANZ: f64 = 0.5;
 
 /// Waehlt einen Kandidaten-Index aus `kosten` -- guenstigster, oder bei
 /// mehreren nahen (`ZIEL_TOLERANZ`) Kandidaten seed-gestreut, sonst der
 /// kleinste Index (stabiler Tie-Break). Generalisierung von
-/// `spaltenbau::waehle_spalte` auf beliebig viele Kandidaten.
+/// `column_build::waehle_spalte` auf beliebig viele Kandidaten.
 fn waehle_kandidat(kosten: &[f64], seed: Option<u64>) -> usize {
     let min_kosten = kosten.iter().cloned().fold(f64::INFINITY, f64::min);
     let kandidaten: Vec<usize> = (0..kosten.len()).filter(|&i| kosten[i] - min_kosten <= ZIEL_TOLERANZ).collect();
@@ -291,7 +291,7 @@ fn waehle_kandidat(kosten: &[f64], seed: Option<u64>) -> usize {
 }
 
 /// §18 (Diagonalen-Baustein): wie [`ziel_zellen_generisch`], aber mit
-/// `spaltenbau::zelle_kosten_smart` statt der geteilten (§16/§17-Schalter-
+/// `column_build::zelle_kosten_smart` statt der geteilten (§16/§17-Schalter-
 /// abhaengigen) [`zellen_kosten`] -- fuer Bauern mit einer EIGENEN,
 /// unabhaengig validierten Special-Zellen-Uebernahme (siehe dortige Doku).
 fn ziel_zellen_generisch_smart(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
@@ -299,10 +299,10 @@ fn ziel_zellen_generisch_smart(state: &GameState, pi: usize, kandidaten: &[Vec<(
         return None;
     }
     let player = &state.players[pi];
-    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::verbleibende_farben(state);
     let kosten: Vec<f64> = kandidaten
         .iter()
-        .map(|z| z.iter().map(|&(r, c)| crate::spaltenbau::zelle_kosten_smart(player, r, c, &verbleibend)).sum())
+        .map(|z| z.iter().map(|&(r, c)| crate::column_build::zelle_kosten_smart(player, r, c, &verbleibend)).sum())
         .collect();
     let seed = PARTIE_SEED.with(|c| c.get());
     let idx = waehle_kandidat(&kosten, seed);
@@ -310,13 +310,13 @@ fn ziel_zellen_generisch_smart(state: &GameState, pi: usize, kandidaten: &[Vec<(
 }
 
 /// Loest die aktive Zielzellen-Menge aus einer Kandidatenliste auf --
-/// Generalisierung von `spaltenbau::ziel_spalte` auf beliebige Geometrien.
+/// Generalisierung von `column_build::ziel_spalte` auf beliebige Geometrien.
 fn ziel_zellen_generisch(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
     if kandidaten.is_empty() {
         return None;
     }
     let player = &state.players[pi];
-    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::verbleibende_farben(state);
     let kosten: Vec<f64> = kandidaten.iter().map(|z| zellen_kosten(player, z, &verbleibend)).collect();
     let seed = PARTIE_SEED.with(|c| c.get());
     let idx = waehle_kandidat(&kosten, seed);
@@ -324,7 +324,7 @@ fn ziel_zellen_generisch(state: &GameState, pi: usize, kandidaten: &[Vec<(usize,
 }
 
 /// Drafting-Vorzug ueber einer beliebigen Zielzellen-Menge -- Generalisierung
-/// von `provokation::vorzugszug_fuer_spalte`. Fuer eine Reihe `r`, die in
+/// von `provocation::vorzugszug_fuer_spalte`. Fuer eine Reihe `r`, die in
 /// `zellen` mit MEHREREN Eintraegen vorkommt (Zeilen-/Ecken-Geometrie), zaehlt
 /// "qualifiziert", wenn IRGENDEINE offene Zielzelle dieser Reihe die
 /// angebotene Farbe fordert (eine Musterreihe fuehrt ohnehin nur eine Farbe
@@ -335,7 +335,7 @@ pub(crate) fn vorzugszug_fuer_zellen(state: &GameState, zellen: &[(usize, usize)
         return None;
     }
     let player = &state.players[state.current_player];
-    let verbleibend = crate::provokation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::verbleibende_farben(state);
     let moves = crate::validation::generate_valid_moves(state);
     let mut best: Option<(i64, i32, i32, crate::moves::Move)> = None;
     for m in moves {
@@ -363,7 +363,7 @@ pub(crate) fn vorzugszug_fuer_zellen(state: &GameState, zellen: &[(usize, usize)
         }
         let zeile = &player.pattern_lines[r];
         let fuellung = zeile.tiles.len() as i32;
-        let knappheit = crate::provokation::farben_index(m.take.color).map(|i| verbleibend[i]).unwrap_or(i64::MAX);
+        let knappheit = crate::provocation::farben_index(m.take.color).map(|i| verbleibend[i]).unwrap_or(i64::MAX);
         let kandidat = (knappheit, -fuellung, r as i32, m);
         let besser = best.as_ref().map_or(true, |(k, f, rr, _)| (kandidat.0, kandidat.1, kandidat.2) < (*k, *f, *rr));
         if besser {
@@ -374,7 +374,7 @@ pub(crate) fn vorzugszug_fuer_zellen(state: &GameState, zellen: &[(usize, usize)
 }
 
 /// Score einer (Kachel, Slot, Rotation)-Kombination gegen eine beliebige
-/// Zielzellen-Menge -- Generalisierung von `spaltenbau::slot_score`: statt
+/// Zielzellen-Menge -- Generalisierung von `column_build::slot_score`: statt
 /// nur die zwei Zellen EINER Spalte je Slot zu pruefen, werden alle vier
 /// Platzierungspositionen des Slots gegen die Zielzellen-Mitgliedschaft
 /// geprueft. Fuer eine Spalten-Zielzellenliste ist das rechnerisch identisch
@@ -398,7 +398,7 @@ fn slot_score_generic(
             continue;
         }
         beruehrt = true;
-        summe += crate::spaltenbau::zellen_wert(player, row, &tile.spaces[idx[i]]);
+        summe += crate::column_build::zellen_wert(player, row, &tile.spaces[idx[i]]);
     }
     if beruehrt {
         Some(summe)
@@ -408,7 +408,7 @@ fn slot_score_generic(
 }
 
 /// Kuppelplatten-Wahl-Vorzug ueber einer beliebigen Zielzellen-Menge --
-/// Generalisierung von `spaltenbau::vorzug_dome_wahl`. Anders als dort wird
+/// Generalisierung von `column_build::vorzug_dome_wahl`. Anders als dort wird
 /// NICHT nach `slot_col` vorgefiltert (eine Zeilen-/Ecken-Zielmenge kann
 /// mehrere Slot-Spalten beruehren) -- [`slot_score_generic`]s `beruehrt`-Flag
 /// uebernimmt den gleichen Ausschluss implizit (Score 0, dann durch den
@@ -477,7 +477,7 @@ pub(crate) fn dome_vorzug_fuer_zellen(state: &GameState, zellen: &[(usize, usize
 }
 
 /// Tiling-Routing-Vorzug ueber einer beliebigen Zielzellen-Menge --
-/// Generalisierung von `spaltenbau::vorzug_tiling_step_fuer_spalte`: zaehlt
+/// Generalisierung von `column_build::vorzug_tiling_step_fuer_spalte`: zaehlt
 /// gefuellte Zielzellen statt gefuellte Zellen EINER Spalte.
 pub(crate) fn tiling_vorzug_fuer_zellen(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Option<TilingStep> {
     if !(1..=4).contains(&state.round_number) {
@@ -614,7 +614,7 @@ impl Plattenbauer for Diagonalenbauer {
             // zellen sind. UNBEDINGT (siehe `special_nachbar_zellen_immer`-
             // Doku) -- §18 hat diese Erweiterung EIGENSTAeNDIG validiert.
             let player = &state.players[state.current_player];
-            let nz = crate::spaltenbau::special_nachbar_zellen_immer(player, &z);
+            let nz = crate::column_build::special_nachbar_zellen_immer(player, &z);
             if nz.is_empty() { None } else { vorzugszug_fuer_zellen(state, &nz) }
         })
     }
@@ -626,7 +626,7 @@ impl Plattenbauer for Diagonalenbauer {
         let z = self.zellen(state, pi)?;
         tiling_vorzug_fuer_zellen(state, pi, &z).or_else(|| {
             let player = &state.players[pi];
-            let nz = crate::spaltenbau::special_nachbar_zellen_immer(player, &z);
+            let nz = crate::column_build::special_nachbar_zellen_immer(player, &z);
             if nz.is_empty() { None } else { tiling_vorzug_fuer_zellen(state, pi, &nz) }
         })
     }
@@ -635,7 +635,7 @@ impl Plattenbauer for Diagonalenbauer {
 // ── Kriterium 5: Ecken (2x2-Slots, 3/8 Pkt) ─────────────────────────────────
 
 // §20 (Eckplatten-Neubau, Nutzer-Entwurf "kannst ihn fast schon kombinieren
-// k1 und zwei spalten", PREREG_provokation.md §20): statt vier isolierter
+// k1 und zwei spalten", PREREG_provocation.md §20): statt vier isolierter
 // Eck-Slots ein AEUSSERES Spaltenpaar (Rasterspalten 0+1 oder 4+5) als Ziel
 // -- das Paar schliesst BEIDE Ecken derselben Seite (8+3=11 Punkte, das
 // Nutzer-Orakel fuer k5) und liefert bei aktivem Kriterium 1 zwei volle
@@ -838,7 +838,7 @@ impl Plattenbauer for Spezialbauer {
         // -6,6 statt -11,1 -- das Gegenteil des beabsichtigten Stoerkanals)
         // UND einen (nicht signifikanten, aber deutlichen) Sieg-Ruecksgang
         // (5/20 statt 9/20). Bleibt als getestete, unverdrahtete Funktion
-        // stehen (siehe PREREG_provokation.md §19).
+        // stehen (siehe PREREG_provocation.md §19).
         let z = self.zellen(&state.players[state.current_player]);
         dome_vorzug_fuer_zellen(state, &z)
     }
@@ -1074,25 +1074,25 @@ mod tests {
 
     #[test]
     fn default_aus_liefert_ueberall_none() {
-        crate::spaltenbau::set_aktiv_override_for_test(Some(false));
+        crate::column_build::set_aktiv_override_for_test(Some(false));
         set_modus_override_for_test(Some(Modus::Aus));
         let game = drafting_game(1);
         assert_eq!(drafting_vorzug(&game.state), None);
         assert_eq!(dome_vorzug(&game.state), None);
         assert!(tiling_vorzug(&game.state, 0).is_none());
         set_modus_override_for_test(None);
-        crate::spaltenbau::set_aktiv_override_for_test(None);
+        crate::column_build::set_aktiv_override_for_test(None);
     }
 
     /// Kernabnahme Stufe 1: bei aktivem `MOSAIC_SPALTENBAU` muss die
-    /// Abstraktion GENAU das liefern, was `spaltenbau.rs` direkt liefert --
+    /// Abstraktion GENAU das liefern, was `column_build.rs` direkt liefert --
     /// reine Delegation, keine Nachbildung. Ueber mehrere Seeds/Zustaende,
     /// damit der Test nicht nur eine einzelne Zufallskonstellation trifft.
     #[test]
     fn mosaic_spaltenbau_an_ist_verhaltensidentisch_zur_direkten_ansteuerung() {
-        crate::spaltenbau::set_aktiv_override_for_test(Some(true));
+        crate::column_build::set_aktiv_override_for_test(Some(true));
         for seed in 0u64..30 {
-            // Runde 4: `spaltenbau::ziel_spalte` merkt sich jetzt die zuletzt
+            // Runde 4: `column_build::ziel_spalte` merkt sich jetzt die zuletzt
             // gewaehlte Spalte je Partie (Vollendbarkeits-Buchhaltung, siehe
             // dortige Doku) -- ohne Reset hier wuerde die Spalte des VORIGEN
             // Seeds in dieses (voellig andere) Brett hineinlecken, exakt das
@@ -1100,7 +1100,7 @@ mod tests {
             // Partien (self_play.rs) rufen `set_partie_seed` ohnehin schon
             // pro Partie auf -- dieser Test muss es fuer sein eigenes
             // Pro-Seed-"Partie"-Modell jetzt auch tun.
-            crate::spaltenbau::set_partie_seed(None);
+            crate::column_build::set_partie_seed(None);
             let mut game = drafting_game(seed);
             let pi = game.state.current_player;
             let tile = normal_tile(100 + seed as usize, [Rot, Blau, Gelb, Schwarz]);
@@ -1108,25 +1108,25 @@ mod tests {
 
             assert_eq!(
                 drafting_vorzug(&game.state),
-                crate::spaltenbau::vorzugszug(&game.state),
-                "Seed {seed}: drafting_vorzug muss spaltenbau::vorzugszug entsprechen"
+                crate::column_build::vorzugszug(&game.state),
+                "Seed {seed}: drafting_vorzug muss column_build::vorzugszug entsprechen"
             );
             assert_eq!(
                 dome_vorzug(&game.state),
-                crate::spaltenbau::vorzug_dome_wahl(&game.state),
-                "Seed {seed}: dome_vorzug muss spaltenbau::vorzug_dome_wahl entsprechen"
+                crate::column_build::vorzug_dome_wahl(&game.state),
+                "Seed {seed}: dome_vorzug muss column_build::vorzug_dome_wahl entsprechen"
             );
             assert_eq!(
                 tiling_vorzug(&game.state, pi),
-                crate::spaltenbau::vorzug_tiling_step(&game.state, pi),
-                "Seed {seed}: tiling_vorzug muss spaltenbau::vorzug_tiling_step entsprechen"
+                crate::column_build::vorzug_tiling_step(&game.state, pi),
+                "Seed {seed}: tiling_vorzug muss column_build::vorzug_tiling_step entsprechen"
             );
         }
-        crate::spaltenbau::set_aktiv_override_for_test(None);
+        crate::column_build::set_aktiv_override_for_test(None);
     }
 
     /// `zellen_kosten` ueber einer Spalten-Zellenliste muss exakt
-    /// `spaltenbau::spalten_kosten` fuer dieselbe Spalte liefern -- das ist
+    /// `column_build::spalten_kosten` fuer dieselbe Spalte liefern -- das ist
     /// der rechnerische Beleg, dass die Generalisierung fuer den Spalten-Fall
     /// nichts verschiebt (siehe Moduldoku).
     #[test]
@@ -1135,9 +1135,9 @@ mod tests {
         let pi = game.state.current_player;
         let tile = normal_tile(200, [Rot, Blau, Gelb, Schwarz]);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
-        let verbleibend = crate::provokation::verbleibende_farben(&game.state);
+        let verbleibend = crate::provocation::verbleibende_farben(&game.state);
         for spalte in 0..6usize {
-            let alt = crate::spaltenbau::spalten_kosten(&game.state.players[pi], spalte, &verbleibend);
+            let alt = crate::column_build::spalten_kosten(&game.state.players[pi], spalte, &verbleibend);
             let neu = zellen_kosten(&game.state.players[pi], &zellen_spalte(spalte), &verbleibend);
             assert!((alt - neu).abs() < 1e-9, "Spalte {spalte}: alt={alt} neu={neu}");
         }
@@ -1145,7 +1145,7 @@ mod tests {
 
     #[test]
     fn mosaic_plattenbau_1_ohne_altknopf_liefert_generischen_spaltenpfad() {
-        crate::spaltenbau::set_aktiv_override_for_test(Some(false));
+        crate::column_build::set_aktiv_override_for_test(Some(false));
         set_modus_override_for_test(Some(Modus::Fest(1)));
         let game = drafting_game(11);
         // Der generische Pfad muss ETWAS liefern koennen (keine strikte
@@ -1154,7 +1154,7 @@ mod tests {
         let _ = drafting_vorzug(&game.state);
         assert_eq!(aktives_kriterium(&game.state), Some(1));
         set_modus_override_for_test(None);
-        crate::spaltenbau::set_aktiv_override_for_test(None);
+        crate::column_build::set_aktiv_override_for_test(None);
     }
 
     #[test]

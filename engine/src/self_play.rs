@@ -1083,9 +1083,9 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, net: Option<&Net>, rng: &mut R)
 /// Knoepfen (`MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU` unset) liefern alle
 /// drei Glieder `None` (dokumentiertes No-Op-Verhalten der Module selbst).
 fn bauer_drafting_vorzug(state: &GameState) -> Option<Action> {
-    crate::provokation::vorzugszug(state)
-        .or_else(|| crate::plattenbauer::drafting_vorzug(state))
-        .or_else(|| crate::plattenbauer::dome_vorzug(state))
+    crate::provocation::vorzugszug(state)
+        .or_else(|| crate::plate_builder::drafting_vorzug(state))
+        .or_else(|| crate::plate_builder::dome_vorzug(state))
 }
 
 /// Ergebnis eines Drafting-Entscheids eines [`DraftingAgent`].
@@ -1102,7 +1102,7 @@ struct DraftingDecision {
     /// PCR-Muenzwurf-Ergebnis (nur `NetSelfPlayAgent` mit aktivem PCR).
     pcr_is_full: Option<bool>,
     /// Vorzugs-Kandidat der Bauer-Kette, falls einer existierte -- fuer den
-    /// Spaltenbau-Trace des Arena-Pfads (`spaltenbau_trace`).
+    /// Spaltenbau-Trace des Arena-Pfads (`column_build_trace`).
     vorzug: Option<Action>,
 }
 
@@ -1335,7 +1335,7 @@ struct PlayerLoopConfig<'a> {
     /// `[SB]`-Trace-Zeilen ins Spiel-Log (Nutzer-Ergaenzung 2026-08-13) --
     /// bisher NUR die Netz-Seite von `play_net_game`; `trace_zeile` selbst
     /// ist No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
-    spaltenbau_trace: bool,
+    column_build_trace: bool,
 }
 
 /// Gesamt-Konfiguration der vereinheitlichten Schleife.
@@ -1482,12 +1482,12 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // Zeile additiv ueber `log_event`. Muss VOR dem Apply
                     // gebaut (liest den Vor-Zustand), aber NACH dem mutablen
                     // Zugriff geschrieben werden.
-                    let trace = if pcfg.spaltenbau_trace {
+                    let trace = if pcfg.column_build_trace {
                         let typ = match &d.chosen {
                             Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => "Dome",
                             _ => "Drafting",
                         };
-                        crate::spaltenbau::trace_zeile(
+                        crate::column_build::trace_zeile(
                             &game.state, player, typ,
                             d.vorzug.as_ref().map(|a| a as &dyn std::fmt::Debug),
                             &d.chosen as &dyn std::fmt::Debug,
@@ -1603,14 +1603,14 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // `tiling_vorzug` separat (rein lesend) NUR fuer die
                     // Log-Zeile aufgerufen -- `resolve_tiling_step` prueft ihn
                     // intern schon, gibt das aber nicht zurueck.
-                    let vorzug_kandidat_tiling = if pcfg.spaltenbau_trace {
-                        crate::plattenbauer::tiling_vorzug(&game.state, pi)
+                    let vorzug_kandidat_tiling = if pcfg.column_build_trace {
+                        crate::plate_builder::tiling_vorzug(&game.state, pi)
                     } else {
                         None
                     };
                     let step = resolve_tiling_step(&game.state, pi, pcfg.tiling_net);
-                    let trace = if pcfg.spaltenbau_trace {
-                        crate::spaltenbau::trace_zeile(
+                    let trace = if pcfg.column_build_trace {
+                        crate::column_build::trace_zeile(
                             &game.state, pi, "Tiling",
                             vorzug_kandidat_tiling.as_ref().map(|a| a as &dyn std::fmt::Debug),
                             &step as &dyn std::fmt::Debug,
@@ -1773,7 +1773,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         agent: &agent,
         tiling_net: None,
         apply_via_chosen_action: false,
-        spaltenbau_trace: false,
+        column_build_trace: false,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -2120,13 +2120,13 @@ fn play_net_game<R: Rng + ?Sized>(
         agent: &net_agent,
         tiling_net: Some(net),
         apply_via_chosen_action: true,
-        spaltenbau_trace: true,
+        column_build_trace: true,
     };
     let heur_player = PlayerLoopConfig {
         agent: &heur_agent,
         tiling_net: None,
         apply_via_chosen_action: false,
-        spaltenbau_trace: false,
+        column_build_trace: false,
     };
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
@@ -2196,9 +2196,9 @@ pub fn run_net_arena_match(
         // im Rayon-Worker-Thread (kein separat gespawnter Thread wie bei
         // `run_net_self_play`s Watchdog), ein Setzen hier landet also auf dem
         // richtigen Thread. Reset danach, damit ein rayon-recycelter Thread
-        // nicht den Seed der VORHERIGEN Partie fuer die naechste `spaltenbau`-
+        // nicht den Seed der VORHERIGEN Partie fuer die naechste `column_build`-
         // Anfrage ausserhalb dieser Funktion mitschleppt.
-        crate::plattenbauer::set_partie_seed(Some(game_seed));
+        crate::plate_builder::set_partie_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -2206,7 +2206,7 @@ pub fn run_net_arena_match(
         let result = play_net_game(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
         );
-        crate::plattenbauer::set_partie_seed(None);
+        crate::plate_builder::set_partie_seed(None);
         result
     };
 
@@ -2261,13 +2261,13 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 agent: &agent_a,
                 tiling_net: Some(net_a),
                 apply_via_chosen_action: true,
-                spaltenbau_trace: false,
+                column_build_trace: false,
             },
             PlayerLoopConfig {
                 agent: &agent_b,
                 tiling_net: Some(net_b),
                 apply_via_chosen_action: true,
-                spaltenbau_trace: false,
+                column_build_trace: false,
             },
         ],
     };
@@ -2308,7 +2308,7 @@ pub fn run_net_vs_net_arena(
             None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
         };
         // Siehe Kommentar in `run_net_arena_match`s `play`-Closure.
-        crate::plattenbauer::set_partie_seed(Some(game_seed));
+        crate::plate_builder::set_partie_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -2317,7 +2317,7 @@ pub fn run_net_vs_net_arena(
             &net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng, game_seed,
             log_games,
         );
-        crate::plattenbauer::set_partie_seed(None);
+        crate::plate_builder::set_partie_seed(None);
         result
     };
 
@@ -2411,9 +2411,9 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                         .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = net_effective_sims(sims_plain, actions.len());
-                        crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
-                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
+                        crate::provocation::vorzugszug(&game.state)
+                            .or_else(|| crate::plate_builder::drafting_vorzug(&game.state))
+                            .or_else(|| crate::plate_builder::dome_vorzug(&game.state))
                             .or_else(|| net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -2896,7 +2896,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         agent: &agent,
         tiling_net: Some(net),
         apply_via_chosen_action: true,
-        spaltenbau_trace: false,
+        column_build_trace: false,
     };
     let cfg = GameLoopConfig {
         timeout_secs: net_game_timeout_secs(base_sims)
@@ -3052,7 +3052,7 @@ pub fn run_net_self_play(
             } else {
                 None
             });
-            // PREREG_ownership_corpus.md §3.1-Nachruestung: `plattenbauer::
+            // PREREG_ownership_corpus.md §3.1-Nachruestung: `plate_builder::
             // PARTIE_SEED` ist wie `PARTIE_GEWICHT` oben thread-lokal -- MUSS
             // HIER gesetzt werden (nicht in der aeusseren `play`-Closure),
             // aus demselben Grund (`run_with_watchdog` spawnt einen NEUEN OS-
@@ -3061,13 +3061,13 @@ pub fn run_net_self_play(
             // Partie, siehe `run_with_watchdog`-Doku), es gibt keine
             // Folge-Partie, die ihn wiederverwenden koennte -- anders als bei
             // rayon-Worker-Threads (siehe die ausfuehrlichen Leck-Warnungen in
-            // spaltenbau.rs) ist ein "vorher"-Zustand hier strukturell
+            // column_build.rs) ist ein "vorher"-Zustand hier strukturell
             // ausgeschlossen. Ohne diesen Aufruf bliebe `PARTIE_SEED` auf
-            // `None` -- `spaltenbau::waehle_spalte`s/`plattenbauer::waehle_
+            // `None` -- `column_build::waehle_spalte`s/`plate_builder::waehle_
             // kandidat`s Seed-Streuung wuerde dann nie greifen (Bestands-
             // verhalten des jeweiligen "kein Seed"-Zweigs: stabil kleinste
             // Spalte/kleinster Index statt gestreut).
-            crate::plattenbauer::set_partie_seed(Some(partie_seed));
+            crate::plate_builder::set_partie_seed(Some(partie_seed));
             // Task #32 (`profiling.rs`-Modulkopf "Task #32"): "total_selfplay"
             // -- die GANZE Spielschleife dieser einen Partie (einziger
             // Aufrufer von `play_net_self_play_game`).
@@ -3575,9 +3575,9 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         )
                     } else {
                         let s = net_effective_sims(sims1, actions.len());
-                        crate::provokation::vorzugszug(&game.state)
-                            .or_else(|| crate::plattenbauer::drafting_vorzug(&game.state))
-                            .or_else(|| crate::plattenbauer::dome_vorzug(&game.state))
+                        crate::provocation::vorzugszug(&game.state)
+                            .or_else(|| crate::plate_builder::drafting_vorzug(&game.state))
+                            .or_else(|| crate::plate_builder::dome_vorzug(&game.state))
                             .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
                             .unwrap_or_else(|| actions[0].clone())
                     };
@@ -5596,11 +5596,11 @@ pub(crate) mod tests {
         }
     }
 
-    /// Provokations-Pflichttest 1 (`evaluations/PREREG_provokation.md`,
+    /// Provokations-Pflichttest 1 (`evaluations/PREREG_provocation.md`,
     /// Abschnitt TESTS Punkt 1): ungesetzter Knopf (`Modus::Aus`) darf die
     /// Aktionsmenge nie veraendern. Geprueft ueber ECHTE Spielverlaeufe
     /// (mehrere Seeds, mehrere Runden) als Ergaenzung zu den adversarialen
-    /// Unit-Tests in `provokation.rs` (die exakte Identitaet auf
+    /// Unit-Tests in `provocation.rs` (die exakte Identitaet auf
     /// handgebauten Kandidatenlisten zeigen): `beschneide_moves` filtert nur
     /// weg, fuegt nie hinzu (siehe dortige Doku) -- ein `Fest`-Lauf auf
     /// GENAU DEMSELBEN, unveraenderten Zustand muss deshalb IMMER eine
@@ -5623,7 +5623,7 @@ pub(crate) mod tests {
                 if guard > 4000 || game.state.round_number > start_round + 2 {
                     break; // mehrere Rundenuebergaenge abgedeckt, dann Testlaufzeit begrenzen.
                 }
-                crate::provokation::set_modus_override_for_test(Some(crate::provokation::Modus::Aus));
+                crate::provocation::set_modus_override_for_test(Some(crate::provocation::Modus::Aus));
                 match game.state.phase {
                     Phase::StartPlacement | Phase::Drafting => {
                         if game.state.players.iter().any(|p| p.start_tile_pending) {
@@ -5632,8 +5632,8 @@ pub(crate) mod tests {
                             }
                         } else if game.state.phase == Phase::Drafting {
                             let aus = generate_valid_moves(&game.state);
-                            crate::provokation::set_modus_override_for_test(Some(
-                                crate::provokation::Modus::Fest(spalte),
+                            crate::provocation::set_modus_override_for_test(Some(
+                                crate::provocation::Modus::Fest(spalte),
                             ));
                             let fest = generate_valid_moves(&game.state);
                             assert!(
@@ -5642,8 +5642,8 @@ pub(crate) mod tests {
                                  des Aus-Ergebnisses sein -- sonst hat 'Aus' faelschlich mitbeschnitten",
                                 game.state.round_number
                             );
-                            crate::provokation::set_modus_override_for_test(Some(
-                                crate::provokation::Modus::Aus,
+                            crate::provocation::set_modus_override_for_test(Some(
+                                crate::provocation::Modus::Aus,
                             ));
                             let actions = drafting_actions(&game.state);
                             if actions.is_empty() {
@@ -5662,10 +5662,10 @@ pub(crate) mod tests {
                 }
             }
         }
-        crate::provokation::set_modus_override_for_test(None);
+        crate::provocation::set_modus_override_for_test(None);
     }
 
-    /// Provokations-Pflichttest 4 (`evaluations/PREREG_provokation.md`,
+    /// Provokations-Pflichttest 4 (`evaluations/PREREG_provocation.md`,
     /// Abschnitt TESTS Punkt 4): eine vollstaendige Partie mit AKTIVER
     /// Spalten-Provokation (hier `Modus::Fest`, ueber die GESAMTE Partie
     /// gesetzt) muss `Phase::Final` erreichen -- kein Deadlock, keine Panik.
@@ -5674,7 +5674,7 @@ pub(crate) mod tests {
     #[test]
     fn provokation_mit_gesetztem_knopf_erreicht_phase_final_ohne_deadlock() {
         for (seed, spalte) in [(61u64, 0usize), (62, 2), (63, 5)] {
-            crate::provokation::set_modus_override_for_test(Some(crate::provokation::Modus::Fest(spalte)));
+            crate::provocation::set_modus_override_for_test(Some(crate::provocation::Modus::Fest(spalte)));
             let mut rng = StdRng::seed_from_u64(seed);
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let mut game =
@@ -5726,7 +5726,7 @@ pub(crate) mod tests {
                 "Seed {seed}, Spalte {spalte}: Partie mit aktiver Provokation muss Phase::Final \
                  erreichen (kein Deadlock, guard={guard})"
             );
-            crate::provokation::set_modus_override_for_test(None);
+            crate::provocation::set_modus_override_for_test(None);
         }
     }
 }

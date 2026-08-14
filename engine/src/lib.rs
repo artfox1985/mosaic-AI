@@ -25,9 +25,9 @@ pub mod net_mcts;
 // heutige Wheel-Bau) sieht dieses Modul ueberhaupt nicht.
 #[cfg(feature = "ort_cuda_probe")]
 pub mod net_ort;
-pub mod plattenbauer;
+pub mod plate_builder;
 pub mod profiling;
-pub mod provokation;
+pub mod provocation;
 pub mod py;
 pub mod round5;
 pub mod round_end;
@@ -38,7 +38,7 @@ pub mod scoring;
 pub mod search_common;
 pub mod self_play;
 pub mod serialize;
-pub mod spaltenbau;
+pub mod column_build;
 pub mod state;
 pub mod supply;
 pub mod tiling_solver;
