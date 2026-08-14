@@ -31,6 +31,7 @@
 //! Verdrahtung mit `player_total` in `mcts.rs` (Stufe 1) wäre reiner
 //! Mehraufwand ohne Nutzen, siehe Kommentar bei `mcts.rs::evaluate`.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use rand::rngs::StdRng;
@@ -81,7 +82,11 @@ pub const N_SAMPLES_TRAIN: u32 = 24;
 /// Dieser Pfad (`round_before` außerhalb 1-4, sollte laut Aufrufer nie
 /// erreicht werden) nutzt den billigen `net_leaf_eval`-Bewerter (ein
 /// Forward-Pass) -- 5s deckt 24 Samples komfortabel ab, selbst unter Last.
-pub const TIME_BUDGET_TRAIN: Duration = Duration::from_secs(5);
+// PREREG_deterministic_labels.md §2 Stufe 2 (2026-08-14): ~10x-Anhebung
+// ("Ausnahme-Niveau") nach bestaetigter Not-Deckel-Mechanik in der
+// Stufe-1-Messung (siehe round_transition_deep.rs-Nachtrag bei
+// TIME_BUDGET_TRAIN_ROUND1). Der Sample-COUNT bleibt der primaere Deckel.
+pub const TIME_BUDGET_TRAIN: Duration = Duration::from_secs(50);
 
 /// Zeitbudget speziell für die Runde-4→5-Transition (siehe
 /// `round5::exact_round5_outcome`, self_play.rs-Aufrufstelle): dort ist
@@ -99,7 +104,7 @@ pub const TIME_BUDGET_TRAIN: Duration = Duration::from_secs(5);
 /// die Deadline wieder der bindende, lastabhängige Cutoff geworden und
 /// hätte den Determinismus-Gewinn genau hier (dem Runde-4-Label!) wieder
 /// zerstört. Neu: ~3x Worst-Case aufgerundet.
-pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(60);
+pub const TIME_BUDGET_TRAIN_ROUND4: Duration = Duration::from_secs(600);
 
 /// Ein Runden-End-Zustand, deterministisch bis unmittelbar vor den EINEN
 /// tatsächlich zufälligen Schritt vorgespult (den `EndTiling`-Aufruf des
@@ -209,6 +214,115 @@ pub fn advance_one_chance<R: Rng + ?Sized>(
     Some(game.state)
 }
 
+// ── Stufe 1, PREREG_deterministic_labels.md §2: Not-Deckel-Feuerraten ───────
+// Reine Beobachtung (Diagnose, KEIN Verhaltenseingriff), gleiches Muster wie
+// `net_batcher.rs::BatcherStats` (`Relaxed` reicht, kein weiterer Zustand
+// haengt kausal an diesen Zahlen). Global statt thread-lokal, weil
+// Self-Play viele Partien PARALLEL ueber rayon-Worker laufen laesst -- die
+// Feuerrate soll ueber den GESAMTEN Lauf aggregiert werden, nicht je Thread.
+// Jede "_checks"-Zaehlung ist EIN Erreichen der jeweiligen Pruefstelle, jede
+// "_deadline_fires"-Zaehlung ISOLIERT den Anteil, in dem die WALL-CLOCK-
+// Deadline die entscheidende (nicht durch einen ohnehin schon erreichten
+// deterministischen Deckel wie `node_budget`/`guard`/Sample-COUNT maskierte)
+// Ursache war -- exakt die Unterscheidung, die PREREG_deterministic_labels.md
+// §1 zwischen "PRIMAERER, deterministischer Cutoff" (Task #71) und
+// "Not-Deckel" (dieser Auftrag) trifft.
+#[derive(Default)]
+pub struct NotDeckelStats {
+    /// `sample_round_transition_value` (hier): je Aufruf.
+    pub sample_transition_checks: AtomicU64,
+    /// Deadline brach die Sample-Schleife VOR `cap` erreichten Samples ab.
+    pub sample_transition_deadline_fires: AtomicU64,
+    /// Schwerster Fall: KEIN Sample vor der Deadline fertig -- Fallback ist
+    /// `evaluator(&pre.state)`, der UNGESAMPELTE Zustand direkt.
+    pub sample_transition_zero_result: AtomicU64,
+    /// `round_transition_deep.rs::choose_drafting_action_pruned`s
+    /// Kandidatenschleife: je durchlaufenem Kandidaten.
+    pub drafting_loop_checks: AtomicU64,
+    pub drafting_loop_deadline_fires: AtomicU64,
+    /// Dieselbe Funktion, Gamma-Pruning: Voll-Sample uebersprungen, weil
+    /// `overall_deadline` erreicht war (isoliert von der eigentlichen
+    /// `GAMMA_MARGIN`-Pruning-Entscheidung).
+    pub gamma_full_checks: AtomicU64,
+    pub gamma_full_deadline_fires: AtomicU64,
+    /// `negamax_progress`, Eintritts-Pruefung.
+    pub negamax_entry_checks: AtomicU64,
+    pub negamax_entry_deadline_fires: AtomicU64,
+    /// `negamax_progress`, Schleifen-Pruefung je Kind-Kandidat.
+    pub negamax_loop_checks: AtomicU64,
+    pub negamax_loop_deadline_fires: AtomicU64,
+    /// `simulate_one_round`: je Zug-Entscheidung innerhalb der simulierten
+    /// Runde. `_guard_fires` ist der deterministische Iterationsdeckel
+    /// (300, Kontext-Zahl, KEIN Not-Deckel), separat von der Deadline.
+    pub simulate_round_checks: AtomicU64,
+    pub simulate_round_deadline_fires: AtomicU64,
+    pub simulate_round_guard_fires: AtomicU64,
+}
+
+/// Global fuer die Dauer des Prozesses (ein Self-Play-Lauf = ein Prozess,
+/// siehe `self_play.py::_worker_run_chunk`) -- `reset()` VOR einer frischen
+/// Messung, `snapshot_json()` danach.
+pub static NOT_DECKEL_STATS: NotDeckelStats = NotDeckelStats {
+    sample_transition_checks: AtomicU64::new(0),
+    sample_transition_deadline_fires: AtomicU64::new(0),
+    sample_transition_zero_result: AtomicU64::new(0),
+    drafting_loop_checks: AtomicU64::new(0),
+    drafting_loop_deadline_fires: AtomicU64::new(0),
+    gamma_full_checks: AtomicU64::new(0),
+    gamma_full_deadline_fires: AtomicU64::new(0),
+    negamax_entry_checks: AtomicU64::new(0),
+    negamax_entry_deadline_fires: AtomicU64::new(0),
+    negamax_loop_checks: AtomicU64::new(0),
+    negamax_loop_deadline_fires: AtomicU64::new(0),
+    simulate_round_checks: AtomicU64::new(0),
+    simulate_round_deadline_fires: AtomicU64::new(0),
+    simulate_round_guard_fires: AtomicU64::new(0),
+};
+
+impl NotDeckelStats {
+    /// Setzt ALLE Zaehler auf 0 -- fuer eine frische, unkontaminierte Messung
+    /// (z.B. nach dem Wheel-Import, vor dem eigentlichen Probe-Lauf).
+    pub fn reset(&self) {
+        self.sample_transition_checks.store(0, Ordering::Relaxed);
+        self.sample_transition_deadline_fires.store(0, Ordering::Relaxed);
+        self.sample_transition_zero_result.store(0, Ordering::Relaxed);
+        self.drafting_loop_checks.store(0, Ordering::Relaxed);
+        self.drafting_loop_deadline_fires.store(0, Ordering::Relaxed);
+        self.gamma_full_checks.store(0, Ordering::Relaxed);
+        self.gamma_full_deadline_fires.store(0, Ordering::Relaxed);
+        self.negamax_entry_checks.store(0, Ordering::Relaxed);
+        self.negamax_entry_deadline_fires.store(0, Ordering::Relaxed);
+        self.negamax_loop_checks.store(0, Ordering::Relaxed);
+        self.negamax_loop_deadline_fires.store(0, Ordering::Relaxed);
+        self.simulate_round_checks.store(0, Ordering::Relaxed);
+        self.simulate_round_deadline_fires.store(0, Ordering::Relaxed);
+        self.simulate_round_guard_fires.store(0, Ordering::Relaxed);
+    }
+
+    /// JSON-Schnappschuss (Muster `batcher_diagnostics`) -- Rohzahlen, Raten
+    /// rechnet die Python-Seite (vermeidet Div-durch-0-Sonderfaelle hier).
+    pub fn snapshot_json(&self) -> serde_json::Value {
+        use serde_json::json;
+        let g = |c: &AtomicU64| c.load(Ordering::Relaxed);
+        json!({
+            "sample_transition_checks": g(&self.sample_transition_checks),
+            "sample_transition_deadline_fires": g(&self.sample_transition_deadline_fires),
+            "sample_transition_zero_result": g(&self.sample_transition_zero_result),
+            "drafting_loop_checks": g(&self.drafting_loop_checks),
+            "drafting_loop_deadline_fires": g(&self.drafting_loop_deadline_fires),
+            "gamma_full_checks": g(&self.gamma_full_checks),
+            "gamma_full_deadline_fires": g(&self.gamma_full_deadline_fires),
+            "negamax_entry_checks": g(&self.negamax_entry_checks),
+            "negamax_entry_deadline_fires": g(&self.negamax_entry_deadline_fires),
+            "negamax_loop_checks": g(&self.negamax_loop_checks),
+            "negamax_loop_deadline_fires": g(&self.negamax_loop_deadline_fires),
+            "simulate_round_checks": g(&self.simulate_round_checks),
+            "simulate_round_deadline_fires": g(&self.simulate_round_deadline_fires),
+            "simulate_round_guard_fires": g(&self.simulate_round_guard_fires),
+        })
+    }
+}
+
 pub fn sample_round_transition_value<R: Rng + ?Sized>(
     pre: &PreChanceState,
     n_samples: u32,
@@ -216,11 +330,25 @@ pub fn sample_round_transition_value<R: Rng + ?Sized>(
     rng: &mut R,
     deadline: Instant,
 ) -> [f64; 2] {
+    NOT_DECKEL_STATS.sample_transition_checks.fetch_add(1, Ordering::Relaxed);
     let cap = n_samples.min(MAX_SAMPLES_HARD_CAP);
     let mut sum = [0.0f64; 2];
     let mut n = 0u32;
+    // PREREG_deterministic_labels.md §2 Stufe 2 ("ehrliche Deckel"): wenn
+    // die Deadline VOR `cap` erreichten Samples feuert, wird das Ergebnis
+    // NICHT aus dem load-abhaengigen Teil-Mittel gebildet (dessen genaue
+    // Zusammensetzung -- wie viele Samples es noch VOR der Deadline schafften
+    // -- selbst vom Ausfuehrungstempo abhinge, exakt die zu vermeidende
+    // Maschinenabhaengigkeit) -- stattdessen faellt die Funktion GENAUSO auf
+    // `evaluator(&pre.state, rng)` zurueck wie im (schon bestehenden)
+    // `n == 0`-Fall unten. Ergebnis: entweder das VOLLE `cap`-Mittel (Deadline
+    // nie erreicht) oder der EINE, immer gleiche Kurz-Pfad -- nie ein
+    // Zwischending, dessen Wert vom Tempo abhaengt.
+    let mut deadline_fired = false;
     for _ in 0..cap {
         if Instant::now() >= deadline {
+            NOT_DECKEL_STATS.sample_transition_deadline_fires.fetch_add(1, Ordering::Relaxed);
+            deadline_fired = true;
             break;
         }
         let mut game = Game { state: pre.state.clone() };
@@ -253,7 +381,10 @@ pub fn sample_round_transition_value<R: Rng + ?Sized>(
         sum[1] += v[1];
         n += 1;
     }
-    if n == 0 {
+    if n == 0 || deadline_fired {
+        if n == 0 {
+            NOT_DECKEL_STATS.sample_transition_zero_result.fetch_add(1, Ordering::Relaxed);
+        }
         return evaluator(&pre.state, rng);
     }
     [sum[0] / n as f64, sum[1] / n as f64]
@@ -665,6 +796,75 @@ mod tests {
         // 4 Samples liefern 0,1,2,3 bzw. 0,2,4,6 -- Mittelwert 1.5 bzw. 3.0.
         assert!((val[0] - 1.5).abs() < 1e-9);
         assert!((val[1] - 3.0).abs() < 1e-9);
+    }
+
+    /// PREREG_deterministic_labels.md §2 Stufe 2 ("ehrliche Deckel"): feuert
+    /// die Deadline NACH einigen (aber nicht allen `cap`) erfolgreichen
+    /// Samples, darf das Ergebnis NICHT das load-abhaengige Teil-Mittel
+    /// dieser wenigen Samples sein (dessen genaue Zusammensetzung vom
+    /// Ausfuehrungstempo abhinge) -- es MUSS exakt derselbe Kurz-Pfad-Wert
+    /// sein wie im (schon vorher bestehenden) `n == 0`-Fall. Erzwingt echte
+    /// Teil-Fertigstellung ueber `thread::sleep` (kein synthetischer
+    /// Zaehler-Trick moeglich, da die Deadline selbst wall-clock-basiert
+    /// ist) -- grosszuegige Margen (50ms Deadline, 120ms je Sample), um
+    /// Flakiness auf einer normal ausgelasteten Test-Maschine auszuschliessen.
+    #[test]
+    fn deadline_mid_loop_discards_partial_samples_not_just_zero() {
+        let leaf = drive_to_first_round_end(29);
+        let pre = resolve_to_pre_chance(&leaf).expect("aufloesbar");
+
+        // Referenzwert: derselbe Bewerter, direkt auf `pre.state()` (der
+        // Kurz-Pfad-Fallback) angewandt -- KEIN Sampling beteiligt.
+        let mut rng_ref = StdRng::seed_from_u64(4242);
+        let fallback_val = evaluator_marks_pre_state(pre.state(), &mut rng_ref);
+        assert_eq!(fallback_val, [1.0, 1.0], "Testaufbau: Referenzwert unerwartet");
+
+        // Deadline knapp: das erste (langsame) Sample schafft es gerade noch,
+        // das zweite nicht mehr -- `n` bleibt zwischen 1 und `cap-1` (nie 0,
+        // nie `cap`), genau der bisher UNGETESTETE Zwischenfall.
+        let mut rng = StdRng::seed_from_u64(4242);
+        let deadline = Instant::now() + Duration::from_millis(50);
+        let calls = std::cell::Cell::new(0u32);
+        let val = sample_round_transition_value(
+            &pre,
+            8,
+            |s, rng| {
+                calls.set(calls.get() + 1);
+                std::thread::sleep(Duration::from_millis(120));
+                evaluator_marks_pre_state(s, rng)
+            },
+            &mut rng,
+            deadline,
+        );
+        assert!(
+            calls.get() >= 1 && calls.get() < 8,
+            "Testaufbau: erwartet einen ECHTEN Teil-Abbruch (1..7 von 8 Samples), \
+             bekam {} Aufrufe -- Timing-Margen pruefen",
+            calls.get()
+        );
+        assert_eq!(
+            val, fallback_val,
+            "Teil-Ergebnis nach {} erfolgreichen Samples war {val:?}, erwartet der \
+             Kurz-Pfad-Fallback {fallback_val:?} -- das Ergebnis haengt noch vom \
+             Ausfuehrungstempo ab (Stufe-2-Fix nicht wirksam)",
+            calls.get()
+        );
+    }
+
+    /// Hilfsfunktion fuer den Test oben: [1.0, 1.0] auf dem UNVERAENDERTEN
+    /// `pre`-Zustand (Fabriken noch nicht neu befuellt), sonst [0.0, 0.0] --
+    /// unterscheidet zuverlaessig "direkt auf pre.state() ausgewertet" von
+    /// "nach mindestens einem echten Sample (Fabriken neu gemischt/befuellt)
+    /// ausgewertet", ohne einen fortlaufenden Zaehler zu brauchen (der bei
+    /// EINEM erfolgreichen Sample zufaellig mit dem Fallback-Wert
+    /// uebereinstimmen koennte).
+    fn evaluator_marks_pre_state<R: Rng + ?Sized>(s: &GameState, _rng: &mut R) -> [f64; 2] {
+        let empty_factories = s.factories.iter().all(|f| f.sun_tiles.is_empty());
+        if empty_factories {
+            [1.0, 1.0]
+        } else {
+            [0.0, 0.0]
+        }
     }
 
     /// Performance-Regressionswaechter, analog zu
