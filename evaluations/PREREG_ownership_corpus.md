@@ -435,3 +435,32 @@ Start-Konfiguration (Entscheidungen beim Vollzug, hier festgeschrieben):
   v21_own_a / v21_own_k1 / v21_own_k2 / v21_own_k5 / v21_own_k6.
 - Danach: Deckungs-Bericht (§2) VOR jedem Training; Training ist ein
   eigener Nutzer-Startknopf.
+
+## §8 DECKUNGS-BERICHT (2026-08-14, vor jedem Training; volle Zahlen:
+## evaluations/ownership_corpus_coverage_report.json, exakt mit den
+## Trainings-Label-Bauern _conjunctions_from_dome/_ownership_from_dome gerechnet)
+
+8000/8000 Partien vollstaendig (0 unvollstaendige). Positive Partien je Seite
+(p0/p1 nahezu symmetrisch -- die beidseitige Verdrahtung traegt; hier p0):
+
+| Einheit | Basisrate Arm A (3000) | bester Anreicherungs-Arm | Hebung |
+|---|---|---|---|
+| SPALTEN voll (k1, +7) | 95 (3,2 %) | B: 419/1000 (42 %); E: 391 mit 506 EINHEITEN (Paare!) | ~13x |
+| Diagonalen (k2, +10) | 11 (0,4 %) | C: 398/1000 (40 %) | ~100x |
+| 8er-Ecken (k5) | 6 (0,2 %) | E: 546/1000 (55 %) | ~270x |
+| 3er-Ecken (k5) | 2786 (93 %) | ueberall dicht | -- |
+| Zeilen voll (k0) | 764 (25 %) | F: 394/1000 | -- |
+| alle Joker (k3) | 1193 (40 %) | ueberall dicht | -- |
+| Farbreihen (k7) | 191 (6 %) | Basisrate reicht (verteidigen-only) | -- |
+| offene Specials Oe (k6) | 3,72 | F: 3,01 (bester), D-Heuristik 4,01 | Spektrum |
+
+Bemerkenswert: Arm E liefert 506 Spalten-EINHEITEN in 391 Partien -- das
+Spaltenpaar-Ziel erzeugt regelmaessig ZWEI volle Spalten je Partie (die
+56-Punkte-Vision des Nutzers, als Trainingsmaterial). Die 8er-Ecken waren
+vor Arm E im Korpus praktisch nicht existent (16 Partien in 4000) und sind
+jetzt mit >1200 Einheiten vertreten.
+
+**VERDIKT: Deckung gegeben, kein Kriterium duenn, beide Seiten symmetrisch --
+der v2-Selektions-Hebel (§2) wird NICHT gebraucht. Der Korpus ist bereit;
+das Training (warm-start, --ownership-weight 0,2 --conjunction
+--extra-data-dir) ist der naechste NUTZER-Startknopf.**
