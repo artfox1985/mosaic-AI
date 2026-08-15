@@ -9,7 +9,7 @@ Ablauf:
   1. Alten dist/build-Output für "Mosaic-AI" entfernen.
   2. `pyinstaller mosaic_release.spec` ausführen.
   3. README_GAME.txt + docs/engine_manual.md ins Bundle kopieren.
-  4. dist/Mosaic-AI/ zu Mosaic-AI_v16_<datum>.zip (Projektroot) packen.
+  4. dist/Mosaic-AI/ zu Mosaic-AI_<champion>_<datum>.zip packen (Name aus models/champion.txt).
 
 Aufruf (im Projekt-Root, mit aktivierter Python-Umgebung, in der
 `pip install pyinstaller` bereits lief):
@@ -65,7 +65,8 @@ def copy_docs() -> None:
 def make_zip() -> Path:
     print("[4/4] Packe ZIP ...")
     date_str = datetime.datetime.now().strftime("%Y%m%d")
-    zip_path = PROJECT_ROOT / "dist" / f"Mosaic-AI_v16_{date_str}.zip"
+    champion = (PROJECT_ROOT / "models" / "champion.txt").read_text(encoding="utf-8").strip()
+    zip_path = PROJECT_ROOT / "dist" / f"Mosaic-AI_{champion}_{date_str}.zip"
     if zip_path.exists():
         zip_path.unlink()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
