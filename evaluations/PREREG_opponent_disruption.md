@@ -109,7 +109,7 @@ Bei AUS: `stoerungs_vorzug` liefert sofort `None`, `drafting_vorzug`s
 `.or_else`-Kette ist dann exakt der Bestand vor diesem Auftrag —
 Bestandsschutz, per Paritaetsprobe zu pruefen (NACH Sweep-Ende, siehe §6).
 
-## §4 Messplan (VORAB festgeschrieben, NICHT gefahren)
+## §4 Messplan (VORAB festgeschrieben -- Ausfuehrung + Zahlen in §7)
 
 **Messgroesse (primaer)**: GEGNER-Plattenpunkte, gepaart (Knopf AN vs. AUS,
 identische Seeds) — Nutzer-Zielgroesse ist STOEREN, nicht die eigene
@@ -196,9 +196,130 @@ und nach diesem Bau). `maturin build --release`: erfolgreich (Wheel liegt
 in `scratchpad/target_decke/wheels/`), **NICHT installiert** — die aktive
 `.pyd` gehoert dem parallel laufenden `ownership_weight`-Sweep.
 
-## §6 Abnahme (NACH Sweep-Ende, nicht Teil dieses Auftrags)
+## §6 Abnahme
 
-1. Wheel-Install + `tools/paritaets_probe.py` — Hash muss halten (Knopf
-   unset = Bestand).
-2. Der volle Messplan aus §4 (Erst- + Replikationslauf, gepoolt).
-3. Ergebnis-Nachtrag in dieser Datei (§7, noch nicht vorhanden).
+1. Wheel-Install + `tools/parity_probe.py` — Hash `8c6684ff...` haelt (vom
+   Koordinator bestaetigt, nach dem `ownership_weight`-Sweep, enthaelt
+   Commit `b28a74a`). GEPRUEFT erneut vor der Messung: haelt.
+2. Der volle Messplan aus §4 (Erst- + Replikationslauf, gepoolt) — siehe §7.
+
+## §7 Ergebnis (2026-08-15) — **ABLEHNUNG**
+
+### §7.1 Aufbau (wie vorregistriert)
+
+`tools/paired_arena_env_ab.py --env-name MOSAIC_OPPONENT_DISRUPTION --arms 0
+1 --control 0 --net-sims 400 --heur-sims 150 --threads 8 --log-games`,
+Champion `v21_2d_brierbest` (Netz = Brett 0, `net_arena_match` — GEPRUEFT
+einseitig: `play_net_game`s `pi==net_board`-Gate, siehe §1 — die Heuristik
+liest `MOSAIC_OPPONENT_DISRUPTION` nicht, die Zuordnung "wer stoert wen" ist
+damit eindeutig). Lauf 1: Basis-Seed 20260815, n=20. Lauf 2 (PFLICHT-
+Replikation): Basis-Seed 20260822 (frisch), n=20. Auswertung:
+`scratchpad/opponent_disruption_analysis.py` (neu, reine Analyse — liest
+`PATTERNS`/`ROUND_PREFIX` aus `analyze_game_log.py` und `mcnemar_exact_p`
+aus `paired_gating.py`, gleiche Wiederverwendung wie `tools/
+plate_points_from_arena.py`, aber fuer die GEGNER-/Heuristik-Seite statt
+der Netz-Seite ausgewertet — das bestehende Werkzeug liefert nur Netz-Zahlen).
+
+### §7.2 Zahlen (Δ = AN minus AUS, gepaart je Seed)
+
+| Groesse | Lauf 1 (n=20) | Lauf 2 (n=20) | GEPOOLT (n=40) |
+|---|---|---|---|
+| Netz-Siege AUS→AN | 17→5 | 15→7 | 32→12 |
+| McNemar (b/c, p) | 1/13, p=0,0018 | 2/10, p=0,0386 | 3/23, **p=0,0001** |
+| Gegner-Punkte Δ | −5,55 (t=−1,36) | −10,15 (t=−1,76) | −7,85 (t=−2,24) |
+| **Gegner-Plattenpunkte Δ (Zielgroesse)** | **+0,95 (t=0,55)** | **−0,85 (t=−0,55)** | **+0,05 (t=0,04)** |
+| Netz-Punkte Δ | −31,25 (t=−9,92) | −34,10 (t=−8,02) | −32,67 (t=−12,46) |
+| Netz-Boden Δ | +8,35 (t=6,53) | +9,70 (t=4,87) | +9,03 (t=7,69) |
+
+**Block-Ebene**: der Standard-`--block-size` (25) machte jeden 20-Partien-
+Lauf zu GENAU EINEM Block — keine feingranulare Innerhalb-Lauf-Blockstruktur
+gefahren (bewusste Zeitentscheidung, siehe §7.4). Als 2-Block-Kontrolle
+(je Lauf ein Block-Mittel, unabhaengige Basis-Seeds) bestaetigt sich die
+Richtung in BEIDEN Bloecken unabhaengig: Gegner-Punkte-Mittel [−5,55;
+−10,15], Netz-Punkte-Mittel [−31,25; −34,10] — kein Einzelblock-Artefakt
+im Sinne der Block-Korrelations-Lehre (dort war GENAU EIN Extremblock die
+ganze "Signifikanz"; hier tragen BEIDE unabhaengigen Bloecke dieselbe
+Richtung und Groessenordnung).
+
+### §7.3 Diagnose (Ursache, nicht nur Befund)
+
+Log-Inspektion (`evaluations/paired_arena_env_opp_disruption_run1.json`,
+Partie Index 0, Seed 20260815): erster Zug des Netzes unter aktivem Knopf
+bereits ein Ueberlauf — `"Netz: 2× gelb von F1 → Reihe 1 [1/1] (+1
+Strafleiste)"` (Reihe 1 hat Kapazitaet 1, die Fabrik bot aber 2 Fliesen,
+eine geht sofort auf die Strafleiste). Ursache GEPRUEFT am Code:
+
+1. `vorzugszug_fuer_farbe` (§5) hat — wie sein Vorbild `vorzugszug_fuer_
+   spalte` bewusst dokumentiert ("KEIN Ueberlauf-Kriterium ... erste
+   Messung ohne") — KEINE Pruefung, ob die Fabrik MEHR Fliesen der
+   Zielfarbe anbietet, als die gewaehlte Musterreihe noch Platz hat. Beim
+   Vorbild ist das ein bekanntes, aber wegen der SCHMALEN Auswahlbedingung
+   (nur EINE feste Zielspalte, nur wenn eine passende Zeile UEBERHAUPT
+   existiert) seltener Fall. Bei `stoerungs_vorzug` ist die Auswahl VIEL
+   BREITER (5 Farben, JEDE offene Gegner-Musterreihe/-Kuppelzelle zaehlt
+   als Bedarf) — der Ueberlauf-Fall tritt dadurch systematisch haeufiger auf.
+2. **Kein Bauer war in dieser Messung aktiv** (`MOSAIC_PLATTENBAU`/
+   `MOSAIC_SPALTENBAU` unbesetzt, wie es der einseitige Vergleich
+   verlangt) — `aktiver_bauer(state)` liefert daher IMMER `None`,
+   `stoerungs_vorzug` ist damit NICHT bloss ein Fallback "wenn der aktive
+   Bauer nichts vorschlaegt" (§2-Absicht), sondern in dieser Messung die
+   EINZIGE UND DAMIT UNBEDINGTE Uebersteuerung der gesamten 400-Sim-Suche,
+   sobald IRGENDEINE vom Gegner gebrauchte Farbe verfuegbar ist — praktisch
+   auf fast jedem Zug. Das Netz spielt unter dem Knopf faktisch nicht mehr
+   MCTS-gefuehrt, sondern ueberwiegend eine gierige Farb-Wegnahme-Heuristik
+   ohne Boden-/Plattenbewusstsein.
+
+Beide Ursachen zusammen erklaeren die Zahlen praezise: Netz-Boden verdoppelt
+sich na­hezu (9,3→17,65 im Mittel, Lauf 1), Netz-Punkte brechen um ~59%
+ein (55,0→23,75), und die Siegquote kollabiert entsprechend.
+
+### §7.4 Vorab-Regel-Anwendung
+
+- **Vorzeichen-Regel (Nutzer-/Koordinator-Vorgabe, k6-Praezedenz)**: nicht
+  einschlaegig im woertlichen Sinn — der Gegner wurde NICHT besser (Gegner-
+  Punkte fielen sogar leicht, −7,85 gepoolt), die Zielgroesse selbst
+  (Gegner-Plattenpunkte) zeigt aber **gar keinen Effekt** (+0,05 gepoolt,
+  t=0,04, Vorzeichen zwischen den beiden Laeufen sogar GEGENLAEUFIG: +0,95
+  vs. −0,85) — die Stoerung erreicht ihr eigenes Ziel nicht messbar.
+- **Kosten-Nutzen-Pflicht-Nebenmessung (§4, wortwoertlich vorregistriert)**:
+  *"ein Stoerungs-Baustein, der die eigene Struktur beschaedigt oder Siege
+  kostet, ist kein Gewinn, selbst wenn er den Gegner drueckt"* — hier
+  beschaedigt er die eigene Struktur KATASTROPHAL (Boden fast verdoppelt,
+  Punkte fast halbiert, Siegquote von 85%/75% auf 25%/35% eingebrochen,
+  gepoolt McNemar p=0,0001) UND erreicht nicht einmal die Zielgroesse.
+  **Klareres Ablehnungsbild als die vorab befuerchtete Vorzeichen-Umkehr.**
+- **Replikations-Pflicht**: erfuellt — beide Laeufe (unabhaengige, frische
+  Seeds) zeigen dieselbe Richtung und Groessenordnung bei Siegquote,
+  Netz-Punkten und Netz-Boden; die Zielgroesse (Gegner-Plattenpunkte)
+  bleibt in BEIDEN Laeufen einzeln UND gepoolt nicht signifikant von 0
+  verschieden.
+
+### §7.5 Verdikt
+
+**ABLEHNUNG.** `MOSAIC_OPPONENT_DISRUPTION` bleibt Default AUS (Bestand,
+unveraendert) und wird NICHT in irgendeinem Training/Gating/Korpus-Lauf
+aktiviert. Der Code (`provocation.rs::gegner_bedarf`/`vorzugszug_fuer_
+farbe`/`stoerungs_vorzug`, `plate_builder.rs::drafting_vorzug`s
+`.or_else`-Zweig) bleibt STEHEN (LOESCHVERBOT) — der Knopf selbst ist
+bereits per Default inert, kein zusaetzliches `#[allow(dead_code)]` noetig
+(anders als bei vollstaendig entkoppeltem Code wie `kuppeldraft_vorzug_
+k6`: hier bleibt der Aufruf-Pfad ERREICHBAR, nur eben standardmaessig aus).
+
+**Falls dieser Baustein spaeter wiederaufgenommen wird**, sind ZWEI
+Konstruktionsfehler zu beheben, nicht nur zu messen:
+1. `vorzugszug_fuer_farbe` braucht eine Ueberlauf-Pruefung (wie viele
+   Fliesen bietet die Fabrik vs. wie viel Platz hat die Zielreihe) —
+   fehlt seit dem Vorbild `vorzugszug_fuer_spalte`, wird dort aber durch
+   eine schmalere Auswahl kaschiert.
+2. `stoerungs_vorzug` braucht eine ECHTE "bei ~gleichwertigen eigenen
+   Zuegen"-Bedingung (Nutzer-Domaenenwissen, §1) statt einer unbedingten
+   Uebersteuerung — z.B. nur greifen, wenn der eigene Zug NICHT schlechter
+   als eine Referenz-Bewertung (Suchwert/`wertung_progress`) ist, statt
+   IMMER zu feuern, sobald irgendein Bedarf existiert. Diese Messung hat
+   das nie geprueft, weil ohne aktiven Bauer keine solche Referenz vorlag —
+   ein GEPAARTER Test GEGEN einen aktiven Bauer (z.B. `MOSAIC_PLATTENBAU=5`
+   + Stoerung als echter Fallback) waere der naechste, andere Versuch, kein
+   Nachbessern DIESER Messung.
+
+Beide Punkte sind NEUE Bausteine, kein Teil dieses Auftrags — als
+`spawn_task`-wuerdiger Folgeauftrag denkbar, aber nicht hier begonnen.
