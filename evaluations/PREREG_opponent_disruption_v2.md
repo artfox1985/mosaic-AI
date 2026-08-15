@@ -1,0 +1,502 @@
+<!-- STATUS: OFFEN | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: OFFEN, vorregistriert 2026-08-16 vor jedem Bau und jeder Messung; Vorstufe (Fensterrate) entscheidet ueber den Bau, Kosten-Waechter entscheidet ueber die Uebernahme -->
+
+# PREREG: Gegner-Stoerung ueber Farbzaehlung, zweiter Anlauf (v2)
+
+Stand 2026-08-16. **PLAN, nichts gebaut, nichts gemessen.** Dieses Dokument
+ist das Ergebnis eines reinen Planungsauftrags; jede Aussage ueber Code ist
+in dieser Sitzung an der genannten Stelle geprueft oder ausdruecklich als
+Herleitung/Annahme markiert (REGEL 0, CLAUDE.md). Durchgehend Plan-Zeitform
+fuer alles Vorgeschlagene; Ist-Zeitform ausschliesslich fuer Bestandscode.
+
+Vorgaenger: `PREREG_opponent_disruption.md` (§7: **ABLEHNUNG** vom
+2026-08-15). Der Bestandscode des ersten Anlaufs bleibt unangetastet
+(LOESCHVERBOT); v2 ist ein NEUER Mechanismus mit NEUEM Knopf, kein
+Nachbessern der abgelehnten Messung.
+
+---
+
+## §1 Was der erste Anlauf hinterlassen hat
+
+Zahlen aus `PREREG_opponent_disruption.md` §7.2 (gepoolt, n=40, nicht neu
+gemessen -- zitiert, nicht nachgerechnet):
+
+- Zielgroesse **Gegner-Plattenpunkte: Δ +0,05 (t=0,04)**, Vorzeichen
+  zwischen den beiden Laeufen gegenlaeufig (+0,95 / −0,85) -- kein Effekt.
+- Kosten: Netz-Siege 32/40 → 12/40, McNemar **p=0,0001**; eigene Punkte
+  **−32,67**; eigener Strafleisten-Boden **+9,03**.
+
+Diagnose des Vorgaengers (§7.3), die v2 adressieren MUSS:
+
+1. **Fehlende Ueberlauf-Pruefung** in `vorzugszug_fuer_farbe` -- die Fabrik
+   bietet mehr Fliesen der Zielfarbe an, als die gewaehlte Musterreihe
+   Platz hat; der Rest faellt sofort auf die Strafleiste.
+2. **Bedingungsloses Feuern**: der Vorzug ersetzte die 400-Sim-Suche auf
+   fast jedem Zug, statt nur bei "ungefaehr gleichwertigen" eigenen Zuegen
+   zu greifen. Nutzer-Domaenenwissen (`docs/domain_knowledge.md`,
+   Abschnitt "4. BAUSTEIN ... Gegner-Stoerung ueber die Farbzaehlung",
+   Zeilen 285-296, in dieser Sitzung gelesen): Stoerung ist ein
+   NEBENZIEL -- *"bei ~gleichwertigen eigenen Zuegen"*. Derselbe Abschnitt
+   nennt "Gegner stoeren" im Pfeiler-Ranking ausdruecklich *"der
+   schwaechste Pfeiler"* (Zeile 282-283).
+
+---
+
+## §2 Code-Pruefung: ist das Q-Abstands-Tor ueberhaupt baubar? (GEPRUEFT)
+
+Kernfrage des Auftrags. Antwort in drei Teilen.
+
+### §2.1 An der heutigen Uebersteuerungsstelle liegen KEINE Suchwerte vor
+
+`plate_builder::drafting_vorzug` (`engine/src/plate_builder.rs:255-259`)
+hat die Signatur `fn drafting_vorzug(state: &GameState) -> Option<Action>`
+-- sie sieht ausschliesslich den Spielzustand. Kein `root_child_q`, keine
+Besuchszahlen, kein Q.
+
+Schlimmer als "nicht durchgereicht": zum Aufrufzeitpunkt EXISTIEREN die
+Werte noch nicht. Beide Netz-Agenten berechnen den Vorzug VOR der Suche
+und ueberspringen die Suche vollstaendig, sobald er `Some` liefert:
+
+- `self_play.rs:1217-1222` (`NetArenaAgent`, der Arena-Pfad, ueber den
+  der erste Anlauf gemessen wurde):
+  `let vorzug_kandidat = ...; let chosen = vorzug_kandidat.clone().or_else(|| net_search_drafting_action(...))`
+- `self_play.rs:1266-1273` (`NetSelfPlayAgent`): identisches Muster, der
+  Vorzugs-Zweig setzt zusaetzlich `root_q = None`, `root_child_q = leer`
+  ("keine echte Suche gelaufen", Doku `self_play.rs:1236-1238`).
+- Dieselbe `.or_else`-Kette noch einmal im Hybrid-Arena-Pfad
+  (`self_play.rs:2414-2418`).
+
+**Verdikt zu Punkt 2 des Auftrags: das Q-Abstands-Tor ist an der heutigen
+Stelle NICHT baubar.** Es ist dort nicht "ein fehlender Parameter", sondern
+eine Kontrollfluss-Frage: wer Q vergleichen will, muss die Suche zuerst
+laufen lassen -- genau das, was der Vorzug heute per Konstruktion einspart.
+
+### §2.2 Die Groesse selbst existiert -- an einer anderen Stelle
+
+`net_mcts::net_root_child_stats_and_policy` (`net_mcts.rs:4334-4419`)
+liefert vier Rueckgabewerte, darunter `Vec<(Action, f64)>` mit der
+**completed-Q je Wurzelkandidat**, laut Doku (`net_mcts.rs:4319-4333`) auf
+der `[0,1]`-Gewinnwahrscheinlichkeits-Skala aus Sicht des an der Wurzel
+ziehenden Spielers, ueber `children ∪ untried`. Das ist exakt die Groesse,
+die ein ε-Tor braucht. Sie kostet keinen zusaetzlichen Netz-Forward (sie
+faellt beim ohnehin gebauten Baum ab).
+
+Verfuegbar ist sie im Self-Play-Pfad (`self_play.rs:2575-2576`), NICHT im
+Arena-Pfad: `NetArenaAgent` ruft `net_search_drafting_action`
+(`net_mcts.rs:4177-4203`), das nur `Option<Action>` zurueckgibt.
+
+### §2.3 Der entscheidende Fund: dieses Tor ist bereits gebaut -- zweimal
+
+`select_final_root_child` (`net_mcts.rs:3150-3156`) ist laut eigener Doku
+(`net_mcts.rs:3140-3145`) *die* gemeinsame Stelle, an der ALLE Aufrufer
+(Self-Play, Arena, GUI/Debug) die tatsaechlich gespielte Wurzelaktion aus
+dem Suchergebnis bestimmen. Im Gumbel-Zweig laeuft dort bereits
+`apply_denial_tiebreak`.
+
+- **E3** (`apply_denial_tiebreak_with`, `net_mcts.rs:2936-2978`): unter
+  allen Wurzelkindern mit `completed_q >= best_q - eps` gewinnt das mit der
+  niedrigsten Gegner-Punkte-Prognose. Knopf `MOSAIC_DENIAL_TIEBREAK_EPS`,
+  Default 0,0 = byte-identisches Bestandsverhalten.
+- **E3b** (`denial_uncert_qualifies`, `net_mcts.rs:3015`;
+  `apply_denial_tiebreak_uncert_with`, `net_mcts.rs:3047-3090`): ersetzt das
+  rohe ε durch Besuchs-Gate `N(a) >= f·N(b)` plus Zwei-Anteils-
+  Standardfehler-Fenster. Knoepfe `MOSAIC_DENIAL_UNCERT_Z` /
+  `MOSAIC_DENIAL_MIN_VISIT_FRAC`.
+- Feuerraten-Zaehler samt Python-Bindung existieren:
+  `note_denial_tiebreak`/`denial_tiebreak_stats` (`net_mcts.rs:2848-2881`),
+  `lib.rs:713-724` und Registrierung `lib.rs:1158-1159`.
+
+**Damit ist die Architekturfrage entschieden**: das "nur bei ungefaehr
+gleichwertig"-Tor wird NICHT neu erfunden und NICHT an `drafting_vorzug`
+angebaut. v2 haengt sich in denselben Mechanismus wie E3/E3b und tauscht
+ausschliesslich das RANGKRITERIUM aus -- statt "niedrigste
+`opp_points`-Kopf-Prognose" (ein Netz-Schaetzwert) das Nutzer-Kriterium
+"nimmt dem Gegner die knappe Farbe weg, die er braucht" (reine
+oeffentliche Buchhaltung, `gegner_bedarf`, `provocation.rs:753-779`).
+
+Das ist zugleich die ehrliche Warnung: **die Aequivalenz-Fenster-Familie
+ist bereits zweimal gemessen und beide Male an der Siegquoten-Wache
+gescheitert** (`PREREG_denial_tiebreak.md`, E3 −13,75pp bei ε=0,03; E3b
+−4,75pp). Siehe §8.
+
+---
+
+## §3 Baustein A: die Ueberlauf-Pruefung (konkret, mit Pruefstelle)
+
+**Was fehlt heute**: `vorzugszug_fuer_farbe` (`provocation.rs:791-819`)
+waehlt unter allen Zuegen mit `m.take.color == farbe` die am weitesten
+gefuellte eigene Musterreihe -- ohne je zu fragen, wie viele Fliesen der
+Zug ueberhaupt bringt. Der Kommentar daran (`provocation.rs:786-788`) erbt
+die Begruendung des Vorbilds `vorzugszug_fuer_spalte`
+(`provocation.rs:524-527`): *"KEIN Ueberlauf-Kriterium: `TakeAction` traegt
+keine Stueckzahl"*.
+
+**Die Stueckzahl ist ableitbar, und die Funktion dafuer existiert schon**:
+`mcts::tiles_taken(state, &m.take) -> usize` (`mcts.rs:573-595`) zaehlt
+exakt, wie viele Steine ein Take-Zug entnimmt (Sonnen-Sektion, Mond-Stapel
+mit passender Oberseite, globaler Mondzug ueber alle Fabriken). Sie wird
+heute in `label_search_move` (`mcts.rs:631-646`) bereits fuer genau diese
+Rechnung benutzt:
+
+```
+let n = tiles_taken(s, &m.take);
+let remaining = row.capacity().saturating_sub(row.tiles.len());
+let overflow = n.saturating_sub(remaining);
+```
+
+`capacity()`/`spaces_left()` sind `PatternLine`-Methoden
+(`board.rs:31-42`), `PatternLine::add_tiles` (`board.rs:56-67`) bestaetigt
+dieselbe Semantik im echten Vollzug.
+
+**Geplante Umsetzung** (drei Zeilen Logik, kein neuer Zaehl-Code):
+
+1. `mcts::tiles_taken` wird von `fn` auf `pub(crate) fn` gehoben
+   (`mcts.rs:573`) -- Wiederverwendung statt Duplikat (CLAUDE.md).
+2. Neue reine Hilfsfunktion in `provocation.rs`:
+   `ueberlauf_von(state, m) -> usize` = obige drei Zeilen, `0` fuer
+   Bodenzuege (`row_index == -1`).
+3. Verwendung als **harter Filter, nicht als Sortierschluessel**: ein
+   Stoerungs-Kandidat kommt nur in Frage, wenn
+   `ueberlauf_von(state, kandidat) <= ueberlauf_von(state, basiszug)`.
+   Der Basiszug ist der Suchsieger; er darf selbst ueberlaufen (das hat die
+   Suche dann so bewertet), aber die Stoerung darf den Ueberlauf nie
+   VERGROESSERN. Genau das ist die Nutzer-Regel "Schadensbegrenzung vor
+   Stoerung" in pruefbarer Form.
+
+**Unit-Test-Pflicht** (Kill-Probe-Standard des Vorgaengers, §5 dort): eine
+Stellung, in der der Stoerzug 2 Fliesen in eine Reihe mit 1 freiem Platz
+legen wuerde, muss ihn verwerfen; Sabotage des Filters muss den Test
+nachweislich rot faerben, bevor er als gruen gilt.
+
+---
+
+## §4 Baustein B: das Gleichwertigkeits-Tor
+
+### §4.1 Gewaehlte Variante B1 (Empfehlung): Rang-Kriterium im E3-Rahmen
+
+**Einhaengepunkt**: `apply_denial_tiebreak`/`select_final_root_child`
+(`net_mcts.rs:3124-3156`) -- also INNERHALB der Suche, nach dem Baumbau,
+vor der finalen Zugwahl. Der Vorzugs-Pfad (`drafting_vorzug`,
+`stoerungs_vorzug`) wird NICHT angefasst und bleibt Default AUS.
+
+**Aequivalenz-Definition**: die E3b-Variante (`denial_uncert_qualifies`,
+`net_mcts.rs:3015`) -- Besuchs-Gate plus Zwei-Anteils-SE-Fenster. Begruendung
+steht in `PREREG_denial_tiebreak.md` (Zeilen 101-109) und ist die teuer
+bezahlte Lehre aus E3: *"Q-Schaetzwerte sind keine Aequivalenzklassen"* --
+der Suchsieger traegt Auswahl-Bias, ein rohes ε tauscht systematisch gegen
+das Urteil der Suche. Ein rohes ε-Tor wird deshalb ausdruecklich NICHT
+vorgeschlagen, obwohl es der naheliegendere Koordinator-Vorschlag war.
+
+**Rang-Kriterium (VORAB festgelegt, danach nicht mehr veraendert)**: unter
+den qualifizierten Kandidaten gewinnt der mit dem groessten
+
+```
+stoerwirkung(m) = min( tiles_taken(state, m.take),  bedarf_akut[farbe(m)] )
+```
+
+- `bedarf_akut` = **nur** der Musterreihen-Anteil aus `gegner_bedarf`
+  (`provocation.rs:759-764`, `spaces_left()` je begonnener Gegner-Reihe),
+  NICHT der Kuppelraster-Anteil (`provocation.rs:765-777`).
+  **Begruendung**: der Raster-Anteil summiert bis zu 36 Zellen und aendert
+  sich ueber eine Runde kaum -- er ist eine Langfrist-Forderung, keine
+  akute. *(Die Zellen-Iteration ueber `0..6 x 0..6` ist geprueft;
+  die Bewertung "swamped die akute Nachfrage" ist eine als solche
+  markierte HERLEITUNG, keine Messung.)*
+- Tie-Break 1: kleineres `noch_erreichbare_farben[farbe]`
+  (`provocation.rs:654-686`) -- knappste Farbe zuerst.
+- Tie-Break 2: kleinerer Kandidat-Index (stabil, deterministisch).
+- Kandidat qualifiziert sich nur bei `stoerwirkung(m) > stoerwirkung(basis)`
+  -- kein Tausch, der nichts gewinnt.
+- Harter Filter aus §3 (Ueberlauf) wird VOR dem Rang geprueft.
+
+**Warum `min(...)`**: eine Farbe wegzunehmen hilft nur bis zu der Menge,
+die der Gegner tatsaechlich noch braucht; 5 Fliesen einer Farbe zu ziehen,
+von der er 1 braucht, ist keine 5-fache Stoerung. *(Modellierungs-
+Entscheidung, nicht gemessen -- deshalb vorab fixiert statt spaeter
+nachjustiert.)*
+
+**Kandidatenmenge**: nur `nodes[0].children`, exakt wie E3
+(`net_mcts.rs:2921-2935`) -- `untried`-Kandidaten haben keine echte
+completed-Q, nur den `v_mix`-Platzhalter.
+
+**Knopf**: `MOSAIC_COLOR_DENIAL_Z` (neu, Default 0,0 = AUS =
+byte-identisches Bestandsverhalten, `OnceLock`+`read_f64_env`-Muster wie
+`net_mcts.rs:2568-2571`) plus `MOSAIC_COLOR_DENIAL_MIN_VISIT_FRAC`
+(Default 0,5). Wechselseitiger Ausschluss mit E3/E3b analog
+`assert_denial_tiebreak_config_not_conflicting` (`net_mcts.rs:3101-3110`):
+zwei gleichzeitig aktive Tie-Break-Kriterien sind ein Konfigurationsfehler,
+kein Feature. Eigene Zaehler nach dem Muster `note_denial_tiebreak`
+(`net_mcts.rs:2848-2881`) mit eigener Python-Bindung (Vorbild `lib.rs:713-724`).
+
+**Was B1 automatisch mitloest** (und was nicht): der Ueberlauf ist im
+Q-Wert des Kandidaten bereits eingepreist (das Netz sieht die Strafleiste),
+und ein Kandidat mit deutlich schlechterem Q faellt aus dem Fenster. Das
+ist ein WEICHER Schutz auf einem Schaetzwert -- genau die Annahme, die E3
+widerlegt hat. Der harte Ueberlauf-Filter aus §3 bleibt deshalb Pflicht,
+zusaetzlich, nicht ersatzweise.
+
+Ebenfalls automatisch: die Wirkung greift in ALLEN Pfaden (Self-Play,
+Arena, GUI), weil `select_final_root_child` laut Doku
+(`net_mcts.rs:3140-3143`) die gemeinsame Stelle ist -- kein Nachziehen von
+vier Aufrufstellen, keine Aenderung an `self_play.rs`.
+
+### §4.2 Verworfene Variante B2: Uebersteuerung NACH der Suche
+
+Kontrollfluss in `NetArenaAgent`/`NetSelfPlayAgent` umbauen (erst suchen,
+dann `stoerungs_vorzug` gegen `root_child_q` gaten).
+
+Bewertung: **baubar, aber schlechter.** Es erfordert Aenderungen an
+mindestens drei Aufrufstellen (`self_play.rs:1217-1222`, `1266-1273`,
+`2414-2418`), im Arena-Pfad zusaetzlich einen Wechsel von
+`net_search_drafting_action` auf `net_root_child_stats_and_policy`
+(`net_mcts.rs:4334`). Dieser Wechsel ist **paritaets-riskant**: die
+gespielte Aktion kommt heute aus `select_final_root_child`
+(`net_mcts.rs:4202`) inklusive Denial-Tie-Break, waehrend
+`net_root_child_stats_and_policy` rohe Stats liefert, aus denen der
+Aufrufer selbst waehlt -- eine unbeabsichtigte Aenderung der gespielten
+Zuege im AUS-Zustand waere ein stiller Bestandsschutz-Bruch. Ausserdem
+verliert der Vorzugs-Pfad seinen einzigen Vorteil (die gesparte Suche),
+weil jetzt IMMER gesucht werden muss. Kein Grund, diesen Weg zu gehen,
+solange B1 dieselbe Semantik an einer bereits erprobten Stelle liefert.
+
+### §4.3 Verworfene Variante B3: billiges Ersatzkriterium ohne Suchwerte
+
+Z.B. "stoere nur, wenn der eigene Zug in dieser Runde ohnehin keine Reihe
+voranbringt" -- rein aus `GameState` ableitbar, damit an `drafting_vorzug`
+baubar.
+
+Bewertung: **verworfen als Hauptweg.** Es ist ein Stellvertreter fuer
+Gleichwertigkeit, kein Mass dafuer; ein Zug kann eine Reihe nicht
+voranbringen und trotzdem der weitaus beste sein (Verweigerung,
+Startspieler-Frage, Boden-Vermeidung). Nach der v1-Erfahrung -- eine
+Heuristik ueberstimmt eine 400-Sim-Suche und die Siegquote kollabiert --
+ist ein weiterer heuristischer Stellvertreter fuer "der Zug kostet nichts"
+das genaue Gegenteil der gezogenen Lehre. Bleibt notiert als Rueckfalloption
+NUR fuer den Fall, dass B1 an einem hier nicht vorhergesehenen technischen
+Hindernis scheitert; dann mit eigener Vorregistrierung.
+
+---
+
+## §5 Vorab-Diagnose: die billige Messung VOR dem Bau
+
+Ziel: die Frage *"tritt ein Q-nahes Stoerfenster ueberhaupt auf?"* soll
+beantwortet sein, bevor Aufwand in Messung und Auswertung fliesst. Ein
+klares Nein hier ist ein wertvolles Ergebnis.
+
+### §5.1 Stufe 0 (kostenlos, KEIN Bau): Fensterrate aus Bestandsdaten
+
+Die Self-Play-JSONs tragen je echtem Drafting-Entscheid `root_child_q`
+parallel zu `policy` (geschrieben in `self_play.rs:1576-1578` ueber
+`root_child_q_field`, `self_play.rs:2688-2692`; die Laengen-/
+Reihenfolgen-Gleichheit ist per Assertion abgesichert,
+`self_play.rs:2626-2631`). Eine reine Python-Auswertung ueber vorhandene
+Self-Play-Dateien zaehlt daraus, in wie viel Prozent der Entscheide
+mindestens ein Nicht-Sieger im Fenster liegt.
+
+**Ehrliche Erwartung, vorab notiert**: diese Stufe wird mit hoher
+Wahrscheinlichkeit bestehen -- E3b hat mit derselben Fensterdefinition
+(z=1,0, f=0,5) eine Feuerrate von **36,52%** gemessen
+(`PREREG_denial_tiebreak.md` Zeilen 137-143, `evaluations/e3b_firing_rate.json`).
+Stufe 0 dient deshalb primaer als **Instrumenten-Probe** (liefert der
+Datensatz ueberhaupt auswertbare `root_child_q`-Felder?), nicht als echtes
+Tor. Kein Besuchszaehler in den JSONs → das Besuchs-Gate ist offline nur
+naeherungsweise nachbildbar; die Rate ist damit eine OBERGRENZE, und das
+wird im Ergebnis so berichtet.
+
+### §5.2 Stufe 1 (kleiner Bau, ZAEHL-MODUS ohne Tausch): die eigentliche Zahl
+
+Gebaut wird B1 vollstaendig, aber mit einem **Trockenlauf-Schalter**: der
+Tie-Break wertet aus und zaehlt, gibt aber IMMER den Basiszug zurueck. Die
+gespielten Partien sind damit byte-identisch zum Bestand; gemessen wird
+nur die Rate.
+
+Gezaehlt werden drei Zahlen (drei Atomics nach dem Muster
+`net_mcts.rs:2848-2863`):
+
+| Zaehler | Bedeutung |
+|---|---|
+| `total` | ausgewertete Wurzelentscheidungen |
+| `fenster` | davon mit >=1 qualifiziertem Nicht-Sieger (Besuchs-Gate + SE-Fenster) |
+| `stoerbar` | davon mit >=1 Kandidat, der zusaetzlich den Ueberlauf-Filter (§3) besteht UND `stoerwirkung > basis` hat |
+
+Entscheidende Groesse ist `stoerbar / total`.
+
+**Treiber**: `tools/e3b_firing_rate.py` (existiert) wird als Vorlage
+uebernommen. Sein Kopf-Kommentar (Zeilen 7-23, in dieser Sitzung gelesen)
+dokumentiert die Falle, die hier genauso gilt: die Zaehler sind
+prozessglobale Atomics, `self_play.py` und `paired_arena_env_ab.py` fuehren
+sie im KIND-Prozess, der Elternprozess liest `(0,0)` -- das saehe wie
+"Rate 0%" aus und wuerde die Abbruchregel FALSCH-POSITIV ausloesen.
+`mosaic_rust.net_arena_match` dagegen threadet im selben Prozess.
+**Pflicht-Plausibilitaetspruefung uebernommen**: `total > 0`, sonst
+"INSTRUMENT KAPUTT" statt einer Rate.
+
+**Umfang**: 200 Partien, Champion@400 vs Heuristik@150dyn, ein frischer
+Seed (Konvention der E3b-Stufe-1-Messung).
+
+**ABBRUCHREGEL (vorab, bindend)**: `stoerbar/total < 5%` → **v2 wird ohne
+Arena-Messung geschlossen**, Ergebnis dokumentiert, kein weiterer Aufwand.
+Begruendung der Schwelle: unter dieser Eingriffstiefe koennte die Arena
+einen Effekt ohnehin nicht aufloesen (identische Schwelle und Begruendung
+wie `PREREG_denial_tiebreak.md` Zeilen 132-135).
+
+**Gegenwarnung, ebenfalls vorab**: eine HOHE Rate ist KEIN gutes Zeichen
+und kein Vorab-Erfolg. E3b feuerte in 36,52% der Entscheidungen und
+verlor trotzdem 4,75pp. Die Rate entscheidet nur, ob die Messung
+aussagekraeftig sein KANN, nicht ob der Mechanismus taugt.
+
+---
+
+## §6 Messplan, Falsifikation und Abbruch (alles vorab bindend)
+
+### §6.1 Aufbau
+
+`tools/paired_arena_env_ab.py --env-name MOSAIC_COLOR_DENIAL_Z --arms 0 1
+--control 0`, Champion@400 vs Heuristik@150dyn, einseitig (die Heuristik
+liest den Knopf nicht -- die Zuordnung "wer stoert wen" bleibt damit
+eindeutig, wie im Vorgaenger §7.1). Auswertung wieder ueber
+`scratchpad/opponent_disruption_analysis.py` (Gegner-/Heuristik-Seite),
+Signifikanztests **auf Block-Ebene** (`feedback_arena_block_correlation`).
+
+### §6.2 Stichprobengroesse: mindestens 2 x 200 gepaarte Partien
+
+Der Vorgaenger mass die Zielgroesse mit n=40 -- fuer die Zielgroesse
+selbst deutlich zu wenig. **Hergeleitet aus `PREREG_opponent_disruption.md`
+§7.2** (Δ=0,95 bei t=0,55, n=20; reine Arithmetik auf berichteten Zahlen,
+nicht neu gemessen): SE ≈ 1,73 → SD der gepaarten Differenz ≈ 7,7. Damit
+liegt die kleinste bei 80% Power und α=0,05 nachweisbare Differenz bei
+n=200 gepaarten Partien bei **≈ 1,5 Gegner-Plattenpunkten**; bei n=40 waere
+sie ≈ 3,4 gewesen. Da die Entscheidung auf BLOCK-Ebene faellt und
+Block-SEs groesser sind als Paar-SEs, ist das eine optimistische
+Untergrenze und wird als solche berichtet.
+
+Zwei Laeufe mit unabhaengigen, frischen Basis-Seeds; **Replikation ist
+Pflichtteil, nicht Option** (Lambda-Lehre: Vorzeichenwechsel zwischen
+Laeufen). Entscheidung gepoolt ueber beide Laeufe.
+
+### §6.3 Zielgroesse (unveraendert gegenueber v1)
+
+**Gegner-Plattenpunkte, gepaart** (Knopf AN vs. AUS, identische Seeds),
+bezogen auf ein festes Brett. Sekundaer deskriptiv: Gegner-Gesamtpunkte,
+Gegner-Boden.
+
+### §6.4 Kosten-Waechter: HARTES Vorab-Kriterium, nicht Nebenmessung
+
+Der Vorgaenger fuehrte die Kosten als "Pflicht-Nebenmessung"; v2 macht sie
+zum **vorrangigen Abbruchkriterium**. Ausgewertet wird die Kosten-Seite
+ZUERST:
+
+1. **McNemar auf Siege**: p < 0,05 gegen den Stoerungs-Arm → **ABBRUCH und
+   ABLEHNUNG**, unabhaengig davon, was die Zielgroesse zeigt. Kein
+   Abwaegen, kein "aber die Stoerung wirkt".
+2. **Punktschaetzer-Wache** (Nutzer-Philosophie *"rein, wenn es nicht
+   schadet"*, uebernommen aus `PREREG_denial_tiebreak.md` Zeilen 188-198):
+   faellt die Siegquoten-Punktschaetzung unter die Kontrolle, gibt es
+   **keine Uebernahme**, auch ohne Signifikanz. Die Beweislast liegt auf
+   Schadensfreiheit, nicht auf Schadensnachweis.
+3. **Eigene Punkte / eigener Boden**: auf Block-Ebene signifikant
+   schlechter (zweiseitig, α=0,05) → ABBRUCH. Beim Vorgaenger waren das
+   −32,67 Punkte und +9,03 Boden; jede Wiederholung dieser
+   Groessenordnung beendet den Versuch sofort.
+
+### §6.5 Vorzeichen-Regel (unveraendert uebernommen)
+
+Erzielt der Gegner unter aktivem Knopf **bessere** Plattenpunkte als ohne,
+ist das ein **ABLEHNUNGS-, kein Interpretationsfall** (k6-Praezedenz,
+`PREREG_provocation.md` §19; v1 §4). Kein Nachjustieren des
+Rang-Kriteriums oder der Zielfarben-Wahl mitten in der Messung.
+
+### §6.6 Uebernahme nur bei ALLEN drei Bedingungen
+
+- Kosten-Waechter §6.4 vollstaendig bestanden (alle drei Punkte), UND
+- Zielgroesse gepoolt signifikant in der gewuenschten Richtung
+  (Gegner-Plattenpunkte niedriger, Block-Ebene, α=0,05), UND
+- Richtung in BEIDEN Laeufen einzeln gleich (kein Vorzeichenwechsel).
+
+Andernfalls: Knopf bleibt Default 0, Ergebnis wird dokumentiert, Code
+bleibt stehen (LOESCHVERBOT), Status-Kopf auf ENTSCHIEDEN.
+
+### §6.7 Reihenfolge und Sperren
+
+1. Stufe 0 (§5.1) -- kostenlos, jederzeit.
+2. Bau B1 im Zaehl-Modus + `cargo test --lib` (0 failed vor und nach) +
+   **Wheel neu bauen** (`feedback_wheel_neu_bauen_nach_engine_aenderung`:
+   gruene `cargo test` heissen nicht, dass die Arena den Code sieht) +
+   Default-Paritaetsprobe (`tools/parity_probe.py`, Hash haelt).
+3. Stufe 1 (§5.2) -- Abbruchregel.
+4. Erst danach Tausch-Modus scharfschalten und §6 messen.
+5. Keine Messung, solange ein anderer Lauf die installierte `.pyd`
+   belegt (Wheel-Install-Sperre wie im Vorgaenger).
+
+---
+
+## §7 Was v2 ausdruecklich NICHT tut
+
+- **Kein Anfassen von `stoerungs_vorzug`/`vorzugszug_fuer_farbe`/
+  `drafting_vorzug`** (`provocation.rs:791-858`,
+  `plate_builder.rs:255-259`). Der abgelehnte Pfad bleibt Default AUS und
+  unveraendert stehen. Die Ueberlauf-Pruefung aus §3 wird als neue,
+  eigenstaendige Hilfsfunktion gebaut und im NEUEN Pfad benutzt; ob sie
+  zusaetzlich in den alten Pfad eingehaengt wird, ist bewusst NICHT Teil
+  dieses Plans (das waere ein Nachbessern einer abgelehnten Messung).
+- **Kein Kombinieren mit E3/E3b** -- gegenseitiger Ausschluss per
+  Konfigurations-Abbruch (§4.1).
+- **Keine Aktivierung in Gating, Training oder Korpus-Generierung.**
+  Reiner Diagnose-Knopf, wie alle Bausteine seit `PREREG_provocation.md`.
+- **Keine Dosis-Variante als Rettung.** Scheitert B1, ist die Familie
+  geschlossen; eine Wiedereroeffnung braucht einen NEUEN Mechanismus, nicht
+  ein anderes z (dieselbe Regel, die sich `PREREG_denial_tiebreak.md`
+  Zeilen 208-209 selbst gegeben hat).
+
+---
+
+## §8 Lohnt sich das ueberhaupt? -- ehrliche Einschaetzung
+
+**Meine Einschaetzung: der Bau lohnt sich nur bis Stufe 1, und die
+Erfolgswahrscheinlichkeit der vollen Messung ist niedrig.**
+
+Was fuer einen zweiten Anlauf spricht:
+
+- Der erste Anlauf hat sein Ziel nie fair getestet. Er hat die Suche
+  ueberstimmt und das eigene Spiel zerstoert; die "+0,05 an der Zielgroesse"
+  sind unter diesen Bedingungen kein Beleg fuer "Stoerung wirkt nicht",
+  sondern ein Messwert aus einer kaputten Konfiguration. Die eigentliche
+  Nutzer-Idee -- stoeren, wenn es nichts kostet -- war nie in der Arena.
+- Die Bau-Kosten sind ungewoehnlich niedrig: Einhaengepunkt, Fenster-
+  Definition, Zaehler, Python-Bindung und Mess-Treiber existieren alle
+  (§2.3, §5.2). v2 ist im Kern ein ausgetauschtes Rang-Kriterium.
+- Stufe 1 ist ein billiges, aussagekraeftiges Tor mit Trockenlauf und
+  Paritaets-Garantie: sie kann den Punkt fuer wenig Geld schliessen.
+
+**Das Gegenargument, das ich fuer staerker halte:**
+
+1. **Dieselbe Architektur ist zweimal gescheitert.** E3 und E3b haben genau
+   das gebaut, was hier vorgeschlagen wird -- Gleichwertigkeitsfenster an
+   der Wurzel, Tausch zugunsten des Gegner-Schadens -- und haben −13,75pp
+   bzw. −4,75pp gekostet. v2 aendert nur, WORAN die Stoerung gemessen wird
+   (Farbzaehlung statt `opp_points`-Kopf), nicht die Bauart. Wenn der
+   Verlust von der Bauart kommt (Tausch gegen das Urteil der Suche, auf
+   geschaetzten Aequivalenzklassen), hilft ein anderes Rangkriterium nicht.
+2. **Plausibel ist schlicht, dass Farbstoerung im 2-Spieler-Spiel zu
+   schwach ist.** Eine weggenommene Fliese ist nur dann eine Stoerung,
+   wenn der Gegner sie nicht anderswo bekommt und sie ihm akut fehlt --
+   zwei Bedingungen, die selten gemeinsam gelten, weil mehrere Fabriken
+   dieselbe Farbe anbieten und der Beutel nachliefert. Das
+   Nutzer-Domaenenwissen selbst nennt "Gegner stoeren" *"der schwaechste
+   Pfeiler"* und den einzigen bisher gemessenen Versuch (λ-Denial) als
+   nicht repliziert (`docs/domain_knowledge.md` Zeilen 282-283).
+   Das v1-Ergebnis an der Zielgroesse (0,05, Vorzeichen gegenlaeufig)
+   passt zu dieser Lesart -- schwach, aber es passt.
+3. **Selbst ein Erfolg an der Zielgroesse waere kein Staerkegewinn.**
+   Gegner-Plattenpunkte zu druecken ist die Nutzer-Zielgroesse, nicht die
+   Elo. Ein Mechanismus, der 1,5 Gegner-Plattenpunkte kostet und die
+   Siegquote unveraendert laesst, hat gemessen NICHTS an der Spielstaerke
+   geaendert -- er hat den Nutzer-Wunsch erfuellt. Das ist ein legitimes
+   Ziel, sollte aber nicht als Staerke-Arbeit verbucht werden.
+
+**Empfehlung**: Stufe 0 und Stufe 1 fahren (billig, mit klarer
+Abbruchregel), die 2 x 200-Arena nur bei `stoerbar/total >= 5%` UND
+erklaertem Nutzer-Go im vollen Wissen um die E3/E3b-Vorgeschichte. Wenn
+die Zeit knapp ist und zwischen v2 und einem Staerke-Hebel gewaehlt werden
+muss, gehoert die Zeit dem Staerke-Hebel: der beste realistische Ausgang
+von v2 ist "stoert messbar, kostet nichts" -- ein Nutzer-Wunsch erfuellt,
+kein Elo gewonnen.
