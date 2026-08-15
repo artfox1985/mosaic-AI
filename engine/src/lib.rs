@@ -13,6 +13,7 @@ pub mod execution;
 pub mod factory;
 pub mod features;
 pub mod game;
+pub mod knob_registry;
 pub mod mcts;
 pub mod moves;
 pub mod net;
@@ -656,6 +657,17 @@ fn engine_config_json() -> String {
     .to_string()
 }
 
+/// Registratur aller `MOSAIC_*`-Laufzeit-Knoepfe als JSON (Architektur-
+/// Fahrplan Punkt 3) -- duenner Wrapper um `knob_registry::registry_json`
+/// (dort die Tabelle + der Waechter-Test), gleiches Export-Muster wie
+/// [`engine_config_json`]. Anders als `engine_config_json` liest diese
+/// Funktion KEINE Laufzeitwerte -- sie liefert die deklarierte Tabelle
+/// (Name, Default, Status, Kurzzweck, Prereg-Verweis).
+#[pyfunction]
+fn knob_registry_json() -> String {
+    crate::knob_registry::registry_json()
+}
+
 /// GUI-Aggressivitäts-Regler (Task #28, `PREREG_task28_aggression.md` Punkt 4
 /// + `evaluations/STATUS.md` Abschnitt "Task #28 DURCHGEFUEHRT"): setzt die
 /// beiden Laufzeit-Parameter des Score-/Denial-Utility-Blends SOFORT neu
@@ -1140,6 +1152,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(profiling_reset, m)?)?;
     m.add_function(wrap_pyfunction!(profiling_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(engine_config_json, m)?)?;
+    m.add_function(wrap_pyfunction!(knob_registry_json, m)?)?;
     m.add_function(wrap_pyfunction!(set_aggression_params, m)?)?;
     m.add_function(wrap_pyfunction!(get_aggression_params, m)?)?;
     m.add_function(wrap_pyfunction!(denial_tiebreak_stats, m)?)?;
