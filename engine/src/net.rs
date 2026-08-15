@@ -33,7 +33,7 @@ use tract_onnx::tract_hir::internal::DimLike;
 /// aufrufen kann, ohne selbst zu wissen, ob `ort` ueberhaupt im
 /// Abhaengigkeitsbaum ist (`ort` bleibt optional, siehe `Cargo.toml`). Bei
 /// aktivem Feature: Knopf pruefen, ORT-CUDA versuchen, bei Fehler EINMAL
-/// warnen und `None` liefern (Aufrufer faellt weiter auf Torch/IPC/tract
+/// warnen und `None` liefern (Aufrufer faellt weiter auf tract
 /// zurueck). Bei fehlendem Feature: `net_ort` existiert nicht einmal als
 /// Modul (siehe `lib.rs`), diese Funktion ist dann ein reiner
 /// Kompilierzeit-No-Op (wird zu einem `None`-Literal weginlined).
@@ -237,10 +237,10 @@ impl Net {
 
     /// Gesamtlaenge des `&[f32]`-Merkmalspuffers je Position, den
     /// `eval`/`eval_pair`/`eval_batch` erwarten (= `layout().flat_len()`,
-    /// hier nur oeffentlich gemacht -- Weg A / `net_ipc.rs` braucht diese
-    /// Groesse aussserhalb von `net.rs`, ohne `InputLayout::flat_len` selbst
-    /// oeffentlich machen zu muessen). Rein additiv, keine bestehende
-    /// Aufrufstelle betroffen.
+    /// hier nur oeffentlich gemacht -- Aufrufer ausserhalb von `net.rs`
+    /// (`net_ort.rs`-/`net_batcher.rs`-Tests) brauchen diese Groesse, ohne
+    /// `InputLayout::flat_len` selbst oeffentlich machen zu muessen). Rein
+    /// additiv, keine bestehende Aufrufstelle betroffen.
     pub fn input_size(&self) -> usize {
         self.input_size
     }
@@ -456,28 +456,19 @@ impl Net {
         &self,
         feats: &[&[f32]],
     ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
-        // Rangfolge der drei Backends (festgelegt in `net_ort.rs`-
-        // Modulkommentar, Nutzer-Auftrag "fang an" 2026-08-12):
+        // Rangfolge der zwei Backends (festgelegt in `net_ort.rs`-
+        // Modulkommentar; Weg A / Torch-IPC ist 2026-08-15 entfernt, gemessen
+        // verworfen -- PREREG_gpu_inference_path.md §9: 0,30x/0,55x):
         //   1) Weg B: ORT-CUDA (`net_ort.rs`) -- ZUERST geprueft.
-        //   2) Weg A: Torch/IPC (`net_ipc.rs`) -- NUR falls (1) keinen
-        //      Erfolg hatte. Bleibt als Knopf stehen (ausgemessen, PREREG
-        //      §9: 0,30x/0,55x, NICHT gedeckt), darf aber Weg B nicht
-        //      verdecken -- deshalb hier an zweiter, nicht erster Stelle.
-        //   3) tract (Bestandsverhalten) -- IMMER als letzter Fallback.
-        // Bei (1) UND (2) aus (Default) wird WEDER `net_ort` NOCH `net_ipc`
-        // ueberhaupt betreten -- der Code unten laeuft dann BYTE-IDENTISCH
-        // wie vor Weg A/B. `ort_cuda_hook::try_eval_batch` ist bei fehlendem
+        //   2) tract (Bestandsverhalten) -- IMMER als letzter Fallback.
+        // Bei (1) aus (Default) wird `net_ort` ueberhaupt nicht betreten --
+        // der Code unten laeuft dann BYTE-IDENTISCH wie vor Weg B.
+        // `ort_cuda_hook::try_eval_batch` ist bei fehlendem
         // `ort_cuda_probe`-Feature ein Kompilierzeit-No-Op (siehe dortige
         // Definition unten) -- `ort` bleibt eine optionale Abhaengigkeit,
         // ein Bau ohne das Feature zieht sie nicht herein.
         if let Some(rows) = ort_cuda_hook::try_eval_batch(self, feats) {
             return Ok(rows);
-        }
-        if crate::net_ipc::ipc_enabled() {
-            match crate::net_ipc::eval_batch_via_ipc(feats) {
-                Ok(result) => return Ok(result),
-                Err(e) => crate::net_ipc::warn_ipc_fallback_once(&e),
-            }
         }
         // Task #32: siehe `eval`-Kommentar oben.
         crate::profiling::selfplay_profile::timed(

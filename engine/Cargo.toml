@@ -16,11 +16,6 @@ rayon = "1"
 serde_json = "1"
 # Reines Rust ONNX-Inferenz (Network-Modus, Phase B) — kein libtorch/onnxruntime nötig.
 tract-onnx = "0.21"
-# Weg A (PREREG_gpu_inference_path.md, net_ipc.rs): speicherabgebildete Dateien
-# als Nutzlast-Puffer für den optionalen Torch/CUDA-IPC-Kanal. War schon
-# transitiv (via tract-onnx) im Lockfile (0.9.11) — hier nur zur direkten
-# Abhängigkeit erhoben, kein neuer Abhängigkeitsbaum.
-memmap2 = "0.9"
 # pyo3-Version wird via `cargo add` auf die neueste 3.14-kompatible gesetzt.
 # Weg B (PREREG_gpu_inference_path.md §6 Schritt 2, NUR Kennlinien-Messung, keine
 # Verdrahtung): ort-Crate mit CUDA-Execution-Provider fuer den Kennlinien-Probe

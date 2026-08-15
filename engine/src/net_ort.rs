@@ -1,10 +1,10 @@
 //! Weg B (`evaluations/PREREG_gpu_inference_path.md` §3/§6/§11, Nutzer-Auftrag
 //! "fang an" 2026-08-12): optionaler ONNX-Runtime-CUDA-Kanal statt tract,
-//! NUR fuer [`crate::net::Net::eval_batch`] -- gleiche Idee wie Weg A
-//! (`net_ipc.rs`), aber ohne Prozessgrenze: kein Python, kein IPC-Rundlauf,
-//! ein Speicherbild. GEDECKT nach Regel 3 (§11: 7,0x-18,5x gegen den
-//! tract-CPU-Bezug, vom Nutzer aus `evaluations/ort_cuda_batch_throughput.json`
-//! nachgeprueft).
+//! NUR fuer [`crate::net::Net::eval_batch`] -- gleiche Idee wie der 2026-08-15
+//! entfernte Weg A (Torch/IPC, gemessen verworfen, PREREG §9), aber ohne
+//! Prozessgrenze: kein Python, kein IPC-Rundlauf, ein Speicherbild. GEDECKT
+//! nach Regel 3 (§11: 7,0x-18,5x gegen den tract-CPU-Bezug, vom Nutzer aus
+//! `evaluations/ort_cuda_batch_throughput.json` nachgeprueft).
 //!
 //! `#![cfg(feature = "ort_cuda_probe")]` unten: diese Datei wird nur
 //! compiliert, wenn das Feature aktiv ist -- `ort` bleibt eine OPTIONALE
@@ -14,24 +14,20 @@
 //! `#[cfg(feature = "ort_cuda_probe")]`-gated -- doppelt abgesichert, falls
 //! diese Zeile hier je entfernt wuerde.
 //!
-//! ## Rangfolge der drei Backends (festgelegt hier, verdrahtet in
+//! ## Rangfolge der zwei Backends (festgelegt hier, verdrahtet in
 //! `net.rs::eval_batch`)
 //!
 //! 1. **ORT-CUDA** (dieses Modul) -- geprueft ZUERST. Wenn `MOSAIC_ORT_CUDA_
 //!    ENABLED=1` UND das Feature beim Bauen aktiv war UND die Session fuer
 //!    dieses `Net` erfolgreich aufgebaut werden konnte (oder schon aufgebaut
 //!    ist), laeuft der Batch hierueber.
-//! 2. **Torch/IPC** (`net_ipc.rs`, Weg A) -- geprueft ZWEITENS, NUR wenn
-//!    Schritt 1 keinen Erfolg hatte (Knopf aus, Feature nicht gebaut, oder
-//!    Session nicht aufbaubar). Weg A ist ausgemessen und nach Regel 3
-//!    NICHT gedeckt (PREREG §9: 0,30x/0,55x gegen synchrones tract) -- der
-//!    Knopf bleibt trotzdem stehen (nicht entfernen, siehe Auftrag), darf
-//!    aber den staerkeren Weg-B-Pfad nicht verdecken. Deshalb PRUEFT
-//!    `net.rs::eval_batch` Schritt 1 vor Schritt 2 im Code, nicht umgekehrt.
-//! 3. **tract** (Bestandsverhalten) -- IMMER als letzter Fallback verfuegbar,
-//!    NIE abschaltbar. Bei Schritt 1 UND 2 aus (Default) wird weder dieses
-//!    Modul noch `net_ipc.rs` ueberhaupt betreten -- byte-identisches
-//!    Bestandsverhalten.
+//! 2. **tract** (Bestandsverhalten) -- IMMER als letzter Fallback verfuegbar,
+//!    NIE abschaltbar. Bei Schritt 1 aus (Default) wird dieses Modul
+//!    ueberhaupt nicht betreten -- byte-identisches Bestandsverhalten.
+//!
+//! (Der fruehere Schritt 2, Weg A / Torch-IPC aus `net_ipc.rs`, ist am
+//! 2026-08-15 entfernt worden -- gemessen verworfen, PREREG §9:
+//! 0,30x/0,55x gegen synchrones tract.)
 //!
 //! ## Knopf (Default AUS = Bestandsverhalten)
 //!
@@ -84,8 +80,8 @@
 //! Fehler zurueck und entscheiden selbst, dass tract (der validierte,
 //! gemessene CPU-Pfad) der richtige Fallback ist, nicht ORTs eigener.
 //! Ein einmal als nicht aufbaubar erkannter Session-Slot wird fuer die
-//! Prozesslaufzeit NICHT erneut versucht -- gleiche bewusste Vereinfachung
-//! wie `net_ipc.rs`.
+//! Prozesslaufzeit NICHT erneut versucht -- bewusste Vereinfachung: kein
+//! periodischer Retry, kein Health-Check-Thread.
 //!
 //! ## Was NICHT Teil dieses Moduls ist
 //!
@@ -117,9 +113,9 @@ use ort::value::Tensor;
 
 use crate::net::{split_batch_n, split_planes_flat_batch, InputLayout, Net};
 
-/// Liest eine `MOSAIC_*`-Bool-Env-Var einmalig -- lokal dupliziert statt aus
-/// `net_ipc.rs` importiert (gleiche Begruendung wie dort: Module sollen
-/// unabhaengig voneinander bleiben, kein Kreuz-Import zwischen den drei
+/// Liest eine `MOSAIC_*`-Bool-Env-Var einmalig -- lokal dupliziert statt
+/// importiert (gleiches Muster wie `net_mcts.rs`/`tiling_solver.rs`: Module
+/// sollen unabhaengig voneinander bleiben, kein Kreuz-Import zwischen den
 /// Backend-Kanaelen).
 fn read_bool_env_once(cell: &'static OnceLock<bool>, name: &str, default: bool) -> bool {
     *cell.get_or_init(|| match std::env::var(name) {
@@ -138,15 +134,15 @@ pub(crate) fn ort_cuda_enabled() -> bool {
 
 /// Einmalige Warnung, wenn der Knopf an, aber die Session nicht (mehr)
 /// nutzbar ist -- gleiches "einmal loggen"-Muster wie
-/// `net_ipc::warn_ipc_fallback_once`.
+/// `net_mcts::warn_missing_opp_head_once`.
 static WARNED_ORT_CUDA_FALLBACK: OnceLock<()> = OnceLock::new();
 
 pub(crate) fn warn_ort_cuda_fallback_once(reason: &str) {
     WARNED_ORT_CUDA_FALLBACK.get_or_init(|| {
         eprintln!(
             "⚠️  MOSAIC_ORT_CUDA_ENABLED=1 gesetzt, aber der ORT-CUDA-Kanal ist nicht \
-             nutzbar ({reason}) -- falle auf Torch/IPC (falls dessen Knopf an ist) oder \
-             tract zurueck (siehe PREREG_gpu_inference_path.md §11). Diese Meldung erscheint \
+             nutzbar ({reason}) -- falle auf tract zurueck (siehe \
+             PREREG_gpu_inference_path.md §11). Diese Meldung erscheint \
              nur einmal je Prozess."
         );
     });
@@ -154,7 +150,7 @@ pub(crate) fn warn_ort_cuda_fallback_once(reason: &str) {
 
 /// Registrierter Zustand je `Net`-Instanz (Zeiger-Identitaet, siehe
 /// Modul-Kommentar). `Unavailable` ist ENDGUELTIG fuer die Prozesslaufzeit --
-/// kein Retry, gleiche Vereinfachung wie `net_ipc::ChannelState`.
+/// kein Retry (siehe Modul-Kommentar "Fallback").
 enum SessionSlot {
     Ready(Mutex<Session>),
     Unavailable,
@@ -253,8 +249,8 @@ fn build_ort_inputs(layout: InputLayout, feats: &[&[f32]]) -> Result<Vec<(&'stat
 ///
 /// NIE ein Panic: jeder Fehlerfall (Session-Aufbau, Tensor-Bau,
 /// `session.run`, Ausgaben-Extraktion) wird als `Err(String)` an den
-/// Aufrufer zurueckgegeben, der (in `net.rs::eval_batch`) weiter auf
-/// Torch/IPC oder tract zurueckfaellt.
+/// Aufrufer zurueckgegeben, der (in `net.rs::eval_batch`) auf tract
+/// zurueckfaellt.
 pub(crate) fn eval_batch_via_ort_cuda(
     net: &Net,
     feats: &[&[f32]],
@@ -304,7 +300,7 @@ mod tests {
         // Eigene, synthetische Env-Var statt `MOSAIC_ORT_CUDA_ENABLED` direkt
         // zu setzen -- verhindert Kontamination des Prozess-weiten
         // `OnceLock`-Caches fuer parallel laufende `cargo test`-Threads
-        // (gleiches Vorsichts-Muster wie `net_ipc.rs`-Tests).
+        // (gleiches Vorsichts-Muster wie `net_batcher.rs`-Tests).
         static CELL: OnceLock<bool> = OnceLock::new();
         assert!(!read_bool_env_once(&CELL, "MOSAIC_ORT_CUDA_ENABLED_TEST_UNSET_XYZ", false));
     }

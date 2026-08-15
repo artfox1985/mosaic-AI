@@ -25,10 +25,10 @@
 //! - **Sammel-Faden**: EIN dedizierter `std::thread`, haelt `Arc<Net>` fuer
 //!   seine gesamte Lebensdauer (muss `'static` sein, siehe
 //!   [`spawn_batcher`]), zieht bis zu `batch_max` Zeilen, ruft
-//!   **`Net::eval_batch`** -- damit laeuft der optionale Torch/CUDA-IPC-Kanal
-//!   (`net_ipc.rs`, `net.rs::eval_batch` Zeile ~370) automatisch mit, wenn er
-//!   zusaetzlich eingeschaltet ist. Verteilt die Ergebnisse zeilenweise an
-//!   die jeweiligen Antwort-Kanaele zurueck.
+//!   **`Net::eval_batch`** -- damit laeuft der optionale ORT-CUDA-Kanal
+//!   (`net_ort.rs`, Backend-Rangfolge in `net.rs::eval_batch`) automatisch
+//!   mit, wenn er zusaetzlich eingeschaltet ist. Verteilt die Ergebnisse
+//!   zeilenweise an die jeweiligen Antwort-Kanaele zurueck.
 //! - **Deadlock-Waechter**: die Fuell-Schleife wartet auf JEDES weitere
 //!   Element nur bis [`fill_timeout`] (Default 200µs, siehe dortige
 //!   Begruendung) -- kommt in dieser Zeit nichts mehr, wird der bisher
@@ -167,10 +167,10 @@ fn collector_loop(
         }
 
         let feats_refs: Vec<&[f32]> = batch.iter().map(|r| r.feats.as_slice()).collect();
-        // Genau HIER laeuft (bei eingeschaltetem `MOSAIC_TORCH_IPC_ENABLED`)
-        // automatisch der Torch/CUDA-IPC-Kanal mit -- `net.rs::eval_batch`
-        // (Zeile ~370) prueft den Knopf selbst, dieser Aufruf hier weiss
-        // nichts davon und muss es auch nicht wissen.
+        // Genau HIER laeuft (bei eingeschaltetem `MOSAIC_ORT_CUDA_ENABLED`
+        // und aktivem `ort_cuda_probe`-Feature) automatisch der ORT-CUDA-
+        // Kanal mit -- `net.rs::eval_batch` prueft den Knopf selbst, dieser
+        // Aufruf hier weiss nichts davon und muss es auch nicht wissen.
         let result = net.eval_batch(&feats_refs);
 
         let batch_len = batch.len();
@@ -309,7 +309,7 @@ mod tests {
         // Eigene Testfunktion statt der echten `interleave_enabled()` --
         // sonst wuerde der Prozess-weite `OnceLock`-Cache diesen Test mit
         // allen ANDEREN, evtl. spaeter laufenden Tests im selben Binary
-        // kontaminieren (gleiches Vorsichts-Muster wie `net_ipc.rs`-Tests).
+        // kontaminieren (gleiches Vorsichts-Muster wie `net_ort.rs`-Tests).
         static CELL: OnceLock<bool> = OnceLock::new();
         assert!(!*CELL.get_or_init(|| match std::env::var("MOSAIC_INTERLEAVE_ENABLED_TEST_UNSET_XYZ") {
             Ok(v) => v != "0" && !v.trim().is_empty(),
