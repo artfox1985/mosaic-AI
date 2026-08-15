@@ -299,9 +299,16 @@ pub fn clear_registry_for_test() {
 mod tests {
     use super::*;
 
-    fn load_test_net() -> Option<Net> {
+    /// Harter Fehler statt Skip bei fehlendem Modell (seit 2026-08-15): das
+    /// alte `Option`-Muster liess die beiden Tests unten bei Abwesenheit
+    /// still leer-gruen bestehen (Nutzer-Regel: nie leer gruen; Praezedenz
+    /// `self_play.rs::load_test_net_for_gating`).
+    fn load_test_net() -> Net {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v20_2d_opp_brierbest.onnx");
-        Net::load_auto(path.to_str().unwrap()).ok()
+        Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
+             leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ))
     }
 
     #[test]
@@ -319,10 +326,7 @@ mod tests {
 
     #[test]
     fn lookup_returns_none_when_nothing_registered() {
-        let Some(net) = load_test_net() else {
-            eprintln!("  ⚠️  kein lokales Modell -- Test uebersprungen.");
-            return;
-        };
+        let net = load_test_net();
         clear_registry_for_test();
         assert!(lookup(&net).is_none());
     }
@@ -340,10 +344,7 @@ mod tests {
     /// Kommentar) dieselben Ergebnisse liefern wie direkte `Net::eval`-Aufrufe.
     #[test]
     fn batcher_eval_rows_matches_direct_eval_batch() {
-        let Some(net) = load_test_net() else {
-            eprintln!("  ⚠️  kein lokales Modell -- Test uebersprungen.");
-            return;
-        };
+        let net = load_test_net();
         let net = Arc::new(net);
         let batcher = spawn_batcher(Arc::clone(&net), 8, Duration::from_millis(5));
 
