@@ -6,7 +6,7 @@ Generator-Kampagne abgeschlossen, GPU-Rundlauf geloest, Korpus-Plan").
 
 ---
 
-## STAND 2026-08-14
+## STAND 2026-08-15
 
 **Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434].
 Paritaets-Hash `8c6684ff...` haelt (nach jedem Wheel-Neubau geprueft).
@@ -39,8 +39,8 @@ sweepbar). Die Kette:
 | 1 | Vorzug-Verdrahtung (beidseitig) + 5x30-Wirkungsprobe je Arm | **ERLEDIGT** (5992f38; Probe: k1 2,80 / k5 8,30 nahe Arena-Niveau, Korpus-Prereg §3.5) |
 | 2 | `PREREG_unified_game_loop.md` -- vier Schleifen vereinheitlicht | **ERLEDIGT** (307caa4..d9c49e6; Golden-Records 0 Bit alle Pfade, §5-Protokoll) |
 | 3 | `PREREG_deterministic_labels.md` ("2b") -- Not-Deckel ehrlich | **ERLEDIGT** (3fcfed1; unter 12x CPU-Stress 0/1956 byte-identisch, §4; sync<->async-Gate-B-Retest offen bis wt_async2 frei) |
-| 4 | GPU-Verdikt `PREREG_gpu_inference_path.md` par.22 | **GEFALLEN 2026-08-14: Regel 3 verfehlt** -- beste Zelle N=64 ORT 1,545x, N=128 ORT 1,47x (mehr Nebenlaeufigkeit hilft ORT nicht: reale Ankunftsverteilung haelt keine Voll-Batches; Erwartung widerlegt). Pfad: klassisch 8 Threads |
-| 5 | Generierung 8000 -> Deckungs-Bericht -> (eigener Startknopf) Training | **LAEUFT seit 2026-08-14** (Startvollzug Korpus-Prereg par.7): Arm D zuerst, dann A->B->C->E->F; Sims 200 (Wirkungsproben-Stufe), Streuung max 1,0, Ablage MOSAIC_DATA_DIR=data/ownership_corpus. Deckungs-Bericht VOR Training; Training bleibt Nutzer-Startknopf |
+| 4 | GPU-Verdikt `PREREG_gpu_inference_path.md` par.22 | **GEFALLEN 2026-08-14: Regel 3 verfehlt** -- beste Zelle N=64 ORT 1,545x, N=128 ORT 1,47x (mehr Nebenlaeufigkeit hilft ORT nicht: reale Ankunftsverteilung haelt keine Voll-Batches; Erwartung widerlegt). Pfad: klassisch, seit par.23 mit 11 Threads als Sync-Standard |
+| 5 | Generierung 8000 + Deckungs-Bericht + Training | **GENERIERUNG KOMPLETT** (8000/8000, par.7); **DECKUNG GEGEBEN** (par.8: Spalten 3,2%->42%, Diagonalen 0,4%->40%, 8er-Ecken 0,2%->55%, Arm E liefert regelmaessig ZWEI Spalten je Partie; v2-Selektion nicht noetig). **ownership_weight-SWEEP LAEUFT** (par.9, Nutzer-Auftrag): w0 fertig, w01 in Arbeit, w02/w05 folgen; Auswahl nach Tor-A-Kopfguete mit w0 als Fenster-Kontrolle |
 
 ### Generator-Sortiment (aktuelle Aera, alle Zahlen nachgerechnet)
 
@@ -59,12 +59,16 @@ Rundlauf-Engpass GELOEST (Condvar-Park/Wake statt recv_timeout,
 net_batcher.rs:318; par.21: N=1 0,946x, N=16 0,979x -- vorher 0,053x).
 Batch-Fuellung war nie das Problem (99,7 % bei N=128). Async-Architektur:
 Gate A+B bestanden (Spielgeschehen bit-identisch). par.22 ENTSCHIEDEN
-(s. Startsequenz Zeile 4). EINGETAKTET fuer NACH der Generierung:
-**par.23** (PREREG_gpu_inference_path.md) -- Traeger-Skalierung (GPU laeuft
-bei 10 %, Deckel ist die CPU-Blatt-Erzeugung), fairer Endvergleich bei
-vollen Kernen (Regel 3 kuenftig gegen den staerksten Sync-Arm) und die
-Nutzer-Bonus-Zelle zwei Flotten teilen die GPU. Ausserdem offen: der
-sync<->async-Gate-B-Retest nach 2b -- niedrige Prioritaet, kein Blocker.
+(s. Startsequenz Zeile 4). **par.23 ENTSCHIEDEN 2026-08-14: Weg B
+GESCHLOSSEN bis zum groesseren Netz.** Fairer Nenner frisch gemessen:
+Sync@11 Threads = 528,5 Spiele/h (12 Threads LANGSAMER -- SMT-Saettigung;
+Hardware gemessen: 6C/12T Ryzen 3600X). Beste GPU-Konfiguration war die
+Nutzer-Bonus-Zelle (zwei Flotten, Aggregat 663/h = 1,26x), Traeger-11-Zelle
+0,90x -- keine Zelle >=2,0x. Der Async+ORT-Stand liegt gesichert in den
+Branches async_search_stage{1,3}_archive (Worktrees entfernt, Commits
+referenziert). Sync-Self-Play-Standard kuenftig 11 Threads statt 8.
+Ausserdem offen: der sync<->async-Gate-B-Retest nach 2b -- niedrige
+Prioritaet, kein Blocker.
 
 ### Offene Punkte ausserhalb der Startsequenz
 
@@ -74,8 +78,9 @@ sync<->async-Gate-B-Retest nach 2b -- niedrige Prioritaet, kein Blocker.
 | **Stoerungs-Baustein Farbzaehlung** | Nutzer-Auftrag steht (domain_knowledge.md Punkt 4); Messgroesse Gegner-Plattenpunkte gepaart + Frisch-Seed-Replikation; sinnvoll NACH dem Schleifen-Refactor (ein Einbauort statt vier) |
 | **Architektur-Fahrplan Rest** | (1) PREREG_INDEX generieren statt von Hand (der A5-Hook prueft nur Konsistenz), (2) stille Test-Skips verbieten, (3) MOSAIC_*-Knopf-Registratur. Punkte 4+5 sind jetzt PREREG_unified_game_loop.md (Startsequenz Schritt 2) |
 | **Torch-IPC-Reste (Weg A)** | Entfernung freigegeben, war wegen Datei-Konflikt uebersprungen -- nach dem Refactor nachholen |
+| **Aufraeumstand 2026-08-15** | Scratchpads geraeumt (53 GB frei; prereg-zitierte Mess-Skripte vorher nach tools/probes/ + Seeds nach seeds_per_criterion/ versioniert, dbbf2d0); GPU-Worktrees + wt_2b_vor entfernt (Junction-Scan sauber, Commits als Archiv-Branches gesichert); Alt-Branch claude/elastic-bell geloescht (0 eigene Commits). Hardware-Hinweis fuer kuenftige Beschaffung: RAM 32 GB ist Engpass Nr. 2 (ein Trainingslauf haelt 19,3 GB -> kein Parallel-Sweep), CPU 6C/12T Engpass Nr. 1, GPU (RTX 3060) unterausgelastet |
 | **Bootstrap-Horizont / Zufallsknoten / Stapelzug** | **ENTSCHIEDEN 2026-08-14 (Nutzer: "beibehalten")**: der Korpus-Start laeuft mit Horizont 2 und allen Defaults -- keine Zusatzvariablen im Lehr-Korpus. Die Preregs (bootstrap_horizon, chance_nodes) bleiben fuer einen KUENFTIGEN Fenster-Generierungsstart (v22) geparkt, nicht geschlossen |
-| **Kopf-Warmstart Index-Abbildung** | fuer den Korpus-Trainingslauf pruefen: Champion-Checkpoint traegt den 140er-Kopf (untrainiert) -- Warm-Start formgleich, Abbildungsfrage stellt sich nur bei Alt-Checkpoints (122er). Kurzcheck vor dem Training |
+| ~~Kopf-Warmstart Index-Abbildung~~ | **ERLEDIGT 2026-08-14 (Kurzcheck am Checkpoint)**: der Champion traegt den ALTEN 72er-Kopf (ownership_head.2 = (72,128)), nicht den 140er -- mit --conjunction-head wird die Ausgabeschicht form-bedingt uebersprungen und startet in ALLEN Sweep-Armen gleich frisch (die 72 alten Zeilen waren mit Gewicht 0 ohnehin untrainiert). Keine Index-Abbildung noetig |
 | **Formungsterm Arm A/B** | Kontrast (gezaehlte Felder vs. Ownership-Marginale) geht im Consumer-Tor-C-Sweep auf -- kein eigener Task mehr |
 | ~~"P0-P6"-Bezeichnung~~ | **AUSGEMUSTERT 2026-08-14** (Nutzer: obsolet; die Zuschreibung "Nutzer-Nomenklatur" war zudem falsch -- es war Koordinator-Nummerierung, nie verschriftlicht). Die Kette ist vollstaendig durch die Preregs abgedeckt (corpus/consumer + Abschaltkriterium oben). Verstreute "P4"-Erwaehnungen in alten Preregs meinen den Verbraucher-Bau |
 
