@@ -18,7 +18,12 @@ Vier Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg):
                                   2026-08-09 geschlossen, siehe dort).
   4. Prereg-Index-Konsistenz  -- evaluations/PREREG_*.md <-> PREREG_INDEX.md
                                   in beide Richtungen, plus Zaehler in den
-                                  Abschnitts-Ueberschriften.
+                                  Abschnitts-Ueberschriften. Seit 2026-08-15
+                                  (Architektur-Fahrplan Punkt 1) zusaetzlich:
+                                  jede PREREG_*.md braucht einen parsebaren
+                                  Status-Kopf in Zeile 1, und der generierte
+                                  Tabellenteil des Index muss dem Output von
+                                  tools/generate_prereg_index.py entsprechen.
 
 CLI:
     python tools/check_conventions.py                    # ganzes Repo (manueller Lauf)
@@ -394,6 +399,49 @@ def check_prereg_index_consistency(staged_only: bool, staged_files: set[str]) ->
             "  Ausweg: Zeile aus der Tabelle entfernen und den Abschnitts-Zaehler um 1 senken; falls die "
             "Datei nur umbenannt wurde, stattdessen den neuen Namen eintragen."
         )
+
+    # Seit 2026-08-15 (Architektur-Fahrplan Punkt 1): der Tabellenteil des
+    # Index ist GENERIERT. Zwei zusaetzliche Pruefungen gegen den Generator
+    # (tools/generate_prereg_index.py, per Import -- kein Subprozess, das
+    # Hook-Budget von < 3 s bleibt eingehalten):
+    #   (a) jede PREREG_*.md braucht einen parsebaren Status-Kopf in Zeile 1;
+    #   (b) der Index muss byte-genau dem Generator-Output entsprechen.
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "tools"))
+        import generate_prereg_index as _gpi
+        regenerated, unparsable = _gpi.regenerate_index_text(index_text)
+    except ValueError as e:
+        violations.append(
+            f"REGEL 4 (Prereg-Index-Konsistenz): {e}\n"
+            "  Konsequenz: ohne die BEGIN/END-Marker kann der Generator den Tabellenteil nicht\n"
+            "  ersetzen -- der Index laeuft wieder in den von Hand gepflegten (und damit\n"
+            "  veraltbaren) Zustand zurueck, der den 2026-08-12-Fehlauftrag ausgeloest hat.\n"
+            "  Ausweg: Marker wiederherstellen (git-Historie von evaluations/PREREG_INDEX.md)."
+        )
+    else:
+        if unparsable:
+            violations.append(
+                "REGEL 4 (Prereg-Index-Konsistenz): diese PREREG-Dateien haben keinen parsebaren "
+                f"Status-Kopf in Zeile 1: {', '.join(unparsable)}.\n"
+                "  Konsequenz: der Generator kann sie nicht in den Index aufnehmen -- fuer Leser "
+                "sind sie unsichtbar oder veralten still, genau die Fehlerklasse des "
+                "2026-08-12-Fehlauftrags.\n"
+                "  Ausweg: als ERSTE Zeile der Datei einen Kommentar der Form\n"
+                "  <!-- STATUS: OFFEN | Frage: <eine Zeile> | Beleg: <eine Zeile> -->\n"
+                "  ergaenzen (Status: OFFEN/ENTSCHIEDEN/UEBERHOLT; kein `|` und kein `-->` in den "
+                "Zellen), dann `python tools/generate_prereg_index.py` laufen lassen."
+            )
+        elif regenerated != index_text:
+            violations.append(
+                "REGEL 4 (Prereg-Index-Konsistenz): der generierte Tabellenteil von "
+                "PREREG_INDEX.md entspricht nicht dem Generator-Output.\n"
+                "  Konsequenz: Index und Status-Koepfe der Dateien laufen auseinander -- der Index "
+                "wuerde wieder zur veraltbaren Handpflege, die den 2026-08-12-Fehlauftrag "
+                "ausgeloest hat.\n"
+                "  Ausweg: `python tools/generate_prereg_index.py` laufen lassen und "
+                "evaluations/PREREG_INDEX.md mitcommitten (den Tabellenteil nie von Hand "
+                "editieren; Statusaenderungen gehoeren in den Kopf der jeweiligen PREREG-Datei)."
+            )
 
     sections = [(m.group(1), int(m.group(2)), m.end()) for m in SECTION_HEADER_PATTERN.finditer(index_text)]
     for name, claimed_count, body_start in sections:
