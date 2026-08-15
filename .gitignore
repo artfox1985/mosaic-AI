@@ -81,3 +81,4 @@ evaluations/paired_arena_env_*.json
 # git-crypt-Schluessel: bewusst UNGETRACKT im Repo (Nutzer 2026-08-13).
 # Ohne diese Datei ist player_profiles.json nach frischem Klon unlesbar.
 /git-crypt-key
+scratchpad/
