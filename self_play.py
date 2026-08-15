@@ -36,6 +36,22 @@ except Exception:
 
 from config import DATA_DIR, MODELS_DIR, BASE_DIR
 
+# GPU-Inferenzpfad (PREREG_gpu_inference_path.md §19, Nutzer-Auftrag 2026-08-13):
+# das mit `--features ort_cuda_probe` gebaute Wheel bringt den ORT-CUDA-
+# Kanal mit, der zur Laufzeit CUDA-12-DLLs braucht (cudart64_12, cublas64_12,
+# cudnn64_9 u.a. -- siehe net_ort.rs-Modulkommentar). `torch` bringt genau
+# diese DLLs in `torch/lib` schon mit (PREREG §11, dieselbe Datei-Liste),
+# darum hier best-effort VOR dem `mosaic_rust`-Import bekanntmachen. Wirkt
+# nur unter Windows (`add_dll_directory` existiert dort); No-Op, wenn `torch`
+# fehlt oder die API nicht existiert (z.B. Linux) -- ein fehlender Zusatzpfad
+# darf den Import nicht verhindern, `mosaic_rust` faellt in diesem Fall auf
+# tract (CPU) zurueck, wie ohne diesen Knopf auch.
+try:
+    import torch as _torch_for_dll_path
+    os.add_dll_directory(os.path.join(os.path.dirname(_torch_for_dll_path.__file__), "lib"))
+except Exception:
+    pass
+
 try:
     import mosaic_rust as _mr
 except ImportError as e:  # pragma: no cover
@@ -151,7 +167,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     (Task #85): steuert das teure round_transition_value-Sampling, siehe
     --rtv-Flag-Hilfetext. Bei mode == "mcts" ohne Modell irrelevant (rtv
     wurde dort noch nie berechnet).
-    `tau_argmax_from_move` (PREREG_suchpfad_nachmessungen.md, Messung 3):
+    `tau_argmax_from_move` (PREREG_search_path_remeasurements.md, Messung 3):
     KEIN pyo3-Parameter -- Rust liest `MOSAIC_TAU_ARGMAX_FROM_MOVE` selbst
     per OnceLock-Env-Var (net_mcts::tau_argmax_from_move), gleiches Muster
     wie MOSAIC_GUMBEL_TOP_M/MOSAIC_FLOOR_SHAPING_W. Deshalb hier VOR dem
@@ -422,7 +438,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # (self_play.rs::pcr_decide_full), kein Epsilon-Hack noetig.
     if pcr_full_prob is not None and not (0.0 <= pcr_full_prob <= 1.0):
         raise SystemExit(f"❌ --pcr-full-prob muss in [0,1] liegen (0 = value-only), ist {pcr_full_prob}.")
-    # τ-Annealing (PREREG_suchpfad_nachmessungen.md, Messung 3): wirkt nur im
+    # τ-Annealing (PREREG_search_path_remeasurements.md, Messung 3): wirkt nur im
     # netzgeführten Self-Play-Pfad (net_drafting_policy, siehe self_play.rs).
     # --mode mcts liest MOSAIC_TAU_ARGMAX_FROM_MOVE gar nicht -- kein Fehler,
     # nur ein wirkungsloses Flag, deshalb Warnung statt SystemExit.
@@ -610,6 +626,18 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             # gezählt (verfälscht `done` und das per_file-Chunking). Hier
             # rausfiltern, bevor gruppiert/gepickelt wird.
             steps = [s for s in steps if "perspective_divergence_diagnostics" not in s]
+            # GPU-Inferenzpfad-Messung (PREREG §19): gleiches additives Muster --
+            # `batcher_diagnostics` ist nur angehängt, wenn `MOSAIC_INTERLEAVE_
+            # ENABLED=1` einen Sammel-Faden fuer dieses Netz registriert hat
+            # (siehe self_play.rs::run_net_self_play), sonst fehlt der Record
+            # komplett und diese Zeile ist ein No-Op. Ausgabe hier statt stillem
+            # Verwerfen, weil die Abnahme-Messung genau diese Zahl braucht
+            # ("berichte den TATSAECHLICH erreichten mittleren Batch").
+            for s in steps:
+                if s.get("batcher_diagnostics"):
+                    print(f"  📊 [Batcher] batches={s.get('batches')} rows={s.get('rows')} "
+                          f"mean_batch={s.get('mean_batch'):.2f} max_batch_seen={s.get('max_batch_seen')}")
+            steps = [s for s in steps if "batcher_diagnostics" not in s]
 
             # Chunk in Spiele aufteilen und je `per_file` Spiele eine .pkl schreiben.
             _absorb_games(_group_by_game(steps))
@@ -699,7 +727,7 @@ if __name__ == "__main__":
                              "evaluations/stage2_investigation.md. NICHT fuer reguläre Trainingsdaten-"
                              "Generierung gedacht (weniger Zustandsvielfalt).")
     parser.add_argument("--tau-argmax-from-move", dest="tau_argmax_from_move", type=int, default=0,
-                        help="PREREG_suchpfad_nachmessungen.md, Messung 3 (τ-Annealing): ab dem N-ten "
+                        help="PREREG_search_path_remeasurements.md, Messung 3 (τ-Annealing): ab dem N-ten "
                              "Halbzug EINER Partie (1-basiert, beide Spieler zusammen gezählt) wird "
                              "statt visit-proportional zu sampeln der argmax der Besuchsverteilung "
                              "gespielt -- frühe Züge bleiben τ=1 (Sampling, Bestandsverhalten). "
