@@ -584,3 +584,25 @@ seine 15 Epochen bekommt.
 
 **Seed-Varianz-Vorbehalt (§9 unveraendert):** Einzel-Seed-Sweep. Dies waehlt
 das Gewicht fuer den ersten Verbraucher-Anlauf, es ist KEIN Staerke-Verdikt.
+
+### §10.5 NACHTRAG: fuenfter Arm w1 (ownership_weight 1,0)
+
+**Post-hoc-Erweiterung, ehrlich als solche markiert** (Nutzer-Entscheid
+2026-08-16 nach Sichtung von §10.2): der Sweep war mit vier Armen
+vorregistriert; der beobachtete MONOTONE Anstieg ueber 0,1/0,2/0,5 macht
+0,5 zu einem Randwert, nicht zu einem Optimum. Der Zusatzarm klaert, ob der
+Anstieg weitergeht oder kippt.
+
+Rezept **identisch** zu den vier Bestandsarmen (Warm-Start v21_2d_brierbest,
+lr 5e-5 cosine, WDL, 2D, nortv, opp/endgame-Kopf, --select-by-brier,
+--conjunction-head, --extra-data-dir, Seed 2) -- bewusst OHNE die in §10.3
+empfohlene Auswahlkriterium-Aenderung, weil ein abweichendes Rezept den
+Armvergleich zerstoeren wuerde. Der Checkpoint-Zielkonflikt aus §10.3 bleibt
+also auch hier bestehen und wird wie bei den anderen Armen ueber die
+zusaetzliche `final`-Messung sichtbar gemacht.
+
+Auswertung mit demselben `tools/probes/ownership_gate_a.py` auf demselben
+Held-out-Satz. Deutungsregel vorab: steigt w1 weiter, ist das Optimum immer
+noch nicht eingeklammert (dann waere ein weiterer Arm faellig oder die
+Gewichtsfrage als "nach oben offen, praktisch gedeckelt" zu schliessen);
+faellt w1 gegen w05 ab, ist 0,5 als Optimum bestaetigt.
