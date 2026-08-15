@@ -128,6 +128,10 @@ ANCHOR_KEY = node_key(ANCHOR_NAME, ANCHOR_SIMS)
 
 def ensure_csv():
     if not os.path.exists(CSV_PATH):
+        # Release-Bundle-Fall (Rauchtest 2026-08-15): im PyInstaller-Bundle
+        # existiert evaluations/ nicht -- open("w") wirft dann FileNotFoundError
+        # BEVOR die Datei angelegt werden kann. Elternverzeichnis sicherstellen.
+        os.makedirs(os.path.dirname(CSV_PATH) or ".", exist_ok=True)
         with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerow(HEADER)
 

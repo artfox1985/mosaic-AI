@@ -35,7 +35,14 @@ def collect_static_datas():
 datas = collect_static_datas()
 
 # Nur das aktive Referenz-Netz (Task #96): kein .pth, keine anderen Versionsstände.
-datas.append((os.path.join(PROJECT_ROOT, 'models', 'alphazero_v16_best.onnx'), 'models'))
+# Champion-Stand 2026-08-15: v21_2d_brierbest (Elo 1358). champion.txt MUSS
+# mit ins Bundle -- server.py::_load_champion_model liest sie und wuerde ohne
+# sie auf den (nicht mitgelieferten, engine-inkompatiblen) v16-Fallback gehen.
+datas.append((os.path.join(PROJECT_ROOT, 'models', 'alphazero_v21_2d_brierbest.onnx'), 'models'))
+datas.append((os.path.join(PROJECT_ROOT, 'models', 'champion.txt'), 'models'))
+# Elo-Historie mitliefern: ohne sie hat estimate_ai_anchor keine Arena-Kanten
+# und JEDES KI-Spiel waere ungewertet (Rauchtest-Befund 2026-08-15).
+datas.append((os.path.join(PROJECT_ROOT, 'evaluations', 'elo_history.csv'), 'evaluations'))
 
 a = Analysis(
     ['run_mosaic.py'],
