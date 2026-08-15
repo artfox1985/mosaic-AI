@@ -500,3 +500,87 @@ MOSAIC_DATA_EXCLUDE=v21_exclude_regex + MOSAIC_CARRIER_MANIFEST=v21;
 Cache-NEUBAU ist beim ersten Arm ERWARTET (neue Dateimenge), danach
 muessen die Arme "Lade HDF5-Cache" zeigen -- ein zweiter Neubau waere
 der Alarm.
+
+## §10 TOR-A-ERGEBNIS (2026-08-15/16) — der Kopf lernt die Geometrien
+
+Messung: `tools/probes/ownership_gate_a.py`, 820 Held-out-Partien / 14.360
+Bretter aus dem Val-Split (identisch ueber alle Arme: gleicher Seed 2,
+gleiche Dateiliste). Rohzahlen: `evaluations/ownership_gate_a_results.json`.
+Alle Zahlen unten vom Koordinator am JSON nachgerechnet.
+
+### §10.1 Waechter (§9 Punkt 1): kein Arm faellt durch
+
+| Arm | policy val_loss | value Brier |
+|---|---:|---:|
+| w0 (Kontrolle) | 0,2138 | 0,1884 |
+| w01 | 0,2139 | 0,1884 |
+| w02 | 0,2138 | 0,1883 |
+| w05 | 0,2139 | 0,1883 |
+
+Der Ownership-Verlust kostet Policy/Value **nichts** (Unterschiede in der
+4. Nachkommastelle). Alle Arme bleiben im Rennen.
+
+### §10.2 Kopfguete: monoton im Gewicht, w05 gewinnt durchgehend
+
+Feld-Ebene (36 eigene Felder, AUC; Basisraten-Prädiktor = 0,500):
+w0 **0,502** (= blind, wie erwartet bei Gewicht 0) · w01 0,687 · w02 0,692 ·
+w05 **0,709**. Feld-Brier w05 0,1631 gegen Basisrate 0,1828.
+
+E_k-Rangkorrelation (Spearman, Mittelspiel-Prognose gegen tatsaechliche
+Plattenpunkte am Ende) — die eigentliche Tor-A-Frage:
+
+| Kriterium | w0 | w01 | w02 | w05 |
+|---|---:|---:|---:|---:|
+| Spalten k1 | −0,030 | 0,133 | 0,144 | **0,160** |
+| Diagonalen k2 | −0,012 | 0,256 | 0,259 | **0,266** |
+| Ecken k5 | 0,011 | 0,260 | 0,263 | **0,269** |
+| Joker k3 | 0,018 | 0,166 | 0,163 | **0,172** |
+| Zeilen k0 | 0,029 | 0,216 | 0,220 | **0,229** |
+| Farbreihen k7 | −0,009 | 0,073 | 0,072 | 0,068 |
+
+w0 liegt erwartungsgemaess bei 0 (untrainierter Kopf) — das validiert die
+Messung selbst. Einzige Ausnahme der Monotonie ist k7, das laut
+`neural_net.py:954` aus Ownership prinzipiell nicht lernbar ist.
+
+### §10.3 ENTSCHEIDENDER NEBENBEFUND: die Checkpoint-Wahl ist das Nadeloehr
+
+Bei ALLEN vier Armen faellt der `_best`-Checkpoint auf **Epoche 1** (Training
+lief bis 15, Early Stop) — Auswahlkriterium ist `val_combined`, das den
+Ownership-Verlust **gar nicht enthaelt**. Der gemessene Kopf hatte also genau
+eine Epoche Training. Der `final`-Checkpoint (Epoche 15) desselben Laufs:
+
+| Groesse (w05) | best (Ep. 1) | final (Ep. 15) |
+|---|---:|---:|
+| Feld-AUC eigene | 0,709 | **0,837** |
+| Konjunktion Spalten k1 (AUC) | 0,745 | **0,957** |
+| Konjunktion Diagonalen k2 | 0,788 | **0,984** |
+| Konjunktion Ecken k5 | 0,827 | **0,963** |
+| E_k Spearman k1 / k2 / k5 | 0,160 / 0,266 / 0,269 | **0,332 / 0,347 / 0,408** |
+| policy val_loss | 0,2138 | 0,3002 |
+
+Die Policy-Verschlechterung bei Epoche 15 ist **KEIN Ownership-Effekt**: der
+Kontrollarm w0 (Gewicht 0,0) zeigt mit 0,3002 exakt denselben Wert — es ist
+reines Ueberanpassen ueber 15 Epochen. Damit steht fest: weder `best`
+(Kopf untertrainiert) noch `final` (Policy ueberangepasst) ist der richtige
+Checkpoint.
+
+### §10.4 VERDIKT & EMPFEHLUNG
+
+**Tor A ist BESTANDEN**: der Kopf schlaegt die Basisrate auf allen
+Ownership-lernbaren Kriterien deutlich, und E_k traegt echte
+Vorhersagekraft (bis 0,41 Spearman) — er darf steuern.
+
+**Gewicht: w05 (ownership_weight 0,5)** — bester Arm auf jedem Zielkriterium,
+ohne Waechter-Kosten. VORBEHALT: der Trend ist ueber 0,1/0,2/0,5 monoton
+steigend, das Optimum liegt also moeglicherweise OBERHALB von 0,5; der Sweep
+ist nach oben nicht abgeschlossen.
+
+**Vor dem Verbraucher-Bau zu klaeren (neuer, kleiner Arbeitsgang):** ein
+ownership-bewusstes Auswahlkriterium bzw. ein Zwischen-Checkpoint. Der
+naheliegende Weg — Trunk einfrieren und NUR den Kopf weitertrainieren (der
+Nutzer-Vorschlag aus PREREG_provocation.md §10 Punkt 2) — loest genau diesen
+Zielkonflikt: die Policy kann dann nicht ueberanpassen, waehrend der Kopf
+seine 15 Epochen bekommt.
+
+**Seed-Varianz-Vorbehalt (§9 unveraendert):** Einzel-Seed-Sweep. Dies waehlt
+das Gewicht fuer den ersten Verbraucher-Anlauf, es ist KEIN Staerke-Verdikt.
