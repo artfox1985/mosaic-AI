@@ -797,7 +797,7 @@ Farblayout FEST) + `rotation_indices` (`dome.rs:89-97`) liefern die geforderte
 Farbe JEDER Zelle deterministisch aus den `Kachel X -> Slot (r,c) rot=d`-
 Logzeilen -- robuster als `kein_vorzug_grund`s Text, der nur die ERSTE
 blockierende Zeile nennt und die eigentlich interessierende Zelle oft verdeckt.
-Werkzeug: `scratchpad/blocker_split_abcd.py` (Scratch, nicht im Repo), liest die
+Werkzeug: `tools/probes/blocker_split_abcd.py` (Scratch, nicht im Repo), liest die
 --log-games-Rohdaten aus Runde 2/3 (`evaluations/paired_arena_env_column_build_
 r{2,3}.json`, bereits vorhanden).
 
@@ -973,7 +973,7 @@ Farbknappheits-Rettung war nie der dominante Hebel.
 - **`kombination_hat_jackpot` per Gleichheitsvergleich auf `JACKPOT_WERT`**
   statt einem eigenen Rueckgabewert -- kleinerer Diff, sicher, weil
   `zellen_wert` nur Literale liefert (kein Rundungsrisiko).
-- **`scratchpad/blocker_split_abcd.py` bleibt Scratch**, nicht Teil des Repos
+- **`tools/probes/blocker_split_abcd.py` bleibt Scratch**, nicht Teil des Repos
   -- Diagnosewerkzeug fuer diese Sitzung, nicht auf Dauerbetrieb ausgelegt
   (haerteste Annahme: exakter Kachel-Katalog aus `dome.rs` von Hand
   uebernommen, bricht stumm bei einer Katalog-Aenderung dort).
