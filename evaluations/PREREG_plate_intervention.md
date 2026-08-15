@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Hebt ein Endgame-/Wertungsplatten-Aux-Kopf die R5-Plattenkalibrierung, und schlaegt er den Champion in der Arena? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("ARENA-ERGEBNIS: H0"); Kopf wird Trainings-Upgrade, Champion unveraendert -->
+
 # Vorregistrierung: Wertungsplatten-/Endspiel-Zonen-Intervention (Aux-Kopf)
 
 **Angelegt 2026-08-07 als Entwurf; Nutzer-Go "dann takte es ein" am

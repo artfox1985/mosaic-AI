@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Warum trug das Punkte-Ziel einen 0,1-Gegner-Anteil, und braucht es neben dem Punkte-Kopf ueberhaupt einen eigenen Gegner-Kopf? | Beleg: **ENTSCHIEDEN 2026-08-10** (Nutzer-Auftrag): Anteil ENTFERNT, Schema 19->20, Epsilon auf 0. Zum Gegner-Kopf: kein Faehigkeits-Argument (die Eingabe ist perspektiv-normalisiert, ein Flip genuegt), sondern nur ein KOSTEN-Argument (zweiter Forward-Pass = 1,6-1,8x) -- und dessen Bedingung ist falsch, weil `blended_leaf_win_prob_with` bei w=0 zurueckkehrt, bevor er gelesen wird. Verdikt: reines Hilfsziel, Nutzen UNBELEGT, Messung vorgeschlagen; Praezedenz `ownership_head`. -->
+
 # Entscheidung: Gegner-Anteil aus dem Punkte-Ziel entfernt (Schema 20)
 
 **2026-08-10, Nutzer-Auftrag** — *"nimm aus dem point head den kleinen anteil

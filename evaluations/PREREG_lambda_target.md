@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Senkt ein λ-Mix aus Spielausgang und Root-Completed-Q (900er-Fenster) die Value-Zielvarianz und die Arena-Staerke? | Beleg: Offline 6/6 positiv, Arena verloren (43:57, H0); `archive/history.md` Z. ~6969-7002 -->
+
 # Vorregistrierung: λ-Misch-Value-Target-Experiment (soft-Z)
 
 **Angelegt 2026-08-02, VOR dem ersten der 24 Trainingsläufe.** Zweck: prüfen,

@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Ist die PLATZIERUNG (welche Spalte eine fertige Musterreihe bekommt) die eigentliche Blockade fuer geschlossene Spalten -- nicht das Drafting? | Beleg: ENTSCHIEDEN 2026-08-12 (Datei §11 VERDIKT): Hypothese WIDERLEGT -- die vorab gesetzte Falsifikationsschwelle (vertikale Punkte unter 3) ist erreicht, beste Fassung 1,75 gegen Bezug 2,10; die Platzierungsseite ist NICHT die Blockade. §14 ergaenzt Deckenprobe + Farbschranke; Folge-Lesart (Injektion als Korpus-Werkzeug) ausdruecklich als Lesart markiert. -->
+
 # Vorregistrierung: die Platzierungsseite plattenbewusst machen
 
 **Angelegt 2026-08-12 nachts, Nutzer-Auftrag** — *"dann überleg dir wie wir

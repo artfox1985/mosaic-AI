@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Wiederholt sich der λ=0,7-Effekt auf reinem v18-Korpus (65,67% root_q-Mix)? | Beleg: Arena gewonnen (227:173, p=0,0101) -> v20-Standard-Kandidat, spaeter durch WDL-Aera-Grenze relativiert; `archive/history.md` Z. ~7107-7138 -->
+
 # Vorregistrierung: λ-Misch-Target auf reinem v18-Korpus (Dosis-Vorziehung)
 
 **Angelegt 2026-08-03, VOR dem ersten Trainingslauf.** Folge-Experiment zu

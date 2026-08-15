@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Beleg: Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 -->
+
 # Vorregistrierung: Value-Rangmetrik gegen das Orakel (Task #29)
 
 **Angelegt 2026-08-03, VOR der ersten Tau-Berechnung.** Zweck wie bei den

@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Wie kommt der Ownership-Kopf als VERBRAUCHER in Drafting (Blatt-Shift ueber erwartete Plattenpunkte E_k) und Tiling (marginale Feldwerte einmal je Zug) -- und ab welcher Kopfguete darf er steuern? | Beleg: **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag "ueberleg dir schon mal wie wir den ownership head ins drafting und tiling miteinbeziehen"). ENTWURF, nichts gebaut. Geprueft: Kopf im Champion untrainiert (`ownership_weight` 0,0, Manifest v21_2d), kein Engine-Verbraucher (ONNX-Ausgang 4 ungelesen). Zwei-Pole-Regler `MOSAIC_OWNERSHIP_W`, Default 0 = byte-identisch (Task-#28-Muster). Reihenfolge: Generator -> Kopf-Training (+Konjunktionen) -> Tor A Kopfguete VOR Verbraucher-Bau. -->
+
 # PREREG: Ownership-Kopf als Verbraucher in Drafting und Tiling
 
 Stand 2026-08-13, ENTWURF (nichts hiervon ist gebaut — durchgehend Plan-Zeitform).

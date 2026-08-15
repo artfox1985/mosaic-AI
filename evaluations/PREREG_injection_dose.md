@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Wie hoch muss die Wertungsplatten-Injektion in der Suche dosiert werden, damit die Spezialfeld-Freischaltung ueberhaupt angesteuert wird -- und rechnet sich das in Siege? | Beleg: **OFFEN, vorregistriert 2026-08-11** (Nutzer-Auftrag "wie viel wir injizieren muessen wir an einem arena spiel verifizieren"). Sauberster Kontrast im Projekt: DERSELBE Champion, Knopf an gegen aus, kein Training ⇒ keine Trainings-Seed-Varianz. Gegenstand nur `MOSAIC_UNLOCK_SHAPING_W` (0 / 0,3 / 1,0); Freischaltrate ist PFLICHT-Nebenmessung, weil ein blockierender Prior sonst als "Term wirkungslos" fehlgelesen wird. Enthaelt die Ruecknahme meiner Blindheits-Aussage zu Task #93. -->
+
 # Vorregistrierung: Dosis der Wertungsplatten-Injektion
 
 **Angelegt 2026-08-11 auf Nutzer-Auftrag** -- *"wie viel wir injizieren muessen

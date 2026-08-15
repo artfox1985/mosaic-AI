@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) -->
+
 # Vorregistrierung: PLATTENKOPF (per-Kriterium-Endwertungs-Kopf)
 
 **Angelegt 2026-08-09, VOR jeder Implementierung.** Nutzer-Entscheid:

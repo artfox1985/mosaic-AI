@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Senkt ein opp-Punkte-Kopf + λ_aggr-Blend die Gegnerpunkte ohne Siegquotenverlust (Task #28, Hauptmessung)? | Beleg: Beide Gates bestanden, aber kein Arm p<0,05 (bester -6,16 Punkte, p=0,078); `archive/history.md` Z. ~7140-7183 -->
+
 # Vorregistrierung: Task #28 -- Score-/Denial-Utility (aggressiveres Spiel), Evaluation in der v19-Generation
 
 **Angelegt 2026-08-03, VOR Implementierung und erster Messung.**

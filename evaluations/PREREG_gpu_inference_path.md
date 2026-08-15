@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Ueber WELCHEN Pfad erreicht die Rust-Engine die GPU -- Cross-Language-Queue zu Python/torch oder ein CUDA-faehiger Rust-Pfad? | Beleg: ENTSCHIEDEN 2026-08-14 (Datei §23 Regel-3-Endverdikt): keine Zelle erreicht 2,0x gegen den frisch gemessenen staerksten Sync-Arm (528,5 Partien/h bei 11 Faeden); beste Konfiguration = Doppel-Prozess-Aggregat 663,0/h = 1,255x. Weg B (GPU-Inferenzpfad) wird NICHT Standard fuer v22+ -- geschlossen, bis ein groesseres Netz die Kennlinie verschiebt. -->
+
 # Vorregistrierung: der Inferenz-PFAD zur GPU
 
 **Angelegt 2026-08-12, Nutzer-Entscheid** — auf die Frage, wie nach dem Befund

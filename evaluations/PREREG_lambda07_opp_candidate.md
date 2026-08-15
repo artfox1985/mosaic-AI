@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Schlaegt der Kandidat v19_2d_opp_l07 (900er-Fenster) den Champion im Arena-Gating? | Beleg: Verloren (33:47, H0, p=0,167); `archive/history.md` Z. ~7374-7416 -->
+
 # Vorregistrierung: λ=0,7 + opp-Kopf als Champion-Kandidat auf dem Bestandskorpus
 
 **Angelegt 2026-08-04, VOR dem Trainingslauf.** Nutzer-Vorschlag: den

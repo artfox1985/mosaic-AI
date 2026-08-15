@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/t_e_prior_blind_spot.json`, `evaluations/t_g_gumbel_scale_v21.json` -->
+
 # Vorregistrierung: Prior-Blindfleck & Wurzelbreite (externes Review R2)
 
 **Angelegt 2026-08-09, VOR allen Laeufen.** Anlass: zweite Runde

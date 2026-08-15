@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt λ=0,7-Mix in der WDL-Aera (Zielfeld `values_wdl`) Arena-Staerke gegen den Champion? | Beleg: **H0** -- Ein-Faktor-Gating 63:77 (p=0,21) gegen `v20_2d_opp_brierbest`; Brier 0,18937 vs 0,18749 (schlechter). Befund aera-gebunden; `evaluations/STATUS.md` + Statusfussnote in der Prereg-Datei -->
+
 # Vorregistrierung: λ-Misch-Value-Target in der WDL-Aera (Hypothesen-Arm)
 
 **Angelegt 2026-08-08, VOR dem Training.** Nutzer-Go am selben Tag

@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Nutzt es, die WERTUNGSPLATTEN (alle acht Kriterien, gegatet auf die aktiven) in die Blattbewertung zu injizieren -- und in welcher Dosis? | Beleg: **OFFEN, vorregistriert 2026-08-11, HAUPT-SWEEP** (Nutzer-Ruege: "wir wollen die wertungsplatten injizieren, nicht nur die spezialplatten"). `MOSAIC_WERTUNG_SHAPING_W` 0 / 0,1 / 0,3 -- KLEINER als beim Freischalt-Term, weil der Term eine Groessenordnung groesser ist (Kriterium 1 allein ~7,9 Pkt -> tanh = 0,156, das saettigt den geklemmten Blattwert). Basis-Seed 20260911. Pflicht-Nebenmessung ueber `log_games` + `analyze_game_log.py`: Zellen je Rasterreihe und Nahmen-Anteil tiefe Reihen (dicht) statt Abschluesse (zu selten). Enthaelt in Abschnitt 0 die Dokumentation meines Messplan-Fehlers. -->
+
 # Vorregistrierung: Injektion der WERTUNGSPLATTEN (alle acht Kriterien)
 
 **Angelegt 2026-08-11 nach Nutzer-Rüge** — *"das ist einfach ein witz. wir

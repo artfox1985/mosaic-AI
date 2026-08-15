@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Beleg: Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 -->
+
 # Vorregistrierung: Task #30 -- monotone Value-Skalen-Korrektur, Arena-A/B
 
 **Angelegt 2026-08-04, NACH dem Platt-Fit (der ist reine Kalibrierung auf

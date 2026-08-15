@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Schlaegt die GPU bei dem Batch, der real erreichbar ist (~11-44), den CPU-Aggregatdurchsatz -- lohnt ein zentraler Inferenz-Batcher (Alt-Nummer #82)? | Beleg: **REGEL 1, GESCHLOSSEN 2026-08-10**: erreichbare Punkte 11/22/44 liefern 2.581/6.197/14.060 Evals/s, alle unter der UNTEREN CPU-Schranke von 17.600 -- Verdikt robust gegen die Bandbreite. Break-even erst bei ~64-128. Vermerk: 'nur zusammen mit blatt-paralleler Auswertung sinnvoll'; die GPU ist nicht langsam, sondern ausgehungert. `evaluations/gpu_batch_throughput.json` -->
+
 # Vorregistrierung: Machbarkeitsprobe GPU-Inferenz-Batcher (Alt-Nummer #82)
 
 **Angelegt 2026-08-09, VOR jeder Messung.** Nutzer-Auftrag: *"takte das

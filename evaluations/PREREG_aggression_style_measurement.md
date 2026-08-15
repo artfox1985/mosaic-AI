@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Hebt der Aggressions-Blend (w/λ) die eigene Punktzahl/Gegner-Floor bei gleicher Siegquote, auch gegen einen starken Gegner? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("STARK-GEGNER-ERGEBNIS", "E1-/E2-ERGEBNIS"): keine Uebernahme, Blend inert -->
+
 # Vorregistrierung: Aggressions-Stilmessung (Punkte-Raub bei gleicher Siegquote)
 
 **Angelegt 2026-08-07, VOR dem Lauf** (Nutzer-Auftrag: "arena spiel mit

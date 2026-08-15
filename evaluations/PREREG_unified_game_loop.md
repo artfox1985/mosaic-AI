@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Lassen sich die vier kopierten Spielschleifen in self_play.rs hinter EINER parametrisierten Schleife mit Spieler-Abstraktion vereinheitlichen — bit-identisch je Pfad? | Beleg: ENTSCHIEDEN 2026-08-14 (Datei §5 Abnahme-Protokoll): Umbau ausgefuehrt (Commits 7512412, 307caa4, 96e7a9a, a9450b1, c14068f); Golden-Replay nach Schritt 4: p1/p1n/p2/p3 inkl. Knopf-Laeufe byte-identisch (0/8), p4 nur die bekannte rtv-Basislinien-Instabilitaet (0/1308 im Spielgeschehen + bootstrap_value + Policy-Targets); cargo test --lib 418/0/20, Paritaets-Hash haelt. -->
+
 # PREREG: Vereinheitlichte Spielschleife (Architektur-Fahrplan Punkte 1+2)
 
 Stand 2026-08-14, PLAN (Nutzer-Auftrag: *"dann räum die vier spielschleifen

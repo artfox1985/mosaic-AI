@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Erfuellt ein milderes PCR-Regime (p=0,5/cheap=300) das Wandzeit-Kriterium (>=1,15x)? | Beleg: Verfehlte 1,15x (nur 1,118x) -> Training/Arena dieser Prereg nie gelaufen; `archive/history.md` Z. ~7226-7256 -->
+
 # Vorregistrierung: PCR mildes Regime (p=0,5 / cheap=300) -- Task-#14-Folgemesspunkt
 
 **Angelegt 2026-08-03, VOR jedem Lauf dieses Arms.** Nutzer-Auftrag nach dem

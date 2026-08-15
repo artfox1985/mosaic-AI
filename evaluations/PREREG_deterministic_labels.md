@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Werden die Trainingsziel-Felder (bootstrap/round_transition) maschinenlast-unabhängig, wenn die Task-#71-Not-Deckel bei Feuern auf deterministischen Fallback degradieren statt still zu kappen? | Beleg: ENTSCHIEDEN 2026-08-14 (Datei §4 Ergebnis): Stufe 1 gemessen (§4.1), Stufe 2 GEBAUT (§4.2); Abnahme-Punkt 2 unter zusaetzlichem kuenstlichem CPU-Stress BESTANDEN (1956/1956 Records byte-identisch, 0 Not-Deckel-Feuerungen); Punkt 4 (Gate-B-Retest der sync-async-Divergenz) ZURUECKGESTELLT bis wt_async2 frei ist (§4.3). -->
+
 # PREREG: Deterministische Trainingslabels (Task-#71-Not-Deckel, "Baustein 2b")
 
 Stand 2026-08-14, PLAN (Nutzer-Go: *"go, häng es als 2b an"*). Läuft NACH der

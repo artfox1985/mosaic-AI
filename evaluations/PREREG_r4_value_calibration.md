@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: "Kein Befund" (R² negativ), zusaetzlich Methoden-Alarm (Vorzeichen-Anker nur 9/24) -> Folge-Messung "R4b" initiiert; Git-Commit `cb4773d`, kein Prosa-Absatz in history.md -->
+
 # Vorregistrierung: Runde-4-Ende-Value-Kalibrierung gegen gesampelte exakte Ground Truth (Chance-Knoten-Erwartung)
 
 **Angelegt 2026-08-03, VOR jeder Messung.** Ausführung gated: NACH dem vollen

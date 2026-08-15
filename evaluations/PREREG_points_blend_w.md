@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt w>0 im Punkte-Blend Arena-Staerke, jetzt mechanistisch begruendet? | Beleg: **REGEL 2, GESCHLOSSEN 2026-08-10**: Kontrolle w=0 321/400 (80,25 %) gegen Arm w=0,1 300/400 (75,00 %) -- Block-Delta -5,25pp, t=-2,68, McNemar p=0,0527. Kein Gewinner, Richtung eher schaedlich; w bleibt 0. Die +6pp der Neukartierung sind mit doppelter Stichprobe NICHT reproduziert, sondern umgekehrt. Hebel muss plattenselektiv werden ⇒ Plattenkopf. `evaluations/paired_arena_env_points_blend_w.json` -->
+
 # Vorregistrierung: Punkte-Blend-Gewicht w > 0 (plattenmotiviert)
 
 **Angelegt 2026-08-09, VOR jedem Lauf.** Nutzer-Auftrag: *"setz die

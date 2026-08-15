@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Frage). Grundlage: es gibt keine private Information, also Zufallsknoten statt ISMCTS. Teil A = Korrektheit (bekannter Unterbau), Teil B = Zufallsknoten mit Kostengate, Teil C = Diagnose der Platte-6-Interaktion -->
+
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
 **Angelegt 2026-08-09, VOR jeder Implementierung.** Nutzer-Frage: *"die

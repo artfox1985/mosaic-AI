@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | Beleg: OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. -->
+
 # Vorregistrierung: v22-Fenster (Nutzer-Zuschnitt 2026-08-08)
 
 **Angelegt VOR der v22-Generierung.** Zuschnitt vom Nutzer festgelegt;
