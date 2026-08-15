@@ -42,14 +42,23 @@ The full rules are in "engine_manual.md" in this folder (open it with a text
 editor or any Markdown viewer). It is written for players and describes every
 rule; if you hit a technical passage, you can safely skip it.
 
-DIFFICULTY LEVELS
------------------
-- Easy:   simple heuristic AI (no neural network involved), 60 simulations
-- Medium: the bundled neural network, 60 simulations per move
-- Hard:   the same network, 150 simulations
-- Expert: the same network, 400 simulations
-Medium, Hard and Expert all use the same reigning champion network — only
-the thinking time (search simulations per move) differs.
+AI STRENGTH
+-----------
+There are no preset difficulty levels yet — they are on the roadmap. Instead,
+the "Gegen KI spielen" (play against AI) dialog exposes the two raw controls:
+
+- "Modell-Version" (model version): which opponent plays. Leave it at the
+  default for the bundled champion network, or type "heuristic" to face the
+  handcrafted heuristic AI instead — clearly weaker, and it needs no network.
+- "Simulationen" (simulations): how much the AI thinks per move. Default 400
+  is full strength; lower numbers play faster and somewhat weaker.
+
+Fair warning if you are looking for an easy game: turning the simulations
+down does NOT give you a beginner opponent. The final round is played by an
+exact solver rather than the network, so the AI's endgame stays essentially
+perfect at any setting. Real difficulty levels — ones that also dial back the
+endgame and let the AI make plausible human-sized mistakes — are planned but
+not built yet.
 
 TEACHER MODE
 ------------
