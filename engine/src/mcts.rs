@@ -570,7 +570,11 @@ fn subtree_depth(nodes: &[Node], nid: usize) -> u32 {
 /// Wie viele Steine ein Take-Zug aus `state` entnimmt: alle der Farbe in der
 /// Sonnen-Sektion bzw. (Mond) je Stapel mit passender Oberseite. Der globale
 /// Mond-Zug (factory_id=None) summiert alle kleinen Fabriken + große Fabrik.
-fn tiles_taken(state: &GameState, t: &crate::moves::TakeAction) -> usize {
+/// `pub(crate)` seit PREREG_opponent_disruption_v2.md §3: die Ueberlauf-
+/// Pruefung des Stoerungs-Bausteins braucht dieselbe Stueckzahl. Wiederver-
+/// wendung statt Duplikat (CLAUDE.md) -- der erste Anlauf scheiterte genau
+/// daran, dass er die Zahl gar nicht erst ermittelte.
+pub(crate) fn tiles_taken(state: &GameState, t: &crate::moves::TakeAction) -> usize {
     use crate::moves::TakeSource::*;
     let by_id = |fid: usize| state.factories.iter().find(|f| f.factory_id == fid);
     let moon_top = |f: &crate::factory::Factory, c: TileColor| {
