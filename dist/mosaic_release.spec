@@ -36,8 +36,13 @@ datas = collect_static_datas()
 
 # Nur das aktive Referenz-Netz (Task #96): kein .pth, keine anderen Versionsstände.
 # Champion-Stand 2026-08-15: v21_2d_brierbest (Elo 1358). champion.txt MUSS
-# mit ins Bundle -- server.py::_load_champion_model liest sie und wuerde ohne
-# sie auf den (nicht mitgelieferten, engine-inkompatiblen) v16-Fallback gehen.
+# mit ins Bundle -- server.py::_load_champion_model liest sie und fiele ohne
+# sie auf den Namen "v16_best" zurueck, dessen ONNX hier gar nicht mitgeliefert
+# wird. (KORREKTUR 2026-08-15: eine fruehere Fassung dieses Kommentars nannte
+# v16 "engine-inkompatibel" -- das ist FALSCH und war ungeprueft. NUM_ACTIONS
+# 406 und INPUT_SIZE 708 sind zwischen dem v16-Tag und heute identisch
+# (git show v0.1-alpha16:config.py); v16 ist nur ein flaches, viel schwaecheres
+# Netz, kein unladbares.)
 datas.append((os.path.join(PROJECT_ROOT, 'models', 'alphazero_v21_2d_brierbest.onnx'), 'models'))
 datas.append((os.path.join(PROJECT_ROOT, 'models', 'champion.txt'), 'models'))
 # Elo-Historie mitliefern: ohne sie hat estimate_ai_anchor keine Arena-Kanten
