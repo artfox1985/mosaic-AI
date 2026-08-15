@@ -4856,9 +4856,10 @@ pub(crate) mod tests {
         let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../models/alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
-        if Net::load_auto(model_path).is_err() {
-            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
-            return;
+        if let Err(e) = Net::load_auto(model_path) {
+            panic!(
+                "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+            );
         }
 
         // Seeds, die absichtlich NICHT in einer i*const-Formel zueinander
@@ -5101,10 +5102,9 @@ pub(crate) mod tests {
         let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../models/alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
-        let Ok(net) = Net::load_auto(model_path) else {
-            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
-            return;
-        };
+        let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
+            "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
 
         fn play(net: &Net, seed: u64) -> Vec<Value> {
             let mut rng = StdRng::seed_from_u64(seed);
@@ -5315,17 +5315,17 @@ pub(crate) mod tests {
     ///    wieder die strenge ("JEDER", nicht nur "mindestens einer").
     #[test]
     fn pcr_full_prob_gates_policy_target_valid_and_stays_off_by_default() {
-        // Nutzt bewusst NICHT `load_test_net_for_gating` (haengt an
-        // `alphazero_v10_best.onnx`, das im aktuellen Modell-Bestand nicht
-        // mehr vorhanden ist -- `v18_best` ist der naechstliegende lokal
-        // real vorhandene flache Checkpoint, gleiches Skip-Muster bei
-        // Abwesenheit).
+        // Fixture-Historie: v10_best (weg seit NUM_ACTIONS-Wechsel) ->
+        // v18_best (inzwischen ebenfalls aus dem Bestand gefallen) -- der Test
+        // lief dadurch bis 2026-08-15 still leer-gruen. Jetzt: amtierender
+        // Champion, und unten harter Fehler statt Skip.
         let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v18_best.onnx");
+            .join("../models/alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
-        if Net::load_auto(model_path).is_err() {
-            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
-            return;
+        if let Err(e) = Net::load_auto(model_path) {
+            panic!(
+                "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+            );
         }
 
         let seed = 42_042u64;
@@ -5479,12 +5479,15 @@ pub(crate) mod tests {
     /// dagegen NIE tragen.
     #[test]
     fn root_child_q_present_for_real_decisions_absent_for_shortcuts_and_tiling() {
+        // Fixture bis 2026-08-15: v18_best (aus dem Bestand gefallen, Test lief
+        // still leer-gruen) -- jetzt amtierender Champion + harter Fehler.
         let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v18_best.onnx");
+            .join("../models/alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
-        if Net::load_auto(model_path).is_err() {
-            eprintln!("  ⚠️  {model_path:?} nicht ladbar -- Test übersprungen (kein lokaler Checkpoint).");
-            return;
+        if let Err(e) = Net::load_auto(model_path) {
+            panic!(
+                "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+            );
         }
 
         let seed = 35_035u64;

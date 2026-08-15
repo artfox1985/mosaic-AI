@@ -1026,22 +1026,18 @@ mod tests {
     /// muss bei GLEICHEM Seed und GLEICHEM Ausgangszustand zweimal EXAKT
     /// denselben Wert liefern -- vorher (wall-clock-basierte Deadlines als
     /// primärer Cutoff) war das nicht garantiert, weil unter Systemlast
-    /// weniger Sucharbeit stattfinden konnte. Braucht ein echtes Netz --
-    /// überspringt sich selbst (kein Fehlschlag), falls das Kalibrier-Modell
-    /// lokal fehlt (z.B. frischer Checkout ohne `models/`, siehe .gitignore).
+    /// weniger Sucharbeit stattfinden konnte. Braucht ein echtes Netz -- bis
+    /// 2026-08-15 zeigte der Pfad auf `alphazero_v10_best.onnx` (existiert
+    /// seit dem NUM_ACTIONS-Wechsel nicht mehr) und der Test UEBERSPRANG sich
+    /// still: der Kern-Regressionsschutz lief nie. Jetzt: amtierender Champion
+    /// + harter Fehler statt Skip (Nutzer-Regel: nie leer gruen).
     #[test]
     fn bootstrap_value_after_rounds_is_deterministic_for_same_seed() {
-        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v10_best.onnx");
-        let net = match Net::load_auto(model_path) {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!(
-                    "bootstrap_value_after_rounds_is_deterministic_for_same_seed uebersprungen \
-                     (Modell nicht geladen: {e})"
-                );
-                return;
-            }
-        };
+        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v21_2d_brierbest.onnx");
+        let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
+            "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf \
+             nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let leaf = crate::round_transition::drive_to_first_round_end(51);
         let pre = round_transition::resolve_to_pre_chance(&leaf).expect("aufloesbar");
 
@@ -1072,17 +1068,14 @@ mod tests {
     /// bit-identisch sein.
     #[test]
     fn bootstrap_value_after_rounds_ignores_partie_streuung() {
-        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v10_best.onnx");
-        let net = match Net::load_auto(model_path) {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!(
-                    "bootstrap_value_after_rounds_ignores_partie_streuung uebersprungen \
-                     (Modell nicht geladen: {e})"
-                );
-                return;
-            }
-        };
+        // Fixture-Hinweis wie beim Determinismus-Test oben: bis 2026-08-15
+        // v10_best (fehlt) + stiller Skip -- der Test lief nie. Jetzt Champion
+        // + harter Fehler (Nutzer-Regel: nie leer gruen).
+        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v21_2d_brierbest.onnx");
+        let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
+            "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf \
+             nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let leaf = crate::round_transition::drive_to_first_round_end(51);
         let pre = round_transition::resolve_to_pre_chance(&leaf).expect("aufloesbar");
         assert!(

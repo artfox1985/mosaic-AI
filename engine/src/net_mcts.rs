@@ -4991,13 +4991,9 @@ mod tests {
 
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../models/alphazero_v21_2d_brierbest.onnx");
-        let net = match Net::load_auto(path.to_str().unwrap()) {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Sonde uebersprungen.");
-                return;
-            }
-        };
+        let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Sonden-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         const ORACLE: u64 = 20_000;
         const SIMS: u32 = 400;
         const C_PUCT: f64 = 1.5;
@@ -6037,15 +6033,12 @@ mod tests {
         // Eval-Kosten betrifft.
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../models/alphazero_v21_2d_brierbest.onnx");
-        let Ok(net) = Net::load_auto(path.to_str().unwrap()) else {
-            eprintln!("  Champion-Modell nicht ladbar -- Sonde uebersprungen.");
-            return;
-        };
+        let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Sonden-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let mut seed_rng = StdRng::seed_from_u64(7);
-        let state = match random_drafting_state(7, 12, &mut seed_rng) {
-            Some(s) => s,
-            None => return,
-        };
+        let state = random_drafting_state(7, 12, &mut seed_rng)
+            .expect("kein Drafting-Zustand erzeugbar -- Sonden-Aufbau defekt, nicht still ueberspringen");
 
         // (1) Zeit je Eval, einzeln und als Paar (der Suchpfad nutzt beides).
         // Dispatch PRO NETZ -- der Champion ist 2D und braucht den
@@ -6103,15 +6096,17 @@ mod tests {
         }
     }
 
-    fn load_test_net() -> Option<Net> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
-        match Net::load_auto(path.to_str().unwrap()) {
-            Ok(n) => Some(n),
-            Err(e) => {
-                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");
-                None
-            }
-        }
+    /// Bis 2026-08-15 zeigte dieser Lader auf `alphazero_v10_best.onnx`, das es
+    /// seit dem NUM_ACTIONS-Wechsel nicht mehr gibt, und gab bei Abwesenheit
+    /// still `None` -- alle neun abhaengigen Tests liefen seither LEER-GRUEN,
+    /// ohne je zu pruefen (Architektur-Fahrplan Punkt 2, Inventar 2026-08-15).
+    /// Jetzt: amtierender Champion + harter Fehler statt Skip (Nutzer-Regel:
+    /// nie leer gruen; Praezedenz `self_play.rs::load_test_net_for_gating`).
+    fn load_test_net() -> Net {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ))
     }
 
     /// Spielt ein paar zufaellige Drafting-Zuege aus `Game::start` heraus
@@ -6155,9 +6150,11 @@ mod tests {
     /// 1,46x-2D-Inferenzkosten druecken), der Paritaetstest soll also genau
     /// DIESE Architektur (`PlanesPlusFlat`-Layout, ZWEI ONNX-Graph-Inputs)
     /// abdecken, nicht nur den einfacheren flachen Pfad.
-    fn load_batching_test_net() -> Option<Net> {
+    fn load_batching_test_net() -> Net {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v19_2d_best.onnx");
-        Net::load_auto(path.to_str().unwrap()).ok()
+        Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ))
     }
 
     /// Perf-Auftrag (2026-08-02) -- Kernabsicherung fuer `BATCH_ROOT_EXPANSION`:
@@ -6185,7 +6182,7 @@ mod tests {
     /// koennte.
     #[test]
     fn batched_root_expansion_matches_sequential_within_tolerance() {
-        let Some(net) = load_batching_test_net() else { return };
+        let net = load_batching_test_net();
         let mut state_rng = StdRng::seed_from_u64(2026_08_02);
         let Some(state) = random_drafting_state(1, 0, &mut state_rng) else {
             panic!("random_drafting_state(steps=0) sollte immer den frischen Runde-1-Zustand liefern");
@@ -6263,7 +6260,7 @@ mod tests {
     #[test]
     #[ignore]
     fn batch_root_expansion_latency_bench() {
-        let Some(net) = load_batching_test_net() else { return };
+        let net = load_batching_test_net();
         let mut state_rng = StdRng::seed_from_u64(2026_08_02);
         let Some(state) = random_drafting_state(1, 0, &mut state_rng) else {
             panic!("random_drafting_state(steps=0) sollte immer den frischen Runde-1-Zustand liefern");
@@ -6313,7 +6310,7 @@ mod tests {
         // `build_net_tree`-Aufruf mit identischem RNG-Seed entsprechen --
         // Sicherheitsnetz, falls ein zukuenftiges Refactoring den
         // <=1-Sonderfall an den Aufrufstellen versehentlich entfernt.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut rng_state = StdRng::seed_from_u64(777);
         let state = random_drafting_state(1, 10, &mut rng_state).expect("Testzustand sollte auswertbar sein");
 
@@ -6351,7 +6348,7 @@ mod tests {
         // ist Standard `true`). Gleicher RNG-Strom (ein einziges `rng`,
         // wie `build_determinized_forest` es an `build_net_tree` weiterreicht)
         // muss trotzdem drei verschiedene Ziehungen liefern.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut rng = StdRng::seed_from_u64(2468);
         let state = random_drafting_state(2, 10, &mut rng).expect("Testzustand sollte auswertbar sein");
         assert!(
@@ -6380,7 +6377,7 @@ mod tests {
         // jede kuenftige 2x2-Messung keinen sauberen A=B-Referenzpunkt. Prueft
         // volle Wurzel-Statistik (Besuche, Q), completed-Q-Politik UND die
         // finale Zugwahl, ueber mehrere zufaellige Stellungen und Sims-Budgets.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut setup_rng = StdRng::seed_from_u64(4242);
         let mut checked = 0;
         for gi in 0..6u64 {
@@ -6449,7 +6446,7 @@ mod tests {
         // Knoten) UND dieselbe finale Zugwahl liefern wie `trace=None`.
         // Gleiches Muster wie `hybrid_search_with_equal_nets_matches_plain_search`
         // (A=B-Referenzpunkt fuer einen additiven Codepfad).
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut setup_rng = StdRng::seed_from_u64(9595);
         let mut checked = 0;
         for gi in 0..6u64 {
@@ -6511,7 +6508,7 @@ mod tests {
         // exakt dasselbe Ergebnis liefern -- unabhaengig davon, wer gerade
         // "current_player" ist. Ein Perspektiv-/Plumbing-Bug wuerde diese
         // Invariante brechen.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut rng = StdRng::seed_from_u64(2026);
         let mut checked = 0;
         for gi in 0..10u64 {
@@ -6530,6 +6527,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Schwelle stammt aus der v10-Aera; seit dem Fixture-Wechsel auf den v21-Champion (2026-08-15) erst neu kalibrieren -- lief zuvor still leer-gruen, weil v10_best fehlte"]
     fn net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth() {
         // "Terminalnahe Zustaende mit bekanntem Sieger" (Kollegen-Vorschlag)
         // verallgemeinert: `mcts::evaluate` ist an JEDEM Drafting-Zustand ein
@@ -6540,7 +6538,7 @@ mod tests {
         // Seite der 50%-Linie liegt. Ein echter Perspektivfehler wuerde die
         // Uebereinstimmungsrate weit unter 50% druecken (systematische
         // Umkehrung), reines Value-Rauschen bleibt darueber.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut rng = StdRng::seed_from_u64(4242);
         let (mut agree, mut total) = (0usize, 0usize);
         for gi in 0..40u64 {
@@ -6869,7 +6867,7 @@ mod tests {
             );
             return;
         }
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut setup_rng = StdRng::seed_from_u64(9300);
         let mut checked = 0;
         for gi in 0..4u64 {
@@ -6981,7 +6979,7 @@ mod tests {
         // `net_leaf_eval`-Output. Gleiches Muster wie
         // `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero`
         // (Task #28) fuer den `blended_leaf_win_prob`-Blend.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         assert_eq!(
             wertung_shaping_weight(),
             0.0,
@@ -7351,7 +7349,7 @@ mod tests {
         // EINSCHLIESSLICH des (bei Default ebenfalls inerten) Wertungsplatten-
         // EGO-Shaping, aber OHNE den neuen `apply_unlock_shaping`-Aufruf, und
         // vergleicht bit-genau gegen den tatsaechlichen Output.
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
 
         let mut rng = StdRng::seed_from_u64(9100);
         let mut checked = 0;
@@ -7959,30 +7957,24 @@ mod tests {
     fn ort_cuda_matches_tract_gumbel_root_selection() {
         use crate::net::Net;
 
-        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
-            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
-            return;
-        };
-        let Ok(raw) = std::fs::read_to_string(&states_path) else {
-            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
-            return;
-        };
+        let states_path = std::env::var("MOSAIC_FROZEN_STATES_JSON").unwrap_or_else(|_| panic!(
+            "MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
+        let raw = std::fs::read_to_string(&states_path).unwrap_or_else(|e| panic!(
+            "{states_path} nicht lesbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty(), "leere Zustandsliste -- Export fehlgeschlagen?");
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        if !onnx_path.exists() {
-            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
-            return;
-        }
-        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("  ⚠️  ONNX-Modell nicht ladbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
+        assert!(
+            onnx_path.exists(),
+            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
+        let net = Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
 
         let m_for_400_sims = gumbel_top_m_for_budget(400);
         println!("gumbel_top_m_for_budget(400) = {m_for_400_sims}");
@@ -8153,30 +8145,24 @@ mod tests {
     fn ort_cuda_single_deviation_gap_diagnostic() {
         use crate::net::Net;
 
-        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
-            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
-            return;
-        };
-        let Ok(raw) = std::fs::read_to_string(&states_path) else {
-            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
-            return;
-        };
+        let states_path = std::env::var("MOSAIC_FROZEN_STATES_JSON").unwrap_or_else(|_| panic!(
+            "MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
+        let raw = std::fs::read_to_string(&states_path).unwrap_or_else(|e| panic!(
+            "{states_path} nicht lesbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        if !onnx_path.exists() {
-            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
-            return;
-        }
-        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
+        assert!(
+            onnx_path.exists(),
+            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
+        let net = Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
 
         let m_for_400_sims = gumbel_top_m_for_budget(400);
 
@@ -8450,30 +8436,24 @@ mod tests {
         use std::collections::VecDeque;
         use std::sync::{Arc, Mutex};
 
-        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
-            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
-            return;
-        };
-        let Ok(raw) = std::fs::read_to_string(&states_path) else {
-            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
-            return;
-        };
+        let states_path = std::env::var("MOSAIC_FROZEN_STATES_JSON").unwrap_or_else(|_| panic!(
+            "MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
+        let raw = std::fs::read_to_string(&states_path).unwrap_or_else(|e| panic!(
+            "{states_path} nicht lesbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        if !onnx_path.exists() {
-            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
-            return;
-        }
-        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
-            Ok(n) => Arc::new(n),
-            Err(e) => {
-                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
+        assert!(
+            onnx_path.exists(),
+            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
+        let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        )));
 
         // EIGENE ENTSCHEIDUNG, NACHTRAEGLICH GEAENDERT (siehe Bericht): ein
         // Pilotlauf mit `N_STATES=60` (Zufallsstichprobe, Seed `SAMPLE_SEED`)
@@ -8542,10 +8522,10 @@ mod tests {
             offset += chunk.len();
         }
         println!("Zustaende mit echtem Schnitt (Screening): {}/{}", eligible.len(), all_states.len());
-        if eligible.is_empty() {
-            eprintln!("  ⚠️  keine Zustaende mit echtem Schnitt gefunden -- Test uebersprungen.");
-            return;
-        }
+        assert!(
+            !eligible.is_empty(),
+            "keine Zustaende mit echtem Schnitt gefunden -- Stichproben-Aufbau defekt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
 
         // ── Schritt 2: VOLLE eligible Menge (siehe Entscheidung oben, statt
         // einer Zufalls-Teilmenge) -- `sample_all_idx` ist die GESAMTE
@@ -8850,30 +8830,24 @@ mod tests {
         use std::collections::VecDeque;
         use std::sync::{Arc, Mutex};
 
-        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
-            eprintln!("  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test uebersprungen.");
-            return;
-        };
-        let Ok(raw) = std::fs::read_to_string(&states_path) else {
-            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
-            return;
-        };
+        let states_path = std::env::var("MOSAIC_FROZEN_STATES_JSON").unwrap_or_else(|_| panic!(
+            "MOSAIC_FROZEN_STATES_JSON nicht gesetzt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
+        let raw = std::fs::read_to_string(&states_path).unwrap_or_else(|e| panic!(
+            "{states_path} nicht lesbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        if !onnx_path.exists() {
-            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
-            return;
-        }
-        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
-            Ok(n) => Arc::new(n),
-            Err(e) => {
-                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
+        assert!(
+            onnx_path.exists(),
+            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
+        let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        )));
 
         let mut states: Vec<GameState> = Vec::with_capacity(records.len());
         let mut record_indices: Vec<usize> = Vec::with_capacity(records.len());
@@ -9047,17 +9021,13 @@ mod tests {
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        if !onnx_path.exists() {
-            eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
-            return;
-        }
-        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
-            Ok(n) => Arc::new(n),
-            Err(e) => {
-                eprintln!("  ⚠️  ONNX nicht ladbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
+        assert!(
+            onnx_path.exists(),
+            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
+        let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        )));
 
         // Ein paar echte Drafting-Zustaende (kein frozen-Set noetig hier --
         // reiner Durchsatz-/Batch-Test, keine Entscheidungs-Analyse).
@@ -9068,10 +9038,10 @@ mod tests {
                 pool.push(crate::features::features_for_net(&net, &s));
             }
         }
-        if pool.is_empty() {
-            eprintln!("  ⚠️  keine Drafting-Zustaende erzeugbar -- Test uebersprungen.");
-            return;
-        }
+        assert!(
+            !pool.is_empty(),
+            "keine Drafting-Zustaende erzeugbar -- Test-Aufbau defekt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        );
         let pool = Arc::new(pool);
 
         const N_THREADS: usize = 11; // heutige Selfplay-Konvention (siehe Bericht).

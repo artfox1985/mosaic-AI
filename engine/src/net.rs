@@ -902,20 +902,19 @@ mod tests {
         assert_eq!(flat_buf, sample[76..].to_vec());
     }
 
-    /// Lädt das aktuelle Produktionsmodell für den Batching-Paritätstest
-    /// (Paket 1) -- gleiches Skip-statt-Fail-Muster wie
-    /// `net_mcts.rs::load_test_net` (`models/` ist per `.gitignore` nicht Teil
-    /// des Checkouts, ein frischer Klon hätte sonst einen harten Testfehler
-    /// ohne jeden eigenen Fehler).
-    fn load_test_net() -> Option<Net> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v10_best.onnx");
-        match Net::load_auto(path.to_str().unwrap()) {
-            Ok(n) => Some(n),
-            Err(e) => {
-                eprintln!("  ⚠️  {path:?} nicht ladbar ({e}) -- Test übersprungen (kein lokaler Checkpoint).");
-                None
-            }
-        }
+    /// Lädt den amtierenden Champion für den Batching-Paritätstest (Paket 1).
+    /// Bis 2026-08-15 zeigte der Lader auf `alphazero_v10_best.onnx` (existiert
+    /// seit dem NUM_ACTIONS-Wechsel nicht mehr) und ÜBERSPRANG bei Abwesenheit
+    /// still -- der Test lief seither leer-grün, ohne je zu prüfen. Deshalb
+    /// jetzt: existierendes Modell + harter Fehler statt Skip (Nutzer-Regel:
+    /// nie leer gruen; Präzedenz `self_play.rs::load_test_net_for_gating`).
+    fn load_test_net() -> Net {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
+             leer-gruen bestehen (Nutzer-Regel: nie leer gruen). Lokales models/-Checkpoint \
+             bereitstellen oder den Test bewusst mit --skip abwaehlen."
+        ))
     }
 
     /// Paket 1, Kernabsicherung: `eval_pair(a, b)` muss elementweise (Toleranz
@@ -926,7 +925,7 @@ mod tests {
     /// Semantik nötig).
     #[test]
     fn eval_pair_matches_two_single_evals() {
-        let Some(net) = load_test_net() else { return };
+        let net = load_test_net();
         let mut rng = StdRng::seed_from_u64(7);
         let close = |x: &[f32], y: &[f32]| -> bool {
             x.len() == y.len() && x.iter().zip(y).all(|(u, v)| (u - v).abs() < 1e-5)
@@ -950,15 +949,18 @@ mod tests {
         }
     }
 
-    /// Laedt ein lokal vorhandenes Modell fuer `eval_batch`-Tests --
-    /// `load_test_net()` (oben) haengt an `alphazero_v10_best.onnx`, das im
-    /// aktuellen Modell-Bestand nicht mehr vorhanden ist (siehe Task #14,
-    /// gleicher Befund bei `self_play.rs`s PCR-Tests) -- `v18_best` ist der
-    /// naechstliegende lokal real vorhandene flache Checkpoint, gleiches
-    /// Skip-statt-Fail-Muster bei Abwesenheit.
-    fn load_eval_batch_test_net() -> Option<Net> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v18_best.onnx");
-        Net::load_auto(path.to_str().unwrap()).ok()
+    /// Laedt ein lokal vorhandenes Modell fuer `eval_batch`-Tests. Bis
+    /// 2026-08-15 zeigte der Lader auf `alphazero_v18_best.onnx` (inzwischen
+    /// ebenfalls aus dem Bestand gefallen) und gab bei Abwesenheit still
+    /// `None` -- die drei `eval_batch`-Tests liefen seither leer-gruen.
+    /// Jetzt: Champion + harter Fehler statt Skip (Nutzer-Regel: nie leer
+    /// gruen).
+    fn load_eval_batch_test_net() -> Net {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
+             leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ))
     }
 
     /// Perf-Auftrag (2026-08-02), Kernabsicherung fuer `eval_batch`: fuer
@@ -971,7 +973,7 @@ mod tests {
     /// nicht `self.model` selbst) und `N=EVAL_BATCH_MAX_N` (Randwert) ab.
     #[test]
     fn eval_batch_matches_n_single_evals() {
-        let Some(net) = load_eval_batch_test_net() else { return };
+        let net = load_eval_batch_test_net();
         let mut rng = StdRng::seed_from_u64(11);
         let close = |x: &[f32], y: &[f32]| -> bool {
             x.len() == y.len() && x.iter().zip(y).all(|(u, v)| (u - v).abs() < 1e-5)
@@ -998,7 +1000,7 @@ mod tests {
     /// Fehler liefern (kein stiller Fallback, siehe `eval_batch`-Doku).
     #[test]
     fn eval_batch_rejects_batch_size_beyond_max() {
-        let Some(net) = load_eval_batch_test_net() else { return };
+        let net = load_eval_batch_test_net();
         let feats: Vec<f32> = vec![0.0; net.input_size];
         let refs: Vec<&[f32]> = (0..EVAL_BATCH_MAX_N + 1).map(|_| feats.as_slice()).collect();
         assert!(net.eval_batch(&refs).is_err(), "N > EVAL_BATCH_MAX_N muss fehlschlagen, nicht still zurueckfallen");
@@ -1085,8 +1087,17 @@ mod tests {
 
     #[test]
     fn eval_ex_matches_eval_on_legacy_model_and_opp_is_empty() {
-        let Some(net) = load_eval_batch_test_net() else { return };
-        assert!(!net.has_opp_head(), "v18_best hat noch keinen opp_points-Kopf");
+        // Braucht ein LEGACY-Modell OHNE opp-Kopf -- der Champion-Lader oben
+        // taugt hier nicht. Bis 2026-08-15 hing der Test an `v18_best` (aus
+        // dem Bestand gefallen) und lief seither leer-gruen; `v17_best` ist
+        // der aelteste lokal real vorhandene flache Checkpoint ohne opp-Kopf.
+        // Fehlt auch der: harter Fehler statt Skip (Nutzer-Regel: nie leer gruen).
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v17_best.onnx");
+        let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
+            "{path:?} nicht ladbar ({e}) -- Legacy-Fixture fehlt, der Test darf nicht \
+             leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+        ));
+        assert!(!net.has_opp_head(), "v17_best hat noch keinen opp_points-Kopf");
         let feats: Vec<f32> = vec![0.1; net.input_size];
         let (p1, v1, m1, pt1) = net.eval(&feats).expect("eval");
         let (p2, v2, m2, pt2, opp) = net.eval_ex(&feats).expect("eval_ex");

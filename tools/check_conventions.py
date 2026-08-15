@@ -6,7 +6,9 @@ Siehe evaluations/DESIGN_conventions_as_checks.md, Abschnitt
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
 
-Vier Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg):
+Vier harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
+plus eine Warn-Regel 5 (stille Test-Skips, nur stderr -- Heuristik zu grob
+fuer einen Commit-Blocker, siehe dortiger Kommentar):
   1. Datei-Groessen-RATSCHE   -- tools/size_baseline.json, Schwelle 40 KB,
                                   rot nur bei Wachstum > +2% einer bereits
                                   zu grossen Datei (kein Refactoring-Zwang).
@@ -461,6 +463,69 @@ def check_prereg_index_consistency(staged_only: bool, staged_files: set[str]) ->
 
 
 # --------------------------------------------------------------------------
+# Regel 5 (WARNUNG, kein Fehler): stille Test-Skips
+# --------------------------------------------------------------------------
+
+# Architektur-Fahrplan Punkt 2 (2026-08-15). Anlassfall: `load_test_net_for_
+# gating` lud ein geloeschtes Modell, und die abhaengigen Tests bestanden
+# LEER-GRUEN; das Inventar fand danach 17 weitere Tests, die wegen
+# verschwundener Fixtures (v10_best/v18_best) nie liefen. Regel seither:
+# eine fehlende Voraussetzung fuehrt zu `panic!`/`assert!` mit klarer
+# Meldung oder zu `#[ignore = "Grund"]` -- nie zu stillem `return`.
+#
+# Die Heuristik hier ist bewusst grob (Textmuster, kein Parser) und darum
+# nur eine WARNUNG auf stderr, kein Exit-1: sie sucht in Rust-Quellen nach
+# einem fruehen `return` unmittelbar (<= 3 Zeilen) nach einer Zeile, die wie
+# eine Voraussetzungs-Pruefung aussieht (`exists()`, `is_err()`,
+# `let Ok(..) = .. else`, `uebersprungen`-Meldung). Treffer in Nicht-Test-
+# Code sind moeglich (deshalb Warnung). Bekannter, BEGRUENDETER Bestands-
+# Treffer (bleibt): net_mcts.rs `plate_shaping_disabled_search_matches_
+# pre_task93_tree` -- Skip haengt an der Compile-Zeit-Konstante
+# PLATE_SHAPING_ENABLED (Mess-Wheel-Arm), nicht an einer fehlenden Fixture;
+# der Test soll in BEIDEN Toggle-Zustaenden gruen bleiben (dortiger
+# Kommentar). Jede NEUE Warnung dagegen verdient einen Blick.
+SILENT_SKIP_TRIGGER = re.compile(
+    r"exists\(\)|\.is_err\(\)|let\s+Ok\(|uebersprungen|übersprungen", re.IGNORECASE
+)
+SILENT_SKIP_RETURN = re.compile(r"^\s*return(\s+Ok\(\(\)\))?\s*;\s*$")
+
+
+def warn_silent_test_skips(staged_only: bool, staged_files: set[str]) -> None:
+    if staged_only:
+        targets = [f for f in sorted(staged_files) if f.endswith(".rs")]
+    else:
+        targets = sorted(
+            p.relative_to(REPO_ROOT).as_posix() for p in (REPO_ROOT / "engine" / "src").glob("*.rs")
+        )
+    for rel in targets:
+        if staged_only:
+            text = get_staged_content(rel)
+        else:
+            path = REPO_ROOT / rel
+            text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else None
+        if text is None:
+            continue
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            if not SILENT_SKIP_RETURN.match(line):
+                continue
+            window = lines[max(0, i - 3): i]
+            trigger = next((w for w in window if SILENT_SKIP_TRIGGER.search(w)), None)
+            if trigger is None:
+                continue
+            print(
+                f"[WARNUNG, Regel 5 -- stille Test-Skips] {rel}:{i + 1}: fruehes `return` direkt "
+                f"nach einer Voraussetzungs-Pruefung ({trigger.strip()[:80]!r}).\n"
+                "  Wenn das ein Test ist: fehlende Voraussetzungen muessen `panic!`en (klare "
+                "Meldung) oder der Test traegt `#[ignore = \"Grund\"]` -- ein stiller Skip "
+                "besteht leer-gruen und prueft nichts (Anlassfall: load_test_net_for_gating, "
+                "17 leer-gruene Tests im Inventar 2026-08-15). Kein Commit-Blocker: die "
+                "Heuristik ist grob; Nicht-Test-Treffer bitte ignorieren.",
+                file=sys.stderr,
+            )
+
+
+# --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
 
@@ -501,6 +566,7 @@ def main() -> int:
     violations += check_doc_language(staged_mode, staged_files)
     violations += check_no_new_task_numbers(staged_mode, staged_files)
     violations += check_prereg_index_consistency(staged_mode, staged_files)
+    warn_silent_test_skips(staged_mode, staged_files)  # Regel 5: nur Warnung, kein Exit-1
 
     if violations:
         print(f"\n{len(violations)} Konventions-Verstoss/Verstoesse:\n", file=sys.stderr)
