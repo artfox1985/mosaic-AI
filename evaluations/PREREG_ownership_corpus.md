@@ -216,8 +216,8 @@ diesen reinen Verdrahtungs-Umbau). `tools/parity_probe.py`: Hash
 (Wheel neu gebaut+installiert) — Bestandsverhalten bei unbesetzten Knoepfen
 byte-identisch.
 
-**Wirkungs-Probe** (Anti-Stillstand-Beweis, `scratchpad/wirkungsprobe_arm.py`
-+ `scratchpad/wirkungsprobe_auswertung.py`): je Arm 30 Partien ueber
+**Wirkungs-Probe** (Anti-Stillstand-Beweis, `tools/probes/effect_probe_arm.py`
++ `tools/probes/effect_probe_eval.py`): je Arm 30 Partien ueber
 `mosaic_rust.net_self_play_games` (= `run_net_self_play`), Champion
 `v21_2d_brierbest`, `base_sims=200`, EIN gemeinsamer Seed (20260814) ueber
 alle Arme (gepaarte Anlage wie im uebrigen Auftrag), `record_rtv=false`,

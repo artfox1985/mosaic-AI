@@ -70,7 +70,7 @@ Auftrags-Annahme: die Zeilen `:492`/`:557`-`:597` in
 wird sie an EINER Stelle in der Nachbardatei, nicht an jeder Erzeugungsstelle
 einzeln).
 
-~50-Partien-Probe (`scratchpad/not_deckel_feuerraten.py`, `run_net_self_play`,
+~50-Partien-Probe (`tools/probes/emergency_cap_fire_rates.py`, `run_net_self_play`,
 Champion `v21_2d_brierbest`, sims=400, 8 Threads, `record_rtv=true`, Seed
 20260814, normale Last): 8204 Step-Records, 50 Partien.
 
@@ -167,7 +167,7 @@ geklaerter Ursache, kein Fehlschlag der Aenderung selbst.** VOR-Baseline
 
 **Punkt 2 (unter Last) -- BESTANDEN.** NACH-Capture (kein `--paths`-Wechsel,
 identischer Seed) einmal ohne und einmal MIT zusaetzlichem kuenstlichem
-CPU-Stress (`scratchpad/cpu_stress.py`, 12 Dauerlast-Prozesse zusaetzlich
+CPU-Stress (`tools/probes/cpu_stress.py`, 12 Dauerlast-Prozesse zusaetzlich
 zur ohnehin schon vorhandenen Fremdlast) ueber `mosaic_rust.
 net_self_play_games`: **1956/1956 Records byte-identisch**, 0 Not-Deckel-
 Feuerungen in BEIDEN Laeufen. Der geforderte Repro-Massstab (§3 Punkt 2:
