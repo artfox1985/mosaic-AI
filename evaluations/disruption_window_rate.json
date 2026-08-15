@@ -1,0 +1,98 @@
+{
+ "entscheidungen_gesamt": 261270,
+ "entscheidungen_mit_echter_wahl": 213376,
+ "entscheidungen_je_runde": {
+  "1": 57417,
+  "2": 57002,
+  "3": 56503,
+  "4": 54288,
+  "5": 36060
+ },
+ "kandidaten_histogramm": {
+  "1": 47894,
+  "2": 21222,
+  "3": 16949,
+  "4": 14901,
+  "5": 13225,
+  "6": 15023,
+  "7": 16361,
+  "8": 16504,
+  "9": 16937,
+  "10": 19190,
+  "11": 16925,
+  "12": 20120,
+  "13": 22772,
+  "14": 1286,
+  "15": 1279,
+  "16": 682
+ },
+ "verdaechtige_kandidatenmengen": 0,
+ "raten": {
+  "0.01": {
+   "fenster_pct": 35.69,
+   "stoerbar_n": 14374,
+   "stoerbar_pct": 5.5,
+   "stoerbar_pct_nur_entscheidungen_mit_wahl": 6.74,
+   "stoerbar_pct_ohne_strafleisten_filter": 6.42,
+   "stoerbar_pct_bedarf_inkl_kuppelzellen": 5.95,
+   "stoerbar_je_runde": {
+    "1": 3114,
+    "2": 4306,
+    "3": 3459,
+    "4": 3495
+   }
+  },
+  "0.02": {
+   "fenster_pct": 52.97,
+   "stoerbar_n": 26094,
+   "stoerbar_pct": 9.99,
+   "stoerbar_pct_nur_entscheidungen_mit_wahl": 12.23,
+   "stoerbar_pct_ohne_strafleisten_filter": 11.66,
+   "stoerbar_pct_bedarf_inkl_kuppelzellen": 10.79,
+   "stoerbar_je_runde": {
+    "1": 5919,
+    "2": 8123,
+    "3": 6386,
+    "4": 5666
+   }
+  },
+  "0.03": {
+   "fenster_pct": 62.2,
+   "stoerbar_n": 35458,
+   "stoerbar_pct": 13.57,
+   "stoerbar_pct_nur_entscheidungen_mit_wahl": 16.62,
+   "stoerbar_pct_ohne_strafleisten_filter": 15.83,
+   "stoerbar_pct_bedarf_inkl_kuppelzellen": 14.52,
+   "stoerbar_je_runde": {
+    "1": 7982,
+    "2": 11158,
+    "3": 8882,
+    "4": 7436
+   }
+  }
+ },
+ "gegenprobe": {
+  "log_gegenprobe_ok": 168,
+  "log_gegenprobe_abweichend": 0,
+  "log_gegenprobe_quellen": {
+   "LARGE_FACTORY_SUN": 168
+  },
+  "moon_top_counts_gegenprobe_ok": 41918,
+  "moon_top_counts_gegenprobe_abweichend": 0,
+  "abweichungs_beispiele": []
+ },
+ "quelle": {
+  "glob": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\data\\ownership_corpus\\selfplay_v21_own_a_*.pkl",
+  "dateien": 300,
+  "manifest": "manifest_v21_own_a_20260814_141733.json",
+  "modell": "v21_2d_brierbest",
+  "sims": 200,
+  "add_root_noise": true,
+  "gumbel_top_m": 16
+ },
+ "abbruchregel": {
+  "schwelle_pct": 5.0,
+  "primaeres_eps": 0.01,
+  "unterschritten": false
+ }
+}

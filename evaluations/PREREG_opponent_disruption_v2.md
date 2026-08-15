@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: OFFEN, vorregistriert 2026-08-16 vor jedem Bau und jeder Messung; Vorstufe (Fensterrate) entscheidet ueber den Bau, Kosten-Waechter entscheidet ueber die Uebernahme -->
+<!-- STATUS: OFFEN | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: Vorregistriert 2026-08-16 vor jedem Bau. §9 (2026-08-16): Stufe 0 BESTANDEN (Fensterrate 35,69 % bei eps=0,01) und Stufe-1-Offline-Ersatz gefahren -- Stoerfensteranteil 5,50 % (eps=0,01) bis 13,57 % (eps=0,03), Abbruchschwelle 5 % NICHT unterschritten, evaluations/disruption_window_rate.json. OFFEN bleibt die Nutzer-Entscheidung ueber Stufe 2 (Bau); die vorregistrierte Rust-Zaehlmodus-Messung steht noch aus (Wheel-/Arena-Sperre). -->
 
 # PREREG: Gegner-Stoerung ueber Farbzaehlung, zweiter Anlauf (v2)
 
@@ -500,3 +500,163 @@ die Zeit knapp ist und zwischen v2 und einem Staerke-Hebel gewaehlt werden
 muss, gehoert die Zeit dem Staerke-Hebel: der beste realistische Ausgang
 von v2 ist "stoert messbar, kostet nichts" -- ein Nutzer-Wunsch erfuellt,
 kein Elo gewonnen.
+
+---
+
+## §9 ERGEBNIS Stufe 0 + Stufe 1 (2026-08-16)
+
+Nutzer-Freigabe "bis Stufe 1, keinen Schritt weiter". Belegstelle:
+`evaluations/disruption_window_rate.json`, Treiber
+`tools/disruption_window_rate.py`.
+
+### §9.1 Abweichung vom vorregistrierten Verfahren -- vorab benannt
+
+Die in §5.2 vorregistrierte Stufe 1 (Rust-Zaehlmodus + 200 Arena-Partien)
+**ist NICHT gefahren worden**: sie braucht `maturin`-Bau, Wheel-Install und
+einen Arena-Lauf, und alle drei waren fuer diesen Auftrag gesperrt (auf der
+Maschine laeuft Sweep-Arm w1). **Gemessen wurde statt dessen ein
+Offline-Ersatz** auf bereits aufgezeichneten Self-Play-Records -- kein Bau,
+kein Wheel, keine Partie. Das ist eine ANDERE Messung als die
+vorregistrierte; sie wird hier nicht als deren Erfuellung ausgegeben. Was
+sie kostet, steht in §9.4.
+
+**Quelle**: `data/ownership_corpus/selfplay_v21_own_a_*.pkl`, 300 Dateien
+(~3000 Partien), Champion `v21_2d_brierbest`, **200 Sims**,
+`add_root_noise=true`, `gumbel_top_m=16` (Manifest
+`manifest_v21_own_a_20260814_141733.json`). Die spaetere Arena-Messung
+liefe bei 400 Sims ohne Wurzelrauschen -- die Rate ist damit nicht
+punktgenau uebertragbar.
+
+**Auswertbare Wurzelentscheidungen: 261.270.** Davon 47.894 (18,3 %) mit
+nur EINEM Kandidaten -- dort kann per Konstruktion kein Fenster entstehen.
+
+### §9.2 Instrument und Gegenproben (VOR jeder Rate)
+
+Drei Engine-Funktionen mussten fuer die Offline-Rechnung nach Python
+portiert werden (`tiles_taken` <- `mcts.rs:573-595`, Strafleisten-Zuwachs
+<- `mcts.rs:634-642`, `gegner_bedarf` <- `provocation.rs:753-779`). Eine
+Portierung ist eine Behauptung, bis sie geprueft ist; der Treiber bricht
+darum ab, bevor er eine Rate berichtet, wenn eine der beiden Gegenproben
+nicht aufgeht:
+
+| Gegenprobe | Ergebnis |
+|---|---|
+| **A -- Spiel-Log**: Stueckzahl und Strafleisten-Zuwachs gegen die vom echten Vollzug gebaute Log-Zeile (`execution.rs:38-46`) | **168 / 168 exakt**, 0 Abweichungen (nur `LARGE_FACTORY_SUN` erreicht -- das Log waechst zwischen aufeinanderfolgenden Records selten um genau eine Zeile) |
+| **B -- `moon_top_counts`**: per Konstruktion exakt `tiles_taken` des globalen Mondzugs, aus einem vom Suchpfad unabhaengigen Serializer-Zweig (`serialize.rs:215-228`) | **41.918 / 41.918 exakt**, 0 Abweichungen |
+
+Zwei weitere Instrumenten-Pruefungen:
+
+- **Join Policy-Kandidat -> `valid_moves`** (fuer die Zugquelle, ohne die
+  `tiles_taken` nicht rechenbar ist): 193.319 von 193.319 Kandidaten
+  getroffen, Quelle je Schluessel eindeutig. Die naheliegende Join-Variante
+  MIT `moon_order` scheitert zu 52 % -- die Suche zaehlt
+  Moon-Order-Permutationen als eigene Kandidaten, `valid_moves` nicht.
+  (Nebenbefund: `moon_order` steht auch an reinen SONNEN-Zuegen und ist
+  KEIN Mondzug-Marker -- die Quelle steht nur in `valid_moves[].source`.)
+- **untried-Abgrenzung**: nach Abzug der `v_mix`-Gruppe hatte KEINE
+  einzige Entscheidung mehr als `gumbel_top_m = 16` Kandidaten
+  (`verdaechtige_kandidatenmengen: 0`) -- die Trennung children/untried
+  greift sauber.
+
+### §9.3 Stufe 0 -- BESTANDEN
+
+Anteil der Entscheidungen mit mindestens einem Nicht-Sieger im
+Q-Aequivalenzfenster:
+
+| eps | Fensterrate |
+|---|---|
+| 0,01 | **35,69 %** |
+| 0,02 | 52,97 % |
+| 0,03 | 62,20 % |
+
+Das Instrument liefert; Stufe 0 ist bestanden. **Unabhaengige
+Plausibilitaets-Kontrolle**: E3b hat mit seinem Besuchs-/SE-Fenster eine
+Feuerrate von 36,52 % gemessen (`PREREG_denial_tiebreak.md` Zeilen
+137-143) -- gezaehlt auf demselben Nenner-Zuschnitt (`total` enthaelt dort
+wie hier auch Ein-Kandidaten-Entscheidungen, `net_mcts.rs:3056-3058`).
+Da 36,52 % eine TAUSCH-Rate ist und eine Tauschrate nie ueber der
+Fensterrate liegen kann, ist das E3b-Fenster mindestens so weit wie das
+rohe eps=0,01-Fenster hier. Zwei voellig verschiedene Messwege
+(prozessglobaler Rust-Zaehler in der Arena gegen Offline-Rechnung auf
+Self-Play-Records) landen bei derselben Groessenordnung -- das spricht
+fuer beide.
+
+### §9.4 Stufe 1 (Offline-Ersatz) -- Abbruchschwelle NICHT unterschritten
+
+Stoerfenster = Fenster-Kandidat, der (a) dem Gegner mehr von einer akut
+gebrauchten Farbe wegnimmt als der Basiszug (`min(tiles_taken,
+bedarf_akut)`, §4.1) UND (b) die eigene Strafleiste nicht staerker fuellt
+(§3).
+
+| eps | Stoerfenster (alle Entscheidungen) | nur Entscheidungen mit echter Wahl | ohne Strafleisten-Filter | Bedarf inkl. Kuppelzellen |
+|---|---|---|---|---|
+| **0,01** | **5,50 %** (14.374) | 6,74 % | 6,42 % | 5,95 % |
+| 0,02 | 9,99 % (26.094) | 12,23 % | 11,66 % | 10,79 % |
+| 0,03 | 13,57 % (35.458) | 16,62 % | 15,83 % | 14,52 % |
+
+Weitere Befunde:
+
+- **Runde 5 traegt exakt 0 bei** (36.060 Entscheidungen = 13,8 % des
+  Nenners). Erwartet und strukturell: dort entscheidet der exakte
+  Alpha-Beta-Solver, der Gumbel-Baum wird nie gebaut
+  (`net_mcts.rs:4345-4347`). Auf die Runden 1-4 allein bezogen liegt die
+  Rate bei eps=0,01 bei **6,38 %**.
+- Ueber die Runden 1-4 ist die Rate flach (bei eps=0,01: 3.114 / 4.306 /
+  3.459 / 3.495) -- kein Rundenfenster, in dem sich Stoerung ballt.
+- Der Strafleisten-Filter aus §3 entfernt rund ein Siebtel der sonst
+  qualifizierten Faelle (6,42 % -> 5,50 %). Er ist also kein Papiertiger:
+  in etwa jedem siebten Stoerkandidaten HAETTE die Stoerung zusaetzlichen
+  Boden gekostet -- genau der v1-Fehler.
+- Der Kuppelzellen-Anteil des `gegner_bedarf` aendert die Rate kaum
+  (5,95 % gegen 5,50 %). Die in §4.1 als HERLEITUNG markierte Annahme
+  ("der Raster-Anteil ueberdeckt die akute Nachfrage") ist damit fuer die
+  RATE widerlegt; fuer die Zielfarben-WAHL bleibt sie ungeprueft.
+
+**Was diese Zahl NICHT ist** (Grenzen des Ersatzverfahrens):
+
+1. Besuchszahlen sind nicht aufgezeichnet -> es ist ein ROHES eps-Fenster
+   (E3-Definition), nicht das E3b-Kriterium. Nach §9.3 ist das
+   E3b-Fenster eher WEITER als eps=0,01; die 5,50 % sind fuer den
+   geplanten Mechanismus damit eher eine Unter- als eine Obergrenze.
+2. Der Basiszug ist `argmax(completed-Q)`, nicht der tatsaechlich
+   gespielte (besuchsbasierte) Zug.
+3. 200 Sims mit Wurzelrauschen statt 400 ohne.
+
+### §9.5 Verdikt nach der vorregistrierten Abbruchregel
+
+Die Abbruchregel lautete: `stoerbar/total < 5 %` -> ohne Arena schliessen.
+Bei eps=0,01 liegt der Anteil bei **5,50 %**, bei groesserem Fenster
+deutlich darueber. **Die Abbruchregel greift NICHT.** Der Punkt wird also
+nicht geschlossen -- v2 bleibt OFFEN.
+
+**Hier wird gestoppt.** Die Entscheidung ueber Stufe 2 (Bau des
+Zaehlmodus, danach die 2 x 200-Arena) trifft der Nutzer. Zur Einordnung
+gehoert dazu, ohne Beschoenigung:
+
+- 5,50 % ist knapp ueber der Schwelle, und die Schwelle war als
+  "darunter kann die Arena es ohnehin nicht aufloesen" begruendet. Knapp
+  darueber heisst nicht "gut aufloesbar", sondern "gerade eben nicht
+  ausgeschlossen".
+- E3b hat bei einer SECHSMAL hoeheren Eingriffstiefe (36,52 % getauschte
+  Entscheidungen) keinen Gewinn erzeugt, sondern -4,75pp. Ein Mechanismus,
+  der nur jede achtzehnte Entscheidung beruehrt, muesste pro Eingriff
+  entsprechend mehr leisten.
+- Meine Einschaetzung aus §8 aendert sich durch diese Zahlen **nicht**:
+  die Fensterrate war nie das Problem, das Problem war und ist die
+  Wirksamkeit des Tauschs.
+
+### §9.6 Korrekturen am Plan (aus der Messung gelernt)
+
+1. **§3 ist an einer Stelle falsch**: dort steht, `ueberlauf_von` liefere
+   `0` fuer Bodenzuege. Ein Bodenzug legt ALLE genommenen Fliesen auf die
+   Strafleiste; `0` waere die falsche Zahl und wuerde Bodenzuege als
+   schadensfrei durchwinken. Der Treiber rechnet bereits korrekt
+   (`floor_zuwachs`: `n` bei `row < 0`). Beim Bau ist die Funktion so und
+   nicht wie in §3 beschrieben zu implementieren.
+2. **Runde 5 gehoert explizit aus dem Geltungsbereich**: kein Gumbel-Baum,
+   keine Wurzelkinder, kein Tie-Break. Das ist kein Mangel, sondern die
+   Bestandsentscheidung fuer den exakten Solver -- in §4.1 war es nicht
+   benannt.
+3. Der Join Policy -> `valid_moves` darf `moon_order` NICHT verwenden
+   (§9.2); wer die Offline-Auswertung spaeter wiederholt, faellt sonst
+   auf 52 % Fehltreffer herein.
