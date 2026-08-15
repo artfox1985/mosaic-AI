@@ -1900,7 +1900,12 @@ fn try_batched_single_eval(
 ) -> Option<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
     let batcher = crate::net_batcher::lookup(net)?;
     let mut rows = batcher.eval_rows(&[feats]).ok()?;
-    Some(rows.remove(0))
+    // Der Sammel-Faden liefert seit dem Ownership-Verbraucher Teil 1 sechs
+    // Spalten; dieser Aufrufer (`drafting_action_priors`) braucht nur den
+    // `Net::eval`-4-Tupel-Vertrag und verwirft die beiden Aux-Koepfe --
+    // dort gibt es keinen Blattwert, in den ein Shift eingehen koennte.
+    let (policy, value, moon, points, _opp, _own) = rows.remove(0);
+    Some((policy, value, moon, points))
 }
 
 /// Verschraenkung (Weg V, `net_batcher.rs`): versucht `feats_a`/`feats_b`
@@ -1917,23 +1922,30 @@ fn try_batched_single_eval(
 /// `None` (Knopf aus, `w>0`, kein registrierter Sammel-Faden, oder ein
 /// Fehler im Rundlauf) faellt auf den bestehenden synchronen Pfad zurueck --
 /// der Aufrufer bleibt dadurch UNVERAENDERT lauffaehig, egal was hier passiert.
+///
+/// Ownership-Verbraucher Teil 1: der Sammel-Faden liefert seit der
+/// Verdrahtung SECHS Spalten je Zeile, `ownership` kommt also auch ueber
+/// diesen Pfad durch (frueher waere hier still ein leerer Kopf entstanden).
+/// `opp_points` wird trotzdem weiterhin als LEER zurueckgegeben und der
+/// `points_utility_w()`-Waechter bleibt unangetastet -- siehe
+/// `net_batcher.rs`-Modulkommentar "Was NICHT Teil dieser Datei ist".
 #[allow(clippy::type_complexity)]
 fn try_batched_pair_ex(
     net: &Net,
     feats_a: &[f32],
     feats_b: &[f32],
 ) -> Option<(
-    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
-    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
 )> {
     if points_utility_w() != 0.0 {
         return None;
     }
     let batcher = crate::net_batcher::lookup(net)?;
     let rows = batcher.eval_rows(&[feats_a, feats_b]).ok()?;
-    let (pa, va, ma, pta) = rows[0].clone();
-    let (pb, vb, mb, ptb) = rows[1].clone();
-    Some(((pa, va, ma, pta, Vec::new()), (pb, vb, mb, ptb, Vec::new())))
+    let (pa, va, ma, pta, _oppa, owna) = rows[0].clone();
+    let (pb, vb, mb, ptb, _oppb, ownb) = rows[1].clone();
+    Some(((pa, va, ma, pta, Vec::new(), owna), (pb, vb, mb, ptb, Vec::new(), ownb)))
 }
 
 /// Netz-Blattwert für `state`: unabhängige Pro-Spieler-Werte. Das Netz liefert
@@ -1955,6 +1967,11 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     // zusammen statt zwei sequenzieller Batch=1-Aufrufe zu bezahlen (Parität
     // siehe `net.rs::eval_pair_matches_two_single_evals`). Bei `true` entfällt
     // der zweite Pass ohnehin (reines `eval`, unverändert).
+    // Ownership-Verbraucher Teil 1: die Ownership-Karte des MOVER-Passes
+    // deckt BEIDE Spieler ab (`[0:36]` ich, `[36:72]` Gegner, ego-
+    // perspektivisch -- `neural_net.py:1825-1840`), der geflippte Pass wird
+    // dafuer also nicht gebraucht.
+    let mut own_map: Vec<f32> = Vec::new();
     let (mover_val, other_val) = if MIRROR_OTHER_VAL {
         // Task #81: Batch=1 (ein einzelner Forward-Pass) -- fuer die Amdahl-
         // Aufteilung des geplanten GPU-Batchers (Task #82).
@@ -1962,12 +1979,13 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         // `opp_points`-Kopf (leerer Vec bei jedem Netz ohne den Kopf, siehe
         // `net.rs::eval_ex`-Doku), sonst BYTE-IDENTISCH (gleiche Extraktion
         // der ersten vier Ausgaben).
-        let (_logits, value, _moon, points, opp_points) =
+        let (_logits, value, _moon, points, opp_points, ownership) =
             crate::profiling::timed_net_eval(1, || {
                 net.eval_ex(&feats).unwrap_or_else(|_| {
-                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                    (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
                 })
             });
+        own_map = ownership;
         let mv = blended_leaf_win_prob(&value, &points, &opp_points);
         (mv, 1.0 - mv)
     } else {
@@ -1981,18 +1999,21 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         // ZUERST den registrierten Sammel-Faden -- `None` (Knopf aus ist der
         // Default) faellt byte-identisch auf den bisherigen synchronen
         // `eval_pair_ex`-Aufruf zurueck.
-        let ((_logits, value, _moon, points, opp_points), (_o_logits, o_value, _o_moon, o_points, o_opp_points)) =
-            match try_batched_pair_ex(net, &feats, &other_feats) {
-                Some(pair) => pair,
-                None => crate::profiling::timed_net_eval(2, || {
-                    net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
-                        (
-                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                        )
-                    })
-                }),
-            };
+        let (
+            (_logits, value, _moon, points, opp_points, ownership),
+            (_o_logits, o_value, _o_moon, o_points, o_opp_points, _o_ownership),
+        ) = match try_batched_pair_ex(net, &feats, &other_feats) {
+            Some(pair) => pair,
+            None => crate::profiling::timed_net_eval(2, || {
+                net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
+                    (
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                    )
+                })
+            }),
+        };
+        own_map = ownership;
         (
             blended_leaf_win_prob(&value, &points, &opp_points),
             blended_leaf_win_prob(&o_value, &o_points, &o_opp_points),
@@ -2018,7 +2039,17 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     // `apply_unlock_shaping` NICHT mehr hier: der Spezialfeld-Anteil steckt seit
     // 2026-08-11 IM `apply_wertung_shaping`-Term (ein Gewicht fuer alle acht
     // Kriterien). Ein zweiter Aufruf wuerde ihn doppelt zaehlen.
-    apply_wertung_shaping(apply_value_shrink(raw, state.round_number), state)
+    //
+    // Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md` §2) NACH
+    // dem Heuristik-Pol: derselbe Rechen-Ort, dieselbe Shift-Form, aber der
+    // ANDERE Pol (Netz-Prognose statt Ist-Fortschritt). Bei
+    // `MOSAIC_OWNERSHIP_W` ungesetzt (Default 0,0) exakte Identitaet --
+    // `apply_ownership_shaping` steigt VOR jeder Rechnung aus.
+    apply_ownership_shaping(
+        apply_wertung_shaping(apply_value_shrink(raw, state.round_number), state),
+        state,
+        &own_map,
+    )
 }
 
 /// Netz-Policy-Priors für `state`: EIN Forward-Pass, wiederverwendet
@@ -2106,7 +2137,9 @@ fn make_node<R: Rng + ?Sized>(
     // Task #28: `_ex`-Varianten statt `eval`/`eval_pair` -- lesen zusaetzlich
     // den optionalen `opp_points`-Kopf (leer bei jedem Netz ohne den Kopf),
     // sonst BYTE-IDENTISCH (gleiche Extraktion von logits/value/moon/points).
-    let (logits, value, moon, points, opp_points, other_pass) = if same_net {
+    // Ownership-Verbraucher Teil 1: `ownership` kommt IMMER aus dem
+    // Mover-Pass (deckt beide Spielerhaelften ab, siehe `net_leaf_eval`).
+    let (logits, value, moon, points, opp_points, ownership, other_pass) = if same_net {
         // Unveraendert gegenueber vor Task #88 (Paritaets-Codepfad).
         let net = net_policy;
         let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
@@ -2127,29 +2160,29 @@ fn make_node<R: Rng + ?Sized>(
             // Produktions-Stand) -- die eigentliche Ziel-Stelle der
             // Verschraenkung.
             let (
-                (logits, value, moon, points, opp_points),
-                (_o_logits, o_value, _o_moon, o_points, o_opp_points),
+                (logits, value, moon, points, opp_points, ownership),
+                (_o_logits, o_value, _o_moon, o_points, o_opp_points, _o_ownership),
             ) = match try_batched_pair_ex(net, &feats, &other_feats) {
                 Some(pair) => pair,
                 None => crate::profiling::timed_net_eval(2, || {
                     net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
                         (
-                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                            (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                         )
                     })
                 }),
             };
-            (logits, value, moon, points, opp_points, Some((o_value, o_points, o_opp_points)))
+            (logits, value, moon, points, opp_points, ownership, Some((o_value, o_points, o_opp_points)))
         } else {
             // Task #81: Batch=1.
-            let (logits, value, moon, points, opp_points) =
+            let (logits, value, moon, points, opp_points, ownership) =
                 crate::profiling::timed_net_eval(1, || {
                     net.eval_ex(&feats).unwrap_or_else(|_| {
-                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
                     })
                 });
-            (logits, value, moon, points, opp_points, None)
+            (logits, value, moon, points, opp_points, ownership, None)
         }
     } else {
         // Task #88 Hybrid-Pfad: Policy/Moon von `net_policy` (EIN Batch=1-
@@ -2175,31 +2208,31 @@ fn make_node<R: Rng + ?Sized>(
             let feats_value = crate::features::features_for_net(net_value, &state);
             let other_feats_value = crate::features::features_for_net(net_value, &flipped);
             let (
-                (_v_logits, value, _v_moon, points, opp_points),
-                (_o_logits, o_value, _o_moon, o_points, o_opp_points),
+                (_v_logits, value, _v_moon, points, opp_points, ownership),
+                (_o_logits, o_value, _o_moon, o_points, o_opp_points, _o_ownership),
             ) = crate::profiling::timed_net_eval(2, || {
                 net_value.eval_pair_ex(&feats_value, &other_feats_value).unwrap_or_else(|_| {
                     (
-                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                     )
                 })
             });
-            (logits, value, moon, points, opp_points, Some((o_value, o_points, o_opp_points)))
+            (logits, value, moon, points, opp_points, ownership, Some((o_value, o_points, o_opp_points)))
         } else {
             let feats_value = crate::features::features_for_net(net_value, &state);
-            let (_v_logits, value, _v_moon, points, opp_points) = crate::profiling::timed_net_eval(1, || {
-                net_value
-                    .eval_ex(&feats_value)
-                    .unwrap_or_else(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()))
+            let (_v_logits, value, _v_moon, points, opp_points, ownership) = crate::profiling::timed_net_eval(1, || {
+                net_value.eval_ex(&feats_value).unwrap_or_else(|_| {
+                    (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+                })
             });
-            (logits, value, moon, points, opp_points, None)
+            (logits, value, moon, points, opp_points, ownership, None)
         }
     };
 
     node_from_net_outputs(
         net_policy, net_value, state, parent, parent_state, action, prior, player_who_acted, terminal,
-        logits, value, moon, points, opp_points, other_pass, rng,
+        logits, value, moon, points, opp_points, ownership, other_pass, rng,
     )
 }
 
@@ -2235,6 +2268,12 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     // `opp_points`-Output -- `other_pass`s 3. Tupel-Element ist das
     // Gegenstueck aus der geflippten Perspektive.
     opp_points: Vec<f32>,
+    // Ownership-Verbraucher Teil 1: rohe Kopf-LOGITS des Mover-Passes
+    // (`[0:36]` ich, `[36:72]` Gegner; 140 breit bei Konjunktions-Netzen,
+    // der Verbraucher liest nur die ersten 72). Leer bei jedem Netz ohne den
+    // Kopf. Bewusst KEIN Gegenstueck in `other_pass` -- die Karte deckt
+    // beide Spielerhaelften schon ab.
+    ownership: Vec<f32>,
     other_pass: Option<(Vec<f32>, Vec<f32>, Vec<f32>)>,
     rng: &mut R,
 ) -> Node {
@@ -2332,6 +2371,13 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // 0.0) exakte Identitaet -- der Fruehausstieg in
             // `apply_wertung_shaping_full` ueberspringt jede Rechnung.
             today_value = apply_wertung_shaping(today_value, &state);
+
+            // Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md`
+            // §2), NACH dem Heuristik-Pol -- gleiche Reihenfolge wie in
+            // `net_leaf_eval`. Bei `MOSAIC_OWNERSHIP_W` ungesetzt (Default
+            // 0,0) exakte Identitaet: `apply_ownership_shaping` steigt VOR
+            // jeder Rechnung aus (kein Sigmoid, kein tanh, keine Rundung).
+            today_value = apply_ownership_shaping(today_value, &state, &ownership);
 
             // KEIN separates Freischalt-Shaping mehr (2026-08-11): der
             // Spezialfeld-Anteil (Kriterium 6 samt ungegatetem ⭐-Bonus) steckt
@@ -3149,10 +3195,142 @@ fn apply_denial_tiebreak(nodes: &[Node], baseline: usize) -> usize {
 /// Annealing (Commit 4c5db0e): reine Zugwahl, kein Trainingsziel-Einfluss.
 fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
     if USE_GUMBEL_SEARCH {
-        gumbel_final_root_action(nodes).map(|baseline| apply_denial_tiebreak(nodes, baseline))
+        gumbel_final_root_action(nodes).map(|baseline| {
+            // PREREG_opponent_disruption_v2.md §5.2: reiner ZAEHLMODUS, VOR
+            // dem Tie-Break und ohne Einfluss auf dessen Eingaben oder auf
+            // den Rueckgabewert -- die gespielte Aktion bleibt exakt
+            // `apply_denial_tiebreak(...)`.
+            color_denial_probe(nodes, baseline);
+            apply_denial_tiebreak(nodes, baseline)
+        })
     } else {
         best_root_child(nodes, &nodes[0].children)
     }
+}
+
+// ── PREREG_opponent_disruption_v2.md §5.2: Stoerfenster-Zaehlmodus ─────────
+//
+// Beantwortet OHNE Verhaltenseingriff die Vorfrage "wie oft tritt ueberhaupt
+// ein Stoerfenster auf?": eine Wurzelentscheidung, in der ein nach dem
+// E3b-Kriterium gleichwertiger Kandidat dem Gegner mehr von einer AKUT
+// gebrauchten Farbe wegnimmt als der Suchsieger, ohne die eigene Strafleiste
+// staerker zu fuellen. Der Zaehler laeuft, der Zug bleibt der Zug.
+//
+// Runde 5 erreicht diese Stelle nie (`round5::applies` kurzschliesst schon in
+// `net_search_drafting_action`/`net_root_child_stats_and_policy`, dort kein
+// Gumbel-Baum) -- PREREG §9.6 Punkt 2, hier bewusst nicht noch einmal gegatet.
+
+static COLOR_DENIAL_PROBE_TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static COLOR_DENIAL_PROBE_FENSTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static COLOR_DENIAL_PROBE_STOERBAR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// `z`-Schwelle des Zaehlmodus, `MOSAIC_COLOR_DENIAL_PROBE_Z` -- Default
+/// `0.0` = AUS = kein Zaehlen, keine Kosten. BEWUSST getrennt von
+/// `MOSAIC_DENIAL_UNCERT_Z`: dieser Knopf darf den E3b-Tie-Break NICHT
+/// aktivieren (der wuerde das Spielverhalten aendern und die
+/// Byte-Identitaets-Zusicherung brechen).
+fn color_denial_probe_z() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_COLOR_DENIAL_PROBE_Z", 0.0))
+}
+
+/// Mindest-Besuchsanteil des Zaehlmodus, `MOSAIC_COLOR_DENIAL_PROBE_MIN_VISIT_FRAC`
+/// -- Default `0,5` wie beim E3b-Vorbild (`denial_min_visit_frac`).
+fn color_denial_probe_min_visit_frac() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_COLOR_DENIAL_PROBE_MIN_VISIT_FRAC", 0.5))
+}
+
+/// Snapshot `(total, fenster, stoerbar)` des Zaehlmodus.
+/// `total` = ausgewertete Wurzelentscheidungen (inkl. Ein-Kandidaten-Faelle,
+/// gleicher Nenner-Zuschnitt wie `denial_tiebreak_stats`),
+/// `fenster` = davon mit >=1 gleichwertigem Nicht-Sieger,
+/// `stoerbar` = davon mit >=1 gleichwertigem Kandidaten, der mehr stoert und
+/// nicht mehr Strafleiste kostet.
+pub fn color_denial_probe_stats() -> (u64, u64, u64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    (
+        COLOR_DENIAL_PROBE_TOTAL.load(Relaxed),
+        COLOR_DENIAL_PROBE_FENSTER.load(Relaxed),
+        COLOR_DENIAL_PROBE_STOERBAR.load(Relaxed),
+    )
+}
+
+/// Setzt alle drei Zaehler zurueck (Muster `reset_denial_tiebreak_stats`).
+pub fn reset_color_denial_probe_stats() {
+    use std::sync::atomic::Ordering::Relaxed;
+    COLOR_DENIAL_PROBE_TOTAL.store(0, Relaxed);
+    COLOR_DENIAL_PROBE_FENSTER.store(0, Relaxed);
+    COLOR_DENIAL_PROBE_STOERBAR.store(0, Relaxed);
+}
+
+/// Reiner Zaehlkern OHNE Env-Zugriff (Trennungsmuster wie
+/// `apply_denial_tiebreak_with`/`denial_uncert_qualifies`) -- direkt mit
+/// synthetischen `Node`-Vektoren testbar.
+///
+/// KEINE Rueckgabe, KEINE Mutation an `nodes`, kein RNG-Zugriff, kein
+/// Netz-Forward: alle Eingaben (Besuche, completed-Q, Wurzelzustand) liegen
+/// nach dem Baumbau bereits vor. Kandidatenmenge ausschliesslich
+/// `nodes[0].children` -- identisch zu E3/E3b (siehe
+/// `apply_denial_tiebreak_with`-Kommentar, warum nicht `untried`).
+fn color_denial_probe_with(nodes: &[Node], baseline: usize, z: f64, min_visit_frac: f64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    if z <= 0.0 {
+        return; // AUS: kein Zaehlen, keine Kosten.
+    }
+    COLOR_DENIAL_PROBE_TOTAL.fetch_add(1, Relaxed);
+    let children = &nodes[0].children;
+    if children.len() <= 1 {
+        return;
+    }
+    let Some(baseline_pos) = children.iter().position(|&c| c == baseline) else {
+        return; // defensiv, wie im Tie-Break: nie beobachtet, nie paniken.
+    };
+    let root = &nodes[0].state;
+    let cq = completed_q_per_candidate(nodes, 0);
+    let n_b = nodes[baseline].visits as f64;
+    let q_b = cq[baseline_pos].1;
+    let bedarf = crate::provocation::gegner_bedarf_akut(root, root.current_player);
+    // Der Basiszug selbst: nur Stein-Zuege tragen eine Farbe/Stueckzahl. Eine
+    // Nicht-Stein-Basis (Kuppelwahl o.ae.) bekommt (0,0) -- dann kann jeder
+    // stoerende Stein-Kandidat sie schlagen, was sachlich richtig ist.
+    let (stoer_b, floor_b) = match nodes[baseline].action.as_ref() {
+        Some(Action::Stone(m)) => crate::provocation::stoer_bewertung(root, m, &bedarf),
+        _ => (0, 0),
+    };
+    let mut fenster = false;
+    let mut stoerbar = false;
+    for (i, &cid) in children.iter().enumerate() {
+        if i == baseline_pos {
+            continue;
+        }
+        if !denial_uncert_qualifies(nodes[cid].visits as f64, cq[i].1, n_b, q_b, z, min_visit_frac) {
+            continue; // ausserhalb des Aequivalenzfensters oder zu wenig Besuche
+        }
+        fenster = true;
+        let Some(Action::Stone(m)) = nodes[cid].action.as_ref() else { continue };
+        let (stoer_a, floor_a) = crate::provocation::stoer_bewertung(root, m, &bedarf);
+        if stoer_a > stoer_b && floor_a <= floor_b {
+            stoerbar = true;
+            break; // eine qualifizierte Alternative genuegt fuer die Rate
+        }
+    }
+    if fenster {
+        COLOR_DENIAL_PROBE_FENSTER.fetch_add(1, Relaxed);
+    }
+    if stoerbar {
+        COLOR_DENIAL_PROBE_STOERBAR.fetch_add(1, Relaxed);
+    }
+}
+
+/// Env-gelesener Wrapper von [`color_denial_probe_with`] (produktiver
+/// Aufrufer: `select_final_root_child`).
+fn color_denial_probe(nodes: &[Node], baseline: usize) {
+    let z = color_denial_probe_z();
+    if z <= 0.0 {
+        return; // Fruehausstieg VOR jedem weiteren Env-Lesen (Default-Kosten: ein f64-Vergleich).
+    }
+    color_denial_probe_with(nodes, baseline, z, color_denial_probe_min_visit_frac());
 }
 
 // ── Task #95: Debug-Trace (Value-Head-Einschätzung + granularer Gumbel-Trace) ──
@@ -3233,9 +3411,9 @@ fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &G
     let feats = crate::features::features_for_net(net, state);
     // Task #28: `eval_ex` statt `eval` -- liest zusaetzlich den optionalen
     // `opp_points`-Kopf (leerer Vec bei jedem Netz ohne den Kopf).
-    let (_logits, value, _moon, points, opp_points) = net
-        .eval_ex(&feats)
-        .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new()));
+    let (_logits, value, _moon, points, opp_points, _ownership) = net.eval_ex(&feats).unwrap_or_else(|_| {
+        (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
+    });
     let raw_value = value.first().copied().unwrap_or(0.0);
     let win_prob = value_to_win_prob(&value);
     // Task #30: additiv, roher UND korrigierter Wert nebeneinander (siehe
@@ -5726,6 +5904,88 @@ mod tests {
         assert_eq!(apply_denial_tiebreak_uncert_with(&nodes, 1, 1.0, 0.5), 1, "inert -> Basis unveraendert");
         assert_eq!(denial_tiebreak_stats(), (0, 0), "kein Kopf -> gar keine Auswertung gezaehlt");
         reset_denial_tiebreak_stats();
+    }
+
+    // ── PREREG_opponent_disruption_v2.md §5.2: Stoerfenster-Zaehlmodus ──────
+    //
+    // Aufbau aller drei Tests: Wurzel mit Spieler 0 am Zug, der GEGNER
+    // (Spieler 1) hat eine begonnene Rot-Reihe mit 2 offenen Plaetzen
+    // (akuter Bedarf Rot = 2, Blau = 0). Fabrik 1 bietet 2x Rot und 1x Blau.
+    // Basiszug nimmt Blau (stoert nicht), Kandidat nimmt Rot (stoert).
+
+    static COLOR_DENIAL_PROBE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn probe_stone(state: &GameState, color: crate::tile::TileColor, row: i32) -> Action {
+        Action::Stone(crate::moves::Move {
+            take: crate::moves::TakeAction {
+                source: TakeSource::SmallFactorySun,
+                color,
+                factory_id: Some(state.factories[0].factory_id),
+                moon_order: Vec::new(),
+            },
+            place: crate::moves::PlaceAction { row_index: row },
+        })
+    }
+
+    /// Wurzel + zwei Kinder mit identischem Q/Besuch (Fenster qualifiziert
+    /// sicher), Basiszug `nodes[1]` = Blau, Kandidat `nodes[2]` = Rot in
+    /// Reihe `kandidat_row`.
+    fn probe_test_nodes(kandidat_row: i32) -> Vec<Node> {
+        use crate::tile::TileColor::{Blau, Rot};
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.state.factories[0].sun_tiles = vec![Rot, Rot, Blau];
+        // Gegner (Spieler 1): begonnene Rot-Reihe der Kapazitaet 3 -> 2 offen.
+        root.state.players[1].pattern_lines[2].color = Some(Rot);
+        root.state.players[1].pattern_lines[2].tiles = vec![Rot];
+        let basis_action = probe_stone(&root.state, Blau, 5);
+        let kandidat_action = probe_stone(&root.state, Rot, kandidat_row);
+        root.children = vec![1, 2];
+        let mut basis = gumbel_test_node(0.5, 10, 6.0, 1); // Q = 0.6
+        basis.action = Some(basis_action);
+        let mut kandidat = gumbel_test_node(0.5, 10, 6.0, 1); // Q = 0.6, gleichwertig
+        kandidat.action = Some(kandidat_action);
+        vec![root, basis, kandidat]
+    }
+
+    #[test]
+    fn color_denial_probe_z_zero_zaehlt_gar_nichts() {
+        let _guard = COLOR_DENIAL_PROBE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_color_denial_probe_stats();
+        let nodes = probe_test_nodes(5);
+        color_denial_probe_with(&nodes, 1, 0.0, 0.5);
+        assert_eq!(color_denial_probe_stats(), (0, 0, 0), "z=0 darf keinen Zaehler anfassen");
+        reset_color_denial_probe_stats();
+    }
+
+    #[test]
+    fn color_denial_probe_zaehlt_fenster_und_stoerbarkeit() {
+        let _guard = COLOR_DENIAL_PROBE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_color_denial_probe_stats();
+        // Kandidat legt 2x Rot in Reihe 6 (Kapazitaet 6, leer) -> kein
+        // Ueberlauf, Stoerwirkung min(2, Bedarf 2) = 2 > Basis 0.
+        let nodes = probe_test_nodes(5);
+        color_denial_probe_with(&nodes, 1, 1.0, 0.5);
+        assert_eq!(color_denial_probe_stats(), (1, 1, 1), "Fenster offen UND stoerbar");
+        reset_color_denial_probe_stats();
+    }
+
+    #[test]
+    fn color_denial_probe_verwirft_stoerzug_der_die_strafleiste_fuellt() {
+        let _guard = COLOR_DENIAL_PROBE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_color_denial_probe_stats();
+        // GEGENPROBE zum Test darueber -- einzige Aenderung: Zielreihe 1
+        // (Kapazitaet 1) statt 6. Dieselben 2 Rot-Fliesen erzeugen jetzt 1
+        // Ueberlauf gegen 0 des Basiszugs; der Ueberlauf-Filter (PREREG §3,
+        // korrigiert in §9.6) muss den Kandidaten verwerfen. Das Fenster
+        // bleibt offen -- nur `stoerbar` faellt weg.
+        let nodes = probe_test_nodes(0);
+        color_denial_probe_with(&nodes, 1, 1.0, 0.5);
+        assert_eq!(
+            color_denial_probe_stats(),
+            (1, 1, 0),
+            "Ueberlauf-Kandidat darf NICHT als stoerbar zaehlen"
+        );
+        reset_color_denial_probe_stats();
     }
 
     #[test]

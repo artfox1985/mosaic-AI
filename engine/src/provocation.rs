@@ -750,18 +750,19 @@ fn disruption_aktiv() -> bool {
 ///
 /// Rein oeffentliche Buchhaltung -- `aktueller_spieler` sieht exakt das, was
 /// auch ein menschlicher Mitspieler am Gegnerbrett abliest.
+///
+/// Der Musterreihen-Anteil allein steht als [`gegner_bedarf_akut`] zur
+/// Verfuegung (PREREG_opponent_disruption_v2.md §4.1: der Kuppelraster-Anteil
+/// ist eine Langfrist-Forderung, die sich ueber eine Runde kaum aendert; das
+/// Rangkriterium des Stoerungs-Bausteins v2 nutzt deshalb nur den akuten
+/// Teil). Diese Funktion delegiert an ihn -- ihr eigenes Ergebnis bleibt
+/// unveraendert (Bestandsschutz fuer `stoerungs_vorzug`, per Test gesichert).
 pub(crate) fn gegner_bedarf(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
-    let mut bedarf = [0i64; 5];
+    let mut bedarf = gegner_bedarf_akut(state, aktueller_spieler);
     let gegner_idx = 1 - aktueller_spieler;
     let Some(gegner) = state.players.get(gegner_idx) else {
         return bedarf; // defensiv, sollte bei genau 2 Spielern nie vorkommen.
     };
-    for line in &gegner.pattern_lines {
-        let Some(c) = line.color else { continue }; // leere Reihe -- keine Farbe festgelegt.
-        if let Some(i) = farben_index(c) {
-            bedarf[i] += line.spaces_left() as i64;
-        }
-    }
     for r in 0..6 {
         for spalte in 0..6 {
             let Some(sp) = gegner.dome_grid.get_space(r, spalte) else { continue };
@@ -776,6 +777,64 @@ pub(crate) fn gegner_bedarf(state: &GameState, aktueller_spieler: usize) -> [i64
         }
     }
     bedarf
+}
+
+// ── Stoerungs-Baustein v2 (PREREG_opponent_disruption_v2.md) ────────────────
+//
+// Drei reine Lesefunktionen fuer den Zaehlmodus (§5.2) bzw. spaeter den
+// Tie-Break selbst (§4.1). Keine davon veraendert Zustand, keine wird vom
+// Bestandspfad aufgerufen -- der abgelehnte v1-Pfad (`stoerungs_vorzug`)
+// bleibt unberuehrt.
+
+/// AKUTER Gegner-Bedarf je Farbe: nur die offenen Plaetze seiner bereits
+/// BEGONNENEN Musterreihen (`PatternLine::color`/`spaces_left`, board.rs:40).
+/// Das ist der Teil von [`gegner_bedarf`], der sich innerhalb einer Runde
+/// tatsaechlich bewegt -- eine begonnene Reihe verlangt JETZT Nachschub,
+/// waehrend eine offene Kuppelzelle noch viele Runden Zeit hat.
+pub(crate) fn gegner_bedarf_akut(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
+    let mut bedarf = [0i64; 5];
+    let Some(gegner) = state.players.get(1 - aktueller_spieler) else {
+        return bedarf; // defensiv, sollte bei genau 2 Spielern nie vorkommen.
+    };
+    for line in &gegner.pattern_lines {
+        let Some(c) = line.color else { continue }; // leere Reihe -- keine Farbe festgelegt.
+        if let Some(i) = farben_index(c) {
+            bedarf[i] += line.spaces_left() as i64;
+        }
+    }
+    bedarf
+}
+
+/// Wie viele Fliesen dieser Zug auf die EIGENE Strafleiste legt.
+///
+/// KORREKTUR gegenueber PREREG_opponent_disruption_v2.md §3 (dort stand "0
+/// fuer Bodenzuege", festgestellt in §9.6): ein Bodenzug legt ALLE genommenen
+/// Fliesen auf die Strafleiste -- `0` wuerde Bodenzuege faelschlich als
+/// schadensfrei durchwinken. Reihenzug: Ueberlauf wie `mcts.rs:636-638`
+/// (`execution::execute_place` -> `PatternLine::add_tiles`, board.rs:56-67).
+pub(crate) fn strafleisten_zuwachs(state: &GameState, spieler: usize, m: &Move) -> usize {
+    let n = crate::mcts::tiles_taken(state, &m.take);
+    let r = m.place.row_index;
+    if !(0..=5).contains(&r) {
+        return n; // Bodenzug: alles geht auf die Strafleiste.
+    }
+    let zeile = &state.players[spieler].pattern_lines[r as usize];
+    n.saturating_sub(zeile.spaces_left())
+}
+
+/// Bewertung EINES Zuges fuer den Stoerungs-Baustein v2:
+/// `(stoerwirkung, strafleisten_zuwachs)`.
+///
+/// `stoerwirkung = min(genommene Fliesen, akuter Gegner-Bedarf dieser Farbe)`
+/// -- eine Farbe wegzunehmen hilft nur bis zu der Menge, die der Gegner
+/// ueberhaupt noch braucht (PREREG §4.1; Modellierungs-Entscheidung, vorab
+/// fixiert). `bedarf_akut` wird vom Aufrufer EINMAL je Entscheidung berechnet
+/// und hereingereicht, nicht je Kandidat neu (gleiche Begruendung wie bei
+/// `verbleibende_farben` in `vorzugszug_fuer_spalte`).
+pub(crate) fn stoer_bewertung(state: &GameState, m: &Move, bedarf_akut: &[i64; 5]) -> (i64, usize) {
+    let n = crate::mcts::tiles_taken(state, &m.take) as i64;
+    let bedarf = farben_index(m.take.color).map(|i| bedarf_akut[i]).unwrap_or(0);
+    (n.min(bedarf), strafleisten_zuwachs(state, state.current_player, m))
 }
 
 /// Kern von [`vorzugszug_fuer_spalte`], aber OHNE dessen Spalten-/
@@ -861,7 +920,7 @@ pub(crate) fn stoerungs_vorzug(state: &GameState) -> Option<crate::moves::Action
 mod vorzugszug_tests {
     use super::*;
     use crate::dome::{DomeSpace, DomeTile};
-    use crate::moves::Action;
+    use crate::moves::{Action, PlaceAction, TakeAction};
     use crate::tile::TileColor::*;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -1208,5 +1267,98 @@ mod vorzugszug_tests {
         // Ohne aktiven Bauer UND ohne Stoerungs-Knopf muss der Dispatch
         // `None` liefern (kein Kriterium aktiv in diesem Testaufbau).
         assert!(vorher.is_none(), "ohne jeden Knopf darf drafting_vorzug nichts vorschlagen, bekam {vorher:?}");
+    }
+
+    // ── Stoerungs-Baustein v2 (PREREG_opponent_disruption_v2.md) ────────────
+
+    /// Bestandsschutz fuer die Aufteilung: `gegner_bedarf` = akuter Anteil
+    /// PLUS Kuppelzellen-Anteil. Waere die Refaktorierung schiefgegangen,
+    /// haette sich `stoerungs_vorzug`s Zielfarben-Wahl still veraendert.
+    #[test]
+    fn gegner_bedarf_ist_akut_plus_kuppelzellen() {
+        let mut game = drafting_game(301);
+        let pi = game.state.current_player;
+        let gegner = 1 - pi;
+        // Musterreihe: Rot, Kapazitaet 3, 1 Fliese -> akut 2.
+        game.state.players[gegner].pattern_lines[2].color = Some(Rot);
+        game.state.players[gegner].pattern_lines[2].tiles.push(Rot);
+        // Kuppelkachel auf dem GEGNER-Brett: 4 offene Normal-Zellen.
+        let tile = DomeTile::new(
+            70,
+            vec![
+                DomeSpace::normal(Rot),
+                DomeSpace::normal(Blau),
+                DomeSpace::normal(Gelb),
+                DomeSpace::normal(Schwarz),
+            ],
+            0,
+        );
+        game.state.players[gegner].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
+
+        let akut = gegner_bedarf_akut(&game.state, pi);
+        let voll = gegner_bedarf(&game.state, pi);
+        let i_rot = farben_index(Rot).expect("Rot ist eine Normalfarbe");
+        assert_eq!(akut[i_rot], 2, "zwei offene Plaetze der begonnenen Rot-Reihe");
+        assert_eq!(voll[i_rot], 3, "plus die eine offene Rot-Kuppelzelle");
+        // Der akute Anteil darf NIE groesser sein als der volle.
+        for i in 0..5 {
+            assert!(akut[i] <= voll[i], "Farbe {i}: akut {} > voll {}", akut[i], voll[i]);
+        }
+        // Blau/Gelb/Schwarz haben KEINE begonnene Reihe -> akut 0, voll 1.
+        let i_blau = farben_index(Blau).expect("Blau ist eine Normalfarbe");
+        assert_eq!(akut[i_blau], 0);
+        assert_eq!(voll[i_blau], 1);
+    }
+
+    /// PREREG §9.6 Punkt 1: ein Bodenzug legt ALLE Fliesen auf die
+    /// Strafleiste (die Vorregistrierung hatte hier faelschlich "0"), ein
+    /// Reihenzug nur den Ueberlauf.
+    #[test]
+    fn strafleisten_zuwachs_zaehlt_bodenzug_voll_und_reihenueberlauf() {
+        let mut game = drafting_game(302);
+        let pi = game.state.current_player;
+        let fid = game.state.factories[0].factory_id;
+        game.state.factories[0].sun_tiles = vec![Rot, Rot, Rot];
+        let zug = |row: i32| Move {
+            take: TakeAction {
+                source: crate::moves::TakeSource::SmallFactorySun,
+                color: Rot,
+                factory_id: Some(fid),
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: row },
+        };
+        // 3 Fliesen, Reihe 1 (Kapazitaet 1, leer) -> 2 Ueberlauf.
+        assert_eq!(strafleisten_zuwachs(&game.state, pi, &zug(0)), 2);
+        // 3 Fliesen, Reihe 6 (Kapazitaet 6, leer) -> kein Ueberlauf.
+        assert_eq!(strafleisten_zuwachs(&game.state, pi, &zug(5)), 0);
+        // Bodenzug -> alle 3 auf die Strafleiste (NICHT 0).
+        assert_eq!(strafleisten_zuwachs(&game.state, pi, &zug(-1)), 3);
+    }
+
+    /// Das Rangkriterium selbst: `min(genommene Fliesen, akuter Bedarf)`.
+    #[test]
+    fn stoer_bewertung_deckelt_die_wirkung_am_akuten_bedarf() {
+        let mut game = drafting_game(303);
+        let pi = game.state.current_player;
+        let gegner = 1 - pi;
+        let fid = game.state.factories[0].factory_id;
+        // Gegner braucht genau 1x Rot (Reihe 1, Kapazitaet 1, leer),
+        // die Fabrik bietet 3x Rot an.
+        game.state.players[gegner].pattern_lines[0].color = Some(Rot);
+        game.state.factories[0].sun_tiles = vec![Rot, Rot, Rot];
+        let bedarf = gegner_bedarf_akut(&game.state, pi);
+        let m = Move {
+            take: TakeAction {
+                source: crate::moves::TakeSource::SmallFactorySun,
+                color: Rot,
+                factory_id: Some(fid),
+                moon_order: Vec::new(),
+            },
+            place: PlaceAction { row_index: 5 },
+        };
+        let (wirkung, boden) = stoer_bewertung(&game.state, &m, &bedarf);
+        assert_eq!(wirkung, 1, "3 genommene Fliesen, aber nur 1 gebraucht -> Wirkung 1");
+        assert_eq!(boden, 0, "Reihe 6 fasst alle drei");
     }
 }

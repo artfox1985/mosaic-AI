@@ -723,6 +723,30 @@ fn reset_denial_tiebreak_stats() {
     crate::net_mcts::reset_denial_tiebreak_stats();
 }
 
+/// Zaehlmodus-Snapshot des Stoerungs-Bausteins v2
+/// (`evaluations/PREREG_opponent_disruption_v2.md` §5.2, Stufe 1):
+/// `(total, fenster, stoerbar)` -- ausgewertete Wurzelentscheidungen, davon
+/// mit gleichwertigem Alternativzug, davon mit gleichwertigem Alternativzug,
+/// der den Gegner staerker stoert OHNE mehr Strafleiste zu kosten.
+///
+/// Reiner Zaehler: der Modus veraendert die gespielte Aktion NICHT (siehe
+/// `net_mcts::color_denial_probe_with`). Prozessglobale Atomics -- in einem
+/// Worker-KIND gefuehrte Zaehler sind vom Elternprozess aus unsichtbar; der
+/// Treiber `tools/color_denial_probe.py` prueft darum `total > 0`
+/// (gleiche Falle wie bei `denial_tiebreak_stats`, siehe
+/// `tools/e3b_firing_rate.py`).
+#[pyfunction]
+fn color_denial_probe_stats() -> (u64, u64, u64) {
+    crate::net_mcts::color_denial_probe_stats()
+}
+
+/// Setzt die drei Zaehler des Stoerfenster-Zaehlmodus zurueck -- vor einem
+/// zu messenden Lauf aufrufen.
+#[pyfunction]
+fn reset_color_denial_probe_stats() {
+    crate::net_mcts::reset_color_denial_probe_stats();
+}
+
 /// Task #89 (Oracle-Metriken): Netz-Suche auf einem EXTERN gespeicherten
 /// Zustand statt `PyGame::state` -- der bisher fehlende Such-Einstieg (siehe
 /// `evaluations/STATUS.md`, "Task #89 ... BLOCKIERT", Commit `373acc1`).
@@ -1157,6 +1181,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_aggression_params, m)?)?;
     m.add_function(wrap_pyfunction!(denial_tiebreak_stats, m)?)?;
     m.add_function(wrap_pyfunction!(reset_denial_tiebreak_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(color_denial_probe_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_color_denial_probe_stats, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
