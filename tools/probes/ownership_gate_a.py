@@ -73,6 +73,14 @@ from neural_net import (  # noqa: E402
 )
 
 ARMS = ["w0", "w01", "w02", "w05"]
+# Wiederverwendbarkeit fuer spaetere Arme auf DEMSELBEN Held-out (z.B.
+# PREREG_frozen_trunk_head.md): --arms/--model-prefix/--out ueberschreiben die
+# drei Konstanten, die sonst den Sweep-Armen fest zugeordnet waren. Ohne
+# Argumente laeuft das Skript unveraendert wie am 2026-08-15 -- der
+# Held-out-Satz bleibt in jedem Fall derselbe, weil `reconstruct_split()` ihn
+# aus der Dateiliste + fixem Random(20260707) neu aufbaut und gegen
+# W0_MANIFEST prueft.
+MODEL_PREFIX = "alphazero_v21_2d_own_"
 W0_MANIFEST = REPO / "models" / "manifest_train_v21_2d_own_w0_20260815_015638.json"
 OUT_JSON = REPO / "evaluations" / "ownership_gate_a_results.json"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -345,8 +353,11 @@ def main():
     }
 
     for arm in ARMS:
-        for tag, fname in (("best", f"alphazero_v21_2d_own_{arm}_best.pth"),
-                           ("final", f"alphazero_v21_2d_own_{arm}.pth")):
+        for tag, fname in (("best", f"{MODEL_PREFIX}{arm}_best.pth"),
+                           ("final", f"{MODEL_PREFIX}{arm}.pth")):
+            if not (REPO / "models" / fname).exists() and tag == "final":
+                print(f"  (kein {fname} -- uebersprungen)")
+                continue
             ck = torch.load(REPO / "models" / fname, map_location="cpu",
                             weights_only=False)
             model, _enc = build_model_from_checkpoint(ck)
@@ -426,4 +437,19 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--arms", default=",".join(ARMS),
+                    help=f"Kommaliste der Arme (Default: {','.join(ARMS)}). Jeder Arm wird als "
+                         f"<prefix><arm>_best.pth (+ <prefix><arm>.pth, falls vorhanden) geladen.")
+    ap.add_argument("--model-prefix", default=MODEL_PREFIX,
+                    help=f"Dateipraefix in models/ (Default: {MODEL_PREFIX}).")
+    ap.add_argument("--out", default=str(OUT_JSON),
+                    help=f"Ziel-JSON (Default: {OUT_JSON}). Ein neuer Arm-Satz gehoert in eine "
+                         f"EIGENE Datei -- sonst ueberschreibt er die Sweep-Rohzahlen.")
+    _a = ap.parse_args()
+    ARMS = [s.strip() for s in _a.arms.split(",") if s.strip()]
+    MODEL_PREFIX = _a.model_prefix
+    OUT_JSON = Path(_a.out)
     main()
