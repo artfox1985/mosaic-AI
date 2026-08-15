@@ -47,7 +47,7 @@ Bereits vorhanden und wiederverwendet (kein Neubau):
   NICHT anfassen — genau der Grund, warum dieser Auftrag ohne
   Spielschleifen-Aenderung auskommt.
 
-## §2 Mechanismus (Entwurf, noch ungebaut zum Zeitpunkt dieses Abschnitts)
+## §2 Mechanismus (GEBAUT -- Zeilen unten sind der Ist-Stand nach dem Bau)
 
 **Eingaben** (alle oeffentlich, GameState-Felder):
 1. Gegner-Musterreihen: jede NICHT-volle Reihe mit `color = Some(c)` braucht
@@ -154,38 +154,47 @@ Kampagne angelehnt (20-30 Partien pro Lauf, zwei Laeufe = Erst+Replik) —
 exakte Zahl bei Freigabe, kein Vorgriff auf eine Messung, die noch nicht
 laufen darf.
 
-## §5 Bau (dieser Auftrag)
+## §5 Bau (GEBAUT, dieser Auftrag)
 
 Neue Funktionen, alle `provocation.rs` (Erweiterung der bestehenden
 "Runde 3: zaehlbare Versorgung"-Sektion, gleiche Farb-Buchhaltungs-Familie):
-- `gegner_bedarf(state, aktueller_spieler) -> [i64; 5]`
-- `vorzugszug_fuer_farbe(state, farbe) -> Option<Action>`
-- `disruption_aktiv() -> bool` (Knopf-Lesefunktion, `OnceLock`, Muster
-  `column_build::aktiv_env`)
-- `stoerungs_vorzug(state) -> Option<Action>` (fasst die drei obigen
-  zusammen: Knopf-Gate, Rundenfenster, Zielfarben-Wahl, Zielzug)
+- `disruption_aktiv_env()`/`disruption_aktiv()` (Zeilen 701/729) — Knopf-
+  Lesefunktion, `OnceLock`-Cache + `#[cfg(test)]`-Thread-Local-Override
+  (`set_disruption_override_for_test`), exaktes Muster `column_build::
+  aktiv_env`/`ist_aktiv` (der `OnceLock` allein waere sonst prozessweit
+  fuer ALLE parallelen `cargo test`-Threads fixiert).
+- `gegner_bedarf(state, aktueller_spieler) -> [i64; 5]` (Zeile 753).
+- `vorzugszug_fuer_farbe(state, farbe) -> Option<Action>` (Zeile 791).
+- `stoerungs_vorzug(state) -> Option<Action>` (Zeile 832) — fasst die drei
+  obigen zusammen: Knopf-Gate, Rundenfenster, Zielfarben-Wahl, Zielzug.
 
-`plate_builder.rs`: `drafting_vorzug` bekommt den `.or_else`-Zweig (§2).
+`plate_builder.rs::drafting_vorzug` (Zeile 255): `.or_else(||
+crate::provocation::stoerungs_vorzug(state))`-Zweig NACH dem bestehenden
+`aktiver_bauer(...).and_then(...)`-Aufruf angehaengt (§2).
 
-Unit-Tests (Kill-Probe-Pflicht: mind. ein Test muss OHNE den Fix/die neue
-Logik nachweislich fehlschlagen, nicht nur "gruen weil er nichts prueft"):
-- `gegner_bedarf` auf einer konstruierten Stellung mit bekannter
-  Musterreihen-/Kuppelzellen-Belegung des Gegners — erwartete Zahlen von
-  Hand nachgerechnet.
-- `stoerungs_vorzug` liefert `None` bei Default (Knopf unset) UND bei
-  `Runde > 4` (Bestandsschutz-Probe).
-- `stoerungs_vorzug` waehlt auf einer Stellung mit EINDEUTIG knappster,
-  vom Gegner gebrauchter Farbe GENAU den Zug, der diese Farbe nimmt (Kill-
-  Probe: mit einer zweiten, absichtlich falschen Zielfarben-Sortierung
-  wuerde der Test einen ANDEREN Zug erwarten und fehlschlagen).
-- `drafting_vorzug`-Integrationstest: Knopf aus -> Bestandsverhalten
-  (Aequivalenz-Probe wie bei den bestehenden Plattenbauer-Regressionstests).
+**Unit-Tests** (alle `provocation.rs::vorzugszug_tests`, 5 neu):
+- `gegner_bedarf_zaehlt_musterreihen_und_offene_kuppelzellen_des_gegners` —
+  begonnene Musterreihe (2 offene Plaetze) + eine offene + eine GEFUELLTE
+  Kuppelzelle des Gegners; erwartete Zahlen von Hand nachgerechnet.
+- `stoerungs_vorzug_ist_aus_ohne_knopf` — Bestandsschutz bei Default.
+- `stoerungs_vorzug_wirkt_nicht_nach_runde_4` — Bestandsschutz bei Runde 5.
+- `stoerungs_vorzug_waehlt_die_vom_gegner_gebrauchte_knappe_farbe`
+  (**Kill-Probe, GEPRUEFT dass sie etwas prueft**): Gegner braucht Rot UND
+  Gelb, Rot ist knapp (11/13 sichtbar verbaut), Gelb reichlich — muss Rot
+  waehlen. Scarcity-Sortierschluessel testweise auf eine Konstante
+  sabotiert (`(erreichbar[i], ...)` → `(0i64, ...)`) → Test schlaegt
+  nachweislich fehl ("bekam Gelb, erwartet Rot"); Fix restauriert → gruen.
+- `drafting_vorzug_integration_ohne_stoerungs_knopf_ist_bestand` —
+  Dispatch-Ebene, Knopf aus.
 
-`cargo test --lib` muss danach gruen bleiben (Baseline 419/0/20, PATH um
-`C:\Users\Patrick\AppData\Local\Python\pythoncore-3.14-64` ergaenzt).
-`maturin build --release` ist erlaubt (Kompilierbarkeits-/Wheel-Bau-Probe),
-**Installation NICHT** — die aktive `.pyd` gehoert dem parallel laufenden
-`ownership_weight`-Sweep.
+**`cargo test --lib`**: 415/0/18 (410 Vorher-Stand dieser Sitzung + 5 neu;
+die Vorher-Zahl selbst ist NICHT die zuletzt dokumentierte Projekt-Baseline
+419/0/20 — zwei parallel arbeitende Agenten aendern gerade `net.rs`/
+`lib.rs`/`Cargo.toml`/`tools/check_conventions.py`, die geteilte Test-Menge
+ist also ein bewegtes Ziel; entscheidend ist ausschliesslich 0 failed vor
+und nach diesem Bau). `maturin build --release`: erfolgreich (Wheel liegt
+in `scratchpad/target_decke/wheels/`), **NICHT installiert** — die aktive
+`.pyd` gehoert dem parallel laufenden `ownership_weight`-Sweep.
 
 ## §6 Abnahme (NACH Sweep-Ende, nicht Teil dieses Auftrags)
 
