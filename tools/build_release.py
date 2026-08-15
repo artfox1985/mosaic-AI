@@ -22,7 +22,9 @@ auf einem bereits vorhandenen dist/Mosaic-AI/ laufen zu lassen.
 
 import argparse
 import datetime
+import os
 import shutil
+import stat
 import subprocess
 import sys
 import zipfile
@@ -36,10 +38,28 @@ BUILD_DIR = PROJECT_ROOT / "build" / "Mosaic-AI"
 SPEC_FILE = PROJECT_ROOT / "dist" / "mosaic_release.spec"
 
 
+def _force_rmtree(path: Path) -> None:
+    """rmtree, das an OneDrive-ReadOnly-Attributen nicht scheitert.
+
+    Unter OneDrive tragen zurueckgeschriebene Dateien haeufig das
+    ReadOnly-Flag; `shutil.rmtree` wirft darauf PermissionError (WinError 5)
+    und der PyInstaller-Lauf bricht ab, BEVOR er baut (mehrfach passiert,
+    zuletzt 2026-08-15). Der Handler nimmt das Flag und versucht es erneut.
+    """
+    def onexc(func, target, exc):
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except Exception:
+            pass
+    shutil.rmtree(path, onexc=onexc)
+
+
 def run_pyinstaller() -> None:
     print(f"[1/4] Entferne alten Build-Output ({DIST_DIR}, {BUILD_DIR}) ...")
-    shutil.rmtree(DIST_DIR, ignore_errors=True)
-    shutil.rmtree(BUILD_DIR, ignore_errors=True)
+    for d in (DIST_DIR, BUILD_DIR):
+        if d.exists():
+            _force_rmtree(d)
 
     print("[2/4] Starte PyInstaller (mosaic_release.spec) ...")
     result = subprocess.run(
