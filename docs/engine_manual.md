@@ -1,91 +1,201 @@
-# 🎲 Mosaic — Offizielle Spielanleitung
+# 🎲 Mosaic — Rules of Play
 
-Diese Anleitung beschreibt die verbindlichen Spielregeln von Mosaic, basierend auf der tatsächlichen Logik der Engine. *(Vollabgleich Engine ↔ Original-Regelbuch ↔ dieses Manual am 2026-08-06: drei Fehler korrigiert, acht Lücken ergänzt — Details in `evaluations/STATUS.md`, Abschnitt Regelbuch-Audit.)*
+This document describes the rules **as the engine actually implements them**.
+Where the physical game leaves a case open, the engine's chosen reading is
+marked as such. German terms are kept for every element that the in-game UI
+labels in German (the interface is German for now); each is glossed in English
+on first use.
 
-## 1. Überblick & Spielziel
+> **Attribution:** Mosaic is a private, non-commercial reimplementation of the
+> *Azul Duel* ruleset (game design by Michael Kiesling, © Plan B Games / Next
+> Move Games). The game design is not ours — this repository contributes the
+> engine, the neural network and the training pipeline. Not affiliated with or
+> endorsed by the publisher.
 
-Mosaic ist ein abstraktes und taktisches Legespiel für zwei Personen. Eine Partie geht über exakt 5 Runden. Die Spieler sammeln farbige Fliesen, ordnen diese in ihren Musterreihen an und übertragen sie anschließend strategisch auf ihr persönliches Kuppel-Raster. Punkte können sowohl während des Spiels beim Platzieren auf der Kuppel als auch bei der großen Endwertung durch spezielle Wertungsplatten gesammelt werden. Wer am Ende die meisten Punkte vorweisen kann, gewinnt das Spiel.
+## 1. Overview & Objective
 
-## 2. Spielmaterial
+Mosaic is an abstract, tactical tile-laying game for exactly two players over
+exactly 5 rounds. You collect coloured tiles, stage them in your
+**Musterreihen** (pattern rows) and then transfer them onto your personal
+**Kuppel** (dome), a growing 6×6 grid. Points come from two sources: placing
+tiles during the game, and the final scoring driven by the
+**Wertungsplatten** (scoring plates). Highest total wins.
 
-* **Farbige Fliesen:** Es gibt insgesamt 65 normale Fliesen in 5 verschiedenen Farben (blau, gelb, rot, schwarz, türkis), also exakt 13 Stück pro Farbe. Zusätzlich existiert eine separate Reserve von 9 Spezialfliesen.
-* **Beutel & Turm:** Zu Beginn befinden sich alle 65 normalen Fliesen gut gemischt im Beutel. Verbrauchte oder abgeräumte Fliesen fallen in den Turm. Ist der Beutel leer, wird er mit den Fliesen aus dem Turm wieder neu befüllt. Reichen Beutel und Turm zusammen einmal nicht mehr aus (Fliesen auf den Kuppeln verlassen den Kreislauf dauerhaft), startet die Runde mit teilbefüllten oder leeren Fabriken; Bonusplättchen leer gestarteter Fabriken werden sofort aufgedeckt.
-* **Fabriken:** Es gibt 4 kleine Fabriken (diese starten mit je 4 Fliesen auf der Sonnenseite) sowie 1 große Fabrik (diese startet mit 5 Fliesen).
-* **Das Spieler-Tableau:** Jeder Spieler besitzt ein eigenes Brett. Dieses besteht aus 6 Musterreihen, deren Kapazität sich von oben nach unten von 1 bis 6 Fliesen steigert. Es gibt zudem eine Strafleiste (den "Boden") mit 4 Feldern, die am Ende der Runde Minuspunkte von -1 bis -4 bringen. Das Herzstück ist die Kuppel, ein 3x3-Raster, das im Laufe des Spiels mit bis zu 9 Kuppelplatten gefüllt wird. Da jede Platte aus 2x2 Feldern besteht, entsteht nach und nach ein 6x6-Wertungsraster.
-* **Kuppelplatten:** Insgesamt 18 Stück. Jede Platte trägt 3 Farbfelder und 1 Sonderfeld — bei 9 Platten ist das Sonderfeld ein **Spezialfeld** (gesperrt, siehe Abschnitt 5), bei den anderen 9 ein **Wildfeld**, das beim Legen jede beliebige Farbe akzeptiert. 3 Platten liegen offen in der Ablage, der Rest bildet den verdeckten Nachziehstapel. Die offene Ablage wird während einer Runde **nicht** nachgefüllt (einzige Ausnahme: nach den Startkuppel-Platzierungen); erst bei der Rundenvorbereitung wird sie wieder auf 3 aufgefüllt.
-* **Bonusplättchen (Chips):** Zu Rundenbeginn wird auf jede der 4 kleinen Fabriken 1 verdecktes Bonusplättchen gelegt (4 pro Runde, Vorrat 20 Stück für 5 Runden). Ein Plättchen wird aufgedeckt, sobald seine Fabrik komplett geleert wurde.
-* **Startpunkte:** Jeder Spieler beginnt die Partie mit **5 Punkten**.
+## 2. Components
 
-## 3. Vorbereitung & Spielaufbau
+* **Tiles:** 65 normal tiles in 5 colours — blau, gelb, rot, schwarz, türkis
+  (blue, yellow, red, black, turquoise) — exactly 13 per colour. A separate
+  reserve holds 9 **Spezialfliesen** (special tiles).
+* **Beutel & Turm (bag & tower):** all 65 normal tiles start shuffled in the
+  bag; discarded tiles go to the tower, which refills the bag when it runs
+  empty. If bag and tower together cannot fill the **Fabriken** (factories),
+  the round starts with partly filled or empty ones — and the Bonuschips of
+  any factory that started empty are revealed immediately. (Tiles resting on
+  a Kuppel leave the cycle for good, so this state is reachable.)
+* **Fabriken:** 4 small ones (4 tiles each on their Sonnenseite / sun side)
+  and 1 large one (5 tiles).
+* **Player board:** 6 Musterreihen with capacities rising from 1 to 6 tiles
+  top to bottom; a **Strafleiste** (penalty floor) with 4 slots worth −1 to
+  −4 at the end of a round; and the Kuppel, a 3×3 arrangement of slots. Each
+  **Kuppelplatte** (dome plate) covers a slot with 2×2 cells, so a filled
+  Kuppel forms the 6×6 scoring grid.
+* **Kuppelplatten:** 18 in total, each carrying 3 colour cells plus one
+  special cell. On 9 plates that cell is a locked **Spezialfeld** (special
+  field, see section 5); on the other 9 it is a **Wildfeld** (wild field)
+  that accepts any colour when a tile is placed on it. 3 plates lie face up
+  in the display, the rest form the face-down draw stack. The display is
+  **not** refilled during a round — the only exception is right after the
+  opening placements — and is topped back up to 3 during round preparation.
+* **Bonuschips (bonus tiles):** each round, 1 face-down chip is placed on
+  each of the 4 small Fabriken (20 in the supply, 4 per round over 5 rounds).
+  A chip is revealed as soon as its factory has been emptied.
+* **Starting score:** each player begins the game with **5 points**.
 
-* Zu Beginn jeder neuen Runde werden die kleinen Fabriken mit je 4 Fliesen und die große Fabrik mit 5 Fliesen (inklusive Startspielerstein) frisch aus dem Beutel befüllt.
-* **Sonderregel für die große Fabrik:** Haben zufällig alle 5 gezogenen Fliesen dieselbe Farbe, werden sie zurückgelegt und es wird neu gezogen, bis mindestens zwei verschiedene Farben ausliegen. Können Beutel und Turm zusammen keine zwei verschiedenen Farben mehr liefern, wird die monochrome Befüllung akzeptiert — wer diese 5 gleichfarbigen Fliesen nimmt, erhält den Startspielerstein.
-* **Startkuppel (Nur vor der 1. Runde):** Vor dem eigentlichen Spielbeginn muss jeder Spieler eine Startkachel auf seiner Kuppel platzieren. Der Nicht-Startspieler legt seine Platte dabei zuerst, danach folgt der Startspieler. Diese Startplatzierung ist kostenlos, Position sowie Drehung sind frei wählbar und sie zählt nicht zu den regulären Zügen der ersten Runde (sie verbraucht auch keines der beiden Runden-Plättchen aus Abschnitt 4A).
+## 3. Setup
 
-## 4. Der Rundenablauf
+* At the start of every round the small Fabriken are refilled with 4 tiles
+  each and the large one with 5 tiles, drawn fresh from the bag; the
+  **Startspielerstein** (start player marker) sits with the large factory.
+* **Large factory, monochrome case:** if all 5 drawn tiles happen to share a
+  colour, they go back and are redrawn until at least two colours are
+  present. Should bag and tower be unable to produce two colours at all, the
+  monochrome fill stands — and whoever takes those 5 identical tiles receives
+  the Startspielerstein.
+* **Opening placement (before round 1 only):** each player places one
+  starting Kuppelplatte, the non-start player first. This placement is free,
+  position and rotation are unrestricted, and it counts neither as a regular
+  turn nor against the two plates owed for round 1 (section 4A).
 
-Jede der 5 Runden ist in zwei aufeinanderfolgende Phasen unterteilt: Drafting (Fliesen nehmen) und Tiling (Auf die Kuppel legen).
+## 4. Round Structure
+
+Every round runs through two consecutive phases: Drafting (taking tiles) and
+Tiling (placing them on the Kuppel).
 
 ### Phase 1: Drafting
 
-Die Spieler sind abwechselnd am Zug und führen eine der folgenden vier Aktionen aus. Wer keine gültige Aktion mehr hat, **muss** passen (freiwilliges Passen ist nicht erlaubt); der andere Spieler zieht dann ggf. mehrfach hintereinander weiter.
+Players alternate turns, each taking exactly one of four actions. A player
+with no legal action **must** pass — passing by choice is not allowed — after
+which the opponent may take several turns in a row.
 
-* **A) Kuppelplatte legen:** In den Runden 1–4 **muss** jeder Spieler genau 2 Kuppelplatten legen — die Drafting-Phase endet erst, wenn beide Spieler ihre 2 Platten verbaut haben. In Runde 5 werden **keine** Kuppelplatten mehr gelegt. Eine Platte kann entweder kostenlos aus der offenen Ablage genommen oder blind vom Nachziehstapel gezogen werden. **Der Stapel-Zug im Detail:** Jede Ziehung kostet 1 Punkt und darf beliebig oft wiederholt werden (die Rückseite verrät nur den Platten-Typ — Wild oder Spezial); erst nach dem Zieh-Stopp werden die Vorderseiten aufgedeckt, eine Platte wird gewählt und platziert, die übrigen wandern in beliebiger Reihenfolge zurück unter den Stapel. Steht der Punktestand bei 0, sind weitere Ziehungen faktisch kostenlos (der Stand kann nie unter 0 fallen; diesen Fall laesst das Original-Regelbuch offen — die Engine legt die Luecke konsistent mit der Nie-unter-0-Regel aus). Einmal gelegte Platten sind fix; Position und Rotation sind frei.
-* **B) Fliesen (Sonnenseite):** Der Spieler nimmt alle Fliesen einer gewünschten Farbe von der Sonnenseite einer Fabrik. Diese werden in exakt eine Musterreihe gelegt. Alle restlichen Fliesen dieser Fabrik wandern danach auf die Mondseite (als Mond-Stapel bei der kleinen Fabrik oder in den Moon-Pool bei der großen Fabrik). **Bei der kleinen Fabrik bestimmt der nehmende Spieler die Stapel-Reihenfolge der Restfliesen selbst** — strategisch relevant, denn vom Mond-Stapel sind später nur die obersten Fliesen nehmbar.
-* **C) Fliesen (Mondseite):** Der Spieler sammelt alle oben aufliegenden Fliesen einer bestimmten Farbe aus den Mondbereichen *aller* Fabriken gleichzeitig ein (je Stapel zählt nur die oberste Fliese; aus dem Moon-Pool der großen Fabrik alle dieser Farbe).
-* **D) Bonusplättchen nehmen:** Der Spieler nimmt sich ein aufgedecktes Bonusplättchen einer leeren Fabrik. Jeder Spieler nimmt **genau 2 pro Runde** — da alle 4 Plättchen aufgedeckt werden und die Runde erst endet, wenn keines mehr ausliegt, ist das keine Option, sondern Pflicht.
+**A) Place a Kuppelplatte.** In rounds 1–4 each player owes exactly 2 plate
+placements, and the drafting phase does not end before both players have
+placed theirs; in round 5 no plates are placed at all. A plate can be taken
+for free from the face-up display, or drawn blind from the stack.
+*Drawing from the stack:* every single draw costs 1 point and may be repeated
+as often as you like — the plate backs reveal only the type (Wild or Special).
+When you stop drawing, the fronts are turned up, you keep and place one plate,
+and the rest go back under the stack in any order you choose. At a score of 0
+further draws are effectively free, because a score can never drop below zero.
+*(The physical rules leave this case open; the engine resolves it consistently
+with the never-below-zero rule.)* Placed plates are permanent; position and
+rotation are free.
 
-**Wichtige Platzierungsregeln:**
+**B) Take tiles from a Sonnenseite.** Take every tile of one colour from the
+sun side of a single factory and assign them to exactly one Musterreihe. The
+factory's remaining tiles then move to its moon side — as a stack on a small
+factory, or into the moon pool of the large one. On a small factory, **the
+taking player decides the stack order** of those leftovers, which matters:
+only the top tile of a moon stack can be taken later.
 
-* Passen aufgenommene Fliesen nicht mehr in die gewählte Musterreihe (oder passt die Farbe nicht), fallen alle überschüssigen Fliesen als Strafe auf die Strafleiste am Boden. Es ist auch erlaubt, Fliesen freiwillig direkt auf die Strafleiste zu legen.
-* Ist die Strafleiste mit ihren 4 Plätzen voll, fallen weitere Fliesen direkt in den Turm.
-* Der Startspielerstein wird NUR bei der ersten Nahme vom **Mondbereich** der großen Fabrik vergeben — eine Sonnen-Nahme lässt ihn liegen. Die Mitnahme ist nicht ablehnbar. Wer ihn nimmt, beginnt die nächste Runde, kassiert dafür am Rundenende aber feste -2 Punkte. (Einzige Ausnahme: musste die große Fabrik mangels zwei verfügbarer Farben monochrom befüllt werden, geht der Stein bereits mit der Sonnen-Nahme der 5 gleichfarbigen Fliesen.) Da die Runde erst endet, wenn auch die große Fabrik restlos leer ist — den Stein eingeschlossen —, wird er in jeder Runde von einem der Spieler genommen.
+**C) Take tiles from the Mondbereich.** Collect every *topmost* tile of one
+chosen colour across the moon areas of *all* factories at once — one tile per
+stack, plus every tile of that colour from the large factory's moon pool.
+
+**D) Take a revealed Bonuschip** from an emptied factory. Each player takes
+exactly 2 per round; since all 4 chips get revealed and the round only ends
+once none are left, this is an obligation rather than an option.
+
+**Placement rules**
+
+* Tiles that no longer fit the chosen Musterreihe — or whose colour clashes
+  with it — fall onto the Strafleiste. Placing tiles there voluntarily is
+  also allowed.
+* Once all 4 Strafleiste slots are occupied, further tiles drop into the
+  tower.
+* The Startspielerstein is awarded **only** on the first take from the large
+  factory's **Mondbereich** — a sun-side take leaves it where it is — and it
+  cannot be declined. Its holder opens the next round but takes a fixed −2 at
+  round end. (Sole exception: after a forced monochrome fill it travels with
+  the sun-side take of those 5 identical tiles.) Since the round ends only
+  when the large factory is completely empty, marker included, someone takes
+  it every round.
 
 ### Phase 2: Tiling
 
-Am Ende der Runde werden die vollen Musterreihen ausgewertet.
+At the end of the round the completed Musterreihen are resolved.
 
-* Die Reihen werden zwingend von oben nach unten (Reihe 1 bis 6) abgearbeitet. Passt eine Fliesenfarbe zu einer vorhandenen Kuppelplatte, ist diese auch zu legen. Wird eine tiefere Reihe gelegt, sind darüberliegende Reihen für den Rest dieser Phase gesperrt.
-* Von jeder fertigen Reihe wird genau ein Stein auf ein passendes Feld der Kuppel übertragen, die restlichen Steine der abgeräumten Reihe wandern in den Turm.
-* **Unplatzierbare Reihen:** Sind einer Musterreihe bereits alle 3 Kuppelplatten zugeordnet und gibt es dort kein passendes freies Feld mehr, muss die Reihe (auch eine unvollständige) zwingend geräumt werden; ihre Steine fallen als Strafe Richtung Strafleiste/Turm. Hat die zugehörige Kuppel-Reihe dagegen noch freie Platten-Slots, **bleiben die Fliesen liegen und tragen in die nächste Runde über** — erst eine später gelegte passende Platte (oder das Volllaufen der Slots) entscheidet ihr Schicksal.
-* Nicht volle Reihen ohne Platzierungszwang verbleiben ebenfalls unverändert für die nächste Runde.
+* Rows are worked strictly top to bottom (1 through 6). If a row's colour
+  matches an available cell on a Kuppelplatte, it *must* be placed. Once a
+  lower row has been placed, every row above it is locked for the rest of the
+  phase.
+* Each completed row sends exactly one tile to the Kuppel; the rest of that
+  row goes to the tower.
+* **Rows that cannot be placed:** if all 3 Kuppelplatten of a row's dome row
+  are already assigned and none offers a matching free cell, the row — even
+  an incomplete one — must be cleared, and its tiles fall toward the
+  Strafleiste and tower. If that dome row still has empty plate slots,
+  however, **the tiles stay and carry over into the next round**; a later
+  matching plate (or the slots filling up) decides their fate.
+* Incomplete rows under no such pressure simply remain for the next round.
 
-**Punktevergabe beim Legen:**
+**Scoring a placement**
 
-* Ein Stein ohne orthogonal angrenzende Nachbarn bringt 1 Punkt.
-* Berührt der Stein eine zusammenhängende Linie aus Steinen, gibt es Punkte in Höhe der Gesamtlänge — **die Farben der Steine spielen dabei keine Rolle**, jede belegte Fliese zählt (auch Spezialfliesen). Für eine horizontale Linie der Länge *h* (>1) gibt es *h* Punkte, für eine vertikale Linie der Länge *v* (>1) gibt es *v* Punkte. Ist beides der Fall, wird die Summe aus beidem gebildet.
+* A tile with no orthogonal neighbour scores 1 point.
+* A tile that joins a contiguous line scores that line's full length —
+  **colour is irrelevant here**, every occupied cell counts, Spezialfliesen
+  included. A horizontal line of length *h* (>1) pays *h* points, a vertical
+  line of length *v* (>1) pays *v* points, and a tile completing both is paid
+  for both.
 
-**Einsatz von Bonusplättchen (Chips):**
+**Spending Bonuschips**
 
-* Unvollständige Musterreihen (mit mindestens 1 Fliese) können durch den geschickten Einsatz von Bonusplättchen komplettiert werden — freiwillig, kein Zwang.
-* Um ein fehlendes Feld auszugleichen, müssen entweder 2 Chips in der exakt gleichen Farbe wie die Reihe oder 3 Chips in beliebiger Farbe ausgegeben werden (mischbar über mehrere fehlende Felder; zweifarbige Chips gelten als passend, wenn sie die Reihenfarbe zeigen). Auch hier gilt die Top-down-Regel: Gesperrte Reihen können nicht mehr per Chip befüllt werden.
+* An incomplete Musterreihe holding at least 1 tile may be completed with
+  chips — entirely optional.
+* Each missing cell costs either 2 chips matching the row's colour exactly,
+  or 3 chips of any colour; costs may be mixed across several missing cells,
+  and a two-coloured chip counts as matching if it shows the row's colour.
+  The top-down rule applies here too: locked rows can no longer be filled.
 
-### Rundenende-Abrechnung
+### Round-End Settlement
 
-* Die Strafleiste wird abgerechnet: -1, -2, -3 und -4 Punkte für die jeweiligen belegten Slots.
-* Der Startspielerstein bringt weitere -2 Punkte.
-* Die Gesamtpunktzahl eines Spielers kann durch Strafen jedoch niemals unter 0 fallen (der Deckel gilt bei jeder Verrechnung auf den Gesamtstand).
+* The Strafleiste pays out −1, −2, −3 and −4 for its occupied slots.
+* The Startspielerstein costs a further −2.
+* A player's total can never fall below 0 through penalties — the floor
+  applies to every settlement against the running total.
 
 ## 5. Spezialfliesen & Spezialfelder
 
-* Auf 9 der 18 Kuppelplatten befindet sich ein gesperrtes Spezialfeld.
-* Ein solches Feld wird erst dann (und nur in der Tiling-Phase) freigeschaltet, wenn die restlichen drei regulären Felder derselben Platte erfolgreich belegt wurden.
-* Die Spezialfliese aus der separaten Reserve wird dann **sofort und automatisch** auf das freie Feld gelegt (keine Option). Die Reserve von 9 Fliesen kann nie ausgehen (9 Spezialfelder im Spiel).
-* **Wertung:** Die Spezialfliese bringt sofort Punkte entsprechend der Reihe (1 bis 6), in der sie platziert wird. Sie selbst erhält keinen Linien-Bonus, zählt aber in den Linien anderer, angrenzender Fliesen als normale belegte Fliese mit.
+* 9 of the 18 Kuppelplatten carry a locked Spezialfeld.
+* It unlocks only in the Tiling phase, and only once the plate's other three
+  regular cells are filled.
+* A Spezialfliese from the separate reserve is then placed there
+  **immediately and automatically** — there is no choice involved. The
+  reserve of 9 can never run dry, as there are exactly 9 Spezialfelder in
+  play.
+* **Scoring:** the Spezialfliese immediately pays points equal to the grid
+  row it lands in (1 to 6). It earns no line bonus of its own, but counts as
+  an ordinary occupied cell in the lines of neighbouring tiles.
 
-## 6. Spielende & Endwertung
+## 6. Game End & Final Scoring
 
-Nach der 5. Runde endet das Spiel. Zu den erspielten Punkten kommt nun die Endwertung hinzu, für die 3 von 8 möglichen Wertungsplatten herangezogen werden. Von 4 festgelegten Paaren darf jeweils nur maximal eine Platte gewählt werden, da sie sich thematisch ausschließen (physisch: 4 doppelseitige Platten — je Paar wird zufällig eine Seite bestimmt, davon kommen 3 der 4 Platten ins Spiel).
+The game ends after round 5, and the Wertungsplatten are settled. Exactly 3 of
+the 8 possible plates are in play. They come in 4 mutually exclusive pairs
+(physically: 4 double-sided plates, one side chosen at random per pair, of
+which 3 enter the game), so at most one plate per pair can ever apply.
 
-**Die 8 Wertungsplatten:**
+**The 8 Wertungsplatten**
 
-1. ↔️ **Horizontale Reihen:** 3 Pkt. je kompletter horizontaler Reihe. *(Schließt Nr. 8 aus)*
-2. ↕️ **Vertikale Reihen:** 7 Pkt. je kompletter vertikaler Reihe. *(Schließt Nr. 5 aus)*
-3. ↗️ **Diagonale Reihen:** 10 Pkt. je kompletter Diagonale (max. 2 Stück möglich). *(Schließt Nr. 6 aus)*
-4. 🌈 **Mehrfarbige Felder:** 2 Pkt. je Wildcard-Feld, vorausgesetzt *alle* sind belegt. *(Schließt Nr. 7 aus)*
-5. ⬜ **Äußere Felder:** 1 Pkt. je Fliese am äußersten Rand der Kuppel. *(Schließt Nr. 2 aus)*
-6. 🔲 **Eckplatten:** 3 Pkt. je kompletter oberer Eckplatte, 8 Pkt. je kompletter unterer Eckplatte (alle 4 Felder belegt). *(Schließt Nr. 3 aus)*
-7. ⭐ **Spezialfelder:** -3 Pkt. je leer gebliebenem Spezialfeld. *(Schließt Nr. 4 aus)*
-8. 🎨 **Farbenreiche Reihen:** 4 Pkt. je horizontaler Reihe, die mindestens 5 verschiedene Farben enthält (Spezialfliesen zählen nicht als Farbe; Lücken in der Reihe sind erlaubt). *(Schließt Nr. 1 aus)*
+| # | Plate | Scores | Excludes |
+|---|---|---|---|
+| 1 | ↔️ Horizontale Reihen | 3 pts per complete horizontal row | 8 |
+| 2 | ↕️ Vertikale Reihen | 7 pts per complete vertical column | 5 |
+| 3 | ↗️ Diagonale Reihen | 10 pts per complete diagonal (max. 2) | 6 |
+| 4 | 🌈 Mehrfarbige Felder | 2 pts per Wildfeld — but only if *all* of them are filled | 7 |
+| 5 | ⬜ Äußere Felder | 1 pt per tile on the outer edge of the Kuppel | 2 |
+| 6 | 🔲 Eckplatten | 3 pts per completed upper corner plate, 8 pts per completed lower one (all 4 cells) | 3 |
+| 7 | ⭐ Spezialfelder | −3 pts per Spezialfeld left empty | 4 |
+| 8 | 🎨 Farbenreiche Reihen | 4 pts per horizontal row holding at least 5 different colours (Spezialfliesen count as no colour; gaps are allowed) | 1 |
 
-Wer nach der Endwertung die höchste Gesamtpunktzahl erreicht hat, ist der Sieger. Bei einem Gleichstand gewinnt der Spieler, der den Startspielerstein besitzt (also der Spieler, der ihn in Runde 5 genommen hat — genommen wird er in jeder Runde, siehe Phase 1).
+The highest total after final scoring wins. A tie goes to the player holding
+the Startspielerstein — that is, whoever took it in round 5, and as noted in
+Phase 1, someone always does.

@@ -8,10 +8,16 @@
 AlphaZero-style neural networks on a two-player tile-drafting and
 dome-building board game with hidden information.
 
-> **⚠️ Disclaimer:** This project is a learning/research project around a
-> generic tile-drafting/wall-tiling game mechanic. It was built from scratch
-> and has no connection to any existing commercial board games, publishers,
-> or brands.
+> **⚠️ Disclaimer — credit where credit is due:** This is a non-commercial
+> learning and research project: a private digital reimplementation of the
+> **_Azul Duel_** ruleset (game design by Michael Kiesling, © Plan B Games /
+> Next Move Games), written from scratch to serve as a training environment
+> for reinforcement learning. **The game design is not mine** — only the
+> engine, the neural network and the training pipeline are. This project is
+> not affiliated with, endorsed by, or connected to the publisher in any way,
+> and it contains none of their artwork, rulebook text, or other assets; all
+> trademarks belong to their respective owners. It is no substitute for the
+> physical game — if you enjoy it, buy the original.
 
 ---
 

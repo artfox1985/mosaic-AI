@@ -1,75 +1,80 @@
 =========================================================
-  Mosaic-AI — Spielanleitung (Programm)
+  Mosaic-AI — How to Run the Game
 =========================================================
 
-STARTEN
--------
-1. Diesen Ordner an einen beliebigen Ort entpacken (falls noch nicht geschehen).
-2. Datei "Mosaic-AI.exe" doppelklicken.
-3. Ein Konsolenfenster öffnet sich kurz und zeigt an, unter welcher Adresse
-   das Spiel läuft (normalerweise http://127.0.0.1:5000). Der Standard-
-   Browser öffnet sich danach automatisch mit dem Spiel.
-4. Falls sich kein Browser öffnet: die im Konsolenfenster angezeigte
-   Adresse von Hand in einen Browser eingeben (Chrome, Edge, Firefox, ...).
+Note: the game interface itself is in German for now. This file, and the
+rules manual next to it, are in English.
 
-BEENDEN
--------
-Einfach das Konsolenfenster schließen, oder darin Strg+C drücken.
+STARTING
+--------
+1. Unpack this folder anywhere you like (if you haven't already).
+2. Double-click "Mosaic-AI.exe".
+3. A console window opens briefly and shows the address the game is running
+   on (normally http://127.0.0.1:5000). Your default browser then opens
+   with the game automatically.
+4. If no browser opens: type the address shown in the console window into a
+   browser by hand (Chrome, Edge, Firefox, ...).
 
-WINDOWS-SMARTSCREEN-HINWEIS
-----------------------------
-Windows kennt dieses Programm nicht und zeigt beim ersten Start evtl. eine
-blaue Warnung ("Windows hat den Computer geschützt" / SmartScreen). Das ist
-normal bei kleinen, nicht kommerziell signierten Programmen. Auf
-"Weitere Informationen" klicken und dann "Trotzdem ausführen" wählen.
+QUITTING
+--------
+Just close the console window, or press Ctrl+C inside it.
 
-SPIEL-LOG TEILEN
+WINDOWS SMARTSCREEN
+-------------------
+Windows does not know this program and may show a blue warning on first
+start ("Windows protected your PC" / SmartScreen). That is normal for small
+programs without a commercial code-signing certificate. Click "More info",
+then "Run anyway".
+
+SHARING A GAME LOG
+------------------
+Every game automatically writes a log file to the folder
+"_internal\static\log" (next to the EXE). You can also download it straight
+from the game via the "📄 Log" button in the top bar. If you would like to
+send a game back for analysis: attach the file
+game_<date>_<time>_seed<...>.log from that folder (or the one downloaded via
+the Log button) — it can be evaluated directly with tools/analyze_game_log.py
+in the project.
+
+RULES
+-----
+The full rules are in "engine_manual.md" in this folder (open it with a text
+editor or any Markdown viewer). It is written for players and describes every
+rule; if you hit a technical passage, you can safely skip it.
+
+DIFFICULTY LEVELS
 -----------------
-Jede Partie erzeugt automatisch eine Log-Datei im Ordner
-"_internal\static\log" (neben der EXE). Diese Datei lässt sich auch direkt
-im Spiel über den Button "📄 Log" (oben in der Kopfleiste) herunterladen.
-Wer eine Partie zur Analyse zurückschicken möchte: einfach die Datei
-game_<datum>_<zeit>_seed<...>.log aus diesem Ordner (oder über den
-Log-Button heruntergeladen) anhängen — sie kann direkt mit
-tools/analyze_game_log.py im Projekt ausgewertet werden.
+- Easy:   simple heuristic AI (no neural network involved), 60 simulations
+- Medium: the bundled neural network, 60 simulations per move
+- Hard:   the same network, 150 simulations
+- Expert: the same network, 400 simulations
+Medium, Hard and Expert all use the same reigning champion network — only
+the thinking time (search simulations per move) differs.
 
-SPIELREGELN
------------
-Die vollständige Spielanleitung liegt als "engine_manual.md" in diesem
-Ordner (einfach mit einem Texteditor oder Markdown-Viewer öffnen). Sie
-richtet sich in erster Linie an Spieler und beschreibt alle Regeln;
-sollten dort auch technische Abschnitte auftauchen, können diese
-gefahrlos übersprungen werden.
-
-SCHWIERIGKEITSGRADE
---------------------
-- Leicht:  einfache Heuristik-KI (kein neuronales Netz nötig)
-- Mittel/Schwer/Experte: neuronales Netz "v16_best" mit steigender
-  Bedenkzeit (mehr Suchsimulationen je Zug)
-
-LEHRER-MODUS
+TEACHER MODE
 ------------
-Beim Start einer Partie "Gegen KI spielen" gibt es zusätzlich eine
-Lehrer-Stufe zu wählen:
-- Aus:               keine Hilfe (Standard).
-- Kandidaten:        ein "💡 Tipp"-Button in der Kopfleiste markiert auf
-                     Wunsch die besten Zugmöglichkeiten auf dem Brett,
-                     ohne Zahlen zu verraten.
-- + Bewertungen:     dieselbe Markierung, zusätzlich mit geschätzter
-                     Gewinnwahrscheinlichkeit je Kandidat.
-- + Coach-Feedback:  nach jedem eigenen Zug zeigt ein kurzer Hinweis, wie
-                     gut er im Vergleich zum besten Zug war; am Spielende
-                     gibt es eine Bilanz (Durchschnittsabweichung, Trefferquote,
-                     größte Ausreißer).
-Der Lehrer-Modus nutzt dieselbe KI-Analyse wie die Gegner-KI und braucht
-daher ebenfalls kurz Bedenkzeit (typisch 1-3 Sekunden je Tipp/Feedback).
-Ist die KI auf "Leicht" (Heuristik, kein neuronales Netz), fällt der Lehrer
-auf eine gröbere Heuristik-Schätzung zurück — ein Hinweis dazu erscheint
-dann im Tipp-Fenster.
+When you start a game in "Gegen KI spielen" (play against the AI) mode, you
+can additionally pick a teacher level:
+- Off:              no help (default).
+- Candidates:       a "💡 Tipp" button in the top bar highlights the best
+                    moves on the board on request, without revealing numbers.
+- + Evaluations:    the same highlighting, plus an estimated win probability
+                    per candidate.
+- + Coach feedback: after each of your moves, a short note shows how it
+                    compared to the best move; at the end of the game you get
+                    a summary (average deviation, hit rate, biggest misses).
+Teacher mode runs the same AI analysis as the opponent AI and therefore needs
+a moment to think as well (typically 1-3 seconds per hint or piece of
+feedback). If the AI is set to "Easy" (heuristic, no neural network), the
+teacher falls back to a coarser heuristic estimate — a note in the hint
+window will tell you so.
 
-BEKANNTE EINSCHRÄNKUNGEN
--------------------------
-- Der Port 5000 wird bevorzugt; ist er belegt, sucht das Programm
-  automatisch einen freien Port und zeigt ihn im Konsolenfenster an.
-- Es handelt sich um einen lokalen Entwicklungsserver (Flask) für den
-  Hausgebrauch, nicht für den Betrieb über das Internet gedacht.
+Note: using AI hints marks the game as unrated (it no longer counts toward
+your Elo rating).
+
+KNOWN LIMITATIONS
+-----------------
+- Port 5000 is preferred; if it is taken, the program automatically looks for
+  a free port and shows it in the console window.
+- This is a local development server (Flask) for home use — it is not meant
+  to be exposed to the internet.
