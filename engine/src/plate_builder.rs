@@ -242,8 +242,20 @@ fn aktiver_bauer(state: &GameState) -> Option<&'static dyn Plattenbauer> {
 
 /// Aufrufstellen: die vier Drafting-Hook-Stellen in `self_play.rs`, ersetzt
 /// `crate::column_build::vorzugszug(&game.state)` in der `.or_else(...)`-Kette.
+///
+/// `PREREG_opponent_disruption.md` §2: NACH dem aktiven Bauer haengt der
+/// Stoerungs-Vorzug (`provocation::stoerungs_vorzug`) als `.or_else`-Zweig
+/// an -- "erst die eigene Vollendung [des aktiven Bauers fuer DIESEN Zug],
+/// dann die Stoerung [als Fallback, wenn der aktive Bauer hier nichts
+/// vorschlaegt]" (Nutzer-Domaenenwissen, `docs/domain_knowledge.md`
+/// "Spielstrategie aus Nutzer-Praxis" Punkt 4). Wirkt eigenstaendig ueber
+/// den Knopf `MOSAIC_OPPONENT_DISRUPTION`, unabhaengig davon, ob ueberhaupt
+/// ein Bauer (`MOSAIC_PLATTENBAU`/`MOSAIC_SPALTENBAU`) aktiv ist -- bei
+/// unbesetztem Knopf liefert `stoerungs_vorzug` sofort `None` (Bestandsschutz).
 pub(crate) fn drafting_vorzug(state: &GameState) -> Option<Action> {
-    aktiver_bauer(state).and_then(|b| b.drafting_vorzug(state))
+    aktiver_bauer(state)
+        .and_then(|b| b.drafting_vorzug(state))
+        .or_else(|| crate::provocation::stoerungs_vorzug(state))
 }
 
 /// Aufrufstellen: dieselben vier Hook-Stellen, ersetzt

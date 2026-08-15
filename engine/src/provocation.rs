@@ -691,6 +691,172 @@ pub(crate) fn farben_index(color: TileColor) -> Option<usize> {
     TileColor::NORMAL.iter().position(|&c| c == color)
 }
 
+// ── Stoerungs-Baustein (Nutzer-Auftrag, PREREG_opponent_disruption.md) ──────
+//
+// Dieselbe oeffentliche Zaehlung, die oben die eigene Vollendbarkeit prueft,
+// beantwortet auch: welche Farbe braucht der GEGNER? Musterreihen-Farbe ist
+// Spielregel (`PatternLine::color`), Kuppelzellen-Forderung ist
+// `geforderte_farbe` -- beides oeffentlich sichtbar, keine Vorhersage.
+
+fn disruption_aktiv_env() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_OPPONENT_DISRUPTION") {
+        Err(_) => false,
+        Ok(raw) => {
+            let v = raw.trim();
+            !v.is_empty() && v != "0"
+        }
+    })
+}
+
+// Test-Override -- gleiches Muster wie `column_build::AKTIV_OVERRIDE`: ein
+// `OnceLock` waere sonst prozessweit fuer ALLE parallelen `cargo test`-
+// Threads fixiert, sobald der erste Test ihn liest.
+#[cfg(test)]
+thread_local! {
+    static DISRUPTION_OVERRIDE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn set_disruption_override_for_test(v: Option<bool>) {
+    DISRUPTION_OVERRIDE.with(|c| c.set(v));
+}
+
+/// Liest `MOSAIC_OPPONENT_DISRUPTION` einmalig (Prozess-Cache, Muster
+/// `column_build::aktiv_env`/`ist_aktiv`). Jeder nicht-leere Wert ausser
+/// `"0"` schaltet die Stoerung ein. Default (unset) = AUS, reiner
+/// Diagnose-Knopf, NIE im Gating (siehe `PREREG_opponent_disruption.md` §3).
+fn disruption_aktiv() -> bool {
+    #[cfg(test)]
+    {
+        if let Some(v) = DISRUPTION_OVERRIDE.with(|c| c.get()) {
+            return v;
+        }
+    }
+    disruption_aktiv_env()
+}
+
+/// Wie sehr braucht der GEGNER (aus Sicht von `aktueller_spieler`) jede der
+/// 5 Normalfarben JETZT -- Summe aus (a) offenen Plaetzen seiner bereits
+/// begonnenen Musterreihen (`PatternLine::color`/`spaces_left`, Spielregel:
+/// eine Reihe ist auf GENAU eine Farbe festgelegt, sobald sie eine Fliese
+/// traegt) und (b) offenen Kuppelzellen mit determinierter Normalfarben-
+/// Forderung (`required_color`, `None` fuer Wild/Special -- diese
+/// Einschraenkung auf "Zellen, die ueberhaupt eine Farbe fordern koennen"
+/// ist die (implizite) Rolle der aktiven Wertungskriterien hier: nur
+/// Normal-Zellen tragen eine Farbforderung, unabhaengig davon, welche 3 der
+/// 8 Platten gezogen sind -- siehe `PREREG_opponent_disruption.md` §2 fuer
+/// die explizite Begruendung dieser Vereinfachung).
+///
+/// Rein oeffentliche Buchhaltung -- `aktueller_spieler` sieht exakt das, was
+/// auch ein menschlicher Mitspieler am Gegnerbrett abliest.
+pub(crate) fn gegner_bedarf(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
+    let mut bedarf = [0i64; 5];
+    let gegner_idx = 1 - aktueller_spieler;
+    let Some(gegner) = state.players.get(gegner_idx) else {
+        return bedarf; // defensiv, sollte bei genau 2 Spielern nie vorkommen.
+    };
+    for line in &gegner.pattern_lines {
+        let Some(c) = line.color else { continue }; // leere Reihe -- keine Farbe festgelegt.
+        if let Some(i) = farben_index(c) {
+            bedarf[i] += line.spaces_left() as i64;
+        }
+    }
+    for r in 0..6 {
+        for spalte in 0..6 {
+            let Some(sp) = gegner.dome_grid.get_space(r, spalte) else { continue };
+            if sp.is_filled() {
+                continue; // schon geliefert -- kein Bedarf mehr.
+            }
+            if let Some(c) = sp.required_color {
+                if let Some(i) = farben_index(c) {
+                    bedarf[i] += 1;
+                }
+            }
+        }
+    }
+    bedarf
+}
+
+/// Kern von [`vorzugszug_fuer_spalte`], aber OHNE dessen Spalten-/
+/// `geforderte_farbe`-Filter: die Stoerung zielt auf IRGENDeine eigene
+/// Platzierung der Zielfarbe (die Farbe wird dem Gegner damit entzogen,
+/// unabhaengig davon, wo sie bei mir landet) -- Portierung des Tie-Breaks
+/// ("vollste eigene Reihe zuerst, kleinste Reihe als Rest-Tie-Break"),
+/// gleiche Begruendung wie dort ("kein Ueberlauf-Kriterium, `TakeAction`
+/// traegt keine Stueckzahl"). Bodenzuege (`row_index` ausserhalb `0..=5`)
+/// werden bewusst NICHT beruecksichtigt -- Stoerung soll nicht auf Kosten
+/// der eigenen Strafleiste gehen (Nutzer-Vorgabe: "bei ~gleichwertigen
+/// eigenen Zuegen"; Schadensbegrenzung bleibt Prioritaet vor Stoerung).
+pub(crate) fn vorzugszug_fuer_farbe(state: &GameState, farbe: TileColor) -> Option<crate::moves::Action> {
+    if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
+        return None;
+    }
+    let player = &state.players[state.current_player];
+    let moves = crate::validation::generate_valid_moves(state);
+    let mut best: Option<(i32, i32, Move)> = None;
+    for m in moves {
+        if m.take.color != farbe {
+            continue;
+        }
+        let r = m.place.row_index;
+        if !(0..=5).contains(&r) {
+            continue;
+        }
+        let r = r as usize;
+        let zeile = &player.pattern_lines[r];
+        let fuellung = zeile.tiles.len() as i32;
+        let kandidat = (-fuellung, r as i32, m);
+        let besser = match &best {
+            None => true,
+            Some((f, rr, _)) => (kandidat.0, kandidat.1) < (*f, *rr),
+        };
+        if besser {
+            best = Some(kandidat);
+        }
+    }
+    best.map(|(_, _, m)| crate::moves::Action::Stone(m))
+}
+
+/// Der Stoerungs-Vorzug selbst -- Aufrufstelle: `plate_builder::drafting_
+/// vorzug` (`.or_else`-Zweig NACH dem aktiven Bauer, siehe dortiger
+/// Kommentar und `PREREG_opponent_disruption.md` §2). `None` bei
+/// ausgeschaltetem Knopf (Bestandsschutz), ausserhalb Runde 1..4, oder wenn
+/// kein Gegner-Bedarf/kein passender eigener Zug existiert.
+///
+/// Zielfarben-Wahl: unter den Farben mit `bedarf > 0` die mit dem
+/// KLEINSTEN `noch_erreichbare_farben`-Wert (knappste zuerst) -- Gleichstand
+/// nach hoechstem `bedarf`, dann nach Farbindex (stabil, bewusst KEINE
+/// Streuung: die Stoerung soll deterministisch aus der Buchhaltung folgen,
+/// nicht gewuerfelt sein).
+pub(crate) fn stoerungs_vorzug(state: &GameState) -> Option<crate::moves::Action> {
+    if !disruption_aktiv() {
+        return None;
+    }
+    if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
+        return None;
+    }
+    let bedarf = gegner_bedarf(state, state.current_player);
+    let erreichbar = noch_erreichbare_farben(state, state.current_player);
+    let mut ziel: Option<(i64, i64, usize)> = None; // (erreichbar, -bedarf, farbindex)
+    for i in 0..5 {
+        if bedarf[i] <= 0 {
+            continue;
+        }
+        let kandidat = (erreichbar[i], -bedarf[i], i);
+        let besser = match ziel {
+            None => true,
+            Some(z) => kandidat < z,
+        };
+        if besser {
+            ziel = Some(kandidat);
+        }
+    }
+    let (_, _, farbindex) = ziel?;
+    let farbe = TileColor::NORMAL[farbindex];
+    vorzugszug_fuer_farbe(state, farbe)
+}
+
 #[cfg(test)]
 mod vorzugszug_tests {
     use super::*;
@@ -921,5 +1087,126 @@ mod vorzugszug_tests {
             crate::tile::TILES_PER_COLOR as i64 - 2,
             "Fabrik-Rot und die eigene Musterreihe duerfen nicht abgezogen werden: {erreichbar:?}"
         );
+    }
+
+    // ── Stoerungs-Baustein (PREREG_opponent_disruption.md) ──────────────────
+
+    /// `gegner_bedarf` muss (a) eine begonnene, nicht-volle Musterreihe des
+    /// GEGNERS mit ihren `spaces_left()` zaehlen, (b) eine OFFENE Kuppelzelle
+    /// mit determinierter Farbforderung zaehlen, und (c) eine bereits
+    /// GEFUELLTE Kuppelzelle NICHT zaehlen (kein Bedarf mehr).
+    #[test]
+    fn gegner_bedarf_zaehlt_musterreihen_und_offene_kuppelzellen_des_gegners() {
+        let mut game = drafting_game(201);
+        let pi = game.state.current_player;
+        let gegner = 1 - pi;
+
+        // Musterreihe 2 (Kapazitaet 3) des Gegners: 1 Rot drin, 2 Plaetze frei.
+        game.state.players[gegner].pattern_lines[2].color = Some(Rot);
+        game.state.players[gegner].pattern_lines[2].tiles.push(Rot);
+
+        // Slot (0,0): Index 0 -> Zelle (0,0) = Blau (bleibt OFFEN),
+        // Index 2 -> Zelle (1,0) = Gelb (wird als GEFUELLT markiert).
+        let tile = DomeTile::new(
+            60,
+            vec![DomeSpace::normal(Blau), DomeSpace::normal(Schwarz), DomeSpace::normal(Gelb), DomeSpace::normal(Tuerkis)],
+            0,
+        );
+        game.state.players[gegner].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
+        game.state.players[gegner].dome_grid.dome_slots[0][0].as_mut().unwrap().spaces[2].placed_color = Some(Gelb);
+
+        let bedarf = gegner_bedarf(&game.state, pi);
+        assert_eq!(bedarf[farben_index(Rot).unwrap()], 2, "Musterreihe 2 braucht noch 2 Rot: {bedarf:?}");
+        assert_eq!(bedarf[farben_index(Blau).unwrap()], 1, "offene Zelle (0,0) braucht 1 Blau: {bedarf:?}");
+        assert_eq!(bedarf[farben_index(Gelb).unwrap()], 0, "gefuellte Zelle (1,0) darf nicht zaehlen: {bedarf:?}");
+    }
+
+    /// Kill-Probe Teil 1: dieselbe eindeutig stoerbare Stellung wie im
+    /// Folgetest, aber OHNE gesetzten Knopf -- muss `None` liefern
+    /// (Bestandsschutz).
+    #[test]
+    fn stoerungs_vorzug_ist_aus_ohne_knopf() {
+        set_disruption_override_for_test(Some(false));
+        let mut game = drafting_game(202);
+        let gegner = 1 - game.state.current_player;
+        game.state.players[gegner].pattern_lines[0].color = Some(Rot);
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        let ergebnis = stoerungs_vorzug(&game.state);
+        set_disruption_override_for_test(None);
+        assert!(ergebnis.is_none(), "ohne Knopf darf kein Stoerungs-Vorzug entstehen, bekam {ergebnis:?}");
+    }
+
+    /// Runde 5 hat ihren exakten Solver -- der Vorzug darf dort nicht
+    /// eingreifen, selbst bei aktivem Knopf und eindeutigem Gegner-Bedarf.
+    #[test]
+    fn stoerungs_vorzug_wirkt_nicht_nach_runde_4() {
+        set_disruption_override_for_test(Some(true));
+        let mut game = drafting_game(203);
+        let gegner = 1 - game.state.current_player;
+        game.state.players[gegner].pattern_lines[0].color = Some(Rot);
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        game.state.round_number = 5;
+        let ergebnis = stoerungs_vorzug(&game.state);
+        set_disruption_override_for_test(None);
+        assert!(ergebnis.is_none(), "Runde 5 muss dem exakten Solver ueberlassen bleiben, bekam {ergebnis:?}");
+    }
+
+    /// Kill-Probe Teil 2 (Kern des Bausteins): der Gegner braucht sowohl Rot
+    /// als auch Gelb, aber Rot ist KNAPP (fast komplett sichtbar verbraucht)
+    /// und Gelb ist REICHLICH -- der Vorzug muss die knappe Farbe (Rot)
+    /// waehlen, nicht einfach die ERSTE gefundene Bedarfsfarbe. Eine
+    /// fehlerhafte Sortierung (z.B. nur nach Bedarf, ohne Knappheit) wuerde
+    /// hier Gelb waehlen und den Test zum Scheitern bringen.
+    #[test]
+    fn stoerungs_vorzug_waehlt_die_vom_gegner_gebrauchte_knappe_farbe() {
+        set_disruption_override_for_test(Some(true));
+        let mut game = drafting_game(204);
+        let pi = game.state.current_player;
+        let gegner = 1 - pi;
+
+        for f in game.state.factories.iter_mut() {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
+
+        // Gegner braucht BEIDE Farben (je eine begonnene Musterreihe).
+        game.state.players[gegner].pattern_lines[3].color = Some(Rot);
+        game.state.players[gegner].pattern_lines[3].tiles.push(Rot);
+        game.state.players[gegner].pattern_lines[4].color = Some(Gelb);
+        game.state.players[gegner].pattern_lines[4].tiles.push(Gelb);
+
+        // Rot ist knapp: 11 weitere Kopien sichtbar verbaut (Strafleiste),
+        // nur die 2 jetzt angebotenen bleiben uebrig (13 - 11 - 2 = 0 danach).
+        game.state.players[gegner].broken_tiles = vec![Rot; 11];
+        // Gelb bleibt reichlich (nichts sonst sichtbar verbaut).
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        game.state.factories[1].sun_tiles = vec![Gelb, Gelb];
+
+        let ergebnis = stoerungs_vorzug(&game.state);
+        set_disruption_override_for_test(None);
+        match ergebnis.expect("eindeutiger Stoerungs-Kandidat muss existieren") {
+            Action::Stone(m) => {
+                assert_eq!(m.take.color, Rot, "die KNAPPE, vom Gegner gebrauchte Farbe (Rot) muss gewinnen, nicht Gelb");
+            }
+            other => panic!("erwartet Action::Stone, bekam {other:?}"),
+        }
+    }
+
+    /// `plate_builder::drafting_vorzug` bei ausgeschaltetem Stoerungs-Knopf
+    /// bleibt exakt der Bestand -- keine `.or_else`-Wirkung ohne Knopf.
+    #[test]
+    fn drafting_vorzug_integration_ohne_stoerungs_knopf_ist_bestand() {
+        set_disruption_override_for_test(Some(false));
+        let mut game = drafting_game(205);
+        let gegner = 1 - game.state.current_player;
+        game.state.players[gegner].pattern_lines[0].color = Some(Rot);
+        game.state.factories[0].sun_tiles = vec![Rot, Rot];
+        let vorher = crate::plate_builder::drafting_vorzug(&game.state);
+        set_disruption_override_for_test(None);
+        // Ohne aktiven Bauer UND ohne Stoerungs-Knopf muss der Dispatch
+        // `None` liefern (kein Kriterium aktiv in diesem Testaufbau).
+        assert!(vorher.is_none(), "ohne jeden Knopf darf drafting_vorzug nichts vorschlagen, bekam {vorher:?}");
     }
 }
