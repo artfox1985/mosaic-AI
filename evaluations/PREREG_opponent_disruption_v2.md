@@ -660,3 +660,121 @@ gehoert dazu, ohne Beschoenigung:
 3. Der Join Policy -> `valid_moves` darf `moon_order` NICHT verwenden
    (§9.2); wer die Offline-Auswertung spaeter wiederholt, faellt sonst
    auf 52 % Fehltreffer herein.
+
+---
+
+## §10 Stufe 1 (die ECHTE, vorregistrierte): GEBAUT, Messung eingetaktet
+
+Nutzer-Auftrag 2026-08-16: den in §5.2 vorregistrierten Trockenlauf-
+Zaehlmodus in der laufenden Engine nachreichen. Stand dieses Abschnitts:
+**gebaut und getestet, NICHT gemessen** -- die Messung haengt an der
+Maschine (siehe §10.4).
+
+### §10.1 Was gebaut ist
+
+| Baustein | Stelle |
+|---|---|
+| Zaehlkern (rein lesend, ohne Rueckgabe) | `net_mcts.rs::color_denial_probe_with` |
+| Einhaengung | `net_mcts.rs::select_final_root_child`, VOR `apply_denial_tiebreak`, Rueckgabewert unveraendert |
+| Aequivalenz-Kriterium | `denial_uncert_qualifies` (E3b: Besuchs-Gate + Zwei-Anteils-SE) -- wiederverwendet, nicht nachgebaut |
+| Rangkriterium | `provocation.rs::stoer_bewertung` = `min(tiles_taken, gegner_bedarf_akut[farbe])` |
+| Ueberlauf-Filter | `provocation.rs::strafleisten_zuwachs` (Bodenzug = volle Stueckzahl, §9.6 Punkt 1) |
+| Stueckzahl | `mcts.rs::tiles_taken`, von `fn` auf `pub(crate) fn` gehoben -- wiederverwendet |
+| Knoepfe | `MOSAIC_COLOR_DENIAL_PROBE_Z` (Default 0,0 = aus), `..._MIN_VISIT_FRAC` (0,5); beide in `knob_registry.rs` als `Diagnose` |
+| Python-Bindung | `lib.rs::color_denial_probe_stats` / `reset_color_denial_probe_stats` |
+| Treiber | `tools/color_denial_probe.py` (Messmodus + `--golden`) |
+
+**BEWUSST eigene Knoepfe** statt `MOSAIC_DENIAL_UNCERT_Z`: dessen Setzen
+wuerde den E3b-Tie-Break AKTIVIEREN und damit das Spielverhalten aendern --
+genau das, was der Zaehlmodus nicht darf. Der Treiber setzt beide
+E3/E3b-Regler explizit auf 0, statt auf einen sauberen Prozess zu hoffen.
+
+### §10.2 Tests
+
+Sechs neue Tests, alle gruen: drei zum Zaehlmodus (`z=0` zaehlt gar nichts;
+Fenster+Stoerbarkeit werden erkannt; **Gegenprobe**: derselbe Aufbau mit
+Zielreihe 1 statt 6 erzeugt Ueberlauf und darf NICHT als stoerbar zaehlen)
+und drei zu den Provokations-Helfern (Bedarfs-Aufteilung akut/voll als
+Bestandsschutz der Refaktorierung, Bodenzug-Strafleiste, Deckelung der
+Stoerwirkung am Bedarf).
+
+`cargo test --lib` im Hauptbaum: **425 passed, 0 failed, 19 ignored**
+(Lauf zu einem Zeitpunkt, an dem der Baum konsistent war). Da ein zweiter
+Agent parallel `net.rs`/`net_mcts.rs` umbaut (Ownership-Kopf-Verdrahtung)
+und der Baum zwischenzeitlich nicht uebersetzte, sind die sechs Tests
+zusaetzlich in einem ISOLIERTEN Worktree auf sauberer Basis gelaufen
+(letzter gemeinsamer Stand + ausschliesslich die eigenen Hunks):
+**6 passed, 0 failed**. Die dortigen 21 Fehler der Gesamtsuite sind
+ausnahmslos `models/*.onnx nicht ladbar` -- im Worktree fehlt das
+gitignorierte `models/`-Verzeichnis, kein Codebefund.
+
+### §10.3 Byte-Identitaet: der Nachweis ist vorbereitet, nicht behauptet
+
+`tools/color_denial_probe.py --golden` spielt dieselbe Partienzahl mit
+demselben Seed zweimal -- Zaehler AUS und AN -- in **zwei getrennten
+Kindprozessen** (die Regler sind `OnceLock`, ein Umschalten im selben
+Prozess waere wirkungslos) und vergleicht die kompletten Arena-JSONs
+zeichenweise. Abweichung = Fehlschlag mit Partie-Index.
+
+Konstruktiv ist der Eingriff Null: `color_denial_probe_with` gibt nichts
+zurueck, mutiert `nodes` nicht, zieht keinen Zufall und ruft kein Netz --
+alle Eingaben (Besuche, completed-Q, Wurzelzustand) liegen nach dem
+Baumbau bereits vor. Das ist aber ein Argument, kein Beleg; der Beleg ist
+der Golden-Lauf nach dem Wheel-Install.
+
+### §10.4 Warum die Messung noch nicht laeuft (und was sie braucht)
+
+Das Wheel ist gebaut (`maturin build --release`, erfolgreich), aber
+**NICHT installiert**. Die installierte `.pyd` ist zweifach belegt:
+
+1. **Sweep-Arm w1** (`train.py --name v21_2d_own_w1`, PID 12532, gestartet
+   00:56). Der Vorgaenger-Arm w05 lief 3 h 18 min (16:43 -> 20:01), das
+   Ende ist also gegen ~04:15 zu erwarten. Ein harness-getrackter Waechter
+   auf den Prozess laeuft.
+2. **`server.py`** (drei Prozesse, gestartet 01:08) -- importiert
+   `mosaic_rust` ebenfalls und blockiert `pip install` unabhaengig vom
+   Training. Der Server wird NICHT von mir beendet; das Herunterfahren ist
+   eine Nutzer-/Koordinator-Entscheidung.
+
+**WICHTIG zur Wahl des Wheels**: es ist bewusst NICHT aus dem Hauptbaum
+gebaut, sondern aus dem isolierten Worktree = letzter gemeinsamer Stand
+PLUS ausschliesslich dem Zaehlmodus. Grund: der Hauptbaum traegt gerade die
+halbfertige Ownership-Kopf-Verdrahtung eines anderen Agenten. Ein daraus
+gebautes Wheel wuerde die Paritaetsprobe (Hash `8c6684ff...`) mit hoher
+Wahrscheinlichkeit brechen -- und zwar wegen einer FREMDEN Aenderung, was
+den Zaehlmodus faelschlich als Verhaltensaenderung erscheinen liesse.
+
+### §10.5 Ablauf nach Freiwerden der `.pyd` (vorab festgeschrieben)
+
+1. Wheel installieren (`pip install --force-reinstall --no-deps` aus dem
+   Worktree-`target/wheels/`).
+2. `tools/parity_probe.py` -- Hash `8c6684ff...` MUSS halten. Haelt er
+   nicht, wird NICHT gemessen, sondern die Ursache geklaert.
+3. `tools/color_denial_probe.py --golden --n-games 12` -- Byte-Identitaet.
+4. `tools/color_denial_probe.py --n-games 200 --net-sims 400
+   --heur-sims 150` (wie §5.2 vorregistriert), Ausgabe nach
+   `evaluations/color_denial_probe.json`.
+5. Verdikt nach derselben Abbruchregel (<5 % -> geschlossen), dann **STOPP**
+   -- Stufe 2 bleibt Nutzer-Entscheidung.
+
+### §10.6 Der eigentliche Erkenntniswert: der Vergleich
+
+Die Live-Zahl ist gegen den Offline-Ersatz aus §9.4 (5,50 % bei eps=0,01)
+zu halten. Weichen sie ab, ist das ein Befund ueber die
+Offline-Rekonstruktion, nicht ueber den Mechanismus. **Vier bekannte
+Unterschiede, vorab benannt, damit keiner davon nachtraeglich als
+Erklaerung erfunden wird:**
+
+1. **Aequivalenz-Definition**: live das E3b-Kriterium (Besuchs-Gate +
+   SE-Fenster), offline ein rohes eps (Besuchszahlen fehlen in den
+   Records). Nach der Kalibrierung in §9.3 ist das E3b-Fenster eher WEITER
+   als eps=0,01 -- erwartet wird die Live-Zahl also eher HOEHER.
+2. **Basiszug**: live der echte Gumbel-Sieger (besuchsbasiert), offline
+   `argmax(completed-Q)`.
+3. **Sims**: live 400, offline 200.
+4. **Gegner/Rauschen**: live Arena gegen Heuristik@150 ohne Wurzelrauschen,
+   offline Self-Play mit Wurzelrauschen.
+
+Eine grobe Uebereinstimmung waere eine Bestaetigung der drei nach Python
+portierten Engine-Funktionen; eine grosse Abweichung waere ein Grund, die
+Offline-Methodik kuenftig nicht mehr als Ersatz zuzulassen.
