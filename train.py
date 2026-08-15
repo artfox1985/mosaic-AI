@@ -23,6 +23,9 @@ from pathlib import Path
 from datetime import datetime
 from torch.utils.data import DataLoader
 
+from freeze_trunk import (OwnershipValLoss, TrunkFreeze, plateau_series_for,
+                          validate_freeze_args)
+
 
 # ── Diagnose-Instrumentierung (2026-07-31, Task #11 Phase 2, fs_2d_s1-
 # Absturzuntersuchung) ────────────────────────────────────────────────────
@@ -464,7 +467,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
-          ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True, extra_data_dir=None):
+          ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True, extra_data_dir=None,
+          freeze_trunk=False):
+    # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
+    # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
+    validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -598,7 +605,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "endgame_head": endgame_head,
         "value_head": value_head,
         "ranking_loss_weight": ranking_loss_weight,
-        "extra_data_dir": extra_data_dir,
+        "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
     }
     _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
 
@@ -798,8 +805,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     model.to(device)
 
+    # PREREG_frozen_trunk_head.md: Trunk + alle uebrigen Koepfe einfrieren,
+    # nur `ownership_head` weitertrainieren. Ohne --freeze-trunk ein no-op
+    # (Task-#28-Muster). Siehe freeze_trunk.py fuer den BatchNorm-Riegel.
+    ftz = TrunkFreeze.setup(model, freeze_trunk)
+
     # 4. Training Parameter
-    optimizer = optim.Adam(model.parameters(), lr=effective_lr)
+    optimizer = optim.Adam(ftz.trainable_params(model), lr=effective_lr)
 
     # Epochen-Anzahl ---
     epochs = input_epoch
@@ -868,6 +880,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Kommentar an der Berechnungsstelle im Val-Loop). Anders als
     # val_vloss/value_r2 gilt sie fuer 'tanh'- UND 'wdl'-Laeufe gleichermassen.
     val_brier_history = []
+    # PREREG_frozen_trunk_head.md (aus PREREG_ownership_corpus.md §10.3): der
+    # Ownership-Val-Verlust fehlte bisher komplett -- deshalb konnte
+    # `val_combined` den Kopf gar nicht sehen und waehlte durchgaengig Epoche 1.
+    # Wird ab jetzt bei jedem Lauf mit Ownership-Gewicht > 0 mitgemessen (rein
+    # additiv: geht NUR im Freeze-Modus in die Auswahl ein, sonst nur ins Log).
+    val_ownloss_history = []
     plateau_window    = 5
     plateau_threshold = 0.01
     early_stop_patience = 5 if early_stop else 999999
@@ -1206,8 +1224,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     + effective_points_weight * opp_loss
                     + effective_points_weight * endgame_loss
                     + ranking_loss_weight * ranking_loss)
-            loss.backward()
-            optimizer.step()
+            if ftz.backward_ok(loss):   # nur im Freeze-Modus je restriktiv, s. Docstring
+                loss.backward()
+                optimizer.step()
 
             t_loss       += loss.item()
             t_ploss      += p_loss.item()
@@ -1252,6 +1271,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_val_endgame_mse = None
         epoch_val_ranking_acc = None  # Task #35b: rein deskriptiv, siehe val_ranking_acc_history
         epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
+        epoch_val_ownloss = None  # PREREG_frozen_trunk_head.md, s. val_ownloss_history
+        own_meter = OwnershipValLoss(effective_ownership_weight > 0.0)
         if val_dataloader is not None:
             model.eval()
             val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
@@ -1302,6 +1323,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
                     (_v_pred_points_logits, v_pred_value_wdl_logits,
                      v_pred_opp_points, v_pred_endgame) = _unpack_optional_outputs(model, _vout)
+                    own_meter.add(v_pred_own, v_own)
                     if v_pred_endgame is not None:
                         _eg_w = v_endgame_mask.view(-1, 1)
                         val_endgame_sqerr_sum += (((v_pred_endgame - (v_targets_endgame * 2.0 - 1.0)) ** 2) * _eg_w).sum().item()
@@ -1475,6 +1497,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             # Set). Rein deskriptiv, geht NICHT in val_combined ein.
             epoch_val_ranking_acc = (val_rank_correct_sum / val_rank_n
                                      if val_rank_n > 0 else None)
+            epoch_val_ownloss = own_meter.value()  # PREREG_frozen_trunk_head.md
 
             def _r2(sum_y, sumsq_y, sqerr, n):
                 if n == 0:
@@ -1498,6 +1521,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         val_endgame_mse_history.append(epoch_val_endgame_mse)
         val_ranking_acc_history.append(epoch_val_ranking_acc)
         val_brier_history.append(epoch_val_brier)
+        val_ownloss_history.append(epoch_val_ownloss)
 
         # Fund 8 (externer Hinweis, Bugfixes.txt Abschnitt C): "bestes Modell"
         # wurde bisher NUR nach Policy-Val-Loss gewählt -- der Value-Head
@@ -1540,8 +1564,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # untrainierten frischen Kopf (beobachtet 2026-08-05). Der Brier liegt
         # fuer BEIDE Kopfarten im selben Wertebereich (~0,2) und macht den Term
         # wieder sinnvoll gewichtet. Default AUS -> byte-identisches Verhalten.
+        # PREREG_frozen_trunk_head.md: im Freeze-Modus IST der Ownership-Val-
+        # Verlust das Auswahlkriterium. Alles andere waere die Wiederholung des
+        # §10.3-Fehlers -- policy/value sind hier konstant (eingefroren), eine
+        # val_combined-Auswahl waere reines Rauschen auf einer Nachkommastelle.
         value_term_val = epoch_val_brier if (select_by_brier and epoch_val_brier is not None) else epoch_val_vloss
-        if epoch_val_ploss is not None:
+        if ftz.active and epoch_val_ownloss is not None:
+            current_metric = epoch_val_ownloss
+        elif epoch_val_ploss is not None:
             current_metric = epoch_val_ploss + effective_value_weight * value_term_val + effective_points_weight * epoch_val_pointsloss
         else:
             current_metric = epoch_ploss + effective_value_weight * epoch_vloss + effective_points_weight * epoch_pointsloss
@@ -1576,7 +1606,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # loest Early Stopping korrekt aus, auch wenn "PLATEAU" fuer einen
         # tatsaechlich divergierenden Verlauf untertrieben ist.
         has_val_ploss = val_dataloader is not None
-        plateau_series = val_ploss_history if has_val_ploss else policy_history
+        plateau_series = plateau_series_for(          # PREREG_frozen_trunk_head.md
+            ftz.active, val_ownloss_history,
+            val_ploss_history if has_val_ploss else policy_history)
         plateau_marker = ""
         policy_plateaued = False
         if len(plateau_series) >= plateau_window * 2:
@@ -1586,7 +1618,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if rel < plateau_threshold:
                 policy_plateaued = True
 
-        plateau_label = "VAL-POLICY-PLATEAU" if has_val_ploss else "POLICY-PLATEAU"
+        plateau_label = ("OWNERSHIP-PLATEAU" if ftz.active else
+                         "VAL-POLICY-PLATEAU" if has_val_ploss else "POLICY-PLATEAU")
         if policy_plateaued:
             if policy_plateau_since is None:
                 policy_plateau_since = epoch + 1
@@ -1660,9 +1693,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if ranking_loss_weight > 0.0:
             _rk_acc_s = f"{epoch_val_ranking_acc:.3f}" if epoch_val_ranking_acc is not None else "n/a"
             ranking_str = f" | Ranking: {epoch_rankingloss:.4f} / Val-Acc {_rk_acc_s}"
+        # PREREG_frozen_trunk_head.md: sichtbar machen, WELCHES Kriterium greift.
+        own_str = ""
+        if epoch_val_ownloss is not None:
+            own_str = (f" | Own-Val={epoch_val_ownloss:.4f}"
+                       + ("  ⬅ AUSWAHLKRITERIUM" if ftz.active else ""))
         lr_str = f" | LR={optimizer.param_groups[0]['lr']:.2e}" if lr_scheduler is not None else ""
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{endgame_str}{ranking_str}{plateau_marker}{lr_str}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{own_str}{endgame_str}{ranking_str}{plateau_marker}{lr_str}")
 
         # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
@@ -1845,6 +1883,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # (nutzt die bestehenden Policy-Logits), daher keine "*_present"-
         # Rueckerkennungsfunktion in neural_net.py noetig/vorhanden. Rein
         # informativ, NICHT Teil von val_combined/der Checkpoint-Auswahl.
+        # PREREG_frozen_trunk_head.md: Freeze-Modus + der Ownership-Val-Verlust,
+        # der ihn steuert (bei inaktivem Modus rein informativ).
+        "freeze_trunk":      bool(freeze_trunk),
+        "final_ownership_val_loss": (
+            round(_last_valid(val_ownloss_history), 4)
+            if _last_valid(val_ownloss_history) is not None else None),
         "ranking_loss_weight": ranking_loss_weight,
         "final_ranking_loss": round(ranking_loss_history[-1], 4) if ranking_loss_history else None,
         "final_ranking_val_acc": (
@@ -1861,8 +1905,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         best_checkpoint["model_state"]      = best_state_dict
         best_checkpoint["epochs"]           = best_epoch
         best_checkpoint["is_best_checkpoint"] = True
-        best_checkpoint["selected_by"]      = ("val_combined(p+v*value_w+pts*points_w)" if val_dataloader is not None
+        best_checkpoint["selected_by"]      = (ftz.selected_by() if ftz.active
+                                                else "val_combined(p+v*value_w+pts*points_w)" if val_dataloader is not None
                                                 else "train_combined(p+v*value_w+pts*points_w)")
+        best_checkpoint["final_ownership_val_loss"] = (
+            round(val_ownloss_history[best_idx], 4)
+            if best_idx < len(val_ownloss_history) and val_ownloss_history[best_idx] is not None
+            else None)
         best_checkpoint["final_policy_loss"] = round(policy_history[best_idx], 4)
         best_checkpoint["final_policy_val_loss"] = (
             round(val_ploss_history[best_idx], 4) if val_ploss_history[best_idx] is not None else None)
@@ -2054,6 +2103,14 @@ if __name__ == "__main__":
                              "Seed unterscheiden sich allein durch die getestete Aenderung "
                              "-- ohne Seed vermischt sich der Effekt mit der Lauf-zu-Lauf-"
                              "Varianz (die in diesem Projekt bis 2026-07-28 nie gemessen wurde).")
+    parser.add_argument("--freeze-trunk", action="store_true",
+                        help="Trunk und ALLE Koepfe ausser ownership_head einfrieren "
+                             "(requires_grad=False + BatchNorm-Riegel) und die Checkpoint-"
+                             "Auswahl auf den Ownership-Val-Verlust umstellen. Loest den "
+                             "Zielkonflikt aus PREREG_ownership_corpus.md §10.3 (best=Ep.1 mit "
+                             "untrainiertem Kopf vs. final=Ep.15 mit ueberangepasster Policy). "
+                             "Verlangt --load, --ownership-weight > 0 und --val-frac > 0. "
+                             "Details/Zusicherung: freeze_trunk.py, PREREG_frozen_trunk_head.md.")
     parser.add_argument("--reinit-points-head", action="store_true",
                         help="Den points_head beim Warm-Start NEU initialisieren statt ihn zu "
                              "uebernehmen. Fairer Kontrollarm zu --points-dist-bins: der "
@@ -2227,4 +2284,5 @@ if __name__ == "__main__":
           endgame_head=args.endgame_head,
           value_head=args.value_head,
           ranking_loss_weight=args.ranking_loss_weight,
-          head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir)
+          head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
+          freeze_trunk=args.freeze_trunk)
