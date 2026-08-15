@@ -11449,3 +11449,114 @@ IDENTIFIKATOREN und bleiben; ebenso die historischen Zustandsnotizen in
 PREREG_gpu_inference_path.md par.20 ("provokation.rs zum Zeitpunkt des Baus").
 
 Nachtrag 3: in Welle 1 uebersehen -- evaluations/paired_arena_env_e3b_stufe2.json -> paired_arena_env_e3b_stage2.json (Belegstelle in PREREG_denial_tiebreak.md mitgezogen).
+
+## 2026-08-15/16: Korpus generiert, Tor A bestanden, Architektur-Fahrplan abgeschlossen
+
+Champion unveraendert `v21_2d_brierbest`. Alle tragenden Zahlen unten vom
+Koordinator an Roh-JSONs/Code nachgerechnet; Details in den jeweiligen Preregs.
+
+### Ownership-Korpus: 8000 Partien, Deckung gegeben
+
+Sechs Arme sequentiell auf 8 Threads (par.7): D Heuristik 1000, A Netz+Streuung
+3000, B Spaltenbau, C Diagonalen, E Eckenpaar, F Spezialbauer je 1000 --
+8000/8000 vollstaendig, ~9 h Rechenzeit. **Deckungs-Bericht (par.8, mit den
+exakten Trainings-Label-Bauern gerechnet)**: Spalten 3,2 % -> 42 % (Arm B),
+Diagonalen 0,4 % -> 40 % (C), 8er-Ecken 0,2 % -> 55 % (E). Arm E liefert 506
+Spalten-EINHEITEN in 391 Partien -- das Nutzer-Spaltenpaar-Ziel erzeugt
+regelmaessig ZWEI volle Spalten je Partie. p0/p1 symmetrisch (die beidseitige
+Vorzug-Verdrahtung traegt). v2-Selektionshebel nicht noetig.
+
+Vorab gefundene Blocker, die den Korpus sonst entwertet haetten:
+`run_net_self_play` las die Bauer-Knoepfe GAR NICHT (Arme B/C/E/F waeren
+wirkungslos gewesen) -- nachgeruestet und mit einer 5x30-Wirkungsprobe belegt;
+und das **Streuungs-Shaping leckte in die Value-Labels** (bootstrap_value
+0,5109 -> 0,5583 allein durch den Partie-Wuerfelwurf), behoben mit einem
+RAII-Guard um die Label-Funktionen (1b61f9c).
+
+### Tor A BESTANDEN -- und der eigentliche Fund liegt daneben
+
+Sweep ownership_weight 0/0,1/0,2/0,5, identisches Rezept und Seed, geteilter
+Cache. Waechter unauffaellig: der Ownership-Verlust kostet Policy/Value nichts
+(4. Nachkommastelle). Kopfguete monoton im Gewicht, w05 gewinnt jedes
+Kriterium; der Kontrollarm w0 liegt bei AUC 0,502 und Rangkorrelation ~0 --
+die Messung validiert sich selbst.
+
+**Nebenbefund, der den naechsten Schritt bestimmt**: der `_best`-Checkpoint
+faellt bei ALLEN Armen auf Epoche 1, weil `val_combined` den
+Ownership-Verlust nicht enthaelt. Der `final`-Checkpoint (Ep. 15) hat einen
+drastisch besseren Kopf (Konjunktions-AUC 0,96-0,98, E_k-Spearman bis 0,41),
+aber eine ueberangepasste Policy -- und zwar NICHT wegen Ownership: der
+w0-Kontrollarm zeigt exakt dieselbe Verschlechterung. Daraus folgt der
+Frozen-Trunk-Auftrag (Nutzer-Vorschlag aus der Zwei-Pole-Prereg).
+
+### Stoerungs-Baustein v1: gemessen, abgelehnt
+
+Zielgroesse (Gegner-Plattenpunkte) rein Rauschen (gepoolt +0,05, Vorzeichen
+zwischen den Laeufen inkonsistent), Kosten katastrophal: Siege 32/40 -> 12/40
+(McNemar p=0,0001), eigene Punkte -32,7, Strafleiste fast verdoppelt.
+Log-Diagnose: der Vorzug feuerte BEDINGUNGSLOS statt opportunistisch und erbte
+eine fehlende Ueberlauf-Pruefung -- aus 400-Sims-Suche wurde ein gieriger
+Farbgreifer. **Die Nutzer-Spielidee ist damit nicht widerlegt, die Umsetzung
+hat sie nicht abgebildet.** v2 vorregistriert: das "nur bei ungefaehr
+gleichwertig"-Tor existiert bereits zweimal als `apply_denial_tiebreak`
+(net_mcts.rs:2936 ff.) -- v2 tauscht dort nur das Rangkriterium, statt vier
+Aufrufstellen umzubauen. Korrektur einer Koordinator-Annahme: an der
+bisherigen Uebersteuerungsstelle ist ein Q-Tor GRUNDSAETZLICH nicht baubar,
+weil der Vorzug VOR der Suche berechnet wird und sie ueberspringt
+(self_play.rs:1217-1222, geprueft).
+
+### Architektur-Fahrplan: alle fuenf Punkte abgeschlossen
+
+(1) PREREG-Index wird generiert, Status-Koepfe in allen Dateien, Hook-Regel 4
+prueft Index == Generator-Output. (2) Test-Skip-Verbot: leer-gruene Tests
+paniken jetzt, veraltete v10/v18-Fixtures auf v21 umgestellt. (3)
+**Knopf-Registratur**: 66 MOSAIC_*-Knoepfe (41 aktiv, 17 Diagnose, 7 tot, 1
+geplant) mit Waechter-Test -- ein unregistrierter Knopf ist ab jetzt ein
+Testfehler; sie fand beim Erstlauf, dass `MOSAIC_GAME_TIMEOUT_SCALE` nur in
+einer Prereg existiert, nicht im Code. (4)+(5) vereinheitlichte Spielschleife
+mit `DraftingAgent`-Trait, Golden-Record-Abnahme **0 Bit je Pfad** (auch mit
+Bauer-Knoepfen). Dazu: Torch-IPC/Weg A restlos entfernt, Inferenzkette jetzt
+schlicht ORT-CUDA -> tract.
+
+Der Refactor zahlte sich sofort aus: der Stoerungs-Baustein brauchte KEINEN
+self_play.rs-Eingriff mehr -- die gemeinsame Schleife trug ihn automatisch
+beidseitig auf allen vier Pfaden.
+
+### GPU par.23: Weg B geschlossen -- mit korrigiertem Nenner
+
+Der bisherige 248,5-Spiele/h-Bezug war ein Artefakt der belasteten Maschine.
+Frisch gemessen: **Sync@11 Threads = 528,5 Spiele/h** (12 Threads sind
+LANGSAMER -- SMT-Saettigung auf 6C/12T, Hardware erstmals gemessen statt
+uebernommen). Gegen diesen ehrlichen Nenner: Traeger-Skalierung 0,90x, beste
+Zelle war die Nutzer-Bonus-Idee "zwei Flotten teilen die GPU" mit Aggregat
+663/h = 1,26x. Keine Zelle >= 2,0x -> **Weg B geschlossen bis zum groesseren
+Netz**; der Async+ORT-Stand ist in `async_search_stage{1,3}_archive`
+gesichert. Nebenbefund: die GPU laeuft bei ~10 % Auslastung, der Deckel ist
+die CPU-seitige Blatt-Erzeugung.
+
+### Release, Attribution, Aufraeumen
+
+Bundle auf den v21-Champion umgestellt und rauchgetestet -- der Test fand zwei
+echte Fehler (die Spec buendelte noch das v16-Netz; `ensure_csv` legte das
+fehlende `evaluations/`-Verzeichnis nicht an, wodurch jedes KI-Spiel mit HTTP
+500 starb). **Attribution ehrlich gestellt**: der alte Disclaimer behauptete
+"no connection to any existing commercial board games" -- nach Abgleich mit
+dem Original-Regelbuch (docs/, gitignored) unzutreffend. Mosaic ist eine
+Reimplementierung des Azul-Duel-Regelwerks; Spieler-Doku auf Englisch NEU
+FORMULIERT statt uebersetzt, weil das deutsche Handbuch streckenweise der
+Regelbuch-Formulierung folgte. README_GAME nannte ausserdem
+Schwierigkeitsstufen, die es in der GUI gar nicht gibt (Nutzer-Befund).
+Tag-Haushalt bereinigt, Scratchpads geraeumt (53 GB frei; prereg-zitierte
+Mess-Skripte vorher nach `tools/probes/` gerettet).
+
+### Zwei eigene Fehler, protokolliert
+
+1. **Meinung als Anweisung gelesen**: "ich denk es ist obsolet" wurde als
+   Auftrag behandelt, die P0-P6-Nummerierung auszumustern -- der Nutzer wollte
+   erst die Liste sehen. Vierter Vorfall dieser Klasse (nicht-destruktiv);
+   Merksatz jetzt: Frage != Anweisung UND Meinung != Anweisung.
+2. **Ungeprueft behauptet, v16 sei "engine-inkompatibel"** -- `git show
+   v0.1-alpha16:config.py` zeigt NUM_ACTIONS 406 und INPUT_SIZE 708, exakt wie
+   heute. v16 ist nur schwaecher, nicht unladbar (korrigiert in 3bdbc1c).
+   REGEL 0 gilt auch fuer Commit-Texte und uebersetzte Doku: eine Aussage ist
+   nicht dadurch geprueft, dass sie schon dastand.

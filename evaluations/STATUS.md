@@ -1,88 +1,94 @@
 # Mosaic-AI — Status & Fahrplan
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
-**`../archive/history.md`** (juengstes Kapitel: "2026-08-13/14:
-Generator-Kampagne abgeschlossen, GPU-Rundlauf geloest, Korpus-Plan").
+**`../archive/history.md`** (juengstes Kapitel: "2026-08-15/16: Korpus
+generiert, Tor A bestanden, Architektur-Fahrplan abgeschlossen").
 
 ---
 
-## STAND 2026-08-15
+## STAND 2026-08-16
 
 **Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434].
-Paritaets-Hash `8c6684ff...` haelt (nach jedem Wheel-Neubau geprueft).
-**AERA-REGEL seit dem RNG-Schnitt (`fe1e306`)**: Alt-Aera-Messwerte (auch
-Generator-Benchmarks wie das fruehere 5,95) sind KEINE gueltigen
-Vergleichsanker mehr -- gleiche Seeds erzeugen andere Partie-Verlaeufe
-(Karten identisch, Nachfuellungen auf neuem Strom; Beleg history-Kapitel).
+Paritaets-Hash `8c6684ff...` haelt (zuletzt nach dem Wheel-Neubau vom
+2026-08-15 geprueft, der alle Umbauten der Woche enthaelt).
+**AERA-REGEL seit dem RNG-Schnitt (`fe1e306`)**: Alt-Aera-Messwerte sind
+KEINE gueltigen Vergleichsanker mehr -- gleiche Seeds erzeugen andere
+Partie-Verlaeufe. Gilt auch fuer Generator-Benchmarks.
 
-### Geltender Rahmen: Zwei-Pole -> Ownership-Kette (vollstaendig vorregistriert)
+### Wo die Ownership-Kette steht
 
-Basispol = Netz, Plattenpol = Bauer-Heuristiken/Heuristik; Regler = kuenftiges
-Konsumenten-Gewicht des Ownership-Kopfs (`MOSAIC_OWNERSHIP_W`, zur Laufzeit
-sweepbar). Die Kette:
+Lehr-Korpus **8000 Partien generiert und gedeckt** (PREREG_ownership_corpus
+par.7/par.8), Sweep gefahren, **TOR A BESTANDEN** (par.10): der Kopf schlaegt
+auf allen ownership-lernbaren Kriterien die Basisrate, E_k traegt echte
+Vorhersagekraft (Spearman bis 0,41). Empfohlenes Gewicht **w05**, alle Zahlen
+vom Koordinator am Roh-JSON nachgerechnet.
 
-- **`PREREG_ownership_corpus.md`** -- Lehr-Korpus, 6 Arme / 8000 Partien nach
-  `data/ownership_corpus/`; Deckungs-Bericht VOR Training; Lebenszyklus par.5b.
-  **Nutzer-GO erteilt**, bedingt auf die Startsequenz unten.
-- **`PREREG_ownership_consumer.md`** -- Verbraucher (Blatt-Shift ueber E_k +
-  marginale Feldwerte im Tiling-Solver, beides Default 0). **Tor A (Kopfguete:
-  Brier/AUC je Feld gegen Basisrate, Rangkorrelation E_k) kommt VOR dem Bau.**
-- **Abschaltkriterium der Injektion** (unveraendert gueltig): (1) steigt die
-  Prior-Masse auf den Zielzuegen ueber Generationen? (2) haelt die Rate bei
-  gesenktem Gewicht? Beides ja -> destilliert, Injektion kann runter.
-  Messmittel: Raten je Partie + Heuristik-Kante, NICHT Geschwister-Arena.
+**Der Engpass ist jetzt die CHECKPOINT-WAHL, nicht der Kopf** (par.10.3): bei
+allen Armen faellt `_best` auf Epoche 1, weil `val_combined` den
+Ownership-Verlust nicht enthaelt; `final` (Ep. 15) hat den viel besseren Kopf,
+aber eine ueberangepasste Policy -- nachweislich NICHT durch Ownership
+verursacht (Kontrollarm w0 zeigt dieselbe Verschlechterung).
 
-### STARTSEQUENZ zur Korpus-Generierung
+| Laeuft gerade | Was es klaert |
+|---|---|
+| **w1-Arm** (ownership_weight 1,0; par.10.5, post-hoc markiert) | Der Trend war bis 0,5 monoton -- ist 0,5 Optimum oder Randwert? |
+| **Frozen-Trunk-Kopftraining** (`PREREG_frozen_trunk_head.md`, Bau laeuft) | Loest den Checkpoint-Zielkonflikt strukturell: Trunk + Staerke-Koepfe eingefroren, nur der Ownership-Kopf lernt, ownership-bewusstes Auswahlkriterium. Misst zugleich den Nutzer-Vorbehalt "eingefrorener Trunk koennte die Decke sein" |
+| **Stoerung v2, Stufe 0+1** (`PREREG_opponent_disruption_v2.md`) | Billige Diagnose vor jedem Bau: tritt ein Q-nahes Stoerfenster ueberhaupt auf? Abbruch unter 5 %, danach STOPP fuer Nutzer-Entscheid |
 
-| # | Schritt | Stand |
-|---|---|---|
-| 1 | Vorzug-Verdrahtung (beidseitig) + 5x30-Wirkungsprobe je Arm | **ERLEDIGT** (5992f38; Probe: k1 2,80 / k5 8,30 nahe Arena-Niveau, Korpus-Prereg §3.5) |
-| 2 | `PREREG_unified_game_loop.md` -- vier Schleifen vereinheitlicht | **ERLEDIGT** (307caa4..d9c49e6; Golden-Records 0 Bit alle Pfade, §5-Protokoll) |
-| 3 | `PREREG_deterministic_labels.md` ("2b") -- Not-Deckel ehrlich | **ERLEDIGT** (3fcfed1; unter 12x CPU-Stress 0/1956 byte-identisch, §4; sync<->async-Gate-B-Retest offen bis wt_async2 frei) |
-| 4 | GPU-Verdikt `PREREG_gpu_inference_path.md` par.22 | **GEFALLEN 2026-08-14: Regel 3 verfehlt** -- beste Zelle N=64 ORT 1,545x, N=128 ORT 1,47x (mehr Nebenlaeufigkeit hilft ORT nicht: reale Ankunftsverteilung haelt keine Voll-Batches; Erwartung widerlegt). Pfad: klassisch, seit par.23 mit 11 Threads als Sync-Standard |
-| 5 | Generierung 8000 + Deckungs-Bericht + Training | **GENERIERUNG KOMPLETT** (8000/8000, par.7); **DECKUNG GEGEBEN** (par.8: Spalten 3,2%->42%, Diagonalen 0,4%->40%, 8er-Ecken 0,2%->55%, Arm E liefert regelmaessig ZWEI Spalten je Partie; v2-Selektion nicht noetig). **ownership_weight-SWEEP LAEUFT** (par.9, Nutzer-Auftrag): w0 fertig, w01 in Arbeit, w02/w05 folgen; Auswahl nach Tor-A-Kopfguete mit w0 als Fenster-Kontrolle |
+### NAECHSTER GROSSER SCHRITT: der Verbraucher
+
+`PREREG_ownership_consumer.md` -- Blatt-Shift ueber E_k + marginale Feldwerte
+im Tiling-Solver, Regler `MOSAIC_OWNERSHIP_W` (Default 0 = byte-identisch).
+Tor A ist bestanden, damit ist der Bau freigegeben, sobald der beste
+Kopf-Checkpoint feststeht (w1-Ergebnis + Frozen-Trunk). Danach Tor B
+(Bestandsschutz bei w_own=0) und **Tor C** (Regler-Sweep in der Arena,
+Messgroessen Plattenpunkte je Kriterium + Endstand-Marge). Erst Tor C ist
+eine Staerkeaussage -- Tor A ist es ausdruecklich NICHT.
 
 ### Generator-Sortiment (aktuelle Aera, alle Zahlen nachgerechnet)
 
 | Kriterium | Generator | Niveau | Status |
 |---|---|---|---|
-| k1 vertikal | Spaltenbau R3-Pfad (`MOSAIC_SPALTENBAU`) | 3,15 (8/20 Partien >=1 Spalte) | aktiv; Sicherheitsnetz/Jackpot/Special = Diagnose-Knoepfe AUS (par.15-17) |
-| k2 diagonal | Plattenbauer + Special-Erweiterung (`MOSAIC_PLATTENBAU=2`) | 5,65 (13/23 volle Diagonalen) | UEBERNOMMEN par.18 |
-| k5 Ecken | Spaltenpaar-Bauer (`MOSAIC_PLATTENBAU=5`) | 8,55 (13/22 >=11; 8er-Ecken erschlossen) | UEBERNOMMEN par.20 (staerkste der Kampagne) |
-| k6 spezial | Heuristik (Referenz, Arm D) + Spezialbauer (Arm F, -9,75) | Heuristik -6,60..-11,10 | Kuppeldraft ABGELEHNT par.19 |
+| k1 vertikal | Spaltenbau R3-Pfad (`MOSAIC_SPALTENBAU`) | 3,15 (8/20 Partien >=1 Spalte) | aktiv; Sicherheitsnetz/Jackpot/Special = Diagnose-Knoepfe AUS |
+| k2 diagonal | Plattenbauer + Special (`MOSAIC_PLATTENBAU=2`) | 5,65 (13/23 volle Diagonalen) | UEBERNOMMEN |
+| k5 Ecken | Spaltenpaar-Bauer (`MOSAIC_PLATTENBAU=5`) | 8,55 (13/22 >=11) | UEBERNOMMEN (staerkste der Kampagne) |
+| k6 spezial | Heuristik (Arm D) + Spezialbauer (Arm F) | Heuristik -6,60..-11,10 | Kuppeldraft abgelehnt |
 | k3/k4 | Beifang aller Arme | 5-6 / 10,6 | reicht |
-| k0/k7 | nur Basisrate | 0,6-1,0 / 0,0 | Nutzer-Entscheid: verteidigen, nie anstreben; k7 aus Ownership nicht lernbar |
+| k0/k7 | nur Basisrate | 0,6-1,0 / 0,0 | verteidigen, nie anstreben; k7 aus Ownership nicht lernbar |
 
-### GPU/Async-Front
+### Release-Stand (GitHub)
 
-Rundlauf-Engpass GELOEST (Condvar-Park/Wake statt recv_timeout,
-net_batcher.rs:318; par.21: N=1 0,946x, N=16 0,979x -- vorher 0,053x).
-Batch-Fuellung war nie das Problem (99,7 % bei N=128). Async-Architektur:
-Gate A+B bestanden (Spielgeschehen bit-identisch). par.22 ENTSCHIEDEN
-(s. Startsequenz Zeile 4). **par.23 ENTSCHIEDEN 2026-08-14: Weg B
-GESCHLOSSEN bis zum groesseren Netz.** Fairer Nenner frisch gemessen:
-Sync@11 Threads = 528,5 Spiele/h (12 Threads LANGSAMER -- SMT-Saettigung;
-Hardware gemessen: 6C/12T Ryzen 3600X). Beste GPU-Konfiguration war die
-Nutzer-Bonus-Zelle (zwei Flotten, Aggregat 663/h = 1,26x), Traeger-11-Zelle
-0,90x -- keine Zelle >=2,0x. Der Async+ORT-Stand liegt gesichert in den
-Branches async_search_stage{1,3}_archive (Worktrees entfernt, Commits
-referenziert). Sync-Self-Play-Standard kuenftig 11 Threads statt 8.
-Ausserdem offen: der sync<->async-Gate-B-Retest nach 2b -- niedrige
-Prioritaet, kein Blocker.
+Bundle `dist/Mosaic-AI_v21_2d_brierbest_20260815.zip` (40,5 MB) gebaut und am
+laufenden Bundle rauchgetestet (Server, Champion, gewertetes KI-Spiel,
+Menschen-Zug, echter Netz-Zug). Spieler-Doku englisch, Attribution zu
+*Azul Duel* ehrlich gestellt (README + Handbuch-Kopf). Tag-Haushalt bereinigt:
+`v0.1-alpha16` zeigt auf den v16-Stand, lokal und auf GitHub deckungsgleich.
+**Offen:** der aktuelle main-Stand ist NICHT gepusht; das v21-Release (Tag +
+Release-Text + Zip) wartet auf den Nutzer.
 
-### Offene Punkte ausserhalb der Startsequenz
+### Offene Punkte
 
 | Punkt | Stand |
 |---|---|
-| **Dateinamen Welle 2** | TEILMENGE 1 ERLEDIGT 2026-08-14 (Tabelle am Ende von archive/history.md): column_build.rs, plate_builder.rs, provocation.rs, PREREG_provocation.md, seeds_per_criterion/, seed_selection_plates.*, provocation_acceptance.json, column_build_trace.py, plate_points_from_arena.py, game_manual_GUI.pptx (Lock war weg). TEILMENGE 2 ERLEDIGT 2026-08-14 (GPU-Agent fertig, par.22 committet): PREREG_gpu_inference_path.md, gpu_inference_path_ipc_roundtrip.{py,json}, gpu_inference_path_selfplay_e2e_route_b.json, async_gpu_stage3_probe.jsonl, parity_probe.py, data/gpu_measurement/ (NICHT leer: 5 Manifeste + 5 pkl-Messkorpora ~254 MB, unangetastet). MIGRATION KOMPLETT -- kein deutscher Dateiname mehr im Hauptbaum |
-| **Stoerungs-Baustein Farbzaehlung** | Nutzer-Auftrag steht (domain_knowledge.md Punkt 4); Messgroesse Gegner-Plattenpunkte gepaart + Frisch-Seed-Replikation; sinnvoll NACH dem Schleifen-Refactor (ein Einbauort statt vier) |
-| **Architektur-Fahrplan Rest** | (1) PREREG_INDEX generieren statt von Hand (der A5-Hook prueft nur Konsistenz), (2) stille Test-Skips verbieten, (3) MOSAIC_*-Knopf-Registratur. Punkte 4+5 sind jetzt PREREG_unified_game_loop.md (Startsequenz Schritt 2) |
-| **Torch-IPC-Reste (Weg A)** | Entfernung freigegeben, war wegen Datei-Konflikt uebersprungen -- nach dem Refactor nachholen |
-| **Aufraeumstand 2026-08-15** | Scratchpads geraeumt (53 GB frei; prereg-zitierte Mess-Skripte vorher nach tools/probes/ + Seeds nach seeds_per_criterion/ versioniert, dbbf2d0); GPU-Worktrees + wt_2b_vor entfernt (Junction-Scan sauber, Commits als Archiv-Branches gesichert); Alt-Branch claude/elastic-bell geloescht (0 eigene Commits). Hardware-Hinweis fuer kuenftige Beschaffung: RAM 32 GB ist Engpass Nr. 2 (ein Trainingslauf haelt 19,3 GB -> kein Parallel-Sweep), CPU 6C/12T Engpass Nr. 1, GPU (RTX 3060) unterausgelastet |
-| **Bootstrap-Horizont / Zufallsknoten / Stapelzug** | **ENTSCHIEDEN 2026-08-14 (Nutzer: "beibehalten")**: der Korpus-Start laeuft mit Horizont 2 und allen Defaults -- keine Zusatzvariablen im Lehr-Korpus. Die Preregs (bootstrap_horizon, chance_nodes) bleiben fuer einen KUENFTIGEN Fenster-Generierungsstart (v22) geparkt, nicht geschlossen |
-| ~~Kopf-Warmstart Index-Abbildung~~ | **ERLEDIGT 2026-08-14 (Kurzcheck am Checkpoint)**: der Champion traegt den ALTEN 72er-Kopf (ownership_head.2 = (72,128)), nicht den 140er -- mit --conjunction-head wird die Ausgabeschicht form-bedingt uebersprungen und startet in ALLEN Sweep-Armen gleich frisch (die 72 alten Zeilen waren mit Gewicht 0 ohnehin untrainiert). Keine Index-Abbildung noetig |
-| **Formungsterm Arm A/B** | Kontrast (gezaehlte Felder vs. Ownership-Marginale) geht im Consumer-Tor-C-Sweep auf -- kein eigener Task mehr |
-| ~~"P0-P6"-Bezeichnung~~ | **AUSGEMUSTERT 2026-08-14** (Nutzer: obsolet; die Zuschreibung "Nutzer-Nomenklatur" war zudem falsch -- es war Koordinator-Nummerierung, nie verschriftlicht). Die Kette ist vollstaendig durch die Preregs abgedeckt (corpus/consumer + Abschaltkriterium oben). Verstreute "P4"-Erwaehnungen in alten Preregs meinen den Verbraucher-Bau |
+| **Stoerungs-Baustein Farbzaehlung** | v1 GEMESSEN und ABGELEHNT (Ziel Rauschen Delta+0,05, Kosten katastrophal: Siege 32/40 -> 12/40, McNemar p=0,0001; Ursache: Vorzug feuerte bedingungslos und ueberlaufblind). Knopf default AUS, Code inert stehen gelassen. v2 vorregistriert, Stufe 0/1 laeuft |
+| **Task-#71-Notdeckel** | 2b hat sie ehrlich gemacht (Fallback statt stillem Kappen, Deckel ~10x). OFFEN nur noch der sync<->async-Gate-B-Retest -- niedrige Prioritaet |
+| **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth` traegt `#[ignore]` bis zur Schwellen-Neukalibrierung auf dem v21-Fixture |
+| **MOSAIC_GAME_TIMEOUT_SCALE** | steht in der Knopf-Registratur als "geplant": der par.22-Umbau lebt nur im Archiv-Branch `async_search_stage3_archive`, nicht in main. Beim naechsten Async-Anlauf mitziehen |
+| **Task #31 Schwierigkeitsstufen** | weiter zurueckgestellt (Nutzer 2026-08-16: "der kommt erst spaeter"). README_GAME nennt jetzt korrekt die zwei Rohregler statt erfundener Stufen |
+| **Hardware-Hinweis** | RAM 32 GB = Engpass Nr. 2 (ein Trainingslauf haelt ~19 GB -> kein Parallel-Sweep), CPU 6C/12T = Engpass Nr. 1, GPU (RTX 3060) unterausgelastet. Preis-Leistungs-Empfehlung falls je aufgeruestet wird: 5950X + 32 GB RAM |
+
+### Was diese Woche ABGESCHLOSSEN wurde (Details in der History)
+
+Architektur-Fahrplan **alle fuenf Punkte** (Index generiert + Hook-Regel,
+Test-Skip-Verbot, Knopf-Registratur mit Waechter-Test, vereinheitlichte
+Spielschleife mit 0-Bit-Abnahme, Spieler-Abstraktion) · Torch-IPC/Weg A
+restlos entfernt · GPU par.23: **Weg B geschlossen** bis zum groesseren Netz
+(beste Zelle 1,26x gegen den frisch gemessenen Sync-Nenner 528,5 Spiele/h bei
+11 Threads; 12 Threads sind langsamer) · Dateinamen-Migration komplett ·
+Scratchpads geraeumt (53 GB), Worktrees entfernt, Async-Stand in den Branches
+`async_search_stage{1,3}_archive` gesichert.
+
+**Sync-Self-Play-Standard ist seit par.23 11 Threads, nicht mehr 8.**
 
 ---
 
