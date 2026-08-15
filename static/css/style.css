@@ -38,36 +38,26 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    eigene Auswahl auf JEDER Fliesenfarbe klar erkennbar bleibt. */
 .tile.sel{outline:3px solid #F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.3)}
 .tile.empty{background:var(--bg);border-style:dashed;border-color:var(--border);color:var(--text3)}
-/* Farbenblinden-Symbole (Nutzer 2026-08-07): jede farbige Fliese traegt ein
-   weisses Form-Symbol (Rot ✦ Blau ✢ Schwarz ▣ Tuerkis ◈ Gelb ❂) -- zentral
-   per ::after auf der Farbklasse, gilt automatisch ueberall (.tile in
-   Fabriken, Reihen, Boden, Stapeln, Modals, Zug-Liste). Kuppelfelder (.ds)
-   bekommen ihr Symbol via spaceHTML-Label bzw. hier fuer belegte Felder. */
+/* Farbenblinden-Symbole (Nutzer 2026-08-07): Form-Symbol je Farbe
+   (Rot ✦ Blau ✢ Schwarz ▣ Tuerkis ◈ Gelb ❂). */
 /* Symbol-Rendering v3 (2026-08-07): SVG-Hintergrundbilder statt Font-
    Glyphen -- Text-Rasterung snappt je nach Browser-Zoom horizontal auf
    Geraetepixel (Nutzer-Report), Hintergrundbilder werden kontinuierlich
    resampelt und background-position:center ist exakt. --sym haengt an
    der Farbklasse und vererbt sich in die ::after-Overlays. */
+/* NUTZER-AUFTRAG 2026-08-15: Symbole NUR NOCH AUF KUPPELPLATTEN (.ds).
+   Die FLIESENSTEINE (.tile in Fabriken, Musterreihen, Boden, Mond-Stapeln,
+   Modals, Zug-Liste) tragen KEIN Symbol mehr -- das ehemalige
+   `.tile.<farbe>::after`-Overlay und die zugehoerigen Phantom-Varianten
+   von --sym sind ersatzlos entfernt. --sym bleibt auf der FARBKLASSE
+   definiert, weil die Kuppelfelder (.ds.N, .ds.filled) sie brauchen; die
+   Farbklasse selbst wird also NICHT angefasst. Wer Fliesen-Symbole wieder
+   will, ergaenzt hier eine .tile-Regel -- nicht die Farbklasse aendern. */
 .blau{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A2%3C/text%3E%3C/svg%3E")}
 .gelb{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9D%82%3C/text%3E%3C/svg%3E")}
 .rot{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E")}
 .schwarz{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%96%A3%3C/text%3E%3C/svg%3E")}
 .tuerkis{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%97%88%3C/text%3E%3C/svg%3E")}
-.tile.phantom.blau{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%232563EB' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A2%3C/text%3E%3C/svg%3E")}
-.tile.phantom.gelb{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%23D97706' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%9D%82%3C/text%3E%3C/svg%3E")}
-.tile.phantom.rot{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%23DC2626' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E")}
-.tile.phantom.schwarz{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%23292524' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%96%A3%3C/text%3E%3C/svg%3E")}
-.tile.phantom.tuerkis{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='%230891B2' stroke='none' stroke-width='0.6' paint-order='stroke'%3E%E2%97%88%3C/text%3E%3C/svg%3E")}
-.tile.blau::after,.tile.gelb::after,.tile.rot::after,.tile.schwarz::after,.tile.tuerkis::after{
-  content:'';position:absolute;inset:0;
-  background:var(--sym) center/13px no-repeat}
-/* Phantom-Fliesen (weisse Fuellung): weisses Symbol waere unsichtbar --
-   Symbol in der Randfarbe. */
-.tile.phantom.blau::after{color:var(--blau)}
-.tile.phantom.gelb::after{color:var(--gelb)}
-.tile.phantom.rot::after{color:var(--rot)}
-.tile.phantom.schwarz::after{color:var(--schwarz)}
-.tile.phantom.tuerkis::after{color:var(--tuerkis)}
 /* Belegte Kuppelfelder (lbl ist leer): Symbol per CSS. */
 .ds.filled.blau::after,.ds.filled.gelb::after,.ds.filled.rot::after,.ds.filled.schwarz::after,.ds.filled.tuerkis::after{
   content:'';position:absolute;inset:0;

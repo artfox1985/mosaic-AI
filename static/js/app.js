@@ -629,11 +629,11 @@ function tileDiv(color, extra='', size='') {
   return `<div class="tile ${nc} ${size} ${extra}">${COLOR_LABELS[color]||''}</div>`;
 }
 
-// Farbenblinden-Symbole (Nutzer 2026-08-07): jede Fliesenfarbe traegt
-// ueberall ein weisses Form-Symbol -- Rot ✦, Blau ✢, Schwarz ▣,
-// Tuerkis ◈, Gelb ❂. Fuer .tile-Elemente rendert das CSS (::after auf
-// der Farbklasse, style.css), fuer Kuppelfelder setzt spaceHTML das
-// Symbol als Label.
+// Farbenblinden-Symbole (Nutzer 2026-08-07) -- Rot ✦, Blau ✢, Schwarz ▣,
+// Tuerkis ◈, Gelb ❂. Nutzer-Auftrag 2026-08-15: Symbole erscheinen NUR
+// NOCH AUF KUPPELPLATTEN (.ds, gerendert per CSS ueber die Farbklasse);
+// die FLIESENSTEINE (.tile) tragen keins mehr. Diese Tabelle wird derzeit
+// nirgends gelesen (Symbol-Rendering v3 laeuft komplett ueber style.css).
 const TILE_SYMBOL = {rot:'✦', blau:'✢', schwarz:'▣', tuerkis:'◈', gelb:'❂'};
 
 function normColor(c) {
