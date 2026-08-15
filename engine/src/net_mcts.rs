@@ -7881,26 +7881,11 @@ mod tests {
         assert!((u - 0.575).abs() < 1e-6, "u={u}, erwartet 0.575 (Kalibrierung A=0/B=1 = Identitaet)");
     }
 
-    // ── Weg A (`evaluations/PREREG_gpu_inference_path.md`): WIRKUNGSMESSUNG ──
-    // Nutzer-Nachfrage 2026-08-12: der Policy-Kopf zeigt 3,4e-5 max. Abweichung
-    // tract<->torch (siehe `net_ipc.rs`-Toleranztest,
-    // `eval_batch_via_ipc_matches_tract_within_tolerance`) -- das entscheidet
-    // ueber die Gumbel-Wurzelauswahl nur, wenn es die tatsaechliche Auswahl
-    // aendert. Zwei Metriken auf ECHTEN Wurzelstellungen, siehe
-    // `policy_head_deviation_effect_on_gumbel_root_selection` unten fuer die
-    // volle Herleitung.
-
-    /// Wie [`ChannelState`] in `net_ipc.rs` -- hier lokal dupliziert (dortige
-    /// Variante ist modul-privat), gleicher Zweck: den gespawnten
-    /// `tools/torch_ipc_server.py`-Kindprozess IMMER zu beenden, auch bei
-    /// einem `panic!`/frühen `return` in diesem Test.
-    struct ChildGuard(std::process::Child);
-    impl Drop for ChildGuard {
-        fn drop(&mut self) {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
-    }
+    // ── Backend-Entscheidungsgleichheits-Helfer (`evaluations/
+    // PREREG_gpu_inference_path.md`): urspruenglich fuer die Weg-A-
+    // Wirkungsmessung tract<->torch gebaut (Weg A ist 2026-08-15 entfernt,
+    // gemessen verworfen -- PREREG §9); weiterverwendet von den Weg-B-
+    // (`ort_cuda_*`) und Weg-V-Tests (`interleaved_*`) unten.
 
     /// Reproduziert `build_gumbel_tree_inner`s Score-/Sortier-Schritt (siehe
     /// dortige Zeilen ~3644-3676: `score(a) = g(a) + ln(prior(a))`, `g(a) ~
@@ -7940,225 +7925,19 @@ mod tests {
         pairs
     }
 
-    /// Wirkungsmessung: wie oft aendert die tract<->torch-Policy-Abweichung
-    /// die TATSAECHLICHE Gumbel-Wurzelauswahl? Zwei Metriken, beide auf den
-    /// 1148 "sauberen" Phase::Drafting-Zustaenden aus
-    /// `evaluations/frozen_eval_set_v2.pkl` (Filter identisch zu
-    /// `tools/build_frozen_oracle_labels.py::is_start_adjacent`/
-    /// `is_pending_rotation`, siehe `tools/export_frozen_drafting_states.py` --
-    /// geprueft: liefert exakt 1148, wie `evaluations/oracle_v21_own02.json`
-    /// ::n_labeled):
-    ///
-    /// 1. **Argmax** (deterministisch, KEIN Gumbel-Rauschen): der Legal-Zug
-    ///    mit dem hoechsten rohen Policy-Logit unter den EINDEUTIGEN legalen
-    ///    Aktions-IDs (`legal_logits_sorted`) -- reiner Policy-Kopf-Vergleich,
-    ///    Moon-Kopf/-Aufspaltung bewusst AUSSEN vor (siehe Bericht Punkt 5).
-    /// 2. **Gumbel-Top-m-Menge** (`m = gumbel_top_m_for_budget(400)`, siehe
-    ///    dortige Formel/Konstante -- hier zur Laufzeit ausgelesen, nicht nur
-    ///    aus dem Kommentar zitiert): reproduziert die ECHTE Wurzel-Kandidaten-
-    ///    Ziehung (inkl. Moon-Order-Aufspaltung, `build_untried_actions(...,
-    ///    skip_cutoff=true)` -- an der Wurzel IMMER wahr, `USE_GUMBEL_SEARCH=
-    ///    true`, siehe `make_node`s `skip_cutoff`-Zeile) mit je Backend einer
-    ///    EIGENEN, aber GLEICH geseedeten RNG (gleicher Startwert, getrennte
-    ///    Stroeme -- entspricht zwei realen Suchen mit demselben Top-Level-
-    ///    Seed, einmal ueber tract, einmal ueber den Torch-IPC-Pfad).
-    ///
-    /// KEIN Urteil in dieser Funktion -- nur Zahlen (`println!`), siehe
-    /// Bericht. Haerte Fehler (Verbindungsaufbau, Groessen-Mismatch zwischen
-    /// den Backend-Antworten) bleiben `assert!`/`panic!`, das ist ein Bug,
-    /// keine Messgroesse.
-    ///
-    /// `#[ignore]`: braucht `python`+torch, das lokale ONNX/`.pth`-Paar UND
-    /// die von `tools/export_frozen_drafting_states.py` exportierte JSON-Datei
-    /// (Pfad via `MOSAIC_FROZEN_STATES_JSON`, sonst uebersprungen). Aufruf:
-    /// `cargo test --lib -- --ignored net_mcts::tests::policy_head_deviation_effect_on_gumbel_root_selection --nocapture`
-    #[test]
-    #[ignore]
-    fn policy_head_deviation_effect_on_gumbel_root_selection() {
-        use crate::net::Net;
-
-        let Ok(states_path) = std::env::var("MOSAIC_FROZEN_STATES_JSON") else {
-            eprintln!(
-                "  ⚠️  MOSAIC_FROZEN_STATES_JSON nicht gesetzt (siehe \
-                 tools/export_frozen_drafting_states.py) -- Test uebersprungen."
-            );
-            return;
-        };
-        let Ok(raw) = std::fs::read_to_string(&states_path) else {
-            eprintln!("  ⚠️  {states_path} nicht lesbar -- Test uebersprungen.");
-            return;
-        };
-        let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
-        assert!(!records.is_empty(), "leere Zustandsliste -- Export fehlgeschlagen?");
-
-        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        let pth_path = repo.join("models/alphazero_v20_2d_opp_brierbest.pth");
-        if !onnx_path.exists() || !pth_path.exists() {
-            eprintln!("  ⚠️  {onnx_path:?} oder {pth_path:?} fehlt -- Test uebersprungen.");
-            return;
-        }
-        let net = match Net::load_auto(onnx_path.to_str().unwrap()) {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("  ⚠️  ONNX-Modell nicht ladbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
-
-        let port: u16 = 18849; // eigener Port, kollidiert nicht mit net_ipc.rs's Testport 18848.
-        let shm_dir = std::env::temp_dir().join("mosaic_torch_ipc_test_gumbel");
-        std::env::set_var("MOSAIC_TORCH_IPC_PORT", port.to_string());
-        std::env::set_var("MOSAIC_TORCH_IPC_SHM_DIR", shm_dir.to_str().unwrap());
-
-        let server_script = repo.join("tools/torch_ipc_server.py");
-        let mut child = match std::process::Command::new("python")
-            .arg(&server_script)
-            .arg("--model")
-            .arg(&pth_path)
-            .arg("--port")
-            .arg(port.to_string())
-            .arg("--shm-dir")
-            .arg(&shm_dir)
-            .arg("--device")
-            .arg("cpu")
-            .spawn()
-        {
-            Ok(c) => ChildGuard(c),
-            Err(e) => {
-                eprintln!("  ⚠️  Python-Server nicht startbar ({e}) -- Test uebersprungen.");
-                return;
-            }
-        };
-        let addr: std::net::SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
-        let mut ready = false;
-        for _ in 0..300 {
-            if std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(200)).is_ok() {
-                ready = true;
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(200));
-        }
-        if !ready {
-            eprintln!("  ⚠️  Python-Server nach 60s nicht erreichbar -- Test uebersprungen.");
-            let _ = child.0.kill();
-            return;
-        }
-
-        // Zur Laufzeit ausgelesen (nicht nur aus dem Kommentar zitiert),
-        // siehe Bericht Punkt (2): m fuer sims=400.
-        let m_for_400_sims = gumbel_top_m_for_budget(400);
-        println!("gumbel_top_m_for_budget(400) = {m_for_400_sims}");
-
-        let mut n_total = 0usize;
-        let mut n_argmax_mismatch = 0usize;
-        let mut n_topm_mismatch = 0usize;
-        let mut argmax_mismatch_gaps: Vec<(usize, f32, f32)> = Vec::new(); // (record_index, tract_gap, torch_gap)
-
-        let chunk_size = crate::net::EVAL_BATCH_MAX_N;
-        for chunk in records.chunks(chunk_size) {
-            let mut states: Vec<GameState> = Vec::with_capacity(chunk.len());
-            let mut record_indices: Vec<usize> = Vec::with_capacity(chunk.len());
-            for entry in chunk {
-                let record_index = entry["record_index"].as_u64().unwrap() as usize;
-                let mut rng = StdRng::seed_from_u64(record_index as u64);
-                match crate::serialize::json_to_state(&entry["state"], &mut rng) {
-                    Ok(s) => {
-                        states.push(s);
-                        record_indices.push(record_index);
-                    }
-                    Err(e) => eprintln!("  ⚠️  record #{record_index}: json_to_state fehlgeschlagen ({e}) -- ausgelassen."),
-                }
-            }
-            if states.is_empty() {
-                continue;
-            }
-            let feats: Vec<Vec<f32>> = states.iter().map(|s| crate::features::features_for_net(&net, s)).collect();
-            let refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
-
-            let tract_out = net.eval_batch(&refs).expect("tract eval_batch");
-            let torch_out = crate::net_ipc::eval_batch_via_ipc(&refs).expect("Torch-IPC-Rundlauf (Server muss laufen)");
-            assert_eq!(tract_out.len(), states.len());
-            assert_eq!(torch_out.len(), states.len());
-
-            for i in 0..states.len() {
-                let state = &states[i];
-                let record_index = record_indices[i];
-                let (policy_t, _value_t, moon_t, _points_t) = &tract_out[i];
-                let (policy_p, _value_p, moon_p, _points_p) = &torch_out[i];
-
-                // ── Metrik 1: Argmax (rauschfrei) ──
-                let sorted_t = legal_logits_sorted(state, policy_t);
-                let sorted_p = legal_logits_sorted(state, policy_p);
-                assert_eq!(sorted_t.len(), sorted_p.len(), "record #{record_index}: unterschiedliche Legal-ID-Menge?!");
-                assert!(!sorted_t.is_empty(), "record #{record_index}: keine legalen Aktionen an einer Drafting-Wurzel?!");
-                n_total += 1;
-                if sorted_t[0].0 != sorted_p[0].0 {
-                    n_argmax_mismatch += 1;
-                    let gap_t = if sorted_t.len() > 1 { sorted_t[0].1 - sorted_t[1].1 } else { f32::INFINITY };
-                    let gap_p = if sorted_p.len() > 1 { sorted_p[0].1 - sorted_p[1].1 } else { f32::INFINITY };
-                    argmax_mismatch_gaps.push((record_index, gap_t, gap_p));
-                }
-
-                // ── Metrik 2: Gumbel-Top-m-Menge ──
-                let mut moon_arr_t = [0f32; 5];
-                for (j, s) in moon_t.iter().take(5).enumerate() {
-                    moon_arr_t[j] = *s;
-                }
-                let mut moon_arr_p = [0f32; 5];
-                for (j, s) in moon_p.iter().take(5).enumerate() {
-                    moon_arr_p[j] = *s;
-                }
-                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true);
-                let (acts_p, _) = build_untried_actions(state, policy_p, &moon_arr_p, true);
-                assert_eq!(acts_t.len(), acts_p.len(), "record #{record_index}: unterschiedliche Kandidatenzahl nach Moon-Expansion?!");
-                let n_root = acts_t.len();
-                let m_prime = m_for_400_sims.min(n_root);
-
-                let seed = 900_000_000u64 + record_index as u64;
-                let mut rng_t = StdRng::seed_from_u64(seed);
-                let mut rng_p = StdRng::seed_from_u64(seed);
-                let set_t = gumbel_topm_set(&acts_t, m_prime, &mut rng_t);
-                let set_p = gumbel_topm_set(&acts_p, m_prime, &mut rng_p);
-                let sets_match = set_t.len() == set_p.len() && set_t.iter().all(|a| set_p.contains(a));
-                if !sets_match {
-                    n_topm_mismatch += 1;
-                }
-            }
-        }
-
-        let argmax_rate = n_argmax_mismatch as f64 / n_total as f64;
-        let topm_rate = n_topm_mismatch as f64 / n_total as f64;
-        println!("\n=== Wirkungsmessung Policy-Kopf tract<->torch (Weg A) ===");
-        println!("Stellungen verarbeitet: {n_total}");
-        println!("Argmax-Abweichung:      {n_argmax_mismatch}/{n_total} ({:.4}%)", argmax_rate * 100.0);
-        println!("Top-{m_for_400_sims}-Mengen-Abweichung: {n_topm_mismatch}/{n_total} ({:.4}%)", topm_rate * 100.0);
-        if argmax_mismatch_gaps.is_empty() {
-            println!("Keine Argmax-Abweichungen -- keine Logit-Abstaende zu berichten.");
-        } else {
-            println!("Logit-Abstaende (Platz1-Platz2) in den Argmax-Abweichungsfaellen (tract | torch):");
-            for (idx, gap_t, gap_p) in &argmax_mismatch_gaps {
-                println!("  record #{idx}: tract={gap_t:.6}  torch={gap_p:.6}");
-            }
-        }
-    }
-
     // ── Weg B (`evaluations/PREREG_gpu_inference_path.md` §11), Nutzer-Auftrag
     // "fang an" 2026-08-12, Schritt 2 -- ausdruecklich verlangt, weil leicht
-    // uebersehen: die 0-von-1148 oben (tract<->torch) und weiter unten
-    // (synchron<->verschraenkt, beide tract) decken KEIN drittes Backend ab.
-    // ORT-CUDA ist ein DRITTER Inferenz-Mechanismus (eigener Graph-Optimierer,
-    // eigene CUDA-Kernels) und braucht seinen EIGENEN Nachweis. Wiederverwendet
-    // dieselben Helfer (`legal_logits_sorted`, `gumbel_topm_set`) wie oben.
+    // uebersehen: die 0-von-1148 der (2026-08-15 entfernten) Weg-A-Messung
+    // (tract<->torch) und die unten folgende (synchron<->verschraenkt, beide
+    // tract) decken KEIN weiteres Backend ab. ORT-CUDA ist ein EIGENER
+    // Inferenz-Mechanismus (eigener Graph-Optimierer, eigene CUDA-Kernels)
+    // und braucht seinen EIGENEN Nachweis. Wiederverwendet dieselben Helfer
+    // (`legal_logits_sorted`, `gumbel_topm_set`) wie oben.
 
-    /// Entscheidungsgleichheit tract<->ORT-CUDA, gleiche Messkette wie
-    /// `policy_head_deviation_effect_on_gumbel_root_selection` (Argmax +
-    /// Gumbel-Top-m auf denselben 1148 Zustaenden, dasselbe Modell
-    /// `alphazero_v20_2d_opp_brierbest.onnx`), ZUSAETZLICH die maximale
-    /// Rohwert-Abweichung je Kopf (wie
-    /// `net_ipc::eval_batch_via_ipc_matches_tract_within_tolerance`), damit
-    /// die beiden Cross-Backend-Vergleiche (tract<->torch, tract<->ORT-CUDA)
-    /// nebeneinander lesbar sind.
+    /// Entscheidungsgleichheit tract<->ORT-CUDA: Argmax + Gumbel-Top-m auf
+    /// denselben 1148 Zustaenden wie die fruehere Weg-A-Wirkungsmessung,
+    /// dasselbe Modell `alphazero_v20_2d_opp_brierbest.onnx`, ZUSAETZLICH
+    /// die maximale Rohwert-Abweichung je Kopf.
     ///
     /// KEIN Urteil hier -- nur Zahlen. Weicht die Entscheidung ab: BERICHTEN,
     /// NICHT die Toleranz anpassen (Auftragstext) -- bei ORT ist eine
@@ -8212,7 +7991,7 @@ mod tests {
         let mut n_argmax_mismatch = 0usize;
         let mut n_topm_mismatch = 0usize;
         let mut argmax_mismatch_gaps: Vec<(usize, f32, f32)> = Vec::new();
-        let mut max_abs = [0f32; 4]; // policy, value, moon, points -- gleiche Reihenfolge wie net_ipc.rs
+        let mut max_abs = [0f32; 4]; // policy, value, moon, points -- gleiche Reihenfolge wie net.rs::eval_batch
 
         let chunk_size = crate::net::EVAL_BATCH_MAX_N;
         for chunk in records.chunks(chunk_size) {
@@ -9038,23 +8817,21 @@ mod tests {
     }
 
     // ── Weg V (Verschraenkung, `net_batcher.rs`), Nutzer-Auftrag 2026-08-12
-    // "dann leg los" -- ABNAHME Punkte 2+3. Wiederverwendet die Helfer aus dem
-    // Policy-Tor-Block oben (`legal_logits_sorted`, `gumbel_topm_set`,
-    // `ChildGuard`) statt sie neu zu bauen.
+    // "dann leg los" -- ABNAHME Punkte 2+3. Wiederverwendet die Helfer
+    // `legal_logits_sorted`/`gumbel_topm_set` von oben statt sie neu zu bauen.
 
     /// ABNAHME Punkt 2: ENTSCHEIDUNGSGLEICHHEIT synchron<->verschraenkt, mit
-    /// derselben Messkette wie
-    /// `policy_head_deviation_effect_on_gumbel_root_selection` (Argmax +
-    /// Gumbel-Top-m auf denselben 1148 Zustaenden), aber "synchron" (EIN
-    /// `Net::eval_batch(&[feats])`-Aufruf je Zustand, heutiges Verhalten)
+    /// derselben Messkette wie `ort_cuda_matches_tract_gumbel_root_selection`
+    /// (Argmax + Gumbel-Top-m auf denselben 1148 Zustaenden), aber "synchron"
+    /// (EIN `Net::eval_batch(&[feats])`-Aufruf je Zustand, heutiges Verhalten)
     /// gegen "verschraenkt" (derselbe `eval_batch`-Vertrag, aber ueber den
     /// registrierten Sammel-Faden UND mit `N_THREADS` GLEICHZEITIGEN
     /// Aufrufern, die ihre Zeilen tatsaechlich miteinander mischen koennen).
     /// Gleiches Backend (tract) auf beiden Seiten -- der einzige Unterschied
-    /// ist die Batch-KOMPOSITION, nicht die Inferenz-Maschinerie (anders als
-    /// beim tract<->torch-Vergleich oben also KEIN Cross-Framework-Vorbehalt
-    /// noetig, nur der schon existierende "tract ist ueber verschiedene
-    /// Batch-Plaene nicht bitgleich"-Praezedenzfall, `net.rs:840`).
+    /// ist die Batch-KOMPOSITION, nicht die Inferenz-Maschinerie (KEIN
+    /// Cross-Framework-Vorbehalt noetig, nur der schon existierende "tract
+    /// ist ueber verschiedene Batch-Plaene nicht bitgleich"-Praezedenzfall,
+    /// `net.rs:840`).
     ///
     /// Berichtet nebenbei den TATSAECHLICH erreichten mittleren Batch
     /// (`Batcher::stats`) -- ABNAHME Punkt 3s zweite Haelfte, hier OHNE
@@ -9062,10 +8839,10 @@ mod tests {
     /// senden so schnell wie moeglich hintereinander) -- das ist also der
     /// MECHANISCH ERREICHBARE Batch bei Sattelung, NICHT die realistische
     /// Zahl unter echter Baumarbeit (die liefert
-    /// `interleaved_throughput_vs_synchronous_realistic_duty` unten).
+    /// `interleaved_throughput_vs_synchronous` unten).
     ///
     /// `#[ignore]`: braucht das lokale ONNX UND die exportierte JSON-Datei.
-    /// KEIN Python/Torch noetig (reiner tract-Vergleich, kein IPC-Kanal).
+    /// KEIN Python/Torch noetig (reiner tract-Vergleich).
     #[test]
     #[ignore]
     fn interleaved_matches_synchronous_gumbel_root_selection() {
@@ -9252,28 +9029,24 @@ mod tests {
     /// `interleave_concurrency_probe.rs` offenlassen musste (dortige Faeden
     /// taten zwischen zwei Anfragen NICHTS, Bestfall fuer die Fuellung).
     ///
-    /// DREI Arme, gleiche Zustaende/Merkmale, gleiche Fadenzahl:
+    /// ZWEI Arme, gleiche Zustaende/Merkmale, gleiche Fadenzahl (der fruehere
+    /// Arm 3, verschraenkt + Torch/CUDA-IPC, ist mit Weg A am 2026-08-15
+    /// entfernt worden -- gemessen verworfen, PREREG §9):
     /// 1. **Synchron** (heutiges Verhalten): `Net::eval_batch(&[feats])`
     ///    direkt, kein Sammel-Faden.
-    /// 2. **Verschraenkt, tract**: derselbe Aufruf ueber den Sammel-Faden,
-    ///    IPC-Knopf AUS -- isoliert die Wirkung der Buendel-MECHANIK allein.
-    /// 3. **Verschraenkt, Torch/CUDA-IPC**: wie 2, aber `net_ipc.rs`s Kanal
-    ///    zusaetzlich eingeschaltet (`tools/torch_ipc_server.py`, `--device
-    ///    cpu` -- SIEHE DORTIGE EINSCHRAENKUNG: CPU, nicht GPU, dieselbe
-    ///    Baustelle wie beim Policy-Tor-Toleranztest, kein neuer Vorbehalt).
+    /// 2. **Verschraenkt, tract**: derselbe Aufruf ueber den Sammel-Faden --
+    ///    isoliert die Wirkung der Buendel-MECHANIK allein.
     ///
-    /// `#[ignore]`: braucht das lokale ONNX+`.pth`-Paar; Arm 3 zusaetzlich
-    /// `python`+torch (spawnt den Server selbst, `ChildGuard`).
+    /// `#[ignore]`: braucht das lokale ONNX-Modell.
     #[test]
     #[ignore]
     fn interleaved_throughput_vs_synchronous() {
         use crate::net::Net;
         use std::sync::Arc;
-        use std::time::{Duration, Instant};
+        use std::time::Instant;
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        let pth_path = repo.join("models/alphazero_v20_2d_opp_brierbest.pth");
         if !onnx_path.exists() {
             eprintln!("  ⚠️  {onnx_path:?} fehlt -- Test uebersprungen.");
             return;
@@ -9326,7 +9099,7 @@ mod tests {
         let total_evals = (N_THREADS * ITERS_PER_THREAD) as f64;
         let sync_rate = total_evals / sync_elapsed.as_secs_f64();
 
-        // ── Arm 2: verschraenkt, tract (IPC-Knopf AUS) ──
+        // ── Arm 2: verschraenkt, tract ──
         std::env::set_var("MOSAIC_INTERLEAVE_ENABLED", "1");
         std::env::set_var("MOSAIC_INTERLEAVE_BATCH_MAX", crate::net::EVAL_BATCH_MAX_N.to_string());
         std::env::set_var("MOSAIC_INTERLEAVE_FILL_TIMEOUT_US", "200");
@@ -9362,86 +9135,6 @@ mod tests {
         println!("Synchron            : {sync_rate:.1} Evals/s ({sync_elapsed:?})");
         println!(
             "Verschraenkt (tract) : {inter_tract_rate:.1} Evals/s ({inter_tract_elapsed:?}), mittlerer Batch = {mean_batch_tract:.2} ({batches_delta} Batches, {rows_delta} Zeilen)"
-        );
-
-        // ── Arm 3: verschraenkt + Torch/CUDA-IPC ──
-        struct ChildGuard(std::process::Child);
-        impl Drop for ChildGuard {
-            fn drop(&mut self) {
-                let _ = self.0.kill();
-                let _ = self.0.wait();
-            }
-        }
-        if !pth_path.exists() {
-            eprintln!("  ⚠️  {pth_path:?} fehlt -- Arm 3 (Torch-IPC) uebersprungen.");
-            return;
-        }
-        let port: u16 = 18850;
-        let shm_dir = std::env::temp_dir().join("mosaic_torch_ipc_test_throughput");
-        std::env::set_var("MOSAIC_TORCH_IPC_PORT", port.to_string());
-        std::env::set_var("MOSAIC_TORCH_IPC_SHM_DIR", shm_dir.to_str().unwrap());
-        std::env::set_var("MOSAIC_TORCH_IPC_ENABLED", "1");
-
-        let server_script = repo.join("tools/torch_ipc_server.py");
-        let _child = match std::process::Command::new("python")
-            .arg(&server_script)
-            .arg("--model")
-            .arg(&pth_path)
-            .arg("--port")
-            .arg(port.to_string())
-            .arg("--shm-dir")
-            .arg(&shm_dir)
-            .arg("--device")
-            .arg("cuda") // Nutzer-Auftrag 2026-08-12: DER Punkt, auf den Weg V hinauslaeuft -- CPU-Torch-Arm kann strukturell nicht gewinnen (siehe Bericht).
-            .spawn()
-        {
-            Ok(c) => ChildGuard(c),
-            Err(e) => {
-                eprintln!("  ⚠️  Python-Server nicht startbar ({e}) -- Arm 3 uebersprungen.");
-                return;
-            }
-        };
-        let addr: std::net::SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
-        let mut ready = false;
-        for _ in 0..300 {
-            if std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok() {
-                ready = true;
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        }
-        if !ready {
-            eprintln!("  ⚠️  Python-Server nach 60s nicht erreichbar -- Arm 3 uebersprungen.");
-            return;
-        }
-
-        let batches_before = batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed);
-        let rows_before = batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed);
-        let t2 = Instant::now();
-        let handles: Vec<_> = (0..N_THREADS)
-            .map(|tid| {
-                let batcher = Arc::clone(&batcher);
-                let pool = Arc::clone(&pool);
-                std::thread::spawn(move || {
-                    for it in 0..ITERS_PER_THREAD {
-                        let f = &pool[(tid * 7 + it) % pool.len()];
-                        let _ = batcher.eval_rows(&[f.as_slice()]).expect("eval_rows");
-                        busy_spin(SYNTHETIC_TREE_WORK);
-                    }
-                })
-            })
-            .collect();
-        for h in handles {
-            h.join().unwrap();
-        }
-        let inter_torch_elapsed = t2.elapsed();
-        let inter_torch_rate = total_evals / inter_torch_elapsed.as_secs_f64();
-        let batches_delta2 = batcher.stats.batches.load(std::sync::atomic::Ordering::Relaxed) - batches_before;
-        let rows_delta2 = batcher.stats.rows.load(std::sync::atomic::Ordering::Relaxed) - rows_before;
-        let mean_batch_torch = if batches_delta2 > 0 { rows_delta2 as f64 / batches_delta2 as f64 } else { 0.0 };
-
-        println!(
-            "Verschraenkt (torch) : {inter_torch_rate:.1} Evals/s ({inter_torch_elapsed:?}), mittlerer Batch = {mean_batch_torch:.2} ({batches_delta2} Batches, {rows_delta2} Zeilen)"
         );
     }
 }

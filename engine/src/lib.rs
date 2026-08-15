@@ -17,7 +17,6 @@ pub mod mcts;
 pub mod moves;
 pub mod net;
 pub mod net_batcher;
-pub mod net_ipc;
 pub mod net_mcts;
 // Weg B (PREREG_gpu_inference_path.md §11, `net.rs::eval_batch`-Rangfolge):
 // nur compiliert, wenn `ort` als optionale Abhaengigkeit ueber dieses

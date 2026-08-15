@@ -68,7 +68,6 @@
   "tools/tiling_candidate_spread.py": 7850,
   "tools/tiling_value_reference_main.py": 12499,
   "tools/tiling_value_reference_pilot.py": 8735,
-  "tools/torch_ipc_server.py": 8651,
   "tools/train_2d_vs_flat_fs.py": 13349,
   "tools/train_corpus_dose.py": 39915,
   "tools/train_lambda_sweep.py": 39099,
