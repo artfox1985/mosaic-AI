@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Lohnt sich Playout-Cap-Randomization (p=0,25/cheap=150) bei gleichem Wandzeit-Budget (Task #14)? | Beleg: Negativ, Orakel 0/6, Doku-Arena 67:83 (H0); `archive/history.md` Z. ~7008-7063 -->
+
 # Vorregistrierung: Playout-Cap-Randomization (PCR, Task #14)
 
 **Angelegt 2026-08-02, VOR jedem Self-Play-Lauf dieses Experiments.** Reiner

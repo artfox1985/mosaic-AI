@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein Ranking-Loss-Arm (Task #35b, WDL-Aera) die Orakel-validierten Policy-Metriken? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS: Orakel-Vorpruefung NEGATIV -> kein Gating"), #35b geschlossen -->
+
 # Vorregistrierung: Task #35b -- Ranking-Loss-Arm (WDL-Aera)
 
 **Angelegt 2026-08-08, VOR dem Training.** Implementierung committet

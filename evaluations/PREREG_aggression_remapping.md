@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Zeigt einer der 3 (w,λ)-Blend-Arme einen signifikanten Staerkegewinn gegen die w=0-Kontrolle (v20-Aera, F1-gefixt)? | Beleg: Alle 3 Arme H0 (149/154/161/155 von je 200), w bleibt ueberall 0; `evaluations/paired_arena_env_aggr_remapping.json` -->
+
 # Vorregistrierung: Aggressions-Neukartierung (v20-Aera)
 
 **Angelegt 2026-08-07, VOR allen Laeufen.** Vorgezogen in der CPU-Bahn

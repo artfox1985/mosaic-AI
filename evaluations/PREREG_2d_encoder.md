@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt der 2D-Conv-Encoder from-scratch mehr zur Netzstaerke bei als das flache MLP (Task #11, Phase 2)? | Beleg: Orakel 6/6 fuer 2D, aber Arena-Gating 416:384 (Wash, p=0,30); `archive/history.md` Z. ~6660-6741 -->
+
 # Vorregistrierung: 2D-Encoder from-scratch vs. Flach-Netz from-scratch (Task #11, Phase 2)
 
 **Angelegt 2026-07-30, VOR dem ersten der 12 Trainingsläufe.** Zweck: den

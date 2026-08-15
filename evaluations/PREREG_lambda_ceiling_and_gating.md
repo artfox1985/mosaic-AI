@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Welches lambda_aggr ist sicher, und schlaegt v19_2d_opp@(w=0,1,lambda) den Champion? | Beleg: Kein Staerkebeleg (205:195, p=0,68), keine Promotion; `archive/history.md` Z. ~7315-7351 -->
+
 # Vorregistrierung
 
 ## NACHTRAG 2026-08-04 (VOR den w-Partien): w-Leiter + Verschiebungs-Monitor

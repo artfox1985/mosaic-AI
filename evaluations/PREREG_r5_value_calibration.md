@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Beleg: Unterkalibrierung bestaetigt (Steigung 0,06-0,09 statt ~1); `archive/history.md` Z. ~7065-7089 -->
+
 # Vorregistrierung: Runde-5-Value-/Punkte-Kopf-Kalibrierung gegen exakte Ground Truth
 
 **Angelegt 2026-08-02 (Task #27), VOR dem ersten vollen Lauf.** Nur Design +

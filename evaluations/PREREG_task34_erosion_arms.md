@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Welcher Mechanismus (Label-Smoothing vs entstauchter Bootstrap-Blend) mildert die WDL-Erosion am besten (Task #34)? | Beleg: Entstauchter Blend gewinnt (Peak 0,1971, Erosion +0,005) -> #34-Zielkonfiguration; `archive/history.md` Z. ~9185-9229 -->
+
 # Vorregistrierung: Erosions-Arme A/B (Task #34, Nutzer-Go 2026-08-05)
 
 **Angelegt VOR den Laeufen.** Befundlage: der Value-Fit des harten Ziels

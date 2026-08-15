@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Hilft mehr Self-Play-Korpus (900 vs 450 Dateien) bei unveraenderter Suchtiefe der Netzqualitaet (Vorstudie Task #14)? | Beleg: Orakel 6/6 UND Arena bestaetigt (479:321, p<0,0001); `archive/history.md` Z. ~6746-6821 -->
+
 # Vorregistrierung: Korpus-Dosis-Wirkungs-Messung (Vorstudie zu Task #14)
 
 **Angelegt 2026-08-01, VOR dem ersten der 12 Trainingsläufe.** Zweck: klären,

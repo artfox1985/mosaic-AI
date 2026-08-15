@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Teil A: wird der Ownership-Kopf (Task #9) Standard? Teil B: bleibt Gumbel-c_scale bei 1,0 (Task #18)? | Beleg: Teil A bereits im Dateitext entschieden (bleibt 0,0); Teil B c_scale bleibt 1,0 trotz hoeherer Siegquote bei 0,3 (Score-Einbruch beidseits); `archive/history.md` Z. ~6133-6210 -->
+
 # Vorregistrierung: Abschluss Ownership-Head und Gumbel-Parameter
 
 **Angelegt 2026-07-28, VOR Erhebung der zusaetzlichen Daten.** Zweck: beide

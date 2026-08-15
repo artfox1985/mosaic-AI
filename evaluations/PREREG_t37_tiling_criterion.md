@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Ist reines P(Sieg)-Ranking beim Tiling-Abschluss besser als das Bestandskriterium punkte*P(Sieg) (Task #37)? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS: H0 -- #37 GESCHLOSSEN") -->
+
 # Vorregistrierung: Task #37 -- Tiling-Auswahlkriterium (punkte*P vs reines P)
 
 **Angelegt 2026-08-08, VOR dem Messlauf.** Knopf: MOSAIC_TILING_SELECT

@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Soll die Suche einen EIGENEN Zufallsstrom bekommen, damit Partien replaybar werden und gepaarte Arenen echte gemeinsame Zufallszahlen haben? | Beleg: ENTSCHIEDEN 2026-08-13 (Datei §11 VERDIKT): umgesetzt -- net_mcts::derive_search_seed (SplitMix64) + Verdrahtung in self_play.rs/py.rs; Kern bestaetigt (Gegenprobe mit geteiltem RNG bricht in Runde 4, nach dem Fix 0 Abweichungen), zwei Prognosen der Datei widerlegt (u.a.: der Paritaets-Hash haelt). Details: STATUS.md, Kapitel 'NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie umgesetzt'. -->
+
 # Vorregistrierung: Such-RNG von der Partie trennen
 
 **Angelegt 2026-08-11, Nutzer-Auftrag** — *"[Instrumentenschulden] takte das als

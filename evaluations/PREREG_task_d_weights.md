@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt ein hoeheres value_weight (0,4/0,8) oder ein hoeheres points_weight (0,25) Arena-Staerke gegen die Kontrolle `v21_2d`? | Beleg: **H0 2026-08-10, alle drei Arme** ⇒ Regel 5: `VALUE_WEIGHT=0,2` und der Punkte-Default bleiben, Punkt fuer die WDL-/2D-Aera geschlossen. vw04 208:192 (52,0%), vw08 92:108 (46,0%), pw025 68:82 (45,3%, SPRT-H0 nach 75 Paaren). Bild monoton: 0,4 nicht besser, 0,8 schlechter -- der aus der MSE-Aera geerbte Wert liegt offenbar nahe am Optimum. `evaluations/paired_gating_t_d_{vw04,vw08,pw025}_vs_v21.json` -->
+
 # Vorregistrierung: Task D -- Loss-Gewichte (value_weight / points_weight)
 
 **Angelegt 2026-08-09, NACH dem Training von `t_d_vw04` aber VOR jedem

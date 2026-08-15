@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein Denial-Tie-Break an der Wurzel (ε-Fenster, niedrigste Gegner-Punktprognose) das Spiel ohne Schaden? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS ... E3 GESCHEITERT") -->
+
 # Vorregistrierung: Denial-Tie-Break an der Wurzel (E3, eigenstaendig)
 
 **Angelegt 2026-08-07, VOR Implementierung und Messung.** Nutzer-Go am

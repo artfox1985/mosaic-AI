@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Saettigt der Value-Kopf mit mehr Self-Play-Partien, oder bleibt er "spielhungrig" (Task #36)? | Beleg: "Spielhungrig" bestaetigt (monotone Verbesserung ueber 202/405/810 Dateien); v20-Budget nicht gekuerzt; `archive/history.md` Z. ~9965-9998 -->
+
 # Vorregistrierung Task #36: Saettigt der Value-Kopf ueber die Spielzahl?
 
 **Angelegt 2026-08-05, VOR jedem Lauf.** Nutzer-Entscheid gleichen Tags:

@@ -1,3 +1,5 @@
+<!-- STATUS: UEBERHOLT | Frage: Konfirmiert eine frische Stichprobe den la20-Denial-Effekt, und wo liegt der Kipppunkt (λ in {0;0,5;1;2;3;5})? | Beleg: Praemisse (realer Effekt) entfiel: der scheinbare Widerspruch der Konfirmationsstichprobe war ein Block-Korrelations-Artefakt, kein echter Effekt in irgendeine Richtung -- Kipppunkt-Kartierung dadurch gegenstandslos gestrichen; `archive/history.md` Z. ~7278-7313 -->
+
 # Vorregistrierung: Task-#28-Power-Erweiterung -- Konfirmation des la20-Denial-Effekts
 
 **Angelegt 2026-08-03, NACH Sichtung des Erst-Sweeps (la20: Gegnerpunkte

@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Tragen Aux-Koepfe (Arm 1 `t12_dist`, Arm 2 `t9_own`) am neuen #34-WDL-Ziel zur Staerke bei? | Beleg: Beide Arme geschlossen (t9_own Paritaet, t12_dist Seed-Rauschen in Replikation); `archive/history.md` Z. ~10005-10039 -->
+
 # Vorregistrierung: Nach-#34-Paket in EINEM Zug (#9, #12, #29)
 
 **Angelegt 2026-08-06, VOR allen Laeufen** (Nutzer-Erinnerung: "denk an

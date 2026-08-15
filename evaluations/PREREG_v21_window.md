@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Fenster-/Korpus-Zuschnitt fuer die v21-Generation (Zwei-Klassen, Rotation) sowie τ-Annealing-Entscheid | Beleg: **AUSGEFUEHRT** -- Fenster 29.450 Partien realisiert, `v21_2d_brierbest` ist seit 2026-08-08 Champion (Gating 75:45 p=0,0059 + Frisch-Seed 97:63 p=0,0095, Elo 1358); τ-Teilfrage H0 (τ=1 bleibt). Fenster per Nutzer-Entscheid fix ("das fenster bleibt nun so") -->
+
 # Vorregistrierung: v21-Fenster (Zwei-Klassen, Rotation)
 
 **Angelegt 2026-08-07. Fenster-Zuschnitt = NUTZER-VORSCHLAG (woertlich

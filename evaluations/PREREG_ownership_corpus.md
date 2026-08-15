@@ -1,3 +1,5 @@
+<!-- STATUS: OFFEN | Frage: Wie wird der Zwei-Pole-Korpus für das Ownership-Kopf-Training generiert — welche Arme, Quoten, Ablage, Prüfpunkte und welches Kopfgüte-Tor? | Beleg: **OFFEN, vorregistriert 2026-08-14** (Nutzer-Auftrag "mach schon mal den generierungsplan"). Vier Arme (Netz+Streuung 50 %, k1-Bauer, k2-Bauer, Heuristik), 6000 Partien nach `data/ownership_corpus/` (nicht-rekursiver Fenster-Glob geprüft, train.py:552); fünf Prüfpunkte vor Start (u.a. Policy-Ziele unter Vorzug, Konjunktions-Breite 68 vs. 25); Abnahme = Tor A aus PREREG_ownership_consumer.md, nicht Arena. Nachtrag: §7 Startvollzug und §8 Deckungs-Bericht (2026-08-14) liegen vor (Deckung gegeben), §9-Trainings-Sweep vorregistriert; Tor A weiter offen. -->
+
 # PREREG: Ownership-Korpus — Generierungsplan (Zwei-Pole)
 
 Stand 2026-08-14, PLAN (nichts gestartet — durchgehend Plan-Zeitform).

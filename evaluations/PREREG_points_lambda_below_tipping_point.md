@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Nutzt der Punkte-Kanal, wenn lambda UNTER dem Kipppunkt liegt, ab dem die Formel 30:15 gegenueber 55:50 bevorzugt? | Beleg: ENTSCHIEDEN (Datei-VERDIKTE 2026-08-11 und 2026-08-12): Stufe 1 H0 -- der Kanal bleibt zu; die Fortsetzung repliziert den DENIAL-Anteil nicht (Vorzeichen des Gegner-Effekts kippt zwischen Laeufen). POINTS_UTILITY_WEIGHT bleibt 0; Wiederaufnahme braucht n>=800 auf frischen Seeds plus eine Mechanismus-Erklaerung. -->
+
 # Vorregistrierung: Punkte-Optimierung mit λ UNTER dem Kipppunkt
 
 **Angelegt 2026-08-11, Nutzer-Auftrag** — *"dann kannst auch die punkte

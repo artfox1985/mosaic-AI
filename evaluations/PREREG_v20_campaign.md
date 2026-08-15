@@ -1,3 +1,5 @@
+<!-- STATUS: ENTSCHIEDEN | Frage: Gewinnt der v20-WDL-Kandidat (Zwei-Klassen-Self-Play) das Champion-Gating gegen `v19_2d_best`? | Beleg: Gewonnen 208:162, p=0,0178, neuer Champion seit 2026-08-07; `archive/history.md` Z. ~9847, ~10250 -->
+
 # Vorregistrierung: v20-Kampagne (Zwei-Klassen-Self-Play, WDL-Aera)
 
 **Angelegt 2026-08-06, VOR dem Start der Self-Plays** (Nutzer startet die
