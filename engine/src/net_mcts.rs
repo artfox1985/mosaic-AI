@@ -1598,8 +1598,10 @@ pub(crate) fn sigmoid(x: f64) -> f64 {
 /// `blended_leaf_win_prob_with` (die OnceLock-Getter sind pro Prozess nur
 /// einmal lesbar, ein env-basierter Test kaeme nie an sein Ziel).
 ///
-///     shift_i = w_own * SUM_k gew_k * tanh(E_k(i) / 50)
-///     out_i   = clamp(value_i + shift_i, 0, 1)
+/// ```text
+/// shift_i = w_own * SUM_k gew_k * tanh(E_k(i) / 50)
+/// out_i   = clamp(value_i + shift_i, 0, 1)
+/// ```
 ///
 /// -- dieselbe Form, dieselbe Skala (`WERTUNG_SHAPING_SCALE`) und dasselbe
 /// "Gewicht AUSSEN am tanh" wie der Heuristik-Pol (siehe dortige Begruendung:

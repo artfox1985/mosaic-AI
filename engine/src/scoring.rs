@@ -538,7 +538,9 @@ pub fn expected_plate_points(
 /// Marginaler Plattenwert JE FELD aus einer Ownership-Karte -- Verbraucher 2
 /// (Tiling), `PREREG_ownership_consumer.md` §3:
 ///
-///     wert(f) = SUM_k gew_k * ( [E_k mit p_own(f):=1] - E_k )
+/// ```text
+/// wert(f) = SUM_k gew_k * ( [E_k mit p_own(f):=1] - E_k )
+/// ```
 ///
 /// "Was waere dieses Feld wert, wenn es am Spielende sicher belegt ist?" Fuer
 /// die konjunktiven Kriterien faellt das automatisch auf
