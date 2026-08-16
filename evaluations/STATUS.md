@@ -443,6 +443,32 @@ Expansion). Zwei nie untersuchte Punkte fuer spaeter:
    v20 gratis), waere das ein billiger A/B, kein Pflichtumbau.
    Kein akuter Bedarf: Policy-Seite ist ueber die Orakel-Metriken
    arena-validiert, inkl. PL-Aufteilung.
+3. **Das Label ist EGOZENTRISCH -- damit ist "Fabriken aushungern"
+   strukturell unerreichbar** (Nutzer-Frage 2026-08-16 "was ist mit
+   fabriken aushungern gemeint", Code am selben Tag geprueft). Die
+   Mond-Stapelreihenfolge ist der EINZIGE Hebel im Spiel, mit dem man dem
+   Gegner gezielt nur vergiftete Optionen hinterlaesst: bei kleinen
+   Fabriken bestimmt der nehmende Spieler die Reihenfolge, und spaeter ist
+   nur die OBERSTE Fliese nehmbar (docs/engine_manual.md, Phase 1 B). Wer
+   das steuert, kann den Gegner in Farben zwingen, die seine Musterreihen
+   ueberlaufen lassen -- Strafpunkte ohne eigenen Einsatz, und der Zwang
+   ist strukturell (die Runde endet erst, wenn alles leer ist; wer keine
+   gueltige Aktion hat, MUSS passen).
+   **Das Netz hat den Kopf dafuer, aber nie das Ziel**: `moon_order_target`
+   (`self_play.rs:634`) probiert Reihenfolgen durch und bewertet jede mit
+   `solve_round_final_score(state, pi)` (`tiling_solver.rs:494`) -- also
+   ausschliesslich dem EIGENEN Rundenendstand. Der Gegner kommt in der
+   Bewertung nicht vor. Der Kopf kann Aushungern also nicht lernen, egal
+   wie gut er wird.
+   **Billiger Zuschnitt, falls je angegangen**: nur das Label aendern
+   (eigener Rundenendstand MINUS Gegner-Rundenendstand, oder als eigener
+   Arm), Bau bleibt unberuehrt. Vorbehalt: das ist eine neue
+   Stoerungs-Wette, und Stoerung hat in diesem Projekt zweimal verloren
+   (k6-Kuppeldraft, Farbzaehlung v1) -- vorher gehoert eine billige
+   Diagnose davor, ob die Reihenfolge-Freiheit ueberhaupt genutzt wird
+   (Praezedenz #39: Rotation/Position der Startkuppel waren tote
+   Freiheitsgrade). Herkunft der Idee: Reddit-Rueckfrage eines Spielers
+   nach adversarialen Faellen.
 
 ## Task #39 (geparkt, Arbeitskreis "Spaeter" mit #31/#38): Startkuppel-Platzierung (2026-08-06)
 
