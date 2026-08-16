@@ -13,7 +13,7 @@ Paritaets-Hash `8c6684ff...` haelt -- zuletzt auf dem Wheel geprueft, das
 Ownership-Verbraucher UND Stoer-Zaehlmodus enthaelt. Beide sind bei
 Default-Knopf byte-identisch, kein Bestandsverhalten hat sich geaendert.
 
-### Die Ownership-Kette: alles gebaut, alles gemessen -- nur die Arena fehlt
+### Die Ownership-Kette: gebaut, gemessen -- und in der Arena gescheitert
 
 | Stueck | Stand |
 |---|---|
@@ -21,40 +21,48 @@ Default-Knopf byte-identisch, kein Bestandsverhalten hat sich geaendert.
 | Gewichts-Sweep w0/w01/w02/w05/w1 | FERTIG, **Tor A BESTANDEN** (par.10), w1 gewinnt einstimmig (par.10.6) |
 | Frozen-Trunk-Kopftraining F1 | FERTIG (frozen_trunk_head par.7): Zielkonflikt halb geloest, Decke bestaetigt |
 | **Verbraucher Drafting** | **GEBAUT** (8eabbdb): E_k am Blatt, `MOSAIC_OWNERSHIP_W` Default 0, **Tor B belegt** (byte-identisch ueber 4 Kopfbreiten, Paritaetsprobe gruen) |
-| **Verbraucher Tiling** | **WIRD JETZT GEBAUT** (Nutzer-Korrektur 2026-08-16: *"nur im drafting auf die wertungsplatten hinarbeiten ist nur die halbe miete"*). Beleg gibt ihm recht: PREREG_placement_side mass die Draftingseite allein bei 0,70 -> 1,75 gegen Ziel 14 -- die Platzierung entscheidet der SOLVER, ein reiner Blatt-Verbraucher erbt diese Blockade. Eigener Knopf `MOSAIC_OWNERSHIP_TILING_W`, damit Tor C beide Haelften einzeln UND gemeinsam fahren kann |
-| **Tor C (Regler-Sweep Arena)** | **DER NAECHSTE SCHRITT** -- siehe unten |
+| **Verbraucher Tiling** | **GEBAUT** (Nutzer-Korrektur 2026-08-16: *"nur im drafting auf die wertungsplatten hinarbeiten ist nur die halbe miete"*). Eigener Knopf `MOSAIC_OWNERSHIP_TILING_W`, Default 0, ein Wurzelpass je Tiling-Zug in R1-4 |
+| **Tor C (Regler-Sweep Arena)** | **GEFAHREN UND NEGATIV ENTSCHIEDEN** (2026-08-16, 970 Partien, `PREREG_gate_c_consumer_sweep.md` par.15) |
 
-**Die drei Kopf-Kandidaten fuer Tor C** (alle auf demselben Held-out
-gemessen, Zahlen nachgerechnet):
+### Tor C ist gefallen: der Verbraucher traegt die Wertungsplatten NICHT
 
-| Checkpoint | policy val | Feld-AUC | E_k k1/k2/k5 | Charakter |
-|---|---:|---:|---|---|
-| `v21_2d_own_w1_best` | 0,2141 | 0,726 | 0,18/0,28/0,28 | Policy intakt, Kopf schwach |
-| **`v21_2d_own_f1`** | **0,2141** | 0,780 | 0,28/0,31/0,35 | Policy intakt, Kopf mittel -- gratis besser als w1_best |
-| `v21_2d_own_w1` (final) | 0,3018 | 0,870 | 0,36/0,35/0,47 | Bester Kopf, Policy +41 % schlechter |
+970 Partien, zwei Checkpoints, drei Dosisstufen, zwei disjunkte Seed-Saetze.
+Nullarm war jeweils DERSELBE Checkpoint mit Regler 0, nicht der Champion.
 
-Offline sind Kopfguete und Policy-Staerke NICHT ineinander umrechenbar --
-deshalb entscheidet die Arena, nicht die Abwaegung.
+| Befund | Zahl |
+|---|---|
+| Zielkriterien k1/k2/k5 | **bewegen sich nicht** -- gepoolt n=243 auf F1: +0,22 (t 0,73) / -0,11 (t -1,00) / +0,09 (t 0,61) |
+| Siege gegen Heuristik@150, F1 | **monoton fallend mit der Dosis: 98 / 89 / 86 / 84** von 121; D2 p=0,043, D3 p=0,049 |
+| Staerkerer Kopf (w1-final, AUC 0,870) | macht den Verbraucher **inert**, nicht nuetzlich: 91:91, b=c=18, p=1,000 |
+| Plattenpunkt-Gewinn bei D1 | im Hauptsatz +0,74 -- **replizierte NICHT** (+0,20 auf frischen Seeds) |
+| Durchsatzkosten | nicht gemessen (GPU belegt, Ausloeser entfallen); **obere Schranke ~0,25 %** der Netz-Paesse, hergeleitet aus dem Code |
 
-### NAECHSTER SCHRITT: Tor C
+**Warum** (Herleitung, kein eigener Messbefund): der Verbraucher lenkt genau
+dorthin, wohin seine Formel zeigt -- k4 (Aeussere Felder) steigt in allen drei
+Dosen, und k4 ist das Kriterium mit dem deterministischen Marginal
+`(1-p_f)*1`. Die konjunktiven Zielkriterien haben dagegen ein Marginal von
+`7*(1-p_f)*PROD(uebrige 5)` und damit ~0, solange die Spalte nicht fast fertig
+ist. **Sein Signal entsteht erst, wenn die Luecke schon fast geschlossen ist.**
 
-Vorregistrierung schreiben und fahren (PREREG_ownership_consumer.md §5
-Punkt 5 ist der Rahmen, braucht aber eine eigene Mess-Prereg):
+Damit reiht sich Tor C in PREREG_placement_side par.11 ein: die Spaltenluecke
+ist keine Bewertungsfrage.
 
-1. **Zwei Checkpoint-Arme** (`f1` und `w1` final) x **w_own-Raster**
-   (0 / klein / mittel / gross -- Startwerte aus der tanh-Skala herleiten,
-   nicht raten). Der w_own=0-Arm ist zugleich die Bestandsschutz-Kontrolle.
-   **BEIDE HAELFTEN sind Teil des Haupt-Arms** (Blatt + Tiling gemeinsam) --
-   die Injektions-Kampagne hat gemessen, dass Drafting allein saettigt.
-   Getrennte Knoepfe bleiben, um bei einem Befund zuordnen zu koennen, aber
-   die Hauptmessung faehrt beide an.
-2. **Messgroessen**: Plattenpunkte je Kriterium (k1/k2/k5 -- die
-   Zielgroesse der ganzen Kampagne) UND Endstand-Marge UND Siege.
-   Block-Ebene, gepaart, Frisch-Seed-Replikation fuer den Sieger-Arm.
-3. **Vorab-Regeln**: Was zaehlt als Erfolg? Nutzer-Zielgroesse ist
-   "Sieg mit vielen Punkten" -- ein Plattenpunkt-Gewinn, der Siege kostet,
-   ist KEIN Erfolg (k6-Praezedenz, Stoerungs-Praezedenz).
-4. Erst Tor C ist eine Staerkeaussage. Tor A war es ausdruecklich nicht.
+**Folgen, alle bereits vollzogen bzw. festgelegt:**
+
+1. `MOSAIC_OWNERSHIP_W` und `MOSAIC_OWNERSHIP_TILING_W` bleiben auf **Default 0**.
+   Gebaut, getestet, dokumentiert, byte-identisch bei 0 -- aber nicht im Standardpfad.
+2. **Kein 8000er-Self-Play** mit dem Verbraucher.
+3. **F1 bleibt der Checkpoint** der Ownership-Reihe (gegen w1-final p=0,360 --
+   nicht signifikant, aber vorn in der Punktschaetzung UND mit intakter Policy).
+   Damit ist frozen_trunk par.7.1 beantwortet.
+4. Der Mittelweg aus frozen_trunk par.7.2 (sanftes gemeinsames Nachtrainieren)
+   **verliert seine Begruendung** -- er sollte die Kopf-Decke heben, und genau
+   die ist nicht der Engpass.
+5. Einzige sichtbare Fortsetzung: **k6 (Spezialfelder) ISOLIERT**. Groesster
+   Einzelposten im Endstand (-11,64), groesstes deterministisches Marginal
+   (`(1-p_f)*3`), einziger gepoolt nominal signifikanter Wert (+0,55, t 2,12)
+   -- ausdruecklich NICHT als Befund verkauft (einer von acht Tests). Braucht
+   eine eigene Vorregistrierung mit Kriterien-Isolierung.
 
 ### Danach in der Warteschlange
 
@@ -67,7 +75,7 @@ Punkt 5 ist der Rahmen, braucht aber eine eigene Mess-Prereg):
   dafuer, was ein Zug den Gegner kostet. Eigenes Gewicht, eigener Arm, NICHT
   mit der Eigen-Haelfte verrechnen (Prereg §4). **Reihenfolge-Begruendung**:
   bringt die eigene Haelfte in Tor C nichts, ist die Gegner-Haelfte kein
-  guter Einsatz -- dann faellt sie mit.
+  guter Einsatz -- dann faellt sie mit. **2026-08-16: Tor C ist negativ ausgefallen, die Bedingung ist damit NICHT erfuellt -- die Gegner-Haelfte faellt nach der eigenen Reihenfolge-Begruendung mit.**
 - **F2 (Deckel-Sonde)**: Frozen-Trunk vom Champion aus -- beantwortet, ob ein
   Trunk ohne je gesehenen Ownership-Gradienten ueberhaupt so weit kommt wie
   F1. Unabhaengig von Tor C, billig.
