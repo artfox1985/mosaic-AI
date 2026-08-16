@@ -75,7 +75,8 @@ Punkte- und Ownership-Ziele laufen durch.
 |---|---|
 | "Der Korpus hat die Policy geformt / nicht geformt" | **HINFAELLIG** -- inklusive der Kampagnen-Praemisse |
 | Tor A Kopfguete | **GUELTIG** -- Ownership-Ziele waren nie maskiert |
-| Tor C, direktes Duell, Frozen-Trunk-Riegel | **GUELTIG** |
+| Tor C | **EINGESCHRAENKT** (Nutzer-Einwand, Destillations-Prereg par.10.6): der Regler steuert die SUCHE, deren Kandidaten aus dem Policy-Prior kommen -- gemessen wurde er an Vehikeln ohne plattenfaehige Policy. Belegt ist nur "nuetzt nichts bei einer Policy, die den Plattenbau nicht kennt". **Auf `v21-b18_best` zu wiederholen.** |
+| Direktes Duell, Frozen-Trunk-Riegel | **GUELTIG** |
 
 **Neue Lesart, als Hypothese festgehalten:** der Korpus lief in den
 VALUE-Kopf -- 4000 Partien, in denen die Bauer absichtlich schlechter spielten
