@@ -21,7 +21,10 @@ use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_un
 use crate::round_end::generate_tiling_actions;
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
-use crate::tiling_solver::{best_first_step_exact_or_valued, solve_round_final_score, TilingStep};
+use crate::tiling_solver::{
+    best_first_step_exact_or_valued, best_first_step_exact_or_valued_ex, solve_round_final_score,
+    TilingStep,
+};
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
 
@@ -732,11 +735,19 @@ impl PyGame {
         // hinter `NET_TILING_TIEBREAK_ENABLED` + Rundenfenster 2-4, sonst
         // exakt `best_first_step_exact`. Ohne geladenes Netz (`self.net ==
         // None`, Heuristik-Debug-Sitzung) unveraendert.
+        //
+        // Ownership-Verbraucher Teil 2 (`PREREG_ownership_consumer.md` §3):
+        // dieselbe Wurzelkarte-EINMAL-je-Zug-Logik wie im Rust-Self-Play-Pfad,
+        // ueber dieselbe Funktion -- eine zweite Implementierung koennte
+        // auseinanderlaufen, und ein Pol, der nur in einem der beiden
+        // Spielpfade wirkt, waere im Gating unsichtbar. Default 0 -> `None`,
+        // kein zusaetzlicher Vorwaertspass.
         let step = match self.net.as_ref() {
             Some(net) => {
+                let own = crate::self_play::ownership_tiling_marginals(net, &self.game.state, pi);
                 let evaluator =
                     |final_state: &GameState| crate::self_play::net_tiling_tiebreak_value(net, final_state, pi);
-                best_first_step_exact_or_valued(&self.game.state, pi, Some(&evaluator))
+                best_first_step_exact_or_valued_ex(&self.game.state, pi, Some(&evaluator), own.as_ref())
             }
             None => best_first_step_exact_or_valued(&self.game.state, pi, None),
         };

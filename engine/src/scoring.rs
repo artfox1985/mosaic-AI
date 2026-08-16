@@ -535,6 +535,54 @@ pub fn expected_plate_points(
     out
 }
 
+/// Marginaler Plattenwert JE FELD aus einer Ownership-Karte -- Verbraucher 2
+/// (Tiling), `PREREG_ownership_consumer.md` §3:
+///
+///     wert(f) = SUM_k gew_k * ( [E_k mit p_own(f):=1] - E_k )
+///
+/// "Was waere dieses Feld wert, wenn es am Spielende sicher belegt ist?" Fuer
+/// die konjunktiven Kriterien faellt das automatisch auf
+/// `punkte_k * PROD ueber die UEBRIGEN Felder der Geometrie` -- der Wert eines
+/// Feldes steigt also, je voller seine Spalte/Diagonale/Ecke schon ist, und
+/// faellt auf 0, sobald ein ANDERES Feld derselben Geometrie tot ist (`p ~ 0`).
+/// Genau diese Zielwechsel-Logik ist der Zweck des Terms.
+///
+/// KEINE zweite Formel: der Wert wird als DIFFERENZ zweier
+/// [`expected_plate_points`]-Auswertungen gebildet, nicht per Hand je
+/// Kriterium abgeleitet. Eine handgeschriebene "PROD ueber die uebrigen
+/// Felder"-Variante waere schneller, aber eine zweite Wahrheit, die von der
+/// Drafting-Seite wegdriften kann -- und der Aufwand ist irrelevant: die
+/// Funktion laeuft EINMAL je Tiling-Zug (37 Auswertungen a 36 Felder), waehrend
+/// der Tiling-Stichentscheid daneben bis zu `MAX_TILING_LEAVES` NETZ-
+/// Vorwaertspaesse kostet.
+///
+/// Alle Werte sind bei `gew_k >= 0` nicht-negativ: jedes `E_k` ist in jedem
+/// `p_own(f)` monoton steigend (Produkte und Summen nicht-negativer Faktoren;
+/// Kriterium 6 zaehlt `-3 * (1 - p)`, steigt mit `p` also ebenfalls).
+///
+/// `gew` teilt sich bewusst die Acht-Stellen-Semantik der uebrigen
+/// Kriteriengewichte (Aufrufer: `tiling_solver::ownership_marginals` reicht
+/// `MOSAIC_TILING_PLATTEN_GEW` durch). Stelle 7 ist wirkungslos, weil
+/// [`expected_plate_points`] fuer Kriterium 7 immer 0 liefert.
+pub fn marginal_plate_points(
+    player: &PlayerBoard,
+    p_own: &[f64; OWNERSHIP_FIELDS],
+    tile_ids: &[usize],
+    gew: &[f64; 8],
+) -> [f64; OWNERSHIP_FIELDS] {
+    let gewichtet = |e: &[f64; 8]| -> f64 {
+        (0..8).filter(|&k| gew[k] != 0.0).map(|k| gew[k] * e[k]).sum()
+    };
+    let basis = gewichtet(&expected_plate_points(player, p_own, tile_ids));
+    let mut out = [0.0f64; OWNERSHIP_FIELDS];
+    for (f, slot) in out.iter_mut().enumerate() {
+        let mut mit = *p_own;
+        mit[f] = 1.0;
+        *slot = gewichtet(&expected_plate_points(player, &mit, tile_ids)) - basis;
+    }
+    out
+}
+
 /// Alle Spaces der GELEGTEN Kuppelkacheln mit ihren Koordinaten
 /// `(slot_row, slot_col, space_idx, space)` -- wie [`collect_spaces`], aber
 /// mit Position (die [`expected_plate_points`] fuer den Feldindex braucht).
@@ -2262,5 +2310,125 @@ mod tests {
         // Gatung: Kriterium 6 nicht gezogen -> 0, egal was das Netz sagt.
         let e_gate = expected_plate_points(&player, &p_zero, &[0, 1]);
         assert_eq!(e_gate[6], 0.0, "nicht gezogene Wertungsplatte darf nichts beitragen");
+    }
+
+    // ── Verbraucher 2 (Tiling): marginale Feldwerte ─────────────────────────
+
+    /// Der im Auftrag vorgeschriebene Formel-Test: eine kuenstliche
+    /// Ownership-Karte, in der EIN Feld die letzte Luecke einer sonst sicheren
+    /// Spalte ist -> sein marginaler Wert muss EXAKT den Spaltenpunkten (+7)
+    /// entsprechen. Ein Feld in einer TOTEN Spalte (ein anderes Feld dort
+    /// `p = 0`) -> 0.
+    #[test]
+    fn marginal_plate_points_last_gap_of_a_column_is_worth_the_full_column() {
+        let player = player_with_grid(grid_from_plan(&[[None; 6]; 6]));
+        let gew = [1.0f64; 8];
+        let (lebend, tot) = (2usize, 4usize);
+
+        let mut p_own = [0.0f64; OWNERSHIP_FIELDS];
+        // Spalte `lebend`: 5 von 6 Feldern sicher, Reihe 3 ist die Luecke.
+        for r in 0..6 {
+            if r != 3 {
+                p_own[ownership_index_for_grid(r, lebend)] = 1.0;
+            }
+        }
+        // Spalte `tot`: ebenfalls 5 sichere Felder, ABER Reihe 0 ist mit p=0
+        // gesetzt -- die Spalte ist damit unvollendbar, und die Luecke in
+        // Reihe 3 darf nichts mehr wert sein.
+        for r in 1..6 {
+            if r != 3 {
+                p_own[ownership_index_for_grid(r, tot)] = 1.0;
+            }
+        }
+
+        let m = marginal_plate_points(&player, &p_own, &[1], &gew);
+        let luecke_lebend = m[ownership_index_for_grid(3, lebend)];
+        let luecke_tot = m[ownership_index_for_grid(3, tot)];
+        assert!(
+            (luecke_lebend - 7.0).abs() < 1e-12,
+            "die letzte Luecke einer Spalte muss exakt die Spaltenpunkte (7) wert sein, ist {luecke_lebend}"
+        );
+        assert_eq!(
+            luecke_tot, 0.0,
+            "ein Feld in einer toten Spalte darf keinen marginalen Wert haben"
+        );
+        // Gegenprobe, dass der Test diskriminiert: das mit p=0 blockierende
+        // Feld selbst ist NICHT wertlos -- es ist die zweite Luecke derselben
+        // Spalte und braucht die andere noch, also 7 * PROD(uebrige) = 0.
+        // Erst wenn die Luecke in Reihe 3 geschlossen waere, waere es 7 wert.
+        assert_eq!(m[ownership_index_for_grid(0, tot)], 0.0);
+        let mut p_geschlossen = p_own;
+        p_geschlossen[ownership_index_for_grid(3, tot)] = 1.0;
+        let m2 = marginal_plate_points(&player, &p_geschlossen, &[1], &gew);
+        assert!(
+            (m2[ownership_index_for_grid(0, tot)] - 7.0).abs() < 1e-12,
+            "nach Schliessen der zweiten Luecke muss das Blockerfeld 7 wert sein, ist {}",
+            m2[ownership_index_for_grid(0, tot)]
+        );
+    }
+
+    /// Zwei Eigenschaften, die der Verbraucher braucht: (a) das Gewicht je
+    /// Kriterium schlaegt linear durch und kann ein Kriterium ausblenden,
+    /// (b) ein sicher belegtes Feld (`p = 1`) hat marginalen Wert 0 -- sonst
+    /// wuerde der Tiling-Term Felder belohnen, die ohnehin schon gefuellt sind.
+    #[test]
+    fn marginal_plate_points_respects_weights_and_zeroes_certain_fields() {
+        let player = player_with_grid(grid_from_plan(&[[None; 6]; 6]));
+        let spalte = 1usize;
+        let mut p_own = [0.0f64; OWNERSHIP_FIELDS];
+        for r in 0..6 {
+            if r != 3 {
+                p_own[ownership_index_for_grid(r, spalte)] = 1.0;
+            }
+        }
+        let luecke = ownership_index_for_grid(3, spalte);
+        let sicher = ownership_index_for_grid(0, spalte);
+
+        // Nur Kriterium 1 aktiv, Gewicht 1 -> 7 (wie oben).
+        let voll = marginal_plate_points(&player, &p_own, &[1], &[1.0; 8]);
+        assert!((voll[luecke] - 7.0).abs() < 1e-12);
+        assert_eq!(voll[sicher], 0.0, "p=1 muss marginal 0 sein");
+
+        // Gewicht 0,5 auf Kriterium 1 -> exakt die Haelfte.
+        let mut halb_gew = [1.0f64; 8];
+        halb_gew[1] = 0.5;
+        let halb = marginal_plate_points(&player, &p_own, &[1], &halb_gew);
+        assert!((halb[luecke] - 3.5).abs() < 1e-12, "Gewicht 0,5 erwartet 3,5, ist {}", halb[luecke]);
+
+        // Gewicht 0 auf Kriterium 1 -> der Term verschwindet ganz.
+        let mut aus_gew = [1.0f64; 8];
+        aus_gew[1] = 0.0;
+        let aus = marginal_plate_points(&player, &p_own, &[1], &aus_gew);
+        assert_eq!(aus[luecke], 0.0, "Gewicht 0 muss das Kriterium ausblenden");
+    }
+
+    /// Das ADDITIVE Kriterium 4 (Randfelder, +1 je Feld) und das additive
+    /// NEGATIVE Kriterium 6 (Spezialfelder, -3 je leerem) muessen ebenfalls
+    /// sinnvolle Marginale liefern: Randfeld +1, Spezialfeld +3 (das Fuellen
+    /// vermeidet den Abzug), Innenfeld ohne aktives Kriterium 0.
+    #[test]
+    fn marginal_plate_points_covers_the_additive_criteria() {
+        let mut plan: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        // Ein Spezialfeld im INNEREN, damit es nicht zugleich Randfeld ist.
+        plan[2][2] = Some((SpaceType::Special, None, false));
+        let player = player_with_grid(grid_from_plan(&plan));
+        let p_own = [0.0f64; OWNERSHIP_FIELDS];
+
+        let m = marginal_plate_points(&player, &p_own, &[4, 6], &[1.0; 8]);
+        assert!(
+            (m[ownership_index_for_grid(0, 3)] - 1.0).abs() < 1e-12,
+            "Randfeld erwartet +1, ist {}",
+            m[ownership_index_for_grid(0, 3)]
+        );
+        assert!(
+            (m[ownership_index_for_grid(2, 2)] - 3.0).abs() < 1e-12,
+            "leeres Spezialfeld erwartet +3 (vermiedener Abzug), ist {}",
+            m[ownership_index_for_grid(2, 2)]
+        );
+        assert_eq!(
+            m[ownership_index_for_grid(3, 3)], 0.0,
+            "Innenfeld ohne Spezialstatus traegt bei den Kriterien 4/6 nichts"
+        );
     }
 }

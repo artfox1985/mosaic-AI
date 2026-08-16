@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 70 Knoepfe (43 aktiv, 19 diagnose, 7 tot, 1 geplant).
+Stand: 71 Knoepfe (44 aktiv, 19 diagnose, 7 tot, 1 geplant).
 
 | Knopf | Default | Status | Zweck | Beleg |
 |---|---|---|---|---|
@@ -46,6 +46,7 @@ Stand: 70 Knoepfe (43 aktiv, 19 diagnose, 7 tot, 1 geplant).
 | `MOSAIC_TILING_PLATTEN_W` | 0.0 (aus) | aktiv | plattenbewusste Tiling-Zugwahl R1-4: w * Endwertung nach Abschluss additiv (tiling_solver.rs:964) | PREREG_placement_side.md |
 | `MOSAIC_TILING_PLATTEN_GEW` | 1.0 (1 oder 8 Werte) | aktiv | Gewicht je Kriterium fuer den Plattenwert der Tiling-Wahl (tiling_solver.rs:1023) | PREREG_placement_side.md |
 | `MOSAIC_TILING_PUNKTE_W` | 0.0 (aus) | aktiv | Punkte-Kopf-Blend im Netz-Tiling-Stichentscheid; gemessen wirkungslos (self_play.rs:985; archive/history.md:10715) | - |
+| `MOSAIC_OWNERSHIP_TILING_W` | 0.0 (aus) | aktiv | Ownership-Pol der Tiling-Zugwahl R1-4: marginale Feldwerte aus der Wurzelkarte, additiv zum Plattenterm (tiling_solver.rs, ownership_tiling_weight) | PREREG_ownership_consumer.md par.3 |
 | `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
 | `MOSAIC_PROFILE_SELFPLAY` | aus (nur =1) | diagnose | Self-Play-Zeitprofil je Kategorie (profiling.rs:493) | PREREG_gpu_offloading.md |
 | `MOSAIC_DATA_DIR` | <repo>/data | aktiv | Korpus-Ordner-Override fuer train/self_play/server (config.py:28; Kommentar-Erwaehnung net_mcts.rs:177) | PREREG_corpus_dose.md |

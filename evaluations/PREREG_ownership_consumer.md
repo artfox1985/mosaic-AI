@@ -3,6 +3,18 @@
 # PREREG: Ownership-Kopf als Verbraucher in Drafting und Tiling
 
 Stand 2026-08-13, ENTWURF (nichts hiervon ist gebaut — durchgehend Plan-Zeitform).
+
+> **NACHTRAG 2026-08-16 — §2 und §3 sind GEBAUT** (Zeitform-Korrektur zum
+> Absatz oben, der seit dem Entwurf steht). §2 (Drafting-Blattshift,
+> `MOSAIC_OWNERSHIP_W`) mit Commit `8eabbdb`, §3 (Tiling, marginale Feldwerte,
+> `MOSAIC_OWNERSHIP_TILING_W`) mit diesem Schritt. Beide Default 0 = aus.
+> Eine Annahme aus §3 hat sich am Code NICHT bestätigt: die Wurzel-Ownership-
+> Karte liegt zur Tiling-Zeit *nicht* "nach der Suche vor" — es gibt keinen
+> Kanal von der Suche in die Tiling-Phase, und die Suche läuft ohnehin auf
+> Drafting-Zuständen. Gebaut ist stattdessen EIN zusätzlicher Vorwärtspass je
+> Tiling-Zug auf dem Wurzel-Zustand (`self_play.rs::ownership_tiling_marginals`);
+> die harte Kostenbedingung "kein Netz-Aufruf je Kandidat" bleibt eingehalten.
+> Offen bleiben §4 (Gegner-Hälfte) und Tor C (Regler-Sweep).
 Nutzer-Auftrag: *"überleg dir dann auch schon mal wie wir den ownership head ins
 drafting und tiling miteinbeziehen"*. Kontext: Zwei-Pole-Architektur
 (PREREG_provocation.md) — Netz-Pol und Platten-Heuristik-Pol, der
