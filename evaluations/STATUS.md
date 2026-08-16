@@ -56,6 +56,49 @@ Offen und unerklaert: w0_best macht im direkten Duell MEHR Punkte im Schnitt
 TRUE und schreibt `models/champion.txt` selbsttaetig um. Messlaeufe brauchen
 `--no-promote-winner`.
 
+### BEFUND 2026-08-16 ABENDS: der Ownership-Korpus war policy-maskiert
+
+**Der Policy-Kopf hat den Lehrkorpus nie gesehen** -- in keinem der sieben
+Modelle, die ihn im Training hatten (`w0`, `w01`, `w02`, `w05`, `w1`, `F1`,
+`F2`).
+
+Mechanik, mit der Funktion selbst nachgerechnet
+(`engine/py/neural_net.py:679` `_is_policy_carrier`, `:667`
+`WDL_GENERATOR_PREFIXES`, `:1804` die Anwendung): Traeger ist nur, wer im
+Traeger-Manifest gelistet ist oder mit `selfplay_v19wdl`/`selfplay_v20wdl`
+beginnt. Die Korpusdateien erfuellen beides nicht -- unter
+`policy_carrier_manifest_v20.json` (Default!) wie unter `_v21.json`. Fuer
+Nicht-Traeger gilt `pol_w = 0.0`; **nur die Policy** wird maskiert, Value-,
+Punkte- und Ownership-Ziele laufen durch.
+
+| | Status |
+|---|---|
+| "Der Korpus hat die Policy geformt / nicht geformt" | **HINFAELLIG** -- inklusive der Kampagnen-Praemisse |
+| Tor A Kopfguete | **GUELTIG** -- Ownership-Ziele waren nie maskiert |
+| Tor C, direktes Duell, Frozen-Trunk-Riegel | **GUELTIG** |
+
+**Neue Lesart, als Hypothese festgehalten:** der Korpus lief in den
+VALUE-Kopf -- 4000 Partien, in denen die Bauer absichtlich schlechter spielten
+-- und der Value-Kopf traegt hier gemessen die Staerke. Die sieben Modelle
+haben Siegwahrscheinlichkeiten einer verzerrten Politik gelernt und dafuer
+kein Policy-Signal bekommen. Dass `w0_best` das direkte Duell 43:57 verliert,
+passt dazu, beweist es aber nicht. Pruefbar: Value-Kopf eines Korpus-Arms und
+des Champions auf DEMSELBEN Held-out vergleichen.
+
+**Zwei Fallen, die dabei sichtbar wurden:**
+
+1. `MOSAIC_CARRIER_MANIFEST` hat den Default `policy_carrier_manifest_v20.json`.
+   Unter dem Default traegt der SCHWARM (`v20wdlsw`) ebenfalls Policy, weil
+   `WDL_GENERATOR_PREFIXES` ohne abschliessenden Unterstrich prueft. Welches
+   Manifest bei welchem Lauf aktiv war, ist in KEINEM Trainingsmanifest
+   protokolliert.
+2. `data/` ist gitignored -- die Traeger-Manifeste, die entscheiden, welche
+   Daten den Policy-Kopf erreichen, sind **nicht versioniert**.
+
+**Stehende Regel ab jetzt:** der Traeger-Status jeder neuen Korpus-Quelle
+gehoert in die Ist-Stand-Tabelle jeder Prereg, die eine Policy-Aussage machen
+will.
+
 ### NAECHSTER SCHRITT: Selektor-Umbau, Stufe 0 laeuft
 
 Die Diagnose zum doppelten Negativbefund ist am Code gefuehrt und in
