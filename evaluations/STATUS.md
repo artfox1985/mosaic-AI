@@ -146,6 +146,13 @@ oben. Was beim Spaltenbauer traegt, ist die KOORDINATION beider Seiten
 
 ### Danach in der Warteschlange
 
+> **NICHT weiterverfolgen** (Nutzer-Entscheid 2026-08-17): den Korpus mit
+> hoeheren Sims nachgenerieren. Die Policy-Ziele des Korpus stammen aus einer
+> 200-Sims-Suche, der v21-Sockel aus 400-600 -- `b18` haelt den Champion also
+> mit MEHR (7.000 gegen 5.800), aber flacher gesuchten Policy-Zielen auf
+> Paritaet. Der Nutzer ist mit der Paritaet vorlaeufig zufrieden; die
+> Nachgenerierung waere teuer und ist ausdruecklich abgelehnt.
+
 - **Tor C auf `v21-b18_best`** -- der erste faire Test des Laufzeit-Reglers.
 - **Kontrollarm "Weitertraining ohne Korpus"** -- loest den Konfund
   Korpus-oder-Weitertraining, ein GPU-Lauf.
