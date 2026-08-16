@@ -159,7 +159,6 @@ oben. Was beim Spaltenbauer traegt, ist die KOORDINATION beider Seiten
 
 | Punkt | Stand |
 |---|---|
-| **Release** | Bundle v21 gebaut+rauchgetestet; v21-Release (Tag/Text/Zip) wartet auf den Nutzer |
 | **Doctest-Falle** | Eingerueckte Formelbloecke in Doku-Kommentaren werden von rustdoc als Doctests kompiliert (Pre-Push fiel darueber, `7873bf0`). Neue Formeln immer als ```text auszeichnen |
 | **Gate-B-Retest sync<->async** | offen, niedrige Prioritaet, kein Blocker |
 | **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_...` `#[ignore]` bis Neukalibrierung auf v21 |
