@@ -69,6 +69,20 @@ def main() -> None:
     p.add_argument("--threads", type=int, default=0)
     p.add_argument("--c", type=float, default=0.3)
     p.add_argument("--c-puct", type=float, default=1.5)
+    # 2026-08-16 (Destillations-Messung, PREREG_corpus_distillation.md par.4):
+    # optionaler NETZ-GEGEN-NETZ-Modus. Gesetzt -> `net_vs_net_arena_match`
+    # (Brett 0 = --model, Brett 1 = --model-b) statt `net_arena_match`.
+    # NICHT gesetzt = Bestandsverhalten, byte-identisch. Grund fuer den
+    # Zusatz-Schalter statt eines eigenen Workers: Seed-Liste, Block-Schnitt,
+    # `--log-games` und das Ausgabeformat sind bei beiden Arena-Funktionen
+    # identisch (`self_play.rs::run_net_vs_net_arena` spiegelt
+    # `run_net_arena_match` Zeile fuer Zeile) -- ein zweiter Worker waere eine
+    # Kopie, die bei der naechsten Aenderung auseinanderlaeuft.
+    p.add_argument("--model-b", default=None,
+                   help="Gegner-ONNX auf Brett 1 -> Netz-gegen-Netz statt "
+                        "Netz-gegen-Heuristik (--heur-sims wird dann ignoriert)")
+    p.add_argument("--sims-b", type=int, default=None,
+                   help="Sims fuer --model-b (Default: gleich --net-sims)")
     # 2026-08-11: durchgereicht an `net_arena_match`s `log_games` (Commit
     # 9dfeb16). AUS = Bestandsverhalten, das Ergebnis-JSON ist dann exakt wie
     # vorher. AN = je Partie kommen `game_seed`, `first_player`, `names` und
@@ -94,12 +108,22 @@ def main() -> None:
                                # entscheidet allein der Python-Interpreter (--python-exe
                                # der aufrufenden Seite), nicht dieses Skript.
 
-    raw = mr.net_arena_match(
-        args.model, net_sims=args.net_sims, heur_sims=args.heur_sims,
-        n_games=(args.n_games if args.n_games is not None else 0),
-        seed=args.seed, num_threads=args.threads,
-        c=args.c, c_puct=args.c_puct, log_games=args.log_games, seeds=seeds,
-    )
+    if args.model_b:
+        raw = mr.net_vs_net_arena_match(
+            args.model, args.model_b,
+            sims_a=args.net_sims, sims_b=(args.sims_b or args.net_sims),
+            n_games=(args.n_games if args.n_games is not None else 0),
+            seed=args.seed, num_threads=args.threads,
+            c_puct_a=args.c_puct, c_puct_b=args.c_puct,
+            log_games=args.log_games, seeds=seeds,
+        )
+    else:
+        raw = mr.net_arena_match(
+            args.model, net_sims=args.net_sims, heur_sims=args.heur_sims,
+            n_games=(args.n_games if args.n_games is not None else 0),
+            seed=args.seed, num_threads=args.threads,
+            c=args.c, c_puct=args.c_puct, log_games=args.log_games, seeds=seeds,
+        )
     # NUR das rohe JSON auf stdout -- der Orchestrator parsed es 1:1.
     sys.stdout.write(raw)
 

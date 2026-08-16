@@ -73,7 +73,8 @@ def champion_model() -> str:
 
 def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int,
             n_games: int, seed: int, block_size: int, threads: int,
-            log_games: bool = False, seeds: list[int] | None = None) -> list[dict]:
+            log_games: bool = False, seeds: list[int] | None = None,
+            model_b: str | None = None, sims_b: int | None = None) -> list[dict]:
     """`env_name` darf mehrere komma-getrennte Var-Namen tragen; `value`
     dann entsprechend viele komma-getrennte Werte (Aggressions-
     Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt).
@@ -103,8 +104,10 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
 
     games: list[dict] = []
     done, block_idx = 0, 0
+    gegner = (f"{os.path.basename(model_b)}@{sims_b or net_sims}" if model_b
+              else f"Heuristik@{heur_sims}(dyn)")
     print(f"Arm {env_name}={value}: {os.path.basename(model)}@{net_sims} vs "
-          f"Heuristik@{heur_sims}(dyn), "
+          f"{gegner}, "
           + (f"{len(seeds)} explizite Seeds" if seeds is not None else f"Basis-Seed={seed}")
           + f", n={n_games}", flush=True)
     while done < n_games:
@@ -112,6 +115,10 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
         cmd = [sys.executable, str(WORKER), "--model", model,
                "--net-sims", str(net_sims), "--heur-sims", str(heur_sims),
                "--n-games", str(n), "--threads", str(threads)]
+        if model_b:
+            cmd += ["--model-b", model_b]
+            if sims_b is not None:
+                cmd += ["--sims-b", str(sims_b)]
         if seeds is not None:
             # BLOCKWEISE Teilliste, nicht ein neu abgeleiteter Basis-Seed --
             # das ist die delikate Stelle: mit einer expliziten Liste gibt es
@@ -157,6 +164,17 @@ def main() -> None:
     ap.add_argument("--control", required=True,
                     help="Kontroll-Arm-Wert; jeder andere Arm wird gegen ihn gepaart")
     ap.add_argument("--model", default=None, help="Default: models/champion.txt")
+    # 2026-08-16 (Destillations-Messung, PREREG_corpus_distillation.md par.4.2,
+    # Nutzer-Einwand "die Gegnerwahl ist selbst eine Variable"): Gegner-Netz
+    # statt Heuristik. Reicht nur durch -- die Umschaltung sitzt im Worker
+    # (`--model-b` dort), damit es genau EINE Stelle gibt, die entscheidet,
+    # welche Arena-Funktion gerufen wird. Ohne den Schalter unveraendert.
+    ap.add_argument("--model-b", default=None,
+                    help="Gegner-ONNX auf Brett 1 -> Netz-gegen-Netz statt "
+                         "Netz-gegen-Heuristik (Brett-Tausch: zweiter Lauf mit "
+                         "vertauschten --model/--model-b und eigenem --out-prefix)")
+    ap.add_argument("--sims-b", type=int, default=None,
+                    help="Sims fuer --model-b (Default: gleich --net-sims)")
     ap.add_argument("--net-sims", type=int, default=400)
     ap.add_argument("--heur-sims", type=int, default=150)
     ap.add_argument("--n-games", type=int, default=200,
@@ -198,11 +216,14 @@ def main() -> None:
         results[v] = run_arm(args.env_name, v, model, args.net_sims,
                              args.heur_sims, args.n_games, args.seed,
                              args.block_size, args.threads,
-                             log_games=args.log_games, seeds=seeds)
+                             log_games=args.log_games, seeds=seeds,
+                             model_b=args.model_b, sims_b=args.sims_b)
 
     out = {
         "env_name": args.env_name, "arms": args.arms, "control": args.control,
-        "model": model, "net_sims": args.net_sims, "heur_sims": args.heur_sims,
+        "model": model, "model_b": args.model_b,
+        "sims_b": args.sims_b if args.model_b else None,
+        "net_sims": args.net_sims, "heur_sims": args.heur_sims,
         "n_games": n_games, "base_seed": args.seed,
         "seeds": seeds,
         "arm_wins": {}, "comparisons": {},
