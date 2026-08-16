@@ -783,3 +783,14 @@ Arena-Verlust ist eingeplant und sagt ueber die Plattenfrage nichts.
 
 Beide Ausgaenge sind verwertbar; der zweite schliesst einen Strang, statt ihn
 offen zu lassen.
+
+**Erwarteter Saettigungspunkt, vorab festgehalten (Nutzer-Erfahrung
+2026-08-17):** aeltere Cold Starts in diesem Projekt plateauten nach rund
+**40 Epochen**. Das Budget von 60 ist danach bemessen, nicht geraten. Damit ist
+auch die Auswertung interpretierbar: plateaut `b20` bei ~40, war die
+Dimensionierung richtig; plateaut er schon bei 10, stimmt etwas anderes nicht
+(zu kleiner Policy-Kanal, zu hohe LR, oder Early Stopping greift auf dem
+falschen Kopf).
+
+**Laufzeitfolge:** rund 17 min je Epoche, also etwa **11-12 Stunden** bis zum
+erwarteten Plateau. `v21-b21` haengt dahinter und kommt entsprechend spaet.
