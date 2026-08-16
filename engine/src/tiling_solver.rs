@@ -976,6 +976,99 @@ pub(crate) fn set_platten_weight_override_for_test(v: Option<f64>) {
     PLATTEN_WEIGHT_OVERRIDE.with(|c| c.set(v));
 }
 
+// ── Ownership-Verbraucher Teil 2: Tiling (PREREG_ownership_consumer.md §3) ──
+//
+// Zweiter Pol AM SELBEN Entscheid wie `MOSAIC_TILING_PLATTEN_W`: dort misst
+// `wertung_progress_per_kriterium` den IST-Fortschritt des Bretts, hier
+// prognostiziert der Ownership-Kopf, welche Geometrien am Spielende
+// tatsaechlich VOLLENDET sind. Der Term routet die Fliese zu Feldern, deren
+// Geometrie das Netz fuer vollendbar haelt, und ignoriert Felder in toten
+// Spalten von selbst (Produktform, siehe `scoring::marginal_plate_points`).
+//
+// WARUM UEBERHAUPT DIE TILING-SEITE (gemessen, `PREREG_placement_side.md`):
+// die Draftingseite allein saettigte bei 0,70 -> 1,75 vertikalen
+// Plattenpunkten gegen ein Ziel von 14. Ursache ist die Arbeitsteilung in
+// `resolve_tiling_step`: WO die gedraftete Farbe landet, entscheidet der
+// Solver, nicht die Suche -- in Runde 1 vollstaendig plattenblind, in den
+// Runden 2-4 wirkt der Netzwert nur als Faktor auf den nach
+// Platzierungspunkten gebildeten Kandidatenwert. Ein Ownership-Verbraucher,
+// der nur am Blatt haengt, erbt genau diese Blockade.
+
+/// `MOSAIC_OWNERSHIP_TILING_W` -- Gewicht des Ownership-Pols in der
+/// Tiling-Zugwahl. Default **0,0** = Fruehausstieg, byte-identisches
+/// Bestandsverhalten (Tor B, `PREREG_ownership_consumer.md` §5).
+///
+/// BEWUSST GETRENNT vom Blatt-Regler `MOSAIC_OWNERSHIP_W` (net_mcts.rs) und
+/// nicht mit ihm zusammengelegt: Tor C soll die beiden Haelften des
+/// Verbrauchers EINZELN und GEMEINSAM fahren koennen. Ein gemeinsamer Knopf
+/// haette genau diese Zerlegung unmoeglich gemacht -- und die Draftingseite
+/// hat gemessen gezeigt, dass eine Haelfte allein saettigt.
+pub(crate) fn ownership_tiling_weight() -> f64 {
+    OWNERSHIP_TILING_WEIGHT_OVERRIDE
+        .with(|c| c.get())
+        .unwrap_or_else(ownership_tiling_weight_env)
+}
+
+fn ownership_tiling_weight_env() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env_local("MOSAIC_OWNERSHIP_TILING_W", 0.0))
+}
+
+thread_local! {
+    /// Test-Override fuer [`ownership_tiling_weight`] -- gleiches thread-lokales
+    /// Muster wie [`PLATTEN_WEIGHT_OVERRIDE`] (der `OnceLock`-Cache waere sonst
+    /// fuer alle parallelen `cargo test`-Threads verbrannt).
+    static OWNERSHIP_TILING_WEIGHT_OVERRIDE: std::cell::Cell<Option<f64>> =
+        std::cell::Cell::new(None);
+}
+
+#[cfg(test)]
+pub(crate) fn set_ownership_tiling_weight_override_for_test(v: Option<f64>) {
+    OWNERSHIP_TILING_WEIGHT_OVERRIDE.with(|c| c.set(v));
+}
+
+/// Marginale Feldwerte fuer die Tiling-Wahl aus einer fertigen
+/// Ownership-Karte -- duenner Wrapper um [`crate::scoring::marginal_plate_points`],
+/// der die Kriteriengewichte beisteuert.
+///
+/// GETEILTES GEWICHTS-MUSTER, kein drittes daneben (Auftrag Punkt 4): der
+/// Ownership-Pol benutzt DIESELBEN acht Gewichte wie der Heuristik-Pol
+/// derselben Entscheidung, `MOSAIC_TILING_PLATTEN_GEW` ([`platten_gewichte`]).
+/// Begruendung:
+///   - die Semantik ist identisch -- "welches Wertungskriterium soll die
+///     Tiling-Wahl steuern"; beide Pole beantworten dieselbe Frage, nur mit
+///     verschiedener Datenquelle (Brett-IST vs. Netz-Prognose);
+///   - zwei getrennte Kriterienmasken an EINEM Entscheid liessen
+///     widerspruechliche Konfigurationen zu ("Heuristik nur vertikal,
+///     Ownership nur diagonal"), die kein Messprotokoll mehr interpretieren
+///     koennte;
+///   - es gibt den Praezedenzfall im selben Modul: `platten_wert` teilt sich
+///     die `alphas` mit der Draftingseite (`MOSAIC_WERTUNG_ALPHA`) aus genau
+///     diesem Grund (siehe dortiger Kommentar).
+/// Die DOSIS bleibt getrennt (`MOSAIC_TILING_PLATTEN_W` vs.
+/// `MOSAIC_OWNERSHIP_TILING_W`) -- nur die Kriterien-AUSWAHL ist gemeinsam.
+///
+/// Stelle 7 der Gewichte ist auf diesem Pol wirkungslos:
+/// `expected_plate_points` liefert fuer Kriterium 7 immer 0 (Farbinformation
+/// steckt nicht im Ownership-Ziel, `neural_net.py:958`).
+pub(crate) fn ownership_marginals(
+    player: &crate::board::PlayerBoard,
+    p_own: &[f64; crate::scoring::OWNERSHIP_FIELDS],
+    ids: &[usize],
+) -> [f64; crate::scoring::OWNERSHIP_FIELDS] {
+    crate::scoring::marginal_plate_points(player, p_own, ids, &platten_gewichte())
+}
+
+/// Rundenfenster des Plattenzweigs (Zweig 1 in
+/// [`best_first_step_exact_or_valued_ex`]) -- EINE Quelle, weil ausser dem
+/// Solver auch die Aufrufer sie brauchen: `self_play.rs` darf die
+/// Wurzel-Ownership-Karte nur dann per Netz-Vorwaertspass holen, wenn der
+/// Zweig sie ueberhaupt liest. Eine zweite, handkopierte `1..=4`-Bremse dort
+/// waere still verstimmbar.
+pub(crate) fn platten_branch_applies(round: u32) -> bool {
+    (1..=4).contains(&round)
+}
+
 /// Task #100: reiner Auswahlkern OHNE Env-Zugriff -- `w` als Parameter, direkt
 /// mit konstruierten Stellungen testbar (gleiches Muster wie
 /// `select_best_tiling_candidate`s `mode`-Parameter, Task #37).
@@ -1078,6 +1171,21 @@ fn platten_wert(
         .sum()
 }
 
+/// Belegungsmaske des 6x6-Rasters, indiziert wie der Ownership-Kopf
+/// (`scoring::ownership_index_for_grid`) -- damit sich Wurzel- und
+/// Kandidatenbrett feldweise gegen die marginalen Feldwerte halten lassen.
+/// Ein nicht gelegter Slot zaehlt als leer (`get_space` liefert dort `None`).
+fn belegtes_raster(player: &crate::board::PlayerBoard) -> [bool; crate::scoring::OWNERSHIP_FIELDS] {
+    let mut out = [false; crate::scoring::OWNERSHIP_FIELDS];
+    for r in 0..6 {
+        for c in 0..6 {
+            out[crate::scoring::ownership_index_for_grid(r, c)] =
+                player.dome_grid.get_space(r, c).is_some_and(|sp| sp.is_filled());
+        }
+    }
+    out
+}
+
 /// KORREKTUR 2026-08-12: der Plattenterm ERSETZT den Netz-Stichentscheid nicht
 /// mehr, sondern ergaenzt ihn. Vorher lief dieser Zweig VOR dem Task-#20-Zweig
 /// und verdraengte ihn -- gemessen war das Ergebnis dann 0,70 gegen 2,10 im
@@ -1091,10 +1199,34 @@ fn platten_wert(
 /// Value-Head dort belegt blind ist (`tiling_solver.rs`-Doku zu Task #20:
 /// RMSE 0,2531 ~ Zielstreuung 0,2538) -- der berechnete Plattenterm wirkt dort
 /// aber trotzdem, er hat keinen Schaetzfehler.
+///
+/// OWNERSHIP-POL (Teil 2, §3): `own_marg` sind die EINMAL je Zug aus der
+/// Wurzel-Ownership-Karte abgeleiteten marginalen Feldwerte (36 Stellen,
+/// Rasterindex wie `scoring::ownership_index_for_grid`). Sie gehen als
+/// KOMPLEMENT in dieselbe Summe -- analog `zellen_wert` im Spaltenbauer, und
+/// ausdruecklich NICHT als Ersatz des Platzierungspunkt-Terms:
+///
+/// ```text
+/// punkte + w * plattendelta + w_own * SUM_{f neu belegt} wert(f)
+/// ```
+///
+/// Die dokumentierte Falle der Injektions-Kampagne (siehe Kommentar an
+/// `best_first_step_exact_or_valued`, "KORREKTUR 2026-08-12") war genau die
+/// Ersatz-Form: ein Plattenterm, der den bestehenden Vorfilter VERDRAENGTE,
+/// hat gemessen geschadet (0,70 gegen 2,10). Deshalb ergaenzt auch dieser
+/// zweite Term nur.
+///
+/// Die Karte wird auf dem WURZEL-Brett ausgewertet, die Kandidaten liefern
+/// nur noch, WELCHE Felder sie neu belegen -- kein Netz-Aufruf je Kandidat
+/// (harte Kostenbedingung des Vertrags). Bereits belegte Felder zaehlen nicht
+/// mit (Differenzmenge vorher/nachher), doppelt zaehlen kann der Term also
+/// nicht.
 fn best_first_step_platten_valued(
     state: &GameState,
     pi: usize,
     w: f64,
+    w_own: f64,
+    own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
 ) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
@@ -1104,17 +1236,44 @@ fn best_first_step_platten_valued(
     // nur einen konstanten Sockel bei -- in `.total`-Form war das ein grosser
     // negativer Brocken aus den leeren Spezialfeldern, der die Rangfolge
     // verzerrte. Interessant ist allein, was die Platzierung AENDERT.
-    let vorher = platten_wert(&state.players[pi], &state.scoring_tile_ids, &gew,
-                              state.round_number);
+    //
+    // `w == 0` ueberspringt die Rechnung ganz: seit dem Ownership-Pol kann
+    // dieser Zweig auch OHNE den Heuristik-Term laufen (Tor C faehrt beide
+    // Haelften einzeln). Numerisch ist das identisch (`0 * x == 0`), es spart
+    // nur die Auswertung.
+    let heur_aktiv = w != 0.0;
+    let vorher = if heur_aktiv {
+        platten_wert(&state.players[pi], &state.scoring_tile_ids, &gew, state.round_number)
+    } else {
+        0.0
+    };
+    let own_aktiv = w_own != 0.0 && own_marg.is_some();
+    let belegt_vorher = if own_aktiv { Some(belegtes_raster(&state.players[pi])) } else { None };
     let mut best: Option<(f64, TilingStep)> = None;
     for c in cands {
-        let nachher = platten_wert(
-            &c.final_state.players[pi],
-            &c.final_state.scoring_tile_ids,
-            &gew,
-            c.final_state.round_number,
-        );
-        let basis = f64::from(c.points) + w * (nachher - vorher);
+        let nachher = if heur_aktiv {
+            platten_wert(
+                &c.final_state.players[pi],
+                &c.final_state.scoring_tile_ids,
+                &gew,
+                c.final_state.round_number,
+            )
+        } else {
+            0.0
+        };
+        let mut basis = f64::from(c.points) + w * (nachher - vorher);
+        // KOMPLEMENT (nur wenn eingeschaltet -- sonst bleibt `basis` bitgleich
+        // zum Bestand, Tor B).
+        if let (Some(marg), Some(vorher_raster)) = (own_marg, belegt_vorher.as_ref()) {
+            let nachher_raster = belegtes_raster(&c.final_state.players[pi]);
+            let mut summe = 0.0f64;
+            for f in 0..crate::scoring::OWNERSHIP_FIELDS {
+                if nachher_raster[f] && !vorher_raster[f] {
+                    summe += marg[f];
+                }
+            }
+            basis += w_own * summe;
+        }
         // Netzfaktor nur in Runden 2-4, wie im Bestand (Runde 1: Value-Head blind).
         let val = match evaluator {
             Some(e) if (2..=4).contains(&state.round_number) => basis * e(&c.final_state),
@@ -1262,10 +1421,41 @@ pub(crate) fn vorzug_tiling_step_fuer_spalte(
     }
 }
 
+/// Bestandssignatur ohne Ownership-Karte -- delegiert an
+/// [`best_first_step_exact_or_valued_ex`] mit `own_marg = None`.
+///
+/// ADDITIV-MUSTER wie `net.rs`s `eval`/`eval_ex` (siehe dortige Begruendung):
+/// die Ownership-Karte betrifft nur die beiden echten Netz-Spielpfade
+/// (`self_play.rs::resolve_tiling_step`, `py.rs::ai_tiling_step`). Alle
+/// uebrigen Aufrufer -- Heuristik-Pfade und die Bestandstests dieses Moduls --
+/// bleiben durch die unveraenderte Signatur unangetastet, statt an einem
+/// Dutzend Stellen ein `None` nachzuziehen.
 pub fn best_first_step_exact_or_valued(
     state: &GameState,
     pi: usize,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
+) -> TilingStep {
+    best_first_step_exact_or_valued_ex(state, pi, evaluator, None)
+}
+
+/// Wie [`best_first_step_exact_or_valued`], zusaetzlich mit den EINMAL je Zug
+/// aus der Wurzel-Ownership-Karte abgeleiteten marginalen Feldwerten
+/// (`PREREG_ownership_consumer.md` §3, Teil 2).
+///
+/// `own_marg = None` (jeder Heuristik-Pfad, jedes Netz ohne Ownership-Kopf,
+/// jeder Zug bei `MOSAIC_OWNERSHIP_TILING_W = 0`) -> byte-identisch zum
+/// Bestand.
+///
+/// Die Karte kommt bewusst als fertiges `[f64; 36]` herein und nicht als
+/// `&Net`: dieses Modul kennt kein Netz (siehe `best_first_step_valued`s
+/// Begruendung zur Evaluator-Closure), und der Vertrag verlangt, dass der
+/// Solver KEINEN Netz-Aufruf je Kandidat kostet -- eine Datenschnittstelle
+/// macht das strukturell unmoeglich statt es nur zu versprechen.
+pub fn best_first_step_exact_or_valued_ex(
+    state: &GameState,
+    pi: usize,
+    evaluator: Option<&dyn Fn(&GameState) -> f64>,
+    own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
 ) -> TilingStep {
     // Spaltenbau (MOSAIC_SPALTENBAU, eigene Entscheidung siehe column_build.rs-
     // Moduldoku): PRUEFT ZUERST, damit das dynamisch gewaehlte Ziel der
@@ -1292,10 +1482,17 @@ pub fn best_first_step_exact_or_valued(
     // bildet `(punkte + w * plattendelta) * p_win` -- die Bestandsform mit dem
     // Plattenterm in den Punkten. Zweig 2 bleibt fuer den Fall `w == 0`
     // unveraendert zustaendig.
-    if (1..=4).contains(&state.round_number) {
+    //
+    // Ownership-Pol (Teil 2): derselbe Zweig traegt jetzt einen ZWEITEN,
+    // unabhaengig dosierten Term. Er kann den Zweig auch ALLEIN aktivieren
+    // (`w == 0`, `w_own != 0`) -- Tor C faehrt beide Haelften einzeln und
+    // gemeinsam.
+    if platten_branch_applies(state.round_number) {
         let w = tiling_platten_weight();
-        if w != 0.0 {
-            if let Some(step) = best_first_step_platten_valued(state, pi, w, evaluator) {
+        let w_own = ownership_tiling_weight();
+        let own = if w_own != 0.0 { own_marg } else { None };
+        if w != 0.0 || own.is_some() {
+            if let Some(step) = best_first_step_platten_valued(state, pi, w, w_own, own, evaluator) {
                 return step;
             }
         }
@@ -2274,6 +2471,251 @@ mod tests {
             baseline,
             TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
             "Testkonstruktion: Runde-5-Baseline sollte der Punkte-Zug sein (Diskriminierungspruefung)"
+        );
+    }
+
+    // ── Ownership-Verbraucher Teil 2: Tiling (PREREG_ownership_consumer §3) ──
+
+    /// Rasterindex der beiden Fork-Zielfelder, ABGELEITET aus der
+    /// Slot-Abbildung `grid[sr*2 + si/2][sc*2 + si%2]` und hier festgenagelt,
+    /// damit die folgenden Tests nicht auf einer stillen Annahme stehen: der
+    /// Platten-Zug legt auf Slot (0,0) si0 -> Raster (0,0), der Punkte-Zug auf
+    /// Slot (0,2) si0 -> Raster (0,4).
+    fn fork_feld_platte() -> usize {
+        crate::scoring::ownership_index_for_grid(0, 0)
+    }
+    fn fork_feld_punkte() -> usize {
+        crate::scoring::ownership_index_for_grid(0, 4)
+    }
+
+    #[test]
+    fn fork_field_indices_match_the_two_fork_moves() {
+        assert_eq!(
+            fork_feld_platte(),
+            crate::scoring::ownership_field_index(
+                PLATTEN_FORK_PLATTE_MOVE.slot_row,
+                PLATTEN_FORK_PLATTE_MOVE.slot_col,
+                PLATTEN_FORK_PLATTE_MOVE.space_index
+            )
+        );
+        assert_eq!(
+            fork_feld_punkte(),
+            crate::scoring::ownership_field_index(
+                PLATTEN_FORK_POINTS_MOVE.slot_row,
+                PLATTEN_FORK_POINTS_MOVE.slot_col,
+                PLATTEN_FORK_POINTS_MOVE.space_index
+            )
+        );
+    }
+
+    /// TOR B (Bestandsschutz): der Knopf steht auf Default `0.0`, also muss der
+    /// Solver in den Runden 1-4 exakt `best_first_step_exact` liefern -- und
+    /// zwar AUCH DANN, wenn eine (beliebig grosse) Ownership-Karte anliegt. Das
+    /// ist die schaerfere Variante von
+    /// `platten_weight_default_off_matches_exact_rounds_1_to_4`: sie belegt,
+    /// dass der Fruehausstieg am GEWICHT haengt und nicht daran, dass zufaellig
+    /// keine Karte da ist.
+    #[test]
+    fn ownership_tiling_default_off_matches_exact_rounds_1_to_4() {
+        assert_eq!(
+            ownership_tiling_weight(),
+            0.0,
+            "Testumgebung darf MOSAIC_OWNERSHIP_TILING_W nicht gesetzt haben"
+        );
+        let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        for (i, m) in marg.iter_mut().enumerate() {
+            *m = 1000.0 + i as f64; // absurd gross, damit jede Wirkung auffiele
+        }
+        let mut checked = 0;
+        for seed in 1u64..=60 {
+            for round in [1u32, 2, 3, 4] {
+                let mut s = rich_state(seed);
+                s.round_number = round;
+                if legal_steps(&s, 0, true).is_empty() {
+                    continue;
+                }
+                checked += 1;
+                let exact = best_first_step_exact(&s, 0);
+                assert_eq!(
+                    best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg)),
+                    exact,
+                    "Seed {seed} Runde {round}: Default 0 mit anliegender Karte weicht ab"
+                );
+                // Und die Bestandssignatur bleibt identisch zur _ex-Form mit None.
+                assert_eq!(
+                    best_first_step_exact_or_valued(&s, 0, None),
+                    best_first_step_exact_or_valued_ex(&s, 0, None, None),
+                    "Seed {seed} Runde {round}: Wrapper weicht von der _ex-Form ab"
+                );
+            }
+        }
+        assert!(checked >= 20, "nur {checked} Stellungen geprueft");
+    }
+
+    /// Der Ownership-Pol wirkt in den Runden 1-4 -- EINSCHLIESSLICH Runde 1,
+    /// wo der Bestandspfad plattenblind ist (das ist der gemessene Grund fuer
+    /// diesen Bauteil, siehe `PREREG_placement_side.md`). Der Heuristik-Pol
+    /// bleibt dabei auf Default 0: der Ownership-Pol allein muss den Zweig
+    /// aktivieren koennen, sonst kann Tor C die Haelften nicht einzeln fahren.
+    #[test]
+    fn ownership_tiling_overrides_points_rounds_1_to_4() {
+        for round in [1u32, 2, 3, 4] {
+            let s = platten_fork_state(round);
+            let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+            marg[fork_feld_platte()] = 2.0;
+
+            set_ownership_tiling_weight_override_for_test(Some(0.0));
+            let off = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+            set_ownership_tiling_weight_override_for_test(None);
+            assert_eq!(
+                off,
+                TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
+                "Runde {round}: w_own=0 muss den punktereicheren Zug lassen"
+            );
+
+            // 1 + 5*2 = 11 gegen 2 + 0 = 2.
+            set_ownership_tiling_weight_override_for_test(Some(5.0));
+            let on = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+            set_ownership_tiling_weight_override_for_test(None);
+            assert_eq!(
+                on,
+                TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
+                "Runde {round}: w_own=5 muss zum Feld mit hohem marginalen Wert routen"
+            );
+        }
+    }
+
+    /// KOMPLEMENT, NICHT ERSATZ (die dokumentierte Falle der Injektions-
+    /// Kampagne): der Platzierungspunkt-Term bleibt in der Summe. Nachweis mit
+    /// einer Karte, die BEIDE Zielfelder gleich hoch bewertet -- der
+    /// Ownership-Anteil ist dann fuer beide Kandidaten identisch und darf die
+    /// Rangfolge nicht drehen; es muss weiter der punktereichere Zug gewinnen.
+    /// Wuerde der Term den Vorfilter ERSETZEN, waere das Ergebnis hier
+    /// beliebig (Gleichstand -> erster Kandidat).
+    #[test]
+    fn ownership_tiling_complements_and_does_not_replace_the_points_term() {
+        let s = platten_fork_state(2);
+        let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        marg[fork_feld_platte()] = 3.0;
+        marg[fork_feld_punkte()] = 3.0;
+
+        set_ownership_tiling_weight_override_for_test(Some(5.0));
+        let gewaehlt = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+        set_ownership_tiling_weight_override_for_test(None);
+        assert_eq!(
+            gewaehlt,
+            TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
+            "bei gleichem Ownership-Beitrag muss der Platzierungspunkt weiter entscheiden"
+        );
+    }
+
+    /// Beide Pole zusammen: der Heuristik-Term (Platten-Zug +2 Endwertung) und
+    /// der Ownership-Term (Punkte-Zug hoher Feldwert) ziehen gegeneinander und
+    /// verrechnen sich ADDITIV. Mit `w=1` (Platte: 1 + 1*2 = 3) und `w_own=1`
+    /// auf einem Feldwert von 4 (Punkte: 2 + 4 = 6) gewinnt der Punkte-Zug;
+    /// bei Feldwert 0 gewinnt der Platten-Zug. Belegt, dass keiner der beiden
+    /// Terme den anderen verdraengt.
+    #[test]
+    fn ownership_tiling_and_heuristic_pole_add_up() {
+        let s = platten_fork_state(2);
+        let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+
+        set_platten_weight_override_for_test(Some(1.0));
+        set_ownership_tiling_weight_override_for_test(Some(1.0));
+        let ohne_feldwert = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+        marg[fork_feld_punkte()] = 4.0;
+        let mit_feldwert = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+        set_ownership_tiling_weight_override_for_test(None);
+        set_platten_weight_override_for_test(None);
+
+        assert_eq!(
+            ohne_feldwert,
+            TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
+            "ohne Ownership-Beitrag entscheidet der Heuristik-Pol (1+2 > 2+0)"
+        );
+        assert_eq!(
+            mit_feldwert,
+            TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
+            "ein Ownership-Feldwert von 4 muss den Heuristik-Pol ueberstimmen (2+4 > 1+2)"
+        );
+    }
+
+    /// Nur NEU belegte Felder zaehlen: ein absurd hoher marginaler Wert auf
+    /// einem bereits belegten Feld (Slot (0,2) si1 ist im Fork vorbefuellt)
+    /// darf die Wahl nicht beeinflussen. Ohne die Differenzmenge
+    /// vorher/nachher wuerde dieser Sockel jeden Kandidaten gleich hoch
+    /// anheben -- was hier zufaellig folgenlos waere -- oder, schlimmer, in
+    /// einer Absolutform die Rangfolge verzerren.
+    #[test]
+    fn ownership_tiling_counts_only_newly_filled_fields() {
+        let s = platten_fork_state(2);
+        let vorbefuellt = crate::scoring::ownership_field_index(0, 2, 1);
+        assert!(
+            s.players[0].dome_grid.get_space(0, 5).is_some_and(|sp| sp.is_filled()),
+            "Testvoraussetzung: Slot (0,2) si1 = Raster (0,5) ist im Fork vorbefuellt"
+        );
+
+        let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        marg[vorbefuellt] = 1000.0;
+        set_ownership_tiling_weight_override_for_test(Some(5.0));
+        let mit_sockel = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+        set_ownership_tiling_weight_override_for_test(None);
+
+        assert_eq!(
+            mit_sockel,
+            best_first_step_exact(&s, 0),
+            "ein bereits belegtes Feld darf keinen Beitrag liefern"
+        );
+    }
+
+    /// Runde 5 unangetastet -- gleiches Rundenfenster wie der Heuristik-Pol
+    /// (`platten_branch_applies`). Diskriminierend konstruiert: die Baseline in
+    /// Runde 5 ist der PLATTEN-Zug (Task #21 addiert die Endwertung mit Gewicht
+    /// 1: 1+2=3 > 2+0=2), der hohe Feldwert liegt auf dem PUNKTE-Feld -- ein
+    /// faelschlich in Runde 5 aktiver Pol wuerde also sichtbar umschwenken.
+    #[test]
+    fn ownership_tiling_round5_unaffected() {
+        let s = platten_fork_state(5);
+        let baseline = best_first_step_exact_or_valued_ex(&s, 0, None, None);
+        assert_eq!(
+            baseline,
+            TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
+            "Testkonstruktion: Runde-5-Baseline sollte der Platten-Zug sein"
+        );
+
+        let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        marg[fork_feld_punkte()] = 100.0;
+        set_ownership_tiling_weight_override_for_test(Some(5.0));
+        let mit = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
+        set_ownership_tiling_weight_override_for_test(None);
+        assert_eq!(mit, baseline, "Runde 5 darf sich durch den Ownership-Pol nicht aendern");
+    }
+
+    /// Die Kriteriengewichte sind GETEILT (`MOSAIC_TILING_PLATTEN_GEW`, siehe
+    /// `ownership_marginals`): der Wrapper muss genau das durchreichen, was
+    /// `platten_gewichte()` liefert -- kein zweiter, eigener Satz.
+    #[test]
+    fn ownership_marginals_uses_the_shared_criterion_weights() {
+        let s = platten_fork_state(2);
+        let mut p_own = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        for r in 0..6 {
+            if r != 3 {
+                p_own[crate::scoring::ownership_index_for_grid(r, 1)] = 1.0;
+            }
+        }
+        let ids = [1usize];
+        let ueber_wrapper = ownership_marginals(&s.players[0], &p_own, &ids);
+        let direkt = crate::scoring::marginal_plate_points(
+            &s.players[0],
+            &p_own,
+            &ids,
+            &platten_gewichte(),
+        );
+        assert_eq!(ueber_wrapper, direkt);
+        // Und die Rechnung ist nicht trivial leer.
+        assert!(
+            (ueber_wrapper[crate::scoring::ownership_index_for_grid(3, 1)] - 7.0).abs() < 1e-12,
+            "die letzte Luecke der Spalte muss 7 wert sein"
         );
     }
 

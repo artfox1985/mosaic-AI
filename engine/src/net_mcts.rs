@@ -1584,7 +1584,12 @@ fn warn_ownership_head_unusable_once(len: usize) {
 /// `binary_cross_entropy_with_logits` trainiert (`train.py:1171-1172`), die
 /// Kopf-Ausgaben sind also LOGITS. Die Umrechnung gehoert hierher, nicht in
 /// `net.rs` (das reicht Koepfe roh durch).
-fn sigmoid(x: f64) -> f64 {
+///
+/// `pub(crate)` seit Teil 2 (Tiling): `self_play.rs::ownership_tiling_marginals`
+/// dekodiert dieselben Logits fuer die Wurzelkarte des Tiling-Zuges. Eine
+/// zweite lokale Kopie waere hier die schlechtere Wahl -- beide Pole muessen
+/// dieselbe Umrechnung benutzen, sonst haben sie verschiedene Karten.
+pub(crate) fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + (-x).exp())
 }
 

@@ -44,7 +44,10 @@ use crate::scoring::{sample_valid_scoring_ids, wertung_progress};
 use crate::serialize::state_to_json;
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
-use crate::tiling_solver::{best_first_step_exact_or_valued, solve_round_final_score, TilingStep};
+use crate::tiling_solver::{
+    best_first_step_exact_or_valued, best_first_step_exact_or_valued_ex, solve_round_final_score,
+    TilingStep,
+};
 
 /// Standard-UCT-Konstante der Self-Play-Suche (= `py.rs::AI_C`).
 pub const SELF_PLAY_C: f64 = 0.3;
@@ -1009,12 +1012,94 @@ fn warne_fehlenden_punkte_kopf_einmal() {
 /// -- die vollständige Anwendungsbedingung (Toggle + Rundenfenster) lebt
 /// zentral in `best_first_step_exact_or_valued`, damit sie nicht an jeder
 /// Aufrufstelle erneut dupliziert wird.
+/// Ownership-Verbraucher Teil 2 (`PREREG_ownership_consumer.md` §3): die
+/// WURZEL-Ownership-Karte des Tiling-Zustands, bereits zu den 36 marginalen
+/// Feldwerten verrechnet, oder `None` = Pol aus.
+///
+/// WOHER DIE WURZELKARTE KOMMT -- geprueft, nicht angenommen. Der Vertrag
+/// sagt "liegt nach der Suche vor"; am Code stimmt das NICHT: `net_leaf_eval`
+/// (net_mcts.rs) liest die Karte zwar bei jeder Blattauswertung, verbraucht
+/// sie aber sofort in `apply_ownership_shaping` und legt sie nirgends ab; es
+/// gibt keinen Kanal, der ein Suchergebnis in die Tiling-Phase traegt (die
+/// Suche laeuft ohnehin auf DRAFTING-Zustaenden, die Wurzel hier ist ein
+/// Tiling-Zustand). Der einzige Netz-Zugang im Tiling-Pfad ist das
+/// `net: Option<&Net>` dieses Moduls (self_play.rs) bzw. `self.net`
+/// (py.rs::ai_tiling_step).
+///
+/// Also EIN zusaetzlicher Vorwaertspass je Tiling-Zug, und zwar auf dem
+/// WURZEL-Zustand. Die harte Kostenbedingung des Vertrags ("kein Netz-Aufruf
+/// je Kandidat") bleibt damit eingehalten -- und die Groessenordnung stimmt:
+/// derselbe Zug bezahlt im Bestand bereits bis zu `MAX_TILING_LEAVES` (400)
+/// Vorwaertspaesse, sobald der Evaluator aktiv ist (`net_tiling_tiebreak_value`
+/// je Kandidat). Bei ausgeschaltetem Knopf faellt auch dieser eine Pass weg.
+///
+/// Zwei Bremsen VOR dem Netz-Aufruf, beide reine Kostengates:
+///   1. `ownership_tiling_weight() == 0` (Default) -> `None`, kein Pass.
+///   2. Runde ausserhalb des Plattenzweig-Fensters -> der Solver wuerde die
+///      Karte gar nicht lesen. Das Fenster kommt aus
+///      `tiling_solver::platten_branch_applies`, damit hier keine zweite,
+///      still verstimmbare Kopie von `1..=4` entsteht.
+pub(crate) fn ownership_tiling_marginals(
+    net: &Net,
+    state: &GameState,
+    pi: usize,
+) -> Option<[f64; crate::scoring::OWNERSHIP_FIELDS]> {
+    if crate::tiling_solver::ownership_tiling_weight() == 0.0
+        || !crate::tiling_solver::platten_branch_applies(state.round_number)
+    {
+        return None;
+    }
+    let feats = crate::features::features_for_net(net, state);
+    let (_logits, _value, _moon, _points, _opp, ownership) = net.eval_ex(&feats).ok()?;
+    let need = 2 * crate::scoring::OWNERSHIP_FIELDS;
+    if ownership.len() < need {
+        warne_unbrauchbaren_ownership_kopf_einmal(ownership.len());
+        return None;
+    }
+    // PERSPEKTIVE wie am Blatt (`net_mcts::apply_ownership_shaping_full`):
+    // `[0:36]` gehoert `state.current_player`, `[36:72]` dem anderen. `pi` ist
+    // hier strukturell `state.current_player` (siehe `net_tiling_tiebreak_value`s
+    // Perspektiv-Nachweis), der Zweig bleibt trotzdem defensiv stehen.
+    let base = if pi == state.current_player { 0 } else { crate::scoring::OWNERSHIP_FIELDS };
+    let mut p_own = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+    for (f, slot) in p_own.iter_mut().enumerate() {
+        *slot = crate::net_mcts::sigmoid(ownership[base + f] as f64);
+    }
+    Some(crate::tiling_solver::ownership_marginals(
+        &state.players[pi],
+        &p_own,
+        &state.scoring_tile_ids,
+    ))
+}
+
+/// Laut scheitern statt still nichts tun -- gleiches Muster wie
+/// `warne_fehlenden_punkte_kopf_einmal` oben und
+/// `net_mcts::warn_ownership_head_unusable_once` am Blatt. Eigene Meldung,
+/// weil hier ein ANDERER Knopf gesetzt ist: wer nur den Tiling-Pol angeschaltet
+/// hat, soll nicht nach `MOSAIC_OWNERSHIP_W` suchen muessen.
+fn warne_unbrauchbaren_ownership_kopf_einmal(len: usize) {
+    static EINMAL: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    EINMAL.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_OWNERSHIP_TILING_W ist gesetzt, aber der Ownership-Kopf des geladenen \
+             Netzes ist unbrauchbar (Laenge {len}, gebraucht werden mindestens {min} Werte \
+             = 2 x 36 Felder). Der Tiling-Ownership-Pol verhaelt sich wie w=0. Diese Meldung \
+             erscheint nur einmal je Prozess.",
+            min = 2 * crate::scoring::OWNERSHIP_FIELDS
+        );
+    });
+}
+
 fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net>) -> TilingStep {
     match net {
         Some(n) => {
+            // Ownership-Pol Teil 2: EINMAL je Zug, VOR der Kandidatenschleife.
+            let own = ownership_tiling_marginals(n, state, pi);
             let evaluator = |final_state: &GameState| net_tiling_tiebreak_value(n, final_state, pi);
-            best_first_step_exact_or_valued(state, pi, Some(&evaluator))
+            best_first_step_exact_or_valued_ex(state, pi, Some(&evaluator), own.as_ref())
         }
+        // Ohne Netz gibt es keine Ownership-Karte -- der Pol ist auf allen
+        // Heuristik-Pfaden strukturell aus, nicht nur per Knopf.
         None => best_first_step_exact_or_valued(state, pi, None),
     }
 }
