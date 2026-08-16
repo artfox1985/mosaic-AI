@@ -39,13 +39,29 @@ from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402  (bewusst nach
 KRITERIUM = re.compile(r"^\s+\S+ (?P<name>[^:]+): (?P<pkt>-?\d+) Pkt$")
 
 
-def partien(pfad: Path) -> list[dict]:
+def partien(pfad: Path, arm: str | None = None) -> list[dict]:
+    """Partien EINES Arms. `arm` waehlt aus der Mehr-Arm-Form
+    (`{armwert: [partien]}`, die `paired_arena_env_ab.py` schreibt, sobald
+    `--arms` mehr als einen Wert traegt).
+
+    ERWEITERT 2026-08-16 (Tor C, `PREREG_gate_c_consumer_sweep.md`): vorher
+    brach das Werkzeug an jeder Mehr-Arm-Datei ab, was die Kampagne gezwungen
+    haette, jeden Arm in einem EIGENEN Orchestrator-Lauf zu fahren -- damit
+    waere der McNemar aus derselben Datei verloren gegangen. Ein Ein-Arm-File
+    ohne `arm` verhaelt sich unveraendert."""
     d = json.load(open(pfad, encoding="utf-8"))
     g = d["games"]
     if isinstance(g, dict):  # Mehr-Arm-Form: {armwert: [partien]}
-        if len(g) != 1:
-            raise SystemExit(f"{pfad.name}: {len(g)} Arme -- dieses Werkzeug erwartet einen")
-        g = next(iter(g.values()))
+        if arm is not None:
+            if arm not in g:
+                raise SystemExit(f"{pfad.name}: Arm {arm!r} nicht vorhanden "
+                                 f"-- da sind {sorted(g)}")
+            g = g[arm]
+        elif len(g) != 1:
+            raise SystemExit(f"{pfad.name}: {len(g)} Arme {sorted(g)} -- Arm mit "
+                             f"'datei.json#arm' bzw. 'kuerzel#arm' waehlen")
+        else:
+            g = next(iter(g.values()))
     return g
 
 
@@ -93,6 +109,28 @@ def t_wert(werte: list[float]) -> tuple[float, float]:
     return m, (m / (sd / math.sqrt(n)) if sd > 0 else 0.0)
 
 
+def block_mittel(diffs: list[float], block: int) -> list[float]:
+    """Gepaarte Differenzen in LAUFREIHENFOLGE zu Blockmitteln zusammenfassen.
+
+    Stehende Regel seit 2026-08-04 ([[feedback_arena_block_correlation]]): auf
+    Partie-Ebene sind die Paar-SEs massiv unterschaetzt, weil die Partien eines
+    Blocks korreliert sind (gemeinsamer Worker-Prozess, benachbarte Seeds).
+    Der t-Wert gehoert deshalb auf die BLOECKE, nicht auf die Partien. Die
+    Reihenfolge ist die des Laufs (`games`-Liste), nicht die sortierte
+    Seed-Reihenfolge -- der Block IST die Laufeinheit des Orchestrators
+    (`paired_arena_env_ab.py --block-size`).
+
+    Ein angebrochener letzter Block zaehlt mit, aber nur wenn er mindestens
+    die halbe Blockgroesse traegt -- sonst waere ein 1-Partie-Rest ein
+    vollwertiger Datenpunkt mit der Streuung einer Einzelpartie."""
+    out = []
+    for i in range(0, len(diffs), block):
+        teil = diffs[i:i + block]
+        if len(teil) >= max(1, block // 2):
+            out.append(sum(teil) / len(teil))
+    return out
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("kuerzel", nargs="+",
@@ -101,16 +139,24 @@ def main() -> None:
                    help="gemeinsamer Namensteil vor dem Kuerzel (Default: platten)")
     p.add_argument("--bezug", default=None,
                    help="Kuerzel, gegen das GEPAART verglichen wird (ueber den Seed)")
+    p.add_argument("--block", type=int, default=None,
+                   help="Blockgroesse fuer die BLOCK-Ebene der gepaarten t-Werte "
+                        "(stehende Regel seit 2026-08-04). Sollte der "
+                        "--block-size des Laufs sein. Ohne Angabe nur Partie-Ebene.")
     a = p.parse_args()
 
     daten: dict[str, dict[int, dict]] = {}
+    reihenfolge: dict[str, list[int]] = {}  # Laufreihenfolge je Kuerzel, fuer --block
     for k in a.kuerzel:
-        pf = Path(k) if k.endswith(".json") else \
-            BASIS / "evaluations" / f"paired_arena_env_{a.praefix}_{k}.json"
+        roh, _, arm = k.partition("#")
+        pf = Path(roh) if roh.endswith(".json") else \
+            BASIS / "evaluations" / f"paired_arena_env_{a.praefix}_{roh}.json"
         if not pf.exists():
             print(f"{k}: FEHLT ({pf.name})")
             continue
-        daten[k] = {r["seed"]: r for r in (auswerten(s) for s in partien(pf))}
+        satz = [auswerten(s) for s in partien(pf, arm or None)]
+        daten[k] = {r["seed"]: r for r in satz}
+        reihenfolge[k] = [r["seed"] for r in satz]
 
     if not daten:
         raise SystemExit("keine Daten")
@@ -142,6 +188,29 @@ def main() -> None:
             zeile += f" | {dp:>+8.2f} {tp:>6.2f} {dl:>+9.2f} {tl:>6.2f} {db:>+7.2f} {tb:>6.2f}"
         print(zeile)
 
+    # BLOCK-Ebene (stehende Regel): dieselben gepaarten Differenzen, aber der
+    # t-Wert ueber die Blockmittel statt ueber die Partien. Reihenfolge ist die
+    # des BEZUGS-Laufs, damit alle Arme dieselbe Blockeinteilung bekommen.
+    if bezug and a.block:
+        ordn = [s for s in reihenfolge.get(a.bezug, sorted(bezug)) if s in bezug]
+        kopf2 = (f"\nBLOCK-Ebene (Blockgroesse {a.block}, t ueber Blockmittel)\n"
+                 f"{'Kuerzel':<10} {'Bloecke':>7} {'ΔPunkte':>8} {'t':>6} "
+                 f"{'ΔPlatten':>9} {'t':>6} {'ΔBoden':>7} {'t':>6}")
+        print(kopf2)
+        for k, v in daten.items():
+            if k == a.bezug:
+                continue
+            gem = [s for s in ordn if s in v]
+            bp = block_mittel([v[s]["punkte"] - bezug[s]["punkte"] for s in gem], a.block)
+            bl = block_mittel([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0)
+                               for s in gem], a.block)
+            bb = block_mittel([v[s]["boden"] - bezug[s]["boden"] for s in gem], a.block)
+            dp, tp = t_wert(bp)
+            dl, tl = t_wert(bl)
+            db, tb = t_wert(bb)
+            print(f"{k:<10} {len(bp):>7} {dp:>+8.2f} {tp:>6.2f} "
+                  f"{dl:>+9.2f} {tl:>6.2f} {db:>+7.2f} {tb:>6.2f}")
+
     # Je Kriterium: nur Platten, die ueberhaupt vorkommen
     namen = sorted({n for v in daten.values() for r in v.values() for n in r["je_kriterium"]})
     if namen:
@@ -153,6 +222,31 @@ def main() -> None:
                 tr = [r["je_kriterium"][n] for r in v.values() if n in r["je_kriterium"]]
                 zeile += f"{(sum(tr)/len(tr) if tr else float('nan')):>15.2f}({len(tr):>2})"
             print(zeile)
+
+    # GEPAART je Kriterium -- das ist die Zielgroesse der Wertungsplatten-
+    # Kampagne (Tor C, `PREREG_gate_c_consumer_sweep.md` par.5). Nur Partien,
+    # in denen die Platte in BEIDEN Armen aktiv war; sie ist seed-bestimmt,
+    # also immer beidseitig -- die Bedingung ist ein Waechter, keine Auswahl.
+    if bezug and namen:
+        print(f"\nGEPAART je Kriterium gegen '{a.bezug}' (Delta, t Partie-Ebene"
+              + (f" / t Block-Ebene, Bloecke a {a.block}" if a.block else "") + "):")
+        for k, v in daten.items():
+            if k == a.bezug:
+                continue
+            ordn = [s for s in reihenfolge.get(a.bezug, sorted(bezug)) if s in v]
+            print(f"  {k}")
+            for n in namen:
+                gem = [s for s in ordn
+                       if n in v[s]["je_kriterium"] and n in bezug[s]["je_kriterium"]]
+                if not gem:
+                    continue
+                diffs = [v[s]["je_kriterium"][n] - bezug[s]["je_kriterium"][n] for s in gem]
+                d, t = t_wert(diffs)
+                rest = ""
+                if a.block:
+                    bd, bt = t_wert(block_mittel(diffs, a.block))
+                    rest = f"   Block {bd:>+7.2f} t={bt:>6.2f} (nB={len(block_mittel(diffs, a.block))})"
+                print(f"    {n[:22]:<24} n={len(gem):>3}  {d:>+7.2f} t={t:>6.2f}{rest}")
 
 
 if __name__ == "__main__":
