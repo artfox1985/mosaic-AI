@@ -270,3 +270,68 @@ nicht. Eine Phasen-/Freeze-Mechanik gab es nicht; sie ist neu.
 **NICHT gebaut / bewusst offen**: kein Trainingslauf gestartet, kein
 Teil-Einfrieren (nur "alles ausser Kopf"), kein zweiter Kopf-Aufsatz, keine
 Aenderung am Verbraucher.
+
+## §7 ERGEBNIS F1 (2026-08-16): Zielkonflikt zur Haelfte geloest, Decke real
+
+Lauf: `--freeze-trunk --load v21_2d_own_w1_best --ownership-weight 1,0
+--lr 5e-4`, Early Stop Epoche 15 (Ownership-Plateau ab Ep. 10). Auswertung
+mit `tools/probes/ownership_gate_a.py` auf demselben Held-out (820 Partien);
+Rohzahlen `evaluations/ownership_gate_a_f1.json`. Zahlen vom Koordinator
+nachgerechnet.
+
+| Stand | Ep | policy val | value Brier | Feld-AUC | E_k k1 | k2 | k5 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| w1 `_best` (= was wir sonst ausliefern wuerden) | 1 | 0,2141 | 0,1884 | 0,726 | 0,180 | 0,276 | 0,277 |
+| **F1 (eingefroren)** | 15 | **0,2141** | **0,1884** | **0,780** | **0,280** | **0,314** | **0,345** |
+| w1 `final` (gemeinsam, ueberangepasst) | 15 | 0,3018 | 0,1905 | 0,870 | 0,361 | 0,354 | 0,466 |
+
+**Der Freeze-Riegel haelt exakt**: policy val_loss und value-Brier sind auf
+die vierte Nachkommastelle identisch zum Startpunkt -- die Zusicherung des
+Modus ist damit auch am echten Lauf belegt, nicht nur im Selbsttest.
+
+**Ausgang 1 (Zielkonflikt geloest): TEILWEISE.** F1 hebt die Kopfguete
+deutlich ueber den Checkpoint, den wir sonst nehmen muessten (Feld-AUC
++0,054; E_k k5 0,277 -> 0,345, also +25 %) -- und zwar zu **Kosten von
+exakt null** auf der Spielstaerke-Seite.
+
+**Ausgang 2 (Decke bestaetigt): JA, und zwar messbar.** F1 erreicht
+w1-`final` nicht (0,780 gegen 0,870). Der Nutzer-Vorbehalt aus
+PREREG_provocation.md §10 Punkt 2 ist damit bestaetigt: fuer die letzte
+Wegstrecke MUSS sich der Trunk bewegen, der Kopf allein reicht nicht.
+
+**Aufschlussreich ist, WO die Decke sitzt** (Konjunktions-AUC, F1 gegen
+w1-final): die geometrischen Zielkriterien verlieren wenig -- Zeilen −0,015,
+Spalten −0,065, Diagonalen −0,064, Ecken −0,062 --, aber die
+FARB-abhaengigen brechen ein: farbenreiche Reihen −0,213, Wild-Layout −0,189.
+Deutung (als Herleitung markiert): der eingefrorene Trunk transportiert die
+Geometrie, die der Kopf braucht, aber nicht die Farbstruktur; k7 ist ohnehin
+laut `neural_net.py:954` aus Ownership prinzipiell nicht lernbar und
+`layout_wild` ist ein Hilfsziel. **Fuer die Kriterien, die der Verbraucher
+tatsaechlich nutzt (k1/k2/k5), ist der Verlust also klein.**
+
+### §7.1 Empfehlung: die Arena entscheiden lassen, nicht die Offline-Zahl
+
+Statt F1 und w1-`final` offline gegeneinander abzuwaegen -- der eine hat den
+besseren Kopf, der andere die intakte Policy, und beide Groessen sind
+offline nicht ineinander umrechenbar -- gehen **BEIDE als Checkpoint-Arme in
+Tor C** (PREREG_ownership_consumer.md §5 Punkt 5). Der Regler-Sweep misst
+dann in derselben Arena, was die Kombination aus Kopfguete und Policy-Staerke
+wirklich wert ist. Das ist die einzige Messung, die die Frage beantworten
+kann, und sie kostet nur einen zusaetzlichen Arm.
+
+Begruendung gegen die naheliegende Abkuerzung "nimm w1-final, der Kopf ist
+besser": der Policy-Abfall 0,2141 -> 0,3018 ist real und gross (+41 %), und
+Policy-Guete ist im Projekt arena-validiert (Orakel-Metriken 7/7). Ihn gegen
+einen Kopf-Vorsprung zu tauschen, ohne zu messen, waere genau die Sorte
+Abwaegung nach Gefuehl, die REGEL 0 verbietet.
+
+### §7.2 Offen, nicht verfolgt
+
+Zwischen "Trunk ganz eingefroren" und "Trunk laeuft 15 Epochen mit" liegt ein
+ungetesteter Mittelweg: sanftes gemeinsames Nachtrainieren mit kleiner LR und
+Early Stop auf dem Ownership-Verlust, oder ein Teil-Freeze (nur Policy-Kopf
+fest, Trunk beweglich). Das ist der erste Kandidat, falls Tor C zeigt, dass
+die Kopfguete tatsaechlich traegt und die Decke wehtut. **F2 (Deckel-Sonde
+vom Champion) wird dadurch NICHT ueberfluessig** -- sie beantwortet die
+andere Haelfte: ob ein Trunk, der nie einen Ownership-Gradienten gesehen hat,
+ueberhaupt so weit kommt wie F1.
