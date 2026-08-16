@@ -983,3 +983,31 @@ sondern die Trennung der beiden Blockaden: die Policy-Blockade ist beseitigt,
 die Formel-Blockade nicht. Genau dann traegt der Selektor-Umbau ein gemessenes
 Argument statt eines plausiblen.
 
+### par.16.1 EINSCHRAENKUNG DER ZURECHNUNG (Nutzer-Korrektur, vor den Ergebnissen)
+
+par.16 sagt, mit `b18_best` sei die Policy-Blockade beseitigt. **Das ist zu
+stark.** Nutzer-Hinweis: *"wir wissen aber dass die policy aus b18 keinen
+plattenbau vorschlaegt."*
+
+Belegt ist nur, dass `b18`s Policy **plattengelenkt trainiert** wurde. Ihr
+gemessenes VERHALTEN zeigt keinen Plattenbau — gegen den Champion k1 +0,05,
+k2 0,00, k5 −0,09 (`PREREG_corpus_distillation.md` par.10.7). Ob sie den
+plattenbauenden Zug ueberhaupt mit nennenswerter Priorwahrscheinlichkeit
+anbietet, ist **nicht gemessen**; belegt ist nur, dass er sich im Wettlauf um
+die Besuche nicht durchsetzt.
+
+**Folge fuer die Lesart eines negativen Ausgangs:** die Zurechnung ist NICHT
+so sauber, wie par.16 sie beschreibt. Faellt der Versuch negativ aus, bleiben
+ZWEI Erklaerungen offen:
+
+1. die Produktform unterdrueckt die Zielkriterien (Formel-Blockade), oder
+2. der Prior bietet den plattenbauenden Zug gar nicht erst in ausreichender
+   Masse an — dann kann auch eine korrigierte Formel ihn nicht waehlen.
+
+**Trennbar waeren die beiden ueber die Priormasse:** wie viel
+Policy-Wahrscheinlichkeit legt `b18` auf Zuege, die eine noch offene Spalte
+bedienen? Das ist eine Offline-Sonde auf vorhandenen Partien, keine Arena, und
+sie steht noch aus. Sie waere die Voraussetzung dafuer, aus einem negativen
+Tor C ein Argument FUER den Selektor-Umbau zu machen statt nur eine weitere
+Absage.
+
