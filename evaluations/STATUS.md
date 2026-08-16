@@ -21,7 +21,7 @@ Default-Knopf byte-identisch, kein Bestandsverhalten hat sich geaendert.
 | Gewichts-Sweep w0/w01/w02/w05/w1 | FERTIG, **Tor A BESTANDEN** (par.10), w1 gewinnt einstimmig (par.10.6) |
 | Frozen-Trunk-Kopftraining F1 | FERTIG (frozen_trunk_head par.7): Zielkonflikt halb geloest, Decke bestaetigt |
 | **Verbraucher Drafting** | **GEBAUT** (8eabbdb): E_k am Blatt, `MOSAIC_OWNERSHIP_W` Default 0, **Tor B belegt** (byte-identisch ueber 4 Kopfbreiten, Paritaetsprobe gruen) |
-| Verbraucher Tiling | NICHT gebaut -- bewusst als eigener Schritt (Einstieg `tiling_solver.rs::best_first_step_platten_valued`, Muster `MOSAIC_TILING_PLATTEN_GEW` liegt bereit) |
+| **Verbraucher Tiling** | **WIRD JETZT GEBAUT** (Nutzer-Korrektur 2026-08-16: *"nur im drafting auf die wertungsplatten hinarbeiten ist nur die halbe miete"*). Beleg gibt ihm recht: PREREG_placement_side mass die Draftingseite allein bei 0,70 -> 1,75 gegen Ziel 14 -- die Platzierung entscheidet der SOLVER, ein reiner Blatt-Verbraucher erbt diese Blockade. Eigener Knopf `MOSAIC_OWNERSHIP_TILING_W`, damit Tor C beide Haelften einzeln UND gemeinsam fahren kann |
 | **Tor C (Regler-Sweep Arena)** | **DER NAECHSTE SCHRITT** -- siehe unten |
 
 **Die drei Kopf-Kandidaten fuer Tor C** (alle auf demselben Held-out
@@ -44,6 +44,10 @@ Punkt 5 ist der Rahmen, braucht aber eine eigene Mess-Prereg):
 1. **Zwei Checkpoint-Arme** (`f1` und `w1` final) x **w_own-Raster**
    (0 / klein / mittel / gross -- Startwerte aus der tanh-Skala herleiten,
    nicht raten). Der w_own=0-Arm ist zugleich die Bestandsschutz-Kontrolle.
+   **BEIDE HAELFTEN sind Teil des Haupt-Arms** (Blatt + Tiling gemeinsam) --
+   die Injektions-Kampagne hat gemessen, dass Drafting allein saettigt.
+   Getrennte Knoepfe bleiben, um bei einem Befund zuordnen zu koennen, aber
+   die Hauptmessung faehrt beide an.
 2. **Messgroessen**: Plattenpunkte je Kriterium (k1/k2/k5 -- die
    Zielgroesse der ganzen Kampagne) UND Endstand-Marge UND Siege.
    Block-Ebene, gepaart, Frisch-Seed-Replikation fuer den Sieger-Arm.
