@@ -311,6 +311,44 @@ weil ein Ergebnis knapp verfehlt wird.
 
 ---
 
+## par.7a NACHTRAG 2026-08-16, 14:00 — ABWEICHUNG VON par.4.1 (Koordinator)
+
+Der erste Messlauf ist an der Dimensionierung gescheitert: von vier H-Armen
+lief nur der Champion-Arm, Block N gar nicht. Beim Neuansatz faellt auf, dass
+**zwei der vier Arme bereits gespielt sind**. Geprueft, nicht angenommen:
+
+| Datei | Modell | n | Bedingungen | Seeds im 407er-Satz |
+|---|---|---:|---|---:|
+| `paired_arena_env_gate_c_f1.json#0,0` | `own_f1` | 121 | net 400 / heur 150 / Regler 0 | **121 von 121** |
+| `paired_arena_env_gate_c_w1.json#0,0` | `own_w1` (final) | 121 | net 400 / heur 150 / Regler 0 | **121 von 121** |
+
+Diese beiden Arme werden **wiederverwendet statt nachgespielt**.
+
+**Der Preis dafuer steht hier und wird nicht weggelassen: diese zwei Arme sind
+NICHT blind.** Ihre Siegquote (F1: 98/121) und ihre Plattenpunkte (3,45) waren
+bekannt, als die Wiederverwendung entschieden wurde. Daraus folgt bindend:
+
+1. **Der tragende Vergleich sind die drei BLINDEN Arme** — `champion`,
+   `w0_best`, `w1_best`, je n=407, identische Seed-Liste, alle drei zum
+   Zeitpunkt dieses Nachtrags ungemessen. Nur sie koennen das Verdikt in
+   par.10 begruenden.
+2. `f1` und `w1`-final gehen als **Zusatzarme bei n=121** ein und duerfen
+   einen Ausgang stuetzen, aber keinen tragen.
+3. Die saubere Ein-Faktor-Zerlegung bleibt **`w0_best` gegen `w1_best`**
+   (Manifeste unterscheiden sich allein im `ownership_weight` 0,0 / 1,0).
+   `champion` gegen `w0_best` bleibt doppeldeutig (Korpus ODER
+   Weitertraining) — der fehlende Kontrollarm "Weitertraining ohne Korpus"
+   ist ein GPU-Lauf und in der Warteschlange, nicht in dieser Messung.
+
+**Die beiden Kostenproben aus par.6 tragen weiterhin nichts** — hier
+nachgerechnet, damit die Zahlen nicht als Vorbefund weiterwandern:
+
+- Champion 14/24 gegen F1 19/24 auf **identischen** Seeds und identischem
+  Anziehenden: diskordant 8 zu 3, **exakter McNemar p = 0,227**. Kein Befund.
+- Netz gegen Netz F1-gegen-Champion 4:8 bei n=12, Anziehende sauber 6/6
+  verteilt: ebenfalls kein Befund — und die Richtung ist der Heuristik-Probe
+  **entgegengesetzt**. Genau deshalb entscheidet keine von beiden.
+
 ## par.8 ERGEBNIS BLOCK H (leer bei Registrierung)
 
 ## par.9 ERGEBNIS BLOCK N (leer bei Registrierung)
