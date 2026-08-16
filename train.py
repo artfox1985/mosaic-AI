@@ -841,6 +841,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     lr_scheduler = None
     if lr_schedule == "cosine":
         lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    elif lr_schedule == "plateau":
+        # Grob bis zum Plateau, dann feiner in der Zielregion (Nutzer-Anstoss
+        # 2026-08-17). Adaptiv, braucht also den Horizont NICHT -- der Grund, warum
+        # Cosine beim Cold Start ausfaellt: dessen T_max haengt an --epochs, und der
+        # Saettigungspunkt eines Laufs von null ist unbekannt.
+        # patience=2 ist bewusst KLEINER als die 5 Epochen des Early Stoppings --
+        # sonst braeche der Lauf ab, bevor die LR je gesenkt wuerde. Greift die
+        # Senkung, kommt wieder Fortschritt und der Early-Stop-Zaehler faellt zurueck.
+        # factor/patience sind gaengige Startwerte, NICHT fuer dieses Projekt gemessen.
+        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", factor=0.5, patience=2)
     elif lr_schedule not in (None, "none"):
         print(f"   ⚠️  Unbekanntes --lr-schedule '{lr_schedule}' -- ignoriert (konstante LR).")
     if load_version:
@@ -1720,7 +1731,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
         # einmal danach) -- bleibt bei lr_scheduler=None ein no-op.
         if lr_scheduler is not None:
-            lr_scheduler.step()
+            # ReduceLROnPlateau ist der einzige Scheduler hier, der die Metrik
+            # braucht -- dieselbe, nach der auch der beste Checkpoint gewaehlt wird.
+            if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step(current_metric)
+            else:
+                lr_scheduler.step()
 
         # ── Early Stopping: BEIDE Koepfe muessen plateauen (Task #34) ──
         if policy_plateau_since is not None and value_plateau_since is not None:
@@ -2167,9 +2183,9 @@ if __name__ == "__main__":
                              "Suchpfad zu round5::choose_action (exakte Alpha-Beta-Suche), "
                              "und der Runde-4-Bootstrap nutzt round5::exact_round5_outcome. "
                              "~17%% der Value- und ~15%% der Policy-Samples liegen dort.")
-    parser.add_argument("--lr-schedule", type=str, default="none", choices=["none", "cosine"],
+    parser.add_argument("--lr-schedule", type=str, default="none", choices=["none", "cosine", "plateau"],
                         help="LR-Verlauf ueber die Epochen. 'none' (Standard): konstante LR wie bisher. "
-                             "'cosine': torch.optim.lr_scheduler.CosineAnnealingLR mit T_max=--epochs.")
+                             "'cosine': CosineAnnealingLR mit T_max=--epochs (ACHTUNG: bei zu grossem --epochs regelt er faktisch nicht ab). 'plateau': ReduceLROnPlateau (factor 0.5, patience 2) -- adaptiv, fuer Laeufe mit unbekanntem Saettigungspunkt.")
     parser.add_argument("--value-weight", type=float, default=None,
                         help="Gewicht des Value-Aux-Loss im Gesamt-Loss (Standard: VALUE_WEIGHT aus "
                              "config.py, aktuell 0.2). Task #79 (v12d): VALUE_WEIGHT/POINTS_WEIGHT-Sweep. "

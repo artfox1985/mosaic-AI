@@ -705,3 +705,44 @@ und die gemessenen Feuerraten sind Eigenschaften des KOPFES, nicht der Policy
 gelernt hat. Der Regler liegt gebaut in der Engine (Default 0), das Dosisraster
 existiert. Erst dann waeren beide Haelften beisammen: eine Policy, die Spalten
 bauen KANN, und ein Kopf, der sagt, WELCHE.
+
+### par.10.7 DIE PRIMAERFRAGE IST BEANTWORTET (2026-08-17) — NEGATIV
+
+par.10.4 hatte festgestellt, dass diese Prereg ihre Primaerfrage nicht
+beantworten KONNTE, weil der Policy-Kopf den Korpus nie gesehen hat. Mit
+`v21-b18` gibt es erstmals einen Checkpoint, dessen Policy-Gradient zu **100 %**
+aus dem Korpus kommt (Traegersatz `policy_carrier_manifest_own.json`, 700
+Dateien / 7.000 Partien; zum Vergleich hatte der Champion 580 Dateien / 5.800
+Partien Sockel — es ist also MEHR, nicht weniger).
+
+**Messung:** `v21-b18_best` gegen den Champion, Netz gegen Netz, beide @400,
+407 Seeds, alle Regler aus, Brett-Tausch je Block.
+`evaluations/paired_arena_env_b18best_vs_ch.json`.
+
+| | `b18_best` | Champion | Delta |
+|---|---:|---:|---:|
+| Siege | **211/407 = 51,8 %** | 196/407 | Binomial p=0,488; Block-Ebene t=0,88 (nB=16) |
+| **k1 vertikale Reihen** | 0,90 | 0,85 | **+0,05** |
+| **k2 Diagonalen** | **0,00** | 0,07 | **−0,07** |
+| **k5 Eckplatten** | 3,48 | 3,57 | **−0,09** |
+| k0 / k3 / k4 / k6 / k7 | 1,50 / 4,12 / 9,61 / −12,10 / 0,35 | 1,56 / 4,24 / 9,51 / −11,92 / 0,48 | alle |Delta| <= 0,18 |
+
+> **Die Destillation uebertraegt den Plattenbau NICHT.** Kein Zielkriterium
+> bewegt sich. `b18` hat in 150 Partien **keine einzige Diagonale** geschlossen
+> — mit einer Policy, die ausschliesslich aus plattengelenktem Spiel gelernt
+> hat.
+
+**Was der Lauf trotzdem zeigt:** die Umstellung kostet **nichts**. Paritaet
+gegen den Champion (p=0,49) bei einem Policy-Kanal, der auf eine schmale,
+absichtlich suboptimale Verteilung umgestellt wurde und dessen Suchtiefe von
+400-600 auf 200 Sims faellt. Das ist die Vorbedingung dafuer, `b18` als
+Generator einzusetzen — er produziert keine schlechteren Partien.
+
+**Offen bleibt die Zurechnung**: liegt es am Korpus oder am Prior aus 30.000
+Partien, der im Warm Start in den Gewichten steckt? Genau das misst der Cold
+Start `v21-b20` (`PREREG_lr_schedule.md` par.6).
+
+**Nicht beantwortet ist damit die Reglerfrage.** Der Verbraucher war in dieser
+Messung AUS (`MOSAIC_OWNERSHIP_W=0`). Tor C auf `b18_best` bleibt faellig und
+ist jetzt zum ersten Mal fair — die Policy kann den plattenbauenden Zug
+vorschlagen, auch wenn sie ihn von sich aus nicht waehlt.
