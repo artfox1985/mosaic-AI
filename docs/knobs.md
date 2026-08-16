@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 66 Knoepfe (41 aktiv, 17 diagnose, 7 tot, 1 geplant).
+Stand: 70 Knoepfe (43 aktiv, 19 diagnose, 7 tot, 1 geplant).
 
 | Knopf | Default | Status | Zweck | Beleg |
 |---|---|---|---|---|
@@ -24,11 +24,15 @@ Stand: 66 Knoepfe (41 aktiv, 17 diagnose, 7 tot, 1 geplant).
 | `MOSAIC_WERTUNG_FLOOR_W` | 0.0 | aktiv | Strafleisten-Gegenterm im Wertungsplatten-Shaping (net_mcts.rs:1306) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_TILING_W` | 0.0 | aktiv | Tiling-Potenzial-Term (Heuristik-Summand solve_round_final_score) im Shaping (net_mcts.rs:1332) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_WERTUNG_STREUUNG_MAX` | 0.0 (aus) | aktiv | partieweise Streuung des Shaping-Gewichts aus dem Partie-Seed, Wert in [0,max] (net_mcts.rs:1154) | PREREG_ownership_corpus.md |
+| `MOSAIC_OWNERSHIP_W` | 0.0 (aus) | aktiv | Zwei-Pole-Regler w_own: Blatt-Shift aus den erwarteten Plattenpunkten E_k des Ownership-Kopfs (net_mcts.rs, ownership_weight) | PREREG_ownership_consumer.md par.2 |
+| `MOSAIC_OWNERSHIP_GEW` | 1.0 (1 oder 8 Werte) | aktiv | Gewicht je Kriterium innerhalb des Ownership-Pols; Stelle 7 wirkungslos (net_mcts.rs, ownership_weights) | PREREG_ownership_consumer.md par.2 |
 | `MOSAIC_GUMBEL_TOP_M` | 0 (= Formel sims/16) | aktiv | fester Wurzelbreiten-Override m fuer Gumbel-Top-m (net_mcts.rs:2514) | PREREG_search_path_remeasurements.md M2 |
 | `MOSAIC_TAU_ARGMAX_FROM_MOVE` | 0 (= aus) | aktiv | Self-Play: ab Halbzug N argmax statt Besuchs-Sampling (net_mcts.rs:2540) | PREREG_search_path_remeasurements.md M3 |
 | `MOSAIC_DENIAL_TIEBREAK_EPS` | 0.0 (aus) | aktiv | eps-Fenster des Denial-Tie-Breaks E3 (net_mcts.rs:2556) | PREREG_denial_tiebreak.md |
 | `MOSAIC_DENIAL_UNCERT_Z` | 0.0 (aus) | aktiv | z-Schwelle des E3b-Unsicherheits-Fensters (net_mcts.rs:2570) | PREREG_denial_tiebreak.md |
 | `MOSAIC_DENIAL_MIN_VISIT_FRAC` | 0.5 | aktiv | Mindest-Besuchsanteil f des E3b-Besuchs-Gates (net_mcts.rs:2579) | PREREG_denial_tiebreak.md |
+| `MOSAIC_COLOR_DENIAL_PROBE_Z` | 0.0 (aus) | diagnose | z-Schwelle des Stoerfenster-ZAEHLMODUS -- zaehlt nur, aendert die gespielte Aktion nicht (net_mcts.rs, color_denial_probe_with) | PREREG_opponent_disruption_v2.md par.5.2 |
+| `MOSAIC_COLOR_DENIAL_PROBE_MIN_VISIT_FRAC` | 0.5 | diagnose | Mindest-Besuchsanteil des Stoerfenster-Zaehlmodus (net_mcts.rs, color_denial_probe_min_visit_frac) | PREREG_opponent_disruption_v2.md par.5.2 |
 | `MOSAIC_R5_CHANCE_NODES` | an (=0 Altverhalten) | aktiv | Zufallsknoten fuer verdeckte Bonuschips im R5-Loeser, scharf seit 2026-08-10 (round5.rs:159) | PREREG_chance_nodes.md |
 | `MOSAIC_R5_NET_SOLVER` | an (=0 Gegenprobe Netz) | aktiv | Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs:183) | PREREG_chance_nodes.md Teil E |
 | `MOSAIC_R5_NODE_BUDGET` | 200 | aktiv | Knotenbudget je R5-Entscheidung (round5.rs:199, NODE_BUDGET round5.rs:88) | PREREG_chance_nodes.md |
