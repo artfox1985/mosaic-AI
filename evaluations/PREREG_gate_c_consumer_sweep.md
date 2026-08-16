@@ -463,13 +463,163 @@ Die Siegzahlen (10 / 11 / 10 / 8 von 12) und die Endstands-Differenzen sind
 nach der vorab festgelegten Regel **nicht auswertbar** und gehen in kein
 Verdikt ein. Sie stehen hier nur, weil sie in der Rohdatei stehen.
 
-## par.11 ERGEBNIS Stufe 1
+## par.11 ERGEBNIS Stufe 1 — NICHT-ERFOLG nach der Vorab-Regel, und zwar deutlich
 
-*(leer zum Registrierungszeitpunkt)*
+4 Arme x 121 Seeds = 484 Partien, F1 @400 gegen Heuristik@150, 11 Faeden,
+Bloecke a 25. Roh: `evaluations/paired_arena_env_gate_c_f1.json` (gitignoriert,
+kompakte Form in `arena_compact.jsonl`). Auswertung
+`tools/plate_points_from_arena.py --block 25`.
 
-## par.12 ERGEBNIS Stufe 2
+### par.11.1 Der Waechter: die Siege fallen MONOTON mit der Dosis
 
-*(leer zum Registrierungszeitpunkt)*
+| Arm | Siege | McNemar gegen N | ΔMarge (Block, t) | ΔPlatten gesamt (Block, t) |
+|---|---:|---:|---:|---:|
+| **N** `0,0` | **98/121** (81,0 %) | — | — | — |
+| D1 `0.1,0.3` | 89/121 (73,6 %) | b=10 / c=19, **p = 0,136** | −2,27 (t −1,49) | +0,74 (t 2,72) |
+| D2 `0.3,1.0` | 86/121 (71,1 %) | b=9 / c=21, **p = 0,043** | −4,60 (t −1,39) | +0,06 (t 0,16) |
+| D3 `1.0,3.0` | 84/121 (69,4 %) | b=15 / c=29, **p = 0,049** | −5,53 (t −2,73) | +1,20 (t 4,00) |
+
+**98 → 89 → 86 → 84 ist streng monoton fallend in der Dosis.** Das ist der
+tragende Befund, nicht der einzelne p-Wert: drei unabhaengige Dosisstufen
+ordnen sich in der Richtung, die die Vorab-Regel als Schaden definiert.
+
+Auf BLOCK-Ebene ist der Verlust kein Extremblock-Artefakt (stehende Regel
+2026-08-04) — die gepaarte Sieg-Differenz je Block:
+
+| Arm | B1 | B2 | B3 | B4 | B5 | Summe |
+|---|---:|---:|---:|---:|---:|---:|
+| D1 | +1 | −4 | 0 | −3 | −3 | −9 |
+| D2 | −2 | −4 | −3 | +1 | −4 | −12 |
+| D3 | −2 | −7 | 0 | −1 | −4 | −14 |
+
+Je Arm sind **4 von 5 Bloecken negativ**. Die Abbruchregel aus par.6 hat nie
+gegriffen (Schwelle bei Block 3 war 50/75; die Arme standen bei 59/75, 53/75,
+53/75) — die Arme sind alle vollstaendig gelaufen.
+
+### par.11.2 Die Zielgroesse: k1 und k2 bewegen sich NICHT, k5 nur bei Ueberdosis
+
+Plattenpunkte JE KRITERIUM, gepaart gegen N, Mittel ueber die Partien mit
+aktiver Platte (n = 45-47 je Kriterium; t auf Partie-Ebene):
+
+| Kriterium | Nullpunkt N | D1 | D2 | D3 |
+|---|---:|---:|---:|---:|
+| **k1 Vertikale Reihen** (Zielkriterium) | 1,04 | **+0,00** (t 0,00) | **−0,15** (t −0,30) | **+0,00** (t 0,00) |
+| **k2 Diagonale Reihen** (Zielkriterium) | 0,44 | **−0,22** (t −1,00) | **−0,22** (t −0,57) | **−0,44** (t −1,43) |
+| **k5 Eckplatten** (Zielkriterium) | 3,07 | +0,00 (t 0,00) | +0,24 (t 1,05) | **+0,96** (t 2,98) |
+| k0 Horizontale Reihen | 1,13 | −0,13 | −0,07 | −0,13 |
+| k3 Mehrfarbige Felder | 5,17 | +1,30 (t 1,19) | +0,04 | +2,04 (t 1,59) |
+| k4 Aeussere Felder | 9,20 | +0,40 (t 1,56) | +0,31 (t 1,42) | +0,51 (t 2,24) |
+| k6 Spezialfelder | −11,40 | +0,47 | +0,07 | +0,20 |
+| k7 Farbenreiche Reihen | 0,44 | +0,18 | +0,00 | +0,09 |
+
+**Die Zielkriterien der Kampagne bewegen sich nicht.** k1 steht bei allen drei
+Dosen exakt auf dem Nullpunkt; k2 geht in ALLEN drei Dosen zurueck, monoton
+mit der Dosis. Nur k5 steigt — und nur in der Ueberdosis D3, die 14 Siege
+kostet.
+
+**Woher der Plattenpunkt-Gewinn stattdessen kommt**: k3 (Mehrfarbige Felder)
+und k4 (Aeussere Felder). Das sind genau die beiden ZAEHL-Kriterien. Der
+Vorbehalt aus `project_plattenpunkte_aufschluesselung` ("ein Term, der die
+Summe hebt, kann das ueber mehrfarbige Felder tun ... ohne eine einzige Spalte
+zu schliessen") trifft hier woertlich zu — deshalb steht in par.6 die Regel,
+je Kriterium zu entscheiden und nicht auf der Summe.
+
+**Methodischer Vorbehalt, ehrlich**: die Block-Ebene traegt bei den
+Je-Kriterium-Zahlen NICHT. Mit 45 Partien je Kriterium und Blockgroesse 25
+bleiben nur 2 Bloecke; die dort ausgewiesenen t-Werte (bis 24,0) sind
+Artefakte von n_Block=2 und werden hier nicht verwendet. Die oben genannten
+t-Werte sind Partie-Ebene und damit die OPTIMISTISCHE Lesart — sie
+unterschaetzen die Streuung, und selbst so bewegt sich k1/k2 nicht.
+
+### par.11.3 Der Mechanismus stimmt, das Ziel nicht
+
+Bemerkenswert und mit der Herleitung in par.3.3 konsistent: **k4 steigt in
+allen drei Dosen** (+0,40 / +0,31 / +0,51, monoton in D3). k4 ist genau das
+Kriterium mit dem DETERMINISTISCHEN marginalen Feldwert `(1−p_f)·1` je
+Randfeld — der Tiling-Pol routet also nachweislich dorthin, wohin die Formel
+zeigt. Der Verbraucher ist nicht kaputt; er lenkt auf die Kriterien, deren
+Marginale gross und sicher sind (Randfelder, Ecken), und bezahlt das mit
+Platzierungspunkten (ΔMarge −2,3 bis −5,5).
+
+Die konjunktiven Zielkriterien k1/k2 bekommen dagegen fast nie ein Signal:
+ihr Marginal ist `7·(1−p_f)·PROD(uebrige 5)` bzw. `10·(1−p_f)·PROD(uebrige 5)`
+und damit ~0, solange die Spalte/Diagonale nicht fast fertig ist — und
+fast-fertige Spalten sind der Zustand, den das Netz laut
+`PREREG_placement_side.md` par.9 gerade NICHT erreicht (36 von 57 Partien bei
+5/6). **Der Verbraucher kann die Spaltenluecke nicht schliessen, weil sein
+Signal erst entsteht, wenn sie fast geschlossen ist.** Das ist eine
+Herleitung aus Formel plus Messung, kein separat gemessener Befund.
+
+### par.11.4 Verdikt Stufe 1 nach der Vorab-Regel aus par.6
+
+| Arm | Zielkriterien k1/k2/k5 hoch? | Siege nicht signifikant runter? | **Urteil** |
+|---|---|---|---|
+| D1 | **nein** (0,00 / −0,22 / 0,00) | ja (p = 0,136) | **NICHT-ERFOLG** |
+| D2 | nein | **nein** (p = 0,043) | **NICHT-ERFOLG** |
+| D3 | nur k5 (+0,96) | **nein** (p = 0,049) | **NICHT-ERFOLG** — exakt das k6-Kuppeldraft-Muster |
+
+**Kein Arm erfuellt die Vorab-Erfolgsregel.** D3 ist der Praezedenzfall in
+Reinform: Plattenpunkte hoch (+1,20 gesamt, k5 +0,96), Siege signifikant
+runter. Genau daran sind k6-Kuppeldraft und Stoerungs-v1 gescheitert, und
+genau dafuer stand die Regel vorher fest.
+
+## par.12 NACHTRAG zur Bedingung von Stufe 2 (geschrieben VOR dem Lauf)
+
+Stufe 2 war in par.4 an "**nur wenn** Stufe 1 eine Dosis D\* mit
+Plattenpunkt-Gewinn liefert" gebunden. Nach par.11.4 ist diese Bedingung
+**nicht erfuellt** — nach dem Buchstaben des Preregs waere Stufe 2 gestrichen.
+
+**Sie wird trotzdem gefahren, und zwar als FALSIFIKATIONS-Probe statt als
+Sieger-Bestaetigung.** Ehrlich als Abweichung markiert, mit Begruendung und
+mit einer Entscheidungsregel, die VOR dem Lauf hier steht:
+
+**Warum die Abweichung vertretbar ist**, und warum sie kein Nachfischen ist:
+1. Der Negativbefund aus Stufe 1 ist mit der KOPFGUETE konfundiert. F1 hat
+   Feld-AUC **0,780**, w1-final **0,870**, E_k-Spearman k5 0,345 gegen 0,466
+   (par.2). Ein Verbraucher, der von einem mittelmaessigen Kopf gesteuert
+   wird, kann aus zwei ganz verschiedenen Gruenden schaden.
+2. Die Frage ist NICHT neu erfunden: sie steht als Frage (b) in par.1 dieses
+   Preregs und als ausdrueckliche Empfehlung in
+   `PREREG_frozen_trunk_head.md` par.7.1 ("**BEIDE gehen als Checkpoint-Arme
+   in Tor C**"). Sie zu streichen, weil (a) negativ ausfiel, waere die
+   Verletzung einer aelteren Festlegung.
+3. Stufe 1 HAT einen Effekt gezeigt — einen monoton dosisabhaengigen. Die in
+   par.1 genannte Vorbedingung ("erst interessant, wenn (a) ueberhaupt einen
+   Effekt zeigt") ist damit im Wortsinn erfuellt; nur ist das Vorzeichen ein
+   anderes als erhofft.
+4. Kosten: 242 Partien ≈ 16 min (par.10). Der Preis, diese Frage offen zu
+   lassen, ist hoeher.
+
+**Arme**: `N = 0,0` und **D1 `0.1,0.3`** auf
+`models/alphazero_v21_2d_own_w1.onnx`, dieselben 121 Seeds.
+D1, weil es die einzige Dosis ohne signifikanten Sieg-Verlust ist und
+weil bei staerkerem Kopf die kleinste Dosis die groesste Chance hat.
+
+**Entscheidungsregel, vorab:**
+
+> **A — Der Kopf war das Problem**: w1-D1 hebt k1/k2/k5 gegen w1-N *und*
+> verliert die Siege nicht signifikant (McNemar p >= 0,05). Dann geht
+> **w1-D1 in Stufe 3 (Replikation)**, und das Verdikt von Tor C lautet
+> "Verbraucher traegt, aber erst ab Kopfguete ~0,87".
+>
+> **B — Der Verbraucher ist das Problem**: w1-D1 zeigt dasselbe Muster wie
+> F1-D1 (k1/k2 flach oder negativ, Siege runter). Dann ist der Negativbefund
+> NICHT kopfguetebedingt, **Tor C schliesst negativ**, und Stufe 3/4 entfallen
+> — es gibt keinen Sieger zu replizieren.
+>
+> **C — Uneindeutig** (Zielkriterien hoch, Siege signifikant runter, oder
+> umgekehrt): wie B behandeln (kein Erfolg), aber im Verdikt getrennt
+> ausweisen.
+
+Als Beifang faellt der **reine Checkpoint-Vergleich w1-N gegen F1-N** an
+(gleiche Seeds, Regler beidseitig aus): er beantwortet die in
+`PREREG_frozen_trunk_head.md` par.7.1 gestellte Frage, ob der Policy-Verlust
+von +41 % oder die Kopfguete von +0,09 AUC in der Arena schwerer wiegt —
+unabhaengig vom Verbraucher.
+
+## par.12.1 ERGEBNIS Stufe 2
+
+*(leer zum Zeitpunkt der Nachtrag-Registrierung)*
 
 ## par.13 ERGEBNIS Stufe 3 (Replikation)
 
