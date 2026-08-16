@@ -82,6 +82,16 @@ Korpus-Anteil des Val-Splits — dieselbe Skala wie fuer `w1_best`, `F1`, `F2`,
 damit die Zahlen ueber den Fensterwechsel hinweg vergleichbar bleiben. Die
 val_loss-Zahlen aus den Trainingslogs sind es ausdruecklich NICHT.
 
+**AUSFUEHRUNG AUF DER CPU** (Nutzer-Vorgabe 2026-08-16): waehrend `v21-b19`
+die GPU belegt, laufen alle Auswertungen zu `v21-b18` auf der CPU. Beide Sonden
+waehlen ihr Geraet ueber `DEVICE = "cuda" if torch.cuda.is_available() else
+"cpu"` (`ownership_gate_a.py:86`, `ownership_route_calibration.py:73`) und
+haben keinen Schalter dafuer. Erzwungen wird es per Env-Var — **geprueft, nicht
+angenommen**: `CUDA_VISIBLE_DEVICES=""` wirkt unter Windows NICHT
+(`is_available()` bleibt `True`), `CUDA_VISIBLE_DEVICES=-1` wirkt. Dazu die
+Torch-Threads begrenzen (`OMP_NUM_THREADS`), damit der Dataloader des laufenden
+Trainings Luft behaelt.
+
 1. **Kopfguete**: Feld-AUC und E_k-Rangkorrelation (k1 Spalten, k2 Diagonalen,
    k5 Ecken), zusaetzlich die Konjunktions-AUC je Atomgruppe.
 2. **WAECHTER**: Policy-val_loss auf demselben Held-out. Er ist im neuen
