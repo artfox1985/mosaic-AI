@@ -93,6 +93,11 @@ def auswerten(sp: dict) -> dict:
     return dict(
         seed=sp["game_seed"],
         punkte=sp["scores"][ni],
+        # ENDSTAND-MARGE (ergaenzt 2026-08-16, Tor C): der absolute Endstand
+        # allein taeuscht, weil das veraenderte Netz-Spiel auch den GEGNER
+        # bedient -- ein Arm, der 3 Punkte mehr macht und dem Gegner dabei 5
+        # mehr laesst, sieht auf `punkte` besser aus und ist schlechter.
+        marge=sp["scores"][ni] - sp["scores"][1 - ni],
         platten=platten_gesamt,
         je_kriterium=je_kriterium,
         boden=boden[ni] if isinstance(boden, list) else boden,
@@ -167,22 +172,25 @@ def main() -> None:
               f"Logtext geaendert? (siehe Modul-Doc)\n")
 
     bezug = daten.get(a.bezug) if a.bezug else None
-    kopf = f"{'Kuerzel':<10} {'n':>3} {'Sieg':>7} {'Punkte':>7} {'Platten':>8} {'Boden':>7}"
+    kopf = (f"{'Kuerzel':<10} {'n':>3} {'Sieg':>7} {'Punkte':>7} {'Marge':>7} "
+            f"{'Platten':>8} {'Boden':>7}")
     if bezug:
-        kopf += f" | {'ΔPunkte':>8} {'t':>6} {'ΔPlatten':>9} {'t':>6} {'ΔBoden':>7} {'t':>6}"
+        kopf += f" | {'ΔMarge':>8} {'t':>6} {'ΔPlatten':>9} {'t':>6} {'ΔBoden':>7} {'t':>6}"
     print(kopf)
     print("-" * len(kopf))
     for k, v in daten.items():
         ks = sorted(v)
         n = len(ks)
         mp = sum(v[s]["punkte"] for s in ks) / n
+        mm = sum(v[s]["marge"] for s in ks) / n
         mpl = sum(v[s]["platten"] or 0 for s in ks) / n
         mb = sum(v[s]["boden"] for s in ks) / n
         w = sum(v[s]["sieg"] for s in ks)
-        zeile = f"{k:<10} {n:>3} {w:>3}/{n:<3} {mp:>7.2f} {mpl:>8.2f} {mb:>7.2f}"
+        zeile = (f"{k:<10} {n:>3} {w:>3}/{n:<3} {mp:>7.2f} {mm:>7.2f} "
+                 f"{mpl:>8.2f} {mb:>7.2f}")
         if bezug:
             gem = [s for s in ks if s in bezug]
-            dp, tp = t_wert([v[s]["punkte"] - bezug[s]["punkte"] for s in gem])
+            dp, tp = t_wert([v[s]["marge"] - bezug[s]["marge"] for s in gem])
             dl, tl = t_wert([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0) for s in gem])
             db, tb = t_wert([v[s]["boden"] - bezug[s]["boden"] for s in gem])
             zeile += f" | {dp:>+8.2f} {tp:>6.2f} {dl:>+9.2f} {tl:>6.2f} {db:>+7.2f} {tb:>6.2f}"
@@ -194,14 +202,14 @@ def main() -> None:
     if bezug and a.block:
         ordn = [s for s in reihenfolge.get(a.bezug, sorted(bezug)) if s in bezug]
         kopf2 = (f"\nBLOCK-Ebene (Blockgroesse {a.block}, t ueber Blockmittel)\n"
-                 f"{'Kuerzel':<10} {'Bloecke':>7} {'ΔPunkte':>8} {'t':>6} "
+                 f"{'Kuerzel':<10} {'Bloecke':>7} {'ΔMarge':>8} {'t':>6} "
                  f"{'ΔPlatten':>9} {'t':>6} {'ΔBoden':>7} {'t':>6}")
         print(kopf2)
         for k, v in daten.items():
             if k == a.bezug:
                 continue
             gem = [s for s in ordn if s in v]
-            bp = block_mittel([v[s]["punkte"] - bezug[s]["punkte"] for s in gem], a.block)
+            bp = block_mittel([v[s]["marge"] - bezug[s]["marge"] for s in gem], a.block)
             bl = block_mittel([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0)
                                for s in gem], a.block)
             bb = block_mittel([v[s]["boden"] - bezug[s]["boden"] for s in gem], a.block)
