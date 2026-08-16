@@ -1,5 +1,14 @@
 # Mosaic-AI — Status & Fahrplan
 
+> **WENN DU DAS ALS ARTIFACT LIEST UND ZUGRIFF AUF DAS REPO HAST: lies
+> stattdessen `evaluations/STATUS.md`.** Die Repo-Datei ist die QUELLE, dieses
+> Artifact nur eine Ansicht und moeglicherweise aelter. Das Artifact ist fuer
+> Sitzungen OHNE Repo-Zugriff gedacht.
+>
+> Letzte Aenderung der Quelle laut git: **2026-08-17 00:10**. Gegenpruefen mit
+> `git log -1 --format=%cd -- evaluations/STATUS.md` -- weicht das ab, ist
+> diese Ansicht veraltet und darf nicht als Stand zitiert werden.
+
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
 **`../archive/history.md`**.
 
