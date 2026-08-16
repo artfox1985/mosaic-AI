@@ -27,21 +27,21 @@ Ownership-Verlust im Training traegt nichts bei.** `w1_best` gegen
 ALLEN vier Messgroessen schlechter (Siege 321:333, Marge 13,89:15,99,
 Platten 2,84:3,40, Strafleiste 9,89:8,87; n=407 gepaart, beide Arme blind).
 
-### Der Herausforderer  -- im direkten Duell GESCHEITERT
+### Der Herausforderer `w0_best` -- im direkten Duell GESCHEITERT
 
 Block H (gegen Heuristik@150, 4 Arme x 407 Partien, alle Regler aus):
 
 | Arm | Siege | Marge | Platten | Boden | McNemar gegen CH |
 |---|---:|---:|---:|---:|---:|
-| CH  | 296/407 | 11,26 | 2,42 | 10,49 | -- |
-|  | **333/407** | 15,99 | 3,40 | 8,87 | 0,0017 |
-|  /  | 321/407 | 13,89 | 2,84 | 9,89 | 0,0314 |
+| CH `v21_2d_brierbest` | 296/407 | 11,26 | 2,42 | 10,49 | -- |
+| `w0_best` | **333/407** | 15,99 | 3,40 | 8,87 | 0,0017 |
+| `w1_best` / `f1` | 321/407 | 13,89 | 2,84 | 9,89 | 0,0314 |
 
 **Das direkte Duell sagt das Gegenteil** (2026-08-16 17:00,
-, beide @400, Brett-Tausch):
+`paired_gating_w0best_vs_champion.json`, beide @400, Brett-Tausch je Paar):
 **w0_best 43:57 gegen den Champion**, SPRT nimmt H0 nach 50 Paaren an,
 Vorzeichentest p=0,21, KI [-0,652, +0,092]. Kein signifikanter Unterschied in
-beide Richtungen, nominal hinten. **Champion bleibt .**
+beide Richtungen, nominal hinten. **Champion bleibt `v21_2d_brierbest`.**
 
 > **STEHENDE LEHRE:** der Vergleich ueber den Heuristik-Anker sagt die
 > Kopf-an-Kopf-Staerke NICHT vorher. Zwei Faelle zeigen es (F1 bei n=12,
@@ -52,9 +52,9 @@ beide Richtungen, nominal hinten. **Champion bleibt .**
 Offen und unerklaert: w0_best macht im direkten Duell MEHR Punkte im Schnitt
 (45,44 gegen 44,77) und gewinnt trotzdem seltener.
 
-**Falle:**  hat  per Default auf
-TRUE und schreibt  selbsttaetig um. Messlaeufe brauchen
-.
+**Falle:** `tools/paired_gating.py:473` hat `--promote-winner` per Default auf
+TRUE und schreibt `models/champion.txt` selbsttaetig um. Messlaeufe brauchen
+`--no-promote-winner`.
 
 ### NAECHSTER SCHRITT: Selektor-Umbau, Stufe 0 laeuft
 
