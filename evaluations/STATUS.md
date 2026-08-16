@@ -20,21 +20,22 @@
 aber es gibt erstmals seit v21 einen ernsthaften **Herausforderer**, siehe
 unten. Paritaets-Hash `8c6684ff...` haelt.
 
-### Die Plattenagenda: beide Wege gemessen, beide negativ
+### Die Plattenagenda: was wirklich gemessen ist (Stand nach dem Traeger-Befund)
 
-Der Ownership-Kopf hatte genau zwei Wege ins Spiel. Beide sind jetzt
-durchgemessen, und keiner traegt:
+Der Ownership-Kopf hat zwei Wege ins Spiel. **Keiner von beiden ist bisher
+fair geprueft worden** -- das ist die Korrektur eines frueheren, zu
+zuversichtlichen Eintrags an dieser Stelle:
 
-| Weg | Ergebnis |
+| Weg | Stand |
 |---|---|
-| **Laufzeit-Regler** (Tor C, `PREREG_gate_c_consumer_sweep.md`) | NEGATIV und monoton schaedlich: 98 / 89 / 86 / 84 Siege ueber die Dosisstufen |
-| **Destillation** (`PREREG_corpus_distillation.md` par.8.4/par.10.2) | Zielkriterien k1/k2/k5 bei BEIDEN Korpus-Armen innerhalb der Vorab-Aufloesung => Ausgang 2 |
+| **Laufzeit-Regler** (Tor C) | Gemessen NEGATIV (98/89/86/84 Siege ueber die Dosisstufen), aber an Vehikeln, deren Policy den Plattenbau nie gesehen hat. Belegt ist nur "nuetzt nichts bei plattenblinder Policy" -- Destillations-Prereg par.10.6 |
+| **Destillation** | **Hat nie stattgefunden.** Der Korpus war in allen sieben Laeufen policy-maskiert (siehe Befund unten) |
 
-Dazu die Zerlegung, die den Baustein selbst trifft: **der
-Ownership-Verlust im Training traegt nichts bei.** `w1_best` gegen
-`w0_best` unterscheidet sich in genau einem Manifest-Feld und ist auf
-ALLEN vier Messgroessen schlechter (Siege 321:333, Marge 13,89:15,99,
-Platten 2,84:3,40, Strafleiste 9,89:8,87; n=407 gepaart, beide Arme blind).
+Was davon **haelt**: die Zerlegung `w1_best` gegen `w0_best` -- ein
+Manifest-Feld Unterschied, und der Ownership-Verlust im Training faellt auf
+allen vier Messgroessen negativ aus (Siege 321:333, Marge 13,89:15,99, Platten
+2,84:3,40, Strafleiste 9,89:8,87; n=407 gepaart, beide Arme blind). Auch das
+allerdings ohne Policy-Beitrag des Korpus gemessen.
 
 ### Der Herausforderer `w0_best` -- im direkten Duell GESCHEITERT
 
@@ -109,43 +110,58 @@ des Champions auf DEMSELBEN Held-out vergleichen.
 gehoert in die Ist-Stand-Tabelle jeder Prereg, die eine Policy-Aussage machen
 will.
 
-### NAECHSTER SCHRITT: Selektor-Umbau, Stufe 0 laeuft
+### NAECHSTER SCHRITT: v21-b18 / v21-b19 im neuen Fenster
 
-Die Diagnose zum doppelten Negativbefund ist am Code gefuehrt und in
-`PREREG_ownership_selector.md` par.1 registriert. Kurzfassung:
+**Erstmals traegt der Korpus die Policy.** Neues Fenster
+(`PREREG_ownership_weight_new_window.md`): Korpus als Sockel (700 Dateien
+Policy-aktiv), Schwarm `v19wdlsw` ausgeduennt, Gesamtmenge exakt wie v21 --
+2945 Dateien / 29.450 Partien, davon 7.000 mit Policy-Zielen und 29.450 mit
+Value-Zielen. Traegersatz: `data/policy_carrier_manifest_own.json`.
 
-1. **Die Platzierung entscheidet der Loeser, nicht die Policy**
-   (`self_play.rs:1093`). Ein Verbraucher am Blatt erbt diese Blockade --
-   der Kommentar in `tiling_solver.rs:968` hatte Tor C vorhergesagt. Das
-   erklaert auch, warum die Destillation nicht greifen KONNTE: die Policy
-   hat fuer die Platzierung keinen Ausgang.
-2. **Das Signal ist invers zum Bedarf.** Platzieren zahlt immer >= 1 Punkt,
-   eine fortgesetzte Linie zahlt ihre Laenge (`engine_manual.md:143-148`).
-   Spaltenbau kostet also nur die ersten ein bis zwei Zuege etwas und zahlt
-   danach von selbst -- waehrend der Produktform-Marginalwert erst gross
-   wird, wenn die Spalte fast fertig ist.
-3. **Die Produktform unterdrueckt die Zielkriterien** (Marginalwert bei
-   p=0,5: k1 0,109, k2 0,156 gegen k4 0,500 und k6 1,500).
-4. **Die Konjunktions-Ausgaenge sind trainiert und ungenutzt** -- und zwar
-   auf GEOMETRIE-Ebene (Spalte 6..11, Diagonale 12..13, Ecke 14..17), also
-   genau das, was ein Selektor braucht.
+| Lauf | `ownership_weight` | Stand |
+|---|---:|---|
+| `v21-b18` | 1,0 | FERTIG, Early Stop nach Epoche 15, **bester Checkpoint Epoche 4** (Policy-Optimum) |
+| `v21-b19` | 2,0 | laeuft (GPU) |
 
-Der Umbau gibt dem Kopf deshalb die **Vorzugsroute mit Frueh-Ausstieg**, die
-beim Spaltenbauer nachweislich traegt (`tiling_solver.rs:1467`, Deckung
-3,2 % -> 42 %), statt eines Gewichts in einer Nachsortierung.
+Laufend auf der CPU: `v21-b18_best` gegen den Champion, Netz gegen Netz, 407
+Seeds mit Partie-Logs -- liefert Siege UND Plattenpunkte je Kriterium aus
+denselben Partien. Das sind die zwei Nutzer-Kriterien dafuer, ob `b18` als
+Self-Play-Generator taugt.
 
-**Stufe 0 laeuft** (offline, zwei Sonden): Kopfguete F2 gegen F1, und
-Kalibrierung der Konjunktions-Atome plus Schwellenraster. Zwei
-Abbruchregeln stehen vorab in par.5.
+**Danach faellig, in dieser Reihenfolge:** erst die zwei Kriterien auswerten,
+und nur wenn die Policy tatsaechlich Platten anspielt, **Tor C auf
+`v21-b18_best` wiederholen**. Vorher waere es erneut eine Messung an der
+falschen Stelle.
+
+### Selektor-Umbau: Stufe 0 GEMESSEN, Entwurf widerlegt
+
+`PREREG_ownership_selector.md` par.9. Beide Abbruchregeln greifen nicht, aber
+die Schwellenregel aus par.3.1 ist tot: eine absolute Schwelle feuert bei 0,7
+fuer Spalten in **0,22 %** der Tiling-Zuege und fuer Ecken in **72,4 %** --
+gleichzeitig zu selten und zu haeufig. Ursache: der Kopf **rangiert
+hervorragend** (AUC 0,83-0,91) und **kalibriert schlecht** (Brier nur 8-14 %
+besser als die Grundrate). Ersatz ist eine kalibrierungsfreie Rangregel mit
+Abstandsbedingung (par.9.3).
+
+Gemessenes Hauptrisiko: Spalten-AUC 0,698 in Runde 1 gegen 0,886 in Runde 5 --
+der Kopf ist genau dort am schwaechsten, wo die Hilfe gebraucht wird.
+
+**Zwei Korrekturen an der Diagnose in par.1**, beide vom Nutzer angestossen:
+die Platzierungsseite ist laut `PREREG_placement_side.md` par.11 NICHT die
+Blockade (Draftingseite allein 2,10; Vorzugsroute dort 0,70 = schlechtester
+von vier Anlaeufen), und das Destillations-Versagen hatte die banalere Ursache
+oben. Was beim Spaltenbauer traegt, ist die KOORDINATION beider Seiten
+(`tiling_solver.rs:1460`), nicht der Vorrang.
 
 ### Danach in der Warteschlange
 
-- **Direktes Gating-Duell `w0_best` gegen Champion** -- die Championfrage,
-  ~1 h bei 11,95 s/Partie. Unabhaengig vom Selektor-Umbau.
-- **Kontrollarm "Weitertraining ohne Korpus"** -- loest den Konfund, ein
-  GPU-Lauf.
-- **F3** (Frozen-Trunk-Kopf auf `w0_best`) -- gaebe staerkste Policy PLUS
-  trainierten Kopf; haengt an Stufe 0 Punkt 1.
+- **Tor C auf `v21-b18_best`** -- der erste faire Test des Laufzeit-Reglers.
+- **Kontrollarm "Weitertraining ohne Korpus"** -- loest den Konfund
+  Korpus-oder-Weitertraining, ein GPU-Lauf.
+- **Fester Bewertungssatz**: ein paar Korpusdateien dauerhaft aus JEDEM
+  Training aussperren. Ohne das ist jeder Kopfvergleich ueber einen
+  Fensterwechsel hinweg kontaminiert -- gemessen 88 % Ueberlappung zwischen
+  dem Sonden-Held-out und `v21-b18`s Trainingsdaten.
 - **Stoerungs-Baustein Stufe 2**: NUTZER-ENTSCHEID offen, 7,63 % Stoerfenster.
 
 ### Offene Punkte
