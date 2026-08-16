@@ -344,6 +344,19 @@ muss der Preis bekannt sein.
   `= D*`, sonst identische Konfiguration, 11 Faeden, 40 Partien je Arm
   (dieselbe Groesse wie der Traeger-Sweep in
   `PREREG_gpu_inference_path.md` par.23, damit die Zahlen vergleichbar sind).
+- **In SELF-PLAY, nicht in der Arena** (Praezisierung 2026-08-16, noch vor der
+  Messung eingetragen): die Entscheidung, die die Zahl tragen soll, ist ein
+  8000er-Self-Play. Dort spielen BEIDE Seiten mit Netz, der Zusatzpass faellt
+  also doppelt so oft an wie in der Arena (dort hat nur die Netzseite
+  `tiling_net: Some(net)`, `self_play.rs::play_net_game`). Eine Arena-Messung
+  wuerde den Preis systematisch unterschaetzen. Konfiguration daher wie die
+  Korpus-Erzeugung: `self_play.py --mode network --sims 200 --threads 11`
+  (`PREREG_ownership_corpus.md` par.7: "Sims 200 fuer die Netz-Arme"), Ablage
+  ueber `MOSAIC_DATA_DIR` in ein Wegwerf-Verzeichnis, damit `data/` unberuehrt
+  bleibt.
+- Der DRITTE Arm ist `MOSAIC_OWNERSHIP_W = D*` **allein** (Tiling-Pol aus).
+  Er trennt die beiden Kostenanteile: der Blatt-Pol darf strukturell nichts
+  kosten (siehe Vorab-Deutung unten), der Tiling-Pol muss etwas kosten.
 - **Bedingung**: **erst wenn die GPU frei ist.** Zum Registrierungszeitpunkt
   laeuft `train.py --name v21_2d_own_f2` (PID 17612, geprueft per
   `Get-CimInstance Win32_Process`) und die Maschine steht bei 100 % CPU-Last
