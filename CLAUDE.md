@@ -61,6 +61,18 @@ git -c filter.git-crypt.smudge=cat -c filter.git-crypt.clean=cat -c filter.git-c
 Im Worktree enthält `player_profiles.json` dann Ciphertext — für Engine-/
 Tool-Arbeit egal, aber die Datei dort NIE bearbeiten oder committen.
 
+## STATUS.md als Artifact (Nutzer-Entscheid 2026-08-16)
+
+`evaluations/STATUS.md` wird zusaetzlich als Artifact veroeffentlicht:
+https://claude.ai/code/artifact/4616b765-9592-465f-948a-84015275f163
+
+**Die Datei im Repo ist die QUELLE, das Artifact nur eine ANSICHT.** Nie
+umgekehrt bearbeiten. Nach jedem Commit, der `STATUS.md` aendert, dieselbe
+Datei erneut veroeffentlichen (`Artifact`-Werkzeug, gleicher `file_path` in
+derselben Sitzung, sonst die URL oben als `url` mitgeben) -- sonst zeigt das
+Artifact einen ueberholten Stand und ist schlimmer als keines, weil es
+aussieht wie der aktuelle.
+
 ## Workflow-Präferenzen
 
 - Bevor du große Refactorings durchführst, skizziere kurz den Plan (1-2 Sätze).
