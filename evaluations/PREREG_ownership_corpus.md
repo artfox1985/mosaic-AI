@@ -606,3 +606,40 @@ Held-out-Satz. Deutungsregel vorab: steigt w1 weiter, ist das Optimum immer
 noch nicht eingeklammert (dann waere ein weiterer Arm faellig oder die
 Gewichtsfrage als "nach oben offen, praktisch gedeckelt" zu schliessen);
 faellt w1 gegen w05 ab, ist 0,5 als Optimum bestaetigt.
+
+### §10.6 w1-ERGEBNIS: der Trend haelt -- und die Gewichtsfrage wandert weiter
+
+Gemessen mit demselben `ownership_gate_a.py` auf demselben Held-out
+(820 Partien, Dateilisten-Kontrolle bestanden). Rohzahlen:
+`evaluations/ownership_gate_a_w1.json`.
+
+| Arm | Feld-AUC (best/final) | E_k k1 (final) | k2 | k5 | policy val_loss (best) |
+|---|---|---:|---:|---:|---:|
+| w05 | 0,709 / 0,837 | 0,332 | 0,347 | 0,408 | 0,2139 |
+| **w1** | **0,726 / 0,870** | **0,361** | **0,354** | **0,466** | 0,2141 |
+
+w1 gewinnt **jedes** Zielkriterium und jede Konjunktionsgruppe (Ecken
+0,963 -> 0,981, Layout 0,910 -> 0,973). Der Waechter bleibt praktisch
+unbewegt (policy 0,2139 -> 0,2141, Brier unveraendert 0,1884) -- die dritte
+Nachkommastelle ist der erste zarte Hinweis auf Kosten, mehr nicht.
+
+**Damit ist das Optimum WEITERHIN nicht eingeklammert.** Die ehrliche Lesart:
+der Sweep hat gezeigt, dass mehr Ownership-Gewicht im gemeinsamen Training
+bis 1,0 nur nuetzt, aber er hat kein Maximum gefunden.
+
+**Trotzdem KEIN w2-Arm.** Begruendung, warum die Frage ihren Gegenstand
+verliert: im Frozen-Trunk-Modus (PREREG_frozen_trunk_head.md) trainiert NUR
+noch der Kopf. Das Ownership-Gewicht skaliert dann ausschliesslich den
+Gradienten des einzigen lernenden Teils -- es wird faktisch zu einem zweiten
+Lernraten-Faktor und verliert seine Bedeutung als Abwaegung zwischen Koepfen.
+Die Abwaegung, die der Sweep messen sollte ("wie viel Kopf vertraegt die
+Policy"), existiert dort nicht mehr. Ein w2-Arm im gemeinsamen Training
+wuerde also eine Frage weiter verfolgen, die der naechste Schritt ohnehin
+aufloest. Sollte Frozen-Trunk scheitern (Ausgang "Decke bestaetigt"), kommt
+die Gewichtsfrage zurueck -- dann mit w2 als erstem Arm.
+
+**Folge fuer F1**: die Vorab-Regel aus PREREG_frozen_trunk_head.md §3
+("sollte w1 den Arm w05 schlagen, wandert F1 auf `v21_2d_own_w1_best` und
+`--ownership-weight 1,0`") ist damit ausgeloest -- nach der dort genannten
+Mehrheitsregel sogar einstimmig. F1 startet entsprechend, Referenz J ist der
+w1-Satz.
