@@ -101,28 +101,48 @@ des Champions auf DEMSELBEN Held-out vergleichen.
 gehoert in die Ist-Stand-Tabelle jeder Prereg, die eine Policy-Aussage machen
 will.
 
-### NAECHSTER SCHRITT: v21-b18 / v21-b19 im neuen Fenster
+### STAND 2026-08-17: b18 ist paritaetisch UND plattenblind
 
-**Erstmals traegt der Korpus die Policy.** Neues Fenster
-(`PREREG_ownership_weight_new_window.md`): Korpus als Sockel (700 Dateien
-Policy-aktiv), Schwarm `v19wdlsw` ausgeduennt, Gesamtmenge exakt wie v21 --
-2945 Dateien / 29.450 Partien, davon 7.000 mit Policy-Zielen und 29.450 mit
-Value-Zielen. Traegersatz: `data/policy_carrier_manifest_own.json`.
+**Erstmals traegt der Korpus die Policy** (Traegersatz
+`policy_carrier_manifest_own.json`, 700 Dateien / 7.000 Partien -- mehr als der
+Champion mit 5.800). Ergebnis von `v21-b18_best` gegen den Champion, 407
+Seeds, Netz gegen Netz, alle Regler aus:
 
-| Lauf | `ownership_weight` | Stand |
-|---|---:|---|
-| `v21-b18` | 1,0 | FERTIG, Early Stop nach Epoche 15, **bester Checkpoint Epoche 4** (Policy-Optimum) |
-| `v21-b19` | 2,0 | laeuft (GPU) |
+| | b18_best | Champion |
+|---|---:|---:|
+| Siege | 211/407 = 51,8 % (p=0,49, Block-t 0,88) | 196/407 |
+| k1 vertikal | 0,90 | 0,85 |
+| **k2 Diagonalen** | **0,00** | 0,07 |
+| k5 Ecken | 3,48 | 3,57 |
 
-Laufend auf der CPU: `v21-b18_best` gegen den Champion, Netz gegen Netz, 407
-Seeds mit Partie-Logs -- liefert Siege UND Plattenpunkte je Kriterium aus
-denselben Partien. Das sind die zwei Nutzer-Kriterien dafuer, ob `b18` als
-Self-Play-Generator taugt.
+**Die Destillation uebertraegt den Plattenbau nicht** -- kein Zielkriterium
+bewegt sich, keine einzige Diagonale in 150 Partien. Aber sie kostet auch
+nichts: Paritaet bei einem Policy-Kanal, der auf 200-Sims-Ziele aus einer
+schmalen Verteilung umgestellt wurde. Als Generator taugt `b18` damit, er
+liefert nur von sich aus keinen Plattenbau. Details:
+`PREREG_corpus_distillation.md` par.10.7.
 
-**Danach faellig, in dieser Reihenfolge:** erst die zwei Kriterien auswerten,
-und nur wenn die Policy tatsaechlich Platten anspielt, **Tor C auf
-`v21-b18_best` wiederholen**. Vorher waere es erneut eine Messung an der
-falschen Stelle.
+### LAUFEND
+
+| Lauf | Was | Stand |
+|---|---|---|
+| `v21-b19` | Gewicht 2,0 gegen b18s 1,0 (`PREREG_ownership_weight_new_window.md`) | GPU |
+| `v21-b20` | **Cold Start**, kein Warm Start -- liegt es am Korpus oder am Prior? | eingekettet |
+| `v21-b21` | Warm Start mit **Plateau-Scheduler** gegen b18 (`PREREG_lr_schedule.md`) | eingekettet |
+
+**Defekt, der dabei auffiel:** `CosineAnnealingLR` nimmt `T_max=--epochs`. Bei
+`--epochs 100` und Early Stop nach 15 faellt die LR um 5 % -- das
+Warm-Start-Standardrezept seit v12b_lr hat sein Annealing **nie** ausgespielt.
+Neu gebaut: `--lr-schedule plateau` (ReduceLROnPlateau, adaptiv, braucht den
+Horizont nicht). Bestandsvergleiche bleiben gueltig, weil alle Arme denselben
+Defekt hatten.
+
+### DANACH: Tor C auf `v21-b18_best`
+
+Der Regler war in der Messung oben AUS. Tor C ist jetzt zum ersten Mal fair --
+die Policy kann den plattenbauenden Zug vorschlagen, auch wenn sie ihn von
+sich aus nicht waehlt. Erwartung gedaempft: die Produktform-Arithmetik
+(Marginalwert k1 0,109 gegen k6 1,50) bleibt unberuehrt von der Policy.
 
 ### Selektor-Umbau: Stufe 0 GEMESSEN, Entwurf widerlegt
 
