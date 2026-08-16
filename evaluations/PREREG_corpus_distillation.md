@@ -416,6 +416,14 @@ ist damit **unbeantwortet**. Ausgang 4 konnte nicht geprueft werden.
 Angewandt wird die Regel aus par.7 in ihrem Wortlaut vor der ersten
 Entscheidungspartie, auf die eine gemessene Paarung.
 
+**Verhaeltnis zu par.7a:** dort ist festgelegt, dass nur die drei BLINDEN Arme
+(`champion`, `w0_best`, `w1_best`) ein Verdikt tragen duerfen. Das ist hier
+eingehalten — beide hier ausgewerteten Arme waren zum Zeitpunkt ihres Laufs
+ungemessen. Es fehlt der dritte: `w1_best`. Damit fehlt genau die
+Ein-Faktor-Zerlegung aus par.7a Punkt 3 (`w0_best` gegen `w1_best`), und das
+Verdikt unten steht auf zwei statt drei blinden Armen. Die Zusatzarme `f1` und
+`w1`-final aus par.7a sind hier NICHT verrechnet.
+
 **Ausgang 1 (DESTILLATION HAT GEGRIFFEN) — greift NICHT.** Er verlangt einen
 signifikanten Zuwachs auf k1/k2/k5. Keines der drei ist signifikant.
 
