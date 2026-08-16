@@ -355,7 +355,14 @@ def main():
     for arm in ARMS:
         for tag, fname in (("best", f"{MODEL_PREFIX}{arm}_best.pth"),
                            ("final", f"{MODEL_PREFIX}{arm}.pth")):
-            if not (REPO / "models" / fname).exists() and tag == "final":
+            # Fehlende Varianten ueberspringen statt zu sterben -- gilt fuer
+            # BEIDE Tags: `_best` fehlt legitim, wenn die letzte Epoche schon
+            # die beste war (train.py:1956 schreibt dann keinen separaten
+            # Checkpoint). Genau das passiert im Frozen-Trunk-Modus, wo der
+            # Ownership-Val-Verlust monoton faellt -- dort IST `<arm>.pth` der
+            # ausgewaehlte Stand. Vorher brach die Sonde hier mit
+            # FileNotFoundError ab (aufgefallen bei F1, 2026-08-16).
+            if not (REPO / "models" / fname).exists():
                 print(f"  (kein {fname} -- uebersprungen)")
                 continue
             ck = torch.load(REPO / "models" / fname, map_location="cpu",
