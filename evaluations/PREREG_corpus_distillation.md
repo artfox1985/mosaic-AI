@@ -534,5 +534,43 @@ DIREKTE Duell (par.4.2 / `paired_gating.py`), nicht den indirekten Vergleich
 ueber die Heuristik. Die Kostenprobe aus par.6 ist die Mahnung dazu — F1 schlug
 den Champion indirekt und verlor direkt 4:8 (n=12, kein Befund, aber die
 richtige Warnung).
+
+### par.10.3 NACHTRAG 2026-08-16, 17:00 — DAS DIREKTE DUELL IST GEFAHREN, UND ES KIPPT AUSGANG 3
+
+`evaluations/paired_gating_w0best_vs_champion.json`, `tools/paired_gating.py`,
+`--no-promote-winner` (der Default haette `models/champion.txt` selbsttaetig
+umgeschrieben, `paired_gating.py:473`). Beide @400 Sims, Brett-Tausch je Paar.
+
+| | Wert |
+|---|---:|
+| **W0_best gegen Champion** | **43 : 57** (100 Partien, 50 Paare) |
+| SPRT-Verdikt | **H0** nach 50 Paaren (LLR −3,251, Schranke −2,944) |
+| Vorzeichentest (Bericht, nicht die Stoppregel) | p = 0,2100 |
+| Gepaarte Differenz | −0,280, 95 %-KI [−0,652, +0,092] |
+| Durchschnittspunkte | W0 **45,44** gegen CH 44,77 |
+| Strafleiste | W0 14,69 gegen CH 14,32 |
+
+**Was das heisst und was nicht.** Die SPRT-Alternative war p=0,65, also ein
+grosser Vorsprung; H0 anzunehmen heisst *"kein Beleg fuer einen solchen
+Vorsprung"*, nicht *"W0 ist schlechter"*. Der Vorzeichentest (p=0,21) und das
+Konfidenzintervall (schliesst 0 ein) sagen: **kein signifikanter Unterschied in
+beide Richtungen.** Nominal liegt W0 hinten. **Der Champion bleibt.**
+
+**Der eigentliche Befund ist die Nicht-Transitivitaet.** Gegen die Heuristik
+schlaegt W0 den Champion um 37 Partien bei p=0,0017 (par.8.4). Direkt gegen ihn
+liegt er hinten. Beides ist gemessen, beides ist gepaart, und beides gilt — der
+Vergleich UEBER EINEN DRITTEN GEGNER sagt die Kopf-an-Kopf-Staerke nicht
+vorher. Die n=12-Sonde aus par.6 hatte genau darauf gedeutet und wurde
+zu Recht nicht als Befund verkauft; jetzt steht es bei n=100.
+
+**Konsequenz fuer den Sprachgebrauch im Projekt:** ein Arm, der nur im
+Heuristik-Anker vorne liegt, ist **kein Gating-Kandidat**, sondern ein
+Kandidat fuer ein Gating. Der Satz oben ("der Gating-Kandidat ist damit
+eindeutig W0_best") war in dieser Hinsicht zu stark und wird hiermit
+eingeschraenkt statt geloescht — er stand vor dem Duell.
+
+Kurios und unerklaert: W0 macht im direkten Duell **mehr** Punkte im Schnitt
+(45,44 gegen 44,77) und gewinnt trotzdem seltener. Das ist mit diesen Daten
+nicht aufgeloest und ausdruecklich als offen markiert.
 3. Ein Arm "Weitertraining OHNE Korpus", der den Konfund aus par.3 aufloest.
    Existiert nicht und muesste trainiert werden.
