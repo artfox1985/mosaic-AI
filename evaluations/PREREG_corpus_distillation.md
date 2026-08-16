@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bauen die auf dem Ownership-Korpus trainierten Netze VON SELBST mehr Wertungsplatten als der Champion -- ohne jeden Regler? Und traegt das der Korpus oder der Ownership-Verlust? | Beleg: **TEILERGEBNIS 2026-08-16, 814 Partien** (par.8): EINE von drei Paarungen gemessen (W0 gegen Champion, n=407, Regler aus). Zielkriterien NICHT gehoben -- k1 +0,27 (p 0,391), k2 +0,20 (p 0,296), k5 +0,11 (p 0,564), alle drei innerhalb der vorab ausgewiesenen Aufloesung 0,85/0,48/0,31 => Ausgang 2. Gleichzeitig Ausgang 3: W0 gewinnt 333:296 (McNemar p=0,0017), Marge +4,73, Strafleiste -1,62, Platten gesamt +0,99 -- der Plattenzuwachs kommt aus k3 (+1,99), dem Zaehl-Kriterium, nicht aus den konjunktiven Zielkriterien (Tor-C-Muster wiederholt). W0 hat ownership_weight 0,0: der Staerkegewinn braucht den Ownership-Verlust NICHT. Konfund bleibt: Korpus ODER 100 weitere Epochen. OFFEN: w1_best und f1 (Lauf abgebrochen), Block N nie gestartet. -->
+<!-- STATUS: OFFEN | Frage: Bauen die auf dem Ownership-Korpus trainierten Netze VON SELBST mehr Wertungsplatten als der Champion -- ohne jeden Regler? Und traegt das der Korpus oder der Ownership-Verlust? | Beleg: **BLOCK H VOLLSTAENDIG 2026-08-16, 1628 Partien, 4 Arme auf identischem 407-Seed-Satz** (par.8, par.8.4). ZIELKRITERIEN NICHT GEHOBEN, bei BEIDEN Korpus-Armen: W0 k1 +0,27 / k2 +0,20 / k5 +0,11, W1 k1 +0,19 / k2 +0,13 / k5 +0,07 -- alle sechs innerhalb der vorab ausgewiesenen Aufloesung 0,85/0,48/0,31 => Ausgang 2. Zugleich Ausgang 3: W0 333:296 (McNemar p=0,0017), W1 321:296 (p=0,0314); Plattenzuwachs kommt aus k3 (Zaehl-Kriterium), Staerkegewinn aus Marge +5,09 und Strafleiste -1,61. EIN-FAKTOR-ZERLEGUNG EINGELOEST: W1 gegen W0 (nur ownership_weight unterscheidet sie) ist auf ALLEN vier Messgroessen schlechter => der Ownership-Verlust traegt nichts bei. F1 == W1 auf allen 407 Seeds (0 diskordant) => Frozen-Trunk-Riegel live bestaetigt. Konfund bleibt: Korpus ODER 100 weitere Epochen. OFFEN: Block N / direktes Gating-Duell W0 gegen Champion. -->
 
 # PREREG: Destillations-Messung — hat der Ownership-Korpus die POLICY geformt?
 
@@ -403,6 +403,43 @@ nicht wie in Tor C auf einer nicht tragenden nB=2.
    nicht vorregistriert, deshalb steht hier der Nominalwert — aber er traegt
    keine Einzelaussage.
 
+### par.8.4 NACHTRAG 2026-08-16, 15:20 — die fehlenden Arme sind nachgeholt
+
+Der Koordinator hat `w1_best` und `f1` auf **demselben 407-Seed-Satz** mit
+demselben Aufruf nachgezogen (14:37–15:20). Block H ist damit **vollstaendig**;
+alle vier Arme sind ueber den Seed gepaart, der Anziehende ist je Seed in allen
+Armen identisch (geprueft, nicht angenommen).
+
+| Arm | Siege | Marge | Platten | Boden | k1 | k2 | k5 | k3 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| CH | 296/407 | 11,26 | 2,42 | 10,49 | 0,63 | 0,07 | 3,25 | 3,50 |
+| **W0** | **333/407** | **15,99** | **3,40** | **8,87** | 0,90 | 0,27 | 3,37 | 5,49 |
+| W1 | 321/407 | 13,89 | 2,84 | 9,89 | 0,85 | 0,20 | 3,33 | 4,13 |
+| F1 | 321/407 | — | — | — | — | — | — | — |
+
+**Paarungen (exakter McNemar, n=407):**
+
+| Paarung | nur A | nur B | p |
+|---|---:|---:|---:|
+| W0 gegen CH | 85 | 48 | **0,0017** |
+| W1 gegen CH | 75 | 50 | **0,0314** |
+| F1 gegen CH | 75 | 50 | **0,0314** |
+| **W1 gegen W0** | 48 | 60 | 0,2898 |
+| **F1 gegen W1** | **0** | **0** | 1,0000 |
+
+**F1 und W1 spielen auf allen 407 Seeds Zug fuer Zug gleich — null diskordante
+Paare.** Das ist keine Messung, sondern eine Tautologie mit Beleg-Wert: F1 hat
+nur den Ownership-Kopf trainiert, und bei `MOSAIC_OWNERSHIP_W=0` wird der nie
+gelesen. Der BatchNorm-Riegel aus `PREREG_frozen_trunk_head.md` (ohne den das
+Einfrieren still falsch gewesen waere) ist damit **live in der Arena
+bestaetigt**, nicht nur im Selbsttest.
+
+**W1 gegen CH je Kriterium** (Block-Ebene, nB=6): k1 +0,19 (t 0,55) · k2 +0,13
+(t 1,58) · k5 +0,07 (t 0,40) · k3 +0,57 (t 1,00) · k7 +0,21 (t 1,58) · uebrige
+|t| < 1,2. **Kein Kriterium signifikant, alle drei Zielkriterien wieder
+innerhalb der Aufloesung.** Block-Ebene gesamt: Marge +2,79 (t 2,22), Platten
++0,38 (t 1,40), Boden −0,55 (t −1,06).
+
 ## par.9 ERGEBNIS BLOCK N — NICHT GELAUFEN
 
 Kein einziger Lauf. Die CPU war durchgehend von Block H belegt (6 Kerne / 12
@@ -455,8 +492,47 @@ Aussage lautet **"Korpus oder Weitertraining"**, nicht "Korpus".
 
 ### par.10.1 Was als naechstes zu messen waere (nicht gemessen, keine Empfehlung)
 
-1. `w1_best` und `f1` auf demselben 407-Seed-Satz — vervollstaendigt die
-   Zerlegung und kostet ~2 x 25 min bei freier CPU.
+1. ~~`w1_best` und `f1` auf demselben 407-Seed-Satz~~ — **erledigt 15:20,
+   par.8.4.**
 2. Block N wie in par.4.2 registriert — die Gating-Frage zu Ausgang 3.
+
+### par.10.2 VERDIKT NACH VOLLSTAENDIGEM BLOCK H (2026-08-16, 15:20)
+
+Alle drei blinden Arme aus par.7a liegen jetzt vor. Das Verdikt oben wird
+dadurch **nicht umgestossen, sondern verschaerft**:
+
+**Ausgang 2 gilt fuer BEIDE Korpus-Arme.** Was oben nur fuer W0 belegt war,
+gilt auch fuer W1: k1 +0,19 / k2 +0,13 / k5 +0,07, alle drei innerhalb der
+vorab ausgewiesenen Aufloesung 0,85 / 0,48 / 0,31. Die in par.10 offen
+gelassene Moeglichkeit — "es bleibt moeglich, dass der Ownership-VERLUST die
+Zielkriterien bewegt" — ist damit **gemessen und verneint**.
+
+**Die Ein-Faktor-Zerlegung aus par.3 ist eingeloest, und sie faellt negativ
+aus.** W1 gegen W0 unterscheidet sich in genau einem Manifest-Feld
+(`ownership_weight` 1,0 gegen 0,0), ist also vom Korpus/Epochen-Konfund frei.
+Ergebnis: W1 ist auf **jeder** Messgroesse schlechter als W0 — Siege 321
+gegen 333 (p=0,29), Marge 13,89 gegen 15,99, Platten 2,84 gegen 3,40,
+Strafleiste 9,89 gegen 8,87. Einzeln ist keine Differenz signifikant, aber die
+Richtung ist ueber alle vier Groessen einheitlich.
+
+> **Der Ownership-Verlust im Training traegt nichts bei.** Nicht zur Staerke,
+> nicht zu den Zielkriterien. Er kostet nominal.
+
+Das ist die dritte unabhaengige Absage an denselben Baustein und trifft die
+stehende Nutzer-Freigabe zur Gewichtserhoehung (`ownership_weight > 1,0`,
+2026-08-16) an der Wurzel: der Sweep war auf den OFFLINE-Kriterien monoton
+steigend, aber der Arm mit dem hoechsten Gewicht ist in der Arena der
+schwaechere. Eine weitere Erhoehung waere eine Extrapolation entlang einer
+Kennlinie, die am gemessenen Ende bereits in die falsche Richtung zeigt.
+**Das ist kein Widerruf der Freigabe** — die Entscheidung liegt beim Nutzer —
+sondern der Befund, den er dabei kennen sollte.
+
+**Ausgang 3 gilt fuer beide Korpus-Arme**, W0 staerker als W1. Der
+Gating-Kandidat ist damit eindeutig **W0_best** — und zwar der Arm OHNE
+Ownership-Verlust. Die Gating-Entscheidung bleibt offen: sie verlangt das
+DIREKTE Duell (par.4.2 / `paired_gating.py`), nicht den indirekten Vergleich
+ueber die Heuristik. Die Kostenprobe aus par.6 ist die Mahnung dazu — F1 schlug
+den Champion indirekt und verlor direkt 4:8 (n=12, kein Befund, aber die
+richtige Warnung).
 3. Ein Arm "Weitertraining OHNE Korpus", der den Konfund aus par.3 aufloest.
    Existiert nicht und muesste trainiert werden.
