@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Tor C -- traegt der Ownership-Verbraucher (Blatt-Pol MOSAIC_OWNERSHIP_W + Tiling-Pol MOSAIC_OWNERSHIP_TILING_W, gemeinsam gefahren) in der Arena Plattenpunkte ein, OHNE Siege zu kosten -- und welcher Kopf (F1 eingefroren vs w1-final) traegt ihn? | Beleg: **OFFEN, vorregistriert 2026-08-16.** Nichts gefahren zum Zeitpunkt der Registrierung. Nullarm ist DERSELBE Checkpoint mit Regler 0, nicht der Champion. Drei Dosisstufen als Paare (0,1/0,3 -- 0,3/1,0 -- 1,0/3,0), hergeleitet aus den Punktskalen beider Formeln (par.3). Vorab-Erfolgsregel: Plattenpunkt-Gewinn OHNE signifikanten Sieg-Verlust; Praezedenz k6-Kuppeldraft und Stoerungs-v1. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Tor C -- traegt der Ownership-Verbraucher (Blatt-Pol MOSAIC_OWNERSHIP_W + Tiling-Pol MOSAIC_OWNERSHIP_TILING_W, gemeinsam gefahren) in der Arena Plattenpunkte ein, OHNE Siege zu kosten -- und welcher Kopf (F1 eingefroren vs w1-final) traegt ihn? | Beleg: **NEGATIV ENTSCHIEDEN 2026-08-16, 970 Partien** (par.15). Kein Arm hebt die Zielkriterien k1/k2/k5 -- gepoolt n=243 auf F1: k1 +0,22 (t 0,73), k2 -0,11, k5 +0,09. Siege fallen monoton mit der Dosis (98/89/86/84), D2 p=0,043 und D3 p=0,049 signifikant. Der staerkere Kopf w1-final macht den Verbraucher inert (91:91, b=c=18) statt nuetzlich -- Kopfguete ist NICHT der Engpass. Erklaerung (Herleitung): das Marginal der konjunktiven Kriterien ist ~0, solange die Spalte nicht fast fertig ist. Beide Regler bleiben auf Default 0. Beifang: F1 gegen w1-final bei Regler aus p=0,360, F1 bleibt Checkpoint der Wahl. -->
 
 # PREREG: TOR C — Regler-Sweep des Ownership-Verbrauchers in der Arena
 
@@ -723,14 +723,211 @@ Warum genau diese Zelle und keine andere:
 > Widerspruch zum Hauptsatz — dann wird KEIN Erfolg ausgerufen, sondern der
 > Widerspruch berichtet und ein dritter Satz gefordert.
 
-## par.13.1 ERGEBNIS Stufe 3 (Replikation)
+## par.13.1 ERGEBNIS Stufe 3 — der Nullbefund repliziert, der Schaden ist nicht belegbar
 
-*(leer zum Zeitpunkt der Nachtrag-Registrierung)*
+2 Arme x 122 frische Seeds = 244 Partien, F1, Seeds `5000..5241` (disjunkt zum
+Hauptsatz). Roh: `evaluations/paired_arena_env_gate_c_repl.json`.
 
-## par.14 ERGEBNIS Stufe 5 (Durchsatz)
+| Groesse | N `0,0` | D1 `0.1,0.3` | Delta (Block, t) |
+|---|---:|---:|---:|
+| Siege | 92/122 | 87/122 | b=20 / c=25, **p = 0,552** |
+| Endstand-Marge | 11,62 | 10,93 | −0,80 (t −0,45) |
+| Plattenpunkte gesamt | 2,57 | 2,81 | +0,20 (t 0,28) |
+| k1 Vertikale Reihen | 0,57 | +0,43 | t 1,14 |
+| k2 Diagonale Reihen | 0,00 | +0,00 | t 0,00 |
+| k5 Eckplatten | 3,27 | +0,18 | t 0,68 |
 
-*(leer zum Registrierungszeitpunkt)*
+**Der Plattenpunkt-Gewinn aus dem Hauptsatz repliziert NICHT**: +0,74
+(Block-t 2,72) im Hauptsatz gegen +0,20 (Block-t 0,28) hier. Genau dafuer war
+die Replikation da — und genau dieser Fall ist eingetreten. Die Sieg-Richtung
+repliziert (−5 nach −9), aber wieder ohne Signifikanz.
 
-## par.15 VERDIKT
+### par.13.2 GEPOOLTE ENTSCHEIDUNG (n = 243, beide Seed-Saetze, F1, D1 gegen N)
 
-*(leer zum Registrierungszeitpunkt)*
+Die vorab festgelegte Entscheidungsebene aus par.13:
+
+| Groesse | Delta (Partie) | t | Delta (Block, nB=10) | t | Urteil |
+|---|---:|---:|---:|---:|---|
+| **Siege** | b=30 / c=44 | — | — | **McNemar p = 0,130** | kein belegbarer Schaden |
+| Endstand-Marge | −1,41 | −1,05 | −1,46 | −1,31 | flach |
+| Plattenpunkte gesamt | +0,50 | 1,37 | +0,45 | 1,41 | flach |
+| Strafleiste | −0,13 | −0,26 | −0,11 | −0,23 | flach |
+
+Je Kriterium, gepoolt (Partie-Ebene, n je Kriterium 90-96):
+
+| Kriterium | Nullpunkt | Delta D1 | t |
+|---|---:|---:|---:|
+| **k1 Vertikale Reihen** | +0,80 | +0,22 | 0,73 |
+| **k2 Diagonale Reihen** | +0,22 | −0,11 | −1,00 |
+| **k5 Eckplatten** | +3,17 | +0,09 | 0,61 |
+| k0 Horizontale Reihen | +0,90 | +0,07 | 0,47 |
+| k3 Mehrfarbige Felder | +4,86 | +0,44 | 0,57 |
+| k4 Aeussere Felder | +9,33 | +0,23 | 1,44 |
+| k6 Spezialfelder | −11,64 | **+0,55** | **2,12** |
+| k7 Farbenreiche Reihen | +0,62 | −0,18 | −0,94 |
+
+**Nach der Vorab-Regel aus par.13:**
+- Der Waechter bleibt ueber p >= 0,05 (0,130). Der Befund fuer D1 lautet
+  damit woertlich wie vorab formuliert: **"kein nachweisbarer Schaden, aber
+  auch kein Nutzen"**. Die Monotonie 98/89/86/84 aus Stufe 1 bleibt als
+  **Indiz** bestehen und wird nicht zum Beleg befoerdert.
+- Die Zielgroesse bleibt auf dem frischen Satz null. **Der Negativbefund ist
+  repliziert, Tor C ist geschlossen.**
+
+**Der einzige nominal signifikante Einzelwert ist k6 (+0,55, t 2,12) — und
+er wird hier NICHT als Befund verkauft.** Er ist einer von acht gleichzeitig
+geprueften Kriterien; bei acht Tests ist ein Treffer bei p<0,05 die
+Erwartung, nicht die Ausnahme. Interessant ist er trotzdem als Richtungs-
+Hinweis, weil k6 dasjenige Kriterium mit dem groessten deterministischen
+Marginal ist (`(1−p_f)·3` je Spezialfeld, par.3.3) und mit −11,64 der
+groesste Einzelposten im Endstand. Wenn irgendwo eine Fortsetzung ansetzt,
+dann dort — mit einer eigenen Vorregistrierung und einer Kriterien-Isolierung
+auf k6 statt der vollen Maske.
+
+## par.14 Stufe 5 (Durchsatz) — NICHT GEMESSEN, dafuer strukturell eingegrenzt
+
+**Nicht gefahren, mit zwei Gruenden, beide vorab in par.8 angelegt:**
+
+1. **Die GPU ist nicht frei.** `train.py --name v21_2d_own_f2` laeuft
+   durchgehend (PID 17612, zuletzt 27 % GPU-Auslastung, 3075 s CPU-Zeit,
+   geprueft per `nvidia-smi` und `Get-CimInstance Win32_Process`). par.8 macht
+   die freie Maschine zur Bedingung — eine Messung jetzt waere Fremdlast.
+2. **Die Ausloesebedingung ist entfallen.** Der Satz, der die Messung
+   motiviert hat, war "bevor jemand damit ein 8000er-Self-Play startet". Nach
+   par.15 startet niemand eins. Auf ein leeres Ergebnis eine Stunde
+   Maschinenwartezeit zu setzen, waere die falsche Reihenfolge.
+
+**Die Messung bleibt vorregistriert** (par.8, inkl. der Praezisierung
+Self-Play statt Arena und des dritten Arms) und ist faellig, sobald der
+Verbraucher je wiederbelebt wird.
+
+### par.14.1 Was stattdessen belegt ist: eine OBERE SCHRANKE aus dem Code
+
+Ausdruecklich eine **HERLEITUNG**, keine Wandzeitmessung — die beiden
+Eingangszahlen sind aber in dieser Sitzung gemessen bzw. am Code geprueft.
+
+Geprueft am Code:
+- Der Zusatzpass faellt **einmal je Tiling-Zug** an, und nur in **Runde 1-4**
+  (`self_play.rs::ownership_tiling_marginals`, zwei Kostengates vor dem
+  Netz-Aufruf: `w_own == 0` und `platten_branch_applies`).
+- **Derselbe Tiling-Zug bezahlt im Bestand schon bis zu
+  `MAX_TILING_LEAVES = 400` Vorwaertspaesse** (`tiling_solver.rs:622`), sobald
+  der Netz-Stichentscheid aktiv ist — das ist er in Runde 2-4
+  (`best_first_step_platten_valued`, `(2..=4).contains(..)`). In Runde 1 ist
+  der Bestand dagegen bei 0 Netz-Paessen fuer diesen Zug, dort ist der
+  Zusatzpass der ERSTE.
+
+Gemessen in dieser Sitzung, aus den Stufe-1-Partie-Logs (n=121 je Arm):
+- **32,5 Drafting-Suchen** des Netzes je Partie (je 400 Sims).
+- **17,7 gewertete Tiling-Schritte** des Netzes je Partie (untere Schranke
+  fuer die Zahl der `resolve_tiling_step`-Aufrufe — nicht gewertete
+  Platzierungen sind darin nicht enthalten).
+- Beide Zahlen sind zwischen den Armen praktisch identisch (32,5/32,7/32,9
+  und 17,7/17,8/17,6), der Regler aendert die Partiestruktur also nicht.
+
+Rechnung: Zusatzpaesse je Partie ≈ 4/5 x (18 bis 35) ≈ **15 bis 28**.
+Netz-Paesse je Partie im Bestand ≈ 32,5 x 400 ≈ **13 000** allein aus dem
+Drafting, plus die Kandidaten-Paesse der Tiling-Stichentscheide.
+
+→ **Obere Schranke des Mehraufwands: ~0,25 % der Netz-Vorwaertspaesse je
+Partie.** Selbst wenn ein Einzelpass (Batchgroesse 1) fuenfmal ineffizienter
+ist als ein Pass im gebatchten Suchlauf, bleibt der Aufschlag unter 2 %.
+
+**Der Blatt-Pol kostet strukturell null zusaetzliche Paesse** — er liest die
+Ownership-Karte des ohnehin gerechneten Blatt-Passes
+(`net_mcts::apply_ownership_shaping_full`); nur `expected_plate_points` kommt
+als reine CPU-Arithmetik dazu.
+
+**Nicht verwendbar** waren die Blockwandzeiten aus Stufe 1 (71-94 s je 25
+Partien, ueber alle Arme durchmischt): sie liefen unter der F2-Last, in der
+Arena spielt nur EINE Seite mit Netz, und die Partielaenge haengt selbst vom
+Arm ab. Drei Konfundierungen auf einmal — sie werden hier bewusst nicht zu
+einer Durchsatzaussage verrechnet.
+
+## par.15 VERDIKT: Tor C schliesst NEGATIV
+
+**970 Partien** (Stufe 0: 48, Stufe 1: 484, Stufe 2: 242, Stufe 3: 244),
+zwei Checkpoints, drei Dosisstufen, zwei disjunkte Seed-Saetze.
+
+### Die Antwort auf Frage (a): der Verbraucher wirkt, aber nicht auf das Ziel
+
+**Kein Arm auf keinem Checkpoint hebt die Zielkriterien k1/k2/k5.** Gepoolt
+ueber 243 Partien auf F1 bei der einzigen unschaedlichen Dosis: k1 +0,22
+(t 0,73), k2 −0,11 (t −1,00), k5 +0,09 (t 0,61). Auf w1-final bei derselben
+Dosis: k1 +0,15, k2 +0,22, k5 −0,07 — alle im Rauschen.
+
+Was der Verbraucher stattdessen tut, in aufsteigender Dosis:
+- **D1** (0,1 / 0,3): nichts Belegbares. Siege gepoolt p = 0,130, Marge und
+  Plattenpunkte flach.
+- **D2** (0,3 / 1,0): **Siege signifikant runter** (p = 0,043), Plattenpunkte
+  unveraendert. Reiner Verlust.
+- **D3** (1,0 / 3,0): Plattenpunkte hoch (+1,20 gesamt, k5 +0,96), **Siege
+  signifikant runter** (p = 0,049). Das ist exakt das k6-Kuppeldraft-Muster,
+  auf das die Vorab-Regel aus par.6 gerichtet war.
+
+### Die Antwort auf Frage (b): nicht der Kopf, der Verbraucher
+
+Der staerkere Kopf (w1-final, Feld-AUC 0,870 gegen 0,780) dreht nichts um: er
+macht den Verbraucher **inert** (91:91 Siege, b=c=18) statt nuetzlich. Ausgang
+B der Vorab-Regel aus par.12. Eine weitere Kopfverbesserung ist damit **kein
+aussichtsreicher Hebel** fuer diesen Verbraucher.
+
+### Warum — die Erklaerung, die der Versuch mitliefert
+
+Der Verbraucher ist nicht defekt. Er lenkt nachweislich dorthin, wohin seine
+Formel zeigt: **k4 (Aeussere Felder) steigt in allen drei Dosen** auf F1
+(+0,40 / +0,31 / +0,51), und k4 ist genau das Kriterium mit dem
+DETERMINISTISCHEN marginalen Feldwert `(1−p_f)·1`. Auch k5 bewegt sich, sobald
+die Dosis gross genug ist (+0,96 bei D3).
+
+Die konjunktiven Zielkriterien k1/k2 bekommen dagegen praktisch nie ein
+Signal. Ihr Marginal ist `7·(1−p_f)·PROD(uebrige 5)` bzw.
+`10·(1−p_f)·PROD(uebrige 5)` — nahe 0, solange die Spalte nicht fast
+vollstaendig ist. **Der Verbraucher kann die Spaltenluecke nicht schliessen,
+weil sein Signal erst entsteht, wenn sie fast geschlossen ist.** Und genau
+"fast geschlossen" ist der Zustand, den das Netz laut
+`PREREG_placement_side.md` par.9 nicht erreicht (36 von 57 Partien bei 5/6).
+Das ist eine HERLEITUNG aus Formel plus Messung, kein eigener Messbefund —
+sie erklaert die Zahlen, sie beweist nicht ihre Ursache.
+
+Damit reiht sich Tor C in denselben Befund ein wie
+`PREREG_placement_side.md` par.11: die Spaltenluecke ist **keine
+Bewertungsfrage** — weder Drafting-Lenkung noch plattenbewusste Platzierung
+noch ein gelernter Ownership-Prior bewegen sie.
+
+### Was das fuer die Kampagne heisst
+
+1. **`MOSAIC_OWNERSHIP_W` und `MOSAIC_OWNERSHIP_TILING_W` bleiben auf Default
+   0.** Sie sind gebaut, getestet, dokumentiert und byte-identisch bei 0 —
+   sie bleiben als Werkzeug stehen, kommen aber nicht in den Standardpfad.
+2. **Kein 8000er-Self-Play mit dem Verbraucher.**
+3. **F1 bleibt der Checkpoint** der Ownership-Reihe: nicht signifikant besser
+   als w1-final (p = 0,360), aber vorn in der Punktschaetzung (98 gegen 91
+   Siege, Marge 14,57 gegen 12,29) UND mit intakter Policy. Damit ist die
+   Frage aus `PREREG_frozen_trunk_head.md` par.7.1 beantwortet — mit der
+   ehrlichen Einschraenkung, dass die Arena bei n=121 keinen der beiden
+   Effekte aufloest.
+4. **Der Mittelweg aus `PREREG_frozen_trunk_head.md` par.7.2** (sanftes
+   gemeinsames Nachtrainieren) verliert seine Begruendung: er sollte die
+   Kopf-Decke heben, und Stufe 2 zeigt, dass eine hoehere Kopfguete nichts
+   bringt.
+5. **Was offen bleibt und die einzige sichtbare Fortsetzung waere**: k6
+   (Spezialfelder). Es ist mit −11,64 der groesste Einzelposten im Endstand,
+   hat das groesste deterministische Marginal (`(1−p_f)·3`), und ist der
+   einzige gepoolt nominal signifikante Wert (+0,55, t 2,12) — **ausdruecklich
+   nicht als Befund verkauft**, weil er einer von acht gleichzeitig
+   geprueften Kriterien ist. Eine Fortsetzung muesste die Kriterienmaske auf
+   k6 ISOLIEREN (`MOSAIC_OWNERSHIP_GEW` / `MOSAIC_TILING_PLATTEN_GEW`) statt
+   die volle Maske zu fahren, und braucht eine eigene Vorregistrierung.
+
+### Was dieses Prereg NICHT sagt
+
+- Nicht, dass der Ownership-Kopf nutzlos ist. Er ist als LERNZIEL
+  unangetastet (Tor A: AUC 0,870, `PREREG_ownership_corpus.md` par.10.6) —
+  gemessen wurde hier nur seine Tauglichkeit als Laufzeit-STEUERSIGNAL in
+  diesen zwei Einspeisungsformen.
+- Nicht, dass eine andere Einspeisungsform scheitern muesste. Die
+  Injektions-Kampagne hat viermal gezeigt, dass die FORM entscheidet
+  (`PREREG_placement_side.md` par.11).
+- Nichts ueber Self-Play-Nutzen, Gegner-Haelfte `[36:72]` oder
+  Kriterien-Isolierung — alle drei stehen unveraendert in par.7.
