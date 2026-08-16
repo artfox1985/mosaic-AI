@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bauen die auf dem Ownership-Korpus trainierten Netze VON SELBST mehr Wertungsplatten als der Champion -- ohne jeden Regler? Und traegt das der Korpus oder der Ownership-Verlust? | Beleg: laeuft (registriert 2026-08-16 vor der ersten Entscheidungspartie) -->
+<!-- STATUS: OFFEN | Frage: Bauen die auf dem Ownership-Korpus trainierten Netze VON SELBST mehr Wertungsplatten als der Champion -- ohne jeden Regler? Und traegt das der Korpus oder der Ownership-Verlust? | Beleg: **TEILERGEBNIS 2026-08-16, 814 Partien** (par.8): EINE von drei Paarungen gemessen (W0 gegen Champion, n=407, Regler aus). Zielkriterien NICHT gehoben -- k1 +0,27 (p 0,391), k2 +0,20 (p 0,296), k5 +0,11 (p 0,564), alle drei innerhalb der vorab ausgewiesenen Aufloesung 0,85/0,48/0,31 => Ausgang 2. Gleichzeitig Ausgang 3: W0 gewinnt 333:296 (McNemar p=0,0017), Marge +4,73, Strafleiste -1,62, Platten gesamt +0,99 -- der Plattenzuwachs kommt aus k3 (+1,99), dem Zaehl-Kriterium, nicht aus den konjunktiven Zielkriterien (Tor-C-Muster wiederholt). W0 hat ownership_weight 0,0: der Staerkegewinn braucht den Ownership-Verlust NICHT. Konfund bleibt: Korpus ODER 100 weitere Epochen. OFFEN: w1_best und f1 (Lauf abgebrochen), Block N nie gestartet. -->
 
 # PREREG: Destillations-Messung — hat der Ownership-Korpus die POLICY geformt?
 
@@ -349,8 +349,106 @@ nachgerechnet, damit die Zahlen nicht als Vorbefund weiterwandern:
   verteilt: ebenfalls kein Befund — und die Richtung ist der Heuristik-Probe
   **entgegengesetzt**. Genau deshalb entscheidet keine von beiden.
 
-## par.8 ERGEBNIS BLOCK H (leer bei Registrierung)
+## par.8 ERGEBNIS BLOCK H — 2 von 4 Armen (Lauf abgebrochen)
 
-## par.9 ERGEBNIS BLOCK N (leer bei Registrierung)
+**Was gelaufen ist:** `champion` und `w0_best`, je 407 Partien. Der `w1_best`-Arm
+starb mitten im Lauf (keine Datei — der Orchestrator schreibt erst nach dem
+letzten Block), `f1` wurde nie gestartet. **Damit gibt es genau EINE der drei
+registrierten Paarungen.** Rohdaten: `evaluations/paired_arena_env_dist_h_ch.json`,
+`..._dist_h_w0.json` (je ~10 MB, per `.gitignore:78` nicht versioniert);
+Kennzahlen versioniert in `evaluations/distillation_block_h_partial.json`.
 
-## par.10 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+### par.8.1 Absolut (Block-Mittel; der Restblock von 7 Partien faellt nach der Blockregel raus)
+
+| | Champion | W0_best |
+|---|---:|---:|
+| Siege / n | 296/407 | **333/407** |
+| Plattenpunkte gesamt (Block-SE) | 2,420 (0,566) | 3,40 |
+| k1 Vertikale Reihen (n=156) | 0,653 (0,225) | 0,90 |
+| k2 Diagonale Reihen (n=150) | 0,067 (0,067) | 0,27 |
+| k5 Eckplatten (n=150) | 3,253 (0,113) | 3,37 |
+
+### par.8.2 Registrierte Paarung W0 gegen Champion (n=407, gepaart, Block-Ebene)
+
+| Groesse | Delta | t(Block) | p(Block) | nB |
+|---|---:|---:|---:|---:|
+| Siege 333:296 | b=85 / c=48 | — | **McNemar 0,0017** | — |
+| Plattenpunkte gesamt | +0,99 | 2,91 | **0,011** | 16 |
+| Endstand-Marge | +4,73 | 4,60 | **0,000** | 16 |
+| Strafleiste | −1,62 | −3,09 | **0,007** | 16 |
+| **ZIEL k1 Vertikale Reihen** | +0,27 | 0,94 | 0,391 | 6 |
+| **ZIEL k2 Diagonale Reihen** | +0,20 | 1,17 | 0,296 | 6 |
+| **ZIEL k5 Eckplatten** | +0,11 | 0,62 | 0,564 | 6 |
+| k0 Horizontale Reihen | +0,04 | 0,25 | 0,813 | 6 |
+| k3 Mehrfarbige Felder | +1,99 | 3,27 | 0,022 | 6 |
+| k4 Aeussere Felder | +0,06 | 0,17 | 0,873 | 6 |
+| k6 Spezialfelder | −0,12 | −0,67 | 0,530 | 6 |
+| k7 Farbenreiche Reihen | +0,08 | 0,75 | 0,490 | 6 |
+
+Die 6 Bloecke je Kriterium sind erreicht — der Zweck der Stichprobe aus par.5
+ist eingeloest, die Je-Kriterium-Zahlen stehen hier auf der Block-Ebene und
+nicht wie in Tor C auf einer nicht tragenden nB=2.
+
+### par.8.3 Zwei Einordnungen, die das Bild sonst verzerren
+
+1. **Der Plattenzuwachs kommt aus dem ZAEHL-Kriterium.** k3 (+1,99) traegt ihn
+   praktisch allein; die konjunktiven Zielkriterien k1/k2 bewegen sich nicht.
+   Das ist woertlich das Muster aus Tor C par.11.2 — dort stiegen ebenfalls k3
+   und k4, und k1/k2 nicht. Der Vorbehalt aus
+   `project_plattenpunkte_aufschluesselung` ("ein Term, der die Summe hebt,
+   kann das ueber mehrfarbige Felder tun, ohne eine einzige Spalte zu
+   schliessen") trifft erneut zu.
+2. **k3 ist eines von 8 getesteten Kriterien.** p=0,022 haelt einer
+   Bonferroni-Schranke (0,05/8 = 0,00625) **nicht** stand. Eine Korrektur war
+   nicht vorregistriert, deshalb steht hier der Nominalwert — aber er traegt
+   keine Einzelaussage.
+
+## par.9 ERGEBNIS BLOCK N — NICHT GELAUFEN
+
+Kein einziger Lauf. Die CPU war durchgehend von Block H belegt (6 Kerne / 12
+logisch, 11 Faeden, 100 % Last, dazu das parallele F2-Training). Die in par.4.2
+begruendete Frage — ob der Plattenvorteil gegen den plattenblinden Champion
+sichtbar wird, wo er gegen die Heuristik im symmetrischen Kanal verschwindet —
+ist damit **unbeantwortet**. Ausgang 4 konnte nicht geprueft werden.
+
+## par.10 VERDIKT NACH DER VORAB-REGEL
+
+Angewandt wird die Regel aus par.7 in ihrem Wortlaut vor der ersten
+Entscheidungspartie, auf die eine gemessene Paarung.
+
+**Ausgang 1 (DESTILLATION HAT GEGRIFFEN) — greift NICHT.** Er verlangt einen
+signifikanten Zuwachs auf k1/k2/k5. Keines der drei ist signifikant.
+
+**Ausgang 2 (DESTILLATION IST AUSGEBLIEBEN) — GREIFT.** Die Regel verlangt,
+dass die Differenz innerhalb der in par.5 ausgewiesenen Aufloesung liegt.
+Vorab ausgewiesen: k1 0,85 / k2 0,48 / k5 0,31. Gemessen: +0,27 / +0,20 /
++0,11 — **alle drei innerhalb**. Der Korpus hat auf den Zielkriterien nichts
+in die Policy destilliert. Nach par.7 ist das ausdruecklich ein tragender
+Architektur-Befund: zusammen mit dem negativen Tor C bekommt die
+Zwei-Pole-Architektur den Plattenbau auf KEINEM ihrer beiden Wege in das
+Spiel — weder ueber den Regler noch ueber die Destillation.
+**Einschraenkung:** belegt ist das fuer W0. Fuer w1_best und f1 fehlt die
+Messung; es bleibt moeglich, dass der Ownership-VERLUST (den W0 nicht hat)
+die Zielkriterien bewegt.
+
+**Ausgang 3 (SIEGE OHNE PLATTEN) — GREIFT EBENFALLS.** W0 gewinnt signifikant
+mehr (333:296, McNemar p=0,0017), bei +4,73 Marge und −1,62 Strafleiste, ohne
+die Zielkriterien zu heben. Par.7 dazu woertlich: **kein Beleg fuer die
+Plattenagenda**, aber ein Staerkebefund und ein Gating-Kandidat. Die
+Gating-Entscheidung selbst kann dieser Versuch NICHT treffen — dafuer waere
+Block N noetig gewesen (Netz gegen Netz), und der ist nicht gelaufen.
+
+**Zur Zerlegungsfrage aus par.1**, soweit die eine Paarung sie beantwortet:
+**W0 hat `ownership_weight` 0,0** (par.2). Der Staerkegewinn entsteht also
+**ohne den Ownership-Verlust**. Ob W1 etwas draufsetzt, ist offen. Der in
+par.3 vorregistrierte Konfund bleibt bindend: gegenueber dem Champion
+unterscheidet W0 sich in ZWEI Dingen, Korpus UND 100 weitere Epochen — die
+Aussage lautet **"Korpus oder Weitertraining"**, nicht "Korpus".
+
+### par.10.1 Was als naechstes zu messen waere (nicht gemessen, keine Empfehlung)
+
+1. `w1_best` und `f1` auf demselben 407-Seed-Satz — vervollstaendigt die
+   Zerlegung und kostet ~2 x 25 min bei freier CPU.
+2. Block N wie in par.4.2 registriert — die Gating-Frage zu Ausgang 3.
+3. Ein Arm "Weitertraining OHNE Korpus", der den Konfund aus par.3 aufloest.
+   Existiert nicht und muesste trainiert werden.

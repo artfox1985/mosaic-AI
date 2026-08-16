@@ -1,0 +1,278 @@
+{
+ "stand": "Block H Arme 1-2 von 4 (ch, w0); w1 und f1 liefen zum Schreibzeitpunkt noch",
+ "absolut": [
+  {
+   "arm": "champion v21_2d_brierbest",
+   "n": 407,
+   "siege": 296,
+   "platten": {
+    "block_mittel": 2.42,
+    "block_se": 0.5660506455550893,
+    "nB": 16
+   },
+   "marge": {
+    "block_mittel": 11.075,
+    "block_se": 0.9897533362745824,
+    "nB": 16
+   },
+   "boden": {
+    "block_mittel": 10.5025,
+    "block_se": 0.37594270396786084,
+    "nB": 16
+   },
+   "kriterien": {
+    "Vertikale Reihen": {
+     "n": 156,
+     "block_mittel": 0.6533333333333333,
+     "block_se": 0.22477643213745618,
+     "nB": 6
+    },
+    "Diagonale Reihen": {
+     "n": 150,
+     "block_mittel": 0.06666666666666667,
+     "block_se": 0.06666666666666668,
+     "nB": 6
+    },
+    "Eckplatten": {
+     "n": 150,
+     "block_mittel": 3.2533333333333334,
+     "block_se": 0.11250678991855462,
+     "nB": 6
+    },
+    "Horizontale Reihen": {
+     "n": 156,
+     "block_mittel": 0.7599999999999999,
+     "block_se": 0.08579044235810888,
+     "nB": 6
+    },
+    "Mehrfarbige Felder": {
+     "n": 152,
+     "block_mittel": 3.546666666666667,
+     "block_se": 0.45002715967421847,
+     "nB": 6
+    },
+    "Äußere Felder": {
+     "n": 154,
+     "block_mittel": 9.326666666666666,
+     "block_se": 0.06484168755086843,
+     "nB": 6
+    },
+    "Spezialfelder": {
+     "n": 153,
+     "block_mittel": -11.339999999999998,
+     "block_se": 0.09165151389911695,
+     "nB": 6
+    },
+    "Farbenreiche Reihen": {
+     "n": 150,
+     "block_mittel": 0.26666666666666666,
+     "block_se": 0.06746192341692543,
+     "nB": 6
+    }
+   }
+  },
+  {
+   "arm": "w0_best",
+   "n": 407,
+   "siege": 333,
+   "platten": {
+    "block_mittel": 3.3474999999999997,
+    "block_se": 0.45474855689710547,
+    "nB": 16
+   },
+   "marge": {
+    "block_mittel": 16.1675,
+    "block_se": 0.7956483205537481,
+    "nB": 16
+   },
+   "boden": {
+    "block_mittel": 8.89,
+    "block_se": 0.42364293140961684,
+    "nB": 16
+   },
+   "kriterien": {
+    "Vertikale Reihen": {
+     "n": 156,
+     "block_mittel": 0.9333333333333335,
+     "block_se": 0.18666666666666668,
+     "nB": 6
+    },
+    "Diagonale Reihen": {
+     "n": 150,
+     "block_mittel": 0.26666666666666666,
+     "block_se": 0.13333333333333336,
+     "nB": 6
+    },
+    "Eckplatten": {
+     "n": 150,
+     "block_mittel": 3.3666666666666667,
+     "block_se": 0.12750599114464298,
+     "nB": 6
+    },
+    "Horizontale Reihen": {
+     "n": 156,
+     "block_mittel": 0.7999999999999999,
+     "block_se": 0.13386560424545213,
+     "nB": 6
+    },
+    "Mehrfarbige Felder": {
+     "n": 152,
+     "block_mittel": 5.3999999999999995,
+     "block_se": 0.5448424848828635,
+     "nB": 6
+    },
+    "Äußere Felder": {
+     "n": 154,
+     "block_mittel": 9.346666666666666,
+     "block_se": 0.10616548926610352,
+     "nB": 6
+    },
+    "Spezialfelder": {
+     "n": 153,
+     "block_mittel": -11.42,
+     "block_se": 0.12165525060596444,
+     "nB": 6
+    },
+    "Farbenreiche Reihen": {
+     "n": 150,
+     "block_mittel": 0.3466666666666667,
+     "block_se": 0.08682037651253179,
+     "nB": 6
+    }
+   }
+  }
+ ],
+ "vergleiche": [
+  {
+   "name": "W0 gegen CHAMPION",
+   "n": 407,
+   "siege": {
+    "test": 333,
+    "bezug": 296,
+    "b": 85,
+    "c": 48,
+    "p": 0.0016943197076057033
+   },
+   "platten": {
+    "d": 0.9852579852579852,
+    "t_partie": 3.257133501423103,
+    "d_block": 0.9275,
+    "t_block": 2.9143775891134385,
+    "n_block": 16,
+    "mittel_test": 3.4004914004914006,
+    "mittel_bezug": 2.4152334152334154,
+    "p_block": 0.010678644466355563
+   },
+   "marge": {
+    "d": 4.72972972972973,
+    "t_partie": 3.9549793563014424,
+    "d_block": 5.0925,
+    "t_block": 4.596520551898676,
+    "n_block": 16,
+    "mittel_test": 15.985257985257986,
+    "mittel_bezug": 11.255528255528256,
+    "p_block": 0.00034938465298235813
+   },
+   "boden": {
+    "d": -1.6191646191646192,
+    "t_partie": -3.9935083935245337,
+    "d_block": -1.6125,
+    "t_block": -3.089804848808021,
+    "n_block": 16,
+    "mittel_test": 8.867321867321868,
+    "mittel_bezug": 10.486486486486486,
+    "p_block": 0.007471190052034308
+   },
+   "kriterien": {
+    "Vertikale Reihen": {
+     "n": 156,
+     "d": 0.2692307692307692,
+     "t_partie": 1.0291868210040747,
+     "d_block": 0.28,
+     "t_block": 0.9393364366277241,
+     "n_block": 6,
+     "mittel_test": 0.8974358974358975,
+     "mittel_bezug": 0.6282051282051282,
+     "p_block": 0.3906840165496305
+    },
+    "Diagonale Reihen": {
+     "n": 150,
+     "d": 0.2,
+     "t_partie": 1.3452570755027766,
+     "d_block": 0.20000000000000004,
+     "t_block": 1.1677484162422846,
+     "n_block": 6,
+     "mittel_test": 0.26666666666666666,
+     "mittel_bezug": 0.06666666666666667,
+     "p_block": 0.2955586447345291
+    },
+    "Eckplatten": {
+     "n": 150,
+     "d": 0.11333333333333333,
+     "t_partie": 0.8141711416315627,
+     "d_block": 0.11333333333333333,
+     "t_block": 0.6168983731899045,
+     "n_block": 6,
+     "mittel_test": 3.3666666666666667,
+     "mittel_bezug": 3.2533333333333334,
+     "p_block": 0.5643054742256053
+    },
+    "Horizontale Reihen": {
+     "n": 156,
+     "d": 0.038461538461538464,
+     "t_partie": 0.28782529293260006,
+     "d_block": 0.04,
+     "t_block": 0.24999999999999994,
+     "n_block": 6,
+     "mittel_test": 0.7884615384615384,
+     "mittel_bezug": 0.75,
+     "p_block": 0.8125341307441232
+    },
+    "Mehrfarbige Felder": {
+     "n": 152,
+     "d": 1.986842105263158,
+     "t_partie": 3.130720322510588,
+     "d_block": 1.8533333333333333,
+     "t_block": 3.2688242248326174,
+     "n_block": 6,
+     "mittel_test": 5.4868421052631575,
+     "mittel_bezug": 3.5,
+     "p_block": 0.022227455907117093
+    },
+    "Äußere Felder": {
+     "n": 154,
+     "d": 0.06493506493506493,
+     "t_partie": 0.46506449797566113,
+     "d_block": 0.019999999999999993,
+     "t_block": 0.16807316136320352,
+     "n_block": 6,
+     "mittel_test": 9.344155844155845,
+     "mittel_bezug": 9.279220779220779,
+     "p_block": 0.8731126753010623
+    },
+    "Spezialfelder": {
+     "n": 153,
+     "d": -0.11764705882352941,
+     "t_partie": -0.46732301954611766,
+     "d_block": -0.08,
+     "t_block": -0.6741998624632421,
+     "n_block": 6,
+     "mittel_test": -11.431372549019608,
+     "mittel_bezug": -11.313725490196079,
+     "p_block": 0.5300916186704536
+    },
+    "Farbenreiche Reihen": {
+     "n": 150,
+     "d": 0.08,
+     "t_partie": 0.9039826566422914,
+     "d_block": 0.08,
+     "t_block": 0.7453559924999299,
+     "n_block": 6,
+     "mittel_test": 0.3466666666666667,
+     "mittel_bezug": 0.26666666666666666,
+     "p_block": 0.48958974456442816
+    }
+   }
+  }
+ ]
+}
