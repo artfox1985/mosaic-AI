@@ -61,17 +61,20 @@ git -c filter.git-crypt.smudge=cat -c filter.git-crypt.clean=cat -c filter.git-c
 Im Worktree enthält `player_profiles.json` dann Ciphertext — für Engine-/
 Tool-Arbeit egal, aber die Datei dort NIE bearbeiten oder committen.
 
-## STATUS.md als Artifact (Nutzer-Entscheid 2026-08-16)
+## STATUS.md ist das Übergabedokument (Nutzer-Entscheid 2026-08-17)
 
-`evaluations/STATUS.md` wird zusaetzlich als Artifact veroeffentlicht:
-https://claude.ai/code/artifact/4616b765-9592-465f-948a-84015275f163
+`evaluations/STATUS.md` ist die **einzige** Quelle für den aktuellen Stand —
+kein Artifact, keine Kopie, keine zweite Ansicht. Der Grund ist gemessen und
+nicht theoretisch: an einem einzigen Tag haben drei überholte, aber plausible
+Quellen Zeit gekostet (ein Code-Kommentar statt der Primärquelle, ein
+„GÜLTIG"-Etikett an einer Messung, deren Voraussetzung weggefallen war, und
+eine Sonden-Skala, die zu 88 % im Trainingssatz lag).
 
-**Die Datei im Repo ist die QUELLE, das Artifact nur eine ANSICHT.** Nie
-umgekehrt bearbeiten. Nach jedem Commit, der `STATUS.md` aendert, dieselbe
-Datei erneut veroeffentlichen (`Artifact`-Werkzeug, gleicher `file_path` in
-derselben Sitzung, sonst die URL oben als `url` mitgeben) -- sonst zeigt das
-Artifact einen ueberholten Stand und ist schlimmer als keines, weil es
-aussieht wie der aktuelle.
+**Pflege-Regel:** Wer einen Befund erzeugt, trägt ihn im selben Zug in
+STATUS.md nach — und prüft dabei, ob ein *anderer* Abschnitt dadurch falsch
+wird. Genau das ist zweimal passiert: oben stand noch „beide Wege negativ",
+während weiter unten schon der Befund stand, der das widerlegt. Für einen
+Menschen ein Schönheitsfehler, für die nächste Sitzung eine Falschaussage.
 
 ## Workflow-Präferenzen
 
