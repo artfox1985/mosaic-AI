@@ -5,7 +5,7 @@
 > Artifact nur eine Ansicht und moeglicherweise aelter. Das Artifact ist fuer
 > Sitzungen OHNE Repo-Zugriff gedacht.
 >
-> Letzte Aenderung der Quelle laut git: **2026-08-17 00:10**. Gegenpruefen mit
+> Letzte Aenderung der Quelle laut git: **2026-08-17 00:30**. Gegenpruefen mit
 > `git log -1 --format=%cd -- evaluations/STATUS.md` -- weicht das ab, ist
 > diese Ansicht veraltet und darf nicht als Stand zitiert werden.
 
