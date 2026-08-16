@@ -58,6 +58,16 @@ Punkt 5 ist der Rahmen, braucht aber eine eigene Mess-Prereg):
 
 ### Danach in der Warteschlange
 
+- **Verbraucher §4: die GEGNER-Haelfte** (Nutzer-Auftrag 2026-08-16
+  "takte das ein", BEDINGT auf ein positives Tor C). Der Kopf sagt auch die
+  Gegnerfelder vorher (`[36:72]`) und hat sie nachweislich gelernt (Feld-AUC
+  Gegnerseite 0,633-0,649 im Sweep, corpus par.10.2) -- das ist die GELERNTE
+  Fassung genau der Idee, die als handgebaute Farbzaehlung zweimal
+  gescheitert ist: statt "welche Farbe braucht er wohl" ein direkter Wert
+  dafuer, was ein Zug den Gegner kostet. Eigenes Gewicht, eigener Arm, NICHT
+  mit der Eigen-Haelfte verrechnen (Prereg §4). **Reihenfolge-Begruendung**:
+  bringt die eigene Haelfte in Tor C nichts, ist die Gegner-Haelfte kein
+  guter Einsatz -- dann faellt sie mit.
 - **F2 (Deckel-Sonde)**: Frozen-Trunk vom Champion aus -- beantwortet, ob ein
   Trunk ohne je gesehenen Ownership-Gradienten ueberhaupt so weit kommt wie
   F1. Unabhaengig von Tor C, billig.
