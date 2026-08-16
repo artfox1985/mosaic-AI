@@ -99,24 +99,50 @@ def main() -> None:
     ohne_log = []
     for f in dateien:
         roh_bytes += f.stat().st_size
-        try:
-            sp_liste = partien(f)
-        except SystemExit:
-            # Mehr-Arm-Datei: alle Arme einzeln mitnehmen
-            d = json.load(open(f, encoding="utf-8"))
-            sp_liste = [sp for arm in d["games"].values() for sp in arm]
         name = f.stem.replace("paired_arena_env_", "")
-        hat_log = any(sp.get("log") for sp in sp_liste)
-        if not hat_log:
-            ohne_log.append(name)
-        for sp in sp_liste:
-            zeilen.append(kompakt(sp, name))
+        # Mehr-Arm-Dateien: JE ARM eine eigene Quelle. KORREKTUR 2026-08-16
+        # (Tor C): vorher wurden alle Arme zu EINER Quelle verschmolzen -- die
+        # kompakte Form war damit fuer jeden Mehr-Arm-Lauf wertlos, weil sich
+        # Test- und Kontrollpartien nicht mehr trennen liessen. Genau diese
+        # Laeufe sind aber die, die eine Vorregistrierung als Beleg benennt.
+        d = json.load(open(f, encoding="utf-8"))
+        g = d["games"]
+        quellen = ([(name, g)] if isinstance(g, list)
+                   else [(f"{name}#{arm}", partien(f, arm)) for arm in g])
+        for quelle, sp_liste in quellen:
+            if not any(sp.get("log") for sp in sp_liste):
+                ohne_log.append(quelle)
+            for sp in sp_liste:
+                zeilen.append(kompakt(sp, quelle))
 
-    text = "\n".join(json.dumps(z, ensure_ascii=False) for z in zeilen) + "\n"
+    # BESTAND ERHALTEN. KORREKTUR 2026-08-16 (Tor C): `ZIEL.write_text` hat den
+    # Bestand bedingungslos ersetzt. Ein Lauf mit `--muster "gate_c_*"` haette
+    # damit 14 961 Partien aus 33 aelteren Quellen geloescht, deren Rohdateien
+    # teils nicht mehr existieren -- ein Datenverlust, den weder der Aufruf noch
+    # die Ausgabe angekuendigt haetten. Jetzt werden nur die Zeilen der GERADE
+    # eingedampften Quellen ersetzt, alle uebrigen bleiben stehen.
+    neue_quellen = {z["quelle"] for z in zeilen}
+    behalten = []
+    if ZIEL.exists():
+        for ln in ZIEL.read_text(encoding="utf-8").splitlines():
+            if not ln.strip():
+                continue
+            alt = json.loads(ln)
+            if alt.get("quelle") not in neue_quellen:
+                behalten.append(alt)
+    if behalten:
+        print(f"Bestand: {len(behalten)} Partien aus "
+              f"{len({z.get('quelle') for z in behalten})} anderen Quellen bleiben erhalten")
+    neu_text = "\n".join(json.dumps(z, ensure_ascii=False) for z in zeilen)
+    text = "\n".join(json.dumps(z, ensure_ascii=False)
+                     for z in behalten + zeilen) + "\n"
+    neu_bytes = len(neu_text.encode("utf-8"))
     print(f"{len(dateien)} Dateien, {len(zeilen)} Partien")
     print(f"roh      {roh_bytes / 1024 / 1024:8.1f} MB")
-    print(f"kompakt  {len(text.encode('utf-8')) / 1024 / 1024:8.1f} MB "
-          f"({100 * len(text.encode('utf-8')) / max(roh_bytes, 1):.1f} %)")
+    # Die Quote bezieht sich auf die GERADE eingedampften Quellen, nicht auf die
+    # ganze Zieldatei -- sonst waere sie nach der Bestandserhaltung sinnlos.
+    print(f"kompakt  {neu_bytes / 1024 / 1024:8.1f} MB "
+          f"({100 * neu_bytes / max(roh_bytes, 1):.1f} %)")
     if ohne_log:
         print(f"WARNUNG: {len(ohne_log)} Datei(en) ohne Partie-Logs -- deren "
               f"Endwertung ist NICHT rekonstruierbar und faellt bei einem "
