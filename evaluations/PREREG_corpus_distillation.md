@@ -673,3 +673,35 @@ Korpus hat den Value-Kopf verschlechtert. Pruefbar, indem man den Value-Kopf
 eines Korpus-Arms und den des Champions auf DEMSELBEN Held-out vergleicht --
 nicht auf dem jeweils eigenen Val-Split, der bei Korpus-Armen anders
 zusammengesetzt ist.
+
+### par.10.6 NACHTRAG 2026-08-16 abends — TOR C IST DOCH BETROFFEN (Nutzer-Einwand)
+
+In par.10.4/par.10.5 steht Tor C in der Spalte "GUELTIG". **Das ist zu weit
+gefasst**, Nutzer-Einwand: *"er ist durchgefallen weil wir kein modell hatten
+das am richtigen korpus trainiert war"*.
+
+Der Grund traegt. Der Verbraucher steuert nicht den KOPF, sondern die SUCHE:
+er verschiebt den Blattwert in Richtung der Geometrien, die der Kopf fuer
+vollendbar haelt. WELCHE Zuege ueberhaupt bewertet werden, bestimmt aber der
+Policy-Prior. Eine Policy, die den Plattenbau nie gesehen hat — und keine der
+Tor-C-Vehikel (`f1`, `w1`) hatte ihn gesehen, siehe par.10.4 — schlaegt den
+plattenbauenden Zug nicht vor, und dann kann kein Blatt-Shift ihn waehlen.
+
+**Praezisierte Reichweite:**
+
+| | |
+|---|---|
+| "Der Laufzeit-Regler nuetzt nichts" | **NICHT belegt** |
+| "Der Laufzeit-Regler nuetzt nichts bei einer Policy, die den Plattenbau nicht kennt" | belegt (98/89/86/84 Siege ueber die Dosisstufen) |
+
+**Was unberuehrt bleibt** (damit die Korrektur nicht ueberschiesst): die
+Produktform kollabiert rechnerisch, unabhaengig von jeder Policy
+(Marginalwert k1 0,109 gegen k6 1,50, `PREREG_ownership_selector.md` par.1.3),
+und die gemessenen Feuerraten sind Eigenschaften des KOPFES, nicht der Policy
+(par.9.3 dort).
+
+**Folge:** Tor C ist auf `v21-b18_best` zu WIEDERHOLEN, sobald dieser vorliegt
+— dem ersten Checkpoint, dessen Policy zu 100 % aus plattengelenktem Spiel
+gelernt hat. Der Regler liegt gebaut in der Engine (Default 0), das Dosisraster
+existiert. Erst dann waeren beide Haelften beisammen: eine Policy, die Spalten
+bauen KANN, und ein Kopf, der sagt, WELCHE.
