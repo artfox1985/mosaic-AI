@@ -931,3 +931,55 @@ noch ein gelernter Ownership-Prior bewegen sie.
   (`PREREG_placement_side.md` par.11).
 - Nichts ueber Self-Play-Nutzen, Gegner-Haelfte `[36:72]` oder
   Kriterien-Isolierung — alle drei stehen unveraendert in par.7.
+
+---
+
+## par.16 WIEDERHOLUNG AUF `v21-b18_best` (registriert 2026-08-17, VOR den Partien)
+
+**Warum ueberhaupt wiederholt wird.** Das Verdikt oben ist auf einen Einwand
+hin eingeschraenkt worden (`PREREG_corpus_distillation.md` par.10.6): der
+Verbraucher steuert nicht den KOPF, sondern die SUCHE, und deren Kandidaten
+kommen aus dem Policy-Prior. Keines der damaligen Vehikel (`f1`, `w1`) hatte
+eine Policy, die den Plattenbau je gesehen hat — der Korpus war in allen
+sieben Laeufen policy-maskiert. Ein Blatt-Shift kann keinen Zug waehlen, den
+der Prior nicht vorschlaegt.
+
+Belegt war damit nur: *"der Regler nuetzt nichts bei einer Policy, die den
+Plattenbau nicht kennt."* Mit `v21-b18_best` gibt es erstmals eine Policy, die
+zu 100 % aus plattengelenktem Spiel gelernt hat. **Erst jetzt ist Tor C fair.**
+
+**Aufbau** — identisch zum Original bis auf Vehikel und Gegner:
+
+| | |
+|---|---|
+| Checkpoint | `alphazero_v21-b18_best.onnx` |
+| Gegner | **Champion** `v21_2d_brierbest` @400, Netz gegen Netz (nicht Heuristik@150 wie im Original) |
+| Seeds | derselbe 407er-Satz wie alle Messungen dieser Reihe |
+| Dosisstufen | N (0/0) · D1 (0,1/0,3) · D2 (0,3/1,0) · D3 (1,0/3,0) — unveraendert aus par.3.4 |
+| Kriteriengewichte | Default 1,0, keine Isolierung auf k1/k2/k5 |
+
+**Gegnerwahl begruendet:** gegen die Heuristik ist der Plattenkanal weitgehend
+symmetrisch (gemessen: Heuristik 2,72 gegen Netz 3,45 Plattenpunkte), gegen den
+plattenblinden Champion schlaegt jeder Plattenpunkt voll durch. Ausserdem
+liegt der **N-Arm bereits vor** — `paired_arena_env_b18best_vs_ch.json`, 211/407,
+identische Seeds, Regler nachweislich aus. Gefahren werden deshalb nur D1, D2,
+D3.
+
+**VORAB-REGEL** (woertlich, wie im Original par.7, unveraendert uebernommen):
+
+> **ERFOLG** heisst: eine Dosis hebt **k1 oder k2** signifikant auf
+> Block-Ebene gegen den N-Arm — **und** verliert dabei keine Siege signifikant
+> (exakter zweiseitiger McNemar, p >= 0,05 zugunsten von N).
+
+**Ein Plattenzuwachs, der Siege kostet, ist KEIN Erfolg.** Sechstes Auftreten
+derselben Regel. **k3/k4 zaehlen nicht** — ein Zuwachs aus den Zaehl-Kriterien
+ist genau das Muster, das im Original schon auftrat.
+
+**Was dieser Versuch NICHT reparieren kann, vorab benannt:** die Produktform
+kollabiert rechnerisch, unabhaengig von der Policy — Marginalwert k1 0,109
+gegen k6 1,50 bei p=0,5 (`PREREG_ownership_selector.md` par.1.3). Faellt Tor C
+erneut negativ aus, ist das deshalb **kein** Widerspruch zum Einwand oben,
+sondern die Trennung der beiden Blockaden: die Policy-Blockade ist beseitigt,
+die Formel-Blockade nicht. Genau dann traegt der Selektor-Umbau ein gemessenes
+Argument statt eines plausiblen.
+
