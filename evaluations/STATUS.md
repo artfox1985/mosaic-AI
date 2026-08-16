@@ -1,94 +1,82 @@
 # Mosaic-AI — Status & Fahrplan
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
-**`../archive/history.md`** (juengstes Kapitel: "2026-08-15/16: Korpus
-generiert, Tor A bestanden, Architektur-Fahrplan abgeschlossen").
+**`../archive/history.md`** (juengstes Kapitel: "2026-08-16: Ownership-Kopf
+gelernt, Verbraucher gebaut -- die Arena ist am Zug").
 
 ---
 
-## STAND 2026-08-16
+## STAND 2026-08-16 (abends)
 
 **Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434].
-Paritaets-Hash `8c6684ff...` haelt (zuletzt nach dem Wheel-Neubau vom
-2026-08-15 geprueft, der alle Umbauten der Woche enthaelt).
-**AERA-REGEL seit dem RNG-Schnitt (`fe1e306`)**: Alt-Aera-Messwerte sind
-KEINE gueltigen Vergleichsanker mehr -- gleiche Seeds erzeugen andere
-Partie-Verlaeufe. Gilt auch fuer Generator-Benchmarks.
+Paritaets-Hash `8c6684ff...` haelt -- zuletzt auf dem Wheel geprueft, das
+Ownership-Verbraucher UND Stoer-Zaehlmodus enthaelt. Beide sind bei
+Default-Knopf byte-identisch, kein Bestandsverhalten hat sich geaendert.
 
-### Wo die Ownership-Kette steht
+### Die Ownership-Kette: alles gebaut, alles gemessen -- nur die Arena fehlt
 
-Lehr-Korpus **8000 Partien generiert und gedeckt** (PREREG_ownership_corpus
-par.7/par.8), Sweep gefahren, **TOR A BESTANDEN** (par.10): der Kopf schlaegt
-auf allen ownership-lernbaren Kriterien die Basisrate, E_k traegt echte
-Vorhersagekraft (Spearman bis 0,41). Empfohlenes Gewicht **w05**, alle Zahlen
-vom Koordinator am Roh-JSON nachgerechnet.
-
-**Der Engpass ist jetzt die CHECKPOINT-WAHL, nicht der Kopf** (par.10.3): bei
-allen Armen faellt `_best` auf Epoche 1, weil `val_combined` den
-Ownership-Verlust nicht enthaelt; `final` (Ep. 15) hat den viel besseren Kopf,
-aber eine ueberangepasste Policy -- nachweislich NICHT durch Ownership
-verursacht (Kontrollarm w0 zeigt dieselbe Verschlechterung).
-
-| Laeuft gerade | Was es klaert |
+| Stueck | Stand |
 |---|---|
-| **w1-Arm** (ownership_weight 1,0; par.10.5, post-hoc markiert) | Der Trend war bis 0,5 monoton -- ist 0,5 Optimum oder Randwert? |
-| **Frozen-Trunk-Kopftraining** (`PREREG_frozen_trunk_head.md`, Bau laeuft) | Loest den Checkpoint-Zielkonflikt strukturell: Trunk + Staerke-Koepfe eingefroren, nur der Ownership-Kopf lernt, ownership-bewusstes Auswahlkriterium. Misst zugleich den Nutzer-Vorbehalt "eingefrorener Trunk koennte die Decke sein" |
-| **Stoerung v2, Stufe 0+1** (`PREREG_opponent_disruption_v2.md`) | Billige Diagnose vor jedem Bau: tritt ein Q-nahes Stoerfenster ueberhaupt auf? Abbruch unter 5 %, danach STOPP fuer Nutzer-Entscheid |
+| Lehr-Korpus 8000 Partien | FERTIG, Deckung belegt (corpus par.7/par.8) |
+| Gewichts-Sweep w0/w01/w02/w05/w1 | FERTIG, **Tor A BESTANDEN** (par.10), w1 gewinnt einstimmig (par.10.6) |
+| Frozen-Trunk-Kopftraining F1 | FERTIG (frozen_trunk_head par.7): Zielkonflikt halb geloest, Decke bestaetigt |
+| **Verbraucher Drafting** | **GEBAUT** (8eabbdb): E_k am Blatt, `MOSAIC_OWNERSHIP_W` Default 0, **Tor B belegt** (byte-identisch ueber 4 Kopfbreiten, Paritaetsprobe gruen) |
+| Verbraucher Tiling | NICHT gebaut -- bewusst als eigener Schritt (Einstieg `tiling_solver.rs::best_first_step_platten_valued`, Muster `MOSAIC_TILING_PLATTEN_GEW` liegt bereit) |
+| **Tor C (Regler-Sweep Arena)** | **DER NAECHSTE SCHRITT** -- siehe unten |
 
-### NAECHSTER GROSSER SCHRITT: der Verbraucher
+**Die drei Kopf-Kandidaten fuer Tor C** (alle auf demselben Held-out
+gemessen, Zahlen nachgerechnet):
 
-`PREREG_ownership_consumer.md` -- Blatt-Shift ueber E_k + marginale Feldwerte
-im Tiling-Solver, Regler `MOSAIC_OWNERSHIP_W` (Default 0 = byte-identisch).
-Tor A ist bestanden, damit ist der Bau freigegeben, sobald der beste
-Kopf-Checkpoint feststeht (w1-Ergebnis + Frozen-Trunk). Danach Tor B
-(Bestandsschutz bei w_own=0) und **Tor C** (Regler-Sweep in der Arena,
-Messgroessen Plattenpunkte je Kriterium + Endstand-Marge). Erst Tor C ist
-eine Staerkeaussage -- Tor A ist es ausdruecklich NICHT.
+| Checkpoint | policy val | Feld-AUC | E_k k1/k2/k5 | Charakter |
+|---|---:|---:|---|---|
+| `v21_2d_own_w1_best` | 0,2141 | 0,726 | 0,18/0,28/0,28 | Policy intakt, Kopf schwach |
+| **`v21_2d_own_f1`** | **0,2141** | 0,780 | 0,28/0,31/0,35 | Policy intakt, Kopf mittel -- gratis besser als w1_best |
+| `v21_2d_own_w1` (final) | 0,3018 | 0,870 | 0,36/0,35/0,47 | Bester Kopf, Policy +41 % schlechter |
 
-### Generator-Sortiment (aktuelle Aera, alle Zahlen nachgerechnet)
+Offline sind Kopfguete und Policy-Staerke NICHT ineinander umrechenbar --
+deshalb entscheidet die Arena, nicht die Abwaegung.
 
-| Kriterium | Generator | Niveau | Status |
-|---|---|---|---|
-| k1 vertikal | Spaltenbau R3-Pfad (`MOSAIC_SPALTENBAU`) | 3,15 (8/20 Partien >=1 Spalte) | aktiv; Sicherheitsnetz/Jackpot/Special = Diagnose-Knoepfe AUS |
-| k2 diagonal | Plattenbauer + Special (`MOSAIC_PLATTENBAU=2`) | 5,65 (13/23 volle Diagonalen) | UEBERNOMMEN |
-| k5 Ecken | Spaltenpaar-Bauer (`MOSAIC_PLATTENBAU=5`) | 8,55 (13/22 >=11) | UEBERNOMMEN (staerkste der Kampagne) |
-| k6 spezial | Heuristik (Arm D) + Spezialbauer (Arm F) | Heuristik -6,60..-11,10 | Kuppeldraft abgelehnt |
-| k3/k4 | Beifang aller Arme | 5-6 / 10,6 | reicht |
-| k0/k7 | nur Basisrate | 0,6-1,0 / 0,0 | verteidigen, nie anstreben; k7 aus Ownership nicht lernbar |
+### NAECHSTER SCHRITT: Tor C
 
-### Release-Stand (GitHub)
+Vorregistrierung schreiben und fahren (PREREG_ownership_consumer.md §5
+Punkt 5 ist der Rahmen, braucht aber eine eigene Mess-Prereg):
 
-Bundle `dist/Mosaic-AI_v21_2d_brierbest_20260815.zip` (40,5 MB) gebaut und am
-laufenden Bundle rauchgetestet (Server, Champion, gewertetes KI-Spiel,
-Menschen-Zug, echter Netz-Zug). Spieler-Doku englisch, Attribution zu
-*Azul Duel* ehrlich gestellt (README + Handbuch-Kopf). Tag-Haushalt bereinigt:
-`v0.1-alpha16` zeigt auf den v16-Stand, lokal und auf GitHub deckungsgleich.
-**Offen:** der aktuelle main-Stand ist NICHT gepusht; das v21-Release (Tag +
-Release-Text + Zip) wartet auf den Nutzer.
+1. **Zwei Checkpoint-Arme** (`f1` und `w1` final) x **w_own-Raster**
+   (0 / klein / mittel / gross -- Startwerte aus der tanh-Skala herleiten,
+   nicht raten). Der w_own=0-Arm ist zugleich die Bestandsschutz-Kontrolle.
+2. **Messgroessen**: Plattenpunkte je Kriterium (k1/k2/k5 -- die
+   Zielgroesse der ganzen Kampagne) UND Endstand-Marge UND Siege.
+   Block-Ebene, gepaart, Frisch-Seed-Replikation fuer den Sieger-Arm.
+3. **Vorab-Regeln**: Was zaehlt als Erfolg? Nutzer-Zielgroesse ist
+   "Sieg mit vielen Punkten" -- ein Plattenpunkt-Gewinn, der Siege kostet,
+   ist KEIN Erfolg (k6-Praezedenz, Stoerungs-Praezedenz).
+4. Erst Tor C ist eine Staerkeaussage. Tor A war es ausdruecklich nicht.
+
+### Danach in der Warteschlange
+
+- **F2 (Deckel-Sonde)**: Frozen-Trunk vom Champion aus -- beantwortet, ob ein
+  Trunk ohne je gesehenen Ownership-Gradienten ueberhaupt so weit kommt wie
+  F1. Unabhaengig von Tor C, billig.
+- **Verbraucher Tiling** (§3 der Consumer-Prereg), sinnvollerweise nach Tor C.
+- **Sanftes gemeinsames Nachtrainieren** (kleine LR, Early Stop auf
+  Ownership) -- der ungetestete Mittelweg zwischen F1 und w1-final; erster
+  Kandidat, falls Tor C zeigt, dass Kopfguete traegt und die Decke wehtut.
+- **Stoerungs-Baustein Stufe 2**: NUTZER-ENTSCHEID offen. Stufe 1 live
+  gemessen: **7,63 %** Stoerfenster (200 Partien, byte-identisch belegt),
+  Abbruchregel greift nicht. Koordinator-Empfehlung: knappes Ja, aber
+  Wunsch-Feature, kein Elo-Hebel -- bei Zeitkonkurrenz hat Tor C Vorrang.
 
 ### Offene Punkte
 
 | Punkt | Stand |
 |---|---|
-| **Stoerungs-Baustein Farbzaehlung** | v1 GEMESSEN und ABGELEHNT (Ziel Rauschen Delta+0,05, Kosten katastrophal: Siege 32/40 -> 12/40, McNemar p=0,0001; Ursache: Vorzug feuerte bedingungslos und ueberlaufblind). Knopf default AUS, Code inert stehen gelassen. v2 vorregistriert, Stufe 0/1 laeuft |
-| **Task-#71-Notdeckel** | 2b hat sie ehrlich gemacht (Fallback statt stillem Kappen, Deckel ~10x). OFFEN nur noch der sync<->async-Gate-B-Retest -- niedrige Prioritaet |
-| **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth` traegt `#[ignore]` bis zur Schwellen-Neukalibrierung auf dem v21-Fixture |
-| **MOSAIC_GAME_TIMEOUT_SCALE** | steht in der Knopf-Registratur als "geplant": der par.22-Umbau lebt nur im Archiv-Branch `async_search_stage3_archive`, nicht in main. Beim naechsten Async-Anlauf mitziehen |
-| **Task #31 Schwierigkeitsstufen** | weiter zurueckgestellt (Nutzer 2026-08-16: "der kommt erst spaeter"). README_GAME nennt jetzt korrekt die zwei Rohregler statt erfundener Stufen |
-| **Hardware-Hinweis** | RAM 32 GB = Engpass Nr. 2 (ein Trainingslauf haelt ~19 GB -> kein Parallel-Sweep), CPU 6C/12T = Engpass Nr. 1, GPU (RTX 3060) unterausgelastet. Preis-Leistungs-Empfehlung falls je aufgeruestet wird: 5950X + 32 GB RAM |
-
-### Was diese Woche ABGESCHLOSSEN wurde (Details in der History)
-
-Architektur-Fahrplan **alle fuenf Punkte** (Index generiert + Hook-Regel,
-Test-Skip-Verbot, Knopf-Registratur mit Waechter-Test, vereinheitlichte
-Spielschleife mit 0-Bit-Abnahme, Spieler-Abstraktion) · Torch-IPC/Weg A
-restlos entfernt · GPU par.23: **Weg B geschlossen** bis zum groesseren Netz
-(beste Zelle 1,26x gegen den frisch gemessenen Sync-Nenner 528,5 Spiele/h bei
-11 Threads; 12 Threads sind langsamer) · Dateinamen-Migration komplett ·
-Scratchpads geraeumt (53 GB), Worktrees entfernt, Async-Stand in den Branches
-`async_search_stage{1,3}_archive` gesichert.
-
-**Sync-Self-Play-Standard ist seit par.23 11 Threads, nicht mehr 8.**
+| **Aufraeum-Freigabe ausstehend** | `scratchpad/wt_probe` samt dort gebautem Wheel ist ueberfluessig (Stoer-Agent), ebenso ggf. `scratchpad/wt_2b_vor`-Reste. Loeschung braucht pfadgenaue Nutzer-Freigabe |
+| **Gate-B-Retest sync<->async** | nach 2b noch offen, niedrige Prioritaet, kein Blocker |
+| **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth` `#[ignore]` bis Schwellen-Neukalibrierung auf v21 |
+| **MOSAIC_GAME_TIMEOUT_SCALE** | Registratur-Status "geplant": lebt nur im Branch `async_search_stage3_archive` |
+| **Release** | Bundle v21 gebaut+rauchgetestet, main NICHT gepusht; v21-Release (Tag/Text/Zip) wartet auf den Nutzer |
+| **Task #31 Schwierigkeitsstufen** | zurueckgestellt (Nutzer). README_GAME nennt korrekt die zwei Rohregler |
+| **Hardware** | RAM 32 GB = Engpass 2 (ein Lauf ~19 GB, kein Parallel-Sweep), CPU 6C/12T = Engpass 1, GPU unterausgelastet. Empfehlung falls Aufruestung: 5950X + 32 GB |
 
 ---
 

@@ -11560,3 +11560,77 @@ Mess-Skripte vorher nach `tools/probes/` gerettet).
    heute. v16 ist nur schwaecher, nicht unladbar (korrigiert in 3bdbc1c).
    REGEL 0 gilt auch fuer Commit-Texte und uebersetzte Doku: eine Aussage ist
    nicht dadurch geprueft, dass sie schon dastand.
+
+## 2026-08-16: Ownership-Kopf gelernt, Verbraucher gebaut -- die Arena ist am Zug
+
+Champion unveraendert. Alle Zahlen vom Koordinator an Roh-JSONs nachgerechnet.
+
+### Der Sweep zu Ende: w1 gewinnt, das Optimum bleibt offen
+
+Fuenfter Arm (ownership_weight 1,0, post-hoc als solcher markiert) schlaegt
+w05 einstimmig: Feld-AUC final 0,870 gegen 0,837, E_k-Ecken 0,466 gegen
+0,408, alle Konjunktionsgruppen besser, Waechter praktisch unbewegt
+(policy 0,2139 -> 0,2141). Damit ist das Optimum immer noch nicht
+eingeklammert -- ein w2-Arm unterblieb trotzdem begruendet: im
+Frozen-Trunk-Modus trainiert nur der Kopf, das Gewicht wird dort zum blossen
+Lernraten-Faktor, und die Abwaegung, die der Sweep messen sollte, existiert
+nicht mehr.
+
+### Frozen-Trunk F1: Zielkonflikt halb geloest, Nutzer-Vorbehalt bestaetigt
+
+Der Freeze-Riegel haelt exakt (policy val_loss und Brier bit-gleich zum
+Startpunkt ueber 15 Epochen). F1 hebt die Kopfguete klar ueber den sonst
+auslieferbaren Checkpoint (Feld-AUC 0,726 -> 0,780, E_k k5 +25 %) -- gratis.
+Erreicht aber w1-`final` (0,870) nicht: **die Decke ist real**. Wo sie sitzt,
+ist der eigentliche Erkenntnisgewinn: die geometrischen Kriterien verlieren
+nur ~0,06 AUC, die FARB-abhaengigen brechen ein (k7 −0,213, Wild-Layout
+−0,189). Der eingefrorene Trunk transportiert Geometrie, aber nicht
+Farbstruktur -- und die Farbkriterien braucht der Verbraucher nicht.
+
+Zwei Mechanik-Funde beim Bau: der Val-Zweig entpackte `v_pred_own` und
+benutzte es nie (die Wurzel des Epoche-1-Problems), und `requires_grad=False`
+allein waere STILL FALSCH gewesen -- BatchNorm-Puffer haben kein
+`requires_grad`, ohne eval-Riegel driftet die Policy nach vier Schritten um
+2,2e-2. Beides mit Kill-Probe abgesichert.
+
+### Ownership-Verbraucher (Drafting) gebaut, Tor B belegt
+
+E_k am Blatt nach der Prereg-Formel, Regler `MOSAIC_OWNERSHIP_W` Default 0
+mit Frueh-Ausstieg. Byte-Identitaet ueber 4 Kopfbreiten x 4 Blattwerte x 8
+Zustaende plus handgebauter Alt-Pfad-Vergleich; Paritaets-Hash haelt auf dem
+installierten Wheel. Formel-Beleg: bei p=1 auf vollem Brett liefert E_k
+**exakt** die harte Endwertung, Kriterium fuer Kriterium.
+
+Verhinderter stiller Fehler: der Sammel-Faden musste auf `eval_batch_ex`
+umgestellt werden -- dabei fiel auf, dass diese Variante den ORT-Haken noch
+nicht hatte. Ohne Nachruestung haette der Batcher seinen GPU-Pfad verloren
+UND jedes verschraenkt ausgewertete Blatt haette still einen leeren
+Ownership-Kopf gesehen.
+
+### Stoerungs-Baustein v2: Stufe 1 live gemessen
+
+7,63 % Stoerfenster (200 Partien, 400 Sims), Abbruchregel greift nicht,
+Byte-Identitaet des Zaehlmodus belegt (12 Partien, 2127 Zeichen exakt
+gleich). Methodik-Befund: die Entscheidungszahl der Offline-Rekonstruktion
+haelt (5,50 % vs 7,63 %, gleiche Groessenordnung, gleiches Verdikt), die
+FENSTER-Statistik aber nicht (62 % vs 89 %, Faktor 2,5). Die Kombination
+zeigt: begrenzend ist nicht die Gleichwertigkeit, sondern die
+Stoerbedingung selbst. Offline-Rekonstruktion taugt als
+Groessenordnungs-Schaetzer, nicht fuer Aussagen ueber das Fenster.
+
+### Eigene Fehler des Tages
+
+- **Waechter am falschen Prozess**: ich hielt eine `server.py`-PID fuer den
+  Trainingslauf; zusaetzlich deckelt `run_in_background` bei 600 s. Beides
+  haette die Startreihenfolge zu frueh ausgeloest. Konsequenz: fuer
+  Warte-Bedingungen den persistenten Monitor nehmen, und die PID am
+  Kommandozeilen-Text verifizieren, nicht am Zeitpunkt raten.
+- **Zwei Agenten gleichzeitig in `net_mcts.rs`** -- trotz eigener
+  Kollisionswarnung. Folge: ein Agent committete in-flight-Arbeit des
+  anderen mit, HEAD uebersetzte voruebergehend nicht standalone. Der
+  betroffene Agent hat richtig entschieden, NICHT per amend in eine fremde
+  Arbeitsdatei zu greifen.
+- **Praemisse aus der History ungeprueft weitergegeben**: `--skip-phase1`
+  und `--value-hidden` existieren in `train.py` nicht mehr, sie stehen nur
+  im Archiv. Der Agent hat es geprueft statt uebernommen -- die History
+  beschreibt vergangene Staende, nicht den Code.
