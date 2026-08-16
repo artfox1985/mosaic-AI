@@ -1,0 +1,159 @@
+"""Policy-Traegersatz eines Trainingslaufs aufloesen und protokollieren.
+
+Eigenes Modul, weil `train.py` die Modularitaetsschwelle aus CLAUDE.md bereits
+reisst -- der Konventions-Waechter hat das Wachstum zu Recht geblockt.
+"""
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
+from config import DATA_DIR, MODELS_DIR
+
+
+def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
+    """Loest die Policy-TRAEGER-Regel schon beim Manifest-Schreiben auf und
+    zaehlt je Praefix, wie viele Dateien tatsaechlich Policy-Ziele beitragen.
+
+    WARUM DAS HIER STEHT (Befund 2026-08-16): der gesamte Ownership-Korpus war
+    in SIEBEN Trainingslaeufen policy-maskiert, ohne dass es irgendwo sichtbar
+    wurde -- die Korpusdateien sind weder im Traeger-Manifest gelistet noch
+    beginnen sie mit `WDL_GENERATOR_PREFIXES`, also galt `pol_w = 0.0`
+    (`neural_net.py:1804`). Value-, Punkte- und Ownership-Ziele liefen normal
+    durch, die Laeufe sahen also voellig unauffaellig aus. Aufgefallen ist es
+    erst ueber eine Nutzer-Frage, nicht ueber eine Messung.
+
+    Eine Zeile "v21_own_k1: 100 Dateien, davon 0 Traeger" im Manifest haette
+    das am ersten Tag gezeigt. Genau die schreibt diese Funktion.
+
+    Zusaetzlich festgehalten wird, WELCHES Traeger-Manifest galt: der Default
+    (`policy_carrier_manifest_v20.json`) und das v21-Manifest liefern
+    unterschiedliche Traegersaetze, und bisher stand in keinem Trainings-
+    manifest, welches aktiv war."""
+    try:
+        from neural_net import _is_policy_carrier, WDL_GENERATOR_PREFIXES
+    except ImportError:                                   # defensiv: nie den Lauf blockieren
+        return {"error": "neural_net._is_policy_carrier nicht importierbar"}
+
+    mf_name = os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json")
+    mf_path = Path(DATA_DIR) / mf_name
+    carrier_set, carrier_prefixes = None, None
+    if mf_path.exists():
+        try:
+            mf = json.loads(mf_path.read_text(encoding="utf-8"))
+            carrier_set = frozenset(mf.get("policy_carrier_files", []))
+            if "carrier_prefixes" in mf:
+                carrier_prefixes = list(mf["carrier_prefixes"])
+        except Exception as e:                            # kaputtes Manifest sichtbar machen
+            return {"carrier_manifest": mf_name, "error": f"nicht lesbar: {e}"}
+
+    je_praefix: dict[str, int] = {}
+    traeger_gesamt = 0
+    for f in all_files:
+        name = Path(f).name
+        m = (selfplay_filename_re or _SELFPLAY_FILENAME_RE).match(name)
+        prefix = m.group("prefix") if m else "_unmatched"
+        ist = _is_policy_carrier(name, carrier_set, carrier_prefixes,
+                                 name.startswith(WDL_GENERATOR_PREFIXES))
+        je_praefix[prefix] = je_praefix.get(prefix, 0) + (1 if ist else 0)
+        traeger_gesamt += 1 if ist else 0
+    return {
+        "carrier_manifest": mf_name,
+        "carrier_manifest_gefunden": mf_path.exists(),
+        "carrier_prefixes": carrier_prefixes,
+        "gelistete_dateien": len(carrier_set) if carrier_set is not None else None,
+        "traeger_dateien_gesamt": traeger_gesamt,
+        "traeger_dateien_je_praefix": je_praefix,
+        "data_exclude": os.environ.get("MOSAIC_DATA_EXCLUDE"),
+    }
+
+
+_SELFPLAY_FILENAME_RE = re.compile(
+    r"^selfplay_(?P<prefix>.+)_(?P<date>\d{8})_(?P<time>\d{4})_g(?P<games>\d+)\.pkl$"
+)
+
+
+def corpus_composition(all_files: list[str]) -> list[dict]:
+    """Gruppiert die Trainingskorpus-Dateien nach Versions-Präfix (alles vor
+    dem eingebetteten Zeitstempel `_<date>_<time>_g<N>.pkl`, siehe
+    `self_play.py::_flush`) -- rein aus den DATEINAMEN, kein Pickle-Laden
+    nötig. `games`-Schätzung: die kumulative `_g<N>`-Ziffer resettet bei
+    JEDEM neuen Self-Play-Lauf auf klein (self_play.py's `done` startet pro
+    Aufruf bei 0) -- Dateien je Präfix nach (Zeitstempel, dann g) sortiert,
+    ein Sprung `g_i <= g_{i-1}` gilt als Start eines neuen Laufs (eigener
+    Beitrag = g_i selbst statt g_i - g_{i-1}). Reduziert sich für den
+    Normalfall (ein durchgehender Lauf je Präfix) exakt auf `max(g)`
+    (z.B. "180 Dateien netcq (1800 Spiele)" bei per_file=10)."""
+    groups: dict[str, list[tuple[str, int]]] = {}
+    unmatched = 0
+    for f in all_files:
+        name = Path(f).name
+        m = _SELFPLAY_FILENAME_RE.match(name)
+        if not m:
+            unmatched += 1
+            continue
+        prefix = m.group("prefix")
+        dt_key = m.group("date") + m.group("time")
+        games = int(m.group("games"))
+        groups.setdefault(prefix, []).append((dt_key, games))
+
+    composition = []
+    for prefix, entries in groups.items():
+        entries.sort(key=lambda e: (e[0], e[1]))  # (Zeitstempel, dann g) aufsteigend
+        total_games = 0
+        prev_g = 0
+        for _dt_key, g in entries:
+            total_games += g if g <= prev_g else g - prev_g
+            prev_g = g
+        composition.append({"prefix": prefix, "files": len(entries), "games": total_games})
+    composition.sort(key=lambda c: -c["files"])
+    if unmatched:
+        composition.append({"prefix": "_unmatched", "files": unmatched, "games": None})
+    return composition
+
+
+def write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp,
+                          policy_carriers=None) -> None:
+    """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
+    Korpus-Zusammensetzung auf Konsole."""
+    manifest = {
+        "version": version_name,
+        "run_timestamp": run_timestamp,
+        "cli_args": cli_args,
+        "git_commit": _git_commit_hash(),
+        "git_dirty": _git_is_dirty(),
+        "engine_config": _engine_config(),
+        "python_constants": {
+            "TD_LAMBDA": TD_LAMBDA,
+            "POLICY_TARGET_SHARPEN_EXPONENT": POLICY_TARGET_SHARPEN_EXPONENT,
+            "VALUE_WEIGHT": VALUE_WEIGHT,
+            "POINTS_WEIGHT": POINTS_WEIGHT,
+            "VALUE_SCHEMA_VERSION": VALUE_SCHEMA_VERSION,
+        },
+        "corpus_composition": corpus_composition,
+        "policy_carriers": policy_carriers,
+    }
+    path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+        print(f"📝 Trainings-Manifest geschrieben: '{path}'")
+    except Exception as e:
+        print(f"  ⚠️  Manifest konnte nicht geschrieben werden ({e!r}) -- Training läuft trotzdem weiter.")
+
+    print("📦 Trainingskorpus-Zusammensetzung (nach Versions-Präfix, aus Dateinamen):")
+    je_pre = (policy_carriers or {}).get("traeger_dateien_je_praefix") or {}
+    for c in corpus_composition:
+        games_s = f"{c['games']} Spiele" if c["games"] is not None else "Spiele-Zahl unklar"
+        tr = je_pre.get(c["prefix"])
+        # Der Traeger-Hinweis ist der Kern des 2026-08-16-Befunds: ohne ihn sieht ein
+        # policy-maskierter Korpus im Log genauso aus wie ein wirksamer.
+        tr_s = "" if tr is None else (f"  [Policy-Traeger: {tr}/{c['files']}]"
+                                       if tr else f"  [KEINE Policy-Traeger -- {c['prefix']} fuettert nur Value/Ownership]")
+        print(f"   {c['files']:>4} Dateien {c['prefix']:<28} ({games_s}){tr_s}")
+    if policy_carriers:
+        print(f"   Traeger-Manifest: {policy_carriers.get('carrier_manifest')}"
+              f"{'' if policy_carriers.get('carrier_manifest_gefunden') else ' (NICHT GEFUNDEN -- jede Datei traegt Policy)'}"
+              f" | Policy-Traeger gesamt: {policy_carriers.get('traeger_dateien_gesamt')}")
