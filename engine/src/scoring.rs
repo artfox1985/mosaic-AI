@@ -398,6 +398,160 @@ pub fn unlock_progress_beta(player: &PlayerBoard, tile_ids: &[usize], beta: f64)
     total
 }
 
+// ── Erwartete Plattenpunkte aus dem Ownership-Kopf ──────────────────────────────
+//
+// `PREREG_ownership_consumer.md` §2, Verbraucher 1 (Drafting). Reine Formel,
+// KEIN Netz-Aufruf und kein Env-Var-Zugriff -- die Wahrscheinlichkeiten kommen
+// als fertiger `[f64; 36]` herein (der Verbraucher in `net_mcts.rs` rechnet die
+// rohen Kopf-Logits per Sigmoid um und waehlt die Spielerhaelfte). Bewusst HIER
+// statt in `net_mcts.rs`: es ist Wertungsgeometrie, sie gehoert neben die
+// Wertung, und sie ist so mit einem KUENSTLICHEN Ownership-Vektor testbar,
+// ohne ein ONNX-Modell zu laden.
+
+/// Breite EINER Spielerhaelfte des Ownership-Kopfs: 3x3 Slots x 4 Spaces.
+pub const OWNERSHIP_FIELDS: usize = 36;
+
+/// Feldindex im Ownership-Vektor fuer (Slot-Zeile, Slot-Spalte, Space-Index).
+///
+/// ABGELESEN, NICHT HERGELEITET (`PREREG_ownership_consumer.md` §6): der
+/// Label-Bauer `neural_net.py::_ownership_from_dome` (Zeile 882-897) laeuft
+/// `for sr in 0..3 { for sc in 0..3 { for si in 0..4 { out.push(..) } } }`,
+/// also **slot_row-major, dann slot_col, dann space_index** -- Index =
+/// `sr*12 + sc*4 + si`. Der Docstring dort nennt genau diese Reihenfolge
+/// ("Reihenfolge slot_row-major, dann space_index").
+pub fn ownership_field_index(slot_row: usize, slot_col: usize, space_idx: usize) -> usize {
+    slot_row * 12 + slot_col * 4 + space_idx
+}
+
+/// Feldindex im Ownership-Vektor fuer eine Position `(r, c)` des 6x6-Rasters.
+///
+/// Umkehrung der Rasterabbildung aus [`build_grid`] (Zeile 493:
+/// `grid[sr*2 + si/2][sc*2 + si%2]`, identisch in
+/// `neural_net.py::_dome_grids_from_dome`): `sr = r/2`, `sc = c/2`,
+/// `si = (r%2)*2 + (c%2)`.
+pub fn ownership_index_for_grid(r6: usize, c6: usize) -> usize {
+    ownership_field_index(r6 / 2, c6 / 2, (r6 % 2) * 2 + (c6 % 2))
+}
+
+/// Erwartete Plattenpunkte je Kriterium aus einer Ownership-Karte.
+///
+/// `E_k = SUM_{Geometrie g von k} punkte_k * PROD_{Feld f in g} p_own(f)` fuer
+/// die KONJUNKTIVEN Kriterien, `SUM_f p*punkte` fuer die ADDITIVEN 4 und 6
+/// (`PREREG_ownership_consumer.md` §2). Nur Kriterien aus `tile_ids` liefern
+/// einen Wert, alle uebrigen Stellen bleiben 0,0 -- gleiche Gatung wie die
+/// echte Endwertung ([`calculate_end_scoring`]): eine nicht gezogene
+/// Wertungsplatte zahlt nicht.
+///
+/// Die Punktwerte sind DIESELBEN wie in den `score_*`-Funktionen unten
+/// (3 / 7 / 10 / 2*wild_total / +1 / 3,3,8,8 / -3 / --). Nachweis, dass die
+/// Formel bei `p == 1` exakt in die harte Endwertung faellt: Test
+/// `expected_plate_points_at_p_one_matches_calculate_end_scoring`.
+///
+/// **Kriterium 7 (farbenreiche Reihen) bleibt 0** -- es kann laut
+/// `neural_net.py:958` NICHT aus `ownership` kommen ("das Ziel dort ist
+/// belegt/leer ohne Farbe"), siehe `PREREG_ownership_consumer.md` §6. Ein
+/// Gewicht auf Stelle 7 ist damit wirkungslos, nicht falsch.
+///
+/// Kriterium 3 (Jokerfelder) und 6 (Spezialfelder) brauchen zusaetzlich das
+/// BRETT, weil erst dort steht, WELCHE Felder Joker-/Spezialfelder sind
+/// (`SpaceType`). Ein Slot, der noch gar nicht liegt, traegt fuer diese beiden
+/// Kriterien nichts bei -- exakt die Konvention von [`score_wild_fields`]/
+/// [`score_empty_special_fields`], die ebenfalls nur ueber die GELEGTEN
+/// Kacheln laufen ([`collect_spaces`]).
+pub fn expected_plate_points(
+    player: &PlayerBoard,
+    p_own: &[f64; OWNERSHIP_FIELDS],
+    tile_ids: &[usize],
+) -> [f64; 8] {
+    let mut out = [0.0f64; 8];
+    let p = |r: usize, c: usize| p_own[ownership_index_for_grid(r, c)];
+
+    for &id in tile_ids {
+        match id {
+            // Horizontale Reihen: 6 Geometrien a 6 Felder, +3 je vollstaendige.
+            0 => {
+                out[0] = (0..6).map(|r| (0..6).map(|c| p(r, c)).product::<f64>()).sum::<f64>() * 3.0;
+            }
+            // Vertikale Reihen: +7.
+            1 => {
+                out[1] = (0..6).map(|c| (0..6).map(|r| p(r, c)).product::<f64>()).sum::<f64>() * 7.0;
+            }
+            // Diagonalen (i,i) und (i,5-i): +10 je.
+            2 => {
+                let d0: f64 = (0..6).map(|i| p(i, i)).product();
+                let d1: f64 = (0..6).map(|i| p(i, 5 - i)).product();
+                out[2] = (d0 + d1) * 10.0;
+            }
+            // Jokerfelder: ALLE Joker-Spaces belegt -> 2 * Anzahl Joker-Spaces.
+            3 => {
+                let mut prod = 1.0f64;
+                let mut total = 0usize;
+                for (sr, sc, si, sp) in dome_spaces(player) {
+                    if sp.space_type == SpaceType::Wild {
+                        total += 1;
+                        prod *= p_own[ownership_field_index(sr, sc, si)];
+                    }
+                }
+                out[3] = if total == 0 { 0.0 } else { prod * 2.0 * total as f64 };
+            }
+            // Randfelder: ADDITIV, +1 je belegtem Randfeld des 6x6-Rasters.
+            4 => {
+                let mut s = 0.0f64;
+                for r in 0..6 {
+                    for c in 0..6 {
+                        if r == 0 || r == 5 || c == 0 || c == 5 {
+                            s += p(r, c);
+                        }
+                    }
+                }
+                out[4] = s;
+            }
+            // Eckplatten: alle 4 Spaces des Eckslots -> 3/3/8/8.
+            5 => {
+                let mut s = 0.0f64;
+                for (&(sr, sc), &pts) in
+                    [(0usize, 0usize), (0, 2), (2, 0), (2, 2)].iter().zip([3.0f64, 3.0, 8.0, 8.0].iter())
+                {
+                    let prod: f64 = (0..4).map(|si| p_own[ownership_field_index(sr, sc, si)]).product();
+                    s += prod * pts;
+                }
+                out[5] = s;
+            }
+            // Spezialfelder: ADDITIV und NEGATIV, -3 je LEER gebliebenem
+            // Spezialfeld -> Erwartungswert -3 * SUM (1 - p).
+            6 => {
+                let mut s = 0.0f64;
+                for (sr, sc, si, sp) in dome_spaces(player) {
+                    if sp.space_type == SpaceType::Special {
+                        s += 1.0 - p_own[ownership_field_index(sr, sc, si)];
+                    }
+                }
+                out[6] = -3.0 * s;
+            }
+            // 7: nicht aus ownership ableitbar, siehe Funktionskommentar.
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Alle Spaces der GELEGTEN Kuppelkacheln mit ihren Koordinaten
+/// `(slot_row, slot_col, space_idx, space)` -- wie [`collect_spaces`], aber
+/// mit Position (die [`expected_plate_points`] fuer den Feldindex braucht).
+fn dome_spaces(player: &PlayerBoard) -> Vec<(usize, usize, usize, &DomeSpace)> {
+    let mut out = Vec::new();
+    for sr in 0..3 {
+        for sc in 0..3 {
+            if let Some(slot) = &player.dome_grid.dome_slots[sr][sc] {
+                for (si, sp) in slot.spaces.iter().enumerate().take(4) {
+                    out.push((sr, sc, si, sp));
+                }
+            }
+        }
+    }
+    out
+}
+
 // ── Einzelne Wertungen ──────────────────────────────────────────────────────────
 
 fn score_horizontal_rows(player: &PlayerBoard) -> i32 {
@@ -1965,5 +2119,148 @@ mod tests {
         assert_eq!(exclusion_partner(0), Some(7));
         assert_eq!(exclusion_partner(7), Some(0));
         assert_eq!(exclusion_partner(5), Some(2));
+    }
+
+    // ── Ownership-Verbraucher Teil 1: Feldindex + E_k-Formel ────────────────
+    // `PREREG_ownership_consumer.md` §2/§6. §6 verlangt ausdruecklich, die
+    // Feld-Indexierung ABZULESEN statt herzuleiten -- diese Tests halten die
+    // abgelesene Zuordnung fest, damit ein spaeterer Indexdreher auffliegt
+    // (er waere sonst unsichtbar und wuerde als "Kopf taugt nichts"
+    // fehlgedeutet).
+
+    /// Die Reihenfolge aus `neural_net.py::_ownership_from_dome` (Zeile
+    /// 882-897: `for sr { for sc { for si { push } } }`) ist genau
+    /// `sr*12 + sc*4 + si`, und die 6x6-Rasterabbildung ist die von
+    /// `build_grid` (`grid[sr*2 + si/2][sc*2 + si%2]`).
+    #[test]
+    fn ownership_index_matches_label_builder_order_and_grid_mapping() {
+        let mut seen = Vec::new();
+        for sr in 0..3 {
+            for sc in 0..3 {
+                for si in 0..4 {
+                    let idx = ownership_field_index(sr, sc, si);
+                    // (a) Push-Reihenfolge des Label-Bauers = 0,1,2,... ohne Luecke.
+                    assert_eq!(idx, seen.len(), "Push-Reihenfolge weicht ab bei ({sr},{sc},{si})");
+                    seen.push(idx);
+                    // (b) dieselbe Zelle ueber die Rasterkoordinate erreicht
+                    //     denselben Index.
+                    let (r, c) = (sr * 2 + si / 2, sc * 2 + si % 2);
+                    assert_eq!(
+                        ownership_index_for_grid(r, c),
+                        idx,
+                        "Rasterabbildung ({r},{c}) trifft nicht ({sr},{sc},{si})"
+                    );
+                }
+            }
+        }
+        assert_eq!(seen.len(), OWNERSHIP_FIELDS);
+    }
+
+    /// Die Formel ist nicht nur behauptet: bei `p == 1` auf einem VOLLEN
+    /// Brett muss `E_k` exakt der harten Endwertung entsprechen -- Kriterium
+    /// fuer Kriterium, inklusive der beiden brettabhaengigen (3 Joker,
+    /// 6 Spezialfelder). Kriterium 7 ist ausgenommen (nicht aus ownership
+    /// ableitbar, `neural_net.py:958`).
+    #[test]
+    fn expected_plate_points_at_p_one_matches_calculate_end_scoring() {
+        let colors5 = [Blau, Gelb, Rot, Schwarz, Tuerkis];
+        let mut plan: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for r in 0..6 {
+            for c in 0..6 {
+                plan[r][c] = Some((SpaceType::Normal, Some(colors5[(r + c) % 5]), false));
+            }
+        }
+        // Drei Jokerfelder und zwei Spezialfelder, alle BELEGT -- damit die
+        // brettabhaengigen Kriterien 3 und 6 nicht trivial 0 sind.
+        for &(r, c) in &[(0usize, 0usize), (2, 2), (4, 4)] {
+            plan[r][c] = Some((SpaceType::Wild, Some(Blau), false));
+        }
+        for &(r, c) in &[(1usize, 3usize), (5, 1)] {
+            plan[r][c] = Some((SpaceType::Special, None, true));
+        }
+        let player = player_with_grid(grid_from_plan(&plan));
+
+        let p_own = [1.0f64; OWNERSHIP_FIELDS];
+        let all: Vec<usize> = (0..8).collect();
+        let e = expected_plate_points(&player, &p_own, &all);
+        for k in 0..7 {
+            let hart = ALL_SCORING_TILES[k].score(&player) as f64;
+            assert!(
+                (e[k] - hart).abs() < 1e-9,
+                "Kriterium {k}: E={} weicht von der harten Endwertung {hart} ab",
+                e[k]
+            );
+        }
+        // Sanity gegen einen leer-gruenen Test: die Wertung ist wirklich
+        // besetzt (volles Brett = 18/42/20/6/20/22/0).
+        assert!((e[0] - 18.0).abs() < 1e-9, "k0 {}", e[0]);
+        assert!((e[1] - 42.0).abs() < 1e-9, "k1 {}", e[1]);
+        assert!((e[2] - 20.0).abs() < 1e-9, "k2 {}", e[2]);
+        assert!((e[3] - 6.0).abs() < 1e-9, "k3 {}", e[3]);
+        assert!((e[4] - 20.0).abs() < 1e-9, "k4 {}", e[4]);
+        assert!((e[5] - 22.0).abs() < 1e-9, "k5 {}", e[5]);
+        assert_eq!(e[7], 0.0, "k7 ist aus ownership nicht ableitbar und muss 0 bleiben");
+    }
+
+    /// Der KUENSTLICHE Vektor aus dem Auftrag: alle `p = 1` auf EINER Spalte,
+    /// sonst 0. Dann muss `E_1` exakt der Punktwert einer vollstaendigen
+    /// vertikalen Reihe sein (+7) -- und das Produkt muss eine TOTE Spalte
+    /// (ein Feld auf 0) von selbst auf 0 druecken, genau die in §2 verlangte
+    /// Eigenschaft.
+    #[test]
+    fn expected_plate_points_synthetic_full_column_yields_exactly_seven() {
+        let player = player_with_grid(grid_from_plan(&[[None; 6]; 6]));
+        let spalte = 2usize;
+
+        let mut p_own = [0.0f64; OWNERSHIP_FIELDS];
+        for r in 0..6 {
+            p_own[ownership_index_for_grid(r, spalte)] = 1.0;
+        }
+        let e = expected_plate_points(&player, &p_own, &[0, 1, 2, 4, 5]);
+        assert!((e[1] - 7.0).abs() < 1e-12, "eine sichere Spalte muss E_1 = 7 geben, ist {}", e[1]);
+        assert_eq!(e[0], 0.0, "keine Reihe ist vollstaendig");
+        assert_eq!(e[2], 0.0, "keine Diagonale ist vollstaendig");
+        assert_eq!(e[5], 0.0, "keine Eckplatte ist vollstaendig");
+        // Kriterium 4 ist ADDITIV: Spalte 2 beruehrt den Rand in Reihe 0 und 5.
+        assert!((e[4] - 2.0).abs() < 1e-12, "k4 additiv erwartet 2.0, ist {}", e[4]);
+
+        // Unsicheres Feld -> Produkt, nicht Summe.
+        p_own[ownership_index_for_grid(3, spalte)] = 0.5;
+        let e_halb = expected_plate_points(&player, &p_own, &[1]);
+        assert!((e_halb[1] - 3.5).abs() < 1e-12, "0,5 auf einem Feld muss E_1 halbieren, ist {}", e_halb[1]);
+
+        // Totes Feld -> die ganze Spalte ist wertlos.
+        p_own[ownership_index_for_grid(3, spalte)] = 0.0;
+        let e_tot = expected_plate_points(&player, &p_own, &[1]);
+        assert_eq!(e_tot[1], 0.0, "ein Feld mit p=0 muss die ganze Spalte auf 0 setzen");
+    }
+
+    /// Kriterium 6 ist additiv, negativ und brettabhaengig: `-3` je Feld, das
+    /// das Netz NICHT fuer belegt haelt. Und die Gatung greift -- ein nicht
+    /// gezogenes Kriterium liefert 0.
+    #[test]
+    fn expected_plate_points_criterion6_is_negative_additive_and_gated() {
+        let mut plan: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for &(r, c) in &[(1usize, 3usize), (5, 1)] {
+            plan[r][c] = Some((SpaceType::Special, None, false));
+        }
+        let player = player_with_grid(grid_from_plan(&plan));
+
+        // Netz haelt beide Spezialfelder fuer sicher leer -> -6.
+        let p_zero = [0.0f64; OWNERSHIP_FIELDS];
+        let e = expected_plate_points(&player, &p_zero, &[6]);
+        assert!((e[6] + 6.0).abs() < 1e-12, "zwei sicher leere Spezialfelder erwarten -6, ist {}", e[6]);
+
+        // Netz haelt eines fuer sicher belegt -> -3.
+        let mut p_mix = [0.0f64; OWNERSHIP_FIELDS];
+        p_mix[ownership_index_for_grid(1, 3)] = 1.0;
+        let e_mix = expected_plate_points(&player, &p_mix, &[6]);
+        assert!((e_mix[6] + 3.0).abs() < 1e-12, "erwartet -3, ist {}", e_mix[6]);
+
+        // Gatung: Kriterium 6 nicht gezogen -> 0, egal was das Netz sagt.
+        let e_gate = expected_plate_points(&player, &p_zero, &[0, 1]);
+        assert_eq!(e_gate[6], 0.0, "nicht gezogene Wertungsplatte darf nichts beitragen");
     }
 }

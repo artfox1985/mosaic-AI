@@ -1,6 +1,8 @@
 //! Weg B (`evaluations/PREREG_gpu_inference_path.md` §3/§6/§11, Nutzer-Auftrag
 //! "fang an" 2026-08-12): optionaler ONNX-Runtime-CUDA-Kanal statt tract,
-//! NUR fuer [`crate::net::Net::eval_batch`] -- gleiche Idee wie der 2026-08-15
+//! NUR fuer [`crate::net::Net::eval_batch`] und (seit dem Ownership-
+//! Verbraucher Teil 1) [`crate::net::Net::eval_batch_ex`], das dieselbe
+//! Session ueber dieselbe Extraktion bedient -- gleiche Idee wie der 2026-08-15
 //! entfernte Weg A (Torch/IPC, gemessen verworfen, PREREG §9), aber ohne
 //! Prozessgrenze: kein Python, kein IPC-Rundlauf, ein Speicherbild. GEDECKT
 //! nach Regel 3 (§11: 7,0x-18,5x gegen den tract-CPU-Bezug, vom Nutzer aus
@@ -111,7 +113,7 @@ use ort::ep::CUDA;
 use ort::session::{Session, SessionInputValue};
 use ort::value::Tensor;
 
-use crate::net::{split_batch_n, split_planes_flat_batch, InputLayout, Net};
+use crate::net::{split_batch_n, split_batch_n_or_empty_rows, split_planes_flat_batch, InputLayout, Net};
 
 /// Liest eine `MOSAIC_*`-Bool-Env-Var einmalig -- lokal dupliziert statt
 /// importiert (gleiches Muster wie `net_mcts.rs`/`tiling_solver.rs`: Module
@@ -255,6 +257,35 @@ pub(crate) fn eval_batch_via_ort_cuda(
     net: &Net,
     feats: &[&[f32]],
 ) -> Result<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>, String> {
+    // Duenne Huelle ueber die 6-Tupel-Variante -- die beiden Vertraege sollen
+    // sich nicht auseinanderentwickeln koennen. Die zusaetzlichen Extraktionen
+    // dort sind bei einem Modell OHNE den jeweiligen Kopf ein reiner
+    // `Option`-Test (kein Tensor-Zugriff), bei einem Modell MIT Kopf ein
+    // Kopiervorgang aus einem Tensor, den ORT ohnehin schon berechnet hat.
+    Ok(eval_batch_ex_via_ort_cuda(net, feats)?
+        .into_iter()
+        .map(|(p, v, m, pt, _opp, _own)| (p, v, m, pt))
+        .collect())
+}
+
+/// Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md` §5 Punkt 6):
+/// 6-Tupel-Variante von [`eval_batch_via_ort_cuda`], Vertrag identisch zu
+/// `net.rs::Net::eval_batch_ex` ((policy, value, moon, points, opp_points,
+/// ownership) je Zeile).
+///
+/// Die beiden Zusatz-Koepfe werden -- anders als die Ausgaben 0..3 -- ueber
+/// den beim Laden NAMENSBASIERT bestimmten Index gelesen
+/// (`Net::opp_head_index`/`Net::own_head_index`), exakt wie im tract-Pfad.
+/// Ein fester Positionsindex waere hier derselbe Fehler wie AUDIT-F1
+/// 2026-08-05 (`out[4]` ist `ownership`, nicht `opp_points`). Fehlt der Kopf
+/// oder liefert der Graph zu wenige Ausgaben, bleibt die Spalte LEER -- die
+/// etablierte "kein Kopf"-Konvention, `split_batch_n_or_empty_rows` haelt
+/// dabei die Invariante "genau `n` Zeilen".
+#[allow(clippy::type_complexity)]
+pub(crate) fn eval_batch_ex_via_ort_cuda(
+    net: &Net,
+    feats: &[&[f32]],
+) -> Result<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>, String> {
     let n = feats.len();
     if n == 0 {
         return Err("leerer Batch".to_string());
@@ -274,11 +305,23 @@ pub(crate) fn eval_batch_via_ort_cuda(
     let value = outputs[1].try_extract_tensor::<f32>().map_err(|e| e.to_string())?.1.to_vec();
     let moon = outputs[2].try_extract_tensor::<f32>().map_err(|e| e.to_string())?.1.to_vec();
     let points = outputs[3].try_extract_tensor::<f32>().map_err(|e| e.to_string())?.1.to_vec();
+    let aux = |idx: Option<usize>| -> Result<Vec<f32>, String> {
+        match idx {
+            Some(i) if outputs.len() > i => {
+                Ok(outputs[i].try_extract_tensor::<f32>().map_err(|e| e.to_string())?.1.to_vec())
+            }
+            _ => Ok(Vec::new()),
+        }
+    };
+    let opp_points = aux(net.opp_head_index())?;
+    let ownership = aux(net.own_head_index())?;
 
     let policy_rows = split_batch_n(policy, n);
     let value_rows = split_batch_n(value, n);
     let moon_rows = split_batch_n(moon, n);
     let points_rows = split_batch_n(points, n);
+    let opp_rows = split_batch_n_or_empty_rows(opp_points, n);
+    let own_rows = split_batch_n_or_empty_rows(ownership, n);
     Ok((0..n)
         .map(|i| {
             (
@@ -286,6 +329,8 @@ pub(crate) fn eval_batch_via_ort_cuda(
                 value_rows[i].clone(),
                 moon_rows[i].clone(),
                 points_rows[i].clone(),
+                opp_rows[i].clone(),
+                own_rows[i].clone(),
             )
         })
         .collect())

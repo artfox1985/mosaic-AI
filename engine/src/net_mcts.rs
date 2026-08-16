@@ -1505,6 +1505,180 @@ fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
     )
 }
 
+// ── Ownership-Verbraucher Teil 1: Drafting/Blattbewertung ───────────────────
+// `evaluations/PREREG_ownership_consumer.md` §2/§5/§6, freigegeben durch Tor A
+// (`PREREG_ownership_corpus.md` §10). Der ZWEITE Pol neben dem Heuristik-Pol
+// (`apply_wertung_shaping` oben): dort misst `wertung_progress_per_kriterium`
+// den IST-Fortschritt, hier prognostiziert das Netz die VOLLENDUNG. Gleiche
+// Shift-Form, gleicher Rechen-Ort, eigener Regler.
+//
+// NUR die Drafting-Seite. Der Tiling-Verbraucher (§3, marginale Feldwerte im
+// Solver) ist AUSDRUECKLICH nicht Teil dieses Schritts.
+
+/// `MOSAIC_OWNERSHIP_W` -- der Zwei-Pole-Regler `w_own`. Default **0,0** =
+/// Verbraucher TOT (Fruehausstieg in [`apply_ownership_shaping_full`], kein
+/// Sigmoid, kein tanh, keine Rundung -> byte-identisches Bestandsverhalten,
+/// Task-#28-Muster, siehe `blended_leaf_win_prob_with`s `w == 0.0`-Kurzschluss).
+///
+/// Prozessweit einmalig gelesen (`OnceLock`), wie alle Nachbarregler --
+/// ein Test, der den Wert nach dem ersten Zugriff umstellen will, kaeme nie an
+/// sein Ziel; die Formel ist deshalb ueber
+/// [`apply_ownership_shaping_full`] ohne Env-Var direkt pruefbar.
+pub fn ownership_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_f64_env("MOSAIC_OWNERSHIP_W", 0.0))
+}
+
+/// `MOSAIC_OWNERSHIP_GEW` -- Gewicht JE KRITERIUM `gew_k` innerhalb des
+/// Ownership-Pols. Acht Werte in Kriterien-Reihenfolge 0..7, ein einzelner
+/// gilt fuer alle; falsche Laenge wird VERWORFEN (mit Meldung), nicht
+/// teilgelesen. Format und Haerte exakt wie `MOSAIC_WERTUNG_SHAPING_W`/
+/// `MOSAIC_TILING_PLATTEN_GEW`.
+///
+/// Default **alle 1,0**, NICHT 0,0: `w_own` ist der Hauptschalter (§2), die
+/// Kriteriengewichte sind der Isolier-Knopf darueber ("nur die Vertikale" =
+/// `0,1,0,0,0,0,0,0`). Waere der Default 0, waere `w_own` allein wirkungslos
+/// -- genau die still-wirkungslose Kombination, die bei
+/// `MOSAIC_WERTUNG_SHAPING_W` schon einmal eine Messung entwertet hat.
+///
+/// Stelle 7 ist per Konstruktion wirkungslos: `expected_plate_points` liefert
+/// fuer Kriterium 7 immer 0 (Farbinformation steckt nicht im Ownership-Ziel,
+/// `neural_net.py:958`).
+pub fn ownership_weights() -> [f64; 8] {
+    static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let mut out = [1.0f64; 8];
+        let Ok(raw) = std::env::var("MOSAIC_OWNERSHIP_GEW") else { return out };
+        let parts: Vec<&str> = raw.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+        let vals: Option<Vec<f64>> = parts.iter().map(|p| p.parse::<f64>().ok()).collect();
+        match vals.as_deref() {
+            Some([one]) => out = [*one; 8],
+            Some(v) if v.len() == 8 => out.copy_from_slice(v),
+            _ => eprintln!(
+                "MOSAIC_OWNERSHIP_GEW={raw:?} ignoriert -- erwartet 1 oder 8 Zahlen, Default 1,0 je Kriterium gilt"
+            ),
+        }
+        out
+    })
+}
+
+/// Einmalige Warnung, wenn `w_own > 0` gesetzt ist, das geladene Netz aber
+/// keinen brauchbaren Ownership-Kopf liefert -- Stufe 2 des
+/// `blended_leaf_win_prob`-Musters (net_mcts.rs, `warn_missing_opp_head_once`):
+/// laut scheitern statt still nichts tun. Der Verbraucher verhaelt sich danach
+/// wie `w_own = 0`.
+fn warn_ownership_head_unusable_once(len: usize) {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    WARNED.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_OWNERSHIP_W ist gesetzt, aber der Ownership-Kopf des geladenen Netzes ist \
+             unbrauchbar (Laenge {len}, gebraucht werden mindestens {min} Werte = 2 x 36 Felder). \
+             Der Ownership-Pol verhaelt sich wie w_own=0. Diese Meldung erscheint nur einmal je Prozess.",
+            min = 2 * crate::scoring::OWNERSHIP_FIELDS
+        );
+    });
+}
+
+/// Sigmoid -- der Ownership-Kopf endet auf `nn.Linear` OHNE Aktivierung
+/// (`neural_net.py:2390-2394`) und wird mit
+/// `binary_cross_entropy_with_logits` trainiert (`train.py:1171-1172`), die
+/// Kopf-Ausgaben sind also LOGITS. Die Umrechnung gehoert hierher, nicht in
+/// `net.rs` (das reicht Koepfe roh durch).
+fn sigmoid(x: f64) -> f64 {
+    1.0 / (1.0 + (-x).exp())
+}
+
+/// Reine Formel hinter [`apply_ownership_shaping`], OHNE Env-Var-Zugriff --
+/// gleiches Trennungsmuster wie `apply_wertung_shaping_full`/
+/// `blended_leaf_win_prob_with` (die OnceLock-Getter sind pro Prozess nur
+/// einmal lesbar, ein env-basierter Test kaeme nie an sein Ziel).
+///
+///     shift_i = w_own * SUM_k gew_k * tanh(E_k(i) / 50)
+///     out_i   = clamp(value_i + shift_i, 0, 1)
+///
+/// -- dieselbe Form, dieselbe Skala (`WERTUNG_SHAPING_SCALE`) und dasselbe
+/// "Gewicht AUSSEN am tanh" wie der Heuristik-Pol (siehe dortige Begruendung:
+/// `tanh(w*P/50)` saettigt gegen 1 unabhaengig von w, `w*tanh(P/50)` gegen w).
+///
+/// PERSPEKTIVE: `ownership` ist die Karte des MOVER-Passes, ego-perspektivisch
+/// -- `[0:36]` gehoert `state.current_player`, `[36:72]` dem anderen Spieler
+/// (`neural_net.py:1825-1840`, "erst der Spieler am Zug, dann der Gegner").
+/// Jeder Spieler bekommt seinen eigenen, unabhaengigen Shift aus seiner
+/// eigenen Haelfte -- keine mine-minus-theirs-Kopplung, exakt wie der
+/// Heuristik-Pol.
+///
+/// DREI STUFEN, Muster von `blended_leaf_win_prob_with`:
+///   1. `w_own == 0.0` (Default) -> `value` UNVERAENDERT zurueck. Kein
+///      Sigmoid, kein tanh, keine Rundung -> byte-identisch.
+///   2. `w_own > 0`, aber der Kopf ist unbrauchbar (fehlt ganz oder ist
+///      schmaler als 72) -> einmalige Warnung, dann wie Stufe 1. Deckt den
+///      72er- UND den 140er-Kopf ab: gebraucht werden nur die ersten 72
+///      Werte, alles dahinter (Konjunktionen) wird hier nicht gelesen.
+///   3. `w_own > 0` und Kopf brauchbar -> Shift wie oben.
+///
+/// WARUM DER 140er-KOPF NICHT DIREKT GELESEN WIRD (bewusste Wahl, siehe
+/// Bericht): `expected_plate_points` rechnet das PRODUKT der Feld-Randwahr-
+/// scheinlichkeiten, obwohl der Konjunktionsteil des 140er-Kopfs
+/// (`neural_net.py::_conjunctions_from_dome`, Index `[72:106]` ich /
+/// `[106:140]` Gegner) genau diese Konjunktionen direkt schaetzt und laut
+/// dortigem Docstring GENAUER ist ("P(alle 6 Felder) ist nicht das Produkt
+/// der Einzelwahrscheinlichkeiten"). Drei Gruende fuer die Produktform:
+///   - §2 des Vertrags schreibt sie woertlich vor;
+///   - sie ist kopfbreiten-agnostisch, der amtierende Champion
+///     (`v21_2d_brierbest`, 72 breit) und die Sweep-Checkpoints (140 breit)
+///     nehmen denselben Codepfad -- kein zweiter, nur halb getesteter Zweig;
+///   - der Tiling-Verbraucher (§3) braucht ohnehin marginale Feldwerte
+///     (`punkte_k * PROD ueber die UEBRIGEN Felder`), die aus einer
+///     Konjunktions-Ausgabe gar nicht ableitbar waeren.
+/// Die Konjunktions-Ausgaenge sind damit heute UNGENUTZT -- ein moeglicher
+/// zweiter Regler-Arm, kein Teil dieses Auftrags.
+fn apply_ownership_shaping_full(
+    value: [f64; 2],
+    state: &GameState,
+    ownership: &[f32],
+    w_own: f64,
+    gew: &[f64; 8],
+) -> [f64; 2] {
+    if w_own == 0.0 {
+        return value;
+    }
+    let need = 2 * crate::scoring::OWNERSHIP_FIELDS;
+    if ownership.len() < need {
+        warn_ownership_head_unusable_once(ownership.len());
+        return value;
+    }
+    let mut out = value;
+    for i in 0..2 {
+        // Ego-Haelfte des ZIEHENDEN Spielers ist `[0:36]`, die des anderen
+        // `[36:72]` -- siehe Funktionskommentar "PERSPEKTIVE".
+        let base = if i == state.current_player { 0 } else { crate::scoring::OWNERSHIP_FIELDS };
+        let mut p_own = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        for (f, slot) in p_own.iter_mut().enumerate() {
+            *slot = sigmoid(ownership[base + f] as f64);
+        }
+        let e = crate::scoring::expected_plate_points(
+            &state.players[i], &p_own, &state.scoring_tile_ids,
+        );
+        let mut shift = 0.0;
+        for k in 0..8 {
+            if gew[k] == 0.0 {
+                continue;
+            }
+            shift += gew[k] * (e[k] / WERTUNG_SHAPING_SCALE).tanh();
+        }
+        out[i] = (value[i] + w_own * shift).clamp(0.0, 1.0);
+    }
+    out
+}
+
+/// Laufzeit-Wrapper von [`apply_ownership_shaping_full`], liest `w_own`/`gew`
+/// aus den prozessweiten OnceLock-Caches. Aufrufstellen: `net_leaf_eval` und
+/// `node_from_net_outputs`s `LeafEval::Net`-Zweig -- dieselben zwei Stellen
+/// wie [`apply_wertung_shaping`], jeweils DIREKT dahinter.
+fn apply_ownership_shaping(value: [f64; 2], state: &GameState, ownership: &[f32]) -> [f64; 2] {
+    apply_ownership_shaping_full(value, state, ownership, ownership_weight(), &ownership_weights())
+}
+
 // ── Freischalt-Shaping (Nutzer-Auftrag 2026-08-10, Messlage watchlist_v20_
 // zwischenlese.md Abschnitt 2) ──────────────────────────────────────────────
 // Eigener Knopf, eigene Formel (`unlock_progress_beta`, scoring.rs) --
@@ -1971,8 +2145,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     // deckt BEIDE Spieler ab (`[0:36]` ich, `[36:72]` Gegner, ego-
     // perspektivisch -- `neural_net.py:1825-1840`), der geflippte Pass wird
     // dafuer also nicht gebraucht.
-    let mut own_map: Vec<f32> = Vec::new();
-    let (mover_val, other_val) = if MIRROR_OTHER_VAL {
+    let (mover_val, other_val, own_map) = if MIRROR_OTHER_VAL {
         // Task #81: Batch=1 (ein einzelner Forward-Pass) -- fuer die Amdahl-
         // Aufteilung des geplanten GPU-Batchers (Task #82).
         // Task #28: `eval_ex` statt `eval` -- liest zusaetzlich den optionalen
@@ -1985,9 +2158,8 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
                     (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
                 })
             });
-        own_map = ownership;
         let mv = blended_leaf_win_prob(&value, &points, &opp_points);
-        (mv, 1.0 - mv)
+        (mv, 1.0 - mv, ownership)
     } else {
         crate::profiling::note_gamestate_clone();
         let mut flipped = state.clone();
@@ -2013,10 +2185,10 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
                 })
             }),
         };
-        own_map = ownership;
         (
             blended_leaf_win_prob(&value, &points, &opp_points),
             blended_leaf_win_prob(&o_value, &o_points, &o_opp_points),
+            ownership,
         )
     };
     if !MIRROR_OTHER_VAL {
@@ -3696,7 +3868,11 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     // optionalen `opp_points`-Kopf je Zeile (leer bei jedem Netz ohne den
     // Kopf), sonst BYTE-IDENTISCH.
     let outputs = crate::profiling::timed_net_eval(n, || net_policy.eval_batch_ex(&feats_refs)).unwrap_or_else(
-        |_| (0..n).map(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect(),
+        |_| {
+            (0..n)
+                .map(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()))
+                .collect()
+        },
     );
 
     let other_outputs: Vec<Option<(Vec<f32>, Vec<f32>, Vec<f32>)>> = if need_other_pass {
@@ -3711,19 +3887,22 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
         let other_feats_refs: Vec<&[f32]> = other_feats.iter().map(|v| v.as_slice()).collect();
         let other_out = crate::profiling::timed_net_eval(n, || net_policy.eval_batch_ex(&other_feats_refs))
             .unwrap_or_else(|_| {
-                (0..n).map(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect()
+                (0..n).map(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect()
             });
-        other_out.into_iter().map(|(_, o_value, _, o_points, o_opp_points)| Some((o_value, o_points, o_opp_points))).collect()
+        other_out
+            .into_iter()
+            .map(|(_, o_value, _, o_points, o_opp_points, _o_own)| Some((o_value, o_points, o_opp_points)))
+            .collect()
     } else {
         (0..n).map(|_| None).collect()
     };
 
     for (idx, p) in pending.into_iter().enumerate() {
-        let (logits, value, moon, points, opp_points) = outputs[idx].clone();
+        let (logits, value, moon, points, opp_points, ownership) = outputs[idx].clone();
         let other_pass = other_outputs[idx].clone();
         let child = node_from_net_outputs(
             net_policy, net_value, p.child_state, Some(0), Some(root_state), Some(p.action), p.prior, mover,
-            p.terminal, logits, value, moon, points, opp_points, other_pass, rng,
+            p.terminal, logits, value, moon, points, opp_points, ownership, other_pass, rng,
         );
         let cid = nodes.len();
         nodes.push(child);
@@ -7258,8 +7437,10 @@ mod tests {
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let other_feats = crate::features::features_for_net(&net, &flipped);
-            let ((_l, value, _m, points, opp_points), (_ol, o_value, _om, o_points, o_opp_points)) =
-                net.eval_pair_ex(&feats, &other_feats).expect("eval_pair_ex (Alt-Pfad)");
+            let (
+                (_l, value, _m, points, opp_points, _own),
+                (_ol, o_value, _om, o_points, o_opp_points, _o_own),
+            ) = net.eval_pair_ex(&feats, &other_feats).expect("eval_pair_ex (Alt-Pfad)");
             let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
             let other_val = blended_leaf_win_prob(&o_value, &o_points, &o_opp_points);
             let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
@@ -7621,8 +7802,10 @@ mod tests {
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let other_feats = crate::features::features_for_net(&net, &flipped);
-            let ((_l, value, _m, points, opp_points), (_ol, o_value, _om, o_points, o_opp_points)) =
-                net.eval_pair_ex(&feats, &other_feats).expect("eval_pair_ex (Alt-Pfad)");
+            let (
+                (_l, value, _m, points, opp_points, _own),
+                (_ol, o_value, _om, o_points, o_opp_points, _o_own),
+            ) = net.eval_pair_ex(&feats, &other_feats).expect("eval_pair_ex (Alt-Pfad)");
             let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
             let other_val = blended_leaf_win_prob(&o_value, &o_points, &o_opp_points);
             let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
@@ -8843,7 +9026,7 @@ mod tests {
                 let idx = idx_queue.lock().unwrap().pop_front();
                 let Some(idx) = idx else { break };
                 let row = batcher.eval_rows(&[feats_arc[idx].as_slice()]).expect("eval_rows");
-                let (p, _v, m, _pt) = row.into_iter().next().unwrap();
+                let (p, _v, m, _pt, _opp, _own) = row.into_iter().next().unwrap();
                 inter_results.lock().unwrap()[idx] = Some((p, m));
             }));
         }
@@ -9156,7 +9339,7 @@ mod tests {
                 let idx = idx_queue.lock().unwrap().pop_front();
                 let Some(idx) = idx else { break };
                 let row = batcher.eval_rows(&[feats_arc[idx].as_slice()]).expect("eval_rows");
-                let (p, _v, m, _pt) = row.into_iter().next().unwrap();
+                let (p, _v, m, _pt, _opp, _own) = row.into_iter().next().unwrap();
                 inter_results.lock().unwrap()[idx] = Some((p, m));
             }));
         }
@@ -9367,4 +9550,194 @@ mod tests {
             "Verschraenkt (tract) : {inter_tract_rate:.1} Evals/s ({inter_tract_elapsed:?}), mittlerer Batch = {mean_batch_tract:.2} ({batches_delta} Batches, {rows_delta} Zeilen)"
         );
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Ownership-Verbraucher Teil 1 (`evaluations/PREREG_ownership_consumer.md`
+    // §2/§6) -- Tor B (Bestandsschutz) und der Formel-Beleg.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Synthetische Ownership-LOGITS: `-20` ueberall (sigmoid ~ 2e-9),
+    /// `+20` (sigmoid ~ 1) auf den Feldern von Spalte `spalte` in der
+    /// EGO-Haelfte `[0:36]`. `-20` als Grundwert statt 0: bei p=0,5 wuerde
+    /// jede der uebrigen fuenf Spalten ueber `0,5^6 * 7` einen Untergrund von
+    /// zusammen ~0,55 Punkten erzeugen und den Formel-Beleg verwaessern.
+    fn synth_ownership_column(breite: usize, spalte: usize) -> Vec<f32> {
+        let mut v = vec![-20.0f32; breite];
+        for r in 0..6 {
+            v[crate::scoring::ownership_index_for_grid(r, spalte)] = 20.0;
+        }
+        v
+    }
+
+    /// TOR B, Teil 1: bei ungesetztem `MOSAIC_OWNERSHIP_W` (Default 0,0) ist
+    /// der Verbraucher tot -- `apply_ownership_shaping` gibt den Blattwert
+    /// BIT-GENAU unveraendert zurueck, egal was der Kopf sagt und egal, ob er
+    /// 72 oder 140 breit ist. Muster von
+    /// `zusammengefuehrtes_shaping_ist_bei_default_exakte_identitaet`.
+    #[test]
+    fn ownership_shaping_ist_bei_default_exakte_identitaet() {
+        assert_eq!(
+            ownership_weight(),
+            0.0,
+            "Test-Voraussetzung: MOSAIC_OWNERSHIP_W darf hier nicht gesetzt sein"
+        );
+        let mut rng = StdRng::seed_from_u64(20260816);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
+            for breite in [0usize, 71, 72, 140] {
+                let own = if breite == 0 { Vec::new() } else { synth_ownership_column(breite, 2) };
+                for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
+                    assert_eq!(
+                        apply_ownership_shaping(v, &state, &own),
+                        v,
+                        "Spiel {gi}, Kopfbreite {breite}: w_own=0 muss exakte Identitaet sein"
+                    );
+                }
+            }
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    /// TOR B, Teil 2 (Paritaetsprobe): `net_leaf_eval` liefert bei Default
+    /// denselben Wert wie der Pfad OHNE den neuen `apply_ownership_shaping`-
+    /// Aufruf -- bit-genau, gegen einen von Hand nachgebauten Alt-Pfad.
+    /// Gleiches Muster wie
+    /// `net_leaf_eval_matches_pre_unlock_shaping_path_when_weight_is_zero`.
+    #[test]
+    fn net_leaf_eval_matches_pre_ownership_shaping_path_when_weight_is_zero() {
+        assert_eq!(ownership_weight(), 0.0, "Test-Voraussetzung: MOSAIC_OWNERSHIP_W ungesetzt");
+        let net = load_test_net();
+        assert!(net.has_own_head(), "Test-Voraussetzung: der Champion traegt einen ownership-Output");
+
+        let mut rng = StdRng::seed_from_u64(20260817);
+        let mut checked = 0;
+        for gi in 0..10u64 {
+            let Some(state) = random_drafting_state(gi, 14, &mut rng) else { continue };
+            let actual = net_leaf_eval(&net, &state);
+
+            let feats = crate::features::features_for_net(&net, &state);
+            let mut flipped = state.clone();
+            flipped.current_player = 1 - state.current_player;
+            let other_feats = crate::features::features_for_net(&net, &flipped);
+            let (
+                (_l, value, _m, points, opp_points, own),
+                (_ol, o_value, _om, o_points, o_opp_points, _o_own),
+            ) = net.eval_pair_ex(&feats, &other_feats).expect("eval_pair_ex (Alt-Pfad)");
+            // Der Kopf IST da und wird auch gelesen -- der Test darf nicht
+            // deshalb gruen sein, weil gar nichts durchkommt.
+            assert_eq!(
+                own.len(),
+                2 * crate::scoring::OWNERSHIP_FIELDS,
+                "Spiel {gi}: ownership kommt nicht (in erwarteter Breite) durch die Inferenzkette"
+            );
+            let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
+            let other_val = blended_leaf_win_prob(&o_value, &o_points, &o_opp_points);
+            let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+            let expected = apply_wertung_shaping(apply_value_shrink(raw, state.round_number), &state);
+
+            assert_eq!(actual, expected, "Spiel {gi}: net_leaf_eval weicht bei w_own=0 vom Alt-Pfad ab");
+            checked += 1;
+        }
+        assert!(checked >= 6, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    /// Robuste Kopf-Erkennung (Auftragspunkt 2): ein FEHLENDER oder zu
+    /// SCHMALER Kopf darf bei `w_own > 0` nicht panisch werden, sondern
+    /// verhaelt sich wie Gewicht 0 -- der 72er-Kopf des amtierenden Champions
+    /// UND der 140er der Sweep-Checkpoints muessen dagegen BEIDE steuern
+    /// koennen (identisch, weil nur die ersten 72 Werte gelesen werden).
+    #[test]
+    fn ownership_shaping_toleriert_fehlenden_und_zu_schmalen_kopf() {
+        let mut rng = StdRng::seed_from_u64(20260818);
+        let Some(mut state) = random_drafting_state(3, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        state.scoring_tile_ids = vec![1];
+        let v = [0.5f64, 0.5f64];
+        let gew = [1.0f64; 8];
+
+        for zu_schmal in [Vec::new(), vec![0.0f32; 35], vec![0.0f32; 71]] {
+            assert_eq!(
+                apply_ownership_shaping_full(v, &state, &zu_schmal, 0.5, &gew),
+                v,
+                "Kopfbreite {} muss sich wie w_own=0 verhalten (kein Panic, kein Teil-Shift)",
+                zu_schmal.len()
+            );
+        }
+
+        let out72 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(72, 2), 0.5, &gew);
+        let out140 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(140, 2), 0.5, &gew);
+        assert_ne!(out72, v, "ein brauchbarer 72er-Kopf muss den Blattwert bewegen");
+        assert_eq!(out72, out140, "72er- und 140er-Kopf muessen denselben Shift liefern (nur [0:72] wird gelesen)");
+    }
+
+    /// FORMEL-BELEG (Auftrag: "sonst ist die Formel nur behauptet"): mit
+    /// einem KUENSTLICHEN Ownership-Vektor -- eine Spalte sicher, alles
+    /// andere sicher leer -- und nur Kriterium 1 gezogen muss der Shift exakt
+    /// `w_own * gew_1 * tanh(7 / 50)` sein, und er darf NUR bei dem Spieler
+    /// landen, dem die Ego-Haelfte `[0:36]` gehoert.
+    #[test]
+    fn ownership_shaping_liefert_exakt_die_prereg_formel_und_die_richtige_haelfte() {
+        let mut rng = StdRng::seed_from_u64(20260819);
+        let Some(mut state) = random_drafting_state(5, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        // Nur die Vertikale gezogen -- sonst rechnete der Untergrund anderer
+        // Kriterien mit und der Beleg waere nicht mehr exakt.
+        state.scoring_tile_ids = vec![1];
+
+        let w_own = 0.4f64;
+        let gew = [1.0f64; 8];
+        let own = synth_ownership_column(72, 2);
+        let v = [0.5f64, 0.5f64];
+        let out = apply_ownership_shaping_full(v, &state, &own, w_own, &gew);
+
+        let erwartet_shift = w_own * (7.0f64 / WERTUNG_SHAPING_SCALE).tanh();
+        let ego = state.current_player;
+        let gegner = 1 - ego;
+        assert!(
+            (out[ego] - (v[ego] + erwartet_shift)).abs() < 1e-6,
+            "Ego-Shift weicht von w_own*tanh(7/50)={erwartet_shift} ab: out={out:?}"
+        );
+        // Die Gegner-Haelfte `[36:72]` steht auf -20 (sicher leer) -> E_1 = 0
+        // -> tanh(0) = 0 -> kein Shift.
+        assert!(
+            (out[gegner] - v[gegner]).abs() < 1e-9,
+            "Gegner-Haelfte war leer, darf keinen Shift bekommen: out={out:?}"
+        );
+
+        // Gegenprobe der Perspektive: dieselbe Spalte in die GEGNER-Haelfte
+        // gelegt muss den Shift auf den anderen Spieler drehen.
+        let mut own_gegner = vec![-20.0f32; 72];
+        for r in 0..6 {
+            own_gegner[crate::scoring::OWNERSHIP_FIELDS + crate::scoring::ownership_index_for_grid(r, 2)] = 20.0;
+        }
+        let out2 = apply_ownership_shaping_full(v, &state, &own_gegner, w_own, &gew);
+        assert!(
+            (out2[gegner] - (v[gegner] + erwartet_shift)).abs() < 1e-6,
+            "Gegner-Shift weicht ab: out2={out2:?}"
+        );
+        assert!((out2[ego] - v[ego]).abs() < 1e-9, "Ego darf jetzt keinen Shift bekommen: out2={out2:?}");
+
+        // Kriteriengewicht 0 schaltet das Kriterium vollstaendig ab.
+        let mut gew_aus = [1.0f64; 8];
+        gew_aus[1] = 0.0;
+        assert_eq!(
+            apply_ownership_shaping_full(v, &state, &own, w_own, &gew_aus),
+            v,
+            "gew_1=0 muss Kriterium 1 vollstaendig abschalten"
+        );
+    }
+
+    /// Die beiden neuen Knoepfe stehen bei ungesetzter Umgebung auf ihren
+    /// dokumentierten Defaults -- `w_own=0` (aus) und `gew` alle 1,0 (der
+    /// Hauptschalter ist `w_own`, nicht die Kriteriengewichte).
+    #[test]
+    fn ownership_knobs_default_to_off_weight_and_unit_criteria() {
+        assert_eq!(ownership_weight(), 0.0);
+        assert_eq!(ownership_weights(), [1.0; 8]);
+    }
+
 }
