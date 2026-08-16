@@ -1,115 +1,107 @@
 # Mosaic-AI — Status & Fahrplan
 
 **Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
-**`../archive/history.md`** (juengstes Kapitel: "2026-08-16: Ownership-Kopf
-gelernt, Verbraucher gebaut -- die Arena ist am Zug").
+**`../archive/history.md`**.
 
 ---
 
-## STAND 2026-08-16 (abends)
+## STAND 2026-08-16 (spaeter Abend)
 
-**Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434].
-Paritaets-Hash `8c6684ff...` haelt -- zuletzt auf dem Wheel geprueft, das
-Ownership-Verbraucher UND Stoer-Zaehlmodus enthaelt. Beide sind bei
-Default-Knopf byte-identisch, kein Bestandsverhalten hat sich geaendert.
+**Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434] --
+aber es gibt erstmals seit v21 einen ernsthaften **Herausforderer**, siehe
+unten. Paritaets-Hash `8c6684ff...` haelt.
 
-### Die Ownership-Kette: gebaut, gemessen -- und in der Arena gescheitert
+### Die Plattenagenda: beide Wege gemessen, beide negativ
 
-| Stueck | Stand |
+Der Ownership-Kopf hatte genau zwei Wege ins Spiel. Beide sind jetzt
+durchgemessen, und keiner traegt:
+
+| Weg | Ergebnis |
 |---|---|
-| Lehr-Korpus 8000 Partien | FERTIG, Deckung belegt (corpus par.7/par.8) |
-| Gewichts-Sweep w0/w01/w02/w05/w1 | FERTIG, **Tor A BESTANDEN** (par.10), w1 gewinnt einstimmig (par.10.6) |
-| Frozen-Trunk-Kopftraining F1 | FERTIG (frozen_trunk_head par.7): Zielkonflikt halb geloest, Decke bestaetigt |
-| **Verbraucher Drafting** | **GEBAUT** (8eabbdb): E_k am Blatt, `MOSAIC_OWNERSHIP_W` Default 0, **Tor B belegt** (byte-identisch ueber 4 Kopfbreiten, Paritaetsprobe gruen) |
-| **Verbraucher Tiling** | **GEBAUT** (Nutzer-Korrektur 2026-08-16: *"nur im drafting auf die wertungsplatten hinarbeiten ist nur die halbe miete"*). Eigener Knopf `MOSAIC_OWNERSHIP_TILING_W`, Default 0, ein Wurzelpass je Tiling-Zug in R1-4 |
-| **Tor C (Regler-Sweep Arena)** | **GEFAHREN UND NEGATIV ENTSCHIEDEN** (2026-08-16, 970 Partien, `PREREG_gate_c_consumer_sweep.md` par.15) |
+| **Laufzeit-Regler** (Tor C, `PREREG_gate_c_consumer_sweep.md`) | NEGATIV und monoton schaedlich: 98 / 89 / 86 / 84 Siege ueber die Dosisstufen |
+| **Destillation** (`PREREG_corpus_distillation.md` par.8.4/par.10.2) | Zielkriterien k1/k2/k5 bei BEIDEN Korpus-Armen innerhalb der Vorab-Aufloesung => Ausgang 2 |
 
-### Tor C ist gefallen: der Verbraucher traegt die Wertungsplatten NICHT
+Dazu die Zerlegung, die den Baustein selbst trifft: **der
+Ownership-Verlust im Training traegt nichts bei.** `w1_best` gegen
+`w0_best` unterscheidet sich in genau einem Manifest-Feld und ist auf
+ALLEN vier Messgroessen schlechter (Siege 321:333, Marge 13,89:15,99,
+Platten 2,84:3,40, Strafleiste 9,89:8,87; n=407 gepaart, beide Arme blind).
 
-970 Partien, zwei Checkpoints, drei Dosisstufen, zwei disjunkte Seed-Saetze.
-Nullarm war jeweils DERSELBE Checkpoint mit Regler 0, nicht der Champion.
+### Der Herausforderer: `w0_best`
 
-| Befund | Zahl |
-|---|---|
-| Zielkriterien k1/k2/k5 | **bewegen sich nicht** -- gepoolt n=243 auf F1: +0,22 (t 0,73) / -0,11 (t -1,00) / +0,09 (t 0,61) |
-| Siege gegen Heuristik@150, F1 | **monoton fallend mit der Dosis: 98 / 89 / 86 / 84** von 121; D2 p=0,043, D3 p=0,049 |
-| Staerkerer Kopf (w1-final, AUC 0,870) | macht den Verbraucher **inert**, nicht nuetzlich: 91:91, b=c=18, p=1,000 |
-| Plattenpunkt-Gewinn bei D1 | im Hauptsatz +0,74 -- **replizierte NICHT** (+0,20 auf frischen Seeds) |
-| Durchsatzkosten | nicht gemessen (GPU belegt, Ausloeser entfallen); **obere Schranke ~0,25 %** der Netz-Paesse, hergeleitet aus dem Code |
+Block H, 4 Arme x 407 Partien gegen Heuristik@150, alle Regler aus:
 
-**Warum** (Herleitung, kein eigener Messbefund): der Verbraucher lenkt genau
-dorthin, wohin seine Formel zeigt -- k4 (Aeussere Felder) steigt in allen drei
-Dosen, und k4 ist das Kriterium mit dem deterministischen Marginal
-`(1-p_f)*1`. Die konjunktiven Zielkriterien haben dagegen ein Marginal von
-`7*(1-p_f)*PROD(uebrige 5)` und damit ~0, solange die Spalte nicht fast fertig
-ist. **Sein Signal entsteht erst, wenn die Luecke schon fast geschlossen ist.**
+| Arm | Siege | Marge | Platten | Boden | McNemar gegen CH |
+|---|---:|---:|---:|---:|---:|
+| CH `v21_2d_brierbest` | 296/407 | 11,26 | 2,42 | 10,49 | — |
+| **`w0_best`** | **333/407** | **15,99** | **3,40** | **8,87** | **0,0017** |
+| `w1_best` | 321/407 | 13,89 | 2,84 | 9,89 | 0,0314 |
+| `f1` | 321/407 | identisch zu w1 | | | 0,0314 |
 
-Damit reiht sich Tor C in PREREG_placement_side par.11 ein: die Spaltenluecke
-ist keine Bewertungsfrage.
+Der Staerkegewinn steckt in **Marge und Strafleiste**, nicht in den
+Platten -- der Plattenzuwachs kommt aus k3, dem Zaehl-Kriterium.
 
-**Folgen, alle bereits vollzogen bzw. festgelegt:**
+**ACHTUNG, zwei Vorbehalte:** (1) Der Vergleich ist INDIREKT, beide gegen
+die Heuristik. Eine n=12-Sonde zeigte F1 indirekt besser und direkt 4:8
+schlechter -- das direkte Duell steht aus. (2) `w0_best` unterscheidet sich
+vom Champion in ZWEI Dingen (Korpus UND Weitertraining); der Kontrollarm
+"Weitertraining ohne Korpus" fehlt.
 
-1. `MOSAIC_OWNERSHIP_W` und `MOSAIC_OWNERSHIP_TILING_W` bleiben auf **Default 0**.
-   Gebaut, getestet, dokumentiert, byte-identisch bei 0 -- aber nicht im Standardpfad.
-2. **Kein 8000er-Self-Play** mit dem Verbraucher.
-3. **F1 bleibt der Checkpoint** der Ownership-Reihe (gegen w1-final p=0,360 --
-   nicht signifikant, aber vorn in der Punktschaetzung UND mit intakter Policy).
-   Damit ist frozen_trunk par.7.1 beantwortet.
-4. Der Mittelweg aus frozen_trunk par.7.2 (sanftes gemeinsames Nachtrainieren)
-   **verliert seine Begruendung** -- er sollte die Kopf-Decke heben, und genau
-   die ist nicht der Engpass.
-5. Einzige sichtbare Fortsetzung: **k6 (Spezialfelder) ISOLIERT**. Groesster
-   Einzelposten im Endstand (-11,64), groesstes deterministisches Marginal
-   (`(1-p_f)*3`), einziger gepoolt nominal signifikanter Wert (+0,55, t 2,12)
-   -- ausdruecklich NICHT als Befund verkauft (einer von acht Tests). Braucht
-   eine eigene Vorregistrierung mit Kriterien-Isolierung.
+**Falle beim Gating:** `tools/paired_gating.py:473` hat `--promote-winner`
+per Default auf TRUE und schreibt `models/champion.txt` selbsttaetig um.
+Messlaeufe brauchen `--no-promote-winner`; der Championwechsel ist
+Nutzer-Entscheidung.
+
+### NAECHSTER SCHRITT: Selektor-Umbau, Stufe 0 laeuft
+
+Die Diagnose zum doppelten Negativbefund ist am Code gefuehrt und in
+`PREREG_ownership_selector.md` par.1 registriert. Kurzfassung:
+
+1. **Die Platzierung entscheidet der Loeser, nicht die Policy**
+   (`self_play.rs:1093`). Ein Verbraucher am Blatt erbt diese Blockade --
+   der Kommentar in `tiling_solver.rs:968` hatte Tor C vorhergesagt. Das
+   erklaert auch, warum die Destillation nicht greifen KONNTE: die Policy
+   hat fuer die Platzierung keinen Ausgang.
+2. **Das Signal ist invers zum Bedarf.** Platzieren zahlt immer >= 1 Punkt,
+   eine fortgesetzte Linie zahlt ihre Laenge (`engine_manual.md:143-148`).
+   Spaltenbau kostet also nur die ersten ein bis zwei Zuege etwas und zahlt
+   danach von selbst -- waehrend der Produktform-Marginalwert erst gross
+   wird, wenn die Spalte fast fertig ist.
+3. **Die Produktform unterdrueckt die Zielkriterien** (Marginalwert bei
+   p=0,5: k1 0,109, k2 0,156 gegen k4 0,500 und k6 1,500).
+4. **Die Konjunktions-Ausgaenge sind trainiert und ungenutzt** -- und zwar
+   auf GEOMETRIE-Ebene (Spalte 6..11, Diagonale 12..13, Ecke 14..17), also
+   genau das, was ein Selektor braucht.
+
+Der Umbau gibt dem Kopf deshalb die **Vorzugsroute mit Frueh-Ausstieg**, die
+beim Spaltenbauer nachweislich traegt (`tiling_solver.rs:1467`, Deckung
+3,2 % -> 42 %), statt eines Gewichts in einer Nachsortierung.
+
+**Stufe 0 laeuft** (offline, zwei Sonden): Kopfguete F2 gegen F1, und
+Kalibrierung der Konjunktions-Atome plus Schwellenraster. Zwei
+Abbruchregeln stehen vorab in par.5.
 
 ### Danach in der Warteschlange
 
-- **Verbraucher §4: die GEGNER-Haelfte** (Nutzer-Auftrag 2026-08-16
-  "takte das ein", BEDINGT auf ein positives Tor C). Der Kopf sagt auch die
-  Gegnerfelder vorher (`[36:72]`) und hat sie nachweislich gelernt (Feld-AUC
-  Gegnerseite 0,633-0,649 im Sweep, corpus par.10.2) -- das ist die GELERNTE
-  Fassung genau der Idee, die als handgebaute Farbzaehlung zweimal
-  gescheitert ist: statt "welche Farbe braucht er wohl" ein direkter Wert
-  dafuer, was ein Zug den Gegner kostet. Eigenes Gewicht, eigener Arm, NICHT
-  mit der Eigen-Haelfte verrechnen (Prereg §4). **Reihenfolge-Begruendung**:
-  bringt die eigene Haelfte in Tor C nichts, ist die Gegner-Haelfte kein
-  guter Einsatz -- dann faellt sie mit. **2026-08-16: Tor C ist negativ ausgefallen, die Bedingung ist damit NICHT erfuellt -- die Gegner-Haelfte faellt nach der eigenen Reihenfolge-Begruendung mit.**
-- **F2 (Deckel-Sonde)**: Frozen-Trunk vom Champion aus -- beantwortet, ob ein
-  Trunk ohne je gesehenen Ownership-Gradienten ueberhaupt so weit kommt wie
-  F1. Unabhaengig von Tor C, billig.
-- **Verbraucher Tiling** (§3 der Consumer-Prereg), sinnvollerweise nach Tor C.
-- **Sanftes gemeinsames Nachtrainieren** (kleine LR, Early Stop auf
-  Ownership) -- der ungetestete Mittelweg zwischen F1 und w1-final; erster
-  Kandidat, falls Tor C zeigt, dass Kopfguete traegt und die Decke wehtut.
-- **Ownership-Gewicht WEITER ERHOEHEN -- stehende Nutzer-Freigabe
-  (2026-08-16)**: "bei bedarf das gewicht des ownership head fuers training
-  weiter erhoehen". Gilt fuer JEDES kuenftige Ownership-Training, ohne neue
-  Rueckfrage. Belegte Ausgangslage: der Sweep war ueber 0,1/0,2/0,5/1,0
-  monoton steigend, das Optimum ist NICHT eingeklammert (corpus par.10.6),
-  und der Waechter (policy val_loss) hat bis 1,0 praktisch nicht reagiert
-  (0,2139 -> 0,2141). Naechster Arm waere **w2**. Zwei Bedingungen bleiben:
-  (a) der Waechter gegen den w0-Kontrollarm entscheidet weiterhin mit --
-  faellt Policy/Value merklich ab, ist Schluss; (b) im Frozen-Trunk-Modus
-  ist das Gewicht nur noch ein Lernraten-Faktor (dort stattdessen an der LR
-  drehen, siehe frozen_trunk_head §4).
-- **Stoerungs-Baustein Stufe 2**: NUTZER-ENTSCHEID offen. Stufe 1 live
-  gemessen: **7,63 %** Stoerfenster (200 Partien, byte-identisch belegt),
-  Abbruchregel greift nicht. Koordinator-Empfehlung: knappes Ja, aber
-  Wunsch-Feature, kein Elo-Hebel -- bei Zeitkonkurrenz hat Tor C Vorrang.
+- **Direktes Gating-Duell `w0_best` gegen Champion** -- die Championfrage,
+  ~1 h bei 11,95 s/Partie. Unabhaengig vom Selektor-Umbau.
+- **Kontrollarm "Weitertraining ohne Korpus"** -- loest den Konfund, ein
+  GPU-Lauf.
+- **F3** (Frozen-Trunk-Kopf auf `w0_best`) -- gaebe staerkste Policy PLUS
+  trainierten Kopf; haengt an Stufe 0 Punkt 1.
+- **Stoerungs-Baustein Stufe 2**: NUTZER-ENTSCHEID offen, 7,63 % Stoerfenster.
 
 ### Offene Punkte
 
 | Punkt | Stand |
 |---|---|
-| **Aufraeum-Freigabe ausstehend** | `scratchpad/wt_probe` samt dort gebautem Wheel ist ueberfluessig (Stoer-Agent), ebenso ggf. `scratchpad/wt_2b_vor`-Reste. Loeschung braucht pfadgenaue Nutzer-Freigabe |
-| **Gate-B-Retest sync<->async** | nach 2b noch offen, niedrige Prioritaet, kein Blocker |
-| **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_with_exact_dfs_ground_truth` `#[ignore]` bis Schwellen-Neukalibrierung auf v21 |
+| **Release** | Bundle v21 gebaut+rauchgetestet; v21-Release (Tag/Text/Zip) wartet auf den Nutzer |
+| **Doctest-Falle** | Eingerueckte Formelbloecke in Doku-Kommentaren werden von rustdoc als Doctests kompiliert (Pre-Push fiel darueber, `7873bf0`). Neue Formeln immer als ```text auszeichnen |
+| **Gate-B-Retest sync<->async** | offen, niedrige Prioritaet, kein Blocker |
+| **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_...` `#[ignore]` bis Neukalibrierung auf v21 |
 | **MOSAIC_GAME_TIMEOUT_SCALE** | Registratur-Status "geplant": lebt nur im Branch `async_search_stage3_archive` |
-| **Release** | Bundle v21 gebaut+rauchgetestet, main NICHT gepusht; v21-Release (Tag/Text/Zip) wartet auf den Nutzer |
-| **Task #31 Schwierigkeitsstufen** | zurueckgestellt (Nutzer). README_GAME nennt korrekt die zwei Rohregler |
-| **Hardware** | RAM 32 GB = Engpass 2 (ein Lauf ~19 GB, kein Parallel-Sweep), CPU 6C/12T = Engpass 1, GPU unterausgelastet. Empfehlung falls Aufruestung: 5950X + 32 GB |
+| **Task #31 Schwierigkeitsstufen** | zurueckgestellt (Nutzer) |
+| **Hardware** | RAM 32 GB = Engpass 2, CPU 6C/12T = Engpass 1, GPU unterausgelastet |
 
 ---
 
