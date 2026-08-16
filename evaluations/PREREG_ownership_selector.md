@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt der Ownership-Kopf, wenn er als SELEKTOR ueber eine Vorzugsroute im Tiling wirkt statt als Gewicht in der Blatt- und Nachsortier-Bewertung? | Beleg: **ENTWURF 2026-08-16**, nichts gebaut. Anlass: Tor C negativ (Regler) UND Destillation ohne Zielkriterien-Wirkung (par.10.2 dort) -- beide Wege des Verbrauchers gescheitert, Diagnose heute am Code gefuehrt (par.1). Nutzer-Auftrag: "der ownership head muss rein". -->
+<!-- STATUS: OFFEN | Frage: Traegt der Ownership-Kopf, wenn er als SELEKTOR ueber eine Vorzugsroute im Tiling wirkt statt als Gewicht in der Blatt- und Nachsortier-Bewertung? | Beleg: **STUFE 0 GEMESSEN 2026-08-16** (par.9), Umbau noch nicht gebaut. Keine der beiden Abbruchregeln greift: Spalten-Konjunktion AUC 0,830 auf 36.611 Tiling-Zustaenden (Grundrate 0,0243), F2 faellt gegen F1 nur 3-5 % relativ ab. ABER der Entwurf aus par.3.1 ist WIDERLEGT: eine absolute Schwelle feuert bei 0,7 fuer Spalten in 0,22 % der Zuege und fuer Ecken in 72,4 % -- gleichzeitig zu selten und zu haeufig. Ursache: hervorragende Rangordnung (AUC 0,83-0,91) bei schlechter Kalibrierung (Brier nur 8-14 % besser als Grundrate). Ersetzt durch eine kalibrierungsfreie RANGREGEL mit Abstandsbedingung (par.9.3). Hauptrisiko gemessen: Spalten-AUC 0,698 in Runde 1 gegen 0,886 in Runde 5 -- der Kopf ist genau dort am schwaechsten, wo die Hilfe gebraucht wird. Anlass: Tor C negativ (Regler) UND Destillation ohne Zielkriterien-Wirkung (par.10.2 dort) -- beide Wege des Verbrauchers gescheitert, Diagnose heute am Code gefuehrt (par.1). Nutzer-Auftrag: "der ownership head muss rein". -->
 
 # PREREG: Der Ownership-Kopf als SELEKTOR — Vorzugsroute statt Blattgewicht
 
@@ -327,7 +327,136 @@ zusaetzlich ausgewiesen.
 
 ---
 
-## par.9 ERGEBNIS STUFE 0 (leer bei Registrierung)
+## par.9 ERGEBNIS STUFE 0 (2026-08-16, abends)
+
+Beide Sonden gelaufen, alle tragenden Zahlen vom Koordinator an den
+Roh-JSONs nachgeprueft. **Keine der beiden Abbruchregeln greift — aber
+Stufe 0 hat den Entwurf aus par.3.1 widerlegt** (par.9.3). Genau dafuer war
+sie da.
+
+### par.9.1 Kopfguete F2 gegen F1 (Stufe 0 Punkt 1)
+
+`evaluations/ownership_gate_a_f1_f2.json`, Sonde
+`tools/probes/ownership_gate_a.py`, beide Arme ueber den `final`-Tag
+(Epoche 15). Held-out identisch: 820 Partien, 82 Val-Dateien.
+
+| Metrik | F1 (Trunk sah Ownership-Gradient) | F2 (Trunk sah ihn nie) |
+|---|---:|---:|
+| Feld-AUC me / opp | 0,780 / 0,715 | 0,749 / 0,682 |
+| Konjunktion Spalten AUC | **0,909** | 0,866 |
+| Konjunktion Diagonalen AUC | 0,924 | 0,893 |
+| Konjunktion Ecken AUC | 0,918 | 0,885 |
+| E_k-Rang Spalten / Ecken | 0,280 / 0,345 | 0,265 / 0,275 |
+
+**MANGEL DER VORREGISTRIERUNG, ausdruecklich benannt:** die Abbruchregel in
+par.5 sagt "deutlich unter F1" und nennt **keine Zahl**. Sie ist damit
+nachtraeglich auslegbar, und genau das musste hier geschehen — der
+ausfuehrende Agent hat den Mangel selbst angezeigt statt ihn zu ueberspielen.
+Auslegung des Koordinators: die Regel war gegen *"traegt keinen Kopf"*
+formuliert; F2 faellt konsistent um 3–5 % relativ ab, kollabiert aber nirgends
+zur Grundrate. **Die Regel greift nicht.** Kuenftige Abbruchregeln bekommen
+eine Zahl.
+
+**Folge:** F3 (Frozen-Trunk-Kopf auf `w0_best`) wird gebaut — gestartet
+2026-08-16 16:04. Begruendung: `w0_best`s Trunk hat den Korpus gesehen, nur
+nicht den Ownership-Gradienten, liegt also strikt zwischen F2 und F1. Ein
+Rangverlust von wenigen Prozent gegen +12 Siege Policy-Staerke (333 statt
+321 von 407) ist ein guter Tausch, wenn nur der RANG benutzt wird.
+
+### par.9.2 Kalibrierung dort, wo die Route liest (Stufe 0 Punkte 2+3)
+
+`evaluations/ownership_route_calibration_results.json`, neue Sonde
+`tools/probes/ownership_route_calibration.py`. **Methodisch besser als
+beauftragt:** gemessen wird nicht am Endzustand wie Tor A, sondern auf den
+**36.611 Tiling-Zustaenden**, an denen die Route tatsaechlich lesen wuerde
+(Runden r1..r5 = 4806/7284/8193/7875/8453).
+
+| Gruppe (F1) | Grundrate | Brier (Basis) | AUC |
+|---|---:|---:|---:|
+| Spalten 6..11 | 0,0243 | 0,0200 (0,0217) | 0,830 |
+| Diagonalen 12..13 | 0,0267 | 0,0237 (0,0264) | 0,911 |
+| Ecken 14..17 | 0,2702 | 0,0939 (0,1255) | 0,844 |
+
+Kein Einzelatom traegt das Makro-AUC allein (Spalten je Atom 0,759–0,890).
+
+**Abbruchregel 2 ("p_atom fuer Spalten nicht besser als die Grundrate")
+greift nicht**: AUC 0,830 gegen 0,5, konsistent ueber alle sechs Atome.
+
+**Zuverlaessigkeit:** Ecken gut kalibriert; Spalten und Diagonalen ueber 0,5
+deutlich **ueberschaetzt** (F1-Top-Bin Spalten: vorhergesagt 0,949,
+tatsaechlich 0,733 — aber n=15, also eine schwach gestuetzte Punktschaetzung,
+vom W1-Muster nur gestuetzt, nicht belegt).
+
+**Konfundierung nach Runde** (par.8 Punkt 3), Spalten-AUC:
+
+| r1 | r2 | r3 | r4 | r5 |
+|---:|---:|---:|---:|---:|
+| 0,698 | 0,795 | 0,823 | 0,867 | 0,886 |
+
+Der Kopf weiss mehr, je weiter die Geometrie schon ist — die Konfundierung
+ist **real und messbar**. Sie ist aber **nicht vollstaendig**: schon in Runde 1
+liegt die AUC bei 0,698, klar ueber Zufall. Sauber trennen laesst sie sich mit
+diesen Daten nicht (kein kontrafaktischer "gleicher Fuellgrad, andere
+Runde"-Vergleich moeglich) — ausdruecklich als UNGETRENNT markiert.
+
+### par.9.3 DER ENTWURF AUS par.3.1 IST WIDERLEGT — Feuerraten
+
+Anteil der Tiling-Zustaende, in denen eine absolute Schwelle feuern wuerde
+(Zustandsebene, MAX ueber die Atome der Gruppe):
+
+| Schwelle | Spalten | Diagonalen | Ecken |
+|---|---:|---:|---:|
+| >= 0,3 | 2,0 % | 2,6 % | **98,9 %** |
+| >= 0,5 | 0,7 % | 1,1 % | **91,4 %** |
+| >= 0,7 | **0,22 %** | **0,47 %** | **72,4 %** |
+
+Quantile Spalten (Zustands-Max): p50 0,020 · p75 0,041 · p90 0,091 ·
+p95 0,156 · **p99 0,422**. Hoeher kommt der Kopf fuer Spalten praktisch nie.
+
+> **Eine absolute Schwelle ist gleichzeitig zu selten und zu haeufig.** Fuer
+> die Zielkriterien feuert sie bei 0,7 in 0,22 % der Zuege — mein eigener
+> Entwurf haette damit die Stufe-1-Abbruchregel ("unter 1 %") gerissen. Fuer
+> die Ecken feuert dieselbe Schwelle in 72,4 % der Zuege, waere also keine
+> Ausnahme mehr, sondern der Normalfall — und damit exakt die
+> bedingungslose Verdraengung, die laut par.1.5 gemessen geschadet hat
+> (0,70 gegen 2,10).
+
+Ursache ist der Befund aus par.9.1/par.9.2 zusammengenommen: **hervorragende
+Rangordnung bei schlechter Kalibrierung.** Spalten-AUC 0,909 (Endzustand) bzw.
+0,830 (Tiling-Zustaende), aber der Brier verbessert sich nur um 8–14 % gegen
+die Grundrate. Der Kopf weiss sehr genau, WELCHE der sechs Spalten vollaeuft,
+und kaum, mit welcher Wahrscheinlichkeit. Das ist die dritte unabhaengige
+Bestaetigung der These aus par.1.6 — nun auch in der Kalibrierung.
+
+**GEAENDERTER ENTWURF (par.3.1 wird ersetzt, nicht ergaenzt):**
+
+1. **Rangregel statt absoluter Schwelle.** Gewaehlt wird das Atom mit der
+   hoechsten `p_atom` unter den Atomen der AKTIVEN Zielkriterien. Ein Rang ist
+   kalibrierungsfrei — genau die Eigenschaft, an der die Schwelle scheitert.
+2. **Abstandsbedingung als Regler** statt eines Wahrscheinlichkeitsniveaus:
+   die Route feuert nur, wenn das beste Atom das zweitbeste um den Faktor
+   `MOSAIC_OWNERSHIP_ROUTE_MARGIN` uebertrifft (Default 0 = aus). Damit ist
+   die Feuerrate stetig steuerbar, unabhaengig davon, wo die absoluten Werte
+   einer Gruppe liegen.
+3. **Ecken werden nach Punktwert getrennt.** Die Gruppe mischt zwei billige
+   Ecken (Grundrate 0,68 / 0,30, je +3) mit zwei teuren (0,038 / 0,056, je
+   +8). Ein gruppenweiter Wert verwischt genau den Unterschied, auf den es
+   ankommt.
+4. Das **Raster fuer Stufe 2** wird aus der Feuerraten-Messung von Stufe 1
+   abgeleitet und VOR Stufe 2 festgeschrieben.
+
+**Die Erfolgsregel in par.6 bleibt unveraendert.** Geaendert wird die Bauform,
+nicht der Massstab.
+
+### par.9.4 Das gemessene Hauptrisiko
+
+Die Hilfe wird **frueh** gebraucht (par.1.2: der Plan kostet nur die ersten
+ein bis zwei Zuege etwas), und dort ist der Kopf am schwaechsten
+(Spalten-AUC 0,698 in Runde 1 gegen 0,886 in Runde 5). Das ist kein
+Ausschlussgrund — 0,698 ist deutlich ueber Zufall —, aber es ist die Stelle,
+an der dieser Umbau scheitern wird, wenn er scheitert. **Stufe 1 Punkt 5 ist
+genau dagegen gebaut** und bleibt bindend.
+
 
 ## par.10 ERGEBNIS STUFE 1 (leer bei Registrierung)
 
