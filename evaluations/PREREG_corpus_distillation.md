@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bauen die auf dem Ownership-Korpus trainierten Netze VON SELBST mehr Wertungsplatten als der Champion -- ohne jeden Regler? Und traegt das der Korpus oder der Ownership-Verlust? | Beleg: **BLOCK H VOLLSTAENDIG 2026-08-16, 1628 Partien, 4 Arme auf identischem 407-Seed-Satz** (par.8, par.8.4). ZIELKRITERIEN NICHT GEHOBEN, bei BEIDEN Korpus-Armen: W0 k1 +0,27 / k2 +0,20 / k5 +0,11, W1 k1 +0,19 / k2 +0,13 / k5 +0,07 -- alle sechs innerhalb der vorab ausgewiesenen Aufloesung 0,85/0,48/0,31 => Ausgang 2. Zugleich Ausgang 3: W0 333:296 (McNemar p=0,0017), W1 321:296 (p=0,0314); Plattenzuwachs kommt aus k3 (Zaehl-Kriterium), Staerkegewinn aus Marge +5,09 und Strafleiste -1,61. EIN-FAKTOR-ZERLEGUNG EINGELOEST: W1 gegen W0 (nur ownership_weight unterscheidet sie) ist auf ALLEN vier Messgroessen schlechter => der Ownership-Verlust traegt nichts bei. F1 == W1 auf allen 407 Seeds (0 diskordant) => Frozen-Trunk-Riegel live bestaetigt. Konfund bleibt: Korpus ODER 100 weitere Epochen. OFFEN: Block N / direktes Gating-Duell W0 gegen Champion. -->
+<!-- STATUS: UEBERHOLT | Frage: Bauen die auf dem Ownership-Korpus trainierten Netze VON SELBST mehr Wertungsplatten als der Champion? | Beleg: **MESSUNG HINFAELLIG, 2026-08-16 (par.10.4)**: der Policy-Kopf hat den Korpus NIE gesehen. Unter BEIDEN Traeger-Manifesten (policy_carrier_manifest_v20/_v21) sind alle Korpusdateien policy-MASKIERT -- sie beginnen nicht mit WDL_GENERATOR_PREFIXES und sind nicht namentlich gelistet (neural_net.py:679/:667, mit der Funktion selbst nachgerechnet). "Ausgang 2 -- Destillation ausgeblieben" ist damit die mechanische Folge eines Filters, kein Befund ueber Destillation. GUELTIG BLEIBEN: das direkte Duell w0_best 43:57 gegen den Champion (par.10.3, reine Spielstaerke) und die Block-H-Rohzahlen (par.8.4) -- deren Unterschiede entstanden ueber Value-Kopf und Trunk-Drift, nicht ueber die Policy. Lehre: der Traeger-Status jeder neuen Korpus-Quelle gehoert in die Ist-Stand-Tabelle jeder Prereg mit Policy-Aussage. -->
 
 # PREREG: Destillations-Messung — hat der Ownership-Korpus die POLICY geformt?
 
@@ -574,3 +574,102 @@ Kurios und unerklaert: W0 macht im direkten Duell **mehr** Punkte im Schnitt
 nicht aufgeloest und ausdruecklich als offen markiert.
 3. Ein Arm "Weitertraining OHNE Korpus", der den Konfund aus par.3 aufloest.
    Existiert nicht und muesste trainiert werden.
+
+### par.10.4 NACHTRAG 2026-08-16, 18:00 — DIESE MESSUNG IST HINFAELLIG
+
+**Der Policy-Kopf hat den Ownership-Korpus nie gesehen.** Damit beantwortet
+diese Vorregistrierung ihre Primaerfrage aus par.1 nicht -- weder positiv noch
+negativ.
+
+Geprueft am Code, nicht vermutet (`engine/py/neural_net.py:679`
+`_is_policy_carrier`, `:667` `WDL_GENERATOR_PREFIXES`, `:1244`
+`MOSAIC_CARRIER_MANIFEST`): eine Datei traegt nur dann Policy-Ziele, wenn ihr
+Basename im Traeger-Manifest gelistet ist oder mit einem Traeger-Praefix
+beginnt. Andernfalls wird ihre Policy MASKIERT und der Value-Ausgang trotzdem
+benutzt.
+
+Nachgerechnet mit der Funktion selbst, gegen beide vorhandenen Manifeste:
+
+| Datei | `policy_carrier_manifest_v20.json` (Default) | `..._v21.json` |
+|---|---|---|
+| `selfplay_v20wdl_...` | Traeger | Traeger |
+| `selfplay_v20wdlsw_...` | **Traeger** | maskiert |
+| `selfplay_v21_own_k1_...` | **MASKIERT** | **MASKIERT** |
+| `selfplay_v21_own_a_...` | **MASKIERT** | **MASKIERT** |
+| `selfplay_heur_own_...` | **MASKIERT** | **MASKIERT** |
+
+Die Korpusdateien erfuellen keine der beiden Bedingungen: sie beginnen nicht
+mit `selfplay_v19wdl`/`selfplay_v20wdl` (`WDL_GENERATOR_PREFIXES`), und
+namentlich gelistet sind sie auch nicht. **Unter BEIDEN Manifesten maskiert** --
+welches bei `w0`/`w1` aktiv war, ist in keinem Trainingsmanifest protokolliert,
+aber fuer diesen Befund auch gleichgueltig.
+
+**Was das fuer par.10/par.10.2 heisst:**
+
+- **"Ausgang 2 -- Destillation ist ausgeblieben" ist KEIN Befund ueber
+  Destillation.** Der Korpus hat den Policy-Kopf nie erreicht; dass die
+  Zielkriterien sich nicht bewegten, ist die mechanische Folge und keine
+  Aussage ueber die Lernbarkeit des Plattenbaus.
+- **Die Ein-Faktor-Zerlegung W0 gegen W1 bleibt gueltig**, aber sie misst etwas
+  Engeres als angenommen: den Ownership-Verlust bei ansonsten gleichem
+  VALUE-/OWNERSHIP-Training -- nicht bei gleichem Policy-Training, denn
+  Policy-Training auf dem Korpus gab es in keinem der beiden Arme.
+- **Die Staerkeunterschiede zum Champion (par.8.4) bleiben gemessen** und
+  entstanden ueber Value-Kopf und Trunk-Drift, nicht ueber die Policy.
+- **par.10.3 (direktes Duell 43:57) bleibt unberuehrt** -- das ist eine reine
+  Spielstaerkemessung.
+
+**Was in par.2 gefehlt hat.** Der Ist-Stand-Abschnitt hat vierzehn Punkte
+geprueft, darunter Reglerdefaults und Seed-Determinismus, aber nicht die
+Frage, ob die Trainingsdaten des Arms ueberhaupt Policy-Ziele beitragen.
+**Kuenftig gehoert der Traeger-Status jeder neuen Korpus-Quelle in die
+Ist-Stand-Tabelle jeder Prereg, die eine Policy-Aussage machen will.**
+
+**Wie es aufgefallen ist:** nicht durch eine Messung, sondern durch die
+Nutzer-Frage *"welchen grund gab es das den v20 korpus mitzutrainieren"*.
+Sie fuehrte in `PREREG_v21_window.md` (Zwei-Klassen-Fenster) und von dort in
+die Traegerlogik. Zwei meiner Zwischenbehauptungen dabei waren falsch und
+wurden vom Nutzer korrigiert -- zuletzt die Aussage, der Sockel SEI das
+Policy-Material: das gilt nur unter dem v21-Manifest, unter dem Default traegt
+der Schwarm ebenfalls.
+
+### par.10.5 REICHWEITE: SIEBEN MODELLE, NICHT EINE MESSUNG
+
+Auf die Nutzer-Frage *"entwertet es wirklich nur ein ergebnis? gab es nur ein
+modell mit dem 38000er fenster?"* -- nein. Ausgezaehlt ueber alle
+`models/manifest_train_*.json` mit gesetztem `extra_data_dir`: **sieben real
+trainierte Modelle** haben den Korpus gesehen (`w0`, `w01`, `w02`, `w05`, `w1`,
+`F1`, `F2`; `c1`/`c2`/`f3` wurden abgebrochen). In allen sieben war die
+Korpus-Policy maskiert.
+
+**Was die Maskierung genau tut** (`neural_net.py:1804`, abgelesen):
+
+```text
+if not file_policy_carrier:
+    pol_w = 0.0
+```
+
+Sie setzt **allein das Policy-Gewicht** auf 0. Value-, Punkte-, root_q- und
+Ownership-Ziele laufen unveraendert durch. Daraus die Dreiteilung:
+
+| | Status |
+|---|---|
+| Jede Aussage "der Korpus hat die Policy geformt / nicht geformt" | **HINFAELLIG** -- betrifft nicht nur diese Prereg, sondern die Praemisse der Kampagne (Lehrkorpus -> Policy lernt Plattenbau) |
+| Tor A (Kopfguete), `PREREG_ownership_corpus.md` par.10 | **GUELTIG** -- Ownership-Ziele waren nie maskiert, der Kopf hat aus dem Korpus gelernt (AUC 0,83-0,91, w0-Kontrolle 0,502) |
+| Tor C (Laufzeit-Regler), par.10.3 (direktes Duell), Frozen-Trunk-Riegel | **GUELTIG** -- reine Spielstaerke- bzw. Mechanikmessungen |
+
+**Die neue Lesart, und sie ist die wichtigste.** Der Korpus hat den
+**VALUE-Kopf** gefuettert: 8000 Partien, davon 4000 Bauer-Partien, in denen
+absichtlich schlechter gespielt wurde, um Platten zu bauen. Der Value-Kopf ist
+in diesem Projekt der gemessen strkketragende (2x2-Kopftausch,
+`project_hybrid_head_attribution`: 57,5 % gegen 49,2 %). Die sieben Modelle
+haben also **Siegwahrscheinlichkeiten einer absichtlich verzerrten Politik
+gelernt und dafuer keinerlei Policy-Signal zurueckbekommen.**
+
+Dazu passt, ohne dass es damit bewiesen waere: `w0_best` verliert das direkte
+Duell 43:57 (par.10.3), obwohl es den Champion ueber den Heuristik-Anker
+deutlich schlaegt (par.8.4). **HYPOTHESE, ausdruecklich ungeprueft:** der
+Korpus hat den Value-Kopf verschlechtert. Pruefbar, indem man den Value-Kopf
+eines Korpus-Arms und den des Champions auf DEMSELBEN Held-out vergleicht --
+nicht auf dem jeweils eigenen Val-Split, der bei Korpus-Armen anders
+zusammengesetzt ist.

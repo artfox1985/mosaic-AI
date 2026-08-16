@@ -14,6 +14,27 @@ Alles in diesem Abschnitt ist **heute am Code geprueft**, mit Fundstelle.
 
 ### par.1.1 Die Platzierung ist nicht die Entscheidung des Netzes
 
+> **NACHTRAG 2026-08-16, 18:00 — DIESER ABSCHNITT ERKLAERT ETWAS, DAS SO NICHT
+> STATTGEFUNDEN HAT.** Der Satz unten, das Destillations-Versagen sei damit
+> erklaert, dass die Policy fuer die Platzierung keinen Ausgang habe, ist als
+> URSACHE falsch: der Policy-Kopf hat den Korpus ueberhaupt nie gesehen (alle
+> Korpusdateien sind unter beiden Traeger-Manifesten policy-maskiert, Beleg in
+> `PREREG_corpus_distillation.md` par.10.4). Die Strukturaussage selbst -- die
+> Platzierung entscheidet `resolve_tiling_step`, nicht die Policy -- bleibt am
+> Code geprueft und richtig. Sie war nur nicht die wirksame Ursache des
+> gemessenen Ausbleibens, und ich habe sie als solche ausgegeben.
+>
+> Zweite Korrektur im selben Abschnitt: die Zahlen "0,70 -> 1,75 Saettigung der
+> Draftingseite" sind falsch gelesen. Laut `PREREG_placement_side.md` par.11
+> ist **2,10 die Draftingseite allein** (Bezug), 1,75 die beste
+> Platzierungsvariante und **0,70 die Vorzugsroute** -- die dort als Fehler #4
+> gefuehrt wird. Eine Vorzugsroute auf der Platzierungsseite ist also bereits
+> gemessen und war der schlechteste von vier Anlaeufen. Was beim Spaltenbauer
+> stattdessen traegt, ist die KOORDINATION (`tiling_solver.rs:1460`: das im
+> Drafting gewaehlte Ziel wird beim Tiling-Routing wiederverwendet), nicht der
+> Vorrang als solcher. par.3.1/par.9.3 sind daran noch nicht angepasst.
+
+
 `resolve_tiling_step` (`engine/src/self_play.rs:1093`) bestimmt, **WO** eine
 gedraftete Farbe landet — nicht die Suche, nicht die Policy. Der Kommentar in
 `engine/src/tiling_solver.rs:968-975` benennt die Folge selbst:
