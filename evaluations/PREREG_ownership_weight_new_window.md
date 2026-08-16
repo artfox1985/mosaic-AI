@@ -75,6 +75,21 @@ Cache.
 
 ---
 
+
+**NACHTRAG 2026-08-17 — der Cosine war in beiden Armen INERT.** Nutzer-Hinweis.
+`CosineAnnealingLR` bekommt `T_max=epochs` (`train.py:843`), also den Wert von
+`--epochs`. Beide Arme liefen mit `--epochs 100` und stoppten nach 15 -- die
+Lernrate kroch von 5,00e-05 auf 4,76e-05, das sind 5 % ueber den ganzen Lauf.
+Praktisch war es eine **konstante Lernrate**, kein Cosine.
+
+Fuer den Vergleich b18 gegen b19 ist das **unschaedlich**: beide Arme sind
+gleich betroffen, und das kopierte `w1`-Rezept lief mit demselben Defekt --
+die Einfaktor-Aussage bleibt gueltig. Die Beschreibung "lr 5e-5, cosine" in
+par.3 ist trotzdem irrefuehrend und steht hiermit korrigiert.
+
+**Fuer kuenftige Warm Starts:** `--epochs` auf die erwartete Lauflaenge setzen
+(rund 20), damit der Cosine tatsaechlich abregelt.
+
 ## par.4 ENTSCHEIDUNGSGROESSEN (vorab, gemessen auf dem KORPUS-Held-out)
 
 Gemessen wird mit der Bestandssonde `tools/probes/ownership_gate_a.py` auf dem
