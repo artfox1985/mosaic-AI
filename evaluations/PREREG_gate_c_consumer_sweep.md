@@ -617,13 +617,115 @@ Als Beifang faellt der **reine Checkpoint-Vergleich w1-N gegen F1-N** an
 von +41 % oder die Kopfguete von +0,09 AUC in der Arena schwerer wiegt —
 unabhaengig vom Verbraucher.
 
-## par.12.1 ERGEBNIS Stufe 2
+## par.12.1 ERGEBNIS Stufe 2 — AUSGANG B: der Kopf war NICHT das Problem
+
+2 Arme x 121 Seeds = 242 Partien auf `alphazero_v21_2d_own_w1.onnx`
+(Feld-AUC 0,870), dieselben Seeds wie Stufe 1. Roh:
+`evaluations/paired_arena_env_gate_c_w1.json`.
+
+| Groesse | w1-N `0,0` | w1-D1 `0.1,0.3` | Delta (Block, t) |
+|---|---:|---:|---:|
+| Siege | 91/121 | **91/121** | b=18 / c=18, **McNemar p = 1,000** |
+| Endstand-Marge | 12,29 | 13,31 | +0,77 (t 0,30) |
+| Plattenpunkte gesamt | 3,97 | 3,42 | **−0,57 (t −1,09)** |
+
+Je Kriterium, gepaart (Partie-Ebene; Block-Ebene traegt hier nicht, nB=2):
+
+| Kriterium | w1-N | Delta D1 | t |
+|---|---:|---:|---:|
+| **k1 Vertikale Reihen** | 1,19 | +0,15 | 0,33 |
+| **k2 Diagonale Reihen** | 0,00 | +0,22 | 1,00 |
+| **k5 Eckplatten** | 3,47 | −0,07 | −0,30 |
+| k3 Mehrfarbige Felder | 6,39 | −1,48 | −1,41 |
+| k0 Horizontale Reihen | 1,40 | −0,27 | −1,27 |
+| k4 Aeussere Felder | 9,38 | −0,11 | −0,35 |
+| k6 Spezialfelder | −11,53 | −0,07 | −0,16 |
+
+**Auf dem STARKEN Kopf ist der Verbraucher schlicht wirkungslos.** Die Siege
+sind exakt gleich (91:91, b=c=18 — die perfekte Nullverteilung), die
+Plattenpunkte gehen leicht ZURUECK, und keines der drei Zielkriterien
+bewegt sich ausserhalb des Rauschens.
+
+**Damit greift Ausgang B der Vorab-Regel aus par.12**: der Negativbefund aus
+Stufe 1 ist NICHT kopfguetebedingt. Eine Steigerung der Feld-AUC von 0,780 auf
+0,870 und des E_k-Spearman k5 von 0,345 auf 0,466 dreht das Vorzeichen nicht —
+sie macht den Verbraucher nur harmloser, nicht nuetzlicher. **Tor C schliesst
+negativ; Stufe 4 (Zerlegung) entfaellt**, weil es keinen tragenden Effekt zu
+zerlegen gibt.
+
+Praezisierung gegenueber dem Wortlaut von Ausgang B: dort stand "k1/k2 flach
+oder negativ, **Siege runter**". Die Siege gehen hier NICHT runter, sie stehen
+still. Nach par.12 Ausgang C ist das getrennt auszuweisen, und das ist es
+hiermit: **auf F1 schadet der Verbraucher, auf w1-final ist er inert.** Beides
+ist NICHT-ERFOLG nach par.6, aber es sind zwei verschiedene Befunde und sie
+werden nicht zu einem verschmolzen.
+
+### par.12.2 Beifang: der Checkpoint-Vergleich (Antwort auf frozen_trunk par.7.1)
+
+Beide Nullarme, gleiche Seeds, Regler beidseitig aus — der reine
+Checkpoint-Vergleich, den `PREREG_frozen_trunk_head.md` par.7.1 von Tor C
+verlangt hat:
+
+| | F1 (Policy 0,2141 / AUC 0,780) | w1-final (Policy 0,3018 / AUC 0,870) |
+|---|---:|---:|
+| Siege | **98/121** | 91/121 |
+| Endstand-Marge | **14,57** | 12,29 |
+| Plattenpunkte gesamt | 3,45 | 3,97 |
+
+McNemar w1 gegen F1: b=18 / c=25, **p = 0,360** — **kein signifikanter
+Unterschied.** F1 fuehrt um 7 Partien und 2,28 Punkte Marge, beides innerhalb
+des Rauschens (Marge t −1,05 auf Blockebene).
+
+**Lesart, mit Vorsicht formuliert**: der Kopf-Vorsprung von w1-final zahlt
+sich in der Arena NICHT aus, und sein Policy-Verlust von +41 % kostet ihn
+auch nicht nachweisbar etwas. Die Frage aus par.7.1 ("was ist die Kombination
+aus Kopfguete und Policy-Staerke wirklich wert?") hat damit die Antwort:
+**bei dieser Aufloesung nichts von beidem messbar** — und weil F1 den intakten
+Policy-Verlust hat und in der Punktschaetzung vorn liegt, bleibt **F1 der
+Checkpoint der Wahl**. Das ist eine Praeferenz nach Punktschaetzung plus
+Vorsichtsargument, KEIN signifikanter Befund.
+
+## par.13 NACHTRAG Stufe 3: die Replikation bekommt ein neues Ziel (vor dem Lauf)
+
+par.4 machte die Replikation zur Pflicht "fuer den Sieger-Arm". **Es gibt
+keinen Sieger.** Die Pflicht faellt damit nach dem Buchstaben weg — aber die
+Begruendung dahinter (Lambda-Lehre: eine einzelne Arena-Marge ist kein
+Befund) gilt fuer einen Negativbefund genauso.
+
+**Die Replikation wird deshalb umgewidmet, statt gestrichen**, und zielt auf
+die eine Zelle, an der das Verdikt noch wackeln koennte:
+
+> **Ziel: F1, Arme N `0,0` und D1 `0.1,0.3`, auf den 122 FRISCHEN Seeds aus
+> `evaluations/gate_c_seeds_repl.txt`.**
+
+Warum genau diese Zelle und keine andere:
+- D1 ist der **einzige Arm mit unentschiedener Waechter-Lage**: −9 Siege bei
+  p = 0,136. D2 und D3 sind bereits signifikant negativ, D3 zusaetzlich durch
+  die Monotonie gestuetzt — dort wuerde eine Replikation nichts entscheiden.
+- Die tragende NEGATIV-Aussage ("k1 bewegt sich nicht, k2 geht zurueck") steht
+  bisher auf EINEM Seed-Satz. Ein Nullbefund auf einem zweiten, disjunkten
+  Satz ist die billigste Versicherung gegen ein Seed-Satz-Artefakt.
+- Kosten 244 Partien ≈ 16 min.
+
+**Entscheidungsregel, vorab, GEPOOLT ueber beide Seed-Saetze (n = 243):**
+
+> **Der Waechter**: exakter McNemar auf allen 243 gepaarten Partien. Wird
+> D1 dort signifikant (p < 0,05) schlechter, gilt: **auch die kleinste Dosis
+> kostet Siege**, und Tor C schliesst nicht nur "ohne Nutzen", sondern
+> "mit Schaden auf allen Dosen".
+> Bleibt es ueber p >= 0,05, lautet der Befund fuer D1 "kein nachweisbarer
+> Schaden, aber auch kein Nutzen" — die Monotonie 98/89/86/84 bleibt als
+> Indiz bestehen und wird als solches, nicht als Beleg, berichtet.
+>
+> **Die Zielgroesse**: bleibt k1/k2/k5 auf dem frischen Satz null oder
+> negativ, ist der Negativbefund repliziert und Tor C ist geschlossen.
+> Sollte D1 dort UNERWARTET k1/k2/k5 signifikant heben, waere das ein
+> Widerspruch zum Hauptsatz — dann wird KEIN Erfolg ausgerufen, sondern der
+> Widerspruch berichtet und ein dritter Satz gefordert.
+
+## par.13.1 ERGEBNIS Stufe 3 (Replikation)
 
 *(leer zum Zeitpunkt der Nachtrag-Registrierung)*
-
-## par.13 ERGEBNIS Stufe 3 (Replikation)
-
-*(leer zum Registrierungszeitpunkt)*
 
 ## par.14 ERGEBNIS Stufe 5 (Durchsatz)
 
