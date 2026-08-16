@@ -354,7 +354,7 @@ aussagekraeftig sein KANN, nicht ob der Mechanismus taugt.
 --control 0`, Champion@400 vs Heuristik@150dyn, einseitig (die Heuristik
 liest den Knopf nicht -- die Zuordnung "wer stoert wen" bleibt damit
 eindeutig, wie im Vorgaenger §7.1). Auswertung wieder ueber
-`scratchpad/opponent_disruption_analysis.py` (Gegner-/Heuristik-Seite),
+`tools/probes/opponent_disruption_analysis.py` (Gegner-/Heuristik-Seite),
 Signifikanztests **auf Block-Ebene** (`feedback_arena_block_correlation`).
 
 ### §6.2 Stichprobengroesse: mindestens 2 x 200 gepaarte Partien

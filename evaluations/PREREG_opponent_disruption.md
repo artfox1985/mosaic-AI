@@ -214,7 +214,7 @@ einseitig: `play_net_game`s `pi==net_board`-Gate, siehe §1 — die Heuristik
 liest `MOSAIC_OPPONENT_DISRUPTION` nicht, die Zuordnung "wer stoert wen" ist
 damit eindeutig). Lauf 1: Basis-Seed 20260815, n=20. Lauf 2 (PFLICHT-
 Replikation): Basis-Seed 20260822 (frisch), n=20. Auswertung:
-`scratchpad/opponent_disruption_analysis.py` (neu, reine Analyse — liest
+`tools/probes/opponent_disruption_analysis.py` (neu, reine Analyse — liest
 `PATTERNS`/`ROUND_PREFIX` aus `analyze_game_log.py` und `mcnemar_exact_p`
 aus `paired_gating.py`, gleiche Wiederverwendung wie `tools/
 plate_points_from_arena.py`, aber fuer die GEGNER-/Heuristik-Seite statt
