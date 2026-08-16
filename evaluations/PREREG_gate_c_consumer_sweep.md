@@ -373,11 +373,82 @@ muss der Preis bekannt sein.
 | `evaluations/paired_arena_env_gate_c_w1.json` | Stufe 2 |
 | `evaluations/paired_arena_env_gate_c_repl.json` | Stufe 3 |
 
+Die `paired_arena_env_*.json` sind **gitignoriert** (`.gitignore:78`, Anlass:
+57 Dateien / 43,7 MB in einer Nacht bei 1,8 % verwertbarer Fraktion). Sie
+bleiben lokal; die eingedampfte, VERSIONIERTE Form entsteht am Ende ueber
+`python -X utf8 tools/arena_compact.py --muster "gate_c_*"` →
+`evaluations/arena_compact.jsonl`.
+
 ---
 
-## par.10 ERGEBNIS Stufe 0
+## par.10 ERGEBNIS Stufe 0 — beide Vorab-Bedingungen erfuellt, Raster bleibt
 
-*(leer zum Registrierungszeitpunkt)*
+Gefahren 2026-08-16, 12 Seeds `900000..900011` (BEWUSST ausserhalb beider
+Versuchssaetze, damit Stufe 0 keine Hauptdaten anfasst), F1 @400 gegen
+Heuristik@150, 11 Faeden. Roh: `evaluations/paired_arena_env_gate_c_s0.json`.
+
+### Kostenprobe (Punkt 1 der Stufe-0-Regel)
+
+| Arm | Wandzeit 12 Partien | Partien/h |
+|---|---:|---:|
+| N `0,0` | 50,1 s | 862 |
+| D1 `0.1,0.3` | 47,8 s | 904 |
+| D2 `0.3,1.0` | 44,9 s | 962 |
+| D3 `1.0,3.0` | 48,2 s | 896 |
+
+**≈ 900 Partien/h — und zwar UNTER der laufenden F2-Trainingslast.** Damit
+kostet Stufe 1 (484 Partien) rund 32 min, Stufe 2 und Stufe 3 je rund 16 min.
+Der Versuchsplan ist damit als Ganzes bezahlbar; eine Verkleinerung von n zur
+Kostenersparnis ist nicht noetig und findet nicht statt.
+
+Nebenbemerkung, KEIN Durchsatzbefund: dass D2/D3 hier nicht langsamer sind als
+N, ist bei n=12 unter Fremdlast nicht aussagekraeftig. Die Durchsatzfrage
+bleibt vollstaendig bei Stufe 5 (par.8).
+
+### Nicht-Vakuitaets-Schirm (Punkt 2 der Stufe-0-Regel)
+
+| Arm | Partien mit IDENTISCHEM Ergebnis zum Nullarm | mittl. Endstand Netz |
+|---|---:|---:|
+| N `0,0` | 12/12 (per Definition) | 51,67 |
+| D1 `0.1,0.3` | **2/12** | 57,92 |
+| D2 `0.3,1.0` | **0/12** | 54,25 |
+| D3 `1.0,3.0` | **0/12** | 48,25 |
+
+- **Keine Stufe ist vakuum.** Die Ersetzungsregel ("Verdreifachen, falls
+  bit-identisch") greift bei keiner Stufe. Das Raster aus par.3.4 bleibt
+  unveraendert.
+- **D3 bricht nicht ein**: −3,42 Punkte gegen den Nullarm, die Streichgrenze
+  lag bei −10. D3 bleibt in Stufe 1.
+
+### Zusatzprobe: beide Pole feuern EINZELN (nicht vorregistriert, nachgetragen)
+
+Anlass: `paired_arena_env_ab.py` verwirft `stderr` der Worker bei Erfolg
+(`:133-137` — `proc.stderr` wird nur im Fehlerfall gelesen). Eine Warnung
+"Ownership-Kopf unbrauchbar" (`net_mcts::warn_ownership_head_unusable_once`,
+`self_play::warne_unbrauchbaren_ownership_kopf_einmal`) waere damit UNSICHTBAR
+gewesen, und der Verbraucher haette sich still wie `w=0` verhalten. Deshalb
+direkt am Worker nachgeprueft, 4 Seeds, stderr mitgelesen:
+
+| Konfiguration | Warnung auf stderr | Endstaende | identisch zum Nullarm |
+|---|---|---|---:|
+| `W=0, T=0` (Bezug) | — | 95 / 42 / 48 / 59 | — |
+| **nur Blatt** `W=0.3, T=0` | **keine** | 47 / 13 / 34 / 54 | **0/4** |
+| **nur Tiling** `W=0, T=1.0` | **keine** | 42 / 38 / 48 / 59 | **2/4** |
+
+Beide Pole sind also einzeln wirksam und der Kopf wird von beiden als
+brauchbar erkannt (Breite 140 >= 72). Die Endstaende dieser 4 Seeds werden
+NICHT gedeutet — n=4.
+
+**Determinismus-Gegenprobe** (fuer die Paarung tragend): der Nullarm liefert
+in einem voellig getrennten Prozess bitgleich dieselben Endstaende wie in
+Stufe 0 ([95,33] / [42,30] / [48,18] / [59,27]). Die gepaarte Anlage steht
+also nicht auf einer Annahme.
+
+### Was aus Stufe 0 NICHT gelesen wird
+
+Die Siegzahlen (10 / 11 / 10 / 8 von 12) und die Endstands-Differenzen sind
+nach der vorab festgelegten Regel **nicht auswertbar** und gehen in kein
+Verdikt ein. Sie stehen hier nur, weil sie in der Rohdatei stehen.
 
 ## par.11 ERGEBNIS Stufe 1
 
