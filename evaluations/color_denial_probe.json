@@ -1,0 +1,20 @@
+{
+ "task": "PREREG_opponent_disruption_v2.md Stufe 1 (Stoerfenster-Zaehlmodus, live)",
+ "prereg": "evaluations/PREREG_opponent_disruption_v2.md",
+ "model": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\alphazero_v21_2d_brierbest.onnx",
+ "net_sims": 400,
+ "heur_sims": 150,
+ "n_games": 200,
+ "seed": 20260901,
+ "probe_z": "1.0",
+ "probe_min_visit_frac": "0.5",
+ "net_wins": 157,
+ "total": 8915,
+ "fenster": 7950,
+ "fenster_rate": 0.8917554683118339,
+ "stoerbar": 680,
+ "stoerbar_rate": 0.07627593942793046,
+ "abbruchschwelle": 0.05,
+ "verdikt": "ABBRUCHREGEL GREIFT NICHT",
+ "detail": "Stoerfensterrate 7.63% >= 5%. Die Entscheidung ueber Stufe 2 (Bau) trifft der Nutzer -- eine hohe Rate ist KEIN Wirksamkeitsnachweis (E3b feuerte 36,52% und verlor 4,75pp)."
+}

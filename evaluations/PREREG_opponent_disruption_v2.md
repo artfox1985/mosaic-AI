@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: Vorregistriert 2026-08-16 vor jedem Bau. §9 (2026-08-16): Stufe 0 BESTANDEN (Fensterrate 35,69 % bei eps=0,01) und Stufe-1-Offline-Ersatz gefahren -- Stoerfensteranteil 5,50 % (eps=0,01) bis 13,57 % (eps=0,03), Abbruchschwelle 5 % NICHT unterschritten, evaluations/disruption_window_rate.json. OFFEN bleibt die Nutzer-Entscheidung ueber Stufe 2 (Bau); die vorregistrierte Rust-Zaehlmodus-Messung steht noch aus (Wheel-/Arena-Sperre). -->
+<!-- STATUS: OFFEN | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: Vorregistriert 2026-08-16 vor jedem Bau. Stufe 0 bestanden; Stufe 1 ECHT gefahren (§11, Zaehlmodus im installierten Wheel, Paritaet 8c6684ff und Byte-Identitaet belegt): Stoerfensteranteil 7,63 % bei 400 Sims und 7,95 % bei 200 Sims, Abbruchschwelle 5 % NICHT unterschritten -- evaluations/color_denial_probe.json. Offline-Ersatz (§9) lag bei 5,50 %, die Fensterstatistik dagegen um Faktor 2,5 daneben (§11.4). OFFEN bleibt allein die Nutzer-Entscheidung ueber Stufe 2 (Bau des Tie-Breaks). -->
 
 # PREREG: Gegner-Stoerung ueber Farbzaehlung, zweiter Anlauf (v2)
 
@@ -778,3 +778,100 @@ Erklaerung erfunden wird:**
 Eine grobe Uebereinstimmung waere eine Bestaetigung der drei nach Python
 portierten Engine-Funktionen; eine grosse Abweichung waere ein Grund, die
 Offline-Methodik kuenftig nicht mehr als Ersatz zuzulassen.
+
+---
+
+## §11 ERGEBNIS Stufe 1 (live, 2026-08-16): Abbruchregel greift NICHT
+
+Belegstellen: `evaluations/color_denial_probe.json` (Hauptlauf),
+`evaluations/color_denial_probe_200sims.json` (Sim-Kontrolle).
+Treiber `tools/color_denial_probe.py`.
+
+### §11.1 Voraussetzungen -- selbst geprueft, nicht uebernommen
+
+- **Wheel installiert** (aus dem Hauptbaum, inkl. der inzwischen
+  vollstaendigen Ownership-Verbraucher-Verdrahtung des anderen Agenten).
+  Der isolierte Worktree-Bau aus §10.4 wurde damit hinfaellig und NICHT
+  installiert.
+- **Paritaetsprobe selbst gefahren**: `8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423`,
+  Exit 0, "Defaults sind byte-identisch zum Bestand". Damit ist belegt,
+  dass weder der Zaehlmodus noch der Ownership-Verbraucher (Default 0) das
+  Suchverhalten anfasst.
+- **Byte-Identitaets-Nachweis gefahren** (§10.3): `--golden --n-games 12`,
+  Seed 20260901, Zaehler AUS gegen AN in getrennten Prozessen ->
+  **BYTE-IDENTISCH**, 2127 Zeichen Arena-JSON exakt gleich. Die Zusicherung
+  "reiner Zaehlmodus" ist damit belegt, nicht behauptet.
+
+### §11.2 Die Zahlen
+
+Champion `v21_2d_brierbest` vs Heuristik@150, je 200 Partien, z=1,0, f=0,5.
+
+| Lauf | Entscheidungen | Fenster offen | **stoerbar** | Netz-Siege |
+|---|---|---|---|---|
+| **400 Sims** (vorregistriert), Seed 20260901 | 8.915 | 7.950 = **89,18 %** | 680 = **7,63 %** | 157/200 |
+| 200 Sims (Kontrolle), Seed 20260902 | 8.892 | 8.315 = 93,51 % | 707 = **7,95 %** | 143/200 |
+
+Ueber die acht Bloecke des Hauptlaufs ist die Rate stabil (7,66 / 7,43 /
+8,13 / 8,17 / 7,94 / 7,86 / 7,68 / 7,63 % kumulativ) -- keine Drift, kein
+Extremblock.
+
+### §11.3 Verdikt
+
+Die vorregistrierte Abbruchregel (`stoerbar/total < 5 %` -> ohne Arena
+schliessen) **greift nicht**: 7,63 % im vorregistrierten Lauf, 7,95 % in der
+Kontrolle. v2 bleibt OFFEN.
+
+**Hier wird gestoppt.** Die Entscheidung ueber Stufe 2 (Bau des echten
+Tie-Breaks, danach die 2 x 200-Arena) trifft der Nutzer. Die Einordnung aus
+§9.5 gilt unveraendert: eine Rate von 7,6 % ist kein Wirksamkeitsnachweis.
+E3b hat bei 36,52 % getauschten Entscheidungen -4,75pp gekostet.
+
+### §11.4 Der Vergleich Offline gegen Live -- ein Befund ueber die Methode
+
+| | Fenster | stoerbar |
+|---|---|---|
+| Offline, rohes eps=0,01 | 35,69 % | 5,50 % |
+| Offline, rohes eps=0,02 | 52,97 % | 9,99 % |
+| Offline, rohes eps=0,03 | 62,20 % | 13,57 % |
+| **Live, E3b-Kriterium, 400 Sims** | **89,18 %** | **7,63 %** |
+| Live, E3b-Kriterium, 200 Sims | 93,51 % | 7,95 % |
+
+Drei Befunde, in dieser Reihenfolge:
+
+1. **Die entscheidungsrelevante Zahl haelt.** 5,50 % offline gegen 7,63 %
+   live -- gleiche Groessenordnung, gleiche Seite der 5 %-Schwelle. Die
+   Offline-Rekonstruktion haette hier zum selben Verdikt gefuehrt.
+2. **Die Fensterstatistik haelt NICHT, um den Faktor 2,5.** Das
+   E3b-Fenster steht in fast NEUN von zehn Wurzelentscheidungen offen; das
+   roheste getestete eps=0,03 kam auf 62 %. Die in §9.3 gezogene Schranke
+   ("E3b-Fenster mindestens so weit wie eps=0,01") war richtig, aber viel
+   zu schwach -- sie liess offen, wie extrem der Unterschied ist.
+3. **Sims erklaeren die Luecke NICHT.** Der dritte der vier vorab
+   benannten Stoerfaktoren (§10.6) ist ausgeraeumt: 200 statt 400 Sims
+   bewegen die Rate um 0,32pp (7,63 -> 7,95 %), waehrend die Offline-Live-
+   Luecke 2,13pp betraegt.
+
+**Die eigentliche Lehre** ist die Kombination aus 1 und 2: das Fenster
+wird um den Faktor 2,5 weiter, die Stoerbarkeit steigt aber nur um den
+Faktor 1,39 -- und liegt sogar UNTER dem, was die Offline-Rechnung bei
+vergleichbarer Fensterbreite vorhersagt (bei eps=0,03 und nur 62 %
+Fensterrate schon 13,57 %). Der begrenzende Faktor ist also NICHT das
+Aequivalenzfenster, sondern die Stoerbedingung selbst.
+
+*(INTERPRETATION, nicht gemessen)*: plausibel macht das der Besuchs-Gate
+`N(a) >= 0,5*N(b)`. Er laesst nur Kandidaten zu, die die Suche ohnehin
+schon stark besucht hat -- typischerweise strukturell aehnliche Zuege
+(gleiche Farbe, benachbarte Reihen), die sich in ihrer Stoerwirkung kaum
+unterscheiden. Ein rohes eps ohne Besuchs-Gate laesst dagegen auch
+strukturell ANDERE Zuege zu, bei denen ein Unterschied in der Stoerwirkung
+wahrscheinlicher ist. Zwei Fensterdefinitionen unterscheiden sich hier also
+nicht nur in der Breite, sondern in der ART der zugelassenen Kandidaten.
+Diese Deutung ist NICHT geprueft; sie waere durch einen Live-Lauf mit
+rohem eps (ohne Besuchs-Gate) zu testen -- nicht Teil dieses Auftrags.
+
+**Konsequenz fuer die Methodik**: die Offline-Rekonstruktion aus vorhandenen
+Records taugt als billiger Groessenordnungs-Schaetzer fuer die
+Entscheidungszahl, aber NICHT als Ersatz fuer die Live-Messung, sobald eine
+Aussage ueber das Fenster selbst getroffen werden soll. Wer sie kuenftig
+einsetzt, sollte das ausdruecklich als Vorab-Schaetzung deklarieren -- so
+wie §9.1 es getan hat.
