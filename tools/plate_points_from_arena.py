@@ -20,6 +20,10 @@ einsammelt.
 
 Aufruf:
     python -X utf8 tools/plate_points_from_arena.py w0 w01 uni --bezug w0
+
+Token-Form je Datei: `kuerzel[#arm][@seite]` -- `#arm` waehlt aus einer
+Mehr-Arm-Datei, `@seite` (0/1) das BRETT (nur Netz-gegen-Netz noetig, siehe
+`auswerten`).
 """
 from __future__ import annotations
 
@@ -65,10 +69,18 @@ def partien(pfad: Path, arm: str | None = None) -> list[dict]:
     return g
 
 
-def auswerten(sp: dict) -> dict:
-    """Eine Partie -> Kennzahlen des NETZ-Spielers."""
+def auswerten(sp: dict, seite: int | None = None) -> dict:
+    """Eine Partie -> Kennzahlen des NETZ-Spielers.
+
+    `seite` (2026-08-16, Destillations-Messung `PREREG_corpus_distillation.md`
+    par.4.2): erzwingt einen BRETT-INDEX statt der Namensregel. Noetig fuer
+    Netz-gegen-Netz-Partien -- dort heissen BEIDE Spieler "NetzA"/"NetzB",
+    die Namensregel unten liefert dann immer Brett 0 und die Gegenseite waere
+    unsichtbar. Genau die ist hier aber die Frage ("sammelt das Korpus-Netz
+    die Platten ein, die der Champion liegen laesst"). `None` = unveraendert."""
     namen = sp["names"]
-    ni = next((i for i, n in enumerate(namen) if "euristik" not in n), 0)
+    ni = seite if seite is not None else \
+        next((i for i, n in enumerate(namen) if "euristik" not in n), 0)
     netzname = namen[ni]
 
     platten_gesamt, je_kriterium = None, {}
@@ -153,13 +165,19 @@ def main() -> None:
     daten: dict[str, dict[int, dict]] = {}
     reihenfolge: dict[str, list[int]] = {}  # Laufreihenfolge je Kuerzel, fuer --block
     for k in a.kuerzel:
-        roh, _, arm = k.partition("#")
+        # Token-Form: kuerzel[#arm][@seite]. `@seite` (0/1) waehlt bei
+        # Netz-gegen-Netz-Dateien das BRETT -- siehe `auswerten`-Docstring.
+        rest, _, seite_s = k.partition("@")
+        seite = int(seite_s) if seite_s else None
+        if seite not in (None, 0, 1):
+            raise SystemExit(f"{k}: @seite muss 0 oder 1 sein")
+        roh, _, arm = rest.partition("#")
         pf = Path(roh) if roh.endswith(".json") else \
             BASIS / "evaluations" / f"paired_arena_env_{a.praefix}_{roh}.json"
         if not pf.exists():
             print(f"{k}: FEHLT ({pf.name})")
             continue
-        satz = [auswerten(s) for s in partien(pf, arm or None)]
+        satz = [auswerten(s, seite) for s in partien(pf, arm or None)]
         daten[k] = {r["seed"]: r for r in satz}
         reihenfolge[k] = [r["seed"] for r in satz]
 
