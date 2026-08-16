@@ -746,3 +746,40 @@ Start `v21-b20` (`PREREG_lr_schedule.md` par.6).
 Messung AUS (`MOSAIC_OWNERSHIP_W=0`). Tor C auf `b18_best` bleibt faellig und
 ist jetzt zum ersten Mal fair — die Policy kann den plattenbauenden Zug
 vorschlagen, auch wenn sie ihn von sich aus nicht waehlt.
+
+### par.10.8 `v21-b20` COLD START — der letzte offene Punkt der Destillationsfrage
+
+Registriert 2026-08-17 vor dem Lauf. Nutzer-Vorgabe: *"fuer b20 will ich nur
+die wertungsplatten thematik wissen"* — der Plateau-Scheduler ist bei diesem
+Lauf ein **Nebeneffekt**, den wir mitnehmen, keine Fragestellung.
+
+**Die Frage, und es ist die letzte offene der Destillation:** par.10.7 hat
+gezeigt, dass eine Policy mit 100 % Korpus-Gradient den Plattenbau nicht
+uebertraegt. Offen blieb die Zurechnung — liegt es am Korpus, oder am Prior
+aus 30.000 Partien, der beim Warm Start bereits in den Gewichten steckt?
+`v21-b20` startet ohne `--load`. Seine Policy kennt nichts anderes als
+plattengelenktes Spiel.
+
+**Aufbau:** identisch zu par.10.7 — gegen den Champion, beide @400, derselbe
+407-Seed-Satz, alle Regler aus, `--log-games`. Nur so sind die Plattenzahlen
+direkt neben die von `b18` zu stellen.
+
+**Messgroesse: Plattenpunkte je Kriterium (k1/k2/k5).** Die Siege werden
+ausgewiesen, tragen hier aber nichts: ein From-Scratch-Aufbau lag in diesem
+Projekt schon einmal bei Elo 884 gegen einen 1100er-Champion, ein deutlicher
+Arena-Verlust ist eingeplant und sagt ueber die Plattenfrage nichts.
+
+**VORAB-REGEL:**
+
+> Hebt `b20` k1 oder k2 deutlich ueber `b18` (das bei k1 0,90 und k2 0,00
+> liegt), war der PRIOR die Blockade — dann ist der Korpus lehrfaehig und der
+> Warm Start hat ihn ueberstimmt.
+>
+> Bleiben k1 und k2 auch bei `b20` auf `b18`-Niveau, ist die Zurechnung
+> geklaert und die **Policy-Destillation als Weg abgeschlossen**: dann lehrt
+> der Korpus den Plattenbau nicht, unabhaengig vom Prior. Der Plattenbau
+> muesste dann ueber die AKTIVIERUNG des Kopfes kommen, nicht ueber die
+> Policy.
+
+Beide Ausgaenge sind verwertbar; der zweite schliesst einen Strang, statt ihn
+offen zu lassen.

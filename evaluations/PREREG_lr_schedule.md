@@ -43,65 +43,58 @@ wieder Fortschritt, faellt der Early-Stop-Zaehler zurueck.
 dieses Projekt **nicht gemessen**. Sie werden hier mitgetestet, nicht
 validiert.
 
-## par.3 DIE ARME
+## par.3 DER ARM — UND WAS DIESER LAUF IST
 
-| Arm | Start | LR | Schedule | Vergleich gegen |
+**`v21-b21` ist eine PARAMETERSUCHE, kein Konfirmationstest.** Nutzer-Vorgabe:
+*"b21 soll nur einstellparameter finden fuer den warmstart"*. Das steht hier,
+damit hinterher niemand ein Verdikt hineinliest, das der Aufbau nicht tragen
+kann — ein Arm, ein Seed, und die Projektregel zur Seed-Streuung
+(`project_training_seed_variance`: der Seed bewegt die Metrik 4-6x staerker als
+jeder Knopf) gilt fuer Einzelvergleiche voll.
+
+| Arm | Start | LR | Schedule | Bezug |
 |---|---|---:|---|---|
-| `v21-b20` | **Cold** (kein `--load`) | 4e-4 | plateau | kein Bestandsarm — Erkundung |
-| `v21-b21` | Warm (`v21_2d_brierbest`) | 5e-5 | plateau | **`v21-b18`** (einfaktoriell) |
+| `v21-b21` | Warm (`v21_2d_brierbest`) | 5e-5 | plateau | `v21-b18` (konstante 5e-5) |
 
-Alles Uebrige identisch: neues Fenster (Korpus als Policy-Sockel, 2945
-Dateien), `--ownership-weight 1.0`, `--conjunction-head`, 2d/wdl/nortv,
-opp-points, endgame, seed 2, `--epochs 60` als Deckel (bei `plateau` ohne
-Wirkung auf die LR-Kurve, anders als bei Cosine).
+Alles Uebrige identisch zu `b18`: neues Fenster, `--ownership-weight 1.0`,
+`--conjunction-head`, 2d/wdl/nortv, opp-points, endgame, seed 2, `--epochs 60`
+als Deckel (bei `plateau` ohne Wirkung auf die LR-Kurve).
 
-**`b21` gegen `b18` ist sauber einfaktoriell**: b18s Cosine war inert, also
-vergleicht man "konstante 5e-5" gegen "5e-5 mit Plateau-Senkung". Beide sehen
-dasselbe Held-out (seed-fester Val-Split, identischer Dateisatz).
+`v21-b20` steht NICHT mehr in dieser Prereg. Sein Zweck ist die Plattenfrage,
+nicht der Scheduler; er ist in `PREREG_corpus_distillation.md` par.10.8
+registriert. Dass er mit `plateau` faehrt, ist dort ein Nebeneffekt.
 
-## par.4 ENTSCHEIDUNGSGROESSEN
+## par.4 WAS ABGELESEN WIRD (vorab, damit nicht nachtraeglich ausgewaehlt wird)
 
-Gemessen auf dem Held-out des neuen Fensters, mit der Gate-A-Sonde auf der
-CPU (`CUDA_VISIBLE_DEVICES=-1`, geprueft: `""` wirkt unter Windows nicht):
+Auf dem Held-out des neuen Fensters, Gate-A-Sonde auf der CPU
+(`CUDA_VISIBLE_DEVICES=-1`; `""` wirkt unter Windows nicht):
 
-1. **`val_combined` am besten Checkpoint** — die Groesse, nach der der
-   Checkpoint ohnehin gewaehlt wird, und die der Scheduler direkt optimiert.
-2. **Policy-val_loss** am besten Checkpoint.
-3. **Kopfguete** (Feld-AUC, E_k-Rang k1/k2/k5) — als Beobachtung.
-4. **Epochen bis Early Stop** und die LR-Kurve — zeigt, ob der Scheduler
-   ueberhaupt gegriffen hat.
+1. **LR-Kurve und Epochen bis Early Stop** — hat der Scheduler ueberhaupt
+   gegriffen? Das ist die eigentliche Frage einer Parametersuche.
+2. `val_combined` und Policy-val_loss am besten Checkpoint, neben `b18`.
+3. Kopfguete (Feld-AUC, E_k-Rang) als Beobachtung.
 
-## par.5 VORAB-REGEL
+## par.5 WIE DAS ERGEBNIS ZU LESEN IST
 
-> **`plateau` wird neues Warm-Start-Standardrezept**, wenn `b21` ein besseres
-> `val_combined` am besten Checkpoint erreicht als `b18` **und** der
-> Policy-val_loss dabei nicht steigt.
+**Kein Erfolgs-/Misserfolgsurteil.** Ein Einzellauf entscheidet hier nichts.
+Was er liefert, ist eine **Einstellempfehlung** fuer das kuenftige
+Warm-Start-Rezept, plus die Information, ob `factor=0.5`/`patience=2`
+ueberhaupt im richtigen Bereich liegen.
 
-**Wenn der Scheduler gar nicht greift** (LR bleibt ueber den ganzen Lauf bei
-5e-5, weil Early Stopping vorher feuert), ist das **kein Ergebnis ueber
-Plateau-Scheduling**, sondern ein Befund ueber `patience` — dann waere
-`patience=1` der naechste Versuch, nicht die Verwerfung des Verfahrens. Das
-steht hier vorab, damit es hinterher nicht als Absage gelesen wird.
+Drei Ablesungen sind vorab benannt:
 
-**Fuer `b20` gibt es keine Erfolgsregel** — es ist ein Erkundungslauf. Seine
-Frage ist eine andere (par.6), und seine Zahlen sind mit keinem Warm-Start-Arm
-vergleichbar.
+- **Der Scheduler greift nie** (LR bleibt 5e-5, Early Stopping feuert zuerst)
+  → `patience=2` ist zu gross, naechster Versuch `patience=1`. **Keine Absage
+  an das Verfahren.**
+- **Der Scheduler greift und der Lauf laeuft laenger** → das Verfahren tut, was
+  es soll; ob es besser ist, muesste ein gepaarter Mehr-Seed-Versuch zeigen.
+- **Der Scheduler greift und es wird schlechter** → `factor=0.5` senkt zu hart,
+  oder das Bestandsrezept war mit konstanter LR zufaellig gut bedient.
 
-## par.6 WAS `b20` BEANTWORTEN SOLL (Cold Start)
+Erst wenn eine dieser Ablesungen eine Richtung nahelegt, lohnt der teure Teil:
+ein gepaarter Versuch ueber mehrere Seeds. Das ist ausdruecklich NICHT Teil
+dieser Prereg.
 
-Nutzer-Frage: baut eine Policy, die **nie etwas anderes gesehen hat** als
-plattengelenktes Spiel, die Wertungsplatten von selbst? `b18` hat das mit
-Warm Start **verneint** (`PREREG_corpus_distillation.md` par.10.7: gegen den
-Champion k1 +0,05, k2 −0,07, k5 −0,09 — nichts). Die offene Frage war, ob das
-am Korpus liegt oder am Prior aus 30.000 Partien, der in den Gewichten steckt.
+## par.6 ERGEBNIS (leer bei Registrierung)
 
-**Erwartungsmanagement, vorab:** ein From-Scratch-Aufbau ist hier schon einmal
-gefahren worden — v14 landete bei Elo 884 gegen einen 1100er-Champion. `b20`
-wird die Arena voraussichtlich deutlich verlieren. **Die tragende Messgroesse
-sind deshalb die Plattenpunkte je Kriterium, nicht die Siege.** Ein schwaches
-Netz, das k1 und k2 anspielt, beantwortet die Frage sauberer als ein starkes,
-bei dem man nie weiss, ob der Prior oder der Korpus gesprochen hat.
-
-## par.7 ERGEBNIS (leer bei Registrierung)
-
-## par.8 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+## par.7 EINSTELLEMPFEHLUNG (leer bei Registrierung)
