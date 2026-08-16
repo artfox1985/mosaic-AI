@@ -154,6 +154,7 @@ from head_warmstart import apply_head_warmstart
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
+from carrier_report import policy_carrier_report
 from neural_net import (
     MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
@@ -400,7 +401,8 @@ def _corpus_composition(all_files: list[str]) -> list[dict]:
     return composition
 
 
-def _write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp) -> None:
+def _write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp,
+                          policy_carriers=None) -> None:
     """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
     Korpus-Zusammensetzung auf Konsole."""
     manifest = {
@@ -418,6 +420,7 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
             "VALUE_SCHEMA_VERSION": VALUE_SCHEMA_VERSION,
         },
         "corpus_composition": corpus_composition,
+        "policy_carriers": policy_carriers,
     }
     path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
     try:
@@ -428,9 +431,19 @@ def _write_train_manifest(version_name, cli_args, corpus_composition, run_timest
         print(f"  ⚠️  Manifest konnte nicht geschrieben werden ({e!r}) -- Training läuft trotzdem weiter.")
 
     print("📦 Trainingskorpus-Zusammensetzung (nach Versions-Präfix, aus Dateinamen):")
+    je_pre = (policy_carriers or {}).get("traeger_dateien_je_praefix") or {}
     for c in corpus_composition:
         games_s = f"{c['games']} Spiele" if c["games"] is not None else "Spiele-Zahl unklar"
-        print(f"   {c['files']:>4} Dateien {c['prefix']:<28} ({games_s})")
+        tr = je_pre.get(c["prefix"])
+        # Der Traeger-Hinweis ist der Kern des 2026-08-16-Befunds: ohne ihn sieht ein
+        # policy-maskierter Korpus im Log genauso aus wie ein wirksamer.
+        tr_s = "" if tr is None else (f"  [Policy-Traeger: {tr}/{c['files']}]"
+                                       if tr else f"  [KEINE Policy-Traeger -- {c['prefix']} fuettert nur Value/Ownership]")
+        print(f"   {c['files']:>4} Dateien {c['prefix']:<28} ({games_s}){tr_s}")
+    if policy_carriers:
+        print(f"   Traeger-Manifest: {policy_carriers.get('carrier_manifest')}"
+              f"{'' if policy_carriers.get('carrier_manifest_gefunden') else ' (NICHT GEFUNDEN -- jede Datei traegt Policy)'}"
+              f" | Policy-Traeger gesamt: {policy_carriers.get('traeger_dateien_gesamt')}")
 
 
 def _destretch_wdl_target(targets_v_wdl, wdl_outcome, a, b):
@@ -607,7 +620,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "ranking_loss_weight": ranking_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
     }
-    _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp)
+    _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp,
+                          policy_carriers=policy_carrier_report(all_files, _SELFPLAY_FILENAME_RE))
 
     val_files = []
     train_files = None  # None == MosaicDataset laedt wie bisher den ganzen Ordner
