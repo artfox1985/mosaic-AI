@@ -61,6 +61,17 @@ Punkt 5 ist der Rahmen, braucht aber eine eigene Mess-Prereg):
 - **Sanftes gemeinsames Nachtrainieren** (kleine LR, Early Stop auf
   Ownership) -- der ungetestete Mittelweg zwischen F1 und w1-final; erster
   Kandidat, falls Tor C zeigt, dass Kopfguete traegt und die Decke wehtut.
+- **Ownership-Gewicht WEITER ERHOEHEN -- stehende Nutzer-Freigabe
+  (2026-08-16)**: "bei bedarf das gewicht des ownership head fuers training
+  weiter erhoehen". Gilt fuer JEDES kuenftige Ownership-Training, ohne neue
+  Rueckfrage. Belegte Ausgangslage: der Sweep war ueber 0,1/0,2/0,5/1,0
+  monoton steigend, das Optimum ist NICHT eingeklammert (corpus par.10.6),
+  und der Waechter (policy val_loss) hat bis 1,0 praktisch nicht reagiert
+  (0,2139 -> 0,2141). Naechster Arm waere **w2**. Zwei Bedingungen bleiben:
+  (a) der Waechter gegen den w0-Kontrollarm entscheidet weiterhin mit --
+  faellt Policy/Value merklich ab, ist Schluss; (b) im Frozen-Trunk-Modus
+  ist das Gewicht nur noch ein Lernraten-Faktor (dort stattdessen an der LR
+  drehen, siehe frozen_trunk_head §4).
 - **Stoerungs-Baustein Stufe 2**: NUTZER-ENTSCHEID offen. Stufe 1 live
   gemessen: **7,63 %** Stoerfenster (200 Partien, byte-identisch belegt),
   Abbruchregel greift nicht. Koordinator-Empfehlung: knappes Ja, aber
