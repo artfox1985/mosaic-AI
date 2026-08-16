@@ -59,12 +59,15 @@
 //!
 //! ## Was NICHT Teil dieser Datei ist
 //!
-//! Kein Virtual Loss (Weg B, als gating-pflichtig verworfen). Keine
-//! Batch-Ueber-N-Suchen-Kopplung an `opp_points`: Aufrufstellen, die
-//! `points_utility_w()>0` brauchen (Task #28, opt-in, Default 0), pruefen das
-//! SELBST und lassen den Batcher aussen vor, weil er nur den 4-Tupel-
-//! `eval_batch`-Vertrag kennt (kein `opp_points`) -- siehe `net_mcts.rs`s
-//! `try_batched_pair_ex`.
+//! Kein Virtual Loss (Weg B, als gating-pflichtig verworfen).
+//!
+//! Keine Freigabe des Batchers fuer `opp_points`-Aufrufer: seit dem
+//! Ownership-Verbraucher Teil 1 traegt der Zeilen-Vertrag zwar SECHS Spalten
+//! (inkl. `opp_points`, siehe [`BatchRow`]), aber `net_mcts.rs`s
+//! `try_batched_pair_ex` behaelt seinen `points_utility_w()>0`-Waechter
+//! UNVERAENDERT -- Task #28 unter eingeschalteter Verschraenkung ist eine
+//! eigene, nie gemessene Kombination, und dieser Auftrag aendert daran
+//! bewusst nichts. Der Waechter ist damit strenger als noetig, nicht falsch.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -75,10 +78,20 @@ use std::time::Duration;
 use crate::net::Net;
 
 /// Eine Merkmalszeile + Antwortkanal. `resp_tx` bekommt GENAU EINE Antwort
-/// (Ok = `(policy,value,moon,points)`-Zeile, Err = Fehlertext).
+/// (Ok = `(policy,value,moon,points,opp_points,ownership)`-Zeile, Err =
+/// Fehlertext).
+///
+/// Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md` §5 Punkt 6):
+/// der Vertrag ist von 4 auf 6 Spalten erweitert, weil sonst JEDES ueber den
+/// Sammel-Faden ausgewertete Blatt seine Ownership-Karte verloeren wuerde --
+/// der Verbraucher saehe dann bei eingeschalteter Verschraenkung still einen
+/// leeren Kopf und schoebe nichts, waehrend er es ohne Verschraenkung taete.
+/// Genau diese Art stiller Pfadabhaengigkeit soll die Verdrahtung vermeiden.
+type BatchRow = (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>);
+
 struct Request {
     feats: Vec<f32>,
-    resp_tx: Sender<Result<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>), String>>,
+    resp_tx: Sender<Result<BatchRow, String>>,
 }
 
 /// Lauflaufende Zaehler fuer die Durchsatz-/Batch-Messung (Abnahme Punkt 3,
@@ -116,10 +129,7 @@ impl Batcher {
     /// Zeilen beantwortet sind. Die einzelnen Zeilen koennen vom Sammel-Faden
     /// mit denen ANDERER, GLEICHZEITIGER Aufrufer in DENSELBEN physischen
     /// `eval_batch`-Aufruf gemischt werden -- das ist der ganze Zweck.
-    pub fn eval_rows(
-        &self,
-        feats: &[&[f32]],
-    ) -> Result<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>, String> {
+    pub fn eval_rows(&self, feats: &[&[f32]]) -> Result<Vec<BatchRow>, String> {
         let mut receivers = Vec::with_capacity(feats.len());
         for f in feats {
             let (resp_tx, resp_rx) = mpsc::channel();
@@ -169,9 +179,14 @@ fn collector_loop(
         let feats_refs: Vec<&[f32]> = batch.iter().map(|r| r.feats.as_slice()).collect();
         // Genau HIER laeuft (bei eingeschaltetem `MOSAIC_ORT_CUDA_ENABLED`
         // und aktivem `ort_cuda_probe`-Feature) automatisch der ORT-CUDA-
-        // Kanal mit -- `net.rs::eval_batch` prueft den Knopf selbst, dieser
+        // Kanal mit -- `net.rs::eval_batch_ex` prueft den Knopf selbst, dieser
         // Aufruf hier weiss nichts davon und muss es auch nicht wissen.
-        let result = net.eval_batch(&feats_refs);
+        // `eval_batch_ex` statt `eval_batch` seit dem Ownership-Verbraucher
+        // Teil 1: gleicher vorgebauter tract-Plan, gleiche Extraktion der
+        // Ausgaben 0..3, zusaetzlich `opp_points`/`ownership` (siehe
+        // `BatchRow`-Doku). Der GPU-Pfad bleibt erhalten, weil
+        // `eval_batch_ex` denselben ORT-Haken bekommen hat.
+        let result = net.eval_batch_ex(&feats_refs);
 
         let batch_len = batch.len();
         stats.batches.fetch_add(1, Ordering::Relaxed);
@@ -360,11 +375,11 @@ mod tests {
                 std::thread::spawn(move || batcher.eval_rows(&[&f]).expect("eval_rows"))
             })
             .collect();
-        let mut via_batcher: Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> =
+        let mut via_batcher: Vec<BatchRow> =
             handles.into_iter().map(|h| h.join().unwrap().remove(0)).collect();
 
         let refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
-        let direct = net.eval_batch(&refs).expect("eval_batch direkt");
+        let direct = net.eval_batch_ex(&refs).expect("eval_batch_ex direkt");
 
         // Reihenfolge ist ueber Threads nicht garantiert -- nach dem ersten
         // Policy-Wert sortieren (Merkmale sind bewusst so gebaut, dass sie
@@ -383,6 +398,13 @@ mod tests {
             assert!(close(&a.1, &b.1), "Zeile {i}: value weicht > 1e-5 ab");
             assert!(close(&a.2, &b.2), "Zeile {i}: moon weicht > 1e-5 ab");
             assert!(close(&a.3, &b.3), "Zeile {i}: points weicht > 1e-5 ab");
+            // Ownership-Verbraucher Teil 1: die beiden neuen Spalten muessen
+            // ebenfalls durchkommen. `v20_2d_opp_brierbest` traegt BEIDE
+            // Koepfe -- ein leerer `ownership`-Vektor waere hier also ein
+            // Verdrahtungsfehler, kein "Modell ohne Kopf".
+            assert!(close(&a.4, &b.4), "Zeile {i}: opp_points weicht > 1e-5 ab");
+            assert!(close(&a.5, &b.5), "Zeile {i}: ownership weicht > 1e-5 ab");
+            assert!(!a.5.is_empty(), "Zeile {i}: ownership leer -- Sammel-Faden reicht den Kopf nicht durch");
         }
     }
 }

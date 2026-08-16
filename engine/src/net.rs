@@ -56,6 +56,25 @@ mod ort_cuda_hook {
             }
         }
     }
+
+    /// Ownership-Verbraucher Teil 1: Pendant fuer den 6-Tupel-Vertrag
+    /// (`opp_points` + `ownership`), siehe `Net::eval_batch_ex`.
+    #[allow(clippy::type_complexity)]
+    pub(super) fn try_eval_batch_ex(
+        net: &Net,
+        feats: &[&[f32]],
+    ) -> Option<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        if !crate::net_ort::ort_cuda_enabled() {
+            return None;
+        }
+        match crate::net_ort::eval_batch_ex_via_ort_cuda(net, feats) {
+            Ok(rows) => Some(rows),
+            Err(e) => {
+                crate::net_ort::warn_ort_cuda_fallback_once(&e);
+                None
+            }
+        }
+    }
 }
 #[cfg(not(feature = "ort_cuda_probe"))]
 mod ort_cuda_hook {
@@ -65,6 +84,14 @@ mod ort_cuda_hook {
         _net: &Net,
         _feats: &[&[f32]],
     ) -> Option<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        None
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub(super) fn try_eval_batch_ex(
+        _net: &Net,
+        _feats: &[&[f32]],
+    ) -> Option<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
         None
     }
 }
@@ -209,6 +236,21 @@ pub struct Net {
     /// DIESEN Index -- vorher wurde positionsbasiert `out[4]` gelesen, das
     /// ist aber der `ownership`-Head (opp_points liegt real auf Index 5).
     opp_head_index: Option<usize>,
+    /// Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md` §1/§5
+    /// Punkt 6): Index des `ownership`-Outputs im ONNX-Graphen, per
+    /// Namens-Erkennung beim Laden bestimmt (`detect_own_head`), `None` bei
+    /// einem Netz ohne den Kopf. GENAU dasselbe Muster wie
+    /// `opp_head_index` -- Name statt Position, damit ein weiterer Aux-Kopf
+    /// (points_dist/value_wdl_logits/opp_points haengen alle HINTER
+    /// `ownership`, siehe `export_onnx.py:121ff`) die Erkennung nicht bricht.
+    ///
+    /// KOPFBREITE wird hier BEWUSST NICHT geprueft: der amtierende Champion
+    /// `v21_2d_brierbest` traegt einen 72 breiten (untrainierten) Kopf, die
+    /// Sweep-Checkpoints einen 140 breiten (72 Feld + 68 Konjunktionen, siehe
+    /// `neural_net.py:1836-1848`). Beide muessen ladbar bleiben; ueber die
+    /// Brauchbarkeit entscheidet der VERBRAUCHER
+    /// (`net_mcts::ownership_leaf_shift`), nicht der Lader.
+    own_head_index: Option<usize>,
     /// Dateipfad, unter dem dieses Netz geladen wurde (Weg B, `net_ort.rs`
     /// braucht ihn, um AUSSERHALB von tract eine eigene ORT-CUDA-Session auf
     /// derselben `.onnx`-Datei aufzubauen -- tract selbst haelt den Pfad
@@ -225,6 +267,27 @@ impl Net {
     /// `opp_points`-Output hat (siehe `opp_head_index`-Feld-Doku).
     pub fn has_opp_head(&self) -> bool {
         self.opp_head_index.is_some()
+    }
+    /// Ownership-Verbraucher Teil 1: `true`, wenn dieses geladene Netz einen
+    /// `ownership`-Output hat (siehe `own_head_index`-Feld-Doku). Sagt NICHTS
+    /// ueber Breite oder Guete des Kopfes aus.
+    pub fn has_own_head(&self) -> bool {
+        self.own_head_index.is_some()
+    }
+
+    /// ONNX-Ausgabeindex des `opp_points`- bzw. `ownership`-Kopfes (`None` =
+    /// kein solcher Output). `pub(crate)` und NUR fuer `net_ort.rs`: der
+    /// ORT-Kanal liest dieselben Ausgaenge aus einem EIGENEN Graphen und
+    /// braucht dafuer dieselbe (namensbasiert beim Laden bestimmte)
+    /// Index-Auskunft wie der tract-Pfad -- sonst haetten die beiden Backends
+    /// unterschiedliche Annahmen, genau der AUDIT-F1-Fehler von 2026-08-05.
+    #[cfg_attr(not(feature = "ort_cuda_probe"), allow(dead_code))]
+    pub(crate) fn opp_head_index(&self) -> Option<usize> {
+        self.opp_head_index
+    }
+    #[cfg_attr(not(feature = "ort_cuda_probe"), allow(dead_code))]
+    pub(crate) fn own_head_index(&self) -> Option<usize> {
+        self.own_head_index
     }
     /// Deklariertes Input-Layout dieses geladenen Netzes (Task #11 Phase 2,
     /// M3.5: Engine-Verdrahtung) -- Aufrufer nutzen dies, um pro Netz die
@@ -300,6 +363,8 @@ impl Net {
         // veraendern) -- analog zu `detect_layout`, das aus demselben Grund
         // ebenfalls vor jedem `apply_input_facts`/`into_optimized` laeuft.
         let opp_head_index = detect_opp_head(&base)?;
+        // Ownership-Verbraucher Teil 1: gleiche Stelle, gleiche Begruendung.
+        let own_head_index = detect_own_head(&base)?;
         let model = layout
             .apply_input_facts(base.clone(), 1)?
             .into_optimized()?
@@ -332,6 +397,7 @@ impl Net {
             input_size: layout.flat_len(),
             layout,
             opp_head_index,
+            own_head_index,
             onnx_path: path.to_string(),
         })
     }
@@ -514,11 +580,23 @@ impl Net {
     // zusaetzlich ausgelesen, kein zweiter ONNX-Aufruf.
 
     /// Wie [`Net::eval`], zusaetzlich der optionale `opp_points`-Kopf als 5.
-    /// Rueckgabewert -- leerer `Vec`, wenn das Netz keinen `opp_points`-
-    /// Output hat (`has_opp_head() == false`) ODER der Graph trotz
-    /// `has_opp_head() == true` unerwartet nur 4 Outputs liefert (defensiv,
+    /// und der optionale `ownership`-Kopf als 6. Rueckgabewert -- jeweils
+    /// leerer `Vec`, wenn das Netz den Output nicht hat
+    /// (`has_opp_head()`/`has_own_head() == false`) ODER der Graph trotz
+    /// erkanntem Kopf unerwartet zu wenige Outputs liefert (defensiv,
     /// sollte durch die Namens-Erkennung beim Laden nie vorkommen).
-    pub fn eval_ex(&self, feats: &[f32]) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
+    ///
+    /// Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md`): der 6.
+    /// Rueckgabewert ist der ROHE Kopf-Ausgang, also **Logits** (der Kopf
+    /// endet auf `nn.Linear` ohne Sigmoid, `neural_net.py:2390-2394`; das
+    /// Training nutzt `binary_cross_entropy_with_logits`,
+    /// `train.py:1171-1172`). Die Sigmoid-Umrechnung macht der Verbraucher,
+    /// nicht diese Schicht -- `net.rs` reicht Koepfe unveraendert durch.
+    #[allow(clippy::type_complexity)]
+    pub fn eval_ex(
+        &self,
+        feats: &[f32],
+    ) -> TractResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
         // Task #32: siehe `eval`-Kommentar oben.
         crate::profiling::selfplay_profile::timed(
             crate::profiling::selfplay_profile::SelfplayCat::NetInference,
@@ -535,21 +613,28 @@ impl Net {
                     }
                     _ => Vec::new(),
                 };
-                Ok((policy, value, moon, points, opp_points))
+                let ownership: Vec<f32> = match self.own_head_index {
+                    Some(idx) if out.len() > idx => {
+                        out[idx].to_array_view::<f32>()?.iter().copied().collect()
+                    }
+                    _ => Vec::new(),
+                };
+                Ok((policy, value, moon, points, opp_points, ownership))
             },
         )
     }
 
-    /// Wie [`Net::eval_pair`], zusaetzlich `opp_points` je Zeile (5. Tupel-
-    /// Element), gleiche Leer-Semantik wie [`Net::eval_ex`].
+    /// Wie [`Net::eval_pair`], zusaetzlich `opp_points` (5. Tupel-Element)
+    /// und `ownership` (6.) je Zeile, gleiche Leer-Semantik wie
+    /// [`Net::eval_ex`].
     #[allow(clippy::type_complexity)]
     pub fn eval_pair_ex(
         &self,
         feats_a: &[f32],
         feats_b: &[f32],
     ) -> TractResult<(
-        (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
-        (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+        (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+        (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
     )> {
         // Task #32: siehe `eval`-Kommentar oben.
         crate::profiling::selfplay_profile::timed(
@@ -567,31 +652,50 @@ impl Net {
                     }
                     _ => Vec::new(),
                 };
+                let ownership: Vec<f32> = match self.own_head_index {
+                    Some(idx) if out.len() > idx => {
+                        out[idx].to_array_view::<f32>()?.iter().copied().collect()
+                    }
+                    _ => Vec::new(),
+                };
                 let (policy_a, policy_b) = split_batch2(policy);
                 let (value_a, value_b) = split_batch2(value);
                 let (moon_a, moon_b) = split_batch2(moon);
                 let (points_a, points_b) = split_batch2(points);
                 let (opp_a, opp_b) = split_batch2(opp_points);
+                let (own_a, own_b) = split_batch2(ownership);
                 Ok((
-                    (policy_a, value_a, moon_a, points_a, opp_a),
-                    (policy_b, value_b, moon_b, points_b, opp_b),
+                    (policy_a, value_a, moon_a, points_a, opp_a, own_a),
+                    (policy_b, value_b, moon_b, points_b, opp_b, own_b),
                 ))
             },
         )
     }
 
-    /// Wie [`Net::eval_batch`], zusaetzlich `opp_points` je Zeile (5. Tupel-
-    /// Element). `split_batch_n` (unveraendert fuer policy/value/moon/points
-    /// wiederverwendet) wuerde bei LEEREM `opp_points` (Legacy-Modell/kein
-    /// Kopf) NICHT `n` leere Zeilen liefern, sondern eine leere Liste (0/N
-    /// teilt nicht sauber je Zeile auf) -- `split_batch_n_or_empty_rows`
-    /// deckt genau diesen Fall ab, damit `opp_rows[i]` fuer JEDES `i in 0..n`
-    /// definiert bleibt.
+    /// Wie [`Net::eval_batch`], zusaetzlich `opp_points` (5. Tupel-Element)
+    /// und `ownership` (6.) je Zeile. `split_batch_n` (unveraendert fuer
+    /// policy/value/moon/points wiederverwendet) wuerde bei LEEREM
+    /// `opp_points`/`ownership` (Modell ohne den Kopf) NICHT `n` leere Zeilen
+    /// liefern, sondern eine leere Liste (0/N teilt nicht sauber je Zeile
+    /// auf) -- `split_batch_n_or_empty_rows` deckt genau diesen Fall ab,
+    /// damit `opp_rows[i]`/`own_rows[i]` fuer JEDES `i in 0..n` definiert
+    /// bleibt.
+    ///
+    /// ORT-CUDA (Weg B): seit dem Ownership-Verbraucher Teil 1 laeuft der
+    /// ORT-Kanal AUCH ueber diese Methode (`ort_cuda_hook::try_eval_batch_ex`)
+    /// -- noetig, weil der Sammel-Faden (`net_batcher.rs::collector_loop`)
+    /// jetzt hier statt bei `eval_batch` einhaengt und seinen GPU-Pfad sonst
+    /// verloeren wuerde. Bei ausgeschaltetem Knopf (Default) ODER einem Bau
+    /// ohne `--features ort_cuda_probe` (jeder heutige Wheel-Bau) ist der
+    /// Aufruf ein No-Op und der tract-Zweig unten laeuft unveraendert.
     #[allow(clippy::type_complexity)]
     pub fn eval_batch_ex(
         &self,
         feats: &[&[f32]],
-    ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+    ) -> TractResult<Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>> {
+        if let Some(rows) = ort_cuda_hook::try_eval_batch_ex(self, feats) {
+            return Ok(rows);
+        }
         // Task #32: siehe `eval`-Kommentar oben.
         crate::profiling::selfplay_profile::timed(
             crate::profiling::selfplay_profile::SelfplayCat::NetInference,
@@ -614,11 +718,18 @@ impl Net {
                     }
                     _ => Vec::new(),
                 };
+                let ownership: Vec<f32> = match self.own_head_index {
+                    Some(idx) if out.len() > idx => {
+                        out[idx].to_array_view::<f32>()?.iter().copied().collect()
+                    }
+                    _ => Vec::new(),
+                };
                 let policy_rows = split_batch_n(policy, n);
                 let value_rows = split_batch_n(value, n);
                 let moon_rows = split_batch_n(moon, n);
                 let points_rows = split_batch_n(points, n);
                 let opp_rows = split_batch_n_or_empty_rows(opp_points, n);
+                let own_rows = split_batch_n_or_empty_rows(ownership, n);
                 Ok((0..n)
                     .map(|i| {
                         (
@@ -627,6 +738,7 @@ impl Net {
                             moon_rows[i].clone(),
                             points_rows[i].clone(),
                             opp_rows[i].clone(),
+                            own_rows[i].clone(),
                         )
                     })
                     .collect())
@@ -752,6 +864,27 @@ fn detect_opp_head(model: &RawModel) -> TractResult<Option<usize>> {
     Ok(output_opp_head_index(&names))
 }
 
+/// Ownership-Verbraucher Teil 1 (`PREREG_ownership_consumer.md` §5 Punkt 6):
+/// Pendant zu [`output_opp_head_index`] fuer den `ownership`-Ausgang.
+/// Namensbasiert aus demselben Grund -- laut `export_onnx.py:121` steht
+/// `ownership` heute auf Index 4, aber `points_dist`/`value_wdl_logits`/
+/// `opp_points` haengen dahinter und koennen sich verschieben; ein festes
+/// `out[4]` waere genau der Fehler, den AUDIT-F1 2026-08-05 fuer
+/// `opp_points` schon einmal aufgeraeumt hat (dort wurde der rohe
+/// ownership-Logit von Feld (0,0) als "Gegner-Punkte" gelesen).
+/// Reine Namens-Pruefung, ohne tract-Graph -> ohne ONNX-Datei testbar.
+fn output_own_head_index(names: &[Option<&str>]) -> Option<usize> {
+    names.iter().position(|n| *n == Some("ownership"))
+}
+
+/// Wie [`detect_opp_head`], fuer `ownership`. Muss aus demselben Grund VOR
+/// jedem `apply_input_facts`/`into_optimized()` laufen.
+fn detect_own_head(model: &RawModel) -> TractResult<Option<usize>> {
+    let outlets = model.output_outlets()?;
+    let names: Vec<Option<&str>> = outlets.iter().map(|&o| model.outlet_label(o)).collect();
+    Ok(output_own_head_index(&names))
+}
+
 /// Teilt einen zeilenweise (Batch zuerst) flach ausgelesenen Batch=2-Output
 /// exakt in der Mitte -- funktioniert für jede Kopfgröße (policy/value/moon/
 /// points), solange der Tensor row-major mit Batch als führender Achse ist
@@ -787,7 +920,7 @@ pub(crate) fn split_batch_n(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
 /// Chunks statt `n` leerer Zeilen liefert. `eval_batch_ex`s Aufrufer indiziert
 /// `opp_rows[i]` aber fuer JEDES `i in 0..n` -- diese Variante haelt die
 /// Invariante "genau `n` Zeilen" auch im leeren Fall.
-fn split_batch_n_or_empty_rows(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
+pub(crate) fn split_batch_n_or_empty_rows(flat: Vec<f32>, n: usize) -> Vec<Vec<f32>> {
     if flat.is_empty() {
         return vec![Vec::new(); n];
     }
@@ -1025,6 +1158,35 @@ mod tests {
         assert_eq!(output_opp_head_index(&names), Some(5));
     }
 
+    // ── Ownership-Verbraucher Teil 1: `ownership`-Kopf-Erkennung ──
+    // Gleiches Muster wie oben: reine Namenslogik, kein ONNX-Zugriff.
+
+    #[test]
+    fn output_own_head_index_real_export_order_is_four() {
+        // `export_onnx.py:121` (`out_names = [policy, value, moon, points,
+        // ownership]`): `ownership` steht auf Index 4, alle spaeteren Koepfe
+        // haengen DAHINTER.
+        let names = vec![Some("policy"), Some("value"), Some("moon"), Some("points"),
+                         Some("ownership"), Some("opp_points")];
+        assert_eq!(output_own_head_index(&names), Some(4));
+    }
+
+    #[test]
+    fn output_own_head_index_absent_and_position_independent() {
+        // Alt-Export ohne den Kopf (real: `alphazero_v17_best.onnx`, siehe
+        // `eval_ex_matches_eval_on_legacy_model_and_opp_is_empty`).
+        let legacy = vec![Some("policy"), Some("value"), Some("moon"), Some("points")];
+        assert_eq!(output_own_head_index(&legacy), None);
+        assert_eq!(output_own_head_index(&[]), None);
+        // Namens- statt positionsbasiert: eine verschobene Reihenfolge findet
+        // den Kopf trotzdem (das ist der ganze Zweck der Erkennung).
+        let verschoben = vec![Some("policy"), Some("ownership"), Some("value")];
+        assert_eq!(output_own_head_index(&verschoben), Some(1));
+        // Unbenannte Outlets duerfen nicht faelschlich treffen.
+        let unbenannt = vec![None, None, Some("ownership")];
+        assert_eq!(output_own_head_index(&unbenannt), Some(2));
+    }
+
     #[test]
     fn output_opp_head_index_with_points_dist_and_wdl_is_last() {
         // Vollausbau (points_dist + value_wdl_logits aktiv): opp_points
@@ -1100,11 +1262,22 @@ mod tests {
         assert!(!net.has_opp_head(), "v17_best hat noch keinen opp_points-Kopf");
         let feats: Vec<f32> = vec![0.1; net.input_size];
         let (p1, v1, m1, pt1) = net.eval(&feats).expect("eval");
-        let (p2, v2, m2, pt2, opp) = net.eval_ex(&feats).expect("eval_ex");
+        let (p2, v2, m2, pt2, opp, own) = net.eval_ex(&feats).expect("eval_ex");
         assert_eq!(p1, p2);
         assert_eq!(v1, v2);
         assert_eq!(m1, m2);
         assert_eq!(pt1, pt2);
         assert!(opp.is_empty(), "Legacy-Modell darf keinen opp_points-Wert liefern");
+        // Ownership-Verbraucher Teil 1: `v17_best` ist GEMESSEN (dieser Test,
+        // 2026-08-16) auch ohne `ownership`-Output exportiert worden -- der
+        // heutige Export-Vertrag (`export_onnx.py:121`) haengt den Kopf zwar
+        // immer an, dieses Alt-Modell ist aber aelter als diese Zeile. Damit
+        // deckt der Test genau den Legacy-Fall ab, den die Kopf-Erkennung
+        // aushalten muss: kein Panic, leerer Vec, Verbraucher spaeter inert.
+        // (Gegenprobe mit vorhandenem Kopf: `net_mcts.rs::net_leaf_eval_
+        // matches_pre_ownership_shaping_path_when_weight_is_zero` prueft am
+        // amtierenden Champion `own.len() == 72`.)
+        assert!(!net.has_own_head(), "v17_best hat keinen ownership-Output (Alt-Export)");
+        assert!(own.is_empty(), "ohne ownership-Output muss der 6. Rueckgabewert leer sein");
     }
 }
