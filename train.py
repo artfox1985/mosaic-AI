@@ -1,5 +1,6 @@
 # train.py
 import sys
+import os
 import argparse
 
 # Windows-Konsolen (cp1252) können die Emoji-Ausgaben sonst nicht kodieren.
@@ -154,7 +155,8 @@ from head_warmstart import apply_head_warmstart
 
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
-from carrier_report import policy_carrier_report
+from train_manifest import (policy_carrier_report, corpus_composition,
+                            write_train_manifest, _SELFPLAY_FILENAME_RE)
 from neural_net import (
     MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
@@ -173,9 +175,6 @@ from neural_net import (
 # engine_config_json koennen fehlen) -- ein Manifest-Fehler darf das
 # eigentliche Training nie verhindern.
 
-_SELFPLAY_FILENAME_RE = re.compile(
-    r"^selfplay_(?P<prefix>.+)_(?P<date>\d{8})_(?P<time>\d{4})_g(?P<games>\d+)\.pkl$"
-)
 
 
 def points_dist_loss(logits, targets, model, rw2, denom):
@@ -362,90 +361,6 @@ def _engine_config() -> dict:
         return {"_error": f"engine_config_json nicht verfügbar: {e!r}"}
 
 
-def _corpus_composition(all_files: list[str]) -> list[dict]:
-    """Gruppiert die Trainingskorpus-Dateien nach Versions-Präfix (alles vor
-    dem eingebetteten Zeitstempel `_<date>_<time>_g<N>.pkl`, siehe
-    `self_play.py::_flush`) -- rein aus den DATEINAMEN, kein Pickle-Laden
-    nötig. `games`-Schätzung: die kumulative `_g<N>`-Ziffer resettet bei
-    JEDEM neuen Self-Play-Lauf auf klein (self_play.py's `done` startet pro
-    Aufruf bei 0) -- Dateien je Präfix nach (Zeitstempel, dann g) sortiert,
-    ein Sprung `g_i <= g_{i-1}` gilt als Start eines neuen Laufs (eigener
-    Beitrag = g_i selbst statt g_i - g_{i-1}). Reduziert sich für den
-    Normalfall (ein durchgehender Lauf je Präfix) exakt auf `max(g)`
-    (z.B. "180 Dateien netcq (1800 Spiele)" bei per_file=10)."""
-    groups: dict[str, list[tuple[str, int]]] = {}
-    unmatched = 0
-    for f in all_files:
-        name = Path(f).name
-        m = _SELFPLAY_FILENAME_RE.match(name)
-        if not m:
-            unmatched += 1
-            continue
-        prefix = m.group("prefix")
-        dt_key = m.group("date") + m.group("time")
-        games = int(m.group("games"))
-        groups.setdefault(prefix, []).append((dt_key, games))
-
-    composition = []
-    for prefix, entries in groups.items():
-        entries.sort(key=lambda e: (e[0], e[1]))  # (Zeitstempel, dann g) aufsteigend
-        total_games = 0
-        prev_g = 0
-        for _dt_key, g in entries:
-            total_games += g if g <= prev_g else g - prev_g
-            prev_g = g
-        composition.append({"prefix": prefix, "files": len(entries), "games": total_games})
-    composition.sort(key=lambda c: -c["files"])
-    if unmatched:
-        composition.append({"prefix": "_unmatched", "files": unmatched, "games": None})
-    return composition
-
-
-def _write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp,
-                          policy_carriers=None) -> None:
-    """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
-    Korpus-Zusammensetzung auf Konsole."""
-    manifest = {
-        "version": version_name,
-        "run_timestamp": run_timestamp,
-        "cli_args": cli_args,
-        "git_commit": _git_commit_hash(),
-        "git_dirty": _git_is_dirty(),
-        "engine_config": _engine_config(),
-        "python_constants": {
-            "TD_LAMBDA": TD_LAMBDA,
-            "POLICY_TARGET_SHARPEN_EXPONENT": POLICY_TARGET_SHARPEN_EXPONENT,
-            "VALUE_WEIGHT": VALUE_WEIGHT,
-            "POINTS_WEIGHT": POINTS_WEIGHT,
-            "VALUE_SCHEMA_VERSION": VALUE_SCHEMA_VERSION,
-        },
-        "corpus_composition": corpus_composition,
-        "policy_carriers": policy_carriers,
-    }
-    path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2, ensure_ascii=False)
-        print(f"📝 Trainings-Manifest geschrieben: '{path}'")
-    except Exception as e:
-        print(f"  ⚠️  Manifest konnte nicht geschrieben werden ({e!r}) -- Training läuft trotzdem weiter.")
-
-    print("📦 Trainingskorpus-Zusammensetzung (nach Versions-Präfix, aus Dateinamen):")
-    je_pre = (policy_carriers or {}).get("traeger_dateien_je_praefix") or {}
-    for c in corpus_composition:
-        games_s = f"{c['games']} Spiele" if c["games"] is not None else "Spiele-Zahl unklar"
-        tr = je_pre.get(c["prefix"])
-        # Der Traeger-Hinweis ist der Kern des 2026-08-16-Befunds: ohne ihn sieht ein
-        # policy-maskierter Korpus im Log genauso aus wie ein wirksamer.
-        tr_s = "" if tr is None else (f"  [Policy-Traeger: {tr}/{c['files']}]"
-                                       if tr else f"  [KEINE Policy-Traeger -- {c['prefix']} fuettert nur Value/Ownership]")
-        print(f"   {c['files']:>4} Dateien {c['prefix']:<28} ({games_s}){tr_s}")
-    if policy_carriers:
-        print(f"   Traeger-Manifest: {policy_carriers.get('carrier_manifest')}"
-              f"{'' if policy_carriers.get('carrier_manifest_gefunden') else ' (NICHT GEFUNDEN -- jede Datei traegt Policy)'}"
-              f" | Policy-Traeger gesamt: {policy_carriers.get('traeger_dateien_gesamt')}")
-
-
 def _destretch_wdl_target(targets_v_wdl, wdl_outcome, a, b):
     """Erosions-Arm B (`--wdl-bootstrap-destretch`): entstaucht den
     Bootstrap-Anteil des `values_wdl`-Ziels OHNE Cache-Neubau.
@@ -620,7 +535,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "ranking_loss_weight": ranking_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
     }
-    _write_train_manifest(version_name, _cli_args, _corpus_composition(all_files), _run_timestamp,
+    write_train_manifest(version_name, _cli_args, corpus_composition(all_files), _run_timestamp,
                           policy_carriers=policy_carrier_report(all_files, _SELFPLAY_FILENAME_RE))
 
     val_files = []
@@ -864,6 +779,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     mse_loss = nn.MSELoss()
     n_batches = len(dataloader)
     policy_history  = []
+    epoch_history   = []   # je Epoche ein Datensatz -> Manifest (Nutzer 2026-08-17)
     value_history   = []
     points_history  = []
     # Task #28: nur befuellt, wenn --opp-points-head aktiv ist -- rein
@@ -991,7 +907,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Puffer-Flush ohnehin faellig waere, steht die letzte Messung trotzdem
     # in der Log-Datei. Absichtlich unabhaengig vom Encoder (auch im Flach-
     # Pfad aktiv) fuer eine direkte Vergleichsbasis.
-    _mem_log_every = 100
+    # Alle 100 Batches waren 215 Zeilen je Epoche und ueber einen Lauf rund 3.000 --
+    # der Epochen-Verlauf im Manifest deckt den Informationsbedarf jetzt ab
+    # (Nutzer 2026-08-17). Ganz abschalten waere trotzdem falsch: RAM ist in diesem
+    # Projekt Engpass 2, ein Lauf belegt 15-19 GB von 32. 0 = aus.
+    _mem_log_every = int(os.environ.get("MOSAIC_MEM_LOG_EVERY", "2000"))
 
     for epoch in range(epochs):
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
@@ -1000,7 +920,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         t_rankingloss = 0  # Task #35b: nur != 0 relevant, wenn ranking_loss_weight>0
 
         for _batch_idx, _batch in enumerate(dataloader):
-            if _batch_idx % _mem_log_every == 0:
+            if _mem_log_every and _batch_idx % _mem_log_every == 0:
                 _mi = _mem_info_gb()
                 if _mi is not None:
                     print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
@@ -1724,6 +1644,22 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             own_str = (f" | Own-Val={epoch_val_ownloss:.4f}"
                        + ("  ⬅ AUSWAHLKRITERIUM" if ftz.active else ""))
         lr_str = f" | LR={optimizer.param_groups[0]['lr']:.2e}" if lr_scheduler is not None else ""
+        # Epochen-Verlauf fuers Manifest. Bisher blieb er nur in der Konsole stehen und
+        # war mit zwei Nachkommastellen zu grob, um daraus z.B. Scheduler-Parameter
+        # abzuschaetzen (Anlass: Plateau-Abschaetzung 2026-08-17).
+        epoch_history.append({
+            "epoch": epoch + 1,
+            "lr": optimizer.param_groups[0]["lr"],
+            "policy_loss": epoch_ploss,
+            "policy_val_loss": epoch_val_ploss,
+            "value_loss": epoch_vloss,
+            "value_val_loss": epoch_val_vloss,
+            "value_val_brier": epoch_val_brier,
+            "points_loss": epoch_pointsloss,
+            "points_val_loss": epoch_val_pointsloss,
+            "ownership_val_loss": epoch_val_ownloss,
+            "val_combined": current_metric,
+        })
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
               f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{own_str}{endgame_str}{ranking_str}{plateau_marker}{lr_str}")
 
@@ -1850,6 +1786,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     # 6. Speichern
     model.cpu()
+    # Epochen-Verlauf ins bereits geschriebene Manifest nachtragen (es entsteht VOR
+    # dem Training, den Verlauf gibt es erst danach).
+    _mpath = MODELS_DIR / f"manifest_train_{version_name}_{_run_timestamp}.json"
+    try:
+        _m = json.loads(_mpath.read_text(encoding="utf-8"))
+        _m["epoch_history"] = epoch_history
+        _mpath.write_text(json.dumps(_m, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"📝 Epochen-Verlauf ({len(epoch_history)} Epochen) ins Manifest nachgetragen.")
+    except Exception as e:
+        print(f"  ⚠️  Epochen-Verlauf nicht nachtragbar ({e!r}) -- Rest laeuft weiter.")
+
     save_path = MODELS_DIR / f"alphazero_{version_name}.pth"
     actual_epochs = len(policy_history)
     checkpoint = {

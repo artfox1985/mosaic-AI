@@ -95,6 +95,58 @@ Erst wenn eine dieser Ablesungen eine Richtung nahelegt, lohnt der teure Teil:
 ein gepaarter Versuch ueber mehrere Seeds. Das ist ausdruecklich NICHT Teil
 dieser Prereg.
 
+## par.5a VORAB-ABSCHAETZUNG AN `b18`s VERLAUF (2026-08-17, vor dem Lauf)
+
+Nutzer-Anstoss: die Parameter an einem bereits gelaufenen Verlauf abschaetzen,
+statt sie zu raten. `ReduceLROnPlateau` wurde dafuer mit dem echten
+PyTorch-Objekt ueber `b18`s Policy-Val-Reihe gefahren
+(0,40 / 0,39 / 0,39 / 0,39 / 0,39 / 0,40 / 0,40 / 0,41 / 0,41 / 0,42 / 0,43 /
+0,44 / 0,44 / 0,45 / 0,46):
+
+| `patience` | Senkungen bei Epoche | End-LR nach 15 Epochen |
+|---:|---|---:|
+| 1 | 4, 6, 8, 10, 12, 14 | 7,8e-07 (Faktor 64) |
+| **2** | **5**, 8, 11, 14 | 3,1e-06 (Faktor 16) |
+| 3 | 6, 10, 14 | 6,3e-06 (Faktor 8) |
+
+Zum Vergleich: `b18`s bester Checkpoint lag bei **Epoche 4**, Early Stopping
+feuerte nach 15.
+
+**Was die Simulation traegt:** nur die ERSTE Senkung. Danach waere der Verlauf
+ein anderer — der Scheduler greift ja in genau das ein, was er misst. Die
+Folgesenkungen sind Artefakte der eingefrorenen Kurve.
+
+**Zwei Einschraenkungen:**
+
+1. Die Eingabe ist auf **zwei Nachkommastellen gerundet**, weil `train.py`
+   bisher keinen Epochen-Verlauf speichert. Rundung erzeugt kuenstliche
+   Plateaus ("0,39 → 0,39" liest der Scheduler als Stillstand), und der
+   Standard-`threshold` von 1e-4 relativ verschaerft das. **Epoche 5 ist eine
+   Untergrenze**, real duerfte es spaeter greifen. (Ab sofort behoben: das
+   Manifest traegt den Verlauf mit voller Genauigkeit, siehe unten.)
+2. Es ist EINE Kurve, kein Mittel ueber Seeds.
+
+**Folge fuer par.5:** die dort erstgenannte Ablesung — "der Scheduler greift
+nie" — ist damit die **unwahrscheinlichste** der drei. Erwartet wird die
+zweite oder dritte.
+
+**Das eigentliche Risiko, das die Abschaetzung sichtbar macht:** sobald die
+Ueberanpassung einsetzt, liest der Reducer sie als Plateau und senkt **immer
+weiter** — bei `patience=2` auf ein Sechzehntel. Das Problem des Laufs ist aber
+keine zu hohe Lernrate, sondern Ueberanpassung auf 7.000 Policy-Partien. Ob
+die Halbierung sie verlangsamt und ein neues Optimum bringt oder den Lauf nur
+einfriert, kann keine Simulation sagen. Das ist die Frage von `b21`.
+
+**Entscheidung: `patience=2` bleibt.** Die erste Senkung sitzt am Optimum;
+`patience=1` schnitte schon bei Epoche 4 und damit potenziell auf einen
+einzelnen Ausreisser.
+
+**Neu gebaut (Nutzer-Anstoss im selben Zug):** das Trainingsmanifest bekommt
+`epoch_history` — je Epoche LR, Policy/Value/Points-Verluste (Training UND
+Validierung), Value-Brier, Ownership-Val und `val_combined`, in voller
+Genauigkeit. Damit ist die naechste Abschaetzung dieser Art keine Schaetzung
+mehr. Gilt ab `v21-b20`; `b18`/`b19` haben ihn noch nicht.
+
 ## par.6 ERGEBNIS (leer bei Registrierung)
 
 ## par.7 EINSTELLEMPFEHLUNG (leer bei Registrierung)
