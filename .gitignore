@@ -11,9 +11,9 @@
 # Der Traeger-Befund vom 2026-08-16 (Korpus in sieben Laeufen policy-maskiert)
 # war unter anderem deshalb so lange unsichtbar, weil sich zwei Laeufe nicht
 # diffen liessen. 41 Dateien = 192 KB, das ist fuer git nichts.
-# Die Verzeichnisform muss  sein, nicht : git kann eine
+# Die Verzeichnisform muss '/models/*' sein, NICHT '/models/': git kann eine
 # Datei nicht wieder einschliessen, wenn ihr ELTERNVERZEICHNIS ausgeschlossen
-# ist -- mit  waere die Negation unten wirkungslos.
+# ist -- mit '/models/' waere die Negation unten wirkungslos.
 /models/*
 !/models/manifest_train_*.json
 /static/log
