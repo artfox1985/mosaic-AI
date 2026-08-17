@@ -157,3 +157,59 @@ und das direkte Duell 43:57 verlor.
 ## par.7 ERGEBNIS (leer bei Registrierung)
 
 ## par.8 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+
+## par.6 ERGEBNIS (2026-08-17)
+
+Beide Arme durch, Early Stopping jeweils nach Epoche 15. Bester Checkpoint
+`b18` Epoche 4, `b19` Epoche 3. Kopfguete mit `tools/probes/ownership_gate_a.py`
+auf der CPU, Rohzahlen `evaluations/ownership_gate_a_b18_b19.json`.
+
+| Metrik am besten Checkpoint | `b18` (1,0) | `b19` (2,0) | besser |
+|---|---:|---:|---|
+| **Feld-AUC macro** | 0,7944 | **0,8087** | b19 |
+| Feld-Brier (Basis 0,1828) | 0,1379 | **0,1343** | b19 |
+| **E_k k1 Spalten** | 0,3249 | **0,3273** | b19 |
+| **E_k k2 Diagonalen** | 0,3387 | 0,3388 | Gleichstand |
+| **E_k k5 Ecken** | 0,3974 | **0,4076** | b19 |
+| Konjunktions-AUC k1 | 0,9037 | **0,9119** | b19 |
+| Konjunktions-AUC k2 | 0,9032 | **0,9314** | b19 |
+| Konjunktions-AUC k5 | 0,9357 | **0,9529** | b19 |
+| **WAECHTER** policy_val | **0,3899** | 0,3918 | b18 |
+
+**Zum Held-out, ausdruecklich:** die Sonde misst auf dem Split des
+w0-Manifests, der mit den Trainingsdaten beider Arme ueberlappt. Fuer den
+Vergleich der beiden UNTEREINANDER ist das unschaedlich — sie haben exakt
+denselben Trainingssatz und sind identisch betroffen. Die Absolutwerte sind
+NICHT mit `F1`/`w1` vergleichbar.
+
+**Zur Sauberkeit des Paares:** beide Arme liefen mit `--seed 2`, also
+identischer Initialisierung, identischer Datenreihenfolge und identischem
+Val-Split. Der einzige Unterschied ist das Gewicht. Das ist ein sehr sauberer
+Einfaktor-Vergleich — aber es bleibt EINE Realisierung. Getragen wird er
+weniger von der Groesse der Einzeldifferenzen als davon, dass **acht von neun
+Metriken in dieselbe Richtung zeigen** und die neunte ein Gleichstand ist.
+
+## par.7 VERDIKT NACH DER VORAB-REGEL
+
+Die Regel aus par.5 woertlich: *"2,0 wird uebernommen, wenn es die Kopfguete
+auf der MEHRHEIT von {Feld-AUC, E_k k1, E_k k2, E_k k5} gegenueber 1,0 hebt
+UND der Policy-val_loss dabei nicht merklich steigt"*, mit der Zahl
+**"mehr als 2 % Anstieg = gerissen"**.
+
+- **Kopfguete:** Feld-AUC, k1 und k5 gehen an `b19`, k2 ist ein Gleichstand
+  (Differenz 0,0001 — das als Sieg zu zaehlen waere unredlich). **Drei von vier,
+  Mehrheit erfuellt.**
+- **Waechter:** 0,3899 → 0,3918 = **+0,49 %**, klar unter der Schwelle von 2 %.
+  **Haelt.**
+
+> **`ownership_weight = 2,0` WIRD UEBERNOMMEN.**
+
+**Folge fuer den naechsten Arm.** par.5 sagt: *"ein Arm bei 4,0 kommt nur
+infrage, wenn 2,0 den Kopf hebt UND den Waechter haelt."* Beides ist
+eingetreten — **ein 4,0-Arm ist damit im Rahmen**, das Optimum ist weiterhin
+nicht eingeklammert. Er ist nicht gestartet und braucht eine Nutzer-Entscheidung;
+die GPU ist bis in den Nachmittag mit `b20`/`b21` belegt.
+
+**Was das NICHT heisst:** eine Staerkeaussage. Diese Prereg misst Kopfguete und
+Waechter, keine Arena. Ob der bessere Kopf am Brett etwas aendert, haengt am
+Verbraucher — und der ist Gegenstand von Tor C, nicht von hier.
