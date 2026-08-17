@@ -76,6 +76,31 @@ wird. Genau das ist zweimal passiert: oben stand noch „beide Wege negativ",
 während weiter unten schon der Befund stand, der das widerlegt. Für einen
 Menschen ein Schönheitsfehler, für die nächste Sitzung eine Falschaussage.
 
+## Öffentliches Repo: keine Rechnerstruktur (Nutzer-Entscheid 2026-08-17)
+
+Das Repo ist öffentlich. **Neue Dateien enthalten keine absoluten Pfade und
+keinen Nutzernamen.** Wo ein maschinenabhängiger Pfad gebraucht wird, kommt er
+aus der Umgebung, mit Ableitung als Fallback — Vorbilder im Baum:
+`MOSAIC_PYTHON_DIR` (tools/hooks/pre-push, sonst aus `sys.executable`),
+`MOSAIC_BACKUP_DIR` (tools/mosaic_backup.ps1, sonst `$env:OneDrive`),
+`MOSAIC_MODELS_DIR` (engine/examples, sonst relativ zum Crate).
+
+**Die Historie wird NICHT umgeschrieben.** Ältere Commits enthalten noch
+Vorname und einen Python-Installationspfad; ein `filter-repo` plus Force-Push
+würde jeden Klon invalidieren, und bei atomaren Commits müsste man gezielt
+danach suchen. Nutzer-Abwägung: mehr Kosmetik als Nutzen. Nicht neu vorschlagen.
+
+**Prüfbefehl** vor dem Pushen neuer Dateien:
+
+```
+git ls-files -z | xargs -0 grep -lIE "Patrick|OneDrive.(Documents|Backups)"
+```
+
+Beim Bereinigen solcher Pfade per Regex: eine Zeichenklasse braucht ZWEI
+Backslashes vor dem Schrägstrich (`[\/]`). Mit einem escapt er den
+Schrägstrich, trifft nur Vorwärtsschrägstriche und lässt jeden Windows-Pfad
+still stehen — dieser Fehler ist am 2026-08-17 zweimal passiert.
+
 ## Workflow-Präferenzen
 
 - Bevor du große Refactorings durchführst, skizziere kurz den Plan (1-2 Sätze).
