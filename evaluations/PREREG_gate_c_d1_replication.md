@@ -81,6 +81,53 @@ sind die einzigen, die voll kollabieren. Diese Replikation entscheidet nur, ob
 der Regler in seiner HEUTIGEN Form einen belegten Nutzen hat, den man beim
 Umbau nicht verlieren darf.
 
-## par.5 ERGEBNIS (leer bei Registrierung)
+## par.5 ERGEBNIS (2026-08-17)
 
-## par.6 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+150 frische Seeds (50000..50435, Ueberschneidung mit dem alten Satz 0), alle
+mit k5 aktiv, zwei Arme, `first_player` je Seed identisch (geprueft).
+Rohdaten `evaluations/paired_arena_env_gate_c_repl_k5.json`.
+
+| | N (0/0) | D1 (0,1/0,3) |
+|---|---:|---:|
+| Siege | 77/150 = 51,3 % | 81/150 = 54,0 % |
+| McNemar D1 gegen N | — | b=32 c=28, **p=0,699** |
+| **k5 Eckplatten, gepaart** | Bezug | **+0,19, Block-t 1,10 (nB=6)** |
+
+Gegenueberstellung zum Erstbefund (`PREREG_gate_c_consumer_sweep.md` par.16.3):
+
+| | Erstbefund, 407 Seeds | Replikation, 150 frische Seeds |
+|---|---:|---:|
+| k5, Block-t | +0,34, **t 2,79** | +0,19, **t 1,10** |
+| Siege | 236:211, p=0,066 | 81:77, p=0,699 |
+
+## par.6 VERDIKT NACH DER VORAB-REGEL
+
+Die Regel aus par.3 verlangt |t| > 2,571 auf k5. Gemessen: **t = 1,10**.
+
+> **NICHT REPLIZIERT.**
+
+par.3 sagt woertlich, was das bedeutet: *"Dann war der Erstbefund Glueck, und
+Tor C bleibt in JEDER Lesart negativ -- auch in der Originalfassung mit
+k1/k2/k5."* Genau das ist eingetreten. **Beide** positiven Zahlen des
+Erstbefunds sind zusammengebrochen, die Plattenzahl wie die Siege.
+
+**Nebenwirkung, die ich ausdruecklich festhalte:** mein Registrierungsfehler
+in Tor C par.16 -- die Erfolgsklausel auf k1/k2 verkuerzt und faelsch als
+"unveraendert" bezeichnet, obwohl das Original k1/k2/k5 nennt -- war damit
+**ergebnisneutral**. Haette ich die schmeichelhafte Lesart gewaehlt und k5 als
+Erfolg gezaehlt, staende jetzt ein widerlegter Befund im Protokoll. Die
+strengere Auslegung hat nichts gekostet und einen Fehlschluss verhindert.
+
+**Der Regler-Strang ist damit abgeschlossen.** Der Laufzeit-Verbraucher in
+seiner heutigen Form (Produkt der Feldwahrscheinlichkeiten) hebt die
+Zielkriterien nicht -- weder bei plattenblinder Policy (Originalsweep) noch bei
+plattenfaehiger (par.16.3 + diese Replikation). Beide Regler bleiben auf
+Default 0.
+
+**Was vom Erstbefund UEBERLEBT**, und es traegt den naechsten Schritt: der
+Zuwachs bei **k3** war ueber alle drei Dosen stabil (+1,59 / +1,20 / +1,68,
+Block-t bis 5,65) und ist damit kein Rauschen. Die Aussage lautet also
+praeziser als vorher: **das Kriterium mit der KURZEN Konjunktion bewegt sich,
+die mit sechs Feldern nicht.** Das ist die Produktkollaps-Vorhersage, und sie
+begruendet `PREREG_conjunction_terms.md` weiterhin -- nur nicht mehr ueber k5,
+sondern ueber den Kontrast k3 gegen k1/k2.
