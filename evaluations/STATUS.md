@@ -72,7 +72,7 @@ alle drei Dosen stabil (+1,59 / +1,20 / +1,68, Block-t bis 5,65). **Das
 Kriterium mit der KURZEN Konjunktion bewegt sich, die mit sechs Feldern nicht**
 — die Produktkollaps-Vorhersage, aus Arena-Daten bestaetigt.
 
-### NAECHSTER SCHRITT: Konjunktionsterme sind GEBAUT, aber NICHT GEMESSEN
+### KONJUNKTIONSTERME: GEMESSEN, NICHT-ERFOLG (2026-08-18)
 
 `MOSAIC_OWNERSHIP_CONJ`, Default 0 = Produktform (byte-identisch), Commit
 `d520672`. `scoring::expected_plate_points_conj`: konjunktive Kriterien
@@ -81,7 +81,22 @@ Feldlabels. Bei Kopf < 140 Rueckfall MIT Warnung. Test
 `conjunction_atom_ranges_match_label_builder` nagelt die Atom-Bereiche fest.
 `cargo test --release`: 447 passed, 0 failed.
 
-**Die Arena LAEUFT seit 2026-08-17 23:59** (Anordnung `PREREG_conjunction_terms.md`
+**ERGEBNIS (par.9): k1 +0,14 (Block-t 0,54) · k2 +0,07 (Block-t 1,00)** —
+beide weit unter der Schwelle 2,571. Siege 229/407 = 56,3 % gegen 211/407 im
+Nullarm (McNemar p = 0,2025, kein Verlust), aber das war nie das Kriterium.
+
+**Wichtig fuer die Zurechnung: das ist KEIN Nullbefund aus Wirkungslosigkeit.**
+In **402 von 407 Partien** weicht der Ausgang vom Nullarm ab (in 178 kippt
+sogar der Sieger), bei hoher Dosis kippen 6 von 8. Der Regler greift massiv ins
+Spiel ein — er verschiebt den Plattenbau nicht. **Damit ist die Produktkollaps-Erklaerung als URSACHE widerlegt:** sie
+sagte voraus, dass k1/k2 sich bewegen, sobald die Form repariert ist. Die Form
+ist repariert, k1/k2 bewegen sich nicht.
+
+**Registrierter naechster Schritt (par.7, woertlich):** *"Dann ist die Form
+nicht der Engpass, sondern die Kalibrierung oder die Kandidatenauswahl — und
+der naechste Schritt ist die Rangregel, nicht eine weitere Dosis."*
+
+Die Anordnung war (Start 2026-08-17 23:59, fertig 2026-08-18 00:58) (Anordnung `PREREG_conjunction_terms.md`
 par.6/par.7): `b18_best` @400 gegen Champion @400, 407 Seeds, EIN zusaetzlicher
 Arm — D1 `0.1,0.3` mit `MOSAIC_OWNERSHIP_CONJ=1` —, Blockgroesse 25, mit
 `--log-games`. Der Produktform-Arm bei D1 liegt schon vor
@@ -110,7 +125,16 @@ ohne Siegverlust.** k3/k5 zaehlen NICHT.
 |---|---|
 | Laufzeit-Regler in Produktform | **geschlossen, negativ** — Tor C wiederholt UND frisch-Seed-repliziert |
 | Policy-Destillation | **geschlossen, negativ** — Warm Start (par.10.7) UND Cold Start (par.10.9) |
-| **Aktivierung mit korrigierter Form** | **GEBAUT, NICHT GEMESSEN** — der einzige verbliebene Weg |
+| **Aktivierung mit korrigierter Form** | **GEMESSEN, NICHT-ERFOLG** — k1 Block-t 0,54, k2 Block-t 1,00 (par.9). Die Form war nicht der Engpass |
+
+**Alle drei Wege sind damit durchgemessen, keiner traegt.** Was ueberlebt, ist
+die Zurechnung: der Prior BIETET den Zug an (4,91x), der Regler GREIFT massiv
+ins Spiel ein (402/407 Partien laufen anders) — und trotzdem entsteht keine
+Platte. Der
+Engpass sitzt also zwischen Angebot und Auswahl, nicht in der Formel und nicht
+im Prior. Genau dorthin zeigt der registrierte naechste Schritt: **Rangregel**
+statt Wertaddition, plus die Kalibrierung (Steigung B != 1, Versatz ist
+gemessen klein).
 
 **Cold Start `v21-b20` gegen Champion (fertig 2026-08-17 22:20):** 158/407 =
 38,8 % Siege, und gepaart gegen `b18` auf Block-Ebene k1 +0,09 (t 0,27), k2
@@ -128,7 +152,6 @@ Verbraucher, und genau dort ist die Produktform die gemessene Bremse.
 
 | Was | Wo | Zweck |
 |---|---|---|
-| **Konjunktions-Arena** D1 mit `MOSAIC_OWNERSHIP_CONJ=1` | CPU | der einzige verbliebene Weg zum Plattenbau, Anordnung oben. ~202 s je Block, 17 Bloecke, Start 23:59 |
 | **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau, 60 Epochen, `ownership_weight` 1,0, Seed 2 (aus `manifest_train_v21-b22_20260817_220655.json`) |
 
 **Zu `b22` gehoert eine Warnung, die schon einmal fast zu einer falschen
@@ -151,7 +174,12 @@ Zielkonflikt nicht, sondern tauscht die Seite. Bestaetigt sich das ueber die
 restlichen 53 Epochen, ist der Frozen-Trunk-Kopf fuer den Verbraucher der
 SCHLECHTERE Kopf und `b18`/`b19` bleiben die Kandidaten.
 
-### Kalibrierung: Platt-Korrektur ZURUECKGESTELLT bis zum Platten-Champion (2026-08-17)
+### Kalibrierung: Versatz erledigt, Steigung offen — Uebergangsweg entschieden (2026-08-18)
+
+**In einem Satz:** die geplante Mittelwert-Korrektur ist gegenstandslos (unten
+gemessen), die Steigungskorrektur bleibt offen und bekommt als Uebergang einen
+ausgesperrten BAUER-Satz, bis ein plattenbewusster Champion eigene Daten
+liefert.
 
 Der Konjunktions-Kopf **rangiert gut und kalibriert schlecht** (AUC 0,83-0,91,
 Brier nur 8-14 % unter der Grundrate, ueber 0,5 ueberschaetzt er) — das steht.
@@ -173,7 +201,8 @@ tatsaechliche Endrate derselben Partien, Runde-3-Zustaende.
 
 **Die Herleitung aus Grundraten war ein Artefakt der Referenzwahl.** Gegen die
 Bauer-Arme gerechnet ergibt k1 einen Versatz von 1,58, gegen die
-Trainingsmischung 0,49 — gemessen sind 0,35. Eine ungeprueft eingetragene
+Trainingsmischung 0,64 (1,08 % bei 2145 Fenster- + 800 Korpus-Dateien laut
+`manifest_train_v21-b19_20260817_000926.json`) — gemessen sind 0,35. Eine ungeprueft eingetragene
 Konstante haette den Kopf dreifach zu stark gedaempft. **Regel daraus:** einen
 Prior-Versatz nie aus Grundraten falten, wenn man ihn am Kopf selbst messen
 kann; die Referenzwahl bewegt ihn um den Faktor 3.
@@ -190,6 +219,37 @@ Fehlkalibrierung im OBEREN Bereich gemessen (Top-Bin Spalten: vorhergesagt
 sie ohnehin nie behoben. `pos_weight` im Loss bleibt zurueckgestellt (kostet
 einen vollen Lauf und zerstoert jeden Bestandsvergleich).
 
+**Der obere Bereich existiert im normalen Spiel NICHT** (Nutzer-Frage
+2026-08-18 "helfen extra Bauer-Self-Plays?",
+`tools/probes/conjunction_reliability_by_source.py`, `b19_best`, 60 Dateien je
+Quelle, Runde-3-Zustaende):
+
+| ueber p=0,5 | normales Spiel | Bauer-Arme |
+|---|---|---|
+| Spalten k1 | **3** von 7200 | **106** von 7200 |
+| Diagonalen k2 | **0** von 2400 | **109** von 2400 |
+
+Fehlkalibrierung dort, in den Armen: k1 0,50-0,80 vorhergesagt 63,0 % gegen
+46,2 % tatsaechlich (91 Faelle), 0,80-1,00 88,0 % gegen 60,0 % (15); k2
+64,6/50,6 (77) und 86,7/50,0 (32). **k5 ist im normalen Spiel ueber die GANZE
+Kennlinie richtig** (66,0/66,4 bei 393 Faellen, 92,5/91,1 bei 858) — dort ist
+nichts zu holen.
+
+**Antwort auf die Frage (sie galt dem ausgesperrten Satz, nicht dem Korpus):
+ja.** Die Arme sind fuer den oberen Bereich die einzige Quelle — 150-300
+Dateien geben 250-550 Faelle ueber 0,5, ~17 Partien/min (k1-Arm-Zeitstempel)
+also 1,5-3 h, mit dem 4,7- bzw. 35-fachen Ertrag je Datei gegenueber
+Normalspiel. Der Fit gilt dann fuer die Bauer-Verteilung, nicht fuer die
+Einsatzverteilung.
+
+**Was den Nutzen heute begrenzt:** im normalen Spiel liegen **98,3 %** der
+k1-Faelle unter p=0,05, und dort ist der Kopf fast richtig (0,3/0,5 · 1,9/1,3).
+Eine Steigungskorrektur wuerde kaum feuern. **Ungeprueft:** gemessen sind
+Zustaende GESPIELTER Partien, nicht Suchknoten — die Suche besucht
+plattenbauende Linien, die im Verlauf nie auftauchen, und koennte hoeher
+liegen. Das ist der einzige Weg, auf dem die Korrektur schon heute wirkte, und
+er ist mit einer Sonde auf Suchknoten pruefbar.
+
 **WIEDERVORLAGE, mit messbarem Ausloeser (Nutzer 2026-08-17):** sobald ein
 Champion die Wertungsplatten beruecksichtigt, wird die Kalibrierung wieder
 legitim — dann IST das normale Spiel das Zielverhalten. Der Ausloeser steht
@@ -198,6 +258,28 @@ schon fest: die k1-Grundrate liegt heute ueber **fuenf** Generationen flach bei
 zwar WEIL keine davon Platten baut. Der erste Champion, der es tut, hebt sie
 sichtbar. **Dieser Ausschlag ist das Startsignal fuer Platt-Korrektur UND
 festen Bewertungssatz** — beide dann mit genau jenem Champion erzeugt.
+
+**Bis dahin (Nutzer-Entscheid 2026-08-18): Uebergangskalibrierung auf dem
+Bauer-Satz.** Begruendung, warum das NICHT der Fehler von gestern ist: der Fit
+entsteht im Regime, in das wir hineinwollen, nicht in dem, das wir verlassen.
+**Zwei Vorbehalte, die mitgeschrieben gehoeren:** der Transfer auf die
+Einsatzverteilung ist eine ANNAHME (eine Stellung mit p=0,88 entsteht im Arm
+anders als im spaeteren Netzspiel), und der Wert ist Bereitschaft, nicht
+Arena-Gewinn — bei 98,3 % der Faelle unter p=0,05 feuert die Korrektur heute
+kaum. Die Alternative ist aber die Annahme, p sei richtig, und die ist am
+oberen Ende um 28 Punkte widerlegt. Auslegung deshalb eher zu schwach als zu
+stark, Knopf mit Default 0, Arena-A/B wie ueblich.
+
+**Der Fit gehoert JE GRUPPE GEPOOLT, nicht je Atom (Nutzer-Befund 2026-08-18):**
+die Bauer-Arme schliessen bevorzugt die AEUSSEREN Spalten — von den sechs
+Spalten-Atomen liegen im Korpus genau zwei bei 1,17/1,32 %, die anderen vier
+bei 2,16-3,75 % (`base_rate_conj`, 14.360 Bretter), also zwei Mittelspalten
+gegen vier Aussenspalten, Faktor 2,4. Im normalen Spiel gibt es diese
+Schieflage nicht, sie ist von den Armen gemacht. Ein Fit je Atom wuerde die
+Arm-Geometrie erben; Poolen mittelt sie heraus. Der `k5`-Arm ist aus demselben
+Grund (aeusseres Spaltenpaar als Ziel) der staerkste k1-Lieferant ueberhaupt
+(8,75 % gegen 6,67 % des k1-Arms, par.5a) — er kommt als Ergaenzung mit in den
+Satz, ersetzt aber die Basisverteilung nicht.
 
 ### LR-Schedules: reaktive Verfahren sind hier strukturell zu spaet
 
@@ -230,7 +312,11 @@ das.
 | **Gewichtsarm 4,0** | Vorabregel hat ihn freigegeben (`PREREG_ownership_weight_new_window.md` par.7); Nutzer-Entscheid 2026-08-17: **weiter hinten geparkt** |
 | **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr |
 | **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) — nicht neu vorschlagen |
-| **Fester Bewertungssatz** | **auf Wiedervorlage**, Ausloeser = erster plattenbewusster Champion (s.o.), dann mit DIESEM erzeugt. Rechnung steht und bleibt gueltig: 300 Dateien = 204 k1-Positive (SE 0,07), ~15 k2; **erzeugen** (3000 Partien, 2,5-8 h) statt aus dem Fenster entnehmen. Bis dahin verbliebener Zweck: Kopfvergleiche ueber Fenstergrenzen, Steigungsfrage B != 1 |
+| **Fester Bewertungssatz** | **entschieden (Nutzer 2026-08-18): der BAUER-Satz, als Uebergangskalibrierung bis Netzdaten da sind.** Zusammensetzung festgelegt: **300 Dateien / 3000 Partien** — `v21_own_a` 100 · `v21_own_k1` 50 · `v21_own_k2` 50 · `v21_own_k5` 50 · `heur_own` 50, zusammen **~3 h 5 min** (Durchsaetze aus den Zeitstempeln vom 14.08.: 10,3 / 17,2 / 19,8 / 23,0 / 50 Partien je Minute). **Ablage `data/holdout/`, Praefix `selfplay_hold_` (Nutzer 2026-08-18)** — der `data/*.pkl`-Glob ist nicht rekursiv, das IST die Sperre; nie in `--extra-data-dir` aufnehmen. Aufruf waere `--version hold --tag k1` usw. **LAEUFT seit 2026-08-18 00:49** (Nutzer-Go). Rezept 1:1 aus `PREREG_ownership_corpus.md` par.7: Netz-Arme 200 Sims mit `MOSAIC_WERTUNG_STREUUNG_MAX=1.0` und Champion-ONNX, Heuristik-Arm 150 Sims ohne Streuung, 8 Threads, 10 Partien je Datei, rtv aus, Ablage ueber `MOSAIC_DATA_DIR=data/holdout`. Reihenfolge heur -> a -> k1 -> k2 -> k5.
+
+**EINZIGE bewusste Abweichung: der Basis-Seed** (20260818..22 statt der Korpus-20260814). Gleicher Seed plus gleiches Modell plus gleiche Knoepfe haette BITGLEICHE Partien ergeben — der Bewertungssatz waere eine Kopie von Trainingsmaterial gewesen.
+
+**Werkzeug-Fehlgriff, protokolliert:** ich habe erst ein `self_play.py --out-dir` gebaut und danach gemerkt, dass `config.py:28` laengst `MOSAIC_DATA_DIR` liest — genau den Weg, den auch die Korpus-Erzeugung genommen hat (par.7 "Ablage"). Das Flag ist auf Nutzer-Entscheid wieder zurueckgenommen; zwei Wege fuer dieselbe Sache sind auf Dauer teurer. Vierter Fall von `feedback_check_existing_tools_first`. Das ist kein neues Konstrukt, sondern das Einfrieren und Vergroessern dessen, worauf Gate A heute schon misst (`n_val_corpus_files = 82` aus dem rotierenden Val-Split). Er traegt BEIDE offenen Aufgaben: Steigungsfit B != 1 und Kopfvergleiche ueber Fenstergrenzen. **Der Normalspiel-Satz entfaellt damit** — sein Zweck war der Mittelwert, und der ist gemessen und klein. (A,B) sind modellspezifisch und werden je Champion neu gefittet, der Satz bleibt fest |
 | **Push** | `main` ist lokal voraus; Suite gruen, Push moeglich |
 
 ### FALLEN, die am 2026-08-17 Zeit gekostet haben

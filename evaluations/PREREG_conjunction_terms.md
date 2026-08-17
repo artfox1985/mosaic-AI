@@ -279,6 +279,42 @@ Schritt ist die Rangregel, nicht eine weitere Dosis.
    `plattenkopf_conjunction_atoms_match_spec` als Vorbild).
 4. Erst dann die Arena.
 
-## par.9 ERGEBNIS (leer bei Registrierung)
+## par.9 ERGEBNIS (2026-08-18) — NICHT-ERFOLG, die Form ist nicht der Engpass
+
+Gefahren wie in par.6 registriert, Gueltigkeitskontrollen in par.6.1.
+Rohdaten `evaluations/paired_arena_env_conj_d1_b18.json`, Arm `0.1,0.3,1`.
+
+**Die Zielkriterien, gepaart gegen die Produktform bei derselben Dosis D1**
+(Block-Ebene, nB=6, Schwelle |t| > 2,571):
+
+| Kriterium | Produktform | Konjunktionsform | Delta | Block-t |
+|---|---:|---:|---:|---:|
+| **k1** Vertikale Reihen | 0,85 | 0,94 | **+0,14** | **0,54** |
+| **k2** Diagonale Reihen | 0,07 | 0,13 | **+0,07** | **1,00** |
+| Plattenpunkte gesamt | 3,86 | 3,85 | +0,03 | 0,16 |
+
+Beide weit unter der Schwelle. **Nebenbedingung erfuellt** (und nur die):
+229/407 = 56,3 % gegen 211/407 im Nullarm, diskordant b=98/c=80, exakter
+McNemar **p = 0,2025** — kein Siegverlust, tendenziell ein Gewinn.
+
+> **VERDIKT nach par.7: NICHT-ERFOLG.** k1 und k2 bleiben flach.
+
+**Was das NICHT ist: ein Nullbefund aus Wirkungslosigkeit.** Der Regler
+veraendert das Spiel deutlich — der Differenztest in par.6.1 zeigt bei hoher
+Dosis 6 von 8 gekippten Partien, und bei D1 weicht der Ausgang in **402 von 407
+Partien** vom Nullarm ab (in 178 kippt sogar der Sieger). Die Form greift also
+massiv ins Spiel ein, sie verschiebt nur den Plattenbau nicht.
+
+**Damit ist die Produktkollaps-Erklaerung als URSACHE widerlegt.** Sie sagte
+voraus: das Marginal der konjunktiven Kriterien ist ~0, weil sechs Feld-
+Wahrscheinlichkeiten multipliziert werden — behebe die Form, und k1/k2 bewegen
+sich. Die Form ist behoben (Atome statt Produkt, `expected_plate_points_conj`),
+k1/k2 bewegen sich nicht. Die Vorhersage ist gefallen.
+
+**Naechster Schritt, so registriert (par.7, woertlich):** *"Dann ist die Form
+nicht der Engpass, sondern die Kalibrierung oder die Kandidatenauswahl — und
+der naechste Schritt ist die Rangregel, nicht eine weitere Dosis."* Eine
+Dosis-Reihe auf der Konjunktionsform ist damit vorab ausgeschlossen.
+
 
 ## par.10 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
