@@ -166,6 +166,14 @@ oben. Was beim Spaltenbauer traegt, ist die KOORDINATION beider Seiten
 
 ### Danach in der Warteschlange
 
+- **Stoerungs-Baustein Stufe 2 gehoert zum MOON-ORDER-KOPF** (Nutzer-Entscheid
+  2026-08-17) und ist damit KEINE offene Einzelentscheidung mehr. Er wird
+  zusammen mit dessen Optimierung angefasst, nicht davor. Stand der Messung
+  bleibt: Stoerfenster 7,63 % live belegt, Abbruchregel nicht gerissen.
+- **Gewichtsarm 4,0** -- die Vorabregel hat ihn nach b19 freigegeben
+  (`PREREG_ownership_weight_new_window.md` par.7), Nutzer-Entscheid
+  2026-08-17: **weiter hinten geparkt**, nicht jetzt.
+
 > **NICHT weiterverfolgen** (Nutzer-Entscheid 2026-08-17): den Korpus mit
 > hoeheren Sims nachgenerieren. Die Policy-Ziele des Korpus stammen aus einer
 > 200-Sims-Suche, der v21-Sockel aus 400-600 -- `b18` haelt den Champion also
@@ -180,7 +188,6 @@ oben. Was beim Spaltenbauer traegt, ist die KOORDINATION beider Seiten
   Training aussperren. Ohne das ist jeder Kopfvergleich ueber einen
   Fensterwechsel hinweg kontaminiert -- gemessen 88 % Ueberlappung zwischen
   dem Sonden-Held-out und `v21-b18`s Trainingsdaten.
-- **Stoerungs-Baustein Stufe 2**: NUTZER-ENTSCHEID offen, 7,63 % Stoerfenster.
 
 ### Offene Punkte
 
