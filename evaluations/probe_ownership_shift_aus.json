@@ -1,0 +1,920 @@
+{
+ "model": "models/alphazero_v21-b18_best.onnx",
+ "sims": 400,
+ "phase": "drafting",
+ "dose": "0,0",
+ "conj": "0",
+ "n_stellungen": 58,
+ "mittel": {
+  "n_kand": 12.810344827586206,
+  "sigma_q_spanne": 4.887078230690276,
+  "sigma_q_std": 1.4730252501112164,
+  "logit_spanne": 5.583775468507884,
+  "logit_std": 1.7178560744476126,
+  "q_spanne": 0.07813300899657522,
+  "max_visits": 19.620689655172413
+ },
+ "verhaeltnis_sigma_zu_logit": 0.8752282856381074,
+ "roh": [
+  {
+   "stellung": 0,
+   "q": {
+    "3× Stein blau von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.0,
+    "Stapel: verdeckt ziehen": 0.0,
+    "1× Stein gelb von F2 → Reihe 2 [1/2]": 0.0,
+    "1× Stein schwarz von F4 → Reihe 1 [1/1]": 0.0,
+    "1× Stein gelb von F2 → Reihe 1 [1/1]": 0.0,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.0,
+    "1× Stein türkis von F1 → Reihe 1 [1/1]": 0.0
+   }
+  },
+  {
+   "stellung": 1,
+   "q": {
+    "3× Stein blau von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.0,
+    "1× Stein gelb von F2 → Reihe 1 [1/1]": 0.0,
+    "1× Stein gelb von F2 → Reihe 2 [1/2]": 0.0,
+    "1× Stein rot von F1 → Reihe 2 [1/2]": 0.0,
+    "1× Stein schwarz von F1 → Reihe 1 [1/1]": 0.0,
+    "1× Stein gelb von F1 → Reihe 1 [1/1]": 0.0,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.0
+   }
+  },
+  {
+   "stellung": 2,
+   "q": {
+    "Kuppel #5 → (0,1)": 0.5497722017404868,
+    "Kuppel #5 → (2,2)": 0.5726257761319479,
+    "Kuppel #5 → (0,2)": 0.558946818113327,
+    "Kuppel #4 → (2,2)": 0.54612468679746,
+    "Kuppel #5 → (1,1)": 0.5518685380617777,
+    "Kuppel #5 → (1,0)": 0.5500183689234092,
+    "1× Stein türkis von F1 → Reihe 1 [1/1]": 0.5318143181366292,
+    "Kuppel #17 → (2,2)": 0.5245307286580404,
+    "Kuppel #4 → (0,2)": 0.5420543948809305,
+    "3× Stein blau von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.5110229327455559,
+    "Kuppel #4 → (0,1)": 0.5190194944540659
+   }
+  },
+  {
+   "stellung": 3,
+   "q": {
+    "Kuppel #5 → (0,1)": 0.5497722017404868,
+    "Kuppel #5 → (2,2)": 0.5726257761319479,
+    "Kuppel #5 → (0,2)": 0.558946818113327,
+    "Kuppel #4 → (2,2)": 0.54612468679746,
+    "Kuppel #5 → (1,1)": 0.5518685380617777,
+    "Kuppel #5 → (1,0)": 0.5500183689234092,
+    "1× Stein türkis von F1 → Reihe 1 [1/1]": 0.5318143181366292,
+    "Kuppel #17 → (2,2)": 0.5245307286580404,
+    "Kuppel #4 → (0,2)": 0.5420543948809305,
+    "3× Stein blau von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.5110229327455559,
+    "Kuppel #4 → (0,1)": 0.5190194944540659
+   }
+  },
+  {
+   "stellung": 4,
+   "q": {
+    "1× Stein gelb von F2 → Reihe 1 [1/1]": 0.49663018560781413,
+    "Kuppel #4 → (0,1)": 0.4769339859485626,
+    "Kuppel #4 → (0,2)": 0.46038662271076775,
+    "1× Stein rot von F1 → Reihe 1 [1/1]": 0.4895515864367154,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.4813949018716812,
+    "2× Stein türkis von F4 → Reihe 1 [1/1] (+1 Strafleiste)": 0.47383465112998074,
+    "3× Stein blau von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.46645544709517545,
+    "Stapel: verdeckt ziehen": 0.4541662335395813,
+    "Kuppel #4 → (2,2)": 0.4465634922186534
+   }
+  },
+  {
+   "stellung": 5,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.5775395333766937,
+    "1× Stein gelb von F2 → Reihe 2 [1/2]": 0.5923100709915161,
+    "Kuppel #4 → (0,1)": 0.5828751424948374,
+    "1× Stein rot von F3 → Reihe 2 [1/2]": 0.5905549426873525,
+    "2× Stein türkis von F4 → Reihe 1 [1/1] (+1 Strafleiste)": 0.5756290628686943,
+    "1× Stein schwarz von F4 → Reihe 3 [1/3]": 0.5836149851481119,
+    "Kuppel #4 → (0,2)": 0.5792687038580576,
+    "3× Stein blau von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.5775160167788862,
+    "1× Stein gelb vom Mondpool → Reihe 3 [1/3]": 0.5698378284772238
+   }
+  },
+  {
+   "stellung": 6,
+   "q": {
+    "1× Stein schwarz von F4 → Reihe 2 [2/2]": 0.47877776126066846,
+    "1× Stein gelb vom Mondpool → Reihe 1 [1/1]": 0.4888841498084036,
+    "1× Stein schwarz von F3 → Reihe 2 [2/2]": 0.47692675520105166,
+    "1× Stein gelb von F2 → Reihe 1 [1/1]": 0.49382378908742136,
+    "1× Stein schwarz von GF → Reihe 2 [2/2]": 0.49662192662556964,
+    "Stapel: verdeckt ziehen": 0.4711388051509857,
+    "2× Stein türkis von F4 → Reihe 1 [1/1] (+1 Strafleiste)": 0.45605499785894144,
+    "1× Stein rot von F3 → Reihe 1 [1/1]": 0.4895155182033513
+   }
+  },
+  {
+   "stellung": 7,
+   "q": {
+    "1× Stein türkis vom Mondpool → Reihe 1 [1/1]": 0.6216914256413778,
+    "1× Stein türkis vom Mondpool → Reihe 3 [1/3]": 0.6324861248334249,
+    "1× Stein schwarz von GF → Reihe 3 [1/3]": 0.6646930972735087,
+    "1× Stein gelb vom Mondpool → Reihe 3 [1/3]": 0.6289112667242686,
+    "1× Stein rot von F3 → Reihe 2 [1/2]": 0.6139576224125856,
+    "2× Stein türkis von GF → Reihe 1 [1/1] (+1 Strafleiste)": 0.6370950116888084,
+    "1× Stein gelb vom Mondpool → Reihe 2 [1/2]": 0.6126415332158407,
+    "1× Stein blau von F3 → Reihe 2 [1/2]": 0.6075633962949117,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.6023374994595846
+   }
+  },
+  {
+   "stellung": 8,
+   "q": {
+    "1× Stein türkis vom Mondpool → Reihe 1 [1/1]": 0.4955967217683792,
+    "Stapel: verdeckt ziehen": 0.48589831590652466,
+    "1× Stein gelb vom Mondpool → Reihe 1 [1/1]": 0.4800586501757304,
+    "1× Stein blau vom Mondpool → Reihe 1 [1/1]": 0.5011495302120844,
+    "1× Stein gelb von F3 → Reihe 1 [1/1]": 0.4871308704217275,
+    "2× Stein türkis von GF → Reihe 1 [1/1] (+1 Strafleiste)": 0.48095663132025784,
+    "1× Stein rot von F3 → Reihe 1 [1/1]": 0.47230977813402814
+   }
+  },
+  {
+   "stellung": 9,
+   "q": {
+    "1× Stein türkis vom Mondpool → Reihe 1 [1/1]": 0.6244415541489919,
+    "1× Stein gelb vom Mondpool → Reihe 2 [2/2]": 0.6111296713352203,
+    "1× Stein türkis vom Mondpool → Reihe 3 [1/3]": 0.6050751705964407,
+    "1× Stein schwarz vom Mondpool → Reihe 3 [1/3]": 0.6013629535833994,
+    "2× Stein türkis von GF → Reihe 3 [2/3]": 0.6269261340300242,
+    "2× Stein türkis von GF → Reihe 1 [1/1] (+1 Strafleiste)": 0.6089942628319461,
+    "1× Stein schwarz von GF → Reihe 3 [1/3]": 0.6020325720310211,
+    "1× Stein schwarz vom Mondpool → Reihe 1 [1/1]": 0.6178568502267202,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.5900298555692037,
+    "1× Stein gelb vom Mondpool → Reihe 3 [1/3]": 0.5813553035259247,
+    "2× Stein türkis von GF → Reihe 5 [2/5]": 0.6119094789028168,
+    "1× Stein blau vom Mondpool → Reihe 3 [1/3]": 0.5918863813082377,
+    "1× Stein schwarz vom Mondpool → Reihe 5 [1/5]": 0.6090817451477051,
+    "1× Stein blau vom Mondpool → Reihe 5 [1/5]": 0.592666745185852,
+    "1× Stein gelb vom Mondpool → Reihe 1 [1/1]": 0.5973408222198486,
+    "2× Stein rot von GF → Reihe 3 [2/3]": 0.576457550128301
+   }
+  },
+  {
+   "stellung": 10,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.4847778379917145,
+    "1× Stein schwarz vom Mondpool → Reihe 3 [1/3]": 0.45886616286013854,
+    "1× Stein schwarz von GF → Reihe 3 [1/3]": 0.4507083594799042,
+    "2× Stein türkis von GF → Reihe 3 [2/3]": 0.4608158469200134,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.4580842802921931,
+    "1× Stein türkis vom Mondpool → Reihe 3 [1/3]": 0.44609292844931286,
+    "2× Stein türkis von GF → Reihe 5 [2/5]": 0.45488470296065014,
+    "Kuppel #4 → (0,1)": 0.4689379582802455,
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.4546171973148982,
+    "1× Stein blau vom Mondpool → Reihe 5 [1/5]": 0.4554424633582433,
+    "1× Stein rot vom Mondpool → Reihe 3 [1/3]": 0.4354558326440487,
+    "Kuppel #4 → (1,1)": 0.43164073427518207,
+    "2× Stein rot von GF → Reihe 3 [2/3]": 0.4565834055344264,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.45696109036604565,
+    "Kuppel #4 → (1,0)": 0.4328812062740326,
+    "2× Stein rot von GF → Reihe 4 [2/4]": 0.4480013996362686
+   }
+  },
+  {
+   "stellung": 11,
+   "q": {
+    "3× Stein türkis vom Mondpool → Reihe 3 [3/3]": 0.643559455871582,
+    "1× Stein blau vom Mondpool → Reihe 3 [1/3]": 0.6384414633115133,
+    "1× Stein schwarz vom Mondpool → Reihe 3 [1/3]": 0.6162369151910146,
+    "3× Stein türkis vom Mondpool → Reihe 1 [1/1] (+2 Strafleiste)": 0.5998541799457684,
+    "1× Stein schwarz vom Mondpool → Reihe 1 [1/1]": 0.641675611337026,
+    "3× Stein rot vom Mondpool → Reihe 3 [3/3]": 0.5880707303682963,
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.6116383373737335,
+    "3× Stein türkis vom Mondpool → Reihe 5 [3/5]": 0.6062705516815186,
+    "1× Stein blau vom Mondpool → Reihe 5 [1/5]": 0.6269239485263824,
+    "1× Stein blau vom Mondpool → Reihe 1 [1/1]": 0.6300897796948751,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.6097042560577393,
+    "1× Stein schwarz vom Mondpool → Reihe 6 [1/6]": 0.6300501823425293,
+    "1× Stein schwarz vom Mondpool → Reihe 5 [1/5]": 0.6125374535719553,
+    "3× Stein rot vom Mondpool → Reihe 6 [3/6]": 0.6014350503136979,
+    "3× Stein rot vom Mondpool → Reihe 1 [1/1] (+2 Strafleiste)": 0.5677931419107515,
+    "3× Stein rot vom Mondpool → Reihe 4 [3/4]": 0.5919259239683813
+   }
+  },
+  {
+   "stellung": 12,
+   "q": {
+    "1× Stein schwarz vom Mondpool → Reihe 3 [2/3]": 0.460912083586057,
+    "4× Stein türkis vom Mondpool → Reihe 5 [4/5]": 0.43023231128851575,
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.43570877611637115,
+    "Stapel: verdeckt ziehen": 0.4092264771461487,
+    "Kuppel #4 → (1,1)": 0.4350440551837285,
+    "4× Stein türkis vom Mondpool → Reihe 4 [4/4]": 0.4385901739199956,
+    "1× Stein blau vom Mondpool → Reihe 5 [1/5]": 0.44478299493732415,
+    "Kuppel #4 → (0,1)": 0.4356248776117961,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.4247363954782486,
+    "1× Stein schwarz vom Mondpool → Reihe 5 [1/5]": 0.44297702610492706,
+    "1× Stein schwarz vom Mondpool → Reihe 6 [1/6]": 0.43321094910303753,
+    "1× Stein blau vom Mondpool → Reihe 6 [1/6]": 0.4407820701599121,
+    "Kuppel #4 → (0,2)": 0.4214513897895813,
+    "Kuppel #4 → (1,0)": 0.42190346618493396,
+    "4× Stein türkis vom Mondpool → Reihe 6 [4/6]": 0.41810261209805805,
+    "Kuppel #4 → (1,2)": 0.4231870671113332
+   }
+  },
+  {
+   "stellung": 13,
+   "q": {
+    "4× Stein türkis vom Mondpool → Reihe 5 [4/5]": 0.590367180109024,
+    "2× Stein blau vom Mondpool → Reihe 4 [2/4]": 0.5969869256019592,
+    "4× Stein türkis vom Mondpool → Reihe 4 [4/4]": 0.6032752215862274,
+    "2× Stein blau vom Mondpool → Reihe 5 [2/5]": 0.5942701816558837,
+    "2× Stein blau vom Mondpool → Reihe 6 [2/6]": 0.6064978301525116,
+    "2× Stein blau vom Mondpool → Reihe 1 [1/1] (+1 Strafleiste)": 0.5859852089658776,
+    "4× Stein türkis vom Mondpool → Reihe 1 [1/1] (+3 Strafleiste)": 0.5502175405536675,
+    "4× Stein türkis vom Mondpool → Reihe 6 [4/6]": 0.571586138010025,
+    "2× Stein blau vom Mondpool → Strafleiste": 0.5719865011445499,
+    "4× Stein türkis vom Mondpool → Strafleiste": 0.4858030549201538
+   }
+  },
+  {
+   "stellung": 14,
+   "q": {
+    "Bonuschip F1": 0.45949898660182953,
+    "Stapel: verdeckt ziehen": 0.44384777545928955,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.4697168668111165,
+    "2× Stein blau vom Mondpool → Reihe 4 [2/4]": 0.4588979631662369,
+    "Kuppel #4 → (0,1)": 0.4559355477492015,
+    "Kuppel #4 → (1,1)": 0.4328087270259857,
+    "Kuppel #4 → (1,0)": 0.4340821752945582,
+    "2× Stein blau vom Mondpool → Reihe 6 [2/6]": 0.46843746304512024,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.45762409766515094,
+    "2× Stein blau vom Mondpool → Reihe 5 [2/5]": 0.44788530965646106,
+    "Kuppel #4 → (1,2)": 0.44758240878582,
+    "Kuppel #17 → (1,1)": 0.4349917968114217,
+    "Kuppel #17 → (0,1)": 0.4415665070215861,
+    "Kuppel #4 → (0,2)": 0.43711012601852417,
+    "Kuppel #4 → (2,2)": 0.4296184877554576,
+    "Kuppel #17 → (1,0)": 0.4337960332632065
+   }
+  },
+  {
+   "stellung": 15,
+   "q": {
+    "1× Stein türkis vom Mondpool → Reihe 1 [1/1]": 0.6180934607982635,
+    "1× Stein türkis vom Mondpool → Reihe 5 [5/5]": 0.599012303352356,
+    "2× Stein blau vom Mondpool → Reihe 4 [2/4]": 0.6026653170585632,
+    "Bonuschip F1": 0.5875786066055297,
+    "2× Stein blau vom Mondpool → Reihe 6 [2/6]": 0.6167868971824646,
+    "2× Stein blau vom Mondpool → Reihe 1 [1/1] (+1 Strafleiste)": 0.5884355261102715,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.5879582941532135,
+    "1× Stein türkis vom Mondpool → Strafleiste": 0.5857212140337029,
+    "1× Stein türkis vom Mondpool → Reihe 6 [1/6]": 0.5694943487644195,
+    "2× Stein blau vom Mondpool → Strafleiste": 0.5719256149999118
+   }
+  },
+  {
+   "stellung": 16,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.49487701058387756,
+    "Bonuschip F1": 0.4743080735206604,
+    "3× Stein blau vom Mondpool → Reihe 4 [3/4]": 0.4565296371777852,
+    "3× Stein blau vom Mondpool → Reihe 6 [3/6]": 0.45779184500376385,
+    "Kuppel #4 → (1,0)": 0.44922832647959393,
+    "Kuppel #4 → (1,1)": 0.4415399481852849,
+    "Kuppel #4 → (1,2)": 0.46689791480700177,
+    "3× Stein blau vom Mondpool → Reihe 5 [3/5]": 0.43674391011397046,
+    "Kuppel #4 → (0,2)": 0.4604978213707606,
+    "Kuppel #4 → (2,2)": 0.45182234545548755,
+    "Kuppel #17 → (1,1)": 0.42845139900843304,
+    "Kuppel #17 → (1,2)": 0.437689408659935,
+    "Kuppel #4 → (2,0)": 0.44976554811000824,
+    "Kuppel #17 → (1,0)": 0.41491779685020447,
+    "Kuppel #17 → (0,2)": 0.4285529553890228,
+    "Kuppel #4 → (2,1)": 0.4452771643797557
+   }
+  },
+  {
+   "stellung": 17,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.4922950267791748,
+    "Bonuschip F1": 0.4698263108730316,
+    "3× Stein blau vom Mondpool → Reihe 4 [3/4]": 0.4628062794605891,
+    "Kuppel #4 → (1,1)": 0.45915872355302173,
+    "Kuppel #4 → (1,0)": 0.4611167758703232,
+    "3× Stein blau vom Mondpool → Reihe 6 [3/6]": 0.4554574688275655,
+    "Kuppel #4 → (1,2)": 0.46656470000743866,
+    "3× Stein blau vom Mondpool → Reihe 5 [3/5]": 0.43487419684727985,
+    "Kuppel #4 → (0,2)": 0.4585656026999156,
+    "Kuppel #17 → (1,1)": 0.43130460381507874,
+    "Kuppel #4 → (2,2)": 0.44830600917339325,
+    "Kuppel #17 → (1,2)": 0.437689408659935,
+    "Kuppel #4 → (2,0)": 0.4481315811475118,
+    "Kuppel #17 → (1,0)": 0.41953707734743756,
+    "Kuppel #17 → (0,2)": 0.42746404310067493,
+    "Kuppel #4 → (2,1)": 0.44426510731379193
+   }
+  },
+  {
+   "stellung": 18,
+   "q": {
+    "3× Stein blau vom Mondpool → Reihe 4 [3/4]": 0.6522698677503146,
+    "Bonuschip F1": 0.6415843207102555,
+    "3× Stein blau vom Mondpool → Reihe 6 [3/6]": 0.6576328575611115,
+    "3× Stein blau vom Mondpool → Reihe 1 [1/1] (+2 Strafleiste)": 0.6246749104179906,
+    "3× Stein blau vom Mondpool → Strafleiste": 0.5963618774741853
+   }
+  },
+  {
+   "stellung": 19,
+   "q": {
+    "3× Stein blau vom Mondpool → Reihe 4 [3/4]": 0.4052994632720947,
+    "3× Stein blau vom Mondpool → Reihe 6 [3/6]": 0.3927977705001831,
+    "3× Stein blau vom Mondpool → Reihe 5 [3/5]": 0.38675048828125,
+    "3× Stein blau vom Mondpool → Strafleiste": 0.3233420213972112
+   }
+  },
+  {
+   "stellung": 20,
+   "q": {
+    "1× Stein rot vom Mondpool → Reihe 1 [1/1]": 0.6470586494965986,
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.6291809136217291,
+    "1× Stein blau vom Mondpool → Reihe 1 [1/1]": 0.6467205015095797,
+    "Bonuschip F4": 0.6284534714438699,
+    "1× Stein blau vom Mondpool → Reihe 6 [1/6]": 0.6322395693172108,
+    "1× Stein rot vom Mondpool → Reihe 6 [1/6]": 0.5997968478636309,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.5825453346425836,
+    "1× Stein blau vom Mondpool → Strafleiste": 0.6260883177404095,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.581752302212511
+   }
+  },
+  {
+   "stellung": 21,
+   "q": {
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.4193904926017883,
+    "Bonuschip F4": 0.40354673378169537,
+    "1× Stein blau vom Mondpool → Reihe 6 [4/6]": 0.4034819006919861,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.39909442886710167,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.3923053461239138,
+    "1× Stein blau vom Mondpool → Reihe 5 [1/5]": 0.38792261899868274,
+    "1× Stein rot vom Mondpool → Reihe 5 [1/5]": 0.38237731344997883,
+    "1× Stein blau vom Mondpool → Strafleiste": 0.3882598559484282
+   }
+  },
+  {
+   "stellung": 22,
+   "q": {
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.6433695801994725,
+    "Bonuschip F4": 0.6478724291364338,
+    "Bonuschip F3": 0.6436971214774314,
+    "1× Stein blau vom Mondpool → Reihe 6 [1/6]": 0.6466902535368221,
+    "1× Stein blau vom Mondpool → Strafleiste": 0.6427692702183356
+   }
+  },
+  {
+   "stellung": 23,
+   "q": {
+    "Bonuschip F4": 0.3952798813213843,
+    "Bonuschip F2": 0.40013662672340256,
+    "Bonuschip F3": 0.3961423591766332
+   }
+  },
+  {
+   "stellung": 24,
+   "q": {
+    "Bonuschip F4": 0.6478256759866654,
+    "Bonuschip F3": 0.6386256883367479
+   }
+  },
+  {
+   "stellung": 26,
+   "q": {
+    "Kuppel #2 → (0,2)": 0.632716257138792,
+    "Kuppel #2 → (1,0)": 0.6277478511407839,
+    "Kuppel #8 → (0,2)": 0.5882529255834917,
+    "Kuppel #2 → (2,2)": 0.6040322458023694,
+    "Kuppel #2 → (1,2)": 0.6227294579421349,
+    "2× Stein schwarz von F3 → Reihe 2 [2/2]": 0.6330114766988818,
+    "Kuppel #2 → (2,0)": 0.6159520522033043,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.6137612613708872,
+    "2× Stein rot von F3 → Reihe 2 [2/2]": 0.6155436014408734,
+    "Kuppel #8 → (1,0)": 0.5800840258598328,
+    "Kuppel #2 → (2,1)": 0.5998590365325279,
+    "Kuppel #8 → (1,2)": 0.5928518374760946,
+    "Kuppel #8 → (2,2)": 0.5624002714951833,
+    "3× Stein schwarz von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.5881137363476124,
+    "Stapel: verdeckt ziehen": 0.5684280296166738
+   }
+  },
+  {
+   "stellung": 27,
+   "q": {
+    "Kuppel #2 → (0,2)": 0.46127222734934104,
+    "Kuppel #2 → (1,0)": 0.41635903475926334,
+    "3× Stein blau von F4 → Reihe 2 [2/2] (+1 Strafleiste)": 0.4079153608630836,
+    "Kuppel #2 → (1,1)": 0.4218741283639869,
+    "Kuppel #8 → (0,2)": 0.4053299353345832,
+    "1× Stein schwarz von F1 → Reihe 3 [3/3]": 0.40680513042455924,
+    "1× Stein blau von F1 → Reihe 2 [1/2]": 0.35965393913300975,
+    "Stapel: verdeckt ziehen": 0.40785859285042697,
+    "2× Stein rot von F3 → Reihe 1 [1/1] (+1 Strafleiste)": 0.34762203408785064,
+    "Kuppel #8 → (1,1)": 0.3832577542289695,
+    "3× Stein schwarz von F2 → Reihe 3 [3/3] (+2 Strafleiste)": 0.35326416572972524,
+    "Kuppel #8 → (1,0)": 0.3421255971813799
+   }
+  },
+  {
+   "stellung": 28,
+   "q": {
+    "Kuppel #2 → (1,0)": 0.6895630913275997,
+    "Kuppel #2 → (1,2)": 0.6709797538616776,
+    "1× Stein blau von F1 → Reihe 2 [1/2]": 0.6746644336800109,
+    "Kuppel #2 → (2,1)": 0.6638178981640458,
+    "3× Stein blau von F4 → Reihe 2 [2/2] (+1 Strafleiste)": 0.6675208666796548,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.6764398573657205,
+    "Kuppel #8 → (1,0)": 0.6409040987491608,
+    "Stapel: verdeckt ziehen": 0.6338412662347158,
+    "Kuppel #8 → (1,2)": 0.6582371848124783,
+    "Kuppel #2 → (2,2)": 0.6666505890387814,
+    "1× Stein gelb von F4 → Reihe 2 [1/2]": 0.6625400229516915,
+    "3× Stein schwarz von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.6345142707628965
+   }
+  },
+  {
+   "stellung": 29,
+   "q": {
+    "Kuppel #2 → (1,0)": 0.6895630913275997,
+    "Kuppel #2 → (1,2)": 0.6677447316347083,
+    "1× Stein blau von F1 → Reihe 2 [1/2]": 0.6746644336800109,
+    "3× Stein blau von F4 → Reihe 2 [2/2] (+1 Strafleiste)": 0.6675208666796548,
+    "Kuppel #2 → (2,1)": 0.6606924690106034,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.6764398573657205,
+    "Kuppel #8 → (1,0)": 0.6409040987491608,
+    "Kuppel #8 → (1,2)": 0.6582371848124783,
+    "Stapel: verdeckt ziehen": 0.6292733252048492,
+    "Kuppel #2 → (2,2)": 0.6634753701387366,
+    "1× Stein gelb von F4 → Reihe 2 [1/2]": 0.6625124260011604,
+    "3× Stein schwarz von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.6345142707628965
+   }
+  },
+  {
+   "stellung": 30,
+   "q": {
+    "3× Stein blau von F4 → Reihe 2 [2/2] (+1 Strafleiste)": 0.33445421637142086,
+    "1× Stein schwarz vom Mondpool → Reihe 3 [3/3]": 0.31387049244336884,
+    "1× Stein blau von F1 → Reihe 2 [1/2]": 0.28339288207873903,
+    "1× Stein schwarz von F1 → Reihe 3 [3/3]": 0.2858653224804521,
+    "1× Stein gelb von F4 → Reihe 2 [1/2]": 0.29289985199769336,
+    "Kuppel #17 → (0,2)": 0.2933845548480014,
+    "1× Stein schwarz vom Mondpool → Reihe 2 [1/2]": 0.30639543420565724,
+    "Stapel: verdeckt ziehen": 0.242686798175176,
+    "1× Stein rot von GF → Reihe 2 [1/2]": 0.2815699214166371,
+    "2× Stein türkis von F1 → Reihe 4 [2/4]": 0.23922970466797752,
+    "3× Stein schwarz von F2 → Reihe 3 [3/3] (+2 Strafleiste)": 0.22045613345648005
+   }
+  },
+  {
+   "stellung": 31,
+   "q": {
+    "3× Stein blau von F4 → Reihe 2 [2/2] (+1 Strafleiste)": 0.7327023673161307,
+    "1× Stein gelb von F4 → Reihe 2 [1/2]": 0.7214726905028025,
+    "1× Stein blau von F1 → Reihe 2 [1/2]": 0.7147070382631858,
+    "1× Stein gelb von F2 → Reihe 2 [1/2]": 0.7293348525560935,
+    "1× Stein schwarz vom Mondpool → Reihe 2 [1/2]": 0.7141665303534683,
+    "2× Stein gelb von GF → Reihe 2 [2/2]": 0.7283191496726911,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.7156615042514023,
+    "1× Stein rot von GF → Reihe 2 [1/2]": 0.6981458380418063,
+    "3× Stein schwarz von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.7230757219296177,
+    "2× Stein türkis von F1 → Reihe 2 [2/2]": 0.7321415955421369,
+    "1× Stein schwarz vom Mondpool → Reihe 3 [1/3]": 0.7017235373056968
+   }
+  },
+  {
+   "stellung": 32,
+   "q": {
+    "3× Stein blau von F4 → Reihe 2 [2/2] (+1 Strafleiste)": 0.3715700535083253,
+    "Stapel: verdeckt ziehen": 0.29735050598780316,
+    "2× Stein gelb von GF → Reihe 2 [2/2]": 0.333843363016165,
+    "3× Stein schwarz von F2 → Reihe 4 [3/4]": 0.3186846247431098,
+    "1× Stein rot von GF → Reihe 2 [1/2]": 0.3154262783795471,
+    "Kuppel #8 → (0,2)": 0.33129817132617867,
+    "1× Stein schwarz vom Mondpool → Reihe 2 [1/2]": 0.3304527776333856,
+    "1× Stein gelb von F4 → Reihe 2 [1/2]": 0.2957737566382428,
+    "Kuppel #17 → (0,2)": 0.3282223922679698,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.31088148267233956,
+    "1× Stein gelb von F2 → Reihe 2 [1/2]": 0.30442974756305724,
+    "3× Stein blau von F4 → Reihe 5 [3/5]": 0.32371754944324493,
+    "3× Stein schwarz von F2 → Reihe 2 [2/2] (+1 Strafleiste)": 0.31674604435340165,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.3171325843648572,
+    "1× Stein rot von GF → Reihe 4 [1/4]": 0.3032510009301868,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.2890629789348899
+   }
+  },
+  {
+   "stellung": 33,
+   "q": {
+    "1× Stein schwarz vom Mondpool → Reihe 3 [1/3]": 0.7093250723576109,
+    "1× Stein türkis vom Mondpool → Reihe 3 [1/3]": 0.7086344134703836,
+    "1× Stein gelb vom Mondpool → Reihe 4 [1/4]": 0.7064197234208942,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.7236705493823251,
+    "2× Stein türkis von GF → Reihe 3 [2/3]": 0.6939013572430174,
+    "1× Stein gelb vom Mondpool → Reihe 3 [1/3]": 0.6963544857398233,
+    "3× Stein schwarz von F2 → Reihe 4 [3/4]": 0.7183198900913755,
+    "3× Stein schwarz von F2 → Reihe 3 [3/3]": 0.6739278010423542,
+    "2× Stein gelb von GF → Reihe 4 [2/4]": 0.7173206082876087,
+    "1× Stein gelb von F2 → Reihe 4 [1/4]": 0.7016007276272337,
+    "1× Stein rot von GF → Reihe 3 [1/3]": 0.6674968075648507,
+    "2× Stein gelb von GF → Reihe 3 [2/3]": 0.6833441499120295,
+    "1× Stein rot von GF → Reihe 4 [1/4]": 0.6592345805859129,
+    "1× Stein türkis vom Mondpool → Strafleiste": 0.703299363454183,
+    "1× Stein gelb von F2 → Reihe 3 [1/3]": 0.687439180602189,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.6835243276651264
+   }
+  },
+  {
+   "stellung": 34,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.40490667304440725,
+    "3× Stein schwarz von F2 → Reihe 4 [3/4]": 0.3557950782879629,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.35005352676952267,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.34127363841776437,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.3453147737288911,
+    "Kuppel #8 → (0,2)": 0.37026150307103384,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.3583249179625947,
+    "3× Stein schwarz von F2 → Reihe 5 [3/5]": 0.3274274943376024,
+    "1× Stein schwarz vom Mondpool → Reihe 5 [1/5]": 0.3504437136753836,
+    "Kuppel #17 → (0,2)": 0.35264540494525815,
+    "1× Stein gelb von F2 → Reihe 5 [1/5]": 0.31515180847092855,
+    "1× Stein rot vom Mondpool → Reihe 5 [1/5]": 0.3391300914788682,
+    "3× Stein gelb vom Mondpool → Reihe 4 [3/4]": 0.31659768800978255,
+    "1× Stein gelb von F2 → Reihe 4 [1/4]": 0.29085449160182864,
+    "Kuppel #8 → (1,1)": 0.3361626593375642,
+    "Kuppel #8 → (1,0)": 0.3160345035895148
+   }
+  },
+  {
+   "stellung": 35,
+   "q": {
+    "1× Stein türkis vom Mondpool → Reihe 3 [3/3]": 0.6836441840908204,
+    "3× Stein gelb vom Mondpool → Reihe 4 [3/4]": 0.6756899953352401,
+    "3× Stein schwarz von F2 → Reihe 4 [3/4]": 0.6854468925122551,
+    "1× Stein gelb von F2 → Reihe 4 [1/4]": 0.6615700466756157,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.6580690912301899,
+    "1× Stein türkis vom Mondpool → Strafleiste": 0.6353169509342739,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.63694864272182,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.6432709864671589,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.6415144630840847,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.6451425382069179,
+    "3× Stein gelb vom Mondpool → Strafleiste": 0.569453558851533,
+    "1× Stein gelb von F2 → Strafleiste": 0.6582896624292646,
+    "3× Stein schwarz von F2 → Strafleiste": 0.5394288089594345
+   }
+  },
+  {
+   "stellung": 36,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.4438557156030773,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.41085065187061215,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.39735792359753835,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.385972765893185,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.41449579875711984,
+    "1× Stein schwarz vom Mondpool → Reihe 5 [1/5]": 0.40912758589828396,
+    "1× Stein türkis vom Mondpool → Strafleiste": 0.38237659977478283,
+    "1× Stein rot vom Mondpool → Reihe 5 [1/5]": 0.3755375075444021,
+    "4× Stein gelb vom Mondpool → Reihe 4 [4/4]": 0.34445285082900906,
+    "Kuppel #17 → (1,0)": 0.36680279951338357,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.36840829022349686,
+    "Kuppel #17 → (1,1)": 0.3614462691649237,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.3754059955140203,
+    "Kuppel #8 → (1,0)": 0.3514698225363531,
+    "Kuppel #8 → (1,1)": 0.34709847252611703,
+    "4× Stein gelb vom Mondpool → Reihe 5 [4/5]": 0.32403163891081405
+   }
+  },
+  {
+   "stellung": 37,
+   "q": {
+    "1× Stein türkis vom Mondpool → Reihe 3 [3/3]": 0.6666325751211605,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [4/4]": 0.6384620551489699,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.6224407769267469,
+    "1× Stein türkis vom Mondpool → Strafleiste": 0.6001503083084855,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.611219053918665,
+    "4× Stein gelb vom Mondpool → Strafleiste": 0.5427733478834167
+   }
+  },
+  {
+   "stellung": 38,
+   "q": {
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.4124402673937684,
+    "1× Stein türkis vom Mondpool → Reihe 4 [1/4]": 0.3986185767762914,
+    "1× Stein türkis vom Mondpool → Reihe 5 [1/5]": 0.38060055087139755,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.395681022510153,
+    "1× Stein schwarz vom Mondpool → Reihe 5 [1/5]": 0.40234243590611274,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.3938507578012045,
+    "1× Stein türkis vom Mondpool → Strafleiste": 0.37211332402580677,
+    "1× Stein rot vom Mondpool → Reihe 5 [1/5]": 0.34768775039759786,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.35380207601320157,
+    "4× Stein gelb vom Mondpool → Reihe 4 [4/4]": 0.3043299582028305,
+    "4× Stein gelb vom Mondpool → Reihe 5 [4/5]": 0.2589451860809242,
+    "4× Stein gelb vom Mondpool → Strafleiste": 0.20548724490633077
+   }
+  },
+  {
+   "stellung": 39,
+   "q": {
+    "2× Stein schwarz vom Mondpool → Reihe 4 [4/4] (+1 Strafleiste)": 0.6378906556213937,
+    "2× Stein schwarz vom Mondpool → Strafleiste": 0.5888892632424239,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.5493621156905528,
+    "4× Stein gelb vom Mondpool → Strafleiste": 0.555893819568564
+   }
+  },
+  {
+   "stellung": 40,
+   "q": {
+    "2× Stein schwarz vom Mondpool → Reihe 4 [2/4]": 0.49943716647582614,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.4701666898748045,
+    "Bonuschip F4": 0.47260819288104516,
+    "Bonuschip F2": 0.4730422108752323,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.4215571756942977,
+    "2× Stein schwarz vom Mondpool → Strafleiste": 0.38127724826335907
+   }
+  },
+  {
+   "stellung": 41,
+   "q": {
+    "2× Stein schwarz vom Mondpool → Reihe 4 [4/4] (+1 Strafleiste)": 0.5941711535434022,
+    "2× Stein schwarz vom Mondpool → Strafleiste": 0.5515664283867071,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.5170294432277869,
+    "Bonuschip F2": 0.5194769184227179
+   }
+  },
+  {
+   "stellung": 42,
+   "q": {
+    "2× Stein schwarz vom Mondpool → Reihe 4 [2/4]": 0.4966941972863558,
+    "Bonuschip F2": 0.45455226485666644,
+    "2× Stein schwarz vom Mondpool → Strafleiste": 0.3924148480097453
+   }
+  },
+  {
+   "stellung": 43,
+   "q": {
+    "Bonuschip F1": 0.6598278916243351,
+    "Bonuschip F3": 0.6449869031255896,
+    "Bonuschip F2": 0.6453967988491058
+   }
+  },
+  {
+   "stellung": 44,
+   "q": {
+    "Bonuschip F3": 0.39712404415011404,
+    "Bonuschip F2": 0.3863059033453464
+   }
+  },
+  {
+   "stellung": 46,
+   "q": {
+    "2× Stein rot von F2 → Reihe 2 [2/2]": 0.727048933506012,
+    "2× Stein rot von GF → Reihe 2 [2/2]": 0.7498626806218063,
+    "1× Stein rot von F4 → Reihe 2 [1/2]": 0.676848343249417,
+    "2× Stein blau von F2 → Reihe 2 [2/2]": 0.694164592786375,
+    "2× Stein gelb von F3 → Reihe 2 [2/2]": 0.6733598510424296,
+    "1× Stein blau von F3 → Reihe 2 [1/2]": 0.6500209383529988,
+    "3× Stein türkis von F1 → Reihe 1 [1/1] (+2 Strafleiste)": 0.6456167387238955,
+    "1× Stein blau von F4 → Reihe 2 [1/2]": 0.6384596029917399
+   }
+  },
+  {
+   "stellung": 47,
+   "q": {
+    "1× Stein rot von F4 → Reihe 2 [1/2]": 0.31510429350996977,
+    "2× Stein blau von F2 → Reihe 3 [2/3]": 0.3591648839037978,
+    "2× Stein rot von F2 → Reihe 2 [2/2]": 0.3247157188377146,
+    "3× Stein türkis von F1 → Reihe 4 [3/4]": 0.31414391474300957,
+    "1× Stein schwarz von F1 → Reihe 1 [1/1]": 0.32428017755349475,
+    "1× Stein schwarz vom Mondpool → Reihe 1 [1/1]": 0.3177912634731694,
+    "2× Stein gelb von F3 → Reihe 2 [2/2]": 0.26590929700893473,
+    "2× Stein blau von F2 → Reihe 2 [2/2]": 0.2810118697207534,
+    "3× Stein türkis von F1 → Reihe 2 [2/2] (+1 Strafleiste)": 0.22588792913445843,
+    "1× Stein schwarz von F1 → Reihe 3 [1/3]": 0.23130050798257193
+   }
+  },
+  {
+   "stellung": 48,
+   "q": {
+    "1× Stein schwarz von F1 → Reihe 1 [1/1]": 0.8016959230105082,
+    "1× Stein schwarz vom Mondpool → Reihe 1 [1/1]": 0.7933426598707835,
+    "Kuppel #8 → (1,2)": 0.7609540522098541,
+    "1× Stein schwarz von F3 → Reihe 1 [1/1]": 0.7544706563154856,
+    "3× Stein türkis von F1 → Reihe 1 [1/1] (+2 Strafleiste)": 0.7274588929883455,
+    "Stapel: verdeckt ziehen": 0.7792999744415283,
+    "2× Stein rot von F2 → Reihe 1 [1/1] (+1 Strafleiste)": 0.7695167722118729,
+    "Kuppel #6 → (1,2)": 0.7648778756459554,
+    "Kuppel #8 → (2,1)": 0.7584067285060883,
+    "3× Stein türkis von F1 → Reihe 3 [3/3]": 0.7525743071958555,
+    "2× Stein blau von F2 → Reihe 4 [2/4]": 0.7416444207743872,
+    "Kuppel #17 → (1,2)": 0.7216039595880743,
+    "1× Stein schwarz von F1 → Reihe 3 [1/3]": 0.6779852410157522,
+    "1× Stein schwarz vom Mondpool → Reihe 3 [1/3]": 0.6851927834628656
+   }
+  },
+  {
+   "stellung": 49,
+   "q": {
+    "2× Stein rot von F2 → Reihe 2 [2/2]": 0.32788026332855225,
+    "2× Stein gelb von F3 → Reihe 2 [2/2]": 0.30374084909756977,
+    "2× Stein gelb vom Mondpool → Reihe 2 [2/2]": 0.33847711483637494,
+    "2× Stein blau von F2 → Reihe 2 [2/2]": 0.3223528067270915,
+    "2× Stein blau von F2 → Reihe 3 [2/3]": 0.3210129340489705,
+    "1× Stein schwarz von F1 → Reihe 2 [1/2]": 0.33512726922829944,
+    "1× Stein blau vom Mondpool → Reihe 2 [1/2]": 0.3255043774843216,
+    "3× Stein türkis von F1 → Reihe 2 [2/2] (+1 Strafleiste)": 0.2905513072188098,
+    "1× Stein blau von F3 → Reihe 2 [1/2]": 0.26773470640182495,
+    "3× Stein türkis von F1 → Reihe 4 [3/4]": 0.2538964052995046,
+    "1× Stein blau von F3 → Reihe 3 [1/3]": 0.1800817350546519,
+    "1× Stein schwarz von F1 → Reihe 3 [1/3]": 0.21143993735313416
+   }
+  },
+  {
+   "stellung": 50,
+   "q": {
+    "Kuppel #8 → (1,2)": 0.8014532725016276,
+    "Stapel: verdeckt ziehen": 0.7893351912498474,
+    "Kuppel #8 → (2,1)": 0.7829397618770599,
+    "Kuppel #6 → (1,2)": 0.775795708100001,
+    "2× Stein blau von F2 → Reihe 6 [3/6]": 0.7763146956761678,
+    "3× Stein türkis von F1 → Reihe 3 [3/3]": 0.7610028088092804,
+    "Kuppel #17 → (1,2)": 0.7684501508871714,
+    "2× Stein blau von F2 → Reihe 4 [2/4]": 0.7385925948619843,
+    "Kuppel #17 → (2,1)": 0.756586899360021,
+    "1× Stein schwarz von F1 → Reihe 3 [1/3]": 0.7157073418299357,
+    "2× Stein rot von F2 → Reihe 3 [2/3]": 0.7248292366663615,
+    "1× Stein blau von F3 → Reihe 4 [1/4]": 0.6938307583332062,
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.7023538649082184,
+    "1× Stein schwarz von F3 → Reihe 3 [1/3]": 0.6882460614045461
+   }
+  },
+  {
+   "stellung": 51,
+   "q": {
+    "2× Stein blau von F2 → Reihe 3 [2/3]": 0.3594101121028264,
+    "3× Stein türkis von F1 → Reihe 4 [3/4]": 0.3097740064064662,
+    "1× Stein blau vom Mondpool → Reihe 3 [1/3]": 0.3251226991415024,
+    "3× Stein türkis von F1 → Reihe 5 [4/5]": 0.2962273259957631,
+    "1× Stein blau von F3 → Reihe 3 [1/3]": 0.2533346662918727,
+    "2× Stein rot von F2 → Reihe 4 [2/4]": 0.29312342902024585,
+    "1× Stein schwarz von F1 → Reihe 3 [1/3]": 0.27358901003996533,
+    "1× Stein schwarz von F1 → Reihe 4 [1/4]": 0.28994954625765484,
+    "2× Stein blau von F2 → Reihe 6 [5/6]": 0.27478277683258057,
+    "2× Stein gelb von F3 → Reihe 3 [2/3]": 0.2186707854270935,
+    "1× Stein schwarz von F3 → Reihe 4 [1/4]": 0.2502741763989131,
+    "3× Stein türkis von F1 → Reihe 3 [3/3]": 0.2329057107369105,
+    "1× Stein schwarz von F3 → Reihe 3 [1/3]": 0.24935359756151834
+   }
+  },
+  {
+   "stellung": 52,
+   "q": {
+    "3× Stein türkis von F1 → Reihe 3 [3/3]": 0.7483416497707367,
+    "Stapel: verdeckt ziehen": 0.7119990785916647,
+    "1× Stein blau von F3 → Reihe 6 [2/6]": 0.7177499135335287,
+    "1× Stein blau vom Mondpool → Reihe 6 [2/6]": 0.7164439757664999,
+    "Kuppel #8 → (2,1)": 0.7201465666294098,
+    "1× Stein blau von F3 → Reihe 4 [1/4]": 0.6830465197563171,
+    "1× Stein schwarz von F3 → Reihe 4 [1/4]": 0.6782939434051514,
+    "1× Stein blau vom Mondpool → Reihe 4 [1/4]": 0.6880607604980469,
+    "1× Stein schwarz von F1 → Reihe 4 [1/4]": 0.6910681625207266,
+    "1× Stein schwarz von F1 → Reihe 3 [1/3]": 0.6365334535844661
+   }
+  },
+  {
+   "stellung": 53,
+   "q": {
+    "1× Stein blau vom Mondpool → Reihe 3 [3/3]": 0.3762105455001195,
+    "1× Stein blau von F3 → Reihe 3 [3/3]": 0.3066140115261078,
+    "1× Stein blau vom Mondpool → Reihe 6 [4/6]": 0.3506834954023361,
+    "1× Stein blau von F3 → Reihe 6 [4/6]": 0.2872895946105321,
+    "1× Stein schwarz von F3 → Reihe 4 [1/4]": 0.2500794331232707,
+    "Kuppel #8 → (1,1)": 0.28711095949014026,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.2789547344048818,
+    "Kuppel #17 → (1,1)": 0.3003357946872711,
+    "Kuppel #6 → (1,1)": 0.2989465594291687,
+    "1× Stein blau von F3 → Reihe 4 [1/4]": 0.25750995179017383
+   }
+  },
+  {
+   "stellung": 54,
+   "q": {
+    "1× Stein blau von F3 → Reihe 6 [2/6]": 0.7406773070494334,
+    "Stapel: verdeckt ziehen": 0.7429202298323313,
+    "2× Stein gelb von F3 → Reihe 4 [2/4]": 0.7388110061486562,
+    "Kuppel #8 → (2,1)": 0.7404185036818186,
+    "1× Stein blau von F3 → Reihe 4 [1/4]": 0.7066258788108826,
+    "1× Stein schwarz von F3 → Reihe 4 [1/4]": 0.7022611399491628,
+    "Kuppel #6 → (2,1)": 0.723365714152654,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.6809187134106954,
+    "Kuppel #17 → (2,1)": 0.6774954001108805
+   }
+  },
+  {
+   "stellung": 55,
+   "q": {
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.3343060128254261,
+    "Kuppel #6 → (1,1)": 0.3489105353752772,
+    "Stapel: verdeckt ziehen": 0.35128238797187805,
+    "Kuppel #17 → (1,1)": 0.34660106897354126,
+    "Kuppel #8 → (1,1)": 0.30912700295448303,
+    "1× Stein gelb vom Mondpool → Strafleiste": 0.3575428797975579,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.3496446683183709,
+    "1× Stein gelb vom Mondpool → Reihe 4 [1/4]": 0.30633558332920074,
+    "2× Stein rot vom Mondpool → Reihe 4 [2/4]": 0.2924374540646871,
+    "Kuppel #8 → (2,0)": 0.33604927361011505,
+    "Kuppel #17 → (2,0)": 0.33893708884716034,
+    "Kuppel #6 → (2,0)": 0.3329871594905853,
+    "Kuppel #8 → (2,2)": 0.31302252411842346,
+    "Kuppel #17 → (2,2)": 0.3106059928735097,
+    "Kuppel #8 → (2,1)": 0.2924232880274455,
+    "2× Stein rot vom Mondpool → Strafleiste": 0.26621744903642097
+   }
+  },
+  {
+   "stellung": 56,
+   "q": {
+    "2× Stein gelb vom Mondpool → Reihe 4 [2/4]": 0.7218789358933767,
+    "Stapel: verdeckt ziehen": 0.7387497027715048,
+    "Kuppel #8 → (2,1)": 0.7783189117908478,
+    "1× Stein rot vom Mondpool → Reihe 4 [1/4]": 0.7528585195541382,
+    "1× Stein rot vom Mondpool → Strafleiste": 0.7606682851091423,
+    "Kuppel #8 → (2,0)": 0.7637694080670675,
+    "Kuppel #8 → (2,2)": 0.7702609896659851,
+    "1× Stein schwarz vom Mondpool → Reihe 4 [1/4]": 0.6808679401874542,
+    "Kuppel #6 → (2,1)": 0.7118495802084605,
+    "Kuppel #6 → (2,2)": 0.7350539565086365,
+    "Kuppel #6 → (2,0)": 0.7243548731009165,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.7036725157673556,
+    "Kuppel #17 → (2,1)": 0.7019152839978536,
+    "Kuppel #17 → (2,2)": 0.7355522414048513,
+    "Kuppel #17 → (2,0)": 0.705120454231898,
+    "2× Stein gelb vom Mondpool → Strafleiste": 0.6921408461801027
+   }
+  },
+  {
+   "stellung": 57,
+   "q": {
+    "Bonuschip F2": 0.2873433803791669,
+    "Kuppel #8 → (1,1)": 0.27223284045855206,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.2984412485535342,
+    "Stapel: verdeckt ziehen": 0.2614848166704178,
+    "2× Stein gelb vom Mondpool → Strafleiste": 0.2890912679107801,
+    "Kuppel #8 → (2,0)": 0.2970702548821767,
+    "Kuppel #6 → (1,1)": 0.22545584042867026,
+    "Kuppel #17 → (1,1)": 0.22901696463425955,
+    "Kuppel #8 → (2,2)": 0.24503251413504282,
+    "Kuppel #17 → (2,2)": 0.23969177405039468,
+    "Kuppel #17 → (2,0)": 0.2453162968158722,
+    "Kuppel #17 → (2,1)": 0.240007350842158,
+    "Kuppel #6 → (2,0)": 0.23657304545243582,
+    "Kuppel #8 → (2,1)": 0.2177067349354426,
+    "Kuppel #6 → (2,2)": 0.2143062154452006,
+    "Kuppel #6 → (2,1)": 0.20323123037815094
+   }
+  },
+  {
+   "stellung": 58,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.29697490235169727,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.3175974859968224,
+    "Bonuschip F2": 0.29148698600876993,
+    "Kuppel #8 → (1,1)": 0.2807176311810811,
+    "2× Stein gelb vom Mondpool → Strafleiste": 0.3001265215150332,
+    "Kuppel #8 → (2,0)": 0.29998646179835003,
+    "Kuppel #6 → (1,1)": 0.22545584042867026,
+    "Kuppel #17 → (1,1)": 0.2354307323694229,
+    "Kuppel #8 → (2,2)": 0.24943664173285165,
+    "Kuppel #17 → (2,2)": 0.24372459948062897,
+    "Kuppel #17 → (2,0)": 0.2453162968158722,
+    "Kuppel #17 → (2,1)": 0.240007350842158,
+    "Kuppel #6 → (2,0)": 0.23657304545243582,
+    "Kuppel #8 → (2,1)": 0.2177067349354426,
+    "Kuppel #6 → (2,2)": 0.2143062154452006,
+    "Kuppel #6 → (2,1)": 0.20323123037815094
+   }
+  },
+  {
+   "stellung": 59,
+   "q": {
+    "Stapel: verdeckt ziehen": 0.7349866926670074,
+    "Bonuschip F2": 0.6910695180460731,
+    "1× Stein schwarz vom Mondpool → Strafleiste": 0.6943931295648613,
+    "Kuppel #6 → (2,2)": 0.6975300550460816,
+    "Kuppel #6 → (2,1)": 0.6782498896121979,
+    "Kuppel #17 → (2,2)": 0.6951493442058563,
+    "Kuppel #17 → (2,0)": 0.6792131058953663,
+    "Kuppel #17 → (2,1)": 0.6541838221333881,
+    "Kuppel #6 → (2,0)": 0.6697429895401001,
+    "2× Stein gelb vom Mondpool → Strafleiste": 0.667115906015543
+   }
+  }
+ ]
+}

@@ -184,6 +184,52 @@ Engine-Code, und ohne die Prüfung hätte die Arena die alte Engine gefahren.
 
 ---
 
+### par.6.1 ERGEBNIS DER VORPRUEFUNG (2026-08-18) — das Inkrement reicht NICHT
+
+Gemessen mit `tools/probes/ownership_shift_magnitude.py`: 60 Drafting-Stellungen
+aus dem Held-out-Ownership-Korpus, `b18_best` @400 Sims, derselbe Seed je
+Stellung, zweimal gesucht (Regler aus / D1 mit Konjunktionsform). Die Zahlen
+kommen aus `net_search_state_json_trace` (`gumbel_trace`, je Kandidat `q`,
+`sigma_q`, `score`, `visits`) — also aus der Engine, nicht aus einem
+Python-Nachbau der Formel.
+
+| Groesse | Wert |
+|---|---:|
+| \|Delta q\| je Kandidat, Mittel / Median / max | 0,0026 / 0,0016 / 0,0202 |
+| **Spannweite des Delta je Stellung** (das UNTERSCHEIDENDE Signal) | **0,0024** |
+| q-Spanne der Suche selbst (Bezug) | 0,0781 |
+| **Anteil** | **3,1 %** |
+| Stellungen mit gewechseltem q-Bestkandidaten | **0 von 58** |
+
+**Der Regler wirkt** (max 0,0202, also kein Wheel-/Env-Alarm), **aber er
+verschiebt fast alle Kandidaten GLEICH.** Uebrig bleibt eine unterscheidende
+Restgroesse von 3 % dessen, was die Suche ohnehin an Wertunterschieden erzeugt —
+und sie kippt in 58 Stellungen keine einzige Wurzelentscheidung. Das ist die
+Vorhersage "Niveau statt Inkrement" aus par.3, hier gemessen.
+
+**Nach der Vorabregel in par.6 Punkt 4 ist die Arena damit gesperrt, bis B1+B2
+gebaut sind.** Groessenordnung des Bedarfs: das unterscheidende Signal muesste
+etwa 10- bis 30-fach wachsen, um mit der Eigen-Spreizung der Suche vergleichbar
+zu sein.
+
+**Zwei Korrekturen an par.3, beide durch die Messung:**
+
+1. `max_N` ist **19,6**, nicht die angenommenen 50. Die Verstaerkung
+   `(c_visit + max_N)·c_scale` betraegt also **69,6**, nicht 100.
+2. Der Massstab "Gumbel-Rauschen 1,28" war fuer die Arena FALSCH. Dort gilt
+   `add_root_noise=false` und damit `gumbel_scale=0` (`net_mcts.rs:3842`) — es
+   gibt gar kein Rauschen. Richtiger Bezug ist die q-Eigenspreizung der Suche
+   (0,078) bzw. die Log-Prior-Spreizung (5,58 gegen sigma_q-Spreizung 4,89,
+   Verhaeltnis 0,88). Die Rauschgroesse gilt nur fuer Self-Play.
+
+**Offener Widerspruch, ausdruecklich als ungeklaert markiert:** in der Arena
+laufen 402 von 407 Partien anders als im Nullarm, hier kippt am Draft-Pol keine
+einzige von 58 Wurzelentscheidungen. Zwei Erklaerungen, beide UNGEPRUEFT — der
+**Tiling-Pol** (`MOSAIC_OWNERSHIP_TILING_W` = 0,3) traegt den Effekt, oder
+winzige Verschiebungen kippen ueber ~100 Entscheidungen je Partie gelegentlich
+doch. Das zu trennen ist die naechste Messung und aendert die Gewichtung von
+B1-B3: traegt der Tiling-Pol allein, gehoert die Arbeit dorthin.
+
 ## par.7 MESSANORDNUNG
 
 Wie `PREREG_conjunction_terms.md` par.6, damit die Zahlen daneben stehen:
