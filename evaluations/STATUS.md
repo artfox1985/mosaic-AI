@@ -28,6 +28,63 @@ diese Frage "nichts" war.
 
 ---
 
+## FAHRPLAN DIESER GENERATION (Nutzer-Auftrag 2026-08-18, woertlich)
+
+> 1. *"modell erstellen dass mit dem ownership head aktiv die züge steuert und
+>    den champ schlägt"*
+> 2. *"anschließend mit dem neuen champ self plays (smoke test) überprüfen ob
+>    hier genug diversität vorhanden ist für den ownership head"*
+> 3. *"dann self plays für v22 erstellen"*
+
+Die Reihenfolge ist bindend: **kein v22-Korpus, bevor Schritt 1 und 2 stehen.**
+Der Grund ist gemessen und nicht theoretisch — ein Korpus, den ein Netz erzeugt,
+das die Platten nicht steuert, enthaelt die Zielhandlung nicht, und genau daran
+ist die Destillation zweimal gescheitert (`PREREG_corpus_distillation.md`
+par.10.7 warm, par.10.9 kalt).
+
+### Schritt 1 — Stand: KANDIDAT LIEGT SCHON VOR, Zurechnung fehlt
+
+`alphazero_v21-b18_best.onnx` @400 gegen Champion @400, 407 Seeds, keine Remis:
+
+| Arm | Siege | gegen 50 % |
+|---|---:|---|
+| Regler **AUS** | 211/407 = 51,8 % | p = 0,457 — Paritaet |
+| **Produktform D1** `0.1,0.3` | **236/407 = 58,0 %** | **p = 0,0013** |
+| **Konjunktionsform D1** | **229/407 = 56,3 %** | **p = 0,0115** |
+
+**Mit aktivem Kopf schlaegt `b18_best` den Champion signifikant, ohne ihn
+nicht** — und "aktiv steuert" ist keine Behauptung: 402 von 407 Partien laufen
+anders als im Nullarm. Zwei Vorbehalte, beide offen:
+
+1. **Kein Brettwechsel.** Alle drei Arme liefen auf Brett 0. Der Seiteneffekt
+   ist damit unkontrolliert; die DIFFERENZ zwischen den Armen ist es nicht
+   (gleiche Seite, gleiche Seeds), wohl aber die absolute Aussage gegen den
+   Champion. Naechste Messung: derselbe Arm mit vertauschten
+   `--model`/`--model-b` und eigenem `--out-prefix`.
+2. **Gepaarte Zurechnung fehlt.** Gegen den Nullarm ist der Zuwachs NICHT
+   signifikant (exakter McNemar: Produktform p = 0,066, Konjunktionsform
+   p = 0,2025). Der Sieg ueber den Champion steht, die Zurechnung zum Kopf
+   nicht.
+
+Reihenfolge daraus: **erst Brettwechsel** (billig, entscheidet den Vorbehalt 1
+und verdoppelt die Paarungen fuer Vorbehalt 2), dann Gating.
+
+### Schritt 2 — was "genug Diversitaet" operativ heisst
+
+Zu klaeren VOR der Messung, damit der Smoke Test ein Kriterium hat: der
+Ownership-Kopf braucht Varianz in seinen Labels. Spielt der neue Champion zu
+deterministisch, kollabieren die 36 Feld- und 34 Atom-Ziele auf Grundraten, und
+der Kopf lernt nichts dazu — dieselbe Falle wie die Grundraten-Waechter in
+`feedback_skill_confound_already_determined`. Messgroessen: Positivrate je
+Kriterium und je Atomgruppe, Feldvarianz, Anteil der Partien mit mindestens
+einem Positiv. Vergleichsmassstab sind die Raten des v21-Fensters.
+
+### Schritt 3 — v22-Korpus
+
+Erst danach. Design liegt auf Halde (Abschnitt "v22-FENSTER"), NICHT eingeplant.
+
+---
+
 ## STAND 2026-08-17 (Nachmittag) — Champion unveraendert `v21_2d_brierbest`
 
 ### DER BEFUND DES TAGES: der Korpus war policy-maskiert
