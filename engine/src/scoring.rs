@@ -484,12 +484,19 @@ const CORNER_POINTS: [f64; 4] = [3.0, 3.0, 8.0, 8.0];
 ///
 /// VORBEHALT, gemessen (Prereg par.5, par.5a): der Kopf RANGIERT gut
 /// (AUC 0,83-0,91) und KALIBRIERT schlecht (Brier nur 8-14 % unter der
-/// Grundrate, ueber 0,5 ueberschaetzt er). Ursache ist eine
-/// Verteilungsverschiebung: die Bauer-Arme des Korpus haben bei den
-/// Zielkriterien die 11- bis 48-fache Positivrate von normalem Spiel. Diese
-/// Funktion benutzt die Wahrscheinlichkeit als WERT und erbt das. Eine
-/// nachgelagerte Platt-Korrektur je Atomgruppe ist der geplante naechste
-/// Schritt, sie gehoert NICHT hierher.
+/// Grundrate, ueber 0,5 ueberschaetzt er). Diese Funktion benutzt die
+/// Wahrscheinlichkeit als WERT und erbt das.
+///
+/// STAND 2026-08-17: die dafuer geplante nachgelagerte Platt-Korrektur je
+/// Atomgruppe ist ZURUECKGESTELLT (nicht verworfen -- Wiedervorlage beim
+/// ersten plattenbewussten Champion, Ausloeser in STATUS.md). Gemessen
+/// (`tools/probes/conjunction_marginal_normal_play.py`, b19_best, 3000
+/// Bretter) ist der Versatz des Kopf-Mittelwerts gegen die tatsaechliche Rate
+/// im normalen Spiel klein: k1 0,35 Log-Odds, k0/k5/k3/k7 praktisch null. Die
+/// Fehlkalibrierung sitzt im OBEREN Bereich, das ist eine Steigungsfrage
+/// (B != 1), die ein Versatz nicht behebt. Dazu kommt: die Normalspiel-Rate
+/// stammt von Netzen, die die Platten nicht beachten -- darauf zu kalibrieren
+/// wuerde dem Projektziel entgegenarbeiten. Einzelheiten in STATUS.md.
 pub fn expected_plate_points_conj(
     player: &PlayerBoard,
     p_own: &[f64; OWNERSHIP_FIELDS],
