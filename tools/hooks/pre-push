@@ -63,12 +63,31 @@ fi
 # Reihenfolge: erst MOSAIC_PYTHON_DIR, sonst aus dem gefundenen python selbst
 # ableiten. Nur falls beides scheitert, laeuft cargo ohne die DLL im PATH und
 # bricht mit STATUS_DLL_NOT_FOUND ab -- dann MOSAIC_PYTHON_DIR setzen.
+#
+# sys.base_prefix statt dirname(sys.executable): in einem venv liegt das
+# Interpreter-Exe in venv/Scripts/, die python*.dll aber in der Basis-
+# Installation.
 PYDIR="${MOSAIC_PYTHON_DIR:-}"
 if [ -z "$PYDIR" ] && command -v python >/dev/null 2>&1; then
-    PYDIR="$(python -c 'import sys,os; print(os.path.dirname(sys.executable))' 2>/dev/null)"
+    PYDIR="$(python -c 'import sys; print(sys.base_prefix)' 2>/dev/null)"
 fi
-if [ -n "$PYDIR" ]; then
+
+# PATH ist hier ein :-getrennter POSIX-PATH. Ein Windows-Pfad ("C:\Users\...")
+# zerfaellt darin am Laufwerks-Doppelpunkt in die zwei unbrauchbaren Eintraege
+# "C" und "\Users\..." -- die DLL wird NICHT gefunden und cargo test stirbt mit
+# STATUS_DLL_NOT_FOUND, obwohl das Verzeichnis korrekt ermittelt wurde. Genau
+# dieser Fehlschlag ist am 2026-08-17 im Push aufgetreten. Deshalb umrechnen;
+# ein bereits POSIX-formatierter Pfad bleibt von cygpath -u unberuehrt.
+if [ -n "$PYDIR" ] && command -v cygpath >/dev/null 2>&1; then
+    PYDIR="$(cygpath -u "$PYDIR" 2>/dev/null || printf '%s' "$PYDIR")"
+fi
+
+if [ -n "$PYDIR" ] && ls "$PYDIR"/python3*.dll >/dev/null 2>&1; then
     export PATH="$PYDIR:$PATH"
+elif [ -n "$PYDIR" ]; then
+    echo "pre-push: WARNUNG -- in '$PYDIR' liegt keine python3*.dll." >&2
+    echo "          Bei STATUS_DLL_NOT_FOUND: MOSAIC_PYTHON_DIR auf das" >&2
+    echo "          Verzeichnis mit python3.dll/python3XX.dll setzen." >&2
 else
     echo "pre-push: WARNUNG -- Python-Verzeichnis nicht ermittelbar." >&2
     echo "          Bei STATUS_DLL_NOT_FOUND: MOSAIC_PYTHON_DIR setzen." >&2
