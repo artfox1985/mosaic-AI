@@ -132,9 +132,49 @@ die Zurechnung: der Prior BIETET den Zug an (4,91x), der Regler GREIFT massiv
 ins Spiel ein (402/407 Partien laufen anders) — und trotzdem entsteht keine
 Platte. Der
 Engpass sitzt also zwischen Angebot und Auswahl, nicht in der Formel und nicht
-im Prior. Genau dorthin zeigt der registrierte naechste Schritt: **Rangregel**
-statt Wertaddition, plus die Kalibrierung (Steigung B != 1, Versatz ist
-gemessen klein).
+im Prior.
+
+**Harte Rangregeln sind AUSGESCHLOSSEN** (Nutzer 2026-08-18: *"wir pfuschen
+nicht mit harten rangregeln herum"*) — der in `PREREG_conjunction_terms.md`
+par.7 registrierte Satz ist damit ueberholt, soweit er eine Rangregel nennt.
+
+### NAECHSTER SCHRITT: KOPPLUNG, nicht Formel — `PREREG_ownership_coupling.md`
+
+Der Auftrag lautete, Draft und Tiling **gemeinsam** anzusehen. Das hat drei
+Dinge ergeben, die alle drei bisherigen Preregs uebersehen haben:
+
+1. **Das Tiling entscheidet ein SOLVER, nicht die Suche** (`tiling_solver.rs:990`,
+   die Diagnose steht dort schon im Code). Der Plattenbau ist eine
+   Tiling-Handlung — ein Regler, der nur am Blattwert der Draft-Suche haengt,
+   kann ihn strukturell nicht ausloesen.
+2. **Die Suche ist GUMBEL, nicht PUCT** (`net_mcts.rs:2869`; PUCT ist Legacy).
+   Der Q-Anteil geht ueber `σ(q) = (c_visit + max_N)·c_scale·q` ein, c_visit=50,
+   c_scale=1,0 — Verstaerkung ~100 gegen Gumbel-Rauschen ~1,28. **Hergeleitet**
+   (max_N=50 ist Annahme): ein gefuelltes Spezialfeld erreicht ~45 % des
+   Rauschens und wirkt, eine Fliese in einer Spalte ~1,6 % und wirkt nicht.
+   Damit ist erklaert, warum k6 sich bewegt und k1/k2 nie — es ist die
+   **Skala**, nicht die Form. Das gemeinsame `/50` (`:1059`) trifft Kriterien,
+   deren Inkremente drei Groessenordnungen auseinanderliegen.
+3. **Die Tiling-Seite hat die Lehre schon gezogen, die dem Draft fehlt:** dort
+   marginale Werte plus Gewicht je Kriterium, ausdruecklich weil der
+   Spezialfeld-Posten (−11,70) *"jede Geometrie ueberdeckt"* (`:1108`, gemessen
+   2026-08-12). Der Draft-Pfad formt weiter mit dem NIVEAU.
+
+**Beifang, gemessen am Nullarm (Regler AUS), also aus dem trainierten Netz und
+nicht aus dem Verbraucher:** bei aktiver k6-Platte legt `b18` Spezialkuppeln zu
+**62,8 %** nach unten (ohne die Platte 42,3 %) und raeumt die oberen Slots von
+29,6 % auf **8,5 %**. `docs/domain_knowledge.md` §8 verlangt das Gegenteil. Bei
+k5 dagegen **keine Reaktion** (50,2 gegen 50,1 %), obwohl §6 dort
+Spezialkuppeln in die unteren Ecken will. Das Netz hat eine Anti-§8-Gewohnheit
+GELERNT. Zahlen: 4,36 Spezialplatten je Spieler, 3,94 leere Spezialfelder je
+Partie, **0 von 153 Partien** ohne Verlust, und von 367 Spezialfliesen lagen
+298 in den Reihen 1–2 gegen **4** in den Reihen 5–6.
+
+**Die groessere offene Frage steht in par.9 der neuen Prereg:** der Kopf sagt
+vorher, was passieren WIRD, nicht was erreichbar WAERE. Zwei unabhaengige
+Belege stuetzen das — der staerkere Kopf machte den Verbraucher inert (Tor C
+par.15), und bei k6 ist die Kopplung stark genug und das Verhalten trotzdem
+falsch.
 
 **Cold Start `v21-b20` gegen Champion (fertig 2026-08-17 22:20):** 158/407 =
 38,8 % Siege, und gepaart gegen `b18` auf Block-Ebene k1 +0,09 (t 0,27), k2
