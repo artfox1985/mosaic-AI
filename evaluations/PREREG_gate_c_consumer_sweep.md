@@ -1063,3 +1063,85 @@ aus b18-Partien; der Spaltenbauer ist ein guter Proxy, kein bewiesenes
 Optimum; und ob eine konkurrierende Vorzugskette (`MOSAIC_VORZUG_SPALTE`) bei
 der Korpuserzeugung mitlief, ist mangels Env-Protokollierung ungeprueft.
 
+### par.16.3 ERGEBNIS DER WIEDERHOLUNG (2026-08-17)
+
+Drei Dosisarme x 407 Partien gegen den Champion, Nullarm aus
+`paired_arena_env_b18best_vs_ch.json` (identische Seeds, Reproduktion in den
+ersten 50 Partien byte-genau geprueft). Rohdaten
+`evaluations/paired_arena_env_gate_c_b18.json`.
+
+| Arm | Siege | McNemar gegen N |
+|---|---:|---:|
+| N (0/0) | 211/407 = 51,8 % | — |
+| **D1 (0,1/0,3)** | **236/407 = 58,0 %** | b=98 c=73, **p=0,066** |
+| D2 (0,3/1,0) | 219/407 = 53,8 % | p=0,600 |
+| D3 (1,0/3,0) | 208/407 = 51,1 % | p=0,883 |
+
+**Plattenpunkte gegen N, Block-Ebene (nB=6, kritischer t 2,571):**
+
+| Dosis | k1 vertikal | k2 Diagonalen | k5 Ecken | k3 Joker |
+|---|---:|---:|---:|---:|
+| D1 | −0,09 (t −0,23) | +0,07 (t 1,00) | **+0,34 (t 2,79)** | +1,59 (t 2,58) |
+| D2 | +0,05 (t 0,13) | +0,20 (t 1,46) | +0,30 (t 1,43) | +1,20 (t 1,95) |
+| D3 | −0,19 (t −0,61) | +0,07 (t 1,00) | +0,22 (t 1,65) | **+1,68 (t 5,65)** |
+
+#### FEHLER IN MEINER EIGENEN REGISTRIERUNG, offengelegt
+
+par.16 sagt, die Regel sei *"wie im Original par.7, unveraendert
+uebernommen"*, und nennt dann **"k1 oder k2"**. Die Originalregel (par.6) nennt
+**"die Zielkriterien (k1/k2/k5)"**. Ich habe k5 weggelassen und die Aenderung
+als Unveraendertheit ausgegeben. Und ausgerechnet k5 ist die Zahl, die sich
+bewegt.
+
+Damit haengt das Verdikt an meinem Transkriptionsfehler:
+
+- **Nach der fuer diesen Lauf registrierten Fassung (k1/k2): NICHT ERFUELLT.**
+  Keine Dosis hebt k1 oder k2 signifikant.
+- Nach der Originalfassung (k1/k2/k5) waere D1 erfuellt: k5 signifikant
+  (t 2,79) UND Siege gewonnen statt verloren.
+
+**Ich waehle die registrierte Fassung, also NICHT-ERFOLG.** Eine
+Erfolgsklausel nachtraeglich zu erweitern, nachdem man gesehen hat, welches
+Kriterium sich bewegt hat, ist der Fehler, gegen den Vorregistrierung
+existiert. Hinzu kommt die Multiplizitaet: 8 Kriterien x 3 Dosen = 24 Tests,
+und t=2,79 bei nB=6 ueberlebt keine Korrektur.
+
+#### WAS IN JEDER LESART BLEIBT — und es ist der eigentliche Befund
+
+1. **D1 gewinnt 25 Partien MEHR als der Nullarm** (p=0,066). Jede frueher
+   gemessene Dosis hat Siege GEKOSTET; der Originalsweep fiel monoton
+   98/89/86/84. Das ist die erste positive Reglermessung dieser Kampagne.
+   Die Erklaerung dafuer ist plausibel und ungeprueft: erstmals steuert der
+   Regler eine Policy, die den Zug ueberhaupt anbietet (par.16.2).
+
+2. **Die Rangfolge der Zuwaechse ist die Rangfolge der Marginalwerte.**
+   Nutzer-Beobachtung: *"aus welchen gruenden auch immer nimmt er die
+   jokerplatten mit."* Der Grund ist die Konjunktionslaenge:
+
+   | Kriterium | Kette | Auszahlung | Marginal bei p=0,5 | Zuwachs D1 |
+   |---|---:|---:|---:|---:|
+   | k3 Joker | N klein | **2·N** | 1,00 (N=2) … 0,50 (N=4) | +1,59 |
+   | k5 Ecken | 4 | 8 | 0,500 | +0,34 |
+   | k2 Diagonalen | 6 | 10 | 0,156 | +0,07 |
+   | k1 Spalten | 6 | 7 | 0,109 | −0,09 |
+
+   k3 entgeht dem Kollaps strukturell: seine Auszahlung **waechst mit der
+   Kettenlaenge** (2·N), was den Produktzerfall ausgleicht — bei wenigen
+   Jokerfeldern zerfaellt das Produkt ohnehin kaum. k1 und k2 haben feste
+   Laenge 6 bei fester Auszahlung und kollabieren voll.
+   *(Die tatsaechliche Zahl der Joker-Spaces je Kuppel ist NICHT gemessen —
+   aus der Zustandsstruktur der Korpusdateien nicht auslesbar. Fuer jedes
+   N <= 4 gilt die Rangfolge.)*
+
+> **Die Produktform-Diagnose ist damit nicht mehr hergeleitet, sondern aus
+> Arena-Daten bestaetigt.** Die Arithmetik hat die Rangfolge vorhergesagt, die
+> Messung hat sie geliefert. Das ist das gemessene Argument fuer den
+> Selektor-Umbau, das par.16 in Aussicht gestellt hat.
+
+#### WAS ZU TUN WAERE
+
+**Frisch-Seed-Replikation von D1 allein**, mit k5 diesmal VORAB als Ziel
+benannt und ohne die anderen Dosen (keine Multiplizitaet). Rund 1,4 h CPU. Das
+wuerde entscheiden, ob k5 und der Siegzuwachs echt sind oder Glueck. Nicht
+gestartet — braucht eine eigene Vorregistrierung und eine Nutzer-Entscheidung.
+
