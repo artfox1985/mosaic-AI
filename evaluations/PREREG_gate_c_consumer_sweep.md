@@ -1011,3 +1011,55 @@ sie steht noch aus. Sie waere die Voraussetzung dafuer, aus einem negativen
 Tor C ein Argument FUER den Selektor-Umbau zu machen statt nur eine weitere
 Absage.
 
+### par.16.2 DIE PRIORMASSE IST GEMESSEN — ERKLAERUNG (a) IST WIDERLEGT
+
+par.16.1 liess zwei Erklaerungen fuer einen negativen Ausgang offen. Eine
+davon ist jetzt erledigt.
+
+**Sonde** `tools/probes/column_build_prior_mass.py`, Ergebnis in
+`evaluations/probe_column_build_prior_mass_heldout.json`. Gemessen wird die
+Policy-Priormasse auf der **tatsaechlich gewaehlten Bauer-Aktion** in den
+k1-Bauer-Partien des Korpus — eine Groesse, die keine Hilfskonstruktion
+braucht, weil die gespielte Aktion dort per Konstruktion die Bauer-Aktion ist.
+
+**KONTAMINATION, zuerst geprueft:** 87 der 100 k1-Dateien liegen in
+`v21-b18`s TRAININGSSATZ. Die erste Messung lief auf allen 100 und war damit
+zu 87 % ein Gedaechtnisvergleich gegen einen Champion, der keine davon je
+gesehen hat. Nachgemessen auf den **13 Val-Dateien** (130 Partien, 4.340
+Entscheidungen):
+
+| | `b18_best` | Champion |
+|---|---:|---:|
+| Priormasse, Median | **0,246** | 0,029 |
+| Verhaeltnis zur Gleichverteilung, Median | **4,91x** | 0,59x |
+| Priormasse, Mittel | 0,314 | 0,144 |
+| gepaart je Partie vorn | **129 / 130** | 1 |
+
+Gepaarte Differenz im Verhaeltnis 8,02 (t = 25,6 auf Partie-Ebene). Zum
+Vergleich der kontaminierte Lauf: 10,59 und 999/1000 — die Kontamination hat
+den Effekt um rund ein Viertel aufgeblaeht, aber **nicht erzeugt**.
+
+> **Der Korpus HAT die Policy erreicht, und zwar stark.** `b18` bietet den
+> spaltenbauenden Zug im Median mit knapp fuenffacher Gleichverteilungsmasse
+> an, der Champion mit weniger als der Haelfte der Gleichverteilung. Erklaerung
+> (a) aus par.16.1 — "der Prior bietet den Zug gar nicht erst an" — ist damit
+> **widerlegt**.
+
+**Folge fuer die Zurechnung.** Ein negativer Tor-C-Ausgang zeigt jetzt
+eindeutig nach unten: der Zug wird angeboten, oft sogar dominant, und
+verschwindet trotzdem zwischen Prior und Brett. Uebrig bleiben die Suche
+(Besuchswettlauf) und die Formel (Produktform-Kollaps) — nicht die Policy.
+Damit traegt der Selektor-Umbau erstmals ein gemessenes Argument.
+
+**Und es erklaert par.10.7 der Destillations-Prereg neu:** dass `b18` im Spiel
+keine Platten baut, heisst NICHT, dass die Destillation misslungen ist. Sie ist
+gelungen — sie kommt nur nicht bis aufs Brett. Der Satz "die Destillation
+uebertraegt den Plattenbau nicht" muss praezisiert werden zu: **sie ueberträgt
+ihn in den Prior, aber nicht durch die Suche.**
+
+**Grenzen der Sonde, vom ausfuehrenden Agenten benannt und uebernommen:** der
+Zustandsraum stammt aus Champion-Self-Play mit aktivem Bauer-Override, nicht
+aus b18-Partien; der Spaltenbauer ist ein guter Proxy, kein bewiesenes
+Optimum; und ob eine konkurrierende Vorzugskette (`MOSAIC_VORZUG_SPALTE`) bei
+der Korpuserzeugung mitlief, ist mangels Env-Protokollierung ungeprueft.
+
