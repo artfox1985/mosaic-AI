@@ -42,7 +42,34 @@ das die Platten nicht steuert, enthaelt die Zielhandlung nicht, und genau daran
 ist die Destillation zweimal gescheitert (`PREREG_corpus_distillation.md`
 par.10.7 warm, par.10.9 kalt).
 
-### Schritt 1 — Stand: KANDIDAT LIEGT SCHON VOR, Zurechnung fehlt
+### Schritt 1 — Stand: SIEG-HAELFTE ERFUELLT, PLATTEN-HAELFTE NICHT
+
+**Nutzer-Einwand 2026-08-18, und er ist entscheidend:** *"ja nur spielt er noch
+nicht auf die wertungsplatten"*. Der Sieg allein erfuellt Schritt 1 NICHT — der
+Hebel des ganzen Vorhabens ist der Plattenblick, nicht die Siegquote.
+
+Praezisiert man, WELCHE Platten der Regler bewegt (gegen den Nullarm,
+Block-Ebene, Schwelle 2,571), wird das Bild eindeutig:
+
+| Kriterium | Δ | Block-t |
+|---|---:|---:|
+| **k3** Mehrfarbige Felder | +1,59 | **2,58** |
+| **k5** Eckplatten | +0,34 | **2,79** |
+| k1 Vertikale Reihen | −0,09 | 0,23 |
+| k2 Diagonale Reihen | +0,07 | 1,00 |
+
+Er spielt auf die **kurzen Ketten** und laesst die teuren Geometrien liegen —
+dieselbe Kettenlaengen-Grenze wie in der Skalen-Rechnung
+(`PREREG_ownership_coupling.md` par.3), hier in Arena-Zahlen. Die Siege kommen
+mit einiger Wahrscheinlichkeit von k3/k5.
+
+**Folge fuer die Reihenfolge, und sie ist scharf:** wuerde dieser Stand als
+Champion promoviert, erzeugten seine Self-Plays k3/k5-Verhalten und weiter kein
+k1/k2 — der v22-Korpus enthielte die Zielhandlung erneut nicht. Genau die Falle,
+gegen die die Fahrplan-Reihenfolge gebaut ist. **Schritt 1 braucht also beides:
+Sieg UND Bewegung bei k1/k2.**
+
+#### Die Sieg-Haelfte, dokumentiert (Zurechnung fehlt)
 
 `alphazero_v21-b18_best.onnx` @400 gegen Champion @400, 407 Seeds, keine Remis:
 
@@ -66,8 +93,16 @@ anders als im Nullarm. Zwei Vorbehalte, beide offen:
    p = 0,2025). Der Sieg ueber den Champion steht, die Zurechnung zum Kopf
    nicht.
 
-Reihenfolge daraus: **erst Brettwechsel** (billig, entscheidet den Vorbehalt 1
-und verdoppelt die Paarungen fuer Vorbehalt 2), dann Gating.
+**NICHT FREIGEGEBEN (Nutzer 2026-08-18):** *"es ist good to know, aber noch
+nicht von mir freigegeben den champion herauszufordern"*. Also **kein
+Brettwechsel-Lauf, kein Gating, keine Promotion** auf diesem Stand — die Zahlen
+sind Kenntnisstand, kein Auftrag. Der Grund liegt oben: die Platten-Haelfte
+fehlt, und ein Champion ohne k1/k2 wuerde den v22-Korpus wieder ohne die
+Zielhandlung erzeugen.
+
+Wenn Schritt 1 spaeter freigegeben wird, waere die Reihenfolge: erst
+Brettwechsel (billig, entscheidet Vorbehalt 1 und verdoppelt die Paarungen fuer
+Vorbehalt 2), dann Gating.
 
 ### Schritt 2 — was "genug Diversitaet" operativ heisst
 
