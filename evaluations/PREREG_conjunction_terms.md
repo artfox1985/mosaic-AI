@@ -117,6 +117,75 @@ einen kollabierten auf allen. Aber es begrenzt die Erwartung, und es ist der
 Grund, warum die Rangregel (par.9.3 dort) als eigener, spaeterer Schritt
 geplant ist: ein Rang ist kalibrierungsfrei.
 
+
+## par.5a URSACHENMESSUNG ZUR KALIBRIERUNG (2026-08-17, vor dem Bau)
+
+Nutzer-Auftrag: Massnahmen gegen die schlechte Kalibrierung ueberlegen, bevor
+gebaut wird. Sonde `tools/probes/conjunction_base_rates.py` -- Positivraten der
+ENDZUSTANDS-Labels je Quelle, 12 Dateien und 120 Partien je Praefix:
+
+| Quelle | Spalten k1 | Diagonalen k2 | Ecken k5 |
+|---|---:|---:|---:|
+| Fenster v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw | 0,21–0,62 % | 0,00–0,42 % | 26–27 % |
+| `v21_own_a` (Netz, ungelenkt) | 0,49 % | 0,00 % | 27,19 % |
+| **`v21_own_k1`** Spaltenbauer | **6,67 %** | 0,00 % | 23,33 % |
+| **`v21_own_k2`** Diagonalenbauer | 0,69 % | **20,00 %** | 25,10 % |
+| **`v21_own_k5`** Eckenbauer | **8,75 %** | 0,62 % | **38,54 %** |
+| `v21_own_k6` | 0,76 % | 0,62 % | 28,12 % |
+| `heur_own` | 0,35 % | 0,21 % | 17,19 % |
+
+> **Die Verteilungsverschiebung ist belegt.** Die Bauer-Arme haben bei genau
+> den Zielkriterien die **11- bis 48-fache** Positivrate von normalem Spiel.
+> Der Kopf lernt Spaltenvollendung praktisch ausschliesslich aus Bauer-Partien
+> und wird auf Stellungen benutzt, in denen sie fast nie vorkommt. Wenn er
+> sicher ist, ist er zu sicher -- genau das gemessene Bild (par.5).
+
+**Massnahme, daraus folgend: nachgelagerte Platt-Korrektur je Atomgruppe.**
+Zwei Parameter (A_g, B_g) auf einem sauberen Held-out gefittet, in der Engine
+vor der Verwendung als Wert angewandt. Vorbild im Baum:
+`neural_net.py::_destretch_prob` (Platt-Streckung mit A=0,0051, B=1,9269 fuer
+gestauchte Alt-Kopf-Wahrscheinlichkeiten) -- die Idiomatik existiert, sie ist
+bisher nur datenseitig und nicht inferenzseitig.
+
+**Voraussetzung, die noch fehlt:** ein dauerhaft aus JEDEM Training
+ausgesperrter Bewertungssatz. Ohne ihn wird auf Trainingsdaten gefittet und die
+Korrektur macht es schlimmer. Steht in STATUS auf der Warteschlange.
+
+**Zurueckgestellt: `pos_weight` im Ownership-Loss.** Der Loss ist schlichtes
+maskiertes BCE ohne Klassengewichtung (`train.py:1082`), und bei 2,4 %
+Grundrate ist das die mechanische Mitursache. Aber es kostet einen vollen
+Trainingslauf und macht jeden Bestandsvergleich (b18/b19/f1/w1) unvergleichbar,
+weil der Kopf ein anderer wird. Erst wenn eine Platt-Korrektur NICHT reicht.
+
+**Ein Trugschluss, ausgeraeumt:** das `tanh(E_k/50)` absorbiert die
+Ueberschaetzung NICHT. Bei k1 (7 Punkte) und p=0,95 statt echten 0,73 ergibt
+das tanh(0,133) gegen tanh(0,102), also 0,132 gegen 0,102 -- wir arbeiten im
+linearen Bereich, die 30 % Ueberschaetzung kommen zu 30 % durch.
+
+## par.5b LAYOUT-ATOME: EIGENER VERDACHT GEPRUEFT UND VERWORFEN
+
+Die Sonde zeigte die Layout-Atome bei **exakt 50,00 %** in jeder Quelle. Das
+sah nach einem strukturellen Konstantwert aus -- und haette par.3s Vorschlag
+gekippt, `E[wild_total]` daraus zu schaetzen. Nachgemessen an 120 Brettern:
+
+| Slots mit Wild-Feld je Brett | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---:|---:|---:|---:|---:|---:|
+| Bretter | 3 | 14 | 43 | 43 | 14 | 3 |
+
+**Die Zahl variiert (2..7)**, die Verteilung ist symmetrisch um 4,5 -- die
+exakten 50 % sind ein Symmetrieartefakt der Mittelung, kein Konstantwert. Der
+Verdacht ist damit ausgeraeumt.
+
+Zwei Praezisierungen fallen dabei an:
+- **Wild-Slots und Wild-FELDER stimmen 1:1 ueberein** (alle gemessenen Paare
+  sind (n,n)). `E[wild_total] = SUM P(Slot wild)` ist also exakt und nicht nur
+  naeherungsweise richtig.
+- **Der Nutzen kommt von NOCH NICHT GELEGTEN Slots.** `expected_plate_points`
+  zaehlt heute nur Wild-Felder in gelegten Slots (`scoring.rs:489`), fruehe
+  Stellungen unterschaetzen also. Die Layout-Atome sagen das ENDlayout voraus --
+  echte Vorhersage, nicht Ablesen einer sichtbaren Groesse. Der k3-Umbau aus
+  par.3 bleibt damit begruendet.
+
 ## par.6 MESSANORDNUNG
 
 Wie Tor C par.16, damit die Zahlen direkt daneben stehen:
