@@ -104,15 +104,39 @@ Wenn Schritt 1 spaeter freigegeben wird, waere die Reihenfolge: erst
 Brettwechsel (billig, entscheidet Vorbehalt 1 und verdoppelt die Paarungen fuer
 Vorbehalt 2), dann Gating.
 
-### Schritt 2 — was "genug Diversitaet" operativ heisst
+### Schritt 2 — die Diversitaet ist GEBAUT, nicht erhofft
 
-Zu klaeren VOR der Messung, damit der Smoke Test ein Kriterium hat: der
-Ownership-Kopf braucht Varianz in seinen Labels. Spielt der neue Champion zu
-deterministisch, kollabieren die 36 Feld- und 34 Atom-Ziele auf Grundraten, und
-der Kopf lernt nichts dazu — dieselbe Falle wie die Grundraten-Waechter in
-`feedback_skill_confound_already_determined`. Messgroessen: Positivrate je
-Kriterium und je Atomgruppe, Feldvarianz, Anteil der Partien mit mindestens
-einem Positiv. Vergleichsmassstab sind die Raten des v21-Fensters.
+**Nutzer-Hinweis 2026-08-18:** *"das haben wir schon mal festgehalten. hier
+variieren wir den 'zug' zur wertungsplatte mit dem seed. sprich es wird dann
+eine gleichverteilung geben bei der sich die partien mal mehr und mal weniger
+auf die wertungsplatten fokussieren"*. Der Mechanismus existiert und ist
+verdrahtet — nachgeprueft:
+
+| Baustein | Stelle |
+|---|---|
+| `MOSAIC_WERTUNG_STREUUNG_MAX`, Default **0,0 (aus)** | `net_mcts.rs:1152`, Registry `knob_registry.rs:81` |
+| Ziehung: SplitMix64 aus dem Partie-Seed, **gleichverteilt in [0, max]** | `net_mcts.rs:1164` |
+| Produktions-Verdrahtung im Self-Play, je Partie | `self_play.rs:3134-3136` |
+| Wirkt auf | `wertung_shaping_weights()` → `[w; 8]` (`net_mcts.rs:1218`) |
+| Ausgesetzt fuer Label-Rollouts (sonst Rauschen im Ziel) | `net_mcts.rs:1105 ff.` |
+
+**Korrektur einer frueheren Formulierung in dieser Datei:** hier stand, der
+Smoke Test muesse pruefen, ob der Champion "zu deterministisch" spielt. Das ist
+die falsche Richtung — die Streuung erzeugt die Diversitaet aktiv, unabhaengig
+davon, wie deterministisch das Netz ist. Der Smoke Test prueft, ob die
+gezogene Spreizung sich in den LABELS niederschlaegt.
+
+**Zwei Punkte, die dabei zu beachten sind (beide aus dem Code, nicht vermutet):**
+
+1. Die Streuung dreht das **heuristische** Plattengewicht (`wertung_progress`),
+   nicht das Ownership-Gewicht. Fuer Label-Diversitaet ist das richtig — die
+   Partien variieren im Plattenfokus, also variieren die Ownership-Ziele mit.
+2. `wertung_shaping_weights()` liefert `[w; 8]` — **derselbe** Wert fuer alle
+   acht Kriterien. Die Streuung variiert also den Plattenfokus INSGESAMT, nicht
+   je Kriterium. Damit kann k1/k2 weiter untersampelt bleiben, obwohl die
+   Spreizung insgesamt gut aussieht. **Der Smoke Test muss deshalb die
+   Positivrate von k1 und k2 EINZELN ausweisen**, nicht nur ein Diversitaetsmass
+   ueber alle Kriterien. Vergleichsmassstab sind die Raten des v21-Fensters.
 
 ### Schritt 3 — v22-Korpus
 
