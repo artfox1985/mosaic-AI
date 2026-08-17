@@ -433,6 +433,96 @@ pub fn ownership_index_for_grid(r6: usize, c6: usize) -> usize {
     ownership_field_index(r6 / 2, c6 / 2, (r6 % 2) * 2 + (c6 % 2))
 }
 
+/// Anzahl der Konjunktions-Atome je Spieler im 140er-Ownership-Kopf.
+/// ABGELESEN aus `config.py:117` (`CONJUNCTIONS_PER_PLAYER = 34`) und der
+/// Index-Liste im Docstring von `neural_net.py::_conjunctions_from_dome` --
+/// NICHT hergeleitet. Der Test `conjunction_atom_ranges_match_label_builder`
+/// haelt die Zuordnung gegen die dortige Reihenfolge fest.
+pub const CONJUNCTION_ATOMS: usize = 34;
+
+/// Atom-Bereiche je Kriterium, in der Reihenfolge des Label-Bauers:
+/// 0..6 Reihen (+3) · 6..12 Spalten (+7) · 12..14 Diagonalen (+10) ·
+/// 14..18 Eckplatten (3/3/8/8) · 18 alle Jokerfelder · 19..25 farbenreiche
+/// Reihen (+4) · 25..34 LAYOUT (`P(Slot traegt Jokerplatte)`, kein Kriterium).
+pub const ATOMS_ROWS: (usize, usize)      = (0, 6);
+pub const ATOMS_COLUMNS: (usize, usize)   = (6, 12);
+pub const ATOMS_DIAGONALS: (usize, usize) = (12, 14);
+pub const ATOMS_CORNERS: (usize, usize)   = (14, 18);
+pub const ATOM_WILD_ALL: usize            = 18;
+pub const ATOMS_COLORFUL: (usize, usize)  = (19, 25);
+pub const ATOMS_LAYOUT: (usize, usize)    = (25, 34);
+
+/// Eckplatten-Punktwerte in der Atom-Reihenfolge der Slots
+/// (0,0) (0,2) (2,0) (2,2) -- identisch zu [`expected_plate_points`].
+const CORNER_POINTS: [f64; 4] = [3.0, 3.0, 8.0, 8.0];
+
+/// Wie [`expected_plate_points`], aber die KONJUNKTIVEN Kriterien kommen aus
+/// den GELERNTEN Konjunktions-Ausgaengen statt aus dem Produkt der
+/// Feld-Randwahrscheinlichkeiten (`PREREG_conjunction_terms.md` par.4.1).
+///
+/// WARUM (gemessen, nicht hergeleitet): das Produkt ueber sechs Faktoren < 1
+/// kollabiert. In Tor C par.16.3 ist die Rangfolge der Plattenzuwaechse ueber
+/// die Kriterien exakt die Rangfolge der Marginalwerte -- das Kriterium mit der
+/// KURZEN Kette (Joker) bewegt sich, die mit sechs Feldern (Spalten,
+/// Diagonalen) nicht. Der Kopf schaetzt die Konjunktionen direkt.
+///
+/// AUFTEILUNG, bewusst nicht "alles umstellen":
+/// - **konjunktiv** (k0, k1, k2, k3, k5, k7) -> Atome. Nur hier kollabiert das
+///   Produkt, nur hier bringt der Umzug etwas.
+/// - **additiv** (k4 Randfelder, k6 Spezialfelder) -> weiter `p_own`. Dort ist
+///   `SUM p * punkte` EXAKT; ein Umzug auf geschaetzte Konjunktionen waere eine
+///   Verschlechterung.
+///
+/// Zwei Stellen sind mehr als Umsortieren:
+/// - **k3** bekommt seinen zustandsabhaengigen Punktwert `2 * wild_total`
+///   erstmals GESCHAETZT (`2 * SUM(Layout-Atome)`) statt aus den bereits
+///   GELEGTEN Slots gezaehlt. Die alte Zaehlung unterschaetzt frueh im Spiel
+///   systematisch. Geprueft: Wild-Slots und Wild-Felder stimmen 1:1 ueberein,
+///   die Summe ist also der richtige Schaetzer (Prereg par.5b).
+/// - **k7** wird ueberhaupt erst darstellbar -- aus Feldlabels ist "Reihe hat
+///   >= 5 Farben" prinzipiell nicht ableitbar.
+///
+/// VORBEHALT, gemessen (Prereg par.5, par.5a): der Kopf RANGIERT gut
+/// (AUC 0,83-0,91) und KALIBRIERT schlecht (Brier nur 8-14 % unter der
+/// Grundrate, ueber 0,5 ueberschaetzt er). Ursache ist eine
+/// Verteilungsverschiebung: die Bauer-Arme des Korpus haben bei den
+/// Zielkriterien die 11- bis 48-fache Positivrate von normalem Spiel. Diese
+/// Funktion benutzt die Wahrscheinlichkeit als WERT und erbt das. Eine
+/// nachgelagerte Platt-Korrektur je Atomgruppe ist der geplante naechste
+/// Schritt, sie gehoert NICHT hierher.
+pub fn expected_plate_points_conj(
+    player: &PlayerBoard,
+    p_own: &[f64; OWNERSHIP_FIELDS],
+    p_conj: &[f64; CONJUNCTION_ATOMS],
+    tile_ids: &[usize],
+) -> [f64; 8] {
+    let mut out = [0.0f64; 8];
+    let summe = |(a, b): (usize, usize)| -> f64 { p_conj[a..b].iter().sum() };
+
+    for &id in tile_ids {
+        match id {
+            0 => out[0] = summe(ATOMS_ROWS) * 3.0,
+            1 => out[1] = summe(ATOMS_COLUMNS) * 7.0,
+            2 => out[2] = summe(ATOMS_DIAGONALS) * 10.0,
+            // Punktwert geschaetzt statt gezaehlt: 2 * E[wild_total].
+            3 => out[3] = p_conj[ATOM_WILD_ALL] * 2.0 * summe(ATOMS_LAYOUT),
+            // ADDITIV -- unveraendert aus den Feldlabels.
+            4 | 6 => {
+                let bestand = expected_plate_points(player, p_own, &[id]);
+                out[id] = bestand[id];
+            }
+            5 => {
+                let (a, _) = ATOMS_CORNERS;
+                out[5] = (0..4).map(|i| p_conj[a + i] * CORNER_POINTS[i]).sum();
+            }
+            7 => out[7] = summe(ATOMS_COLORFUL) * 4.0,
+            _ => {}
+        }
+    }
+    out
+}
+
+
 /// Erwartete Plattenpunkte je Kriterium aus einer Ownership-Karte.
 ///
 /// `E_k = SUM_{Geometrie g von k} punkte_k * PROD_{Feld f in g} p_own(f)` fuer
@@ -1326,6 +1416,65 @@ mod tests {
             .filter(|&i| !(coverage_true[i] && coverage_false[i]))
             .collect();
         assert!(missing.is_empty(), "Labels ohne beide Zustaende (feuert/feuert nicht): {missing:?}");
+    }
+
+    /// Nagelt die Atom-BEREICHE (`ATOMS_ROWS` usw.) gegen den Label-Bauer fest.
+    ///
+    /// WARUM eigener Test (PREREG_conjunction_terms.md par.8 Punkt 3): ein
+    /// vertauschter Bereich wuerde `expected_plate_points_conj` still falsche
+    /// Kriterien speisen -- und das Ergebnis waere in der Arena von einem
+    /// echten Dosiseffekt nicht zu unterscheiden. Der Test oben prueft, DASS
+    /// jedes Atom beide Zustaende annehmen kann; dieser prueft, WELCHES Atom
+    /// zu welchem Kriterium gehoert.
+    #[test]
+    fn conjunction_atom_ranges_match_label_builder() {
+        // Groessen und Lueckenlosigkeit: 6+6+2+4+1+6+9 = 34.
+        let bereiche = [ATOMS_ROWS, ATOMS_COLUMNS, ATOMS_DIAGONALS, ATOMS_CORNERS,
+                        (ATOM_WILD_ALL, ATOM_WILD_ALL + 1), ATOMS_COLORFUL, ATOMS_LAYOUT];
+        assert_eq!(bereiche[0].0, 0, "erster Bereich muss bei 0 beginnen");
+        for paar in bereiche.windows(2) {
+            assert_eq!(paar[0].1, paar[1].0, "Bereiche muessen lueckenlos aneinander liegen");
+        }
+        assert_eq!(bereiche[bereiche.len() - 1].1, CONJUNCTION_ATOMS,
+                   "letzter Bereich muss bei CONJUNCTION_ATOMS enden");
+
+        let atome = |plan: &[[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6]| {
+            conjunction_atoms_spec(&player_with_grid(grid_from_plan(plan)))
+        };
+        let anzahl = |a: &[i32; 34], (von, bis): (usize, usize)| -> i32 { a[von..bis].iter().sum() };
+
+        // Eine volle SPALTE: genau ein Spalten-Atom feuert, kein Reihen-Atom.
+        let mut plan_col: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for r in 0..6 {
+            plan_col[r][5] = Some((SpaceType::Normal, Some(Blau), false));
+        }
+        let a = atome(&plan_col);
+        assert_eq!(anzahl(&a, ATOMS_COLUMNS), 1, "eine volle Spalte -> genau ein Spalten-Atom");
+        assert_eq!(a[ATOMS_COLUMNS.0 + 5], 1, "Spalte 5 -> Atom ATOMS_COLUMNS.0 + 5");
+        assert_eq!(anzahl(&a, ATOMS_ROWS), 0, "eine Spalte vollendet keine Reihe");
+        assert_eq!(anzahl(&a, ATOMS_DIAGONALS), 0, "eine Spalte vollendet keine Diagonale");
+
+        // Eine volle REIHE: genau ein Reihen-Atom, kein Spalten-Atom.
+        let mut plan_row: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for c in 0..6 {
+            plan_row[3][c] = Some((SpaceType::Normal, Some(Blau), false));
+        }
+        let a = atome(&plan_row);
+        assert_eq!(anzahl(&a, ATOMS_ROWS), 1, "eine volle Reihe -> genau ein Reihen-Atom");
+        assert_eq!(a[ATOMS_ROWS.0 + 3], 1, "Reihe 3 -> Atom ATOMS_ROWS.0 + 3");
+        assert_eq!(anzahl(&a, ATOMS_COLUMNS), 0, "eine Reihe vollendet keine Spalte");
+
+        // Hauptdiagonale (i,i): genau das ERSTE Diagonalen-Atom.
+        let mut plan_diag: [[Option<(SpaceType, Option<crate::tile::TileColor>, bool)>; 6]; 6] =
+            [[None; 6]; 6];
+        for i in 0..6 {
+            plan_diag[i][i] = Some((SpaceType::Normal, Some(Blau), false));
+        }
+        let a = atome(&plan_diag);
+        assert_eq!(a[ATOMS_DIAGONALS.0], 1, "(i,i) -> erstes Diagonalen-Atom");
+        assert_eq!(a[ATOMS_DIAGONALS.0 + 1], 0, "(i,i) ist nicht die Gegendiagonale");
     }
 
     // ── Referenzlaeufe: Boden (Zufall) und Mittelwert (Heuristik) ────────────
