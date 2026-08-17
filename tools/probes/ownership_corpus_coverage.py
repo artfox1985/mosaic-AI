@@ -9,7 +9,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-B = Path("D:/OneDrive/Documents/Projekte/mosaic-AI")
+B = Path("<REPO>")
 sys.path.insert(0, str(B))                 # config.py (Wurzel)
 sys.path.insert(0, str(B / "engine" / "py"))
 from neural_net import _conjunctions_from_dome, _ownership_from_dome  # noqa: E402

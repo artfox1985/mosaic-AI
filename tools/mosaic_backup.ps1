@@ -16,7 +16,12 @@ $ErrorActionPreference = "Continue"
 # Pfad -- der alte absolute D:\Archiv-Pfad war nach dem OneDrive-Vorfall
 # (2026-07-28) nicht mehr der echte Projektstandort.
 $src  = Split-Path -Parent $PSScriptRoot
-$dst  = "D:\OneDrive\Backups\mosaic-AI"
+# Sicherungsziel aus der Umgebung: MOSAIC_BACKUP_DIR gewinnt, sonst der
+# OneDrive-Ordner des angemeldeten Nutzers. Kein fester Pfad -- das Repo ist
+# oeffentlich (Nutzer-Entscheid 2026-08-17).
+$dst = if ($env:MOSAIC_BACKUP_DIR) { $env:MOSAIC_BACKUP_DIR }
+       elseif ($env:OneDrive)      { Join-Path $env:OneDrive "Backups\mosaic-AI" }
+       else { Write-Error "Weder MOSAIC_BACKUP_DIR noch OneDrive gesetzt -- Abbruch."; exit 1 }
 $date = Get-Date -Format "yyyy-MM-dd"
 
 New-Item -ItemType Directory -Force "$dst\mirror"          | Out-Null

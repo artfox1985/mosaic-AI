@@ -390,7 +390,7 @@ Auto-Erkennung zu vertrauen, die laut `resolve.rs` ohnehin auf `cu12`
 zurückfällt, wenn kein `CUDA_HOME`/`nvcc` gefunden wird).
 
 Torch-DLLs aus
-`C:\Users\Patrick\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\torch\lib`
+`<USER>\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\torch\lib`
 (cudart64_12, cublas64_12, cublasLt64_12, cudnn64_9 + 5 weitere cudnn-Teile,
 cufft64_11, curand64_10, nvJitLink_120_0, nvrtc64_120_0 -- 19 Dateien) neben
 die Beispiel-`.exe` kopiert, dieselbe Technik wie schon für die

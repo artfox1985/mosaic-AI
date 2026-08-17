@@ -56,8 +56,23 @@ if [ -z "$ENGINE_SRC_CHANGED" ]; then
 fi
 
 # Python-DLL im PATH voranstellen, sonst STATUS_DLL_NOT_FOUND (siehe MEMORY
-# "cargo test braucht Python-DLL im PATH").
-export PATH="/c/Users/Patrick/AppData/Local/Python/pythoncore-3.14-64:$PATH"
+# "cargo test braucht Python-DLL im PATH"). Der Pfad ist maschinenabhaengig und
+# steht deshalb NICHT mehr fest im Skript (Nutzer-Entscheid 2026-08-17: das Repo
+# ist oeffentlich, es soll keine Rechnerstruktur enthalten).
+#
+# Reihenfolge: erst MOSAIC_PYTHON_DIR, sonst aus dem gefundenen python selbst
+# ableiten. Nur falls beides scheitert, laeuft cargo ohne die DLL im PATH und
+# bricht mit STATUS_DLL_NOT_FOUND ab -- dann MOSAIC_PYTHON_DIR setzen.
+PYDIR="${MOSAIC_PYTHON_DIR:-}"
+if [ -z "$PYDIR" ] && command -v python >/dev/null 2>&1; then
+    PYDIR="$(python -c 'import sys,os; print(os.path.dirname(sys.executable))' 2>/dev/null)"
+fi
+if [ -n "$PYDIR" ]; then
+    export PATH="$PYDIR:$PATH"
+else
+    echo "pre-push: WARNUNG -- Python-Verzeichnis nicht ermittelbar." >&2
+    echo "          Bei STATUS_DLL_NOT_FOUND: MOSAIC_PYTHON_DIR setzen." >&2
+fi
 
 if [ -n "$NUR_LOGTEXT" ]; then
     echo "pre-push: engine/src/ nur in LOGTEXT/Kommentaren geaendert -- nur" >&2
