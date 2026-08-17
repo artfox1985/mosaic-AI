@@ -324,43 +324,6 @@ def _pairwise_ranking_loss(policy_logits, ranking_action_ids, ranking_child_q, r
     return loss, accuracy, n_pairs
 
 
-def _git_commit_hash() -> str | None:
-    """Best-effort HEAD-Commit-Hash. None, wenn nicht ermittelbar."""
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=str(Path(__file__).resolve().parent),
-            capture_output=True, text=True, timeout=5, check=True,
-        )
-        return out.stdout.strip()
-    except Exception:
-        return None
-
-
-def _git_is_dirty() -> bool | None:
-    """Best-effort: gibt es uncommittete Änderungen im Arbeitsbaum? None,
-    wenn nicht ermittelbar."""
-    try:
-        out = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=str(Path(__file__).resolve().parent),
-            capture_output=True, text=True, timeout=5, check=True,
-        )
-        return bool(out.stdout.strip())
-    except Exception:
-        return None
-
-
-def _engine_config() -> dict:
-    """Aktive Rust-Suchkonstanten, siehe `mosaic_rust.engine_config_json`
-    (lib.rs, Phase 2a). Best-effort: `train.py` braucht `mosaic_rust`
-    ansonsten nicht -- ein fehlendes/altes Wheel darf das Training nicht
-    verhindern, nur diesen Manifest-Teil leer/fehlerhaft lassen."""
-    try:
-        import mosaic_rust as _mr
-        return json.loads(_mr.engine_config_json())
-    except Exception as e:
-        return {"_error": f"engine_config_json nicht verfügbar: {e!r}"}
-
-
 def _destretch_wdl_target(targets_v_wdl, wdl_outcome, a, b):
     """Erosions-Arm B (`--wdl-bootstrap-destretch`): entstaucht den
     Bootstrap-Anteil des `values_wdl`-Ziels OHNE Cache-Neubau.

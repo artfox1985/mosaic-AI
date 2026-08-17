@@ -56,7 +56,10 @@ import sys
 from pathlib import Path
 from collections import Counter
 
-REPO = Path(r"D:\OneDrive\Documents\Projekte\mosaic-AI")
+# Repo-Wurzel aus dem Skriptort ableiten (tools/probes/ -> zwei Ebenen hoch).
+# Vorher stand hier ein absoluter Pfad; das Repo ist oeffentlich und soll
+# keine Rechnerstruktur enthalten (Nutzer-Entscheid 2026-08-17).
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools"))
 
 from analyze_game_log import ROUND_PREFIX  # noqa: E402

@@ -6,11 +6,14 @@ reisst -- der Konventions-Waechter hat das Wachstum zu Recht geblockt.
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
-from config import DATA_DIR, MODELS_DIR
+from config import DATA_DIR, MODELS_DIR, VALUE_WEIGHT, POINTS_WEIGHT
+from neural_net import (TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
+                        VALUE_SCHEMA_VERSION)
 
 
 def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
@@ -68,6 +71,43 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
         "traeger_dateien_je_praefix": je_praefix,
         "data_exclude": os.environ.get("MOSAIC_DATA_EXCLUDE"),
     }
+
+
+def _git_commit_hash() -> str | None:
+    """Best-effort HEAD-Commit-Hash. None, wenn nicht ermittelbar."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(Path(__file__).resolve().parent),
+            capture_output=True, text=True, timeout=5, check=True,
+        )
+        return out.stdout.strip()
+    except Exception:
+        return None
+
+
+def _git_is_dirty() -> bool | None:
+    """Best-effort: gibt es uncommittete Änderungen im Arbeitsbaum? None,
+    wenn nicht ermittelbar."""
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=str(Path(__file__).resolve().parent),
+            capture_output=True, text=True, timeout=5, check=True,
+        )
+        return bool(out.stdout.strip())
+    except Exception:
+        return None
+
+
+def _engine_config() -> dict:
+    """Aktive Rust-Suchkonstanten, siehe `mosaic_rust.engine_config_json`
+    (lib.rs, Phase 2a). Best-effort: `train.py` braucht `mosaic_rust`
+    ansonsten nicht -- ein fehlendes/altes Wheel darf das Training nicht
+    verhindern, nur diesen Manifest-Teil leer/fehlerhaft lassen."""
+    try:
+        import mosaic_rust as _mr
+        return json.loads(_mr.engine_config_json())
+    except Exception as e:
+        return {"_error": f"engine_config_json nicht verfügbar: {e!r}"}
 
 
 _SELFPLAY_FILENAME_RE = re.compile(

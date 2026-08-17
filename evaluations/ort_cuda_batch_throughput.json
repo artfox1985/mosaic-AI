@@ -30,7 +30,7 @@
     "64": 36625.73555924707,
     "8": 5029.554939007141
   },
-  "model": "D:/OneDrive/Documents/Projekte/mosaic-AI/models/alphazero_v21_2d_brierbest.onnx",
+  "model": "<REPO>/models/alphazero_v21_2d_brierbest.onnx",
   "note_de": "Volle Zeit je Batch: Merkmalspuffer -> ORT-Eingabetensoren -> session.run -> Vec<f32>-Extraktion. session.run blockiert synchron (kein separates CUDA-synchronize noetig).",
   "onnxruntime_version": "1.24.2",
   "onnxruntime_windows_build_tag": "cu12",

@@ -77,13 +77,15 @@ fn check_model(path: &str) -> bool {
 }
 
 fn main() {
-    let models_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
-    // Absolute Pfade ins Haupt-Checkout (Sicherheitsregel 1: nur lesend, nie
-    // per Junction/Symlink referenziert). Fallback auf den Worktree-relativen
-    // Pfad, falls das Beispiel woanders ausgeführt wird.
+    // Modellordner: MOSAIC_MODELS_DIR gewinnt, sonst relativ zum Crate. Vorher
+    // standen hier zwei absolute Pfade ins Haupt-Checkout (Fallback fuer den
+    // Worktree-Fall) -- das Repo ist oeffentlich und soll keine Rechnerstruktur
+    // enthalten (Nutzer-Entscheid 2026-08-17). Im Worktree stattdessen
+    // MOSAIC_MODELS_DIR auf das Haupt-Checkout zeigen lassen (nur lesend).
+    let models_dir = std::env::var("MOSAIC_MODELS_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models"));
     let candidates = [
-        r"D:\OneDrive\Documents\Projekte\mosaic-AI\models\alphazero_v17_best.onnx".to_string(),
-        r"D:\OneDrive\Documents\Projekte\mosaic-AI\models\alphazero_v18_best.onnx".to_string(),
         models_dir.join("alphazero_v17_best.onnx").to_string_lossy().to_string(),
         models_dir.join("alphazero_v18_best.onnx").to_string_lossy().to_string(),
     ];

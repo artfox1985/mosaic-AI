@@ -84,7 +84,7 @@ Zugentscheidungen bleiben heuristisch.
 ## Kuppelplatten-Faktorisierung (Slot × Rotation, analog Moon-Order)
 
 Neu diese Session (2026-07-19), **Baustein A** aus
-`C:\Users\Patrick\.claude\plans\elegant-wandering-mist.md`. Kuppelplatten-
+`<USER>\.claude\plans\elegant-wandering-mist.md`. Kuppelplatten-
 Platzierung (3×3-Raster, 4 Rotationen) war der dominante Treiber der
 riesigen Aktionsanzahl in frühen Runden (~195 Aktionen bei Zug 1). Im
 Gegensatz zu Moon-Order kodierte `action_to_id` Slot UND Rotation bisher
@@ -4189,7 +4189,7 @@ fuer 6000 Spiele = **0,247 Spiele/s** (vs. v15-Batch 0,229 Spiele/s, +8%).
 `cargo test --release` schlug beim ersten Versuch mit
 `STATUS_DLL_NOT_FOUND` fehl (Python-DLL nicht im PATH der Shell) --
 behoben durch Aufnahme von
-`C:\Users\Patrick\AppData\Local\Python\pythoncore-3.14-64` in den PATH,
+`<USER>\AppData\Local\Python\pythoncore-3.14-64` in den PATH,
 danach **161/161 Tests gruen** (1 weiterhin ignoriert). `pip install .
 --force-reinstall --no-deps` erfolgreich. Smoke-Test via
 `mosaic_rust.net_search_state_json` auf einem Runde-3-Drafting-Zustand aus
@@ -5268,7 +5268,7 @@ bleibt der in Teil 1 gemessene winzige Netto-Beitrag (+0,52 Punkte,
 v16-Korpus) ueber die Generationen konstant? v10-v13-Gewichte sind durch
 den Datenverlust (2026-07-24) weg, aber `v14b_best/v15_best/v16_best`
 haben vollstaendige Self-Play-Korpora im automatischen, nicht-loeschenden
-OneDrive-Backup-Mirror (`D:\OneDrive\Backups\mosaic-AI\mirror\data\`,
+OneDrive-Backup-Mirror (`<BACKUP>\mirror\data\`,
 robocopy /XO ohne /PURGE seit 2026-07-24) ueberlebt -- `v17_best` hatte
 nie einen eigenen Self-Play-Batch (wurde nur aus dem v16/v15/v14b-Fenster
 trainiert), dafuer 200 frische Diagnose-Spiele generiert.
