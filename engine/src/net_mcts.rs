@@ -1645,6 +1645,7 @@ fn apply_ownership_shaping_full(
     ownership: &[f32],
     w_own: f64,
     gew: &[f64; 8],
+    use_conj: bool,
 ) -> [f64; 2] {
     if w_own == 0.0 {
         return value;
@@ -1663,9 +1664,33 @@ fn apply_ownership_shaping_full(
         for (f, slot) in p_own.iter_mut().enumerate() {
             *slot = sigmoid(ownership[base + f] as f64);
         }
-        let e = crate::scoring::expected_plate_points(
-            &state.players[i], &p_own, &state.scoring_tile_ids,
-        );
+        // FORMUMSCHALTUNG (PREREG_conjunction_terms.md par.4): die konjunktiven
+        // Kriterien aus den GELERNTEN Atomen statt aus dem Produkt der
+        // Feldwahrscheinlichkeiten. Braucht den 140er-Kopf; bei schmalerem Kopf
+        // Rueckfall auf die Produktform MIT Warnung -- still zurueckfallen wuerde
+        // heissen, dass ein Knopf beim einen Checkpoint wirkt und beim anderen
+        // nicht, und das waere in der Arena von einem Dosiseffekt nicht zu
+        // unterscheiden (par.4.3).
+        let conj_breite = 2 * (crate::scoring::OWNERSHIP_FIELDS
+                               + crate::scoring::CONJUNCTION_ATOMS);
+        let e = if use_conj && ownership.len() >= conj_breite {
+            let cbase = 2 * crate::scoring::OWNERSHIP_FIELDS
+                + if i == state.current_player { 0 } else { crate::scoring::CONJUNCTION_ATOMS };
+            let mut p_conj = [0.0f64; crate::scoring::CONJUNCTION_ATOMS];
+            for (a, slot) in p_conj.iter_mut().enumerate() {
+                *slot = sigmoid(ownership[cbase + a] as f64);
+            }
+            crate::scoring::expected_plate_points_conj(
+                &state.players[i], &p_own, &p_conj, &state.scoring_tile_ids,
+            )
+        } else {
+            if use_conj {
+                warn_ownership_conj_unavailable_once(ownership.len());
+            }
+            crate::scoring::expected_plate_points(
+                &state.players[i], &p_own, &state.scoring_tile_ids,
+            )
+        };
         let mut shift = 0.0;
         for k in 0..8 {
             if gew[k] == 0.0 {
@@ -1683,7 +1708,38 @@ fn apply_ownership_shaping_full(
 /// `node_from_net_outputs`s `LeafEval::Net`-Zweig -- dieselben zwei Stellen
 /// wie [`apply_wertung_shaping`], jeweils DIREKT dahinter.
 fn apply_ownership_shaping(value: [f64; 2], state: &GameState, ownership: &[f32]) -> [f64; 2] {
-    apply_ownership_shaping_full(value, state, ownership, ownership_weight(), &ownership_weights())
+    apply_ownership_shaping_full(value, state, ownership, ownership_weight(),
+                                 &ownership_weights(), ownership_conj())
+}
+
+/// `MOSAIC_OWNERSHIP_CONJ` -- Formumschaltung des Ownership-Verbrauchers.
+/// Default **0** = Produktform, byte-identisches Bestandsverhalten. 1 = die
+/// konjunktiven Kriterien kommen aus den gelernten Atomen
+/// (`scoring::expected_plate_points_conj`).
+///
+/// Das ist KEINE Dosis, sondern ein Schalter: die Staerke regelt weiterhin
+/// `MOSAIC_OWNERSHIP_W`. Getrennt gehalten, damit Form und Dosis in der Arena
+/// einzeln messbar bleiben (PREREG_conjunction_terms.md par.6).
+pub(crate) fn ownership_conj() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_OWNERSHIP_CONJ")
+            .ok()
+            .and_then(|s| s.trim().parse::<f64>().ok())
+            .map(|v| v != 0.0)
+            .unwrap_or(false)
+    })
+}
+
+/// Einmalige Warnung, wenn `MOSAIC_OWNERSHIP_CONJ` gesetzt ist, der Kopf aber
+/// keinen Konjunktionsteil hat (72 statt 140 breit -- etwa der amtierende
+/// Champion). Absichtlich laut: siehe Begruendung an der Aufrufstelle.
+fn warn_ownership_conj_unavailable_once(len: usize) {
+    static EINMAL: std::sync::Once = std::sync::Once::new();
+    EINMAL.call_once(|| {
+        eprintln!("[mosaic] WARNUNG: MOSAIC_OWNERSHIP_CONJ ist gesetzt, aber der Ownership-Kopf ist nur {len} breit (noetig: {}). Rueckfall auf die Produktform -- die Formumschaltung ist fuer diesen Checkpoint WIRKUNGSLOS.",
+                  2 * (crate::scoring::OWNERSHIP_FIELDS + crate::scoring::CONJUNCTION_ATOMS));
+    });
 }
 
 // ── Freischalt-Shaping (Nutzer-Auftrag 2026-08-10, Messlage watchlist_v20_
@@ -9667,15 +9723,15 @@ mod tests {
 
         for zu_schmal in [Vec::new(), vec![0.0f32; 35], vec![0.0f32; 71]] {
             assert_eq!(
-                apply_ownership_shaping_full(v, &state, &zu_schmal, 0.5, &gew),
+                apply_ownership_shaping_full(v, &state, &zu_schmal, 0.5, &gew, false),
                 v,
                 "Kopfbreite {} muss sich wie w_own=0 verhalten (kein Panic, kein Teil-Shift)",
                 zu_schmal.len()
             );
         }
 
-        let out72 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(72, 2), 0.5, &gew);
-        let out140 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(140, 2), 0.5, &gew);
+        let out72 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(72, 2), 0.5, &gew, false);
+        let out140 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(140, 2), 0.5, &gew, false);
         assert_ne!(out72, v, "ein brauchbarer 72er-Kopf muss den Blattwert bewegen");
         assert_eq!(out72, out140, "72er- und 140er-Kopf muessen denselben Shift liefern (nur [0:72] wird gelesen)");
     }
@@ -9699,7 +9755,7 @@ mod tests {
         let gew = [1.0f64; 8];
         let own = synth_ownership_column(72, 2);
         let v = [0.5f64, 0.5f64];
-        let out = apply_ownership_shaping_full(v, &state, &own, w_own, &gew);
+        let out = apply_ownership_shaping_full(v, &state, &own, w_own, &gew, false);
 
         let erwartet_shift = w_own * (7.0f64 / WERTUNG_SHAPING_SCALE).tanh();
         let ego = state.current_player;
@@ -9721,7 +9777,7 @@ mod tests {
         for r in 0..6 {
             own_gegner[crate::scoring::OWNERSHIP_FIELDS + crate::scoring::ownership_index_for_grid(r, 2)] = 20.0;
         }
-        let out2 = apply_ownership_shaping_full(v, &state, &own_gegner, w_own, &gew);
+        let out2 = apply_ownership_shaping_full(v, &state, &own_gegner, w_own, &gew, false);
         assert!(
             (out2[gegner] - (v[gegner] + erwartet_shift)).abs() < 1e-6,
             "Gegner-Shift weicht ab: out2={out2:?}"
@@ -9732,7 +9788,7 @@ mod tests {
         let mut gew_aus = [1.0f64; 8];
         gew_aus[1] = 0.0;
         assert_eq!(
-            apply_ownership_shaping_full(v, &state, &own, w_own, &gew_aus),
+            apply_ownership_shaping_full(v, &state, &own, w_own, &gew_aus, false),
             v,
             "gew_1=0 muss Kriterium 1 vollstaendig abschalten"
         );
