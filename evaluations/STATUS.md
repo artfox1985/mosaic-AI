@@ -87,12 +87,31 @@ Seeds, EIN zusaetzlicher Arm (D1 mit Konjunktionsform) — der Produktform-Arm
 bei D1 liegt schon vor. **Erfolgsregel: k1 oder k2 signifikant auf Block-Ebene
 gegen die Produktform, ohne Siegverlust.** k3/k5 zaehlen NICHT.
 
-### LAEUFT GERADE (Stand Sitzungswechsel)
+### ZWEI VON DREI WEGEN ZUM PLATTENBAU SIND GESCHLOSSEN
+
+| Weg | Stand |
+|---|---|
+| Laufzeit-Regler in Produktform | **geschlossen, negativ** — Tor C wiederholt UND frisch-Seed-repliziert |
+| Policy-Destillation | **geschlossen, negativ** — Warm Start (par.10.7) UND Cold Start (par.10.9) |
+| **Aktivierung mit korrigierter Form** | **GEBAUT, NICHT GEMESSEN** — der einzige verbliebene Weg |
+
+**Cold Start `v21-b20` gegen Champion (fertig 2026-08-17 22:20):** 158/407 =
+38,8 % Siege, und gepaart gegen `b18` auf Block-Ebene k1 +0,09 (t 0,27), k2
++0,13 (t 1,00), k5 +0,06 (t 0,59) — **kein Kriterium signifikant**. Eine Policy,
+die NICHTS anderes gesehen hat als plattengelenktes Spiel, baut nicht mehr
+Platten. **Der Prior war nicht die Blockade.** Der Cold Start ist als Fahrzeug
+erledigt: schwaecher UND nicht besser bei den Platten.
+
+**Der verbliebene Weg ist begruendet, nicht bloss uebrig:** die Priormasse zeigt,
+dass `b18` den plattenbauenden Zug dominant ANBIETET (4,91x Gleichverteilung,
+129/130 Partien) — er setzt sich nur nicht durch. Genau dort greift der
+Verbraucher, und genau dort ist die Produktform die gemessene Bremse.
+
+### LAEUFT NOCH (Stand Sitzungswechsel)
 
 | Was | Wo | Zweck |
 |---|---|---|
-| `b20best_vs_ch` Arena, 407 Seeds | CPU | Cold-Start-Plattenfrage: baut eine Policy OHNE jeden Prior die Platten? Schliesst die Zurechnung Korpus-gegen-Prior (`PREREG_corpus_distillation.md` par.10.8, Vorabregel dort) |
-| **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau (hier KORREKT, weil vom Ownership-Verlust gespeist) |
+| **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau (hier KORREKT, weil vom Ownership-Verlust gespeist). Start bestaetigt: Freeze aktiv, BatchNorm-Riegel gesetzt |
 
 ### Kalibrierung: Ursache gemessen, Massnahme klar, Voraussetzung fehlt
 

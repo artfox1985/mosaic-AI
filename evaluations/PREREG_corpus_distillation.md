@@ -794,3 +794,48 @@ falschen Kopf).
 
 **Laufzeitfolge:** rund 17 min je Epoche, also etwa **11-12 Stunden** bis zum
 erwarteten Plateau. `v21-b21` haengt dahinter und kommt entsprechend spaet.
+
+### par.10.9 ERGEBNIS COLD START (2026-08-17) — DER PRIOR WAR NICHT DIE BLOCKADE
+
+`v21-b20_best` gegen den Champion, 407 Seeds, alle Regler aus, identische
+Anordnung wie par.10.7. Rohdaten `evaluations/paired_arena_env_b20best_vs_ch.json`.
+
+| | `b18` (Warm Start) | `b20` (Cold Start) |
+|---|---:|---:|
+| Siege gegen Champion | 211/407 = 51,8 % | **158/407 = 38,8 %** |
+| k1 vertikale Reihen | 0,90 | 1,03 |
+| k2 Diagonalen | 0,00 | 0,13 |
+| k5 Eckplatten | 3,48 | 3,54 |
+
+Gepaart ueber dieselben Seeds, Block-Ebene (nB=6, Schwelle |t| > 2,571):
+**k1 +0,09 (t 0,27) · k2 +0,13 (t 1,00) · k5 +0,06 (t 0,59)**. Kein Kriterium
+signifikant.
+
+> **VERDIKT nach der Vorabregel:** *"Bleiben k1 und k2 auch bei `b20` auf
+> `b18`-Niveau, ist die Zurechnung geklaert und die Policy-Destillation als Weg
+> abgeschlossen."* Genau das ist eingetreten.
+
+**Was damit geklaert ist.** Eine Policy, die **nichts anderes gesehen hat** als
+plattengelenktes Spiel — kein Warm Start, kein Prior aus 30.000 Partien — baut
+nicht mehr Platten als eine, die den Korpus obendrauf bekam. Der Prior war also
+nicht die Blockade. Der Korpus lehrt den Plattenbau nicht **auf dem Weg ueber
+die Policy**, unabhaengig davon, was vorher in den Gewichten stand.
+
+**Und der Cold Start ist als Fahrzeug erledigt:** er ist deutlich schwaecher
+(38,8 % gegen 51,8 %) und dabei nicht besser bei den Platten. Beides zusammen
+schliesst ihn aus.
+
+**Was NICHT widerlegt ist**, und es ist der einzige verbliebene Weg: die
+**Aktivierung** des Kopfes. Die Priormassen-Messung (par.16.2 in
+`PREREG_gate_c_consumer_sweep.md`) zeigt, dass `b18` den plattenbauenden Zug oft
+dominant ANBIETET (4,91x Gleichverteilungsmasse, 129 von 130 Held-out-Partien).
+Er setzt sich nur nicht durch. Genau dort greift der Verbraucher — und genau
+dort ist die Produktform die gemessene Bremse.
+
+**Damit sind zwei der drei Wege zum Plattenbau geschlossen:**
+
+| Weg | Stand |
+|---|---|
+| Laufzeit-Regler in Produktform | **geschlossen, negativ** (par.16.3 + Replikation) |
+| Policy-Destillation | **geschlossen, negativ** (par.10.7 Warm Start + par.10.9 Cold Start) |
+| **Aktivierung mit korrigierter Form** (Konjunktionsterme) | **GEBAUT, NICHT GEMESSEN** — `PREREG_conjunction_terms.md` |
