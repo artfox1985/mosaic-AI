@@ -1,0 +1,72 @@
+{
+  "version": "v19_2d_opp",
+  "run_timestamp": "20260803_121157",
+  "cli_args": {
+    "name": "v19_2d_opp",
+    "load": "v19_2d_best",
+    "epochs": 100,
+    "hidden": null,
+    "early_stop": true,
+    "show_plot": false,
+    "val_frac": 0.1,
+    "train_file_limit": null,
+    "lr": 5e-05,
+    "lr_schedule": "cosine",
+    "exclude_round5": false,
+    "ownership_weight": null,
+    "seed": 2,
+    "snapshot": false,
+    "value_weight": null,
+    "points_weight": null,
+    "value_target_variant": "nortv",
+    "encoder": "2d",
+    "value_target_lambda": 1.0,
+    "opp_points_head": true
+  },
+  "git_commit": "d38a163e5e9361b051c4f53600215c62444da79c",
+  "git_dirty": true,
+  "engine_config": {
+    "active_leaf": "Net",
+    "aggr_lambda": 0.0,
+    "bootstrap_horizon_rounds": 2,
+    "decouple_net_sims_from_actions": true,
+    "determinize_root_hidden_info": true,
+    "engine_version": "0.1.0",
+    "floor_shaping_weight": 0.3,
+    "gumbel_top_m": 16,
+    "mirror_other_val": false,
+    "num_actions": 406,
+    "points_utility_w": 0.0,
+    "points_utility_weight": 0.0,
+    "policy_mass_cutoff": 0.95,
+    "round_transition_n_samples_search": 8,
+    "round_transition_sampling": false,
+    "shuffle_stack_peek_in_search": false,
+    "use_gumbel_search": true,
+    "value_opp_epsilon": 0.1
+  },
+  "python_constants": {
+    "TD_LAMBDA": 0.5,
+    "POLICY_TARGET_SHARPEN_EXPONENT": 2.0,
+    "VALUE_WEIGHT": 0.2,
+    "POINTS_WEIGHT": 0.5,
+    "VALUE_SCHEMA_VERSION": 15
+  },
+  "corpus_composition": [
+    {
+      "prefix": "v18",
+      "files": 600,
+      "games": 6000
+    },
+    {
+      "prefix": "v17",
+      "files": 200,
+      "games": 2000
+    },
+    {
+      "prefix": "v16",
+      "files": 100,
+      "games": 1000
+    }
+  ]
+}
