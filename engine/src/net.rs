@@ -1247,37 +1247,28 @@ mod tests {
     // dieselben ersten vier Ausgaben liefern wie `eval` -- byte-identischer
     // Kern, nur ein zusaetzlicher (hier leerer) 5. Wert.
 
-    #[test]
-    fn eval_ex_matches_eval_on_legacy_model_and_opp_is_empty() {
-        // Braucht ein LEGACY-Modell OHNE opp-Kopf -- der Champion-Lader oben
-        // taugt hier nicht. Bis 2026-08-15 hing der Test an `v18_best` (aus
-        // dem Bestand gefallen) und lief seither leer-gruen; `v17_best` ist
-        // der aelteste lokal real vorhandene flache Checkpoint ohne opp-Kopf.
-        // Fehlt auch der: harter Fehler statt Skip (Nutzer-Regel: nie leer gruen).
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v17_best.onnx");
-        let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
-            "{path:?} nicht ladbar ({e}) -- Legacy-Fixture fehlt, der Test darf nicht \
-             leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
-        ));
-        assert!(!net.has_opp_head(), "v17_best hat noch keinen opp_points-Kopf");
-        let feats: Vec<f32> = vec![0.1; net.input_size];
-        let (p1, v1, m1, pt1) = net.eval(&feats).expect("eval");
-        let (p2, v2, m2, pt2, opp, own) = net.eval_ex(&feats).expect("eval_ex");
-        assert_eq!(p1, p2);
-        assert_eq!(v1, v2);
-        assert_eq!(m1, m2);
-        assert_eq!(pt1, pt2);
-        assert!(opp.is_empty(), "Legacy-Modell darf keinen opp_points-Wert liefern");
-        // Ownership-Verbraucher Teil 1: `v17_best` ist GEMESSEN (dieser Test,
-        // 2026-08-16) auch ohne `ownership`-Output exportiert worden -- der
-        // heutige Export-Vertrag (`export_onnx.py:121`) haengt den Kopf zwar
-        // immer an, dieses Alt-Modell ist aber aelter als diese Zeile. Damit
-        // deckt der Test genau den Legacy-Fall ab, den die Kopf-Erkennung
-        // aushalten muss: kein Panic, leerer Vec, Verbraucher spaeter inert.
-        // (Gegenprobe mit vorhandenem Kopf: `net_mcts.rs::net_leaf_eval_
-        // matches_pre_ownership_shaping_path_when_weight_is_zero` prueft am
-        // amtierenden Champion `own.len() == 72`.)
-        assert!(!net.has_own_head(), "v17_best hat keinen ownership-Output (Alt-Export)");
-        assert!(own.is_empty(), "ohne ownership-Output muss der 6. Rueckgabewert leer sein");
-    }
+    // ENTFERNT 2026-08-17 (Nutzer-Entscheid): der Test
+    // `eval_ex_matches_eval_on_legacy_model_and_opp_is_empty` verlangte ein
+    // Modell OHNE `opp_points`- UND OHNE `ownership`-Kopf als Fixture.
+    //
+    // Warum er weg ist, und zwar aus Ziel- und nicht aus Aufwandsgruenden: er
+    // hat zum Ziel dieses Projekts (staerkerer Spieler, Hebel Plattenblick)
+    // NICHTS beigetragen. Er versicherte gegen das Laden ausgemusterter
+    // Checkpoints -- ein Pfad, den kein Schritt auf dem Weg zu Plattenpunkten
+    // beruehrt.
+    //
+    // Dazu war die Fixture strukturell nicht haltbar: ein grosses,
+    // gitignoriertes Gewichtsfile aus der Champion-Linie, in einem Repo, das
+    // `models/` regelmaessig aufraeumt. Sie ist ZWEIMAL still verrottet -- erst
+    // hing der Test an `v18_best` und lief nach dessen Wegfall wochenlang
+    // leer-gruen, dann fehlte `v17_best` und er blockierte den Push.
+    //
+    // Kein aktuelles Modell kann ihn ersetzen: der Export-Vertrag
+    // (`export_onnx.py:121`) haengt den Ownership-Kopf immer an, das gepruefte
+    // Szenario ist also nicht mehr erzeugbar. Geprueft 2026-08-17: ALLE
+    // verbliebenen Modelle in `models/` liefern `ownership`.
+    //
+    // Falls die Kopf-Erkennung je wieder abgesichert werden soll, dann mit
+    // einer winzigen COMMITTETEN ONNX-Fixture alter Signatur -- nicht mit einem
+    // Modell aus der laufenden Linie.
 }
