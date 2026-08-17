@@ -1,0 +1,62 @@
+{
+  "version": "v17_lrfix",
+  "run_timestamp": "20260726_235642",
+  "cli_args": {
+    "name": "v17_lrfix",
+    "load": "v16_best",
+    "epochs": 20,
+    "hidden": null,
+    "early_stop": true,
+    "show_plot": false,
+    "val_frac": 0.1,
+    "train_file_limit": null,
+    "lr": 5e-05,
+    "lr_schedule": "cosine",
+    "value_weight": null,
+    "points_weight": null,
+    "value_target_variant": "nortv"
+  },
+  "git_commit": "da3ffff3f5490eb1b8513cf3fa949723c572e0e3",
+  "git_dirty": true,
+  "engine_config": {
+    "active_leaf": "Net",
+    "bootstrap_horizon_rounds": 2,
+    "decouple_net_sims_from_actions": true,
+    "determinize_root_hidden_info": true,
+    "engine_version": "0.1.0",
+    "floor_shaping_weight": 0.3,
+    "gumbel_top_m": 16,
+    "mirror_other_val": false,
+    "num_actions": 406,
+    "points_utility_weight": 0.0,
+    "policy_mass_cutoff": 0.95,
+    "round_transition_n_samples_search": 8,
+    "round_transition_sampling": false,
+    "shuffle_stack_peek_in_search": false,
+    "use_gumbel_search": true
+  },
+  "python_constants": {
+    "TD_LAMBDA": 0.5,
+    "POLICY_TARGET_SHARPEN_EXPONENT": 2.0,
+    "VALUE_WEIGHT": 0.2,
+    "POINTS_WEIGHT": 0.5,
+    "VALUE_SCHEMA_VERSION": 15
+  },
+  "corpus_composition": [
+    {
+      "prefix": "v16",
+      "files": 600,
+      "games": 6000
+    },
+    {
+      "prefix": "v15",
+      "files": 200,
+      "games": 2000
+    },
+    {
+      "prefix": "v14b",
+      "files": 100,
+      "games": 2000
+    }
+  ]
+}
