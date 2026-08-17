@@ -151,6 +151,22 @@ bisher nur datenseitig und nicht inferenzseitig.
 ausgesperrter Bewertungssatz. Ohne ihn wird auf Trainingsdaten gefittet und die
 Korrektur macht es schlimmer. Steht in STATUS auf der Warteschlange.
 
+> **ZURUECKGESTELLT am 2026-08-17 — nicht verworfen.** Der Versatz
+> ist am Kopf selbst gemessen statt aus Grundraten gefaltet
+> (`tools/probes/conjunction_marginal_normal_play.py`, b19_best, 3000 Bretter):
+> k1 0,35 Log-Odds, k0/k5/k3/k7/Layout praktisch null. Der aus den Grundraten
+> hergeleitete Wert (1,58 gegen die Bauer-Arme, 0,49 gegen die
+> Trainingsmischung) war ein Artefakt der Referenzwahl. Die Fehlkalibrierung
+> aus par.5 sitzt im OBEREN Bereich — eine Steigungsfrage, die ein Versatz
+> nicht behebt. Und die Normalspiel-Rate stammt von Netzen ohne Plattenblick;
+> darauf zu kalibrieren arbeitet dem Leitstern entgegen.
+>
+> **Wiedervorlage mit messbarem Ausloeser (Nutzer 2026-08-17):** sobald ein
+> Champion die Platten beruecksichtigt, ist das normale Spiel das
+> Zielverhalten und die Korrektur wieder legitim. Die k1-Grundrate liegt heute
+> ueber fuenf Generationen flach (p=0,68), weil keine davon Platten baut — der
+> erste, der es tut, hebt sie sichtbar. STATUS.md, Abschnitt "Kalibrierung".
+
 **Zurueckgestellt: `pos_weight` im Ownership-Loss.** Der Loss ist schlichtes
 maskiertes BCE ohne Klassengewichtung (`train.py:1082`), und bei 2,4 %
 Grundrate ist das die mechanische Mitursache. Aber es kostet einen vollen
@@ -200,6 +216,37 @@ Wie Tor C par.16, damit die Zahlen direkt daneben stehen:
 
 Der Produktform-Arm bei D1 liegt bereits vor (par.16.3), muss also nicht neu
 gespielt werden — es kommt **ein** Arm hinzu.
+
+### par.6.1 GUELTIGKEITSKONTROLLE VOR DER MESSUNG (2026-08-17, 23:44)
+
+Zwei Kontrollen, beide VOR der ersten gewerteten Partie, weil ohne sie ein
+Nicht-Erfolg nicht interpretierbar waere.
+
+**1. Das Wheel war veraltet — Beinahe-Fehlschluss.** Die installierte
+Erweiterung `mosaic_rust.cp314-win_amd64.pyd` trug den Stand **2026-08-16
+10:57**, der Konjunktionscode in `scoring.rs` / `net_mcts.rs` den Stand
+**2026-08-17 11:04 / 11:07**. Die Arena haette die ALTE Engine gefahren: der
+Konjunktionsarm waere bitgleich mit dem Produktarm gewesen, das Ergebnis
+"k1/k2 flach" — und damit haette die Messung den einzigen verbliebenen Weg
+faelschlich geschlossen. Neu gebaut und installiert 23:44:10.
+
+**2. Determinismus zuerst, dann Reglerwirkung.** Ein Differenztest ueber 8
+Seeds, hohe Dosis `1.0,3.0`, `b18_best` gegen Champion je @400:
+
+| Kontrolle | Ergebnis | Belegdatei |
+|---|---|---|
+| derselbe Arm zweimal, gleiche Seeds | **8/8 Partien identisch** (Sieger, Punktstaende, Bodenreihen) | `paired_arena_env_conj_determinism.json` |
+| Konjunktionsform gegen Produktform | **6/8 Partien kippen** (b=3/c=3) | `paired_arena_env_conj_smoke.json` |
+
+Die Reihenfolge ist der Punkt: ohne die erste Zeile beweist die zweite nichts,
+weil Abweichungen dann auch aus Nichtdeterminismus kommen koennten. Erst
+zusammen belegen sie, dass `MOSAIC_OWNERSHIP_CONJ` die Engine erreicht und das
+Spiel wirklich veraendert.
+
+**Regelbezug:** genau der Fall aus dem Merkzettel *"Wheel nach
+Engine-Aenderung neu bauen"* — gruene `cargo test` heissen nicht, dass die
+Arena den Code sieht, und Zahlengleichheit bei gleichen Seeds ist ALARM, kein
+Befund. Der Merkzettel hat hier gehalten.
 
 ## par.7 VORAB-ERFOLGSREGEL (woertlich, vor der ersten Partie)
 
