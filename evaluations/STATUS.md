@@ -81,11 +81,28 @@ Feldlabels. Bei Kopf < 140 Rueckfall MIT Warnung. Test
 `conjunction_atom_ranges_match_label_builder` nagelt die Atom-Bereiche fest.
 `cargo test --release`: 447 passed, 0 failed.
 
-**Die Arena dazu FEHLT NOCH.** Messanordnung steht fertig in
-`PREREG_conjunction_terms.md` par.6/par.7: `b18_best` gegen Champion, 407
-Seeds, EIN zusaetzlicher Arm (D1 mit Konjunktionsform) — der Produktform-Arm
-bei D1 liegt schon vor. **Erfolgsregel: k1 oder k2 signifikant auf Block-Ebene
-gegen die Produktform, ohne Siegverlust.** k3/k5 zaehlen NICHT.
+**Die Arena LAEUFT seit 2026-08-17 23:59** (Anordnung `PREREG_conjunction_terms.md`
+par.6/par.7): `b18_best` @400 gegen Champion @400, 407 Seeds, EIN zusaetzlicher
+Arm — D1 `0.1,0.3` mit `MOSAIC_OWNERSHIP_CONJ=1` —, Blockgroesse 25, mit
+`--log-games`. Der Produktform-Arm bei D1 liegt schon vor
+(`paired_arena_env_gate_c_b18.json`, Arm `0.1,0.3`), der Nullarm ebenfalls
+(`paired_arena_env_b18best_vs_ch.json`). Ausgabe: `paired_arena_env_conj_d1_b18.json`.
+**Erfolgsregel: k1 oder k2 signifikant auf Block-Ebene gegen die Produktform,
+ohne Siegverlust.** k3/k5 zaehlen NICHT.
+
+**Zwei Gueltigkeitskontrollen liefen vorher, beide dokumentiert in par.6.1:**
+
+1. **Das Wheel war veraltet — Beinahe-Fehlschluss.** Die installierte
+   `mosaic_rust.cp314-win_amd64.pyd` trug den Stand 16.08. 10:57, der
+   Konjunktionscode den Stand 17.08. 11:04/11:07. Die Arena haette die ALTE
+   Engine gefahren, der Konjunktionsarm waere bitgleich mit dem Produktarm
+   gewesen — und ein "k1/k2 flach" haette den einzigen verbliebenen Weg
+   faelschlich geschlossen. Neu gebaut 23:44:10.
+2. **Determinismus zuerst, dann Reglerwirkung.** Derselbe Arm zweimal auf
+   gleichen Seeds: **8/8 Partien identisch**. Konjunktionsform gegen
+   Produktform: **6/8 Partien kippen**. Ohne die erste Zahl beweist die zweite
+   nichts. Belege: `paired_arena_env_conj_determinism.json`,
+   `paired_arena_env_conj_smoke.json`.
 
 ### ZWEI VON DREI WEGEN ZUM PLATTENBAU SIND GESCHLOSSEN
 
@@ -111,22 +128,76 @@ Verbraucher, und genau dort ist die Produktform die gemessene Bremse.
 
 | Was | Wo | Zweck |
 |---|---|---|
-| **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau (hier KORREKT, weil vom Ownership-Verlust gespeist). Start bestaetigt: Freeze aktiv, BatchNorm-Riegel gesetzt |
+| **Konjunktions-Arena** D1 mit `MOSAIC_OWNERSHIP_CONJ=1` | CPU | der einzige verbliebene Weg zum Plattenbau, Anordnung oben. ~202 s je Block, 17 Bloecke, Start 23:59 |
+| **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau, 60 Epochen, `ownership_weight` 1,0, Seed 2 (aus `manifest_train_v21-b22_20260817_220655.json`) |
 
-### Kalibrierung: Ursache gemessen, Massnahme klar, Voraussetzung fehlt
+**Zu `b22` gehoert eine Warnung, die schon einmal fast zu einer falschen
+Aussage gefuehrt hat:** um 23:35 meldete der Harness den Lauf als "failed, exit
+code 1". Gestorben war der **Hintergrund-Wrapper der Shell**, nicht das
+Training — der Prozess rechnete weiter (belegt: CPU-Zuwachs 13 s in 20 s, GPU
+26 %, RSS flach bei 15,62 GB ueber alle Epochen, also kein Leck). Verloren ist
+die **Log-Sicht** ab Epoche 8, nicht der Lauf; die `epoch_history` im Manifest
+schliesst die Luecke am Laufende. **Regel: bei einer "failed"-Meldung zuerst
+`Get-CimInstance Win32_Process` fragen, ob das Kind noch lebt, bevor irgendwas
+neu gestartet wird.**
+
+**Teilablesung Weg 1 ueber 7 von 60 Epochen** (Einzelheiten in
+`PREREG_lr_schedule.md`): der eingefrorene Rumpf bringt den Ownership-Verlust
+von 0,3466 (= `b18_best`, Epoche 4) auf 0,3414 und flacht dabei ab (E5→E7 nur
+0,0004 je Epoche). Das gemeinsame Training stand bei derselben Epoche schon bei
+0,3339 und lief weiter auf 0,3191 (`b19` sogar 0,2994). **Herleitung, nicht
+gemessen:** die Kopfguete haengt an der Rumpfdarstellung — dann loest Weg 1 den
+Zielkonflikt nicht, sondern tauscht die Seite. Bestaetigt sich das ueber die
+restlichen 53 Epochen, ist der Frozen-Trunk-Kopf fuer den Verbraucher der
+SCHLECHTERE Kopf und `b18`/`b19` bleiben die Kandidaten.
+
+### Kalibrierung: Platt-Korrektur ZURUECKGESTELLT bis zum Platten-Champion (2026-08-17)
 
 Der Konjunktions-Kopf **rangiert gut und kalibriert schlecht** (AUC 0,83-0,91,
-Brier nur 8-14 % unter der Grundrate, ueber 0,5 ueberschaetzt er). **Ursache
-belegt:** Verteilungsverschiebung — die Bauer-Arme haben bei den Zielkriterien
-die **11- bis 48-fache** Positivrate von normalem Spiel
-(`tools/probes/conjunction_base_rates.py`).
+Brier nur 8-14 % unter der Grundrate, ueber 0,5 ueberschaetzt er) — das steht.
+Die daraus abgeleitete **Massnahme** aber faellt weg.
 
-**Massnahme:** nachgelagerte Platt-Korrektur je Atomgruppe, Vorbild
-`neural_net.py::_destretch_prob`. **Voraussetzung, die noch fehlt: ein
-dauerhaft aus JEDEM Training ausgesperrter Bewertungssatz** — sonst wird auf
-Trainingsdaten gefittet und die Korrektur macht es schlimmer. `pos_weight` im
-Loss ist zurueckgestellt (kostet einen vollen Lauf und zerstoert jeden
-Bestandsvergleich).
+**Gemessen** (`tools/probes/conjunction_marginal_normal_play.py`, `b19_best`,
+150 Normalspiel-Dateien, 1500 Partien, 3000 Bretter): Kopf-Mittelwert gegen die
+tatsaechliche Endrate derselben Partien, Runde-3-Zustaende.
+
+| Gruppe | Kopf sagt | tatsaechlich | DELTA |
+|---|---|---|---|
+| Reihen k0 | 4,294 % | 4,278 % | 0,00 |
+| **Spalten k1** | 0,731 % | 0,517 % | **0,35 ± 0,10** |
+| Diagonalen k2 | 0,453 % | 0,117 % | 1,36 ± 0,38 (nur 7 Positive) |
+| Ecken k5 | 26,692 % | 26,650 % | 0,00 |
+| Joker k3 | 40,881 % | 39,800 % | 0,04 |
+| farbenreich k7 | 0,955 % | 1,017 % | −0,06 |
+| Layout (k3-Input) | 49,777 % | 50,000 % | −0,01 |
+
+**Die Herleitung aus Grundraten war ein Artefakt der Referenzwahl.** Gegen die
+Bauer-Arme gerechnet ergibt k1 einen Versatz von 1,58, gegen die
+Trainingsmischung 0,49 — gemessen sind 0,35. Eine ungeprueft eingetragene
+Konstante haette den Kopf dreifach zu stark gedaempft. **Regel daraus:** einen
+Prior-Versatz nie aus Grundraten falten, wenn man ihn am Kopf selbst messen
+kann; die Referenzwahl bewegt ihn um den Faktor 3.
+
+**Nutzer-Einwand, der auch die 0,35 entwertet (2026-08-17):** die
+Normalspiel-Rate stammt aus Partien von Netzen, die die Wertungsplatten NICHT
+beruecksichtigen. Den Kopf darauf zu eichen hiesse, ihn auf genau das Verhalten
+zu kalibrieren, das der Leitstern abschaffen will — seine Spalten-Zuversicht
+wegzurechnen ist das Gegenteil des Hebels.
+
+**Was NICHT widerlegt ist:** `PREREG_ownership_selector.md` par.9.2 hat die
+Fehlkalibrierung im OBEREN Bereich gemessen (Top-Bin Spalten: vorhergesagt
+0,949). Das ist eine Steigungsfrage (B != 1), kein Versatz — ein Offset haette
+sie ohnehin nie behoben. `pos_weight` im Loss bleibt zurueckgestellt (kostet
+einen vollen Lauf und zerstoert jeden Bestandsvergleich).
+
+**WIEDERVORLAGE, mit messbarem Ausloeser (Nutzer 2026-08-17):** sobald ein
+Champion die Wertungsplatten beruecksichtigt, wird die Kalibrierung wieder
+legitim — dann IST das normale Spiel das Zielverhalten. Der Ausloeser steht
+schon fest: die k1-Grundrate liegt heute ueber **fuenf** Generationen flach bei
+~0,52 % (Chi2 2,3 bei 4 FG, p=0,68; k0 driftet dagegen klar, Chi2 40,5), und
+zwar WEIL keine davon Platten baut. Der erste Champion, der es tut, hebt sie
+sichtbar. **Dieser Ausschlag ist das Startsignal fuer Platt-Korrektur UND
+festen Bewertungssatz** — beide dann mit genau jenem Champion erzeugt.
 
 ### LR-Schedules: reaktive Verfahren sind hier strukturell zu spaet
 
@@ -159,7 +230,7 @@ das.
 | **Gewichtsarm 4,0** | Vorabregel hat ihn freigegeben (`PREREG_ownership_weight_new_window.md` par.7); Nutzer-Entscheid 2026-08-17: **weiter hinten geparkt** |
 | **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr |
 | **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) — nicht neu vorschlagen |
-| **Fester Bewertungssatz** | noetig fuer die Platt-Korrektur: einige Korpusdateien dauerhaft aus jedem Training aussperren |
+| **Fester Bewertungssatz** | **auf Wiedervorlage**, Ausloeser = erster plattenbewusster Champion (s.o.), dann mit DIESEM erzeugt. Rechnung steht und bleibt gueltig: 300 Dateien = 204 k1-Positive (SE 0,07), ~15 k2; **erzeugen** (3000 Partien, 2,5-8 h) statt aus dem Fenster entnehmen. Bis dahin verbliebener Zweck: Kopfvergleiche ueber Fenstergrenzen, Steigungsfrage B != 1 |
 | **Push** | `main` ist lokal voraus; Suite gruen, Push moeglich |
 
 ### FALLEN, die am 2026-08-17 Zeit gekostet haben
@@ -173,6 +244,16 @@ das.
 | Gate-A-Held-out ueberlappt `b18`/`b19`-Training zu **88 %** | Kopfvergleiche ueber Fenstergrenzen brauchen einen festen Bewertungssatz. Der Paarvergleich b18↔b19 bleibt gueltig (identischer Trainingssatz, identisch betroffen) |
 | Nach einer Code-Auslagerung reicht `ast.parse` NICHT | Kurzlauf mit `--train-file-limit` fahren. Zwei `NameError` haetten `b20` sofort getoetet |
 | `--promote-winner` ist bei `paired_gating.py` Default TRUE | Messlaeufe brauchen `--no-promote-winner` |
+
+### FALLEN vom 2026-08-17 (Nacht) / 2026-08-18
+
+| Falle | Regel daraus |
+|---|---|
+| **Das installierte Wheel war 25 h aelter als der Engine-Code** | Vor JEDER Arena, die neuen Engine-Code messen soll: `.pyd`-Zeitstempel gegen die `.rs`-Zeitstempel halten. Haette hier ein falsches "Konjunktionsform bringt nichts" erzeugt und den einzigen verbliebenen Weg geschlossen. Danach ZWEI Kontrollen, in dieser Reihenfolge: erst Determinismus (derselbe Arm zweimal, muss 8/8 gleich sein), dann Reglerwirkung (muss abweichen). Umgekehrt beweist die zweite nichts |
+| **Harness-Meldung "failed, exit code 1" betraf den Wrapper, nicht das Training** | Bei jeder Fehlmeldung zuerst `Get-CimInstance Win32_Process` fragen, ob das Kind lebt. Sonst startet man einen 7-Stunden-Lauf neu, der noch laeuft — oder erklaert ihn faelschlich fuer tot |
+| **Arena ohne `--log-games` gestartet** | Die Plattenkriterien k1/k2/k5 kommen aus den Partie-Logs (`tools/plate_points_from_arena.py`). Ohne den Schalter fehlt das Feld `log` und das vorregistrierte Erfolgskriterium ist NICHT berechenbar. Vor dem Start eine Referenzdatei aufmachen und die benoetigten Felder vergleichen |
+| `nohup … &` in einem Bash-Aufruf | Der Wrapper meldet sofort "completed" und der Lauf ist nicht mehr harness-verfolgt. `run_in_background` benutzen, ohne `&`. **Steht schon im Merkzettel und ist wieder passiert** |
+| Aus einem Dict mit `' '.join(...)` lesen liefert die SCHLUESSEL | Wirkte wie ein Manifest-Mangel ("`cli_args` speichert keine Werte"), war ein Lesefehler. Vor einer Mangel-Behauptung die Datenstruktur ansehen |
 
 ---
 

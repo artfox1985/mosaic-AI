@@ -205,3 +205,39 @@ mit val_combined.**
 **Der Knopf bleibt drin** (Default `none`, nichts veraendert sich ohne
 Zutun) — fuer Regime mit unbekanntem Saettigungspunkt, etwa den Cold Start
 `v21-b20`, ist er weiter die richtige Wahl. Nur fuer den Warm Start nicht.
+
+### ERGEBNIS WEG 1 — TEILABLESUNG UEBER 7 VON 60 EPOCHEN (2026-08-17)
+
+`v21-b22`: Frozen Trunk auf `v21-b18_best`, lr 5e-4, `plateau`, 60 Epochen,
+`ownership_weight` 1,0, Seed 2 (aus `manifest_train_v21-b22_20260817_220655.json`).
+
+**Der Lauf laeuft noch** — was hier steht, ist die Ablesung der ersten sieben
+Epochen, nicht das Endergebnis. Grund fuer die Luecke: der Hintergrund-Wrapper
+der Shell starb (Exit 1), das Training selbst laeuft weiter (PID-Pruefung:
+CPU-Zuwachs 13 s in 20 s, GPU 26 %). Verloren ist die Log-Sicht, nicht der Lauf.
+Die `epoch_history` im Manifest schliesst die Luecke am Laufende.
+
+| | Own-Val |
+|---|---:|
+| `b18_best` = Epoche 4, Startpunkt von `b22` | 0,3466 |
+| `b22` Frozen Trunk E1 | 0,3438 |
+| **`b22` E7** | **0,3414** |
+| `b18` gemeinsames Training, dieselbe E7 | 0,3339 |
+| `b18` E15 | 0,3191 |
+| `b19` E15 (Gewicht 2,0) | 0,2994 |
+
+Der eingefrorene Rumpf bringt den Kopf in sieben Epochen um **0,0052** voran
+und flacht dabei ab (E5→E7 nur noch 0,0004 je Epoche); die LR ist nie gefallen,
+weil `plateau` bei minimaler Besserung nicht ausloest. Das gemeinsame Training
+schaffte im selben Fenster 0,0127 und lief weiter auf 0,3191.
+
+**Lesart, ausdruecklich als Herleitung markiert:** die Kopfguete haengt an der
+Rumpfdarstellung, nicht an der Kopfkapazitaet. Dann loest Weg 1 den
+Zielkonflikt nicht, sondern tauscht die Seite — Policy erhalten, Kopf
+verschenkt. Falls die restlichen 53 Epochen das bestaetigen, ist der
+Frozen-Trunk-Kopf fuer den Konjunktions-Verbraucher der SCHLECHTERE Kopf, und
+`b18`/`b19` bleiben die Kandidaten.
+
+**Was das nicht sagt:** ob ein guter Ownership-Kopf ueberhaupt Plattenpunkte
+eintraegt. Das entscheidet der Verbraucher, nicht der Kopf — Tor C par.15 hat
+Kopfguete schon einmal als Engpass ausgeschlossen.
