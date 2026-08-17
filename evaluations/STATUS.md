@@ -1,204 +1,159 @@
 # Mosaic-AI — Status & Fahrplan
 
-**Hier steht nur AKTUELLES und OFFENES.** Alles Abgeschlossene liegt in
+**Hier steht nur AKTUELLES und OFFENES.** Abgeschlossenes liegt in
 **`../archive/history.md`**.
 
 ---
 
-## STAND 2026-08-16 (spaeter Abend)
+## DAS ZIEL (Leitstern — Nutzer-Auftrag 2026-08-17: bei jeder Priorisierung im Kopf behalten)
 
-**Champion unveraendert: `v21_2d_brierbest`, Elo 1358** [1292, 1434] --
-aber es gibt erstmals seit v21 einen ernsthaften **Herausforderer**, siehe
-unten. Paritaets-Hash `8c6684ff...` haelt.
+> *"das netz spielt die basis an sich schon gut, aber nimmt keine ruecksicht auf
+> die wertungsplatten. das wollen wir via injektion -> selfplay -> ownership
+> head in den griff bekommen. dann sind nochmal je partie 10 punkte und mehr
+> drinnen"*
 
-### Die Plattenagenda: was wirklich gemessen ist (Stand nach dem Traeger-Befund)
+1. **Ziel: ein staerkerer Spieler**, gemessen am **direkten Duell** gegen den
+   Champion. Zielgroesse: **"Sieg mit vielen Punkten"** — nicht Punkte allein.
+2. **Hebel: der Plattenblick.** Die Grundmechanik spielt das Netz kompetent und
+   laesst 10+ Punkte je Partie liegen.
 
-Der Ownership-Kopf hat zwei Wege ins Spiel. **Keiner von beiden ist bisher
-fair geprueft worden** -- das ist die Korrektur eines frueheren, zu
-zuversichtlichen Eintrags an dieser Stelle:
+**Klausel, die schon sechs Vorschlaege aussortiert hat:** ein Plattenzuwachs,
+der Siege kostet, ist KEIN Erfolg. Ein Zuwachs bei den Zaehl-Kriterien (k3/k4)
+zaehlt nicht — gefragt sind die konjunktiven k1/k2/k5.
 
-| Weg | Stand |
-|---|---|
-| **Laufzeit-Regler** (Tor C) | Gemessen NEGATIV (98/89/86/84 Siege ueber die Dosisstufen), aber an Vehikeln, deren Policy den Plattenbau nie gesehen hat. Belegt ist nur "nuetzt nichts bei plattenblinder Policy" -- Destillations-Prereg par.10.6 |
-| **Destillation** | **Hat nie stattgefunden.** Der Korpus war in allen sieben Laeufen policy-maskiert (siehe Befund unten) |
+**Vor jeder Arbeit fragen: was traegt das dazu bei?** Ownership-Kopf, Korpus,
+Regler, Konjunktionsterme, LR-Schedules, Traeger-Manifeste sind WERKZEUG ohne
+Eigenwert. Am 2026-08-17 wurde ein Legacy-Test gestrichen, weil die Antwort auf
+diese Frage "nichts" war.
 
-Was davon **haelt**: die Zerlegung `w1_best` gegen `w0_best` -- ein
-Manifest-Feld Unterschied, und der Ownership-Verlust im Training faellt auf
-allen vier Messgroessen negativ aus (Siege 321:333, Marge 13,89:15,99, Platten
-2,84:3,40, Strafleiste 9,89:8,87; n=407 gepaart, beide Arme blind). Auch das
-allerdings ohne Policy-Beitrag des Korpus gemessen.
+---
 
-### Der Herausforderer `w0_best` -- im direkten Duell GESCHEITERT
+## STAND 2026-08-17 (Nachmittag) — Champion unveraendert `v21_2d_brierbest`
 
-Block H (gegen Heuristik@150, 4 Arme x 407 Partien, alle Regler aus):
+### DER BEFUND DES TAGES: der Korpus war policy-maskiert
 
-| Arm | Siege | Marge | Platten | Boden | McNemar gegen CH |
-|---|---:|---:|---:|---:|---:|
-| CH `v21_2d_brierbest` | 296/407 | 11,26 | 2,42 | 10,49 | -- |
-| `w0_best` | **333/407** | 15,99 | 3,40 | 8,87 | 0,0017 |
-| `w1_best` / `f1` | 321/407 | 13,89 | 2,84 | 9,89 | 0,0314 |
-
-**Das direkte Duell sagt das Gegenteil** (2026-08-16 17:00,
-`paired_gating_w0best_vs_champion.json`, beide @400, Brett-Tausch je Paar):
-**w0_best 43:57 gegen den Champion**, SPRT nimmt H0 nach 50 Paaren an,
-Vorzeichentest p=0,21, KI [-0,652, +0,092]. Kein signifikanter Unterschied in
-beide Richtungen, nominal hinten. **Champion bleibt `v21_2d_brierbest`.**
-
-> **STEHENDE LEHRE:** der Vergleich ueber den Heuristik-Anker sagt die
-> Kopf-an-Kopf-Staerke NICHT vorher. Zwei Faelle zeigen es (F1 bei n=12,
-> w0_best bei n=100): indirekt vorne, direkt hinten. Ein Arm, der nur im
-> Anker fuehrt, ist KEIN Gating-Kandidat, sondern ein Kandidat FUER ein
-> Gating.
-
-Offen und unerklaert: w0_best macht im direkten Duell MEHR Punkte im Schnitt
-(45,44 gegen 44,77) und gewinnt trotzdem seltener.
-
-**Falle:** `tools/paired_gating.py:473` hat `--promote-winner` per Default auf
-TRUE und schreibt `models/champion.txt` selbsttaetig um. Messlaeufe brauchen
-`--no-promote-winner`.
-
-### BEFUND 2026-08-16 ABENDS: der Ownership-Korpus war policy-maskiert
-
-**Der Policy-Kopf hat den Lehrkorpus nie gesehen** -- in keinem der sieben
-Modelle, die ihn im Training hatten (`w0`, `w01`, `w02`, `w05`, `w1`, `F1`,
-`F2`).
-
-Mechanik, mit der Funktion selbst nachgerechnet
-(`engine/py/neural_net.py:679` `_is_policy_carrier`, `:667`
-`WDL_GENERATOR_PREFIXES`, `:1804` die Anwendung): Traeger ist nur, wer im
+**Der Policy-Kopf hat den Lehrkorpus in SIEBEN Trainingslaeufen nie gesehen**
+(`w0`, `w01`, `w02`, `w05`, `w1`, `F1`, `F2`). Traeger ist nur, wer im
 Traeger-Manifest gelistet ist oder mit `selfplay_v19wdl`/`selfplay_v20wdl`
-beginnt. Die Korpusdateien erfuellen beides nicht -- unter
-`policy_carrier_manifest_v20.json` (Default!) wie unter `_v21.json`. Fuer
-Nicht-Traeger gilt `pol_w = 0.0`; **nur die Policy** wird maskiert, Value-,
-Punkte- und Ownership-Ziele laufen durch.
+beginnt (`neural_net.py:679`, `:667`); fuer Nicht-Traeger gilt `pol_w = 0.0`
+(`:1804`). Value-, Punkte- und Ownership-Ziele liefen normal durch — die Laeufe
+sahen unauffaellig aus. Details: `PREREG_corpus_distillation.md` par.10.4/10.5.
 
-| | Status |
+**Behoben** mit `data/policy_carrier_manifest_own.json` (Korpus traegt Policy,
+Fenster nur Value). Das Trainingsmanifest protokolliert den Traegersatz jetzt
+je Praefix mit (`train_manifest.py`) — diese Zeile haette den Befund am ersten
+Tag gezeigt.
+
+### Was mit korrekt getragenem Korpus herauskam
+
+Neues Fenster: Korpus als Sockel (700 Dateien Policy-aktiv), `v19wdlsw`
+ausgeduennt, Gesamtmenge exakt wie v21 (2945 Dateien).
+
+| | Ergebnis |
 |---|---|
-| "Der Korpus hat die Policy geformt / nicht geformt" | **HINFAELLIG** -- inklusive der Kampagnen-Praemisse |
-| Tor A Kopfguete | **GUELTIG** -- Ownership-Ziele waren nie maskiert |
-| Tor C | **EINGESCHRAENKT** (Nutzer-Einwand, Destillations-Prereg par.10.6): der Regler steuert die SUCHE, deren Kandidaten aus dem Policy-Prior kommen -- gemessen wurde er an Vehikeln ohne plattenfaehige Policy. Belegt ist nur "nuetzt nichts bei einer Policy, die den Plattenbau nicht kennt". **Auf `v21-b18_best` zu wiederholen.** |
-| Direktes Duell, Frozen-Trunk-Riegel | **GUELTIG** |
+| **`v21-b18`** (Gewicht 1,0) | bester Checkpoint Epoche 4. Gegen Champion **211/407 = 51,8 %** (p=0,49) — **Paritaet** |
+| **Plattenbau von `b18`** | k1 +0,05 · k2 **0,00** · k5 −0,09 gegen den Champion. **Keine einzige Diagonale in 150 Partien** |
+| **`v21-b19`** (Gewicht 2,0) | Kopf besser auf 3 von 4 Kriterien, Waechter haelt (+0,49 % gegen Schwelle 2 %) → **2,0 uebernommen** |
+| **Priormasse** (`probe_column_build_prior_mass_heldout.json`) | `b18` legt auf die Bauer-Aktion **4,91x** Gleichverteilungsmasse (Champion 0,59x), in **129 von 130** Held-out-Partien vorn |
 
-**Neue Lesart, als Hypothese festgehalten:** der Korpus lief in den
-VALUE-Kopf -- 4000 Partien, in denen die Bauer absichtlich schlechter spielten
--- und der Value-Kopf traegt hier gemessen die Staerke. Die sieben Modelle
-haben Siegwahrscheinlichkeiten einer verzerrten Politik gelernt und dafuer
-kein Policy-Signal bekommen. Dass `w0_best` das direkte Duell 43:57 verliert,
-passt dazu, beweist es aber nicht. Pruefbar: Value-Kopf eines Korpus-Arms und
-des Champions auf DEMSELBEN Held-out vergleichen.
+> **Die Destillation ist gelungen — sie kommt nur nicht bis aufs Brett.** Der
+> Prior bietet den plattenbauenden Zug oft dominant an, und er verschwindet
+> zwischen Prior und Brett. Uebrig bleiben Suche und Formel, nicht die Policy.
 
-**Zwei Fallen, die dabei sichtbar wurden:**
+### Der Regler-Strang ist ABGESCHLOSSEN (negativ)
 
-1. `MOSAIC_CARRIER_MANIFEST` hat den Default `policy_carrier_manifest_v20.json`.
-   Unter dem Default traegt der SCHWARM (`v20wdlsw`) ebenfalls Policy, weil
-   `WDL_GENERATOR_PREFIXES` ohne abschliessenden Unterstrich prueft. Welches
-   Manifest bei welchem Lauf aktiv war, ist in KEINEM Trainingsmanifest
-   protokolliert.
-2. `data/` ist gitignored -- die Traeger-Manifeste, die entscheiden, welche
-   Daten den Policy-Kopf erreichen, sind **nicht versioniert**.
+Tor C auf `b18_best` wiederholt (erstmals mit plattenfaehiger Policy), dann
+frisch-Seed-repliziert: **nicht repliziert.** k5 fiel von t 2,79 auf t 1,10,
+der Siegzuwachs von p 0,066 auf p 0,699. Beide Regler bleiben Default 0.
+`PREREG_gate_c_d1_replication.md` par.6.
 
-**Stehende Regel ab jetzt:** der Traeger-Status jeder neuen Korpus-Quelle
-gehoert in die Ist-Stand-Tabelle jeder Prereg, die eine Policy-Aussage machen
-will.
+**Was UEBERLEBT und den naechsten Schritt traegt:** der k3-Zuwachs war ueber
+alle drei Dosen stabil (+1,59 / +1,20 / +1,68, Block-t bis 5,65). **Das
+Kriterium mit der KURZEN Konjunktion bewegt sich, die mit sechs Feldern nicht**
+— die Produktkollaps-Vorhersage, aus Arena-Daten bestaetigt.
 
-### STAND 2026-08-17: b18 ist paritaetisch UND plattenblind
+### NAECHSTER SCHRITT: Konjunktionsterme sind GEBAUT, aber NICHT GEMESSEN
 
-**Erstmals traegt der Korpus die Policy** (Traegersatz
-`policy_carrier_manifest_own.json`, 700 Dateien / 7.000 Partien -- mehr als der
-Champion mit 5.800). Ergebnis von `v21-b18_best` gegen den Champion, 407
-Seeds, Netz gegen Netz, alle Regler aus:
+`MOSAIC_OWNERSHIP_CONJ`, Default 0 = Produktform (byte-identisch), Commit
+`d520672`. `scoring::expected_plate_points_conj`: konjunktive Kriterien
+(k0/k1/k2/k3/k5/k7) aus den gelernten Atomen, additive k4/k6 weiter aus den
+Feldlabels. Bei Kopf < 140 Rueckfall MIT Warnung. Test
+`conjunction_atom_ranges_match_label_builder` nagelt die Atom-Bereiche fest.
+`cargo test --release`: 447 passed, 0 failed.
 
-| | b18_best | Champion |
-|---|---:|---:|
-| Siege | 211/407 = 51,8 % (p=0,49, Block-t 0,88) | 196/407 |
-| k1 vertikal | 0,90 | 0,85 |
-| **k2 Diagonalen** | **0,00** | 0,07 |
-| k5 Ecken | 3,48 | 3,57 |
+**Die Arena dazu FEHLT NOCH.** Messanordnung steht fertig in
+`PREREG_conjunction_terms.md` par.6/par.7: `b18_best` gegen Champion, 407
+Seeds, EIN zusaetzlicher Arm (D1 mit Konjunktionsform) — der Produktform-Arm
+bei D1 liegt schon vor. **Erfolgsregel: k1 oder k2 signifikant auf Block-Ebene
+gegen die Produktform, ohne Siegverlust.** k3/k5 zaehlen NICHT.
 
-**Die Destillation uebertraegt den Plattenbau nicht** -- kein Zielkriterium
-bewegt sich, keine einzige Diagonale in 150 Partien. Aber sie kostet auch
-nichts: Paritaet bei einem Policy-Kanal, der auf 200-Sims-Ziele aus einer
-schmalen Verteilung umgestellt wurde. Als Generator taugt `b18` damit, er
-liefert nur von sich aus keinen Plattenbau. Details:
-`PREREG_corpus_distillation.md` par.10.7.
+### LAEUFT GERADE (Stand Sitzungswechsel)
 
-### LAUFEND
-
-| Lauf | Was | Stand |
+| Was | Wo | Zweck |
 |---|---|---|
-| `v21-b19` | Gewicht 2,0 gegen b18s 1,0 (`PREREG_ownership_weight_new_window.md`) | GPU |
-| `v21-b20` | **Cold Start**, kein Warm Start -- liegt es am Korpus oder am Prior? | eingekettet |
-| `v21-b21` | Warm Start mit **Plateau-Scheduler** gegen b18 (`PREREG_lr_schedule.md`) | eingekettet |
+| `b20best_vs_ch` Arena, 407 Seeds | CPU | Cold-Start-Plattenfrage: baut eine Policy OHNE jeden Prior die Platten? Schliesst die Zurechnung Korpus-gegen-Prior (`PREREG_corpus_distillation.md` par.10.8, Vorabregel dort) |
+| **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau (hier KORREKT, weil vom Ownership-Verlust gespeist) |
 
-**Defekt, der dabei auffiel:** `CosineAnnealingLR` nimmt `T_max=--epochs`. Bei
-`--epochs 100` und Early Stop nach 15 faellt die LR um 5 % -- das
-Warm-Start-Standardrezept seit v12b_lr hat sein Annealing **nie** ausgespielt.
-Neu gebaut: `--lr-schedule plateau` (ReduceLROnPlateau, adaptiv, braucht den
-Horizont nicht). Bestandsvergleiche bleiben gueltig, weil alle Arme denselben
-Defekt hatten.
+### Kalibrierung: Ursache gemessen, Massnahme klar, Voraussetzung fehlt
 
-### DANACH: Tor C auf `v21-b18_best`
+Der Konjunktions-Kopf **rangiert gut und kalibriert schlecht** (AUC 0,83-0,91,
+Brier nur 8-14 % unter der Grundrate, ueber 0,5 ueberschaetzt er). **Ursache
+belegt:** Verteilungsverschiebung — die Bauer-Arme haben bei den Zielkriterien
+die **11- bis 48-fache** Positivrate von normalem Spiel
+(`tools/probes/conjunction_base_rates.py`).
 
-Der Regler war in der Messung oben AUS. Tor C ist jetzt zum ersten Mal fair --
-die Policy kann den plattenbauenden Zug vorschlagen, auch wenn sie ihn von
-sich aus nicht waehlt. Erwartung gedaempft: die Produktform-Arithmetik
-(Marginalwert k1 0,109 gegen k6 1,50) bleibt unberuehrt von der Policy.
+**Massnahme:** nachgelagerte Platt-Korrektur je Atomgruppe, Vorbild
+`neural_net.py::_destretch_prob`. **Voraussetzung, die noch fehlt: ein
+dauerhaft aus JEDEM Training ausgesperrter Bewertungssatz** — sonst wird auf
+Trainingsdaten gefittet und die Korrektur macht es schlimmer. `pos_weight` im
+Loss ist zurueckgestellt (kostet einen vollen Lauf und zerstoert jeden
+Bestandsvergleich).
 
-### Selektor-Umbau: Stufe 0 GEMESSEN, Entwurf widerlegt
+### LR-Schedules: reaktive Verfahren sind hier strukturell zu spaet
 
-`PREREG_ownership_selector.md` par.9. Beide Abbruchregeln greifen nicht, aber
-die Schwellenregel aus par.3.1 ist tot: eine absolute Schwelle feuert bei 0,7
-fuer Spalten in **0,22 %** der Tiling-Zuege und fuer Ecken in **72,4 %** --
-gleichzeitig zu selten und zu haeufig. Ursache: der Kopf **rangiert
-hervorragend** (AUC 0,83-0,91) und **kalibriert schlecht** (Brier nur 8-14 %
-besser als die Grundrate). Ersatz ist eine kalibrierungsfreie Rangregel mit
-Abstandsbedingung (par.9.3).
+Zweimal gemessen (`b21` Warm Start, `b20` Cold Start): Optimum bei Epoche 4,
+Plateau-Scheduler feuert bei 8, bester Checkpoint identisch zum konstanten
+Lauf. Auch `patience=1` waere zu spaet. **Kein weiteres Nachstellen.**
+`PREREG_lr_schedule.md` par.7.
 
-Gemessenes Hauptrisiko: Spalten-AUC 0,698 in Runde 1 gegen 0,886 in Runde 5 --
-der Kopf ist genau dort am schwaechsten, wo die Hilfe gebraucht wird.
+Nebenbefund: bei `b21` hat die LR-Senkung den Ownership-Kopf gebremst, der noch
+besser wurde — ausgeloest von `val_combined`, das den Ownership-Verlust nicht
+enthaelt. **Wer `plateau` fuer ein Kopf-Training nimmt, muss ihn mit dem
+Ownership-Verlust speisen** (im Freeze-Modus passiert das automatisch — genau
+darum laeuft `b22` so).
 
-**Zwei Korrekturen an der Diagnose in par.1**, beide vom Nutzer angestossen:
-die Platzierungsseite ist laut `PREREG_placement_side.md` par.11 NICHT die
-Blockade (Draftingseite allein 2,10; Vorzugsroute dort 0,70 = schlechtester
-von vier Anlaeufen), und das Destillations-Versagen hatte die banalere Ursache
-oben. Was beim Spaltenbauer traegt, ist die KOORDINATION beider Seiten
-(`tiling_solver.rs:1460`), nicht der Vorrang.
+Falls doch ein Schedule gewollt: **proaktiver Cosine mit `T_max` 8-10**, nicht
+20 und nicht 100. `T_max` haengt am `--epochs`-Flag — deshalb war der Cosine des
+Bestandsrezepts seit v12b_lr immer inert.
 
-### Danach in der Warteschlange
+### Cold Start `v21-b20`: Saettigung bei Epoche 4, nicht bei 40
 
-- **Stoerungs-Baustein Stufe 2 gehoert zum MOON-ORDER-KOPF** (Nutzer-Entscheid
-  2026-08-17) und ist damit KEINE offene Einzelentscheidung mehr. Er wird
-  zusammen mit dessen Optimierung angefasst, nicht davor. Stand der Messung
-  bleibt: Stoerfenster 7,63 % live belegt, Abbruchregel nicht gerissen.
-- **Gewichtsarm 4,0** -- die Vorabregel hat ihn nach b19 freigegeben
-  (`PREREG_ownership_weight_new_window.md` par.7), Nutzer-Entscheid
-  2026-08-17: **weiter hinten geparkt**, nicht jetzt.
+Erwartet waren ~40 Epochen (Nutzer-Erfahrung, vorab notiert), gemessen 4 mit
+Early Stop bei 15. Bestes `policy_val` 0,4392 gegen `b18`s 0,3899. **Der
+Policy-Kanal ist zu schmal: 7.000 Partien von null.** Kein Schedule repariert
+das.
 
-> **NICHT weiterverfolgen** (Nutzer-Entscheid 2026-08-17): den Korpus mit
-> hoeheren Sims nachgenerieren. Die Policy-Ziele des Korpus stammen aus einer
-> 200-Sims-Suche, der v21-Sockel aus 400-600 -- `b18` haelt den Champion also
-> mit MEHR (7.000 gegen 5.800), aber flacher gesuchten Policy-Zielen auf
-> Paritaet. Der Nutzer ist mit der Paritaet vorlaeufig zufrieden; die
-> Nachgenerierung waere teuer und ist ausdruecklich abgelehnt.
-
-- **Tor C auf `v21-b18_best`** -- der erste faire Test des Laufzeit-Reglers.
-- **Kontrollarm "Weitertraining ohne Korpus"** -- loest den Konfund
-  Korpus-oder-Weitertraining, ein GPU-Lauf.
-- **Fester Bewertungssatz**: ein paar Korpusdateien dauerhaft aus JEDEM
-  Training aussperren. Ohne das ist jeder Kopfvergleich ueber einen
-  Fensterwechsel hinweg kontaminiert -- gemessen 88 % Ueberlappung zwischen
-  dem Sonden-Held-out und `v21-b18`s Trainingsdaten.
-
-### Offene Punkte
+### OFFENE ENTSCHEIDUNGEN (Nutzer)
 
 | Punkt | Stand |
 |---|---|
-| **Doctest-Falle** | Eingerueckte Formelbloecke in Doku-Kommentaren werden von rustdoc als Doctests kompiliert (Pre-Push fiel darueber, `7873bf0`). Neue Formeln immer als ```text auszeichnen |
-| **Gate-B-Retest sync<->async** | offen, niedrige Prioritaet, kein Blocker |
-| **Kalibrier-Schuld** | `net_leaf_eval_sign_mostly_agrees_...` `#[ignore]` bis Neukalibrierung auf v21 |
-| **MOSAIC_GAME_TIMEOUT_SCALE** | Registratur-Status "geplant": lebt nur im Branch `async_search_stage3_archive` |
-| **Task #31 Schwierigkeitsstufen** | zurueckgestellt (Nutzer) |
-| **Hardware** | RAM 32 GB = Engpass 2, CPU 6C/12T = Engpass 1, GPU unterausgelastet |
+| **Gewichtsarm 4,0** | Vorabregel hat ihn freigegeben (`PREREG_ownership_weight_new_window.md` par.7); Nutzer-Entscheid 2026-08-17: **weiter hinten geparkt** |
+| **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr |
+| **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) — nicht neu vorschlagen |
+| **Fester Bewertungssatz** | noetig fuer die Platt-Korrektur: einige Korpusdateien dauerhaft aus jedem Training aussperren |
+| **Push** | `main` ist lokal voraus; Suite gruen, Push moeglich |
+
+### FALLEN, die am 2026-08-17 Zeit gekostet haben
+
+| Falle | Regel daraus |
+|---|---|
+| Backticks in doppelt gequoteten Bash-Argumenten werden AUSGEFUEHRT | Text mit Backticks nur ueber Heredoc mit EINFACHEN Quotes, oder ueber eine Datei. **Zweimal passiert** |
+| Zeichenklasse mit EINEM Backslash vor dem Schraegstrich trifft nur den Schraegstrich | Zwei Backslashes, und vor dem Schreiben ein Selbsttest gegen BEIDE Schreibweisen. **Zweimal passiert** |
+| `TaskStop` toetet die Kind-Bash nicht zuverlaessig | Nach dem Stoppen die Prozessliste pruefen. Folge: `v21-b20` lief doppelt |
+| `grep`-Pipe puffert blockweise | Hintergrundlaeufe ohne Pipe starten, sonst bleibt das Log minutenlang leer |
+| Gate-A-Held-out ueberlappt `b18`/`b19`-Training zu **88 %** | Kopfvergleiche ueber Fenstergrenzen brauchen einen festen Bewertungssatz. Der Paarvergleich b18↔b19 bleibt gueltig (identischer Trainingssatz, identisch betroffen) |
+| Nach einer Code-Auslagerung reicht `ast.parse` NICHT | Kurzlauf mit `--train-file-limit` fahren. Zwei `NameError` haetten `b20` sofort getoetet |
+| `--promote-winner` ist bei `paired_gating.py` Default TRUE | Messlaeufe brauchen `--no-promote-winner` |
 
 ---
 
