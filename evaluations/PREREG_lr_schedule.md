@@ -147,6 +147,61 @@ Validierung), Value-Brier, Ownership-Val und `val_combined`, in voller
 Genauigkeit. Damit ist die naechste Abschaetzung dieser Art keine Schaetzung
 mehr. Gilt ab `v21-b20`; `b18`/`b19` haben ihn noch nicht.
 
-## par.6 ERGEBNIS (leer bei Registrierung)
+## par.6 ERGEBNIS (2026-08-17)
 
-## par.7 EINSTELLEMPFEHLUNG (leer bei Registrierung)
+`v21-b21`, Early Stopping nach Epoche 15, bester Checkpoint Epoche 4. Erster
+Lauf mit `epoch_history` im Manifest, LR also in voller Genauigkeit:
+
+| Ep | LR | policy_val | val_combined | own_val |
+|---:|---|---:|---:|---:|
+| 1–7 | 5,000e-05 | 0,3974 → 0,4004 | 0,5379 → 0,5414 | 0,3702 → 0,3341 |
+| **8** | **2,500e-05** ← erste Senkung | 0,4057 | 0,5466 | 0,3320 |
+| 11 | 1,250e-05 | 0,4167 | 0,5579 | 0,3284 |
+| 14 | 6,250e-06 | 0,4252 | 0,5665 | 0,3267 |
+| 15 | 6,250e-06 | 0,4272 | 0,5685 | 0,3265 |
+
+**Vergleich mit `b18` (konstante 5e-5) am besten Checkpoint:**
+
+| | `b18` | `b21` |
+|---|---:|---:|
+| beste Epoche | 4 | 4 |
+| val_combined | 0,5304 | **0,5304** |
+| policy_val | 0,3899 | **0,3899** |
+| own_val bei Ep 15 | **0,3200** | 0,3265 |
+
+## par.7 EINSTELLEMPFEHLUNG
+
+**Eine vierte Ablesung, die ich nicht vorregistriert hatte, ist eingetreten:**
+der Scheduler greift — aber ERST NACH dem Optimum, und aendert deshalb nichts.
+Erste Senkung Epoche 8, Optimum Epoche 4. Der beste Checkpoint ist mit `b18`
+identisch, bis auf die vierte Stelle.
+
+Meine Vorab-Abschaetzung (par.5a) hatte Epoche 5 genannt und ausdruecklich als
+**Untergrenze** markiert, weil die Eingabe auf zwei Nachkommastellen gerundet
+war. Richtung richtig, Betrag um drei Epochen zu frueh. Genau dafuer steht der
+Epochen-Verlauf jetzt im Manifest.
+
+**Empfehlung: `plateau` NICHT als Warm-Start-Standard.** Der Grund ist nicht
+`patience` — auch `patience=1` waere zu spaet, weil `val_combined` erst ab
+Epoche 5 steigt und ein reaktiver Scheduler frueher gar nicht ausloesen KANN.
+Das Regime ist "schnelle Ueberanpassung, Optimum bei Epoche 4". Dagegen hilft
+kein reaktives, sondern nur ein **proaktives** Verfahren.
+
+**Was stattdessen zu versuchen waere:** ein Cosine mit `T_max` in der
+Groessenordnung des tatsaechlichen Laufs, also `--epochs 8..10` statt 100. Dann
+regelt die LR **durch** die Optimumsregion, statt danach. Das ist die
+Praezisierung der Nutzer-Vorgabe von gestern ("--epochs auf 20 stellen"):
+20 waere nach diesem Verlauf noch zu lang.
+
+**Ein Schaden, der ausdruecklich gehoert dazu:** `b21`s Ownership-Val liegt bei
+Epoche 15 mit 0,3265 SCHLECHTER als `b18`s 0,3200. Die LR-Senkungen haben den
+Ownership-Kopf gebremst, der noch monoton besser wurde — ausgeloest von
+`val_combined`, das den Ownership-Verlust gar nicht enthaelt (`train.py:1589`).
+Ein Scheduler, der auf die Policy hoert und dabei den Kopf abwuergt, ist im
+Freeze-Modus harmlos, hier aber ein echter Zielkonflikt. **Wer `plateau` je fuer
+ein Kopf-Training einsetzt, muss ihn mit dem Ownership-Verlust speisen, nicht
+mit val_combined.**
+
+**Der Knopf bleibt drin** (Default `none`, nichts veraendert sich ohne
+Zutun) — fuer Regime mit unbekanntem Saettigungspunkt, etwa den Cold Start
+`v21-b20`, ist er weiter die richtige Wahl. Nur fuer den Warm Start nicht.
