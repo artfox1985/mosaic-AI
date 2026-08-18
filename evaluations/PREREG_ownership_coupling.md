@@ -360,6 +360,62 @@ validiert wurde.
 gegen einen Arena-Arm, und sie beantwortet die einzige Frage, an der B4 haengt.
 Dasselbe Muster hat par.6 Punkt 4 fuer die Arena schon einmal richtig gemacht.
 
+#### par.6.3.1 ERGEBNIS STUFE 1 fuer k1 (2026-08-18): BESTANDEN
+
+`tools/probes/sibling_order_stability.py`, `b18_best` @400 Sims. 40 Stellungen
+aus **40 verschiedenen Partien**, je eine, ab **Runde 2**, k1-Platte aktiv.
+Kopf-Erwartung je Kandidat als `q_an - q_aus` bei `MOSAIC_OWNERSHIP_GEW` nur auf
+k1 — streng monoton in `e[1]`, also ordnungsgleich, ohne
+`expected_plate_points` nachzubauen.
+
+| | k1 |
+|---|---:|
+| Kandidaten je Stellung | 12,0 |
+| **Kendall-Tau zwischen zwei Determinisierungs-Seeds** | **+0,942** (std 0,102) |
+| t gegen 0 | +58,2 (Schwelle 1,68) |
+| numerische Spreizung des Deltas | 1,07e-03 |
+
+Beide Bedingungen halten: die Ordnung uebersteht eine komplette Neuziehung der
+verdeckten Information nahezu unveraendert, und die Spreizung liegt dreizehn
+Groessenordnungen ueber der Gleitkomma-Aufloesung. **Es ist kein Zahlenrauschen,
+das eine Rangtransformation verstaerken wuerde.**
+
+**Die inhaltliche Aussage:** der Kopf HAT bei k1 eine stabile Meinung darueber,
+welcher Geschwisterzug besser ist — sie ist nur so klein beziffert (1,07e-03 auf
+einer q-Eigenspreizung von 0,078, par.6.1), dass sie in der Wertaddition
+untergeht. Genau die Konstellation, fuer die B4 gebaut waere.
+
+**Vorbehalt, der bleibt:** Stufe 1 zeigt STABILITAET, nicht RICHTIGKEIT. Eine
+stabil falsche Ordnung bestuende diesen Test genauso. Dafuer ist Stufe 2 da.
+
+##### Zwei Methodenfehler auf dem Weg, beide korrigiert
+
+1. **Pseudoreplikation.** Der erste Sampler nahm die ersten n Drafting-
+   Stellungen in DATEIREIHENFOLGE — alle 40 kamen aus EINER Partie mit fester
+   Plattenkombination (7,1,6). Das damals gemeldete "Tau +0,629, t +12,78" ist
+   damit **zurueckgezogen**: 36 korrelierte Stellungen sind keine 36
+   Stichproben. Nebenwirkung derselben Ursache: k2 war in jener Stichprobe NIE
+   aktiv, das "kein verwertbares Paar" war ein Konstruktionsfehler und kein
+   Nullbefund. Jetzt: nach `game_id` gruppiert, eine Stellung je Partie,
+   Kriterium muss in `scoring_tile_ids` liegen.
+2. **OnceLock.** `MOSAIC_OWNERSHIP_W` wird EINMAL je Prozess gelesen. Der erste
+   Versuch fuhr alle vier Laeufe mit derselben Dosis, das Delta war ueberall
+   null. Zwei Dosen brauchen zwei Prozesse — steht jetzt im Sonden-Kopf.
+
+##### BEIFANG, nicht gesucht: der Regler ist in RUNDE 1 wirkungslos
+
+Auf 40 von 40 Runde-1-Stellungen ist `q` mit und ohne Regler **bitgleich**
+(Delta exakt 0,000). Ab Runde 2 wirkt er (Spreizung ~1e-03). **Ursache
+UNGEPRUEFT** — ein Rundentor an `apply_ownership_shaping_full` gibt es nicht.
+
+Die Parallele ist auffaellig: `tiling_solver.rs:990` sagt ueber die
+TILING-Seite *"in Runde 1 vollstaendig plattenblind"*. Gilt dasselbe fuer den
+Draft-Pol, ist der Verbraucher in der GANZEN ersten Runde auf beiden Seiten
+abwesend. Das ist kein Detail: die Kuppelplatten-Wahl der ersten Runde legt
+fest, welche Spezialfelder man sich einhandelt, und `docs/domain_knowledge.md`
+§8 haengt genau daran. **Eigene Messung noetig, bevor daraus etwas gefolgert
+wird.**
+
 ## par.7 MESSANORDNUNG
 
 Wie `PREREG_conjunction_terms.md` par.6, damit die Zahlen daneben stehen:
