@@ -384,6 +384,34 @@ zum selben Ziel. Der Einwand aus 6b, das Vollendbarkeits-Label spreche erst ab
 Runde 3 und der Aufbau beginne in Runde 2, wird dadurch **schwaecher**: in dieser
 Partie liegt der entscheidende Zug in Runde 5, also mitten im tragenden Fenster.
 
+### 6d. DAS NETZ BEWERTET DIE PLATTENZUEGE NEGATIV (2026-08-18)
+
+`static/log/game_20260818_214620_seed632335.log`, Mensch gegen Champion @400,
+Platten [3, 5, 1]. Endstand **97:59** fuer den Menschen (k1: 14 gegen 0).
+Orakel-Auswertung mit demselben Champion:
+
+| | bewertete Zuege | Ø Δwin% zum Netz-Favoriten | Top-1 |
+|---|---:|---:|---:|
+| Mensch | 33 | **3,7 pp** | 42 % |
+| KI | 43 | 1,3 pp | 49 % |
+
+Die drei groessten Abweichungen des Menschen sind **Farbsammel-Zuege**: Rang
+15/40 bei −17,5 pp, Rang 8/10 bei −13,8 pp, Rang 13/37 bei −13,7 pp.
+
+**Das verschiebt die Diagnose.** Alle Skalen-Messungen (Abschnitt 6) setzen
+voraus, das Plattensignal sei zu LEISE. Hier ist es nicht leise, sondern
+**falsch gerichtet**: das Netz haelt genau diese Zuege fuer 13-17 Prozentpunkte
+schlechter — und die Partie geht 97:59 fuer den Menschen aus. Ein zu leises
+Signal dreht man lauter; ein falsch gerichtetes nicht.
+
+**Und das Netz erkennt das ERGEBNIS**, nur nicht den Weg: bei Zug #65 springt die
+Siegwahrscheinlichkeit des Menschen auf 95,7 %. Zuordnungs-Schwaeche im Wortsinn.
+
+**n=1, und der Konfund ist benannt:** der Mensch koennte allgemein staerker sein.
+Die Messreihe, die das trennt (k1-relevante gegen neutrale Zuege DESSELBEN
+Spielers), ist registriert als `PREREG_human_game_oracle_gap.md` — mit
+Vorabregel, ab 5 replaybaren Partien.
+
 ## 7. Offene Fragen, die tragfähigste Ursache zuerst
 
 **(1) Der Lehrkorpus konnte dem VALUE-Kopf nichts beibringen — per Konstruktion.**
