@@ -560,7 +560,7 @@ pub(crate) fn ist_spalte_vollendbar(player: &PlayerBoard, spalte: usize, verblei
 /// liegen koennen als die gerade gepruefte Zielspalte. Wild/Special selbst
 /// gelten immer als vollendbar (Special-in-Special kommt laut Katalog nie
 /// vor, ein zweiter Rekursionsschritt waere aber ohnehin terminierend).
-fn ist_zelle_vollendbar(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> bool {
+pub(crate) fn ist_zelle_vollendbar(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> bool {
     let Some(sp) = player.dome_grid.get_space(r, c) else { return true };
     if sp.is_filled() {
         return true;

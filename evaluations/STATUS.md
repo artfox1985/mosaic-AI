@@ -409,6 +409,80 @@ plattenbauende Linien, die im Verlauf nie auftauchen, und koennte hoeher
 liegen. Das ist der einzige Weg, auf dem die Korrektur schon heute wirkte, und
 er ist mit einer Sonde auf Suchknoten pruefbar.
 
+### NEUER STRANG: der Shaping-Nenner ist rundenblind (2026-08-18)
+
+`WERTUNG_SHAPING_SCALE` ist fest **50** (`net_mcts.rs:1059`). Gemessen an 22
+Arena-Logs (`static/log/elo/*.log`) steht nach Runde 1 ein Punktestand von **4**
+auf dem Brett, nach Runde 5 von 47,6, nach Endwertung 55,7 (Mensch: 7,0 / 59,2 /
+74,4). Der Nenner ist also frueh um mehr als eine Groessenordnung zu grob.
+
+**Die Kurvenform ist staerke-invariant** — die Niveaus liegen 33 % auseinander,
+die Anteile am Endstand stimmen auf 0,02 ueberein (0,083 · 0,172 · 0,327 ·
+0,515 · 0,825). Genau das erlaubt ein festes Profil: der Verlauf ist
+Spielstruktur, nicht Spielstaerke.
+
+**Das Argument, das den Strang traegt:** `w` und `S` sind global austauschbar
+(im linearen `tanh`-Bereich ist `w·tanh(E/S) ~ w·E/S`), je Runde aber nicht. Die
+Dosisreihen variierten `w` und konnten eine RUNDENabhaengige Schieflage
+strukturell nicht finden. Und die ist da: bei vergleichbarer Zielerreichung
+ergibt sich heute Runde 1 ein Shift von 0,014 und Runde 5 einer von 0,139 —
+Faktor 10 zugunsten der Runde, in der nur noch <= 7 Optionen offen sind
+(Zug 1 der Runde 1: 195). **Der negative Dosisbefund ist damit nicht ungueltig,
+aber er koennte ein Artefakt sein.**
+
+**Vorregistriert: `PREREG_shaping_scale_per_round.md`.** Knopf statt Konstante
+(Default = heutiges Verhalten), Pfad A (Wertung) zuerst, `ROUND_GAIN` fest auf
+0, Erfolgsregel k1/k2 auf Block-Ebene ohne Siegverlust. **Vorbedingung vor dem
+Bau:** Saettigungspruefung auf `data/holdout` — liegt das 90-%-Quantil von
+`E_r/SCALE_r` unter 1,0, traegt ein gemeinsames Profil fuer beide Pfade, sonst
+brauchen sie getrennte. Die Verzweigung ist vorab benannt.
+
+**Einordnung, damit es niemand ueberschaetzt:** beide Shaping-Pfade sind per
+Default AUS (`MOSAIC_WERTUNG_SHAPING_W` und `MOSAIC_OWNERSHIP_W` je 0,0). Der
+Umbau repariert nichts im laufenden Spiel — er stellt die Bedingungen her, unter
+denen die Injektionsmessung ueberhaupt aussagekraeftig waere.
+
+### DER FELD-KOPF, AN DER SPALTE GEMESSEN (2026-08-18)
+
+Nutzer-Frage: der Kopf gibt je Feld P(am Ende belegt) aus -- steigt die
+Spaltenwahrscheinlichkeit, wenn ich eine Fliese lege? Sonde
+`tools/probes/ownership_column_intent.py`: bei GLEICHEM Fuellstand einer Spalte
+(Brettlage kontrolliert) die Kopf-Vorhersage fuer die noch leeren Felder,
+gegen die tatsaechliche Vollendungsrate. Runden 2-4, 30 Dateien je Arm.
+
+| Arm | Fuell | p_belegt | p_leer | Produktform | tatsaechlich | Faktor |
+|---|---|---|---|---|---|---|
+| a | 3 | 79,0 % | 27,8 % | 0,57 % | 1,1 % | 2,0x |
+| **k1** | 3 | 70,5 % | 33,3 % | **1,27 %** | **21,1 %** | **16,5x** |
+| a | 5 | 66,5 % | 22,2 % | 1,08 % | 15,8 % | 14,6x |
+| **k1** | 5 | 61,1 % | 31,1 % | **1,77 %** | **38,9 %** | **21,9x** |
+
+1. **Der Kopf sieht die Absicht kaum.** Bei Fuellstand 3 sagt er 27,8 % (a)
+   gegen 33,3 % (k1) -- Faktor 1,2, waehrend die Wirklichkeit um Faktor **19**
+   auseinanderliegt. Er ist also nicht nur "Eintreten statt Erreichbarkeit",
+   er ist auch als Eintretens-Vorhersager schwach.
+2. **Er weiss nicht, was sicher ist.** Bereits belegte Felder bekommen 61-86 %
+   statt 100 %. GEPRUEFT: 186 von 186 belegten Feldern sind am Ende belegt.
+3. **Die Produktform multipliziert sechs solcher Zahlen.** Bei Fuellstand 5
+   fehlt EIN Feld: Produkt 1,77 % gegen 38,9 % echt. Fuenf der Faktoren sind
+   Sicherheiten, die mit ~0,61 bepreist werden (0,61^5 = 0,085).
+
+**DIE LUECKE, praezise:** es gibt keinen Term, der sieht, dass ein
+DRAFTING-Zug eine Spalte voranbringt. Der Fortschrittsterm `wertung_progress`
+koennte es, liest aber nur `build_grid` und ist damit innerhalb einer Runde
+fuer jeden Drafting-Zug identisch (`archive/history.md`, Ursache am Code
+geprueft) -- deshalb hob die Injektion die vertikalen Platten nur von 0,70 auf
+1,05 Punkte. Der Kopf-Weg wiederum sieht die Absicht nicht. **Kandidat, gebaut
+und auf Default 0: `MOSAIC_ENDAWARE_W`** (`solve_rec_endaware`,
+`tiling_solver.rs:519-546`) rollt die Musterreihen auf die Kuppel aus und
+maximiert Platzierungspunkte + Endwertung -- in `history.md` als "der
+aussichtsreichste" der drei Kandidatenterme notiert. NICHT gemessen.
+
+**Korrektur einer eigenen Formulierung:** die Heuristik ist NICHT der
+plattenbewusste Spieler schlechthin -- bei Spalten liegt sie mit 1,2 %
+Vollendung (Fuellstand 3) auf dem Niveau von Arm a. Plattenbewusst ist sie bei
+den Spezialfeldern (k6), nicht bei k1.
+
 ### KALIBRIERUNG GEFITTET -- ERGEBNIS: NICHT EINBAUEN (2026-08-18)
 
 `tools/probes/conjunction_calibration_fit.py`, `b19_best`, Fit auf 25.000
@@ -440,6 +514,41 @@ Brettern des `heur`-Arms. Rohzahlen: `evaluations/conjunction_calibration_fit.js
 
 **Entscheid: kein Knopf, kein Einbau.** 0,6 % Gewinn im Fit-Satz gegen -6 %
 dort, wo es zaehlt, traegt keinen Verbraucher-Eingriff.
+
+**AUCH DIE RUNDENABHAENGIGE VARIANTE FAELLT DURCH -- Linie geschlossen.**
+Vier Varianten gegeneinander, entschieden am Transfer (V0 keine Korrektur, V1 je
+Gruppe, V2 je Gruppe UND Runde, V3 Steigung je Runde ueber die Gruppen geteilt +
+Versatz je Gruppe):
+
+| | Fit-Satz vs V0 | Transfer vs V0 | k1 Transfer | k2 Transfer |
+|---|---:|---:|---:|---:|
+| V1 | +0,27 % | **-0,01 %** | -6,0 % | -15,4 % |
+| V2 | +0,47 % | **+0,03 %** | -6,4 % | -11,5 % |
+| V3 | +0,22 % | **-0,02 %** | -7,1 % | -20,7 % |
+
+Mehr Parameter helfen NICHT -- V2 hat die meiste Freiheit und gewinnt im Fit am
+meisten, im Transfer bleibt alles null. Und bei den beiden ZIELkriterien wird es
+mit jeder Variante schlechter, waehrend k0/k5 (die keine Korrektur brauchen)
+leicht gewinnen. Kein Rausch-, sondern ein Richtungsproblem.
+
+**Die Erklaerung, die alles zusammenhaelt (Nutzer 2026-08-18):** *"der Kopf sagt
+vorher, was passieren wird, statt was erreichbar waere."* Das Ziel ist das
+Endbrett der TATSAECHLICH gespielten Partie (`_final_ownership_by_game`), also
+P(Kriterium | Stellung UND weiterspielende Politik) -- eine politikabhaengige
+Groesse. Drei Messungen stuetzen das: die Rundenabhaengigkeit (frueh Prognose,
+spaet Ablesung), der gescheiterte Transfer auf eine andere Politik, und der
+k5-Arm, der MEHR volle Spalten liefert als der k1-Arm (8,53 % gegen 6,98 %) --
+gleiche Brettgeometrie, andere Absicht, anderes Label.
+
+**Folge: kein besserer Fit, sondern ein anderes ZIEL.** Eine Groesse, die
+Erreichbarkeit misst statt Eintreten. Die Bauer-Arme sind davon schon die halbe
+Antwort -- sie sind das "was passiert, wenn man es versucht" zur selben Stellung.
+Nicht entworfen, nur festgehalten.
+
+**Einschraenkung zu einer frueheren Zahl:** V3s geteilte Rundensteigungen sind
+mit 0,866 -> 0,990 viel milder als die 0,71 -> 1,02, die der Einzelfit fuer k1
+zeigte. Der starke Rundeneffekt sitzt in den duenn besetzten Gruppen und
+verschwindet fast, sobald k5/k3 mitgewichtet werden.
 
 **Widerspruch, den ich NICHT aufloesen konnte** (ungeprueft, aber protokolliert):
 auf den KORPUS-Dateien zeigte `conjunction_reliability_by_source.py` fuer k1 im
