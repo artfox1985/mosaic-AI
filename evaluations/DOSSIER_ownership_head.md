@@ -315,7 +315,7 @@ ZEITPUNKTS.** Strafpunkte je Runde:
 | **5** | **0** | **12** |
 | Summe | 28 | 16 |
 
-**Der Mensch zahlt vorne, die KI hinten.** 25 von 28 Strafpunkten fallen in Runde
+**In DIESER Partie zahlt der Mensch vorne, die KI hinten** (zur Verallgemeinerung siehe 6c — sie haelt NICHT). 25 von 28 Strafpunkten fallen in Runde
 2-4 — der Preis dafuer, Fliesen nach FARBE statt nach Plazierbarkeit zu nehmen. In
 Runde 5 zahlt er null, weil die Spalten stehen. Die KI zahlt vier Runden je einen
 Punkt und dann **12 in Runde 5** — sie vermeidet die Kosten nicht, sie verschiebt
@@ -340,6 +340,49 @@ die 0,00 als Befund zu melden.*
 Partie:** das Vollendbarkeits-Label traegt ab Runde 3
 (`PREREG_reachability_target.md` par.10), der entscheidende Aufbau beginnt hier
 aber in Runde **2**.
+
+### 6c. ZWEITE MENSCHENPARTIE (2026-08-18) — ein Muster haelt, eines nicht
+
+`static/log/game_20260818_200516_seed585858.log`, Platten **[1, 2, 3]** (Spalten,
+Diagonalen, Mehrfarbige).
+
+| | Grundpunkte | k1 | k2 | k3 | Endstand |
+|---|---:|---:|---:|---:|---:|
+| **Mensch** | 38 | **7** | **10** | 6 | **61** |
+| KI | **40** | **0** | **0** | **12** | 52 |
+
+**WAS SICH BESTAETIGT — und es ist das Wichtigere:**
+
+1. **Die KI ist bei den Grundpunkten vorn und verliert trotzdem** (40:38, Endstand
+   52:61). Wie in 6b (41:34 → 32:47). Zwei von zwei.
+2. **Die KI holt die KURZE Kette und laesst die langen liegen.** Sie nimmt k3 mit
+   **12 Punkten** — doppelt so viel wie der Mensch — und bleibt bei k1 und k2 auf
+   **null**. Das ist die Kettenlaengen-Rangfolge aus
+   `PREREG_conjunction_terms.md` par.9.1, hier unabhaengig in einer
+   Menschenpartie. Ueber beide Partien: KI-Plattenpunkte kommen aus k5 (3) und k3
+   (12), aus k1/k2 **nie** (0/0/0/0).
+
+**WAS SICH NICHT BESTAETIGT — Ruecknahme:** das Strafprofil. Hier zahlt der Mensch
+**7** und die KI **23**; in 6b war es 28 gegen 16. Die Aussage "der Mensch zahlt
+vorne, die KI hinten" war eine Ein-Partie-Beobachtung und ist **keine Regel**. Sie
+ist in 6b entsprechend eingeschraenkt.
+
+| Runde | Mensch | KI |
+|---|---:|---:|
+| 1 | 2 | 0 |
+| 2 | 2 | 6 |
+| 3 | 1 | 2 |
+| 4 | 0 | **12** |
+| 5 | 2 | 3 |
+
+**Was in beiden Partien vorkommt:** eine schwere Spaetstrafe der KI — 12 in Runde
+5 (6b) bzw. 12 in Runde 4 (hier). Zwei Faelle, also ein Hinweis und kein Befund.
+
+**Auch der Aufbauweg unterscheidet sich:** hier 2, 2, 3, 0, **6** — die Spalte
+faellt in Runde 5 in einem Sprung; in 6b war es progressiv 2, 4, 5, 6. Zwei Wege
+zum selben Ziel. Der Einwand aus 6b, das Vollendbarkeits-Label spreche erst ab
+Runde 3 und der Aufbau beginne in Runde 2, wird dadurch **schwaecher**: in dieser
+Partie liegt der entscheidende Zug in Runde 5, also mitten im tragenden Fenster.
 
 ## 7. Offene Fragen, die tragfähigste Ursache zuerst
 
