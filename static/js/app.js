@@ -1331,7 +1331,13 @@ function renderCenter() {
   const lMoon = [...new Set(lf.moon)].map(c => {
     const n = lf.moon.filter(x=>x===c).length;
     const tiles = Array.from({length: n}, () => `<div class="tile ${normColor(c)}"></div>`).join('');
-    return `<div class="cgroup" title="${n}× ${c} — Entnahme ueber &quot;Geteilte Mondfliesen&quot;">${tiles}</div>`;
+    // BEWUSST OHNE die Klasse `cgroup`: die traegt `cursor:pointer` und
+    // `:hover .tile{transform:scale(1.12)}` (style.css:320/321). Mit ihr sah die
+    // Gruppe weiter klickbar aus und hob sich beim Anklicken hervor, ohne zu
+    // selektieren -- Nutzer-Befund 2026-08-18. Layout hier inline, ohne Zeiger
+    // und ohne Hover-Effekt.
+    return `<div style="display:flex;align-items:center;gap:2px;padding:2px;cursor:default" `
+         + `title="${n}× ${c} — Entnahme ueber &quot;Geteilte Mondfliesen&quot;">${tiles}</div>`;
   }).join('');
 
   const moonTopCounts = S.moon_top_counts || {};
