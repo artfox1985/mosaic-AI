@@ -206,7 +206,7 @@ mit val_combined.**
 Zutun) — fuer Regime mit unbekanntem Saettigungspunkt, etwa den Cold Start
 `v21-b20`, ist er weiter die richtige Wahl. Nur fuer den Warm Start nicht.
 
-### ERGEBNIS WEG 1 — TEILABLESUNG UEBER 7 VON 60 EPOCHEN (2026-08-17)
+### ERGEBNIS WEG 1 — VOLLSTAENDIG (2026-08-18): der Frozen Trunk liefert den SCHLECHTEREN Kopf
 
 `v21-b22`: Frozen Trunk auf `v21-b18_best`, lr 5e-4, `plateau`, 60 Epochen,
 `ownership_weight` 1,0, Seed 2 (aus `manifest_train_v21-b22_20260817_220655.json`).
@@ -241,3 +241,33 @@ Frozen-Trunk-Kopf fuer den Konjunktions-Verbraucher der SCHLECHTERE Kopf, und
 **Was das nicht sagt:** ob ein guter Ownership-Kopf ueberhaupt Plattenpunkte
 eintraegt. Das entscheidet der Verbraucher, nicht der Kopf — Tor C par.15 hat
 Kopfguete schon einmal als Engpass ausgeschlossen.
+
+#### Abschluss (2026-08-18) — 15 Epochen, Early Stop, Befund bestaetigt
+
+`v21-b22` ist durchgelaufen und hat `epoch_history` geschrieben. Early Stop bei
+**15** Epochen (nicht 60). Die Teilablesung oben wird exakt bestaetigt:
+
+| | Own-Val |
+|---|---:|
+| `b18_best` E4 (Startpunkt von `b22`) | 0,3466 |
+| **`b22` Frozen Trunk, bestes (E13)** | **0,3407** |
+| `b18` gemeinsames Training E15 | 0,3191 |
+| `b19` E15 (Gewicht 2,0) | 0,2994 |
+
+Der eingefrorene Rumpf gewinnt in 15 Epochen **0,0059** und steht dann
+(E9-E15 bewegen zusammen 0,0004). Das gemeinsame Training erreicht 0,3191, `b19`
+sogar 0,2994. **Weg 1 liefert also nicht den besseren, sondern den schlechteren
+Kopf** — um 0,0216 gegen `b18`, um 0,0413 gegen `b19`. Die Kopfguete haengt an
+der Rumpfdarstellung; sie einzufrieren spart die Policy und kostet den Kopf.
+Das ist jetzt gemessen, nicht mehr hergeleitet.
+
+**Zweiter Befund, er stuetzt den LR-Strang:** die LR blieb ueber alle 15 Epochen
+bei 5,00e-04. `ReduceLROnPlateau` (patience 2) hat NIE ausgeloest, weil sich der
+Verlust je Epoche noch um 0,0001-0,0002 verbesserte — das zaehlt als Fortschritt.
+Ein reaktiver Scheduler greift also selbst auf einer faktisch flachen Kurve
+nicht, solange sie monoton bleibt. Genau die strukturelle Schwaeche, die dieser
+Strang vermutet hatte.
+
+**Folge fuer den Verbraucher:** fuer die Kopplungsarbeit
+(`PREREG_ownership_coupling.md`) bleiben `b18`/`b19` die Kandidaten. Ein
+Frozen-Trunk-Kopf waere das schwaechere Werkzeug.
