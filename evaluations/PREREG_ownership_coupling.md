@@ -230,6 +230,53 @@ winzige Verschiebungen kippen ueber ~100 Entscheidungen je Partie gelegentlich
 doch. Das zu trennen ist die naechste Messung und aendert die Gewichtung von
 B1-B3: traegt der Tiling-Pol allein, gehoert die Arbeit dorthin.
 
+### par.6.2 KORREKTUR VON par.6.1 (2026-08-18) — die Sonde mass die falsche Groesse
+
+**Nutzer-Einwand, und er traegt:** *"es müssen entscheidungen am draft pool wie
+auch am tiling pool kippen. tiling kann nur das legen was drafting vorbereitet
+hat."* Genau daran zerbricht par.6.1s Lesart.
+
+**Der Fehler:** die Sonde verglich den argmax von `q`. Gumbel waehlt aber ueber
+`score = logit + sigma_q`. Das "0 von 58 Wurzelwechseln" beantwortet damit eine
+Frage, die niemand gestellt hat, und die Folgerung "der Draft ist inert" war
+falsch.
+
+**In-situ gemessen an den Arena-Logs** (b18-Seite, Nullarm gegen Konjunktion D1,
+407 gepaarte Partien, Draft-Folge = gezogene Fliesen UND gelegte Kuppelplatten):
+
+| | |
+|---|---:|
+| Draft-Entscheidungen je Partie | 17,8 |
+| Partien mit ABWEICHENDER Draft-Folge | **400 / 407** |
+| erste Abweichung, Median / Mittel | 4 / 4,95 |
+| Kipp-Rate je Draft-Entscheidung (hergeleitet, geometrisch) | **~17 %** |
+
+**Der Draft kippt also, rund jede sechste Entscheidung.** Damit loest sich auch
+der "offene Widerspruch" aus par.6.1 auf — es brauchte keinen Tiling-Pol als
+Erklaerung, und der dortige Satz "traegt der Tiling-Pol allein, gehoert die
+Arbeit dorthin" ist gegenstandslos.
+
+**Was daraus folgt, ist eine bessere Diagnose als die alte:** die STAERKE reicht,
+die RICHTUNG stimmt nicht. Der Regler lenkt 17 % der Draft-Entscheidungen um,
+und er lenkt sie nachweislich dorthin, wo ein brauchbares Marginal existiert —
+k3 +1,59 (Block-t 2,58) und k5 +0,34 (Block-t 2,79) heben sich signifikant. Bei
+k1/k2 ist das Marginal am Produkt von sechs Feldwahrscheinlichkeiten praktisch
+null, also fuehrt kein Kipp dorthin.
+
+**B1 und B2 ueberleben, mit GEAENDERTER Begruendung.** Nicht mehr "das Signal ist
+zu schwach" — es ist stark genug, um Verhalten zu aendern. Sondern: **der Anteil
+von k1/k2 am Signal ist ~0.** B2 (Skala je Kriterium) ist damit nicht die
+Lautstaerke-Schraube, sondern die Verteilungs-Schraube. B1 (Inkrement statt
+Niveau) bleibt richtig, weil der gemeinsame Sockel die unterscheidende
+Restgroesse klein haelt (gemessen: 0,0024 von 0,0026 mittlerer Verschiebung ist
+Sockel).
+
+**Was von par.6.1 GUELTIG bleibt:** die beiden Korrekturen an par.3 — `max_N` ist
+19,6 statt 50 (Verstaerkung 69,6 statt 100), und der Massstab "Gumbel-Rauschen
+1,28" gilt in der Arena nicht, weil `add_root_noise=false` die Samples
+abschaltet. Ebenso gueltig: die gemessene Aufteilung des Reglerbeitrags in einen
+fast gemeinsamen Sockel und eine kleine unterscheidende Restgroesse.
+
 ## par.7 MESSANORDNUNG
 
 Wie `PREREG_conjunction_terms.md` par.6, damit die Zahlen daneben stehen:
