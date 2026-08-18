@@ -20,6 +20,15 @@ sich `sigma_q` je Kandidat verschiebt (das ist das eingespeiste Signal) und wie
 diese Verschiebung zur Log-Prior-Spreizung derselben Kandidatenmenge steht (das
 ist, was sie ueberstimmen muesste).
 
+VORBEHALT (2026-08-18, nach dem ersten Einsatz): diese Sonde vergleicht den
+argmax von `q`. GEWAEHLT wird bei Gumbel aber ueber `score = logit + sigma_q` --
+ein unveraenderter q-Bestkandidat heisst also NICHT, dass die Entscheidung steht.
+Genau dieser Fehlschluss steht als Korrektur in PREREG_ownership_coupling.md
+par.6.2. Fuer die Frage "kippen Entscheidungen?" ist der Vergleich der
+Draft-Folgen aus den ARENA-LOGS das bessere Instrument (dort: 400/407 Partien
+weichen ab, ~17 % Kipp-Rate je Entscheidung). Diese Sonde bleibt nuetzlich fuer
+die GROESSE des Reglerbeitrags und fuer max_N, nicht fuer seine Wirksamkeit.
+
 Aufruf:
     python -X utf8 tools/probes/ownership_shift_magnitude.py --n-states 60
 """
