@@ -317,4 +317,42 @@ der naechste Schritt ist die Rangregel, nicht eine weitere Dosis."* Eine
 Dosis-Reihe auf der Konjunktionsform ist damit vorab ausgeschlossen.
 
 
+### par.9.1 NACHTRAG (2026-08-18): gegen den NULLARM gerechnet — die additiven Kriterien bewegen sich
+
+par.9 vergleicht gegen die Produktform, wie vorregistriert. Der Vergleich gegen
+den **Nullarm** (Regler ganz aus) war nicht Teil der Erfolgsregel und wurde
+zunaechst uebersehen. Er zeigt das Deutlichste der ganzen Messreihe.
+
+Block-Ebene, nB=6, Schwelle |t| > 2,571, gepaart ueber dieselben 407 Seeds:
+
+| Kriterium | Delta | Block-t | Kettenlaenge |
+|---|---:|---:|---|
+| **Plattenpunkte gesamt** | **+0,94** | **4,53** | — |
+| **k4 Aeussere Felder** | **+0,33** | **4,01** | **additiv, 1 Feld** |
+| k3 Mehrfarbige Felder | +1,24 | 1,94 | kurz |
+| k5 Eckplatten | +0,27 | 1,89 | kurz |
+| k6 Spezialfelder | +0,30 | 1,67 | additiv |
+| k2 Diagonalen | +0,13 | 1,58 | 6 Felder |
+| **k1 Vertikale Reihen** | **+0,05** | **0,11** | **6 Felder** |
+| Marge | +1,51 | 1,32 | — |
+
+**Zwei Befunde, die par.9 nicht hatte:**
+
+1. **Die Plattenpunkte insgesamt steigen signifikant** (+0,94, t 4,53) — das
+   staerkste Signal der Reihe. Der Regler kauft Plattenpunkte ein, nur nicht
+   die vorregistrierten. Das Urteil NICHT-ERFOLG bleibt davon unberuehrt, es war
+   auf k1/k2 gestellt und ist es zurecht.
+2. **Die Rangfolge ist exakt die Kettenlaenge.** Signifikant wird k4 "Aeussere
+   Felder" — 1 Punkt je Randfliese, die kuerzestmoegliche Kette. Danach die
+   kurzen Ketten, dann nichts mehr.
+
+**Und die schaerfste Beobachtung:** k4 und k6 sind genau die beiden Kriterien,
+die `expected_plate_points_conj` NICHT aus Atomen rechnet, sondern additiv aus
+`p_own` weiterlaufen laesst (Zweig `4 | 6` in `scoring.rs`). Die additiven
+bewegen sich, die konjunktiven nicht — **unabhaengig davon, ob sie als Produkt
+oder als gelernte Atome gerechnet werden.** Damit ist die Marginal-These ueber
+den vollen Kriteriensatz bestaetigt statt an zwei Beispielen, und die
+Formumschaltung ist als Ursache endgueltig ausgeschieden: sie aendert nichts
+daran, dass eine Kette aus sechs Feldern je Zug ein Marginal nahe null hat.
+
 ## par.10 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
