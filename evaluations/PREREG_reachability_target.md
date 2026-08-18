@@ -2,6 +2,12 @@
 
 # PREREG: Zielwechsel des Ownership-Kopfes — Vollendbarkeit statt Realisierung
 
+> **FOKUS-REGEL (Nutzer 2026-08-18):** ab hier wird ausschliesslich **k1**
+> bearbeitet. Registrierte "k1 oder k2"-Klauseln bleiben gueltig, werden aber auf
+> k1 gelesen (strengere Lesart). Begruendung und Umfang: `evaluations/STATUS.md`,
+> Abschnitt "FOKUS-REGEL".
+
+
 Stand **2026-08-18**, **ENTWURF, nichts gebaut.** Durchgehend Plan-Zeitform.
 
 **Anlass.** Vier Wege sind am Verbraucher gescheitert

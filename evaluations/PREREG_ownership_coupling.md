@@ -2,6 +2,12 @@
 
 # Vorregistrierung: Kopplung des Ownership-Kopfes an Draft und Tiling
 
+> **FOKUS-REGEL (Nutzer 2026-08-18):** ab hier wird ausschliesslich **k1**
+> bearbeitet. Registrierte "k1 oder k2"-Klauseln bleiben gueltig, werden aber auf
+> k1 gelesen (strengere Lesart). Begruendung und Umfang: `evaluations/STATUS.md`,
+> Abschnitt "FOKUS-REGEL".
+
+
 **Anlass (Nutzer-Auftrag 2026-08-18):** *"überleg dir nochmal tiefgehend wie wir
 den ownership head vernünftig in die züge und ins tiling bekommen"* — und
 ausdrücklich **ohne harte Rangregeln** (*"wir pfuschen nicht mit harten

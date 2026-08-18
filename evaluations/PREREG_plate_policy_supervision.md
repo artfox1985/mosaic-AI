@@ -2,6 +2,12 @@
 
 # PREREG: Plattenziel auf AKTIONS-Ebene — Prototyp k1, Runde 5
 
+> **FOKUS-REGEL (Nutzer 2026-08-18):** ab hier wird ausschliesslich **k1**
+> bearbeitet. Registrierte "k1 oder k2"-Klauseln bleiben gueltig, werden aber auf
+> k1 gelesen (strengere Lesart). Begruendung und Umfang: `evaluations/STATUS.md`,
+> Abschnitt "FOKUS-REGEL".
+
+
 Stand **2026-08-18**, **ENTWURF, nichts gebaut.** Durchgehend Plan-Zeitform.
 
 **Der Paradigmenwechsel, um den es geht** (Formulierung der zweiten externen

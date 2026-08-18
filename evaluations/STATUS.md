@@ -28,6 +28,41 @@ diese Frage "nichts" war.
 
 ---
 
+## FOKUS-REGEL: NUR k1 (Nutzer-Entscheid 2026-08-18)
+
+> *"mir kommt vor du switcht wild zwischen den wertungsplatten analysen herum.
+> wir sollten uns wirklich mal nur auf eine wertungsplatte fokussieren"*
+
+**Bis auf Widerruf wird ausschliesslich k1 (Vertikale Reihen, 7 Pkt je volle
+Spalte) bearbeitet.** Warum k1 und nicht eine andere — alles gemessen:
+
+| | |
+|---|---|
+| Wert | 7 Punkte je Spalte, 6 Geometrien |
+| Kosten | **keine** — innerhalb des k1-Bauer-Arms +7,86 Gesamtpunkte, davon 7,02 aus der Platte, Rest +0,84 |
+| Synergie | Platzierung zahlt den vertikalen Lauf getrennt (`round_end.rs:366`), Spaltenbau liegt auf derselben Achse wie normales Spiel |
+| Luecke | Netz 20/156 Partien (13 %), Bauer 419/1000 (42 %) |
+| Label | Vollendbarkeits-Sperre bestanden, traegt in Runde 3-5 |
+
+**Was das AUSSCHLIESST**, obwohl dazu Befunde vorliegen: k2 (Diagonalen), k4
+(Aeussere Felder), k5 (Eckplatten), k6 (Spezialfelder). Ihre Messungen bleiben in
+den Preregs erhalten und gelten weiter, werden aber **nicht weiterverfolgt**. Erst
+wenn k1 traegt, kommt k2 — so war es in
+`PREREG_plate_policy_supervision.md` registriert und so bleibt es.
+
+**Konkret heisst k1-only:**
+
+- Erfolgsregeln nennen nur k1. (Die registrierten "k1 oder k2"-Klauseln bleiben
+  gueltig, werden aber auf k1 gelesen — die strengere Lesart.)
+- Der Verbraucher wird nur mit `MOSAIC_OWNERSHIP_GEW` auf k1 gefahren.
+- Nebenbefunde zu anderen Kriterien werden protokolliert und NICHT verfolgt.
+
+**Der Anlass war Drift, nicht Erkenntnis:** am 2026-08-18 sind aus k1-Messungen
+heraus Analysen zu k6 (Spezialkuppel-Platzierung, Stapel-Ziehungen), k5 und k4
+entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 voran.
+
+---
+
 ## FAHRPLAN DIESER GENERATION (Nutzer-Auftrag 2026-08-18, woertlich)
 
 > 1. *"modell erstellen dass mit dem ownership head aktiv die züge steuert und
