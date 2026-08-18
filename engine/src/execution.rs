@@ -26,8 +26,27 @@ pub fn execute_move(state: &mut GameState, m: &Move) {
     let name = state.players[pi].name.clone();
     let dest = dest_label(m.place.row_index);
     let src = src_label(m);
+    // FEHLERKORREKTUR 2026-08-18 (Nutzer-Befund): das Emoji war hier HART auf
+    // Sonne gesetzt, obwohl `execute_take` auch die Mond-Entnahmen aus EINER
+    // Fabrik behandelt (`SmallFactoryMoon`/`LargeFactoryMoon`). Nur Aktion C
+    // (globaler Mond-Zug) laeuft ueber `execute_moon_take` und bekam 🌙.
+    // WARUM ES NIE AUFFIEL: `validation.rs:214` erzeugt Mond-Zuege NUR als
+    // Aktion C (`factory_id: None`); `LargeFactoryMoon` wird nie GENERIERT, vom
+    // Validator (`validate_large_moon`) aber AKZEPTIERT. In Self-Play und Arena
+    // spielt nur der Generator -- der Fall tritt also ausschliesslich in
+    // MENSCHENPARTIEN ueber die API auf.
+    // Folge im Bestand: in `game_20260818_200516_seed585858` steht Runde 1 Zeile
+    // 21 (Mensch nimmt 4x tuerkis aus dem GF-Mondpool per LargeFactoryMoon) mit
+    // Sonne, Runde 2 Zeile 80 (dieselbe Absicht als Aktion C) mit Mond. Der
+    // Replay in `tools/analyze_game_log.py` leitete daraus den Aktionstyp ab,
+    // fand LargeFactoryMoon nicht in der Generator-Liste und griff zur globalen
+    // Mond-Entnahme -- also zu einer ANDEREN Aktion.
+    let phase_emoji = match m.take.source {
+        crate::moves::TakeSource::SmallFactoryMoon | crate::moves::TakeSource::LargeFactoryMoon => "🌙",
+        _ => "☀️ ",
+    };
     state.log_event(format!(
-        "☀️  {name}: {}× {} von {} → {}",
+        "{phase_emoji} {name}: {}× {} von {} → {}",
         taken.len(),
         m.take.color.value(),
         src,
