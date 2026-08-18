@@ -27,9 +27,23 @@ pub fn execute_move(state: &mut GameState, m: &Move) {
     let dest = dest_label(m.place.row_index);
     let src = src_label(m);
     // FEHLERKORREKTUR 2026-08-18 (Nutzer-Befund): das Emoji war hier HART auf
-    // Sonne gesetzt, obwohl `execute_take` auch die Mond-Entnahmen aus EINER
-    // Fabrik behandelt (`SmallFactoryMoon`/`LargeFactoryMoon`). Nur Aktion C
-    // (globaler Mond-Zug) laeuft ueber `execute_moon_take` und bekam 🌙.
+    // Sonne gesetzt, obwohl `execute_take` auch Mond-Quellen behandelt
+    // (`SmallFactoryMoon` mit gesetzter factory_id, `LargeFactoryMoon`). Nur
+    // Aktion C (globaler Mond-Zug, factory_id = None) laeuft ueber
+    // `execute_moon_take` und bekam 🌙.
+    //
+    // BEGRIFF, praezisiert nach Nutzer-Hinweis: eine "Mond-Entnahme aus EINER
+    // Fabrik" gibt es als REGEL nicht. Der Mondbereich ist EIN Pool -- die
+    // obersten Fliesen der Mondstapel ALLER kleinen Fabriken plus ALLE Fliesen
+    // der Mondseite der grossen Fabrik (`engine_manual.md:100-102`), und Aktion
+    // C nimmt daraus alles der gewaehlten Farbe. Die beiden Quellen hier sind
+    // also TEIL-Entnahmen, die das Regelwerk nicht vorsieht. Sie werden nie
+    // GENERIERT (`validation.rs:214` erzeugt nur die globale Form), vom
+    // Validator aber AKZEPTIERT (`validate_large_moon` prueft ausschliesslich
+    // den GF-Pool) -- eine LATENTE Luecke, erreichbar nur ueber die API.
+    // Geprueft am Anlassfall `game_20260818_200516_seed585858` Runde 1: dort lag
+    // auf keinem kleinen Stapel tuerkis oben (F2 schwarz, F3 blau, F4 blau), der
+    // GF-Zug war also deckungsgleich mit Aktion C -- keine Regelverletzung.
     // WARUM ES NIE AUFFIEL: `validation.rs:214` erzeugt Mond-Zuege NUR als
     // Aktion C (`factory_id: None`); `LargeFactoryMoon` wird nie GENERIERT, vom
     // Validator (`validate_large_moon`) aber AKZEPTIERT. In Self-Play und Arena
