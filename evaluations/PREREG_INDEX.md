@@ -77,15 +77,16 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 66 Dateien = 16 OFFEN + 46 ENTSCHIEDEN + 4 UEBERHOLT.**
+**Stand (automatisch generiert): 67 Dateien = 17 OFFEN + 46 ENTSCHIEDEN + 4 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (16)
+## OFFEN (17)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_action_id_logging.md` | Kann der Partie-Replay exakt statt heuristisch werden, indem jede Aktion mit ihrer ID aus dem ACTION SPACE geloggt wird -- derselben, gegen die der Policy-Kopf trainiert? | offen, nichts gebaut. Anlass: Nutzer-Vorschlag 2026-08-18 nach drei Fehlschluessen aus der Prosa-Rekonstruktion. |
 | `PREREG_async_search.md` | Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag). Stufe 1 (Drafting-Suche als Zustandsautomat, `async`/`await`, additiv in `net_mcts.rs`/`net_batcher.rs`, `MOSAIC_ASYNC_SUCHE`) GEBAUT und Gate A BESTANDEN: 0/1148 Abweichungen sowohl ohne Sammel-Faden (bit-identisch) als auch MIT Sammel-Faden + 16-facher Nebenlaeufigkeit (finale Zugwahl). `cargo test --lib` im isolierten Worktree 387/0/20 (keine Regression). Stufe 2 (Rundenuebergaenge) und Stufe 3 (Durchsatz, Gate C >= 2,0x) OFFEN. Nachtrag (Datei-VERDIKT, Gate-B-Abschnitt): Spielgeschehen sync/async bit-identisch (0/16 ueber zwei Laeufe), Trainingsziel-Felder NICHT bit-identisch (verbleibende Wall-Clock-Quellen in round_transition_deep.rs, Task #71) -- Gate B im urspruenglichen Wortlaut blockiert, als offener Befund festgehalten. |
 | `PREREG_bootstrap_horizon.md` | Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = zwei Arme auf identischen Partien via doppelt geschriebener Labels |
 | `PREREG_chance_nodes.md` | Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Frage). Grundlage: es gibt keine private Information, also Zufallsknoten statt ISMCTS. Teil A = Korrektheit (bekannter Unterbau), Teil B = Zufallsknoten mit Kostengate, Teil C = Diagnose der Platte-6-Interaktion |
