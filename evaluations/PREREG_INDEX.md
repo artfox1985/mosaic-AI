@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 63 Dateien = 20 OFFEN + 41 ENTSCHIEDEN + 2 UEBERHOLT.**
+**Stand (automatisch generiert): 64 Dateien = 21 OFFEN + 41 ENTSCHIEDEN + 2 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (20)
+## OFFEN (21)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -105,6 +105,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_plate_head.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) |
 | `PREREG_provocation.md` | Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | **OFFEN, vorregistriert 2026-08-12** (Nutzer-Korrektur: *"das ist kein plan. das ist hoffen. als erstes brauchen wir eine methode gezielt spiele zu provozieren"*). Stufe 1 VOR der Streuung ins Self-Play; ich hatte die beiden Stufen verwechselt. Nutzer-kalibrierte Abnahmezahl: **>= 7,00 vertikale Plattenpunkte = eine Spalte je Partie** (heute 1,05 = 0,15). Eine Spalte sind 21 Platzierungs- PLUS 7 Plattenpunkte = 28, also rund ein Fuenftel eines guten Endstands. Der Eingriff ist eine Beschneidung der Aktionsmenge, kein neuer Bewerter -- fuenf Anlaeufe ueber die Bewertung sind gescheitert, weil eine Stellungsbewertung keine mehrrundige Farbzusage darstellen kann (`dome.rs:61-70`: jede Zelle verlangt genau eine Farbe). |
 | `PREREG_scoring_plate_injection.md` | Nutzt es, die WERTUNGSPLATTEN (alle acht Kriterien, gegatet auf die aktiven) in die Blattbewertung zu injizieren -- und in welcher Dosis? | **OFFEN, vorregistriert 2026-08-11, HAUPT-SWEEP** (Nutzer-Ruege: "wir wollen die wertungsplatten injizieren, nicht nur die spezialplatten"). `MOSAIC_WERTUNG_SHAPING_W` 0 / 0,1 / 0,3 -- KLEINER als beim Freischalt-Term, weil der Term eine Groessenordnung groesser ist (Kriterium 1 allein ~7,9 Pkt -> tanh = 0,156, das saettigt den geklemmten Blattwert). Basis-Seed 20260911. Pflicht-Nebenmessung ueber `log_games` + `analyze_game_log.py`: Zellen je Rasterreihe und Nahmen-Anteil tiefe Reihen (dicht) statt Abschluesse (zu selten). Enthaelt in Abschnitt 0 die Dokumentation meines Messplan-Fehlers. |
+| `PREREG_shaping_scale_per_round.md` | Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | **ENTWURF 2026-08-18, nichts gebaut.** Anlass gemessen: Punktestand je Runde aus 22 Arena-Logs, Anteilskurve zwischen Mensch und KI deckungsgleich trotz 33 % Niveauunterschied. Nutzer-Auftrag: "schreib für den rundenabhängigen WERTUNG_SHAPING_SCALE mal ein prereg". |
 | `PREREG_v22_window.md` | Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. |
 
 ## ENTSCHIEDEN (41)
