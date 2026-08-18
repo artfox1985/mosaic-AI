@@ -304,31 +304,34 @@ dass `b18` den plattenbauenden Zug dominant ANBIETET (4,91x Gleichverteilung,
 129/130 Partien) — er setzt sich nur nicht durch. Genau dort greift der
 Verbraucher, und genau dort ist die Produktform die gemessene Bremse.
 
-### LAEUFT NOCH (Stand Sitzungswechsel)
+### WEG 1 (Frozen Trunk) ABGESCHLOSSEN, NEGATIV — `v21-b22`
 
-| Was | Wo | Zweck |
-|---|---|---|
-| **`v21-b22`** Frozen-Trunk auf `b18_best` | GPU | "Weg 1" gegen den LR-Zielkonflikt: nur der Ownership-Kopf lernt, Policy bitgenau erhalten, Auswahlkriterium automatisch der Ownership-Verlust. lr 5e-4, plateau, 60 Epochen, `ownership_weight` 1,0, Seed 2 (aus `manifest_train_v21-b22_20260817_220655.json`) |
+Fertig 2026-08-18, Early Stop nach **15** von 60 Epochen. Einzelheiten in
+`PREREG_lr_schedule.md`.
 
-**Zu `b22` gehoert eine Warnung, die schon einmal fast zu einer falschen
-Aussage gefuehrt hat:** um 23:35 meldete der Harness den Lauf als "failed, exit
-code 1". Gestorben war der **Hintergrund-Wrapper der Shell**, nicht das
-Training — der Prozess rechnete weiter (belegt: CPU-Zuwachs 13 s in 20 s, GPU
-26 %, RSS flach bei 15,62 GB ueber alle Epochen, also kein Leck). Verloren ist
-die **Log-Sicht** ab Epoche 8, nicht der Lauf; die `epoch_history` im Manifest
-schliesst die Luecke am Laufende. **Regel: bei einer "failed"-Meldung zuerst
-`Get-CimInstance Win32_Process` fragen, ob das Kind noch lebt, bevor irgendwas
-neu gestartet wird.**
+| | Own-Val |
+|---|---:|
+| `b18_best` E4 (Startpunkt) | 0,3466 |
+| **`b22` Frozen Trunk, bestes (E13)** | **0,3407** |
+| `b18` gemeinsames Training E15 | 0,3191 |
+| `b19` E15 (Gewicht 2,0) | 0,2994 |
 
-**Teilablesung Weg 1 ueber 7 von 60 Epochen** (Einzelheiten in
-`PREREG_lr_schedule.md`): der eingefrorene Rumpf bringt den Ownership-Verlust
-von 0,3466 (= `b18_best`, Epoche 4) auf 0,3414 und flacht dabei ab (E5→E7 nur
-0,0004 je Epoche). Das gemeinsame Training stand bei derselben Epoche schon bei
-0,3339 und lief weiter auf 0,3191 (`b19` sogar 0,2994). **Herleitung, nicht
-gemessen:** die Kopfguete haengt an der Rumpfdarstellung — dann loest Weg 1 den
-Zielkonflikt nicht, sondern tauscht die Seite. Bestaetigt sich das ueber die
-restlichen 53 Epochen, ist der Frozen-Trunk-Kopf fuer den Verbraucher der
-SCHLECHTERE Kopf und `b18`/`b19` bleiben die Kandidaten.
+Der eingefrorene Rumpf gewinnt 0,0059 und steht dann (E9-E15 zusammen 0,0004).
+**Weg 1 liefert den SCHLECHTEREN Kopf**, nicht den besseren — die Kopfguete
+haengt an der Rumpfdarstellung, das Einfrieren spart die Policy und kostet den
+Kopf. Fuer die Kopplungsarbeit bleiben `b18`/`b19` die Kandidaten.
+
+**Beifang, er stuetzt den LR-Strang:** die LR blieb ueber alle 15 Epochen bei
+5,00e-04. `ReduceLROnPlateau` (patience 2) hat NIE ausgeloest, weil sich der
+Verlust je Epoche noch um 0,0001-0,0002 verbesserte — das zaehlt als
+Fortschritt. Ein reaktiver Scheduler greift selbst auf einer faktisch flachen
+Kurve nicht, solange sie monoton bleibt.
+
+**Die Warnung zu `b22` bleibt gueltig:** um 23:35 meldete der Harness den Lauf
+als "failed, exit code 1". Gestorben war der **Hintergrund-Wrapper der Shell**,
+nicht das Training — der Prozess lief sauber zu Ende. **Regel: bei einer
+"failed"-Meldung zuerst `Get-CimInstance Win32_Process` fragen, ob das Kind noch
+lebt, bevor irgendwas neu gestartet wird.**
 
 ### Kalibrierung: Versatz erledigt, Steigung offen — Uebergangsweg entschieden (2026-08-18)
 
@@ -406,6 +409,47 @@ plattenbauende Linien, die im Verlauf nie auftauchen, und koennte hoeher
 liegen. Das ist der einzige Weg, auf dem die Korrektur schon heute wirkte, und
 er ist mit einer Sonde auf Suchknoten pruefbar.
 
+### KALIBRIERUNG GEFITTET -- ERGEBNIS: NICHT EINBAUEN (2026-08-18)
+
+`tools/probes/conjunction_calibration_fit.py`, `b19_best`, Fit auf 25.000
+Brettern (Arme a/k1/k2/k5, je Partie ein Zustand pro Runde), Transfer auf 5.000
+Brettern des `heur`-Arms. Rohzahlen: `evaluations/conjunction_calibration_fit.json`.
+
+| Gruppe | Positive | B | A | Brier-Gewinn Fit | Gewinn Transfer |
+|---|---:|---:|---:|---:|---:|
+| Reihen k0 | 4535 | 1,037 | -0,136 | +0,4 % | +2,6 % |
+| **Spalten k1** | 5175 | 0,921 | +0,144 | **+0,6 %** | **-6,0 %** (190 Pos) |
+| **Diagonalen k2** | 2005 | 0,839 | -0,095 | **+1,3 %** | **-15,4 %** (20 Pos) |
+| Ecken k5 | 28375 | 0,952 | -0,018 | 0,0 % | +0,5 % |
+| Joker k3 | 9065 | 0,980 | -0,065 | +0,1 % | -0,5 % |
+| farbenreich k7 | 1240 | 0,823 | -0,719 | +0,1 % | +0,3 % |
+
+**Drei Befunde, und sie zeigen alle in dieselbe Richtung:**
+
+1. **Die Korrektur ist winzig.** B liegt zwischen 0,82 und 1,08, der
+   Brier-Gewinn im Fit-Satz bei hoechstens 1,3 %. Kein Vergleich zu den
+   ~20 %, die eine echte Fehlkalibrierung hergeben wuerde.
+2. **Sie uebertraegt NICHT.** Auf `heur` -- dem einzigen plattenBEWUSSTEN
+   Spieler im Satz -- verschlechtert sie k1 um 6,0 % (190 Positive, belastbar)
+   und k2 um 15,4 % (20 Positive, schwach). Genau die als offen markierte
+   Transfer-Annahme ist damit gemessen und GEFALLEN.
+3. **Die Fehlkalibrierung haengt an der RUNDE, nicht an der Gruppe.** Eigener
+   Fit je Runde: k1 B = 0,71 / 0,93 / 0,94 / 1,01 / 1,02 (R1..R5), k5 0,82 ->
+   1,03, k2 0,69 -> 0,92. Der Kopf ist FRUEH ueberkonfident und SPAET richtig.
+   Eine Konstante je Gruppe mittelt genau diese Struktur weg.
+
+**Entscheid: kein Knopf, kein Einbau.** 0,6 % Gewinn im Fit-Satz gegen -6 %
+dort, wo es zaehlt, traegt keinen Verbraucher-Eingriff.
+
+**Widerspruch, den ich NICHT aufloesen konnte** (ungeprueft, aber protokolliert):
+auf den KORPUS-Dateien zeigte `conjunction_reliability_by_source.py` fuer k1 im
+Bin 0,50-0,80 noch 63,0 % vorhergesagt gegen 46,2 % tatsaechlich (91 Faelle);
+auf dem Bewertungssatz sind es 58,7 % gegen 55,8 % (373 Faelle). Die neue Zahl
+ist groesser und auf ausgesperrten Daten, also die bessere -- der Abstand ist
+aber zu gross fuer Rauschen. Kandidat, ungeprueft: die Korpus-Partien stammen
+vom 14.08. und damit von einem ANDEREN Engine-Stand als der Bewertungssatz (das
+Wheel wurde am 17.08. 23:44 neu gebaut, Commit `4ca164e`).
+
 **WIEDERVORLAGE, mit messbarem Ausloeser (Nutzer 2026-08-17):** sobald ein
 Champion die Wertungsplatten beruecksichtigt, wird die Kalibrierung wieder
 legitim — dann IST das normale Spiel das Zielverhalten. Der Ausloeser steht
@@ -468,7 +512,9 @@ das.
 | **Gewichtsarm 4,0** | Vorabregel hat ihn freigegeben (`PREREG_ownership_weight_new_window.md` par.7); Nutzer-Entscheid 2026-08-17: **weiter hinten geparkt** |
 | **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr |
 | **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) — nicht neu vorschlagen |
-| **Fester Bewertungssatz** | **entschieden (Nutzer 2026-08-18): der BAUER-Satz, als Uebergangskalibrierung bis Netzdaten da sind.** Zusammensetzung festgelegt: **300 Dateien / 3000 Partien** — `v21_own_a` 100 · `v21_own_k1` 50 · `v21_own_k2` 50 · `v21_own_k5` 50 · `heur_own` 50, zusammen **~3 h 5 min** (Durchsaetze aus den Zeitstempeln vom 14.08.: 10,3 / 17,2 / 19,8 / 23,0 / 50 Partien je Minute). **Ablage `data/holdout/`, Praefix `selfplay_hold_` (Nutzer 2026-08-18)** — der `data/*.pkl`-Glob ist nicht rekursiv, das IST die Sperre; nie in `--extra-data-dir` aufnehmen. Aufruf waere `--version hold --tag k1` usw. **LAEUFT seit 2026-08-18 00:49** (Nutzer-Go). Rezept 1:1 aus `PREREG_ownership_corpus.md` par.7: Netz-Arme 200 Sims mit `MOSAIC_WERTUNG_STREUUNG_MAX=1.0` und Champion-ONNX, Heuristik-Arm 150 Sims ohne Streuung, 8 Threads, 10 Partien je Datei, rtv aus, Ablage ueber `MOSAIC_DATA_DIR=data/holdout`. Reihenfolge heur -> a -> k1 -> k2 -> k5.
+| **Fester Bewertungssatz** | **entschieden (Nutzer 2026-08-18): der BAUER-Satz, als Uebergangskalibrierung bis Netzdaten da sind.** Zusammensetzung festgelegt: **300 Dateien / 3000 Partien** — `v21_own_a` 100 · `v21_own_k1` 50 · `v21_own_k2` 50 · `v21_own_k5` 50 · `heur_own` 50, zusammen **~3 h 5 min** (Durchsaetze aus den Zeitstempeln vom 14.08.: 10,3 / 17,2 / 19,8 / 23,0 / 50 Partien je Minute). **Ablage `data/holdout/`, Praefix `selfplay_hold_` (Nutzer 2026-08-18)** — der `data/*.pkl`-Glob ist nicht rekursiv, das IST die Sperre; nie in `--extra-data-dir` aufnehmen. Aufruf waere `--version hold --tag k1` usw. **FERTIG 2026-08-18 03:28** — 300 Dateien, 3000 Partien, **0 unvollstaendige**, 2 h 39 min. **Abnahme bestanden**, jeder Arm reproduziert seinen Korpus-Zwilling (Positivrate je Atom-Brett, Klammer = Korpus aus par.5a, dort nur 120 Partien je Arm): `a` k1 0,56 % (0,49) · k5 27,05 % (27,19) | `k1` k1 **6,98 %** (6,67) | `k2` k2 **19,25 %** (20,00) | `k5` k1 **8,53 %** (8,75) · k5 **40,02 %** (38,54) | `heur` k1 0,63 % (0,35). Damit ist auch der Nutzer-Befund praezise bestaetigt: **der k5-Arm liefert mehr volle Spalten als der k1-Arm.** Seeds je Arm im Manifest (20260818-22).
+
+**Erzeugt am 2026-08-18 00:49-03:28** (Nutzer-Go). Rezept 1:1 aus `PREREG_ownership_corpus.md` par.7: Netz-Arme 200 Sims mit `MOSAIC_WERTUNG_STREUUNG_MAX=1.0` und Champion-ONNX, Heuristik-Arm 150 Sims ohne Streuung, 8 Threads, 10 Partien je Datei, rtv aus, Ablage ueber `MOSAIC_DATA_DIR=data/holdout`. Reihenfolge heur -> a -> k1 -> k2 -> k5.
 
 **EINZIGE bewusste Abweichung: der Basis-Seed** (20260818..22 statt der Korpus-20260814). Gleicher Seed plus gleiches Modell plus gleiche Knoepfe haette BITGLEICHE Partien ergeben — der Bewertungssatz waere eine Kopie von Trainingsmaterial gewesen.
 
