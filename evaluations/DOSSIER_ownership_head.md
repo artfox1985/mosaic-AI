@@ -213,6 +213,67 @@ auseinander** — das ist das Problem in einer Zahl.
 
 ---
 
+---
+
+## 6a. DER ENTSCHEIDENDE BEFUND (2026-08-18): eine Spalte kostet NICHTS
+
+Die Frage, die dieser Kampagne die ganze Zeit zugrunde lag und nie gestellt
+wurde: **kostet der Plattenbau mehr, als er bringt?** Plattenpunkte zaehlen voll
+zum Gesamtstand (Nutzer-Klarstellung), es ist also eine reine
+Opportunitaetsfrage.
+
+**(A) Fuer die kurzen Ketten: ja, Nullsummentausch.** Gepaart ueber 407 Seeds,
+`b18_best` gegen Champion:
+
+| Arm | Siege | eigene Punkte | Marge | Plattenpunkte |
+|---|---|---:|---:|---:|
+| Nullarm | 211/407 | **44,76** | 0,99 | 2,96 |
+| Produktform D1 | 236/407 | **45,03** | 2,69 | 3,86 |
+| Konjunktionsform D1 | 229/407 | **44,79** | 2,55 | 3,85 |
+
+Plattenpunkte +0,9 **signifikant** (Block-t 4,16 / 4,53), eigener Gesamtstand
+praktisch unveraendert. Die gewonnenen Plattenpunkte sind aus Platzierungspunkten
+bezahlt. Die Marge steigt (+1,5 bis +1,7), aber weil der GEGNER verliert, und
+nicht signifikant (Block-t 1,32).
+
+**(B) Fuer eine fertige Spalte: nein — sie ist gratis.** Innerhalb des
+k1-Bauer-Arms, 1000 Partien, gleiche Einstellungen, Spieler 0:
+
+| | n | Gesamtpunkte | davon k1 |
+|---|---:|---:|---:|
+| **mit** fertiger Spalte | 419 | **31,23** | 7,02 |
+| **ohne** fertige Spalte | 581 | **23,37** | 0,00 |
+| Differenz | | **+7,86** | +7,02 |
+
+**Rest: +0,84.** Die Spalte bringt 7,02 Plattenpunkte und kostet nichts an
+Platzierungspunkten — sie korreliert sogar mit leicht besserem Restspiel.
+
+*Vorbehalt:* Korrelation innerhalb des Arms, keine Kostenmessung. Partien mit
+fertiger Spalte koennten die mit guenstiger Fliesenversorgung sein. Was der
+Vorbehalt NICHT erklaert: waere Spaltenbau teuer, muesste der Rest FALLEN.
+
+**Der Mechanismus (Spielregel, `round_end.rs:366`, `engine_manual.md:143-148`):**
+die Platzierung zahlt den VERTIKALEN Lauf getrennt vom horizontalen. Wer eine
+Spalte aufbaut, kassiert unterwegs schon Platzierungspunkte — Spaltenbau liegt
+**auf derselben Achse** wie das normale Spiel, nicht quer dazu. Nutzer-Praxis
+dazu: *"wenn ich vertikale oder eck wertungsplatten hab, ist das eine wunderbare
+synergie zum normalen spiel"*. Dasselbe gilt fuer k5, das einzige Kriterium, das
+der Regler je signifikant gehoben hat (+0,34, Block-t 2,79) — auch dort schliesst
+eine Ecke mit Spezialkuppel schneller (`domain_knowledge.md` §6).
+
+**(C) Die Groessenordnung des Ziels.** Der Bauer erreicht die Spalte in **419 von
+1000** Partien (42 %), das Netz in **20 von 156** (13 %). *Herleitung:* die
+Differenz von ~29 Prozentpunkten mal 7,86 sind **~2,3 Punkte je Partie** allein
+bei k1, dazu die Diagonalen mit 10 Punkten je Treffer.
+
+> **WAS DAS FUER DIE DIAGNOSE AENDERT.** Bisher wurde nach einem
+> wirtschaftlichen Grund gesucht, warum das Netz die Platten meidet — Kosten,
+> Tempo, Opportunitaet. Es gibt keinen. **Das Netz lehnt kostenlose Punkte auf
+> seiner eigenen Achse ab.** Damit ist es kein Abwaegungsproblem, sondern ein
+> Zuordnungs- und Entdeckungsproblem: das Verhalten wurde nie gelernt, obwohl es
+> nichts kostet. Genau dorthin zeigen Abschnitt 7 Punkt (1) — der Value-Kopf hat
+> den Vorteil nie als Vorteil gesehen — und der Aussenblick in Abschnitt 8.
+
 ## 7. Offene Fragen, die tragfähigste Ursache zuerst
 
 **(1) Der Lehrkorpus konnte dem VALUE-Kopf nichts beibringen — per Konstruktion.**
