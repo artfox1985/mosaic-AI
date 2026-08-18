@@ -206,6 +206,17 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
 
 /// Vollständiges State-Dict für das Frontend.
 pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
+    // Maschinenzeilen (`#a {...}`, PREREG_action_id_logging.md S2) gehoeren in
+    // die GESPEICHERTE Fassung, nicht in die Anzeige (Nutzer-Vorgabe
+    // 2026-08-18: "am log der in index.html angezeigt wird brauchst nichts
+    // ändern. nur in der gespeicherten variante"). Gefiltert wird VOR dem
+    // `take(30)` -- sonst wuerde jede Maschinenzeile einen echten Eintrag aus
+    // dem Anzeigefenster draengen.
+    let log_sichtbar: Vec<String> = {
+        let sichtbar: Vec<&String> =
+            state.log.iter().filter(|l| !l.starts_with("#a ")).collect();
+        sichtbar.iter().rev().take(30).rev().map(|l| (*l).clone()).collect()
+    };
     let players: Vec<Value> = (0..state.players.len())
         .map(|pi| serialize_player(state, pi))
         .collect();
@@ -269,7 +280,7 @@ pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
         "dome_pool_mask": dome_pool_mask(state),
         "dome_wild_remaining_frac": dome_wild_remaining_frac(state),
         "players": players,
-        "log": state.log.iter().rev().take(30).rev().cloned().collect::<Vec<_>>(),
+        "log": log_sichtbar,
         "valid_moves": serialize_valid_moves(state),
         "valid_tiling_rows": serialize_valid_tiling_rows(state),
         "chippable_tiling_rows": serialize_chippable_tiling_rows(state),
@@ -352,6 +363,23 @@ pub fn tiling_action_to_dict(ta: &TilingAction) -> Value {
     })
 }
 
+/// Aktions-ID im ACTION-SPACE des Policy-Kopfes (`features::action_to_id`,
+/// `NUM_ACTIONS = 406`) fuer einen UI-`valid_moves`-Eintrag.
+/// PREREG_action_id_logging.md, Stueck S1.
+///
+/// ZWEI DINGE, die der Leser wissen MUSS (beide geprueft 2026-08-18):
+///  - Die ID ist NICHT eindeutig je UI-Eintrag. `moon_order` fliesst nicht ein
+///    (net_mcts.rs:1824), und Kuppel-Zuege werden intern in Slot-Wahl und
+///    Rotation zerlegt (game.rs::apply_drafting) -- die vier Rotations-
+///    Varianten eines Kuppel-Zugs teilen sich also `id`. Deshalb traegt ein
+///    rotationsbehafteter Eintrag zusaetzlich `id_rotation`; das PAAR
+///    identifiziert den atomaren UI-Zug.
+///  - Die Berechnung laeuft ueber `self_play::action_to_id_direct`, also ueber
+///    exakt dieselbe Funktion wie in der Suche -- keine zweite Wahrheit.
+fn move_action_id(state: &GameState, a: &Action) -> usize {
+    crate::self_play::action_to_id_direct(state, a)
+}
+
 fn serialize_valid_moves(state: &GameState) -> Value {
     if state.phase != Phase::Drafting {
         return json!([]);
@@ -372,7 +400,10 @@ fn serialize_valid_moves(state: &GameState) -> Value {
     // gezogenen Platten wählen -- keine andere Aktion (siehe game::drafting_actions).
     if !state.pending_stack_draw.is_empty() {
         if crate::game::can_draw_stack_peek(state) {
-            moves.push(json!({ "type": "dome_stack_peek" }));
+            moves.push(json!({
+                "type": "dome_stack_peek",
+                "id": move_action_id(state, &Action::DrawStackPeek),
+            }));
         }
         // Baustein B: `generate_draw_stack_moves` liefert nur noch Kachel×Slot
         // (Rotation ist eine separate Stufe-2-Suchknoten-Entscheidung, siehe
@@ -384,6 +415,8 @@ fn serialize_valid_moves(state: &GameState) -> Value {
                 if crate::game::validate_draw_from_stack(state, &full).is_none() {
                     moves.push(json!({
                         "type": "dome_stack_choose",
+                        "id": move_action_id(state, &Action::ChooseDrawStackSlot(full.clone())),
+                        "id_rotation": move_action_id(state, &Action::ChooseDomeRotation(rotation)),
                         "chosen_id": full.chosen_id,
                         "slot_row": full.slot_row,
                         "slot_col": full.slot_col,
@@ -398,8 +431,11 @@ fn serialize_valid_moves(state: &GameState) -> Value {
 
     // Stein-Züge (Aktion B + globaler Mond-Zug aus generate_valid_moves).
     for m in generate_valid_moves(state) {
+        // ID VOR dem json!-Bau, solange `m` noch als `Action` verfuegbar ist.
+        let id = move_action_id(state, &Action::Stone(m.clone()));
         moves.push(json!({
             "type": "stone",
+            "id": id,
             "source": source_name(m.take.source),
             "factory_id": m.take.factory_id,
             "color": m.take.color.value(),
@@ -419,6 +455,8 @@ fn serialize_valid_moves(state: &GameState) -> Value {
             if crate::game::validate_dome_move(state, &full).is_none() {
                 moves.push(json!({
                     "type": "dome_display",
+                    "id": move_action_id(state, &Action::ChooseDomeSlot(full)),
+                    "id_rotation": move_action_id(state, &Action::ChooseDomeRotation(rotation)),
                     "tile_id": full.dome_tile_id,
                     "slot_row": full.slot_row,
                     "slot_col": full.slot_col,
@@ -430,12 +468,19 @@ fn serialize_valid_moves(state: &GameState) -> Value {
 
     // Aktion A: verdeckt vom Stapel ziehen (Schritt 1, startet einen neuen Zieh-Vorgang).
     if crate::game::can_draw_stack_peek(state) {
-        moves.push(json!({ "type": "dome_stack_peek" }));
+        moves.push(json!({
+            "type": "dome_stack_peek",
+            "id": move_action_id(state, &Action::DrawStackPeek),
+        }));
     }
 
     // Bonusplättchen.
     for m in crate::game::generate_bonus_chip_moves(state) {
-        moves.push(json!({ "type": "bonus_chip", "factory_id": m.factory_id }));
+        moves.push(json!({
+            "type": "bonus_chip",
+            "id": move_action_id(state, &Action::BonusChip(m)),
+            "factory_id": m.factory_id,
+        }));
     }
 
     Value::Array(moves)
