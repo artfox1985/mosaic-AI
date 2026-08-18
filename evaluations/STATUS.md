@@ -177,6 +177,28 @@ gezogene Spreizung sich in den LABELS niederschlaegt.
 
 Erst danach. Design liegt auf Halde (Abschnitt "v22-FENSTER"), NICHT eingeplant.
 
+### Zwei neue Vorregistrierungen (2026-08-18) — beide OFFEN, nichts gebaut
+
+Anlass: externe Durchsicht mit zwei ausgearbeiteten Spezifikationen. Beide sind
+gepruefte Antworten auf `DOSSIER_ownership_head.md` Abschnitt 7, beide in
+Plan-Zeitform, **keine** ist freigegeben.
+
+| Datei | Greift an | Stand |
+|---|---|---|
+| `PREREG_asymmetric_curriculum.md` | 7(1) Wegsymmetrisierung — der Value-Kopf hat den Plattenbau nie als Vorteil gesehen | Sperre par.5 vor dem Training; **erzeugt einen Self-Play-Korpus** |
+| `PREREG_reachability_target.md` par.12 (Arm P) | die Saettigung des Vollendbarkeits-Labels in Runde 1-2 | faellt in den ohnehin anstehenden Relabeling-Durchlauf |
+
+**Die eine offene Entscheidung, die nicht beim Bauen fallen darf:** der
+asymmetrische Arm erzeugt einen neuen Korpus. Der Fahrplan sperrt
+Korpus-Erzeugung bis Schritt 1 und 2 stehen; Praezedenz fuer einen *Lehr*-Korpus
+ausserhalb der Reihe ist `PREREG_ownership_corpus.md`. Einordnung — Lehrkorpus
+(jetzt) oder Schritt 3 (spaeter) — ist **Nutzer-Entscheid und offen**
+(`PREREG_asymmetric_curriculum.md` par.9).
+
+Was aus den externen Spezifikationen **verworfen** wurde, steht mit Begruendung
+in den Dateien selbst (`asymmetric_curriculum` par.8, `reachability_target`
+par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
+
 ---
 
 ## STAND 2026-08-17 (Nachmittag) — Champion unveraendert `v21_2d_brierbest`
@@ -686,6 +708,56 @@ das.
 | **Arena ohne `--log-games` gestartet** | Die Plattenkriterien k1/k2/k5 kommen aus den Partie-Logs (`tools/plate_points_from_arena.py`). Ohne den Schalter fehlt das Feld `log` und das vorregistrierte Erfolgskriterium ist NICHT berechenbar. Vor dem Start eine Referenzdatei aufmachen und die benoetigten Felder vergleichen |
 | `nohup … &` in einem Bash-Aufruf | Der Wrapper meldet sofort "completed" und der Lauf ist nicht mehr harness-verfolgt. `run_in_background` benutzen, ohne `&`. **Steht schon im Merkzettel und ist wieder passiert** |
 | Aus einem Dict mit `' '.join(...)` lesen liefert die SCHLUESSEL | Wirkte wie ein Manifest-Mangel ("`cli_args` speichert keine Werte"), war ein Lesefehler. Vor einer Mangel-Behauptung die Datenstruktur ansehen |
+
+---
+
+## PARTIE-REPLAY IST EXAKT (erledigt 2026-08-18) -- `PREREG_action_id_logging.md`
+
+**Jede kuenftige Mensch-vs-KI-Partie ist Zug fuer Zug exakt nachspielbar**, weil
+die Engine je Drafting-Aktion eine maschinenlesbare Zeile in die GESPEICHERTE
+Logfassung schreibt (nicht in die Anzeige):
+
+    #a {"id": 86, "p": 0, "a": {"type": "stone", "source": "LARGE_FACTORY_SUN", ...}}
+
+Die `id` ist dieselbe, gegen die der **Policy-Kopf trainiert**
+(`features.rs::action_to_id`, `NUM_ACTIONS = 406`) -- eine Log-ID ist damit
+unmittelbar mit den Policy-Logits vergleichbar, nicht nur ein Replay-Schluessel.
+Seither traegt auch jeder `valid_moves`-Eintrag seine `id`.
+
+**Gemessen** (par.7 der Registrierung):
+
+| | |
+|---|---|
+| frische Partie | 245/245 Zeilen exakt, **52/52 Stein-Zuege ueber die ID**, 0 ueber den Text |
+| `game_20260818_200516_seed585858` | war Abbruch bei Zeile 16, **jetzt 321/321** |
+| `game_20260818_195111_seed558549` | 327/327 (unveraendert) |
+| alte Elo-Logs | unveraendert unreplaybar (Seed reproduziert den Fabrik-Aufbau nicht) |
+| `cargo test --release` | 447 bestanden |
+
+**Drei Dinge, die man wissen muss, bevor man darauf aufbaut:**
+
+1. **Die ID ist NICHT eindeutig.** `moon_order` fliesst nicht ein
+   (`net_mcts.rs:1824`), und Kuppel-Zuege zerfallen in Slot + Rotation --
+   deshalb `id_rotation` und die kanonischen Felder als Disambiguierung. Die
+   gegenteilige Annahme stand in der Registrierung und war falsch (par.7.2).
+2. **Der Haken sitzt an der API-Grenze (`py.rs`), nicht in `apply_drafting`**
+   (Heisspfad der Suche). Wer eine `apply_*`-Methode ergaenzt, ruft
+   `log_and_apply` statt `apply_drafting`. Zwei bewusste Luecken: `apply_pass`
+   (schreibt nie ins Log) und der Stapel-Zug der Netz-KI -- beide vom Textweg
+   gedeckt.
+3. **`tools/plate_points_from_arena.py` musste gehaertet werden.** Die
+   par.4-Sperre hat einen echten Bruch gefunden: eine `#`-Zeile im
+   Endwertungs-Block leerte `je_kriterium` still. Jetzt filtert der Leser
+   `#`-Zeilen wie `analyze_game_log.load_log` es immer schon tat.
+
+**Dateischnitt nebenbei:** die Report-Schicht liegt jetzt in
+`tools/game_log_report.py` (`analyze_game_log.py` hatte die Groessen-Ratsche
+gerissen, Nutzer-Entscheid 2026-08-18: auslagern statt Basislinie neu legen).
+Reine Darstellung, kein Replay -- die drei Partien liefern unveraenderte Reports.
+
+**Nebenbefund, korrigiert:** `analyze_game_log._run_loop` gab auf dem
+Erfolgspfad ein Tupel statt des Zeilenindex zurueck -- die "wie weit kam der
+Replay"-Zahl im Report war dort bedeutungslos (Altbestand, `HEAD:785`).
 
 ---
 

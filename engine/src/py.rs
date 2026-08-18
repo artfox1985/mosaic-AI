@@ -212,7 +212,15 @@ impl PyGame {
             take: TakeAction { source: src, color: col, factory_id, moon_order: order },
             place: PlaceAction { row_index: row },
         };
-        map_err(self.game.apply_drafting(&Action::Stone(m)))
+        let ui = json!({
+            "type": "stone",
+            "source": source,
+            "color": color,
+            "row": row,
+            "factory_id": factory_id,
+            "moon_order": m.take.moon_order.iter().map(|c| c.value()).collect::<Vec<_>>(),
+        });
+        map_err(self.log_and_apply(&Action::Stone(m), ui))
     }
 
     /// Bleibt nach aussen ein ATOMARER Zug (Tile+Slot+Rotation in einem Aufruf,
@@ -223,7 +231,20 @@ impl PyGame {
     #[pyo3(signature = (tile_id, slot_row, slot_col, rotation=0))]
     fn apply_dome(&mut self, tile_id: usize, slot_row: usize, slot_col: usize, rotation: u32) -> PyResult<()> {
         let m = PlaceDomeTileMove { dome_tile_id: tile_id, slot_row, slot_col, rotation: 0 };
-        map_err(self.game.apply_drafting(&Action::ChooseDomeSlot(m)))?;
+        // EINE `#a`-Zeile fuer den nach aussen atomaren Zug (Slot + Rotation).
+        // `id` deckt die Slot-Stufe ab, `id_rotation` die zweite -- die ID
+        // allein kann die Rotation nicht tragen (eigene Stufe im Action Space,
+        // siehe features.rs::action_to_id/choose_dome_rotation).
+        let ui = json!({
+            "type": "dome_display",
+            "id_rotation": crate::self_play::action_to_id_direct(
+                &self.game.state, &Action::ChooseDomeRotation(rotation)),
+            "tile_id": tile_id,
+            "slot_row": slot_row,
+            "slot_col": slot_col,
+            "rotation": rotation,
+        });
+        map_err(self.log_and_apply(&Action::ChooseDomeSlot(m), ui))?;
         map_err(self.game.apply_drafting(&Action::ChooseDomeRotation(rotation)))
     }
 
@@ -232,7 +253,7 @@ impl PyGame {
     /// Vorderseite -- der Zug endet nicht, `apply_dome_stack_choose` oder ein
     /// weiterer `apply_dome_stack_peek` folgt.
     fn apply_dome_stack_peek(&mut self) -> PyResult<String> {
-        map_err(self.game.apply_drafting(&Action::DrawStackPeek))?;
+        map_err(self.log_and_apply(&Action::DrawStackPeek, json!({ "type": "dome_stack_peek" })))?;
         let last = self.game.state.pending_stack_draw.last().ok_or_else(|| {
             PyValueError::new_err("Keine Kachel gezogen (interner Fehler).")
         })?;
@@ -265,15 +286,34 @@ impl PyGame {
         });
         // Bleibt nach aussen atomar -- siehe `apply_dome`-Kommentar.
         let m = DrawFromStackMove { chosen_id, slot_row, slot_col, rotation: 0, return_order };
-        map_err(self.game.apply_drafting(&Action::ChooseDrawStackSlot(m)))?;
+        let ui = json!({
+            "type": "dome_stack_choose",
+            "id_rotation": crate::self_play::action_to_id_direct(
+                &self.game.state, &Action::ChooseDomeRotation(rotation)),
+            "chosen_id": chosen_id,
+            "slot_row": slot_row,
+            "slot_col": slot_col,
+            "rotation": rotation,
+            "return_order": m.return_order.clone(),
+        });
+        map_err(self.log_and_apply(&Action::ChooseDrawStackSlot(m), ui))?;
         map_err(self.game.apply_drafting(&Action::ChooseDomeRotation(rotation)))
     }
 
     fn apply_bonus_chip(&mut self, factory_id: usize) -> PyResult<()> {
-        map_err(self.game.apply_drafting(&Action::BonusChip(TakeBonusChipMove { factory_id })))
+        map_err(self.log_and_apply(
+            &Action::BonusChip(TakeBonusChipMove { factory_id }),
+            json!({ "type": "bonus_chip", "factory_id": factory_id }),
+        ))
     }
 
     fn apply_pass(&mut self) -> PyResult<()> {
+        // BEWUSST OHNE `#a`-Zeile (PREREG_action_id_logging.md S2): `Pass` ist
+        // der einzige Drafting-Zug, der NICHTS ins Log schreibt, und der
+        // Replay verlaesst sich darauf -- `Replayer.ensure_drafting_actor`
+        // (tools/analyze_game_log.py) bricht ab, wenn `apply_pass` die
+        // Log-Laenge veraendert. Passes werden dort ohnehin aus dem Spieler-
+        // wechsel rekonstruiert, nicht aus dem Log gelesen.
         map_err(self.game.apply_drafting(&Action::Pass))
     }
 
@@ -509,6 +549,66 @@ impl PyGame {
 
 // Interne KI-Schritt-Helfer (kein PyO3-Export).
 impl PyGame {
+    /// PREREG_action_id_logging.md, Stueck S2: schreibt EINE maschinenlesbare
+    /// Zeile je angewandter Drafting-Aktion in den Log-Strom -- die
+    /// Aktions-ID aus DEMSELBEN Raum, gegen den der Policy-Kopf trainiert
+    /// (`features::action_to_id`, `NUM_ACTIONS = 406`), plus die kanonischen
+    /// Felder als Rueckfallebene, falls sich der Raum spaeter verschiebt.
+    ///
+    /// ```text
+    /// #a {"id":137,"p":0,"a":{"type":"stone", ...}}
+    /// ```
+    ///
+    /// DREI Eigenschaften, die beim Aendern zu halten sind:
+    ///
+    ///  1. **Nur der gespeicherte Strom.** Die Zeile geht in `state.log` und
+    ///     damit ueber `log_since` in die Datei -- die UI-Ansicht filtert sie
+    ///     wieder heraus (`serialize.rs::state_to_json`, Nutzer-Vorgabe
+    ///     2026-08-18: "am log der in index.html angezeigt wird brauchst
+    ///     nichts ändern").
+    ///  2. **VOR dem Anwenden.** `action_to_id_direct` liest Fabrik- und
+    ///     Ablage-POSITIONEN, die der Zug selbst verschiebt; und `p` ist der
+    ///     Spieler am Zug, nicht der danach.
+    ///  3. **Eigenes Praefix, kein bestehender Logtext geaendert.** Die drei
+    ///     Leser am Logtext (`analyze_game_log.py`, `plate_points_from_arena.py`,
+    ///     `tools/hooks/pre-push`) bleiben unberuehrt -- geprueft am
+    ///     2026-08-18 per Injektion in eine echte Partie (par.4-Sperre).
+    ///
+    /// Kein `log_event`: das wuerde das "[Rn] "-Praefix voranstellen und die
+    /// Zeile damit in die Textklassifikation der Leser ziehen.
+    fn push_action_id_line(&mut self, id: usize, ui: Value) {
+        let p = self.game.state.current_player;
+        self.game
+            .state
+            .log
+            .push(format!("#a {}", json!({ "id": id, "p": p, "a": ui })));
+    }
+
+    /// `push_action_id_line` + `apply_drafting`, atomar: schlaegt das Anwenden
+    /// fehl, verschwindet auch die Zeile wieder (sonst behauptete das Log eine
+    /// Aktion, die nie stattgefunden hat).
+    fn log_and_apply(&mut self, a: &Action, ui: Value) -> Result<(), String> {
+        let id = crate::self_play::action_to_id_direct(&self.game.state, a);
+        let mark = self.game.state.log.len();
+        self.push_action_id_line(id, ui);
+        match self.game.apply_drafting(a) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // Nur die EIGENE Zeile zuruecknehmen. Zwischen `mark` und dem
+                // Fehler kann bei mehrstufigen Zuegen (Kuppel: Slot, dann
+                // Rotation) schon echter Logtext stehen -- ein `truncate(mark)`
+                // wuerde den mit loeschen.
+                if self.game.state.log.get(mark).is_some_and(|l| l.starts_with("#a ")) {
+                    self.game.state.log.remove(mark);
+                }
+                Err(e)
+            }
+        }
+    }
+}
+
+// Interne KI-Schritt-Helfer (kein PyO3-Export).
+impl PyGame {
     /// Separate RNG für reine Debug-/Analyse-Endpunkte (`ai_debug_*`): Die
     /// Suche braucht Zufall, darf aber den Spiel-RNG NICHT fortschreiten
     /// lassen — sonst verschiebt ein KI-Debugger-Aufruf während der Partie
@@ -613,7 +713,29 @@ impl PyGame {
         // ueber weiterziehen/waehlen, wie der Rest der Heuristik-Suche auch.
         let action_json = search_move_json(&mv, Some(&self.game.state));
         let SearchMove::Draft(a) = &mv;
-        map_err(self.game.apply_drafting(a))?;
+        // PREREG_action_id_logging.md S2: die KI-Aktion traegt ihre ID genauso
+        // wie die menschliche -- sonst waere nur die halbe Partie exakt
+        // replaybar. `action_to_env_dict` liefert die kanonischen Felder, die
+        // `action_to_id` konsumiert (Rueckfallebene, par.5).
+        // `Pass` bleibt aussen vor -- gleiche Begruendung wie bei `apply_pass`
+        // (er erzeugt keine Textzeile, und der Replay rekonstruiert ihn aus dem
+        // Spielerwechsel). Ohne diese Ausnahme schriebe die KI eine `#a`-Zeile
+        // fuer einen Zug, den der Mensch-Pfad still laesst.
+        let mark_len = self.game.state.log.len();
+        let geloggt = !matches!(a, Action::Pass);
+        if geloggt {
+            let id = crate::self_play::action_to_id_direct(&self.game.state, a);
+            let ui = crate::self_play::action_to_env_dict(&self.game.state, a);
+            self.push_action_id_line(id, ui);
+        }
+        if let Err(e) = self.game.apply_drafting(a) {
+            if geloggt
+                && self.game.state.log.get(mark_len).is_some_and(|l| l.starts_with("#a "))
+            {
+                self.game.state.log.remove(mark_len);
+            }
+            return Err(PyValueError::new_err(e));
+        }
 
         let mut obj = serde_json::Map::new();
         obj.insert("applied".into(), json!(true));
@@ -694,9 +816,33 @@ impl PyGame {
         // `apply_chosen_action`-Kommentar) -- NICHT verschlucken: sonst
         // meldet der Server `applied: true` fuer einen nie angewendeten Zug
         // und Engine-/Server-Zustand laufen auseinander.
+        // PREREG_action_id_logging.md S2, mit EINER bewussten Luecke: startet
+        // die Netz-KI einen Stapel-Zug (`DrawStackPeek`), loest
+        // `apply_chosen_action` intern eine ganze FOLGE von Aktionen auf
+        // (mehrfach weiterziehen, dann waehlen, dann rotieren, siehe
+        // self_play.rs::resolve_and_apply_stack_draw). Die Zwischen-Zustaende
+        // sind hier nicht greifbar, und die Funktion liegt im Self-Play-
+        // Heisspfad -- sie bekommt deshalb KEINEN Logging-Haken (par.6: "keine
+        // Aenderung an Suche, Wertung oder Self-Play"). Fuer diesen Fall bleibt
+        // es beim Textweg, den der Replay ohnehin beherrscht (STACK_PEEK/
+        // DOME_PLACE); S3 faellt dort automatisch darauf zurueck.
+        if !matches!(a, Action::DrawStackPeek | Action::Pass) {
+            let id = crate::self_play::action_to_id_direct(&self.game.state, &a);
+            let ui = crate::self_play::action_to_env_dict(&self.game.state, &a);
+            self.push_action_id_line(id, ui);
+        }
+        let mark = self.game.state.log.len();
         let resolved = match crate::self_play::apply_chosen_action(&mut self.game, a) {
             Ok(resolved) => resolved,
             Err(e) => {
+                // Angekuendigte, aber nie angewandte Aktion wieder entfernen --
+                // dieselbe Regel wie in `log_and_apply`. `mark` zeigt hinter die
+                // `#a`-Zeile, deshalb `mark - 1`.
+                if mark > 0
+                    && self.game.state.log.get(mark - 1).is_some_and(|l| l.starts_with("#a "))
+                {
+                    self.game.state.log.remove(mark - 1);
+                }
                 return Ok(json!({
                     "applied": false,
                     "phase": self.game.state.phase.as_str(),

@@ -8,7 +8,19 @@ Pipeline (Auftrag "Spiel-Analyse-Werkzeug", 2026-07-25):
       wurden NICHT geraten, sondern direkt aus den log_event(...)-Aufrufen in
       engine/src/{execution,game,round_end,state,py}.rs abgelesen.
   2. Replay:  mosaic_rust.PyGame + die passenden apply_*-Methoden, Zug für
-      Zug. Kreuzvalidierung: nach JEDER Aktion wird `g.log_since(checkpoint)`
+      Zug. Seit PREREG_action_id_logging.md (2026-08-18) wird ein Stein-Zug
+      NICHT mehr aus der Prosa erraten, sondern ueber die AKTIONS-ID
+      aufgeloest, die die Engine je Zug mitschreibt:
+
+          #a {"id": 137, "p": 0, "a": {"type": "stone", ...}}
+
+      Das ist dieselbe ID, gegen die der Policy-Kopf trainiert
+      (`features.rs::action_to_id`, `NUM_ACTIONS = 406`); sie steht seither
+      auch an jedem `valid_moves`-Eintrag. Die Zeile geht NUR in die
+      gespeicherte Fassung, nicht in die Anzeige (serialize.rs filtert sie).
+      Logs ohne solche Zeilen (alles vor dem 2026-08-18, Arena-Logs, und der
+      KI-Stapelzug) laufen unveraendert ueber den alten Textweg.
+      Kreuzvalidierung: nach JEDER Aktion wird `g.log_since(checkpoint)`
       (== dieselben log_event-Strings wie im Original-Log, inkl. "[Rn] "-
       Präfix, siehe GameState::log_event) exakt gegen den entsprechenden
       Original-Log-Abschnitt verglichen. Divergenz -> sofortiger Abbruch mit
@@ -42,7 +54,6 @@ import hashlib
 import itertools
 import json
 import re
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -89,8 +100,15 @@ PATTERNS: dict[str, re.Pattern] = {
     "START_TILE": re.compile(
         r"^(?P<name>.+?): Startkachel (?P<tile>\d+) → \((?P<row>\d+),(?P<col>\d+)\) rot=(?P<rot>\d+)°$"
     ),
+    # Das Emoji ist seit der Korrektur vom 2026-08-18 (execution.rs:59) KEIN
+    # Formatmerkmal mehr, sondern folgt der QUELLE: eine Teil-Entnahme aus dem
+    # Mondbereich (SmallFactoryMoon/LargeFactoryMoon mit factory_id) traegt
+    # 🌙 im SCHLICHTEN Format, ohne die (detail)-Klammer der globalen
+    # Mond-Entnahme. Deshalb hier beide Emoji zulassen -- der Aktionstyp wird
+    # ohnehin nicht mehr daraus abgeleitet (siehe resolve_stone).
+    # Alte Logs behalten ihr ☀️ und bleiben unveraendert parsebar.
     "SUN_TAKE": re.compile(
-        r"^☀️\s*(?P<name>.+?): (?P<n>\d+)× (?P<color>\S+) von (?P<src>F\d+|GF) → "
+        r"^(?P<emoji>☀️|🌙)\s*(?P<name>.+?): (?P<n>\d+)× (?P<color>\S+) von (?P<src>F\d+|GF) → "
         r"(?P<dest>Reihe \d+|Strafleiste)(?: \[(?P<fill>\d+)/(?P<cap>\d+)\])?"
         r"(?: \(\+(?P<overflow>\d+) Strafleiste\))?$"
     ),
@@ -177,12 +195,26 @@ class LogLine:
     body: str  # ohne Praefix (fuer die Klassifikation)
 
 
+# Maschinenlesbare Aktionszeile (PREREG_action_id_logging.md S2), geschrieben
+# von py.rs::push_action_id_line. Traegt die Aktions-ID aus DEMSELBEN Raum,
+# gegen den der Policy-Kopf trainiert (features::action_to_id), plus die
+# kanonischen Felder als Rueckfallebene.
+ACTION_HINT_RE = re.compile(r"^#a (\{.*\})$")
+
 SPIELENDE_RE = re.compile(r"^# SPIELENDE: (\[.*\])$")
 
 
 def load_log(path: Path):
+    """Gibt (header_meta, lines, hints) zurueck.
+
+    `hints[i]` = Liste der `#a`-Nutzlasten, die im Original UNMITTELBAR VOR
+    Textzeile `i` stehen. Die Engine schreibt sie VOR dem Anwenden, sie
+    gehoeren also zu der Aktion, die die folgenden Textzeilen erzeugt hat.
+    Fehlen sie (alte Logs, Arena-Logs, KI-Stapelzug -- siehe py.rs), bleibt
+    der Eintrag leer und der Replay faellt auf den Textweg zurueck."""
     header_meta = None
     lines: list[LogLine] = []
+    hints: dict[int, list[dict]] = {}
     spielende_scores = None
     with open(path, encoding="utf-8") as fh:
         for raw_line in fh:
@@ -191,6 +223,13 @@ def load_log(path: Path):
                 header_meta = json.loads(raw_line[2:])
                 continue
             if raw_line.startswith("#"):
+                mh = ACTION_HINT_RE.match(raw_line)
+                if mh:
+                    try:
+                        hints.setdefault(len(lines), []).append(json.loads(mh.group(1)))
+                    except json.JSONDecodeError:
+                        pass  # defekte Zeile ignorieren, der Textweg traegt weiter
+                    continue
                 m2 = SPIELENDE_RE.match(raw_line)
                 if m2:
                     spielende_scores = ast.literal_eval(m2.group(1))
@@ -202,7 +241,7 @@ def load_log(path: Path):
     if header_meta is None:
         raise ReplayDivergence("Header-JSON-Zeile (# {...}) nicht gefunden.")
     header_meta["_spielende_scores"] = spielende_scores
-    return header_meta, lines
+    return header_meta, lines, hints
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -331,6 +370,12 @@ class Replayer:
         self.c_puct = c_puct
         self.do_oracle = do_oracle
 
+        # PREREG_action_id_logging.md S3: von `load_log` nachgereicht.
+        # `hints[i]` = `#a`-Nutzlasten unmittelbar vor Textzeile i.
+        self.hints: dict[int, list[dict]] = {}
+        self.emoji_toleriert = 0  # Zeilen, die nur am ☀️/🌙-Praefix abwichen
+        self.hint_used = 0      # Zuege, die ueber die ID aufgeloest wurden
+        self.hint_missing = 0   # Stein-Zuege ohne Hinweis (Textweg)
         self.action_log: list[tuple[str, tuple, dict]] = []
         self.g = self._fresh_game()
         self.turn_idx = 0
@@ -349,6 +394,36 @@ class Replayer:
             getattr(g, method)(*args, **kwargs)
         return g
 
+    # ── Textvergleich mit EINER benannten, datierten Toleranz ───────────────
+    def _zeilen_gleich(self, original: str, replay: str) -> bool:
+        """String-Gleichheit -- mit genau einer Ausnahme, und die ist keine
+        Aufweichung, sondern eine bekannte Aenderung am Logtext.
+
+        Am 2026-08-18 hat die Emoji-Korrektur (`execution.rs:59`, Commits
+        9c92c66/86c1144) das Praefix einer Teil-Entnahme aus dem Mondbereich
+        von ☀️ auf 🌙 umgestellt. Alte Logs tragen ☀️, die heutige Engine
+        schreibt 🌙 -- der Rest der Zeile ist zeichengleich (nachgemessen an
+        `game_20260818_200516_seed585858` Zeile 17). Ohne diese Toleranz ist
+        JEDE aeltere Partie mit einer solchen Entnahme dauerhaft unreplaybar,
+        obwohl der Zug korrekt aufgeloest wurde.
+
+        Eng gehalten: NUR das Emoji direkt nach dem `[Rn] `-Praefix, und nur
+        zwischen diesen beiden Zeichen. Die globale Mond-Entnahme bleibt
+        unterscheidbar, weil sie zusaetzlich die `(detail)`-Klammer traegt --
+        die Toleranz kann also keine Quellen-Verwechslung durchlassen. Jeder
+        Treffer wird gezaehlt und im Report ausgewiesen, nicht verschwiegen."""
+        if original == replay:
+            return True
+        m_o, m_r = ROUND_PREFIX.match(original), ROUND_PREFIX.match(replay)
+        if not m_o or not m_r or m_o.group(1) != m_r.group(1):
+            return False
+        rest_o, rest_r = m_o.group(2), m_r.group(2)
+        for a, b in (("☀️ ", "🌙"), ("☀️", "🌙")):
+            if rest_o.startswith(a) and rest_r.startswith(b)                     and rest_o[len(a):].lstrip() == rest_r[len(b):].lstrip():
+                self.emoji_toleriert += 1
+                return True
+        return False
+
     # ── zentrale Anwendung + exakte Textvalidierung ─────────────────────────
     def _call_and_check(self, g, lines: list[LogLine], li: int, method: str, args: tuple, kwargs: dict):
         """Fuehrt den Aufruf auf `g` aus und vergleicht die neu erzeugten
@@ -357,11 +432,16 @@ class Replayer:
         Mutation von `g` bleibt in JEDEM Fall bestehen (kein Undo in Rust)."""
         before = g.log_len()
         getattr(g, method)(*args, **kwargs)
-        new_lines = g.log_since(before)
+        # Die Engine schreibt seit PREREG_action_id_logging.md S2 eigene
+        # Maschinenzeilen (`#a {...}`) mit in den Strom. `load_log` haelt sie
+        # aus `lines` heraus (sie stehen in `hints`), also muessen sie auch
+        # hier raus -- sonst verschiebt sich der Vergleich um genau eine Zeile
+        # und JEDER Zug meldet Divergenz.
+        new_lines = [l for l in g.log_since(before) if not l.startswith("#a ")]
         n = len(new_lines)
         if li + n > len(lines):
             return False, n, new_lines
-        matched = all(lines[li + k].raw == new_lines[k] for k in range(n))
+        matched = all(self._zeilen_gleich(lines[li + k].raw, new_lines[k]) for k in range(n))
         return matched, n, new_lines
 
     def apply(self, lines: list[LogLine], li: int, method: str, *args, **kwargs) -> int:
@@ -532,6 +612,20 @@ class Replayer:
             rec.ambiguous_match = out.get("ambiguous_match", False)
         self.oracle_records.append(rec)
 
+    # ── Aktions-Hinweis (#a) ─────────────────────────────────────────────────
+    def hint_for(self, li: int, typ: str) -> dict | None:
+        """Die `#a`-Nutzlast vor Zeile `li`, sofern sie zum erwarteten
+        Aktionstyp passt. `None` heisst: kein Hinweis vorhanden (altes Log,
+        Arena-Log, KI-Stapelzug) -- der Aufrufer faellt dann auf den Textweg
+        zurueck. Ein Hinweis mit ANDEREM Typ wird ebenfalls verworfen, statt
+        ihn zu erzwingen: das waere genau die Sorte stiller Ersatzwahl, gegen
+        die diese Registrierung angetreten ist."""
+        for h in self.hints.get(li, []):
+            a = h.get("a") or {}
+            if a.get("type") == typ and isinstance(h.get("id"), int):
+                return h
+        return None
+
     # ── Stein-Zug: Quelle/Kandidaten aufloesen ──────────────────────────────
     def resolve_stone(self, lines: list[LogLine], li: int, m: re.Match, is_global: bool, actor: int) -> int:
         color = m.group("color")
@@ -551,6 +645,52 @@ class Replayer:
                 expected = {"LARGE_FACTORY_MOON"} if factory_id is None else {"SMALL_FACTORY_MOON"}
 
         st = json.loads(self.g.state_json())
+
+        # ── ID-WEG (PREREG_action_id_logging.md S3) ──────────────────────────
+        # Liegt ein `#a`-Hinweis vor, wird die aufgezeichnete Aktion ANGEWANDT
+        # statt aus der Prosa erraten. Das erledigt genau die drei Ebenen, die
+        # am 2026-08-18 gekippt sind (par.1): das Emoji bestimmt den Aktionstyp
+        # nicht, "von GF" bestimmt die Quelle nicht, und eine gueltige, aber nie
+        # GENERIERTE Aktion (`LargeFactoryMoon`) fehlt in der Kandidatenliste.
+        # Die ID kommt aus `valid_moves` (Stueck S1) und ist damit dieselbe
+        # Zahl, gegen die der Policy-Kopf trainiert.
+        #
+        # WICHTIG -- die ID ist NICHT eindeutig: `moon_order` fliesst nicht in
+        # sie ein (net_mcts.rs:1824). Der Hinweis traegt die Reihenfolge
+        # deshalb in seinen kanonischen Feldern mit; sie wird hier bevorzugt,
+        # und wenn sie nicht passt, bleibt die Permutations-Disambiguierung
+        # weiter unten als Netz darunter.
+        hint = self.hint_for(li, "stone")
+        if hint is not None:
+            per_id = [mv for mv in st["valid_moves"] if mv.get("id") == hint["id"]]
+            if per_id:
+                self.hint_used += 1
+                ha = hint["a"]
+                cand_calls = []
+                # Exakte Reihenfolge aus dem Hinweis zuerst, danach die
+                # kanonische je Kandidat -- niemals raten, nur ordnen.
+                for mv in sorted(per_id, key=lambda m: 0 if m["source"] == ha.get("source") else 1):
+                    orders = []
+                    if isinstance(ha.get("moon_order"), list):
+                        orders.append(list(ha["moon_order"]))
+                    if list(mv["moon_order"]) not in orders:
+                        orders.append(list(mv["moon_order"]))
+                    for o in orders:
+                        cand_calls.append(((mv["source"], mv["color"], mv["row"],
+                                            mv["factory_id"], o), {}))
+                # `sun_used` weiterfuehren -- nur der Textweg liest es, aber
+                # ein Log kann beide Wege mischen (Arena-Zeilen ohne Hinweis).
+                if cand_calls and cand_calls[0][0][0] in ("SMALL_FACTORY_SUN", "LARGE_FACTORY_SUN"):
+                    self.sun_used["GF" if factory_id is None else factory_id] = True
+                return self.apply_ambiguous(lines, li, "apply_stone", cand_calls)
+            raise ReplayDivergence(
+                f"Zeile {li} (Runde {lines[li].round_num}): Aktions-ID {hint['id']} "
+                f"aus dem Log ist hier nicht legal. Verfuegbare Stein-IDs: "
+                + ", ".join(sorted({str(mv['id']) for mv in st['valid_moves'] if mv['type'] == 'stone'}))
+            )
+        self.hint_missing += 1
+        # ── TEXTWEG (Rueckfall: alte Logs, Arena-Logs, KI-Stapelzug) ─────────
+
         candidates = [
             mv for mv in st["valid_moves"]
             if mv["type"] == "stone" and mv["color"] == color and mv["row"] == row
@@ -615,6 +755,30 @@ class Replayer:
                     continue
                 seen_orders.add(key2)
                 cand_calls.append(((cand["source"], cand["color"], cand["row"], cand["factory_id"], list(perm)), {}))
+
+        # NACHGESTELLTE RETTUNGS-KANDIDATEN (par.8 Punkt 1 der Registrierung).
+        # Die Kandidatenliste oben kommt aus `valid_moves`, also aus dem
+        # GENERATOR -- und der erzeugt Mond-Entnahmen ausschliesslich in der
+        # globalen Form (validation.rs:214). Die TEIL-Entnahmen
+        # (`LargeFactoryMoon`, `SmallFactoryMoon` mit factory_id) werden vom
+        # Validator aber AKZEPTIERT und sind ueber die API im Menschenspiel
+        # entstanden. Genau daran scheitert `game_20260818_200516_seed585858`:
+        # der Textweg griff zur globalen Mond-Entnahme, also zu einer ANDEREN
+        # Aktion, und das fiel erst drei Zeilen spaeter auf.
+        #
+        # Warum das gefahrlos ist: `apply_ambiguous` probiert JEDEN Kandidaten
+        # auf einer frischen Kopie und verlangt, dass er die Original-Zeilen
+        # EXAKT reproduziert. Ein zusaetzlicher Kandidat kann also nie eine
+        # falsche Wahl herbeifuehren -- er kann nur einen Fall retten, den der
+        # Generator nicht abdeckt. Deshalb steht er HINTEN.
+        #
+        # Nur fuer das schlichte Format (`is_global == False`), und nur fuer
+        # neue Logs unnoetig: dort greift der ID-Weg weiter oben.
+        if not is_global:
+            teil_quelle = "LARGE_FACTORY_MOON" if factory_id is None else "SMALL_FACTORY_MOON"
+            if not any(c[0][0] == teil_quelle and c[0][3] == factory_id for c in cand_calls):
+                cand_calls.append(((teil_quelle, color, row, factory_id, []), {}))
+
         return self.apply_ambiguous(lines, li, "apply_stone", cand_calls)
 
     # ── Kuppel-Zug ────────────────────────────────────────────────────────────
@@ -646,9 +810,10 @@ def run(log_path: Path, model_path: Path, sims: int, c_puct: float, do_oracle: b
     Aufrufer trotzdem einen (Teil-)Report ueber das bis dahin Erreichte
     schreiben kann (Auftrag: "bei Divergenz praezise abbrechen und
     berichten", nicht einfach nur crashen)."""
-    header, lines = load_log(log_path)
+    header, lines, hints = load_log(log_path)
     rep = Replayer(header, log_path.name, str(model_path), sims, c_puct, do_oracle,
                    dump_path=dump_states)
+    rep.hints = hints
     name_to_idx = rep.name_to_idx
 
     n_lines = len(lines) if limit is None else min(limit, len(lines))
@@ -782,297 +947,21 @@ def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines:
         elif li % 20 == 0:
             print(f"  ... Zeile {li}/{n_lines}", flush=True)
 
-    return rep, lines
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Report
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _git_commit_short() -> str:
-    try:
-        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True, timeout=10)
-        return out.stdout.strip() if out.returncode == 0 else "?"
-    except Exception:
-        return "?"
-
-
-def extract_full_score_timeline(all_lines: list[LogLine], players: list[str]) -> dict:
-    """Reine Text-Extraktion (KEIN Replay noetig) der Rundenend-Punktestaende
-    und der Endwertung -- funktioniert auch dann noch, wenn das Engine-Replay
-    (z.B. wegen der RNG-Perturbation ab Runde 4, siehe Grenzen-Abschnitt)
-    vorzeitig abbricht, da diese Zahlen direkt im Log-Text stehen."""
-    round_end_scores: dict[int, dict[str, int]] = {}
-    final: dict[str, dict] = {}
-    cur_final_name = None
-    for l in all_lines:
-        cat, m = classify(l.body)
-        if cat == "ROUND_STRAFE":
-            round_end_scores.setdefault(l.round_num, {})[m.group("name")] = int(m.group("score"))
-        elif cat == "FINAL_SCORE":
-            cur_final_name = m.group("name")
-            final[cur_final_name] = {"total": int(m.group("total")), "score": int(m.group("score")), "details": []}
-        elif cat == "FINAL_DETAIL" and cur_final_name is not None:
-            final[cur_final_name]["details"].append(l.body.strip())
-    # Auch ohne "Strafe"-Zeile (0 Pkt Strafe -> keine Zeile) den Endstand pro
-    # Runde nachvollziehbar machen: letzter bekannter Wert je Spieler je Runde.
-    return {"round_end_scores": round_end_scores, "final": final}
-
-
-def build_report(header: dict, log_path: Path, rep: "Replayer", divergence: str | None,
-                  li_reached: int, n_lines_total: int, elapsed_s: float, all_lines: list[LogLine]) -> str:
-    players = header["players"]
-    recs = rep.oracle_records
-    lines_out: list[str] = []
-    P = lines_out.append
-
-    P(f"# Spielanalyse: {log_path.name}")
-    P("")
-    P(f"Erzeugt von `tools/analyze_game_log.py` (Commit `{_git_commit_short()}`), "
-      f"Laufzeit {elapsed_s:.0f}s.")
-    P("")
-    # Partien ohne KI (Mensch vs. Mensch bzw. KI abgeschaltet) haben ai_player=None
-    # im Header -- players[None] wuerde den ganzen Report-Lauf mit TypeError killen.
-    ai_idx = header.get("ai_player")
-    ki_desc = ("keine (Mensch vs. Mensch)" if ai_idx is None else
-               f"{players[ai_idx]} ({header.get('ai_model')}, {header.get('ai_sims')} Sims)")
-    P(f"- Seed: {header['seed']}, Startspieler: {players[header['first_player']]}, "
-      f"KI-Spieler: {ki_desc}")
-    timeline = extract_full_score_timeline(all_lines, players)
-    if divergence:
-        P("")
-        P(f"**Replay-Abbruch bei Zeile {li_reached}/{n_lines_total}** (Ursache siehe unten, "
-          f"Abschnitt \"Grenzen\").")
-        P("")
-        P("```")
-        P(divergence)
-        P("```")
-        P("")
-
-    # ── (a) Zusammenfassung ─────────────────────────────────────────────────
-    P("## (a) Zusammenfassung")
-    P("")
-    fin0 = timeline["final"]
-    if fin0 and all(p in fin0 for p in players):
-        P(f"Endstand (aus dem Log-Text): **{players[0]} {fin0[players[0]]['score']} : "
-          f"{fin0[players[1]]['score']} {players[1]}**")
-    else:
-        try:
-            scores = rep.g.scores()
-            P(f"Endstand (Replay-Zwischenstand, Partie evtl. nicht zu Ende gespielt): "
-              f"**{players[0]} {scores[0]} : {scores[1]} {players[1]}**")
-        except Exception:
-            P("Endstand: nicht ermittelbar.")
-    P("")
-    P("Replay-Kreuzvalidierung: jede einzelne erzeugte Log-Zeile (`log_since`) wurde exakt "
-      "(String-Gleichheit inkl. `[Rn] `-Präfix) gegen die Original-Logdatei geprüft "
-      f"({'alle ' + str(n_lines_total) + ' Zeilen bestehen' if not divergence else f'{li_reached}/{n_lines_total} Zeilen bestanden, dann Abbruch'}).")
-    P("")
-
-    per_player = {}
-    for pi in (0, 1):
-        evald = [r for r in recs if r.actor == pi and r.evaluated]
-        skipped = [r for r in recs if r.actor == pi and not r.evaluated]
-        skip_reasons: dict[str, int] = {}
-        for r in skipped:
-            skip_reasons[r.reason] = skip_reasons.get(r.reason, 0) + 1
-        n = len(evald)
-        avg_delta = sum(r.delta_win_pct for r in evald) / n if n else None
-        top1 = sum(1 for r in evald if r.played_rank == 1)
-        top3 = sum(1 for r in evald if r.played_rank is not None and r.played_rank <= 3)
-        per_player[pi] = dict(n=n, avg_delta=avg_delta, top1=top1, top3=top3,
-                               skipped=len(skipped), skip_reasons=skip_reasons)
-
-    P("| Spieler | oracle-bewertete Züge | Ø Δwin% zum Oracle-Top | Top-1-Treffer | Top-3-Treffer | nicht bewertet |")
-    P("|---|---|---|---|---|---|")
-    for pi in (0, 1):
-        s = per_player[pi]
-        avg_s = f"{s['avg_delta']:.1f} pp" if s["avg_delta"] is not None else "–"
-        top1_s = f"{s['top1']}/{s['n']} ({100*s['top1']/s['n']:.0f}%)" if s["n"] else "–"
-        top3_s = f"{s['top3']}/{s['n']} ({100*s['top3']/s['n']:.0f}%)" if s["n"] else "–"
-        P(f"| {players[pi]} | {s['n']} | {avg_s} | {top1_s} | {top3_s} | {s['skipped']} |")
-    P("")
-    for pi in (0, 1):
-        sr = per_player[pi]["skip_reasons"]
-        if sr:
-            parts = ", ".join(f"{v}× {k}" for k, v in sorted(sr.items(), key=lambda kv: -kv[1]))
-            P(f"- {players[pi]}: nicht bewertete Züge -- {parts}")
-    P("")
-    P("`Δwin%` = (Oracle-Top-Q − Q der gespielten Aktion) × 100, aus 5000-Sim-Netzsuche "
-      "(v16_best) am Zustand VOR dem Zug. 0.0 = die gespielte Aktion WAR der Oracle-Top-Zug.")
-    P("")
-
-    # ── (b) Top-3-Abweichungen je Spieler ────────────────────────────────────
-    P("## (b) Groesste Abweichungen von der Oracle-Empfehlung")
-    P("")
-    for pi in (0, 1):
-        evald = [r for r in recs if r.actor == pi and r.evaluated and r.played_rank and r.played_rank > 1]
-        evald.sort(key=lambda r: -r.delta_win_pct)
-        P(f"### {players[pi]}")
-        P("")
-        if not evald:
-            P("(keine Abweichung -- jeder oracle-bewertete Zug war Top-1, oder keine Züge bewertet.)")
-            P("")
-            continue
-        for r in evald[:3]:
-            P(f"- **Runde {r.round_num}, Zug #{r.turn_idx}** ({r.kind}): gespielt "
-              f"`{r.played_desc.strip()}` (Rang {r.played_rank}/{r.num_actions}, Q={r.played_q:.3f}) "
-              f"vs. Oracle-Top `{r.top_desc}` (Q={r.top_q:.3f}) -- **Δwin% = {r.delta_win_pct:.1f}**"
-              + (" _(Match evtl. mehrdeutig)_" if r.ambiguous_match else ""))
-        P("")
-
-    # ── (c) Wendepunkte ───────────────────────────────────────────────────────
-    P("## (c) Wendepunkte (groesste Win%-Sprünge)")
-    P("")
-    trace = [r for r in recs if r.root_value is not None]
-    p1wp = []
-    for r in trace:
-        wp = r.root_value * 100.0 if r.actor == 0 else (1 - r.root_value) * 100.0
-        p1wp.append((r.turn_idx, r.round_num, r.actor_name, wp))
-    if len(p1wp) < 2:
-        P("(zu wenige oracle-bewertete Zustände fuer eine Wendepunkt-Analyse.)")
-        P("")
-    else:
-        jumps = []
-        for i in range(1, len(p1wp)):
-            d = p1wp[i][3] - p1wp[i - 1][3]
-            jumps.append((abs(d), d, p1wp[i - 1], p1wp[i]))
-        jumps.sort(key=lambda x: -x[0])
-        P(f"Win%-Schätzung ist immer aus Sicht von **{players[0]}** normiert (Oracle-`root_value` "
-          f"ist Win% des jeweils ziehenden Spielers am Zustand VOR dem Zug; für Zug-Perspektive "
-          f"{players[1]} wird 100−root_value gebildet).")
-        P("")
-        P(f"| von (Zug#/Runde) | nach (Zug#/Runde) | Δ Win% ({players[0]}) |")
-        P("|---|---|---|")
-        for absd, d, before, after in jumps[:5]:
-            P(f"| #{before[0]} (R{before[1]}, {before[2]} zieht, {before[3]:.1f}%) "
-              f"| #{after[0]} (R{after[1]}, {after[2]} zieht, {after[3]:.1f}%) | {d:+.1f} pp |")
-        P("")
-
-    # ── (d) Wertungsplatten-Story ─────────────────────────────────────────────
-    P("## (d) Die Wertungsplatten-Story")
-    P("")
-    P("Punktestand am Ende jeder Runde (reine Text-Extraktion aus dem Log -- "
-      "unabhaengig vom Replay-Fortschritt, siehe Grenzen):")
-    P("")
-    res = timeline["round_end_scores"]
-    if res:
-        P("| Runde | " + " | ".join(players) + " |")
-        P("|---|" + "---|" * len(players))
-        for rn in sorted(res):
-            row = res[rn]
-            P(f"| {rn} | " + " | ".join(str(row.get(p, "–")) for p in players) + " |")
-        P("")
-    spielende = header.get("_spielende_scores")
-    if spielende:
-        P(f"(Rohpunktestand direkt vor der Endwertung, aus der `# SPIELENDE:`-Kopfzeile: "
-          f"{players[0]} {spielende[0]} : {spielende[1]} {players[1]} -- fehlende \"–\"-Werte "
-          f"oben bedeuten lediglich 0 Pkt Strafe in dieser Runde, keine Lücke.)")
-        P("")
-    fin = timeline["final"]
-    if fin:
-        P("Endwertung (Wertungsplatten-Bonus):")
-        P("")
-        for p in players:
-            if p not in fin:
-                continue
-            d = fin[p]
-            P(f"- **{p}**: +{d['total']} Pkt -> Gesamt {d['score']} Pkt")
-            for det in d["details"]:
-                P(f"  - {det}")
-        P("")
-        if spielende:
-            pre = {players[0]: spielende[0], players[1]: spielende[1]}
-        else:
-            pre = {p: res.get(max(res), {}).get(p) for p in players} if res else {}
-        if all(pre.get(p) is not None for p in players):
-            P(f"Vor der Endwertung stand es {pre[players[0]]} : {pre[players[1]]}; "
-              f"nach dem Wertungsplatten-Bonus {fin[players[0]]['score']} : {fin[players[1]]['score']}.")
-            winner_pre = players[0] if pre[players[0]] > pre[players[1]] else players[1]
-            winner_post = players[0] if fin[players[0]]["score"] > fin[players[1]]["score"] else players[1]
-            if winner_pre != winner_post:
-                P(f"**Die Wertungsplatten haben das Ergebnis gedreht**: ohne Endwertung hätte "
-                  f"{winner_pre} gewonnen, nach der Endwertung gewinnt {winner_post}.")
-            P("")
-    P(f"Win%-Verlauf (aus {players[0]}-Sicht) über den oracle-bewerteten Teil der Partie:")
-    P("")
-    if p1wp:
-        P("| Zug# | Runde | zieht | Win% (Spieler 1) |")
-        P("|---|---|---|---|")
-        for t, rn, actor_name, wp in p1wp:
-            P(f"| {t} | {rn} | {actor_name} | {wp:.1f}% |")
-        P("")
-        first_wp = p1wp[0][3]
-        last_wp = p1wp[-1][3]
-        P(f"Das Oracle sah {players[0]} zu Beginn der bewerteten Zuege bei **{first_wp:.1f}%** "
-          f"und am Ende von Runde 4 bei **{last_wp:.1f}%** Gewinnwahrscheinlichkeit (jeweils "
-          f"aus Sicht des ziehenden Spielers umgerechnet). Runde 5 (Endwertung inkl. "
-          f"Wertungsplatten) lief ausserhalb dieser Betrachtung über den exakten Solver.")
-        P("")
-    else:
-        P("(keine Datenpunkte -- oracle-Analyse war deaktiviert oder lieferte keine Ergebnisse.)")
-        P("")
-
-    # ── Grenzen ───────────────────────────────────────────────────────────────
-    P("## Grenzen und Auffälligkeiten (ehrlich dokumentiert)")
-    P("")
-    if divergence:
-        P("- **Replay-Abbruch, Ursachenanalyse**: das byte-exakte Replay (jede erzeugte "
-          "Log-Zeile exakt gegen das Original geprüft) hielt bis zu der oben genannten Zeile "
-          "durch, dann wich der Fabrikinhalt vom Original ab (eine benötigte Farbe fehlte in "
-          "der per Replay rekonstruierten Fabrik). Root Cause (verifiziert): `Bag::draw()` "
-          "(engine/src/supply.rs) entnimmt Fliesen aus einem EINMALIG gemischten Beutel ohne "
-          "weiteren RNG-Verbrauch -- der Beutel bleibt daher unabhängig von jeglichem "
-          "Netzsuche-Rauschen exakt reproduzierbar, SOLANGE er nie leer läuft. Sobald er "
-          "während einer Rundenvorbereitung zur Neige geht, wird er aus dem Turm neu gemischt "
-          "(`Bag::refill_from_tower`, verbraucht RNG proportional zur Turmgröße). Der "
-          "Mensch-vs-KI-Server (`server.py`) nutzt für die EINE PyGame-Instanz der Partie "
-          "durchgehend denselben `self.rng` -- auch die Debug-/Analyse-Endpunkte "
-          "`/api/ai_debug`, `/api/ai_debug_history`, `/api/ai_suggest` (`ai_debug_json`/"
-          "`ai_debug_net_json`, engine/src/py.rs) rufen MCTS-Suchen mit demselben `self.rng` "
-          "auf, OHNE dafür jemals einen Log-Eintrag zu schreiben. Öffnete der Nutzer während "
-          "der Partie das KI-Debug-Panel (naheliegend, siehe die unmittelbar vorausgehenden "
-          "Commits zu debug.html/Task #95), verschiebt das den RNG-Zustand unsichtbar für das "
-          "Log -- mit Auswirkung erst beim ERSTEN Beutel-Nachmischen (hier: Beginn Runde 4, "
-          "der Beutel reicht für 3 Runden Fabrik-Auffüllung knapp, dann nicht mehr). Das ist "
-          "eine FUNDAMENTALE, aus dem Log allein nicht rekonstruierbare Grenze dieses Ansatzes "
-          "(keine Werkzeug-Lücke, kein Parser-Bug) -- die Drafting-ENTSCHEIDUNGEN selbst "
-          "bleiben im Log-Text vollständig sichtbar, nur die exakte verdeckte Fabrik-Belegung "
-          "ab diesem Punkt nicht mehr. Runden- und Endwertungs-Punktestände (Abschnitt (d)) "
-          "wurden deshalb bewusst per reiner Text-Extraktion statt per Replay ermittelt -- die "
-          "stehen unabhängig davon exakt im Log.")
-    if rep.silent_chip_gaps:
-        gaps = ", ".join(f"R{r} {players[a]} Reihe {pr + 1}" for r, a, pr in rep.silent_chip_gaps)
-        P(f"- **Entdeckte Logging-Luecke (KI-Bonuschips)**: der Mensch-Pfad `apply_tiling_chips` "
-          f"(py.rs) loggt \"🎫 ... komplettiert Reihe N ...\", der KI-Pfad (`ai_tiling_step` -> "
-          f"`TilingStep::Chips` -> `apply_bonus_chips_with`, round_end.rs) tut das NICHT. "
-          f"Betroffen in dieser Partie: {gaps}. Das Replay-Werkzeug erkennt die unvollstaendige "
-          f"Zielreihe und holt die Chip-Komplettierung automatisch nach (ohne die dabei "
-          f"entstehende, im Original fehlende \"🎫\"-Zeile gegen das Log zu pruefen).")
-    P("- **Determinisierung**: `net_search_state_json` rekonstruiert verdeckte Information "
-      "(Beutel/Turm/Kuppelstapel/Bonuschip-Pool) aus Zählern/Masken und mischt sie NEU mit "
-      "einem festen, aus dem Zugindex abgeleiteten Seed -- das Oracle sieht also, wie ein "
-      "echter Spieler, KEINE verdeckte Information, nur eine andere zufällige Mischung als "
-      "das tatsächliche Spiel. Ein einzelner 5000-Sim-Lauf ist dadurch eine starke, aber "
-      "keine perfekte Schätzung (siehe Task #89 fuer die empirisch verifizierte Rekonstruktions-Genauigkeit).")
-    P("- **Runde 5** läuft über den exakten Alpha-Beta-Solver (kein Informationsgehalt mehr, "
-      "siehe `round5.rs`) und wurde bewusst NICHT netz-oracle-bewertet (andere Skala/Semantik "
-      "als die PUCT-Netzsuche der Runden 1-4).")
-    P("- **Kuppel-Rotation**: die Rotationswahl (Stufe 2 nach Kachel+Slot) wird NICHT separat "
-      "oracle-bewertet -- `apply_dome`/`apply_dome_stack_choose` bleiben nach aussen atomar, "
-      "die PendingDomeChoice-Zwischenzustände haben laut Task #89 Serialisierungs-Näherungen.")
-    P("- **`root_value`-Interpretation**: als Win%-Schätzung des jeweils ziehenden Spielers am "
-      "Zustand VOR seinem Zug interpretiert (Projekt-Konvention); keine unabhängig re-kalibrierte "
-      "Wahrscheinlichkeit.")
-    P("- **Oracle-Zug-Zuordnung** erfolgt über eine geparste Kurzbeschreibung (Farbe/Quelle/"
-      "Zielreihe bzw. Kachel/Slot/Fabrik) gegen die von der Suche gelabelten Kandidaten; bei "
-      "der Stapel-Wahl (`choose_draw_stack_slot`) fehlt die Kachel-ID im Label, ein `_(Match "
-      "evtl. mehrdeutig)_`-Hinweis markiert das im Text.")
-    P("")
-    return "\n".join(lines_out)
+    # ALTBESTANDS-KORREKTUR (gefunden 2026-08-18 beim Bau von S3): hier stand
+    # `return rep, lines`. Der Aufrufer `run()` legt das Ergebnis aber auf `li`
+    # ab und gibt es als `li_reached` weiter -- die "wie weit kam der Replay"-
+    # Zahl im Report war auf dem ERFOLGSPFAD also ein Tupel, kein Zeilenindex.
+    # Auf dem Divergenzpfad war sie korrekt, deshalb ist es nie aufgefallen.
+    return li
 
 
 def main() -> None:
+    # Verzoegerter Import: die Report-Schicht liegt seit 2026-08-18 in einem
+    # eigenen Modul und greift ihrerseits auf `classify`/`LogLine`/`ROOT` von
+    # hier zurueck. Der Import steht deshalb IN `main()` -- an beiden
+    # Modul-Koepfen waere er ein Zyklus (siehe game_log_report.py).
+    from game_log_report import build_report
+
     check_prereqs()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--log", default=str(ROOT / "static" / "log" / "game_20260725_214038_seed465392.log"))
@@ -1104,7 +993,7 @@ def main() -> None:
     if divergence:
         print(f"\nABBRUCH: {divergence}\n", file=sys.stderr)
 
-    header, _ = load_log(log_path)
+    header, _, _ = load_log(log_path)
     report = build_report(header, log_path, rep, divergence, li_reached, n_lines_total, elapsed, lines)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
