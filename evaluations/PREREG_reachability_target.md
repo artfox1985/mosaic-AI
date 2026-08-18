@@ -242,3 +242,36 @@ die sich zwischen Runde 3 und 5 entscheidet und die im Draft beeinflussbar ist.
 **Naechster Schritt nach par.9:** Label-Bauer umstellen (Kopfbreite unveraendert),
 Warm Start vom Champion, dann die Offline-Pruefungen und die Arena N / S / T+S.
 
+## par.11 UMSETZUNGS-BEFUND (2026-08-18): das Label ist JE ZUSTAND, nicht je Partie
+
+Beim Vorbereiten von par.9 Schritt 2 zeigt sich ein struktureller Unterschied, der
+in par.3 noch nicht stand.
+
+**Heute** werden die Ownership-Labels **EINMAL je Partie** aus dem Endbrett
+gebildet (`_conjunctions_from_dome`, `neural_net.py:932`) und auf alle Zustaende
+derselben Partie angewandt. Das ist billig: eine Rechnung je Partie.
+
+**Vollendbarkeit ist dagegen eine Eigenschaft des ZUSTANDS** — sie haengt am
+Brett und am verbleibenden Vorrat und aendert sich mit jedem Zug. Das Label muss
+also **je Trainings-Sample** berechnet werden, ueber den neuen Export und mit
+einer JSON-Serialisierung des Zustands je Aufruf.
+
+**Kostenschaetzung (Herleitung, nicht gemessen):** das Fenster hat ~4,3 Mio.
+Samples; bei ~1 ms je Aufruf sind das ~70 Minuten EINMALIG beim Cache-Bau. Danach
+ist der Cache wiederverwendbar.
+
+**Cache-Sicherheit ist geklaert:** der Schluessel wird aus Material mit
+`+`-Suffixen gebildet (`neural_net.py:1254-1292`, Muster `+enc2d_v1`,
+`+conj_v2`). Ein `+reach_v1` erzwingt einen eigenen Cache, alte Labels koennen
+also nicht still weiterverwendet werden.
+
+**Verbilligung, die aus der Sperre folgt:** par.10 zeigt, dass das Label in Runde
+1-2 konstant ist (100 % / 98,8 %) und erst ab Runde 3 traegt. Es genuegt daher,
+**nur Runde 3-5 umzulabeln** und in Runde 1-2 beim Realisierungs-Label zu bleiben
+oder den Gradienten dort zu maskieren. Das halbiert die Kosten und wirft keine
+Information weg, die es nicht ohnehin nicht gibt.
+
+**Das ist eine Aenderung an par.3** und wird hier registriert, statt sie beim
+Bauen stillschweigend zu treffen: die Variante heisst weiter "Ersetzen", aber
+**rundenweise ersetzen** — Runde 3-5 Vollendbarkeit, Runde 1-2 unveraendert. Die
+Kopfbreite bleibt bei 140.
