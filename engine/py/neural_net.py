@@ -9,6 +9,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND,
+                          reach_columns, reach_target_k1_active)
 from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
                     CONJUNCTION_TARGETS, CONJUNCTIONS_PER_PLAYER,
                     POINTS_DIST_BINS)
@@ -1277,6 +1279,10 @@ class MosaicDataset(Dataset):
         # Fehlermeldung).
         if conjunction_head:
             cache_key_material += "+conj_v2"
+            if reach_target_k1_active():
+                # Eigener Cache, sonst wuerden alte Realisierungs-Labels still
+                # weiterverwendet (Muster wie "+enc2d_v1").
+                cache_key_material += f"+reachk1_r{REACH_K1_MIN_ROUND}_v1"
         # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
         # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
         # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
@@ -1533,6 +1539,7 @@ class MosaicDataset(Dataset):
                 with open(f, "rb") as file:
                     game_data = pickle.load(file)
                     final_own = _final_ownership_by_game(game_data)
+                    reach_k1 = self.conjunction_head and reach_target_k1_active()
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if planes_l is not None:
@@ -1844,6 +1851,17 @@ class MosaicDataset(Dataset):
                                 # sagte frueher faelschlich [72:97]/[97:122]
                                 # = 25, siehe PREREG_ownership_corpus.md §3.3).
                                 cj_first, cj_second = (fo[2], fo[3]) if c == 0 else (fo[3], fo[2])
+                                if reach_k1 and int(step["state"].get("round") or 0) >= REACH_K1_MIN_ROUND:
+                                    # KOPIEREN ist Pflicht: fo[2]/fo[3] werden
+                                    # EINMAL je Partie gebildet und von allen
+                                    # Schritten geteilt -- direktes Ueberschreiben
+                                    # wuerde alle Folgeschritte verderben.
+                                    ego = reach_columns(step["state"], c)
+                                    geg = reach_columns(step["state"], 1 - c)
+                                    if ego is not None and geg is not None:
+                                        cj_first, cj_second = list(cj_first), list(cj_second)
+                                        cj_first[REACH_ATOMS] = ego
+                                        cj_second[REACH_ATOMS] = geg
                                 vec = vec + cj_first + cj_second
                             own_l.append(np.array(vec, dtype=np.int8))
 
