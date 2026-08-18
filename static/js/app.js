@@ -1313,11 +1313,26 @@ function renderCenter() {
     count: lf.sun.filter(x=>x===c).length,
     selected: sel?.source==='LARGE_FACTORY_SUN' && sel?.color===c,
   })).join('');
-  const lMoon = [...new Set(lf.moon)].map(c => tileGroupHTML({
-    src: 'LARGE_FACTORY_MOON', fid: 'null', color: c,
-    count: lf.moon.filter(x=>x===c).length,
-    selected: sel?.source==='LARGE_FACTORY_MOON' && sel?.color===c,
-  })).join('');
+  // REGELKORREKTUR 2026-08-18 (Nutzer-Entscheid, reproduziert an
+  // static/log/game_20260818_205751_seed642598): der Mondbereich ist EIN Pool --
+  // oberste Fliesen aller kleinen Stapel PLUS alles der Mondseite der grossen
+  // Fabrik (docs/engine_manual.md:100-102), und Aktion C nimmt daraus ALLES der
+  // gewaehlten Farbe. Der frueher hier klickbare 'LARGE_FACTORY_MOON' nahm nur
+  // den GF-Anteil: im Beleg lag rot auf F4 obenauf, der Zug holte trotzdem nur
+  // die eine GF-Fliese. Betroffen war ausschliesslich der Mensch -- die
+  // Zug-Erzeugung (validation.rs:214) kennt nur die Vereinigungsform, das Netz
+  // spielt also regelkonform.
+  //
+  // Der GF-Mondbereich wird deshalb nur noch ANGEZEIGT. Genommen wird
+  // ausschliesslich ueber "Geteilte Mondfliesen" (data-src SMALL_FACTORY_MOON,
+  // fid ALL) -- und `moon_top_counts` enthaelt den GF-Pool bereits
+  // (serialize.rs:226), es geht also keine Fliese verloren. Die kleinen Stapel
+  // waren nie klickbar und bleiben es nicht.
+  const lMoon = [...new Set(lf.moon)].map(c => {
+    const n = lf.moon.filter(x=>x===c).length;
+    const tiles = Array.from({length: n}, () => `<div class="tile ${normColor(c)}"></div>`).join('');
+    return `<div class="cgroup" title="${n}× ${c} — Entnahme ueber &quot;Geteilte Mondfliesen&quot;">${tiles}</div>`;
+  }).join('');
 
   const moonTopCounts = S.moon_top_counts || {};
   const moonTopEntries = Object.entries(moonTopCounts);
