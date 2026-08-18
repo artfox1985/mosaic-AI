@@ -228,10 +228,30 @@ Geometrie lernt:
    47 % liegen. Ein Kopf, der nur "kriege ich irgendeine Spalte" lernt, lernt
    nichts. Die 6 Atome muessen einzeln gelernt werden.
 
-**Die Einschraenkung, die ins Ergebnis gehoert:** das neue Ziel ist stumm genau
-dort, wo laut `docs/domain_knowledge.md` §8 die tragenden Entscheidungen fallen —
-Runde 1-2, die Kuppelplatten-Wahl. Es traegt in Runde 3-5. Das ist eine
-Praezisierung des Vorhabens, nicht seine Erfuellung.
+**Die Einschraenkung, praezisiert nach Nutzer-Rueckfrage und MESSUNG
+(2026-08-18):** hier stand zunaechst, das neue Ziel sei stumm dort, wo "die
+tragenden Entscheidungen fallen — Runde 1-2, die Kuppelplatten-Wahl". Das war
+eine ungepruefte Behauptung und ist nur zur Haelfte richtig. Gemessen an den
+407er-Arena-Logs (b18-Seite):
+
+| Runde | Kuppelplatten GELEGT (je Partie) | Stapel-ZIEHUNGEN (beide Spieler) |
+|---|---:|---:|
+| 1 | 2,00 | 9,5 |
+| 2 | 2,00 | 6,3 |
+| 3 | 2,00 | 2,7 |
+| 4 | 2,00 | 1,0 |
+| 5 | 0,00 | 0,0 |
+
+- **Beschaffung** (welche Platten-TYPEN man ueberhaupt sieht, §8 Hebel 1 "Joker
+  horten"): **81 % der Ziehungen in Runde 1-2.** Dort ist das Label stumm.
+- **Platzierung** (welcher Slot, §8 Hebel 2 "erzwungene Spezialkuppeln nach
+  oben"): **exakt 2 Platten je Runde in Runde 1-4**, in Runde 5 keine. Die
+  **Haelfte der Platzierungen fallt in Runde 3-4** — genau dort, wo das Label
+  traegt.
+
+Das neue Ziel deckt also die Platzierungs-Haelfte von §8 ab und die
+Beschaffungs-Haelfte nicht. Das ist eine Praezisierung des Vorhabens, nicht seine
+Erfuellung — aber eine deutlich guenstigere als zuerst notiert.
 
 **Bezug zum Prototyp-Befund** (`PREREG_plate_policy_supervision.md` par.8): dort
 zeigte sich, dass die Tiling-Ebene fuer k1 kein Aktionssignal traegt, weil die
