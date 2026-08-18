@@ -62,6 +62,46 @@ auch so markiert. Belastbar ist der Vergleich INNERHALB des k1-Arms.
    ich anstrebe"); der Coach lehrt "welche Aktion fuehrt dorthin".
 5. **k1 zuerst isolieren**, k2 danach.
 
+### par.1.3 WIE AZAL UND UVFA UEBERNOMMEN WERDEN — und was NICHT
+
+**AZAL: der Mechanismus ja, die Voraussetzung nein.** Uebernommen wird ein
+Hilfsverlust auf der **Policy** mit einem Ziel aus einer staerkeren Referenz.
+NICHT uebernommen wird die Label-Quelle: die dortigen Domaenen (Connect Four,
+Chomp) sind loesbar und haben ein Vollspiel-Orakel. Unser exakter Horizont ist
+**eine Runde** (par.2). Deshalb sitzt der Prototyp in Runde 5 — und deshalb
+erlaubt ein positives Ergebnis dort **nicht**, das Verfahren auf Runde 1-3
+auszurollen, ohne eine neue Label-Quelle. Das ist keine Vorsichtsformel, sondern
+die einzige Stelle, an der unser Lehrer nachweislich besser ist als der Schueler.
+
+**UVFA gehoert an eine andere Stelle als vorgeschlagen.** Die erste Durchsicht
+setzt die Ziel-Konditionierung an den Ownership-Kopf (Loss-Maskierung: kein
+Gradient fuer k1, wenn k1 nicht ausliegt). Dagegen spricht die Natur des Ziels:
+**die Ownership-Labels sind zielUNabhaengig** — eine Spalte wurde fertig oder
+nicht, unabhaengig davon, welche drei Platten gezogen waren. Eine Maskierung nimmt
+dem Kopf dort vor allem DATEN weg (jedes Kriterium sieht nur die ~3/8 aktiven
+Partien; bei k2 mit 2005 Positiven ein realer Verlust), ohne ihm Bedingtheit zu
+geben.
+
+Zielabhaengig ist etwas anderes: **welches Kriterium anzustreben ist.** Die
+Konditionierung gehoert deshalb an den **Plate-Policy-Head**:
+`P(Zug bringt k voran | k liegt aus)`. Damit traegt EIN Bau beide
+Literaturfaeden — AZAL die Form, UVFA die Konditionierung.
+
+**Was von der Maskierung uebrig bleibt**, als Variante zweiter Ordnung und nicht
+als eigener Versuch: die ZUSTANDSVERTEILUNG haengt sehr wohl vom aktiven
+Kriterium ab (gemessen: das Netz legt Spezialkuppeln bei aktiver k6-Platte zu
+62,8 % nach unten gegen 42,3 % ohne sie). Insofern ist die Vorhersageaufgabe in
+k1-aktiven Partien eine andere. Das ist ein Effekt zweiter Ordnung gegenueber der
+Policy-Konditionierung und wird nur geprueft, wenn der Hauptweg traegt.
+
+**Menschen-Partien als Datenquelle: verworfen** (Nutzer 2026-08-18, *"wird denk
+ich auch nicht viel helfen wenn ich gegen die KI spiele, da hast zu wenig
+datenlage"*). 22 Logs reichen fuer Diagnose (das Rundenpunkte-Profil in
+`PREREG_shaping_scale_per_round.md` par.1 stammt daraus), nicht fuer Labels. Der
+Kanal ist ohnehin genutzt, nur destilliert: die Nutzer-Taktiken in
+`docs/domain_knowledge.md` §6/§8 enthalten die REGEL statt der Instanz und haben
+die Bauer-Arme erzeugt.
+
 ---
 
 ## par.2 KORREKTUR DER TRAGENDEN ANNAHME — das Geschwister-"Orakel" ist keines
@@ -197,7 +237,7 @@ bleibt:
 | # | Versuch | Warum diese Stelle | Risiko |
 |---|---|---|---|
 | **1** | **Prototyp par.4** (k1, Runde 5, exaktes Label) | einzige Quelle mit exaktem Label, kein Lehrer-Risiko, und Weiche fuer alles Weitere | gering, offline, kein Training |
-| **2** | **Loss-Maskierung je Kriterium** (par.1.1 Punkt 4) | trifft den gemessenen Defekt ohne neue Daten | duenne Kriterien verlieren Daten |
+| **2** | **Plate-Policy-Head, konditioniert auf das aktive Kriterium** | traegt AZAL (Form) und UVFA (Konditionierung) in EINEM Bau, par.1.3 | Label nur im Rundenhorizont exakt |
 | **3** | **Vollendbarkeits-Ziel** (`PREREG_reachability_target.md`) | bricht die selbsterfuellende Prophezeiung, Praedikat existiert | obere Schranke |
 | 4 | **Lehrer-Qualifikation** des Bauers, dann asymmetrischer Korpus + isolierte Value-Supervision | erst wenn belegt ist, dass der Lehrer nicht schwaecher ist | Gegenlernen (par.3) |
 | 5 | **Nenner je Kriterium** (`PREREG_ownership_coupling.md` B2/B4) | macht laut, was vorher richtig sein muss | verstaerkt einen Fehler 50-fach |
