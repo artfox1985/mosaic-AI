@@ -416,6 +416,44 @@ fest, welche Spezialfelder man sich einhandelt, und `docs/domain_knowledge.md`
 §8 haengt genau daran. **Eigene Messung noetig, bevor daraus etwas gefolgert
 wird.**
 
+#### par.6.3.2 ERGEBNIS STUFE 1 fuer k2 (2026-08-18): BESTANDEN — Stufe 1 damit vollstaendig
+
+Gleiche Anordnung wie par.6.3.1, 40 Stellungen aus 40 verschiedenen Partien ab
+Runde 2, k2-Platte aktiv (Korpus `selfplay_v21_own_*`, k2 liegt in 230 von 600
+geprueften Partien — der frueher gemeldete Fehlschlag lag allein am alten
+Sampler).
+
+| | k1 | k2 |
+|---|---:|---:|
+| Kandidaten je Stellung | 12,0 | 11,8 |
+| **Kendall-Tau ueber zwei Determinisierungs-Seeds** | **+0,942** | **+0,943** |
+| t gegen 0 | +58,2 | +50,4 |
+| numerische Spreizung des Deltas | 1,07e-03 | **3,73e-04** |
+
+> **VORAB-REGEL par.6.3 Stufe 1: fuer k1 UND k2 BESTANDEN.** B4 ist nicht durch
+> Rauschen gesperrt.
+
+**Die letzte Zeile ist das Argument fuer B4 in einer Zahl:** k2 ordnet genauso
+stabil wie k1 (Tau 0,943 gegen 0,942), bei **einem Drittel der Groesse**. Betrag
+und Information laufen auseinander. Eine Wertaddition sieht nur den Betrag und
+verschenkt die Information; eine Rangtransformation sieht nur die Ordnung und
+nimmt sie mit. Das ist keine Herleitung mehr, sondern gemessen — und es ist das
+vierte unabhaengige Argument fuer B4, neben dem AUC-Brier-Profil, dem Wegfall von
+B1/B2 und der Gegenstandslosigkeit des Nenners.
+
+**Bezug zu `PREREG_shaping_scale_per_round.md` (parallele Sitzung, 2026-08-18):**
+dort wird derselbe Mangel von der anderen Seite angegangen — `WERTUNG_SHAPING_SCALE`
+ist fest 50, waehrend der Punktestand nach Runde 1 bei 4 liegt (22 Arena-Logs:
+Anteil des Endstands 8,3 % nach Runde 1, 32,7 % nach Runde 3). Die beiden Wege
+schliessen sich nicht aus: **jener justiert den Betrag rundenweise, B4 verzichtet
+auf den Betrag.** Traegt B4, bleibt der rundenabhaengige Nenner nur fuer den
+HEURISTISCHEN Pol noetig, nicht fuer den Ownership-Pol.
+
+**WAS JETZT NOCH FEHLT — Stufe 2.** Stabilitaet ist nicht Richtigkeit. Eine
+stabil falsche Ordnung haette beide Tests bestanden. Vor dem Bauen von B4 fehlt
+also der Vergleich der Kopf-Ordnung gegen die ORAKEL-Ordnung derselben
+Geschwister, mit der Vorabregel aus par.6.3 Stufe 2.
+
 ## par.7 MESSANORDNUNG
 
 Wie `PREREG_conjunction_terms.md` par.6, damit die Zahlen daneben stehen:
