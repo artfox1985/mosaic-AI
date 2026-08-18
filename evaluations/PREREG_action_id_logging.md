@@ -22,19 +22,28 @@ Mond-Stapel-Zeile. Am 2026-08-18 sind drei dieser Ebenen gekippt:
    Vergabe des Startspielersteins direkt vor einer Zeile im SONNEN-Format
    (`4× türkis von GF`), in Runde 2 (Zeilen 78/79/80) dieselbe Abfolge im
    MOND-Format (`2 (2)× türkis von GF`).
-   *RUECKNAHME 2026-08-18:* daraus wurde zunaechst geschlossen, die Engine
-   protokolliere inkonsistent. **Das ist widerlegt** — `factory.rs::take_from_sun`
-   der grossen Fabrik vergibt den Marker ausschliesslich bei
-   `monochrome_fallback && has_first_player_marker` und zitiert die Regelstelle
-   im Kommentar. Ebenso widerlegt: ein veralteter Server-Prozess (Server startete
-   19:31:44, installiertes Wheel 19:16:28 — derselbe Stand, mit dem replayed
-   wird). **Die Ursache der Divergenz in dieser Partie ist UNGEKLAERT** und liegt
-   vermutlich in einem frueheren, textlich unsichtbaren Auseinanderlaufen
-   (`moon_order`-Wahl oder eine RNG-verbrauchende Aktion).
+   **URSACHE GEKLAERT 2026-08-18 (zwei eigene Fehlschluesse davor, beide
+   zurueckgenommen).** Nicht die Engine protokollierte inkonsistent im Sinne
+   eines Regelfehlers, und es lag auch nicht an einem veralteten Server-Prozess
+   (Server 19:31:44, installiertes Wheel 19:16:28 — derselbe Stand). Die
+   tatsaechliche Kette:
+
+   * `execute_move` schrieb das Emoji HART auf Sonne, obwohl `execute_take` auch
+     Mond-Quellen behandelt. **Behoben** (Commits `9c92c66`, `86c1144`): das
+     Emoji folgt jetzt der Quelle.
+   * Der Zug in Runde 1 war `LargeFactoryMoon` — eine TEIL-Entnahme, die
+     `validation.rs:214` **nie generiert**, `validate_large_moon` aber
+     **akzeptiert**. Erreichbar also nur ueber die API, das heisst im
+     Menschenspiel.
+   * Der Parser leitete den Typ aus dem Emoji ab, suchte in der
+     GENERATOR-Kandidatenliste, fand `LargeFactoryMoon` dort nicht — und der
+     quellen-tolerante Rueckfall griff zur globalen Mond-Entnahme, also zu einer
+     ANDEREN Aktion. Erst drei Zeilen spaeter scheiterte die Textpruefung.
+
    **Und genau das ist das Argument fuer diese Registrierung:** mit IDs wuerde der
-   Replay die aufgezeichnete Aktion ANWENDEN statt zu raten, und eine echte
-   Divergenz waere als "ID hier nicht legal" sofort benannt — statt still eine
-   andere Aktion zu waehlen und erst drei Zeilen spaeter am Text zu scheitern.
+   Replay die aufgezeichnete Aktion ANWENDEN. Eine nicht generierte, aber gueltige
+   Aktion waere kein Problem mehr, und eine echte Divergenz waere sofort als "ID
+   hier nicht legal" benannt statt durch eine stille Ersatzwahl verdeckt.
 2. **`von GF` bestimmt die Quelle nicht.** Aktion C (Mond ueber alle Fabriken
    plus GF-Mondpool) traegt intern `SMALL_FACTORY_MOON` mit `factory_id = None`
    und passt damit nicht zu den `LARGE_*`-Quellen, die `GF` erwarten laesst.
@@ -144,11 +153,48 @@ Eingabe.
 
 - **Alte Logs bekommen nichts.** Sie bleiben unreplaybar; das sind sie ohnehin
   (par.1). Der Gewinn liegt bei allen kuenftigen Partien.
-- **Die Verhaltensdifferenz in `game_20260818_200516_seed585858` wird nicht
-  geheilt.** Dort bot die heutige Engine keinen `LARGE_FACTORY_SUN`-Zug an, wo
-  das Original einen machte. Mit IDs wuerde der Replay das SAUBER melden statt
-  eine falsche Aktion zu waehlen — das ist der Gewinn, nicht die Heilung.
+- **Die latente Validator-Luecke wird nicht geschlossen.** `SmallFactoryMoon`
+  mit gesetzter `factory_id` und `LargeFactoryMoon` sind Teil-Entnahmen, die das
+  Regelwerk nicht vorsieht (der Mondbereich ist EIN Pool: oberste Fliesen aller
+  kleinen Stapel plus alles der Mondseite der grossen Fabrik,
+  `engine_manual.md:100-102`). Sie werden nie generiert, vom Validator aber
+  akzeptiert. **Das ist eine eigene Regelentscheidung und NICHT Teil dieses
+  Umbaus** — mit IDs wird der Replay solche Zuege korrekt anwenden statt sie zu
+  ersetzen, was sie sichtbar macht statt sie zu heilen.
 - **Es ist keine Aenderung an Suche, Wertung oder Self-Play.** Nur Logging plus
   ein Feld in `valid_moves`.
 
 ## par.7 ERGEBNIS (leer bei Registrierung)
+
+---
+
+## par.8 UEBERGABE — was ein anderer Agent wissen muss
+
+**Ausgangslage, alles committet und gruen (447 Tests):**
+
+| Was | Stand |
+|---|---|
+| `--dump-states` im Analyse-Werkzeug | gebaut (`21697ac`), liefert JSONL je Entscheidungspunkt |
+| Emoji folgt der Quelle | gebaut (`9c92c66`, `86c1144`) |
+| Replay `game_20260818_195111_seed558549` | laeuft VOLLSTAENDIG durch, 109 Zustaende |
+| Replay `game_20260818_200516_seed585858` | scheitert, Ursache geklaert (par.1) |
+| alte Elo-Logs | reproduzieren nicht; vermutlich dieselbe Ursache (Teil-Entnahmen ueber die API) |
+
+**Die drei Bauteile stehen in par.3.** Reihenfolge: S1 (`id` in `valid_moves`) →
+par.4-Sperre → S2 (Log-Zeile, NUR gespeicherte Fassung) → S3 (Replay auf ID).
+
+**Zwei Dinge, die beim Bauen zu beachten sind und heute Zeit gekostet haben:**
+
+1. **Der Parser muss `LargeFactoryMoon` als Kandidaten kennen**, sonst scheitert
+   Partie 2 weiter — die Kandidatenliste kommt aus dem GENERATOR, der diese
+   Aktion nie erzeugt. Mit S3 entfaellt das Problem, weil ueber die ID gematcht
+   wird; bis dahin ist es die kleinste Reparatur fuer Partie 2.
+2. **Die Emoji-Korrektur hat den Logtext GEAENDERT.** Kuenftige Logs tragen 🌙 im
+   schlichten Format (ohne die `(detail)`-Klammer) fuer Teil-Entnahmen. Der
+   Parser kennt bisher 🌙 nur MIT Klammer (`MOON_GLOBAL_TAKE`). Das ist beim
+   Einbau mitzuziehen — alte Logs behalten ihr ☀️.
+
+**Nicht wieder aufrollen:** die Ursache in par.1 (dreimal falsch geraten, jetzt
+belegt), die Rolle des Server-Prozesses (geprueft, unschuldig), und die Frage, ob
+die Engine gegen das Regelwerk protokolliert (tut sie nicht — `take_from_sun`
+zitiert die Regel und haelt sie ein).
