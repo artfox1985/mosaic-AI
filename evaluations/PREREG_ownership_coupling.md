@@ -160,7 +160,56 @@ Policy-Logits — das Rauschen kann ihn weiter überstimmen, es wird kein Rang
 erzwungen. Begründung aus der Messung: der Prior bietet den Bauzug bereits
 dominant an (4,91x), gespielt wird er nicht — der Wert-Backup überstimmt ihn.
 
-**Reihenfolge:** B1+B2 gemeinsam (sie sind dieselbe Änderung an einer Stelle),
+**B4 — ORDINAL statt BETRAG (Nutzer-Vorschlag 2026-08-18). Ersetzt B1 und B2.**
+
+*Begruendung aus der Messung:* der Kopf **rangiert gut und beziffert schlecht** —
+Konjunktions-AUC 0,83-0,91 bei einem Brier nur 8-14 % unter der Grundrate
+(`PREREG_ownership_selector.md` par.9.2, zitiert in `scoring.rs:486`). Ein
+Signal mit diesem Profil als BETRAG zu verwenden ist die falsche Richtung, und
+genau das tut der Verbraucher seit dem ersten Tag.
+
+*Mechanik:* fuer die m Wurzelkandidaten die Plattenerwartung des Kopfes je
+Kandidat bilden, in den **zentrierten Perzentilrang** in [-1, +1] umrechnen und
+`w · Rang` additiv auf den Logit geben. `w = 0` ist bitgenau Bestandsverhalten.
+
+*Warum das B1 UND B2 ueberfluessig macht:*
+
+- **B2 (Skala je Kriterium) entfaellt**, weil eine Rangtransformation
+  skalenfrei ist. k1s Unterschied von ~10⁻⁴ und k4s grosser Unterschied werden
+  zur selben ordinalen Spreizung. Es muss keine Normierungskonstante je
+  Kriterium geschaetzt werden — es gibt keine Skala mehr.
+- **B1 (Inkrement statt Niveau) entfaellt ebenfalls**, und zwar exakt, nicht
+  naeherungsweise: unter den Geschwistern EINES Knotens ist Φ(s) eine
+  gemeinsame Konstante, also ist die Rangfolge von Φ(s′) identisch mit der
+  Rangfolge von Φ(s′) − Φ(s). Der Rang implementiert die Inkrementform gratis.
+  Das gilt, weil B4 an der WURZEL ansetzt (wie B3) und nicht am Blatt.
+
+*Verhaeltnis zu B3:* B4 ist die ordinale Fassung von B3 — dieselbe Stelle
+(Wurzel-Logits), dieselbe additive, dosierbare Form, nur der ORDNUNGSanteil des
+Kopfsignals statt seines Betrags.
+
+*Abgrenzung zur verworfenen Rangregel:* es wird nichts erzwungen. Prior und
+Wert koennen den Term ueberstimmen, `w` dosiert ihn, und er ist ein Merkmal im
+selben Raum wie die Policy-Logits — nicht die Anweisung "nimm den
+plattenbauenden Zug".
+
+*Unabhaengiges Argument:* in diesem Projekt haben die ORDINALEN Masse die Arena
+vorhergesagt (Kendall-Tau und Prior-Masse auf die Orakel-Top-3, 7 von 7,
+`project_oracle_metrics_validated`), waehrend die kardinalen R²-Masse es nicht
+taten.
+
+**DAS RISIKO, und es ist ernst:** heute schuetzt die winzige Groesse davor,
+Unsinn einzuspeisen — ist der k1-Unterschied zwischen Geschwistern reines
+Zahlenrauschen, richtet ein Term von 10⁻⁴ keinen Schaden an. Die
+Rangtransformation nimmt genau diesen Schutz weg und skaliert Rauschen auf
+VOLLE Staerke. Aus einem harmlosen Nullsignal wuerde ein kraeftiges
+Falschsignal. Deshalb die Sperre in par.6.3.
+
+**Reihenfolge (ERSETZT 2026-08-18):** zuerst die Sperre par.6.3, dann **B4**,
+danach erst entscheiden, ob B3 in kardinaler Form ueberhaupt noch gebraucht
+wird. B1 und B2 sind durch B4 aufgehoben — nicht verworfen, sondern subsumiert.
+
+*(historisch, vor B4:)* B1+B2 gemeinsam (sie sind dieselbe Änderung an einer Stelle),
 B3 getrennt danach, damit die Zurechnung erhalten bleibt.
 
 ---
@@ -276,6 +325,40 @@ Sockel).
 1,28" gilt in der Arena nicht, weil `add_root_noise=false` die Samples
 abschaltet. Ebenso gueltig: die gemessene Aufteilung des Reglerbeitrags in einen
 fast gemeinsamen Sockel und eine kleine unterscheidende Restgroesse.
+
+### par.6.3 SPERRE VOR B4 — traegt die Geschwister-ORDNUNG ueberhaupt Signal?
+
+Die AUC 0,83-0,91 gilt fuer die Vorhersage, OB ein Feld gefuellt wird. Sie sagt
+NICHTS darueber, ob der Kopf die Geschwisterzuege EINES Knotens sinnvoll ordnet.
+Genau das braucht B4 aber, und genau dort liegt sein Risiko.
+
+**Stufe 1 — Stabilitaet (billig, kann die Idee sofort toeten).** Dieselbe
+Kandidatenmenge zweimal bewerten, mit unterschiedlichem
+Determinisierungs-Seed der verdeckten Information. Gemessen wird Kendall-Tau
+zwischen den beiden k1- bzw. k2-Ordnungen.
+
+> **VORAB-REGEL:** liegt das mittlere Tau der k1-Ordnung ueber die Stellungen
+> nicht **signifikant ueber 0** (einseitig, p < 0,05), ist die Ordnung
+> seed-instabil und damit Rauschen. **Dann wird B4 NICHT gebaut** — die
+> Rangtransformation wuerde dieses Rauschen auf volle Staerke heben.
+
+Zusaetzlich als Nebenbedingung protokollieren: die numerische Spreizung der
+k1-Erwartung ueber die Geschwister. Liegt sie im Bereich der
+Gleitkomma-Aufloesung, ist die Ordnung schon deshalb bedeutungslos.
+
+**Stufe 2 — Informativitaet (nur wenn Stufe 1 haelt).** Kendall-Tau zwischen der
+Kopf-Ordnung der Geschwister und der ORAKEL-Ordnung derselben Geschwister
+(Orakel = tatsaechliches Endbrett-Ergebnis des jeweiligen Kandidaten). Vorbild
+und Werkzeugkette: dieselbe, mit der `kendall_tau` als Arena-Praediktor
+validiert wurde.
+
+> **VORAB-REGEL:** Tau der k1-Ordnung gegen das Orakel muss signifikant > 0
+> sein. Ist es das nicht, ordnet der Kopf die ZUEGE nicht, auch wenn er die
+> FELDER gut ordnet — und B4 haette nichts zu transportieren.
+
+**Warum diese Sperre vor dem Bauen kommt und nicht danach:** sie ist billig
+gegen einen Arena-Arm, und sie beantwortet die einzige Frage, an der B4 haengt.
+Dasselbe Muster hat par.6 Punkt 4 fuer die Arena schon einmal richtig gemacht.
 
 ## par.7 MESSANORDNUNG
 
