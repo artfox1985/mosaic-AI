@@ -253,4 +253,79 @@ Trainings.
 Reihenfolge ist eine Selbstkorrektur: sie wurden zwei Stunden vorher noch als
 naechster Schritt vorgeschlagen.
 
-## par.8 ERGEBNIS (leer bei Registrierung)
+## par.8 ERGEBNIS DES PROTOTYPS (2026-08-18): VORABREGEL (A) HAT GEFEUERT
+
+`tools/probes/plate_action_signal_k1.py`, Held-out-Satz `data/holdout`, k1-Platte
+aktiv, je Partie eine Tiling-Stellung.
+
+| Anordnung | Stellungen mit >= 3 Kandidaten | Kandidaten je Stellung | Stellungen OHNE Label-Spreizung |
+|---|---:|---:|---:|
+| Runde 5, ungefiltert | 37 | 7,4 | **37/37 = 100 %** |
+| Runde 4 / 3 / 2, ungefiltert | 45 / 49 / 53 | ~7 | **100 % je Runde** |
+| Runde 5, beste Spalte >= 5/6 gefuellt | 20 | 5,0 | **20/20 = 100 %** |
+| dieselbe, `k=64` statt 8 | 13 | 8,4 | **13/13 = 100 %** |
+
+Rohwerte-Kontrolle ueber 40 Stellungen: **alle 265 Kandidaten haben k1 = 0** —
+kein Extraktionsfehler, sondern die Lage.
+
+> **VORABREGEL (A) trifft zu:** die Label-Spreizung ist in der ueberwaeltigenden
+> Mehrheit der Stellungen NULL. Auf der Tiling-Ebene gibt es fuer k1 nichts zu
+> lernen. Der Prototyp endet damit **ohne Aussage ueber die Methode** — genau wie
+> vorab festgelegt.
+
+**Zwei Kontrollen wurden noetig, weil die erste Fassung falsch sampelte:**
+
+1. *"Je Partie die erste Tiling-Stellung"* liefert systematisch die FRUEHESTE, in
+   der keine Spalte nahe am Abschluss steht. Dritter Vorfall derselben
+   Fehlerklasse in dieser Serie (nach Pseudoreplikation und Runde-1-Auswahl);
+   der Filter auf "beste Spalte >= 5/6 gefuellt" ist als Konsequenz im Code
+   dokumentiert.
+2. `k=8` haette eine punktsortierte Auswahl sein und den spaltenschliessenden
+   Kandidaten ausschliessen koennen. Mit `k=64` steigt die Kandidatenzahl nur von
+   5,0 auf 8,4 — die Aufzaehlung ist erschoepfend, nicht abgeschnitten.
+
+### Was der Befund bedeutet
+
+**Selbst wenn eine Spalte 5 von 6 Feldern gefuellt hat, gibt es unter den
+verfuegbaren Tiling-Abschluessen keinen, der sie schliesst.** Die Ursache ist die
+Farbforderung des letzten Feldes: ob man die passende Fliese HAT, ist im DRAFT
+entschieden, nicht in der Platzierung.
+
+**Damit ist die Rahmung aus `tiling_solver.rs:990` unvollstaendig.** Dort steht,
+der Plattenbau sei eine Tiling-Handlung — WO die Fliese landet, zaehlt aber nur,
+wenn man sie besitzt. Die bindende Beschraenkung liegt eine Ebene hoeher.
+
+**Und daraus folgt die strukturelle Klemme, jetzt gemessen statt argumentiert:**
+
+| Ebene | exaktes Label? | Aktionssignal fuer k1? |
+|---|---|---|
+| Tiling (Runde 5) | **ja** (Endbrett) | **nein** (diese Messung) |
+| Draft | **nein** (haengt an Folgerunden und Gegner) | ja (dort faellt die Entscheidung) |
+
+Die einzige Ebene mit exaktem Label hat kein Signal; die Ebene mit Signal hat kein
+exaktes Label. Ein Plate-Policy-Head im Sinne von par.1.2 braucht also
+Draft-Labels — und die sind nur als **Schranke** oder aus einer **Heuristik** zu
+bekommen.
+
+### Folge fuer den Schlachtplan
+
+**Der Zielwechsel auf Vollendbarkeit (`PREREG_reachability_target.md`) wird zum
+Hauptversuch** — nicht weil er gewonnen hat, sondern durch Ausschluss: das
+Vollendbarkeits-Praedikat ist an der Draft-Ebene berechenbar (obere Schranke,
+par.4 dort), und es ist die einzige nicht-heuristische Label-Quelle, die dort
+ueberhaupt existiert.
+
+Platz 2 (Plate-Policy-Head) bleibt gueltig, aber **nur mit Draft-Labels aus dem
+Praedikat**, nicht mit exakten Labels. Damit verliert er das Argument, das ihn
+vor den Zielwechsel gesetzt hatte, und tauscht mit ihm den Platz.
+
+### Was dieser Prototyp NICHT gezeigt hat
+
+- **k2 (Diagonalen)** ist nicht geprueft. Zwei Geometrien statt sechs, 10 statt 7
+  Punkte — die Lage kann dort anders sein.
+- **Die Ordnung des Kopfes** bleibt unvalidiert. Ausgang (B) der Vorabregel wurde
+  nicht erreicht, weil (A) vorher zutraf. Stufe 2 aus
+  `PREREG_ownership_coupling.md` par.6.3 ist damit weiter offen.
+- **Der Held-out-Satz stammt aus Bauer-Partien.** In Partien mit noch weniger
+  Spaltenfortschritt waere das Ergebnis dasselbe oder deutlicher, nicht schwaecher.
+
