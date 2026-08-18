@@ -454,6 +454,52 @@ stabil falsche Ordnung haette beide Tests bestanden. Vor dem Bauen von B4 fehlt
 also der Vergleich der Kopf-Ordnung gegen die ORAKEL-Ordnung derselben
 Geschwister, mit der Vorabregel aus par.6.3 Stufe 2.
 
+#### par.6.4 ERGEBNIS: `E` IST RUNDENKONSTANT — der Nenner ist ~50x zu gross (2026-08-18)
+
+`tools/probes/shaping_scale_e_distribution.py`, `b18_best`, 600 Drafting-
+Zustaende aus **600 verschiedenen Partien** des Held-out-Satzes `data/holdout`
+(je Partie und Runde einer), 120 je Runde. Feldindizierung aus `scoring.rs:422/432`
+uebernommen, nicht geraten.
+
+| Runde | Median E(k0) | Median E(k1) | Median E(k2) | 90 %-E/SCALE_r max |
+|---|---:|---:|---:|---:|
+| 1 | 1,362 | 0,082 | 0,038 | 0,397 |
+| 2 | 1,335 | 0,081 | 0,026 | 0,217 |
+| 3 | 1,403 | 0,082 | 0,025 | 0,135 |
+| 4 | 1,375 | 0,097 | 0,025 | 0,099 |
+| 5 | 1,174 | 0,116 | 0,023 | 0,057 |
+
+**Drei Befunde:**
+
+1. **`E` waechst ueber die Runden NICHT** (k2 faellt sogar). Der Grund ist
+   strukturell: `wertung_progress` (Pfad A) misst FORTSCHRITT und waechst
+   naturgemaess, der Ownership-Kopf (Pfad B) prognostiziert den ENDZUSTAND und
+   wird im Verlauf *schaerfer*, nicht *groesser*.
+2. **Der Nenner ist fuer Pfad B um Groessenordnungen zu gross.** `tanh(0,082/50)`
+   = 0,0016 gegen eine q-Eigenspreizung der Suche von 0,078 (par.6.1) — Faktor
+   ~50 zu leise, **in jeder Runde**.
+3. **Damit ist B2 bezifferbar statt geschaetzt.** Damit der Shift die
+   Groessenordnung der Suche erreicht, muesste der Nenner je Kriterium etwa
+   **k0 ~17, k1 ~1, k2 ~0,3** lauten statt einheitlich 50.
+
+**Die Runde-1-Frage aus par.6.3.1 ist beantwortet — negativ:** `E` ist dort
+NICHT null (Median k1 0,082, wie in allen Runden). Die gemessene Bitgleichheit
+von `q` mit und ohne Regler in Runde 1 hat also eine ANDERE Ursache als ein
+verschwindendes `E`, und ein rundenabhaengiger Nenner wuerde sie NICHT heilen.
+Ursache weiterhin ungeklaert.
+
+**FOLGE FUER `PREREG_shaping_scale_per_round.md` (parallele Sitzung):** deren
+par.6-Saettigungsregel ist ERFUELLT (alle 90-%-Quantile unter 0,40, Grenze 1,0).
+Aber deren **Praemisse trifft fuer Pfad B nicht zu**: sie setzt `E ~ 0,7` in
+Runde 1 auf `E ~ 7` in Runde 5 an (Faktor 10, aus dem PUNKTESTAND je Runde
+abgeleitet) und leitet daraus ab, das Profil *"vergleichmaessigt den Einfluss
+ueber die Runden"*. Gemessen ist `E` fuer Pfad B rundenkonstant — mit `SCALE_r`
+wuerde der Shift bei k1 in Runde 1 auf 0,0195 steigen und in Runde 5 auf 0,0028
+fallen, also **siebenfach zugunsten der frueher Runden kippen** statt zu
+vergleichmaessigen. Fuer Pfad A (Fortschrittsgroesse) bleibt die Herleitung
+plausibel. **Empfehlung: getrennte Profile, und fuer Pfad B statt eines
+Rundenprofils eine Skala JE KRITERIUM** (Punkt 3 oben).
+
 ## par.7 MESSANORDNUNG
 
 Wie `PREREG_conjunction_terms.md` par.6, damit die Zahlen daneben stehen:
