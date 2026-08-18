@@ -316,7 +316,10 @@ class Replayer:
     verfuegbar -- diese Replay-von-vorn-Strategie ist der Ersatz dafuer).
     """
 
-    def __init__(self, header: dict, log_name: str, model_path: str, sims: int, c_puct: float, do_oracle: bool):
+    def __init__(self, header: dict, log_name: str, model_path: str, sims: int, c_puct: float,
+                 do_oracle: bool, dump_path: str | None = None):
+        # --dump-states: Datei bleibt fuer die Dauer des Replays offen
+        self.dump_fh = open(dump_path, "w", encoding="utf-8") if dump_path else None
         self.header = header
         self.players = header["players"]
         self.name_to_idx = {name: i for i, name in enumerate(self.players)}
@@ -487,6 +490,18 @@ class Replayer:
             rec.reason = f"Phase '{self.g.phase()}' statt drafting (unerwartet)"
             self.oracle_records.append(rec)
             return
+        # --dump-states (2026-08-18, Nutzer-Auftrag "die Partien als
+        # AUSGANGSSTELLUNG hernehmen, um Drafting und Tiling zu debuggen"):
+        # der Zustand wird VOR allen Frueh-Ausstiegen geschrieben, damit auch
+        # Runde 5 und `--no-oracle` einen Pruefstand liefern. Rein additiv --
+        # ohne den Schalter aendert sich nichts.
+        if self.dump_fh is not None:
+            self.dump_fh.write(json.dumps({
+                "turn": self.turn_idx, "round": rec.round_num, "kind": kind,
+                "player": getattr(rec, "player", None),
+                "played": getattr(rec, "played_desc", None),
+                "state": json.loads(self.g.state_json()),
+            }, ensure_ascii=False) + chr(10))
         if rec.round_num >= 5:
             rec.reason = "Runde 5 -- exakter Alpha-Beta-Solver (round5.rs), nicht netz-oracle-bewertet"
             self.oracle_records.append(rec)
@@ -542,20 +557,36 @@ class Replayer:
             and mv["factory_id"] == factory_id and mv["source"] in expected
         ]
         if not candidates:
-            # Sonnen-Tracking evtl. falsch -- Gegenteil probieren, bevor abgebrochen wird.
-            all_sources = {"SMALL_FACTORY_SUN", "SMALL_FACTORY_MOON"} if factory_id is not None \
-                else {"LARGE_FACTORY_SUN", "LARGE_FACTORY_MOON"}
-            if not is_global:
-                alt = all_sources - expected
-                candidates = [
-                    mv for mv in st["valid_moves"]
-                    if mv["type"] == "stone" and mv["color"] == color and mv["row"] == row
-                    and mv["factory_id"] == factory_id and mv["source"] in alt
-                ]
+            # QUELLEN-TOLERANTER RUECKFALL (2026-08-18): das Log-Emoji ist KEIN
+            # verlaesslicher Indikator des Aktionstyps, und "von GF" ist keiner
+            # der Quelle. Nachgewiesen an game_20260818_200516_seed585858:
+            # dieselbe Lage -- Rest der grossen Fabrik im Mondpool,
+            # Startspielerstein vergeben (laut engine_manual.md:118 NUR bei
+            # einer Mond-Entnahme) -- steht in Runde 1 (Zeilen 15/20/21) mit
+            # SONNE und in Runde 2 (Zeilen 78/79/80) mit MOND im Log. Zudem
+            # traegt Aktion C (Mond ueber alle Fabriken + GF-Mondpool) intern
+            # `SMALL_FACTORY_MOON` mit `factory_id=None`, passt also nicht zu
+            # den LARGE_*-Quellen, die "von GF" erwarten laesst.
+            # Deshalb: ueber ALLE Quellen suchen, `expected` nur noch als
+            # Sortier-Praeferenz. Farbe, Reihe und factory_id bleiben harte
+            # Bedingungen -- die Zuordnung wird also nicht beliebig.
+            candidates = sorted(
+                (mv for mv in st["valid_moves"]
+                 if mv["type"] == "stone" and mv["color"] == color and mv["row"] == row
+                 and mv["factory_id"] == factory_id),
+                key=lambda mv: 0 if mv["source"] in expected else 1,
+            )
         if not candidates:
+            # Diagnose statt Raten (2026-08-18): die verfuegbaren Stein-Zuege
+            # mitgeben, sonst ist die Divergenz nicht aufzuklaeren.
+            verf = [
+                f"{mv['source']}/f{mv['factory_id']}/{mv['color']}/r{mv['row']}"
+                for mv in st["valid_moves"] if mv["type"] == "stone"
+            ]
             raise ReplayDivergence(
                 f"Zeile {li} (Runde {lines[li].round_num}): kein passender Stein-Zug: "
-                f"color={color} row={row} factory_id={factory_id} is_global={is_global} erwartet={expected}"
+                f"color={color} row={row} factory_id={factory_id} is_global={is_global} "
+                f"erwartet={expected}  |  verfuegbar ({len(verf)}): " + ", ".join(sorted(set(verf))[:24])
             )
 
         if candidates[0]["source"] in ("SMALL_FACTORY_SUN", "LARGE_FACTORY_SUN"):
@@ -608,14 +639,16 @@ class Replayer:
 # Haupt-Treiber
 # ═══════════════════════════════════════════════════════════════════════════
 
-def run(log_path: Path, model_path: Path, sims: int, c_puct: float, do_oracle: bool, limit: int | None):
+def run(log_path: Path, model_path: Path, sims: int, c_puct: float, do_oracle: bool,
+        limit: int | None, dump_states: str | None = None):
     """Gibt (rep, lines, li_reached, divergence_msg_or_None) zurueck -- wirft
     NICHT bei einer ReplayDivergence, sondern faengt sie ab, damit der
     Aufrufer trotzdem einen (Teil-)Report ueber das bis dahin Erreichte
     schreiben kann (Auftrag: "bei Divergenz praezise abbrechen und
     berichten", nicht einfach nur crashen)."""
     header, lines = load_log(log_path)
-    rep = Replayer(header, log_path.name, str(model_path), sims, c_puct, do_oracle)
+    rep = Replayer(header, log_path.name, str(model_path), sims, c_puct, do_oracle,
+                   dump_path=dump_states)
     name_to_idx = rep.name_to_idx
 
     n_lines = len(lines) if limit is None else min(limit, len(lines))
@@ -1048,6 +1081,9 @@ def main() -> None:
     ap.add_argument("--c-puct", type=float, default=DEFAULT_C_PUCT)
     ap.add_argument("--no-oracle", action="store_true", help="nur Parser+Replay, keine Netzsuche (schnell, zum Testen)")
     ap.add_argument("--limit", type=int, default=None, help="nur die ersten N Log-Zeilen verarbeiten (Debug)")
+    ap.add_argument("--dump-states", default=None,
+                    help="JSONL-Datei mit dem Zustand an JEDEM Entscheidungspunkt "
+                         "(Pruefstand fuer Drafting/Tiling-Debugging)")
     ap.add_argument("--out", default=None, help="Ziel-Markdown-Datei (Default: evaluations/game_analysis_<logname>.md)")
     args = ap.parse_args()
 
@@ -1057,8 +1093,12 @@ def main() -> None:
     print(f"Lade {log_path} ...")
     t0 = time.time()
     rep, lines, li_reached, divergence = run(
-        log_path, Path(args.model), args.sims, args.c_puct, not args.no_oracle, args.limit
+        log_path, Path(args.model), args.sims, args.c_puct, not args.no_oracle, args.limit,
+        dump_states=args.dump_states
     )
+    if getattr(rep, "dump_fh", None) is not None:
+        rep.dump_fh.close()
+        print(f"  Zustands-Dump: {args.dump_states}")
     elapsed = time.time() - t0
     n_lines_total = len(lines)
     if divergence:
