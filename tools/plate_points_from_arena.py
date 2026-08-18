@@ -86,6 +86,14 @@ def auswerten(sp: dict, seite: int | None = None) -> dict:
     platten_gesamt, je_kriterium = None, {}
     aktiv = None  # sammelt nur direkt nach der Endwertungs-Zeile des Netzes
     for roh in sp.get("log") or []:
+        # Maschinenzeilen (`#a {...}`, PREREG_action_id_logging.md) und jede
+        # andere `#`-Kommentarzeile ueberspringen -- genau wie
+        # `analyze_game_log.load_log` es tut. Ohne diesen Filter wuerde eine
+        # solche Zeile INNERHALB des Endwertungs-Blocks den `aktiv`-Sammler
+        # abbrechen und `je_kriterium` still leeren (gemessen 2026-08-18:
+        # {'Vertikale Reihen': 0, 'Eckplatten': 3, 'Spezialfelder': -12} -> {}).
+        if roh.startswith("#"):
+            continue
         m = ROUND_PREFIX.match(roh)
         text = m.group(2) if m else roh
         fs = PATTERNS["FINAL_SCORE"].match(text)
