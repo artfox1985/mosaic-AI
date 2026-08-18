@@ -909,6 +909,69 @@ fn end_scoring_from_state_json(
     Ok(result.to_string())
 }
 
+/// Vollendbarkeit der Plattengeometrien fuer einen extern gespeicherten Zustand
+/// -- reine LESEFUNKTION fuer `PREREG_reachability_target.md` par.5 (Sperre vor
+/// dem Zielwechsel: traegt das Vollendbarkeits-Label ueberhaupt Information, oder
+/// ist es nahezu konstant?).
+///
+/// Der Label-Bauer sitzt in `neural_net.py`, das Praedikat in
+/// `column_build.rs` (`pub(crate)`) -- dieser Wrapper ist die einzige Bruecke.
+/// Additiv, aendert nichts an Suche, Self-Play oder Wertung.
+///
+/// Vorratsgroesse ist `provocation::noch_erreichbare_farben`, dieselbe, die auch
+/// das Sicherheitsnetz des Spaltenbauers benutzt (`column_build.rs:643`) -- sie
+/// zaehlt ueber die BRETTER beider Spieler und die Strafleisten, nutzt also nur
+/// beobachtbare Information und kein verdecktes Beutelwissen.
+///
+/// Liefert JSON: `{columns:[bool;6], rows:[bool;6], diagonals:[bool;2],
+/// col_fill:[u32;6], row_fill:[u32;6], diag_fill:[u32;2]}`. Die
+/// Fuellstaende kommen mit, damit die Sperre nach Fortschritt aufschluesseln
+/// kann, ohne den Zustand ein zweites Mal zu parsen.
+#[pyfunction]
+#[pyo3(signature = (state_json, player, seed=None))]
+fn plate_completability_json(
+    state_json: String,
+    player: usize,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    if player >= state.players.len() {
+        return Err(PyValueError::new_err(format!("player {player} existiert nicht")));
+    }
+    let p = &state.players[player];
+    let erreichbar = crate::provocation::noch_erreichbare_farben(&state, player);
+    let feats = crate::scoring::player_scoring_features(p);
+
+    // Zeilen/Diagonalen ueber dieselbe ZELL-Funktion wie die Spalten -- eine
+    // Geometrie ist vollendbar, wenn alle ihre offenen Zellen es sind.
+    let zelle_ok = |r: usize, c: usize| crate::column_build::ist_zelle_vollendbar(p, r, c, &erreichbar);
+    let spalten: Vec<bool> = (0..6)
+        .map(|c| crate::column_build::ist_spalte_vollendbar(p, c, &erreichbar))
+        .collect();
+    let zeilen: Vec<bool> = (0..6).map(|r| (0..6).all(|c| zelle_ok(r, c))).collect();
+    let diagonalen = vec![
+        (0..6).all(|i| zelle_ok(i, i)),
+        (0..6).all(|i| zelle_ok(i, 5 - i)),
+    ];
+
+    Ok(serde_json::json!({
+        "columns": spalten,
+        "rows": zeilen,
+        "diagonals": diagonalen,
+        "col_fill": feats.col_fill.to_vec(),
+        "row_fill": feats.row_fill.to_vec(),
+        "diag_fill": feats.diag_fill.to_vec(),
+    })
+    .to_string())
+}
+
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
@@ -1190,6 +1253,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(plate_completability_json, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;

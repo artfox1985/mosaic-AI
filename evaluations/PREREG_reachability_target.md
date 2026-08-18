@@ -190,4 +190,55 @@ gehoert getrennt berichtet.
 5. Arm S bauen (Nenner je Kriterium als Knopf, Default = heutige 50).
 6. Arena N / S / T+S.
 
-## par.10 ERGEBNIS (leer bei Registrierung)
+## par.10 ERGEBNIS DER SPERRE par.5 (2026-08-18): BESTANDEN, an der Grenze
+
+`tools/probes/reachability_label_base_rate.py`, Held-out-Satz `data/holdout`,
+Tiling-Stellungen, je (Partie, Runde) eine, 150 je Runde. Label-Quelle ist der
+neue Export `mosaic_rust.plate_completability_json` (Wrapper um
+`column_build::ist_spalte_vollendbar`; Vorrat aus
+`provocation::noch_erreichbare_farben` — zaehlt ueber die Bretter beider Spieler
+und die Strafleisten, also **nur beobachtbare Information**, kein verdecktes
+Beutelwissen). Paritaetsprobe nach dem Wheel-Bau gruen, Hash unveraendert.
+
+Granularitaet ist das **Atom** (6 Spalten, 2 Diagonalen), weil der Kopf je
+Geometrie lernt:
+
+| Runde | n | k1 Spalten-Atome | k2 Diagonalen-Atome | irgendeine Spalte | irgendeine Diagonale |
+|---|---:|---:|---:|---:|---:|
+| 1 | 150 | 100,0 % | 100,0 % | 100,0 % | 100,0 % |
+| 2 | 150 | 98,8 % | 98,0 % | 100,0 % | 100,0 % |
+| **3** | 150 | **85,1 %** | **86,0 %** | 100,0 % | 97,3 % |
+| **4** | 150 | **55,4 %** | **52,3 %** | 96,0 % | 77,3 % |
+| **5** | 150 | **47,2 %** | **47,7 %** | 96,0 % | 68,7 % |
+
+> **VORABREGEL par.5: BESTANDEN.** k1 3/5 und k2 3/5 Runden im Band 5-95 % —
+> gefordert waren je drei. **Bestanden mit null Reserve.**
+
+**Drei Ablesungen:**
+
+1. **Das Label traegt in Runde 3-5, nicht in 1-2.** Dort ist praktisch alles noch
+   vollendbar (100 % / 98,8 %), das Label ist konstant und wertlos. In Runde 4-5
+   ist es nahezu ausbalanciert (55 % / 47 %) — informationstheoretisch das
+   Optimum.
+2. **Gegen die Realisierung ist es ein klarer Gewinn**, aber in einem
+   VERSCHOBENEN Fenster: Realisierung liegt bei ~13 % ueber die ganze Partie,
+   Vollendbarkeit bei 47-85 % in der zweiten Haelfte.
+3. **Das Signal sitzt JE SPALTE, nicht in der Aggregation.** "Irgendeine Spalte
+   vollendbar" bleibt selbst in Runde 5 bei 96 %, waehrend einzelne Spalten bei
+   47 % liegen. Ein Kopf, der nur "kriege ich irgendeine Spalte" lernt, lernt
+   nichts. Die 6 Atome muessen einzeln gelernt werden.
+
+**Die Einschraenkung, die ins Ergebnis gehoert:** das neue Ziel ist stumm genau
+dort, wo laut `docs/domain_knowledge.md` §8 die tragenden Entscheidungen fallen —
+Runde 1-2, die Kuppelplatten-Wahl. Es traegt in Runde 3-5. Das ist eine
+Praezisierung des Vorhabens, nicht seine Erfuellung.
+
+**Bezug zum Prototyp-Befund** (`PREREG_plate_policy_supervision.md` par.8): dort
+zeigte sich, dass die Tiling-Ebene fuer k1 kein Aktionssignal traegt, weil die
+Farbforderung des letzten Feldes im DRAFT entschieden wird. Die Sperre hier passt
+dazu: die Vollendbarkeit — also ob der Vorrat noch reicht — ist genau die Groesse,
+die sich zwischen Runde 3 und 5 entscheidet und die im Draft beeinflussbar ist.
+
+**Naechster Schritt nach par.9:** Label-Bauer umstellen (Kopfbreite unveraendert),
+Warm Start vom Champion, dann die Offline-Pruefungen und die Arena N / S / T+S.
+
