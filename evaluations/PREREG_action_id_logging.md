@@ -153,14 +153,24 @@ Eingabe.
 
 - **Alte Logs bekommen nichts.** Sie bleiben unreplaybar; das sind sie ohnehin
   (par.1). Der Gewinn liegt bei allen kuenftigen Partien.
-- **Die latente Validator-Luecke wird nicht geschlossen.** `SmallFactoryMoon`
-  mit gesetzter `factory_id` und `LargeFactoryMoon` sind Teil-Entnahmen, die das
-  Regelwerk nicht vorsieht (der Mondbereich ist EIN Pool: oberste Fliesen aller
-  kleinen Stapel plus alles der Mondseite der grossen Fabrik,
-  `engine_manual.md:100-102`). Sie werden nie generiert, vom Validator aber
-  akzeptiert. **Das ist eine eigene Regelentscheidung und NICHT Teil dieses
-  Umbaus** — mit IDs wird der Replay solche Zuege korrekt anwenden statt sie zu
-  ersetzen, was sie sichtbar macht statt sie zu heilen.
+- **Der Teil-Entnahme-Fehler wird nicht geheilt, sondern nur sichtbar gemacht.**
+  Der Mondbereich ist EIN Pool (oberste Fliesen aller kleinen Stapel plus alles
+  der Mondseite der grossen Fabrik, `engine_manual.md:100-102`). `LargeFactoryMoon`
+  nimmt nur den GF-Anteil.
+
+  **BESTAETIGT 2026-08-18** (Nutzer: *"ja lässt sich reproduzieren. das gehört
+  nicht so."*), Beleg `static/log/game_20260818_205751_seed642598`: nach dem
+  GF-Sonnenzug (rel. Zeile 1) liegt auf F4 rot obenauf (rel. Zeile 4, keine
+  weitere F4-Entnahme dazwischen), und rel. Zeile 21 nimmt **1×** rot von GF
+  statt der Vereinigung. Betroffen ist nur der MENSCH — der Generator erzeugt
+  ausschliesslich die Vereinigungsform, das Netz spielt regelkonform.
+
+  **Nutzer-Entscheid zur Reparatur:** der UI-Klick auf den GF-Mondbereich
+  entfaellt; geklickt wird nur noch in den GETEILTEN Mondbereich, die Stapel
+  bleiben ebenfalls nicht klickbar. Das ist eine EIGENE Aenderung und nicht Teil
+  dieses Umbaus — hier steht sie nur, weil sie erklaert, warum alte Logs (auch
+  die Elo-Logs) nicht reproduzieren: der Replay nimmt die Vereinigung, das
+  Original nahm weniger, und ab da laufen die Zustaende auseinander.
 - **Es ist keine Aenderung an Suche, Wertung oder Self-Play.** Nur Logging plus
   ein Feld in `valid_moves`.
 
