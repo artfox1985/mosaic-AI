@@ -274,6 +274,73 @@ bei k1, dazu die Diagonalen mit 10 Punkten je Treffer.
 > nichts kostet. Genau dorthin zeigen Abschnitt 7 Punkt (1) — der Value-Kopf hat
 > den Vorteil nie als Vorteil gesehen — und der Aussenblick in Abschnitt 8.
 
+### 6b. EINE MENSCHENPARTIE ALS SOLLBILD (2026-08-18)
+
+`static/log/game_20260818_195111_seed558549.log` — Nutzer gegen Champion
+`v21_2d_brierbest` @400, Wertungsplatten [1, 5, 6], also **k1 dabei**. n=1, also
+kein Beleg, aber das schaerfste Sollbild, das vorliegt.
+
+| | Grundpunkte | Plattenpunkte | Endstand |
+|---|---:|---:|---:|
+| **Mensch** | 34 | **+13** (k1 **14**, k5 11, k6 −12) | **47** |
+| KI | **41** | −9 (k1 **0**, k5 3, k6 −12) | 32 |
+
+**Die KI spielt die Basis besser (41:34) und verliert um 15.** Der gesamte
+Unterschied sind die Platten, 25 gegen 3, und der groesste Posten sind die **zwei
+fertigen Spalten**, die die KI mit null beantwortet — bei ausliegender Platte.
+
+**Der Aufbau ist progressiv, und er beginnt in Runde 2.** Maximaler vertikaler
+Lauf je Runde:
+
+| Runde | Mensch | KI |
+|---|---:|---:|
+| 1 | 2 | 2 |
+| 2 | **4** | 3 |
+| 3 | 3 | 2 |
+| 4 | **6** (fertig) | 3 |
+| 5 | **6** (zweite) | 4 |
+
+Die KI kommt **nie ueber 4** und erreicht ihr Maximum erst in Runde 5, wenn nichts
+mehr geht.
+
+**Und die Kostenfrage klaert sich anders als vermutet — es ist eine Frage des
+ZEITPUNKTS.** Strafpunkte je Runde:
+
+| Runde | Mensch | KI |
+|---|---:|---:|
+| 1 | 3 | 1 |
+| 2 | **8** | 1 |
+| 3 | **12** | 1 |
+| 4 | 5 | 1 |
+| **5** | **0** | **12** |
+| Summe | 28 | 16 |
+
+**Der Mensch zahlt vorne, die KI hinten.** 25 von 28 Strafpunkten fallen in Runde
+2-4 — der Preis dafuer, Fliesen nach FARBE statt nach Plazierbarkeit zu nehmen. In
+Runde 5 zahlt er null, weil die Spalten stehen. Die KI zahlt vier Runden je einen
+Punkt und dann **12 in Runde 5** — sie vermeidet die Kosten nicht, sie verschiebt
+sie, und bekommt nichts dafuer.
+
+**Die Frage ist also nicht "Strafpunkte oder nicht", sondern wann man sie zahlt
+und ob es eine Rendite gibt.** Das ist ein besseres Argument fuer den Spaltenbau
+als der Kostenvergleich in Abschnitt 6a — und es passt zu ihm: dort war der "Rest"
++0,84, also kein Preis; hier ist der Preis vorgezogen und in Runde 5
+zurueckverdient.
+
+**Gegenprobe an den Arena-Daten** (b18-Seite, Nullarm, 20 Partien mit fertiger
+Spalte gegen 136 ohne): Bodenreihe 14,10 gegen 13,69, Differenz **+0,41** — der
+Strafleisten-Mechanismus zeigt sich dort NICHT als Aufschlag. Die −28 des Menschen
+sind also seine Spielweise in dieser Partie (zwei Spalten UND zwei Eckplatten),
+nicht der generelle Preis. *Nebenbefund zur Methode: die erste Messung dieser
+Frage am Korpus schlug fehl, weil der letzte Record keinen Bodenwert traegt —
+Strafsteine werden am Rundenende geraeumt. Ersetzt durch die Arena-Daten, statt
+die 0,00 als Befund zu melden.*
+
+**Der schaerfste Einwand gegen den laufenden Zielwechsel kommt aus dieser
+Partie:** das Vollendbarkeits-Label traegt ab Runde 3
+(`PREREG_reachability_target.md` par.10), der entscheidende Aufbau beginnt hier
+aber in Runde **2**.
+
 ## 7. Offene Fragen, die tragfähigste Ursache zuerst
 
 **(1) Der Lehrkorpus konnte dem VALUE-Kopf nichts beibringen — per Konstruktion.**
