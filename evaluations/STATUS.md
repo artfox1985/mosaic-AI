@@ -230,9 +230,12 @@ steigt die Differenz auf +1,79 pp (t 1,69, 6/7) — knapp unter der Schwelle.
 
 Zwei Nebenbefunde aus der Saettigungsmessung: **in Runde 1 ist JEDER
 Pfad-A-Term exakt 0** (das Kuppelraster ist vor dem Rundenende leer — ein
-Rundenprofil kann R1 dort nicht heilen), und der Strafleisten-Term faehrt mit
-Default-Gewicht 0,3 **live** mit — ein Profil am gemeinsamen `tanh`-Nenner
-aendert Produktionsverhalten, nicht nur Messarme (steht als Warnung in par.6a).
+Rundenprofil kann R1 dort nicht heilen). Der zweite Nebenbefund („Strafleisten-
+Term faehrt mit 0,3 live mit") war **FALSCH und ist korrigiert** (Regel-0-Fund
+bei der Umsetzung 2026-08-19): die 0,3 gehoeren zu `MOSAIC_FLOOR_SHAPING_W`
+(anderes Additiv am Netz-Blattwert); der Pfad-A-Strafleisten-Term haengt an
+`MOSAIC_WERTUNG_FLOOR_W`, Default **0,0** — per Default ist KEIN Pfad-A-Term
+live, der Profil-Knopf aendert kein Produktionsverhalten (par.6a, korrigiert).
 
 ### Werkzeug-Stand (alles additiv, Suite gruen)
 
@@ -556,9 +559,10 @@ aber er koennte ein Artefakt sein.**
 0, Erfolgsregel k1/k2 auf Block-Ebene ohne Siegverlust. **Die Vorbedingung
 (Saettigungspruefung par.6) ist seit 2026-08-19 BEIDSEITIG erfuellt** (Pfad B
 par.3a, Pfad A par.6a: alle 90-%-Quantile <= 0,31) — ein gemeinsames Profil
-traegt, der Bau ist frei. Zwei Warnungen aus par.6a beachten: Runde 1 ist fuer
-Pfad A strukturell stumm (E = 0), und der Strafleisten-Term (Default 0,3)
-faehrt LIVE mit.
+traegt, der Bau ist frei. Warnung aus par.6a: Runde 1 ist fuer Pfad A
+strukturell stumm (E = 0). (Die fruehere zweite Warnung „Strafleisten-Term
+Default 0,3 live" war eine Knopf-Verwechslung und ist in par.6a korrigiert —
+alle Pfad-A-Gewichte sind per Default 0.)
 
 **Einordnung, damit es niemand ueberschaetzt:** beide Shaping-Pfade sind per
 Default AUS (`MOSAIC_WERTUNG_SHAPING_W` und `MOSAIC_OWNERSHIP_W` je 0,0). Der

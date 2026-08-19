@@ -12,7 +12,9 @@ rechnet exakt die Groessen, die in `apply_wertung_shaping_full`
 eingehen: `wertung_progress_per_kriterium` je Kriterium (Laufzeit-Alphas,
 `round_gain = 0` wie in der Prereg registriert), `unlock_progress_beta` (k6,
 zahlt ungegatet), `projected_unplaceable_penalty` (Strafleisten-Gegenterm,
-Gewicht default 0,3 -- der EINZIGE per Default AKTIVE Term!) und
+`MOSAIC_WERTUNG_FLOOR_W` Default 0,0 -- NICHT zu verwechseln mit
+`MOSAIC_FLOOR_SHAPING_W` = 0,3, das ist eine andere Korrektur am
+Netz-Blattwert; Regel-0-Korrektur 2026-08-19, par.6a) und
 `tiling_potenzial`.
 
 Entscheidungsregel par.6: liegt das 90-%-Quantil von `E_r / SCALE_r` in beiden
@@ -119,8 +121,9 @@ def main() -> None:
     print()
     print(f"  Vorabregel par.6, Pfad A (90%-Quantil E_r/SCALE_r < 1,0): "
           f"{'ERFUELLT' if not ueber else 'VERLETZT bei ' + ', '.join(ueber)}")
-    print("  Hinweis: `floor_penalty` faehrt mit Default-Gewicht 0,3 IMMER mit --"
-          " ein Profil aendert dessen Live-Verhalten, nicht nur die Messarme.")
+    print("  Hinweis: alle Pfad-A-Gewichte sind per Default 0 (auch der"
+          " Strafleisten-Term, MOSAIC_WERTUNG_FLOOR_W) -- ein Profil aendert"
+          " kein Live-Verhalten. Korrektur 2026-08-19, siehe par.6a.")
 
     (BASIS / "evaluations" / "probe_shaping_e_distribution_pfad_a.json").write_text(
         json.dumps({"states": a.states, "n": len(proben), "profil": PROFIL,
