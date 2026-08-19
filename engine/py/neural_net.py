@@ -9,8 +9,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND,
-                          reach_columns, reach_target_k1_active)
+from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND, REACH_BUF_CAP,
+                          reach_columns, reach_target_k1_active,
+                          reach_buffer_mode, reach_buffer_columns)
 from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
                     CONJUNCTION_TARGETS, CONJUNCTIONS_PER_PLAYER,
                     POINTS_DIST_BINS)
@@ -1283,6 +1284,11 @@ class MosaicDataset(Dataset):
                 # Eigener Cache, sonst wuerden alte Realisierungs-Labels still
                 # weiterverwendet (Muster wie "+enc2d_v1").
                 cache_key_material += f"+reachk1_r{REACH_K1_MIN_ROUND}_v1"
+                if reach_buffer_mode():
+                    # Arm P (par.12): eigener Zusatz-Key, sonst wuerden
+                    # boolesche Runde-1-2-Labels aus einem Alt-Cache (reine
+                    # k1-Variante) still weiterverwendet.
+                    cache_key_material += f"+reachbuf_cap{REACH_BUF_CAP}_v1"
         # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
         # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
         # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
@@ -1540,6 +1546,13 @@ class MosaicDataset(Dataset):
                     game_data = pickle.load(file)
                     final_own = _final_ownership_by_game(game_data)
                     reach_k1 = self.conjunction_head and reach_target_k1_active()
+                    reach_buf = reach_k1 and reach_buffer_mode()
+                    # Arm P (par.12): stetige Puffer-Ziele in Runde 1-2
+                    # sprengen int8 (nur 0/1 bisher noetig) -- float16 traegt
+                    # die Stauchung verlustarm. -1-Maskierung (fo is None)
+                    # bleibt in float16 exakt, BCE-with-logits (train.py)
+                    # nimmt ohnehin weiche Ziele und maskiert mit `>= 0`.
+                    own_dtype = np.float16 if reach_buf else np.int8
                     for step in game_data:
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if planes_l is not None:
@@ -1836,7 +1849,7 @@ class MosaicDataset(Dataset):
                         # alle Schritte dieser Partie.
                         fo = final_own.get(step["game_id"])
                         if fo is None:
-                            own_l.append(np.full(self.own_targets, -1, dtype=np.int8))
+                            own_l.append(np.full(self.own_targets, -1, dtype=own_dtype))
                         else:
                             c = step["state"].get("current_player", 0)
                             first, second = (fo[0], fo[1]) if c == 0 else (fo[1], fo[0])
@@ -1851,7 +1864,8 @@ class MosaicDataset(Dataset):
                                 # sagte frueher faelschlich [72:97]/[97:122]
                                 # = 25, siehe PREREG_ownership_corpus.md §3.3).
                                 cj_first, cj_second = (fo[2], fo[3]) if c == 0 else (fo[3], fo[2])
-                                if reach_k1 and int(step["state"].get("round") or 0) >= REACH_K1_MIN_ROUND:
+                                rd = int(step["state"].get("round") or 0)
+                                if reach_k1 and rd >= REACH_K1_MIN_ROUND:
                                     # KOPIEREN ist Pflicht: fo[2]/fo[3] werden
                                     # EINMAL je Partie gebildet und von allen
                                     # Schritten geteilt -- direktes Ueberschreiben
@@ -1862,8 +1876,23 @@ class MosaicDataset(Dataset):
                                         cj_first, cj_second = list(cj_first), list(cj_second)
                                         cj_first[REACH_ATOMS] = ego
                                         cj_second[REACH_ATOMS] = geg
+                                elif reach_buf and 1 <= rd < REACH_K1_MIN_ROUND:
+                                    # Arm P (par.12): Runde 1-2 traegt hier
+                                    # sonst die konstante 1 (100 %/98,8 %
+                                    # vollendbar, par.10) -- der stetige
+                                    # Puffer schliesst genau diese Luecke.
+                                    # Gleiches Kopieren-Muster, gleiche
+                                    # None-Absicherung: bei None (fehlendes
+                                    # Wheel) bleibt das Realisierungs-Label
+                                    # stehen.
+                                    ego = reach_buffer_columns(step["state"], c)
+                                    geg = reach_buffer_columns(step["state"], 1 - c)
+                                    if ego is not None and geg is not None:
+                                        cj_first, cj_second = list(cj_first), list(cj_second)
+                                        cj_first[REACH_ATOMS] = ego
+                                        cj_second[REACH_ATOMS] = geg
                                 vec = vec + cj_first + cj_second
-                            own_l.append(np.array(vec, dtype=np.int8))
+                            own_l.append(np.array(vec, dtype=own_dtype))
 
             # RAM-Fix (2026-07-31): jede *_l-Liste wird SOFORT nach ihrer
             # *_np-Konvertierung freigegeben (statt alle Listen bis nach der
@@ -1896,7 +1925,7 @@ class MosaicDataset(Dataset):
             polw_np      = np.array(polw_l,      dtype=np.float32); del polw_l
             points_np    = np.array(points_l,    dtype=np.float32); del points_l
             rounds_np    = np.array(rounds_l,    dtype=np.int8);    del rounds_l
-            own_np       = np.array(own_l,       dtype=np.int8);    del own_l
+            own_np       = np.array(own_l,       dtype=own_dtype); del own_l
             root_q_np      = np.array(root_q_l,      dtype=np.float32); del root_q_l
             root_q_mask_np = np.array(root_q_mask_l, dtype=np.float32); del root_q_mask_l
             opp_points_np      = np.array(opp_points_l,      dtype=np.float32); del opp_points_l

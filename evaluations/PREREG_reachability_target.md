@@ -421,6 +421,30 @@ der Puffer faellt monoton mit dem Vorrat ueber die Runden.
 1-2, nicht seinen Nutzwert. Ob der Puffer die Beschaffungs-Haelfte wirklich
 traegt, entscheidet erst par.7.
 
+### ENTSCHEID 2026-08-19 (Nutzer): der Neustart faehrt ARM P, als EIN Lauf
+
+Der abgebrochene `v21-b23` (Variante R) wird als **`v21-b24` mit Arm P**
+neu gestartet — Runde 1-2 Puffer (CAP 12), Runde 3-5 boolesch. Begruendung:
+das Realisierungs-Label ist in Runde 1-2 zu ~99,5 % konstant (kein Gradient,
+und es ist das selbsterfuellende Ziel in genau den Runden mit 81 % der
+Stapel-Ziehungen); die einzige Vorbedingung von Arm P (Sperre oben) ist
+bestanden. Es faehrt EIN Arm, kein R-gegen-P-Trainings-A/B (par.12:
+Seed-Empfindlichkeit schlaegt den Knopf).
+
+Umsetzungs-Festlegungen, vor dem Lauf registriert:
+
+- Knopf: `MOSAIC_REACH_TARGET_K1=p` (Wert `1` = Variante R bleibt moeglich,
+  Default aus). Der Knopf wird ab jetzt im Trainingsmanifest protokolliert
+  (`train_manifest.py`) — beim b23-Fehlstart waechterte nur der Cache-Key.
+- Cache-Key: zusaetzlich `+reachbuf_cap12_v1` neben `+reachk1_r3_v1`.
+- Speicherung: die Ownership-Ziele wechseln im Puffer-Modus von int8 auf
+  **float16** (stetige Ziele; BCE-with-logits nimmt weiche Ziele nativ, die
+  `-1`-Maskierung und der `>= 0`-Loss-Filter bleiben unveraendert).
+- Trainingsrezept wie b23 (Warm Start Champion, ownership 1,0, Korpus
+  additiv, Traeger `policy_carrier_manifest_own.json`), aber `--epochs 20`
+  statt 100 — sonst annealt der Cosine faktisch nicht (T_max-Footgun,
+  Optimum lag zweimal bei Epoche 4).
+
 ## par.13 WAS AUS `EXP-2026-MICRO-MILESTONE` NICHT UEBERNOMMEN WIRD
 
 Vollstaendig, damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
