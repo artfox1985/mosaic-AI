@@ -676,3 +676,55 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .ds.filled.schwarz,.ds.filled.tuerkis,.ds.filled.special{
   background-image:var(--stone-face)
 }
+
+/* == MARMOR ANFANG (Block per Marker austauschen, NIE per Regex-Wildcard) == */
+/* MARMOR-FLAECHE der drei Panels (Nutzer-Auftrag 2026-08-19: "statt einer
+   weissen Hintergrundfarbe einen Marmor-Hintergrund, das schaut wertiger aus")
+
+   Getroffen werden GENAU die drei Panels per ID -- board0/board1,
+   factories-panel, center. Bewusst per ID und nicht ueber `.panel`: Modal,
+   Log-Kasten und die uebrigen `.panel`-Kaesten bleiben weiss, und
+   app.js::renderBoard setzt das className der Boards bei jedem Rendern neu
+   ("panel" bzw. "panel active") -- eine Zusatzklasse waere dabei verloren
+   gegangen, die ID nicht.
+
+   ZWEITER VERSUCH. Der erste hat feTurbulence flaechig gefiltert und sah nach
+   Pinselstrichen aus (Nutzer: "ziemlich haesslich"). Grund: Rauschen erzeugt
+   gleichmaessig verteilte Struktur, echter Marmor ist zu ~80 % ruhige Flaeche
+   mit WENIGEN Adern. Jetzt sind die Adern gezeichnete Pfade, jede vierfach
+   gestrichen -- breiter weicher Hof (0.045), zwei Mittellagen, duenner Kern
+   (0.30). Der Hof ist der eigentliche Trick: ohne ihn wirkt eine Ader wie ein
+   Kratzer, mit ihm wie Stein. Alle Adern folgen einer Grundrichtung, weil sie
+   in echtem Stein der Schichtung folgen.
+
+   DRITTER VERSUCH: die gezeichneten Pfade laufen zusaetzlich durch zwei
+   feDisplacementMap-Stufen (grob scale 95 fuer den Verlauf der Ader, fein
+   scale 14 fuer die zerrissene Kante). Ohne diese Verzerrung sahen die Adern
+   nach Bleistiftstrichen aus -- glatte Bezierboegen mit konstanter Breite
+   sind das, was Marmor gerade NICHT hat. Zwei Adergruppen mit verschiedenen
+   Rausch-Seeds, damit sich kein Muster wiederholt.
+
+   `background-size:cover` statt `100% 100%`: gezeichnete Pfade verzerren
+   sichtbar, wenn man sie auf ein anderes Seitenverhaeltnis streckt (Rauschen
+   nicht). Die drei Panels zeigen ueber `background-position` verschiedene
+   Ausschnitte derselben Platte -- wie drei Zuschnitte aus einem Block.
+
+   HELLIGKEIT ist Anforderung, kein Geschmack: in den Panels stehen 9px
+   Grossbuchstaben-Labels in var(--text3). Wer die Adern dunkler stellt, muss
+   die Lesbarkeit dieser Labels nachpruefen. */
+#board0,#board1,#factories-panel,#center{
+  background-color:#FBF9F5;
+  background-image:
+    linear-gradient(152deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 45%,rgba(0,0,0,.03) 100%),
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='900'%3E %3Cdefs%3E %3Cfilter id='cl' x='0' y='0' width='100%' height='100%'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='0.0019' numOctaves='4' seed='9'/%3E %3CfeColorMatrix type='matrix' values='0 0 0 0 0.63 0 0 0 0 0.62 0 0 0 0 0.58 0.52 0 0 0 -0.20'/%3E %3C/filter%3E %3Cfilter id='gr' x='0' y='0' width='100%' height='100%'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' seed='4'/%3E %3CfeColorMatrix type='matrix' values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0.08 0 0 0 -0.028'/%3E %3C/filter%3E %3Cfilter id='w1' x='-25%' y='-25%' width='150%' height='150%'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='0.0075' numOctaves='4' seed='13' result='n1'/%3E %3CfeDisplacementMap in='SourceGraphic' in2='n1' scale='95' xChannelSelector='R' yChannelSelector='G' result='d1'/%3E %3CfeTurbulence type='fractalNoise' baseFrequency='0.05' numOctaves='3' seed='31' result='n2'/%3E %3CfeDisplacementMap in='d1' in2='n2' scale='14' xChannelSelector='R' yChannelSelector='G'/%3E %3CfeGaussianBlur stdDeviation='0.55'/%3E %3C/filter%3E %3Cfilter id='w2' x='-25%' y='-25%' width='150%' height='150%'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='0.0062' numOctaves='4' seed='47' result='m1'/%3E %3CfeDisplacementMap in='SourceGraphic' in2='m1' scale='120' xChannelSelector='G' yChannelSelector='B' result='e1'/%3E %3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5' result='m2'/%3E %3CfeDisplacementMap in='e1' in2='m2' scale='11' xChannelSelector='R' yChannelSelector='G'/%3E %3CfeGaussianBlur stdDeviation='0.5'/%3E %3C/filter%3E %3Cg id='va'%3E %3Cpath d='M -80 760 C 170 700 300 616 470 566 C 640 516 720 448 880 368 C 1010 302 1100 282 1280 238'/%3E %3Cpath d='M 470 566 C 528 510 556 444 636 398 C 706 358 762 328 830 258'/%3E %3Cpath d='M -80 372 C 150 344 268 288 430 240 C 596 192 660 140 812 96 C 960 54 1080 38 1280 22'/%3E %3Cpath d='M 430 240 C 452 306 466 350 504 410'/%3E %3Cpath d='M 1010 302 C 1058 348 1088 386 1140 452'/%3E %3C/g%3E %3Cg id='vb'%3E %3Cpath d='M 130 900 C 300 810 372 764 512 702 C 660 636 726 592 856 522'/%3E %3Cpath d='M 860 900 C 946 822 986 782 1064 708 C 1138 640 1182 612 1280 572'/%3E %3Cpath d='M 570 650 C 660 616 706 588 782 540'/%3E %3Cpath d='M 40 540 C 148 512 196 480 286 442'/%3E %3Cpath d='M 240 120 C 330 150 400 176 470 232'/%3E %3C/g%3E %3C/defs%3E %3Crect width='1200' height='900' fill='%23FBF9F5'/%3E %3Crect width='1200' height='900' filter='url(%23cl)'/%3E %3Cg fill='none' stroke='%236E6A5E' stroke-linecap='round' filter='url(%23w1)'%3E %3Cuse href='%23va' stroke-width='26' opacity='0.055'/%3E %3Cuse href='%23va' stroke-width='9' opacity='0.07'/%3E %3Cuse href='%23va' stroke-width='2.4' opacity='0.17'/%3E %3Cuse href='%23va' stroke-width='0.8' opacity='0.34'/%3E %3C/g%3E %3Cg fill='none' stroke='%2375705F' stroke-linecap='round' filter='url(%23w2)'%3E %3Cuse href='%23vb' stroke-width='20' opacity='0.045'/%3E %3Cuse href='%23vb' stroke-width='6' opacity='0.06'/%3E %3Cuse href='%23vb' stroke-width='1.5' opacity='0.13'/%3E %3Cuse href='%23vb' stroke-width='0.6' opacity='0.26'/%3E %3C/g%3E %3Crect width='1200' height='900' filter='url(%23gr)'/%3E %3C/svg%3E");
+  background-size:100% 100%,cover;
+  background-repeat:no-repeat,no-repeat;
+  /* Etwas mehr Tiefe unter der Platte -- sonst liegt Stein auf nichts. */
+  box-shadow:0 1px 3px rgba(0,0,0,.10),0 6px 16px -8px rgba(0,0,0,.18);
+  border-color:#DAD5CC;
+}
+#board0{background-position:0 0,left top}
+#board1{background-position:0 0,right bottom}
+#factories-panel{background-position:0 0,center top}
+#center{background-position:0 0,right center}
+/* == MARMOR ENDE == */
