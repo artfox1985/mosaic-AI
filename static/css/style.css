@@ -2,7 +2,11 @@
 :root{
   --bg:#F7F6F2;--surface:#FFF;--border:#E0DDD8;--border2:#C8C4BC;
   --text:#1C1917;--text2:#78716C;--text3:#A8A29E;
-  --blau:#2563EB;--gelb:#D97706;--rot:#DC2626;--schwarz:#292524;--tuerkis:#0891B2;
+  /* Nutzer-Auftrag 2026-08-19: --schwarz von #292524 (stone-800) auf
+     stone-700 aufgehellt -- auf fast-schwarzen Steinen sind Glanzkante
+     und Schattenkante des Reliefs (Block "Haptik" am Dateiende) nicht
+     unterscheidbar; dunkelgrau laesst dem 3D-Effekt Spielraum. */
+  --blau:#2563EB;--gelb:#D97706;--rot:#DC2626;--schwarz:#44403C;--tuerkis:#0891B2;
   --wild:#7C3AED;--special:#E7E5E4;
   --r:8px;--shadow:0 1px 3px rgba(0,0,0,.08)
 }
@@ -58,10 +62,15 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .rot{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E")}
 .schwarz{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%96%A3%3C/text%3E%3C/svg%3E")}
 .tuerkis{--sym:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ctext x='10' y='10' font-size='14' text-anchor='middle' dominant-baseline='central' fill='white' stroke='rgba(0,0,0,0.35)' stroke-width='0.6' paint-order='stroke'%3E%E2%97%88%3C/text%3E%3C/svg%3E")}
-/* Belegte Kuppelfelder (lbl ist leer): Symbol per CSS. */
-.ds.filled.blau::after,.ds.filled.gelb::after,.ds.filled.rot::after,.ds.filled.schwarz::after,.ds.filled.tuerkis::after{
-  content:'';position:absolute;inset:0;
-  background:var(--sym) center/12px no-repeat}
+/* NUTZER-AUFTRAG 2026-08-19: GELEGTE Kuppelfelder tragen KEIN Symbol mehr --
+   das frueher hier stehende `.ds.filled.<farbe>::after`-Overlay ist ersatzlos
+   entfernt (Begruendung analog zum Fliesen-Auftrag 2026-08-15: auf dem
+   fertigen Stein trennt das Symbol nichts mehr, es verrauscht ihn nur). Das
+   Symbol bleibt genau dort, wo es eine Entscheidung stuetzt: auf den OFFENEN
+   Feldern (`.ds.N::after`, unten). --sym bleibt an der Farbklasse, weil die
+   offenen Felder sie brauchen. ⭐ auf einem gelegten Spezialfeld ist KEIN
+   Farbsymbol, sondern der einzige Hinweis, dass dort eine Spezialfliese
+   liegt (app.js::spaceHTML setzt es als Textlabel) -- bleibt deshalb. */
 /* Unbelegte Kuppel-Farbfelder: Label-Symbol (spaceHTML) etwas groesser als
    die 9px-Basis, damit die Form erkennbar ist. */
 .ds.N{font-size:11px;font-weight:400}
@@ -161,11 +170,17 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   width: 58px;
   height: 58px;
   box-sizing: border-box;
-  padding: 5px;
+  /* 4px statt 5px: 58 - 2*1 Rand - 2*4 Padding = 48px, genau die neue
+     .d2x2-Breite. Bei 5px ragte die Platte 2px heraus. */
+  padding: 4px;
   border: 1px dashed var(--border);
   border-radius: 6px;
   transition: all .1s;
-  overflow: hidden;
+  /* overflow:hidden -> visible (2026-08-19). Es gibt hier nichts zu clippen
+     (die Platte passt genau), es wurden nur die Schlagschatten der vier
+     Randzellen abgeschnitten -- und der Tipp-Badge des Lehrermodus, der mit
+     top/right:-9px bewusst AUSSERHALB des Slots sitzt (.hint-badge). */
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -175,13 +190,26 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .dslot.cando:hover{background:#EDE9FE}
 .dslot.start{border-color:#F59E0B;background:#FEF3C744;cursor:pointer}
 .dslot.start:hover{background:#FEF3C7}
+/* LUECKE 2026-08-19 (Nutzer: "gleich aussehen tun die Fliesen noch nicht"):
+   2px -> 4px. Gemessen im Browser an vier Varianten nebeneinander -- die
+   Fliesen auf Musterreihe und Kuppelplatte trugen bereits IDENTISCHE Stile
+   (Relief, Radius, Rand, Gradient je gleich), sahen aber verschieden aus,
+   weil bei 2px Abstand der Schlagschatten jeder Zelle auf dem NACHBARSTEIN
+   landet statt auf heller Flaeche: vier Steine verschmolzen zu einem Block.
+   Die Musterreihe hat 3px (.prow gap), die Platte jetzt 4px -- mehr, weil
+   dort jeder Stein VIER Nachbarn hat statt zwei.
+   Die Platte waechst damit 46 -> 48px. Wer sie zurueckdreht, muss die
+   Breiten in app.js (4x im Markup `width:48px; height:48px` PLUS die
+   CSSOM-Zuweisung in syncDomeHeight(), die das Spielbrett regiert) und das
+   Padding von .dslot/.dgtile/.ptile mitziehen -- sonst ragt das Gitter aus
+   seinem Rahmen. */
 .d2x2 {
   display: grid;
   grid-template-columns: repeat(2, 22px);
   grid-template-rows: repeat(2, 22px);
-  gap: 2px;
-  width: 46px;
-  height: 46px;
+  gap: 4px;
+  width: 48px;
+  height: 48px;
 }
 /* Nutzer-Feedback: die Vorschau der Rotation (buildPreview) ist die einzig
    relevante Ansicht kurz vorm Legen -- deutlich groesser als die Auswahl-
@@ -211,9 +239,20 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    zurueckgenommen. Bitte nicht auf den 08-07-Stand zurueckdrehen; die
    Prioritaet hat sich bewusst geaendert, das ist kein Regressions-Bug.
    Konsistent bleibt `.ds.S.locked` gedimmt: gesperrt = NICHT belegbar,
-   gehoert also aus demselben Grund in den Hintergrund. */
+   gehoert also aus demselben Grund in den Hintergrund.
+   NACHTRAG 2026-08-19: die zweite Haelfte dieses Entscheids ("BELEGTE leicht
+   zurueckgenommen") ist aufgehoben -- `.ds.filled` steht auf opacity:1,
+   Begruendung dort. Die erste Haelfte (unbelegt voll sichtbar) gilt weiter. */
+/* AENDERUNG 2026-08-19 (Nutzer): die Sollfarbe fuellt das Feld jetzt RANDLOS
+   (100% statt 62%), es bleibt kein weisser Hintergrund uebrig. Der
+   Gradient-Trick bleibt trotzdem stehen -- er ist die Stelle, an der die
+   Groesse ueber `background-size` einstellbar ist; wer wieder eine
+   verkleinerte Kachel will, dreht 100% 100% zurueck. Die Unterscheidung
+   offen/belegt haengt damit nicht mehr an der Flaeche, sondern an drei
+   anderen Merkmalen: gestrichelter vs. durchgezogener Rand, Symbol vs. kein
+   Symbol, flach vs. erhaben (Haptik-Block am Dateiende). */
 .ds.N{border-style:dashed;border-color:rgba(0,0,0,.4);
-  background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/62% 62% no-repeat,#FAFAF9}
+  background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/100% 100% no-repeat,#FAFAF9}
 /* Symbol der Soll-Farbe: Farbklasse liefert --sym (siehe v3-Block oben). */
 .ds.N::after{content:'';position:absolute;inset:0;
   background:var(--sym) center/12px no-repeat}
@@ -227,12 +266,54 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    Folge, bewusst in Kauf genommen: gesperrt und freigeschaltet
    unterscheiden sich jetzt nur noch am Symbol (⭐ gesperrt / ◎ frei),
    nicht mehr an der Helligkeit. */
-.ds.S{background:#fff;border-style:dashed;border-color:#aaa}
-/* Belegt = erledigt, tritt zurueck (Gegenstueck zur Umkehrung oben).
-   Bewusst nur "etwas weniger sichtbar" (.6, nicht die alten .35 der
-   unbelegten Felder): die gelegte Farbe muss zum Abgleich mit den
-   Wertungsplatten weiter klar erkennbar bleiben. */
-.ds.filled{border-style:solid;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);opacity:.6}
+/* TOENUNG 2026-08-19 (Nutzer): #fff -> #EAE7E1. Das unbelegte Spezialfeld
+   hatte nach dem Rahmen-Auftrag desselben Tages keine Aussenkante mehr und
+   verschwand auf der weissen Panel-Flaeche. Der Ton liegt bewusst zwischen
+   Panel-Weiss (#FFF) und dem BELEGTEN Spezialfeld (#D6D3D1) -- sichtbar,
+   aber weiter erkennbar als die weisse Spezialfliese (dome.rs::special).
+   ACHTUNG: der Inline-Style in app.js::spaceHTML ueberstimmt diese Zeile,
+   beide Stellen sind zusammen geaendert worden und muessen es bleiben. */
+.ds.S{background:#EAE7E1;border-style:dashed;border-color:#aaa}
+/* NUTZER-AUFTRAG 2026-08-19: nicht gelegte Felder ohne Rahmen und deutlich
+   runder (10px auf 22px Zelle -- testweise, war zuerst 7px). Die drei
+   Rahmen-Deklarationen der Regeln darueber (.ds.N/.W/.S, jeweils gestrichelt)
+   werden hier absichtlich ueberstimmt statt geloescht -- sie stehen mitten in
+   den Begruendungsbloecken zur offen/belegt-Unterscheidung, die weiter gelten.
+
+   `border:0` und NICHT `border-color:transparent`: background-origin ist
+   padding-box, die Sollfarbe deckt den 1px-Randbereich also nicht ab. Mit
+   transparentem Rand blieb dort die zweite Hintergrundschicht (#FAFAF9)
+   stehen -- genau das Weiss, das im Auftrag davor weggeraeumt wurde. Mit
+   Breite 0 gibt es keinen Randbereich mehr; die Zellgroesse haengt an den
+   festen Grid-Spuren von .d2x2 und aendert sich dadurch nicht.
+
+   Offene Felder sind ausserdem BEWUSST FLACH (Nutzer-Entscheid 2026-08-19,
+   Korrektur der ersten Fassung vom selben Tag): eine 22px-Zelle ist zu klein,
+   um Mulde UND randlose Sollfarbe gleichzeitig zu tragen, der Innenschatten
+   hat die Farbe nur verschmutzt. Vertieft bleiben die grossen LEEREN
+   KUPPELPLAETZE (.dslot, 58px). Deshalb steht hier keine box-shadow-Regel.
+
+   FOLGE, bewusst in Kauf genommen: das unbelegte SPEZIALFELD (.ds.S) ist nur
+   getoent und hat keine Aussenkante mehr -- es haengt am Label (◎ frei /
+   ⭐ gesperrt, app.js::spaceHTML). */
+.ds.N,.ds.W,.ds.S{border:0;border-radius:10px}
+/* OPACITY 2026-08-19 (Nutzer-Entscheid, TESTWEISE): .6 -> 1.
+   Der Beobachtung des Nutzers folgend: die 60 % haben nicht nur die Farbe
+   zurueckgenommen, sondern auch das Relief mitgedaempft -- der gelegte Stein
+   verlor genau den Tiefeneffekt, der ihn als gelegt kennzeichnen soll.
+
+   Damit faellt die Daempfung als Unterscheidungsmerkmal weg. Sie wird durch
+   drei andere getragen, die alle am selben Tag entstanden sind:
+     - Form:   offen 10px Radius (fast Kreis) vs. belegt 4px (Kachel)
+     - Symbol: offen traegt das Farbsymbol, belegt keins
+     - Relief: offen flach vs. belegt erhaben (Haptik-Block am Dateiende)
+
+   Damit ist der Entscheid vom 2026-08-09 ("BELEGTE leicht zurueckgenommen",
+   Kommentar bei `.ds.N` oben) in seiner opacity-Haelfte ueberholt. Die andere
+   Haelfte gilt weiter: UNBELEGTE Felder bleiben voll sichtbar. Wenn belegte
+   und unbelegte Felder sich jetzt zu aehnlich sind, ist der Rueckweg diese
+   eine Zahl -- nicht die Sichtbarkeit der unbelegten Felder. */
+.ds.filled{border-style:solid;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);opacity:1}
 .ds.filled.blau{background:var(--blau);color:#fff}
 .ds.filled.gelb{background:var(--gelb);color:#fff}
 .ds.filled.rot{background:var(--rot);color:#fff}
@@ -289,7 +370,24 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .bchip-half.tuerkis { background: var(--tuerkis); }
 
 /* Floor */
-.floor{display:flex;gap:3px;flex-wrap:wrap}
+/* Nutzer-Feedback 2026-08-19: das Areal der zerbrochenen Fliesen ist selbst
+   das Klickziel fuer "auf den Boden legen" -- der frueher eingeblendete
+   Button hat beim Auftauchen die Leiste verschoben (er sass im Flexcontainer,
+   s. app.js::renderBoard).
+
+   PADDING NUR VERTIKAL (4px 0). Gemessen: die Spalte ist 124px breit (der
+   Bonuschip-Kasten darunter gibt das Mass vor), die fuenf Slots brauchen
+   122px. Mit seitlichem Padding blieben 116px -- die Leiste brach in zwei
+   Zeilen um, also genau das Verruecken, das weg sollte. Die Hervorhebung
+   benutzt ausschliesslich outline, background und box-shadow -- alle drei
+   ohne Reflow.
+
+   Farbton bewusst Straf-Rot statt des Hinweis-Blaus von .chips-usable: der
+   Boden kostet Punkte, das soll die Markierung nicht verschweigen. */
+.floor{display:flex;gap:3px;flex-wrap:wrap;padding:4px 0;border-radius:7px}
+.floor-usable{background:#FEE2E2;outline:2.5px solid var(--rot);
+  box-shadow:0 0 0 3px rgba(220,38,38,.18);cursor:pointer}
+.floor-usable:hover{background:#FECACA}
 .fslot{width:22px;height:22px;border-radius:4px;background:var(--bg);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text3)}
 
 /* Factories */
@@ -326,7 +424,7 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .dgtile {
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 5px;
+  padding: 4px;  /* s. .dslot: macht Platz fuer die 48px-Platte */
   cursor: pointer;
   transition: all .1s;
   display: flex;
@@ -392,7 +490,7 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .ptile {
   border: 1.5px solid var(--border);
   border-radius: 7px;
-  padding: 5px;
+  padding: 4px;  /* s. .dslot: macht Platz fuer die 48px-Platte */
   cursor: pointer;
   transition: all .1s;
   display: flex;
@@ -459,3 +557,122 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 #teacher-toast.show{opacity:1;transform:translateY(0);pointer-events:all}
 #teacher-toast .tt-head{font-weight:700;font-size:12px;margin-bottom:3px}
 #teacher-toast .tt-sub{font-size:11px;color:var(--text2)}
+
+/* ============================================================================
+   HAPTIK-EBENE (Nutzer-Auftrag 2026-08-19)
+   "gelegte Fliesen heben sich deutlich vom flachen Spielplan ab, offene
+   Plaetze in Musterreihen und auf der Kuppel sind Vertiefungen."
+
+   Zwei Reliefs, konsequent in eine Richtung beleuchtet (Licht von oben):
+     --relief-up   Stein LIEGT AUF dem Plan: helle Glanzkante oben, dunkle
+                   Abrisskante unten, echter Schlagschatten nach unten.
+     --relief-down Platz ist ein LOCH im Plan: Schatten oben innen, heller
+                   Reflex an der unteren Innenkante, kein Schlagschatten.
+
+   WARUM AM DATEIENDE: die Farbklassen (.blau ... .tuerkis) setzen
+   `background` als KURZSCHREIBWEISE und wuerden ein weiter oben notiertes
+   `background-image` (den Glanz-Gradienten) auf `none` zuruecksetzen. Hier
+   gewinnt die Kaskade. Wer den Block verschiebt, verliert den Gradienten --
+   Rand und Schatten blieben, der Stein wuerde flach.
+   ============================================================================ */
+:root{
+  --relief-up:
+    inset 0 1.5px 0 rgba(255,255,255,.50),
+    inset 1.5px 0 0 rgba(255,255,255,.18),
+    inset -1.5px 0 0 rgba(0,0,0,.22),
+    inset 0 -2.5px 0 rgba(0,0,0,.34),
+    0 2px 3px -1px rgba(0,0,0,.34),
+    0 5px 9px -4px rgba(0,0,0,.34);
+  --relief-down:
+    inset 0 4px 6px -2px rgba(0,0,0,.34),
+    inset 0 2px 2px -1px rgba(0,0,0,.22),
+    inset 2px 0 3px -2px rgba(0,0,0,.16),
+    inset 0 -2px 0 rgba(255,255,255,.92);
+  /* Gewoelbte Steinoberflaeche. Liegt als background-IMAGE ueber der
+     Farbe der Farbklasse, faerbt also nicht selbst. */
+  --stone-face:linear-gradient(165deg,
+    rgba(255,255,255,.38) 0%,
+    rgba(255,255,255,.10) 34%,
+    rgba(0,0,0,.07) 60%,
+    rgba(0,0,0,.24) 100%);
+  --hollow-face:linear-gradient(180deg,rgba(0,0,0,.16),rgba(0,0,0,.02) 60%,rgba(255,255,255,.35) 100%);
+}
+
+/* --- Gelegte Steine: erhaben ---------------------------------------------- */
+.tile:not(.empty):not(.phantom){
+  background-image:var(--stone-face);
+  border-color:rgba(0,0,0,.30);
+  box-shadow:var(--relief-up);
+  text-shadow:0 1px 1px rgba(0,0,0,.45)
+}
+/* Die Auswahl-Markierung setzt selbst box-shadow (Amber-Halo) und wuerde das
+   Relief sonst loeschen -- beides zusammen statt gegeneinander. */
+.tile.sel:not(.empty):not(.phantom){
+  box-shadow:var(--relief-up),0 0 0 3px rgba(245,158,11,.3)
+}
+/* Phantom-Fliesen bleiben BEWUSST flach: sie sind per Bonuschip virtuell
+   ergaenzt, liegen also physisch nicht auf dem Brett (siehe .tile.phantom
+   weiter oben). Flach vs. erhaben ist damit zusaetzlich zur Fuellung ein
+   zweites Unterscheidungsmerkmal. */
+.tile.phantom{box-shadow:none}
+
+/* --- Offene Plaetze in den Musterreihen: Vertiefung ----------------------- */
+.tile.empty{
+  background:#E3DFD6;
+  background-image:var(--hollow-face);
+  border:1px solid rgba(0,0,0,.10);
+  box-shadow:var(--relief-down)
+}
+/* Bodenreihe + Startspieler-Platzhalter gehoeren zur selben Familie offener
+   Plaetze und sitzen direkt neben den Musterreihen -- gleiche Vertiefung,
+   sonst liest sich die eine flache Zeile wie ein Fehler. */
+.fslot{
+  background:#E3DFD6;
+  background-image:var(--hollow-face);
+  border:1px solid rgba(0,0,0,.10);
+  box-shadow:var(--relief-down)
+}
+/* Der Startspielerstein-Slot ist Marker, kein Loch -- Rand/Fuellung kommen
+   aus .marker-empty/.marker-taken oben, hier nur die Vertiefung abschalten. */
+.fslot.marker-empty,.fslot.marker-taken{
+  background-image:none;box-shadow:none;border-width:1px;border-style:solid
+}
+
+/* --- Kuppel: leerer Kuppelplatz als Vertiefung ---------------------------- */
+/* Leerer 3x3-Platz (noch keine Kuppelplatte gelegt) = tiefste Mulde. Die
+   offenen Felder AUF einer Platte sind dagegen flach, s. `.ds.N,.ds.W,.ds.S`
+   weiter oben (Nutzer-Entscheid 2026-08-19). */
+.dslot:not(.occ){box-shadow:var(--relief-down)}
+/* Fuellung/Rand nur im NEUTRALEN Zustand -- .cando (lila) und .start (amber)
+   markieren legale Ziele und haben gleiche Spezifitaet; ohne die :not()-Kette
+   wuerde die Mulde hier deren Hervorhebung ueberschreiben. */
+.dslot:not(.occ):not(.cando):not(.start){
+  background:#E7E4DC;
+  background-image:var(--hollow-face);
+  border-color:rgba(0,0,0,.10)
+}
+/* Belegtes Kuppelfeld = gelegter Stein, also erhaben. Der Gradient muss je
+   Farbklasse notiert werden, weil `.ds.filled.<farbe>{background:...}` (drei
+   Klassen) ein Kurzschreibweise-background setzt und eine 2-Klassen-Regel
+   damit ueberstimmen wuerde.
+
+   ANGLEICHUNG 2026-08-19 (Nutzer-Frage "warum sehen die anders aus"): das
+   Kuppelfeld trug bis hierher ein abgeschwaechtes Relief (3 Schattenlagen
+   statt 6, Radius 3px, Rand 1px) -- gelegter Stein auf der Musterreihe und
+   gelegter Stein auf der Kuppel sahen also unterschiedlich aus, ohne dass es
+   dafuer einen Grund in der Spiellogik gab. Jetzt beide identisch: gleiches
+   Relief, 4px Radius, 1.5px Rand. Die Randbreite war der letzte verbliebene
+   Unterschied und in der ersten Kontrolle durchgerutscht, weil der Browser
+   beide Werte auf dieselben 0.8px Geraetepixel gerundet hatte.
+
+   Der urspruengliche Grund fuer die schwache Variante ist NICHT erfunden,
+   sondern nur ueberholt: bei den damaligen 60 % Deckkraft wurde das volle
+   Relief matschig. Wenn der Schatten in den Luecken zwischen den vier Zellen
+   zu dick wirkt, ist der Zwischenweg, hier NUR die zweite Schlagschatten-Lage
+   (`0 5px 9px -4px`) wegzulassen, statt wieder ein eigenes Relief aufzubauen.
+   Die Zellgroesse bleibt 22px (globales box-sizing:border-box). */
+.ds.filled{box-shadow:var(--relief-up);border:1.5px solid rgba(0,0,0,.30);border-radius:4px}
+.ds.filled.blau,.ds.filled.gelb,.ds.filled.rot,
+.ds.filled.schwarz,.ds.filled.tuerkis,.ds.filled.special{
+  background-image:var(--stone-face)
+}

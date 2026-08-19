@@ -694,12 +694,15 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
   } else {
     // Nutzer-Feedback 2026-08-07: gesperrtes Spezialfeld zeigt den gelben
     // Stern der Spezial-Rueckseite (⭐, s. stackTopTypeIcon) statt 🔒.
-    // Nutzer 2026-08-09: unbelegtes Spezialfeld = WEISSER Hintergrund (die
-    // Spezialfliese ist weiss, `dome.rs::special()` -- "Special-Space
-    // (weiss)"), voll sichtbar. ACHTUNG: dieser Inline-Style ueberstimmt
-    // `.ds.S` im CSS -- beide Stellen muessen zusammen geaendert werden,
-    // sonst zeigt die Datei eine Farbe und die Seite eine andere.
-    bg = 'background:#fff;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '⭐' : '◎';
+    // Nutzer 2026-08-09: unbelegtes Spezialfeld voll sichtbar (die Spezial-
+    // fliese ist weiss, `dome.rs::special()` -- "Special-Space (weiss)").
+    // NACHTRAG 2026-08-19 (Nutzer): reines Weiss ist es nicht mehr -- seit die
+    // offenen Felder ihren gestrichelten Rahmen verloren haben, hatte das Feld
+    // auf der weissen Panel-Flaeche keine Kante mehr. Jetzt leicht getoent.
+    // ACHTUNG: dieser Inline-Style ueberstimmt `.ds.S` im CSS -- beide Stellen
+    // muessen zusammen geaendert werden, sonst zeigt die Datei eine Farbe und
+    // die Seite eine andere. Am 2026-08-19 beide auf #EAE7E1 gesetzt.
+    bg = 'background:#EAE7E1;'; cls = `ds S${sp.locked?' locked':''}`; lbl = sp.locked ? '⭐' : '◎';
   }
   
   if(tiling && si >= 0) {
@@ -955,9 +958,16 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
     <div class="board-inner">
       <div>
         <div class="lbl">Zerbrochene Fliesen</div>
-        <div class="floor">${markerHTML}${floorHTML}
-          ${sel&&isActive?`<button class="btn danger" style="padding:2px 8px;font-size:10px" onclick="onFloorDirect()">→ Boden</button>`:''}
-        </div>
+        ${/* Nutzer-Feedback 2026-08-19: der frueher hier stehende Button
+             "→ Boden" ist ersatzlos entfernt. Er wurde erst bei ausgewaehlter
+             Fliese eingeblendet und sass IM .floor-Flexcontainer -- sein
+             Auftauchen verschob die ganze Leiste. Jetzt ist das AREAL selbst
+             das Klickziel (gleiche Idee wie der Bonuschip-Kasten
+             .chips-usable), markiert nur ueber outline/background/cursor,
+             also ohne Einfluss auf den Layoutfluss. Bedingung unveraendert:
+             sel && isActive. */''}
+        <div class="floor${sel&&isActive?' floor-usable':''}"
+             ${sel&&isActive?'onclick="onFloorDirect()" title="Gewählte Fliesen hier ablegen — kostet Strafpunkte"':''}>${markerHTML}${floorHTML}</div>
 
         ${(() => { trackChipGhosts(pi, p.bonus_chips || []); return ''; })()}
         <div class="${chipAreaClickable ? 'chips-usable' : ''}"
@@ -1033,8 +1043,14 @@ function syncDomeHeight(pi) {
     slot.style.height = '58px';
     const d2 = slot.querySelector('.d2x2');
     if(d2) {
-      d2.style.height = '46px';
-      d2.style.width = '46px';
+      // 46 -> 48px (2026-08-19, Luecke zwischen den Feldern 2 -> 4px). Diese
+      // Zuweisung ueberstimmt die Breite aus `.d2x2` in style.css und regiert
+      // das SPIELBRETT -- wer die Luecke im CSS aendert, muss hier mit. Sie
+      // wird per CSSOM gesetzt und ist deshalb nicht per Textsuche nach
+      // `width:46px` zu finden; genau daran ist die Umstellung zuerst
+      // vorbeigelaufen.
+      d2.style.height = '48px';
+      d2.style.width = '48px';
     }
   });
 }
@@ -1236,7 +1252,7 @@ function renderCenter() {
     // weder Tooltip noch Label zeigen sie mehr. `data-tile-id` bleibt (interne
     // Zuordnung fuer den Klick-Handler, kein sichtbarer Text).
     return `<div class="dgtile" data-tile-id="${t.id}" title="Kuppelplatte – anklicken zum Legen" onclick="openDisplayPicker(${t.id})" style="cursor:pointer">
-      <div class="d2x2" style="width:46px; height:46px;">${spaces}</div>
+      <div class="d2x2" style="width:48px; height:48px;">${spaces}</div>
     </div>`;
   }).join('');
 
@@ -1841,7 +1857,7 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
       const div = document.createElement('div');
       div.className='ptile'; div.dataset.id=t.id;
       // Punkt 8: keine Platten-ID mehr anzeigen (nur intern per data-id).
-      div.innerHTML=`<div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>`;
+      div.innerHTML=`<div class="d2x2" style="width:48px; height:48px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>`;
       div.addEventListener('click',()=>{
         domeModal.tile_id=t.id;
         grid.querySelectorAll('.ptile').forEach(e=>e.classList.remove('sel'));
@@ -1973,7 +1989,7 @@ function stackStopAndChoose() {
 
     // Punkt 8: keine Platten-ID mehr anzeigen (nur intern per data-id).
     div.innerHTML = `
-      <div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>`;
+      <div class="d2x2" style="width:48px; height:48px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>`;
 
     div.addEventListener('click', () => {
       domeModal.tile_id = t.id;
@@ -2040,7 +2056,7 @@ function renderReturnOrderPicker() {
     // Punkt 8: keine Platten-ID mehr anzeigen -- der Order-Badge ("#1", "#2", ...)
     // ist keine Platten-ID, sondern die vom Spieler gewaehlte Rueckleg-Position.
     div.innerHTML = `
-      <div class="d2x2" style="width:46px; height:46px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
+      <div class="d2x2" style="width:48px; height:48px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>
       <div class="order-badge" style="font-size:10px; font-weight:bold;">${placedAt !== -1 ? '#' + (placedAt + 1) : ''}</div>`;
 
     div.addEventListener('click', () => {
