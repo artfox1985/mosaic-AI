@@ -203,6 +203,16 @@ drei Arme liefen auf Brett 0, der Seiteneffekt ist unkontrolliert).
 Seeds sind ~150 Partien k1-aktiv; ob 13 % gegen 22 % auf Block-Ebene mit nB=6
 aufloest, ist **offen** und keine Annahme).
 
+**AUSGERECHNET (2026-08-19, Monte-Carlo, 20.000 Wiederholungen, 6 Bloecke a
+25, Block-Korrelation als Beta-Mischung bis ICC 0,1):** die Schwellen loesen
+auf. P(Rate >= 22 % | wahre Rate 13 %) = 0,2-5,4 % je nach ICC — ein
+Fehlsignal aus der heutigen Grundrate ist also selten. P(Rate >= 22 % |
+wahre Rate 30 %) = 89-99 %. Erwartbar und kein Mangel: liegt die wahre Rate
+GENAU auf einer Schwelle, ist deren Ueberschreiten ein Muenzwurf (~51 % fuer
+beide Stufen) — genau dafuer ist die Zweistufigkeit da. Lesart: "kein
+Signal" (< 22 %) ist bei echter Grundrate fast sicher korrekt, ein echter
+30-%-Effekt wird fast sicher mindestens als "Signal" erkannt.
+
 **WAS DIESER VERSUCH NICHT ENTSCHEIDET** (vorab, damit es hinterher nicht
 umgedeutet wird):
 
@@ -235,6 +245,15 @@ Korpus ohne Frage dahinter.
 1. **Kostenrechnung** — Korpusgroesse mal Partiekosten, ausgerechnet und hier
    nachgetragen (der Destillations-Korpus waren 8.000 Partien; die Uebertragung
    ist **ungerechnet**).
+   **AUSGERECHNET (2026-08-19, aus den Datei-Zeitstempeln des
+   Ownership-Korpus vom 14.08.):** der Netz-Arm `v21_own_a` (Champion beide
+   Seiten, 200 Sims, 8 Threads) lief mit **10,3 Partien/min** — die beste
+   Naeherung fuer den asymmetrischen Arm (der Bauer-Vorzug selbst ist
+   billig). Damit: **Arm S 8.000 Partien ~ 13 h, Arm N nochmal ~ 13 h,
+   zusammen ~ 26 h** sequenziell. Halber Umfang (2 x 4.000) waere ~ 13 h;
+   ob das reicht, haengt an der Sperre par.5 (Raten-Differenz), nicht an
+   der Arena — die par.7-Messung laeuft ohnehin auf den 407 Seeds.
+   Umfang ist Nutzer-Entscheid beim Freigeben.
 2. Umbau `self_play.rs` (zweiter Agent, `[p0, p1]`), Wheel neu bauen. **Ein
    gruener `cargo test` heisst nicht, dass die Arena den Code sieht** —
    Zahlengleichheit bei gleichen Seeds waere Alarm, kein Befund.
