@@ -886,6 +886,18 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
   export MOSAIC_CARRIER_MANIFEST="policy_carrier_manifest_v21.json"
   ```
   
+  **DRITTER Beinahe-Fehler derselben Klasse (2026-08-19): die Regex-Datei
+  veraltet.** Das b18-FENSTER (Korpus-Sockel-Linie: b18/b19/b23/b24) schliesst
+  zusaetzlich `selfplay_v19wdlsw_` aus — `v21_exclude_regex.txt` enthaelt das
+  NICHT. Ein b24-Start mit der txt-Datei lud 3371 statt 2945 Dateien (800
+  v19wdlsw zu viel); aufgefallen an der Kompositions-Zeile VOR dem Cache-Bau,
+  Lauf gestoppt und neu gestartet. **Regel: das Exclude fuer einen
+  Wiederholungs-/Nachfolgelauf IMMER aus dem `data_exclude`-Feld des
+  REFERENZ-Manifests ziehen** (materialisiert:
+  `evaluations/b18_window_exclude_regex.txt` aus dem b23-Manifest), nie aus
+  einer benannten txt-Datei, deren Stand niemand prueft. Fuer die
+  b18-Linie gilt zudem `MOSAIC_CARRIER_MANIFEST="policy_carrier_manifest_own.json"`.
+  
   `MOSAIC_CARRIER_MANIFEST` wurde beim `t_d_vw08`-Start VERGESSEN. Der
   Default ist `policy_carrier_manifest_v20.json`, also ein ANDERER
   Traeger-Satz: der Arm haette mit einer anderen Policy-Maske als
