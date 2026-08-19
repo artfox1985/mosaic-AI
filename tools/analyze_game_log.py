@@ -56,6 +56,7 @@ import json
 import re
 import sys
 import time
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -578,8 +579,9 @@ class Replayer:
         if self.dump_fh is not None:
             self.dump_fh.write(json.dumps({
                 "turn": self.turn_idx, "round": rec.round_num, "kind": kind,
-                "player": getattr(rec, "player", None),
-                "played": getattr(rec, "played_desc", None),
+                "player": rec.actor,
+                "played": rec.played_desc,
+                "fields": fields,
                 "state": json.loads(self.g.state_json()),
             }, ensure_ascii=False) + chr(10))
         if rec.round_num >= 5:
@@ -973,6 +975,9 @@ def main() -> None:
     ap.add_argument("--dump-states", default=None,
                     help="JSONL-Datei mit dem Zustand an JEDEM Entscheidungspunkt "
                          "(Pruefstand fuer Drafting/Tiling-Debugging)")
+    ap.add_argument("--oracle-json", default=None,
+                    help="JSONL-Datei mit den Oracle-Records (maschinenlesbar; "
+                         "Verbraucher: PREREG_human_game_oracle_gap.md par.4)")
     ap.add_argument("--out", default=None, help="Ziel-Markdown-Datei (Default: evaluations/game_analysis_<logname>.md)")
     args = ap.parse_args()
 
@@ -988,6 +993,14 @@ def main() -> None:
     if getattr(rep, "dump_fh", None) is not None:
         rep.dump_fh.close()
         print(f"  Zustands-Dump: {args.dump_states}")
+    if args.oracle_json:
+        # Maschinenlesbare Fassung dessen, was der Markdown-Report aus
+        # `oracle_records` rendert -- damit die par.4-Klassifikation
+        # (PREREG_human_game_oracle_gap.md) nicht den Report parsen muss.
+        with open(args.oracle_json, "w", encoding="utf-8") as fh:
+            for rec in rep.oracle_records:
+                fh.write(json.dumps(dataclasses.asdict(rec), ensure_ascii=False) + "\n")
+        print(f"  Oracle-JSONL: {args.oracle_json}")
     elapsed = time.time() - t0
     n_lines_total = len(lines)
     if divergence:
