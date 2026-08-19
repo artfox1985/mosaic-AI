@@ -46,7 +46,8 @@ Abschnitts-Header `## Task #NN: ...`).
 **Verworfen** als Fehltreffer (mit Beleg, warum):
 - `#0`, `#1`, `#9` in `evaluations/reference_game.md:11` ("Kuppelplatten
   im Display: #9, #0, #1") -- physische Spielplatten-IDs in einem
-  Partie-Log, keine Task-Bezuege.
+  Partie-Log, keine Task-Bezuege. (Datei 2026-08-19 entfernt; der
+  Fehltreffer-Beleg bleibt hier stehen.)
 - `#5`, `#6`, `#10` in `evaluations/watchlist_v20_interim_review.md:91`
   ("...in 3 von 10 Partien aktiv (#5, #6, #10)") -- Partienummern
   innerhalb eines 10er-Testsets, keine Tasks.
