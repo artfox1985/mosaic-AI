@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mosaic-AI — KI Debugger</title>
+<title>Mosaic-AI - KI Debugger</title>
 <style>
   :root {
     --bg: #0f1419;
@@ -141,7 +141,7 @@
     <button id="btnLoad">⟳ Historie laden</button>
     <button id="btnFirst" class="secondary">⏮</button>
     <button id="btnPrev" class="secondary">◀</button>
-    <span id="navInfo" style="min-width:90px;text-align:center;color:var(--muted)">– / –</span>
+    <span id="navInfo" style="min-width:90px;text-align:center;color:var(--muted)">- / -</span>
     <button id="btnNext" class="secondary">▶</button>
     <button id="btnLast" class="secondary">⏭</button>
   </div>
@@ -158,22 +158,22 @@
     <h2>Stellungsbewertung (Value-Head)</h2>
     <div class="value-display">
       <div class="value-gauge"><div class="value-fill" id="valueFill" style="width:50%">50%</div></div>
-      <div class="value-num" id="valueNum">–</div>
+      <div class="value-num" id="valueNum">-</div>
     </div>
     <div class="meta-row">
-      <span>KI-Zug Nr: <b id="moveIdx">–</b></span>
-      <span>Runde: <b id="roundNum">–</b></span>
-      <span>Aktueller Spieler: <b id="curPlayer">–</b></span>
-      <span>KI-Spieler: <b id="aiPlayer">–</b></span>
-      <span>Gültige Aktionen: <b id="numActions">–</b></span>
-      <span>Simulationen: <b id="numSims">–</b></span>
-	  <span>Max. Suchtiefe: <b id="maxDepth" style="color: var(--accent);">–</b></span>
+      <span>KI-Zug Nr: <b id="moveIdx">-</b></span>
+      <span>Runde: <b id="roundNum">-</b></span>
+      <span>Aktueller Spieler: <b id="curPlayer">-</b></span>
+      <span>KI-Spieler: <b id="aiPlayer">-</b></span>
+      <span>Gültige Aktionen: <b id="numActions">-</b></span>
+      <span>Simulationen: <b id="numSims">-</b></span>
+	  <span>Max. Suchtiefe: <b id="maxDepth" style="color: var(--accent);">-</b></span>
     </div>
     <div id="valueBreakdown" class="value-breakdown" style="display:none"></div>
   </div>
 
   <div class="panel full">
-    <h2>Zug-Analyse — Netz-Policy vs. MCTS-Suche</h2>
+    <h2>Zug-Analyse - Netz-Policy vs. MCTS-Suche</h2>
     <div id="movesContainer"><div class="empty">Noch keine Analyse geladen. Klicke „Historie laden".</div></div>
     <div class="legend">
       <span><span class="cat-dot cat-row"></span>Reihe (punkteträchtig)</span>
@@ -213,7 +213,7 @@ async function api(path, method='GET', body=null) {
 }
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
 function catClass(cat) { return 'cat-' + cat; }
-function fmtNum(x, digits=3) { return (x === null || x === undefined) ? '–' : Number(x).toFixed(digits); }
+function fmtNum(x, digits=3) { return (x === null || x === undefined) ? '-' : Number(x).toFixed(digits); }
 
 // ── Task #95: Value-Head-Breakdown (Anforderung 1) ──────────────────────────
 function renderValueBreakdown(vd) {
@@ -230,7 +230,7 @@ function renderValueBreakdown(vd) {
     const diff = 50 * Math.atanh(p);
     pointsDiffTxt = (diff >= 0 ? '+' : '') + diff.toFixed(1);
   }
-  const itemTxt = (label, txt) => `<div class="vb-item"><div class="vb-num">${txt ?? '–'}</div><div class="vb-label">${label}</div></div>`;
+  const itemTxt = (label, txt) => `<div class="vb-item"><div class="vb-num">${txt ?? '-'}</div><div class="vb-label">${label}</div></div>`;
   box.innerHTML =
     item('Roh-Value (tanh)', vd.raw_value) +
     itemTxt('Prognose Δ-Endpunkte (KI−Gegner)', pointsDiffTxt) +
@@ -246,7 +246,7 @@ function renderValueBreakdown(vd) {
     // besonders in Runde 5 (frozen_eval_set-Kalibrierung: r=0.68 vs. 0.79-0.93
     // in Runde 1-4, 8.1% starke Widersprueche vs. 0% in Runde 1-4).
     `<div class="vb-item" style="grid-column:1/-1;font-size:11px;color:var(--muted);text-align:left;padding-top:2px">` +
-    `Win%- und Δ-Punkte-Kopf sind unabhängige Netzköpfe (kein Blend, POINTS_UTILITY_WEIGHT=0) — Abweichungen sind erwartbar, besonders in Runde 5.` +
+    `Win%- und Δ-Punkte-Kopf sind unabhängige Netzköpfe (kein Blend, POINTS_UTILITY_WEIGHT=0) - Abweichungen sind erwartbar, besonders in Runde 5.` +
     `</div>`;
 }
 
@@ -274,7 +274,7 @@ function renderTrace(gt) {
 
   // (c) Sequential-Halving-Phasen
   for (const p of (gt.phases || [])) {
-    html += `<div class="trace-phase"><h4>Phase ${p.phase} — ${p.sims_per_survivor} Sims je Überlebendem</h4>`;
+    html += `<div class="trace-phase"><h4>Phase ${p.phase} - ${p.sims_per_survivor} Sims je Überlebendem</h4>`;
     html += `<table class="trace-table"><thead><tr><th>Zug</th><th class="num">Visits</th><th class="num">Q</th><th class="num">σ(Q)</th><th class="num">Score</th></tr></thead><tbody>`;
     for (const cand of p.candidates) {
       html += `<tr class="${cand.eliminated ? 'trace-elim' : ''}"><td>${cand.description}</td>` +
@@ -317,15 +317,15 @@ function renderAnalysis(d) {
     fill.style.background = 'var(--border)';
     document.getElementById('valueNum').textContent = 'kein Netz';
   }
-  document.getElementById('moveIdx').textContent = d.move_idx ?? '–';
-  document.getElementById('roundNum').textContent = d.round ?? '–';
+  document.getElementById('moveIdx').textContent = d.move_idx ?? '-';
+  document.getElementById('roundNum').textContent = d.round ?? '-';
   document.getElementById('curPlayer').textContent = 'P' + (d.current_player + 1);
-  document.getElementById('aiPlayer').textContent = (d.ai_player !== null && d.ai_player !== undefined) ? 'P' + (d.ai_player + 1) : '–';
+  document.getElementById('aiPlayer').textContent = (d.ai_player !== null && d.ai_player !== undefined) ? 'P' + (d.ai_player + 1) : '-';
   document.getElementById('numActions').textContent = (d.num_actions_considered !== undefined && d.num_actions_considered !== null)
     ? `${d.num_actions_considered}/${d.num_actions}`
     : d.num_actions;
   document.getElementById('numSims').textContent = d.simulations;
-  document.getElementById('maxDepth').textContent = d.max_depth !== undefined ? d.max_depth : '–';
+  document.getElementById('maxDepth').textContent = d.max_depth !== undefined ? d.max_depth : '-';
   renderValueBreakdown(d.value_debug);
 
   const moves = d.moves || [];
@@ -366,7 +366,7 @@ function renderAnalysis(d) {
     }
 
     const netLeafCell = hasNet
-      ? `<td class="num">${m.net_leaf_value != null ? (m.net_leaf_value*100).toFixed(1) + '%' : '–'}</td>`
+      ? `<td class="num">${m.net_leaf_value != null ? (m.net_leaf_value*100).toFixed(1) + '%' : '-'}</td>`
       : '';
 	html += `<tr${rowStyle}>
       <td><span class="cat-dot ${catClass(m.category)}"></span>${m.description}${chosenMark}
@@ -374,9 +374,9 @@ function renderAnalysis(d) {
       ${netCell}
       <td class="num bar-cell"><div class="bar bar-mcts" style="width:${mctsW}%"></div>
           <span class="bar-label">${m.mcts_visits} (${(m.mcts_share*100).toFixed(0)}%)</span></td>
-      <td class="num">${m.mcts_win_pct != null ? m.mcts_win_pct.toFixed(1) + '%' : '–'}</td>
+      <td class="num">${m.mcts_win_pct != null ? m.mcts_win_pct.toFixed(1) + '%' : '-'}</td>
       ${netLeafCell}
-      <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '–'}</td>
+      <td class="num" style="color: var(--accent); font-weight: bold;">${m.max_depth !== undefined ? m.max_depth : '-'}</td>
       ${divCell}
     </tr>`;
   }
@@ -389,7 +389,7 @@ function renderTree(d) {
   const c = document.getElementById('treeContainer');
   const t = d && d.tree;
   if (!t) { c.innerHTML = '<div class="empty">Kein Baum für diesen Zug (z.B. Tiling/DFS).</div>'; return; }
-  const win = (t.win_pct != null) ? t.win_pct.toFixed(1) + '%' : '–';
+  const win = (t.win_pct != null) ? t.win_pct.toFixed(1) + '%' : '-';
   c.innerHTML =
     `<div class="root-summary">` +
     `<b>Wurzel</b> · N=${t.visits} · Q ${win} · max. Tiefe ${t.depth} · ${t.n_children} Kinder` +
@@ -408,7 +408,7 @@ function showIdx(i) {
   const valStr = (d.value != null)
     ? `Value ${d.value.toFixed(3)} (Win ${Number(d.win_pct).toFixed(2)}%)`
     : (chosen && chosen.mcts_win_pct != null ? `Win ${chosen.mcts_win_pct.toFixed(0)}%` : 'Heuristik');
-  setStatus(`KI-Zug ${d.move_idx} (Runde ${d.round ?? '?'}): ${chosen ? chosen.description : 'Aktion '+d.ai_action} — ${valStr}`);
+  setStatus(`KI-Zug ${d.move_idx} (Runde ${d.round ?? '?'}): ${chosen ? chosen.description : 'Aktion '+d.ai_action} - ${valStr}`);
 }
 
 async function loadHistory(keepIdx=false) {

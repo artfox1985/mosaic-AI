@@ -78,7 +78,7 @@ function _ratingBadgeHTML(pi) {
   const prof = pi === 0 ? RATING_INFO.p0 : RATING_INFO.p1;
   if (!prof) return '';
   if (RATING_INFO.unrated) {
-    return ` <span class="rating-badge unrated" title="KI-Tipps genutzt — diese Partie zählt nicht fürs Rating">ungewertet</span>`;
+    return ` <span class="rating-badge unrated" title="KI-Tipps genutzt - diese Partie zählt nicht fürs Rating">ungewertet</span>`;
   }
   return ` <span class="rating-badge" title="Profil-Rating (Elo)">${Math.round(prof.rating)}</span>`;
 }
@@ -967,7 +967,7 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
              also ohne Einfluss auf den Layoutfluss. Bedingung unveraendert:
              sel && isActive. */''}
         <div class="floor${sel&&isActive?' floor-usable':''}"
-             ${sel&&isActive?'onclick="onFloorDirect()" title="Gewählte Fliesen hier ablegen — kostet Strafpunkte"':''}>${markerHTML}${floorHTML}</div>
+             ${sel&&isActive?'onclick="onFloorDirect()" title="Gewählte Fliesen hier ablegen - kostet Strafpunkte"':''}>${markerHTML}${floorHTML}</div>
 
         ${(() => { trackChipGhosts(pi, p.bonus_chips || []); return ''; })()}
         <div class="${chipAreaClickable ? 'chips-usable' : ''}"
@@ -1116,15 +1116,15 @@ function renderCenter() {
     _notifyGameEnd();
   }
   const tilingStatus = S.phase==='tiling'
-    ? (tilingRow!==null ? `TILING — Reihe ${tilingRow+1} legen` : 'PHASE 2: Reihe anklicken')
+    ? (tilingRow!==null ? `TILING - Reihe ${tilingRow+1} legen` : 'PHASE 2: Reihe anklicken')
     : '';
-  badge.textContent = S.phase==='drafting'?`Phase 1 — ${S.players[S.current_player].name}`
+  badge.textContent = S.phase==='drafting'?`Phase 1 - ${S.players[S.current_player].name}`
     :S.phase==='tiling'? tilingStatus
-    :S.phase==='end'?'SPIELENDE':'—';
+    :S.phase==='end'?'SPIELENDE':'-';
 
   const info = document.getElementById('info-area');
   if(sel) {
-    info.innerHTML=`<div class="info sel">🎨 <strong>${sel.color}</strong> ausgewählt — Musterreihe wählen oder → Boden</div>`;
+    info.innerHTML=`<div class="info sel">🎨 <strong>${sel.color}</strong> ausgewählt - Musterreihe wählen oder → Boden</div>`;
   } else if(S.phase==='tiling') {
     const placeableRows = (S.valid_tiling_rows||[]); 
     const allComplete = S.players.flatMap((p,pi)=>
@@ -1179,7 +1179,7 @@ function renderCenter() {
       infoHTML = `<div class="info tiling" style="display:flex;align-items:center;justify-content:space-between">
         <span>→ <strong>${S.players[tilingPi].name}</strong> Reihe ${tilingRow+1}
           <span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px"></span>
-          — passendes Kuppelfeld anklicken
+          - passendes Kuppelfeld anklicken
         </span>
         <button class="btn" onclick="tilingPi=null;tilingRow=null;render()" style="font-size:10px;flex-shrink:0">✕</button>
       </div>`;
@@ -1192,7 +1192,7 @@ function renderCenter() {
         </span>`
       ).join(' ');
       infoHTML = `<div class="info tiling">
-        <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen — anklicken zum Legen:</div>
+        <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen - anklicken zum Legen:</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">${rows}</div>
       </div>`;
     } else if(chippable.length>0) {
@@ -1223,7 +1223,7 @@ function renderCenter() {
         <button class="btn" onclick="openScoringModal()" style="margin-top:4px;width:100%;font-size:10px">⚙️ Wertungsplatten ändern</button>
       </div>`;
     } else {
-      info.innerHTML=`<div class="info tiling">🏁 <strong>${w}</strong> — ${p0.name}: ${p0.score} | ${p1.name}: ${p1.score}</div>`;
+      info.innerHTML=`<div class="info tiling">🏁 <strong>${w}</strong> - ${p0.name}: ${p0.score} | ${p1.name}: ${p1.score}</div>`;
     }
   } else {
     const pending = S.players.filter(p=>!p.start_placed);
@@ -1251,7 +1251,7 @@ function renderCenter() {
     // Spieler irrelevant (die Platte ist an ihrem Farbmuster erkennbar) --
     // weder Tooltip noch Label zeigen sie mehr. `data-tile-id` bleibt (interne
     // Zuordnung fuer den Klick-Handler, kein sichtbarer Text).
-    return `<div class="dgtile" data-tile-id="${t.id}" title="Kuppelplatte – anklicken zum Legen" onclick="openDisplayPicker(${t.id})" style="cursor:pointer">
+    return `<div class="dgtile" data-tile-id="${t.id}" title="Kuppelplatte - anklicken zum Legen" onclick="openDisplayPicker(${t.id})" style="cursor:pointer">
       <div class="d2x2" style="width:48px; height:48px;">${spaces}</div>
     </div>`;
   }).join('');
@@ -1353,7 +1353,7 @@ function renderCenter() {
     // selektieren -- Nutzer-Befund 2026-08-18. Layout hier inline, ohne Zeiger
     // und ohne Hover-Effekt.
     return `<div style="display:flex;align-items:center;gap:2px;padding:2px;cursor:default" `
-         + `title="${n}× ${c} — Entnahme ueber &quot;Geteilte Mondfliesen&quot;">${tiles}</div>`;
+         + `title="${n}× ${c} - Entnahme ueber &quot;Geteilte Mondfliesen&quot;">${tiles}</div>`;
   }).join('');
 
   const moonTopCounts = S.moon_top_counts || {};
@@ -1489,7 +1489,7 @@ const sdiv = document.getElementById('scoring-display');
 
   if(!S.valid_moves || S.valid_moves.length === 0) {
     if (vmCountEl) vmCountEl.textContent = '';
-    vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Keine Aktionen — Passen möglich</div>`;
+    vmDiv.innerHTML = `<div class="le" style="color:var(--text3);font-style:italic">Keine Aktionen - Passen möglich</div>`;
     return;
   }
   if (vmCountEl) vmCountEl.textContent = `(${S.valid_moves.length})`;
@@ -1550,7 +1550,7 @@ const sdiv = document.getElementById('scoring-display');
     lines.push(`<div class="le" style="padding:2px 0">🎴 Bonusplättchen: ${fnames}</div>`);
   }
 
-  vmDiv.innerHTML = lines.join('') || `<div class="le" style="color:var(--text3)">—</div>`;
+  vmDiv.innerHTML = lines.join('') || `<div class="le" style="color:var(--text3)">-</div>`;
 }
 
 // -- INTERACTION ---------------------------------------------------------------
@@ -1628,7 +1628,7 @@ function openChipModal(pi, ri) {
     confirmedGroups: [],
   };
   document.getElementById('chip-title').textContent =
-    `Reihe ${ri+1} (${row.color}) — fehlen ${chipModal.missing} Fliese(n)`;
+    `Reihe ${ri+1} (${row.color}) - fehlen ${chipModal.missing} Fliese(n)`;
   document.getElementById('chip-info').textContent =
     `Wähle je Gruppe: 2 gleichfarbige ODER 3 beliebige Plättchen = 1 Fliese ersetzen`;
   renderChipModal();
@@ -1688,7 +1688,7 @@ function renderChipModal() {
   addBtn.disabled=!valid;
   addBtn.textContent= same2?'→ 2 gleichfarbige = 1 Fliese hinzufügen'
     :any3?'→ 3 beliebige = 1 Fliese hinzufügen'
-    :`Auswahl (${selectionIds.length}) — 2 gleiche oder 3 beliebige`;
+    :`Auswahl (${selectionIds.length}) - 2 gleiche oder 3 beliebige`;
 
   const gArea=document.getElementById('chip-groups-area');
   const gDiv=document.getElementById('chip-groups');
@@ -1938,7 +1938,7 @@ function renderStackPeekState() {
   const typeIcons = pending.map(t => t.bonus > 0 ? '⭐' : WILD_BACK_ICON).join(' ');
   const statusEl = document.getElementById('stack-peek-status');
   if(statusEl) {
-    statusEl.innerHTML = `${n}. Platte gezogen. Rückseiten bisher: ${typeIcons} — bisher −${n} Pkt.<br>
+    statusEl.innerHTML = `${n}. Platte gezogen. Rückseiten bisher: ${typeIcons} - bisher −${n} Pkt.<br>
       <span style="font-size:9px">Vorderseiten siehst du erst, wenn du aufhörst.</span>`;
   }
   const moreBtn = document.getElementById('stack-peek-more-btn');
@@ -2223,7 +2223,7 @@ function renderMoonModal() {
     const div = document.createElement('div');
     div.className = `tile ${normColor(item.color)} click`;
     div.style.cursor = 'pointer';
-    div.title = `${item.color} — klicken zum Stapeln`;
+    div.title = `${item.color} - klicken zum Stapeln`;
     div.addEventListener('click', () => addToMoonStack(item.uid));
     tilesDiv.appendChild(div);
   });
@@ -2249,7 +2249,7 @@ function renderMoonModal() {
       div.style.opacity = isTop ? '1' : '.85';
       div.style.cursor = 'pointer';
       div.title = (isTop ? 'Oben (sichtbar im Mondbereich)' : `${origIndex+1}. von unten`)
-        + ' — klicken zum Entfernen (auch alle Fliesen darüber)';
+        + ' - klicken zum Entfernen (auch alle Fliesen darüber)';
       div.addEventListener('click', () => removeFromMoonStack(origIndex));
       stackDiv.insertBefore(div, empty);
     });
@@ -2391,7 +2391,7 @@ async function downloadGameLog() {
     if (d && d.ok) file = d.log_file;
   } catch(e) { /* Server evtl. nicht erreichbar -- Fallback unten */ }
   if (!file) file = window._gameLogFile;
-  if (!file) { showError('Noch kein Spiel-Log vorhanden — zuerst ein Spiel starten.'); return; }
+  if (!file) { showError('Noch kein Spiel-Log vorhanden - zuerst ein Spiel starten.'); return; }
   const a = document.createElement('a');
   a.href = `/static/log/${file}`;
   a.download = file;
@@ -2463,7 +2463,7 @@ function _ratingUpdateLineHTML(name, entry) {
     return `<div style="font-size:11px;margin-top:4px">
       <strong>${_escapeHtml(name)}</strong>:
       <span style="color:#B45309">ungewertet (KI-Tipps genutzt)</span>
-      <span style="color:var(--text3)">— Rating bleibt bei ${Math.round(entry.rating_before)}</span>
+      <span style="color:var(--text3)">- Rating bleibt bei ${Math.round(entry.rating_before)}</span>
     </div>`;
   }
   const sign = entry.delta >= 0 ? '+' : '';
@@ -2491,7 +2491,7 @@ async function showEndResults(results, ratingUpdates) {
     const t = allScoringTiles.find(t=>t.id===tid);
     const r0 = results['0']?.[tid], r1 = results['1']?.[tid];
     if(!t) return '';
-    const pts = (r,sign='')=> r?`<span style="font-weight:600;color:${r.score>=0?'#059669':'#DC2626'}">${r.score>=0?'+':''}${r.score}</span>`:'—';
+    const pts = (r,sign='')=> r?`<span style="font-weight:600;color:${r.score>=0?'#059669':'#DC2626'}">${r.score>=0?'+':''}${r.score}</span>`:'-';
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:4px 6px;font-size:10px">${t.emoji} ${t.name}</td>
       <td style="padding:4px 8px;text-align:right">${pts(r0)}</td>
@@ -2525,7 +2525,7 @@ async function showEndResults(results, ratingUpdates) {
       if (sum.ok && sum.count > 0) {
         const worstHTML = sum.worst.map(w => `
           <li style="font-size:10px;margin-bottom:2px">
-            Runde ${w.round}: −${w.delta_win_pp.toFixed(1)} pp (Rang ${w.rang}) — besser: ${w.top_desc}
+            Runde ${w.round}: −${w.delta_win_pp.toFixed(1)} pp (Rang ${w.rang}) - besser: ${w.top_desc}
           </li>`).join('');
         teacherHTML = `
           <div class="sep" style="margin:10px 0"></div>
@@ -2677,10 +2677,10 @@ function render() {
     // Punkt 8: keine Platten-ID mehr im Hinweistext -- previewHTML zeigt das
     // tatsaechliche Farbmuster ohnehin bereits an.
     const msg = source === 'stack'
-      ? `📦 Platte gezogen — klick auf ein freies Kuppelfeld zum Legen (−${num} Pkt)`
+      ? `📦 Platte gezogen - klick auf ein freies Kuppelfeld zum Legen (−${num} Pkt)`
       : source === 'start'
-      ? `🏁 Startplatte gewählt — klick auf ein freies Kuppelfeld zum Legen`
-      : `🧩 Platte gewählt — klick auf ein freies Kuppelfeld zum Legen`;
+      ? `🏁 Startplatte gewählt - klick auf ein freies Kuppelfeld zum Legen`
+      : `🧩 Platte gewählt - klick auf ein freies Kuppelfeld zum Legen`;
       
     document.getElementById('info-area').innerHTML = `
       <div class="info warn" style="display:flex; flex-direction:column; gap:8px;">

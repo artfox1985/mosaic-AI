@@ -36,8 +36,12 @@ from pathlib import Path
 # Stelle sicher dass der Hauptordner im Python-Path ist (nur im normalen
 # Skriptbetrieb sinnvoll -- im PyInstaller-Bundle (Task #96) ist __file__
 # keine reale Datei auf der Platte und dieser Schritt wird übersprungen).
+# server.py liegt in der Repo-Wurzel, also ist `.parent` die Wurzel --
+# hier stand `.parent.parent` und schob das ELTERNverzeichnis des Repos in
+# den Importpfad (wirkungslos bis leicht schaedlich; die Importe trugen nur,
+# weil Python das Skriptverzeichnis ohnehin einbindet). Korrigiert 2026-08-19.
 if not getattr(sys, "frozen", False):
-    BASE_DIR = str(Path(__file__).resolve().parent.parent)
+    BASE_DIR = str(Path(__file__).resolve().parent)
     sys.path.insert(0, BASE_DIR)
 
 from flask import Flask, request, jsonify, send_from_directory
@@ -567,11 +571,11 @@ def new_game():
                 _rust.load_net(str(model_path))
                 _ai_model = requested_model
             except Exception as e:
-                model_warning = f"Netz '{requested_model}' konnte nicht geladen werden ({e}) — spiele gegen Heuristik."
+                model_warning = f"Netz '{requested_model}' konnte nicht geladen werden ({e}) - spiele gegen Heuristik."
                 _ai_model = None
         else:
             if requested_model and requested_model.strip().lower() not in ("", "heuristic", "heuristik"):
-                model_warning = f"Modell '{requested_model}' nicht gefunden (models/alphazero_{requested_model}.onnx) — spiele gegen Heuristik."
+                model_warning = f"Modell '{requested_model}' nicht gefunden (models/alphazero_{requested_model}.onnx) - spiele gegen Heuristik."
             _ai_model = None
     else:
         _ai_player = None
@@ -689,7 +693,7 @@ def _stack_draw_lock():
     try:
         st = _json.loads(_rust.state_json())
         if st.get('pending_stack_draw'):
-            return jsonify(err("Stapel-Zug läuft — bitte erst eine gezogene Platte wählen und legen."))
+            return jsonify(err("Stapel-Zug läuft - bitte erst eine gezogene Platte wählen und legen."))
     except Exception:
         pass
     return None
@@ -851,7 +855,7 @@ def move_pass():
         return jsonify(err("Passen nur in Phase 1 möglich."))
     real_moves = [m for m in _rust_state().get("valid_moves", []) if m.get("type") != "pass"]
     if real_moves:
-        return jsonify(err("Passen nicht erlaubt — es gibt noch gültige Aktionen."))
+        return jsonify(err("Passen nicht erlaubt - es gibt noch gültige Aktionen."))
     try:
         _rust.apply_pass()
         _flush_game_log()
@@ -1079,7 +1083,7 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
         human_pi = 1 - _ai_player
         human_profile_id = _profile_p0 if human_pi == 0 else _profile_p1
         if human_profile_id is None:
-            out["note"] = "Kein Profil ausgewählt — Spiel ungewertet."
+            out["note"] = "Kein Profil ausgewählt - Spiel ungewertet."
             return out
         ai_identity = _ai_model or "Heuristik"
         ai_elo, ai_is_estimate, ai_node = _pp.estimate_ai_anchor(ai_identity, _ai_sims)
@@ -1091,7 +1095,7 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
         # geschrieben (rated:false, Transparenz wie beim Tipp-Fall).
         if rated and ai_is_estimate:
             out["note"] = (f"{ai_identity}@{_ai_sims} hat keinen direkten Arena-Anker "
-                           f"(nur Schätzwert) — Spiel ungewertet. Gewertete Spiele nur "
+                           f"(nur Schätzwert) - Spiel ungewertet. Gewertete Spiele nur "
                            f"gegen verankerte Konfigurationen (z.B. @400).")
             rated = False
         if ai_elo is None and rated:
@@ -1099,7 +1103,7 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
             # (ohne Anker keine Elo-Rechnung moeglich) -- bei ungewerteten
             # Spielen (Tipps genutzt) wird trotzdem ein Historien-Eintrag
             # geschrieben, auch ohne bekannten Gegner-Wert (opponent_rating=None).
-            out["note"] = f"Kein Elo-Anker für {ai_identity}@{_ai_sims} bekannt — Spiel ungewertet."
+            out["note"] = f"Kein Elo-Anker für {ai_identity}@{_ai_sims} bekannt - Spiel ungewertet."
             return out
         result = result_p0 if human_pi == 0 else result_p1
         entry = _record(human_profile_id, ai_node or f"{ai_identity}@{_ai_sims}",
@@ -1116,12 +1120,12 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
         out["note"] = "Werten nur, wenn beide Spieler ein Profil ausgewählt haben."
         return out
     if _profile_p0 == _profile_p1:
-        out["note"] = "Beide Seiten haben dasselbe Profil ausgewählt — ungewertet."
+        out["note"] = "Beide Seiten haben dasselbe Profil ausgewählt - ungewertet."
         return out
     p0 = _pp.get_profile(_profile_p0)
     p1 = _pp.get_profile(_profile_p1)
     if p0 is None or p1 is None:
-        out["note"] = "Profil nicht gefunden — ungewertet."
+        out["note"] = "Profil nicht gefunden - ungewertet."
         return out
     # Beide Ratings VOR dem Update einfrieren (symmetrisches Matchup) --
     # Standard-Elo-Konvention für gegenseitige Updates, sonst würde die
@@ -1281,7 +1285,7 @@ def ai_config_set():
 # mit einem AttributeError abstuerzen zu lassen (Server muss mit einem NOCH
 # ALTEN Wheel weiterlaufen).
 _AGGRESSION_UNAVAILABLE_MSG = (
-    "Aggressivitäts-Regler nicht verfügbar — Wheel-Update nötig "
+    "Aggressivitäts-Regler nicht verfügbar - Wheel-Update nötig "
     "(installiertes mosaic_rust-Wheel kennt set_aggression_params/"
     "get_aggression_params noch nicht, Server-Neustart nach dem Update nötig)."
 )
