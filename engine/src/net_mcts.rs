@@ -3831,6 +3831,18 @@ pub struct GumbelPhaseCandidate {
     pub raw_value: Option<f32>,
     pub points_forecast: Option<f32>,
     pub opp_points_forecast: Option<f32>,
+    /// PREREG_reachability_target.md par.6 ("Ordnung gegen das Praedikat
+    /// selbst"): Nachfolgezustand nach Anwenden dieses Kandidatenzugs, als
+    /// Frontend-JSON (`state_to_json`, `scoring_confirmed=false` -- in der
+    /// Drafting-Phase ohne Wirkung). Rein additiv: kostet nur bei
+    /// `collect_trace=true` einen weiteren `state_to_json`-Aufruf je
+    /// Kandidat, Self-Play/Arena rufen weiterhin immer mit `trace=None`.
+    /// `None` nur bei fehlgeschlagener Expansion (siehe `raw_value`-Kommentar).
+    pub successor_state_json: Option<String>,
+    /// Ziehender Spieler an diesem Kindzustand (`Node::player_who_acted`) --
+    /// noetig, um ein Praedikat egoseitig auf dem Nachfolgezustand
+    /// auszuwerten (der Zug kann die Spielerreihenfolge wechseln).
+    pub mover: Option<usize>,
 }
 
 impl GumbelPhaseCandidate {
@@ -3845,6 +3857,8 @@ impl GumbelPhaseCandidate {
             "raw_value": self.raw_value,
             "points_forecast": self.points_forecast,
             "opp_points_forecast": self.opp_points_forecast,
+            "successor_state_json": self.successor_state_json,
+            "mover": self.mover,
         })
     }
 }
@@ -4410,12 +4424,17 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     // Ausgaben am bereits expandierten Kindzustand -- `None`
                     // nur bei wiederholt fehlgeschlagener Expansion (siehe
                     // `GumbelPhaseCandidate::raw_value`-Kommentar).
-                    let (raw_value, points_forecast, opp_points_forecast) = match candidate_node[ci] {
-                        Some(cid) => {
-                            (nodes[cid].raw_value, nodes[cid].points_forecast, nodes[cid].opp_points_forecast)
-                        }
-                        None => (None, None, None),
-                    };
+                    let (raw_value, points_forecast, opp_points_forecast, successor_state_json, mover) =
+                        match candidate_node[ci] {
+                            Some(cid) => (
+                                nodes[cid].raw_value,
+                                nodes[cid].points_forecast,
+                                nodes[cid].opp_points_forecast,
+                                Some(crate::serialize::state_to_json(&nodes[cid].state, false).to_string()),
+                                Some(nodes[cid].player_who_acted),
+                            ),
+                            None => (None, None, None, None, None),
+                        };
                     phase_candidates.push(GumbelPhaseCandidate {
                         description,
                         visits,
@@ -4426,6 +4445,8 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                         raw_value,
                         points_forecast,
                         opp_points_forecast,
+                        successor_state_json,
+                        mover,
                     });
                 }
                 t.phases.push(GumbelPhase { phase: phase_num, sims_per_survivor: extra, candidates: phase_candidates });

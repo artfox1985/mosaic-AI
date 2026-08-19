@@ -23,6 +23,16 @@ dieselbe -- der Fehler ist beim ersten Versuch genau so passiert.
     python -X utf8 tools/probes/sibling_order_stability.py --krit 1 --w 0
     python -X utf8 tools/probes/sibling_order_stability.py --krit 1 --w 1.0
     python -X utf8 tools/probes/sibling_order_stability.py --krit 1 --w 1.0 --compare
+
+ZUSATZ (2026-08-20, additiv, PREREG_reachability_target.md par.6 "Ordnung
+gegen das Praedikat selbst" -- `tools/probes/sibling_order_vs_predicate.py`):
+`--dump-successors` haengt an jeden Kandidaten zusaetzlich seinen
+NACHFOLGEZUSTAND (`successor_state_json`, aus dem neuen Trace-Feld
+`GumbelPhaseCandidate::successor_state_json`/`mover`, engine/src/net_mcts.rs)
+und schreibt EINEN Seed (`--seed-a`) nach `probe_sibling_succ_k{krit}_w{w}.json`
+-- eigener Dateiname, bestehende `--compare`/Zwei-Seed-Dumps unveraendert:
+
+    python -X utf8 tools/probes/sibling_order_stability.py --krit 1 --w 1.0 --dump-successors
 """
 from __future__ import annotations
 
@@ -101,6 +111,28 @@ def pfad(krit, w):
     return BASIS / "evaluations" / f"probe_sibling_k{krit}_w{w}.json"
 
 
+def succ_pfad(krit, w):
+    """Eigener Dateiname fuer `--dump-successors` -- ueberschreibt nie `pfad()`."""
+    return BASIS / "evaluations" / f"probe_sibling_succ_k{krit}_w{w}.json"
+
+
+def kand_full(res):
+    """Wie `kand_q`, aber je Kandidat zusaetzlich `successor_state_json`/`mover`
+    (neue Trace-Felder, engine/src/net_mcts.rs::GumbelPhaseCandidate)."""
+    gt = (res if isinstance(res, dict) else json.loads(res)).get("gumbel_trace") or {}
+    ph = gt.get("phases") or []
+    if not ph:
+        return {}
+    out = {}
+    for i, c in enumerate(ph[0].get("candidates") or []):
+        out[str(c.get("description", i))] = {
+            "q": float(c.get("q", 0.0)),
+            "successor_state_json": c.get("successor_state_json"),
+            "mover": c.get("mover"),
+        }
+    return out
+
+
 def vergleiche(krit, w):
     n0 = json.loads(pfad(krit, 0.0).read_text(encoding="utf-8"))
     n1 = json.loads(pfad(krit, w).read_text(encoding="utf-8"))
@@ -147,6 +179,9 @@ def main() -> None:
     ap.add_argument("--seed-b", type=int, default=99999)
     ap.add_argument("--min-runde", type=int, default=2, dest="min_runde")
     ap.add_argument("--compare", action="store_true")
+    ap.add_argument("--dump-successors", action="store_true", dest="dump_successors",
+                     help="zusaetzlich additiv: Nachfolgezustand+mover je Kandidat, EIN "
+                          "Seed (--seed-a), eigene Ausgabedatei (siehe Docstring-Zusatz)")
     a = ap.parse_args()
 
     if a.compare:
@@ -166,6 +201,22 @@ def main() -> None:
     import mosaic_rust  # noqa: PLC0415 -- erst NACH den Env-Vars
 
     modell = str(BASIS / a.model)
+
+    if a.dump_successors:
+        aus = {"w": a.w, "krit": a.krit, "sims": a.sims, "seed": a.seed_a, "stellungen": []}
+        for i, st in enumerate(zust):
+            try:
+                res = mosaic_rust.net_search_state_json_trace(
+                    json.dumps(st), modell, a.sims, 1.5, a.seed_a)
+            except Exception as ex:  # noqa: BLE001
+                print(f"  Stellung {i}: {ex}")
+                continue
+            aus["stellungen"].append({"round": st.get("round"), "kandidaten": kand_full(res)})
+        succ_pfad(a.krit, a.w).write_text(json.dumps(aus, ensure_ascii=False), encoding="utf-8")
+        print(f"  {len(aus['stellungen'])} Stellungen (mit Nachfolgezustaenden) -> "
+              f"{succ_pfad(a.krit, a.w).name}")
+        return
+
     aus = {"w": a.w, "krit": a.krit, "sims": a.sims, "stellungen": []}
     for i, st in enumerate(zust):
         e = {}
