@@ -1,0 +1,268 @@
+<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Wert des k1-Baus, wenn er ihn in asymmetrischen Partien (EIN Spieler baut, der andere nicht) erstmals als siegentscheidendes Merkmal sieht? | Beleg: offen, nichts gebaut. Anlass: DOSSIER_ownership_head.md 7(1) -- die Bauer-Arme sind wegsymmetrisiert; externe Spezifikation 2026-08-18. -->
+
+# PREREG: Asymmetrisches Self-Play — den Plattenbau erstmals als Vorteil zeigen
+
+> **FOKUS-REGEL (Nutzer 2026-08-18):** ausschliesslich **k1**. Registrierte
+> "k1 oder k2"-Klauseln werden auf k1 gelesen. Begruendung: `STATUS.md`,
+> Abschnitt "FOKUS-REGEL".
+
+Stand **2026-08-18**. **ENTWURF, nichts gebaut.** Durchgehend Plan-Zeitform.
+
+**Anlass.** `DOSSIER_ownership_head.md` 7(1): die Bauer-Knoepfe sind ein
+Prozess-Schalter ohne Spielerparameter (`bauer_drafting_vorzug(state)`,
+`self_play.rs:1170`) — in den Bauer-Armen bauen **beide** Spieler. Damit ist das
+Value-Ziel (Sieg/Niederlage) beziiglich des Plattenbaus **wegsymmetrisiert**.
+Der Value-Kopf hat ueber den *Wert* des Plattenbaus nicht das Falsche gelernt,
+sondern **nichts**. Das erklaert die Stelle, an der alle vier geschlossenen Wege
+haengenbleiben: der Prior bietet den Bauzug dominant an (4,91x
+Gleichverteilungsmasse, 129 von 130 Held-out-Partien vorn,
+`PREREG_corpus_distillation.md`), ueberstimmt wird er vom Wert-Backup — und der
+Wert kennt keinen Grund, den Bau zu bevorzugen.
+
+Eine externe Spezifikation (2026-08-18) hat daraus ein Drei-Phasen-Curriculum
+gemacht. Diese Vorregistrierung uebernimmt den **flachen** asymmetrischen Arm und
+**verwirft das dynamische Curriculum** (Begruendung: par.8).
+
+---
+
+## par.1 DIE FRAGE
+
+> Sieht der Value-Kopf den k1-Bau als Vorteil, wenn er in einem Teil der
+> Trainingspartien **nur auf einer Seite** vorkommt — und behaelt er ihn,
+> nachdem der Bauer wieder weg ist?
+
+Zwei getrennte Teilfragen, beide vorab benannt, weil die zweite die erste
+entwerten kann:
+
+- **B (Zuordnung):** entsteht ueberhaupt ein Signal — trennt der Value-Kopf
+  Stellungen mit und ohne Spaltenfortschritt?
+- **C (Transfer):** ueberlebt es den Wegfall des Bauers, oder war es
+  "Bauer erkannt", nicht "Spalte bewertet"?
+
+---
+
+## par.2 GEPRUEFTER IST-STAND — die Seitigkeit ist schon gebaut
+
+| Sache | Befund | Pruefstelle |
+|---|---|---|
+| Seitigkeits-Flag je Agent | `NetSelfPlayAgent { .., vorzug: bool }` | `self_play.rs:1332` |
+| Absicht des Flags | *"die EXPLIZITE Seitigkeits-Konfiguration des Bauer-Vorzugs"* | `self_play.rs:1279` |
+| heutiger Self-Play | EINE Konfiguration an beide Seiten: `players: [player, player]`, `vorzug: true` | `self_play.rs:2992`, `:2977` |
+| Vorzug ist kein Zwang | `.or_else`-Kette: der Bauer greift nur, wo er etwas vorschlaegt, sonst das Netz | `self_play.rs:1170-1174` |
+| Bauer je Kriterium | `bauer_fuer(1)` = `SPALTENBAUER_GENERISCH`, Knopf `MOSAIC_PLATTENBAU` | `plate_builder.rs:220-228`, `:231-243` |
+| Knopf ist prozessglobal | `OnceCell::get_or_init` ueber `std::env::var` | `column_build.rs:78` |
+| Tiling bleibt Solver | `plate_builder::tiling_vorzug` hat GENAU EINEN Aufrufer, und der ist Log-Ausgabe hinter `if pcfg.column_build_trace` | `self_play.rs:1691`; Entscheidungspfad `resolve_tiling_step`, `:1093`; kein `plate_builder`-Aufruf in `tiling_solver.rs` |
+| **`dome_vorzug` faehrt mit** | haengt in derselben Draft-Kette wie `drafting_vorzug` | `self_play.rs:1173` |
+| Partie-Seed je Partie setzbar | `plate_builder::set_partie_seed(Some(game_seed))` | `self_play.rs:2286` |
+
+**Folge:** der Arm ist ein zweiter Agent mit `vorzug: false` und `[p0, p1]` statt
+`[player, player]`. Kein neuer Bauer, keine neue Heuristik, kein Eingriff in den
+Tiling-Solver. Der prozessglobale Knopf bleibt unangetastet — er sagt nur, WELCHER
+Bauer aktiv waere; WER ihn benutzt, entscheidet das Agenten-Flag.
+
+**Der Kommentar `self_play.rs:1688`** (*"`resolve_tiling_step` prueft ihn intern
+schon"*) ist insoweit irrefuehrend und wird beim Bauen berichtigt.
+
+---
+
+## par.3 WAS GEBAUT WIRD
+
+**Arm S (asymmetrisch), primaer.** Self-Play-Korpus, in dem je Partie **genau
+ein** Spieler den k1-Bauer-Vorzug hat:
+
+- Seitenwahl aus dem Partie-Seed, Ziel-Aufteilung 50/50 ueber den Korpus.
+- `MOSAIC_PLATTENBAU=1` (Spaltenbauer), Rest wie im Produktions-Self-Play.
+- **`dome_vorzug` bleibt AN** (Begruendung und Gegenmessung: par.4).
+- Tiling unveraendert (Solver), siehe par.2.
+
+**Arm N (Kontrolle).** Derselbe Umfang, identische Seeds, **beide** Seiten ohne
+Bauer-Vorzug — der heutige Zustand. Notwendig, weil sonst Korpusgroesse und
+Erzeuger-Checkpoint mit der Asymmetrie konfundiert sind.
+
+**Kein Arm mit beidseitigem Bauer.** Der existiert bereits (Destillations-Korpus,
+`PREREG_ownership_corpus.md`) und ist genau der wegsymmetrisierte Fall.
+
+**Training:** Warm Start vom Champion, Standardrezept (`lr 5e-5` + Cosine,
+`--epochs` = tatsaechliches Budget, siehe Fussnote par.9). Fenster und
+Traeger-Manifest wie im v21-Fenster; der neue Korpus ist **policy-tragend**
+einzutragen — sonst wiederholt sich der Befund vom 2026-08-17 (sieben Laeufe mit
+maskiertem Korpus, `neural_net.py:679/:667/:1804`).
+
+---
+
+## par.4 DIE ZWEI VORBEHALTE, DIE INS ERGEBNIS GEHOEREN
+
+**(1) `dome_vorzug` faehrt mit.** Die Bauer-Kette entscheidet nicht nur den
+Draft, sondern auch die **Kuppelplatten-Slot-Wahl** (`self_play.rs:1173`). Genau
+dort hat das Netz eine gemessen falsche Gewohnheit (`DOSSIER` 7(5): 62,8 %
+Spezialkuppeln nach unten, `domain_knowledge.md` §8 Hebel 2 verlangt oben).
+
+Er bleibt AN, weil §8 Hebel 2 zum Ziel gehoert und ein halbierter Bauer die
+Wirkung verduennt. **Gegenmessung, verbindlich:** die Slot-Verteilung (oben/unten
+bei ausliegender k6-Platte) wird am Ende von Arm S **getrennt ausgewiesen**. Ohne
+diese Zahl ist "der Kopf hat den Spaltenwert behalten" nicht von "der Kopf hat
+eine Slot-Gewohnheit uebernommen" zu unterscheiden.
+
+**Die Gegenmessung besteht aus ZWEI Zahlen** (Erweiterung nach externer
+Durchsicht 2026-08-18, und sie ist noetig): neben der Slot-Verteilung die
+**Platzierungspunkte in Partien OHNE k1-Treffer**, getrennt nach Zwangs- und
+freier Seite. Holt die Zwangsseite dort mehr Punkte, ohne mehr Spalten zu bauen,
+laeuft der Vorteil ueber die Slot-Wahl und die k1-Zurechnung faellt.
+
+**(2) Ego-Perspektive vs. Regime.** Der Value-Kopf sieht nicht, ob ER der
+gezwungene Spieler ist. Er lernt also "Brett mit Spaltenfortschritt gewinnt
+oefter", nicht "ich sollte bauen". Das ist der beabsichtigte Mechanismus (die
+Suche macht daraus die Praeferenz), aber es heisst: **ein Ausbleiben des Effekts
+in Arm S widerlegt 7(1) nicht** — es koennte auch heissen, dass die Brettmerkmale
+den Fortschritt nicht ausreichend tragen. Das ist in par.7 als
+Nicht-Entscheidung protokolliert.
+
+---
+
+## par.5 SPERRE VOR DEM TRAINING — traegt der Korpus das Signal ueberhaupt?
+
+**Vor** dem ersten Trainingslauf, auf dem fertigen Korpus S, drei Zahlen:
+
+| Groesse | Warum | Vorabregel |
+|---|---|---|
+| **Siegquote der Zwangsseite** (Partien mit aktiver k1-Platte) | das ist das Signal, aus dem der Value-Kopf lernen soll | **nicht getunt** — siehe unten |
+| **k1-Rate der Zwangsseite** | greift der Bauer ueberhaupt durch? | Erwartung ~42 % (`DOSSIER` 6a(C)); unter 30 % ist der Arm gegenstandslos |
+| **k1-Rate der freien Seite** | Grundrate im selben Korpus | Erwartung ~13 % |
+
+> **VORABREGEL par.5:** die Sperre ist bestanden, wenn die **Differenz der
+> k1-Raten zwischen Zwangsseite und freier Seite >= 20 Prozentpunkte** betraegt.
+> Darunter existiert die Asymmetrie nur auf dem Papier und es wird **nicht
+> trainiert**.
+
+**Die Siegquote ist ERGEBNIS, nicht Zielgroesse.** Die externe Spezifikation will
+den Bauer nachziehen (epsilon), bis die Zwangsseite 55–70 % gewinnt. Das ist hier
+**ausdruecklich verboten**: damit stellte man genau die Korrelation her, die der
+Value-Kopf anschliessend "entdecken" soll — das Experiment waere
+selbstbestaetigend. Die Quote wird gemessen und berichtet, in jeder Hoehe. Sie
+ist zugleich die erste **unkonfundierte** Messung zu 6a(B) (ist Spaltenbau
+gratis?), weil dort bisher nur ein Vergleich *innerhalb* eines Arms vorlag.
+
+Ein Nachziehen der Bauer-Staerke ist genau **einmal** erlaubt, mit frischem
+Korpus und hier nachgetragener Begruendung — nicht als laufende Anpassung.
+
+**Kein epsilon-Rauschen.** Die Spezifikation will Varianz per epsilon-greedy
+zumischen; die `.or_else`-Kette liefert sie strukturell schon (der Bauer greift
+nur, wo er etwas vorschlaegt). Wie oft er greift, ist **ungemessen** und wird in
+der Sperre mit ausgewiesen.
+
+---
+
+## par.6 MESSANORDNUNG
+
+**Teilfrage B (Zuordnung), nach dem Training auf Korpus S.**
+
+Der naheliegende Test — mittlerer Value bei Stellungen *mit* gegen *ohne*
+Spaltenfortschritt — ist **konfundiert** und wird NICHT verwendet: Stellungen mit
+fortgeschrittener Spalte sind auch die, in denen die Partie gut laeuft. Das ist
+dieselbe Fehlerklasse, die in diesem Projekt bereits dreimal aufgetreten ist
+(Endzustands-Ziel auf den bereits entschiedenen Teil gemessen).
+
+Verwendet wird stattdessen ein **gepaarter Geschwister-Vergleich**: dieselbe
+Stellung, Nachfolgezustaende, die sich im Spaltenfortschritt unterscheiden;
+Referenz je Stellung, nicht ueber den Satz gemittelt. Die Maschinerie liegt im
+Baum (`sibling_ranking_diagnostic`, `DOSSIER` 7(2)). Ausgewiesen wird die
+**Differenz zum Nullarm-Modell auf denselben Stellungen**.
+
+**Teilfrage C (Transfer).** Arena **Nullarm** (alle Regler 0, `MOSAIC_OWNERSHIP_W`
+= `MOSAIC_OWNERSHIP_TILING_W` = 0) gegen den Champion, **407 feste Seeds**,
+gepaart, Auswertung auf **Block-Ebene** (Bloecke a 25, nB=6, Schwelle |t| >
+2,571). Partie-Level-p-Werte gelten nicht.
+
+Nullarm ist Pflicht: gemessen werden soll, was das **Netz** gelernt hat, nicht
+was ein Regler erzwingt.
+
+**Brettwechsel:** derselbe Arm zusaetzlich mit vertauschten `--model`/`--model-b`
+und eigenem `--out-prefix`. Grund: der Vorbehalt aus `STATUS.md` (alle bisherigen
+drei Arme liefen auf Brett 0, der Seiteneffekt ist unkontrolliert).
+
+---
+
+## par.7 VORAB-ERFOLGSREGEL (woertlich, vor der ersten Partie)
+
+**ERFOLG** heisst **beides**:
+
+1. **k1-Rate im Nullarm** (Partien mit ausliegender k1-Platte, eigene Seite):
+   - **>= 30 %** = Ziel erreicht.
+   - **>= 22 %** = Signal, Fortsetzung gerechtfertigt, aber kein Erfolg.
+   - **< 22 %** = kein Signal.
+   Bezugswerte: heute **13 %** (20/156, `DOSSIER` 6(C)), Bauer **42 %**
+   (419/1000). Die Zweistufigkeit ist bewusst: eine einzelne Schwelle bei 30 %
+   haette einen echten Teileffekt bei 25 % verworfen, ohne etwas zu entscheiden.
+2. **Siege**: im Nullarm gegen den Champion **nicht signifikant schlechter** als
+   der Kontroll-Arm N auf denselben Seeds (Block-Ebene). Ein Plattenzuwachs, der
+   Siege kostet, ist **kein** Erfolg (Leitstern-Klausel, `STATUS.md`).
+
+**MISSERFOLG** heisst: k1-Rate < 22 % **oder** signifikanter Siegverlust.
+
+**Die Trennschaerfe der k1-Rate ist VOR dem ersten Lauf auszurechnen** (bei 407
+Seeds sind ~150 Partien k1-aktiv; ob 13 % gegen 22 % auf Block-Ebene mit nB=6
+aufloest, ist **offen** und keine Annahme).
+
+**WAS DIESER VERSUCH NICHT ENTSCHEIDET** (vorab, damit es hinterher nicht
+umgedeutet wird):
+
+- Ein Nullresultat widerlegt 7(1) **nicht** — siehe par.4(2).
+- Er sagt nichts darueber, ob die *Ordnung* des Ownership-Kopfes richtig ist
+  (7(2)). Das ist eine eigene Messung.
+- Er sagt nichts ueber k2. Fokus-Regel.
+
+---
+
+## par.8 WAS VERWORFEN WIRD, UND WARUM
+
+**Das dynamische Curriculum** (externe Spezifikation, Phase B/C: Bonus an den
+Verlierer, dann an die Plattenpunkt-Differenz gekoppelt) wird **nicht gebaut**.
+
+Begruendung: es koppelt das Value-Ziel an ein Regime, **das nicht in der
+Beobachtung steht**. Der Value-Kopf saehe wieder nicht, warum der Wert schwankt —
+dieselbe Fehlerklasse wie 7(1), nur mit Nicht-Stationaritaet statt Symmetrie.
+Tragfaehig waere es erst, wenn der Armparameter **Eingabe** ist; das ist der
+UVFA-Punkt aus `DOSSIER` Abschnitt 8 und eine eigene Entscheidungseinheit.
+
+**Der Warmup ("Phase A")** entfaellt: der Champion IST die konvergierte
+Grundlinie. Ein Aufwaermen auf symmetrischem Self-Play waere ein zusaetzlicher
+Korpus ohne Frage dahinter.
+
+---
+
+## par.9 REIHENFOLGE UND FREIGABEN
+
+1. **Kostenrechnung** — Korpusgroesse mal Partiekosten, ausgerechnet und hier
+   nachgetragen (der Destillations-Korpus waren 8.000 Partien; die Uebertragung
+   ist **ungerechnet**).
+2. Umbau `self_play.rs` (zweiter Agent, `[p0, p1]`), Wheel neu bauen. **Ein
+   gruener `cargo test` heisst nicht, dass die Arena den Code sieht** —
+   Zahlengleichheit bei gleichen Seeds waere Alarm, kein Befund.
+3. Korpus S und Korpus N erzeugen.
+4. **Sperre par.5.** Bestanden → weiter, sonst Ende.
+5. Training beide Arme, Traeger-Manifest gesetzt, Fenster mit
+   `MOSAIC_DATA_EXCLUDE` gepinnt.
+6. Messungen par.6, Auswertung nach par.7.
+
+> **FREIGABE-VORBEHALT.** Dieser Arm erzeugt einen **neuen Self-Play-Korpus**.
+> Der Fahrplan (`STATUS.md`) sperrt Korpus-Erzeugung bis Schritt 1 und 2 stehen.
+> Praezedenz fuer einen *Lehr*-Korpus ausserhalb der Reihe ist
+> `PREREG_ownership_corpus.md`. **Die Einordnung — Lehrkorpus (jetzt) oder
+> Schritt 3 (spaeter) — ist eine Nutzer-Entscheidung und hier offen.**
+
+**Fussnote zu `--epochs`:** `T_max` des Cosine haengt am `--epochs`-Flag; bei
+`--epochs 100` und Early Stop nach 15 ist die LR faktisch konstant. Das Budget
+ist vor dem Lauf realistisch zu setzen, sonst laeuft das Standardrezept ohne
+Annealing.
+
+---
+
+## par.10 BEZUG ZU OFFENEN FRAGEN
+
+- **7(1)** — direkter Test, das ist der Zweck dieser Datei.
+- **6a(B)** — die Siegquote der Zwangsseite in par.5 ist die erste
+  unkonfundierte Messung der Frage "kostet Spaltenbau etwas?".
+- **7(5)** — die Slot-Gegenmessung in par.4(1) beruehrt die falsche Gewohnheit,
+  entscheidet sie aber nicht.
+- **7(2), 7(3), 7(4)** — unberuehrt. 7(3) laeuft eigenstaendig in
+  `PREREG_reachability_target.md`.
