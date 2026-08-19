@@ -177,6 +177,43 @@ Runde**. Entscheidungsregel:
   einen flacheren Verlauf gesetzt. Diese Verzweigung ist damit VORAB benannt
   und keine nachträgliche Anpassung.
 
+## par.6a ERGEBNIS DER SÄTTIGUNGSPRÜFUNG, PFAD A (2026-08-19)
+
+`tools/probes/shaping_scale_pfad_a_e.py`, 600 Drafting-Zustände aus
+`data/holdout` (je (Partie, Runde) einer, 120 je Runde), Quelle der Größen:
+neuer Read-only-Export `mosaic_rust.wertung_shaping_e_json` (rechnet exakt die
+Terme aus `net_mcts.rs:1462-1487`, Laufzeit-Alphas, `round_gain = 0`).
+Rohzahlen: `evaluations/probe_shaping_e_distribution_pfad_a.json`.
+
+> **par.6, Pfad A: ERFÜLLT.** Alle 90-%-Quantile von `E_r / SCALE_r` liegen
+> unter **0,32** (Maximum: k3 in Runde 4 mit 0,31; die Zielkriterien k1/k2
+> maximal 0,20/0,14). Zusammen mit dem Pfad-B-Ergebnis aus par.3a (< 0,40)
+> ist die Vorbedingung beidseitig erfüllt: **ein gemeinsames Profil trägt**,
+> die Verzweigung "getrennte Profile" wird nicht ausgelöst.
+
+Drei Nebenbefunde, gemessen und geprüft:
+
+1. **`wertung_progress` wächst je Kriterium monoton mit der Runde** (k1-Median
+   0,00 → 0,78 → 1,94 → 4,08 → 6,61) — die par.3-Prämisse gilt für Pfad A
+   also wirklich, im Gegensatz zu Pfad B (par.3a). **Aber: in Runde 1 ist
+   JEDER Pfad-A-Term exakt 0** (alle Kriterien, unlock, floor, tiling; 120
+   Zustände) — das Kuppelraster ist in Runde 1 vor dem Rundenende leer, und
+   `wertung_progress` liest nur `build_grid`. Ein Rundenprofil kann Runde 1
+   für Pfad A also NICHT heilen — dort gibt es nichts zu skalieren; der
+   kleinste wirksame Nenner ist der von Runde 2.
+2. **`floor_penalty` und `tiling_potenzial` sind in den Holdout-Stichproben
+   fast durchgehend 0.** Geprüft, kein Exportfehler: `projected_unplaceable_
+   penalty` misst kommende Strafpunkte aus UNPLATZIERBAREN Musterreihen
+   (`round_end.rs:115-124`), nicht die aktuelle Strafleiste — unplatzierbare
+   Reihen sind in Self-Play-Zuständen selten. An Mensch-Partie-Zuständen
+   liefert der Export Werte > 0.
+3. **`floor_penalty` fährt mit Default-Gewicht 0,3 IMMER mit**
+   (`floor_shaping_weight = 0,3`, engine_config) — ein Rundenprofil am
+   gemeinsamen `bei(x)` ändert damit auch LIVE-Verhalten, nicht nur die
+   Messarme. Bei der Umsetzung (par.5) gehört der Strafleisten-Term deshalb
+   entweder auf den flachen Nenner gepinnt oder der Effekt in den Arena-Armen
+   ausgewiesen.
+
 ## par.7 MESSANORDNUNG
 
 **Zuerst Pfad A (Wertungs-Pfad).** Er ist der Pfad, in dem die Injektion schon
