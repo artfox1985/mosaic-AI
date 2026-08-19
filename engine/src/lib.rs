@@ -961,6 +961,55 @@ fn plate_completability_json(
         (0..6).all(|i| zelle_ok(i, 5 - i)),
     ];
 
+    // Offene Zellen je Spalte, mit Farbbedarf und Vorratspuffer -- dieselbe
+    // Rechnung wie `ist_zelle_vollendbar` (column_build.rs:563), nur mit
+    // ausgewiesenem Abstand statt Boolean. Verbraucher:
+    // `PREREG_human_game_oracle_gap.md` par.4 (Farbbedarf der offenen Zellen)
+    // und `PREREG_reachability_target.md` par.12 Arm P (Puffer =
+    // erreichbar - Bedarf, bindende Zelle = Minimum ueber die Kette).
+    // `color_idx` folgt `provocation::farben_index`, also `TileColor::NORMAL`.
+    let col_open_cells: Vec<Vec<serde_json::Value>> = (0..6usize)
+        .map(|c| {
+            (0..6usize)
+                .filter_map(|r| {
+                    let Some(sp) = p.dome_grid.get_space(r, c) else {
+                        return Some(serde_json::json!({"r": r, "kind": "empty_slot"}));
+                    };
+                    if sp.is_filled() {
+                        return None;
+                    }
+                    match sp.space_type {
+                        crate::dome::SpaceType::Wild => {
+                            Some(serde_json::json!({"r": r, "kind": "wild"}))
+                        }
+                        crate::dome::SpaceType::Special => {
+                            Some(serde_json::json!({"r": r, "kind": "special"}))
+                        }
+                        crate::dome::SpaceType::Normal => {
+                            let Some(need) = sp.required_color else {
+                                return Some(serde_json::json!({"r": r, "kind": "normal_frei"}));
+                            };
+                            let zeile = &p.pattern_lines[r];
+                            let schon =
+                                if zeile.color == Some(need) { zeile.tiles.len() as i64 } else { 0 };
+                            let Some(i) = crate::provocation::farben_index(need) else {
+                                return Some(serde_json::json!({"r": r, "kind": "normal_frei"}));
+                            };
+                            let benoetigt = (r as i64 + 1) - schon;
+                            Some(serde_json::json!({
+                                "r": r,
+                                "kind": "normal",
+                                "color_idx": i,
+                                "need": benoetigt,
+                                "buffer": erreichbar[i] - benoetigt,
+                            }))
+                        }
+                    }
+                })
+                .collect()
+        })
+        .collect();
+
     Ok(serde_json::json!({
         "columns": spalten,
         "rows": zeilen,
@@ -968,6 +1017,61 @@ fn plate_completability_json(
         "col_fill": feats.col_fill.to_vec(),
         "row_fill": feats.row_fill.to_vec(),
         "diag_fill": feats.diag_fill.to_vec(),
+        "verbleibend": erreichbar.to_vec(),
+        "col_open_cells": col_open_cells,
+    })
+    .to_string())
+}
+
+/// Pfad-A-Eingangsgroessen des Wertungs-Shapings fuer einen extern
+/// gespeicherten Zustand -- reine LESEFUNKTION fuer
+/// `PREREG_shaping_scale_per_round.md` par.6 (Saettigungspruefung: Verteilung
+/// von `E` je Pfad und je Runde, VOR jeder Zeile Umbau-Code). Pfad B ist
+/// bereits gemessen (par.3a); dieser Export liefert die noch fehlende
+/// Pfad-A-Seite.
+///
+/// Ausgegeben werden exakt die Groessen, die in `apply_wertung_shaping_full`
+/// (`net_mcts.rs:1462-1487`) in `bei(x) = tanh(x / WERTUNG_SHAPING_SCALE)`
+/// eingehen, mit den Laufzeit-Alphas (`wertung_shaping_alphas()`, Default 2)
+/// und `round_gain = 0` (die Prereg registriert ROUND_GAIN fest auf 0):
+/// `wertung_e[k]` je Kriterium 0..8 (unabhaengig davon, ob die Platte liegt --
+/// `active_tile_ids` sagt, welche liegen), `unlock_beta` (k6-Bonusanteil,
+/// zahlt ungegatet), `floor_penalty` (Strafleisten-Gegenterm) und
+/// `tiling_potenzial` (Rundenend-Solverscore minus aktueller Score).
+#[pyfunction]
+#[pyo3(signature = (state_json, player, seed=None))]
+fn wertung_shaping_e_json(state_json: String, player: usize, seed: Option<u64>) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    if player >= state.players.len() {
+        return Err(PyValueError::new_err(format!("player {player} existiert nicht")));
+    }
+    let p = &state.players[player];
+    let alphas = crate::net_mcts::wertung_shaping_alphas();
+
+    let wertung_e: Vec<f64> = (0..8usize)
+        .map(|k| {
+            crate::scoring::wertung_progress_per_kriterium(p, &[k], &alphas, state.round_number, 0.0)
+        })
+        .collect();
+    let unlock_beta = crate::scoring::unlock_progress_beta(p, &state.scoring_tile_ids, alphas[6]);
+    let floor_penalty = crate::round_end::projected_unplaceable_penalty(p) as f64;
+    let tiling_potenzial =
+        (crate::tiling_solver::solve_round_final_score(&state, player) - p.score) as f64;
+
+    Ok(serde_json::json!({
+        "round": state.round_number,
+        "active_tile_ids": state.scoring_tile_ids.iter().map(|&id| id as u64).collect::<Vec<_>>(),
+        "wertung_e": wertung_e,
+        "unlock_beta": unlock_beta,
+        "floor_penalty": floor_penalty,
+        "tiling_potenzial": tiling_potenzial,
     })
     .to_string())
 }
@@ -1254,6 +1358,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(plate_completability_json, m)?)?;
+    m.add_function(wrap_pyfunction!(wertung_shaping_e_json, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
