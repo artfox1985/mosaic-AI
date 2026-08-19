@@ -770,6 +770,20 @@ das.
 | Nach einer Code-Auslagerung reicht `ast.parse` NICHT | Kurzlauf mit `--train-file-limit` fahren. Zwei `NameError` haetten `b20` sofort getoetet |
 | `--promote-winner` ist bei `paired_gating.py` Default TRUE | Messlaeufe brauchen `--no-promote-winner` |
 
+### FALLE vom 2026-08-20 — CPU-NEBENLAST VERSTUEMMELT ARENA-PARTIEN
+
+Zwei parallel laufende Arena-Instanzen (je `--threads 10` plus Worker):
+derselbe 8-Partien-Smoke lieferte unter Last ZWEI VERSCHIEDENE Ergebnisse
+(eine Partie endete 3:1 — offensichtlich abgewuergt), ohne Last dreimal
+byte-identisch (auch identisch zum Vortag; das frische Wheel war NICHT die
+Ursache, per Dreifach-Vergleich ausgeschlossen). **Regel: Arena-Messungen
+laufen EXKLUSIV — keine zweite Arena, keine Sonden mit Suchlaeufen, kein
+Training parallel.** Vorflug-Determinismus-Checks zaehlen nur, wenn sie
+unter denselben Lastbedingungen laufen wie die Messung selbst (praktisch:
+beide exklusiv). Belege: `paired_arena_env_reach_conj_smoke1/2.json`
+(unter Last, abweichend) gegen `reach_smoke1/3/4.json` (exklusiv,
+identisch).
+
 ### FALLEN vom 2026-08-17 (Nacht) / 2026-08-18
 
 | Falle | Regel daraus |

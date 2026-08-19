@@ -176,6 +176,25 @@ Wheel frisch gebaut und installiert (Paritaets-Hash unveraendert,
 `cargo test` 460/0). Start der Arena-Kette 2026-08-19 ~23:50, Arme
 S (b18) und T+S (b24) sequenziell.
 
+**KORREKTUR 2026-08-20, vor der ersten gewerteten Partie — `MOSAIC_OWNERSHIP_CONJ=1`
+ist PFLICHT in S und T+S.** Die ersten beiden Starts (23:50, vom
+Sitzungs-Ende gekillt; Neustart ~10:00, bei Block 15 des Nullarms
+gestoppt) liefen in der Default-Produktform. Die liest im Verbraucher
+NUR die 72 Feldlabels (`net_mcts.rs:1784-1790`, else-Zweig
+`expected_plate_points` ueber `p_own`) — der Zielwechsel sitzt aber
+ausschliesslich in den k1-ATOMEN (`reach_target.py::REACH_ATOMS`,
+`neural_net.py:1877/1892`), und die Feldlabels sind unveraendert
+Realisierung. In Produktform haette Arm T+S das neue Ziel also GAR NICHT
+konsumiert; T+S gegen S waere reines Retraining-Rauschen gewesen.
+Aufgefallen ueber die Praedikat-Ordnungs-Sonde (Tau +0,083 n.s. gegen
+das Puffer-Praedikat — gemessen war die Produktform-Ordnung, siehe
+`probe_sibling_vs_predicate_k1.json`). Auch die beiden Offline-Sonden
+werden mit `MOSAIC_OWNERSHIP_CONJ=1` wiederholt; die Produktform-Werte
+(Tau +0,972 Seed-Stabilitaet / +0,083 gegen Praedikat) bleiben als
+Protokoll der FELD-Seite stehen. Verlorene Rechenzeit: ~50 min.
+Der Nullarm N ist von CONJ unberuehrt (w_own=0, Verbraucher kehrt vor
+jeder Rechnung um).
+
 ---
 
 ## par.7 VORAB-ERFOLGSREGEL (woertlich, vor der ersten Partie)
