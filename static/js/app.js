@@ -675,6 +675,14 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     // Stern (wie die Spezial-Rueckseite im Stapel-Dialog), statt ohne Label.
     bg=''; cls=`ds filled ${normColor(sp.filled)}`;
     lbl = normColor(sp.filled) === 'special' ? '⭐' : '';
+    // Nutzer 2026-08-20: ein belegtes JOKERFELD behaelt sein Symbol, damit man
+    // die Sonderpunkte der Joker-Wertungsplatte schon waehrend der Partie
+    // mitzaehlen kann. Weiss statt bunt -- das Emoji traegt seine Farbe selbst,
+    // deshalb wird es in CSS (.ds.filled .wild-glyph) per filter entfaerbt.
+    // Der Fall "weisser Stein auf Jokerfeld" existiert nicht: `accepts_special`
+    // laesst weisse Steine nur auf SPECIAL-Feldern zu (engine/src/dome.rs:74),
+    // ein belegtes Jokerfeld traegt also immer eine der fuenf satten Farben.
+    if (sp.type === 'WILD') lbl = `<span class="wild-glyph">${WILD_BACK_ICON}</span>`;
   } else if(sp.type === 'N' || !sp.type || sp.type === 'NORMAL') {
     const hexFull={blau:'#2563EB',gelb:'#D97706',rot:'#DC2626',schwarz:'#292524',tuerkis:'#0891B2'};
     const hex = hexFull[nc] || (nc ? '#FF00FF' : '#999');
@@ -1882,8 +1890,7 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
     } else {
       const statusEl = document.getElementById('stack-peek-status');
       if(statusEl) statusEl.textContent = '';
-      const moreBtn = document.getElementById('stack-peek-more-btn');
-      if(moreBtn) moreBtn.style.display = '';
+      renderStackDrawButton();
       const stopBtn = document.getElementById('stack-stop-btn');
       if(stopBtn) stopBtn.disabled = true;
     }
@@ -1929,6 +1936,20 @@ async function stackPeekMore() {
   renderStackPeekState();
 }
 
+// Der Ziehen-Knopf im Stapel-Dialog traegt die Rueckseite der Platte, die als
+// NAECHSTES kaeme (Nutzer 2026-08-20) -- dieselbe Information wie auf dem
+// Stapel-Knopf des Bretts (stackTopTypeIcon). Das traegt, weil
+// execute_draw_stack_peek die gezogene Platte aus dome_tile_pool ENTFERNT
+// (engine/src/game.rs:183) und dome_stack_top_type aus dome_tile_pool[0]
+// serialisiert wird (engine/src/serialize.rs:269): nach jeder Ziehung steht
+// dort schon die naechste Rueckseite, nicht die eben gezogene.
+function renderStackDrawButton() {
+  const moreBtn = document.getElementById('stack-peek-more-btn');
+  if(!moreBtn) return;
+  moreBtn.style.display = (S.dome_stack_count > 0) ? '' : 'none';
+  moreBtn.innerHTML = `${stackTopTypeIcon()} Ziehen (−1 Pkt)`;
+}
+
 function renderStackPeekState() {
   const pending = S.pending_stack_draw || [];
   const n = pending.length;
@@ -1941,7 +1962,6 @@ function renderStackPeekState() {
     statusEl.innerHTML = `${n}. Platte gezogen. Rückseiten bisher: ${typeIcons} - bisher −${n} Pkt.<br>
       <span style="font-size:9px">Vorderseiten siehst du erst, wenn du aufhörst.</span>`;
   }
-  const moreBtn = document.getElementById('stack-peek-more-btn');
   const stopBtn = document.getElementById('stack-stop-btn');
   // Weiterziehen ist beliebig oft moeglich, solange nur der Stapel reicht --
   // die fruehere Hausregel "max. so viele Platten wie Punkte vorhanden" wurde
@@ -1949,7 +1969,7 @@ function renderStackPeekState() {
   // siehe validate_draw_stack_peek in engine/src/game.rs: bei 0 Punkten ist
   // jede weitere Ziehung wirklich gratis (Score klemmt bei 0), nicht nur die
   // erste. Die GUI darf hier also NICHT zusaetzlich auf Punktestand pruefen.
-  if(moreBtn) moreBtn.style.display = (S.dome_stack_count > 0) ? '' : 'none';
+  renderStackDrawButton();
   if(stopBtn) stopBtn.disabled = n === 0;
   // Sobald mind. 1 Punkt bezahlt wurde, ist der Zug nicht mehr abbrechbar
   // (das Regelwerk kennt kein Zurück, sobald gezogen wurde).

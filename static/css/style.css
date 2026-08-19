@@ -323,6 +323,14 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .ds.filled.schwarz{background:var(--schwarz);color:#fff}
 .ds.filled.tuerkis{background:var(--tuerkis);color:#fff}
 .ds.filled.special{background:#D6D3D1;color:var(--text2)}
+/* Belegtes Jokerfeld: das Symbol bleibt stehen (Nutzer 2026-08-20), in Weiss.
+   `color:#fff` reicht bei einem Emoji nicht -- es bringt seine eigene Farbe
+   mit; brightness(0) macht daraus eine Silhouette, invert(1) faerbt sie weiss.
+   Der Schlagschatten haelt sie auch auf Gelb lesbar. */
+.ds.filled .wild-glyph{
+  filter:brightness(0) invert(1) drop-shadow(0 1px 1px rgba(0,0,0,.45));
+  line-height:1
+}
 
 /* Bonus-Chips */
 /* Nutzer-Feedback (2026-07-27): der Bonuschip-Bereich selbst wird klickbar/
