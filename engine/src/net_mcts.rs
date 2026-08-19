@@ -1360,6 +1360,43 @@ pub fn wertung_round_gain() -> f64 {
     *CELL.get_or_init(|| read_f64_env("MOSAIC_WERTUNG_ROUND_GAIN", 0.0))
 }
 
+/// Baustein 3 (`MOSAIC_WERTUNG_SCALE_PROFILE`, `PREREG_shaping_scale_per_
+/// round.md` par.4): `profil_r` je Runde 1..5, gemessen aus dem
+/// Punktestand-ANTEIL (nicht dem Punktestand selbst) ueber 22 Arena-Logs
+/// (par.1) -- `SCALE_r = WERTUNG_SHAPING_SCALE * profil_r`.
+const WERTUNG_SCALE_PROFILE: [f64; 5] = [0.083, 0.172, 0.327, 0.515, 0.825];
+
+/// Laufzeit-Wert von `MOSAIC_WERTUNG_SCALE_PROFILE` -- Default **aus**
+/// (ungesetzt, leer oder `"0"`) = flacher Nenner `WERTUNG_SHAPING_SCALE`
+/// (50.0) fuer ALLE Runden, byte-identisches Bestandsverhalten. Gesetzt auf
+/// `"1"` oder `"an"` = das rundenabhaengige Profil (par.4) gilt fuer den
+/// Wertungsplatten-/Spezialfeld-Term in [`apply_wertung_shaping_full`] --
+/// NICHT fuer den Strafleisten- oder den Tiling-Term, siehe dortige
+/// Begruendung (par.6a).
+pub fn wertung_scale_profile_active() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_WERTUNG_SCALE_PROFILE") {
+        Ok(raw) => {
+            let t = raw.trim();
+            t == "1" || t.eq_ignore_ascii_case("an")
+        }
+        Err(_) => false,
+    })
+}
+
+/// `SCALE_r` fuer Runde `round_number` (1-basiert, geklemmt auf 1..5, gleiche
+/// Klemmung wie die bestehende `t`-Berechnung in [`apply_wertung_shaping_full`]).
+/// Reine Funktion (kein Env-Zugriff) -- `profile_active` als Parameter, damit
+/// Tests das OnceLock nicht umgehen muessen (gleiches Trennungsmuster wie
+/// `apply_wertung_shaping_full` selbst).
+fn wertung_scale_for_round(round_number: u32, profile_active: bool) -> f64 {
+    if !profile_active {
+        return WERTUNG_SHAPING_SCALE;
+    }
+    let idx = (round_number.clamp(1, 5) - 1) as usize;
+    WERTUNG_SHAPING_SCALE * WERTUNG_SCALE_PROFILE[idx]
+}
+
 /// Reine Formel hinter [`apply_wertung_shaping`], OHNE Env-Var-Zugriff --
 /// Gewichte/Exponenten als Parameter statt aus dem OnceLock-Cache gelesen,
 /// gleiches Trennungsmuster wie `blended_leaf_win_prob`/`_with` (siehe
@@ -1388,9 +1425,30 @@ pub fn wertung_round_gain() -> f64 {
 /// Gegenterm (Strafleiste `floor_w`). Ein Gewicht 0 schaltet das jeweilige
 /// Kriterium/Additiv vollstaendig ab -- das ist die Voraussetzung fuer den
 /// Nutzer-Versuchsaufbau (je Satz nur EIN Kriterium injiziert).
+///
+/// Baustein 3 (`scale_profile_active`, `MOSAIC_WERTUNG_SCALE_PROFILE`,
+/// `PREREG_shaping_scale_per_round.md` par.4/par.5/par.6a): wirkt NUR auf den
+/// Nenner der Wertungsplatten-/Spezialfeld-Terme (die `bei`-Closure unten).
+/// Der Strafleisten-Term (`floor_w`) und der Tiling-Term (`tiling_w`) bleiben
+/// AUSDRUECKLICH auf dem flachen Nenner `WERTUNG_SHAPING_SCALE`, unabhaengig
+/// vom Profil-Knopf -- par.6a Praezisierung (REGEL 0, geprueft, weicht vom
+/// Prereg-Wortlaut ab): der DEFAULT von `floor_w` selbst
+/// (`wertung_floor_weight()`/`MOSAIC_WERTUNG_FLOOR_W`) ist **0.0**, nicht
+/// 0,3 -- der im Prereg zitierte Beleg "`floor_shaping_weight = 0,3`,
+/// engine_config" (`lib.rs:631`) meint `FLOOR_SHAPING_WEIGHT`/
+/// `floor_shaping_weight()` (`MOSAIC_FLOOR_SHAPING_W`), das GANZ ANDERE Floor-
+/// Additiv in `blended_leaf_win_prob`/`floor_shaping_delta` -- eine separate
+/// Funktion, die diese Closure gar nicht durchlaeuft. Der `floor_w`-Zweig
+/// hier ist also per Default TOT (der fruehe `floor_w == 0.0`-Zweig unten
+/// greift ohnehin nicht, weil der ganze Ausdruck schon durch den
+/// Gesamt-Fruehausstieg abgefangen wird). Der flache Nenner bleibt trotzdem
+/// EXPLIZIT gepinnt -- als Schutz fuer den Fall, dass jemand `MOSAIC_WERTUNG_
+/// FLOOR_W` UND das Profil gleichzeitig setzt (nicht-default Kombination),
+/// und weil `tiling_w` (`MOSAIC_TILING_W`, ebenfalls Default 0.0) aus
+/// Symmetriegruenden analog behandelt wird.
 fn apply_wertung_shaping_full(
     value: [f64; 2], state: &GameState, ws: &[f64; 8], alphas: &[f64; 8], round_gain: f64,
-    floor_w: f64, tiling_w: f64,
+    floor_w: f64, tiling_w: f64, scale_profile_active: bool,
 ) -> [f64; 2] {
     if ws.iter().all(|w| *w == 0.0) && floor_w == 0.0 && tiling_w == 0.0 {
         return value;
@@ -1453,7 +1511,14 @@ fn apply_wertung_shaping_full(
         // (w=0,03/0,1/0,3/1,0 gleichmaessig) ist damit unter der ALTEN Formel
         // gemessen und nicht mit neuen Zahlen vergleichbar.
         let t = ((state.round_number.clamp(1, 5) - 1) as f64) / 4.0;
-        let bei = |x: f64| (x / WERTUNG_SHAPING_SCALE).tanh();
+        // Baustein 3: Nenner der Wertungsplatten-/Spezialfeld-Terme, gesteuert
+        // von `MOSAIC_WERTUNG_SCALE_PROFILE` -- bei inaktivem Knopf identisch
+        // zu `WERTUNG_SHAPING_SCALE` (byte-identisches Bestandsverhalten).
+        let scale_r = wertung_scale_for_round(state.round_number, scale_profile_active);
+        let bei = |x: f64| (x / scale_r).tanh();
+        // Strafleisten-/Tiling-Term bleiben IMMER auf dem flachen Nenner --
+        // siehe Funktionskommentar oben (par.6a-Praezisierung).
+        let bei_flat = |x: f64| (x / WERTUNG_SHAPING_SCALE).tanh();
         let mut shift = 0.0;
 
         // Wertungsplatten, je Kriterium einzeln gewichtet und einzeln begrenzt.
@@ -1477,13 +1542,16 @@ fn apply_wertung_shaping_full(
             ));
         }
         // Strafleisten-Gegenterm: NEGATIV (Summe der BROKEN_PENALTIES).
+        // Flacher Nenner (`bei_flat`), NICHT `scale_r` -- siehe
+        // Funktionskommentar (par.6a).
         if floor_w != 0.0 {
-            shift += floor_w * bei(
+            shift += floor_w * bei_flat(
                 crate::round_end::projected_unplaceable_penalty(&state.players[i]) as f64);
         }
         // Tiling-Potenzial: der Musterreihen-Traeger aus der Heuristik.
+        // Flacher Nenner, analog zum Strafleisten-Term (siehe oben).
         if tiling_w != 0.0 {
-            shift += tiling_w * bei(tiling_potenzial(state, i));
+            shift += tiling_w * bei_flat(tiling_potenzial(state, i));
         }
         out[i] = (value[i] + shift).clamp(0.0, 1.0);
     }
@@ -1501,7 +1569,7 @@ fn apply_wertung_shaping_full(
 fn apply_wertung_shaping(value: [f64; 2], state: &GameState) -> [f64; 2] {
     apply_wertung_shaping_full(
         value, state, &wertung_shaping_weights(), &wertung_shaping_alphas(), wertung_round_gain(),
-        wertung_floor_weight(), tiling_weight(),
+        wertung_floor_weight(), tiling_weight(), wertung_scale_profile_active(),
     )
 }
 
@@ -1556,6 +1624,35 @@ pub fn ownership_weights() -> [f64; 8] {
             Some(v) if v.len() == 8 => out.copy_from_slice(v),
             _ => eprintln!(
                 "MOSAIC_OWNERSHIP_GEW={raw:?} ignoriert -- erwartet 1 oder 8 Zahlen, Default 1,0 je Kriterium gilt"
+            ),
+        }
+        out
+    })
+}
+
+/// Baustein 2 (`MOSAIC_OWNERSHIP_SCALE`, `PREREG_reachability_target.md`
+/// par.6 / `PREREG_shaping_scale_per_round.md` par.3a): Nenner JE KRITERIUM
+/// fuer den Ownership-Pol, ersetzt die feste `WERTUNG_SHAPING_SCALE` (50.0)
+/// im `tanh(E_k / scale_k)`-Term. Format und Haerte exakt wie
+/// `wertung_shaping_alphas`/`ownership_weights`: 1 oder 8 kommagetrennte
+/// Zahlen, falsche Laenge wird VERWORFEN (mit Meldung), nicht teilgelesen.
+///
+/// Default alle `WERTUNG_SHAPING_SCALE` (50.0) = byte-identisches
+/// Bestandsverhalten. Anlass (par.6, gemessen): `tanh(0,082/50)` = 0,0016
+/// gegen eine q-Eigenspreizung der Suche von 0,078 -- Faktor ~50 zu leise.
+/// Gemessene Nenner fuer Arm S: k0 ~17, k1 ~1, k2 ~0,3 statt einheitlich 50.
+pub fn ownership_scale() -> [f64; 8] {
+    static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let mut out = [WERTUNG_SHAPING_SCALE; 8];
+        let Ok(raw) = std::env::var("MOSAIC_OWNERSHIP_SCALE") else { return out };
+        let parts: Vec<&str> = raw.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+        let vals: Option<Vec<f64>> = parts.iter().map(|p| p.parse::<f64>().ok()).collect();
+        match vals.as_deref() {
+            Some([one]) => out = [*one; 8],
+            Some(v) if v.len() == 8 => out.copy_from_slice(v),
+            _ => eprintln!(
+                "MOSAIC_OWNERSHIP_SCALE={raw:?} ignoriert -- erwartet 1 oder 8 Zahlen, Default {WERTUNG_SHAPING_SCALE} je Kriterium gilt"
             ),
         }
         out
@@ -1646,6 +1743,7 @@ fn apply_ownership_shaping_full(
     w_own: f64,
     gew: &[f64; 8],
     use_conj: bool,
+    scale: &[f64; 8],
 ) -> [f64; 2] {
     if w_own == 0.0 {
         return value;
@@ -1696,20 +1794,20 @@ fn apply_ownership_shaping_full(
             if gew[k] == 0.0 {
                 continue;
             }
-            shift += gew[k] * (e[k] / WERTUNG_SHAPING_SCALE).tanh();
+            shift += gew[k] * (e[k] / scale[k]).tanh();
         }
         out[i] = (value[i] + w_own * shift).clamp(0.0, 1.0);
     }
     out
 }
 
-/// Laufzeit-Wrapper von [`apply_ownership_shaping_full`], liest `w_own`/`gew`
-/// aus den prozessweiten OnceLock-Caches. Aufrufstellen: `net_leaf_eval` und
-/// `node_from_net_outputs`s `LeafEval::Net`-Zweig -- dieselben zwei Stellen
+/// Laufzeit-Wrapper von [`apply_ownership_shaping_full`], liest `w_own`/`gew`/
+/// `scale` aus den prozessweiten OnceLock-Caches. Aufrufstellen: `net_leaf_eval`
+/// und `node_from_net_outputs`s `LeafEval::Net`-Zweig -- dieselben zwei Stellen
 /// wie [`apply_wertung_shaping`], jeweils DIREKT dahinter.
 fn apply_ownership_shaping(value: [f64; 2], state: &GameState, ownership: &[f32]) -> [f64; 2] {
     apply_ownership_shaping_full(value, state, ownership, ownership_weight(),
-                                 &ownership_weights(), ownership_conj())
+                                 &ownership_weights(), ownership_conj(), &ownership_scale())
 }
 
 /// `MOSAIC_OWNERSHIP_CONJ` -- Formumschaltung des Ownership-Verbrauchers.
@@ -7439,12 +7537,12 @@ mod tests {
         for gi in 0..8u64 {
             let Some(state) = random_drafting_state(gi, 16, &mut rng) else { continue };
             for v in [[0.5f64, 0.5f64], [0.9, 0.2], [0.0, 1.0], [1.0, 0.0]] {
-                let out = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[2.0; 8], 0.0, 0.0, 0.0);
+                let out = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[2.0; 8], 0.0, 0.0, 0.0, false);
                 assert_eq!(out, v, "Spiel {gi}: w=0.0 muss byte-identisch zur Eingabe bleiben (v={v:?})");
                 // Auch bei einem exotischen `alpha` darf `w=0.0` NICHTS
                 // veraendern -- der Fruehausstieg greift VOR jedem
                 // `alpha`-Gebrauch.
-                let out2 = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[7.0; 8], 0.0, 0.0, 0.0);
+                let out2 = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[7.0; 8], 0.0, 0.0, 0.0, false);
                 assert_eq!(out2, v);
             }
             checked += 1;
@@ -7549,7 +7647,7 @@ mod tests {
 
             for s in [&state_a, &hybrid] {
                 let v = [0.5, 0.5];
-                let out = apply_wertung_shaping_full(v, s, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
+                let out = apply_wertung_shaping_full(v, s, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
                 for i in 0..2 {
                     // Seit der Zusammenfuehrung (2026-08-11) traegt der Term ALLE
                     // acht Kriterien: die gegateten sieben plus den
@@ -7570,8 +7668,8 @@ mod tests {
                 }
             }
 
-            let out_a = apply_wertung_shaping_full([0.5, 0.5], &state_a, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
-            let out_hybrid = apply_wertung_shaping_full([0.5, 0.5], &hybrid, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
+            let out_a = apply_wertung_shaping_full([0.5, 0.5], &state_a, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
+            let out_hybrid = apply_wertung_shaping_full([0.5, 0.5], &hybrid, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
             // (2) Index 0 unveraendert -- `players[0]` ist zwischen `state_a`
             // und `hybrid` identisch geblieben.
             assert_eq!(
@@ -7618,8 +7716,8 @@ mod tests {
         let mut det_swapped = det.clone();
         det_swapped.players[1] = board_with_border_fill(5); // NUR Gegnerbrett anders
 
-        let o1 = apply_wertung_shaping_full([0.5, 0.5], &det, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
-        let o2 = apply_wertung_shaping_full([0.5, 0.5], &det_swapped, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0);
+        let o1 = apply_wertung_shaping_full([0.5, 0.5], &det, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
+        let o2 = apply_wertung_shaping_full([0.5, 0.5], &det_swapped, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
         assert_eq!(o1[0], o2[0], "Index 0 darf nicht vom Gegnerbrett abhaengen");
         assert_ne!(
             o1[1], o2[1],
@@ -7649,7 +7747,7 @@ mod tests {
         let p1 = crate::scoring::wertung_progress_alpha(&state.players[1], &state.scoring_tile_ids, 2.0);
         assert!(p0 > 0.0 && p1 > 0.0, "Testaufbau: beide Seiten brauchen echten Fortschritt (p0={p0}, p1={p1})");
 
-        let out = apply_wertung_shaping_full([0.5, 0.5], &state, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0);
+        let out = apply_wertung_shaping_full([0.5, 0.5], &state, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0, false);
         assert!(out[0] > 0.5, "Index 0 sollte steigen (p0={p0}), war {}", out[0]);
         assert!(out[1] > 0.5, "Index 1 sollte steigen (p1={p1}), war {}", out[1]);
     }
@@ -7721,8 +7819,8 @@ mod tests {
             "Testaufbau: Vorsprung sollte in beiden Faellen 1 sein (low={margin_low}, high={margin_high})"
         );
 
-        let out_low = apply_wertung_shaping_full([0.5, 0.5], &low, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0);
-        let out_high = apply_wertung_shaping_full([0.5, 0.5], &high, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0);
+        let out_low = apply_wertung_shaping_full([0.5, 0.5], &low, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0, false);
+        let out_high = apply_wertung_shaping_full([0.5, 0.5], &high, &[0.5; 8], &[2.0; 8], 0.0, 0.0, 0.0, false);
         assert!(
             (out_low[0] - out_high[0]).abs() > 1e-6,
             "gleicher Vorsprung, unterschiedliches Niveau MUSS unterschiedliche Werte liefern \
@@ -7740,10 +7838,166 @@ mod tests {
         let Some(state) = random_drafting_state(0, 16, &mut rng) else {
             panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
         };
-        let out_hi = apply_wertung_shaping_full([0.95, 0.05], &state, &[5.0; 8], &[2.0; 8], 0.0, 0.0, 0.0);
-        let out_lo = apply_wertung_shaping_full([0.05, 0.95], &state, &[5.0; 8], &[2.0; 8], 0.0, 0.0, 0.0);
+        let out_hi = apply_wertung_shaping_full([0.95, 0.05], &state, &[5.0; 8], &[2.0; 8], 0.0, 0.0, 0.0, false);
+        let out_lo = apply_wertung_shaping_full([0.05, 0.95], &state, &[5.0; 8], &[2.0; 8], 0.0, 0.0, 0.0, false);
         for v in out_hi.iter().chain(out_lo.iter()) {
             assert!((0.0..=1.0).contains(v), "Shift muss auf [0,1] geklemmt sein, war {v}");
+        }
+    }
+
+    // ── Baustein 3: MOSAIC_WERTUNG_SCALE_PROFILE (PREREG_shaping_scale_per_round.md) ──
+
+    /// Default (Env-Var ungesetzt) muss aus sein.
+    #[test]
+    fn wertung_scale_profile_active_defaults_to_off() {
+        assert!(
+            !wertung_scale_profile_active(),
+            "MOSAIC_WERTUNG_SCALE_PROFILE muss bei ungesetzter Env-Var aus sein (Bestandsverhalten)"
+        );
+    }
+
+    /// (a) `wertung_scale_for_round` reproduziert bei inaktivem Profil in
+    /// JEDER Runde exakt die alte feste Konstante -- unabhaengig von der
+    /// Runde. Alte Konstante hier bewusst als Literal nachgebaut, nicht aus
+    /// `WERTUNG_SHAPING_SCALE` gelesen (REGEL 0: der Test darf eine falsche
+    /// Aenderung an der Konstante nicht mitfeiern).
+    #[test]
+    fn wertung_scale_for_round_bei_inaktivem_profil_ist_immer_die_alte_konstante() {
+        const ALTE_KONSTANTE: f64 = 50.0;
+        for r in 1..=5u32 {
+            assert_eq!(
+                wertung_scale_for_round(r, false),
+                ALTE_KONSTANTE,
+                "Runde {r}: inaktives Profil muss immer den flachen Nenner 50 liefern"
+            );
+        }
+        // Auch ausserhalb 1..5 (Clamp-Pfad) bei inaktivem Profil unveraendert.
+        assert_eq!(wertung_scale_for_round(0, false), ALTE_KONSTANTE);
+        assert_eq!(wertung_scale_for_round(9, false), ALTE_KONSTANTE);
+    }
+
+    /// (b) Aktives Profil liefert je Runde `50 * profil_r` aus par.4 und
+    /// weicht damit von der flachen Konstante ab (ausser evtl. bei
+    /// Rundungszufall, hier durch die konkreten par.4-Werte ausgeschlossen).
+    #[test]
+    fn wertung_scale_for_round_bei_aktivem_profil_folgt_par4() {
+        let erwartet = [4.15, 8.6, 16.35, 25.75, 41.25];
+        for (idx, &e) in erwartet.iter().enumerate() {
+            let r = (idx + 1) as u32;
+            let got = wertung_scale_for_round(r, true);
+            assert!(
+                (got - e).abs() < 1e-9,
+                "Runde {r}: erwartet SCALE_r={e} (par.4), war {got}"
+            );
+            assert_ne!(got, WERTUNG_SHAPING_SCALE, "Runde {r}: aktives Profil darf nicht auf dem flachen Nenner liegen");
+        }
+    }
+
+    /// Clamp-Pfad bei aktivem Profil: Runde 0/9 muessen auf Runde 1/5 fallen
+    /// (gleiche Klemmung wie die bestehende `t`-Berechnung im Wertungs-Pfad).
+    #[test]
+    fn wertung_scale_for_round_klemmt_ausserhalb_1_bis_5() {
+        assert_eq!(wertung_scale_for_round(0, true), wertung_scale_for_round(1, true));
+        assert_eq!(wertung_scale_for_round(9, true), wertung_scale_for_round(5, true));
+    }
+
+    /// (a) FORMEL-BELEG: `apply_wertung_shaping_full` mit `scale_profile_active
+    /// = false` reproduziert bitgleich die ALTE Formel `tanh(pts/50)` -- exakt
+    /// derselbe Aufbau wie der bestehende Formel-Beleg-Test oben, nur mit der
+    /// ausdruecklichen Behauptung "Default aendert nichts".
+    #[test]
+    fn apply_wertung_shaping_full_mit_inaktivem_profil_reproduziert_alte_formel_bitgleich() {
+        const ALTE_KONSTANTE: f64 = 50.0;
+        let mut rng = StdRng::seed_from_u64(20260819200);
+        let Some(state) = random_drafting_state(11, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        let w = 0.4;
+        let alpha = 1.5;
+        let v = [0.5, 0.5];
+        let out = apply_wertung_shaping_full(v, &state, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
+        for i in 0..2 {
+            let alphas = [alpha; 8];
+            let pts = crate::scoring::wertung_progress_per_kriterium(
+                &state.players[i], &state.scoring_tile_ids, &alphas, state.round_number, 0.0,
+            ) + crate::scoring::unlock_progress_beta(
+                &state.players[i], &state.scoring_tile_ids, alpha,
+            );
+            let expected = (v[i] + w * (pts / ALTE_KONSTANTE).tanh()).clamp(0.0, 1.0);
+            assert!(
+                (out[i] - expected).abs() < 1e-12,
+                "Index {i}: inaktives Profil muss bitgleich tanh(pts/50) liefern (out={out:?})"
+            );
+        }
+    }
+
+    /// (b) Aktives Profil AENDERT das Ergebnis gegenueber inaktivem Profil,
+    /// wenn ein Wertungsplatten-Gewicht > 0 gesetzt ist. DETERMINISTISCHER
+    /// Aufbau statt Zufallsstellung (gleiches Muster wie Teil 3 des
+    /// Geschwister-Tests oben, `board_with_border_fill` + Kriterium 4 --
+    /// linear, garantiert positiv fuer JEDES `n>0`, unabhaengig von der
+    /// Runde -- eine Zufallsstellung koennte zufaellig 0 Fortschritt haben
+    /// und den Test scheinlos gruen machen).
+    #[test]
+    fn apply_wertung_shaping_full_mit_aktivem_profil_aendert_das_ergebnis() {
+        let mut rng = StdRng::seed_from_u64(70099);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        state.round_number = 3;
+        state.scoring_tile_ids = vec![4]; // linear, positiv fuer jedes n>0
+        state.players[0] = board_with_border_fill(3);
+        state.players[1] = board_with_border_fill(2);
+        let w = 0.4;
+        let alpha = 1.5;
+        let v = [0.5, 0.5];
+        let out_aus = apply_wertung_shaping_full(v, &state, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, false);
+        let out_an = apply_wertung_shaping_full(v, &state, &[w; 8], &[alpha; 8], 0.0, 0.0, 0.0, true);
+        assert_ne!(
+            out_aus, out_an,
+            "aktives Profil muss das Ergebnis gegenueber dem flachen Default veraendern (Runde 3, w={w})"
+        );
+    }
+
+    /// par.6a-Praezisierung, geprueft: der Strafleisten-Term (`floor_w`) und
+    /// der Tiling-Term (`tiling_w`) bleiben auf dem FLACHEN Nenner, auch wenn
+    /// das Profil aktiv ist -- alle Wertungsplatten-Gewichte hier auf 0, NUR
+    /// `floor_w`/`tiling_w` gesetzt, damit der Test ausschliesslich deren
+    /// Pfad trifft. ZWEI Belege: (1) profil AN/AUS darf den Output nicht
+    /// unterscheiden, (2) der Output bei aktivem Profil muss trotzdem exakt
+    /// der FLACHEN Formel entsprechen -- (2) bleibt auch dann aussagekraeftig,
+    /// wenn `projected_unplaceable_penalty`/`tiling_potenzial` fuer diese
+    /// konkrete Zufallsstellung 0 sein sollten (Praezedenz: `PREREG_shaping_
+    /// scale_per_round.md` par.6a Fund 2 -- beide sind in Self-Play-Stichproben
+    /// oft 0), weil die Formel unabhaengig vom Wert geprueft wird.
+    #[test]
+    fn apply_wertung_shaping_full_floor_und_tiling_term_bleiben_bei_aktivem_profil_auf_flachem_nenner() {
+        const ALTE_KONSTANTE: f64 = 50.0;
+        let mut rng = StdRng::seed_from_u64(20260819202);
+        let Some(mut state) = random_drafting_state(15, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        state.round_number = 3;
+        let v = [0.5, 0.5];
+        let floor_w = 0.3;
+        let tiling_w = 0.2;
+        let out_aus = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[2.0; 8], 0.0, floor_w, tiling_w, false);
+        let out_an = apply_wertung_shaping_full(v, &state, &[0.0; 8], &[2.0; 8], 0.0, floor_w, tiling_w, true);
+        assert_eq!(
+            out_aus, out_an,
+            "Strafleisten-/Tiling-Term duerfen sich NICHT aendern, wenn nur das Profil umgeschaltet wird \
+             (par.6a: beide bleiben auf dem flachen Nenner)"
+        );
+        for i in 0..2 {
+            let floor_pts = crate::round_end::projected_unplaceable_penalty(&state.players[i]) as f64;
+            let tiling_pts = tiling_potenzial(&state, i);
+            let expected = (v[i]
+                + floor_w * (floor_pts / ALTE_KONSTANTE).tanh()
+                + tiling_w * (tiling_pts / ALTE_KONSTANTE).tanh())
+            .clamp(0.0, 1.0);
+            assert!(
+                (out_an[i] - expected).abs() < 1e-12,
+                "Index {i}: Strafleisten-/Tiling-Term bei AKTIVEM Profil muessen trotzdem exakt der \
+                 flachen Formel tanh(x/50) folgen (out_an={out_an:?})"
+            );
         }
     }
 
@@ -9720,18 +9974,19 @@ mod tests {
         state.scoring_tile_ids = vec![1];
         let v = [0.5f64, 0.5f64];
         let gew = [1.0f64; 8];
+        let scale = [WERTUNG_SHAPING_SCALE; 8];
 
         for zu_schmal in [Vec::new(), vec![0.0f32; 35], vec![0.0f32; 71]] {
             assert_eq!(
-                apply_ownership_shaping_full(v, &state, &zu_schmal, 0.5, &gew, false),
+                apply_ownership_shaping_full(v, &state, &zu_schmal, 0.5, &gew, false, &scale),
                 v,
                 "Kopfbreite {} muss sich wie w_own=0 verhalten (kein Panic, kein Teil-Shift)",
                 zu_schmal.len()
             );
         }
 
-        let out72 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(72, 2), 0.5, &gew, false);
-        let out140 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(140, 2), 0.5, &gew, false);
+        let out72 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(72, 2), 0.5, &gew, false, &scale);
+        let out140 = apply_ownership_shaping_full(v, &state, &synth_ownership_column(140, 2), 0.5, &gew, false, &scale);
         assert_ne!(out72, v, "ein brauchbarer 72er-Kopf muss den Blattwert bewegen");
         assert_eq!(out72, out140, "72er- und 140er-Kopf muessen denselben Shift liefern (nur [0:72] wird gelesen)");
     }
@@ -9753,9 +10008,10 @@ mod tests {
 
         let w_own = 0.4f64;
         let gew = [1.0f64; 8];
+        let scale = [WERTUNG_SHAPING_SCALE; 8];
         let own = synth_ownership_column(72, 2);
         let v = [0.5f64, 0.5f64];
-        let out = apply_ownership_shaping_full(v, &state, &own, w_own, &gew, false);
+        let out = apply_ownership_shaping_full(v, &state, &own, w_own, &gew, false, &scale);
 
         let erwartet_shift = w_own * (7.0f64 / WERTUNG_SHAPING_SCALE).tanh();
         let ego = state.current_player;
@@ -9777,7 +10033,7 @@ mod tests {
         for r in 0..6 {
             own_gegner[crate::scoring::OWNERSHIP_FIELDS + crate::scoring::ownership_index_for_grid(r, 2)] = 20.0;
         }
-        let out2 = apply_ownership_shaping_full(v, &state, &own_gegner, w_own, &gew, false);
+        let out2 = apply_ownership_shaping_full(v, &state, &own_gegner, w_own, &gew, false, &scale);
         assert!(
             (out2[gegner] - (v[gegner] + erwartet_shift)).abs() < 1e-6,
             "Gegner-Shift weicht ab: out2={out2:?}"
@@ -9788,7 +10044,7 @@ mod tests {
         let mut gew_aus = [1.0f64; 8];
         gew_aus[1] = 0.0;
         assert_eq!(
-            apply_ownership_shaping_full(v, &state, &own, w_own, &gew_aus, false),
+            apply_ownership_shaping_full(v, &state, &own, w_own, &gew_aus, false, &scale),
             v,
             "gew_1=0 muss Kriterium 1 vollstaendig abschalten"
         );
@@ -9801,6 +10057,87 @@ mod tests {
     fn ownership_knobs_default_to_off_weight_and_unit_criteria() {
         assert_eq!(ownership_weight(), 0.0);
         assert_eq!(ownership_weights(), [1.0; 8]);
+    }
+
+    // ── Baustein 2: MOSAIC_OWNERSHIP_SCALE (PREREG_reachability_target.md par.6) ──
+
+    /// (a) Default: `ownership_scale()` liefert je Kriterium die alte feste
+    /// Konstante `WERTUNG_SHAPING_SCALE` (50.0) -- byte-identisches
+    /// Bestandsverhalten, ungesetzte Env-Var.
+    #[test]
+    fn ownership_scale_defaults_to_wertung_shaping_scale_je_kriterium() {
+        assert_eq!(ownership_scale(), [WERTUNG_SHAPING_SCALE; 8]);
+    }
+
+    /// (a) Formel-Beleg mit dem Default-Nenner reproduziert exakt dieselbe
+    /// alte Formel `tanh(E/50)` wie vor Baustein 2 (alte Konstante hier
+    /// explizit nachgebaut, nicht aus `ownership_scale()` gelesen -- sonst
+    /// waere der Test gegen sich selbst blind fuer eine falsche Aenderung an
+    /// der Konstante).
+    #[test]
+    fn ownership_shaping_full_mit_default_nenner_reproduziert_alte_formel_bitgleich() {
+        const ALTE_KONSTANTE: f64 = 50.0;
+        let mut rng = StdRng::seed_from_u64(20260819100);
+        let Some(mut state) = random_drafting_state(7, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        state.scoring_tile_ids = vec![1];
+        let w_own = 0.4f64;
+        let gew = [1.0f64; 8];
+        let own = synth_ownership_column(72, 2);
+        let v = [0.5f64, 0.5f64];
+
+        let scale_default = [ALTE_KONSTANTE; 8];
+        let out = apply_ownership_shaping_full(v, &state, &own, w_own, &gew, false, &scale_default);
+        // Die alte Formel wird ueber DIESELBE Pipeline nachgebaut (sigmoid ->
+        // expected_plate_points -> tanh(e/50) mit der expliziten alten
+        // Konstante, NICHT ueber ownership_scale()). Ein analytisches E=7,0
+        // taugt hier nicht als Erwartung: der synthetische Kopf liefert
+        // sigmoid(+-20) = 1 - 2e-9 je Zelle, das Sechser-Produkt drueckt E um
+        // ~9e-8 unter 7,0 -- der erste Wurf dieses Tests scheiterte daran mit
+        // einer Abweichung von 3e-9 bei Toleranz 1e-12.
+        let ego = state.current_player;
+        let mut p_own = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        for (f, slot) in p_own.iter_mut().enumerate() {
+            // Ego-Haelfte liegt bei [0:36], und `ego == current_player`.
+            *slot = sigmoid(own[f] as f64);
+        }
+        let e = crate::scoring::expected_plate_points(&state.players[ego], &p_own, &state.scoring_tile_ids);
+        let erwartet_shift: f64 =
+            w_own * (0..8).map(|k| gew[k] * (e[k] / ALTE_KONSTANTE).tanh()).sum::<f64>();
+        assert!(
+            (out[ego] - (v[ego] + erwartet_shift)).abs() < 1e-15,
+            "Default-Nenner muss bitgleich die alte Formel tanh(E/50) reproduzieren: out={out:?}, erwartet={}",
+            v[ego] + erwartet_shift
+        );
+    }
+
+    /// (b) Ein gesetzter (nicht-uniformer) Nenner je Kriterium AENDERT das
+    /// Ergebnis gegenueber dem flachen Default -- direkt an der reinen
+    /// Funktion geprueft (kein Env-Var/OnceLock-Umweg, siehe Testkommentar
+    /// oben bei `apply_wertung_shaping_full`).
+    #[test]
+    fn ownership_scale_je_kriterium_aendert_den_shift_gegenueber_flachem_default() {
+        let mut rng = StdRng::seed_from_u64(20260819101);
+        let Some(mut state) = random_drafting_state(9, 16, &mut rng) else {
+            panic!("Testaufbau: random_drafting_state lieferte keinen Zustand");
+        };
+        state.scoring_tile_ids = vec![1];
+        let w_own = 0.4f64;
+        let gew = [1.0f64; 8];
+        let own = synth_ownership_column(72, 2);
+        let v = [0.5f64, 0.5f64];
+
+        let scale_flat = [WERTUNG_SHAPING_SCALE; 8];
+        let mut scale_k1_eng = [WERTUNG_SHAPING_SCALE; 8];
+        scale_k1_eng[1] = 1.0; // par.6: gemessener Nenner fuer k1 ~1 statt 50
+
+        let out_flat = apply_ownership_shaping_full(v, &state, &own, w_own, &gew, false, &scale_flat);
+        let out_eng = apply_ownership_shaping_full(v, &state, &own, w_own, &gew, false, &scale_k1_eng);
+        assert_ne!(
+            out_flat, out_eng,
+            "ein engerer Nenner fuer Kriterium 1 muss den Shift gegenueber dem flachen Default veraendern"
+        );
     }
 
 }
