@@ -207,12 +207,18 @@ Drei Nebenbefunde, gemessen und geprüft:
    (`round_end.rs:115-124`), nicht die aktuelle Strafleiste — unplatzierbare
    Reihen sind in Self-Play-Zuständen selten. An Mensch-Partie-Zuständen
    liefert der Export Werte > 0.
-3. **`floor_penalty` fährt mit Default-Gewicht 0,3 IMMER mit**
-   (`floor_shaping_weight = 0,3`, engine_config) — ein Rundenprofil am
-   gemeinsamen `bei(x)` ändert damit auch LIVE-Verhalten, nicht nur die
-   Messarme. Bei der Umsetzung (par.5) gehört der Strafleisten-Term deshalb
-   entweder auf den flachen Nenner gepinnt oder der Effekt in den Arena-Armen
-   ausgewiesen.
+3. **KORRIGIERT (2026-08-19, Regel-0-Fund bei der Umsetzung, am Code
+   verifiziert):** hier stand zunächst, `floor_penalty` fahre „mit
+   Default-Gewicht 0,3 IMMER mit". Das war eine **Verwechslung zweier
+   Knöpfe**: die 0,3 gehören zu `MOSAIC_FLOOR_SHAPING_W`
+   (`floor_shaping_delta`, Korrektur am Netz-Blattwert, `net_mcts.rs:403`)
+   — die läuft NICHT durch die Pfad-A-Closure. Der Strafleisten-Term in
+   `apply_wertung_shaping_full` hängt an `MOSAIC_WERTUNG_FLOOR_W`, Default
+   **0,0** (`net_mcts.rs:1306`). **Per Default ist damit KEIN Pfad-A-Term
+   live; der Profil-Knopf ändert kein Produktionsverhalten.** Strafleisten-
+   und Tiling-Term sind bei der Umsetzung trotzdem auf den flachen Nenner
+   gepinnt (Schutz, falls je `MOSAIC_WERTUNG_FLOOR_W` und das Profil
+   gleichzeitig gesetzt werden).
 
 ## par.7 MESSANORDNUNG
 
