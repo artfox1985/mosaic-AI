@@ -651,8 +651,8 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    weiter oben (Nutzer-Entscheid 2026-08-19). */
 /* WEISS 2026-08-19 (Nutzer): die Kuppelplaetze bekommen eine eigene weisse
    Flaeche, statt den Marmor durchscheinen zu lassen -- gleiche Idee wie bei
-   den Fabrikkarten unten. Gilt in JEDEM Zustand, also auch unter einer
-   gelegten Platte (.occ).
+   den Fabrikkarten unten. Gilt unter einer GELEGTEN Platte (.occ); der leere
+   Platz ist auf Nutzerwunsch wieder grau (Regel weiter unten).
    AUSNAHME, bewusst: .cando (lila) und .start (amber) setzen eigene, leicht
    transparente Fuellungen mit hoeherer Spezifitaet -- dort scheint der Marmor
    weiter durch. Der Unterschied ist rechnerisch winzig (die 27-prozentige
@@ -660,13 +660,23 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    farbige Rand. */
 .dslot{background:#fff}
 .dslot:not(.occ){box-shadow:var(--relief-down)}
-/* Rand nur im NEUTRALEN Zustand -- .cando/.start haben gleiche Spezifitaet;
-   ohne die :not()-Kette wuerde dieser Rand deren Hervorhebung ueberschreiben.
-   Die Mulde traegt jetzt allein der Innenschatten: der frueher hier liegende
-   --hollow-face-Verlauf hat die Flaeche abgedunkelt und damit genau das
-   Weiss zurueckgenommen, um das es in diesem Auftrag geht. Folge, bewusst:
-   die Vertiefung liest sich auf Weiss etwas flacher als vorher auf #E7E4DC. */
-.dslot:not(.occ):not(.cando):not(.start){border-color:rgba(0,0,0,.10)}
+/* Fuellung und Rand nur im NEUTRALEN Zustand -- .cando/.start haben gleiche
+   Spezifitaet; ohne die :not()-Kette wuerde das hier deren Hervorhebung
+   ueberschreiben.
+
+   GRAU 2026-08-19 (Nutzer, letzter Schliff): der LEERE Kuppelplatz ist wieder
+   grau. Auf Weiss trug die Vertiefung nur noch der Innenschatten und las sich
+   flacher als die uebrigen offenen Plaetze. Der Wert ist bewusst genau
+   #E3DFD6, also derselbe wie bei `.tile.empty` und `.fslot` (nicht das
+   frueher hier stehende, etwas hellere #E7E4DC): "damit es einheitlich
+   aussieht" heisst, dass alle offenen Plaetze des Bretts denselben Grauton
+   tragen. Weiss bleibt der Kuppelplatz UNTER einer gelegten Platte (.occ,
+   Regel oben). */
+.dslot:not(.occ):not(.cando):not(.start){
+  background:#E3DFD6;
+  background-image:var(--hollow-face);
+  border-color:rgba(0,0,0,.10)
+}
 /* Belegtes Kuppelfeld = gelegter Stein, also erhaben. Der Gradient muss je
    Farbklasse notiert werden, weil `.ds.filled.<farbe>{background:...}` (drei
    Klassen) ein Kurzschreibweise-background setzt und eine 2-Klassen-Regel
