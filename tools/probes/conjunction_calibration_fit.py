@@ -94,6 +94,31 @@ def fit_platt(x, y, iterationen=100):
     return float(w[0]), float(w[1])
 
 
+def fit_glm(X, y, iterationen=100):
+    """IRLS fuer beliebig viele Spalten -- gebraucht fuer V3 (geteilte Steigung
+    je Runde + Versatz je Gruppe). Gibt den Koeffizientenvektor zurueck."""
+    X = np.asarray(X, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    w = np.zeros(X.shape[1])
+    for _ in range(iterationen):
+        eta = X @ w
+        pr = sigmoid(eta)
+        W = np.clip(pr * (1 - pr), 1e-12, None)
+        z = eta + (y - pr) / W
+        A = X.T @ (X * W[:, None]) + 1e-8 * np.eye(X.shape[1])
+        try:
+            neu = np.linalg.solve(A, X.T @ (W * z))
+        except np.linalg.LinAlgError:
+            return None
+        if not np.all(np.isfinite(neu)):
+            return None
+        fertig = np.abs(neu - w).max() < 1e-10
+        w = neu
+        if fertig:
+            break
+    return w
+
+
 def sammle_zustaende(dateien, partien_je_arm=0):
     """Je Partie EIN Zustand je Runde (mittlerer Record der Runde) + Endlabel."""
     states, cps, labels, runden = [], [], [], []
@@ -247,19 +272,94 @@ def main():
 
     print()
     print("=" * 100)
-    print("HAENGT DIE STEIGUNG AN DER RUNDE?  (eigener Fit je Runde, Fit-Satz)")
+    print("VARIANTEN-VERGLEICH -- entschieden wird am TRANSFER, nicht am Fit")
     print("=" * 100)
-    print(f"{'Gruppe':16s} " + " ".join(f"{'R' + str(r):>15s}" for r in RUNDEN))
-    for g in ("Spalten k1", "Diagonalen k2", "Ecken k5"):
-        a, b = GRUPPEN[g]
-        zellen = []
-        for r in RUNDEN:
-            m = r_fit == r
-            x = logit(p_fit[m, a:b].ravel())
-            y = y_fit[m, a:b].ravel().astype(float)
-            w = fit_platt(x, y) if y.sum() >= 5 else None
-            zellen.append(f"B={w[0]:5.2f} n={int(y.sum()):4d}" if w else f"{'--':>15s}")
-        print(f"{g:16s} " + " ".join(zellen))
+    print("V0 = keine Korrektur | V1 = je Gruppe | V2 = je Gruppe UND Runde")
+    print("V3 = Steigung je RUNDE (ueber die Gruppen geteilt) + Versatz je Gruppe")
+    print("V3 hat 5+6 statt 2x6 (V1) bzw. 2x30 (V2) Parameter -- weniger Freiheit,")
+    print("mehr Aussicht auf Transfer, und sie folgt dem gemessenen Muster.")
+    print()
+
+    KRIT = [g for g in GRUPPEN if g != "Layout"]
+
+    def stapel(quelle):
+        """-> x (Logit), y, runde, gruppenindex; alle Kriteriumsgruppen untereinander."""
+        pp, yy, rr = quelle
+        xs, ys, rs, gs = [], [], [], []
+        for gi, g in enumerate(KRIT):
+            a, b = GRUPPEN[g]
+            n_at = b - a
+            xs.append(logit(pp[:, a:b]).ravel())
+            ys.append(yy[:, a:b].ravel().astype(float))
+            rs.append(np.repeat(rr, n_at))
+            gs.append(np.full(n_at * pp.shape[0], gi))
+        return (np.concatenate(xs), np.concatenate(ys),
+                np.concatenate(rs), np.concatenate(gs))
+
+    def design_v3(x, r, g):
+        sp = [np.where(r == rnd, x, 0.0) for rnd in RUNDEN]
+        ic = [(g == gi).astype(float) for gi in range(len(KRIT))]
+        return np.column_stack(sp + ic)
+
+    xf, yf, rf, gf = stapel((p_fit, y_fit, r_fit))
+    w3 = fit_glm(design_v3(xf, rf, gf), yf)
+
+    v2 = {}
+    for gi, g in enumerate(KRIT):
+        for rnd in RUNDEN:
+            m = (gf == gi) & (rf == rnd)
+            v2[(g, rnd)] = fit_platt(xf[m], yf[m]) if yf[m].sum() >= 5 else None
+
+    def anwenden(variante, x, r, g):
+        if variante == "V0":
+            return sigmoid(x)
+        if variante == "V1":
+            B = np.array([ergebnis[KRIT[i]]["B"] if KRIT[i] in ergebnis else 1.0 for i in range(len(KRIT))])
+            A = np.array([ergebnis[KRIT[i]]["A"] if KRIT[i] in ergebnis else 0.0 for i in range(len(KRIT))])
+            return sigmoid(B[g] * x + A[g])
+        if variante == "V2":
+            eta = np.empty_like(x)
+            for gi, gg in enumerate(KRIT):
+                for rnd in RUNDEN:
+                    m = (g == gi) & (r == rnd)
+                    w = v2[(gg, rnd)]
+                    eta[m] = (w[0] * x[m] + w[1]) if w else x[m]
+            return sigmoid(eta)
+        if variante == "V3":
+            if w3 is None:
+                return sigmoid(x)
+            return sigmoid(design_v3(x, r, g) @ w3)
+        raise ValueError(variante)
+
+    if w3 is not None:
+        print("V3-Steigungen je Runde: "
+              + "  ".join(f"R{r} {w3[i]:.3f}" for i, r in enumerate(RUNDEN)))
+        print("V3-Versatz je Gruppe:   "
+              + "  ".join(f"{g.split()[-1]} {w3[len(RUNDEN)+i]:+.3f}"
+                          for i, g in enumerate(KRIT)))
+    print()
+
+    saetze = [("FIT-Satz", (p_fit, y_fit, r_fit))]
+    if hat_transfer:
+        saetze.append((f"TRANSFER {TRANSFER_ARM}", daten[TRANSFER_ARM]))
+    for name, quelle in saetze:
+        x, y, r, g = stapel(quelle)
+        print(f"--- {name}  ({int(y.sum())} Positive, {len(y)} Paare)")
+        print(f"{'Gruppe':16s} {'Pos':>7s} " + " ".join(f"{v:>11s}" for v in ("V0", "V1", "V2", "V3")))
+        pv = {v: anwenden(v, x, r, g) for v in ("V0", "V1", "V2", "V3")}
+        for gi, gg in enumerate(KRIT):
+            m = g == gi
+            zellen = [f"{brier(y[m], pv[v][m]):11.6f}" for v in ("V0", "V1", "V2", "V3")]
+            print(f"{gg:16s} {int(y[m].sum()):7d} " + " ".join(zellen))
+        gesamt = [brier(y, pv[v]) for v in ("V0", "V1", "V2", "V3")]
+        print(f"{'GESAMT':16s} {int(y.sum()):7d} " + " ".join(f"{b:11.6f}" for b in gesamt))
+        print(f"{'  vs V0':16s} {'':7s} " + " ".join(
+            f"{100*(gesamt[0]-b)/gesamt[0]:10.2f}%" for b in gesamt))
+        print()
+
+    print("Entscheidungsregel (vorab): eine Variante wird nur gebaut, wenn sie im")
+    print("TRANSFER besser ist als V0 -- im Fit-Satz ist jede Variante per")
+    print("Konstruktion besser, das entscheidet nichts.")
 
     ziel = REPO / "evaluations" / "conjunction_calibration_fit.json"
     ziel.write_text(json.dumps({"checkpoint": CHECKPOINT, "fit_arme": vorhanden,
