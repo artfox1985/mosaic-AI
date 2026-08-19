@@ -239,6 +239,56 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
   **10,3 gegen 1,3 je Partie**, also 9,0 der 14,5 Punkte Differenz. Die KI
   schaltet in **6 von 10** Partien kein einziges Spezialfeld frei, der Mensch in
   9 von 10 schon in Runde 2.
+- **Zuege und Verzweigungsgrad je Runde** (uebernommen aus
+  `evaluations/actions_per_round.md`): **~11 Zuege pro Runde und Spieler**.
+  Gemessen in Runde 1; in spaeteren Runden werden es weniger, weil weniger
+  Kuppelplatten zur Verfuegung stehen. Der Verzweigungsgrad faellt dabei stark:
+
+  | Zug | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+  | Aktionen | 195 | 152 | 134 | 117 | 83 | 44 | 42 | 7 | 7 | 5 | 2 |
+
+  Die ersten vier Zuege tragen also den Loewenanteil der Entscheidung (195 bis
+  117 Optionen), ab Zug 8 ist die Runde praktisch determiniert (<= 7 Optionen).
+### Punktestand je Runde — und warum es zwei Zahlenreihen gibt
+
+**Referenz ist der ARENA-Modus, nicht das Self-Play.** Gemessen an den 22
+Elo-Logs (`static/log/elo/*.log`, Mensch gegen KI, Modelle `v19_2d_best` und
+`v20_2d_opp_brierbest`, 400 Sims), Stand nach der letzten punktewirksamen Zeile
+je Runde:
+
+| Runde | Mensch | Zuwachs | KI | Zuwachs | Vorsprung |
+|---|---:|---:|---:|---:|---:|
+| 1 | 7,0 | 7,0 | 4,0 | 4,0 | 3,0 |
+| 2 | 13,3 | 6,3 | 9,2 | 5,2 | 4,1 |
+| 3 | 23,0 | 9,7 | 19,2 | 10,0 | 3,8 |
+| 4 | 37,7 | 14,7 | 29,2 | 10,0 | 8,5 |
+| 5 | 59,2 | 21,5 | 47,6 | 18,4 | 11,6 |
+| **nach Endwertung** | **74,4** | | **55,7** | | **18,7** |
+
+Zwei Ablesungen: **der Zuwachs waechst monoton** — die letzte Runde ist drei-
+bis fuenfmal so viel wert wie die erste. Und **der Vorsprung des Menschen
+entsteht in Runde 4/5**: bis Runde 3 sind es 3,8 Punkte, danach oeffnet sich die
+Schere auf 11,6 und mit der Endwertung auf 18,7 — genau dort landen die
+Wertungsplatten.
+
+**Im SELF-PLAY liegen dieselben Staende deutlich tiefer** (Bewertungssatz
+`data/holdout`, Arm `a`, 300 Partien): 5,8 / 8,8 / 12,1 / 17,3 / **26,6** gegen
+die 47,6 der Arena. **Das ist kein Widerspruch, sondern Absicht**
+(Nutzer-Erklaerung 2026-08-18): Self-Play laeuft mit Wurzelrauschen und
+Besuchs-Sampling und mit 200 statt 400 Sims — der Agent spielt dort bewusst
+schlechter, damit der Korpus Vielfalt bekommt. Beleg in den Lauf-Manifesten:
+`add_root_noise: true`, `deterministic: false`, `sims: 200`.
+
+**Regel daraus: Punktniveaus nie aus Self-Play-Daten als Referenz fuer echtes
+Spiel nehmen.** Wer eine Skala, Schwelle oder Zielgroesse an Punkten festmacht,
+nimmt die Arena-Reihe.
+
+**Caveat zur Vergleichbarkeit:** die beiden Reihen haben verschiedene Anker (Log
+= tatsaechliche Punktereignisse, Self-Play = `player.score` am letzten Record der
+Runde, das innerhalb einer Runde schwankt), und die Zeilen-n der Log-Reihe
+schwanken zwischen 14 und 22, weil nicht in jeder Runde eine Punktezeile je
+Spieler faellt. Die Groessenordnung traegt, die zweite Stelle nicht.
 
 
 ## Spielstrategie aus Nutzer-Praxis (2026-08-13, woertlich aufgenommen)
