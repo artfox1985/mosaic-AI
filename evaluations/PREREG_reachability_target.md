@@ -301,3 +301,167 @@ Information weg, die es nicht ohnehin nicht gibt.
 Bauen stillschweigend zu treffen: die Variante heisst weiter "Ersetzen", aber
 **rundenweise ersetzen** — Runde 3-5 Vollendbarkeit, Runde 1-2 unveraendert. Die
 Kopfbreite bleibt bei 140.
+
+## par.12 NACHTRAG-ARM: VORRATSPUFFER STATT BOOLEAN (2026-08-18)
+
+**ENTWURF, nichts gebaut.** Plan-Zeitform.
+
+**Anlass.** Eine externe Spezifikation (`EXP-2026-MICRO-MILESTONE`, 2026-08-18)
+schlaegt einen zusaetzlichen Hilfskopf mit abgestuftem Kurzfrist-Label vor. Der
+Vorschlag wird in dieser Form **nicht uebernommen** (Begruendung: par.13). Ein
+Punkt daraus traegt aber, und er faellt in genau den Durchlauf, der hier ohnehin
+ansteht.
+
+**Der Punkt.** par.10 zeigt, dass das Praedikat in Runde 1-2 bei 100 % / 98,8 %
+saettigt und deshalb genau dort stumm ist, wo die Beschaffung faellt (81 % der
+Stapel-Ziehungen in Runde 1-2, par.10). Die Saettigung ist eine Folge der
+**Booleschen Form**, nicht der Groesse selbst: `ist_spalte_vollendbar` prueft, ob
+der Vorrat reicht, und wirft den **Abstand** weg.
+
+**Arm P (Puffer).** Dieselbe Rechnung, stetiger Ausgang: je offener Zelle die
+Zahl der noch erreichbaren Kopien der geforderten Farbe **minus** dem Bedarf,
+ueber die Kette zum Minimum zusammengefasst (die bindende Zelle bestimmt die
+Spalte). Quelle unveraendert `provocation::noch_erreichbare_farben` — also
+weiterhin **nur beobachtbare Information**, kein Beutelwissen.
+
+- **Kopfbreite unveraendert** (140). Der Ausgang bleibt Sigmoid; das Ziel wird
+  auf [0,1] gestaucht (Stauchung vor dem ersten Lauf festzulegen und hier
+  nachzutragen — sie ist ein Freiheitsgrad und darf nicht beim Bauen fallen).
+- **Kein neuer Kopf, kein Hilfsverlust, kein Annealing.** Arm P ist eine zweite
+  Label-Variante im selben Relabeling-Durchlauf, nicht eine zweite Architektur.
+- **Eigener Cache-Schluessel** (`+reachbuf_v1` neben `+reach_v1`, Muster
+  `neural_net.py:1254-1292`), damit die Varianten sich nicht still mischen.
+
+**Rundenaufteilung, verbindlich:** Puffer in **Runde 1-2**, boolesche
+Vollendbarkeit in **Runde 3-5**. Nicht 1-3/4-5: in Runde 3 traegt das boolesche
+Label bereits (85,1 %, par.10), dort gibt es nichts zu ersetzen. Arm P schliesst
+die Luecke, er verschiebt sie nicht.
+
+**Warum ueberhaupt ein zweiter Arm.** Variante R (boolesch) und Arm P
+unterscheiden sich damit nur in Runde 1-2; in Runde 3-5 sind sie identisch.
+
+**Was Arm P NICHT ist: gratis.** Die Label-Rechnung ist es fast (dieselbe
+Vorratsabfrage, ein zusaetzlicher Schreibzugriff je Sample) — der **Trainingslauf
+ist es nicht**. Zwei Label-Varianten sind zwei Laeufe, und damit ein A/B mit der
+bekannten Seed-Empfindlichkeit. Die externe Durchsicht 2026-08-18 nennt Arm P
+"kein A/B-Trainingsrisiko"; das ist falsch, und die Kostenzeile in par.9 ist
+entsprechend zu fuehren.
+
+**Und er kann sehr wohl schlechter sein als das boolesche Label.** Die externe
+Durchsicht argumentiert, schlimmstenfalls lerne der Kopf denselben Wert. Das
+gilt nur, wenn die Stauchung informationserhaltend ist — eine zu enge Kappung
+(z. B. "3 Fliesen ueber Bedarf = 1,0") macht aus dem Puffer in Runde 1-2 wieder
+eine Konstante, nur mit anderem Wert. Die Kappung ist ein **Hyperparameter**,
+kein Detail; sie wird vor dem Lauf festgelegt und hier nachgetragen, und genau
+darauf zielt die Sperre unten.
+
+### VORAB-SPERRE fuer Arm P (vor jeder Trainingsminute)
+
+Dieselbe Anordnung wie par.5/par.10 (Held-out, je (Partie, Runde) eine Stellung,
+150 je Runde), aber fuer eine stetige Groesse:
+
+> **VORAB-REGEL par.12:** der Puffer muss in **Runde 1 und 2** eine
+> Standardabweichung ueber die 6 Spalten-Atome von **> 0** in mindestens 80 % der
+> Stellungen aufweisen, und der Median darf nicht am Rand der Stauchung liegen
+> (nicht in den obersten oder untersten 5 % des Wertebereichs). Andernfalls ist
+> der Puffer nur eine umskalierte Konstante, und Arm P wird NICHT gebaut.
+
+Der Sinn ist eng: Arm P existiert **ausschliesslich**, um die Runde-1-2-Luecke zu
+schliessen. Zeigt er dort keine Spreizung, hat er keinen Zweck — dann bleibt es
+bei Variante R.
+
+**Vor der Sperre, als Handprobe** (uebernommen aus der externen Durchsicht): 20
+bis 30 Stellungen aus Runde 1-2 ansehen und pruefen, ob die stetige Skala mit der
+Naehe zur Fertigstellung zusammengeht. Das ist keine Entscheidungsregel, sondern
+der billige Schutz gegen einen Vorzeichen- oder Normierungsfehler, den die
+Sperre selbst nicht faende — eine invertierte Skala haette Spreizung.
+
+**Erfolgsregel:** unveraendert par.7, mit Arm P an der Stelle von T+S. Ein
+zusaetzlicher Vergleich P gegen T+S wird protokolliert, entscheidet aber nichts
+(die Anordnung ist dafuer nicht gebaut; zwei Trainingslaeufe unterscheiden sich
+gemessen staerker im Seed als im Knopf).
+
+### ERGEBNIS DER VORAB-SPERRE par.12 (2026-08-19): BESTANDEN, Stauchung festgelegt
+
+`tools/probes/reachability_buffer_spread.py`, Anordnung wie par.10 (`data/
+holdout`, Tiling-Stellungen, je (Partie, Runde) eine, 150 je Runde). Puffer aus
+dem erweiterten Export `plate_completability_json` (neues Feld
+`col_open_cells`: je offener Normal-Zelle `buffer = erreichbar - Bedarf`,
+bindende Zelle = Minimum ueber die Spalte). Rohzahlen:
+`evaluations/probe_reachability_buffer_spread.json`.
+
+| Runde | bindende Spalten je Stellung | Roh-Puffer p10 / Median / p90 |
+|---|---:|---|
+| 1 | 5,64 | 6 / 9 / 11 |
+| 2 | 5,89 | 2 / 5 / 8 |
+| 3 | 5,95 | −1 / 2 / 6 |
+| 4 | 5,99 | −3 / 0 / 3 |
+| 5 | 5,96 | −4 / −1 / 2 |
+
+**Drei Absicherungen, alle gruen:** Paritaets-Selbsttest Puffer↔Boolean 0
+Brueche in 4.500 Spalten-Pruefungen (Spalte unvollendbar ⇔ eine bindende Zelle
+mit Puffer < 0); Handprobe 25 Stellungen ohne Vorzeichen-/Normierungsbefund;
+der Puffer faellt monoton mit dem Vorrat ueber die Runden.
+
+> **Sperre je Kappungs-Kandidat** (`squash(b) = clip(b, 0, CAP)/CAP`,
+> `b < 0 → 0`, Spalte ohne bindende Zelle → 1,0):
+>
+> | CAP | R1 std>0 | R1 Median | R2 std>0 | R2 Median | Sperre |
+> |---:|---:|---:|---:|---:|---|
+> | 4 | 2,7 % | 1,000 (Rand) | 80,7 % | 1,000 (Rand) | nicht bestanden |
+> | 8 | 70,0 % | 1,000 (Rand) | 100 % | 0,625 | nicht bestanden |
+> | **12** | **100 %** | **0,750** | **100 %** | **0,417** | **BESTANDEN** |
+> | 16 | 100 % | 0,562 | 100 % | 0,312 | BESTANDEN |
+>
+> **Festgelegte Stauchung: CAP = 12** — der kleinste bestehende Kandidat; er
+> laesst die Mediane beider Runden am weitesten von den Raendern und kappt bei
+> p90(Runde 1) = 11 fast nichts. Arm P ist damit baubar.
+
+**Einordnung, unveraendert:** die Sperre belegt SPREIZUNG des Labels in Runde
+1-2, nicht seinen Nutzwert. Ob der Puffer die Beschaffungs-Haelfte wirklich
+traegt, entscheidet erst par.7.
+
+## par.13 WAS AUS `EXP-2026-MICRO-MILESTONE` NICHT UEBERNOMMEN WIRD
+
+Vollstaendig, damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
+
+1. **Die Begruendung des Vorschlags haelt nicht.** Er stuetzt sich darauf, das
+   Realisierungs-Label habe in der Aufbauphase "~50 % Varianz" und ersticke
+   deshalb den Gradienten. Gemessen ist das Gegenteil: Realisierung liegt bei
+   **~13 %** (`DOSSIER_ownership_head.md` 6(C), 20 Spalten in 156 Partien) — das
+   Label ist entartet **duenn**. Die 47-55 % sind die **Vollendbarkeit** in
+   Runde 4-5 (par.10 oben), wo sie ausdruecklich als informationstheoretisches
+   Optimum bewertet ist. Der Vorschlag schreibt die Zahl des Heilmittels der
+   Krankheit zu.
+2. **Die vorgeschlagene Label-Quelle liegt auf der falschen Ebene.** "Garantiert
+   belegbar" soll aus dem Tiling-Solver kommen. Der entscheidet, WO eine Farbe
+   landet (`DOSSIER` Abschnitt 4); die Vorratsgarantie ist
+   `column_build.rs:506/563`. Und auf der Tiling-Ebene ist fuer k1 **kein
+   Aktionssignal** vorhanden: 265 von 265 Kandidaten mit k1 = 0
+   (`PREREG_plate_policy_supervision.md` par.8).
+3. **Die Definition widerspricht sich.** "Unter Annahme optimaler
+   Gegner-Verteidigung, aber ohne Beruecksichtigung von Draft-Unsicherheit" —
+   die bindende Beschraenkung IST der Draft (ebd.).
+4. **Der Bezug auf 7(4) ist ein Kategorienfehler.** 7(4) beschreibt einen
+   **Laufzeit**-Befund (der Regler ist in Runde 1 bitgleich wirkungslos,
+   40/40 Stellungen). Ein Trainings-Hilfsziel, das laut eigener Spezifikation
+   NICHT in den Draft-Shift eingeht, beruehrt das nicht.
+5. **Die dazu behauptete Spielregel stimmt nicht.** "In Runde 1 ist kein Feld in
+   <= 2 Zuegen garantiert belegbar, da noch keine Musterreihe gewaehlt ist" —
+   abgeschlossene Musterreihen werden am **Rundenende** aufgeloest und schicken
+   je eine Fliese auf die Kuppel (`docs/engine_manual.md:125-131`); die Reihe
+   mit Kapazitaet 1 ist in Runde 1 abschliessbar.
+6. **Zwei der fuenf Erfolgsmetriken sind nicht auswertbar.**
+   - `loss_micro < 0,1` ohne Grundraten-Waechter: bei einer Grundrate um 90 %
+     erreicht man das durch Vorhersage der Grundrate.
+   - `Kendall-Tau >= 0,9 gegen den Vor-Zustand` misst mit
+     `sibling_order_stability.py` die Stabilitaet ueber
+     **Determinisierungs-Seeds** (`DOSSIER` 6(iv)), nicht ueber Checkpoints — und
+     bestraft davon abgesehen genau die Aenderung, die der Versuch herbeifuehren
+     soll. Stabilitaet einer moeglicherweise falschen Ordnung (7(2)) ist kein
+     Guetemass.
+7. **Der Kostenblock ist falsch veranschlagt.** Die Spezifikation sorgt sich um
+   Solver-Laufzeit. Teurer ist, dass es ein **Trainings**-A/B ist: der Seed
+   bewegt die Metrik staerker als der Knopf, Einzellaeufe sind uninterpretierbar
+   (Projektbefund; hier nicht neu geprueft). "Parallel zum asymmetrischen Arm"
+   ist damit kein billiger Zusatz.
