@@ -1173,6 +1173,46 @@ fn bauer_drafting_vorzug(state: &GameState) -> Option<Action> {
         .or_else(|| crate::plate_builder::dome_vorzug(state))
 }
 
+/// `MOSAIC_ASYM_VORZUG` -- Baustein 1, `PREREG_asymmetric_curriculum.md` par.3
+/// (Arm S, "asymmetrisches Self-Play"). Default **0/aus** = Bestandsverhalten:
+/// `play_net_self_play_game` gibt weiterhin BEIDEN Seiten `vorzug: true`
+/// (par.2, `players: [player, player]`). Gesetzt (nicht leer und `!= "0"`,
+/// gleiches Muster wie `stack_draw_research`): je Partie bekommt GENAU EINE
+/// Seite den Bauer-Vorzug (`vorzug: true`), die andere `vorzug: false` --
+/// Seitenwahl deterministisch aus dem Partie-Seed, siehe
+/// [`asym_vorzug_seite`]. `dome_vorzug` faehrt in derselben Kette mit
+/// (par.4(1): NICHT getrennt schaltbar, das ist Absicht).
+fn asym_vorzug_active() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_ASYM_VORZUG")
+            .map(|v| !v.is_empty() && v != "0")
+            .unwrap_or(false)
+    })
+}
+
+/// Deterministische Seitenwahl fuer `MOSAIC_ASYM_VORZUG`: welche Spielerseite
+/// (0 oder 1) bekommt in DIESER Partie den Bauer-Vorzug. Reproduzierbar
+/// (dieselbe Partie ergibt dieselbe Seite) und ueber viele Partien 50/50
+/// verteilt (Ziel aus par.3).
+///
+/// Wiederverwendet den bereits GEPRUEFTEN SplitMix64-Finalizer aus
+/// [`crate::net_mcts::partie_gewicht_aus_seed`] (net_mcts.rs:1164, Vorbild
+/// laut Auftrag) statt einer zweiten Kopie derselben Mischung -- XOR mit
+/// einem Distinguisher-Konstante VOR dem Mischen, damit die Seitenwahl NICHT
+/// bit-fuer-bit mit einer gleichzeitig aktiven `MOSAIC_WERTUNG_STREUUNG_MAX`-
+/// Ableitung DESSELBEN Partie-Seeds korreliert (beide Knoepfe koennten in
+/// derselben Partie aktiv sein).
+fn asym_vorzug_seite(game_seed: u64) -> usize {
+    const DISTINGUISHER: u64 = 0xA5A5_A5A5_A5A5_A5A5;
+    let w = crate::net_mcts::partie_gewicht_aus_seed(game_seed ^ DISTINGUISHER, 1.0);
+    if w < 0.5 {
+        0
+    } else {
+        1
+    }
+}
+
 /// Ergebnis eines Drafting-Entscheids eines [`DraftingAgent`].
 struct DraftingDecision {
     chosen: Action,
@@ -1447,6 +1487,16 @@ struct GameLoopConfig<'a> {
     labels: Option<LabelSamplingConfig<'a>>,
     mode: LoopMode<'a>,
     players: [PlayerLoopConfig<'a>; 2],
+    /// Baustein 1 (`PREREG_asymmetric_curriculum.md` par.5): optionaler
+    /// Zaehler, wie oft die Bauer-Vorzugskette ([`bauer_drafting_vorzug`])
+    /// je Seite tatsaechlich einen Kandidaten geliefert hat (`DraftingDecision::
+    /// vorzug.is_some()`), Index = Spielerindex. `None` (alle Aufrufer ausser
+    /// `play_net_self_play_game` unter `MOSAIC_ASYM_VORZUG`) = kein Zaehlen,
+    /// keine Nebenwirkung -- byte-identisches Bestandsverhalten. `Cell` statt
+    /// `AtomicU64`-Paar: die Schleife laeuft sequenziell in EINEM Thread (kein
+    /// Rayon-Zugriff auf denselben Zaehler), gleiche Wahl wie `PARTIE_GEWICHT`
+    /// in net_mcts.rs.
+    vorzug_greift: Option<&'a std::cell::Cell<[u64; 2]>>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -1554,6 +1604,15 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         None
                     };
                     let d = pcfg.agent.decide(&game.state, &actions, &mut search_rng, move_number);
+                    // Baustein 1 (par.5 "wie oft greift der Bauer"): additiv,
+                    // NUR wenn der Aufrufer einen Zaehler bereitstellt.
+                    if let Some(cell) = cfg.vorzug_greift {
+                        if d.vorzug.is_some() {
+                            let mut counts = cell.get();
+                            counts[player] += 1;
+                            cell.set(counts);
+                        }
+                    }
                     // Record-Vorbereitung VOR dem Apply (moon_order_target
                     // zieht aus dem Such-RNG, `state_to_json` liest den
                     // Vor-Zustand) -- exakt die Bestandsreihenfolge.
@@ -1686,8 +1745,14 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
                     // `tiling_vorzug` separat (rein lesend) NUR fuer die
-                    // Log-Zeile aufgerufen -- `resolve_tiling_step` prueft ihn
-                    // intern schon, gibt das aber nicht zurueck.
+                    // Log-Zeile aufgerufen. BERICHTIGUNG (PREREG_asymmetric_
+                    // curriculum.md par.2, geprueft): `resolve_tiling_step`
+                    // ruft `plate_builder` NICHT auf -- es ist ein reiner
+                    // DFS-Solver (`best_first_step_exact_or_valued[_ex]`).
+                    // `tiling_vorzug` hat genau DIESEN einen Aufrufer (die
+                    // Log-Zeile hier); der Solver selbst sieht den
+                    // Bauer-Vorzug also gar nicht, weder pruefend noch
+                    // steuernd.
                     let vorzug_kandidat_tiling = if pcfg.column_build_trace {
                         crate::plate_builder::tiling_vorzug(&game.state, pi)
                     } else {
@@ -1869,6 +1934,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         labels: net.map(|n| LabelSamplingConfig { net: n, record_rtv, profiled: false }),
         mode: LoopMode::Records { game_id },
         players: [player, player],
+        vorzug_greift: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -2223,6 +2289,7 @@ fn play_net_game<R: Rng + ?Sized>(
         labels: None,
         mode: LoopMode::Summary { log_games },
         players,
+        vorzug_greift: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -2355,6 +2422,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 column_build_trace: false,
             },
         ],
+        vorzug_greift: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -2967,7 +3035,20 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // (rtv/bootstrap) MIT Task-#80/#81-Profiling-Kategorien (`profiled`),
     // Timeout mit `EXTRA_GAME_TIMEOUT_SECS`-Zuschlag (Bugfix-Historie siehe
     // round_transition_deep.rs).
-    let agent = NetSelfPlayAgent {
+    //
+    // Baustein 1 (`MOSAIC_ASYM_VORZUG`, PREREG_asymmetric_curriculum.md
+    // par.3): bei INAKTIVEM Knopf bleibt es exakt beim Bestand -- EIN Agent
+    // fuer beide Seiten, `vorzug: true` beidseitig. Bei AKTIVEM Knopf
+    // bekommt GENAU EINE Seite (deterministisch aus `game_seed`, siehe
+    // [`asym_vorzug_seite`]) `vorzug: true`, die andere `vorzug: false` --
+    // dafuer sind ZWEI eigene Agenten-Instanzen noetig, weil `vorzug` ein
+    // Konstruktor-Argument von `NetSelfPlayAgent` ist, kein Laufzeit-Parameter
+    // von `decide`.
+    let asym = asym_vorzug_active();
+    let vorzug_seite = if asym { Some(asym_vorzug_seite(game_seed)) } else { None };
+    let vorzug_p0 = vorzug_seite.map(|s| s == 0).unwrap_or(true);
+    let vorzug_p1 = vorzug_seite.map(|s| s == 1).unwrap_or(true);
+    let agent0 = NetSelfPlayAgent {
         net,
         base_sims,
         c_puct,
@@ -2975,14 +3056,33 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         deterministic,
         pcr_full_prob,
         pcr_cheap_sims,
-        vorzug: true,
+        vorzug: vorzug_p0,
     };
-    let player = PlayerLoopConfig {
-        agent: &agent,
+    let agent1 = NetSelfPlayAgent {
+        net,
+        base_sims,
+        c_puct,
+        add_root_noise,
+        deterministic,
+        pcr_full_prob,
+        pcr_cheap_sims,
+        vorzug: vorzug_p1,
+    };
+    let player0 = PlayerLoopConfig {
+        agent: &agent0,
         tiling_net: Some(net),
         apply_via_chosen_action: true,
         column_build_trace: false,
     };
+    let player1 = PlayerLoopConfig {
+        agent: &agent1,
+        tiling_net: Some(net),
+        apply_via_chosen_action: true,
+        column_build_trace: false,
+    };
+    // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
+    // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
+    let greif_counter = std::cell::Cell::new([0u64; 2]);
     let cfg = GameLoopConfig {
         timeout_secs: net_game_timeout_secs(base_sims)
             + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS,
@@ -2991,12 +3091,29 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         move_heartbeat,
         labels: Some(LabelSamplingConfig { net, record_rtv, profiled: true }),
         mode: LoopMode::Records { game_id },
-        players: [player, player],
+        players: [player0, player1],
+        vorzug_greift: if asym { Some(&greif_counter) } else { None },
     };
-    match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
+    let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
         LoopOutput::Summary(_) => unreachable!("Records-Modus konfiguriert"),
+    };
+    // par.5 (Sperre): "wie oft greift der Bauer" muss je Seite ausgewiesen
+    // werden. ENTSCHEIDUNG eprintln statt Record-Feld (Begruendung im
+    // Abschlussbericht dieses Auftrags): das Trainings-Record-Schema hat
+    // mehrere Python-Konsumenten (self_play.py/neural_net.py/train.py), ein
+    // zusaetzliches Feld auf JEDEM Step-Record waere ein Format-Eingriff mit
+    // unklarer Downstream-Wirkung. Additiv NUR bei aktivem Knopf, ein
+    // Prozess-Log statt eines Korpus-Feldes.
+    if asym {
+        let counts = greif_counter.get();
+        let seite = vorzug_seite.unwrap_or(usize::MAX);
+        eprintln!(
+            "[asym_vorzug] game_id={game_id} seed={game_seed} zwangsseite={seite} greift_p0={} greift_p1={}",
+            counts[0], counts[1]
+        );
     }
+    out
 }
 
 /// Zusätzliche Sicherheitsmarge (über `net_game_timeout_secs +
@@ -5816,5 +5933,68 @@ pub(crate) mod tests {
             );
             crate::provocation::set_modus_override_for_test(None);
         }
+    }
+
+    // ── Baustein 1: MOSAIC_ASYM_VORZUG (PREREG_asymmetric_curriculum.md) ────
+
+    /// Default (Env-Var ungesetzt) muss Bestandsverhalten sein: kein
+    /// asymmetrischer Vorzug, `play_net_self_play_game` bleibt bei
+    /// `vorzug: true` beidseitig.
+    #[test]
+    fn asym_vorzug_active_defaults_to_off() {
+        assert!(
+            !asym_vorzug_active(),
+            "MOSAIC_ASYM_VORZUG muss bei ungesetzter Env-Var aus sein (Bestandsverhalten)"
+        );
+    }
+
+    /// par.3 verlangt zwei Eigenschaften der Seitenwahl: (a) DETERMINISTISCH
+    /// je Partie-Seed (dieselbe Partie -> dieselbe Zwangsseite bei jedem
+    /// Aufruf) und (b) ~50/50 ueber den Korpus verteilt. Beides hier direkt
+    /// an der reinen Funktion geprueft, ohne Env-Var/OnceLock (siehe
+    /// `net_mcts.rs`-Musterkommentar zu `apply_wertung_shaping_full`: ein
+    /// Test kann einen einmal gelesenen OnceLock-Cache nicht mehr umstellen).
+    #[test]
+    fn asym_vorzug_seite_ist_deterministisch_und_naehert_sich_50_50() {
+        let n = 20_000u64;
+        let mut side0 = 0u64;
+        for seed in 0..n {
+            let a = asym_vorzug_seite(seed);
+            let b = asym_vorzug_seite(seed);
+            assert_eq!(a, b, "Seed {seed}: Seitenwahl muss deterministisch sein (zweiter Aufruf weicht ab)");
+            assert!(a == 0 || a == 1, "Seed {seed}: Seite muss 0 oder 1 sein, war {a}");
+            if a == 0 {
+                side0 += 1;
+            }
+        }
+        let frac0 = side0 as f64 / n as f64;
+        assert!(
+            (frac0 - 0.5).abs() < 0.02,
+            "Seitenverteilung weicht zu stark von 50/50 ab: Seite 0 = {frac0:.4} ueber {n} Seeds \
+             (Ziel par.3: 50/50 ueber den Korpus)"
+        );
+    }
+
+    /// Gegenprobe zu oben mit einer ZWEITEN, unabhaengigen Seed-Quelle
+    /// (typische `wrapping_add(i * 0x9E37...)`-Ableitung wie in
+    /// `run_net_self_play`/`run_net_self_play`-Aufrufern) -- schliesst aus,
+    /// dass die 50/50-Naeherung oben nur ein Artefakt fortlaufender
+    /// Seed-Werte 0..n ist.
+    #[test]
+    fn asym_vorzug_seite_50_50_ueber_abgeleitete_partie_seeds() {
+        let base: u64 = 0x1234_5678_9ABC_DEF0;
+        let n = 20_000u64;
+        let mut side0 = 0u64;
+        for i in 0..n {
+            let seed = base.wrapping_add(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            if asym_vorzug_seite(seed) == 0 {
+                side0 += 1;
+            }
+        }
+        let frac0 = side0 as f64 / n as f64;
+        assert!(
+            (frac0 - 0.5).abs() < 0.02,
+            "Seitenverteilung ueber abgeleitete Partie-Seeds weicht zu stark von 50/50 ab: {frac0:.4}"
+        );
     }
 }

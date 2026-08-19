@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 71 Knoepfe (44 aktiv, 19 diagnose, 7 tot, 1 geplant).
+Stand: 77 Knoepfe (46 aktiv, 23 diagnose, 7 tot, 1 geplant).
 
 | Knopf | Default | Status | Zweck | Beleg |
 |---|---|---|---|---|
@@ -23,9 +23,12 @@ Stand: 71 Knoepfe (44 aktiv, 19 diagnose, 7 tot, 1 geplant).
 | `MOSAIC_WERTUNG_ROUND_GAIN` | 0.0 | aktiv | rundenabhaengige Anhebung aller Alphas (net_mcts.rs:1360) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_WERTUNG_FLOOR_W` | 0.0 | aktiv | Strafleisten-Gegenterm im Wertungsplatten-Shaping (net_mcts.rs:1306) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_TILING_W` | 0.0 | aktiv | Tiling-Potenzial-Term (Heuristik-Summand solve_round_final_score) im Shaping (net_mcts.rs:1332) | PREREG_scoring_plate_injection.md |
+| `MOSAIC_WERTUNG_SCALE_PROFILE` | aus (=0/leer; 1 oder an = Rundenprofil) | diagnose | Baustein 3: rundenabhaengiger Nenner SCALE_r=50*profil_r fuer den Wertungsplatten-/Spezialfeld-Term (Pfad A); Strafleisten-/Tiling-Term bleiben auf dem flachen Nenner (net_mcts.rs, wertung_scale_profile_active) | PREREG_shaping_scale_per_round.md par.4/par.6a |
 | `MOSAIC_WERTUNG_STREUUNG_MAX` | 0.0 (aus) | aktiv | partieweise Streuung des Shaping-Gewichts aus dem Partie-Seed, Wert in [0,max] (net_mcts.rs:1154) | PREREG_ownership_corpus.md |
 | `MOSAIC_OWNERSHIP_W` | 0.0 (aus) | aktiv | Zwei-Pole-Regler w_own: Blatt-Shift aus den erwarteten Plattenpunkten E_k des Ownership-Kopfs (net_mcts.rs, ownership_weight) | PREREG_ownership_consumer.md par.2 |
 | `MOSAIC_OWNERSHIP_GEW` | 1.0 (1 oder 8 Werte) | aktiv | Gewicht je Kriterium innerhalb des Ownership-Pols; Stelle 7 wirkungslos (net_mcts.rs, ownership_weights) | PREREG_ownership_consumer.md par.2 |
+| `MOSAIC_OWNERSHIP_SCALE` | 50.0 (1 oder 8 Werte) | diagnose | Baustein 2: Nenner je Kriterium im Ownership-Pol tanh(E_k/scale_k), ersetzt die feste 50; gemessene Werte fuer Arm S: k0~17, k1~1, k2~0,3 (net_mcts.rs, ownership_scale) | PREREG_reachability_target.md par.6 |
+| `MOSAIC_REACH_TARGET_K1` | 0 (aus) | aktiv | Zielwechsel des Ownership-Kopfes fuer k1: Spalten-Atome (Index 6..11) tragen ab Runde 3 VOLLENDBARKEIT statt Realisierung; eigener HDF5-Cache-Schluessel (neural_net.py, _reach_target_k1_active) | PREREG_reachability_target.md |
 | `MOSAIC_GUMBEL_TOP_M` | 0 (= Formel sims/16) | aktiv | fester Wurzelbreiten-Override m fuer Gumbel-Top-m (net_mcts.rs:2514) | PREREG_search_path_remeasurements.md M2 |
 | `MOSAIC_TAU_ARGMAX_FROM_MOVE` | 0 (= aus) | aktiv | Self-Play: ab Halbzug N argmax statt Besuchs-Sampling (net_mcts.rs:2540) | PREREG_search_path_remeasurements.md M3 |
 | `MOSAIC_DENIAL_TIEBREAK_EPS` | 0.0 (aus) | aktiv | eps-Fenster des Denial-Tie-Breaks E3 (net_mcts.rs:2556) | PREREG_denial_tiebreak.md |
@@ -47,10 +50,13 @@ Stand: 71 Knoepfe (44 aktiv, 19 diagnose, 7 tot, 1 geplant).
 | `MOSAIC_TILING_PLATTEN_GEW` | 1.0 (1 oder 8 Werte) | aktiv | Gewicht je Kriterium fuer den Plattenwert der Tiling-Wahl (tiling_solver.rs:1023) | PREREG_placement_side.md |
 | `MOSAIC_TILING_PUNKTE_W` | 0.0 (aus) | aktiv | Punkte-Kopf-Blend im Netz-Tiling-Stichentscheid; gemessen wirkungslos (self_play.rs:985; archive/history.md:10715) | - |
 | `MOSAIC_OWNERSHIP_TILING_W` | 0.0 (aus) | aktiv | Ownership-Pol der Tiling-Zugwahl R1-4: marginale Feldwerte aus der Wurzelkarte, additiv zum Plattenterm (tiling_solver.rs, ownership_tiling_weight) | PREREG_ownership_consumer.md par.3 |
+| `MOSAIC_OWNERSHIP_CONJ` | 0 (aus, Produktform) | aktiv | FORMumschaltung, keine Dosis: die konjunktiven Kriterien (k0/k1/k2/k3/k5/k7) kommen aus den gelernten Konjunktions-Atomen statt aus dem Produkt der Feldwahrscheinlichkeiten; additive k4/k6 bleiben auf den Feldlabels. Braucht den 140er-Kopf, sonst Rueckfall MIT Warnung (net_mcts.rs, ownership_conj) | PREREG_conjunction_terms.md par.4 |
 | `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
+| `MOSAIC_ASYM_VORZUG` | aus | diagnose | Baustein 1 (Arm S): je Self-Play-Partie bekommt GENAU EINE Seite den Bauer-Vorzug (vorzug:true), Seitenwahl deterministisch aus dem Partie-Seed 50/50; dome_vorzug faehrt in derselben Kette mit (self_play.rs, asym_vorzug_active/asym_vorzug_seite) | PREREG_asymmetric_curriculum.md par.3 |
 | `MOSAIC_PROFILE_SELFPLAY` | aus (nur =1) | diagnose | Self-Play-Zeitprofil je Kategorie (profiling.rs:493) | PREREG_gpu_offloading.md |
 | `MOSAIC_DATA_DIR` | <repo>/data | aktiv | Korpus-Ordner-Override fuer train/self_play/server (config.py:28; Kommentar-Erwaehnung net_mcts.rs:177) | PREREG_corpus_dose.md |
 | `MOSAIC_PROFILES_PATH` | player_profiles.json im Projektroot | aktiv | Profil-Datei-Override, Pflicht fuer Test-/Zweitinstanzen seit Vorfall 2026-08-02 (player_profiles.py:51) | - |
+| `MOSAIC_MEM_LOG_EVERY` | 2000 Batches (0 = aus) | diagnose | Abstand der [mem]-Zeilen im Training. Vorher fest 100, also 215 Zeilen je Epoche; der Epochen-Verlauf im Manifest deckt den Bedarf ab. Nicht ganz abschaltbar per Default, weil RAM Engpass 2 ist (train.py) | - |
 | `MOSAIC_SPALTENBAU` | aus | diagnose | Spaltenbauer-Vorzugsschicht (Kriterium 1), nie im Gating (column_build.rs:78) | PREREG_provocation.md par.11ff |
 | `MOSAIC_SPALTENBAU_SICHERHEITSNETZ` | aus (Opt-in =1) | diagnose | Baustein 1 Vollendbarkeits-Filter, seit par.15 default AUS (column_build.rs:134) | PREREG_provocation.md par.15 |
 | `MOSAIC_SPALTENBAU_JACKPOT` | aus (Opt-in =1) | diagnose | Baustein 3a dominante Jackpot-Gewichtung, seit par.15 default AUS (column_build.rs:151) | PREREG_provocation.md par.15 |
