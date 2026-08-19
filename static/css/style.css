@@ -370,9 +370,13 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   flex: 1;
   height: 100%;
 }
+/* Einfarbiges Bonusplaettchen (Nutzer 2026-08-20): die farblose Haelfte ist
+   weiss und die gestrichelte Trennlinie faellt weg -- das Plaettchen liest
+   sich als EIN Kreis mit farbiger Haelfte statt als zweigeteiltes Feld mit
+   leerem Fach. Die Trennlinie gab es nur hier; zweifarbige Chips trennen
+   sich ohnehin durch ihre beiden Farben. */
 .bchip-half.empty {
-  background: var(--bg);
-  border-left: 1px dashed var(--border2);
+  background: #fff;
 }
 .bchip-half.blau { background: var(--blau); }
 .bchip-half.gelb { background: var(--gelb); }
