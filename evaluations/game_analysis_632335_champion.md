@@ -1,6 +1,6 @@
 # Spielanalyse: game_20260818_214620_seed632335.log
 
-Erzeugt von `tools/analyze_game_log.py` (Commit `47d36f7`), Laufzeit 220s.
+Erzeugt von `tools/analyze_game_log.py` (Commit `0f67b3e`), Laufzeit 183s.
 
 - Seed: 632335, Startspieler: Spieler 1, KI-Spieler: KI (v21_2d_brierbest, 400 Sims)
 ## (a) Zusammenfassung

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: n=1 Partie (2026-08-18), Nutzer generiert weitere. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19), NICHT BESTAETIGT -- 7 replaybare Partien, gepaarte Differenz +0,60 pp, t 0,78 unter Schwelle 1,943. Staerke-Effekt; die Kampagne bleibt bei "zu leise". -->
 
 # PREREG: Der Orakel-Abstand in Menschenpartien
 
@@ -132,7 +132,46 @@ einer Q-Schwankung von ±20 pp ein einzelner Lauf nichts traegt.
 - **Etwas ueber Runde 5.** Dort laeuft der exakte Loeser und wird vom Werkzeug
   bewusst nicht orakel-bewertet.
 
-## par.7 ERGEBNIS (leer bei Registrierung, n=1 in par.2 als Anlass)
+## par.7 ERGEBNIS (2026-08-19): NICHT BESTAETIGT — Staerke-Effekt, nicht falsches Vorzeichen
+
+**Anordnung wie registriert:** 7 replaybare Partien (alle 7 replayen zu 100 %
+exakt, 0 ausgeschlossen), Orakel = Champion `v21_2d_brierbest` @400 (derselbe
+wie der Gegner), Klassifikation par.4 ueber den erweiterten Export
+`plate_completability_json` (`col_open_cells`: offene Normal-Zellen mit
+Farbbedarf, Spalte vollendbar und unvollstaendig). Werkzeug:
+`tools/probes/human_oracle_gap_k1.py`; Rohzahlen:
+`evaluations/probe_human_oracle_gap_k1.json`; Berichte je Partie:
+`evaluations/game_analysis_<seed>_champion.md`.
+
+| Partie | Platten | Endstand | n k1 / neutral | Mittel k1 | Mittel neutral | Differenz |
+|---|---|---|---|---:|---:|---:|
+| 214620_632335 | [3,5,1] | 75:73 | 16 / 17 | 4,95 | 2,47 | **+2,48** |
+| 221619_698355 | [0,1,2] | 78:72 | 16 / 18 | 3,31 | 2,54 | +0,77 |
+| 222531_333082 | [7,3,1] | 80:80 | 17 / 20 | 3,13 | 3,62 | −0,50 |
+| 224021_462727 | [1,5,3] | 74:57 | 13 / 19 | 4,44 | 4,36 | +0,07 |
+| 124709_992964 | [7,3,1] | 97:59 | 17 / 20 | 7,20 | 3,41 | **+3,79** |
+| 141804_179429 | [7,1,2] | 54:43 | 17 / 19 | 3,04 | 5,56 | −2,53 |
+| 153857_196906 | [3,1,2] | 74:45 | 16 / 20 | 5,36 | 5,22 | +0,14 |
+
+(k1 lag in ALLEN 7 Partien aus; der Mensch gewann 6, eine endete remis.
+Wild-Zuege: 0. Endstaende aus den Log-Texten der Berichte.)
+
+> **Gepaart ueber 7 Partien: mittlere Differenz +0,60 pp (sd 2,05), t = 0,78,
+> df = 6, einseitige Schwelle t = 1,943 — NICHT BESTAETIGT.** Vorzeichen 5/7.
+> Nach der registrierten Lesart: das Netz bewertet Menschenzuege ALLGEMEIN
+> schlechter (Ø Δwin% 2,5-5,6 pp auch bei neutralen Zuegen), nicht die
+> k1-relevanten spezifisch. **Die Kampagne bleibt bei "zu leise", nicht
+> "falsch gerichtet"** — die Anlasspartie (par.2, +2,48) war das obere Ende
+> der Streuung, nicht der Regelfall.
+
+**Explorativ, NACH der Messung gerechnet, entscheidet nichts:** verengt man
+die Klassifikation auf Spalten mit Fuellstand >= 2 bzw. >= 3 (die par.4-
+Definition ist in Runde 1-3 schwach selektiv — bei ~5,6 vollendbaren Spalten
+qualifiziert fast jede Farbe), steigt die Differenz auf +1,29 pp (t 1,42, 6/7)
+bzw. +1,79 pp (t 1,69, 6/7). Ein Trend in die vermutete Richtung bei ECHTEM
+Spaltenfortschritt, aber post hoc und unter der Schwelle. Falls je wieder
+aufgegriffen: als EIGENE Vorregistrierung mit Fuellstand-Schwelle, nicht als
+Umdeutung dieser Messung.
 
 ---
 

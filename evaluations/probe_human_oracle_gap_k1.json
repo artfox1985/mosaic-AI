@@ -1,0 +1,246 @@
+{
+ "partien": [
+  {
+   "partie": "game_20260818_214620_seed632335",
+   "mensch_idx": 0,
+   "n_k1": 16,
+   "n_neutral": 17,
+   "n_wild": 0,
+   "mittel_k1": 4.95304183281669,
+   "mittel_neutral": 2.4706998314768214,
+   "differenz": 2.4823420013398687,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 17.528531686968492,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 3 (1+2)× gelb von F1, GF → Reihe 2 [2/2] (+1 Strafleiste)",
+     "spalte": 1,
+     "fill": 3
+    },
+    {
+     "delta_win_pct": 13.768146777692507,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 3 (1+1+1)× schwarz von F1, F2, GF → Reihe 3 [3/3]",
+     "spalte": 3,
+     "fill": 0
+    },
+    {
+     "delta_win_pct": 12.784783268142231,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 1 (1)× schwarz von F1 → Reihe 1 [1/1]",
+     "spalte": 1,
+     "fill": 0
+    }
+   ]
+  },
+  {
+   "partie": "game_20260818_221619_seed698355",
+   "mensch_idx": 0,
+   "n_k1": 16,
+   "n_neutral": 18,
+   "n_wild": 0,
+   "mittel_k1": 3.31023540406502,
+   "mittel_neutral": 2.5447545481752583,
+   "differenz": 0.7654808558897619,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 11.07370047727404,
+     "runde": 1,
+     "zug": "🌙 Spieler 1: 4 (1+1+1+1)× rot von F2, F3, F4, GF → Reihe 5 [4/5]",
+     "spalte": 1,
+     "fill": 0
+    },
+    {
+     "delta_win_pct": 6.76283293976018,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 1 (1)× schwarz von F2 → Reihe 3 [3/3]",
+     "spalte": 1,
+     "fill": 3
+    },
+    {
+     "delta_win_pct": 6.486698022733128,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 1 (1)× rot von F3 → Reihe 1 [1/1]",
+     "spalte": 1,
+     "fill": 0
+    }
+   ]
+  },
+  {
+   "partie": "game_20260818_222531_seed333082",
+   "mensch_idx": 0,
+   "n_k1": 17,
+   "n_neutral": 20,
+   "n_wild": 0,
+   "mittel_k1": 3.127618924880965,
+   "mittel_neutral": 3.6249333617446293,
+   "differenz": -0.49731443686366417,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 14.852635375300615,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 1 (1)× rot von F3 → Reihe 5 [4/5]",
+     "spalte": 0,
+     "fill": 3
+    },
+    {
+     "delta_win_pct": 11.016556347548805,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 2 (1+1)× blau von F1, F4 → Reihe 3 [2/3]",
+     "spalte": 1,
+     "fill": 1
+    },
+    {
+     "delta_win_pct": 6.961704519212436,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 1 (1)× rot von F1 → Reihe 4 [1/4]",
+     "spalte": 1,
+     "fill": 2
+    }
+   ]
+  },
+  {
+   "partie": "game_20260818_224021_seed462727",
+   "mensch_idx": 0,
+   "n_k1": 13,
+   "n_neutral": 19,
+   "n_wild": 0,
+   "mittel_k1": 4.436001613919866,
+   "mittel_neutral": 4.364769762271532,
+   "differenz": 0.07123185164833412,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 20.114538841991152,
+     "runde": 3,
+     "zug": "🌙 Spielerin: 1 (1)× blau von GF → Reihe 5 [4/5]",
+     "spalte": 2,
+     "fill": 0
+    },
+    {
+     "delta_win_pct": 8.235925536499767,
+     "runde": 3,
+     "zug": "🌙 Spielerin: 1 (1)× schwarz von F2 → Reihe 3 [1/3]",
+     "spalte": 1,
+     "fill": 3
+    },
+    {
+     "delta_win_pct": 7.226286937257442,
+     "runde": 4,
+     "zug": "🌙 Spielerin: 1 (1)× schwarz von F3 → Reihe 3 [2/3]",
+     "spalte": 1,
+     "fill": 4
+    }
+   ]
+  },
+  {
+   "partie": "game_20260819_124709_seed992964",
+   "mensch_idx": 0,
+   "n_k1": 17,
+   "n_neutral": 20,
+   "n_wild": 0,
+   "mittel_k1": 7.200734204217061,
+   "mittel_neutral": 3.4149766456403023,
+   "differenz": 3.7857575585767584,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 20.933938437628946,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 1 (1)× rot von F1 → Reihe 6 [4/6]",
+     "spalte": 0,
+     "fill": 4
+    },
+    {
+     "delta_win_pct": 17.363391292843396,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 2 (1+1)× rot von F3, F4 → Reihe 2 [2/2]",
+     "spalte": 0,
+     "fill": 4
+    },
+    {
+     "delta_win_pct": 16.36806253705052,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 1 (1)× rot von F1 → Reihe 6 [5/6]",
+     "spalte": 0,
+     "fill": 4
+    }
+   ]
+  },
+  {
+   "partie": "game_20260819_141804_seed179429",
+   "mensch_idx": 0,
+   "n_k1": 17,
+   "n_neutral": 19,
+   "n_wild": 0,
+   "mittel_k1": 3.0367428695465812,
+   "mittel_neutral": 5.563038253993299,
+   "differenz": -2.5262953844467178,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 9.354463886143293,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 1 (1)× schwarz von GF → Reihe 4 [3/4]",
+     "spalte": 1,
+     "fill": 0
+    },
+    {
+     "delta_win_pct": 7.658282977183184,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 1 (1)× gelb von GF → Reihe 6 [5/6]",
+     "spalte": 1,
+     "fill": 0
+    },
+    {
+     "delta_win_pct": 6.182546508227505,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 1 (1)× gelb von F3 → Reihe 5 [2/5]",
+     "spalte": 1,
+     "fill": 1
+    }
+   ]
+  },
+  {
+   "partie": "game_20260819_153857_seed196906",
+   "mensch_idx": 0,
+   "n_k1": 16,
+   "n_neutral": 20,
+   "n_wild": 0,
+   "mittel_k1": 5.359713860734373,
+   "mittel_neutral": 5.219750565932693,
+   "differenz": 0.1399632948016798,
+   "groesste_k1_abweichungen": [
+    {
+     "delta_win_pct": 15.276161665703485,
+     "runde": 2,
+     "zug": "🌙 Spieler 1: 3 (1+1+1)× gelb von F1, F2, F4 → Reihe 6 [3/6]",
+     "spalte": 0,
+     "fill": 3
+    },
+    {
+     "delta_win_pct": 13.65491086514716,
+     "runde": 4,
+     "zug": "🌙 Spieler 1: 1 (1)× schwarz von F3 → Reihe 6 [2/6]",
+     "spalte": 2,
+     "fill": 2
+    },
+    {
+     "delta_win_pct": 11.87735713725003,
+     "runde": 3,
+     "zug": "🌙 Spieler 1: 2 (1+1)× türkis von F2, GF → Reihe 3 [2/3]",
+     "spalte": 2,
+     "fill": 1
+    }
+   ]
+  }
+ ],
+ "verdikt": {
+  "n_partien": 7,
+  "mittel_differenz": 0.603023677278003,
+  "sd": 2.048927926027675,
+  "t": 0.7786758453014112,
+  "df": 6,
+  "t_krit_einseitig_05": 1.943,
+  "p_einseitig": null,
+  "vorzeichen_positiv": 5,
+  "bestaetigt": false
+ }
+}
