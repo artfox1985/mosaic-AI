@@ -19,10 +19,28 @@ import os
 REACH_K1_MIN_ROUND = 3
 REACH_ATOMS = slice(6, 12)  # Spalten-Atome innerhalb der 34 je Spieler
 
+# par.12-Sperre 2026-08-19 (BESTANDEN, siehe PREREG_reachability_target.md):
+# Stauchung squash(b) = clip(b, 0, CAP)/CAP. CAP=12 ist der kleinste
+# bestehende Kandidat (CAP=4/8 nicht bestanden, Median am Rand).
+REACH_BUF_CAP = 12
+
 
 def reach_target_k1_active() -> bool:
     """`MOSAIC_REACH_TARGET_K1` -- Default AUS = unveraendertes Bestandsverhalten."""
     return os.environ.get("MOSAIC_REACH_TARGET_K1", "0") not in ("", "0", "false", "False")
+
+
+def reach_buffer_mode() -> bool:
+    """Arm P (par.12): `MOSAIC_REACH_TARGET_K1` auf "p"/"buf"/"puffer" (case-
+    insensitiv) -- dann traegt Runde 1-2 den stetigen Vorratspuffer statt des
+    konstanten Realisierungs-Labels, Runde 3-5 bleibt wie bei k1 boolesch.
+
+    ACHTUNG: `reach_target_k1_active()` ist fuer diese Werte EBENFALLS True
+    (sie prueft nur gegen ""/"0"/"false"/"False") -- das ist gewollt, denn
+    "p" bedeutet "Zielwechsel k1 AN, UND in Runde 1-2 der Puffer statt der
+    konstanten 1".
+    """
+    return os.environ.get("MOSAIC_REACH_TARGET_K1", "0").strip().lower() in ("p", "buf", "puffer")
 
 
 def reach_columns(state: dict, player: int):
@@ -48,5 +66,39 @@ def reach_columns(state: dict, player: int):
         import mosaic_rust
         d = json.loads(mosaic_rust.plate_completability_json(json.dumps(state), player))
         return [1 if x else 0 for x in d["columns"]]
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def reach_buffer_columns(state: dict, player: int):
+    """Vorratspuffer je Spalte fuer `player`, gestaucht auf [0,1] (Arm P, par.12).
+
+    Analog zu `reach_columns`, aber stetig statt boolesch: Quelle ist
+    dasselbe `plate_completability_json`, ueber das Feld `col_open_cells`.
+    Je Spalte binden nur die Zellen mit `kind == "normal"` (Farbforderung);
+    ihr `buffer`-Minimum (erreichbare Kopien minus Bedarf, ueber die Kette
+    zusammengefasst) ist der Roh-Puffer b. Eine Spalte ohne bindende Zelle
+    (nur wild/special/leerer Kuppelplatz) ist bereits vollstaendig -> 1.0.
+
+    Stauchung `squash(b) = clip(b, 0, REACH_BUF_CAP) / REACH_BUF_CAP`
+    (b < 0 -> 0.0 = unvollendbar), Kappung durch die par.12-Sperre
+    (2026-08-19) festgelegt -- siehe `tools/probes/reachability_buffer_spread.py`
+    fuer die Herleitung.
+
+    Gibt bei JEDEM Fehler `None` zurueck (gleiches Muster wie `reach_columns`
+    -- ein fehlendes Wheel darf einen Trainingslauf nicht toeten).
+    """
+    try:
+        import mosaic_rust
+        d = json.loads(mosaic_rust.plate_completability_json(json.dumps(state), player))
+        out = []
+        for zellen in d["col_open_cells"]:
+            werte = [z["buffer"] for z in zellen if z.get("kind") == "normal"]
+            if not werte:
+                out.append(1.0)
+            else:
+                b = min(werte)
+                out.append(max(0.0, min(float(b), REACH_BUF_CAP)) / REACH_BUF_CAP)
+        return out
     except Exception:  # noqa: BLE001
         return None

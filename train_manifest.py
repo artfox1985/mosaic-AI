@@ -70,6 +70,10 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
         "traeger_dateien_gesamt": traeger_gesamt,
         "traeger_dateien_je_praefix": je_praefix,
         "data_exclude": os.environ.get("MOSAIC_DATA_EXCLUDE"),
+        # b23-Manifest hat den Knopf nicht protokolliert, nur der Cache-Key
+        # waechterte -- exakt die Fehlerklasse des MOSAIC_CARRIER_MANIFEST-
+        # Vorfalls. Roh-Wert (auch "p"/"buf"/"puffer" fuer Arm P, par.12).
+        "reach_target_k1": os.environ.get("MOSAIC_REACH_TARGET_K1"),
     }
 
 
