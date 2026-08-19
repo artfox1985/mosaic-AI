@@ -186,7 +186,7 @@ Plan-Zeitform, **keine** ist freigegeben.
 | Datei | Greift an | Stand |
 |---|---|---|
 | `PREREG_asymmetric_curriculum.md` | 7(1) Wegsymmetrisierung — der Value-Kopf hat den Plattenbau nie als Vorteil gesehen | Sperre par.5 vor dem Training; **erzeugt einen Self-Play-Korpus** |
-| `PREREG_reachability_target.md` par.12 (Arm P) | die Saettigung des Vollendbarkeits-Labels in Runde 1-2 | faellt in den ohnehin anstehenden Relabeling-Durchlauf |
+| `PREREG_reachability_target.md` par.12 (Arm P) | die Saettigung des Vollendbarkeits-Labels in Runde 1-2 | **Vorab-Sperre BESTANDEN 2026-08-19**, Stauchung CAP 12 festgelegt; faellt in den ohnehin anstehenden Relabeling-Durchlauf |
 
 **Die eine offene Entscheidung, die nicht beim Bauen fallen darf:** der
 asymmetrische Arm erzeugt einen neuen Korpus. Der Fahrplan sperrt
@@ -198,6 +198,70 @@ ausserhalb der Reihe ist `PREREG_ownership_corpus.md`. Einordnung — Lehrkorpus
 Was aus den externen Spezifikationen **verworfen** wurde, steht mit Begruendung
 in den Dateien selbst (`asymmetric_curriculum` par.8, `reachability_target`
 par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
+
+---
+
+## STAND 2026-08-19 — Orakel-Abstand gemessen (NICHT bestaetigt), beide Vorpruefungen bestanden
+
+### Orakel-Abstand in Menschenpartien: STAERKE-EFFEKT, kein falsches Vorzeichen
+
+`PREREG_human_game_oracle_gap.md` par.7, jetzt ueber **7 replaybare Partien**
+(alle 100 % exakt, k1 lag in allen aus, Mensch gewann 6 + 1 Remis): die
+k1-relevanten Menschen-Zuege werden vom Champion **nicht** signifikant
+schlechter bewertet als die neutralen desselben Menschen — gepaarte Differenz
+**+0,60 pp (sd 2,05), t = 0,78** gegen Schwelle 1,943, Vorzeichen 5/7.
+
+**Folge fuer die Kampagne, und sie ist eine Weichenstellung:** der n=1-Verdacht
+vom 2026-08-18 ("das Netz haelt die Plattenzuege fuer verlierend") haelt nicht.
+Das Netz bewertet Menschenzuege ALLGEMEIN 2,5-5,6 pp unter dem Orakel-Top —
+ein Staerke-Effekt. **Die Diagnose bleibt "zu leise", nicht "falsch
+gerichtet"** — der Skalen-/Zielwechsel-Strang traegt weiter, und das
+asymmetrische Curriculum verliert seinen Zusatz-Dringlichkeitsbeleg (seine
+eigene Begruendung 7(1) ist davon unberuehrt). Explorativer Nebenbefund
+(post hoc, entscheidet nichts): bei Verengung auf Spalten mit Fuellstand >= 3
+steigt die Differenz auf +1,79 pp (t 1,69, 6/7) — knapp unter der Schwelle.
+
+### Beide Schritt-2-Vorpruefungen BESTANDEN (Details in den Preregs)
+
+| Pruefung | Ergebnis |
+|---|---|
+| **Saettigung par.6** (`PREREG_shaping_scale_per_round.md` par.6a) | Pfad A gemessen (600 Holdout-Zustaende): alle 90-%-Quantile von `E_r/SCALE_r` <= 0,31 — mit Pfad B (par.3a) beidseitig erfuellt, **ein gemeinsames Profil traegt** |
+| **Arm-P-Sperre** (`PREREG_reachability_target.md` par.12) | **BESTANDEN**, Stauchung festgelegt: `clip(b,0,12)/12` — Puffer spreizt in R1/R2 zu 100 %, Paritaets-Selbsttest 0/4.500, Handprobe unauffaellig |
+
+Zwei Nebenbefunde aus der Saettigungsmessung: **in Runde 1 ist JEDER
+Pfad-A-Term exakt 0** (das Kuppelraster ist vor dem Rundenende leer — ein
+Rundenprofil kann R1 dort nicht heilen), und der Strafleisten-Term faehrt mit
+Default-Gewicht 0,3 **live** mit — ein Profil am gemeinsamen `tanh`-Nenner
+aendert Produktionsverhalten, nicht nur Messarme (steht als Warnung in par.6a).
+
+### Werkzeug-Stand (alles additiv, Suite gruen)
+
+- `plate_completability_json` liefert jetzt zusaetzlich `verbleibend` und
+  `col_open_cells` (offene Zellen mit Farbbedarf und Vorratspuffer); neuer
+  Read-only-Export `wertung_shaping_e_json` (Pfad-A-Groessen). Wheel neu
+  gebaut + installiert 2026-08-19 ~15:24, **Paritaetsprobe gruen (Hash
+  unveraendert), `cargo test --release` 447/0**.
+- `analyze_game_log.py`: `--oracle-json` (maschinenlesbare Oracle-Records);
+  der `--dump-states`-Eintrag traegt jetzt `fields` (genommene Farbe) und den
+  echten Spieler-Index (das Feld `player` war vorher IMMER `None` —
+  `getattr(rec, "player", None)` auf einem Record, dessen Attribut `actor`
+  heisst).
+- Neue Sonden: `human_oracle_gap_k1.py` (par.4/par.5-Auswertung),
+  `shaping_scale_pfad_a_e.py` (Saettigung Pfad A),
+  `reachability_buffer_spread.py` (Arm-P-Sperre + Handprobe).
+- Champion-Orakel-Berichte fuer alle 7 Partien:
+  `evaluations/game_analysis_<seed>_champion.md`.
+
+### Naechste Schritte nach dem Fahrplan vom 2026-08-19
+
+1. **Nutzer-Entscheid** Einordnung Asymmetrie-Korpus (Lehrkorpus jetzt vs.
+   Schritt 3) — die Empfehlung "jetzt, falls Orakel-Abstand bestaetigt"
+   ist hinfaellig; ohne den Beleg ist die Reihenfolge-Frage wieder offen.
+2. **Vollendbarkeits-Zweig** (`PREREG_reachability_target.md` par.9/par.11):
+   Label-Bauer rundenweise umstellen (R1-2 Puffer CAP 12, R3-5 boolesch,
+   Cache `+reachbuf_v1`/`+reach_v1`), Warm Start, Offline-Ordnung, dann
+   Arena N / S / T+S — Arm-S-Nenner je Kriterium (k0 ~17, k1 ~1, k2 ~0,3 aus
+   `PREREG_ownership_coupling.md` par.6.4).
 
 ---
 
@@ -489,10 +553,12 @@ aber er koennte ein Artefakt sein.**
 
 **Vorregistriert: `PREREG_shaping_scale_per_round.md`.** Knopf statt Konstante
 (Default = heutiges Verhalten), Pfad A (Wertung) zuerst, `ROUND_GAIN` fest auf
-0, Erfolgsregel k1/k2 auf Block-Ebene ohne Siegverlust. **Vorbedingung vor dem
-Bau:** Saettigungspruefung auf `data/holdout` — liegt das 90-%-Quantil von
-`E_r/SCALE_r` unter 1,0, traegt ein gemeinsames Profil fuer beide Pfade, sonst
-brauchen sie getrennte. Die Verzweigung ist vorab benannt.
+0, Erfolgsregel k1/k2 auf Block-Ebene ohne Siegverlust. **Die Vorbedingung
+(Saettigungspruefung par.6) ist seit 2026-08-19 BEIDSEITIG erfuellt** (Pfad B
+par.3a, Pfad A par.6a: alle 90-%-Quantile <= 0,31) — ein gemeinsames Profil
+traegt, der Bau ist frei. Zwei Warnungen aus par.6a beachten: Runde 1 ist fuer
+Pfad A strukturell stumm (E = 0), und der Strafleisten-Term (Default 0,3)
+faehrt LIVE mit.
 
 **Einordnung, damit es niemand ueberschaetzt:** beide Shaping-Pfade sind per
 Default AUS (`MOSAIC_WERTUNG_SHAPING_W` und `MOSAIC_OWNERSHIP_W` je 0,0). Der
@@ -675,6 +741,7 @@ das.
 
 | Punkt | Stand |
 |---|---|
+| **`v21-b23` = der Zielwechsel-Lauf, abgebrochen vor Epoche 1** (Nutzer-Aufklaerung 2026-08-19) | b23 ist Schritt 3 aus `PREREG_reachability_target.md`: k1-Ownership-Ziel von Realisierung auf **Vollendbarkeit** ab Runde 3. Der Label-Bauer ist committet und per Knopf gated (`MOSAIC_REACH_TARGET_K1`, Default aus, `reach_target.py`, Cache-Key `+reachk1_r3_v1`, Commit `41b1c25`). Das Manifest (18.08. 19:47) hat KEINE Checkpoints und keine `epoch_history` — der Lauf kam nie bis Epoche 1. Zwei Punkte fuer den Neustart: das Manifest protokolliert den Knopf NICHT (nur der Cache-Key waechtert, gleiches Muster wie `MOSAIC_CARRIER_MANIFEST`), und `--epochs 100` + Cosine ist der bekannte T_max-Footgun. Seit 2026-08-19 kommt fuer Runde 1-2 der bestandene Arm-P-Puffer (CAP 12) in Frage — ob der Neustart Variante R oder Arm P faehrt, ist vor dem Start festzulegen |
 | **Gewichtsarm 4,0** | Vorabregel hat ihn freigegeben (`PREREG_ownership_weight_new_window.md` par.7); Nutzer-Entscheid 2026-08-17: **weiter hinten geparkt** |
 | **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr |
 | **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) — nicht neu vorschlagen |
