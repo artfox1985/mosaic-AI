@@ -391,7 +391,14 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .fslot{width:22px;height:22px;border-radius:4px;background:var(--bg);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text3)}
 
 /* Factories */
-.fcard{border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:5px}
+/* WEISS 2026-08-19 (Nutzer: "ebenso die kleinen Fabriken, aehnlich wie die
+   grosse Fabrik"): die kleinen Fabrikkarten liegen jetzt auf eigener weisser
+   Flaeche statt direkt auf dem Marmor. Die GROSSE Fabrik behaelt bewusst ihr
+   var(--bg) (Regel darunter, zwei Klassen und damit staerker) -- das war der
+   Sinn ihrer Sonderfarbe (Nutzer 2026-08-07: sie soll sich abheben). Beide
+   weiss zu machen haette diese Unterscheidung geloescht. */
+.fcard{border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:5px;
+  background:#fff}
 /* Nutzer-Feedback 2026-08-07: grosse Fabrik (Frankfurt) hebt sich per
    Hintergrund von den kleinen Fabriken ab -- dieselbe Flaechenfarbe
    var(--bg), die auch die (leeren) Musterreihen-Felder nutzen (.tile.empty). */
@@ -642,15 +649,24 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 /* Leerer 3x3-Platz (noch keine Kuppelplatte gelegt) = tiefste Mulde. Die
    offenen Felder AUF einer Platte sind dagegen flach, s. `.ds.N,.ds.W,.ds.S`
    weiter oben (Nutzer-Entscheid 2026-08-19). */
+/* WEISS 2026-08-19 (Nutzer): die Kuppelplaetze bekommen eine eigene weisse
+   Flaeche, statt den Marmor durchscheinen zu lassen -- gleiche Idee wie bei
+   den Fabrikkarten unten. Gilt in JEDEM Zustand, also auch unter einer
+   gelegten Platte (.occ).
+   AUSNAHME, bewusst: .cando (lila) und .start (amber) setzen eigene, leicht
+   transparente Fuellungen mit hoeherer Spezifitaet -- dort scheint der Marmor
+   weiter durch. Der Unterschied ist rechnerisch winzig (die 27-prozentige
+   Lila-Lage ueber Weiss ergibt #FAF9FF), die Markierung traegt ohnehin der
+   farbige Rand. */
+.dslot{background:#fff}
 .dslot:not(.occ){box-shadow:var(--relief-down)}
-/* Fuellung/Rand nur im NEUTRALEN Zustand -- .cando (lila) und .start (amber)
-   markieren legale Ziele und haben gleiche Spezifitaet; ohne die :not()-Kette
-   wuerde die Mulde hier deren Hervorhebung ueberschreiben. */
-.dslot:not(.occ):not(.cando):not(.start){
-  background:#E7E4DC;
-  background-image:var(--hollow-face);
-  border-color:rgba(0,0,0,.10)
-}
+/* Rand nur im NEUTRALEN Zustand -- .cando/.start haben gleiche Spezifitaet;
+   ohne die :not()-Kette wuerde dieser Rand deren Hervorhebung ueberschreiben.
+   Die Mulde traegt jetzt allein der Innenschatten: der frueher hier liegende
+   --hollow-face-Verlauf hat die Flaeche abgedunkelt und damit genau das
+   Weiss zurueckgenommen, um das es in diesem Auftrag geht. Folge, bewusst:
+   die Vertiefung liest sich auf Weiss etwas flacher als vorher auf #E7E4DC. */
+.dslot:not(.occ):not(.cando):not(.start){border-color:rgba(0,0,0,.10)}
 /* Belegtes Kuppelfeld = gelegter Stein, also erhaben. Der Gradient muss je
    Farbklasse notiert werden, weil `.ds.filled.<farbe>{background:...}` (drei
    Klassen) ein Kurzschreibweise-background setzt und eine 2-Klassen-Regel
