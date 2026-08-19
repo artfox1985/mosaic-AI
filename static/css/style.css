@@ -173,7 +173,11 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   /* 4px statt 5px: 58 - 2*1 Rand - 2*4 Padding = 48px, genau die neue
      .d2x2-Breite. Bei 5px ragte die Platte 2px heraus. */
   padding: 4px;
-  border: 1px dashed var(--border);
+  /* Leerer Kuppelplatz: kein sichtbarer Rand mehr (Nutzer 2026-08-19).
+     Der Rand bleibt als transparenter 1px-Streifen stehen, damit Groesse
+     und Raster gleich bleiben und die Zustaende unten nur die FARBE
+     setzen muessen. */
+  border: 1px solid transparent;
   border-radius: 6px;
   transition: all .1s;
   /* overflow:hidden -> visible (2026-08-19). Es gibt hier nichts zu clippen
@@ -185,7 +189,6 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   align-items: center;
   justify-content: center;
 }
-.dslot.occ{border-style:solid}
 .dslot.cando{border-color:var(--wild);background:#EDE9FE44;cursor:pointer}
 .dslot.cando:hover{background:#EDE9FE}
 .dslot.start{border-color:#F59E0B;background:#FEF3C744;cursor:pointer}
@@ -429,6 +432,12 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 /* Ablage */
 .display-g{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
 .dgtile {
+  /* WEISS 2026-08-19 (Nutzer): die Kuppelplatten der Auslage stehen auf
+     eigener weisser Flaeche statt auf durchscheinendem Marmor -- gleiche
+     Idee wie bei den Kuppelplaetzen (.dslot) und den Fabrikkarten.
+     .dgtile:hover/.sel setzen weiter unten ihre eigene Fuellung; sie stehen
+     spaeter in der Datei und gewinnen bei gleicher Spezifitaet. */
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 4px;  /* s. .dslot: macht Platz fuer die 48px-Platte */
@@ -659,6 +668,10 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    Lila-Lage ueber Weiss ergibt #FAF9FF), die Markierung traegt ohnehin der
    farbige Rand. */
 .dslot{background:#fff}
+/* Rand nur unter einer GELEGTEN Platte -- der leere Platz traegt seit
+   2026-08-19 keinen sichtbaren Rand mehr, seine Vertiefung kommt allein aus
+   Grauton und Innenschatten. */
+.dslot.occ{border-color:var(--border)}
 .dslot:not(.occ){box-shadow:var(--relief-down)}
 /* Fuellung und Rand nur im NEUTRALEN Zustand -- .cando/.start haben gleiche
    Spezifitaet; ohne die :not()-Kette wuerde das hier deren Hervorhebung
@@ -674,8 +687,7 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    Regel oben). */
 .dslot:not(.occ):not(.cando):not(.start){
   background:#E3DFD6;
-  background-image:var(--hollow-face);
-  border-color:rgba(0,0,0,.10)
+  background-image:var(--hollow-face)
 }
 /* Belegtes Kuppelfeld = gelegter Stein, also erhaben. Der Gradient muss je
    Farbklasse notiert werden, weil `.ds.filled.<farbe>{background:...}` (drei
