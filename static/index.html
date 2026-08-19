@@ -45,7 +45,7 @@
     <div id="factories-list-area"></div>
   </div>
   <div class="panel" id="center">
-    <div class="phase-badge" id="phase-badge">—</div>
+    <div class="phase-badge" id="phase-badge">-</div>
     <div id="info-area"></div>
     <div id="auslage-area"></div>
 
@@ -81,7 +81,7 @@
     </div>
     <div id="moon-tiles" style="display:flex;gap:5px;flex-wrap:wrap;min-height:32px;padding:6px;background:var(--bg);border-radius:6px;border:1px solid var(--border);margin-bottom:8px"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <span style="font-size:10px;color:var(--text2)">Stapel (oben=oberste/zuletzt geklickt, unten=unterste) — Fliese anklicken zum Entfernen:</span>
+      <span style="font-size:10px;color:var(--text2)">Stapel (oben=oberste/zuletzt geklickt, unten=unterste) - Fliese anklicken zum Entfernen:</span>
       <span id="moon-reset-btn" onclick="resetMoonStack()" style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;white-space:nowrap;margin-left:6px">↺ Zurücksetzen</span>
     </div>
     <div id="moon-stack" style="display:flex;flex-direction:column;align-items:flex-start;min-height:28px;padding:5px 5px 14px;background:var(--bg);border:1px dashed var(--border);margin-bottom:10px">
@@ -97,7 +97,7 @@
     <h3 id="chip-title">Bonusplättchen einsetzen</h3>
     <div class="info warn" style="font-size:11px;margin-bottom:10px" id="chip-info"></div>
     <div style="font-size:10px;color:var(--text2);margin-bottom:5px">
-      Verfügbare Plättchen — wähle eine Gruppe:<br>
+      Verfügbare Plättchen - wähle eine Gruppe:<br>
       <span style="color:var(--text3)">2 gleichfarbige = 1 Fliese &nbsp;·&nbsp; 3 beliebige = 1 Fliese</span>
     </div>
     <div id="chip-pool" style="display:flex;gap:5px;flex-wrap:wrap;min-height:36px;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:8px"></div>
@@ -178,7 +178,7 @@
 
     <!-- Spielerprofil P1 (Elo-Rating, Nutzer-Feature 2026-08-02) -->
     <div style="margin-bottom:12px">
-      <div class="lbl" style="margin-bottom:6px">Profil <span style="font-weight:400;color:var(--text3);font-size:9px">(optional — nur mit Profil wird das Spiel gewertet)</span></div>
+      <div class="lbl" style="margin-bottom:6px">Profil <span style="font-weight:400;color:var(--text3);font-size:9px">(optional - nur mit Profil wird das Spiel gewertet)</span></div>
       <div style="display:flex;gap:6px">
         <select id="ng-profile-p0" style="flex:1;padding:7px 8px;border:1px solid var(--border);border-radius:6px;
                  background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
@@ -313,7 +313,7 @@
 
     <!-- Seed für reproduzierbare Spiele -->
     <div style="margin-bottom:14px">
-      <div class="lbl" style="margin-bottom:6px">Seed <span style="font-weight:400;color:var(--text2);font-size:10px">(optional — leer = zufällig)</span></div>
+      <div class="lbl" style="margin-bottom:6px">Seed <span style="font-weight:400;color:var(--text2);font-size:10px">(optional - leer = zufällig)</span></div>
       <input id="ng-seed" type="number" placeholder="z.B. 12345 für reproduzierbare Stellung"
         style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
                background:var(--bg2,#fff);color:var(--text);font-family:inherit;font-size:11px;box-sizing:border-box">
