@@ -140,6 +140,42 @@ Anordnung wie bisher: `@400` gegen Champion `@400`, der 407er-Seed-Satz aus
 Stabilitaet des neuen Kopfes (`tools/probes/sibling_order_stability.py`, Bezug
 k1 Tau +0,942 / k2 +0,943) und die Ordnung gegen das Praedikat selbst.
 
+### KONKRETISIERUNG VOR DEM START (2026-08-19, vor der ersten Partie)
+
+Die Tabelle oben laesst die DOSIS offen; sie wird hier festgelegt, nicht beim
+Bauen:
+
+- **`MOSAIC_OWNERSHIP_W = 1.0`** in S und T+S. Herleitung aus par.6.4 der
+  Kopplungs-Prereg, keine freie Wahl: die Nenner (k1 ~1) sind exakt so
+  bemessen, dass der Shift bei Gewicht 1 die q-Eigenspreizung der Suche
+  erreicht (`tanh(0,082/1) = 0,082` gegen 0,078). Jede andere Dosis wuerde
+  die Nenner-Herleitung wieder aufheben.
+- **`MOSAIC_OWNERSHIP_GEW = "0,1,0,0,0,0,0,0"`** (nur k1) — Fokus-Regel;
+  damit sind die k0/k2-Nenner inert, sie werden trotzdem wie gemessen
+  gesetzt: **`MOSAIC_OWNERSHIP_SCALE = "17,1,0.3,50,50,50,50,50"`**.
+- **`MOSAIC_OWNERSHIP_TILING_W = 0`** — der Tiling-Verbraucher ist nicht
+  Teil dieser Anordnung.
+- Modelle: **S = `v21-b18_best`**, **T+S = `v21-b24_best`** (bestes
+  val_combined, Epoche 4 — gleiche Auswahlregel wie bei b18). Gegner
+  Champion @400, die 407 Gate-C-Seeds, Blockgroesse 25, `--log-games`.
+- Umsetzung: GEW/SCALE (kommahaltig) ueber die Eltern-Umgebung an BEIDE
+  Arme, der Arm-Schalter ist `MOSAIC_OWNERSHIP_W` (0 = Nullarm; bei W=0
+  kehrt der Verbraucher vor jeder Rechnung um, GEW/SCALE sind dann tot).
+  Je Modell ein Lauf mit Armen {0, 1.0}; der S-gegen-T+S-Vergleich wird
+  wie bei b18/b20 nachtraeglich auf Block-Ebene ueber die identischen
+  Seeds gerechnet.
+- Protokolliert ohne Entscheidungsregel: der b24-Nullarm (neues Ziel ohne
+  Regler) gegen den Champion — misst, ob der Zielwechsel allein Staerke
+  kostet.
+
+Vorflug-Kontrollen vor dem Start (beide bestanden, 2026-08-19 ~23:45,
+Belege `paired_arena_env_reach_smoke1/2.json`): Determinismus — derselbe
+Arm zweimal auf 8 Seeds, der komplette `games`-Block beider Laeufe
+identisch; Reglerwirkung — 3 von 8 Partien kippen zwischen W=0 und W=1.
+Wheel frisch gebaut und installiert (Paritaets-Hash unveraendert,
+`cargo test` 460/0). Start der Arena-Kette 2026-08-19 ~23:50, Arme
+S (b18) und T+S (b24) sequenziell.
+
 ---
 
 ## par.7 VORAB-ERFOLGSREGEL (woertlich, vor der ersten Partie)
