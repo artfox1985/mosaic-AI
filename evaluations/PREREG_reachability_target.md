@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: offen, nichts gebaut. Anlass: vier geschlossene Wege am Verbraucher, externe Durchsicht 2026-08-18. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: par.14 (2026-08-20), NICHT-ERFOLG mit umgekehrtem Vorzeichen -- T+S gegen S: k1 -0,67 Punkte (Block-t -3,73), Siege 194 gegen 214 (McNemar gegen eigenen Nullarm p=0,0045). Der Kopf ordnet Geschwister nicht nach seinem eigenen Praedikat (Tau -0,03). -->
 
 # PREREG: Zielwechsel des Ownership-Kopfes — Vollendbarkeit statt Realisierung
 
@@ -544,3 +544,52 @@ Vollstaendig, damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
    bewegt die Metrik staerker als der Knopf, Einzellaeufe sind uninterpretierbar
    (Projektbefund; hier nicht neu geprueft). "Parallel zum asymmetrischen Arm"
    ist damit kein billiger Zusatz.
+
+## par.14 ERGEBNIS (2026-08-20): NICHT-ERFOLG, mit umgekehrtem Vorzeichen
+
+**Anordnung wie registriert** (par.6 + Konkretisierung + CONJ-Korrektur):
+407 Gate-C-Seeds, Champion @400 als Gegner, `MOSAIC_OWNERSHIP_CONJ=1`,
+`W=1,0`, GEW nur k1, Nenner `17,1,0.3,...`, Blockgroesse 25, exklusiv
+(keine CPU-Nebenlast), Vorflug-Gate bestanden (Determinismus identisch,
+Reglerwirkung ja). Rohdaten `paired_arena_env_reach_s_b18.json` /
+`_reach_ts_b24.json`.
+
+| Arm | Kopf | Regler | Siege | k1-Punkte (aktive Partien) |
+|---|---|---|---:|---:|
+| N | b18 (Realisierung) | aus | 211/407 | 0,90 |
+| S | b18 (Realisierung) | an | 214/407 | 0,85 |
+| b24-Null | b24 (Vollendbarkeit) | aus | **221/407** | — (protokolliert) |
+| T+S | b24 (Vollendbarkeit) | an | **194/407** | **0,18** |
+
+- **Erfolgsregel-Teil 1 (k1 hoch gegen S): VERFEHLT, invertiert.** T+S gegen
+  S auf Block-Ebene: **k1 -0,67 Punkte, t = -3,73** (Schwelle war +2,571).
+  Der Kopf mit dem Vollendbarkeits-Ziel steuert die Suche VON den Spalten
+  WEG (0,85 -> 0,18).
+- **Erfolgsregel-Teil 2 (keine Siegkosten): VERFEHLT.** T+S verliert gegen
+  den eigenen Nullarm signifikant (diskordant 29/56, McNemar p = 0,0045);
+  zusaetzlich Strafleiste +1,83 Punkte (Block-t 2,87) und Marge -1,56.
+- **Arm S gegen N (protokolliert): flach.** k1 -0,05 (Block-t -0,18),
+  Siege 214:211 (p = 0,84) — die hoerbare Skala allein bewegt beim alten
+  Ziel weiterhin nichts. Nebenbefund Spezialfelder -0,28 (Block-t -2,65).
+- **Der Zielwechsel allein kostet keine Staerke:** b24-Null 221/407 —
+  numerisch sogar ueber b18-Null (gleiche Seeds).
+- Nebenbefund T+S: Spezialfelder +0,56 (Block-t 7,00) — wieder bewegt sich
+  das kurze Kriterium, nicht die Kette (dasselbe Muster wie bei allen
+  bisherigen Reglern).
+
+**Die Offline-Prufung hatte es angekuendigt** (par.6, exklusiv wiederholt):
+die Kopf-Ordnung ist ueber Determinisierungs-Seeds stabil (Tau +0,970),
+aber sie folgt dem eigenen Trainings-Praedikat NICHT (Puffer-Summe der
+Nachfolgezustaende: Tau -0,03, n.s., 33 Runde-2-Stellungen;
+`probe_sibling_vs_predicate_k1.json`). Der Kopf hat das Ziel auf
+ZUSTANDS-Ebene gelernt (own_val fiel monoton), unterscheidet aber die
+GESCHWISTER eines Knotens nicht danach — dieselbe Fehlerklasse wie beim
+Realisierungs-Kopf ("sieht die Absicht kaum", Feld-Kopf-Befund 2026-08-18).
+
+**Folge (par.7, woertlich registriert):** "Dann ist auch das Ziel nicht der
+Engpass, und es bleibt die Policy-Seite (orakel-abgeleitete Supervision,
+AZAL-Muster) als letzter unversuchter Strang." Dazu unveraendert offen:
+das asymmetrische Curriculum (`PREREG_asymmetric_curriculum.md`, greift den
+VALUE-Kopf an, nicht den Ownership-Kopf — von diesem Ergebnis unberuehrt).
+Der Ownership-Verbraucher-Strang ist damit in ALLEN gemessenen Formen
+(Produktform, Konjunktionsform, hoerbare Skala, neues Ziel) negativ.
