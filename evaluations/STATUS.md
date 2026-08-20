@@ -678,6 +678,22 @@ Expansion). Zwei nie untersuchte Punkte fuer spaeter:
    darunter bleibt als Ideen-Protokoll stehen, seine Praemisse ("bewertet
    jede Reihenfolge") ist widerlegt. Details:
    `PREREG_implementation_review_unprimed.md` par.7.
+   **FOLGE FUER DEN #38-ZUSCHNITT (Nutzer-Entscheid 2026-08-20: hier
+   festgehalten, bleibt im Arbeitskreis "Spaeter"):** wenn #38 angegangen
+   wird, ist die Reihenfolge jetzt klar vorgezeichnet —
+   (a) **billigster erster Arm: `moon`-Loss-Gewicht 0** (ein Trainingslauf
+   + Gating). Das testet Punkt 1 (Loss-Gewicht) und den No-Op-Befund in
+   einem: der Kopf zieht heute bis zu ~1/3 des Policy-Gradienten fuer ein
+   NACHWEISLICH konstantes Rauschziel — Gewicht 0 ist die
+   Nullhypothesen-Messung, ob das Gradient-Budget woanders mehr traegt.
+   (b) Ein ECHTES Reihenfolge-Ziel braucht eine Zielfunktion, die
+   `state.factories` liest (Reihenfolge-bewusste Variante von
+   `solve_round_final_score` oder Suche-basierte Labels via root_child_q)
+   — teurer, erst nach (a) sinnvoll. (c) Der alte "billige Zuschnitt"
+   (minus Gegner-Endstand) ist als No-Op gestrichen. Zusaetzlich zu (a)
+   gehoert der Python-Vielfachheiten-Bug der Zielrepraesentation
+   (`neural_net.py:1799-1806`, 42 % der Labels betroffen) mit behoben,
+   falls je ein echtes Ziel kommt.
    **Das Netz hat den Kopf dafuer, aber nie das Ziel** (Alt-Text): `moon_order_target`
    (`self_play.rs:634`) probiert Reihenfolgen durch und bewertet jede mit
    `solve_round_final_score(state, pi)` (`tiling_solver.rs:494`) -- also
