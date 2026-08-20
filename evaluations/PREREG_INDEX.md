@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 72 Dateien = 9 OFFEN + 56 ENTSCHIEDEN + 7 UEBERHOLT.**
+**Stand (automatisch generiert): 73 Dateien = 10 OFFEN + 56 ENTSCHIEDEN + 7 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (9)
+## OFFEN (10)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -94,6 +94,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. |
 | `PREREG_provocation.md` | Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | **OFFEN, vorregistriert 2026-08-12** (Nutzer-Korrektur: *"das ist kein plan. das ist hoffen. als erstes brauchen wir eine methode gezielt spiele zu provozieren"*). Stufe 1 VOR der Streuung ins Self-Play; ich hatte die beiden Stufen verwechselt. Nutzer-kalibrierte Abnahmezahl: **>= 7,00 vertikale Plattenpunkte = eine Spalte je Partie** (heute 1,05 = 0,15). Eine Spalte sind 21 Platzierungs- PLUS 7 Plattenpunkte = 28, also rund ein Fuenftel eines guten Endstands. Der Eingriff ist eine Beschneidung der Aktionsmenge, kein neuer Bewerter -- fuenf Anlaeufe ueber die Bewertung sind gescheitert, weil eine Stellungsbewertung keine mehrrundige Farbzusage darstellen kann (`dome.rs:61-70`: jede Zelle verlangt genau eine Farbe). |
 | `PREREG_round5_minfix_elo_reset.md` | Wird die Min-Knoten-Zugsortierung in round5.rs und round_transition_deep.rs hart gefixt, und wie wird die dadurch entwertete Elo-Leiter neu verankert (v21/v20/v19 + Anker)? | Nutzer-Entscheid 2026-08-20 ("du kannst ihn jetzt schon fixen und dann faehrst du die arena games mit v21, v20 und v19. die alte elo leiter kannst ins archiv werfen"). Fix-Grundlage: PREREG_implementation_review_unprimed par.7 Befund 1. |
+| `PREREG_stack_top_feature.md` | Traegt es zur Staerke bei, wenn das Netz die offen liegende Rueckseite der obersten Kuppelstapel-Platte als Merkmal bekommt (additiv, ohne Bestandsmodelle zu brechen)? | nichts gebaut. Anlass: Nutzer-Frage 2026-08-20 im Anschluss an die GUI-Aenderung am Stapel-Dialog (Commit 94b9090). Prioritaet: geparkt, Arbeitskreis "Spaeter" wie Task #38. |
 | `PREREG_v22_window.md` | Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. |
 
 ## ENTSCHIEDEN (56)
