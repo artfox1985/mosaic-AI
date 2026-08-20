@@ -25,11 +25,11 @@ function Lauf {
 $arena = "tools\paired_arena_env_ab.py"
 $tot   = @("--env-name", "MOSAIC_OWNERSHIP_W", "--arms", "0", "--control", "0", "--block-size", "25")
 
-Lauf "Anker v21"  @($arena) + $tot + @("--model", "models\alphazero_v21_2d_brierbest.onnx",  "--n-games", "150", "--seed", "20260834", "--out-prefix", "elo_r5fix_v21_anchor")
-Lauf "Anker v20"  @($arena) + $tot + @("--model", "models\alphazero_v20_2d_opp_brierbest.onnx", "--n-games", "150", "--seed", "20260834", "--out-prefix", "elo_r5fix_v20_anchor")
-Lauf "Anker v19"  @($arena) + $tot + @("--model", "models\alphazero_v19_2d_best.onnx",        "--n-games", "150", "--seed", "20260834", "--out-prefix", "elo_r5fix_v19_anchor")
-Lauf "Kante v21-v20" @($arena) + $tot + @("--model", "models\alphazero_v21_2d_brierbest.onnx", "--model-b", "models\alphazero_v20_2d_opp_brierbest.onnx", "--sims-b", "400", "--net-sims", "400", "--n-games", "400", "--seed", "20260835", "--out-prefix", "elo_r5fix_v21_v20")
-Lauf "Kante v20-v19" @($arena) + $tot + @("--model", "models\alphazero_v20_2d_opp_brierbest.onnx", "--model-b", "models\alphazero_v19_2d_best.onnx", "--sims-b", "400", "--net-sims", "400", "--n-games", "400", "--seed", "20260836", "--out-prefix", "elo_r5fix_v20_v19")
+Lauf "Anker v21"  (@($arena) + $tot + @("--model", "models\alphazero_v21_2d_brierbest.onnx",  "--n-games", "150", "--seed", "20260834", "--out-prefix", "elo_r5fix_v21_anchor"))
+Lauf "Anker v20"  (@($arena) + $tot + @("--model", "models\alphazero_v20_2d_opp_brierbest.onnx", "--n-games", "150", "--seed", "20260834", "--out-prefix", "elo_r5fix_v20_anchor"))
+Lauf "Anker v19"  (@($arena) + $tot + @("--model", "models\alphazero_v19_2d_best.onnx",        "--n-games", "150", "--seed", "20260834", "--out-prefix", "elo_r5fix_v19_anchor"))
+Lauf "Kante v21-v20" (@($arena) + $tot + @("--model", "models\alphazero_v21_2d_brierbest.onnx", "--model-b", "models\alphazero_v20_2d_opp_brierbest.onnx", "--sims-b", "400", "--net-sims", "400", "--n-games", "400", "--seed", "20260835", "--out-prefix", "elo_r5fix_v21_v20"))
+Lauf "Kante v20-v19" (@($arena) + $tot + @("--model", "models\alphazero_v20_2d_opp_brierbest.onnx", "--model-b", "models\alphazero_v19_2d_best.onnx", "--sims-b", "400", "--net-sims", "400", "--n-games", "400", "--seed", "20260836", "--out-prefix", "elo_r5fix_v20_v19"))
 
 # ── Teil 2: Asym-Korpus (4 Bloecke a 4.000, Fruehwarn-Gate nach S1) ────────
 $env:MOSAIC_DATA_DIR = "data\asym_corpus"
