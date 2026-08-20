@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 71 Dateien = 8 OFFEN + 56 ENTSCHIEDEN + 7 UEBERHOLT.**
+**Stand (automatisch generiert): 72 Dateien = 9 OFFEN + 56 ENTSCHIEDEN + 7 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (8)
+## OFFEN (9)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -93,6 +93,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_gpu_offloading.md` | Laesst sich die Inferenz von der CPU auf die GPU verlagern -- erreicht Verschraenkung vieler gleichzeitiger Partien den Batch, an dem die GPU gewinnt? | **OFFEN, vorregistriert 2026-08-10** (Nutzer-Richtung "weg von der cpu und hin zur gpu"). Teil 1 GEMESSEN: Speicher ist kein Engpass (1,5 MiB je Suche, Batch 512 = 0,76 GiB) ⇒ Regel 1, Weg V (Verschraenkung, suchneutral) statt Weg B (Virtual Loss, gating-pflichtig). Teil 2 GESCHLOSSEN (Commit `e1bce64`, ohne neue Messung): die Blatt-Erzeugungsrate wurde ANALYTISCH aus der vorhandenen Task-#32-Messung (`selfplay_time_profile.json`, Netz 62 % / Tiling 27 %) plus Little's Law hergeleitet -- ein eigener Null-Evaluator haette die Baumform degeneriert. Erreichbarer Batch **~140 bis ~590**, Startwert **N=256**, damit in der Gewinnzone der GPU-Kennlinie. Deckel Amdahl 2,6-5,3x. **OFFEN ist jetzt allein die UMSETZUNG von Weg V.** STALE-FALLE 2026-08-12: diese Zeile trug bis hierher noch "offen ist die Blatt-Erzeugungsrate" und hat genau dadurch einen Agenten-Auftrag ausgeloest, der die Zahl neu messen sollte -- sie lag seit `e1bce64` vor. Ein veralteter Index kostet Arbeit, nicht nur Klarheit. `evaluations/interleave_batch_probe.json` (nur Teil-1-Daten) |
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. |
 | `PREREG_provocation.md` | Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | **OFFEN, vorregistriert 2026-08-12** (Nutzer-Korrektur: *"das ist kein plan. das ist hoffen. als erstes brauchen wir eine methode gezielt spiele zu provozieren"*). Stufe 1 VOR der Streuung ins Self-Play; ich hatte die beiden Stufen verwechselt. Nutzer-kalibrierte Abnahmezahl: **>= 7,00 vertikale Plattenpunkte = eine Spalte je Partie** (heute 1,05 = 0,15). Eine Spalte sind 21 Platzierungs- PLUS 7 Plattenpunkte = 28, also rund ein Fuenftel eines guten Endstands. Der Eingriff ist eine Beschneidung der Aktionsmenge, kein neuer Bewerter -- fuenf Anlaeufe ueber die Bewertung sind gescheitert, weil eine Stellungsbewertung keine mehrrundige Farbzusage darstellen kann (`dome.rs:61-70`: jede Zelle verlangt genau eine Farbe). |
+| `PREREG_round5_minfix_elo_reset.md` | Wird die Min-Knoten-Zugsortierung in round5.rs und round_transition_deep.rs hart gefixt, und wie wird die dadurch entwertete Elo-Leiter neu verankert (v21/v20/v19 + Anker)? | Nutzer-Entscheid 2026-08-20 ("du kannst ihn jetzt schon fixen und dann faehrst du die arena games mit v21, v20 und v19. die alte elo leiter kannst ins archiv werfen"). Fix-Grundlage: PREREG_implementation_review_unprimed par.7 Befund 1. |
 | `PREREG_v22_window.md` | Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. |
 
 ## ENTSCHIEDEN (56)

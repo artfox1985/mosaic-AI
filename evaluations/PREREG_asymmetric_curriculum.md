@@ -285,3 +285,39 @@ Annealing.
   entscheidet sie aber nicht.
 - **7(2), 7(3), 7(4)** — unberuehrt. 7(3) laeuft eigenstaendig in
   `PREREG_reachability_target.md`.
+
+
+## par.11 FREIGABE UND START-KONKRETISIERUNG (Nutzer, 2026-08-20)
+
+**Freigegeben: voller Umfang (2 x 8.000 Partien), als Lehrkorpus ausserhalb
+der Fahrplan-Reihe** (Praezedenz PREREG_ownership_corpus). Kein
+Zusatz-Backup noetig — das automatische Tages-Backup (12:00) deckt
+`data/` ab. **Start ERST NACH dem round5-Min-Knoten-Fix**
+(`PREREG_round5_minfix_elo_reset.md`): die Runde-4/5-Labels des Korpus
+laufen durch die betroffenen Loeser, der Korpus soll die reparierte
+Engine sehen.
+
+Festlegungen vor dem Start (Preflight 2026-08-20 bestanden: Seitenwahl
+~50/50, Greifrate 15-22 je Partie nur auf der Zwangsseite):
+
+- **Vier Bloecke a 4.000 Partien** (S1, S2, N1, N2), Basis-Seeds
+  **20260830 / 20260831 / 20260832 / 20260833** (disjunkt von Korpus
+  20260814 und Holdout 20260818-22). Datei-Granularitaet 10 Partien =
+  natuerlicher Minuten-Checkpoint; bei Abbruch nur den fehlenden Rest
+  mit Folge-Seed nachgenerieren.
+- **Arm S:** `MOSAIC_ASYM_VORZUG=1`, `MOSAIC_PLATTENBAU=1`
+  (k1-Spaltenbauer), Champion-Modell, 200 Sims, Streuung AUS
+  (`MOSAIC_WERTUNG_STREUUNG_MAX` ungesetzt — die Seitigkeit ist die
+  gewollte Varianz, par.5 verbietet Zusatz-Rauschen), rtv aus, 8 Threads,
+  10 Partien/Datei, Ablage `data/asym_corpus/` via `MOSAIC_DATA_DIR`
+  (nicht-rekursiver Fenster-Glob = Sperre, wie Holdout).
+- **Arm N:** identisch, aber `MOSAIC_ASYM_VORZUG` und `MOSAIC_PLATTENBAU`
+  UNGESETZT — der heutige Produktionszustand.
+- **Zwischenkontrollen je Block** (protokolliert, nur Abbruch-Option):
+  Vollstaendigkeit (Dateizahl x 10, 0 unvollstaendige), Greif-Statistik
+  aus dem Log; nach S1 die par.5-FRUEHWARNUNG (k1-Raten-Differenz
+  Zwangs- gegen freie Seite auf 4.000 Partien — liegt sie fern der
+  20 pp, Abbruch statt Weiterlauf; die verbindliche par.5-Sperre laeuft
+  unveraendert auf dem fertigen Korpus).
+- Lauf in der Nutzer-Shell mit tee-Log (`logs/asym_corpus_<datum>.log`),
+  Ueberwachung ueber Log + Dateizahl + Prozessliste.
