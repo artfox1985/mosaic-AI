@@ -659,7 +659,19 @@ Expansion). Zwei nie untersuchte Punkte fuer spaeter:
    ueberlaufen lassen -- Strafpunkte ohne eigenen Einsatz, und der Zwang
    ist strukturell (die Runde endet erst, wenn alles leer ist; wer keine
    gueltige Aktion hat, MUSS passen).
-   **Das Netz hat den Kopf dafuer, aber nie das Ziel**: `moon_order_target`
+   **AKTENLAGE KORRIGIERT (ungeprimter Review 2026-08-20, am Code
+   bestaetigt): `moon_order_target` ist ein beweisbarer NO-OP** — die
+   Zielfunktion `solve_round_final_score` liest nur `players[pi]`
+   (Cache-Key `tiling_key`), die Mondreihenfolge lebt aber in
+   `state.factories`; alle Permutationen scoren identisch, das Label ist
+   immer die rohe Beutelreihenfolge (80/80-Sonde). Der Kopf trainiert auf
+   RAUSCHEN und zieht dabei potenziell ~1/3 des Policy-Gradienten (Punkt 1
+   oben). Auch der unten skizzierte "billige Zuschnitt" (eigener minus
+   Gegner-Rundenendstand) waere aus demselben Grund ein No-Op. Der Text
+   darunter bleibt als Ideen-Protokoll stehen, seine Praemisse ("bewertet
+   jede Reihenfolge") ist widerlegt. Details:
+   `PREREG_implementation_review_unprimed.md` par.7.
+   **Das Netz hat den Kopf dafuer, aber nie das Ziel** (Alt-Text): `moon_order_target`
    (`self_play.rs:634`) probiert Reihenfolgen durch und bewertet jede mit
    `solve_round_final_score(state, pi)` (`tiling_solver.rs:494`) -- also
    ausschliesslich dem EIGENEN Rundenendstand. Der Gegner kommt in der
