@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 71 Dateien = 9 OFFEN + 55 ENTSCHIEDEN + 7 UEBERHOLT.**
+**Stand (automatisch generiert): 71 Dateien = 8 OFFEN + 56 ENTSCHIEDEN + 7 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (9)
+## OFFEN (8)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -93,10 +93,9 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_gpu_offloading.md` | Laesst sich die Inferenz von der CPU auf die GPU verlagern -- erreicht Verschraenkung vieler gleichzeitiger Partien den Batch, an dem die GPU gewinnt? | **OFFEN, vorregistriert 2026-08-10** (Nutzer-Richtung "weg von der cpu und hin zur gpu"). Teil 1 GEMESSEN: Speicher ist kein Engpass (1,5 MiB je Suche, Batch 512 = 0,76 GiB) ⇒ Regel 1, Weg V (Verschraenkung, suchneutral) statt Weg B (Virtual Loss, gating-pflichtig). Teil 2 GESCHLOSSEN (Commit `e1bce64`, ohne neue Messung): die Blatt-Erzeugungsrate wurde ANALYTISCH aus der vorhandenen Task-#32-Messung (`selfplay_time_profile.json`, Netz 62 % / Tiling 27 %) plus Little's Law hergeleitet -- ein eigener Null-Evaluator haette die Baumform degeneriert. Erreichbarer Batch **~140 bis ~590**, Startwert **N=256**, damit in der Gewinnzone der GPU-Kennlinie. Deckel Amdahl 2,6-5,3x. **OFFEN ist jetzt allein die UMSETZUNG von Weg V.** STALE-FALLE 2026-08-12: diese Zeile trug bis hierher noch "offen ist die Blatt-Erzeugungsrate" und hat genau dadurch einen Agenten-Auftrag ausgeloest, der die Zahl neu messen sollte -- sie lag seit `e1bce64` vor. Ein veralteter Index kostet Arbeit, nicht nur Klarheit. `evaluations/interleave_batch_probe.json` (nur Teil-1-Daten) |
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. |
 | `PREREG_provocation.md` | Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | **OFFEN, vorregistriert 2026-08-12** (Nutzer-Korrektur: *"das ist kein plan. das ist hoffen. als erstes brauchen wir eine methode gezielt spiele zu provozieren"*). Stufe 1 VOR der Streuung ins Self-Play; ich hatte die beiden Stufen verwechselt. Nutzer-kalibrierte Abnahmezahl: **>= 7,00 vertikale Plattenpunkte = eine Spalte je Partie** (heute 1,05 = 0,15). Eine Spalte sind 21 Platzierungs- PLUS 7 Plattenpunkte = 28, also rund ein Fuenftel eines guten Endstands. Der Eingriff ist eine Beschneidung der Aktionsmenge, kein neuer Bewerter -- fuenf Anlaeufe ueber die Bewertung sind gescheitert, weil eine Stellungsbewertung keine mehrrundige Farbzusage darstellen kann (`dome.rs:61-70`: jede Zelle verlangt genau eine Farbe). |
-| `PREREG_shaping_scale_per_round.md` | Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | EINGETAKTET (Nutzer-Entscheid 2026-08-20): der Pfad-A-Test wird zu Ende gemessen, aber erst NACH den beiden Implementierungs-Reviews. Knopf MOSAIC_WERTUNG_SCALE_PROFILE ist gebaut, Vorbedingung par.6 beidseitig erfuellt -- es fehlt nur die par.7-Arena (~2 h). Die Pfad-B-Haelfte ist durch PREREG_reachability_target par.14 gegenstandslos. |
 | `PREREG_v22_window.md` | Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. |
 
-## ENTSCHIEDEN (55)
+## ENTSCHIEDEN (56)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -144,6 +143,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_scoring_plate_injection.md` | Nutzt es, die WERTUNGSPLATTEN (alle acht Kriterien, gegatet auf die aktiven) in die Blattbewertung zu injizieren -- und in welcher Dosis? | NEGATIV: der Haupt-Sweep lief am 2026-08-11 (w 0,03/0,1/0,3/1,0), Vertikale nur 0,70 auf 1,05 Plattenpunkte; die Artefakt-Frage (rundenblinder Nenner) lebt registriert in PREREG_shaping_scale_per_round.md weiter. Stale-Korrektur des Kopfes 2026-08-20. |
 | `PREREG_search_path_remeasurements.md` | Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Eigener Ergebnis-Abschnitt in der Datei ("MESSUNG-3-ERGEBNIS"); alle 3 Messungen H0, Status quo bestaetigt |
 | `PREREG_search_rng_split.md` | Soll die Suche einen EIGENEN Zufallsstrom bekommen, damit Partien replaybar werden und gepaarte Arenen echte gemeinsame Zufallszahlen haben? | ENTSCHIEDEN 2026-08-13 (Datei §11 VERDIKT): umgesetzt -- net_mcts::derive_search_seed (SplitMix64) + Verdrahtung in self_play.rs/py.rs; Kern bestaetigt (Gegenprobe mit geteiltem RNG bricht in Runde 4, nach dem Fix 0 Abweichungen), zwei Prognosen der Datei widerlegt (u.a.: der Paritaets-Hash haelt). Details: STATUS.md, Kapitel 'NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie umgesetzt'. |
+| `PREREG_shaping_scale_per_round.md` | Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | par.13 (2026-08-20): NEIN -- Profil-Arena gefahren (Dosis 0,3, 407 Seeds, Vorflug bestanden): k1 -0,23 (Block-t -1,27), k2 +0,13 (t 1,58), Siege 284:295 (p=0,34). par.8-Klausel greift: der rundenblinde Nenner ist als Erklaerung ausgeschieden, die Injektionslinie ist ohne neue Idee zu Ende gemessen. |
 | `PREREG_t35b_ranking.md` | Verbessert ein Ranking-Loss-Arm (Task #35b, WDL-Aera) die Orakel-validierten Policy-Metriken? | Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS: Orakel-Vorpruefung NEGATIV -> kein Gating"), #35b geschlossen |
 | `PREREG_t37_tiling_criterion.md` | Ist reines P(Sieg)-Ranking beim Tiling-Abschluss besser als das Bestandskriterium punkte*P(Sieg) (Task #37)? | Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS: H0 -- #37 GESCHLOSSEN") |
 | `PREREG_task28_aggression.md` | Senkt ein opp-Punkte-Kopf + λ_aggr-Blend die Gegnerpunkte ohne Siegquotenverlust (Task #28, Hauptmessung)? | Beide Gates bestanden, aber kein Arm p<0,05 (bester -6,16 Punkte, p=0,078); `archive/history.md` Z. ~7140-7183 |

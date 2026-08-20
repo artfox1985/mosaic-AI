@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | Beleg: EINGETAKTET (Nutzer-Entscheid 2026-08-20): der Pfad-A-Test wird zu Ende gemessen, aber erst NACH den beiden Implementierungs-Reviews. Knopf MOSAIC_WERTUNG_SCALE_PROFILE ist gebaut, Vorbedingung par.6 beidseitig erfuellt -- es fehlt nur die par.7-Arena (~2 h). Die Pfad-B-Haelfte ist durch PREREG_reachability_target par.14 gegenstandslos. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | Beleg: par.13 (2026-08-20): NEIN -- Profil-Arena gefahren (Dosis 0,3, 407 Seeds, Vorflug bestanden): k1 -0,23 (Block-t -1,27), k2 +0,13 (t 1,58), Siege 284:295 (p=0,34). par.8-Klausel greift: der rundenblinde Nenner ist als Erklaerung ausgeschieden, die Injektionslinie ist ohne neue Idee zu Ende gemessen. -->
 
 # PREREG: Rundenabhängiger `WERTUNG_SHAPING_SCALE`
 
@@ -283,3 +283,25 @@ Festlegungen, die par.7 offen liess:
   weicht ab; Achtung: in Runde 1 ist Pfad-A-E exakt 0, die Wirkung muss
   also aus R2+ kommen).
 - Erfolgsregel unveraendert par.8, Fokus-Lesart k1.
+
+
+## par.13 ERGEBNIS (2026-08-20): NICHT-ERFOLG — die Injektionslinie ist zu Ende gemessen
+
+Anordnung nach par.12 (Dosis 0,3, Profil-Knopf als Arm-Variable, 407
+Seeds, Champion@400 gegen Heuristik@150dyn, Block 25, log-games).
+Vorflug bestanden (Determinismus 2x8 identisch; Profil-Wirkung ja).
+Rohdaten `paired_arena_env_pfada_profil.json`.
+
+| | Kontrollarm (flach 50) | Profil-Arm |
+|---|---:|---:|
+| Siege | 295/407 | 284/407 (McNemar p=0,34) |
+| k1 Delta (Block-t) | — | **−0,23 (−1,27)** |
+| k2 Delta (Block-t) | — | +0,13 (+1,58) |
+
+Kein Kriterium naehert sich der Schwelle 2,571; kein Siegverlust, kein
+Gewinn. **par.8, woertlich registriert:** *"Dann ist der rundenblinde
+Nenner als Erklaerung fuer den negativen Dosisbefund ausgeschieden, und
+die Injektionslinie ist ohne neue Idee zu Ende gemessen — keine weitere
+Dosis- oder Profilvariante."* Zusammen mit dem par.16-Endverdikt des
+Zielwechsels sind damit BEIDE Shaping-Pfade (A ueber den Fortschritt,
+B ueber den Kopf) abschliessend negativ.
