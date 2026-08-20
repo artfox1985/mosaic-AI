@@ -1,21 +1,37 @@
-<!-- STATUS: OFFEN | Frage: Traegt es zur Staerke bei, wenn das Netz die offen liegende Rueckseite der obersten Kuppelstapel-Platte als Merkmal bekommt (additiv, ohne Bestandsmodelle zu brechen)? | Beleg: nichts gebaut. Anlass: Nutzer-Frage 2026-08-20 im Anschluss an die GUI-Aenderung am Stapel-Dialog (Commit 94b9090). Prioritaet: geparkt, Arbeitskreis "Spaeter" wie Task #38. -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: nichts gebaut. Anlass: Nutzer-Frage 2026-08-20 nach der GUI-Aenderung am Stapel-Dialog (Commit 94b9090); Ziel ist Sichtgleichheit, nicht ein Staerkegewinn. Prioritaet: geparkt, Arbeitskreis "Spaeter" wie Task #38. -->
 
-# PREREG: Oberste Stapel-Rueckseite als Netz-Merkmal (`stack_top_feature`)
+# PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
-Stand **2026-08-20**. **ENTWURF, nichts gebaut.** Alles ab par.4 steht in
-Plan-Zeitform; par.2/par.3 sind in dieser Sitzung am Code geprueft.
+Stand **2026-08-20**. **ENTWURF, nichts gebaut.** Alles ab par.5 steht in
+Plan-Zeitform; par.2 bis par.4 sind in dieser Sitzung am Code geprueft.
 
-## par.1 Anlass
+## par.1 Ziel und Kriterium (Nutzer-Vorgabe 2026-08-20)
 
-Der Ziehen-Knopf im Stapel-Dialog zeigt seit Commit 94b9090 die Rueckseite
-der Platte, die als naechstes kaeme (`stackTopTypeIcon`, `static/js/app.js`).
-Nutzer-Rueckfrage im selben Zug: *"hat diese information das netz auch?"*
-Die Pruefung sagt nein — und zwar an einer Stelle, an der der Mensch am
-Tisch mehr sieht als die KI.
+**Das Ziel ist Sichtgleichheit, nicht ein Staerkegewinn.** Das Netz soll
+denselben Informationsstand haben wie ein Spieler am Tisch — nicht mehr
+(kein Orakel) und nicht weniger. Ob daraus Elo folgt, ist eine SEPARATE,
+nachgelagerte Frage; ein flaches Arena-Ergebnis ist kein Grund, die
+Sichtgleichheit wieder herzunehmen. Das ist die etablierte Hausregel
+"Korrektheit vor gemessenem Nutzen": zurueckgedreht wird nur bei einer
+klaren Regression, die Rauschen nicht erklaeren kann.
 
-## par.2 Befund (geprueft 2026-08-20)
+Damit entfaellt ausdruecklich, was ein Staerke-Zuschnitt verlangt haette:
+keine Haeufigkeitsschwelle als Baubedingung, kein Gating-Kriterium, das
+ueber Bauen oder Verwerfen entscheidet.
 
-Was das Netz zum Kuppelstapel bekommt, in beiden Flat-Pfaden identisch:
+## par.2 Das Prinzip gibt es schon — in der anderen Richtung
+
+Die Farben eines Bonusplaettchens gehen NUR bei aufgedecktem Chip in den
+Merkmalsvektor, ausdruecklich begruendet mit *"sonst versteckte
+Information, die kein Spieler kennt"* (`engine/src/features.rs:154`, im
+Python-Zwilling gleich gehalten). Die Sichtgleichheit ist also bereits
+gebautes Hausrecht — bisher nur als Schutz davor, dass das Netz ZU VIEL
+sieht. Diese Prereg zieht die zweite Haelfte nach: es soll auch nicht
+weniger sehen.
+
+## par.3 Befund am Kuppelstapel (geprueft 2026-08-20)
+
+Was das Netz zum Stapel bekommt, in beiden Flat-Pfaden identisch:
 
 | Merkmal | Inhalt | Pruefstelle |
 | --- | --- | --- |
@@ -23,37 +39,64 @@ Was das Netz zum Kuppelstapel bekommt, in beiden Flat-Pfaden identisch:
 | `dome_wild_remaining_frac` (1) | Wild-Anteil des Restes | `engine/src/features.rs:114` / `:514`, `engine/py/neural_net.py:61` |
 | `dome_stack_count` (1) | Stapelgroesse | `engine/src/features.rs:393` / `:742` |
 
-`dome_stack_top_type` existiert ausschliesslich in der Serialisierung fuers
-Frontend (`engine/src/serialize.rs:269`) und wird in `features.rs` wie in
-`neural_net.py` **nirgends gelesen** (Grep ueber beide Dateien, null Treffer).
-Der 2D-Pfad aendert daran nichts: der Planes-Zweig haengt denselben
-Flat-Vektor an (`InputLayout::PlanesPlusFlat`, `engine/src/net.rs:118`;
-`flat_branch`, `engine/py/neural_net.py:2638`).
+Alle drei sind reihenfolgeblind. `dome_stack_top_type` existiert
+ausschliesslich in der Serialisierung fuers Frontend
+(`engine/src/serialize.rs:269`) und wird in `features.rs` wie in
+`neural_net.py` **nirgends gelesen** (Grep ueber beide Dateien, null
+Treffer). Der 2D-Pfad aendert daran nichts: der Planes-Zweig haengt
+denselben Flat-Vektor an (`InputLayout::PlanesPlusFlat`,
+`engine/src/net.rs:118`; `flat_branch`, `engine/py/neural_net.py:2638`).
 
-Verdeckt ist damit allein die **Reihenfolge** des Stapels — und genau davon
-liegt das oberste Element offen auf dem Tisch. Beim Roundtrip wird die
-Reihenfolge sogar neu gewuerfelt und nur die oberste Platte per Tausch an
-`dome_stack_top_type` angepasst (`engine/src/serialize.rs:899-918`).
+Der Spieler dagegen sieht die oberste Rueckseite jederzeit — am Tisch
+physisch, in der GUI seit Commit 94b9090 auch im Ziehen-Knopf des
+Stapel-Dialogs (`stackTopTypeIcon`, `static/js/app.js`). **Genau hier
+sieht das Netz weniger als der Mensch.**
 
-## par.3 Kein Orakel-Thema, sondern eine Luecke
+Zweite Luecke derselben Art: waehrend einer laufenden Ziehserie kennt der
+ziehende Spieler die Rueckseiten ALLER bereits gezogenen Platten. Im
+Merkmalsvektor kommt `pending_stack_draw` ueberhaupt nicht vor — es taucht
+in `features.rs` nur in der Aktions-ID-Kodierung auf (Grep). Das Netz
+merkt eine Ziehserie nur indirekt daran, dass `dome_pool_mask` schrumpft.
+
+## par.4 Kein Orakel-Thema
 
 Die 18 Designs sind ein fester, offener Satz mit je genau einem Exemplar
 (`NUM_DOME_TILE_DESIGNS = 18` und 18 verschiedene `defs`-Eintraege,
-`engine/src/dome.rs:198-226`). Wer Auslage und Bretter sieht, kennt den Rest
-durch Subtraktion. `dome_pool_mask` ist also **abgeleitetes oeffentliches
-Wissen**, kein verdecktes — es spart dem Netz Buchfuehrung, verraet ihm
-nichts Zusaetzliches. (Korrektur einer Koordinator-Aussage vom selben Tag,
-die die Maske faelschlich als Orakel-Wissen eingeordnet hatte;
+`engine/src/dome.rs:198-226`). Wer Auslage und Bretter sieht, kennt den
+Rest durch Subtraktion. `dome_pool_mask` ist damit **abgeleitetes
+oeffentliches Wissen**, kein verdecktes — es spart dem Netz Buchfuehrung,
+verraet ihm nichts Zusaetzliches. (Korrektur einer Koordinator-Aussage vom
+selben Tag, die die Maske faelschlich als Orakel-Wissen eingeordnet hatte;
 Nutzer-Richtigstellung.)
 
-Uebrig bleibt eine Asymmetrie in die andere Richtung: das Netz spielt hier
-mit **weniger** Information als ein Mensch. Relevanzfall ist die Wertungs-
-platte "-3 je offenes Spezialfeld" — genau die Begruendung, mit der
-`dome_wild_remaining_frac` seinerzeit eingefuehrt wurde
-(`engine/src/serialize.rs:58`), naemlich abzuschaetzen ob die naechste Platte
-eher Wild oder Special ist. Beim Ziehen ist das keine Schaetzung mehr.
+Verdeckt ist am Stapel allein die **Reihenfolge** — und davon liegt das
+oberste Element offen. Beim Roundtrip wird die Reihenfolge sogar neu
+gewuerfelt und nur die oberste Platte per Tausch an `dome_stack_top_type`
+angepasst (`engine/src/serialize.rs:899-918`).
 
-## par.4 Der additive Zuschnitt (Plan)
+## par.5 Stufe 0 — Sicht-Inventar in BEIDE Richtungen (Plan)
+
+Weil das Kriterium Sichtgleichheit ist und nicht ein einzelnes Loch, wuerde
+zuerst ein Abgleich entstehen: **was die GUI einem Spieler zeigt** gegen
+**was der Merkmalsvektor traegt**, Feld fuer Feld, mit zwei Spalten
+"Netz sieht mehr" und "Netz sieht weniger". Bekannte Eintraege heute:
+
+- Netz sieht **weniger**: oberste Stapel-Rueckseite (par.3), Rueckseiten
+  der bereits gezogenen Platten waehrend einer Ziehserie (par.3).
+- Netz sieht **mehr**: bislang kein Fund; der einzige Kandidat
+  (`dome_pool_mask`) ist nach par.4 ableitbar, und die Chip-Farben sind
+  bereits an `chip_revealed` gebunden (par.2).
+- Ungeprueft und im Inventar zu klaeren: Mondstapel-Reihenfolge
+  (`features.rs:337-340` codiert Positionen), Beutel-/Turmzaehler
+  (`bag_colors`/`tower_colors`, im Python-Kommentar als rueckrechenbar
+  begruendet, `neural_net.py:45-49`) — beide plausibel oeffentlich, aber
+  nicht in dieser Sitzung belegt.
+
+Ergebnis des Inventars ist eine Liste; **diese Prereg baut daraus nur den
+Kuppelstapel-Teil** (par.6). Fuer alles Weitere entscheidet der Nutzer
+getrennt.
+
+## par.6 Stufe 1 — Der additive Zuschnitt (Plan)
 
 Die Voraussetzung steht bereits: das Eingabe-Layout wird aus der ONNX-Datei
 selbst bestimmt (`detect_layout`, `engine/src/net.rs:104-118`), nicht aus
@@ -61,8 +104,8 @@ selbst bestimmt (`detect_layout`, `engine/src/net.rs:104-118`), nicht aus
 
 1. **Kodierung**: zwei Werte am ENDE des Flat-Vektors,
    `[top_is_special, top_is_wild]`; leerer Stapel = `[0, 0]`. `INPUT_SIZE`
-   708 -> 710, Indizes 0..707 unveraendert. One-hot statt eines Einzelwerts,
-   damit "leer" nicht zwischen Special und Wild interpoliert.
+   708 -> 710, Indizes 0..707 unveraendert. One-hot statt eines
+   Einzelwerts, damit "leer" nicht zwischen Special und Wild interpoliert.
 2. **Die eine Stelle, an der Additivitaet entsteht**: `features_for_layout`
    (`engine/src/features.rs:952`) ignoriert die deklarierte Laenge heute
    (`Flat(_)`, `PlanesPlusFlat { .. }`) und baut immer den vollen Vektor. Es
@@ -89,58 +132,55 @@ selbst bestimmt (`detect_layout`, `engine/src/net.rs:104-118`), nicht aus
    (enthaelt `INPUT_SIZE=`) — und danach **Wheel neu bauen**, sonst sieht
    die Arena den Code nicht.
 
-## par.5 Stufe 0 — Diagnose VOR dem Bau, mit vorregistrierter Schwelle
+**Erfolgskriterium dieser Stufe (das eigentliche Kriterium der Prereg):**
+das Merkmal traegt in jedem Zustand genau den Wert, den die GUI im selben
+Zustand anzeigt, und Bestandsmodelle laufen byte-identisch weiter. Beides
+ist pruefbar, keine Statistik noetig:
 
-Praezedenz #39 (Rotation/Position der Startkuppel waren tote Freiheits-
-grade) und der Alt-Vorbehalt aus #38: erst messen, ob die Freiheit
-ueberhaupt genutzt wird. Auf 200 Champion-Self-Play-Partien wuerde gezaehlt:
+- Sichtgleichheits-Test: ueber >= 500 zufaellige Zustaende stimmt
+  `[top_is_special, top_is_wild]` mit `dome_stack_top_type` aus der
+  Serialisierung ueberein, inklusive leerem Stapel;
+- Regressionstest: "708er-Layout bekommt weiterhin exakt den alten
+  Vektor", >= 500 Zustaende, 0 Abweichungen;
+- `cargo test --release` gruen, Wheel neu gebaut. Zahlengleichheit bei
+  gleichen Seeds gilt dabei als ALARM, nicht als Bestaetigung.
 
-- (a) Anteil der Zuege, in denen `dome_stack_peek` legal ist
-  (Bedingung: Stapel nicht leer, `engine/src/game.rs:168`),
-- (b) Anteil der Partien mit mindestens einer gespielten `dome_stack_peek`,
-- (c) darunter der Anteil mit aktiver "-3 je offenes Spezialfeld"-Wertungs-
-  platte, also der Fall mit der klarsten Wirkrichtung.
+## par.7 Stufe 2 — Netz, das es nutzen kann (Plan, nachgelagert)
 
-**Abbruchregel, vorregistriert**: liegt (b) unter 10 %, wird nicht gebaut
-und diese Prereg auf ENTSCHIEDEN/tot gesetzt. Die 10 % sind gesetzt, nicht
-hergeleitet — Begruendung: unter dieser Rate kann ein Merkmal, das nur in
-dieser Situation etwas sagt, in einer 400-Partien-Arena keinen Effekt
-zeigen, der vom Rauschen zu trennen waere.
+Ein Merkmal ohne trainiertes Netz bleibt wirkungslos: Bestandsmodelle
+bekommen es nach par.6 Punkt 2 gar nicht zu sehen. Warmstart mit
+**null-initialisierten** zwei neuen Spalten in `flat_branch.0.weight`
+(Eingangsbreite aus dem Checkpoint ableitbar, `neural_net.py:2825`) — das
+Netz ist im ersten Schritt exakt das alte.
 
-## par.6 Stufe 1 — Bau plus Regressionsgate
+**Die Arena laeuft hier als Waechter, nicht als Richter.** Gepaartes
+Duell gegen den Champion @400, Auswertung auf BLOCK-Ebene
+(`tools/paired_arena_*`). Vorregistrierte Lesart:
 
-Erst der Kuerzungs-Mechanismus (par.4 Punkt 2) MIT Test
-"708er-Layout bekommt weiterhin exakt den alten Vektor" (>= 500 zufaellige
-Zustaende, 0 Abweichungen), dann das Merkmal. **Gate**: Bestands-Champion
-laedt und spielt unveraendert; `cargo test --release` gruen; Wheel neu
-gebaut, und Zahlengleichheit bei gleichen Seeds gilt als ALARM, nicht als
-Bestaetigung.
+- kein signifikanter Unterschied -> das neue Netz uebernimmt trotzdem den
+  Merkmalsstand (Sichtgleichheit ist das Ziel, par.1);
+- signifikante Regression -> Ursachensuche, NICHT stilles Zuruecknehmen
+  der Sichtgleichheit; ein Merkmal, das der Spieler hat, kann das Netz
+  nicht ehrlich schwaecher machen, also waere ein solcher Befund ein
+  Hinweis auf einen Fehler im Bau oder im Trainingslauf.
 
-## par.7 Stufe 2 — Trainingsarm und Entscheidungsmass
+Die Offline-Metriken werden ausdruecklich nicht als Kriterium gefuehrt:
+der Wirkbereich ist schmal, unterhalb der bekannten Aufloesungsgrenze von
+`value_r2_rounds_1_4`.
 
-Warmstart mit **null-initialisierten** zwei neuen Spalten in
-`flat_branch.0.weight` (Eingangsbreite ist aus dem Checkpoint ableitbar,
-`neural_net.py:2825`): das Netz ist im ersten Schritt exakt das alte, damit
-misst der A/B das Merkmal und nicht einen Neuanfang.
+Fuer die EINORDNUNG (nicht als Baubedingung) waere es nuetzlich zu wissen,
+wie oft die Lage ueberhaupt auftritt: Anteil der Zuege mit legalem
+`dome_stack_peek` (`engine/src/game.rs:168`), Anteil der Partien mit
+mindestens einer gespielten Ziehung, davon der Anteil mit aktiver
+"-3 je offenes Spezialfeld"-Wertungsplatte. Eine niedrige Rate erklaert
+ein flaches Arena-Ergebnis — sie widerlegt die Sichtgleichheit nicht.
 
-**Vorregistriertes Entscheidungsmass: die Arena, nichts anderes.** Gepaartes
-Gating gegen den Champion @400 mit der Haus-Blockanalyse
-(`tools/paired_arena_*`), Auswertung auf BLOCK-Ebene. Die Offline-Metriken
-werden ausdruecklich NICHT als Kriterium gefuehrt: das Merkmal wirkt nur in
-einem schmalen Ausschnitt der Partie, unterhalb der bekannten Aufloesungs-
-grenze von `value_r2_rounds_1_4`.
+## par.8 Abgrenzung
 
-## par.8 Kosten, Risiken, Vorbehalte
-
-- Zwei Werte von 710. Der Bau ist klein; teuer ist ausschliesslich der
-  Trainings- plus Arena-Durchgang.
-- "Billig" ist kein Argument fuer einen Gewinn. Erwartung ehrlich benannt:
-  schmaler Wirkbereich, plausibel H0.
-- Das Merkmal beantwortet NICHT, was waehrend einer laufenden Ziehserie
-  passiert: `pending_stack_draw` ist in `features.rs` nur in der
-  Aktions-ID-Kodierung praesent, nicht als Zustandsmerkmal (Grep). Ein
-  zweiter additiver Block koennte das nachtragen — bewusst NICHT Teil
-  dieser Prereg, damit der A/B ein Merkmal misst und nicht zwei.
+`pending_stack_draw` (par.3, zweite Luecke) gehoert sachlich zum selben
+Ziel, ist hier aber bewusst NICHT mitgebaut: zwei Merkmale in einem Zug
+machen jede spaetere Zuordnung unmoeglich. Es steht im Inventar (par.5)
+und bekommt bei Bedarf eine eigene Stufe.
 
 ## par.9 Prioritaet
 
