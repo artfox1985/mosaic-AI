@@ -11634,3 +11634,627 @@ Groessenordnungs-Schaetzer, nicht fuer Aussagen ueber das Fenster.
   und `--value-hidden` existieren in `train.py` nicht mehr, sie stehen nur
   im Archiv. Der Agent hat es geprueft statt uebernommen -- die History
   beschreibt vergangene Staende, nicht den Code.
+
+## Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)
+
+### STAND 2026-08-17 (Nachmittag) — Champion unveraendert `v21_2d_brierbest`
+
+#### DER BEFUND DES TAGES: der Korpus war policy-maskiert
+
+**Der Policy-Kopf hat den Lehrkorpus in SIEBEN Trainingslaeufen nie gesehen**
+(`w0`, `w01`, `w02`, `w05`, `w1`, `F1`, `F2`). Traeger ist nur, wer im
+Traeger-Manifest gelistet ist oder mit `selfplay_v19wdl`/`selfplay_v20wdl`
+beginnt (`neural_net.py:679`, `:667`); fuer Nicht-Traeger gilt `pol_w = 0.0`
+(`:1804`). Value-, Punkte- und Ownership-Ziele liefen normal durch — die Laeufe
+sahen unauffaellig aus. Details: `PREREG_corpus_distillation.md` par.10.4/10.5.
+
+**Behoben** mit `data/policy_carrier_manifest_own.json` (Korpus traegt Policy,
+Fenster nur Value). Das Trainingsmanifest protokolliert den Traegersatz jetzt
+je Praefix mit (`train_manifest.py`) — diese Zeile haette den Befund am ersten
+Tag gezeigt.
+
+#### Was mit korrekt getragenem Korpus herauskam
+
+Neues Fenster: Korpus als Sockel (700 Dateien Policy-aktiv), `v19wdlsw`
+ausgeduennt, Gesamtmenge exakt wie v21 (2945 Dateien).
+
+| | Ergebnis |
+|---|---|
+| **`v21-b18`** (Gewicht 1,0) | bester Checkpoint Epoche 4. Gegen Champion **211/407 = 51,8 %** (p=0,49) — **Paritaet** |
+| **Plattenbau von `b18`** | k1 +0,05 · k2 **0,00** · k5 −0,09 gegen den Champion. **Keine einzige Diagonale in 150 Partien** |
+| **`v21-b19`** (Gewicht 2,0) | Kopf besser auf 3 von 4 Kriterien, Waechter haelt (+0,49 % gegen Schwelle 2 %) → **2,0 uebernommen** |
+| **Priormasse** (`probe_column_build_prior_mass_heldout.json`) | `b18` legt auf die Bauer-Aktion **4,91x** Gleichverteilungsmasse (Champion 0,59x), in **129 von 130** Held-out-Partien vorn |
+
+> **Die Destillation ist gelungen — sie kommt nur nicht bis aufs Brett.** Der
+> Prior bietet den plattenbauenden Zug oft dominant an, und er verschwindet
+> zwischen Prior und Brett. Uebrig bleiben Suche und Formel, nicht die Policy.
+
+#### Der Regler-Strang ist ABGESCHLOSSEN (negativ)
+
+Tor C auf `b18_best` wiederholt (erstmals mit plattenfaehiger Policy), dann
+frisch-Seed-repliziert: **nicht repliziert.** k5 fiel von t 2,79 auf t 1,10,
+der Siegzuwachs von p 0,066 auf p 0,699. Beide Regler bleiben Default 0.
+`PREREG_gate_c_d1_replication.md` par.6.
+
+**Was UEBERLEBT und den naechsten Schritt traegt:** der k3-Zuwachs war ueber
+alle drei Dosen stabil (+1,59 / +1,20 / +1,68, Block-t bis 5,65). **Das
+Kriterium mit der KURZEN Konjunktion bewegt sich, die mit sechs Feldern nicht**
+— die Produktkollaps-Vorhersage, aus Arena-Daten bestaetigt.
+
+#### KONJUNKTIONSTERME: GEMESSEN, NICHT-ERFOLG (2026-08-18)
+
+`MOSAIC_OWNERSHIP_CONJ`, Default 0 = Produktform (byte-identisch), Commit
+`d520672`. `scoring::expected_plate_points_conj`: konjunktive Kriterien
+(k0/k1/k2/k3/k5/k7) aus den gelernten Atomen, additive k4/k6 weiter aus den
+Feldlabels. Bei Kopf < 140 Rueckfall MIT Warnung. Test
+`conjunction_atom_ranges_match_label_builder` nagelt die Atom-Bereiche fest.
+`cargo test --release`: 447 passed, 0 failed.
+
+**ERGEBNIS (par.9): k1 +0,14 (Block-t 0,54) · k2 +0,07 (Block-t 1,00)** —
+beide weit unter der Schwelle 2,571. Siege 229/407 = 56,3 % gegen 211/407 im
+Nullarm (McNemar p = 0,2025, kein Verlust), aber das war nie das Kriterium.
+
+**Wichtig fuer die Zurechnung: das ist KEIN Nullbefund aus Wirkungslosigkeit.**
+In **402 von 407 Partien** weicht der Ausgang vom Nullarm ab (in 178 kippt
+sogar der Sieger), bei hoher Dosis kippen 6 von 8. Der Regler greift massiv ins
+Spiel ein — er verschiebt den Plattenbau nicht. **Damit ist die Produktkollaps-Erklaerung als URSACHE widerlegt:** sie
+sagte voraus, dass k1/k2 sich bewegen, sobald die Form repariert ist. Die Form
+ist repariert, k1/k2 bewegen sich nicht.
+
+**Registrierter naechster Schritt (par.7, woertlich):** *"Dann ist die Form
+nicht der Engpass, sondern die Kalibrierung oder die Kandidatenauswahl — und
+der naechste Schritt ist die Rangregel, nicht eine weitere Dosis."*
+
+Die Anordnung war (Start 2026-08-17 23:59, fertig 2026-08-18 00:58) (Anordnung `PREREG_conjunction_terms.md`
+par.6/par.7): `b18_best` @400 gegen Champion @400, 407 Seeds, EIN zusaetzlicher
+Arm — D1 `0.1,0.3` mit `MOSAIC_OWNERSHIP_CONJ=1` —, Blockgroesse 25, mit
+`--log-games`. Der Produktform-Arm bei D1 liegt schon vor
+(`paired_arena_env_gate_c_b18.json`, Arm `0.1,0.3`), der Nullarm ebenfalls
+(`paired_arena_env_b18best_vs_ch.json`). Ausgabe: `paired_arena_env_conj_d1_b18.json`.
+**Erfolgsregel: k1 oder k2 signifikant auf Block-Ebene gegen die Produktform,
+ohne Siegverlust.** k3/k5 zaehlen NICHT.
+
+**Zwei Gueltigkeitskontrollen liefen vorher, beide dokumentiert in par.6.1:**
+
+1. **Das Wheel war veraltet — Beinahe-Fehlschluss.** Die installierte
+   `mosaic_rust.cp314-win_amd64.pyd` trug den Stand 16.08. 10:57, der
+   Konjunktionscode den Stand 17.08. 11:04/11:07. Die Arena haette die ALTE
+   Engine gefahren, der Konjunktionsarm waere bitgleich mit dem Produktarm
+   gewesen — und ein "k1/k2 flach" haette den einzigen verbliebenen Weg
+   faelschlich geschlossen. Neu gebaut 23:44:10.
+2. **Determinismus zuerst, dann Reglerwirkung.** Derselbe Arm zweimal auf
+   gleichen Seeds: **8/8 Partien identisch**. Konjunktionsform gegen
+   Produktform: **6/8 Partien kippen**. Ohne die erste Zahl beweist die zweite
+   nichts. Belege: `paired_arena_env_conj_determinism.json`,
+   `paired_arena_env_conj_smoke.json`.
+
+#### ZWEI VON DREI WEGEN ZUM PLATTENBAU SIND GESCHLOSSEN
+
+| Weg | Stand |
+|---|---|
+| Laufzeit-Regler in Produktform | **geschlossen, negativ** — Tor C wiederholt UND frisch-Seed-repliziert |
+| Policy-Destillation | **geschlossen, negativ** — Warm Start (par.10.7) UND Cold Start (par.10.9) |
+| **Aktivierung mit korrigierter Form** | **GEMESSEN, NICHT-ERFOLG** — k1 Block-t 0,54, k2 Block-t 1,00 (par.9). Die Form war nicht der Engpass |
+
+**Alle drei Wege sind damit durchgemessen, keiner traegt.** Was ueberlebt, ist
+die Zurechnung: der Prior BIETET den Zug an (4,91x), der Regler GREIFT massiv
+ins Spiel ein (402/407 Partien laufen anders) — und trotzdem entsteht keine
+Platte. Der
+Engpass sitzt also zwischen Angebot und Auswahl, nicht in der Formel und nicht
+im Prior.
+
+**Harte Rangregeln sind AUSGESCHLOSSEN** (Nutzer 2026-08-18: *"wir pfuschen
+nicht mit harten rangregeln herum"*) — der in `PREREG_conjunction_terms.md`
+par.7 registrierte Satz ist damit ueberholt, soweit er eine Rangregel nennt.
+
+#### NAECHSTER SCHRITT: KOPPLUNG, nicht Formel — `PREREG_ownership_coupling.md`
+
+Der Auftrag lautete, Draft und Tiling **gemeinsam** anzusehen. Das hat drei
+Dinge ergeben, die alle drei bisherigen Preregs uebersehen haben:
+
+1. **Das Tiling entscheidet ein SOLVER, nicht die Suche** (`tiling_solver.rs:990`,
+   die Diagnose steht dort schon im Code). Der Plattenbau ist eine
+   Tiling-Handlung — ein Regler, der nur am Blattwert der Draft-Suche haengt,
+   kann ihn strukturell nicht ausloesen.
+2. **Die Suche ist GUMBEL, nicht PUCT** (`net_mcts.rs:2869`; PUCT ist Legacy).
+   Der Q-Anteil geht ueber `σ(q) = (c_visit + max_N)·c_scale·q` ein, c_visit=50,
+   c_scale=1,0 — Verstaerkung ~100 gegen Gumbel-Rauschen ~1,28. **Hergeleitet**
+   (max_N=50 ist Annahme): ein gefuelltes Spezialfeld erreicht ~45 % des
+   Rauschens und wirkt, eine Fliese in einer Spalte ~1,6 % und wirkt nicht.
+   Damit ist erklaert, warum k6 sich bewegt und k1/k2 nie — es ist die
+   **Skala**, nicht die Form. Das gemeinsame `/50` (`:1059`) trifft Kriterien,
+   deren Inkremente drei Groessenordnungen auseinanderliegen.
+3. **Die Tiling-Seite hat die Lehre schon gezogen, die dem Draft fehlt:** dort
+   marginale Werte plus Gewicht je Kriterium, ausdruecklich weil der
+   Spezialfeld-Posten (−11,70) *"jede Geometrie ueberdeckt"* (`:1108`, gemessen
+   2026-08-12). Der Draft-Pfad formt weiter mit dem NIVEAU.
+
+**Beifang, gemessen am Nullarm (Regler AUS), also aus dem trainierten Netz und
+nicht aus dem Verbraucher:** bei aktiver k6-Platte legt `b18` Spezialkuppeln zu
+**62,8 %** nach unten (ohne die Platte 42,3 %) und raeumt die oberen Slots von
+29,6 % auf **8,5 %**. `docs/domain_knowledge.md` §8 verlangt das Gegenteil. Bei
+k5 dagegen **keine Reaktion** (50,2 gegen 50,1 %), obwohl §6 dort
+Spezialkuppeln in die unteren Ecken will. Das Netz hat eine Anti-§8-Gewohnheit
+GELERNT. Zahlen: 4,36 Spezialplatten je Spieler, 3,94 leere Spezialfelder je
+Partie, **0 von 153 Partien** ohne Verlust, und von 367 Spezialfliesen lagen
+298 in den Reihen 1–2 gegen **4** in den Reihen 5–6.
+
+**Die groessere offene Frage steht in par.9 der neuen Prereg:** der Kopf sagt
+vorher, was passieren WIRD, nicht was erreichbar WAERE. Zwei unabhaengige
+Belege stuetzen das — der staerkere Kopf machte den Verbraucher inert (Tor C
+par.15), und bei k6 ist die Kopplung stark genug und das Verhalten trotzdem
+falsch.
+
+**Cold Start `v21-b20` gegen Champion (fertig 2026-08-17 22:20):** 158/407 =
+38,8 % Siege, und gepaart gegen `b18` auf Block-Ebene k1 +0,09 (t 0,27), k2
++0,13 (t 1,00), k5 +0,06 (t 0,59) — **kein Kriterium signifikant**. Eine Policy,
+die NICHTS anderes gesehen hat als plattengelenktes Spiel, baut nicht mehr
+Platten. **Der Prior war nicht die Blockade.** Der Cold Start ist als Fahrzeug
+erledigt: schwaecher UND nicht besser bei den Platten.
+
+**Der verbliebene Weg ist begruendet, nicht bloss uebrig:** die Priormasse zeigt,
+dass `b18` den plattenbauenden Zug dominant ANBIETET (4,91x Gleichverteilung,
+129/130 Partien) — er setzt sich nur nicht durch. Genau dort greift der
+Verbraucher, und genau dort ist die Produktform die gemessene Bremse.
+
+#### WEG 1 (Frozen Trunk) ABGESCHLOSSEN, NEGATIV — `v21-b22`
+
+Fertig 2026-08-18, Early Stop nach **15** von 60 Epochen. Einzelheiten in
+`PREREG_lr_schedule.md`.
+
+| | Own-Val |
+|---|---:|
+| `b18_best` E4 (Startpunkt) | 0,3466 |
+| **`b22` Frozen Trunk, bestes (E13)** | **0,3407** |
+| `b18` gemeinsames Training E15 | 0,3191 |
+| `b19` E15 (Gewicht 2,0) | 0,2994 |
+
+Der eingefrorene Rumpf gewinnt 0,0059 und steht dann (E9-E15 zusammen 0,0004).
+**Weg 1 liefert den SCHLECHTEREN Kopf**, nicht den besseren — die Kopfguete
+haengt an der Rumpfdarstellung, das Einfrieren spart die Policy und kostet den
+Kopf. Fuer die Kopplungsarbeit bleiben `b18`/`b19` die Kandidaten.
+
+**Beifang, er stuetzt den LR-Strang:** die LR blieb ueber alle 15 Epochen bei
+5,00e-04. `ReduceLROnPlateau` (patience 2) hat NIE ausgeloest, weil sich der
+Verlust je Epoche noch um 0,0001-0,0002 verbesserte — das zaehlt als
+Fortschritt. Ein reaktiver Scheduler greift selbst auf einer faktisch flachen
+Kurve nicht, solange sie monoton bleibt.
+
+**Die Warnung zu `b22` bleibt gueltig:** um 23:35 meldete der Harness den Lauf
+als "failed, exit code 1". Gestorben war der **Hintergrund-Wrapper der Shell**,
+nicht das Training — der Prozess lief sauber zu Ende. **Regel: bei einer
+"failed"-Meldung zuerst `Get-CimInstance Win32_Process` fragen, ob das Kind noch
+lebt, bevor irgendwas neu gestartet wird.**
+
+#### Kalibrierung: Versatz erledigt, Steigung offen — Uebergangsweg entschieden (2026-08-18)
+
+**In einem Satz:** die geplante Mittelwert-Korrektur ist gegenstandslos (unten
+gemessen), die Steigungskorrektur bleibt offen und bekommt als Uebergang einen
+ausgesperrten BAUER-Satz, bis ein plattenbewusster Champion eigene Daten
+liefert.
+
+Der Konjunktions-Kopf **rangiert gut und kalibriert schlecht** (AUC 0,83-0,91,
+Brier nur 8-14 % unter der Grundrate, ueber 0,5 ueberschaetzt er) — das steht.
+Die daraus abgeleitete **Massnahme** aber faellt weg.
+
+**Gemessen** (`tools/probes/conjunction_marginal_normal_play.py`, `b19_best`,
+150 Normalspiel-Dateien, 1500 Partien, 3000 Bretter): Kopf-Mittelwert gegen die
+tatsaechliche Endrate derselben Partien, Runde-3-Zustaende.
+
+| Gruppe | Kopf sagt | tatsaechlich | DELTA |
+|---|---|---|---|
+| Reihen k0 | 4,294 % | 4,278 % | 0,00 |
+| **Spalten k1** | 0,731 % | 0,517 % | **0,35 ± 0,10** |
+| Diagonalen k2 | 0,453 % | 0,117 % | 1,36 ± 0,38 (nur 7 Positive) |
+| Ecken k5 | 26,692 % | 26,650 % | 0,00 |
+| Joker k3 | 40,881 % | 39,800 % | 0,04 |
+| farbenreich k7 | 0,955 % | 1,017 % | −0,06 |
+| Layout (k3-Input) | 49,777 % | 50,000 % | −0,01 |
+
+**Die Herleitung aus Grundraten war ein Artefakt der Referenzwahl.** Gegen die
+Bauer-Arme gerechnet ergibt k1 einen Versatz von 1,58, gegen die
+Trainingsmischung 0,64 (1,08 % bei 2145 Fenster- + 800 Korpus-Dateien laut
+`manifest_train_v21-b19_20260817_000926.json`) — gemessen sind 0,35. Eine ungeprueft eingetragene
+Konstante haette den Kopf dreifach zu stark gedaempft. **Regel daraus:** einen
+Prior-Versatz nie aus Grundraten falten, wenn man ihn am Kopf selbst messen
+kann; die Referenzwahl bewegt ihn um den Faktor 3.
+
+**Nutzer-Einwand, der auch die 0,35 entwertet (2026-08-17):** die
+Normalspiel-Rate stammt aus Partien von Netzen, die die Wertungsplatten NICHT
+beruecksichtigen. Den Kopf darauf zu eichen hiesse, ihn auf genau das Verhalten
+zu kalibrieren, das der Leitstern abschaffen will — seine Spalten-Zuversicht
+wegzurechnen ist das Gegenteil des Hebels.
+
+**Was NICHT widerlegt ist:** `PREREG_ownership_selector.md` par.9.2 hat die
+Fehlkalibrierung im OBEREN Bereich gemessen (Top-Bin Spalten: vorhergesagt
+0,949). Das ist eine Steigungsfrage (B != 1), kein Versatz — ein Offset haette
+sie ohnehin nie behoben. `pos_weight` im Loss bleibt zurueckgestellt (kostet
+einen vollen Lauf und zerstoert jeden Bestandsvergleich).
+
+**Der obere Bereich existiert im normalen Spiel NICHT** (Nutzer-Frage
+2026-08-18 "helfen extra Bauer-Self-Plays?",
+`tools/probes/conjunction_reliability_by_source.py`, `b19_best`, 60 Dateien je
+Quelle, Runde-3-Zustaende):
+
+| ueber p=0,5 | normales Spiel | Bauer-Arme |
+|---|---|---|
+| Spalten k1 | **3** von 7200 | **106** von 7200 |
+| Diagonalen k2 | **0** von 2400 | **109** von 2400 |
+
+Fehlkalibrierung dort, in den Armen: k1 0,50-0,80 vorhergesagt 63,0 % gegen
+46,2 % tatsaechlich (91 Faelle), 0,80-1,00 88,0 % gegen 60,0 % (15); k2
+64,6/50,6 (77) und 86,7/50,0 (32). **k5 ist im normalen Spiel ueber die GANZE
+Kennlinie richtig** (66,0/66,4 bei 393 Faellen, 92,5/91,1 bei 858) — dort ist
+nichts zu holen.
+
+**Antwort auf die Frage (sie galt dem ausgesperrten Satz, nicht dem Korpus):
+ja.** Die Arme sind fuer den oberen Bereich die einzige Quelle — 150-300
+Dateien geben 250-550 Faelle ueber 0,5, ~17 Partien/min (k1-Arm-Zeitstempel)
+also 1,5-3 h, mit dem 4,7- bzw. 35-fachen Ertrag je Datei gegenueber
+Normalspiel. Der Fit gilt dann fuer die Bauer-Verteilung, nicht fuer die
+Einsatzverteilung.
+
+**Was den Nutzen heute begrenzt:** im normalen Spiel liegen **98,3 %** der
+k1-Faelle unter p=0,05, und dort ist der Kopf fast richtig (0,3/0,5 · 1,9/1,3).
+Eine Steigungskorrektur wuerde kaum feuern. **Ungeprueft:** gemessen sind
+Zustaende GESPIELTER Partien, nicht Suchknoten — die Suche besucht
+plattenbauende Linien, die im Verlauf nie auftauchen, und koennte hoeher
+liegen. Das ist der einzige Weg, auf dem die Korrektur schon heute wirkte, und
+er ist mit einer Sonde auf Suchknoten pruefbar.
+
+#### NEUER STRANG: der Shaping-Nenner ist rundenblind (2026-08-18)
+
+`WERTUNG_SHAPING_SCALE` ist fest **50** (`net_mcts.rs:1059`). Gemessen an 22
+Arena-Logs (`static/log/elo/*.log`) steht nach Runde 1 ein Punktestand von **4**
+auf dem Brett, nach Runde 5 von 47,6, nach Endwertung 55,7 (Mensch: 7,0 / 59,2 /
+74,4). Der Nenner ist also frueh um mehr als eine Groessenordnung zu grob.
+
+**Die Kurvenform ist staerke-invariant** — die Niveaus liegen 33 % auseinander,
+die Anteile am Endstand stimmen auf 0,02 ueberein (0,083 · 0,172 · 0,327 ·
+0,515 · 0,825). Genau das erlaubt ein festes Profil: der Verlauf ist
+Spielstruktur, nicht Spielstaerke.
+
+**Das Argument, das den Strang traegt:** `w` und `S` sind global austauschbar
+(im linearen `tanh`-Bereich ist `w·tanh(E/S) ~ w·E/S`), je Runde aber nicht. Die
+Dosisreihen variierten `w` und konnten eine RUNDENabhaengige Schieflage
+strukturell nicht finden. Und die ist da: bei vergleichbarer Zielerreichung
+ergibt sich heute Runde 1 ein Shift von 0,014 und Runde 5 einer von 0,139 —
+Faktor 10 zugunsten der Runde, in der nur noch <= 7 Optionen offen sind
+(Zug 1 der Runde 1: 195). **Der negative Dosisbefund ist damit nicht ungueltig,
+aber er koennte ein Artefakt sein.**
+
+**Vorregistriert: `PREREG_shaping_scale_per_round.md`.** Knopf statt Konstante
+(Default = heutiges Verhalten), Pfad A (Wertung) zuerst, `ROUND_GAIN` fest auf
+0, Erfolgsregel k1/k2 auf Block-Ebene ohne Siegverlust. **Die Vorbedingung
+(Saettigungspruefung par.6) ist seit 2026-08-19 BEIDSEITIG erfuellt** (Pfad B
+par.3a, Pfad A par.6a: alle 90-%-Quantile <= 0,31) — ein gemeinsames Profil
+traegt, der Bau ist frei. Warnung aus par.6a: Runde 1 ist fuer Pfad A
+strukturell stumm (E = 0). (Die fruehere zweite Warnung „Strafleisten-Term
+Default 0,3 live" war eine Knopf-Verwechslung und ist in par.6a korrigiert —
+alle Pfad-A-Gewichte sind per Default 0.)
+
+**Einordnung, damit es niemand ueberschaetzt:** beide Shaping-Pfade sind per
+Default AUS (`MOSAIC_WERTUNG_SHAPING_W` und `MOSAIC_OWNERSHIP_W` je 0,0). Der
+Umbau repariert nichts im laufenden Spiel — er stellt die Bedingungen her, unter
+denen die Injektionsmessung ueberhaupt aussagekraeftig waere.
+
+#### DER FELD-KOPF, AN DER SPALTE GEMESSEN (2026-08-18)
+
+Nutzer-Frage: der Kopf gibt je Feld P(am Ende belegt) aus -- steigt die
+Spaltenwahrscheinlichkeit, wenn ich eine Fliese lege? Sonde
+`tools/probes/ownership_column_intent.py`: bei GLEICHEM Fuellstand einer Spalte
+(Brettlage kontrolliert) die Kopf-Vorhersage fuer die noch leeren Felder,
+gegen die tatsaechliche Vollendungsrate. Runden 2-4, 30 Dateien je Arm.
+
+| Arm | Fuell | p_belegt | p_leer | Produktform | tatsaechlich | Faktor |
+|---|---|---|---|---|---|---|
+| a | 3 | 79,0 % | 27,8 % | 0,57 % | 1,1 % | 2,0x |
+| **k1** | 3 | 70,5 % | 33,3 % | **1,27 %** | **21,1 %** | **16,5x** |
+| a | 5 | 66,5 % | 22,2 % | 1,08 % | 15,8 % | 14,6x |
+| **k1** | 5 | 61,1 % | 31,1 % | **1,77 %** | **38,9 %** | **21,9x** |
+
+1. **Der Kopf sieht die Absicht kaum.** Bei Fuellstand 3 sagt er 27,8 % (a)
+   gegen 33,3 % (k1) -- Faktor 1,2, waehrend die Wirklichkeit um Faktor **19**
+   auseinanderliegt. Er ist also nicht nur "Eintreten statt Erreichbarkeit",
+   er ist auch als Eintretens-Vorhersager schwach.
+2. **Er weiss nicht, was sicher ist.** Bereits belegte Felder bekommen 61-86 %
+   statt 100 %. GEPRUEFT: 186 von 186 belegten Feldern sind am Ende belegt.
+3. **Die Produktform multipliziert sechs solcher Zahlen.** Bei Fuellstand 5
+   fehlt EIN Feld: Produkt 1,77 % gegen 38,9 % echt. Fuenf der Faktoren sind
+   Sicherheiten, die mit ~0,61 bepreist werden (0,61^5 = 0,085).
+
+**DIE LUECKE, praezise:** es gibt keinen Term, der sieht, dass ein
+DRAFTING-Zug eine Spalte voranbringt. Der Fortschrittsterm `wertung_progress`
+koennte es, liest aber nur `build_grid` und ist damit innerhalb einer Runde
+fuer jeden Drafting-Zug identisch (`archive/history.md`, Ursache am Code
+geprueft) -- deshalb hob die Injektion die vertikalen Platten nur von 0,70 auf
+1,05 Punkte. Der Kopf-Weg wiederum sieht die Absicht nicht. **Kandidat, gebaut
+und auf Default 0: `MOSAIC_ENDAWARE_W`** (`solve_rec_endaware`,
+`tiling_solver.rs:519-546`) rollt die Musterreihen auf die Kuppel aus und
+maximiert Platzierungspunkte + Endwertung -- in `history.md` als "der
+aussichtsreichste" der drei Kandidatenterme notiert. NICHT gemessen.
+
+**Korrektur einer eigenen Formulierung:** die Heuristik ist NICHT der
+plattenbewusste Spieler schlechthin -- bei Spalten liegt sie mit 1,2 %
+Vollendung (Fuellstand 3) auf dem Niveau von Arm a. Plattenbewusst ist sie bei
+den Spezialfeldern (k6), nicht bei k1.
+
+#### KALIBRIERUNG GEFITTET -- ERGEBNIS: NICHT EINBAUEN (2026-08-18)
+
+`tools/probes/conjunction_calibration_fit.py`, `b19_best`, Fit auf 25.000
+Brettern (Arme a/k1/k2/k5, je Partie ein Zustand pro Runde), Transfer auf 5.000
+Brettern des `heur`-Arms. Rohzahlen: `evaluations/conjunction_calibration_fit.json`.
+
+| Gruppe | Positive | B | A | Brier-Gewinn Fit | Gewinn Transfer |
+|---|---:|---:|---:|---:|---:|
+| Reihen k0 | 4535 | 1,037 | -0,136 | +0,4 % | +2,6 % |
+| **Spalten k1** | 5175 | 0,921 | +0,144 | **+0,6 %** | **-6,0 %** (190 Pos) |
+| **Diagonalen k2** | 2005 | 0,839 | -0,095 | **+1,3 %** | **-15,4 %** (20 Pos) |
+| Ecken k5 | 28375 | 0,952 | -0,018 | 0,0 % | +0,5 % |
+| Joker k3 | 9065 | 0,980 | -0,065 | +0,1 % | -0,5 % |
+| farbenreich k7 | 1240 | 0,823 | -0,719 | +0,1 % | +0,3 % |
+
+**Drei Befunde, und sie zeigen alle in dieselbe Richtung:**
+
+1. **Die Korrektur ist winzig.** B liegt zwischen 0,82 und 1,08, der
+   Brier-Gewinn im Fit-Satz bei hoechstens 1,3 %. Kein Vergleich zu den
+   ~20 %, die eine echte Fehlkalibrierung hergeben wuerde.
+2. **Sie uebertraegt NICHT.** Auf `heur` -- dem einzigen plattenBEWUSSTEN
+   Spieler im Satz -- verschlechtert sie k1 um 6,0 % (190 Positive, belastbar)
+   und k2 um 15,4 % (20 Positive, schwach). Genau die als offen markierte
+   Transfer-Annahme ist damit gemessen und GEFALLEN.
+3. **Die Fehlkalibrierung haengt an der RUNDE, nicht an der Gruppe.** Eigener
+   Fit je Runde: k1 B = 0,71 / 0,93 / 0,94 / 1,01 / 1,02 (R1..R5), k5 0,82 ->
+   1,03, k2 0,69 -> 0,92. Der Kopf ist FRUEH ueberkonfident und SPAET richtig.
+   Eine Konstante je Gruppe mittelt genau diese Struktur weg.
+
+**Entscheid: kein Knopf, kein Einbau.** 0,6 % Gewinn im Fit-Satz gegen -6 %
+dort, wo es zaehlt, traegt keinen Verbraucher-Eingriff.
+
+**AUCH DIE RUNDENABHAENGIGE VARIANTE FAELLT DURCH -- Linie geschlossen.**
+Vier Varianten gegeneinander, entschieden am Transfer (V0 keine Korrektur, V1 je
+Gruppe, V2 je Gruppe UND Runde, V3 Steigung je Runde ueber die Gruppen geteilt +
+Versatz je Gruppe):
+
+| | Fit-Satz vs V0 | Transfer vs V0 | k1 Transfer | k2 Transfer |
+|---|---:|---:|---:|---:|
+| V1 | +0,27 % | **-0,01 %** | -6,0 % | -15,4 % |
+| V2 | +0,47 % | **+0,03 %** | -6,4 % | -11,5 % |
+| V3 | +0,22 % | **-0,02 %** | -7,1 % | -20,7 % |
+
+Mehr Parameter helfen NICHT -- V2 hat die meiste Freiheit und gewinnt im Fit am
+meisten, im Transfer bleibt alles null. Und bei den beiden ZIELkriterien wird es
+mit jeder Variante schlechter, waehrend k0/k5 (die keine Korrektur brauchen)
+leicht gewinnen. Kein Rausch-, sondern ein Richtungsproblem.
+
+**Die Erklaerung, die alles zusammenhaelt (Nutzer 2026-08-18):** *"der Kopf sagt
+vorher, was passieren wird, statt was erreichbar waere."* Das Ziel ist das
+Endbrett der TATSAECHLICH gespielten Partie (`_final_ownership_by_game`), also
+P(Kriterium | Stellung UND weiterspielende Politik) -- eine politikabhaengige
+Groesse. Drei Messungen stuetzen das: die Rundenabhaengigkeit (frueh Prognose,
+spaet Ablesung), der gescheiterte Transfer auf eine andere Politik, und der
+k5-Arm, der MEHR volle Spalten liefert als der k1-Arm (8,53 % gegen 6,98 %) --
+gleiche Brettgeometrie, andere Absicht, anderes Label.
+
+**Folge: kein besserer Fit, sondern ein anderes ZIEL.** Eine Groesse, die
+Erreichbarkeit misst statt Eintreten. Die Bauer-Arme sind davon schon die halbe
+Antwort -- sie sind das "was passiert, wenn man es versucht" zur selben Stellung.
+Nicht entworfen, nur festgehalten.
+
+**Einschraenkung zu einer frueheren Zahl:** V3s geteilte Rundensteigungen sind
+mit 0,866 -> 0,990 viel milder als die 0,71 -> 1,02, die der Einzelfit fuer k1
+zeigte. Der starke Rundeneffekt sitzt in den duenn besetzten Gruppen und
+verschwindet fast, sobald k5/k3 mitgewichtet werden.
+
+**Widerspruch, den ich NICHT aufloesen konnte** (ungeprueft, aber protokolliert):
+auf den KORPUS-Dateien zeigte `conjunction_reliability_by_source.py` fuer k1 im
+Bin 0,50-0,80 noch 63,0 % vorhergesagt gegen 46,2 % tatsaechlich (91 Faelle);
+auf dem Bewertungssatz sind es 58,7 % gegen 55,8 % (373 Faelle). Die neue Zahl
+ist groesser und auf ausgesperrten Daten, also die bessere -- der Abstand ist
+aber zu gross fuer Rauschen. Kandidat, ungeprueft: die Korpus-Partien stammen
+vom 14.08. und damit von einem ANDEREN Engine-Stand als der Bewertungssatz (das
+Wheel wurde am 17.08. 23:44 neu gebaut, Commit `4ca164e`).
+
+**WIEDERVORLAGE, mit messbarem Ausloeser (Nutzer 2026-08-17):** sobald ein
+Champion die Wertungsplatten beruecksichtigt, wird die Kalibrierung wieder
+legitim — dann IST das normale Spiel das Zielverhalten. Der Ausloeser steht
+schon fest: die k1-Grundrate liegt heute ueber **fuenf** Generationen flach bei
+~0,52 % (Chi2 2,3 bei 4 FG, p=0,68; k0 driftet dagegen klar, Chi2 40,5), und
+zwar WEIL keine davon Platten baut. Der erste Champion, der es tut, hebt sie
+sichtbar. **Dieser Ausschlag ist das Startsignal fuer Platt-Korrektur UND
+festen Bewertungssatz** — beide dann mit genau jenem Champion erzeugt.
+
+**Bis dahin (Nutzer-Entscheid 2026-08-18): Uebergangskalibrierung auf dem
+Bauer-Satz.** Begruendung, warum das NICHT der Fehler von gestern ist: der Fit
+entsteht im Regime, in das wir hineinwollen, nicht in dem, das wir verlassen.
+**Zwei Vorbehalte, die mitgeschrieben gehoeren:** der Transfer auf die
+Einsatzverteilung ist eine ANNAHME (eine Stellung mit p=0,88 entsteht im Arm
+anders als im spaeteren Netzspiel), und der Wert ist Bereitschaft, nicht
+Arena-Gewinn — bei 98,3 % der Faelle unter p=0,05 feuert die Korrektur heute
+kaum. Die Alternative ist aber die Annahme, p sei richtig, und die ist am
+oberen Ende um 28 Punkte widerlegt. Auslegung deshalb eher zu schwach als zu
+stark, Knopf mit Default 0, Arena-A/B wie ueblich.
+
+**Der Fit gehoert JE GRUPPE GEPOOLT, nicht je Atom (Nutzer-Befund 2026-08-18):**
+die Bauer-Arme schliessen bevorzugt die AEUSSEREN Spalten — von den sechs
+Spalten-Atomen liegen im Korpus genau zwei bei 1,17/1,32 %, die anderen vier
+bei 2,16-3,75 % (`base_rate_conj`, 14.360 Bretter), also zwei Mittelspalten
+gegen vier Aussenspalten, Faktor 2,4. Im normalen Spiel gibt es diese
+Schieflage nicht, sie ist von den Armen gemacht. Ein Fit je Atom wuerde die
+Arm-Geometrie erben; Poolen mittelt sie heraus. Der `k5`-Arm ist aus demselben
+Grund (aeusseres Spaltenpaar als Ziel) der staerkste k1-Lieferant ueberhaupt
+(8,75 % gegen 6,67 % des k1-Arms, par.5a) — er kommt als Ergaenzung mit in den
+Satz, ersetzt aber die Basisverteilung nicht.
+
+#### LR-Schedules: reaktive Verfahren sind hier strukturell zu spaet
+
+Zweimal gemessen (`b21` Warm Start, `b20` Cold Start): Optimum bei Epoche 4,
+Plateau-Scheduler feuert bei 8, bester Checkpoint identisch zum konstanten
+Lauf. Auch `patience=1` waere zu spaet. **Kein weiteres Nachstellen.**
+`PREREG_lr_schedule.md` par.7.
+
+Nebenbefund: bei `b21` hat die LR-Senkung den Ownership-Kopf gebremst, der noch
+besser wurde — ausgeloest von `val_combined`, das den Ownership-Verlust nicht
+enthaelt. **Wer `plateau` fuer ein Kopf-Training nimmt, muss ihn mit dem
+Ownership-Verlust speisen** (im Freeze-Modus passiert das automatisch — genau
+darum laeuft `b22` so).
+
+Falls doch ein Schedule gewollt: **proaktiver Cosine mit `T_max` 8-10**, nicht
+20 und nicht 100. `T_max` haengt am `--epochs`-Flag — deshalb war der Cosine des
+Bestandsrezepts seit v12b_lr immer inert.
+
+#### Cold Start `v21-b20`: Saettigung bei Epoche 4, nicht bei 40
+
+Erwartet waren ~40 Epochen (Nutzer-Erfahrung, vorab notiert), gemessen 4 mit
+Early Stop bei 15. Bestes `policy_val` 0,4392 gegen `b18`s 0,3899. **Der
+Policy-Kanal ist zu schmal: 7.000 Partien von null.** Kein Schedule repariert
+das.
+
+### FALLEN, die am 2026-08-17 Zeit gekostet haben
+
+| Falle | Regel daraus |
+|---|---|
+| Backticks in doppelt gequoteten Bash-Argumenten werden AUSGEFUEHRT | Text mit Backticks nur ueber Heredoc mit EINFACHEN Quotes, oder ueber eine Datei. **Zweimal passiert** |
+| Zeichenklasse mit EINEM Backslash vor dem Schraegstrich trifft nur den Schraegstrich | Zwei Backslashes, und vor dem Schreiben ein Selbsttest gegen BEIDE Schreibweisen. **Zweimal passiert** |
+| `TaskStop` toetet die Kind-Bash nicht zuverlaessig | Nach dem Stoppen die Prozessliste pruefen. Folge: `v21-b20` lief doppelt |
+| `grep`-Pipe puffert blockweise | Hintergrundlaeufe ohne Pipe starten, sonst bleibt das Log minutenlang leer |
+| Gate-A-Held-out ueberlappt `b18`/`b19`-Training zu **88 %** | Kopfvergleiche ueber Fenstergrenzen brauchen einen festen Bewertungssatz. Der Paarvergleich b18↔b19 bleibt gueltig (identischer Trainingssatz, identisch betroffen) |
+| Nach einer Code-Auslagerung reicht `ast.parse` NICHT | Kurzlauf mit `--train-file-limit` fahren. Zwei `NameError` haetten `b20` sofort getoetet |
+| `--promote-winner` ist bei `paired_gating.py` Default TRUE | Messlaeufe brauchen `--no-promote-winner` |
+
+
+### FALLEN vom 2026-08-17 (Nacht) / 2026-08-18
+
+| Falle | Regel daraus |
+|---|---|
+| **Das installierte Wheel war 25 h aelter als der Engine-Code** | Vor JEDER Arena, die neuen Engine-Code messen soll: `.pyd`-Zeitstempel gegen die `.rs`-Zeitstempel halten. Haette hier ein falsches "Konjunktionsform bringt nichts" erzeugt und den einzigen verbliebenen Weg geschlossen. Danach ZWEI Kontrollen, in dieser Reihenfolge: erst Determinismus (derselbe Arm zweimal, muss 8/8 gleich sein), dann Reglerwirkung (muss abweichen). Umgekehrt beweist die zweite nichts |
+| **Harness-Meldung "failed, exit code 1" betraf den Wrapper, nicht das Training** | Bei jeder Fehlmeldung zuerst `Get-CimInstance Win32_Process` fragen, ob das Kind lebt. Sonst startet man einen 7-Stunden-Lauf neu, der noch laeuft — oder erklaert ihn faelschlich fuer tot |
+| **Arena ohne `--log-games` gestartet** | Die Plattenkriterien k1/k2/k5 kommen aus den Partie-Logs (`tools/plate_points_from_arena.py`). Ohne den Schalter fehlt das Feld `log` und das vorregistrierte Erfolgskriterium ist NICHT berechenbar. Vor dem Start eine Referenzdatei aufmachen und die benoetigten Felder vergleichen |
+| `nohup … &` in einem Bash-Aufruf | Der Wrapper meldet sofort "completed" und der Lauf ist nicht mehr harness-verfolgt. `run_in_background` benutzen, ohne `&`. **Steht schon im Merkzettel und ist wieder passiert** |
+| Aus einem Dict mit `' '.join(...)` lesen liefert die SCHLUESSEL | Wirkte wie ein Manifest-Mangel ("`cli_args` speichert keine Werte"), war ein Lesefehler. Vor einer Mangel-Behauptung die Datenstruktur ansehen |
+
+
+### PARTIE-REPLAY IST EXAKT (erledigt 2026-08-18) -- `PREREG_action_id_logging.md`
+
+**Jede kuenftige Mensch-vs-KI-Partie ist Zug fuer Zug exakt nachspielbar**, weil
+die Engine je Drafting-Aktion eine maschinenlesbare Zeile in die GESPEICHERTE
+Logfassung schreibt (nicht in die Anzeige):
+
+    #a {"id": 86, "p": 0, "a": {"type": "stone", "source": "LARGE_FACTORY_SUN", ...}}
+
+Die `id` ist dieselbe, gegen die der **Policy-Kopf trainiert**
+(`features.rs::action_to_id`, `NUM_ACTIONS = 406`) -- eine Log-ID ist damit
+unmittelbar mit den Policy-Logits vergleichbar, nicht nur ein Replay-Schluessel.
+Seither traegt auch jeder `valid_moves`-Eintrag seine `id`.
+
+**Gemessen** (par.7 der Registrierung):
+
+| | |
+|---|---|
+| frische Partie | 245/245 Zeilen exakt, **52/52 Stein-Zuege ueber die ID**, 0 ueber den Text |
+| `game_20260818_200516_seed585858` | war Abbruch bei Zeile 16, **jetzt 321/321** |
+| `game_20260818_195111_seed558549` | 327/327 (unveraendert) |
+| alte Elo-Logs | unveraendert unreplaybar (Seed reproduziert den Fabrik-Aufbau nicht) |
+| `cargo test --release` | 447 bestanden |
+
+**Drei Dinge, die man wissen muss, bevor man darauf aufbaut:**
+
+1. **Die ID ist NICHT eindeutig.** `moon_order` fliesst nicht ein
+   (`net_mcts.rs:1824`), und Kuppel-Zuege zerfallen in Slot + Rotation --
+   deshalb `id_rotation` und die kanonischen Felder als Disambiguierung. Die
+   gegenteilige Annahme stand in der Registrierung und war falsch (par.7.2).
+2. **Der Haken sitzt an der API-Grenze (`py.rs`), nicht in `apply_drafting`**
+   (Heisspfad der Suche). Wer eine `apply_*`-Methode ergaenzt, ruft
+   `log_and_apply` statt `apply_drafting`. Zwei bewusste Luecken: `apply_pass`
+   (schreibt nie ins Log) und der Stapel-Zug der Netz-KI -- beide vom Textweg
+   gedeckt.
+3. **`tools/plate_points_from_arena.py` musste gehaertet werden.** Die
+   par.4-Sperre hat einen echten Bruch gefunden: eine `#`-Zeile im
+   Endwertungs-Block leerte `je_kriterium` still. Jetzt filtert der Leser
+   `#`-Zeilen wie `analyze_game_log.load_log` es immer schon tat.
+
+**Dateischnitt nebenbei:** die Report-Schicht liegt jetzt in
+`tools/game_log_report.py` (`analyze_game_log.py` hatte die Groessen-Ratsche
+gerissen, Nutzer-Entscheid 2026-08-18: auslagern statt Basislinie neu legen).
+Reine Darstellung, kein Replay -- die drei Partien liefern unveraenderte Reports.
+
+**Nebenbefund, korrigiert:** `analyze_game_log._run_loop` gab auf dem
+Erfolgspfad ein Tupel statt des Zeilenindex zurueck -- die "wie weit kam der
+Replay"-Zahl im Report war dort bedeutungslos (Altbestand, `HEAD:785`).
+
+#### Offene-Entscheidungen-Nachtrag: v21-b23 und Fester Bewertungssatz
+
+| Punkt | Stand |
+|---|---|
+| **`v21-b23` = der Zielwechsel-Lauf, abgebrochen vor Epoche 1** (Nutzer-Aufklaerung 2026-08-19) | b23 ist Schritt 3 aus `PREREG_reachability_target.md`: k1-Ownership-Ziel von Realisierung auf **Vollendbarkeit** ab Runde 3. Der Label-Bauer ist committet und per Knopf gated (`MOSAIC_REACH_TARGET_K1`, Default aus, `reach_target.py`, Cache-Key `+reachk1_r3_v1`, Commit `41b1c25`). Das Manifest (18.08. 19:47) hat KEINE Checkpoints und keine `epoch_history` — der Lauf kam nie bis Epoche 1. Zwei Punkte fuer den Neustart: das Manifest protokolliert den Knopf NICHT (nur der Cache-Key waechtert, gleiches Muster wie `MOSAIC_CARRIER_MANIFEST`), und `--epochs 100` + Cosine ist der bekannte T_max-Footgun. Seit 2026-08-19 kommt fuer Runde 1-2 der bestandene Arm-P-Puffer (CAP 12) in Frage — ob der Neustart Variante R oder Arm P faehrt, ist vor dem Start festzulegen |
+| **Fester Bewertungssatz** | **entschieden (Nutzer 2026-08-18): der BAUER-Satz, als Uebergangskalibrierung bis Netzdaten da sind.** Zusammensetzung festgelegt: **300 Dateien / 3000 Partien** — `v21_own_a` 100 · `v21_own_k1` 50 · `v21_own_k2` 50 · `v21_own_k5` 50 · `heur_own` 50, zusammen **~3 h 5 min** (Durchsaetze aus den Zeitstempeln vom 14.08.: 10,3 / 17,2 / 19,8 / 23,0 / 50 Partien je Minute). **Ablage `data/holdout/`, Praefix `selfplay_hold_` (Nutzer 2026-08-18)** — der `data/*.pkl`-Glob ist nicht rekursiv, das IST die Sperre; nie in `--extra-data-dir` aufnehmen. Aufruf waere `--version hold --tag k1` usw. **FERTIG 2026-08-18 03:28** — 300 Dateien, 3000 Partien, **0 unvollstaendige**, 2 h 39 min. **Abnahme bestanden**, jeder Arm reproduziert seinen Korpus-Zwilling (Positivrate je Atom-Brett, Klammer = Korpus aus par.5a, dort nur 120 Partien je Arm): `a` k1 0,56 % (0,49) · k5 27,05 % (27,19) | `k1` k1 **6,98 %** (6,67) | `k2` k2 **19,25 %** (20,00) | `k5` k1 **8,53 %** (8,75) · k5 **40,02 %** (38,54) | `heur` k1 0,63 % (0,35). Damit ist auch der Nutzer-Befund praezise bestaetigt: **der k5-Arm liefert mehr volle Spalten als der k1-Arm.** Seeds je Arm im Manifest (20260818-22).
+
+**Erzeugt am 2026-08-18 00:49-03:28** (Nutzer-Go). Rezept 1:1 aus `PREREG_ownership_corpus.md` par.7: Netz-Arme 200 Sims mit `MOSAIC_WERTUNG_STREUUNG_MAX=1.0` und Champion-ONNX, Heuristik-Arm 150 Sims ohne Streuung, 8 Threads, 10 Partien je Datei, rtv aus, Ablage ueber `MOSAIC_DATA_DIR=data/holdout`. Reihenfolge heur -> a -> k1 -> k2 -> k5.
+
+**EINZIGE bewusste Abweichung: der Basis-Seed** (20260818..22 statt der Korpus-20260814). Gleicher Seed plus gleiches Modell plus gleiche Knoepfe haette BITGLEICHE Partien ergeben — der Bewertungssatz waere eine Kopie von Trainingsmaterial gewesen.
+
+**Werkzeug-Fehlgriff, protokolliert:** ich habe erst ein `self_play.py --out-dir` gebaut und danach gemerkt, dass `config.py:28` laengst `MOSAIC_DATA_DIR` liest — genau den Weg, den auch die Korpus-Erzeugung genommen hat (par.7 "Ablage"). Das Flag ist auf Nutzer-Entscheid wieder zurueckgenommen; zwei Wege fuer dieselbe Sache sind auf Dauer teurer. Vierter Fall von `feedback_check_existing_tools_first`. Das ist kein neues Konstrukt, sondern das Einfrieren und Vergroessern dessen, worauf Gate A heute schon misst (`n_val_corpus_files = 82` aus dem rotierenden Val-Split). Er traegt BEIDE offenen Aufgaben: Steigungsfit B != 1 und Kopfvergleiche ueber Fenstergrenzen. **Der Normalspiel-Satz entfaellt damit** — sein Zweck war der Mittelwert, und der ist gemessen und klein. (A,B) sind modellspezifisch und werden je Champion neu gefittet, der Satz bleibt fest |
+
+### STAND 2026-08-19 — Orakel-Abstand gemessen (NICHT bestaetigt), beide Vorpruefungen bestanden
+
+#### Orakel-Abstand in Menschenpartien: STAERKE-EFFEKT, kein falsches Vorzeichen
+
+`PREREG_human_game_oracle_gap.md` par.7, jetzt ueber **7 replaybare Partien**
+(alle 100 % exakt, k1 lag in allen aus, Mensch gewann 6 + 1 Remis): die
+k1-relevanten Menschen-Zuege werden vom Champion **nicht** signifikant
+schlechter bewertet als die neutralen desselben Menschen — gepaarte Differenz
+**+0,60 pp (sd 2,05), t = 0,78** gegen Schwelle 1,943, Vorzeichen 5/7.
+
+**Folge fuer die Kampagne, und sie ist eine Weichenstellung:** der n=1-Verdacht
+vom 2026-08-18 ("das Netz haelt die Plattenzuege fuer verlierend") haelt nicht.
+Das Netz bewertet Menschenzuege ALLGEMEIN 2,5-5,6 pp unter dem Orakel-Top —
+ein Staerke-Effekt. **Die Diagnose bleibt "zu leise", nicht "falsch
+gerichtet"** — der Skalen-/Zielwechsel-Strang traegt weiter, und das
+asymmetrische Curriculum verliert seinen Zusatz-Dringlichkeitsbeleg (seine
+eigene Begruendung 7(1) ist davon unberuehrt). Explorativer Nebenbefund
+(post hoc, entscheidet nichts): bei Verengung auf Spalten mit Fuellstand >= 3
+steigt die Differenz auf +1,79 pp (t 1,69, 6/7) — knapp unter der Schwelle.
+
+#### Beide Schritt-2-Vorpruefungen BESTANDEN (Details in den Preregs)
+
+| Pruefung | Ergebnis |
+|---|---|
+| **Saettigung par.6** (`PREREG_shaping_scale_per_round.md` par.6a) | Pfad A gemessen (600 Holdout-Zustaende): alle 90-%-Quantile von `E_r/SCALE_r` <= 0,31 — mit Pfad B (par.3a) beidseitig erfuellt, **ein gemeinsames Profil traegt** |
+| **Arm-P-Sperre** (`PREREG_reachability_target.md` par.12) | **BESTANDEN**, Stauchung festgelegt: `clip(b,0,12)/12` — Puffer spreizt in R1/R2 zu 100 %, Paritaets-Selbsttest 0/4.500, Handprobe unauffaellig |
+
+Zwei Nebenbefunde aus der Saettigungsmessung: **in Runde 1 ist JEDER
+Pfad-A-Term exakt 0** (das Kuppelraster ist vor dem Rundenende leer — ein
+Rundenprofil kann R1 dort nicht heilen). Der zweite Nebenbefund („Strafleisten-
+Term faehrt mit 0,3 live mit") war **FALSCH und ist korrigiert** (Regel-0-Fund
+bei der Umsetzung 2026-08-19): die 0,3 gehoeren zu `MOSAIC_FLOOR_SHAPING_W`
+(anderes Additiv am Netz-Blattwert); der Pfad-A-Strafleisten-Term haengt an
+`MOSAIC_WERTUNG_FLOOR_W`, Default **0,0** — per Default ist KEIN Pfad-A-Term
+live, der Profil-Knopf aendert kein Produktionsverhalten (par.6a, korrigiert).
+
+#### Werkzeug-Stand (alles additiv, Suite gruen)
+
+- `plate_completability_json` liefert jetzt zusaetzlich `verbleibend` und
+  `col_open_cells` (offene Zellen mit Farbbedarf und Vorratspuffer); neuer
+  Read-only-Export `wertung_shaping_e_json` (Pfad-A-Groessen). Wheel neu
+  gebaut + installiert 2026-08-19 ~15:24, **Paritaetsprobe gruen (Hash
+  unveraendert), `cargo test --release` 447/0**.
+- `analyze_game_log.py`: `--oracle-json` (maschinenlesbare Oracle-Records);
+  der `--dump-states`-Eintrag traegt jetzt `fields` (genommene Farbe) und den
+  echten Spieler-Index (das Feld `player` war vorher IMMER `None` —
+  `getattr(rec, "player", None)` auf einem Record, dessen Attribut `actor`
+  heisst).
+- Neue Sonden: `human_oracle_gap_k1.py` (par.4/par.5-Auswertung),
+  `shaping_scale_pfad_a_e.py` (Saettigung Pfad A),
+  `reachability_buffer_spread.py` (Arm-P-Sperre + Handprobe).
+- Champion-Orakel-Berichte fuer alle 7 Partien:
+  `evaluations/game_analysis_<seed>_champion.md`.
+
+#### Naechste Schritte nach dem Fahrplan vom 2026-08-19
+
+1. **Nutzer-Entscheid** Einordnung Asymmetrie-Korpus (Lehrkorpus jetzt vs.
+   Schritt 3) — die Empfehlung "jetzt, falls Orakel-Abstand bestaetigt"
+   ist hinfaellig; ohne den Beleg ist die Reihenfolge-Frage wieder offen.
+2. **Vollendbarkeits-Zweig: ERLEDIGT am 2026-08-20, NICHT-ERFOLG mit
+   umgekehrtem Vorzeichen** — siehe STAND 2026-08-20 (in evaluations/STATUS.md) und par.14 der
+   Prereg. (Der Plan stand hier mit Umsetzungsdetails; sie sind in der
+   Prereg-Konkretisierung dokumentiert.)
