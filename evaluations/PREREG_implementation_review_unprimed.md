@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Findet ein UNGEPRIMTER Reviewer (ohne unsere Hypothesen, Verdachtsflaechen und Schlussfolgerungen) Korrektheitsfehler in der KI selbst -- Suche, Netz-Integration, Self-Play, Trainingsziele? | Beleg: offen, nichts gestartet. Anlass: Nutzer-Auftrag 2026-08-20; alle bisherigen Reviews waren vom Koordinator gebrieft und damit auf dessen Verdachtsflaechen verengt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Findet ein UNGEPRIMTER Reviewer (ohne unsere Hypothesen, Verdachtsflaechen und Schlussfolgerungen) Korrektheitsfehler in der KI selbst -- Suche, Netz-Integration, Self-Play, Trainingsziele? | Beleg: par.7 (2026-08-20): JA -- zwei mittlere Befunde, beide vom Koordinator am Code bestaetigt: (1) Alpha-Beta-Zugsortierung an MIN-Knoten invertiert (round5.rs/round_transition_deep.rs, unter Knotenbudget systematisch zu hohe Min-Werte; NEU), (2) moon_order_target ist beweisbar ein No-Op (Zielfunktion reihenfolgeblind, Label = rohe Beutelreihenfolge, 80/80-Sonde; korrigiert die Aktenlage von Task #38). Dazu zwei niedrige Befunde und eine umfangreiche Sauber-Liste (u.a. Feature-Paritaet 0.0 ueber 873 Zustaende). Konsequenzen nach par.3 registriert. -->
 
 # PREREG: Ungeprimter Implementierungs-Review der KI
 
@@ -82,4 +82,56 @@ Ein Opus-Agent, grosszuegig bemessen (Richtwert 30-90 min Agentenzeit),
 keine GPU. Der Nutzen haengt nicht am Erwartungswert eines Funds, sondern
 an der Abdeckung der Flaechen, die auf keiner Verdachtskarte stehen.
 
-## par.7 ERGEBNIS (leer bei Registrierung)
+## par.7 ERGEBNIS (2026-08-20)
+
+Der volle Bericht liegt im Sitzungsprotokoll; hier die verrechneten Kerne.
+
+**BESTAETIGT (Koordinator-Verifikation am Code, Regel 0):**
+
+1. **Min-Knoten-Sortierung invertiert** (`round5.rs:366-387` sortiert
+   absteigend nach `leaf_value(s, perspective)` mit wurzelfester Perspektive,
+   dieselbe Liste an Max- UND Min-Knoten; `:463-466` bricht die Kinderschleife
+   am Knotenbudget ab; Budget 200 = p75, greift regelmaessig). Folge: Min-Werte
+   systematisch zu hoch, Gegner-Widerlegungen werden bevorzugt abgeschnitten;
+   Cutoffs feuern spaetestmoeglich. Zweite Fundstelle
+   `round_transition_deep.rs:311-329` (Budget 40). Die hauseigene korrekte
+   Variante existiert (`self_play.rs:3398-3411`). Wirkungsgroesse UNGEMESSEN.
+   **Konsequenz nach par.3 ("sonst"):** Fix mit eigenem Arena-Gating,
+   eingetaktet NACH der Wiederholungs-Arena des Zielwechsels (die braucht den
+   byte-identischen Engine-Stand fuer die N-Arm-Wiederverwendung). VOR dem
+   Fix zu klaeren: ob der Heuristik-ANKER-Pfad round5 mitbenutzt — dann
+   greift die NICHT-ANFASSEN-Regel und der Fix ist Nutzer-Entscheid.
+2. **`moon_order_target` ist ein No-Op** (`self_play.rs:678-685` bewertet
+   Permutationen mit `solve_round_final_score`, das ueber
+   `tiling_key(&state.players[pi])` cached und auch uncached nur
+   `players[pi]` liest — die Mondreihenfolge lebt in `state.factories`;
+   alle Permutationen scoren identisch, `perms[0]` = rohe Beutelreihenfolge
+   gewinnt; Agenten-Sonde 80/80). Der Moon-Kopf trainiert auf Rauschen und
+   zieht dabei laut Task #38 potenziell ~1/3 des Policy-Gradienten. Die in
+   STATUS #38 notierte Billig-Variante (eigener minus Gegner-Rundenendstand)
+   waere aus demselben Grund ebenfalls ein No-Op. **Konsequenz:** Aktenlage
+   in STATUS #38 korrigiert; ob und wie der Kopf ein echtes Ziel bekommt
+   (oder Gewicht 0), ist eine Trainings-Rezept-Entscheidung -> Nutzer.
+
+**PROTOKOLLIERT (niedrig):** (3) Stapelzug-Aufloeser vergleicht
+unvergleichbare Skalen und `cost_so_far` kuerzt sich heraus — gemessen
+dormant (0 DrawStackPeek in 56 Netzpartien). (4) Falsche Blockgroessen in
+Feature-Kommentaren (`features.rs:193` "57" statt 52;
+`neural_net.py:159` "81" statt 153) — kosmetisch, beim naechsten
+Engine-Fix mitzunehmen.
+
+**SAUBER-LISTE (Auszug, entlastet):** Feature-Paritaet Rust-Python exakt
+0.0 ueber 873 Zustaende; action_to_id-Spiegel deckungsgleich;
+Backprop-Perspektive korrekt; WDL-Skala Training-Inferenz exakt;
+ONNX-Ausgaenge namensbasiert; Determinisierung verliert keine Information;
+Floor-Shaping vorzeichenrichtig; Rundenende regelkonform.
+
+**Duplikat-Abgleich:** Befund 1 und 4 NEU; Befund 2 korrigiert eine
+falsche Aktenlage; Befund 3 betrifft Funktionen, die fuer einen ANDEREN
+Fehler bereits markiert sind (PREREG_chance_nodes par.525-532).
+
+**Methoden-Notiz:** die unabhaengige Konvergenz-Hoffnung (par.5) trat
+nicht ein — der ungeprimte Review fand den Dosis-Saettigungs-Befund des
+gezielten Reviews NICHT (er las den Ownership-Verbraucher als sauber,
+was er implementierungsseitig auch ist), dafuer zwei Befunde, die auf
+keiner Verdachtskarte standen. Genau das war der Zweck der Trennung.
