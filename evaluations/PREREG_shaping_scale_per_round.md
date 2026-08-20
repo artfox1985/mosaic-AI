@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | Beleg: **ENTWURF 2026-08-18, nichts gebaut.** Anlass gemessen: Punktestand je Runde aus 22 Arena-Logs, Anteilskurve zwischen Mensch und KI deckungsgleich trotz 33 % Niveauunterschied. Nutzer-Auftrag: "schreib für den rundenabhängigen WERTUNG_SHAPING_SCALE mal ein prereg". -->
+<!-- STATUS: OFFEN | Frage: Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | Beleg: EINGETAKTET (Nutzer-Entscheid 2026-08-20): der Pfad-A-Test wird zu Ende gemessen, aber erst NACH den beiden Implementierungs-Reviews. Knopf MOSAIC_WERTUNG_SCALE_PROFILE ist gebaut, Vorbedingung par.6 beidseitig erfuellt -- es fehlt nur die par.7-Arena (~2 h). Die Pfad-B-Haelfte ist durch PREREG_reachability_target par.14 gegenstandslos. -->
 
 # PREREG: Rundenabhängiger `WERTUNG_SHAPING_SCALE`
 
@@ -257,3 +257,8 @@ in STATUS.md schliesst die Zähl-Kriterien aus; gefragt sind die konjunktiven.
   Versuchsplan und ist hiermit vorab ausgeschlossen.
 
 ## par.10 ERGEBNIS (leer bei Registrierung)
+
+
+## par.11 EINTAKTUNG (2026-08-20)
+
+Nutzer-Entscheid: *"wir messen es zu ende, aber nicht jetzt."* Reihenfolge: erst die beiden Implementierungs-Reviews (PREREG_implementation_review_*), dann dieser Pfad-A-Arena-Lauf als letzter offener Test der Injektionslinie. Nur Pfad A -- die Pfad-B-Anwendung des Profils ist mit dem par.14-Verdikt des Zielwechsels gegenstandslos.

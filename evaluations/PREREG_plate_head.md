@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) -->
+<!-- STATUS: UEBERHOLT | Frage: Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | Beleg: Der plate_head wurde am 2026-08-10 gebaut und wieder ENTFERNT -- der Ownership-Kopf ist der Randlayer (STATUS-Architektur). Gegenstandslos (festgestellt 2026-08-20). -->
 
 # Vorregistrierung: PLATTENKOPF (per-Kriterium-Endwertungs-Kopf)
 
@@ -1910,3 +1910,8 @@ Drei Vorhaben, keines wartet auf ein anderes:
       unangetastet. DER EINZIGE der drei, der das Verhalten aendern kann.
   (c) AUSLESE ueber die Marginalen -- ZULETZT, weil sie erst nach (b) eine
       beantwortbare Frage ist.
+
+
+## SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Status auf **UEBERHOLT** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: Der plate_head wurde am 2026-08-10 gebaut und wieder ENTFERNT -- der Ownership-Kopf ist der Randlayer (STATUS-Architektur). Gegenstandslos (festgestellt 2026-08-20).

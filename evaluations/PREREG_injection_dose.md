@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie hoch muss die Wertungsplatten-Injektion in der Suche dosiert werden, damit die Spezialfeld-Freischaltung ueberhaupt angesteuert wird -- und rechnet sich das in Siege? | Beleg: **OFFEN, vorregistriert 2026-08-11** (Nutzer-Auftrag "wie viel wir injizieren muessen wir an einem arena spiel verifizieren"). Sauberster Kontrast im Projekt: DERSELBE Champion, Knopf an gegen aus, kein Training ⇒ keine Trainings-Seed-Varianz. Gegenstand nur `MOSAIC_UNLOCK_SHAPING_W` (0 / 0,3 / 1,0); Freischaltrate ist PFLICHT-Nebenmessung, weil ein blockierender Prior sonst als "Term wirkungslos" fehlgelesen wird. Enthaelt die Ruecknahme meiner Blindheits-Aussage zu Task #93. -->
+<!-- STATUS: UEBERHOLT | Frage: Wie hoch muss die Wertungsplatten-Injektion in der Suche dosiert werden, damit die Spezialfeld-Freischaltung ueberhaupt angesteuert wird -- und rechnet sich das in Siege? | Beleg: Der Gegenstand MOSAIC_UNLOCK_SHAPING_W ist seit der Zusammenfuehrung 2026-08-11 WIRKUNGSLOS (net_mcts.rs, wertung_shaping_alphas warnt laut); die Rolle uebernahmen MOSAIC_WERTUNG_SHAPING_W + Alpha-Stelle 7. Ohne wirkenden Knopf hat die Frage keinen Traeger mehr (festgestellt 2026-08-20). -->
 
 # Vorregistrierung: Dosis der Wertungsplatten-Injektion
 
@@ -238,3 +238,8 @@ ERGAENZUNG an `plate_head_labels.py`, **kein zweites Werkzeug**.
 `paired_arena_env_ab.py` braucht keine Aenderung: `--env-name` ist generisch
 (Nutzungsbeispiele im Modulkopf zeigen `MOSAIC_FLOOR_SHAPING_W` und
 `MOSAIC_GUMBEL_TOP_M`).
+
+
+## SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Status auf **UEBERHOLT** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: Der Gegenstand MOSAIC_UNLOCK_SHAPING_W ist seit der Zusammenfuehrung 2026-08-11 WIRKUNGSLOS (net_mcts.rs, wertung_shaping_alphas warnt laut); die Rolle uebernahmen MOSAIC_WERTUNG_SHAPING_W + Alpha-Stelle 7. Ohne wirkenden Knopf hat die Frage keinen Traeger mehr (festgestellt 2026-08-20).

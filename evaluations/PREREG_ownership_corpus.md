@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Zwei-Pole-Korpus für das Ownership-Kopf-Training generiert — welche Arme, Quoten, Ablage, Prüfpunkte und welches Kopfgüte-Tor? | Beleg: **OFFEN, vorregistriert 2026-08-14** (Nutzer-Auftrag "mach schon mal den generierungsplan"). Vier Arme (Netz+Streuung 50 %, k1-Bauer, k2-Bauer, Heuristik), 6000 Partien nach `data/ownership_corpus/` (nicht-rekursiver Fenster-Glob geprüft, train.py:552); fünf Prüfpunkte vor Start (u.a. Policy-Ziele unter Vorzug, Konjunktions-Breite 68 vs. 25); Abnahme = Tor A aus PREREG_ownership_consumer.md, nicht Arena. Nachtrag: §7 Startvollzug und §8 Deckungs-Bericht (2026-08-14) liegen vor (Deckung gegeben), §9-Trainings-Sweep vorregistriert; Tor A weiter offen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird der Zwei-Pole-Korpus für das Ownership-Kopf-Training generiert — welche Arme, Quoten, Ablage, Prüfpunkte und welches Kopfgüte-Tor? | Beleg: Tor A BESTANDEN (par.10.4, 2026-08-15/16): der Kopf schlaegt die Basisrate auf allen Geometrien; Korpus erzeugt, Deckung gegeben. Der Statuskopf hinkte dem eigenen par.10 nach (Stale-Korrektur 2026-08-20). -->
 
 # PREREG: Ownership-Korpus — Generierungsplan (Zwei-Pole)
 
@@ -643,3 +643,8 @@ die Gewichtsfrage zurueck -- dann mit w2 als erstem Arm.
 `--ownership-weight 1,0`") ist damit ausgeloest -- nach der dort genannten
 Mehrheitsregel sogar einstimmig. F1 startet entsprechend, Referenz J ist der
 w1-Satz.
+
+
+## SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Status auf **ENTSCHIEDEN** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: Tor A BESTANDEN (par.10.4, 2026-08-15/16): der Kopf schlaegt die Basisrate auf allen Geometrien; Korpus erzeugt, Deckung gegeben. Der Statuskopf hinkte dem eigenen par.10 nach (Stale-Korrektur 2026-08-20).

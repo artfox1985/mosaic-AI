@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie kommt der Ownership-Kopf VERNUENFTIG in die Zugwahl (Gumbel-Draft) und in das Tiling -- nachdem drei Eingriffe an Prior, Korpus und Formel nichts bewegt haben? | Beleg: offen -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie kommt der Ownership-Kopf VERNUENFTIG in die Zugwahl (Gumbel-Draft) und in das Tiling -- nachdem drei Eingriffe an Prior, Korpus und Formel nichts bewegt haben? | Beleg: NEGATIV geschlossen 2026-08-20: alle par.6-Messungen liegen vor (Nenner ~50x zu gross, E rundenkonstant, q-Bitgleichheit R1); die Nachfolger (Konjunktionsform, Zielwechsel T+S) sind gemessen und tragen nicht -- PREREG_reachability_target.md par.14. Der Ownership-Verbraucher-Strang ist damit in allen Formen negativ. -->
 
 # Vorregistrierung: Kopplung des Ownership-Kopfes an Draft und Tiling
 
@@ -570,3 +570,8 @@ entschieden ist.
 ---
 
 ## par.10 ERGEBNIS (leer bei Registrierung)
+
+
+## SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Status auf **ENTSCHIEDEN** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: NEGATIV geschlossen 2026-08-20: alle par.6-Messungen liegen vor (Nenner ~50x zu gross, E rundenkonstant, q-Bitgleichheit R1); die Nachfolger (Konjunktionsform, Zielwechsel T+S) sind gemessen und tragen nicht -- PREREG_reachability_target.md par.14. Der Ownership-Verbraucher-Strang ist damit in allen Formen negativ.

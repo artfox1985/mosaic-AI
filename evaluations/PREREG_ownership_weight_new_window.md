@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist ownership_weight 1,0 im NEUEN Fenster (Korpus als Policy-Sockel) noch die richtige Wahl, und haelt der Policy-Waechter dort? | Beleg: **REGISTRIERT 2026-08-16 18:20, waehrend v21-b18 traeniert und VOR jeder Auswertung.** Zwei Arme: v21-b18 (own_w 1,0) und v21-b19 (2,0), Rezept sonst identisch zu w1. Anlass: der alte Sweep bleibt als Kopf-Aussage gueltig (Tor A lief fensterunabhaengig auf dem Korpus-Held-out), aber sein WAECHTER (Policy-val_loss 0,2139 -> 0,2141) wurde an einer fenstertrainierten Policy gemessen und traegt im neuen Aufbau nicht mehr. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Ist ownership_weight 1,0 im NEUEN Fenster (Korpus als Policy-Sockel) noch die richtige Wahl, und haelt der Policy-Waechter dort? | Beleg: Gewicht 2,0 UEBERNOMMEN (b18 vs b19, 2026-08-17): Kopf besser auf 3 von 4 Kriterien, Policy-Waechter haelt (+0,49 % gegen Schwelle 2 %). Stale-Korrektur des Kopfes 2026-08-20. -->
 
 # PREREG: Ownership-Gewicht im neuen Fenster — zwei Arme
 
@@ -213,3 +213,8 @@ die GPU ist bis in den Nachmittag mit `b20`/`b21` belegt.
 **Was das NICHT heisst:** eine Staerkeaussage. Diese Prereg misst Kopfguete und
 Waechter, keine Arena. Ob der bessere Kopf am Brett etwas aendert, haengt am
 Verbraucher — und der ist Gegenstand von Tor C, nicht von hier.
+
+
+## SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Status auf **ENTSCHIEDEN** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: Gewicht 2,0 UEBERNOMMEN (b18 vs b19, 2026-08-17): Kopf besser auf 3 von 4 Kriterien, Policy-Waechter haelt (+0,49 % gegen Schwelle 2 %). Stale-Korrektur des Kopfes 2026-08-20.
