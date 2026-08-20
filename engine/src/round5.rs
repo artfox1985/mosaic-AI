@@ -363,7 +363,28 @@ fn leaf_value(state: &GameState, perspective: usize) -> f64 {
 /// absteigend sortiert. Wird sowohl für die Zugsortierung in `negamax` als
 /// auch an der Wurzel (`choose_action`) genutzt, um doppeltes Anwenden
 /// derselben Aktion zu vermeiden.
-fn ordered_children(state: &GameState, perspective: usize, chance: bool) -> Vec<Child> {
+///
+/// BUGFIX (`PREREG_round5_minfix_elo_reset.md` par.1 /
+/// `PREREG_implementation_review_unprimed.md` par.7 Befund 1, bestaetigt):
+/// bis hierher sortierte diese Funktion mit einem als Parameter
+/// hereingereichten, WURZELFESTEN `perspective` -- dieselbe Liste wird aber
+/// sowohl an Max- als auch an Min-Knoten von `negamax` benutzt (`:454`).
+/// An einem Min-Knoten (`state.current_player != perspective`) ist
+/// `leaf_value(s, perspective)` aus Sicht des NICHT ziehenden Spielers --
+/// absteigend danach sortiert stehen die fuer den ZIEHENDEN (den Gegner der
+/// Wurzel) besten Gegenzuege am ENDE der Liste. Unter dem Knotenbudget
+/// (`negamax`s Kinderschleife bricht bei `node_count >= node_budget` ab)
+/// werden genau diese Widerlegungen bevorzugt abgeschnitten, Min-Werte
+/// liegen dadurch systematisch zu hoch. Fix: der Sortierschluessel ist jetzt
+/// KNOTENLOKAL -- immer aus Sicht von `state.current_player`, dem an DIESEM
+/// Knoten Ziehenden (Vorbild `self_play.rs:3398-3411`, das ebenso
+/// knotenlokal sortiert). An Max-Knoten (`state.current_player ==
+/// perspective`) ist das byte-identisch zum alten Verhalten. Die
+/// RUECKGABE-Semantik von `negamax`/`leaf_value` bleibt unveraendert in
+/// `perspective`-Sicht -- nur diese Sortierung wechselt, der Parameter wird
+/// darum nicht mehr gebraucht.
+fn ordered_children(state: &GameState, chance: bool) -> Vec<Child> {
+    let mover = state.current_player;
     let mut scored: Vec<Child> = drafting_actions(state)
         .into_iter()
         .filter_map(|a| {
@@ -372,13 +393,16 @@ fn ordered_children(state: &GameState, perspective: usize, chance: bool) -> Vec<
                 return None;
             }
             let outcomes = action_outcomes(state, &a, g.state, chance);
-            // Sortierwert = ERWARTUNGSWERT ueber die Ausgaenge. Mit dem
-            // konkreten (wahren) Chip zu sortieren waere ein Leck: unter
-            // Knotenbudget entscheidet die Reihenfolge mit, welche Zuege
-            // ueberhaupt durchsucht werden (siehe Leckkanal 2 im
-            // Abschnittskopf). Mit ausgeschalteten Zufallsknoten ist die Summe
-            // ueber genau einen Ausgang mit Gewicht 1 identisch zu vorher.
-            let v: f64 = outcomes.iter().map(|(w, s)| w * leaf_value(s, perspective)).sum();
+            // Sortierwert = ERWARTUNGSWERT ueber die Ausgaenge, aus Sicht des
+            // an DIESEM Knoten Ziehenden (`mover`, siehe Bugfix-Kommentar
+            // oben) -- NICHT einer wurzelfesten Perspektive. Mit dem
+            // konkreten (wahren) Chip zu sortieren waere zusaetzlich ein
+            // Leck: unter Knotenbudget entscheidet die Reihenfolge mit,
+            // welche Zuege ueberhaupt durchsucht werden (siehe Leckkanal 2
+            // im Abschnittskopf). Mit ausgeschalteten Zufallsknoten ist die
+            // Summe ueber genau einen Ausgang mit Gewicht 1 identisch zu
+            // vorher.
+            let v: f64 = outcomes.iter().map(|(w, s)| w * leaf_value(s, mover)).sum();
             Some(Child { order_value: v, action: a, outcomes })
         })
         .collect();
@@ -451,7 +475,7 @@ fn negamax(
     {
         return leaf_value(state, perspective);
     }
-    let children = ordered_children(state, perspective, chance);
+    let children = ordered_children(state, chance);
     if children.is_empty() {
         return leaf_value(state, perspective);
     }
@@ -550,7 +574,7 @@ fn choose_action_inner(state: &GameState, chance: bool, budget: u64) -> Option<A
 /// deadline- und damit lastgebunden statt knotengebunden.
 pub(crate) fn choose_action_deadlined(state: &GameState, chance: bool, budget: u64, deadline: Instant) -> Option<Action> {
     let perspective = state.current_player;
-    let children = ordered_children(state, perspective, chance);
+    let children = ordered_children(state, chance);
     if children.is_empty() {
         return None;
     }
@@ -594,7 +618,7 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
     crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::Round5Alphabeta, || {
     let chance = chance_nodes_enabled();
     let perspective = state.current_player;
-    let children = ordered_children(state, perspective, chance);
+    let children = ordered_children(state, chance);
     if children.is_empty() {
         return (None, Value::Null);
     }
@@ -735,7 +759,7 @@ mod tests {
         // `negamax`-Aufruf und `ordered_children`s Sortierwert bitgleich zum
         // alten `leaf_value`.
         let s = round5_state_with_imminent_reveal(11);
-        let children = ordered_children(&s, s.current_player, false);
+        let children = ordered_children(&s, false);
         assert!(!children.is_empty());
         for c in &children {
             assert_eq!(c.outcomes.len(), 1, "ohne Knopf darf kein Zufallsknoten entstehen");
@@ -748,7 +772,7 @@ mod tests {
         // Gegenprobe zur Invarianz unten: der Zufallsknoten muss ueberhaupt
         // feuern, sonst waere jene Prüfung leer.
         let s = round5_state_with_imminent_reveal(12);
-        let children = ordered_children(&s, s.current_player, true);
+        let children = ordered_children(&s, true);
         assert!(!children.is_empty());
         let branched: Vec<&Child> = children.iter().filter(|c| c.outcomes.len() > 1).collect();
         assert!(
@@ -775,13 +799,121 @@ mod tests {
             s.factories[i].bonus_chip = Some(BonusChip { chip_id: i, colors: vec![Rot] });
             s.factories[i].bonus_chip_revealed = false;
         }
-        let children = ordered_children(&s, s.current_player, true);
+        let children = ordered_children(&s, true);
         for c in &children {
             assert_eq!(
                 c.outcomes.len(),
                 1,
                 "vier farbgleiche Chips muessen zu EINEM Ausgang zusammenfallen"
             );
+        }
+    }
+
+    /// Min-Knoten-Regressionstest fuer den Sortier-Fix
+    /// (`PREREG_round5_minfix_elo_reset.md` par.1 /
+    /// `PREREG_implementation_review_unprimed.md` par.7 Befund 1):
+    /// `ordered_children` sortiert seit dem Fix immer knotenlokal (aus
+    /// Sicht von `state.current_player`). An einem MIN-Knoten -- hier
+    /// simuliert, indem eine gedachte Wurzel-Perspektive `1 - s.current_player`
+    /// angenommen wird, so wie `negamax` ihn an einem Min-Knoten saehe --
+    /// muss die fuer den ZIEHENDEN beste Widerlegung an Position 0 stehen,
+    /// NICHT die aus Sicht der (hier gedachten) Wurzel beste.
+    #[test]
+    fn ordered_children_puts_the_movers_best_reply_first_at_a_min_node() {
+        // Mehrere Seeds durchprobieren, bis ein Zustand mit >=2 Kandidaten
+        // UND einer echten Wertspreizung gefunden ist -- sonst waere der
+        // Test bei zufaelligem Gleichstand aller Kandidaten wertlos (vgl.
+        // "Testaufbau"-Muster in den Nachbartests).
+        let mut found = false;
+        for seed in 30u64..80 {
+            let s = round5_state(seed);
+            let mover = s.current_player;
+            let root_perspective = 1 - mover; // macht `s` zu einem MIN-Knoten
+            let children = ordered_children(&s, false);
+            if children.len() < 2 {
+                continue;
+            }
+            let max_v = children.iter().map(|c| c.order_value).fold(f64::NEG_INFINITY, f64::max);
+            let min_v = children.iter().map(|c| c.order_value).fold(f64::INFINITY, f64::min);
+            if (max_v - min_v).abs() < 1e-9 {
+                continue; // kein Unterschied zwischen den Kandidaten -- naechster Seed
+            }
+            found = true;
+
+            // Referenz: bester Zug FUER DEN ZIEHENDEN, unabhaengig von
+            // `ordered_children` direkt ueber `leaf_value` nachgerechnet.
+            let mut expected_action: Option<&Action> = None;
+            let mut expected_v = f64::NEG_INFINITY;
+            for c in &children {
+                let v: f64 = c.outcomes.iter().map(|(w, s2)| w * leaf_value(s2, mover)).sum();
+                if v > expected_v {
+                    expected_v = v;
+                    expected_action = Some(&c.action);
+                }
+            }
+            assert_eq!(
+                &children[0].action,
+                expected_action.expect("mind. ein Kandidat"),
+                "seed={seed}: Position 0 muss die fuer den ZIEHENDEN beste Widerlegung sein"
+            );
+
+            // Gegenprobe, dass der Fix hier ueberhaupt etwas aendert: mit der
+            // ALTEN, wurzelfesten Formel (`leaf_value(s, root_perspective)`)
+            // waere an diesem Min-Knoten ein ANDERER Kandidat das Optimum
+            // gewesen als der fuer den Ziehenden tatsaechlich beste (`leaf_value`
+            // ist exakt antisymmetrisch: `leaf_value(s,p) = -leaf_value(s,1-p)`,
+            // die alte Formel bewertet also strikt gegenlaeufig zur neuen).
+            // Kein Vergleich gegen `children.last()`: bei einem Gleichstand
+            // mehrerer Kandidaten am unteren Ende waere die Position dort
+            // nicht eindeutig, das Optimum unter der alten Formel ist es aber.
+            let mut old_best_action: Option<&Action> = None;
+            let mut old_best_v = f64::NEG_INFINITY;
+            for c in &children {
+                let v: f64 = c.outcomes.iter().map(|(w, s2)| w * leaf_value(s2, root_perspective)).sum();
+                if v > old_best_v {
+                    old_best_v = v;
+                    old_best_action = Some(&c.action);
+                }
+            }
+            assert_ne!(
+                &children[0].action,
+                old_best_action.expect("mind. ein Kandidat"),
+                "seed={seed}: alte und neue Sortierung waehlten denselben ersten Kandidaten -- Test waere wertlos"
+            );
+        }
+        assert!(found, "kein Seed mit >=2 unterschiedlich bewerteten Kandidaten gefunden -- Testaufbau pruefen");
+    }
+
+    /// Max-Knoten-Gegenprobe: an einem Max-Knoten (`state.current_player ==
+    /// Wurzel-Perspektive`) war der alte, wurzelfeste Sortierschluessel
+    /// bereits identisch zum neuen knotenlokalen Schluessel (Prereg par.1:
+    /// "an Max-Knoten identisch zu heute") -- die Reihenfolge nach dem Fix
+    /// muss darum exakt der manuell mit der ALTEN Formel (`perspective =
+    /// state.current_player`) nachgerechneten entsprechen.
+    #[test]
+    fn ordered_children_matches_the_old_ordering_at_a_max_node() {
+        for seed in [41u64, 42, 43, 44, 45] {
+            let s = round5_state(seed);
+            let perspective = s.current_player; // Max-Knoten per Konstruktion
+            let children = ordered_children(&s, false);
+            let mut expected: Vec<(f64, Action)> = drafting_actions(&s)
+                .into_iter()
+                .filter_map(|a| {
+                    let mut g = Game { state: s.clone() };
+                    if g.apply_drafting(&a).is_err() {
+                        return None;
+                    }
+                    Some((leaf_value(&g.state, perspective), a))
+                })
+                .collect();
+            expected.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            assert_eq!(children.len(), expected.len(), "seed={seed}: Kandidatenzahl weicht ab");
+            for (i, (c, (_, a))) in children.iter().zip(expected.iter()).enumerate() {
+                assert_eq!(
+                    &c.action, a,
+                    "seed={seed} Position {i}: Max-Knoten-Reihenfolge weicht von der alten Formel ab"
+                );
+            }
         }
     }
 
@@ -1225,7 +1357,7 @@ mod tests {
         // zwischen Maximierer/Minimierer waeren ein klassischer Bug hier).
         let s = round5_state(3);
         let perspective = s.current_player;
-        let children = ordered_children(&s, perspective, false);
+        let children = ordered_children(&s, false);
         let naive_best = children.first().map(|c| c.order_value).unwrap_or(f64::NEG_INFINITY);
         let chosen = choose_action(&s).expect("Aktion");
         let mut g = Game { state: s.clone() };
@@ -1348,7 +1480,7 @@ mod tests {
             let mut state = drive_to_round_start(seed, 5);
             let mut step = 0u32;
             while state.phase == Phase::Drafting {
-                let children = ordered_children(&state, state.current_player, false);
+                let children = ordered_children(&state, false);
                 if children.is_empty() {
                     break;
                 }

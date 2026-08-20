@@ -68,3 +68,21 @@ Ausbleiben waere ein eigener Befund und wuerde hier protokolliert.
 Exklusiv-Regel gilt (keine Nebenlast).
 
 ## par.4 ERGEBNIS (leer bei Registrierung)
+
+
+## par.4 ERGEBNIS FIX-ABNAHME (2026-08-20, vor den Leiter-Laeufen)
+
+- Fix umgesetzt (beide Fundstellen, Sortierschluessel = Knoten-Zieher;
+  `perspective`-Parameter der Sortierfunktionen entfaellt), 4 neue
+  Ordnungstests, **Suite 464/0**. Keine Alt-Erwartung musste angepasst
+  werden. Kosmetik-Fixes (Feature-Kommentare, inkl. der Zwillingsstelle
+  `features.rs:575`) mitgenommen.
+- Wheel neu gebaut und installiert. **Abdeckungsbefund an der
+  Paritaetsprobe: ihr Hash blieb UNVERAENDERT (8c6684ff...)** — die Probe
+  erreicht die R5-/Deep-Pfade nicht. Die Verhaltensaenderung ist
+  stattdessen direkt belegt: 8-Partien-Probe gegen die Alt-Engine, **2 von
+  8 Partien verlaufen anders** (gleiche Seeds), Sieger in dieser
+  Stichprobe zufaellig identisch. Determinismus der Fix-Engine: 2x8
+  byte-identisch. Die Paritaets-Basislinie bleibt formal 8c6684ff; die
+  Abdeckungsluecke der Probe ist als eigener niedriger Befund
+  protokolliert.

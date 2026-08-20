@@ -156,7 +156,7 @@ def state_to_tensor(data):
             for ri in range(1, 6):   # Reihen-Index 1..5 (Reihe 2..6)
                 features.append(1.0 if ri in chippable_rows else 0.0)
             
-        # 6. Kuppelzustand (pro Spieler: 9 Slots × 9 Features = 81 Features × 2 = 162)
+        # 6. Kuppelzustand (pro Spieler: 9 Slots × 17 Features = 153 Features × 2 = 306)
         COLOR_ID_MAP = {"blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis": 5}
         TYPE_MAP     = {"NORMAL": 0.0, "WILD": 0.5, "SPECIAL": 1.0}
 
