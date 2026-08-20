@@ -85,4 +85,42 @@ Exklusiv-Regel gilt (keine Nebenlast).
   protokolliert.
 
 
-## par.5 ERGEBNIS DER NEUVERANKERUNG (leer bei Registrierung — fuellt die naechste Sitzung)
+## par.5 ERGEBNIS DER NEUVERANKERUNG (registriert 2026-08-21)
+
+Alle 5 Kanten im Nachtlauf 2026-08-20/21 gefahren (Nutzer-Shell, Log
+`logs/nacht_20260820.log`), exklusiv, ohne Fruehstopp; Zahlen an den
+Artefakt-JSONs verifiziert (`paired_arena_env_elo_r5fix_*.json`). Ein
+Fehlstart der ersten Kante (exit 2, fehlende Argumente, 22:53) wurde vor
+Spielbeginn neu abgesetzt — keine Partie doppelt.
+
+| Kante | Ergebnis | Seed |
+|---|---|---|
+| v21_2d_brierbest@400 gegen Heuristik@150(dyn) | **116:34** (n=150) | 20260834 |
+| v20_2d_opp_brierbest@400 gegen Heuristik@150(dyn) | **103:47** (n=150) | 20260834 |
+| v19_2d_best@400 gegen Heuristik@150(dyn) | **112:38** (n=150) | 20260834 |
+| v21 gegen v20 (@400) | **217:183** (n=400) | 20260835 |
+| v20 gegen v19 (@400) | **238:162** (n=400) | 20260836 |
+
+Bradley-Terry-Fit (`tools/elo_tracker.py report`, Anker Heuristik@150 = 1000,
+Bootstrap-CI 95 %), eingetragen in die frische `evaluations/elo_history.csv`
+(Contract-Stempel a169ebf0a4451e08, Knobs leer = Default):
+
+| Knoten | Elo | 95%-CI |
+|---|---:|---|
+| v21_2d_brierbest@400 | **1215** | [1170, 1259] |
+| v20_2d_opp_brierbest@400 | **1186** | [1144, 1227] |
+| v19_2d_best@400 | **1136** | [1097, 1178] |
+
+**Die Reihung v19 < v20 < v21 haelt im Fit** (Punktschaetzer; die
+Nachbar-CIs ueberlappen). Ein Nebenbefund gehoert protokolliert: auf den
+Anker-Kanten allein laege v19 (112) numerisch UEBER v20 (103) — die
+Differenz von 9 Siegen bei n=150 traegt aber keine Ordnungsaussage, und
+beide Direktkanten (217:183, 238:162) zeigen in die erwartete Richtung;
+der Fit gewichtet sie mit n=400 entsprechend staerker.
+
+Einordnung, nicht Verrechnung: im Alt-Register (`archive/
+elo_history_pre_r5fix.csv`) stand v21 bei 1349 auf einer LAENGEREN Leiter
+(mehr Kanten, mehr Zwischenstufen) und der Alt-Engine. Der Niveau-
+Unterschied zur neuen 1215 ist damit doppelt konfundiert (Leiterlaenge +
+Fix-Grenze) und KEINE Staerkeaussage — die Regel "Kanten ueber die
+Fix-Grenze nie mischen" gilt unveraendert.
