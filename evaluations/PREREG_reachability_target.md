@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: par.14 (2026-08-20), NICHT-ERFOLG mit umgekehrtem Vorzeichen -- T+S gegen S: k1 -0,67 Punkte (Block-t -3,73), Siege 194 gegen 214 (McNemar gegen eigenen Nullarm p=0,0045). Der Kopf ordnet Geschwister nicht nach seinem eigenen Praedikat (Tau -0,03). -->
+<!-- STATUS: OFFEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: WIEDER OFFEN (2026-08-20): das par.14-Verdikt ist als Dosis-Artefakt entkraeftet -- der Implementierungs-Review (Linse C) fand die Offline-Sonden gesaettigt, und die Koordinator-Nachmessung zeigt: der Vollendbarkeits-Kopf liefert e_k1 Median 36,1 (Konjunktionsform) gegen 0,26 beim Realisierungs-Kopf -- mit Nenner 1 war der T+S-Arm wertblind (q=1,0 geclampt in 100 % der Zustaende). Wiederholung mit je Kopf rekalibrierten Nennern registriert (par.15). Die b24-Null-Aussage (221/407, Zielwechsel kostet keine Staerke) bleibt gueltig (W=0). -->
 
 # PREREG: Zielwechsel des Ownership-Kopfes — Vollendbarkeit statt Realisierung
 
@@ -593,3 +593,47 @@ das asymmetrische Curriculum (`PREREG_asymmetric_curriculum.md`, greift den
 VALUE-Kopf an, nicht den Ownership-Kopf — von diesem Ergebnis unberuehrt).
 Der Ownership-Verbraucher-Strang ist damit in ALLEN gemessenen Formen
 (Produktform, Konjunktionsform, hoerbare Skala, neues Ziel) negativ.
+
+
+## par.15 KORREKTUR NACH IMPLEMENTIERUNGS-REVIEW (2026-08-20): par.14 IST EIN DOSIS-ARTEFAKT-VERDACHT, WIEDERHOLUNG REGISTRIERT
+
+**Befund** (`PREREG_implementation_review_targeted.md`, Linse C; vom
+Koordinator unabhaengig quantifiziert, 200 k1-aktive Holdout-Zustaende):
+
+| Kopf | e_k1 Median (Konjunktionsform, Ego-Atome 6..12) | p10/p90 | tanh(e/1) > 0,95 |
+|---|---:|---|---|
+| b18 (Realisierung) | 0,26 | 0,15 / 0,55 | 0 % |
+| **b24 (Vollendbarkeit)** | **36,1** | 22,4 / 41,0 | **100 %** |
+
+Mit `W=1, SCALE_k1=1` war der Shift im T+S-Arm konstant 1,0 und
+`out = clamp(value + 1,0)` in praktisch jedem Blatt **1,0 — der Arm war
+wertblind**, die Suche spielte Prior + Gumbel-Rauschen. Siegverlust und
+k1-Einbruch aus par.14 sind damit nicht als Aussage ueber das ZIEL
+interpretierbar. Auch die Offline-Sonden (Tau +0,970 Stabilitaet, −0,03
+gegen Praedikat) sind entwertet: ihre q(w=1)-Seite lag in 80/80 Faellen
+auf der Clamp-Grenze (`probe_sibling_k1_w1.0.json`).
+
+**Die Fehlannahme, benannt:** par.6 setzte "T+S: dieselben Nenner" fuer
+gleiche Hoerbarkeit. Der Zielwechsel aendert aber die AUSGABESKALA des
+Kopfes (Atome ~0,5-1,0 statt ~0,005) um Faktor ~140 — ein Nenner ist
+kopfspezifisch, nicht kriteriumsspezifisch.
+
+**Unberuehrt bleiben:** die b24-Null-Zeile (221/407 — der Zielwechsel
+selbst kostet keine Staerke; W=0), Arm S gegen N (flach; b18-e liegt mit
+0,26 im linearen Bereich), und saemtliche Label-/Verbraucher-/Messweg-
+Freisprueche der Linsen A/B/C.
+
+### WIEDERHOLUNGS-ANORDNUNG (vorab, vor der ersten Partie)
+
+Wie par.6/Konkretisierung, mit EINER Aenderung — Nenner je KOPF nach der
+par.6.4-Methode (Shift-Median = q-Eigenspreizung 0,078, tanh-linear):
+
+- **Arm S': b18_best, `MOSAIC_OWNERSHIP_SCALE` k1 = 0,26/0,078 ~ 3,3**
+  (die bisherige 1 machte S ~3x lauter als registriert beabsichtigt).
+- **Arm T+S': b24_best, k1 = 36,1/0,078 ~ 463.**
+- Alles andere unveraendert: `W=1`, GEW nur k1, `CONJ=1`, 407 Seeds,
+  Blockgroesse 25, `--log-games`, exklusiv, Vorflug (Determinismus +
+  Reglerwirkung + NEU: Saettigungs-Wache — in einer 8-Partien-Probe muss
+  q(w=1) im Trace STREUEN, nicht clampen).
+- Erfolgsregel unveraendert par.7 (T+S' hebt k1 gegen S' auf Block-Ebene,
+  ohne Siegverlust gegen N). Der N-Arm liegt vor und bleibt gueltig.
