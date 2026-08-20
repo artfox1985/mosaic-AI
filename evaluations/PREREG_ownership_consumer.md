@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie kommt der Ownership-Kopf als VERBRAUCHER in Drafting (Blatt-Shift ueber erwartete Plattenpunkte E_k) und Tiling (marginale Feldwerte einmal je Zug) -- und ab welcher Kopfguete darf er steuern? | Beleg: **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag "ueberleg dir schon mal wie wir den ownership head ins drafting und tiling miteinbeziehen"). ENTWURF, nichts gebaut. Geprueft: Kopf im Champion untrainiert (`ownership_weight` 0,0, Manifest v21_2d), kein Engine-Verbraucher (ONNX-Ausgang 4 ungelesen). Zwei-Pole-Regler `MOSAIC_OWNERSHIP_W`, Default 0 = byte-identisch (Task-#28-Muster). Reihenfolge: Generator -> Kopf-Training (+Konjunktionen) -> Tor A Kopfguete VOR Verbraucher-Bau. -->
+<!-- STATUS: UEBERHOLT | Frage: Wie kommt der Ownership-Kopf als VERBRAUCHER in Drafting (Blatt-Shift ueber erwartete Plattenpunkte E_k) und Tiling (marginale Feldwerte einmal je Zug) -- und ab welcher Kopfguete darf er steuern? | Beleg: Vom eigenen Nachfolge-Strang ueberholt: der Verbraucher wurde gebaut (Tor A bestanden, PREREG_ownership_corpus par.10) und ueber PREREG_ownership_coupling / _conjunction_terms / _reachability_target in allen Formen negativ gemessen (par.14). Der hiesige ENTWURF-Stand ist Geschichte (festgestellt 2026-08-20). -->
 
 # PREREG: Ownership-Kopf als Verbraucher in Drafting und Tiling
 
@@ -113,3 +113,8 @@ Eigenes Gewicht, eigener Arm — nicht mit der Eigen-Hälfte verrechnen.
   "verteidigen, nie anstreben" (Nutzer-Entscheid).
 - Kalibrierung der tanh-Skala (50) für E_k prüfen — E_k ist punkteskaliert
   wie P_term, sollte passen; messen statt annehmen.
+
+
+## SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Status auf **UEBERHOLT** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: Vom eigenen Nachfolge-Strang ueberholt: der Verbraucher wurde gebaut (Tor A bestanden, PREREG_ownership_corpus par.10) und ueber PREREG_ownership_coupling / _conjunction_terms / _reachability_target in allen Formen negativ gemessen (par.14). Der hiesige ENTWURF-Stand ist Geschichte (festgestellt 2026-08-20).
