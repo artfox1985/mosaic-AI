@@ -201,6 +201,54 @@ par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
 
 ---
 
+## UEBERGABE AN DIE NAECHSTE SITZUNG (angelegt 2026-08-20 Nacht — ZUERST LESEN)
+
+**Kontext-Wechsel per Nutzer-Entscheid; diese Sektion ist der komplette
+Auftrag der naechsten Sitzung. In der Nacht laufen zwei Ketten in der
+NUTZER-Shell** (Log `logs/nacht_20260820.log`; Ueberwachung ueber Log +
+Dateizahl + Prozessliste, keine PID):
+
+1. **Neue Elo-Leiter** (`PREREG_round5_minfix_elo_reset.md` par.3, auf der
+   Fix-Engine c83fb35): 3 Anker-Kanten (v21/v20/v19 gegen Heuristik@150dyn,
+   je n=150, Seed 20260834) + 2 Nachbar-Kanten (v21-v20, v20-v19, je 400
+   Partien @400, Seeds 20260835/36). Artefakte
+   `evaluations/paired_arena_env_elo_r5fix_*.json`.
+2. **Asym-Korpus** (`PREREG_asymmetric_curriculum.md` par.11): 4 Bloecke
+   a 4.000 nach `data/asym_corpus/` (S1/S2 = `v21_asymS`, Seeds
+   20260830/31; N1/N2 = `v21_asymN`, Seeds 20260832/33), mit
+   automatischem Fruehwarn-Gate nach S1
+   (`tools/probes/asym_early_rate_check.py`, Abbruch < 10 pp).
+
+**AUFTRAG, in dieser Reihenfolge (nichts davon wurde in der alten Sitzung
+begonnen):**
+
+1. Vollstaendigkeit pruefen: 5 Leiter-JSONs vorhanden; `data/asym_corpus/`
+   = 1.600 Dateien / 16.000 Partien (Dateizahl x 10), Log auf Abbrueche/
+   Fruehwarn-Ausgang pruefen. Unvollstaendig -> Stall-Regel (nur fehlenden
+   Rest nachgenerieren, Folge-Seed), NICHT alles neu.
+2. **Elo-Fit** ueber die 5 Kanten (Anker definiert den Nullpunkt wie
+   bisher), Eintraege in die FRISCHE `evaluations/elo_history.csv`
+   (Alt-Register liegt in `archive/elo_history_pre_r5fix.csv`; **Kanten
+   ueber die Fix-Grenze hinweg NIE mischen**). Ergebnis in
+   `PREREG_round5_minfix_elo_reset.md` par.5 registrieren, inkl. der
+   Frage, ob die Reihung v19 < v20 < v21 haelt.
+3. **Asym-Korpus abnehmen:** Vollstaendigkeits-/Greif-Statistik aus dem
+   Log; dann die verbindliche **par.5-Sperre** (k1-Raten-Differenz
+   Zwangs-/freie Seite >= 20 pp auf dem Gesamt-Korpus S; Siegquote der
+   Zwangsseite protokollieren, NICHT tunen). Sperre bestanden ->
+   par.9 Schritt 5 (Training beider Arme: Warm Start Champion,
+   Standardrezept, `--epochs` realistisch ~20, Traeger-Manifest fuer den
+   neuen Korpus policy-tragend, Fenster gepinnt — b18-Fenster-Regex aus
+   `evaluations/b18_window_exclude_regex.txt` bzw. dem Referenz-Manifest).
+4. Danach Messungen nach par.6/par.7 der Asym-Prereg (Nullarm-Arena auf
+   der Fix-Engine; Brettwechsel-Arm ist dort Pflichtteil).
+
+**Stehende Regeln, die letzte Nacht teuer wurden:** Arena nur EXKLUSIV;
+`MOSAIC_OWNERSHIP_CONJ=1` in Ownership-Armen; Nenner sind KOPFSPEZIFISCH
+(par.15-Lehre); Builds nie in Pipes; nie pushen ohne Anweisung.
+
+---
+
 ## STAND 2026-08-20 — ZIELWECHSEL GEMESSEN: NICHT-ERFOLG, mit umgekehrtem Vorzeichen
 
 > **KORREKTUR, noch am selben Tag (Implementierungs-Review, par.15 der

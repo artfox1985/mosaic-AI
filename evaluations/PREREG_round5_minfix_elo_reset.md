@@ -67,9 +67,6 @@ NEUVERMESSUNG, kein A/B; die Reihung v19 < v20 < v21 ist Erwartung, ihr
 Ausbleiben waere ein eigener Befund und wuerde hier protokolliert.
 Exklusiv-Regel gilt (keine Nebenlast).
 
-## par.4 ERGEBNIS (leer bei Registrierung)
-
-
 ## par.4 ERGEBNIS FIX-ABNAHME (2026-08-20, vor den Leiter-Laeufen)
 
 - Fix umgesetzt (beide Fundstellen, Sortierschluessel = Knoten-Zieher;
@@ -86,3 +83,6 @@ Exklusiv-Regel gilt (keine Nebenlast).
   byte-identisch. Die Paritaets-Basislinie bleibt formal 8c6684ff; die
   Abdeckungsluecke der Probe ist als eigener niedriger Befund
   protokolliert.
+
+
+## par.5 ERGEBNIS DER NEUVERANKERUNG (leer bei Registrierung — fuellt die naechste Sitzung)
