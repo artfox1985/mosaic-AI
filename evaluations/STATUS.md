@@ -213,9 +213,16 @@ par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
 > Offline-Tau-Werte sind entwertet (q lag in 80/80 Faellen auf der
 > Clamp-Grenze). **Gueltig bleiben:** b24-Null 221/407 (Zielwechsel
 > kostet keine Staerke), S gegen N flach, alle Linsen-Freisprueche.
-> Wiederholung mit kopfspezifisch rekalibrierten Nennern (S' ~3,3,
-> T+S' ~463) ist registriert und eingeplant; die Zahlen darunter bleiben
-> als Protokoll des ersten Laufs stehen.
+> **WIEDERHOLUNG GEFAHREN (noch am 2026-08-20, par.16): NICHT-ERFOLG,
+> diesmal ohne Artefakt.** Nenner S' 3,3 / T+S' 463, Saettigungs-Wache
+> bestanden (Clamp 0,0 %). k1 flach (T+S' gegen S' +0,23, Block-t 1,11;
+> gegen eigenen Nullarm −0,05) — aber KEIN Siegverlust: **T+S' 233/407,
+> nominell bester Arm der Kampagne** (gegen b24-Null p=0,169, n.s.).
+> Korrekt dosiertes Vollendbarkeits-Shaping ist kostenlos, nur
+> k1-wirkungslos. Endverdikt nach par.7-Klausel: das Ziel ist nicht der
+> Engpass; es bleibt die Policy-Seite. Der Ownership-Verbraucher-Strang
+> ist damit ENDGUELTIG durchgemessen. Die Zahlen darunter bleiben als
+> Protokoll des ersten Laufs stehen.
 
 Der Vollendbarkeits-Kopf (`v21-b24`, Arm P) ist trainiert, offline geprueft
 und in der registrierten N/S/T+S-Arena gemessen (par.14 der Prereg, alle
