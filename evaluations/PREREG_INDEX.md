@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 69 Dateien = 17 OFFEN + 48 ENTSCHIEDEN + 4 UEBERHOLT.**
+**Stand (automatisch generiert): 69 Dateien = 16 OFFEN + 49 ENTSCHIEDEN + 4 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (17)
+## OFFEN (16)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -99,12 +99,11 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_plate_head.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Stufe A = reines Aux-Ziel mit Pflicht-Kriterium 6; Stufe B (Einbau in die Blattbewertung) ausdruecklich offen. Startet erst NACH Task D (Schema-Bump invalidiert den gemeinsamen Cache) |
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. |
 | `PREREG_provocation.md` | Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | **OFFEN, vorregistriert 2026-08-12** (Nutzer-Korrektur: *"das ist kein plan. das ist hoffen. als erstes brauchen wir eine methode gezielt spiele zu provozieren"*). Stufe 1 VOR der Streuung ins Self-Play; ich hatte die beiden Stufen verwechselt. Nutzer-kalibrierte Abnahmezahl: **>= 7,00 vertikale Plattenpunkte = eine Spalte je Partie** (heute 1,05 = 0,15). Eine Spalte sind 21 Platzierungs- PLUS 7 Plattenpunkte = 28, also rund ein Fuenftel eines guten Endstands. Der Eingriff ist eine Beschneidung der Aktionsmenge, kein neuer Bewerter -- fuenf Anlaeufe ueber die Bewertung sind gescheitert, weil eine Stellungsbewertung keine mehrrundige Farbzusage darstellen kann (`dome.rs:61-70`: jede Zelle verlangt genau eine Farbe). |
-| `PREREG_reachability_target.md` | Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | offen, nichts gebaut. Anlass: vier geschlossene Wege am Verbraucher, externe Durchsicht 2026-08-18. |
 | `PREREG_scoring_plate_injection.md` | Nutzt es, die WERTUNGSPLATTEN (alle acht Kriterien, gegatet auf die aktiven) in die Blattbewertung zu injizieren -- und in welcher Dosis? | **OFFEN, vorregistriert 2026-08-11, HAUPT-SWEEP** (Nutzer-Ruege: "wir wollen die wertungsplatten injizieren, nicht nur die spezialplatten"). `MOSAIC_WERTUNG_SHAPING_W` 0 / 0,1 / 0,3 -- KLEINER als beim Freischalt-Term, weil der Term eine Groessenordnung groesser ist (Kriterium 1 allein ~7,9 Pkt -> tanh = 0,156, das saettigt den geklemmten Blattwert). Basis-Seed 20260911. Pflicht-Nebenmessung ueber `log_games` + `analyze_game_log.py`: Zellen je Rasterreihe und Nahmen-Anteil tiefe Reihen (dicht) statt Abschluesse (zu selten). Enthaelt in Abschnitt 0 die Dokumentation meines Messplan-Fehlers. |
 | `PREREG_shaping_scale_per_round.md` | Ist die Wirkungslosigkeit der Wertungsplatten-Injektion ein Artefakt eines rundenblinden Nenners? `WERTUNG_SHAPING_SCALE` ist fest 50, der Punktestand nach Runde 1 liegt bei 4. | **ENTWURF 2026-08-18, nichts gebaut.** Anlass gemessen: Punktestand je Runde aus 22 Arena-Logs, Anteilskurve zwischen Mensch und KI deckungsgleich trotz 33 % Niveauunterschied. Nutzer-Auftrag: "schreib für den rundenabhängigen WERTUNG_SHAPING_SCALE mal ein prereg". |
 | `PREREG_v22_window.md` | Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. |
 
-## ENTSCHIEDEN (48)
+## ENTSCHIEDEN (49)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -143,6 +142,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_prior_blind_spot.md` | Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/t_e_prior_blind_spot.json`, `evaluations/t_g_gumbel_scale_v21.json` |
 | `PREREG_r4_value_calibration.md` | Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | "Kein Befund" (R² negativ), zusaetzlich Methoden-Alarm (Vorzeichen-Anker nur 9/24) -> Folge-Messung "R4b" initiiert; Git-Commit `cb4773d`, kein Prosa-Absatz in history.md |
 | `PREREG_r5_value_calibration.md` | Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Unterkalibrierung bestaetigt (Steigung 0,06-0,09 statt ~1); `archive/history.md` Z. ~7065-7089 |
+| `PREREG_reachability_target.md` | Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | par.14 (2026-08-20), NICHT-ERFOLG mit umgekehrtem Vorzeichen -- T+S gegen S: k1 -0,67 Punkte (Block-t -3,73), Siege 194 gegen 214 (McNemar gegen eigenen Nullarm p=0,0045). Der Kopf ordnet Geschwister nicht nach seinem eigenen Praedikat (Tau -0,03). |
 | `PREREG_search_path_remeasurements.md` | Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Eigener Ergebnis-Abschnitt in der Datei ("MESSUNG-3-ERGEBNIS"); alle 3 Messungen H0, Status quo bestaetigt |
 | `PREREG_search_rng_split.md` | Soll die Suche einen EIGENEN Zufallsstrom bekommen, damit Partien replaybar werden und gepaarte Arenen echte gemeinsame Zufallszahlen haben? | ENTSCHIEDEN 2026-08-13 (Datei §11 VERDIKT): umgesetzt -- net_mcts::derive_search_seed (SplitMix64) + Verdrahtung in self_play.rs/py.rs; Kern bestaetigt (Gegenprobe mit geteiltem RNG bricht in Runde 4, nach dem Fix 0 Abweichungen), zwei Prognosen der Datei widerlegt (u.a.: der Paritaets-Hash haelt). Details: STATUS.md, Kapitel 'NACHTRAG 2026-08-13: RNG-Schnitt Suche/Partie umgesetzt'. |
 | `PREREG_t35b_ranking.md` | Verbessert ein Ranking-Loss-Arm (Task #35b, WDL-Aera) die Orakel-validierten Policy-Metriken? | Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS: Orakel-Vorpruefung NEGATIV -> kein Gating"), #35b geschlossen |
