@@ -73,9 +73,6 @@ keine GPU, keine Arena. Gegenrechnung: ein uebersehener Mess-Bug wuerde einen
 geschlossenen Forschungsstrang falsch schliessen und den naechsten (26-h-Korpus)
 auf falscher Grundlage starten.
 
-## par.6 ERGEBNIS (leer bei Registrierung)
-
-
 ## par.6 ERGEBNIS (2026-08-20)
 
 - **Linse A (Label/Training): SAUBER auf allen sieben Flaechen**, mit

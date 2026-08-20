@@ -203,6 +203,20 @@ par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
 
 ## STAND 2026-08-20 — ZIELWECHSEL GEMESSEN: NICHT-ERFOLG, mit umgekehrtem Vorzeichen
 
+> **KORREKTUR, noch am selben Tag (Implementierungs-Review, par.15 der
+> Prereg): das T+S-Verdikt unten ist ein DOSIS-ARTEFAKT-VERDACHT und
+> traegt NICHT als Ziel-Aussage.** Der Vollendbarkeits-Kopf liefert
+> e_k1 Median **36,1** (Konjunktionsform) gegen 0,26 beim
+> Realisierungs-Kopf — mit dem am alten Kopf kalibrierten Nenner 1 war
+> der T+S-Arm **wertblind** (Shift 1,0, q auf 1,0 geclampt, 100 % der
+> Zustaende): die Suche spielte Prior + Rauschen. Auch die beiden
+> Offline-Tau-Werte sind entwertet (q lag in 80/80 Faellen auf der
+> Clamp-Grenze). **Gueltig bleiben:** b24-Null 221/407 (Zielwechsel
+> kostet keine Staerke), S gegen N flach, alle Linsen-Freisprueche.
+> Wiederholung mit kopfspezifisch rekalibrierten Nennern (S' ~3,3,
+> T+S' ~463) ist registriert und eingeplant; die Zahlen darunter bleiben
+> als Protokoll des ersten Laufs stehen.
+
 Der Vollendbarkeits-Kopf (`v21-b24`, Arm P) ist trainiert, offline geprueft
 und in der registrierten N/S/T+S-Arena gemessen (par.14 der Prereg, alle
 Zahlen dort). Kurzfassung:
