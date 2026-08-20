@@ -135,3 +135,16 @@ nicht ein — der ungeprimte Review fand den Dosis-Saettigungs-Befund des
 gezielten Reviews NICHT (er las den Ownership-Verbraucher als sauber,
 was er implementierungsseitig auch ist), dafuer zwei Befunde, die auf
 keiner Verdachtskarte standen. Genau das war der Zweck der Trennung.
+
+
+### Nachtrag zu Befund 1 (2026-08-20, Anker-Klaerung)
+
+Geprueft: `mcts.rs:746-747/777-778/796-797` — **auch der Heuristik-Pfad
+kurzschliesst Runde 5 in denselben Loeser.** Der Elo-Anker spielt also mit
+dem Min-Knoten-Fehler. Damit greift die par.3-Klausel "beruehrt den
+Elo-Anker": der Fix ist NUTZER-ENTSCHEID. Empfohlener Zuschnitt, der den
+Anker unangetastet laesst: Fix hinter einem Knopf (Default = ALTES
+Verhalten, Task-#28-Muster) — der Anker bleibt byte-identisch, Netz-Arme
+koennen den Fix per Env aktivieren und regulaer gaten; eine spaetere
+Default-Umstellung waere ein eigener, vom Nutzer freizugebender Schritt
+mit Neuverankerung der Elo-Leiter.
