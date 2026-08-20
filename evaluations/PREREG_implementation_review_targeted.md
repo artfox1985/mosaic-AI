@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist der Mess-Pfad des Zielwechsel-Ergebnisses (par.14) frei von Perspektiven-, Vorzeichen- und Index-Fehlern -- oder ist das invertierte k1-Delta ein Implementierungs-Artefakt? | Beleg: offen, nichts gestartet. Anlass: invertiertes Vorzeichen ist die typische Bug-Signatur; die Kette entstand in 48 h aus drei Haenden. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Ist der Mess-Pfad des Zielwechsel-Ergebnisses (par.14) frei von Perspektiven-, Vorzeichen- und Index-Fehlern -- oder ist das invertierte k1-Delta ein Implementierungs-Artefakt? | Beleg: par.6 (2026-08-20): Linsen A und B vollstaendig SAUBER (mit Repro-Sonden); Linse C fand den tragenden BEFUND -- die k1-Dosis saettigte den T+S-Arm (e_k1 Median 36,1 bei Nenner 1, q geclampt), par.14 des Zielwechsels ist Dosis-Artefakt-verdaechtig und die Messung wird mit rekalibrierten Nennern wiederholt (PREREG_reachability_target par.15). -->
 
 # PREREG: Gezielter Implementierungs-Review des Zielwechsel-Mess-Pfads
 
@@ -74,3 +74,35 @@ geschlossenen Forschungsstrang falsch schliessen und den naechsten (26-h-Korpus)
 auf falscher Grundlage starten.
 
 ## par.6 ERGEBNIS (leer bei Registrierung)
+
+
+## par.6 ERGEBNIS (2026-08-20)
+
+- **Linse A (Label/Training): SAUBER auf allen sieben Flaechen**, mit
+  Repro-Sonden (Ego/Gegner-Zuordnung, Atom-Slice, Rundengrenzen empirisch
+  ueber 400 Partien, float16-Stufen unterscheidbar, Cache-Keys
+  kollisionsfrei, Vorzeichen konsistent).
+- **Linse B (Engine-Verbraucher): SAUBER auf allen sechs Kernfragen**
+  (Layout-Vertrag Python-ONNX-Rust index-genau ueber Namens-Erkennung,
+  Ego an Nicht-Wurzel-Knoten korrekt, Sigmoid exakt einmal, Knopf-Indizes
+  deckungsgleich). Protokoll-Notiz nach par.3(c):
+  `conjunction_atom_ranges_match_label_builder` prueft nur Rust-intern
+  gegen eine Hand-Transkription, kein Python-Cross-Check — Testluecke,
+  kein Befund.
+- **Linse C (Messweg/Sonden): Messweg SAUBER** (Arena-Orchestrierung,
+  Seed-Paarung, `plate_points_from_arena` reproduziert Block-t −3,73
+  zahlengenau, keine verstuemmelten Partien, arm_wins konsistent) — und
+  **EIN BEFUND, vom Koordinator bestaetigt und quantifiziert:** die
+  Offline-Sonden liefen bei w=1 vollstaendig in der q-Clamp (80/80 auf
+  1,0), Ursache ist die Dosis-Saettigung des Vollendbarkeits-Kopfes
+  (e_k1 Median 36,1 gegen Nenner 1). Konsequenz nach par.3(a):
+  `PREREG_reachability_target.md` par.15 (Annotation + registrierte
+  Wiederholung mit kopfspezifisch rekalibrierten Nennern).
+  Protokoll-Notiz nach par.3(c): die Arena-JSONs schreiben die
+  Neben-Envs (GEW/SCALE/CONJ/TILING_W) nicht mit — Auditierbarkeitsluecke.
+
+**Verifikations-Schritt:** der Linse-C-Befund wurde nicht adversarial
+widerlegt, sondern durch unabhaengige Koordinator-Nachmessung BESTAETIGT
+(eigene Sonde, 200 Zustaende, Zahlen in par.15 des Zielwechsel-Preregs) —
+das erfuellt die Befund-Regel (Repro + nicht widerlegbar) in der
+staerksten Form.
