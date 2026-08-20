@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: WIEDER OFFEN (2026-08-20): das par.14-Verdikt ist als Dosis-Artefakt entkraeftet -- der Implementierungs-Review (Linse C) fand die Offline-Sonden gesaettigt, und die Koordinator-Nachmessung zeigt: der Vollendbarkeits-Kopf liefert e_k1 Median 36,1 (Konjunktionsform) gegen 0,26 beim Realisierungs-Kopf -- mit Nenner 1 war der T+S-Arm wertblind (q=1,0 geclampt in 100 % der Zustaende). Wiederholung mit je Kopf rekalibrierten Nennern registriert (par.15). Die b24-Null-Aussage (221/407, Zielwechsel kostet keine Staerke) bleibt gueltig (W=0). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: par.16 (2026-08-20), Wiederholung mit kopfspezifisch rekalibrierten Nennern (Saettigungs-Wache bestanden): NICHT-ERFOLG -- k1 T+S-neu gegen S-neu +0,23 (Block-t 1,11, Schwelle 2,571), gegen den eigenen Nullarm -0,05. KEIN Siegverlust: T+S-neu 233/407, nominell bester Arm der Kampagne (n.s.). Das Ziel ist nicht der Engpass; es bleibt die Policy-Seite (par.7-Klausel). -->
 
 # PREREG: Zielwechsel des Ownership-Kopfes — Vollendbarkeit statt Realisierung
 
@@ -637,3 +637,39 @@ par.6.4-Methode (Shift-Median = q-Eigenspreizung 0,078, tanh-linear):
   q(w=1) im Trace STREUEN, nicht clampen).
 - Erfolgsregel unveraendert par.7 (T+S' hebt k1 gegen S' auf Block-Ebene,
   ohne Siegverlust gegen N). Der N-Arm liegt vor und bleibt gueltig.
+
+
+## par.16 ERGEBNIS DER WIEDERHOLUNG (2026-08-20): NICHT-ERFOLG, diesmal ohne Artefakt
+
+Anordnung nach par.15 (Nenner S' 3,3 / T+S' 463, sonst unveraendert; nur die
+aktiven Arme neu gefahren, Nullarme byte-reproduzierbar aus dem Erstlauf).
+Vorflug komplett bestanden: Saettigungs-Wache b24@463 Clamp 0,0 % (q-Median
+0,557), b18@3,3 Clamp 0,1 %; Determinismus identisch; Reglerwirkung ja.
+Rohdaten `paired_arena_env_reach2_s_b18.json` / `_reach2_ts_b24.json`.
+
+| Arm | Siege | k1 vs S' (Block-t) | k1 vs eigener Null (Block-t) |
+|---|---:|---|---|
+| S' (b18@3,3) | 194/407 | — | — |
+| **T+S' (b24@463)** | **233/407** | **+0,23 (t 1,11)** | **−0,05 (t −0,25)** |
+
+- **Erfolgsregel-Teil 1 (k1 signifikant hoch gegen S'): VERFEHLT** — flach,
+  weit unter der Schwelle 2,571. Gegen den eigenen Nullarm traegt das
+  Shaping exakt nichts bei (−0,05). Einziger Beweger ist erneut das kurze
+  Kriterium (Spezialfelder +0,66, t 1,89, n.s.).
+- **Erfolgsregel-Teil 2 (keine Siegkosten): ERFUELLT** — T+S' verliert
+  nirgends signifikant (gegen b24-Null p=0,169, gegen N p=0,137) und ist
+  nominell der staerkste Arm der gesamten Kampagne. Der Schaden aus par.14
+  war vollstaendig das Saettigungs-Artefakt.
+- Protokolliert: S' gegen N 194:211 (p=0,075, n.s. leicht negativ) — die
+  auf Hoerbarkeit kalibrierte Skala nutzt dem alten Kopf nichts;
+  T+S' gegen S' Siege p=0,0072, aber modellkonfundiert (b24-Null war schon
+  +10 gegen N), keine Zurechnung.
+
+> **ENDVERDIKT (par.7-Klausel, woertlich registriert):** k1 bleibt flach,
+> obwohl Label informativ (par.10), Ordnung stabil (Tau 0,970) und die
+> Skala nachweislich hoerbar und unsaettigt war. *"Dann ist auch das Ziel
+> nicht der Engpass, und es bleibt die Policy-Seite (orakel-abgeleitete
+> Supervision, AZAL-Muster) als letzter unversuchter Strang."* Der
+> Ownership-VERBRAUCHER-Strang ist damit endgueltig durchgemessen —
+> Beifang dieser Wiederholung: das Vollendbarkeits-Shaping ist bei
+> korrekter Dosis KOSTENLOS (kein Siegverlust), nur wirkungslos fuer k1.
