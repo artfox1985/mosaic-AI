@@ -262,3 +262,24 @@ in STATUS.md schliesst die Zähl-Kriterien aus; gefragt sind die konjunktiven.
 ## par.11 EINTAKTUNG (2026-08-20)
 
 Nutzer-Entscheid: *"wir messen es zu ende, aber nicht jetzt."* Reihenfolge: erst die beiden Implementierungs-Reviews (PREREG_implementation_review_*), dann dieser Pfad-A-Arena-Lauf als letzter offener Test der Injektionslinie. Nur Pfad A -- die Pfad-B-Anwendung des Profils ist mit dem par.14-Verdikt des Zielwechsels gegenstandslos.
+
+
+## par.12 KONKRETISIERUNG VOR DEM START (2026-08-20, vor der ersten Partie)
+
+Die Reviews sind abgeschlossen (Bedingung aus par.11), der Lauf startet.
+Festlegungen, die par.7 offen liess:
+
+- **Dosis: `MOSAIC_WERTUNG_SHAPING_W = 0.3`** — die hoechste Dosis des
+  gemessenen Haupt-Sweeps (`PREREG_scoring_plate_injection.md`, Arme
+  0/0,1/0,3), damit der Vergleichspunkt maximal traegt.
+- **Arm-Variable: `MOSAIC_WERTUNG_SCALE_PROFILE`** {0 = Kontrollarm
+  flacher Nenner 50, 1 = Profil 4,2/8,6/16,3/25,8/41,3}; Dosis in beiden
+  Armen identisch ueber die Eltern-Umgebung.
+- Instrument wie im Haupt-Sweep: `paired_arena_env_ab.py`,
+  Champion-Netz gegen Heuristik@150(dyn), Netz-Sims 400. Seeds: der
+  407er-Satz (`distillation_seeds_main.txt`), Blockgroesse 25,
+  `--log-games` (Pflicht fuer k1).
+- Vorflug: Determinismus (2x8 identisch) + Reglerwirkung (Profil-Arm
+  weicht ab; Achtung: in Runde 1 ist Pfad-A-E exakt 0, die Wirkung muss
+  also aus R2+ kommen).
+- Erfolgsregel unveraendert par.8, Fokus-Lesart k1.
