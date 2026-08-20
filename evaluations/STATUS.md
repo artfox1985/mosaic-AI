@@ -201,6 +201,51 @@ par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
 
 ---
 
+## STAND 2026-08-20 — ZIELWECHSEL GEMESSEN: NICHT-ERFOLG, mit umgekehrtem Vorzeichen
+
+Der Vollendbarkeits-Kopf (`v21-b24`, Arm P) ist trainiert, offline geprueft
+und in der registrierten N/S/T+S-Arena gemessen (par.14 der Prereg, alle
+Zahlen dort). Kurzfassung:
+
+| Arm | Siege | k1-Punkte |
+|---|---:|---:|
+| N (b18, Regler aus) | 211/407 | 0,90 |
+| S (b18, hoerbare Skala) | 214/407 | 0,85 |
+| b24-Null (neues Ziel, Regler aus) | **221/407** | — |
+| **T+S (neues Ziel, hoerbare Skala)** | **194/407** | **0,18** |
+
+- **T+S gegen S: k1 −0,67 Punkte, Block-t −3,73** — signifikant in die
+  FALSCHE Richtung; dazu Siegverlust (McNemar p=0,0045) und mehr
+  Strafleiste (+1,83, Block-t 2,87). Nur die Spezialfelder profitieren
+  (+0,56, Block-t 7,00) — wieder das Kurze-Kette-Muster.
+- **S gegen N: flach** (k1 t −0,18, Siege p=0,84) — die hoerbare Skala
+  allein bewegt beim alten Ziel nichts. Damit sind Skala UND Ziel als
+  Engpass-Erklaerungen GEMESSEN und GEFALLEN.
+- **Der Zielwechsel allein kostet keine Staerke** (b24-Null 221/407,
+  numerisch ueber b18-Null auf denselben Seeds) — der Schaden entsteht
+  erst, wenn der Kopf die Suche steuert.
+- **Die Offline-Sonde hatte es angekuendigt:** Kopf-Ordnung seed-stabil
+  (Tau +0,970), aber OHNE Bezug zum eigenen Trainings-Praedikat
+  (Tau −0,03 gegen die Puffer-Summe der Nachfolgezustaende). Der Kopf
+  lernt das Ziel auf Zustands-Ebene (own_val fiel monoton 0,407→0,361),
+  unterscheidet aber die Geschwister eines Knotens nicht danach —
+  dieselbe Fehlerklasse wie der Feld-Kopf-Befund vom 18.08. („sieht die
+  Absicht kaum").
+
+**Damit ist der Ownership-VERBRAUCHER-Strang in allen gemessenen Formen
+negativ** (Produktform, Konjunktionsform, hoerbare Skala, neues Ziel).
+Was laut par.7-Registrierung bleibt: die **Policy-Seite**
+(orakel-abgeleitete Supervision, AZAL-Muster) als letzter unversuchter
+Strang — und unabhaengig davon das **asymmetrische Curriculum** am
+VALUE-Kopf (von diesem Ergebnis unberuehrt; Rechnungen liegen, Umfang ist
+Nutzer-Entscheid).
+
+Zwei am 2026-08-20 gefangene Fallen stehen in der Fallen-Tabelle
+(Produktform liest keine Atome → `MOSAIC_OWNERSHIP_CONJ=1` Pflicht in
+Ownership-Armen; Arena nur EXKLUSIV fahren).
+
+---
+
 ## STAND 2026-08-19 — Orakel-Abstand gemessen (NICHT bestaetigt), beide Vorpruefungen bestanden
 
 ### Orakel-Abstand in Menschenpartien: STAERKE-EFFEKT, kein falsches Vorzeichen
@@ -260,11 +305,10 @@ live, der Profil-Knopf aendert kein Produktionsverhalten (par.6a, korrigiert).
 1. **Nutzer-Entscheid** Einordnung Asymmetrie-Korpus (Lehrkorpus jetzt vs.
    Schritt 3) — die Empfehlung "jetzt, falls Orakel-Abstand bestaetigt"
    ist hinfaellig; ohne den Beleg ist die Reihenfolge-Frage wieder offen.
-2. **Vollendbarkeits-Zweig** (`PREREG_reachability_target.md` par.9/par.11):
-   Label-Bauer rundenweise umstellen (R1-2 Puffer CAP 12, R3-5 boolesch,
-   Cache `+reachbuf_v1`/`+reach_v1`), Warm Start, Offline-Ordnung, dann
-   Arena N / S / T+S — Arm-S-Nenner je Kriterium (k0 ~17, k1 ~1, k2 ~0,3 aus
-   `PREREG_ownership_coupling.md` par.6.4).
+2. **Vollendbarkeits-Zweig: ERLEDIGT am 2026-08-20, NICHT-ERFOLG mit
+   umgekehrtem Vorzeichen** — siehe STAND 2026-08-20 oben und par.14 der
+   Prereg. (Der Plan stand hier mit Umsetzungsdetails; sie sind in der
+   Prereg-Konkretisierung dokumentiert.)
 
 ---
 
