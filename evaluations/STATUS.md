@@ -219,6 +219,16 @@ Dateizahl + Prozessliste, keine PID):
    automatischem Fruehwarn-Gate nach S1
    (`tools/probes/asym_early_rate_check.py`, Abbruch < 10 pp).
 
+**FORTSCHRITT (Stand 2026-08-21 frueh):** Schritt 1 und 2 sind ERLEDIGT.
+Die Ketten starteten erst ~22:53 (ein argumentloser Fehlstart, neu
+abgesetzt 22:56, keine Partie doppelt); alle 5 Leiter-Kanten liegen vor
+und sind an den JSONs verifiziert. **Elo-Fit eingetragen und in
+`PREREG_round5_minfix_elo_reset.md` par.5 registriert: v21 1215 [1170,
+1259], v20 1186 [1144, 1227], v19 1136 [1097, 1178], Anker 1000 — die
+Reihung v19 < v20 < v21 haelt** (Nebenbefund dort: auf den Anker-Kanten
+allein laege v19 numerisch ueber v20; die n=400-Direktkanten wiegen das).
+Der Asym-Korpus laeuft seit 00:30 (Block S1). Schritt 3/4 offen.
+
 **AUFTRAG, in dieser Reihenfolge (nichts davon wurde in der alten Sitzung
 begonnen):**
 
@@ -359,6 +369,7 @@ identisch).
 | --- | --- |
 | **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: braucht >=6 arena-entschiedene Paare (Stand ~3); Kandidaten-Metriken werden je Gating mitgefuehrt. `PREREG_post34_package.md` |
 | #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter", Details unten) |
+| `stack_top_feature` | geparkt, Arbeitskreis "Spaeter", gleiche Stufe wie #38 (Nutzer-Entscheid 2026-08-20). Ziel ist SICHTGLEICHHEIT Netz/Spieler, kein Staerke-A/B. `PREREG_stack_top_feature.md`, Details unten |
 
 ### v22-FENSTER -- DESIGN AUF HALDE, NICHT EINGEPLANT
 
@@ -828,3 +839,55 @@ angegangen, wenn ein Champion existiert, der auch gute menschliche
 Spieler wirklich fordert. Bis dahin bleibt die Prioritaet auf
 Staerke-Arbeit (v20-Zyklus, Value-Head-Front #29/#30, lambda=0.7-
 Kandidat), nicht auf Schwierigkeits-UX.
+
+---
+
+## `stack_top_feature` (geparkt, Arbeitskreis "Spaeter" -- gleiche Stufe wie #38): Sichtgleichheit Netz/Spieler am Kuppelstapel (2026-08-20)
+
+Aus einer Nutzer-Frage im Anschluss an eine GUI-Aenderung ("hat diese
+Information das Netz auch?"), Code am selben Tag geprueft. Vollstaendiger
+Zuschnitt in `PREREG_stack_top_feature.md`, hier nur der Kern.
+
+**Das Kriterium ist Sichtgleichheit, nicht Staerke (Nutzer-Vorgabe
+2026-08-20).** Das Netz soll denselben Informationsstand haben wie ein
+Spieler am Tisch -- nicht mehr und nicht weniger. Ein flaches
+Arena-Ergebnis waere kein Grund, das wieder herzunehmen ("Korrektheit vor
+gemessenem Nutzen"); die Arena laeuft als Waechter gegen Regression, nicht
+als Richter ueber das Merkmal. Entsprechend gibt es KEINE
+Haeufigkeitsschwelle als Baubedingung.
+
+**Das Prinzip ist schon gebaut, nur in der anderen Richtung:** die Farben
+eines Bonusplaettchens gehen nur bei aufgedecktem Chip ins Merkmal,
+begruendet mit "sonst versteckte Information, die kein Spieler kennt"
+(`engine/src/features.rs:154`). Diese Prereg zieht die zweite Haelfte nach.
+
+**Befund.** Die Rueckseite der obersten Kuppelstapel-Platte liegt am Tisch
+offen und steht seit Commit 94b9090 auch im Ziehen-Knopf des
+Stapel-Dialogs. Das Netz bekommt sie nicht: `dome_stack_top_type` existiert
+nur in der Frontend-Serialisierung (`engine/src/serialize.rs:269`) und wird
+weder in `features.rs` noch in `neural_net.py` gelesen (Grep, null Treffer).
+Zum Stapel sieht das Netz nur die Menge der Rest-Designs
+(`dome_pool_mask`), den Wild-Anteil und die Stapelgroesse -- alles
+reihenfolgeblind. Zweite Luecke derselben Art: `pending_stack_draw` ist gar
+kein Zustandsmerkmal, waehrend einer Ziehserie kennt der Spieler die
+Rueckseiten aller bereits gezogenen Platten.
+
+**Keine Orakel-Frage.** Die 18 Designs sind ein offener Satz mit je einem
+Exemplar (`engine/src/dome.rs:198-226`); wer Auslage und Bretter sieht,
+kennt den Rest durch Subtraktion. `dome_pool_mask` ist damit abgeleitetes
+oeffentliches Wissen. (Eine gegenteilige Koordinator-Aussage vom
+2026-08-20 ist durch den Nutzer richtiggestellt.)
+
+**Warum es additiv ginge.** Das Eingabe-Layout kommt schon heute aus der
+ONNX-Datei selbst (`detect_layout`, `engine/src/net.rs:104-118`). Zwei neue
+Werte ans Ende des Flat-Vektors (708 -> 710) plus eine Kuerzung auf die vom
+Modell deklarierte Laenge in `features_for_layout`
+(`engine/src/features.rs:952`, dem einzigen Engpass aller Inferenz) laesst
+Bestandsmodelle byte-identisch weiterlaufen. Bestehende Korpora tragen das
+Feld bereits, Neugenerierung waere nicht noetig.
+
+**Erste Stufe ist ein Inventar, kein Bau:** Abgleich Feld fuer Feld,
+was die GUI zeigt gegen das, was der Merkmalsvektor traegt, in BEIDE
+Richtungen ("Netz sieht mehr" / "Netz sieht weniger"). Offen und im
+Inventar zu klaeren sind u.a. Mondstapel-Reihenfolge und Beutel-/Turm-
+zaehler.
