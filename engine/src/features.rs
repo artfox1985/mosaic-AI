@@ -190,7 +190,7 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
         let order = [(&players[curr_pi], curr_pi), (&players[enemy_pi], enemy_pi)];
         let chippable = v.get("chippable_tiling_rows").and_then(|x| x.as_array()).unwrap_or(&empty);
 
-        // 5. Spielerblock (57 je Spieler)
+        // 5. Spielerblock (52 je Spieler)
         for (p, pi) in &order {
             f.push((num(p, "score") / 100.0) as f32);
             f.push((num(p, "estimated_score") / 100.0) as f32);
@@ -572,7 +572,7 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
         let order = [curr_pi, enemy_pi];
         let chippable = chippable_pairs_direct(state);
 
-        // 5. Spielerblock (57 je Spieler)
+        // 5. Spielerblock (52 je Spieler)
         for &pi in &order {
             let p = &state.players[pi];
             f.push(p.score as f32 / 100.0);
