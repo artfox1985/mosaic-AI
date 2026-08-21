@@ -176,7 +176,7 @@ the project's directory mantra: root executes, `tools/` measures, `evaluations/`
 ├── 📂 models/       # Checkpoints (.pth/.onnx), loss plots, training manifests
 ├── 📂 static/       # Web UI (index.html, debug.html, css/js, log/ = game logs)
 ├── 📂 tools/        # Diagnosis/arena/gating/analysis scripts, see table below
-├── 📂 docs/         # engine_manual.md, reference CSVs, process diagrams (diagrams.txt + SVGs)
+├── 📂 docs/         # engine_manual.md, project_overview.md (plain-language summary, German), reference CSVs, process diagrams
 ├── 📂 archive/      # Legacy: old Python engine/agents, superseded analyses
 ├── 📜 config.py     # INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, LR, ...
 ├── 📜 self_play.py  # ▶️ Self-play driver
