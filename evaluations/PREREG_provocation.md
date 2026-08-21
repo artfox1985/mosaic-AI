@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | Beleg: **OFFEN, vorregistriert 2026-08-12** (Nutzer-Korrektur: *"das ist kein plan. das ist hoffen. als erstes brauchen wir eine methode gezielt spiele zu provozieren"*). Stufe 1 VOR der Streuung ins Self-Play; ich hatte die beiden Stufen verwechselt. Nutzer-kalibrierte Abnahmezahl: **>= 7,00 vertikale Plattenpunkte = eine Spalte je Partie** (heute 1,05 = 0,15). Eine Spalte sind 21 Platzierungs- PLUS 7 Plattenpunkte = 28, also rund ein Fuenftel eines guten Endstands. Der Eingriff ist eine Beschneidung der Aktionsmenge, kein neuer Bewerter -- fuenf Anlaeufe ueber die Bewertung sind gescheitert, weil eine Stellungsbewertung keine mehrrundige Farbzusage darstellen kann (`dome.rs:61-70`: jede Zelle verlangt genau eine Farbe). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Laesst sich eine geschlossene Spalte durch BESCHNEIDUNG der Aktionsmenge gezielt provozieren -- eine Spalte je Partie? | Beleg: ENTSCHIEDEN, nachgetragen 2026-08-21: die urspruengliche Abnahme (>= 7,00 vertikale Plattenpunkte) wurde NIE erreicht -- Maximum 5,95 (§12; Entkonfundierung §15: kein Arm darueber). Nach der Nutzer-Neueinordnung §8 (Provokation = DIAGNOSEINSTRUMENT; Kernbefund: der Engpass ist die PLATZIERBARKEIT, nicht die Plattenbewertung) wurde daraus das Plattenbauer-Sortiment: k1-Spaltenbauer (Runde-3-Stand, §15), k2 Diagonalen +2,61 UEBERNOMMEN (§18), k5 Spaltenpaar +4,86 UEBERNOMMEN (§20, staerkste Uebernahme), k6 Kuppeldraft NICHT uebernommen (§19). Die Bauer sind heute der Generator des Lehr-Korpus (`PREREG_ownership_corpus.md`, k1-Greifrate 42 %) und des laufenden Asym-Curriculums (`PREREG_asymmetric_curriculum.md`, `MOSAIC_PLATTENBAU=1`) -- der Strang lebt dort weiter, diese Datei ist Protokoll. Abschluss: §21. -->
 
 # Vorregistrierung: Spalten gezielt PROVOZIEREN (Stufe 1 vor dem Self-Play)
 
@@ -1786,3 +1786,32 @@ Sitzung bereits wirksam.
 - **`zellen_ecke` (alte Geometrie-Funktion) nicht geloescht**, nur
   `#[allow(dead_code)]` markiert -- sie traegt weiterhin ihren eigenen
   Geometrietest, Loeschung war nicht beauftragt (LOESCHVERBOT).
+
+---
+
+## 21. ABSCHLUSS (nachgetragen 2026-08-21): Frage beantwortet, Werkzeug in Produktion, Datei geschlossen
+
+Die im Kopf gestellte Frage ist doppelt beantwortet:
+
+1. **Als Provokations-Abnahme: NEIN.** >= 7,00 vertikale Plattenpunkte
+   wurden ueber vier Mess-Runden nie erreicht (Maximum 5,95, §12; das
+   2x2 in §15 bestaetigte: kein Arm darueber). Der Grund war frueh
+   sichtbar (§7/§8): erzwungene Farbbindung bricht nicht den Spaltenbau,
+   sondern die Platzierbarkeit.
+2. **Als Diagnose- und Generator-Instrument: JA, und in Produktion.**
+   Aus den Runden entstand der parametrisierte Plattenbauer (§13,
+   `plate_builder.rs`, `MOSAIC_PLATTENBAU`), Sortiment-Stand: k1
+   Runde-3-Konfiguration (§15), k2 uebernommen (§18), k5 Spaltenpaar
+   uebernommen (§20), k6 verworfen (§19). Verbraucher heute: der
+   Ownership-Lehr-Korpus (`PREREG_ownership_corpus.md`, k1-Greifrate
+   42 % = 419/1000) und das laufende asymmetrische Curriculum
+   (`PREREG_asymmetric_curriculum.md` par.11, Arm S mit
+   `MOSAIC_PLATTENBAU=1`; Fruehwarn-Gate S1 2026-08-21: k1-Rate
+   Zwangsseite 34,6 % gegen freie Seite 3,2 %).
+
+Ueberholte Einordnungen in dieser Datei, damit sie niemand mehr als
+geltend liest: die Zwei-Pole-Architektur (§10) gehoert zur inzwischen
+ENDGUELTIG durchgemessenen Ownership-Verbraucher-Kampagne (STATUS.md
+2026-08-20, alle Formen negativ) -- der verbliebene Weg zum Ziel laeuft
+ueber das Value-Ziel (Asym-Curriculum) und die Policy-Seite, nicht ueber
+einen Laufzeit-Regler.

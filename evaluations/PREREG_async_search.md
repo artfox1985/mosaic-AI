@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: **OFFEN, vorregistriert 2026-08-13** (Nutzer-Auftrag). Stufe 1 (Drafting-Suche als Zustandsautomat, `async`/`await`, additiv in `net_mcts.rs`/`net_batcher.rs`, `MOSAIC_ASYNC_SUCHE`) GEBAUT und Gate A BESTANDEN: 0/1148 Abweichungen sowohl ohne Sammel-Faden (bit-identisch) als auch MIT Sammel-Faden + 16-facher Nebenlaeufigkeit (finale Zugwahl). `cargo test --lib` im isolierten Worktree 387/0/20 (keine Regression). Stufe 2 (Rundenuebergaenge) und Stufe 3 (Durchsatz, Gate C >= 2,0x) OFFEN. Nachtrag (Datei-VERDIKT, Gate-B-Abschnitt): Spielgeschehen sync/async bit-identisch (0/16 ueber zwei Laeufe), Trainingsziel-Felder NICHT bit-identisch (verbleibende Wall-Clock-Quellen in round_transition_deep.rs, Task #71) -- Gate B im urspruenglichen Wortlaut blockiert, als offener Befund festgehalten. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: ENTSCHIEDEN, nachgetragen 2026-08-21 (das Verdikt selbst fiel 2026-08-14): JA fuer den Batch (99,7 % Fuellung bei N=128), NEIN fuer den Zweck -- Stufe 3 wurde mit DIESEM Async-Pfad als Vehikel in `PREREG_gpu_inference_path.md` §20-§23 vermessen; nach Condvar-Fix (0,053x -> 0,98x) bleibt das Maximum 1,255x (Doppel-Prozess-Aggregat) gegen den ehrlichen Sync-Nenner 528,5 Partien/h @ 11 Faeden -- Gate C (>= 2,0x) VERFEHLT, Weg geschlossen bis zum groesseren Netz. Korrektheit war durchweg gruen: Gate A 0/1148; Gate B Spielgeschehen 0/16 bit-identisch; die Trainingsziel-Divergenz ist Task-#71-Wall-Clock (eigene Prereg `PREREG_deterministic_labels.md`, ENTSCHIEDEN). Code NICHT in main -- Archiv-Branches `async_search_stage{1,3}_archive`; Worktrees wt_async/wt_async2 entfernt. Abschluss: Abschnitt 13. -->
 
 # Vorregistrierung: Async-Suche (Drafting-Suche als Zustandsautomat)
 
@@ -927,3 +927,34 @@ dokumentierten Toleranzquelle, keine neue.
 - Gate B (b)s 0,22-%-Bezugsrate ist aus §14-§17 übernommen (dieselbe
   Toleranzquelle), NICHT für DIESES Modell/diese Partien neu gemessen --
   die 30-%-Rechnung ist eine Plausibilitätsschätzung, kein Beweis.
+
+---
+
+## 13. ABSCHLUSS (nachgetragen 2026-08-21): Stufe 3 lief in der GPU-Prereg -- Gate C verfehlt, Strang geschlossen
+
+Diese Datei endete bei Gate B, obwohl Stufe 3 laengst gefahren war -- der
+Durchsatzteil wurde (sachlich richtig, dokumentarisch verwirrend) in
+`PREREG_gpu_inference_path.md` §20-§23 protokolliert, weil Async-Suche +
+Sammel-Faden dort das Vehikel fuer die ORT-CUDA-Zellen waren. Der Nachtrag
+schliesst die Luecke:
+
+- **Gate C (>= 2,0x Ende-zu-Ende) VERFEHLT.** Beste Zelle nach Condvar-Fix
+  (§21 dort: Busy-Poll/recv_timeout-Taeter behoben, 0,053x -> 0,98x) und
+  Nenner-Korrektur (§23: Sync@11 Faeden = 528,5 Partien/h auf freier
+  Maschine): Doppel-Prozess-Aggregat 663,0/h = **1,255x**. Verdikt dort:
+  geschlossen bis zum groesseren Netz. Nebenbefund: GPU-Auslastung ~10 %,
+  der Deckel ist die CPU-seitige Blatt-Erzeugung.
+- **Die Architektur-Behauptung selbst hat gehalten**: der Batch, an dem
+  Weg V scheiterte (~14,6), wurde erreicht und uebertroffen (mittl. Batch
+  87-128, Fuellung 99,7 %) -- es hat nur nicht gereicht, weil der ehrliche
+  Sync-Nenner hoeher lag als der alte Bezug.
+- **Verbleib des Codes**: nie in main gemerged; gesichert in den Branches
+  `async_search_stage1_archive` / `async_search_stage3_archive`. Die
+  Worktrees `scratchpad/wt_async{,2}` sind entfernt. Der Gate-B-Retest aus
+  `PREREG_deterministic_labels.md` Punkt 4 ("bis wt_async2 frei ist") ist
+  damit gegenstandslos -- der Strang, den er absichern sollte, ist zu.
+- **Nicht mehr gueltige Einordnung in §6**: die dortige Prioritaets-
+  Begruendung ("Self-Plays starten erst, wenn der Ownership-Kopf die
+  Wertungsplatten traegt", Zwei-Pole-Architektur) gehoert zur inzwischen
+  ENDGUELTIG durchgemessenen Ownership-Verbraucher-Kampagne (STATUS.md
+  2026-08-20).
