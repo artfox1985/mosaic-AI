@@ -357,6 +357,29 @@ des in par.11 genannten Namens). Alle Zahlen an den Artefakten geprueft:
   die Richtung: bei aktiver k1-Platte kostet der Zwang weniger (47,5
   gegen 45,7 %).
 
+**Warum der Bauer AUCH OHNE aktive k1-Platte greift (Nutzer-Frage
+2026-08-21, nachgetragen; die Immer-an-Wahl war in par.3/par.11 nur
+implizit):** k1 lag in 2.942 von 8.000 Zwangspartien aus (~37 %,
+Ziehchance 3/8), der Bauer lief in ALLEN. Drei Gruende:
+
+1. **Der Kontrast ist das Interaktions-Signal.** Das Netz soll nicht
+   "Spalten sind gut" lernen, sondern "Spalten sind MEHR wert, wenn k1
+   ausliegt" -- das verlangt Bauen mit UND ohne Platte im selben Regime.
+   Gemessen traegt der Kontrast: Siegquote Zwangsseite 47,5 % mit
+   aktiver k1-Platte gegen 44,7 % ohne (2260/5058, Arithmetik aus den
+   Abnahme-Zaehlern). Ein Platten-Gate am Bauer haette "Zwangsseite"
+   perfekt mit "k1 liegt aus" konfundiert.
+2. **Selektives Bauen braucht Negativ-Beispiele.** Partien ohne Platte
+   zeigen, wann Bauen NICHT lohnt; eine volle Spalte bringt auch ohne
+   Platte die 21 Platzierungspunkte (PREREG_provocation.md par.2), ist
+   also der Basiswert-Fall, nicht sinnloses Spiel.
+3. **Die Auswertung bedingt auf die Platte, der Korpus nicht:** par.7
+   misst die Nullarm-Baurate auf Partien MIT ausliegender k1-Platte,
+   und die Bezugswerte 42 %/13 % stammen ebenfalls aus dem
+   Immer-an-Regime. Ein Platten-Gate waere zudem neuer Mechanismus
+   (die .or_else-Kette kennt keine Plattenbedingung) und haette die
+   Zwangsstichprobe je Klasse verkleinert.
+
 **par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
 Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
 `--epochs 20` (echtes Annealing, T_max-Fussnote beachtet), 2d/wdl/
