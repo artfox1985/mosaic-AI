@@ -43,6 +43,12 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - Bestand wird bei Gelegenheit mit-migriert (README ist am 2026-08-21
   bereinigt), keine Grossaktion ueber alle Altdateien.
 
+## Diagramm-Format: SVG (Nutzer-Anweisung 2026-08-21)
+
+- Diagramme werden als **SVG** erstellt, nicht als PNG.
+- PNG-Exporte stoesst der Nutzer bei Bedarf selbst an; nicht ungefragt
+  mitgenerieren.
+
 ## Dateinamen-Konvention (Nutzer-Anweisung 2026-08-13)
 
 - **Neue Dateien und Verzeichnisse werden IMMER englisch benannt** (Code,

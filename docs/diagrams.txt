@@ -2,7 +2,8 @@
 # NEU VERANKERTEN Leiter -- round5-Fix c83fb35, Alt-Register mit Elo 1358
 # in archive/elo_history_pre_r5fix.csv, ueber die Fix-Grenze nicht
 # vergleichbar; PREREG_round5_minfix_elo_reset.md par.5).
-# Rendern: python evaluations/render_diagrams.py [name] [--format png]
+# Rendern: python docs/render_diagrams.py [name]  (SVG; PNG nur auf
+# Nutzer-Anstoss via --format png, siehe CLAUDE.md Diagramm-Format-Regel)
 # Farbcode: blau = Netz/Modell, gruen = exakt/verifiziert, orange = Suche/
 # Daten-Pipeline, violett = Ergebnis/Artefakt, grau = Regelwerk.
 
