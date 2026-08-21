@@ -348,6 +348,14 @@ des in par.11 genannten Namens). Alle Zahlen an den Artefakten geprueft:
   Erzwungener Spaltenbau kostet im Selbstspiel also ~4 pp Siegquote.
   Fuer den Lernmechanismus (Korrelation Brettmerkmal/Ausgang) ist das
   unschaedlich; ein Nachziehen der Bauer-Staerke findet NICHT statt.
+  **Lesart (Nutzer, 2026-08-21):** die ~4 pp sind der Preis des BLINDEN
+  Zwangs, kein Deckel fuer gelernten Bau -- der trainierte Arm muss aus
+  den Daten SELEKTIVES Bauen lernen (wann die Platte es bezahlt, wann
+  die Farben platzierbar bleiben), nicht den Zwang imitieren. Genau das
+  prueft par.7: Nullarm-Baurate UND kein Siegverlust; ein Netz, das nur
+  den Zwang nachahmt, faellt an der zweiten Bedingung. Der Split stuetzt
+  die Richtung: bei aktiver k1-Platte kostet der Zwang weniger (47,5
+  gegen 45,7 %).
 
 **par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
 Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
