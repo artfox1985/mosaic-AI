@@ -31,7 +31,7 @@ Pipeline (Auftrag "Spiel-Analyse-Werkzeug", 2026-07-25):
       ein `mosaic_rust.net_search_state_json`-Aufruf (v16_best, 5000 Sims,
       deterministischer Seed je Zugindex) -- Rang/Δwin% der gespielten Aktion
       im Vergleich zum Oracle-Top-Zug.
-  4. Report:  Markdown nach evaluations/game_analysis_<...>.md.
+  4. Report:  Markdown nach evaluations/game_analysis/game_analysis_<...>.md.
 
 Bekannte, bewusste Einschränkung (Task #89): PendingDomeChoice-Zwischen-
 zustände (Kuppel-Rotation NACH Kachel+Slot-Wahl) haben Serialisierungs-
@@ -978,11 +978,11 @@ def main() -> None:
     ap.add_argument("--oracle-json", default=None,
                     help="JSONL-Datei mit den Oracle-Records (maschinenlesbar; "
                          "Verbraucher: PREREG_human_game_oracle_gap.md par.4)")
-    ap.add_argument("--out", default=None, help="Ziel-Markdown-Datei (Default: evaluations/game_analysis_<logname>.md)")
+    ap.add_argument("--out", default=None, help="Ziel-Markdown-Datei (Default: evaluations/game_analysis/game_analysis_<logname>.md)")
     args = ap.parse_args()
 
     log_path = Path(args.log)
-    out_path = Path(args.out) if args.out else ROOT / "evaluations" / f"game_analysis_{log_path.stem.replace('game_', '')}.md"
+    out_path = Path(args.out) if args.out else ROOT / "evaluations" / "game_analysis" / f"game_analysis_{log_path.stem.replace('game_', '')}.md"
 
     print(f"Lade {log_path} ...")
     t0 = time.time()

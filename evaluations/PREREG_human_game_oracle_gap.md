@@ -141,7 +141,7 @@ wie der Gegner), Klassifikation par.4 ueber den erweiterten Export
 Farbbedarf, Spalte vollendbar und unvollstaendig). Werkzeug:
 `tools/probes/human_oracle_gap_k1.py`; Rohzahlen:
 `evaluations/probe_human_oracle_gap_k1.json`; Berichte je Partie:
-`evaluations/game_analysis_<seed>_champion.md`.
+`evaluations/game_analysis/game_analysis_<seed>_champion.md`.
 
 | Partie | Platten | Endstand | n k1 / neutral | Mittel k1 | Mittel neutral | Differenz |
 |---|---|---|---|---:|---:|---:|
@@ -191,7 +191,7 @@ Umdeutung dieser Messung.
 
     python -X utf8 tools/analyze_game_log.py --log static/log/<datei>.log         --no-oracle --dump-states <ziel>.jsonl
 
-    python -X utf8 tools/analyze_game_log.py --log static/log/<datei>.log         --model models/alphazero_v21_2d_brierbest.onnx --sims 400         --out evaluations/game_analysis_<seed>_champion.md
+    python -X utf8 tools/analyze_game_log.py --log static/log/<datei>.log         --model models/alphazero_v21_2d_brierbest.onnx --sims 400         --out evaluations/game_analysis/game_analysis_<seed>_champion.md
 
 Der erste liefert die Zustaende je Entscheidungspunkt (JSONL mit `turn`, `round`,
 `kind`, `state`), der zweite den Orakel-Bericht mit Ø Δwin%, Top-1/Top-3 und den
