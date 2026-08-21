@@ -389,9 +389,15 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
 - **NEUER PUSH-BLOCKER seit 2026-08-21 (79de9fa): Rechnerstruktur im
   `pre-push`-Haken.** Wenn ein Push abbricht mit „RECHNERSTRUKTUR in
   gepushten Dateien", ist das kein Defekt, sondern der Waechter: eine
-  hinzugefuegte/geaenderte Datei im Push-Bereich enthaelt `X:\Users\`,
-  `/c/Users/`, `OneDrive\Documents|Backups` oder den Nutzernamen aus der
-  Umgebung. Das setzt CLAUDE.md („Oeffentliches Repo: keine
+  hinzugefuegte/geaenderte Datei im Push-Bereich enthaelt einen absoluten
+  Pfad in ein Nutzerverzeichnis (Windows- wie Git-Bash-Schreibweise), einen
+  OneDrive-Pfad in den Dokumente- oder Backups-Ordner, oder den Nutzernamen
+  aus der Umgebung. **Das genaue Muster steht ausschliesslich in
+  `PRIVACY_PAT` (`tools/hooks/pre-push`)** -- dort als Regex mit
+  Zeichenklassen notiert, was es davor bewahrt, sich selbst zu treffen. Wer
+  es woanders WOERTLICH hinschreibt, macht diese Datei zum Dauerblocker;
+  genau das ist beim ersten Eintragen hier passiert. Das setzt CLAUDE.md
+  („Oeffentliches Repo: keine
   Rechnerstruktur", 2026-08-17) durch, das bisher nur ein Pruefbefehl zum
   Selbstausfuehren war. Geprueft wird der GEPUSHTE Stand (nicht der Working
   Tree) und nur A/C/M/R -- die Historie wird nicht umgeschrieben, Alt-Treffer
