@@ -33,13 +33,16 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - **Direktes Schreiben** Wenn du eine Datei bearbeitest, schreibe die Änderung direkt in die Datei. Verzichte auf die Anzeige des vollständigen Codes im Chat.
 - **Kontext-Fokus** Antworte direkt auf die Aufgabe. Erkläre nur kurz die Logik, wenn es für das Verständnis der Änderung notwendig ist.
 
-## Gedankenstrich-Regel (Nutzer-Anweisung 2026-08-21)
+## Gedankenstrich-Regel (Nutzer-Anweisung 2026-08-21, gelockert am selben Tag)
 
-- Lange Striche (Gedankenstriche, d.h. die Zeichen U+2014 und U+2013)
-  sind im CHAT weiterhin erlaubt, in DOKUMENTEN und Repo-Dateien
-  (README, STATUS, Preregs, docs/, Kommentare) nicht mehr.
-- Ersatz je nach Kontext: Komma, Doppelpunkt, Semikolon oder Klammern.
-  Zahlenbereiche bekommen den einfachen Bindestrich (z.B. 10-273).
+- Der Geviertstrich (U+2014, "langer" Gedankenstrich) ist im CHAT
+  weiterhin erlaubt, in DOKUMENTEN und Repo-Dateien (README, STATUS,
+  Preregs, docs/, Kommentare) nicht mehr.
+- Der Halbgeviertstrich (U+2013, "–") ist ueberall OK (Nutzer-Lockerung
+  2026-08-21; so umgesetzt in docs/engine_manual.md).
+- Ersatz fuer U+2014 je nach Kontext: Halbgeviertstrich, Komma,
+  Doppelpunkt, Semikolon oder Klammern. Zahlenbereiche bekommen den
+  einfachen Bindestrich (z.B. 10-273).
 - Bestand wird bei Gelegenheit mit-migriert (README ist am 2026-08-21
   bereinigt), keine Grossaktion ueber alle Altdateien.
 
