@@ -1,4 +1,4 @@
-# Feature-Golden-Hash-Fixture v1 (A3, evaluations/DESIGN_conventions_as_checks.md)
+# Feature-Golden-Hash-Fixture v1 (A3, docs/DESIGN_conventions_as_checks.md)
 # INPUT_SIZE=708
 # NUM_PLANES_CHANNELS=76
 # rustc: rustc 1.96.0 (ac68faa20 2026-05-25)

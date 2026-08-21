@@ -4,7 +4,7 @@
 versioniert. Diese Skripte liegen deshalb in `tools/hooks/` (reviewbar wie
 normaler Code) und werden per `core.hooksPath` aktiviert.
 
-Herleitung und Zeitbudgets: `evaluations/DESIGN_conventions_as_checks.md`,
+Herleitung und Zeitbudgets: `docs/DESIGN_conventions_as_checks.md`,
 Abschnitt "Entscheid: LOKALER GIT-HOOK".
 
 Die Golden-Waechter A1-A4 aus dem Design-Dokument sind **gebaut** (Stand
